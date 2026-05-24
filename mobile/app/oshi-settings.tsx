@@ -522,7 +522,13 @@ function MasterSelectModal({
               />
             ))}
           </ScrollView>
-          <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.masterList}>
+          <ScrollView
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={[
+              styles.masterList,
+              draftSelectedOptions.length > 0 ? styles.masterListWithFloatingRegister : null,
+            ]}
+          >
             {filtered.length === 0 ? (
               <View style={styles.modalEmpty}>
                 <Text style={styles.emptyTitle}>見つかりませんでした</Text>
@@ -559,9 +565,13 @@ function MasterSelectModal({
             )}
           </ScrollView>
           {draftSelectedOptions.length > 0 ? (
-            <View style={styles.masterSelectButtonWrap}>
-              <PrimaryButton onPress={submitDraftSelection}>推しを設定する</PrimaryButton>
-            </View>
+            <PrimaryButton
+              accessibilityLabel={`${draftSelectedOptions.length}件の推しを登録`}
+              onPress={submitDraftSelection}
+              style={styles.masterFloatingRegisterButton}
+            >
+              登録
+            </PrimaryButton>
           ) : null}
         </View>
       </View>
@@ -1375,6 +1385,9 @@ const styles = StyleSheet.create({
     gap: 9,
     paddingBottom: 4,
   },
+  masterListWithFloatingRegister: {
+    paddingBottom: 78,
+  },
   masterRow: {
     alignItems: "center",
     backgroundColor: ihubColors.surface,
@@ -1415,10 +1428,14 @@ const styles = StyleSheet.create({
   masterAdded: {
     color: ihubColors.mutedInk,
   },
-  masterSelectButtonWrap: {
-    borderTopColor: "rgba(58,50,74,0.08)",
-    borderTopWidth: 1,
-    paddingTop: 10,
+  masterFloatingRegisterButton: {
+    borderRadius: ihubRadii.pill,
+    bottom: 16,
+    minHeight: 42,
+    paddingHorizontal: 18,
+    position: "absolute",
+    right: 16,
+    zIndex: 4,
   },
   modalEmpty: {
     gap: 10,

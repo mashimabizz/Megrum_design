@@ -710,7 +710,7 @@ function MasterSelectModal({
       onClick={onClose}
     >
       <div
-        className="flex h-[min(78dvh,640px)] max-h-[calc(100dvh-48px)] w-full max-w-[380px] flex-col overflow-hidden rounded-[28px] border border-white/80 bg-[#fbf9fc] shadow-[0_22px_58px_rgba(58,50,74,0.24)]"
+        className="relative flex h-[min(78dvh,640px)] max-h-[calc(100dvh-48px)] w-full max-w-[380px] flex-col overflow-hidden rounded-[28px] border border-white/80 bg-[#fbf9fc] shadow-[0_22px_58px_rgba(58,50,74,0.24)]"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex-shrink-0 bg-white px-5 pb-3 pt-4">
@@ -789,7 +789,11 @@ function MasterSelectModal({
           </div>
         </div>
 
-        <div className="min-h-0 flex-1 space-y-2 overflow-y-auto px-5 py-3 pb-4">
+        <div
+          className={`min-h-0 flex-1 space-y-2 overflow-y-auto px-5 py-3 ${
+            draftSelectedOptions.length > 0 ? "pb-24" : "pb-4"
+          }`}
+        >
           {filteredOptions.length > 0 ? (
             filteredOptions.map((option) => {
               const selected = selectedGroupIds.has(option.id);
@@ -856,11 +860,14 @@ function MasterSelectModal({
           )}
         </div>
         {draftSelectedOptions.length > 0 && (
-          <div className="flex-shrink-0 border-t border-[#3a324a0f] bg-white px-5 py-3 pb-[calc(env(safe-area-inset-bottom)+14px)]">
-            <PrimaryButton type="button" onClick={submitDraftSelection}>
-              推しを設定する
-            </PrimaryButton>
-          </div>
+          <PrimaryButton
+            type="button"
+            onClick={submitDraftSelection}
+            className="absolute bottom-[calc(env(safe-area-inset-bottom)+16px)] right-5 z-20 w-auto rounded-full px-5 py-3 text-[13px] shadow-lg"
+            aria-label={`${draftSelectedOptions.length}件の推しを登録`}
+          >
+            登録
+          </PrimaryButton>
         )}
       </div>
     </div>
