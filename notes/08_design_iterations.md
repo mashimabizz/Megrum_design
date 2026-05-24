@@ -4,6 +4,73 @@
 
 ---
 
+## イテレーション168.20：再整理後分類の推しマスタ拡充
+
+### 背景・問題意識
+
+オーナーから「その分類に従って、マスタを充実させていってください。かならず現実にあるグループや作品、キャラや人名を登録するようにしてください」と指示があった。iter168.19で確定した分類を前提に、アイドル・音楽だけでなく、キャラクターIP、VTuber・配信者、お笑い、スポーツ、俳優・タレント、海外エンタメまで、実在するL1/L2候補を増やした。
+
+### 変更内容
+
+#### `supabase/migrations/20260524234000_expand_oshi_master_by_refined_taxonomy.sql`
+- K-POP男性/女性、国内男性/女性、歌い手、声優、2.5次元・舞台、アニメ・マンガ、ゲームを追加拡充した。
+- キャラクターIPに サンリオキャラクターズ / ちいかわ / すみっコぐらし / リラックマ / ポケットモンスター / 星のカービィ / ディズニー ミッキー&フレンズ / ミッフィー / PEANUTS / おぱんちゅうさぎ / mofusand / パペットスンスン を追加した。
+- VTuber・配信者に にじさんじ / hololive / ぶいすぽっ！ / Neo-Porte / TOP4 / 東海オンエア / Fischer's / HIKAKIN / はじめしゃちょー を追加した。
+- お笑いに 令和ロマン / 真空ジェシカ / マユリカ / ぱーてぃーちゃん / バッテリィズ / ヤーレンズ / エバース / ジョックロック / ママタルト / トム・ブラウン / ダイタク / ハナコ / かまいたち / 霜降り明星 / ニューヨーク / 男性ブランコ を追加した。
+- スポーツに日本代表、NPB/Jリーグ/B.LEAGUEチームを追加し、代表グループには主要選手をL2登録した。
+- 俳優・タレント、海外エンタメは人物を `kind='solo'` として追加した。
+
+#### `supabase/migrations/20260524234500_fill_oshi_master_l2_gaps.sql`
+- L2が明確な ミッフィー / おぱんちゅうさぎ / パペットスンスン / Fischer's / お笑いコンビ・トリオ を補完した。
+
+### 影響範囲
+
+- オンボーディングの推し選択
+- プロフィールの推し編集
+- グッズ登録 / Wish登録 / 個別募集のグループ・作品・人物選択
+- `groups_master` / `characters_master` のseedデータ
+
+### 確認方法
+
+- `supabase db push --dry-run`
+- `supabase db push --yes`
+- `supabase db query --linked -o table "select ge.display_order, ge.name as genre, count(distinct g.id) as groups, count(c.id) as characters from public.genres_master ge left join public.groups_master g on g.genre_id = ge.id left join public.characters_master c on c.group_id = g.id group by ge.id, ge.display_order, ge.name order by ge.display_order, ge.name;"`
+
+### 適用後件数
+
+- L1合計: 259
+- L2合計: 732
+- K-POP男性: 21グループ / 120メンバー
+- K-POP女性: 18グループ / 79メンバー
+- 国内男性: 18グループ / 76メンバー
+- 国内女性: 19グループ / 47メンバー
+- キャラクターIP: 12作品/IP / 51キャラ
+- VTuber・配信者: 9組・人物 / 38名
+- お笑い: 16組 / 34名
+- スポーツ: 19チーム・代表 / 15選手
+- 俳優・タレント: 16名
+- 海外エンタメ: 20名
+
+### 関連ファイル
+
+- `supabase/migrations/20260524234000_expand_oshi_master_by_refined_taxonomy.sql`
+- `supabase/migrations/20260524234500_fill_oshi_master_l2_gaps.sql`
+- `notes/08_design_iterations.md`
+
+### セルフレビュー結果
+
+- ✅ 実在するグループ・作品・IP・人物・キャラ・選手のみを登録
+- ✅ L1は `groups_master`、L2は `characters_master`、人物単体は `kind='solo'` で登録
+- ✅ `groups_master.kind = group / work / solo` とジャンル分類を混同しない構成を維持
+- ✅ `supabase db push --dry-run` 成功
+- ✅ `supabase db push --yes` でリモートDBへ適用済み
+- ✅ リモートDBでジャンル別件数を確認済み
+- ✅ 状態IDの追加・変更なし（`notes/09_state_machines.md` 更新不要）
+- ✅ 新しいアプリ用語・廃止用語なし（`notes/10_glossary.md` 更新不要）
+- ✅ DBスキーマ変更なし（`notes/05_data_model.md` 更新不要、seed追加のみ）
+
+---
+
 ## イテレーション168.19：推しジャンル分類を再整理
 
 ### 背景・問題意識
