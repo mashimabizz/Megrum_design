@@ -345,9 +345,6 @@ function GroupCard({
   return (
     <View style={styles.groupCard}>
       <View style={styles.groupHeader}>
-        <View style={styles.groupIcon}>
-          <Text style={styles.groupIconText}>{group.name.slice(0, 1)}</Text>
-        </View>
         <View style={styles.groupCopy}>
           <View style={styles.groupTitleRow}>
             <Text numberOfLines={1} style={styles.groupName}>{group.name}</Text>
@@ -515,9 +512,6 @@ function MasterSelectModal({
                     onPress={() => onSelect(option)}
                     style={[styles.masterRow, selected ? styles.masterRowSelected : null]}
                   >
-                    <View style={styles.masterIcon}>
-                      <Text style={styles.masterIconText}>{option.name.slice(0, 1)}</Text>
-                    </View>
                     <View style={styles.masterCopy}>
                       <Text numberOfLines={1} style={styles.masterName}>{option.name}</Text>
                       <Text numberOfLines={1} style={styles.masterMeta}>
@@ -1100,19 +1094,6 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     gap: 11,
   },
-  groupIcon: {
-    alignItems: "center",
-    backgroundColor: "rgba(166,149,216,0.16)",
-    borderRadius: 18,
-    height: 44,
-    justifyContent: "center",
-    width: 44,
-  },
-  groupIconText: {
-    color: ihubColors.lavender,
-    fontSize: 16,
-    fontWeight: "900",
-  },
   groupCopy: {
     flex: 1,
     minWidth: 0,
@@ -1369,19 +1350,6 @@ const styles = StyleSheet.create({
   },
   masterRowSelected: {
     opacity: 0.52,
-  },
-  masterIcon: {
-    alignItems: "center",
-    backgroundColor: "rgba(166,149,216,0.16)",
-    borderRadius: 16,
-    height: 40,
-    justifyContent: "center",
-    width: 40,
-  },
-  masterIconText: {
-    color: ihubColors.lavender,
-    fontSize: 15,
-    fontWeight: "900",
   },
   masterCopy: {
     flex: 1,

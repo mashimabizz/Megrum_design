@@ -4,6 +4,64 @@
 
 ---
 
+## イテレーション168.21：推し設定の頭文字アイコンを削除
+
+### 背景・問題意識
+
+オーナーから「推し設定関連の画面で、アイコンを推しの先頭一文字にしていますが、そのアイコンは不要です。何の情報もないので。表示させないでください」と指摘があった。推し名の先頭1文字を丸/角丸アイコンとして表示しても識別性が低く、一覧内の情報密度と視線移動だけを増やしていたため、推し設定関連画面から削除した。
+
+### 変更内容
+
+#### `mobile/app/onboarding/oshi.tsx`
+- 推し選択カード左側の先頭1文字アイコンを削除した。
+
+#### `mobile/app/onboarding/members.tsx`
+- 推しメン・推しキャラ選択セクションのグループ頭文字アイコンを削除した。
+
+#### `mobile/app/oshi-settings.tsx`
+- 推し設定一覧のグループ頭文字アイコンを削除した。
+- 登録済み推し追加モーダルの候補行から頭文字アイコンを削除した。
+
+#### `web/src/app/onboarding/oshi/OshiForm.tsx`
+- Web版オンボーディング推し選択の通常候補/審査中候補から頭文字アイコンを削除した。
+
+#### `web/src/app/profile/oshi/OshiEditView.tsx`
+- Web版プロフィール推し編集の推しカードヘッダーと追加候補行から頭文字アイコンを削除した。
+
+### 影響範囲
+
+- iOS版 オンボーディング推し選択
+- iOS版 オンボーディング推しメン・推しキャラ選択
+- iOS版 推し設定
+- Web版 オンボーディング推し選択
+- Web版 プロフィール推し編集
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix web run lint -- src/app/onboarding/oshi/OshiForm.tsx src/app/profile/oshi/OshiEditView.tsx`
+
+### 関連ファイル
+
+- `mobile/app/onboarding/oshi.tsx`
+- `mobile/app/onboarding/members.tsx`
+- `mobile/app/oshi-settings.tsx`
+- `web/src/app/onboarding/oshi/OshiForm.tsx`
+- `web/src/app/profile/oshi/OshiEditView.tsx`
+- `notes/08_design_iterations.md`
+
+### セルフレビュー結果
+
+- ✅ 推し名の先頭1文字を表示するアイコンを削除
+- ✅ 名前・ジャンル・選択状態など、意味のある情報は維持
+- ✅ iOS側 typecheck 成功
+- ✅ Web対象ファイルの eslint 成功
+- ✅ 状態IDの追加・変更なし（`notes/09_state_machines.md` 更新不要）
+- ✅ 新しいアプリ用語・廃止用語なし（`notes/10_glossary.md` 更新不要）
+- ✅ DBスキーマ変更なし（`notes/05_data_model.md` 更新不要）
+
+---
+
 ## イテレーション168.20：再整理後分類の推しマスタ拡充
 
 ### 背景・問題意識

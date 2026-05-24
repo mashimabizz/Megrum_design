@@ -531,12 +531,6 @@ function GroupCard({
     <div className="overflow-hidden rounded-[14px] border border-[#3a324a0f] bg-white">
       {/* ヘッダー */}
       <div className="flex items-center gap-3 border-b border-[#3a324a0f] px-4 py-3.5">
-        <div
-          className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-[linear-gradient(135deg,#a695d8,#a8d4e6)] text-[14px] font-extrabold text-white"
-          style={{ fontFamily: '"Inter Tight", system-ui' }}
-        >
-          {group.groupName[0]}
-        </div>
         <div className="flex-1 min-w-0">
           <div className="flex min-w-0 items-center gap-1.5">
             <div className="truncate text-[14px] font-bold text-gray-900">
@@ -781,23 +775,6 @@ function MasterSelectModal({
                       : "border-[#3a324a14] bg-white hover:border-[#a695d855]"
                   }`}
                 >
-                  <div
-                    className={`flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-[12px] text-[14px] font-extrabold ${
-                      selected
-                        ? "bg-[#a695d822] text-[#a695d8]"
-                        : "bg-[linear-gradient(135deg,#a695d8,#a8d4e6)] text-white"
-                    }`}
-                    style={
-                      latin
-                        ? {
-                            fontFamily:
-                              "var(--font-inter-tight), system-ui",
-                          }
-                        : undefined
-                    }
-                  >
-                    {option.name[0]}
-                  </div>
                   <div className="min-w-0 flex-1">
                     <div
                       className="truncate text-[14px] font-extrabold text-[#3a324a]"

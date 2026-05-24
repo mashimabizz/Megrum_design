@@ -235,24 +235,6 @@ export function OshiForm({
                     : "border-[#3a324a14] bg-white hover:border-[#3a324a26]"
                 }`}
               >
-                {/* アイコン円 */}
-                <div
-                  className={`flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-[10px] text-sm font-extrabold ${
-                    active
-                      ? "bg-[linear-gradient(135deg,#a695d8,#a8d4e6)] text-white"
-                      : "bg-[#a695d822] text-[#a695d8]"
-                  }`}
-                  style={
-                    latin
-                      ? {
-                          fontFamily: "var(--font-inter-tight), system-ui",
-                        }
-                      : undefined
-                  }
-                >
-                  {o.name[0]}
-                </div>
-
                 {/* 名前 + サブ */}
                 <div className="flex-1 min-w-0">
                   <div
@@ -329,24 +311,6 @@ export function OshiForm({
                       : "border-[#3a324a26] bg-white hover:border-[#3a324a40]"
                   }`}
                 >
-                  {/* アイコン円 */}
-                  <div
-                    className={`flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-[10px] text-sm font-extrabold ${
-                      active
-                        ? "bg-[linear-gradient(135deg,#a695d8,#a8d4e6)] text-white"
-                        : "bg-[#a695d822] text-[#a695d8]"
-                    }`}
-                    style={
-                      latin
-                        ? {
-                            fontFamily: "var(--font-inter-tight), system-ui",
-                          }
-                        : undefined
-                    }
-                  >
-                    {r.name[0]}
-                  </div>
-
                   {/* 名前 + サブ + バッジ */}
                   <div className="flex-1 min-w-0">
                     <div

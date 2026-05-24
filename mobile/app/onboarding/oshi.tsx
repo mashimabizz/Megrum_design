@@ -296,9 +296,6 @@ export default function OnboardingOshiScreen() {
               onPress={() => toggle(option)}
               style={[styles.card, active ? styles.cardActive : null]}
             >
-              <View style={styles.avatar}>
-                <Text style={styles.avatarText}>{option.name.slice(0, 1)}</Text>
-              </View>
               <View style={styles.cardCopy}>
                 <Text numberOfLines={1} style={styles.cardTitle}>{option.name}</Text>
                 <Text numberOfLines={1} style={styles.cardMeta}>
@@ -576,19 +573,6 @@ const styles = StyleSheet.create({
   cardActive: {
     backgroundColor: "rgba(166,149,216,0.08)",
     borderColor: ihubColors.lavender,
-  },
-  avatar: {
-    alignItems: "center",
-    backgroundColor: "rgba(166,149,216,0.14)",
-    borderRadius: 16,
-    height: 42,
-    justifyContent: "center",
-    width: 42,
-  },
-  avatarText: {
-    color: ihubColors.lavender,
-    fontSize: 16,
-    fontWeight: "900",
   },
   cardCopy: {
     flex: 1,

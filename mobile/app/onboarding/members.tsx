@@ -379,9 +379,6 @@ export default function OnboardingMembersScreen() {
           return (
             <View key={section.key} style={styles.sectionCard}>
               <View style={styles.sectionHeader}>
-                <View style={styles.groupAvatar}>
-                  <Text style={styles.groupAvatarText}>{section.groupName.slice(0, 1)}</Text>
-                </View>
                 <View style={styles.sectionCopy}>
                   <Text style={styles.groupName}>{section.groupName}</Text>
                   <Text style={styles.groupMeta}>
@@ -631,19 +628,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     flexDirection: "row",
     gap: 11,
-  },
-  groupAvatar: {
-    alignItems: "center",
-    backgroundColor: "rgba(166,149,216,0.14)",
-    borderRadius: 17,
-    height: 44,
-    justifyContent: "center",
-    width: 44,
-  },
-  groupAvatarText: {
-    color: ihubColors.lavender,
-    fontSize: 16,
-    fontWeight: "900",
   },
   sectionCopy: {
     flex: 1,
