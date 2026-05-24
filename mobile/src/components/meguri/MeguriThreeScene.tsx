@@ -85,7 +85,7 @@ const avatarTextureSize: Record<MeguriAnimalType, { height: number; width: numbe
   fox: { height: 2048, width: 2048 },
   rabbit: { height: 2048, width: 2048 },
 };
-const AVATAR_MODEL_TARGET_HEIGHT = 1.42;
+const AVATAR_MODEL_TARGET_HEIGHT = 0.0432;
 const avatarTemplateCache = new Map<MeguriAnimalType, Promise<THREE.Group>>();
 const avatarTextureCache = new Map<MeguriAnimalType, Promise<THREE.Texture>>();
 

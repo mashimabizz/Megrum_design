@@ -4,6 +4,44 @@
 
 ---
 
+## イテレーション168.5：v2めぐりアバターを1/50相当に縮小
+
+### 背景・問題意識
+
+iter168.4 の縮小後も、オーナーから「1/50くらいにして」と追加指示があった。v2 GLBのボーン/スキン込みサイズが実機表示で大きく出ている可能性があるため、まず極端に縮小して表示有無と暴れ方を切り分ける。
+
+### 変更内容
+
+#### `mobile/src/components/meguri/MeguriThreeScene.tsx`
+- GLB cloneの正規化目標高さを `AVATAR_MODEL_TARGET_HEIGHT = 0.0432` に変更した。
+- 元の正規化高さ `2.16` の約1/50相当まで、モデル本体だけを縮小した。
+
+### 影響範囲
+
+- iOS版 めぐりホーム/めぐりイントロ/めぐり広場/めぐりプロフィール/アバター編集の3D表示
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- `npm --prefix mobile run update:ios:preview -- --message "[iter168.5] v2めぐりアバターを1/50に縮小" --non-interactive`
+- EAS Update: `019e5821-56f5-78cc-a99d-0c8f5e30221e`
+- EAS Update group: `8c74a6a7-c42c-4a93-8b16-603e564da257`
+
+### 関連ファイル
+
+- `mobile/src/components/meguri/MeguriThreeScene.tsx`
+
+### セルフレビュー結果
+
+- ✅ 指示通り、元の正規化高さの約1/50相当まで縮小
+- ✅ `npm --prefix mobile run typecheck` 成功
+- ✅ `npm --prefix mobile run export:ios:preview` 成功
+- ✅ Expo preview channel への EAS Update 成功
+- ✅ 状態ID・用語・DBスキーマの追加変更なし
+
+---
+
 ## イテレーション168.4：v2めぐりアバターの表示サイズを縮小
 
 ### 背景・問題意識
