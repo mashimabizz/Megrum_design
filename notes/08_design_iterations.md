@@ -4,6 +4,52 @@
 
 ---
 
+## イテレーション168.35：ソロ候補の0メンバー表示を省略
+
+### 背景・問題意識
+
+オーナーから、推し追加画面でソロ候補に「0メンバー」と出るのは不要と指摘があった。ソロはメンバーを持たない前提なので、0件表示は情報量がなく、候補の読みやすさを下げる。
+
+### 変更内容
+
+#### `mobile/app/oshi-settings.tsx`
+- 推し追加モーダルの候補メタ情報で、`kind === "solo"` の場合はメンバー数を表示しないようにした。
+- グループ / 作品は従来通りメンバー数を表示する。
+
+#### `web/src/app/profile/oshi/OshiEditView.tsx`
+- Web/PWA側も、ソロ候補ではメンバー数を出さない条件を明示した。
+
+### 影響範囲
+
+- 推し設定の「推しを追加」モーダル
+- プロフィール推し編集のマスタ選択候補
+
+### 確認方法
+
+- `npm --prefix web run lint -- src/app/profile/oshi/OshiEditView.tsx`
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- `EXPO_NO_GIT_STATUS=1 npm --prefix mobile run update:ios:preview -- --message "[iter168.35] 推し追加モーダルの登録CTA反映" --non-interactive`
+- EAS Update: `019e5af7-748a-7f81-84f9-d048865fc1cc`
+- EAS Update group: `d052287c-45e2-4d8c-93e7-7ee06df85973`
+
+### 関連ファイル
+
+- `mobile/app/oshi-settings.tsx`
+- `web/src/app/profile/oshi/OshiEditView.tsx`
+- `notes/08_design_iterations.md`
+
+### セルフレビュー結果
+
+- ✅ ソロ候補で「0メンバー」を表示しない
+- ✅ グループ / 作品候補のメンバー数表示は維持
+- ✅ Preview channel へ EAS Update 済み
+- ✅ 状態IDの追加・変更なし（`notes/09_state_machines.md` 更新不要）
+- ✅ 新しいアプリ用語・廃止用語なし（`notes/10_glossary.md` 更新不要）
+- ✅ DBスキーマ変更なし（`notes/05_data_model.md` 更新不要）
+
+---
+
 ## イテレーション168.34：推し追加を複数登録CTAへ変更
 
 ### 背景・問題意識

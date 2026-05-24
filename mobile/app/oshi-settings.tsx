@@ -555,7 +555,8 @@ function MasterSelectModal({
                     <View style={styles.masterCopy}>
                       <Text numberOfLines={1} style={styles.masterName}>{option.name}</Text>
                       <Text numberOfLines={1} style={styles.masterMeta}>
-                        {option.genreName} / {kindLabel(option.kind)} / {option.characters.length}メンバー
+                        {option.genreName} / {kindLabel(option.kind)}
+                        {option.kind === "solo" ? "" : ` / ${option.characters.length}メンバー`}
                         {selected ? " / 設定済み" : ""}
                       </Text>
                     </View>
