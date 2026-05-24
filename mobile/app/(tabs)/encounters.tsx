@@ -107,6 +107,7 @@ export type GroomPost = {
   imageTransform?: GroomImageTransform;
   caption: string;
   doodles?: GroomDoodleStroke[];
+  publishedAt?: string;
   stickers?: GroomStickerOverlay[];
   textOverlays?: GroomTextOverlay[];
   placeHint: string;
@@ -519,6 +520,7 @@ function remotePostToGroomPost(post: GroomRemotePost): GroomPost {
     liked: post.liked,
     mine: post.mine,
     placeHint: post.placeHint,
+    publishedAt: post.publishedAt,
     stickers: post.stickers as GroomStickerOverlay[],
     textOverlays: post.textOverlays as GroomTextOverlay[],
     timeLabel: relativeTimeLabel(post.publishedAt),
@@ -1183,6 +1185,40 @@ function groomAccountGroups(posts: GroomPost[]): GroomAccountGroup[] {
   return groups;
 }
 
+function groomPostPublishedTime(post: GroomPost) {
+  if (!post.publishedAt) return null;
+  const time = Date.parse(post.publishedAt);
+  return Number.isFinite(time) ? time : null;
+}
+
+function groomStoryPosts(posts: GroomPost[]) {
+  const indexed = posts.map((post, index) => ({
+    index,
+    post,
+    time: groomPostPublishedTime(post),
+  }));
+  if (!indexed.some((item) => item.time !== null)) return posts;
+  return indexed
+    .sort((a, b) => {
+      if (a.time === null && b.time === null) return a.index - b.index;
+      if (a.time === null) return a.index - b.index;
+      if (b.time === null) return a.index - b.index;
+      return a.time - b.time || a.index - b.index;
+    })
+    .map((item) => item.post);
+}
+
+function groomInitialStoryPost(group: GroomAccountGroup | null | undefined) {
+  if (!group) return null;
+  return groomStoryPosts(group.posts)[0] ?? null;
+}
+
+function groomLatestStoryPost(group: GroomAccountGroup | null | undefined) {
+  if (!group) return null;
+  const posts = groomStoryPosts(group.posts);
+  return posts[posts.length - 1] ?? null;
+}
+
 function normalizeGroomOpenOrigin(origin: GroomOpenOrigin | null | undefined) {
   if (!origin) return null;
   const values = [origin.x, origin.y, origin.width, origin.height];
@@ -1236,11 +1272,13 @@ function GroomRail({
         ) : null}
 
         {!loading && groups.map((group) => {
-          const post = group.posts[0];
-          if (!post) return null;
+          const post = groomLatestStoryPost(group);
+          const initialPost = groomInitialStoryPost(group);
+          if (!post || !initialPost) return null;
           return (
             <GroomRailItem
               key={group.key}
+              initialPost={initialPost}
               onOpen={onOpen}
               post={post}
               viewed={viewedKeys.has(group.key)}
@@ -1253,10 +1291,12 @@ function GroomRail({
 }
 
 function GroomRailItem({
+  initialPost,
   onOpen,
   post,
   viewed,
 }: {
+  initialPost: GroomPost;
   onOpen: (post: GroomPost, origin?: GroomOpenOrigin | null) => void;
   post: GroomPost;
   viewed: boolean;
@@ -1282,18 +1322,18 @@ function GroomRailItem({
     };
     const ring = ringRef.current;
     if (!ring) {
-      onOpen(post, null);
+      onOpen(initialPost, null);
       releaseOpeningLock();
       return;
     }
     ring.measureInWindow((x, y, width, height) => {
       const origin = normalizeGroomOpenOrigin({ height, width, x, y });
       if (!origin) {
-        onOpen(post, null);
+        onOpen(initialPost, null);
         releaseOpeningLock();
         return;
       }
-      onOpen(post, origin);
+      onOpen(initialPost, origin);
       releaseOpeningLock();
     });
   }
@@ -1370,9 +1410,13 @@ function GroomViewerModal({
     : -1;
   const currentGroup =
     currentAccountIndex >= 0 ? accountGroups[currentAccountIndex] ?? null : null;
+  const currentGroupPosts = useMemo(
+    () => (currentGroup ? groomStoryPosts(currentGroup.posts) : []),
+    [currentGroup],
+  );
   const currentPostIndex =
     currentGroup && post
-      ? currentGroup.posts.findIndex((item) => item.id === post.id)
+      ? currentGroupPosts.findIndex((item) => item.id === post.id)
       : -1;
   const previousAccountGroup =
     currentAccountIndex > 0 ? accountGroups[currentAccountIndex - 1] ?? null : null;
@@ -1380,8 +1424,16 @@ function GroomViewerModal({
     currentAccountIndex >= 0 && currentAccountIndex < accountGroups.length - 1
       ? accountGroups[currentAccountIndex + 1] ?? null
       : null;
-  const previousAccountPost = previousAccountGroup?.posts[0] ?? null;
-  const nextAccountPost = nextAccountGroup?.posts[0] ?? null;
+  const previousAccountPosts = useMemo(
+    () => (previousAccountGroup ? groomStoryPosts(previousAccountGroup.posts) : []),
+    [previousAccountGroup],
+  );
+  const nextAccountPosts = useMemo(
+    () => (nextAccountGroup ? groomStoryPosts(nextAccountGroup.posts) : []),
+    [nextAccountGroup],
+  );
+  const previousAccountPost = previousAccountPosts[previousAccountPosts.length - 1] ?? null;
+  const nextAccountPost = nextAccountPosts[0] ?? null;
 
   function setHorizontalSwipeActive(active: boolean) {
     if (horizontalSwipingRef.current === active) return;
@@ -1397,8 +1449,8 @@ function GroomViewerModal({
 	  function selectRelativePost(offset: -1 | 1) {
 	    if (!currentGroup || currentPostIndex < 0) return;
 	    const nextPostIndex = currentPostIndex + offset;
-	    if (nextPostIndex >= 0 && nextPostIndex < currentGroup.posts.length) {
-	      onSelectPost(currentGroup.posts[nextPostIndex].id);
+	    if (nextPostIndex >= 0 && nextPostIndex < currentGroupPosts.length) {
+	      onSelectPost(currentGroupPosts[nextPostIndex].id);
 	      return;
 	    }
 	    const hasRelativeAccount =
@@ -1406,7 +1458,7 @@ function GroomViewerModal({
 	        ? currentAccountIndex < accountGroups.length - 1
 	        : currentAccountIndex > 0;
 	    if (!hasRelativeAccount && offset < 0) return;
-	    finishSwipe(offset);
+	    selectRelativeAccount(offset);
 	  }
 
   function selectRelativeAccount(offset: -1 | 1) {
@@ -1416,7 +1468,8 @@ function GroomViewerModal({
       if (offset > 0) onClose();
       return;
     }
-    const nextPost = accountGroups[nextIndex]?.posts[0];
+    const nextGroup = accountGroups[nextIndex] ?? null;
+    const nextPost = offset > 0 ? groomInitialStoryPost(nextGroup) : groomLatestStoryPost(nextGroup);
     if (nextPost) onSelectPost(nextPost.id);
   }
 
@@ -1714,7 +1767,7 @@ function GroomViewerModal({
       post={post}
       progress={progress}
       progressIndex={Math.max(currentPostIndex, 0)}
-      progressPosts={currentGroup?.posts ?? (post ? [post] : [])}
+      progressPosts={currentGroupPosts.length ? currentGroupPosts : post ? [post] : []}
       reply={reply}
     />
   ) : null;
@@ -1777,7 +1830,7 @@ function GroomViewerModal({
                       footerBottom={chromeFooterBottom}
                       headerTop={chromeTopPadding}
                       post={nextAccountPost}
-                      progressPosts={nextAccountGroup?.posts}
+                      progressPosts={nextAccountPosts}
                       reply=""
                     />
                   ) : null
@@ -1790,7 +1843,8 @@ function GroomViewerModal({
                       footerBottom={chromeFooterBottom}
                       headerTop={chromeTopPadding}
                       post={previousAccountPost}
-                      progressPosts={previousAccountGroup?.posts}
+                      progressIndex={Math.max(previousAccountPosts.length - 1, 0)}
+                      progressPosts={previousAccountPosts}
                       reply=""
                     />
                   ) : null
@@ -1808,7 +1862,7 @@ function GroomViewerModal({
               >
                 <GroomProgressBar
                   currentIndex={Math.max(currentPostIndex, 0)}
-                  posts={currentGroup?.posts ?? (post ? [post] : [])}
+                  posts={currentGroupPosts.length ? currentGroupPosts : post ? [post] : []}
                   progress={progress}
                 />
                 <View style={styles.groomViewerHeaderRow}>

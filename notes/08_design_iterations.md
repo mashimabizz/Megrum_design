@@ -4,6 +4,54 @@
 
 ---
 
+## イテレーション168.16：グルーム右タップを直近表示へ修正
+
+### 背景・問題意識
+
+オーナーから「進捗ステータスの分割は、右にタップすればするほど直近のグルームが見えるようにしてね。今だと逆です」「タップした瞬間にグルームが切り替わるようにしてください」と指摘があった。リモート取得は `published_at desc` のため、同一アカウント内の進捗が左=最新、右=古い並びになり、右タップで古い投稿へ戻っていた。また同一アカウントの投稿が尽きて次アカウントへ進むタップでも、スワイプ用のアニメーション完了後に投稿IDを切り替えていた。
+
+### 変更内容
+
+#### `mobile/app/(tabs)/encounters.tsx`
+- `GroomPost` に `publishedAt` を保持し、グルームビューア内の同一アカウント投稿を古い順から新しい順へ並べ替えるようにした。
+- グルームレールのサムネイルは直近投稿を維持しつつ、開いたときは古い投稿から表示して右タップで直近へ進めるようにした。
+- 右/左タップ時は `selectedGroomId` を即時更新し、次アカウントへ移る場合もタップではスワイプ演出完了を待たないようにした。
+- スワイプ時のキューブ演出は維持し、次アカウントは古い投稿から、前アカウントは直近投稿からプレビューするようにした。
+
+### 影響範囲
+
+- iOS版 めぐりホームのグルームビューア
+- グルーム進捗バーの分割順
+- グルーム左右タップの切替挙動
+- アカウント間遷移時のタップ応答
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- `npm --prefix mobile run update:ios:preview -- --message "[iter168.16] グルーム右タップを直近表示へ修正" --non-interactive`
+- EAS Update: `019e5991-ad27-7403-9f30-178297e6ffc5`
+- EAS Update group: `9c615b7e-124d-4985-a77d-576783b514ce`
+
+### 関連ファイル
+
+- `mobile/app/(tabs)/encounters.tsx`
+- `notes/08_design_iterations.md`
+
+### セルフレビュー結果
+
+- ✅ 同一アカウントの進捗を古い→新しい順に変更
+- ✅ 右タップで直近投稿へ進む挙動に変更
+- ✅ タップ時はアニメーション完了待ちなしで投稿IDを即時切替
+- ✅ `npm --prefix mobile run typecheck` 成功
+- ✅ `npm --prefix mobile run export:ios:preview` 成功
+- ✅ Expo preview channel への EAS Update 成功
+- ✅ 状態IDの追加・変更なし（`notes/09_state_machines.md` 更新不要）
+- ✅ 新しいアプリ用語・廃止用語なし（`notes/10_glossary.md` 更新不要）
+- ✅ DBスキーマの追加変更なし（`notes/05_data_model.md` 更新不要）
+
+---
+
 ## イテレーション168.15：グルーム投稿RLS保存失敗を修正
 
 ### 背景・問題意識
