@@ -71,6 +71,11 @@ type ExpoGLModule = {
 
 let cachedGLView: ExpoGLModule["GLView"] | null | undefined;
 const avatarAssetModules: Record<MeguriAnimalType, number> = {
+  cat: require("../../../assets/meguri-avatars/cat-idle.glb"),
+  fox: require("../../../assets/meguri-avatars/fox-idle.glb"),
+  rabbit: require("../../../assets/meguri-avatars/rabbit-idle.glb"),
+};
+const avatarWalkAssetModules: Record<MeguriAnimalType, number> = {
   cat: require("../../../assets/meguri-avatars/cat.glb"),
   fox: require("../../../assets/meguri-avatars/fox.glb"),
   rabbit: require("../../../assets/meguri-avatars/rabbit.glb"),
@@ -87,6 +92,7 @@ const avatarTextureSize: Record<MeguriAnimalType, { height: number; width: numbe
 };
 const AVATAR_MODEL_TARGET_HEIGHT = 0.0216;
 const avatarTemplateCache = new Map<MeguriAnimalType, Promise<THREE.Group>>();
+const avatarWalkTemplateCache = new Map<MeguriAnimalType, Promise<THREE.Group>>();
 const avatarTextureCache = new Map<MeguriAnimalType, Promise<THREE.Texture>>();
 
 function getExpoGLView() {
@@ -153,6 +159,15 @@ type AvatarBoneRig = Partial<Record<
   | "spine02",
   AvatarBoneSnapshot
 >>;
+
+type AvatarAnimationMode = "idle" | "walk";
+
+type AvatarAnimationState = {
+  active: AvatarAnimationMode | null;
+  idleAction: THREE.AnimationAction | null;
+  mixer: THREE.AnimationMixer;
+  walkAction: THREE.AnimationAction | null;
+};
 
 type PlushModel = {
   group: THREE.Group;
@@ -738,36 +753,29 @@ function updateResidentObject(
   );
   item.group.rotation.z = moving ? sway : idleSideSway;
   animatePlushParts(item, role, target, elapsed, index, moving);
-  updateAvatarWalkAnimation(item, elapsed, index, delta);
+  updateAvatarAnimation(item, elapsed, index, delta, moving);
   animateFace(item.parts.face, speaking, smiling, elapsed);
 }
 
-function updateAvatarWalkAnimation(
+function updateAvatarAnimation(
   item: ResidentRuntime,
   elapsed: number,
   index: number,
   delta: number,
+  moving: boolean,
 ) {
   const rigSource = item.group.userData.avatarRigSource as
     | THREE.Object3D
     | null
     | undefined;
   const animationSource = rigSource ?? item.group;
-  const mixer = animationSource.userData.avatarMixer as
-    | THREE.AnimationMixer
+  const animation = animationSource.userData.avatarAnimation as
+    | AvatarAnimationState
     | null
     | undefined;
-  const actions = animationSource.userData.avatarActions as
-    | THREE.AnimationAction[]
-    | undefined;
-  if (mixer && actions?.length) {
-    for (const action of actions) {
-      if (!action.isRunning()) {
-        action.reset();
-        action.play();
-      }
-    }
-    mixer.update(delta);
+  if (animation) {
+    setAvatarAnimationMode(animation, moving ? "walk" : "idle");
+    animation.mixer.update(delta);
     return;
   }
 
@@ -776,7 +784,19 @@ function updateAvatarWalkAnimation(
     | null
     | undefined;
   if (!rig) return;
+  if (!moving) {
+    updateAvatarIdleFallback(rig, elapsed, index);
+    return;
+  }
 
+  updateAvatarProceduralWalk(rig, elapsed, index);
+}
+
+function updateAvatarProceduralWalk(
+  rig: AvatarBoneRig,
+  elapsed: number,
+  index: number,
+) {
   const phase = elapsed * 6.2 + index * 0.52;
   const stride = Math.sin(phase);
   const counter = Math.sin(phase + Math.PI);
@@ -804,6 +824,33 @@ function updateAvatarWalkAnimation(
   applyAvatarBoneRotation(rig.rightLeg, -0.28 - 0.54 * lift, 0, 0);
   applyAvatarBoneRotation(rig.leftFoot, -0.16 + 0.34 * lift, 0, 0);
   applyAvatarBoneRotation(rig.rightFoot, -0.16 + 0.34 * counterLift, 0, 0);
+}
+
+function updateAvatarIdleFallback(
+  rig: AvatarBoneRig,
+  elapsed: number,
+  index: number,
+) {
+  const phase = elapsed * 1.6 + index * 0.32;
+  const breathe = Math.sin(phase);
+  applyAvatarBonePosition(rig.hips, 0, Math.max(0, breathe) * 0.025, 0);
+  applyAvatarBoneRotation(rig.hips, 0, 0.015 * breathe, 0.018 * breathe);
+  applyAvatarBoneRotation(rig.spine02, 0.025 * breathe, 0, -0.018 * breathe);
+  applyAvatarBoneRotation(rig.spine01, 0.018 * breathe, 0, -0.012 * breathe);
+  applyAvatarBoneRotation(rig.spine, 0.012 * breathe, 0, -0.008 * breathe);
+  applyAvatarBoneRotation(rig.head, -0.04 + 0.025 * breathe, 0.018 * breathe, -0.012 * breathe);
+  applyAvatarBoneRotation(rig.leftShoulder, 0, 0, -0.2);
+  applyAvatarBoneRotation(rig.rightShoulder, 0, 0, 0.2);
+  applyAvatarBoneRotation(rig.leftArm, -0.08, 0, -0.36);
+  applyAvatarBoneRotation(rig.rightArm, -0.08, 0, 0.36);
+  applyAvatarBoneRotation(rig.leftForeArm, -0.1, 0, -0.05);
+  applyAvatarBoneRotation(rig.rightForeArm, -0.1, 0, 0.05);
+  applyAvatarBoneRotation(rig.leftUpLeg, 0, 0, 0);
+  applyAvatarBoneRotation(rig.rightUpLeg, 0, 0, 0);
+  applyAvatarBoneRotation(rig.leftLeg, 0, 0, 0);
+  applyAvatarBoneRotation(rig.rightLeg, 0, 0, 0);
+  applyAvatarBoneRotation(rig.leftFoot, 0, 0, 0);
+  applyAvatarBoneRotation(rig.rightFoot, 0, 0, 0);
 }
 
 function updateCameraFocus(
@@ -1474,29 +1521,27 @@ function attachAvatarModel(
   const safeAnimalType = normalizeAvatarAnimalType(animalType);
   const loadToken = Symbol(safeAnimalType);
   group.userData.avatarLoadToken = loadToken;
-  group.userData.avatarActions = [];
+  group.userData.avatarAnimation = null;
   group.userData.avatarRig = null;
-  group.userData.avatarMixer = null;
   void loadAvatarTemplate(safeAnimalType)
     .then(async (template) => {
       if (group.userData.avatarLoadToken !== loadToken) return;
       const model = cloneAvatarTemplate(template);
       model.name = `meguri-avatar-${safeAnimalType}`;
       prepareAvatarClone(model);
-      await loadAvatarTexture(safeAnimalType)
-        .then((texture) => applyAvatarTexture(model, texture))
-        .catch(() => applyAvatarFallbackMaterial(model));
+      const [walkTemplate] = await Promise.all([
+        loadAvatarWalkTemplate(safeAnimalType).catch(() => null),
+        loadAvatarTexture(safeAnimalType)
+          .then((texture) => applyAvatarTexture(model, texture))
+          .catch(() => applyAvatarFallbackMaterial(model)),
+      ]);
       if (group.userData.avatarLoadToken !== loadToken) return;
-      const walkClip = getAvatarWalkAnimation(template);
-      if (walkClip) {
-        const mixer = new THREE.AnimationMixer(model);
-        const action = mixer.clipAction(walkClip);
-        action.reset();
-        action.setLoop(THREE.LoopRepeat, Infinity);
-        action.enabled = true;
-        action.play();
-        group.userData.avatarActions = [action];
-        group.userData.avatarMixer = mixer;
+      const idleClip = getAvatarMotionAnimation(template, "idle");
+      const walkClip = walkTemplate ? getAvatarMotionAnimation(walkTemplate, "walk") : null;
+      const animation = createAvatarAnimationState(model, idleClip, walkClip);
+      if (animation) {
+        setAvatarAnimationMode(animation, "idle");
+        group.userData.avatarAnimation = animation;
       } else {
         group.userData.avatarRig = createAvatarBoneRig(model);
       }
@@ -1540,6 +1585,35 @@ function loadAvatarTemplate(animalType: MeguriAnimalType) {
   return promise;
 }
 
+function loadAvatarWalkTemplate(animalType: MeguriAnimalType) {
+  const safeAnimalType = normalizeAvatarAnimalType(animalType);
+  const cached = avatarWalkTemplateCache.get(safeAnimalType);
+  if (cached) return cached;
+
+  const promise = Asset.loadAsync(avatarWalkAssetModules[safeAnimalType]).then(
+    ([asset]) =>
+      new Promise<THREE.Group>((resolve, reject) => {
+        const uri = asset.localUri ?? asset.uri;
+        if (!uri) {
+          reject(new Error(`Missing ${safeAnimalType} avatar walk asset uri`));
+          return;
+        }
+        const loader = new GLTFLoader();
+        loader.load(
+          uri,
+          (gltf: GLTF) => {
+            gltf.scene.userData.avatarAnimations = gltf.animations;
+            resolve(gltf.scene);
+          },
+          undefined,
+          reject,
+        );
+      }),
+  );
+  avatarWalkTemplateCache.set(safeAnimalType, promise);
+  return promise;
+}
+
 function loadAvatarTexture(animalType: MeguriAnimalType) {
   const safeAnimalType = normalizeAvatarAnimalType(animalType);
   const cached = avatarTextureCache.get(safeAnimalType);
@@ -1579,7 +1653,10 @@ function cloneAvatarTemplate(template: THREE.Group): THREE.Group {
   return (clone ? clone(template) : template.clone(true)) as THREE.Group;
 }
 
-function getAvatarWalkAnimation(template: THREE.Group): THREE.AnimationClip | null {
+function getAvatarMotionAnimation(
+  template: THREE.Group,
+  mode: AvatarAnimationMode,
+): THREE.AnimationClip | null {
   const animations = template.userData.avatarAnimations;
   if (!Array.isArray(animations)) return null;
   const playable = animations.filter((clip): clip is THREE.AnimationClip => {
@@ -1587,11 +1664,70 @@ function getAvatarWalkAnimation(template: THREE.Group): THREE.AnimationClip | nu
     return clip.duration > 0.1 && clip.tracks.some((track) => track.times.length > 1);
   });
   if (playable.length === 0) return null;
+  const pattern = mode === "walk" ? /walk|walking|歩き/i : /idle|stand|standing|立ち/i;
   return (
-    playable.find((clip) => /walk|walking|歩き/i.test(clip.name)) ??
+    playable.find((clip) => pattern.test(clip.name)) ??
     playable[0] ??
     null
   );
+}
+
+function createAvatarAnimationState(
+  model: THREE.Object3D,
+  idleClip: THREE.AnimationClip | null,
+  walkClip: THREE.AnimationClip | null,
+): AvatarAnimationState | null {
+  if (!idleClip && !walkClip) return null;
+  const mixer = new THREE.AnimationMixer(model);
+  const idleAction = idleClip ? createAvatarAction(mixer, idleClip) : null;
+  const walkAction = walkClip ? createAvatarAction(mixer, walkClip) : null;
+  return {
+    active: null,
+    idleAction,
+    mixer,
+    walkAction,
+  };
+}
+
+function createAvatarAction(
+  mixer: THREE.AnimationMixer,
+  clip: THREE.AnimationClip,
+) {
+  const action = mixer.clipAction(clip);
+  action.reset();
+  action.setLoop(THREE.LoopRepeat, Infinity);
+  action.enabled = true;
+  action.play();
+  action.setEffectiveWeight(0);
+  return action;
+}
+
+function setAvatarAnimationMode(
+  animation: AvatarAnimationState,
+  requestedMode: AvatarAnimationMode,
+) {
+  const mode =
+    requestedMode === "walk" && !animation.walkAction && animation.idleAction
+      ? "idle"
+      : requestedMode === "idle" && !animation.idleAction && animation.walkAction
+        ? "walk"
+        : requestedMode;
+  if (animation.active === mode) return;
+  animation.active = mode;
+  const idleWeight = mode === "idle" ? 1 : 0;
+  const walkWeight = mode === "walk" ? 1 : 0;
+  if (animation.idleAction) {
+    animation.idleAction.enabled = true;
+    animation.idleAction.paused = false;
+    animation.idleAction.play();
+    animation.idleAction.setEffectiveWeight(idleWeight);
+  }
+  if (animation.walkAction) {
+    animation.walkAction.enabled = true;
+    animation.walkAction.paused = false;
+    animation.walkAction.play();
+    animation.walkAction.setEffectiveWeight(walkWeight);
+  }
 }
 
 function prepareAvatarClone(model: THREE.Group) {

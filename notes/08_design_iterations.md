@@ -4,6 +4,59 @@
 
 ---
 
+## イテレーション168.10：v2立ち歩きアニメーションを切替
+
+### 背景・問題意識
+
+オーナーから「同じフォルダに、立ち姿のglbファイルも入れました。立っている時はこのアニメーションで、それ以外の歩いているときは歩いている時のアニメーションにしてほしいです」と指示があった。iter168.9では歩行clipを常時再生していたため、停止中も歩いて見える問題が残っていた。
+
+### 変更内容
+
+#### `mobile/assets/meguri-avatars/`
+- `Megrum めぐり/v2/ねこ  v2 立ち.glb` を `cat-idle.glb` として取り込んだ。
+- `Megrum めぐり/v2/きつね v2 立ち.glb` を `fox-idle.glb` として取り込んだ。
+- `Megrum めぐり/v2/うさぎ  v2 立ち.glb` を `rabbit-idle.glb` として取り込んだ。
+- 3ファイルとも `Armature|Idle_13|baselayer` の約11.43秒・343キーidle clipを含むことを確認した。
+
+#### `mobile/src/components/meguri/MeguriThreeScene.tsx`
+- 表示モデルのベースを立ちGLBに変更し、初期表示と停止中の姿勢を立ち姿側へ揃えた。
+- 歩きGLBはwalk clip供給用として読み込み、同じボーン名の表示モデルへ `AnimationMixer` で適用するようにした。
+- 既存の移動判定に合わせ、移動中はwalk action、停止中はidle actionへ切り替えるようにした。
+- idle/walk clipが欠けた場合だけ、前回の自前ボーンモーションへフォールバックする保険を残した。
+
+### 影響範囲
+
+- iOS版 めぐりホーム/めぐりイントロ/めぐり広場/めぐりプロフィール/アバター編集の3D表示
+
+### 確認方法
+
+- v2立ちGLB/歩きGLBのanimation key数確認
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- `npm --prefix mobile run update:ios:preview -- --message "[iter168.10] v2立ち歩きアニメーションを切替" --non-interactive`
+- EAS Update: `019e5850-aa43-791f-8fa2-8d03bdb1b8c3`
+- EAS Update group: `bcb0c285-caac-4b05-8f0a-750b4c085a09`
+
+### 関連ファイル
+
+- `mobile/assets/meguri-avatars/cat-idle.glb`
+- `mobile/assets/meguri-avatars/fox-idle.glb`
+- `mobile/assets/meguri-avatars/rabbit-idle.glb`
+- `mobile/src/components/meguri/MeguriThreeScene.tsx`
+
+### セルフレビュー結果
+
+- ✅ 追加されたv2立ちGLBをアプリbundle対象のassetsへ反映
+- ✅ `Armature|Idle_13|baselayer` が343キーのidle clipであることを確認
+- ✅ 表示モデルは立ちGLB、移動中clipは歩きGLBという分担に変更
+- ✅ 移動判定に応じてidle/walk actionを切り替える実装に変更
+- ✅ `npm --prefix mobile run typecheck` 成功
+- ✅ `npm --prefix mobile run export:ios:preview` 成功
+- ✅ Expo preview channel への EAS Update 成功
+- ✅ 状態ID・用語・DBスキーマの追加変更なし
+
+---
+
 ## イテレーション168.9：v2歩きGLBのアニメーションを適用
 
 ### 背景・問題意識
