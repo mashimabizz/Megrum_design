@@ -97,6 +97,8 @@ iter24 で「推し2階層」（グループ/作品 → メンバー/キャラ�
 | `display_order` | int | |
 | `created_at` | timestamptz | |
 
+> **iter168.24 推しL2必須ルール**：`groups_master.kind in ('group','work')` のL1は、推し候補として出す時に空箱にならないよう、運営マスタ上で少なくとも1件以上の `characters_master` を持つ。`kind='solo'` は人物/対象そのものをL1として選ぶためL2必須の対象外。DB制約ではなく、マスタ投入migrationと運用チェックで担保する。
+
 ### `characters_master`
 
 | カラム | 型 | 説明 |

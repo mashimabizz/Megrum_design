@@ -4,6 +4,70 @@
 
 ---
 
+## イテレーション168.24：推しL2必須でマスタを拡充
+
+### 背景・問題意識
+
+オーナーから「私が止めるまで、推しのマスタを拡充してください」「グループや作品のマスタについては、必ずその中にメンバーが１人以上追加されるようにしてください」と指示があった。推し登録・グッズ登録・Wish登録ではL1だけが増えても、メンバー/キャラが空だとユーザーが具体的な推しを選びづらくなる。そこで既存の `group` / `work` のL2空状態を解消し、追加する新規L1も同一migration内でL2を必ず持つようにした。
+
+### 変更内容
+
+#### `supabase/migrations/20260525002000_fill_oshi_master_required_l2.sql`
+- 既存の `groups_master.kind in ('group','work')` で `characters_master` が0件だったL1を補完した。
+- K-POP男性/女性、国内男性/女性、歌い手、2.5次元・舞台、ゲーム、キャラクターIP、スポーツなどを中心にL2を追加した。
+- スポーツチームはグッズ化されやすい公式マスコットをL2として追加し、`oshi_entities_master.entity_type='character'` に明示リンクした。
+- NCT 127 / NCT DREAM のマーク・ヘチャン、After the Rain / ソロのまふまふ・そらる、刀剣乱舞系の同一キャラクターを同じ `oshi_entities_master` に明示リンクした。
+
+#### `supabase/migrations/20260525003500_expand_oshi_master_batch2.sql`
+- 新規L1として K-POP、国内アイドル/音楽、アニメ・マンガ、ゲーム、キャラクターIP、VTuber・配信者、お笑いを追加した。
+- P1Harmony / MAMAMOO / Da-iCE / IS:SUE / 薬屋のひとりごと / ブルーアーカイブ / たまごっち / ホロスターズ / 見取り図など、追加した全 `group` / `work` にL2を同梱した。
+- 刀剣乱舞ONLINE と既存の2.5次元文脈に出る同一キャラクターを `oshi_entities_master` で束ねた。
+
+#### `notes/05_data_model.md`
+- `groups_master.kind in ('group','work')` は少なくとも1件以上の `characters_master` を持つ、という運用不変条件を追記した。
+
+### 影響範囲
+
+- オンボーディングの推し選択
+- プロフィールの推し追加
+- グッズ登録 / Wish登録 / 個別募集の推し選択候補
+- 推しすれ違いの同担・近傍界隈判定に使うマスタ候補
+
+### 確認方法
+
+- `supabase db push --dry-run`
+- `supabase db push --yes`
+- `supabase db query --linked -o table "with missing as (select gm.id from public.groups_master gm left join public.characters_master cm on cm.group_id=gm.id where gm.kind in ('group','work') group by gm.id having count(cm.id)=0) select count(*) as group_or_work_without_l2 from missing;"`
+- `supabase db query --linked -o table "select 'solo_l1_without_entity' as check_name, count(*) from public.groups_master where kind='solo' and entity_id is null union all select 'l2_without_entity', count(*) from public.characters_master where entity_id is null union all select 'l1_total', count(*) from public.groups_master union all select 'l2_total', count(*) from public.characters_master union all select 'entities_total', count(*) from public.oshi_entities_master;"`
+
+### 適用後件数
+
+- L1合計: 338
+- L2合計: 1370
+- `oshi_entities_master`: 1494件
+- `group` / `work` でL2が0件のL1: 0件
+- `entity_id` 未紐付け: solo L1 0件 / L2 0件
+
+### 関連ファイル
+
+- `supabase/migrations/20260525002000_fill_oshi_master_required_l2.sql`
+- `supabase/migrations/20260525003500_expand_oshi_master_batch2.sql`
+- `notes/05_data_model.md`
+- `notes/08_design_iterations.md`
+
+### セルフレビュー結果
+
+- ✅ 実在するグループ・作品・人物・キャラクター・公式マスコットのみを追加
+- ✅ 既存/新規の `group` / `work` は、少なくとも1件以上のL2を持つ状態にした
+- ✅ 新規L1追加時も同一migration内でL2を同梱
+- ✅ `oshi_entities_master` と `entity_id` を再同期し、未紐付け0件を確認
+- ✅ 同一人物・同一キャラとして明確な文脈は手動entityで束ねた
+- ✅ 状態IDの追加・変更なし（`notes/09_state_machines.md` 更新不要）
+- ✅ 新しいアプリ用語・廃止用語なし（`notes/10_glossary.md` 更新不要）
+- ✅ データモデル運用ルールは `notes/05_data_model.md` に反映
+
+---
+
 ## イテレーション168.23：推し追加を複数選択CTAへ変更
 
 ### 背景・問題意識
