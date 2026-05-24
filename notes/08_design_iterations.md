@@ -4,6 +4,78 @@
 
 ---
 
+## イテレーション168.22：推しの同一人物entityを追加
+
+### 背景・問題意識
+
+オーナーから「ソロで登録していても、どこか別のグループのメンバーとしても活躍している場合がある」「同じ人としてみなされるような設計にしたい」「選ぶ側はグループのメンバーとしても選べるし、ソロとしても選べるようになりたい」と相談があり、その設計で進めることになった。既存の `groups_master` / `characters_master` はユーザーが推しを選ぶ文脈として必要なので維持しつつ、内部で同じ人物・キャラクターを束ねる正規entityを追加した。
+
+### 変更内容
+
+#### `supabase/migrations/20260524235000_add_oshi_entities_identity_model.sql`
+- `oshi_entities_master` を追加し、`identity_key` / `canonical_name` / `entity_type` / `aliases` を保持するようにした。
+- `groups_master.entity_id` と `characters_master.entity_id` を追加した。
+- 同名別人の誤統合を避けるため、既定では選択文脈ごとにentityを作り、明示した兼任・移籍・ソロ活動だけ同じentityへ寄せる設計にした。
+- 既存の `kind='solo'` L1 と全L2に `entity_id` をバックフィルした。
+
+#### `supabase/migrations/20260524235500_expand_cross_context_oshi_master.sql`
+- K-POP男性に ASTRO、K-POP女性に IZ*ONE を追加した。
+- 国内男性に DISH// を追加し、既存の FANTASTICS / M!LK / IMP. のメンバーを補完した。
+- 声優に μ's / Aqours / Roselia と主要ソロ声優を追加した。
+- 俳優・タレントに 平野紫耀 / 神宮寺勇太 / 岸優太 / 佐野勇斗 を追加した。
+- サクラ / キム・チェウォン / ユジン / ウォニョン / チャ・ウヌ / Number_i 3名 / 八木勇征 / 北村匠海 / 佐野勇斗 を、別文脈から同じ `oshi_entities_master` に明示紐付けした。
+
+#### `notes/05_data_model.md`
+- `oshi_entities_master` と `entity_id` の設計を追記した。
+- `groups_master` / `characters_master` は「選択文脈」、`oshi_entities_master` は「内部的な同一推し」を表すと明記した。
+
+#### `notes/10_glossary.md`
+- 「推し正規entity」「選択文脈」を追加した。
+
+### 影響範囲
+
+- オンボーディングの推し選択
+- プロフィールの推し編集
+- グッズ登録 / Wish登録 / 個別募集の対象選択
+- 将来の推し別集計、同担判定、検索サジェスト、マッチング補助
+
+### 確認方法
+
+- `supabase db push --dry-run`
+- `supabase db push --yes`
+- `supabase db query --linked -o table "select entity_type, count(*) as entities from public.oshi_entities_master group by entity_type order by entity_type;"`
+- `supabase db query --linked -o table "select ge.display_order, ge.name as genre, count(distinct g.id) as groups, count(c.id) as characters from public.genres_master ge left join public.groups_master g on g.genre_id = ge.id left join public.characters_master c on c.group_id = g.id group by ge.id, ge.display_order, ge.name order by ge.display_order, ge.name;"`
+
+### 適用後件数
+
+- L1合計: 274
+- L2合計: 797
+- `oshi_entities_master`: person 551件 / character 323件
+- `entity_id` 未紐付け: solo L1 0件 / L2 0件
+- 同一entity確認: サクラ（IZ*ONE / LE SSERAFIM）、キム・チェウォン（IZ*ONE / LE SSERAFIM）、ユジン（IVE / IZ*ONE）、ウォニョン（IVE / IZ*ONE）、チャ・ウヌ（ASTRO / 海外エンタメsolo）、平野紫耀・神宮寺勇太・岸優太（Number_i / 俳優・タレントsolo）、八木勇征（FANTASTICS / 俳優・タレントsolo）、北村匠海（DISH// / 俳優・タレントsolo）、佐野勇斗（M!LK / 俳優・タレントsolo）
+
+### 関連ファイル
+
+- `supabase/migrations/20260524235000_add_oshi_entities_identity_model.sql`
+- `supabase/migrations/20260524235500_expand_cross_context_oshi_master.sql`
+- `notes/05_data_model.md`
+- `notes/10_glossary.md`
+- `notes/08_design_iterations.md`
+
+### セルフレビュー結果
+
+- ✅ ユーザーが選ぶL1/L2文脈は維持し、内部の同一人物判定だけ `entity_id` に分離
+- ✅ 同名別人の誤統合を避けるため、全件名前一致統合ではなく文脈別entity + 明示リンク方式にした
+- ✅ 実在するグループ・ユニット・人物のみを追加
+- ✅ `supabase db push --dry-run` 成功
+- ✅ `supabase db push --yes` でリモートDBへ適用済み
+- ✅ リモートDBでジャンル別件数、entity件数、代表的な同一人物リンクを確認済み
+- ✅ 状態IDの追加・変更なし（`notes/09_state_machines.md` 更新不要）
+- ✅ 新用語は `notes/10_glossary.md` に追加
+- ✅ DBスキーマ変更は `notes/05_data_model.md` に反映
+
+---
+
 ## イテレーション168.21：推し設定の頭文字アイコンを削除
 
 ### 背景・問題意識

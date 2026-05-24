@@ -54,7 +54,7 @@
 
 ## 1. マスタテーブル
 
-iter24 で「推し2階層」（グループ/作品 → メンバー/キャラ）を UI で明示化。データモデル側は既存設計を維持。
+iter24 で「推し2階層」（グループ/作品 → メンバー/キャラ）を UI で明示化。iter168.22 で、ユーザーが選ぶ文脈（グループ所属・作品所属・ソロ）とは別に、同じ人物/キャラクターを内部で束ねる `oshi_entities_master` を追加した。
 
 ### `genres_master`
 
@@ -68,6 +68,22 @@ iter24 で「推し2階層」（グループ/作品 → メンバー/キャラ�
 
 > **iter168.19 推し分類方針**：UI上は `genres_master` をユーザーが探す入口として扱う。アイドル・音楽領域だけ `K-POP男性` / `K-POP女性` / `国内男性` / `国内女性` / `歌い手` / `声優` に細分化し、それ以外は `2.5次元・舞台` / `アニメ・マンガ` / `ゲーム` / `キャラクターIP` / `VTuber・配信者` / `お笑い` / `スポーツ` / `俳優・タレント` / `海外エンタメ` の大分類を維持する。`groups_master.kind` は対象の形（`group` / `work` / `solo`）として別軸で保持する。
 
+### `oshi_entities_master`
+
+同じ人物・同じキャラクターを、複数の選択文脈から束ねる内部マスタ。たとえば「LE SSERAFIM のサクラ」と「IZ*ONE のサクラ」、または「FANTASTICS の八木勇征」と「俳優・タレントの八木勇征」は、UI上は別文脈で選べるが同じ `entity_id` に紐付く。
+
+| カラム | 型 | 説明 |
+|---|---|---|
+| `id` | uuid | PK |
+| `identity_key` | text | 運営管理用の安定キー。同名別人を分け、明示した同一対象だけ同じentityへ寄せる |
+| `canonical_name` | text | 代表表示名。芸名・キャラ名などユーザーに自然な名称を使う |
+| `entity_type` | text | 'person' / 'character' / 'other' |
+| `aliases` | text[] | 表記揺れ |
+| `display_order` | int | 管理・候補表示の補助順 |
+| `created_at` | timestamptz | |
+
+> **iter168.22 同一人物設計**：`groups_master` / `characters_master` は「ユーザーがどう選ぶか」の文脈、`oshi_entities_master` は「内部的に同じ推しか」を表す。自動で同名を全部統合すると `ユナ` など同名別人を誤統合するため、基本は文脈別entityを作り、兼任・移籍・ソロ活動など同一性が明確なものだけ明示的に同じ `entity_id` に寄せる。
+
 ### `groups_master`
 
 | カラム | 型 | 説明 |
@@ -77,6 +93,7 @@ iter24 で「推し2階層」（グループ/作品 → メンバー/キャラ�
 | `name` | text | "SEVENTEEN" / "TWICE" / "呪術廻戦" / "Ado" 等 |
 | `aliases` | text[] | ["방탄소년단", "防弾少年団"] 等の表記揺れ |
 | `kind` | text | 'group' / 'work' / 'solo'（iter24対応：ソロアーティストの取扱い、⚠️要確認） |
+| `entity_id` | uuid nullable | → oshi_entities_master（`kind='solo'` が表す人物/対象。グループ/作品では通常NULL） |
 | `display_order` | int | |
 | `created_at` | timestamptz | |
 
@@ -89,6 +106,7 @@ iter24 で「推し2階層」（グループ/作品 → メンバー/キャラ�
 | `genre_id` | uuid | → genres_master（グループ非所属でも参照） |
 | `name` | text | "ジョングク" / "虎杖悠仁" 等 |
 | `aliases` | text[] | |
+| `entity_id` | uuid nullable | → oshi_entities_master（同一人物/キャラクターを別文脈と束ねる） |
 | `display_order` | int | |
 | `created_at` | timestamptz | |
 
