@@ -4,6 +4,60 @@
 
 ---
 
+## イテレーション168.26：作品IPと配信者マスタを追加
+
+### 背景・問題意識
+
+オーナーから「私が止めるまで続けて」と再指示があったため、推しマスタ拡充を継続した。前バッチまででアイドル・音楽はかなり厚くなったため、今回はグッズ交換や推し活対象になりやすいアニメ・マンガ、ゲーム、キャラクターIP、VTuber・配信者、お笑いを中心に追加した。
+
+### 変更内容
+
+#### `supabase/migrations/20260525013000_expand_oshi_master_batch4.sql`
+- アニメ・マンガに NARUTO / HUNTER×HUNTER / Dr.STONE / ワールドトリガー / 鋼の錬金術師 / BLEACH / 怪獣8号 などを追加し、主要キャラをL2登録した。
+- ゲームに FFVII / ペルソナ5 / ゼルダの伝説 / スプラトゥーン / どうぶつの森 / モンスターハンター / キングダム ハーツを追加した。
+- キャラクターIPに ハローキティ / マイメロディ / クロミ / ポムポムプリン / シナモロール / PUI PUI モルカー / カナヘイの小動物などを追加した。
+- VTuber・配信者に hololive English / hololive DEV_IS / NIJISANJI EN / QuizKnock / ドズル社を追加した。
+- お笑いに 千鳥 / チョコレートプラネット / ミキ / ダウ90000 / ヨネダ2000を追加した。
+- 追加した全 `group` / `work` にL2を同梱し、`oshi_entities_master` と `entity_id` を再同期した。
+
+### 影響範囲
+
+- オンボーディングの推し選択
+- プロフィールの推し追加
+- グッズ登録 / Wish登録 / 個別募集の推し選択候補
+
+### 確認方法
+
+- `supabase db push --dry-run`
+- `supabase db push --yes`
+- `supabase db query --linked -o table "with missing as (select gm.id from public.groups_master gm left join public.characters_master cm on cm.group_id=gm.id where gm.kind in ('group','work') group by gm.id having count(cm.id)=0) select count(*) as group_or_work_without_l2 from missing;"`
+- `supabase db query --linked -o table "select 'solo_l1_without_entity' as check_name, count(*) from public.groups_master where kind='solo' and entity_id is null union all select 'l2_without_entity', count(*) from public.characters_master where entity_id is null union all select 'l1_total', count(*) from public.groups_master union all select 'l2_total', count(*) from public.characters_master union all select 'entities_total', count(*) from public.oshi_entities_master;"`
+
+### 適用後件数
+
+- L1合計: 393
+- L2合計: 1594
+- `oshi_entities_master`: 1718件
+- `group` / `work` でL2が0件のL1: 0件
+- `entity_id` 未紐付け: solo L1 0件 / L2 0件
+
+### 関連ファイル
+
+- `supabase/migrations/20260525013000_expand_oshi_master_batch4.sql`
+- `notes/08_design_iterations.md`
+
+### セルフレビュー結果
+
+- ✅ 実在する作品・IP・グループ・人物・キャラクターのみを追加
+- ✅ 追加した `group` / `work` はすべて同一migration内でL2を同梱
+- ✅ `group` / `work` でL2が0件のL1は引き続き0件
+- ✅ `entity_id` 未紐付け0件を確認
+- ✅ 状態IDの追加・変更なし（`notes/09_state_machines.md` 更新不要）
+- ✅ 新しいアプリ用語・廃止用語なし（`notes/10_glossary.md` 更新不要）
+- ✅ 既存のL2必須運用ルール内のseed追加であり、追加のデータモデル更新なし
+
+---
+
 ## イテレーション168.25：定番KPOPと声優ユニットを追加
 
 ### 背景・問題意識
