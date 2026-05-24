@@ -127,6 +127,33 @@ type SkeletonUtilsModule = {
   clone?: (source: THREE.Object3D) => THREE.Object3D;
 };
 
+type AvatarBoneSnapshot = {
+  basePosition: THREE.Vector3;
+  baseQuaternion: THREE.Quaternion;
+  object: THREE.Object3D;
+};
+
+type AvatarBoneRig = Partial<Record<
+  | "head"
+  | "hips"
+  | "leftArm"
+  | "leftFoot"
+  | "leftForeArm"
+  | "leftLeg"
+  | "leftShoulder"
+  | "leftUpLeg"
+  | "rightArm"
+  | "rightFoot"
+  | "rightForeArm"
+  | "rightLeg"
+  | "rightShoulder"
+  | "rightUpLeg"
+  | "spine"
+  | "spine01"
+  | "spine02",
+  AvatarBoneSnapshot
+>>;
+
 type PlushModel = {
   group: THREE.Group;
   parts: PlushParts;
@@ -635,8 +662,7 @@ function syncResidentVisual(
 
   const plush = createPlushAnimal(resident);
   item.group.clear();
-  item.group.userData.avatarMixer = null;
-  item.group.userData.avatarActions = [];
+  item.group.userData.avatarRigSource = plush.group;
   item.group.add(plush.group);
   item.parts = plush.parts;
   item.resident = resident;
@@ -712,27 +738,52 @@ function updateResidentObject(
   );
   item.group.rotation.z = moving ? sway : idleSideSway;
   animatePlushParts(item, role, target, elapsed, index, moving);
-  updateAvatarWalkAnimation(item, delta);
+  updateAvatarWalkAnimation(item, elapsed, index);
   animateFace(item.parts.face, speaking, smiling, elapsed);
 }
 
 function updateAvatarWalkAnimation(
   item: ResidentRuntime,
-  delta: number,
+  elapsed: number,
+  index: number,
 ) {
-  const mixer = item.group.userData.avatarMixer as THREE.AnimationMixer | null | undefined;
-  const actions = item.group.userData.avatarActions as THREE.AnimationAction[] | undefined;
-  if (!mixer || !actions?.length) return;
+  const rigSource = item.group.userData.avatarRigSource as
+    | THREE.Object3D
+    | null
+    | undefined;
+  const rig = (rigSource?.userData.avatarRig ?? item.group.userData.avatarRig) as
+    | AvatarBoneRig
+    | null
+    | undefined;
+  if (!rig) return;
 
-  const active = item.group.userData.avatarWalkingActive === true;
-  if (!active) {
-    for (const action of actions) {
-      action.reset();
-      action.play();
-    }
-    item.group.userData.avatarWalkingActive = true;
-  }
-  mixer.update(delta);
+  const phase = elapsed * 6.2 + index * 0.52;
+  const stride = Math.sin(phase);
+  const counter = Math.sin(phase + Math.PI);
+  const lift = Math.max(0, Math.sin(phase));
+  const counterLift = Math.max(0, Math.sin(phase + Math.PI));
+  const settle = Math.sin(phase * 0.5);
+
+  applyAvatarBonePosition(rig.hips, 0, lift * 0.07 + counterLift * 0.07, 0);
+  applyAvatarBoneRotation(rig.hips, 0.02 * settle, 0.05 * stride, 0.08 * stride);
+  applyAvatarBoneRotation(rig.spine02, 0.04 * counter, 0, -0.08 * stride);
+  applyAvatarBoneRotation(rig.spine01, 0.03 * counter, 0, -0.05 * stride);
+  applyAvatarBoneRotation(rig.spine, 0.02 * counter, 0, -0.04 * stride);
+  applyAvatarBoneRotation(rig.head, -0.05 + 0.04 * counter, 0.04 * stride, -0.05 * stride);
+
+  applyAvatarBoneRotation(rig.leftShoulder, 0, 0, -0.42);
+  applyAvatarBoneRotation(rig.rightShoulder, 0, 0, 0.42);
+  applyAvatarBoneRotation(rig.leftArm, -0.46 * counter, 0, -1.02 + 0.18 * stride);
+  applyAvatarBoneRotation(rig.rightArm, -0.46 * stride, 0, 1.02 + 0.18 * counter);
+  applyAvatarBoneRotation(rig.leftForeArm, -0.18 - 0.2 * counterLift, 0, -0.16);
+  applyAvatarBoneRotation(rig.rightForeArm, -0.18 - 0.2 * lift, 0, 0.16);
+
+  applyAvatarBoneRotation(rig.leftUpLeg, 0.62 * stride, 0, 0.06 * stride);
+  applyAvatarBoneRotation(rig.rightUpLeg, 0.62 * counter, 0, 0.06 * counter);
+  applyAvatarBoneRotation(rig.leftLeg, -0.28 - 0.54 * counterLift, 0, 0);
+  applyAvatarBoneRotation(rig.rightLeg, -0.28 - 0.54 * lift, 0, 0);
+  applyAvatarBoneRotation(rig.leftFoot, -0.16 + 0.34 * lift, 0, 0);
+  applyAvatarBoneRotation(rig.rightFoot, -0.16 + 0.34 * counterLift, 0, 0);
 }
 
 function updateCameraFocus(
@@ -1088,6 +1139,7 @@ function createResidentRuntime(
   const plush = createPlushAnimal(resident);
   group.position.copy(spawnPosition);
   group.scale.set(0.18, 0.18, 0.18);
+  group.userData.avatarRigSource = plush.group;
   group.add(plush.group);
   return {
     group,
@@ -1402,9 +1454,7 @@ function attachAvatarModel(
   const safeAnimalType = normalizeAvatarAnimalType(animalType);
   const loadToken = Symbol(safeAnimalType);
   group.userData.avatarLoadToken = loadToken;
-  group.userData.avatarActions = [];
-  group.userData.avatarMixer = null;
-  group.userData.avatarWalkingActive = false;
+  group.userData.avatarRig = null;
   void loadAvatarTemplate(safeAnimalType)
     .then(async (template) => {
       if (group.userData.avatarLoadToken !== loadToken) return;
@@ -1415,14 +1465,7 @@ function attachAvatarModel(
         .then((texture) => applyAvatarTexture(model, texture))
         .catch(() => applyAvatarFallbackMaterial(model));
       if (group.userData.avatarLoadToken !== loadToken) return;
-      const animations = getAvatarAnimations(template);
-  if (animations.length > 0) {
-    const mixer = new THREE.AnimationMixer(model);
-    const actions = animations.map((clip) => mixer.clipAction(clip));
-    group.userData.avatarActions = actions;
-    group.userData.avatarMixer = mixer;
-    group.userData.avatarWalkingActive = false;
-  }
+      group.userData.avatarRig = createAvatarBoneRig(model);
       fallbackGroup.visible = false;
       group.add(model);
     })
@@ -1451,7 +1494,6 @@ function loadAvatarTemplate(animalType: MeguriAnimalType) {
           uri,
           (gltf: GLTF) => {
             prepareAvatarMaterials(gltf.scene);
-            gltf.scene.userData.avatarAnimations = gltf.animations;
             resolve(gltf.scene);
           },
           undefined,
@@ -1502,11 +1544,6 @@ function cloneAvatarTemplate(template: THREE.Group): THREE.Group {
   return (clone ? clone(template) : template.clone(true)) as THREE.Group;
 }
 
-function getAvatarAnimations(template: THREE.Group): THREE.AnimationClip[] {
-  const animations = template.userData.avatarAnimations;
-  return Array.isArray(animations) ? animations : [];
-}
-
 function prepareAvatarClone(model: THREE.Group) {
   prepareAvatarMaterials(model);
   const box = new THREE.Box3().setFromObject(model);
@@ -1541,6 +1578,66 @@ function applyAvatarFallbackMaterial(model: THREE.Group) {
       side: THREE.DoubleSide,
     });
   });
+}
+
+function createAvatarBoneRig(model: THREE.Object3D): AvatarBoneRig {
+  const rig: AvatarBoneRig = {};
+  const mapping: Array<[keyof AvatarBoneRig, string]> = [
+    ["head", "Head"],
+    ["hips", "Hips"],
+    ["leftArm", "LeftArm"],
+    ["leftFoot", "LeftFoot"],
+    ["leftForeArm", "LeftForeArm"],
+    ["leftLeg", "LeftLeg"],
+    ["leftShoulder", "LeftShoulder"],
+    ["leftUpLeg", "LeftUpLeg"],
+    ["rightArm", "RightArm"],
+    ["rightFoot", "RightFoot"],
+    ["rightForeArm", "RightForeArm"],
+    ["rightLeg", "RightLeg"],
+    ["rightShoulder", "RightShoulder"],
+    ["rightUpLeg", "RightUpLeg"],
+    ["spine", "Spine"],
+    ["spine01", "Spine01"],
+    ["spine02", "Spine02"],
+  ];
+
+  for (const [key, name] of mapping) {
+    const object = model.getObjectByName(name);
+    if (!object) continue;
+    rig[key] = {
+      basePosition: object.position.clone(),
+      baseQuaternion: object.quaternion.clone(),
+      object,
+    };
+  }
+  return rig;
+}
+
+function applyAvatarBoneRotation(
+  bone: AvatarBoneSnapshot | undefined,
+  x = 0,
+  y = 0,
+  z = 0,
+) {
+  if (!bone) return;
+  bone.object.quaternion.copy(bone.baseQuaternion);
+  bone.object.quaternion.multiply(
+    new THREE.Quaternion().setFromEuler(new THREE.Euler(x, y, z, "XYZ")),
+  );
+}
+
+function applyAvatarBonePosition(
+  bone: AvatarBoneSnapshot | undefined,
+  x = 0,
+  y = 0,
+  z = 0,
+) {
+  if (!bone) return;
+  bone.object.position.copy(bone.basePosition);
+  bone.object.position.x += x;
+  bone.object.position.y += y;
+  bone.object.position.z += z;
 }
 
 function prepareAvatarMaterials(model: THREE.Object3D) {

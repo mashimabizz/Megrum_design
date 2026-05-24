@@ -4,6 +4,47 @@
 
 ---
 
+## イテレーション168.8：v2ボーンへ自前歩行モーションを適用
+
+### 背景・問題意識
+
+オーナーから「めぐり演出中、Tポーズのままです。歩くようにして欲しいです。元々のアニメーションを使ってもらった方がいいのかな？初期の自前のやつ」と指摘があった。v2 GLB内の `Armature|clip0|baselayer` は実質1キーの静止clipで、常時再生しても歩行にならないため、初期実装の自前モーション方針へ戻す必要がある。
+
+### 変更内容
+
+#### `mobile/src/components/meguri/MeguriThreeScene.tsx`
+- GLB内蔵clip依存をやめ、v2モデルの `Hips` / `Spine` / `Head` / 手足ボーンへサイン波ベースの歩行モーションを毎フレーム適用するようにした。
+- アバターのボーンrigを内側のアバターグループから外側の住人グループ経由で参照できるようにし、めぐり演出中の更新処理が確実にv2ボーンへ届くようにした。
+- 腰の上下動は小さく抑え、腕・脚・足先・首の揺れで「常に歩いている」見え方を作るようにした。
+
+### 影響範囲
+
+- iOS版 めぐりホーム/めぐりイントロ/めぐり広場/めぐりプロフィール/アバター編集の3D表示
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- `npm --prefix mobile run update:ios:preview -- --message "[iter168.8] v2めぐりアバターに自前歩行を適用" --non-interactive`
+- EAS Update: `019e5834-812b-76e7-83a2-abbf20230e21`
+- EAS Update group: `a6cf2181-6e1e-4411-856b-3dcecf4187d6`
+
+### 関連ファイル
+
+- `mobile/src/components/meguri/MeguriThreeScene.tsx`
+
+### セルフレビュー結果
+
+- ✅ GLB内蔵clipが静止1キーでも、v2ボーンへ自前歩行が適用される構成に変更
+- ✅ アバターrig参照先のズレを修正し、外側の住人更新ループから内側のGLBボーンを更新
+- ✅ 腰の上下動を抑え、手足と首の常時歩行表現を追加
+- ✅ `npm --prefix mobile run typecheck` 成功
+- ✅ `npm --prefix mobile run export:ios:preview` 成功
+- ✅ Expo preview channel への EAS Update 成功
+- ✅ 状態ID・用語・DBスキーマの追加変更なし
+
+---
+
 ## イテレーション168.7：v2アバターの歩行clipを常時再生
 
 ### 背景・問題意識
