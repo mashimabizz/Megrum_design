@@ -161,6 +161,12 @@ type GroomPublishPayload = {
   textOverlays: GroomTextOverlay[];
 };
 
+type GroomCapturePayload = {
+  base64?: string | null;
+  contentType?: string | null;
+  uri: string;
+};
+
 type GroomAccountGroup = {
   key: string;
   posts: GroomPost[];
@@ -576,6 +582,8 @@ export default function EncountersScreen() {
   const [groomReplyNotice, setGroomReplyNotice] = useState("");
   const [groomCameraOpen, setGroomCameraOpen] = useState(false);
   const [groomDraftUri, setGroomDraftUri] = useState<string | null>(null);
+  const [groomDraftBase64, setGroomDraftBase64] = useState<string | null>(null);
+  const [groomDraftContentType, setGroomDraftContentType] = useState<string | null>(null);
   const [groomDraftCaption, setGroomDraftCaption] = useState("");
   const [groomOpenOrigin, setGroomOpenOrigin] = useState<GroomOpenOrigin | null>(null);
   const [groomViewerSession, setGroomViewerSession] = useState(0);
@@ -671,9 +679,11 @@ export default function EncountersScreen() {
     setGroomCameraOpen(true);
   }
 
-  function openGroomEditor(uri: string) {
+  function openGroomEditor(capture: GroomCapturePayload) {
     setGroomCameraOpen(false);
-    setGroomDraftUri(uri);
+    setGroomDraftUri(capture.uri);
+    setGroomDraftBase64(capture.base64 ?? null);
+    setGroomDraftContentType(capture.contentType ?? "image/jpeg");
     setGroomDraftCaption("");
   }
 
@@ -725,6 +735,8 @@ export default function EncountersScreen() {
   async function publishGroom(payload: GroomPublishPayload) {
     if (!groomDraftUri) return;
     const draftUri = groomDraftUri;
+    const draftBase64 = groomDraftBase64;
+    const draftContentType = groomDraftContentType;
     const optimisticId = `groom-mine-${Date.now()}`;
     const newPost: GroomPost = {
       id: optimisticId,
@@ -742,12 +754,16 @@ export default function EncountersScreen() {
     };
     setGroomPosts((current) => [newPost, ...current]);
     setGroomDraftUri(null);
+    setGroomDraftBase64(null);
+    setGroomDraftContentType(null);
     setGroomDraftCaption("");
     if (previewMode || !user) return;
     try {
       const remotePost = await createGroomPost(user.id, {
         caption: payload.caption.trim(),
         doodles: payload.doodles,
+        imageBase64: draftBase64,
+        imageContentType: draftContentType,
         imageTransform: payload.imageTransform,
         imageUri: draftUri,
         placeHint: "今日の現場付近",
@@ -766,6 +782,8 @@ export default function EncountersScreen() {
       console.warn("Failed to publish groom post", error);
       setGroomPosts((current) => current.filter((post) => post.id !== optimisticId));
       setGroomDraftUri(draftUri);
+      setGroomDraftBase64(draftBase64);
+      setGroomDraftContentType(draftContentType);
       setGroomDraftCaption(payload.caption.trim());
       Alert.alert(
         "グルームを保存できませんでした",
@@ -1111,11 +1129,15 @@ export default function EncountersScreen() {
         onChangeCaption={setGroomDraftCaption}
         onClose={() => {
           setGroomDraftUri(null);
+          setGroomDraftBase64(null);
+          setGroomDraftContentType(null);
           setGroomDraftCaption("");
         }}
         onPublish={publishGroom}
         onRetake={() => {
           setGroomDraftUri(null);
+          setGroomDraftBase64(null);
+          setGroomDraftContentType(null);
           setGroomDraftCaption("");
           openGroomCamera();
         }}
@@ -2617,7 +2639,7 @@ function GroomCameraModal({
   onClose,
   visible,
 }: {
-  onCapture: (uri: string) => void;
+  onCapture: (payload: GroomCapturePayload) => void;
   onClose: () => void;
   visible: boolean;
 }) {
@@ -2680,12 +2702,19 @@ function GroomCameraModal({
     setBusy("camera");
     try {
       const picture = await cameraRef.current?.takePictureAsync({
+        base64: true,
         imageType: "jpg",
         maxDownsampling: 1,
         quality: GROOM_CAMERA_QUALITY,
         skipProcessing: false,
       });
-      if (picture?.uri) onCapture(picture.uri);
+      if (picture?.uri) {
+        onCapture({
+          base64: picture.base64 ?? null,
+          contentType: "image/jpeg",
+          uri: picture.uri,
+        });
+      }
     } catch {
       Alert.alert("撮影できませんでした", "時間を置いてもう一度お試しください。");
     } finally {
@@ -2705,13 +2734,21 @@ function GroomCameraModal({
       void refreshLatestLibraryPhoto(false);
       const result = await ImagePicker.launchImageLibraryAsync({
         allowsEditing: false,
+        base64: true,
         mediaTypes: ["images"],
         preferredAssetRepresentationMode:
           ImagePicker.UIImagePickerPreferredAssetRepresentationMode.Compatible,
         quality: GROOM_LIBRARY_QUALITY,
         selectionLimit: 1,
       });
-      if (!result.canceled && result.assets[0]?.uri) onCapture(result.assets[0].uri);
+      const asset = result.canceled ? null : result.assets[0];
+      if (asset?.uri) {
+        onCapture({
+          base64: asset.base64 ?? null,
+          contentType: asset.mimeType ?? "image/jpeg",
+          uri: asset.uri,
+        });
+      }
     } finally {
       setBusy(null);
     }
@@ -2835,8 +2872,23 @@ function selectBestGroomPictureSize(sizes: string[]) {
 }
 
 function groomPublishFailureMessage(error: unknown) {
-  if (error instanceof Error && error.message.startsWith("画像サイズが大きすぎます")) {
-    return error.message;
+  if (error instanceof Error) {
+    if (
+      error.message.startsWith("画像サイズが大きすぎます") ||
+      error.message.startsWith("グルーム画像を読み込めませんでした") ||
+      error.message.startsWith("ログイン情報を確認できませんでした") ||
+      error.message.startsWith("ログイン中のユーザー情報が古くなっています")
+    ) {
+      return error.message;
+    }
+    if (
+      error.message.includes("row-level security") ||
+      error.message.includes("permission") ||
+      error.message.includes("Unauthorized") ||
+      error.message.includes("403")
+    ) {
+      return "保存権限を確認できませんでした。ログインし直してから、もう一度投稿してください。";
+    }
   }
   return "通信状況を確認して、もう一度投稿してください。";
 }

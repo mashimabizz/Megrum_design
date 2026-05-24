@@ -37,6 +37,8 @@ export type GroomRemotePost = {
 export type GroomCreatePostInput = {
   caption: string;
   doodles: unknown[];
+  imageBase64?: string | null;
+  imageContentType?: string | null;
   imageTransform: GroomRemoteImageTransform;
   imageUri: string;
   placeHint?: string;
@@ -107,7 +109,23 @@ export async function createGroomPost(
     throw new Error("Supabase is not configured.");
   }
 
-  const uploaded = await uploadGroomImage(currentUserId, input.imageUri);
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser();
+  if (authError || !user) {
+    throw new Error("ログイン情報を確認できませんでした。ログインし直してから投稿してください。");
+  }
+  if (user.id !== currentUserId) {
+    throw new Error("ログイン中のユーザー情報が古くなっています。アプリを開き直してから投稿してください。");
+  }
+
+  const uploaded = await uploadGroomImage(
+    currentUserId,
+    input.imageUri,
+    input.imageBase64,
+    input.imageContentType,
+  );
   const audience = await buildGroomAudience(currentUserId);
   const { data, error } = await supabase
     .from("groom_posts")
@@ -289,31 +307,54 @@ async function fetchGroomViewIds(currentUserId: string, postIds: string[]) {
   return new Set((Array.isArray(data) ? data : []).map((row) => stringValue(row.groom_post_id)));
 }
 
-async function uploadGroomImage(currentUserId: string, uri: string) {
+async function uploadGroomImage(
+  currentUserId: string,
+  uri: string,
+  base64?: string | null,
+  base64ContentType?: string | null,
+) {
   if (!supabase) throw new Error("Supabase is not configured.");
   if (/^https?:\/\//i.test(uri)) {
     return { path: null, storedUrl: uri };
   }
 
-  const response = await fetch(uri);
-  if (!response.ok) {
-    throw new Error("グルーム画像を読み込めませんでした");
-  }
-  const arrayBuffer = await response.arrayBuffer();
-  if (arrayBuffer.byteLength > GROOM_MAX_UPLOAD_BYTES) {
+  const imageBody = base64
+    ? {
+        body: base64ToArrayBuffer(base64),
+        contentType: contentTypeForUri(uri, base64ContentType ?? null),
+      }
+    : await readLocalImageWithFetch(uri);
+  if (imageBody.body.byteLength > GROOM_MAX_UPLOAD_BYTES) {
     throw new Error("画像サイズが大きすぎます。別の写真を選ぶか、少し小さくしてから投稿してください。");
   }
-  const contentType = contentTypeForUri(uri, response.headers.get("content-type"));
+  const contentType = imageBody.contentType;
   const extension = extensionForContentType(contentType);
   const path = `${currentUserId}/${Date.now()}_${Math.random().toString(36).slice(2)}.${extension}`;
   const { error } = await supabase.storage
     .from(GROOM_BUCKET)
-    .upload(path, arrayBuffer, {
+    .upload(path, imageBody.body, {
       contentType,
       upsert: false,
     });
   if (error) throw error;
   return { path, storedUrl: path };
+}
+
+async function readLocalImageWithFetch(uri: string) {
+  try {
+    const response = await fetch(uri);
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+    return {
+      body: await response.arrayBuffer(),
+      contentType: contentTypeForUri(uri, response.headers.get("content-type")),
+    };
+  } catch (error) {
+    throw new Error(
+      `グルーム画像を読み込めませんでした。もう一度撮影するか、アルバムから選び直してください。${error instanceof Error ? ` (${error.message})` : ""}`,
+    );
+  }
 }
 
 async function buildGroomAudience(currentUserId: string) {
@@ -424,6 +465,37 @@ function extensionForContentType(contentType: string) {
   if (contentType.includes("png")) return "png";
   if (contentType.includes("webp")) return "webp";
   return "jpg";
+}
+
+function base64ToArrayBuffer(value: string) {
+  const clean = value
+    .replace(/^data:[^;]+;base64,/, "")
+    .replace(/[\r\n\s]/g, "");
+  const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+  const padding = clean.endsWith("==") ? 2 : clean.endsWith("=") ? 1 : 0;
+  const byteLength = Math.floor((clean.length * 3) / 4) - padding;
+  const bytes = new Uint8Array(byteLength);
+  let buffer = 0;
+  let bits = 0;
+  let index = 0;
+
+  for (let i = 0; i < clean.length; i += 1) {
+    const char = clean[i];
+    if (char === "=") break;
+    const value = alphabet.indexOf(char);
+    if (value < 0) continue;
+    buffer = (buffer << 6) | value;
+    bits += 6;
+    if (bits >= 8) {
+      bits -= 8;
+      if (index < byteLength) {
+        bytes[index] = (buffer >> bits) & 0xff;
+        index += 1;
+      }
+    }
+  }
+
+  return bytes.buffer;
 }
 
 function imageTransformValue(value: unknown): GroomRemoteImageTransform {

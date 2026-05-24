@@ -4,6 +4,56 @@
 
 ---
 
+## イテレーション168.14：グルーム投稿画像読込を安定化
+
+### 背景・問題意識
+
+オーナーから「まだグルームを保存できないので、保存できるようにしてください。エラーがでます」と再指摘があった。iter168.11 で画像サイズ超過と署名URL失敗の扱いは修正したが、iOS/Expo 実機では `fetch(file://...)` によるローカル画像読み込みが失敗し、Storageアップロード前に「グルームを保存できませんでした」へ落ちる可能性が残っていた。
+
+### 変更内容
+
+#### `mobile/app/(tabs)/encounters.tsx`
+- カメラ撮影とアルバム選択で、投稿用の `uri` に加えてBase64画像データとMIME typeを保持するようにした。
+- グルーム下書きのBase64/MIME typeを投稿成功・閉じる・撮り直し時に確実にクリアし、投稿失敗時は再投稿できるよう復元する構成にした。
+- 投稿失敗メッセージを拡張し、画像読み込み失敗・ログイン情報不整合・Storage権限系の原因をユーザーに具体表示できるようにした。
+
+#### `mobile/src/lib/groom.ts`
+- 投稿前にSupabaseの認証ユーザーを再確認し、画面側の `currentUserId` と不一致なら明示エラーにした。
+- Base64が渡された場合は `fetch(file://...)` を使わず、Base64から直接 `ArrayBuffer` を生成して `groom-posts` Storageへアップロードするようにした。
+- Base64が無い場合だけ従来の `fetch(uri)` fallback を使い、失敗時は撮り直し/選び直しを促す具体エラーにした。
+
+### 影響範囲
+
+- iOS版 めぐりホームのグルーム投稿
+- カメラ撮影からのグルーム投稿
+- アルバム選択からのグルーム投稿
+- グルーム投稿失敗時のエラー表示
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- `npm --prefix mobile run update:ios:preview -- --message "[iter168.14] グルーム投稿保存をBase64アップロードへ修正" --non-interactive`
+- EAS Update: `019e5877-0561-7d43-8128-0457da777894`
+- EAS Update group: `871211a4-ca3d-4dd6-974d-d8f2b370e049`
+
+### 関連ファイル
+
+- `mobile/app/(tabs)/encounters.tsx`
+- `mobile/src/lib/groom.ts`
+
+### セルフレビュー結果
+
+- ✅ `fetch(file://...)` 依存を避け、Base64から直接アップロードできる経路を追加
+- ✅ Supabase認証ユーザーと投稿者IDの不一致を明示エラー化
+- ✅ 投稿失敗時に下書き画像・キャプションを復元
+- ✅ `npm --prefix mobile run typecheck` 成功
+- ✅ `npm --prefix mobile run export:ios:preview` 成功
+- ✅ Expo preview channel への EAS Update 成功
+- ✅ 状態ID・用語・DBスキーマの追加変更なし（`notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` 更新不要）
+
+---
+
 ## イテレーション168.13：SEVENTEENメンバーをマスタ追加
 
 ### 背景・問題意識
