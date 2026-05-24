@@ -4,6 +4,55 @@
 
 ---
 
+## イテレーション168：めぐりアバターv2 GLBとボーンアニメーション適用
+
+### 背景・問題意識
+
+オーナーが `Megrum めぐり/v2/` に、ボーン入りの新しい `ねこv2.glb` / `きつねv2.glb` / `うさぎv2.glb` を追加した。既存実装はGLBを外部jpgテクスチャで上書きし、動きは手足の旧プロシージャルモデル側に付けていたため、v2に入っているスキン/アニメーションを活かせない構造だった。
+
+### 変更内容
+
+#### `mobile/assets/meguri-avatars/*.glb`
+- `cat.glb` / `fox.glb` / `rabbit.glb` を v2 GLB に差し替えた。
+- v2 GLB はそれぞれ `skins: 1` / `animations: 1` / 埋め込み画像ありで、アプリ側ではGLB内テクスチャを使用する。
+
+#### `mobile/src/components/meguri/MeguriThreeScene.tsx`
+- GLB内の埋め込みテクスチャを使うようにし、旧 `textures/*.jpg` の手動上書きをやめた。
+- `SkeletonUtils.clone()` でスキン付きGLBを複製し、複数体表示でもボーンが共有破綻しないようにした。
+- GLBに含まれる animation clip を `THREE.AnimationMixer` で再生し、移動中/待機中/会話中で再生速度を切り替えるようにした。
+
+### 影響範囲
+
+- iOS版 めぐり3D演出
+- iOS版 めぐりホーム/めぐり広場/めぐりプロフィール/アバター編集の3D表示
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- `npm --prefix mobile run update:ios:preview -- --message "[iter168] めぐりアバターv2 GLBを適用" --non-interactive`
+- EAS Update: `019e57fe-c704-77c8-afe6-0959864f0dbf`
+- EAS Update group: `407ed231-1bb2-45b7-a735-ec576911c447`
+
+### 関連ファイル
+
+- `mobile/assets/meguri-avatars/cat.glb`
+- `mobile/assets/meguri-avatars/fox.glb`
+- `mobile/assets/meguri-avatars/rabbit.glb`
+- `mobile/src/components/meguri/MeguriThreeScene.tsx`
+
+### セルフレビュー結果
+
+- ✅ v2 GLBにスキン・アニメーション・埋め込み画像が含まれていることを確認
+- ✅ GLB内テクスチャを尊重し、旧jpgテクスチャ上書きを削除
+- ✅ スキン付きモデルを安全に複製するため `SkeletonUtils.clone()` を使用
+- ✅ `npm --prefix mobile run typecheck` 成功
+- ✅ `npm --prefix mobile run export:ios:preview` 成功
+- ✅ Expo preview channel への EAS Update 成功
+- ✅ 状態ID・用語・DBスキーマの追加変更なし
+
+---
+
 ## イテレーション167：初回表示のプレビューデータちらつきを除去
 
 ### 背景・問題意識
