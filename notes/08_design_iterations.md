@@ -4,6 +4,52 @@
 
 ---
 
+## イテレーション168.13：SEVENTEENメンバーをマスタ追加
+
+### 背景・問題意識
+
+オーナーから「推し活グループとして、KPOPグループにSEVENTEENというグループを追加して、メンバーをマスタ登録して欲しい」と指示があった。既存の初期seedでは `groups_master` に `SEVENTEEN` は登録済みだが、`characters_master` 側の13名が未登録だったため、オンボーディング/推し設定/在庫登録でメンバーを選べるようにする。
+
+### 変更内容
+
+#### `supabase/migrations/20260524210000_seed_seventeen_members.sql`
+- `groups_master` の `SEVENTEEN` を upsert し、aliases に `SVT` を追加した。
+- SEVENTEEN Japan official site の PROFILE 掲載順に合わせて、13名を `characters_master` に追加した。
+- 既存環境で重複登録しないよう、同一 `group_id` + `name` が存在する場合はメンバーinsertをスキップする構成にした。
+- 表示名は既存seedに合わせて日本語カナを主にし、aliases に英字公式表記・ハングル・主要な表記揺れを入れた。
+
+### 影響範囲
+
+- Supabase `groups_master` / `characters_master`
+- オンボーディングの推しグループ/メンバー選択
+- プロフィール推し設定
+- 在庫/ウィッシュの推し・メンバー選択
+
+### 確認方法
+
+- `supabase db push --dry-run`
+- `supabase db push --yes`
+- `supabase migration list --linked`
+- `supabase db query --linked -o table "select g.name as group_name, count(c.id) as member_count from public.groups_master g left join public.characters_master c on c.group_id = g.id where g.name = 'SEVENTEEN' group by g.name;"`
+- `rg -n "SEVENTEEN|エスクプス|ディノ" supabase/migrations/20260524210000_seed_seventeen_members.sql notes/08_design_iterations.md`
+
+### 関連ファイル
+
+- `supabase/migrations/20260524210000_seed_seventeen_members.sql`
+- `notes/08_design_iterations.md`
+
+### セルフレビュー結果
+
+- ✅ `groups_master` は既存seedと整合する `genre_id + name` upsert
+- ✅ `characters_master` へSEVENTEEN 13名を登録
+- ✅ `supabase db push --yes` でリモートDBへ適用済み
+- ✅ リモートDBで `SEVENTEEN` の `member_count = 13` を確認
+- ✅ 状態IDの追加・変更なし（`notes/09_state_machines.md` 更新不要）
+- ✅ 新しいアプリ用語・廃止用語なし（`notes/10_glossary.md` 更新不要）
+- ✅ DBスキーマ変更なし（`notes/05_data_model.md` 更新不要）
+
+---
+
 ## イテレーション168.12：3Dアバターを歩きGLB常時再生状態へ戻す
 
 ### 背景・問題意識
