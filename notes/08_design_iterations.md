@@ -41,6 +41,7 @@
 - `npm --prefix web install`
 - `npm --prefix web run build`
 - `supabase db push --dry-run`
+- `supabase db push --yes`
 - `npm --prefix web run lint`（既存のReact 19 purity系lintが複数あり失敗。今回追加ファイルはlintエラー対象に出ていない）
 
 ### 関連ファイル
@@ -66,6 +67,7 @@
 - ✅ Premium判定を `subscriptions` 生状態ではなく `user_entitlements` に集約
 - ✅ `npm --prefix web run build` 成功
 - ✅ `supabase db push --dry-run` 成功
+- ✅ `supabase db push --yes` 成功
 - ⚠️ `npm --prefix web run lint` は既存ファイルのReact purity lintで失敗（今回追加の管理者ファイルは指摘なし）
 - ⚠️ 初回ownerはSupabase SQLで `admin_roles` に手動bootstrapが必要
 
