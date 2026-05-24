@@ -1,6 +1,6 @@
 # 09. 状態遷移図（State Machines）
 
-> **目的**：iHub の主要エンティティのライフサイクルと状態遷移ルールを定義。
+> **目的**：Megrum の主要エンティティのライフサイクルと状態遷移ルールを定義。
 > 実装が状態遷移でブレないための一次資料。デザイン・実装・QA の共通言語。
 
 最終更新: 2026-05-01
@@ -34,7 +34,9 @@
 8. [Listing Lifecycle（個別募集 / iter64〜）](#8-listing-lifecycle)
 9. [Calendar Disclosure（カレンダー公開 / iter65〜）](#9-calendar-disclosure)
 10. [Local Mode（現地モード / iter63〜）](#10-local-mode)
-11. [付録：エンティティ間の関係](#11-付録エンティティ間の関係)
+11. [Meguri Message Lifecycle（めぐりメッセージ）](#11-meguri-message-lifecycle)
+12. [Groom Lifecycle（グルーム）](#12-groom-lifecycle)
+13. [付録：エンティティ間の関係](#13-付録エンティティ間の関係)
 
 ---
 
@@ -585,7 +587,84 @@ stateDiagram-v2
 
 ---
 
-## 11. 付録：エンティティ間の関係
+## 11. Meguri Message Lifecycle
+
+推しすれ違い機能のめぐりメッセージ状態管理。
+iter157 で体験プロトタイプを iOS 版に追加し、iter162.41 でレター表記からLINE風のメッセージUIへ変更した。交換・打診・取引とは独立したソーシャル体験として扱う。
+
+### 状態図
+
+```mermaid
+stateDiagram-v2
+    [*] --> received_locked: メッセージ到着
+    received_locked --> opened: Plusで本文表示
+    opened --> replied: 返信送信
+    received_locked --> hidden: 非表示 / ブロック
+    opened --> hidden: 非表示 / ブロック
+    replied --> archived: 会話終了 / 履歴化
+```
+
+### 状態定義
+
+| 状態 | 説明 |
+|---|---|
+| `received_locked` | 到着は見えるが本文は未表示。推し傾向・ぼかした場所/時刻・相性のみ表示 |
+| `opened` | 月額プランで本文を表示済み。返信導線が有効 |
+| `replied` | ユーザーが返信済み。以後は個別チャットとして扱う |
+| `hidden` | ユーザーが非表示・ブロックした状態 |
+| `archived` | 会話終了または履歴化した状態 |
+
+### ビジネスルール
+
+- 単発の本文表示チケットは作らず、月額1000円のサブスクのみで本文表示・返信を許可する。
+- 送信側は月2通まで無料。月2通を超える送信枠追加は Plus 対象。
+- 場所と時刻は必ず丸め、正確な地点・時刻・職場や生活導線の特定につながる表示は避ける。
+- 交換・打診・取引とは独立し、`proposal` / `deal` 状態へ自動遷移しない。
+
+---
+
+## 12. Groom Lifecycle
+
+めぐり機能の「グルーム」投稿状態管理。
+iter162.49 で、インスタグラムのストーリーに近い一過性スナップとして追加。フォロー関係ではなく、めぐりあった人・同じ現場圏内という場所と時間の文脈で閲覧できる。
+
+### 状態図
+
+```mermaid
+stateDiagram-v2
+    [*] --> draft: カメラ撮影 / 編集
+    draft --> published: 投稿
+    published --> expired: 24時間経過
+    published --> hidden: 削除 / 通報対応 / ブロック
+    expired --> archived: 履歴化
+```
+
+### 状態定義
+
+| 状態 | 説明 |
+|---|---|
+| `draft` | 撮影後、投稿前に写真とひとことを確認している状態 |
+| `published` | めぐりあった人に表示される状態。丸いアイコンと全画面ビューアで閲覧できる |
+| `expired` | 24時間経過で通常閲覧できなくなった状態 |
+| `hidden` | 投稿者削除、通報対応、ブロック関係により非表示になった状態 |
+| `archived` | 履歴・分析用に保存された状態。通常ユーザーには表示しない |
+
+### ビジネスルール
+
+- 表示対象は「めぐりあった人」または同じ現場圏内に限定し、フォロー/フォロワー関係を前提にしない。
+- 場所と時刻は必ず丸め、正確な現在地・生活導線・滞在時刻を特定できる表示にしない。
+- グルームへの返信は、めぐりメッセージ導線へつなげる。交換・打診・取引へは自動遷移しない。
+- iter165 以降、`encountered_people` の閲覧は `audience_user_ids` に含まれるユーザーだけに制限する。空配列を公開フィード扱いにしない。
+- `groom-posts` Storage は private bucket とし、`can_view_groom_post()` を満たす投稿だけ署名URLを発行する。
+- `published` の通常表示は `expires_at > now()` の投稿だけに限定する。アプリ起動時/復帰時に `expire_groom_posts()` を呼び、pg_cron が利用できる環境では15分間隔でも期限切れ投稿を `expired`、期限切れから7日経過した投稿を `archived` へ進める。
+- いいねは `groom_reactions`、閲覧済みは `groom_views`、返信は `groom_replies` に保存する。返信は `notifications.kind='groom_reply'` を作り、めぐりメッセージで開いた時に `groom_replies.read_at` を更新する。
+- グルーム返信後の通常会話は `meguri_messages` に保存し、`notifications.kind='meguri_message'` を作る。受信者が会話を開いた時に `meguri_messages.read_at` を更新する。
+- ユーザー単位の非表示は `groom_hidden_posts`、ブロックは `groom_user_blocks`、通報は `groom_reports` に保存し、RLSとアプリフィードの両方で表示対象から除外する。
+- 初期実装は写真1枚 + ひとこと + いいね + メッセージ入力を対象にし、動画・公開範囲の細分化は後続検討とする。
+
+---
+
+## 13. 付録：エンティティ間の関係
 
 ```mermaid
 graph LR

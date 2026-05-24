@@ -3,8 +3,8 @@
 > **目的**：iHub の全エンティティのDBスキーマ設計と、状態・マッチング・取引のデータフロー定義。
 > 実装の正解集。`09_state_machines.md` と完全に整合させ、`10_glossary.md` の用語を使う。
 
-最終更新: 2026-05-06
-ステータス: Draft v2.9（iter154.34 反映済）
+最終更新: 2026-05-24
+ステータス: Draft v2.12（iter165 反映済）
 
 ## 最新化履歴
 
@@ -21,6 +21,9 @@
 | **v2.7** | **2026-05-03** | **iter68-D/E/F 反映（proposals に evidence_photo_url / evidence_taken_at / evidence_taken_by / approved_by_* / completed_at / status='completed' 追加。user_evaluations テーブル新規（1 取引 1 評価 unique）。Storage chat-photos バケット作成）** |
 | **v2.8** | **2026-05-03** | **iter68.1 反映（proposal_evidence_photos テーブル新規：複数枚証跡対応。proposals.evidence_photo_url は最初の写真の互換ミラーとして残す）** |
 | **v2.9** | **2026-05-06** | **iter154.34 反映（proposals.meetup_candidates jsonb 追加。最大3件の「交換できる候補」を保存し、候補1を既存 meetup_* 列へミラー）** |
+| **v2.10** | **2026-05-23** | **iter162.83 反映（proposal_read_states テーブル新規：取引チャット/ネゴチャットの参加者別読了位置を保存し、実データに基づく既読表示へ変更）** |
+| **v2.11** | **2026-05-24** | **iter164 反映（groom_posts / groom_reactions / groom_views / groom_replies と groom-posts Storage を実装。グルームの24時間公開、いいね、閲覧済み、返信通知をDB管理へ移行）** |
+| **v2.12** | **2026-05-24** | **iter165 反映（グルーム公開範囲をRLS/Private Storageで厳格化。groom_hidden_posts / groom_user_blocks / groom_reports / meguri_messages と meguri-message-media Storage を追加）** |
 
 ## このドキュメントの位置付け
 
@@ -142,6 +145,123 @@ iter24 で「推し2階層」（グループ/作品 → メンバー/キャラ�
 ⚠️ 要確認：
 - 1ユーザーが複数推し（DD）登録できる前提でOKか
 - L1のみ・L2のみ・両方の組み合わせ可否
+
+### `groom_posts`（グルーム投稿 / iter164）
+
+iter162.49 で iOS めぐりホームに追加した、写真中心の24時間スナップ投稿。iter164 で Supabase Storage + DB 永続化へ移行し、iter165 で `groom-posts` Storage を private bucket 化した。閲覧対象は `audience_scope='encountered_people'` かつ `audience_user_ids` に含まれるユーザー、または `same_area` の `area_key` 一致ユーザーだけに制限する。空配列は公開フィード扱いにしない。
+
+| カラム | 型 | 説明 |
+|---|---|---|
+| `id` | uuid | PK |
+| `user_id` | uuid | → users（投稿者） |
+| `image_url` | text | 互換用。private Storage では path 相当または旧URLを保持し、アプリは署名URLへ差し替えて表示 |
+| `image_path` | text nullable | `groom-posts` private Storage path（署名URL発行・削除用） |
+| `caption` | text nullable | ひとこと（80字程度） |
+| `status` | text | `draft` / `published` / `expired` / `hidden` / `archived`（09 Groom Lifecycleと一致） |
+| `audience_scope` | text | `encountered_people`（めぐりあった人）を初期値にする想定 |
+| `audience_user_ids` | uuid[] | 閲覧できるユーザー。`encountered_people` / `followers` では含まれるユーザーのみ表示可 |
+| `place_hint` | text nullable | 「同じイベント圏内」など丸めた場所表示 |
+| `area_key` | text nullable | 厳密位置ではなく、閲覧判定用の粗いエリアキー |
+| `image_transform` | jsonb | 編集画面での画像の `rotation` / `scale` / `x` / `y` |
+| `text_overlays` | jsonb | テキストオーバーレイ配列 |
+| `stickers` | jsonb | スタンプ等の拡張配列 |
+| `doodles` | jsonb | 手描き線の配列 |
+| `published_at` | timestamptz nullable | 投稿時刻 |
+| `expires_at` | timestamptz nullable | 通常は `published_at + interval '24 hours'` |
+| `created_at` / `updated_at` | timestamptz | |
+
+### `groom_reactions`（グルームいいね / iter164）
+
+| カラム | 型 | 説明 |
+|---|---|---|
+| `id` | uuid | PK |
+| `groom_post_id` | uuid | → groom_posts |
+| `user_id` | uuid | → users |
+| `reaction_type` | text | 初期は `like` のみ |
+| `created_at` | timestamptz | |
+
+`unique (groom_post_id, user_id, reaction_type)` で同一ユーザーの重複いいねを防ぐ。アプリ側は現在ユーザーの liked 状態だけを取得する。
+
+### `groom_views`（グルーム閲覧済み / iter164）
+
+| カラム | 型 | 説明 |
+|---|---|---|
+| `groom_post_id` | uuid | → groom_posts。PKの一部 |
+| `user_id` | uuid | → users。PKの一部 |
+| `viewed_at` | timestamptz | 最後に閲覧した時刻 |
+
+丸アイコンの閲覧済みリングや、同一端末外でも既読扱いをそろえるための参加者別閲覧状態。
+
+### `groom_replies`（グルーム返信 / iter164）
+
+グルーム表示画面から送信したメッセージを、めぐりメッセージ導線へ接続するための追記テーブル。投稿写真・キャプションは `groom_snapshot` に保存し、投稿が期限切れになっても返信文脈を残す。
+
+| カラム | 型 | 説明 |
+|---|---|---|
+| `id` | uuid | PK |
+| `groom_post_id` | uuid | → groom_posts |
+| `sender_id` | uuid | → users |
+| `recipient_id` | uuid | → users（投稿者） |
+| `body` | text | 返信本文（1〜500字） |
+| `groom_snapshot` | jsonb | `caption` / `image_url` など返信時点の投稿スナップショット |
+| `read_at` | timestamptz nullable | 受信者がめぐりメッセージで開いた時刻 |
+| `created_at` | timestamptz | |
+
+`notifications.kind='groom_reply'` と `notifications.groom_reply_id` を追加し、受信者に通知を残す。
+
+### `groom_hidden_posts`（グルーム非表示 / iter165）
+
+ユーザーごとの「このグルームを非表示」を保持する。`can_view_groom_post()` の判定に含め、非表示後はフィード・Storage署名URL発行から除外する。
+
+| カラム | 型 | 説明 |
+|---|---|---|
+| `user_id` | uuid | → users。PKの一部 |
+| `groom_post_id` | uuid | → groom_posts。PKの一部 |
+| `created_at` | timestamptz | |
+
+### `groom_user_blocks`（グルームブロック / iter165）
+
+グルーム/めぐり文脈のユーザーブロック。`blocker_id` と `blocked_id` のどちらかに該当する関係では、相互にグルーム表示・めぐりメッセージ送信を抑制する。
+
+| カラム | 型 | 説明 |
+|---|---|---|
+| `blocker_id` | uuid | → users。PKの一部 |
+| `blocked_id` | uuid | → users。PKの一部 |
+| `created_at` | timestamptz | |
+
+### `groom_reports`（グルーム通報 / iter165）
+
+不適切なグルーム投稿の通報。ユーザーは自分の通報だけ参照できる。
+
+| カラム | 型 | 説明 |
+|---|---|---|
+| `id` | uuid | PK |
+| `reporter_id` | uuid | → users |
+| `groom_post_id` | uuid | → groom_posts |
+| `reported_user_id` | uuid | → users |
+| `reason` | text | `spam` / `harassment` / `privacy` / `other` |
+| `note` | text nullable | 補足 |
+| `status` | text | `open` / `reviewing` / `resolved` / `dismissed` |
+| `created_at` / `updated_at` | timestamptz | |
+
+### `meguri_messages`（めぐりあいメッセージ / iter165）
+
+グルーム返信後の通常会話を永続化する追記型メッセージ。静的プレビュー相手などUUIDでない相手はローカルフォールバックを使うが、実ユーザー間ではDB同期される。
+
+| カラム | 型 | 説明 |
+|---|---|---|
+| `id` | uuid | PK |
+| `sender_id` | uuid | → users |
+| `recipient_id` | uuid | → users |
+| `source_groom_reply_id` | uuid nullable | → groom_replies。グルーム返信から始まった会話の起点 |
+| `message_type` | text | `text` / `image` |
+| `body` | text nullable | 本文 |
+| `image_url` | text nullable | 互換用。private Storage では path 相当 |
+| `image_path` | text nullable | `meguri-message-media` private Storage path |
+| `read_at` | timestamptz nullable | 受信者がスレッドを開いた時刻 |
+| `created_at` | timestamptz | |
+
+`notifications.kind='meguri_message'` と `notifications.meguri_message_id` を追加し、受信者に通知を残す。
 
 ---
 
@@ -447,6 +567,23 @@ iter34 で `message_type` 拡張。
 ⚠️ 要確認：
 - `outfit_photo` を `messages` に格納するか専用テーブル `deal_outfit_photos` にするか
 - system message の `event_type` の値リスト確定（'arrival', 'agreement_one_side', 'evidence_captured' 等）
+
+### `proposal_read_states`（取引チャット読了状態 / iter162.83）
+
+`messages` は追記型のまま維持し、参加者がその proposal のチャットをどこまで開いたかだけを別テーブルで管理する。送信者側のUIでは、相手ユーザーの `last_read_at` が自分のメッセージ `created_at` 以降の時だけ「既読」を表示する。
+
+| カラム | 型 | 説明 |
+|---|---|---|
+| `proposal_id` | uuid | → proposals。PKの一部 |
+| `user_id` | uuid | → users/auth.users。PKの一部 |
+| `last_read_at` | timestamptz | その参加者が最後に開いたメッセージ時刻 |
+| `updated_at` | timestamptz | 読了位置を更新した時刻 |
+
+制約・RLS：
+- primary key: `(proposal_id, user_id)`
+- SELECT: proposal の sender / receiver のみ
+- INSERT/UPDATE: proposal 参加者が自分の `user_id` 行のみ
+- `messages` 本体は更新しない。既読は `proposal_read_states` の派生表示として扱う。
 
 ---
 
@@ -843,5 +980,6 @@ ad_impressions table（オプション、Post-MVP で詳細分析用）:
 | Item | `available` `in_negotiation` `in_deal` `traded` | `user_haves.status` |
 | Wish | `active` `matched` `in_negotiation` `achieved` | `user_wants.status` |
 | Account | `registered` `verified` `onboarding` `active` `suspended` `deletion_requested` `deleted` | `users.account_status` |
+| Groom | `draft` `published` `expired` `hidden` `archived` | `groom_posts.status` |
 
 > **注意**：実装で状態名を勝手に変えると 09 と不整合になる。命名変更が必要なら必ず両方を同時に更新する。

@@ -1,14 +1,30 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import { router } from "expo-router";
 import {
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ComponentType,
+  type ReactNode,
+} from "react";
+import { router } from "expo-router";
+import { BlurView } from "expo-blur";
+import type { GlassViewProps } from "expo-glass-effect";
+import type { SFSymbol, SymbolViewProps } from "expo-symbols";
+import {
+  ActionSheetIOS,
+  Alert,
   Animated,
+  AppState,
   Easing,
   Image,
+  Keyboard,
   Modal,
+  PanResponder,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
-  Switch,
   Text,
   TextInput,
   View,
@@ -27,16 +43,41 @@ import {
   type ShelfSection,
 } from "../../src/data/homeMatches";
 import { fetchHomeSupabaseSections } from "../../src/data/homeSupabase";
+import { appendMeguriGroomReply } from "../../src/lib/meguriMessages";
+import {
+  archiveGroomPost,
+  blockGroomUser,
+  fetchGroomFeed,
+  hideGroomPost,
+  isUuidLike,
+  markGroomPostViewed,
+  reportGroomPost,
+  setGroomPostLiked,
+  type GroomRemotePost,
+} from "../../src/lib/groom";
 import {
   NativeMapPreview,
   type MapCoordinate,
 } from "../../src/components/NativeMapPreview";
+import { GroomProfileSlidePanel, type GroomProfileUser } from "../../src/components/meguri/GroomProfileSlidePanel";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useImageReady } from "../../src/lib/useImageReady";
+import { formatHashTags } from "../../src/lib/inventoryTags";
+import { useKeyboardInset } from "../../src/lib/useKeyboardInset";
 import { ihubColors, ihubRadii } from "../../src/theme/tokens";
+import { USERS } from "./encounters";
 
 const FALLBACK_LOCAL_CENTER: MapCoordinate = {
   latitude: 35.6595,
   longitude: 139.7005,
 };
+const TOP_EDGE_FADE_BANDS = Array.from({ length: 24 }, (_, index) => {
+  const t = index / 23;
+  const strength = Math.pow(1 - t, 1.9);
+  return {
+    backgroundColor: `rgba(251,249,252,${(0.74 * strength).toFixed(3)})`,
+  };
+});
 const LOCAL_DURATION_OPTIONS = [
   { label: "1時間", value: 60 },
   { label: "2時間", value: 120 },
@@ -76,54 +117,244 @@ type LocalCarryingItem = {
   hue: string;
 };
 
+type HomeGroomPost = {
+  authorId?: string;
+  caption: string;
+  doodles?: HomeGroomDoodleStroke[];
+  id: string;
+  imagePath?: string | null;
+  imageTransform?: HomeGroomImageTransform;
+  imageUri: string;
+  liked: boolean;
+  name: string;
+  stickers?: HomeGroomStickerOverlay[];
+  timeLabel: string;
+  textOverlays?: HomeGroomTextOverlay[];
+  viewed?: boolean;
+};
+
+type HomeGroomImageTransform = {
+  rotation: number;
+  scale: number;
+  x: number;
+  y: number;
+};
+
+type HomeGroomTextOverlay = {
+  color: string;
+  id: string;
+  rotation?: number;
+  scale?: number;
+  text: string;
+  tone: "plain" | "label" | "solid";
+  x: number;
+  y: number;
+};
+
+type HomeGroomStickerOverlay = {
+  color: string;
+  id: string;
+  label: string;
+  x: number;
+  y: number;
+};
+
+type HomeGroomDoodleStroke = {
+  color: string;
+  id: string;
+  points: { x: number; y: number }[];
+};
+
+const DEFAULT_HOME_GROOM_IMAGE_TRANSFORM: HomeGroomImageTransform = {
+  rotation: 0,
+  scale: 1,
+  x: 0,
+  y: 0,
+};
+
+function isDefaultHomeGroomImageTransform(transform?: HomeGroomImageTransform | null) {
+  if (!transform) return true;
+  return (
+    Math.abs(transform.rotation) < 0.001 &&
+    Math.abs(transform.scale - 1) < 0.001 &&
+    Math.abs(transform.x) < 0.001 &&
+    Math.abs(transform.y) < 0.001
+  );
+}
+
+const HOME_GROOM_POSTS: HomeGroomPost[] = [
+  {
+    id: "home-groom-michirio",
+    imageUri:
+      "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&w=900&q=82",
+    caption: "淡色コーデでトレカケースも合わせてきた",
+    liked: false,
+    name: "みち",
+    timeLabel: "12分前",
+  },
+  {
+    id: "home-groom-kiko",
+    imageUri:
+      "https://images.unsplash.com/photo-1483985988355-763728e1935b?auto=format&fit=crop&w=900&q=82",
+    caption: "会場前で少しだけ休憩中",
+    liked: true,
+    name: "きこ",
+    timeLabel: "28分前",
+  },
+  {
+    id: "home-groom-yui",
+    imageUri:
+      "https://images.unsplash.com/photo-1513201099705-a9746e1e201f?auto=format&fit=crop&w=900&q=82",
+    caption: "推し色の小物で来ています",
+    liked: false,
+    name: "ゆい",
+    timeLabel: "41分前",
+  },
+  {
+    id: "home-groom-mai",
+    imageUri:
+      "https://images.unsplash.com/photo-1496747611176-843222e1e57c?auto=format&fit=crop&w=900&q=82",
+    caption: "交換前に軽く身支度",
+    liked: false,
+    name: "まい",
+    timeLabel: "1時間前",
+    viewed: true,
+  },
+];
+
+const HOME_GROOM_USER_BY_NAME: Record<string, string> = {
+  "きこ": "kai_kiko",
+  "まい": "idol_mai",
+  "みち": "michirio",
+  "ゆい": "stage_yui",
+};
+
+function remotePostToHomeGroomPost(post: GroomRemotePost): HomeGroomPost {
+  return {
+    authorId: post.author.id,
+    caption: post.caption,
+    doodles: post.doodles as HomeGroomDoodleStroke[],
+    id: post.id,
+    imagePath: post.imagePath,
+    imageTransform: post.imageTransform,
+    imageUri: post.imageUrl,
+    liked: post.liked,
+    name: post.mine ? "あなた" : post.author.displayName,
+    stickers: post.stickers as HomeGroomStickerOverlay[],
+    timeLabel: relativeHomeGroomTimeLabel(post.publishedAt),
+    textOverlays: post.textOverlays as HomeGroomTextOverlay[],
+    viewed: post.viewed,
+  };
+}
+
+function relativeHomeGroomTimeLabel(value: string) {
+  const publishedAt = Date.parse(value);
+  if (!Number.isFinite(publishedAt)) return "たった今";
+  const diffMinutes = Math.max(0, Math.floor((Date.now() - publishedAt) / 60000));
+  if (diffMinutes < 1) return "たった今";
+  if (diffMinutes < 60) return `${diffMinutes}分前`;
+  const diffHours = Math.floor(diffMinutes / 60);
+  if (diffHours < 24) return `${diffHours}時間前`;
+  return "昨日";
+}
+
+type GlassEffectModule = {
+  GlassView: ComponentType<GlassViewProps>;
+};
+
+type SymbolModule = {
+  SymbolView: ComponentType<SymbolViewProps>;
+};
+
+let cachedGlassView: ComponentType<GlassViewProps> | null | undefined;
+let cachedSymbolView: ComponentType<SymbolViewProps> | null | undefined;
+const ENABLE_NATIVE_HOME_EFFECTS = false;
+
+function getIOSGlassView() {
+  if (!ENABLE_NATIVE_HOME_EFFECTS) {
+    return null;
+  }
+  if (Platform.OS !== "ios") {
+    return null;
+  }
+  if (cachedGlassView !== undefined) {
+    return cachedGlassView;
+  }
+  try {
+    cachedGlassView = (require("expo-glass-effect") as GlassEffectModule).GlassView;
+  } catch {
+    cachedGlassView = null;
+  }
+  return cachedGlassView;
+}
+
+function getIOSSFSymbolView() {
+  if (!ENABLE_NATIVE_HOME_EFFECTS) {
+    return null;
+  }
+  if (Platform.OS !== "ios") {
+    return null;
+  }
+  if (cachedSymbolView !== undefined) {
+    return cachedSymbolView;
+  }
+  try {
+    cachedSymbolView = (require("expo-symbols") as SymbolModule).SymbolView;
+  } catch {
+    cachedSymbolView = null;
+  }
+  return cachedSymbolView;
+}
+
 export default function HomeScreen() {
   const { previewMode, user } = useAuth();
   const usePreviewData = previewMode || !hasSupabaseConfig;
   const [localMode, setLocalMode] = useState(usePreviewData);
-  const [viewMode, setViewMode] = useState<HomeModeView>(
-    usePreviewData ? "local" : "national",
-  );
-  const viewModeTouchedRef = useRef(usePreviewData);
   const [sections, setSections] = useState<ShelfSection[]>(() =>
     usePreviewData ? MATCH_SECTIONS : [],
   );
   const [placeName, setPlaceName] = useState(
     usePreviewData ? "守口市地区 豊秀町一丁目" : "",
   );
-  const [unreadCount, setUnreadCount] = useState(0);
   const [homeLoading, setHomeLoading] = useState(!usePreviewData);
   const [homeError, setHomeError] = useState<string | null>(null);
   const [localSheetOpen, setLocalSheetOpen] = useState(false);
   const [revertLocalOnSheetClose, setRevertLocalOnSheetClose] = useState(false);
+  const [modeSwitching, setModeSwitching] = useState<HomeModeView | null>(null);
+  const [homeGroomPosts, setHomeGroomPosts] = useState(HOME_GROOM_POSTS);
+  const [selectedHomeGroomId, setSelectedHomeGroomId] = useState<string | null>(null);
+  const [homeGroomViewerSession, setHomeGroomViewerSession] = useState(0);
+  const [homeGroomReply, setHomeGroomReply] = useState("");
+  const [homeGroomFeedback, setHomeGroomFeedback] = useState("");
+  const homeGroomToastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const edgePulse = useRef(new Animated.Value(0)).current;
+  const modeSwitchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const { width } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
   const tileWidth = Math.max(128, Math.min(148, (width - 54) / 2.55));
-  const placeLabel = localMode
-    ? truncateLocation(placeName || "場所未設定")
-    : "現地交換OFF";
+  const homeTopPadding = Math.max(insets.top, 18) + 12;
+  const topEdgeFadeHeight = Math.max(insets.top + 22, 68);
+  const selectedHomeGroomPost =
+    homeGroomPosts.find((post) => post.id === selectedHomeGroomId) ?? null;
   const visibleSections = useMemo(() => {
-    if (viewMode !== "local") return sections;
+    if (!localMode) return sections;
     return sections
       .map((section) => ({
         ...section,
         rows: section.rows
           .map((row) => ({
             ...row,
-            candidates: row.candidates.filter((candidate) => candidate.local),
+            candidates: [...row.candidates].sort((a, b) => Number(!!b.local) - Number(!!a.local)),
           }))
           .filter((row) => row.candidates.length > 0),
       }))
       .filter((section) => section.rows.length > 0);
-  }, [sections, viewMode]);
-
+  }, [localMode, sections]);
   function refreshHomeData() {
     if (previewMode || !hasSupabaseConfig) {
       setSections(MATCH_SECTIONS);
       setLocalMode(usePreviewData);
-      if (!viewModeTouchedRef.current) {
-        setViewMode(usePreviewData ? "local" : "national");
-      }
       setPlaceName("守口市地区 豊秀町一丁目");
-      setUnreadCount(0);
       setHomeLoading(false);
       setHomeError(null);
       return () => {};
@@ -131,10 +362,7 @@ export default function HomeScreen() {
     if (!user) {
       setSections([]);
       setLocalMode(false);
-      setViewMode("national");
-      viewModeTouchedRef.current = false;
       setPlaceName("");
-      setUnreadCount(0);
       setHomeLoading(false);
       setHomeError(null);
       return () => {};
@@ -149,14 +377,7 @@ export default function HomeScreen() {
         setSections(result.sections.length > 0 ? result.sections : []);
         const nextLocalMode = result.localModeEnabled;
         setLocalMode(nextLocalMode);
-        if (!nextLocalMode) {
-          setViewMode("national");
-          viewModeTouchedRef.current = false;
-        } else if (!viewModeTouchedRef.current) {
-          setViewMode("local");
-        }
         setPlaceName(result.placeLabel ?? "場所未設定");
-        setUnreadCount(result.unreadNotificationCount);
       })
       .catch((error: unknown) => {
         if (!active) return;
@@ -176,10 +397,73 @@ export default function HomeScreen() {
     return refreshHomeData();
   }, [previewMode, user]);
 
+  async function refreshHomeGroomPosts() {
+    if (previewMode || !user) {
+      setHomeGroomPosts(HOME_GROOM_POSTS);
+      return;
+    }
+    const remotePosts = await fetchGroomFeed(user.id);
+    setHomeGroomPosts(remotePosts.map(remotePostToHomeGroomPost));
+  }
+
+  useEffect(() => {
+    refreshHomeGroomPosts().catch(() => undefined);
+  }, [previewMode, user]);
+
+  useEffect(() => {
+    if (previewMode || !user) return undefined;
+    const subscription = AppState.addEventListener("change", (state) => {
+      if (state === "active") refreshHomeGroomPosts().catch(() => undefined);
+    });
+    return () => subscription.remove();
+  }, [previewMode, user]);
+
+  useEffect(() => {
+    return () => {
+      if (modeSwitchTimerRef.current) {
+        clearTimeout(modeSwitchTimerRef.current);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!localMode) {
+      edgePulse.stopAnimation();
+      edgePulse.setValue(0);
+      return;
+    }
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(edgePulse, {
+          toValue: 1,
+          duration: 1450,
+          useNativeDriver: true,
+        }),
+        Animated.timing(edgePulse, {
+          toValue: 0,
+          duration: 1350,
+          useNativeDriver: true,
+        }),
+      ]),
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [edgePulse, localMode]);
+
+  function showModeSwitchStatus(next: HomeModeView) {
+    if (modeSwitchTimerRef.current) {
+      clearTimeout(modeSwitchTimerRef.current);
+    }
+    setModeSwitching(next);
+    modeSwitchTimerRef.current = setTimeout(() => {
+      setModeSwitching(null);
+      modeSwitchTimerRef.current = null;
+    }, 820);
+  }
+
   function openLocalModeSheetForEnable() {
+    showModeSwitchStatus("local");
     setLocalMode(true);
-    setViewMode("local");
-    viewModeTouchedRef.current = true;
     setHomeError(null);
     setRevertLocalOnSheetClose(true);
     setLocalSheetOpen(true);
@@ -193,8 +477,7 @@ export default function HomeScreen() {
       return;
     }
 
-    setViewMode("national");
-    viewModeTouchedRef.current = false;
+    showModeSwitchStatus("national");
     setLocalSheetOpen(false);
     setRevertLocalOnSheetClose(false);
     if (!supabase || !user || usePreviewData) return;
@@ -204,96 +487,335 @@ export default function HomeScreen() {
     if (error) setHomeError(error.message);
   }
 
-  function handleViewModeChange(next: HomeModeView) {
-    viewModeTouchedRef.current = true;
-    if (next === "national") {
-      setViewMode("national");
+  function openHomeActionMenu() {
+    const actions = [
+      {
+        label: localMode ? "現地交換モードをオフにする" : "現地交換モードをオンにする",
+        destructive: localMode,
+        onPress: () => {
+          void handleLocalEnabledChange(!localMode);
+        },
+      },
+      ...(localMode
+        ? [
+            {
+              label: "現地交換情報を編集する",
+              onPress: () => {
+                setRevertLocalOnSheetClose(false);
+                setLocalSheetOpen(true);
+              },
+            },
+          ]
+        : []),
+    ];
+    if (Platform.OS === "ios") {
+      ActionSheetIOS.showActionSheetWithOptions(
+        {
+          options: [...actions.map((action) => action.label), "閉じる"],
+          cancelButtonIndex: actions.length,
+          destructiveButtonIndex:
+            actions.findIndex((action) => action.destructive) >= 0
+              ? actions.findIndex((action) => action.destructive)
+              : undefined,
+          title: "現地交換",
+          userInterfaceStyle: "light",
+          tintColor: ihubColors.lavender,
+        },
+        (buttonIndex) => {
+          actions[buttonIndex]?.onPress();
+        },
+      );
       return;
     }
-    if (localMode) {
-      setViewMode("local");
+    const primary = actions[0];
+    primary?.onPress();
+  }
+
+  function openHomeGroom(postId: string) {
+    setHomeGroomViewerSession((current) => current + 1);
+    setSelectedHomeGroomId(postId);
+    setHomeGroomFeedback("");
+    clearHomeGroomToastTimer();
+    setHomeGroomPosts((current) =>
+      current.map((post) => (post.id === postId ? { ...post, viewed: true } : post)),
+    );
+    if (user && isUuidLike(postId)) {
+      markGroomPostViewed(user.id, postId).catch(() => undefined);
+    }
+  }
+
+  function closeHomeGroom() {
+    setSelectedHomeGroomId(null);
+    setHomeGroomReply("");
+    setHomeGroomFeedback("");
+    clearHomeGroomToastTimer();
+  }
+
+  function selectHomeGroom(postId: string) {
+    setSelectedHomeGroomId(postId);
+    setHomeGroomFeedback("");
+    clearHomeGroomToastTimer();
+    setHomeGroomPosts((current) =>
+      current.map((post) => (post.id === postId ? { ...post, viewed: true } : post)),
+    );
+    if (user && isUuidLike(postId)) {
+      markGroomPostViewed(user.id, postId).catch(() => undefined);
+    }
+  }
+
+  function toggleHomeGroomLike() {
+    if (!selectedHomeGroomId) return;
+    const target = homeGroomPosts.find((post) => post.id === selectedHomeGroomId);
+    const nextLiked = !target?.liked;
+    setHomeGroomPosts((current) =>
+      current.map((post) =>
+        post.id === selectedHomeGroomId ? { ...post, liked: !post.liked } : post,
+      ),
+    );
+    if (user && isUuidLike(selectedHomeGroomId)) {
+      setGroomPostLiked(user.id, selectedHomeGroomId, nextLiked).catch(() => {
+        setHomeGroomPosts((current) =>
+          current.map((post) =>
+            post.id === selectedHomeGroomId ? { ...post, liked: target?.liked ?? false } : post,
+          ),
+        );
+      });
+    }
+  }
+
+  function removeHomeGroomPostLocally(postId: string) {
+    setHomeGroomPosts((current) => current.filter((post) => post.id !== postId));
+    if (selectedHomeGroomId === postId) closeHomeGroom();
+  }
+
+  function openHomeGroomActions(post: HomeGroomPost) {
+    const mine = post.name === "あなた";
+    const actions = mine
+      ? [
+          {
+            destructive: true,
+            label: "投稿を削除",
+            onPress: () => confirmDeleteHomeGroomPost(post),
+          },
+        ]
+      : [
+          {
+            label: "このグルームを非表示",
+            onPress: () => hideHomeGroomPost(post),
+          },
+          {
+            label: "通報する",
+            onPress: () => reportHomeGroomPost(post),
+          },
+          {
+            destructive: true,
+            label: "このユーザーをブロック",
+            onPress: () => confirmBlockHomeGroomAuthor(post),
+          },
+        ];
+
+    if (Platform.OS === "ios") {
+      ActionSheetIOS.showActionSheetWithOptions(
+        {
+          cancelButtonIndex: actions.length,
+          destructiveButtonIndex:
+            actions.findIndex((action) => action.destructive) >= 0
+              ? actions.findIndex((action) => action.destructive)
+              : undefined,
+          options: [...actions.map((action) => action.label), "閉じる"],
+          title: "グルーム",
+          userInterfaceStyle: "dark",
+          tintColor: ihubColors.lavender,
+        },
+        (buttonIndex) => actions[buttonIndex]?.onPress(),
+      );
       return;
     }
-    openLocalModeSheetForEnable();
+
+    actions[0]?.onPress();
+  }
+
+  function confirmDeleteHomeGroomPost(post: HomeGroomPost) {
+    Alert.alert("グルームを削除しますか？", "この投稿は一覧から表示されなくなります。", [
+      { style: "cancel", text: "キャンセル" },
+      {
+        onPress: () => deleteHomeGroomPost(post),
+        style: "destructive",
+        text: "削除",
+      },
+    ]);
+  }
+
+  async function deleteHomeGroomPost(post: HomeGroomPost) {
+    removeHomeGroomPostLocally(post.id);
+    if (!user || !isUuidLike(post.id)) return;
+    try {
+      await archiveGroomPost(user.id, post.id);
+    } catch {
+      Alert.alert("削除できませんでした", "通信状況を確認して、もう一度お試しください。");
+      refreshHomeGroomPosts().catch(() => undefined);
+    }
+  }
+
+  async function hideHomeGroomPost(post: HomeGroomPost) {
+    removeHomeGroomPostLocally(post.id);
+    if (!user || !isUuidLike(post.id)) return;
+    try {
+      await hideGroomPost(user.id, post.id);
+    } catch {
+      Alert.alert("非表示にできませんでした", "通信状況を確認して、もう一度お試しください。");
+      refreshHomeGroomPosts().catch(() => undefined);
+    }
+  }
+
+  async function reportHomeGroomPost(post: HomeGroomPost) {
+    const authorId = homeGroomProfileId(post);
+    removeHomeGroomPostLocally(post.id);
+    if (!user || !isUuidLike(post.id) || !isUuidLike(authorId)) return;
+    try {
+      await Promise.all([
+        reportGroomPost(user.id, post.id, authorId),
+        hideGroomPost(user.id, post.id),
+      ]);
+      Alert.alert("通報しました", "このグルームは非表示にしました。");
+    } catch {
+      Alert.alert("通報できませんでした", "通信状況を確認して、もう一度お試しください。");
+      refreshHomeGroomPosts().catch(() => undefined);
+    }
+  }
+
+  function confirmBlockHomeGroomAuthor(post: HomeGroomPost) {
+    const authorId = homeGroomProfileId(post);
+    if (!authorId) return;
+    Alert.alert(`${post.name}さんをブロックしますか？`, "相手のグルームとめぐりあいメッセージが表示されにくくなります。", [
+      { style: "cancel", text: "キャンセル" },
+      {
+        onPress: () => blockHomeGroomAuthor(post),
+        style: "destructive",
+        text: "ブロック",
+      },
+    ]);
+  }
+
+  async function blockHomeGroomAuthor(post: HomeGroomPost) {
+    const authorId = homeGroomProfileId(post);
+    setHomeGroomPosts((current) => current.filter((item) => homeGroomProfileId(item) !== authorId));
+    closeHomeGroom();
+    if (!user || !isUuidLike(authorId)) return;
+    try {
+      await blockGroomUser(user.id, authorId);
+    } catch {
+      Alert.alert("ブロックできませんでした", "通信状況を確認して、もう一度お試しください。");
+      refreshHomeGroomPosts().catch(() => undefined);
+    }
+  }
+
+  function clearHomeGroomToastTimer() {
+    if (!homeGroomToastTimerRef.current) return;
+    clearTimeout(homeGroomToastTimerRef.current);
+    homeGroomToastTimerRef.current = null;
+  }
+
+  async function sendHomeGroomReply() {
+    const post = selectedHomeGroomPost;
+    const body = homeGroomReply.trim();
+    if (!post || !body) return;
+    setHomeGroomReply("");
+    setHomeGroomFeedback("メッセージが送信されました");
+    clearHomeGroomToastTimer();
+    homeGroomToastTimerRef.current = setTimeout(() => {
+      setHomeGroomFeedback("");
+      homeGroomToastTimerRef.current = null;
+    }, 1800);
+    try {
+      await appendMeguriGroomReply({
+        body,
+        groomCaption: post.caption,
+        groomId: post.id,
+        groomImagePath: post.imagePath ?? null,
+        groomImageUri: post.imageUri,
+        recipientId: post.authorId ?? HOME_GROOM_USER_BY_NAME[post.name] ?? post.id,
+        recipientName: post.name,
+      });
+    } catch {
+      // 送信UIは維持し、ローカル保存の失敗だけ握りつぶす。
+    }
   }
 
   return (
-    <Screen scroll={false} contentStyle={styles.screenContent}>
+    <Screen
+      bottomInset={false}
+      scroll={false}
+      topInset={false}
+      topPadding={homeTopPadding}
+      contentStyle={styles.screenContent}
+    >
       <ScrollView
+        automaticallyAdjustsScrollIndicatorInsets
+        contentInsetAdjustmentBehavior="automatic"
         showsVerticalScrollIndicator={false}
         style={styles.homeScroll}
         contentContainerStyle={styles.homeScrollContent}
+        scrollEventThrottle={16}
       >
-        <View style={styles.topBar}>
-          <View style={styles.topLeft}>
-            <CircleIconButton
-              icon="notifications-outline"
-              accessibilityLabel="通知"
-              badge={unreadCount > 0 ? String(Math.min(unreadCount, 9)) : undefined}
-              onPress={() => router.push("/notifications")}
-            />
+        {homeError ? <Text style={styles.inlineError}>{homeError}</Text> : null}
+        {homeLoading ? <Text style={styles.loadingText}>マッチを読み込み中…</Text> : null}
+        <HomeGroomRail onOpen={openHomeGroom} posts={homeGroomPosts} />
+        {visibleSections.length > 0 ? (
+          visibleSections.map((section, sectionIndex) => [
+            <StickySectionHeader
+              key={`${section.id}-header`}
+              title={section.title}
+            />,
+            <ShelfSectionRows
+              key={`${section.id}-rows`}
+              section={section}
+              sectionIndex={sectionIndex}
+              tileWidth={tileWidth}
+              localMode={localMode}
+              onCandidatePress={openMatchDetail}
+            />,
+          ])
+        ) : (
+          <View style={styles.emptyMatches}>
+            <Text style={styles.emptyMatchesTitle}>まだ候補がありません</Text>
+            <Text style={styles.emptyMatchesText}>
+              Wish と譲る候補が増えると、ここに交換候補が並びます。
+            </Text>
           </View>
-          <View style={styles.topRight}>
-            <Pressable
-              accessibilityRole="button"
-              onPress={() => {
-                if (localMode) {
-                  setRevertLocalOnSheetClose(false);
-                  setLocalSheetOpen(true);
-                } else {
-                  handleLocalEnabledChange(true);
-                }
-              }}
-              style={styles.placeButton}
-            >
-              <Text numberOfLines={1} style={styles.placeText}>
-                {placeLabel}
-              </Text>
-            </Pressable>
-            <Switch
-              value={localMode}
-              onValueChange={handleLocalEnabledChange}
-              ios_backgroundColor="rgba(58,50,74,0.14)"
-              thumbColor={ihubColors.surface}
-              trackColor={{
-                false: "rgba(58,50,74,0.14)",
-                true: "rgba(166,149,216,0.78)",
-              }}
-            />
-          </View>
-        </View>
-
-        <ModeSwitch
-          viewMode={viewMode}
-          width={width}
-          onChange={handleViewModeChange}
-        />
-
-        <View style={styles.sections}>
-          {homeError ? <Text style={styles.inlineError}>{homeError}</Text> : null}
-          {homeLoading ? <Text style={styles.loadingText}>マッチを読み込み中…</Text> : null}
-          {visibleSections.length > 0 ? (
-            visibleSections.map((section, sectionIndex) => (
-              <ShelfSectionView
-                key={section.id}
-                section={section}
-                sectionIndex={sectionIndex}
-                tileWidth={tileWidth}
-                localMode={viewMode === "local"}
-                onCandidatePress={openMatchDetail}
-              />
-            ))
-          ) : (
-            <View style={styles.emptyMatches}>
-              <Text style={styles.emptyMatchesTitle}>まだ候補がありません</Text>
-              <Text style={styles.emptyMatchesText}>
-                Wish と譲る候補が増えると、ここに交換候補が並びます。
-              </Text>
-            </View>
-          )}
-        </View>
+        )}
       </ScrollView>
+      <TopEdgeFade height={topEdgeFadeHeight} />
+      {localMode ? <LocalFocusVignette pulse={edgePulse} /> : null}
       <FloatingSearchButton />
+      <FloatingHomeActionButton
+        localMode={localMode}
+        onPress={openHomeActionMenu}
+      />
+      {selectedHomeGroomPost ? (
+        <HomeGroomViewerModal
+          key={`home-groom-viewer-${homeGroomViewerSession}`}
+          feedback={homeGroomFeedback}
+          onChangeReply={setHomeGroomReply}
+          onClose={closeHomeGroom}
+          onLike={toggleHomeGroomLike}
+          onOpenActions={openHomeGroomActions}
+          onSelectPost={selectHomeGroom}
+          onSendReply={sendHomeGroomReply}
+          post={selectedHomeGroomPost}
+          posts={homeGroomPosts}
+          reply={homeGroomReply}
+        />
+      ) : null}
+      {modeSwitching ? (
+        <View pointerEvents="none" style={styles.modeStatusPill}>
+          <Text style={styles.modeStatusText}>
+            {modeSwitching === "local"
+              ? "今すぐ現地交換モードに切り替え中…"
+              : "全国交換モードに切り替え中…"}
+          </Text>
+        </View>
+      ) : null}
       <LocalModeSheet
         open={localSheetOpen}
         previewMode={usePreviewData}
@@ -310,8 +832,6 @@ export default function HomeScreen() {
           setRevertLocalOnSheetClose(false);
           setLocalSheetOpen(false);
           setLocalMode(true);
-          setViewMode("local");
-          viewModeTouchedRef.current = true;
           setPlaceName(nextPlace);
           refreshHomeData();
         }}
@@ -498,22 +1018,26 @@ function LocalModeSheet({
 
   const radiusLabel = radiusM >= 1000 ? `${radiusM / 1000}km` : `${radiusM}m`;
   const selectedCarryingCount = selectedCarryingIds.length;
+  const nativeSheet = Platform.OS === "ios";
 
   return (
     <Modal
       animationType="slide"
       onRequestClose={onClose}
-      transparent
+      presentationStyle={nativeSheet ? "pageSheet" : "overFullScreen"}
+      transparent={!nativeSheet}
       visible={open}
     >
-      <View style={styles.localSheetLayer}>
-        <Pressable
-          accessibilityLabel="閉じる"
-          accessibilityRole="button"
-          onPress={onClose}
-          style={styles.localSheetBackdrop}
-        />
-        <View style={styles.localSheet}>
+      <View style={[styles.localSheetLayer, nativeSheet ? styles.localSheetNativeLayer : null]}>
+        {!nativeSheet ? (
+          <Pressable
+            accessibilityLabel="閉じる"
+            accessibilityRole="button"
+            onPress={onClose}
+            style={styles.localSheetBackdrop}
+          />
+        ) : null}
+        <View style={[styles.localSheet, nativeSheet ? styles.localSheetNativePanel : null]}>
           <View style={styles.localSheetHandle} />
           <View style={styles.localSheetHeader}>
             <View>
@@ -751,135 +1275,111 @@ function LocalModeSheet({
   );
 }
 
-function ModeSwitch({
-  viewMode,
-  width,
-  onChange,
+function FloatingHomeActionButton({
+  localMode,
+  onPress,
 }: {
-  viewMode: HomeModeView;
-  width: number;
-  onChange: (next: HomeModeView) => void;
+  localMode: boolean;
+  onPress: () => void;
 }) {
-  const progress = useRef(new Animated.Value(viewMode === "local" ? 1 : 0)).current;
-  const pulse = useRef(new Animated.Value(0)).current;
-  const switchWidth = Math.max(280, width - 36);
-  const thumbWidth = (switchWidth - 8) / 2;
-
-  useEffect(() => {
-    pulse.setValue(0);
-    Animated.parallel([
-      Animated.spring(progress, {
-        toValue: viewMode === "local" ? 1 : 0,
-        damping: 22,
-        stiffness: 190,
-        mass: 0.72,
-        useNativeDriver: true,
-      }),
-      Animated.sequence([
-        Animated.timing(pulse, {
-          toValue: 1,
-          duration: 130,
-          easing: Easing.out(Easing.cubic),
-          useNativeDriver: true,
-        }),
-        Animated.timing(pulse, {
-          toValue: 0,
-          duration: 210,
-          easing: Easing.out(Easing.quad),
-          useNativeDriver: true,
-        }),
-      ]),
-    ]).start();
-  }, [progress, pulse, viewMode]);
-
-  const translateX = progress.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0, thumbWidth],
-  });
-  const stretch = pulse.interpolate({
-    inputRange: [0, 1],
-    outputRange: [1, 1.035],
-  });
-  const glossOpacity = pulse.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0.32, 0.55],
-  });
-  const nationalActive = viewMode === "national";
-  const localActive = viewMode === "local";
-
+  const symbolColor = localMode ? ihubColors.lavender : ihubColors.ink;
   return (
-    <View style={styles.modeSwitch}>
-      <Animated.View
-        pointerEvents="none"
-        style={[
-          styles.modeThumb,
-          {
-            width: thumbWidth,
-            transform: [{ translateX }, { scaleX: stretch }],
-          },
-        ]}
-      >
-        <Animated.View
-          style={[
-            styles.modeThumbGloss,
-            {
-              opacity: glossOpacity,
-            },
-          ]}
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel="現地交換メニュー"
+      onPress={onPress}
+      style={({ pressed }) => [
+        styles.homeActionButton,
+        localMode ? styles.homeActionButtonLive : null,
+        pressed ? styles.homeActionButtonPressed : null,
+      ]}
+    >
+      <HomeActionGlass active={localMode} />
+      <View style={styles.homeActionIconLayer}>
+        <NativeHomeActionSymbol
+          color={symbolColor}
+          fallbackName="time-outline"
+          name={localMode ? "location.circle.fill" : "location.circle"}
         />
-      </Animated.View>
-      <Pressable
-        style={styles.modeButton}
-        onPress={() => onChange("national")}
-      >
-        <Text
-          style={[
-            styles.modeText,
-            nationalActive ? styles.modeTextActive : styles.modeTextInactive,
-          ]}
-        >
-          全国交換モード
-        </Text>
-      </Pressable>
-      <Pressable style={styles.modeButton} onPress={() => onChange("local")}>
-        <Text
-          style={[
-            styles.modeText,
-            localActive ? styles.modeTextActive : styles.modeTextInactive,
-          ]}
-        >
-          今すぐ現地交換
-        </Text>
-      </Pressable>
-    </View>
+      </View>
+    </Pressable>
   );
 }
 
-function CircleIconButton({
-  icon,
-  accessibilityLabel,
-  badge,
-  onPress,
+function HomeActionGlass({ active }: { active: boolean }) {
+  const GlassView = getIOSGlassView();
+  if (GlassView) {
+    return (
+      <GlassView
+        colorScheme="light"
+        glassEffectStyle={{
+          style: active ? "regular" : "clear",
+          animate: true,
+          animationDuration: 0.2,
+        }}
+        isInteractive
+        pointerEvents="none"
+        style={StyleSheet.absoluteFillObject}
+        tintColor={active ? "rgba(166,149,216,0.24)" : "rgba(255,255,255,0.12)"}
+      />
+    );
+  }
+  if (Platform.OS === "ios" && ENABLE_NATIVE_HOME_EFFECTS) {
+    return (
+      <BlurView
+        intensity={54}
+        pointerEvents="none"
+        style={StyleSheet.absoluteFillObject}
+        tint="systemThinMaterialLight"
+      />
+    );
+  }
+  return <View pointerEvents="none" style={styles.homeActionFallbackGlass} />;
+}
+
+function NativeHomeActionSymbol({
+  color,
+  fallbackName,
+  name,
 }: {
-  icon: IconSymbolName;
-  accessibilityLabel: string;
-  badge?: string;
-  onPress?: () => void;
+  color: string;
+  fallbackName: IconSymbolName;
+  name: SFSymbol;
 }) {
+  const SymbolView = getIOSSFSymbolView();
+  if (SymbolView) {
+    return (
+      <SymbolView
+        fallback={<IconSymbol color={color} name={fallbackName} size={26} />}
+        name={name}
+        size={31}
+        tintColor={color}
+        type="hierarchical"
+        weight="semibold"
+      />
+    );
+  }
+  return <IconSymbol color={color} name={fallbackName} size={26} />;
+}
+
+function LocalFocusVignette({ pulse }: { pulse: Animated.Value }) {
+  const opacity = pulse.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0.32, 0.58],
+  });
+  const scaleX = pulse.interpolate({
+    inputRange: [0, 1],
+    outputRange: [1, 1.08],
+  });
   return (
-    <Pressable
-      accessibilityLabel={accessibilityLabel}
-      accessibilityRole="button"
-      onPress={onPress}
-      style={styles.circleButton}
-    >
-      <IconSymbol name={icon} size={20} color={ihubColors.ink} />
-      {badge ? (
-        <View style={styles.notificationBadge}>
-          <Text style={styles.notificationBadgeText}>{badge}</Text>
-        </View>
-      ) : null}
-    </Pressable>
+    <View pointerEvents="none" style={styles.localFocusLayer}>
+      <Animated.View
+        style={[styles.localFocusEdge, styles.localFocusLeft, { opacity, transform: [{ scaleX }] }]}
+      />
+      <Animated.View
+        style={[styles.localFocusEdge, styles.localFocusRight, { opacity, transform: [{ scaleX }] }]}
+      />
+    </View>
   );
 }
 
@@ -896,7 +1396,1131 @@ function FloatingSearchButton() {
   );
 }
 
-function ShelfSectionView({
+function StickySectionHeader({ title }: { title: string }) {
+  return (
+    <View style={styles.stickySectionHeader}>
+      <Text style={styles.sectionTitle}>{title}</Text>
+    </View>
+  );
+}
+
+function HomeGroomRail({
+  onOpen,
+  posts,
+}: {
+  onOpen: (postId: string) => void;
+  posts: HomeGroomPost[];
+}) {
+  return (
+    <View style={styles.homeGroomRail}>
+      <Text style={styles.homeGroomTitle}>グルーム</Text>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.homeGroomList}
+      >
+        <Pressable
+          accessibilityLabel="グルームを追加"
+          accessibilityRole="button"
+          onPress={() => router.push("/encounters")}
+          style={styles.homeGroomItem}
+        >
+          <View style={[styles.homeGroomRing, styles.homeGroomAddRing]}>
+            <View style={styles.homeGroomAddCircle}>
+              <IconSymbol name="add" color={ihubColors.lavender} size={27} />
+            </View>
+          </View>
+          <Text numberOfLines={1} style={styles.homeGroomName}>
+            追加
+          </Text>
+        </Pressable>
+
+        {posts.map((post) => (
+          <Pressable
+            accessibilityLabel={`${post.name}のグルームを見る`}
+            accessibilityRole="button"
+            key={post.id}
+            onPress={() => onOpen(post.id)}
+            style={styles.homeGroomItem}
+          >
+            <View
+              style={[
+                styles.homeGroomRing,
+                post.liked ? styles.homeGroomRingLiked : null,
+                post.viewed ? styles.homeGroomRingViewed : null,
+              ]}
+            >
+              <Image source={{ uri: post.imageUri }} style={styles.homeGroomImage} />
+            </View>
+            <Text numberOfLines={1} style={styles.homeGroomName}>
+              {post.name}
+            </Text>
+          </Pressable>
+        ))}
+      </ScrollView>
+    </View>
+  );
+}
+
+function HomeGroomViewerModal({
+  feedback,
+  onChangeReply,
+  onClose,
+  onLike,
+  onOpenActions,
+  onSelectPost,
+  onSendReply,
+  post,
+  posts,
+  reply,
+}: {
+  feedback: string;
+  onChangeReply: (value: string) => void;
+  onClose: () => void;
+  onLike: () => void;
+  onOpenActions: (post: HomeGroomPost) => void;
+  onSelectPost: (postId: string) => void;
+  onSendReply: () => void;
+  post: HomeGroomPost | null;
+  posts: HomeGroomPost[];
+  reply: string;
+}) {
+  const insets = useSafeAreaInsets();
+  const keyboardInset = useKeyboardInset();
+  const { height, width } = useWindowDimensions();
+  const progress = useRef(new Animated.Value(0)).current;
+  const progressValueRef = useRef(0);
+  const replyInputRef = useRef<TextInput>(null);
+  const swipeX = useRef(new Animated.Value(0)).current;
+  const dismissY = useRef(new Animated.Value(0)).current;
+  const gestureMode = useRef<"horizontal" | "vertical" | null>(null);
+  const [replyFocused, setReplyFocused] = useState(false);
+  const [horizontalSwiping, setHorizontalSwiping] = useState(false);
+  const horizontalSwipingRef = useRef(false);
+  const [profileUser, setProfileUser] = useState<GroomProfileUser | null>(null);
+  const canSend = reply.trim().length > 0;
+  const currentIndex = post ? posts.findIndex((item) => item.id === post.id) : -1;
+  const previousPost = currentIndex > 0 ? posts[currentIndex - 1] ?? null : null;
+  const nextPost =
+    currentIndex >= 0 && currentIndex < posts.length - 1 ? posts[currentIndex + 1] ?? null : null;
+
+  function commitRelativePost(offset: -1 | 1) {
+    if (currentIndex < 0) return;
+    const nextIndex = currentIndex + offset;
+    if (nextIndex < 0) return;
+    if (nextIndex >= posts.length) {
+      onClose();
+      return;
+    }
+    const next = posts[nextIndex];
+    if (next) onSelectPost(next.id);
+  }
+
+  function setHorizontalSwipeActive(active: boolean) {
+    if (horizontalSwipingRef.current === active) return;
+    horizontalSwipingRef.current = active;
+    setHorizontalSwiping(active);
+    if (active) {
+      progress.stopAnimation((value) => {
+        progressValueRef.current = value;
+      });
+    }
+  }
+
+  function selectRelativePost(offset: -1 | 1) {
+    if (currentIndex < 0) return;
+    const nextIndex = currentIndex + offset;
+    if (nextIndex < 0) return;
+    if (nextIndex >= posts.length) {
+      onClose();
+      return;
+    }
+    finishSwipe(offset);
+  }
+
+  function finishSwipe(offset: -1 | 1) {
+    setHorizontalSwipeActive(true);
+    const toValue = offset > 0 ? -width : width;
+    Animated.timing(swipeX, {
+      toValue,
+      duration: 240,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: false,
+    }).start(({ finished }) => {
+      if (!finished) return;
+      setHorizontalSwipeActive(false);
+      commitRelativePost(offset);
+    });
+  }
+
+  function resetSwipe() {
+    Animated.spring(swipeX, {
+      toValue: 0,
+      damping: 20,
+      stiffness: 220,
+      useNativeDriver: false,
+    }).start(() => {
+      setHorizontalSwipeActive(false);
+    });
+  }
+
+  function closeWithDismiss() {
+    Animated.timing(dismissY, {
+      toValue: height,
+      duration: 210,
+      easing: Easing.in(Easing.cubic),
+      useNativeDriver: false,
+    }).start(({ finished }) => {
+      if (!finished) return;
+      dismissY.setValue(0);
+      swipeX.setValue(0);
+      onClose();
+    });
+  }
+
+  function resetDismiss() {
+    Animated.spring(dismissY, {
+      toValue: 0,
+      damping: 20,
+      stiffness: 220,
+      useNativeDriver: false,
+    }).start();
+  }
+
+  function dismissReplyInput() {
+    replyInputRef.current?.blur();
+    setReplyFocused(false);
+    Keyboard.dismiss();
+  }
+
+  function sendReplyAndDismiss() {
+    dismissReplyInput();
+    onSendReply();
+  }
+
+  function openProfileFromGroom(postToOpen: HomeGroomPost) {
+    dismissReplyInput();
+    setProfileUser(homeGroomProfileUser(postToOpen));
+  }
+
+  function focusReplyInputAfterProfile() {
+    setTimeout(() => {
+      replyInputRef.current?.focus();
+    }, 120);
+  }
+
+  const panResponder = useMemo(
+    () =>
+      PanResponder.create({
+        onMoveShouldSetPanResponder: (_, gesture) => {
+          const horizontal =
+            Math.abs(gesture.dx) > 12 && Math.abs(gesture.dx) > Math.abs(gesture.dy) * 1.18;
+          const vertical = gesture.dy > 12 && gesture.dy > Math.abs(gesture.dx) * 1.18;
+          return horizontal || vertical;
+        },
+        onPanResponderGrant: () => {
+          gestureMode.current = null;
+        },
+        onPanResponderMove: (_, gesture) => {
+          if (!gestureMode.current) {
+            gestureMode.current =
+              gesture.dy > Math.abs(gesture.dx) * 1.18 ? "vertical" : "horizontal";
+          }
+          if (gestureMode.current === "vertical") {
+            dismissY.setValue(Math.max(0, gesture.dy));
+            return;
+          }
+          setHorizontalSwipeActive(true);
+          swipeX.setValue(Math.max(-width, Math.min(width, gesture.dx)));
+        },
+        onPanResponderRelease: (_, gesture) => {
+          if (gestureMode.current === "vertical") {
+            if (gesture.dy > 88 || gesture.vy > 0.9) closeWithDismiss();
+            else resetDismiss();
+            setHorizontalSwipeActive(false);
+            gestureMode.current = null;
+            return;
+          }
+          if (gesture.dx < -62 && nextPost) {
+            finishSwipe(1);
+            gestureMode.current = null;
+            return;
+          }
+          if (gesture.dx > 62 && previousPost) {
+            finishSwipe(-1);
+            gestureMode.current = null;
+            return;
+          }
+          resetSwipe();
+          gestureMode.current = null;
+        },
+        onPanResponderTerminate: () => {
+          if (gestureMode.current === "vertical") {
+            resetDismiss();
+            setHorizontalSwipeActive(false);
+          } else {
+            resetSwipe();
+          }
+          gestureMode.current = null;
+        },
+      }),
+    [height, nextPost, previousPost, width],
+  );
+
+  useEffect(() => {
+    const listenerId = progress.addListener(({ value }) => {
+      progressValueRef.current = value;
+    });
+    return () => progress.removeListener(listenerId);
+  }, [progress]);
+
+  useLayoutEffect(() => {
+    swipeX.setValue(0);
+    dismissY.setValue(0);
+    progress.stopAnimation();
+    progressValueRef.current = 0;
+    progress.setValue(0);
+  }, [dismissY, post?.id, progress, swipeX]);
+
+  useEffect(() => {
+    let animation: Animated.CompositeAnimation | null = null;
+    let cancelled = false;
+
+    progress.stopAnimation((value) => {
+      progressValueRef.current = value;
+      if (cancelled || !post || replyFocused || profileUser || horizontalSwiping) return;
+
+      const currentValue = Math.max(0, Math.min(0.99, value));
+      animation = Animated.timing(progress, {
+        toValue: 1,
+        duration: Math.max(250, Math.round((1 - currentValue) * 20000)),
+        easing: Easing.linear,
+        useNativeDriver: false,
+      });
+      animation.start(({ finished }) => {
+        if (finished && !cancelled && !replyFocused) selectRelativePost(1);
+      });
+    });
+
+    return () => {
+      cancelled = true;
+      animation?.stop();
+      progress.stopAnimation((value) => {
+        progressValueRef.current = value;
+      });
+    };
+  }, [horizontalSwiping, post?.id, profileUser, progress, replyFocused]);
+
+  useEffect(() => {
+    const hideSubscription = Keyboard.addListener("keyboardDidHide", () => {
+      setReplyFocused(false);
+    });
+    return () => hideSubscription.remove();
+  }, []);
+
+  const dismissDragY = dismissY.interpolate({
+    inputRange: [0, height * 0.72],
+    outputRange: [0, height * 0.26],
+    extrapolate: "clamp",
+  });
+  const dismissScale = dismissY.interpolate({
+    inputRange: [0, height * 0.72],
+    outputRange: [1, 0.18],
+    extrapolate: "clamp",
+  });
+  const dismissOpacity = dismissY.interpolate({
+    inputRange: [0, height * 0.55],
+    outputRange: [1, 0.18],
+    extrapolate: "clamp",
+  });
+  const backdropOpacity = dismissY.interpolate({
+    inputRange: [0, height * 0.55],
+    outputRange: [0.48, 0],
+    extrapolate: "clamp",
+  });
+  const staticChromeOpacity = swipeX.interpolate({
+    inputRange: [-2, 0, 2],
+    outputRange: [0, 1, 0],
+    extrapolate: "clamp",
+  });
+  const chromeTopPadding = Math.max(insets.top, 14) + 8;
+  const chromeFooterBottom = Math.max(insets.bottom, 12) + 10 + keyboardInset;
+  const currentChrome = post ? (
+    <HomeGroomStoryAttachedChrome
+      canSend={canSend}
+      footerBottom={chromeFooterBottom}
+      headerTop={chromeTopPadding}
+      post={post}
+      progress={progress}
+      progressIndex={Math.max(currentIndex, 0)}
+      progressPosts={posts}
+      reply={reply}
+    />
+  ) : null;
+
+  return (
+    <Modal
+      animationType="fade"
+      transparent
+      visible={!!post}
+      onRequestClose={() => {
+        if (profileUser) {
+          setProfileUser(null);
+          return;
+        }
+        onClose();
+      }}
+    >
+      {post ? (
+        <View style={styles.homeGroomViewer}>
+          <Animated.View
+            pointerEvents="none"
+            style={[styles.homeGroomViewerBackdrop, { opacity: backdropOpacity }]}
+          />
+          <Animated.View
+            style={[
+              styles.homeGroomViewerFrame,
+              {
+                opacity: dismissOpacity,
+                transform: [{ translateY: dismissDragY }, { scale: dismissScale }],
+              },
+            ]}
+            {...panResponder.panHandlers}
+          >
+            <HomeGroomStoryCube
+              currentChrome={currentChrome}
+              currentPost={post}
+              nextChrome={
+                nextPost ? (
+                  <HomeGroomStoryAttachedChrome
+                    canSend={false}
+                    footerBottom={chromeFooterBottom}
+                    headerTop={chromeTopPadding}
+                    post={nextPost}
+                    progressIndex={Math.max(currentIndex + 1, 0)}
+                    progressPosts={posts}
+                    reply=""
+                  />
+                ) : null
+              }
+              nextPost={nextPost}
+              previousChrome={
+                previousPost ? (
+                  <HomeGroomStoryAttachedChrome
+                    canSend={false}
+                    footerBottom={chromeFooterBottom}
+                    headerTop={chromeTopPadding}
+                    post={previousPost}
+                    progressIndex={Math.max(currentIndex - 1, 0)}
+                    progressPosts={posts}
+                    reply=""
+                  />
+                ) : null
+              }
+              previousPost={previousPost}
+              swipeX={swipeX}
+              width={width}
+            />
+
+            <Animated.View
+              style={[
+                styles.homeGroomViewerHeader,
+                { opacity: staticChromeOpacity, paddingTop: chromeTopPadding },
+              ]}
+            >
+              <HomeGroomProgressBar currentIndex={Math.max(currentIndex, 0)} posts={posts} progress={progress} />
+              <View style={styles.homeGroomViewerHeaderRow}>
+                <Pressable
+                  accessibilityLabel={`${post.name}のめぐりプロフィールを開く`}
+                  accessibilityRole="button"
+                  onPress={() => openProfileFromGroom(post)}
+                  style={({ pressed }) => [
+                    styles.homeGroomViewerAuthor,
+                    styles.homeGroomViewerAuthorInRow,
+                    pressed ? styles.homeGroomViewerAuthorPressed : null,
+                  ]}
+                >
+                  <View style={[styles.homeGroomViewerFace, post.liked ? styles.homeGroomViewerFaceLiked : null]}>
+                    <Text style={styles.homeGroomViewerFaceText}>{post.name.slice(0, 1)}</Text>
+                  </View>
+                  <View style={styles.homeGroomViewerNameWrap}>
+                    <Text numberOfLines={1} style={styles.homeGroomViewerName}>{post.name}</Text>
+                    <Text numberOfLines={1} style={styles.homeGroomViewerMeta}>{post.timeLabel}</Text>
+                  </View>
+                </Pressable>
+                <Pressable
+                  accessibilityLabel="グルームのメニューを開く"
+                  accessibilityRole="button"
+                  onPress={() => onOpenActions(post)}
+                  style={styles.homeGroomViewerMenuButton}
+                >
+                  <IconSymbol name="ellipsis-horizontal" color="#fff" size={25} />
+                </Pressable>
+              </View>
+            </Animated.View>
+
+            <View pointerEvents="box-none" style={styles.homeGroomTapLayer}>
+              <Pressable
+                accessibilityLabel="前のグルームへ"
+                accessibilityRole="button"
+                onPress={() => selectRelativePost(-1)}
+                style={styles.homeGroomTapZone}
+              />
+              <Pressable
+                accessibilityLabel="次のグルームへ"
+                accessibilityRole="button"
+                onPress={() => selectRelativePost(1)}
+                style={styles.homeGroomTapZone}
+              />
+            </View>
+
+            {post.caption.trim() ? (
+              <Animated.View style={[styles.homeGroomCaptionPanel, { opacity: staticChromeOpacity }]}>
+                {post.caption.trim() ? (
+                  <Text style={styles.homeGroomCaptionText}>{post.caption}</Text>
+                ) : null}
+              </Animated.View>
+            ) : null}
+
+            {feedback ? (
+              <View pointerEvents="none" style={styles.homeGroomCenterToast}>
+                <Text style={styles.homeGroomCenterToastText}>{feedback}</Text>
+              </View>
+            ) : null}
+
+            {replyFocused ? (
+              <Pressable
+                accessibilityLabel="メッセージ入力を閉じる"
+                accessibilityRole="button"
+                onPress={dismissReplyInput}
+                style={[
+                  styles.homeGroomInputDimmer,
+                  { bottom: Math.max(insets.bottom, 12) + 78 + keyboardInset },
+                ]}
+              />
+            ) : null}
+
+            <Animated.View
+              style={[
+                styles.homeGroomViewerFooter,
+                { opacity: staticChromeOpacity, paddingBottom: chromeFooterBottom },
+              ]}
+            >
+              <View style={styles.homeGroomReplyRow}>
+                <TextInput
+                  maxLength={180}
+                  multiline
+                  onBlur={() => setReplyFocused(false)}
+                  onChangeText={onChangeReply}
+                  onFocus={() => setReplyFocused(true)}
+                  placeholder="メッセージを送信..."
+                  placeholderTextColor="rgba(255,255,255,0.78)"
+                  ref={replyInputRef}
+                  scrollEnabled={false}
+                  style={styles.homeGroomReplyInput}
+                  value={reply}
+                />
+                <Pressable
+                  accessibilityLabel={post.liked ? "いいねを取り消す" : "いいねする"}
+                  accessibilityRole="button"
+                  onPress={onLike}
+                  style={styles.homeGroomViewerAction}
+                >
+                  <IconSymbol
+                    name={post.liked ? "heart" : "heart-outline"}
+                    color={post.liked ? ihubColors.pink : "#fff"}
+                    size={31}
+                  />
+                </Pressable>
+                <Pressable
+                  accessibilityLabel="メッセージを送信"
+                  accessibilityRole="button"
+                  disabled={!canSend}
+                  onPress={sendReplyAndDismiss}
+                  style={[styles.homeGroomViewerAction, !canSend ? styles.homeGroomSendButtonDisabled : null]}
+                >
+                  <IconSymbol name="send-outline" color="#fff" size={31} />
+                </Pressable>
+              </View>
+            </Animated.View>
+            <GroomProfileSlidePanel
+              onClose={() => setProfileUser(null)}
+              onReply={focusReplyInputAfterProfile}
+              user={profileUser}
+            />
+          </Animated.View>
+        </View>
+      ) : null}
+    </Modal>
+  );
+}
+
+function homeGroomProfileId(post: HomeGroomPost) {
+  return post.authorId ?? HOME_GROOM_USER_BY_NAME[post.name] ?? post.id;
+}
+
+function homeGroomProfileUser(post: HomeGroomPost): GroomProfileUser {
+  const profileId = homeGroomProfileId(post);
+  const matchedUser = USERS.find((user) => user.id === profileId);
+  if (matchedUser) return matchedUser;
+  return {
+    animalType: "cat",
+    area: "イベント周辺",
+    count: 1,
+    furColor: "lavender",
+    group: "公開プロフィール",
+    hitokoto: post.caption,
+    hue: "lav",
+    id: profileId,
+    name: post.name,
+    oshi: "推し",
+    recent: post.caption,
+    since: post.timeLabel,
+    style: "推し活",
+  };
+}
+
+function HomeGroomStoryCube({
+  currentPost,
+  currentChrome,
+  nextPost,
+  nextChrome,
+  previousPost,
+  previousChrome,
+  swipeX,
+  width,
+}: {
+  currentPost: HomeGroomPost;
+  currentChrome?: ReactNode;
+  nextPost: HomeGroomPost | null;
+  nextChrome?: ReactNode;
+  previousPost: HomeGroomPost | null;
+  previousChrome?: ReactNode;
+  swipeX: Animated.Value;
+  width: number;
+}) {
+  const perspective = Math.max(width * 1.28, 620);
+  const seamOverlap = 1;
+  const currentToNextLeft = swipeX.interpolate({
+    inputRange: [-width, -width * 0.5, 0],
+    outputRange: [-width + seamOverlap, -width * 0.5 + seamOverlap, 0],
+    extrapolate: "clamp",
+  });
+  const currentToNextRotateY = swipeX.interpolate({
+    inputRange: [-width, 0],
+    outputRange: ["-90deg", "0deg"],
+    extrapolate: "clamp",
+  });
+  const currentToNextOpacity = swipeX.interpolate({
+    inputRange: [-width, -1, 0, 1],
+    outputRange: [0, 1, 1, 0],
+    extrapolate: "clamp",
+  });
+  const currentToNextShadeOpacity = swipeX.interpolate({
+    inputRange: [-width, -width * 0.5, 0],
+    outputRange: [0.34, 0.2, 0],
+    extrapolate: "clamp",
+  });
+  const currentToNextChromeOpacity = swipeX.interpolate({
+    inputRange: [-width, -1, 0],
+    outputRange: [1, 1, 0],
+    extrapolate: "clamp",
+  });
+  const currentToPreviousLeft = swipeX.interpolate({
+    inputRange: [0, width * 0.5, width],
+    outputRange: [0, width * 0.5 - seamOverlap, width - seamOverlap],
+    extrapolate: "clamp",
+  });
+  const currentToPreviousRotateY = swipeX.interpolate({
+    inputRange: [0, width],
+    outputRange: ["0deg", "90deg"],
+    extrapolate: "clamp",
+  });
+  const currentToPreviousOpacity = swipeX.interpolate({
+    inputRange: [-1, 0, 1, width],
+    outputRange: [0, 1, 1, 0],
+    extrapolate: "clamp",
+  });
+  const currentToPreviousShadeOpacity = swipeX.interpolate({
+    inputRange: [0, width * 0.5, width],
+    outputRange: [0, 0.2, 0.34],
+    extrapolate: "clamp",
+  });
+  const currentToPreviousChromeOpacity = swipeX.interpolate({
+    inputRange: [0, 1, width],
+    outputRange: [0, 1, 1],
+    extrapolate: "clamp",
+  });
+  const nextLeft = swipeX.interpolate({
+    inputRange: [-width, -width * 0.5, 0],
+    outputRange: [0, width * 0.5 - seamOverlap, width - seamOverlap],
+    extrapolate: "clamp",
+  });
+  const nextRotateY = swipeX.interpolate({
+    inputRange: [-width, 0],
+    outputRange: ["0deg", "90deg"],
+    extrapolate: "clamp",
+  });
+  const nextOpacity = swipeX.interpolate({
+    inputRange: [-width, -1, 0],
+    outputRange: [1, 1, 0],
+    extrapolate: "clamp",
+  });
+  const nextShadeOpacity = swipeX.interpolate({
+    inputRange: [-width, -width * 0.5, 0],
+    outputRange: [0, 0.2, 0.34],
+    extrapolate: "clamp",
+  });
+  const previousLeft = swipeX.interpolate({
+    inputRange: [0, width * 0.5, width],
+    outputRange: [-width + seamOverlap, -width * 0.5 + seamOverlap, 0],
+    extrapolate: "clamp",
+  });
+  const previousRotateY = swipeX.interpolate({
+    inputRange: [0, width],
+    outputRange: ["-90deg", "0deg"],
+    extrapolate: "clamp",
+  });
+  const previousOpacity = swipeX.interpolate({
+    inputRange: [0, 1, width],
+    outputRange: [0, 1, 1],
+    extrapolate: "clamp",
+  });
+  const previousShadeOpacity = swipeX.interpolate({
+    inputRange: [0, width * 0.5, width],
+    outputRange: [0.34, 0.2, 0],
+    extrapolate: "clamp",
+  });
+
+  return (
+    <View style={styles.homeGroomStoryStage}>
+      {previousPost ? (
+        <Animated.View
+          pointerEvents="none"
+          style={[
+            styles.homeGroomStoryFace,
+            {
+              left: previousLeft,
+              opacity: previousOpacity,
+              transform: [{ perspective }, { rotateY: previousRotateY }],
+              transformOrigin: "right center",
+              width,
+              zIndex: 2,
+            },
+          ]}
+        >
+          <HomeGroomStoryFaceContent
+            chrome={previousChrome}
+            post={previousPost}
+            shadeOpacity={previousShadeOpacity}
+          />
+        </Animated.View>
+      ) : null}
+      {nextPost ? (
+        <Animated.View
+          pointerEvents="none"
+          style={[
+            styles.homeGroomStoryFace,
+            {
+              left: nextLeft,
+              opacity: nextOpacity,
+              transform: [{ perspective }, { rotateY: nextRotateY }],
+              transformOrigin: "left center",
+              width,
+              zIndex: 2,
+            },
+          ]}
+        >
+          <HomeGroomStoryFaceContent chrome={nextChrome} post={nextPost} shadeOpacity={nextShadeOpacity} />
+        </Animated.View>
+      ) : null}
+      <Animated.View
+        pointerEvents="none"
+        style={[
+          styles.homeGroomStoryFace,
+          {
+            left: currentToNextLeft,
+            opacity: currentToNextOpacity,
+            transform: [{ perspective }, { rotateY: currentToNextRotateY }],
+            transformOrigin: "right center",
+            width,
+            zIndex: 3,
+          },
+        ]}
+      >
+        <HomeGroomStoryFaceContent
+          chrome={currentChrome}
+          chromeOpacity={currentToNextChromeOpacity}
+          post={currentPost}
+          shadeOpacity={currentToNextShadeOpacity}
+        />
+      </Animated.View>
+      <Animated.View
+        pointerEvents="none"
+        style={[
+          styles.homeGroomStoryFace,
+          {
+            left: currentToPreviousLeft,
+            opacity: currentToPreviousOpacity,
+            transform: [{ perspective }, { rotateY: currentToPreviousRotateY }],
+            transformOrigin: "left center",
+            width,
+            zIndex: 3,
+          },
+        ]}
+      >
+        <HomeGroomStoryFaceContent
+          chrome={currentChrome}
+          chromeOpacity={currentToPreviousChromeOpacity}
+          post={currentPost}
+          shadeOpacity={currentToPreviousShadeOpacity}
+        />
+      </Animated.View>
+    </View>
+  );
+}
+
+function HomeGroomStoryFaceContent({
+  chrome,
+  chromeOpacity = 1,
+  post,
+  shadeOpacity,
+}: {
+  chrome?: ReactNode;
+  chromeOpacity?: number | Animated.AnimatedInterpolation<number>;
+  post: HomeGroomPost;
+  shadeOpacity?: number | Animated.AnimatedInterpolation<number>;
+}) {
+  return (
+    <>
+      <HomeGroomStoryImageLayer transform={post.imageTransform} uri={post.imageUri} />
+      <HomeGroomStoryDecorations
+        doodles={post.doodles ?? []}
+        stickers={post.stickers ?? []}
+        textOverlays={post.textOverlays ?? []}
+      />
+      {shadeOpacity !== undefined ? (
+        <Animated.View
+          pointerEvents="none"
+          style={[styles.homeGroomStoryCubeShade, { opacity: shadeOpacity }]}
+        />
+      ) : null}
+      {chrome ? (
+        <Animated.View
+          pointerEvents="none"
+          style={[StyleSheet.absoluteFillObject, { opacity: chromeOpacity }]}
+        >
+          {chrome}
+        </Animated.View>
+      ) : null}
+    </>
+  );
+}
+
+function HomeGroomStoryImageLayer({
+  transform,
+  uri,
+}: {
+  transform?: HomeGroomImageTransform;
+  uri: string;
+}) {
+  const [canvasSize, setCanvasSize] = useState({ height: 1, width: 1 });
+  const [imageSize, setImageSize] = useState({ height: 16, width: 9 });
+  const safeTransform = transform ?? DEFAULT_HOME_GROOM_IMAGE_TRANSFORM;
+
+  useEffect(() => {
+    let mounted = true;
+    Image.getSize(
+      uri,
+      (width, height) => {
+        if (mounted && width > 0 && height > 0) setImageSize({ height, width });
+      },
+      () => {
+        if (mounted) setImageSize({ height: 16, width: 9 });
+      },
+    );
+    return () => {
+      mounted = false;
+    };
+  }, [uri]);
+
+  if (!transform || isDefaultHomeGroomImageTransform(transform)) {
+    return <Image resizeMode="cover" source={{ uri }} style={StyleSheet.absoluteFillObject} />;
+  }
+
+  const canvasWidth = Math.max(canvasSize.width, 1);
+  const canvasHeight = Math.max(canvasSize.height, 1);
+  const imageAspect = Math.max(imageSize.width, 1) / Math.max(imageSize.height, 1);
+  const canvasAspect = canvasWidth / canvasHeight;
+  const frameWidth = imageAspect >= canvasAspect ? canvasHeight * imageAspect : canvasWidth;
+  const frameHeight = imageAspect >= canvasAspect ? canvasHeight : canvasWidth / imageAspect;
+  const left = (canvasWidth - frameWidth) / 2;
+  const top = (canvasHeight - frameHeight) / 2;
+
+  return (
+    <View
+      onLayout={(event) => {
+        const { height, width } = event.nativeEvent.layout;
+        setCanvasSize({ height, width });
+      }}
+      style={StyleSheet.absoluteFillObject}
+    >
+      <View pointerEvents="none" style={styles.homeGroomStoryBackdrop} />
+      <Animated.View
+        style={[
+          styles.homeGroomStoryImageFrame,
+          {
+            height: frameHeight,
+            left,
+            top,
+            width: frameWidth,
+            transform: [
+              { translateX: safeTransform.x * canvasWidth },
+              { translateY: safeTransform.y * canvasHeight },
+              { rotate: `${safeTransform.rotation}deg` },
+              { scale: safeTransform.scale },
+            ],
+          },
+        ]}
+      >
+        <Image resizeMode="cover" source={{ uri }} style={StyleSheet.absoluteFillObject} />
+      </Animated.View>
+    </View>
+  );
+}
+
+function HomeGroomStoryDecorations({
+  doodles,
+  stickers,
+  textOverlays,
+}: {
+  doodles: HomeGroomDoodleStroke[];
+  stickers: HomeGroomStickerOverlay[];
+  textOverlays: HomeGroomTextOverlay[];
+}) {
+  return (
+    <View pointerEvents="none" style={StyleSheet.absoluteFillObject}>
+      {doodles.map((stroke) =>
+        stroke.points.map((point, index) => (
+          <View
+            key={`${stroke.id}-${index}`}
+            style={[
+              styles.homeGroomDoodleDot,
+              {
+                backgroundColor: stroke.color,
+                left: `${point.x * 100}%`,
+                top: `${point.y * 100}%`,
+              },
+            ]}
+          />
+        )),
+      )}
+      {textOverlays.map((overlay) => (
+        <View
+          key={overlay.id}
+          style={[
+            styles.homeGroomStoryTextOverlay,
+            overlay.tone === "label"
+              ? styles.homeGroomStoryTextOverlayLabel
+              : overlay.tone === "solid"
+                ? styles.homeGroomStoryTextOverlaySolid
+                : null,
+            {
+              left: `${overlay.x * 100}%`,
+              top: `${overlay.y * 100}%`,
+              transform: [{ rotate: `${overlay.rotation ?? 0}deg` }, { scale: overlay.scale ?? 1 }],
+            },
+          ]}
+        >
+          <Text
+            numberOfLines={3}
+            style={[
+              styles.homeGroomStoryTextOverlayText,
+              { color: overlay.tone === "solid" ? ihubColors.ink : overlay.color },
+            ]}
+          >
+            {overlay.text}
+          </Text>
+        </View>
+      ))}
+      {stickers.map((sticker) => (
+        <View
+          key={sticker.id}
+          style={[
+            styles.homeGroomStoryStickerOverlay,
+            {
+              borderColor: sticker.color,
+              left: `${sticker.x * 100}%`,
+              top: `${sticker.y * 100}%`,
+            },
+          ]}
+        >
+          <Text style={[styles.homeGroomStoryStickerText, { color: sticker.color }]}>
+            {sticker.label}
+          </Text>
+        </View>
+      ))}
+    </View>
+  );
+}
+
+function HomeGroomStoryAttachedChrome({
+  canSend,
+  footerBottom,
+  headerTop,
+  post,
+  progress,
+  progressIndex = 0,
+  progressPosts,
+  reply,
+}: {
+  canSend: boolean;
+  footerBottom: number;
+  headerTop: number;
+  post: HomeGroomPost;
+  progress?: Animated.Value;
+  progressIndex?: number;
+  progressPosts?: HomeGroomPost[];
+  reply: string;
+}) {
+  const posts = progressPosts?.length ? progressPosts : [post];
+  return (
+    <>
+      <View style={[styles.homeGroomViewerHeader, { paddingTop: headerTop }]}>
+        {progress ? (
+          <HomeGroomProgressBar currentIndex={progressIndex} posts={posts} progress={progress} />
+        ) : (
+          <HomeGroomAttachedProgressBar currentIndex={progressIndex} posts={posts} />
+        )}
+        <View style={styles.homeGroomViewerAuthor}>
+          <View style={[styles.homeGroomViewerFace, post.liked ? styles.homeGroomViewerFaceLiked : null]}>
+            <Text style={styles.homeGroomViewerFaceText}>{post.name.slice(0, 1)}</Text>
+          </View>
+          <View style={styles.homeGroomViewerNameWrap}>
+            <Text numberOfLines={1} style={styles.homeGroomViewerName}>
+              {post.name}
+            </Text>
+            <Text numberOfLines={1} style={styles.homeGroomViewerMeta}>
+              {post.timeLabel}
+            </Text>
+          </View>
+        </View>
+      </View>
+
+      {post.caption.trim() ? (
+        <View style={styles.homeGroomCaptionPanel}>
+          <Text style={styles.homeGroomCaptionText}>{post.caption}</Text>
+        </View>
+      ) : null}
+
+      <View style={[styles.homeGroomViewerFooter, { paddingBottom: footerBottom }]}>
+        <View style={styles.homeGroomReplyRow}>
+          <View style={styles.homeGroomReplyGhost}>
+            <Text numberOfLines={1} style={styles.homeGroomReplyGhostText}>
+              {reply.trim() || "メッセージを送信..."}
+            </Text>
+          </View>
+          <View style={styles.homeGroomViewerAction}>
+            <IconSymbol name={post.liked ? "heart" : "heart-outline"} color={post.liked ? ihubColors.pink : "#fff"} size={31} />
+          </View>
+          <View style={[styles.homeGroomViewerAction, !canSend ? styles.homeGroomSendButtonDisabled : null]}>
+            <IconSymbol name="send-outline" color="#fff" size={31} />
+          </View>
+        </View>
+      </View>
+    </>
+  );
+}
+
+function HomeGroomAttachedProgressBar({
+  currentIndex,
+  posts,
+}: {
+  currentIndex: number;
+  posts: HomeGroomPost[];
+}) {
+  return (
+    <View style={styles.homeGroomProgressRow}>
+      {posts.map((item, index) => (
+        <View key={item.id} style={styles.homeGroomProgressTrack}>
+          <View style={[styles.homeGroomProgressFill, { width: index < currentIndex ? "100%" : "0%" }]} />
+        </View>
+      ))}
+    </View>
+  );
+}
+
+function HomeGroomProgressBar({
+  currentIndex,
+  posts,
+  progress,
+}: {
+  currentIndex: number;
+  posts: HomeGroomPost[];
+  progress: Animated.Value;
+}) {
+  return (
+    <View style={styles.homeGroomProgressRow}>
+      {posts.map((item, index) => (
+        <HomeGroomProgressSegment
+          active={index === currentIndex}
+          done={index < currentIndex}
+          key={item.id}
+          progress={progress}
+        />
+      ))}
+    </View>
+  );
+}
+
+function HomeGroomProgressSegment({
+  active,
+  done,
+  progress,
+}: {
+  active: boolean;
+  done: boolean;
+  progress: Animated.Value;
+}) {
+  const [width, setWidth] = useState(0);
+  const animatedWidth = active
+    ? progress.interpolate({
+        inputRange: [0, 1],
+        outputRange: [0, width],
+        extrapolate: "clamp",
+      })
+    : done
+      ? width
+      : 0;
+
+  return (
+    <View
+      onLayout={(event) => setWidth(event.nativeEvent.layout.width)}
+      style={styles.homeGroomProgressTrack}
+    >
+      <Animated.View style={[styles.homeGroomProgressFill, { width: animatedWidth }]} />
+    </View>
+  );
+}
+
+function TopEdgeFade({
+  height,
+}: {
+  height: number;
+}) {
+  return (
+    <View pointerEvents="none" style={[styles.topEdgeFade, { height }]}>
+      {TOP_EDGE_FADE_BANDS.map((band, index) => (
+        <View
+          key={`top-edge-fade-${index}`}
+          style={[styles.topEdgeFadeBand, band]}
+        />
+      ))}
+    </View>
+  );
+}
+
+function ShelfSectionRows({
   section,
   sectionIndex,
   tileWidth,
@@ -910,8 +2534,7 @@ function ShelfSectionView({
   onCandidatePress: (row: ShelfRow, candidate: Candidate) => void;
 }) {
   return (
-    <View style={styles.shelfSection}>
-      <Text style={styles.sectionTitle}>{section.title}</Text>
+    <View style={styles.shelfSectionRows}>
       {section.rows.map((row, rowIndex) => (
         <ShelfRowView
           key={row.id}
@@ -991,18 +2614,24 @@ function AnimatedCandidateTile({
   onPress: () => void;
 }) {
   const appear = useRef(new Animated.Value(0)).current;
+  const mountedAt = useRef(Date.now()).current;
+  const hasAnimated = useRef(false);
+  const imageReady = useImageReady(candidate.photoUrl);
 
   useEffect(() => {
+    if (!imageReady || hasAnimated.current) return;
+    const remainingDelay = Math.max(0, delayMs - (Date.now() - mountedAt));
     const timer = setTimeout(() => {
+      hasAnimated.current = true;
       Animated.timing(appear, {
         toValue: 1,
         duration: 520,
         useNativeDriver: true,
       }).start();
-    }, delayMs);
+    }, remainingDelay);
 
     return () => clearTimeout(timer);
-  }, [appear, delayMs]);
+  }, [appear, delayMs, imageReady, mountedAt]);
 
   const translateX = appear.interpolate({
     inputRange: [0, 1],
@@ -1011,6 +2640,7 @@ function AnimatedCandidateTile({
 
   return (
     <Animated.View
+      pointerEvents={imageReady ? "auto" : "none"}
       style={{
         opacity: appear,
         transform: [{ translateX }],
@@ -1038,6 +2668,7 @@ function CandidateTile({
   onPress: () => void;
 }) {
   const showLocal = localMode && candidate.local;
+  const tagLine = formatHashTags(candidate.tagLabels ?? (candidate.tag ? [candidate.tag] : []));
   const frameStyle = useMemo(
     () => getPriorityFrameStyle(candidate.priority),
     [candidate.priority],
@@ -1070,19 +2701,16 @@ function CandidateTile({
               <Text style={styles.fakeImageLetter}>{candidate.member}</Text>
             </>
           )}
-          <Text numberOfLines={1} style={styles.fakeImageCaption}>
-            {candidate.type}
-          </Text>
         </View>
         {showLocal ? (
           <View style={styles.liveBadge}>
             <Text style={styles.liveBadgeText}>LIVE</Text>
           </View>
         ) : null}
-        {candidate.tag ? (
+        {tagLine ? (
           <View style={styles.tagOverlay}>
             <Text numberOfLines={1} style={styles.tagText}>
-              {truncateTag(candidate.tag)}
+              {tagLine}
             </Text>
           </View>
         ) : null}
@@ -1358,16 +2986,6 @@ function LocalAura() {
   );
 }
 
-function truncateLocation(value: string) {
-  const chars = Array.from(value.replace(/\s+/g, ""));
-  return chars.length > 8 ? `${chars.slice(0, 8).join("")}…` : value;
-}
-
-function truncateTag(value: string) {
-  const chars = Array.from(value);
-  return chars.length > 8 ? `${chars.slice(0, 8).join("")}...` : value;
-}
-
 function getPriorityFrameStyle(priority: CandidatePriority) {
   if (priority === "both") {
     return {
@@ -1412,59 +3030,23 @@ const styles = StyleSheet.create({
   homeScroll: {
     flex: 1,
     marginHorizontal: -18,
+    zIndex: 1,
   },
   homeScrollContent: {
-    paddingBottom: 24,
+    paddingBottom: 132,
     paddingHorizontal: 18,
+    paddingTop: 6,
   },
-  topBar: {
-    alignItems: "center",
-    flexDirection: "row",
-    justifyContent: "space-between",
-    marginBottom: 14,
-  },
-  topLeft: {
-    flexDirection: "row",
-    gap: 9,
-  },
-  topRight: {
-    alignItems: "center",
-    flexDirection: "row",
-    gap: 8,
-  },
-  circleButton: {
-    alignItems: "center",
-    backgroundColor: "rgba(255,255,255,0.82)",
-    borderColor: "rgba(255,255,255,0.78)",
-    borderRadius: 20,
-    borderWidth: 1,
-    height: 40,
-    justifyContent: "center",
-    shadowColor: ihubColors.ink,
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.1,
-    shadowRadius: 18,
-    width: 40,
-  },
-  notificationBadge: {
-    alignItems: "center",
-    backgroundColor: ihubColors.pink,
-    borderColor: ihubColors.surface,
-    borderRadius: 999,
-    borderWidth: 1,
-    height: 17,
-    justifyContent: "center",
-    minWidth: 17,
-    paddingHorizontal: 4,
+  topEdgeFade: {
+    left: -18,
+    overflow: "hidden",
     position: "absolute",
-    right: -2,
-    top: -2,
+    right: -18,
+    top: 0,
+    zIndex: 18,
   },
-  notificationBadgeText: {
-    color: ihubColors.surface,
-    fontSize: 9,
-    fontWeight: "900",
-    lineHeight: 11,
+  topEdgeFadeBand: {
+    flex: 1,
   },
   floatingSearchButton: {
     alignItems: "center",
@@ -1484,24 +3066,103 @@ const styles = StyleSheet.create({
     width: 54,
     zIndex: 20,
   },
-  placeButton: {
+  homeActionButton: {
+    alignItems: "center",
+    backgroundColor: "rgba(255,255,255,0.34)",
+    borderColor: "rgba(255,255,255,0.78)",
+    borderRadius: 999,
+    borderWidth: StyleSheet.hairlineWidth,
+    bottom: 104,
+    height: 58,
+    justifyContent: "center",
+    overflow: "hidden",
+    position: "absolute",
+    right: 18,
+    shadowColor: ihubColors.ink,
+    shadowOffset: { width: 0, height: 16 },
+    shadowOpacity: 0.13,
+    shadowRadius: 28,
+    width: 58,
+    zIndex: 21,
+  },
+  homeActionButtonLive: {
+    backgroundColor: "rgba(166,149,216,0.18)",
+    borderColor: "rgba(255,255,255,0.9)",
+    shadowColor: ihubColors.lavender,
+    shadowOpacity: 0.3,
+  },
+  homeActionButtonPressed: {
+    opacity: 0.86,
+    transform: [{ scale: 0.96 }],
+  },
+  homeActionFallbackGlass: {
+    ...StyleSheet.absoluteFillObject,
     backgroundColor: "rgba(255,255,255,0.86)",
-    borderColor: "rgba(58,50,74,0.09)",
+  },
+  homeActionIconLayer: {
+    alignItems: "center",
+    backgroundColor: "rgba(255,255,255,0.08)",
+    borderRadius: 999,
+    height: 58,
+    justifyContent: "center",
+    width: 58,
+  },
+  localFocusLayer: {
+    bottom: 0,
+    left: 0,
+    pointerEvents: "none",
+    position: "absolute",
+    right: 0,
+    top: 0,
+    zIndex: 12,
+  },
+  localFocusEdge: {
+    backgroundColor: "rgba(166,149,216,0.28)",
+    bottom: 0,
+    position: "absolute",
+    top: 0,
+    width: 24,
+  },
+  localFocusLeft: {
+    left: -12,
+    shadowColor: ihubColors.lavender,
+    shadowOffset: { width: 18, height: 0 },
+    shadowOpacity: 0.55,
+    shadowRadius: 30,
+  },
+  localFocusRight: {
+    right: -12,
+    shadowColor: ihubColors.lavender,
+    shadowOffset: { width: -18, height: 0 },
+    shadowOpacity: 0.55,
+    shadowRadius: 30,
+  },
+  modeStatusPill: {
+    alignItems: "center",
+    alignSelf: "center",
+    backgroundColor: "rgba(58,50,74,0.76)",
+    borderColor: "rgba(255,255,255,0.40)",
     borderRadius: ihubRadii.pill,
     borderWidth: 1,
-    maxWidth: 126,
-    paddingHorizontal: 12,
+    paddingHorizontal: 16,
     paddingVertical: 9,
+    position: "absolute",
+    top: 58,
+    zIndex: 30,
   },
-  placeText: {
-    color: ihubColors.ink,
-    fontSize: 11.5,
+  modeStatusText: {
+    color: ihubColors.surface,
+    fontSize: 12,
     fontWeight: "900",
   },
   localSheetLayer: {
     backgroundColor: "rgba(20,18,28,0.28)",
     flex: 1,
     justifyContent: "flex-end",
+  },
+  localSheetNativeLayer: {
+    backgroundColor: ihubColors.background,
+    justifyContent: "flex-start",
   },
   localSheetBackdrop: {
     bottom: 0,
@@ -1524,6 +3185,15 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: -16 },
     shadowOpacity: 0.16,
     shadowRadius: 34,
+  },
+  localSheetNativePanel: {
+    backgroundColor: ihubColors.background,
+    borderTopLeftRadius: 0,
+    borderTopRightRadius: 0,
+    borderWidth: 0,
+    maxHeight: "100%",
+    shadowOpacity: 0,
+    shadowRadius: 0,
   },
   localSheetHandle: {
     alignSelf: "center",
@@ -1814,68 +3484,6 @@ const styles = StyleSheet.create({
     letterSpacing: 0,
     lineHeight: 29,
   },
-  modeSwitch: {
-    backgroundColor: "rgba(118,112,134,0.12)",
-    borderColor: "rgba(255,255,255,0.72)",
-    borderRadius: ihubRadii.pill,
-    borderWidth: 1,
-    flexDirection: "row",
-    marginBottom: 11,
-    overflow: "hidden",
-    padding: 4,
-    position: "relative",
-    shadowColor: ihubColors.ink,
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.08,
-    shadowRadius: 18,
-  },
-  modeThumb: {
-    backgroundColor: "rgba(255,255,255,0.96)",
-    borderColor: "rgba(255,255,255,0.88)",
-    borderRadius: ihubRadii.pill,
-    borderWidth: 1,
-    bottom: 4,
-    left: 4,
-    overflow: "hidden",
-    position: "absolute",
-    top: 4,
-    shadowColor: ihubColors.ink,
-    shadowOffset: { width: 0, height: 5 },
-    shadowOpacity: 0.16,
-    shadowRadius: 12,
-  },
-  modeThumbGloss: {
-    backgroundColor: "rgba(255,255,255,0.62)",
-    borderRadius: 999,
-    height: "54%",
-    left: 12,
-    position: "absolute",
-    right: 12,
-    top: 5,
-  },
-  modeButton: {
-    alignItems: "center",
-    flex: 1,
-    justifyContent: "center",
-    minHeight: 38,
-    paddingVertical: 8,
-    zIndex: 1,
-  },
-  modeText: {
-    fontSize: 12,
-    fontWeight: "900",
-    lineHeight: 16,
-  },
-  modeTextActive: {
-    color: ihubColors.ink,
-  },
-  modeTextInactive: {
-    color: "rgba(58,50,74,0.55)",
-  },
-  sections: {
-    gap: 20,
-    marginTop: 16,
-  },
   inlineError: {
     color: ihubColors.warn,
     fontSize: 11,
@@ -1887,6 +3495,361 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "800",
     lineHeight: 18,
+  },
+  homeGroomRail: {
+    gap: 10,
+    marginBottom: 8,
+    marginTop: 2,
+  },
+  homeGroomTitle: {
+    color: ihubColors.ink,
+    fontSize: 22,
+    fontWeight: "900",
+    lineHeight: 27,
+  },
+  homeGroomList: {
+    gap: 13,
+    paddingRight: 18,
+  },
+  homeGroomItem: {
+    alignItems: "center",
+    gap: 6,
+    width: 80,
+  },
+  homeGroomRing: {
+    alignItems: "center",
+    backgroundColor: ihubColors.surface,
+    borderColor: ihubColors.lavender,
+    borderRadius: 999,
+    borderWidth: 2,
+    height: 74,
+    justifyContent: "center",
+    padding: 3,
+    shadowColor: ihubColors.lavender,
+    shadowOffset: { width: 0, height: 5 },
+    shadowOpacity: 0.16,
+    shadowRadius: 12,
+    width: 74,
+  },
+  homeGroomRingLiked: {
+    borderColor: ihubColors.pink,
+    shadowColor: ihubColors.pink,
+  },
+  homeGroomRingViewed: {
+    borderColor: "rgba(58,50,74,0.24)",
+    shadowColor: "rgba(58,50,74,0.20)",
+    shadowOpacity: 0.06,
+  },
+  homeGroomImage: {
+    backgroundColor: "rgba(166,149,216,0.12)",
+    borderRadius: 999,
+    height: "100%",
+    width: "100%",
+  },
+  homeGroomAddRing: {
+    borderColor: "rgba(166,149,216,0.34)",
+    borderStyle: "dashed",
+    shadowOpacity: 0.08,
+  },
+  homeGroomAddCircle: {
+    alignItems: "center",
+    backgroundColor: "rgba(166,149,216,0.12)",
+    borderRadius: 999,
+    height: "100%",
+    justifyContent: "center",
+    width: "100%",
+  },
+  homeGroomName: {
+    color: "rgba(58,50,74,0.72)",
+    fontSize: 11,
+    fontWeight: "900",
+    maxWidth: 78,
+    textAlign: "center",
+  },
+  homeGroomViewer: {
+    flex: 1,
+  },
+  homeGroomViewerBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "#05080d",
+  },
+  homeGroomViewerFrame: {
+    backgroundColor: "#000",
+    flex: 1,
+    overflow: "hidden",
+  },
+  homeGroomStoryStage: {
+    backgroundColor: "#05080d",
+    flex: 1,
+    overflow: "hidden",
+  },
+  homeGroomStoryFace: {
+    backfaceVisibility: "hidden",
+    backgroundColor: "#05080d",
+    bottom: 0,
+    overflow: "hidden",
+    position: "absolute",
+    top: 0,
+  },
+  homeGroomStoryCubeShade: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "#000",
+  },
+  homeGroomStoryBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "#8f8c86",
+  },
+  homeGroomStoryImageFrame: {
+    overflow: "hidden",
+    position: "absolute",
+  },
+  homeGroomDoodleDot: {
+    borderRadius: 999,
+    height: 5,
+    marginLeft: -2.5,
+    marginTop: -2.5,
+    opacity: 0.9,
+    position: "absolute",
+    width: 5,
+  },
+  homeGroomStoryTextOverlay: {
+    maxWidth: "70%",
+    position: "absolute",
+  },
+  homeGroomStoryTextOverlayLabel: {
+    backgroundColor: "rgba(0,0,0,0.32)",
+    borderRadius: 13,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+  },
+  homeGroomStoryTextOverlaySolid: {
+    backgroundColor: "#fff",
+    borderRadius: 13,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+  },
+  homeGroomStoryTextOverlayText: {
+    fontSize: 26,
+    fontWeight: "900",
+    lineHeight: 33,
+    textShadowColor: "rgba(0,0,0,0.35)",
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 5,
+  },
+  homeGroomStoryStickerOverlay: {
+    borderRadius: 999,
+    borderWidth: 2,
+    paddingHorizontal: 9,
+    paddingVertical: 5,
+    position: "absolute",
+  },
+  homeGroomStoryStickerText: {
+    fontSize: 13,
+    fontWeight: "900",
+  },
+  homeGroomViewerHeader: {
+    left: 0,
+    paddingHorizontal: 12,
+    position: "absolute",
+    right: 0,
+    top: 0,
+    zIndex: 8,
+  },
+  homeGroomProgressRow: {
+    flexDirection: "row",
+    gap: 4,
+  },
+  homeGroomProgressTrack: {
+    backgroundColor: "rgba(255,255,255,0.34)",
+    borderRadius: 99,
+    flex: 1,
+    height: 3,
+    overflow: "hidden",
+  },
+  homeGroomProgressFill: {
+    backgroundColor: "rgba(255,255,255,0.92)",
+    borderRadius: 99,
+    height: "100%",
+  },
+  homeGroomViewerHeaderRow: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 10,
+    marginTop: 14,
+  },
+  homeGroomViewerAuthor: {
+    alignItems: "center",
+    borderRadius: 999,
+    flexDirection: "row",
+    gap: 10,
+    marginTop: 14,
+  },
+  homeGroomViewerAuthorInRow: {
+    flex: 1,
+    marginTop: 0,
+    minWidth: 0,
+  },
+  homeGroomViewerAuthorPressed: {
+    opacity: 0.72,
+  },
+  homeGroomViewerMenuButton: {
+    alignItems: "center",
+    backgroundColor: "rgba(0,0,0,0.18)",
+    borderRadius: ihubRadii.pill,
+    height: 38,
+    justifyContent: "center",
+    width: 38,
+  },
+  homeGroomViewerFace: {
+    alignItems: "center",
+    backgroundColor: "rgba(166,149,216,0.58)",
+    borderColor: ihubColors.pink,
+    borderRadius: 999,
+    borderWidth: 2,
+    height: 38,
+    justifyContent: "center",
+    width: 38,
+  },
+  homeGroomViewerFaceLiked: {
+    borderColor: ihubColors.pink,
+  },
+  homeGroomViewerFaceText: {
+    color: ihubColors.ink,
+    fontSize: 15,
+    fontWeight: "900",
+  },
+  homeGroomViewerNameWrap: {
+    flex: 1,
+    minWidth: 0,
+  },
+  homeGroomViewerName: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "900",
+  },
+  homeGroomViewerMeta: {
+    color: "rgba(255,255,255,0.78)",
+    fontSize: 13,
+    fontWeight: "800",
+    marginTop: 2,
+  },
+  homeGroomTapLayer: {
+    bottom: 108,
+    flexDirection: "row",
+    left: 0,
+    position: "absolute",
+    right: 0,
+    top: 112,
+    zIndex: 3,
+  },
+  homeGroomTapZone: {
+    flex: 1,
+  },
+  homeGroomCaptionPanel: {
+    bottom: 112,
+    left: 18,
+    position: "absolute",
+    right: 76,
+    zIndex: 7,
+  },
+  homeGroomCaptionText: {
+    color: "#fff",
+    fontSize: 13,
+    fontWeight: "500",
+    lineHeight: 18,
+    textAlign: "left",
+  },
+  homeGroomFeedbackText: {
+    color: "rgba(255,255,255,0.82)",
+    fontSize: 12,
+    fontWeight: "700",
+    marginTop: 8,
+    textAlign: "left",
+  },
+  homeGroomCenterToast: {
+    alignSelf: "center",
+    backgroundColor: "rgba(20,16,29,0.74)",
+    borderColor: "rgba(255,255,255,0.18)",
+    borderRadius: 18,
+    borderWidth: 1,
+    left: 42,
+    paddingHorizontal: 18,
+    paddingVertical: 12,
+    position: "absolute",
+    right: 42,
+    top: "45%",
+    zIndex: 11,
+  },
+  homeGroomCenterToastText: {
+    color: "#fff",
+    fontSize: 14,
+    fontWeight: "900",
+    textAlign: "center",
+  },
+  homeGroomInputDimmer: {
+    backgroundColor: "rgba(0,0,0,0.34)",
+    left: 0,
+    position: "absolute",
+    right: 0,
+    top: 0,
+    zIndex: 8,
+  },
+  homeGroomViewerFooter: {
+    bottom: 0,
+    left: 0,
+    paddingHorizontal: 13,
+    position: "absolute",
+    right: 0,
+    zIndex: 9,
+  },
+  homeGroomReplyRow: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 11,
+  },
+  homeGroomReplyInput: {
+    backgroundColor: "rgba(5,8,13,0.42)",
+    borderColor: "rgba(255,255,255,0.46)",
+    borderRadius: ihubRadii.pill,
+    borderWidth: 1,
+    color: "#fff",
+    flex: 1,
+    fontSize: 16,
+    fontWeight: "800",
+    lineHeight: 21,
+    maxHeight: 100,
+    minHeight: 50,
+    paddingHorizontal: 18,
+    paddingVertical: 12,
+  },
+  homeGroomReplyGhost: {
+    alignItems: "center",
+    backgroundColor: "rgba(5,8,13,0.42)",
+    borderColor: "rgba(255,255,255,0.46)",
+    borderRadius: ihubRadii.pill,
+    borderWidth: 1,
+    flex: 1,
+    justifyContent: "center",
+    minHeight: 50,
+    paddingHorizontal: 18,
+    paddingVertical: 12,
+  },
+  homeGroomReplyGhostText: {
+    alignSelf: "stretch",
+    color: "rgba(255,255,255,0.78)",
+    fontSize: 16,
+    fontWeight: "800",
+    lineHeight: 21,
+  },
+  homeGroomViewerAction: {
+    alignItems: "center",
+    borderRadius: ihubRadii.pill,
+    height: 48,
+    justifyContent: "center",
+    width: 42,
+  },
+  homeGroomSendButtonDisabled: {
+    opacity: 0.52,
   },
   emptyMatches: {
     backgroundColor: "rgba(255,255,255,0.86)",
@@ -1908,8 +3871,17 @@ const styles = StyleSheet.create({
     lineHeight: 18,
     marginTop: 6,
   },
-  shelfSection: {
+  stickySectionHeader: {
+    backgroundColor: "transparent",
+    marginHorizontal: -18,
+    paddingBottom: 10,
+    paddingHorizontal: 18,
+    paddingTop: 12,
+    zIndex: 10,
+  },
+  shelfSectionRows: {
     gap: 10,
+    marginBottom: 20,
   },
   sectionTitle: {
     color: "#111111",
@@ -1917,6 +3889,7 @@ const styles = StyleSheet.create({
     fontWeight: "900",
     letterSpacing: 0,
     lineHeight: 29,
+    position: "relative",
   },
   shelfRow: {
     gap: 4,
@@ -1980,14 +3953,6 @@ const styles = StyleSheet.create({
     textShadowColor: "rgba(58,50,74,0.16)",
     textShadowOffset: { width: 0, height: 2 },
     textShadowRadius: 7,
-  },
-  fakeImageCaption: {
-    bottom: 12,
-    color: "rgba(255,255,255,0.92)",
-    fontSize: 10,
-    fontWeight: "900",
-    letterSpacing: 0.3,
-    position: "absolute",
   },
   tagOverlay: {
     alignSelf: "center",

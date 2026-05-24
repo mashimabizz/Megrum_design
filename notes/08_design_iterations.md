@@ -4,6 +4,9174 @@
 
 ---
 
+## イテレーション165：グルーム公開範囲とめぐり会話を永続化
+
+### 背景・問題意識
+
+グルーム機能の棚卸しで、公開範囲が実質的に絞れていないこと、投稿保存失敗時にローカルだけ投稿済みに見えること、グルーム返信後の通常会話が永続化されないこと、自分の投稿削除・相手投稿の非表示/通報/ブロック導線が未整備なことが分かった。オーナーから「全て上から順に実装」と指示があったため、DB/RLS/Storage/アプリUIまで一続きで修正した。
+
+### 変更内容
+
+#### `supabase/migrations/20260524143000_harden_groom_privacy_and_messages.sql`
+- `groom-posts` Storage を private bucket に切り替え、`can_view_groom_post()` を満たす投稿だけ署名URLを発行できるようにした。
+- `groom_audience_for_user()` を追加し、投稿時に同じ粗いエリアの active ユーザーを `audience_user_ids` へ入れるようにした。
+- `groom_hidden_posts` / `groom_user_blocks` / `groom_reports` を追加し、非表示・ブロック・通報をDB管理にした。
+- `meguri_messages` と `meguri-message-media` private Storage を追加し、グルーム返信後の通常会話と画像送信を永続化した。
+- `notifications.kind='meguri_message'` と `notifications.meguri_message_id` を追加した。
+- pg_cron が利用できる環境では `expire_groom_posts()` を15分ごとに実行するようにした。
+
+#### `mobile/src/lib/groom.ts`
+- グルーム画像を private Storage path として保存し、フィード取得時に署名URLへ差し替えるようにした。
+- 投稿時に `audience_user_ids` / `area_key` を設定し、空配列公開をやめた。
+- 自分の投稿アーカイブ、投稿非表示、投稿通報、ユーザーブロックのAPIラッパーを追加した。
+
+#### `mobile/app/(tabs)/encounters.tsx`
+- 投稿失敗時は optimistic 投稿を消し、編集画面に戻して再投稿できるようにした。
+- グルームビューアのメニューから、自分の投稿削除、他人の投稿非表示、通報、ブロックを実行できるようにした。
+- アプリ復帰時にもグルームフィードを再取得するようにした。
+- グルーム返信に `groomImagePath` を渡し、期限切れ後も署名URLを再生成できるようにした。
+
+#### `mobile/app/(tabs)/index.tsx`
+- ホーム上部のグルームにも、非表示・通報・ブロック・削除メニューとアプリ復帰時再取得を追加した。
+- ホーム側のグルーム返信にも private Storage path を渡すようにした。
+
+#### `mobile/src/lib/meguriMessages.ts` / `mobile/app/meguri-letters.tsx`
+- `meguri_messages` の読み書き・既読更新・ローカルフォールバックを追加した。
+- めぐりメッセージ画面で通常テキスト/画像送信をDBに保存し、再起動後や別端末でも復元できるようにした。
+- グルーム返信画像と通常送信画像を private Storage の署名URLで表示するようにした。
+
+#### `mobile/app/(tabs)/notifications.tsx`
+- `meguri_message` 通知種別に対応した。
+
+#### `notes/05_data_model.md` / `notes/09_state_machines.md` / `notes/10_glossary.md`
+- グルーム公開範囲、private Storage、非表示/ブロック/通報、めぐり会話永続化を追記した。
+
+### 影響範囲
+
+- iOS版 めぐりホームのグルーム投稿・閲覧・返信・管理メニュー
+- iOS版 ホーム画面上部のグルーム閲覧・返信・管理メニュー
+- iOS版 めぐりメッセージの通常会話・画像送信・既読
+- Supabase DB / Storage / RLS / notifications
+
+### 確認方法
+
+- `supabase db push --dry-run`
+- `supabase db push --yes`
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- `npm --prefix mobile run update:ios:preview -- --message "[iter165] グルーム公開範囲とめぐり会話を永続化" --non-interactive`
+- EAS Update: `019e57af-4479-7d0c-b534-d236ed08e815`
+- EAS Update group: `28b3994d-0e9c-4329-81e8-fc3f3931d44d`
+
+### 関連ファイル
+
+- `supabase/migrations/20260524143000_harden_groom_privacy_and_messages.sql`
+- `mobile/src/lib/groom.ts`
+- `mobile/src/lib/meguriMessages.ts`
+- `mobile/app/(tabs)/encounters.tsx`
+- `mobile/app/(tabs)/index.tsx`
+- `mobile/app/meguri-letters.tsx`
+- `mobile/app/(tabs)/notifications.tsx`
+- `notes/05_data_model.md`
+- `notes/09_state_machines.md`
+- `notes/10_glossary.md`
+
+### セルフレビュー結果
+
+- ✅ `audience_user_ids` 空配列を公開扱いにしないRLSへ変更
+- ✅ `groom-posts` / `meguri-message-media` は private Storage + 署名URL表示
+- ✅ 投稿失敗時はローカルだけ投稿済みになる状態を解消
+- ✅ グルーム削除・非表示・通報・ブロック導線を追加
+- ✅ めぐり返信後の通常会話を `meguri_messages` に永続化
+- ✅ 期限切れはアプリ起動/復帰時に加え、利用可能な環境では pg_cron でも進行
+- ✅ `supabase db push --dry-run` / `supabase db push --yes` 成功
+- ✅ `npm --prefix mobile run typecheck` 成功
+- ✅ `npm --prefix mobile run export:ios:preview` 成功
+- ✅ Expo preview channel への EAS Update 成功
+- ✅ データモデル・状態遷移・用語集を更新済み
+
+---
+
+## イテレーション164.1：グルーム写真の通常表示をクリア化
+
+### 背景・問題意識
+
+オーナーから、撮影した写真・アルバムから選んだ写真がまだモザイクになっているという指摘があった。過去仕様では、写真本体は常にクリアに表示し、ピンチアウトなどで画像を小さくした時だけ背面背景が単色グレーとして見える方針だった。実装をレビューしたところ、編集画面と閲覧画面で `imageTransform` がデフォルト値のままでも変形用レイヤーに入っており、初期表示でも通常の全画面 `Image cover` 経路を通らない状態になっていた。
+
+### 変更内容
+
+#### `mobile/app/(tabs)/encounters.tsx`
+- `isDefaultGroomImageTransform` を追加し、`rotation=0 / scale=1 / x=0 / y=0` の時は変形レイヤーを使わず、写真本体を通常の全画面 `Image resizeMode="cover"` で表示するようにした。
+- 画像をピンチ・回転・移動した時だけ、単色グレー背景 + 変形画像レイヤーを表示するようにした。
+- カメラ起動時に `getAvailablePictureSizesAsync()` から最大画質の `pictureSize` を選び、iOSでは `Photo`、なければ最大解像度/`High` を使うようにした。
+- 撮影時に `maxDownsampling: 1` を指定し、撮影画像が不要に縮小されないようにした。
+
+#### `mobile/app/(tabs)/index.tsx`
+- ホーム側グルームビューアにも同じデフォルト変形判定を追加し、DBからデフォルト `image_transform` が来ても写真本体はクリアな通常表示経路を通るようにした。
+
+### 影響範囲
+
+- iOS版 グルーム撮影後編集画面
+- iOS版 めぐりホームのグルーム閲覧画面
+- iOS版 ホーム画面上部のグルーム閲覧画面
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- `npm --prefix mobile run update:ios:preview -- --message "[iter164.1] グルーム写真をクリア表示に修正" --non-interactive`
+- EAS Update: `019e55f4-e6e9-72f8-b137-f6bf29c273ff`
+- EAS Update group: `b9d63a01-c630-4cd0-a1cd-60373626ffbf`
+
+### 関連ファイル
+
+- `mobile/app/(tabs)/encounters.tsx`
+- `mobile/app/(tabs)/index.tsx`
+
+### セルフレビュー結果
+
+- ✅ 仕様どおり、通常状態では写真本体にモザイク/ぼかし/背面レイヤーを重ねない
+- ✅ ピンチアウトなどで画像を変形した時だけ背面の単色グレーが露出する
+- ✅ 撮影時は利用可能な最大 `pictureSize` を選ぶようにした
+- ✅ `npm --prefix mobile run typecheck` 成功
+- ✅ `npm --prefix mobile run export:ios:preview` 成功
+- ✅ Expo preview channel への EAS Update 成功
+- ✅ 状態ID追加なしのため `notes/09_state_machines.md` の更新は不要
+- ✅ 新用語追加なしのため `notes/10_glossary.md` の更新は不要
+- ✅ DB構造変更なしのため `notes/05_data_model.md` の更新は不要
+
+---
+
+## イテレーション164：グルームをDB連携へ移行
+
+### 背景・問題意識
+
+グルーム機能全体を棚卸しした結果、投稿・24時間ライフサイクル・ホーム側グルーム・返信・いいね/閲覧済みがローカルモック中心に残っていた。オーナーから「1から5まで実装」と指示があったため、グルームの主要データを Supabase 管理へ移し、プレビュー更新まで完了させた。
+
+### 変更内容
+
+#### `supabase/migrations/20260524100000_add_groom_backend.sql`
+- `groom-posts` Storage bucket を作成し、ユーザー別フォルダアップロードと公開表示のRLSを追加。
+- `groom_posts` を追加し、投稿写真・キャプション・編集変形・テキスト/手描き/スタンプ・24時間期限を保存するようにした。
+- `expire_groom_posts()` を追加し、`published` の期限切れを `expired`、7日経過後を `archived` へ進めるようにした。
+- `groom_reactions` / `groom_views` / `groom_replies` を追加し、いいね・閲覧済み・グルーム返信をDB管理へ移行。
+- `notifications.kind='groom_reply'` と `notifications.groom_reply_id` を追加し、グルーム返信通知を作れるようにした。
+
+#### `mobile/src/lib/groom.ts`
+- グルームフィード取得、Storageアップロード、投稿作成、いいね更新、閲覧済み更新の Supabase API ラッパーを追加。
+- フィード取得前に `expire_groom_posts()` を呼び、期限切れ投稿を通常表示から落とすようにした。
+
+#### `mobile/app/(tabs)/encounters.tsx`
+- めぐりホームのグルーム一覧を Supabase フィードから読み込むようにした。
+- 新規グルーム投稿時は、ローカル即時表示後に Storage + `groom_posts` へ保存し、成功後にDB IDへ差し替えるようにした。
+- いいねと閲覧済みを `groom_reactions` / `groom_views` に反映するようにした。
+
+#### `mobile/app/(tabs)/index.tsx`
+- ホーム画面上部のグルームも同じ Supabase フィードを読むようにした。
+- ホーム側ビューアの再オープンをセッションkeyで安定化し、縦dismissの native driver 混在を解消。
+- ホーム側でも投稿編集後の画像変形・テキスト・手描き・スタンプを表示できるようにした。
+
+#### `mobile/src/lib/meguriMessages.ts` / `mobile/app/meguri-letters.tsx`
+- グルーム返信を `groom_replies` に保存し、ローカルAsyncStorageはフォールバック兼即時履歴として扱うようにした。
+- 受信したグルーム返信をめぐりメッセージ一覧/スレッドへ表示し、開いたら `read_at` を更新するようにした。
+
+#### `mobile/app/(tabs)/notifications.tsx`
+- `groom_reply` 通知種別と `/meguri-letters?open=1&userId=...` 遷移に対応した。
+
+#### `notes/05_data_model.md` / `notes/09_state_machines.md`
+- グルーム関連テーブルとライフサイクル運用をDB実装に合わせて更新した。
+
+### 影響範囲
+
+- iOS版 めぐりホームのグルーム一覧・投稿・閲覧
+- iOS版 ホーム画面上部のグルーム一覧・閲覧
+- iOS版 グルーム返信からめぐりメッセージ/通知への導線
+- Supabase DB / Storage / RLS
+
+### 確認方法
+
+- `supabase db push --dry-run`
+- `supabase db push --yes`
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- `npm --prefix mobile run update:ios:preview -- --message "[iter164] グルームをDB連携" --non-interactive`
+- EAS Update: `019e55ef-ebdd-7a17-b07d-9a08070a0e6e`
+- EAS Update group: `338ec1fe-eb48-4555-95b1-5989ae066747`
+
+### 関連ファイル
+
+- `supabase/migrations/20260524100000_add_groom_backend.sql`
+- `mobile/src/lib/groom.ts`
+- `mobile/src/lib/meguriMessages.ts`
+- `mobile/app/(tabs)/encounters.tsx`
+- `mobile/app/(tabs)/index.tsx`
+- `mobile/app/meguri-letters.tsx`
+- `mobile/app/(tabs)/notifications.tsx`
+- `notes/05_data_model.md`
+- `notes/09_state_machines.md`
+
+### セルフレビュー結果
+
+- ✅ グルーム投稿が Storage + DB に保存される経路を追加
+- ✅ `expires_at` による24時間表示制御と `expired` / `archived` 遷移関数を追加
+- ✅ ホーム側グルームも同じフィードを参照し、再オープン安定化を反映
+- ✅ グルーム返信をDB保存・通知・めぐりメッセージ既読へ接続
+- ✅ いいね/閲覧済みをDB管理へ移行
+- ✅ `supabase db push --yes` 成功
+- ✅ `npm --prefix mobile run typecheck` 成功
+- ✅ `npm --prefix mobile run export:ios:preview` 成功
+- ✅ Expo preview channel への EAS Update 成功
+- ✅ 新規DB構造を `notes/05_data_model.md` に反映
+- ✅ 状態運用の補足を `notes/09_state_machines.md` に反映
+- ✅ 新規一般用語追加なしのため `notes/10_glossary.md` の更新は不要
+
+---
+
+## イテレーション163.4：グルーム再オープンクラッシュを修正
+
+### 背景・問題意識
+
+オーナーから、グルーム一覧をタップした時の開き方は改善されたが、2回目以降にグルームを開くとクラッシュするという指摘があった。開閉後に残るアニメーション状態や、native driver と JS driver の混在が再オープン時に影響している可能性があったため、ビューアのライフサイクルと dismiss アニメーションを安定化する必要があった。
+
+### 変更内容
+
+#### `mobile/app/(tabs)/encounters.tsx`
+- グルームビューアを `selectedGroomPost` がある時だけマウントする構成に変更し、閉じたらビューア内部の Animated.Value / responder / 入力状態が破棄されるようにした。
+- グルーム一覧から開くたびに `groomViewerSession` を更新し、ビューアを新しい `key` で再生成するようにした。
+- 縦方向 dismiss の `dismissY` アニメーションを `useNativeDriver: false` に統一し、PanResponder の JS 更新と native driver が混在しないようにした。
+
+### 影響範囲
+
+- iOS版 めぐりホームのグルーム一覧
+- iOS版 グルームビューアの再オープン挙動
+- iOS版 グルームビューアの縦スワイプ dismiss
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- `npm --prefix mobile run update:ios:preview -- --message "[iter163.4] グルーム再オープンクラッシュを修正" --non-interactive`
+- EAS Update: `019e55d3-a539-7f79-8cc3-89a929340856`
+- EAS Update group: `6c349b31-8643-481e-98d8-43284d6f60f8`
+
+### 関連ファイル
+
+- `mobile/app/(tabs)/encounters.tsx`
+
+### セルフレビュー結果
+
+- ✅ グルームビューアを閉じたら完全にアンマウントする構成へ変更
+- ✅ 再オープンごとにビューア内部状態を作り直すようにした
+- ✅ `dismissY` の native/JS driver 混在を解消
+- ✅ `npm --prefix mobile run typecheck` 成功
+- ✅ `npm --prefix mobile run export:ios:preview` 成功
+- ✅ Expo preview channel への EAS Update 成功
+- ✅ 状態ID追加なしのため `notes/09_state_machines.md` の更新は不要
+- ✅ 新用語追加なしのため `notes/10_glossary.md` の更新は不要
+- ✅ DB構造変更なしのため `notes/05_data_model.md` の更新は不要
+
+---
+
+## イテレーション163.3：グルーム写真をクリア表示へ修正
+
+### 背景・問題意識
+
+オーナーから、グルームをアルバム経由・写真撮影経由のどちらで作成しても、撮った写真そのものに強いモザイクがかかったように見えるという指摘があった。モザイク/ぼかしが必要なのは写真の後ろの背景レイヤーだけであり、その背景も単色グレーでよいという方針が示された。
+
+### 変更内容
+
+#### `mobile/app/(tabs)/encounters.tsx`
+- グルーム画像レイヤーの背面から、写真を `blurRadius` 付きで敷く背景処理を削除した。
+- 背景レイヤーを単色グレーの `GroomStoryBackdrop` に変更した。
+- 前面の写真画像に専用スタイルを追加し、写真本体は常にクリア表示されるようにした。
+- グルーム編集画面のルート背景も同じ単色グレーに変更した。
+- グルーム編集画面の全体シェードを削除し、ピンチアウト時に見える背面背景がそのまま単色グレーで表示されるようにした。
+- カメラ撮影とアルバム選択の画像取得品質を `quality: 1` に引き上げた。
+
+### 影響範囲
+
+- iOS版 グルーム投稿編集画面
+- iOS版 グルーム投稿閲覧画面
+- iOS版 グルームカメラ/アルバム選択後の画像表示
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- `npm --prefix mobile run update:ios:preview -- --message "[iter163.5] グルーム編集背景を単色化" --non-interactive`
+- EAS Update: `019e55d5-f09b-701d-842e-6f8cd2f5ae0f`
+- EAS Update group: `1d654457-5656-46b4-a501-09bd5a1cee45`
+
+### 関連ファイル
+
+- `mobile/app/(tabs)/encounters.tsx`
+
+### セルフレビュー結果
+
+- ✅ 写真本体に使われていた可能性のある背面ぼかし画像を削除
+- ✅ 背景レイヤーを単色グレー化
+- ✅ ピンチアウト時の背面背景に残っていた全体シェードを削除
+- ✅ 前面写真はクリアな通常画像として表示
+- ✅ カメラ/アルバムの取得品質を `quality: 1` へ変更
+- ✅ `npm --prefix mobile run typecheck` 成功
+- ✅ `npm --prefix mobile run export:ios:preview` 成功
+- ✅ Expo preview channel への EAS Update 成功
+- ✅ 状態ID追加なしのため `notes/09_state_machines.md` の更新は不要
+- ✅ 新用語追加なしのため `notes/10_glossary.md` の更新は不要
+- ✅ DB構造変更なしのため `notes/05_data_model.md` の更新は不要
+
+---
+
+## イテレーション163.2：グルーム一覧タップ遷移を安定化
+
+### 背景・問題意識
+
+オーナーから、グルーム一覧をタップしてグルーム表示画面を開く時に、出現アニメーションが「ぼよん」と跳ねるのが嫌で、もっとスタイリッシュにぱっと表示されるだけでよいという指摘があった。あわせて、2回目以降にタップした時にクラッシュすることがあるため、再オープン時の安定性も改善する必要があった。
+
+### 変更内容
+
+#### `mobile/app/(tabs)/encounters.tsx`
+- グルーム一覧からビューアを開くアニメーションを `Animated.spring` から短い `Animated.timing` に変更した。
+- 開く時のスケール補間から `1.035` のオーバーシュートを削除し、跳ねずに等倍へ収束するようにした。
+- 開始元のリング計測値を `normalizeGroomOpenOrigin` で検証し、不正な座標・サイズの場合は通常表示へフォールバックするようにした。
+- グルーム一覧アイテムの連続タップ中に複数の `measureInWindow`/open 処理が重ならないよう、短時間のオープンロックを追加した。
+
+### 影響範囲
+
+- iOS版 めぐりホームのグルーム一覧
+- iOS版 グルームビューアのオープン遷移
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- `npm --prefix mobile run update:ios:preview -- --message "[iter163.2] グルーム一覧タップ遷移を安定化" --non-interactive`
+- EAS Update: `019e55cd-48d6-7bcd-ac49-3e83351cd863`
+- EAS Update group: `261fc98c-7e84-42de-b21c-fef73accfe7a`
+
+### 関連ファイル
+
+- `mobile/app/(tabs)/encounters.tsx`
+
+### セルフレビュー結果
+
+- ✅ グルーム一覧タップ時のオーバーシュートを削除
+- ✅ spring 由来の跳ね感を短い timing 遷移へ変更
+- ✅ タップ元計測値の不正値をガード
+- ✅ 連続タップ/再オープン時の open 処理重複を抑制
+- ✅ `npm --prefix mobile run typecheck` 成功
+- ✅ `npm --prefix mobile run export:ios:preview` 成功
+- ✅ Expo preview channel への EAS Update 成功
+- ✅ 状態ID追加なしのため `notes/09_state_machines.md` の更新は不要
+- ✅ 新用語追加なしのため `notes/10_glossary.md` の更新は不要
+- ✅ DB構造変更なしのため `notes/05_data_model.md` の更新は不要
+
+---
+
+## イテレーション163.1：個別募集一覧を縦型カードへ変更
+
+### 背景・問題意識
+
+オーナーから、個別募集の一覧が横並びパネルになっていて見づらいため、縦に並べてスクロールで見られるようにしたいという要望があった。あわせて、各パネル右上の操作は編集を鉛筆、削除を×ボタンにし、削除時には「本当に個別募集を削除しますか？」の確認ポップアップを挟むこと、パネル内のグッズ/Wishは4件以上でも省略せずすべて表示することが求められた。
+
+### 変更内容
+
+#### `mobile/app/(tabs)/wishes.tsx`
+- 個別募集一覧を横スクロールの募集デッキから、縦に積むカードリストへ変更した。
+- 個別募集カード右上の操作を、編集の鉛筆アイコンと削除の×ボタンに整理した。
+- カード右上の削除ボタン、および詳細シートの削除アクションから、個別募集削除確認モーダルを開くようにした。
+- 削除確認モーダルの文言を「本当に個別募集を削除しますか？」にした。
+- 個別募集カード内の「譲る」「求める」表示を、積み重ね/＋省略表示から折り返しグリッドへ変更し、登録されているグッズ/Wish/定価選択肢をすべて表示するようにした。
+
+### 影響範囲
+
+- iOS版 ウィッシュタブ内の個別募集一覧
+- iOS版 個別募集カード操作
+- iOS版 個別募集削除フロー
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- `npm --prefix mobile run update:ios:preview -- --message "[iter163.1] 個別募集一覧を縦型カードへ変更" --non-interactive`
+- EAS Update: `019e55c8-8f0b-707c-a7fb-3ba202605124`
+- EAS Update group: `71fe69a3-e50f-4b33-9fcb-313de8ad0b58`
+
+### 関連ファイル
+
+- `mobile/app/(tabs)/wishes.tsx`
+
+### セルフレビュー結果
+
+- ✅ 個別募集一覧を縦並びに変更し、既存の画面スクロールで見られる構成にした
+- ✅ カード右上の操作を編集=鉛筆、削除=×へ変更
+- ✅ 削除前に確認ポップアップを挟むようにした
+- ✅ 4件以上でも＋省略せず、登録済みの譲るグッズ/求めるWish/定価選択肢をすべてカード内へ表示
+- ✅ `npm --prefix mobile run typecheck` 成功
+- ✅ `npm --prefix mobile run export:ios:preview` 成功
+- ✅ Expo preview channel への EAS Update 成功
+- ✅ 状態ID追加なしのため `notes/09_state_machines.md` の更新は不要
+- ✅ 新用語追加なしのため `notes/10_glossary.md` の更新は不要
+- ✅ DB構造変更なしのため `notes/05_data_model.md` の更新は不要
+
+---
+
+## イテレーション163：グルーム編集の画像/テキスト操作を拡張
+
+### 背景・問題意識
+
+オーナーから、アルバムからグルームを作成した時に画像へ強いモザイクがかかって見えるため、通常表示ではモザイクが出ないようにしたいという指摘があった。あわせて、グルーム編集のテキストは2本指ピンチで拡大縮小できるだけでなく、回転・位置調整もできるようにし、1本指で移動中に2本目を追加した場合もそのまま拡大縮小・回転へ移れるようにしたいという要望があった。さらに、何もない場所をタップしてテキスト入力開始、キャプション入力欄の文言変更、キーボード表示時の入力欄押し上げも求められた。
+
+### 変更内容
+
+#### `mobile/app/(tabs)/encounters.tsx`
+- グルーム画像の編集表示を contain 基準から cover 基準に変更し、初期状態では画像が画面全面を覆うようにした。
+- 画像をピンチで縮小した時だけ、背面のぼかし/グラデーション背景が見えるようにした。
+- テキストオーバーレイに `rotation` を追加し、投稿後の表示と編集画面の両方で回転を反映するようにした。
+- テキストの2本指ジェスチャーで、拡大縮小に加えて回転と位置調整も同時にできるようにした。
+- 1本指でテキストを移動している途中に2本目を追加した場合、その時点の位置・サイズ・角度を基準にピンチ/回転へ移行するようにした。
+- グルーム編集画面の何もない場所をタップすると、その位置を初期配置先としてテキスト入力を開始できるようにした。
+- 下部キャプション入力欄の placeholder を「キャプションを追加」に変更した。
+- キャプション入力中にキーボードが出た時、下部入力欄がキーボード上へ押し上がるようにした。
+
+### 影響範囲
+
+- iOS版 グルーム投稿編集画面
+- iOS版 グルーム投稿閲覧画面
+- グルーム投稿の画像・テキストオーバーレイ表示
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- `npm --prefix mobile run update:ios:preview -- --message "[iter163] グルーム編集の画像テキスト操作を拡張" --non-interactive`
+- EAS Update: `019e55c3-24c9-7566-b458-3b1dad2f9ea6`
+- EAS Update group: `37b6dc0a-634f-4908-8370-2e6d97627370`
+
+### 関連ファイル
+
+- `mobile/app/(tabs)/encounters.tsx`
+
+### セルフレビュー結果
+
+- ✅ アルバム画像の初期表示ではモザイク背景が露出しない cover 基準へ変更
+- ✅ 画像縮小時のみ背面のぼかし/グラデーション背景が見える構成を維持
+- ✅ テキストのピンチ拡大縮小・回転・位置調整に対応
+- ✅ 1本指移動中の2本目追加からピンチ/回転へ移行可能
+- ✅ 空白タップからテキスト入力開始可能
+- ✅ キャプション placeholder を「キャプションを追加」に変更
+- ✅ キャプション入力欄がキーボード上へ移動
+- ✅ `npm --prefix mobile run typecheck` 成功
+- ✅ `npm --prefix mobile run export:ios:preview` 成功
+- ✅ Expo preview channel への EAS Update 成功
+- ✅ 状態ID追加なしのため `notes/09_state_machines.md` の更新は不要
+- ✅ 新用語追加なしのため `notes/10_glossary.md` の更新は不要
+- ✅ DB構造変更なしのため `notes/05_data_model.md` の更新は不要
+
+---
+
+## イテレーション162.99：在庫/Wish/ホームカード下部をタグ表示へ変更
+
+### 背景・問題意識
+
+オーナーから、マイ在庫・ウィッシュ・ホーム画面の各パネル下部に、グループ名やグッズ種別ではなく、登録されているタグを `# タグ名` の形で表示したいという要望があった。あわせて、個別募集を設定する際に、譲るものとして定価も設定できるようにしたいという要望があった。
+
+### 変更内容
+
+#### `mobile/src/lib/inventoryTags.ts`
+- `goods_inventory_tags` から在庫/Wishのタグラベルをまとめて取得する helper を追加した。
+- 表示用に `# タグ名` 形式へ整形する `formatHashTags` を追加した。
+
+#### `mobile/src/components/GoodsGrid.tsx`
+- 共通グッズパネルの下部表示を `subtitle` ではなく `tagLabels` 優先に変更した。
+- タグがない場合は、グループ名/種別ではなく「タグ未設定」を表示するようにした。
+
+#### `mobile/app/(tabs)/inventory.tsx`
+- マイ在庫一覧の取得時に登録タグを読み込み、各パネル下部へ反映した。
+- プレビュー在庫にもタグ表示用のサンプルタグを追加した。
+- 選択時のポップオーバーにもタグ表示を優先するようにした。
+
+#### `mobile/app/(tabs)/wishes.tsx`
+- Wish一覧の取得時に登録タグを読み込み、各パネル下部へ反映した。
+- プレビューWishにもタグ表示用のサンプルタグを追加した。
+- 選択時のポップオーバーにもタグ表示を優先するようにした。
+
+#### `mobile/src/data/homeMatches.ts`
+- ホームプレビュー候補に `tagLabels` を追加した。
+
+#### `mobile/src/data/homeSupabase.ts`
+- Supabase から取得済みのタグラベルをホーム候補の `tagLabels` として渡すようにした。
+
+#### `mobile/app/(tabs)/index.tsx`
+- ホーム候補パネル下部からグッズ種別キャプションを削除し、登録タグを `# タグ名` 形式で表示するようにした。
+
+#### `mobile/app/listing-editor.tsx`
+- 個別募集の「譲るグッズ」セクションに「定価でも譲る」トグルを追加した。
+- トグルON時は既存の `listing_wish_options.is_cash_offer / cash_amount` を使い、定価交換選択肢として保存するようにした。
+- Wishが未登録でも、譲る候補があれば定価交換の個別募集を作れるようにした。
+
+### 影響範囲
+
+- iOS版 マイ在庫一覧
+- iOS版 ウィッシュ一覧
+- iOS版 ホーム候補パネル
+- iOS版 個別募集作成/編集
+- `goods_inventory_tags` の読み取り表示
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- `npm --prefix mobile run update:ios:preview -- --message "[iter162.99] 在庫Wishホームをタグ表示へ変更" --non-interactive`
+- EAS Update: `019e55bc-5e47-7893-a102-f585b07f0ba3`
+- EAS Update group: `1981e3ce-a7a8-4221-beb0-d03013c4c4b1`
+
+### 関連ファイル
+
+- `mobile/src/lib/inventoryTags.ts`
+- `mobile/src/components/GoodsGrid.tsx`
+- `mobile/app/(tabs)/inventory.tsx`
+- `mobile/app/(tabs)/wishes.tsx`
+- `mobile/app/(tabs)/index.tsx`
+- `mobile/src/data/homeMatches.ts`
+- `mobile/src/data/homeSupabase.ts`
+- `mobile/app/listing-editor.tsx`
+
+### セルフレビュー結果
+
+- ✅ マイ在庫パネル下部はタグ表示に変更
+- ✅ Wishパネル下部はタグ表示に変更
+- ✅ ホーム候補パネル下部はタグ表示に変更
+- ✅ グループ名/グッズ種別をパネル下部に出さない構成に変更
+- ✅ 個別募集の譲る側から定価交換選択肢を作成可能
+- ✅ Wish未登録でも譲る候補 + 定価で個別募集を作れる構成に変更
+- ✅ `npm --prefix mobile run typecheck` 成功
+- ✅ `npm --prefix mobile run export:ios:preview` 成功
+- ✅ Expo preview channel への EAS Update 成功
+- ✅ 既存DBカラム `listing_wish_options.is_cash_offer/cash_amount` を使うため新規 migration は不要
+- ✅ 状態ID追加なしのため `notes/09_state_machines.md` の更新は不要
+- ✅ 新用語追加なしのため `notes/10_glossary.md` の更新は不要
+- ✅ DB構造変更なしのため `notes/05_data_model.md` の更新は不要
+
+---
+
+## イテレーション162.98：グルーム画像のピンチ回転編集を追加
+
+### 背景・問題意識
+
+オーナーから、グルーム編集でテキストがない場所を2本指でピンチして画像サイズを調整し、向きも変えられるようにしたいという要望があった。さらに、画像を縮小した時の余白は単色ではなく、添付画像のようにグラデーションのかかったモザイク調背景にしたいという指定があった。テキストについても、入力後の文字を2本指で拡大縮小できるようにしたいという要望があった。
+
+### 変更内容
+
+#### `mobile/app/(tabs)/encounters.tsx`
+- グルーム投稿データに `imageTransform` を追加し、画像の拡大率・回転角・位置を投稿後も保持できるようにした。
+- グルーム編集画面で、テキストや描画ツールを触っていない状態の2本指ジェスチャーを画像操作として扱い、ピンチで拡大縮小、2本指の角度変化で回転、中心点移動で位置調整できるようにした。
+- 編集画面と投稿閲覧画面の画像表示を共通化し、変形済み画像の背面にぼかし画像＋紫/水色/ピンクのグラデーション＋淡いモザイク面を表示するようにした。
+- 既存のテキストオーバーレイ操作は、2本指ピンチ時の文字サイズ変更範囲を広げ、小さくする/大きくする操作をしやすくした。
+- `imageTransform` がない既存グルームは従来通り全画面 cover 表示を維持し、既存投稿の見え方を不用意に変えないようにした。
+
+### 影響範囲
+
+- iOS版 グルーム投稿編集画面
+- iOS版 グルーム投稿閲覧画面
+- グルーム投稿のテキストオーバーレイ操作
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- `npm --prefix mobile run update:ios:preview -- --message "[iter162.98] グルーム画像のピンチ回転編集を追加" --non-interactive`
+- EAS Update: `019e55b4-3c4f-71a7-abf4-a62d385d5f02`
+- EAS Update group: `5ed11112-60fa-4807-85cd-77a91104d38b`
+
+### 関連ファイル
+
+- `mobile/app/(tabs)/encounters.tsx`
+
+### セルフレビュー結果
+
+- ✅ 画像のピンチ縮小/拡大、2本指回転、位置調整を追加
+- ✅ 画像縮小時にぼかし＋グラデーション＋モザイク調の背景が出る構成に変更
+- ✅ 投稿後も `imageTransform` を保存して閲覧画面に反映
+- ✅ 既存グルームは `imageTransform` 未設定なら従来の cover 表示を維持
+- ✅ テキストオーバーレイのピンチ拡大縮小範囲を拡張
+- ✅ `npm --prefix mobile run typecheck` 成功
+- ✅ `npm --prefix mobile run export:ios:preview` 成功
+- ✅ Expo preview channel への EAS Update 成功
+- ✅ 状態ID追加なしのため `notes/09_state_machines.md` の更新は不要
+- ✅ 新用語追加なしのため `notes/10_glossary.md` の更新は不要
+- ✅ DB構造変更なしのため `notes/05_data_model.md` の更新は不要
+
+---
+
+## イテレーション162.97：タグサジェストを登録件数順に変更
+
+### 背景・問題意識
+
+オーナーから、タグは入力中にサジェストが出るようにし、登録件数を表示し、登録件数が多い順にサジェストしてほしいという要望があった。既存実装では `search_tags` RPC の候補をそのまま横チップで表示しており、登録件数が見えず、入力ありの場合は前方一致・類似度が登録件数より優先されていた。
+
+### 変更内容
+
+#### `mobile/app/goods-editor.tsx`
+- タグ検索結果を多めに取得し、モバイル側で `userCount` の多い順へ並べ替えるようにした。
+- サジェスト表示に `登録◯件` を追加した。
+- サジェストを横並びチップから、タグ名と登録件数を読みやすい1行リストへ変更した。
+- 既に選択済みのタグはサジェスト候補から除外するようにした。
+- 通常のグッズ/ウィッシュ編集と、複数写真からのまとめ登録フローの両方に同じサジェスト挙動を反映した。
+
+### 影響範囲
+
+- iOS版 グッズ登録/編集のタグ入力
+- iOS版 ウィッシュ登録/編集のタグ入力
+- iOS版 複数写真まとめ登録の共通タグ入力
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- `npm --prefix mobile run update:ios:preview -- --message "[iter162.97] タグサジェストを登録件数順に変更" --non-interactive`
+- EAS Update: `019e55ac-aef1-78ed-a955-5b988cd921a1`
+- EAS Update group: `f185f537-7858-4bf7-a16c-2edbc21db13d`
+
+### 関連ファイル
+
+- `mobile/app/goods-editor.tsx`
+
+### セルフレビュー結果
+
+- ✅ 入力中のタグサジェストに登録件数を表示
+- ✅ サジェストは登録件数の多い順に並べ替え
+- ✅ 選択済みタグは候補から除外
+- ✅ 通常編集とまとめ登録の両方に反映
+- ✅ `npm --prefix mobile run typecheck` 成功
+- ✅ `npm --prefix mobile run export:ios:preview` 成功
+- ✅ Expo preview channel への EAS Update 成功
+- ✅ 状態ID追加なしのため `notes/09_state_machines.md` の更新は不要
+- ✅ 新用語追加なしのため `notes/10_glossary.md` の更新は不要
+- ✅ DB構造変更なしのため `notes/05_data_model.md` の更新は不要
+
+---
+
+## イテレーション162.96：グルーム編集のタグ削除とテキスト操作改善
+
+### 背景・問題意識
+
+オーナーから、グルーム編集機能のタグ登録は不要であり、入力したテキストをタップしても自由に動かせないため、指のスワイプに追従して移動できるようにしたいという指摘があった。あわせて、テキスト入力中は添付画像のように背景が薄暗くなり、画面上で直接文字を入力している見え方にしたいが、左バー、字体変更、メンション、位置情報などは不要という要望があった。
+
+### 変更内容
+
+#### `mobile/app/(tabs)/encounters.tsx`
+- グルーム編集画面のタグ/スタンプ追加ボタンとプリセット選択トレイを削除した。
+- 新規投稿時にタグ/スタンプ情報を追加しないようにした。
+- テキスト入力中は画面全体に暗い編集レイヤーを出し、右上の「完了」と大きめの直接入力欄を表示する構成に変更した。
+- テキスト入力中は背景写真を薄暗くし、通常のキャプション入力や投稿ボタンを一時的に隠すようにした。
+- テキストの色・表示トーンだけを下部に残し、字体変更、メンション、位置情報に相当する操作は追加しない構成にした。
+- 既存テキストのドラッグ移動を `gesture.dx/dy` だけに頼らず、タッチの絶対座標とキャンバス位置から再計算する方式へ変更し、指のスワイプに追従しやすくした。
+
+### 影響範囲
+
+- iOS版 グルーム投稿編集画面
+- グルーム投稿のテキストオーバーレイ操作
+- グルーム投稿のタグ/スタンプ追加導線
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- `npm --prefix mobile run update:ios:preview -- --message "[iter162.96] グルーム編集テキスト入力を修正" --non-interactive`
+- EAS Update: `019e55a7-04c0-70ce-a336-f07f7602ef8f`
+- EAS Update group: `cb5bf269-d5a0-46a5-86c5-ba6facc34a2a`
+
+### 関連ファイル
+
+- `mobile/app/(tabs)/encounters.tsx`
+
+### セルフレビュー結果
+
+- ✅ タグ/スタンプ登録UIは編集画面から削除
+- ✅ テキスト入力中は背景が薄暗くなり、直接入力風のUIを表示
+- ✅ 左バー、字体変更、メンション、位置情報の機能は追加なし
+- ✅ 既存テキストの移動はタッチ位置ベースで更新
+- ✅ `npm --prefix mobile run typecheck` 成功
+- ✅ `npm --prefix mobile run export:ios:preview` 成功
+- ✅ Expo preview channel への EAS Update 成功
+- ✅ 状態ID追加なしのため `notes/09_state_machines.md` の更新は不要
+- ✅ 新用語追加なしのため `notes/10_glossary.md` の更新は不要
+- ✅ DB構造変更なしのため `notes/05_data_model.md` の更新は不要
+
+---
+
+## イテレーション162.95：グルームカメラをシンプル化し最新写真入口を追加
+
+### 背景・問題意識
+
+オーナーから、グルームのカメラ画面左側にある `Aa` などの編集アイコンと、画面下部の「投稿／ストーリーズ／リール／ライブ」は不要であり、右下に置いていたアルバム起動アイコンは左端へ移して、自分のアルバムの最新写真がサムネイル表示される形にしたいという要望があった。
+
+### 変更内容
+
+#### `mobile/app/(tabs)/encounters.tsx`
+- カメラ画面左側のツールレールを表示しないようにした。
+- カメラ画面下部の投稿種別ラベルを表示しないようにした。
+- アルバム起動ボタンを右下から左下へ移動した。
+- `expo-media-library` で写真ライブラリの最新写真を取得し、アルバム起動ボタン内にサムネイル表示するようにした。
+- 写真権限がない場合や最新写真が取れない場合は、カメラアイコンのフォールバックを表示するようにした。
+
+#### `mobile/package.json`
+- `expo-media-library` を追加した。
+
+#### `mobile/app.config.js`
+- Expo config plugin に `expo-media-library` を追加した。
+
+### 影響範囲
+
+- iOS版 グルーム投稿カメラ
+- iOS版 グルーム投稿のアルバム選択導線
+- `expo-media-library` 追加により、反映には OTA ではなく preview/native rebuild が必要
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run config:ios:preview`
+- `npm --prefix mobile run export:ios:preview`
+
+### 関連ファイル
+
+- `mobile/app/(tabs)/encounters.tsx`
+- `mobile/package.json`
+- `mobile/package-lock.json`
+- `mobile/app.config.js`
+
+### セルフレビュー結果
+
+- ✅ 左側の `Aa` などのツールアイコンは非表示化
+- ✅ 下部の投稿種別ラベルは非表示化
+- ✅ アルバム入口は左下配置へ変更
+- ✅ アルバム入口に最新写真サムネイルを表示する処理を追加
+- ✅ `npm --prefix mobile run typecheck` 成功
+- ✅ `npm --prefix mobile run config:ios:preview` で `expo-media-library` plugin 追加を確認
+- ✅ `npm --prefix mobile run export:ios:preview` 成功
+- ⚠️ `expo-media-library` はネイティブ依存のため、直前に作成済みの preview build には含まれていない。反映には再度 EAS preview build が必要
+- ✅ 状態ID追加なしのため `notes/09_state_machines.md` の更新は不要
+- ✅ 新用語追加なしのため `notes/10_glossary.md` の更新は不要
+- ✅ DB構造変更なしのため `notes/05_data_model.md` の更新は不要
+
+---
+
+## イテレーション162.94：グルーム一覧から閲覧へ拡大遷移
+
+### 背景・問題意識
+
+オーナーから、グルーム一覧でグルームをタップした時に、単に閲覧画面へ切り替わるのではなく、一覧上のグルームから画面がブワッと拡大されてグルームを見る感じにしたいという要望があった。既存実装は `selectedGroomId` をセットして `Modal` を表示するだけだったため、タップした一覧アイコンと閲覧画面のつながりが弱かった。
+
+### 変更内容
+
+#### `mobile/app/(tabs)/encounters.tsx`
+- グルーム一覧アイコンの `measureInWindow` で、タップされた丸アイコンの画面上の位置・サイズを取得するようにした。
+- `GroomOpenOrigin` を追加し、一覧から閲覧モーダルへ起動元の矩形情報を渡すようにした。
+- `GroomViewerModal` に入場用の `openProgress` を追加し、起動元アイコンの中心から全画面へスケールアップするスプリングアニメーションを追加した。
+- 入場時はモーダルの標準 fade ではなく、アプリ側で背景暗転と閲覧画面の拡大を制御するようにした。
+- 横スワイプ中・下スワイプで閉じる既存挙動はそのまま維持し、入場アニメーションは一覧から新規に開いた時だけ走るようにした。
+
+### 影響範囲
+
+- iOS版 めぐりホームのグルーム一覧
+- iOS版 グルーム閲覧モーダルの入場演出
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+
+### 関連ファイル
+
+- `mobile/app/(tabs)/encounters.tsx`
+
+### セルフレビュー結果
+
+- ✅ 一覧アイコンの実測位置からグルーム閲覧画面が拡大表示される
+- ✅ 閲覧中の左右スワイプ切り替えでは入場拡大を再発火しない
+- ✅ 既存の下スワイプ終了、返信入力、プロフィールスライド導線を維持
+- ✅ `npm --prefix mobile run typecheck` 成功
+- ✅ `npm --prefix mobile run export:ios:preview` 成功
+- ✅ 状態ID追加なしのため `notes/09_state_machines.md` の更新は不要
+- ✅ 新用語追加なしのため `notes/10_glossary.md` の更新は不要
+- ✅ DB構造変更なしのため `notes/05_data_model.md` の更新は不要
+
+---
+
+## イテレーション162.93：グルーム投稿カメラとテキスト編集を拡張
+
+### 背景・問題意識
+
+オーナーから、グルームで起動するカメラをシステムカメラではなくストーリーズ投稿に近い全画面カメラ構成にしたい、右下からアルバムを開いてアップロードできるようにしたい、さらに投稿編集画面で入力したテキストを1本指で移動、2本指で拡大縮小、タップで再編集できるようにしたいという要望があった。既存実装は `expo-image-picker` の `launchCameraAsync` に寄っていたため、撮影UIをアプリ側で制御できず、テキストも追加後の直接編集・ジェスチャ操作ができなかった。
+
+### 変更内容
+
+#### `mobile/app/(tabs)/encounters.tsx`
+- `expo-camera` の `CameraView` を使う `GroomCameraModal` を追加し、グルーム投稿の撮影画面を全画面プレビュー構成にした。
+- カメラ画面の右下にアルバム起動ボタンを置き、写真ライブラリから選択した画像も同じ編集画面へ流すようにした。
+- カメラ画面にクローズ、前後カメラ切替、左側ツールレール、下部モードタブを配置し、添付参考に近いストーリーズ投稿カメラの骨格にした。
+- 既存の `openGroomCamera` をシステムカメラ起動からアプリ内カメラモーダル起動へ変更した。
+- 編集画面のテキストオーバーレイに `scale` を追加し、1本指ドラッグで移動、2本指ジェスチャで拡大縮小できるようにした。
+- テキストオーバーレイをタップすると、入力トレイに既存の文字・色・トーンを戻して再編集できるようにした。
+- 描画レイヤーと編集可能テキストレイヤーを分離し、描画ツール使用時だけ doodle の PanResponder が有効になるようにした。
+
+#### `mobile/package.json`
+- `expo-camera` を追加した。
+
+#### `mobile/app.config.js`
+- Expo config plugin に `expo-camera` を追加し、iOSビルドへネイティブカメラモジュールを組み込めるようにした。
+
+### 影響範囲
+
+- iOS版 グルーム投稿カメラ
+- iOS版 グルーム投稿編集画面
+- グルーム投稿の画像アップロード導線
+- グルーム投稿内テキストオーバーレイの編集操作
+- `expo-camera` 追加により、反映には OTA ではなく preview/native rebuild が必要
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- `npm --prefix mobile run config:ios:preview` で `expo-camera` plugin が含まれることを確認
+- `npm --prefix mobile run build:ios:preview -- --non-interactive`
+
+### 関連ファイル
+
+- `mobile/app/(tabs)/encounters.tsx`
+- `mobile/package.json`
+- `mobile/package-lock.json`
+- `mobile/app.config.js`
+
+### セルフレビュー結果
+
+- ✅ グルーム投稿カメラはアプリ内 `CameraView` の全画面プレビュー構成へ変更
+- ✅ 右下アルバムボタンから画像選択して編集画面へ進める導線を追加
+- ✅ テキストオーバーレイは1本指移動、2本指拡大縮小、タップ再編集に対応
+- ✅ `npm --prefix mobile run typecheck` 成功
+- ✅ `npm --prefix mobile run export:ios:preview` 成功
+- ✅ `expo-camera` は Expo config plugin に追加済み
+- ⚠️ `expo-camera` はネイティブ依存のため、端末反映には EAS preview build の再作成が必要
+- ⚠️ 初回の EAS preview build は Xcode の `Invalid expression encountered` で失敗。オーナー側ターミナルで再実行し、同じ場合は Xcode log を追加確認する
+- ✅ 状態ID追加なしのため `notes/09_state_machines.md` の更新は不要
+- ✅ 新用語追加なしのため `notes/10_glossary.md` の更新は不要
+- ✅ DB構造変更なしのため `notes/05_data_model.md` の更新は不要
+
+---
+
+## イテレーション162.92：関係図選択と打診match_typeを修正
+
+### 背景・問題意識
+
+オーナーから、ホーム画面から関係図を経由して提示物の選択画面へ進んだ時に、関係図で選んだ「私が出すもの」「受け取るもの」が選択状態になっていないこと、さらに打診送信時に `new role for relation "proposals" violates check constraint "proprosals_match_type_check"` が出るという報告があった。調査の結果、関係図画面では選択後もホームカード由来の route `gives/receives` が優先される場合があり、送信確認ではモバイル側の `complete/they_want_you/you_want_them` をDB制約が許可する `perfect/forward/backward` に変換していなかった。
+
+### 変更内容
+
+#### `mobile/app/match-detail.tsx`
+- 関係図で選択がある場合は、route params の初期 `gives/receives/listings` よりも関係図の集約結果を優先して `proposal-select` に渡すようにした。
+- 相手側の個別募集で、ハイライトされている相手の譲が listing have 側にある場合も、対応する候補を初期選択するようにした。
+- AND条件では各wishの先頭候補を、OR条件では先頭の候補を初期選択する補助関数を追加した。
+
+#### `mobile/app/proposal-confirm.tsx`
+- 送信前に `matchType` をDB正規値へ変換するようにした。
+  - `complete` → `perfect`
+  - `you_want_them` → `forward`
+  - `they_want_you` → `backward`
+- 既に正規値の `perfect/forward/backward` が来た場合はそのまま扱うようにした。
+
+### 影響範囲
+
+- iOS版 ホーム → 関係図 → 提示物選択
+- iOS版 提示物選択 → 送信確認 → 打診送信
+- `proposals.match_type` 保存値
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- `npm --prefix mobile run update:ios:preview -- --message "[iter162.92] 関係図選択と打診match_typeを修正" --non-interactive`
+- EAS Update: `019e5580-36c5-7350-9b69-249190424d0b`
+- EAS Update group: `139b77d8-cba0-42fe-a32d-1569a37a87b7`
+
+### 関連ファイル
+
+- `mobile/app/match-detail.tsx`
+- `mobile/app/proposal-confirm.tsx`
+
+### セルフレビュー結果
+
+- ✅ 関係図で選択した提示物を `proposal-select` の初期選択へ優先反映
+- ✅ 相手側 listing have がハイライトされたケースでも初期候補を選択
+- ✅ `proposals.match_type` は `perfect/forward/backward` のDB正規値で送信
+- ✅ `npm --prefix mobile run typecheck` 成功
+- ✅ `npm --prefix mobile run export:ios:preview` 成功
+- ✅ Expo preview channel への EAS Update 成功
+- ✅ 状態ID追加なしのため `notes/09_state_machines.md` の更新は不要
+- ✅ 新用語追加なしのため `notes/10_glossary.md` の更新は不要
+- ✅ DB構造変更なしのため `notes/05_data_model.md` の更新は不要
+
+---
+
+## イテレーション162.91：グルームUIをキューブ面へ追従
+
+### 背景・問題意識
+
+オーナーから、グルーム横スワイプ中は進捗ステータスが止まること、さらにグルーム画像上のユーザーネーム・進捗バー・画面下部のメッセージ入力欄も画像と同じ3Dキューブ面に貼り付いて動くことを求められた。前iterまでは画像面だけがキューブ化され、UIクロームは画面上に固定されていたため、キューブの外側に1枚のストーリー画面が貼られている感覚が弱かった。
+
+### 変更内容
+
+#### `mobile/app/(tabs)/encounters.tsx`
+- 横スワイプ開始時に `horizontalSwiping` を立て、進捗アニメーションを停止して現在値を保持するようにした。
+- 横スワイプ終了・キャンセル時に `horizontalSwiping` を解除し、保持した進捗値から再開するようにした。
+- `GroomStoryAttachedChrome` を追加し、進捗バー・ユーザー名・時刻・キャプション・入力欄風UI・いいね/送信アイコンをキューブ面の子要素として描画するようにした。
+- 通常時の操作可能なヘッダー/入力欄は残しつつ、スワイプ中は透明化し、面に貼った非操作UIが動いて見える構成にした。
+- next / previous 面の進捗バーも、そのユーザー側のストーリー本数に合わせた静止バーとして表示するようにした。
+
+#### `mobile/app/(tabs)/index.tsx`
+- ホーム上部グルーム閲覧にも同じ `horizontalSwiping` 停止制御を反映した。
+- `HomeGroomStoryAttachedChrome` を追加し、ホーム側の進捗・ユーザー名・キャプション・入力欄風UIもキューブ面に追従させた。
+- next / previous 面では、遷移先/遷移元の進捗位置に合わせた静止バーを表示するようにした。
+
+### 影響範囲
+
+- iOS版 グルーム閲覧
+- iOS版 ホーム上部グルーム閲覧
+- グルームの横スワイプ切り替え演出
+- グルーム閲覧中のストーリー進捗制御
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- `npm --prefix mobile run update:ios:preview -- --message "[iter162.91] グルームUIをキューブ面へ追従" --non-interactive`
+- EAS Update: `019e557a-5b08-7426-9ecf-f615858200c6`
+- EAS Update group: `f6175664-6692-45c3-9247-e3047afc795d`
+
+### 関連ファイル
+
+- `mobile/app/(tabs)/encounters.tsx`
+- `mobile/app/(tabs)/index.tsx`
+
+### セルフレビュー結果
+
+- ✅ 横スワイプ中は進捗アニメーションを停止し、終了後に保持値から再開
+- ✅ ユーザー名・進捗バー・キャプション・入力欄風UIをキューブ面へ追従
+- ✅ 通常時の入力欄は操作可能なまま維持
+- ✅ グルームタブとホーム側グルームの両方へ反映
+- ✅ ネイティブ依存追加なし
+- ✅ `npm --prefix mobile run typecheck` 成功
+- ✅ `npm --prefix mobile run export:ios:preview` 成功
+- ✅ Expo preview channel への EAS Update 成功
+- ✅ 状態ID追加なしのため `notes/09_state_machines.md` の更新は不要
+- ✅ 新用語追加なしのため `notes/10_glossary.md` の更新は不要
+- ✅ DB構造変更なしのため `notes/05_data_model.md` の更新は不要
+
+---
+
+## イテレーション162.90：グルームキューブ面の隙間を解消
+
+### 背景・問題意識
+
+オーナーから、グルーム横スワイプ時の動き自体は良くなったが、前のグルームと次のグルームの間に隙間ができるという指摘があった。前iterでは current / next / previous の動きはキューブらしくなったが、面の `left` 補間がキューブの回転エッジ位置と一致しておらず、スワイプ途中で壁面同士の辺が離れて見える瞬間があった。
+
+### 変更内容
+
+#### `mobile/app/(tabs)/encounters.tsx`
+- current / next / previous の `left` 補間を半幅基準に揃え、回転中の辺同士が同じX位置で接続するようにした。
+- 実機描画のアンチエイリアスで細い穴が出ないよう、面同士に `1px` の重なりを追加した。
+
+#### `mobile/app/(tabs)/index.tsx`
+- ホーム側グルーム閲覧にも同じ半幅基準と `1px` 重なりを反映した。
+
+### 影響範囲
+
+- iOS版 グルーム閲覧
+- iOS版 ホーム上部グルーム閲覧
+- グルームの横スワイプ切り替え演出
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- `npm --prefix mobile run update:ios:preview -- --message "[iter162.90] グルームキューブ面の隙間を解消" --non-interactive`
+- EAS Update: `019e5570-bb18-739f-b2a7-95c7e76966f7`
+- EAS Update group: `f6bd5d85-5bfb-4d77-8bad-d342ebc5d81f`
+
+### 関連ファイル
+
+- `mobile/app/(tabs)/encounters.tsx`
+- `mobile/app/(tabs)/index.tsx`
+
+### セルフレビュー結果
+
+- ✅ キューブ面の辺位置を半幅基準に揃えた
+- ✅ 実機の細い隙間対策として1pxの面重なりを追加
+- ✅ グルームタブとホーム側グルームの両方へ反映
+- ✅ ネイティブ依存追加なし
+- ✅ `npm --prefix mobile run typecheck` 成功
+- ✅ `npm --prefix mobile run export:ios:preview` 成功
+- ✅ Expo preview channel への EAS Update 成功
+- ✅ 状態ID追加なしのため `notes/09_state_machines.md` の更新は不要
+- ✅ 新用語追加なしのため `notes/10_glossary.md` の更新は不要
+- ✅ DB構造変更なしのため `notes/05_data_model.md` の更新は不要
+
+---
+
+## イテレーション162.89：グルーム現面のキューブ回転を調整
+
+### 背景・問題意識
+
+オーナーから、グルーム横スワイプ時の次のグルーム画像は良くなった一方、スワイプ前の現在画像がその場でY軸回転しているように見えるという指摘があった。前iterの仮想キューブ化では、incoming 面は `left + rotateY` で壁面から正面へ動いていたが、current 面は `left` が固定のまま回っていたため、同じキューブの壁面としてつながって見えなかった。
+
+### 変更内容
+
+#### `mobile/app/(tabs)/encounters.tsx`
+- current 面を、次面の逆アニメーションとして `left + rotateY` を連動させる形に変更した。
+- 左スワイプ時は current 面が右端支点で左壁へ逃げ、右スワイプ時は左端支点で右壁へ逃げるようにした。
+- current / previous / next それぞれの側面シェードを、正面では薄く、壁面では濃くなるように整理した。
+
+#### `mobile/app/(tabs)/index.tsx`
+- ホーム側グルーム閲覧にも同じ current 面の逆アニメーションを反映した。
+- ホーム側の側面シェードもグルームタブ側と同じ挙動にした。
+
+### 影響範囲
+
+- iOS版 グルーム閲覧
+- iOS版 ホーム上部グルーム閲覧
+- グルームの横スワイプ切り替え演出
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- `npm --prefix mobile run update:ios:preview -- --message "[iter162.89] グルーム現面のキューブ回転を調整" --non-interactive`
+- EAS Update: `019e556c-d8d1-7b4b-956a-e1a56eaedff0`
+- EAS Update group: `c3a91470-eda0-442c-b954-89e674b0d427`
+
+### 関連ファイル
+
+- `mobile/app/(tabs)/encounters.tsx`
+- `mobile/app/(tabs)/index.tsx`
+
+### セルフレビュー結果
+
+- ✅ current面がその場回転に見える原因だった `left: 0` 固定を解消
+- ✅ 次面の逆アニメーションとして current面にも `left + rotateY` を適用
+- ✅ 左右スワイプ両方で端支点が自然になるよう current面を2系統で描画
+- ✅ ネイティブ依存追加なし
+- ✅ `npm --prefix mobile run typecheck` 成功
+- ✅ `npm --prefix mobile run export:ios:preview` 成功
+- ✅ Expo preview channel への EAS Update 成功
+- ✅ 状態ID追加なしのため `notes/09_state_machines.md` の更新は不要
+- ✅ 新用語追加なしのため `notes/10_glossary.md` の更新は不要
+- ✅ DB構造変更なしのため `notes/05_data_model.md` の更新は不要
+
+---
+
+## イテレーション162.88：グルーム横スワイプを仮想キューブ化
+
+### 背景・問題意識
+
+オーナーから、グルームを横スワイプした時に画像が裂けたように見え、3Dキューブの外側にそれぞれのグルーム画像が貼られてぐるっと回る体験になっていないという指摘があった。前iterまでの実装は current 面を左右方向用に2枚描画し、next/previous を別面として重ねていたため、スワイプ途中に中央の縦割れや不自然な帯が出やすかった。
+
+### 変更内容
+
+#### `mobile/app/(tabs)/encounters.tsx`
+- グルーム閲覧の横スワイプを `GroomStoryCube` 構造に変更した。
+- current を1枚の前面として中心軸で回転させ、previous / next を左右の壁面として表示する構成にした。
+- previous / next 面はスワイプ量に応じて `left` と `rotateY` を同時に変化させ、仮想キューブ外側の面に画像が貼られているようにした。
+- 側面に薄いシェードを入れ、壁面として奥行きが出るようにした。
+- `left` をアニメーションするため、横スワイプの `swipeX` アニメーションは JS driver に変更した。
+
+#### `mobile/app/(tabs)/index.tsx`
+- ホーム側のグルーム閲覧にも同じ `HomeGroomStoryCube` 構造を反映した。
+- current 分割描画をやめ、ホーム側でも前面＋左右壁面の仮想キューブとして回るようにした。
+
+### 影響範囲
+
+- iOS版 グルーム閲覧
+- iOS版 ホーム上部グルーム閲覧
+- グルームの横スワイプ切り替え演出
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- `npm --prefix mobile run update:ios:preview -- --message "[iter162.88] グルーム横スワイプを仮想キューブ化" --non-interactive`
+- EAS Update: `019e5567-2b6f-73ee-b50c-233f8092bffb`
+- EAS Update group: `02e6b0f6-e070-496a-bbd7-7a05b1387f51`
+
+### 関連ファイル
+
+- `mobile/app/(tabs)/encounters.tsx`
+- `mobile/app/(tabs)/index.tsx`
+
+### セルフレビュー結果
+
+- ✅ current面の二重描画を撤去し、中央の縦割れ原因を除去
+- ✅ previous / next を左右の壁面として扱う仮想キューブ構造へ変更
+- ✅ グルーム画面とホーム側グルームの両方へ同じ方針を反映
+- ✅ ネイティブ依存追加なし
+- ✅ `npm --prefix mobile run typecheck` 成功
+- ✅ `npm --prefix mobile run export:ios:preview` 成功
+- ✅ Expo preview channel への EAS Update 成功
+- ✅ 状態ID追加なしのため `notes/09_state_machines.md` の更新は不要
+- ✅ 新用語追加なしのため `notes/10_glossary.md` の更新は不要
+- ✅ DB構造変更なしのため `notes/05_data_model.md` の更新は不要
+
+---
+
+## イテレーション162.87：メールログイン導線を明確化
+
+### 背景・問題意識
+
+オーナーから、メールアドレスとパスワードでログインできるようにしたいという指示があった。既存実装には Supabase Auth の `signInWithPassword` とログイン画面自体は存在していたが、Welcome画面ではメール新規登録が主導線で、ログインは小さなテキストリンクに留まっていた。実利用時にメール/パスワードログインが見つけづらいため、ログイン導線を明示し、ログイン成功後の遷移も確実にした。
+
+### 変更内容
+
+#### `mobile/app/(auth)/welcome.tsx`
+- Welcome画面の最上位アクションとして「メールアドレスでログイン」ボタンを追加した。
+- 新規登録系の導線は「はじめての方」で区切り、利用規約同意後に進む構成へ整理した。
+- 既存の小さなログインテキストリンクを廃止し、ログイン導線を押しやすいボタンにした。
+
+#### `mobile/app/(auth)/login.tsx`
+- ログインボタンの文言を「メールアドレスでログイン」に変更した。
+- メール/パスワード入力に `autoComplete` / `autoCorrect={false}` を付け、iOSで入力しやすくした。
+- ログイン成功時に `router.replace("/")` で明示的にホームへ進むようにした。
+
+#### `mobile/src/auth/AuthProvider.tsx`
+- メール/パスワードログイン成功時に `users.last_login_at` を更新するようにした。
+- 何らかの理由で `auth.users` は存在するが `public.users` が無いユーザーでも、ログイン時に最低限のプロフィール行を補完するフォールバックを追加した。
+- Appleログイン側も同じプロフィール補完を通すようにした。
+
+### 影響範囲
+
+- iOS版 Welcome画面
+- iOS版 ログイン画面
+- iOS版 Supabase Auth セッション確立後のプロフィール同期
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- `npm --prefix mobile run update:ios:preview -- --message "[iter162.87] メールアドレスログイン導線を明確化" --non-interactive`
+- EAS Update: `019e5560-7e85-7eb5-814f-a3bad68cdae3`
+- EAS Update group: `6092e63b-e49e-445a-9787-88297ffc71a5`
+
+### 関連ファイル
+
+- `mobile/app/(auth)/welcome.tsx`
+- `mobile/app/(auth)/login.tsx`
+- `mobile/src/auth/AuthProvider.tsx`
+
+### セルフレビュー結果
+
+- ✅ メール/パスワードログインがWelcome画面から明確に選べる
+- ✅ Supabase Auth の `signInWithPassword` 経路を維持
+- ✅ ログイン成功後のホーム遷移を明示
+- ✅ 既存DBカラム `last_login_at` の利用のみで、新規DB変更なし
+- ✅ `npm --prefix mobile run typecheck` 成功
+- ✅ `npm --prefix mobile run export:ios:preview` 成功
+- ✅ Expo preview channel への EAS Update 成功
+- ✅ 状態ID追加なしのため `notes/09_state_machines.md` の更新は不要
+- ✅ 新用語追加なしのため `notes/10_glossary.md` の更新は不要
+- ✅ DB構造変更なしのため `notes/05_data_model.md` の更新は不要
+
+---
+
+## イテレーション162.86：チャット送信グラデーションを再調整
+
+### 背景・問題意識
+
+オーナーから、前iterで直した取引チャット・めぐりあいチャットのメッセージグラデーションがまだおかしいという指摘があった。前回は滑らかな描画にはなったが、各吹き出し単体に斜め方向で強く色変化するため、Instagram風のチャットバブルとしては主張が強く、紫〜水色の自然な面に見えづらかった。
+
+### 変更内容
+
+#### `mobile/src/components/ChatGradientBubble.tsx`
+- 送信側グラデーションの中間色を、強い青からブランド紫〜水色の段階補間へ変更した。
+- グラデーション方向を斜めの強い変化から、ほぼ横方向に穏やかにつながる流れへ変更した。
+- `ihubColors.lavender` / `ihubColors.sky` を起点にし、ブランド色との整合を取り直した。
+- 相手側メッセージは引き続き単色背景のまま維持した。
+
+### 影響範囲
+
+- iOS版 取引チャット
+- iOS版 めぐりあいチャット
+- 共通チャット吹き出しコンポーネント
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- `npm --prefix mobile run update:ios:preview -- --message "[iter162.86] チャット吹き出しグラデーションを再調整" --non-interactive`
+- EAS Update: `019e5553-e782-7d47-9cc4-76e7bb1b9ba6`
+- EAS Update group: `4748e8b9-03b4-4272-843d-a1d832a2fa38`
+- EAS iOS preview build: `https://expo.dev/accounts/mashima.bizz/projects/ihub/builds/1c89da23-9a08-4d9b-a19c-dccd8ef14942`
+
+### 関連ファイル
+
+- `mobile/src/components/ChatGradientBubble.tsx`
+
+### セルフレビュー結果
+
+- ✅ 送信側だけグラデーション、受信側は単色背景の仕様を維持
+- ✅ 紫〜水色以外の強い色味を抑制
+- ✅ ブランドカラー起点の自然な補間へ変更
+- ✅ `npm --prefix mobile run typecheck` 成功
+- ✅ `npm --prefix mobile run export:ios:preview` 成功
+- ✅ Expo preview channel への EAS Update 成功
+- ✅ 状態ID追加なしのため `notes/09_state_machines.md` の更新は不要
+- ✅ 新用語追加なしのため `notes/10_glossary.md` の更新は不要
+- ✅ DB変更なしのため `notes/05_data_model.md` の更新は不要
+
+---
+
+## イテレーション162.85：チャット送信吹き出しを滑らかに調整
+
+### 背景・問題意識
+
+オーナーから、取引チャット・めぐりあいチャットのメッセージ吹き出しグラデーションがInstagramのチャットと全然違うという指摘があった。Instagram DMの送信側バブルは紫〜青系の滑らかなグラデーション、受信側はグレー/無地に見える整理のため、前iterで入れた色帯を重ねる疑似グラデーションではなく、送信側だけネイティブのリニアグラデーションで描画する必要があった。
+
+### 変更内容
+
+#### `mobile/src/components/ChatGradientBubble.tsx`
+- `expo-linear-gradient` を使い、自分から送ったメッセージだけを紫〜水色の滑らかなリニアグラデーションで描画するようにした。
+- 相手からのメッセージはグラデーションをやめ、単色背景の通常バブルに戻した。
+- 前iterの疑似グラデーション用に重ねていた複数の色面を削除した。
+
+#### `mobile/app/transaction-detail.tsx`
+- 取引チャットの自分側メッセージ背景がグラデーションを邪魔しないよう、送信側バブルの単色背景を透明にした。
+
+#### `mobile/app/meguri-letters.tsx`
+- めぐりあいチャットの自分側メッセージ背景がグラデーションを邪魔しないよう、送信側バブルの単色背景を透明にした。
+
+#### `mobile/package.json`
+- `expo-linear-gradient` を追加した。
+
+### 影響範囲
+
+- iOS版 取引チャット
+- iOS版 めぐりあいチャット
+- 共通チャット吹き出しコンポーネント
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- `npm --prefix mobile run update:ios:preview -- --message "[iter162.85] チャット吹き出しグラデーションを調整" --non-interactive`
+- EAS Update: `019e554b-8167-71da-817d-1e885bc1782b`
+- EAS Update group: `c8c03996-aaf0-44f1-a840-71e6d4faf378`
+
+### 関連ファイル
+
+- `mobile/src/components/ChatGradientBubble.tsx`
+- `mobile/app/transaction-detail.tsx`
+- `mobile/app/meguri-letters.tsx`
+- `mobile/package.json`
+- `mobile/package-lock.json`
+
+### セルフレビュー結果
+
+- ✅ Instagram DMの送信側だけが紫〜青系に見える整理へ寄せた
+- ✅ 受信側バブルのグラデーションを撤去し、単色背景にした
+- ✅ 疑似的な色帯ではなく `expo-linear-gradient` による滑らかな描画へ変更
+- ✅ `npm --prefix mobile run typecheck` 成功
+- ✅ `npm --prefix mobile run export:ios:preview` 成功
+- ✅ Expo preview channel への EAS Update 成功
+- ✅ 状態ID追加なしのため `notes/09_state_machines.md` の更新は不要
+- ✅ 新用語追加なしのため `notes/10_glossary.md` の更新は不要
+- ✅ DB変更なしのため `notes/05_data_model.md` の更新は不要
+
+---
+
+## イテレーション162.84：グルームキューブ遷移をInstagram式に調整
+
+### 背景・問題意識
+
+オーナーから、前iterで入れたグルームの3Dキューブ遷移がInstagram Storiesのイメージと違うという指摘があった。また、スワイプで切り替えた直後に一瞬前のグルームが表示され、ユーザー体験が悪いという問題もあった。調査したところ、Instagram Stories系のキューブ遷移は「横スライド中の各面を個別に回す」よりも、正面・左右の3面を作り、パン量に応じて共有エッジを軸に90度回転させる構造に近い。React Nativeでも `rotateY` には `perspective` が必要で、現行RNでは `transformOrigin` を使って回転軸を左右端へ寄せられるため、その方式へ寄せた。
+
+### 変更内容
+
+#### `mobile/app/(tabs)/encounters.tsx`
+- `useLayoutEffect` を使い、選択中のグルームが切り替わった同一描画サイクルで `swipeX` を0へ戻すようにした。
+- スワイプ確定時に `swipeX` を先に0へ戻す処理をやめ、次の投稿選択を先に確定させるようにした。
+- `GroomStoryFace` を、正面・左面・右面の3面構成へ変更した。
+- current面は左右スワイプ方向ごとに回転軸を `left center` / `right center` に分け、隣の面は画面外の左/右端から90度回転して入るようにした。
+- `perspective` を広めに取り、前回より強すぎる魚眼感を抑えた。
+- 自動送り/タップ/スワイプの別ユーザー切り替えで、旧グルームが一瞬再表示される原因だった「reset → select」の順序を「select → layout reset」に変更した。
+
+#### `mobile/app/(tabs)/index.tsx`
+- ホーム側グルーム閲覧も同じInstagram Stories風の3面キューブ構造へ変更した。
+- スワイプ確定時の旧グルームちらつき対策をホーム側にも反映した。
+
+### 影響範囲
+
+- iOS版 グルーム閲覧
+- iOS版 ホーム上部グルーム閲覧
+- グルームのタップ送り・スワイプ送り・自動送り
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- `npm --prefix mobile run update:ios:preview -- --message "[iter162.84] グルームキューブ遷移をInstagram式に調整" --non-interactive`
+- EAS Update: `019e5546-eda0-7972-8d84-9060694cc2eb`
+- EAS Update group: `278cb051-2a6c-4a42-aaae-fb87b9cb6cf7`
+
+### 関連ファイル
+
+- `mobile/app/(tabs)/encounters.tsx`
+- `mobile/app/(tabs)/index.tsx`
+
+### セルフレビュー結果
+
+- ✅ Instagram Stories系のキューブ構造を調査して、3面構成・共有エッジ回転へ寄せた
+- ✅ React Nativeの `perspective` / `rotateY` / `transformOrigin` を使って実装
+- ✅ スワイプ確定時の旧グルームちらつき原因だった `swipeX` リセット順序を修正
+- ✅ `npm --prefix mobile run typecheck` 成功
+- ✅ `npm --prefix mobile run export:ios:preview` 成功
+- ✅ Expo preview channel への EAS Update 成功
+- ✅ 状態ID追加なしのため `notes/09_state_machines.md` の更新は不要
+- ✅ 新用語追加なしのため `notes/10_glossary.md` の更新は不要
+- ✅ DB変更なしのため `notes/05_data_model.md` の更新は不要
+
+---
+
+## イテレーション162.83：グルーム遷移とチャット既読表示を調整
+
+### 背景・問題意識
+
+オーナーから、グルームのユーザー切り替え時に3Dキューブが回るような遷移にしたい、グルーム一覧アイコンを少し大きくしたい、取引チャット・めぐりあいチャットの吹き出しをInstagram風のグラデーションへ寄せたい、めぐりあい側のアイコンをアバター顔にしたいという指示があった。また、めぐりあいチャットの既読が送信直後に付いているように見える問題について、見せかけの遅延ではなく、実データに基づく仕様へ直す必要があった。
+
+### 変更内容
+
+#### `mobile/app/(tabs)/encounters.tsx`
+- グルーム閲覧で、同一ユーザー内の投稿移動は従来通り、別ユーザーへ切り替わる時だけY軸回転を伴うキューブ風遷移にした。
+- グルーム一覧の丸アイコンを 62px から 74px 相当へ拡大し、横幅と戻り先のアイコン座標を調整した。
+- グルームの戻る縮小アニメーション先が拡大後のアイコン中心へ合うようにした。
+
+#### `mobile/app/(tabs)/index.tsx`
+- ホーム側グルーム閲覧でも、投稿切り替え時にY軸回転を伴うキューブ風遷移を追加した。
+- ホーム側グルーム一覧の丸アイコンも 74px 相当へ拡大した。
+
+#### `mobile/src/components/ChatGradientBubble.tsx`
+- 取引チャット・めぐりあいチャットで共通利用する、Instagram風のグラデーション吹き出し部品を追加した。
+- 自分のメッセージは紫・青・ピンクが重なる濃いグラデーション、相手側は白地に淡い色のにじみが入る表現にした。
+
+#### `mobile/app/transaction-detail.tsx`
+- 取引チャットのテキスト/写真吹き出しを `ChatGradientBubble` へ差し替えた。
+- 自分のメッセージに常時 `既読` を出していた処理をやめ、相手の `proposal_read_states.last_read_at` が自分のメッセージ時刻以降の時だけ表示するようにした。
+- 画面を開いたユーザー側の読了位置を、最新メッセージ時刻で `proposal_read_states` に upsert するようにした。
+- `proposal_read_states` 未作成環境では既読表示を出さず、チャット本体は落とさないフォールバックにした。
+
+#### `supabase/migrations/20260506110000_add_proposal_read_states.sql`
+- `proposal_read_states` テーブルを追加した。
+- `proposal_id + user_id` を主キーにし、参加者ごとの `last_read_at` / `updated_at` を保存するようにした。
+- proposal参加者のみ読み取り可能、本人行のみ insert/update 可能なRLSを追加した。
+
+#### `mobile/app/meguri-letters.tsx`
+- めぐりあいチャットの吹き出しを `ChatGradientBubble` へ差し替えた。
+- めぐりあいチャットでは、相手がこちらの返信を読んだイベントがまだ存在しないため、送信直後に出ていた `既読` 表示を撤去し、送信時刻のみ表示するようにした。
+- めぐりメッセージ一覧、スレッド上部、相手メッセージ横の小アイコンを、文字丸ではなく `MeguriAvatarFace` に差し替えた。
+
+#### `mobile/app/(tabs)/transactions.tsx`
+- やりとりタブ内のめぐりあい一覧アイコンを、文字丸から `MeguriAvatarFace` に差し替えた。
+
+#### `mobile/src/components/meguri/MeguriAvatarFace.tsx`
+- めぐり一覧・チャット内で使う2Dアバター顔コンポーネントを追加した。
+- ねこ・きつね・うさぎ、毛色、アクセント色を既存めぐり住人データから反映できるようにした。
+
+#### `notes/05_data_model.md`
+- `proposal_read_states` をデータモデルへ追記し、取引チャット既読表示の派生ルールを明記した。
+
+### 影響範囲
+
+- iOS版 グルーム一覧・グルーム閲覧
+- iOS版 取引チャット
+- iOS版 めぐりあいチャット
+- iOS版 やりとり > めぐりあい一覧
+- Supabase DB migration
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- `npm --prefix mobile run update:ios:preview -- --message "[iter162.83] グルームとチャット既読表示を調整" --non-interactive`
+- `supabase db push`
+- EAS Update: `019e5538-37d9-7cdb-8f67-e88a44b1bacd`
+- EAS Update group: `7eec5d9b-d8dd-48ae-bc27-c80249feba72`
+- Expo exportで新規JSバンドルが生成され、既存めぐりGLB/テクスチャアセットが引き続きiOSアセットに含まれることを確認
+- Supabase remote database に `20260506100000_add_proposal_meetup_candidates.sql` と `20260506110000_add_proposal_read_states.sql` が適用されたことを確認
+
+### 関連ファイル
+
+- `mobile/app/(tabs)/encounters.tsx`
+- `mobile/app/(tabs)/index.tsx`
+- `mobile/app/(tabs)/transactions.tsx`
+- `mobile/app/meguri-letters.tsx`
+- `mobile/app/transaction-detail.tsx`
+- `mobile/src/components/ChatGradientBubble.tsx`
+- `mobile/src/components/meguri/MeguriAvatarFace.tsx`
+- `supabase/migrations/20260506110000_add_proposal_read_states.sql`
+- `notes/05_data_model.md`
+
+### セルフレビュー結果
+
+- ✅ グルームの別ユーザー切り替えをキューブ風Y軸回転へ変更
+- ✅ グルーム一覧アイコンを拡大し、戻り先座標も調整
+- ✅ 取引チャット/めぐりあいチャットの通常吹き出しをグラデーション化
+- ✅ 取引チャットの既読表示を `proposal_read_states` ベースに変更
+- ✅ めぐりあいチャットの根拠がない即時 `既読` 表示を撤去
+- ✅ めぐり一覧・チャット内のユーザーアイコンをアバター顔へ差し替え
+- ✅ `notes/05_data_model.md` を更新
+- ✅ `npm --prefix mobile run typecheck` 成功
+- ✅ `npm --prefix mobile run export:ios:preview` 成功
+- ✅ Expo preview channel への EAS Update 成功
+- ✅ Supabase remote database への migration 適用成功
+- ✅ 状態ID追加なしのため `notes/09_state_machines.md` の更新は不要
+- ✅ 新用語追加なしのため `notes/10_glossary.md` の更新は不要
+
+---
+
+## イテレーション162.82：めぐりGLBテクスチャ表示を改善
+
+### 背景・問題意識
+
+オーナーから、追加したGLBアバターの表示について、特にねこときつねのテクスチャが粗く崩れて見えるという指摘があった。前iterではReact Native実行時の画像読み込みを避けるため、GLB内の2048pxテクスチャを頂点カラーへ焼き込んでいたが、目や顔のような細かい情報は頂点密度では再現できず、低ポリゴン状の色むらとして見えてしまっていた。うさぎの頂点数・フェイス数が他モデルより多いことは見え方の差に少し影響するが、根本原因ではなかった。
+
+### 変更内容
+
+#### `mobile/assets/meguri-avatars/`
+- アプリ同梱版GLBを、頂点カラー版からジオメトリのみの軽量GLBへ作り直した。
+- 元GLBの2048pxベースカラーテクスチャを `textures/cat.jpg` / `textures/fox.jpg` / `textures/rabbit.jpg` として別アセット化した。
+- ねこ・きつね・うさぎのGLBサイズをそれぞれ約600KB前後まで軽量化し、テクスチャは元のJPEG品質を保持した。
+
+#### `mobile/src/components/meguri/MeguriThreeScene.tsx`
+- GLBモデル読み込みと同時に、対応する2048pxテクスチャを `expo-asset` で読み込むようにした。
+- Expo GL の `texImage2D` が扱える `localUri` 付き画像オブジェクトを `THREE.Texture` に渡し、元UVのままテクスチャ表示するようにした。
+- glTF由来のUVに合わせて `texture.flipY = false` を指定した。
+- 頂点カラー前提ではなく、`MeshStandardMaterial` の `map` にテクスチャを割り当てる方式へ変更した。
+
+### 影響範囲
+
+- iOS版 めぐり3D演出
+- iOS版 めぐり広場
+- iOS版 めぐりプロフィール
+- iOS版 アバター編集プレビュー
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- `npm --prefix mobile run update:ios:preview -- --message "[iter162.82] めぐりGLBテクスチャ表示を改善" --non-interactive`
+- EAS Update: `019e5416-6ba7-7a98-b107-2390be32a949`
+- EAS Update group: `75ef22b2-7f02-49ea-accb-038334416289`
+- Expo exportで、軽量化した `cat.glb` / `fox.glb` / `rabbit.glb` と、`textures/*.jpg` 3枚がiOSアセットに含まれることを確認
+
+### 関連ファイル
+
+- `mobile/assets/meguri-avatars/cat.glb`
+- `mobile/assets/meguri-avatars/fox.glb`
+- `mobile/assets/meguri-avatars/rabbit.glb`
+- `mobile/assets/meguri-avatars/textures/cat.jpg`
+- `mobile/assets/meguri-avatars/textures/fox.jpg`
+- `mobile/assets/meguri-avatars/textures/rabbit.jpg`
+- `mobile/src/components/meguri/MeguriThreeScene.tsx`
+
+### セルフレビュー結果
+
+- ✅ テクスチャ崩れの主因を頂点カラー化と判断
+- ✅ 2048px元テクスチャを別アセット化
+- ✅ GLBはジオメトリのみへ軽量化
+- ✅ Three.js 側で元UVにテクスチャを割り当てる方式へ変更
+- ✅ `npm --prefix mobile run typecheck` 成功
+- ✅ `npm --prefix mobile run export:ios:preview` 成功
+- ✅ Expo preview channel への EAS Update 成功
+- ✅ 状態ID追加なしのため `notes/09_state_machines.md` の更新は不要
+- ✅ 新用語追加なしのため `notes/10_glossary.md` の更新は不要
+- ✅ DB変更なしのため `notes/05_data_model.md` の更新は不要
+
+---
+
+## イテレーション162.81：めぐりアバターをGLBモデルへ差し替え
+
+### 背景・問題意識
+
+オーナーから、`Megrum めぐり` フォルダに追加した、ねこ・きつね・うさぎのアバターを、現在のめぐりアバターへ反映してほしいという指示があった。既存のめぐり3D演出はコード生成のぬいぐるみ風モデルだったため、追加済みGLBをiOSアプリのアセットとして同梱し、現在のめぐり住人の種類をGLBモデルへ差し替える必要があった。
+
+### 変更内容
+
+#### `mobile/assets/meguri-avatars/`
+- `Megrum めぐり/ねこ.glb` を `cat.glb` として追加した。
+- `Megrum めぐり/きつね.glb` を `fox.glb` として追加した。
+- `Megrum めぐり/うさぎ.glb` を `rabbit.glb` として追加した。
+- React Native の画像ローダーに依存しないよう、アプリ同梱版はテクスチャ色を頂点カラーへ焼き込んだGLBとして整えた。
+
+#### `mobile/src/components/meguri/MeguriThreeScene.tsx`
+- `expo-asset` と `GLTFLoader` でGLBアバターを読み込む処理を追加した。
+- 読み込み完了後、既存のコード生成アバターを非表示にし、GLBモデルを正規化して表示するようにした。
+- ねこ・きつね・うさぎの3種類を `animalType` に応じて読み分けるようにした。
+- アバター設定変更時に、同じIDの3D表示でも見た目が更新されるようにした。
+- GLBが読み込めない場合は、既存のコード生成アバターをフォールバックとして残すようにした。
+
+#### `mobile/app/(tabs)/encounters.tsx`
+- めぐり住人の種類を `cat | fox | rabbit` に変更した。
+- 既存データの `bear` を `fox` へ置き換えた。
+
+#### `mobile/app/meguri-avatar-edit.tsx`
+- アバター編集の選択肢を「ねこ / きつね / うさぎ」に変更した。
+
+#### `mobile/src/lib/meguriSettings.ts`
+- 保存されるアバター種別を `cat | fox | rabbit` に変更した。
+- 旧バージョンで保存済みの `bear` は、読み込み時に `fox` へ寄せる互換処理を追加した。
+
+#### `mobile/metro.config.js`
+- Metroのアセット拡張子に `glb` を追加した。
+
+#### `notes/10_glossary.md`
+- 「めぐり住人」の定義を、GLBアセットのねこ・きつね・うさぎに更新した。
+
+### 影響範囲
+
+- iOS版 めぐり3D演出
+- iOS版 めぐり広場
+- iOS版 めぐりプロフィール
+- iOS版 グルーム内プロフィールスライド
+- iOS版 アバター編集
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- `npm --prefix mobile run update:ios:preview -- --message "[iter162.81] めぐりアバターをGLBモデルへ差し替え" --non-interactive`
+- EAS Update: `019e5410-4c6f-77a1-a64c-6730ab74ae46`
+- EAS Update group: `f6ea3ffc-7747-4fbb-abfa-9e69566392c3`
+- Expo exportで `assets/meguri-avatars/cat.glb` / `fox.glb` / `rabbit.glb` がiOSアセットに含まれることを確認
+
+### 関連ファイル
+
+- `mobile/assets/meguri-avatars/cat.glb`
+- `mobile/assets/meguri-avatars/fox.glb`
+- `mobile/assets/meguri-avatars/rabbit.glb`
+- `mobile/src/components/meguri/MeguriThreeScene.tsx`
+- `mobile/app/(tabs)/encounters.tsx`
+- `mobile/app/meguri-avatar-edit.tsx`
+- `mobile/src/lib/meguriSettings.ts`
+- `mobile/src/components/meguri/GroomProfileSlidePanel.tsx`
+- `mobile/metro.config.js`
+- `notes/10_glossary.md`
+
+### セルフレビュー結果
+
+- ✅ GLBアセット3種をiOSアプリ側へ追加
+- ✅ GLB内テクスチャ色を頂点カラー化し、React Native実行時の画像デコード依存を回避
+- ✅ Three.js 側で頂点カラーを使う指定を追加
+- ✅ Metroで `glb` をバンドル対象に追加
+- ✅ めぐり住人の種類をねこ・きつね・うさぎに統一
+- ✅ 既存の `bear` データを `fox` へ置換
+- ✅ 旧保存値 `bear` の読み込み互換を追加
+- ✅ GLB読み込み失敗時のフォールバック表示を保持
+- ✅ `npm --prefix mobile run typecheck` 成功
+- ✅ `npm --prefix mobile run export:ios:preview` 成功
+- ✅ Expo preview channel への EAS Update 成功
+- ✅ 状態ID追加なしのため `notes/09_state_machines.md` の更新は不要
+- ✅ 用語定義変更のため `notes/10_glossary.md` を更新
+- ✅ DB変更なしのため `notes/05_data_model.md` の更新は不要
+
+---
+
+## イテレーション162.80：やりとり側めぐり一覧の未返信表示を修正
+
+### 背景・問題意識
+
+オーナーから、めぐりあいのメッセージ一覧が以前の修正指示どおりになっておらず、「メッセージがきています！」と場所・時刻ヒントが表示されたままになっているという指摘があった。実際の表示は `meguri-letters.tsx` ではなく、下部タブ「やりとり」内の `mobile/app/(tabs)/transactions.tsx` 側のめぐりあい一覧だったため、同じ表示ルールをそちらにも反映する必要があった。
+
+### 変更内容
+
+#### `mobile/app/(tabs)/transactions.tsx`
+- めぐりあい一覧から `letter.placeHint / letter.timeHint` の表示を削除した。
+- 未返信行の文言を「未返信　メッセージが届いています！」に変更した。
+- 「未返信」は赤文字、「メッセージが届いています！」は太字で表示するようにした。
+- 未返信行に赤系の枠と影を追加し、通常行より目立つようにした。
+- 保存済みのグルーム返信を読み込み、こちらから送ったメッセージがある相手は、本文を一覧プレビューとして通常ウェイトで表示するようにした。
+- やりとりタブにフォーカスした時、めぐり既読状態とグルーム返信履歴を再読み込みするようにした。
+
+### 影響範囲
+
+- iOS版 やりとりタブ
+- やりとりタブ内のめぐりあいメッセージ一覧
+- グルーム返信済み相手の一覧プレビュー
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- `npm --prefix mobile run update:ios:preview -- --message "[iter162.80] やりとり側めぐり一覧の未返信表示を修正" --non-interactive`
+- EAS Update: `11ddcf03-04f0-427a-9201-4e4642fbdcbf`
+- やりとりタブのめぐりあい一覧で、場所・時刻ヒントが表示されないことを確認
+- 未返信行が「未返信　メッセージが届いています！」になり、「未返信」が赤文字で表示されることを確認
+- 未返信行の枠が目立つことを確認
+- グルーム返信済み相手では、送信本文が一覧プレビューに通常ウェイトで表示されることを確認
+
+### 関連ファイル
+
+- `mobile/app/(tabs)/transactions.tsx`
+
+### セルフレビュー結果
+
+- ✅ やりとりタブ側の旧文言「メッセージがきています！」を削除
+- ✅ 場所・時刻ヒントを一覧から削除
+- ✅ 未返信文言と赤文字表示を追加
+- ✅ 未返信パネルの枠と影を強調
+- ✅ 送信済みグルーム返信の本文プレビュー表示を追加
+- ✅ `npm --prefix mobile run typecheck` 成功
+- ✅ `npm --prefix mobile run export:ios:preview` 成功
+- ✅ Expo preview channel への EAS Update 成功
+- ✅ 状態ID追加なしのため `notes/09_state_machines.md` の更新は不要
+- ✅ 新用語追加なしのため `notes/10_glossary.md` の更新は不要
+- ✅ DB変更なしのため `notes/05_data_model.md` の更新は不要
+
+---
+
+## イテレーション162.79：Wish操作をLiquid Glassへ統一
+
+### 背景・問題意識
+
+オーナーから、Wish のパネルを押した時も、マイ在庫と同様に iOS Liquid Glass 仕様の操作UIにしてほしいという指示があった。直前の iter162.77 で、マイ在庫側は `expo-glass-effect` の `GlassContainer` / `GlassView` を使い、非対応環境では模造UIを出さず iOS 標準 ActionSheet に戻す方針に修正済みだったため、Wish 側も同じ共通UIへ揃える必要があった。
+
+### 変更内容
+
+#### `mobile/app/(tabs)/wishes.tsx`
+- Wish パネル押下時に、タップ位置を `GoodsGrid` から受け取り、操作UIのアンカーとして保持するようにした。
+- 選択中 Wish の写真・色・文字を `BottomOptionSheet` のプレビューとして渡すようにした。
+- Wish 操作用の `BottomOptionSheet` に `presentation="glass"` を指定し、マイ在庫と同じ Liquid Glass 浮遊操作レイヤーを使うようにした。
+- フィルタ変更、タブ切り替え、横スワイプ時に Wish の選択状態とアンカー位置を同時に閉じるようにした。
+
+### 影響範囲
+
+- iOS版 Wish 一覧
+- iOS版 Wish パネルタップ時の操作UI
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- `npm --prefix mobile run update:ios:preview -- --message "[iter162.79] Wish操作をLiquid Glassへ統一" --non-interactive`
+- EAS Update: `bb77b4b9-0324-49e8-a3a7-6d42fd85cab5`
+- Wish 一覧で Wish パネルをタップし、iOS Liquid Glass API 対応環境ではタップ位置近くに小さな操作レイヤーが浮くことを確認
+- Liquid Glass API 非対応 iOS では、iter162.77 と同じく標準 ActionSheet に戻ることを確認
+
+### 関連ファイル
+
+- `mobile/app/(tabs)/wishes.tsx`
+- `mobile/src/components/GoodsGrid.tsx`
+
+### セルフレビュー結果
+
+- ✅ Wish パネルもマイ在庫と同じ `presentation="glass"` を使用
+- ✅ タップ位置アンカーとグッズプレビューを渡すように変更
+- ✅ 非対応 iOS は共通 `GoodsGrid` 側の標準 ActionSheet フォールバックを利用
+- ✅ `npm --prefix mobile run typecheck` 成功
+- ✅ `npm --prefix mobile run export:ios:preview` 成功
+- ✅ Expo preview channel への EAS Update 成功
+- ✅ 状態ID追加なしのため `notes/09_state_machines.md` の更新は不要
+- ✅ 新用語追加なしのため `notes/10_glossary.md` の更新は不要
+- ✅ DB変更なしのため `notes/05_data_model.md` の更新は不要
+
+---
+
+## イテレーション162.78：グルーム内プロフィール遷移をスライド化
+
+### 背景・問題意識
+
+オーナーから、グルーム閲覧中に左上のアイコンや名前を押した時、一旦めぐりホームが映ってしまうのではなく、グルーム画面のまま右横からその人のプロフィール画面がスライドして見えるようにしたいという指示があった。また、プロフィール側から左端を右へスワイプすると元のストーリーへ戻る設計にする必要があった。
+
+### 変更内容
+
+#### `mobile/src/components/meguri/GroomProfileSlidePanel.tsx`
+- グルーム閲覧モーダル内で使うプロフィール用スライドパネルを新規追加した。
+- パネルは右端から全画面でスライドインし、ストーリーを閉じずにプロフィールを表示する。
+- 左端から右方向へのスワイプでパネルをスライドアウトし、元のグルームストーリーへ戻るようにした。
+- 既存のめぐりプロフィールと同じ公開情報、めぐり回数、推し、最近の公開メモを表示する構成にした。
+- パネル内の「グルームに戻って返信」ボタンで、プロフィールを閉じて返信入力欄へ戻れるようにした。
+
+#### `mobile/app/(tabs)/encounters.tsx`
+- グルーム閲覧中のプロフィール遷移を、`router.push("/meguri-profile")` からモーダル内スライドパネル表示へ変更した。
+- プロフィールパネル表示中はグルーム進捗バーを停止し、戻った後に再開するようにした。
+- iOSの戻る要求では、プロフィールパネルが開いている場合はまずパネルだけ閉じるようにした。
+
+#### `mobile/app/(tabs)/index.tsx`
+- ホーム上部グルームでも同じスライドプロフィール表示に変更した。
+- ホーム用グルーム投稿から既存のめぐりユーザー情報を解決し、プロフィールパネルに渡すようにした。
+
+### 影響範囲
+
+- iOS版 めぐりタブ内グルーム閲覧
+- iOS版 ホーム上部グルーム閲覧
+- グルームからめぐりプロフィールへ移動する体験
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- `npm --prefix mobile run update:ios:preview -- --message "[iter162.78] グルーム内プロフィール遷移をスライド化" --non-interactive`
+- EAS Update: `b2384477-312d-4959-9f45-d9c116be0ee6`
+- グルーム閲覧中に左上のユーザー情報をタップして、めぐりホームを挟まずプロフィールが右からスライドインすることを確認
+- プロフィール画面の左端を右へスワイプし、元のグルームストーリーへ戻ることを確認
+- プロフィール表示中は進捗バーが進まず、戻った後に再開することを確認
+
+### 関連ファイル
+
+- `mobile/src/components/meguri/GroomProfileSlidePanel.tsx`
+- `mobile/app/(tabs)/encounters.tsx`
+- `mobile/app/(tabs)/index.tsx`
+
+### セルフレビュー結果
+
+- ✅ グルームから route 遷移せず、モーダル内プロフィール表示へ変更
+- ✅ 右からスライドインするプロフィールパネルを追加
+- ✅ 左端右スワイプでストーリーへ戻る操作を追加
+- ✅ プロフィール表示中の進捗停止と復帰を追加
+- ✅ ホーム上部グルームにも同じ挙動を適用
+- ⚠️ `npm --prefix mobile run typecheck` は実装直後に成功。その後の最終再実行では、今回の変更外である `mobile/app/(tabs)/wishes.tsx` の `closeSelectedWish` / `normalizePressContext` 未定義により失敗
+- ✅ `npm --prefix mobile run export:ios:preview` 成功
+- ✅ Expo preview channel への EAS Update 成功
+- ✅ 状態ID追加なしのため `notes/09_state_machines.md` の更新は不要
+- ✅ 新用語追加なしのため `notes/10_glossary.md` の更新は不要
+- ✅ DB変更なしのため `notes/05_data_model.md` の更新は不要
+
+## イテレーション162.77：マイ在庫操作をLiquid Glassへ再実装
+
+### 背景・問題意識
+
+オーナーから、マイ在庫パネルタップ時のUIについて、単なる半透明カードや「似せた」表現ではなく、iOS の Liquid Glass 仕様を使った挙動へ再実装するよう指示があった。Apple HIG 上の Liquid Glass はコンテンツそのものではなく、コンテンツ上に浮くコントロール／ナビゲーションの機能レイヤーとして扱うべきであり、在庫パネルの操作UIも大きなボトムシートではなく、選択パネルから浮く小さな操作レイヤーにする必要があった。
+
+### 変更内容
+
+#### `mobile/src/components/GoodsGrid.tsx`
+- `expo-glass-effect` の `GlassContainer` / `GlassView` を使った、iOS ネイティブ Liquid Glass 操作ポップオーバーを追加した。
+- `isGlassEffectAPIAvailable()` と `isLiquidGlassAvailable()` を確認し、iOS Liquid Glass API が利用できる場合のみ Liquid Glass ポップオーバーを表示するようにした。
+- Liquid Glass API が利用できない iOS では、模造ガラスUIを出さず、iOS 標準の `ActionSheetIOS` にフォールバックするようにした。
+- 既存の大きな glass bottom sheet ではなく、タップ位置を起点に小さな操作群が浮く配置へ変更した。
+- `GlassContainer` 内に、選択グッズのプレビューと、編集・移動・削除・閉じるの各操作を個別の `GlassView` として表示するようにした。
+- Expo GlassEffect の既知制約に合わせ、Liquid Glass 表示時は `GlassView` / 親要素の opacity アニメーションを使わず、位置と scale のみで表示するようにした。
+
+#### `mobile/app/(tabs)/inventory.tsx`
+- グッズパネル押下時のタップ位置を `GoodsGrid` から受け取り、Liquid Glass 操作ポップオーバーの表示位置として渡すようにした。
+- 選択中グッズの写真・色・文字をプレビューとして操作レイヤーに渡すようにした。
+- フィルタ変更、ステータス切り替え、ページスワイプ時に選択状態とアンカー位置を同時に閉じるようにした。
+
+### 影響範囲
+
+- iOS版 マイ在庫一覧
+- iOS版 マイ在庫パネルタップ時の操作UI
+- 共通 `GoodsGrid` の `presentation="glass"` 表示
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- `npm --prefix mobile run update:ios:preview -- --message "[iter162.77] マイ在庫操作をLiquid Glassへ再実装" --non-interactive`
+- EAS Update: `b7da2a38-d921-49ec-a60c-3dfa09629179`
+- マイ在庫でグッズパネルをタップし、iOS Liquid Glass API 対応環境ではタップ位置近くに小さな操作レイヤーが浮くことを確認
+- Liquid Glass API 非対応 iOS では、模造UIではなく iOS 標準 ActionSheet に戻ることを確認
+
+### 関連ファイル
+
+- `mobile/src/components/GoodsGrid.tsx`
+- `mobile/app/(tabs)/inventory.tsx`
+
+### セルフレビュー結果
+
+- ✅ `expo-glass-effect` の `GlassContainer` / `GlassView` を使用
+- ✅ `isGlassEffectAPIAvailable()` / `isLiquidGlassAvailable()` で可用性チェック
+- ✅ 非対応 iOS ではガラス風 View / BlurView で似せず、標準 ActionSheet にフォールバック
+- ✅ マイ在庫の大きなボトムシート表示を廃止し、タップ位置起点の浮遊操作レイヤーへ変更
+- ✅ `npm --prefix mobile run typecheck` 成功
+- ✅ `npm --prefix mobile run export:ios:preview` 成功
+- ✅ Expo preview channel への EAS Update 成功
+- ✅ 状態ID追加なしのため `notes/09_state_machines.md` の更新は不要
+- ✅ 新用語追加なしのため `notes/10_glossary.md` の更新は不要
+- ✅ DB変更なしのため `notes/05_data_model.md` の更新は不要
+
+---
+
+## イテレーション162.76：グルーム返信入力の復帰挙動を整理
+
+### 背景・問題意識
+
+オーナーから、グルームでメッセージ入力を始めたあと、画面上部などをタップしたらキーボードが閉じて入力欄が下へ戻り、通常のグルーム閲覧に復帰してほしいという指示があった。また、入力中は入力欄とキーボード以外を薄く暗くし、進捗ステータスは入力中だけ停止、それ以外では動くようにする必要があった。
+
+### 変更内容
+
+#### `mobile/app/(tabs)/encounters.tsx`
+- グルーム閲覧モーダルの返信 `TextInput` に ref を追加し、背景タップで `blur()` と `Keyboard.dismiss()` を実行するようにした。
+- 返信入力中だけ、入力欄より上の閲覧領域に薄い暗幕レイヤーを表示し、タップすると入力を閉じるようにした。
+- 返信送信時も入力を閉じ、送信後に進捗が再開できるようにした。
+- グルーム進捗アニメーションの停止時に現在値を保存し、入力終了後は保存値から再開するようにした。
+- キーボードが閉じた時に `replyFocused` を確実に false へ戻す listener を追加した。
+
+#### `mobile/app/(tabs)/index.tsx`
+- ホーム上部のグルーム閲覧でも同じ返信入力の暗幕、背景タップ復帰、送信時 dismiss、進捗再開処理を追加した。
+
+### 影響範囲
+
+- iOS版 めぐりタブ内グルーム閲覧
+- iOS版 ホーム上部グルーム閲覧
+- グルーム返信入力中の進捗ステータス制御
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- `npm --prefix mobile run update:ios:preview -- --message "[iter162.76] グルーム返信入力の復帰挙動を整理" --non-interactive`
+- EAS Update: `548c0070-5d2c-4065-b080-ea533baa1d14`
+- グルーム閲覧で返信入力欄をタップし、入力中に閲覧領域が薄く暗くなることを確認
+- 入力中に画面上部をタップし、キーボードが閉じて入力欄が下へ戻ることを確認
+- 入力中は進捗バーが停止し、入力を閉じた後は途中から進むことを確認
+
+### 関連ファイル
+
+- `mobile/app/(tabs)/encounters.tsx`
+- `mobile/app/(tabs)/index.tsx`
+
+### セルフレビュー結果
+
+- ✅ 入力中の暗幕レイヤーを追加
+- ✅ 背景タップで `TextInput` blur とキーボード dismiss を実行
+- ✅ 返信送信後も入力状態を解除
+- ✅ 進捗ステータスは入力中だけ停止し、入力終了後は保存位置から再開
+- ✅ `npm --prefix mobile run typecheck` 成功
+- ✅ `npm --prefix mobile run export:ios:preview` 成功
+- ✅ Expo preview channel への EAS Update 成功
+- ✅ 状態ID追加なしのため `notes/09_state_machines.md` の更新は不要
+- ✅ 新用語追加なしのため `notes/10_glossary.md` の更新は不要
+- ✅ DB変更なしのため `notes/05_data_model.md` の更新は不要
+
+---
+
+## イテレーション162.75：グルーム撮影後編集をストーリー型へ変更
+
+### 背景・問題意識
+
+オーナーから、グルームを撮った後の画面を、Instagram ストーリーの撮影後編集のように、文字入れなどができる構成にしたいという指示があった。撮影後の単純な投稿シートではなく、写真を全画面で確認しながら編集する体験に寄せる必要があった。
+
+### 変更内容
+
+#### `mobile/app/(tabs)/encounters.tsx`
+- グルーム投稿前の画面を、下部シートから全画面のストーリー編集画面へ変更した。
+- 上部ツールとして、閉じる、文字追加、スタンプ追加、描画、ひとつ戻すを配置した。
+- 文字追加では、文字色、表示スタイル（文字 / 帯 / 塗り）を選んで写真上に重ねられるようにした。
+- スタンプ追加では、グルーム向けの「現場到着」「交換OK」「推し色」などのスタンプを写真上に配置できるようにした。
+- 描画では、色を選んで写真上をなぞる簡易ペン入力を追加した。
+- 下部には、ひとこと入力、撮り直す、投稿するを配置し、ストーリー投稿画面に近い操作構成へ変更した。
+- 投稿したグルームの閲覧画面でも、追加した文字・スタンプ・描画を写真上に表示するようにした。
+
+### 影響範囲
+
+- iOS版 グルーム撮影後編集
+- iOS版 グルーム投稿
+- iOS版 グルーム閲覧
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- `npm --prefix mobile run update:ios:preview -- --message "[iter162.75] グルーム撮影後編集をストーリー型へ変更" --non-interactive`
+- EAS Update: `32e78c48-e600-40ed-8916-96b55c69fcda`
+- めぐりタブでグルーム撮影後、全画面編集画面が表示されることを確認
+- 文字・スタンプ・描画を追加して投稿できることを確認
+- 投稿後のグルーム閲覧で、追加した文字・スタンプ・描画が表示されることを確認
+
+### 関連ファイル
+
+- `mobile/app/(tabs)/encounters.tsx`
+
+### セルフレビュー結果
+
+- ✅ グルーム撮影後画面を全画面編集へ変更
+- ✅ 文字入れ機能を追加
+- ✅ グルーム向けスタンプ追加機能を追加
+- ✅ 簡易描画機能を追加
+- ✅ 投稿後の閲覧画面にも編集内容を反映
+- ✅ `npm --prefix mobile run typecheck` 成功
+- ✅ `npm --prefix mobile run export:ios:preview` 成功
+- ✅ Expo preview channel への EAS Update 成功
+- ✅ 状態ID追加なしのため `notes/09_state_machines.md` の更新は不要
+- ✅ 新用語追加なしのため `notes/10_glossary.md` の更新は不要
+- ✅ DB変更なしのため `notes/05_data_model.md` の更新は不要
+
+---
+
+## イテレーション162.74：めぐりメッセージ一覧の未返信表示整理
+
+### 背景・問題意識
+
+オーナーから、めぐりあいのメッセージ一覧では、いつどこでめぐりあったかの説明は不要で、未返信状態をより分かりやすく表示したいという指示があった。また、こちらから送ったメッセージは一覧にも本文プレビューとして表示し、未返信のパネルは枠を目立たせる必要があった。
+
+### 変更内容
+
+#### `mobile/app/meguri-letters.tsx`
+- メッセージ一覧の未返信行で、「未返信　メッセージが届いています！」を表示するようにした。
+- 「未返信」は赤文字、「メッセージが届いています！」は太字で表示するようにした。
+- こちらから送信済みのスレッドでは、最新の送信本文を一覧プレビューに表示するようにした。
+- 送信済み本文の一覧プレビューは太字にせず、通常寄りの文字ウェイトにした。
+- 未返信の行に赤系の枠と軽い影を追加し、通常行より目立つようにした。
+- 旧文言「メッセージがきています！」を「メッセージが届いています！」へ整理した。
+
+### 影響範囲
+
+- iOS版 めぐりメッセージ一覧
+- iOS版 めぐりメッセージ未開封表示
+- iOS版 グルーム返信・通常返信の一覧プレビュー
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- `npm --prefix mobile run update:ios:preview -- --message "[iter162.74] めぐりメッセージ一覧の未返信表示整理" --non-interactive`
+- EAS Update: `34ddf355-66ed-4cdb-bcf7-97423c957cb4`
+- めぐりメッセージ一覧で、未返信行に赤い「未返信」と太字の「メッセージが届いています！」が表示されることを確認
+- 未返信行の枠が通常行より目立つことを確認
+- こちらから送ったメッセージがある行では、送信本文が一覧に1行プレビューされることを確認
+
+### 関連ファイル
+
+- `mobile/app/meguri-letters.tsx`
+
+### セルフレビュー結果
+
+- ✅ 未返信文言を指定どおりに変更
+- ✅ 「未返信」だけ赤文字に変更
+- ✅ 到着メッセージ文言を太字に変更
+- ✅ 送信済み本文を一覧プレビューに表示
+- ✅ 未返信行の枠を強調
+- ✅ `npm --prefix mobile run typecheck` 成功
+- ✅ `npm --prefix mobile run export:ios:preview` 成功
+- ✅ Expo preview channel への EAS Update 成功
+- ✅ 状態ID追加なしのため `notes/09_state_machines.md` の更新は不要
+- ✅ 新用語追加なしのため `notes/10_glossary.md` の更新は不要
+- ✅ DB変更なしのため `notes/05_data_model.md` の更新は不要
+
+---
+
+## イテレーション162.73：グルーム閲覧からめぐりプロフィールへ遷移
+
+### 背景・問題意識
+
+オーナーから、グルーム画面で左上のアイコンや名前を押したら、その人のめぐりプロフィールに遷移できるようにしたいという指示があった。グルーム閲覧中に気になった相手の詳細を自然に見に行ける導線が必要だった。
+
+### 変更内容
+
+#### `mobile/app/(tabs)/encounters.tsx`
+- めぐりタブ内のグルーム閲覧ヘッダーで、相手のアイコン・名前・時刻のまとまりをタップ可能にした。
+- タップ時にグルーム閲覧モーダルを閉じ、`/meguri-profile?id=...` へ遷移するようにした。
+- 自分の投稿など `author` がないグルームではプロフィール遷移を無効にした。
+
+#### `mobile/app/(tabs)/index.tsx`
+- ホーム上部のグルーム閲覧でも、左上のアイコン・名前タップでめぐりプロフィールへ遷移するようにした。
+- ホーム用グルームの表示名を、既存のめぐりユーザーIDマップでプロフィールIDへ解決するようにした。
+
+### 影響範囲
+
+- iOS版 めぐりタブ内グルーム閲覧
+- iOS版 ホーム上部グルーム閲覧
+- iOS版 めぐりプロフィール導線
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- `npm --prefix mobile run update:ios:preview -- --message "[iter162.73] グルームからプロフィールへ遷移" --non-interactive`
+- EAS Update: `1eea3f12-41fc-4bb4-9e7e-42b2cb69c77b`
+- グルーム閲覧中、左上のアイコンまたは名前をタップすると対象ユーザーのめぐりプロフィールへ遷移することを確認
+- 自分の投稿グルームではプロフィール遷移が発火しないことを確認
+
+### 関連ファイル
+
+- `mobile/app/(tabs)/encounters.tsx`
+- `mobile/app/(tabs)/index.tsx`
+
+### セルフレビュー結果
+
+- ✅ めぐりタブ内グルームからプロフィール遷移を追加
+- ✅ ホーム上部グルームからプロフィール遷移を追加
+- ✅ 自分投稿など相手ユーザーがないグルームは無効化
+- ✅ `npm --prefix mobile run typecheck` 成功
+- ✅ `npm --prefix mobile run export:ios:preview` 成功
+- ✅ Expo preview channel への EAS Update 成功
+- ✅ 状態ID追加なしのため `notes/09_state_machines.md` の更新は不要
+- ✅ 新用語追加なしのため `notes/10_glossary.md` の更新は不要
+- ✅ DB変更なしのため `notes/05_data_model.md` の更新は不要
+
+---
+
+## イテレーション162.72：マイ在庫登録の入力項目整理
+
+### 背景・問題意識
+
+オーナーから、マイ在庫からグッズを登録する時にシリーズ・弾名やコンディションを入力させるのではなく、タグ入力へ寄せたいという指示があった。また、「ラベル設定」という案内、詳細登録画面の持参中一括設定、説明／メモ欄、ヘッダー右上の `NEW` が分かりにくいため整理する必要があった。
+
+### 変更内容
+
+#### `mobile/app/goods-editor.tsx`
+- 新規在庫登録の共通ステップから「シリーズ・弾名」と「コンディション」を削除した。
+- 代わりに共通ステップへ「タグ」入力を配置し、登録時に各グッズへ同じタグを付与する流れにした。
+- 写真選択後の案内を「ラベル設定」から「詳細設定へ」に変更した。
+- 詳細設定画面の見出しを「各グッズの詳細設定」に変更した。
+- 詳細設定画面から「全部今日から持参中にする」と「説明 / メモ」を削除した。
+- 新規在庫登録画面のヘッダー右上に出ていた `NEW` 表示を削除した。
+- 入力しなくなった `series` / `description` は新規在庫登録では `null`、`condition` は既定値 `good`、`carrying` は `false` として保存するようにした。
+
+### 影響範囲
+
+- iOS版 マイ在庫の新規グッズ登録
+- 複数写真からのまとめ登録
+- 在庫タグ付与
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- `npm --prefix mobile run update:ios:preview -- --message "[iter162.72] マイ在庫登録の入力項目整理" --non-interactive`
+- EAS Update: `53c7dfba-ef3c-46c1-b0d3-81cb7c53a1ef`
+- マイ在庫 → 追加 → 新規グッズ登録で、共通ステップにタグ入力が表示され、シリーズ・弾名／コンディションが表示されないことを確認
+- 写真選択後のボタンが「次へ：詳細設定へ」になっていることを確認
+- 詳細設定画面に「全部今日から持参中にする」と「説明 / メモ」が表示されないことを確認
+- 新規在庫登録画面のヘッダー右上に `NEW` が表示されないことを確認
+
+### 関連ファイル
+
+- `mobile/app/goods-editor.tsx`
+
+### セルフレビュー結果
+
+- ✅ 新規在庫登録の不要項目を削除
+- ✅ タグ入力をシリーズ・弾名の代替として共通ステップへ移動
+- ✅ 「ラベル設定」文言を「詳細設定」へ変更
+- ✅ 詳細設定画面の持参中一括設定と説明／メモ欄を削除
+- ✅ 新規在庫登録ヘッダーの `NEW` 表示を削除
+- ✅ `npm --prefix mobile run typecheck` 成功
+- ✅ `npm --prefix mobile run export:ios:preview` 成功
+- ✅ Expo preview channel への EAS Update 成功
+- ✅ 状態ID追加なしのため `notes/09_state_machines.md` の更新は不要
+- ✅ 新用語追加なしのため `notes/10_glossary.md` の更新は不要
+- ✅ DBスキーマ変更なしのため `notes/05_data_model.md` の更新は不要
+
+---
+
+## イテレーション162.71：グルーム返信をめぐりメッセージへ反映
+
+### 背景・問題意識
+
+オーナーから、グルームでメッセージを送信した時に、画面中央へ「メッセージが送信されました」というトーストを表示したいという指示があった。また、送信したグルーム画像とその時のメッセージを、めぐりメッセージ側にもストーリーズ返信のように表示する必要があった。
+
+### 変更内容
+
+#### `mobile/src/lib/meguriMessages.ts`
+- グルーム返信をローカル保存する `MeguriGroomReply` 型を追加した。
+- `loadMeguriGroomReplies` / `appendMeguriGroomReply` を追加し、返信したグルーム画像・本文・送信先ユーザーを保存できるようにした。
+
+#### `mobile/app/(tabs)/encounters.tsx`
+- グルーム閲覧中の返信送信時に、中央トースト「メッセージが送信されました」を表示するようにした。
+- 返信本文と対象グルーム画像をめぐりメッセージ用に保存するようにした。
+- 従来のキャプション位置に出ていた送信フィードバックを中央トーストへ移動した。
+
+#### `mobile/app/(tabs)/index.tsx`
+- ホーム上部グルームの返信でも、同じ中央トーストとめぐりメッセージ保存を行うようにした。
+- ホーム用グルームの表示名から、対応するめぐりユーザーIDへ紐づけるマップを追加した。
+
+#### `mobile/app/meguri-letters.tsx`
+- 保存済みのグルーム返信を読み込み、対象ユーザーのめぐりメッセージスレッドに自分の送信メッセージとして表示するようにした。
+- 「この人のストーリーズに返信しました」というラベル、返信対象のグルーム画像、送信したメッセージ本文を添付画像のように縦並びで表示するようにした。
+- メッセージ一覧のプレビューでも、グルーム返信は「ストーリーズに返信しました」と分かるようにした。
+
+### 影響範囲
+
+- iOS版 グルーム閲覧
+- iOS版 ホーム上部グルーム閲覧
+- iOS版 めぐりメッセージ
+- ローカル保存のめぐりメッセージ補助データ
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- `npm --prefix mobile run update:ios:preview -- --message "[iter162.71] グルーム返信をめぐりメッセージへ反映" --non-interactive`
+- EAS Update: `a091fded-55d8-456e-8196-eed75050183b`
+- グルームでメッセージ送信後、画面中央に「メッセージが送信されました」トーストが出ることを確認
+- めぐりメッセージ側で、返信したグルーム画像と送信本文が対象ユーザーのスレッドに表示されることを確認
+
+### 関連ファイル
+
+- `mobile/src/lib/meguriMessages.ts`
+- `mobile/app/(tabs)/encounters.tsx`
+- `mobile/app/(tabs)/index.tsx`
+- `mobile/app/meguri-letters.tsx`
+
+### セルフレビュー結果
+
+- ✅ グルーム返信後の中央トーストを追加
+- ✅ グルーム返信をめぐりメッセージ用に保存
+- ✅ めぐりメッセージでグルーム画像＋返信本文を表示
+- ✅ ホーム上部グルームとめぐり画面内グルームの両方に対応
+- ✅ `npm --prefix mobile run typecheck` 成功
+- ✅ `npm --prefix mobile run export:ios:preview` 成功
+- ✅ Expo preview channel への EAS Update 成功
+- ✅ 状態ID追加なしのため `notes/09_state_machines.md` の更新は不要
+- ✅ 新用語追加なしのため `notes/10_glossary.md` の更新は不要
+- ✅ DB変更なしのため `notes/05_data_model.md` の更新は不要
+
+---
+
+## イテレーション162.70：取引チャット詳細モーダルを確認画面寄せ
+
+### 背景・問題意識
+
+オーナーから、打診中チャットではヘッダー右端に合意ステータスが既に表示されているため、合意ステータスカード内の見出しは不要という指示があった。また、交換条件の詳細を開いた時の「交換できる候補」は、打診送信内容の確認画面と同じようにマップも表示し、打診時メッセージはチャット最初のメッセージとして出るため詳細画面には表示しない必要があった。
+
+### 変更内容
+
+#### `mobile/app/transaction-detail.tsx`
+- 打診中の合意カードから「✓ 合意ステータス」見出しと双方ドット表示を削除し、ヘッダー右端のステータス表示と重複しないようにした。
+- 交換条件詳細モーダルの「交換できる候補」を、地図パネルと番号付き候補リストのカード表示へ差し替えた。
+- 候補に緯度経度がある場合は `NativeMapPreview` で送信確認画面と同じ番号付きピンを表示し、座標がない候補はリストだけ表示するようにした。
+- 交換条件詳細モーダルから打診メッセージ欄を削除した。打診時メッセージは従来通りチャット最初のメッセージとして表示する。
+
+### 影響範囲
+
+- iOS版 取引チャット
+- 取引内容詳細モーダル
+- 打診中の合意アクションカード
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- `npm --prefix mobile run update:ios:preview -- --message "[iter162.70] 取引チャット詳細モーダルを確認画面寄せ" --non-interactive`
+- EAS Update: `a7b05357-ba2a-487a-b2bc-b97a1406ff55`
+- 打診中チャットで合意カード内の「合意ステータス」見出しが表示されないことを確認
+- 取引内容の詳細モーダルで、交換できる候補に地図と番号付きリストが表示されることを確認
+- 取引内容の詳細モーダルに打診時メッセージが表示されないことを確認
+
+### 関連ファイル
+
+- `mobile/app/transaction-detail.tsx`
+
+### セルフレビュー結果
+
+- ✅ 合意ステータス見出しの重複を解消
+- ✅ 交換できる候補にマップ表示を追加
+- ✅ 詳細モーダルから打診時メッセージ表示を削除
+- ✅ 打診時メッセージはチャット先頭表示のまま維持
+- ✅ `npm --prefix mobile run typecheck` 成功
+- ✅ `npm --prefix mobile run export:ios:preview` 成功
+- ✅ Expo preview channel への EAS Update 成功
+- ✅ 状態ID追加なしのため `notes/09_state_machines.md` の更新は不要
+- ✅ 新用語追加なしのため `notes/10_glossary.md` の更新は不要
+- ✅ DB変更なしのため `notes/05_data_model.md` の更新は不要
+
+---
+
+## イテレーション162.69：チャット送信後スクロールとメタ表示調整
+
+### 背景・問題意識
+
+オーナーから、取引チャットとめぐりあいチャットの両方で、メッセージ送信後に送信したメッセージの最下部へ移動してほしいという指示があった。また、送信時間と既読表示は吹き出し内ではなく、吹き出し外の左下に表示する必要があった。
+
+### 変更内容
+
+#### `mobile/app/transaction-detail.tsx`
+- 取引チャットのメッセージScrollViewに参照とメッセージ末尾アンカーを追加し、最新メッセージIDが変わった時にメッセージ一覧の末尾へスクロールするようにした。
+- 完了パネルや証跡パネルがメッセージ下に続く場合でも、送信後はScrollView全体の末尾ではなくメッセージ末尾に寄せるようにした。
+- テキスト/写真メッセージと現在地メッセージの時刻を吹き出し内から外へ移動し、自分のメッセージは吹き出し左下に「既読」と送信時刻を表示するようにした。
+
+#### `mobile/app/meguri-letters.tsx`
+- めぐりあいチャットのスレッドScrollViewに参照を追加し、メッセージ送信・画像送信後にスレッド末尾へスクロールするようにした。
+- めぐりあいチャットでも自分のメッセージの「既読」と送信時刻を吹き出し外の左下に表示し、相手メッセージの時刻も吹き出し外へ出した。
+
+### 影響範囲
+
+- iOS版 取引チャット
+- iOS版 めぐりあいチャット
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- `npm --prefix mobile run update:ios:preview -- --message "[iter162.69] チャット送信後スクロールとメタ表示調整" --non-interactive`
+- EAS Update: `1fdc2c17-49b4-414a-ad20-57a32dc7706e`
+- 取引チャットでメッセージ送信後、送信したメッセージの末尾へスクロールすることを確認
+- めぐりあいチャットでメッセージ/画像送信後、スレッド末尾へスクロールすることを確認
+- 両チャットで送信時刻と既読表示が吹き出し外の左下に表示されることを確認
+
+### 関連ファイル
+
+- `mobile/app/transaction-detail.tsx`
+- `mobile/app/meguri-letters.tsx`
+
+### セルフレビュー結果
+
+- ✅ 取引チャット送信後のメッセージ末尾スクロールを追加
+- ✅ めぐりあいチャット送信後のスレッド末尾スクロールを追加
+- ✅ 送信時刻/既読表示を吹き出し外へ移動
+- ✅ `npm --prefix mobile run typecheck` 成功
+- ✅ `npm --prefix mobile run export:ios:preview` 成功
+- ✅ Expo preview channel への EAS Update 成功
+- ✅ 状態ID追加なしのため `notes/09_state_machines.md` の更新は不要
+- ✅ 新用語追加なしのため `notes/10_glossary.md` の更新は不要
+- ✅ DB変更なしのため `notes/05_data_model.md` の更新は不要
+
+---
+
+## イテレーション162.68：Wish未紐付け表示を警告枠へ変更
+
+### 背景・問題意識
+
+オーナーから、ウィッシュ一覧のパネル上部にあるタグは表示せず、個別募集にまだ紐づけていないものだけ「⚠️ 未紐付け」と左上に表示し、そのパネル自体を黄色く囲ってほしいという指示があった。
+
+### 変更内容
+
+#### `mobile/src/components/GoodsGrid.tsx`
+- `GoodsGrid` に `showUnlinkedWarning` オプションを追加した。
+- `showUnlinkedWarning` が有効で `badge === "未紐付け"` のパネルだけ、左上に「⚠️ 未紐付け」チップを表示するようにした。
+- 未紐付けパネルだけ黄色の枠と軽い黄色影で囲うようにした。
+- 既存の `showTopRow` は維持し、ウィッシュ一覧以外の在庫グリッド表示には影響しないようにした。
+
+#### `mobile/app/(tabs)/wishes.tsx`
+- ウィッシュ一覧の `GoodsGrid` で `showTopRow={false}` を指定し、パネル上部の既存タグ行を非表示にした。
+- 同じ一覧で `showUnlinkedWarning` を有効化し、未紐付けのWishだけ警告表示と黄色枠を出すようにした。
+
+### 影響範囲
+
+- iOS版 ウィッシュ一覧
+- 共通 `GoodsGrid` の任意オプション
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- `npm --prefix mobile run update:ios:preview -- --message "[iter162.68] Wish未紐付け表示を警告枠へ変更" --non-interactive`
+- EAS Update: `a9012abd-1454-4998-8e20-eff251ff3beb`
+- ウィッシュ一覧で通常パネルの上部タグが表示されないことを確認
+- 個別募集に紐づいていないWishだけ左上に「⚠️ 未紐付け」が表示され、黄色枠で囲われることを確認
+
+### 関連ファイル
+
+- `mobile/src/components/GoodsGrid.tsx`
+- `mobile/app/(tabs)/wishes.tsx`
+
+### セルフレビュー結果
+
+- ✅ ウィッシュ一覧の上部タグ行を非表示化
+- ✅ 未紐付けWishだけ左上警告と黄色枠を表示
+- ✅ 共通 `GoodsGrid` の既存利用箇所はデフォルト挙動を維持
+- ✅ `npm --prefix mobile run typecheck` 成功
+- ✅ `npm --prefix mobile run export:ios:preview` 成功
+- ✅ Expo preview channel への EAS Update 成功
+- ✅ 状態ID追加なしのため `notes/09_state_machines.md` の更新は不要
+- ✅ 新用語追加なしのため `notes/10_glossary.md` の更新は不要
+- ✅ DB変更なしのため `notes/05_data_model.md` の更新は不要
+
+---
+
+## イテレーション162.67：マイ在庫タップ時のリキッドグラスメニュー
+
+### 背景・問題意識
+
+オーナーから、マイ在庫の各グッズパネルをタップした時に、iOSのリキッドグラス風UIで操作ボタンを表示したいという要望があった。既存実装では iOS では `ActionSheetIOS` が表示されるだけで、アプリ内の視覚表現としてはホーム画面のグラス表現と揃っていなかった。
+
+### 変更内容
+
+#### `mobile/src/components/GoodsGrid.tsx`
+- `BottomOptionSheet` に `presentation="glass"` を追加し、既存のネイティブActionSheetとは別にグラス風の浮遊メニューを表示できるようにした。
+- iOSでは `expo-glass-effect` の `GlassView` を動的に使用し、利用できない環境では `expo-blur` の `BlurView` にフォールバックする構成にした。
+- グラスメニュー内に対象グッズ名/補足と、アイコン付きのアクションボタンを2列で表示するようにした。
+- 既存の `presentation` 未指定箇所は従来通り `ActionSheetIOS` / ボトムシートを使うようにし、Wish側の既存挙動には影響させないようにした。
+
+#### `mobile/app/(tabs)/inventory.tsx`
+- マイ在庫のグッズパネルタップ時の `BottomOptionSheet` を `presentation="glass"` に切り替えた。
+- 過去に譲ったグッズもタップ時にグラスメニューを出し、「詳細を見る」「閉じる」のみ表示するようにした。
+
+### 影響範囲
+
+- iOS版 マイ在庫
+- 共通 `GoodsGrid` のオプションシート表示
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- `npm --prefix mobile run update:ios:preview -- --message "[iter162.67] マイ在庫タップ時のリキッドグラスメニュー" --non-interactive`
+- EAS Update: `768b4054-bee7-4a9c-9bd1-ce838a776682`
+- マイ在庫のグッズパネルをタップし、グラス風の浮遊メニューが表示されることを確認
+- 編集/移動/削除/閉じるの各アクションが従来通り動くことを確認
+- 過去に譲ったグッズでは「詳細を見る」「閉じる」のみ表示されることを確認
+
+### 関連ファイル
+
+- `mobile/src/components/GoodsGrid.tsx`
+- `mobile/app/(tabs)/inventory.tsx`
+
+### セルフレビュー結果
+
+- ✅ マイ在庫のパネルタップ時にグラス風アクションメニューを表示
+- ✅ `GlassView` が使えない環境では `BlurView` へフォールバック
+- ✅ Wish側など既存の `BottomOptionSheet` 利用箇所は従来表示を維持
+- ✅ 過去に譲ったグッズは読み取り専用のアクションだけ表示
+- ✅ `npm --prefix mobile run typecheck` 成功
+- ✅ `npm --prefix mobile run export:ios:preview` 成功
+- ✅ Expo preview channel への EAS Update 成功
+- ✅ 状態ID追加なしのため `notes/09_state_machines.md` の更新は不要
+- ✅ 新用語追加なしのため `notes/10_glossary.md` の更新は不要
+- ✅ DB変更なしのため `notes/05_data_model.md` の更新は不要
+
+---
+
+## イテレーション162.66：ホーム上部グルームをその場で閲覧
+
+### 背景・問題意識
+
+オーナーから、Megrimホーム画面上部のグルームを押した時に、めぐり画面へ遷移してしまうのではなく、その場でグルームを見られるようにしたいという指示があった。
+
+### 変更内容
+
+#### `mobile/app/(tabs)/index.tsx`
+- ホーム上部グルームの丸アイコン押下を `/encounters` 遷移から、ホーム内の閲覧モーダル起動へ変更した。
+- ホーム画面用のグルーム閲覧モーダルを追加し、フルスクリーンでグルーム写真・投稿者・時間・ひとことを表示できるようにした。
+- ホーム内閲覧でも左右タップ/横スワイプで前後のグルームへ切り替えられるようにした。
+- ホーム内閲覧でもいいね、メッセージ入力、送信フィードバックを表示できるようにした。
+- 閲覧したグルームはホーム上部の丸アイコン枠を既読色へ更新するようにした。
+
+### 影響範囲
+
+- iOS版 Megrimホーム画面
+- ホーム画面上部のグルームレール
+- ホーム内グルーム閲覧モーダル
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- `npm --prefix mobile run update:ios:preview -- --message "[iter162.66] ホーム上部グルームをその場で閲覧" --non-interactive`
+- EAS Update: `e11c7846-d141-4551-9f9d-f7a4ae678a2e`
+- ホーム上部のグルーム丸アイコンを押しても、めぐり画面へ遷移せず、その場で閲覧モーダルが開くことを確認
+- ホーム内閲覧で左右タップ/横スワイプにより前後のグルームへ切り替わることを確認
+- ホーム内閲覧でいいね、メッセージ入力、送信フィードバックが動くことを確認
+
+### 関連ファイル
+
+- `mobile/app/(tabs)/index.tsx`
+
+### セルフレビュー結果
+
+- ✅ ホーム上部グルーム押下を画面遷移ではなくモーダル閲覧へ変更
+- ✅ ホーム内でグルーム写真、投稿者、時間、ひとことを表示
+- ✅ ホーム内閲覧で前後切り替え、いいね、返信入力を実装
+- ✅ `npm --prefix mobile run typecheck` 成功
+- ✅ `npm --prefix mobile run export:ios:preview` 成功
+- ✅ Expo preview channel への EAS Update 成功
+- ✅ 状態ID追加なしのため `notes/09_state_machines.md` の更新は不要
+- ✅ 新用語追加なしのため `notes/10_glossary.md` の更新は不要
+- ✅ DB変更なしのため `notes/05_data_model.md` の更新は不要
+
+---
+
+## イテレーション162.65：グルーム閲覧のスワイプと入力中進行を調整
+
+### 背景・問題意識
+
+オーナーから、グルーム閲覧中に下スワイプすると画面が黒く暗くなってしまうため、スワイプに従って元のめぐりホーム画面へうっすら戻る見え方にしたいという指示があった。また、横スワイプ時に画像が縦に割れたように表示される不具合があり、メッセージ入力時には背景のグルームがキーボードに合わせて上へスライドせず、入力中は進捗ステータスが進まない必要があった。
+
+### 変更内容
+
+#### `mobile/app/(tabs)/encounters.tsx`
+- グルーム閲覧モーダルを透明モーダルに変更し、下スワイプ時は黒背景ではなく背後のめぐりホームが透けて戻るようにした。
+- 下スワイプ中の暗幕はスワイプ量に応じて薄くなるようにし、画面本体は丸アイコン方向へ縮小しながら収束する動きを維持した。
+- 横スワイプ時の大きな `rotateY` 重なりをやめ、安定した横ページ移動に軽い奥行きだけを加える表現へ変更した。
+- メッセージ入力時に `KeyboardAvoidingView` でモーダル全体を押し上げる挙動を廃止し、入力欄フッターだけをキーボード上へ逃がすようにした。
+- メッセージ入力欄のフォーカス中はグルーム進捗アニメーションを一時停止し、フォーカス解除後に続きから再開するようにした。
+
+### 影響範囲
+
+- iOS版 めぐりホーム > グルーム閲覧モーダル
+- グルーム閲覧中の下スワイプ dismiss
+- グルーム閲覧中の横スワイプ切り替え
+- グルーム閲覧中のメッセージ入力
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- `npm --prefix mobile run update:ios:preview -- --message "[iter162.65] グルーム閲覧のスワイプと入力中進行を調整" --non-interactive`
+- EAS Update: `357e79c2-35a0-4f6e-b25c-dcec92c9b280`
+- 下スワイプ時に黒く暗くならず、背後のめぐりホームが透けて見えることを確認
+- 横スワイプ時に画像が縦割れ状に崩れないことを確認
+- メッセージ入力時に背景のグルームがキーボードと一緒に上へ動かないことを確認
+- メッセージ入力中に進捗ステータスが進まないことを確認
+
+### 関連ファイル
+
+- `mobile/app/(tabs)/encounters.tsx`
+
+### セルフレビュー結果
+
+- ✅ 下スワイプ時にホームへ透けて戻る透明モーダル構成へ変更
+- ✅ 横スワイプの表示崩れを避ける安定したページ移動表現へ変更
+- ✅ 入力時に背景グルームが上へスライドしない構成へ変更
+- ✅ 入力中は進捗アニメーションを停止
+- ✅ `npm --prefix mobile run typecheck` 成功
+- ✅ `npm --prefix mobile run export:ios:preview` 成功
+- ✅ Expo preview channel への EAS Update 成功
+- ✅ 状態ID追加なしのため `notes/09_state_machines.md` の更新は不要
+- ✅ 新用語追加なしのため `notes/10_glossary.md` の更新は不要
+- ✅ DB変更なしのため `notes/05_data_model.md` の更新は不要
+
+---
+
+## イテレーション162.64：推し追加モーダルを下固定検索とスワイプ切替へ変更
+
+### 背景・問題意識
+
+オーナーから、「登録済みの推しを追加」のポップアップタイトルを「推しを追加」に変え、検索バーは画面下部に固定し、その上に推しの区分ボタンを置きたいという指示があった。また、一覧部分を横スワイプした時に、マイ在庫一覧と同じように指の動きへ追従しながら区分が切り替わる必要があった。
+
+### 変更内容
+
+#### `mobile/app/oshi-settings.tsx`
+- 推し追加モーダルのタイトルを「推しを追加」に変更した。
+- 推し追加モーダル内の検索バーを、一覧の下部に固定されるドックへ移動した。
+- 検索バーの上に「すべて」＋ジャンル区分ボタンを横並びで表示するようにした。
+- 推し一覧をジャンル区分ごとの横ページャーへ変更し、横スワイプで区分を切り替えられるようにした。
+- スワイプ中は一覧ページが指の動きに追従し、スワイプ完了後に区分ボタンの選択状態も同期するようにした。
+- 区分ボタンをタップした場合も、対応する一覧ページへ横スクロールするようにした。
+
+### 影響範囲
+
+- iOS版 推し設定
+- 推し設定 > 推し追加モーダル
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- `npm --prefix mobile run update:ios:preview -- --message "[iter162.64] 推し追加モーダルを下固定検索とスワイプ切替へ変更" --non-interactive`
+- EAS Update: `0066c064-a2d2-4c18-b55f-3a96fdb45f24`
+- 推し追加モーダルのタイトルが「推しを追加」になっていることを確認
+- 検索バーが下部固定で表示され、その上に区分ボタンが表示されることを確認
+- 一覧部分を横スワイプすると、指の動きに追従して区分ページが切り替わることを確認
+- 区分ボタンをタップすると、対応する一覧ページへ切り替わることを確認
+
+### 関連ファイル
+
+- `mobile/app/oshi-settings.tsx`
+
+### セルフレビュー結果
+
+- ✅ モーダルタイトルを「推しを追加」へ変更
+- ✅ 検索バーを下部固定ドックへ移動
+- ✅ 区分ボタンを検索バーの上に配置
+- ✅ 一覧を横スワイプ追従のページャー化
+- ✅ 区分ボタンとスワイプ後の表示状態を同期
+- ✅ `npm --prefix mobile run typecheck` 成功
+- ✅ `npm --prefix mobile run export:ios:preview` 成功
+- ✅ Expo preview channel への EAS Update 成功
+- ✅ 状態ID追加なしのため `notes/09_state_machines.md` の更新は不要
+- ✅ 新用語追加なしのため `notes/10_glossary.md` の更新は不要
+- ✅ DB変更なしのため `notes/05_data_model.md` の更新は不要
+
+---
+
+## イテレーション162.63：取引チャット取引内容を1行折りたたみ化
+
+### 背景・問題意識
+
+オーナーから、取引チャットの交換内容はデフォルトでは1行に折りたたみ、タップした時だけ詳細をポップアップ表示したいという指示があった。詳細画面では送信確認画面で使っている交換内容のカード表現を流用し、交換できる候補も同じ文脈で確認できる必要がある。また、合意ステータスは取引チャットのヘッダー右端へ簡潔に載せる必要があった。
+
+### 変更内容
+
+#### `mobile/app/transaction-detail.tsx`
+- 取引チャット上部の取引内容カードを、デフォルト1行の折りたたみ行へ変更した。
+- 1行の交換内容をタップすると、取引内容の詳細モーダルを表示するようにした。
+- 詳細モーダル内の交換内容を、送信確認画面の交換カードに近い左右パネル＋矢印のデザインへ変更した。
+- 詳細モーダル内に交換できる候補をリスト表示し、簡易地図は出さない構成にした。
+- 合意ステータスを、相手ユーザー名が表示されているヘッダー行の右端へ短いバッジとして表示した。
+- 詳細モーダルの内容が多い場合にスクロールできるようにした。
+
+### 影響範囲
+
+- iOS版 取引チャット
+- iOS版 取引チャット > 取引内容詳細モーダル
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- `npm --prefix mobile run update:ios:preview -- --message "[iter162.63] 取引チャット取引内容を1行折りたたみ化" --non-interactive`
+- EAS Update: `a4d2f501-b358-4589-921c-59e234b23555`
+- 取引チャット上部の交換内容が1行で表示されることを確認
+- 交換内容タップで詳細モーダルが開くことを確認
+- 詳細モーダルで交換内容が送信確認画面風の左右カードで表示されることを確認
+- 詳細モーダルで交換できる候補が簡易地図なしで表示されることを確認
+- ヘッダー右端に合意ステータスの短いバッジが表示されることを確認
+
+### 関連ファイル
+
+- `mobile/app/transaction-detail.tsx`
+
+### セルフレビュー結果
+
+- ✅ 交換内容のデフォルト表示を1行折りたたみへ変更
+- ✅ タップ時の詳細ポップアップを実装
+- ✅ 送信確認画面に近い交換内容カード表現を詳細モーダルへ反映
+- ✅ 交換できる候補は簡易地図なしで表示
+- ✅ 合意ステータスをヘッダー右端の短いバッジへ移動
+- ✅ `npm --prefix mobile run typecheck` 成功
+- ✅ `npm --prefix mobile run export:ios:preview` 成功
+- ✅ Expo preview channel への EAS Update 成功
+- ✅ 状態ID追加なしのため `notes/09_state_machines.md` の更新は不要
+- ✅ 新用語追加なしのため `notes/10_glossary.md` の更新は不要
+- ✅ DB変更なしのため `notes/05_data_model.md` の更新は不要
+
+---
+
+## イテレーション162.62：グルーム閲覧をアカウント内投稿単位へ再整理
+
+### 背景・問題意識
+
+オーナーから、グルームはアカウント単位で3Dキューブの面を切り替えつつ、同じアカウントが複数グルームを投稿している場合は、そのアカウント内で進捗ステータスバーを投稿数分に分割し、左右タップで投稿を切り替えたいという指示があった。また、下スワイプで閉じる際は、画面がスワイプに追従しながら一覧のグルームアイコンへ収束していく感じにする必要があった。
+
+### 変更内容
+
+#### `mobile/app/(tabs)/encounters.tsx`
+- グルーム一覧を投稿単位ではなくアカウント単位の丸アイコンへ整理した。
+- グルーム閲覧では、アカウントごとに投稿配列を持つ `groomAccountGroups` を追加した。
+- 進捗ステータスバーは現在表示中アカウントの投稿数で分割するようにした。
+- 左右タップは同一アカウント内の前後グルームへ移動し、端まで進んだ場合のみ前後アカウントへ移動するようにした。
+- 横スワイプはアカウント間の切り替え専用にし、隣アカウントのグルームへ3Dキューブ風に回転して移るようにした。
+- 下スワイプ dismiss では、画面が縮小しながら選択中アカウントの丸アイコン位置へ寄るように、横/縦方向の収束アニメーションを追加した。
+- プレビュー確認用に、同一アカウントが複数グルームを持つデータを追加した。
+
+### 影響範囲
+
+- iOS版 めぐりホーム > グルーム一覧
+- iOS版 グルーム閲覧モーダル
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- `npm --prefix mobile run update:ios:preview -- --message "[iter162.62] グルーム閲覧をアカウント内投稿単位へ再整理" --non-interactive`
+- EAS Update: `e57a8f19-7b70-4129-9593-b1ab85651b13`
+- 同一アカウントのグルームを開いたとき、進捗バーがそのアカウントの投稿数分に分割されることを確認
+- 右側タップで同一アカウント内の次グルームへ切り替わることを確認
+- 横スワイプで別アカウントのグルームへ3Dキューブ風に切り替わることを確認
+- グルーム閲覧中に下スワイプし、画面が縮小しながら一覧の丸アイコンへ寄ることを確認
+
+### 関連ファイル
+
+- `mobile/app/(tabs)/encounters.tsx`
+
+### セルフレビュー結果
+
+- ✅ 進捗バーをアカウント内投稿数で分割
+- ✅ 左右タップを同一アカウント内投稿切り替えへ変更
+- ✅ 横スワイプはアカウント間の3Dキューブ切り替えに限定
+- ✅ 下スワイプ dismiss を丸アイコン方向へ収束する動きに調整
+- ✅ `npm --prefix mobile run typecheck` 成功
+- ✅ `npm --prefix mobile run export:ios:preview` 成功
+- ✅ Expo preview channel への EAS Update 成功
+- ✅ 状態ID追加なしのため `notes/09_state_machines.md` の更新は不要
+- ✅ 新用語追加なしのため `notes/10_glossary.md` の更新は不要
+- ✅ DB変更なしのため `notes/05_data_model.md` の更新は不要
+
+---
+
+## イテレーション162.61：在庫/Wish/ホーム導線を整理
+
+### 背景・問題意識
+
+オーナーから、マイ在庫の各グッズパネル上部に出ているキャラ名や「譲る候補」などのタグは不要という指示があった。また、マイ在庫のステータス切り替えはパネルがない余白でも左右スワイプでき、指の動きに追従して画面が動く必要があった。あわせて、Wishにもマイ在庫と同じ推し/種別フィルタを追加し、個別募集は募集デッキだけ残して下の一覧を消し、グルームをホーム画面上部にも表示したいという要望があった。
+
+### 変更内容
+
+#### `mobile/src/components/GoodsGrid.tsx`
+- `GoodsGrid` に `showTopRow` オプションを追加し、カード上部のタイトル/バッジ行を画面ごとに非表示へできるようにした。
+
+#### `mobile/app/(tabs)/inventory.tsx`
+- マイ在庫の `GoodsGrid` では `showTopRow={false}` を指定し、各グッズパネル上部のキャラ名/状態タグを表示しないようにした。
+- ステータス切り替えを手動タッチ判定から横スクロールページャーへ変更し、パネルがない余白でも左右スワイプできるようにした。
+- スワイプ中はページが指に追従し、スワイプ完了後に `譲る候補` / `自分用キープ` / `過去に譲った` のタブ状態が同期するようにした。
+
+#### `mobile/app/(tabs)/wishes.tsx`
+- Wish に `group` / `type` を持たせ、マイ在庫と同じ「推し」「種別」フィルタを追加した。
+- Wishタブの件数とグリッド表示をフィルタ後の件数/内容へ同期した。
+- 個別募集タブでは募集デッキのみを表示し、その下の縦一覧を削除した。
+
+#### `mobile/app/(tabs)/index.tsx`
+- ホーム画面の上部にグルームの横レールを追加した。
+- グルームの追加/閲覧タップは既存のめぐり画面へ接続し、既存のグルーム投稿/閲覧導線を使えるようにした。
+
+### 影響範囲
+
+- iOS版 マイ在庫
+- iOS版 Wish
+- iOS版 個別募集タブ
+- iOS版 ホーム画面
+- 共通グッズグリッド表示
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- `npm --prefix mobile run update:ios:preview -- --message "[iter162.61] 在庫Wishホーム導線を整理" --non-interactive`
+- マイ在庫のグッズパネル上部にキャラ名/状態タグが出ないことを確認
+- マイ在庫の余白を左右スワイプして、画面が指に追従しながらステータスタブが切り替わることを確認
+- Wishで推し/種別フィルタが使えることを確認
+- 個別募集タブで募集デッキだけが残り、下の一覧が出ないことを確認
+- ホーム上部にグルームレールが表示されることを確認
+- EAS Update: `40d23cd1-519d-460e-8baa-98a30811ad22`
+
+### 関連ファイル
+
+- `mobile/src/components/GoodsGrid.tsx`
+- `mobile/app/(tabs)/inventory.tsx`
+- `mobile/app/(tabs)/wishes.tsx`
+- `mobile/app/(tabs)/index.tsx`
+
+### セルフレビュー結果
+
+- ✅ マイ在庫のカード上部タグを非表示化
+- ✅ マイ在庫のステータス切り替えを指追従の横ページャーへ変更
+- ✅ Wishに推し/種別フィルタを追加
+- ✅ 個別募集タブは募集デッキのみ表示
+- ✅ ホーム上部にグルームレールを追加
+- ✅ `npm --prefix mobile run typecheck` 成功
+- ✅ `npm --prefix mobile run export:ios:preview` 成功
+- ✅ Expo preview channel への EAS Update 成功
+- ✅ 状態ID追加なしのため `notes/09_state_machines.md` の更新は不要
+- ✅ 新用語追加なしのため `notes/10_glossary.md` の更新は不要
+- ✅ DB変更なしのため `notes/05_data_model.md` の更新は不要
+
+---
+
+## イテレーション162.60：めぐりメッセージ未読バッジを実件数化
+
+### 背景・問題意識
+
+オーナーから、めぐりあいのメッセージ一覧に出ているバッジは、相手のメッセージのうちこちらが未読の件数を表示するべきという指示があった。また、既読/未読が実際には機能しておらず、バッジ有無によって送信日時の表示位置もずれているため、バッジがある行でも送信日時を右端に揃える必要があった。
+
+### 変更内容
+
+#### `mobile/src/lib/meguriMessages.ts`
+- めぐりメッセージの相手側メッセージIDを定義し、未読件数を算出する共通ヘルパーを追加した。
+- 会話を開いたら相手側メッセージを既読として `AsyncStorage` に保存する処理を追加した。
+
+#### `mobile/app/(tabs)/transactions.tsx`
+- めぐりあいメッセージ一覧の未読バッジを、仮の `index` 判定ではなく相手側メッセージの未読件数から表示するようにした。
+- 会話を開いた時点で既読状態を保存し、画面へ戻ったときにもフォーカス時に既読状態を読み直すようにした。
+- 送信日時を本文側の行内から右側のメタ列へ移し、バッジ有無に関係なく同じ右端位置へ揃えた。
+
+#### `mobile/app/meguri-letters.tsx`
+- めぐりメッセージ一覧側も同じ既読状態を読み込み、未読バッジを相手側メッセージの未読件数で表示するようにした。
+- 会話画面を開いたらその相手からのメッセージを既読化し、一覧へ戻るとバッジが消えるようにした。
+- ユーザー名横の仮件数表記を削除し、件数表示をバッジへ一本化した。
+
+### 影響範囲
+
+- iOS版 やりとり > めぐりあいメッセージ一覧
+- iOS版 めぐりメッセージ一覧
+- iOS版 めぐりメッセージ会話画面の既読化
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- 未読バッジがあるめぐりメッセージを開き、一覧へ戻るとバッジが消えることを確認
+- バッジあり/なしの行で、送信日時が同じ右端位置に表示されることを確認
+- バッジの数が相手側メッセージの未読件数になることを確認
+
+### 関連ファイル
+
+- `mobile/src/lib/meguriMessages.ts`
+- `mobile/app/(tabs)/transactions.tsx`
+- `mobile/app/meguri-letters.tsx`
+
+### セルフレビュー結果
+
+- ✅ 未読バッジを仮の index 値から相手側メッセージの未読件数へ変更
+- ✅ 会話を開いた時点で既読状態を保存
+- ✅ めぐりあい一覧へ戻った時も既読状態を再読み込み
+- ✅ バッジ有無に関係なく送信日時を右端列へ固定
+- ✅ `npm --prefix mobile run typecheck` 成功
+- ✅ `npm --prefix mobile run export:ios:preview` 成功
+- ✅ 状態ID追加なしのため `notes/09_state_machines.md` の更新は不要
+- ✅ 新用語追加なしのため `notes/10_glossary.md` の更新は不要
+- ✅ DB変更なしのため `notes/05_data_model.md` の更新は不要
+
+---
+
+## イテレーション162.59：スケジュール画面をカレンダー入力へ変更
+
+### 背景・問題意識
+
+オーナーから、左ドロワーのスケジュールから開く設定画面について、タイトル下の「自分の予定（AWとは別）」表記を消し、スケジュール設定のメリットを画面上部に示したうえで、待ち合わせ候補の登録で使っているカレンダー機能を画面内に載せたいという指示があった。また、時間帯選択後は待ち合わせ候補登録と同じようなポップアップを出し、この画面固有の項目として「予定名」を入力できるようにする必要があった。
+
+### 変更内容
+
+#### `mobile/app/schedules.tsx`
+- `RouteHeader` の subtitle を外し、「自分の予定（AWとは別）」が表示されないようにした。
+- 画面上部に、スケジュール設定によって相手が交換候補を提示しやすくなるメリット文言を追加した。
+- 既存の一覧中心UIを、待ち合わせ候補登録と同じ5日表示・時間グリッド・長押し/タップで時間帯を作るカレンダーUIへ変更した。
+- 時間帯を選択すると、iOSでは `pageSheet` のポップアップを開き、「予定名」を入力して保存できるようにした。
+- 既存予定はカレンダー上のブロックとして表示し、タップで予定名編集、長押しドラッグで移動、下端ドラッグで終了時刻変更ができるようにした。
+
+### 影響範囲
+
+- iOS版 左ドロワー > スケジュール
+- iOS版 スケジュール登録・編集
+- `schedules` テーブルへの登録・更新・削除
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- 左ドロワーからスケジュールを開き、「自分の予定（AWとは別）」が出ないことを確認
+- 画面上部にスケジュール設定のメリット文言が出ることを確認
+- カレンダー上で時間帯を選択すると、予定名入力のポップアップが出ることを確認
+- 予定名を保存するとカレンダー上に予定ブロックが表示されることを確認
+
+### 関連ファイル
+
+- `mobile/app/schedules.tsx`
+
+### セルフレビュー結果
+
+- ✅ 「自分の予定（AWとは別）」表記を削除
+- ✅ メリット文言を画面上部に追加
+- ✅ 待ち合わせ候補登録と同系統の時間グリッド操作をスケジュール画面へ追加
+- ✅ 時間帯選択後のポップアップに「予定名」入力を追加
+- ✅ `npm --prefix mobile run typecheck` 成功
+- ✅ `npm --prefix mobile run export:ios:preview` 成功
+- ✅ 状態ID追加なしのため `notes/09_state_machines.md` の更新は不要
+- ✅ 新用語追加なしのため `notes/10_glossary.md` の更新は不要
+- ✅ 既存 `schedules` テーブル利用のみのため `notes/05_data_model.md` の更新は不要
+
+---
+
+## イテレーション162.58：左ドロワーに自分のプロフィールアイコンを反映
+
+### 背景・問題意識
+
+オーナーから、左ドロワーに表示されるアイコンへ、自分のプロフィールで設定したアイコン画像を表示したいという指示があった。プロフィール編集画面では `users.avatar_url` を保存している一方、左ドロワーは認証メタデータ側の `avatar_url` / `picture` を見ていたため、アプリ内プロフィールで設定した画像が反映されなかった。
+
+### 変更内容
+
+#### `mobile/src/auth/AuthProvider.tsx`
+- 認証コンテキストの `AuthProfile` に `avatarUrl` / `displayName` / `handle` を追加した。
+- `refreshProfile()` で `users.avatar_url` / `display_name` / `handle` を取得するようにした。
+
+#### `mobile/app/(tabs)/_layout.tsx`
+- 左ドロワーの表示名・ハンドル・アイコン画像を、`profile` の値を優先して表示するようにした。
+- アイコン画像は `profile.avatarUrl` を最優先し、なければ従来どおり認証メタデータへフォールバックするようにした。
+
+#### `mobile/app/profile-edit.tsx`
+- プロフィール保存成功後に `refreshProfile()` を呼び、保存したアイコン画像が左ドロワーへ即時反映されるようにした。
+
+### 影響範囲
+
+- iOS版 左ドロワー
+- iOS版 プロフィール編集
+- iOS版 認証プロフィールコンテキスト
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- プロフィール編集でアイコン画像を設定・保存し、左ドロワーを開いて同じ画像が表示されることを確認
+
+### 関連ファイル
+
+- `mobile/src/auth/AuthProvider.tsx`
+- `mobile/app/(tabs)/_layout.tsx`
+- `mobile/app/profile-edit.tsx`
+
+### セルフレビュー結果
+
+- ✅ 左ドロワーは `users.avatar_url` 由来のプロフィール画像を優先表示
+- ✅ 保存後に `refreshProfile()` を実行し、画面再起動なしで反映されるようにした
+- ✅ `npm --prefix mobile run typecheck` 成功
+- ✅ `npm --prefix mobile run export:ios:preview` 成功
+- ✅ 状態ID追加なしのため `notes/09_state_machines.md` の更新は不要
+- ✅ 新用語追加なしのため `notes/10_glossary.md` の更新は不要
+- ✅ DB変更なしのため `notes/05_data_model.md` の更新は不要
+
+---
+
+## イテレーション162.57：グルーム閲覧をユーザー単位キューブへ調整
+
+### 背景・問題意識
+
+オーナーから、グルーム閲覧の進捗ステータスバーは投稿単位ではなく一人のアカウント単位で分割したいこと、グルームはユーザーごとに3Dキューブの各面になっているイメージにしたいこと、上部の黒い透明覆いと右上の `×` / `...` を外したいこと、未入力の一言は非表示にし、表示する場合も背景なし・左寄せ・小さめ・細めにしたいこと、下スワイプで元の画面へ戻りながらグルームアイコンへ収まるような退出動作にしたいこと、閲覧済みグルームのアイコン枠をグレーにしたいという指示があった。
+
+### 変更内容
+
+#### `mobile/app/(tabs)/encounters.tsx`
+- グルーム閲覧用に投稿配列からアカウント単位の `faces` を作り、進捗バー・左右移動・3Dキューブ面をユーザー単位で扱うようにした。
+- グルームビューア上部/下部の黒い scrim 表示を外し、右上の `...` と `×` ボタンも表示しない構成にした。
+- グルームの一言は未入力なら非表示にし、投稿時も空入力なら空のまま保持するようにした。
+- 一言表示は背景なし・左寄せ・小さめ・細めのスタイルへ変更した。
+- 下スワイプ時にビューア全体が下へ移動しながら縮小・フェードして閉じる dismiss アニメーションを追加した。
+- 開いたグルームのアカウントキーをローカル state で記録し、閲覧済みの丸アイコン枠をグレー表示にした。
+
+### 影響範囲
+
+- iOS版 めぐりホーム
+- iOS版 グルーム閲覧モーダル
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- グルーム閲覧で進捗バーがアカウント単位の本数になることを確認
+- 横スワイプでユーザーごとの3Dキューブ面として切り替わることを確認
+- 上部の黒い覆い、右上の `...` / `×` が出ないことを確認
+- 一言未入力のグルームで一言欄が出ないことを確認
+- 一言ありのグルームで、左寄せ・小さめ・細めの文字になることを確認
+- 下スワイプでビューアが縮小しながら閉じ、閲覧済みアイコン枠がグレーになることを確認
+
+### 関連ファイル
+
+- `mobile/app/(tabs)/encounters.tsx`
+
+### セルフレビュー結果
+
+- ✅ 進捗バー・左右移動・3D面をユーザー単位へ変更
+- ✅ 上下の黒い覆いと右上操作ボタンを表示から削除
+- ✅ 未入力の一言は非表示
+- ✅ 一言表示は背景なし・左寄せ・小さめ・細めに変更
+- ✅ 下スワイプ dismiss と閲覧済みグレー枠を追加
+- ✅ `npm --prefix mobile run typecheck` 成功
+- ✅ `npm --prefix mobile run export:ios:preview` 成功
+- ✅ 状態ID追加なしのため `notes/09_state_machines.md` の更新は不要
+- ✅ 新用語追加なしのため `notes/10_glossary.md` の更新は不要
+- ✅ DB変更なしのため `notes/05_data_model.md` の更新は不要
+
+---
+
+## イテレーション162.56：取引チャットの取引内容と証跡確認を整理
+
+### 背景・問題意識
+
+オーナーから、取引チャット上の待ち合わせ場所には簡易地図を表示しなくてよいこと、取引内容はタップで詳細ポップアップ表示にしたいこと、メッセージ入力欄上の「写真添付」クイックボタンを外したいこと、証跡到着後は遅刻・キャンセル相談導線を出さないこと、追加撮影時は撮影画面へ直接遷移せず事前に「交換したグッズを撮影してください」と案内したいこと、取引完了確認画面では証跡サムネイルを選択して上部表示へ反映し、選択枠と撮影者表示を出したいという指示があった。
+
+### 変更内容
+
+#### `mobile/app/transaction-detail.tsx`
+- 取引内容カードから待ち合わせ場所の簡易地図サムネイルを削除し、時間・場所テキストのみの表示に変更した。
+- 取引内容カード全体をタップ可能にし、受け取るもの・出すもの・待ち合わせを確認できる詳細モーダルを追加した。
+- メッセージ入力欄上のクイックアクションから「写真添付」を削除した。
+- 取引証跡が届いているカードから `TradeSupportActions` を外し、「遅刻を連絡」「キャンセル相談」が出ないようにした。
+- 証跡到着後の「追加撮影」は撮影画面へ遷移せず、確認ポップアップを出してからカメラを起動し、撮影した画像を証跡として追加するようにした。
+
+#### `mobile/app/transaction-approve.tsx`
+- 証跡一覧のサムネイルをタップ可能にし、選択した証跡を上部の大きい画像へ反映するようにした。
+- 選択中の証跡サムネイルに枠線と背景を付け、どの証跡を見ているか分かるようにした。
+- 証跡の上部メタ情報とサムネイルラベルに、誰が撮影したものかを表示するようにした。
+
+### 影響範囲
+
+- iOS版 取引チャット
+- iOS版 取引証跡追加
+- iOS版 取引完了の確認画面
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- 取引チャットで、取引内容カードに簡易地図が出ず、カードタップで詳細ポップアップが開くことを確認
+- 取引チャットの入力欄上のクイックアクションに「写真添付」が出ないことを確認
+- 証跡到着後のカードに「遅刻を連絡」「キャンセル相談」が出ないことを確認
+- 「追加撮影」押下時に事前ポップアップが出て、その後カメラが開くことを確認
+- 取引完了の確認画面で証跡サムネイルをタップし、上部画像・選択枠・撮影者表示が切り替わることを確認
+
+### 関連ファイル
+
+- `mobile/app/transaction-detail.tsx`
+- `mobile/app/transaction-approve.tsx`
+
+### セルフレビュー結果
+
+- ✅ 取引内容カード内の待ち合わせ簡易地図を削除
+- ✅ 取引内容詳細はモーダルで確認可能
+- ✅ 入力欄上の「写真添付」クイックボタンを削除
+- ✅ 証跡到着後カードから遅刻・キャンセル相談導線を削除
+- ✅ 追加撮影は事前ポップアップ後にカメラ起動
+- ✅ 証跡確認画面で選択中画像・選択枠・撮影者表示を追加
+- ✅ `npm --prefix mobile run typecheck` 成功
+- ✅ 状態ID追加なしのため `notes/09_state_machines.md` の更新は不要
+- ✅ 新用語追加なしのため `notes/10_glossary.md` の更新は不要
+- ✅ DB変更なしのため `notes/05_data_model.md` の更新は不要
+
+---
+
+## イテレーション162.55：チャット入力バーのキーボード追従を安定化
+
+### 背景・問題意識
+
+オーナーから、取引チャットで入力欄をタップしても入力バーがキーボード上へ調整されないという指摘があった。また、取引チャット・めぐりチャットの複数行入力時に、同じ行の `+` アイコンと送信アイコンを入力欄の最下行側へ固定したいという要望があった。
+
+### 変更内容
+
+#### `mobile/src/lib/useKeyboardInset.ts`
+- iOS/Android のキーボード表示イベントから、画面下部に対するキーボード重なり量を返す共通フックを追加した。
+
+#### `mobile/app/transaction-detail.tsx`
+- 取引チャットの下部入力バーを `KeyboardAvoidingView` 依存から、キーボード重なり量に応じて `marginBottom` を付ける構成へ変更した。
+- キーボード表示中は safe-area 分の下余白を抑え、入力バーがキーボード直上に密着しやすいよう調整した。
+- 複数行入力時も `+` ボタンと送信ボタンが入力欄の下端に揃うよう、各ボタンを下揃えに固定した。
+
+#### `mobile/app/meguri-letters.tsx`
+- めぐりチャットの下部入力バーにも同じキーボード重なり量による追従を適用した。
+- 複数行入力時に `+` アイコンと送信アイコンが入力欄の下端へ残るよう、入力バー全体と各ボタンを下揃えにした。
+
+### 影響範囲
+
+- iOS版 取引チャット
+- iOS版 めぐりチャット
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- iOS Previewで取引チャットを開き、入力欄タップ時に入力バーがキーボード直上へ移動することを確認
+- iOS Previewでめぐりチャットを開き、入力欄タップ時に入力バーがキーボード直上へ移動することを確認
+- 複数行入力時に `+` アイコンと送信アイコンが入力欄の最下行側に揃うことを確認
+
+### 関連ファイル
+
+- `mobile/src/lib/useKeyboardInset.ts`
+- `mobile/app/transaction-detail.tsx`
+- `mobile/app/meguri-letters.tsx`
+
+### セルフレビュー結果
+
+- ✅ iOS標準のキーボードイベントを使い、入力バー自体がキーボード重なり量へ追従するようにした
+- ✅ 複数行入力時の `+` / 送信アイコンは下揃えに固定
+- ✅ `npm --prefix mobile run typecheck` 成功
+- ✅ 状態ID追加なしのため `notes/09_state_machines.md` の更新は不要
+- ✅ 新用語追加なしのため `notes/10_glossary.md` の更新は不要
+- ✅ DB変更なしのため `notes/05_data_model.md` の更新は不要
+
+---
+
+## イテレーション162.54：グルーム閲覧をストーリーUIへ寄せる
+
+### 背景・問題意識
+
+オーナーから、めぐりホームのグルーム一覧は白いパネルに閉じ込めず、Instagramのストーリーのように「グルーム」見出し下へ丸アイコンを横並びにしたいという指示があった。また、グルーム閲覧画面もInstagram Stories仕様に寄せ、20秒進捗バー、左右タップでの切り替え、横スワイプ中の3Dキューブ風遷移、キーボード直上の返信入力欄を実装したいという要望があった。
+
+### 変更内容
+
+#### `mobile/app/(tabs)/encounters.tsx`
+- めぐりホームのグルーム一覧から白いカード枠と補足文を削除し、「グルーム」見出し直下に丸アイコンが横並びになる構成へ変更した。
+- グルーム追加ボタンを一覧の一番左に移動した。
+- 旧MESSAGEパネルを削除し、めぐりメッセージ導線はフッターの `やりとり` に集約した。
+- グルーム閲覧モーダルに、1枚20秒で進む分割進捗バーを追加した。
+- 閲覧中の左上表示を、投稿画像ではなくめぐりアバター風の顔アイコンと名前に変更した。
+- 画面右タップで次のグルームへ進む操作を追加した。
+- 横スワイプで前後のグルームへ移動する際、スワイプ量に追従して3Dキューブ風に切り替わる表現を追加した。
+- グルーム返信入力欄を `KeyboardAvoidingView` でキーボード直上へ出し、複数行入力は最大4行相当に制限した。
+
+#### `mobile/src/components/IconSymbol.tsx`
+- グルーム閲覧画面のアクション用に `heart` / `heart-outline` を追加した。
+
+### 影響範囲
+
+- iOS版 めぐりホーム
+- iOS版 グルーム閲覧モーダル
+- iOS版 共通簡易アイコン
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- iOS Previewでめぐりホームを開き、グルーム追加が左端、丸アイコン列が見出し下に出ることを確認
+- グルームを開き、20秒進捗バー、右タップで次へ、横スワイプ時の3D風遷移、キーボード直上の入力欄を確認
+
+### 関連ファイル
+
+- `mobile/app/(tabs)/encounters.tsx`
+- `mobile/src/components/IconSymbol.tsx`
+
+### セルフレビュー結果
+
+- ✅ グルーム一覧からMESSAGEパネルを削除し、やりとり導線との重複を解消
+- ✅ 返信入力欄はiOS標準のキーボード回避挙動を使うため `KeyboardAvoidingView` を利用
+- ✅ `npm --prefix mobile run typecheck` 成功
+- ✅ 状態ID追加なしのため `notes/09_state_machines.md` の更新は不要
+- ✅ 既存用語「グルーム」の範囲内のため `notes/10_glossary.md` の更新は不要
+- ✅ DB変更なしのため `notes/05_data_model.md` の更新は不要
+
+---
+
+## イテレーション162.53：チャット入力欄をキーボード直上へ調整
+
+### 背景・問題意識
+
+オーナーから、取引チャットとめぐりチャットで文字入力時に、iOSのメッセージアプリのように入力欄がキーボードのすぐ上に出るようにしたいという指示があった。また、複数行入力時は入力欄を最大7行まで表示したいという要望があった。
+
+### 変更内容
+
+#### `mobile/app/transaction-detail.tsx`
+- 取引チャットの入力フッターを通常フローへ戻し、`KeyboardAvoidingView` でキーボード上へ押し上げる構成にした。
+- 入力中はクイックアクション列を隠し、入力欄・添付・送信だけがキーボード直上に残るようにした。
+- メッセージ入力欄を複数行対応にし、最大7行相当まで表示するようにした。
+
+#### `mobile/app/meguri-letters.tsx`
+- めぐりチャット画面にも `KeyboardAvoidingView` を追加し、入力欄がキーボード上へ移動するようにした。
+- めぐりチャットの入力欄も複数行対応にし、最大7行相当まで表示するようにした。
+
+### 影響範囲
+
+- iOS版 取引チャット
+- iOS版 めぐりチャット
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- iOS Previewで取引チャットを開き、入力欄タップ時にキーボード直上へ入力欄が移動することを確認
+- iOS Previewでめぐりチャットを開き、入力欄タップ時にキーボード直上へ入力欄が移動することを確認
+- 7行を超える長文入力時に入力欄が肥大化しすぎないことを確認
+
+### 関連ファイル
+
+- `mobile/app/transaction-detail.tsx`
+- `mobile/app/meguri-letters.tsx`
+
+### セルフレビュー結果
+
+- ✅ iOS標準のキーボード回避挙動を使うため `KeyboardAvoidingView` を利用
+- ✅ 入力欄は7行相当で高さ上限を設定
+- ✅ 取引チャットでは入力中に補助アクションを畳み、キーボード上を入力に集中できる状態へ調整
+- ✅ `npm --prefix mobile run typecheck` 成功
+- ✅ 状態ID追加なしのため `notes/09_state_machines.md` の更新は不要
+- ✅ 新用語追加なしのため `notes/10_glossary.md` の更新は不要
+- ✅ DB変更なしのため `notes/05_data_model.md` の更新は不要
+
+---
+
+## イテレーション162.52：やりとり画面のタブ構成を整理
+
+### 背景・問題意識
+
+オーナーから、フッターの `取引` は実態として取引チャットだけでなく、めぐりメッセージも含むため `やりとり` にしたいという指示があった。また、`めぐりあい` / `取引` はタップだけでなく横スワイプで切り替え、打診中の `要対応` / `相手待ち` はタブではなく各パネル内で分かるようにしたいという要望があった。
+
+### 変更内容
+
+#### `mobile/app/(tabs)/_layout.tsx`
+- フッターの `取引` ラベルを `やりとり` に変更した。
+
+#### `mobile/app/(tabs)/transactions.tsx`
+- 通常の `やりとり` 画面から左上ヘッダー表示を削除した。
+- 上位タブ `めぐりあい` / `取引` を横スワイプ可能なページャーにした。
+- `打診中` / `進行中` は取引側の小さめセグメントに整理した。
+- 打診中内の `要対応` / `相手待ち` タブを廃止し、取引パネル内のバッジとして表示する構成にした。
+
+#### `mobile/app/meguri-letters.tsx`
+- めぐりメッセージ画面上部の相手プロフィール帯を押すと、めぐり専用プロフィールへ遷移するようにした。
+
+### 影響範囲
+
+- iOS版 フッター
+- iOS版 やりとり画面
+- iOS版 めぐりメッセージ画面
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- iOS Previewで、フッターが `やりとり` 表記になっていることを確認
+- iOS Previewで、やりとり画面の左上に `Transactions / 取引` が出ないことを確認
+- iOS Previewで、`めぐりあい` / `取引` が横スワイプで切り替わることを確認
+- iOS Previewで、打診中パネルに `要対応` / `相手待ち` がバッジ表示されることを確認
+- iOS Previewで、めぐりメッセージ画面の相手プロフィール帯からめぐりプロフィールへ遷移することを確認
+
+### 関連ファイル
+
+- `mobile/app/(tabs)/_layout.tsx`
+- `mobile/app/(tabs)/transactions.tsx`
+- `mobile/app/meguri-letters.tsx`
+
+### セルフレビュー結果
+
+- ✅ iOSフッターは `NativeTabs` を維持し、ラベルのみ変更
+- ✅ 取引画面内の上位切り替えは横スワイプに対応
+- ✅ 打診中の `要対応` / `相手待ち` はタブではなくカード内状態として表現
+- ✅ `npm --prefix mobile run typecheck` 成功
+- ✅ 状態ID追加なしのため `notes/09_state_machines.md` の更新は不要
+- ✅ UIラベル変更のみのため `notes/10_glossary.md` の更新は不要
+- ✅ DB変更なしのため `notes/05_data_model.md` の更新は不要
+
+---
+
+## イテレーション162.51：プレビュー起動クラッシュを回避
+
+### 背景・問題意識
+
+オーナーから、Preview版で新規登録画面までは開けるが、`画面だけプレビューする` を押すとアプリが強制終了するという報告があった。プレビュー突入時はタブ配下のホーム・めぐり・取引関連モジュールが一気に読み込まれるため、起動導線では実験的なネイティブ演出や3D native module の即時ロードを避ける必要があった。
+
+### 変更内容
+
+#### `mobile/app/(tabs)/index.tsx`
+- ホームの `expo-glass-effect` / `expo-symbols` 利用を起動時は無効化し、React Native標準表示へフォールバックするようにした。
+- `BlurView` も同じ feature flag 下に置き、Preview起動直後にネイティブ演出をロードしないようにした。
+
+#### `mobile/src/components/meguri/MeguriThreeScene.tsx`
+- `expo-gl` の `GLView` をトップレベル import せず、利用時にだけ guarded `require` する形へ変更した。
+- `GLView` が利用できない環境ではクラッシュさせず、既存の2Dフォールバック表示へ切り替えるようにした。
+
+### 影響範囲
+
+- iOS版 Preview の `画面だけプレビューする` 導線
+- iOS版 ホーム画面の現地交換アクション表示
+- iOS版 めぐり3D演出のフォールバック
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- iOS Previewで、新規登録/ログイン画面の `画面だけプレビューする` からホームへ遷移してクラッシュしないことを確認
+
+### 関連ファイル
+
+- `mobile/app/(tabs)/index.tsx`
+- `mobile/src/components/meguri/MeguriThreeScene.tsx`
+
+### セルフレビュー結果
+
+- ✅ Preview起動直後に experimental native effects をロードしないようにした
+- ✅ `expo-gl` のトップレベル import を避けた
+- ✅ `npm --prefix mobile run typecheck` 成功
+- ✅ `npm --prefix mobile run export:ios:preview` 成功
+- ✅ 状態ID追加なしのため `notes/09_state_machines.md` の更新は不要
+- ✅ 新用語追加なしのため `notes/10_glossary.md` の更新は不要
+- ✅ DB変更なしのため `notes/05_data_model.md` の更新は不要
+
+---
+
+## イテレーション162.50：取引タブをめぐりあい二層構成へ変更
+
+### 背景・問題意識
+
+オーナーから、自分のプロフィール画面では左ドロワーから設定できる列を出さず、見るためのプロフィールに絞りたいという指示があった。また、フッターの `取引` では、通常の取引だけでなく、めぐり機能のメッセージ一覧も同じ入口から見たいという要望があった。
+
+### 変更内容
+
+#### `mobile/app/(tabs)/profile.tsx`
+- 自分のプロフィール画面から `アイデンティティ` 以下の設定・サポート・アカウント列を削除した。
+- プロフィール本体、推し、譲る候補に表示内容を絞った。
+
+#### `mobile/app/(tabs)/_layout.tsx`
+- 左ドロワーからフッターと重複する `通知` 導線を外した。
+- 左ドロワーに `完了した取引` を追加し、完了ステータスの取引を専用入口から見られるようにした。
+
+#### `mobile/app/(tabs)/transactions.tsx`
+- フッターの `取引` 画面に、上位タブ `めぐりあい` / `取引` を追加した。
+- `取引` 側のタブを `打診中` / `進行中` のみに整理し、`完了` は左ドロワーの `完了した取引` から開く構成にした。
+- `めぐりあい` 側に、めぐりメッセージの一覧を表示し、押下で対象ユーザーのめぐりメッセージ画面を直接開く導線を追加した。
+
+#### `mobile/app/meguri-letters.tsx`
+- `open=1&userId=...` で特定のめぐりメッセージを直接開けるようにした。
+- めぐりメッセージのやり取り画面を、取引チャットの構成に寄せたヘッダー・相手情報帯・下部入力フッターへ再構成した。
+- 取引詳細ヘッダーは表示せず、めぐり用のアバターと名前だけを表示する構成にした。
+
+### 影響範囲
+
+- iOS版 自分のプロフィール画面
+- iOS版 左ドロワー
+- iOS版 取引タブ
+- iOS版 めぐりメッセージ一覧・メッセージ画面
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- iOS Previewで、自分のプロフィール画面から `アイデンティティ` 以下の列が消えていることを確認
+- iOS Previewで、左ドロワーに `完了した取引` が表示されることを確認
+- iOS Previewで、フッターの `取引` に `めぐりあい` / `取引` の上位タブが表示されることを確認
+- iOS Previewで、`取引` 側に `打診中` / `進行中` のみが表示されることを確認
+- iOS Previewで、めぐりメッセージ一覧から会話画面に遷移し、取引チャット由来の入力フッターが表示されることを確認
+
+### 関連ファイル
+
+- `mobile/app/(tabs)/profile.tsx`
+- `mobile/app/(tabs)/_layout.tsx`
+- `mobile/app/(tabs)/transactions.tsx`
+- `mobile/app/meguri-letters.tsx`
+
+### セルフレビュー結果
+
+- ✅ 自分のプロフィール画面を設定導線なしの表示に整理した
+- ✅ 完了取引を左ドロワーの専用項目へ移した
+- ✅ 取引タブを `めぐりあい` / `取引` の二層構成にした
+- ✅ 取引側の上部タブを `打診中` / `進行中` のみにした
+- ✅ めぐりメッセージの会話画面を取引チャット構成に寄せ、取引詳細ヘッダーは省いた
+- ✅ 状態ID追加なしのため `notes/09_state_machines.md` の更新は不要
+- ✅ 新用語追加なしのため `notes/10_glossary.md` の更新は不要
+- ✅ DB変更なしのため `notes/05_data_model.md` の更新は不要
+
+---
+
+## イテレーション162.49：グルーム導線をめぐりホームへ追加
+
+### 背景・問題意識
+
+オーナーから、めぐり機能にインスタグラムのストーリーのような一過性投稿を追加し、名前を「グルーム」にしたいという要望があった。推し活現場で撮ったグッズ・服装・現場の雰囲気を、めぐりあった人の間で見られるようにし、気になった相手へメッセージやいいねを送れる導線にする。
+
+### 変更内容
+
+#### `mobile/app/(tabs)/encounters.tsx`
+- めぐりホーム上部に、グルームの丸い写真アイコンが横並びで表示されるレールを追加した。
+- レール右端に、自分のグルームを追加するプラス付き丸アイコンを追加した。
+- 追加アイコンからカメラを起動し、正方形トリミング後にひとことを編集して投稿できるローカル投稿フローを追加した。
+- 他人/自分のグルームをタップすると、写真が画面いっぱいに表示される全画面ビューアを追加した。
+- 全画面ビューア下部に、メッセージ入力欄・いいねボタン・送信ボタンを配置した。
+
+#### `notes/10_glossary.md`
+- 新用語 `グルーム` を追加した。
+
+#### `notes/09_state_machines.md`
+- `Groom Lifecycle` を追加し、`draft` / `published` / `expired` / `hidden` / `archived` を定義した。
+
+#### `notes/05_data_model.md`
+- 永続化時の draft として `groom_posts` / `groom_reactions` のテーブル候補を追加した。
+
+### 影響範囲
+
+- iOS版 めぐりホーム
+- めぐりからめぐりメッセージへ向かうソーシャル導線
+- 推しすれ違い系の用語・状態・データモデル draft
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+  - 現時点では既存/並行作業中の `mobile/app/(tabs)/transactions.tsx` の型エラーで失敗（今回変更した `encounters.tsx` 由来のエラーは出ていない）
+- iOS Previewで、めぐりホーム上部にグルームの丸アイコン列が表示されることを確認
+- iOS Previewで、右端の追加アイコンからカメラ起動・編集・投稿ができることを確認
+- iOS Previewで、グルームをタップすると全画面表示になり、下部にメッセージ入力といいねが表示されることを確認
+
+### 関連ファイル
+
+- `mobile/app/(tabs)/encounters.tsx`
+- `notes/10_glossary.md`
+- `notes/09_state_machines.md`
+- `notes/05_data_model.md`
+
+### セルフレビュー結果
+
+- ✅ めぐりホーム上部にグルーム導線を追加した
+- ✅ 自分の投稿追加アイコンを右端に配置した
+- ✅ カメラ撮影 → 編集 → 投稿の流れを追加した
+- ✅ 他人のグルーム閲覧時に全画面表示・メッセージ入力・いいねを表示した
+- ✅ 新用語 `グルーム` を `notes/10_glossary.md` に追加した
+- ✅ 新状態を `notes/09_state_machines.md` に追加した
+- ✅ 永続化時のテーブル候補を `notes/05_data_model.md` に draft 追記した
+- ⚠️ 型チェックは既存/並行作業中の `transactions.tsx` エラーで失敗しているため、別途修正が必要
+
+---
+
+## イテレーション162.48：推し追加導線を固定フッター化
+
+### 背景・問題意識
+
+オーナーから、推し設定画面の上部にある `登録済みの推しを追加` ボタンを固定フッターへ移し、`マスタに無い推しを追加リクエスト` は推し設定画面上には出さないようにしたいという指示があった。また、登録済みの推し追加モーダル内の `すべて` / `K-POP` などのジャンルタブが選択時に潰れて見える問題と、追加完了メッセージをトースト形式にしたいという要望があった。
+
+### 変更内容
+
+#### `mobile/app/oshi-settings.tsx`
+- 推し設定画面上部の追加ボタン群を削除し、画面左下に固定表示される `+ 推しを追加` のピル型フッター導線へ変更した。
+- 推し設定画面上の `マスタに無い推しを追加リクエスト` ボタンを非表示にした。
+- 登録済みの推し追加時の成功文言を `推しを追加しました` に変更し、画面内テキストではなく下部トーストで表示するようにした。
+- ジャンルタブのチップに最小高さ・縮小禁止・1行表示を指定し、選択時に潰れて見えないようにした。
+
+### 影響範囲
+
+- iOS版 推し設定画面
+- 登録済みの推し追加モーダル
+- 推し追加成功時の通知表示
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- iOS Previewで、推し設定画面上部に追加ボタンが出ず、左下固定フッターに `推しを追加` が出ることを確認
+- iOS Previewで、登録済みの推し追加モーダルの `すべて` / `K-POP` などのタブが選択時も潰れないことを確認
+- iOS Previewで、推し追加後に `推しを追加しました` がトースト表示されることを確認
+
+### 関連ファイル
+
+- `mobile/app/oshi-settings.tsx`
+
+### セルフレビュー結果
+
+- ✅ 推し設定画面上の追加リクエストボタンを削除した
+- ✅ 追加導線を左下固定フッターに移した
+- ✅ ジャンルチップの縮小を防いだ
+- ✅ 成功メッセージをトースト化した
+- ✅ 状態ID追加なしのため `notes/09_state_machines.md` の更新は不要
+- ✅ 新用語追加なしのため `notes/10_glossary.md` の更新は不要
+- ✅ DB変更なしのため `notes/05_data_model.md` の更新は不要
+
+---
+
+## イテレーション162.47：めぐりメッセージ一覧をMegrim文法へ戻す
+
+### 背景・問題意識
+
+オーナーから、めぐりメッセージはLINE風の一覧/トーク構造に寄せつつ、画面上部の行・フッター・文字サイズはMegrim本体の文法に合わせたいという指摘があった。また、メッセージルームから戻る時は必ずメッセージ一覧へ戻る必要があった。
+
+### 変更内容
+
+#### `mobile/app/meguri-letters.tsx`
+- メッセージ一覧の上部ヘッダーを、左戻るボタン + 中央 `メッセージ` のみに整理した。
+- LINE風の独自フッターを削除し、Megrimの通常タブに合わせた下部ナビ表示へ差し替えた。
+- 一覧のユーザー名、本文プレビュー、時刻、未読バッジのフォントサイズ/色をMegrimの既存画面に近い密度へ調整した。
+- メッセージルーム表示中に戻る操作をした場合、まず一覧へ戻るように `BackHandler` とヘッダー戻るを整理した。
+- めぐりプロフィールからのメッセージ導線は、対象相手を一覧先頭に出す形へ変更し、ルームは一覧から開く構造にした。
+
+### 影響範囲
+
+- iOS版めぐりメッセージ一覧
+- iOS版めぐりメッセージルーム
+- めぐりプロフィールからのメッセージ導線
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- iOS Previewで、めぐりメッセージ一覧のヘッダーが `メッセージ` のみになっていることを確認
+- iOS Previewで、一覧下部がLINE風フッターではなくMegrim本体の下部ナビに見えることを確認
+- iOS Previewで、メッセージルームから戻ると一覧へ戻ることを確認
+
+### 関連ファイル
+
+- `mobile/app/meguri-letters.tsx`
+
+### セルフレビュー結果
+
+- ✅ LINE風の上部ピル/右アクションを削除した
+- ✅ LINE風フッターをMegrim側の下部ナビ表現へ戻した
+- ✅ 文字サイズと色をMegrimの既存トーンへ寄せた
+- ✅ ルームからの戻り先を一覧へ寄せた
+- ✅ 状態ID追加なしのため `notes/09_state_machines.md` の更新は不要
+- ✅ 新用語追加なしのため `notes/10_glossary.md` の更新は不要
+- ✅ DB変更なしのため `notes/05_data_model.md` の更新は不要
+
+---
+
+## イテレーション162.46：めぐりメッセージ画像送信と専用プロフィールを追加
+
+### 背景・問題意識
+
+オーナーから、めぐりメッセージをちゃんと機能するようにし、画像も送れるようにしたいという指示があった。また、めぐり広場でキャラを押した後のプロフィールは、グッズ交換側の相手プロフィールではなく、めぐり専用プロフィールとして3Dアバター、拠点、公開情報、自分とのめぐり回数、メッセージ導線を表示したいという要望があった。
+
+### 変更内容
+
+#### `mobile/app/meguri-letters.tsx`
+- `expo-image-picker` を使い、めぐりメッセージのトークルームから画像を選択して送信できるようにした。
+- 画像送信時は自分側の吹き出し内に画像プレビューを表示するようにした。
+- 画像送信も無料送信枠を消費し、Plus未加入で無料枠を超える場合はPlus導線へ遷移するようにした。
+- `/meguri-letters?userId=...` で指定ユーザーをメッセージ一覧の先頭に表示できるようにした。
+- 一覧プレビューも、送信済み画像がある場合は `画像を送信しました` を表示するようにした。
+
+#### `mobile/app/meguri-profile.tsx`
+- めぐり専用プロフィール画面を新規追加した。
+- 3Dアバター、拠点、ユーザー名、公開している推し情報、今日のひとこと、最近の公開メモ、めぐり回数を表示するようにした。
+- `メッセージを送る` ボタンから、対象ユーザーが先頭に出るめぐりメッセージ一覧へ遷移するようにした。
+- 3Dが利用できない場合は既存の2D `WalkingCard` 表示にフォールバックするようにした。
+
+#### `mobile/app/meguri-plaza.tsx`
+- 広場の `詳細を見る` 導線を、グッズ交換側の `/user-profile` ではなく `/meguri-profile` へ変更した。
+
+#### `mobile/src/components/meguri/MeguriThreeScene.tsx`
+- `presentation="profile"` を追加し、めぐりプロフィール用に1体の3Dアバターを中央表示できるようにした。
+
+#### `notes/10_glossary.md`
+- `めぐりプロフィール` を新規用語として追加した。
+
+### 影響範囲
+
+- iOS版めぐりメッセージ
+- iOS版めぐり広場
+- iOS版めぐりプロフィール
+- Megrum Plus の本文開封/送信枠導線
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- iOS Previewで、めぐりメッセージから画像を選択して自分側の吹き出しに表示できることを確認
+- iOS Previewで、無料枠超過時に画像/テキスト送信がPlus導線になることを確認
+- iOS Previewで、めぐり広場の `詳細を見る` からめぐり専用プロフィールへ遷移することを確認
+- iOS Previewで、めぐりプロフィールのメッセージ導線から対象ユーザーが先頭に出るメッセージ一覧へ遷移することを確認
+
+### 関連ファイル
+
+- `mobile/app/meguri-letters.tsx`
+- `mobile/app/meguri-profile.tsx`
+- `mobile/app/meguri-plaza.tsx`
+- `mobile/src/components/meguri/MeguriThreeScene.tsx`
+- `notes/10_glossary.md`
+
+### セルフレビュー結果
+
+- ✅ 画像送信をめぐりメッセージに追加した
+- ✅ 画像送信もPlus/無料枠制限の対象にした
+- ✅ めぐり広場のプロフィール導線をグッズ交換側から分離した
+- ✅ 3Dアバター付きのめぐり専用プロフィールを追加した
+- ✅ `めぐりプロフィール` を用語集に追加した
+- ✅ 状態ID追加なしのため `notes/09_state_machines.md` の更新は不要
+- ✅ DB変更なしのため `notes/05_data_model.md` の更新は不要
+
+---
+
+## イテレーション162.45：めぐりメッセージをLINE風UIへ再構成
+
+### 背景・問題意識
+
+オーナーから、めぐりメッセージ一覧とメッセージ詳細について、LINEのUIを完全に再現するくらいの精度で寄せたいという指示があった。また、Plusプランでないと本文開封や月3通目以降の送信ができない仕様も、見た目だけでなく挙動として入れる必要があった。LINE公式ガイド/ヘルプで、トーク一覧からトークルームへ入り、トークルーム内で左右の吹き出し・上部メニュー・入力欄を扱う構成を確認した。
+
+### 変更内容
+
+#### `mobile/app/meguri-letters.tsx`
+- `RouteHeader` とカード型レイアウトをやめ、白背景のLINE風トーク一覧へ再構成した。
+- 上部は黒い `メッセージ⌄` ピル、太い見出し、右側アクションアイコンの構成にした。
+- トーク一覧は、丸いアバター、太い相手名、薄いプレビュー、右側の時刻と緑の未読バッジに寄せた。
+- めぐりユーザーから追加のモック会話を生成し、LINEのように会話が縦に並ぶ密度へ調整した。
+- 下部にLINE風のタブバーを追加し、`メッセージ` をアクティブ表示にした。
+- 個別画面は、白い上部バー、青系トーク背景、日付チップ、左=相手/右=自分の吹き出し、下部入力バーへ変更した。
+- Plus未加入かつ未開封の会話では、本文の代わりに `メッセージがきています！` と `Plusで開封` を表示するようにした。
+- Plus未加入時は無料送信枠を月2通までに制限し、3通目以降は入力欄と送信ボタンからPlus導線へ遷移するようにした。
+- 送信できたメッセージは、自分側の緑の吹き出しとして会話内に追加されるようにした。
+
+### 影響範囲
+
+- iOS版めぐりメッセージ一覧
+- iOS版めぐりメッセージ詳細
+- Megrum Plus のメッセージ本文開封/送信枠導線
+
+### 確認方法
+
+- LINE公式ガイド/ヘルプのトーク一覧・トークルーム構成を確認
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- iOS Previewで、一覧がLINE風のトーク一覧になっていることを確認
+- iOS Previewで、詳細がLINE風のトークルームになっていることを確認
+- iOS Previewで、未加入時の本文開封ロックと3通目以降送信ロックを確認
+
+### 関連ファイル
+
+- `mobile/app/meguri-letters.tsx`
+
+### セルフレビュー結果
+
+- ✅ トーク一覧/トークルームの視覚構造をLINE寄せに再構成した
+- ✅ 会話件数を増やし、一覧画面の密度をLINEのトーク一覧に近づけた
+- ✅ 受信/送信のタブ分割はなく、相手ごとのトーク一覧にした
+- ✅ Plus未加入時は本文を伏せ、開封導線を明示した
+- ✅ 無料は月2通まで、3通目以降はPlus誘導になるよう送信処理を制御した
+- ✅ 送信成功時に自分側の吹き出しとして追加されることを実装した
+- ✅ 状態ID追加なしのため `notes/09_state_machines.md` の追加更新は不要
+- ✅ 新用語追加なしのため `notes/10_glossary.md` の追加更新は不要
+- ✅ DB変更なしのため `notes/05_data_model.md` の更新は不要
+
+---
+
+## イテレーション162.44：めぐり広場の説明削除と引き構図調整
+
+### 背景・問題意識
+
+オーナーから、めぐり広場の一番上の説明書きと一番下の説明書きは不要であり、キャラクター同士の距離が近すぎるため少し間隔を取りたいという指示があった。また、カメラがキャラクターに寄りすぎているため、もっと引きの見下ろし構図にしたいという要望があった。
+
+### 変更内容
+
+#### `mobile/app/meguri-plaza.tsx`
+- 上部タイトル横の説明文を削除し、`めぐり広場` のタイトルだけを残した。
+- 下部の説明パネルを削除し、画面下まで3D広場が見えるようにした。
+- キャラ選択用の透明タップ領域を、広がった3D配置に合わせて再配置した。
+
+#### `mobile/src/components/meguri/MeguriThreeScene.tsx`
+- `presentation="plaza"` のカメラ位置をさらに上・奥へ移動し、広場全体が見える引き構図にした。
+- 広場住人の配置座標を広げ、キャラ同士の距離を確保した。
+- 広場住人の表示スケールを少し下げ、密集感を抑えた。
+
+### 影響範囲
+
+- iOS版めぐり広場
+- めぐり広場の3D住人表示
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- iOS Previewで、上/下の説明文が消え、引きの見下ろし構図になっていることを確認
+
+### 関連ファイル
+
+- `mobile/app/meguri-plaza.tsx`
+- `mobile/src/components/meguri/MeguriThreeScene.tsx`
+
+### セルフレビュー結果
+
+- ✅ 上部説明文を削除した
+- ✅ 下部説明パネルを削除した
+- ✅ カメラを引いて、キャラ同士の距離を広げた
+- ✅ 状態ID追加なしのため `notes/09_state_machines.md` の更新は不要
+- ✅ 新用語追加なしのため `notes/10_glossary.md` の更新は不要
+- ✅ DB変更なしのため `notes/05_data_model.md` の更新は不要
+
+---
+
+## イテレーション162.43：めぐりメッセージのPlus制限を明確化
+
+### 背景・問題意識
+
+オーナーから、`すれ違いレター` から `メッセージ` への文言変更とLINE風UIの依頼について、Plusプランでないと本文開封や月3通目以降の送信ができない仕様まできちんと実装できているか確認があった。前回実装ではLINE風の一覧/スレッド自体は入っていたが、無料送信枠の見え方と、送信した文が会話に積まれる挙動が弱かったため補強した。
+
+### 変更内容
+
+#### `mobile/app/meguri-letters.tsx`
+- LINE公式ガイドのトーク一覧/トークルーム構成を参考に、相手ごとの一覧から個別トークへ入る構成を維持した。
+- Plus未加入かつ本文未表示の会話では、本文を出さず `メッセージがきています！` と `Plusで開封` を表示するようにした。
+- トーク詳細にPlus制限カードを追加し、本文開封にはPlusが必要であることを明示した。
+- 無料送信枠を月2通までとし、3通目以降はPlus誘導になるよう送信ボタンと入力欄を制御した。
+- 送信できた場合は、自分側の吹き出しとして会話に追加されるようにした。
+- Plus加入プレビュー時は本文開封と送信制限解除が確認できるようにした。
+
+### 影響範囲
+
+- iOS版めぐりメッセージ一覧
+- iOS版めぐりメッセージ詳細
+- Megrum Plus のメッセージ開封/送信枠導線
+
+### 確認方法
+
+- LINE公式ガイドのトーク一覧/トークルーム系ページを確認
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- iOS Previewで、Plus未加入時に本文が伏せられ、`メッセージがきています！` と表示されることを確認
+- iOS Previewで、無料送信枠を超えた状態では送信欄がPlus誘導になることを確認
+
+### 関連ファイル
+
+- `mobile/app/meguri-letters.tsx`
+
+### セルフレビュー結果
+
+- ✅ LINE風の相手別一覧/個別トーク構成を維持した
+- ✅ Plus未加入時の本文開封ロックを明示した
+- ✅ 無料は月2通まで、3通目以降はPlusという制限をUIと送信処理に入れた
+- ✅ 送信済みメッセージが自分側の吹き出しとして追加されるようにした
+- ✅ 既存の `notes/09_state_machines.md` に月2通/Plus制限が記録済みのため追加更新は不要
+- ✅ 新用語追加なしのため `notes/10_glossary.md` の追加更新は不要
+- ✅ DB変更なしのため `notes/05_data_model.md` の更新は不要
+
+---
+
+## イテレーション162.42：めぐり広場を見下ろし3D広場へ刷新
+
+### 背景・問題意識
+
+オーナーから、めぐり広場を添付画像のように上から見下ろす形で、複数ユーザーのキャラクターを画面いっぱいに見られるよう改善したいという指示があった。あわせて、各キャラをタップするとこちらを見るようにし、`詳細を見る` の吹き出しからそのユーザー詳細画面へ遷移したいという要望があった。
+
+### 変更内容
+
+#### `mobile/app/meguri-plaza.tsx`
+- 旧カード内表示のめぐり広場を、全画面の3D広場表示へ変更した。
+- 10人のめぐり住人を上から見下ろす配置にし、透明なタップ領域を重ねてキャラごとに選択できるようにした。
+- 選択したキャラの近くに `詳細を見る` 吹き出しを表示し、タップで `/user-profile?id=...` へ遷移するようにした。
+- 3Dが利用できない場合の2Dフォールバックも、上から見下ろす広場配置に寄せた。
+
+#### `mobile/src/components/meguri/MeguriThreeScene.tsx`
+- `focusedId` を追加し、めぐり広場で選択された住人だけがカメラ側を向いて少し大きく見えるようにした。
+- `presentation="plaza"` のカメラを上から見下ろす位置へ変更した。
+- 広場用の住人配置を、複数人が画面全体に散らばって見える並びへ調整した。
+
+#### `notes/10_glossary.md`
+- `めぐり広場` の定義を、上から見下ろす3D広場とタップ詳細導線を含む内容へ更新した。
+
+### 影響範囲
+
+- iOS版めぐり広場
+- iOS版めぐり住人3D表示
+- 相手プロフィールへの導線
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- iOS Previewで、めぐり広場が画面いっぱいの見下ろし3D表示になることを確認
+- iOS Previewで、キャラタップ後に吹き出しが出て、詳細画面へ遷移することを確認
+
+### 関連ファイル
+
+- `mobile/app/meguri-plaza.tsx`
+- `mobile/src/components/meguri/MeguriThreeScene.tsx`
+- `notes/10_glossary.md`
+
+### セルフレビュー結果
+
+- ✅ カード内表示ではなく、全画面の3D広場表示に変更した
+- ✅ キャラごとのタップ領域、選択表示、詳細導線を追加した
+- ✅ 3D利用不可時の2Dフォールバックを残した
+- ✅ 状態ID追加なしのため `notes/09_state_machines.md` の追加更新は不要
+- ✅ `めぐり広場` の定義変更を `notes/10_glossary.md` に反映した
+- ✅ DB変更なしのため `notes/05_data_model.md` の更新は不要
+
+---
+
+## イテレーション162.41：めぐりメッセージをLINE風スレッドへ刷新
+
+### 背景・問題意識
+
+オーナーから、`すれ違いレター` という文字を `メッセージ` に修正し、受け取った/送ったの2分割ではなく、LINEのように相手ごとの一覧と双方向のやり取り画面にしたいという指示があった。また、Plus未加入の場合は本文を見せず、`メッセージがきています！` と到着だけが分かる見せ方にしたいという要望があった。着手前にLINE公式ガイドのトーク一覧の考え方を確認した。
+
+### 変更内容
+
+#### `mobile/app/meguri-letters.tsx`
+- 画面タイトルとUI表記を `めぐりメッセージ` / `メッセージ` に変更した。
+- `受け取った` / `送った` のセグメントを削除し、相手ごとのLINE風メッセージ一覧へ変更した。
+- 未読バッジ、時刻、相手名、プレビューを持つトーク一覧の形にした。
+- Plus未加入かつ本文未表示の会話は、一覧と本文側の両方で `メッセージがきています！` と表示するようにした。
+- 各会話をタップすると、左右の吹き出しでやり取りする双方向スレッド画面へ遷移するようにした。
+
+#### `mobile/app/(tabs)/encounters.tsx`
+- めぐりホーム、実績、Plusモーダル、旧レター系モーダルの表示文言をメッセージ表記へ統一した。
+
+#### `mobile/app/meguri-plus.tsx`
+- Plus訴求を、レター開封ではなくメッセージ本文表示・返信へ変更した。
+
+#### `mobile/app/meguri-achievements.tsx`
+#### `mobile/app/meguri-report.tsx`
+#### `mobile/app/meguri-plaza.tsx`
+- めぐり関連の表示文言を `レター` から `メッセージ` に変更した。
+
+#### `mobile/src/components/IconSymbol.tsx`
+- メッセージ一覧/スレッドで使う `search-outline`、`send-outline`、`ellipsis-horizontal`、`chevron-back`、`add-circle-outline` を追加した。
+
+#### `notes/09_state_machines.md`
+- 推しすれ違いレター状態管理を、めぐりメッセージの状態管理へ名称変更した。
+- 本文開封表記を本文表示表記へ更新した。
+
+#### `notes/10_glossary.md`
+- `すれ違いレター` を廃止用語に移し、後継を `めぐりメッセージ` とした。
+- 推しすれ違い Plus の説明も、メッセージ本文表示・返信・送信枠追加へ更新した。
+
+### 影響範囲
+
+- iOS版めぐりメッセージ一覧
+- iOS版めぐりメッセージ詳細
+- iOS版めぐりホーム/Plus/実績/レポート/広場の表示文言
+- めぐりメッセージの用語定義と状態遷移ドキュメント
+
+### 確認方法
+
+- LINE公式ガイドのトーク整理ページを確認
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- iOS Previewで、めぐりメッセージが相手ごとの一覧と双方向スレッドになっていることを確認
+- Plus未加入時に本文の代わりに `メッセージがきています！` と表示されることを確認
+
+### 関連ファイル
+
+- `mobile/app/meguri-letters.tsx`
+- `mobile/app/(tabs)/encounters.tsx`
+- `mobile/app/meguri-plus.tsx`
+- `mobile/app/meguri-achievements.tsx`
+- `mobile/app/meguri-report.tsx`
+- `mobile/app/meguri-plaza.tsx`
+- `mobile/src/components/IconSymbol.tsx`
+- `notes/09_state_machines.md`
+- `notes/10_glossary.md`
+
+### セルフレビュー結果
+
+- ✅ `すれ違いレター` の表示を `メッセージ` へ置換した
+- ✅ 受信/送信の分割をやめ、相手ごとの一覧と双方向スレッドにした
+- ✅ Plus未加入時は本文を伏せ、到着だけを示す表示にした
+- ✅ 状態遷移ドキュメントを `めぐりメッセージ` 表記へ更新した
+- ✅ 用語集で `すれ違いレター` を廃止語、`めぐりメッセージ` を後継語として整理した
+- ✅ DB変更なしのため `notes/05_data_model.md` の更新は不要
+
+---
+
+## イテレーション162.40：めぐり広場を3D住人表示へ差し替え
+
+### 背景・問題意識
+
+オーナーから、めぐり広場のキャラクターを現在の3Dキャラクターへ変更したいという指示があった。また、めぐり広場とめぐりホームのキャラクターについて、立っている時に完全停止ではなく、少し横に揺れながら自然に待機している動きにしたいという要望があった。
+
+### 変更内容
+
+#### `mobile/app/meguri-plaza.tsx`
+- めぐり広場のメイン表示を、旧 `WalkingCard` の2Dカード表現から `MeguriThreeScene` の3D住人表示へ差し替えた。
+- 広場用に8人の住人が広場内に並ぶ表示へ変更した。
+- 3Dが利用できない場合だけ旧2D表示へ戻すフォールバックを残した。
+- 3Dシーン下に、出会った住人のIDと回数が分かるコンパクトなチップを追加した。
+
+#### `mobile/src/components/meguri/MeguriThreeScene.tsx`
+- 3Dシーンに広場用の `presentation="plaza"` を追加した。
+- 広場用のカメラ位置と住人配置を追加し、複数人が広場に立っている見え方にした。
+- ホーム・広場・待機列などの停止中キャラクターにも、横揺れを含む自然なアイドルモーションを付けた。
+- 立っている時も、体・頭・しっぽの微細な揺れに加えて、グループ全体が少し横に揺れるようにした。
+
+### 影響範囲
+
+- iOS版めぐり広場
+- iOS版めぐりホームの3D住人表示
+- めぐり演出3D住人の待機モーション
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- iOS Previewで、めぐり広場の住人が3Dキャラクターで表示されることを確認
+- iOS Previewで、めぐりホーム/広場の住人が立っている時に自然に横揺れすることを確認
+
+### 関連ファイル
+
+- `mobile/app/meguri-plaza.tsx`
+- `mobile/src/components/meguri/MeguriThreeScene.tsx`
+
+### セルフレビュー結果
+
+- ✅ めぐり広場を現在の3D住人表示へ差し替えた
+- ✅ GL利用不可時の2Dフォールバックを残した
+- ✅ ホーム/広場の待機キャラに横揺れを追加した
+- ✅ 状態ID追加なしのため `notes/09_state_machines.md` の更新は不要
+- ✅ 新用語追加なしのため `notes/10_glossary.md` の更新は不要
+- ✅ DB変更なしのため `notes/05_data_model.md` の更新は不要
+
+---
+
+## イテレーション162.39：認証画面のアプリアイコン化と登録前同意を追加
+
+### 背景・問題意識
+
+オーナーから、アプリ内で古いロゴ/アイコンが使われている箇所を現在のアプリアイコンへ差し替えたいという指示があった。また、新規登録入口の画面で「ログイン」導線を見るために下スクロールが必要になっており、初期表示内に登録ボタン・Apple/Google登録・ログイン導線が収まるようにしたいという要望があった。さらに、Apple/Googleで登録する前に利用規約・プライバシーポリシー同意チェックを必須にしたいという指示があった。
+
+### 変更内容
+
+#### `mobile/src/components/IHubLogo.tsx`
+- 旧テキストロゴ `Mg` を、現在のアプリアイコン画像 `mobile/assets/icon.png` 表示へ差し替えた。
+- Welcome/Loginなど、`IHubLogo` を使う画面がまとめて現在のアプリアイコン表示になるようにした。
+
+#### `mobile/app/(auth)/welcome.tsx`
+- 画面上部余白、ロゴサイズ、ボタン間隔、下部余白を詰め、初期表示で登録ボタン群とログイン導線が見えるようにした。
+- 登録ボタン群の上に、利用規約・プライバシーポリシー同意チェックを追加した。
+- 同意前はメール登録・Apple登録を進められないようにした。
+- 同意文内の「利用規約」「プライバシーポリシー」から既存の法的画面へ遷移できるようにした。
+
+#### `mobile/app/(auth)/signup.tsx`
+- Welcomeで同意済みの状態からメール登録へ進んだ場合、同意チェックを引き継いで表示するようにした。
+- 直接メール登録画面に入った場合は、従来通り登録前に同意チェックが必要な状態を維持した。
+
+### 影響範囲
+
+- iOS版Welcome画面
+- iOS版ログイン画面のロゴ表示
+- iOS版メール新規登録画面
+- Apple登録前の同意チェック
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- iOS Previewで、Welcome画面のロゴが現在のアプリアイコンになっていることを確認
+- iOS Previewで、Welcome初期表示内に登録ボタン群とログイン導線が収まることを確認
+- iOS Previewで、同意チェック前にApple/メール登録へ進めないことを確認
+
+### 関連ファイル
+
+- `mobile/src/components/IHubLogo.tsx`
+- `mobile/app/(auth)/welcome.tsx`
+- `mobile/app/(auth)/signup.tsx`
+
+### セルフレビュー結果
+
+- ✅ 古いテキストロゴを現在のアプリアイコンへ差し替えた
+- ✅ Welcome画面の余白を詰め、ログイン導線が初期表示に入りやすい構成にした
+- ✅ 登録前の利用規約・プライバシーポリシー同意チェックを追加した
+- ✅ 法的文書本文の変更はないため `notes/17_legal_alignment.md` の更新は不要
+- ✅ 状態ID追加なしのため `notes/09_state_machines.md` の更新は不要
+- ✅ 新用語追加なしのため `notes/10_glossary.md` の更新は不要
+- ✅ DB変更なしのため `notes/05_data_model.md` の更新は不要
+
+---
+
+## イテレーション162.38：めぐり演出の解放マップを本体マップへ統一
+
+### 背景・問題意識
+
+オーナーから、めぐり演出中の新しいエリア解放表示で、`▼` が出る前後に白いパネルの縦幅が変わらないようにしたいという指示があった。また、この画面に出る都道府県マップを、めぐりマップ本体の新しいブロック地図に合わせたいという要望があった。
+
+### 変更内容
+
+#### `mobile/src/data/japanPrefectures.ts`
+- めぐりマップ本体で使っていた47都道府県ブロック地図の座標・サイズ・地域カラーを共通データとして移動した。
+- `MEGURI_MAP_TILES`、`MEGURI_MAP_REGION_COLORS`、マップサイズ、タイルサイズをエクスポートし、演出画面とマップ画面で同じ配置を参照できるようにした。
+
+#### `mobile/app/meguri-map.tsx`
+- ローカルに持っていたマップ座標定義を削除し、共通データを参照する構成へ変更した。
+- 表示内容と現在の見た目は維持したまま、演出側とデータを共有できるようにした。
+
+#### `mobile/app/meguri-intro.tsx`
+- エリア解放演出内の都道府県マップを、旧略字グリッドから、めぐりマップ本体と同じ47都道府県ブロック地図へ変更した。
+- 解放済み県は地域色、未解放県はグレー、今回解放された県は点滅グローと拡大で目立つようにした。
+- `▼` は表示前も透明状態でスペースを確保し、表示前後で白いパネルの高さが変わらないようにした。
+
+### 影響範囲
+
+- iOS版めぐり演出
+- 新しいエリア解放演出
+- iOS版めぐりマップ
+- 都道府県ブロック地図の共通データ
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- 座標レビューで47都道府県が表示され、タイル同士の重なりがないことを確認
+- iOS Previewで、解放演出の `▼` 表示前後に白いパネルの高さが変わらないことを確認
+- iOS Previewで、解放演出内の地図がめぐりマップ本体と同じブロック配置になっていることを確認
+
+### 関連ファイル
+
+- `mobile/app/meguri-intro.tsx`
+- `mobile/app/meguri-map.tsx`
+- `mobile/src/data/japanPrefectures.ts`
+- `notes/21_oshi_encounter_strategy.md`
+
+### セルフレビュー結果
+
+- ✅ 解放演出の `▼` 用スペースを常時確保した
+- ✅ 演出内マップとめぐりマップ本体で同じ座標データを参照するようにした
+- ✅ 47都道府県のタイル数と重なりなしを確認した
+- ✅ 状態ID追加なしのため `notes/09_state_machines.md` の更新は不要
+- ✅ 新用語追加なしのため `notes/10_glossary.md` の更新は不要
+- ✅ DB変更なしのため `notes/05_data_model.md` の更新は不要
+
+---
+
+## イテレーション162.37：左ドロワー通知遷移を即時実行へ修正
+
+### 背景・問題意識
+
+オーナーから、スクショで示された左ドロワー内の「通知」ボタンを押しても通知一覧に遷移しないと再指摘があった。前回は `/notifications` の入口不足として扱ったが、実際には左ドロワーの項目押下時に「ドロワーを閉じ終わってから遷移する」共通処理があり、実機上で閉じアニメーション完了コールバックに依存すると遷移が走らない可能性があった。
+
+### 変更内容
+
+#### `mobile/app/(tabs)/_layout.tsx`
+- 左ドロワーの共通遷移処理を、先に `router.push` で遷移を確定し、その後ドロワーを閉じる順序へ変更した。
+- 左ドロワーの「通知」は、隠しタブ側の通知一覧を明示的に開くため `/(tabs)/notifications` へ遷移するようにした。
+- プロフィール、プロフィール編集、推し設定、スケジュール等の他ドロワー項目も、閉じアニメーション完了待ちに依存しない挙動へ揃えた。
+
+### 影響範囲
+
+- iOS版左ドロワー
+- 左ドロワー内の各メニュー遷移
+- 通知一覧画面への遷移
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- iOS Previewで、左ドロワー内の「通知」を押すと通知一覧へ遷移することを確認
+
+### 関連ファイル
+
+- `mobile/app/(tabs)/_layout.tsx`
+- `notes/21_oshi_encounter_strategy.md`
+
+### セルフレビュー結果
+
+- ✅ スクショで示された左ドロワーの通知項目を対象に修正した
+- ✅ ドロワーを閉じるアニメーション完了に遷移を依存させないようにした
+- ✅ 通知一覧は `/(tabs)/notifications` を明示して開くようにした
+- ✅ 状態ID追加なしのため `notes/09_state_machines.md` の更新は不要
+- ✅ 新用語追加なしのため `notes/10_glossary.md` の更新は不要
+- ✅ DB変更なしのため `notes/05_data_model.md` の更新は不要
+
+---
+
+## イテレーション162.36：めぐりマップの北陸・近畿配置を再調整
+
+### 背景・問題意識
+
+オーナーから、めぐりマップの都道府県ブロックについて、北陸・東北・近畿の位置関係をより分かりやすくしたいという指示があった。特に、石川・福井を下げること、岐阜を1マス化すること、大阪・京都・和歌山・奈良・兵庫の関係を整えることが求められた。
+
+### 変更内容
+
+#### `mobile/app/meguri-map.tsx`
+- 石川と福井をそれぞれ2マス分下へ移動した。
+- 岐阜を縦長ブロックから通常の1マスブロックに変更した。
+- 新潟を1マス分下げ、長野・山梨・静岡の縦列も重なりが出ないように整理した。
+- 北海道・東北ブロックは、福島を含めて全体を1マス分下へ移動した。
+- 大阪を2マス上へ移動し、その上に京都を配置した。
+- 和歌山を横長ブロックから1マスブロックに変更し、奈良の横に配置した。
+- 兵庫を鳥取・岡山の右側の近畿入口として見える位置へ移動した。
+
+### 影響範囲
+
+- iOS版めぐりマップ
+- 都道府県ブロック地図の見え方
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- 座標レビューで47都道府県が表示され、タイル同士の重なりがないことを確認
+- iOS Previewで、北陸・東北・近畿の配置が指定に近づいていることを確認
+
+### 関連ファイル
+
+- `mobile/app/meguri-map.tsx`
+- `notes/21_oshi_encounter_strategy.md`
+
+### セルフレビュー結果
+
+- ✅ 47都道府県のタイル数を維持した
+- ✅ タイル同士の重なりがないことを座標レビューで確認した
+- ✅ 和歌山と岐阜を1マス化した
+- ✅ 状態ID追加なしのため `notes/09_state_machines.md` の更新は不要
+- ✅ 新用語追加なしのため `notes/10_glossary.md` の更新は不要
+- ✅ DB変更なしのため `notes/05_data_model.md` の更新は不要
+
+---
+
+## イテレーション162.35：通知ドロワー導線を専用ルート化
+
+### 背景・問題意識
+
+オーナーから、左ドロワーの「通知」ボタンを押しても通知一覧へ遷移しないという指摘があった。通知一覧画面自体は隠しタブ配下に存在していたが、ドロワーは `/notifications` へ遷移しており、プロフィール導線と同様に公開ルート側で明示的に受ける必要があった。
+
+### 変更内容
+
+#### `mobile/app/notifications.tsx`
+- ルート直下に通知一覧用の `/notifications` ルートを追加した。
+- 実装は既存の `mobile/app/(tabs)/notifications.tsx` を再利用し、画面ロジックや表示内容は重複させない構成にした。
+- 左ドロワーの既存遷移先 `/notifications` がそのまま通知一覧へ解決されるようにした。
+
+#### `notes/21_oshi_encounter_strategy.md`
+- 左ドロワーの通知導線は、隠しタブ直行ではなく `/notifications` 専用ルートで受ける方針を追記した。
+
+### 影響範囲
+
+- iOS版左ドロワー
+- 通知一覧画面への遷移
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- iOS Previewで、左ドロワーの「通知」を押すと通知一覧へ遷移することを確認
+
+### 関連ファイル
+
+- `mobile/app/notifications.tsx`
+- `mobile/app/(tabs)/notifications.tsx`
+- `mobile/app/(tabs)/_layout.tsx`
+- `notes/21_oshi_encounter_strategy.md`
+
+### セルフレビュー結果
+
+- ✅ 通知一覧の既存実装を再利用し、重複画面を作らない構成にした
+- ✅ 左ドロワーの既存 `/notifications` 遷移先を明示的に解決できるようにした
+- ✅ 状態ID追加なしのため `notes/09_state_machines.md` の更新は不要
+- ✅ 新用語追加なしのため `notes/10_glossary.md` の更新は不要
+- ✅ DB変更なしのため `notes/05_data_model.md` の更新は不要
+
+---
+
+## イテレーション162.34：めぐりマップ解放状態とレター導線を調整
+
+### 背景・問題意識
+
+オーナーから、めぐりマップは良くなっているが、まだ解放していないエリアはグレーアウトしたいという要望があった。また、めぐりマップ画面上部の説明書きは不要であり、めぐりホーム最上部にはレター導線を置き、レターが届いている時は目立たせ、届いていない時でも送りたくなる導線にしたいという指示があった。
+
+### 変更内容
+
+#### `mobile/app/meguri-map.tsx`
+- 未解放の都道府県ブロックを地域色ではなくグレー表示に変更した。
+- 未解放県の県名も薄いインク色にし、解放済み県との視覚差を強めた。
+- めぐりマップ上部の説明文と `RouteHeader` の補足文を削除した。
+- 解放済み県の色分け、回数バッジ、47都道府県の縦長配置は維持した。
+
+#### `mobile/app/(tabs)/encounters.tsx`
+- めぐりホーム最上部にレター導線カードを追加した。
+- 未開封レターがある場合は、ピンク系の目立つカードで `レターが届いています` と未開封数を表示するようにした。
+- 未開封レターがない場合も、`めぐりあった人へ、ひとことを` としてレターを書きたくなる導線を表示するようにした。
+- レター導線は `/meguri-letters` へ遷移する。
+
+#### `notes/21_oshi_encounter_strategy.md`
+- めぐりマップの未解放県はグレーアウトする方針と、めぐりホーム最上部にレター導線を置く方針を追記した。
+
+### 影響範囲
+
+- iOS版めぐりマップ
+- iOS版めぐりホーム
+- すれ違いレター画面への導線
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- iOS Previewで、未解放県がグレー表示になることを確認
+- iOS Previewで、めぐりマップ上部の説明文が消えていることを確認
+- iOS Previewで、めぐりホーム最上部にレター導線が表示されることを確認
+
+### 関連ファイル
+
+- `mobile/app/meguri-map.tsx`
+- `mobile/app/(tabs)/encounters.tsx`
+- `notes/21_oshi_encounter_strategy.md`
+
+### セルフレビュー結果
+
+- ✅ 未解放県をグレーアウトし、解放済み県だけ地域色にした
+- ✅ めぐりマップ上部の説明文を削除した
+- ✅ めぐりホーム最上部にレター導線を追加した
+- ✅ 状態ID追加なしのため `notes/09_state_machines.md` の更新は不要
+- ✅ 新用語追加なしのため `notes/10_glossary.md` の更新は不要
+- ✅ DB変更なしのため `notes/05_data_model.md` の更新は不要
+
+---
+
+## イテレーション162.33：めぐりホーム吹き出し位置を修正
+
+### 背景・問題意識
+
+オーナーから、めぐりホームの吹き出しが3Dキャラクターのいる枠の外に出ていて位置関係が不自然であること、吹き出し内のユーザーネームは不要であること、また「X人とめぐりあいました！」の紫パネルが下にあり上部に空白ができていることを指摘された。今日のめぐりパネルは、数字・3D住人・セリフがひとつの演出としてまとまって見える必要がある。
+
+### 変更内容
+
+#### `mobile/app/(tabs)/encounters.tsx`
+- 吹き出しを3Dキャラクター表示枠の外から、3D枠内のオーバーレイへ移動した。
+- 吹き出し内の `@ユーザーID さん` 表示を削除し、セリフ本文だけを表示するようにした。
+- 吹き出しのしっぽを上向きにし、3Dキャラクター側を指す見え方へ変更した。
+- めぐりホームの本文スクロールで自動インセットを使わないようにし、固定ヘッダー用の余白が重なってカード上部に大きな空白が出ないようにした。
+- 今日のめぐりパネルの高さを詰め、3D枠の外に余分な吹き出し領域を持たない構成にした。
+
+#### `notes/21_oshi_encounter_strategy.md`
+- めぐりホームの吹き出しは3D住人枠内に収め、ユーザーネームではなくひとこと本文を見せる方針を追記した。
+
+### 影響範囲
+
+- iOS版めぐりホーム
+- 今日のめぐりパネル内の3D住人表示と吹き出し
+- 固定ヘッダー下の初期余白
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- iOS Previewで、吹き出しが3Dキャラクター枠内に収まることを確認
+- iOS Previewで、吹き出しにユーザーネームが表示されないことを確認
+- iOS Previewで、今日のめぐりパネル上部に大きな空白が出ないことを確認
+
+### 関連ファイル
+
+- `mobile/app/(tabs)/encounters.tsx`
+- `notes/21_oshi_encounter_strategy.md`
+
+### セルフレビュー結果
+
+- ✅ 吹き出しを3D住人枠の中へ移動した
+- ✅ 吹き出し内のユーザーネーム表示を削除した
+- ✅ 自動インセット由来の上部余白を抑えた
+- ✅ 状態ID追加なしのため `notes/09_state_machines.md` の更新は不要
+- ✅ 新用語追加なしのため `notes/10_glossary.md` の更新は不要
+- ✅ DB変更なしのため `notes/05_data_model.md` の更新は不要
+
+---
+
+## イテレーション162.32：めぐりマップを横スクロールなしへ
+
+### 背景・問題意識
+
+オーナーから、めぐりマップが横にスクロールしないと全体を見られないのはダメで、日本地図が少し縦長になってもよいので1画面幅に収めたいという指示があった。前回の横長ブロック地図は添付画像には近かったが、スマホ操作では全体像を一目で把握できず、めぐりマップとしての達成感が弱かった。
+
+### 変更内容
+
+#### `mobile/app/meguri-map.tsx`
+- めぐりマップから横スクロール用 `ScrollView` を削除した。
+- 都道府県ブロックの列数を減らし、全体を縦長の日本地図レイアウトへ再配置した。
+- 47都道府県のフル表記と地域色分けは維持した。
+- 端末幅が狭い場合も横にはみ出さないよう、地図全体を画面幅に合わせて自動縮小するようにした。
+- 回数バッジ、薄いガイド線、解放済み県の強調表示は維持した。
+
+#### `notes/21_oshi_encounter_strategy.md`
+- めぐりマップは横スクロールなしで1画面幅に収め、必要なら縦長配置にする方針を追記した。
+
+### 影響範囲
+
+- iOS版めぐりマップ画面
+- めぐりマップの47都道府県ブロック配置
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- iOS Previewで、めぐりマップが横スクロールなしで画面幅内に収まることを確認
+- iOS Previewで、47都道府県がすべて表示されることを確認
+
+### 関連ファイル
+
+- `mobile/app/meguri-map.tsx`
+- `notes/21_oshi_encounter_strategy.md`
+
+### セルフレビュー結果
+
+- ✅ 横スクロール表示を削除した
+- ✅ 47都道府県を縦長ブロック地図として画面幅内に収めた
+- ✅ 狭い端末幅でも地図全体が自動縮小される
+- ✅ 状態ID追加なしのため `notes/09_state_machines.md` の更新は不要
+- ✅ 新用語追加なしのため `notes/10_glossary.md` の更新は不要
+- ✅ DB変更なしのため `notes/05_data_model.md` の更新は不要
+
+---
+
+## イテレーション162.31：自分プロフィール導線を専用ルート化
+
+### 背景・問題意識
+
+オーナーから、左ドロワーの「プロフィール」を押してもプロフィール画面に遷移しないという指摘が再度あった。自分プロフィール画面自体は `mobile/app/(tabs)/profile.tsx` に存在していたが、隠しタブとして置いた画面へドロワーから遷移する構造が不安定だった。ユーザー視点では「プロフィール画面がない」ように見えるため、ドロワーから確実に開ける専用ルートが必要だった。
+
+### 変更内容
+
+#### `mobile/app/me.tsx`
+- 自分プロフィール画面を開くための明示ルート `/me` を追加した。
+- 既存の自分プロフィール画面 `mobile/app/(tabs)/profile.tsx` を再利用し、画面実装を重複させない構成にした。
+
+#### `mobile/app/(tabs)/_layout.tsx`
+- 左ドロワーの `プロフィール` 押下先を `/(tabs)/profile` から `/me` へ変更した。
+- ドロワー内メニューの遷移処理を、ドロワーを閉じ切ってから遷移する方式へ変更した。
+- 背景タップやスワイプ終了時のドロワー閉じ処理は既存挙動を維持した。
+
+#### `notes/21_oshi_encounter_strategy.md`
+- 自分プロフィールは隠しタブ直行ではなく、ドロワーから `/me` を開く方針を追記した。
+
+### 影響範囲
+
+- iOS版の左ドロワー
+- 自分プロフィール画面への導線
+- ドロワー内メニュー全般の遷移タイミング
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- iOS Previewで、左ドロワーの `プロフィール` から自分プロフィール画面へ遷移することを確認
+- iOS Previewで、`プロフィール編集` など他のドロワーメニューも閉じた後に遷移することを確認
+
+### 関連ファイル
+
+- `mobile/app/me.tsx`
+- `mobile/app/(tabs)/_layout.tsx`
+- `mobile/app/(tabs)/profile.tsx`
+- `notes/21_oshi_encounter_strategy.md`
+
+### セルフレビュー結果
+
+- ✅ 自分プロフィール画面は既存実装を再利用し、`/me` から確実に開けるようにした
+- ✅ 隠しタブへの直接遷移に依存しない導線へ変更した
+- ✅ ドロワーを閉じ切ってから遷移するため、押下後の見え方が安定する
+- ✅ 状態ID追加なしのため `notes/09_state_machines.md` の更新は不要
+- ✅ 新用語追加なしのため `notes/10_glossary.md` の更新は不要
+- ✅ DB変更なしのため `notes/05_data_model.md` の更新は不要
+
+---
+
+## イテレーション162.30：めぐりホームに固定設定と3D住人列
+
+### 背景・問題意識
+
+オーナーから、めぐりホーム右上の設定アイコンは固定ヘッダーにし、「今日のめぐり X人と出会いました！」のパネルには巡り会った人たちの3Dキャラクターが並ぶようにしたいという指示があった。めぐりホームはスクロールしても設定へすぐ戻れることと、今日の出会いが数字だけではなく住人の存在として見えることを優先する。
+
+### 変更内容
+
+#### `mobile/app/(tabs)/encounters.tsx`
+- めぐりホームを固定ヘッダー + スクロール本文の構造へ変更した。
+- 右上の設定アイコンをスクロール領域から外し、画面右上に固定表示されるようにした。
+- 今日のめぐりパネル内に、巡り会った人たちが横並びする3Dシーンを追加した。
+- 3D初期化に失敗した場合は、既存の軽量キャラクター列へフォールバックするようにした。
+- 表示中の相手プレビューは、3D列に合わせてゆっくり切り替わるようにした。
+
+#### `mobile/src/components/meguri/MeguriThreeScene.tsx`
+- 既存のめぐり演出3Dシーンに `presentation="home"` を追加した。
+- ホーム表示では自分キャラを非表示にし、巡り会った人たちだけを横一列に自然な待機モーションで並べるようにした。
+- ホーム表示では `3D MEGURI` ラベルを出さず、パネル内の一部として馴染ませた。
+
+#### `notes/21_oshi_encounter_strategy.md`
+- めぐりホームの今日パネルは、数字だけでなく3D住人列で今日の出会いを見せる方針を追記した。
+
+### 影響範囲
+
+- iOS版めぐりホーム
+- めぐり設定モーダルへの導線
+- 既存めぐり3Dシーンのホーム利用
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- iOS Previewで、めぐりホームをスクロールしても右上設定アイコンが残ることを確認
+- iOS Previewで、今日のめぐりパネル内に巡り会った人の3Dキャラクター列が表示されることを確認
+
+### 関連ファイル
+
+- `mobile/app/(tabs)/encounters.tsx`
+- `mobile/src/components/meguri/MeguriThreeScene.tsx`
+- `notes/21_oshi_encounter_strategy.md`
+
+### セルフレビュー結果
+
+- ✅ 設定アイコンをスクロール本文から分離し、固定ヘッダーにした
+- ✅ 今日のめぐりパネルに本物の3D住人列を表示する経路を追加した
+- ✅ 3D不可環境向けのフォールバックを維持した
+- ✅ 状態ID追加なしのため `notes/09_state_machines.md` の更新は不要
+- ✅ 新用語追加なしのため `notes/10_glossary.md` の更新は不要
+- ✅ DB変更なしのため `notes/05_data_model.md` の更新は不要
+
+---
+
+## イテレーション162.29：めぐりマップをブロック地図へ変更
+
+### 背景・問題意識
+
+オーナーから、めぐりマップは添付画像のような都道府県ブロック地図を再現したいという指示があった。これまでの省略記号ベースの小さなグリッドでは、日本地図としての視認性と「47都道府県を集めていく」楽しさが弱かったため、地域ごとの色分けとフル県名表示を優先したレイアウトへ変更する。
+
+### 変更内容
+
+#### `mobile/app/meguri-map.tsx`
+- めぐりマップ本体を、省略名グリッドから47都道府県のフル表記ブロック地図へ置き換えた。
+- 添付画像に寄せて、北海道を大きな青紫ブロック、東北を水色、関東を緑、中部をシアン、関西を黄緑、中国を黄色、四国をオレンジ、九州・沖縄をピンクで配置した。
+- 沖縄と本州側の距離感を出すため、白背景上に薄いガイド線を追加した。
+- 既にめぐりあった都道府県には回数バッジを出し、未解放県も含めて47件すべてを一覧できるようにした。
+- モバイル画面で文字が潰れないよう、地図は横スクロールできる大きめのキャンバスにした。
+
+#### `notes/21_oshi_encounter_strategy.md`
+- めぐりマップの基準表現を、添付画像に近い都道府県ブロック地図へ変更する方針を追記した。
+
+### 影響範囲
+
+- iOS版めぐりマップ画面
+- めぐり演出中のエリア開放演出で参照するマップ表現方針
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- iOS Previewで、めぐりマップに47都道府県のブロック地図が表示されることを確認
+
+### 関連ファイル
+
+- `mobile/app/meguri-map.tsx`
+- `notes/21_oshi_encounter_strategy.md`
+
+### セルフレビュー結果
+
+- ✅ 47都道府県をすべてフル表記で表示する構成にした
+- ✅ 添付画像に近い地域色とブロック配置へ寄せた
+- ✅ 状態ID追加なしのため `notes/09_state_machines.md` の更新は不要
+- ✅ 新用語追加なしのため `notes/10_glossary.md` の更新は不要
+- ✅ DB変更なしのため `notes/05_data_model.md` の更新は不要
+
+---
+
+## イテレーション162.28：ドロワーのプロフィール導線を修正
+
+### 背景・問題意識
+
+オーナーから、左ドロワーの「プロフィール」を押しても自分のプロフィール画面へ遷移せず、ホーム画面に戻ってしまうという指摘があった。プロフィール画面はタブグループ内の非表示タブとして存在しているため、通常の `/profile` ではなくタブグループを明示したルートへ遷移させる必要があった。
+
+### 変更内容
+
+#### `mobile/app/(tabs)/_layout.tsx`
+- 左ドロワーの `プロフィール` 押下時の遷移先を `/profile` から `/(tabs)/profile` に変更した。
+- 既存のドロワー開閉挙動と、他のメニュー項目の遷移先は維持した。
+
+### 影響範囲
+
+- iOS版の左端スワイプドロワー
+- 自分のプロフィール画面への導線
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- iOS Previewで、左ドロワーの `プロフィール` から自分のプロフィール画面へ遷移することを確認
+
+### 関連ファイル
+
+- `mobile/app/(tabs)/_layout.tsx`
+
+### セルフレビュー結果
+
+- ✅ ドロワーのプロフィール遷移先をタブグループ内プロフィールへ明示した
+- ✅ 他のドロワーメニューには影響を与えていない
+- ✅ 状態ID追加なしのため `notes/09_state_machines.md` の更新は不要
+- ✅ 新用語追加なしのため `notes/10_glossary.md` の更新は不要
+- ✅ DB変更なしのため `notes/05_data_model.md` の更新は不要
+
+---
+
+## イテレーション162.27：めぐりホームを今日のパネル中心へ整理
+
+### 背景・問題意識
+
+オーナーから、めぐりホーム上部の `MEGRUM` 表記、メール/Plusアイコン、大きい「めぐり」見出しを削除し、今日のめぐりパネル周辺の導線を整理したいという要望があった。あわせて、パネル下のバー・広場/レター/演出ボタン、下部の「今日のめぐりを見る」CTA、最下部の説明文を削除し、設定は右上アイコンから開けるようにしたいという指示があった。
+
+### 変更内容
+
+#### `mobile/app/(tabs)/encounters.tsx`
+- 画面上部の `MEGRUM`、メールアイコン、Plusアイコン、大きい「めぐり」タイトルを削除した。
+- 右上に設定アイコンだけを置くヘッダーへ変更した。
+- 今日のめぐりパネル下部のドットバー、`広場` / `レター` / `演出へ` ボタンを削除した。
+- 今日のめぐりパネル右上に `演出をもう一度見る` ボタンを追加し、`/meguri-intro` へ遷移するようにした。
+- パネル下の `今日のめぐりを見る` CTAを削除した。
+- 最下部の `広場・マップ・実績・レポートは、それぞれの入口から見に行けます。` 説明文を削除した。
+- 右上設定アイコンから開く `めぐり設定` モーダルを追加した。
+- 設定モーダルに `アバター編集`、`プロフィール編集（名前、めぐりで別れ際のメッセージ）`、`めぐり機能 ON/OFF` を並べた。
+- `めぐり機能 ON/OFF` はプレビュー上でトグルできるローカル状態にした。
+
+#### `mobile/src/components/IconSymbol.tsx`
+- 設定アイコン用に `settings-outline` を追加した。
+
+#### `notes/21_oshi_encounter_strategy.md`
+- めぐりホームは、今日のめぐりパネル中心で、右上設定からめぐり固有設定を開く方針を追記した。
+
+### 影響範囲
+
+- iOS版のめぐりタブホーム
+- めぐり設定モーダル
+- アイコン表示ヘルパー
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- iOS Previewで、上部の `MEGRUM` / メール / Plus / 大きい「めぐり」見出しが出ないことを確認
+- iOS Previewで、今日のめぐりパネル右上の `演出をもう一度見る` から演出へ進めることを確認
+- iOS Previewで、右上設定アイコンから設定一覧が開き、ON/OFFトグルが動くことを確認
+
+### 関連ファイル
+
+- `mobile/app/(tabs)/encounters.tsx`
+- `mobile/src/components/IconSymbol.tsx`
+- `notes/21_oshi_encounter_strategy.md`
+
+### セルフレビュー結果
+
+- ✅ 指定された上部表記とアイコンを削除した
+- ✅ パネル下部バーと演出CTAを削除し、パネル右上へ再配置した
+- ✅ 指定の設定一覧を右上アイコンから開けるようにした
+- ✅ 状態ID追加なしのため `notes/09_state_machines.md` の更新は不要
+- ✅ 新用語追加なしのため `notes/10_glossary.md` の更新は不要
+- ✅ DB変更なしのため `notes/05_data_model.md` の更新は不要
+
+---
+
+## イテレーション162.26：めぐり3D演出を3つ前へ戻す
+
+### 背景・問題意識
+
+オーナーから、直近の入場順・影・服まわりの修正で見え方がおかしくなっているため、3つ前のバージョンへ戻したいという指示があった。対象は `iter162.23` から `iter162.25` で入れた服上下分割、会話前歩行の減速、隊列追い抜き対策、影分離などの調整であり、安定していた `iter162.22` 相当へ戻す。
+
+### 変更内容
+
+#### `mobile/app/meguri-intro.tsx`
+- `approaching` から会話へ入る待ち時間を `iter162.22` 相当の短い値へ戻した。
+
+#### `mobile/src/components/meguri/MeguriThreeScene.tsx`
+- `active` / `farewell` の停止位置・スケール・速度を `iter162.22` 相当へ戻した。
+- 冒頭入場の後続ディレイ、アクティブ中の隊列インデックス固定、`approaching` 中の `intro_queue` 扱いを撤回した。
+- 影をキャラクターグループから分離する変更を撤回し、元のキャラクター内シャドウに戻した。
+- 服の上下分割と単色服調整を撤回し、元の1枚服パネル構成に戻した。
+- 別れ際の手振り角度を `iter162.22` 相当へ戻した。
+
+#### `notes/21_oshi_encounter_strategy.md`
+- `iter162.23` から `iter162.25` の演出調整を撤回し、`iter162.22` 相当へ戻したことを追記した。
+
+### 影響範囲
+
+- iOS版の `meguri-intro` 3D演出
+- めぐり住人の入場、会話前歩行、影、服、別れ際手振り
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- iOS Previewで、直近3回の調整前の見え方に戻っていることを確認
+
+### 関連ファイル
+
+- `mobile/app/meguri-intro.tsx`
+- `mobile/src/components/meguri/MeguriThreeScene.tsx`
+- `notes/21_oshi_encounter_strategy.md`
+
+### セルフレビュー結果
+
+- ✅ 直近3回の3D演出調整を撤回した
+- ✅ `iter162.22` 相当の入場・影・服・手振り構成に戻した
+- ✅ 状態ID追加なしのため `notes/09_state_machines.md` の更新は不要
+- ✅ 新用語追加なしのため `notes/10_glossary.md` の更新は不要
+- ✅ DB変更なしのため `notes/05_data_model.md` の更新は不要
+
+---
+
+## イテレーション162.25：めぐり入場隊列と影を根本修正
+
+### 背景・問題意識
+
+オーナーから、前回修正後も冒頭入場で一人目より後続が前に出て見える問題が残っていると指摘があった。原因は、`approaching` に入った瞬間に一人目だけが `active` としてゆっくり前へ出る一方、二人目以降は通常 `queue` として高速に前の隊列スロットへ詰めていたことだった。また、影はキャラクターグループ内の子要素として補正していたため、移動中の見え方がまだ安定しきっていなかった。
+
+### 変更内容
+
+#### `mobile/src/components/meguri/MeguriThreeScene.tsx`
+- `approaching` 中の後続キャラは通常 `queue` ではなく `intro_queue` のまま扱い、高速に前へ詰めないようにした。
+- アクティブな一人目がいる間は、後続キャラの表示インデックスを1つ後ろに固定し、二人目が一人目のスロットへ移動しないようにした。
+- 先頭キャラの入場速度をさらに上げ、後続キャラの追従ディレイを強めた。
+- 影をキャラクターグループの子要素から分離し、広場ワールド上の地面オブジェクトとして独立更新するようにした。
+- 移動中の影は地面の固定位置に置き、上下バウンドや体の左右揺れに連動して変形しないようにした。
+
+### 影響範囲
+
+- iOS版の `meguri-intro` 3D演出
+- 冒頭入場から一人目の会話前歩行までの隊列制御
+- めぐり住人の影表示
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- iOS Previewで、`10人にめぐりあいました！` 後に一人目が先行し、二人目以降が一人目を追い抜かないことを確認
+- iOS Previewで、会話前歩行中の影が不自然に浮いたり傾いたりしないことを確認
+
+### 関連ファイル
+
+- `mobile/src/components/meguri/MeguriThreeScene.tsx`
+- `notes/21_oshi_encounter_strategy.md`
+
+### セルフレビュー結果
+
+- ✅ `approaching` 中の後続高速詰めを止めた
+- ✅ アクティブ中は後続を一つ後ろの隊列位置に固定した
+- ✅ 影をキャラクター本体から分離して地面基準で更新するようにした
+- ✅ 状態ID追加なしのため `notes/09_state_machines.md` の更新は不要
+- ✅ 新用語追加なしのため `notes/10_glossary.md` の更新は不要
+- ✅ DB変更なしのため `notes/05_data_model.md` の更新は不要
+
+---
+
+## イテレーション162.24：めぐり入場順・影・服表示を再調整
+
+### 背景・問題意識
+
+オーナーから、冒頭で一人目と後続が登場する時に、一人目だけ到着が遅く見え、二人目以降が一瞬追い抜いているように見えるという指摘があった。また、自分の番になったキャラクターがユーザー前へ来る時に影が不自然に見えること、服の柄テクスチャがうまく見えていないためテクスチャを外したいという要望があった。
+
+### 変更内容
+
+#### `mobile/src/components/meguri/MeguriThreeScene.tsx`
+- `intro_queue` のスポーン位置と速度を調整し、一人目が先に前へ出て後続が追う順番にした。
+- 後続キャラには短い追従ディレイを入れ、冒頭入場で先頭を追い抜いて見えないようにした。
+- キャラクターの影をパーツとして保持し、歩行バウンド中も地面に貼り付くように補正した。
+- 服のプロシージャル柄テクスチャを削除し、上半身/下半身の分割は残したまま単色パーツへ戻した。
+
+#### `notes/21_oshi_encounter_strategy.md`
+- 服は当面テクスチャなし、冒頭入場は先頭優先、影は地面に固定する方針を追記した。
+
+### 影響範囲
+
+- iOS版の `meguri-intro` 3D演出
+- めぐり住人の冒頭入場、会話前歩行、影、服表示
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- iOS Previewで、一人目が先に前へ出て、後続が後ろから追うことを確認
+- iOS Previewで、会話前歩行中に影が浮いたり歪んだりして見えないことを確認
+- iOS Previewで、服の柄テクスチャが消え、上下分割の単色服になっていることを確認
+
+### 関連ファイル
+
+- `mobile/src/components/meguri/MeguriThreeScene.tsx`
+- `notes/21_oshi_encounter_strategy.md`
+
+### セルフレビュー結果
+
+- ✅ 冒頭入場の先頭優先と後続追従を調整した
+- ✅ 影がキャラの上下揺れに付いて浮かないよう補正した
+- ✅ 服テクスチャを削除し、単色上下パーツへ戻した
+- ✅ 状態ID追加なしのため `notes/09_state_machines.md` の更新は不要
+- ✅ 新用語追加なしのため `notes/10_glossary.md` の更新は不要
+- ✅ DB変更なしのため `notes/05_data_model.md` の更新は不要
+
+---
+
+## イテレーション162.23：めぐり服上下分割と歩行間合い調整
+
+### 背景・問題意識
+
+オーナーから、3Dキャラクターの服が1枚の服装テクスチャを上から貼ったように見えるため、上半身と下半身を分けて別デザインのテクスチャにしたいという要望があった。また、別れ際の手振りが下向きに見えること、自分の番になった相手が一瞬で前に来てしまい、ユーザーより手前で大きく見えることも指摘された。
+
+### 変更内容
+
+#### `mobile/src/components/meguri/MeguriThreeScene.tsx`
+- キャラクターの服を、上半身エリアと下半身エリアの2パートに分割した。
+- 上半身は斜めチェック、下半身はストライプ/裾ラインのプロシージャルテクスチャを貼る構成にした。
+- 別れ際の `farewell` ロールで、右腕を横上へ上げて振る角度に調整した。
+- 会話前に前へ出てくる相手キャラの停止位置を自分キャラと同じ奥行きに揃え、スケールを抑えて手前に出すぎないようにした。
+- `active` ロールの移動速度と歩行テンポを落とし、とことこ歩いてくる時間が見えるようにした。
+
+#### `mobile/app/meguri-intro.tsx`
+- `approaching` フェーズから会話へ入るまでの待ち時間を伸ばし、相手がユーザー前へ歩いてくる尺を確保した。
+
+#### `notes/21_oshi_encounter_strategy.md`
+- 服の上下分割、横上のバイバイ、会話前歩行の間合いと停止位置の方針を追記した。
+
+### 影響範囲
+
+- iOS版の `meguri-intro` 3D演出
+- めぐり住人の服テクスチャ表現
+- 相手キャラクターの会話前入場と別れ際モーション
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- iOS Previewで、服が上半身/下半身の2エリアに分かれて見えることを確認
+- iOS Previewで、別れ際の手振りが横上のバイバイに見えることを確認
+- iOS Previewで、相手キャラがゆっくり歩いてきて、自分キャラと同じ奥行きで止まることを確認
+
+### 関連ファイル
+
+- `mobile/app/meguri-intro.tsx`
+- `mobile/src/components/meguri/MeguriThreeScene.tsx`
+- `notes/21_oshi_encounter_strategy.md`
+
+### セルフレビュー結果
+
+- ✅ 服を上半身/下半身の2エリアに分けた
+- ✅ 上半身/下半身で異なるプロシージャルテクスチャを使った
+- ✅ バイバイ時の腕を横上に上げる方向へ調整した
+- ✅ 会話前の歩行時間を伸ばし、相手の停止位置と大きさをユーザーと揃えた
+- ✅ 状態ID追加なしのため `notes/09_state_machines.md` の更新は不要
+- ✅ 新用語追加なしのため `notes/10_glossary.md` の更新は不要
+- ✅ DB変更なしのため `notes/05_data_model.md` の更新は不要
+
+---
+
+## イテレーション162.22：めぐり表情・実績解除・別れ際を強化
+
+### 背景・問題意識
+
+オーナーから、冒頭サマリー文言を「X人にめぐりあいました！」に戻したいこと、立っているキャラクターが完全停止して見える不自然さ、エリア開放演出の文言と見せ方、別れ際の手振りとセリフ、会話中のニコニコ目について要望があった。めぐり演出は説明よりもキャラクターの反応と達成感で見せる必要がある。
+
+### 変更内容
+
+#### `mobile/app/meguri-intro.tsx`
+- 冒頭サマリーを `X人がきました！` から `X人にめぐりあいました！` に戻した。
+- 会話の最後に、相手キャラクターが話す別れ際のひとことを追加した。
+- 別れ際の文言を複数パターンから選ぶようにした。
+- エリア開放演出を `AREA OPEN` ではなく `実績解除` に変更し、タイトルを `{都道府県}の人に初遭遇！` にした。
+- エリア開放演出の補足説明文を削除した。
+- エリア開放演出の表示直後1秒間は `▼` を表示せず、タップしても次へ進まないようにした。
+- エリア開放マップで新しく解放された都道府県を濃い色・拡大・グローで強調した。
+
+#### `mobile/src/components/meguri/MeguriThreeScene.tsx`
+- 会話中の話者は、顔テクスチャ上の目をニコニコ目に切り替えるようにした。
+- 別れ際の相手キャラクターは、ニコニコ目のまま手を振る `farewell` ロールにした。
+- 待機中のキャラクターにも呼吸・小さな体/頭/腕/しっぽの揺れを入れ、完全停止して見えないようにした。
+- 顔テクスチャの目をベースから分離し、通常目・ニコニコ目・口パクを同じテクスチャ内で描き替えるようにした。
+
+#### `mobile/src/data/japanPrefectures.ts`
+- 正規化済み都道府県名から `東京都` / `大阪府` / `北海道` / `神奈川県` のような表示名を返す `displayPrefectureName` を追加した。
+
+#### `notes/21_oshi_encounter_strategy.md`
+- 冒頭サマリー、実績解除演出、別れ際の手振り、話者のニコニコ目、待機時の自然な揺れを追記した。
+
+### 影響範囲
+
+- iOS版の `meguri-intro` 3D演出
+- めぐり住人の顔テクスチャ・表情・待機モーション
+- 新エリア開放演出
+- 会話完了から門へ向かう前の別れ際演出
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- iOS Previewで、冒頭サマリーが `10人にめぐりあいました！` と表示されることを確認
+- iOS Previewで、話者の目がニコニコになり、別れ際に相手が手を振ってから門へ向かうことを確認
+- iOS Previewで、エリア開放演出が `実績解除` / `{都道府県}の人に初遭遇！` になり、1秒後まで `▼` が出ないことを確認
+- iOS Previewで、待機中のキャラクターが自然に小さく揺れることを確認
+
+### 関連ファイル
+
+- `mobile/app/meguri-intro.tsx`
+- `mobile/src/components/meguri/MeguriThreeScene.tsx`
+- `mobile/src/data/japanPrefectures.ts`
+- `notes/21_oshi_encounter_strategy.md`
+
+### セルフレビュー結果
+
+- ✅ 冒頭サマリー文言を戻した
+- ✅ エリア開放演出を実績解除の見せ方に変更し、即スキップを防いだ
+- ✅ 新規解放都道府県をマップ上でより強く目立たせた
+- ✅ 会話中の話者をニコニコ目にし、別れ際は手振りを追加した
+- ✅ 待機中のキャラクターに自然な揺れを追加した
+- ✅ 状態ID追加なしのため `notes/09_state_machines.md` の更新は不要
+- ✅ 新用語追加なしのため `notes/10_glossary.md` の更新は不要
+- ✅ DB変更なしのため `notes/05_data_model.md` の更新は不要
+
+---
+
+## イテレーション162.21：めぐり説明ヘッダーと開始ボタンを削除
+
+### 背景・問題意識
+
+オーナーから、演出中の「こちらに向かって歩いてきています」「TODAY 10人が広場に到着しました」「TODAY 広場の門へ向かっています」といった表記は不要であり、「一人ずつ話す」ボタンも不要という指摘があった。人数サマリーを押すと、一人目が自然に歩いてきて会話が始まるほうが、演出として途切れにくい。
+
+### 変更内容
+
+#### `mobile/app/meguri-intro.tsx`
+- 演出中の `TODAY` ヘッダー表示を出さないようにした。
+- `summary` 中の下部プライマリボタンを表示対象から外し、「一人ずつ話す」ボタンを削除した。
+- 冒頭カメラ後は、人数サマリー表示自体をタップできる状態にし、タップすると一人目の `approaching` へ進むようにした。
+- 人数サマリー文言を `X人とめぐりあいました！` から `X人がきました！` に変更した。
+
+#### `notes/21_oshi_encounter_strategy.md`
+- 説明ヘッダーを出さず、人数サマリーを開始入口にする方針を追記した。
+
+### 影響範囲
+
+- iOS版の `meguri-intro` 3D演出
+- 冒頭サマリーから一人目の会話へ入る操作導線
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- iOS Previewで、演出中に `TODAY` ヘッダーや「一人ずつ話す」ボタンが出ないことを確認
+- iOS Previewで、`10人がきました！` をタップすると一人目が歩いてきて会話が始まることを確認
+
+### 関連ファイル
+
+- `mobile/app/meguri-intro.tsx`
+- `notes/21_oshi_encounter_strategy.md`
+
+### セルフレビュー結果
+
+- ✅ 説明ヘッダーを表示しないようにした
+- ✅ 「一人ずつ話す」ボタンを削除した
+- ✅ 人数サマリーをタップ開始の入口にした
+- ✅ 状態ID追加なしのため `notes/09_state_machines.md` の更新は不要
+- ✅ 新用語追加なしのため `notes/10_glossary.md` の更新は不要
+- ✅ DB変更なしのため `notes/05_data_model.md` の更新は不要
+
+---
+
+## イテレーション162.20：めぐり冒頭を縦下降カメラと同時入場へ調整
+
+### 背景・問題意識
+
+オーナーから、演出冒頭のカメラは斜めに寄るのではなく、上から下へ降りてくる感じにしたいという指摘があった。また、カメラがゆっくり降りている間に、右奥からめぐりあった人たちがとことこ歩いてくるイメージにしたいという要望があった。
+
+### 変更内容
+
+#### `mobile/app/meguri-intro.tsx`
+- 冒頭の `camera` フェーズを長めにし、上空から降りる動きが見える時間を確保した。
+- 2Dフォールバックでも `camera` フェーズ中は来訪者を隠さず、導入中から列が見える方向に寄せた。
+
+#### `mobile/src/components/meguri/MeguriThreeScene.tsx`
+- 冒頭カメラの開始位置と目標位置の横移動を抑え、Y方向中心にゆっくり下降する軌道へ変更した。
+- `camera` フェーズ中のカメラ追従速度を落とし、降りてくる動きが急に終わらないようにした。
+- 導入中の来訪者を非表示にせず、右奥のスポーン位置から待機列へゆっくり歩く `intro_queue` ロールを追加した。
+- `splash` / `walking` 中も来訪者が背景で歩き続け、人数サマリー後に列が整う流れへ寄せた。
+
+#### `notes/21_oshi_encounter_strategy.md`
+- 冒頭カメラは縦方向に降り、同時に右奥から来訪者が歩いてくる方針を追記した。
+
+### 影響範囲
+
+- iOS版の `meguri-intro` 3D演出
+- めぐり演出冒頭のカメラワークと来訪者入場テンポ
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- iOS Previewで、演出冒頭のカメラが上空から縦方向にゆっくり降りることを確認
+- iOS Previewで、カメラ下降中から右奥の来訪者がゆっくり歩き始めることを確認
+
+### 関連ファイル
+
+- `mobile/app/meguri-intro.tsx`
+- `mobile/src/components/meguri/MeguriThreeScene.tsx`
+- `notes/21_oshi_encounter_strategy.md`
+
+### セルフレビュー結果
+
+- ✅ 冒頭カメラの横方向移動を抑え、上から下へ降りる見え方に寄せた
+- ✅ カメラ下降中から来訪者が右奥から歩き始める
+- ✅ 導入用のゆっくりした歩行ロールを追加し、通常待機列への移動と分けた
+- ✅ 状態ID追加なしのため `notes/09_state_machines.md` の更新は不要
+- ✅ 新用語追加なしのため `notes/10_glossary.md` の更新は不要
+- ✅ DB変更なしのため `notes/05_data_model.md` の更新は不要
+
+---
+
+## イテレーション162.19：めぐりマップを47都道府県表示へ統一
+
+### 背景・問題意識
+
+オーナーから、めぐりマップが47都道府県を表示できておらず、解放したところだけ色がつく見え方にしたいという指摘があった。会話中の新エリア開放演出でも同じ地図表現にし、マップ本体と演出の認知をそろえる必要があった。
+
+### 変更内容
+
+#### `mobile/src/data/japanPrefectures.ts`
+- 47都道府県すべてのタイル表示用データを追加した。
+- 都道府県名の表記を正規化する `normalizePrefectureName` を追加し、「東京都」「大阪府」などのプロフィール値でもめぐりマップ側の表記に合わせられるようにした。
+
+#### `mobile/app/meguri-map.tsx`
+- 22件だけだったマップタイルを、共通データに基づく47都道府県表示へ変更した。
+- 未解放の都道府県は薄いグレー、めぐり済みの都道府県は色付きタイルと回数バッジで表示するようにした。
+- サマリー文言を `解放済み / 47 都道府県` の見え方に変更した。
+
+#### `mobile/app/meguri-intro.tsx`
+- 会話中の新エリア開放演出でも、抽象的な島とピンではなく47都道府県タイルを表示するようにした。
+- すでに解放済みの都道府県は色付き、新しく解放された都道府県は点滅・拡大して灯るようにした。
+- `kind: "area"` の判定時に都道府県名を正規化し、プロフィール値の表記揺れに強くした。
+
+#### `mobile/app/(tabs)/encounters.tsx`
+- めぐりトップのマップショートカット文言を `47 都道府県` に変更した。
+
+#### `notes/21_oshi_encounter_strategy.md`
+- めぐりマップ本体とエリア開放演出はどちらも47都道府県を先に表示し、解放済みだけ色をつける方針を追記した。
+
+### 影響範囲
+
+- iOS版の `meguri-map`
+- iOS版の `meguri-intro` 新エリア開放演出
+- めぐりトップのマップショートカット文言
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- iOS Previewで、めぐりマップに47都道府県のタイルが表示され、解放済みだけ色付きになることを確認
+- iOS Previewで、会話中の新エリア開放演出でも47都道府県が表示され、新しく解放された都道府県が点滅することを確認
+
+### 関連ファイル
+
+- `mobile/src/data/japanPrefectures.ts`
+- `mobile/app/meguri-map.tsx`
+- `mobile/app/meguri-intro.tsx`
+- `mobile/app/(tabs)/encounters.tsx`
+- `notes/21_oshi_encounter_strategy.md`
+
+### セルフレビュー結果
+
+- ✅ 47都道府県すべてを共通データとして定義した
+- ✅ めぐりマップ本体は未解放グレー、解放済み色付きで表示する
+- ✅ 会話中の新エリア開放演出も同じ47都道府県タイル表現へ統一した
+- ✅ プロフィール値が `東京都` などでも `東京` として扱えるよう正規化した
+- ✅ 状態ID追加なしのため `notes/09_state_machines.md` の更新は不要
+- ✅ 新用語追加なしのため `notes/10_glossary.md` の更新は不要
+- ✅ DB変更なしのため `notes/05_data_model.md` の更新は不要
+
+---
+
+## イテレーション162.18：めぐり都道府県セリフを短く調整
+
+### 背景・問題意識
+
+オーナーから、会話中の都道府県セリフを「〇〇の方で推し活をしています」ではなく、「〇〇からきました！」にしたいという要望があった。3D住人の自己紹介としては、説明調の文章よりも短くポップな挨拶のほうがテンポに合う。
+
+### 変更内容
+
+#### `mobile/app/meguri-intro.tsx`
+- 相手の都道府県セリフを `${partner.area}のほうで推し活しています。` から `${partner.area}からきました！` に変更した。
+- `kind: "area"` は維持し、新エリア開放マップ演出の発火位置は変えないようにした。
+
+#### `notes/21_oshi_encounter_strategy.md`
+- 会話例と文言方針を「〇〇からきました！」へ更新した。
+- 「からきました！」は公開プロフィール上の所属都道府県を使う演出上の挨拶であり、現在地や正確な移動元を示すものではないと明記した。
+
+### 影響範囲
+
+- iOS版の `meguri-intro` 会話演出
+- 新エリア開放演出直前の都道府県セリフ
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- iOS Previewで、相手の都道府県セリフが「千葉からきました！」のように表示され、その後の新エリア開放演出が引き続き動くことを確認
+
+### 関連ファイル
+
+- `mobile/app/meguri-intro.tsx`
+- `notes/21_oshi_encounter_strategy.md`
+
+### セルフレビュー結果
+
+- ✅ 都道府県セリフを短く親しみやすい文言へ変更した
+- ✅ `kind: "area"` を維持し、新エリア開放演出の判定は変えていない
+- ✅ 安全設計として、現在地や正確な移動元を示す文言ではないことを仕様メモに残した
+- ✅ 状態ID追加なしのため `notes/09_state_machines.md` の更新は不要
+- ✅ 新用語追加なしのため `notes/10_glossary.md` の更新は不要
+- ✅ DB変更なしのため `notes/05_data_model.md` の更新は不要
+
+---
+
+## イテレーション162.17：めぐり冒頭カメラ導入と顔拡大
+
+### 背景・問題意識
+
+オーナーから、演出画面に入った直後にすぐ「X人とめぐりあいました！」を出すのではなく、まず3D世界へカメラが上から降りて、自分キャラが広場の門前に立っているところを見せたいという要望があった。また、顔テクスチャが頭の面積に対して小さく見えるため、表情が読み取りづらい問題もあった。
+
+### 変更内容
+
+#### `mobile/app/meguri-intro.tsx`
+- 冒頭フェーズを `camera → splash → walking → ready` に変更し、人数サマリー表示前に3D世界の導入時間を挟むようにした。
+- 2Dフォールバックでも `camera` フェーズ中は来訪者の列を出さず、人数サマリー前の間を保つようにした。
+
+#### `mobile/src/components/meguri/MeguriThreeScene.tsx`
+- `camera` フェーズを追加し、3Dシーン開始時は上空視点から門前の自分キャラへカメラが降りるようにした。
+- 冒頭の `camera` / `splash` 中は自分キャラを門前に立たせ、来訪者はまだ表示しないようにした。
+- 顔の曲面メッシュとプロシージャル顔テクスチャの描画範囲を大きくし、頭に対して表情が小さく見えないようにした。
+
+#### `notes/21_oshi_encounter_strategy.md`
+- 冒頭カメラ導入と顔テクスチャ拡大の方針を追記した。
+
+### 影響範囲
+
+- iOS版の `meguri-intro` 3D演出
+- めぐり演出の冒頭テンポ、カメラワーク、顔テクスチャの見え方
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- iOS Previewで、演出開始直後に上空から門前の自分キャラへカメラが降り、その後に人数サマリーが表示されることを確認
+- iOS Previewで、住人の顔テクスチャが以前より大きく見え、表情が読み取りやすいことを確認
+
+### 関連ファイル
+
+- `mobile/app/meguri-intro.tsx`
+- `mobile/src/components/meguri/MeguriThreeScene.tsx`
+- `notes/21_oshi_encounter_strategy.md`
+
+### セルフレビュー結果
+
+- ✅ 人数サマリー前に3D世界へ入るカメラ導入を追加した
+- ✅ 導入中は自分キャラが広場の門前に立ち、来訪者列はまだ表示されない
+- ✅ 顔曲面とテクスチャ内の顔パーツを拡大し、頭に対して表情が小さく見えにくいようにした
+- ✅ 状態ID追加なしのため `notes/09_state_machines.md` の更新は不要
+- ✅ 新用語追加なしのため `notes/10_glossary.md` の更新は不要
+- ✅ DB変更なしのため `notes/05_data_model.md` の更新は不要
+
+---
+
+## イテレーション162.16：めぐり会話中に新エリア開放マップ演出を追加
+
+### 背景・問題意識
+
+オーナーから、ひとりひとりの挨拶中に相手が所属都道府県を話したあと、その都道府県が自分にとって新しいエリアだった場合、マップが開いて場所が開放される演出を挟みたいという要望があった。「新しいエリアの人に出会いました！」のような表示と、該当エリアに光がぱっと灯って点滅する演出を会話中に自然にインサートする必要があった。
+
+### 変更内容
+
+#### `mobile/app/meguri-intro.tsx`
+- 会話行に `kind: "area"` を追加し、都道府県を話す行を判定できるようにした。
+- 自分のエリアを初期開放済みとして、会話中に出会った新しい都道府県を `unlockedAreas` で管理するようにした。
+- 都道府県行を全文表示した後の次タップで、未開放エリアなら会話を進めず `AreaUnlockOverlay` を表示するようにした。
+- マップ演出では、抽象化した日本地図、該当エリアの光るピン、点滅するグロー、「新しいエリアの人に出会いました！」のテキストを表示するようにした。
+- マップ演出をタップすると閉じ、元の会話フローの次のセリフへ戻るようにした。
+- 同じ都道府県は開放済みとして扱い、演出が重複しないようにした。
+
+#### `notes/21_oshi_encounter_strategy.md`
+- 都道府県会話の後に新エリア開放マップ演出を挟む仕様を追記した。
+
+### 影響範囲
+
+- iOS版の `meguri-intro` 会話演出
+- めぐり中の都道府県開放・マップ表示演出
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- iOS Previewで、新しい都道府県の相手のエリア会話後にマップ演出が挟まることを確認
+- iOS Previewで、同じ都道府県ではマップ演出が重複しないことを確認
+- iOS Previewで、マップ演出後に会話が次のセリフへ戻ることを確認
+
+### 関連ファイル
+
+- `mobile/app/meguri-intro.tsx`
+- `notes/21_oshi_encounter_strategy.md`
+
+### セルフレビュー結果
+
+- ✅ 都道府県行の直後にだけ新エリア判定を行うようにした
+- ✅ 初期状態で自分のエリアは開放済み扱いにした
+- ✅ 新しい都道府県ではマップ上のピンと光が点滅する演出を表示する
+- ✅ 同じ都道府県で開放演出が重複しないようにした
+- ✅ マップ演出後は元の会話フローへ戻る
+- ✅ 状態ID追加なしのため `notes/09_state_machines.md` の更新は不要
+- ✅ 新用語追加なしのため `notes/10_glossary.md` の更新は不要
+- ✅ DB変更なしのため `notes/05_data_model.md` の更新は不要
+
+---
+
+## イテレーション162.15：めぐり住人の光を全体マット寄りに調整
+
+### 背景・問題意識
+
+オーナーから、キャラクターに当たる光が反射しているように見え、もう少しキャラクター全体に光が当たる見え方にしたいという指摘があった。ぬいぐるみ風の住人としては、強い一点ライトのハイライトよりも、全身の形と色が均等に読み取れる柔らかいライティングが合っている。
+
+### 変更内容
+
+#### `mobile/src/components/meguri/MeguriThreeScene.tsx`
+- 3Dシーンに `HemisphereLight` を追加し、上からの暖色光と下からの淡い反射光で全体へ光を回すようにした。
+- `AmbientLight` を少し強め、キャラクターの暗部が潰れにくいようにした。
+- 強い `DirectionalLight` と `PointLight` を弱め、局所的な反射感を抑えた。
+- 反対側から弱いフィルライトを追加し、顔や体の片側だけが暗くなりすぎないようにした。
+- ぬいぐるみ住人の毛・服・顔・耳内側を `MeshLambertMaterial` に変更し、反射感の少ないマットな見え方へ寄せた。
+
+### 影響範囲
+
+- iOS版の `meguri-intro` 3D演出
+- めぐり住人のライティング、顔・体・服の質感
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- コードレビューで、キャラクター材質が `MeshLambertMaterial` になっていることを確認
+- iOS Previewで、強い反射感が抑えられ、キャラクター全体に柔らかく光が回っていることを確認
+
+### 関連ファイル
+
+- `mobile/src/components/meguri/MeguriThreeScene.tsx`
+- `notes/21_oshi_encounter_strategy.md`
+
+### セルフレビュー結果
+
+- ✅ 強い一点ライトを弱め、環境光・半球ライト・弱いキー/フィルライトへ再配分した
+- ✅ ぬいぐるみ住人の材質を反射感の少ない `MeshLambertMaterial` へ変更した
+- ✅ 顔テクスチャも同じマット寄り材質にし、顔だけ反射・発光して見えにくくした
+- ✅ 状態ID追加なしのため `notes/09_state_machines.md` の更新は不要
+- ✅ 新用語追加なしのため `notes/10_glossary.md` の更新は不要
+- ✅ DB変更なしのため `notes/05_data_model.md` の更新は不要
+
+---
+
+## イテレーション162.14：めぐり曲面顔の表示復旧と退出待ち短縮
+
+### 背景・問題意識
+
+オーナーから、顔テクスチャが見えなくなってしまったこと、またキャラクターが画面外に出てから次へ進むまで少し時間がかかることが指摘された。iter162.13 で顔を曲面化した結果、曲面メッシュの表面向きや深度判定が厳しくなり、顔が描画されにくくなっていた可能性があった。
+
+### 変更内容
+
+#### `mobile/src/components/meguri/MeguriThreeScene.tsx`
+- 曲面顔マテリアルを `DoubleSide` にし、表面向きで消えないようにした。
+- `depthWrite: false` と `alphaTest` を設定し、頭メッシュとの深度干渉や透明部分の描画を安定させた。
+- 曲面顔メッシュを頭表面から少し外側へ出し、埋もれやZ-fightingを避けた。
+
+#### `mobile/app/meguri-intro.tsx`
+- 退出演出の待機時間を `4300ms` から `3400ms` に短縮し、キャラクターが見えなくなってからの待ちを減らした。
+
+### 影響範囲
+
+- iOS版の `meguri-intro` 3D演出
+- めぐり住人の顔テクスチャ表示
+- 会話後の退出から次キャラへ移るテンポ
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- コードレビューで、曲面顔が `DoubleSide` / `depthWrite: false` / 外側オフセットを持つことを確認
+- iOS Previewで、顔テクスチャが見え、画面外に出た後の待ちが短くなっていることを確認
+
+### 関連ファイル
+
+- `mobile/app/meguri-intro.tsx`
+- `mobile/src/components/meguri/MeguriThreeScene.tsx`
+
+### セルフレビュー結果
+
+- ✅ 曲面顔メッシュの描画面を `DoubleSide` にした
+- ✅ 頭との深度干渉を避けるため `depthWrite: false` と外側オフセットを入れた
+- ✅ 退出後の待ち時間を短縮した
+- ✅ 状態ID追加なしのため `notes/09_state_machines.md` の更新は不要
+- ✅ 新用語追加なしのため `notes/10_glossary.md` の更新は不要
+- ✅ DB変更なしのため `notes/05_data_model.md` の更新は不要
+
+---
+
+## イテレーション162.13：めぐり顔テクスチャ曲面化と体型再調整
+
+### 背景・問題意識
+
+オーナーから、顔のテクスチャが顔から離れて張り付いて見え、不自然であると指摘された。また、参照画像のような体型、つまり大きな頭、小さな胴、細く下がる腕、短い脚のシルエットへさらに寄せたいという要望があった。従来の顔は平面テクスチャを頭の前に置いていたため、角度によってシールが浮いたように見える問題があった。
+
+### 変更内容
+
+#### `mobile/src/components/meguri/MeguriThreeScene.tsx`
+- 顔テクスチャを `PlaneGeometry` から、頭の楕円体前面に沿うカスタム曲面 `BufferGeometry` へ変更した。
+- 曲面側にUVを割り当て、既存の顔テクスチャと口パクテクスチャをそのまま頭の表面に沿って表示するようにした。
+- 顔テクスチャのマテリアルを `MeshStandardMaterial` にし、周囲の立体と同じライティングに馴染むようにした。
+- 頭をさらに大きく、胴を小さく、腕を細く長めに、脚と足を短く小さめに再調整した。
+- 服の前面も小さい胴に合わせて縮め、菱形のディテールを追加した。
+- 大きくした頭に合わせて、ねこ・うさぎ・くまの耳と毛束位置を上げた。
+
+#### `notes/21_oshi_encounter_strategy.md`
+- 顔テクスチャを平面板として置かず、頭の曲面へ沿わせる方針と、参照体型の基本シルエットを追記した。
+
+### 影響範囲
+
+- iOS版の `meguri-intro` 3D演出
+- めぐり住人の顔テクスチャ表示
+- めぐり住人の体型・耳・服シルエット
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- コードレビューで、顔が `PlaneGeometry` ではなく `createCurvedFaceGeometry()` を使っていることを確認
+- コードレビューで、頭・胴・腕・脚のスケールが参照体型寄りに変更されていることを確認
+- iOS Previewで、顔が頭から浮いて見えず、体型が大きい頭・小さい胴に寄っていることを確認
+
+### 関連ファイル
+
+- `mobile/src/components/meguri/MeguriThreeScene.tsx`
+- `notes/21_oshi_encounter_strategy.md`
+
+### セルフレビュー結果
+
+- ✅ 顔テクスチャ用の `PlaneGeometry` を廃止し、頭前面に沿う曲面 `BufferGeometry` にした
+- ✅ 顔テクスチャと口パクは同じ曲面上で動く
+- ✅ `MeshStandardMaterial` に変え、顔だけ不自然に発光した板に見えにくくした
+- ✅ 頭を大きく、胴を小さく、腕を細く、脚を短くして参照体型へ寄せた
+- ✅ 大きい頭に合わせて耳と毛束の位置を再調整した
+- ✅ コードレビューで `PlaneGeometry` が顔用に残っていないことを確認した
+- ✅ 状態ID追加なしのため `notes/09_state_machines.md` の更新は不要
+- ✅ 新用語追加なしのため `notes/10_glossary.md` の更新は不要
+- ✅ DB変更なしのため `notes/05_data_model.md` の更新は不要
+
+---
+
+## イテレーション162.12：めぐり退出の向きと歩行速度を再調整
+
+### 背景・問題意識
+
+オーナーから、最後に門へ入っていく時のキャラクターの向きが逆になっていること、歩くスピードが早く吸い込まれているように見えること、もっと画面外まで歩いていく感じにしたいという指摘があった。門へ向かう退出は、方向転換、歩行、画面外への抜けが分かる尺にする必要があった。
+
+### 変更内容
+
+#### `mobile/app/meguri-intro.tsx`
+- 退出演出の尺を `2100ms` から `4300ms` に伸ばし、歩いて抜ける時間を確保した。
+
+#### `mobile/src/components/meguri/MeguriThreeScene.tsx`
+- 退出開始直後の方向転換時間を少し伸ばした。
+- 退出時の `rotationY` を進行方向へ向く角度に修正した。
+- 退出ターゲットを門の奥さらに画面外側へ移動した。
+- 退出時の移動速度と歩行テンポを下げ、吸い込まれる見え方を抑えた。
+
+#### `notes/21_oshi_encounter_strategy.md`
+- 退出時は進行方向へ向き、ゆっくり画面外まで歩いて抜ける仕様として追記した。
+
+### 影響範囲
+
+- iOS版の `meguri-intro` 3D演出
+- 会話完了後の門くぐり・退出モーション
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- iOS Previewで、退出時にキャラが門方向を向き、早すぎず、画面外まで歩いて抜けることを確認
+
+### 関連ファイル
+
+- `mobile/app/meguri-intro.tsx`
+- `mobile/src/components/meguri/MeguriThreeScene.tsx`
+- `notes/21_oshi_encounter_strategy.md`
+
+### セルフレビュー結果
+
+- ✅ 退出時の向きを進行方向へ修正した
+- ✅ 退出速度を落とし、歩行テンポもゆっくりにした
+- ✅ 退出ターゲットを画面外まで伸ばした
+- ✅ 退出演出の尺を伸ばし、吸い込まれる見え方を抑えた
+- ✅ 状態ID追加なしのため `notes/09_state_machines.md` の更新は不要
+- ✅ 新用語追加なしのため `notes/10_glossary.md` の更新は不要
+- ✅ DB変更なしのため `notes/05_data_model.md` の更新は不要
+
+---
+
+## イテレーション162.11：めぐり口パクを口テクスチャ差し替え方式へ修正
+
+### 背景・問題意識
+
+オーナーから、会話中に口はパクパクするようになったが、元の口テクスチャが残ったまま開いた口が重なって見え、気持ち悪いという指摘があった。閉じ口と開き口を別々に重ねるのではなく、同じ口の形が会話に合わせて変化しているように見せる必要があった。
+
+### 変更内容
+
+#### `mobile/src/components/meguri/MeguriThreeScene.tsx`
+- 顔テクスチャのベースデータから口を外し、口なしの顔を `baseData` として保持するようにした。
+- 初期表示時は口なしベースに閉じ口を描くようにした。
+- 口パク時は毎回、口なしベースへ戻してから、閉じ口または開き口を描き直すようにした。
+- 閉じ口と開き口を `drawMouth` に集約し、既存の笑い口と開いた口が同時に残らないようにした。
+
+#### `notes/21_oshi_encounter_strategy.md`
+- 口パクは既存口の上書きではなく、口なしベースから閉じ口・開き口を描き替える仕様として追記した。
+
+### 影響範囲
+
+- iOS版の `meguri-intro` 3D演出
+- めぐり住人の顔テクスチャと口パク表示
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- iOS Previewで、会話中に閉じ口と開き口が二重に表示されず、同じ口が開閉して見えることを確認
+
+### 関連ファイル
+
+- `mobile/src/components/meguri/MeguriThreeScene.tsx`
+- `notes/21_oshi_encounter_strategy.md`
+
+### セルフレビュー結果
+
+- ✅ 元の笑い口が開いた口の下に残らないようにした
+- ✅ 口なしベースから閉じ口・開き口を毎回描き直す方式にした
+- ✅ 顔テクスチャ方式を維持し、別メッシュの口パーツは追加していない
+- ✅ 状態ID追加なしのため `notes/09_state_machines.md` の更新は不要
+- ✅ 新用語追加なしのため `notes/10_glossary.md` の更新は不要
+- ✅ DB変更なしのため `notes/05_data_model.md` の更新は不要
+
+---
+
+## イテレーション162.10：めぐり退出セリフ削除と門くぐり・雲を再調整
+
+### 背景・問題意識
+
+オーナーから、別れ際の「まためぐりあえますように」は不要であり、最後はキャラクターがまず門の方を向いてから、ゆっくり歩いて門をくぐるようにしたいという要望があった。また、空に流れる雲が小さく見えるため、より大きく、画面上部を流れる環境演出にしたいという指摘があった。
+
+### 変更内容
+
+#### `mobile/app/meguri-intro.tsx`
+- `exiting` 中の吹き出し表示をやめ、別れ際の追加セリフを出さないようにした。
+- 退出中は発話扱いにせず、口パクも発生しないようにした。
+- 退出演出の表示時間を延ばし、門へ向かう動きが見える時間を確保した。
+
+#### `mobile/src/components/meguri/MeguriThreeScene.tsx`
+- 住人ランタイムに直近のモーションロールと開始時刻を持たせた。
+- 退出開始直後はその場で門の方向へ向きを変え、その後に歩き出すようにした。
+- 退出ターゲットを門の奥側へずらし、キャラクターが門をくぐって抜けるようにした。
+- 退出時の歩行スピードと歩幅を落とし、ゆっくり歩いている見え方に調整した。
+- 雲のサイズを大きくし、Y座標を上げて画面上部の空を流れるようにした。
+
+#### `notes/21_oshi_encounter_strategy.md`
+- 別れ際セリフ削除、門の方を向いてからゆっくりくぐる退出、上部に大きく流れる雲を仕様メモに追記した。
+
+### 影響範囲
+
+- iOS版の `meguri-intro` 3D演出
+- 会話終了後の退出演出
+- 3D背景の雲演出
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- iOS Previewで、最後の会話後に追加セリフが出ないことを確認
+- iOS Previewで、退出時にキャラクターが門の方へ向き、ゆっくり歩いてくぐることを確認
+- iOS Previewで、雲が画面上部を大きめに流れることを確認
+
+### 関連ファイル
+
+- `mobile/app/meguri-intro.tsx`
+- `mobile/src/components/meguri/MeguriThreeScene.tsx`
+- `notes/21_oshi_encounter_strategy.md`
+
+### セルフレビュー結果
+
+- ✅ 別れ際の「まためぐりあえますように」を削除した
+- ✅ 退出中の吹き出しと口パクを止めた
+- ✅ 退出開始直後に門の方へ向きを変える時間を入れた
+- ✅ その後にゆっくり歩いて門をくぐるターゲットへ移動するようにした
+- ✅ 雲を大きくし、上部を流れる配置にした
+- ✅ 状態ID追加なしのため `notes/09_state_machines.md` の更新は不要
+- ✅ 新用語追加なしのため `notes/10_glossary.md` の更新は不要
+- ✅ DB変更なしのため `notes/05_data_model.md` の更新は不要
+
+---
+
+## イテレーション162.9：めぐり会話の全文表示タップと話者カメラを追加
+
+### 背景・問題意識
+
+オーナーから、会話本文が一文字ずつ出ている途中でも、タップしたら現在のセリフ全文を表示できるようにしたいという要望があった。また、話し手に合わせて画面視点がゆっくり切り替わり、左のキャラクターが話す時は左側へ、右のキャラクターが話す時は右側へカメラが向くようにしたいという要望があった。
+
+### 変更内容
+
+#### `mobile/app/meguri-intro.tsx`
+- 会話中の本文表示途中にタップした場合、次のセリフへ進まず、現在の本文を即時に全文表示するようにした。
+- 全文表示後の次のタップで次のセリフへ進むようにした。
+- 前のセリフで使った全文表示シグナルが次のセリフへ持ち越されないようにした。
+
+#### `mobile/src/components/meguri/MeguriThreeScene.tsx`
+- 3Dランタイムにカメラの注視点を保持するようにした。
+- 会話中の `speakingId` に合わせて、カメラ位置と注視点を毎フレームゆっくり補間するようにした。
+- 自分が話す時は左側へ、相手が話す時は右側へ視点が寄り、会話以外では全体構図へ戻るようにした。
+
+#### `notes/21_oshi_encounter_strategy.md`
+- 文字送り途中のタップで全文表示する挙動と、話者に合わせたカメラ寄りの仕様を追記した。
+
+### 影響範囲
+
+- iOS版の `meguri-intro` 3D演出
+- 会話UIのタップ挙動
+- 会話中の3Dカメラ演出
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- iOS Previewで、文字送り中のタップで全文表示され、次タップで次セリフへ進むことを確認
+- iOS Previewで、自分/相手の発話に合わせてカメラがゆっくり左右へ寄ることを確認
+
+### 関連ファイル
+
+- `mobile/app/meguri-intro.tsx`
+- `mobile/src/components/meguri/MeguriThreeScene.tsx`
+- `notes/21_oshi_encounter_strategy.md`
+
+### セルフレビュー結果
+
+- ✅ 文字送り中のタップは次のセリフへ進まず、現在の本文を全文表示するようにした
+- ✅ 全文表示後の次タップで次のセリフへ進む
+- ✅ 全文表示シグナルが次セリフへ持ち越されないようにした
+- ✅ 話者に合わせてカメラがゆっくり左右へ寄る
+- ✅ 状態ID追加なしのため `notes/09_state_machines.md` の更新は不要
+- ✅ 新用語追加なしのため `notes/10_glossary.md` の更新は不要
+- ✅ DB変更なしのため `notes/05_data_model.md` の更新は不要
+
+---
+
+## イテレーション162.8：めぐり顔テクスチャの上下反転を修正
+
+### 背景・問題意識
+
+オーナーから、めぐり住人の顔テクスチャが上下逆になっている可能性があると指摘された。`DataTexture` は通常の画像テクスチャとY方向の扱いがずれやすく、プロシージャルに描いた顔の上下がPlaneGeometry上で反転して見える可能性があった。
+
+### 変更内容
+
+#### `mobile/src/components/meguri/MeguriThreeScene.tsx`
+- 顔用 `DataTexture` に `flipY = true` を設定し、描画データの上方向と3D平面上のUVの上方向を合わせた。
+- 口パクも同じ顔テクスチャ上で動くため、口の開閉方向も合わせて補正される。
+
+### 影響範囲
+
+- iOS版の `meguri-intro` 3D演出
+- めぐり住人の顔テクスチャ表示
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- iOS Previewで、目が上・口が下に表示されること、口パクの上下方向が自然なことを確認
+
+### 関連ファイル
+
+- `mobile/src/components/meguri/MeguriThreeScene.tsx`
+
+### セルフレビュー結果
+
+- ✅ 顔テクスチャのY方向を `flipY` で補正した
+- ✅ 口パクは同じテクスチャ上で動くため追加の個別補正は不要
+- ✅ 状態ID追加なしのため `notes/09_state_machines.md` の更新は不要
+- ✅ 新用語追加なしのため `notes/10_glossary.md` の更新は不要
+- ✅ DB変更なしのため `notes/05_data_model.md` の更新は不要
+
+---
+
+## イテレーション162.7：めぐり会話中の口パクを追加
+
+### 背景・問題意識
+
+オーナーから、会話中に話しているキャラクターの口がバクバク動くようにしたいという要望があった。めぐり住人の顔は iter162.6 でテクスチャ表現へ寄せたため、別メッシュを貼るのではなく、顔テクスチャ内の口だけを会話中に描き替える形で対応する必要があった。
+
+### 変更内容
+
+#### `mobile/src/components/meguri/MeguriThreeScene.tsx`
+- 3Dシーンに `speakingId` / `speaking` を渡せるようにし、現在話している住人だけを判定できるようにした。
+- 顔テクスチャのベースデータを保持し、会話中だけ口の開き具合をフレームごとに描き替えるようにした。
+- 文字表示完了後や聞き手・待機列では口を閉じるようにした。
+- `DataTexture` の破棄漏れを避けるため、material dispose 時に `map` も破棄するようにした。
+
+#### `mobile/app/meguri-intro.tsx`
+- 会話中の発話者が自分か相手かを `MeguriThreeScene` へ渡すようにした。
+- 吹き出し本文が出きる前だけ `speaking` を true にし、本文完了後は口パクを止めるようにした。
+
+#### `notes/21_oshi_encounter_strategy.md`
+- 会話本文が一文字ずつ出ている間だけ、話者キャラの口を開閉する仕様を追記した。
+
+### 影響範囲
+
+- iOS版の `meguri-intro` 3D演出
+- めぐり住人の会話中表情アニメーション
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- iOS Previewで、自分/相手それぞれの発話中だけ口が開閉し、本文表示完了後に止まることを確認
+
+### 関連ファイル
+
+- `mobile/app/meguri-intro.tsx`
+- `mobile/src/components/meguri/MeguriThreeScene.tsx`
+- `notes/21_oshi_encounter_strategy.md`
+
+### セルフレビュー結果
+
+- ✅ 口パクは顔の上に別パーツを載せず、顔テクスチャ内の口を描き替える方式にした
+- ✅ 発話者だけが口パクし、聞き手・待機列は動かない
+- ✅ 本文表示完了後は口が閉じる
+- ✅ 状態ID追加なしのため `notes/09_state_machines.md` の更新は不要
+- ✅ 新用語追加なしのため `notes/10_glossary.md` の更新は不要
+- ✅ DB変更なしのため `notes/05_data_model.md` の更新は不要
+
+---
+
+## イテレーション162.6：めぐり演出の待機・顔・吹き出し・門を再調整
+
+### 背景・問題意識
+
+オーナーから、待機中のキャラクターが歩き続けて見えること、動物の顔が図形パーツの貼り足しに見えること、冒頭サマリー表示が唐突で味気ないこと、吹き出しと本文が同時に出てしまうこと、吹き出し内の「タップで次へ」が不要であること、広場入口の門と雲の品質を上げたいことが指摘された。めぐり演出として、止まる・歩く・話す・広場へ入るが自然につながるように調整する必要があった。
+
+### 変更内容
+
+#### `mobile/src/components/meguri/MeguriThreeScene.tsx`
+- 待機列のキャラクターが目標位置に着いた後は、歩行用の腕脚アニメーションを止めるようにした。
+- 顔の目・鼻・口・ほっぺ・ねこのひげ等を、個別メッシュではなく `DataTexture` のプロシージャルテクスチャへまとめた。
+- 動物種ごとに目の丸さ、鼻色、ひげ、マズルの出方を少し変え、デフォルメされた「めぐり住人」寄りにした。
+- 広場入口の門を、細い棒と半円から、厚みのある黄色いアーチ板・足元の小道・葉っぱ飾りの構成へ作り直した。
+- 背景の雲に速度を持たせ、3Dシーン内でゆっくり流れるようにした。
+
+#### `mobile/app/meguri-intro.tsx`
+- 冒頭の「X人とめぐりあいました！」を、スプリング感のあるぬるっとした表示にした。
+- 吹き出しは先にポップ表示し、その後に本文が一文字ずつ出るようにした。
+- 本文表示完了後に、吹き出し右下の `▼` が点滅するようにした。
+- 吹き出し内の「タップで次へ」テキストを削除し、会話中の下部ボタンも非表示にした。
+- 本文が出きる前のタップでは次のセリフへ進まないようにした。
+
+#### `notes/21_oshi_encounter_strategy.md`
+- 顔テクスチャ、門の品質、流れる雲、スプラッシュ表示、吹き出しの文字送りと `▼` 表示を仕様メモに追記した。
+
+### 影響範囲
+
+- iOS版の `meguri-intro` 3D演出
+- めぐり住人の待機・歩行・顔表現
+- 冒頭サマリー、吹き出しUI、広場入口背景
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- iOS Previewで、待機列が止まること、顔がテクスチャ表現に寄ること、サマリー表示・文字送り・点滅 `▼`・門・雲を確認
+
+### 関連ファイル
+
+- `mobile/app/meguri-intro.tsx`
+- `mobile/src/components/meguri/MeguriThreeScene.tsx`
+- `notes/21_oshi_encounter_strategy.md`
+
+### セルフレビュー結果
+
+- ✅ 待機中のキャラクターは歩行用の腕脚スイングを止めた
+- ✅ 顔は個別メッシュの積み重ねではなく、1枚のプロシージャルテクスチャへ寄せた
+- ✅ 冒頭サマリーを唐突な静的表示ではなく、ぬるっと出るAnimated表示にした
+- ✅ 吹き出しポップ後に本文が一文字ずつ表示され、完了後だけ `▼` が点滅する
+- ✅ 吹き出し内の「タップで次へ」と会話中の下部ボタンを削除した
+- ✅ 本文表示完了前の誤タップで会話が飛ばないようにした
+- ✅ 門を厚みのある黄色いアーチへ作り直し、雲をゆっくり流れる演出にした
+- ✅ 状態ID追加なしのため `notes/09_state_machines.md` の更新は不要
+- ✅ 新用語追加なしのため `notes/10_glossary.md` の更新は不要
+- ✅ DB変更なしのため `notes/05_data_model.md` の更新は不要
+
+---
+
+## イテレーション162.5：めぐり住人の頭身と連続歩行演出を再調整
+
+### 背景・問題意識
+
+オーナーから、3Dキャラクターの見た目がイメージから離れているとの指摘があった。参照画像のように、大きな顔、小さな体、手先に向かって細くなる腕、顔の構成がはっきり分かる造形へ寄せる必要があった。また、キャラクターが地面にめり込んで見える問題、会話中に「10人とめぐりあいました！」が残る問題、会話後と次の人の登場が連続的に見えない問題、吹き出しが即表示されすぎる問題も合わせて修正する必要があった。
+
+### 変更内容
+
+#### `mobile/src/components/meguri/MeguriThreeScene.tsx`
+- 住人の頭身を、大きい頭・小さい胴体へ再調整した。
+- 顔の白い面、縦長の目、瞳、ハイライト、口、鼻、ほっぺの位置を再調整し、顔の構成が前面から読みやすい形にした。
+- 腕と脚を円柱/球だけではなく、先端に向かって細くなるテーパー形状へ変更した。
+- 足裏が地面に乗るよう、脚・足・影のY座標を調整した。
+- 歩行中の上下揺れが地面より下へ沈まないよう、バウンドを上方向だけにした。
+
+#### `mobile/app/meguri-intro.tsx`
+- 内部演出フェーズに `approaching` を追加し、会話前に相手が前へ歩いてくる時間を作った。
+- 1人目の会話後はその人が門へ歩き、次に2人目が前へ歩き出し、残りの列が続いて詰める流れにした。
+- 会話中は「10人とめぐりあいました！」ヘッダーを表示しないようにした。
+- 吹き出しをタップ直後に文字付きで出すのではなく、ポップ表示後に文字が出る流れにした。
+
+### 影響範囲
+
+- iOS版の `meguri-intro` 3D演出
+- めぐり住人の造形、足元、会話前後の歩行、吹き出し表示タイミング
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- iOS Previewで、足元・頭身・会話中ヘッダー非表示・吹き出しポップ・次の人の歩き出しを確認
+
+### 関連ファイル
+
+- `mobile/app/meguri-intro.tsx`
+- `mobile/src/components/meguri/MeguriThreeScene.tsx`
+
+### セルフレビュー結果
+
+- ✅ 既存IPの直接模倣ではなく、Megrum独自の住人として頭身・顔構成の方向性を寄せた
+- ✅ 手先に向かって細くなる腕・脚にした
+- ✅ 地面めり込みを避けるため、足裏とバウンド方向を調整した
+- ✅ 会話中の「10人とめぐりあいました！」表示を外した
+- ✅ 会話後の退出と次キャラの歩き出しを連続的にした
+- ✅ 吹き出しのポップ後に文字表示されるようにした
+- ✅ 状態ID追加なしのため `notes/09_state_machines.md` の更新は不要
+- ✅ 新用語追加なしのため `notes/10_glossary.md` の更新は不要
+- ✅ DB変更なしのため `notes/05_data_model.md` の更新は不要
+
+---
+
+## イテレーション162.4：めぐり3D住人の造形と歩行モーションを強化
+
+### 背景・問題意識
+
+オーナーから、めぐり3Dキャラクターをより高品質にし、参照画像のように手・足・顔がはっきり分かるキャラクターへ近づけたいという要望があった。既存のプロシージャル3Dは丸いマスコット感が強く、腕脚の動きも全身の揺れ中心だったため、Megrum独自のぬいぐるみ住人として、パーツ密度と歩行アニメーションを上げる必要があった。
+
+### 変更内容
+
+#### `mobile/src/components/meguri/MeguriThreeScene.tsx`
+- 3D住人を、胴体・頭・耳・腕・手・脚・足・しっぽ・顔・服パーツに分けて生成する構造へ変更した。
+- 顔に白目、黒目、ハイライト、眉、鼻、口、ほっぺ、マズルを追加し、表情が読み取れるようにした。
+- 服・襟・ボタン風パーツを追加し、毛色だけでなくキャラごとの見た目に奥行きが出るようにした。
+- ねこ / うさぎ / くまの耳としっぽの形状差を強めた。
+- 入場・退出など移動中は、腕と脚を交互に振り、足先も踏み出しに合わせて回転する歩行アニメーションにした。
+- 会話中や待機中は歩行ではなく小さなアイドル揺れに抑え、話している時に不自然に歩き続けないようにした。
+
+### 影響範囲
+
+- iOS版の `meguri-intro` 3D演出
+- めぐり住人の見た目、歩行、待機アニメーション
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- iOS Previewで、住人の手足・顔・服パーツと、遠くから歩いてくる時の腕脚モーションを確認
+
+### 関連ファイル
+
+- `mobile/src/components/meguri/MeguriThreeScene.tsx`
+
+### セルフレビュー結果
+
+- ✅ 既存IPのキャラを直接模倣せず、Megrum独自のぬいぐるみ住人として造形密度を上げた
+- ✅ 手・足・顔・しっぽ・服パーツを追加した
+- ✅ 移動中の腕脚スイングと足先回転を追加した
+- ✅ 会話中はアイドル揺れに抑えた
+- ✅ 状態ID追加なしのため `notes/09_state_machines.md` の更新は不要
+- ✅ 新用語追加なしのため `notes/10_glossary.md` の更新は不要
+- ✅ DB変更なしのため `notes/05_data_model.md` の更新は不要
+
+---
+
+## イテレーション162.3：めぐり演出に入場フェーズと吹き出し会話を追加
+
+### 背景・問題意識
+
+オーナーから、めぐり演出の冒頭は最初に「10人とめぐりあいました！」が大きく出て、その後めぐり合った人たちが遠くからとことこ歩いてくる流れにしたいという要望があった。また、会話中のUIは下部カードではなく、キャラクターたちの上側に吹き出しとして表示し、どちらが話しているかを吹き出しの突き出し位置で判別できるようにする必要があった。
+
+### 変更内容
+
+#### `mobile/app/meguri-intro.tsx`
+- `summary` 内に `splash` / `walking` / `ready` の入場フェーズを追加した。
+- 冒頭に「10人とめぐりあいました！」を大きく表示し、その後に入場フェーズへ自動遷移するようにした。
+- 入場中は進行ボタンをロックし、列が整ってから「一人ずつ話す」へ進めるようにした。
+- 下部の会話カードを廃止し、キャラクターの上側に吹き出しUIを表示するようにした。
+- 自分が話す時は吹き出しの突き出しを左側、相手が話す時は右側に寄せ、発話者が構図から分かるようにした。
+- 2Dフォールバックでも冒頭スプラッシュ中は相手列を隠すようにした。
+
+#### `mobile/src/components/meguri/MeguriThreeScene.tsx`
+- `introPhase` を受け取り、`splash` 中は相手キャラを遠くの待機位置に置いて非表示にするようにした。
+- `walking` へ進むと、相手キャラが遠くから右側の待機列へ補間移動するようにした。
+- 自分キャラは左手前に固定し、相手だけが入場してくる見え方にした。
+
+### 影響範囲
+
+- iOS版の `meguri-intro` 演出画面
+- 3D演出の冒頭タイミング
+- 会話UIの表示位置と発話者判別
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- iOS Previewで、冒頭スプラッシュ、相手列の入場、吹き出し位置を確認
+
+### 関連ファイル
+
+- `mobile/app/meguri-intro.tsx`
+- `mobile/src/components/meguri/MeguriThreeScene.tsx`
+
+### セルフレビュー結果
+
+- ✅ 冒頭に「X人とめぐりあいました！」を大きく出す流れにした
+- ✅ 相手キャラが遠くから待機列へ歩いてくる入場フェーズを追加した
+- ✅ 会話UIをキャラクター上側の吹き出しに変更した
+- ✅ 吹き出しの突き出し位置で、自分 / 相手の発話を区別できるようにした
+- ✅ 状態ID追加なしのため `notes/09_state_machines.md` の更新は不要
+- ✅ 新用語追加なしのため `notes/10_glossary.md` の更新は不要
+- ✅ DB変更なしのため `notes/05_data_model.md` の更新は不要
+
+---
+
+## イテレーション162.2：めぐり3D演出を全画面の左右構図へ調整
+
+### 背景・問題意識
+
+Preview確認後、オーナーから「左側が自分ユーザー、右で並んでいるのがめぐり合った人の列」という参照画像ベースの構図指定があった。また、演出画面はカード内ではなく画面いっぱいに見せたいという要望があったため、3Dシーンの座標と画面レイアウトを調整する必要があった。
+
+### 変更内容
+
+#### `mobile/app/meguri-intro.tsx`
+- `Screen` の通常余白を外し、めぐり演出を画面いっぱいのフルスクリーンステージとして表示するようにした。
+- 戻る / 進捗 / スキップ、会話カード、進行ボタンをステージ上にオーバーレイ配置した。
+- 2Dフォールバックでも、自分を左、めぐり相手の列を右側に並べる構図へ変更した。
+
+#### `mobile/src/components/meguri/MeguriThreeScene.tsx`
+- 自分キャラを左手前、めぐり相手の列を右側から奥へ続く配置に変更した。
+- 会話中の相手は列から前に出て自分と向き合い、会話後は左奥の門へ歩いていく座標にした。
+- 参照画像の印象に合わせ、空色背景、芝生床、黄色い門、雲、スパークルを追加・調整した。
+- 縦長画面でも左右構図が収まるよう、カメラFOVと距離を調整した。
+
+### 影響範囲
+
+- iOS版の `meguri-intro` 演出画面
+- 3D演出の構図、2Dフォールバックの構図
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- iOS Previewで、めぐり演出が画面いっぱいになり、左に自分・右にめぐり列が表示されることを確認
+
+### 関連ファイル
+
+- `mobile/app/meguri-intro.tsx`
+- `mobile/src/components/meguri/MeguriThreeScene.tsx`
+
+### セルフレビュー結果
+
+- ✅ 指定された「左が自分、右がめぐり合った人の列」の構図へ変更した
+- ✅ 演出画面をカード状の内側表示ではなく、フルスクリーンステージにした
+- ✅ 3Dと2Dフォールバックの両方で構図を揃えた
+- ✅ 状態ID追加なしのため `notes/09_state_machines.md` の更新は不要
+- ✅ 新用語追加なしのため `notes/10_glossary.md` の更新は不要
+- ✅ DB変更なしのため `notes/05_data_model.md` の更新は不要
+
+---
+
+## イテレーション162.1：めぐり3D描画をGLView直結へ修正
+
+### 背景・問題意識
+
+Previewビルド確認で、めぐり演出の3Dモデルが表示されない問題が出た。iter162 の初期実装は React Three Fiber native Canvas に依存しており、Preview環境でCanvas側が描画されないと3Dシーン全体が空白になるリスクがあった。また、正式な `.glb` モデル資産ではなく、アプリ内でぬいぐるみ風キャラをプロシージャルに組み立てる実装である点を明確にする必要があった。
+
+### 変更内容
+
+#### `mobile/src/components/meguri/MeguriThreeScene.tsx`
+- React Three Fiber依存をやめ、Expo公式の `GLView` で取得したGLコンテキストへ `three` の `WebGLRenderer` を直接接続する実装に変更した。
+- ねこ / うさぎ / くまのぬいぐるみ風3Dキャラ、待機列、自分キャラ、広場の門、床、ライト、スパークルをThree.jsオブジェクトとして直接生成する形にした。
+- アニメーションは `requestAnimationFrame` で各キャラの位置・回転・スケールを補間し、会話中・退出中・待機中の見え方を維持した。
+- 描画リソースをunmount時にdisposeし、再表示時のGLリソース残りを抑えるようにした。
+
+#### `mobile/app/meguri-intro.tsx`
+- GL初期化失敗時は失敗表示だけを残さず、既存の2Dフォールバック演出へ切り替えるようにした。
+
+#### `mobile/package.json` / `package-lock.json`
+- 不要になった `@react-three/fiber` と `expo-three` を削除し、実運用で必要な `expo-gl` / `expo-asset` / `three` の構成に整理した。
+
+#### `notes/21_oshi_encounter_strategy.md`
+- 初期実装方針を、React Three Fiber前提から `GLView` + `three` 直結へ更新した。
+
+### 影響範囲
+
+- iOS版の `meguri-intro` 演出画面
+- iOS Preview / EAS Build（`expo-gl` 追加済みのため、ネイティブ反映にはPreview再ビルドが必要）
+- 将来の `.glb` モデル資産差し替え方針
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run config:ios:preview`
+- `npm --prefix mobile run export:ios:preview`
+- iOS Previewを再ビルド後、めぐりトップの「今日のめぐりを見る」から3D演出を確認
+
+### 関連ファイル
+
+- `mobile/src/components/meguri/MeguriThreeScene.tsx`
+- `mobile/app/meguri-intro.tsx`
+- `mobile/package.json`
+- `package-lock.json`
+- `notes/21_oshi_encounter_strategy.md`
+
+### セルフレビュー結果
+
+- ✅ 3Dキャラクターは外部モデル未配置ではなく、アプリ内でThree.jsオブジェクトとして生成する実装にした
+- ✅ 3D描画失敗時は2Dフォールバックに切り替わる
+- ✅ ねこ / うさぎ / くま、毛色、会話後に門へ向かう演出の仕様は維持した
+- ✅ 新しい状態IDは追加していないため `notes/09_state_machines.md` の更新は不要
+- ✅ 初回は仮データ運用でDB追加なしのため `notes/05_data_model.md` の更新は不要
+- ✅ 新しい用語追加はないため `notes/10_glossary.md` の更新は不要
+
+---
+
+## イテレーション162：めぐり3D演出をiOSに実装
+
+### 背景・問題意識
+
+iter161.9 で確定した「めぐり3D演出」を、まずiOS版のめぐり演出画面へ実装する必要があった。初回はめぐりのみを対象にし、グッズ交換側のクラッカー等の3D演出は保留する。正式な `.glb` モデル資産がまだないため、R3F上で高品質なぬいぐるみ風のプロシージャル3Dキャラクターを組み、後から正式モデルへ差し替えられる土台にした。
+
+### 変更内容
+
+#### `mobile/package.json` / `mobile/package-lock.json` / `package-lock.json`
+- `expo-gl` / `expo-asset` / `three` / `@react-three/fiber` を追加し、iOS版で3Dシーンを描画できる依存を入れた。
+- `@types/three` を追加し、Three.jsまわりのTypeScript型チェックを通した。
+
+#### `mobile/app.config.js`
+- Expoの動的configに `expo-asset` plugin を追加した。
+
+#### `mobile/src/components/meguri/MeguriThreeScene.tsx`
+- めぐり用の3Dシーンコンポーネントを追加した。
+- ねこ / うさぎ / くまの3種類のぬいぐるみ風キャラクターを、球体・耳・手足・顔・毛束パーツで構成した。
+- 自分キャラ、待機列、会話中の相手、門へ歩いていく相手をR3Fの `useFrame` で滑らかに補間するようにした。
+- 広場の床、門、淡い光、スパークルを入れ、めぐり広場の入口として見えるステージにした。
+- 3D描画エラー時に2D演出へ戻れる `MeguriThreeBoundary` を追加した。
+
+#### `mobile/app/meguri-intro.tsx`
+- 既存の3ステップ演出を、タップ進行の3D会話演出へ置き換えた。
+- 「X人とめぐりあいました！」から始まり、相手自己紹介、自分自己紹介、都道府県、相手の今日のひとこと、自分の今日のひとこと、門へ歩く流れにした。
+- 10人ごとの一区切りに合わせ、最大10人を1回の演出対象にした。
+- スキップ導線、2Dフォールバック表示、ひとこと未設定時の代替文を入れた。
+
+#### `mobile/app/(tabs)/encounters.tsx`
+- `MeguriUser` に仮の `animalType` / `furColor` を追加した。
+- ねこ / うさぎ / くま、複数毛色の仮データを既存ユーザーに付与した。
+- 今日のめぐりCTA文言を、10人区切りの3D演出に合わせた。
+
+#### `notes/21_oshi_encounter_strategy.md`
+- 初期実装は正式 `.glb` 資産待ちではなく、R3Fのプロシージャル3Dキャラで先に実装し、後から `.glb` 差し替え可能にする方針を追記した。
+
+### 影響範囲
+
+- iOS版の `めぐり` タブ
+- `meguri-intro` 演出画面
+- iOS Preview / EAS Build（`expo-gl` 追加により再ビルド必須）
+- 将来のプロフィール設定（毛色選択）と3Dモデル差し替え設計
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run config:ios:preview`
+- `npm --prefix mobile run export:ios:preview`
+- iOS Previewを再ビルド後、めぐりトップの「今日のめぐりを見る」から3D演出を確認
+
+### 関連ファイル
+
+- `mobile/app/meguri-intro.tsx`
+- `mobile/src/components/meguri/MeguriThreeScene.tsx`
+- `mobile/app/(tabs)/encounters.tsx`
+- `mobile/app.config.js`
+- `mobile/package.json`
+- `mobile/package-lock.json`
+- `package-lock.json`
+- `notes/21_oshi_encounter_strategy.md`
+
+### セルフレビュー結果
+
+- ✅ 初回実装範囲をめぐり演出だけに限定し、交換側3D演出は入れていない
+- ✅ ねこ / うさぎ / くま、ぬいぐるみ風、毛色仮データ、10人区切り、柔らかい会話文を反映した
+- ✅ 3Dエラー時の2Dフォールバックを実装した
+- ✅ ネイティブ依存 `expo-gl` を追加したため、EAS UpdateだけではなくPreview再ビルドが必要であることを影響範囲に明記した
+- ✅ 新しい状態IDは追加していないため `notes/09_state_machines.md` の更新は不要
+- ✅ 初回は仮データ運用のため `notes/05_data_model.md` の更新は不要
+- ✅ 新しい主要用語は iter161.9 で追加済みのため `notes/10_glossary.md` の追加更新は不要
+
+---
+
+## イテレーション161.9：めぐり3D演出仕様を確定
+
+### 背景・問題意識
+
+オーナーから、めぐり機能で巡り合った時の演出を、既存の「歩くプロフカード」よりも立体的で高品質な3D体験にしたいという相談があった。グッズ交換側はキャラ必須ではなく、将来的にクラッカー等の立体エフェクトを検討する一方、まずはめぐり側に絞って、ぬいぐるみ風3Dキャラクターが会話し、自分の広場へ入っていく演出仕様を固める必要があった。
+
+### 変更内容
+
+#### `notes/21_oshi_encounter_strategy.md`
+- 「めぐり3D演出仕様（iter161.9）」を追加した。
+- 初回実装範囲をめぐりのみとし、交換側3D演出は保留にした。
+- `expo-gl` + `three` / React Three Fiber系で `.glb` を表示する方針、2Dフォールバック、Preview再ビルドが必要な点を明記した。
+- 初期キャラ種を、ねこ / うさぎ / くまの3種類にし、ぬいぐるみ風の質感と毛色仮データ運用を定義した。
+- タップごとの会話フロー、10人ごとの区切り、未設定ひとこと代替文、スキップ導線、会話後に門をくぐって広場へ入る演出を整理した。
+
+#### `notes/10_glossary.md`
+- `めぐり`、`めぐり3D演出`、`めぐり住人`、`めぐり広場` を用語として追加した。
+
+### 影響範囲
+
+- iOS版の `めぐり` タブ
+- `mobile/app/meguri-intro.tsx` の次期3D化方針
+- `mobile/app/(tabs)/encounters.tsx` の2Dフォールバック方針
+- 将来のプロフィール設定（毛色選択）と3Dモデル資産設計
+
+### 確認方法
+
+- `notes/21_oshi_encounter_strategy.md` §16 を読み、会話フロー・キャラ仕様・リスク対策が今回の合意と一致していることを確認
+- `notes/10_glossary.md` §B で追加用語の定義を確認
+
+### 関連ファイル
+
+- `notes/21_oshi_encounter_strategy.md`
+- `notes/10_glossary.md`
+- `mobile/app/meguri-intro.tsx`
+- `mobile/app/(tabs)/encounters.tsx`
+
+### セルフレビュー結果
+
+- ✅ めぐり側の3D演出に絞り、グッズ交換側の3D演出は保留として分離した
+- ✅ 「ねこ / うさぎ / くま」「ぬいぐるみ風」「毛色は初回仮データ、将来プロフィール設定」を明記した
+- ✅ 都道府県は公開プロフィール項目だが、会話文では柔らかく表示する方針にした
+- ✅ 10人ごとの区切り、スキップ、2Dフォールバック、ネイティブ再ビルドリスクを明記した
+- ✅ 新しい状態IDは追加していないため `notes/09_state_machines.md` の更新は不要
+- ✅ 初回はDB追加なしの仮データ運用のため `notes/05_data_model.md` の更新は不要
+
+---
+
+## イテレーション161.8：Expo Routerの解決パスをMetro設定側で固定
+
+### 背景・問題意識
+
+iter161.7 でEAS Build profileに `NODE_PATH=mobile/node_modules` を追加したが、EASのiOS Bundle JavaScript phaseでは作業ディレクトリが変わり、相対 `NODE_PATH` が期待通りに効かない可能性が残った。実際にPreviewビルドで再度 `EXPO_ROUTER_APP_ROOT` がインライン化されないエラーが出たため、環境変数だけに頼らず、Metro設定の読み込み時点でNodeの解決パスを固定する必要があった。
+
+### 変更内容
+
+#### `mobile/metro.config.js`
+- `expo/metro-config` を読み込む前に `mobile/node_modules` とrepo root `node_modules` を `NODE_PATH` に追加し、`Module._initPaths()` でNodeの解決パスへ反映するようにした。
+- これにより、root側にいる `babel-preset-expo` からも `mobile/node_modules/expo-router` を解決でき、Expo Router Babel pluginが `process.env.EXPO_ROUTER_APP_ROOT` を文字列へ変換できるようにした。
+
+#### `mobile/eas.json`
+- `NODE_PATH` を `./node_modules:mobile/node_modules` に変更し、EASのcwdがrepo rootでもmobile配下でも解決できるようにした。
+
+### 影響範囲
+
+- iOS Preview Build
+- iOS Preview向けEAS Update
+- Expo Routerの本番バンドル処理
+- npm workspace上のMetro/Babel解決
+
+### 確認方法
+
+- `cd mobile && npm run export:ios:preview`
+- `npm --prefix mobile run typecheck`
+- `cd mobile && npm run build:ios:preview:clear`
+
+### 関連ファイル
+
+- `mobile/metro.config.js`
+- `mobile/eas.json`
+
+### セルフレビュー結果
+
+- ✅ 環境変数だけでなく、Metro設定側で絶対パスをNode解決パスへ追加した
+- ✅ iOS標準コンポーネントや画面仕様には触れていない
+- ✅ 新しい状態IDやDB列は追加していないため `notes/09_state_machines.md` / `notes/05_data_model.md` の更新は不要
+- ✅ 新しい主要用語は追加していないため `notes/10_glossary.md` の更新は不要
+
+---
+
+## イテレーション161.7：EAS BuildのExpo Router app root解決を修正
+
+### 背景・問題意識
+
+EAS BuildのPreviewビルドで `node_modules/expo-router/_ctx.ios.js: Invalid call ... process.env.EXPO_ROUTER_APP_ROOT` が発生した。npm workspace構成では `expo` / `babel-preset-expo` がroot側、`expo-router` が `mobile/node_modules` 側に配置されることがあり、公式のExpo Router Babel pluginが `expo-router` を解決できず、`process.env.EXPO_ROUTER_APP_ROOT` を文字列へインライン化できていなかった。
+
+### 変更内容
+
+#### `mobile/eas.json`
+- EAS Buildの各profileに `NODE_PATH=mobile/node_modules` を追加し、root側で動くMetro/Babelからも `mobile/node_modules/expo-router` を解決できるようにした。
+- `production` profileにも `NPM_CONFIG_LEGACY_PEER_DEPS=true` を明示し、依存解決の挙動をPreview/Developmentと揃えた。
+
+#### `mobile/package.json`
+- `export:ios:preview` を追加し、ローカルでもEAS BuildのiOS export相当を検証できるようにした。
+- `update:ios:preview` に `NODE_PATH=./node_modules` を追加し、EAS Update配信時にもExpo Routerのapp root変換が確実に効くようにした。
+
+### 影響範囲
+
+- iOS Preview Build
+- iOS Preview向けEAS Update
+- Expo Routerの本番バンドル処理
+
+### 確認方法
+
+- `cd mobile && npm run export:ios:preview`
+- `npm --prefix mobile run typecheck`
+- `cd mobile && npm run build:ios:preview:clear`
+
+### 関連ファイル
+
+- `mobile/eas.json`
+- `mobile/package.json`
+
+### セルフレビュー結果
+
+- ✅ ローカルで `NODE_PATH=./node_modules APP_VARIANT=preview npx expo export:embed --eager --platform ios --dev false` が成功した
+- ✅ EAS Build側はroot cwdで動くため `NODE_PATH=mobile/node_modules`、ローカルscript側はmobile cwdで動くため `NODE_PATH=./node_modules` と分けた
+- ✅ iOS標準コンポーネントや画面仕様には触れていない
+- ✅ 新しい状態IDやDB列は追加していないため `notes/09_state_machines.md` / `notes/05_data_model.md` の更新は不要
+- ✅ 新しい主要用語は追加していないため `notes/10_glossary.md` の更新は不要
+
+---
+
+## イテレーション161.6：EAS UpdateでPreviewへJS更新を配信できるように設定
+
+### 背景・問題意識
+
+外出用の `Megrum Preview` はMacなしで単体起動できる一方、これまでは新しい開発内容を反映するたびにEAS Buildを作り直して再インストールする必要があった。オーナーから「EAS Updateを入れてJSだけ配信更新できるようにしてほしい」と依頼があり、Previewビルドへ素早く更新を流せる構成にした。
+
+### 変更内容
+
+#### `mobile/package.json`
+- `expo-updates` を追加した。
+- `update:ios:preview` を追加し、`preview` チャンネルへiOS向けJS更新を配信できるようにした。
+
+#### `mobile/app.config.js`
+- `runtimeVersion: { policy: "appVersion" }` を追加した。
+- EAS Update用の `updates.url` を `https://u.expo.dev/<projectId>` で設定した。
+- 既存のPreview分離設定は維持し、`Megrum Preview` / `tokyo.ihub.app.preview` / `megrum-preview` のままにした。
+
+#### `mobile/eas.json`
+- `preview` profile に `channel: "preview"` を追加し、外出用Previewアプリが `preview` チャンネルを購読するようにした。
+- `development` / `production` にもチャンネルを明示した。
+
+### 影響範囲
+
+- iOS版の外出レビュー運用
+- EAS Build / EAS Updateの配信フロー
+- PreviewアプリのJS更新反映タイミング
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `cd mobile && npm run config:ios:preview`
+- 初回のみ `cd mobile && npm run build:ios:preview:clear`
+- 以後JS/画面変更だけなら `cd mobile && npm run update:ios:preview -- --message "更新内容"`
+
+### 関連ファイル
+
+- `mobile/app.config.js`
+- `mobile/eas.json`
+- `mobile/package.json`
+- `mobile/package-lock.json`
+- `package-lock.json`
+
+### セルフレビュー結果
+
+- ✅ Previewビルドが `preview` チャンネルを購読する設定になった
+- ✅ EAS Updateに必要な `expo-updates` / `updates.url` / `runtimeVersion` を追加した
+- ✅ ネイティブ依存やBundle IDなどを変える時は従来通り再ビルドが必要で、JS/画面変更だけをEAS Update対象にした
+- ✅ 新しい状態IDやDB列は追加していないため `notes/09_state_machines.md` / `notes/05_data_model.md` の更新は不要
+- ✅ 新しい主要用語は追加していないため `notes/10_glossary.md` の更新は不要
+
+---
+
+## イテレーション161.5：iOS Previewを別アプリとして共存できる構成に分離
+
+### 背景・問題意識
+
+外出中にMacなしで起動できるPreviewビルドを作る場合、既存の開発ビルドと同じBundle IDのままだとiPhone上で上書きされ、Metro接続用の開発ビルドと単体起動用のPreviewを併用しづらい。オーナーから「それやりたい」と確認があったため、Previewだけ別アプリとしてインストールできる構成にした。
+
+### 変更内容
+
+#### `mobile/app.config.js`
+- `APP_VARIANT=preview` の時だけ、表示名を `Megrum Preview`、URLスキームを `megrum-preview`、iOS Bundle IDを `tokyo.ihub.app.preview` に切り替える動的Expo configを追加した。
+- 通常の開発ビルドでは既存の `Megrum` / `ihub` / `tokyo.ihub.app` を維持するようにした。
+
+#### `mobile/eas.json`
+- `preview` profile に `APP_VARIANT=preview` を設定し、EAS Build上でPreview専用configが解決されるようにした。
+
+#### `mobile/package.json`
+- `config:ios:preview` を追加し、ローカルでPreview用Expo configを確認できるようにした。
+
+### 影響範囲
+
+- iOS版のEAS Build運用
+- 外出用Previewアプリのインストール・起動導線
+- Supabase Authのメールリンク/Deep Link設定
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `cd mobile && npm run config:ios:preview`
+- `cd mobile && npm run build:ios:preview:clear`
+
+### 関連ファイル
+
+- `mobile/app.config.js`
+- `mobile/eas.json`
+- `mobile/package.json`
+
+### セルフレビュー結果
+
+- ✅ 開発ビルドの既存Bundle IDとスキームは維持し、Previewだけ別Bundle ID / 別スキームに分離した
+- ✅ `preview` profileのみ `APP_VARIANT=preview` を渡すため、通常の開発ビルドに影響しない
+- ⚠️ Previewでメールリンクログインを使う場合、Supabase AuthのRedirect URLに `megrum-preview://auth/email-confirmed` を追加する必要がある
+- ✅ 新しい状態IDやDB列は追加していないため `notes/09_state_machines.md` / `notes/05_data_model.md` の更新は不要
+- ✅ 新しい主要用語は追加していないため `notes/10_glossary.md` の更新は不要
+
+---
+
+## イテレーション161.4：外出用iOSプレビュービルド導線を追加
+
+### 背景・問題意識
+
+開発ビルドはMac上のMetroサーバーに接続する前提のため、外出中に単体でアプリを開きづらい。オーナーから「外出中にもアプリを開きたい」と相談があり、Macなしで起動できる内部配布用プレビュービルドを作りやすくする必要があった。
+
+### 変更内容
+
+#### `mobile/package.json`
+- `build:ios:preview` を追加し、`eas build --platform ios --profile preview` を短いコマンドで実行できるようにした。
+- `build:ios:preview:clear` を追加し、依存関係やEASキャッシュが怪しい時に `--clear-cache` 付きで外出用ビルドを作れるようにした。
+
+### 影響範囲
+
+- iOS版のビルド/レビュー運用
+- 外出中にMacなしで起動するための内部配布フロー
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `cd mobile && npm run build:ios:preview`
+
+### 関連ファイル
+
+- `mobile/package.json`
+- `mobile/eas.json`
+
+### セルフレビュー結果
+
+- ✅ 既存の `preview` profile は `developmentClient: true` ではないため、Mac上のMetroに依存しない内部配布ビルド用として使える
+- ✅ 新しい状態IDやDB列は追加していないため `notes/09_state_machines.md` / `notes/05_data_model.md` の更新は不要
+- ✅ 新しい主要用語は追加していないため `notes/10_glossary.md` の更新は不要
+
+---
+
+## イテレーション161.3：めぐり文言と各画面再現度を調整
+
+### 背景・問題意識
+
+オーナーから、めぐり機能の表記を「めぐりました」ではなく「めぐりあいました」に統一し、各画面のデザインがモックアップと所々違うため自分でレビューして再現するよう要望があった。トップ画面だけでなく、広場・マップ・実績・レポート・ひとこと・レター・Plus・シェアの個別画面も `Megurum めぐる機能/` のモックアップに近づける必要があった。
+
+### 変更内容
+
+#### `mobile/app/meguri-*.tsx`
+- `meguri-report.tsx` を、モックアップの `DAILY REPORT`、大きな人数カード、内訳タイル、今日のカード、実績達成、匿名シェアCTA構成に寄せた。
+- `meguri-map.tsx` を、抽象的な丸いマップから都道府県タイル風のめぐりマップへ変更し、点灯済みエリアと回数が見えるようにした。
+- `meguri-plaza.tsx` を、フィルタ・統計ピル・広場ステージ・歩くプロフカードの構成に寄せた。
+- `meguri-hitokoto.tsx` を、今日のお題、入力欄、文字数、カードプレビュー、過去のひとこと、注意書きの構成に寄せた。
+- `meguri-letters.tsx` を、受け取った/送ったのセグメント、未開封レター、Plus導線、送信フォームの構成に寄せた。
+- `meguri-plus.tsx` を、Plusヒーロー、月額/無料プラン選択、機能一覧、月額CTAの構成に寄せた。
+- `meguri-share.tsx` を、1:1匿名シェア画像プレビュー、表示オプション、背景スウォッチ、保存CTAの構成に寄せた。
+- `meguri-achievements.tsx` を、実績数のヒーロー、サマリー、解除/未解除一覧の構成に寄せた。
+
+#### `mobile/app/(tabs)/encounters.tsx`
+- 実績説明とひとことモーダルの文言を「めぐりあいました」「めぐりあった人」に統一した。
+
+#### `notes/21_oshi_encounter_strategy.md`
+- AIデザインブリーフ内の表記も「めぐりました」「めぐった」から「めぐりあいました」「めぐりあった」に合わせた。
+
+### 影響範囲
+
+- iOS版の `めぐり` タブ
+- めぐりトップから遷移する個別画面群
+- めぐり機能のデザインブリーフ
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `rg -n "めぐりました|めぐった" mobile notes/21_oshi_encounter_strategy.md`
+- `Megurum めぐる機能/meguri-screens-a.jsx` / `meguri-screens-b.jsx` と各 `mobile/app/meguri-*.tsx` の構成を突き合わせる
+
+### 関連ファイル
+
+- `mobile/app/(tabs)/encounters.tsx`
+- `mobile/app/meguri-achievements.tsx`
+- `mobile/app/meguri-hitokoto.tsx`
+- `mobile/app/meguri-letters.tsx`
+- `mobile/app/meguri-map.tsx`
+- `mobile/app/meguri-plaza.tsx`
+- `mobile/app/meguri-plus.tsx`
+- `mobile/app/meguri-report.tsx`
+- `mobile/app/meguri-share.tsx`
+- `notes/21_oshi_encounter_strategy.md`
+
+### セルフレビュー結果
+
+- ✅ `npm --prefix mobile run typecheck` が成功した
+- ✅ `mobile` と `notes/21_oshi_encounter_strategy.md` から「めぐりました」「めぐった」の残存がなくなった
+- ✅ 各画面を `Megurum めぐる機能/meguri-screens-a.jsx` / `meguri-screens-b.jsx` と突き合わせ、モックアップの主要ブロック構成を再現した
+- ✅ 新しい状態IDやDB列は追加していないため `notes/09_state_machines.md` / `notes/05_data_model.md` の更新は不要
+- ✅ 新しい主要用語は追加していないため `notes/10_glossary.md` の更新は不要
+
+---
+
+## イテレーション161.2：ナビ・通知・設定・打診送信の改善
+
+### 背景・問題意識
+
+オーナーから、左ドロワーとフッターの役割整理、Xに近い通知一覧/設定一覧、打診送信時のエラー修正の要望があった。通知は左ドロワーから開けるためフッターから外し、フッター右端は取引に固定する。また、打診送信はSupabaseのスキーマキャッシュや一部列の有無に影響されて失敗しないようにする必要があった。
+
+### 変更内容
+
+#### `mobile/app/(tabs)/_layout.tsx`
+- フッターから `通知` タブを非表示にし、表示順を `ホーム / 在庫 / Wish / めぐり / 取引` に整理した。
+- `通知` は左ドロワーから開ける hidden route として維持した。
+- 左ドロワーから `取引` を削除し、`プロフィール` は自分のプロフィール画面へ遷移する導線として維持した。
+
+#### `mobile/app/(tabs)/notifications.tsx`
+- 通知一覧をカード型からX寄りのタイムライン型に変更した。
+- `すべて / 未読 / 取引` の上部タブを追加し、未読数や件数を見ながら切り替えられるようにした。
+- 通知行は左アイコン、タイトル、時刻、本文、未読ドットの構成にし、区切り線で連続的に読める表示にした。
+
+#### `mobile/app/settings-privacy.tsx`
+- 設定一覧から `アカウント` と `表示と言語` を削除した。
+- `プライバシーと安全` を `プライバシーポリシー` に変更した。
+- `プライバシーポリシー` と `規約と法的情報` を下部の法的情報セクションにまとめた。
+
+#### `mobile/app/proposal-confirm.tsx`
+- 打診送信時に `proposals` の任意列がSupabase側のスキーマキャッシュや環境差分で見つからない場合、該当列を外して再送するフォールバックを追加した。
+- エラー表示をユーザー向けの日本語メッセージに整えた。
+
+### 影響範囲
+
+- iOS版の NativeTabs / 左ドロワー
+- 通知一覧画面
+- 設定とプライバシー画面
+- 打診送信確認画面
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- iOS開発ビルドで、左ドロワーからプロフィール/通知に遷移できること、フッター右端が取引であること、通知/設定一覧の表示を確認
+- 打診送信時にスキーマキャッシュ由来の任意列エラーで即失敗しないことを確認
+
+### 関連ファイル
+
+- `mobile/app/(tabs)/_layout.tsx`
+- `mobile/app/(tabs)/notifications.tsx`
+- `mobile/app/settings-privacy.tsx`
+- `mobile/app/proposal-confirm.tsx`
+
+### セルフレビュー結果
+
+- ✅ `npm --prefix mobile run typecheck` が成功した
+- ✅ 新しい状態IDやDB列は追加していないため `notes/09_state_machines.md` / `notes/05_data_model.md` の更新は不要
+- ✅ 新しい主要用語は追加していないため `notes/10_glossary.md` の更新は不要
+- ⚠️ 打診送信の最終確認は実機でSupabase接続状態のまま実送信テストが必要
+
+---
+
+## イテレーション161.1：めぐり導線を個別画面へ分割
+
+### 背景・問題意識
+
+iter161 の初期実装では、めぐりトップの1画面に「広場」「マップ」「実績」「今日のレポート」「レター」「Plus」をまとめて表示していた。オーナーから「1枚の画面に載せず、めぐりトップの各導線をタップしたらそれぞれの画面に飛ぶように」「めぐり演出の画面もきちんと表示」と指摘があったため、トップは入口に戻し、各体験を独立画面として確認できる構成へ修正した。
+
+### 変更内容
+
+#### `mobile/app/(tabs)/encounters.tsx`
+- めぐりトップから、広場・マップ・実績・レポート・レター・Plusの詳細セクションを削除した。
+- トップは「今日のめぐり」ステージ、演出へのCTA、統計、各導線カード、ひとこと設定導線に整理した。
+- 各ショートカットを個別ルートへ遷移させるようにした。
+- 既存のめぐり用データ・プロフカード・レター・Plusモーダル系コンポーネントを、個別画面から再利用できるよう named export した。
+
+#### `mobile/app/meguri-*.tsx`
+- `meguri-intro.tsx` を追加し、今日のめぐり演出、1人ずつの自己紹介、マップに点く演出を3ステップで表示するようにした。
+- `meguri-plaza.tsx` を追加し、プロフカードに手足が生えたカードが集まる「めぐり広場」を個別画面化した。
+- `meguri-map.tsx` を追加し、正確な位置を出さない抽象マップ画面を個別画面化した。
+- `meguri-achievements.tsx` を追加し、実績一覧を個別画面化した。
+- `meguri-report.tsx` を追加し、今日のレポートと匿名シェア導線を個別画面化した。
+- `meguri-hitokoto.tsx` を追加し、すれ違い用ひとこと設定を個別画面化した。
+- `meguri-letters.tsx` を追加し、すれ違いレター一覧・開封/Plus導線・送信枠を個別画面化した。
+- `meguri-plus.tsx` を追加し、月額1,000円のPlus説明を個別画面化した。
+- `meguri-share.tsx` を追加し、匿名シェア画像のプレビュー画面を個別画面化した。
+
+### 影響範囲
+
+- iOS版の `めぐり` タブ
+- めぐりトップからの各導線
+- めぐり演出、広場、マップ、実績、今日のレポート、ひとこと、レター、Plus、匿名シェア画面
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- iOS開発ビルドで `めぐり` タブを開き、各カード/ボタンから個別画面へ遷移することを確認
+
+### 関連ファイル
+
+- `mobile/app/(tabs)/encounters.tsx`
+- `mobile/app/meguri-intro.tsx`
+- `mobile/app/meguri-plaza.tsx`
+- `mobile/app/meguri-map.tsx`
+- `mobile/app/meguri-achievements.tsx`
+- `mobile/app/meguri-report.tsx`
+- `mobile/app/meguri-hitokoto.tsx`
+- `mobile/app/meguri-letters.tsx`
+- `mobile/app/meguri-plus.tsx`
+- `mobile/app/meguri-share.tsx`
+- `Megurum めぐる機能/meguri-app.jsx`
+- `Megurum めぐる機能/meguri-intro.jsx`
+- `Megurum めぐる機能/meguri-screens-a.jsx`
+- `Megurum めぐる機能/meguri-screens-b.jsx`
+
+### セルフレビュー結果
+
+- ✅ `npm --prefix mobile run typecheck` が成功した
+- ✅ めぐりトップは詳細を抱え込まず、各導線から個別画面へ遷移する構成にした
+- ✅ めぐり演出画面を独立ルートとして追加した
+- ✅ 新しい状態IDやDB列は追加していないため `notes/09_state_machines.md` / `notes/05_data_model.md` の更新は不要
+- ✅ 「推しすれ違い」「すれ違いレター」は既存用語として定義済みのため `notes/10_glossary.md` の追加更新は不要
+
+---
+
+## イテレーション161：めぐりタブを体験モックへ刷新
+
+### 背景・問題意識
+
+ZohoのDNS反映待ちの間に、オーナーから「めぐり」機能のデザイン一式が `Megurum めぐる機能/` に格納されたため、前回整理した推しすれ違い仕様とデザインモックに沿って iOS 版の専用タブを具体化する必要があった。
+
+### 変更内容
+
+#### `mobile/app/(tabs)/encounters.tsx`
+- 既存のラフな推しすれ違い画面を、デザインモックの「めぐりトップ」中心の体験UIへ全面差し替えした。
+- アプリを開いた瞬間の「今日5人とめぐりあいました！」ステージを追加し、プロフカードに小さな手足が生えて歩いてくる表現をReact Native上で再現した。
+- アクティブなカードの自己紹介吹き出し、今日のめぐり数、広場・マップ・実績・今日のレポートのショートカットを追加した。
+- 「めぐり広場」「めぐりマップ」「実績」「すれ違いレター」「送信枠」「Megrum Plus」を1つのタブ内に配置し、交換導線ではなく体験価値中心の構成にした。
+- 未開封レターは届いたこと・相性・ぼかした場所/時刻を見せ、本文開封と返信は月額Plusに寄せるモーダル導線にした。
+- すれ違い用ひとこと、レター作成、Plus確認のモーダルを追加した。
+
+#### `mobile/app/(tabs)/_layout.tsx`
+- タブ表示名を `すれ違い` から `めぐり` に変更した。
+
+### 影響範囲
+
+- iOS版の `めぐり` タブ
+- NativeTabs の表示ラベル
+- 推しすれ違い体験の初期UI、Plus導線、レター導線
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- iOS開発ビルドで `めぐり` タブを開き、ステージ/広場/マップ/レター/Plus導線を確認
+
+### 関連ファイル
+
+- `mobile/app/(tabs)/encounters.tsx`
+- `mobile/app/(tabs)/_layout.tsx`
+- `Megurum めぐる機能/meguri-app.jsx`
+- `Megurum めぐる機能/meguri-screens-a.jsx`
+- `Megurum めぐる機能/meguri-screens-b.jsx`
+- `Megurum めぐる機能/meguri-card.jsx`
+
+### セルフレビュー結果
+
+- ✅ `npm --prefix mobile run typecheck` が成功した
+- ✅ 交換マッチングではなく、同担・近い界隈との偶然性、蓄積、レター課金導線を主軸にした
+- ✅ 新しい状態IDやDB列は追加していないため `notes/09_state_machines.md` / `notes/05_data_model.md` の更新は不要
+- ✅ 「推しすれ違い」「すれ違いレター」は既に `notes/10_glossary.md` に定義済みのため追加更新は不要
+
+---
+
+## イテレーション160：megrum.jp移行とめぐりブリーフ追記
+
+### 背景・問題意識
+
+オーナーが正式ドメインとして `megrum.jp` を取得したため、ユーザーに見えるURL・問い合わせメール・API仕様上のドメインを `ihub.tokyo` 系から `megrum.jp` 系へ移す必要がある。
+また、会話で固めた Megrum「めぐり」機能の仕様を、デザインAIへそのまま渡せる形でファイルに残す必要がある。
+
+### 変更内容
+
+#### `notes/21_oshi_encounter_strategy.md`
+- Megrum「めぐり」デザインAI用ブリーフ最新版を追記した。
+- 3DSのすれ違い通信を参考にしつつ、任天堂・Mii・既存ゲームUIを模倣しない方針を明記した。
+- プロフカードに小さな手足が生えて歩いてくる表現、すれ違い図鑑、抽象マップ、実績、すれ違い用一言、レター課金導線を整理した。
+- 月額1,000円、無料送信月2通、単発開封チケットなしをデザイン前提に入れた。
+
+#### `web/src/app/` / `mobile/app/` / `iHub/legal-pages.jsx`
+- ヘルプ、設定、法務ページ、geocode User-Agent/Referer などのユーザー向け連絡先・URLを `megrum.jp` 系へ更新した。
+- `support@ihub.tokyo` を `support@megrum.jp` に置き換えた。
+- `web/.env.local.example` の Supabase プロジェクト名メモを Megrum に更新した。
+
+#### `notes/13_api_spec.md` / `notes/15_non_functional.md` / `notes/16_monetization.md` / `notes/17_legal_alignment.md` / `notes/19_email_templates.md`
+- APIベースURLを `api.megrum.jp` / `api-staging.megrum.jp` に更新した。
+- 公開連絡先を `support@megrum.jp` / `info@megrum.jp` に更新した。
+- Supabase Auth メールテンプレートのブランド名・URL・問い合わせ先を Megrum / `megrum.jp` 系へ更新した。
+- 法務整合メモに、公開ドメイン・問い合わせメールは `megrum.jp` 系へ移行し、Apple bundle identifier 等の技術IDは当面維持する方針を追記した。
+
+### 影響範囲
+
+- Web版 / iOS版のヘルプ・法務・設定表示
+- geocode API の外部リクエスト識別ヘッダー
+- API仕様ドキュメント
+- 法務・非機能・収益化・メールテンプレートの公開連絡先
+- めぐり機能のデザイン検討資料
+
+### 確認方法
+
+- `rg` で現行コード・現行仕様ドキュメントに旧ドメイン/旧メールが残っていないことを確認
+- `npm --prefix mobile run typecheck`
+
+### 関連ファイル
+
+- `notes/21_oshi_encounter_strategy.md`
+- `notes/13_api_spec.md`
+- `notes/15_non_functional.md`
+- `notes/16_monetization.md`
+- `notes/17_legal_alignment.md`
+- `notes/19_email_templates.md`
+- `web/src/app/help/page.tsx`
+- `web/src/app/settings/page.tsx`
+- `web/src/app/legal/*.tsx`
+- `web/src/app/api/geocode/route.ts`
+- `web/.env.local.example`
+- `mobile/app/help.tsx`
+- `mobile/app/legal/*.tsx`
+- `iHub/legal-pages.jsx`
+
+### セルフレビュー結果
+
+- ✅ 現行コード・現行仕様ドキュメントの `ihub.tokyo` / `support@ihub.tokyo` / `info@ihub.tokyo` を `megrum.jp` 系へ更新した
+- ✅ Apple bundle identifier / Expo scheme / slug は配信・署名影響があるため変更していない
+- ✅ 「めぐり」機能のデザインAI用ブリーフを、会話の最新仕様に合わせて追記した
+- ✅ 状態遷移・DBスキーマの変更はないため `notes/09_state_machines.md` / `notes/05_data_model.md` の更新は不要
+
+---
+
+## イテレーション159.3：表示名をMegrumへ統一
+
+### 背景・問題意識
+
+オーナーから、サービス名を `iHub` から **Megrum** にしたいという依頼があった。前回の暫定表記として旧綴りが一部に残っていたため、ユーザーに見えるアプリ名・Web metadata・法務表示・ヘルプ文言・設計ドキュメントの正式名を `Megrum` に統一する。
+
+### 変更内容
+
+#### `mobile/app.json`
+- Expo のアプリ表示名を `Megrum` に変更した。
+- `slug` / `scheme` / `bundleIdentifier` は、EAS・Apple署名・既存リンクに影響するため `ihub` 系のまま維持した。
+
+#### `package.json` / `package-lock.json`
+- ワークスペースルートの private package 名を `megrum-platform` に変更した。
+
+#### `mobile/app/` / `mobile/src/`
+- 認証、ヘルプ、法務、オンボーディング完了、タブ表示などのユーザー向け表記を `Megrum` に統一した。
+
+#### `web/src/`
+- metadata title、Welcome、ヘルプ、法務ページ、サポート表記、User-Agent などのユーザー向け表記を `Megrum` に統一した。
+
+#### `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/17_legal_alignment.md` / `notes/21_oshi_encounter_strategy.md`
+- 正式サービス名・デザインAI用ブリーフ・法務整合メモの表記を `Megrum` に統一した。
+
+### 影響範囲
+
+- iOS版 / Web版のユーザー向けブランド表示
+- アプリ名
+- ヘルプ・法務ページ・デザインブリーフ上のサービス名
+- 設計ドキュメントの正式名称
+
+### 確認方法
+
+- 旧綴りの英字表記が残っていないことを `rg` で確認
+- `npm --prefix mobile run typecheck`
+
+### 関連ファイル
+
+- `mobile/app.json`
+- `mobile/app/(auth)/welcome.tsx`
+- `mobile/app/(auth)/signup.tsx`
+- `mobile/app/help.tsx`
+- `mobile/app/legal/*.tsx`
+- `mobile/src/components/LegalDocument.tsx`
+- `package.json`
+- `package-lock.json`
+- `web/src/app/**/*.tsx`
+- `web/src/app/api/geocode/route.ts`
+- `notes/09_state_machines.md`
+- `notes/10_glossary.md`
+- `notes/17_legal_alignment.md`
+- `notes/21_oshi_encounter_strategy.md`
+
+### セルフレビュー結果
+
+- ✅ ユーザー向けの現行表記を `Megrum` に統一した
+- ✅ `slug` / `scheme` / `bundleIdentifier` は配信・署名に影響するため維持した
+- ✅ `npm --prefix mobile run typecheck` が成功した
+- ✅ 状態名・DB列の追加変更はないため `notes/05_data_model.md` の更新は不要
+
+---
+
+## イテレーション159.2：Megrumアプリアイコンを差し替え
+
+### 背景・問題意識
+
+オーナーから、生成した Megrum の新しいアプリアイコン案をいったん実アプリのアイコンに設定したいという依頼があった。背景は既存アプリの淡いラベンダー/スカイ/ピンクの雰囲気を踏襲しつつ、中央の `M` と巡る軌道をシンプルに見せる方向で採用する。
+
+### 変更内容
+
+#### `mobile/assets/icon.png`
+- 生成済みの Megrum アイコンを 1024x1024 PNG にリサイズして差し替えた。
+- Expo `app.json` は既に `./assets/icon.png` を参照しているため、アプリ表示アイコンとして反映される。
+- 画像は alpha なしの RGB PNG として確認した。
+
+### 影響範囲
+
+- iOS / Expo アプリの表示アイコン
+- ホーム画面・インストール画面・開発ビルド上のアプリアイコン
+
+### 確認方法
+
+- `sips -g pixelWidth -g pixelHeight -g hasAlpha mobile/assets/icon.png`
+- `file mobile/assets/icon.png`
+
+### 関連ファイル
+
+- `mobile/assets/icon.png`
+- `mobile/app.json`
+
+### セルフレビュー結果
+
+- ✅ `mobile/assets/icon.png` が 1024x1024 であることを確認した
+- ✅ alpha なしであることを確認した
+- ✅ `mobile/app.json` の `icon` が `./assets/icon.png` を参照していることを確認した
+- ✅ 画像差し替えのみで状態名・用語・DB列追加はなく `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要
+
+---
+
+## イテレーション159.1：推しすれ違いデザインAI用ブリーフを追加
+
+### 背景・問題意識
+
+オーナーから、`notes/21_oshi_encounter_strategy.md` の内容をもとに、画面デザイン生成AIへそのまま渡せるプロンプトと前提情報を整理したいという依頼があった。推しすれ違いは交換機能ではなく体験機能として設計する必要があるため、デザインAIが「近くの交換相手探し」や出会い系UIへ寄らないよう、禁止事項・画面一覧・サンプルデータ・文言候補まで明文化した。
+
+### 変更内容
+
+#### `notes/21_oshi_encounter_strategy.md`
+- 「14. デザインAIへ渡す画面生成ブリーフ」を追加した。
+- デザインAIへそのまま貼れるメインプロンプトを追加した。
+- 9画面分の具体仕様を追加した。
+  - 推しすれ違いトップ
+  - すれ違いパネル詳細
+  - 未開封レター一覧
+  - 未開封レター詳細 / 開封前課金導線
+  - レター開封後の本文・返信
+  - レター作成
+  - 推しすれ違い Plus
+  - プライバシー・安全設定
+  - 初回オンボーディング / 許可説明
+- 推しパネル・レター・Plus のサンプルデータを追加した。
+- UI文言候補、避ける表現、避けるUIを追加した。
+- ビジュアルバリエーション、パネル深掘り、レター課金導線、モーション案用の追加プロンプトを追加した。
+
+### 影響範囲
+
+- 推しすれ違い機能の画面デザイン検討
+- 外部/別AIへのデザイン依頼文
+- 今後のiOS版 `すれ違い` タブ実装方針
+
+### 確認方法
+
+- `notes/21_oshi_encounter_strategy.md` の 14章だけをコピーして、デザインAIへ渡しても前提が伝わることを確認
+- 「交換」「正確な位置」「出会い系」へ寄せない禁止事項が含まれていることを確認
+- 月額1000円、無料送信月2通、単発開封チケットなしが反映されていることを確認
+
+### 関連ファイル
+
+- `notes/21_oshi_encounter_strategy.md`
+
+### セルフレビュー結果
+
+- ✅ 画面生成AIに渡せる独立ブリーフとして読める構成にした
+- ✅ 既存の推しすれ違い仕様・課金方針・安全設計と矛盾しない
+- ✅ 新しい状態名・用語・DB列追加はないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要
+
+---
+
+## イテレーション159：推しすれ違い体験構想を整理
+
+### 背景・問題意識
+
+オーナーから、現地交換モードとは別に「同担や近い界隈とすれ違う楽しさ」「すれ違うほどパネルが完成していく体験」「課金したらレター本文を開封・返信できる体験」を、交換機能から切り離して深掘りしたいという依頼があった。既存の `すれ違い` タブは骨格があるため、次のUI/機能開発に入る前に、体験価値・課金・安全設計・MVPロードマップを整理した。
+
+### 変更内容
+
+#### `notes/21_oshi_encounter_strategy.md`
+- 推しすれ違いのコアコンセプトを「同じ推しを好きな人が、今日もどこかで生きていた気配を集める」と定義した。
+- 現地交換モードと混同しないため、グッズ条件・Wish一致・即時合流を主訴にしない方針を明記した。
+- すれ違いパネル、気配通知、すれ違いレター、同担濃度、すれ違いストーリー、イベント会場の空気などの体験案を列挙した。
+- 月額1000円、無料送信月2通、レター開封チケットなしの課金設計を整理した。
+- 位置・時刻のぼかし、k匿名性、ブロック、未成年・センシティブ対応などの安全設計を整理した。
+- `encounter_presence_windows` / `encounter_events` / `encounter_panels` / `encounter_letters` / `encounter_quotas` のデータモデル候補を追加した。
+- 既存 `mobile/app/(tabs)/encounters.tsx` を次に磨くためのUI改善順を整理した。
+
+### 影響範囲
+
+- iOS版 `すれ違い` タブの今後の設計
+- 推しすれ違い Plus の課金体験
+- 位置情報・Push通知・匿名性の非機能設計
+
+### 確認方法
+
+- `notes/21_oshi_encounter_strategy.md` を読み、交換機能ではなく体験機能として一貫していることを確認
+- 既存 `notes/09_state_machines.md` の Oshi Encounter Letter Lifecycle と矛盾しないことを確認
+- 既存 `notes/10_glossary.md` の `推しすれ違い` / `すれ違いパネル` / `すれ違いレター` / `推しすれ違い Plus` と矛盾しないことを確認
+
+### 関連ファイル
+
+- `notes/21_oshi_encounter_strategy.md`
+- `mobile/app/(tabs)/encounters.tsx`
+- `notes/09_state_machines.md`
+- `notes/10_glossary.md`
+
+### セルフレビュー結果
+
+- ✅ 交換・打診・取引への自動接続はしない方針を明記した
+- ✅ 月額1000円、無料送信月2通、単発開封チケットなしの既存方針と整合した
+- ✅ 既存の `received_locked` / `opened` / `replied` / `hidden` / `archived` 状態と矛盾しない
+- ✅ 新しい正式用語は追加せず、既存 glossary の用語範囲で整理したため `notes/10_glossary.md` の追加更新は不要
+- ⚠️ データモデル候補は未確定のため、実装前に `notes/05_data_model.md` へ正式反映する必要がある
+
+---
+
+## イテレーション158：ユーザー向けサービス名をMegrumへ変更
+
+### 背景・問題意識
+
+オーナーから、サービス名を `iHub` から `Megrum` に変更する方針が示された。既にApple Developer / EAS / Supabase / ドメイン周りは `ihub` 系識別子で進んでいるため、まずはユーザーに見える表示名・ロゴ文字・ヘルプ・法務ページの画面表示を `Megrum` に変更し、bundle identifier やドメインなど署名・配信に関わる技術識別子は現時点では維持する。
+
+### 変更内容
+
+#### `mobile/app.json`
+- アプリ表示名を `Megrum` に変更した。
+- `slug` / `scheme` / `bundleIdentifier` は既存の `ihub` 系のまま維持した。
+
+#### `mobile/app/` / `mobile/src/`
+- 認証画面、ヘルプ、法務ページ、オンボーディング完了、プロフドロワー等の表示文言を `Megrum` に変更した。
+- ロゴ表示文字を `iH` から `Mg` に変更した。
+
+#### `web/src/`
+- ページ metadata title、Welcome 表示、ヘルプ、法務ページ、サポート表記などのユーザー向け `iHub` 表示を `Megrum` に変更した。
+- Geocoding User-Agent も `Megrum/0.1` に変更した。ドメイン・問い合わせメールは現状の `ihub.tokyo` を維持した。
+
+#### `notes/10_glossary.md`
+- プラットフォーム名を `Megrum` として登録し、`iHub` は旧称として残した。
+
+#### `notes/09_state_machines.md`
+- ドキュメント目的文のサービス名を `Megrum` に変更した。
+
+#### `notes/17_legal_alignment.md`
+- 法務原典は `iHub` のまま当面維持し、画面表示名のみ `Megrum` に変えたことを追記した。
+
+### 影響範囲
+
+- iOS版 / Web版のユーザー向けブランド表示
+- 法務ページの画面表示
+- アプリ名
+- ロゴ文字
+
+### 確認方法
+
+- iOS版 Welcome / ヘルプ / 法務ページで `Megrum` 表示になっていることを確認
+- Web版 Welcome / metadata title / ヘルプ / 法務ページで `Megrum` 表示になっていることを確認
+- `npm --prefix mobile run typecheck`
+
+### 関連ファイル
+
+- `mobile/app.json`
+- `mobile/app/(auth)/welcome.tsx`
+- `mobile/app/(auth)/signup.tsx`
+- `mobile/app/help.tsx`
+- `mobile/app/legal/*.tsx`
+- `mobile/src/components/IHubLogo.tsx`
+- `mobile/src/components/LegalDocument.tsx`
+- `web/src/app/**/*.tsx`
+- `web/src/components/auth/IHubLogo.tsx`
+- `notes/09_state_machines.md`
+- `notes/10_glossary.md`
+- `notes/17_legal_alignment.md`
+
+### セルフレビュー結果
+
+- ✅ `mobile/app` / `mobile/src` / `web/src` のユーザー向け `iHub` 表示が残っていないことを `rg` で確認した
+- ✅ iOS版 typecheck が成功した
+- ⚠️ Web版 lint は `web/node_modules` に `eslint` が無く実行できなかった
+- ⚠️ `slug` / `scheme` / `bundleIdentifier` / `ihub.tokyo` / `support@ihub.tokyo` は配信・署名・連絡先の移行判断が必要なため維持した
+
+---
+
+## イテレーション157.3：iOS認証後ホーム遷移のNativeTabs警告を修正
+
+### 背景・問題意識
+
+iOS開発ビルドで認証・プレビュー導線からホームへ遷移する際、`The action 'NAVIGATE' ... Do you have a route named '(tabs)'?` という開発時警告が出ていた。Expo Router の route group と `NativeTabs` の組み合わせで、`router.navigate("/")` が内部グループ `"(tabs)"` への navigate として解決され、現在のナビゲータで処理できないケースがあった。
+
+### 変更内容
+
+#### `mobile/app/(auth)/_layout.tsx`
+- 認証済み・プレビュー中のホーム遷移を、imperative な `router.navigate("/")` ではなく `<Redirect href="/" />` に変更した。
+- `HomeRedirect` コンポーネントを削除し、認証レイアウトが状態に応じて直接リダイレクトする形にした。
+
+#### `mobile/app/(auth)/login.tsx` / `mobile/app/(auth)/welcome.tsx`
+- ログイン成功後・プレビュー開始後の `router.navigate("/")` を削除し、AuthProvider の状態変化を受けたレイアウトRedirectに一本化した。
+
+#### `mobile/app/onboarding/done.tsx` / `mobile/app/settings-privacy.tsx` / `mobile/src/components/RouteHeader.tsx` / `mobile/app/(tabs)/notifications.tsx`
+- ホームへ戻る導線を `router.navigate("/")` から `router.replace("/")` に変更した。
+
+#### `mobile/app/proposal-confirm.tsx` / `mobile/app/goods-editor.tsx`
+- `/(tabs)` route group を直接指定していた箇所を、公開パスの `/` / `/transactions` / `/inventory` / `/wishes` に変更した。
+
+### 影響範囲
+
+- iOS版 認証・プレビュー導線
+- オンボーディング完了後のホーム遷移
+- 共通ヘッダーの戻り先フォールバック
+- 打診完了後・在庫/Wish編集後のタブ遷移
+
+### 確認方法
+
+- iOS開発ビルドでログインまたはプレビュー開始後、`(tabs)` ナビゲーション警告が出ずにホームへ遷移することを確認
+- `npm --prefix mobile run typecheck`
+
+### 関連ファイル
+
+- `mobile/app/(auth)/_layout.tsx`
+- `mobile/app/(auth)/login.tsx`
+- `mobile/app/(auth)/welcome.tsx`
+- `mobile/app/onboarding/done.tsx`
+- `mobile/app/settings-privacy.tsx`
+- `mobile/src/components/RouteHeader.tsx`
+- `mobile/app/(tabs)/notifications.tsx`
+- `mobile/app/proposal-confirm.tsx`
+- `mobile/app/goods-editor.tsx`
+
+### セルフレビュー結果
+
+- ✅ `router.navigate("/")` と `router.replace("/(tabs)")` が残っていないことを `rg` で確認した
+- ✅ TypeScript typecheck が成功することを確認した
+- ✅ ナビゲーション修正のみで状態名・用語・DB列追加はなく `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の追加更新は不要
+
+---
+
+## イテレーション157.2：EAS依存解決にlegacy-peer-depsを固定
+
+### 背景・問題意識
+
+iOS development build が Apple署名・端末登録までは進む一方、EAS Build の `Install dependencies` フェーズで連続して失敗した。ローカルで `npm ci` を再現すると、Expo Router周辺の peer dependency 解決が `--legacy-peer-deps` なしで走り、ローカルで使っていたインストール条件とEAS上の条件がずれていた。
+
+### 変更内容
+
+#### `.npmrc` / `mobile/.npmrc`
+- `legacy-peer-deps=true` を追加し、EAS上の依存インストールでもローカルと同じpeer dependency解決にした。
+- npm workspaces 構成では `mobile/.npmrc` が無視される場合があるため、ルート `.npmrc` にも同じ設定を置いた。
+
+#### `mobile/eas.json`
+- EAS Build 上で確実に効くよう、development / development-simulator / preview プロファイルに `NPM_CONFIG_LEGACY_PEER_DEPS=true` を追加した。
+
+### 影響範囲
+
+- iOS版 EAS development build
+- EAS Build の Install dependencies フェーズ
+
+### 確認方法
+
+- `npm --prefix mobile ci --legacy-peer-deps`
+- `npm --prefix mobile run typecheck`
+- EASで `eas build --platform ios --profile development --clear-cache`
+
+### 関連ファイル
+
+- `.npmrc`
+- `mobile/.npmrc`
+- `mobile/eas.json`
+
+### セルフレビュー結果
+
+- ✅ ローカルで `npm ci --legacy-peer-deps` が成功することを確認した
+- ✅ TypeScript typecheck が成功することを確認した
+- ✅ ビルド環境設定のみの変更で状態名・用語・DB列追加はなく `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の追加更新は不要
+
+---
+
+## イテレーション157.1：ホーム右下操作をiOS純正Liquid GlassとSF Symbolsへ変更
+
+### 背景・問題意識
+
+ホーム画面右下の現地交換操作ボタンについて、オーナーから「っぽい方向へ寄せます、ではなく、ちゃんとリサーチして、本物通りに仕上げて」と指摘があった。独自SVGや文字アイコンではなく、iOS標準の見え方に沿うため、AppleのSF SymbolsとiOS 26 Liquid GlassをExpoのネイティブモジュール経由で使う方針にした。
+
+### 変更内容
+
+#### `mobile/package.json`
+- `expo-symbols` を追加し、iOSではSF Symbolsを直接描画できるようにした。
+- `expo-glass-effect` を追加し、iOS 26対応環境ではネイティブLiquid Glassを使えるようにした。
+
+#### `mobile/app/(tabs)/index.tsx`
+- ホーム右下の現地交換操作ボタンを、SF Symbolsの `location.circle` / `location.circle.fill` に変更した。
+- iOS 26対応端末では `expo-glass-effect` の `GlassView` を使い、未対応・未再ビルド環境では `BlurView` / 既存アイコンへフォールバックする構成にした。
+- ActionSheetIOS のメニュー構成は維持し、「現地交換モードをオン/オフ」「現地交換情報を編集する」だけを表示する。
+
+### 影響範囲
+
+- iOS版 ホーム画面
+- 右下の現地交換操作ボタン
+- 開発ビルドのネイティブ依存関係
+
+### 確認方法
+
+- iOS 26対応実機の開発ビルドでホーム右下ボタンがLiquid Glass表示になることを確認
+- iOSでボタン内アイコンがSF Symbolsの位置アイコンになることを確認
+- ボタン押下でActionSheetIOSが開き、通知系の余計な項目が出ないことを確認
+- `npm --prefix mobile run typecheck`
+
+### 関連ファイル
+
+- `mobile/app/(tabs)/index.tsx`
+- `mobile/package.json`
+- `mobile/package-lock.json`
+
+### セルフレビュー結果
+
+- ✅ iOS標準に寄せるため、独自アイコンではなくSF Symbolsを使用した
+- ✅ iOS 26ではネイティブLiquid Glassを使い、未対応環境では既存UIが壊れないようフォールバックを入れた
+- ✅ UI表現のみの変更で状態名・用語・DB列追加はなく `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の追加更新は不要
+
+---
+
+## イテレーション157：推しすれ違いタブとレター課金体験を追加
+
+### 背景・問題意識
+
+オーナーから、現地交換モードとは別に「同担や近い界隈とすれ違う楽しさ」「すれ違うほどパネルが完成していく体験」「届いたメッセージの開封・返信は月額課金」という構想が提示された。交換やグッズ条件はいったん忘れ、利便性よりも推し活の偶然性・蓄積・開封したくなる体験を重視する。
+
+### 変更内容
+
+#### `mobile/app/(tabs)/_layout.tsx`
+- フッターに `すれ違い` 専用タブを追加した。
+- 既存のホーム / 在庫 / Wish / 通知 / 取引タブは維持し、既存画面の取得・取引ロジックには接続しない構成にした。
+
+#### `mobile/app/(tabs)/encounters.tsx`
+- 新規に `推しすれ違い` 画面を追加した。
+- 同担の気配・濃いすれ違い・未開封レターのサマリーを表示する。
+- 推しごとの `すれ違いパネル` を横スクロールで表示し、ピースが埋まるコレクション体験を追加した。
+- `すれ違いレター` は到着・相性・推し傾向・ぼかした場所/時刻のみ無料表示し、本文開封と返信は Plus 導線へ分離した。
+- 課金は単発チケットなし、月額1000円のみの設計で表示した。
+- 送信側は無料枠2通/月とし、追加送信枠は Plus 対象として表示した。
+- 位置と時刻はぼかす前提を画面内で明示した。
+
+#### `notes/10_glossary.md`
+- `推しすれ違い` / `すれ違いパネル` / `すれ違いレター` / `推しすれ違い Plus` を追加した。
+
+#### `notes/09_state_machines.md`
+- `Oshi Encounter Letter Lifecycle` を追加し、`received_locked` / `opened` / `replied` / `hidden` / `archived` を定義した。
+
+### 影響範囲
+
+- iOS版 フッター
+- iOS版 推しすれ違い画面
+- 新規ソーシャル体験の用語・状態定義
+
+### 確認方法
+
+- iOS実機でフッターに `すれ違い` タブが出ることを確認
+- `すれ違い` タブでパネル・未開封レター・月額1000円プラン・月2通の送信枠が表示されることを確認
+- Plusプレビュー切替後、レター本文と返信導線が表示されることを確認
+- `npm --prefix mobile run typecheck`
+
+### 関連ファイル
+
+- `mobile/app/(tabs)/_layout.tsx`
+- `mobile/app/(tabs)/encounters.tsx`
+- `notes/09_state_machines.md`
+- `notes/10_glossary.md`
+
+### セルフレビュー結果
+
+- ✅ 既存の交換・打診・取引データ取得には接続せず、新規タブとして分離した
+- ✅ 月額1000円のみ、単発開封チケットなし、送信無料枠2通/月の仕様を画面に反映した
+- ✅ レター本文と返信はPlus導線に分離し、到着・相性・ぼかした場所/時刻だけ無料表示にした
+- ✅ 新用語とレター状態遷移を `notes/10_glossary.md` / `notes/09_state_machines.md` に記録した
+
+---
+
+## イテレーション156.23：ホームヘッダー実験を撤去し上端フェードだけに戻す
+
+### 背景・問題意識
+
+ホーム画面のヘッダーBlur/モザイク実験が実機で不自然な表示になり、見出しタイトルが隠れる・灰色帯が出る・モザイクが荒いなど、ユーザー体験を大きく損ねていた。オーナーから「どういう感じにするかまずここで教えろ」「やって今すぐ」と指示があったため、複雑な固定ヘッダー制御を撤去し、通常のスクロール見出しへ戻す。
+
+### 変更内容
+
+#### `mobile/app/(tabs)/index.tsx`
+- 多段 `BlurView` による `HeaderGradientOverlay` を撤去した。
+- `マッチしてるよ！` / `交換できるかも` はスクロール内の通常見出しとして維持した。
+- 画面最上部だけ、白から透明へ細かく抜ける `TopEdgeFade` に置き換えた。
+- 見出しタイトルの固定化・入れ替え・背面Blur制御は追加しない方針に戻した。
+
+### 影響範囲
+
+- iOS版 ホーム画面
+- ホーム上部のステータスバー保護表示
+- `マッチしてるよ！` / `交換できるかも` の見出し表示
+
+### 確認方法
+
+- 実機でホームを開き、見出しが通常のスクロール内表示に戻っていることを確認
+- 画面上部に灰色帯や粗いモザイクが出ないことを確認
+- `npm --prefix mobile run typecheck`
+
+### 関連ファイル
+
+- `mobile/app/(tabs)/index.tsx`
+
+### セルフレビュー結果
+
+- ✅ 複雑な固定ヘッダー/Blur実験を撤去した
+- ✅ 見出しタイトルをスクロール内の通常表示に戻した
+- ✅ UI表現のみの変更で状態名・用語・DB列追加はなく `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要
+
+---
+
+## イテレーション156.22：ホーム見出しを元に戻し上部だけ細密グラデーション透過
+
+### 背景・問題意識
+
+固定ヘッダー上で見出しタイトルを入れ替える方式は、実機で不自然な表示になり、オーナーから「元に戻してください。ヘッダー部分だけ、すごく細かいグラデーション透過になるように」と指摘があった。外部資料として、CSS の多段 color stop による透明グラデーション表現と、Expo `BlurView` の「下にあるものをぼかす」仕様を参照し、React Native では細かいバンドを積む形に置き換える。
+
+### 変更内容
+
+#### `mobile/app/(tabs)/index.tsx`
+- 固定ヘッダーで `マッチしてるよ！` / `交換できるかも` を入れ替える仕組みを撤去した。
+- スクロール内の見出しタイトル表示を復元した。
+- 画面上部のヘッダー領域だけに `HeaderGradientOverlay` を追加した。
+- `HeaderGradientOverlay` は 28 段の細かい `BlurView` バンドで構成し、上ほど強く、下ほど透明に近づくようにした。
+
+### 影響範囲
+
+- iOS版 ホーム画面
+- ホーム上部のグラデーション透過Blur
+- `マッチしてるよ！` / `交換できるかも` の通常見出し表示
+
+### 確認方法
+
+- 実機でホームを開き、見出しタイトルがスクロール内に通常表示されることを確認
+- 画面上部ヘッダー部分だけに細かいグラデーション透過Blurが載ることを確認
+- `npm --prefix mobile run typecheck`
+
+### 関連ファイル
+
+- `mobile/app/(tabs)/index.tsx`
+
+### セルフレビュー結果
+
+- ✅ 固定ヘッダーのタイトル入れ替え方式を撤去し、見出し表示を元に戻した
+- ✅ ヘッダー部分だけに細密な多段Blurバンドを適用した
+- ✅ UI表現の変更のみで状態名・用語・DB列追加はなく `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要
+
+---
+
+## イテレーション156.21：ホーム見出しを固定ヘッダーへ一本化
+
+### 背景・問題意識
+
+固定グラデーションヘッダーを追加した後も、スクロール内の見出しタイトルが残っていたため、固定ヘッダー上のタイトルとスクロール内タイトルが重なり、不自然な表示になっていた。また、`Screen` 側の top padding の内側からヘッダーが始まっていたため、ステータスバー周辺まで素材が届きにくかった。
+
+### 変更内容
+
+#### `mobile/app/(tabs)/index.tsx`
+- `Screen` の top padding を 0 にし、固定グラデーションヘッダーが画面最上部から始まるようにした。
+- スクロールコンテンツ側の top padding を固定ヘッダー高さに合わせて動的に付与し、カードや行タイトルがヘッダー下から始まるようにした。
+- スクロール内のセクション見出しテキストを描画しないようにし、固定ヘッダー上のタイトルだけを表示する構造にした。
+- スクロール内見出しは、タイトル切り替え判定用の透明な `sectionAnchor` として残した。
+
+### 影響範囲
+
+- iOS版 ホーム画面
+- 固定ヘッダーのタイトル表示
+- ホーム上部のブラー/モザイク到達範囲
+
+### 確認方法
+
+- 実機でホームを開き、スクロール内と固定ヘッダーで見出しが二重表示されないことを確認
+- 固定ヘッダーがステータスバー周辺まで伸びていることを確認
+- スクロールに応じて固定ヘッダーのタイトルだけが `マッチしてるよ！` / `交換できるかも` に切り替わることを確認
+- `npm --prefix mobile run typecheck`
+
+### 関連ファイル
+
+- `mobile/app/(tabs)/index.tsx`
+
+### セルフレビュー結果
+
+- ✅ 見出しタイトルの描画元を固定ヘッダーへ一本化した
+- ✅ スクロール内見出しは透明アンカーにし、切り替え判定だけ担わせる構造にした
+- ✅ UI表現の変更のみで状態名・用語・DB列追加はなく `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要
+
+---
+
+## イテレーション156.20：ホーム見出しを固定グラデーションヘッダーに分離
+
+### 背景・問題意識
+
+見出しごとの背面Blurでは、見出しタイトル自体がBlur素材の中に巻き込まれ、スクロール中に完全に見えなくなることがあった。オーナーから「ヘッダー自体をグラデーション透過にし、見出しタイトルはその上のレイヤーへ置き、スクロールに従って見出しタイトルが入れ替わる」という方針が提示されたため、見出し表示と背景素材を完全に分離する。
+
+### 変更内容
+
+#### `mobile/app/(tabs)/index.tsx`
+- 見出しごとにBlurを持たせる実装を撤去し、画面上部に固定の `HomeGradientHeader` を追加した。
+- `HomeGradientHeader` の背景は、上ほど強く下ほど透明になる細かい複数段の `BlurView` バンドで構成した。
+- 見出しタイトルはBlurレイヤーより上に別レイヤーで配置し、素材レイヤーに巻き込まれて消えないようにした。
+- `Animated.ScrollView` のスクロール位置と各セクション見出しの `layoutY` を使い、固定ヘッダー上のタイトルが `マッチしてるよ！` / `交換できるかも` に切り替わるようにした。
+
+### 影響範囲
+
+- iOS版 ホーム画面
+- ホーム上部の固定ヘッダー
+- `マッチしてるよ！` / `交換できるかも` の見出し切り替え
+
+### 確認方法
+
+- 実機でホームをスクロールし、上部ヘッダー背景が上ほど強いグラデーション透過Blurになることを確認
+- 見出しタイトルがBlurに巻き込まれず常に前面で読めることを確認
+- セクションの切り替わりに合わせて固定ヘッダーのタイトルが入れ替わることを確認
+- `npm --prefix mobile run typecheck`
+
+### 関連ファイル
+
+- `mobile/app/(tabs)/index.tsx`
+
+### セルフレビュー結果
+
+- ✅ 背景素材レイヤーと見出しテキストレイヤーを分離した
+- ✅ Blurを細かい複数段バンドにし、単一の均一Blurからグラデーション透過ヘッダーへ変更した
+- ✅ UI表現の変更のみで状態名・用語・DB列追加はなく `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要
+
+---
+
+## イテレーション156.19：ホームBlurを上方向へ強まる段階素材に変更
+
+### 背景・問題意識
+
+ホームの見出し背面Blurは方向性として良くなったが、下スクロール時に画面上部のステータスバー周辺がBlurにならず、見出し背面も均一にぼけていた。オーナーから「下から上部にかけてどんどんぼやけていく感じ」と指摘があったため、Blurを1枚ではなく複数段の素材レイヤーとして扱う。
+
+### 変更内容
+
+#### `mobile/app/(tabs)/index.tsx`
+- スクロール量に応じて画面上部へフェードインする `homeStatusMaterial` を追加した。
+- `ProgressiveBlurMaterial` を追加し、上ほど強く下ほど弱い5段の `BlurView` バンドで素材感を作るようにした。
+- `StickySectionHeader` の背面Blurも `ProgressiveBlurMaterial` へ置き換え、均一なぼけから上方向へ強まるぼけに変更した。
+
+### 影響範囲
+
+- iOS版 ホーム画面
+- ステータスバー周辺のスクロール連動Blur
+- `マッチしてるよ！` / `交換できるかも` の見出し背面Blur
+
+### 確認方法
+
+- 実機でホームを下スクロールし、画面上部にもBlurが出ることを確認
+- 見出し背面のBlurが均一ではなく、下から上へ強まるように見えることを確認
+- `npm --prefix mobile run typecheck`
+
+### 関連ファイル
+
+- `mobile/app/(tabs)/index.tsx`
+
+### セルフレビュー結果
+
+- ✅ 画面上部の素材レイヤーをスクロール連動で追加した
+- ✅ `BlurView` を複数段に分け、均一な灰色帯ではなく上方向へ強まる表現にした
+- ✅ UI表現の変更のみで状態名・用語・DB列追加はなく `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要
+
+---
+
+## イテレーション156.18：ホーム見出し背面だけを段階Blur化
+
+### 背景・問題意識
+
+ホーム上部のブラーを画面最上部へ常時貼る実装では、見出しが潜ったり、カードが中途半端に隠れたりして不自然だった。オーナーから「見出しタイトルのところは背景透明で固定し、その一個前のレイヤーに徐々にBlurをかける」という案が提示されたため、見出し自体と背面の素材レイヤーを分離する。
+
+### 変更内容
+
+#### `mobile/app/(tabs)/index.tsx`
+- ホーム最上部に常時出していた `BlurView` オーバーレイを撤去した。
+- `ScrollView` を `Animated.ScrollView` に変更し、スクロール量 `scrollY` を取得するようにした。
+- `StickySectionHeader` に `layoutY` と `scrollY` を渡し、見出しが固定位置へ近づくにつれて背面レイヤーだけ `BlurView` がフェードインするようにした。
+- 見出しタイトル自体は透明背景のまま前面に置き、文字の可読性を残した。
+
+### 影響範囲
+
+- iOS版 ホーム画面
+- `マッチしてるよ！` / `交換できるかも` の sticky header 表現
+- ホーム上部のブラー/モザイク表現
+
+### 確認方法
+
+- 実機でホームを開き、見出しタイトルが背景透明のまま固定されることを確認
+- スクロールが進むにつれ、見出し背面だけに薄く `BlurView` が出ることを確認
+- 見出しの文字がカード画像に潜らず読めることを確認
+- `npm --prefix mobile run typecheck`
+
+### 関連ファイル
+
+- `mobile/app/(tabs)/index.tsx`
+
+### セルフレビュー結果
+
+- ✅ 見出しテキスト層とブラー層を分離し、常時最上部にブラーを貼る不自然な構造を撤去した
+- ✅ `BlurView` は見出しの背面レイヤーとして使い、下の実コンテンツをぼかす用途に戻した
+- ✅ UI表現の変更のみで状態名・用語・DB列追加はなく `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要
+
+---
+
+## イテレーション156.17：公式仕様に合わせたホームBlurとNativeTabsスクロール構造
+
+### 背景・問題意識
+
+ホーム上部がモザイク/ブラーにならず、単にコンテンツがステータスバー裏へ入り込む状態になっていた。またフッターの `NativeTabs minimizeBehavior="onScrollDown"` も、在庫 / Wish では下スクロールしても左下へ集約されなかった。Expo公式では `BlurView` は下にあるものをぼかす用途で、動的コンテンツの後に描画する必要がある。また `NativeTabs` の minimize は iOS 26+ のネイティブ挙動で、スクロール対象が画面内で素直に検知できる構造である必要がある。
+
+### 変更内容
+
+#### `mobile/app/(tabs)/index.tsx`
+- ホーム上部に `expo-blur` の `BlurView` をスクロールコンテンツの後置きオーバーレイとして追加した。
+- 公式の「下にあるものをぼかす」構造に合わせ、疑似画像背景ではなく実コンテンツの上に `systemChromeMaterialLight` を重ねる形にした。
+
+#### `mobile/app/(tabs)/inventory.tsx`
+- 画面直下の最初のスクロール対象を縦 `ScrollView` に変更し、`NativeTabs` が下スクロールを検知しやすい構造へ寄せた。
+- ヘッダーと上部タブは root `ScrollView` の sticky header にまとめた。
+- 内側の縦 `ScrollView` を撤去し、表示中タブのグリッドを root `ScrollView` 上に直接描画するようにした。
+- タブ横スワイプはジェスチャーで維持した。
+
+#### `mobile/app/(tabs)/wishes.tsx`
+- 在庫と同様、画面直下の最初のスクロール対象を縦 `ScrollView` に変更した。
+- ヘッダーと上部タブを sticky header 化し、Wish / 個別募集の中身を root `ScrollView` 上に直接描画するようにした。
+- 横スワイプによる Wish / 個別募集切り替えは維持した。
+
+### 影響範囲
+
+- iOS版 ホーム画面上部のブラー
+- iOS版 マイ在庫 / Wish のフッター最小化
+- 在庫 / Wish の上部ヘッダー・タブ・縦スクロール構造
+
+### 確認方法
+
+- 実機でホームを開き、上部ステータスバー付近に `BlurView` のぼかしが出ることを確認
+- 在庫 / Wish で下へスクロールし、iOS 26+ 環境で `NativeTabs` が `onScrollDown` に反応して畳まれることを確認
+- 在庫 / Wish で横スワイプによるタブ切り替えが残っていることを確認
+- `npm --prefix mobile run typecheck`
+
+### 関連ファイル
+
+- `mobile/app/(tabs)/index.tsx`
+- `mobile/app/(tabs)/inventory.tsx`
+- `mobile/app/(tabs)/wishes.tsx`
+
+### セルフレビュー結果
+
+- ✅ `BlurView` は公式推奨どおり、動的なスクロールコンテンツの後に描画して下の内容をぼかす構造にした
+- ✅ `NativeTabs` は公式の iOS 26+ `minimizeBehavior="onScrollDown"` を維持し、独自フッター化していない
+- ✅ 在庫 / Wish のスクロール構造を、ネイティブタブが検知しやすい root `ScrollView` に寄せた
+- ✅ UI構造の変更のみで状態名・用語・DB列追加はなく `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要
+
+---
+
+## イテレーション156.16：ホーム上部の疑似ブラー背景を撤去
+
+### 背景・問題意識
+
+ホーム上部ヘッダーを参考画像へ寄せるために疑似的な候補画像背景を敷いたが、実機では「変な感じ」になり、参考のInstagram系UIとは根本的に違う見え方になった。調査した結果、iOS/Instagram系の見え方は、ヘッダー背景を別素材で作るのではなく、スクロール中の本物のコンテンツをバーの背後まで流し、その上に半透明/ブラーのバーを重ねる構造であると整理した。
+
+### 変更内容
+
+#### `mobile/app/(tabs)/index.tsx`
+- 上部に候補カード由来の疑似背景を敷く `HomeHeaderAmbient` を撤去した。
+- ホーム上部に固定表示していた `homeHeaderGlassBridge` を撤去した。
+- `StickySectionHeader` ごとの全幅ブラー/灰色帯を撤去し、セクションタイトル自体は透明背景で表示するよう戻した。
+- `BlurView` を背景素材づくりに使う実装を外し、今後は「本物のスクロールコンテンツを背後へ流す」構造へ寄せる前提に戻した。
+
+### 影響範囲
+
+- iOS版 ホーム画面
+- ホーム上部の背景表現
+- `マッチしてるよ！` / `交換できるかも` の sticky header 背景
+
+### 確認方法
+
+- 実機でホームを開き、上部の変な疑似画像背景と灰色のタイトル帯が消えていることを確認
+- `マッチしてるよ！` / `交換できるかも` が透明背景で表示されることを確認
+- `npm --prefix mobile run typecheck`
+
+### 関連ファイル
+
+- `mobile/app/(tabs)/index.tsx`
+
+### セルフレビュー結果
+
+- ✅ 参考画像から遠ざけていた疑似背景と全幅の灰色ブラー帯を撤去した
+- ✅ iOS/Instagram系の基本構造である「本物のコンテンツを背後に流す」方向へ設計を戻した
+- ✅ UI表現の変更のみで状態名・用語・DB列追加はなく `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要
+
+---
+
+## イテレーション156.15：ホーム上部ブラーを参考画像寄せに再調整
+
+### 背景・問題意識
+
+ホーム画面の上部ヘッダーについて、修正後アプリと参考画像を比較すると、アプリ側は「白い半透明の板」が大きく被さり、`マッチしてるよ！` の文字までブラーの下に沈んでいた。参考画像は、背後の写真グリッドが上端まで流れ込み、それをガラスが自然にぼかしている見え方であり、現状は構造・強度ともに違っていた。
+
+### 変更内容
+
+#### `mobile/app/(tabs)/index.tsx`
+- 上部の常時ブラー領域を短くし、セクションタイトルを覆って文字がぼける状態を解消した。
+- 上部ブラーの背後に、ホーム候補カードから作る `HomeHeaderAmbient` を追加し、白地ではなくカード画像/色がにじむ下地にした。
+- `StickyGlassBackground` の白い wash / band / shade を大幅に薄くし、参考画像のように背後の情報が残るブラーへ寄せた。
+
+### 影響範囲
+
+- iOS版 ホーム画面
+- ホーム上部のステータスバー付近のブラー
+- `マッチしてるよ！` / `交換できるかも` の sticky header 背景
+
+### 確認方法
+
+- 実機でホームを開き、上部が白い板ではなくカード画像由来のにじみになることを確認
+- `マッチしてるよ！` の文字がブラー下に沈まず、前面で読めることを確認
+- `npm --prefix mobile run typecheck`
+
+### 関連ファイル
+
+- `mobile/app/(tabs)/index.tsx`
+
+### セルフレビュー結果
+
+- ✅ 参考画像との差分だった「白い大きな覆い」「タイトルのブラー沈み」を解消する方向へ修正した
+- ✅ iOS標準寄りの `BlurView` は維持し、独自タイルモザイクには戻していない
+- ✅ UI表現の変更のみで状態名・用語・DB列追加はなく `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要
+
+---
+
+## イテレーション156.14：NativeTabs直返しとプロフドロワー分離
+
+### 背景・問題意識
+
+在庫 / Wish の実機確認で、ヘッダーは旧構造へ戻した一方、フッターがまだ下スクロールで畳まれないことが確認された。旧版では `(tabs)/_layout.tsx` が `NativeTabs` を直返ししていたが、現行版ではプロフドロワーのために `NativeTabs` 全体を `View` で包んでおり、iOS のネイティブタブ最小化がスクロール連動を拾えない可能性が高い。
+
+### 変更内容
+
+#### `mobile/app/(tabs)/_layout.tsx`
+- `ProfileDrawerHost` で `NativeTabs` を包む構造をやめ、`NativeTabs` を旧版に近い形で直返しする構造へ戻した。
+- プロフドロワーは `ProfileDrawerOverlay` として `NativeTabs` の兄弟に分離し、左端スワイプの導線とドロワー表示は維持した。
+- ドロワーのルートを `pointerEvents="box-none"` の絶対配置オーバーレイにし、通常時にタブ/画面側のスクロール検知を邪魔しないようにした。
+
+### 影響範囲
+
+- iOS版 全タブのフッター最小化
+- 左端スワイプのプロフドロワー
+- `NativeTabs` のネイティブスクロール連動
+
+### 確認方法
+
+- 実機で在庫 / Wish を開き、下スクロール時にフッターが畳まれることを確認
+- 左端から右スワイプしてプロフドロワーが従来どおり開くことを確認
+- `npm --prefix mobile run typecheck`
+
+### 関連ファイル
+
+- `mobile/app/(tabs)/_layout.tsx`
+
+### セルフレビュー結果
+
+- ✅ iOS標準の `NativeTabs` を最優先し、独自ラッパーで包まない構造へ戻した
+- ✅ プロフドロワーは機能を残したまま、ネイティブタブのスクロール連動を阻害しにくい兄弟オーバーレイへ分離した
+- ✅ UI構造の変更のみで状態名・用語・DB列追加はなく `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要
+
+---
+
+## イテレーション156.13：ホーム固定ヘッダーをiOSブラーへ刷新
+
+### 背景・問題意識
+
+ホーム画面の固定ヘッダーについて、オーナーからInstagram風の参考画像が共有され、「こんな感じにして欲しい」と指摘があった。従来のタイル状モザイクは粗く、背景のコンテンツが自然ににじむ表現ではなかったため、iOSらしいブラー表現へ置き換える。
+
+### 変更内容
+
+#### `mobile/app/(tabs)/index.tsx`
+- `expo-blur` の `BlurView` を使い、ホーム上部と sticky section header の背景を本物のブラーへ変更した。
+- タイル状モザイクの生成ロジックを撤去し、上ほど白の重なりが強く、下へ自然にフェードする半透明バンドへ置き換えた。
+- `マッチしてるよ！` / `交換できるかも` の固定ヘッダーが、参考画像のように背後のカードをぼかして受ける見た目になるよう調整した。
+
+#### `mobile/package.json`
+- ホームヘッダーのネイティブブラー用に `expo-blur` を追加した。
+
+### 影響範囲
+
+- iOS版 ホーム画面
+- sticky header の背景表現
+- ホーム上部のステータスバー付近の半透明ブラー
+
+### 確認方法
+
+- ホーム画面を開き、上部の固定ヘッダーがタイル状ではなく滑らかなブラーになっていることを確認
+- `マッチしてるよ！` / `交換できるかも` が sticky になった時、背後のカードが自然にぼけることを確認
+- `npm --prefix mobile run typecheck`
+
+### 関連ファイル
+
+- `mobile/app/(tabs)/index.tsx`
+- `mobile/package.json`
+
+### セルフレビュー結果
+
+- ✅ 参考画像に合わせ、粗いモザイクではなく `BlurView` によるブラー表現へ変更した
+- ✅ iOS標準寄りのネイティブ表現を優先し、独自の擬似モザイクを撤去した
+- ✅ UI表現の変更のみで状態名・用語・DB列追加はなく `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要
+
+---
+
+## イテレーション156.12：在庫Wishを旧NativeTabs時代の構造へ戻す
+
+### 背景・問題意識
+
+在庫とWishのヘッダー収納を独自の固定オーバーレイで制御しようとした結果、昔「フッターにプロフがあった時」に自然に動いていた構造から離れ、ヘッダー固定やフッター最小化の挙動が不安定になった。オーナーから「昔、フッターにプロフがあったときのヘッダーをそのまま再現してくれたらいい。過去のVerを参照して」と指摘があったため、旧 `NativeTabs` 時代の `Screen` ベース構造を再参照した。
+
+### 変更内容
+
+#### `mobile/app/(tabs)/inventory.tsx`
+- 固定オーバーレイ式のヘッダー収納実装を外し、旧実装と同じ `Screen scroll={false}` + 上部ヘッダー + 横ページャー + ページ内縦 `ScrollView` 構造へ戻した。
+- 上部タブのインジケータだけは、横スワイプ中に追従するよう `SectionTabs` の `position` 連動を残した。
+- 削除フェードや確認モーダルなど、既存の現在版機能は維持した。
+
+#### `mobile/app/(tabs)/wishes.tsx`
+- 固定オーバーレイ式のヘッダー収納実装を外し、旧実装と同じ `Screen scroll={false}` + ヘッダー + `SectionTabs` + コンテンツ内縦 `ScrollView` 構造へ戻した。
+- Wish / 個別募集の手動横スワイプ切り替え、削除フェード、個別募集デッキ表示は維持した。
+- 同一グッズが複数表示される場合の duplicate key warning を避けるため、重複し得る描画箇所だけ index 付き key にした。
+
+### 影響範囲
+
+- iOS版 マイ在庫一覧
+- iOS版 Wish / 個別募集一覧
+- 上部ヘッダー、上部タブ、各タブ内スクロール
+
+### 確認方法
+
+- 過去版 `04767dd` の `mobile/app/(tabs)/inventory.tsx` / `wishes.tsx` と構造を比較
+- 在庫 / Wish のヘッダーが固定オーバーレイ由来の揺れを起こさないことを確認
+- Wish / 個別募集の削除・編集・表示が維持されていることを確認
+- `npm --prefix mobile run typecheck`
+
+### 関連ファイル
+
+- `mobile/app/(tabs)/inventory.tsx`
+- `mobile/app/(tabs)/wishes.tsx`
+
+### セルフレビュー結果
+
+- ✅ 独自フッター化はせず、iOS標準 `NativeTabs` / Liquid Glass は維持した
+- ✅ 旧NativeTabs時代の `Screen` ベース構造へ戻し、固定オーバーレイ制御を撤去した
+- ✅ UI構造の調整のみで状態名・用語・DB列追加はなく `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要
+
+---
+
+## イテレーション156.11：在庫Wishヘッダー収納の高速スクロール反動を抑制
+
+### 背景・問題意識
+
+在庫とWishの一覧画面で、ゆっくり下にスクロールするとヘッダーは収まるが、勢いよく下へスクロールすると画面が「ガガガガッ」と揺れ、最終的にヘッダーが再表示されてしまう問題があった。原因は、ヘッダーを畳む高さアニメーションがコンテンツ高さを変え、その直後の `contentOffset` 補正や下端バウンスを「上スクロール」と誤判定していたこと。
+
+### 変更内容
+
+#### `mobile/app/(tabs)/inventory.tsx`
+- ヘッダー開閉直後の短時間は、反動由来の上方向デルタで再表示しないようにした。
+- 下端バウンス付近の上方向デルタをヘッダー再表示判定から除外した。
+- ヘッダー再表示は、一定量以上の上スクロールが蓄積された時だけ行うようにした。
+- 新しい開閉アニメーション開始時に既存アニメーションを止め、競合を抑えた。
+
+#### `mobile/app/(tabs)/wishes.tsx`
+- 在庫と同じヘッダー収納判定を適用し、高速スクロール時の再表示揺れを抑えた。
+
+### 影響範囲
+
+- iOS版 マイ在庫一覧
+- iOS版 Wish / 個別募集一覧
+- 下スクロール時のヘッダー収納と、上スクロール時のヘッダー再表示
+
+### 確認方法
+
+- 在庫 / Wish で下方向へ勢いよくフリックし、ヘッダーが途中で再表示されず収まることを確認
+- ゆっくり下へスクロールしても従来通りヘッダーが収まることを確認
+- 上方向へ明確に戻した時はヘッダーが再表示されることを確認
+- `npm --prefix mobile run typecheck`
+
+### 関連ファイル
+
+- `mobile/app/(tabs)/inventory.tsx`
+- `mobile/app/(tabs)/wishes.tsx`
+
+### セルフレビュー結果
+
+- ✅ `NativeTabs` / Liquid Glass フッターは維持し、独自フッター化していない
+- ✅ 高速スクロール時の反動・下端バウンスをヘッダー再表示に使わないようにした
+- ✅ UI挙動の調整のみで状態名・用語・DB列追加はなく `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要
+
+---
+
+## イテレーション156.10：NativeTabs最小化の対象ScrollViewを主要タブで先頭化
+
+### 背景・問題意識
+
+iOS版のフッターは最新iOSの `NativeTabs` / Liquid Glass を使い、下スクロール時に現在タブのアイコンへ畳まれる標準挙動を期待している。しかし、ホーム以外の主要タブでは画面の先頭にヘッダーや横ページャーがあり、react-native-screens が `first descendant chain` で実際の縦 `ScrollView` を見つけられず、フッターが「左に一つへ集約」されない状態だった。
+
+### 変更内容
+
+#### `mobile/app/(tabs)/inventory.tsx`
+- `NativeTabs` は維持したまま、画面の最初の実子を縦 `ScrollView` に変更した。
+- 在庫ステータスの横スワイプページャーは外側の縦 `ScrollView` 内に残し、各ページの内側縦 `ScrollView` を廃止した。
+- 既存のヘッダー折りたたみ判定は、外側の縦 `ScrollView` の `onScroll` で受けるようにした。
+
+#### `mobile/app/(tabs)/wishes.tsx`
+- Wish / 個別募集画面も、最初の実子を縦 `ScrollView` に変更した。
+- 横スワイプ中に上部タブが追従する既存の `Animated.ScrollView` は維持しつつ、内側の縦 `ScrollView` を外側へ集約した。
+
+#### `mobile/app/(tabs)/transactions.tsx`
+- 取引一覧も、最初の実子を縦 `ScrollView` に変更した。
+- 打診中 / 進行中 / 完了の横スワイプページャーは維持し、各ページ内のリストは外側の縦スクロールに載せた。
+
+### 影響範囲
+
+- iOS版 マイ在庫 / Wish / 取引一覧
+- iOS NativeTabs の `minimizeBehavior="onScrollDown"` 発火条件
+- 各画面の横スワイプページャーと上部タブ追従
+
+### 確認方法
+
+- iOS開発ビルドで在庫 / Wish / 取引一覧を開き、下スクロール時にNativeTabsフッターが現在タブのアイコンへ畳まれることを確認
+- 上スクロールで通常のLiquid Glassフッターへ戻ることを確認
+- 各画面の横スワイプ切り替えが維持されていることを確認
+- `npm --prefix mobile run typecheck`
+
+### 関連ファイル
+
+- `mobile/app/(tabs)/inventory.tsx`
+- `mobile/app/(tabs)/wishes.tsx`
+- `mobile/app/(tabs)/transactions.tsx`
+- `mobile/app/(tabs)/_layout.tsx`
+
+### セルフレビュー結果
+
+- ✅ 独自フッター化せず、既存のiOS `NativeTabs` / Liquid Glassフッターを維持した
+- ✅ ネイティブタブ側の `first descendant chain` 条件に合わせ、主要タブの最初の実子を縦 `ScrollView` にした
+- ✅ 横スワイプページャーと上部タブ追従は残した
+- ✅ UI構造の調整のみで状態名・用語・DB列追加はなく `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要
+
+---
+
+## イテレーション156.09：iOS標準コンポーネント優先ルールをBootstrapへ明文化
+
+### 背景・問題意識
+
+iOS版のフッター最小化挙動について、既存の `NativeTabs` を維持すべき場面で、独自フッター実装へ倒れかけた。iOSアプリでは、最新iOSの標準コンポーネントやネイティブ挙動をできるだけ採用し、標準で実現できるものを独自実装で置き換えないことを、今後の基本ルールとして明文化する必要があった。
+
+### 変更内容
+
+#### `CLAUDE.md`
+- 「iOSネイティブ標準コンポーネント優先（最重要）」を追加した。
+- `NativeTabs` / iOS標準タブバー、`ActionSheetIOS`、iOS標準シート、標準戻る遷移、標準スクロール連動、Apple Map などを優先する方針を明記した。
+- iOS標準を捨てる可能性がある指示が来た場合、実装前にオーナーへ確認するルールを明記した。
+
+#### `AGENTS.md`
+- Codex側にも同じルールを追加し、Claude / Codex のどちらが作業しても判断基準が揃うようにした。
+
+### 影響範囲
+
+- iOSアプリ実装全般
+- フッター、シート、アクションメニュー、地図、画面遷移、スクロール連動などの設計判断
+- Claude / Codex の作業ルール
+
+### 確認方法
+
+- `CLAUDE.md` と `AGENTS.md` に同一方針が追記されていることを確認
+- 今後、iOS標準コンポーネントを独自実装へ置き換える前に、標準側の設定・制約を調査すること
+
+### 関連ファイル
+
+- `CLAUDE.md`
+- `AGENTS.md`
+
+### セルフレビュー結果
+
+- ✅ Claude / Codex の両Bootstrapに同じルールを記載した
+- ✅ オーナー指示がルールに反する可能性がある場合の確認義務を明記した
+- ✅ 作業ルールの追記のみで状態名・用語・DB列追加はなく `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要
+
+---
+
+## イテレーション156.08：NativeTabs最小化の前提に合わせてホームのScrollView配置を補正
+
+### 背景・問題意識
+
+iOS版のフッターは `NativeTabs` の `minimizeBehavior="onScrollDown"` を使い、下スクロール時に現在タブのアイコンへ畳まれるネイティブ挙動を期待している。以前のプロフ画面ではこの挙動が出ていたが、ホームでは発火していなかった。調査すると、react-native-screens / React Navigation の Native Bottom Tabs は、タブ画面から見た `first descendant chain` にある `ScrollView` を対象にインセット調整やスクロール連動を行う仕様だった。ホームでは装飾用の `homeHeaderMosaicBridge` が `ScrollView` より前にあり、最初の子孫チェーンがスクロールビューに到達していなかった。
+
+### 変更内容
+
+#### `mobile/app/(tabs)/index.tsx`
+- `NativeTabs` フッターは維持したまま、ホームのメイン `ScrollView` が `Screen` 内の最初の実子になるよう配置を変更した。
+- `homeHeaderMosaicBridge` は見た目を変えず、`ScrollView` の後ろに回して absolute / zIndex で背景として表示する構造にした。
+
+### 影響範囲
+
+- iOS版 ホーム画面
+- iOS NativeTabs の `minimizeBehavior="onScrollDown"` 発火条件
+
+### 確認方法
+
+- ホーム画面で下スクロールし、NativeTabs フッターが右端の現在タブアイコンへ畳まれることを確認
+- 上スクロールで通常のフッターへ戻ることを確認
+- 上部モザイク背景の見た目が維持されていることを確認
+- `npm --prefix mobile run typecheck`
+
+### 関連ファイル
+
+- `mobile/app/(tabs)/index.tsx`
+- `mobile/app/(tabs)/_layout.tsx`
+- `mobile/node_modules/@react-navigation/bottom-tabs/src/unstable/types.tsx`
+- `mobile/node_modules/react-native-screens/src/components/bottom-tabs/BottomTabsScreen.types.ts`
+
+### セルフレビュー結果
+
+- ✅ 独自フッター化ではなく、既存の iOS NativeTabs / Liquid Glass フッターを維持した
+- ✅ ローカルのライブラリ型定義で確認した `first descendant chain` 条件に沿って修正した
+- ✅ UI構造の調整のみで状態名・用語・DB列追加はなく `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要
+
+---
+
+## イテレーション156.07：ホーム固定ヘッダーのモザイク粒度と上部連続性を調整
+
+### 背景・問題意識
+
+ホーム画面で「マッチしてるよ」「交換できるかも」が固定ヘッダーになった際、モザイクの粒が大きく、半透明ブロックの柄に見えてしまっていた。また、タイトル直上の固定領域が単色の覆いに見え、モザイク背景がそこで途切れているように見える問題があった。
+
+### 変更内容
+
+#### `mobile/app/(tabs)/index.tsx`
+- 固定ヘッダーのモザイクを 5行×14列から 10行×36列へ細分化し、粒を小さくした。
+- モザイクの色・透明度の出方を deterministic にばらけさせ、粗い横帯に見えにくくした。
+- 固定ヘッダー内の強い単色 wash / veil を削除し、モザイク自体で薄く背景を作るようにした。
+- ホーム上部の safe-area 側に `homeHeaderMosaicBridge` を追加し、タイトル直上の固定色領域にも同じ細かいモザイクが見えるようにした。
+
+### 影響範囲
+
+- iOS版 ホーム画面
+- ホームの sticky section header（マッチしてるよ / 交換できるかも）
+
+### 確認方法
+
+- ホームをスクロールし、「マッチしてるよ」「交換できるかも」が固定された時のモザイク粒が細かくなっていることを確認
+- タイトル直上の領域が単色帯ではなく、同じモザイク表現でつながって見えることを確認
+- `npm --prefix mobile run typecheck`
+
+### 関連ファイル
+
+- `mobile/app/(tabs)/index.tsx`
+
+### セルフレビュー結果
+
+- ✅ モザイク粒度と色のばらけ方だけを調整し、ホームの既存スクロール・カード挙動には触れていない
+- ✅ 上部 safe-area 側も同じ `StickyMosaicBackground` を再利用し、別表現を増やさない形にした
+- ✅ UI表現のみの変更で状態名・用語・DB列追加はなく `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要
+
+---
+
+## イテレーション156.06：iOSフッター左シュッ挙動のスクロール連動補正
+
+### 背景・問題意識
+
+iOS版のフッターは `NativeTabs` の `minimizeBehavior="onScrollDown"` で、下スクロール時に左へシュッとまとまる挙動にしている。しかし、React Native の `ScrollView` は標準で `contentInsetAdjustmentBehavior` が `never` になり、ネイティブタブ側がスクロールビューを十分に連動できない画面があった。特にプロフ画面で以前見えていたようなフッター最小化が、他画面で再現されないことが問題になった。
+
+### 変更内容
+
+#### `mobile/src/components/Screen.tsx`
+- 共通 `Screen` の縦スクロールに `contentInsetAdjustmentBehavior="automatic"` と `automaticallyAdjustsScrollIndicatorInsets` を追加した。
+- プロフ・通知など、共通 `Screen` のスクロールを使う画面でネイティブタブのスクロール連動を拾いやすくした。
+
+#### `mobile/app/(tabs)/index.tsx`
+- ホームのメイン縦スクロールに同じiOSスクロール連動設定を追加した。
+
+#### `mobile/app/(tabs)/inventory.tsx`
+- 各在庫ステータスページの縦スクロールに同じiOSスクロール連動設定を追加した。
+
+#### `mobile/app/(tabs)/wishes.tsx`
+- Wish / 個別募集ページの縦スクロールに同じiOSスクロール連動設定を追加した。
+
+#### `mobile/app/(tabs)/transactions.tsx`
+- 取引一覧の各タブページの縦スクロールに同じiOSスクロール連動設定を追加した。
+
+### 影響範囲
+
+- iOS版 全フッター表示画面
+- ホーム / マイ在庫 / Wish / 通知 / 取引 / 自分プロフィールのスクロール時フッター挙動
+
+### 確認方法
+
+- iOS開発ビルドで各タブを開き、下スクロール時にフッターが左へシュッとまとまることを確認
+- 上スクロールでフッターが元の表示へ戻ることを確認
+- `npm --prefix mobile run typecheck`
+
+### 関連ファイル
+
+- `mobile/src/components/Screen.tsx`
+- `mobile/app/(tabs)/index.tsx`
+- `mobile/app/(tabs)/inventory.tsx`
+- `mobile/app/(tabs)/wishes.tsx`
+- `mobile/app/(tabs)/transactions.tsx`
+
+### セルフレビュー結果
+
+- ✅ Expo Router / React Navigation 側の型定義にある `contentInsetAdjustmentBehavior="automatic"` 要件に合わせた
+- ✅ 独自フッターを重ねるのではなく、iOS NativeTabs の本物の最小化挙動を活かす修正にした
+- ✅ スクロール連動設定のみの変更で状態名・用語・DB列追加はなく `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要
+
+---
+
+## イテレーション156.05：iOS譲るグッズ登録の写真複数選択
+
+### 背景・問題意識
+
+譲るグッズを写真から登録する時、写真ライブラリで1枚ずつしか選べないと、同じ推し・同じ種別のグッズをまとめて登録する体験が重くなる。既存のiOS在庫新規登録フローは、内部的には複数写真を `photos` と `metas` で扱い、写真ごとに1件ずつ登録できる構造だったが、ライブラリピッカーの `allowsMultipleSelection` が無効になっていた。
+
+### 変更内容
+
+#### `mobile/app/goods-editor.tsx`
+- 在庫新規登録フローの写真ライブラリ選択で `allowsMultipleSelection: true` を有効化した。
+- iOSで選択順が分かるよう `orderedSelection: true` を指定し、選んだ順にラベル設定へ進めるようにした。
+- 複数選択と相互排他になるため、ライブラリ選択時の `allowsEditing` は `false` にした。
+- 写真選択画面の説明文とボタン文言を「複数枚を一度に選べる」内容に更新した。
+
+### 影響範囲
+
+- iOS版 マイ在庫 > 譲る候補 > 追加 > 写真を選ぶ
+- 写真ライブラリからの在庫一括登録
+
+### 確認方法
+
+- マイ在庫の譲る候補で「追加」から新規登録へ進み、写真ライブラリで複数枚を選べることを確認
+- 複数枚選択後、アップロード済み枚数が増え、ラベル設定で写真ごとに1件ずつ設定できることを確認
+- カメラ撮影は従来通り1枚ずつ追加できることを確認
+- `npm --prefix mobile run typecheck`
+
+### 関連ファイル
+
+- `mobile/app/goods-editor.tsx`
+
+### セルフレビュー結果
+
+- ✅ 既存の複数写真登録ロジックを活かし、入口のピッカー設定だけを複数選択対応にした
+- ✅ 複数選択時はトリミング非対応というExpo/iOS制約に合わせ、ライブラリ側だけ `allowsEditing` を無効化した
+- ✅ UI/入力挙動のみの変更で状態名・用語・DB列追加はなく `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要
+
+---
+
+## イテレーション156.04：iOS自分プロフィール画面を公開プロフ中心に再構成
+
+### 背景・問題意識
+
+左端プロフィールドロワーの「プロフィール」から遷移する画面が必要になった。既存のiOS `profile` 画面は、プロフィール編集・推し設定・通知設定などの設定ハブ寄りで、ユーザーが「自分のプロフィールとして他人にどう見えるか」を確認する画面としては弱かった。Web版の自分プロフは、hero、評価、推し、スケジュール、各設定導線を持つため、iOS版もまず公開プロフィールとして見える情報を前面に出す必要があった。
+
+### 変更内容
+
+#### `mobile/app/(tabs)/profile.tsx`
+- 自分プロフィール画面を作り直し、ドロワーの「プロフィール」から開く閲覧用の自分プロフにした。
+- heroにアバター、ハンドル、表示名、エリア、取引回数、評価サマリを表示するようにした。
+- 評価 / 取引 / 譲る候補 / 個別募集のミニ統計を追加した。
+- 自分の `for_trade + active` な在庫を「譲る候補」としてグリッド表示し、タップで在庫編集へ進めるようにした。
+- 推しサマリ、プロフィール編集、推し設定、スケジュール、通知設定、ヘルプ、ログアウト導線を残した。
+- Supabaseから `users` / `user_oshi` / `proposals` / `listings` / `user_evaluations` / `goods_inventory` を読み込み、自分用の画面データを構築するようにした。
+
+### 影響範囲
+
+- iOS版 左端プロフィールドロワー > プロフィール
+- iOS版 自分プロフィール
+- iOS版 自分の譲る候補プレビュー
+
+### 確認方法
+
+- 左端ドロワーから「プロフィール」を押し、自分プロフィール画面が開くことを確認
+- 評価サマリ、取引数、譲る候補、個別募集数が表示されることを確認
+- 譲る候補のカードを押すと該当在庫編集へ進むことを確認
+- プロフィール編集、推し設定、スケジュール、通知設定、ヘルプ、ログアウトがそれぞれ動くことを確認
+- `npm --prefix mobile run typecheck`
+
+### 関連ファイル
+
+- `mobile/app/(tabs)/profile.tsx`
+- `mobile/app/(tabs)/_layout.tsx`
+- `web/src/app/profile/ProfileView.tsx`
+
+### セルフレビュー結果
+
+- ✅ 自分プロフィールを設定ハブではなく、公開プロフ確認を主目的にした
+- ✅ Web版の自分プロフで使っている評価・取引・推し・編集導線の構成をiOS版へ反映した
+- ✅ 既存DB列の参照のみで新しい状態名・用語・DB列追加はなく `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要
+
+---
+
+## イテレーション156.03：プロフィールドロワーの白フラッシュ抑止
+
+### 背景・問題意識
+
+左端からプロフィールドロワーを出す時、スワイプ開始直後に画面が一瞬白くなるとユーザーから指摘があった。原因は、エッジスワイプ開始時に `visible=true` へ変えた瞬間、位置同期用の `useEffect` がドロワーの `translateX` を開いた状態へ即時リセットしていたため、指に追従する前に白いドロワー面が一瞬全面に出ていたこと。
+
+### 変更内容
+
+#### `mobile/app/(tabs)/_layout.tsx`
+- ドロワーの表示状態変更では `translateX` をリセットしないよう、`visibleRef` を使って幅変更時だけ位置を同期する構造にした。
+- `drawerHost` に背景色を指定し、ネイティブ描画の隙間にもアプリ背景色が出るようにした。
+
+### 影響範囲
+
+- iOS版 全タブ共通の左端プロフィールドロワー
+- エッジスワイプ開始時の描画
+
+### 確認方法
+
+- ホーム/在庫/Wish/通知/取引の各画面で左端からゆっくりスワイプし、白いフラッシュが出ないことを確認
+- ドロワーを途中で戻した時、閉じた後に再度スワイプしても位置が破綻しないことを確認
+- `npm --prefix mobile run typecheck`
+
+### 関連ファイル
+
+- `mobile/app/(tabs)/_layout.tsx`
+
+### セルフレビュー結果
+
+- ✅ スワイプ開始時の位置ジャンプをなくし、指の動きに沿ってドロワーが出るようにした
+- ✅ ドロワーの表示内容・遷移先・フッター構成には触れていない
+- ✅ UI挙動のみの変更で状態名・用語・DB列追加はなく `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要
+
+---
+
+## イテレーション156.02：ホーム固定見出しのモザイク背景
+
+### 背景・問題意識
+
+ホームの「マッチしてるよ！」「交換できるかも」を固定見出しにしたところ、背景が単純な半透明ベタになっていた。ユーザーから、固定ヘッダー部分は下から上にいくにつれて強さが増す半透明のモザイクがかかるようにしたいと要望があった。
+
+### 変更内容
+
+#### `mobile/app/(tabs)/index.tsx`
+- `StickySectionHeader` 内に `StickyMosaicBackground` を追加した。
+- 依存追加なしで、半透明タイルを複数行に敷き、上側ほどopacityが強くなる疑似モザイク背景にした。
+- 見出し背景のベタ塗りを弱め、モザイク層と薄い上部ウォッシュでガラス越しの固定ヘッダーに見えるよう調整した。
+
+### 影響範囲
+
+- iOS版 ホーム
+- ホームの固定セクション見出し背景
+
+### 確認方法
+
+- ホームをスクロールし、「マッチしてるよ！」「交換できるかも」が固定された時に、背景が上ほど濃い半透明モザイクとして見えることを確認
+- 見出し文字がモザイク背景に埋もれず読めることを確認
+- `npm --prefix mobile run typecheck`
+
+### 関連ファイル
+
+- `mobile/app/(tabs)/index.tsx`
+
+### セルフレビュー結果
+
+- ✅ 依存追加なしで軽量なモザイク背景を実装した
+- ✅ 固定見出しの文字レイヤーは維持し、可読性を落とさない構造にした
+- ✅ UI表現のみの変更で状態名・用語・DB列追加はなく `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要
+
+---
+
+## イテレーション156.01：ホーム安全余白とセクション固定見出し
+
+### 背景・問題意識
+
+ホーム画面を最上部までスクロールした時に、「マッチしてるよ！」の大見出しがiPhoneの時計やDynamic Island付近に重なってしまっていた。前iterでホーム上部の固定空白を外した結果、不要な覆いは消えた一方で、ステータスバー領域への上限がなくなっていた。また、「マッチしてるよ！」「交換できるかも」は、該当エリアまでスクロールしたら薄いヘッダーとして残る方が、今どの区分を見ているか分かりやすい。
+
+### 変更内容
+
+#### `mobile/app/(tabs)/index.tsx`
+- ホーム画面に `useSafeAreaInsets` を導入し、上部余白を `safeArea.top + 12px` 相当で確保した。
+- ホームの縦 `ScrollView` に `stickyHeaderIndices` を設定し、「マッチしてるよ！」「交換できるかも」をセクション単位の固定見出しにした。
+- セクション見出しを `StickySectionHeader` に分離し、薄い背景とhairlineの下線でスクロール中も自然に読めるようにした。
+- 既存のグッズ行表示は `ShelfSectionRows` として分離し、カードの横スクロールや優先度演出は維持した。
+
+### 影響範囲
+
+- iOS版 ホーム
+- ホームのマッチセクション見出し
+- ホーム最上部のsafe area余白
+
+### 確認方法
+
+- iPhone実機でホームを最上部までスクロールし、タイトルがステータスバーやDynamic Island領域に重ならないことを確認
+- 「マッチしてるよ！」「交換できるかも」付近までスクロールし、該当見出しが薄い固定ヘッダーとして残ることを確認
+- `npm --prefix mobile run typecheck`
+
+### 関連ファイル
+
+- `mobile/app/(tabs)/index.tsx`
+
+### セルフレビュー結果
+
+- ✅ safe area を使って端末ごとの上部余白を確保した
+- ✅ セクション名は既存文言のまま、薄い固定ヘッダーとして表示するようにした
+- ✅ ホームカード行の横スクロール・優先度表示・現地交換演出には触れていない
+- ✅ UI/レイアウト変更のみで状態名・用語・DB列追加はなく `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要
+
+---
+
+## イテレーション156.00：iOSフッター縮小統一とヘッダー退避
+
+### 背景・問題意識
+
+`NativeTabs` の公開APIでは、下スクロール時にフッターを完全に下へ収納する挙動は用意されておらず、iOS標準の `onScrollDown` は左へ縮むMinimize挙動になる。ユーザーから「では、左にシュッで統一」と方針が確定した。また、ホーム画面では上部とフッター上に固定された空白の覆いが見えるため、ホームだけ安全余白の扱いを分離する必要があった。マイ在庫/Wishでは、スクロール時に元のタイトルヘッダーが上へすっこみ、上スクロールで戻る挙動が求められた。
+
+### 変更内容
+
+#### `mobile/app/(tabs)/_layout.tsx`
+- `NativeTabs` の `minimizeBehavior` を `onScrollDown` に変更し、下スクロール時はiOS標準の左へ縮む挙動で統一した。
+
+#### `mobile/src/components/Screen.tsx`
+- `bottomInset` と `topPadding` props を追加し、画面ごとに固定の上下余白を調整できるようにした。
+
+#### `mobile/app/(tabs)/index.tsx`
+- ホーム画面だけ `topPadding={0}` / `bottomInset={false}` を指定し、上部とフッター上に固定表示されていた空白の覆いをなくした。
+- ホームのスクロール内容側に下余白を持たせ、フッター下に内容が隠れすぎないようにした。
+
+#### `mobile/app/(tabs)/inventory.tsx`
+- マイ在庫のタイトルヘッダーを `Animated.View` で包み、縦スクロール下方向で上へ収納、上方向で再表示するようにした。
+- タブ切替時はヘッダーを再表示するようにした。
+
+#### `mobile/app/(tabs)/wishes.tsx`
+- Wish画面のタイトルヘッダーもマイ在庫と同じく、縦スクロール方向に応じて収納/再表示するようにした。
+- Wish/個別募集の横スワイプ追従は維持したまま、各ページ内の縦スクロールだけでヘッダーを制御するようにした。
+
+### 影響範囲
+
+- iOS版 全タブのフッター縮小挙動
+- iOS版 ホーム
+- iOS版 マイ在庫
+- iOS版 Wish / 個別募集一覧
+- 共通 `Screen` レイアウト
+
+### 確認方法
+
+- 各タブで下スクロール時にフッターがiOS標準の左へ縮む挙動になることを確認
+- ホーム画面上部とフッター上の固定空白が消えていることを確認
+- マイ在庫で下スクロールすると「マイ在庫」ヘッダーが上へ収納され、上スクロールすると戻ることを確認
+- Wish画面で下スクロールすると「ウィッシュ」ヘッダーが上へ収納され、上スクロールすると戻ることを確認
+- `npm --prefix mobile run typecheck`
+
+### 関連ファイル
+
+- `mobile/app/(tabs)/_layout.tsx`
+- `mobile/app/(tabs)/index.tsx`
+- `mobile/app/(tabs)/inventory.tsx`
+- `mobile/app/(tabs)/wishes.tsx`
+- `mobile/src/components/Screen.tsx`
+
+### セルフレビュー結果
+
+- ✅ フッターは独自実装ではなく、iOS標準 `NativeTabs` の `onScrollDown` に統一した
+- ✅ ホームだけ上下固定余白を外し、他画面の安全余白には影響しないprops追加に留めた
+- ✅ マイ在庫/Wishの横スワイプ挙動は維持し、縦スクロール時だけタイトルヘッダーを出し入れするようにした
+- ✅ UI/レイアウト変更のみで状態名・用語・DB列追加はなく `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要
+
+---
+
+## イテレーション155.99：フッター順序訂正と設定導線整備
+
+### 背景・問題意識
+
+通知タブ追加時に、フッターの左右順を逆に解釈してしまった。ユーザーから、左から「ホーム、在庫、Wish、通知、取引」にする訂正が入った。また、プロフィールドロワー内の「設定とプライバシー」「ヘルプ」が仮でプロフィールへ戻る状態だったため、実画面へつなぐ必要があった。ホーム右下の操作ボタンについても、通知導線はフッターへ移ったため、現地交換モード操作だけに絞る要望があった。
+
+### 変更内容
+
+#### `mobile/app/(tabs)/_layout.tsx`
+- `NativeTabs` の表示順を左から「ホーム / 在庫 / Wish / 通知 / 取引」に訂正した。
+- プロフィールドロワーの「設定とプライバシー」を `/settings-privacy` へ、「ヘルプ」を `/help` へ遷移させるようにした。
+- 「プロフィール」は hidden tab の自分プロフィール `/profile` へ進む導線として維持した。
+
+#### `mobile/app/(tabs)/profile.tsx`
+- 自分プロフィール画面の見出しを「プロフ」から「プロフィール」へ整えた。
+
+#### `mobile/app/settings-privacy.tsx`
+- 設定とプライバシー画面を追加した。
+- X系の設定一覧に近い、中央タイトル・ユーザーID・検索欄・大きめの設定リスト構成にした。
+- アカウント、セキュリティ、通知、プライバシー、規約、ヘルプなど既存画面へつながる導線を配置した。
+
+#### `mobile/app/(tabs)/index.tsx`
+- ホーム右下の操作ボタンから「通知を見る」を削除した。
+- iOSでは `ActionSheetIOS` で「現地交換モードをオン/オフにする」「現地交換情報を編集する」だけを表示するようにした。
+- ボタンアイコンからベルを外し、OFF時は時計、ON時は現地交換中の強調アイコンにした。
+
+### 影響範囲
+
+- iOS版 フッター
+- iOS版 プロフィールドロワー
+- iOS版 自分プロフィール
+- iOS版 設定とプライバシー
+- iOS版 ホーム右下アクション
+
+### 確認方法
+
+- フッターが左から「ホーム / 在庫 / Wish / 通知 / 取引」になっていることを確認
+- 左端スワイプでドロワーを開き、「プロフィール」「設定とプライバシー」「ヘルプ」がそれぞれ該当画面へ進むことを確認
+- 設定とプライバシー画面で検索欄と設定リストが表示されることを確認
+- ホーム右下ボタンを押し、通知ではなく現地交換操作だけが出ることを確認
+- `npm --prefix mobile run typecheck`
+
+### 関連ファイル
+
+- `mobile/app/(tabs)/_layout.tsx`
+- `mobile/app/(tabs)/profile.tsx`
+- `mobile/app/(tabs)/index.tsx`
+- `mobile/app/settings-privacy.tsx`
+
+### セルフレビュー結果
+
+- ✅ フッター順序をユーザー訂正どおりに直した
+- ✅ ドロワーの仮遷移を実画面への遷移に置き換えた
+- ✅ ホーム右下の通知導線重複をなくし、現地交換操作に特化した
+- ⚠️ `NativeTabs` の公開APIでは「下スクロールで完全に下へ収納」を指定できず、iOS標準の `onScrollDown` は左側へ縮むMinimize挙動になる。現時点では `minimizeBehavior="never"` で左シュッ挙動を止めており、完全収納を実現するにはNativeTabsからカスタムフッターへの移行が必要
+- ✅ UI/遷移変更のみで状態名・用語・DB列追加はなく `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要
+
+---
+
+## イテレーション155.98：通知タブ追加とフッター順序整理
+
+### 背景・問題意識
+
+フッターからプロフタブを外した後、通知への明確な導線がフッター上にない状態になっていた。ユーザーから、プロフの代わりに通知アイコンを置き、フッターの並びを右から「ホーム、在庫、Wish、通知、取引」にする要望があった。
+
+### 変更内容
+
+#### `mobile/app/(tabs)/_layout.tsx`
+- `NativeTabs` に通知タブを追加した。
+- 表示順を左から「取引 / 通知 / Wish / 在庫 / ホーム」に変更し、右から見た時に「ホーム / 在庫 / Wish / 通知 / 取引」になるようにした。
+- プロフはフッター表示から外したまま、左端スワイプのプロフィールドロワー用 hidden route として維持した。
+
+#### `mobile/app/(tabs)/notifications.tsx`
+- 既存の通知一覧画面をタブ配下へ移動し、フッターの通知アイコンから通知一覧を直接開けるようにした。
+- 既存の既読処理、未読件数表示、通知リンク遷移のロジックは維持した。
+
+### 影響範囲
+
+- iOS版 フッター
+- iOS版 通知一覧
+- iOS版 プロフィールドロワー内の通知導線
+
+### 確認方法
+
+- フッターに通知タブが表示され、タップすると通知一覧が開くことを確認
+- フッターの右端から順に「ホーム / 在庫 / Wish / 通知 / 取引」になっていることを確認
+- 左端スワイプでプロフィールドロワーが開き、プロフ導線は維持されていることを確認
+- `npm --prefix mobile run typecheck`
+
+### 関連ファイル
+
+- `mobile/app/(tabs)/_layout.tsx`
+- `mobile/app/(tabs)/notifications.tsx`
+
+### セルフレビュー結果
+
+- ✅ プロフの代替として通知をフッターへ追加した
+- ✅ 右から見たフッター順がユーザー指定どおりになるよう、NativeTabsの表示順を調整した
+- ✅ 通知一覧の取得・既読・リンク遷移ロジックは既存実装を流用した
+- ✅ UI/ルート整理のみで状態名・用語・DB列追加はなく `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要
+
+---
+
+## イテレーション155.97：ホーム下部操作とプロフ左ドロワー化
+
+### 背景・問題意識
+
+スマホ大型化により、ホーム上部の通知・現地交換モード切替・場所設定ボタンが押しづらくなっていた。ユーザーから、右下の届きやすい位置に操作入口を置き、そこから現地交換モードON/OFFと現地交換情報編集へ進める案が提示された。また、フッターのプロフタブをなくし、Xのように左端スワイプでプロフィール系メニューを引き出す導線へ変更する要望があった。
+
+### 変更内容
+
+#### `mobile/app/(tabs)/index.tsx`
+- ホーム上部の通知アイコン、場所ボタン、現地交換トグル、全国/現地切替セグメントを撤去した。
+- 画面右下に `FloatingHomeActionButton` を追加し、iOSでは `ActionSheetIOS` で以下の操作を出すようにした。
+  - 通知を見る
+  - 現地交換モードをオン/オフにする
+  - 現地交換情報を編集する（現地交換モードON時のみ）
+- 現地交換モードON時は、候補カードを非表示に絞るのではなく、同じ行内で現地交換候補を先頭に並べるようにした。
+- 現地交換モードON中は左右の画面端に脈動する紫のフォーカスエフェクトを出し、視野が狭まるような集中感を演出した。
+
+#### `mobile/app/(tabs)/_layout.tsx`
+- フッターからプロフの表示を削除し、`profile` タブは hidden route として残した。
+- 画面左端から右スワイプするとプロフィールドロワーが出る `ProfileDrawerHost` を追加した。
+- ドロワー内にプロフィール概要、プロフィール編集、推し設定、通知、取引、スケジュール、設定/ヘルプ/ログアウト導線を配置した。
+- `NativeTabs` の `minimizeBehavior="onScrollDown"` をやめ、左に縮む挙動を止めるため `minimizeBehavior="never"` に変更した。
+
+### 影響範囲
+
+- iOS版 ホーム
+- iOS版 フッター
+- iOS版 プロフィール導線
+- iOS版 全タブ画面の左端スワイプ操作
+
+### 確認方法
+
+- ホーム右下の丸ボタンを押し、通知/現地交換ON-OFF/現地交換情報編集が出ることを確認
+- 現地交換モードON時、ホームの画面端に脈動する紫のフォーカスエフェクトが出ることを確認
+- フッターからプロフが消えていることを確認
+- ホーム/在庫/Wish/取引の左端から右へスワイプし、プロフィールドロワーが出ることを確認
+- `npm --prefix mobile run typecheck`
+
+### 関連ファイル
+
+- `mobile/app/(tabs)/index.tsx`
+- `mobile/app/(tabs)/_layout.tsx`
+
+### セルフレビュー結果
+
+- ✅ 上部の届きづらいホーム操作を下部の届く位置へ移した
+- ✅ 現地交換ON時は現地交換候補を優先表示する設計に寄せた
+- ✅ フッターからプロフを外し、左端スワイプのプロフィールドロワーを追加した
+- ⚠️ `NativeTabs` の公開APIには「完全に下へ隠す」指定がなく、今回は左に縮む原因の `onScrollDown` を止める対応に留めた。完全退避を実現するには、NativeTabsを捨てたカスタムフッター化が必要
+- ✅ UI/ナビゲーション変更のみで状態名・用語・DB列追加はなく `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要
+
+---
+
+## イテレーション155.96：Wishタブ横スワイプ追従のカクつき解消
+
+### 背景・問題意識
+
+Wish画面で横スワイプに合わせて上部タブの選択面が動くようになったが、マイ在庫と比べて動きがカクついていた。Wish画面はWishグリッドと個別募集一覧を同時に抱えており、横スクロールの `onScroll` でReact stateを毎フレーム更新すると、重いリスト部分まで再描画されやすい構造になっていた。
+
+### 変更内容
+
+#### `mobile/src/components/GoodsGrid.tsx`
+- `SectionTabs.position` が数値だけでなく `Animated.Value` / `AnimatedInterpolation` を受け取れるようにした。
+- 外部からAnimated値が渡された場合は、内部でReact stateを介さず選択面の位置だけをアニメーションで更新するようにした。
+
+#### `mobile/app/(tabs)/wishes.tsx`
+- 横Pagerのスクロール位置をReact stateではなく `Animated.Value` で管理するようにした。
+- `Animated.ScrollView` + `Animated.event(..., { useNativeDriver: true })` で、タブ追従をネイティブアニメーション側へ逃がした。
+- タブ確定時だけ `tab` stateを更新し、スワイプ中にWishカード/個別募集一覧が毎フレーム再描画されないようにした。
+
+### 影響範囲
+
+- iOS版 Wish画面
+- `SectionTabs` の追従アニメーション
+
+### 確認方法
+
+- Wish画面でWish/個別募集を横スワイプし、上部タブの選択面がカクつかず指に追従することを確認
+- `npm --prefix mobile run typecheck`
+
+### 関連ファイル
+
+- `mobile/app/(tabs)/wishes.tsx`
+- `mobile/src/components/GoodsGrid.tsx`
+
+### セルフレビュー結果
+
+- ✅ Wish画面のスワイプ中React再描画を避ける設計に変更した
+- ✅ マイ在庫側の既存挙動は壊さず、`SectionTabs` の受け口だけ拡張した
+- ✅ UIパフォーマンス修正のみで状態名・用語・DB列追加はなく `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要
+
+---
+
+## イテレーション155.95：個別募集編集のWish候補カード巨大化修正
+
+### 背景・問題意識
+
+iOS版の個別募集編集画面で、求めるものを選択する横スクロール候補の画像カードが極端に巨大化して表示されていた。譲グッズの3列グリッド用カードと、横スクロール内のWish候補カードが同じ幅指定を共有しており、横スクロール側で `width: "31%"` の基準が崩れていた。
+
+### 変更内容
+
+#### `mobile/app/listing-editor.tsx`
+- `GoodsPanelCard` に `compact` props を追加し、横スクロールのWish候補では固定幅のコンパクトカードを使うようにした。
+- `panelWrapCompact` を追加し、横スクロール内でカードが画像実寸やScrollView幅に引っ張られないようにした。
+- 写真表示は `resizeMode="cover"` を明示し、カード枠内に収まるようにした。
+
+### 影響範囲
+
+- iOS版 個別募集編集 / 作成
+- 求めるもののWish候補横スクロール
+
+### 確認方法
+
+- 個別募集編集画面を開き、求めるものの候補画像が巨大化せず横スクロール内の小カードとして表示されることを確認
+- `npm --prefix mobile run typecheck`
+
+### 関連ファイル
+
+- `mobile/app/listing-editor.tsx`
+
+### セルフレビュー結果
+
+- ✅ 譲グッズ側の3列グリッド幅は維持し、横スクロール側だけ固定幅へ分離した
+- ✅ UIサイズ修正のみで状態名・用語・DB列追加はなく `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要
+
+---
+
+## イテレーション155.94：iOS実部品への切替と横スワイプ追従
+
+### 背景・問題意識
+
+前iterではホームのモード切替をLiquid Glass「風」の独自UIとして実装してしまい、ユーザーから「独自のものにするな」「iOSの本物のデザインにしろ」と明確に指摘された。iOS版では見た目を近づけるのではなく、利用できる範囲で実際のiOS標準部品・ネイティブコンテナを優先し、独自表現は補助に留める方針へ訂正した。
+
+### 変更内容
+
+#### `mobile/app/(tabs)/index.tsx`
+- ホームの「全国交換 / 今すぐ現地交換」切替を独自アニメーションから `@react-native-segmented-control/segmented-control` のネイティブ `UISegmentedControl` へ置き換えた。
+- 現地交換設定シートを、iOSでは `Modal` の `pageSheet` 表示へ切り替え、独自の暗幕付き下部シートをiOSでは使わないようにした。
+
+#### `mobile/src/components/GoodsGrid.tsx`
+- `SectionTabs` に `position` を追加し、横スワイプ中のページ位置に合わせて選択面が指の動きへ追従するようにした。
+- 在庫/Wish/個別募集カードの操作メニューは、iOSで `ActionSheetIOS` の本物のアクションシートを使う方針を維持した。
+
+#### `mobile/app/(tabs)/inventory.tsx` / `mobile/app/(tabs)/wishes.tsx` / `mobile/app/(tabs)/transactions.tsx`
+- 横Pagerの `onScroll` から `SectionTabs.position` を更新し、ページ切替中に上部タブも連動して動くようにした。
+- 取引一覧は打診中/進行中/完了を横Pager化し、上部タブとページ位置のズレをなくした。
+
+#### `mobile/app/search.tsx`
+- 検索画面を独自検索フォームから、ネイティブStackヘッダーの `headerSearchBarOptions` へ切り替えた。
+
+#### `mobile/app/profile-edit.tsx` / `mobile/app/oshi-settings.tsx` / `mobile/app/goods-editor.tsx` / `mobile/app/listing-editor.tsx` / `mobile/app/transaction-detail.tsx`
+- プロフ編集、推し設定、グッズ/Wish編集、個別募集編集、取引詳細を `Stack.Screen` のネイティブヘッダーへ寄せた。
+- プロフの活動エリア選択、推し追加、推し/メンバー追加リクエスト、待ち合わせ場所設定はiOSで `pageSheet` として表示するようにした。
+
+#### `mobile/app/onboarding/oshi.tsx` / `mobile/app/onboarding/members.tsx`
+- オンボーディング中の推し追加リクエスト、メンバー追加リクエストもiOSでは `pageSheet` に揃えた。
+
+#### `mobile/package.json` / `package.json`
+- ネイティブ `UISegmentedControl` 利用のため `@react-native-segmented-control/segmented-control` を追加した。
+- 依存解決のためルートに `@types/react` を追加した。
+
+### 影響範囲
+
+- iOS版 ホーム
+- iOS版 マイ在庫 / Wish / 個別募集一覧
+- iOS版 取引一覧
+- iOS版 検索
+- iOS版 プロフ編集 / 推し設定 / グッズ編集 / 個別募集編集 / 取引詳細
+- iOS版 現地交換設定 / 活動エリア設定 / 待ち合わせ場所設定 / 追加リクエスト
+
+### 確認方法
+
+- iOS実機でホームを開き、モード切替が独自UIではなくネイティブSegmentedControlとして表示されることを確認
+- 在庫/Wish/取引一覧を横スワイプし、上部タブの選択面が指の位置に追従することを確認
+- 検索画面を開き、iOSのヘッダー検索欄として表示されることを確認
+- 現地交換設定、待ち合わせ場所設定、推し追加/追加リクエストがiOSシートとして出ることを確認
+- `npm --prefix mobile run typecheck`
+
+### 関連ファイル
+
+- `mobile/app/(tabs)/index.tsx`
+- `mobile/app/(tabs)/inventory.tsx`
+- `mobile/app/(tabs)/wishes.tsx`
+- `mobile/app/(tabs)/transactions.tsx`
+- `mobile/app/search.tsx`
+- `mobile/app/profile-edit.tsx`
+- `mobile/app/oshi-settings.tsx`
+- `mobile/app/goods-editor.tsx`
+- `mobile/app/listing-editor.tsx`
+- `mobile/app/proposal-select.tsx`
+- `mobile/app/transaction-detail.tsx`
+- `mobile/app/onboarding/oshi.tsx`
+- `mobile/app/onboarding/members.tsx`
+- `mobile/src/components/GoodsGrid.tsx`
+- `mobile/src/components/Screen.tsx`
+- `mobile/package.json`
+- `package.json`
+
+### セルフレビュー結果
+
+- ✅ ホームのモード切替は独自Liquid Glass風UIからネイティブ `UISegmentedControl` へ切り替えた
+- ✅ 横スワイプ可能な画面では、ページ位置と上部タブの選択位置を同期した
+- ✅ iOSで本物のシステムUIを使える箇所は `ActionSheetIOS` / `pageSheet` / `Stack.Screen` / `headerSearchBarOptions` へ寄せた
+- ⚠️ `@react-native-segmented-control/segmented-control` はネイティブ依存のため、既存のdevelopment buildに入っていない場合はiOS dev buildの作り直しが必要
+- ✅ UI/遷移の変更のみで状態名・用語・DB列追加はなく `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要
+
+---
+
+## イテレーション155.93：iOS操作部をLiquid Glass系に再整理
+
+### 背景・問題意識
+
+iOS版のフッターは `NativeTabs` によって最新版iOSのLiquid Glass系デザインへ寄せられたが、ホームのモード切替、在庫/Wish/個別募集のタップ操作、上部タブ、共通戻るヘッダーはまだカスタムUI感が強く、画面全体の洗練度に差があった。ユーザーから「今のフッターみたいにIOS最新版のデザインを流用できるところ」を順に実装するよう依頼されたため、まず効果が大きい操作部をiOS寄りへ揃えた。
+
+### 変更内容
+
+#### `mobile/app/(tabs)/index.tsx`
+- ホームの全国交換/今すぐ現地交換モード切替を、半透明のガラスレイヤー、白い可動サム、淡いプリズム反射、周辺グローを持つLiquid Glass系セグメントに刷新した。
+- モード切替中のステータス表示は既存の即時フィードバックを維持し、上部に短時間表示されるピルとして残した。
+- 現地交換OFF時の場所表示は「（現地交換モードOFF）」のまま維持し、既存の現地交換設定シート導線を消さないようにした。
+
+#### `mobile/src/components/GoodsGrid.tsx`
+- 在庫/Wish/個別募集のタップ操作に使う `BottomOptionSheet` を、iOSでは `ActionSheetIOS` のネイティブアクションシートで表示するようにした。
+- iOS以外では既存の下部シートを維持し、操作順・削除確認・既存のフェードアウト挙動は変えないようにした。
+- 在庫/Wish/取引一覧で使う `SectionTabs` を、選択面がスプリングで移動するガラス系セグメントに変更した。
+- 列数切替の小型セグメントも、フッターと馴染む白い半透明の操作部へ寄せた。
+
+#### `mobile/src/components/RouteHeader.tsx`
+- 共通の戻るヘッダーを、半透明のガラスカプセルと軽い影を持つiOS寄りの操作部へ変更した。
+- 戻り先がない場合は `router.navigate("/")` に統一し、未処理の `replace` 警告を避ける既存方針を維持した。
+
+#### `mobile/app/goods-editor.tsx` / `mobile/app/profile-edit.tsx`
+- グッズ/Wish画像とプロフィールアイコンの写真選択を、iOSでは `ActionSheetIOS` のネイティブメニューで表示するようにした。
+- iOS以外では既存の `Alert.alert` を維持し、カメラ/写真ライブラリの権限・アップロード処理は変更していない。
+
+### 影響範囲
+
+- iOS版 ホーム
+- iOS版 マイ在庫 / Wish / 個別募集一覧
+- iOS版 取引一覧など `SectionTabs` 利用画面
+- iOS版 `RouteHeader` 利用画面全般
+- iOS版 グッズ/Wish編集・作成、プロフィール編集の画像選択
+
+### 確認方法
+
+- ホームで全国交換/今すぐ現地交換モードを切り替え、可動サムと切替中ピルがスムーズに出ることを確認
+- iOS実機でマイ在庫/Wish/個別募集カードを押し、ネイティブのアクションシートが出ることを確認
+- iOS実機でグッズ画像・プロフィールアイコンの画像選択を押し、ネイティブのアクションシートが出ることを確認
+- 在庫/Wish/取引一覧のタブを切り替え、選択面がぬるっと移動することを確認
+- `npm --prefix mobile run typecheck`
+
+### 関連ファイル
+
+- `mobile/app/(tabs)/index.tsx`
+- `mobile/app/goods-editor.tsx`
+- `mobile/app/profile-edit.tsx`
+- `mobile/src/components/GoodsGrid.tsx`
+- `mobile/src/components/RouteHeader.tsx`
+
+### セルフレビュー結果
+
+- ✅ 既存のWeb版追従差分、Apple ID導線、現地交換設定シート、検索フローティングボタンは消していない
+- ✅ iOSで本物のシステムUIを使えるカード操作は `ActionSheetIOS` へ寄せた
+- ✅ モード切替とタブは新しい状態名・DB列を追加しない純UI変更のため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要
+
+---
+
+## イテレーション155.92：iOS取引チャットの画面骨格をWeb版へ再同期
+
+### 背景・問題意識
+
+前iterでは取引チャットの機能をWeb版へ寄せたが、UI構造はWeb版 `ChatView` と大きく異なっていた。Web版は「相手ヘッダー」「固定の取引内容＋待ち合わせカード」「メッセージリスト」「下部固定composer」というチャット専用の画面骨格であり、iOS版のような縦積みの詳細画面ではない。ユーザーから「取引チャットのUIと全然違う」と指摘されたため、機能追加ではなく見た目の骨格から再同期した。
+
+### 変更内容
+
+#### `mobile/app/transaction-detail.tsx`
+- `Screen` の通常スクロール画面をやめ、Web版と同じく `KeyboardAvoidingView` ベースのチャット専用レイアウトに変更した。
+- 上部ヘッダーを、戻るボタン・相手アイコン・ユーザーID・到着/打診ステータス・エリア表示の1行構成に変更した。
+- 取引内容と待ち合わせを1つの白いコンパクトカードにまとめ、Web版の `DealCard` に近い小画像サムネ・交換矢印・ミニ地図構成へ変更した。
+- 合意前はWeb版の `ExpireBanner` / `AgreementBar` に合わせ、期限バナーと合意ステータスバーを固定カード下に表示するようにした。
+- 合意後はWeb版の `OutfitCompactRow` に合わせ、服装写真の共有状態をコンパクトな1行表示にした。
+- メッセージ領域に日付セパレーターを追加し、証跡撮影CTAもWeb版のメッセージ内カードに近い配置へ移した。
+- クイックアクションと入力欄を画面下部固定にし、Web版の `QuickChip` + composer の構成へ寄せた。
+
+### 影響範囲
+
+- iOS版 取引詳細 / 取引チャット
+- iOS版 打診中ネゴチャット / 合意後取引チャット
+
+### 確認方法
+
+- 取引一覧からパネルを開き、相手ヘッダー・取引内容カード・メッセージリスト・下部composerがWeb版と同じ骨格で表示されることを確認
+- 合意前の打診で、期限/合意ステータス/再打診導線が下部composer側に出ることを確認
+- 合意後の取引で、服装写真・現在地・到着ステータス・証跡撮影CTAがWeb版と同じ位置関係で表示されることを確認
+- `npm --prefix mobile run typecheck`
+- `git diff --check`
+
+### 関連ファイル
+
+- `mobile/app/transaction-detail.tsx`
+- `web/src/app/transactions/[id]/ChatView.tsx`
+- `iHub/c-flow.jsx`
+- `iHub/nego-flow.jsx`
+
+### セルフレビュー結果
+
+- ✅ Web版 `ChatView` と `iHub/c-flow.jsx` / `iHub/nego-flow.jsx` の構造を確認してから実装した
+- ✅ 機能だけでなく、固定ヘッダー・固定composer・ピン留め取引内容カードという画面骨格をWeb版に寄せた
+- ✅ 前iterで追加したApple導線、写真添付、現在地共有、地図プレビュー、再打診導線は消していない
+- ✅ 画面構成変更のみで状態名・用語・DB列追加はなく `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要
+
+---
+
+## イテレーション155.91：iOS取引チャットと認証導線のWeb版追従
+
+### 背景・問題意識
+
+iOS版の取引チャットがWeb版の取引チャットと比べて、申告中バナー、期限延長、合意状態、合意後の当日ライブ状態、再打診導線の見え方が薄く、ユーザーから「Web版と乖離がある」と指摘された。また、新規登録導線ではApple IDの入口を最初の認証画面へ集約し、メール入力画面の下部からはAppleサインアップを消す必要があった。加えて、開発環境でホーム遷移時に `REPLACE /(tabs)` が未処理になる警告と、Wish一覧で同一グッズIDの重複key警告が出ていた。
+
+### 変更内容
+
+#### `mobile/app/transaction-detail.tsx`
+- Web版 `ChatView` に合わせて、申告中バナー、打診期限/延長、合意状態バー、合意後の当日ライブ準備パネルを追加した。
+- 合意前チャットのクイックアクションに「カレンダー」「条件を変えて再打診」「写真添付」を並べ、Web版の操作導線へ寄せた。
+- `extension_count`、open dispute、到着ステータス、服装写真を実データから集約して表示できるようにした。
+- `extension_count` が未反映の環境でも落ちないよう、期限延長更新は該当列なしの場合にフォールバックするようにした。
+
+#### `mobile/app/(auth)/welcome.tsx`
+- 最初の新規登録画面にApple IDで新規登録する導線を追加した。
+- プレビュー開始後のホーム遷移を `replace` ではなく `navigate` に変更した。
+
+#### `mobile/app/(auth)/signup.tsx`
+- メールアドレス新規登録の各項目入力画面下部からAppleサインアップボタンを削除した。
+
+#### `mobile/app/_layout.tsx` / `mobile/app/(auth)/_layout.tsx`
+- Root Stackで `(tabs)` / `(auth)` を明示し、ログイン済みで認証画面に入った時のホーム遷移を `navigate` ベースにした。
+
+#### `mobile/app/(tabs)/wishes.tsx`
+- 同一グッズが複数候補に出る場合でもReact keyが重複しないよう、表示indexを含むkeyに変更した。
+
+### 影響範囲
+
+- iOS版 取引詳細 / 取引チャット
+- iOS版 新規登録・ログイン後ホーム遷移
+- iOS版 Wish > 個別募集一覧
+
+### 確認方法
+
+- 取引一覧から打診中/進行中のパネルを開き、取引チャット上部に合意状態・期限・再打診導線が出ることを確認
+- 新規登録最初の画面にApple ID導線があり、メール入力画面下部にはApple導線がないことを確認
+- Wish個別募集一覧で重複key警告が出ないことを確認
+- `npm --prefix mobile run typecheck`
+- `git diff --check`
+
+### 関連ファイル
+
+- `mobile/app/transaction-detail.tsx`
+- `mobile/app/(auth)/welcome.tsx`
+- `mobile/app/(auth)/signup.tsx`
+- `mobile/app/_layout.tsx`
+- `mobile/app/(auth)/_layout.tsx`
+- `mobile/app/(tabs)/wishes.tsx`
+
+### セルフレビュー結果
+
+- ✅ ユーザーが追加で要望した写真添付・現在地共有・地図プレビュー等の既存差分は消さずに取引チャットを拡張した
+- ✅ Apple ID新規登録導線は最初の認証画面へ集約し、メール入力画面下部からは削除した
+- ✅ `REPLACE /(tabs)` 警告につながるホームへの `replace` を避け、ホーム遷移を `navigate` に寄せた
+- ✅ 新しいDB列追加は行わず、既存 `extension_count` 参照は列なし環境でもフォールバックするため `notes/05_data_model.md` の更新は不要
+- ✅ 状態名・用語の追加はなく `notes/09_state_machines.md` / `notes/10_glossary.md` の更新は不要
+
+---
+
+## イテレーション155.90：iOSタブ外ルートの認証初期化待ちを追加
+
+### 背景・問題意識
+
+iOS版でログイン済みアカウントを開いた時、タブ画面は認証・プロフィール初期化を待つが、取引詳細や編集画面などタブ外のルートはRoot Stackがすぐ描画されるため、セッション確認前の一瞬にプレビュー/フォールバック情報が見える余地があった。ユーザー体験として「どの画面でもプレビュー用の情報が一瞬読み込まれる」印象につながるため、Web版と同じく実データ接続前の表示を抑える必要があった。
+
+### 変更内容
+
+#### `mobile/app/_layout.tsx`
+- Root Stackを直接描画せず、`RootNavigator` を挟むようにした。
+- `useAuth().loading` または `profileLoading` が true の間は背景色を揃えた中央ローディングのみ表示するようにした。
+- 認証初期化完了後に従来通り `Stack` を表示し、既存の右スライド遷移は維持した。
+
+### 影響範囲
+
+- iOS版 全ルート
+- タブ外画面（取引詳細、在庫/Wish編集、個別募集編集、プロフ編集など）の初期表示
+
+### 確認方法
+
+- ログイン済み状態でアプリを再起動し、タブ外画面へ遷移してプレビュー用の仮情報が一瞬出ないことを確認
+- `npm --prefix mobile run typecheck`
+
+### 関連ファイル
+
+- `mobile/app/_layout.tsx`
+- `mobile/src/auth/AuthProvider.tsx`
+
+### セルフレビュー結果
+
+- ✅ 既存のタブ/認証レイアウトガードを消さず、Root側の初期化待ちだけ追加した
+- ✅ 画面遷移アニメーションと既存の追加要望は維持した
+- ✅ 認証表示制御のみのため、新しい状態名・用語・DB列追加はなく `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要
+
+---
+
+## イテレーション155.89：iOSパスワードリセット画面を追加
+
+### 背景・問題意識
+
+iOS版ログイン画面には「パスワードを忘れた方」の導線があるが、遷移先の `/password-reset` 画面が未実装だった。Web版にはパスワードリセット画面があるため、スマホアプリでも同じくメールアドレス入力からリセットメールを送れる必要があった。
+
+### 変更内容
+
+#### `mobile/app/(auth)/password-reset.tsx`
+- パスワードリセット画面を新規追加した。
+- メールアドレス入力、簡易バリデーション、エラー表示、成功メッセージ表示を実装した。
+- Supabase Auth の `resetPasswordForEmail` を使ってリセットメールを送信するようにした。
+- Web版と同じ案内文・戻る導線・「リセットメールを送信」アクションに揃えた。
+
+### 影響範囲
+
+- iOS版 ログイン > パスワードを忘れた方
+- iOS版 認証導線
+
+### 確認方法
+
+- ログイン画面の「パスワードを忘れた方」からパスワードリセット画面へ遷移できることを確認
+- メールアドレスを入力してリセットメール送信が成功することを確認
+- `npm --prefix mobile run typecheck`
+
+### 関連ファイル
+
+- `mobile/app/(auth)/password-reset.tsx`
+- `mobile/app/(auth)/login.tsx`
+- `web/src/app/password-reset/page.tsx`
+- `web/src/app/password-reset/ResetForm.tsx`
+
+### セルフレビュー結果
+
+- ✅ 既存のログイン導線から404にならないよう、未実装画面を追加した
+- ✅ Supabase Authの既存機能を使うだけで新しい状態名・用語・DB列追加はなく `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要
+
+---
+
+## イテレーション155.88：iOS取引詳細の待ち合わせを地図付きに同期
+
+### 背景・問題意識
+
+Web版の取引チャットでは、取引内容カード内の待ち合わせ欄にミニマップがあり、合流場所を視覚的に確認できる。iOS版の取引詳細は待ち合わせ候補を時間と場所名だけで表示していたため、現地交換時の位置確認がWeb版より弱かった。
+
+### 変更内容
+
+#### `mobile/app/transaction-detail.tsx`
+- 待ち合わせ候補に緯度経度がある場合、`NativeMapPreview` のミニマップを表示するようにした。
+- 待ち合わせカードを押すとApple Mapsで該当地点を開けるようにした。
+- 緯度経度がない候補は、従来通り時間と場所名のみで表示するようにした。
+
+### 影響範囲
+
+- iOS版 取引詳細
+- 待ち合わせ候補カード
+
+### 確認方法
+
+- 取引詳細で緯度経度付きの待ち合わせ候補にミニマップが表示されることを確認
+- そのカードを押すとApple Mapsへ遷移することを確認
+- `npm --prefix mobile run typecheck`
+
+### 関連ファイル
+
+- `mobile/app/transaction-detail.tsx`
+- `mobile/src/components/NativeMapPreview.tsx`
+- `web/src/app/transactions/[id]/ChatView.tsx`
+
+### セルフレビュー結果
+
+- ✅ Web版の待ち合わせミニマップ表示をiOS版にも追加した
+- ✅ 既存の候補時間・場所名表示は維持した
+- ✅ 既存のmeetup緯度経度を使うため、新しい状態名・用語・DB列追加はなく `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要
+
+---
+
+## イテレーション155.87：iOS位置情報メッセージを地図表示へ同期
+
+### 背景・問題意識
+
+Web版の取引チャットでは、現在地共有メッセージがテキストだけではなくミニマップ付きで表示され、必要なら地図アプリへ開ける。iOS版は location message の本文表示に留まっていたため、現地合流時に「どこにいるか」を直感的に確認しづらかった。
+
+### 変更内容
+
+#### `mobile/app/transaction-detail.tsx`
+- location message 用の `LocationChatBubble` を追加した。
+- 緯度経度がある場合は `NativeMapPreview` でチャット内に小さな地図とピンを表示するようにした。
+- 「地図アプリで開く」から Apple Maps のURLを開けるようにした。
+- 既存のテキスト・写真・服装写真・到着ステータスの表示は維持した。
+
+### 影響範囲
+
+- iOS版 取引チャット
+- 現在地共有メッセージの表示
+
+### 確認方法
+
+- 取引チャットで現在地を送信し、チャット内に地図付きのlocation bubbleが表示されることを確認
+- 「地図アプリで開く」を押すとApple Mapsへ遷移することを確認
+- `npm --prefix mobile run typecheck`
+
+### 関連ファイル
+
+- `mobile/app/transaction-detail.tsx`
+- `mobile/src/components/NativeMapPreview.tsx`
+- `web/src/app/transactions/[id]/ChatView.tsx`
+
+### セルフレビュー結果
+
+- ✅ Web版のミニマップ付きlocation bubbleへiOS版を近づけた
+- ✅ 既存の `messages.location_lat/location_lng/location_label` を使うため、新しい状態名・用語・DB列追加はなく `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要
+
+---
+
+## イテレーション155.86：iOS取引チャットに写真・現在地共有を追加
+
+### 背景・問題意識
+
+Web版の取引チャットには、合意後の現在地共有、向かう/到着、服装写真、通常写真添付がクイックアクションとして用意されている。iOS版はテキスト送信と到着ステータスが中心で、当日の取引体験に必要な「見つけやすさ」「現地共有」の機能が不足していた。
+
+### 変更内容
+
+#### `mobile/app/transaction-detail.tsx`
+- 取引チャットの入力欄上にクイックアクションチップを追加した。
+- 合意済み取引では「現在地」「服装写真」「写真添付」を表示し、合意前のネゴチャットでは「写真添付」を表示するようにした。
+- `expo-location` で現在地を取得し、可能なら逆ジオコードした場所名つきの location message を送信するようにした。
+- `expo-image-picker` で通常写真 / 服装写真を選び、`chat-photos` storage へアップロードして signed URL を message に保存するようにした。
+- 服装写真はWeb版同様、合意済み取引でのみ送れるように防御した。
+
+### 影響範囲
+
+- iOS版 取引詳細 / 取引チャット
+- 合意前ネゴチャットの写真添付
+- 合意後取引チャットの現在地共有・服装写真・写真添付
+
+### 確認方法
+
+- 取引チャットで写真添付を押し、写真選択後にチャットへ画像メッセージが追加されることを確認
+- 合意済み取引で現在地を押し、location message が追加されることを確認
+- 合意済み取引で服装写真を押し、outfit_photo message が追加されることを確認
+- `npm --prefix mobile run typecheck`
+
+### 関連ファイル
+
+- `mobile/app/transaction-detail.tsx`
+- `web/src/app/transactions/[id]/ChatView.tsx`
+- `web/src/app/transactions/actions.ts`
+
+### セルフレビュー結果
+
+- ✅ Web版の取引チャットの主要クイックアクションをiOS版にも追加した
+- ✅ 既存のテキスト送信・到着ステータス・証跡撮影導線は残した
+- ✅ 既存の `messages` / `chat-photos` を使うため、新しい状態名・用語・DB列追加はなく `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要
+
+---
+
+## イテレーション155.85：iOS取引詳細の補助取得失敗を分離
+
+### 背景・問題意識
+
+取引一覧から取引詳細へ入る導線では、打診データそのものが取れれば取引チャットを表示できるべきである。iOS版は詳細画面で相手プロフィール、在庫リレーション、証跡写真などの補助データを並列取得していたため、補助テーブルや任意列の取得失敗でも詳細全体が「読み込みに失敗しました」へ落ちる可能性があった。
+
+### 変更内容
+
+#### `mobile/app/transaction-detail.tsx`
+- 相手プロフィール、取引グッズ、証跡写真の取得をそれぞれ安全な helper に分離した。
+- `users.avatar_url` がない環境では、avatarなしのselectへフォールバックするようにした。
+- 在庫リレーションや証跡写真テーブルの取得に失敗しても、取引詳細全体は落とさず、取れる範囲の情報で表示するようにした。
+- 補助取得の失敗は `console.warn` に留め、メインの打診取得とチャット表示を優先するようにした。
+
+### 影響範囲
+
+- iOS版 取引一覧 > 取引詳細
+- iOS版 取引チャット表示
+- 証跡写真・相手アバター・交換物サムネイルの補助表示
+
+### 確認方法
+
+- 取引一覧の打診中 / 進行中 / 完了パネルから詳細へ入れることを確認
+- `avatar_url` や証跡写真テーブルが取得できない環境でも、取引詳細がエラー画面にならないことを確認
+- `npm --prefix mobile run typecheck`
+
+### 関連ファイル
+
+- `mobile/app/transaction-detail.tsx`
+- `mobile/app/(tabs)/transactions.tsx`
+
+### セルフレビュー結果
+
+- ✅ メインの `proposals` 取得と補助データ取得を分離し、補助情報欠落で取引チャットが開けなくなるリスクを下げた
+- ✅ 既存の一覧スナップショット復元フォールバックも残している
+- ✅ 新しい状態名・用語・DB列追加はないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要
+
+---
+
+## イテレーション155.84：iOSログイン後のプレビュー残留を抑止
+
+### 背景・問題意識
+
+iOS版では、ログイン後の画面でプレビュー用の情報が一瞬読み込まれることがあり、実アカウントで操作している感覚を損ねていた。特に取引詳細では `previewMode` が残ると「Preview_hanaでは取引チャットを開けません」という表示へ寄る可能性があるため、実セッションが存在する時はプレビュー状態を明示的に無効化する必要があった。
+
+### 変更内容
+
+#### `mobile/src/auth/AuthProvider.tsx`
+- Supabaseの既存セッション取得時、または auth state change でセッションが入った時に `previewMode` を解除するようにした。
+- Contextへ渡す `previewMode` は、セッションがない時だけ有効な `effectivePreviewMode` に変更した。
+- オンボーディング判定も `effectivePreviewMode` を参照し、ログイン済みユーザーがプレビュー扱いでガードをすり抜けないようにした。
+
+### 影響範囲
+
+- iOS版 認証状態管理
+- ログイン後のホーム / 取引一覧 / 取引詳細 / プロフなど、プレビュー表示を持つ画面
+
+### 確認方法
+
+- プレビュー表示後にログインし、実セッションがある状態ではプレビュー情報が出ないことを確認
+- 取引詳細で、ログイン済みなのに `Preview_hana` 向けの案内へ落ちないことを確認
+- `npm --prefix mobile run typecheck`
+
+### 関連ファイル
+
+- `mobile/src/auth/AuthProvider.tsx`
+- `mobile/app/transaction-detail.tsx`
+
+### セルフレビュー結果
+
+- ✅ 実セッションが存在する時はプレビュー扱いにならないよう、AuthProviderの根元で抑止した
+- ✅ プレビュー機能自体は、未ログインかつ明示的にプレビューへ入った場合だけ残した
+- ✅ 新しい状態名・用語・DB列追加はないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要
+
+---
+
+## イテレーション155.83：iOSカード表示を画像準備後へ同期
+
+### 背景・問題意識
+
+Web版のホーム・在庫・Wishでは、画像が読み込まれてからカードの登場アニメーションを始めるため、写真が空のままパネルだけ先に出る違和感が出にくい。iOS版はカード本体の表示が画像ロードより先に始まる可能性があり、ユーザーが気に入っている表示速度は維持しつつ、写真準備前の不恰好さを抑える必要があった。
+
+### 変更内容
+
+#### `mobile/src/lib/useImageReady.ts`
+- React Native向けに画像URLのプリフェッチ完了を管理する `useImageReady` を追加した。
+- 一度準備できた画像URLはセッション内でキャッシュし、再表示時に待ちすぎないようにした。
+- 画像取得に失敗した場合もカードが永久に隠れないよう、失敗時は準備完了扱いにした。
+
+#### `mobile/src/components/GoodsGrid.tsx`
+- 在庫 / Wish 共通のグッズカードを、画像準備後に登場アニメーションへ入るよう変更した。
+- 画像準備に時間がかかった場合は、経過済みの登場ディレイを差し引いて、現在の速いテンポをできるだけ維持するようにした。
+- 準備前の透明カードがタップを吸わないよう、pointer events を止めた。
+
+#### `mobile/app/(tabs)/index.tsx`
+- ホームのマッチング候補カードも画像準備後に右からスライドインするよう変更した。
+- 行内の順番ディレイは維持しつつ、画像ロード待ちで不必要に遅くならないようにした。
+
+### 影響範囲
+
+- iOS版 ホーム画面のマッチング候補カード
+- iOS版 マイ在庫のグッズカード
+- iOS版 Wishのグッズカード
+
+### 確認方法
+
+- ホーム画面で画像付きマッチングカードが、写真準備後に右から表示されることを確認
+- マイ在庫 / Wishで、画像付きグッズカードが写真の空白を見せずに登場することを確認
+- `npm --prefix mobile run typecheck`
+
+### 関連ファイル
+
+- `mobile/src/lib/useImageReady.ts`
+- `mobile/src/components/GoodsGrid.tsx`
+- `mobile/app/(tabs)/index.tsx`
+- `web/src/components/common/useImageReady.ts`
+- `web/src/components/home/HomeView.tsx`
+- `web/src/app/inventory/InventoryView.tsx`
+- `web/src/app/wishes/WishView.tsx`
+
+### セルフレビュー結果
+
+- ✅ Web版の `useImageReady` と同じ「画像準備後にカードを出す」考え方へ寄せた
+- ✅ 登場アニメーションの速さを損なわないよう、画像待ち中に経過したディレイは再度待たせない実装にした
+- ✅ 新しい状態名・用語・DB列追加はないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要
+
+---
+
+## イテレーション155.82：iOS Wishタブを指追従ページャーへ変更
+
+### 背景・問題意識
+
+iOS版のWish画面は、Wish / 個別募集の切り替えを横スワイプで判定していたが、画面そのものは指の動きに追従せず、切り替え完了時に内容だけが変わる実装だった。在庫画面やiOS標準の画面移動に寄せるには、横ページャーとして実際に画面が動く必要がある。
+
+### 変更内容
+
+#### `mobile/app/(tabs)/wishes.tsx`
+- Wish / 個別募集の2画面を、横 `ScrollView` + `pagingEnabled` のページャーに変更した。
+- 上部タブを押した時は該当ページへ滑らかにスクロールし、横スワイプ時は指の動きに合わせてページが移動するようにした。
+- ページの着地後に上部タブ状態を同期し、選択中のWish/個別募集シートは閉じるようにした。
+
+### 影響範囲
+
+- iOS版 Wishタブ
+- Wish一覧 / 個別募集一覧のタブ切り替え
+- Wish一覧 / 個別募集一覧内の縦スクロール
+
+### 確認方法
+
+- Wish画面で左右にスワイプすると、画面が指に追従してWish/個別募集が切り替わることを確認
+- 上部タブを押しても同じページャーで滑らかに切り替わることを確認
+- 各ページ内の縦スクロールが維持されることを確認
+- `npm --prefix mobile run typecheck`
+
+### 関連ファイル
+
+- `mobile/app/(tabs)/wishes.tsx`
+- `web/src/app/wishes/WishView.tsx`
+
+### セルフレビュー結果
+
+- ✅ 手動のスワイプ判定だけでなく、実際の横ページャーへ変更した
+- ✅ 既存のWish削除、個別募集編集/停止/削除、列数切替は維持した
+- ✅ 新しい状態名・用語・DB列追加はないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要
+
+---
+
+## イテレーション155.81：iOS待ち合わせ長押しの初期枠を30分へ調整
+
+### 背景・問題意識
+
+提示物選択の待ち合わせカレンダーでは、1回タップ時は30分候補を作れる一方で、長押し開始時のドラッグプレビューが60分相当で始まっていた。Google Calendar的な「押した位置から必要な分だけ伸ばす」感覚に寄せるには、最初の候補枠は控えめな30分から始まる方が直感的である。
+
+### 変更内容
+
+#### `mobile/app/proposal-select.tsx`
+- 長押しで時間選択に入った瞬間のドラッグプレビューを、開始スロットから30分ぶんに変更した。
+- 24時付近で長押ししても範囲がカレンダー外へはみ出さないよう、初期 `currentSlot` を `SLOT_COUNT - 1` で丸めた。
+
+### 影響範囲
+
+- iOS版 提示物の選択 > 待ち合わせタブ
+- 長押しでの候補時間作成
+
+### 確認方法
+
+- 待ち合わせカレンダーで長押しすると、最初に30分幅の候補として表示されることを確認
+- そのまま上下へドラッグすると候補時間が自然に伸び縮みすることを確認
+- `npm --prefix mobile run typecheck`
+
+### 関連ファイル
+
+- `mobile/app/proposal-select.tsx`
+- `web/src/app/propose/[partnerId]/ProposeFlow.tsx`
+
+### セルフレビュー結果
+
+- ✅ タップ作成と長押し開始時の時間幅を揃えた
+- ✅ 既存の候補追加、場所設定、週スワイプ、候補移動/リサイズは変更していない
+- ✅ 新しい状態名・用語・DB列追加はないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要
+
+---
+
+## イテレーション155.80：iOS推し設定を楽観更新へ同期
+
+### 背景・問題意識
+
+Web版の推し設定は、推しやメンバーを追加した瞬間に画面へ反映し、保存処理は裏側で順番に流す設計になっている。iOS版は保存ごとに再読み込みしていたため、登録のたびにグループ表示が前後したり、次のメンバーをすぐ追加できないように見える余地があった。
+
+### 変更内容
+
+#### `mobile/app/oshi-settings.tsx`
+- 推し設定の保存処理をキュー化し、画面上は先に反映する楽観更新へ変更した。
+- 登録済みマスタの推し追加、推し削除、メンバー追加、メンバー削除、推し/メンバー追加リクエストを、Web版と同じく即時にUI反映してからバックグラウンド保存するようにした。
+- 保存中に `fetchOshiData` の結果でローカル表示を上書きしないようにし、保存キューが空になったタイミングだけ再同期するようにした。
+- 追加リクエストは送信直後に「承認待ち」の仮登録として表示し、失敗時は直前の表示へ戻すようにした。
+
+### 影響範囲
+
+- iOS版 プロフ > 推し設定
+- 登録済み推し追加モーダル
+- 推し/メンバー追加リクエスト
+- 推しメンバー追加/削除
+
+### 確認方法
+
+- 推し設定で登録済みの推しを追加して、画面上へ即時に追加されることを確認
+- メンバーを連続で追加しても、登録ローディング待ちで次の操作が止まらないことを確認
+- 推し/メンバー追加リクエスト後、承認待ちの仮登録として即時表示されることを確認
+- `npm --prefix mobile run typecheck`
+
+### 関連ファイル
+
+- `mobile/app/oshi-settings.tsx`
+- `web/src/app/profile/oshi/OshiEditView.tsx`
+
+### セルフレビュー結果
+
+- ✅ Web版の「先にUI反映、保存は裏で順番に処理」に合わせた
+- ✅ 既存の追加リクエスト導線、登録済み推し検索、ジャンルタブは残した
+- ✅ 新しい状態名・用語・DB列追加はないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要
+
+---
+
+## イテレーション155.79：iOS待ち合わせカレンダーのジェスチャーロック追加
+
+### 背景・問題意識
+
+提示物選択の待ち合わせカレンダーでは、長押しで時間帯を選択したり、カレンダー上で横スワイプして週を切り替える操作がある。iOS版はドラッグ状態そのものは持っていたが、週スワイプや長押し選択に入った瞬間のスクロール抑制が弱く、時間帯を選ぼうとした時に縦スクロールへ逃げる可能性があった。
+
+### 変更内容
+
+#### `mobile/app/proposal-select.tsx`
+- カレンダー操作専用の `calendarGestureLock` を追加した。
+- 長押し時間選択、候補の移動/リサイズ、時間グリッド上の横スワイプが始まった時に、カレンダーの縦スクロールを明示的に停止するようにした。
+- タッチ終了・キャンセル・候補編集終了時にロックを解除し、通常の軽い縦スクロールは従来通り使えるようにした。
+
+### 影響範囲
+
+- iOS版 提示物の選択 > 待ち合わせタブ
+- カレンダー上の長押し時間選択
+- カレンダー上の横スワイプ週切替
+- 候補時間ブロックの移動 / 終了時刻調整
+
+### 確認方法
+
+- 待ち合わせカレンダーで長押し後に下方向へドラッグしても、画面スクロールではなく時間帯選択が伸びることを確認
+- 時間グリッド上で横スワイプすると、週が切り替わることを確認
+- 軽い縦スクロールでは、これまで通り0時〜24時へスクロールできることを確認
+- `npm --prefix mobile run typecheck`
+
+### 関連ファイル
+
+- `mobile/app/proposal-select.tsx`
+- `web/src/app/propose/[partnerId]/ProposeFlow.tsx`
+
+### セルフレビュー結果
+
+- ✅ 長押し・横スワイプ・候補編集時だけスクロールを止め、通常の縦スクロールは残した
+- ✅ カレンダー候補の保存・場所設定・送信確認へのルートは変更していない
+- ✅ 新しい状態名・用語・DB列追加はないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要
+
+---
+
+## イテレーション155.78：iOSホームのモード切替フィードバックをWeb版へ同期
+
+### 背景・問題意識
+
+Web版ホームでは、全国交換モードと今すぐ現地交換モードを切り替える瞬間に、短時間の「切り替え中」表示を出して操作の手応えを作っている。iOS版はセグメント自体のアニメーションはあったが、切り替え処理中のステータスが出ず、Web版より反応が薄く見える余地があった。
+
+### 変更内容
+
+#### `mobile/app/(tabs)/index.tsx`
+- モード切替時に、画面上部へ短時間のステータスピルを表示するようにした。
+- 現地表示へ切り替える時は `今すぐ現地交換モードに切り替え中…`、全国表示へ切り替える時は `全国交換モードに切り替え中…` を表示するようにした。
+- 右上トグルで現地交換モード自体をOFFにしない限り、全国表示へ切り替えても `localMode` は維持する既存挙動を残した。
+
+### 影響範囲
+
+- iOS版 ホーム画面
+- 全国交換モード / 今すぐ現地交換モードの表示切替
+
+### 確認方法
+
+- ホームのセグメントを押すと、上部に短時間の切り替え中ピルが出ることを確認
+- 現地交換モードON中に全国交換モード表示へ切り替えても、右上トグルがONのまま維持されることを確認
+- 右上トグルをOFFにした時だけ現地交換モード自体がOFFになることを確認
+- `npm --prefix mobile run typecheck`
+
+### 関連ファイル
+
+- `mobile/app/(tabs)/index.tsx`
+- `web/src/components/home/HomeView.tsx`
+
+### セルフレビュー結果
+
+- ✅ Web版の切り替え中フィードバックをiOS版にも追加した
+- ✅ ユーザー要望の「全国表示を見ても現地交換モード自体はOFFにしない」挙動は維持した
+- ✅ 新しい状態名・用語・DB列追加はないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要
+
+---
+
+## イテレーション155.77：iOS在庫登録のメンバー追加リクエストをWeb版へ同期
+
+### 背景・問題意識
+
+Web版の在庫登録フローでは、ラベル設定中に「メンバーが見つからない場合は追加リクエスト」を押すと、その場でメンバー名と任意メモを入力でき、送信済みリクエストが審査中チップとして表示される。iOS版は一行のOSプロンプトでメンバー名だけを送る形だったため、Web版のマスタ管理フローと情報量がズレていた。
+
+### 変更内容
+
+#### `mobile/app/goods-editor.tsx`
+- 在庫登録フローのメタ設定ステップに、Web版と同じくインラインのメンバー追加リクエストフォームを追加した。
+- メンバー名に加えて、公式リンク・別名などを書ける任意メモを `character_requests.note` へ保存するようにした。
+- 送信後はフォームを閉じ、送信済みリクエストを「審査中」チップとして表示するようにした。
+- 送信したリクエストはそのままメンバー候補にも追加され、登録ラベルで選択できるようにした。
+
+### 影響範囲
+
+- iOS版 マイ在庫 > 新規登録 > ラベル設定
+- iOS版 在庫登録中のメンバー追加リクエスト
+
+### 確認方法
+
+- マイ在庫の新規登録で写真選択または写真なし登録へ進み、ラベル設定で追加リクエストフォームが開くことを確認
+- メンバー名とメモを入力して送信すると、審査中候補として選べることを確認
+- 送信済みリクエストのチップが表示されることを確認
+- `npm --prefix mobile run typecheck`
+
+### 関連ファイル
+
+- `mobile/app/goods-editor.tsx`
+- `web/src/app/inventory/new/CaptureFlow.tsx`
+
+### セルフレビュー結果
+
+- ✅ Web版のメンバー追加リクエストと同じ入力項目・送信後表示に寄せた
+- ✅ 既存の在庫登録・タグ・説明メモ・写真登録フローは残した
+- ✅ 新しい状態名・用語・DB列追加はないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要
+
+---
+
+## イテレーション155.76：iOS取引詳細の一覧スナップショット復元
+
+### 背景・問題意識
+
+iOS版の取引一覧からパネルを押した時、一覧では打診データを取得できているのに詳細画面側の再取得で失敗すると「読み込みに失敗しました」だけが表示され、取引チャットへ進めない体験になっていた。Web版は一覧から詳細へ入る導線が取引体験の主軸なので、詳細取得が一時的に失敗しても一覧で見えていた最低限の情報は崩さず表示する必要がある。
+
+### 変更内容
+
+#### `mobile/app/(tabs)/transactions.tsx`
+- 取引パネル押下時に、打診IDだけでなく相手名、アバター、ステータス、受け取る/出すグッズ、場所、時間、メモをルートパラメータへ渡すようにした。
+
+#### `mobile/app/transaction-detail.tsx`
+- 詳細画面で `proposals` の再取得に失敗した場合、一覧から渡されたスナップショットを使って取引詳細を復元するフォールバックを追加した。
+- フォールバック表示でも相手情報、交換物、候補場所/時間、メッセージを最低限表示できるようにした。
+- 日時が実ISO文字列でないフォールバック候補でも `NaN` 表示にならないよう、日時フォーマッタに防御を入れた。
+
+### 影響範囲
+
+- iOS版 取引一覧 > 取引詳細
+- iOS版 打診中 / 進行中 / 完了パネルの詳細遷移
+
+### 確認方法
+
+- 打診中の「相手待ち」パネルを押して、404や「読み込みに失敗しました」だけで止まらないことを確認
+- 詳細取得が成功する場合は従来通り実データの取引チャットが表示されることを確認
+- 詳細取得に失敗する場合も、一覧で見えていた相手名・交換物・場所/時間が表示されることを確認
+- `npm --prefix mobile run typecheck`
+
+### 関連ファイル
+
+- `mobile/app/(tabs)/transactions.tsx`
+- `mobile/app/transaction-detail.tsx`
+- `web/src/app/transactions/TransactionsView.tsx`
+- `web/src/app/proposals/[id]/ProposalDetailView.tsx`
+
+### セルフレビュー結果
+
+- ✅ 一覧の実データを詳細画面へ渡すだけで、新しいDB列や状態を追加していない
+- ✅ 実データ取得成功時の既存チャット・合意・到着ステータス処理は残した
+- ✅ 新しい状態名・用語・DB列追加はないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要
+
+---
+
+## イテレーション155.75：iOSオンボーディング完了判定をWeb版へ同期
+
+### 背景・問題意識
+
+Web版はメール認証後、性別、推し、メンバー、活動エリアの順でオンボーディングを進め、最後の活動エリア保存で `account_status` を `active` にする。一方、iOS版は `account_status=active` の場合に性別や推しの登録有無を見ずホームへ入れる余地があり、新規登録後にオンボーディングを経ずホームへ進む挙動が起きやすかった。
+
+### 変更内容
+
+#### `mobile/src/auth/AuthProvider.tsx`
+- プロフィール取得時に `user_oshi` の件数も読み込み、`hasOshi` として認証コンテキストへ持たせるようにした。
+- `account_status=active` でも、性別または推しが未登録ならオンボーディングが必要と判定するようにした。
+- 未完了状態に応じて `/onboarding/gender`、`/onboarding/oshi`、`/onboarding/members` へ進める `onboardingPath` を追加した。
+- Appleログイン直後のように React state の `session` 反映前でもプロフィールを読めるよう、`supabase.auth.getUser()` をフォールバックにした。
+
+#### `mobile/app/(tabs)/_layout.tsx`
+- ログイン済みだがオンボーディング未完了の場合、確認完了画面ではなく未完了ステップへ直接戻すようにした。
+
+#### `mobile/app/(auth)/_layout.tsx`
+- 認証画面側でも、ログイン済み未完了ユーザーは未完了ステップへ戻すようにした。
+
+#### `mobile/src/components/AppleAuthButton.tsx`
+- Apple IDログイン後の遷移判定を `gender` / `hasOshi` / `account_status` の順に見直し、Web版と同じオンボーディング導線へ進めるようにした。
+
+#### `mobile/app/auth/email-confirmed.tsx`
+- 認証完了ボタンの遷移先を、現在の未完了ステップに合わせるようにした。
+
+### 影響範囲
+
+- iOS版 ログイン / 新規登録 / Apple IDログイン
+- iOS版 メール認証完了後のオンボーディング導線
+- iOS版 タブ画面へ入る前のガード
+
+### 確認方法
+
+- 性別未登録ユーザーでログインすると `/onboarding/gender` に進むことを確認
+- 性別登録済み・推し未登録ユーザーでログインすると `/onboarding/oshi` に進むことを確認
+- 推し登録済みだが `account_status` が未完了のユーザーでログインすると `/onboarding/members` に進むことを確認
+- 既に `active` かつ性別・推しがあるユーザーはホームに進むことを確認
+- `npm --prefix mobile run typecheck`
+
+### 関連ファイル
+
+- `mobile/src/auth/AuthProvider.tsx`
+- `mobile/app/(tabs)/_layout.tsx`
+- `mobile/app/(auth)/_layout.tsx`
+- `mobile/src/components/AppleAuthButton.tsx`
+- `mobile/app/auth/email-confirmed.tsx`
+- `web/src/app/onboarding/actions.ts`
+
+### セルフレビュー結果
+
+- ✅ Web版のオンボーディング完了条件に合わせ、`account_status` だけでホームへ通さないようにした
+- ✅ 活動エリアはWeb版同様に任意入力のため、未設定でも `active` ユーザーを再オンボーディングへ戻さない
+- ✅ 新しい状態名・用語・DB列追加はないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要
+
+---
+
+## イテレーション155.74：iOS関係図を実個別募集データで描画
+
+### 背景・問題意識
+
+ホームから個別募集に合致したマッチ候補を押した時、Web版はその候補に紐づく実際の個別募集・選択肢・グッズ画像を使って関係図を描画する。一方、iOS版の関係図は `listingIds` が渡っていても、ルートパラメータとプレビュー用の仮データから関係図を組み立てていたため、実データの画像が抜けたり、Web版と違う関係が表示されやすかった。
+
+### 変更内容
+
+#### `mobile/app/match-detail.tsx`
+- `listingIds` が渡された場合、`listings` / `listing_wish_options` / `goods_inventory` を読み込み、実際の個別募集データから関係図を組み立てるようにした。
+- 実データから譲グッズ、求めるWish、候補グッズの画像・タイトル・グループ/メンバー/種別を復元するようにした。
+- 自分の個別募集か相手の個別募集かを `listings.user_id` とログインユーザーIDで判定し、Web版と同じ向きで「私が出す」「受け取る」を集計できるようにした。
+- 実データ取得に失敗した場合は既存の簡易関係図へフォールバックし、画面遷移自体は止めないようにした。
+
+### 影響範囲
+
+- iOS版 ホーム > 関係図
+- iOS版 関係図から提示物選択へ進む時の初期選択
+- 個別募集ヒット候補の画像表示
+
+### 確認方法
+
+- ホームで個別募集に合致した候補を押し、関係図内のグッズ画像が実データの画像になることを確認
+- 自分の個別募集 / 相手の個別募集それぞれで、譲と求の向きが崩れないことを確認
+- 実データ取得に失敗しても画面全体が落ちないことを確認
+- `npm --prefix mobile run typecheck`
+
+### 関連ファイル
+
+- `mobile/app/match-detail.tsx`
+- `web/src/components/home/HomeView.tsx`
+- `web/src/app/listings/new/ListingNewForm.tsx`
+
+### セルフレビュー結果
+
+- ✅ Web版と同じく、関係図を候補に紐づく個別募集単位のデータで描く経路を追加した
+- ✅ 既存のスワイプ遷移・提示物選択への遷移・簡易Wish一致フローは残した
+- ✅ 新しい状態名・用語・DB列追加はないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要
+
+---
+
+## イテレーション155.73：iOSホーム候補を候補単位のWebロジックへ同期
+
+### 背景・問題意識
+
+Web版ホームでは、候補カードごとに「自分の個別募集に含まれるか」「相手の個別募集に含まれるか」を判定し、その候補自身が個別募集に絡む場合だけ関係図へ進む。iOS版は相手とのマッチ全体に個別募集があると、個別募集に含まれていない候補まで関係図へ進みやすく、以前指摘された「選べない候補なのに関係図へ飛ぶ」挙動が再発しうる状態だった。また、Web版で行っているタグ類似度による並び替えとタグ表示が、iOS版の実データ取得では未反映だった。
+
+### 変更内容
+
+#### `mobile/src/data/homeSupabase.ts`
+- 個別募集ヒットを相手単位ではなく、相手の譲グッズ候補ID単位で保持するようにした。
+- 候補カードの優先度を「双方の個別募集」「一方の個別募集」「通常の譲 × Wish」の順で、候補ごとに再計算するようにした。
+- 個別募集に含まれない通常候補は `listingIds` を空にし、ホームから押した時に関係図ではなく提示物選択へ進めるようにした。
+- `goods_inventory_tags` / `tags_master` を読み込み、候補タグの表示とタグJaccard類似度による並び替えをiOS側にも追加した。
+- ホーム棚はWeb版と同じく「自分のWishに届いた相手の譲グッズ」を対象にし、自分が出すだけの候補をホームの受け取り棚へ混ぜないようにした。
+
+#### `mobile/src/data/homeMatches.ts`
+- 候補に `tagScore` を持たせ、ホーム棚のソートに使えるようにした。
+
+#### `mobile/app/(tabs)/index.tsx`
+- 現地交換OFF時の右上表示をWeb版と同じ `（現地交換モードOFF）` に寄せ、長い表示でも収まりやすい幅に調整した。
+
+### 影響範囲
+
+- iOS版 ホーム画面
+- ホームのマッチ候補カードの並び順・タグ表示・押下後の遷移
+- 現地交換モードOFF時の場所表示
+
+### 確認方法
+
+- 個別募集に含まれていない通常候補を押すと、関係図ではなく提示物選択へ進むことを確認
+- 個別募集に含まれる候補だけ関係図へ進むことを確認
+- タグ付きの相手譲グッズで、カード下部にタグが表示され、タグ類似度が高い候補が上に来ることを確認
+- `npm --prefix mobile run typecheck`
+
+### 関連ファイル
+
+- `mobile/src/data/homeSupabase.ts`
+- `mobile/src/data/homeMatches.ts`
+- `mobile/app/(tabs)/index.tsx`
+- `web/src/components/home/HomeView.tsx`
+
+### セルフレビュー結果
+
+- ✅ Web版の候補単位判定に合わせ、マッチ全体の個別募集状態を候補へ雑に流用しない形にした
+- ✅ タグ類似度は既存の `goods_inventory_tags` / `tags_master` を読むだけで、新しいDB列は追加していない
+- ✅ 新しい状態名・用語・DB列追加はないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要
+
+---
+
+## イテレーション155.72：iOS取引一覧にWeb版の補助情報を同期
+
+### 背景・問題意識
+
+Web版の取引一覧は、取引パネル上で相手アバター、完了取引の自分の評価、進行中の異議申告、定価交換のプレビューを表示している。一方、iOS版の取引一覧は最小限の相手名とグッズ画像だけで、Web版に比べて状態判断の情報量が不足していた。また、取引一覧から詳細へ進む時に、異議申告中の取引はWeb版では申告詳細へ進む設計になっている。
+
+### 変更内容
+
+#### `mobile/app/(tabs)/transactions.tsx`
+- 取引一覧のデータ取得で、相手の `avatar_url`、完了取引に対する自分の `user_evaluations.stars`、open な `disputes` を取得するようにした。
+- `avatar_url` は列がない環境でも壊れないよう、選択列フォールバック付きで取得するようにした。
+- 定価交換の打診では、Web版と同じく `¥` のキャッシュ用ミニカードを取引プレビューに表示するようにした。
+- open dispute がある取引パネルは要対応扱いにし、タップ時は取引詳細ではなく `dispute-detail` へ進むようにした。
+
+### 影響範囲
+
+- iOS版 取引一覧
+- 取引パネルの状態表示
+- 異議申告中取引の遷移先
+
+### 確認方法
+
+- 完了タブで自分の評価済み取引に `★ n` が表示されることを確認
+- 異議申告中の進行中取引が要対応表示になり、タップで申告詳細へ進むことを確認
+- 定価交換を含む打診で `¥` のプレビューが表示されることを確認
+- `npm --prefix mobile run typecheck`
+
+### 関連ファイル
+
+- `mobile/app/(tabs)/transactions.tsx`
+- `web/src/app/transactions/page.tsx`
+- `web/src/app/transactions/TransactionsView.tsx`
+
+### セルフレビュー結果
+
+- ✅ Web版の取引一覧で参照している補助情報をiOS側にも追加した
+- ✅ 取得できない補助情報は空として扱い、一覧全体が落ちないようにした
+- ✅ 状態名・用語・DB列追加はないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要
+
+---
+
+## イテレーション155.71：iOS待ち合わせ空カレンダー案内を鼓動表示へ
+
+### 背景・問題意識
+
+オーナーから、提示物の選択 > 待ち合わせタブで候補が未設定のときは、カレンダー中央に固定された黒い半透明の案内を出し、その背景が少し大きくなったり小さくなったりするような動きにしたいと要望があった。iOS版では案内自体は中央固定で表示できていたが、静的表示のままで「ここから操作できる」サインが弱かった。
+
+### 変更内容
+
+#### `mobile/app/proposal-select.tsx`
+- 候補未設定かつドラッグプレビューがない時だけ、案内バッジに `Animated.loop` の軽いスケール/透明度アニメーションを付与した。
+- 候補作成またはドラッグ中はアニメーションを停止し、既存のカレンダー操作・候補作成・場所設定導線を邪魔しないようにした。
+
+### 影響範囲
+
+- iOS版 提示物の選択 > 待ち合わせタブ
+- 候補未設定時の空状態ガイド
+
+### 確認方法
+
+- 待ち合わせタブを候補0件で開き、黒い半透明の案内がカレンダー中央付近で控えめに拡縮することを確認
+- 候補時間を作成したら案内が消え、場所設定シートが開くことを確認
+- `npm --prefix mobile run typecheck`
+
+### 関連ファイル
+
+- `mobile/app/proposal-select.tsx`
+
+### セルフレビュー結果
+
+- ✅ 既存の長押しドラッグ、タップ30分作成、週スワイプ、候補移動/リサイズは変更していない
+- ✅ 新しい状態名・用語・DB列追加はないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要
+
+---
+
+## イテレーション155.70：iOS待ち合わせ候補から場所設定へ即接続
+
+### 背景・問題意識
+
+Web版の提示物選択 > 待ち合わせでは、候補時間を作った後にその候補へ場所を紐づける流れが自然につながる。一方、iOS版では候補時間だけが追加され、ユーザーが改めて候補ブロックを押さないと場所設定へ進めなかった。過去要望でも「ドラッグで候補時間を選択した後、自動的に交換場所の設定ポップアップが出てくる」挙動が求められていた。
+
+### 変更内容
+
+#### `mobile/app/proposal-select.tsx`
+- 待ち合わせ候補を新規作成した直後に、作成した候補を active にし、場所設定シートを自動で開くようにした。
+- 候補IDを `Date.now()` 単独からランダム suffix 付きへ変更し、連続作成時のID衝突リスクを下げた。
+
+### 影響範囲
+
+- iOS版 提示物の選択 > 待ち合わせタブ
+- 候補時間作成後の場所設定導線
+
+### 確認方法
+
+- 待ち合わせタブで空き枠をタップし、30分候補が作成されて場所設定シートが開くことを確認
+- 長押しドラッグで時間帯を作成し、同じく場所設定シートが開くことを確認
+- `npm --prefix mobile run typecheck`
+
+### 関連ファイル
+
+- `mobile/app/proposal-select.tsx`
+- `web/src/app/propose/[partnerId]/ProposeFlow.tsx`
+
+### セルフレビュー結果
+
+- ✅ 既存の場所未設定アラート、前の設定適用、削除、候補移動/リサイズの挙動は残した
+- ✅ 新しい状態名・用語・DB列追加はないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要
+
+---
+
+## イテレーション155.69：iOS在庫編集をWeb版の廃止項目に再同期
+
+### 背景・問題意識
+
+オーナーから「在庫の編集画面も、Wishの編集画面もちゃんとWebアプリ版に合わせてください。機能も、それぞれの項目のマスタ管理のところも。寸分違わず」と指摘があった。Web版の在庫編集では過去 iter65.8 / iter61.10 の判断により、既存在庫編集の「シリーズ・弾名」と「コンディション」はUIから廃止されており、説明欄も編集時は500文字上限になっている。一方、iOS版の既存在庫編集ではこの2項目をまだ表示・更新でき、説明も1000文字上限だった。
+
+### 変更内容
+
+#### `mobile/app/goods-editor.tsx`
+- 既存在庫の編集画面から「シリーズ・弾名」と「コンディション」セクションを非表示にした。
+- 既存在庫の保存時に `series` / `condition` を更新対象から外し、画面にない項目を編集操作で変更しないようにした。
+- 在庫編集時の説明 / メモの上限をWeb版編集画面と同じ500文字にした。
+- 在庫新規登録フローにある共通メモ・シリーズ・コンディションは、現行作成フロー側の入力として維持した。
+
+### 影響範囲
+
+- iOS版 マイ在庫の既存グッズ編集
+- iOS版 マイ在庫の詳細のみ表示
+
+### 確認方法
+
+- 既存在庫の編集画面で「シリーズ・弾名」「コンディション」が表示されないことを確認
+- 説明 / メモが 500 文字カウントになり、500文字を超えて入力できないことを確認
+- 保存時に写真・グループ・メンバー・種別・数量・タグ・説明は更新できることを確認
+- `npm --prefix mobile run typecheck`
+
+### 関連ファイル
+
+- `mobile/app/goods-editor.tsx`
+- `web/src/app/inventory/[id]/EditForm.tsx`
+
+### セルフレビュー結果
+
+- ✅ Web版の既存在庫編集UIで廃止済みの項目をiOS版からも外した
+- ✅ 新規登録フローの直近追加項目は削除せず、既存編集画面だけを再同期した
+- ✅ 状態名・用語・DB列追加はないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要
+
+---
+
+## イテレーション155.68：iOS取引一覧のプレビューID混入を抑止
+
+### 背景・問題意識
+
+iOS版でログイン後も、画面によってプレビュー用の情報が一瞬読み込まれると指摘があった。取引一覧では、プレビュー状態から実ログイン状態へ切り替わった直後に、実データ取得が完了するまで既存 state のプレビュー取引（`tx-xx`）が残る可能性があり、そのパネルを押すと実DB上の打診IDではないため詳細画面で「読み込みに失敗しました」につながり得る。
+
+### 変更内容
+
+#### `mobile/app/(tabs)/transactions.tsx`
+- 実ログイン状態で取引一覧の取得を開始する直前に、既存の `transactions` state を空配列へクリアするようにした。
+- これにより、実データ取得中にプレビュー用 `tx-xx` パネルが押せる状態を作らないようにした。
+
+### 影響範囲
+
+- iOS版 取引一覧
+- プレビュー状態からログイン状態へ切り替わる直後の表示
+- 取引詳細への遷移ID
+
+### 確認方法
+
+- プレビュー表示後にログインし、取引一覧を開いて実データ取得中に `tx-xx` のプレビューパネルが表示されないことを確認
+- 実データの取引パネルを押して `/transaction-detail?id=<proposal_uuid>` で開くことを確認
+- `npm --prefix mobile run typecheck`
+
+### 関連ファイル
+
+- `mobile/app/(tabs)/transactions.tsx`
+- `mobile/app/transaction-detail.tsx`
+
+### セルフレビュー結果
+
+- ✅ ユーザー指摘の「プレビュー情報が一瞬見える」問題を取引一覧で抑止
+- ✅ 取引状態名・DB列は変更していないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要
+
+---
+
+## イテレーション155.67：iOS在庫新規登録に説明メモを追加
+
+### 背景・問題意識
+
+Web版の在庫新規登録では「説明 / メモ」を入力でき、状態の補足や入手経路などを `goods_inventory.description` に保存できる。一方、iOS版の在庫新規登録フローは写真ごとのラベル設定とタグまでは対応していたが、保存時に `description: null` を固定で入れていたため、作成時点で補足情報を残せなかった。
+
+### 変更内容
+
+#### `mobile/app/goods-editor.tsx`
+- 在庫新規登録フローに、全グッズへ共通付与する「説明 / メモ」入力欄を追加した。
+- 入力文字数を Web版と同じ 1000 文字上限にし、保存前バリデーションも追加した。
+- 新規登録時の `goods_inventory.description` に入力内容を保存するようにした。
+
+### 影響範囲
+
+- iOS版 マイ在庫の新規登録
+- 複数写真をまとめて登録する場合の共通説明メモ
+
+### 確認方法
+
+- iOS版マイ在庫の新規登録で、ラベル設定画面に「説明 / メモ」が表示されることを確認
+- 入力したメモが登録後の編集画面で表示されることを確認
+- `npm --prefix mobile run typecheck`
+
+### 関連ファイル
+
+- `mobile/app/goods-editor.tsx`
+- `web/src/app/inventory/new/InventoryNewForm.tsx`
+
+### セルフレビュー結果
+
+- ✅ Web版在庫新規登録にある説明メモをiOS版にも追加
+- ✅ 既存DB列の利用のみで新しい状態名・用語・DB列追加はないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要
+
+---
+
 ## イテレーション155.66：iOSプロフィール編集の活動エリアを選択式に同期
 
 ### 背景・問題意識
