@@ -738,7 +738,7 @@ function updateResidentObject(
   );
   item.group.rotation.z = moving ? sway : idleSideSway;
   animatePlushParts(item, role, target, elapsed, index, moving);
-  updateAvatarWalkAnimation(item, elapsed, index);
+  updateAvatarWalkAnimation(item, elapsed, index, delta);
   animateFace(item.parts.face, speaking, smiling, elapsed);
 }
 
@@ -746,11 +746,31 @@ function updateAvatarWalkAnimation(
   item: ResidentRuntime,
   elapsed: number,
   index: number,
+  delta: number,
 ) {
   const rigSource = item.group.userData.avatarRigSource as
     | THREE.Object3D
     | null
     | undefined;
+  const animationSource = rigSource ?? item.group;
+  const mixer = animationSource.userData.avatarMixer as
+    | THREE.AnimationMixer
+    | null
+    | undefined;
+  const actions = animationSource.userData.avatarActions as
+    | THREE.AnimationAction[]
+    | undefined;
+  if (mixer && actions?.length) {
+    for (const action of actions) {
+      if (!action.isRunning()) {
+        action.reset();
+        action.play();
+      }
+    }
+    mixer.update(delta);
+    return;
+  }
+
   const rig = (rigSource?.userData.avatarRig ?? item.group.userData.avatarRig) as
     | AvatarBoneRig
     | null
@@ -1454,7 +1474,9 @@ function attachAvatarModel(
   const safeAnimalType = normalizeAvatarAnimalType(animalType);
   const loadToken = Symbol(safeAnimalType);
   group.userData.avatarLoadToken = loadToken;
+  group.userData.avatarActions = [];
   group.userData.avatarRig = null;
+  group.userData.avatarMixer = null;
   void loadAvatarTemplate(safeAnimalType)
     .then(async (template) => {
       if (group.userData.avatarLoadToken !== loadToken) return;
@@ -1465,7 +1487,19 @@ function attachAvatarModel(
         .then((texture) => applyAvatarTexture(model, texture))
         .catch(() => applyAvatarFallbackMaterial(model));
       if (group.userData.avatarLoadToken !== loadToken) return;
-      group.userData.avatarRig = createAvatarBoneRig(model);
+      const walkClip = getAvatarWalkAnimation(template);
+      if (walkClip) {
+        const mixer = new THREE.AnimationMixer(model);
+        const action = mixer.clipAction(walkClip);
+        action.reset();
+        action.setLoop(THREE.LoopRepeat, Infinity);
+        action.enabled = true;
+        action.play();
+        group.userData.avatarActions = [action];
+        group.userData.avatarMixer = mixer;
+      } else {
+        group.userData.avatarRig = createAvatarBoneRig(model);
+      }
       fallbackGroup.visible = false;
       group.add(model);
     })
@@ -1494,6 +1528,7 @@ function loadAvatarTemplate(animalType: MeguriAnimalType) {
           uri,
           (gltf: GLTF) => {
             prepareAvatarMaterials(gltf.scene);
+            gltf.scene.userData.avatarAnimations = gltf.animations;
             resolve(gltf.scene);
           },
           undefined,
@@ -1542,6 +1577,21 @@ function normalizeAvatarAnimalType(animalType: MeguriAnimalType): MeguriAnimalTy
 function cloneAvatarTemplate(template: THREE.Group): THREE.Group {
   const clone = (SkeletonUtils as SkeletonUtilsModule).clone;
   return (clone ? clone(template) : template.clone(true)) as THREE.Group;
+}
+
+function getAvatarWalkAnimation(template: THREE.Group): THREE.AnimationClip | null {
+  const animations = template.userData.avatarAnimations;
+  if (!Array.isArray(animations)) return null;
+  const playable = animations.filter((clip): clip is THREE.AnimationClip => {
+    if (!(clip instanceof THREE.AnimationClip)) return false;
+    return clip.duration > 0.1 && clip.tracks.some((track) => track.times.length > 1);
+  });
+  if (playable.length === 0) return null;
+  return (
+    playable.find((clip) => /walk|walking|歩き/i.test(clip.name)) ??
+    playable[0] ??
+    null
+  );
 }
 
 function prepareAvatarClone(model: THREE.Group) {

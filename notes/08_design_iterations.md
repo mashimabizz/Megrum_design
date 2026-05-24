@@ -4,6 +4,58 @@
 
 ---
 
+## イテレーション168.9：v2歩きGLBのアニメーションを適用
+
+### 背景・問題意識
+
+オーナーから「v2のフォルダに歩きのglbファイルも追加しました。そちらを使って欲しいです」と指示があった。iter168.8 の自前ボーンモーションでTポーズは解消したが、腕の見え方が不自然だったため、制作者が用意した歩行clipを優先して再生する必要がある。
+
+### 変更内容
+
+#### `mobile/assets/meguri-avatars/`
+- `Megrum めぐり/v2/ねこ v2 歩き.glb` を `cat.glb` として取り込んだ。
+- `Megrum めぐり/v2/きつね v2 歩き.glb` を `fox.glb` として取り込んだ。
+- `Megrum めぐり/v2/うさぎ v2 歩き.glb` を `rabbit.glb` として取り込んだ。
+- 3ファイルとも `Armature|walking_man|baselayer` の約1.06秒・32キー歩行clipを含むことを確認した。
+
+#### `mobile/src/components/meguri/MeguriThreeScene.tsx`
+- GLB内に有効な歩行clipがある場合は `AnimationMixer` でそのclipを常時ループ再生するようにした。
+- clip名は `walk` / `walking` / `歩き` を優先し、複数キーかつ0.1秒超のclipだけを有効な歩行clipとして扱うようにした。
+- 有効な歩行clipがないGLBでは、iter168.8 の自前ボーンモーションへフォールバックする構成を残した。
+
+### 影響範囲
+
+- iOS版 めぐりホーム/めぐりイントロ/めぐり広場/めぐりプロフィール/アバター編集の3D表示
+
+### 確認方法
+
+- v2歩きGLBのanimation key数確認
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- `npm --prefix mobile run update:ios:preview -- --message "[iter168.9] v2歩きGLBのアニメーションを適用" --non-interactive`
+- EAS Update: `019e5840-9ec1-7ae9-bf54-d2918c303fd6`
+- EAS Update group: `8c6ad459-155c-4ba9-a05d-34770c4e76d5`
+
+### 関連ファイル
+
+- `mobile/assets/meguri-avatars/cat.glb`
+- `mobile/assets/meguri-avatars/fox.glb`
+- `mobile/assets/meguri-avatars/rabbit.glb`
+- `mobile/src/components/meguri/MeguriThreeScene.tsx`
+
+### セルフレビュー結果
+
+- ✅ 追加されたv2歩きGLBをアプリbundle対象のassetsへ反映
+- ✅ `Armature|walking_man|baselayer` が32キーの歩行clipであることを確認
+- ✅ 有効な歩行clipがあれば自前モーションより優先して `AnimationMixer` で再生
+- ✅ 有効clipがない場合の自前モーションフォールバックは維持
+- ✅ `npm --prefix mobile run typecheck` 成功
+- ✅ `npm --prefix mobile run export:ios:preview` 成功
+- ✅ Expo preview channel への EAS Update 成功
+- ✅ 状態ID・用語・DBスキーマの追加変更なし
+
+---
+
 ## イテレーション168.8：v2ボーンへ自前歩行モーションを適用
 
 ### 背景・問題意識
