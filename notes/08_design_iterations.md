@@ -4,6 +4,50 @@
 
 ---
 
+## イテレーション168.15：グルーム投稿RLS保存失敗を修正
+
+### 背景・問題意識
+
+オーナーから「まだグルームを保存できません。一度そちらで試してみて、ログとかで何が起きてるかちゃんとみてくれませんか」と再指摘があった。実際にSupabase認証ユーザーで画像アップロードからグルーム投稿保存まで再現したところ、Storageアップロードは成功しており、`groom_posts.insert(...).select()` が `42501 new row violates row-level security policy` で失敗していた。
+
+### 変更内容
+
+#### `supabase/migrations/20260524220000_fix_groom_posts_owner_select_policy.sql`
+- `groom_posts` の `SELECT` RLSポリシーに `auth.uid() = user_id` を追加し、投稿者本人が自分の投稿を直接読めるようにした。
+- 既存の `public.can_view_groom_post(id, auth.uid())` は維持し、公開範囲・モデレーション条件による閲覧制御はそのまま残した。
+- `insert().select()` / `INSERT ... RETURNING` の瞬間だけ、helper関数経由では新規行を見られず失敗するケースを解消した。
+
+### 影響範囲
+
+- iOS版 めぐりホームのグルーム投稿保存
+- Supabase `groom_posts` の本人閲覧RLS
+- グルーム投稿作成直後の署名URL生成前データ取得
+
+### 確認方法
+
+- `supabase db push --dry-run`
+- `supabase db push --yes`
+- `supabase migration list --linked`
+- `supabase db query --linked -o table "select policyname, cmd, qual, with_check from pg_policies where schemaname = 'public' and tablename = 'groom_posts' order by policyname;"`
+- 認証済みテストユーザーで `groom-posts` Storage upload → `groom_posts.insert(...).select(...).single()` → `storage.createSignedUrls()` が成功することを確認
+
+### 関連ファイル
+
+- `supabase/migrations/20260524220000_fix_groom_posts_owner_select_policy.sql`
+- `notes/08_design_iterations.md`
+
+### セルフレビュー結果
+
+- ✅ 実ユーザー相当のSupabase authセッションで保存失敗を再現
+- ✅ 失敗箇所が画像アップロードではなく `groom_posts.insert().select()` のRLSであることを確認
+- ✅ リモートDBへRLSポリシー修正migrationを適用済み
+- ✅ 適用後に同じ保存経路で投稿作成・署名URL生成が成功
+- ✅ 状態IDの追加・変更なし（`notes/09_state_machines.md` 更新不要）
+- ✅ 新しいアプリ用語・廃止用語なし（`notes/10_glossary.md` 更新不要）
+- ✅ テーブル/カラムの追加変更なし（`notes/05_data_model.md` 更新不要、RLSポリシー変更はmigrationで管理）
+
+---
+
 ## イテレーション168.14：グルーム投稿画像読込を安定化
 
 ### 背景・問題意識
