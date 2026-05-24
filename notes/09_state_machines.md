@@ -3,8 +3,8 @@
 > **目的**：Megrum の主要エンティティのライフサイクルと状態遷移ルールを定義。
 > 実装が状態遷移でブレないための一次資料。デザイン・実装・QA の共通言語。
 
-最終更新: 2026-05-01
-ステータス: Draft v1.0
+最終更新: 2026-05-24
+ステータス: Draft v1.1（iter166 管理者・有料権限を追加）
 
 ---
 
@@ -36,7 +36,8 @@
 10. [Local Mode（現地モード / iter63〜）](#10-local-mode)
 11. [Meguri Message Lifecycle（めぐりメッセージ）](#11-meguri-message-lifecycle)
 12. [Groom Lifecycle（グルーム）](#12-groom-lifecycle)
-13. [付録：エンティティ間の関係](#13-付録エンティティ間の関係)
+13. [Admin / Billing Lifecycle（管理者・有料権限）](#13-admin--billing-lifecycle管理者有料権限)
+14. [付録：エンティティ間の関係](#14-付録エンティティ間の関係)
 
 ---
 
@@ -665,13 +666,75 @@ stateDiagram-v2
 
 ---
 
-## 13. 付録：エンティティ間の関係
+## 13. Admin / Billing Lifecycle（管理者・有料権限）
+
+iter166 で、管理者ページ・管理者権限・Premium等の有料権限を実装するための状態を追加した。
+管理者の操作は必ず `admin_audit_logs` に記録し、ユーザー側の有料機能判定は `subscriptions` の生状態ではなく `user_entitlements` の集約結果を見る。
+
+### AdminRole 状態図
+
+```mermaid
+stateDiagram-v2
+    [*] --> active: ownerが付与
+    active --> disabled: owner/roles.manageが無効化
+    disabled --> active: owner/roles.manageが再有効化
+    disabled --> [*]: 対象ユーザー削除
+```
+
+| 状態 | 説明 |
+|---|---|
+| `active` | 管理者ページへアクセス可能。`requires_mfa=true` の場合は AAL2 セッション必須 |
+| `disabled` | 管理者権限は保持されるがアクセス不可。履歴確認用に行は残す |
+
+### Subscription / Entitlement 状態図
+
+```mermaid
+stateDiagram-v2
+    [*] --> incomplete: checkout開始
+    incomplete --> active: 決済成功
+    incomplete --> trialing: trial開始
+    incomplete --> incomplete_expired: 未完了期限切れ
+    trialing --> active: trial終了
+    active --> past_due: 決済失敗
+    past_due --> active: 支払い復旧
+    past_due --> unpaid: 回収不能
+    active --> cancelled: 解約申請
+    cancelled --> expired: 期間終了
+    active --> canceled: 即時キャンセル/webhook削除
+    canceled --> expired: 権限停止
+```
+
+```mermaid
+stateDiagram-v2
+    [*] --> inactive: 権限なし
+    inactive --> active: subscription active/trialing または manual_override active
+    active --> inactive: subscription終了 / manual_override停止 / expires_at超過
+```
+
+| エンティティ | 状態 | 説明 |
+|---|---|---|
+| `subscriptions` | `incomplete` / `incomplete_expired` / `trialing` / `active` / `past_due` / `cancelled` / `canceled` / `unpaid` / `expired` | Stripe等プロバイダー由来の契約状態 |
+| `user_entitlements` | `active=true/false` | アプリが参照する最終的な機能権限。`feature_key='premium'` がPremium判定 |
+| `stripe_webhook_events` | `processing` / `processed` / `failed` / `ignored` | webhook処理の冪等性・再処理判断 |
+
+### ビジネスルール
+
+- 管理者の追加・更新は `roles.manage` 権限が必要。最後の `owner` を無効化・降格してはいけない。
+- `requires_mfa=true` の管理者は Supabase Auth の AAL2 セッションでのみ管理者ページへ入れる。
+- ユーザー停止・権限変更・有料権限手動上書きは、理由入力を必須にし `admin_audit_logs` に保存する。
+- Stripe webhook は `stripe_webhook_events.event_id` で重複処理を防ぎ、`subscriptions` 更新後に `user_entitlements(feature_key='premium')` を upsert する。
+- 手動上書きは `plan_overrides` に履歴を残し、同時に `user_entitlements` を更新する。
+
+## 14. 付録：エンティティ間の関係
 
 ```mermaid
 graph LR
     Account -->|owns 0..*| AW
     Account -->|owns 0..*| Item
     Account -->|owns 0..*| Wish
+    Account -->|has 0..*| Subscription
+    Account -->|has 0..*| Entitlement
+    Account -->|may_have| AdminRole
     AW -->|enables matching| Proposal
     Item -->|used_in 0..*| Proposal
     Wish -->|matches 0..*| Item
@@ -680,6 +743,8 @@ graph LR
     Dispute -->|on_resolve → updates| Deal
     Deal -->|involves 1..*| Item
     Item -->|status reflects| Proposal
+    Subscription -->|grants| Entitlement
+    AdminRole -->|writes| AdminAuditLog
 ```
 
 ### 関係性メモ

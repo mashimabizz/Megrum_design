@@ -1,6 +1,6 @@
 # 13. API仕様（REST API Spec）
 
-> **目的**：iHub のバックエンドAPI（REST）の draft 仕様。実装着手時の正解集。
+> **目的**：Megrum のバックエンドAPI（REST）の draft 仕様。実装着手時の正解集。
 > 全エンドポイントを `[METHOD /path]` の形式で網羅し、各々で入力・出力・認証要否・状態遷移・備考を定義。
 
 最終更新: 2026-05-01（iter42）
@@ -51,11 +51,11 @@
 ### ベースURL
 
 ```
-本番:    https://api.ihub.tokyo/v1
-staging: https://api-staging.ihub.tokyo/v1（or staging.ihub.tokyo）⚠️ 検討
+本番:    https://api.megrum.jp/v1
+staging: https://api-staging.megrum.jp/v1（or staging.megrum.jp）⚠️ 検討
 ```
 
-ドメイン: `ihub.tokyo`（お名前.com で取得済、iter47）
+ドメイン: `megrum.jp`（正式ドメインとして取得済）
 
 ### 認証スキーム
 
@@ -1161,7 +1161,19 @@ Premium 会員の決済セッション開始。
 Stripe webhook 受信。
 
 - **Auth**: webhook 署名検証
-- **Side effects**: `subscriptions` レコード作成・更新、`ad_overrides` 更新、`boosts` グラント
+- **実装 route**: Web App Router では `/api/stripe/webhook`（iter166）。外部公開API名として `/api/v1/subscriptions/webhooks/stripe` を維持する場合は rewrite で接続する。
+- **Side effects**: `stripe_webhook_events` に event_id を保存して冪等化、`subscriptions` レコード作成・更新、`user_entitlements(feature_key='premium')` を更新。広告非表示・boost grant はPremium仕様確定後に別ジョブで反映。
+
+### Admin Console（server actions / iter166）
+
+`/admin` 配下は一般公開 REST API ではなく、Next.js Server Actions + server-side service role で実装する。
+
+- **Auth**: Supabase Auth 必須。`admin_roles.status='active'` かつ必要 permission 必須
+- **MFA**: `admin_roles.requires_mfa=true` の場合 AAL2 セッション必須
+- **Actions**:
+  - `user.account_status.update`: `users.update_status` 権限、理由必須、`admin_audit_logs` 保存
+  - `admin_role.upsert`: `roles.manage` 権限、最後の `owner` 無効化不可、`admin_audit_logs` 保存
+  - `entitlement.manual_override`: `entitlements.manage` 権限、`plan_overrides` + `user_entitlements` + `admin_audit_logs` 保存
 
 ### POST /api/v1/subscriptions/me/cancel
 

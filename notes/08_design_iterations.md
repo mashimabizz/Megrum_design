@@ -4,6 +4,73 @@
 
 ---
 
+## イテレーション166：管理者機能と有料権限の基盤追加
+
+### 背景・問題意識
+
+オーナーから「完全な管理者機能を作れるように」と再レビュー依頼があった。ユーザー管理・権限管理・有料プラン管理を安全に扱うには、画面だけでなく「管理者をどう認可するか」「誰が何を変更したか」「Premium等の権限をどこで判定するか」をDB/RLS/Server Actionで分離する必要がある。
+
+### 変更内容
+
+#### `supabase/migrations/20260524200000_add_admin_security_and_billing.sql`
+- `admin_roles` / `admin_audit_logs` を追加し、管理者ロール・細分化permission・MFA必須フラグ・監査ログをDB管理にした。
+- `subscriptions` / `user_entitlements` / `plan_overrides` / `stripe_webhook_events` を追加し、Premium判定を `user_entitlements` に集約した。
+- `is_admin()` / `admin_has_permission()` を追加し、RLSで管理者の読み取り範囲を制限した。
+
+#### `web/src/lib/admin/permissions.ts`
+- ログインユーザーの管理者ロール確認、permission確認、MFA(AAL2)確認、監査ログ保存の共通処理を実装した。
+
+#### `web/src/app/admin/**`
+- `/admin` 概要、`/admin/users` ユーザー管理、`/admin/roles` 権限管理、`/admin/billing` 有料プラン管理、`/admin/audit` 監査ログを追加した。
+- ユーザー状態変更、管理者ロールupsert、手動有料権限上書きをServer Actionsで実装し、理由必須・監査ログ保存を通した。
+
+#### `web/src/app/api/stripe/webhook/route.ts`
+- Stripe webhookの署名検証、event_id冪等化、subscription upsert、Premium entitlement反映を実装した。
+
+#### docs
+- `notes/05_data_model.md` / `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/13_api_spec.md` に管理者・有料権限・webhookの状態と用語を追記した。
+
+### 影響範囲
+
+- Web版 管理者ページ `/admin`
+- Supabase 管理者ロール、監査ログ、有料権限、Stripe webhook
+- 設定画面の管理者リンク（管理者のみ表示）
+
+### 確認方法
+
+- `npm --prefix web install`
+- `npm --prefix web run build`
+- `supabase db push --dry-run`
+- `npm --prefix web run lint`（既存のReact 19 purity系lintが複数あり失敗。今回追加ファイルはlintエラー対象に出ていない）
+
+### 関連ファイル
+
+- `supabase/migrations/20260524200000_add_admin_security_and_billing.sql`
+- `web/src/lib/admin/permissions.ts`
+- `web/src/app/admin/**`
+- `web/src/app/api/stripe/webhook/route.ts`
+- `web/src/app/settings/page.tsx`
+- `web/.env.local.example`
+- `notes/05_data_model.md`
+- `notes/09_state_machines.md`
+- `notes/10_glossary.md`
+- `notes/13_api_spec.md`
+
+### セルフレビュー結果
+
+- ✅ 管理者変更はServer Action + service roleに閉じ、クライアントへ特権キーを渡さない
+- ✅ 管理者ロール・ユーザー状態・有料権限変更は理由必須で `admin_audit_logs` に保存
+- ✅ `requires_mfa=true` の管理者は AAL2 セッション必須
+- ✅ 最後の `owner` 管理者を無効化・降格できないガードを追加
+- ✅ Stripe webhookは署名検証・5分許容・event_id冪等化を実装
+- ✅ Premium判定を `subscriptions` 生状態ではなく `user_entitlements` に集約
+- ✅ `npm --prefix web run build` 成功
+- ✅ `supabase db push --dry-run` 成功
+- ⚠️ `npm --prefix web run lint` は既存ファイルのReact purity lintで失敗（今回追加の管理者ファイルは指摘なし）
+- ⚠️ 初回ownerはSupabase SQLで `admin_roles` に手動bootstrapが必要
+
+---
+
 ## イテレーション165.1：グルーム返信画像の期限後表示を補強
 
 ### 背景・問題意識

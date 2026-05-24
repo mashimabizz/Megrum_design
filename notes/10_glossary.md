@@ -3,8 +3,8 @@
 > **目的**：Megrum で使う用語の定義を一元化。実装・デザイン・仕様書で「同じ用語を同じ意味で」使うための基準。
 > 新環境（別Claudeセッション・別エンジニア）でも、これだけ読めばコンテキストがつかめる。
 
-最終更新: 2026-05-17
-ステータス: Draft v1.0
+最終更新: 2026-05-24
+ステータス: Draft v1.1（iter166 管理者・有料権限を追加）
 
 ---
 
@@ -35,6 +35,8 @@
 - [J. 廃止用語](#j-廃止用語)
 - [K. 表記揺れに迷う用語](#k-表記揺れに迷う用語)
 - [L. マネタイズ用語](#l-マネタイズ用語iter45)
+- [M. 法的文書の原典マッピング](#m-法的文書規約プライバシー特商法の原典マッピングiter46)
+- [N. 管理者・権限管理用語](#n-管理者権限管理用語iter166)
 
 ---
 
@@ -357,9 +359,16 @@
 | 値 | カテゴリ | 意味 |
 |---|---|---|
 | `active` | subscription.status | アクティブ（有効中） |
+| `trialing` | subscription.status | 無料トライアル中 |
+| `incomplete` / `incomplete_expired` | subscription.status | checkout 未完了 / 未完了期限切れ |
+| `past_due` / `unpaid` | subscription.status | 決済失敗後の督促中 / 回収不能 |
 | `cancelled` | subscription.status | 解約申請済（期間終了まで使用可） |
+| `canceled` | subscription.status | Stripe webhook 等で即時キャンセルされた状態 |
 | `expired` | subscription.status | 期間終了（更新なし） |
 | `monthly` / `yearly` | subscription.plan_type | 課金周期 |
+| `premium_monthly` / `premium_yearly` | subscriptions.plan_type | 実装側のPremium課金周期 |
+| `premium` | user_entitlements.feature_key | アプリ側がPremium機能を判定する権限キー |
+| `subscription` / `manual_override` / `system` / `purchase` | user_entitlements.source | 権限付与元 |
 | `purchase` / `premium_grant` | boosts.granted_via | 取得経路 |
 | `proposal` / `match_view` / `chat` | boosts.target_type | 発動対象種別 |
 | `boost_pack` / `subscription_initial` / `subscription_renewal` | transactions.kind | 決済種別 |
@@ -419,6 +428,21 @@ iter46 で整理した以下を弁護士に再レビュー依頼：
 6. **広告**：AdMob・AdSense は規約通り、Native ad 配置は補足説明
 
 詳細は `notes/17_legal_alignment.md` 参照。
+
+---
+
+## N. 管理者・権限管理用語（iter166）
+
+| 用語 | 別名/英 | 定義 | 関連 |
+|---|---|---|---|
+| **管理者ページ** | admin console | `/admin` 配下の運営用Web画面。ユーザー管理、管理者権限、有料プラン、監査ログを扱う | iter166 |
+| **管理者ロール** | admin role | `admin_roles.role`。`owner` / `support` / `trust_safety` / `billing` / `viewer` の5種類 | iter166 |
+| **管理者権限** | permission | `users.read` などの細分化された操作権限。`owner` または `*` は全権限 | iter166 |
+| **MFA必須管理者** | AAL2 required admin | `admin_roles.requires_mfa=true` の管理者。Supabase Auth の AAL2 セッションでのみ管理者ページへ入れる | iter166 |
+| **監査ログ** | admin audit log | 管理者操作の実行者、対象、理由、変更前後、IP/User-Agentを `admin_audit_logs` に残す履歴 | iter166 |
+| **有料権限** | entitlement | `user_entitlements` に集約される機能利用権。Premium判定もここを見る | iter166 |
+| **手動上書き** | manual override | サポート対応やキャンペーン等で管理者が `plan_overrides` から有料権限を付与/停止すること | iter166 |
+| **Stripe webhookイベント** | stripe webhook event | Stripeから受信したイベント。`stripe_webhook_events.event_id` で冪等に管理する | iter166 |
 
 ---
 

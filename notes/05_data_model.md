@@ -4,7 +4,7 @@
 > 実装の正解集。`09_state_machines.md` と完全に整合させ、`10_glossary.md` の用語を使う。
 
 最終更新: 2026-05-24
-ステータス: Draft v2.12（iter165 反映済）
+ステータス: Draft v2.13（iter166 反映済）
 
 ## 最新化履歴
 
@@ -24,6 +24,7 @@
 | **v2.10** | **2026-05-23** | **iter162.83 反映（proposal_read_states テーブル新規：取引チャット/ネゴチャットの参加者別読了位置を保存し、実データに基づく既読表示へ変更）** |
 | **v2.11** | **2026-05-24** | **iter164 反映（groom_posts / groom_reactions / groom_views / groom_replies と groom-posts Storage を実装。グルームの24時間公開、いいね、閲覧済み、返信通知をDB管理へ移行）** |
 | **v2.12** | **2026-05-24** | **iter165 反映（グルーム公開範囲をRLS/Private Storageで厳格化。groom_hidden_posts / groom_user_blocks / groom_reports / meguri_messages と meguri-message-media Storage を追加）** |
+| **v2.13** | **2026-05-24** | **iter166 反映（admin_roles / admin_audit_logs / user_entitlements / plan_overrides / stripe_webhook_events と subscriptions 実テーブルを追加。管理者ページ・有料権限・Stripe webhookの土台を定義）** |
 
 ## このドキュメントの位置付け
 
@@ -45,8 +46,9 @@
 7. [評価・通報・断った記録](#7-評価通報断った記録)
 8. [Dispute（異議申し立て）](#8-dispute異議申し立て)
 9. [マネタイズ（Subscriptions・Boosts・Transactions・Ads）](#9-マネタイズ)
-10. [マッチング計算ロジック](#10-マッチング計算ロジック)
-11. [⚠️ 未確定項目](#11-未確定項目)
+10. [管理者・権限管理](#10-管理者権限管理)
+11. [マッチング計算ロジック](#11-マッチング計算ロジック)
+12. [⚠️ 未確定項目](#12-未確定項目)
 
 ---
 
@@ -789,7 +791,7 @@ iter45 で追加。`notes/16_monetization.md` の戦略に対応するテーブ�
 | `id` | uuid | PK |
 | `user_id` | uuid | → users |
 | `plan_type` | text | `monthly` / `yearly` |
-| `status` | text | `active` / `cancelled` / `expired` |
+| `status` | text | `incomplete` / `incomplete_expired` / `trialing` / `active` / `past_due` / `cancelled` / `canceled` / `unpaid` / `expired` |
 | `started_at` | timestamptz | 開始日時 |
 | `current_period_end` | timestamptz | 現契約期間の終了 |
 | `cancelled_at` | timestamptz nullable | 解約申請日時（期間終了まで有効） |
@@ -800,6 +802,9 @@ iter45 で追加。`notes/16_monetization.md` の戦略に対応するテーブ�
 ⚠️ 要確認：
 - 課金プロバイダー選定（Stripe / Apple In-App / Google Play）
 - 払い戻しポリシー（年額中途解約）
+
+> iter166: 実装上のPremium判定は `subscriptions` の生ステータスではなく、Stripe webhook/管理者操作で集約された `user_entitlements(feature_key='premium', active=true)` を参照する。
+> `subscriptions` 本体はプロバイダーIDを含むためクライアントへ直接SELECTさせず、ユーザー向け表示は server route で必要列だけ返す。
 
 ### `boosts`（ブースト残数管理）
 
@@ -893,7 +898,81 @@ ad_impressions table（オプション、Post-MVP で詳細分析用）:
 
 ---
 
-## 10. マッチング計算ロジック
+## 10. 管理者・権限管理
+
+### `admin_roles`
+
+| カラム | 型 | 説明 |
+|---|---|---|
+| `user_id` | uuid PK | → users。管理者対象ユーザー |
+| `role` | text | `owner` / `support` / `trust_safety` / `billing` / `viewer` |
+| `permissions` | text[] | `users.read` 等。`*` は全権限 |
+| `status` | text | `active` / `disabled` |
+| `requires_mfa` | boolean | true の場合、AAL2 セッションのみ管理者ページへ入れる |
+| `created_by` | uuid nullable | 付与した管理者 |
+| `created_at` / `updated_at` | timestamptz | |
+
+RLS:
+- SELECT: 自分の管理者レコード、または `roles.read` 権限を持つ管理者のみ
+- INSERT/UPDATE/DELETE: クライアントからは許可しない。管理者Server Actionが service role で更新し、必ず `admin_audit_logs` に記録する。
+
+### `admin_audit_logs`
+
+| カラム | 型 | 説明 |
+|---|---|---|
+| `id` | uuid | PK |
+| `actor_user_id` | uuid nullable | 実行者。system/webhook は NULL |
+| `action` | text | `user.account_status.update` 等 |
+| `target_type` | text | `user` / `admin_role` / `user_entitlement` / `subscription` 等 |
+| `target_id` | text nullable | 対象ID |
+| `reason` | text nullable | 管理者が入力した理由 |
+| `before_state` / `after_state` | jsonb nullable | 変更前後のスナップショット |
+| `request_ip` / `user_agent` | text nullable | 監査補助情報 |
+| `metadata` | jsonb | 追加情報 |
+| `created_at` | timestamptz | |
+
+### `user_entitlements`
+
+| カラム | 型 | 説明 |
+|---|---|---|
+| `user_id` | uuid PK | → users |
+| `feature_key` | text PK | `premium` 等 |
+| `active` | boolean | 現在有効か |
+| `source` | text | `subscription` / `manual_override` / `system` / `purchase` |
+| `subscription_id` | uuid nullable | → subscriptions |
+| `override_id` | uuid nullable | → plan_overrides |
+| `granted_at` | timestamptz | 付与日時 |
+| `expires_at` | timestamptz nullable | 有効期限 |
+| `metadata` | jsonb | 付与元補足 |
+| `updated_at` | timestamptz | |
+
+### `plan_overrides`
+
+| カラム | 型 | 説明 |
+|---|---|---|
+| `id` | uuid | PK |
+| `user_id` | uuid | → users |
+| `feature_key` | text | `premium` 等 |
+| `active` | boolean | true=付与、false=停止 |
+| `reason` | text | 管理者入力理由 |
+| `starts_at` / `expires_at` | timestamptz | 有効期間 |
+| `created_by` | uuid nullable | 管理者 |
+| `revoked_at` / `revoked_by` | timestamptz / uuid nullable | 取消情報 |
+| `created_at` | timestamptz | |
+
+### `stripe_webhook_events`
+
+| カラム | 型 | 説明 |
+|---|---|---|
+| `event_id` | text PK | Stripe event id。冪等性キー |
+| `event_type` | text | `customer.subscription.updated` 等 |
+| `status` | text | `processing` / `processed` / `failed` / `ignored` |
+| `payload` | jsonb | 受信payload |
+| `processed_at` | timestamptz nullable | 処理時刻 |
+| `last_error` | text nullable | 失敗理由 |
+| `created_at` | timestamptz | |
+
+## 11. マッチング計算ロジック
 
 ### 既存ロジック（user_haves × user_wants）
 
@@ -923,7 +1002,7 @@ ad_impressions table（オプション、Post-MVP で詳細分析用）:
 
 ---
 
-## 11. ⚠️ 未確定項目
+## 12. ⚠️ 未確定項目
 
 実装着手前にユーザーと擦り合わせる項目。`09_state_machines.md` の「未確定・要確認項目」表とも連携。
 
@@ -981,5 +1060,9 @@ ad_impressions table（オプション、Post-MVP で詳細分析用）:
 | Wish | `active` `matched` `in_negotiation` `achieved` | `user_wants.status` |
 | Account | `registered` `verified` `onboarding` `active` `suspended` `deletion_requested` `deleted` | `users.account_status` |
 | Groom | `draft` `published` `expired` `hidden` `archived` | `groom_posts.status` |
+| AdminRole | `active` `disabled` | `admin_roles.status` |
+| Subscription | `incomplete` `incomplete_expired` `trialing` `active` `past_due` `cancelled` `canceled` `unpaid` `expired` | `subscriptions.status` |
+| UserEntitlement | `active` / `inactive`（boolean） | `user_entitlements.active` |
+| StripeWebhookEvent | `processing` `processed` `failed` `ignored` | `stripe_webhook_events.status` |
 
 > **注意**：実装で状態名を勝手に変えると 09 と不整合になる。命名変更が必要なら必ず両方を同時に更新する。

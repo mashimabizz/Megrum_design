@@ -1,11 +1,14 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { createClient } from "@/lib/supabase/server";
+import {
+  createClient,
+  createServiceRoleClient,
+} from "@/lib/supabase/server";
 import { HeaderBack } from "@/components/auth/HeaderBack";
 import { logout } from "@/app/auth/actions";
 
 export const metadata = {
-  title: "設定 — iHub",
+  title: "設定 — Megrum",
 };
 
 /**
@@ -24,6 +27,15 @@ export default async function SettingsPage() {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
+
+  const adminSupabase = createServiceRoleClient();
+  const { data: adminRole } = await adminSupabase
+    .from("admin_roles")
+    .select("user_id")
+    .eq("user_id", user.id)
+    .eq("status", "active")
+    .maybeSingle();
+  const isAdmin = Boolean(adminRole);
 
   return (
     <main className="animate-route-slide-in-right flex flex-1 flex-col bg-[#fbf9fc]">
@@ -46,13 +58,19 @@ export default async function SettingsPage() {
         <Section label="サポート">
           <Row href="/help" icon="？" title="ヘルプ・FAQ" sub="使い方・取引の流れ" />
           <Row
-            href="mailto:support@ihub.tokyo"
+            href="mailto:support@megrum.jp"
             icon="✉"
             title="運営に問い合わせ"
-            sub="support@ihub.tokyo"
+            sub="support@megrum.jp"
             external
           />
         </Section>
+
+        {isAdmin && (
+          <Section label="管理者">
+            <Row href="/admin" icon="⚙" title="管理者ページ" sub="ユーザー・権限・有料プラン管理" />
+          </Section>
+        )}
 
         <Section label="規約・法的情報">
           <Row href="/legal/terms" icon="📄" title="利用規約" />
@@ -79,7 +97,7 @@ export default async function SettingsPage() {
         </Section>
 
         <div className="pb-3 pt-1 text-center text-[10px] text-[#3a324a4d]">
-          iHub MVP · build dev
+          Megrum MVP · build dev
         </div>
       </div>
     </main>
