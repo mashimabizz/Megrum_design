@@ -61,10 +61,12 @@ iter24 で「推し2階層」（グループ/作品 → メンバー/キャラ�
 | カラム | 型 | 説明 |
 |---|---|---|
 | `id` | uuid | PK |
-| `name` | text | "K-POP" / "邦アイ" / "2.5次元" / "アニメ" / "ゲーム" 等 |
+| `name` | text | "K-POP男性" / "K-POP女性" / "国内男性" / "国内女性" / "歌い手" / "声優" / "2.5次元・舞台" / "アニメ・マンガ" / "ゲーム" / "キャラクターIP" 等 |
 | `kind` | text | 'idol' / 'anime' / 'game' / 'other' |
 | `display_order` | int | 表示順 |
 | `created_at` | timestamptz | |
+
+> **iter168.19 推し分類方針**：UI上は `genres_master` をユーザーが探す入口として扱う。アイドル・音楽領域だけ `K-POP男性` / `K-POP女性` / `国内男性` / `国内女性` / `歌い手` / `声優` に細分化し、それ以外は `2.5次元・舞台` / `アニメ・マンガ` / `ゲーム` / `キャラクターIP` / `VTuber・配信者` / `お笑い` / `スポーツ` / `俳優・タレント` / `海外エンタメ` の大分類を維持する。`groups_master.kind` は対象の形（`group` / `work` / `solo`）として別軸で保持する。
 
 ### `groups_master`
 
@@ -72,7 +74,7 @@ iter24 で「推し2階層」（グループ/作品 → メンバー/キャラ�
 |---|---|---|
 | `id` | uuid | PK |
 | `genre_id` | uuid | → genres_master |
-| `name` | text | "BTS" / "TWICE" / "呪術廻戦" 等 |
+| `name` | text | "SEVENTEEN" / "TWICE" / "呪術廻戦" / "Ado" 等 |
 | `aliases` | text[] | ["방탄소년단", "防弾少年団"] 等の表記揺れ |
 | `kind` | text | 'group' / 'work' / 'solo'（iter24対応：ソロアーティストの取扱い、⚠️要確認） |
 | `display_order` | int | |

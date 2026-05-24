@@ -3,6 +3,78 @@
 （2026-04-27〜 ／ 2026-04-28 解決済イテレーションを圧縮）
 
 ---
+
+## イテレーション168.19：推しジャンル分類を再整理
+
+### 背景・問題意識
+
+オーナーと推し分類の粒度を整理し、「アイドル・音楽だけ、KPOP男性、KPOP女性、国内男性、国内女性、歌い手、声優、という感じに分けましょう。それ以外は大分類のままで大丈夫です」と方針が確定した。`groups_master.kind = group / work / solo` は登録対象の形を示す別軸なので、ジャンル分類とは混ぜず、`genres_master` をユーザーが推しを探す入口として再整理する。
+
+### 変更内容
+
+#### `supabase/migrations/20260524233000_refine_oshi_genre_taxonomy.sql`
+- 既存の `K-POP` を `K-POP男性`、`邦アイ` を `国内男性` にリネームし、既存IDを維持した。
+- `K-POP女性` / `国内女性` / `歌い手` / `声優` を追加した。
+- `2.5次元` を `2.5次元・舞台`、`アニメ` を `アニメ・マンガ` にリネームした。
+- `キャラクターIP` / `VTuber・配信者` / `お笑い` / `スポーツ` / `俳優・タレント` / `海外エンタメ` を大分類として追加した。
+- K-POP女性グループと国内女性グループを新ジャンルへ移動し、`characters_master.genre_id` を所属グループに同期した。
+- 旧 `K-POP` に紐づいていた pending の追加リクエスト（BABYMONSTER / asepa / ME:I）を適切な女性カテゴリへ移した。
+- `歌い手` と `声優` に初期候補を追加した。
+
+#### `notes/05_data_model.md`
+- `genres_master` の説明を、新しい推し分類方針に合わせて更新した。
+- `groups_master.kind` はジャンルではなく対象形態（group / work / solo）の別軸であることを明記した。
+
+#### `notes/10_glossary.md`
+- 「ジャンル」の定義を iter168.19 の分類方針に合わせて更新した。
+
+### 影響範囲
+
+- オンボーディングの推し選択
+- プロフィールの推し編集
+- グッズ登録 / Wish登録 / 個別募集のグループ・作品選択
+- 推し追加リクエストのジャンル選択
+- `genres_master` / `groups_master` / `characters_master`
+
+### 確認方法
+
+- `supabase db push --dry-run`
+- `supabase db push --yes`
+- `supabase db query --linked -o table "select ge.display_order, ge.name as genre, ge.kind, count(distinct g.id) as groups, count(c.id) as characters from public.genres_master ge left join public.groups_master g on g.genre_id = ge.id left join public.characters_master c on c.group_id = g.id group by ge.id, ge.display_order, ge.name, ge.kind order by ge.display_order, ge.name;"`
+
+### 適用後件数
+
+- K-POP男性: 13グループ / 99メンバー
+- K-POP女性: 9グループ / 52メンバー
+- 国内男性: 8グループ / 56メンバー
+- 国内女性: 7グループ / 40メンバー
+- 歌い手: 10組 / 0メンバー
+- 声優: 10名 / 0メンバー
+- 2.5次元・舞台: 7作品 / 32キャラ
+- アニメ・マンガ: 11作品 / 97キャラ
+- ゲーム: 3作品 / 69キャラ
+
+### 関連ファイル
+
+- `supabase/migrations/20260524233000_refine_oshi_genre_taxonomy.sql`
+- `notes/05_data_model.md`
+- `notes/10_glossary.md`
+- `notes/08_design_iterations.md`
+
+### セルフレビュー結果
+
+- ✅ `groups_master.kind = group / work / solo` は維持し、ジャンル分類と混同しない構造にした
+- ✅ 既存 `K-POP` / `邦アイ` のIDをリネームで再利用し、既存参照を壊さないようにした
+- ✅ 女性グループ移動後、`characters_master.genre_id` を所属グループに同期済み
+- ✅ `supabase db push --dry-run` 成功
+- ✅ `supabase db push --yes` でリモートDBへ適用済み
+- ✅ リモートDBでジャンル別件数を確認済み
+- ✅ 状態IDの追加・変更なし（`notes/09_state_machines.md` 更新不要）
+- ✅ 新しいアプリ用語として「ジャンル」定義を `notes/10_glossary.md` で更新
+- ✅ DBスキーマ変更なし（`notes/05_data_model.md` は分類方針の説明更新のみ）
+
+---
+
 ## イテレーション168.18：推し登録マスタを大幅拡充
 
 ### 背景・問題意識
