@@ -4,6 +4,60 @@
 
 ---
 
+## イテレーション168.27：ビッグ作品の主要L2を厚増し
+
+### 背景・問題意識
+
+オーナーから「まだL2に主要キャラやグループ全員が登録されていないものがあります」「ビッグな作品やグループならちゃんと十分に登録してください」と指摘があった。iter168.24〜168.26 ではL2必須と新規L1拡充を優先したため、一部の大型作品・大型グループでL2が主要数件に留まっていた。今回は既存のビッグL1に対して、代表的な主要キャラ・メンバーを厚く補完した。
+
+### 変更内容
+
+#### `supabase/migrations/20260525014500_expand_major_l2_depth.sql`
+- ONE PIECE / 名探偵コナン / SPY×FAMILY / 進撃の巨人 / 銀魂 / 文豪ストレイドッグス / 黒子のバスケ / テニスの王子様の主要キャラを追加した。
+- Fate/Grand Order / アイドルマスター シンデレラガールズ / アイドルマスター SideM の主要キャラを追加した。
+- ポケットモンスター / サンリオキャラクターズの代表キャラクターを追加した。
+- hololive / にじさんじの代表メンバーを追加した。
+- 追加L2に対して `oshi_entities_master` と `entity_id` を再同期した。
+
+### 影響範囲
+
+- オンボーディングの推し選択
+- プロフィールの推し追加
+- グッズ登録 / Wish登録 / 個別募集の推し選択候補
+
+### 確認方法
+
+- `supabase db push --dry-run`
+- `supabase db push --yes`
+- `supabase db query --linked -o table "select ge.name as genre, gm.name, count(cm.id) as l2 from public.groups_master gm join public.genres_master ge on ge.id=gm.genre_id left join public.characters_master cm on cm.group_id=gm.id where gm.name in ('ONE PIECE','名探偵コナン','SPY×FAMILY','進撃の巨人','銀魂','文豪ストレイドッグス','黒子のバスケ','テニスの王子様','Fate/Grand Order','アイドルマスター シンデレラガールズ','アイドルマスター SideM','ポケットモンスター','サンリオキャラクターズ','hololive','にじさんじ') group by ge.name, gm.name order by ge.name, gm.name;"`
+- `supabase db query --linked -o table "with missing as (select gm.id from public.groups_master gm left join public.characters_master cm on cm.group_id=gm.id where gm.kind in ('group','work') group by gm.id having count(cm.id)=0) select count(*) as group_or_work_without_l2 from missing;"`
+
+### 適用後件数
+
+- L1合計: 393
+- L2合計: 1727
+- `oshi_entities_master`: 1851件
+- `group` / `work` でL2が0件のL1: 0件
+- `entity_id` 未紐付け: solo L1 0件 / L2 0件
+- 代表例: ONE PIECE 18件 / 名探偵コナン 20件 / Fate Grand Order 15件 / hololive 19件 / にじさんじ 19件
+
+### 関連ファイル
+
+- `supabase/migrations/20260525014500_expand_major_l2_depth.sql`
+- `notes/08_design_iterations.md`
+
+### セルフレビュー結果
+
+- ✅ 既存の大型L1に対して、主要キャラ・代表メンバーを厚く補完
+- ✅ 新規L1追加なし、既存ビッグL1のL2密度改善に集中
+- ✅ `group` / `work` でL2が0件のL1は引き続き0件
+- ✅ `entity_id` 未紐付け0件を確認
+- ✅ 状態IDの追加・変更なし（`notes/09_state_machines.md` 更新不要）
+- ✅ 新しいアプリ用語・廃止用語なし（`notes/10_glossary.md` 更新不要）
+- ✅ 既存のL2必須運用ルール内のseed追加であり、追加のデータモデル更新なし
+
+---
+
 ## イテレーション168.26：作品IPと配信者マスタを追加
 
 ### 背景・問題意識
