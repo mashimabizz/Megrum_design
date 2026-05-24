@@ -235,39 +235,49 @@ export function OshiEditView({
     router.refresh();
   }
 
-  function handleAddMasterOption(option: OshiMasterOption) {
-    if (selectedMasterGroupIds.has(option.id)) {
+  function handleAddMasterOptions(options: OshiMasterOption[]) {
+    const addableOptions = options.filter(
+      (option) => !selectedMasterGroupIds.has(option.id),
+    );
+    if (addableOptions.length === 0) {
       setMasterModalOpen(false);
       return;
     }
 
-    const nextGroup: Group = {
+    const basePriority = nextLocalGroupPriority();
+    const rollbackIds = new Set(addableOptions.map((option) => option.id));
+    const nextGroups: Group[] = addableOptions.map((option, index) => ({
       groupId: option.id,
       source: "master",
       groupName: option.name,
-      priority: nextLocalGroupPriority(),
+      priority: basePriority + index,
       members: [],
       availableCharacters: option.characters,
-    };
+    }));
 
     setGroups((prev) => {
-      if (
-        prev.some((g) => g.source === "master" && g.groupId === option.id)
-      ) {
-        return prev;
-      }
-      return [...prev, nextGroup];
+      const existingIds = new Set(
+        prev.filter((g) => g.source === "master").map((g) => g.groupId),
+      );
+      return [
+        ...prev,
+        ...nextGroups.filter((group) => !existingIds.has(group.groupId)),
+      ];
     });
     setMasterModalOpen(false);
     setRequestNotice(null);
 
     enqueueMutation(
-      () => addOshiGroup(option.id),
+      async () => {
+        for (const option of addableOptions) {
+          const result = await addOshiGroup(option.id);
+          if (result?.error) return result;
+        }
+        return undefined;
+      },
       () => {
         setGroups((prev) =>
-          prev.filter(
-            (g) => g.source !== "master" || g.groupId !== option.id,
-          ),
+          prev.filter((g) => g.source !== "master" || !rollbackIds.has(g.groupId)),
         );
       },
     );
@@ -351,7 +361,7 @@ export function OshiEditView({
           genres={genreOptions}
           options={masterOptions}
           selectedGroupIds={selectedMasterGroupIds}
-          onSelect={handleAddMasterOption}
+          onSelect={handleAddMasterOptions}
           onRequest={(name) => {
             setMasterModalOpen(false);
             openOshiRequest(name);
@@ -648,12 +658,13 @@ function MasterSelectModal({
   genres: GenreOption[];
   options: OshiMasterOption[];
   selectedGroupIds: Set<string>;
-  onSelect: (option: OshiMasterOption) => void;
+  onSelect: (options: OshiMasterOption[]) => void;
   onRequest: (initialName?: string) => void;
   onClose: () => void;
 }) {
   const [query, setQuery] = useState("");
   const [activeGenreId, setActiveGenreId] = useState<"all" | string>("all");
+  const [draftSelectedIds, setDraftSelectedIds] = useState<string[]>([]);
   const normalizedQuery = query.trim().toLowerCase();
   const filteredOptions = useMemo(() => {
     return options.filter((option) => {
@@ -667,6 +678,26 @@ function MasterSelectModal({
       return haystacks.some((value) => value.includes(normalizedQuery));
     });
   }, [activeGenreId, normalizedQuery, options]);
+
+  const draftSelectedOptions = useMemo(() => {
+    const selectedSet = new Set(draftSelectedIds);
+    return options.filter((option) => selectedSet.has(option.id));
+  }, [draftSelectedIds, options]);
+
+  function toggleDraftSelection(option: OshiMasterOption) {
+    if (selectedGroupIds.has(option.id)) return;
+    setDraftSelectedIds((prev) =>
+      prev.includes(option.id)
+        ? prev.filter((id) => id !== option.id)
+        : [...prev, option.id],
+    );
+  }
+
+  function submitDraftSelection() {
+    if (draftSelectedOptions.length === 0) return;
+    onSelect(draftSelectedOptions);
+    setDraftSelectedIds([]);
+  }
 
   if (typeof document === "undefined") return null;
 
@@ -762,16 +793,19 @@ function MasterSelectModal({
           {filteredOptions.length > 0 ? (
             filteredOptions.map((option) => {
               const selected = selectedGroupIds.has(option.id);
+              const draftSelected = draftSelectedIds.includes(option.id);
               const latin = isLatin(option.name);
               return (
                 <button
                   key={option.id}
                   type="button"
                   disabled={selected}
-                  onClick={() => onSelect(option)}
+                  onClick={() => toggleDraftSelection(option)}
                   className={`flex w-full items-center gap-3 rounded-2xl border-[1.5px] border-solid px-4 py-3.5 text-left shadow-[0_6px_18px_rgba(58,50,74,0.05)] transition-all duration-150 active:scale-[0.99] disabled:opacity-65 ${
                     selected
                       ? "border-[#a695d833] bg-[#a695d80d]"
+                      : draftSelected
+                        ? "border-[#a695d8] bg-[#a695d814]"
                       : "border-[#3a324a14] bg-white hover:border-[#a695d855]"
                   }`}
                 >
@@ -795,16 +829,8 @@ function MasterSelectModal({
                       {option.characters.length > 0
                         ? `・メンバー ${option.characters.length}件`
                         : ""}
+                      {selected ? "・設定済み" : ""}
                     </div>
-                  </div>
-                  <div
-                    className={`rounded-full px-2.5 py-1 text-[10.5px] font-extrabold ${
-                      selected
-                        ? "bg-[#3a324a0a] text-[#3a324a8c]"
-                        : "bg-[#a695d814] text-[#a695d8]"
-                    }`}
-                  >
-                    {selected ? "追加済み" : "追加"}
                   </div>
                 </button>
               );
@@ -829,6 +855,13 @@ function MasterSelectModal({
             </div>
           )}
         </div>
+        {draftSelectedOptions.length > 0 && (
+          <div className="flex-shrink-0 border-t border-[#3a324a0f] bg-white px-5 py-3 pb-[calc(env(safe-area-inset-bottom)+14px)]">
+            <PrimaryButton type="button" onClick={submitDraftSelection}>
+              推しを設定する
+            </PrimaryButton>
+          </div>
+        )}
       </div>
     </div>
   );

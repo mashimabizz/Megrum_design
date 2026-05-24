@@ -185,16 +185,24 @@ export default function OshiSettingsScreen() {
     }
   }
 
-  function handleAddMaster(option: MasterOption) {
-    if (!user || selectedMasterIds.has(option.id)) {
+  function handleAddMasters(options: MasterOption[]) {
+    if (!user) return;
+    const addableOptions = options.filter((option) => !selectedMasterIds.has(option.id));
+    if (addableOptions.length === 0) {
       setMasterOpen(false);
       return;
     }
     setMasterOpen(false);
     void runMutation(
-      `group:${option.id}`,
-      () => addMasterGroup(user.id, option.id),
-      "登録済みの推しを追加しました。",
+      "groups:bulk-add",
+      async () => {
+        for (const option of addableOptions) {
+          await addMasterGroup(user.id, option.id);
+        }
+      },
+      addableOptions.length === 1
+        ? "登録済みの推しを追加しました。"
+        : `${addableOptions.length}件の推しを追加しました。`,
     );
   }
 
@@ -312,7 +320,7 @@ export default function OshiSettingsScreen() {
           setMasterOpen(false);
           setRequestModal({ type: "oshi", initialName: name });
         }}
-        onSelect={handleAddMaster}
+        onSelect={handleAddMasters}
       />
 
       <RequestModal
@@ -437,10 +445,11 @@ function MasterSelectModal({
   selectedIds: Set<string | undefined>;
   onClose: () => void;
   onRequest: (name?: string) => void;
-  onSelect: (option: MasterOption) => void;
+  onSelect: (options: MasterOption[]) => void;
 }) {
   const [query, setQuery] = useState("");
   const [genreId, setGenreId] = useState<string | "all">("all");
+  const [draftSelectedIds, setDraftSelectedIds] = useState<string[]>([]);
   const normalizedQuery = query.trim().toLowerCase();
   const filtered = useMemo(
     () =>
@@ -453,6 +462,26 @@ function MasterSelectModal({
       }),
     [genreId, normalizedQuery, options],
   );
+
+  const draftSelectedOptions = useMemo(() => {
+    const selectedSet = new Set(draftSelectedIds);
+    return options.filter((option) => selectedSet.has(option.id));
+  }, [draftSelectedIds, options]);
+
+  function toggleDraftSelection(option: MasterOption) {
+    if (selectedIds.has(option.id)) return;
+    setDraftSelectedIds((current) =>
+      current.includes(option.id)
+        ? current.filter((id) => id !== option.id)
+        : [...current, option.id],
+    );
+  }
+
+  function submitDraftSelection() {
+    if (draftSelectedOptions.length === 0) return;
+    onSelect(draftSelectedOptions);
+    setDraftSelectedIds([]);
+  }
 
   return (
     <Modal animationType="fade" transparent visible={visible} onRequestClose={onClose}>
@@ -505,27 +534,35 @@ function MasterSelectModal({
             ) : (
               filtered.map((option) => {
                 const selected = selectedIds.has(option.id);
+                const draftSelected = draftSelectedIds.includes(option.id);
                 return (
                   <Pressable
                     key={option.id}
                     disabled={selected}
-                    onPress={() => onSelect(option)}
-                    style={[styles.masterRow, selected ? styles.masterRowSelected : null]}
+                    onPress={() => toggleDraftSelection(option)}
+                    style={[
+                      styles.masterRow,
+                      draftSelected ? styles.masterRowPicked : null,
+                      selected ? styles.masterRowSelected : null,
+                    ]}
                   >
                     <View style={styles.masterCopy}>
                       <Text numberOfLines={1} style={styles.masterName}>{option.name}</Text>
                       <Text numberOfLines={1} style={styles.masterMeta}>
                         {option.genreName} / {kindLabel(option.kind)} / {option.characters.length}メンバー
+                        {selected ? " / 設定済み" : ""}
                       </Text>
                     </View>
-                    <Text style={[styles.masterAdd, selected ? styles.masterAdded : null]}>
-                      {selected ? "追加済み" : "追加"}
-                    </Text>
                   </Pressable>
                 );
               })
             )}
           </ScrollView>
+          {draftSelectedOptions.length > 0 ? (
+            <View style={styles.masterSelectButtonWrap}>
+              <PrimaryButton onPress={submitDraftSelection}>推しを設定する</PrimaryButton>
+            </View>
+          ) : null}
         </View>
       </View>
     </Modal>
@@ -1351,6 +1388,10 @@ const styles = StyleSheet.create({
   masterRowSelected: {
     opacity: 0.52,
   },
+  masterRowPicked: {
+    backgroundColor: "rgba(166,149,216,0.12)",
+    borderColor: ihubColors.lavender,
+  },
   masterCopy: {
     flex: 1,
     minWidth: 0,
@@ -1373,6 +1414,11 @@ const styles = StyleSheet.create({
   },
   masterAdded: {
     color: ihubColors.mutedInk,
+  },
+  masterSelectButtonWrap: {
+    borderTopColor: "rgba(58,50,74,0.08)",
+    borderTopWidth: 1,
+    paddingTop: 10,
   },
   modalEmpty: {
     gap: 10,

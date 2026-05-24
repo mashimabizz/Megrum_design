@@ -259,13 +259,6 @@ function OshiEdit({ tweaks }) {
               padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 12,
               borderBottom: `0.5px solid ${c.divide}`,
             }}>
-              <div style={{
-                width: 40, height: 40, borderRadius: 12,
-                background: `linear-gradient(135deg, ${c.lavender}, ${c.sky})`,
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                color: '#fff', fontSize: 14, fontWeight: 800,
-                fontFamily: '"Inter Tight", system-ui',
-              }}>{o.name[0]}</div>
               <div style={{ flex: 1 }}>
                 <div style={{ fontSize: 14, fontWeight: 700 }}>{o.name}</div>
                 <div style={{ fontSize: 11, color: c.mute, marginTop: 1 }}>{o.sub}</div>
