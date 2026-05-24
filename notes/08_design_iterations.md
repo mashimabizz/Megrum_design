@@ -4,6 +4,58 @@
 
 ---
 
+## イテレーション168.11：グルーム投稿保存エラーを修正
+
+### 背景・問題意識
+
+オーナーから「グルームを投稿しようとするとグルームを保存できませんでしたというエラーが出るので、なぜエラーが出るか突き止めて直してください」と指摘があった。保存経路を確認したところ、グルーム画像は `groom-posts` Storage の10MB制限に対して、カメラ/アルバム取得時に最大画質・最大サイズのままアップロードされていた。また、DB保存後の署名URL発行失敗まで「保存失敗」として扱うため、実際には保存済みでもエラー表示になり得た。
+
+### 変更内容
+
+#### `mobile/app/(tabs)/encounters.tsx`
+- グルーム撮影時のJPEG qualityを `1` から `0.88` に変更し、アップロード制限を超えにくくした。
+- カメラのpictureSize選択を最大サイズ優先から、長辺2400px以下の最大サイズ優先へ変更した。
+- アルバム選択時は iOS の compatible representation を指定し、HEIC/高容量画像がそのままアップロードされにくいようにした。
+- 投稿失敗時に `console.warn` へ元エラーを出し、サイズ超過など原因が分かる場合はAlertにも具体文言を出すようにした。
+
+#### `mobile/src/lib/groom.ts`
+- `groom_posts` のselect句を共通化した。
+- アップロード前に画像byte長を確認し、9.5MB超過ならStorageへ送る前に明示エラーを返すようにした。
+- Storageアップロード後にDB insertが失敗した場合、アップロード済み画像を削除して孤児ファイルを残さないようにした。
+- DB保存後の署名URL発行に失敗しても投稿保存自体は成功扱いにし、投稿直後はローカル画像URIをfallback表示できるようにした。
+- `content-type` は `image/jpeg` / `image/png` / `image/webp` のみStorage許可MIMEとして渡し、それ以外はJPEG扱いに寄せた。
+
+### 影響範囲
+
+- iOS版 グルーム投稿（カメラ撮影・アルバム選択・投稿保存）
+- iOS版 グルーム投稿直後の楽観表示/署名URL fallback
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- `npm --prefix mobile run update:ios:preview -- --message "[iter168.11] グルーム投稿保存エラーを修正" --non-interactive`
+- EAS Update: `019e5859-b59a-7ab7-89eb-fbb6586059d1`
+- EAS Update group: `8bd4dc07-8290-4a36-8933-141dca821833`
+
+### 関連ファイル
+
+- `mobile/app/(tabs)/encounters.tsx`
+- `mobile/src/lib/groom.ts`
+
+### セルフレビュー結果
+
+- ✅ Storage 10MB制限に対して、撮影/選択時の画像サイズを抑制
+- ✅ DB保存後の署名URL発行失敗を保存失敗として扱わないように修正
+- ✅ DB insert失敗時にStorageへ残った画像を削除
+- ✅ 投稿失敗時に原因ログと具体エラーを出せるように修正
+- ✅ `npm --prefix mobile run typecheck` 成功
+- ✅ `npm --prefix mobile run export:ios:preview` 成功
+- ✅ Expo preview channel への EAS Update 成功
+- ✅ 状態ID・用語・DBスキーマの追加変更なし
+
+---
+
 ## イテレーション168.10：v2立ち歩きアニメーションを切替
 
 ### 背景・問題意識

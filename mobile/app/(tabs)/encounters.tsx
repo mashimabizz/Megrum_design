@@ -58,6 +58,10 @@ import {
 import { appendMeguriGroomReply } from "../../src/lib/meguriMessages";
 import { useKeyboardInset } from "../../src/lib/useKeyboardInset";
 
+const GROOM_CAMERA_QUALITY = 0.88;
+const GROOM_LIBRARY_QUALITY = 0.88;
+const GROOM_MAX_CAMERA_LONG_EDGE = 2400;
+
 export type MeguriHue = "lav" | "sky" | "pink" | "mint" | "butter";
 export type MeguriAnimalType = "cat" | "fox" | "rabbit";
 export type MeguriFurColor =
@@ -758,11 +762,15 @@ export default function EncountersScreen() {
         next.add(groomAccountKey(remotePostToGroomPost(remotePost)));
         return next;
       });
-    } catch {
+    } catch (error) {
+      console.warn("Failed to publish groom post", error);
       setGroomPosts((current) => current.filter((post) => post.id !== optimisticId));
       setGroomDraftUri(draftUri);
       setGroomDraftCaption(payload.caption.trim());
-      Alert.alert("グルームを保存できませんでした", "通信状況を確認して、もう一度投稿してください。");
+      Alert.alert(
+        "グルームを保存できませんでした",
+        groomPublishFailureMessage(error),
+      );
     }
   }
 
@@ -2674,7 +2682,7 @@ function GroomCameraModal({
       const picture = await cameraRef.current?.takePictureAsync({
         imageType: "jpg",
         maxDownsampling: 1,
-        quality: 1,
+        quality: GROOM_CAMERA_QUALITY,
         skipProcessing: false,
       });
       if (picture?.uri) onCapture(picture.uri);
@@ -2698,7 +2706,9 @@ function GroomCameraModal({
       const result = await ImagePicker.launchImageLibraryAsync({
         allowsEditing: false,
         mediaTypes: ["images"],
-        quality: 1,
+        preferredAssetRepresentationMode:
+          ImagePicker.UIImagePickerPreferredAssetRepresentationMode.Compatible,
+        quality: GROOM_LIBRARY_QUALITY,
         selectionLimit: 1,
       });
       if (!result.canceled && result.assets[0]?.uri) onCapture(result.assets[0].uri);
@@ -2803,7 +2813,6 @@ function GroomCameraModal({
 }
 
 function selectBestGroomPictureSize(sizes: string[]) {
-  if (sizes.includes("Photo")) return "Photo";
   const numericSizes = sizes
     .map((size) => {
       const match = size.match(/^(\d+)x(\d+)$/);
@@ -2811,14 +2820,25 @@ function selectBestGroomPictureSize(sizes: string[]) {
       const width = Number(match[1]);
       const height = Number(match[2]);
       return Number.isFinite(width) && Number.isFinite(height)
-        ? { area: width * height, size }
+        ? { area: width * height, longEdge: Math.max(width, height), size }
         : null;
     })
-    .filter((item): item is { area: number; size: string } => !!item)
+    .filter((item): item is { area: number; longEdge: number; size: string } => !!item)
     .sort((a, b) => b.area - a.area);
-  if (numericSizes[0]) return numericSizes[0].size;
+  const uploadFriendlySize = numericSizes.find(
+    (item) => item.longEdge <= GROOM_MAX_CAMERA_LONG_EDGE,
+  );
+  if (uploadFriendlySize) return uploadFriendlySize.size;
+  if (numericSizes.length > 0) return numericSizes[numericSizes.length - 1]?.size;
   if (sizes.includes("High")) return "High";
   return sizes[0];
+}
+
+function groomPublishFailureMessage(error: unknown) {
+  if (error instanceof Error && error.message.startsWith("画像サイズが大きすぎます")) {
+    return error.message;
+  }
+  return "通信状況を確認して、もう一度投稿してください。";
 }
 
 function GroomComposerModal({

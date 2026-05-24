@@ -45,6 +45,7 @@ export type GroomCreatePostInput = {
 };
 
 const GROOM_BUCKET = "groom-posts";
+const GROOM_MAX_UPLOAD_BYTES = 9.5 * 1024 * 1024;
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
@@ -52,31 +53,33 @@ export function isUuidLike(value: string | null | undefined) {
   return typeof value === "string" && UUID_PATTERN.test(value);
 }
 
+function groomPostSelect() {
+  return [
+    "id",
+    "user_id",
+    "image_url",
+    "image_path",
+    "caption",
+    "status",
+    "audience_scope",
+    "area_key",
+    "place_hint",
+    "image_transform",
+    "text_overlays",
+    "stickers",
+    "doodles",
+    "published_at",
+    "expires_at",
+    "users!groom_posts_user_id_fkey(id, display_name, handle, avatar_url, primary_area)",
+  ].join(", ");
+}
+
 export async function fetchGroomFeed(currentUserId: string): Promise<GroomRemotePost[]> {
   if (!supabase || !hasSupabaseConfig) return [];
   await supabase.rpc("expire_groom_posts").throwOnError();
   const { data, error } = await supabase
     .from("groom_posts")
-    .select(
-      [
-        "id",
-        "user_id",
-        "image_url",
-        "image_path",
-        "caption",
-        "status",
-        "audience_scope",
-        "area_key",
-        "place_hint",
-        "image_transform",
-        "text_overlays",
-        "stickers",
-        "doodles",
-        "published_at",
-        "expires_at",
-        "users!groom_posts_user_id_fkey(id, display_name, handle, avatar_url, primary_area)",
-      ].join(", "),
-    )
+    .select(groomPostSelect())
     .eq("status", "published")
     .gt("expires_at", new Date().toISOString())
     .order("published_at", { ascending: false })
@@ -123,37 +126,27 @@ export async function createGroomPost(
       text_overlays: input.textOverlays,
       user_id: currentUserId,
     })
-    .select(
-      [
-        "id",
-        "user_id",
-        "image_url",
-        "image_path",
-        "caption",
-        "status",
-        "audience_scope",
-        "area_key",
-        "place_hint",
-        "image_transform",
-        "text_overlays",
-        "stickers",
-        "doodles",
-        "published_at",
-        "expires_at",
-        "users!groom_posts_user_id_fkey(id, display_name, handle, avatar_url, primary_area)",
-      ].join(", "),
-    )
+    .select(groomPostSelect())
     .single();
 
-  if (error) throw error;
+  if (error) {
+    if (uploaded.path) {
+      await supabase.storage.from(GROOM_BUCKET).remove([uploaded.path]).catch(() => undefined);
+    }
+    throw error;
+  }
   const row = data as unknown as Record<string, unknown>;
-  const signedUrls = await signGroomImageUrls([row]);
+  const signedUrls = await signGroomImageUrls([row]).catch((signError: unknown) => {
+    console.warn("Failed to sign groom image after publishing", signError);
+    return new Map<string, string>();
+  });
   const post = normalizeRemotePost(
     row,
     currentUserId,
     new Set(),
     new Set([stringValue(row.id)]),
     signedUrls,
+    input.imageUri,
   );
   if (!post) throw new Error("Published groom post was malformed.");
   return post;
@@ -307,6 +300,9 @@ async function uploadGroomImage(currentUserId: string, uri: string) {
     throw new Error("グルーム画像を読み込めませんでした");
   }
   const arrayBuffer = await response.arrayBuffer();
+  if (arrayBuffer.byteLength > GROOM_MAX_UPLOAD_BYTES) {
+    throw new Error("画像サイズが大きすぎます。別の写真を選ぶか、少し小さくしてから投稿してください。");
+  }
   const contentType = contentTypeForUri(uri, response.headers.get("content-type"));
   const extension = extensionForContentType(contentType);
   const path = `${currentUserId}/${Date.now()}_${Math.random().toString(36).slice(2)}.${extension}`;
@@ -378,11 +374,13 @@ function normalizeRemotePost(
   likedIds: Set<string>,
   viewedIds: Set<string>,
   signedUrls: Map<string, string>,
+  imageUrlFallback?: string,
 ): GroomRemotePost | null {
   const id = stringValue(row.id);
   const userId = stringValue(row.user_id);
   const imagePath = nullableStringValue(row.image_path);
-  const imageUrl = (imagePath ? signedUrls.get(imagePath) : null) ?? stringValue(row.image_url);
+  const imageUrl =
+    (imagePath ? signedUrls.get(imagePath) : null) ?? imageUrlFallback ?? stringValue(row.image_url);
   const publishedAt = stringValue(row.published_at);
   const expiresAt = stringValue(row.expires_at);
   if (!id || !userId || !imageUrl || !publishedAt || !expiresAt) return null;
@@ -415,7 +413,7 @@ function normalizeRemotePost(
 }
 
 function contentTypeForUri(uri: string, header: string | null) {
-  if (header?.startsWith("image/")) return header;
+  if (header === "image/jpeg" || header === "image/png" || header === "image/webp") return header;
   const lower = uri.toLowerCase();
   if (lower.includes(".png")) return "image/png";
   if (lower.includes(".webp")) return "image/webp";
