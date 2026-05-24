@@ -4,6 +4,53 @@
 
 ---
 
+## イテレーション168.12：3Dアバターを歩きGLB常時再生状態へ戻す
+
+### 背景・問題意識
+
+オーナーから「3Dのアバターですが、おかしくなったので、一つ前の状態に戻してください」と指示があった。iter168.10 で表示モデルを立ちGLBベースにし、停止中idle / 移動中walkの2アクション切替にしたが、実機上の見え方が崩れたため、直前の安定状態である iter168.9 へ戻す。
+
+### 変更内容
+
+#### `mobile/src/components/meguri/MeguriThreeScene.tsx`
+- 立ちGLBベースの表示モデルとidle/walk切替ロジックを削除した。
+- `cat.glb` / `fox.glb` / `rabbit.glb` に含まれる `Armature|walking_man|baselayer` を `AnimationMixer` で常時ループ再生する構成へ戻した。
+- 有効な歩行clipがない場合だけ、自前ボーンモーションへフォールバックする iter168.9 の構成へ戻した。
+
+#### `mobile/assets/meguri-avatars/`
+- `cat-idle.glb` / `fox-idle.glb` / `rabbit-idle.glb` をアプリbundle対象から削除した。
+
+### 影響範囲
+
+- iOS版 めぐりホーム/めぐりイントロ/めぐり広場/めぐりプロフィール/アバター編集の3D表示
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- `npm --prefix mobile run update:ios:preview -- --message "[iter168.12] 3Dアバターを前状態へ戻す" --non-interactive`
+- EAS Update: `019e585e-a9c5-7442-a431-9744a13ce1fc`
+- EAS Update group: `cc0a941f-25d7-4804-a958-4082304470e9`
+
+### 関連ファイル
+
+- `mobile/src/components/meguri/MeguriThreeScene.tsx`
+- `mobile/assets/meguri-avatars/cat-idle.glb`
+- `mobile/assets/meguri-avatars/fox-idle.glb`
+- `mobile/assets/meguri-avatars/rabbit-idle.glb`
+
+### セルフレビュー結果
+
+- ✅ iter168.10 の立ちGLBベース/idling切替を解除
+- ✅ iter168.9 の歩きGLB常時ループ再生構成へ復帰
+- ✅ 未使用になったidle GLBをbundle対象から削除
+- ✅ `npm --prefix mobile run typecheck` 成功
+- ✅ `npm --prefix mobile run export:ios:preview` 成功
+- ✅ Expo preview channel への EAS Update 成功
+- ✅ 状態ID・用語・DBスキーマの追加変更なし
+
+---
+
 ## イテレーション168.11：グルーム投稿保存エラーを修正
 
 ### 背景・問題意識
