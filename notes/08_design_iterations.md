@@ -4,6 +4,44 @@
 
 ---
 
+## イテレーション168.4：v2めぐりアバターの表示サイズを縮小
+
+### 背景・問題意識
+
+オーナーから「サイズがでかすぎるのかもしれない。少し小さくしてほしい」と相談があった。v2 GLBは旧モデルより頂点数・テクスチャサイズ・リグが大きく、既存の正規化高さ `2.16` ではカメラや各シーン配置に対して大きくなりすぎる可能性がある。
+
+### 変更内容
+
+#### `mobile/src/components/meguri/MeguriThreeScene.tsx`
+- GLB cloneの正規化目標高さを `AVATAR_MODEL_TARGET_HEIGHT = 1.42` に変更した。
+- 各シーンの配置・カメラ・キャラ間隔は維持し、モデル本体だけを約34%小さくした。
+
+### 影響範囲
+
+- iOS版 めぐりホーム/めぐりイントロ/めぐり広場/めぐりプロフィール/アバター編集の3D表示
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- `npm --prefix mobile run update:ios:preview -- --message "[iter168.4] v2めぐりアバターを縮小" --non-interactive`
+- EAS Update: `019e581d-ac51-7703-8ce4-52b353585e3b`
+- EAS Update group: `acf34c1a-ccff-4ea8-a76d-910e6dafb0b9`
+
+### 関連ファイル
+
+- `mobile/src/components/meguri/MeguriThreeScene.tsx`
+
+### セルフレビュー結果
+
+- ✅ v2 GLB本体の正規化サイズだけを縮小し、シーン配置の副作用を抑えた
+- ✅ `npm --prefix mobile run typecheck` 成功
+- ✅ `npm --prefix mobile run export:ios:preview` 成功
+- ✅ Expo preview channel への EAS Update 成功
+- ✅ 状態ID・用語・DBスキーマの追加変更なし
+
+---
+
 ## イテレーション168.3：v2アバターを静止表示優先に切り戻し
 
 ### 背景・問題意識

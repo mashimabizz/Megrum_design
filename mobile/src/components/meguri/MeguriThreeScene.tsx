@@ -85,6 +85,7 @@ const avatarTextureSize: Record<MeguriAnimalType, { height: number; width: numbe
   fox: { height: 2048, width: 2048 },
   rabbit: { height: 2048, width: 2048 },
 };
+const AVATAR_MODEL_TARGET_HEIGHT = 1.42;
 const avatarTemplateCache = new Map<MeguriAnimalType, Promise<THREE.Group>>();
 const avatarTextureCache = new Map<MeguriAnimalType, Promise<THREE.Texture>>();
 
@@ -1475,7 +1476,7 @@ function prepareAvatarClone(model: THREE.Group) {
   const size = box.getSize(new THREE.Vector3());
   const center = box.getCenter(new THREE.Vector3());
   const height = size.y || Math.max(size.x, size.z, 1);
-  const scale = 2.16 / Math.max(height, 0.001);
+  const scale = AVATAR_MODEL_TARGET_HEIGHT / Math.max(height, 0.001);
   model.scale.setScalar(scale);
   model.position.set(-center.x * scale, -box.min.y * scale, -center.z * scale);
 }
