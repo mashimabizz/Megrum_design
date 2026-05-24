@@ -4,6 +4,59 @@
 
 ---
 
+## イテレーション168.30：定番アニメゲーム舞台のL2を補完
+
+### 背景・問題意識
+
+オーナーから、大きい作品やグループではL2に主要キャラ・主要メンバーを十分に登録するよう指摘が続いている。前回までの補完後も、定番アニメ・ゲーム・2.5次元作品で主要キャラ数が少ないL1が残っていたため、既存L1のL2を追加補完した。
+
+### 変更内容
+
+#### `supabase/migrations/20260525024500_expand_classic_anime_game_stage_l2.sql`
+- ワンパンマン / るろうに剣心 / 地縛少年花子くん / 怪獣8号 / 薬屋のひとりごと / 鋼の錬金術師の主要キャラを追加した。
+- ファイナルファンタジーVII / ペルソナ5 / スプラトゥーン / キングダム ハーツ / 刀剣乱舞ONLINEの主要キャラを追加した。
+- ミュージカル「刀剣乱舞」/ 舞台「刀剣乱舞」/ ミュージカル「テニスの王子様」のキャラクター候補を補完した。
+- 追加L2に対して `oshi_entities_master` と `entity_id` を再同期した。
+
+### 影響範囲
+
+- オンボーディングの推し選択
+- プロフィールの推し追加
+- グッズ登録 / Wish登録 / 個別募集の推し選択候補
+
+### 確認方法
+
+- `supabase db push --dry-run`
+- `supabase db push --yes`
+- `supabase db query --linked -o table "select ge.name as genre, gm.name, count(cm.id) as l2 from public.groups_master gm join public.genres_master ge on ge.id=gm.genre_id left join public.characters_master cm on cm.group_id=gm.id where gm.name in ('ワンパンマン','るろうに剣心','地縛少年花子くん','怪獣8号','薬屋のひとりごと','鋼の錬金術師','ファイナルファンタジーVII','ペルソナ5','スプラトゥーン','キングダム ハーツ','刀剣乱舞ONLINE','ミュージカル「刀剣乱舞」','舞台「刀剣乱舞」','ミュージカル「テニスの王子様」') group by ge.name, gm.name order by ge.name, gm.name;"`
+- `supabase db query --linked -o table "with missing as (select gm.id from public.groups_master gm left join public.characters_master cm on cm.group_id=gm.id where gm.kind in ('group','work') group by gm.id having count(cm.id)=0) select count(*) as group_or_work_without_l2 from missing;"`
+
+### 適用後件数
+
+- L1合計: 393
+- L2合計: 1953
+- `oshi_entities_master`: 2077件
+- `group` / `work` でL2が0件のL1: 0件
+- `entity_id` 未紐付け: solo L1 0件 / L2 0件
+- 代表例: 刀剣乱舞ONLINE 14件 / ペルソナ5 10件 / ミュージカル「刀剣乱舞」10件 / スプラトゥーン 9件
+
+### 関連ファイル
+
+- `supabase/migrations/20260525024500_expand_classic_anime_game_stage_l2.sql`
+- `notes/08_design_iterations.md`
+
+### セルフレビュー結果
+
+- ✅ 実在する作品・キャラクターのみを追加
+- ✅ 定番アニメ・ゲーム・2.5次元作品のL2密度を改善
+- ✅ `group` / `work` でL2が0件のL1は引き続き0件
+- ✅ `entity_id` 未紐付け0件を確認
+- ✅ 状態IDの追加・変更なし（`notes/09_state_machines.md` 更新不要）
+- ✅ 新しいアプリ用語・廃止用語なし（`notes/10_glossary.md` 更新不要）
+- ✅ 既存のL2必須運用ルール内のseed追加であり、追加のデータモデル更新なし
+
+---
+
 ## イテレーション168.29：キャラIPと定番作品のL2を補完
 
 ### 背景・問題意識
