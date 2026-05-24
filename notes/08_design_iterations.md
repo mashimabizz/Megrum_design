@@ -3,6 +3,70 @@
 （2026-04-27〜 ／ 2026-04-28 解決済イテレーションを圧縮）
 
 ---
+## イテレーション168.18：推し登録マスタを大幅拡充
+
+### 背景・問題意識
+
+オーナーから「推しに登録できるマスタをとにかく充実させて欲しい」「グッズ交換や活動が活発なグループや作品が何かをまずリサーチし、その上でマスタ登録をどんどん進めてください」と指示があった。既存DBではK-POPの一部グループにメンバー未登録があり、アニメ/ゲーム/邦アイ/2.5次元の推し登録候補が薄かったため、ランダム封入トレカ・缶バッジ・アクスタ・生写真など交換文化が強い領域を優先してマスタseedを追加した。
+
+### 変更内容
+
+#### `supabase/migrations/20260524230000_expand_oshi_master_active_goods.sql`
+- K-POPの既存未登録グループ（Stray Kids / ENHYPEN / TXT / LE SSERAFIM）にメンバーを追加した。
+- K-POPに ATEEZ / ZEROBASEONE / RIIZE / NCT WISH / BOYNEXTDOOR / TREASURE / NMIXX / BABYMONSTER / ITZY / (G)I-DLE / &TEAM / PLAVE を追加した。
+- アニメに ブルーロック / 呪術廻戦 / 鬼滅の刃 / ハイキュー!! / 僕のヒーローアカデミア / チェンソーマン / ダンダダン / 葬送のフリーレン / WIND BREAKER / 東京リベンジャーズ / 【推しの子】 を追加し、主要キャラを登録した。
+- ゲーム/メディアミックスに プロジェクトセカイ / あんさんぶるスターズ!! / ディズニー ツイステッドワンダーランド を追加し、主要キャラを登録した。
+
+#### `supabase/migrations/20260524231000_expand_jpop_25d_oshi_master.sql`
+- 邦アイに Snow Man / SixTONES / なにわ男子 / King & Prince / Number_i / JO1 / INI / ME:I / BE:FIRST / FRUITS ZIPPER / =LOVE / ≠ME / 乃木坂46 / 櫻坂46 / 日向坂46 を追加した。
+- 2.5次元に 刀剣乱舞 / ヒプノシスマイク / アイドリッシュセブン / A3! / うたの☆プリンスさまっ♪ / 魔法使いの約束 / Paradox Live を追加した。
+- Snow Man / SixTONES / なにわ男子 / Number_i / BE:FIRST / FRUITS ZIPPER と、刀剣乱舞 / ヒプノシスマイク / アイドリッシュセブンの主要キャラを登録した。
+
+#### `supabase/migrations/20260524232000_expand_jpop_lapone_equal_master.sql`
+- King & Prince / JO1 / INI / ME:I / =LOVE / ≠ME のメンバーを補完した。
+
+### 影響範囲
+
+- オンボーディングの推しグループ/作品選択
+- プロフィールの推し編集
+- グッズ登録/Wish登録/個別募集のグループ・メンバー選択
+- `groups_master` / `characters_master` のseedデータ
+
+### 確認方法
+
+- `supabase db push --dry-run`
+- `supabase db push --yes`
+- `supabase db query --linked -o table "select ge.name as genre, count(distinct g.id) as groups, count(c.id) as characters from public.genres_master ge left join public.groups_master g on g.genre_id = ge.id left join public.characters_master c on c.group_id = g.id group by ge.name, ge.display_order order by ge.display_order;"`
+
+### 適用後件数
+
+- K-POP: 22グループ / 151メンバー
+- 邦アイ: 15グループ / 96メンバー
+- 2.5次元: 7作品 / 32キャラ
+- アニメ: 11作品 / 97キャラ
+- ゲーム: 3作品 / 69キャラ
+
+### 関連ファイル
+
+- `supabase/migrations/20260524230000_expand_oshi_master_active_goods.sql`
+- `supabase/migrations/20260524231000_expand_jpop_25d_oshi_master.sql`
+- `supabase/migrations/20260524232000_expand_jpop_lapone_equal_master.sql`
+- `notes/08_design_iterations.md`
+
+### セルフレビュー結果
+
+- ✅ リサーチを踏まえ、トレカ/ランダムグッズ/缶バッジ/アクスタ交換が起きやすい領域を優先
+- ✅ 既存K-POPグループの未登録メンバーを補完
+- ✅ 空だった邦アイ/2.5次元にもグループ・作品候補を追加
+- ✅ `supabase db push --dry-run` 成功
+- ✅ `supabase db push --yes` でリモートDBへ適用済み
+- ✅ リモートDBでジャンル別件数を確認済み
+- ✅ 状態IDの追加・変更なし（`notes/09_state_machines.md` 更新不要）
+- ✅ 新しいアプリ用語・廃止用語なし（`notes/10_glossary.md` 更新不要）
+- ✅ DBスキーマ変更なし（`notes/05_data_model.md` 更新不要、seed追加のみ）
+
+---
+
 
 ## イテレーション168.16：グルーム右タップを直近表示へ修正
 
