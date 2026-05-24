@@ -85,7 +85,7 @@ const avatarTextureSize: Record<MeguriAnimalType, { height: number; width: numbe
   fox: { height: 2048, width: 2048 },
   rabbit: { height: 2048, width: 2048 },
 };
-const AVATAR_MODEL_TARGET_HEIGHT = 0.0432;
+const AVATAR_MODEL_TARGET_HEIGHT = 0.0216;
 const avatarTemplateCache = new Map<MeguriAnimalType, Promise<THREE.Group>>();
 const avatarTextureCache = new Map<MeguriAnimalType, Promise<THREE.Texture>>();
 
@@ -712,7 +712,36 @@ function updateResidentObject(
   );
   item.group.rotation.z = moving ? sway : idleSideSway;
   animatePlushParts(item, role, target, elapsed, index, moving);
+  updateAvatarWalkAnimation(item, moving, delta);
   animateFace(item.parts.face, speaking, smiling, elapsed);
+}
+
+function updateAvatarWalkAnimation(
+  item: ResidentRuntime,
+  moving: boolean,
+  delta: number,
+) {
+  const mixer = item.group.userData.avatarMixer as THREE.AnimationMixer | null | undefined;
+  const actions = item.group.userData.avatarActions as THREE.AnimationAction[] | undefined;
+  if (!mixer || !actions?.length) return;
+
+  const active = item.group.userData.avatarWalkingActive === true;
+  if (moving) {
+    if (!active) {
+      for (const action of actions) {
+        action.reset();
+        action.play();
+      }
+      item.group.userData.avatarWalkingActive = true;
+    }
+    mixer.update(delta);
+    return;
+  }
+
+  if (!active) return;
+  mixer.stopAllAction();
+  resetAvatarPose(item.group.userData.avatarModel as THREE.Object3D | null | undefined);
+  item.group.userData.avatarWalkingActive = false;
 }
 
 function updateCameraFocus(
@@ -1382,6 +1411,10 @@ function attachAvatarModel(
   const safeAnimalType = normalizeAvatarAnimalType(animalType);
   const loadToken = Symbol(safeAnimalType);
   group.userData.avatarLoadToken = loadToken;
+  group.userData.avatarActions = [];
+  group.userData.avatarMixer = null;
+  group.userData.avatarModel = null;
+  group.userData.avatarWalkingActive = false;
   void loadAvatarTemplate(safeAnimalType)
     .then(async (template) => {
       if (group.userData.avatarLoadToken !== loadToken) return;
@@ -1392,6 +1425,15 @@ function attachAvatarModel(
         .then((texture) => applyAvatarTexture(model, texture))
         .catch(() => applyAvatarFallbackMaterial(model));
       if (group.userData.avatarLoadToken !== loadToken) return;
+      const animations = getAvatarAnimations(template);
+      if (animations.length > 0) {
+        const mixer = new THREE.AnimationMixer(model);
+        const actions = animations.map((clip) => mixer.clipAction(clip));
+        group.userData.avatarActions = actions;
+        group.userData.avatarMixer = mixer;
+        group.userData.avatarModel = model;
+        group.userData.avatarWalkingActive = false;
+      }
       fallbackGroup.visible = false;
       group.add(model);
     })
@@ -1420,6 +1462,7 @@ function loadAvatarTemplate(animalType: MeguriAnimalType) {
           uri,
           (gltf: GLTF) => {
             prepareAvatarMaterials(gltf.scene);
+            gltf.scene.userData.avatarAnimations = gltf.animations;
             resolve(gltf.scene);
           },
           undefined,
@@ -1470,6 +1513,11 @@ function cloneAvatarTemplate(template: THREE.Group): THREE.Group {
   return (clone ? clone(template) : template.clone(true)) as THREE.Group;
 }
 
+function getAvatarAnimations(template: THREE.Group): THREE.AnimationClip[] {
+  const animations = template.userData.avatarAnimations;
+  return Array.isArray(animations) ? animations : [];
+}
+
 function prepareAvatarClone(model: THREE.Group) {
   prepareAvatarMaterials(model);
   const box = new THREE.Box3().setFromObject(model);
@@ -1506,6 +1554,15 @@ function applyAvatarFallbackMaterial(model: THREE.Group) {
   });
 }
 
+function resetAvatarPose(model: THREE.Object3D | null | undefined) {
+  model?.traverse((object) => {
+    if (isSkinnedMesh(object)) {
+      object.skeleton.pose();
+    }
+  });
+  model?.updateMatrixWorld(true);
+}
+
 function prepareAvatarMaterials(model: THREE.Object3D) {
   model.traverse((object) => {
     if (!isMesh(object)) return;
@@ -1531,6 +1588,10 @@ function prepareAvatarMaterials(model: THREE.Object3D) {
 
 function isMesh(object: THREE.Object3D): object is THREE.Mesh {
   return (object as THREE.Mesh).isMesh === true;
+}
+
+function isSkinnedMesh(object: THREE.Object3D): object is THREE.SkinnedMesh {
+  return (object as THREE.SkinnedMesh).isSkinnedMesh === true;
 }
 
 function createSphere(

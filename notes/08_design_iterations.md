@@ -4,6 +4,47 @@
 
 ---
 
+## イテレーション168.6：v2アバターをさらに半分にして移動時だけ歩行clipを適用
+
+### 背景・問題意識
+
+オーナーから「さらに1/2くらいにしてほしい。その後、アニメーション追加。これは歩く時のアニメーションなので、移動する時のアニメーションにして」と指示があった。iter168.5で極端に縮小したうえで、内蔵clipは常時再生ではなく移動時だけ使う必要がある。
+
+### 変更内容
+
+#### `mobile/src/components/meguri/MeguriThreeScene.tsx`
+- GLB cloneの正規化目標高さを `AVATAR_MODEL_TARGET_HEIGHT = 0.0216` に変更し、iter168.5からさらに半分にした。
+- v2 GLB内のanimation clipを `AnimationMixer` に登録し、キャラクターが移動している時だけ再生するようにした。
+- 移動が止まったら `stopAllAction()` と `skeleton.pose()` で待機ポーズへ戻すようにした。
+
+### 影響範囲
+
+- iOS版 めぐりホーム/めぐりイントロ/めぐり広場/めぐりプロフィール/アバター編集の3D表示
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- `npm --prefix mobile run update:ios:preview -- --message "[iter168.6] v2めぐりアバターを縮小し移動時アニメーション化" --non-interactive`
+- EAS Update: `019e5825-2ebf-75fe-bf08-7734e38e7373`
+- EAS Update group: `0157e174-8b44-4b4e-85b3-e515efba3200`
+
+### 関連ファイル
+
+- `mobile/src/components/meguri/MeguriThreeScene.tsx`
+
+### セルフレビュー結果
+
+- ✅ iter168.5からさらに1/2の正規化高さへ変更
+- ✅ v2 GLB内蔵clipを移動時だけ再生
+- ✅ 停止時はclipを止めてスケルトンポーズへ戻す
+- ✅ `npm --prefix mobile run typecheck` 成功
+- ✅ `npm --prefix mobile run export:ios:preview` 成功
+- ✅ Expo preview channel への EAS Update 成功
+- ✅ 状態ID・用語・DBスキーマの追加変更なし
+
+---
+
 ## イテレーション168.5：v2めぐりアバターを1/50相当に縮小
 
 ### 背景・問題意識
