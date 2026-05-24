@@ -4,6 +4,46 @@
 
 ---
 
+## イテレーション168.7：v2アバターの歩行clipを常時再生
+
+### 背景・問題意識
+
+オーナーから「常に歩くモーションにしてもらっていい」と指示があった。iter168.6では移動時のみclip再生にしていたが、めぐり演出では静止時も歩くモーションを見せたい。
+
+### 変更内容
+
+#### `mobile/src/components/meguri/MeguriThreeScene.tsx`
+- v2 GLB内蔵clipを、移動中判定に関係なく常時 `AnimationMixer` で進めるようにした。
+- 停止時に `stopAllAction()` / `skeleton.pose()` で待機ポーズへ戻す処理を削除した。
+- 初回表示時にactionを開始し、その後は毎フレーム `mixer.update(delta)` するようにした。
+
+### 影響範囲
+
+- iOS版 めぐりホーム/めぐりイントロ/めぐり広場/めぐりプロフィール/アバター編集の3D表示
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- `npm --prefix mobile run update:ios:preview -- --message "[iter168.7] v2めぐりアバターを常時歩行モーション化" --non-interactive`
+- EAS Update: `019e582c-22bd-7f45-864e-923d5b81237c`
+- EAS Update group: `d59adb87-e1f7-40a6-a552-3e7f14cc4295`
+
+### 関連ファイル
+
+- `mobile/src/components/meguri/MeguriThreeScene.tsx`
+
+### セルフレビュー結果
+
+- ✅ v2 GLB内蔵clipを常時再生するように変更
+- ✅ 停止時に待機ポーズへ戻す処理を削除
+- ✅ `npm --prefix mobile run typecheck` 成功
+- ✅ `npm --prefix mobile run export:ios:preview` 成功
+- ✅ Expo preview channel への EAS Update 成功
+- ✅ 状態ID・用語・DBスキーマの追加変更なし
+
+---
+
 ## イテレーション168.6：v2アバターをさらに半分にして移動時だけ歩行clipを適用
 
 ### 背景・問題意識

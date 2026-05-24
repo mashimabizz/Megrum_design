@@ -712,13 +712,12 @@ function updateResidentObject(
   );
   item.group.rotation.z = moving ? sway : idleSideSway;
   animatePlushParts(item, role, target, elapsed, index, moving);
-  updateAvatarWalkAnimation(item, moving, delta);
+  updateAvatarWalkAnimation(item, delta);
   animateFace(item.parts.face, speaking, smiling, elapsed);
 }
 
 function updateAvatarWalkAnimation(
   item: ResidentRuntime,
-  moving: boolean,
   delta: number,
 ) {
   const mixer = item.group.userData.avatarMixer as THREE.AnimationMixer | null | undefined;
@@ -726,22 +725,14 @@ function updateAvatarWalkAnimation(
   if (!mixer || !actions?.length) return;
 
   const active = item.group.userData.avatarWalkingActive === true;
-  if (moving) {
-    if (!active) {
-      for (const action of actions) {
-        action.reset();
-        action.play();
-      }
-      item.group.userData.avatarWalkingActive = true;
+  if (!active) {
+    for (const action of actions) {
+      action.reset();
+      action.play();
     }
-    mixer.update(delta);
-    return;
+    item.group.userData.avatarWalkingActive = true;
   }
-
-  if (!active) return;
-  mixer.stopAllAction();
-  resetAvatarPose(item.group.userData.avatarModel as THREE.Object3D | null | undefined);
-  item.group.userData.avatarWalkingActive = false;
+  mixer.update(delta);
 }
 
 function updateCameraFocus(
@@ -1413,7 +1404,6 @@ function attachAvatarModel(
   group.userData.avatarLoadToken = loadToken;
   group.userData.avatarActions = [];
   group.userData.avatarMixer = null;
-  group.userData.avatarModel = null;
   group.userData.avatarWalkingActive = false;
   void loadAvatarTemplate(safeAnimalType)
     .then(async (template) => {
@@ -1426,14 +1416,13 @@ function attachAvatarModel(
         .catch(() => applyAvatarFallbackMaterial(model));
       if (group.userData.avatarLoadToken !== loadToken) return;
       const animations = getAvatarAnimations(template);
-      if (animations.length > 0) {
-        const mixer = new THREE.AnimationMixer(model);
-        const actions = animations.map((clip) => mixer.clipAction(clip));
-        group.userData.avatarActions = actions;
-        group.userData.avatarMixer = mixer;
-        group.userData.avatarModel = model;
-        group.userData.avatarWalkingActive = false;
-      }
+  if (animations.length > 0) {
+    const mixer = new THREE.AnimationMixer(model);
+    const actions = animations.map((clip) => mixer.clipAction(clip));
+    group.userData.avatarActions = actions;
+    group.userData.avatarMixer = mixer;
+    group.userData.avatarWalkingActive = false;
+  }
       fallbackGroup.visible = false;
       group.add(model);
     })
@@ -1554,15 +1543,6 @@ function applyAvatarFallbackMaterial(model: THREE.Group) {
   });
 }
 
-function resetAvatarPose(model: THREE.Object3D | null | undefined) {
-  model?.traverse((object) => {
-    if (isSkinnedMesh(object)) {
-      object.skeleton.pose();
-    }
-  });
-  model?.updateMatrixWorld(true);
-}
-
 function prepareAvatarMaterials(model: THREE.Object3D) {
   model.traverse((object) => {
     if (!isMesh(object)) return;
@@ -1588,10 +1568,6 @@ function prepareAvatarMaterials(model: THREE.Object3D) {
 
 function isMesh(object: THREE.Object3D): object is THREE.Mesh {
   return (object as THREE.Mesh).isMesh === true;
-}
-
-function isSkinnedMesh(object: THREE.Object3D): object is THREE.SkinnedMesh {
-  return (object as THREE.SkinnedMesh).isSkinnedMesh === true;
 }
 
 function createSphere(
