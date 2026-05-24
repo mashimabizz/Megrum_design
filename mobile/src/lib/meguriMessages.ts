@@ -400,7 +400,12 @@ async function appendRemoteMeguriThreadMessage(
       ].join(", "),
     )
     .single();
-  if (error) throw error;
+  if (error) {
+    if (uploaded?.path) {
+      await supabase.storage.from(MEGURI_MESSAGE_BUCKET).remove([uploaded.path]).catch(() => undefined);
+    }
+    throw error;
+  }
   const row = data as unknown as Record<string, unknown>;
   const signedUrls = await signStorageUrls(MEGURI_MESSAGE_BUCKET, [stringValue(row.image_path)]);
   const message = remoteThreadMessageToLocal(row, user.id, signedUrls);

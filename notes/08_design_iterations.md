@@ -4,6 +4,65 @@
 
 ---
 
+## イテレーション165.1：グルーム返信画像の期限後表示を補強
+
+### 背景・問題意識
+
+iter165 実装後の再レビューで、グルーム投稿のStorage権限を `can_view_groom_post()` のみに寄せると、投稿が `expired` / `archived` になった後に、めぐりメッセージ内の「この人のストーリーズに返信しました」画像まで署名URLを再発行できなくなることが分かった。また、通報と非表示を同時実行すると、非表示が先に入った場合に通報RLSの可視性判定が落ちる可能性があった。
+
+### 変更内容
+
+#### `supabase/migrations/20260524152000_allow_groom_reply_snapshot_images.sql`
+- `can_view_groom_object()` を更新し、`groom_replies.groom_snapshot.image_path` に残っている画像は、投稿期限後でも返信スレッド参加者だけ署名URLを発行できるようにした。
+
+#### `mobile/src/lib/groom.ts`
+- `reportGroomPost()` を `upsert` から `insert` に変更し、重複通報だけ無視するようにした。
+
+#### `mobile/app/(tabs)/encounters.tsx` / `mobile/app/(tabs)/index.tsx`
+- 通報後に非表示を実行する順序へ変更し、RLS上の可視性判定が通報前に失われないようにした。
+
+#### `mobile/src/lib/meguriMessages.ts`
+- 画像メッセージのDB保存に失敗した場合、先にアップロードしたStorage objectを削除して孤児ファイルを残しにくくした。
+
+### 影響範囲
+
+- iOS版 めぐりメッセージのグルーム返信画像表示
+- iOS版 グルーム通報/非表示
+- Supabase Storage RLS
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `supabase db push --dry-run`
+- `supabase db push --yes`
+- `npm --prefix mobile run export:ios:preview`
+- `npm --prefix mobile run update:ios:preview -- --message "[iter165.1] グルーム返信画像の期限後表示を補強" --non-interactive`
+- EAS Update: `019e57b5-3072-7854-b839-a496154f8e98`
+- EAS Update group: `b120dbbe-4969-499c-90a2-52dc53dbd8d5`
+
+### 関連ファイル
+
+- `supabase/migrations/20260524152000_allow_groom_reply_snapshot_images.sql`
+- `mobile/src/lib/groom.ts`
+- `mobile/src/lib/meguriMessages.ts`
+- `mobile/app/(tabs)/encounters.tsx`
+- `mobile/app/(tabs)/index.tsx`
+- `notes/05_data_model.md`
+- `notes/09_state_machines.md`
+
+### セルフレビュー結果
+
+- ✅ 期限切れ後も返信スレッド参加者だけグルーム返信画像を再表示できる
+- ✅ 通報RLSが非表示処理に先に潰されない
+- ✅ 画像メッセージ保存失敗時のStorage孤児化を軽減
+- ✅ `npm --prefix mobile run typecheck` 成功
+- ✅ `npm --prefix mobile run export:ios:preview` 成功
+- ✅ Expo preview channel への EAS Update 成功
+- ✅ 新しい状態ID追加なし
+- ✅ 既存用語の意味更新のみで新規用語追加なし
+
+---
+
 ## イテレーション165：グルーム公開範囲とめぐり会話を永続化
 
 ### 背景・問題意識

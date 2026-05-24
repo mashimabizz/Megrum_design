@@ -203,7 +203,7 @@ iter162.49 で iOS めぐりホームに追加した、写真中心の24時間�
 | `sender_id` | uuid | → users |
 | `recipient_id` | uuid | → users（投稿者） |
 | `body` | text | 返信本文（1〜500字） |
-| `groom_snapshot` | jsonb | `caption` / `image_url` など返信時点の投稿スナップショット |
+| `groom_snapshot` | jsonb | `caption` / `image_url` / `image_path` など返信時点の投稿スナップショット。`image_path` は投稿期限切れ後も返信参加者に限って署名URL発行を許可する |
 | `read_at` | timestamptz nullable | 受信者がめぐりメッセージで開いた時刻 |
 | `created_at` | timestamptz | |
 

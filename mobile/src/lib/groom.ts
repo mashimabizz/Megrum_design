@@ -198,18 +198,13 @@ export async function reportGroomPost(
   ) {
     return;
   }
-  const { error } = await supabase
-    .from("groom_reports")
-    .upsert(
-      {
-        groom_post_id: postId,
-        reason,
-        reported_user_id: reportedUserId,
-        reporter_id: currentUserId,
-      },
-      { onConflict: "reporter_id,groom_post_id" },
-    );
-  if (error) throw error;
+  const { error } = await supabase.from("groom_reports").insert({
+    groom_post_id: postId,
+    reason,
+    reported_user_id: reportedUserId,
+    reporter_id: currentUserId,
+  });
+  if (error && error.code !== "23505") throw error;
 }
 
 export async function blockGroomUser(currentUserId: string, blockedUserId: string) {

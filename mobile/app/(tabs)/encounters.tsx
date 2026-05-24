@@ -859,10 +859,8 @@ export default function EncountersScreen() {
     }
     removeGroomPostLocally(post.id);
     try {
-      await Promise.all([
-        reportGroomPost(user.id, post.id, post.author.id),
-        hideGroomPost(user.id, post.id),
-      ]);
+      await reportGroomPost(user.id, post.id, post.author.id);
+      await hideGroomPost(user.id, post.id);
       Alert.alert("通報しました", "このグルームは非表示にしました。");
     } catch {
       Alert.alert("通報できませんでした", "通信状況を確認して、もう一度お試しください。");
