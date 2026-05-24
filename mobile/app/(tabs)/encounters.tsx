@@ -465,14 +465,6 @@ export const GROOM_POSTS: GroomPost[] = [
   },
 ];
 
-const HOME_SELF_SCENE: MeguriSceneResident = {
-  animalType: "rabbit",
-  furColor: "lavender",
-  hue: "lav",
-  id: "me",
-  name: "あなた",
-};
-
 export function hueColor(hue: MeguriHue) {
   switch (hue) {
     case "sky":
@@ -572,8 +564,9 @@ export default function EncountersScreen() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [meguriEnabled, setMeguriEnabled] = useState(true);
   const [plusActive, setPlusActive] = useState(false);
-  const [selfScene, setSelfScene] = useState<MeguriSceneResident>(HOME_SELF_SCENE);
-  const [groomPosts, setGroomPosts] = useState<GroomPost[]>(GROOM_POSTS);
+  const [selfScene, setSelfScene] = useState<MeguriSceneResident | null>(null);
+  const [groomPosts, setGroomPosts] = useState<GroomPost[]>(() => (previewMode ? GROOM_POSTS : []));
+  const [groomLoading, setGroomLoading] = useState(!previewMode);
   const [selectedGroomId, setSelectedGroomId] = useState<string | null>(null);
   const [groomReply, setGroomReply] = useState("");
   const [groomReplyNotice, setGroomReplyNotice] = useState("");
@@ -586,7 +579,7 @@ export default function EncountersScreen() {
   const groomToastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const active = arrivals[activeIndex];
   const selectedGroomPost = groomPosts.find((post) => post.id === selectedGroomId) ?? null;
-  const lockedLetters = plusActive ? 0 : LETTERS.length;
+  const lockedLetters = previewMode && !plusActive ? LETTERS.length : 0;
   const sceneResidents = useMemo(() => arrivals.map(toHomeSceneResident), [arrivals]);
   const headerTop = Math.max(insets.top, 18) + 8;
   const bottomPadding = Math.max(insets.bottom, 12) + 96;
@@ -624,20 +617,32 @@ export default function EncountersScreen() {
   }, []);
 
   async function refreshGroomPosts() {
-    if (previewMode || !user) {
+    if (previewMode) {
+      setGroomLoading(false);
       setGroomPosts(GROOM_POSTS);
       setViewedGroomKeys(new Set());
       return;
     }
-    const remotePosts = await fetchGroomFeed(user.id);
-    const nextPosts = remotePosts.map(remotePostToGroomPost);
-    setGroomPosts(nextPosts);
-    setViewedGroomKeys(
-      new Set(nextPosts.filter((_, index) => remotePosts[index]?.viewed).map(groomAccountKey)),
-    );
+    if (!user) {
+      setGroomLoading(false);
+      setGroomPosts([]);
+      setViewedGroomKeys(new Set());
+      return;
+    }
+    try {
+      const remotePosts = await fetchGroomFeed(user.id);
+      const nextPosts = remotePosts.map(remotePostToGroomPost);
+      setGroomPosts(nextPosts);
+      setViewedGroomKeys(
+        new Set(nextPosts.filter((_, index) => remotePosts[index]?.viewed).map(groomAccountKey)),
+      );
+    } finally {
+      setGroomLoading(false);
+    }
   }
 
   useEffect(() => {
+    setGroomLoading(!previewMode);
     refreshGroomPosts().catch(() => undefined);
   }, [previewMode, user]);
 
@@ -939,6 +944,7 @@ export default function EncountersScreen() {
         showsVerticalScrollIndicator={false}
       >
         <GroomRail
+          loading={groomLoading}
           onAdd={openGroomCamera}
           onOpen={openGroomPost}
           posts={groomPosts}
@@ -963,7 +969,11 @@ export default function EncountersScreen() {
           <Text style={styles.stageTitle}>とめぐりあいました！</Text>
 
           <View style={styles.homeSceneFrame}>
-            {homeThreeFailed ? (
+            {!selfScene ? (
+              <View style={styles.meguriSceneLoading}>
+                <ActivityIndicator color={ihubColors.lavender} />
+              </View>
+            ) : homeThreeFailed ? (
               <HomeResidentsFallback activeIndex={activeIndex} users={arrivals} />
             ) : (
               <MeguriThreeBoundary
@@ -1137,11 +1147,13 @@ function normalizeGroomOpenOrigin(origin: GroomOpenOrigin | null | undefined) {
 }
 
 function GroomRail({
+  loading,
   onAdd,
   onOpen,
   posts,
   viewedKeys,
 }: {
+  loading: boolean;
   onAdd: () => void;
   onOpen: (post: GroomPost, origin?: GroomOpenOrigin | null) => void;
   posts: GroomPost[];
@@ -1172,16 +1184,22 @@ function GroomRail({
           </Text>
         </Pressable>
 
-        {groups.map((group) => {
+        {loading ? (
+          <View style={styles.groomRailLoading}>
+            <ActivityIndicator color={ihubColors.lavender} />
+          </View>
+        ) : null}
+
+        {!loading && groups.map((group) => {
           const post = group.posts[0];
           if (!post) return null;
           return (
-          <GroomRailItem
-            key={group.key}
-            onOpen={onOpen}
-            post={post}
-            viewed={viewedKeys.has(group.key)}
-          />
+            <GroomRailItem
+              key={group.key}
+              onOpen={onOpen}
+              post={post}
+              viewed={viewedKeys.has(group.key)}
+            />
           );
         })}
       </ScrollView>
@@ -4031,6 +4049,12 @@ const styles = StyleSheet.create({
 	    gap: 13,
 	    paddingRight: 18,
 	  },
+  groomRailLoading: {
+    alignItems: "center",
+    height: 74,
+    justifyContent: "center",
+    width: 80,
+  },
 	  groomStoryItem: {
 	    alignItems: "center",
 	    gap: 6,
@@ -5091,6 +5115,11 @@ const styles = StyleSheet.create({
     marginTop: 14,
     overflow: "hidden",
     position: "relative",
+  },
+  meguriSceneLoading: {
+    alignItems: "center",
+    flex: 1,
+    justifyContent: "center",
   },
   homeFallbackScene: {
     backgroundColor: "#c9f1ff",

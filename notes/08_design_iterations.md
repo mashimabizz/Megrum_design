@@ -4,6 +4,68 @@
 
 ---
 
+## イテレーション167：初回表示のプレビューデータちらつきを除去
+
+### 背景・問題意識
+
+オーナーから「グルームも、めぐりのアバターも、めぐりのメッセージ一覧も、最初にひらいたときにプレビュー用の別データが一瞬表示されるのが目障り」と指摘があった。実データやローカル設定を非同期読み込みする前に、モック配列やデフォルトアバターを初期stateへ入れていたため、本来のデータへ差し替わるまで別の内容が見えていた。
+
+### 変更内容
+
+#### `mobile/app/(tabs)/encounters.tsx`
+- グルーム投稿の初期stateを本番モードでは空配列にし、読み込み中はレール内ローダーを表示するようにした。
+- プレビューモードの時だけ `GROOM_POSTS` を使うように分離した。
+- めぐりホームの自分アバターは、保存済みアバター/プロフィール設定を読み込むまで3Dシーンへ渡さず、ローダーを表示するようにした。
+
+#### `mobile/app/meguri-letters.tsx`
+- めぐりメッセージ一覧で、プレビューモード以外は `LETTERS` / `USERS` 由来の静的会話を初期表示しないようにした。
+- Plus設定・既読状態・グルーム返信・めぐり会話を一括で読み込んでから一覧を表示し、読み込み中はローダー、実データなしは空状態を表示するようにした。
+- プレビュー用の返信文はプレビューモード時だけ追加するようにした。
+
+#### `mobile/app/meguri-avatar-edit.tsx` / `mobile/app/meguri-plaza.tsx` / `mobile/app/meguri-intro.tsx`
+- 自分のめぐりアバターを、保存済み設定の読み込み完了前にデフォルトのうさぎとして描画しないようにした。
+- 読み込み中は3Dプレビュー/プラザ/イントロでローダーを表示し、別アバターが一瞬出る挙動を避けた。
+
+#### `mobile/app/meguri-profile.tsx`
+- 存在しないプロフィールIDで開いた時に `USERS[0]` へフォールバックせず、別ユーザーのプロフィールを見せない空状態へ変更した。
+
+### 影響範囲
+
+- iOS版 めぐりホームのグルームレールと自分アバター
+- iOS版 グルーム閲覧入口
+- iOS版 めぐりメッセージ一覧・スレッド
+- iOS版 めぐりアバター編集・プラザ・イントロ・プロフィール
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- `npm --prefix mobile run update:ios:preview -- --message "[iter167] 初回表示のプレビューデータちらつきを除去" --non-interactive`
+- EAS Update: `019e57f5-169c-796e-9de5-58a33cef739e`
+- EAS Update group: `ec7e842e-40b2-4a1e-ad82-82d73a716523`
+
+### 関連ファイル
+
+- `mobile/app/(tabs)/encounters.tsx`
+- `mobile/app/meguri-letters.tsx`
+- `mobile/app/meguri-avatar-edit.tsx`
+- `mobile/app/meguri-plaza.tsx`
+- `mobile/app/meguri-intro.tsx`
+- `mobile/app/meguri-profile.tsx`
+
+### セルフレビュー結果
+
+- ✅ 本番モードではグルーム一覧に静的 `GROOM_POSTS` を初期表示しない
+- ✅ 本番モードではめぐりメッセージ一覧に静的 `LETTERS` / `USERS` 由来の会話を初期表示しない
+- ✅ 自分アバター設定読み込み前にデフォルトアバターを描画しない
+- ✅ プロフィールID不一致時に別ユーザーへフォールバックしない
+- ✅ `npm --prefix mobile run typecheck` 成功
+- ✅ `npm --prefix mobile run export:ios:preview` 成功
+- ✅ Expo preview channel への EAS Update 成功
+- ✅ 状態ID・用語・DBスキーマの追加変更なし
+
+---
+
 ## イテレーション166：管理者機能と有料権限の基盤追加
 
 ### 背景・問題意識

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   AppState,
+  ActivityIndicator,
   BackHandler,
   Image,
   Pressable,
@@ -17,14 +18,16 @@ import { ChatGradientBubble } from "../src/components/ChatGradientBubble";
 import { IconSymbol } from "../src/components/IconSymbol";
 import { MeguriAvatarFace } from "../src/components/meguri/MeguriAvatarFace";
 import { Screen } from "../src/components/Screen";
+import { useAuth } from "../src/auth/AuthProvider";
 import { useKeyboardInset } from "../src/lib/useKeyboardInset";
 import { ihubColors } from "../src/theme/tokens";
 import {
   FREE_SEND_LIMIT,
   LETTERS,
-  Letter,
   PlusModal,
   USERS,
+  type Letter,
+  type MeguriUser,
 } from "./(tabs)/encounters";
 import { loadMeguriPlusSettings, saveMeguriPlusSettings } from "../src/lib/meguriSettings";
 import {
@@ -78,6 +81,7 @@ const INITIAL_FREE_SEND_USED = 0;
 const MESSAGE_ACTIVE = ihubColors.lavender;
 
 export default function MeguriLettersScreen() {
+  const { previewMode } = useAuth();
   const insets = useSafeAreaInsets();
   const params = useLocalSearchParams<{
     open?: string | string[];
@@ -91,7 +95,11 @@ export default function MeguriLettersScreen() {
   const [threadMessages, setThreadMessages] = useState<MeguriThreadMessage[]>([]);
   const [groomReplies, setGroomReplies] = useState<MeguriGroomReply[]>([]);
   const [readState, setReadState] = useState<MeguriMessageReadState>({});
-  const messageLetters = useMemo(() => createMessageLetters(groomReplies), [groomReplies]);
+  const [messagesReady, setMessagesReady] = useState(false);
+  const messageLetters = useMemo(
+    () => createMessageLetters(groomReplies, threadMessages, previewMode),
+    [groomReplies, previewMode, threadMessages],
+  );
   const openParam = Array.isArray(params.open) ? params.open[0] : params.open;
   const userIdParam = Array.isArray(params.userId) ? params.userId[0] : params.userId;
   const conversations = useMemo(
@@ -100,12 +108,13 @@ export default function MeguriLettersScreen() {
       const threadUnreadByConversation = unreadThreadMessagesByConversation(threadMessages, messageLetters);
       const rows = messageLetters.map((letter, index) => {
         const id = `message-${letter.id}`;
+        const latestAt = latestConversationTimestamp(letter, groomReplies, threadMessages);
         return {
           id,
           letter,
-          lastAt: CONVERSATION_TIMES[index] ?? "先週",
-          muted: index === 1,
-          pinned: index === 0 || index === 4,
+          lastAt: latestAt ? formatConversationTime(latestAt) : CONVERSATION_TIMES[index] ?? "先週",
+          muted: previewMode && index === 1,
+          pinned: previewMode && (index === 0 || index === 4),
           unread:
             unreadMeguriMessageCount(letter, readState) +
             (groomUnreadByConversation[id] ?? 0) +
@@ -119,7 +128,7 @@ export default function MeguriLettersScreen() {
         return 0;
       });
     },
-    [groomReplies, messageLetters, readState, threadMessages, userIdParam],
+    [groomReplies, messageLetters, previewMode, readState, threadMessages, userIdParam],
   );
   const groomReplyMessages = useMemo(
     () => groupGroomRepliesByConversation(groomReplies, messageLetters),
@@ -133,27 +142,27 @@ export default function MeguriLettersScreen() {
   const remainingFreeSends = Math.max(0, FREE_SEND_LIMIT - sendUsed);
 
   useEffect(() => {
-    loadMeguriPlusSettings()
-      .then((settings) => setSubscribed(settings.active))
-      .catch(() => undefined);
-  }, []);
-
-  useEffect(() => {
-    loadMeguriMessageReadState()
-      .then(setReadState)
-      .catch(() => undefined);
-  }, []);
-
-  useEffect(() => {
-    loadMeguriGroomReplies()
-      .then(setGroomReplies)
-      .catch(() => undefined);
-  }, []);
-
-  useEffect(() => {
-    loadMeguriThreadMessages()
-      .then(setThreadMessages)
-      .catch(() => undefined);
+    let mounted = true;
+    setMessagesReady(false);
+    Promise.all([
+      loadMeguriPlusSettings().catch(() => null),
+      loadMeguriMessageReadState().catch(() => ({})),
+      loadMeguriGroomReplies().catch(() => []),
+      loadMeguriThreadMessages().catch(() => []),
+    ])
+      .then(([plus, nextReadState, replies, messages]) => {
+        if (!mounted) return;
+        if (plus) setSubscribed(plus.active);
+        setReadState(nextReadState);
+        setGroomReplies(replies);
+        setThreadMessages(messages);
+      })
+      .finally(() => {
+        if (mounted) setMessagesReady(true);
+      });
+    return () => {
+      mounted = false;
+    };
   }, []);
 
   useEffect(() => {
@@ -270,6 +279,7 @@ export default function MeguriLettersScreen() {
         remainingFreeSends={remainingFreeSends}
         sendUsed={sendUsed}
         sentMessages={threadSentMessages[selectedConversation.id] ?? []}
+        showPreviewReply={previewMode}
         subscribed={subscribed}
       >
         <PlusModal
@@ -305,7 +315,20 @@ export default function MeguriLettersScreen() {
         showsVerticalScrollIndicator={false}
         style={styles.talkList}
       >
-        {conversations.map((conversation) => (
+        {!messagesReady ? (
+          <View style={styles.messageLoading}>
+            <ActivityIndicator color={ihubColors.lavender} />
+          </View>
+        ) : null}
+        {messagesReady && conversations.length === 0 ? (
+          <View style={styles.messageEmpty}>
+            <Text style={styles.messageEmptyTitle}>まだメッセージはありません</Text>
+            <Text style={styles.messageEmptyText}>
+              グルームへの返信や、めぐりあいメッセージが届くとここに表示されます。
+            </Text>
+          </View>
+        ) : null}
+        {messagesReady && conversations.map((conversation) => (
           <ConversationRow
             key={conversation.id}
             conversation={conversation}
@@ -414,6 +437,7 @@ function MessageThreadScreen({
   remainingFreeSends,
   sendUsed,
   sentMessages,
+  showPreviewReply,
   subscribed,
 }: {
   children: ReactNode;
@@ -429,11 +453,12 @@ function MessageThreadScreen({
   remainingFreeSends: number;
   sendUsed: number;
   sentMessages: ChatMessage[];
+  showPreviewReply: boolean;
   subscribed: boolean;
 }) {
   const { letter } = conversation;
   const canRead = subscribed;
-  const messages = buildMessages(letter, canRead, sentMessages);
+  const messages = buildMessages(letter, canRead, sentMessages, showPreviewReply);
   const chatScrollRef = useRef<ScrollView>(null);
   const lastMessageId = messages[messages.length - 1]?.id ?? null;
   const canSend = subscribed || remainingFreeSends > 0;
@@ -672,6 +697,7 @@ function buildMessages(
   letter: Letter,
   canRead: boolean,
   sentMessages: ChatMessage[],
+  showPreviewReply: boolean,
 ): ChatMessage[] {
   const baseMessages: ChatMessage[] = [
     {
@@ -688,31 +714,24 @@ function buildMessages(
       time: "0:22",
     },
   ];
-  if (canRead) {
+  if (canRead && showPreviewReply) {
     baseMessages.push({
       id: `${letter.id}-reply`,
-        body: "めぐり、ありがとうございます。また同じ会場で会えたらうれしいです。",
-        mine: true,
-        time: "0:24",
-      });
+      body: "めぐり、ありがとうございます。また同じ会場で会えたらうれしいです。",
+      mine: true,
+      time: "0:24",
+    });
   }
   return [...baseMessages, ...sentMessages];
 }
 
-function createMessageLetters(groomReplies: MeguriGroomReply[]): Letter[] {
-  const letterUserIds = new Set(LETTERS.map((letter) => letter.from.id));
-  const extras = USERS.filter((user) => !letterUserIds.has(user.id))
-    .slice(0, 7)
-    .map((user, index): Letter => ({
-      affinity: 72 + (index % 5) * 4,
-      body: EXTRA_MESSAGE_BODIES[index % EXTRA_MESSAGE_BODIES.length],
-      from: user,
-      id: `message-extra-${user.id}`,
-      opened: index % 3 !== 1,
-      placeHint: index % 2 === 0 ? "同じイベント圏内" : "最近、近いエリア",
-      timeHint: index < 3 ? "今日" : "今週",
-    }));
-  const base = [...LETTERS, ...extras];
+function createMessageLetters(
+  groomReplies: MeguriGroomReply[],
+  threadMessages: MeguriThreadMessage[],
+  includePreviewRows: boolean,
+): Letter[] {
+  const previewBase = includePreviewRows ? createPreviewMessageLetters() : [];
+  const base = [...previewBase];
   const existingIds = new Set(base.map((letter) => letter.from.id));
   const existingNames = new Set(base.map((letter) => letter.from.name));
   const replyLetters = groomReplies
@@ -745,7 +764,106 @@ function createMessageLetters(groomReplies: MeguriGroomReply[]): Letter[] {
       placeHint: "同じイベント圏内",
       timeHint: "今日",
     }));
-  return [...base, ...replyLetters];
+  for (const letter of replyLetters) {
+    existingIds.add(letter.from.id);
+    existingNames.add(letter.from.name);
+  }
+  const threadLetters = threadMessages
+    .filter(
+      (message, index, all) =>
+        !existingIds.has(message.peerId) &&
+        !existingNames.has(message.peerName) &&
+        all.findIndex((candidate) => candidate.peerId === message.peerId) === index,
+    )
+    .map((message): Letter => ({
+      affinity: 76,
+      body: message.body || "めぐりあいメッセージです。",
+      from: messagePeerToMeguriUser(message),
+      id: `message-thread-${message.peerId}`,
+      opened: true,
+      placeHint: "めぐりあい",
+      timeHint: "今日",
+    }));
+  return [...base, ...replyLetters, ...threadLetters];
+}
+
+function createPreviewMessageLetters() {
+  const letterUserIds = new Set(LETTERS.map((letter) => letter.from.id));
+  const extras = USERS.filter((user) => !letterUserIds.has(user.id))
+    .slice(0, 7)
+    .map((user, index): Letter => ({
+      affinity: 72 + (index % 5) * 4,
+      body: EXTRA_MESSAGE_BODIES[index % EXTRA_MESSAGE_BODIES.length],
+      from: user,
+      id: `message-extra-${user.id}`,
+      opened: index % 3 !== 1,
+      placeHint: index % 2 === 0 ? "同じイベント圏内" : "最近、近いエリア",
+      timeHint: index < 3 ? "今日" : "今週",
+    }));
+  return [...LETTERS, ...extras];
+}
+
+function messagePeerToMeguriUser(message: MeguriThreadMessage): MeguriUser {
+  const matched = USERS.find((user) => user.id === message.peerId || user.name === message.peerName);
+  if (matched) {
+    return {
+      ...matched,
+      id: message.peerId,
+      name: message.peerName || matched.name,
+    };
+  }
+  return {
+    animalType: "cat",
+    area: "めぐりあい",
+    count: 1,
+    furColor: "lavender",
+    group: "めぐり",
+    hitokoto: message.body,
+    hue: "lav",
+    id: message.peerId,
+    name: message.peerName,
+    oshi: "推し",
+    recent: message.body,
+    since: "今日",
+    style: "推し活",
+  };
+}
+
+function latestConversationTimestamp(
+  letter: Letter,
+  groomReplies: MeguriGroomReply[],
+  threadMessages: MeguriThreadMessage[],
+) {
+  const timestamps = [
+    ...groomReplies
+      .filter(
+        (reply) =>
+          reply.recipientId === letter.from.id ||
+          reply.recipientName === letter.from.name,
+      )
+      .map((reply) => reply.sentAt),
+    ...threadMessages
+      .filter(
+        (message) =>
+          message.peerId === letter.from.id ||
+          message.peerName === letter.from.name,
+      )
+      .map((message) => message.sentAt),
+  ].filter((value) => Number.isFinite(value));
+  return timestamps.length > 0 ? Math.max(...timestamps) : null;
+}
+
+function formatConversationTime(timestamp: number) {
+  const diffMinutes = Math.max(0, Math.floor((Date.now() - timestamp) / 60000));
+  if (diffMinutes < 1) return "今";
+  if (diffMinutes < 60) return `${diffMinutes}分前`;
+  const diffHours = Math.floor(diffMinutes / 60);
+  if (diffHours < 24) return `${diffHours}時間前`;
+  if (diffHours < 48) return "昨日";
+  return new Intl.DateTimeFormat("ja-JP", {
+    month: "numeric",
+    day: "numeric",
+  }).format(new Date(timestamp));
 }
 
 function groupGroomRepliesByConversation(
@@ -921,6 +1039,29 @@ const styles = StyleSheet.create({
   },
   talkListContent: {
     paddingTop: 2,
+  },
+  messageLoading: {
+    alignItems: "center",
+    minHeight: 180,
+    justifyContent: "center",
+  },
+  messageEmpty: {
+    alignItems: "center",
+    paddingHorizontal: 28,
+    paddingTop: 96,
+  },
+  messageEmptyTitle: {
+    color: ihubColors.ink,
+    fontSize: 16,
+    fontWeight: "900",
+  },
+  messageEmptyText: {
+    color: "rgba(58,50,74,0.52)",
+    fontSize: 12,
+    fontWeight: "700",
+    lineHeight: 20,
+    marginTop: 8,
+    textAlign: "center",
   },
   conversationRow: {
     alignItems: "center",
