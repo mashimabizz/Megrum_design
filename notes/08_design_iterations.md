@@ -4,6 +4,59 @@
 
 ---
 
+## イテレーション168.33：恋愛・BL寄り作品を追加
+
+### 背景・問題意識
+
+アニメ/マンガ系の推しマスタ拡充で、少年漫画・大型アクション作品に偏りすぎると、実際のグッズ交換で強い女性向け・恋愛・BL寄り作品の需要を取りこぼす。公式/専門店でグッズ展開が確認できる作品を中心に、交換対象になりやすいキャラクターをL2として追加した。
+
+### 変更内容
+
+#### `supabase/migrations/20260525035000_expand_romance_bl_manga_merch_titles.sql`
+- ゆびさきと恋々 / 山田くんとLv999の恋をする / 佐々木と宮野 / ギヴンを追加し、主要キャラをL2登録した。
+- ホリミヤ / ブルーピリオド / 彼女、お借りしますを追加し、主要キャラをL2登録した。
+- 追加した全 `work` にL2を同梱し、追加L2に対して `oshi_entities_master` と `entity_id` を再同期した。
+
+### 影響範囲
+
+- オンボーディングの推し選択
+- プロフィールの推し追加
+- グッズ登録 / Wish登録 / 個別募集の推し選択候補
+
+### 確認方法
+
+- `supabase db push --dry-run`
+- `supabase db push --yes`
+- `supabase db query --linked -o table "select ge.name as genre, gm.name, count(cm.id) as l2 from public.groups_master gm join public.genres_master ge on ge.id=gm.genre_id left join public.characters_master cm on cm.group_id=gm.id where gm.name in ('ゆびさきと恋々','山田くんとLv999の恋をする','佐々木と宮野','ギヴン','ホリミヤ','ブルーピリオド','彼女、お借りします') group by ge.name, gm.name order by ge.name, gm.name;"`
+- `supabase db query --linked -o table "with missing as (select gm.id from public.groups_master gm left join public.characters_master cm on cm.group_id=gm.id where gm.kind in ('group','work') group by gm.id having count(cm.id)=0) select count(*) as group_or_work_without_l2 from missing;"`
+
+### 適用後件数
+
+- L1合計: 416
+- L2合計: 2209
+- `oshi_entities_master`: 2333件
+- `group` / `work` でL2が0件のL1: 0件
+- `entity_id` 未紐付け: solo L1 0件 / L2 0件
+- 代表例: ホリミヤ 10件 / ギヴン 8件 / 佐々木と宮野 8件 / 山田くんとLv999の恋をする 8件
+
+### 関連ファイル
+
+- `supabase/migrations/20260525035000_expand_romance_bl_manga_merch_titles.sql`
+- `notes/08_design_iterations.md`
+
+### セルフレビュー結果
+
+- ✅ 女性向け・恋愛・BL寄りのグッズ交換需要を補完
+- ✅ 追加した `work` はすべてL2を同梱
+- ✅ 実在する作品・キャラクターのみを登録
+- ✅ `group` / `work` でL2が0件のL1は引き続き0件
+- ✅ `entity_id` 未紐付け0件を確認
+- ✅ 状態IDの追加・変更なし（`notes/09_state_machines.md` 更新不要）
+- ✅ 新しいアプリ用語・廃止用語なし（`notes/10_glossary.md` 更新不要）
+- ✅ 既存のL2必須運用ルール内のseed追加であり、追加のデータモデル更新なし
+
+---
+
 ## イテレーション168.32：最近人気作のL2を深掘り
 
 ### 背景・問題意識
