@@ -672,9 +672,11 @@ function MasterSelectModal({
         return false;
       }
       if (!normalizedQuery) return true;
-      const haystacks = [option.name, ...option.aliases].map((value) =>
-        value.toLowerCase(),
-      );
+      const haystacks = [
+        option.name,
+        ...option.aliases,
+        ...option.characters.map((character) => character.name),
+      ].map((value) => value.toLowerCase());
       return haystacks.some((value) => value.includes(normalizedQuery));
     });
   }, [activeGenreId, normalizedQuery, options]);

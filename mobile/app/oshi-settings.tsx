@@ -1,16 +1,24 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  Animated,
+  KeyboardAvoidingView,
   Modal,
+  type NativeScrollEvent,
+  type NativeSyntheticEvent,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
   TextInput,
   View,
+  useWindowDimensions,
 } from "react-native";
-import { router } from "expo-router";
+import { Stack } from "expo-router";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAuth } from "../src/auth/AuthProvider";
+import { IconSymbol } from "../src/components/IconSymbol";
 import { PrimaryButton } from "../src/components/PrimaryButton";
 import { Screen } from "../src/components/Screen";
 import { supabase } from "../src/lib/supabase";
@@ -109,15 +117,18 @@ const REQUEST_KINDS: { value: OshiRequestKind; label: string }[] = [
 
 export default function OshiSettingsScreen() {
   const { user, previewMode } = useAuth();
+  const insets = useSafeAreaInsets();
   const [groups, setGroups] = useState<OshiGroup[]>([]);
   const [genres, setGenres] = useState<GenreOption[]>([]);
   const [masterOptions, setMasterOptions] = useState<MasterOption[]>([]);
   const [loading, setLoading] = useState(false);
-  const [busyKey, setBusyKey] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [masterOpen, setMasterOpen] = useState(false);
   const [requestModal, setRequestModal] = useState<RequestModalState | null>(null);
+  const mutationQueueRef = useRef<Promise<void>>(Promise.resolve());
+  const pendingMutationsRef = useRef(0);
+  const toastAnim = useRef(new Animated.Value(0)).current;
 
   const selectedMasterIds = useMemo(
     () => new Set(groups.filter((group) => group.source === "master").map((group) => group.groupId)),
@@ -144,6 +155,7 @@ export default function OshiSettingsScreen() {
     fetchOshiData(user.id)
       .then((next) => {
         if (!active) return;
+        if (pendingMutationsRef.current > 0) return;
         setGroups(next.groups);
         setGenres(next.genres);
         setMasterOptions(next.masterOptions);
@@ -161,28 +173,66 @@ export default function OshiSettingsScreen() {
     };
   }, [previewMode, user]);
 
+  useEffect(() => {
+    if (!notice) return;
+    toastAnim.stopAnimation();
+    toastAnim.setValue(0);
+    Animated.sequence([
+      Animated.timing(toastAnim, {
+        duration: 180,
+        toValue: 1,
+        useNativeDriver: true,
+      }),
+      Animated.delay(1800),
+      Animated.timing(toastAnim, {
+        duration: 180,
+        toValue: 0,
+        useNativeDriver: true,
+      }),
+    ]).start(({ finished }) => {
+      if (finished) setNotice(null);
+    });
+    return () => {
+      toastAnim.stopAnimation();
+    };
+  }, [notice, toastAnim]);
+
   async function reload() {
     if (!user || !supabase) return;
     const next = await fetchOshiData(user.id);
+    if (pendingMutationsRef.current > 0) return;
     setGroups(next.groups);
     setGenres(next.genres);
     setMasterOptions(next.masterOptions);
   }
 
-  async function runMutation(key: string, task: () => Promise<void>, success?: string) {
+  function enqueueMutation(
+    task: () => Promise<void>,
+    options?: { rollback?: () => void; success?: string },
+  ) {
     if (!user || !supabase) return;
-    setBusyKey(key);
     setError(null);
     setNotice(null);
-    try {
+    pendingMutationsRef.current += 1;
+
+    const run = mutationQueueRef.current.then(async () => {
       await task();
-      await reload();
-      if (success) setNotice(success);
-    } catch (mutationError) {
-      setError(mutationError instanceof Error ? mutationError.message : "保存に失敗しました");
-    } finally {
-      setBusyKey(null);
-    }
+    });
+
+    const tracked = run
+      .catch((mutationError) => {
+        options?.rollback?.();
+        setError(mutationError instanceof Error ? mutationError.message : "保存に失敗しました");
+      })
+      .finally(() => {
+        pendingMutationsRef.current = Math.max(0, pendingMutationsRef.current - 1);
+        if (pendingMutationsRef.current === 0) {
+          void reload();
+          if (options?.success) setNotice(options.success);
+        }
+      });
+
+    mutationQueueRef.current = tracked.then(() => undefined);
   }
 
   function handleAddMasters(options: MasterOption[]) {
@@ -193,90 +243,194 @@ export default function OshiSettingsScreen() {
       return;
     }
     setMasterOpen(false);
-    void runMutation(
-      "groups:bulk-add",
+    const rollbackIds = new Set(addableOptions.map((option) => option.id));
+    const basePriority = nextLocalGroupPriority(groups);
+    const nextGroups: OshiGroup[] = addableOptions.map((option, index) => ({
+      key: `master:${option.id}`,
+      source: "master",
+      groupId: option.id,
+      name: option.name,
+      pending: false,
+      priority: basePriority + index,
+      members: [],
+      availableCharacters: sortByName(option.characters),
+    }));
+    setGroups((current) => {
+      const existingIds = new Set(
+        current
+          .filter((group) => group.source === "master" && group.groupId)
+          .map((group) => group.groupId),
+      );
+      return [
+        ...current,
+        ...nextGroups.filter((group) => group.groupId && !existingIds.has(group.groupId)),
+      ];
+    });
+    enqueueMutation(
       async () => {
         for (const option of addableOptions) {
           await addMasterGroup(user.id, option.id);
         }
       },
-      addableOptions.length === 1
-        ? "登録済みの推しを追加しました。"
-        : `${addableOptions.length}件の推しを追加しました。`,
+      {
+        rollback: () =>
+          setGroups((current) =>
+            current.filter(
+              (group) => group.source !== "master" || !rollbackIds.has(group.groupId ?? ""),
+            ),
+          ),
+        success:
+          addableOptions.length === 1
+            ? "推しを追加しました"
+            : `${addableOptions.length}件の推しを追加しました`,
+      },
     );
   }
 
   function handleRemoveGroup(group: OshiGroup) {
     if (!user) return;
-    void runMutation(
-      group.key,
-      () => removeGroup(user.id, group),
-      "推し設定から削除しました。",
-    );
+    let restoreIndex = 0;
+    const snapshot = group;
+    setGroups((current) => {
+      restoreIndex = Math.max(0, current.findIndex((item) => item.key === group.key));
+      return current.filter((item) => item.key !== group.key);
+    });
+    enqueueMutation(() => removeGroup(user.id, group), {
+      rollback: () =>
+        setGroups((current) => {
+          if (current.some((item) => item.key === snapshot.key)) return current;
+          const next = [...current];
+          next.splice(restoreIndex, 0, snapshot);
+          return next;
+        }),
+      success: "推し設定から削除しました。",
+    });
   }
 
   function handleAddMember(group: OshiGroup, character: { id: string; name: string }) {
     if (!user || group.source !== "master" || !group.groupId) return;
-    void runMutation(
-      `${group.key}:${character.id}`,
-      () => addMasterMember(user.id, group, character.id),
-      "推しメンバーを追加しました。",
+    const snapshot = groups;
+    setGroups((current) =>
+      current.map((item) => {
+        if (item.key !== group.key) return item;
+        if (item.members.some((member) => member.source === "master" && member.id === character.id)) {
+          return item;
+        }
+        return {
+          ...item,
+          members: [
+            ...item.members,
+            {
+              id: character.id,
+              rowId: `optimistic:${character.id}`,
+              source: "master",
+              name: character.name,
+              pending: false,
+            },
+          ],
+          availableCharacters: item.availableCharacters.filter((available) => available.id !== character.id),
+        };
+      }),
     );
+    enqueueMutation(() => addMasterMember(user.id, group, character.id), {
+      rollback: () => setGroups(snapshot),
+      success: "推しメンバーを追加しました。",
+    });
   }
 
   function handleRemoveMember(group: OshiGroup, member: OshiMember) {
     if (!user) return;
-    void runMutation(
-      member.rowId,
-      () => removeMemberAndRestoreBox(user.id, group, member),
-      "推しメンバーを外しました。",
+    const snapshot = groups;
+    setGroups((current) =>
+      current.map((item) => {
+        if (item.key !== group.key) return item;
+        const nextMembers = item.members.filter((candidate) => candidate.rowId !== member.rowId);
+        const restoreCharacter =
+          member.source === "master" && !item.availableCharacters.some((candidate) => candidate.id === member.id)
+            ? [{ id: member.id, name: member.name }]
+            : [];
+        return {
+          ...item,
+          members: nextMembers,
+          availableCharacters: sortByName([...item.availableCharacters, ...restoreCharacter]),
+        };
+      }),
     );
+    if (member.rowId.startsWith("optimistic:")) return;
+    enqueueMutation(() => removeMemberAndRestoreBox(user.id, group, member), {
+      rollback: () => setGroups(snapshot),
+      success: "推しメンバーを外しました。",
+    });
   }
 
   function handleRequestSubmit(payload: RequestSubmit) {
     if (!user || !requestModal) return;
     const target = requestModal;
     setRequestModal(null);
+    const snapshot = groups;
     if (target.type === "oshi") {
-      void runMutation(
-        `request:${payload.name}`,
-        () => requestOshiAndAdd(user.id, payload),
-        "追加リクエストを送信し、推し設定に仮登録しました。",
-      );
+      const requestKey = `request:optimistic:${Date.now()}`;
+      setGroups((current) => [
+        ...current,
+        {
+          key: requestKey,
+          source: "request",
+          requestId: requestKey,
+          name: payload.name,
+          pending: true,
+          priority: nextLocalGroupPriority(current),
+          members: [],
+          availableCharacters: [],
+        },
+      ]);
+      enqueueMutation(() => requestOshiAndAdd(user.id, payload), {
+        rollback: () => setGroups(snapshot),
+        success: "追加リクエストを送信し、推し設定に仮登録しました。",
+      });
       return;
     }
-    void runMutation(
-      `member-request:${target.group.key}:${payload.name}`,
-      () => requestCharacterAndAdd(user.id, target.group, payload),
-      "メンバー追加リクエストを送信し、推しメンバーに仮登録しました。",
+    const optimisticRowId = `optimistic-request:${target.group.key}:${Date.now()}`;
+    setGroups((current) =>
+      current.map((group) => {
+        if (group.key !== target.group.key) return group;
+        return {
+          ...group,
+          members: [
+            ...group.members,
+            {
+              id: optimisticRowId,
+              rowId: optimisticRowId,
+              source: "request",
+              name: payload.name,
+              pending: true,
+            },
+          ],
+        };
+      }),
     );
+    enqueueMutation(() => requestCharacterAndAdd(user.id, target.group, payload), {
+      rollback: () => setGroups(snapshot),
+      success: "メンバー追加リクエストを送信し、推しメンバーに仮登録しました。",
+    });
   }
 
-  return (
-    <Screen contentStyle={styles.screen}>
-      <View style={styles.header}>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="戻る"
-          onPress={() => router.back()}
-          style={styles.backButton}
-        >
-          <Text style={styles.backText}>‹</Text>
-        </Pressable>
-        <View style={styles.headerCopy}>
-          <Text style={styles.title}>推し設定</Text>
-          <Text style={styles.subtitle}>{summary}</Text>
-        </View>
-      </View>
+  const toastTranslateY = toastAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [14, 0],
+  });
 
-      <View style={styles.actionStack}>
-        <PrimaryButton variant="secondary" onPress={() => setMasterOpen(true)}>
-          ＋ 登録済みの推しを追加
-        </PrimaryButton>
-        <Pressable onPress={() => setRequestModal({ type: "oshi" })} style={styles.requestEntryButton}>
-          <Text style={styles.requestEntryText}>マスタに無い推しを追加リクエスト</Text>
-        </Pressable>
-      </View>
+  return (
+    <View style={styles.root}>
+      <Screen contentStyle={styles.screen} topInset={false}>
+        <Stack.Screen
+          options={{
+            headerShown: true,
+            title: "推し設定",
+            headerBackButtonDisplayMode: "minimal",
+            headerBlurEffect: "systemMaterial",
+            headerTintColor: ihubColors.lavender,
+          }}
+        />
 
       {loading ? (
         <View style={styles.loadingRow}>
@@ -285,7 +439,6 @@ export default function OshiSettingsScreen() {
         </View>
       ) : null}
       {error ? <Text style={styles.inlineError}>{error}</Text> : null}
-      {notice ? <Text style={styles.inlineNoticeStrong}>{notice}</Text> : null}
 
       {groups.length === 0 && !loading ? (
         <View style={styles.emptyBox}>
@@ -301,7 +454,7 @@ export default function OshiSettingsScreen() {
           <GroupCard
             key={group.key}
             group={group}
-            busyKey={busyKey}
+            busyKey={null}
             onAddMember={handleAddMember}
             onMemberRequest={() => setRequestModal({ type: "member", group })}
             onRemoveGroup={() => handleRemoveGroup(group)}
@@ -329,7 +482,41 @@ export default function OshiSettingsScreen() {
         onClose={() => setRequestModal(null)}
         onSubmit={handleRequestSubmit}
       />
-    </Screen>
+
+      </Screen>
+
+      <View pointerEvents="box-none" style={styles.fixedFooterLayer}>
+        <Pressable
+          onPress={() => setMasterOpen(true)}
+          style={({ pressed }) => [
+            styles.fixedAddButton,
+            { bottom: Math.max(insets.bottom, 12) + 18 },
+            pressed ? styles.fixedAddButtonPressed : null,
+          ]}
+        >
+          <View style={styles.fixedAddIcon}>
+            <IconSymbol name="add" size={18} color={ihubColors.surface} />
+          </View>
+          <Text style={styles.fixedAddText}>推しを追加</Text>
+        </Pressable>
+      </View>
+
+      {notice ? (
+        <Animated.View
+          pointerEvents="none"
+          style={[
+            styles.toast,
+            {
+              bottom: Math.max(insets.bottom, 12) + 88,
+              opacity: toastAnim,
+              transform: [{ translateY: toastTranslateY }],
+            },
+          ]}
+        >
+          <Text style={styles.toastText}>{notice}</Text>
+        </Animated.View>
+      ) : null}
+    </View>
   );
 }
 
@@ -449,24 +636,88 @@ function MasterSelectModal({
 }) {
   const [query, setQuery] = useState("");
   const [genreId, setGenreId] = useState<string | "all">("all");
+  const { width: windowWidth } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
+  const pagerRef = useRef<ScrollView>(null);
+  const suppressGenreSyncRef = useRef(false);
+  const [pagerWidth, setPagerWidth] = useState(0);
+  const [pagerPosition, setPagerPosition] = useState(0);
   const [draftSelectedIds, setDraftSelectedIds] = useState<string[]>([]);
   const normalizedQuery = query.trim().toLowerCase();
-  const filtered = useMemo(
+  const categoryOptions = useMemo(
+    () => [
+      { id: "all" as const, label: "すべて" },
+      ...genres.map((genre) => ({ id: genre.id, label: genre.name })),
+    ],
+    [genres],
+  );
+  const pageWidth = Math.max(1, pagerWidth || windowWidth - 36);
+  const activeCategoryId = categoryOptions.some((category) => category.id === genreId)
+    ? genreId
+    : "all";
+  const filteredByCategory = useMemo(
     () =>
-      options.filter((option) => {
-        if (genreId !== "all" && option.genreId !== genreId) return false;
-        if (!normalizedQuery) return true;
-        return [option.name, ...option.aliases]
-          .map((value) => value.toLowerCase())
-          .some((value) => value.includes(normalizedQuery));
-      }),
-    [genreId, normalizedQuery, options],
+      categoryOptions.map((category) =>
+        options.filter((option) => {
+          if (category.id !== "all" && option.genreId !== category.id) return false;
+          if (!normalizedQuery) return true;
+          return [option.name, ...option.aliases, ...option.characters.map((character) => character.name)]
+            .map((value) => value.toLowerCase())
+            .some((value) => value.includes(normalizedQuery));
+        }),
+      ),
+    [categoryOptions, normalizedQuery, options],
   );
 
-  const draftSelectedOptions = useMemo(() => {
-    const selectedSet = new Set(draftSelectedIds);
-    return options.filter((option) => selectedSet.has(option.id));
-  }, [draftSelectedIds, options]);
+  const nativeSheet = Platform.OS === "ios";
+  const draftSelectedOptions = useMemo(
+    () => {
+      const selectedSet = new Set(draftSelectedIds);
+      return options.filter((option) => selectedSet.has(option.id));
+    },
+    [draftSelectedIds, options],
+  );
+
+  useEffect(() => {
+    if (visible) setDraftSelectedIds([]);
+  }, [visible]);
+
+  useEffect(() => {
+    if (!visible) return;
+    if (suppressGenreSyncRef.current) {
+      suppressGenreSyncRef.current = false;
+      return;
+    }
+    const nextIndex = Math.max(
+      0,
+      categoryOptions.findIndex((category) => category.id === genreId),
+    );
+    setPagerPosition(nextIndex);
+    requestAnimationFrame(() => {
+      pagerRef.current?.scrollTo({ x: nextIndex * pageWidth, animated: false });
+    });
+  }, [categoryOptions, genreId, pageWidth, visible]);
+
+  function selectCategory(nextId: string | "all") {
+    const nextIndex = Math.max(
+      0,
+      categoryOptions.findIndex((category) => category.id === nextId),
+    );
+    suppressGenreSyncRef.current = true;
+    setGenreId(nextId);
+    setPagerPosition(nextIndex);
+    pagerRef.current?.scrollTo({ x: nextIndex * pageWidth, animated: true });
+  }
+
+  function handlePagerSettled(event: NativeSyntheticEvent<NativeScrollEvent>) {
+    const nextIndex = Math.max(
+      0,
+      Math.min(categoryOptions.length - 1, Math.round(event.nativeEvent.contentOffset.x / pageWidth)),
+    );
+    const nextId = categoryOptions[nextIndex]?.id ?? "all";
+    setGenreId(nextId);
+    setPagerPosition(nextIndex);
+  }
 
   function toggleDraftSelection(option: MasterOption) {
     if (selectedIds.has(option.id)) return;
@@ -483,97 +734,150 @@ function MasterSelectModal({
     setDraftSelectedIds([]);
   }
 
-  return (
-    <Modal animationType="fade" transparent visible={visible} onRequestClose={onClose}>
-      <View style={styles.modalLayer}>
-        <Pressable style={styles.modalBackdrop} onPress={onClose} />
-        <View style={styles.masterModal}>
-          <View style={styles.modalHeader}>
-            <View style={styles.modalTitleCopy}>
-              <Text style={styles.modalTitle}>登録済みの推しを追加</Text>
-              <Text style={styles.modalSub}>グループ・作品マスタから選択</Text>
-            </View>
-            <Pressable onPress={() => onRequest(query.trim() || undefined)} style={styles.modalRequestButton}>
-              <Text style={styles.modalRequestText}>追加リクエスト</Text>
-            </Pressable>
-            <Pressable onPress={onClose} style={styles.modalCloseButton}>
-              <Text style={styles.modalCloseText}>×</Text>
-            </Pressable>
+  function renderMasterOptions(pageOptions: MasterOption[]) {
+    if (pageOptions.length === 0) {
+      return (
+        <View style={styles.modalEmpty}>
+          <Text style={styles.emptyTitle}>見つかりませんでした</Text>
+          <Text style={styles.emptyText}>追加リクエストで仮登録できます。</Text>
+          <PrimaryButton onPress={() => onRequest(query.trim() || undefined)}>
+            追加リクエストへ
+          </PrimaryButton>
+        </View>
+      );
+    }
+
+    return pageOptions.map((option) => {
+      const selected = selectedIds.has(option.id);
+      const draftSelected = draftSelectedIds.includes(option.id);
+      return (
+        <Pressable
+          key={option.id}
+          disabled={selected}
+          onPress={() => toggleDraftSelection(option)}
+          style={[
+            styles.masterRow,
+            draftSelected ? styles.masterRowPicked : null,
+            selected ? styles.masterRowSelected : null,
+          ]}
+        >
+          <View style={styles.masterCopy}>
+            <Text numberOfLines={1} style={styles.masterName}>{option.name}</Text>
+            <Text numberOfLines={1} style={styles.masterMeta}>
+              {option.genreName} / {kindLabel(option.kind)}
+              {option.kind === "solo" ? "" : ` / ${option.characters.length}メンバー`}
+              {selected ? " / 設定済み" : ""}
+            </Text>
           </View>
-          <TextInput
-            value={query}
-            onChangeText={setQuery}
-            placeholder="作品名・グループ名で検索"
-            placeholderTextColor="rgba(58,50,74,0.38)"
-            style={styles.searchInput}
-          />
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.genreTabs}
+        </Pressable>
+      );
+    });
+  }
+
+  return (
+    <Modal
+      animationType={nativeSheet ? "slide" : "fade"}
+      presentationStyle={nativeSheet ? "pageSheet" : "overFullScreen"}
+      transparent={!nativeSheet}
+      visible={visible}
+      onRequestClose={onClose}
+    >
+      <View style={[styles.modalLayer, nativeSheet ? styles.nativeSheetLayer : null]}>
+        {!nativeSheet ? <Pressable style={styles.modalBackdrop} onPress={onClose} /> : null}
+        <View
+          style={[
+            styles.masterModal,
+            nativeSheet ? styles.nativeSheetPanel : null,
+            nativeSheet ? styles.masterNativeSheetPanel : null,
+          ]}
+        >
+          <KeyboardAvoidingView
+            behavior={Platform.OS === "ios" ? "padding" : "height"}
+            keyboardVerticalOffset={nativeSheet ? 0 : insets.top}
+            style={styles.masterKeyboardAvoider}
           >
-            <FilterChip label="すべて" active={genreId === "all"} onPress={() => setGenreId("all")} />
-            {genres.map((genre) => (
-              <FilterChip
-                key={genre.id}
-                label={genre.name}
-                active={genreId === genre.id}
-                onPress={() => setGenreId(genre.id)}
-              />
-            ))}
-          </ScrollView>
-          <ScrollView
-            showsVerticalScrollIndicator={false}
-            contentContainerStyle={[
-              styles.masterList,
-              draftSelectedOptions.length > 0 ? styles.masterListWithFloatingRegister : null,
-            ]}
-          >
-            {filtered.length === 0 ? (
-              <View style={styles.modalEmpty}>
-                <Text style={styles.emptyTitle}>見つかりませんでした</Text>
-                <Text style={styles.emptyText}>追加リクエストで仮登録できます。</Text>
-                <PrimaryButton onPress={() => onRequest(query.trim() || undefined)}>
-                  追加リクエストへ
-                </PrimaryButton>
+            <View style={styles.modalHeader}>
+              <View style={styles.modalTitleCopy}>
+                <Text style={styles.modalTitle}>推しを追加</Text>
+                <Text style={styles.modalSub}>グループ・作品マスタから選択</Text>
               </View>
-            ) : (
-              filtered.map((option) => {
-                const selected = selectedIds.has(option.id);
-                const draftSelected = draftSelectedIds.includes(option.id);
-                return (
-                  <Pressable
-                    key={option.id}
-                    disabled={selected}
-                    onPress={() => toggleDraftSelection(option)}
-                    style={[
-                      styles.masterRow,
-                      draftSelected ? styles.masterRowPicked : null,
-                      selected ? styles.masterRowSelected : null,
-                    ]}
-                  >
-                    <View style={styles.masterCopy}>
-                      <Text numberOfLines={1} style={styles.masterName}>{option.name}</Text>
-                      <Text numberOfLines={1} style={styles.masterMeta}>
-                        {option.genreName} / {kindLabel(option.kind)}
-                        {option.kind === "solo" ? "" : ` / ${option.characters.length}メンバー`}
-                        {selected ? " / 設定済み" : ""}
-                      </Text>
-                    </View>
-                  </Pressable>
-                );
-              })
-            )}
-          </ScrollView>
-          {draftSelectedOptions.length > 0 ? (
-            <PrimaryButton
-              accessibilityLabel={`${draftSelectedOptions.length}件の推しを登録`}
-              onPress={submitDraftSelection}
-              style={styles.masterFloatingRegisterButton}
+              <Pressable onPress={() => onRequest(query.trim() || undefined)} style={styles.modalRequestButton}>
+                <Text style={styles.modalRequestText}>追加リクエスト</Text>
+              </Pressable>
+              <Pressable onPress={onClose} style={styles.modalCloseButton}>
+                <Text style={styles.modalCloseText}>×</Text>
+              </Pressable>
+            </View>
+
+            <View
+              style={styles.masterPagerFrame}
+              onLayout={(event) => setPagerWidth(event.nativeEvent.layout.width)}
             >
-              登録
-            </PrimaryButton>
-          ) : null}
+              <ScrollView
+                ref={pagerRef}
+                horizontal
+                pagingEnabled
+                bounces={false}
+                directionalLockEnabled
+                showsHorizontalScrollIndicator={false}
+                scrollEventThrottle={16}
+                style={styles.masterPager}
+                onMomentumScrollEnd={handlePagerSettled}
+              >
+                {categoryOptions.map((category, index) => (
+                  <View key={category.id} style={[styles.masterPage, { width: pageWidth }]}>
+                    <ScrollView
+                      nestedScrollEnabled
+                      showsVerticalScrollIndicator={false}
+                      contentContainerStyle={styles.masterList}
+                    >
+                      {renderMasterOptions(filteredByCategory[index] ?? [])}
+                    </ScrollView>
+                  </View>
+                ))}
+              </ScrollView>
+            </View>
+
+            <View style={[styles.masterSearchDock, { paddingBottom: Math.max(insets.bottom, 10) }]}>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.genreTabsDock}
+              >
+                {categoryOptions.map((category) => (
+                  <FilterChip
+                    key={category.id}
+                    label={category.label}
+                    active={activeCategoryId === category.id}
+                    onPress={() => selectCategory(category.id)}
+                  />
+                ))}
+              </ScrollView>
+              <TextInput
+                value={query}
+                onChangeText={setQuery}
+                placeholder="作品名・グループ名で検索"
+                placeholderTextColor="rgba(58,50,74,0.38)"
+                returnKeyType="search"
+                style={[
+                  styles.searchInput,
+                  draftSelectedOptions.length > 0 ? styles.searchInputWithFloatingRegister : null,
+                ]}
+              />
+              {draftSelectedOptions.length > 0 ? (
+                <PrimaryButton
+                  accessibilityLabel={`${draftSelectedOptions.length}件の推しを登録`}
+                  onPress={submitDraftSelection}
+                  style={[
+                    styles.masterFloatingRegisterButton,
+                    { bottom: Math.max(insets.bottom, 10) + 10 },
+                  ]}
+                >
+                  登録
+                </PrimaryButton>
+              ) : null}
+            </View>
+          </KeyboardAvoidingView>
         </View>
       </View>
     </Modal>
@@ -606,10 +910,16 @@ function RequestModal({
   if (!state) return null;
   const isOshi = state.type === "oshi";
   return (
-    <Modal animationType="fade" transparent visible onRequestClose={onClose}>
-      <View style={styles.modalLayer}>
-        <Pressable style={styles.modalBackdrop} onPress={onClose} />
-        <View style={styles.requestModal}>
+    <Modal
+      animationType={Platform.OS === "ios" ? "slide" : "fade"}
+      presentationStyle={Platform.OS === "ios" ? "pageSheet" : "overFullScreen"}
+      transparent={Platform.OS !== "ios"}
+      visible
+      onRequestClose={onClose}
+    >
+      <View style={[styles.modalLayer, Platform.OS === "ios" ? styles.nativeSheetLayer : null]}>
+        {Platform.OS !== "ios" ? <Pressable style={styles.modalBackdrop} onPress={onClose} /> : null}
+        <View style={[styles.requestModal, Platform.OS === "ios" ? styles.nativeSheetPanel : null]}>
           <View style={styles.modalHeader}>
             <View style={styles.modalTitleCopy}>
               <Text style={styles.modalTitle}>
@@ -687,7 +997,10 @@ function FilterChip({
 }) {
   return (
     <Pressable onPress={onPress} style={[styles.filterChip, active ? styles.filterChipActive : null]}>
-      <Text style={[styles.filterChipText, active ? styles.filterChipTextActive : null]}>
+      <Text
+        numberOfLines={1}
+        style={[styles.filterChipText, active ? styles.filterChipTextActive : null]}
+      >
         {label}
       </Text>
     </Pressable>
@@ -1021,7 +1334,19 @@ function kindLabel(kind: OshiRequestKind) {
   return "グループ";
 }
 
+function nextLocalGroupPriority(groups: OshiGroup[]) {
+  return Math.max(0, ...groups.map((group) => group.priority)) + 1;
+}
+
+function sortByName<T extends { name: string }>(values: T[]) {
+  return [...values].sort((a, b) => a.name.localeCompare(b.name, "ja"));
+}
+
 const styles = StyleSheet.create({
+  root: {
+    backgroundColor: ihubColors.background,
+    flex: 1,
+  },
   screen: {
     gap: 14,
   },
@@ -1277,15 +1602,38 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
     backgroundColor: "rgba(20,18,28,0.44)",
   },
+  nativeSheetLayer: {
+    alignItems: "stretch",
+    backgroundColor: ihubColors.background,
+    justifyContent: "flex-start",
+    padding: 16,
+  },
+  nativeSheetPanel: {
+    borderRadius: 0,
+    borderWidth: 0,
+    elevation: 0,
+    maxHeight: "100%",
+    paddingHorizontal: 0,
+    shadowOpacity: 0,
+    shadowRadius: 0,
+  },
   masterModal: {
     backgroundColor: ihubColors.background,
     borderColor: "rgba(255,255,255,0.72)",
     borderRadius: 28,
     borderWidth: 1,
+    height: "82%",
     maxHeight: "82%",
     padding: 16,
     width: "100%",
     ...ihubShadow,
+  },
+  masterNativeSheetPanel: {
+    flex: 1,
+    height: "100%",
+  },
+  masterKeyboardAvoider: {
+    flex: 1,
   },
   requestModal: {
     backgroundColor: ihubColors.background,
@@ -1353,22 +1701,37 @@ const styles = StyleSheet.create({
     minHeight: 48,
     paddingHorizontal: 14,
   },
+  searchInputWithFloatingRegister: {
+    paddingRight: 96,
+  },
   noteInput: {
     minHeight: 92,
     paddingTop: 12,
   },
   genreTabs: {
+    alignItems: "center",
     flexDirection: "row",
     gap: 7,
     paddingVertical: 10,
   },
+  genreTabsDock: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 7,
+    paddingHorizontal: 2,
+    paddingTop: 2,
+  },
   filterChip: {
+    alignItems: "center",
     backgroundColor: ihubColors.surface,
     borderColor: "rgba(58,50,74,0.10)",
     borderRadius: ihubRadii.pill,
     borderWidth: 1,
+    flexShrink: 0,
+    justifyContent: "center",
+    minHeight: 36,
     paddingHorizontal: 11,
-    paddingVertical: 7,
+    paddingVertical: 8,
   },
   filterChipActive: {
     backgroundColor: ihubColors.lavender,
@@ -1378,16 +1741,45 @@ const styles = StyleSheet.create({
     color: ihubColors.ink,
     fontSize: 11,
     fontWeight: "900",
+    includeFontPadding: false,
+    lineHeight: 14,
   },
   filterChipTextActive: {
     color: ihubColors.surface,
   },
   masterList: {
     gap: 9,
-    paddingBottom: 4,
+    paddingBottom: 16,
+    paddingTop: 2,
   },
-  masterListWithFloatingRegister: {
-    paddingBottom: 78,
+  masterPagerFrame: {
+    flex: 1,
+    minHeight: 0,
+  },
+  masterPager: {
+    flex: 1,
+  },
+  masterPage: {
+    flex: 1,
+    paddingHorizontal: 1,
+  },
+  masterSearchDock: {
+    backgroundColor: ihubColors.background,
+    borderTopColor: "rgba(58,50,74,0.08)",
+    borderTopWidth: 1,
+    gap: 9,
+    marginHorizontal: -2,
+    paddingHorizontal: 2,
+    paddingTop: 10,
+    position: "relative",
+  },
+  masterFloatingRegisterButton: {
+    borderRadius: ihubRadii.pill,
+    minHeight: 42,
+    paddingHorizontal: 18,
+    position: "absolute",
+    right: 10,
+    zIndex: 4,
   },
   masterRow: {
     alignItems: "center",
@@ -1421,25 +1813,57 @@ const styles = StyleSheet.create({
     fontWeight: "800",
     marginTop: 2,
   },
-  masterAdd: {
-    color: ihubColors.lavender,
-    fontSize: 11,
-    fontWeight: "900",
-  },
-  masterAdded: {
-    color: ihubColors.mutedInk,
-  },
-  masterFloatingRegisterButton: {
-    borderRadius: ihubRadii.pill,
-    bottom: 16,
-    minHeight: 42,
-    paddingHorizontal: 18,
-    position: "absolute",
-    right: 16,
-    zIndex: 4,
-  },
   modalEmpty: {
     gap: 10,
     paddingVertical: 24,
+  },
+  fixedFooterLayer: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  fixedAddButton: {
+    alignItems: "center",
+    backgroundColor: "rgba(255,255,255,0.92)",
+    borderColor: "rgba(255,255,255,0.78)",
+    borderRadius: ihubRadii.pill,
+    borderWidth: 1,
+    flexDirection: "row",
+    gap: 8,
+    left: 18,
+    minHeight: 52,
+    paddingLeft: 8,
+    paddingRight: 18,
+    position: "absolute",
+    ...ihubShadow,
+  },
+  fixedAddButtonPressed: {
+    opacity: 0.9,
+    transform: [{ scale: 0.98 }],
+  },
+  fixedAddIcon: {
+    alignItems: "center",
+    backgroundColor: ihubColors.lavender,
+    borderRadius: ihubRadii.pill,
+    height: 36,
+    justifyContent: "center",
+    width: 36,
+  },
+  fixedAddText: {
+    color: ihubColors.ink,
+    fontSize: 13,
+    fontWeight: "900",
+  },
+  toast: {
+    alignSelf: "center",
+    backgroundColor: "rgba(58,50,74,0.92)",
+    borderRadius: ihubRadii.pill,
+    paddingHorizontal: 16,
+    paddingVertical: 11,
+    position: "absolute",
+    ...ihubShadow,
+  },
+  toastText: {
+    color: ihubColors.surface,
+    fontSize: 12.5,
+    fontWeight: "900",
   },
 });

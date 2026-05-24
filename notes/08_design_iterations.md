@@ -4,6 +4,107 @@
 
 ---
 
+## イテレーション168.37：推し追加の分類選択とキーボード追従を改善
+
+### 背景・問題意識
+
+オーナーから、推し追加画面の下部分類ボタンで「押す前と押したボタンが交互に選択するような表示になる」、検索欄フォーカス時に「キーボードの上まで入力欄が押し上がってほしい」と指摘があった。分類チップの選択表示にスクロール中のページ位置を使っていたため、タップ後のアニメーション中に旧分類と新分類が揺れて見えていた。
+
+### 変更内容
+
+#### `mobile/app/oshi-settings.tsx`
+- 分類チップのアクティブ判定を、スクロール中のページ位置ではなく選択中の `genreId` に固定した。
+- ページスワイプで分類が確定したタイミングでは、従来通り `genreId` を更新する。
+- 推し追加モーダル内を `KeyboardAvoidingView` で包み、検索欄フォーカス時に下部ドックがキーボード上へ逃げるようにした。
+- 検索入力に `returnKeyType="search"` を追加した。
+
+### 影響範囲
+
+- iOS版 推し設定の「推しを追加」モーダル
+- 推し追加モーダルの分類チップ選択表示
+- 推し追加モーダルの検索入力時レイアウト
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- `EXPO_NO_GIT_STATUS=1 npm --prefix mobile run update:ios:preview -- --message "[iter168.37] 推し追加の分類と検索入力を改善" --non-interactive`
+- EAS Update: `019e5afe-53f9-7912-b89a-6472fd10047f`
+- EAS Update group: `bf2edac7-439f-4711-bf1f-2847220c7dfe`
+
+### 関連ファイル
+
+- `mobile/app/oshi-settings.tsx`
+- `notes/08_design_iterations.md`
+
+### セルフレビュー結果
+
+- ✅ 分類チップはタップした分類を即座に安定表示
+- ✅ スワイプ完了時の分類同期は維持
+- ✅ 検索欄フォーカス時に下部入力ドックがキーボードを避ける
+- ✅ Preview channel へ EAS Update 済み
+- ✅ 状態IDの追加・変更なし（`notes/09_state_machines.md` 更新不要）
+- ✅ 新しいアプリ用語・廃止用語なし（`notes/10_glossary.md` 更新不要）
+- ✅ DBスキーマ変更なし（`notes/05_data_model.md` 更新不要）
+
+---
+
+## イテレーション168.36：推し追加検索にL2名を含める
+
+### 背景・問題意識
+
+オーナーから、推し追加画面の検索で「メンバーの方も検索に含める」「検索結果として出てくるのはL1のマスタ」と指示があった。たとえば「笠原桃奈」で検索した場合、該当メンバーを含む `ME:I` と `アンジュルム` のようなL1候補を返す必要がある。
+
+### 変更内容
+
+#### `mobile/app/oshi-settings.tsx`
+- 推し追加モーダルの検索対象に `option.characters[].name` を追加した。
+- L2名がヒットしても、表示結果は従来通りL1の `MasterOption` カードにした。
+
+#### `web/src/app/profile/oshi/OshiEditView.tsx`
+- Web/PWA側の同等モーダルも、L2名を検索対象に追加した。
+
+#### `supabase/migrations/20260525041000_add_momona_kasahara_angerme_l2.sql`
+- 代表例として、`アンジュルム` のL2に `笠原桃奈` を追加した。
+- 既存の `ME:I / 笠原桃奈` と同じ `entity_id` を引き継ぎ、同一人物として扱えるようにした。
+
+### 影響範囲
+
+- 推し設定の「推しを追加」モーダル
+- プロフィール推し編集のマスタ選択候補
+- 推しマスタのL2候補
+
+### 確認方法
+
+- `npm --prefix web run lint -- src/app/profile/oshi/OshiEditView.tsx`
+- `npm --prefix mobile run typecheck`
+- `supabase db push --dry-run`
+- `supabase db push --yes`
+- `supabase db query --linked -o table "select gm.name as l1, cm.name as l2 from public.characters_master cm join public.groups_master gm on gm.id = cm.group_id where cm.name = '笠原桃奈' order by gm.name;"`
+- `npm --prefix mobile run export:ios:preview`
+- `EXPO_NO_GIT_STATUS=1 npm --prefix mobile run update:ios:preview -- --message "[iter168.37] 推し追加の分類と検索入力を改善" --non-interactive`（iter168.37と同梱）
+- EAS Update: `019e5afe-53f9-7912-b89a-6472fd10047f`
+- EAS Update group: `bf2edac7-439f-4711-bf1f-2847220c7dfe`
+
+### 関連ファイル
+
+- `mobile/app/oshi-settings.tsx`
+- `web/src/app/profile/oshi/OshiEditView.tsx`
+- `supabase/migrations/20260525041000_add_momona_kasahara_angerme_l2.sql`
+- `notes/08_design_iterations.md`
+
+### セルフレビュー結果
+
+- ✅ L2メンバー名を検索対象に追加
+- ✅ 検索結果表示はL1カードのまま維持
+- ✅ `笠原桃奈` は `ME:I` と `アンジュルム` の両方に紐付く
+- ✅ Preview channel へ EAS Update 済み
+- ✅ 状態IDの追加・変更なし（`notes/09_state_machines.md` 更新不要）
+- ✅ 新しいアプリ用語・廃止用語なし（`notes/10_glossary.md` 更新不要）
+- ✅ 既存L2補完のみでDBスキーマ変更なし（`notes/05_data_model.md` 更新不要）
+
+---
+
 ## イテレーション168.35：ソロ候補の0メンバー表示を省略
 
 ### 背景・問題意識
