@@ -163,7 +163,11 @@ export default function MeguriIntroScreen() {
         setSelfUser(nextSelf);
         setUnlockedAreas(new Set([normalizePrefectureName(nextSelf.area)]));
       })
-      .catch(() => undefined);
+      .catch(() => {
+        if (!mounted) return;
+        setSelfUser(SELF_USER);
+        setUnlockedAreas(new Set([normalizePrefectureName(SELF_USER.area)]));
+      });
     return () => {
       mounted = false;
     };

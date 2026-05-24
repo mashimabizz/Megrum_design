@@ -75,7 +75,18 @@ const avatarAssetModules: Record<MeguriAnimalType, number> = {
   fox: require("../../../assets/meguri-avatars/fox.glb"),
   rabbit: require("../../../assets/meguri-avatars/rabbit.glb"),
 };
+const avatarTextureAssetModules: Record<MeguriAnimalType, number> = {
+  cat: require("../../../assets/meguri-avatars/textures/cat-v2.png"),
+  fox: require("../../../assets/meguri-avatars/textures/fox-v2.png"),
+  rabbit: require("../../../assets/meguri-avatars/textures/rabbit-v2.png"),
+};
+const avatarTextureSize: Record<MeguriAnimalType, { height: number; width: number }> = {
+  cat: { height: 2048, width: 2048 },
+  fox: { height: 2048, width: 2048 },
+  rabbit: { height: 2048, width: 2048 },
+};
 const avatarTemplateCache = new Map<MeguriAnimalType, Promise<THREE.Group>>();
+const avatarTextureCache = new Map<MeguriAnimalType, Promise<THREE.Texture>>();
 
 function getExpoGLView() {
   if (cachedGLView !== undefined) return cachedGLView;
@@ -1393,12 +1404,16 @@ function attachAvatarModel(
   group.userData.avatarLoadToken = loadToken;
   group.userData.avatarMixer = null;
   group.userData.avatarActions = [];
-  void loadAvatarTemplate(safeAnimalType)
-    .then((template) => {
+  void Promise.all([
+    loadAvatarTemplate(safeAnimalType),
+    loadAvatarTexture(safeAnimalType),
+  ])
+    .then(([template, texture]) => {
       if (group.userData.avatarLoadToken !== loadToken) return;
       const model = SkeletonUtils.clone(template) as THREE.Group;
       model.name = `meguri-avatar-${safeAnimalType}`;
       prepareAvatarClone(model);
+      applyAvatarTexture(model, texture);
       const animations = getAvatarAnimations(template);
       if (animations.length > 0) {
         const mixer = new THREE.AnimationMixer(model);
@@ -1451,6 +1466,36 @@ function loadAvatarTemplate(animalType: MeguriAnimalType) {
   return promise;
 }
 
+function loadAvatarTexture(animalType: MeguriAnimalType) {
+  const safeAnimalType = normalizeAvatarAnimalType(animalType);
+  const cached = avatarTextureCache.get(safeAnimalType);
+  if (cached) return cached;
+
+  const promise = Asset.loadAsync(avatarTextureAssetModules[safeAnimalType]).then(
+    ([asset]) => {
+      const uri = asset.localUri ?? asset.uri;
+      if (!uri) {
+        throw new Error(`Missing ${safeAnimalType} avatar texture uri`);
+      }
+      const size = avatarTextureSize[safeAnimalType];
+      const texture = new THREE.Texture({
+        height: size.height,
+        localUri: uri,
+        uri,
+        width: size.width,
+      } as unknown as TexImageSource);
+      texture.colorSpace = THREE.SRGBColorSpace;
+      texture.flipY = false;
+      texture.magFilter = THREE.LinearFilter;
+      texture.minFilter = THREE.LinearMipmapLinearFilter;
+      texture.needsUpdate = true;
+      return texture;
+    },
+  );
+  avatarTextureCache.set(safeAnimalType, promise);
+  return promise;
+}
+
 function normalizeAvatarAnimalType(animalType: MeguriAnimalType): MeguriAnimalType {
   return animalType in avatarAssetModules ? animalType : "fox";
 }
@@ -1469,6 +1514,19 @@ function prepareAvatarClone(model: THREE.Group) {
   const scale = 2.16 / Math.max(height, 0.001);
   model.scale.setScalar(scale);
   model.position.set(-center.x * scale, -box.min.y * scale, -center.z * scale);
+}
+
+function applyAvatarTexture(model: THREE.Group, texture: THREE.Texture) {
+  model.traverse((object) => {
+    if (!isMesh(object)) return;
+    object.material = new THREE.MeshStandardMaterial({
+      map: texture,
+      metalness: 0,
+      roughness: 0.78,
+      side: THREE.DoubleSide,
+      transparent: false,
+    });
+  });
 }
 
 function prepareAvatarMaterials(model: THREE.Object3D) {

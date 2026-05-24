@@ -4,6 +4,67 @@
 
 ---
 
+## イテレーション168.1：めぐりアバターv2の実機表示を修正
+
+### 背景・問題意識
+
+iter168 のEAS Update後、オーナーから「アプリを起動したがアバターが表示されない」と報告があった。v2 GLBはボーン/アニメーション入りだが、GLB内の埋め込み画像テクスチャ参照をそのまま `GLTFLoader` に処理させると、Expo実機側で読み込みが崩れる可能性がある。以前は外部テクスチャを `expo-asset` 経由で明示読み込みしており、この経路の方が実機で安定していた。
+
+### 変更内容
+
+#### `mobile/assets/meguri-avatars/*.glb`
+- v2 GLBからアプリ実行時に不要な埋め込み画像参照を外し、形状・スキン・ボーン・animation clip を保持したGLBとして再出力した。
+
+#### `mobile/assets/meguri-avatars/textures/*-v2.png`
+- v2 GLB内の画像を外部PNGとして抽出し、Expo asset として明示読み込みできるようにした。
+
+#### `mobile/src/components/meguri/MeguriThreeScene.tsx`
+- v2 PNGを `expo-asset` 経由で読み、GLB読み込み後に `MeshStandardMaterial` へ貼り直す方式に変更した。
+- `SkeletonUtils.clone()` と `AnimationMixer` は維持し、表示安定性とボーンアニメーション再生を両立した。
+
+#### `mobile/app/(tabs)/encounters.tsx` / `mobile/app/meguri-avatar-edit.tsx` / `mobile/app/meguri-plaza.tsx` / `mobile/app/meguri-intro.tsx`
+- アバター/プロフィール設定の読み込みに失敗してもローダーのまま止まらないよう、デフォルト設定へフォールバックする保険を追加した。
+
+### 影響範囲
+
+- iOS版 めぐり3D演出
+- iOS版 めぐりホーム/めぐり広場/めぐりプロフィール/アバター編集の3D表示
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- `npm --prefix mobile run update:ios:preview -- --message "[iter168.1] めぐりアバターv2表示を修正" --non-interactive`
+- EAS Update: `019e580a-f5e0-73a5-b5d8-5c69668fcbcf`
+- EAS Update group: `6e602946-c881-4c56-b815-9d7bd4c2aa53`
+
+### 関連ファイル
+
+- `mobile/assets/meguri-avatars/cat.glb`
+- `mobile/assets/meguri-avatars/fox.glb`
+- `mobile/assets/meguri-avatars/rabbit.glb`
+- `mobile/assets/meguri-avatars/textures/cat-v2.png`
+- `mobile/assets/meguri-avatars/textures/fox-v2.png`
+- `mobile/assets/meguri-avatars/textures/rabbit-v2.png`
+- `mobile/src/components/meguri/MeguriThreeScene.tsx`
+- `mobile/app/(tabs)/encounters.tsx`
+- `mobile/app/meguri-avatar-edit.tsx`
+- `mobile/app/meguri-plaza.tsx`
+- `mobile/app/meguri-intro.tsx`
+
+### セルフレビュー結果
+
+- ✅ ボーンアニメーションはv2 GLB内の `Armature|clip0|baselayer` を利用している
+- ✅ 実機で不安定になりやすいGLB埋め込み画像参照を外し、外部PNG読み込みに変更
+- ✅ GLB側のスキン・ボーン・animation clip は保持
+- ✅ 設定読み込み失敗時も3Dシーンがローダーのまま止まらない
+- ✅ `npm --prefix mobile run typecheck` 成功
+- ✅ `npm --prefix mobile run export:ios:preview` 成功
+- ✅ Expo preview channel への EAS Update 成功
+- ✅ 状態ID・用語・DBスキーマの追加変更なし
+
+---
+
 ## イテレーション168：めぐりアバターv2 GLBとボーンアニメーション適用
 
 ### 背景・問題意識

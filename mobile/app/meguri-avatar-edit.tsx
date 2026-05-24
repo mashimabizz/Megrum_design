@@ -10,6 +10,7 @@ import {
 } from "../src/components/meguri/MeguriThreeScene";
 import { ihubColors, ihubShadow } from "../src/theme/tokens";
 import {
+  DEFAULT_MEGURI_AVATAR,
   loadMeguriAvatarSettings,
   saveMeguriAvatarSettings,
   type MeguriAvatarSettings,
@@ -55,7 +56,7 @@ export default function MeguriAvatarEditScreen() {
   );
 
   useEffect(() => {
-    loadMeguriAvatarSettings().then(setSettings).catch(() => undefined);
+    loadMeguriAvatarSettings().then(setSettings).catch(() => setSettings(DEFAULT_MEGURI_AVATAR));
   }, []);
 
   function chooseFur(fur: (typeof FURS)[number]) {

@@ -64,7 +64,16 @@ export default function MeguriPlazaScreen() {
           name: profile.displayName || DEFAULT_MEGURI_PROFILE.displayName,
         });
       })
-      .catch(() => undefined);
+      .catch(() => {
+        if (!mounted) return;
+        setSelfScene({
+          animalType: DEFAULT_MEGURI_AVATAR.animalType,
+          furColor: DEFAULT_MEGURI_AVATAR.furColor,
+          hue: DEFAULT_MEGURI_AVATAR.hue,
+          id: "me",
+          name: DEFAULT_MEGURI_PROFILE.displayName,
+        });
+      });
     return () => {
       mounted = false;
     };
