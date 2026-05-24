@@ -4,6 +4,48 @@
 
 ---
 
+## イテレーション168.3：v2アバターを静止表示優先に切り戻し
+
+### 背景・問題意識
+
+iter168.2 後も、オーナーから「まだ何も表示されない」「めぐり演出を見ると挙動がはちゃめちゃになる」と報告があった。v2 GLBには `Armature|clip0|baselayer` が含まれているが、実アプリ上では配置・歩行演出と同時に再生するとリグポーズが大きく崩れる可能性がある。まずはv2モデルを安定して画面内に出すことを優先し、内蔵clip再生を止める必要がある。
+
+### 変更内容
+
+#### `mobile/src/components/meguri/MeguriThreeScene.tsx`
+- v2 GLBの内蔵animation clip再生を一旦停止した。
+- `AnimationMixer` / action生成を外し、アプリ側のグループ移動・ゆらぎだけで配置するようにした。
+- v2テクスチャ読み込みをGLB読み込みから分離し、テクスチャ読み込みに失敗しても白いモデルとして表示できるフォールバック材質を追加した。
+- `SkeletonUtils.clone()` が実行環境で使えない場合は `template.clone(true)` に落ちるようにした。
+
+### 影響範囲
+
+- iOS版 めぐりホーム/めぐりイントロ/めぐり広場/めぐりプロフィールの3D表示
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- `npm --prefix mobile run update:ios:preview -- --message "[iter168.3] v2めぐりアバター表示を安定化" --non-interactive`
+- EAS Update: `019e5819-32a3-7295-9c7d-f8ee5579d3f3`
+- EAS Update group: `6e9355a2-7368-44dc-8677-e13688129177`
+
+### 関連ファイル
+
+- `mobile/src/components/meguri/MeguriThreeScene.tsx`
+
+### セルフレビュー結果
+
+- ✅ v2 GLB内蔵clipの自動再生を止め、表示安定を優先
+- ✅ テクスチャ失敗時もモデル自体は表示される材質フォールバックを追加
+- ✅ スキン付きcloneの実行環境差分に備えたfallbackを追加
+- ✅ `npm --prefix mobile run typecheck` 成功
+- ✅ `npm --prefix mobile run export:ios:preview` 成功
+- ✅ Expo preview channel への EAS Update 成功
+- ✅ 状態ID・用語・DBスキーマの追加変更なし
+
+---
+
 ## イテレーション168.2：旧めぐりアバターのフォールバック表示を抑止
 
 ### 背景・問題意識

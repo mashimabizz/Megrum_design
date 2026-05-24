@@ -122,6 +122,10 @@ type ResidentRuntime = {
   spawnPosition: THREE.Vector3;
 };
 
+type SkeletonUtilsModule = {
+  clone?: (source: THREE.Object3D) => THREE.Object3D;
+};
+
 type PlushModel = {
   group: THREE.Group;
   parts: PlushParts;
@@ -707,33 +711,7 @@ function updateResidentObject(
   );
   item.group.rotation.z = moving ? sway : idleSideSway;
   animatePlushParts(item, role, target, elapsed, index, moving);
-  updateAvatarAnimation(item, role, moving, speaking, delta);
   animateFace(item.parts.face, speaking, smiling, elapsed);
-}
-
-function updateAvatarAnimation(
-  item: ResidentRuntime,
-  role: ResidentRole,
-  moving: boolean,
-  speaking: boolean,
-  delta: number,
-) {
-  const mixer = item.group.userData.avatarMixer as THREE.AnimationMixer | null | undefined;
-  if (!mixer) return;
-
-  const actions = item.group.userData.avatarActions as THREE.AnimationAction[] | undefined;
-  const speed =
-    moving || role === "exiting" || role === "queue" || role === "intro_queue"
-      ? 1.18
-      : role === "farewell"
-        ? 0.92
-        : speaking
-          ? 0.82
-          : 0.58;
-  for (const action of actions ?? []) {
-    action.timeScale = speed;
-  }
-  mixer.update(delta);
 }
 
 function updateCameraFocus(
@@ -1403,30 +1381,16 @@ function attachAvatarModel(
   const safeAnimalType = normalizeAvatarAnimalType(animalType);
   const loadToken = Symbol(safeAnimalType);
   group.userData.avatarLoadToken = loadToken;
-  group.userData.avatarMixer = null;
-  group.userData.avatarActions = [];
-  void Promise.all([
-    loadAvatarTemplate(safeAnimalType),
-    loadAvatarTexture(safeAnimalType),
-  ])
-    .then(([template, texture]) => {
+  void loadAvatarTemplate(safeAnimalType)
+    .then(async (template) => {
       if (group.userData.avatarLoadToken !== loadToken) return;
-      const model = SkeletonUtils.clone(template) as THREE.Group;
+      const model = cloneAvatarTemplate(template);
       model.name = `meguri-avatar-${safeAnimalType}`;
       prepareAvatarClone(model);
-      applyAvatarTexture(model, texture);
-      const animations = getAvatarAnimations(template);
-      if (animations.length > 0) {
-        const mixer = new THREE.AnimationMixer(model);
-        const actions = animations.map((clip) => {
-          const action = mixer.clipAction(clip);
-          action.reset();
-          action.play();
-          return action;
-        });
-        group.userData.avatarMixer = mixer;
-        group.userData.avatarActions = actions;
-      }
+      await loadAvatarTexture(safeAnimalType)
+        .then((texture) => applyAvatarTexture(model, texture))
+        .catch(() => applyAvatarFallbackMaterial(model));
+      if (group.userData.avatarLoadToken !== loadToken) return;
       fallbackGroup.visible = false;
       group.add(model);
     })
@@ -1455,7 +1419,6 @@ function loadAvatarTemplate(animalType: MeguriAnimalType) {
           uri,
           (gltf: GLTF) => {
             prepareAvatarMaterials(gltf.scene);
-            gltf.scene.userData.avatarAnimations = gltf.animations;
             resolve(gltf.scene);
           },
           undefined,
@@ -1501,9 +1464,9 @@ function normalizeAvatarAnimalType(animalType: MeguriAnimalType): MeguriAnimalTy
   return animalType in avatarAssetModules ? animalType : "fox";
 }
 
-function getAvatarAnimations(template: THREE.Group): THREE.AnimationClip[] {
-  const animations = template.userData.avatarAnimations;
-  return Array.isArray(animations) ? animations : [];
+function cloneAvatarTemplate(template: THREE.Group): THREE.Group {
+  const clone = (SkeletonUtils as SkeletonUtilsModule).clone;
+  return (clone ? clone(template) : template.clone(true)) as THREE.Group;
 }
 
 function prepareAvatarClone(model: THREE.Group) {
@@ -1526,6 +1489,18 @@ function applyAvatarTexture(model: THREE.Group, texture: THREE.Texture) {
       roughness: 0.78,
       side: THREE.DoubleSide,
       transparent: false,
+    });
+  });
+}
+
+function applyAvatarFallbackMaterial(model: THREE.Group) {
+  model.traverse((object) => {
+    if (!isMesh(object)) return;
+    object.material = new THREE.MeshStandardMaterial({
+      color: "#ffffff",
+      metalness: 0,
+      roughness: 0.82,
+      side: THREE.DoubleSide,
     });
   });
 }
