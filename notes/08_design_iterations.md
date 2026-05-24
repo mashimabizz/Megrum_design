@@ -4,6 +4,67 @@
 
 ---
 
+## イテレーション168.31：最近人気アニメ・マンガを追加
+
+### 背景・問題意識
+
+オーナーから「ビッグタイトルもいいんだけど、アニメや漫画系は、最近人気なものやグッズ展開があるものを中心にマスタを充実させて欲しい」と指示があった。そこで定番・長寿作品だけでなく、2024〜2026年に話題化し、公式サイト・公式ショップ・アニメイト等でグッズ展開が確認できるアニメ/マンガ作品を優先して追加した。
+
+### リサーチ観点
+
+- 2025年冬アニメ初速ランキングで上位に出ている作品（例: メダリスト、SAKAMOTO DAYS、薬屋のひとりごと）
+- 公式サイトにグッズ情報・公式ショップ・オンリーショップ・新規描き下ろしグッズ情報がある作品
+- 2025年前後に放送・続編・新規展開があり、ランダムグッズやアクリルスタンド等の交換需要が見込める作品
+
+### 変更内容
+
+#### `supabase/migrations/20260525031000_expand_recent_anime_manga_merch_titles.sql`
+- メダリスト / アオのハコ / 忘却バッテリー / 桃源暗鬼 / ガチアクタ / 光が死んだ夏 / 逃げ上手の若君を追加し、それぞれ主要キャラをL2登録した。
+- MASHLE / ダンジョン飯 / らんま1/2 / その着せ替え人形は恋をする / シャングリラ・フロンティア / 地獄楽を追加し、それぞれ主要キャラをL2登録した。
+- 追加した全 `work` にL2を同梱し、追加L2に対して `oshi_entities_master` と `entity_id` を再同期した。
+- 初回適用時に `oshi_entities_master.entity_type` の制約に合わない `work` 値を入れようとして失敗したため、既存設計に合わせてL1作品のentity同期は行わず、L2キャラクターのみ同期するよう修正した。
+
+### 影響範囲
+
+- オンボーディングの推し選択
+- プロフィールの推し追加
+- グッズ登録 / Wish登録 / 個別募集の推し選択候補
+
+### 確認方法
+
+- `supabase db push --dry-run`
+- `supabase db push --yes`
+- `supabase db query --linked -o table "select ge.name as genre, gm.name, count(cm.id) as l2 from public.groups_master gm join public.genres_master ge on ge.id=gm.genre_id left join public.characters_master cm on cm.group_id=gm.id where gm.name in ('メダリスト','アオのハコ','忘却バッテリー','桃源暗鬼','ガチアクタ','光が死んだ夏','逃げ上手の若君','MASHLE','ダンジョン飯','らんま1/2','その着せ替え人形は恋をする','シャングリラ・フロンティア','地獄楽') group by ge.name, gm.name order by ge.name, gm.name;"`
+- `supabase db query --linked -o table "with missing as (select gm.id from public.groups_master gm left join public.characters_master cm on cm.group_id=gm.id where gm.kind in ('group','work') group by gm.id having count(cm.id)=0) select count(*) as group_or_work_without_l2 from missing;"`
+
+### 適用後件数
+
+- L1合計: 406
+- L2合計: 2077
+- `oshi_entities_master`: 2201件
+- `group` / `work` でL2が0件のL1: 0件
+- `entity_id` 未紐付け: solo L1 0件 / L2 0件
+- 追加例: ガチアクタ 14件 / アオのハコ 12件 / らんま1/2 11件 / 桃源暗鬼 10件 / ダンジョン飯 10件
+
+### 関連ファイル
+
+- `supabase/migrations/20260525031000_expand_recent_anime_manga_merch_titles.sql`
+- `notes/08_design_iterations.md`
+
+### セルフレビュー結果
+
+- ✅ 最近人気・グッズ展開のあるアニメ/マンガ作品に軸を寄せて追加
+- ✅ 追加した `work` はすべてL2を同梱
+- ✅ 実在する作品・キャラクターのみを登録
+- ✅ `group` / `work` でL2が0件のL1は引き続き0件
+- ✅ `entity_id` 未紐付け0件を確認
+- ✅ `oshi_entities_master.entity_type` の既存制約（person / character / other）を尊重
+- ✅ 状態IDの追加・変更なし（`notes/09_state_machines.md` 更新不要）
+- ✅ 新しいアプリ用語・廃止用語なし（`notes/10_glossary.md` 更新不要）
+- ✅ 既存のL2必須運用ルール内のseed追加であり、追加のデータモデル更新なし
+
+---
+
 ## イテレーション168.30：定番アニメゲーム舞台のL2を補完
 
 ### 背景・問題意識
