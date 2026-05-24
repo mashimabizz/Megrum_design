@@ -92,21 +92,15 @@ export default function MeguriPlazaScreen() {
             <ActivityIndicator color={ihubColors.lavender} />
           </View>
         ) : threeFailed ? (
-          <PlazaFallback
-            onOpenDetail={openDetail}
-            onSelect={setSelectedId}
-            selectedId={selectedId}
-            users={plazaUsers}
-          />
+          <View style={styles.sceneLoading}>
+            <ActivityIndicator color={ihubColors.lavender} />
+          </View>
         ) : (
           <MeguriThreeBoundary
             fallback={
-              <PlazaFallback
-                onOpenDetail={openDetail}
-                onSelect={setSelectedId}
-                selectedId={selectedId}
-                users={plazaUsers}
-              />
+              <View style={styles.sceneLoading}>
+                <ActivityIndicator color={ihubColors.lavender} />
+              </View>
             }
             onError={() => setThreeFailed(true)}
           >

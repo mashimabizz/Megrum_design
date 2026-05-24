@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { router, useLocalSearchParams } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { IconSymbol } from "../src/components/IconSymbol";
@@ -9,7 +9,7 @@ import {
   type MeguriSceneResident,
 } from "../src/components/meguri/MeguriThreeScene";
 import { ihubColors, ihubShadow } from "../src/theme/tokens";
-import { USERS, WalkingCard, hueColor, hueTint, type MeguriUser } from "./(tabs)/encounters";
+import { USERS, hueColor, hueTint, type MeguriUser } from "./(tabs)/encounters";
 
 const PROFILE_SELF: MeguriSceneResident = {
   animalType: "rabbit",
@@ -82,13 +82,13 @@ export default function MeguriProfileScreen() {
           <View style={styles.avatarStage}>
             {threeFailed ? (
               <View style={styles.fallbackAvatar}>
-                <WalkingCard active size={126} user={user} />
+                <ActivityIndicator color={ihubColors.lavender} />
               </View>
             ) : (
               <MeguriThreeBoundary
                 fallback={
                   <View style={styles.fallbackAvatar}>
-                    <WalkingCard active size={126} user={user} />
+                    <ActivityIndicator color={ihubColors.lavender} />
                   </View>
                 }
                 onError={() => setThreeFailed(true)}

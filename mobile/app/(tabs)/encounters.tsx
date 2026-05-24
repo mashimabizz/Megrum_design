@@ -983,10 +983,16 @@ export default function EncountersScreen() {
                 <ActivityIndicator color={ihubColors.lavender} />
               </View>
             ) : homeThreeFailed ? (
-              <HomeResidentsFallback activeIndex={activeIndex} users={arrivals} />
+              <View style={styles.meguriSceneLoading}>
+                <ActivityIndicator color={ihubColors.lavender} />
+              </View>
             ) : (
               <MeguriThreeBoundary
-                fallback={<HomeResidentsFallback activeIndex={activeIndex} users={arrivals} />}
+                fallback={
+                  <View style={styles.meguriSceneLoading}>
+                    <ActivityIndicator color={ihubColors.lavender} />
+                  </View>
+                }
                 onError={() => setHomeThreeFailed(true)}
               >
                 <MeguriThreeScene

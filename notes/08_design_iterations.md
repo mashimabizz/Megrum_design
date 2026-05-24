@@ -4,6 +4,52 @@
 
 ---
 
+## イテレーション168.2：旧めぐりアバターのフォールバック表示を抑止
+
+### 背景・問題意識
+
+iter168.1 後も、オーナーから「前作ったアバターが表示される」「何も表示されなくなっている」と報告があった。3Dシーン内部には、v2 GLBが読み込まれるまで旧プロシージャルアバターを一時表示する `fallbackGroup` が残っていた。また、3Dエラー時の画面フォールバックにも `WalkingCard` / 旧2D表現が残っており、v2が失敗した時に前のアバターへ戻って見える状態だった。
+
+### 変更内容
+
+#### `mobile/src/components/meguri/MeguriThreeScene.tsx`
+- 旧プロシージャルアバターの `fallbackGroup` を初期状態から非表示にし、v2 GLB読み込み中や失敗時にも前の3Dアバターを表示しないようにした。
+
+#### `mobile/app/(tabs)/encounters.tsx` / `mobile/app/meguri-intro.tsx` / `mobile/app/meguri-plaza.tsx` / `mobile/app/meguri-profile.tsx`
+- 3D失敗時のフォールバックを旧アバター表示からローダー表示へ変更した。
+- v2表示が失敗した場合に、古いアバターへ戻って見える経路を閉じた。
+
+### 影響範囲
+
+- iOS版 めぐりホーム/めぐりイントロ/めぐり広場/めぐりプロフィールの3D表示
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- `npm --prefix mobile run update:ios:preview -- --message "[iter168.2] 旧めぐりアバター表示を抑止" --non-interactive`
+- EAS Update: `019e5812-0317-7fc6-86ac-ebe1859c1ef0`
+- EAS Update group: `c2eee321-eddf-44bc-86ce-5b51ce4d575c`
+
+### 関連ファイル
+
+- `mobile/src/components/meguri/MeguriThreeScene.tsx`
+- `mobile/app/(tabs)/encounters.tsx`
+- `mobile/app/meguri-intro.tsx`
+- `mobile/app/meguri-plaza.tsx`
+- `mobile/app/meguri-profile.tsx`
+
+### セルフレビュー結果
+
+- ✅ v2 GLB読み込み前に旧プロシージャル3Dアバターを表示しない
+- ✅ 3Dエラー時に旧 `WalkingCard` / 旧2Dアバターへ戻らない
+- ✅ `npm --prefix mobile run typecheck` 成功
+- ✅ `npm --prefix mobile run export:ios:preview` 成功
+- ✅ Expo preview channel への EAS Update 成功
+- ✅ 状態ID・用語・DBスキーマの追加変更なし
+
+---
+
 ## イテレーション168.1：めぐりアバターv2の実機表示を修正
 
 ### 背景・問題意識

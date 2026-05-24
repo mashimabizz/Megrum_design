@@ -297,23 +297,17 @@ export default function MeguriIntroScreen() {
 
         <View style={styles.stageShell}>
           {threeFailed ? (
-            <MeguriFallbackScene
-              active={active}
-              completedIds={completedIds}
-              done={done}
-              introPhase={introPhase}
-              residents={arrivals}
-            />
+            <View style={styles.threeUnavailable}>
+              <ActivityIndicator color={ihubColors.lavender} />
+              <Text style={styles.threeUnavailableText}>3Dアバターを読み込んでいます</Text>
+            </View>
           ) : (
             <MeguriThreeBoundary
               fallback={
-                <MeguriFallbackScene
-                  active={active}
-                  completedIds={completedIds}
-                  done={done}
-                  introPhase={introPhase}
-                  residents={arrivals}
-                />
+                <View style={styles.threeUnavailable}>
+                  <ActivityIndicator color={ihubColors.lavender} />
+                  <Text style={styles.threeUnavailableText}>3Dアバターを読み込んでいます</Text>
+                </View>
               }
               onError={() => setThreeFailed(true)}
             >
@@ -1478,6 +1472,17 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     position: "relative",
+  },
+  threeUnavailable: {
+    alignItems: "center",
+    flex: 1,
+    gap: 10,
+    justifyContent: "center",
+  },
+  threeUnavailableText: {
+    color: "rgba(58,50,74,0.58)",
+    fontSize: 12,
+    fontWeight: "800",
   },
   fallbackGate: {
     alignItems: "center",

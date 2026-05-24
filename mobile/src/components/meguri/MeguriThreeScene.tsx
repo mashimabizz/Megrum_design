@@ -1327,6 +1327,7 @@ function createPlushAnimal(resident: MeguriSceneResident): PlushModel {
   const group = new THREE.Group();
   const fallbackGroup = new THREE.Group();
   fallbackGroup.name = "procedural-avatar";
+  fallbackGroup.visible = false;
   const fur = furColors[resident.furColor];
   const accent = hueColors[resident.hue];
   const furMaterial = new THREE.MeshLambertMaterial({
@@ -1431,7 +1432,7 @@ function attachAvatarModel(
     })
     .catch(() => {
       if (group.userData.avatarLoadToken === loadToken) {
-        fallbackGroup.visible = true;
+        fallbackGroup.visible = false;
       }
     });
 }
