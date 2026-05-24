@@ -4,6 +4,60 @@
 
 ---
 
+## イテレーション168.32：最近人気作のL2を深掘り
+
+### 背景・問題意識
+
+オーナーから、アニメ/マンガ系は「最近人気なものやグッズ展開があるもの」を中心に充実させるよう指示があった。iter168.31で新規作品を追加したが、既存の最近人気作にもL2が薄いものが残っていたため、新規追加と既存作品の主要キャラ補完を同時に行った。
+
+### 変更内容
+
+#### `supabase/migrations/20260525033000_expand_recent_anime_manga_merch_depth.sql`
+- 薫る花は凛と咲く / カグラバチ / ふつうの軽音部を新規追加し、主要キャラをL2登録した。
+- ダンダダン / WIND BREAKER / SAKAMOTO DAYS / 【推しの子】 / 葬送のフリーレン / ブルーロック / 薬屋のひとりごと / 怪獣8号の主要キャラを追加補完した。
+- 追加した全 `work` にL2を同梱し、追加L2に対して `oshi_entities_master` と `entity_id` を再同期した。
+
+### 影響範囲
+
+- オンボーディングの推し選択
+- プロフィールの推し追加
+- グッズ登録 / Wish登録 / 個別募集の推し選択候補
+
+### 確認方法
+
+- `supabase db push --dry-run`
+- `supabase db push --yes`
+- `supabase db query --linked -o table "select ge.name as genre, gm.name, count(cm.id) as l2 from public.groups_master gm join public.genres_master ge on ge.id=gm.genre_id left join public.characters_master cm on cm.group_id=gm.id where gm.name in ('薫る花は凛と咲く','カグラバチ','ふつうの軽音部','ダンダダン','WIND BREAKER','SAKAMOTO DAYS','【推しの子】','葬送のフリーレン','ブルーロック','薬屋のひとりごと','怪獣8号') group by ge.name, gm.name order by ge.name, gm.name;"`
+- `supabase db query --linked -o table "with missing as (select gm.id from public.groups_master gm left join public.characters_master cm on cm.group_id=gm.id where gm.kind in ('group','work') group by gm.id having count(cm.id)=0) select count(*) as group_or_work_without_l2 from missing;"`
+
+### 適用後件数
+
+- L1合計: 409
+- L2合計: 2154
+- `oshi_entities_master`: 2278件
+- `group` / `work` でL2が0件のL1: 0件
+- `entity_id` 未紐付け: solo L1 0件 / L2 0件
+- 代表例: ブルーロック 19件 / SAKAMOTO DAYS 17件 / WIND BREAKER 16件 / 葬送のフリーレン 16件 / 薬屋のひとりごと 14件
+
+### 関連ファイル
+
+- `supabase/migrations/20260525033000_expand_recent_anime_manga_merch_depth.sql`
+- `notes/08_design_iterations.md`
+
+### セルフレビュー結果
+
+- ✅ 最近人気・グッズ展開のあるアニメ/マンガ作品に軸を寄せて追加
+- ✅ 新規追加した `work` はすべてL2を同梱
+- ✅ 既存人気作品の主要キャラ不足を追加補完
+- ✅ 実在する作品・キャラクターのみを登録
+- ✅ `group` / `work` でL2が0件のL1は引き続き0件
+- ✅ `entity_id` 未紐付け0件を確認
+- ✅ 状態IDの追加・変更なし（`notes/09_state_machines.md` 更新不要）
+- ✅ 新しいアプリ用語・廃止用語なし（`notes/10_glossary.md` 更新不要）
+- ✅ 既存のL2必須運用ルール内のseed追加であり、追加のデータモデル更新なし
+
+---
+
 ## イテレーション168.31：最近人気アニメ・マンガを追加
 
 ### 背景・問題意識
