@@ -37,9 +37,13 @@ import {
   DEFAULT_MEGURI_AVATAR,
   DEFAULT_MEGURI_PROFILE,
   loadMeguriAvatarSettings,
-  loadMeguriPlusSettings,
   loadMeguriProfileSettings,
 } from "../../src/lib/meguriSettings";
+import {
+  MEGURI_PLUS_FREE_SEND_LIMIT,
+  MEGURI_PLUS_MONTHLY_SEND_LIMIT,
+  loadMeguriPlusState,
+} from "../../src/lib/meguriPlus";
 import { GroomProfileSlidePanel, type GroomProfileUser } from "../../src/components/meguri/GroomProfileSlidePanel";
 import { useAuth } from "../../src/auth/AuthProvider";
 import {
@@ -189,7 +193,8 @@ export type Achievement = {
 };
 
 export const MONTHLY_PRICE = 1000;
-export const FREE_SEND_LIMIT = 3;
+export const FREE_SEND_LIMIT = MEGURI_PLUS_FREE_SEND_LIMIT;
+export const PLUS_SEND_LIMIT = MEGURI_PLUS_MONTHLY_SEND_LIMIT;
 const GROOM_TEXT_COLORS = ["#ffffff", "#ffd1e4", "#bff0ff", "#d9ffca", "#ffe08a"];
 const GROOM_DRAW_COLORS = ["#ffffff", "#f3c5d4", "#a8d4e6", "#a695d8", "#f2b95b"];
 const DEFAULT_GROOM_IMAGE_TRANSFORM: GroomImageTransform = {
@@ -566,7 +571,7 @@ function relativeTimeLabel(value: string) {
 }
 
 export default function EncountersScreen() {
-  const { previewMode, user } = useAuth();
+  const { previewMode, profile, user } = useAuth();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const arrivals = useMemo(() => USERS.slice(0, 5), []);
@@ -634,10 +639,12 @@ export default function EncountersScreen() {
   }, []);
 
   useEffect(() => {
-    loadMeguriPlusSettings()
-      .then((settings) => setPlusActive(settings.active))
+    loadMeguriPlusState(profile)
+      .then((settings) => {
+        setPlusActive(settings.active);
+      })
       .catch(() => undefined);
-  }, []);
+  }, [profile?.handle]);
 
   async function refreshGroomPosts() {
     if (previewMode) {
@@ -3976,10 +3983,10 @@ export function LetterModal({
                   <IconSymbol name="lock-closed-outline" color={ihubColors.ink} size={24} />
                 </View>
                 <Text style={styles.lockExplain}>
-                  本文の表示と返信には Megrum Plus が必要です。
+                  本文の表示と返信には めぐりPlus が必要です。
                 </Text>
                 <Pressable onPress={onPlan} style={styles.modalPrimaryButton}>
-                  <Text style={styles.modalPrimaryText}>Plusを見る</Text>
+                  <Text style={styles.modalPrimaryText}>めぐりPlusを見る</Text>
                 </Pressable>
               </>
             )}
@@ -3994,11 +4001,13 @@ export function LetterModal({
 }
 
 export function PlusModal({
+  canUseReviewToggle = false,
   onClose,
   onToggle,
   open,
   subscribed,
 }: {
+  canUseReviewToggle?: boolean;
   onClose: () => void;
   onToggle: () => void;
   open: boolean;
@@ -4011,7 +4020,7 @@ export function PlusModal({
         <View style={styles.modalPanel}>
           <View style={styles.modalHandle} />
           <Text style={styles.modalKicker}>PLUS</Text>
-          <Text style={styles.modalTitle}>Megrum Plus</Text>
+          <Text style={styles.modalTitle}>めぐりPlus</Text>
           <Text style={styles.modalPrice}>月額 {MONTHLY_PRICE.toLocaleString()}円</Text>
           <View style={styles.planBullets}>
             <PlanBullet text="届いたメッセージの本文を表示" />
@@ -4019,11 +4028,22 @@ export function PlusModal({
             <PlanBullet text="無料枠を超えてメッセージを送信" />
             <PlanBullet text="めぐり履歴と広場を長く保存" />
           </View>
-          <Pressable onPress={onToggle} style={styles.modalPrimaryButton}>
-            <Text style={styles.modalPrimaryText}>
-              {subscribed ? "Freeに戻す" : "Plusを有効にする"}
-            </Text>
-          </Pressable>
+          {canUseReviewToggle ? (
+            <>
+              <Text style={styles.reviewOnlyText}>
+                michilion 開発レビュー用の切り替えです。
+              </Text>
+              <Pressable onPress={onToggle} style={styles.modalPrimaryButton}>
+                <Text style={styles.modalPrimaryText}>
+                  {subscribed ? "無料会員に切り替える" : "めぐりPlus会員に切り替える"}
+                </Text>
+              </Pressable>
+            </>
+          ) : (
+            <View style={[styles.modalPrimaryButton, styles.disabledButton]}>
+              <Text style={styles.modalPrimaryText}>App Store 課金準備中</Text>
+            </View>
+          )}
           <Pressable onPress={onClose} style={styles.modalCloseButton}>
             <Text style={styles.modalCloseText}>閉じる</Text>
           </Pressable>
@@ -6006,6 +6026,12 @@ const styles = StyleSheet.create({
   },
   planBullets: {
     gap: 9,
+  },
+  reviewOnlyText: {
+    color: "rgba(58,50,74,0.62)",
+    fontSize: 11.5,
+    fontWeight: "800",
+    lineHeight: 17,
   },
   planBullet: {
     flexDirection: "row",

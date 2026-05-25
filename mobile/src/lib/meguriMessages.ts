@@ -24,6 +24,7 @@ export type MeguriThreadMessage = {
   groomReplyId?: string | null;
   imagePath?: string | null;
   imageUri?: string;
+  locked?: boolean;
   mine?: boolean;
   peerId: string;
   peerName: string;
@@ -254,26 +255,7 @@ async function loadRemoteMeguriThreadMessages(): Promise<MeguriThreadMessage[]> 
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return [];
-  const { data, error } = await supabase
-    .from("meguri_messages")
-    .select(
-      [
-        "id",
-        "sender_id",
-        "recipient_id",
-        "source_groom_reply_id",
-        "body",
-        "image_url",
-        "image_path",
-        "read_at",
-        "created_at",
-        "sender:users!meguri_messages_sender_id_fkey(id, display_name, handle)",
-        "recipient:users!meguri_messages_recipient_id_fkey(id, display_name, handle)",
-      ].join(", "),
-    )
-    .or(`sender_id.eq.${user.id},recipient_id.eq.${user.id}`)
-    .order("created_at", { ascending: true })
-    .limit(240);
+  const { data, error } = await supabase.rpc("list_meguri_messages_for_viewer");
   if (error) throw error;
   const rows = (Array.isArray(data) ? data : []) as unknown as Record<string, unknown>[];
   const signedUrls = await signStorageUrls(
@@ -494,18 +476,25 @@ function remoteThreadMessageToLocal(
   const createdAt = stringValue(row.created_at);
   if (!id || !senderId || !recipientId || !createdAt) return null;
   const mine = senderId === currentUserId;
+  const locked = row.locked === true;
   const peerId = mine ? recipientId : senderId;
   const peer = objectValue(mine ? row.recipient : row.sender);
   const imagePath = nullableStringValue(row.image_path);
   return {
-    body,
+    body: locked ? "メッセージが届いています！" : body,
     groomReplyId: nullableStringValue(row.source_groom_reply_id),
     id,
     imagePath,
     imageUri: (imagePath ? signedUrls.get(imagePath) : null) ?? nullableStringValue(row.image_url) ?? undefined,
+    locked,
     mine,
     peerId,
-    peerName: stringValue(peer.display_name) || stringValue(peer.handle) || "めぐりユーザー",
+    peerName:
+      stringValue(peer.display_name) ||
+      stringValue(peer.handle) ||
+      stringValue(mine ? row.recipient_display_name : row.sender_display_name) ||
+      stringValue(mine ? row.recipient_handle : row.sender_handle) ||
+      "めぐりユーザー",
     readAt: row.read_at ? Date.parse(stringValue(row.read_at)) || null : null,
     sentAt: Date.parse(createdAt) || Date.now(),
   };

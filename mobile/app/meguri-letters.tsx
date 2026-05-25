@@ -29,7 +29,10 @@ import {
   type Letter,
   type MeguriUser,
 } from "./(tabs)/encounters";
-import { loadMeguriPlusSettings, saveMeguriPlusSettings } from "../src/lib/meguriSettings";
+import {
+  loadMeguriPlusState,
+  saveMeguriPlusReviewOverride,
+} from "../src/lib/meguriPlus";
 import {
   appendMeguriThreadMessage,
   loadMeguriGroomReplies,
@@ -81,7 +84,7 @@ const INITIAL_FREE_SEND_USED = 0;
 const MESSAGE_ACTIVE = ihubColors.lavender;
 
 export default function MeguriLettersScreen() {
-  const { previewMode } = useAuth();
+  const { previewMode, profile } = useAuth();
   const insets = useSafeAreaInsets();
   const params = useLocalSearchParams<{
     open?: string | string[];
@@ -90,6 +93,7 @@ export default function MeguriLettersScreen() {
   const [selectedConversation, setSelectedConversation] = useState<MessageConversation | null>(null);
   const [plusOpen, setPlusOpen] = useState(false);
   const [subscribed, setSubscribed] = useState(false);
+  const [canUsePlusReviewToggle, setCanUsePlusReviewToggle] = useState(false);
   const [sendUsed, setSendUsed] = useState(INITIAL_FREE_SEND_USED);
   const [draft, setDraft] = useState("");
   const [threadMessages, setThreadMessages] = useState<MeguriThreadMessage[]>([]);
@@ -145,14 +149,17 @@ export default function MeguriLettersScreen() {
     let mounted = true;
     setMessagesReady(false);
     Promise.all([
-      loadMeguriPlusSettings().catch(() => null),
+      loadMeguriPlusState(profile).catch(() => null),
       loadMeguriMessageReadState().catch(() => ({})),
       loadMeguriGroomReplies().catch(() => []),
       loadMeguriThreadMessages().catch(() => []),
     ])
       .then(([plus, nextReadState, replies, messages]) => {
         if (!mounted) return;
-        if (plus) setSubscribed(plus.active);
+        if (plus) {
+          setSubscribed(plus.active);
+          setCanUsePlusReviewToggle(plus.canUseReviewToggle);
+        }
         setReadState(nextReadState);
         setGroomReplies(replies);
         setThreadMessages(messages);
@@ -163,7 +170,7 @@ export default function MeguriLettersScreen() {
     return () => {
       mounted = false;
     };
-  }, []);
+  }, [profile?.handle]);
 
   useEffect(() => {
     const subscription = AppState.addEventListener("change", (state) => {
@@ -211,12 +218,9 @@ export default function MeguriLettersScreen() {
 
   async function toggleSubscribed() {
     const next = !subscribed;
+    const saved = await saveMeguriPlusReviewOverride(profile, next);
+    if (!saved) return;
     setSubscribed(next);
-    await saveMeguriPlusSettings({
-      active: next,
-      freeSendLimit: FREE_SEND_LIMIT,
-      monthlySendLimit: 8,
-    });
   }
 
   async function sendMessage() {
@@ -287,6 +291,7 @@ export default function MeguriLettersScreen() {
           subscribed={subscribed}
           onClose={() => setPlusOpen(false)}
           onToggle={toggleSubscribed}
+          canUseReviewToggle={canUsePlusReviewToggle}
         />
       </MessageThreadScreen>
     );
@@ -346,6 +351,7 @@ export default function MeguriLettersScreen() {
         subscribed={subscribed}
         onClose={() => setPlusOpen(false)}
         onToggle={toggleSubscribed}
+        canUseReviewToggle={canUsePlusReviewToggle}
       />
     </Screen>
   );
@@ -465,7 +471,7 @@ function MessageThreadScreen({
   const lockedByPlan = !canRead;
   const sendLockedByPlan = !canSend;
   const composerPlaceholder = lockedByPlan
-    ? "メッセージを入力"
+      ? "メッセージを入力"
     : sendLockedByPlan
       ? `無料は月${FREE_SEND_LIMIT}通まで`
       : "メッセージを入力";
@@ -544,11 +550,11 @@ function MessageThreadScreen({
             </Text>
             <Text style={styles.systemNoticeText}>
               {lockedByPlan
-                ? "本文の開封と返信にはPlusが必要です。"
-                : `無料は月${FREE_SEND_LIMIT}通まで。${FREE_SEND_LIMIT + 1}通目以降はPlusで送信できます。現在 ${sendUsed}/${FREE_SEND_LIMIT} 通使用済み。`}
+                ? "本文の開封と返信にはめぐりPlusが必要です。"
+                : `無料は月${FREE_SEND_LIMIT}通まで。${FREE_SEND_LIMIT + 1}通目以降はめぐりPlusで送信できます。現在 ${sendUsed}/${FREE_SEND_LIMIT} 通使用済み。`}
             </Text>
             <Pressable onPress={onOpenPlan} style={styles.systemNoticeButton}>
-              <Text style={styles.systemNoticeButtonText}>Plusを見る</Text>
+              <Text style={styles.systemNoticeButtonText}>めぐりPlusを見る</Text>
             </Pressable>
           </View>
         ) : null}
@@ -600,7 +606,7 @@ function MessageThreadScreen({
                   ) : null}
                   {message.locked ? (
                     <Pressable onPress={onOpenPlan} style={styles.bubblePlanButton}>
-                      <Text style={styles.bubblePlanText}>Plusで開封</Text>
+                      <Text style={styles.bubblePlanText}>めぐりPlusで開封</Text>
                     </Pressable>
                   ) : null}
                 </ChatGradientBubble>
@@ -919,6 +925,7 @@ function groupThreadMessagesByConversation(
         body: message.body,
         id: message.id,
         imageUri: message.imageUri,
+        locked: message.locked,
         mine: message.mine !== false,
         sentAt: message.sentAt,
         time: currentTimeLabel(message.sentAt),

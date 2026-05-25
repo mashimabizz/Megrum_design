@@ -138,6 +138,7 @@ async function upsertStripeSubscription(
     readString(metadata.plan_type),
     readString(firstPrice?.recurring_interval),
   );
+  const featureKey = featureKeyForPlanType(planType);
 
   const { data, error } = await adminSupabase
     .from("subscriptions")
@@ -172,7 +173,7 @@ async function upsertStripeSubscription(
     .upsert(
       {
         user_id: userId,
-        feature_key: "premium",
+        feature_key: featureKey,
         active,
         source: "subscription",
         subscription_id: data.id,
@@ -195,6 +196,7 @@ async function upsertStripeSubscription(
     after_state: entitlement,
     metadata: {
       stripe_event_type: eventType,
+      feature_key: featureKey,
       stripe_subscription_id: subscriptionId,
       stripe_customer_id: customerId,
     },
@@ -296,5 +298,12 @@ function normalizePlanType(
   if (metadataPlanType === "yearly" || metadataPlanType === "premium_yearly") {
     return "premium_yearly";
   }
+  if (metadataPlanType === "meguri_plus_monthly") {
+    return "meguri_plus_monthly";
+  }
   return recurringInterval === "year" ? "premium_yearly" : "premium_monthly";
+}
+
+function featureKeyForPlanType(planType: string) {
+  return planType === "meguri_plus_monthly" ? "meguri_plus" : "premium";
 }

@@ -344,6 +344,7 @@ function LegalNotice({ tweaks }) {
             <>
               <b>ブースト</b>：単発 ¥150 / 5個 ¥600 / 10個 ¥1,000<br/>
               <b>Premium 会員</b>：月額 ¥500 / 年額 ¥4,800<br/>
+              <b>めぐりPlus</b>：月額 ¥1,000<br/>
               <span style={{ fontSize: 11, color: c.mute }}>※すべて税込。Phase β 以降に提供予定</span>
             </>
           } />
@@ -357,7 +358,7 @@ function LegalNotice({ tweaks }) {
           <LPDataRow colors={c} label="返品・解約" value={
             <>
               <b>ブースト</b>：未使用分は30日以内なら返金可<br/>
-              <b>Premium 会員</b>：いつでも解約可（期間終了まで使用可、中途返金なし）
+              <b>Premium 会員・めぐりPlus</b>：いつでも解約可（期間終了まで使用可、中途返金なし）
             </>
           } last />
         </div>

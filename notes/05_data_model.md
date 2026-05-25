@@ -3,8 +3,8 @@
 > **目的**：iHub の全エンティティのDBスキーマ設計と、状態・マッチング・取引のデータフロー定義。
 > 実装の正解集。`09_state_machines.md` と完全に整合させ、`10_glossary.md` の用語を使う。
 
-最終更新: 2026-05-24
-ステータス: Draft v2.13（iter166 反映済）
+最終更新: 2026-05-25
+ステータス: Draft v2.14（iter168.43 反映済）
 
 ## 最新化履歴
 
@@ -25,6 +25,7 @@
 | **v2.11** | **2026-05-24** | **iter164 反映（groom_posts / groom_reactions / groom_views / groom_replies と groom-posts Storage を実装。グルームの24時間公開、いいね、閲覧済み、返信通知をDB管理へ移行）** |
 | **v2.12** | **2026-05-24** | **iter165 反映（グルーム公開範囲をRLS/Private Storageで厳格化。groom_hidden_posts / groom_user_blocks / groom_reports / meguri_messages と meguri-message-media Storage を追加）** |
 | **v2.13** | **2026-05-24** | **iter166 反映（admin_roles / admin_audit_logs / user_entitlements / plan_overrides / stripe_webhook_events と subscriptions 実テーブルを追加。管理者ページ・有料権限・Stripe webhookの土台を定義）** |
+| **v2.14** | **2026-05-25** | **iter168.43 反映（めぐりPlusを `user_entitlements(feature_key='meguri_plus')` に分離。`meguri_messages` 本文/画像は無料受信者へ直接返さず、専用RPCでロック済みメタ情報だけ返す）** |
 
 ## このドキュメントの位置付け
 
@@ -286,6 +287,7 @@ iter162.49 で iOS めぐりホームに追加した、写真中心の24時間�
 | `created_at` | timestamptz | |
 
 `notifications.kind='meguri_message'` と `notifications.meguri_message_id` を追加し、受信者に通知を残す。
+iter168.43 以降、無料受信者に本文・画像パスを直接返さないため、通常表示は `list_meguri_messages_for_viewer()` RPC を使う。直接 `meguri_messages` をSELECTできるのは送信者本人、または `user_entitlements(feature_key='meguri_plus', active=true)` を持つ受信者に限定する。
 
 ---
 
@@ -806,13 +808,13 @@ iter12-18 の D-flow に対応するスキーマ（旧版未定義だったの�
 
 iter45 で追加。`notes/16_monetization.md` の戦略に対応するテーブル群。
 
-### `subscriptions`（Premium 会員サブスクリプション）
+### `subscriptions`（Premium 会員 / めぐりPlus サブスクリプション）
 
 | カラム | 型 | 説明 |
 |---|---|---|
 | `id` | uuid | PK |
 | `user_id` | uuid | → users |
-| `plan_type` | text | `monthly` / `yearly` |
+| `plan_type` | text | `premium_monthly` / `premium_yearly` / `meguri_plus_monthly` / `monthly` / `yearly` |
 | `status` | text | `incomplete` / `incomplete_expired` / `trialing` / `active` / `past_due` / `cancelled` / `canceled` / `unpaid` / `expired` |
 | `started_at` | timestamptz | 開始日時 |
 | `current_period_end` | timestamptz | 現契約期間の終了 |
@@ -827,6 +829,7 @@ iter45 で追加。`notes/16_monetization.md` の戦略に対応するテーブ�
 
 > iter166: 実装上のPremium判定は `subscriptions` の生ステータスではなく、Stripe webhook/管理者操作で集約された `user_entitlements(feature_key='premium', active=true)` を参照する。
 > `subscriptions` 本体はプロバイダーIDを含むためクライアントへ直接SELECTさせず、ユーザー向け表示は server route で必要列だけ返す。
+> iter168.43: めぐりPlusは Premium とは別権限として `user_entitlements(feature_key='meguri_plus', active=true)` を参照する。`meguri_plus_monthly` の webhook は `meguri_plus` 権限を更新する。
 
 ### `boosts`（ブースト残数管理）
 
@@ -958,7 +961,7 @@ RLS:
 | カラム | 型 | 説明 |
 |---|---|---|
 | `user_id` | uuid PK | → users |
-| `feature_key` | text PK | `premium` 等 |
+| `feature_key` | text PK | `premium` / `meguri_plus` 等 |
 | `active` | boolean | 現在有効か |
 | `source` | text | `subscription` / `manual_override` / `system` / `purchase` |
 | `subscription_id` | uuid nullable | → subscriptions |

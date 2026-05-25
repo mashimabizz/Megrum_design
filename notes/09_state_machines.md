@@ -598,7 +598,7 @@ iter157 で体験プロトタイプを iOS 版に追加し、iter162.41 でレ�
 ```mermaid
 stateDiagram-v2
     [*] --> received_locked: メッセージ到着
-    received_locked --> opened: Plusで本文表示
+    received_locked --> opened: めぐりPlusで本文表示
     opened --> replied: 返信送信
     received_locked --> hidden: 非表示 / ブロック
     opened --> hidden: 非表示 / ブロック
@@ -617,8 +617,9 @@ stateDiagram-v2
 
 ### ビジネスルール
 
-- 単発の本文表示チケットは作らず、月額1000円のサブスクのみで本文表示・返信を許可する。
-- 送信側は月2通まで無料。月2通を超える送信枠追加は Plus 対象。
+- 単発の本文表示チケットは作らず、月額1000円のめぐりPlusのみで本文表示・返信を許可する。
+- 送信側は月2通まで無料。月2通を超える送信枠追加はめぐりPlus対象。
+- 実装上のめぐりPlus判定は `user_entitlements(feature_key='meguri_plus', active=true)` を参照する。無料ユーザーには `meguri_messages` の本文・画像パスを直接返さず、専用RPCでロック済みメタ情報だけ返す。
 - 場所と時刻は必ず丸め、正確な地点・時刻・職場や生活導線の特定につながる表示は避ける。
 - 交換・打診・取引とは独立し、`proposal` / `deal` 状態へ自動遷移しない。
 
@@ -714,7 +715,7 @@ stateDiagram-v2
 | エンティティ | 状態 | 説明 |
 |---|---|---|
 | `subscriptions` | `incomplete` / `incomplete_expired` / `trialing` / `active` / `past_due` / `cancelled` / `canceled` / `unpaid` / `expired` | Stripe等プロバイダー由来の契約状態 |
-| `user_entitlements` | `active=true/false` | アプリが参照する最終的な機能権限。`feature_key='premium'` がPremium判定 |
+| `user_entitlements` | `active=true/false` | アプリが参照する最終的な機能権限。`feature_key='premium'` がPremium判定、`feature_key='meguri_plus'` がめぐりPlus判定 |
 | `stripe_webhook_events` | `processing` / `processed` / `failed` / `ignored` | webhook処理の冪等性・再処理判断 |
 
 ### ビジネスルール
@@ -722,7 +723,7 @@ stateDiagram-v2
 - 管理者の追加・更新は `roles.manage` 権限が必要。最後の `owner` を無効化・降格してはいけない。
 - `requires_mfa=true` の管理者は Supabase Auth の AAL2 セッションでのみ管理者ページへ入れる。
 - ユーザー停止・権限変更・有料権限手動上書きは、理由入力を必須にし `admin_audit_logs` に保存する。
-- Stripe webhook は `stripe_webhook_events.event_id` で重複処理を防ぎ、`subscriptions` 更新後に `user_entitlements(feature_key='premium')` を upsert する。
+- Stripe webhook は `stripe_webhook_events.event_id` で重複処理を防ぎ、`subscriptions` 更新後に plan_type に応じて `user_entitlements(feature_key='premium' | 'meguri_plus')` を upsert する。
 - 手動上書きは `plan_overrides` に履歴を残し、同時に `user_entitlements` を更新する。
 
 ## 14. 付録：エンティティ間の関係

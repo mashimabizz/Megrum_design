@@ -4,6 +4,95 @@
 
 ---
 
+## イテレーション168.43：めぐりPlus権限を実装
+
+### 背景・問題意識
+
+オーナーから「めぐりに関する有料プランについて機能実装」「Megrum Plusではなく、めぐりPlusという名前に変更」「開発中は、michilionのアカウントでのみ、Plus会員か無料会員かをボタン１つで切り替え」と指示があった。既存実装はローカル `AsyncStorage` の擬似Plus切替で、無料送信枠も仕様上の月2通ではなく月3通になっていた。また、めぐりメッセージ本文がDBから直接取得できる構造のままだったため、本番課金前に `premium` とは分離した `meguri_plus` 権限へ整理する必要があった。
+
+### 変更内容
+
+#### `mobile/src/lib/meguriPlus.ts`
+- めぐりPlus判定を `user_entitlements(feature_key='meguri_plus')` へ分離した。
+- `michilion` アカウントだけが使えるレビュー用ローカル上書きを追加した。
+- 無料送信枠を月2通、めぐりPlus送信枠を月8通として定数化した。
+
+#### `mobile/app/meguri-plus.tsx` / `mobile/app/meguri-letters.tsx` / `mobile/app/(tabs)/encounters.tsx`
+- ユーザー向け名称を `めぐりPlus` に統一した。
+- Plus判定をローカル擬似設定から `meguri_plus` 権限 + `michilion` 限定レビュー上書きへ差し替えた。
+- `michilion` では1ボタンで「めぐりPlus会員 / 無料会員」を切り替えられるようにした。
+- 無料送信枠を月2通に戻し、3通目以降はめぐりPlus導線へ出すようにした。
+
+#### `mobile/src/lib/meguriMessages.ts` / `supabase/migrations/20260525052000_add_meguri_plus_entitlement.sql`
+- `list_meguri_messages_for_viewer()` RPC を追加し、無料受信者には本文・画像パスを返さずロック済みメタ情報だけ返すようにした。
+- `meguri_messages` の直接SELECTは、送信者本人または `meguri_plus` 有効な受信者に限定した。
+- `meguri-message-media` の画像閲覧も同じ権限判定へ寄せた。
+- `subscriptions.plan_type` に `meguri_plus_monthly` を追加した。
+
+#### `web/src/app/api/stripe/webhook/route.ts`
+- Stripe webhookで `plan_type='meguri_plus_monthly'` の場合は `user_entitlements(feature_key='meguri_plus')` を更新するようにした。
+- 既存Premium系は引き続き `feature_key='premium'` を更新する。
+
+#### 法務・仕様ドキュメント
+- 特商法表示に `めぐりPlus：月額¥1,000` を追加した。
+- `notes/05_data_model.md` / `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/13_api_spec.md` / `notes/16_monetization.md` / `notes/17_legal_alignment.md` / `notes/21_oshi_encounter_strategy.md` を更新した。
+
+### 影響範囲
+
+- iOS版 めぐりPlus画面
+- iOS版 めぐりメッセージ一覧・スレッド
+- めぐりメッセージ本文/画像のRLS・RPC
+- Stripe webhookの有料権限反映
+- 特商法表示、マネタイズ、API、データモデル、状態遷移、用語集
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- `EXPO_NO_GIT_STATUS=1 npm --prefix mobile run update:ios:preview -- --message "[iter168.43] めぐりPlus権限を実装" --non-interactive`
+- EAS Update: `019e5d7e-da8f-7c0a-8cfc-c55143877c13`
+- EAS Update group: `633f3914-485a-42fb-a1e9-3a50b6f0165e`
+- `npm --prefix web run lint -- src/app/api/stripe/webhook/route.ts src/app/legal/notice/page.tsx`
+- `supabase db push --dry-run`
+- `supabase db push --yes`
+
+### 関連ファイル
+
+- `mobile/src/lib/meguriPlus.ts`
+- `mobile/src/lib/meguriPlusPurchase.ts`
+- `mobile/app/meguri-plus.tsx`
+- `mobile/app/meguri-letters.tsx`
+- `mobile/app/(tabs)/encounters.tsx`
+- `mobile/src/lib/meguriMessages.ts`
+- `supabase/migrations/20260525052000_add_meguri_plus_entitlement.sql`
+- `web/src/app/api/stripe/webhook/route.ts`
+- `mobile/app/legal/notice.tsx`
+- `web/src/app/legal/notice/page.tsx`
+- `iHub/legal-pages.jsx`
+- `notes/05_data_model.md`
+- `notes/09_state_machines.md`
+- `notes/10_glossary.md`
+- `notes/13_api_spec.md`
+- `notes/16_monetization.md`
+- `notes/17_legal_alignment.md`
+- `notes/21_oshi_encounter_strategy.md`
+
+### セルフレビュー結果
+
+- ✅ ユーザー向け名称を `めぐりPlus` に統一
+- ✅ `premium` と `meguri_plus` を分離
+- ✅ 無料送信枠を月2通へ修正
+- ✅ `michilion` 限定の1ボタン切替を実装
+- ✅ 無料受信者へ `meguri_messages` 本文/画像パスを直接返さないRPC/RLSへ変更
+- ✅ 特商法表示にめぐりPlus月額¥1,000を追加
+- ✅ モバイル型チェック成功
+- ✅ iOS Preview export 成功
+- ✅ Preview channel へ EAS Update 済み
+- ✅ Web対象ファイルlint成功
+- ✅ Supabase migration dry-run / remote push 成功
+
+---
+
 ## イテレーション168.42：推し分類切替を即時化
 
 ### 背景・問題意識
@@ -387,7 +476,6 @@ K-POP男性L2を追加したにもかかわらず、画面上で増えている�
 
 - ✅ ソロ候補で「0メンバー」を表示しない
 - ✅ グループ / 作品候補のメンバー数表示は維持
-- ✅ Preview channel へ EAS Update 済み
 - ✅ 状態IDの追加・変更なし（`notes/09_state_machines.md` 更新不要）
 - ✅ 新しいアプリ用語・廃止用語なし（`notes/10_glossary.md` 更新不要）
 - ✅ DBスキーマ変更なし（`notes/05_data_model.md` 更新不要）
@@ -765,7 +853,6 @@ K-POP男性L2を追加したにもかかわらず、画面上で増えている�
 
 ---
 
-
 ## イテレーション168.27：ビッグ作品の主要L2を厚増し
 
 ### 背景・問題意識
@@ -1003,7 +1090,7 @@ iter168.24 で `group` / `work` のL2空状態は解消できたが、オーナ�
 - 推し追加モーダルの候補パネル右端に出ていた「追加 / 追加済み」ラベルを削除した。
 - 候補パネルのタップを即追加ではなく選択/解除に変更した。
 - 1件以上選択すると、下部に「推しを設定する」ボタンを表示するようにした。
-- 複数候補を選択してボタンを押すと、まとめて `user_oshi` に追加するようにした。
+- 複数候補を選択してボタンを押すと、まとめて `user_oshi` に追加し、ローカルUIにも即時反映するようにした。
 - 設定済み候補はパネル内メタ情報で「設定済み」と分かるようにし、再選択できない状態を維持した。
 
 #### `web/src/app/profile/oshi/OshiEditView.tsx`
@@ -1375,6 +1462,52 @@ iter168.24 で `group` / `work` のL2空状態は解消できたが、オーナ�
 
 ---
 
+## イテレーション168.17：めぐりあい一覧を実データ読込後に表示
+
+### 背景・問題意識
+
+オーナーから「めぐりあいのメッセージ一覧が、まだ開いた瞬間にプレビュー？かわからないですが、それぞれのメッセージがパッと切り替わります」「一発で自分の下のデータを読み込んで欲しくて、読み込み中はそもそもメッセージ一覧全体で読み込み中、、みたいな感じでだしてほしい」と指摘があった。取引タブのめぐりあい一覧が、通常ログイン時でも固定サンプルの `LETTERS + USERS` から会話行を先に作り、あとから `groom_replies` を混ぜ直していたため、一覧が開いた瞬間に別データから実データへ切り替わって見えていた。
+
+### 変更内容
+
+#### `mobile/app/(tabs)/transactions.tsx`
+- 通常ログイン時は、めぐりあい一覧のロード中に固定サンプル行を表示しないようにした。
+- `meguriLoading` を追加し、`loadMeguriMessageReadState()` / `loadMeguriGroomReplies()` / `loadMeguriThreadMessages()` が完了するまで一覧全体を「メッセージを読み込み中…」表示にした。
+- preview mode のみ従来の固定サンプル会話を表示する構成にした。
+- 実データ表示では `groom_replies` と `meguri_messages` から会話相手・最新本文・未読数を組み立てるようにした。
+
+### 影響範囲
+
+- iOS版 取引タブの「めぐりあい」メッセージ一覧
+- めぐりあいメッセージ一覧の初回ロード表示
+- グルーム返信とめぐりあいメッセージの会話プレビュー
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- `npm --prefix mobile run update:ios:preview -- --message "[iter168.17] めぐりあい一覧を実データ読込後に表示" --non-interactive`
+- EAS Update: `019e5995-5d33-7d82-968f-a04970c6d59d`
+- EAS Update group: `97efaa0b-e0f3-495c-8bbf-9bc8b3cbe13f`
+
+### 関連ファイル
+
+- `mobile/app/(tabs)/transactions.tsx`
+- `notes/08_design_iterations.md`
+
+### セルフレビュー結果
+
+- ✅ 通常ログイン時の固定サンプル先出しを停止
+- ✅ ロード中は会話行を描画せず、一覧全体の読み込み表示へ変更
+- ✅ `groom_replies` と `meguri_messages` の実データから会話一覧を作成
+- ✅ `npm --prefix mobile run typecheck` 成功
+- ✅ `npm --prefix mobile run export:ios:preview` 成功
+- ✅ Expo preview channel への EAS Update 成功
+- ✅ 状態IDの追加・変更なし（`notes/09_state_machines.md` 更新不要）
+- ✅ 新しいアプリ用語・廃止用語なし（`notes/10_glossary.md` 更新不要）
+- ✅ DBスキーマの追加変更なし（`notes/05_data_model.md` 更新不要）
+
+---
 
 ## イテレーション168.16：グルーム右タップを直近表示へ修正
 

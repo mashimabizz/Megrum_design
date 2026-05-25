@@ -103,6 +103,8 @@ export default function LegalNoticePage() {
                 <br />
                 <b>Premium 会員</b>：月額 ¥500 / 年額 ¥4,800
                 <br />
+                <b>めぐりPlus</b>：月額 ¥1,000
+                <br />
                 <span className="text-[11px] text-[#3a324a8c]">
                   ※ すべて税込。Phase β 以降に提供予定
                 </span>
@@ -131,6 +133,7 @@ export default function LegalNoticePage() {
                 <b>ブースト</b>：未使用分は 30 日以内なら返金可
                 <br />
                 <b>Premium 会員</b>
+                ・<b>めぐりPlus</b>
                 ：いつでも解約可（期間終了まで使用可、中途返金なし）
               </>
             }

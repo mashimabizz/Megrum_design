@@ -38,7 +38,7 @@
 12. [Deals（取引）](#12-deals取引)
 13. [Disputes（異議申し立て）](#13-disputes異議申し立て)
 14. [Reports（通報）](#14-reports通報)
-15. [Subscriptions（Premium 会員）](#15-subscriptionspremium-会員)
+15. [Subscriptions（Premium 会員 / めぐりPlus）](#15-subscriptionspremium-会員--めぐりplus)
 16. [Boosts（ブースト機能）](#16-boostsブースト機能)
 17. [Ads（広告配信）](#17-ads広告配信)
 18. [Misc（通知・WebSocket）](#18-misc通知websocket)
@@ -1134,27 +1134,27 @@ dispute 詳細。
 
 ---
 
-## 15. Subscriptions（Premium 会員）
+## 15. Subscriptions（Premium 会員 / めぐりPlus）
 
-iter45 で追加。`notes/16_monetization.md` § Premium 会員 に対応。
+iter45 で追加。`notes/16_monetization.md` § Premium 会員 に対応。iter168.43 で、めぐりPlus（月額¥1,000）を `feature_key='meguri_plus'` の独立権限として追加。
 
 ### GET /api/v1/subscriptions/me
 
 自分のサブスクリプション情報取得。
 
 - **Auth**: 必須
-- **Response 200**: `{ subscription: { plan_type, status, started_at, current_period_end, cancelled_at } | null, is_premium: boolean }`
+- **Response 200**: `{ subscription: { plan_type, status, started_at, current_period_end, cancelled_at } | null, is_premium: boolean, entitlements: { premium: boolean, meguri_plus: boolean } }`
 - **Screen**: `SET-top`、`PRO-hub`
 
 ### POST /api/v1/subscriptions/checkout
 
-Premium 会員の決済セッション開始。
+Premium 会員またはめぐりPlusの決済セッション開始。
 
 - **Auth**: 必須
-- **Request**: `{ plan_type: "monthly" | "yearly", provider: "stripe" | "apple" | "google" }`
+- **Request**: `{ plan_type: "premium_monthly" | "premium_yearly" | "meguri_plus_monthly" | "monthly" | "yearly", provider: "stripe" | "apple" | "google" }`
 - **Response 200**: `{ checkout_url, session_id }`（Stripe 等の決済画面 URL）
 - **備考**: Apple/Google の場合は in-app purchase でクライアント側完結 ⚠️
-- **Screen**: 「Premium 会員になる」CTA → 決済画面
+- **Screen**: 「Premium 会員になる」/「めぐりPlusをはじめる」CTA → 決済画面
 
 ### POST /api/v1/subscriptions/webhooks/stripe
 
@@ -1162,7 +1162,7 @@ Stripe webhook 受信。
 
 - **Auth**: webhook 署名検証
 - **実装 route**: Web App Router では `/api/stripe/webhook`（iter166）。外部公開API名として `/api/v1/subscriptions/webhooks/stripe` を維持する場合は rewrite で接続する。
-- **Side effects**: `stripe_webhook_events` に event_id を保存して冪等化、`subscriptions` レコード作成・更新、`user_entitlements(feature_key='premium')` を更新。広告非表示・boost grant はPremium仕様確定後に別ジョブで反映。
+- **Side effects**: `stripe_webhook_events` に event_id を保存して冪等化、`subscriptions` レコード作成・更新。`plan_type='meguri_plus_monthly'` は `user_entitlements(feature_key='meguri_plus')`、それ以外のPremium系は `user_entitlements(feature_key='premium')` を更新。広告非表示・boost grant はPremium仕様確定後に別ジョブで反映。
 
 ### Admin Console（server actions / iter166）
 
