@@ -607,7 +607,7 @@ function MessageThreadScreen({
                   animalType={letter.from.animalType}
                   furColor={letter.from.furColor}
                   hue={letter.from.hue}
-                  size={36}
+                  size={30}
                 />
               </View>
             ) : null}
@@ -1505,17 +1505,17 @@ const styles = StyleSheet.create({
   messageLine: {
     alignItems: "flex-end",
     flexDirection: "row",
-    gap: 7,
+    gap: 6,
   },
   messageLineMine: {
     justifyContent: "flex-end",
   },
   smallAvatar: {
     alignItems: "center",
-    borderRadius: 18,
-    height: 36,
+    borderRadius: 15,
+    height: 30,
     justifyContent: "center",
-    width: 36,
+    width: 30,
   },
   smallAvatarText: {
     color: "#fff",
@@ -1525,7 +1525,7 @@ const styles = StyleSheet.create({
   theirBubbleWrap: {
     alignItems: "flex-end",
     flexDirection: "row",
-    gap: 7,
+    gap: 6,
     maxWidth: "86%",
   },
   mineBubbleWrap: {
@@ -1583,25 +1583,26 @@ const styles = StyleSheet.create({
   lockedMosaic: {
     alignItems: "center",
     backgroundColor: "#f0fbfb",
-    borderRadius: 26,
+    borderRadius: 28,
     justifyContent: "center",
-    minHeight: 112,
+    minHeight: 96,
     overflow: "hidden",
     paddingHorizontal: 22,
-    paddingVertical: 24,
-    width: 234,
+    paddingVertical: 0,
+    width: 216,
   },
   lockedMosaicGlow: {
     backgroundColor: "rgba(40,188,198,0.13)",
     borderRadius: 999,
-    height: 64,
+    height: 58,
     left: 36,
     position: "absolute",
     right: 36,
     shadowColor: "#6bd7dd",
-    shadowOffset: { width: 0, height: 12 },
-    shadowOpacity: 0.42,
-    shadowRadius: 18,
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.38,
+    shadowRadius: 16,
+    top: 19,
   },
   lockedMosaicButton: {
     alignItems: "center",
@@ -1609,16 +1610,16 @@ const styles = StyleSheet.create({
     backgroundColor: "#12b8c8",
     borderRadius: 999,
     justifyContent: "center",
-    minHeight: 46,
+    minHeight: 38,
     paddingHorizontal: 18,
     shadowColor: "#0898a5",
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.24,
-    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.22,
+    shadowRadius: 12,
   },
   lockedMosaicText: {
     color: "#fff",
-    fontSize: 17,
+    fontSize: 16,
     fontWeight: "900",
   },
   groomReplyAttachment: {
@@ -1654,7 +1655,7 @@ const styles = StyleSheet.create({
     alignItems: "flex-start",
     gap: 1,
     minWidth: 38,
-    paddingBottom: 6,
+    paddingBottom: 2,
   },
   messageMetaText: {
     color: "rgba(77,99,101,0.72)",
