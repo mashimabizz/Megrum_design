@@ -4,6 +4,48 @@
 
 ---
 
+## イテレーション168.45：めぐりPlusレビュー切替を常時表示
+
+### 背景・問題意識
+
+オーナーから「一度Plus会員に切り替えた後、無料会員に切り替えるボタンがない」と指摘があった。iter168.43 では `michilion` アカウント限定の切替ボタンをPlusモーダル内に置いていたが、Plus会員状態では本文ロックが解除されるため、通常操作ではPlusモーダルへ戻る入口が消えてしまっていた。
+
+### 変更内容
+
+#### `mobile/app/meguri-letters.tsx`
+- `michilion` アカウントでは、めぐりメッセージ一覧ヘッダー右側にレビュー用の切替ピルを常時表示するようにした。
+- めぐりメッセージの会話スレッドヘッダー右側にも同じ切替ピルを表示するようにした。
+- Plus会員状態では `無料へ`、無料状態では `Plusへ` と表示し、どちらの状態からでも1タップで切り替えられるようにした。
+
+### 影響範囲
+
+- iOS版 めぐりメッセージ一覧
+- iOS版 めぐりメッセージ会話スレッド
+- `michilion` 限定の開発レビュー導線
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- `EXPO_NO_GIT_STATUS=1 npm --prefix mobile run update:ios:preview -- --message "[iter168.45] めぐりPlusレビュー切替を常時表示" --non-interactive`
+- EAS Update: `019e5dac-ec16-778b-aeae-564786347117`
+- EAS Update group: `5967a5c3-7280-4a97-a1f2-23c3f581f21a`
+
+### 関連ファイル
+
+- `mobile/app/meguri-letters.tsx`
+
+### セルフレビュー結果
+
+- ✅ Plus会員状態でも無料会員へ戻す入口を常時表示
+- ✅ 表示対象は `michilion` のレビュー用アカウントに限定
+- ✅ 状態名・用語追加はないため `09` / `10` 更新不要
+- ✅ モバイル型チェック成功
+- ✅ iOS Preview export 成功
+- ✅ Preview channel へ EAS Update 済み
+
+---
+
 ## イテレーション168.44：めぐりPlus送信枠を20通化
 
 ### 背景・問題意識

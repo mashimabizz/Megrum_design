@@ -284,11 +284,13 @@ export default function MeguriLettersScreen() {
         draft={draft}
         insetsBottom={Math.max(insets.bottom, 10)}
         insetsTop={Math.max(insets.top, 12)}
+        canUseReviewToggle={canUsePlusReviewToggle}
         onBack={() => setSelectedConversation(null)}
         onChangeDraft={setDraft}
         onOpenPlan={() => setPlusOpen(true)}
         onPickImage={sendImage}
         onSend={sendMessage}
+        onToggleReviewPlan={toggleSubscribed}
         remainingSends={remainingSends}
         sendUsed={sendUsed}
         sentMessages={threadSentMessages[selectedConversation.id] ?? []}
@@ -309,19 +311,25 @@ export default function MeguriLettersScreen() {
   return (
     <Screen bottomInset={false} contentStyle={styles.lineRoot} scroll={false} topInset={false}>
       <View style={[styles.messageHeader, { paddingTop: Math.max(insets.top, 12) + 12 }]}>
-        <Pressable
-          accessibilityLabel="戻る"
-          accessibilityRole="button"
-          onPress={() => {
-            if (router.canGoBack()) router.back();
-            else router.replace("/encounters");
-          }}
-          style={styles.messageBackButton}
-        >
-          <IconSymbol name="chevron-back" color={ihubColors.ink} size={22} />
-        </Pressable>
+        <View style={styles.messageHeaderSide}>
+          <Pressable
+            accessibilityLabel="戻る"
+            accessibilityRole="button"
+            onPress={() => {
+              if (router.canGoBack()) router.back();
+              else router.replace("/encounters");
+            }}
+            style={styles.messageBackButton}
+          >
+            <IconSymbol name="chevron-back" color={ihubColors.ink} size={22} />
+          </Pressable>
+        </View>
         <Text style={styles.messageHeaderTitle}>メッセージ</Text>
-        <View style={styles.messageHeaderSpacer} />
+        <View style={[styles.messageHeaderSide, styles.messageHeaderSideRight]}>
+          {canUsePlusReviewToggle ? (
+            <ReviewPlanToggleButton active={subscribed} onPress={toggleSubscribed} />
+          ) : null}
+        </View>
       </View>
 
       <ScrollView
@@ -439,6 +447,7 @@ function ConversationRow({
 }
 
 function MessageThreadScreen({
+  canUseReviewToggle,
   children,
   conversation,
   draft,
@@ -449,12 +458,14 @@ function MessageThreadScreen({
   onOpenPlan,
   onPickImage,
   onSend,
+  onToggleReviewPlan,
   remainingSends,
   sendUsed,
   sentMessages,
   showPreviewReply,
   subscribed,
 }: {
+  canUseReviewToggle: boolean;
   children: ReactNode;
   conversation: MessageConversation;
   draft: string;
@@ -465,6 +476,7 @@ function MessageThreadScreen({
   onOpenPlan: () => void;
   onPickImage: () => void;
   onSend: () => void;
+  onToggleReviewPlan: () => void;
   remainingSends: number;
   sendUsed: number;
   sentMessages: ChatMessage[];
@@ -501,18 +513,26 @@ function MessageThreadScreen({
     <View style={styles.chatKeyboardRoot}>
     <Screen bottomInset={false} contentStyle={styles.chatRoot} scroll={false} topInset={false}>
       <View style={[styles.chatHeader, { paddingTop: insetsTop }]}>
-        <Pressable accessibilityRole="button" onPress={onBack} style={styles.chatBack}>
-          <IconSymbol name="chevron-back" color={ihubColors.ink} size={26} />
-        </Pressable>
+        <View style={styles.chatHeaderSide}>
+          <Pressable accessibilityRole="button" onPress={onBack} style={styles.chatBack}>
+            <IconSymbol name="chevron-back" color={ihubColors.ink} size={26} />
+          </Pressable>
+        </View>
         <View style={styles.chatHeaderCenter}>
           <Text numberOfLines={1} style={styles.chatTitle}>{letter.from.name}</Text>
           <Text numberOfLines={1} style={styles.chatSubTitle}>
             めぐりあい
           </Text>
         </View>
-        <Pressable accessibilityRole="button" style={styles.chatMenu}>
-          <IconSymbol name="ellipsis-horizontal" color={ihubColors.ink} size={24} />
-        </Pressable>
+        <View style={[styles.chatHeaderSide, styles.chatHeaderSideRight]}>
+          {canUseReviewToggle ? (
+            <ReviewPlanToggleButton active={subscribed} onPress={onToggleReviewPlan} />
+          ) : (
+            <Pressable accessibilityRole="button" style={styles.chatMenu}>
+              <IconSymbol name="ellipsis-horizontal" color={ihubColors.ink} size={24} />
+            </Pressable>
+          )}
+        </View>
       </View>
 
       <Pressable
@@ -708,6 +728,27 @@ function AppTabItem({
         ) : null}
       </View>
       <Text style={[styles.appTabLabel, active ? styles.appTabLabelActive : null]}>{label}</Text>
+    </Pressable>
+  );
+}
+
+function ReviewPlanToggleButton({
+  active,
+  onPress,
+}: {
+  active: boolean;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      accessibilityLabel={active ? "無料会員に切り替える" : "めぐりPlus会員に切り替える"}
+      accessibilityRole="button"
+      onPress={onPress}
+      style={[styles.reviewPlanToggle, active ? styles.reviewPlanToggleActive : null]}
+    >
+      <Text style={[styles.reviewPlanToggleText, active ? styles.reviewPlanToggleTextActive : null]}>
+        {active ? "無料へ" : "Plusへ"}
+      </Text>
     </Pressable>
   );
 }
@@ -1082,6 +1123,14 @@ const styles = StyleSheet.create({
     paddingBottom: 12,
     paddingHorizontal: 14,
   },
+  messageHeaderSide: {
+    alignItems: "flex-start",
+    justifyContent: "center",
+    width: 72,
+  },
+  messageHeaderSideRight: {
+    alignItems: "flex-end",
+  },
   messageBackButton: {
     alignItems: "center",
     height: 42,
@@ -1094,9 +1143,6 @@ const styles = StyleSheet.create({
     fontSize: 22,
     fontWeight: "900",
     textAlign: "center",
-  },
-  messageHeaderSpacer: {
-    width: 42,
   },
   talkList: {
     backgroundColor: "#fff",
@@ -1321,6 +1367,14 @@ const styles = StyleSheet.create({
     paddingBottom: 9,
     paddingHorizontal: 10,
   },
+  chatHeaderSide: {
+    alignItems: "flex-start",
+    justifyContent: "center",
+    width: 72,
+  },
+  chatHeaderSideRight: {
+    alignItems: "flex-end",
+  },
   chatBack: {
     alignItems: "center",
     height: 38,
@@ -1350,6 +1404,28 @@ const styles = StyleSheet.create({
     height: 38,
     justifyContent: "center",
     width: 40,
+  },
+  reviewPlanToggle: {
+    alignItems: "center",
+    backgroundColor: "rgba(166,149,216,0.12)",
+    borderColor: "rgba(166,149,216,0.26)",
+    borderRadius: 999,
+    borderWidth: 1,
+    minWidth: 62,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+  },
+  reviewPlanToggleActive: {
+    backgroundColor: ihubColors.ink,
+    borderColor: ihubColors.ink,
+  },
+  reviewPlanToggleText: {
+    color: ihubColors.lavender,
+    fontSize: 11,
+    fontWeight: "900",
+  },
+  reviewPlanToggleTextActive: {
+    color: "#fff",
   },
   chatScroll: {
     backgroundColor: ihubColors.background,
