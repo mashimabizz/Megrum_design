@@ -265,6 +265,10 @@ Phase 0a 完了後、Supabase CLI で初期化予定。
 □ 5. データモデルに影響あるか？ → あれば notes/05_data_model.md にメモ追加
 □ 6. commit メッセージは [iter◯◯] [タイトル] 形式で
 □ 7. push
+□ 8. **iOS版 / mobile のユーザー向け変更は、必ず Preview channel にも反映**
+   - JS/TSだけの変更：`npm --prefix mobile run export:ios:preview` → `EXPO_NO_GIT_STATUS=1 npm --prefix mobile run update:ios:preview -- --message "[iter◯◯] ..." --non-interactive`
+   - Swift / Expo local module / native config / 依存追加を含む変更：EAS Updateだけでは反映されないため、Preview用のEAS buildが必要。必要ならオーナーにビルド手順を渡す
+   - Preview更新した場合は、EAS Update ID / Update group を `notes/08_design_iterations.md` の確認方法へ記録
 ```
 
 **省略禁止**：チェックリストの 2-5 を飛ばすと、別環境の Claude が同じ判断を再現できなくなる。
