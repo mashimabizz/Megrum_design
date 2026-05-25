@@ -4,6 +4,54 @@
 
 ---
 
+## イテレーション168.39：K-POP男性L2を旧メンバーまで補完
+
+### 背景・問題意識
+
+オーナーから、K-POP男性のL1に紐づくL2について「それぞれ3、4人くらいしかメンバーがいないの嘘すぎる」と指摘があった。前回補完では現役メンバー中心に判定していたため、旧譜・旧トレカ・過去ツアーグッズで検索される旧メンバーや、NCT内の複数ユニット所属文脈が足りていなかった。
+
+### 変更内容
+
+#### `supabase/migrations/20260525044500_expand_kpop_male_l2_depth.sql`
+- K-POP男性L1に対して、旧メンバー/旧活動文脈も含むL2を24件追加した。
+- `Stray Kids`、`RIIZE`、`TREASURE`、`THE BOYZ`、`NCT 127`、`EXO`、`SHINee`、`MONSTA X`、`BTOB`、`SUPER JUNIOR`、`WayV`、`ONEUS`、`BIGBANG` を補完した。
+- `SUPER JUNIOR` は本体の旧メンバーに加え、グッズ検索で拾われやすい `Super Junior-M` 文脈の `ヘンリー` / `チョウミ` も追加した。
+- `NCT 127` / `NCT DREAM` / `WayV` で同一人物になる `マーク`、`ヘチャン`、`ウィンウィン` の `entity_id` を明示的に束ねた。
+- 英字表記・旧芸名・本名を `aliases` に入れ、検索の取りこぼしを減らした。
+
+### 影響範囲
+
+- 推し追加/推し設定のK-POP男性候補
+- グッズ登録、Wish登録、譲グッズ登録時のK-POP男性メンバー候補
+- NCT系メンバーの同一人物集計
+
+### 確認方法
+
+- `supabase db push --dry-run`
+- `supabase db push --yes`
+- 追加後レビュー: 追加候補24件について `missing_count = 0`
+- 追加後レビュー: 追加候補24件について `entity_null_count = 0`
+- 追加後レビュー: K-POP男性内の `(group_id, name)` 重複0件
+- 追加後レビュー: `マーク`、`ヘチャン`、`ウィンウィン` のNCT系 `entity_id` 同期を確認
+
+### 関連ファイル
+
+- `supabase/migrations/20260525044500_expand_kpop_male_l2_depth.sql`
+- `notes/08_design_iterations.md`
+
+### セルフレビュー結果
+
+- ✅ K-POP男性だけに絞って再レビュー
+- ✅ 現役だけでなく旧グッズ検索に必要な旧メンバー文脈を追加
+- ✅ 追加候補24件の登録漏れなし
+- ✅ 追加候補24件の `entity_id` 同期漏れなし
+- ✅ K-POP男性内の重複L2なし
+- ✅ 状態IDの追加・変更なし（`notes/09_state_machines.md` 更新不要）
+- ✅ 新しいアプリ用語・廃止用語なし（`notes/10_glossary.md` 更新不要）
+- ✅ 既存マスタへのデータ追加のみでDBスキーマ変更なし（`notes/05_data_model.md` 更新不要）
+
+---
+
 ## イテレーション168.38：対象L1の所属L2を大幅補完
 
 ### 背景・問題意識
