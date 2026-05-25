@@ -4,6 +4,58 @@
 
 ---
 
+## イテレーション168.40：推しL2取得をページング化
+
+### 背景・問題意識
+
+K-POP男性L2を追加したにもかかわらず、画面上で増えているように見えないと指摘があった。実DBでは `SHINee` に `ジョンヒョン` を含む5件が登録されていたが、`characters_master` が2825件まで増えたことで、推し設定画面のL2全件取得がSupabase/PostgRESTのデフォルト上限1000件に引っかかり、画面側の候補数が途中で欠ける状態になっていた。
+
+### 変更内容
+
+#### `mobile/app/oshi-settings.tsx`
+- `characters_master` の取得を単発selectから1000件単位の `.range()` ページング取得へ変更した。
+- 推し追加モーダルと推しメンバー追加で、増えたL2マスタを全件使えるようにした。
+
+#### `web/src/app/profile/oshi/page.tsx`
+- Web/PWA側の推し設定でも同じページング取得に変更した。
+- 既存のL1/L2集約ロジックは維持し、取得漏れだけを解消した。
+
+### 影響範囲
+
+- iOS版 推し設定/推し追加画面
+- Web/PWA版 推し設定/推し追加画面
+- L2名検索とメンバー数表示
+
+### 確認方法
+
+- `supabase db query --linked -o table "select count(*) as characters_master_count from public.characters_master;"`
+- `supabase db query --linked -o table "select gm.name as l1, cm.name as l2 from public.characters_master cm join public.groups_master gm on gm.id = cm.group_id join public.genres_master ge on ge.id = cm.genre_id where ge.name = 'K-POP男性' and gm.name ilike '%SHINee%' order by cm.display_order, cm.name;"`
+- `npm --prefix mobile run typecheck`
+- `npm --prefix web run lint -- src/app/profile/oshi/page.tsx`
+- `npm --prefix mobile run export:ios:preview`
+- `EXPO_NO_GIT_STATUS=1 npm --prefix mobile run update:ios:preview -- --message "[iter168.40] 推しL2取得をページング化" --non-interactive`
+- EAS Update: `019e5d26-8cd5-77a4-b0b8-04443d20f3e5`
+- EAS Update group: `48c220ec-6f25-4427-adaa-2414640d0f32`
+
+### 関連ファイル
+
+- `mobile/app/oshi-settings.tsx`
+- `web/src/app/profile/oshi/page.tsx`
+- `notes/08_design_iterations.md`
+
+### セルフレビュー結果
+
+- ✅ `characters_master` 2825件に対して1000件上限を回避
+- ✅ `SHINee` のL2は `オンユ`、`キー`、`ミンホ`、`テミン`、`ジョンヒョン` の5件をDBで確認
+- ✅ モバイル型チェック成功
+- ✅ Web/PWA対象ファイルlint成功
+- ✅ Preview channel へ EAS Update 済み
+- ✅ 状態IDの追加・変更なし（`notes/09_state_machines.md` 更新不要）
+- ✅ 新しいアプリ用語・廃止用語なし（`notes/10_glossary.md` 更新不要）
+- ✅ DBスキーマ変更なし（`notes/05_data_model.md` 更新不要）
+
+---
+
 ## イテレーション168.39：K-POP男性L2を旧メンバーまで補完
 
 ### 背景・問題意識

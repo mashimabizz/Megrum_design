@@ -114,6 +114,7 @@ const REQUEST_KINDS: { value: OshiRequestKind; label: string }[] = [
   { value: "work", label: "作品" },
   { value: "solo", label: "ソロ" },
 ];
+const MASTER_CHARACTER_PAGE_SIZE = 1000;
 
 export default function OshiSettingsScreen() {
   const { user, previewMode } = useAuth();
@@ -1011,7 +1012,7 @@ async function fetchOshiData(userId: string): Promise<OshiData> {
   if (!supabase) return { groups: [], genres: [], masterOptions: [] };
   const [
     { data: oshi, error: oshiError },
-    { data: characters, error: characterError },
+    characters,
     { data: genres, error: genreError },
     { data: masterGroups, error: masterError },
   ] = await Promise.all([
@@ -1022,10 +1023,7 @@ async function fetchOshiData(userId: string): Promise<OshiData> {
       )
       .eq("user_id", userId)
       .order("priority", { ascending: true }),
-    supabase
-      .from("characters_master")
-      .select("id, name, group_id")
-      .order("display_order", { ascending: true }),
+    fetchAllMasterCharacters(),
     supabase
       .from("genres_master")
       .select("id, name")
@@ -1036,11 +1034,10 @@ async function fetchOshiData(userId: string): Promise<OshiData> {
       .order("display_order", { ascending: true }),
   ]);
   if (oshiError) throw oshiError;
-  if (characterError) throw characterError;
   if (genreError) throw genreError;
   if (masterError) throw masterError;
 
-  const characterRows = (characters as CharacterRow[] | null) ?? [];
+  const characterRows = characters;
   const groups = buildGroups((oshi as OshiRow[] | null) ?? [], characterRows);
   const charactersByGroup = new Map<string, { id: string; name: string }[]>();
   for (const character of characterRows) {
@@ -1073,6 +1070,24 @@ async function fetchOshiData(userId: string): Promise<OshiData> {
     })),
     masterOptions,
   };
+}
+
+async function fetchAllMasterCharacters(): Promise<CharacterRow[]> {
+  if (!supabase) return [];
+  const rows: CharacterRow[] = [];
+  for (let from = 0; ; from += MASTER_CHARACTER_PAGE_SIZE) {
+    const { data, error } = await supabase
+      .from("characters_master")
+      .select("id, name, group_id")
+      .order("display_order", { ascending: true })
+      .order("name", { ascending: true })
+      .range(from, from + MASTER_CHARACTER_PAGE_SIZE - 1);
+    if (error) throw error;
+    const page = (data as CharacterRow[] | null) ?? [];
+    rows.push(...page);
+    if (page.length < MASTER_CHARACTER_PAGE_SIZE) break;
+  }
+  return rows;
 }
 
 function buildGroups(rows: OshiRow[], characters: CharacterRow[]): OshiGroup[] {

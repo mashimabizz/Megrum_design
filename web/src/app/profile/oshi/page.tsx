@@ -35,6 +35,12 @@ type GenreRow = {
   name: string;
 };
 
+type CharacterRow = {
+  id: string;
+  name: string;
+  group_id: string | null;
+};
+
 type MasterGroupRow = {
   id: string;
   name: string;
@@ -52,6 +58,27 @@ function pickOne<T>(v: T | T[] | null): T | null {
   return Array.isArray(v) ? (v[0] ?? null) : v;
 }
 
+const MASTER_CHARACTER_PAGE_SIZE = 1000;
+
+async function fetchAllMasterCharacters(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+): Promise<CharacterRow[]> {
+  const rows: CharacterRow[] = [];
+  for (let from = 0; ; from += MASTER_CHARACTER_PAGE_SIZE) {
+    const { data, error } = await supabase
+      .from("characters_master")
+      .select("id, name, group_id")
+      .order("display_order", { ascending: true })
+      .order("name", { ascending: true })
+      .range(from, from + MASTER_CHARACTER_PAGE_SIZE - 1);
+    if (error) throw error;
+    const page = (data as CharacterRow[] | null) ?? [];
+    rows.push(...page);
+    if (page.length < MASTER_CHARACTER_PAGE_SIZE) break;
+  }
+  return rows;
+}
+
 type Props = {
   searchParams: Promise<{ request?: string }>;
 };
@@ -67,7 +94,7 @@ export default async function ProfileOshiPage({ searchParams }: Props) {
   // 自分の推し + 関連 master + 追加リクエスト用 genre を並列取得
   const [
     { data: oshi },
-    { data: characters },
+    characters,
     { data: genres },
     { data: masterGroups },
   ] = await Promise.all([
@@ -78,10 +105,7 @@ export default async function ProfileOshiPage({ searchParams }: Props) {
       )
       .eq("user_id", user.id)
       .order("priority", { ascending: true }),
-    supabase
-      .from("characters_master")
-      .select("id, name, group_id")
-      .order("display_order", { ascending: true }),
+    fetchAllMasterCharacters(supabase),
     supabase
       .from("genres_master")
       .select("id, name")
@@ -187,7 +211,7 @@ export default async function ProfileOshiPage({ searchParams }: Props) {
     string,
     { id: string; name: string }[]
   >();
-  for (const c of characters ?? []) {
+  for (const c of characters) {
     if (!c.group_id) continue;
     const list = charactersByGroup.get(c.group_id) ?? [];
     list.push({ id: c.id, name: c.name });
