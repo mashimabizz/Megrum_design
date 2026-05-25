@@ -4025,7 +4025,7 @@ export function PlusModal({
           <View style={styles.planBullets}>
             <PlanBullet text="届いたメッセージの本文を表示" />
             <PlanBullet text="本文を表示した相手に返信" />
-            <PlanBullet text="無料枠を超えてメッセージを送信" />
+            <PlanBullet text={`新規メッセージを月${PLUS_SEND_LIMIT}通まで送信`} />
             <PlanBullet text="めぐり履歴と広場を長く保存" />
           </View>
           {canUseReviewToggle ? (

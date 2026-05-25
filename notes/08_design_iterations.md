@@ -4,6 +4,66 @@
 
 ---
 
+## イテレーション168.44：めぐりPlus送信枠を20通化
+
+### 背景・問題意識
+
+オーナーから「めぐりPlusは月20通まで新規のユーザーに送れるように」「無料会員の際のメッセージが届いている時、相手からのメッセージにモザイクをかけるように」と指示があった。iter168.43 ではめぐりPlus送信枠を月8通としていたが、レビュー時の期待値は月20通だった。また、無料会員のロック済みスレッドでは本文を伏せていたものの、会話泡としては「メッセージが届いています！」という通常テキストに見えており、開封前の秘匿感が弱かった。
+
+### 変更内容
+
+#### `mobile/src/lib/meguriPlus.ts`
+- めぐりPlusの月間送信枠を 8 通から 20 通へ変更した。
+- 月ごとの送信使用数を `AsyncStorage` に保存し、無料/Plusのどちらでも同じ月次カウンタで残数を計算するようにした。
+
+#### `mobile/app/meguri-letters.tsx`
+- めぐりPlus会員でも月20通を超えた場合は送信欄をロックし、残数表示を月20通基準にした。
+- 無料会員で相手から届いたロック済みメッセージは、本文テキストではなく細かいモザイクブロック付きの泡として表示するようにした。
+- モザイク泡内の「めぐりPlusで開封」から従来のめぐりPlusモーダルへ遷移できるようにした。
+
+#### `mobile/app/meguri-plus.tsx` / `mobile/app/(tabs)/encounters.tsx`
+- めぐりPlusの訴求文言を「新規メッセージ月20通」に更新した。
+
+#### `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/16_monetization.md`
+- めぐりPlusの送信枠を月20通として仕様文言を更新した。
+
+### 影響範囲
+
+- iOS版 めぐりPlus画面
+- iOS版 めぐりメッセージ一覧・スレッド
+- めぐりPlusの送信枠表示・送信ロック
+- めぐりメッセージの無料会員向けロック表示
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- `EXPO_NO_GIT_STATUS=1 npm --prefix mobile run update:ios:preview -- --message "[iter168.44] めぐりPlus送信枠を20通化" --non-interactive`
+- EAS Update: `019e5da0-329b-7a3f-aaec-69c209f2ed9c`
+- EAS Update group: `8aa06de6-43a2-42cd-b89c-9f78307eb548`
+
+### 関連ファイル
+
+- `mobile/src/lib/meguriPlus.ts`
+- `mobile/src/lib/meguriSettings.ts`
+- `mobile/app/meguri-letters.tsx`
+- `mobile/app/meguri-plus.tsx`
+- `mobile/app/(tabs)/encounters.tsx`
+- `notes/09_state_machines.md`
+- `notes/10_glossary.md`
+- `notes/16_monetization.md`
+
+### セルフレビュー結果
+
+- ✅ めぐりPlus送信枠を月20通へ変更
+- ✅ 無料会員の相手メッセージを通常テキストではなくモザイク泡で表示
+- ✅ 状態遷移・用語集・マネタイズ文書の送信枠記述を更新
+- ✅ モバイル型チェック成功
+- ✅ iOS Preview export 成功
+- ✅ Preview channel へ EAS Update 済み
+
+---
+
 ## イテレーション168.43：めぐりPlus権限を実装
 
 ### 背景・問題意識

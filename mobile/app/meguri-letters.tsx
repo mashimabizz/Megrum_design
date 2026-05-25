@@ -24,12 +24,15 @@ import { ihubColors } from "../src/theme/tokens";
 import {
   FREE_SEND_LIMIT,
   LETTERS,
+  PLUS_SEND_LIMIT,
   PlusModal,
   USERS,
   type Letter,
   type MeguriUser,
 } from "./(tabs)/encounters";
 import {
+  incrementMeguriSendUsage,
+  loadMeguriSendUsage,
   loadMeguriPlusState,
   saveMeguriPlusReviewOverride,
 } from "../src/lib/meguriPlus";
@@ -143,7 +146,8 @@ export default function MeguriLettersScreen() {
     [groomReplyMessages, messageLetters, threadMessages],
   );
   const unreadCount = conversations.reduce((sum, item) => sum + item.unread, 0);
-  const remainingFreeSends = Math.max(0, FREE_SEND_LIMIT - sendUsed);
+  const activeSendLimit = subscribed ? PLUS_SEND_LIMIT : FREE_SEND_LIMIT;
+  const remainingSends = Math.max(0, activeSendLimit - sendUsed);
 
   useEffect(() => {
     let mounted = true;
@@ -154,12 +158,15 @@ export default function MeguriLettersScreen() {
       loadMeguriGroomReplies().catch(() => []),
       loadMeguriThreadMessages().catch(() => []),
     ])
-      .then(([plus, nextReadState, replies, messages]) => {
+      .then(async ([plus, nextReadState, replies, messages]) => {
+        const nextSubscribed = plus?.active ?? false;
+        const usage = await loadMeguriSendUsage(profile, nextSubscribed).catch(() => null);
         if (!mounted) return;
         if (plus) {
           setSubscribed(plus.active);
           setCanUsePlusReviewToggle(plus.canUseReviewToggle);
         }
+        setSendUsed(usage?.used ?? INITIAL_FREE_SEND_USED);
         setReadState(nextReadState);
         setGroomReplies(replies);
         setThreadMessages(messages);
@@ -225,7 +232,7 @@ export default function MeguriLettersScreen() {
 
   async function sendMessage() {
     if (!draft.trim() || !selectedConversation) return;
-    const canSend = subscribed || remainingFreeSends > 0;
+    const canSend = remainingSends > 0;
     if (!canSend) {
       setPlusOpen(true);
       return;
@@ -238,12 +245,13 @@ export default function MeguriLettersScreen() {
       peerName: selectedConversation.letter.from.name,
     });
     setThreadMessages((current) => mergeThreadMessageList(current, [message]));
-    if (!subscribed) setSendUsed((current) => Math.min(FREE_SEND_LIMIT, current + 1));
+    const usage = await incrementMeguriSendUsage(profile, subscribed);
+    setSendUsed(usage.used);
   }
 
   async function sendImage() {
     if (!selectedConversation) return;
-    const canSend = subscribed || remainingFreeSends > 0;
+    const canSend = remainingSends > 0;
     if (!canSend) {
       setPlusOpen(true);
       return;
@@ -265,7 +273,8 @@ export default function MeguriLettersScreen() {
       peerName: selectedConversation.letter.from.name,
     });
     setThreadMessages((current) => mergeThreadMessageList(current, [message]));
-    if (!subscribed) setSendUsed((current) => Math.min(FREE_SEND_LIMIT, current + 1));
+    const usage = await incrementMeguriSendUsage(profile, subscribed);
+    setSendUsed(usage.used);
   }
 
   if (selectedConversation) {
@@ -280,7 +289,7 @@ export default function MeguriLettersScreen() {
         onOpenPlan={() => setPlusOpen(true)}
         onPickImage={sendImage}
         onSend={sendMessage}
-        remainingFreeSends={remainingFreeSends}
+        remainingSends={remainingSends}
         sendUsed={sendUsed}
         sentMessages={threadSentMessages[selectedConversation.id] ?? []}
         showPreviewReply={previewMode}
@@ -440,7 +449,7 @@ function MessageThreadScreen({
   onOpenPlan,
   onPickImage,
   onSend,
-  remainingFreeSends,
+  remainingSends,
   sendUsed,
   sentMessages,
   showPreviewReply,
@@ -456,7 +465,7 @@ function MessageThreadScreen({
   onOpenPlan: () => void;
   onPickImage: () => void;
   onSend: () => void;
-  remainingFreeSends: number;
+  remainingSends: number;
   sendUsed: number;
   sentMessages: ChatMessage[];
   showPreviewReply: boolean;
@@ -467,13 +476,15 @@ function MessageThreadScreen({
   const messages = buildMessages(letter, canRead, sentMessages, showPreviewReply);
   const chatScrollRef = useRef<ScrollView>(null);
   const lastMessageId = messages[messages.length - 1]?.id ?? null;
-  const canSend = subscribed || remainingFreeSends > 0;
+  const canSend = remainingSends > 0;
   const lockedByPlan = !canRead;
   const sendLockedByPlan = !canSend;
   const composerPlaceholder = lockedByPlan
-      ? "メッセージを入力"
+    ? "メッセージを入力"
     : sendLockedByPlan
-      ? `無料は月${FREE_SEND_LIMIT}通まで`
+      ? subscribed
+        ? `めぐりPlusは月${PLUS_SEND_LIMIT}通まで`
+        : `無料は月${FREE_SEND_LIMIT}通まで`
       : "メッセージを入力";
   const keyboardInset = useKeyboardInset();
   const composerBottomInset = keyboardInset > 0 ? 8 : insetsBottom;
@@ -543,15 +554,21 @@ function MessageThreadScreen({
         style={styles.chatScroll}
       >
         <Text style={styles.dateChip}>今日</Text>
-        {!subscribed && (lockedByPlan || sendLockedByPlan) ? (
+        {lockedByPlan || sendLockedByPlan ? (
           <View style={styles.systemNotice}>
             <Text style={styles.systemNoticeTitle}>
-              {lockedByPlan ? "メッセージが届いています！" : "無料送信枠を使い切りました"}
+              {lockedByPlan
+                ? "メッセージが届いています！"
+                : subscribed
+                  ? "今月のめぐりPlus送信枠を使い切りました"
+                  : "無料送信枠を使い切りました"}
             </Text>
             <Text style={styles.systemNoticeText}>
               {lockedByPlan
                 ? "本文の開封と返信にはめぐりPlusが必要です。"
-                : `無料は月${FREE_SEND_LIMIT}通まで。${FREE_SEND_LIMIT + 1}通目以降はめぐりPlusで送信できます。現在 ${sendUsed}/${FREE_SEND_LIMIT} 通使用済み。`}
+                : subscribed
+                  ? `めぐりPlusは月${PLUS_SEND_LIMIT}通まで新規メッセージを送れます。現在 ${sendUsed}/${PLUS_SEND_LIMIT} 通使用済み。`
+                  : `無料は月${FREE_SEND_LIMIT}通まで。${FREE_SEND_LIMIT + 1}通目以降はめぐりPlusで送信できます。現在 ${sendUsed}/${FREE_SEND_LIMIT} 通使用済み。`}
             </Text>
             <Pressable onPress={onOpenPlan} style={styles.systemNoticeButton}>
               <Text style={styles.systemNoticeButtonText}>めぐりPlusを見る</Text>
@@ -596,18 +613,14 @@ function MessageThreadScreen({
                   mine={message.mine}
                   style={[styles.bubble, message.mine ? styles.mineBubble : styles.theirBubble]}
                 >
-                  {message.imageUri ? (
+                  {message.locked ? (
+                    <LockedMessageMosaic onPress={onOpenPlan} />
+                  ) : message.imageUri ? (
                     <Image source={{ uri: message.imageUri }} style={styles.messageImage} />
-                  ) : null}
-                  {message.body && !message.imageUri ? (
+                  ) : message.body ? (
                     <Text style={[styles.bubbleText, message.mine ? styles.mineBubbleText : null]}>
                       {message.body}
                     </Text>
-                  ) : null}
-                  {message.locked ? (
-                    <Pressable onPress={onOpenPlan} style={styles.bubblePlanButton}>
-                      <Text style={styles.bubblePlanText}>めぐりPlusで開封</Text>
-                    </Pressable>
                   ) : null}
                 </ChatGradientBubble>
               </View>
@@ -695,6 +708,51 @@ function AppTabItem({
         ) : null}
       </View>
       <Text style={[styles.appTabLabel, active ? styles.appTabLabelActive : null]}>{label}</Text>
+    </Pressable>
+  );
+}
+
+const LOCKED_MOSAIC_ROWS = [10, 9, 11, 8];
+const LOCKED_MOSAIC_COLORS = [
+  "rgba(166,149,216,0.28)",
+  "rgba(168,212,230,0.34)",
+  "rgba(243,197,212,0.3)",
+  "rgba(58,50,74,0.12)",
+];
+
+function LockedMessageMosaic({ onPress }: { onPress: () => void }) {
+  return (
+    <Pressable
+      accessibilityLabel="めぐりPlusでメッセージを開封"
+      accessibilityRole="button"
+      onPress={onPress}
+      style={styles.lockedMosaic}
+    >
+      <View pointerEvents="none" style={styles.lockedMosaicGrid}>
+        {LOCKED_MOSAIC_ROWS.map((count, rowIndex) => (
+          <View key={`row-${rowIndex}`} style={styles.lockedMosaicRow}>
+            {Array.from({ length: count }).map((_, tileIndex) => (
+              <View
+                key={`${rowIndex}-${tileIndex}`}
+                style={[
+                  styles.lockedMosaicTile,
+                  {
+                    backgroundColor:
+                      LOCKED_MOSAIC_COLORS[
+                        (rowIndex * 2 + tileIndex) % LOCKED_MOSAIC_COLORS.length
+                      ],
+                    opacity: 0.72 - ((rowIndex + tileIndex) % 3) * 0.12,
+                  },
+                ]}
+              />
+            ))}
+          </View>
+        ))}
+      </View>
+      <View style={styles.lockedMosaicOverlay}>
+        <IconSymbol name="lock-closed-outline" color="#fff" size={13} />
+        <Text style={styles.lockedMosaicText}>めぐりPlusで開封</Text>
+      </View>
     </Pressable>
   );
 }
@@ -1456,6 +1514,43 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     height: 150,
     width: 190,
+  },
+  lockedMosaic: {
+    borderColor: "rgba(166,149,216,0.18)",
+    borderRadius: 15,
+    borderWidth: 1,
+    minHeight: 76,
+    overflow: "hidden",
+    padding: 9,
+    width: 198,
+  },
+  lockedMosaicGrid: {
+    gap: 5,
+  },
+  lockedMosaicRow: {
+    flexDirection: "row",
+    gap: 4,
+  },
+  lockedMosaicTile: {
+    borderRadius: 4,
+    flex: 1,
+    height: 10,
+  },
+  lockedMosaicOverlay: {
+    alignItems: "center",
+    alignSelf: "flex-start",
+    backgroundColor: ihubColors.ink,
+    borderRadius: 999,
+    flexDirection: "row",
+    gap: 5,
+    marginTop: 9,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  lockedMosaicText: {
+    color: "#fff",
+    fontSize: 11,
+    fontWeight: "900",
   },
   groomReplyAttachment: {
     alignItems: "flex-end",

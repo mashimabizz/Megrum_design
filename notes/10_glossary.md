@@ -348,7 +348,7 @@
 | **ブースト** | boost | 24時間限定で自分の打診・在庫を相手画面で上位表示する課金機能。広告非表示も付帯 | iter45, 16 §6 |
 | **ブーストパック** | boost pack | ブースト購入時の単位（単発1個 / 5個 / 10個） | iter45 |
 | **Premium 会員** | premium subscriber | 月額/年額のサブスク会員。広告非表示＋月3ブースト＋装飾 | iter45, 16 §7 |
-| **めぐりPlus** | meguri plus, encounter plus | 月額1000円のめぐり向けサブスク。めぐりメッセージ本文の表示・返信・送信枠追加を提供する。単発の本文表示チケットは持たない | iter162.41, iter168.43 |
+| **めぐりPlus** | meguri plus, encounter plus | 月額1000円のめぐり向けサブスク。めぐりメッセージ本文の表示・返信・新規メッセージ月20通を提供する。単発の本文表示チケットは持たない | iter162.41, iter168.43, iter168.44 |
 | **Native ad** | ネイティブ広告 | マッチカード等と同形のスポンサー広告。「★ Sponsored」明示 | iter45, 16 §5 |
 | **フッターバナー** | footer banner | 画面下部の固定/末尾バナー広告 | iter45 |
 | **Tier 1 / Tier 2 / Tier 3** | — | 広告配置の3階層。Tier 1=Native、Tier 2=フッター、Tier 3=広告ゼロ画面 | iter45, 16 §5 |
@@ -371,7 +371,7 @@
 | `monthly` / `yearly` | subscription.plan_type | 課金周期 |
 | `premium_monthly` / `premium_yearly` | subscriptions.plan_type | 実装側のPremium課金周期 |
 | `premium` | user_entitlements.feature_key | アプリ側がPremium機能を判定する権限キー |
-| `meguri_plus` | user_entitlements.feature_key | めぐりPlus機能（めぐりメッセージ本文表示・返信・送信枠追加）を判定する権限キー |
+| `meguri_plus` | user_entitlements.feature_key | めぐりPlus機能（めぐりメッセージ本文表示・返信・新規メッセージ月20通）を判定する権限キー |
 | `subscription` / `manual_override` / `system` / `purchase` | user_entitlements.source | 権限付与元 |
 | `purchase` / `premium_grant` | boosts.granted_via | 取得経路 |
 | `proposal` / `match_view` / `chat` | boosts.target_type | 発動対象種別 |

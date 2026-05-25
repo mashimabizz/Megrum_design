@@ -15,7 +15,7 @@ import { requestMeguriPlusStorePurchase } from "../src/lib/meguriPlusPurchase";
 const FEATURES = [
   { title: "届いたメッセージを表示", sub: "本文を読めるようになります", icon: "mail-outline" as const },
   { title: "メッセージに返信できる", sub: "ゆっくり会話を続けられます", icon: "create-outline" as const },
-  { title: `送信枠が月${PLUS_SEND_LIMIT}通に`, sub: `${FREE_SEND_LIMIT}通から${PLUS_SEND_LIMIT}通へ拡張`, icon: "sparkles-outline" as const },
+  { title: `新規メッセージ送信枠が月${PLUS_SEND_LIMIT}通に`, sub: `${FREE_SEND_LIMIT}通から${PLUS_SEND_LIMIT}通へ拡張`, icon: "sparkles-outline" as const },
   { title: "めぐりカードの深掘り", sub: "プロフ・推し履歴・再めぐり履歴", icon: "document-text-outline" as const },
   { title: "めぐり履歴の振り返り", sub: "12ヶ月まで保存", icon: "time-outline" as const },
   { title: "マップの詳細分析", sub: "地方・時期・推しジャンル別", icon: "search" as const },
@@ -98,7 +98,7 @@ export default function MeguriPlusScreen() {
         />
         <Text style={styles.statusText}>
           {savedActive
-            ? `めぐりPlusが有効です。届いた本文の開封と${FREE_SEND_LIMIT + 1}通目以降の送信ができます。`
+            ? `めぐりPlusが有効です。届いた本文の開封と月${PLUS_SEND_LIMIT}通までの新規メッセージ送信ができます。`
             : `現在はFreeです。本文の開封と${FREE_SEND_LIMIT + 1}通目以降の送信はめぐりPlusで使えます。`}
         </Text>
       </View>

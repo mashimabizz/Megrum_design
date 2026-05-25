@@ -41,7 +41,7 @@ export const DEFAULT_MEGURI_PROFILE: MeguriProfileSettings = {
 export const DEFAULT_MEGURI_PLUS: MeguriPlusSettings = {
   active: false,
   freeSendLimit: 2,
-  monthlySendLimit: 8,
+  monthlySendLimit: 20,
 };
 
 export async function loadMeguriAvatarSettings() {
