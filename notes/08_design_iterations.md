@@ -4,6 +4,53 @@
 
 ---
 
+## イテレーション168.54：workspace依存をroot lockfileで固定
+
+### 背景・問題意識
+
+オーナーの最新 iOS Preview build ログでも、失敗箇所は引き続き `Bundle React Native code and images` で、`main.jsbundle` 内の `OTEL_PKG` 動的 import により Hermes が `Invalid expression encountered` で停止していた。ログ中の `resolveHeadersConstructor` / `Deno` / `Headers` 周辺のコード断片を追跡したところ、これは `@supabase/supabase-js` の `2.106.x` 系が追加した tracing / OpenTelemetry 対応コードと一致した。一方、repo の `mobile/package-lock.json` は `2.105.4` を固定しており、手元の export もその版で成功している。原因は、npm workspace の root lockfile が存在しないため、EAS の monorepo install で `mobile/package-lock.json` ではなく `mobile/package.json` の semver range (`^2.105.4`) から最新 `2.106.1` が解決され、remote build だけ dependency tree が変わっていたことだった。
+
+### 変更内容
+
+#### `mobile/package.json`
+- `@supabase/supabase-js` を `^2.105.4` から `2.105.4` に固定した。
+- tracing / OpenTelemetry を含む `2.106.x` 系への意図しない自動更新を防いだ。
+
+#### `mobile/package-lock.json`
+- workspace 内の manifest と整合するよう、top-level dependency spec を `2.105.4` に揃えた。
+
+#### `package-lock.json`
+- npm workspace 用の root lockfile を新規追加した。
+- EAS monorepo install でも root lockfile 経由で `mobile` / `packages/*` の dependency tree を固定し、手元と remote build の解決結果を一致させた。
+
+### 影響範囲
+
+- EAS iOS Preview / development / production build の npm workspace install
+- mobile の Supabase SDK 版
+- monorepo の再現性
+
+### 確認方法
+
+- 一時 workspace で root lockfile なしの `npm install --package-lock-only` を再現し、`@supabase/supabase-js` が `2.106.1` に解決されることを確認
+- root lockfile 生成後に `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+
+### 関連ファイル
+
+- `mobile/package.json`
+- `mobile/package-lock.json`
+- `package-lock.json`
+- `notes/08_design_iterations.md`
+
+### セルフレビュー結果
+
+- ✅ 新ログでも failure point が Swift ではなく JS bundle 生成であることを再確認
+- ✅ npm workspace は root lockfile を使う前提であることと、EAS が immutable lockfile install を使うことを公式ドキュメントで確認
+- ✅ `OTEL_PKG` を含む `@supabase/supabase-js 2.106.x` への drift を止める方針に絞った
+- ✅ 状態遷移・用語・データモデルの変更はないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` 更新不要
+
+---
+
 ## イテレーション168.53：EAS混入サーバー依存をnative shimへ隔離
 
 ### 背景・問題意識
