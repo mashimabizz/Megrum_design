@@ -831,7 +831,7 @@ function MasterSelectModal({
                       {option.name}
                     </div>
                     <div className="mt-0.5 truncate text-[11px] font-medium text-[#3a324a8c]">
-                      {option.genreName}・{kindLabel(option.kind)}
+                      {kindLabel(option.kind)}
                       {option.kind !== "solo" && option.characters.length > 0
                         ? `・メンバー ${option.characters.length}件`
                         : ""}

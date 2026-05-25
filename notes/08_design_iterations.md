@@ -4,6 +4,55 @@
 
 ---
 
+## イテレーション168.42：推し分類切替を即時化
+
+### 背景・問題意識
+
+オーナーから、推し追加モーダル下部の分類ボタン（K-POP男性など）を押した時に「少しラグがあってその分類の画面に切り替わる」と指摘があった。また、L1候補カードのメタ表示で `TXT / K-POP男性 / グループ / 5メンバー` のように大分類名が出ているが、分類タブで文脈は分かるため不要との指示があった。
+
+### 変更内容
+
+#### `mobile/app/oshi-settings.tsx`
+- 分類チップタップ時のページ移動をアニメーション付き横スクロールから即時ジャンプに変更した。
+- L1候補カードのメタ表示から大分類名を外し、`グループ / 5メンバー` のように表示するようにした。
+
+#### `web/src/app/profile/oshi/OshiEditView.tsx`
+- Web/PWA側の同等モーダルでも、L1候補カードのメタ表示から大分類名を外した。
+
+### 影響範囲
+
+- iOS版 推し設定の「推しを追加」モーダル
+- Web/PWA版 推し設定の「推し追加」モーダル
+- L1候補カードのメタ表示
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix web run lint -- src/app/profile/oshi/OshiEditView.tsx`
+- `npm --prefix mobile run export:ios:preview`
+- `EXPO_NO_GIT_STATUS=1 npm --prefix mobile run update:ios:preview -- --message "[iter168.42] 推し分類切替を即時化" --non-interactive`
+- EAS Update: `019e5d31-f8c7-7e68-aa23-e00938fb8c17`
+- EAS Update group: `02d4d4de-f175-434b-940e-d8cbb353b138`
+
+### 関連ファイル
+
+- `mobile/app/oshi-settings.tsx`
+- `web/src/app/profile/oshi/OshiEditView.tsx`
+- `notes/08_design_iterations.md`
+
+### セルフレビュー結果
+
+- ✅ 分類チップタップ時の横スクロールアニメーションを停止し、即時切替に変更
+- ✅ L1候補カードから大分類名表示を削除
+- ✅ モバイル型チェック成功
+- ✅ Web/PWA対象ファイルlint成功
+- ✅ Preview channel へ EAS Update 済み
+- ✅ 状態IDの追加・変更なし（`notes/09_state_machines.md` 更新不要）
+- ✅ 新しいアプリ用語・廃止用語なし（`notes/10_glossary.md` 更新不要）
+- ✅ DBスキーマ変更なし（`notes/05_data_model.md` 更新不要）
+
+---
+
 ## イテレーション168.41：推し追加検索欄のキーボード被りを解消
 
 ### 背景・問題意識

@@ -727,7 +727,7 @@ function MasterSelectModal({
     suppressGenreSyncRef.current = true;
     setGenreId(nextId);
     setPagerPosition(nextIndex);
-    pagerRef.current?.scrollTo({ x: nextIndex * pageWidth, animated: true });
+    pagerRef.current?.scrollTo({ x: nextIndex * pageWidth, animated: false });
   }
 
   function handlePagerSettled(event: NativeSyntheticEvent<NativeScrollEvent>) {
@@ -785,7 +785,7 @@ function MasterSelectModal({
           <View style={styles.masterCopy}>
             <Text numberOfLines={1} style={styles.masterName}>{option.name}</Text>
             <Text numberOfLines={1} style={styles.masterMeta}>
-              {option.genreName} / {kindLabel(option.kind)}
+              {kindLabel(option.kind)}
               {option.kind === "solo" ? "" : ` / ${option.characters.length}メンバー`}
               {selected ? " / 設定済み" : ""}
             </Text>
