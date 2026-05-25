@@ -20,6 +20,7 @@ import {
 import { PrimaryButton } from "../src/components/PrimaryButton";
 import { Screen } from "../src/components/Screen";
 import { StatusPill } from "../src/components/StatusPill";
+import { TradingCardBulkCropper } from "../src/components/TradingCardBulkCropper";
 import { useAuth } from "../src/auth/AuthProvider";
 import { supabase } from "../src/lib/supabase";
 import { ihubColors, ihubRadii, ihubShadow } from "../src/theme/tokens";
@@ -47,6 +48,11 @@ type CreateMeta = {
   characterValue: string;
   title: string;
   quantity: number;
+};
+type LocalPhotoAsset = {
+  uri: string;
+  mimeType?: string | null;
+  fileName?: string | null;
 };
 
 type EditorItem = {
@@ -880,6 +886,7 @@ function InventoryCreateFlow({
   const [tags, setTags] = useState<TagValue[]>([]);
   const [tagDraft, setTagDraft] = useState("");
   const [tagSuggestions, setTagSuggestions] = useState<TagSuggestion[]>([]);
+  const [tradingCardCropperOpen, setTradingCardCropperOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -896,6 +903,7 @@ function InventoryCreateFlow({
   const uploadedCount = photos.filter((photo) => photo.status === "uploaded").length;
   const uploadingCount = photos.filter((photo) => photo.status === "uploading").length;
   const isOther = selectedGoodsType?.name === "その他";
+  const isTradingCardType = selectedGoodsType?.name === "トレカ";
 
   useEffect(() => {
     setPendingMembers(data.pendingMembers);
@@ -997,7 +1005,21 @@ function InventoryCreateFlow({
           });
     if (result.canceled || result.assets.length === 0) return;
 
-    const nextPhotos = result.assets.map((asset) => ({
+    await appendLocalPhotos(result.assets.map((asset) => ({
+      uri: asset.uri,
+      mimeType: asset.mimeType,
+      fileName: asset.fileName,
+    })));
+  }
+
+  async function appendLocalPhotos(assets: LocalPhotoAsset[]) {
+    if (!supabase || previewMode || !userId) {
+      setError("ログイン後に写真登録できます");
+      return;
+    }
+    if (assets.length === 0) return;
+
+    const nextPhotos = assets.map((asset) => ({
       id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
       uri: asset.uri,
       publicUrl: null,
@@ -1006,7 +1028,7 @@ function InventoryCreateFlow({
     setPhotos((current) => [...current, ...nextPhotos]);
 
     await Promise.all(
-      result.assets.map(async (asset, index) => {
+      assets.map(async (asset, index) => {
         const photoId = nextPhotos[index].id;
         try {
           const publicUrl = await uploadGoodsPhoto({
@@ -1039,6 +1061,17 @@ function InventoryCreateFlow({
           );
         }
       }),
+    );
+  }
+
+  async function handleTradingCardCrops(imageUris: string[]) {
+    setError(null);
+    await appendLocalPhotos(
+      imageUris.map((uri, index) => ({
+        uri,
+        mimeType: "image/jpeg",
+        fileName: `trading-card-crop-${Date.now()}-${index + 1}.jpg`,
+      })),
     );
   }
 
@@ -1247,6 +1280,13 @@ function InventoryCreateFlow({
   if (step === "shoot") {
     return (
       <View style={styles.createFlow}>
+        <TradingCardBulkCropper
+          visible={tradingCardCropperOpen}
+          onClose={() => setTradingCardCropperOpen(false)}
+          onComplete={(imageUris) => {
+            void handleTradingCardCrops(imageUris);
+          }}
+        />
         <View style={styles.createHint}>
           <Text style={styles.createHintTitle}>写真を撮る / 選ぶ</Text>
           <Text style={styles.createHintText}>
@@ -1264,6 +1304,25 @@ function InventoryCreateFlow({
             <Text style={styles.photoPickText}>写真を選ぶ</Text>
           </Pressable>
         </View>
+
+        {isTradingCardType ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="トレカ専用 AIで一括登録"
+            onPress={() => setTradingCardCropperOpen(true)}
+            style={styles.tradingCardBulkButton}
+          >
+            <View style={styles.tradingCardBulkIcon}>
+              <Text style={styles.tradingCardBulkIconText}>AI</Text>
+            </View>
+            <View style={styles.tradingCardBulkCopy}>
+              <Text style={styles.tradingCardBulkTitle}>トレカ専用 AIで一括登録</Text>
+              <Text style={styles.tradingCardBulkText}>
+                複数枚を1枚の写真から検出し、1枚ずつ切り出して追加します。
+              </Text>
+            </View>
+          </Pressable>
+        ) : null}
 
         {photos.length > 0 ? (
           <View style={styles.createPhotoSection}>
@@ -2328,6 +2387,44 @@ const styles = StyleSheet.create({
     color: ihubColors.ink,
     fontSize: 13,
     fontWeight: "900",
+  },
+  tradingCardBulkButton: {
+    alignItems: "center",
+    backgroundColor: "rgba(168,212,230,0.18)",
+    borderColor: "rgba(166,149,216,0.28)",
+    borderRadius: ihubRadii.lg,
+    borderWidth: 1,
+    flexDirection: "row",
+    gap: 12,
+    padding: 14,
+  },
+  tradingCardBulkIcon: {
+    alignItems: "center",
+    backgroundColor: ihubColors.lavender,
+    borderRadius: ihubRadii.md,
+    height: 46,
+    justifyContent: "center",
+    width: 46,
+  },
+  tradingCardBulkIconText: {
+    color: ihubColors.surface,
+    fontSize: 13,
+    fontWeight: "900",
+  },
+  tradingCardBulkCopy: {
+    flex: 1,
+    gap: 4,
+  },
+  tradingCardBulkTitle: {
+    color: ihubColors.ink,
+    fontSize: 14,
+    fontWeight: "900",
+  },
+  tradingCardBulkText: {
+    color: ihubColors.mutedInk,
+    fontSize: 11.5,
+    fontWeight: "800",
+    lineHeight: 17,
   },
   createPhotoSection: {
     backgroundColor: ihubColors.surface,

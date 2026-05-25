@@ -1,0 +1,10 @@
+{
+  "name": "megrum-trading-card-cropper",
+  "version": "0.1.0",
+  "description": "On-device trading card rectangle detection and perspective cropper for Megrum.",
+  "license": "UNLICENSED",
+  "private": true,
+  "peerDependencies": {
+    "expo": "*"
+  }
+}

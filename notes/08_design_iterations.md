@@ -4,6 +4,82 @@
 
 ---
 
+## イテレーション168.49：トレカAI一括登録を追加
+
+### 背景・問題意識
+
+オーナーから、譲るグッズ登録で種別「トレカ」を選んだ場合、写真選択画面に `トレカ専用 AIで一括登録` ボタンを設け、複数トレカを1枚の写真から端末内で検出・切り出しできるようにしたいという指示があった。サーバー通信やOpenCV等の外部ライブラリは使わず、iOS純正の Vision / Core Image で完結させる必要がある。
+
+### 変更内容
+
+#### `mobile/app/goods-editor.tsx`
+- 譲るグッズ新規登録フローで、選択したグッズ種別が `トレカ` の場合だけ写真ステップに `トレカ専用 AIで一括登録` ボタンを表示するようにした。
+- AI一括登録で生成された切り出し画像を、既存の複数写真登録と同じ `goods_inventory.photo_urls` 登録フローへ流し込むようにした。
+
+#### `mobile/src/components/TradingCardBulkCropper.tsx`
+- 撮影/ライブラリ選択、撮影ガイド、検出中ローディング、検出枠プレビュー、四隅ドラッグ調整、不要枠削除、手動枠追加、切り出し後サムネイル確認、90度回転補正、確定導線を追加した。
+- ネイティブモジュール未組み込みの既存ビルドでは、その旨を画面内で案内するフォールバック文言を出すようにした。
+
+#### `mobile/src/lib/tradingCardCropper.ts`
+- React Native側から `detectCardsAsync` / `cropCardsAsync` / `rotateImagesAsync` を呼べる薄いラッパーを追加した。
+- 将来のReact Native Bridge公開に備えて、入力画像パス→切り出し済み画像パス配列の単位で扱えるAPIにした。
+
+#### `mobile/modules/trading-card-cropper/`
+- Expo local module として `TradingCardCropperModule` を追加した。
+- iOS Vision `VNDetectRectanglesRequest` の設定値を定数化した。
+  - `maximumObservations = 30`
+  - `minimumAspectRatio = 0.6`
+  - `maximumAspectRatio = 0.85`
+  - `minimumSize = 0.05`
+  - `minimumConfidence = 0.6`
+  - `quadratureTolerance = 20`
+- Visionの左下原点・正規化座標を、RNプレビューで扱う左上原点・正規化座標へ変換して返すようにした。
+- 確定枠を `CIPerspectiveCorrection` で透視補正し、JPEGとして端末キャッシュへ保存する処理を追加した。
+- 切り出し後の90度単位回転保存を追加した。
+
+#### `notes/02_system_requirements.md`
+- F1在庫登録の写真撮影UXに、トレカAI一括登録の要件を追記した。
+
+#### `notes/10_glossary.md`
+- `トレカAI一括登録` をグッズ関連用語として追加した。
+
+### 影響範囲
+
+- iOS版 譲るグッズ新規登録フロー
+- グッズ種別 `トレカ` の写真登録体験
+- iOSネイティブビルド（Expo local module追加のため、EAS Updateだけではネイティブ処理は反映されない）
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- `npx --prefix mobile expo-modules-autolinking search --platform apple --project-root mobile`
+- iOSネイティブビルドは未実行（このリポジトリには生成済み `ios/` がないため、実機検証には次回EAS development/preview buildが必要）
+
+### 関連ファイル
+
+- `mobile/app/goods-editor.tsx`
+- `mobile/src/components/TradingCardBulkCropper.tsx`
+- `mobile/src/lib/tradingCardCropper.ts`
+- `mobile/modules/trading-card-cropper/`
+- `notes/02_system_requirements.md`
+- `notes/10_glossary.md`
+
+### セルフレビュー結果
+
+- ✅ `トレカ` 種別選択時のみ専用AI一括登録ボタンを表示
+- ✅ 検出枠の四隅ドラッグ、削除、手動追加、切り出し後90度回転を実装
+- ✅ Vision/Core Image処理をSwift local moduleへ分離し、RN側UIと処理を分離
+- ✅ 検出0件時に手動枠追加へ誘導する文言を追加
+- ✅ サーバー通信なしで端末内処理する設計
+- ✅ モバイル型チェック成功
+- ✅ iOS Preview export 成功
+- ✅ Expo autolinkingでlocal module検出を確認
+- ⚠️ ネイティブSwiftの実機ビルド/実カード写真検証は次回EAS buildで確認が必要
+- ✅ 状態遷移名の追加はないため `notes/09_state_machines.md` 更新不要
+
+---
+
 ## イテレーション168.48：めぐりメッセージUIを精緻化
 
 ### 背景・問題意識
