@@ -4,6 +4,45 @@
 
 ---
 
+## イテレーション168.52：EAS mobile buildからweb依存を分離
+
+### 背景・問題意識
+
+iter168.50 で Metro の監視対象から `web/` と Next 系パッケージを除外したが、オーナーの iOS Preview build では引き続き `main.jsbundle` に Next / OpenTelemetry 由来の `OTEL_PKG` 動的 import が混入して archive が失敗した。EAS の build 環境では root workspace install により `web` workspace の Next 依存が入るため、Metro側の除外だけでなく install対象からも `web` を分離する必要がある。
+
+### 変更内容
+
+#### `package.json`
+- root `workspaces` から `web` を外し、EAS の mobile build install で Next / React DOM / web 管理画面依存を入れないようにした。
+- `web` は管理者画面用途として残し、従来通り `npm --prefix web ...` または `cd web` で個別に扱う方針にした。
+- `mobile` と `packages/*` は root workspace に残し、mobile build と共通ロジック利用は維持した。
+
+### 影響範囲
+
+- EAS iOS Preview / development / production build の依存インストール
+- root workspace install の対象
+- web 管理画面の運用方法（root workspace経由ではなく `web/` 個別）
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- 生成された `main.jsbundle` と `mobile/dist` に `OTEL_PKG` / `next/dist` / `opentelemetry` が混入していないことを `rg` で確認
+
+### 関連ファイル
+
+- `package.json`
+- `notes/08_design_iterations.md`
+
+### セルフレビュー結果
+
+- ✅ ユーザー向け主対象が `mobile/` になった方針と整合
+- ✅ `web` を削除せず、管理者画面として個別運用できる状態を維持
+- ✅ mobile build に必要な `mobile` / `packages/*` workspace は維持
+- ✅ 状態遷移・用語・データモデルの変更はないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` 更新不要
+
+---
+
 ## イテレーション168.51：mobile主対象・web管理画面方針へ更新
 
 ### 背景・問題意識

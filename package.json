@@ -2,7 +2,6 @@
   "name": "ihub-platform",
   "private": true,
   "workspaces": [
-    "web",
     "mobile",
     "packages/*"
   ],
