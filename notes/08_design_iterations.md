@@ -54,6 +54,9 @@
 - `npm --prefix mobile run typecheck`
 - `npm --prefix mobile run export:ios:preview`
 - `npx --prefix mobile expo-modules-autolinking search --platform apple --project-root mobile`
+- `EXPO_NO_GIT_STATUS=1 npm --prefix /tmp/ihub-preview-update-16849/mobile run update:ios:preview -- --message "[iter168.49] トレカAI一括登録を追加" --non-interactive`
+- EAS Update: `019e5e2e-3458-7831-a2e3-896afff80ef1`
+- EAS Update group: `6bf781bd-24cf-4b3a-b8f5-9bb5b2a1b29f`
 - iOSネイティブビルドは未実行（このリポジトリには生成済み `ios/` がないため、実機検証には次回EAS development/preview buildが必要）
 
 ### 関連ファイル
@@ -75,6 +78,7 @@
 - ✅ モバイル型チェック成功
 - ✅ iOS Preview export 成功
 - ✅ Expo autolinkingでlocal module検出を確認
+- ✅ Preview channel へ EAS Update 済み（UI導線の確認用。Swift処理は次回ネイティブビルドが必要）
 - ⚠️ ネイティブSwiftの実機ビルド/実カード写真検証は次回EAS buildで確認が必要
 - ✅ 状態遷移名の追加はないため `notes/09_state_machines.md` 更新不要
 
