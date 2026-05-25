@@ -4,6 +4,47 @@
 
 ---
 
+## イテレーション168.50：PreviewビルドのMetro混入を防止
+
+### 背景・問題意識
+
+オーナーがトレカAI一括登録を試すために iOS Preview build を実行したところ、Swift local module 自体はコンパイルされたものの、React Native のJSバンドル生成で `Invalid expression encountered` が発生した。ログ上では `main.jsbundle` に Next / OpenTelemetry 由来の `import(/* webpackIgnore: true */ /* turbopackIgnore: true */ OTEL_PKG)` 形式のコードが混入しており、Hermes がその動的 import を解釈できず archive が失敗していた。
+
+### 変更内容
+
+#### `mobile/metro.config.js`
+- Expo/Metro の自動 workspace 検出で `web/` が `watchFolders` に含まれていたため、mobile のMetro対象から明示的に除外した。
+- EAS の workspace install で root `node_modules` に web 側の Next 系依存が同居しても拾わないよう、`next` / `@next` / `@opentelemetry` / `@vercel` を blockList に追加した。
+- mobile から使う workspace package は従来通り `@ihub/core` / `@ihub/design` / `@ihub/supabase` の alias で解決する構成を維持した。
+
+### 影響範囲
+
+- iOS Preview / development / production build のMetroバンドル生成
+- mobile のworkspace package解決
+- トレカAI一括登録を含む次回EAS native build
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- 生成された `main.jsbundle` と `mobile/dist` に `OTEL_PKG` / `next/dist` / `opentelemetry` が混入していないことを `rg` で確認
+
+### 関連ファイル
+
+- `mobile/metro.config.js`
+- `notes/08_design_iterations.md`
+
+### セルフレビュー結果
+
+- ✅ EASログ上の失敗箇所がSwift local moduleではなくJSバンドル生成であることを確認
+- ✅ `web/` をMetroの監視対象から外し、Nextサーバー用コードがmobileバンドルへ混入しないようにした
+- ✅ mobile側のExpo Router依存解決を壊さないよう、nested dependency解決は維持
+- ✅ モバイル型チェック成功
+- ✅ iOS Preview export 成功
+- ✅ 状態遷移・用語・データモデルの変更はないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` 更新不要
+
+---
+
 ## イテレーション168.49：トレカAI一括登録を追加
 
 ### 背景・問題意識
