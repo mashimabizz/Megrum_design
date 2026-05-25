@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Animated,
+  Keyboard,
   KeyboardAvoidingView,
   Modal,
   type NativeScrollEvent,
@@ -115,6 +116,7 @@ const REQUEST_KINDS: { value: OshiRequestKind; label: string }[] = [
   { value: "solo", label: "ソロ" },
 ];
 const MASTER_CHARACTER_PAGE_SIZE = 1000;
+const MASTER_SEARCH_KEYBOARD_GAP = 34;
 
 export default function OshiSettingsScreen() {
   const { user, previewMode } = useAuth();
@@ -644,6 +646,7 @@ function MasterSelectModal({
   const [pagerWidth, setPagerWidth] = useState(0);
   const [pagerPosition, setPagerPosition] = useState(0);
   const [draftSelectedIds, setDraftSelectedIds] = useState<string[]>([]);
+  const [keyboardVisible, setKeyboardVisible] = useState(false);
   const normalizedQuery = query.trim().toLowerCase();
   const categoryOptions = useMemo(
     () => [
@@ -681,6 +684,23 @@ function MasterSelectModal({
 
   useEffect(() => {
     if (visible) setDraftSelectedIds([]);
+  }, [visible]);
+
+  useEffect(() => {
+    if (!visible) {
+      setKeyboardVisible(false);
+      return;
+    }
+    const showSubscription = Keyboard.addListener("keyboardWillShow", () => setKeyboardVisible(true));
+    const didShowSubscription = Keyboard.addListener("keyboardDidShow", () => setKeyboardVisible(true));
+    const hideSubscription = Keyboard.addListener("keyboardWillHide", () => setKeyboardVisible(false));
+    const didHideSubscription = Keyboard.addListener("keyboardDidHide", () => setKeyboardVisible(false));
+    return () => {
+      showSubscription.remove();
+      didShowSubscription.remove();
+      hideSubscription.remove();
+      didHideSubscription.remove();
+    };
   }, [visible]);
 
   useEffect(() => {
@@ -775,6 +795,9 @@ function MasterSelectModal({
     });
   }
 
+  const searchDockBottomPadding =
+    Math.max(insets.bottom, 10) + (keyboardVisible ? MASTER_SEARCH_KEYBOARD_GAP : 0);
+
   return (
     <Modal
       animationType={nativeSheet ? "slide" : "fade"}
@@ -839,7 +862,7 @@ function MasterSelectModal({
               </ScrollView>
             </View>
 
-            <View style={[styles.masterSearchDock, { paddingBottom: Math.max(insets.bottom, 10) }]}>
+            <View style={[styles.masterSearchDock, { paddingBottom: searchDockBottomPadding }]}>
               <ScrollView
                 horizontal
                 showsHorizontalScrollIndicator={false}
@@ -871,7 +894,7 @@ function MasterSelectModal({
                   onPress={submitDraftSelection}
                   style={[
                     styles.masterFloatingRegisterButton,
-                    { bottom: Math.max(insets.bottom, 10) + 10 },
+                    { bottom: searchDockBottomPadding + 10 },
                   ]}
                 >
                   登録

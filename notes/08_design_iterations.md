@@ -4,6 +4,51 @@
 
 ---
 
+## イテレーション168.41：推し追加検索欄のキーボード被りを解消
+
+### 背景・問題意識
+
+オーナーから、推し追加モーダルで検索入力欄をタップした時に「微妙に入力欄がキーボードに隠れてしまっている」と指摘があった。分類チップはキーボード上に見えていたが、検索入力欄の下端がキーボード上端に食われており、入力中の視認性が落ちていた。
+
+### 変更内容
+
+#### `mobile/app/oshi-settings.tsx`
+- 推し追加モーダルでキーボード表示状態を監視するようにした。
+- キーボード表示中だけ検索ドックの下余白を追加し、検索入力欄がキーボード上端から離れて表示されるようにした。
+- 複数選択時の固定「登録」ボタンも、追加した下余白に追従するようにした。
+
+### 影響範囲
+
+- iOS版 推し設定の「推しを追加」モーダル
+- 推し追加モーダルの検索入力フォーカス時レイアウト
+- 複数選択時の固定登録ボタン位置
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- `EXPO_NO_GIT_STATUS=1 npm --prefix mobile run update:ios:preview -- --message "[iter168.41] 推し追加検索欄のキーボード被りを解消" --non-interactive`
+- EAS Update: `019e5d2b-ad02-7ae0-9752-8ffbf327b1c9`
+- EAS Update group: `32e5bad7-760e-41bf-af3e-1f447a5ddc6b`
+
+### 関連ファイル
+
+- `mobile/app/oshi-settings.tsx`
+- `notes/08_design_iterations.md`
+
+### セルフレビュー結果
+
+- ✅ キーボード表示中のみ検索ドックの下余白を増やす
+- ✅ 非表示時の通常レイアウトは維持
+- ✅ 登録ボタン位置も追加余白へ追従
+- ✅ モバイル型チェック成功
+- ✅ Preview channel へ EAS Update 済み
+- ✅ 状態IDの追加・変更なし（`notes/09_state_machines.md` 更新不要）
+- ✅ 新しいアプリ用語・廃止用語なし（`notes/10_glossary.md` 更新不要）
+- ✅ DBスキーマ変更なし（`notes/05_data_model.md` 更新不要）
+
+---
+
 ## イテレーション168.40：推しL2取得をページング化
 
 ### 背景・問題意識
