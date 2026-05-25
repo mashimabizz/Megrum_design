@@ -4013,11 +4013,35 @@ export function PlusModal({
   open: boolean;
   subscribed: boolean;
 }) {
+  const panelProgress = useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    if (!open) return;
+    panelProgress.setValue(1);
+    Animated.timing(panelProgress, {
+      duration: 260,
+      easing: Easing.out(Easing.cubic),
+      toValue: 0,
+      useNativeDriver: true,
+    }).start();
+  }, [open, panelProgress]);
+
+  const panelTranslateY = panelProgress.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, 360],
+  });
+
   return (
-    <Modal animationType="slide" transparent visible={open} onRequestClose={onClose}>
+    <Modal animationType="fade" transparent visible={open} onRequestClose={onClose}>
       <View style={styles.modalLayer}>
         <Pressable style={styles.modalBackdrop} onPress={onClose} />
-        <View style={styles.modalPanel}>
+        <Animated.View
+          style={[
+            styles.modalPanel,
+            styles.modalPanelAnimated,
+            { transform: [{ translateY: panelTranslateY }] },
+          ]}
+        >
           <View style={styles.modalHandle} />
           <Text style={styles.modalKicker}>PLUS</Text>
           <Text style={styles.modalTitle}>めぐりPlus</Text>
@@ -4047,7 +4071,7 @@ export function PlusModal({
           <Pressable onPress={onClose} style={styles.modalCloseButton}>
             <Text style={styles.modalCloseText}>閉じる</Text>
           </Pressable>
-        </View>
+        </Animated.View>
       </View>
     </Modal>
   );
@@ -5929,6 +5953,9 @@ const styles = StyleSheet.create({
     gap: 13,
     padding: 20,
     paddingBottom: 30,
+  },
+  modalPanelAnimated: {
+    width: "100%",
   },
   letterModalPanel: {
     backgroundColor: ihubColors.surface,

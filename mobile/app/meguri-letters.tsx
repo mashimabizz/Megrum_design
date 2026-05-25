@@ -16,6 +16,11 @@ import { router, useLocalSearchParams } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { ChatGradientBubble } from "../src/components/ChatGradientBubble";
 import { IconSymbol } from "../src/components/IconSymbol";
+import {
+  MeguriThreeBoundary,
+  MeguriThreeScene,
+  type MeguriSceneResident,
+} from "../src/components/meguri/MeguriThreeScene";
 import { MeguriAvatarFace } from "../src/components/meguri/MeguriAvatarFace";
 import { Screen } from "../src/components/Screen";
 import { useAuth } from "../src/auth/AuthProvider";
@@ -27,6 +32,7 @@ import {
   PLUS_SEND_LIMIT,
   PlusModal,
   USERS,
+  hueTint as hueTintForMessage,
   type Letter,
   type MeguriUser,
 } from "./(tabs)/encounters";
@@ -64,7 +70,7 @@ type ChatMessage = {
   body: string;
   groomReply?: {
     caption?: string;
-    imageUri: string;
+    imageUri?: string;
   };
   imageUri?: string;
   mine: boolean;
@@ -74,6 +80,19 @@ type ChatMessage = {
 };
 
 const CONVERSATION_TIMES = ["0:24", "昨日", "0:09", "土曜日", "土曜日", "金曜日", "木曜日", "水曜日", "月曜日", "先週"];
+const MESSAGE_LIST_SELF: MeguriSceneResident = {
+  animalType: "rabbit",
+  furColor: "lavender",
+  hue: "lav",
+  id: "me",
+  name: "あなた",
+};
+const LOCKED_TEXT_MOSAIC_ROWS = [
+  [0.86, 0.54],
+  [0.72, 0.38],
+  [0.92],
+  [0.64, 0.28],
+];
 const EXTRA_MESSAGE_BODIES = [
   "さっき同じ曲の話をしていた気がして、うれしくなりました。",
   "今日の現場、空気感が最高でしたね。またどこかでめぐれたらうれしいです。",
@@ -403,13 +422,8 @@ function ConversationRow({
         highlighted ? styles.conversationRowHighlighted : null,
       ]}
     >
-      <View style={styles.avatar}>
-        <MeguriAvatarFace
-          animalType={letter.from.animalType}
-          furColor={letter.from.furColor}
-          hue={letter.from.hue}
-          size={52}
-        />
+      <View style={[styles.avatar, { backgroundColor: hueTintForMessage(letter.from.hue, 0.34) }]}>
+        <ConversationAvatar user={letter.from} />
         {conversation.pinned ? (
           <View style={styles.pinBadge}>
             <Text style={styles.pinText}>↗</Text>
@@ -443,6 +457,49 @@ function ConversationRow({
         ) : null}
       </View>
     </Pressable>
+  );
+}
+
+function ConversationAvatar({ user }: { user: MeguriUser }) {
+  const [threeFailed, setThreeFailed] = useState(false);
+  const resident = useMemo((): MeguriSceneResident => toSceneResident(user), [user]);
+
+  if (threeFailed) {
+    return <ConversationAvatarFallback user={user} />;
+  }
+
+  return (
+    <View style={styles.avatarThreeClip}>
+      <View style={styles.avatarThreeZoom}>
+        <MeguriThreeBoundary
+          fallback={<ConversationAvatarFallback user={user} />}
+          onError={() => setThreeFailed(true)}
+        >
+          <MeguriThreeScene
+            activeId={resident.id}
+            completedIds={[resident.id]}
+            focusedId={resident.id}
+            mode="summary"
+            onUnavailable={() => setThreeFailed(true)}
+            presentation="profile"
+            residents={[resident]}
+            self={MESSAGE_LIST_SELF}
+            smilingId={resident.id}
+          />
+        </MeguriThreeBoundary>
+      </View>
+    </View>
+  );
+}
+
+function ConversationAvatarFallback({ user }: { user: MeguriUser }) {
+  return (
+    <MeguriAvatarFace
+      animalType={user.animalType}
+      furColor={user.furColor}
+      hue={user.hue}
+      size={52}
+    />
   );
 }
 
@@ -619,15 +676,7 @@ function MessageThreadScreen({
               ) : null}
               <View style={message.mine ? styles.mineMessagePayload : styles.theirMessagePayload}>
                 {message.groomReply ? (
-                  <View style={styles.groomReplyAttachment}>
-                    <Text style={styles.groomReplyAttachmentLabel}>
-                      この人のストーリーズに返信しました
-                    </Text>
-                    <Image
-                      source={{ uri: message.groomReply.imageUri }}
-                      style={styles.groomReplyAttachmentImage}
-                    />
-                  </View>
+                  <GroomReplyAttachment attachment={message.groomReply} />
                 ) : null}
                 <ChatGradientBubble
                   mine={message.mine}
@@ -765,11 +814,52 @@ function LockedMessageMosaic({ onPress }: { onPress: () => void }) {
       onPress={onPress}
       style={styles.lockedMosaic}
     >
+      <View pointerEvents="none" style={styles.lockedMessageMosaicLayer}>
+        {LOCKED_TEXT_MOSAIC_ROWS.map((row, rowIndex) => (
+          <View key={`locked-row-${rowIndex}`} style={styles.lockedMessageMosaicRow}>
+            {row.map((width, index) => (
+              <View
+                key={`locked-line-${rowIndex}-${index}`}
+                style={[
+                  styles.lockedMessageMosaicLine,
+                  {
+                    opacity: 0.5 - rowIndex * 0.045,
+                    width: `${Math.round(width * 100)}%`,
+                  },
+                ]}
+              />
+            ))}
+          </View>
+        ))}
+      </View>
       <View pointerEvents="none" style={styles.lockedMosaicGlow} />
       <View style={styles.lockedMosaicButton}>
-        <Text style={styles.lockedMosaicText}>メッセージを開封する</Text>
+        <Text adjustsFontSizeToFit minimumFontScale={0.88} numberOfLines={1} style={styles.lockedMosaicText}>
+          メッセージを開封する
+        </Text>
       </View>
     </Pressable>
+  );
+}
+
+function GroomReplyAttachment({
+  attachment,
+}: {
+  attachment: NonNullable<ChatMessage["groomReply"]>;
+}) {
+  const [imageFailed, setImageFailed] = useState(false);
+  if (!attachment.imageUri || imageFailed) return null;
+  return (
+    <View style={styles.groomReplyAttachment}>
+      <Text style={styles.groomReplyAttachmentLabel}>
+        この人のグルームに返信しました
+      </Text>
+      <Image
+        onError={() => setImageFailed(true)}
+        source={{ uri: attachment.imageUri }}
+        style={styles.groomReplyAttachmentImage}
+      />
+    </View>
   );
 }
 
@@ -906,6 +996,16 @@ function messagePeerToMeguriUser(message: MeguriThreadMessage): MeguriUser {
     recent: message.body,
     since: "今日",
     style: "推し活",
+  };
+}
+
+function toSceneResident(user: MeguriUser): MeguriSceneResident {
+  return {
+    animalType: user.animalType,
+    furColor: user.furColor,
+    hue: user.hue,
+    id: user.id,
+    name: user.name,
   };
 }
 
@@ -1181,6 +1281,19 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     position: "relative",
     width: 52,
+  },
+  avatarThreeClip: {
+    borderRadius: 26,
+    height: 52,
+    overflow: "hidden",
+    width: 52,
+  },
+  avatarThreeZoom: {
+    height: 92,
+    left: -20,
+    position: "absolute",
+    top: -24,
+    width: 92,
   },
   avatarText: {
     color: ihubColors.ink,
@@ -1526,7 +1639,7 @@ const styles = StyleSheet.create({
     alignItems: "flex-end",
     flexDirection: "row",
     gap: 6,
-    maxWidth: "86%",
+    maxWidth: "90%",
   },
   mineBubbleWrap: {
     alignItems: "flex-end",
@@ -1585,24 +1698,45 @@ const styles = StyleSheet.create({
     backgroundColor: "#f0fbfb",
     borderRadius: 28,
     justifyContent: "center",
-    minHeight: 96,
+    minHeight: 108,
     overflow: "hidden",
-    paddingHorizontal: 22,
+    paddingHorizontal: 24,
     paddingVertical: 0,
-    width: 216,
+    width: 260,
+  },
+  lockedMessageMosaicLayer: {
+    gap: 8,
+    left: 22,
+    opacity: 0.9,
+    position: "absolute",
+    right: 22,
+    top: 18,
+  },
+  lockedMessageMosaicRow: {
+    flexDirection: "row",
+    gap: 8,
+  },
+  lockedMessageMosaicLine: {
+    backgroundColor: "rgba(120,161,165,0.22)",
+    borderRadius: 999,
+    height: 8,
+    shadowColor: "#91c7cb",
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.18,
+    shadowRadius: 8,
   },
   lockedMosaicGlow: {
-    backgroundColor: "rgba(40,188,198,0.13)",
+    backgroundColor: "rgba(32,188,198,0.16)",
     borderRadius: 999,
-    height: 58,
-    left: 36,
+    height: 62,
+    left: 34,
     position: "absolute",
-    right: 36,
+    right: 34,
     shadowColor: "#6bd7dd",
     shadowOffset: { width: 0, height: 10 },
     shadowOpacity: 0.38,
     shadowRadius: 16,
-    top: 19,
+    top: 23,
   },
   lockedMosaicButton: {
     alignItems: "center",
@@ -1610,8 +1744,8 @@ const styles = StyleSheet.create({
     backgroundColor: "#12b8c8",
     borderRadius: 999,
     justifyContent: "center",
-    minHeight: 38,
-    paddingHorizontal: 18,
+    minHeight: 42,
+    paddingHorizontal: 20,
     shadowColor: "#0898a5",
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.22,
@@ -1619,7 +1753,7 @@ const styles = StyleSheet.create({
   },
   lockedMosaicText: {
     color: "#fff",
-    fontSize: 16,
+    fontSize: 17,
     fontWeight: "900",
   },
   groomReplyAttachment: {
