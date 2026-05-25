@@ -137,6 +137,12 @@ bg-ihub-lavender / text-ihub-sky / border-ihub-pink / ihub-warn / ihub-ok
 - **MVP の範囲**: 現地交換（郵送は Yahoo フリマ等と棲み分け）、ランダム封入の小型グッズが主な交換対象
 - **特徴**: AW（Activity Window = 「この時間ここにいる」予定）と wish のマッチング、受諾前ネゴ、合意前に待ち合わせfix
 
+## 🎯 実装対象の優先方針（iter168.51）
+
+- **ユーザー向けアプリの主対象は `mobile/`（React Native + Expo / iOS）**。新機能・UI修正・Preview反映は原則 mobile を更新する。
+- **`web/` は通常のユーザー向け更新対象から外す**。同じ変更をWeb版へ横展開しない。ただし、管理者画面・運用画面・法務/サポート確認画面として必要な場合は `web/` を更新してよい。
+- mobile のユーザー向け変更は、引き続き Preview channel / EAS build の反映要否を必ず確認する。web 管理画面だけの変更では iOS Preview 更新は不要。
+
 ---
 
 ## 🤖 環境ごとの動作差分（重要）
@@ -269,6 +275,7 @@ Phase 0a 完了後、Supabase CLI で初期化予定。
    - JS/TSだけの変更：`npm --prefix mobile run export:ios:preview` → `EXPO_NO_GIT_STATUS=1 npm --prefix mobile run update:ios:preview -- --message "[iter◯◯] ..." --non-interactive`
    - Swift / Expo local module / native config / 依存追加を含む変更：EAS Updateだけでは反映されないため、Preview用のEAS buildが必要。必要ならオーナーにビルド手順を渡す
    - Preview更新した場合は、EAS Update ID / Update group を `notes/08_design_iterations.md` の確認方法へ記録
+□ 9. **ユーザー向け変更は原則 `mobile/` のみ更新**。`web/` は管理者画面・運用画面として必要な時だけ更新する
 ```
 
 **省略禁止**：チェックリストの 2-5 を飛ばすと、別環境の Claude が同じ判断を再現できなくなる。

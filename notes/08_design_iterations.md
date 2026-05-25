@@ -4,6 +4,48 @@
 
 ---
 
+## イテレーション168.51：mobile主対象・web管理画面方針へ更新
+
+### 背景・問題意識
+
+オーナーから、今後はWebアプリをほとんど使わない予定であり、ユーザー向け更新対象から外してよいこと、ただしWebは管理者画面として使う想定があることが共有された。これにより、今後の実装・Preview反映・セルフレビューの主対象を iOS / mobile に寄せ、Webへの横展開を前提にしない運用へ整理する必要がある。
+
+### 変更内容
+
+#### `CLAUDE.md`
+- ユーザー向けアプリの主対象を `mobile/`（React Native + Expo / iOS）と明記した。
+- `web/` は通常のユーザー向け更新対象から外し、管理者画面・運用画面・法務/サポート確認画面として必要な場合だけ更新する方針を追加した。
+- mobile のユーザー向け変更では Preview channel / EAS build 反映要否を確認し、web 管理画面だけの変更では iOS Preview 更新不要とした。
+
+#### `notes/14_implementation_phases.md`
+- フロントエンド担当範囲を iOS mobile 主体、Web Next.js は管理者画面用途へ更新した。
+- Web/iOS の完全同期を未確定項目から外し、共通ロジックは `packages/*` に寄せつつ見た目・導線の完全同期は要求しない方針を追記した。
+
+### 影響範囲
+
+- 今後のユーザー向けUI実装・修正の対象判断
+- Preview channel / EAS build 反映判断
+- Web版の位置づけ（ユーザー向け同等画面ではなく管理者・運用画面）
+
+### 確認方法
+
+- ドキュメント差分確認
+
+### 関連ファイル
+
+- `CLAUDE.md`
+- `notes/14_implementation_phases.md`
+- `notes/08_design_iterations.md`
+
+### セルフレビュー結果
+
+- ✅ mobile をユーザー向け主対象にする方針を明記
+- ✅ web を管理者画面・運用画面用途として残す方針を明記
+- ✅ Preview反映ルールと矛盾しないよう、web管理画面のみの変更は iOS Preview 更新不要と整理
+- ✅ 状態遷移・用語・データモデルの変更はないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` 更新不要
+
+---
+
 ## イテレーション168.50：PreviewビルドのMetro混入を防止
 
 ### 背景・問題意識
