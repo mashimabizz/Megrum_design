@@ -617,7 +617,7 @@ function MessageThreadScreen({
                   <Text style={styles.messageMetaText}>{message.time}</Text>
                 </View>
               ) : null}
-              <View style={message.mine ? styles.mineMessagePayload : null}>
+              <View style={message.mine ? styles.mineMessagePayload : styles.theirMessagePayload}>
                 {message.groomReply ? (
                   <View style={styles.groomReplyAttachment}>
                     <Text style={styles.groomReplyAttachmentLabel}>
@@ -631,7 +631,11 @@ function MessageThreadScreen({
                 ) : null}
                 <ChatGradientBubble
                   mine={message.mine}
-                  style={[styles.bubble, message.mine ? styles.mineBubble : styles.theirBubble]}
+                  style={[
+                    styles.bubble,
+                    message.mine ? styles.mineBubble : styles.theirBubble,
+                    message.locked && !message.mine ? styles.lockedTheirBubble : null,
+                  ]}
                 >
                   {message.locked ? (
                     <LockedMessageMosaic onPress={onOpenPlan} />
@@ -753,14 +757,6 @@ function ReviewPlanToggleButton({
   );
 }
 
-const LOCKED_MOSAIC_ROWS = [10, 9, 11, 8];
-const LOCKED_MOSAIC_COLORS = [
-  "rgba(166,149,216,0.28)",
-  "rgba(168,212,230,0.34)",
-  "rgba(243,197,212,0.3)",
-  "rgba(58,50,74,0.12)",
-];
-
 function LockedMessageMosaic({ onPress }: { onPress: () => void }) {
   return (
     <Pressable
@@ -769,30 +765,9 @@ function LockedMessageMosaic({ onPress }: { onPress: () => void }) {
       onPress={onPress}
       style={styles.lockedMosaic}
     >
-      <View pointerEvents="none" style={styles.lockedMosaicGrid}>
-        {LOCKED_MOSAIC_ROWS.map((count, rowIndex) => (
-          <View key={`row-${rowIndex}`} style={styles.lockedMosaicRow}>
-            {Array.from({ length: count }).map((_, tileIndex) => (
-              <View
-                key={`${rowIndex}-${tileIndex}`}
-                style={[
-                  styles.lockedMosaicTile,
-                  {
-                    backgroundColor:
-                      LOCKED_MOSAIC_COLORS[
-                        (rowIndex * 2 + tileIndex) % LOCKED_MOSAIC_COLORS.length
-                      ],
-                    opacity: 0.72 - ((rowIndex + tileIndex) % 3) * 0.12,
-                  },
-                ]}
-              />
-            ))}
-          </View>
-        ))}
-      </View>
-      <View style={styles.lockedMosaicOverlay}>
-        <IconSymbol name="lock-closed-outline" color="#fff" size={13} />
-        <Text style={styles.lockedMosaicText}>めぐりPlusで開封</Text>
+      <View pointerEvents="none" style={styles.lockedMosaicGlow} />
+      <View style={styles.lockedMosaicButton}>
+        <Text style={styles.lockedMosaicText}>メッセージを開封する</Text>
       </View>
     </Pressable>
   );
@@ -1548,8 +1523,10 @@ const styles = StyleSheet.create({
     fontWeight: "900",
   },
   theirBubbleWrap: {
-    alignItems: "flex-start",
-    maxWidth: "78%",
+    alignItems: "flex-end",
+    flexDirection: "row",
+    gap: 7,
+    maxWidth: "86%",
   },
   mineBubbleWrap: {
     alignItems: "flex-end",
@@ -1563,6 +1540,11 @@ const styles = StyleSheet.create({
     gap: 8,
     maxWidth: "100%",
   },
+  theirMessagePayload: {
+    alignItems: "flex-start",
+    flexShrink: 1,
+    gap: 8,
+  },
   bubble: {
     borderRadius: 18,
     maxWidth: "100%",
@@ -1572,6 +1554,13 @@ const styles = StyleSheet.create({
   theirBubble: {
     backgroundColor: ihubColors.surface,
     borderBottomLeftRadius: 5,
+  },
+  lockedTheirBubble: {
+    backgroundColor: "transparent",
+    borderBottomLeftRadius: 26,
+    borderRadius: 26,
+    paddingHorizontal: 0,
+    paddingVertical: 0,
   },
   mineBubble: {
     backgroundColor: "transparent",
@@ -1592,40 +1581,44 @@ const styles = StyleSheet.create({
     width: 190,
   },
   lockedMosaic: {
-    borderColor: "rgba(166,149,216,0.18)",
-    borderRadius: 15,
-    borderWidth: 1,
-    minHeight: 76,
-    overflow: "hidden",
-    padding: 9,
-    width: 198,
-  },
-  lockedMosaicGrid: {
-    gap: 5,
-  },
-  lockedMosaicRow: {
-    flexDirection: "row",
-    gap: 4,
-  },
-  lockedMosaicTile: {
-    borderRadius: 4,
-    flex: 1,
-    height: 10,
-  },
-  lockedMosaicOverlay: {
     alignItems: "center",
-    alignSelf: "flex-start",
-    backgroundColor: ihubColors.ink,
+    backgroundColor: "#f0fbfb",
+    borderRadius: 26,
+    justifyContent: "center",
+    minHeight: 112,
+    overflow: "hidden",
+    paddingHorizontal: 22,
+    paddingVertical: 24,
+    width: 234,
+  },
+  lockedMosaicGlow: {
+    backgroundColor: "rgba(40,188,198,0.13)",
     borderRadius: 999,
-    flexDirection: "row",
-    gap: 5,
-    marginTop: 9,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
+    height: 64,
+    left: 36,
+    position: "absolute",
+    right: 36,
+    shadowColor: "#6bd7dd",
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.42,
+    shadowRadius: 18,
+  },
+  lockedMosaicButton: {
+    alignItems: "center",
+    alignSelf: "stretch",
+    backgroundColor: "#12b8c8",
+    borderRadius: 999,
+    justifyContent: "center",
+    minHeight: 46,
+    paddingHorizontal: 18,
+    shadowColor: "#0898a5",
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.24,
+    shadowRadius: 14,
   },
   lockedMosaicText: {
     color: "#fff",
-    fontSize: 11,
+    fontSize: 17,
     fontWeight: "900",
   },
   groomReplyAttachment: {
@@ -1660,14 +1653,14 @@ const styles = StyleSheet.create({
   messageMetaOutside: {
     alignItems: "flex-start",
     gap: 1,
-    minWidth: 28,
-    paddingBottom: 3,
+    minWidth: 38,
+    paddingBottom: 6,
   },
   messageMetaText: {
-    color: "rgba(58,50,74,0.48)",
-    fontSize: 10,
+    color: "rgba(77,99,101,0.72)",
+    fontSize: 12,
     fontWeight: "700",
-    lineHeight: 13,
+    lineHeight: 15,
   },
   bubbleTime: {
     color: "rgba(58,50,74,0.48)",
