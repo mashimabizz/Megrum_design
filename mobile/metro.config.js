@@ -28,6 +28,19 @@ const packageAliases = {
   "@ihub/design": path.join(workspaceRoot, "packages/design"),
   "@ihub/supabase": path.join(workspaceRoot, "packages/supabase"),
 };
+const serverOnlyShimPath = path.join(
+  projectRoot,
+  "src/shims/serverOnlyModule.js",
+);
+const serverOnlyModulePatterns = [
+  /^next(?:\/.*)?$/,
+  /^@next(?:\/.*)?$/,
+  /^@opentelemetry(?:\/.*)?$/,
+  /^@vercel(?:\/.*)?$/,
+  /^import-in-the-middle(?:\/.*)?$/,
+  /^require-in-the-middle(?:\/.*)?$/,
+  /^server-only$/,
+];
 const ignoredWorkspaceFolders = [path.join(workspaceRoot, "web")];
 const ignoredWorkspaceFolderSet = new Set(
   ignoredWorkspaceFolders.map((folder) => path.normalize(folder)),
@@ -59,6 +72,21 @@ config.resolver.blockList = [
 config.resolver.extraNodeModules = {
   ...(config.resolver.extraNodeModules ?? {}),
   ...packageAliases,
+};
+const defaultResolveRequest = config.resolver.resolveRequest;
+config.resolver.resolveRequest = (context, moduleName, platform) => {
+  if (serverOnlyModulePatterns.some((pattern) => pattern.test(moduleName))) {
+    return {
+      type: "sourceFile",
+      filePath: serverOnlyShimPath,
+    };
+  }
+
+  if (defaultResolveRequest) {
+    return defaultResolveRequest(context, moduleName, platform);
+  }
+
+  return context.resolveRequest(context, moduleName, platform);
 };
 
 module.exports = config;

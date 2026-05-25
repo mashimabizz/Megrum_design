@@ -4,6 +4,49 @@
 
 ---
 
+## イテレーション168.53：EAS混入サーバー依存をnative shimへ隔離
+
+### 背景・問題意識
+
+iter168.52 後も、オーナーの iOS Preview build で `main.jsbundle` に `import(/* webpackIgnore: true */ /* turbopackIgnore: true */ /* @vite-ignore */OTEL_PKG)` が入り、Hermes の `Invalid expression encountered` で archive が失敗した。添付ログでは `megrum-trading-card-cropper` のSwiftビルドは通っており、失敗箇所は引き続き React Native の bundle 生成だった。EAS の install/cache 環境でのみ Next / OpenTelemetry / Vercel 系サーバー依存が解決されるケースを、Metro のパス除外だけでなく resolver レベルでも遮断する必要がある。
+
+### 変更内容
+
+#### `mobile/metro.config.js`
+- `next` / `@next` / `@opentelemetry/*` / `@vercel/*` / `import-in-the-middle` / `require-in-the-middle` / `server-only` を、Metro の `resolveRequest` で native 用の空 shim に向けるようにした。
+- `blockList` に入る前のモジュール名解決で止めることで、EAS 環境だけ root `node_modules` にサーバー依存が存在する場合でも bundle へ実体コードが入らないようにした。
+- `@ihub/*` workspace alias と `mobile/node_modules` 優先解決は維持した。
+
+#### `mobile/src/shims/serverOnlyModule.js`
+- OpenTelemetry / Vercel系の代表的な named export を no-op で返す shim を追加した。
+- サーバー専用コードが誤って読み込まれても、Hermes 非対応の dynamic import 構文を含む実体ファイルへ進まないようにした。
+
+### 影響範囲
+
+- EAS iOS Preview / development / production build のMetroバンドル生成
+- EAS cache や root `node_modules` に依存したサーバー専用パッケージの混入防止
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- 生成された `main.jsbundle` と `mobile/dist` に `OTEL_PKG` / `webpackIgnore` / `turbopackIgnore` / `@opentelemetry` が混入していないことを `rg` で確認
+
+### 関連ファイル
+
+- `mobile/metro.config.js`
+- `mobile/src/shims/serverOnlyModule.js`
+- `notes/08_design_iterations.md`
+
+### セルフレビュー結果
+
+- ✅ 添付XcodeログでSwift local moduleではなくJS bundle生成が失敗していることを再確認
+- ✅ サーバー専用依存を mobile bundle に入れない対策を resolver レベルへ強化
+- ✅ ユーザー向け mobile 主対象・web 管理画面方針と整合
+- ✅ 状態遷移・用語・データモデルの変更はないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` 更新不要
+
+---
+
 ## イテレーション168.52：EAS mobile buildからweb依存を分離
 
 ### 背景・問題意識
