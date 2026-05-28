@@ -1,25 +1,26 @@
-# 20. iOSアプリ化ロードマップ
+# 20. iOSアプリ集中ロードマップ
 
-> 目的：既存Webアプリ版と機能連動する iOS ネイティブアプリを、React Native / Expo で段階的に立ち上げるための実装方針。
+> 目的：Megrum のユーザー向け体験を iOS ネイティブアプリに一本化し、React Native / Expo で段階的に磨き込むための実装方針。
 
-最終更新: 2026-05-12（iter154.75）
-ステータス: Draft v0.1
+最終更新: 2026-05-28（iter168.63）
+ステータス: Active v0.2
 
 ---
 
 ## 1. 方針
 
-- iOS版は `mobile/` に Expo / React Native / TypeScript で実装する。
-- Web版は `web/` の Next.js を継続する。
-- Web/iOS は同じ Supabase Auth / DB / Storage に接続し、ユーザー・在庫・Wish・個別募集・打診・取引・チャットを連動させる。
+- ユーザー向けMegrumは `mobile/` の iOSアプリに一点特化する。
+- iOS版は Expo / React Native / TypeScript で実装し、iOS標準の遷移・通知・地図・カメラ体験を優先する。
+- Web版は `web/` の Next.js を継続するが、通常ユーザー向けWeb版としては育てず、管理者画面・運用画面・サポート確認用途に限定する。
+- iOS / Web管理画面は同じ Supabase Auth / DB / Storage に接続するが、画面体験の正は iOS とする。
 - 状態判定、マッチング優先度、在庫残数、個別募集判定など、挙動ズレが致命的になるロジックは `packages/core/` へ切り出す。
 - 色、余白、影などの共通トークンは `packages/design/` へ置く。
 
 ## 2. リポジトリ構成
 
 ```txt
-web/                 # 既存Next.js Webアプリ
-mobile/              # Expo / React Native iOSアプリ
+mobile/              # Expo / React Native iOSアプリ（ユーザー向けの主対象）
+web/                 # Next.js 管理者・運用画面
 packages/core/       # 状態判定・マッチング・共通型
 packages/design/     # ブランドカラー・余白・影
 packages/supabase/   # Supabase連携の共通補助
@@ -80,7 +81,7 @@ notes/               # 設計判断
 
 - 生成された最新Expo環境は Node.js `>=20.19.4` を要求する。ローカルは `v20.11.1` だったため、実機開発やEAS前にNode更新が必要。
 - Expo Go だけではPush通知や一部ネイティブ挙動の検証に限界があるため、早めに development build を作る。
-- Webの Server Actions に入っている重要ロジックは、iOSから直接呼べない。共通化またはRPC/API化を優先する。
+- Webの Server Actions に入っている重要ロジックは、iOSから直接呼べない。ユーザー向け機能はWeb横展開よりも、共通化またはRPC/API化を優先する。
 
 ## 8. 画面レビュー
 

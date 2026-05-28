@@ -173,12 +173,13 @@ bg-megrum-lavender / text-megrum-sky / border-megrum-pink / megrum-warn / megrum
 
 ## 📁 ファイル構造マップ
 
-### `web/`（実装本体・Phase 0a〜）
+### `web/`（管理者・運用画面）
 
 **Next.js 16.2.4 + React 19.2.4 + TypeScript + Tailwind CSS + App Router**
 
 ⚠️ **重要**：Next.js 16 + React 19 は破壊的変更を含む新版。
 作業前に **`web/AGENTS.md` と `web/node_modules/next/dist/docs/` を確認**すること（特にApp Router系の API変更）。
+ただし、`web/` は通常ユーザー向けWeb版ではなく、管理者・運用・サポート確認用として扱う。
 
 | パス | 内容 |
 |---|---|

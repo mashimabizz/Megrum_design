@@ -44,9 +44,9 @@
 
 | 用語 | 別名/英 | 定義 | 関連 |
 |---|---|---|---|
-| **Megrum** | メグルム、旧称 Megrum | 推し活グッズ交換・推しすれ違いプラットフォーム名 | iter158 |
-| **Webアプリ版** | Web版 | `web/` で実装する Next.js 版 Megrum。ブラウザで動作し、iOS版と同じ Supabase 基盤へ接続する | iter154.75 |
-| **iOSアプリ版** | iOS版、ネイティブ版 | `mobile/` で実装する React Native / Expo 版 Megrum。iOS特有の遷移・通知・地図・カメラ体験を担う | iter154.75 |
+| **Megrum** | メグルム、正式サービス名 | 推し活グッズ交換・推しすれ違いプラットフォーム名 | iter158 |
+| **Web管理画面** | Web版、運用画面 | `web/` で実装する Next.js 版 Megrum。通常ユーザー向けWeb版ではなく、管理者・運用・サポート確認用途を主対象にする | iter168.63 |
+| **iOSアプリ版** | iOS版、ネイティブ版 | `mobile/` で実装する React Native / Expo 版 Megrum。ユーザー向け体験の主対象で、iOS特有の遷移・通知・地図・カメラ体験を担う | iter168.63 |
 | **共通ロジック** | shared core | Web/iOSで挙動を揃えるため `packages/core/` に切り出す状態判定・マッチング優先度・市場残数などの処理 | iter154.75 |
 | **現地交換** | 現地、対面 | 直接会って交換する取引形態。MVPの主要対象 | C-flow |
 | **郵送** | — | MVP対象外。Yahoo フリマ等と棲み分け | iter strategy |

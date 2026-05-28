@@ -145,6 +145,13 @@ bg-megrum-lavender / text-megrum-sky / border-megrum-pink / megrum-warn / megrum
 - **MVP の範囲**: 現地交換（郵送は Yahoo フリマ等と棲み分け）、ランダム封入の小型グッズが主な交換対象
 - **特徴**: AW（Activity Window = 「この時間ここにいる」予定）と wish のマッチング、受諾前ネゴ、合意前に待ち合わせfix
 
+## 🎯 実装対象の優先方針（iter168.63）
+
+- **ユーザー向けアプリは `mobile/` の iOSアプリに一点特化する。** 新機能・UI修正・ユーザーフロー・Preview反映は原則 `mobile/` を対象にする。
+- **`web/` は通常ユーザー向けWeb版としては育てない。** 管理者画面、運用画面、サポート確認、法務確認など、運営側に必要な場合だけ更新する。
+- WebとiOSの見た目・導線を完全同期する必要はない。共通化が必要なものは `packages/core/` / `packages/supabase/` に寄せ、画面体験はiOSを正とする。
+- mobile のユーザー向け変更は、完了前に Preview channel / EAS build 反映要否を必ず確認する。web 管理画面だけの変更では iOS Preview 更新は不要。
+
 ---
 
 ## 🤖 環境ごとの動作差分（重要）
@@ -167,12 +174,13 @@ bg-megrum-lavender / text-megrum-sky / border-megrum-pink / megrum-warn / megrum
 
 ## 📁 ファイル構造マップ
 
-### `web/`（実装本体・Phase 0a〜）
+### `web/`（管理者・運用画面）
 
 **Next.js 16.2.4 + React 19.2.4 + TypeScript + Tailwind CSS + App Router**
 
 ⚠️ **重要**：Next.js 16 + React 19 は破壊的変更を含む新版。
 作業前に **`web/AGENTS.md` と `web/node_modules/next/dist/docs/` を確認**すること（特にApp Router系の API変更）。
+ただし、`web/` は通常ユーザー向けWeb版ではなく、管理者・運用・サポート確認用として扱う。
 
 | パス | 内容 |
 |---|---|

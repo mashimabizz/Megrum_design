@@ -4,6 +4,68 @@
 
 ---
 
+## イテレーション168.63：iOSアプリ集中方針を明文化
+
+### 背景・問題意識
+
+オーナーから「もうiOSアプリに一点特化したい。Web版は管理者画面の実装くらいにしか使わない」という方針が改めて共有された。iter168.51 で `mobile/` 主対象の方針は入っていたが、AGENTS / Playbook / iOSロードマップ側にまだWeb版もユーザー向けに並走するよう読める記述が残っていたため、次セッションが迷わないよう正本方針として明文化した。
+
+### 変更内容
+
+#### `AGENTS.md`
+- 「実装対象の優先方針」を追加し、ユーザー向けアプリは `mobile/` のiOSアプリに一点特化することを明記した。
+- `web/` の位置付けを管理者・運用画面へ変更した。
+- WebとiOSの見た目・導線の完全同期は要求せず、共通化は `packages/core/` / `packages/supabase/` を中心にする方針を追記した。
+
+#### `CLAUDE.md`
+- `web/` の説明を管理者・運用画面用途へ揃えた。
+
+#### `notes/10_glossary.md`
+- `Webアプリ版` の定義を `Web管理画面` へ更新し、通常ユーザー向けWeb版ではないことを明記した。
+- `iOSアプリ版` をユーザー向け体験の主対象として再定義した。
+
+#### `notes/20_ios_app_roadmap.md`
+- ドキュメント名と目的を「iOSアプリ集中ロードマップ」に更新した。
+- ユーザー向けMegrumはiOSアプリへ一本化し、Webは管理者・運用・サポート確認用途に限定する方針へ更新した。
+
+#### `notes/14_implementation_phases.md`
+- フロントエンドの正本方針として、ユーザー向け画面・導線・体験は `mobile/` のiOSアプリを正本にすることを追加した。
+- 更新ログを v1.3 / iter168.63 に更新した。
+
+#### `notes/USER_PLAYBOOK.md`
+- 現在の実装方針として、ユーザー向けMegrumはiOSアプリに一点特化することを冒頭へ追加した。
+- Phase 3 のフロントエンド実装を「iOSアプリ実装（主対象）」と「Web管理者・運用画面実装（必要最小限）」に分けた。
+
+### 影響範囲
+
+- Codex / Claude の作業判断
+- オーナー向け指示テンプレ・作業ガイド
+- 実装フェーズの優先順位
+- 用語上のWeb版の扱い
+
+### 確認方法
+
+- `rg -n "iOSアプリに一点特化|Web管理画面|管理者・運用" AGENTS.md CLAUDE.md notes/10_glossary.md notes/14_implementation_phases.md notes/20_ios_app_roadmap.md notes/USER_PLAYBOOK.md`
+- `git diff --check`
+- `npm run typecheck`
+
+### 関連ファイル
+
+- `AGENTS.md`
+- `CLAUDE.md`
+- `notes/10_glossary.md`
+- `notes/14_implementation_phases.md`
+- `notes/20_ios_app_roadmap.md`
+- `notes/USER_PLAYBOOK.md`
+
+### セルフレビュー結果
+
+- ✅ ユーザー向け実装の正本は `mobile/` / iOSアプリであることを複数の入口ドキュメントへ明記
+- ✅ `web/` は管理者・運用・サポート確認用途に限定する扱いへ更新
+- ✅ 状態遷移・DBスキーマの変更ではないため `notes/09_state_machines.md` / `notes/05_data_model.md` の更新は不要
+
+---
+
 ## イテレーション168.62：旧名残存箇所の最終整理
 
 ### 背景・問題意識
