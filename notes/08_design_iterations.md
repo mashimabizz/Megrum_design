@@ -18,6 +18,11 @@
 - ローカル `origin` を `https://github.com/mashimabizz/Megrum_design.git` へ更新した。
 - GitHub Pages は `https://mashimabizz.github.io/Megrum_design/` として再build中であることを確認した。
 
+#### Vercel project metadata
+- PR の Vercel check は成功しているが、Vercel 側 project path は旧プロジェクト名のまま残っていることを確認した。
+- ローカルには有効な Vercel CLI token / `VERCEL_TOKEN` が無く、API での project rename は実行不能だった。
+- Vercel dashboard 認証後に project name を `megrum` へ変更する必要がある。
+
 #### `Megrum/Megrum Dispute Flow (standalone).html`
 #### `Megrum Dispute Flow _standalone_.html`
 - 展開済みバンドル内に残っていた旧サポート表記を `Megrumサポート` へ置換した。
@@ -31,6 +36,7 @@
 - GitHub の公開リポジトリ名・URL
 - GitHub Pages の公開URL
 - ローカル git remote
+- Vercel project metadata（確認のみ、rename は dashboard 認証待ち）
 - 配布用 standalone HTML の表示文言
 - 旧名残存検索の対象範囲
 
@@ -54,6 +60,7 @@
 - ✅ GitHub リポジトリ名と homepage は `Megrum_design` / `https://megrum.jp` に更新済み
 - ✅ `npm run typecheck` と `git diff --cached --check` は成功
 - ⚠️ `npm --prefix web run lint` は既存の React purity / Link / image 系 lint error で失敗（今回の名称変更に起因する残存表記ではない）
+- ⚠️ Vercel project path の rename は有効な Vercel 認証が無く未実施。PR check の deploy 自体は成功
 - ✅ 状態遷移・業務用語・DB スキーマの変更ではないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の追加更新は不要
 
 ---
