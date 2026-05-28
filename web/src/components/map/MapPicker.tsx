@@ -19,7 +19,7 @@ import "leaflet/dist/leaflet.css";
  * - OpenStreetMap 標準タイル、または light 系タイルを使用
  * - center / radiusM を props として受け取り、変更を onChange で通知
  * - マーカードラッグ・地図クリックで center 更新
- * - iHub ブランドカラーの DivIcon ピン
+ * - Megrum ブランドカラーの DivIcon ピン
  */
 
 type Props = {
@@ -50,9 +50,9 @@ const TILE_STYLES = {
   },
 };
 
-// iHub lavender pin（DivIcon で完全カスタム）
+// Megrum lavender pin（DivIcon で完全カスタム）
 const pinIcon = L.divIcon({
-  className: "ihub-pin",
+  className: "megrum-pin",
   html: `
     <div style="
       position: relative;
@@ -80,7 +80,7 @@ const pinIcon = L.divIcon({
 function buildPinIcon(label?: string) {
   if (!label) return pinIcon;
   return L.divIcon({
-    className: "ihub-pin",
+    className: "megrum-pin",
     html: `
       <div style="
         position: relative;
@@ -187,9 +187,9 @@ export default function MapPicker({
   );
 
   return (
-    <div className={`ihub-map-picker ${className ?? ""}`}>
+    <div className={`megrum-map-picker ${className ?? ""}`}>
       <style>{`
-        .ihub-map-picker .leaflet-control-attribution {
+        .megrum-map-picker .leaflet-control-attribution {
           margin: 0 4px 3px 0;
           padding: 1px 4px;
           border-radius: 999px;
@@ -204,7 +204,7 @@ export default function MapPicker({
           white-space: nowrap;
           box-shadow: 0 1px 4px rgba(58, 50, 74, 0.08);
         }
-        .ihub-map-picker .leaflet-control-attribution a {
+        .megrum-map-picker .leaflet-control-attribution a {
           color: inherit;
           text-decoration: none;
         }

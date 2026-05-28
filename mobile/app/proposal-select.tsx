@@ -5,6 +5,7 @@ import {
   Animated,
   Image,
   Modal,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -30,7 +31,7 @@ import {
   type ProposalInventoryRow,
 } from "../src/data/proposalItems";
 import { supabase } from "../src/lib/supabase";
-import { ihubColors, ihubRadii, ihubShadow } from "../src/theme/tokens";
+import { megrumColors, megrumRadii, megrumShadow } from "../src/theme/tokens";
 
 type ProposalTab = "give" | "receive" | "meetup";
 
@@ -234,15 +235,15 @@ export default function ProposalSelectScreen() {
         id: "give" as const,
         label: "私が出す",
         count: giveSelectedIds.length,
-        color: ihubColors.lavender,
+        color: megrumColors.lavender,
       },
       {
         id: "receive" as const,
         label: "受け取る",
         count: receiveSelectedIds.length,
-        color: ihubColors.sky,
+        color: megrumColors.sky,
       },
-      { id: "meetup" as const, label: "待ち合わせ", count: 1, color: ihubColors.pink },
+      { id: "meetup" as const, label: "待ち合わせ", count: 1, color: megrumColors.pink },
     ],
     [giveSelectedIds.length, receiveSelectedIds.length],
   );
@@ -306,7 +307,7 @@ export default function ProposalSelectScreen() {
               setPlaceSheetId(id);
             }}
             onAddCandidate={(dayIndex, dateId, startSlot, endSlot) => {
-              const id = `candidate-${Date.now()}`;
+              const id = `candidate-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
               const candidate: MeetupCandidate = {
                 id,
                 dateId,
@@ -318,6 +319,7 @@ export default function ProposalSelectScreen() {
               };
               setMeetupCandidates((current) => [...current, candidate]);
               setActiveMeetupId(id);
+              setPlaceSheetId(id);
             }}
             onDeleteCandidate={(id) => {
               setMeetupCandidates((current) =>
@@ -544,10 +546,12 @@ function MeetupPane({
   const calendarGridRef = useRef<View>(null);
   const dragDraftRef = useRef<DragDraft | null>(null);
   const weekDragX = useRef(new Animated.Value(0)).current;
+  const hintPulse = useRef(new Animated.Value(0)).current;
   const weekDragValueRef = useRef(0);
   const [dragDraft, setDragDraftState] = useState<DragDraft | null>(null);
   const [candidateEdit, setCandidateEditState] =
     useState<CandidateEdit | null>(null);
+  const [calendarGestureLock, setCalendarGestureLock] = useState(false);
   const calendarWidth = width - 36;
   const dayWidth = (calendarWidth - TIME_LABEL_WIDTH) / days.length;
   const pagerWeeks = useMemo(
@@ -588,6 +592,32 @@ function MeetupPane({
     };
   }, [weekDragX]);
 
+  useEffect(() => {
+    if (candidates.length > 0 || dragDraft) {
+      hintPulse.stopAnimation();
+      hintPulse.setValue(0);
+      return;
+    }
+    const animation = Animated.loop(
+      Animated.sequence([
+        Animated.timing(hintPulse, {
+          toValue: 1,
+          duration: 1250,
+          useNativeDriver: true,
+        }),
+        Animated.timing(hintPulse, {
+          toValue: 0,
+          duration: 1250,
+          useNativeDriver: true,
+        }),
+      ]),
+    );
+    animation.start();
+    return () => {
+      animation.stop();
+    };
+  }, [candidates.length, dragDraft, hintPulse]);
+
   useEffect(
     () => () => {
       clearTouchPress();
@@ -619,6 +649,7 @@ function MeetupPane({
     }
     candidateTouchRef.current = null;
     setCandidateEdit(null);
+    setCalendarGestureLock(false);
   }
 
   function measureCalendarFrame() {
@@ -729,6 +760,7 @@ function MeetupPane({
       ...state,
       mode: "editing",
     };
+    setCalendarGestureLock(true);
     setCandidateEdit({
       id: state.id,
       action: state.action,
@@ -869,11 +901,12 @@ function MeetupPane({
       const press = touchPressRef.current;
       if (!press || press.mode !== "pending") return;
       press.mode = "dragging";
+      setCalendarGestureLock(true);
       const draft = {
         dayIndex,
         dateId: press.dateId,
         startSlot,
-        currentSlot: startSlot + 3,
+        currentSlot: Math.min(SLOT_COUNT - 1, startSlot + 1),
       };
       setDragDraft(draft);
     }, LONG_PRESS_MS);
@@ -898,12 +931,14 @@ function MeetupPane({
     const absX = Math.abs(dx);
     const absY = Math.abs(dy);
     if (press.mode === "swiping") {
+      setCalendarGestureLock(true);
       setWeekDrag(dx);
       return;
     }
     if (press.mode === "pending" && absX > 10 && absX > absY * 1.08) {
       clearTimeout(press.timer);
       press.mode = "swiping";
+      setCalendarGestureLock(true);
       setWeekDrag(dx);
       return;
     }
@@ -930,6 +965,7 @@ function MeetupPane({
       clearTouchPress();
       setDragDraft(null);
       settleWeekSwipe(dx || weekDragValueRef.current);
+      setCalendarGestureLock(false);
       return;
     }
     clearTouchPress();
@@ -960,12 +996,14 @@ function MeetupPane({
       range.endSlot,
     );
     setDragDraft(null);
+    setCalendarGestureLock(false);
   }
 
   function handleDayTouchCancel() {
     clearTouchPress();
     clearCandidateTouch();
     setDragDraft(null);
+    setCalendarGestureLock(false);
     resetWeekDrag(true);
   }
 
@@ -1036,7 +1074,7 @@ function MeetupPane({
 
       <ScrollView
         ref={scrollRef}
-        scrollEnabled={!dragDraft && !candidateEdit}
+        scrollEnabled={!calendarGestureLock && !dragDraft && !candidateEdit}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={[
           styles.calendarContent,
@@ -1252,11 +1290,30 @@ function MeetupPane({
       </ScrollView>
 
       {candidates.length === 0 && !preview ? (
-        <View pointerEvents="none" style={styles.calendarHint}>
+        <Animated.View
+          pointerEvents="none"
+          style={[
+            styles.calendarHint,
+            {
+              opacity: hintPulse.interpolate({
+                inputRange: [0, 1],
+                outputRange: [0.92, 1],
+              }),
+              transform: [
+                {
+                  scale: hintPulse.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [1, 1.045],
+                  }),
+                },
+              ],
+            },
+          ]}
+        >
           <Text style={styles.calendarHintText}>
             長押しで時間帯を選択できるよ
           </Text>
-        </View>
+        </Animated.View>
       ) : null}
 
       <PlaceSheet
@@ -1397,10 +1454,9 @@ function PlaceSheet({
     });
   }
 
-  return (
-    <Modal visible transparent animationType="slide" onRequestClose={onClose}>
-      <Pressable style={styles.placeBackdrop} onPress={onClose}>
-        <Pressable style={styles.placeSheet}>
+  const nativeSheet = Platform.OS === "ios";
+  const sheetContent = (
+    <Pressable style={[styles.placeSheet, nativeSheet ? styles.placeNativeSheet : null]}>
           <View style={styles.placeHandle} />
           <View style={styles.placeHeader}>
             <View>
@@ -1493,8 +1549,24 @@ function PlaceSheet({
           </View>
 
           <PrimaryButton onPress={confirm}>この場所にする</PrimaryButton>
-        </Pressable>
+    </Pressable>
+  );
+
+  return (
+    <Modal
+      visible
+      transparent={!nativeSheet}
+      animationType="slide"
+      presentationStyle={nativeSheet ? "pageSheet" : "overFullScreen"}
+      onRequestClose={onClose}
+    >
+      {nativeSheet ? (
+        <View style={styles.placeNativeSheetRoot}>{sheetContent}</View>
+      ) : (
+        <Pressable style={styles.placeBackdrop} onPress={onClose}>
+          {sheetContent}
       </Pressable>
+      )}
     </Modal>
   );
 }
@@ -1669,17 +1741,17 @@ const styles = StyleSheet.create({
   },
   backButton: {
     alignItems: "center",
-    backgroundColor: ihubColors.surface,
+    backgroundColor: megrumColors.surface,
     borderColor: "rgba(58,50,74,0.08)",
-    borderRadius: ihubRadii.pill,
+    borderRadius: megrumRadii.pill,
     borderWidth: 1,
     height: 42,
     justifyContent: "center",
     width: 42,
-    ...ihubShadow,
+    ...megrumShadow,
   },
   backText: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 31,
     fontWeight: "700",
     lineHeight: 33,
@@ -1688,13 +1760,13 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   kicker: {
-    color: ihubColors.lavender,
+    color: megrumColors.lavender,
     fontSize: 10,
     fontWeight: "900",
     letterSpacing: 0.7,
   },
   title: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 23,
     fontWeight: "900",
     lineHeight: 28,
@@ -1708,9 +1780,9 @@ const styles = StyleSheet.create({
   },
   choiceCard: {
     alignItems: "center",
-    backgroundColor: ihubColors.surface,
+    backgroundColor: megrumColors.surface,
     borderColor: "rgba(58,50,74,0.08)",
-    borderRadius: ihubRadii.lg,
+    borderRadius: megrumRadii.lg,
     borderWidth: 1,
     flexDirection: "row",
     gap: 12,
@@ -1742,7 +1814,7 @@ const styles = StyleSheet.create({
     width: 56,
   },
   choiceGlyph: {
-    color: ihubColors.surface,
+    color: megrumColors.surface,
     fontSize: 27,
     fontWeight: "900",
   },
@@ -1750,12 +1822,12 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   choiceTitle: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 15,
     fontWeight: "900",
   },
   choiceSubtitle: {
-    color: ihubColors.mutedInk,
+    color: megrumColors.mutedInk,
     fontSize: 11,
     fontWeight: "800",
     marginTop: 3,
@@ -1763,7 +1835,7 @@ const styles = StyleSheet.create({
   choiceHint: {
     alignSelf: "flex-start",
     backgroundColor: "rgba(168,212,230,0.22)",
-    borderRadius: ihubRadii.pill,
+    borderRadius: megrumRadii.pill,
     marginTop: 8,
     paddingHorizontal: 8,
     paddingVertical: 4,
@@ -1783,8 +1855,8 @@ const styles = StyleSheet.create({
     width: 26,
   },
   checkCircleOn: {
-    backgroundColor: ihubColors.lavender,
-    borderColor: ihubColors.lavender,
+    backgroundColor: megrumColors.lavender,
+    borderColor: megrumColors.lavender,
   },
   checkText: {
     color: "transparent",
@@ -1792,10 +1864,10 @@ const styles = StyleSheet.create({
     fontWeight: "900",
   },
   checkTextOn: {
-    color: ihubColors.surface,
+    color: megrumColors.surface,
   },
   meetupRoot: {
-    backgroundColor: ihubColors.surface,
+    backgroundColor: megrumColors.surface,
     borderTopColor: "rgba(58,50,74,0.08)",
     borderTopWidth: 1,
     flex: 1,
@@ -1826,21 +1898,21 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(166,149,216,0.10)",
   },
   dayName: {
-    color: ihubColors.mutedInk,
+    color: megrumColors.mutedInk,
     fontSize: 11,
     fontWeight: "900",
   },
   dayNameToday: {
-    color: ihubColors.lavender,
+    color: megrumColors.lavender,
   },
   dayDate: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 24,
     fontWeight: "900",
     marginTop: 2,
   },
   dayDateToday: {
-    color: ihubColors.lavender,
+    color: megrumColors.lavender,
   },
   calendarContent: {
     paddingBottom: 36,
@@ -1858,7 +1930,7 @@ const styles = StyleSheet.create({
     top: 0,
   },
   hourLabel: {
-    color: ihubColors.mutedInk,
+    color: megrumColors.mutedInk,
     fontSize: 11,
     fontWeight: "800",
     position: "absolute",
@@ -1901,11 +1973,11 @@ const styles = StyleSheet.create({
   },
   candidateBlockActive: {
     borderColor: "rgba(166,149,216,0.88)",
-    shadowColor: ihubColors.lavender,
+    shadowColor: megrumColors.lavender,
     shadowOpacity: 0.2,
   },
   candidateBlockEditing: {
-    shadowColor: ihubColors.ink,
+    shadowColor: megrumColors.ink,
     shadowOffset: { width: 0, height: 16 },
     shadowOpacity: 0.24,
     shadowRadius: 22,
@@ -1926,7 +1998,7 @@ const styles = StyleSheet.create({
     width: 25,
   },
   candidateAlertText: {
-    color: ihubColors.surface,
+    color: megrumColors.surface,
     fontSize: 16,
     fontWeight: "900",
     lineHeight: 18,
@@ -1992,7 +2064,7 @@ const styles = StyleSheet.create({
     zIndex: 40,
   },
   calendarHintText: {
-    color: ihubColors.surface,
+    color: megrumColors.surface,
     fontSize: 13,
     fontWeight: "900",
     textAlign: "center",
@@ -2002,14 +2074,25 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "flex-end",
   },
+  placeNativeSheetRoot: {
+    backgroundColor: megrumColors.background,
+    flex: 1,
+    padding: 16,
+  },
   placeSheet: {
-    backgroundColor: ihubColors.surface,
+    backgroundColor: megrumColors.surface,
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
     gap: 12,
     paddingBottom: 24,
     paddingHorizontal: 18,
     paddingTop: 10,
+  },
+  placeNativeSheet: {
+    backgroundColor: megrumColors.background,
+    borderTopLeftRadius: 0,
+    borderTopRightRadius: 0,
+    paddingHorizontal: 0,
   },
   placeHandle: {
     alignSelf: "center",
@@ -2025,12 +2108,12 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
   },
   placeKicker: {
-    color: ihubColors.lavender,
+    color: megrumColors.lavender,
     fontSize: 11,
     fontWeight: "900",
   },
   placeTitle: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 21,
     fontWeight: "900",
     marginTop: 2,
@@ -2044,7 +2127,7 @@ const styles = StyleSheet.create({
     width: 34,
   },
   placeCloseText: {
-    color: ihubColors.mutedInk,
+    color: megrumColors.mutedInk,
     fontSize: 21,
     fontWeight: "900",
     lineHeight: 22,
@@ -2056,12 +2139,12 @@ const styles = StyleSheet.create({
   },
   placeAction: {
     backgroundColor: "rgba(58,50,74,0.06)",
-    borderRadius: ihubRadii.pill,
+    borderRadius: megrumRadii.pill,
     paddingHorizontal: 12,
     paddingVertical: 9,
   },
   placeActionText: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 11.5,
     fontWeight: "900",
   },
@@ -2072,7 +2155,7 @@ const styles = StyleSheet.create({
     marginLeft: "auto",
   },
   placeActionStrongText: {
-    color: ihubColors.lavender,
+    color: megrumColors.lavender,
     fontSize: 11.5,
     fontWeight: "900",
   },
@@ -2084,14 +2167,14 @@ const styles = StyleSheet.create({
     borderColor: "rgba(58,50,74,0.08)",
     borderRadius: 14,
     borderWidth: 1,
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 14,
     fontWeight: "800",
     paddingHorizontal: 12,
     paddingVertical: 11,
   },
   placeMessage: {
-    color: ihubColors.mutedInk,
+    color: megrumColors.mutedInk,
     fontSize: 10.5,
     fontWeight: "800",
     marginTop: -4,
@@ -2106,7 +2189,7 @@ const styles = StyleSheet.create({
   },
   placePreset: {
     backgroundColor: "rgba(168,212,230,0.16)",
-    borderRadius: ihubRadii.pill,
+    borderRadius: megrumRadii.pill,
     flex: 1,
     paddingHorizontal: 10,
     paddingVertical: 9,

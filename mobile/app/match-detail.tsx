@@ -19,6 +19,7 @@ import {
   getAdjacentCandidateContexts,
   type CandidateContext,
 } from "../src/data/homeMatches";
+import { useAuth } from "../src/auth/AuthProvider";
 import {
   buildProposalCatalogOverrides,
   buildProposalThumbs,
@@ -26,7 +27,7 @@ import {
   type ProposalThumbItem,
 } from "../src/data/proposalItems";
 import { supabase } from "../src/lib/supabase";
-import { ihubColors, ihubRadii } from "../src/theme/tokens";
+import { megrumColors, megrumRadii } from "../src/theme/tokens";
 
 type Priority = "both" | "oneSide" | "wish";
 type ListingKind = "both" | "mine" | "partner" | "simple";
@@ -72,6 +73,13 @@ type ListingInfo = {
   isMyListing: boolean;
 };
 
+type DetailData = {
+  myListings: ListingInfo[];
+  partnerListings: ListingInfo[];
+  simpleReceives: MiniItem[];
+  simpleGives: MiniItem[];
+};
+
 type PopupTarget = {
   listingId: string;
   viewpoint: "mine" | "partner";
@@ -84,6 +92,38 @@ type PopupTarget = {
 
 type Selection = Record<string, string[]>;
 type HaveSelection = Record<string, string[]>;
+
+type ListingRow = {
+  id: string;
+  user_id: string;
+  have_ids: string[] | null;
+  have_qtys: number[] | null;
+  have_logic: Logic | null;
+};
+
+type ListingOptionRow = {
+  id: string;
+  listing_id: string;
+  position: number;
+  wish_ids: string[] | null;
+  wish_qtys: number[] | null;
+  logic: Logic | null;
+  exchange_type: ExchangeType | null;
+  is_cash_offer: boolean | null;
+  cash_amount: number | null;
+};
+
+type RealInventoryRow = ProposalInventoryRow & {
+  group_id: string | null;
+  character_id: string | null;
+  goods_type_id: string | null;
+};
+
+type CatalogMiniItem = MiniItem & {
+  groupId: string | null;
+  characterId: string | null;
+  goodsTypeId: string | null;
+};
 
 const PARTNER_HANDLE = "michilion";
 const MY_AVATAR = "私";
@@ -107,6 +147,7 @@ const BASE_ITEMS = {
 };
 
 export default function MatchDetailScreen() {
+  const { user, previewMode } = useAuth();
   const params = useLocalSearchParams<{
     candidateId?: string | string[];
     title?: string | string[];
@@ -146,6 +187,7 @@ export default function MatchDetailScreen() {
   const routeReceiveIds = parseRouteIds(one(params.receives));
   const routeItemIdsKey = [...routeGiveIds, ...routeReceiveIds].join(",");
   const routeListingIds = parseRouteIds(one(params.listings));
+  const routeListingIdsKey = routeListingIds.join(",");
   const routeMatchType = normalizeMatchType(one(params.matchType));
   const hasRouteProposal =
     routeGiveIds.length > 0 || routeReceiveIds.length > 0 || routeListingIds.length > 0;
@@ -164,15 +206,18 @@ export default function MatchDetailScreen() {
   const [catalogOverrides, setCatalogOverrides] = useState<
     ReturnType<typeof buildProposalCatalogOverrides>
   >(() => new Map());
+  const [realListingData, setRealListingData] = useState<DetailData | null>(null);
   const data = useMemo(
-    () =>
-      buildDetailData(
+    () => {
+      if (realListingData && listingKind !== "simple") return realListingData;
+      return buildDetailData(
         highlightedItem,
         listingKind,
         routeGiveIds,
         routeReceiveIds,
         catalogOverrides,
-      ),
+      );
+    },
     [
       catalogOverrides,
       highlightedItem.id,
@@ -181,6 +226,7 @@ export default function MatchDetailScreen() {
       highlightedItem.color,
       highlightedItem.photoUrl,
       listingKind,
+      realListingData,
       routeItemIdsKey,
     ],
   );
@@ -238,6 +284,36 @@ export default function MatchDetailScreen() {
       active = false;
     };
   }, [routeItemIdsKey]);
+
+  useEffect(() => {
+    if (
+      !supabase ||
+      !user ||
+      previewMode ||
+      routeListingIds.length === 0 ||
+      routeItemIdsKey.length === 0
+    ) {
+      setRealListingData(null);
+      return;
+    }
+
+    let active = true;
+    fetchRealListingDetail({
+      listingIds: routeListingIds,
+      userId: user.id,
+      routeGiveIds,
+      routeReceiveIds,
+    })
+      .then((next) => {
+        if (active) setRealListingData(next);
+      })
+      .catch(() => {
+        if (active) setRealListingData(null);
+      });
+    return () => {
+      active = false;
+    };
+  }, [previewMode, routeItemIdsKey, routeListingIdsKey, user?.id]);
 
   const panResponder = useMemo(
     () =>
@@ -352,21 +428,26 @@ export default function MatchDetailScreen() {
     selection,
     haveSelection,
   });
+  const hasRelationSelection = aggregated.referencedListingIds.length > 0;
+  const proposalGiveIds =
+    hasRelationSelection || routeGiveIds.length === 0 ? aggregated.giveIds : routeGiveIds;
+  const proposalReceiveIds =
+    hasRelationSelection || routeReceiveIds.length === 0
+      ? aggregated.receiveIds
+      : routeReceiveIds;
+  const proposalListingIds =
+    hasRelationSelection || routeListingIds.length === 0
+      ? aggregated.referencedListingIds
+      : routeListingIds;
   const proposalParams = {
     tab: "meetup",
     candidateId: highlightedItem.id,
     ...(routePartnerId ? { partnerId: routePartnerId } : {}),
     partnerHandle,
     matchType: routeMatchType,
-    gives: (routeGiveIds.length > 0 ? routeGiveIds : aggregated.giveIds).join(","),
-    receives: (routeReceiveIds.length > 0
-      ? routeReceiveIds
-      : aggregated.receiveIds
-    ).join(","),
-    listings: (routeListingIds.length > 0
-      ? routeListingIds
-      : aggregated.referencedListingIds
-    ).join(","),
+    gives: proposalGiveIds.join(","),
+    receives: proposalReceiveIds.join(","),
+    listings: proposalListingIds.join(","),
   };
   const simpleProposalParams = {
     tab: "meetup",
@@ -452,7 +533,7 @@ export default function MatchDetailScreen() {
               <SectionGroup
                 title="あなたの個別募集"
                 subtitle="あなたが出している条件で、相手の在庫がヒット"
-                accentColor={ihubColors.lavender}
+                accentColor={megrumColors.lavender}
               >
                 {data.myListings.map((listing, index) => (
                   <ListingTree
@@ -475,7 +556,7 @@ export default function MatchDetailScreen() {
               <SectionGroup
                 title={`@${partnerHandle} の個別募集`}
                 subtitle="相手が出している条件で、あなたの在庫がヒット"
-                accentColor={ihubColors.pink}
+                accentColor={megrumColors.pink}
               >
                 {data.partnerListings.map((listing, index) => (
                   <ListingTree
@@ -673,7 +754,7 @@ function SwipePreview({
           <SectionGroup
             title="あなたの個別募集"
             subtitle="あなたが出している条件で、相手の在庫がヒット"
-            accentColor={ihubColors.lavender}
+            accentColor={megrumColors.lavender}
           >
             {data.myListings.map((listing, index) => (
               <ListingTree
@@ -696,7 +777,7 @@ function SwipePreview({
           <SectionGroup
             title={`@${PARTNER_HANDLE} の個別募集`}
             subtitle="相手が出している条件で、あなたの在庫がヒット"
-            accentColor={ihubColors.pink}
+            accentColor={megrumColors.pink}
           >
             {data.partnerListings.map((listing, index) => (
               <ListingTree
@@ -792,7 +873,7 @@ function SwipeSettledCover({
           <SectionGroup
             title="あなたの個別募集"
             subtitle="あなたが出している条件で、相手の在庫がヒット"
-            accentColor={ihubColors.lavender}
+            accentColor={megrumColors.lavender}
           >
             {data.myListings.map((listing, index) => (
               <ListingTree
@@ -815,7 +896,7 @@ function SwipeSettledCover({
           <SectionGroup
             title={`@${PARTNER_HANDLE} の個別募集`}
             subtitle="相手が出している条件で、あなたの在庫がヒット"
-            accentColor={ihubColors.pink}
+            accentColor={megrumColors.pink}
           >
             {data.partnerListings.map((listing, index) => (
               <ListingTree
@@ -890,7 +971,7 @@ function ListingTree({
       <View style={styles.treeBody}>
         <View style={styles.treeSideLeft}>
           <OwnerLabel
-            color={ihubColors.pink}
+            color={megrumColors.pink}
             name={`@${PARTNER_HANDLE} が譲るもの`}
             avatarName={PARTNER_HANDLE}
           />
@@ -915,7 +996,7 @@ function ListingTree({
 
         <View style={styles.treeSideRight}>
           <OwnerLabel
-            color={ihubColors.lavender}
+            color={megrumColors.lavender}
             name="あなた が譲るもの"
             avatarName={MY_AVATAR}
             right
@@ -1357,7 +1438,7 @@ function WishPopup({
   const candidateOwner =
     target.viewpoint === "mine" ? `@${PARTNER_HANDLE}` : "あなた";
   const candidateColor =
-    target.viewpoint === "mine" ? ihubColors.pink : ihubColors.lavender;
+    target.viewpoint === "mine" ? megrumColors.pink : megrumColors.lavender;
 
   return (
     <Modal visible transparent animationType="fade" onRequestClose={onClose}>
@@ -1529,7 +1610,7 @@ function ItemPhoto({
         {
           width: size,
           height: size,
-          borderColor: variant === "have" ? ihubColors.sky : ihubColors.pink,
+          borderColor: variant === "have" ? megrumColors.sky : megrumColors.pink,
           backgroundColor: item.color,
           opacity: dim ? 0.48 : 1,
         },
@@ -1733,6 +1814,159 @@ function buildDetailData(
   };
 }
 
+async function fetchRealListingDetail({
+  listingIds,
+  userId,
+  routeGiveIds,
+  routeReceiveIds,
+}: {
+  listingIds: string[];
+  userId: string;
+  routeGiveIds: string[];
+  routeReceiveIds: string[];
+}) {
+  if (!supabase || listingIds.length === 0) return null;
+
+  const [{ data: listingRows }, { data: optionRows }] = await Promise.all([
+    supabase
+      .from("listings")
+      .select("id, user_id, have_ids, have_qtys, have_logic")
+      .in("id", listingIds),
+    supabase
+      .from("listing_wish_options")
+      .select(
+        "id, listing_id, position, wish_ids, wish_qtys, logic, exchange_type, is_cash_offer, cash_amount",
+      )
+      .in("listing_id", listingIds)
+      .order("position", { ascending: true }),
+  ]);
+
+  const listings = (listingRows as ListingRow[] | null) ?? [];
+  if (listings.length === 0) return null;
+
+  const optionsByListing = groupBy(
+    (optionRows as ListingOptionRow[] | null) ?? [],
+    (option) => option.listing_id,
+  );
+  const invIds = new Set<string>();
+  for (const listing of listings) {
+    for (const id of listing.have_ids ?? []) invIds.add(id);
+  }
+  for (const option of (optionRows as ListingOptionRow[] | null) ?? []) {
+    for (const id of option.wish_ids ?? []) invIds.add(id);
+  }
+  for (const id of routeGiveIds) invIds.add(id);
+  for (const id of routeReceiveIds) invIds.add(id);
+
+  const catalog = await fetchCatalogMiniItems(Array.from(invIds));
+  const routeGiveItems = routeGiveIds.flatMap((id) => {
+    const item = catalog.get(id);
+    return item ? [item] : [];
+  });
+  const routeReceiveItems = routeReceiveIds.flatMap((id) => {
+    const item = catalog.get(id);
+    return item ? [item] : [];
+  });
+
+  const myListings: ListingInfo[] = [];
+  const partnerListings: ListingInfo[] = [];
+  for (const listing of listings) {
+    const isMyListing = listing.user_id === userId;
+    const routeCounterpart = isMyListing ? routeReceiveItems : routeGiveItems;
+    const matchedHaveIds = new Set(isMyListing ? routeGiveIds : routeReceiveIds);
+    const haves: ListingHave[] = (listing.have_ids ?? []).flatMap((id, index) => {
+      const item = catalog.get(id);
+      if (!item) return [];
+      return [
+        {
+          item,
+          qty: Math.max(1, listing.have_qtys?.[index] ?? 1),
+          matched: matchedHaveIds.size === 0 || matchedHaveIds.has(id),
+        },
+      ];
+    });
+    const options = (optionsByListing.get(listing.id) ?? []).map(
+      (option): ListingOption => {
+        const wishes: ListingWish[] = (option.wish_ids ?? []).flatMap(
+          (wishId, index) => {
+            const wish = catalog.get(wishId);
+            if (!wish) return [];
+            const candidates = routeCounterpart
+              .filter((candidate) => catalogItemsMatch(candidate, wish))
+              .map((candidate) => ({ item: candidate, qty: 1 }));
+            return [
+              {
+                item: wish,
+                qty: Math.max(1, option.wish_qtys?.[index] ?? 1),
+                candidates,
+              },
+            ];
+          },
+        );
+        return {
+          id: option.id,
+          position: option.position,
+          logic: option.logic ?? "or",
+          exchangeType: option.exchange_type ?? "any",
+          isCashOffer: !!option.is_cash_offer,
+          cashAmount: option.cash_amount,
+          matched:
+            !!option.is_cash_offer ||
+            wishes.some((wish) => wish.candidates.length > 0),
+          wishes,
+        };
+      },
+    );
+    const detail: ListingInfo = {
+      listingId: listing.id,
+      haveLogic: listing.have_logic ?? "and",
+      haves,
+      options,
+      isMyListing,
+    };
+    if (isMyListing) myListings.push(detail);
+    else partnerListings.push(detail);
+  }
+
+  return { myListings, partnerListings, simpleReceives: [], simpleGives: [] };
+}
+
+async function fetchCatalogMiniItems(ids: string[]) {
+  const catalog = new Map<string, CatalogMiniItem>();
+  if (!supabase || ids.length === 0) return catalog;
+
+  const { data } = await supabase
+    .from("goods_inventory")
+    .select(
+      "id, title, photo_urls, hue, group_id, character_id, goods_type_id, group:groups_master(name), character:characters_master(name), goods_type:goods_types_master(name)",
+    )
+    .in("id", ids);
+  const rows = (data as RealInventoryRow[] | null) ?? [];
+  const overrides = buildProposalCatalogOverrides(rows);
+  for (const row of rows) {
+    const item = overrides.get(row.id);
+    if (!item) continue;
+    catalog.set(row.id, {
+      id: row.id,
+      label: item.title,
+      glyph: item.glyph,
+      color: item.hue,
+      photoUrl: item.photoUrl,
+      groupId: row.group_id,
+      characterId: row.character_id,
+      goodsTypeId: row.goods_type_id,
+    });
+  }
+  return catalog;
+}
+
+function catalogItemsMatch(a: CatalogMiniItem, b: CatalogMiniItem) {
+  if (a.goodsTypeId !== b.goodsTypeId) return false;
+  if (a.characterId && b.characterId) return a.characterId === b.characterId;
+  if (!a.groupId || !b.groupId) return false;
+  return a.groupId === b.groupId;
+}
+
 function buildRouteMiniItems(
   ids: string[],
   side: "give" | "receive",
@@ -1755,7 +1989,15 @@ function thumbToMiniItem(item: ProposalThumbItem): MiniItem {
 function initialSelection(listings: ListingInfo[], highlightedItemId: string): Selection {
   const selection: Selection = {};
   for (const listing of listings) {
+    const highlightedHave = listing.haves.some((have) => have.item.id === highlightedItemId);
     for (const option of listing.options) {
+      if (highlightedHave && !selection[listing.listingId]?.length) {
+        const defaultCandidateIds = defaultCandidateIdsForOption(option);
+        if (defaultCandidateIds.length > 0) {
+          selection[listing.listingId] = defaultCandidateIds;
+          continue;
+        }
+      }
       for (const wish of option.wishes) {
         if (wish.candidates.some((candidate) => candidate.item.id === highlightedItemId)) {
           selection[listing.listingId] = [
@@ -1767,6 +2009,21 @@ function initialSelection(listings: ListingInfo[], highlightedItemId: string): S
     }
   }
   return selection;
+}
+
+function defaultCandidateIdsForOption(option: ListingOption) {
+  const visibleWishes = option.wishes.filter((wish) => wish.candidates.length > 0);
+  if (visibleWishes.length === 0) return [];
+  if (option.logic === "and") {
+    const ids: string[] = [];
+    for (const wish of visibleWishes) {
+      const id = wish.candidates[0]?.item.id;
+      if (id && !ids.includes(id)) ids.push(id);
+    }
+    return ids;
+  }
+  const firstCandidate = visibleWishes[0]?.candidates[0]?.item.id;
+  return firstCandidate ? [firstCandidate] : [];
 }
 
 function initialHaveSelection(listings: ListingInfo[], highlightedItemId: string): HaveSelection {
@@ -1882,6 +2139,17 @@ function normalizeMatchType(value?: string) {
   return "complete";
 }
 
+function groupBy<T>(items: T[], getKey: (item: T) => string) {
+  const map = new Map<string, T[]>();
+  for (const item of items) {
+    const key = getKey(item);
+    const current = map.get(key) ?? [];
+    current.push(item);
+    map.set(key, current);
+  }
+  return map;
+}
+
 function exchangeLabel(type: ExchangeType) {
   if (type === "same_kind") return "同種";
   if (type === "cross_kind") return "異種";
@@ -1891,7 +2159,7 @@ function exchangeLabel(type: ExchangeType) {
 function exchangeChipStyle(type: ExchangeType) {
   if (type === "same_kind") return { backgroundColor: "#5fa884" };
   if (type === "cross_kind") return { backgroundColor: "#d9826b" };
-  return { backgroundColor: ihubColors.lavender };
+  return { backgroundColor: megrumColors.lavender };
 }
 
 function alpha(hex: string, opacity: number) {
@@ -1904,7 +2172,7 @@ function alpha(hex: string, opacity: number) {
 
 const styles = StyleSheet.create({
   root: {
-    backgroundColor: ihubColors.background,
+    backgroundColor: megrumColors.background,
     flex: 1,
     overflow: "hidden",
   },
@@ -1913,17 +2181,17 @@ const styles = StyleSheet.create({
     position: "relative",
   },
   swipePage: {
-    backgroundColor: ihubColors.background,
+    backgroundColor: megrumColors.background,
     flex: 1,
   },
   previewPage: {
-    backgroundColor: ihubColors.background,
+    backgroundColor: megrumColors.background,
     bottom: 0,
     position: "absolute",
     top: 0,
   },
   swapCover: {
-    backgroundColor: ihubColors.background,
+    backgroundColor: megrumColors.background,
     bottom: 0,
     left: 0,
     position: "absolute",
@@ -1945,9 +2213,9 @@ const styles = StyleSheet.create({
   },
   closeButton: {
     alignItems: "center",
-    backgroundColor: ihubColors.surface,
+    backgroundColor: megrumColors.surface,
     borderColor: "rgba(58,50,74,0.08)",
-    borderRadius: ihubRadii.pill,
+    borderRadius: megrumRadii.pill,
     borderWidth: 1,
     height: 36,
     justifyContent: "center",
@@ -1963,12 +2231,12 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   headerTitle: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 15,
     fontWeight: "900",
   },
   headerSubtitle: {
-    color: ihubColors.mutedInk,
+    color: megrumColors.mutedInk,
     fontSize: 11,
     marginTop: 2,
   },
@@ -1991,25 +2259,25 @@ const styles = StyleSheet.create({
     letterSpacing: 0.4,
   },
   sectionSubtitle: {
-    color: ihubColors.mutedInk,
+    color: megrumColors.mutedInk,
     fontSize: 10,
     marginTop: 2,
   },
   listingTree: {
-    backgroundColor: ihubColors.surface,
+    backgroundColor: megrumColors.surface,
     borderColor: "rgba(58,50,74,0.08)",
     borderRadius: 16,
     borderWidth: 1,
     marginBottom: 12,
     overflow: "hidden",
-    shadowColor: ihubColors.ink,
+    shadowColor: megrumColors.ink,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.04,
     shadowRadius: 8,
   },
   listingHeader: {
     alignItems: "center",
-    backgroundColor: ihubColors.background,
+    backgroundColor: megrumColors.background,
     borderBottomColor: "rgba(58,50,74,0.04)",
     borderBottomWidth: 1,
     flexDirection: "row",
@@ -2023,19 +2291,19 @@ const styles = StyleSheet.create({
     flexDirection: "row",
   },
   listingTitle: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 11,
     fontWeight: "900",
     letterSpacing: 0.3,
   },
   listingOptionCount: {
-    color: ihubColors.mutedInk,
+    color: megrumColors.mutedInk,
     fontSize: 10,
   },
   cashPill: {
     backgroundColor: "rgba(122,154,138,0.08)",
     borderColor: "rgba(122,154,138,0.34)",
-    borderRadius: ihubRadii.pill,
+    borderRadius: megrumRadii.pill,
     borderWidth: 1,
     paddingHorizontal: 7,
     paddingVertical: 3,
@@ -2083,7 +2351,7 @@ const styles = StyleSheet.create({
     width: 20,
   },
   miniAvatarText: {
-    color: ihubColors.surface,
+    color: megrumColors.surface,
     fontSize: 10,
     fontWeight: "900",
   },
@@ -2095,7 +2363,7 @@ const styles = StyleSheet.create({
   },
   optionGroupAnd: {
     backgroundColor: "rgba(166,149,216,0.03)",
-    borderColor: ihubColors.lavender,
+    borderColor: megrumColors.lavender,
     borderRadius: 12,
     borderWidth: 2,
     padding: 6,
@@ -2114,15 +2382,15 @@ const styles = StyleSheet.create({
     gap: 5,
   },
   optionGroupBadge: {
-    borderRadius: ihubRadii.pill,
+    borderRadius: megrumRadii.pill,
     paddingHorizontal: 6,
     paddingVertical: 2,
   },
   optionGroupBadgeAnd: {
-    backgroundColor: ihubColors.lavender,
+    backgroundColor: megrumColors.lavender,
   },
   optionGroupBadgeOr: {
-    backgroundColor: ihubColors.surface,
+    backgroundColor: megrumColors.surface,
     borderColor: "rgba(166,149,216,0.34)",
     borderWidth: 1,
   },
@@ -2131,13 +2399,13 @@ const styles = StyleSheet.create({
     fontWeight: "900",
   },
   optionGroupBadgeTextAnd: {
-    color: ihubColors.surface,
+    color: megrumColors.surface,
   },
   optionGroupBadgeTextOr: {
-    color: ihubColors.lavender,
+    color: megrumColors.lavender,
   },
   optionGroupSub: {
-    color: ihubColors.mutedInk,
+    color: megrumColors.mutedInk,
     flex: 1,
     fontSize: 9,
     fontWeight: "700",
@@ -2146,7 +2414,7 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   wishRow: {
-    backgroundColor: ihubColors.background,
+    backgroundColor: megrumColors.background,
     borderColor: "rgba(58,50,74,0.04)",
     borderRadius: 10,
     borderWidth: 1,
@@ -2175,23 +2443,23 @@ const styles = StyleSheet.create({
     fontSize: 10,
   },
   wishTitle: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     flex: 1,
     fontSize: 11.5,
     fontWeight: "900",
   },
   wishQty: {
-    color: ihubColors.mutedInk,
+    color: megrumColors.mutedInk,
     fontSize: 10.5,
     fontWeight: "800",
   },
   wishMeta: {
-    color: ihubColors.mutedInk,
+    color: megrumColors.mutedInk,
     fontSize: 10,
     marginTop: 2,
   },
   chevron: {
-    color: ihubColors.lavender,
+    color: megrumColors.lavender,
     fontSize: 19,
     fontWeight: "900",
   },
@@ -2202,7 +2470,7 @@ const styles = StyleSheet.create({
     paddingVertical: 7,
   },
   selectedCandidatesLabel: {
-    color: ihubColors.mutedInk,
+    color: megrumColors.mutedInk,
     fontSize: 9.5,
     fontWeight: "800",
     marginBottom: 5,
@@ -2223,7 +2491,7 @@ const styles = StyleSheet.create({
   },
   haveSelectableOn: {
     backgroundColor: "rgba(166,149,216,0.06)",
-    borderColor: ihubColors.lavender,
+    borderColor: megrumColors.lavender,
     borderWidth: 2,
   },
   haveSelectableOff: {
@@ -2231,7 +2499,7 @@ const styles = StyleSheet.create({
   },
   selectedBadge: {
     alignItems: "center",
-    backgroundColor: ihubColors.lavender,
+    backgroundColor: megrumColors.lavender,
     borderRadius: 999,
     height: 16,
     justifyContent: "center",
@@ -2241,20 +2509,20 @@ const styles = StyleSheet.create({
     width: 16,
   },
   selectedBadgeText: {
-    color: ihubColors.surface,
+    color: megrumColors.surface,
     fontSize: 10,
     fontWeight: "900",
   },
   hiddenButton: {
-    backgroundColor: ihubColors.surface,
+    backgroundColor: megrumColors.surface,
     borderColor: "rgba(58,50,74,0.08)",
-    borderRadius: ihubRadii.pill,
+    borderRadius: megrumRadii.pill,
     borderWidth: 1,
     paddingHorizontal: 10,
     paddingVertical: 5,
   },
   hiddenButtonText: {
-    color: ihubColors.mutedInk,
+    color: megrumColors.mutedInk,
     fontSize: 10,
     fontWeight: "900",
   },
@@ -2264,15 +2532,15 @@ const styles = StyleSheet.create({
     fontWeight: "800",
   },
   logicPill: {
-    borderRadius: ihubRadii.pill,
+    borderRadius: megrumRadii.pill,
     paddingHorizontal: 7,
     paddingVertical: 4,
   },
   logicPillAnd: {
-    backgroundColor: ihubColors.lavender,
+    backgroundColor: megrumColors.lavender,
   },
   logicPillOr: {
-    backgroundColor: ihubColors.surface,
+    backgroundColor: megrumColors.surface,
     borderColor: "rgba(166,149,216,0.34)",
     borderWidth: 1,
   },
@@ -2281,17 +2549,17 @@ const styles = StyleSheet.create({
     fontWeight: "900",
   },
   logicPillTextAnd: {
-    color: ihubColors.surface,
+    color: megrumColors.surface,
   },
   logicPillTextOr: {
-    color: ihubColors.lavender,
+    color: megrumColors.lavender,
   },
   unavailableArchive: {
     paddingTop: 2,
   },
   unavailableArchiveButton: {
     alignItems: "center",
-    backgroundColor: ihubColors.surface,
+    backgroundColor: megrumColors.surface,
     borderColor: "rgba(58,50,74,0.10)",
     borderRadius: 10,
     borderStyle: "dashed",
@@ -2300,7 +2568,7 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
   },
   unavailableArchiveText: {
-    color: ihubColors.mutedInk,
+    color: megrumColors.mutedInk,
     fontSize: 10,
     fontWeight: "900",
   },
@@ -2337,17 +2605,17 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   unavailableWishTitle: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 11,
     fontWeight: "900",
   },
   unavailableWishMeta: {
-    color: ihubColors.mutedInk,
+    color: megrumColors.mutedInk,
     fontSize: 9.5,
     marginTop: 2,
   },
   exchangeChipSmall: {
-    borderRadius: ihubRadii.pill,
+    borderRadius: megrumRadii.pill,
     bottom: -4,
     paddingHorizontal: 4,
     paddingVertical: 1,
@@ -2355,36 +2623,36 @@ const styles = StyleSheet.create({
     right: -4,
   },
   exchangeChipSmallText: {
-    color: ihubColors.surface,
+    color: megrumColors.surface,
     fontSize: 8,
     fontWeight: "900",
   },
   simplePanel: {
-    backgroundColor: ihubColors.surface,
+    backgroundColor: megrumColors.surface,
     borderColor: "rgba(58,50,74,0.08)",
     borderRadius: 16,
     borderWidth: 1,
     overflow: "hidden",
-    shadowColor: ihubColors.ink,
+    shadowColor: megrumColors.ink,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.04,
     shadowRadius: 8,
   },
   simpleHeader: {
-    backgroundColor: ihubColors.background,
+    backgroundColor: megrumColors.background,
     borderBottomColor: "rgba(58,50,74,0.04)",
     borderBottomWidth: 1,
     paddingHorizontal: 12,
     paddingVertical: 9,
   },
   simpleHeaderTitle: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 11,
     fontWeight: "900",
     letterSpacing: 0.3,
   },
   simpleHeaderSub: {
-    color: ihubColors.mutedInk,
+    color: megrumColors.mutedInk,
     fontSize: 10,
     marginTop: 2,
   },
@@ -2414,13 +2682,13 @@ const styles = StyleSheet.create({
     letterSpacing: 0.4,
   },
   simpleGiveTitle: {
-    color: ihubColors.lavender,
+    color: megrumColors.lavender,
     fontSize: 10,
     fontWeight: "900",
     letterSpacing: 0.4,
   },
   simpleMeta: {
-    color: ihubColors.mutedInk,
+    color: megrumColors.mutedInk,
     fontSize: 9.5,
     fontWeight: "700",
     marginBottom: 7,
@@ -2435,12 +2703,12 @@ const styles = StyleSheet.create({
     width: 32,
   },
   simpleSwapText: {
-    color: ihubColors.mutedInk,
+    color: megrumColors.mutedInk,
     fontSize: 14,
     fontWeight: "900",
   },
   emptyRelation: {
-    backgroundColor: ihubColors.surface,
+    backgroundColor: megrumColors.surface,
     borderColor: "rgba(58,50,74,0.08)",
     borderRadius: 10,
     borderStyle: "dashed",
@@ -2448,7 +2716,7 @@ const styles = StyleSheet.create({
     padding: 16,
   },
   emptyRelationText: {
-    color: ihubColors.mutedInk,
+    color: megrumColors.mutedInk,
     fontSize: 12,
     textAlign: "center",
   },
@@ -2462,7 +2730,7 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
   },
   summaryTitle: {
-    color: ihubColors.lavender,
+    color: megrumColors.lavender,
     fontSize: 10,
     fontWeight: "900",
     letterSpacing: 0.4,
@@ -2480,8 +2748,8 @@ const styles = StyleSheet.create({
     gap: 5,
   },
   summaryBadge: {
-    borderRadius: ihubRadii.pill,
-    color: ihubColors.surface,
+    borderRadius: megrumRadii.pill,
+    color: megrumColors.surface,
     fontSize: 8.5,
     fontWeight: "900",
     overflow: "hidden",
@@ -2489,13 +2757,13 @@ const styles = StyleSheet.create({
     paddingVertical: 2,
   },
   summaryReceiveBadge: {
-    backgroundColor: ihubColors.pink,
+    backgroundColor: megrumColors.pink,
   },
   summaryGiveBadge: {
-    backgroundColor: ihubColors.lavender,
+    backgroundColor: megrumColors.lavender,
   },
   summarySwap: {
-    color: ihubColors.mutedInk,
+    color: megrumColors.mutedInk,
     fontSize: 12,
     fontWeight: "900",
   },
@@ -2510,7 +2778,7 @@ const styles = StyleSheet.create({
   },
   thumbOverflow: {
     alignSelf: "center",
-    color: ihubColors.mutedInk,
+    color: megrumColors.mutedInk,
     fontSize: 9,
     fontWeight: "800",
   },
@@ -2521,15 +2789,15 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     overflow: "hidden",
     position: "relative",
-    shadowColor: ihubColors.ink,
+    shadowColor: megrumColors.ink,
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.12,
     shadowRadius: 3,
   },
   itemPhotoHighlighted: {
-    borderColor: ihubColors.pink,
+    borderColor: megrumColors.pink,
     borderWidth: 2,
-    shadowColor: ihubColors.pink,
+    shadowColor: megrumColors.pink,
     shadowOpacity: 0.5,
     shadowRadius: 10,
   },
@@ -2562,7 +2830,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 3,
   },
   qtyBadgeText: {
-    color: ihubColors.surface,
+    color: megrumColors.surface,
     fontSize: 9,
     fontWeight: "900",
   },
@@ -2572,7 +2840,7 @@ const styles = StyleSheet.create({
     justifyContent: "flex-end",
   },
   popupPanel: {
-    backgroundColor: ihubColors.surface,
+    backgroundColor: megrumColors.surface,
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     overflow: "hidden",
@@ -2583,7 +2851,7 @@ const styles = StyleSheet.create({
   },
   popupHeader: {
     alignItems: "center",
-    backgroundColor: ihubColors.background,
+    backgroundColor: megrumColors.background,
     borderBottomColor: "rgba(58,50,74,0.04)",
     borderBottomWidth: 1,
     flexDirection: "row",
@@ -2598,12 +2866,12 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   popupTitle: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 12.5,
     fontWeight: "900",
   },
   popupSub: {
-    color: ihubColors.mutedInk,
+    color: megrumColors.mutedInk,
     fontSize: 10,
     marginTop: 2,
   },
@@ -2616,7 +2884,7 @@ const styles = StyleSheet.create({
     width: 28,
   },
   popupCloseText: {
-    color: ihubColors.mutedInk,
+    color: megrumColors.mutedInk,
     fontSize: 17,
     fontWeight: "900",
     lineHeight: 20,
@@ -2631,18 +2899,18 @@ const styles = StyleSheet.create({
     width: 110,
   },
   exchangeChip: {
-    borderRadius: ihubRadii.pill,
+    borderRadius: megrumRadii.pill,
     marginTop: 7,
     paddingHorizontal: 8,
     paddingVertical: 3,
   },
   exchangeChipText: {
-    color: ihubColors.surface,
+    color: megrumColors.surface,
     fontSize: 9.5,
     fontWeight: "900",
   },
   popupFallback: {
-    color: ihubColors.mutedInk,
+    color: megrumColors.mutedInk,
     fontSize: 9,
     marginTop: 5,
     maxWidth: 110,
@@ -2663,7 +2931,7 @@ const styles = StyleSheet.create({
     fontWeight: "900",
   },
   popupTapHint: {
-    color: ihubColors.mutedInk,
+    color: megrumColors.mutedInk,
     fontSize: 9.5,
   },
   candidateGrid: {
@@ -2673,7 +2941,7 @@ const styles = StyleSheet.create({
   },
   candidateButton: {
     alignItems: "center",
-    backgroundColor: ihubColors.surface,
+    backgroundColor: megrumColors.surface,
     borderRadius: 10,
     minHeight: 82,
     padding: 4,
@@ -2682,24 +2950,24 @@ const styles = StyleSheet.create({
   },
   candidateButtonSelected: {
     backgroundColor: "rgba(166,149,216,0.08)",
-    borderColor: ihubColors.lavender,
+    borderColor: megrumColors.lavender,
     borderWidth: 2,
   },
   candidateButtonHighlighted: {
     backgroundColor: "#fff7fb",
-    borderColor: ihubColors.pink,
+    borderColor: megrumColors.pink,
     borderWidth: 2,
   },
   candidateLabel: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 9,
     fontWeight: "800",
     marginTop: 3,
     maxWidth: 64,
   },
   sourceBadge: {
-    backgroundColor: ihubColors.pink,
-    borderRadius: ihubRadii.pill,
+    backgroundColor: megrumColors.pink,
+    borderRadius: megrumRadii.pill,
     left: -4,
     paddingHorizontal: 5,
     paddingVertical: 1,
@@ -2707,13 +2975,13 @@ const styles = StyleSheet.create({
     top: -4,
   },
   sourceBadgeText: {
-    color: ihubColors.surface,
+    color: megrumColors.surface,
     fontSize: 8.5,
     fontWeight: "900",
   },
   candidateCheck: {
     alignItems: "center",
-    backgroundColor: ihubColors.lavender,
+    backgroundColor: megrumColors.lavender,
     borderRadius: 999,
     height: 16,
     justifyContent: "center",
@@ -2723,19 +2991,19 @@ const styles = StyleSheet.create({
     width: 16,
   },
   candidateCheckText: {
-    color: ihubColors.surface,
+    color: megrumColors.surface,
     fontSize: 10,
     fontWeight: "900",
   },
   popupReturnButton: {
-    backgroundColor: ihubColors.lavender,
+    backgroundColor: megrumColors.lavender,
     borderRadius: 10,
     marginHorizontal: 12,
     marginTop: 2,
     paddingVertical: 11,
   },
   popupReturnButtonText: {
-    color: ihubColors.surface,
+    color: megrumColors.surface,
     fontSize: 12.5,
     fontWeight: "900",
     textAlign: "center",
@@ -2751,7 +3019,7 @@ const styles = StyleSheet.create({
     paddingTop: 12,
   },
   resetButton: {
-    backgroundColor: ihubColors.surface,
+    backgroundColor: megrumColors.surface,
     borderColor: "rgba(58,50,74,0.08)",
     borderRadius: 10,
     borderWidth: 1,
@@ -2759,22 +3027,22 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
   },
   resetButtonText: {
-    color: ihubColors.mutedInk,
+    color: megrumColors.mutedInk,
     fontSize: 11,
     fontWeight: "900",
   },
   primaryFooterButton: {
-    backgroundColor: ihubColors.lavender,
+    backgroundColor: megrumColors.lavender,
     borderRadius: 12,
     flex: 1,
     paddingVertical: 12,
-    shadowColor: ihubColors.lavender,
+    shadowColor: megrumColors.lavender,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.33,
     shadowRadius: 14,
   },
   primaryFooterButtonText: {
-    color: ihubColors.surface,
+    color: megrumColors.surface,
     fontSize: 13.5,
     fontWeight: "900",
     letterSpacing: 0.3,

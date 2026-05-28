@@ -5,7 +5,7 @@ export default function LegalPrivacyScreen() {
     <LegalDocument
       title="プライバシーポリシー"
       subtitle="最終更新日：2026年4月30日"
-      info="iHub 運営者は、利用者の個人情報を尊重し、関連法令を遵守するとともに、本プライバシーポリシーに従って個人情報を取り扱います。"
+      info="Megrum 運営者は、利用者の個人情報を尊重し、関連法令を遵守するとともに、本プライバシーポリシーに従って個人情報を取り扱います。"
       articles={[
         {
           num: "1",
@@ -45,7 +45,7 @@ export default function LegalPrivacyScreen() {
         {
           num: "8",
           title: "お問い合わせ窓口",
-          body: "個人情報の取り扱いに関するお問い合わせは、iHub 個人情報保護管理者 support@ihub.tokyo までご連絡ください。受付時間は平日10:00〜18:00（土日祝・年末年始を除く）です。",
+          body: "個人情報の取り扱いに関するお問い合わせは、Megrum 個人情報保護管理者 support@megrum.jp までご連絡ください。受付時間は平日10:00〜18:00（土日祝・年末年始を除く）です。",
         },
         {
           num: "9",

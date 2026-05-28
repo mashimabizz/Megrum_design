@@ -25,7 +25,7 @@ module.exports = () => {
     ],
     ios: {
       ...base.ios,
-      bundleIdentifier: isPreview ? "tokyo.ihub.app.preview" : base.ios.bundleIdentifier,
+      bundleIdentifier: isPreview ? "tokyo.megrum.app.preview" : base.ios.bundleIdentifier,
       infoPlist: {
         ...base.ios.infoPlist,
         ...(isPreview ? { CFBundleDisplayName: "Megrum Preview" } : {}),

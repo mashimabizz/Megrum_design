@@ -120,7 +120,7 @@ export function SignUpForm() {
             minLength={3}
             maxLength={20}
             pattern="[a-z0-9_]+"
-            placeholder="ihub_xx"
+            placeholder="megrum_xx"
             className="block w-full rounded-r-xl px-1 py-3 text-base text-gray-900 placeholder:text-gray-400 focus:outline-none"
           />
         </div>

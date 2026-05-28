@@ -3,6 +3,7 @@ import { router } from "expo-router";
 import {
   ActivityIndicator,
   Modal,
+  Platform,
   Pressable,
   StyleSheet,
   Text,
@@ -13,7 +14,7 @@ import { PrimaryButton } from "../../src/components/PrimaryButton";
 import { Screen } from "../../src/components/Screen";
 import { useAuth } from "../../src/auth/AuthProvider";
 import { supabase } from "../../src/lib/supabase";
-import { ihubColors, ihubRadii } from "../../src/theme/tokens";
+import { megrumColors, megrumRadii } from "../../src/theme/tokens";
 
 type GenreOption = {
   id: string;
@@ -284,7 +285,7 @@ export default function OnboardingOshiScreen() {
           />
         ))}
       </View>
-      {loading ? <ActivityIndicator color={ihubColors.lavender} /> : null}
+      {loading ? <ActivityIndicator color={megrumColors.lavender} /> : null}
       <View style={styles.cards}>
         {filtered.map((option) => {
           const active = option.pending
@@ -334,14 +335,17 @@ export default function OnboardingOshiScreen() {
         </PrimaryButton>
       </View>
       <Modal
-        animationType="fade"
-        transparent
+        animationType={Platform.OS === "ios" ? "slide" : "fade"}
+        presentationStyle={Platform.OS === "ios" ? "pageSheet" : "overFullScreen"}
+        transparent={Platform.OS !== "ios"}
         visible={requestOpen}
         onRequestClose={() => setRequestOpen(false)}
       >
-        <View style={styles.modalLayer}>
-          <Pressable style={styles.modalBackdrop} onPress={() => setRequestOpen(false)} />
-          <View style={styles.requestModal}>
+        <View style={[styles.modalLayer, Platform.OS === "ios" ? styles.nativeSheetLayer : null]}>
+          {Platform.OS !== "ios" ? (
+            <Pressable style={styles.modalBackdrop} onPress={() => setRequestOpen(false)} />
+          ) : null}
+          <View style={[styles.requestModal, Platform.OS === "ios" ? styles.nativeRequestModal : null]}>
             <View style={styles.modalHeader}>
               <View style={styles.modalTitleCopy}>
                 <Text style={styles.modalTitle}>推し追加リクエスト</Text>
@@ -458,16 +462,16 @@ const styles = StyleSheet.create({
   },
   backButton: {
     alignItems: "center",
-    backgroundColor: ihubColors.surface,
+    backgroundColor: megrumColors.surface,
     borderColor: "rgba(58,50,74,0.08)",
-    borderRadius: ihubRadii.pill,
+    borderRadius: megrumRadii.pill,
     borderWidth: 1,
     height: 42,
     justifyContent: "center",
     width: 42,
   },
   backText: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 30,
     fontWeight: "800",
     lineHeight: 32,
@@ -476,20 +480,20 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   headerTitle: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 17,
     fontWeight: "900",
   },
   headerSub: {
-    color: ihubColors.mutedInk,
+    color: megrumColors.mutedInk,
     fontSize: 11,
     fontWeight: "800",
     marginTop: 2,
   },
   progressText: {
     backgroundColor: "rgba(166,149,216,0.12)",
-    borderRadius: ihubRadii.pill,
-    color: ihubColors.lavender,
+    borderRadius: megrumRadii.pill,
+    color: megrumColors.lavender,
     fontSize: 12,
     fontWeight: "900",
     paddingHorizontal: 12,
@@ -507,26 +511,26 @@ const styles = StyleSheet.create({
     height: 5,
   },
   dotActive: {
-    backgroundColor: ihubColors.lavender,
+    backgroundColor: megrumColors.lavender,
   },
   title: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 22,
     fontWeight: "900",
     lineHeight: 28,
   },
   copy: {
-    color: ihubColors.mutedInk,
+    color: megrumColors.mutedInk,
     fontSize: 12,
     fontWeight: "800",
     lineHeight: 19,
   },
   search: {
-    backgroundColor: ihubColors.surface,
+    backgroundColor: megrumColors.surface,
     borderColor: "rgba(58,50,74,0.10)",
-    borderRadius: ihubRadii.md,
+    borderRadius: megrumRadii.md,
     borderWidth: 1,
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 14,
     fontWeight: "800",
     minHeight: 48,
@@ -538,31 +542,31 @@ const styles = StyleSheet.create({
     gap: 7,
   },
   chip: {
-    backgroundColor: ihubColors.surface,
+    backgroundColor: megrumColors.surface,
     borderColor: "rgba(58,50,74,0.10)",
-    borderRadius: ihubRadii.pill,
+    borderRadius: megrumRadii.pill,
     borderWidth: 1,
     paddingHorizontal: 12,
     paddingVertical: 8,
   },
   chipActive: {
     backgroundColor: "rgba(166,149,216,0.12)",
-    borderColor: ihubColors.lavender,
+    borderColor: megrumColors.lavender,
   },
   chipText: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 11.5,
     fontWeight: "900",
   },
   chipTextActive: {
-    color: ihubColors.lavender,
+    color: megrumColors.lavender,
   },
   cards: {
     gap: 9,
   },
   card: {
     alignItems: "center",
-    backgroundColor: ihubColors.surface,
+    backgroundColor: megrumColors.surface,
     borderColor: "rgba(58,50,74,0.08)",
     borderRadius: 18,
     borderWidth: 1.5,
@@ -572,33 +576,33 @@ const styles = StyleSheet.create({
   },
   cardActive: {
     backgroundColor: "rgba(166,149,216,0.08)",
-    borderColor: ihubColors.lavender,
+    borderColor: megrumColors.lavender,
   },
   cardCopy: {
     flex: 1,
   },
   cardTitle: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 14,
     fontWeight: "900",
   },
   cardMeta: {
-    color: ihubColors.mutedInk,
+    color: megrumColors.mutedInk,
     fontSize: 10.5,
     fontWeight: "800",
     marginTop: 3,
   },
   cardCheck: {
-    color: ihubColors.mutedInk,
+    color: megrumColors.mutedInk,
     fontSize: 20,
     fontWeight: "900",
     width: 24,
   },
   cardCheckActive: {
-    color: ihubColors.lavender,
+    color: megrumColors.lavender,
   },
   empty: {
-    color: ihubColors.mutedInk,
+    color: megrumColors.mutedInk,
     fontSize: 12,
     fontWeight: "800",
     textAlign: "center",
@@ -607,7 +611,7 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   error: {
-    color: ihubColors.warn,
+    color: megrumColors.warn,
     fontSize: 12,
     fontWeight: "800",
   },
@@ -625,14 +629,25 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
     backgroundColor: "rgba(20,18,28,0.44)",
   },
+  nativeSheetLayer: {
+    alignItems: "stretch",
+    backgroundColor: megrumColors.background,
+    justifyContent: "flex-start",
+    padding: 16,
+  },
   requestModal: {
-    backgroundColor: ihubColors.background,
+    backgroundColor: megrumColors.background,
     borderColor: "rgba(255,255,255,0.72)",
     borderRadius: 28,
     borderWidth: 1,
     gap: 12,
     padding: 16,
     width: "100%",
+  },
+  nativeRequestModal: {
+    borderRadius: 0,
+    borderWidth: 0,
+    paddingHorizontal: 0,
   },
   modalHeader: {
     alignItems: "center",
@@ -643,12 +658,12 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   modalTitle: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 17,
     fontWeight: "900",
   },
   modalSub: {
-    color: ihubColors.mutedInk,
+    color: megrumColors.mutedInk,
     fontSize: 10.5,
     fontWeight: "800",
     marginTop: 2,
@@ -656,23 +671,23 @@ const styles = StyleSheet.create({
   modalCloseButton: {
     alignItems: "center",
     backgroundColor: "rgba(58,50,74,0.06)",
-    borderRadius: ihubRadii.pill,
+    borderRadius: megrumRadii.pill,
     height: 34,
     justifyContent: "center",
     width: 34,
   },
   modalCloseText: {
-    color: ihubColors.mutedInk,
+    color: megrumColors.mutedInk,
     fontSize: 20,
     fontWeight: "900",
     lineHeight: 22,
   },
   requestInput: {
-    backgroundColor: ihubColors.surface,
+    backgroundColor: megrumColors.surface,
     borderColor: "rgba(58,50,74,0.10)",
-    borderRadius: ihubRadii.md,
+    borderRadius: megrumRadii.md,
     borderWidth: 1,
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 14,
     fontWeight: "800",
     minHeight: 48,

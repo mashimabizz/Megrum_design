@@ -5,7 +5,7 @@ import { PrimaryButton } from "../../src/components/PrimaryButton";
 import { Screen } from "../../src/components/Screen";
 import { useAuth } from "../../src/auth/AuthProvider";
 import { supabase } from "../../src/lib/supabase";
-import { ihubColors, ihubRadii, ihubShadow } from "../../src/theme/tokens";
+import { megrumColors, megrumRadii, megrumShadow } from "../../src/theme/tokens";
 
 type Summary = {
   displayName: string;
@@ -16,7 +16,7 @@ type Summary = {
 export default function OnboardingDoneScreen() {
   const { user } = useAuth();
   const [summary, setSummary] = useState<Summary>({
-    displayName: "iHubユーザー",
+    displayName: "Megrumユーザー",
     area: null,
     oshi: "推し設定済み",
   });
@@ -45,7 +45,7 @@ export default function OnboardingDoneScreen() {
         })
         .filter((name): name is string => !!name);
       setSummary({
-        displayName: String(profile?.display_name ?? profile?.handle ?? "iHubユーザー"),
+        displayName: String(profile?.display_name ?? profile?.handle ?? "Megrumユーザー"),
         area: typeof profile?.primary_area === "string" ? profile.primary_area : null,
         oshi: oshiNames.length > 0 ? oshiNames.join(" / ") : "推し未設定",
       });
@@ -109,21 +109,21 @@ const styles = StyleSheet.create({
   },
   checkCircle: {
     alignItems: "center",
-    backgroundColor: ihubColors.lavender,
+    backgroundColor: megrumColors.lavender,
     borderRadius: 48,
     height: 96,
     justifyContent: "center",
     width: 96,
-    ...ihubShadow,
+    ...megrumShadow,
   },
   check: {
-    color: ihubColors.surface,
+    color: megrumColors.surface,
     fontSize: 52,
     fontWeight: "900",
     lineHeight: 58,
   },
   title: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 22,
     fontWeight: "900",
     lineHeight: 30,
@@ -131,9 +131,9 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
   summaryCard: {
-    backgroundColor: ihubColors.surface,
+    backgroundColor: megrumColors.surface,
     borderColor: "rgba(58,50,74,0.08)",
-    borderRadius: ihubRadii.xl,
+    borderRadius: megrumRadii.xl,
     borderWidth: 1,
     gap: 12,
     marginTop: 26,
@@ -145,13 +145,13 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   summaryLabel: {
-    color: ihubColors.mutedInk,
+    color: megrumColors.mutedInk,
     fontSize: 12,
     fontWeight: "900",
     width: 58,
   },
   summaryValue: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     flex: 1,
     fontSize: 13,
     fontWeight: "900",

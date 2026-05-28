@@ -130,7 +130,7 @@ function QuickLink({
   return (
     <Link
       href={href}
-      className="block rounded-lg border border-slate-200 p-4 transition hover:border-ihub-lavender/50 hover:bg-ihub-lavender/10"
+      className="block rounded-lg border border-slate-200 p-4 transition hover:border-megrum-lavender/50 hover:bg-megrum-lavender/10"
     >
       <div className="text-[13px] font-black text-slate-900">{title}</div>
       <p className="mt-1 text-[11px] font-semibold leading-relaxed text-slate-500">

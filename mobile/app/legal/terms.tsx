@@ -5,7 +5,7 @@ export default function LegalTermsScreen() {
     <LegalDocument
       title="利用規約"
       subtitle="最終更新日：2026年4月30日"
-      info="この利用規約は、iHub 運営者が提供するグッズ交換プラットフォーム「iHub」の利用条件を定めるものです。利用者は、本規約に同意したうえで本サービスを利用します。"
+      info="この利用規約は、Megrum 運営者が提供するグッズ交換プラットフォーム「Megrum」の利用条件を定めるものです。利用者は、本規約に同意したうえで本サービスを利用します。"
       articles={[
         {
           num: "第1条",

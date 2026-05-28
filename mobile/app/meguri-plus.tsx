@@ -3,7 +3,7 @@ import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
 import { IconSymbol } from "../src/components/IconSymbol";
 import { Screen } from "../src/components/Screen";
 import { RouteHeader } from "../src/components/RouteHeader";
-import { ihubColors, ihubShadow } from "../src/theme/tokens";
+import { megrumColors, megrumShadow } from "../src/theme/tokens";
 import { useAuth } from "../src/auth/AuthProvider";
 import { MONTHLY_PRICE, PLUS_SEND_LIMIT, FREE_SEND_LIMIT, hueTint } from "./(tabs)/encounters";
 import {
@@ -93,7 +93,7 @@ export default function MeguriPlusScreen() {
       <View style={styles.statusCard}>
         <IconSymbol
           name={savedActive ? "checkmark-circle-outline" : "lock-closed-outline"}
-          color={savedActive ? "#27a06b" : ihubColors.lavender}
+          color={savedActive ? "#27a06b" : megrumColors.lavender}
           size={18}
         />
         <Text style={styles.statusText}>
@@ -108,7 +108,7 @@ export default function MeguriPlusScreen() {
         {FEATURES.map((feature) => (
           <View key={feature.title} style={styles.featureRow}>
             <View style={styles.featureIcon}>
-              <IconSymbol name={feature.icon} color={ihubColors.lavender} size={18} />
+              <IconSymbol name={feature.icon} color={megrumColors.lavender} size={18} />
             </View>
             <View style={styles.featureCopy}>
               <Text style={styles.featureTitle}>{feature.title}</Text>
@@ -183,23 +183,23 @@ const styles = StyleSheet.create({
     borderRadius: 30,
     overflow: "hidden",
     padding: 26,
-    ...ihubShadow,
+    ...megrumShadow,
   },
   kicker: {
-    color: ihubColors.lavender,
+    color: megrumColors.lavender,
     fontSize: 11,
     fontWeight: "900",
     letterSpacing: 1.7,
   },
   heroTitle: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 30,
     fontWeight: "900",
     lineHeight: 38,
     marginTop: 10,
   },
   heroText: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 14,
     fontWeight: "800",
     lineHeight: 23,
@@ -220,7 +220,7 @@ const styles = StyleSheet.create({
     padding: 13,
   },
   statusText: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     flex: 1,
     fontSize: 12,
     fontWeight: "800",
@@ -238,8 +238,8 @@ const styles = StyleSheet.create({
   },
   planRowPicked: {
     backgroundColor: "#fff",
-    borderColor: ihubColors.lavender,
-    shadowColor: ihubColors.lavender,
+    borderColor: megrumColors.lavender,
+    shadowColor: megrumColors.lavender,
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.18,
     shadowRadius: 14,
@@ -253,7 +253,7 @@ const styles = StyleSheet.create({
   },
   radioPicked: {
     backgroundColor: "#fff",
-    borderColor: ihubColors.lavender,
+    borderColor: megrumColors.lavender,
     borderWidth: 7,
   },
   planCopy: {
@@ -265,7 +265,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   planTitle: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 16.5,
     fontWeight: "900",
   },
@@ -280,7 +280,7 @@ const styles = StyleSheet.create({
     paddingVertical: 3,
   },
   planNote: {
-    color: ihubColors.mutedInk,
+    color: megrumColors.mutedInk,
     fontSize: 12,
     fontWeight: "800",
     marginTop: 3,
@@ -289,17 +289,17 @@ const styles = StyleSheet.create({
     alignItems: "flex-end",
   },
   price: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 22,
     fontWeight: "900",
   },
   unit: {
-    color: ihubColors.mutedInk,
+    color: megrumColors.mutedInk,
     fontSize: 11,
     fontWeight: "800",
   },
   sectionTitle: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 18,
     fontWeight: "900",
     paddingHorizontal: 6,
@@ -327,19 +327,19 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   featureTitle: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 14.5,
     fontWeight: "900",
   },
   featureSub: {
-    color: ihubColors.mutedInk,
+    color: megrumColors.mutedInk,
     fontSize: 12,
     fontWeight: "800",
     marginTop: 2,
   },
   primary: {
     alignItems: "center",
-    backgroundColor: ihubColors.lavender,
+    backgroundColor: megrumColors.lavender,
     borderRadius: 999,
     paddingVertical: 16,
   },
@@ -349,7 +349,7 @@ const styles = StyleSheet.create({
     fontWeight: "900",
   },
   note: {
-    color: ihubColors.mutedInk,
+    color: megrumColors.mutedInk,
     fontSize: 11.5,
     fontWeight: "800",
     lineHeight: 18,

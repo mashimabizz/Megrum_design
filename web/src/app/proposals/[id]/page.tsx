@@ -5,7 +5,7 @@ import { autoExpireProposals } from "@/lib/expire";
 import { ProposalDetailView, type ProposalDetail } from "./ProposalDetailView";
 
 export const metadata = {
-  title: "打診詳細 — iHub",
+  title: "打診詳細 — Megrum",
 };
 
 type ProposalRaw = {

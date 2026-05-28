@@ -17,7 +17,7 @@ import type {
   MeguriFurColor,
   MeguriHue,
 } from "../../../app/(tabs)/encounters";
-import { ihubColors } from "../../theme/tokens";
+import { megrumColors } from "../../theme/tokens";
 
 export type MeguriSceneMode =
   | "summary"
@@ -253,10 +253,10 @@ const furColors: Record<MeguriFurColor, string> = {
 
 const hueColors: Record<MeguriHue, string> = {
   butter: "#efd99b",
-  lav: ihubColors.lavender,
+  lav: megrumColors.lavender,
   mint: "#a8dcc9",
-  pink: ihubColors.pink,
-  sky: ihubColors.sky,
+  pink: megrumColors.pink,
+  sky: megrumColors.sky,
 };
 
 export function MeguriThreeScene({
@@ -2239,12 +2239,12 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   failedTitle: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 16,
     fontWeight: "900",
   },
   failedText: {
-    color: ihubColors.mutedInk,
+    color: megrumColors.mutedInk,
     fontSize: 12,
     fontWeight: "800",
     marginTop: 4,

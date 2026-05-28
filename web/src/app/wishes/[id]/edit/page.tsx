@@ -7,7 +7,7 @@ import {
 } from "@/app/wishes/new/WishNewForm";
 
 export const metadata = {
-  title: "ウィッシュを編集 — iHub",
+  title: "ウィッシュを編集 — Megrum",
 };
 
 export default async function WishEditPage({

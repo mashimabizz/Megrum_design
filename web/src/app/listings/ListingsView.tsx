@@ -231,32 +231,32 @@ function ListingDeck({
   return (
     <section className="-mx-4 overflow-hidden pb-1">
       <style>{`
-        @keyframes ihub-listing-card-float {
+        @keyframes megrum-listing-card-float {
           0%, 100% { transform: translate3d(0, 0, 0) rotate(-0.25deg); }
           50% { transform: translate3d(0, -7px, 0) rotate(0.35deg); }
         }
-        @keyframes ihub-listing-cord-flow {
+        @keyframes megrum-listing-cord-flow {
           from { stroke-dashoffset: 0; }
           to { stroke-dashoffset: -36; }
         }
-        @keyframes ihub-listing-knot-pulse {
+        @keyframes megrum-listing-knot-pulse {
           0%, 100% { transform: scale(1); opacity: 0.92; }
           50% { transform: scale(1.08); opacity: 1; }
         }
-        .ihub-listing-card-float {
-          animation: ihub-listing-card-float 5.4s ease-in-out infinite;
+        .megrum-listing-card-float {
+          animation: megrum-listing-card-float 5.4s ease-in-out infinite;
         }
-        .ihub-listing-cord-line {
+        .megrum-listing-cord-line {
           stroke-dasharray: 7 10;
-          animation: ihub-listing-cord-flow 8s linear infinite;
+          animation: megrum-listing-cord-flow 8s linear infinite;
         }
-        .ihub-listing-knot {
-          animation: ihub-listing-knot-pulse 3.6s ease-in-out infinite;
+        .megrum-listing-knot {
+          animation: megrum-listing-knot-pulse 3.6s ease-in-out infinite;
         }
         @media (prefers-reduced-motion: reduce) {
-          .ihub-listing-card-float,
-          .ihub-listing-cord-line,
-          .ihub-listing-knot {
+          .megrum-listing-card-float,
+          .megrum-listing-cord-line,
+          .megrum-listing-knot {
             animation: none;
           }
         }
@@ -341,7 +341,7 @@ function ListingDeckCard({
 
   return (
     <article
-      className={`ihub-listing-card-float relative min-h-[254px] overflow-hidden rounded-[22px] border bg-white shadow-[0_18px_44px_rgba(58,50,74,0.13)] ${
+      className={`megrum-listing-card-float relative min-h-[254px] overflow-hidden rounded-[22px] border bg-white shadow-[0_18px_44px_rgba(58,50,74,0.13)] ${
         active ? "border-[#a695d866]" : "border-[#3a324a12]"
       }`}
       style={{
@@ -762,7 +762,7 @@ function DeckCord({ variant }: { variant: "duel" | "fan" | "orb" }) {
             strokeLinecap="round"
             strokeWidth="1.35"
             opacity="0.42"
-            className="ihub-listing-cord-line"
+            className="megrum-listing-cord-line"
           />
         </g>
       ))}
@@ -774,7 +774,7 @@ function DeckKnot({ compact = false }: { compact?: boolean }) {
   const size = compact ? 30 : 36;
   return (
     <div
-      className="ihub-listing-knot relative flex shrink-0 items-center justify-center rounded-full border border-white/80 bg-white/80 shadow-[0_8px_20px_rgba(166,149,216,0.18)] backdrop-blur-sm"
+      className="megrum-listing-knot relative flex shrink-0 items-center justify-center rounded-full border border-white/80 bg-white/80 shadow-[0_8px_20px_rgba(166,149,216,0.18)] backdrop-blur-sm"
       style={{ width: size, height: size }}
       aria-hidden="true"
     >

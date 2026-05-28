@@ -4,7 +4,7 @@ import { CaptureFlow } from "./CaptureFlow";
 import { HeaderBack } from "@/components/auth/HeaderBack";
 
 export const metadata = {
-  title: "グッズを登録 — iHub",
+  title: "グッズを登録 — Megrum",
 };
 
 /**

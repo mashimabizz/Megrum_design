@@ -12,7 +12,7 @@ import {
 import { ProposeFlow, type ProposeInv } from "./ProposeFlow";
 
 export const metadata = {
-  title: "打診 — iHub",
+  title: "打診 — Megrum",
 };
 
 type GoodsRow = {

@@ -3,7 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { CaptureView, type EvidencePhoto } from "./CaptureView";
 
 export const metadata = {
-  title: "取引証跡を撮影 — iHub",
+  title: "取引証跡を撮影 — Megrum",
 };
 
 type Row = {

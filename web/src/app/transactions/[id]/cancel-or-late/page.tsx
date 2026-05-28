@@ -4,7 +4,7 @@ import { HeaderBack } from "@/components/auth/HeaderBack";
 import { CancelOrLateForm } from "./CancelOrLateForm";
 
 export const metadata = {
-  title: "取引キャンセル / 遅刻通知 — iHub",
+  title: "取引キャンセル / 遅刻通知 — Megrum",
 };
 
 type ProposalRow = {

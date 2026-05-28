@@ -14,7 +14,7 @@
 import { NextRequest } from "next/server";
 
 const NOMINATIM_BASE = "https://nominatim.openstreetmap.org";
-const USER_AGENT = "iHub/0.1 (https://ihub.tokyo; support@ihub.tokyo)";
+const USER_AGENT = "Megrum/0.1 (https://megrum.jp; support@megrum.jp)";
 
 /**
  * GET /api/geocode?q=横浜アリーナ          — forward geocoding
@@ -46,7 +46,7 @@ export async function GET(req: NextRequest) {
 
   try {
     const upstream = await fetch(url, {
-      headers: { "User-Agent": USER_AGENT, Referer: "https://ihub.tokyo" },
+      headers: { "User-Agent": USER_AGENT, Referer: "https://megrum.jp" },
       // 1 時間キャッシュ（同じクエリの繰り返しを軽減）
       next: { revalidate: 3600 },
     });

@@ -15,7 +15,7 @@ import { RouteHeader } from "../src/components/RouteHeader";
 import { Screen } from "../src/components/Screen";
 import { supabase } from "../src/lib/supabase";
 import { notifyLate, requestTradeCancel } from "../src/lib/transactionActions";
-import { ihubColors, ihubRadii, ihubShadow } from "../src/theme/tokens";
+import { megrumColors, megrumRadii, megrumShadow } from "../src/theme/tokens";
 
 type Kind = "cancel" | "late";
 
@@ -161,7 +161,7 @@ export default function TransactionCancelOrLateScreen() {
         title={isCancel ? "取引をキャンセル" : "遅刻を連絡"}
         subtitle={isCancel ? "相手と合意の上で取り消します" : "到着が遅れる旨を相手に通知"}
       />
-      {loading ? <ActivityIndicator color={ihubColors.lavender} /> : null}
+      {loading ? <ActivityIndicator color={megrumColors.lavender} /> : null}
       {error ? <Text style={styles.errorText}>{error}</Text> : null}
 
       {context ? (
@@ -299,14 +299,14 @@ const styles = StyleSheet.create({
   },
   card: {
     alignItems: "center",
-    backgroundColor: ihubColors.surface,
+    backgroundColor: megrumColors.surface,
     borderColor: "rgba(58,50,74,0.08)",
-    borderRadius: ihubRadii.xl,
+    borderRadius: megrumRadii.xl,
     borderWidth: 1,
     flexDirection: "row",
     gap: 11,
     padding: 14,
-    ...ihubShadow,
+    ...megrumShadow,
   },
   partnerIcon: {
     alignItems: "center",
@@ -317,7 +317,7 @@ const styles = StyleSheet.create({
     width: 42,
   },
   partnerIconText: {
-    color: ihubColors.lavender,
+    color: megrumColors.lavender,
     fontSize: 16,
     fontWeight: "900",
   },
@@ -325,19 +325,19 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   title: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 15,
     fontWeight: "900",
   },
   muted: {
-    color: ihubColors.mutedInk,
+    color: megrumColors.mutedInk,
     fontSize: 11.5,
     fontWeight: "800",
     lineHeight: 17,
     marginTop: 2,
   },
   errorText: {
-    color: ihubColors.warn,
+    color: megrumColors.warn,
     fontSize: 12,
     fontWeight: "900",
   },
@@ -345,16 +345,16 @@ const styles = StyleSheet.create({
     gap: 7,
   },
   label: {
-    color: ihubColors.mutedInk,
+    color: megrumColors.mutedInk,
     fontSize: 10.5,
     fontWeight: "900",
     letterSpacing: 0.4,
     paddingHorizontal: 2,
   },
   lateGrid: {
-    backgroundColor: ihubColors.surface,
+    backgroundColor: megrumColors.surface,
     borderColor: "rgba(58,50,74,0.08)",
-    borderRadius: ihubRadii.lg,
+    borderRadius: megrumRadii.lg,
     borderWidth: 1,
     flexDirection: "row",
     gap: 6,
@@ -362,27 +362,27 @@ const styles = StyleSheet.create({
   },
   lateChip: {
     alignItems: "center",
-    backgroundColor: ihubColors.background,
+    backgroundColor: megrumColors.background,
     borderRadius: 10,
     flex: 1,
     justifyContent: "center",
     paddingVertical: 10,
   },
   lateChipActive: {
-    backgroundColor: ihubColors.lavender,
+    backgroundColor: megrumColors.lavender,
   },
   lateChipText: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 10.5,
     fontWeight: "900",
   },
   lateChipTextActive: {
-    color: ihubColors.surface,
+    color: megrumColors.surface,
   },
   reasonCard: {
-    backgroundColor: ihubColors.surface,
+    backgroundColor: megrumColors.surface,
     borderColor: "rgba(58,50,74,0.08)",
-    borderRadius: ihubRadii.lg,
+    borderRadius: megrumRadii.lg,
     borderWidth: 1,
     overflow: "hidden",
   },
@@ -401,34 +401,34 @@ const styles = StyleSheet.create({
   radio: {
     alignItems: "center",
     borderColor: "rgba(58,50,74,0.22)",
-    borderRadius: ihubRadii.pill,
+    borderRadius: megrumRadii.pill,
     borderWidth: 1.5,
     height: 18,
     justifyContent: "center",
     width: 18,
   },
   radioActive: {
-    borderColor: ihubColors.lavender,
-    backgroundColor: ihubColors.lavender,
+    borderColor: megrumColors.lavender,
+    backgroundColor: megrumColors.lavender,
   },
   radioCore: {
-    backgroundColor: ihubColors.surface,
-    borderRadius: ihubRadii.pill,
+    backgroundColor: megrumColors.surface,
+    borderRadius: megrumRadii.pill,
     height: 6,
     width: 6,
   },
   reasonText: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     flex: 1,
     fontSize: 12.5,
     fontWeight: "800",
   },
   noteInput: {
-    backgroundColor: ihubColors.surface,
+    backgroundColor: megrumColors.surface,
     borderColor: "rgba(58,50,74,0.08)",
-    borderRadius: ihubRadii.lg,
+    borderRadius: megrumRadii.lg,
     borderWidth: 1,
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 14,
     fontWeight: "700",
     minHeight: 104,
@@ -447,7 +447,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   infoText: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 11,
     fontWeight: "800",
     lineHeight: 18,

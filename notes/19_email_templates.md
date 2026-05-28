@@ -1,11 +1,11 @@
-# Supabase Auth メールテンプレート（iHub 日本語版）
+# Supabase Auth メールテンプレート（Megrum 日本語版）
 
 > Supabase Dashboard → **Authentication → Email Templates** で各テンプレを設定する。
 > 反映：保存後すぐ次回送信から有効。
 
 ## 設定するテンプレート
 
-| 種類 | 用途 | iHub での使用 | 優先度 |
+| 種類 | 用途 | Megrum での使用 | 優先度 |
 |---|---|---|---|
 | **Confirm signup** | 新規登録時のメール認証 | ⭕ 必須 | ★★★ |
 | **Reset Password** | パスワードリセット | ⭕ 実装済 | ★★★ |
@@ -21,7 +21,7 @@
 ## ブランド設定
 
 ```
-ロゴ:        iH（角丸正方形 + 紫→水色グラデ）
+ロゴ:        Mg（角丸正方形 + 紫→水色グラデ）
 プライマリ:  #a695d8 (lavender)
 セカンダリ:  #a8d4e6 (sky)
 アクセント:  #f3c5d4 (pink)
@@ -38,7 +38,7 @@ muted:       #6b6478
 ### Subject
 
 ```
-【iHub】メールアドレスを認証してください
+【Megrum】メールアドレスを認証してください
 ```
 
 ### Body（HTML）
@@ -56,12 +56,12 @@ muted:       #6b6478
 
   <!-- ロゴ -->
   <div style="text-align: center; margin-bottom: 24px;">
-    <div style="display: inline-block; width: 72px; height: 72px; border-radius: 23px; background: linear-gradient(135deg, #a695d8, #a8d4e6); color: #ffffff; font-size: 30px; font-weight: 800; line-height: 72px; letter-spacing: -1px; font-family: -apple-system, sans-serif;">iH</div>
+    <div style="display: inline-block; width: 72px; height: 72px; border-radius: 23px; background: linear-gradient(135deg, #a695d8, #a8d4e6); color: #ffffff; font-size: 30px; font-weight: 800; line-height: 72px; letter-spacing: -1px; font-family: -apple-system, sans-serif;">Mg</div>
   </div>
 
   <!-- タイトル -->
   <h1 style="font-size: 22px; font-weight: 800; color: #1a1a26; text-align: center; margin: 0 0 12px;">
-    iHub へようこそ！
+    Megrum へようこそ！
   </h1>
 
   <p style="font-size: 14px; line-height: 1.7; color: #6b6478; text-align: center; margin: 0 0 32px;">
@@ -90,9 +90,9 @@ muted:       #6b6478
 
   <!-- フッター -->
   <div style="margin-top: 28px; padding-top: 20px; border-top: 1px solid #eee; text-align: center; font-size: 11px; color: #999; line-height: 1.7;">
-    iHub - 推し活グッズ交換プラットフォーム<br>
-    <a href="https://ihub.tokyo" style="color: #a695d8; text-decoration: none;">https://ihub.tokyo</a><br>
-    お問い合わせ：<a href="mailto:support@ihub.tokyo" style="color: #a695d8; text-decoration: none;">support@ihub.tokyo</a>
+    Megrum - 推し活グッズ交換プラットフォーム<br>
+    <a href="https://megrum.jp" style="color: #a695d8; text-decoration: none;">https://megrum.jp</a><br>
+    お問い合わせ：<a href="mailto:support@megrum.jp" style="color: #a695d8; text-decoration: none;">support@megrum.jp</a>
   </div>
 
 </div>
@@ -115,7 +115,7 @@ muted:       #6b6478
 ### Subject
 
 ```
-【iHub】パスワードリセットのご案内
+【Megrum】パスワードリセットのご案内
 ```
 
 ### Body（HTML）
@@ -133,7 +133,7 @@ muted:       #6b6478
 
   <!-- ロゴ -->
   <div style="text-align: center; margin-bottom: 24px;">
-    <div style="display: inline-block; width: 72px; height: 72px; border-radius: 23px; background: linear-gradient(135deg, #a695d8, #a8d4e6); color: #ffffff; font-size: 30px; font-weight: 800; line-height: 72px; letter-spacing: -1px; font-family: -apple-system, sans-serif;">iH</div>
+    <div style="display: inline-block; width: 72px; height: 72px; border-radius: 23px; background: linear-gradient(135deg, #a695d8, #a8d4e6); color: #ffffff; font-size: 30px; font-weight: 800; line-height: 72px; letter-spacing: -1px; font-family: -apple-system, sans-serif;">Mg</div>
   </div>
 
   <!-- タイトル -->
@@ -167,9 +167,9 @@ muted:       #6b6478
 
   <!-- フッター -->
   <div style="margin-top: 28px; padding-top: 20px; border-top: 1px solid #eee; text-align: center; font-size: 11px; color: #999; line-height: 1.7;">
-    iHub - 推し活グッズ交換プラットフォーム<br>
-    <a href="https://ihub.tokyo" style="color: #a695d8; text-decoration: none;">https://ihub.tokyo</a><br>
-    お問い合わせ：<a href="mailto:support@ihub.tokyo" style="color: #a695d8; text-decoration: none;">support@ihub.tokyo</a>
+    Megrum - 推し活グッズ交換プラットフォーム<br>
+    <a href="https://megrum.jp" style="color: #a695d8; text-decoration: none;">https://megrum.jp</a><br>
+    お問い合わせ：<a href="mailto:support@megrum.jp" style="color: #a695d8; text-decoration: none;">support@megrum.jp</a>
   </div>
 
 </div>
@@ -204,11 +204,11 @@ muted:       #6b6478
 ## 4. 将来追加するテンプレ（メモ）
 
 ### Magic Link（パスワードレス）
-- Subject: `【iHub】ログイン用のリンクです`
+- Subject: `【Megrum】ログイン用のリンクです`
 - Confirm signup と同じデザインで、CTA は「ログインする」
 
 ### Change Email（メアド変更）
-- Subject: `【iHub】メールアドレス変更の確認`
+- Subject: `【Megrum】メールアドレス変更の確認`
 - 「新しいメールアドレスを認証する」CTA
 
 ### Invite User（運営招待）

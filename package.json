@@ -1,5 +1,5 @@
 {
-  "name": "ihub-platform",
+  "name": "megrum-platform",
   "private": true,
   "workspaces": [
     "mobile",
@@ -17,5 +17,11 @@
     "supabase:typecheck": "mobile/node_modules/.bin/tsc -p packages/supabase/tsconfig.json --noEmit",
     "packages:typecheck": "npm run core:typecheck && npm run design:typecheck && npm run supabase:typecheck",
     "typecheck": "npm run mobile:typecheck && npm run packages:typecheck"
+  },
+  "devDependencies": {
+    "@types/react": "~19.1.0"
+  },
+  "dependencies": {
+    "expo-linear-gradient": "~15.0.8"
   }
 }

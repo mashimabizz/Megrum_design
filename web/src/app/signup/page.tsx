@@ -4,7 +4,7 @@ import { SignUpForm } from "./SignUpForm";
 import { HeaderBack } from "@/components/auth/HeaderBack";
 
 export const metadata = {
-  title: "新規登録 — iHub",
+  title: "新規登録 — Megrum",
 };
 
 export default async function SignUpPage() {
@@ -23,7 +23,7 @@ export default async function SignUpPage() {
           はじめまして
         </h2>
         <p className="mt-1.5 text-xs leading-relaxed text-gray-500">
-          メールアドレスとパスワードを設定して、iHub を始めましょう
+          メールアドレスとパスワードを設定して、Megrum を始めましょう
         </p>
         <div className="mt-6">
           <SignUpForm />

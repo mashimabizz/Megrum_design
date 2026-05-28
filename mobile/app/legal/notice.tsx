@@ -19,9 +19,9 @@ export default function LegalNoticeScreen() {
           label: "電話番号",
           value: "非公表。お問い合わせは原則メールで承ります。",
         },
-        { label: "メールアドレス", value: "support@ihub.tokyo" },
+        { label: "メールアドレス", value: "support@megrum.jp" },
         { label: "受付時間", value: "平日10:00〜18:00（土日祝・年末年始を除く）" },
-        { label: "サービス名", value: "iHub（アイハブ）" },
+        { label: "サービス名", value: "Megrum（メグルム）" },
         {
           label: "サービス内容",
           value: "個人間グッズ交換マッチングプラットフォーム。利用者間の物々交換を仲介するサービスを提供します。",
@@ -42,7 +42,7 @@ export default function LegalNoticeScreen() {
           value: "ブーストは未使用分が30日以内なら返金可。Premium会員・めぐりPlusはいつでも解約可（期間終了まで使用可、中途返金なし）。",
         },
       ]}
-      warning="iHubは利用者間の物々交換（金銭授受を伴わない交換）を仲介するプラットフォームです。当社は取引の当事者ではなく、利用者間の合意による交換を支援する立場です。"
+      warning="Megrumは利用者間の物々交換（金銭授受を伴わない交換）を仲介するプラットフォームです。当社は取引の当事者ではなく、利用者間の合意による交換を支援する立場です。"
       articles={[
         {
           num: "補足",

@@ -13,23 +13,23 @@
 }
 
 /*
- * iHub ブランドカラー（CLAUDE.md 公式値）
+ * Megrum ブランドカラー（CLAUDE.md 公式値）
  * モックアップ AO_C と一致
  *
  * @theme（inline なし）にすることで opacity 修飾子（/35, /5 等）が
  * color-mix() で正しく機能する。
  *
  * 使い方:
- *   bg-ihub-lavender / text-ihub-sky / border-ihub-pink
- *   bg-ihub-lavender/35（35% 透明）
- *   グラデ: bg-gradient-to-br from-ihub-lavender via-ihub-sky to-ihub-pink
+ *   bg-megrum-lavender / text-megrum-sky / border-megrum-pink
+ *   bg-megrum-lavender/35（35% 透明）
+ *   グラデ: bg-gradient-to-br from-megrum-lavender via-megrum-sky to-megrum-pink
  */
 @theme {
-  --color-ihub-lavender: #a695d8;
-  --color-ihub-sky: #a8d4e6;
-  --color-ihub-pink: #f3c5d4;
-  --color-ihub-warn: #d4866b;
-  --color-ihub-ok: #6bb39a;
+  --color-megrum-lavender: #a695d8;
+  --color-megrum-sky: #a8d4e6;
+  --color-megrum-pink: #f3c5d4;
+  --color-megrum-warn: #d4866b;
+  --color-megrum-ok: #6bb39a;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -588,7 +588,7 @@ body.wish-deleting::view-transition-new(root) {
  * iter154.69 / iter154.71 / iter154.72: ボトムナビ用のなめらかな画面遷移。
  * フッタータブの遷移だけに限定し、詳細画面の右スライド演出とは干渉させない。
  */
-body.ihub-bottom-nav-loading::before {
+body.megrum-bottom-nav-loading::before {
   content: "";
   position: fixed;
   inset: 0;
@@ -599,10 +599,10 @@ body.ihub-bottom-nav-loading::before {
     linear-gradient(180deg, rgba(251, 249, 252, 0.38), rgba(251, 249, 252, 0.66));
   backdrop-filter: blur(8px) saturate(150%);
   -webkit-backdrop-filter: blur(8px) saturate(150%);
-  animation: ihubBottomNavLoadingVeil 260ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation: megrumBottomNavLoadingVeil 260ms cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
-body.ihub-bottom-nav-loading::after {
+body.megrum-bottom-nav-loading::after {
   content: "";
   position: fixed;
   left: 50%;
@@ -621,24 +621,24 @@ body.ihub-bottom-nav-loading::after {
   transform: translate(-50%, -50%);
   rotate: 0deg;
   animation:
-    ihubBottomNavLoadingIn 260ms cubic-bezier(0.16, 1, 0.3, 1) both,
-    ihubBottomNavLoadingSpin 900ms linear infinite;
+    megrumBottomNavLoadingIn 260ms cubic-bezier(0.16, 1, 0.3, 1) both,
+    megrumBottomNavLoadingSpin 900ms linear infinite;
 }
 
-body.ihub-bottom-nav-transitioning::view-transition-old(root) {
-  animation: 240ms cubic-bezier(0.4, 0, 0.2, 1) both ihubBottomNavOld;
+body.megrum-bottom-nav-transitioning::view-transition-old(root) {
+  animation: 240ms cubic-bezier(0.4, 0, 0.2, 1) both megrumBottomNavOld;
 }
 
-body.ihub-bottom-nav-transitioning::view-transition-new(root) {
-  animation: 420ms cubic-bezier(0.16, 1, 0.3, 1) both ihubBottomNavNew;
+body.megrum-bottom-nav-transitioning::view-transition-new(root) {
+  animation: 420ms cubic-bezier(0.16, 1, 0.3, 1) both megrumBottomNavNew;
 }
 
-body.ihub-bottom-nav-route-entering main {
-  animation: ihubBottomNavPageIn 420ms cubic-bezier(0.16, 1, 0.3, 1) both;
+body.megrum-bottom-nav-route-entering main {
+  animation: megrumBottomNavPageIn 420ms cubic-bezier(0.16, 1, 0.3, 1) both;
   will-change: transform, opacity, filter;
 }
 
-@keyframes ihubBottomNavLoadingVeil {
+@keyframes megrumBottomNavLoadingVeil {
   from {
     opacity: 0;
   }
@@ -647,7 +647,7 @@ body.ihub-bottom-nav-route-entering main {
   }
 }
 
-@keyframes ihubBottomNavLoadingIn {
+@keyframes megrumBottomNavLoadingIn {
   from {
     opacity: 0;
     transform: translate(-50%, calc(-50% + 8px)) scale(0.88);
@@ -660,13 +660,13 @@ body.ihub-bottom-nav-route-entering main {
   }
 }
 
-@keyframes ihubBottomNavLoadingSpin {
+@keyframes megrumBottomNavLoadingSpin {
   to {
     rotate: 360deg;
   }
 }
 
-@keyframes ihubBottomNavOld {
+@keyframes megrumBottomNavOld {
   to {
     opacity: 0.7;
     transform: scale(0.992);
@@ -674,7 +674,7 @@ body.ihub-bottom-nav-route-entering main {
   }
 }
 
-@keyframes ihubBottomNavNew {
+@keyframes megrumBottomNavNew {
   from {
     opacity: 0;
     transform: translateY(12px) scale(0.985);
@@ -687,7 +687,7 @@ body.ihub-bottom-nav-route-entering main {
   }
 }
 
-@keyframes ihubBottomNavPageIn {
+@keyframes megrumBottomNavPageIn {
   from {
     opacity: 0.74;
     transform: translateY(10px) scale(0.992);
@@ -701,11 +701,11 @@ body.ihub-bottom-nav-route-entering main {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  body.ihub-bottom-nav-loading::before,
-  body.ihub-bottom-nav-loading::after,
-  body.ihub-bottom-nav-transitioning::view-transition-old(root),
-  body.ihub-bottom-nav-transitioning::view-transition-new(root),
-  body.ihub-bottom-nav-route-entering main {
+  body.megrum-bottom-nav-loading::before,
+  body.megrum-bottom-nav-loading::after,
+  body.megrum-bottom-nav-transitioning::view-transition-old(root),
+  body.megrum-bottom-nav-transitioning::view-transition-new(root),
+  body.megrum-bottom-nav-route-entering main {
     animation: none;
   }
 }

@@ -4,7 +4,7 @@ import { WishNewForm } from "./WishNewForm";
 import { HeaderBack } from "@/components/auth/HeaderBack";
 
 export const metadata = {
-  title: "ウィッシュを追加 — iHub",
+  title: "ウィッシュを追加 — Megrum",
 };
 
 export default async function WishNewPage() {

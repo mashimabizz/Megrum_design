@@ -8,13 +8,13 @@ import {
   Text,
   View,
 } from "react-native";
-import { IHubLogo } from "../../src/components/IHubLogo";
+import { MegrumLogo } from "../../src/components/MegrumLogo";
 import { AppleAuthButton } from "../../src/components/AppleAuthButton";
 import { PrimaryButton } from "../../src/components/PrimaryButton";
 import { Screen } from "../../src/components/Screen";
 import { TextField } from "../../src/components/TextField";
 import { useAuth } from "../../src/auth/AuthProvider";
-import { ihubColors, ihubRadii } from "../../src/theme/tokens";
+import { megrumColors, megrumRadii } from "../../src/theme/tokens";
 
 export default function LoginScreen() {
   const { configured, enterPreview, signIn } = useAuth();
@@ -50,7 +50,7 @@ export default function LoginScreen() {
         <AuthHeader title="ログイン" backTo="/welcome" />
 
         <View style={styles.brand}>
-          <IHubLogo size={60} />
+          <MegrumLogo size={60} />
           <Text style={styles.welcome}>おかえりなさい</Text>
           <Text style={styles.webAccountNote}>
             Web版と同じメールアドレス・パスワードでログインできます
@@ -64,7 +64,9 @@ export default function LoginScreen() {
                 label="メールアドレス"
                 value={email}
                 onChangeText={setEmail}
+                autoComplete="email"
                 autoCapitalize="none"
+                autoCorrect={false}
                 keyboardType="email-address"
                 textContentType="emailAddress"
                 placeholder="example@email.com"
@@ -73,6 +75,7 @@ export default function LoginScreen() {
                 label="パスワード"
                 value={password}
                 onChangeText={setPassword}
+                autoComplete="password"
                 secureTextEntry
                 textContentType="password"
                 placeholder="パスワードを入力"
@@ -86,7 +89,7 @@ export default function LoginScreen() {
                 disabled={!email.trim() || !password}
                 onPress={submit}
               >
-                ログイン
+                メールアドレスでログイン
               </PrimaryButton>
             </View>
 
@@ -114,7 +117,6 @@ export default function LoginScreen() {
               variant="secondary"
               onPress={() => {
                 enterPreview();
-                router.replace("/");
               }}
             >
               画面だけプレビューする
@@ -167,22 +169,22 @@ const styles = StyleSheet.create({
   },
   backButton: {
     alignItems: "center",
-    backgroundColor: ihubColors.surface,
+    backgroundColor: megrumColors.surface,
     borderColor: "rgba(58,50,74,0.08)",
-    borderRadius: ihubRadii.pill,
+    borderRadius: megrumRadii.pill,
     borderWidth: 1,
     height: 42,
     justifyContent: "center",
     width: 42,
   },
   backText: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 30,
     fontWeight: "800",
     lineHeight: 32,
   },
   headerTitle: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 18,
     fontWeight: "900",
   },
@@ -194,13 +196,13 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   welcome: {
-    color: ihubColors.mutedInk,
+    color: megrumColors.mutedInk,
     fontSize: 12,
     fontWeight: "800",
     marginTop: 14,
   },
   webAccountNote: {
-    color: ihubColors.mutedInk,
+    color: megrumColors.mutedInk,
     fontSize: 11.5,
     fontWeight: "800",
     lineHeight: 18,
@@ -211,7 +213,7 @@ const styles = StyleSheet.create({
     gap: 14,
   },
   forgot: {
-    color: ihubColors.lavender,
+    color: megrumColors.lavender,
     fontSize: 12,
     fontWeight: "900",
     textAlign: "right",
@@ -219,9 +221,9 @@ const styles = StyleSheet.create({
   message: {
     backgroundColor: "rgba(217,130,107,0.10)",
     borderColor: "rgba(217,130,107,0.22)",
-    borderRadius: ihubRadii.md,
+    borderRadius: megrumRadii.md,
     borderWidth: 1,
-    color: ihubColors.warn,
+    color: megrumColors.warn,
     fontSize: 12,
     fontWeight: "800",
     lineHeight: 18,
@@ -239,7 +241,7 @@ const styles = StyleSheet.create({
     height: 1,
   },
   dividerText: {
-    color: ihubColors.mutedInk,
+    color: megrumColors.mutedInk,
     fontSize: 11,
     fontWeight: "700",
   },
@@ -249,30 +251,30 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   signupText: {
-    color: ihubColors.mutedInk,
+    color: megrumColors.mutedInk,
     fontSize: 13,
     fontWeight: "700",
   },
   signupLink: {
-    color: ihubColors.lavender,
+    color: megrumColors.lavender,
     fontSize: 13,
     fontWeight: "900",
   },
   envBox: {
-    backgroundColor: ihubColors.surface,
+    backgroundColor: megrumColors.surface,
     borderColor: "rgba(58,50,74,0.08)",
-    borderRadius: ihubRadii.xl,
+    borderRadius: megrumRadii.xl,
     borderWidth: 1,
     gap: 12,
     padding: 18,
   },
   envTitle: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 18,
     fontWeight: "900",
   },
   envText: {
-    color: ihubColors.mutedInk,
+    color: megrumColors.mutedInk,
     fontSize: 12,
     fontWeight: "800",
     lineHeight: 19,

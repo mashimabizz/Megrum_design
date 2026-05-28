@@ -1,7 +1,7 @@
 -- =====================================================================
 -- iter80-D4: dispute の相手側（respondent）反論フロー
 -- =====================================================================
--- 仕様: iHub/c-dispute.jsx の D4Respondent
+-- 仕様: Megrum/c-dispute.jsx の D4Respondent
 --
 -- respondent は dispute を受けて 3 択：
 --   accepted  事実を認める → 即 closed / outcome=cancelled

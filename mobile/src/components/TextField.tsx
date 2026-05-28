@@ -1,5 +1,5 @@
 import { StyleSheet, Text, TextInput, View, type TextInputProps } from "react-native";
-import { ihubColors, ihubRadii } from "../theme/tokens";
+import { megrumColors, megrumRadii } from "../theme/tokens";
 
 type TextFieldProps = TextInputProps & {
   label: string;
@@ -23,7 +23,7 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   label: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 12,
     fontWeight: "900",
   },
@@ -31,9 +31,9 @@ const styles = StyleSheet.create({
     minHeight: 48,
     borderWidth: 1,
     borderColor: "rgba(58,50,74,0.12)",
-    borderRadius: ihubRadii.md,
+    borderRadius: megrumRadii.md,
     backgroundColor: "#fff",
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 15,
     fontWeight: "700",
     paddingHorizontal: 14,

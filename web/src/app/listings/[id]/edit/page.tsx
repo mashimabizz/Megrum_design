@@ -16,7 +16,7 @@ import {
 } from "@/app/listings/new/ListingNewForm";
 
 export const metadata = {
-  title: "個別募集を編集 — iHub",
+  title: "個別募集を編集 — Megrum",
 };
 
 type ListingRow = {

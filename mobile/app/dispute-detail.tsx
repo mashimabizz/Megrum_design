@@ -14,7 +14,7 @@ import { PrimaryButton } from "../src/components/PrimaryButton";
 import { RouteHeader } from "../src/components/RouteHeader";
 import { Screen } from "../src/components/Screen";
 import { supabase } from "../src/lib/supabase";
-import { ihubColors, ihubRadii, ihubShadow } from "../src/theme/tokens";
+import { megrumColors, megrumRadii, megrumShadow } from "../src/theme/tokens";
 
 type DisputeStatus = "submitted" | "response_pending" | "arbitrating" | "closed";
 type Category = "short" | "wrong" | "noshow" | "cancel" | "other";
@@ -187,7 +187,7 @@ export default function DisputeDetailScreen() {
         title={data?.status === "closed" ? "運営からの回答" : "申告ステータス"}
         subtitle={data?.ticketNo}
       />
-      {loading ? <ActivityIndicator color={ihubColors.lavender} /> : null}
+      {loading ? <ActivityIndicator color={megrumColors.lavender} /> : null}
       {error ? <Text style={styles.errorText}>{error}</Text> : null}
 
       {data ? (
@@ -540,18 +540,18 @@ const styles = StyleSheet.create({
     gap: 13,
   },
   card: {
-    backgroundColor: ihubColors.surface,
+    backgroundColor: megrumColors.surface,
     borderColor: "rgba(58,50,74,0.08)",
-    borderRadius: ihubRadii.xl,
+    borderRadius: megrumRadii.xl,
     borderWidth: 1,
     gap: 9,
     padding: 15,
-    ...ihubShadow,
+    ...megrumShadow,
   },
   statusCard: {
     backgroundColor: "rgba(166,149,216,0.07)",
     borderColor: "rgba(166,149,216,0.28)",
-    borderRadius: ihubRadii.xl,
+    borderRadius: megrumRadii.xl,
     borderWidth: 1,
     gap: 6,
     padding: 15,
@@ -562,9 +562,9 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
   },
   statusBadge: {
-    backgroundColor: ihubColors.lavender,
-    borderRadius: ihubRadii.pill,
-    color: ihubColors.surface,
+    backgroundColor: megrumColors.lavender,
+    borderRadius: megrumRadii.pill,
+    color: megrumColors.surface,
     fontSize: 10.5,
     fontWeight: "900",
     overflow: "hidden",
@@ -572,35 +572,35 @@ const styles = StyleSheet.create({
     paddingVertical: 5,
   },
   date: {
-    color: ihubColors.mutedInk,
+    color: megrumColors.mutedInk,
     fontSize: 10.5,
     fontWeight: "800",
   },
   title: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 17,
     fontWeight: "900",
   },
   muted: {
-    color: ihubColors.mutedInk,
+    color: megrumColors.mutedInk,
     fontSize: 12,
     fontWeight: "800",
     lineHeight: 18,
   },
   label: {
-    color: ihubColors.lavender,
+    color: megrumColors.lavender,
     fontSize: 11,
     fontWeight: "900",
     letterSpacing: 0.4,
   },
   bodyText: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 13,
     fontWeight: "700",
     lineHeight: 21,
   },
   errorText: {
-    color: ihubColors.warn,
+    color: megrumColors.warn,
     fontSize: 12,
     fontWeight: "900",
   },
@@ -615,11 +615,11 @@ const styles = StyleSheet.create({
     width: 66,
   },
   textArea: {
-    backgroundColor: ihubColors.background,
+    backgroundColor: megrumColors.background,
     borderColor: "rgba(58,50,74,0.08)",
     borderRadius: 14,
     borderWidth: 1,
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 14,
     fontWeight: "700",
     minHeight: 104,
@@ -636,7 +636,7 @@ const styles = StyleSheet.create({
   resultCard: {
     backgroundColor: "rgba(34,197,94,0.08)",
     borderColor: "rgba(34,197,94,0.22)",
-    borderRadius: ihubRadii.xl,
+    borderRadius: megrumRadii.xl,
     borderWidth: 1,
     gap: 8,
     padding: 15,
@@ -649,7 +649,7 @@ const styles = StyleSheet.create({
   },
   timelineDot: {
     borderColor: "rgba(166,149,216,0.4)",
-    borderRadius: ihubRadii.pill,
+    borderRadius: megrumRadii.pill,
     borderStyle: "dashed",
     borderWidth: 1.5,
     height: 24,
@@ -657,18 +657,18 @@ const styles = StyleSheet.create({
   },
   timelineDotDone: {
     alignItems: "center",
-    backgroundColor: ihubColors.lavender,
-    borderColor: ihubColors.lavender,
+    backgroundColor: megrumColors.lavender,
+    borderColor: megrumColors.lavender,
     borderStyle: "solid",
     justifyContent: "center",
   },
   timelineCheck: {
-    color: ihubColors.surface,
+    color: megrumColors.surface,
     fontSize: 13,
     fontWeight: "900",
   },
   timelineLabel: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 12.5,
     fontWeight: "800",
   },
@@ -685,19 +685,19 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(166,149,216,0.16)",
   },
   messageRole: {
-    color: ihubColors.lavender,
+    color: megrumColors.lavender,
     fontSize: 10,
     fontWeight: "900",
     marginBottom: 4,
   },
   messageBody: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 12.5,
     fontWeight: "700",
     lineHeight: 19,
   },
   messageTime: {
-    color: ihubColors.mutedInk,
+    color: megrumColors.mutedInk,
     fontSize: 9.5,
     fontWeight: "800",
     marginTop: 5,
@@ -707,7 +707,7 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
   },
   backToTradeText: {
-    color: ihubColors.lavender,
+    color: megrumColors.lavender,
     fontSize: 13,
     fontWeight: "900",
   },

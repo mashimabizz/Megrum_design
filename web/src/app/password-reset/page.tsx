@@ -4,7 +4,7 @@ import { ResetForm } from "./ResetForm";
 import { HeaderBack } from "@/components/auth/HeaderBack";
 
 export const metadata = {
-  title: "パスワードリセット — iHub",
+  title: "パスワードリセット — Megrum",
 };
 
 /**

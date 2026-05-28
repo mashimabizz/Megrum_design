@@ -32,7 +32,7 @@ import {
   MeguriThreeScene,
   type MeguriSceneResident,
 } from "../../src/components/meguri/MeguriThreeScene";
-import { ihubColors, ihubRadii, ihubShadow } from "../../src/theme/tokens";
+import { megrumColors, megrumRadii, megrumShadow } from "../../src/theme/tokens";
 import {
   DEFAULT_MEGURI_AVATAR,
   DEFAULT_MEGURI_PROFILE,
@@ -484,16 +484,16 @@ export const GROOM_POSTS: GroomPost[] = [
 export function hueColor(hue: MeguriHue) {
   switch (hue) {
     case "sky":
-      return ihubColors.sky;
+      return megrumColors.sky;
     case "pink":
-      return ihubColors.pink;
+      return megrumColors.pink;
     case "mint":
       return "#a8dcc9";
     case "butter":
       return "#efd99b";
     case "lav":
     default:
-      return ihubColors.lavender;
+      return megrumColors.lavender;
   }
 }
 
@@ -1015,17 +1015,17 @@ export default function EncountersScreen() {
           <View style={styles.homeSceneFrame}>
             {!selfScene ? (
               <View style={styles.meguriSceneLoading}>
-                <ActivityIndicator color={ihubColors.lavender} />
+                <ActivityIndicator color={megrumColors.lavender} />
               </View>
             ) : homeThreeFailed ? (
               <View style={styles.meguriSceneLoading}>
-                <ActivityIndicator color={ihubColors.lavender} />
+                <ActivityIndicator color={megrumColors.lavender} />
               </View>
             ) : (
               <MeguriThreeBoundary
                 fallback={
                   <View style={styles.meguriSceneLoading}>
-                    <ActivityIndicator color={ihubColors.lavender} />
+                    <ActivityIndicator color={megrumColors.lavender} />
                   </View>
                 }
                 onError={() => setHomeThreeFailed(true)}
@@ -1071,7 +1071,7 @@ export default function EncountersScreen() {
 
         <View style={styles.hitokotoCard}>
           <View style={styles.hitokotoIcon}>
-            <IconSymbol name="create-outline" color={ihubColors.lavender} size={20} />
+            <IconSymbol name="create-outline" color={megrumColors.lavender} size={20} />
           </View>
           <View style={styles.hitokotoCopy}>
             <Text style={styles.hitokotoTitle}>今日のひとこと</Text>
@@ -1090,7 +1090,7 @@ export default function EncountersScreen() {
           onPress={() => setSettingsOpen(true)}
           style={styles.settingsButton}
         >
-          <IconSymbol name="settings-outline" color={ihubColors.ink} size={20} />
+          <IconSymbol name="settings-outline" color={megrumColors.ink} size={20} />
         </Pressable>
       </View>
 
@@ -1264,7 +1264,7 @@ function GroomRail({
         >
           <View style={[styles.groomAvatarRing, styles.groomAddRing]}>
             <View style={styles.groomAddCircle}>
-              <IconSymbol name="add" color={ihubColors.lavender} size={28} />
+              <IconSymbol name="add" color={megrumColors.lavender} size={28} />
             </View>
           </View>
           <Text numberOfLines={1} style={styles.groomStoryName}>
@@ -1274,7 +1274,7 @@ function GroomRail({
 
         {loading ? (
           <View style={styles.groomRailLoading}>
-            <ActivityIndicator color={ihubColors.lavender} />
+            <ActivityIndicator color={megrumColors.lavender} />
           </View>
         ) : null}
 
@@ -1974,7 +1974,7 @@ function GroomViewerModal({
                   >
                     <IconSymbol
                       name={post.liked ? "heart" : "heart-outline"}
-                      color={post.liked ? ihubColors.pink : "#fff"}
+                      color={post.liked ? megrumColors.pink : "#fff"}
                       size={31}
                     />
                   </Pressable>
@@ -2380,7 +2380,7 @@ function GroomStoryAttachedChrome({
             </Text>
           </View>
           <View style={styles.groomViewerAction}>
-            <IconSymbol name={post.liked ? "heart" : "heart-outline"} color={post.liked ? ihubColors.pink : "#fff"} size={31} />
+            <IconSymbol name={post.liked ? "heart" : "heart-outline"} color={post.liked ? megrumColors.pink : "#fff"} size={31} />
           </View>
           <View style={[styles.groomViewerAction, !canSend ? styles.groomSendButtonDisabled : null]}>
             <IconSymbol name="send-outline" color="#fff" size={31} />
@@ -2456,7 +2456,7 @@ function GroomStoryDecorations({
             numberOfLines={3}
             style={[
               styles.groomStoryTextOverlayText,
-              { color: overlay.tone === "solid" ? ihubColors.ink : overlay.color },
+              { color: overlay.tone === "solid" ? megrumColors.ink : overlay.color },
             ]}
           >
             {overlay.text}
@@ -2622,7 +2622,7 @@ function EditableGroomTextOverlay({
         numberOfLines={3}
         style={[
           styles.groomStoryTextOverlayText,
-          { color: overlay.tone === "solid" ? ihubColors.ink : overlay.color },
+          { color: overlay.tone === "solid" ? megrumColors.ink : overlay.color },
         ]}
       >
         {overlay.text}
@@ -3487,7 +3487,7 @@ function GroomComposerModal({
               onSubmitEditing={addTextOverlay}
               placeholder="テキストを入力"
               placeholderTextColor="rgba(255,255,255,0.62)"
-              selectionColor={ihubColors.lavender}
+              selectionColor={megrumColors.lavender}
               style={[
                 styles.groomStoryLiveTextInput,
                 textTone === "label"
@@ -3495,7 +3495,7 @@ function GroomComposerModal({
                   : textTone === "solid"
                     ? styles.groomStoryLiveTextInputSolid
                     : null,
-                { color: textTone === "solid" ? ihubColors.ink : textColor },
+                { color: textTone === "solid" ? megrumColors.ink : textColor },
               ]}
               value={textDraft}
             />
@@ -3629,7 +3629,7 @@ export function RoundButton({
 }) {
   return (
     <Pressable accessibilityRole="button" onPress={onPress} style={styles.roundButton}>
-      <IconSymbol name={icon} color={ihubColors.ink} size={18} />
+      <IconSymbol name={icon} color={megrumColors.ink} size={18} />
     </Pressable>
   );
 }
@@ -3672,7 +3672,7 @@ export function MeguriSettingsModal({
             />
             <View style={styles.settingRow}>
               <View style={styles.settingIcon}>
-                <IconSymbol name="settings-outline" color={ihubColors.lavender} size={18} />
+                <IconSymbol name="settings-outline" color={megrumColors.lavender} size={18} />
               </View>
               <View style={styles.settingCopy}>
                 <Text style={styles.settingTitle}>めぐり機能</Text>
@@ -3711,7 +3711,7 @@ export function SettingRow({
   return (
     <Pressable accessibilityRole="button" onPress={onPress} style={styles.settingRow}>
       <View style={styles.settingIcon}>
-        <IconSymbol name={icon} color={ihubColors.lavender} size={18} />
+        <IconSymbol name={icon} color={megrumColors.lavender} size={18} />
       </View>
       <View style={styles.settingCopy}>
         <Text style={styles.settingTitle}>{title}</Text>
@@ -3980,7 +3980,7 @@ export function LetterModal({
             ) : (
               <>
                 <View style={styles.bigLock}>
-                  <IconSymbol name="lock-closed-outline" color={ihubColors.ink} size={24} />
+                  <IconSymbol name="lock-closed-outline" color={megrumColors.ink} size={24} />
                 </View>
                 <Text style={styles.lockExplain}>
                   本文の表示と返信には めぐりPlus が必要です。
@@ -4186,7 +4186,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 6,
   },
   eyebrow: {
-    color: ihubColors.lavender,
+    color: megrumColors.lavender,
     fontSize: 11,
     fontWeight: "900",
     letterSpacing: 1.7,
@@ -4213,19 +4213,19 @@ const styles = StyleSheet.create({
     alignItems: "center",
     backgroundColor: "rgba(255,255,255,0.86)",
     borderColor: "rgba(58,50,74,0.08)",
-    borderRadius: ihubRadii.pill,
+    borderRadius: megrumRadii.pill,
     borderWidth: 1,
     height: 40,
     justifyContent: "center",
     width: 40,
-    ...ihubShadow,
+    ...megrumShadow,
   },
   groomRail: {
     gap: 11,
     marginTop: 2,
   },
   groomRailTitle: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 22,
     fontWeight: "900",
     lineHeight: 27,
@@ -4248,21 +4248,21 @@ const styles = StyleSheet.create({
   groomAvatarRing: {
     alignItems: "center",
     backgroundColor: "#fff",
-    borderColor: ihubColors.lavender,
+    borderColor: megrumColors.lavender,
     borderRadius: 999,
     borderWidth: 2,
 	    height: 74,
     justifyContent: "center",
     padding: 3,
-    shadowColor: ihubColors.lavender,
+    shadowColor: megrumColors.lavender,
     shadowOffset: { width: 0, height: 5 },
     shadowOpacity: 0.16,
     shadowRadius: 12,
 	    width: 74,
   },
   groomAvatarRingLiked: {
-    borderColor: ihubColors.pink,
-    shadowColor: ihubColors.pink,
+    borderColor: megrumColors.pink,
+    shadowColor: megrumColors.pink,
   },
   groomAvatarRingViewed: {
     borderColor: "rgba(58,50,74,0.24)",
@@ -4438,7 +4438,7 @@ const styles = StyleSheet.create({
   groomViewerMenuButton: {
     alignItems: "center",
     backgroundColor: "rgba(0,0,0,0.18)",
-    borderRadius: ihubRadii.pill,
+    borderRadius: megrumRadii.pill,
     height: 38,
     justifyContent: "center",
     width: 38,
@@ -4461,7 +4461,7 @@ const styles = StyleSheet.create({
     width: "100%",
   },
   groomViewerFaceText: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 15,
     fontWeight: "900",
   },
@@ -4569,7 +4569,7 @@ const styles = StyleSheet.create({
   groomReplyInput: {
     backgroundColor: "rgba(5,8,13,0.42)",
     borderColor: "rgba(255,255,255,0.46)",
-    borderRadius: ihubRadii.pill,
+    borderRadius: megrumRadii.pill,
     borderWidth: 1,
     color: "#fff",
     flex: 1,
@@ -4585,7 +4585,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     backgroundColor: "rgba(5,8,13,0.42)",
     borderColor: "rgba(255,255,255,0.46)",
-    borderRadius: ihubRadii.pill,
+    borderRadius: megrumRadii.pill,
     borderWidth: 1,
     flex: 1,
     justifyContent: "center",
@@ -4602,7 +4602,7 @@ const styles = StyleSheet.create({
   },
   groomViewerAction: {
     alignItems: "center",
-    borderRadius: ihubRadii.pill,
+    borderRadius: megrumRadii.pill,
     height: 48,
     justifyContent: "center",
     width: 42,
@@ -4787,7 +4787,7 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
   },
   groomCameraPermissionButtonText: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 14,
     fontWeight: "900",
   },
@@ -4952,7 +4952,7 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
   },
   groomStoryDoneText: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 12,
     fontWeight: "900",
   },
@@ -5053,7 +5053,7 @@ const styles = StyleSheet.create({
     paddingVertical: 13,
   },
   groomStoryPublishText: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 13,
     fontWeight: "900",
   },
@@ -5082,7 +5082,7 @@ const styles = StyleSheet.create({
   groomComposerClose: {
     alignItems: "center",
     backgroundColor: "rgba(58,50,74,0.08)",
-    borderRadius: ihubRadii.pill,
+    borderRadius: megrumRadii.pill,
     height: 36,
     justifyContent: "center",
     width: 36,
@@ -5099,7 +5099,7 @@ const styles = StyleSheet.create({
     borderColor: "rgba(166,149,216,0.14)",
     borderRadius: 18,
     borderWidth: 1,
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 14,
     fontWeight: "800",
     minHeight: 48,
@@ -5113,19 +5113,19 @@ const styles = StyleSheet.create({
   groomComposerSecondary: {
     alignItems: "center",
     backgroundColor: "rgba(166,149,216,0.12)",
-    borderRadius: ihubRadii.pill,
+    borderRadius: megrumRadii.pill,
     flex: 1,
     paddingVertical: 14,
   },
   groomComposerSecondaryText: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 14,
     fontWeight: "900",
   },
   groomComposerPrimary: {
     alignItems: "center",
-    backgroundColor: ihubColors.lavender,
-    borderRadius: ihubRadii.pill,
+    backgroundColor: megrumColors.lavender,
+    borderRadius: megrumRadii.pill,
     flex: 1,
     paddingVertical: 14,
   },
@@ -5137,7 +5137,7 @@ const styles = StyleSheet.create({
   roundButton: {
     alignItems: "center",
     backgroundColor: "rgba(255,255,255,0.82)",
-    borderRadius: ihubRadii.pill,
+    borderRadius: megrumRadii.pill,
     height: 38,
     justifyContent: "center",
     shadowColor: "#3a324a",
@@ -5147,7 +5147,7 @@ const styles = StyleSheet.create({
     width: 38,
   },
   pageTitle: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 36,
     fontWeight: "900",
     lineHeight: 42,
@@ -5161,7 +5161,7 @@ const styles = StyleSheet.create({
     paddingBottom: 18,
     paddingTop: 56,
     position: "relative",
-    shadowColor: ihubColors.lavender,
+    shadowColor: megrumColors.lavender,
     shadowOffset: { width: 0, height: 14 },
     shadowOpacity: 0.2,
     shadowRadius: 30,
@@ -5169,7 +5169,7 @@ const styles = StyleSheet.create({
   replayButton: {
     backgroundColor: "rgba(255,255,255,0.86)",
     borderColor: "rgba(166,149,216,0.18)",
-    borderRadius: ihubRadii.pill,
+    borderRadius: megrumRadii.pill,
     borderWidth: 1,
     paddingHorizontal: 12,
     paddingVertical: 8,
@@ -5179,7 +5179,7 @@ const styles = StyleSheet.create({
     zIndex: 3,
   },
   replayButtonText: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 11.5,
     fontWeight: "900",
   },
@@ -5192,11 +5192,11 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     gap: 12,
     padding: 14,
-    ...ihubShadow,
+    ...megrumShadow,
   },
   introCtaIcon: {
     alignItems: "center",
-    backgroundColor: ihubColors.lavender,
+    backgroundColor: megrumColors.lavender,
     borderRadius: 18,
     height: 42,
     justifyContent: "center",
@@ -5207,12 +5207,12 @@ const styles = StyleSheet.create({
     gap: 3,
   },
   introCtaTitle: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 15,
     fontWeight: "900",
   },
   introCtaSub: {
-    color: ihubColors.mutedInk,
+    color: megrumColors.mutedInk,
     fontSize: 11.5,
     fontWeight: "800",
   },
@@ -5244,21 +5244,21 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   bigCount: {
-    color: ihubColors.lavender,
+    color: megrumColors.lavender,
     fontSize: 62,
     fontWeight: "900",
     letterSpacing: 0,
     lineHeight: 66,
   },
   countUnit: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 24,
     fontWeight: "900",
     marginBottom: 8,
     marginLeft: 4,
   },
   stageTitle: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 19,
     fontWeight: "900",
     marginTop: -2,
@@ -5418,7 +5418,7 @@ const styles = StyleSheet.create({
     width: 6,
   },
   dotActive: {
-    backgroundColor: ihubColors.lavender,
+    backgroundColor: megrumColors.lavender,
     width: 18,
   },
   stageChips: {
@@ -5427,18 +5427,18 @@ const styles = StyleSheet.create({
   },
   miniChip: {
     backgroundColor: "rgba(255,255,255,0.8)",
-    borderRadius: ihubRadii.pill,
+    borderRadius: megrumRadii.pill,
     paddingHorizontal: 10,
     paddingVertical: 7,
   },
   miniChipText: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 12,
     fontWeight: "900",
   },
   nextButton: {
-    backgroundColor: ihubColors.lavender,
-    borderRadius: ihubRadii.pill,
+    backgroundColor: megrumColors.lavender,
+    borderRadius: megrumRadii.pill,
     paddingHorizontal: 12,
     paddingVertical: 7,
   },
@@ -5524,7 +5524,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   numValue: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 24,
     fontWeight: "900",
   },
@@ -5554,7 +5554,7 @@ const styles = StyleSheet.create({
     width: 34,
   },
   shortcutTitle: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 16,
     fontWeight: "900",
   },
@@ -5566,14 +5566,14 @@ const styles = StyleSheet.create({
   },
   hitokotoCard: {
     alignItems: "center",
-    backgroundColor: ihubColors.surface,
+    backgroundColor: megrumColors.surface,
     borderColor: "rgba(58,50,74,0.08)",
     borderRadius: 22,
     borderWidth: 1,
     flexDirection: "row",
     gap: 14,
     padding: 16,
-    ...ihubShadow,
+    ...megrumShadow,
   },
   hitokotoIcon: {
     alignItems: "center",
@@ -5587,7 +5587,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   hitokotoTitle: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 14,
     fontWeight: "900",
   },
@@ -5598,8 +5598,8 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   hitokotoButton: {
-    backgroundColor: ihubColors.lavender,
-    borderRadius: ihubRadii.pill,
+    backgroundColor: megrumColors.lavender,
+    borderRadius: megrumRadii.pill,
     paddingHorizontal: 16,
     paddingVertical: 10,
   },
@@ -5640,11 +5640,11 @@ const styles = StyleSheet.create({
     lineHeight: 18,
   },
   plazaCard: {
-    backgroundColor: ihubColors.surface,
+    backgroundColor: megrumColors.surface,
     borderRadius: 26,
     gap: 16,
     padding: 18,
-    ...ihubShadow,
+    ...megrumShadow,
   },
   plazaRow: {
     flexDirection: "row",
@@ -5744,7 +5744,7 @@ const styles = StyleSheet.create({
     width: 34,
   },
   achievementTitle: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 14,
     fontWeight: "900",
   },
@@ -5813,7 +5813,7 @@ const styles = StyleSheet.create({
     fontWeight: "900",
   },
   letterFrom: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 19,
     fontWeight: "900",
     marginTop: 7,
@@ -5831,7 +5831,7 @@ const styles = StyleSheet.create({
     padding: 10,
   },
   letterPreviewText: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 13,
     fontWeight: "800",
     lineHeight: 19,
@@ -5851,7 +5851,7 @@ const styles = StyleSheet.create({
     fontWeight: "800",
   },
   sendCard: {
-    backgroundColor: ihubColors.surface,
+    backgroundColor: megrumColors.surface,
     borderColor: "rgba(58,50,74,0.08)",
     borderRadius: 24,
     borderWidth: 1,
@@ -5863,18 +5863,18 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   sendMeterDot: {
-    borderRadius: ihubRadii.pill,
+    borderRadius: megrumRadii.pill,
     height: 10,
     width: 48,
   },
   sendMeterDotUsed: {
-    backgroundColor: ihubColors.lavender,
+    backgroundColor: megrumColors.lavender,
   },
   sendMeterDotOpen: {
     backgroundColor: "rgba(58,50,74,0.12)",
   },
   sendTitle: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 17,
     fontWeight: "900",
   },
@@ -5886,18 +5886,18 @@ const styles = StyleSheet.create({
   },
   sendButton: {
     alignItems: "center",
-    backgroundColor: ihubColors.lavender,
+    backgroundColor: megrumColors.lavender,
     borderRadius: 18,
     marginTop: 4,
     paddingVertical: 14,
   },
   sendButtonText: {
-    color: ihubColors.surface,
+    color: megrumColors.surface,
     fontSize: 14,
     fontWeight: "900",
   },
   plusCard: {
-    backgroundColor: ihubColors.ink,
+    backgroundColor: megrumColors.ink,
     borderRadius: 26,
     gap: 10,
     padding: 18,
@@ -5927,7 +5927,7 @@ const styles = StyleSheet.create({
     paddingVertical: 13,
   },
   plusButtonText: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 14,
     fontWeight: "900",
   },
@@ -5947,7 +5947,7 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
   },
   modalPanel: {
-    backgroundColor: ihubColors.surface,
+    backgroundColor: megrumColors.surface,
     borderTopLeftRadius: 30,
     borderTopRightRadius: 30,
     gap: 13,
@@ -5958,7 +5958,7 @@ const styles = StyleSheet.create({
     width: "100%",
   },
   letterModalPanel: {
-    backgroundColor: ihubColors.surface,
+    backgroundColor: megrumColors.surface,
     borderRadius: 30,
     gap: 13,
     padding: 20,
@@ -5967,25 +5967,25 @@ const styles = StyleSheet.create({
   modalHandle: {
     alignSelf: "center",
     backgroundColor: "rgba(58,50,74,0.16)",
-    borderRadius: ihubRadii.pill,
+    borderRadius: megrumRadii.pill,
     height: 5,
     marginBottom: 6,
     width: 46,
   },
   modalKicker: {
-    color: ihubColors.lavender,
+    color: megrumColors.lavender,
     fontSize: 11,
     fontWeight: "900",
     letterSpacing: 1.4,
   },
   modalTitle: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 24,
     fontWeight: "900",
     lineHeight: 30,
   },
   modalPrice: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 18,
     fontWeight: "900",
   },
@@ -6021,7 +6021,7 @@ const styles = StyleSheet.create({
     gap: 2,
   },
   settingTitle: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 14,
     fontWeight: "900",
   },
@@ -6033,18 +6033,18 @@ const styles = StyleSheet.create({
   },
   settingSwitch: {
     backgroundColor: "rgba(58,50,74,0.18)",
-    borderRadius: ihubRadii.pill,
+    borderRadius: megrumRadii.pill,
     height: 30,
     justifyContent: "center",
     paddingHorizontal: 3,
     width: 52,
   },
   settingSwitchOn: {
-    backgroundColor: ihubColors.lavender,
+    backgroundColor: megrumColors.lavender,
   },
   settingKnob: {
     backgroundColor: "#fff",
-    borderRadius: ihubRadii.pill,
+    borderRadius: megrumRadii.pill,
     height: 24,
     width: 24,
   },
@@ -6065,13 +6065,13 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   planBulletDot: {
-    color: ihubColors.lavender,
+    color: megrumColors.lavender,
     fontSize: 18,
     fontWeight: "900",
     lineHeight: 20,
   },
   planBulletText: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     flex: 1,
     fontSize: 13,
     fontWeight: "800",
@@ -6079,7 +6079,7 @@ const styles = StyleSheet.create({
   },
   modalPrimaryButton: {
     alignItems: "center",
-    backgroundColor: ihubColors.lavender,
+    backgroundColor: megrumColors.lavender,
     borderRadius: 18,
     marginTop: 4,
     paddingVertical: 14,
@@ -6088,7 +6088,7 @@ const styles = StyleSheet.create({
     opacity: 0.42,
   },
   modalPrimaryText: {
-    color: ihubColors.surface,
+    color: megrumColors.surface,
     fontSize: 14,
     fontWeight: "900",
   },
@@ -6112,14 +6112,14 @@ const styles = StyleSheet.create({
     width: 62,
   },
   lockExplain: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 13,
     fontWeight: "800",
     lineHeight: 20,
     textAlign: "center",
   },
   letterBody: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 15,
     fontWeight: "800",
     lineHeight: 24,
@@ -6129,7 +6129,7 @@ const styles = StyleSheet.create({
     borderColor: "rgba(58,50,74,0.10)",
     borderRadius: 18,
     borderWidth: 1,
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 14,
     fontWeight: "800",
     minHeight: 124,

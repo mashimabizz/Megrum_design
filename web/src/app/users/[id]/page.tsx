@@ -10,7 +10,7 @@ import type {
 } from "@/app/listings/ListingsView";
 
 export const metadata = {
-  title: "ユーザーのプロフィール — iHub",
+  title: "ユーザーのプロフィール — Megrum",
 };
 
 function pickOne<T>(v: T | T[] | null): T | null {

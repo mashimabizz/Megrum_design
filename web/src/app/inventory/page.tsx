@@ -7,7 +7,7 @@ import {
 } from "./InventoryView";
 
 export const metadata = {
-  title: "マイ在庫 — iHub",
+  title: "マイ在庫 — Megrum",
 };
 
 type InventoryRow = {

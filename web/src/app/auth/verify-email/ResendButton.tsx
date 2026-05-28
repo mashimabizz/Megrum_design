@@ -53,7 +53,7 @@ export function ResendButton({
   const disabled = pending || cooldown > 0;
   const ref = useRef<HTMLButtonElement>(null);
   const { trigger, renderRipples } = useRipple({
-    color: "bg-ihub-lavender/25",
+    color: "bg-megrum-lavender/25",
   });
 
   return (

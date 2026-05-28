@@ -1,10 +1,10 @@
 import { Redirect, Stack } from "expo-router";
 import { ActivityIndicator, View } from "react-native";
 import { useAuth } from "../../src/auth/AuthProvider";
-import { ihubColors } from "../../src/theme/tokens";
+import { megrumColors } from "../../src/theme/tokens";
 
 export default function AuthLayout() {
-  const { configured, loading, needsOnboarding, profileLoading, session } =
+  const { configured, loading, needsOnboarding, onboardingPath, previewMode, profileLoading, session } =
     useAuth();
 
   if (loading || profileLoading) {
@@ -14,18 +14,22 @@ export default function AuthLayout() {
           flex: 1,
           alignItems: "center",
           justifyContent: "center",
-          backgroundColor: ihubColors.background,
+          backgroundColor: megrumColors.background,
         }}
       >
-        <ActivityIndicator color={ihubColors.lavender} />
+        <ActivityIndicator color={megrumColors.lavender} />
       </View>
     );
   }
 
   if (configured && session) {
     if (needsOnboarding) {
-      return <Redirect href="/auth/email-confirmed" />;
+      return <Redirect href={onboardingPath ?? "/onboarding/gender"} />;
     }
+    return <Redirect href="/" />;
+  }
+
+  if (previewMode) {
     return <Redirect href="/" />;
   }
 
@@ -34,7 +38,7 @@ export default function AuthLayout() {
       screenOptions={{
         headerShown: false,
         animation: "fade",
-        contentStyle: { backgroundColor: ihubColors.background },
+        contentStyle: { backgroundColor: megrumColors.background },
       }}
     />
   );

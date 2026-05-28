@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import { RouteHeader } from "./RouteHeader";
 import { Screen } from "./Screen";
-import { ihubColors, ihubRadii } from "../theme/tokens";
+import { megrumColors, megrumRadii } from "../theme/tokens";
 
 type Article = {
   num: string;
@@ -62,7 +62,7 @@ export function LegalDocument({
           <Text style={styles.articleBody}>{article.body}</Text>
         </View>
       ))}
-      <Text style={styles.footer}>{footer}{"\n"}iHub 運営者</Text>
+      <Text style={styles.footer}>{footer}{"\n"}Megrum 運営者</Text>
     </Screen>
   );
 }
@@ -98,7 +98,7 @@ const styles = StyleSheet.create({
     borderColor: "rgba(217,130,107,0.25)",
   },
   infoText: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 12,
     fontWeight: "700",
     lineHeight: 21,
@@ -112,26 +112,26 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   articleNum: {
-    color: ihubColors.lavender,
+    color: megrumColors.lavender,
     fontSize: 11,
     fontWeight: "900",
   },
   articleTitle: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     flex: 1,
     fontSize: 14,
     fontWeight: "900",
   },
   articleBody: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 12.5,
     fontWeight: "700",
     lineHeight: 23,
   },
   dataCard: {
-    backgroundColor: ihubColors.surface,
+    backgroundColor: megrumColors.surface,
     borderColor: "rgba(58,50,74,0.08)",
-    borderRadius: ihubRadii.md,
+    borderRadius: megrumRadii.md,
     borderWidth: 1,
     paddingHorizontal: 13,
   },
@@ -145,12 +145,12 @@ const styles = StyleSheet.create({
     borderBottomWidth: 0,
   },
   dataLabel: {
-    color: ihubColors.mutedInk,
+    color: megrumColors.mutedInk,
     fontSize: 11,
     fontWeight: "900",
   },
   dataValue: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 12.5,
     fontWeight: "700",
     lineHeight: 21,
@@ -158,7 +158,7 @@ const styles = StyleSheet.create({
   footer: {
     borderTopColor: "rgba(58,50,74,0.08)",
     borderTopWidth: 1,
-    color: ihubColors.mutedInk,
+    color: megrumColors.mutedInk,
     fontSize: 11,
     fontWeight: "700",
     lineHeight: 19,

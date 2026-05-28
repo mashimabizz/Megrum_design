@@ -11,7 +11,7 @@ import {
 } from "./ListingsView";
 
 export const metadata = {
-  title: "個別募集 — iHub",
+  title: "個別募集 — Megrum",
 };
 
 type ListingRow = {

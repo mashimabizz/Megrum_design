@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * iter76-D: 取引タブ刷新（モックアップ iHub/account-support.jsx の TradeTab 準拠）
+ * iter76-D: 取引タブ刷新（モックアップ Megrum/account-support.jsx の TradeTab 準拠）
  *
  * - 打診中：送信→/←受信 chip 色分け、状態文「相手の返信待ち / 返信が必要」
  * - 進行中：合流カウントダウン

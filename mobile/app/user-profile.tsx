@@ -12,7 +12,7 @@ import { Screen } from "../src/components/Screen";
 import { useAuth } from "../src/auth/AuthProvider";
 import { IconSymbol } from "../src/components/IconSymbol";
 import { supabase } from "../src/lib/supabase";
-import { ihubColors, ihubRadii, ihubShadow } from "../src/theme/tokens";
+import { megrumColors, megrumRadii, megrumShadow } from "../src/theme/tokens";
 
 type MasterName = { name: string | null } | { name: string | null }[] | null;
 
@@ -290,22 +290,22 @@ const styles = StyleSheet.create({
     gap: 16,
   },
   loadingText: {
-    color: ihubColors.mutedInk,
+    color: megrumColors.mutedInk,
     fontSize: 12,
     fontWeight: "800",
   },
   inlineError: {
-    color: ihubColors.warn,
+    color: megrumColors.warn,
     fontSize: 12,
     fontWeight: "800",
   },
   hero: {
-    backgroundColor: ihubColors.surface,
+    backgroundColor: megrumColors.surface,
     borderColor: "rgba(166,149,216,0.22)",
-    borderRadius: ihubRadii.xl,
+    borderRadius: megrumRadii.xl,
     borderWidth: 1,
     padding: 18,
-    ...ihubShadow,
+    ...megrumShadow,
   },
   avatar: {
     alignItems: "center",
@@ -322,7 +322,7 @@ const styles = StyleSheet.create({
     width: "100%",
   },
   avatarText: {
-    color: ihubColors.lavender,
+    color: megrumColors.lavender,
     fontSize: 24,
     fontWeight: "900",
   },
@@ -331,12 +331,12 @@ const styles = StyleSheet.create({
     marginTop: 12,
   },
   handle: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 20,
     fontWeight: "900",
   },
   name: {
-    color: ihubColors.mutedInk,
+    color: megrumColors.mutedInk,
     fontSize: 12,
     fontWeight: "800",
     marginTop: 3,
@@ -351,18 +351,18 @@ const styles = StyleSheet.create({
   },
   stat: {
     alignItems: "center",
-    backgroundColor: ihubColors.background,
-    borderRadius: ihubRadii.md,
+    backgroundColor: megrumColors.background,
+    borderRadius: megrumRadii.md,
     flex: 1,
     paddingVertical: 10,
   },
   statValue: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 15,
     fontWeight: "900",
   },
   statLabel: {
-    color: ihubColors.mutedInk,
+    color: megrumColors.mutedInk,
     fontSize: 10,
     fontWeight: "800",
     marginTop: 2,
@@ -371,20 +371,20 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   sectionTitle: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 15,
     fontWeight: "900",
     paddingHorizontal: 2,
   },
   emptyBox: {
-    backgroundColor: ihubColors.surface,
+    backgroundColor: megrumColors.surface,
     borderColor: "rgba(58,50,74,0.08)",
-    borderRadius: ihubRadii.md,
+    borderRadius: megrumRadii.md,
     borderWidth: 1,
     padding: 18,
   },
   emptyText: {
-    color: ihubColors.mutedInk,
+    color: megrumColors.mutedInk,
     fontSize: 12,
     fontWeight: "800",
     textAlign: "center",
@@ -395,9 +395,9 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   itemCard: {
-    backgroundColor: ihubColors.surface,
+    backgroundColor: megrumColors.surface,
     borderColor: "rgba(58,50,74,0.08)",
-    borderRadius: ihubRadii.md,
+    borderRadius: megrumRadii.md,
     borderWidth: 1,
     padding: 10,
     width: "47.8%",
@@ -415,33 +415,33 @@ const styles = StyleSheet.create({
     width: "100%",
   },
   itemLetter: {
-    color: ihubColors.surface,
+    color: megrumColors.surface,
     fontSize: 24,
     fontWeight: "900",
   },
   itemTitle: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 12,
     fontWeight: "900",
     marginTop: 8,
   },
   itemSubtitle: {
-    color: ihubColors.mutedInk,
+    color: megrumColors.mutedInk,
     fontSize: 10.5,
     fontWeight: "800",
     marginTop: 2,
   },
   cta: {
     alignItems: "center",
-    backgroundColor: ihubColors.lavender,
-    borderRadius: ihubRadii.md,
+    backgroundColor: megrumColors.lavender,
+    borderRadius: megrumRadii.md,
     flexDirection: "row",
     gap: 6,
     justifyContent: "center",
     minHeight: 50,
   },
   ctaText: {
-    color: ihubColors.surface,
+    color: megrumColors.surface,
     fontSize: 14,
     fontWeight: "900",
   },

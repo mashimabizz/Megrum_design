@@ -3,7 +3,7 @@
 -- =====================================================================
 -- グッズ交換でキャラ別需要が出やすい最近人気作の新規追加と既存L2補完を行う。
 
-create temporary table _ihub_seed_groups (
+create temporary table _megrum_seed_groups (
   genre_name text not null,
   name text not null,
   aliases text[] not null default '{}',
@@ -11,7 +11,7 @@ create temporary table _ihub_seed_groups (
   display_order integer not null
 ) on commit drop;
 
-insert into _ihub_seed_groups (genre_name, name, aliases, kind, display_order) values
+insert into _megrum_seed_groups (genre_name, name, aliases, kind, display_order) values
   ('アニメ・マンガ','薫る花は凛と咲く',array['Kaoru Hana wa Rin to Saku','The Fragrant Flower Blooms with Dignity']::text[],'work',103),
   ('アニメ・マンガ','カグラバチ',array['Kagurabachi']::text[],'work',104),
   ('アニメ・マンガ','ふつうの軽音部',array['Futsuu no Keionbu']::text[],'work',105);
@@ -23,14 +23,14 @@ select
   sg.aliases,
   sg.kind,
   sg.display_order
-from _ihub_seed_groups sg
+from _megrum_seed_groups sg
 join public.genres_master ge on ge.name = sg.genre_name
 on conflict (genre_id, name) do update
   set aliases = excluded.aliases,
       kind = excluded.kind,
       display_order = excluded.display_order;
 
-create temporary table _ihub_seed_characters (
+create temporary table _megrum_seed_characters (
   genre_name text not null,
   group_name text not null,
   name text not null,
@@ -38,7 +38,7 @@ create temporary table _ihub_seed_characters (
   display_order integer not null
 ) on commit drop;
 
-insert into _ihub_seed_characters (genre_name, group_name, name, aliases, display_order) values
+insert into _megrum_seed_characters (genre_name, group_name, name, aliases, display_order) values
   -- 新規追加: 薫る花は凛と咲く
   ('アニメ・マンガ','薫る花は凛と咲く','紬凛太郎',array[]::text[],1),
   ('アニメ・マンガ','薫る花は凛と咲く','和栗薫子',array[]::text[],2),
@@ -135,7 +135,7 @@ select
   sc.name,
   sc.aliases,
   sc.display_order
-from _ihub_seed_characters sc
+from _megrum_seed_characters sc
 join public.genres_master ge on ge.name = sc.genre_name
 join public.groups_master gm on gm.genre_id = ge.id and gm.name = sc.group_name
 where not exists (

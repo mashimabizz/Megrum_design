@@ -10,7 +10,7 @@ import type {
 } from "../listings/ListingsView";
 
 export const metadata = {
-  title: "ウィッシュ — iHub",
+  title: "ウィッシュ — Megrum",
 };
 
 type WishRow = {

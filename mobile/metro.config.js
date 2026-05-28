@@ -24,9 +24,9 @@ const existingBlockList = config.resolver.blockList
   : [];
 
 const packageAliases = {
-  "@ihub/core": path.join(workspaceRoot, "packages/core"),
-  "@ihub/design": path.join(workspaceRoot, "packages/design"),
-  "@ihub/supabase": path.join(workspaceRoot, "packages/supabase"),
+  "@megrum/core": path.join(workspaceRoot, "packages/core"),
+  "@megrum/design": path.join(workspaceRoot, "packages/design"),
+  "@megrum/supabase": path.join(workspaceRoot, "packages/supabase"),
 };
 const serverOnlyShimPath = path.join(
   projectRoot,

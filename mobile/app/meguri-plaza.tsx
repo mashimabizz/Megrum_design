@@ -9,7 +9,7 @@ import {
   MeguriThreeScene,
   type MeguriSceneResident,
 } from "../src/components/meguri/MeguriThreeScene";
-import { ihubColors } from "../src/theme/tokens";
+import { megrumColors } from "../src/theme/tokens";
 import { USERS, WalkingCard, hueColor, type MeguriUser } from "./(tabs)/encounters";
 import {
   DEFAULT_MEGURI_AVATAR,
@@ -89,17 +89,17 @@ export default function MeguriPlazaScreen() {
       <View style={styles.scene}>
         {!selfScene ? (
           <View style={styles.sceneLoading}>
-            <ActivityIndicator color={ihubColors.lavender} />
+            <ActivityIndicator color={megrumColors.lavender} />
           </View>
         ) : threeFailed ? (
           <View style={styles.sceneLoading}>
-            <ActivityIndicator color={ihubColors.lavender} />
+            <ActivityIndicator color={megrumColors.lavender} />
           </View>
         ) : (
           <MeguriThreeBoundary
             fallback={
               <View style={styles.sceneLoading}>
-                <ActivityIndicator color={ihubColors.lavender} />
+                <ActivityIndicator color={megrumColors.lavender} />
               </View>
             }
             onError={() => setThreeFailed(true)}
@@ -160,7 +160,7 @@ export default function MeguriPlazaScreen() {
 
         <View pointerEvents="box-none" style={[styles.topBar, { paddingTop: Math.max(insets.top, 12) }]}>
           <Pressable accessibilityRole="button" onPress={() => router.back()} style={styles.roundButton}>
-            <IconSymbol name="chevron-back" color={ihubColors.ink} size={20} />
+            <IconSymbol name="chevron-back" color={megrumColors.ink} size={20} />
           </Pressable>
           <View style={styles.titlePill}>
             <Text style={styles.title}>めぐり広場</Text>
@@ -288,7 +288,7 @@ const styles = StyleSheet.create({
     paddingVertical: 9,
   },
   title: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 17,
     fontWeight: "900",
   },
@@ -306,12 +306,12 @@ const styles = StyleSheet.create({
     width: 150,
   },
   detailName: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 14,
     fontWeight: "900",
   },
   detailMeta: {
-    color: ihubColors.mutedInk,
+    color: megrumColors.mutedInk,
     fontSize: 10.5,
     fontWeight: "800",
     marginTop: 2,
@@ -319,7 +319,7 @@ const styles = StyleSheet.create({
   detailButton: {
     alignItems: "center",
     alignSelf: "flex-start",
-    backgroundColor: ihubColors.ink,
+    backgroundColor: megrumColors.ink,
     borderRadius: 999,
     flexDirection: "row",
     gap: 2,

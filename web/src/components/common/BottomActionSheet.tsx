@@ -49,7 +49,7 @@ export function BottomActionSheet({
               className="h-14 w-11 flex-shrink-0 rounded-[10px] object-cover shadow-[0_3px_8px_rgba(58,50,74,0.16)]"
             />
           ) : (
-            <div className="flex h-14 w-11 flex-shrink-0 items-center justify-center rounded-[10px] bg-ihub-lavender/20 text-[16px] font-extrabold text-ihub-lavender">
+            <div className="flex h-14 w-11 flex-shrink-0 items-center justify-center rounded-[10px] bg-megrum-lavender/20 text-[16px] font-extrabold text-megrum-lavender">
               {fallbackLabel[0] ?? "?"}
             </div>
           )}
@@ -93,7 +93,7 @@ function actionButtonClass(tone: BottomActionSheetAction["tone"]) {
     "flex h-12 w-full items-center justify-center rounded-[14px] text-[14px] font-extrabold transition-transform active:scale-[0.985] disabled:opacity-45";
   switch (tone) {
     case "primary":
-      return `${base} bg-gradient-to-r from-ihub-lavender to-ihub-sky text-white shadow-[0_8px_18px_rgba(166,149,216,0.34)]`;
+      return `${base} bg-gradient-to-r from-megrum-lavender to-megrum-sky text-white shadow-[0_8px_18px_rgba(166,149,216,0.34)]`;
     case "danger":
       return `${base} bg-red-50 text-red-600`;
     case "muted":

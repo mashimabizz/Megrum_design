@@ -3,7 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { HeaderBack } from "@/components/auth/HeaderBack";
 
 export const metadata = {
-  title: "評価一覧 — iHub",
+  title: "評価一覧 — Megrum",
 };
 
 /**

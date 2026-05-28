@@ -21,18 +21,18 @@ export function BottomNavTransitionBridge() {
     if (!consumeBottomNavTransitionFlag()) return;
 
     const body = window.document.body;
-    body.classList.remove("ihub-bottom-nav-loading");
-    body.classList.remove("ihub-bottom-nav-transitioning");
-    body.classList.add("ihub-bottom-nav-route-entering");
+    body.classList.remove("megrum-bottom-nav-loading");
+    body.classList.remove("megrum-bottom-nav-transitioning");
+    body.classList.add("megrum-bottom-nav-route-entering");
 
     const timer = window.setTimeout(() => {
-      body.classList.remove("ihub-bottom-nav-route-entering");
+      body.classList.remove("megrum-bottom-nav-route-entering");
     }, 520);
 
     return () => {
       window.clearTimeout(timer);
-      body.classList.remove("ihub-bottom-nav-loading");
-      body.classList.remove("ihub-bottom-nav-route-entering");
+      body.classList.remove("megrum-bottom-nav-loading");
+      body.classList.remove("megrum-bottom-nav-route-entering");
     };
   }, [pathname]);
 

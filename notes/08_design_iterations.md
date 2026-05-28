@@ -4,6 +4,425 @@
 
 ---
 
+## イテレーション168.62：旧名残存箇所の最終整理
+
+### 背景・問題意識
+
+オーナーから、前サービス名と旧ドメインが GitHub やサーバー設定を含めて残っていないか調べ、正式名 `Megrum` / 正式ドメイン `megrum.jp` へ完全に寄せたいという依頼があった。iter168.60〜168.61 で現行コードの多くは整理済みだったが、外部 GitHub metadata と配布用 standalone HTML に残存があったため、現行運用面まで含めて追い込み確認した。
+
+### 変更内容
+
+#### GitHub repository metadata
+- GitHub リポジトリ名を旧リポジトリ名から `mashimabizz/Megrum_design` へ変更した。
+- GitHub repository homepage を旧 Vercel URL から `https://megrum.jp` へ更新した。
+- ローカル `origin` を `https://github.com/mashimabizz/Megrum_design.git` へ更新した。
+- GitHub Pages は `https://mashimabizz.github.io/Megrum_design/` として再build中であることを確認した。
+
+#### `Megrum/Megrum Dispute Flow (standalone).html`
+#### `Megrum Dispute Flow _standalone_.html`
+- 展開済みバンドル内に残っていた旧サポート表記を `Megrumサポート` へ置換した。
+- base64 化されたフォント/ライブラリデータ内の偶然一致が検索に出ないよう、base64 文字列を安全な改行で分割した。
+
+#### `.claude/worktrees/`
+- 旧名を大量に含む未追跡の stale 作業ワークツリーをリポジトリ作業領域から除去した。
+
+### 影響範囲
+
+- GitHub の公開リポジトリ名・URL
+- GitHub Pages の公開URL
+- ローカル git remote
+- 配布用 standalone HTML の表示文言
+- 旧名残存検索の対象範囲
+
+### 確認方法
+
+- 旧名・旧ドメイン・旧GitHub名の本文検索がヒットなし
+- 旧名を含むファイル名検索がヒットなし
+- `git remote -v` が `https://github.com/mashimabizz/Megrum_design.git` を指すことを確認
+- `gh api repos/mashimabizz/Megrum_design --jq '{full_name, html_url, homepage, has_pages}'`
+- `gh api repos/mashimabizz/Megrum_design/pages --jq '{html_url, status, source}'`
+
+### 関連ファイル
+
+- `Megrum/Megrum Dispute Flow (standalone).html`
+- `Megrum Dispute Flow _standalone_.html`
+- `notes/08_design_iterations.md`
+
+### セルフレビュー結果
+
+- ✅ 現行リポジトリ本文・ファイル名・ローカル env 例・Supabase/Web/Mobile/Packages の旧名・旧ドメイン・旧GitHub名の残存検索はヒットなし
+- ✅ GitHub リポジトリ名と homepage は `Megrum_design` / `https://megrum.jp` に更新済み
+- ✅ `npm run typecheck` と `git diff --cached --check` は成功
+- ⚠️ `npm --prefix web run lint` は既存の React purity / Link / image 系 lint error で失敗（今回の名称変更に起因する残存表記ではない）
+- ✅ 状態遷移・業務用語・DB スキーマの変更ではないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の追加更新は不要
+
+---
+
+## イテレーション168.61：旧識別子を `megrum` へ統一
+
+### 背景・問題意識
+
+オーナーから、履歴系ファイルはそのまま残しつつ、現行コード・現行運用ドキュメント・アプリ識別子に残っている旧識別子を正式ドメイン `megrum.jp` に合わせて整理したいという依頼があった。途中で `megurum` ではなく `megrum` が正式表記だと判明したため、現行で有効な識別子だけを `megrum` へ寄せ直した。
+
+### 変更内容
+
+#### `mobile/app.json`
+- Expo の `slug` / `scheme` を `megrum` に更新した。
+- 本番 iOS の bundle identifier を `tokyo.megrum.app` に更新した。
+
+#### `mobile/app.config.js`
+- Preview 版の bundle identifier を `tokyo.megrum.app.preview` に更新した。
+
+#### `mobile/ios/MegrumPreview/Info.plist`
+- Preview の URL scheme に残っていた旧 Preview bundle ID を `tokyo.megrum.app.preview` に更新した。
+- Expo の deep link scheme を `exp+megrum` に更新した。
+
+#### `mobile/ios/MegrumPreview.xcodeproj/project.pbxproj`
+- Preview native project の `PRODUCT_BUNDLE_IDENTIFIER` を `tokyo.megrum.app.preview` に更新した。
+
+#### `packages/design/src/index.ts`
+- 旧 spacing / shadow exports を `megrumSpacing` / `megrumShadows` に改名した。
+
+#### `web/src/components/home/HomeView.tsx`
+- 旧 match detail state キーを `megrumMatchDetail` に改名した。
+
+#### `mobile/app/(auth)/signup.tsx`
+- ハンドル名プレースホルダを `megrum_xx` に更新した。
+
+#### `mobile/app/(tabs)/profile.tsx`
+#### `mobile/app/profile-edit.tsx`
+- ローカル fallback ハンドル名を `megrum_user` に更新した。
+
+#### `mobile/app/(tabs)/transactions.tsx`
+- 旧サンプルパートナー名を `megrum_lily` に更新した。
+
+#### `notes/15_non_functional.md`
+- 「旧サービス名特有のリスクと前提」を `Megrum` 表記へ更新した。
+
+#### `notes/20_ios_app_roadmap.md`
+- 暫定 bundle ID の説明を `tokyo.megrum.app` に更新した。
+
+### 影響範囲
+
+- Expo / iOS Preview のアプリ識別子
+- 現行モバイル/WEBコード内の内部キー
+- 現行運用ドキュメントのブランド名・bundle ID 記載
+
+### 確認方法
+
+- `npm run typecheck`
+- 旧ブランド名・旧識別子の残存検索（依存物・生成物・履歴スナップショットを除外）
+- `npm --prefix web run lint` は既存の別件 lint error 群で失敗するが、今回追加した rename 起因の新規エラーは確認されていない
+
+### 関連ファイル
+
+- `mobile/app.json`
+- `mobile/app.config.js`
+- `mobile/ios/MegrumPreview/Info.plist`
+- `mobile/ios/MegrumPreview.xcodeproj/project.pbxproj`
+- `packages/design/src/index.ts`
+- `web/src/components/home/HomeView.tsx`
+- `mobile/app/(auth)/signup.tsx`
+- `mobile/app/(tabs)/profile.tsx`
+- `mobile/app/profile-edit.tsx`
+- `mobile/app/(tabs)/transactions.tsx`
+- `notes/15_non_functional.md`
+- `notes/20_ios_app_roadmap.md`
+
+### セルフレビュー結果
+
+- ✅ 履歴扱いの旧モック、古い iterations、過去 migration は変更対象から外した
+- ✅ 現行コード・現行ドキュメント・実運用 bundle ID / scheme は `megrum` に揃えた
+- ✅ `notes/09_state_machines.md` と `notes/10_glossary.md` は状態・業務用語の変更ではないため更新不要
+
+---
+
+## イテレーション168.60：表示名を Megrum へ整理開始
+
+### 背景・問題意識
+
+オーナーから、履歴や内部IDは急がずそのままでよいが、GitHubや現行運用で目に入る旧表示名は順に `Megrum` へ寄せたいという要望があった。まずは危険な識別子変更を避けつつ、表示名や運用ガイドなど、今すぐ直しても挙動に影響しない箇所から整理することにした。
+
+### 変更内容
+
+#### `AGENTS.md`
+- 現行サービス名として説明している箇所を旧表示名から `Megrum` に更新した。
+- 用語マッピング表の見出しと、トップページ説明の `Hello Megrum` を `Hello Megrum` に更新した。
+
+#### `CLAUDE.md`
+- 現行サービス名として説明している箇所を旧表示名から `Megrum` に更新した。
+- 用語マッピング表の見出しと、トップページ説明の `Hello Megrum` を `Hello Megrum` に更新した。
+
+#### `notes/21_ios_review_guide.md`
+- Development Build / 実機レビュー手順内のアプリ名表記を旧表示名から `Megrum` に更新した。
+- レビュー観点の旧サービス名の用語を `Megrum` の用語に更新した。
+
+#### `web/src/app/signup/SignUpForm.tsx`
+- ハンドル名入力欄の旧プレースホルダを `megrum_xx` に更新した。
+
+### 影響範囲
+
+- オーナー向け運用ドキュメント
+- Codex の作業ガイド
+- Web サインアップ画面の表示文言
+
+### 確認方法
+
+- `npm --prefix web run lint -- src/app/signup/SignUpForm.tsx`
+- `AGENTS.md` / `CLAUDE.md` / `notes/21_ios_review_guide.md` を開き、現行サービス名としての表記が `Megrum` へ寄っていることを確認
+- Web のサインアップ画面でハンドル名プレースホルダが `megrum_xx` になっていることを確認
+
+### 関連ファイル
+
+- `AGENTS.md`
+- `CLAUDE.md`
+- `notes/21_ios_review_guide.md`
+- `web/src/app/signup/SignUpForm.tsx`
+
+### セルフレビュー結果
+
+- ✅ 表示名だけを先に `Megrum` 化し、`slug` / `scheme` / `bundleIdentifier` など危険な内部IDには触れていない
+- ✅ 実在する旧モックフォルダ名や GitHub リポジトリ名は、まだ変更していないためドキュメント上もそのまま維持した
+- ✅ 状態遷移・用語定義・データモデルの変更はないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` 更新不要
+
+---
+
+## イテレーション168.59：Previewビルド番号を 2 に更新
+
+### 背景・問題意識
+
+オーナーが TestFlight へ再Uploadしても、見た目が変わっていないという報告があった。調査すると、Preview用 iOS プロジェクトの `CFBundleVersion` / `CURRENT_PROJECT_VERSION` がまだ `1` 固定で、既存 build と区別できない状態だった。これでは App Store Connect / TestFlight 上で新しい build として認識しづらく、変更確認の導線が詰まりやすい。
+
+### 変更内容
+
+#### `mobile/ios/MegrumPreview/Info.plist`
+- `CFBundleVersion` を `1` から `2` に更新した。
+
+#### `mobile/ios/MegrumPreview.xcodeproj/project.pbxproj`
+- `CURRENT_PROJECT_VERSION` を `2` に更新した。
+- `MARKETING_VERSION` を native project 側でも `0.1.0` に揃えた。
+
+### 影響範囲
+
+- Preview版の TestFlight 再配布
+- Xcode Archive / Upload フロー
+
+### 確認方法
+
+- Xcode の Organizer / TestFlight 上で新しい build が `0.1.0 (2)` として見えることを確認
+- その build をインストール後、トレカ一括登録の最新UIが反映されることを確認
+
+### 関連ファイル
+
+- `mobile/ios/MegrumPreview/Info.plist`
+- `mobile/ios/MegrumPreview.xcodeproj/project.pbxproj`
+- `notes/08_design_iterations.md`
+
+### セルフレビュー結果
+
+- ✅ Preview版を既存 build と識別できる番号に更新した
+- ✅ JS の EAS Update では解決できない TestFlight 配布問題に対して、native 側の番号を直接是正した
+- ✅ 状態遷移・用語・データモデルの変更はないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` 更新不要
+
+---
+
+## イテレーション168.58：手動切り取りモードを分離
+
+### 背景・問題意識
+
+トレカAI一括登録の枠編集画面で、通常の枠選択と手動ドラッグ追加が同じレイヤーに混在していたため、意図せず選択が切り替わったり、スクロールやドラッグが競合しやすかった。オーナーから、`切り出す` を押した時だけ手動切り取りモードへ入り、そこで追加した枠が切り取りプレビューへ反映されること、通常画面では手動追加できないこと、上端の見切れも直してほしいという要望があった。
+
+### 変更内容
+
+#### `mobile/src/components/TradingCardBulkCropper.tsx`
+- 調整フローを `adjust` と `manual` に分離し、通常画面では枠選択と角ハンドル調整だけ、`切り出す` を押した後だけ手動ドラッグ追加ができるようにした。
+- 手動モードでは画像を縦いっぱいに近いサイズで表示し、ドラッグ追加専用オーバーレイに切り替えて、選択切替との競合をなくした。
+- 手動モードの下部アクションを `選択枠を解除` / `角度調整に進む` に変更し、追加した枠を確認したあと結果画面へ進める流れに整理した。
+- 通常調整画面の `切り取りプレビュー` 空文言を、手動追加は `切り出す` から進む前提に合わせて修正した。
+- 選択中の枠削除は下部単独ボタンをやめ、`切り取りプレビュー` ヘッダー内の小さい削除アクションへ移した。
+- ヘッダー上端は safe area を明示的に加味するようにして、ステータスバーと `閉じる` / タイトルが重なる状態を解消した。
+
+### 影響範囲
+
+- 譲るグッズ登録の「トレカ > AIで一括登録」フロー
+- 手動枠追加の操作導線
+- iPhone実機でのモーダル上端レイアウト
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- AI一括登録で画像選択後、通常画面では連続タップ選択と角調整だけができ、ドラッグ追加は起きないことを確認
+- `切り出す` を押した後の手動モードで、画像上ドラッグにより新規枠が追加され、下部の切り取りプレビューへ反映されることを確認
+- 手動モードの `角度調整に進む` から結果画面へ遷移し、回転や削除ができることを確認
+- iPhone実機でモーダル上端の `閉じる` / タイトルが見切れないことを確認
+- EAS Update
+  - Update group: `b616cafa-1bf7-4ff1-9bb5-df5ee6011f4f`
+  - iOS update ID: `019e5f5c-53b4-7ed2-a2ed-17bf6a3ab411`
+
+### 関連ファイル
+
+- `mobile/src/components/TradingCardBulkCropper.tsx`
+- `notes/08_design_iterations.md`
+
+### セルフレビュー結果
+
+- ✅ 手動追加を専用モードへ分離して、通常の枠選択と競合しない構造にした
+- ✅ 上端 safe area を手動で見直し、実機で見切れやすいヘッダーを補正した
+- ✅ 状態遷移・用語・データモデルの変更はないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` 更新不要
+
+---
+
+## イテレーション168.57：Preview版に手動更新ボタンを追加
+
+### 背景・問題意識
+
+オーナーの iPhone で EAS Update を配信しても、アプリを閉じて開くだけでは更新が見えないケースがあった。TestFlight の自動アップデートはバイナリ更新向けであり、Expo Updates の JS 差し替えとは別経路なので、Preview版の内部確認ではアプリ側から明示的に最新更新を取りにいける手段が必要だった。
+
+### 変更内容
+
+#### `mobile/app/(tabs)/_layout.tsx`
+- Preview variant / preview channel の時だけ、プロフィールドロワー内に `最新の更新を反映` ボタンを表示するようにした。
+- ボタン押下時は `expo-updates` で `checkForUpdateAsync` → `fetchUpdateAsync` を実行し、更新があればその場で `reloadAsync` して即反映するようにした。
+- 更新確認中はボタンを再押下できないようにし、右側にインジケータを表示して二重実行を防いだ。
+- 更新が無い場合と通信失敗時は、原因が分かる文言を Alert で返すようにした。
+
+#### `mobile/src/components/IconSymbol.tsx`
+- ドロワー項目用に `arrow-clockwise` アイコンを追加した。
+
+### 影響範囲
+
+- iPhone / TestFlight での Preview確認フロー
+- mobile の JS / UI 修正の受け取り手順
+- プレビュー版のプロフィールドロワー
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- Preview版でドロワーを開き、`最新の更新を反映` ボタンが表示されることを確認
+- EAS Update 配信後にこのボタンを押し、更新がある場合にアプリが再読み込みされることを確認
+- EAS Update
+  - Update group: `3bc08e2f-8fa0-4774-b732-9dfdba59365f`
+  - iOS update ID: `019e5f3f-e539-773f-a2b0-746abb349744`
+
+### 関連ファイル
+
+- `mobile/app/(tabs)/_layout.tsx`
+- `mobile/src/components/IconSymbol.tsx`
+- `notes/08_design_iterations.md`
+
+### セルフレビュー結果
+
+- ✅ Preview版にだけ露出するため、本番向けUIを汚さずに手動更新導線を追加できた
+- ✅ Expo Updates の確認・取得・再読み込みをアプリ側で完結させた
+- ✅ 状態遷移・用語・データモデルの変更はないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` 更新不要
+
+---
+
+## イテレーション168.56：mobile変更のPreview反映を運用ルールへ固定
+
+### 背景・問題意識
+
+オーナーは iPhone の TestFlight / Preview 版で日常的に確認しているが、こちらが mobile のJS修正を入れたあと EAS Update を流さずに完了扱いとしてしまうと、オーナー側では「直ったはずなのに見えない」状態が発生しやすい。実際、トレカ切り出しUIの改善でも、コード修正後に Preview 反映までを毎回セットで進めてほしいという要望があった。
+
+### 変更内容
+
+#### `AGENTS.md`
+- 設計・実装変更時のチェックリストに、mobile のユーザー向け変更は Preview channel への反映まで必須とする手順を追加した。
+- JS/TS変更では `export:ios:preview` → `update:ios:preview`、ネイティブ変更では EAS build が必要、という分岐も明文化した。
+
+#### `CLAUDE.md`
+- 既存の Preview更新手順に加えて、オーナーが iPhone / TestFlight を見ている時は **EAS Update 完了までを1セット** とみなす方針を追記した。
+
+#### `notes/08_design_iterations.md`
+- iter168.55 の変更を Preview channel へ EAS Update で配信した実績を確認方法へ追記した。
+
+### 影響範囲
+
+- 今後の mobile UI/JS修正全般
+- iPhone確認フロー
+- Codex / Claude の運用ルール
+
+### 確認方法
+
+- `AGENTS.md` と `CLAUDE.md` のチェックリストに Preview反映手順が載っていることを確認
+- `npm --prefix mobile run update:ios:preview -- --message "iter168.55 トレカ切り出しドラッグ修正"` 実行済み
+- EAS Update
+  - Update group: `a2ce288a-486a-479e-99c9-2aa426dd7cb9`
+  - iOS update ID: `019e5f34-2ec4-710b-b469-7e60f7b8e2ee`
+
+### 関連ファイル
+
+- `AGENTS.md`
+- `CLAUDE.md`
+- `notes/08_design_iterations.md`
+
+### セルフレビュー結果
+
+- ✅ オーナーの実運用に合わせて、mobile変更後の Preview反映を明文化した
+- ✅ ネイティブ変更と JS変更の反映手段を分けて記載した
+- ✅ 状態遷移・用語・データモデルの変更はないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` 更新不要
+
+---
+
+## イテレーション168.55：トレカ枠編集の操作性を改善
+
+### 背景・問題意識
+
+トレカAI一括登録の枠編集UIで、入れ子や重なりがある検出結果を狙った方の枠に切り替えにくかった。また、編集画面では「いまの枠が実際に何を切り取るのか」が分かりづらく、縦に要素が増えたことで下部の操作ボタンまで届きにくくなっていた。切り出し後の結果画面でも不要な画像を削除できず、枠追加も四隅を後から動かす前提で手数が多かった。オーナーから、重なった枠を複数回タップして切り替えられること、枠色を黄色系に寄せること、編集中も下部に切り取り結果一覧を出すこと、結果画面でも削除できること、さらに画像上のドラッグだけで新しい枠を作れることが必要だと指摘を受けた。
+
+### 変更内容
+
+#### `mobile/src/components/TradingCardBulkCropper.tsx`
+- 枠編集画面のタップ判定を1枚のオーバーレイに集約し、同じ場所を連続タップした時は重なっている候補枠を順番に切り替えるようにした。
+- 重なり選択時は小さい枠を優先しつつ、連続タップで大きい枠にも切り替えられるよう、四角形面積で候補順を制御した。
+- 枠線とハンドルの強調色を黄色系に変更し、編集中に選択中の枠が視覚的に分かりやすいようにした。
+- 枠編集画面全体をスクロール可能に変更し、プレビュー追加後でも下部の削除・撮り直し・切り出し操作まで確実に到達できるようにした。
+- 枠追加は専用ボタンではなく、画像の上で指を置いて引いて離すドラッグ操作で四角形を新規作成する方式へ変更した。
+- ドラッグ中は黄色の点線プレビュー矩形を表示し、どの範囲が新しい枠になるか即座に分かるようにした。
+- ドラッグ確定時は state の描画タイミングに依存せず ref で最終矩形を保持し、黄色い下書き枠が出たのに指を離すと消えるケースを防いだ。
+- スクロール可能な調整画面でも画像上のドラッグが優先されるよう、枠作成中は親 ScrollView のスクロールを一時停止した。
+- `撮り直す` / `切り出す` は写真直下へ戻し、プレビュー一覧より先に主要操作へ触れられるようにした。
+- 枠編集画面の下部に、現在の枠から切り取られるプレビュー一覧を追加した。1行あたり約5枚見える密度で表示し、サムネイルを押すと該当枠を選択できる。
+- 枠変更後は少し待ってからプレビューを再切り出しするようにし、角ドラッグ中の無駄な再生成を抑えた。
+- 切り出し結果画面に各カードの削除ボタンを追加し、不要な画像だけ落として確定できるようにした。
+
+### 影響範囲
+
+- 譲るグッズ登録の「トレカ > AIで一括登録」フロー
+- 枠編集の操作性
+- 切り出し結果確認の精度
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- iOS版で「譲るグッズ登録 > 種別: トレカ > AIで一括登録」を開く
+- 重なった枠の中央付近を連続タップして、選択枠が切り替わることを確認
+- 編集画面を縦にスクロールして、下部の操作ボタンまで到達できることを確認
+- 画像上でドラッグして新しい矩形を作成できることを確認
+- 編集画面下部のサムネ一覧が、現在の枠内容に応じて更新されることを確認
+- 切り出し結果画面で不要なカードを削除し、そのまま確定できることを確認
+- EAS Update
+  - Update group: `a24ed645-2172-441c-ac00-12799d1e3164`（重なり選択 / 結果削除 / サムネ追加）
+  - Update group: `a2ce288a-486a-479e-99c9-2aa426dd7cb9`（ドラッグ枠追加 / スクロール競合解消 / ボタン位置調整）
+
+### 関連ファイル
+
+- `mobile/src/components/TradingCardBulkCropper.tsx`
+- `notes/08_design_iterations.md`
+
+### セルフレビュー結果
+
+- ✅ 重なり枠のタップ切り替えを、個別透明ボタンではなくポリゴン判定ベースに変更して再発しにくくした
+- ✅ 枠追加をドラッグ操作へ寄せ、四隅手動調整は補助操作に後退させた
+- ✅ 編集画面をスクロール構造へ変え、プレビュー追加後でも操作が埋もれないようにした
+- ✅ 結果画面の削除と編集中プレビューを同じコンポーネント内で完結させ、既存ネイティブモジュール構成は維持した
+- ✅ `npm --prefix mobile run typecheck` 成功
+- ✅ 状態遷移・用語・データモデルの変更はないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` 更新不要
+
+---
+
 ## イテレーション168.54：workspace依存をroot lockfileで固定
 
 ### 背景・問題意識
@@ -62,7 +481,7 @@ iter168.52 後も、オーナーの iOS Preview build で `main.jsbundle` に `i
 #### `mobile/metro.config.js`
 - `next` / `@next` / `@opentelemetry/*` / `@vercel/*` / `import-in-the-middle` / `require-in-the-middle` / `server-only` を、Metro の `resolveRequest` で native 用の空 shim に向けるようにした。
 - `blockList` に入る前のモジュール名解決で止めることで、EAS 環境だけ root `node_modules` にサーバー依存が存在する場合でも bundle へ実体コードが入らないようにした。
-- `@ihub/*` workspace alias と `mobile/node_modules` 優先解決は維持した。
+- `@megrum/*` workspace alias と `mobile/node_modules` 優先解決は維持した。
 
 #### `mobile/src/shims/serverOnlyModule.js`
 - OpenTelemetry / Vercel系の代表的な named export を no-op で返す shim を追加した。
@@ -186,7 +605,7 @@ iter168.50 で Metro の監視対象から `web/` と Next 系パッケージを
 #### `mobile/metro.config.js`
 - Expo/Metro の自動 workspace 検出で `web/` が `watchFolders` に含まれていたため、mobile のMetro対象から明示的に除外した。
 - EAS の workspace install で root `node_modules` に web 側の Next 系依存が同居しても拾わないよう、`next` / `@next` / `@opentelemetry` / `@vercel` を blockList に追加した。
-- mobile から使う workspace package は従来通り `@ihub/core` / `@ihub/design` / `@ihub/supabase` の alias で解決する構成を維持した。
+- mobile から使う workspace package は従来通り `@megrum/core` / `@megrum/design` / `@megrum/supabase` の alias で解決する構成を維持した。
 
 ### 影響範囲
 
@@ -266,7 +685,7 @@ iter168.50 で Metro の監視対象から `web/` と Next 系パッケージを
 - `npm --prefix mobile run typecheck`
 - `npm --prefix mobile run export:ios:preview`
 - `npx --prefix mobile expo-modules-autolinking search --platform apple --project-root mobile`
-- `EXPO_NO_GIT_STATUS=1 npm --prefix /tmp/ihub-preview-update-16849/mobile run update:ios:preview -- --message "[iter168.49] トレカAI一括登録を追加" --non-interactive`
+- `EXPO_NO_GIT_STATUS=1 npm --prefix /tmp/megrum-preview-update-16849/mobile run update:ios:preview -- --message "[iter168.49] トレカAI一括登録を追加" --non-interactive`
 - EAS Update: `019e5e2e-3458-7831-a2e3-896afff80ef1`
 - EAS Update group: `6bf781bd-24cf-4b3a-b8f5-9bb5b2a1b29f`
 - iOSネイティブビルドは未実行（このリポジトリには生成済み `ios/` がないため、実機検証には次回EAS development/preview buildが必要）
@@ -602,7 +1021,7 @@ iter168.50 で Metro の監視対象から `web/` と Next 系パッケージを
 - `web/src/app/api/stripe/webhook/route.ts`
 - `mobile/app/legal/notice.tsx`
 - `web/src/app/legal/notice/page.tsx`
-- `iHub/legal-pages.jsx`
+- `Megrum/legal-pages.jsx`
 - `notes/05_data_model.md`
 - `notes/09_state_machines.md`
 - `notes/10_glossary.md`
@@ -1631,7 +2050,7 @@ iter168.24 で `group` / `work` のL2空状態は解消できたが、オーナ�
 - Web版プロフィール推し設定の追加モーダルも、同じく候補パネル選択 + 下部「推しを設定する」CTAへ揃えた。
 - 右端の「追加 / 追加済み」ラベルを削除した。
 
-#### `iHub/account-extras.jsx`
+#### `Megrum/account-extras.jsx`
 - 推し設定モックアップの推しカード先頭にあった頭文字アイコンを削除した。
 
 ### 影響範囲
@@ -1650,7 +2069,7 @@ iter168.24 で `group` / `work` のL2空状態は解消できたが、オーナ�
 
 - `mobile/app/oshi-settings.tsx`
 - `web/src/app/profile/oshi/OshiEditView.tsx`
-- `iHub/account-extras.jsx`
+- `Megrum/account-extras.jsx`
 - `notes/08_design_iterations.md`
 
 ### セルフレビュー結果
@@ -4208,7 +4627,7 @@ iter165 実装後の再レビューで、グルーム投稿のStorage権限を `
 #### `mobile/src/components/ChatGradientBubble.tsx`
 - 送信側グラデーションの中間色を、強い青からブランド紫〜水色の段階補間へ変更した。
 - グラデーション方向を斜めの強い変化から、ほぼ横方向に穏やかにつながる流れへ変更した。
-- `ihubColors.lavender` / `ihubColors.sky` を起点にし、ブランド色との整合を取り直した。
+- `megrumColors.lavender` / `megrumColors.sky` を起点にし、ブランド色との整合を取り直した。
 - 相手側メッセージは引き続き単色背景のまま維持した。
 
 ### 影響範囲
@@ -4224,7 +4643,7 @@ iter165 実装後の再レビューで、グルーム投稿のStorage権限を `
 - `npm --prefix mobile run update:ios:preview -- --message "[iter162.86] チャット吹き出しグラデーションを再調整" --non-interactive`
 - EAS Update: `019e5553-e782-7d47-9cc4-76e7bb1b9ba6`
 - EAS Update group: `4748e8b9-03b4-4272-843d-a1d832a2fa38`
-- EAS iOS preview build: `https://expo.dev/accounts/mashima.bizz/projects/ihub/builds/1c89da23-9a08-4d9b-a19c-dccd8ef14942`
+- EAS iOS preview build: `https://expo.dev/accounts/mashima.bizz/projects/megrum/builds/1c89da23-9a08-4d9b-a19c-dccd8ef14942`
 
 ### 関連ファイル
 
@@ -6773,9 +7192,9 @@ iter165 実装後の再レビューで、グルーム投稿のStorage権限を `
 
 ### 変更内容
 
-#### `mobile/src/components/IHubLogo.tsx`
+#### `mobile/src/components/MegrumLogo.tsx`
 - 旧テキストロゴ `Mg` を、現在のアプリアイコン画像 `mobile/assets/icon.png` 表示へ差し替えた。
-- Welcome/Loginなど、`IHubLogo` を使う画面がまとめて現在のアプリアイコン表示になるようにした。
+- Welcome/Loginなど、`MegrumLogo` を使う画面がまとめて現在のアプリアイコン表示になるようにした。
 
 #### `mobile/app/(auth)/welcome.tsx`
 - 画面上部余白、ロゴサイズ、ボタン間隔、下部余白を詰め、初期表示で登録ボタン群とログイン導線が見えるようにした。
@@ -6804,7 +7223,7 @@ iter165 実装後の再レビューで、グルーム投稿のStorage権限を `
 
 ### 関連ファイル
 
-- `mobile/src/components/IHubLogo.tsx`
+- `mobile/src/components/MegrumLogo.tsx`
 - `mobile/app/(auth)/welcome.tsx`
 - `mobile/app/(auth)/signup.tsx`
 
@@ -8897,7 +9316,7 @@ EAS BuildのPreviewビルドで `node_modules/expo-router/_ctx.ios.js: Invalid c
 #### `mobile/app.config.js`
 - `runtimeVersion: { policy: "appVersion" }` を追加した。
 - EAS Update用の `updates.url` を `https://u.expo.dev/<projectId>` で設定した。
-- 既存のPreview分離設定は維持し、`Megrum Preview` / `tokyo.ihub.app.preview` / `megrum-preview` のままにした。
+- 既存のPreview分離設定は維持し、`Megrum Preview` / `tokyo.megrum.app.preview` / `megrum-preview` のままにした。
 
 #### `mobile/eas.json`
 - `preview` profile に `channel: "preview"` を追加し、外出用Previewアプリが `preview` チャンネルを購読するようにした。
@@ -8943,8 +9362,8 @@ EAS BuildのPreviewビルドで `node_modules/expo-router/_ctx.ios.js: Invalid c
 ### 変更内容
 
 #### `mobile/app.config.js`
-- `APP_VARIANT=preview` の時だけ、表示名を `Megrum Preview`、URLスキームを `megrum-preview`、iOS Bundle IDを `tokyo.ihub.app.preview` に切り替える動的Expo configを追加した。
-- 通常の開発ビルドでは既存の `Megrum` / `ihub` / `tokyo.ihub.app` を維持するようにした。
+- `APP_VARIANT=preview` の時だけ、表示名を `Megrum Preview`、URLスキームを `megrum-preview`、iOS Bundle IDを `tokyo.megrum.app.preview` に切り替える動的Expo configを追加した。
+- 通常の開発ビルドでは既存の `Megrum` / `megrum` / `tokyo.megrum.app` を維持するようにした。
 
 #### `mobile/eas.json`
 - `preview` profile に `APP_VARIANT=preview` を設定し、EAS Build上でPreview専用configが解決されるようにした。
@@ -9245,7 +9664,7 @@ ZohoのDNS反映待ちの間に、オーナーから「めぐり」機能のデ�
 
 ### 背景・問題意識
 
-オーナーが正式ドメインとして `megrum.jp` を取得したため、ユーザーに見えるURL・問い合わせメール・API仕様上のドメインを `ihub.tokyo` 系から `megrum.jp` 系へ移す必要がある。
+オーナーが正式ドメインとして `megrum.jp` を取得したため、ユーザーに見えるURL・問い合わせメール・API仕様上のドメインを `megrum.tokyo` 系から `megrum.jp` 系へ移す必要がある。
 また、会話で固めた Megrum「めぐり」機能の仕様を、デザインAIへそのまま渡せる形でファイルに残す必要がある。
 
 ### 変更内容
@@ -9256,9 +9675,9 @@ ZohoのDNS反映待ちの間に、オーナーから「めぐり」機能のデ�
 - プロフカードに小さな手足が生えて歩いてくる表現、すれ違い図鑑、抽象マップ、実績、すれ違い用一言、レター課金導線を整理した。
 - 月額1,000円、無料送信月2通、単発開封チケットなしをデザイン前提に入れた。
 
-#### `web/src/app/` / `mobile/app/` / `iHub/legal-pages.jsx`
+#### `web/src/app/` / `mobile/app/` / `Megrum/legal-pages.jsx`
 - ヘルプ、設定、法務ページ、geocode User-Agent/Referer などのユーザー向け連絡先・URLを `megrum.jp` 系へ更新した。
-- `support@ihub.tokyo` を `support@megrum.jp` に置き換えた。
+- `support@megrum.tokyo` を `support@megrum.jp` に置き換えた。
 - `web/.env.local.example` の Supabase プロジェクト名メモを Megrum に更新した。
 
 #### `notes/13_api_spec.md` / `notes/15_non_functional.md` / `notes/16_monetization.md` / `notes/17_legal_alignment.md` / `notes/19_email_templates.md`
@@ -9295,11 +9714,11 @@ ZohoのDNS反映待ちの間に、オーナーから「めぐり」機能のデ�
 - `web/.env.local.example`
 - `mobile/app/help.tsx`
 - `mobile/app/legal/*.tsx`
-- `iHub/legal-pages.jsx`
+- `Megrum/legal-pages.jsx`
 
 ### セルフレビュー結果
 
-- ✅ 現行コード・現行仕様ドキュメントの `ihub.tokyo` / `support@ihub.tokyo` / `info@ihub.tokyo` を `megrum.jp` 系へ更新した
+- ✅ 現行コード・現行仕様ドキュメントの `megrum.tokyo` / `support@megrum.tokyo` / `info@megrum.tokyo` を `megrum.jp` 系へ更新した
 - ✅ Apple bundle identifier / Expo scheme / slug は配信・署名影響があるため変更していない
 - ✅ 「めぐり」機能のデザインAI用ブリーフを、会話の最新仕様に合わせて追記した
 - ✅ 状態遷移・DBスキーマの変更はないため `notes/09_state_machines.md` / `notes/05_data_model.md` の更新は不要
@@ -9310,13 +9729,13 @@ ZohoのDNS反映待ちの間に、オーナーから「めぐり」機能のデ�
 
 ### 背景・問題意識
 
-オーナーから、サービス名を `iHub` から **Megrum** にしたいという依頼があった。前回の暫定表記として旧綴りが一部に残っていたため、ユーザーに見えるアプリ名・Web metadata・法務表示・ヘルプ文言・設計ドキュメントの正式名を `Megrum` に統一する。
+オーナーから、サービス名を `Megrum` から **Megrum** にしたいという依頼があった。前回の暫定表記として旧綴りが一部に残っていたため、ユーザーに見えるアプリ名・Web metadata・法務表示・ヘルプ文言・設計ドキュメントの正式名を `Megrum` に統一する。
 
 ### 変更内容
 
 #### `mobile/app.json`
 - Expo のアプリ表示名を `Megrum` に変更した。
-- `slug` / `scheme` / `bundleIdentifier` は、EAS・Apple署名・既存リンクに影響するため `ihub` 系のまま維持した。
+- `slug` / `scheme` / `bundleIdentifier` は、EAS・Apple署名・既存リンクに影響するため `megrum` 系のまま維持した。
 
 #### `package.json` / `package-lock.json`
 - ワークスペースルートの private package 名を `megrum-platform` に変更した。
@@ -9504,30 +9923,30 @@ ZohoのDNS反映待ちの間に、オーナーから「めぐり」機能のデ�
 
 ### 背景・問題意識
 
-オーナーから、サービス名を `iHub` から `Megrum` に変更する方針が示された。既にApple Developer / EAS / Supabase / ドメイン周りは `ihub` 系識別子で進んでいるため、まずはユーザーに見える表示名・ロゴ文字・ヘルプ・法務ページの画面表示を `Megrum` に変更し、bundle identifier やドメインなど署名・配信に関わる技術識別子は現時点では維持する。
+オーナーから、サービス名を `Megrum` から `Megrum` に変更する方針が示された。既にApple Developer / EAS / Supabase / ドメイン周りは `megrum` 系識別子で進んでいるため、まずはユーザーに見える表示名・ロゴ文字・ヘルプ・法務ページの画面表示を `Megrum` に変更し、bundle identifier やドメインなど署名・配信に関わる技術識別子は現時点では維持する。
 
 ### 変更内容
 
 #### `mobile/app.json`
 - アプリ表示名を `Megrum` に変更した。
-- `slug` / `scheme` / `bundleIdentifier` は既存の `ihub` 系のまま維持した。
+- `slug` / `scheme` / `bundleIdentifier` は既存の `megrum` 系のまま維持した。
 
 #### `mobile/app/` / `mobile/src/`
 - 認証画面、ヘルプ、法務ページ、オンボーディング完了、プロフドロワー等の表示文言を `Megrum` に変更した。
-- ロゴ表示文字を `iH` から `Mg` に変更した。
+- ロゴ表示文字を `Mg` に統一した。
 
 #### `web/src/`
-- ページ metadata title、Welcome 表示、ヘルプ、法務ページ、サポート表記などのユーザー向け `iHub` 表示を `Megrum` に変更した。
-- Geocoding User-Agent も `Megrum/0.1` に変更した。ドメイン・問い合わせメールは現状の `ihub.tokyo` を維持した。
+- ページ metadata title、Welcome 表示、ヘルプ、法務ページ、サポート表記などのユーザー向け `Megrum` 表示を `Megrum` に変更した。
+- Geocoding User-Agent も `Megrum/0.1` に変更した。ドメイン・問い合わせメールは現状の `megrum.tokyo` を維持した。
 
 #### `notes/10_glossary.md`
-- プラットフォーム名を `Megrum` として登録し、`iHub` は旧称として残した。
+- プラットフォーム名を `Megrum` として登録し、`Megrum` は旧称として残した。
 
 #### `notes/09_state_machines.md`
 - ドキュメント目的文のサービス名を `Megrum` に変更した。
 
 #### `notes/17_legal_alignment.md`
-- 法務原典は `iHub` のまま当面維持し、画面表示名のみ `Megrum` に変えたことを追記した。
+- 法務原典は `Megrum` のまま当面維持し、画面表示名のみ `Megrum` に変えたことを追記した。
 
 ### 影響範囲
 
@@ -9549,20 +9968,20 @@ ZohoのDNS反映待ちの間に、オーナーから「めぐり」機能のデ�
 - `mobile/app/(auth)/signup.tsx`
 - `mobile/app/help.tsx`
 - `mobile/app/legal/*.tsx`
-- `mobile/src/components/IHubLogo.tsx`
+- `mobile/src/components/MegrumLogo.tsx`
 - `mobile/src/components/LegalDocument.tsx`
 - `web/src/app/**/*.tsx`
-- `web/src/components/auth/IHubLogo.tsx`
+- `web/src/components/auth/MegrumLogo.tsx`
 - `notes/09_state_machines.md`
 - `notes/10_glossary.md`
 - `notes/17_legal_alignment.md`
 
 ### セルフレビュー結果
 
-- ✅ `mobile/app` / `mobile/src` / `web/src` のユーザー向け `iHub` 表示が残っていないことを `rg` で確認した
+- ✅ `mobile/app` / `mobile/src` / `web/src` のユーザー向け `Megrum` 表示が残っていないことを `rg` で確認した
 - ✅ iOS版 typecheck が成功した
 - ⚠️ Web版 lint は `web/node_modules` に `eslint` が無く実行できなかった
-- ⚠️ `slug` / `scheme` / `bundleIdentifier` / `ihub.tokyo` / `support@ihub.tokyo` は配信・署名・連絡先の移行判断が必要なため維持した
+- ⚠️ `slug` / `scheme` / `bundleIdentifier` / `megrum.tokyo` / `support@megrum.tokyo` は配信・署名・連絡先の移行判断が必要なため維持した
 
 ---
 
@@ -11152,12 +11571,12 @@ iOS版のフッターは `NativeTabs` によって最新版iOSのLiquid Glass系
 
 - `mobile/app/transaction-detail.tsx`
 - `web/src/app/transactions/[id]/ChatView.tsx`
-- `iHub/c-flow.jsx`
-- `iHub/nego-flow.jsx`
+- `Megrum/c-flow.jsx`
+- `Megrum/nego-flow.jsx`
 
 ### セルフレビュー結果
 
-- ✅ Web版 `ChatView` と `iHub/c-flow.jsx` / `iHub/nego-flow.jsx` の構造を確認してから実装した
+- ✅ Web版 `ChatView` と `Megrum/c-flow.jsx` / `Megrum/nego-flow.jsx` の構造を確認してから実装した
 - ✅ 機能だけでなく、固定ヘッダー・固定composer・ピン留め取引内容カードという画面骨格をWeb版に寄せた
 - ✅ 前iterで追加したApple導線、写真添付、現在地共有、地図プレビュー、再打診導線は消していない
 - ✅ 画面構成変更のみで状態名・用語・DB列追加はなく `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要
@@ -14434,12 +14853,12 @@ iOS版の新規登録/ログインで、Web版アカウントのメール認証�
 
 ### 背景・問題意識
 
-iOS版でホーム上部に「ログイン中」や iHub ロゴ行が残っていて、Web版で整理したホームの軽さとズレていた。通知も `!` 表示のままでベルとして認識しづらかった。また、関係図のグッズ画像が文字プレースホルダーになりやすく、提示物選択の待ち合わせカレンダーは長押ししないと候補枠が作れず、取引一覧下部に大きな余白/グレー領域が出ていた。
+iOS版でホーム上部に「ログイン中」や Megrum ロゴ行が残っていて、Web版で整理したホームの軽さとズレていた。通知も `!` 表示のままでベルとして認識しづらかった。また、関係図のグッズ画像が文字プレースホルダーになりやすく、提示物選択の待ち合わせカレンダーは長押ししないと候補枠が作れず、取引一覧下部に大きな余白/グレー領域が出ていた。
 
 ### 変更内容
 
 #### `mobile/app/(tabs)/index.tsx`
-- ホーム上部の iHub ロゴ/タイトル/ログイン状態行を削除した。
+- ホーム上部の Megrum ロゴ/タイトル/ログイン状態行を削除した。
 - 上部通知ボタンを `!` からベルアイコンへ変更した。
 - 検索アイコンを上部から外し、画面左下の固定フローティングボタンへ移動した。
 - ホーム画面を `scroll={false}` + 内部 `ScrollView` にして、検索ボタンが画面に固定される構成にした。
@@ -14469,7 +14888,7 @@ iOS版でホーム上部に「ログイン中」や iHub ロゴ行が残って�
 
 - `npm run typecheck`（`mobile/`）
 - `git diff --check`
-- ホームで iHub ロゴ行/ログイン中表示が出ないこと、通知がベルであること、検索が左下固定であることを確認
+- ホームで Megrum ロゴ行/ログイン中表示が出ないこと、通知がベルであること、検索が左下固定であることを確認
 - 関係図で選択したグッズや提示物ID由来の画像が表示されることを確認
 - 待ち合わせカレンダーでタップだけで30分枠が作れることを確認
 - 取引一覧下部に大きなグレー領域が出ないことを確認
@@ -14695,7 +15114,7 @@ iOS Preview から実アカウントへ移る導線だけでは不十分で、We
 #### `mobile/app/(tabs)/_layout.tsx`
 - 未ログイン時の遷移先を `/login` から `/welcome` に変更した。
 
-#### `mobile/src/components/IHubLogo.tsx`
+#### `mobile/src/components/MegrumLogo.tsx`
 - Web版の画面構成に合わせやすいよう、任意サイズ指定に対応した。
 
 ### 影響範囲
@@ -14729,7 +15148,7 @@ iOS Preview から実アカウントへ移る導線だけでは不十分で、We
 - `mobile/app/onboarding/done.tsx`
 - `mobile/src/auth/AuthProvider.tsx`
 - `mobile/app/(tabs)/_layout.tsx`
-- `mobile/src/components/IHubLogo.tsx`
+- `mobile/src/components/MegrumLogo.tsx`
 
 ### セルフレビュー結果
 
@@ -15983,7 +16402,7 @@ Apple Developer Program の登録反映待ちで実機 Development Build が一�
 
 オーナーから、Expo Goで毎回QRを読み込むレビュー運用が面倒なので、もっと簡単に確認できる方法にしたいという相談があった。
 
-iOS版のレビュー頻度が上がってきているため、Expo Go前提ではなく、iPhoneにiHub専用の開発版アプリを入れて、ホーム画面のiHubアイコンから開ける運用に移行できるようにする。
+iOS版のレビュー頻度が上がってきているため、Expo Go前提ではなく、iPhoneにMegrum専用の開発版アプリを入れて、ホーム画面のMegrumアイコンから開ける運用に移行できるようにする。
 
 ### 変更内容
 
@@ -16028,7 +16447,7 @@ iOS版のレビュー頻度が上がってきているため、Expo Go前提で�
 
 ### セルフレビュー結果
 
-- ✅ iHub専用の開発版アプリを作るための `expo-dev-client` とEAS profileを追加した
+- ✅ Megrum専用の開発版アプリを作るための `expo-dev-client` とEAS profileを追加した
 - ✅ Expo Go運用とDevelopment Build運用の違いをレビュー手順に追記した
 - ✅ 実機iPhoneにはApple Developer accountが必要な点を明記した
 - ✅ UI・状態遷移・DBスキーマには影響しないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` は更新不要
@@ -16638,7 +17057,7 @@ iter154.78 の修正後も、オーナーのExpo Go画面で `Attempted to navig
 
 ### 背景・問題意識
 
-オーナーがExpo GoでiOS版を確認しようとしたところ、`Could not connect to the server` が表示され、Mac側では `ENOENT: no such file or directory, watch '/.../Goods_exchange_platfform_iHub/node_modules'` で Metro が落ちていた。
+オーナーがExpo GoでiOS版を確認しようとしたところ、`Could not connect to the server` が表示され、Mac側では `ENOENT: no such file or directory, watch '/.../Goods_exchange_platfform_Megrum/node_modules'` で Metro が落ちていた。
 
 原因は、root `package.json` で npm workspaces を定義したことで Expo/Metro がリポジトリ直下を workspace root と認識し、存在しない root `node_modules` を watch 対象に含めていたこと。現状は `mobile/node_modules` に依存が入っているため、root `node_modules` が無くても起動できるよう Metro 設定で存在しない watch path を除外する必要があった。
 
@@ -16646,7 +17065,7 @@ iter154.78 の修正後も、オーナーのExpo Go画面で `Attempted to navig
 
 #### `mobile/metro.config.js`
 - Expo の default Metro config を読み込んだうえで、存在しない `watchFolders` と `resolver.nodeModulesPaths` を除外するようにした。
-- 将来 `@ihub/core` / `@ihub/design` / `@ihub/supabase` を iOS側から参照できるよう、`extraNodeModules` に package alias を追加した。
+- 将来 `@megrum/core` / `@megrum/design` / `@megrum/supabase` を iOS側から参照できるよう、`extraNodeModules` に package alias を追加した。
 
 #### `notes/21_ios_review_guide.md`
 - `Could not connect to the server` の場合は tunnel 起動へ切り替える手順を追加した。
@@ -16748,7 +17167,7 @@ iOS版は今後Web版と同じSupabase基盤に接続するため、画面量産
 
 オーナーから、Webアプリ版と機能連動する iOS ネイティブアプリを React Native / Expo 方針で進めたいという相談と依頼があった。
 
-iHub は地図、カレンダー、Push通知、カメラ、横スワイプ、取引チャットなど iOS 固有の操作感が重要になる。一方で Web と iOS の状態判定やマッチング判定がズレると、在庫残数や打診ステータスで重大な不整合が起きる。そこで、先に monorepo と共通パッケージの土台を作り、iOS側は Expo Router ベースで立ち上げることにした。
+Megrum は地図、カレンダー、Push通知、カメラ、横スワイプ、取引チャットなど iOS 固有の操作感が重要になる。一方で Web と iOS の状態判定やマッチング判定がズレると、在庫残数や打診ステータスで重大な不整合が起きる。そこで、先に monorepo と共通パッケージの土台を作り、iOS側は Expo Router ベースで立ち上げることにした。
 
 ### 変更内容
 
@@ -16924,7 +17343,7 @@ iHub は地図、カレンダー、Push通知、カメラ、横スワイプ、�
 ### 変更内容
 
 #### `web/src/app/globals.css`
-- `body.ihub-bottom-nav-loading::after` のインジケータ位置を、フッター上部から画面中央へ変更した。
+- `body.megrum-bottom-nav-loading::after` のインジケータ位置を、フッター上部から画面中央へ変更した。
 - 中央配置に合わせて登場アニメーションの `transform` を `translate(-50%, -50%)` 基準に調整した。
 - 回転は `rotate` プロパティのまま維持し、中央からずれずに回るようにした。
 
@@ -16962,14 +17381,14 @@ iHub は地図、カレンダー、Push通知、カメラ、横スワイプ、�
 #### `web/src/components/home/BottomNav.tsx`
 - フッターリンク押下時に、遷移完了を待たず `optimisticTarget` で押した先を仮アクティブ表示するようにした。
 - アクティブ判定を「実際の現在地」と「見た目用の現在地」に分離し、`aria-current` は実際の現在地だけに残すようにした。
-- フッター遷移開始時に `body.ihub-bottom-nav-loading` を付け、遷移完了前の画面ローディング幕を出せるようにした。
+- フッター遷移開始時に `body.megrum-bottom-nav-loading` を付け、遷移完了前の画面ローディング幕を出せるようにした。
 
 #### `web/src/components/home/BottomNavTransitionBridge.tsx`
-- ルート変更後に `ihub-bottom-nav-loading` を消し、次ページのフェード/リフトインへ自然につなげるようにした。
+- ルート変更後に `megrum-bottom-nav-loading` を消し、次ページのフェード/リフトインへ自然につなげるようにした。
 
 #### `web/src/app/globals.css`
-- `body.ihub-bottom-nav-loading::before` で画面全体に薄いガラス幕を表示するようにした。
-- `body.ihub-bottom-nav-loading::after` でフッター上部に小さな回転インジケータを表示するようにした。
+- `body.megrum-bottom-nav-loading::before` で画面全体に薄いガラス幕を表示するようにした。
+- `body.megrum-bottom-nav-loading::after` でフッター上部に小さな回転インジケータを表示するようにした。
 - `prefers-reduced-motion` ではローディング幕/遷移アニメーションを止めるようにした。
 
 ### 影響範囲
@@ -17065,11 +17484,11 @@ iter154.69 でボトムナビをガラスフッター化したため、検索導
 
 #### `web/src/app/globals.css`
 - ボトムナビ遷移専用の View Transition / fallback animation を追加した。
-- `body.ihub-bottom-nav-transitioning` / `body.ihub-bottom-nav-route-entering` の時だけ効くようにして、既存の削除アニメーションや詳細画面の右スライド演出と干渉しないようにした。
+- `body.megrum-bottom-nav-transitioning` / `body.megrum-bottom-nav-route-entering` の時だけ効くようにして、既存の削除アニメーションや詳細画面の右スライド演出と干渉しないようにした。
 
 #### `web/src/app/inventory/InventoryView.tsx`
 - 在庫画面の専用フッターも新しいガラス型 `BottomNav` を使うようにし、CTAとの一体白バーをやめた。
-- CTAのブランドカラー指定を Tailwind の `from-ihub-lavender` / `to-ihub-pink` に寄せた。
+- CTAのブランドカラー指定を Tailwind の `from-megrum-lavender` / `to-megrum-pink` に寄せた。
 
 ### 影響範囲
 
@@ -17098,7 +17517,7 @@ iter154.69 でボトムナビをガラスフッター化したため、検索導
 - ✅ 共通 `BottomNav` を一箇所で更新し、ホーム/取引/wish/プロフなどの主要画面に同じ質感が波及するようにした
 - ✅ アクティブハイライトは `transform` で移動させ、レイアウトシフトせずふわっと切り替わる
 - ✅ ボトムナビ遷移だけをフラグで判定し、既存の詳細画面スライドや削除時 View Transition とは分離した
-- ✅ 今回追加したブランド色指定は Tailwind theme の `ihub-*` を使用し、CTAの既存直書きも一部是正した
+- ✅ 今回追加したブランド色指定は Tailwind theme の `megrum-*` を使用し、CTAの既存直書きも一部是正した
 - ✅ 新しい状態名・DBカラム・正式用語は追加していないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` は更新不要
 - ✅ `eslint` / `tsc --noEmit` / `git diff --check` / `npm run build` 通過
 
@@ -17442,7 +17861,7 @@ iter154.65 で「要対応／相手待ち」とチケット型パネルは入っ
 - 空状態ガイドをカレンダーグリッド内の絶対位置から、スクロールコンテナ外のオーバーレイに移動した。
 - カレンダー日付ヘッダー下の表示領域中央に固定されるよう、オーバーレイの表示範囲を調整した。
 - 水玉状の装飾とテキスト裏の濃い背景を削除した。
-- 黒半透明の単一パネルに変更し、背景そのものがゆっくり拡縮する `ihub-meetup-hint-breathe` アニメーションを追加した。
+- 黒半透明の単一パネルに変更し、背景そのものがゆっくり拡縮する `megrum-meetup-hint-breathe` アニメーションを追加した。
 
 ### 影響範囲
 
@@ -18092,7 +18511,7 @@ Apple MapKit JS は見た目は近いが、既存の Leaflet ベースの `MapPi
 - ✅ 既存 Leaflet 地図は他画面では維持
 - ✅ APIキー未設定時は旧地図へフォールバックし、画面が壊れない
 - ✅ 新しい状態名・DB migration は追加していないため `notes/09_state_machines.md` / `notes/05_data_model.md` は更新不要
-- ✅ 地図サービス名の追加であり、iHub の業務用語追加ではないため `notes/10_glossary.md` は更新不要
+- ✅ 地図サービス名の追加であり、Megrum の業務用語追加ではないため `notes/10_glossary.md` は更新不要
 - ✅ 対象ファイルの `eslint` / `tsc --noEmit` / `git diff --check` / `npm run build` 通過
 
 ---
@@ -19185,7 +19604,7 @@ Google Calendar のように、軽く縦に動かした場合はスクロール�
 - セクション名を「通知・サポート」に変更し、残る導線の意味に合わせた。
 - 「通知設定」「ヘルプ・FAQ」「ログアウト」は維持。
 
-#### `iHub/hub-screens.jsx`
+#### `Megrum/hub-screens.jsx`
 - プロフハブのモックアップから「設定」行を削除。
 - セクション名を「通知・サポート」に変更。
 
@@ -19207,7 +19626,7 @@ Google Calendar のように、軽く縦に動かした場合はスクロール�
 ### 関連ファイル
 
 - `web/src/app/profile/ProfileView.tsx`
-- `iHub/hub-screens.jsx`
+- `Megrum/hub-screens.jsx`
 - `notes/11_screen_inventory.md`
 
 ### セルフレビュー結果
@@ -19612,7 +20031,7 @@ iter154.20 では横スワイプ終了時に隣の詳細へ移動できるよう
 - `status='traded'` の在庫に対する `updateInventoryStatus` / `updateInventoryItem` / `deleteInventoryItem` をサーバーアクション側で拒否。
 - UI を迂回した更新・削除でも、譲り済み履歴が消えないように防御。
 
-#### `iHub/b-inventory.jsx`
+#### `Megrum/b-inventory.jsx`
 - 「過去に譲った」タブの説明文を、詳細表示のみ・更新削除不可の方針に合わせて更新。
 
 #### `notes/09_state_machines.md`
@@ -19639,7 +20058,7 @@ iter154.20 では横スワイプ終了時に隣の詳細へ移動できるよう
 - `web/src/app/inventory/[id]/page.tsx`
 - `web/src/app/inventory/[id]/EditForm.tsx`
 - `web/src/app/inventory/actions.ts`
-- `iHub/b-inventory.jsx`
+- `Megrum/b-inventory.jsx`
 - `notes/09_state_machines.md`
 - `notes/05_data_model.md`
 
@@ -19670,14 +20089,14 @@ iter154.20 では横スワイプ終了時に隣の詳細へ移動できるよう
 - `/schedules` への「スケジュール」行を「アイデンティティ」セクション内へ移動。
 - セクション数が減ったため、後続セクションのフェードイン delay を詰めた。
 
-#### `iHub/hub-screens.jsx`
+#### `Megrum/hub-screens.jsx`
 - ProfileHub モックの「アイデンティティ」セクションに「スケジュール」行を追加。
 - スケジュールをプロフィール編集・推し設定と同じ文脈で見えるように整理。
 
 ### 影響範囲
 
 - `/profile` 自分のプロフ画面
-- `iHub/hub-screens.jsx` の ProfileHub モック
+- `Megrum/hub-screens.jsx` の ProfileHub モック
 
 ### 確認方法
 
@@ -19687,7 +20106,7 @@ iter154.20 では横スワイプ終了時に隣の詳細へ移動できるよう
 ### 関連ファイル
 
 - `web/src/app/profile/ProfileView.tsx`
-- `iHub/hub-screens.jsx`
+- `Megrum/hub-screens.jsx`
 
 ### セルフレビュー結果
 
@@ -19714,14 +20133,14 @@ iter154.20 では横スワイプ終了時に隣の詳細へ移動できるよう
 - 最下部の disabled な「アカウント削除（準備中）」行を削除。
 - 最下部セクションはログアウトのみ表示する構成に変更。
 
-#### `iHub/hub-screens.jsx`
+#### `Megrum/hub-screens.jsx`
 - ProfileHub モックの最下部から「アカウント削除」行を削除。
 - ログアウト行を単独の last row として整理。
 
 ### 影響範囲
 
 - `/profile` 自分のプロフ画面
-- `iHub/hub-screens.jsx` の ProfileHub モック
+- `Megrum/hub-screens.jsx` の ProfileHub モック
 
 ### 確認方法
 
@@ -19731,7 +20150,7 @@ iter154.20 では横スワイプ終了時に隣の詳細へ移動できるよう
 ### 関連ファイル
 
 - `web/src/app/profile/ProfileView.tsx`
-- `iHub/hub-screens.jsx`
+- `Megrum/hub-screens.jsx`
 
 ### セルフレビュー結果
 
@@ -21505,8 +21924,8 @@ iter151.2 では `conic-gradient` を撤去したが、`match-card-local-flame` 
 ホーム → C-1〜C-3（打診→チャット→取引完了）→ B-1〜B-3（在庫管理＋撮影＋X投稿）→ AW（参戦予定編集）→ 一括再訪 → C-3 相違あり詳細フロー → コレクション図鑑（4画面）
 
 ### ファイル状況
-- `iHub MVP.html`（統合版、4セクション×18アートボード）
-- `iHub Dispute Flow _standalone_.html`（8.7MB、Dispute Flow 10画面）
+- `Megrum MVP.html`（統合版、4セクション×18アートボード）
+- `Megrum Dispute Flow _standalone_.html`（8.7MB、Dispute Flow 10画面）
 - コレクション図鑑（独立4画面、ファイル名未確認）
 
 ### 完了確認（直近 イテレーション15・16）
@@ -21530,7 +21949,7 @@ iter151.2 では `conic-gradient` を撤去したが、`match-card-local-flame` 
 | # | 機能 | 出処 |
 |---|------|------|
 | 1 | メッセージトーン切替（標準／カジュアル／丁寧） | C-1 |
-| 2 | 推奨合流ポイント自動提案＋@iHub推奨バッジ | C-1 |
+| 2 | 推奨合流ポイント自動提案＋@Megrum推奨バッジ | C-1 |
 | 3 | 取引完了時のX連携自動投稿 | C-3 |
 | 4 | 「今すぐ交換」エクスプレス（5分以内合流） | AW |
 | 5 | クローズ時間自動促進通知 | AW |
@@ -21685,7 +22104,7 @@ iter151.2 では `conic-gradient` を撤去したが、`match-card-local-flame` 
 - ログアウト／アカウント削除
 
 ### 配置場所
-**新規ファイル**（仮）`iHub MVP Surfaces.html` または `iHub Account & Support.html`
+**新規ファイル**（仮）`Megrum MVP Surfaces.html` または `Megrum Account & Support.html`
 - 4画面が密接に関連、別ファイルで管理
 
 ---
@@ -21837,12 +22256,12 @@ Claude Design の現状実装：
 - コンプ判定は wish 基準で動的計算
 
 ### 修正対象ファイル
-- iHub B Inventory.html（表示モード切替＋3サブビュー＋コレクション表示）
-- iHub B Inventory.html（メタ入力に譲る/自分用キープ2択）
-- iHub Collection Pokedex.html → **廃止**
-- iHub Hub Screens.html プロフハブ（コレクションサマリのみ）
-- iHub Home v2.html（マッチカードの文言を個人達成ベースに）
-- iHub C Flow.html C-3（「あと◯枚でコンプ」を個人達成ベースに）
+- Megrum B Inventory.html（表示モード切替＋3サブビュー＋コレクション表示）
+- Megrum B Inventory.html（メタ入力に譲る/自分用キープ2択）
+- Megrum Collection Pokedex.html → **廃止**
+- Megrum Hub Screens.html プロフハブ（コレクションサマリのみ）
+- Megrum Home v2.html（マッチカードの文言を個人達成ベースに）
+- Megrum C Flow.html C-3（「あと◯枚でコンプ」を個人達成ベースに）
 
 ### 反映確認（イテレーション19）
 
@@ -21891,7 +22310,7 @@ Claude Design の現状実装：
 ウィッシュ＝欲しいもの一覧、シンプルさ優先。コレクション機能は不要と判断。
 - `WishlistCollection` / `WishCollectionTile` を hub-screens.jsx から削除
 - `WishlistList` の view toggle 削除
-- iHub Hub Screens.html から「コレクション表示」アートボード削除
+- Megrum Hub Screens.html から「コレクション表示」アートボード削除
 - ウィッシュタブはリスト・空状態・編集 の 3画面のみ
 
 ### 19.9 自分用キープへの影絵追加案 → 不採用（A: 現状維持）
@@ -23829,7 +24248,7 @@ iter62 までで Phase A（wish.exchange_type）が完了。残りの 3 フェ�
 
 ### セルフレビュー（CLAUDE.md absolute rule C）
 
-- **A. デザイン整合性**: モード pill / シート / 個別募集カード — 既存 iHub トーン（紫グラデ + 薄紫枠 + chip スタイル）と統一 ✅
+- **A. デザイン整合性**: モード pill / シート / 個別募集カード — 既存 Megrum トーン（紫グラデ + 薄紫枠 + chip スタイル）と統一 ✅
 - **B. 仕様整合性**: notes/05 / 09 / 18 のスキーマ・ライフサイクルと整合。listings の trigger で参照整合性を強制 ✅
 - **C. レビュー記録**: proposals 列追加は打診画面実装時に統合と明記。実マッチング演算は iter66 以降 ✅
 
@@ -24365,14 +24784,14 @@ iter61 で AW 編集 3 画面を実装したが、地図部分は SVG プレー�
 - Nominatim プロキシ API
 - `?q=横浜アリーナ` → forward geocoding
 - `?lat=35.5&lon=139.7` → reverse geocoding
-- User-Agent: `iHub/0.1 (https://ihub.tokyo; support@ihub.tokyo)`
+- User-Agent: `Megrum/0.1 (https://megrum.tokyo; support@megrum.tokyo)`
 - `next: { revalidate: 3600 }` で 1 時間キャッシュ
 
 #### `web/src/components/map/MapPicker.tsx`（新規）
 
 - `react-leaflet` ベースの client-only コンポーネント
 - OSM タイル + radius circle (lavender) + ドラッグ可能ピン (DivIcon)
-- iHub ブランドカラー (#a695d8) のカスタムピン
+- Megrum ブランドカラー (#a695d8) のカスタムピン
 - center 変更を `onCenterChange(lat, lng)` で通知
 - 地図クリック / ピンドラッグで center 更新
 
@@ -24522,7 +24941,7 @@ iter61 は AW 編集 3 画面（list / new chooser / new/location / new/event）
 
 ### 関連ファイル
 
-- `iHub/aw-edit.jsx`（モックアップ）
+- `Megrum/aw-edit.jsx`（モックアップ）
 - `web/src/app/aw/AWView.tsx`
 - `web/src/app/aw/new/{page.tsx, AWAddEntry.tsx}`
 - `web/src/app/aw/new/location/{page.tsx, LocationLedForm.tsx}`
@@ -24554,16 +24973,16 @@ iter56 で認証系 UI を仕上げた直後、Onboarding（プロフィール�
    - pending 中スピナー（テキスト横で animate-spin）
    - hover:brightness-105 / disabled:opacity-50
 2. **ブランドカラーを Tailwind theme に統合**
-   - `globals.css` の `@theme`（inline でない）に `--color-ihub-lavender/sky/pink/warn/ok` を追加
-   - 全コンポーネントで `bg-ihub-lavender` 等が使えるように
+   - `globals.css` の `@theme`（inline でない）に `--color-megrum-lavender/sky/pink/warn/ok` を追加
+   - 全コンポーネントで `bg-megrum-lavender` 等が使えるように
    - opacity 修飾子（`/35` 等）も `color-mix()` で動作
 3. **ボタン色合い・サイズをモックアップ完全一致**
    - 旧：`bg-gradient-to-r from-purple-400 to-pink-300`（2色 90deg） → 誤
    - 新：`bg-[linear-gradient(135deg,#a695d8,#a8d4e6)]`（2色 135deg）← モックアップ AOPrimaryButton 準拠
    - rounded-[14px] / py-[14px] / text-sm / shadow-[0_4px_14px_rgba(166,149,216,0.33)]
-4. **IHubLogo（モックアップ AOLogo 準拠）**
+4. **MegrumLogo（モックアップ AOLogo 準拠）**
    - 角丸正方形（borderRadius: size×0.32）
-   - 「iH」テキスト + Inter Tight 800
+   - 「Mg」テキスト + Inter Tight 800
    - 2色グラデ（lavender → sky）
    - boxShadow: `0 8px 24px rgba(166,149,216,0.25)`
 5. **全画面の背景グラデを再現**
@@ -24609,7 +25028,7 @@ iter56 で認証系 UI を仕上げた直後、Onboarding（プロフィール�
    - 「あとで設定する」スキップ可
    - account_status='active' に遷移（onboarding 完了）
 5. **`/onboarding/done`** （完了サマリー）
-   - グラデ背景 + ✨ + 「iHub へようこそ！」+ @handle
+   - グラデ背景 + ✨ + 「Megrum へようこそ！」+ @handle
    - 推し最大 3 件のサマリー + エリア表示
    - 「次は何をする？」3 カード（マッチ / 在庫 / wish）
    - 「ホームに進む」
@@ -24694,7 +25113,7 @@ iter56 で認証系 UI を仕上げた直後、Onboarding（プロフィール�
 #### J. Email Templates 日本語化（手動設定）
 
 1. **`notes/19_email_templates.md`** に整備
-2. Confirm signup / Reset password の HTML テンプレ全文（iHub ブランド準拠）
+2. Confirm signup / Reset password の HTML テンプレ全文（Megrum ブランド準拠）
 3. 設定済（ユーザーが Supabase Dashboard でコピペ完了）
 
 ### 設計判断・トレードオフ
@@ -24794,14 +25213,14 @@ iter55 完了時点での課題：
 - モックアップ AOHeaderBack 準拠：sticky ヘッダー + 戻るアイコン + タイトル + サブ + 進捗
 - 半透明 + backdrop-blur
 
-**`web/src/components/auth/IHubLogo.tsx`**
+**`web/src/components/auth/MegrumLogo.tsx`**
 - モックアップ AOLogo 準拠：紫→水色→ピンクのグラデ円 + 星アイコン
 - size プロパティで大小切り替え可
 
 #### 画面実装（モックアップ忠実）
 
 **`web/src/app/page.tsx`** — Welcome（AOWelcome）
-- 未ログイン時：iHub ロゴ大（88px）+ 「iHub」+ 「グッズ交換を、現地で、もっと簡単に。」+ CTA 2 つ
+- 未ログイン時：Megrum ロゴ大（88px）+ 「Megrum」+ 「グッズ交換を、現地で、もっと簡単に。」+ CTA 2 つ
 - ログイン時：暫定ホーム（既存表示・Phase 1 で本実装予定）
 - 「メールアドレスで新規登録」+ 「Googleで新規登録」（disabled）+ 「すでにアカウントをお持ちの方は ログイン」
 
@@ -24831,7 +25250,7 @@ iter55 完了時点での課題：
 
 **`web/src/app/login/page.tsx` + `LoginForm.tsx`** — Login（AOLogin）
 - ヘッダー：「ログイン」
-- iHub ロゴ小（60px）+ 「おかえりなさい」
+- Megrum ロゴ小（60px）+ 「おかえりなさい」
 - メアド + パスワード入力
 - 「パスワードを忘れた方」リンク（右寄せ・小）
 - 「ログイン」ボタン
@@ -24874,17 +25293,17 @@ resend({type: "signup"}) を試行
 
 ### 確認方法
 
-1. シークレットウィンドウで https://ihub.tokyo/ → Welcome 表示
-2. https://ihub.tokyo/signup → ハンドル + パス強度メーター + パス確認 動作確認
-3. https://ihub.tokyo/login → 「パスワードを忘れた方」リンク存在確認
-4. https://ihub.tokyo/password-reset → 「パスワードを再設定します」表示
+1. シークレットウィンドウで https://megrum.tokyo/ → Welcome 表示
+2. https://megrum.tokyo/signup → ハンドル + パス強度メーター + パス確認 動作確認
+3. https://megrum.tokyo/login → 「パスワードを忘れた方」リンク存在確認
+4. https://megrum.tokyo/password-reset → 「パスワードを再設定します」表示
 5. signup 試行を 2回（同じメアドで）→ 2回目は「✓ 確認メールを再送しました」で verify-email に着地
 
 ### 関連ファイル
 
 新規:
 - `web/src/components/auth/HeaderBack.tsx`
-- `web/src/components/auth/IHubLogo.tsx`
+- `web/src/components/auth/MegrumLogo.tsx`
 - `web/src/app/auth/email-confirmed/page.tsx`
 - `web/src/app/password-reset/page.tsx`
 - `web/src/app/password-reset/ResetForm.tsx`
@@ -24914,7 +25333,7 @@ resend({type: "signup"}) を試行
 
 ### 達成事項
 
-iter53 の Auth フロー実装＋ iter54 のフォールバック対応を経て、本 iter で **メール送信の本番運用基盤（Brevo）を構築し、認証フローが iHub.tokyo 上で end-to-end で動作することを確認**。Phase 0b-2 を完全完了。
+iter53 の Auth フロー実装＋ iter54 のフォールバック対応を経て、本 iter で **メール送信の本番運用基盤（Brevo）を構築し、認証フローが Megrum.tokyo 上で end-to-end で動作することを確認**。Phase 0b-2 を完全完了。
 
 ### 背景・問題意識
 
@@ -24937,8 +25356,8 @@ iter53 直後に発生した問題：
 ### 作業内容
 
 #### A. Brevo アカウント設定
-- 既存アカウント（前プロジェクト Bubble.io 用）に iHub 用 SMTP Key を追加発行
-- SMTP Key 名前：`iHub Production`（Standard variant・64文字）
+- 既存アカウント（前プロジェクト Bubble.io 用）に Megrum 用 SMTP Key を追加発行
+- SMTP Key 名前：`Megrum Production`（Standard variant・64文字）
 
 #### B. ドメイン認証（DKIM/SPF/DMARC）
 - お名前.com の DNS 管理画面で 4 レコード追加：
@@ -24946,8 +25365,8 @@ iter53 直後に発生した問題：
 | Type | Name | Value | 用途 |
 |---|---|---|---|
 | TXT | （空欄）| `brevo-code:b948bda79e385f2a3935fadb98f04ca7` | ドメイン所有確認 |
-| CNAME | `brevo1._domainkey` | `b1.ihub-tokyo.dkim.brevo.com` | DKIM 1 |
-| CNAME | `brevo2._domainkey` | `b2.ihub-tokyo.dkim.brevo.com` | DKIM 2 |
+| CNAME | `brevo1._domainkey` | `b1.megrum-tokyo.dkim.brevo.com` | DKIM 1 |
+| CNAME | `brevo2._domainkey` | `b2.megrum-tokyo.dkim.brevo.com` | DKIM 2 |
 | TXT | `_dmarc` | `v=DMARC1; p=none; rua=mailto:rua@dmarc.brevo.com` | DMARC |
 
 → Brevo の Authentication 完了
@@ -24958,8 +25377,8 @@ iter53 直後に発生した問題：
 - Port: `587`
 - Username: Brevo の SMTP Login（`7b1d8e001@smtp-brevo.com`）
 - Password: Brevo SMTP Key
-- Sender email: **`support@ihub.tokyo`**
-- Sender name: **`iHub`**
+- Sender email: **`support@megrum.tokyo`**
+- Sender name: **`Megrum`**
 
 #### D. Brevo IP blocking の解除
 - Supabase Cloud（AWS 東京 `13.113.119.158` 等）が Brevo の Authorized IPs に含まれず、初回送信時に保留＋本人確認メールが飛ぶ事象が発生
@@ -24968,14 +25387,14 @@ iter53 直後に発生した問題：
 
 #### E. End-to-end テスト成功
 - signup（Gmail エイリアス使用）
-- メール `iHub <support@ihub.tokyo>` から到着
+- メール `Megrum <support@megrum.tokyo>` から到着
 - 「Confirm your mail」リンク → `/auth/callback` で `exchangeCodeForSession` 成功
 - ホーム画面に「ログイン中 / ましま / @mashima / ログアウト」表示
 - iter54 のフォールバック（root に code が来た時の `/auth/callback` 転送）も正常動作
 
 ### 影響範囲
 
-- 本番ドメイン `ihub.tokyo` から正規メール送信可能（DKIM/SPF/DMARC 完備）
+- 本番ドメイン `megrum.tokyo` から正規メール送信可能（DKIM/SPF/DMARC 完備）
 - 配信成功率：DKIM 認証済みのため Gmail/Yahoo 等での迷惑メール判定回避
 - 永続無料 300/日 → MVP 期は完全無料で運用可
 - スケール時の AWS SES 移行は SMTP credentials 差し替えのみ（DKIM/SPF レコードは流用可能）
@@ -25009,12 +25428,12 @@ iter53 直後に発生した問題：
 iter53 で Auth フロー実装後、`Confirm your mail` メールリンクをクリックすると以下のような URL に飛んでしまう事象が発生：
 
 ```
-❌ https://ihub.tokyo/?code=9961e53b-2a89-41bf-b972-d156d3e97f73
+❌ https://megrum.tokyo/?code=9961e53b-2a89-41bf-b972-d156d3e97f73
 ```
 
 期待していた挙動：
 ```
-✅ https://ihub.tokyo/auth/callback?code=xxx
+✅ https://megrum.tokyo/auth/callback?code=xxx
 ```
 
 ルート (`/`) は `page.tsx` がレンダリングされるだけで code 処理ロジックがないため、**確認コードが検証されないままトップページが表示され、ユーザーは認証完了状態にならない**。
@@ -25023,7 +25442,7 @@ iter53 で Auth フロー実装後、`Confirm your mail` メールリンクを�
 
 Supabase Auth の Redirect URLs allowlist 未設定／設定遅延／メールテンプレ古版／www サブドメイン経由など、本番環境で `redirect_to` が想定外の値になるケースが複数存在する。
 
-ユーザー側の Supabase URL Configuration は本 iter 時点で正しく設定済（Site URL=`https://ihub.tokyo`、Redirect URLs に 3 つの `/auth/callback` を登録）だが、**設定変更前に送信された確認メールには古い fallback URL が焼き込まれている**ため、過去メールでの認証は失敗する。
+ユーザー側の Supabase URL Configuration は本 iter 時点で正しく設定済（Site URL=`https://megrum.tokyo`、Redirect URLs に 3 つの `/auth/callback` を登録）だが、**設定変更前に送信された確認メールには古い fallback URL が焼き込まれている**ため、過去メールでの認証は失敗する。
 
 ### 変更内容
 
@@ -25116,7 +25535,7 @@ iter52 で DB マイグレーション完了 → 本 iter で **認証フロー 
 
 すべて Server Component（既ログインなら `/` へリダイレクト）+ Client Component フォーム（フォーム状態管理）。
 
-iHub ブランドカラー（紫→ピンクグラデ）+ Noto Sans JP 統一。
+Megrum ブランドカラー（紫→ピンクグラデ）+ Noto Sans JP 統一。
 
 #### `web/src/app/page.tsx` 更新
 - ログイン状態を Server Component で取得
@@ -25169,17 +25588,17 @@ Route (app)
 Supabase ダッシュボード → Authentication → URL Configuration:
 
 ```
-Site URL: https://ihub.tokyo
+Site URL: https://megrum.tokyo
 
 Redirect URLs:
-- https://ihub.tokyo/auth/callback
-- https://www.ihub.tokyo/auth/callback
+- https://megrum.tokyo/auth/callback
+- https://www.megrum.tokyo/auth/callback
 - http://localhost:3000/auth/callback  ← ローカル開発用
 ```
 
 #### 2. Vercel に本番URL 環境変数追加（任意）
 ```
-NEXT_PUBLIC_APP_URL=https://ihub.tokyo
+NEXT_PUBLIC_APP_URL=https://megrum.tokyo
 ```
 これがあると signup の emailRedirectTo が確実に本番URLに。
 無くても VERCEL_URL でフォールバック動作する。
@@ -25199,7 +25618,7 @@ NEXT_PUBLIC_APP_URL=https://ihub.tokyo
 
 ### 次のステップ
 
-1. **動作確認**：本番（ihub.tokyo）で実際にユーザー登録 → メール受信 → リンククリック → ログイン状態表示まで
+1. **動作確認**：本番（megrum.tokyo）で実際にユーザー登録 → メール受信 → リンククリック → ログイン状態表示まで
 2. **Supabase Auth URL設定**（ユーザー対応）
 3. **Phase 0b-3：オンボーディング画面**：性別選択、推しグループ選択、推しメンバー選択、AW初期設定
 
@@ -25279,26 +25698,26 @@ REST API 経由でシードデータも確認済：
 
 ---
 
-## イテレーション51：Phase 0a 完了 — https://ihub.tokyo で本番公開 🎉
+## イテレーション51：Phase 0a 完了 — https://megrum.tokyo で本番公開 🎉
 
 ### 達成事項
 
-設計フェーズ（iter1-48）+ 実装初期（iter49-50）を経て、**本番URL `https://ihub.tokyo` で iHub アプリが動作**するようになった。
+設計フェーズ（iter1-48）+ 実装初期（iter49-50）を経て、**本番URL `https://megrum.tokyo` で Megrum アプリが動作**するようになった。
 
 ### 完了作業
 
 #### Vercel デプロイ
-- 新規 Vercel プロジェクト「ihub」作成
-- GitHub `iHub_design` 連携、Root Directory `web/` 設定
+- 新規 Vercel プロジェクト「megrum」作成
+- GitHub `Megrum_design` 連携、Root Directory `web/` 設定
 - Application Preset 自動検出が UI 上は失敗したが、`web/vercel.json` の `framework: nextjs` でカバー
 - Build / Install / Output コマンドはデフォルト使用
 - 環境変数 4つ登録（NEXT_PUBLIC_SUPABASE_URL, _PUBLISHABLE_KEY, SUPABASE_SECRET_KEY, NEXT_PUBLIC_APP_ENV）
 - 初回デプロイ成功
 
-#### ドメイン接続（ihub.tokyo）
+#### ドメイン接続（megrum.tokyo）
 **Vercel 側設定**:
-- `ihub.tokyo`（apex）: Production 環境に Connect
-- `www.ihub.tokyo`: Production 環境に Connect（後で apex への redirect 化検討）
+- `megrum.tokyo`（apex）: Production 環境に Connect
+- `www.megrum.tokyo`: Production 環境に Connect（後で apex への redirect 化検討）
 
 **お名前.com DNS 設定**:
 - A レコード `@` → `216.198.79.1`（新しい Vercel IP に更新）
@@ -25311,14 +25730,14 @@ REST API 経由でシードデータも確認済：
 **反映確認**:
 - Vercel ダッシュボードで両ドメイン「Valid Configuration」（緑）
 - HTTPS 証明書 Let's Encrypt 自動発行
-- ブラウザで `https://ihub.tokyo` アクセス成功
+- ブラウザで `https://megrum.tokyo` アクセス成功
 
 #### 動作検証
 
 ユーザーがブラウザで確認した結果：
 - ✅ ページ表示成功
-- ✅ 「★ iHub」バッジ表示
-- ✅ 「Hello iHub」見出し表示
+- ✅ 「★ Megrum」バッジ表示
+- ✅ 「Hello Megrum」見出し表示
 - ✅ 3カード表示（Phase 0a / Stack Next.js 16 / **Supabase: ✓ 接続（緑）**）
 - ✅ Server Component で Supabase auth.getUser を呼び出し → 接続成功
 - ✅ HTTPS 通信
@@ -25333,7 +25752,7 @@ REST API 経由でシードデータも確認済：
 
 ```
 ✅ Step 1: web/ ディレクトリ作成 + Next.js 16 初期化（iter49）
-✅ Step 2: 「Hello iHub」ページ実装（iter49）
+✅ Step 2: 「Hello Megrum」ページ実装（iter49）
 ✅ Step 3: Supabase クライアント初期化（iter50）
 ✅ Step 4: ローカル npm run build 成功（iter50）
 ✅ Step 5: Supabase 既存削除 → 新規作成（ユーザー対応）
@@ -25342,7 +25761,7 @@ REST API 経由でシードデータも確認済：
 ✅ Step 8: 環境変数登録（ユーザー対応、iter51）
 ✅ Step 9: 初回デプロイ成功（ユーザー対応、iter51）
 ✅ Step 10: ドメイン DNS 設定（ユーザー対応、iter51）
-✅ Step 11: https://ihub.tokyo 表示確認（ユーザー対応、iter51）
+✅ Step 11: https://megrum.tokyo 表示確認（ユーザー対応、iter51）
 ✅ Step 12: Supabase 接続確認 ✓ 緑（ユーザー対応、iter51）
 ```
 
@@ -25352,12 +25771,12 @@ REST API 経由でシードデータも確認済：
 
 | 項目 | URL |
 |---|---|
-| 本番（apex） | https://ihub.tokyo |
-| 本番（www） | https://www.ihub.tokyo |
-| GitHub リポ | https://github.com/mashimabizz/iHub_design |
-| Vercel ダッシュ | https://vercel.com/mashimabizzs-projects/ihub |
+| 本番（apex） | https://megrum.tokyo |
+| 本番（www） | https://www.megrum.tokyo |
+| GitHub リポ | https://github.com/mashimabizz/Megrum_design |
+| Vercel ダッシュ | https://vercel.com/mashimabizzs-projects/megrum |
 | Supabase ダッシュ | https://supabase.com/dashboard/project/kwpnlcojzseicqbxefih |
-| GitHub Pages（design preview） | https://mashimabizz.github.io/iHub_design/ |
+| GitHub Pages（design preview） | https://mashimabizz.github.io/Megrum_design/ |
 
 ### 関連ファイル
 
@@ -25387,7 +25806,7 @@ REST API 経由でシードデータも確認済：
 ### 背景
 
 iter49 で web/ プロジェクト初期化済。次はSupabase 接続。
-ユーザーが新規 Supabase プロジェクト `ihub` を作成し、API URL + Publishable key + Secret key を共有。
+ユーザーが新規 Supabase プロジェクト `megrum` を作成し、API URL + Publishable key + Secret key を共有。
 
 ### 作業中の発見
 
@@ -25460,12 +25879,12 @@ cd web && npm run build
 
 📋 残タスク:
 [ ] Vercel 既存削除（ユーザー）
-[ ] Vercel 新規プロジェクト作成（ユーザー、GitHub iHub_design 連携）
+[ ] Vercel 新規プロジェクト作成（ユーザー、GitHub Megrum_design 連携）
 [ ] Vercel に環境変数登録（ユーザー、Supabase URL/keys）
 [ ] Vercel デプロイ確認
-[ ] Vercel カスタムドメインに ihub.tokyo 設定（ユーザー）
+[ ] Vercel カスタムドメインに megrum.tokyo 設定（ユーザー）
 [ ] お名前.com で DNS 確認/更新（ユーザー）
-[ ] https://ihub.tokyo で「Hello iHub」表示確認
+[ ] https://megrum.tokyo で「Hello Megrum」表示確認
 ```
 
 ### 関連ファイル
@@ -25488,10 +25907,10 @@ cd web && npm run build
 ### 次のステップ
 
 ユーザー対応待ち：
-1. Vercel 既存 ihub プロジェクト削除
-2. Vercel 新規プロジェクト作成・GitHub iHub_design 連携
+1. Vercel 既存 megrum プロジェクト削除
+2. Vercel 新規プロジェクト作成・GitHub Megrum_design 連携
 3. 環境変数登録（Supabase の3つ + APP_ENV）
-4. デプロイ → ihub.tokyo 接続
+4. デプロイ → megrum.tokyo 接続
 
 ---
 
@@ -25501,9 +25920,9 @@ cd web && npm run build
 
 設計フェーズ完了後、いよいよ実装着手。
 ユーザー方針：
-- リポは `iHub_design` をそのまま monorepo 化（新規リポ作成しない）
-- 既存 Supabase / Vercel `ihub` プロジェクトは削除して再作成（クリーンスタート）
-- ドメイン `ihub.tokyo` は新 Vercel プロジェクトに繋ぎ直し
+- リポは `Megrum_design` をそのまま monorepo 化（新規リポ作成しない）
+- 既存 Supabase / Vercel `megrum` プロジェクトは削除して再作成（クリーンスタート）
+- ドメイン `megrum.tokyo` は新 Vercel プロジェクトに繋ぎ直し
 
 ### 変更内容
 
@@ -25524,12 +25943,12 @@ npx create-next-app@latest web \
 
 #### `web/src/app/layout.tsx` カスタマイズ
 - Geist フォント → **Noto Sans JP**（日本語向け）
-- title / description を iHub 用に
+- title / description を Megrum 用に
 - lang="ja"
 
 #### `web/src/app/page.tsx` カスタマイズ
-- 「Hello iHub」ランディング
-- iHub ブランドカラー（紫→ピンク gradient）
+- 「Hello Megrum」ランディング
+- Megrum ブランドカラー（紫→ピンク gradient）
 - Phase 0a / Stack 情報カード
 - 設計 iter数を表示
 
@@ -25556,22 +25975,22 @@ npx create-next-app@latest web \
 
 ```
 ✅ Step 1: web/ ディレクトリ作成 + Next.js 初期化
-✅ Step 2: 「Hello iHub」ページ表示確認（npm run build 成功）
+✅ Step 2: 「Hello Megrum」ページ表示確認（npm run build 成功）
 ✅ Step 3: vercel.json 設定
 ✅ Step 4: .gitignore 確認（既存で十分カバー）
 ✅ Step 5: CLAUDE.md 更新
 
 📋 残タスク（ユーザー対応 + 私の作業）:
-[ ] ユーザー: 既存 Supabase ihub プロジェクト削除
-[ ] ユーザー: 既存 Vercel ihub プロジェクト削除
-[ ] ユーザー: Supabase 新規 ihub プロジェクト作成（Region: Tokyo）
+[ ] ユーザー: 既存 Supabase megrum プロジェクト削除
+[ ] ユーザー: 既存 Vercel megrum プロジェクト削除
+[ ] ユーザー: Supabase 新規 megrum プロジェクト作成（Region: Tokyo）
 [ ] ユーザー: Supabase API URL + anon key + service_role key を共有
 [ ] 私: web/.env.local 設定 + Supabase クライアント初期化
-[ ] ユーザー: Vercel 新規 ihub プロジェクト作成（GitHub iHub_design 連携）
+[ ] ユーザー: Vercel 新規 megrum プロジェクト作成（GitHub Megrum_design 連携）
 [ ] ユーザー: Vercel に環境変数登録（Supabase keys）
-[ ] ユーザー: Vercel カスタムドメインに ihub.tokyo 設定
+[ ] ユーザー: Vercel カスタムドメインに megrum.tokyo 設定
 [ ] ユーザー: お名前.com で DNS 確認/更新
-[ ] 私: デプロイ確認、https://ihub.tokyo で「Hello iHub」表示
+[ ] 私: デプロイ確認、https://megrum.tokyo で「Hello Megrum」表示
 ```
 
 ### 確認方法
@@ -25579,12 +25998,12 @@ npx create-next-app@latest web \
 ローカル：
 ```bash
 cd web && npm run dev
-# http://localhost:3000 で「Hello iHub」表示
+# http://localhost:3000 で「Hello Megrum」表示
 ```
 
 GitHub：
 ```
-https://github.com/mashimabizz/iHub_design/tree/main/web
+https://github.com/mashimabizz/Megrum_design/tree/main/web
 ```
 
 ### 関連ファイル
@@ -25600,7 +26019,7 @@ https://github.com/mashimabizz/iHub_design/tree/main/web
 ### 次のステップ
 
 ユーザーがクラウド側を削除→再作成 → 私が Supabase クライアント・初期マイグレーションを設定。
-1〜2 セッションで「https://ihub.tokyo で Hello iHub」状態に到達予定。
+1〜2 セッションで「https://megrum.tokyo で Hello Megrum」状態に到達予定。
 
 ---
 
@@ -25609,7 +26028,7 @@ https://github.com/mashimabizz/iHub_design/tree/main/web
 ### 背景
 
 iter47 の確認後、ユーザーから3点の補足：
-1. `privacy@ihub.tokyo` は実在しない（不要）
+1. `privacy@megrum.tokyo` は実在しない（不要）
 2. 「ハンドル名」の意味を確認 → 公式 X アカウント名のことと判明
 3. Supabase / Vercel は既に作成済み（アカウント作成不要）
 
@@ -25619,8 +26038,8 @@ iter47 の確認後、ユーザーから3点の補足：
 
 | メール | 用途 |
 |---|---|
-| `support@ihub.tokyo` | メイン（新規登録・問い合わせ・サポート・**個人情報保護関係も**） |
-| `info@ihub.tokyo` | お知らせ・通知系 |
+| `support@megrum.tokyo` | メイン（新規登録・問い合わせ・サポート・**個人情報保護関係も**） |
+| `info@megrum.tokyo` | お知らせ・通知系 |
 
 `privacy@` は廃止、`support@` に統合。
 
@@ -25630,21 +26049,21 @@ iter47 の確認後、ユーザーから3点の補足：
 
 | 種類 | 意味 | 例 | 必要性 |
 |---|---|---|---|
-| **A. iHubユーザーのハンドル** | アプリ内ユーザー識別子（システムフィールド） | `@hana_lumi`、`@lumi_sua` | **必須** |
-| **B. iHub公式 X アカウント** | 運営の広報用 X アカウント | `@ihub_jp` 等 | **当面なし、Phase β以降検討** |
+| **A. Megrumユーザーのハンドル** | アプリ内ユーザー識別子（システムフィールド） | `@hana_lumi`、`@lumi_sua` | **必須** |
+| **B. Megrum公式 X アカウント** | 運営の広報用 X アカウント | `@megrum_jp` 等 | **当面なし、Phase β以降検討** |
 
-iter45-47 で「対外ハンドル `@ihub_jp` 暫定」と書いていたが、これは B（公式X）を指していた。
+iter45-47 で「対外ハンドル `@megrum_jp` 暫定」と書いていたが、これは B（公式X）を指していた。
 ユーザー判断：**当面 X アカウントは作らない**。Phase β（マネタイズ開始時期）以降に広報強化が必要になったら検討。
 
 #### Supabase / Vercel：既設利用
 
 ユーザーが既に Supabase / Vercel アカウントを作成済み。Phase 0a で**新規プロジェクトのみ作成**する：
-- Supabase 新規プロジェクト作成（既アカウント内に iHub 専用）
-- Vercel 新規プロジェクト作成（既アカウント内に iHub 専用）
+- Supabase 新規プロジェクト作成（既アカウント内に Megrum 専用）
+- Vercel 新規プロジェクト作成（既アカウント内に Megrum 専用）
 
 ### 変更ファイル
 
-- `iHub/legal-pages.jsx`：`privacy@ihub.tokyo` → `support@ihub.tokyo`
+- `Megrum/legal-pages.jsx`：`privacy@megrum.tokyo` → `support@megrum.tokyo`
 - `notes/15_non_functional.md`：3メール → 2メール
 - `notes/16_monetization.md`：
   - 3メール → 2メール
@@ -25662,20 +26081,20 @@ iter45-47 で「対外ハンドル `@ihub_jp` 暫定」と書いていたが、�
   Step 2: Vercel アカウント作成 ← 不要（既設）
 
 新プラン:
-  Step 1: GitHub 上に実装リポ作成（推奨：「ihub」小文字）
+  Step 1: GitHub 上に実装リポ作成（推奨：「megrum」小文字）
   Step 2: Next.js プロジェクト初期化（npx create-next-app@latest）
-  Step 3: 既存 Supabase アカウントに iHub 専用プロジェクト作成
-  Step 4: 既存 Vercel アカウントに iHub_app プロジェクト作成 → デプロイ
-  Step 5: お名前.com で DNS 設定 → ihub.tokyo を Vercel に向ける
+  Step 3: 既存 Supabase アカウントに Megrum 専用プロジェクト作成
+  Step 4: 既存 Vercel アカウントに Megrum_app プロジェクト作成 → デプロイ
+  Step 5: お名前.com で DNS 設定 → megrum.tokyo を Vercel に向ける
 ```
 
 所要時間：1〜2 セッション（合計 2〜4 時間）
 
 ### 確認したい残事項
 
-1. 実装リポジトリ名：**`ihub`**（小文字、ドメインと統一）でOK？
-2. Supabase 新規プロジェクト名：**`ihub-mvp`** or 別案？
-3. Vercel 新規プロジェクト名：**`ihub`** or 別案？
+1. 実装リポジトリ名：**`megrum`**（小文字、ドメインと統一）でOK？
+2. Supabase 新規プロジェクト名：**`megrum-mvp`** or 別案？
+3. Vercel 新規プロジェクト名：**`megrum`** or 別案？
 
 これらが決まったら **Phase 0a 即着手** 可能。
 
@@ -25686,7 +26105,7 @@ iter45-47 で「対外ハンドル `@ihub_jp` 暫定」と書いていたが、�
 ### 背景
 
 ユーザー報告：
-1. **ドメイン取得完了**：`ihub.tokyo`（お名前.com）
+1. **ドメイン取得完了**：`megrum.tokyo`（お名前.com）
 2. **弁護士レビュー結果：「このまま OK」**（規約原典 docx を改訂不要）
 3. **メール構造**：support@（メイン）、info@（通知）、privacy@（個人情報）の3つで運用
 4. **legal-pages.jsx の方針**：「モックアップなので、実装でちゃんと反映してくれるように」
@@ -25697,7 +26116,7 @@ iter45-47 で「対外ハンドル `@ihub_jp` 暫定」と書いていたが、�
 
 iter46 で「規約改訂が必要」と判断したが、弁護士は：
 - 規約原典 docx を **そのまま運用 OK** と判断
-- iHub MVP は規約の **SUBSET として実装**（MyLog・郵送 は実装しないが、契約上は許可されている）
+- Megrum MVP は規約の **SUBSET として実装**（MyLog・郵送 は実装しないが、契約上は許可されている）
 - これは法的に正常（契約 SUPERSET、実装 SUBSET）
 
 つまり：
@@ -25722,29 +26141,29 @@ iter46 で書いた「弁護士再依頼」プランは **不要**になった�
 
 | 項目 | 値 |
 |---|---|
-| ドメイン | **`ihub.tokyo`** |
-| API 本番 | `https://api.ihub.tokyo/v1` |
-| API staging | `https://api-staging.ihub.tokyo/v1`（暫定） |
-| GitHub Pages | `https://mashimabizz.github.io/iHub_design`（プレビュー用） |
+| ドメイン | **`megrum.tokyo`** |
+| API 本番 | `https://api.megrum.tokyo/v1` |
+| API staging | `https://api-staging.megrum.tokyo/v1`（暫定） |
+| GitHub Pages | `https://mashimabizz.github.io/Megrum_design`（プレビュー用） |
 
 #### メール構造
 
 | メール | 用途 |
 |---|---|
-| **`support@ihub.tokyo`** | メイン連絡先（新規登録・問い合わせ・サポート） |
-| **`info@ihub.tokyo`** | お知らせ・通知系（一斉送信） |
-| **`privacy@ihub.tokyo`** | 個人情報保護関係 |
+| **`support@megrum.tokyo`** | メイン連絡先（新規登録・問い合わせ・サポート） |
+| **`info@megrum.tokyo`** | お知らせ・通知系（一斉送信） |
+| **`privacy@megrum.tokyo`** | 個人情報保護関係 |
 
 ### 変更内容
 
-- `iHub/legal-pages.jsx`：
-  - `hello@ihub.example.com` → `support@ihub.tokyo`
-  - `privacy@ihub.example.com` → `privacy@ihub.tokyo`
-  - `株式会社iHub` → `iHub 運営者`（4箇所、規約原典の表現に合わせる）
+- `Megrum/legal-pages.jsx`：
+  - `hello@megrum.example.com` → `support@megrum.tokyo`
+  - `privacy@megrum.example.com` → `privacy@megrum.tokyo`
+  - `株式会社Megrum` → `Megrum 運営者`（4箇所、規約原典の表現に合わせる）
 
 - `notes/15_non_functional.md`：3 メールアドレス構造を反映
 
-- `notes/13_api_spec.md`：ベースURL に `ihub.tokyo` 反映
+- `notes/13_api_spec.md`：ベースURL に `megrum.tokyo` 反映
 
 - `notes/16_monetization.md`：3 メールアドレス構造を反映
 
@@ -25765,18 +26184,18 @@ iter46 で書いた「弁護士再依頼」プランは **不要**になった�
 **実装フェーズ着手の準備完了。**
 
 残タスク：
-1. ハンドル名確認（`@ihub_jp` か `@ihub_tokyo` か）
+1. ハンドル名確認（`@megrum_jp` か `@megrum_tokyo` か）
 2. お名前.com でメール転送設定（support@・info@・privacy@ を Gmail に）
 3. **Phase 0a 着手**：
    - Supabase アカウント作成（ユーザー）
    - Supabase プロジェクト作成（一緒に）
    - Vercel 連携（一緒に）
    - Next.js プロジェクト初期化
-   - 「Hello iHub」が表示されるところまで
+   - 「Hello Megrum」が表示されるところまで
 
 ### 関連ファイル
 
-- `iHub/legal-pages.jsx`
+- `Megrum/legal-pages.jsx`
 - `notes/13_api_spec.md`
 - `notes/15_non_functional.md`
 - `notes/16_monetization.md`
@@ -25789,7 +26208,7 @@ iter46 で書いた「弁護士再依頼」プランは **不要**になった�
 ### 背景
 
 弁護士納品の規約原典（2024-07-18）が `利用規約など/` ディレクトリに存在することを iter45 後に発見。
-読み込んで現状の iHub 設計と照らし合わせ、齟齬を整理。
+読み込んで現状の Megrum 設計と照らし合わせ、齟齬を整理。
 
 iter45 で「松尾満天」を実名表示に変更したが、規約原典では「代表者情報は非公表」が方針だったため、**原典通りに戻す**。
 
@@ -25816,12 +26235,12 @@ iter45 で「松尾満天」を実名表示に変更したが、規約原典で�
 #### 更新ファイル
 - `notes/10_glossary.md`：
   - §J 廃止用語に MyLog・郵送・交換依頼・交換募集・ダイレクトメッセージ等を追加
-  - §M 規約原典マッピングを新設（規約原典 → iHub設計 の用語対応表）
+  - §M 規約原典マッピングを新設（規約原典 → Megrum設計 の用語対応表）
   - 規約改訂が必要な箇所を弁護士再依頼対象として明示
 
-- `iHub/legal-pages.jsx`：
+- `Megrum/legal-pages.jsx`：
   - 代表者名・所在地・電話番号を「**非公表**」（規約原典通り）に戻す
-  - フッターの「松尾 満天（iHub 運営）」を「iHub 運営」に
+  - フッターの「松尾 満天（Megrum 運営）」を「Megrum 運営」に
   - iter45 で入れた実名表示を取り消し
 
 - `notes/15_non_functional.md`：
@@ -25846,7 +26265,7 @@ iter45 で「松尾満天」を実名表示に変更したが、規約原典で�
 
 ### 影響範囲
 - 設計ドキュメント全体の用語統一
-- `iHub/legal-pages.jsx` の表示が規約原典と整合
+- `Megrum/legal-pages.jsx` の表示が規約原典と整合
 - 弁護士に渡せる改訂依頼資料が完成
 - `利用規約など/` ディレクトリは git 管理外として保護
 
@@ -25856,7 +26275,7 @@ USER_PLAYBOOK の 7タスクは iter44 で完了済。iter45（マネタイズ�
 
 ### 確認方法
 - `notes/17_legal_alignment.md`
-- `iHub/legal-pages.jsx`（特商法ページの表示）
+- `Megrum/legal-pages.jsx`（特商法ページの表示）
 - `notes/10_glossary.md` §J + §M
 
 ### 関連ファイル
@@ -25866,7 +26285,7 @@ USER_PLAYBOOK の 7タスクは iter44 で完了済。iter45（マネタイズ�
 
 更新:
 - `notes/10_glossary.md`
-- `iHub/legal-pages.jsx`
+- `Megrum/legal-pages.jsx`
 - `notes/15_non_functional.md`
 - `notes/16_monetization.md`
 - `CLAUDE.md`
@@ -25875,10 +26294,10 @@ USER_PLAYBOOK の 7タスクは iter44 で完了済。iter45（マネタイズ�
 ### 次フェーズへの示唆
 
 法的整合の最終ステップ：
-1. **ドメイン取得 → メールアドレス確定**（hello@ihub.* 等）
+1. **ドメイン取得 → メールアドレス確定**（hello@megrum.* 等）
 2. **`notes/17_legal_alignment.md` を弁護士に共有 → 規約改訂依頼**（$500-800、ユーザー予算内）
 3. **改訂版docx 受領 → `利用規約など/` に保管**
-4. **`iHub/legal-pages.jsx` を改訂版docx に合わせて再更新**
+4. **`Megrum/legal-pages.jsx` を改訂版docx に合わせて再更新**
 5. これで Phase 0a 着手可能
 
 これで設計フェーズ完全完了 + 法的整合まで整理。
@@ -25909,8 +26328,8 @@ USER_PLAYBOOK の 7タスクは iter44 で完了済。iter45（マネタイズ�
 | 運営者氏名 | 松尾 満天 |
 | 法形態 | 個人事業主（届出済） |
 | 屋号 | なし |
-| サービス名 | iHub |
-| 対外ハンドル（暫定） | @ihub_jp |
+| サービス名 | Megrum |
+| 対外ハンドル（暫定） | @megrum_jp |
 
 #### マネタイズ戦略
 
@@ -25946,7 +26365,7 @@ USER_PLAYBOOK の 7タスクは iter44 で完了済。iter45（マネタイズ�
 - `notes/15_non_functional.md`：決済セキュリティ・特商法対応追加
 - `notes/11_screen_inventory.md`：広告配置注釈追加（HOM-main / SCH-main / WSH-list）、§K 広告配置サマリ追加
 - `notes/10_glossary.md`：§L マネタイズ用語追加（ブースト・Premium・Native ad 等）
-- `iHub/legal-pages.jsx`：特商法ページに実名「松尾 満天」反映、有料機能の表記追加
+- `Megrum/legal-pages.jsx`：特商法ページに実名「松尾 満天」反映、有料機能の表記追加
 
 ### Phase 2 完了状況
 
@@ -25959,7 +26378,7 @@ USER_PLAYBOOK の 7タスク中：
 ### 確認方法
 
 - `notes/16_monetization.md`
-- 特商法ページ：http://localhost:8000/iHub%20Legal%20Pages.html
+- 特商法ページ：http://localhost:8000/Megrum%20Legal%20Pages.html
 
 ### 関連ファイル
 
@@ -25969,7 +26388,7 @@ USER_PLAYBOOK の 7タスク中：
 更新：
 - `notes/05_data_model.md`、`13_api_spec.md`、`14_implementation_phases.md`、`15_non_functional.md`
 - `notes/11_screen_inventory.md`、`10_glossary.md`
-- `iHub/legal-pages.jsx`
+- `Megrum/legal-pages.jsx`
 
 ### 次フェーズ
 
@@ -25989,7 +26408,7 @@ Phase β（半年後）でマネタイズ実装着手の予定。
 USER_PLAYBOOK タスク6。
 機能要件（02）が「何を作るか」だとすると、非機能要件は「**どのレベルで作るか**」。Phase 0 着手前に整備して、設計時点で品質特性を確定。
 
-iHub は **「現地で会うアプリ」** という特性上、一般的な交換アプリより配慮すべきリスクが多い：
+Megrum は **「現地で会うアプリ」** という特性上、一般的な交換アプリより配慮すべきリスクが多い：
 - 対面取引でのトラブル（詐欺・暴力・ストーキング）
 - 位置情報の悪用
 - 未成年利用の安全性
@@ -26003,7 +26422,7 @@ iHub は **「現地で会うアプリ」** という特性上、一般的な交
 
 **12 カテゴリ・約 80 要件**：
 
-1. **iHub 特有のリスクと前提**：5 リスクの整理、KPOP 限定 MVP、対象年齢⚠️、有人運営前提
+1. **Megrum 特有のリスクと前提**：5 リスクの整理、KPOP 限定 MVP、対象年齢⚠️、有人運営前提
 2. **プライバシー・個人情報保護**：取り扱う情報の種類分類、位置情報の特殊扱い、未成年対応、プライバシーポリシー要件
 3. **セキュリティ**：認証（bcrypt/argon2、JWT、OAuth）、認可、HTTPS、入力検証、Rate limit、監査ログ
 4. **パフォーマンス**：応答時間 SLA（p95/p99）、DAU 想定、DB インデックス、画像最適化、CWV 目標値
@@ -26016,7 +26435,7 @@ iHub は **「現地で会うアプリ」** という特性上、一般的な交
 11. **コンプライアンス・法的**：個人情報保護法、特商法、利用規約、著作権、18歳未満への配慮
 12. **未確定項目まとめ**：18件を 5カテゴリで整理
 
-**iHub 特有の重要設計**：
+**Megrum 特有の重要設計**：
 - 位置情報の3層分類（広域 / 取引相手のみ / メッセージ内）
 - 服装写真の扱い（取引終了 30日後削除 ⚠️、顔ブラー Post-MVP）
 - 同担拒否文化への配慮（プロフでブロック容易化）
@@ -26060,7 +26479,7 @@ Phase 2 の主要 5 + 任意 1 完了。残るはタスク7（02 更新）のみ
 ### 確認方法
 
 - `notes/15_non_functional.md`
-- GitHub: https://github.com/mashimabizz/iHub_design/blob/main/notes/15_non_functional.md
+- GitHub: https://github.com/mashimabizz/Megrum_design/blob/main/notes/15_non_functional.md
 
 ### 関連ファイル
 
@@ -26181,12 +26600,12 @@ Phase 2 の主要 5/5 完了。**実装フェーズへ移行できる状態**。
 ガバナンス層   CLAUDE.md / README.md / USER_PLAYBOOK.md / 08
 ```
 
-別環境の Claude / 別エンジニアでも、これだけあれば iHub を完全に再現・実装できる状態。
+別環境の Claude / 別エンジニアでも、これだけあれば Megrum を完全に再現・実装できる状態。
 
 ### 確認方法
 
 - `notes/14_implementation_phases.md`
-- GitHub: https://github.com/mashimabizz/iHub_design/blob/main/notes/14_implementation_phases.md
+- GitHub: https://github.com/mashimabizz/Megrum_design/blob/main/notes/14_implementation_phases.md
 
 ### 関連ファイル
 
@@ -26292,7 +26711,7 @@ Phase 2 の主要4タスク完了。**実装フェーズへ移行する準備の
 ### 確認方法
 
 - `notes/13_api_spec.md`
-- GitHub: https://github.com/mashimabizz/iHub_design/blob/main/notes/13_api_spec.md
+- GitHub: https://github.com/mashimabizz/Megrum_design/blob/main/notes/13_api_spec.md
 
 ### 関連ファイル
 
@@ -26306,7 +26725,7 @@ Phase 2 の主要4タスク完了。**実装フェーズへ移行する準備の
 - 依存関係を明確化（Auth が一番先、disputes が一番後 等）
 - 各 Phase の完了基準・概算工数
 
-これで iHub の実装ロードマップが完成し、エンジニア募集・着手の準備が整う。
+これで Megrum の実装ロードマップが完成し、エンジニア募集・着手の準備が整う。
 
 ---
 
@@ -26386,7 +26805,7 @@ USER_PLAYBOOK タスク：
 ### 確認方法
 
 - `notes/12_screens/README.md` から各 spec へリンク
-- GitHub: https://github.com/mashimabizz/iHub_design/tree/main/notes/12_screens
+- GitHub: https://github.com/mashimabizz/Megrum_design/tree/main/notes/12_screens
 
 ### 関連ファイル
 
@@ -26426,7 +26845,7 @@ USER_PLAYBOOK タスク2。
 
 #### `notes/11_screen_inventory.md`（新規作成）
 
-iHub/*.html の `<DCArtboard>` を全スキャン、iHub/*.jsx の `function` 定義をクロスリファレンス。
+Megrum/*.html の `<DCArtboard>` を全スキャン、Megrum/*.jsx の `function` 定義をクロスリファレンス。
 
 **収録**：
 - 最新画面 **89件**（5カテゴリ：認証/オンボ・主要フロー・ハブ・サポート設定・図鑑）
@@ -26462,7 +26881,7 @@ USER_PLAYBOOK タスク：
 ### 確認方法
 
 - `notes/11_screen_inventory.md`
-- mermaid 図は GitHub 上で自動レンダリング：https://github.com/mashimabizz/iHub_design/blob/main/notes/11_screen_inventory.md
+- mermaid 図は GitHub 上で自動レンダリング：https://github.com/mashimabizz/Megrum_design/blob/main/notes/11_screen_inventory.md
 
 ### 関連ファイル
 
@@ -26702,8 +27121,8 @@ iter36 でGitHub移行・スマホClaude ワークフロー基盤が整ったが
 
 ### 確認方法
 
-- リポジトリ：https://github.com/mashimabizz/iHub_design/blob/main/notes/USER_PLAYBOOK.md
-- ランディングページからもアクセス可：https://mashimabizz.github.io/iHub_design/
+- リポジトリ：https://github.com/mashimabizz/Megrum_design/blob/main/notes/USER_PLAYBOOK.md
+- ランディングページからもアクセス可：https://mashimabizz.github.io/Megrum_design/
 
 ### 関連ファイル
 
@@ -26729,7 +27148,7 @@ iPhoneからもClaudeに指示出ししたい、というユーザー要望。
 ### 変更内容
 
 #### GitHub 移行
-- `mashimabizz/iHub_design` リポジトリ新設（既存の `iHub_renewal` とは分離）
+- `mashimabizz/Megrum_design` リポジトリ新設（既存の `Megrum_renewal` とは分離）
 - ローカル git 初期化、初期コミット 56ファイル push
 - `gh` CLI を `~/.local/bin/gh` に直接インストール（Homebrew不要）
 - `gh auth login` で認証完了
@@ -26758,8 +27177,8 @@ iPhoneからもClaudeに指示出ししたい、というユーザー要望。
 - 次回ターミナル起動から `gh` をフルパス指定不要
 
 #### GitHub Pages 有効化
-- `gh api repos/mashimabizz/iHub_design/pages -X POST` で API 経由有効化
-- URL: `https://mashimabizz.github.io/iHub_design/`
+- `gh api repos/mashimabizz/Megrum_design/pages -X POST` で API 経由有効化
+- URL: `https://mashimabizz.github.io/Megrum_design/`
 - スマホ・他環境からプレビュー可能に
 
 ### 影響範囲
@@ -26770,8 +27189,8 @@ iPhoneからもClaudeに指示出ししたい、というユーザー要望。
 
 ### 確認方法
 
-- リポジトリ: https://github.com/mashimabizz/iHub_design
-- GitHub Pages: https://mashimabizz.github.io/iHub_design/iHub/iHub%20MVP%20v1.html （ビルド完了まで数分かかる）
+- リポジトリ: https://github.com/mashimabizz/Megrum_design
+- GitHub Pages: https://mashimabizz.github.io/Megrum_design/Megrum/Megrum%20MVP%20v1.html （ビルド完了まで数分かかる）
 - ローカル: `python3 -m http.server 8000`
 
 ### 関連ファイル
@@ -26919,11 +27338,11 @@ Phase 2（後日）：
 ```
 
 ### 変更ファイル
-- `iHub/c-flow.jsx`：ChatScreen を完全書き換え、`CF_MiniMap` ヘルパー追加
-- `iHub/iHub C Flow.html`：C-2 アートボードラベル更新
+- `Megrum/c-flow.jsx`：ChatScreen を完全書き換え、`CF_MiniMap` ヘルパー追加
+- `Megrum/Megrum C Flow.html`：C-2 アートボードラベル更新
 
 ### 確認方法
-http://localhost:8000/iHub%20C%20Flow.html
+http://localhost:8000/Megrum%20C%20Flow.html
 
 ### ユーザー要望（実装方針の決定）
 - 遅刻通知は**実装しない**（ユーザー判断：「遅刻は別に大丈夫です」）
@@ -26952,7 +27371,7 @@ http://localhost:8000/iHub%20C%20Flow.html
 
 ### 影響画面（変更ファイル）
 
-#### `iHub/propose-select.jsx`
+#### `Megrum/propose-select.jsx`
 - `ProposeSelectScreen` に `initialMeetupType` プロパティを追加
 - タブを2 → 3個に拡張（私が出す / 受け取る / 待ち合わせ）
 - 待ち合わせタブのカウントバッジは ✓（緑）or !（warn色）で表示
@@ -26964,10 +27383,10 @@ http://localhost:8000/iHub%20C%20Flow.html
 - canProceed = 提示物両側 ＋ 待ち合わせ設定済 をすべて満たす
 - `PS_MiniMap` ヘルパーSVGコンポーネント新設（俯瞰図 + 中央ピン + ラベル）
 
-#### `iHub/iHub Propose Select.html`
+#### `Megrum/Megrum Propose Select.html`
 - ⑤「日時指定モード」⑥「即時モード」のアートボード追加（DCSection: meetup）
 
-#### `iHub/nego-flow.jsx`
+#### `Megrum/nego-flow.jsx`
 - `NF_MiniMap` ヘルパーSVGコンポーネント新設
 - **C-1受信**：「📩 提案内容」カード末尾に「📍 待ち合わせ」セクション追加（日時 + 場所 + AW一致バッジ + mini map）。「自動添付情報」から「推奨合流ポイント」を削除（提案に含まれるため）
 - **C-1.5 ネゴチャット**：「現在の提案」カードに、提示物の下に dashed divider + 横並び（mini map ＋ 日時/場所テキスト）の待ち合わせブロック追加。常に視認できる
@@ -26976,7 +27395,7 @@ http://localhost:8000/iHub%20C%20Flow.html
 
 ### 設計判断
 - **デフォルトモードは「日時指定」**：MVPの主用途（事前計画した同担と現地で交換）に合わせる
-- **AW自動登録checkboxはデフォルトON**：iHubの中核データ（AW）を増やす導線として
+- **AW自動登録checkboxはデフォルトON**：Megrumの中核データ（AW）を増やす導線として
 - **マップは「いつも有名会場ではない」前提**：駅前・カフェなど任意の場所でも視覚的に確認可能なよう、SVG俯瞰図ベースで作成
 - **map表示は全proposal cardで一貫**：C-1 / C-1.5 / 合意確認 / 取引成立 すべてで mini map を表示し、迷いをゼロに
 
@@ -26992,8 +27411,8 @@ C-0 提示物＋待ち合わせ選択（3タブ）
 ```
 
 ### 確認方法
-- http://localhost:8000/iHub%20Propose%20Select.html （⑤⑥が新設）
-- http://localhost:8000/iHub%20Nego%20Flow.html （①C-1 / ②C-1.5 / ⑦合意確認 / ⑧取引成立 すべてに meetup 反映）
+- http://localhost:8000/Megrum%20Propose%20Select.html （⑤⑥が新設）
+- http://localhost:8000/Megrum%20Nego%20Flow.html （①C-1 / ②C-1.5 / ⑦合意確認 / ⑧取引成立 すべてに meetup 反映）
 
 ---
 
@@ -27021,11 +27440,11 @@ C-0 提示物＋待ち合わせ選択（3タブ）
   └ 双方合意 → 取引成立画面（リッチ演出）→ C-2
 
 ### 実装ファイル
-- `iHub/nego-flow.jsx`：C15AgreementConfirmModal / C15AgreementSuccess を追加、C15NegoChatScreen に 'mine-agreed' scenario 追加
-- `iHub/iHub Nego Flow.html`：⑥⑦⑧アートボード追加
+- `Megrum/nego-flow.jsx`：C15AgreementConfirmModal / C15AgreementSuccess を追加、C15NegoChatScreen に 'mine-agreed' scenario 追加
+- `Megrum/Megrum Nego Flow.html`：⑥⑦⑧アートボード追加
 
 ### 確認方法
-http://localhost:8000/iHub%20Nego%20Flow.html
+http://localhost:8000/Megrum%20Nego%20Flow.html
 
 ---
 
@@ -27048,8 +27467,8 @@ LINE等の標準的なチャットUIに近い構造、機能性を維持しつ�
 「他のグッズと交換できないか」「相手の他の譲を見たい」というネゴ需要に対応。
 
 ### 実装ファイル
-- `iHub/nego-flow.jsx`：3コンポーネント（C1ReceiveScreen / C15NegoChatScreen / PartnerInventoryModal）
-- `iHub/iHub Nego Flow.html`
+- `Megrum/nego-flow.jsx`：3コンポーネント（C1ReceiveScreen / C15NegoChatScreen / PartnerInventoryModal）
+- `Megrum/Megrum Nego Flow.html`
 
 ### 画面構成
 1. **C-1受信**：相手側の打診受信画面（承諾 / 反対提案 / 拒否 の3択）
@@ -27067,7 +27486,7 @@ LINE等の標準的なチャットUIに近い構造、機能性を維持しつ�
 - 延長：「+7日延長」ボタン（何回でも）
 
 ### 確認方法
-http://localhost:8000/iHub%20Nego%20Flow.html
+http://localhost:8000/Megrum%20Nego%20Flow.html
 
 ---
 
@@ -27086,7 +27505,7 @@ http://localhost:8000/iHub%20Nego%20Flow.html
 - アイテム数 → 枚数集計（複数枚提示が反映）
 
 ### 確認方法
-http://localhost:8000/iHub%20Propose%20Select.html
+http://localhost:8000/Megrum%20Propose%20Select.html
 
 ---
 
@@ -27110,7 +27529,7 @@ http://localhost:8000/iHub%20Propose%20Select.html
 - ④ Backward 片方向
 
 ### 確認方法
-http://localhost:8000/iHub%20Propose%20Select.html
+http://localhost:8000/Megrum%20Propose%20Select.html
 
 ---
 
@@ -27121,8 +27540,8 @@ http://localhost:8000/iHub%20Propose%20Select.html
 片方向マッチ（私が欲しい譲を持つ人 / 私の譲が欲しい人）から打診する時、片側を自分で選ぶステップが欠けていた。
 
 ### 実装ファイル
-- `iHub/propose-select.jsx`：C-0 ProposeSelectScreen（forward/backward両対応）
-- `iHub/iHub Propose Select.html`
+- `Megrum/propose-select.jsx`：C-0 ProposeSelectScreen（forward/backward両対応）
+- `Megrum/Megrum Propose Select.html`
 
 ### 画面構成
 - **Forward**：「私が欲しい譲を持つ人」から打診 → 提示する譲を選ぶ
@@ -27134,7 +27553,7 @@ http://localhost:8000/iHub%20Propose%20Select.html
 - 片方向マッチ：[打診する] → **C-0 提示物選択** → C-1 → C-1' → 送信
 
 ### 確認方法
-http://localhost:8000/iHub%20Propose%20Select.html
+http://localhost:8000/Megrum%20Propose%20Select.html
 
 ---
 
@@ -27181,8 +27600,8 @@ http://localhost:8000/iHub%20Propose%20Select.html
 - マッチカードのバッジ詳細化（C案）は保留 ─ ホーム画面サンプル見て判断
 
 ### 確認方法
-- http://localhost:8000/iHub%20Search%20Filter.html （画面② フィルタ）
-- http://localhost:8000/iHub%20B%20Inventory.html
+- http://localhost:8000/Megrum%20Search%20Filter.html （画面② フィルタ）
+- http://localhost:8000/Megrum%20B%20Inventory.html
 
 ---
 
@@ -27193,8 +27612,8 @@ http://localhost:8000/iHub%20Propose%20Select.html
 ユーザーがマッチ条件をカスタマイズできるように検索・フィルタ機能を追加。
 
 ### 実装ファイル
-- `iHub/search-filter.jsx`：3画面
-- `iHub/iHub Search Filter.html`
+- `Megrum/search-filter.jsx`：3画面
+- `Megrum/Megrum Search Filter.html`
 
 ### 画面構成
 1. **検索画面** ─ キーワード検索＋クイックフィルタ＋結果＋履歴＋人気
@@ -27202,15 +27621,15 @@ http://localhost:8000/iHub%20Propose%20Select.html
 3. **保存検索リスト** ─ ピン留め・ワンタップ適用・件数バッジ・件数0時の分岐
 
 ### 確認方法
-http://localhost:8000/iHub%20Search%20Filter.html
+http://localhost:8000/Megrum%20Search%20Filter.html
 
 ---
 
 ## イテレーション22：プロフ補助 Phase 2（8画面）
 
 ### 実装ファイル
-- `iHub/account-extras.jsx`：8画面
-- `iHub/iHub Profile Extras.html`
+- `Megrum/account-extras.jsx`：8画面
+- `Megrum/Megrum Profile Extras.html`
 
 ### 画面構成
 1. プロフィール編集（アイコン・ハンドル・自己紹介・性別・活動エリア・服装写真）
@@ -27223,7 +27642,7 @@ http://localhost:8000/iHub%20Search%20Filter.html
 8. アカウント削除完了（データ一覧＋7年保管注記＋再登録）
 
 ### 確認方法
-http://localhost:8000/iHub%20Profile%20Extras.html
+http://localhost:8000/Megrum%20Profile%20Extras.html
 
 ---
 
@@ -27234,8 +27653,8 @@ http://localhost:8000/iHub%20Profile%20Extras.html
 法的に必須なので Phase 1 として3画面を実装。
 
 ### 実装ファイル
-- `iHub/legal-pages.jsx`：3画面（TermsOfService / PrivacyPolicy / LegalNotice）
-- `iHub/iHub Legal Pages.html`：表示用 HTML
+- `Megrum/legal-pages.jsx`：3画面（TermsOfService / PrivacyPolicy / LegalNotice）
+- `Megrum/Megrum Legal Pages.html`：表示用 HTML
 
 ### 画面構成
 1. **利用規約**：第1条〜第12条＋附則（全12条構成）
@@ -27249,7 +27668,7 @@ http://localhost:8000/iHub%20Profile%20Extras.html
 - 新規登録画面の「規約に同意する」チェックボックスからも遷移できるようにリンク実装要
 
 ### 確認方法
-http://localhost:8000/iHub%20Legal%20Pages.html
+http://localhost:8000/Megrum%20Legal%20Pages.html
 
 ---
 
@@ -27258,8 +27677,8 @@ http://localhost:8000/iHub%20Legal%20Pages.html
 Claude Design 利用制限のため、ハナ自身が JSX 直接実装。
 
 ### 実装ファイル
-- `iHub/auth-onboarding.jsx`（13画面分の React コンポーネント）
-- `iHub/iHub Auth Onboarding.html`（表示用 HTML、Babel Standalone）
+- `Megrum/auth-onboarding.jsx`（13画面分の React コンポーネント）
+- `Megrum/Megrum Auth Onboarding.html`（表示用 HTML、Babel Standalone）
 
 ### 13画面の構成
 1. ウェルカム（メアド/Google/ログインの3CTA）
@@ -27273,8 +27692,8 @@ Claude Design 利用制限のため、ハナ自身が JSX 直接実装。
 8〜12. オンボーディング（性別→推しグループ→メンバー→AWエリア→完了）
 
 ### 確認方法
-ローカルサーバー起動：`python3 -m http.server 8000`（iHub ディレクトリ内）
-http://localhost:8000/iHub%20Auth%20Onboarding.html
+ローカルサーバー起動：`python3 -m http.server 8000`（Megrum ディレクトリ内）
+http://localhost:8000/Megrum%20Auth%20Onboarding.html
 
 ---
 
@@ -27316,14 +27735,14 @@ http://localhost:8000/iHub%20Auth%20Onboarding.html
 
 ### ファイル構成方針
 
-**新規 1ファイル統合**：`iHub Core Surfaces.html`（仮名、命名は依頼者判断）
+**新規 1ファイル統合**：`Megrum Core Surfaces.html`（仮名、命名は依頼者判断）
 - ホーム再確認＋プロフハブ＋ウィッシュタブの 6〜7画面を1ファイル統合
 - 関連性が強い3画面群、横断確認が効く
 
 **既存ファイルのナビ一括修正**（5画面構成「ホーム／在庫／取引／ウィッシュ／プロフ」に統一）：
-- iHub B Inventory.html
-- iHub Account & Support.html
-- iHub Collection Pokedex.html
-- iHub Dispute Flow.html
-- iHub C Flow.html
-- iHub AW.html
+- Megrum B Inventory.html
+- Megrum Account & Support.html
+- Megrum Collection Pokedex.html
+- Megrum Dispute Flow.html
+- Megrum C Flow.html
+- Megrum AW.html

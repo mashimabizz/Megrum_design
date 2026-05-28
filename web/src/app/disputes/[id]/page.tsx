@@ -4,7 +4,7 @@ import { HeaderBack } from "@/components/auth/HeaderBack";
 import { DisputeView, type DisputeDetail } from "./DisputeView";
 
 export const metadata = {
-  title: "申告ステータス — iHub",
+  title: "申告ステータス — Megrum",
 };
 
 type DisputeRow = {

@@ -1,5 +1,5 @@
 import * as ImagePicker from "expo-image-picker";
-import { router, useLocalSearchParams } from "expo-router";
+import { router, Stack, useLocalSearchParams } from "expo-router";
 import {
   useEffect,
   useMemo,
@@ -10,7 +10,9 @@ import {
 import {
   ActivityIndicator,
   Alert,
+  ActionSheetIOS,
   Image,
+  Platform,
   Pressable,
   StyleSheet,
   Text,
@@ -23,7 +25,7 @@ import { StatusPill } from "../src/components/StatusPill";
 import { TradingCardBulkCropper } from "../src/components/TradingCardBulkCropper";
 import { useAuth } from "../src/auth/AuthProvider";
 import { supabase } from "../src/lib/supabase";
-import { ihubColors, ihubRadii, ihubShadow } from "../src/theme/tokens";
+import { megrumColors, megrumRadii, megrumShadow } from "../src/theme/tokens";
 
 type GoodsKind = "inventory" | "wish";
 type EditorMode = "create" | "edit" | "readonly";
@@ -84,16 +86,10 @@ type EditorData = {
 
 const REQ_PREFIX = "req:";
 const TAG_LIMIT = 5;
+const TAG_SUGGESTION_LIMIT = 8;
 const INVENTORY_DESCRIPTION_LIMIT = 1000;
+const INVENTORY_EDIT_DESCRIPTION_LIMIT = 500;
 const WISH_DESCRIPTION_LIMIT = 200;
-const CONDITIONS: { value: GoodsCondition; label: string }[] = [
-  { value: "sealed", label: "未開封" },
-  { value: "mint", label: "極美" },
-  { value: "good", label: "良好" },
-  { value: "fair", label: "普通" },
-  { value: "poor", label: "難あり" },
-];
-
 export default function GoodsEditorScreen() {
   const { user, previewMode } = useAuth();
   const params = useLocalSearchParams<{
@@ -142,6 +138,10 @@ export default function GoodsEditorScreen() {
   const [tagDraft, setTagDraft] = useState("");
   const [tagSuggestions, setTagSuggestions] = useState<TagSuggestion[]>([]);
   const hydratedKey = useRef<string | null>(null);
+  const filteredTagSuggestions = useMemo(() => {
+    const selected = new Set(tags.map((tag) => tag.label.toLowerCase()));
+    return tagSuggestions.filter((suggestion) => !selected.has(suggestion.label.toLowerCase()));
+  }, [tagSuggestions, tags]);
 
   const screenTitle = useMemo(() => {
     if (readonly) return isWish ? "ウィッシュ詳細" : "グッズ詳細";
@@ -256,25 +256,40 @@ export default function GoodsEditorScreen() {
 
   function handlePickPhoto() {
     if (itemIsReadOnly || !user || !supabase) return;
-    Alert.alert(
-      photoUrls[0] ? "写真を差し替え" : "写真を追加",
-      "登録する画像を選んでください。",
-      [
+    const title = photoUrls[0] ? "写真を差し替え" : "写真を追加";
+    if (Platform.OS === "ios") {
+      ActionSheetIOS.showActionSheetWithOptions(
         {
-          text: "カメラで撮る",
-          onPress: () => {
-            void pickEditorPhoto("camera");
-          },
+          title,
+          message: "登録する画像を選んでください。",
+          options: ["カメラで撮る", "写真を選ぶ", "閉じる"],
+          cancelButtonIndex: 2,
+          userInterfaceStyle: "light",
+          tintColor: megrumColors.lavender,
         },
-        {
-          text: "写真を選ぶ",
-          onPress: () => {
-            void pickEditorPhoto("library");
-          },
+        (buttonIndex) => {
+          if (buttonIndex === 0) void pickEditorPhoto("camera");
+          if (buttonIndex === 1) void pickEditorPhoto("library");
         },
-        { text: "閉じる", style: "cancel" },
-      ],
-    );
+      );
+      return;
+    }
+
+    Alert.alert(title, "登録する画像を選んでください。", [
+      {
+        text: "カメラで撮る",
+        onPress: () => {
+          void pickEditorPhoto("camera");
+        },
+      },
+      {
+        text: "写真を選ぶ",
+        onPress: () => {
+          void pickEditorPhoto("library");
+        },
+      },
+      { text: "閉じる", style: "cancel" },
+    ]);
   }
 
   async function pickEditorPhoto(source: "camera" | "library") {
@@ -372,7 +387,13 @@ export default function GoodsEditorScreen() {
     if (title.trim().length > 100) return "タイトルは 100 文字以内で入力してください";
     if (series.trim().length > 80) return "シリーズ・弾名は 80 文字以内で入力してください";
     if (isWish && description.length > WISH_DESCRIPTION_LIMIT) return "メモは 200 文字以内で入力してください";
-    if (!isWish && description.length > INVENTORY_DESCRIPTION_LIMIT) return "説明は 1000 文字以内で入力してください";
+    if (
+      !isWish &&
+      description.length >
+        (mode === "edit" ? INVENTORY_EDIT_DESCRIPTION_LIMIT : INVENTORY_DESCRIPTION_LIMIT)
+    ) {
+      return `説明は ${mode === "edit" ? INVENTORY_EDIT_DESCRIPTION_LIMIT : INVENTORY_DESCRIPTION_LIMIT} 文字以内で入力してください`;
+    }
     if (mode === "edit" && !id) return "編集対象が見つかりません";
     return null;
   }
@@ -422,9 +443,7 @@ export default function GoodsEditorScreen() {
           character_request_id: payload.character_request_id,
           goods_type_id: payload.goods_type_id,
           title: payload.title,
-          series: payload.series,
           description: payload.description,
-          condition: payload.condition,
           quantity: payload.quantity,
           photo_urls: payload.photo_urls,
         })
@@ -538,44 +557,43 @@ export default function GoodsEditorScreen() {
     const refresh = String(Date.now());
     if (isWish) {
       router.replace({
-        pathname: "/(tabs)/wishes",
+        pathname: "/wishes",
         params: { tab: "wish", refresh },
       });
       return;
     }
     router.replace({
-      pathname: "/(tabs)/inventory",
+      pathname: "/inventory",
       params: { refresh },
     });
   }
 
   const previewGlyph = characterValue
     ? characterLabel(characterValue, data.characters, data.pendingMembers).slice(0, 1)
-    : selectedGroup?.name.slice(0, 1) || one(params.glyph) || "iH";
+    : selectedGroup?.name.slice(0, 1) || one(params.glyph) || "Mg";
   const previewHue = one(params.hue) ?? "#cbbcf4";
+  const descriptionLimit = isWish
+    ? WISH_DESCRIPTION_LIMIT
+    : mode === "edit"
+      ? INVENTORY_EDIT_DESCRIPTION_LIMIT
+      : INVENTORY_DESCRIPTION_LIMIT;
 
   if (!isWish && mode === "create") {
     return (
-      <Screen contentStyle={styles.screen}>
-        <View style={styles.header}>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="戻る"
-            onPress={() => router.back()}
-            style={styles.backButton}
-          >
-            <Text style={styles.backText}>‹</Text>
-          </Pressable>
-          <View style={styles.headerCopy}>
-            <Text style={styles.kicker}>INVENTORY</Text>
-            <Text style={styles.title}>グッズを登録</Text>
-          </View>
-          <StatusPill label="NEW" tone="lavender" />
-        </View>
+      <Screen contentStyle={styles.screen} topInset={false}>
+        <Stack.Screen
+          options={{
+            headerShown: true,
+            title: "グッズを登録",
+            headerBackButtonDisplayMode: "minimal",
+            headerBlurEffect: "systemMaterial",
+            headerTintColor: megrumColors.lavender,
+          }}
+        />
 
         {loading ? (
           <View style={styles.loadingBox}>
-            <ActivityIndicator color={ihubColors.lavender} />
+            <ActivityIndicator color={megrumColors.lavender} />
             <Text style={styles.loadingText}>マスタを読み込み中…</Text>
           </View>
         ) : null}
@@ -595,29 +613,26 @@ export default function GoodsEditorScreen() {
   }
 
   return (
-    <Screen contentStyle={styles.screen}>
-      <View style={styles.header}>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="戻る"
-          onPress={() => router.back()}
-          style={styles.backButton}
-        >
-          <Text style={styles.backText}>‹</Text>
-        </Pressable>
-        <View style={styles.headerCopy}>
-          <Text style={styles.kicker}>{isWish ? "WISH" : "INVENTORY"}</Text>
-          <Text style={styles.title}>{screenTitle}</Text>
-        </View>
-        <StatusPill
-          label={itemIsReadOnly ? "詳細のみ" : mode === "create" ? "NEW" : "EDIT"}
-          tone={isWish ? "pink" : "lavender"}
-        />
-      </View>
+    <Screen contentStyle={styles.screen} topInset={false}>
+      <Stack.Screen
+        options={{
+          headerShown: true,
+          title: screenTitle,
+          headerBackButtonDisplayMode: "minimal",
+          headerBlurEffect: "systemMaterial",
+          headerTintColor: megrumColors.lavender,
+          headerRight: () => (
+            <StatusPill
+              label={itemIsReadOnly ? "詳細のみ" : mode === "create" ? "NEW" : "EDIT"}
+              tone={isWish ? "pink" : "lavender"}
+            />
+          ),
+        }}
+      />
 
       {loading ? (
         <View style={styles.loadingBox}>
-          <ActivityIndicator color={ihubColors.lavender} />
+          <ActivityIndicator color={megrumColors.lavender} />
           <Text style={styles.loadingText}>マスタと登録内容を読み込み中…</Text>
         </View>
       ) : null}
@@ -689,30 +704,6 @@ export default function GoodsEditorScreen() {
           />
         </Section>
 
-        {!isWish ? (
-          <>
-            <Section label="シリーズ・弾名" hint="任意">
-              <TextInput
-                value={series}
-                editable={!itemIsReadOnly}
-                onChangeText={setSeries}
-                maxLength={80}
-                placeholder="例: WORLD TOUR / 5th Mini / 公式"
-                placeholderTextColor="rgba(58,50,74,0.35)"
-                style={styles.input}
-              />
-            </Section>
-
-            <Section label="コンディション">
-              <ConditionChips
-                value={condition}
-                readonly={itemIsReadOnly}
-                onChange={setCondition}
-              />
-            </Section>
-          </>
-        ) : null}
-
         {isOther ? (
           <Section label="タイトル" required>
             <TextInput
@@ -760,7 +751,7 @@ export default function GoodsEditorScreen() {
           <TagEditor
             value={tags}
             draft={tagDraft}
-            suggestions={tagSuggestions}
+            suggestions={filteredTagSuggestions}
             readonly={itemIsReadOnly}
             onChangeDraft={setTagDraft}
             onAdd={addTag}
@@ -770,13 +761,13 @@ export default function GoodsEditorScreen() {
 
         <Section
           label={isWish ? "メモ" : "説明 / メモ"}
-          hint={`${description.length} / ${isWish ? WISH_DESCRIPTION_LIMIT : INVENTORY_DESCRIPTION_LIMIT}`}
+          hint={`${description.length} / ${descriptionLimit}`}
         >
           <TextInput
             value={description}
             editable={!itemIsReadOnly}
             multiline
-            maxLength={isWish ? WISH_DESCRIPTION_LIMIT : INVENTORY_DESCRIPTION_LIMIT}
+            maxLength={descriptionLimit}
             onChangeText={setDescription}
             placeholder={isWish ? "例: 4/27 横アリで取引できる人優先" : "補足やコンディションの詳細"}
             placeholderTextColor="rgba(58,50,74,0.35)"
@@ -877,18 +868,25 @@ function InventoryCreateFlow({
   const [step, setStep] = useState<CreateStep>("common");
   const [groupId, setGroupId] = useState("");
   const [goodsTypeId, setGoodsTypeId] = useState("");
-  const [series, setSeries] = useState("");
-  const [condition, setCondition] = useState<GoodsCondition>("good");
   const [pendingMembers, setPendingMembers] = useState(data.pendingMembers);
   const [photos, setPhotos] = useState<CreatePhoto[]>([]);
   const [metas, setMetas] = useState<CreateMeta[]>([]);
-  const [startCarrying, setStartCarrying] = useState(false);
   const [tags, setTags] = useState<TagValue[]>([]);
   const [tagDraft, setTagDraft] = useState("");
   const [tagSuggestions, setTagSuggestions] = useState<TagSuggestion[]>([]);
+  const [requestOpen, setRequestOpen] = useState(false);
+  const [requestName, setRequestName] = useState("");
+  const [requestNote, setRequestNote] = useState("");
+  const [requestPending, setRequestPending] = useState(false);
+  const [requestError, setRequestError] = useState<string | null>(null);
+  const [requestedNames, setRequestedNames] = useState<string[]>([]);
   const [tradingCardCropperOpen, setTradingCardCropperOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const filteredTagSuggestions = useMemo(() => {
+    const selected = new Set(tags.map((tag) => tag.label.toLowerCase()));
+    return tagSuggestions.filter((suggestion) => !selected.has(suggestion.label.toLowerCase()));
+  }, [tagSuggestions, tags]);
 
   const selectedGroup = data.groups.find((group) => group.id === groupId);
   const selectedGoodsType = data.goodsTypes.find((goodsType) => goodsType.id === goodsTypeId);
@@ -997,9 +995,11 @@ function InventoryCreateFlow({
             quality: 0.86,
           })
         : await ImagePicker.launchImageLibraryAsync({
-            allowsEditing: true,
+            allowsEditing: false,
             aspect: [1, 1],
-            allowsMultipleSelection: false,
+            allowsMultipleSelection: true,
+            orderedSelection: true,
+            selectionLimit: 0,
             mediaTypes: ["images"],
             quality: 0.86,
           });
@@ -1091,40 +1091,44 @@ function InventoryCreateFlow({
 
   async function handleMemberRequest() {
     if (!supabase || !userId || !groupId) return;
-    const db = supabase;
-    Alert.prompt(
-      "メンバー追加リクエスト",
-      "メンバー名を入力してください",
-      async (value) => {
-        const name = value?.trim();
-        if (!name) return;
-        try {
-          const { data: inserted, error: insertError } = await db
-            .from("character_requests")
-            .insert({
-              user_id: userId,
-              group_id: groupId,
-              requested_name: name,
-              note: null,
-            })
-            .select("id")
-            .single();
-          if (insertError) throw insertError;
-          const next = {
-            id: String((inserted as { id: string }).id),
-            name,
-            group_id: groupId,
-          };
-          setPendingMembers((current) => [next, ...current]);
-        } catch (requestError) {
-          setError(
-            requestError instanceof Error
-              ? requestError.message
-              : "追加リクエストに失敗しました",
-          );
-        }
-      },
-    );
+    const name = requestName.trim();
+    if (!name) {
+      setRequestError("メンバー名を入力してください");
+      return;
+    }
+    setRequestPending(true);
+    setRequestError(null);
+    try {
+      const { data: inserted, error: insertError } = await supabase
+        .from("character_requests")
+        .insert({
+          user_id: userId,
+          group_id: groupId,
+          requested_name: name,
+          note: requestNote.trim() || null,
+        })
+        .select("id")
+        .single();
+      if (insertError) throw insertError;
+      const next = {
+        id: String((inserted as { id: string }).id),
+        name,
+        group_id: groupId,
+      };
+      setPendingMembers((current) => [next, ...current]);
+      setRequestedNames((current) => [name, ...current]);
+      setRequestName("");
+      setRequestNote("");
+      setRequestOpen(false);
+    } catch (requestError) {
+      setRequestError(
+        requestError instanceof Error
+          ? requestError.message
+          : "追加リクエストに失敗しました",
+      );
+    } finally {
+      setRequestPending(false);
+    }
   }
 
   async function handleSave() {
@@ -1158,12 +1162,12 @@ function InventoryCreateFlow({
           character_request_id: characterRequestId,
           goods_type_id: goodsTypeId,
           title: finalTitle,
-          series: series.trim() || null,
+          series: null,
           description: null,
-          condition,
+          condition: "good" as GoodsCondition,
           quantity: Math.max(1, Math.min(999, meta.quantity || 1)),
           photo_urls: uploaded[index]?.publicUrl ? [uploaded[index].publicUrl] : [],
-          carrying: startCarrying,
+          carrying: false,
         };
       });
     } catch (metaError) {
@@ -1224,7 +1228,7 @@ function InventoryCreateFlow({
         <View style={styles.createHint}>
           <Text style={styles.createHintTitle}>1回の登録は同じ推し・種別が前提</Text>
           <Text style={styles.createHintText}>
-            先にグループとグッズ種別を選び、次の画面で写真ごとにメンバーや数量を調整します。
+            先に推しとグッズ種別、必要に応じてタグを選び、次の画面で写真ごとにメンバーや数量を調整します。
           </Text>
         </View>
 
@@ -1249,22 +1253,15 @@ function InventoryCreateFlow({
           />
         </Section>
 
-        <Section label="シリーズ・弾名" hint="任意">
-          <TextInput
-            value={series}
-            onChangeText={setSeries}
-            maxLength={80}
-            placeholder="例: WORLD TOUR / 5th Mini / 公式"
-            placeholderTextColor="rgba(58,50,74,0.35)"
-            style={styles.input}
-          />
-        </Section>
-
-        <Section label="コンディション">
-          <ConditionChips
-            value={condition}
+        <Section label="タグ" hint="マッチ優先度に使用">
+          <TagEditor
+            value={tags}
+            draft={tagDraft}
+            suggestions={filteredTagSuggestions}
             readonly={false}
-            onChange={setCondition}
+            onChangeDraft={setTagDraft}
+            onAdd={addTag}
+            onRemove={removeTag}
           />
         </Section>
 
@@ -1290,7 +1287,7 @@ function InventoryCreateFlow({
         <View style={styles.createHint}>
           <Text style={styles.createHintTitle}>写真を撮る / 選ぶ</Text>
           <Text style={styles.createHintText}>
-            1枚ずつ切り抜いて追加できます。複数ある場合は続けて選ぶと、写真ごとに1件ずつ登録できます。
+            写真ライブラリからは複数枚を一度に選べます。選択した順に、写真ごとに1件ずつ登録できます。
           </Text>
         </View>
 
@@ -1301,7 +1298,7 @@ function InventoryCreateFlow({
           </Pressable>
           <Pressable style={styles.photoPickButton} onPress={() => void pickImages("library")}>
             <Text style={styles.photoPickIcon}>▧</Text>
-            <Text style={styles.photoPickText}>写真を選ぶ</Text>
+            <Text style={styles.photoPickText}>写真を選ぶ（複数可）</Text>
           </Pressable>
         </View>
 
@@ -1340,7 +1337,7 @@ function InventoryCreateFlow({
                   <Image source={{ uri: photo.uri }} resizeMode="cover" style={styles.createPhotoImage} />
                   {photo.status === "uploading" ? (
                     <View style={styles.createPhotoOverlay}>
-                      <ActivityIndicator color={ihubColors.surface} />
+                      <ActivityIndicator color={megrumColors.surface} />
                     </View>
                   ) : null}
                   {photo.status === "error" ? (
@@ -1372,7 +1369,7 @@ function InventoryCreateFlow({
             disabled={uploadedCount === 0 || uploadingCount > 0}
             onPress={goToMetaWithPhotos}
           >
-            次へ：ラベル設定
+            次へ：詳細設定へ
           </PrimaryButton>
         </View>
 
@@ -1388,15 +1385,77 @@ function InventoryCreateFlow({
   return (
     <View style={styles.createFlow}>
       <View style={styles.createHint}>
-        <Text style={styles.createHintTitle}>各グッズのラベル設定</Text>
+        <Text style={styles.createHintTitle}>各グッズの詳細設定</Text>
         <Text style={styles.createHintText}>
-          {selectedGroup?.name ?? "推し"} / {selectedGoodsType?.name ?? "種別"} として登録します。
+          写真ごとにメンバーと数量を設定します。{selectedGroup?.name ?? "推し"} / {selectedGoodsType?.name ?? "種別"} として登録します。
         </Text>
       </View>
 
-      <Pressable style={styles.requestButton} onPress={handleMemberRequest}>
-        <Text style={styles.requestButtonText}>+ メンバーが見つからない場合は追加リクエスト</Text>
-      </Pressable>
+      {!requestOpen ? (
+        <Pressable style={styles.requestButton} onPress={() => setRequestOpen(true)}>
+          <Text style={styles.requestButtonText}>+ メンバーが見つからない場合は追加リクエスト</Text>
+        </Pressable>
+      ) : (
+        <View style={styles.requestForm}>
+          <Text style={styles.requestFormLabel}>メンバー追加リクエスト</Text>
+          <TextInput
+            value={requestName}
+            onChangeText={setRequestName}
+            maxLength={100}
+            placeholder="メンバー名（例: スア）"
+            placeholderTextColor="rgba(58,50,74,0.35)"
+            style={styles.requestInput}
+          />
+          <TextInput
+            value={requestNote}
+            onChangeText={setRequestNote}
+            maxLength={500}
+            multiline
+            placeholder="メモ（公式リンク・別名など、任意）"
+            placeholderTextColor="rgba(58,50,74,0.35)"
+            style={[styles.requestInput, styles.requestNoteInput]}
+            textAlignVertical="top"
+          />
+          {requestError ? <Text style={styles.requestError}>{requestError}</Text> : null}
+          <View style={styles.requestActions}>
+            <Pressable
+              disabled={requestPending}
+              onPress={() => {
+                setRequestOpen(false);
+                setRequestError(null);
+              }}
+              style={styles.requestCancelButton}
+            >
+              <Text style={styles.requestCancelText}>キャンセル</Text>
+            </Pressable>
+            <Pressable
+              disabled={requestPending || !requestName.trim()}
+              onPress={() => void handleMemberRequest()}
+              style={[
+                styles.requestSubmitButton,
+                requestPending || !requestName.trim() ? styles.requestSubmitDisabled : null,
+              ]}
+            >
+              <Text style={styles.requestSubmitText}>
+                {requestPending ? "送信中…" : "リクエスト送信"}
+              </Text>
+            </Pressable>
+          </View>
+        </View>
+      )}
+
+      {requestedNames.length > 0 ? (
+        <View style={styles.requestedBox}>
+          <Text style={styles.requestedLead}>送信済リクエスト:</Text>
+          <View style={styles.requestedChips}>
+            {requestedNames.map((name, index) => (
+              <View key={`${name}-${index}`} style={styles.requestedChip}>
+                <Text style={styles.requestedChipText}>{name}（審査中）</Text>
+              </View>
+            ))}
+          </View>
+        </View>
+      ) : null}
 
       <View style={styles.createMetaList}>
         {metas.map((meta, index) => (
@@ -1440,31 +1499,6 @@ function InventoryCreateFlow({
           </View>
         ))}
       </View>
-
-      <Pressable
-        onPress={() => setStartCarrying((current) => !current)}
-        style={styles.carryToggle}
-      >
-        <View style={[styles.checkbox, startCarrying ? styles.checkboxActive : null]}>
-          {startCarrying ? <Text style={styles.checkboxText}>✓</Text> : null}
-        </View>
-        <View style={styles.carryCopy}>
-          <Text style={styles.carryTitle}>全部今日から持参中にする</Text>
-          <Text style={styles.carryText}>会場で交換可能な状態にする</Text>
-        </View>
-      </Pressable>
-
-      <Section label="タグ" hint="全グッズに付与">
-        <TagEditor
-          value={tags}
-          draft={tagDraft}
-          suggestions={tagSuggestions}
-          readonly={false}
-          onChangeDraft={setTagDraft}
-          onAdd={addTag}
-          onRemove={removeTag}
-        />
-      </Section>
 
       {error ? <Notice tone="danger">{error}</Notice> : null}
 
@@ -1548,41 +1582,6 @@ function GoodsTypeChips({
   );
 }
 
-function ConditionChips({
-  value,
-  readonly,
-  onChange,
-}: {
-  value: GoodsCondition;
-  readonly: boolean;
-  onChange: (value: GoodsCondition) => void;
-}) {
-  return (
-    <View style={styles.conditionGrid}>
-      {CONDITIONS.map((condition) => (
-        <Pressable
-          key={condition.value}
-          disabled={readonly}
-          onPress={() => onChange(condition.value)}
-          style={[
-            styles.conditionChip,
-            value === condition.value ? styles.conditionChipActive : null,
-          ]}
-        >
-          <Text
-            style={[
-              styles.conditionChipText,
-              value === condition.value ? styles.conditionChipTextActive : null,
-            ]}
-          >
-            {condition.label}
-          </Text>
-        </Pressable>
-      ))}
-    </View>
-  );
-}
-
 function SelectableChip({
   active,
   dashed,
@@ -1656,7 +1655,7 @@ function PhotoEditor({
         {!readonly ? (
           <Pressable disabled={photoUploading} onPress={onPick} style={styles.photoOverlayButton}>
             {photoUploading ? (
-              <ActivityIndicator color={ihubColors.lavender} size="small" />
+              <ActivityIndicator color={megrumColors.lavender} size="small" />
             ) : (
               <Text style={styles.photoOverlayText}>
                 {photoUrl ? "撮り直す / 差し替え" : "写真を追加"}
@@ -1810,7 +1809,10 @@ function TagEditor({
                   onPress={() => onAdd(suggestion.label, suggestion.id)}
                   style={styles.suggestionChip}
                 >
-                  <Text style={styles.suggestionText}>{suggestion.label}</Text>
+                  <Text numberOfLines={1} style={styles.suggestionText}>#{suggestion.label}</Text>
+                  <Text style={styles.suggestionCountText}>
+                    登録{suggestion.userCount.toLocaleString("ja-JP")}件
+                  </Text>
                 </Pressable>
               ))}
             </View>
@@ -2133,18 +2135,21 @@ async function searchTags(q: string): Promise<TagSuggestion[]> {
   if (!supabase) return [];
   const { data, error } = await supabase.rpc("search_tags", {
     p_q: q,
-    p_limit: 8,
+    p_limit: 30,
   });
   if (error) return [];
   return ((data as {
     id: string;
     label: string;
-    user_count: number;
-  }[] | null) ?? []).map((tag) => ({
-    id: tag.id,
-    label: tag.label,
-    userCount: tag.user_count,
-  }));
+    user_count: number | string | null;
+  }[] | null) ?? [])
+    .map((tag) => ({
+      id: tag.id,
+      label: tag.label,
+      userCount: Number(tag.user_count ?? 0),
+    }))
+    .sort((a, b) => b.userCount - a.userCount || a.label.localeCompare(b.label, "ja"))
+    .slice(0, TAG_SUGGESTION_LIMIT);
 }
 
 async function syncTags(inventoryId: string, currentTags: TagValue[], existingTags: TagValue[]) {
@@ -2284,17 +2289,17 @@ const styles = StyleSheet.create({
   },
   backButton: {
     alignItems: "center",
-    backgroundColor: ihubColors.surface,
+    backgroundColor: megrumColors.surface,
     borderColor: "rgba(58,50,74,0.08)",
-    borderRadius: ihubRadii.pill,
+    borderRadius: megrumRadii.pill,
     borderWidth: 1,
     height: 44,
     justifyContent: "center",
     width: 44,
-    ...ihubShadow,
+    ...megrumShadow,
   },
   backText: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 32,
     fontWeight: "700",
     lineHeight: 34,
@@ -2303,29 +2308,29 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   kicker: {
-    color: ihubColors.lavender,
+    color: megrumColors.lavender,
     fontSize: 10.5,
     fontWeight: "900",
     letterSpacing: 0.6,
   },
   title: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 20,
     fontWeight: "900",
     lineHeight: 25,
   },
   loadingBox: {
     alignItems: "center",
-    backgroundColor: ihubColors.surface,
+    backgroundColor: megrumColors.surface,
     borderColor: "rgba(58,50,74,0.08)",
-    borderRadius: ihubRadii.lg,
+    borderRadius: megrumRadii.lg,
     borderWidth: 1,
     flexDirection: "row",
     gap: 10,
     padding: 14,
   },
   loadingText: {
-    color: ihubColors.mutedInk,
+    color: megrumColors.mutedInk,
     fontSize: 12,
     fontWeight: "800",
   },
@@ -2342,20 +2347,20 @@ const styles = StyleSheet.create({
   createHint: {
     backgroundColor: "rgba(166,149,216,0.08)",
     borderColor: "rgba(166,149,216,0.20)",
-    borderRadius: ihubRadii.lg,
+    borderRadius: megrumRadii.lg,
     borderWidth: 1,
     gap: 6,
     paddingHorizontal: 15,
     paddingVertical: 14,
   },
   createHintTitle: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 15,
     fontWeight: "900",
     lineHeight: 20,
   },
   createHintText: {
-    color: ihubColors.mutedInk,
+    color: megrumColors.mutedInk,
     fontSize: 12,
     fontWeight: "800",
     lineHeight: 18,
@@ -2366,25 +2371,25 @@ const styles = StyleSheet.create({
   },
   photoPickButton: {
     alignItems: "center",
-    backgroundColor: ihubColors.surface,
+    backgroundColor: megrumColors.surface,
     borderColor: "rgba(58,50,74,0.08)",
-    borderRadius: ihubRadii.lg,
+    borderRadius: megrumRadii.lg,
     borderWidth: 1,
     flex: 1,
     gap: 7,
     justifyContent: "center",
     minHeight: 112,
     padding: 14,
-    ...ihubShadow,
+    ...megrumShadow,
   },
   photoPickIcon: {
-    color: ihubColors.lavender,
+    color: megrumColors.lavender,
     fontSize: 28,
     fontWeight: "900",
     lineHeight: 30,
   },
   photoPickText: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 13,
     fontWeight: "900",
   },
@@ -2392,7 +2397,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     backgroundColor: "rgba(168,212,230,0.18)",
     borderColor: "rgba(166,149,216,0.28)",
-    borderRadius: ihubRadii.lg,
+    borderRadius: megrumRadii.lg,
     borderWidth: 1,
     flexDirection: "row",
     gap: 12,
@@ -2400,14 +2405,14 @@ const styles = StyleSheet.create({
   },
   tradingCardBulkIcon: {
     alignItems: "center",
-    backgroundColor: ihubColors.lavender,
-    borderRadius: ihubRadii.md,
+    backgroundColor: megrumColors.lavender,
+    borderRadius: megrumRadii.md,
     height: 46,
     justifyContent: "center",
     width: 46,
   },
   tradingCardBulkIconText: {
-    color: ihubColors.surface,
+    color: megrumColors.surface,
     fontSize: 13,
     fontWeight: "900",
   },
@@ -2416,20 +2421,20 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   tradingCardBulkTitle: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 14,
     fontWeight: "900",
   },
   tradingCardBulkText: {
-    color: ihubColors.mutedInk,
+    color: megrumColors.mutedInk,
     fontSize: 11.5,
     fontWeight: "800",
     lineHeight: 17,
   },
   createPhotoSection: {
-    backgroundColor: ihubColors.surface,
+    backgroundColor: megrumColors.surface,
     borderColor: "rgba(58,50,74,0.08)",
-    borderRadius: ihubRadii.lg,
+    borderRadius: megrumRadii.lg,
     borderWidth: 1,
     gap: 12,
     padding: 13,
@@ -2440,12 +2445,12 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
   },
   createPhotoMeta: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 12,
     fontWeight: "900",
   },
   createPhotoUploading: {
-    color: ihubColors.mutedInk,
+    color: megrumColors.mutedInk,
     fontSize: 10.5,
     fontWeight: "800",
   },
@@ -2455,7 +2460,7 @@ const styles = StyleSheet.create({
     gap: 9,
   },
   createPhotoTile: {
-    backgroundColor: ihubColors.background,
+    backgroundColor: megrumColors.background,
     borderRadius: 16,
     height: 104,
     overflow: "hidden",
@@ -2478,14 +2483,14 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   createPhotoErrorText: {
-    color: ihubColors.surface,
+    color: megrumColors.surface,
     fontSize: 11,
     fontWeight: "900",
   },
   createPhotoRemove: {
     alignItems: "center",
     backgroundColor: "rgba(255,255,255,0.92)",
-    borderRadius: ihubRadii.pill,
+    borderRadius: megrumRadii.pill,
     height: 24,
     justifyContent: "center",
     position: "absolute",
@@ -2494,7 +2499,7 @@ const styles = StyleSheet.create({
     width: 24,
   },
   createPhotoRemoveText: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 16,
     fontWeight: "900",
     lineHeight: 18,
@@ -2509,7 +2514,7 @@ const styles = StyleSheet.create({
     paddingVertical: 7,
   },
   noPhotoText: {
-    color: ihubColors.lavender,
+    color: megrumColors.lavender,
     fontSize: 12,
     fontWeight: "900",
   },
@@ -2517,16 +2522,16 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   createMetaCard: {
-    backgroundColor: ihubColors.surface,
+    backgroundColor: megrumColors.surface,
     borderColor: "rgba(58,50,74,0.08)",
-    borderRadius: ihubRadii.lg,
+    borderRadius: megrumRadii.lg,
     borderWidth: 1,
     flexDirection: "row",
     gap: 12,
     padding: 12,
   },
   createMetaThumb: {
-    backgroundColor: ihubColors.background,
+    backgroundColor: megrumColors.background,
     borderRadius: 16,
     height: 98,
     width: 82,
@@ -2545,23 +2550,23 @@ const styles = StyleSheet.create({
     paddingHorizontal: 2,
   },
   sectionLabel: {
-    color: ihubColors.lavender,
+    color: megrumColors.lavender,
     fontSize: 11,
     fontWeight: "900",
     letterSpacing: 0.5,
   },
   required: {
-    color: ihubColors.warn,
+    color: megrumColors.warn,
   },
   sectionRight: {
-    color: ihubColors.mutedInk,
+    color: megrumColors.mutedInk,
     fontSize: 10,
     fontWeight: "800",
   },
   sectionBody: {
-    backgroundColor: ihubColors.surface,
+    backgroundColor: megrumColors.surface,
     borderColor: "rgba(58,50,74,0.08)",
-    borderRadius: ihubRadii.lg,
+    borderRadius: megrumRadii.lg,
     borderWidth: 1,
     gap: 12,
     padding: 13,
@@ -2572,9 +2577,9 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   groupChip: {
-    backgroundColor: ihubColors.surface,
+    backgroundColor: megrumColors.surface,
     borderColor: "rgba(58,50,74,0.08)",
-    borderRadius: ihubRadii.md,
+    borderRadius: megrumRadii.md,
     borderWidth: 1,
     maxWidth: "48%",
     minWidth: "30%",
@@ -2582,32 +2587,32 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
   },
   groupChipActive: {
-    backgroundColor: ihubColors.lavender,
-    borderColor: ihubColors.lavender,
-    shadowColor: ihubColors.lavender,
+    backgroundColor: megrumColors.lavender,
+    borderColor: megrumColors.lavender,
+    shadowColor: megrumColors.lavender,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.25,
     shadowRadius: 10,
     elevation: 2,
   },
   groupChipText: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 12.5,
     fontWeight: "900",
     textAlign: "center",
   },
   groupChipTextActive: {
-    color: ihubColors.surface,
+    color: megrumColors.surface,
   },
   emptyMasterBox: {
     backgroundColor: "rgba(166,149,216,0.08)",
     borderColor: "rgba(166,149,216,0.25)",
-    borderRadius: ihubRadii.md,
+    borderRadius: megrumRadii.md,
     borderWidth: 1,
     padding: 12,
   },
   emptyMasterText: {
-    color: ihubColors.mutedInk,
+    color: megrumColors.mutedInk,
     fontSize: 12,
     fontWeight: "800",
     lineHeight: 18,
@@ -2618,63 +2623,33 @@ const styles = StyleSheet.create({
     gap: 7,
   },
   selectChip: {
-    backgroundColor: ihubColors.surface,
+    backgroundColor: megrumColors.surface,
     borderColor: "rgba(58,50,74,0.10)",
-    borderRadius: ihubRadii.pill,
+    borderRadius: megrumRadii.pill,
     borderWidth: 1,
     paddingHorizontal: 12,
     paddingVertical: 7,
   },
   selectChipDashed: {
-    borderColor: ihubColors.lavender,
+    borderColor: megrumColors.lavender,
     borderStyle: "dashed",
   },
   selectChipActive: {
-    backgroundColor: ihubColors.lavender,
-    borderColor: ihubColors.lavender,
+    backgroundColor: megrumColors.lavender,
+    borderColor: megrumColors.lavender,
   },
   selectChipText: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 11.5,
     fontWeight: "900",
   },
   selectChipTextActive: {
-    color: ihubColors.surface,
-  },
-  conditionGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 7,
-  },
-  conditionChip: {
-    alignItems: "center",
-    backgroundColor: ihubColors.surface,
-    borderColor: "rgba(58,50,74,0.10)",
-    borderRadius: ihubRadii.md,
-    borderWidth: 1.5,
-    flexBasis: "18%",
-    flexGrow: 1,
-    minWidth: 62,
-    paddingHorizontal: 8,
-    paddingVertical: 9,
-  },
-  conditionChipActive: {
-    backgroundColor: "rgba(166,149,216,0.08)",
-    borderColor: ihubColors.lavender,
-  },
-  conditionChipText: {
-    color: ihubColors.ink,
-    fontSize: 11,
-    fontWeight: "800",
-    textAlign: "center",
-  },
-  conditionChipTextActive: {
-    fontWeight: "900",
+    color: megrumColors.surface,
   },
   requestButton: {
     alignSelf: "flex-start",
     borderColor: "rgba(166,149,216,0.52)",
-    borderRadius: ihubRadii.md,
+    borderRadius: megrumRadii.md,
     borderStyle: "dashed",
     borderWidth: 1,
     marginTop: 2,
@@ -2682,20 +2657,114 @@ const styles = StyleSheet.create({
     paddingVertical: 9,
   },
   requestButtonText: {
-    color: ihubColors.lavender,
+    color: megrumColors.lavender,
     fontSize: 11.5,
+    fontWeight: "900",
+  },
+  requestForm: {
+    backgroundColor: "rgba(166,149,216,0.04)",
+    borderColor: "rgba(166,149,216,0.34)",
+    borderRadius: megrumRadii.md,
+    borderWidth: 1,
+    gap: 8,
+    padding: 12,
+  },
+  requestFormLabel: {
+    color: megrumColors.lavender,
+    fontSize: 11,
+    fontWeight: "900",
+  },
+  requestInput: {
+    backgroundColor: megrumColors.surface,
+    borderColor: "rgba(58,50,74,0.08)",
+    borderRadius: 10,
+    borderWidth: 1,
+    color: megrumColors.ink,
+    fontSize: 12.5,
+    fontWeight: "800",
+    minHeight: 40,
+    paddingHorizontal: 10,
+    paddingVertical: 9,
+  },
+  requestNoteInput: {
+    minHeight: 68,
+  },
+  requestError: {
+    color: megrumColors.warn,
+    fontSize: 11,
+    fontWeight: "800",
+  },
+  requestActions: {
+    flexDirection: "row",
+    gap: 8,
+  },
+  requestCancelButton: {
+    alignItems: "center",
+    backgroundColor: megrumColors.surface,
+    borderColor: "rgba(58,50,74,0.08)",
+    borderRadius: 10,
+    borderWidth: 1,
+    flex: 1,
+    paddingVertical: 9,
+  },
+  requestCancelText: {
+    color: megrumColors.ink,
+    fontSize: 11.5,
+    fontWeight: "900",
+  },
+  requestSubmitButton: {
+    alignItems: "center",
+    backgroundColor: megrumColors.lavender,
+    borderRadius: 10,
+    flex: 1,
+    paddingVertical: 9,
+  },
+  requestSubmitDisabled: {
+    opacity: 0.55,
+  },
+  requestSubmitText: {
+    color: megrumColors.surface,
+    fontSize: 11.5,
+    fontWeight: "900",
+  },
+  requestedBox: {
+    backgroundColor: "rgba(168,212,230,0.14)",
+    borderRadius: megrumRadii.md,
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  requestedLead: {
+    color: megrumColors.ink,
+    fontSize: 11,
+    fontWeight: "900",
+  },
+  requestedChips: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 6,
+  },
+  requestedChip: {
+    backgroundColor: megrumColors.surface,
+    borderRadius: megrumRadii.pill,
+    paddingHorizontal: 9,
+    paddingVertical: 4,
+  },
+  requestedChipText: {
+    color: megrumColors.lavender,
+    fontSize: 10.5,
     fontWeight: "900",
   },
   inventoryPhotoBox: {
     alignSelf: "center",
-    backgroundColor: ihubColors.ink,
+    backgroundColor: megrumColors.ink,
     borderColor: "rgba(58,50,74,0.08)",
     borderRadius: 22,
     borderWidth: 1,
     height: 306,
     overflow: "hidden",
     width: 230,
-    ...ihubShadow,
+    ...megrumShadow,
   },
   inventoryPhoto: {
     height: "100%",
@@ -2708,7 +2777,7 @@ const styles = StyleSheet.create({
     width: "100%",
   },
   inventoryPhotoGlyph: {
-    color: ihubColors.surface,
+    color: megrumColors.surface,
     fontSize: 48,
     fontWeight: "900",
   },
@@ -2716,7 +2785,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     alignSelf: "center",
     backgroundColor: "rgba(255,255,255,0.94)",
-    borderRadius: ihubRadii.pill,
+    borderRadius: megrumRadii.pill,
     bottom: 12,
     justifyContent: "center",
     minHeight: 38,
@@ -2724,7 +2793,7 @@ const styles = StyleSheet.create({
     position: "absolute",
   },
   photoOverlayText: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 12,
     fontWeight: "900",
   },
@@ -2734,7 +2803,7 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   wishPhotoThumb: {
-    backgroundColor: ihubColors.background,
+    backgroundColor: megrumColors.background,
     borderColor: "rgba(58,50,74,0.08)",
     borderRadius: 10,
     borderWidth: 1,
@@ -2753,7 +2822,7 @@ const styles = StyleSheet.create({
     width: "100%",
   },
   wishPhotoGlyph: {
-    color: ihubColors.surface,
+    color: megrumColors.surface,
     fontSize: 21,
     fontWeight: "900",
   },
@@ -2762,12 +2831,12 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   photoTitle: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 12.5,
     fontWeight: "900",
   },
   photoMeta: {
-    color: ihubColors.mutedInk,
+    color: megrumColors.mutedInk,
     fontSize: 11,
     fontWeight: "800",
   },
@@ -2787,19 +2856,19 @@ const styles = StyleSheet.create({
     opacity: 0.42,
   },
   photoMiniButtonText: {
-    color: ihubColors.lavender,
+    color: megrumColors.lavender,
     fontSize: 11,
     fontWeight: "900",
   },
   photoMiniMutedText: {
-    color: ihubColors.mutedInk,
+    color: megrumColors.mutedInk,
     fontSize: 11,
     fontWeight: "900",
   },
   lockText: {
     backgroundColor: "rgba(166,149,216,0.06)",
     borderRadius: 8,
-    color: ihubColors.mutedInk,
+    color: megrumColors.mutedInk,
     fontSize: 10.5,
     fontWeight: "800",
     lineHeight: 15,
@@ -2814,26 +2883,26 @@ const styles = StyleSheet.create({
   },
   stepButton: {
     alignItems: "center",
-    backgroundColor: ihubColors.surface,
+    backgroundColor: megrumColors.surface,
     borderColor: "rgba(58,50,74,0.10)",
-    borderRadius: ihubRadii.pill,
+    borderRadius: megrumRadii.pill,
     borderWidth: 1,
     height: 40,
     justifyContent: "center",
     width: 40,
   },
   stepButtonText: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 20,
     fontWeight: "900",
     lineHeight: 22,
   },
   stepInput: {
-    backgroundColor: ihubColors.surface,
+    backgroundColor: megrumColors.surface,
     borderColor: "rgba(58,50,74,0.10)",
-    borderRadius: ihubRadii.md,
+    borderRadius: megrumRadii.md,
     borderWidth: 1,
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 16,
     fontWeight: "900",
     height: 42,
@@ -2841,67 +2910,23 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     textAlign: "center",
   },
-  carryToggle: {
-    alignItems: "flex-start",
-    backgroundColor: "rgba(168,212,230,0.18)",
-    borderRadius: ihubRadii.md,
-    flexDirection: "row",
-    gap: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-  },
-  checkbox: {
-    alignItems: "center",
-    backgroundColor: ihubColors.surface,
-    borderColor: "rgba(58,50,74,0.18)",
-    borderRadius: 5,
-    borderWidth: 1,
-    height: 18,
-    justifyContent: "center",
-    marginTop: 1,
-    width: 18,
-  },
-  checkboxActive: {
-    backgroundColor: ihubColors.lavender,
-    borderColor: ihubColors.lavender,
-  },
-  checkboxText: {
-    color: ihubColors.surface,
-    fontSize: 12,
-    fontWeight: "900",
-    lineHeight: 14,
-  },
-  carryCopy: {
-    flex: 1,
-    gap: 2,
-  },
-  carryTitle: {
-    color: ihubColors.ink,
-    fontSize: 12.5,
-    fontWeight: "900",
-  },
-  carryText: {
-    color: ihubColors.mutedInk,
-    fontSize: 11,
-    fontWeight: "700",
-  },
   input: {
-    backgroundColor: ihubColors.surface,
+    backgroundColor: megrumColors.surface,
     borderColor: "rgba(58,50,74,0.12)",
-    borderRadius: ihubRadii.md,
+    borderRadius: megrumRadii.md,
     borderWidth: 1,
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 15,
     fontWeight: "700",
     minHeight: 48,
     paddingHorizontal: 14,
   },
   noteInput: {
-    backgroundColor: ihubColors.surface,
+    backgroundColor: megrumColors.surface,
     borderColor: "rgba(58,50,74,0.12)",
-    borderRadius: ihubRadii.md,
+    borderRadius: megrumRadii.md,
     borderWidth: 1,
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 14,
     fontWeight: "700",
     minHeight: 96,
@@ -2922,7 +2947,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     backgroundColor: "rgba(166,149,216,0.08)",
     borderColor: "rgba(166,149,216,0.35)",
-    borderRadius: ihubRadii.pill,
+    borderRadius: megrumRadii.pill,
     borderWidth: 1,
     flexDirection: "row",
     gap: 5,
@@ -2930,17 +2955,17 @@ const styles = StyleSheet.create({
     paddingVertical: 5,
   },
   selectedTagText: {
-    color: ihubColors.lavender,
+    color: megrumColors.lavender,
     fontSize: 11,
     fontWeight: "900",
   },
   selectedTagClose: {
-    color: ihubColors.lavender,
+    color: megrumColors.lavender,
     fontSize: 12,
     fontWeight: "900",
   },
   noTagText: {
-    color: ihubColors.mutedInk,
+    color: megrumColors.mutedInk,
     fontSize: 12,
     fontWeight: "800",
   },
@@ -2950,11 +2975,11 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   tagInput: {
-    backgroundColor: ihubColors.surface,
+    backgroundColor: megrumColors.surface,
     borderColor: "rgba(58,50,74,0.12)",
-    borderRadius: ihubRadii.md,
+    borderRadius: megrumRadii.md,
     borderWidth: 1,
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     flex: 1,
     fontSize: 13,
     fontWeight: "700",
@@ -2963,43 +2988,54 @@ const styles = StyleSheet.create({
   },
   tagAddButton: {
     alignItems: "center",
-    backgroundColor: ihubColors.lavender,
-    borderRadius: ihubRadii.md,
+    backgroundColor: megrumColors.lavender,
+    borderRadius: megrumRadii.md,
     justifyContent: "center",
     minHeight: 44,
     paddingHorizontal: 14,
   },
   tagAddText: {
-    color: ihubColors.surface,
+    color: megrumColors.surface,
     fontSize: 12,
     fontWeight: "900",
   },
   suggestionWrap: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 6,
+    gap: 7,
   },
   suggestionChip: {
-    backgroundColor: ihubColors.background,
-    borderRadius: ihubRadii.pill,
-    paddingHorizontal: 9,
-    paddingVertical: 5,
+    alignItems: "center",
+    backgroundColor: megrumColors.surface,
+    borderColor: "rgba(166,149,216,0.18)",
+    borderRadius: 16,
+    borderWidth: 1,
+    flexDirection: "row",
+    gap: 8,
+    justifyContent: "space-between",
+    minHeight: 42,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
   },
   suggestionText: {
-    color: ihubColors.ink,
-    fontSize: 10.5,
+    color: megrumColors.ink,
+    flex: 1,
+    fontSize: 12,
+    fontWeight: "900",
+  },
+  suggestionCountText: {
+    color: megrumColors.mutedInk,
+    fontSize: 11,
     fontWeight: "800",
   },
   tagHelper: {
-    color: ihubColors.mutedInk,
+    color: megrumColors.mutedInk,
     fontSize: 10.5,
     fontWeight: "700",
     lineHeight: 16,
   },
   notice: {
-    backgroundColor: ihubColors.surface,
+    backgroundColor: megrumColors.surface,
     borderColor: "rgba(58,50,74,0.08)",
-    borderRadius: ihubRadii.lg,
+    borderRadius: megrumRadii.lg,
     borderWidth: 1,
     padding: 14,
   },
@@ -3008,17 +3044,17 @@ const styles = StyleSheet.create({
     borderColor: "rgba(217,130,107,0.25)",
   },
   noticeText: {
-    color: ihubColors.mutedInk,
+    color: megrumColors.mutedInk,
     fontSize: 12,
     fontWeight: "800",
     lineHeight: 18,
   },
   noticeStrong: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontWeight: "900",
   },
   noticeDangerText: {
-    color: ihubColors.warn,
+    color: megrumColors.warn,
   },
   actions: {
     gap: 10,

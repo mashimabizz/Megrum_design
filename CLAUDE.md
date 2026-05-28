@@ -26,10 +26,10 @@
 
 画面を実装・変更する前に、以下を **end-to-end で精読** する：
 
-- 該当する **モックアップ JSX**（`iHub/*.jsx`）の関数全部
+- 該当する **モックアップ JSX**（`Megrum/*.jsx`）の関数全部
   - 主要 function だけでなく、内部の small components も
   - `style={{ ... }}` の数値（fontSize, padding, gap, borderRadius, fontWeight, letterSpacing, boxShadow, background のグラデ角度・色 stops）まで全部見る
-- **GitHub Pages で目視確認**：`https://mashimabizz.github.io/iHub_design/iHub/[ファイル名].html`
+- **GitHub Pages で目視確認**：`https://mashimabizz.github.io/Megrum_design/Megrum/[ファイル名].html`
 - 関連する **仕様ドキュメント**：
   - `notes/02_system_requirements.md` — 機能要件
   - `notes/05_data_model.md` — データモデル
@@ -48,7 +48,7 @@
 
 #### ブランドカラー（Tailwind theme 統合済）
 ```
-bg-ihub-lavender / text-ihub-sky / border-ihub-pink / ihub-warn / ihub-ok
+bg-megrum-lavender / text-megrum-sky / border-megrum-pink / megrum-warn / megrum-ok
 （`#a695d8` などの直書きは禁止。opacity 修飾子も /35, /55 等で使う）
 ```
 
@@ -56,11 +56,19 @@ bg-ihub-lavender / text-ihub-sky / border-ihub-pink / ihub-warn / ihub-ok
 - `PrimaryButton` / `PrimaryLinkButton` — 主アクション（3色グラデ→2色版・rounded-[14px]）
 - `secondaryBaseClass` — セカンダリボタン用 className（白＋紫透明枠）
 - `HeaderBack` — 戻る + タイトル + サブ + 進捗
-- `IHubLogo` — 「iH」テキスト + 角丸正方形 + Inter Tight
+- `MegrumLogo` — 「Mg」テキスト + 角丸正方形 + Inter Tight
 - `ProgressDots` — 4 セルの進捗バー
 - `Spinner` / `useRipple` — ボタン挙動補助
 
 新規ボタンを書く前に：「`PrimaryButton` で済まないか？」を必ず自問。
+
+#### iOSネイティブ標準コンポーネント優先（最重要）
+- iOSアプリ実装では、**できるだけiOS標準・ネイティブのコンポーネント / 挙動を採用する**。
+  - 例：`NativeTabs` / iOS標準タブバー、`ActionSheetIOS`、iOS標準のシート、標準の戻る遷移、標準のスクロール連動、Apple Map など。
+- iOS標準で実現できる見た目・操作感を、独自Viewや独自アニメーションで作り直さない。
+- 既存のiOS標準コンポーネントを使っている箇所は、原則として維持する。置き換えが必要に見える場合は、まず標準コンポーネント側の設定・画面構造・制約を調査する。
+- オーナーの指示がこのルールに背く可能性がある場合、実装前に「iOS標準を捨てることになるが本当に良いか」を明示して確認する。
+- 例外は、iOS標準では明確に実現不能、またはWeb版との機能整合に重大な支障がある場合のみ。その場合も、理由と代替案を説明してから実装する。
 
 #### レイアウト規約
 - 背景：通常画面は `bg-[#fbf9fc]`、Welcome 系はグラデ
@@ -81,7 +89,7 @@ bg-ihub-lavender / text-ihub-sky / border-ihub-pink / ihub-warn / ihub-ok
 
 #### A. デザイン整合性チェック
 - [ ] モックアップと**スクリーンショット並べて比較**（または記述レベルで突き合わせ）
-- [ ] ブランドカラー：直書き `#a695d8` 等が無い（`bg-ihub-lavender` 等を使用）
+- [ ] ブランドカラー：直書き `#a695d8` 等が無い（`bg-megrum-lavender` 等を使用）
 - [ ] 共通コンポーネント：`PrimaryButton` 等を使い回している
 - [ ] フォント：日本語 = Noto Sans JP / 英字主体 = Inter Tight + letterSpacing
 - [ ] 余白・サイズ：モックアップの数値と一致
@@ -108,9 +116,9 @@ bg-ihub-lavender / text-ihub-sky / border-ihub-pink / ihub-warn / ihub-ok
 
 ## 📜 重要な用語ルール（iter46 確定）
 
-旧規約用語（`利用規約など/` 内docx）と現状 iHub の用語マッピング：
+旧規約用語（`利用規約など/` 内docx）と現状 Megrum の用語マッピング：
 
-| 旧規約 | 新（iHub） | 備考 |
+| 旧規約 | 新（Megrum） | 備考 |
 |---|---|---|
 | ダイレクトメッセージ / DM | **取引チャット** | iter46 統一 |
 | 交換依頼 | **打診（proposal）** | iter46 統一 |
@@ -130,7 +138,7 @@ bg-ihub-lavender / text-ihub-sky / border-ihub-pink / ihub-warn / ihub-ok
 
 ---
 
-## 30秒で理解する iHub
+## 30秒で理解する Megrum
 
 - **何**: K-POP / アニメ等の推し活グッズを **現地で交換**するモバイルアプリ
 - **誰のため**: メインペルソナはハナ（27歳・IT勤務・月3〜5万円グッズ予算）。詳細は `notes/00_persona.md`
@@ -175,7 +183,7 @@ bg-ihub-lavender / text-ihub-sky / border-ihub-pink / ihub-warn / ihub-ok
 | パス | 内容 |
 |---|---|
 | `web/src/app/` | App Router 配下（page.tsx / layout.tsx 等） |
-| `web/src/app/page.tsx` | トップページ（Hello iHub） |
+| `web/src/app/page.tsx` | トップページ（Hello Megrum） |
 | `web/src/app/layout.tsx` | ルートレイアウト（Noto Sans JP フォント設定） |
 | `web/src/app/globals.css` | Tailwind 設定 |
 | `web/next.config.ts` | Next.js 設定（turbopack.root 固定済） |
@@ -198,7 +206,7 @@ npm run lint     # ESLint
 
 Phase 0a 完了後、Supabase CLI で初期化予定。
 
-### `iHub/`（mockup）
+### `Megrum/`（mockup）
 
 | ファイル | 担当範囲 |
 |---|---|
@@ -219,10 +227,10 @@ Phase 0a 完了後、Supabase CLI で初期化予定。
 | `ios-frame.jsx` | iPhone 枠コンポーネント |
 | `tweaks-panel.jsx` | ブランドカラー切替パネル（`useTweaks` フック含む） |
 
-### `iHub/iHub *.html`（表示用 HTML）
+### `Megrum/Megrum *.html`（表示用 HTML）
 
 各 HTML は `<DesignCanvas>` で複数アートボードを並べて表示する Figma 風キャンバス。
-ファイル名 = フロー名。例：`iHub Nego Flow.html` は受諾前ネゴ関連の全画面を一覧。
+ファイル名 = フロー名。例：`Megrum Nego Flow.html` は受諾前ネゴ関連の全画面を一覧。
 
 ### `notes/`（ドキュメント）
 
@@ -275,6 +283,7 @@ Phase 0a 完了後、Supabase CLI で初期化予定。
    - JS/TSだけの変更：`npm --prefix mobile run export:ios:preview` → `EXPO_NO_GIT_STATUS=1 npm --prefix mobile run update:ios:preview -- --message "[iter◯◯] ..." --non-interactive`
    - Swift / Expo local module / native config / 依存追加を含む変更：EAS Updateだけでは反映されないため、Preview用のEAS buildが必要。必要ならオーナーにビルド手順を渡す
    - Preview更新した場合は、EAS Update ID / Update group を `notes/08_design_iterations.md` の確認方法へ記録
+   - オーナーが iPhone / TestFlight で見ている前提の時は、mobile のJS変更を反映して終わりではなく **EAS Update 実行完了までを1セット** とみなす
 □ 9. **ユーザー向け変更は原則 `mobile/` のみ更新**。`web/` は管理者画面・運用画面として必要な時だけ更新する
 ```
 
@@ -304,11 +313,11 @@ Phase 0a 完了後、Supabase CLI で初期化予定。
 [どの画面・どのフローに影響するか]
 
 ### 確認方法
-- http://localhost:8000/iHub%20XXX.html
+- http://localhost:8000/Megrum%20XXX.html
 
 ### 関連ファイル
-- `iHub/xxx.jsx`
-- `iHub/iHub XXX.html`
+- `Megrum/xxx.jsx`
+- `Megrum/Megrum XXX.html`
 ```
 
 ### C. 用語追加時
@@ -393,13 +402,13 @@ Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
 python3 -m http.server 8000
 
 # 主要URL
-# http://localhost:8000/iHub%20MVP%20v1.html       — 全画面統合
-# http://localhost:8000/iHub%20Nego%20Flow.html    — ネゴ
-# http://localhost:8000/iHub%20C%20Flow.html       — C-1〜C-3
-# http://localhost:8000/iHub%20Propose%20Select.html — C-0
-# http://localhost:8000/iHub%20Hub%20Screens.html  — ホーム/プロフ/ウィッシュ
-# http://localhost:8000/iHub%20B%20Inventory.html  — 在庫
-# http://localhost:8000/iHub%20Auth%20Onboarding.html — 認証＋オンボ
+# http://localhost:8000/Megrum%20MVP%20v1.html       — 全画面統合
+# http://localhost:8000/Megrum%20Nego%20Flow.html    — ネゴ
+# http://localhost:8000/Megrum%20C%20Flow.html       — C-1〜C-3
+# http://localhost:8000/Megrum%20Propose%20Select.html — C-0
+# http://localhost:8000/Megrum%20Hub%20Screens.html  — ホーム/プロフ/ウィッシュ
+# http://localhost:8000/Megrum%20B%20Inventory.html  — 在庫
+# http://localhost:8000/Megrum%20Auth%20Onboarding.html — 認証＋オンボ
 ```
 
 ### 🌐 GitHub Pages
@@ -407,12 +416,12 @@ python3 -m http.server 8000
 スマホ・他環境からプレビューしたい時：
 
 ```
-https://mashimabizz.github.io/iHub_design/iHub/[ファイル名].html
+https://mashimabizz.github.io/Megrum_design/Megrum/[ファイル名].html
 ```
 
 例：
-- `https://mashimabizz.github.io/iHub_design/iHub/iHub%20MVP%20v1.html`
-- `https://mashimabizz.github.io/iHub_design/iHub/iHub%20Nego%20Flow.html`
+- `https://mashimabizz.github.io/Megrum_design/Megrum/Megrum%20MVP%20v1.html`
+- `https://mashimabizz.github.io/Megrum_design/Megrum/Megrum%20Nego%20Flow.html`
 
 ---
 
@@ -465,8 +474,8 @@ https://mashimabizz.github.io/iHub_design/iHub/[ファイル名].html
 スマホからの典型的な使い方：
 
 1. **claude.ai モバイルアプリ**を開く
-2. iHub_design リポジトリへの GitHub 連携が有効になっている前提
-3. 「**iHub_design リポを見て、〇〇画面の××を△△に変えて**」と依頼
+2. Megrum_design リポジトリへの GitHub 連携が有効になっている前提
+3. 「**Megrum_design リポを見て、〇〇画面の××を△△に変えて**」と依頼
 4. Claude が以下を実行：
    - CLAUDE.md を読む（このファイル）
    - 関連 JSX を読む

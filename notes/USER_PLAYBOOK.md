@@ -85,7 +85,7 @@
 ### 🥇 タスク1：データモデル更新
 
 ```
-iHub_design リポを見て、CLAUDE.md と notes/09_state_machines.md と
+Megrum_design リポを見て、CLAUDE.md と notes/09_state_machines.md と
 notes/08_design_iterations.md を読んで。
 
 notes/05_data_model.md を以下の観点で最新化して：
@@ -112,10 +112,10 @@ notes/05_data_model.md を以下の観点で最新化して：
 ### 🥈 タスク2：画面マトリクス
 
 ```
-iHub_design リポを見て。
+Megrum_design リポを見て。
 
 notes/11_screen_inventory.md を新規作成。
-iHub/*.html と iHub/*.jsx をすべてスキャンして、
+Megrum/*.html と Megrum/*.jsx をすべてスキャンして、
 以下のカラムでマトリクス化して：
 
 | 画面ID | 名称 | 所属フロー | 関連JSX | 関連HTML | 関連 iter | 関連 docs |
@@ -137,7 +137,7 @@ mermaid で簡易フロー図も末尾に追加（ホーム→検索→C-0→C-1
 ### 🥈 タスク3：per-screen spec（重要画面5つから）
 
 ```
-iHub_design リポを見て、CLAUDE.md と notes/09_state_machines.md と 10_glossary.md を読んで。
+Megrum_design リポを見て、CLAUDE.md と notes/09_state_machines.md と 10_glossary.md を読んで。
 
 notes/12_screens/ ディレクトリ作って、以下5つの spec を1ファイルずつ作って：
 1. C-0_propose_select.md
@@ -156,7 +156,7 @@ notes/12_screens/ ディレクトリ作って、以下5つの spec を1ファイ
 ## 関連 API（仮）
 ## 関連 docs
 
-JSXコード（iHub/propose-select.jsx, c-flow.jsx, nego-flow.jsx）を実際に読んで、
+JSXコード（Megrum/propose-select.jsx, c-flow.jsx, nego-flow.jsx）を実際に読んで、
 暗黙的になってる仕様を文章化して。
 未確定項目は「⚠️ 要確認」マークを付けて。
 
@@ -175,7 +175,7 @@ JSXコード（iHub/propose-select.jsx, c-flow.jsx, nego-flow.jsx）を実際に
 ### 🥉 タスク4：API仕様 draft
 
 ```
-iHub_design リポを見て、notes/05_data_model.md と 09_state_machines.md と 12_screens/* を参照して。
+Megrum_design リポを見て、notes/05_data_model.md と 09_state_machines.md と 12_screens/* を参照して。
 
 notes/13_api_spec.md を draft で作成。
 
@@ -210,7 +210,7 @@ REST 形式で、以下を最小限カバー：
 ### 🥉 タスク5：実装フェーズ分割
 
 ```
-iHub_design リポ見て、CLAUDE.md と notes/07_mvp_handoff.md と
+Megrum_design リポ見て、CLAUDE.md と notes/07_mvp_handoff.md と
 直近の docs（11_screen_inventory.md, 12_screens/*, 13_api_spec.md）を読んで。
 
 notes/14_implementation_phases.md を新規作成。
@@ -246,7 +246,7 @@ MVP に向けたフェーズ分割を提案。
 ### 🟡 タスク6：非機能要件
 
 ```
-iHub_design リポ見て、CLAUDE.md と notes/03_strategy.md と
+Megrum_design リポ見て、CLAUDE.md と notes/03_strategy.md と
 notes/12_screens/* を参照して。
 
 notes/15_non_functional.md を新規作成。
@@ -278,7 +278,7 @@ notes/15_non_functional.md を新規作成。
 ### 🟡 タスク7：機能要件の更新
 
 ```
-iHub_design リポ見て、notes/02_system_requirements.md と
+Megrum_design リポ見て、notes/02_system_requirements.md と
 notes/08_design_iterations.md（特に iter24-34）と CLAUDE.md を読んで。
 
 notes/02_system_requirements.md を最新化：
@@ -349,7 +349,7 @@ notes/02_system_requirements.md を最新化：
 ### ✅ 良い指示
 
 ```
-iHub_design リポを見て、CLAUDE.md を最初に読んで。
+Megrum_design リポを見て、CLAUDE.md を最初に読んで。
 
 notes/05_data_model.md を iter33-34 反映で更新して。
 完了後、変更点を3行で報告して commit & push。
@@ -385,7 +385,7 @@ notes/05_data_model.md を iter33-34 反映で更新して。
 
 ### 「Claudeが repo にアクセスできない」と言われた
 - スマホの場合：claude.ai mobile で GitHub 連携が有効か確認
-- 「iHub_design リポを見て」を明示的に書く
+- 「Megrum_design リポを見て」を明示的に書く
 
 ### 「CLAUDE.md にこう書いてあるけど、実際の JSX と違う」
 - まず JSX を正として、CLAUDE.md を更新するのが基本

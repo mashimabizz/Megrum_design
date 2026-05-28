@@ -21,7 +21,7 @@ import {
   removeEvidencePhoto,
   uploadEvidenceImage,
 } from "../src/lib/transactionActions";
-import { ihubColors, ihubRadii } from "../src/theme/tokens";
+import { megrumColors, megrumRadii } from "../src/theme/tokens";
 
 type ProposalRow = {
   id: string;
@@ -277,7 +277,7 @@ export default function TransactionCaptureScreen() {
           onPress={() => void pickImage("camera")}
           style={styles.shutter}
         >
-          {busy === "camera" || busy === "library" ? <ActivityIndicator color={ihubColors.lavender} /> : null}
+          {busy === "camera" || busy === "library" ? <ActivityIndicator color={megrumColors.lavender} /> : null}
         </Pressable>
         <Pressable
           disabled={!!busy || !data || data.photos.length === 0}
@@ -357,7 +357,7 @@ function GoodsStack({ count, label }: { count: number; label: string }) {
               },
             ]}
           >
-            <Text style={styles.goodsCardText}>iH</Text>
+            <Text style={styles.goodsCardText}>Mg</Text>
           </View>
         ))}
       </View>
@@ -402,7 +402,7 @@ const styles = StyleSheet.create({
   topButton: {
     alignItems: "center",
     backgroundColor: "rgba(255,255,255,0.12)",
-    borderRadius: ihubRadii.pill,
+    borderRadius: megrumRadii.pill,
     height: 40,
     justifyContent: "center",
     width: 40,
@@ -416,7 +416,7 @@ const styles = StyleSheet.create({
   statusChip: {
     alignItems: "center",
     backgroundColor: "rgba(0,0,0,0.42)",
-    borderRadius: ihubRadii.pill,
+    borderRadius: megrumRadii.pill,
     flexDirection: "row",
     gap: 7,
     paddingHorizontal: 13,
@@ -463,7 +463,7 @@ const styles = StyleSheet.create({
   },
   photoChipLabel: {
     backgroundColor: "rgba(0,0,0,0.65)",
-    borderRadius: ihubRadii.pill,
+    borderRadius: megrumRadii.pill,
     color: "#fff",
     fontSize: 9,
     fontWeight: "900",
@@ -490,7 +490,7 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
   viewFinder: {
-    borderColor: ihubColors.lavender,
+    borderColor: megrumColors.lavender,
     borderRadius: 20,
     borderWidth: 2,
     bottom: 214,
@@ -529,7 +529,7 @@ const styles = StyleSheet.create({
     width: 28,
   },
   splitBadgeText: {
-    color: ihubColors.lavender,
+    color: megrumColors.lavender,
     fontSize: 15,
     fontWeight: "900",
   },
@@ -557,7 +557,7 @@ const styles = StyleSheet.create({
   },
   goodsLabel: {
     backgroundColor: "rgba(0,0,0,0.5)",
-    borderRadius: ihubRadii.pill,
+    borderRadius: megrumRadii.pill,
     color: "#fff",
     fontSize: 10,
     fontWeight: "900",
@@ -576,7 +576,7 @@ const styles = StyleSheet.create({
   metaChip: {
     alignSelf: "center",
     backgroundColor: "rgba(0,0,0,0.5)",
-    borderRadius: ihubRadii.pill,
+    borderRadius: megrumRadii.pill,
     bottom: 154,
     paddingHorizontal: 14,
     paddingVertical: 8,
@@ -614,7 +614,7 @@ const styles = StyleSheet.create({
   secondaryCircle: {
     alignItems: "center",
     backgroundColor: "rgba(255,255,255,0.14)",
-    borderRadius: ihubRadii.pill,
+    borderRadius: megrumRadii.pill,
     height: 48,
     justifyContent: "center",
     width: 48,
@@ -636,8 +636,8 @@ const styles = StyleSheet.create({
   },
   finishButton: {
     alignItems: "center",
-    backgroundColor: ihubColors.lavender,
-    borderRadius: ihubRadii.pill,
+    backgroundColor: megrumColors.lavender,
+    borderRadius: megrumRadii.pill,
     height: 48,
     justifyContent: "center",
     paddingHorizontal: 15,
@@ -651,18 +651,18 @@ const styles = StyleSheet.create({
     fontWeight: "900",
   },
   authFallback: {
-    backgroundColor: ihubColors.background,
+    backgroundColor: megrumColors.background,
     flex: 1,
     gap: 14,
     paddingHorizontal: 20,
   },
   authTitle: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 22,
     fontWeight: "900",
   },
   authText: {
-    color: ihubColors.mutedInk,
+    color: megrumColors.mutedInk,
     fontSize: 13,
     fontWeight: "800",
     lineHeight: 20,

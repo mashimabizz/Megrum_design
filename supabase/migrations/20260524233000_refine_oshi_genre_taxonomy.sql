@@ -182,7 +182,7 @@ begin
 end;
 $$;
 
-create temporary table _ihub_music_seed_groups (
+create temporary table _megrum_music_seed_groups (
   genre_name text not null,
   name text not null,
   aliases text[] not null default '{}',
@@ -190,7 +190,7 @@ create temporary table _ihub_music_seed_groups (
   display_order integer not null
 ) on commit drop;
 
-insert into _ihub_music_seed_groups (genre_name, name, aliases, kind, display_order) values
+insert into _megrum_music_seed_groups (genre_name, name, aliases, kind, display_order) values
   ('歌い手', 'すとぷり', array['Strawberry Prince', 'STPR']::text[], 'group', 1),
   ('歌い手', 'いれいす', array['IREISU']::text[], 'group', 2),
   ('歌い手', 'Knight A - 騎士A -', array['Knight A', '騎士A']::text[], 'group', 3),
@@ -219,7 +219,7 @@ select
   sg.aliases,
   sg.kind,
   sg.display_order
-from _ihub_music_seed_groups sg
+from _megrum_music_seed_groups sg
 join public.genres_master ge on ge.name = sg.genre_name
 on conflict (genre_id, name) do update
   set aliases = excluded.aliases,

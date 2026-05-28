@@ -4,7 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { PrimaryLinkButton } from "@/components/auth/PrimaryButton";
 
 export const metadata = {
-  title: "iHub へようこそ — iHub",
+  title: "Megrum へようこそ — Megrum",
 };
 
 type OshiRow = {
@@ -111,7 +111,7 @@ export default async function DonePage() {
         <div className="flex flex-1 flex-col items-center text-center">
           <div className="text-5xl">✨</div>
           <h1 className="mt-3 text-[26px] font-extrabold text-gray-900">
-            iHub へようこそ！
+            Megrum へようこそ！
           </h1>
           <p className="mt-2 text-[13px] leading-relaxed text-gray-500">
             <strong className="font-bold text-gray-700">

@@ -4,14 +4,14 @@
 -- グッズ交換では現役メンバーだけでなく、旧譜・旧トレカ・過去ツアー
 -- グッズの検索が発生するため、K-POP男性L1のL2候補を厚くする。
 
-create temporary table _ihub_seed_kpop_male_characters (
+create temporary table _megrum_seed_kpop_male_characters (
   group_name text not null,
   name text not null,
   aliases text[] not null default '{}',
   display_order integer not null
 ) on commit drop;
 
-insert into _ihub_seed_kpop_male_characters (group_name, name, aliases, display_order) values
+insert into _megrum_seed_kpop_male_characters (group_name, name, aliases, display_order) values
   ('Stray Kids', 'ウジン', array['Woojin','Kim Woojin','キム・ウジン']::text[], 9),
   ('RIIZE', 'スンハン', array['Seunghan','Hong Seunghan','ホン・スンハン']::text[], 7),
   ('TREASURE', 'マシホ', array['Mashiho','高田真史帆','Takata Mashiho']::text[], 11),
@@ -44,7 +44,7 @@ select
   sc.name,
   sc.aliases,
   sc.display_order
-from _ihub_seed_kpop_male_characters sc
+from _megrum_seed_kpop_male_characters sc
 join public.genres_master ge on ge.name = 'K-POP男性'
 join public.groups_master gm on gm.genre_id = ge.id and gm.name = sc.group_name
 where not exists (

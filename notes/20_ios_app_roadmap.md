@@ -70,7 +70,7 @@ notes/               # 設計判断
 
 - Apple Developer Program 登録
 - App Store Connect のチーム権限
-- Bundle ID の最終決定（暫定: `tokyo.ihub.app`）
+- Bundle ID の最終決定（暫定: `tokyo.megrum.app`）
 - EAS / Expo アカウント連携
 - Supabase staging / production の環境変数
 - Push通知の本番運用方針

@@ -3,7 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { PrimaryLinkButton } from "@/components/auth/PrimaryButton";
 
 export const metadata = {
-  title: "認証完了 — iHub",
+  title: "認証完了 — Megrum",
 };
 
 /**

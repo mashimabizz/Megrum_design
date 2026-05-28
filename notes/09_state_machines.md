@@ -117,9 +117,9 @@ stateDiagram-v2
 
 ### 関連ファイル
 
-- `iHub/propose-select.jsx`
-- `iHub/c-flow.jsx`（C-1）
-- `iHub/nego-flow.jsx`（C-1.5、合意確認、成立画面）
+- `Megrum/propose-select.jsx`
+- `Megrum/c-flow.jsx`（C-1）
+- `Megrum/nego-flow.jsx`（C-1.5、合意確認、成立画面）
 
 ---
 
@@ -198,7 +198,7 @@ stateDiagram-v2
 
 ### 関連ファイル
 
-- `iHub/c-flow.jsx`（C-2 ChatScreen, C-3 CompleteScreen）
+- `Megrum/c-flow.jsx`（C-2 ChatScreen, C-3 CompleteScreen）
 
 ---
 
@@ -256,8 +256,8 @@ stateDiagram-v2
 
 ### 関連ファイル
 
-- `iHub/c-dispute.jsx`
-- `iHub/iHub Dispute Flow _standalone_.html`
+- `Megrum/c-dispute.jsx`
+- `Megrum/Megrum Dispute Flow _standalone_.html`
 
 ---
 
@@ -311,8 +311,8 @@ stateDiagram-v2
 
 ### 関連ファイル
 
-- `iHub/aw-edit.jsx`
-- `iHub/propose-select.jsx`（meetup タブ）
+- `Megrum/aw-edit.jsx`
+- `Megrum/propose-select.jsx`（meetup タブ）
 
 ---
 
@@ -370,8 +370,8 @@ stateDiagram-v2
 
 ### 関連ファイル
 
-- `iHub/b-inventory.jsx`
-- `iHub/propose-select.jsx`
+- `Megrum/b-inventory.jsx`
+- `Megrum/propose-select.jsx`
 
 ---
 
@@ -416,7 +416,7 @@ stateDiagram-v2
 
 ### 関連ファイル
 
-- `iHub/hub-screens.jsx`
+- `Megrum/hub-screens.jsx`
 
 ---
 
@@ -467,7 +467,7 @@ stateDiagram-v2
 
 ### 関連ファイル
 
-- `iHub/auth-onboarding.jsx`
+- `Megrum/auth-onboarding.jsx`
 
 ---
 

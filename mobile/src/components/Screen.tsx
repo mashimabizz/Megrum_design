@@ -6,21 +6,33 @@ import {
   type ViewStyle,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { ihubColors } from "../theme/tokens";
+import { megrumColors } from "../theme/tokens";
 
 type ScreenProps = PropsWithChildren<{
+  bottomInset?: boolean;
   scroll?: boolean;
   contentStyle?: ViewStyle;
+  topInset?: boolean;
+  topPadding?: number;
 }>;
 
-export function Screen({ children, scroll = true, contentStyle }: ScreenProps) {
+export function Screen({
+  bottomInset = true,
+  children,
+  scroll = true,
+  contentStyle,
+  topInset = true,
+  topPadding,
+}: ScreenProps) {
   const insets = useSafeAreaInsets();
-  const paddingTop = Math.max(insets.top, 18) + 14;
-  const paddingBottom = Math.max(insets.bottom, 12) + 96;
+  const paddingTop = topPadding ?? (topInset ? Math.max(insets.top, 18) + 14 : 14);
+  const paddingBottom = bottomInset ? Math.max(insets.bottom, 12) + 96 : 0;
 
   if (scroll) {
     return (
       <ScrollView
+        automaticallyAdjustsScrollIndicatorInsets
+        contentInsetAdjustmentBehavior="automatic"
         style={styles.root}
         contentContainerStyle={[
           styles.content,
@@ -50,7 +62,7 @@ export function Screen({ children, scroll = true, contentStyle }: ScreenProps) {
 const styles = StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: ihubColors.background,
+    backgroundColor: megrumColors.background,
   },
   content: {
     paddingHorizontal: 18,

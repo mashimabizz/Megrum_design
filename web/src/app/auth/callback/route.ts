@@ -5,7 +5,7 @@ import { createClient } from "@/lib/supabase/server";
  * メール認証リンクのコールバック処理
  *
  * Supabase が送信した確認メールのリンクをクリックすると：
- *   https://ihub.tokyo/auth/callback?code=xxx
+ *   https://megrum.jp/auth/callback?code=xxx
  * のようにアクセスされる。code を session に交換してユーザーをログイン状態にする。
  */
 export async function GET(request: Request) {

@@ -1,6 +1,6 @@
 import MapView, { Marker, type Region } from "react-native-maps";
 import { StyleSheet, Text, View, type ViewStyle } from "react-native";
-import { ihubColors } from "../theme/tokens";
+import { megrumColors } from "../theme/tokens";
 
 export type MapCoordinate = {
   latitude: number;
@@ -74,20 +74,20 @@ const styles = StyleSheet.create({
   },
   pin: {
     alignItems: "center",
-    backgroundColor: ihubColors.lavender,
-    borderColor: ihubColors.surface,
+    backgroundColor: megrumColors.lavender,
+    borderColor: megrumColors.surface,
     borderRadius: 999,
     borderWidth: 3,
     height: 34,
     justifyContent: "center",
-    shadowColor: ihubColors.ink,
+    shadowColor: megrumColors.ink,
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.22,
     shadowRadius: 10,
     width: 34,
   },
   pinText: {
-    color: ihubColors.surface,
+    color: megrumColors.surface,
     fontSize: 13,
     fontWeight: "900",
   },

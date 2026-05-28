@@ -463,7 +463,7 @@ function WishCardWrapper({
           fallbackLabel={itemLabel}
           meta={
             item.quantity > 1 ? (
-              <div className="rounded-md bg-ihub-lavender px-1.5 py-0.5 text-[10px] font-extrabold tabular-nums text-white">
+              <div className="rounded-md bg-megrum-lavender px-1.5 py-0.5 text-[10px] font-extrabold tabular-nums text-white">
                 ×{item.quantity}
               </div>
             ) : null

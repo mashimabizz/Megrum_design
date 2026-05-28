@@ -4,14 +4,14 @@ import { Linking, Pressable, StyleSheet, Text, View } from "react-native";
 import { RouteHeader } from "../src/components/RouteHeader";
 import { Screen } from "../src/components/Screen";
 import { IconSymbol, type IconSymbolName } from "../src/components/IconSymbol";
-import { ihubColors, ihubRadii } from "../src/theme/tokens";
+import { megrumColors, megrumRadii } from "../src/theme/tokens";
 
 const FAQ_SECTIONS = [
   {
     label: "取引の流れ",
     items: [
       {
-        q: "iHubとは？",
+        q: "Megrumとは？",
         a: "K-POP / アニメ等の推し活グッズを現地で物々交換するためのマッチング・取引プラットフォームです。",
       },
       {
@@ -64,11 +64,11 @@ export default function HelpScreen() {
         </Text>
         <Pressable
           accessibilityRole="button"
-          onPress={() => Linking.openURL("mailto:support@ihub.tokyo")}
+          onPress={() => Linking.openURL("mailto:support@megrum.jp")}
           style={styles.mailButton}
         >
           <IconSymbol name="mail-outline" size={15} color="#fff" />
-          <Text style={styles.mailText}>support@ihub.tokyo</Text>
+          <Text style={styles.mailText}>support@megrum.jp</Text>
         </Pressable>
       </View>
 
@@ -111,7 +111,7 @@ function FaqRow({ answer, question }: { answer: string; question: string }) {
         <IconSymbol
           name={open ? "chevron-down" : "chevron-forward"}
           size={14}
-          color={ihubColors.mutedInk}
+          color={megrumColors.mutedInk}
         />
       </View>
       {open ? <Text style={styles.answer}>{answer}</Text> : null}
@@ -130,9 +130,9 @@ function LinkRow({
 }) {
   return (
     <Pressable accessibilityRole="button" onPress={() => router.push(href)} style={styles.linkRow}>
-      <IconSymbol name={icon} size={17} color={ihubColors.lavender} />
+      <IconSymbol name={icon} size={17} color={megrumColors.lavender} />
       <Text style={styles.linkTitle}>{title}</Text>
-      <IconSymbol name="chevron-forward" size={14} color={ihubColors.mutedInk} />
+      <IconSymbol name="chevron-forward" size={14} color={megrumColors.mutedInk} />
     </Pressable>
   );
 }
@@ -144,17 +144,17 @@ const styles = StyleSheet.create({
   contactHero: {
     backgroundColor: "rgba(166,149,216,0.08)",
     borderColor: "rgba(166,149,216,0.24)",
-    borderRadius: ihubRadii.md,
+    borderRadius: megrumRadii.md,
     borderWidth: 1,
     padding: 14,
   },
   contactTitle: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 12.5,
     fontWeight: "900",
   },
   contactText: {
-    color: ihubColors.mutedInk,
+    color: megrumColors.mutedInk,
     fontSize: 11,
     fontWeight: "700",
     lineHeight: 17,
@@ -163,7 +163,7 @@ const styles = StyleSheet.create({
   mailButton: {
     alignItems: "center",
     alignSelf: "flex-start",
-    backgroundColor: ihubColors.lavender,
+    backgroundColor: megrumColors.lavender,
     borderRadius: 10,
     flexDirection: "row",
     gap: 6,
@@ -172,7 +172,7 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
   },
   mailText: {
-    color: ihubColors.surface,
+    color: megrumColors.surface,
     fontSize: 11.5,
     fontWeight: "900",
   },
@@ -180,16 +180,16 @@ const styles = StyleSheet.create({
     gap: 7,
   },
   sectionLabel: {
-    color: ihubColors.mutedInk,
+    color: megrumColors.mutedInk,
     fontSize: 10.5,
     fontWeight: "900",
     letterSpacing: 0.4,
     paddingHorizontal: 2,
   },
   sectionCard: {
-    backgroundColor: ihubColors.surface,
+    backgroundColor: megrumColors.surface,
     borderColor: "rgba(58,50,74,0.08)",
-    borderRadius: ihubRadii.lg,
+    borderRadius: megrumRadii.lg,
     borderWidth: 1,
     overflow: "hidden",
   },
@@ -207,24 +207,24 @@ const styles = StyleSheet.create({
   qBadge: {
     alignItems: "center",
     backgroundColor: "rgba(166,149,216,0.16)",
-    borderRadius: ihubRadii.pill,
+    borderRadius: megrumRadii.pill,
     height: 22,
     justifyContent: "center",
     width: 22,
   },
   qBadgeText: {
-    color: ihubColors.lavender,
+    color: megrumColors.lavender,
     fontSize: 10,
     fontWeight: "900",
   },
   question: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     flex: 1,
     fontSize: 12.5,
     fontWeight: "900",
   },
   answer: {
-    color: ihubColors.mutedInk,
+    color: megrumColors.mutedInk,
     fontSize: 12,
     fontWeight: "700",
     lineHeight: 19,
@@ -241,7 +241,7 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
   },
   linkTitle: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     flex: 1,
     fontSize: 12.5,
     fontWeight: "900",

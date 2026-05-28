@@ -98,7 +98,7 @@ const FALLBACK_CENTER: [number, number] = [35.6595, 139.7005];
 
 /* iter132: シート内 draft（localStorage 保存）─ グッズ選択画面など別画面に
    行って戻ってくる時のフォーム途中状態を引き継ぐため */
-const DRAFT_KEY = "ihub:localModeSheet:draft";
+const DRAFT_KEY = "megrum:localModeSheet:draft";
 const DRAFT_TTL_MS = 30 * 60 * 1000; // 30 分
 
 type SheetDraft = {

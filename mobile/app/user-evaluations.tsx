@@ -6,7 +6,7 @@ import { PrimaryButton } from "../src/components/PrimaryButton";
 import { RouteHeader } from "../src/components/RouteHeader";
 import { Screen } from "../src/components/Screen";
 import { supabase } from "../src/lib/supabase";
-import { ihubColors, ihubRadii, ihubShadow } from "../src/theme/tokens";
+import { megrumColors, megrumRadii, megrumShadow } from "../src/theme/tokens";
 
 type EvaluationRow = {
   stars: number;
@@ -78,7 +78,7 @@ export default function UserEvaluationsScreen() {
         title={data ? `@${data.handle} の評価` : "評価一覧"}
         subtitle={data ? `${data.evaluations.length} 件` : undefined}
       />
-      {loading ? <ActivityIndicator color={ihubColors.lavender} /> : null}
+      {loading ? <ActivityIndicator color={megrumColors.lavender} /> : null}
       {error ? <Text style={styles.errorText}>{error}</Text> : null}
 
       {data ? (
@@ -213,36 +213,36 @@ const styles = StyleSheet.create({
     gap: 14,
   },
   card: {
-    backgroundColor: ihubColors.surface,
+    backgroundColor: megrumColors.surface,
     borderColor: "rgba(58,50,74,0.08)",
-    borderRadius: ihubRadii.xl,
+    borderRadius: megrumRadii.xl,
     borderWidth: 1,
     gap: 10,
     padding: 16,
-    ...ihubShadow,
+    ...megrumShadow,
   },
   title: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 18,
     fontWeight: "900",
   },
   muted: {
-    color: ihubColors.mutedInk,
+    color: megrumColors.mutedInk,
     fontSize: 12,
     fontWeight: "800",
     lineHeight: 18,
     textAlign: "center",
   },
   errorText: {
-    color: ihubColors.warn,
+    color: megrumColors.warn,
     fontSize: 12,
     fontWeight: "900",
   },
   emptyCard: {
     alignItems: "center",
-    backgroundColor: ihubColors.surface,
+    backgroundColor: megrumColors.surface,
     borderColor: "rgba(58,50,74,0.08)",
-    borderRadius: ihubRadii.xl,
+    borderRadius: megrumRadii.xl,
     borderStyle: "dashed",
     borderWidth: 1,
     paddingVertical: 32,
@@ -251,7 +251,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     backgroundColor: "rgba(166,149,216,0.06)",
     borderColor: "rgba(166,149,216,0.32)",
-    borderRadius: ihubRadii.xl,
+    borderRadius: megrumRadii.xl,
     borderWidth: 1,
     flexDirection: "row",
     gap: 16,
@@ -262,12 +262,12 @@ const styles = StyleSheet.create({
     minWidth: 80,
   },
   average: {
-    color: ihubColors.lavender,
+    color: megrumColors.lavender,
     fontSize: 28,
     fontWeight: "900",
   },
   count: {
-    color: ihubColors.mutedInk,
+    color: megrumColors.mutedInk,
     fontSize: 10,
     fontWeight: "800",
   },
@@ -281,30 +281,30 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   histogramLabel: {
-    color: ihubColors.mutedInk,
+    color: megrumColors.mutedInk,
     fontSize: 10,
     fontWeight: "800",
     textAlign: "right",
     width: 12,
   },
   histogramStar: {
-    color: ihubColors.lavender,
+    color: megrumColors.lavender,
     fontSize: 10,
     fontWeight: "900",
   },
   histogramTrack: {
     backgroundColor: "rgba(58,50,74,0.05)",
-    borderRadius: ihubRadii.pill,
+    borderRadius: megrumRadii.pill,
     flex: 1,
     flexDirection: "row",
     height: 7,
     overflow: "hidden",
   },
   histogramFill: {
-    backgroundColor: ihubColors.lavender,
+    backgroundColor: megrumColors.lavender,
   },
   histogramCount: {
-    color: ihubColors.mutedInk,
+    color: megrumColors.mutedInk,
     fontSize: 10,
     fontWeight: "800",
     textAlign: "right",
@@ -314,9 +314,9 @@ const styles = StyleSheet.create({
     gap: 9,
   },
   commentCard: {
-    backgroundColor: ihubColors.surface,
+    backgroundColor: megrumColors.surface,
     borderColor: "rgba(58,50,74,0.08)",
-    borderRadius: ihubRadii.lg,
+    borderRadius: megrumRadii.lg,
     borderWidth: 1,
     padding: 14,
   },
@@ -327,12 +327,12 @@ const styles = StyleSheet.create({
     marginBottom: 7,
   },
   rater: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 11.5,
     fontWeight: "900",
   },
   commentStars: {
-    color: ihubColors.lavender,
+    color: megrumColors.lavender,
     flex: 1,
     fontSize: 10.5,
     fontWeight: "900",
@@ -341,12 +341,12 @@ const styles = StyleSheet.create({
     color: "rgba(58,50,74,0.12)",
   },
   date: {
-    color: ihubColors.mutedInk,
+    color: megrumColors.mutedInk,
     fontSize: 10,
     fontWeight: "800",
   },
   comment: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 12.5,
     fontWeight: "700",
     lineHeight: 20,

@@ -3,7 +3,7 @@
 /**
  * iter79-C: 申告ステータス画面（D-3 / D-5 / D-6 一本化）
  *
- * iHub/c-dispute.jsx 準拠：
+ * Megrum/c-dispute.jsx 準拠：
  * - D-3 (status='submitted')：受付番号 + 「今後の流れ」 4 ステップ + 申告中の制限
  * - D-5 (status='response_pending' / 'arbitrating')：タイムライン進捗 + 提出済証跡 + 制限
  * - D-6 (status='closed')：結果通知（cancelled / upheld / partial）+ 評価への反映
@@ -739,8 +739,8 @@ function ClosedView({ detail }: { detail: DisputeDetail }) {
           {detail.operatorComment ?? v.summary}
           <div className="mt-2 text-[10.5px] text-[#3a324a8c]">
             {detail.closedAt
-              ? `${formatDateTime(detail.closedAt)} ・ iHub サポート`
-              : "iHub サポート"}
+              ? `${formatDateTime(detail.closedAt)} ・ Megrum サポート`
+              : "Megrum サポート"}
           </div>
         </div>
       </Section>
@@ -977,7 +977,7 @@ function DisputeMessageBubble({
       ? "bg-[linear-gradient(135deg,#a695d8,#a8d4e6)] text-white"
       : "bg-white border border-[#3a324a14] text-[#3a324a]";
   const roleLabel = isOperator
-    ? "🛟 iHub サポート"
+    ? "🛟 Megrum サポート"
     : m.senderRole === "reporter"
       ? "申告者"
       : "被申告者";

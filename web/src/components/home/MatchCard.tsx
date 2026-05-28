@@ -134,10 +134,10 @@ function getMatchPattern(card: MatchCardData): MatchPatternMeta {
       label: "双方の条件が交差",
       sub: "あなたの条件にも、相手の条件にも候補あり",
       cta: "条件を選んで打診 →",
-      borderClass: "border-ihub-lavender",
+      borderClass: "border-megrum-lavender",
       shadowClass: "shadow-[0_14px_36px_rgba(166,149,216,0.26)]",
       chipClass:
-        "bg-gradient-to-r from-ihub-pink to-ihub-lavender text-white shadow-[0_3px_10px_rgba(166,149,216,0.35)]",
+        "bg-gradient-to-r from-megrum-pink to-megrum-lavender text-white shadow-[0_3px_10px_rgba(166,149,216,0.35)]",
       background:
         "linear-gradient(180deg, rgba(166,149,216,0.16) 0%, rgba(243,197,212,0.10) 45%, rgba(255,255,255,0.95) 100%)",
     };
@@ -149,9 +149,9 @@ function getMatchPattern(card: MatchCardData): MatchPatternMeta {
       label: "あなたの条件で候補",
       sub: "相手の譲があなたの条件にヒット",
       cta: "条件を選んで打診 →",
-      borderClass: "border-ihub-lavender/55",
+      borderClass: "border-megrum-lavender/55",
       shadowClass: "shadow-[0_10px_28px_rgba(166,149,216,0.18)]",
-      chipClass: "bg-ihub-lavender/15 text-ihub-lavender",
+      chipClass: "bg-megrum-lavender/15 text-megrum-lavender",
       background:
         "linear-gradient(180deg, rgba(166,149,216,0.10) 0%, rgba(255,255,255,0.96) 60%, rgba(255,255,255,1) 100%)",
     };
@@ -163,9 +163,9 @@ function getMatchPattern(card: MatchCardData): MatchPatternMeta {
       label: "相手の条件に応えられる",
       sub: "あなたの譲が相手の条件にヒット",
       cta: "条件を選んで打診 →",
-      borderClass: "border-ihub-sky/70",
+      borderClass: "border-megrum-sky/70",
       shadowClass: "shadow-[0_10px_28px_rgba(168,212,230,0.25)]",
-      chipClass: "bg-ihub-sky/25 text-[#5c8da8]",
+      chipClass: "bg-megrum-sky/25 text-[#5c8da8]",
       background:
         "linear-gradient(180deg, rgba(168,212,230,0.18) 0%, rgba(255,255,255,0.96) 58%, rgba(255,255,255,1) 100%)",
     };
@@ -177,9 +177,9 @@ function getMatchPattern(card: MatchCardData): MatchPatternMeta {
       label: "譲 × wish 双方向",
       sub: "個別条件なしで、お互いの譲と wish が一致",
       cta: "打診する",
-      borderClass: "border-ihub-pink/70",
+      borderClass: "border-megrum-pink/70",
       shadowClass: "shadow-[0_10px_26px_rgba(243,197,212,0.20)]",
-      chipClass: "bg-ihub-pink/30 text-[#b66f87]",
+      chipClass: "bg-megrum-pink/30 text-[#b66f87]",
       background:
         "linear-gradient(180deg, rgba(243,197,212,0.13) 0%, rgba(255,255,255,0.98) 62%, rgba(255,255,255,1) 100%)",
     };
@@ -199,7 +199,7 @@ function getMatchPattern(card: MatchCardData): MatchPatternMeta {
 
 function LocalPossibilityPill({ card }: { card: MatchCardData }) {
   return card.localAvailable ? (
-    <span className="inline-flex items-center gap-1 rounded-full bg-ihub-lavender px-2 py-0.5 text-[10px] font-extrabold text-white shadow-[0_3px_10px_rgba(166,149,216,0.35)]">
+    <span className="inline-flex items-center gap-1 rounded-full bg-megrum-lavender px-2 py-0.5 text-[10px] font-extrabold text-white shadow-[0_3px_10px_rgba(166,149,216,0.35)]">
       <span className="text-[9px]">LIVE</span>
       {card.distanceText ? card.distanceText : "現地OK"}
     </span>

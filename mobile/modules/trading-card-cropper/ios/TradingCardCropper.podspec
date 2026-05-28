@@ -9,12 +9,12 @@ Pod::Spec.new do |s|
   s.description    = package['description']
   s.license        = package['license']
   s.author         = 'Megrum'
-  s.homepage       = 'https://mashimabizz.github.io/iHub_design/'
+  s.homepage       = 'https://mashimabizz.github.io/Megrum_design/'
   s.platforms      = {
     :ios => '15.1'
   }
   s.swift_version  = '5.9'
-  s.source         = { git: 'https://github.com/mashimabizz/iHub_design.git' }
+  s.source         = { git: 'https://github.com/mashimabizz/Megrum_design.git' }
   s.static_framework = true
 
   s.dependency 'ExpoModulesCore'

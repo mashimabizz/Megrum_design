@@ -1,5 +1,5 @@
 -- =====================================================================
--- iHub: 初回マイグレーション
+-- Megrum: 初回マイグレーション
 -- Phase 0 範囲（基盤・認証・マスタデータ）
 -- 関連 docs:
 --   - notes/05_data_model.md §1 マスタ / §2 ユーザー
@@ -80,7 +80,7 @@ create policy "Anyone can read goods_types_master" on public.goods_types_master 
 -- 2. ユーザー拡張: auth.users を補完する public.users
 -- ---------------------------------------------------------------------
 -- Supabase Auth が auth.users を自動管理。
--- iHub 固有の属性（ハンドル名・推し・エリア等）は public.users に保持。
+-- Megrum 固有の属性（ハンドル名・推し・エリア等）は public.users に保持。
 
 create table public.users (
   -- auth.users.id とそのまま 1:1
@@ -107,7 +107,7 @@ create table public.users (
 
 create index idx_users_handle on public.users(handle);
 create index idx_users_account_status on public.users(account_status);
-comment on table public.users is 'iHub ユーザー拡張情報（auth.users と 1:1）';
+comment on table public.users is 'Megrum ユーザー拡張情報（auth.users と 1:1）';
 
 -- ユーザー更新時に updated_at を自動更新
 create or replace function public.set_updated_at()

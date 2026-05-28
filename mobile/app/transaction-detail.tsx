@@ -1,21 +1,34 @@
-import { useEffect, useMemo, useState } from "react";
-import { router, useLocalSearchParams } from "expo-router";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { router, Stack, useLocalSearchParams } from "expo-router";
 import {
   Alert,
   Image,
+  Linking,
+  Modal,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
   View,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAuth } from "../src/auth/AuthProvider";
+import { ChatGradientBubble } from "../src/components/ChatGradientBubble";
 import { PrimaryButton } from "../src/components/PrimaryButton";
-import { Screen } from "../src/components/Screen";
+import {
+  NativeMapPreview,
+  type MapCoordinate,
+} from "../src/components/NativeMapPreview";
 import { StatusPill } from "../src/components/StatusPill";
-import { approveTradeCancel } from "../src/lib/transactionActions";
+import {
+  addEvidencePhoto,
+  approveTradeCancel,
+  uploadEvidenceImage,
+} from "../src/lib/transactionActions";
 import { supabase } from "../src/lib/supabase";
-import { ihubColors, ihubRadii, ihubShadow } from "../src/theme/tokens";
+import { useKeyboardInset } from "../src/lib/useKeyboardInset";
+import { megrumColors, megrumRadii, megrumShadow } from "../src/theme/tokens";
 
 type ProposalStatus =
   | "sent"
@@ -54,6 +67,7 @@ type ProposalRow = {
   created_at: string;
   last_action_at: string | null;
   expires_at: string | null;
+  extension_count: number | null;
 };
 
 type UserRow = {
@@ -91,6 +105,11 @@ type MeetupCandidate = {
   lng: number | null;
 };
 
+const FALLBACK_MEETUP_COORDINATE: MapCoordinate = {
+  latitude: 35.5075,
+  longitude: 139.6174,
+};
+
 type TransactionDetail = {
   id: string;
   status: ProposalStatus;
@@ -111,7 +130,21 @@ type TransactionDetail = {
   meetups: MeetupCandidate[];
   message: string | null;
   expiresAt: string | null;
+  extensionCount: number;
+  openDispute: OpenDispute | null;
+  myArrival: ArrivalStatus;
+  partnerArrival: ArrivalStatus;
+  myOutfitPhoto: string | null;
+  partnerOutfitPhoto: string | null;
+  partnerLastReadAt: string | null;
   messages: ChatMessage[];
+};
+
+type ArrivalStatus = "enroute" | "arrived" | "left" | null;
+
+type OpenDispute = {
+  id: string;
+  ticketNo: string;
 };
 
 type ChatMessage = {
@@ -133,6 +166,10 @@ type ChatMessage = {
   createdAt: string;
 };
 
+type ProposalReadStateRow = {
+  last_read_at: string | null;
+};
+
 type MessageRow = {
   id: string;
   sender_id: string;
@@ -147,17 +184,38 @@ type MessageRow = {
 };
 
 export default function TransactionDetailScreen() {
-  const { id } = useLocalSearchParams<{ id?: string | string[] }>();
+  const params = useLocalSearchParams<{
+    id?: string | string[];
+    direction?: string | string[];
+    give?: string | string[];
+    note?: string | string[];
+    partner?: string | string[];
+    partnerAvatarUrl?: string | string[];
+    place?: string | string[];
+    receive?: string | string[];
+    status?: string | string[];
+    time?: string | string[];
+  }>();
+  const { id } = params;
   const proposalId = Array.isArray(id) ? id[0] : id;
   const { user, previewMode, exitPreview } = useAuth();
+  const insets = useSafeAreaInsets();
   const [detail, setDetail] = useState<TransactionDetail | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState<
-    "accept" | "negotiate" | "reject" | "enroute" | "arrived" | null
+    "accept" | "negotiate" | "reject" | "extend" | "enroute" | "arrived" | null
+  >(null);
+  const [chatActionLoading, setChatActionLoading] = useState<
+    "photo" | "outfit" | "location" | "evidence" | null
   >(null);
   const [draft, setDraft] = useState("");
   const [sendingMessage, setSendingMessage] = useState(false);
+  const [composerFocused, setComposerFocused] = useState(false);
+  const messagesScrollRef = useRef<ScrollView>(null);
+  const messageEndYRef = useRef(0);
+  const messageViewportHeightRef = useRef(0);
+  const pendingMessageScrollRef = useRef(false);
 
   const canAccept = useMemo(() => {
     if (!detail) return false;
@@ -173,6 +231,35 @@ export default function TransactionDetailScreen() {
     ["sent", "negotiating", "agreement_one_side", "agreed", "completed"].includes(
       detail.status,
     );
+  const lastMessageId = detail?.messages[detail.messages.length - 1]?.id ?? null;
+
+  const scrollToLatestMessage = useCallback((animated = true) => {
+    requestAnimationFrame(() => {
+      const targetY = Math.max(
+        0,
+        messageEndYRef.current - messageViewportHeightRef.current + 18,
+      );
+      messagesScrollRef.current?.scrollTo({ y: targetY, animated });
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!lastMessageId) return;
+    pendingMessageScrollRef.current = true;
+    const timer = setTimeout(() => {
+      if (!pendingMessageScrollRef.current) return;
+      pendingMessageScrollRef.current = false;
+      scrollToLatestMessage(true);
+    }, 140);
+    return () => clearTimeout(timer);
+  }, [lastMessageId, scrollToLatestMessage]);
+
+  useEffect(() => {
+    if (!detail || !user || !lastMessageId) return;
+    const latestMessage = detail.messages[detail.messages.length - 1];
+    if (!latestMessage) return;
+    markProposalMessagesRead(detail.id, user.id, latestMessage.createdAt).catch(() => undefined);
+  }, [detail?.id, lastMessageId, user?.id]);
 
   useEffect(() => {
     if (!proposalId) {
@@ -199,6 +286,12 @@ export default function TransactionDetailScreen() {
       })
       .catch((loadError: unknown) => {
         if (!active) return;
+        const fallback = buildRouteFallbackDetail(proposalId, user.id, params);
+        if (fallback) {
+          setDetail(fallback);
+          setError(null);
+          return;
+        }
         setError(toErrorMessage(loadError, "読み込みに失敗しました"));
       })
       .finally(() => {
@@ -226,6 +319,72 @@ export default function TransactionDetailScreen() {
     } finally {
       setActionLoading(null);
     }
+  }
+
+  async function handleExtendProposal() {
+    if (!detail || !user || !supabase) return;
+    const client = supabase;
+    Alert.alert(
+      "打診の期限を延長しますか？",
+      "現在の期限から7日間延長します。",
+      [
+        { text: "戻る", style: "cancel" },
+        {
+          text: "延長する",
+          onPress: async () => {
+            setActionLoading("extend");
+            setError(null);
+            try {
+              const now = new Date();
+              const currentExpires = detail.expiresAt
+                ? new Date(detail.expiresAt)
+                : null;
+              const base =
+                currentExpires && currentExpires.getTime() > now.getTime()
+                  ? currentExpires
+                  : now;
+              const nextExpires = new Date(base.getTime() + 7 * 24 * 60 * 60 * 1000);
+              const updates: Record<string, unknown> = {
+                expires_at: nextExpires.toISOString(),
+                extension_count: detail.extensionCount + 1,
+                last_action_at: now.toISOString(),
+              };
+              const { error: updateError } = await client
+                .from("proposals")
+                .update(updates)
+                .eq("id", detail.id);
+              const missingColumn = getMissingProposalColumn(updateError);
+              if (missingColumn === "extension_count") {
+                delete updates.extension_count;
+                const { error: retryError } = await client
+                  .from("proposals")
+                  .update(updates)
+                  .eq("id", detail.id);
+                if (retryError) throw retryError;
+              } else if (updateError) {
+                throw updateError;
+              }
+              await client.from("messages").insert({
+                proposal_id: detail.id,
+                sender_id: user.id,
+                message_type: "system",
+                body: "打診期限を7日間延長しました",
+                meta: { action: "extend" },
+              });
+              await refreshDetail();
+            } catch (extendError) {
+              setError(
+                extendError instanceof Error
+                  ? extendError.message
+                  : "期限延長に失敗しました",
+              );
+            } finally {
+              setActionLoading(null);
+            }
+          },
+        },
+      ],
+    );
   }
 
   async function handleSendMessage() {
@@ -277,224 +436,564 @@ export default function TransactionDetailScreen() {
     }
   }
 
+  async function refreshDetail() {
+    if (!proposalId || !user) return;
+    setDetail(await fetchTransactionDetail(proposalId, user.id));
+  }
+
+  async function handleSendCurrentLocation() {
+    if (!detail || !user || !supabase) return;
+    setChatActionLoading("location");
+    setError(null);
+    try {
+      const ExpoLocation = await import("expo-location");
+      const permission = await ExpoLocation.requestForegroundPermissionsAsync();
+      if (permission.status !== "granted") {
+        setError("位置情報の許可が必要です");
+        return;
+      }
+      const position = await ExpoLocation.getCurrentPositionAsync({
+        accuracy: ExpoLocation.Accuracy.Balanced,
+      });
+      const coordinate = {
+        latitude: position.coords.latitude,
+        longitude: position.coords.longitude,
+      };
+      const label = await reverseLocationLabel(coordinate);
+      const { error: insertError } = await supabase.from("messages").insert({
+        proposal_id: detail.id,
+        sender_id: user.id,
+        message_type: "location",
+        body: label ?? "現在地を共有しました",
+        location_lat: coordinate.latitude,
+        location_lng: coordinate.longitude,
+        location_label: label ?? "現在地を共有",
+      });
+      if (insertError) throw insertError;
+      await refreshDetail();
+    } catch (locationError) {
+      setError(
+        locationError instanceof Error
+          ? locationError.message
+          : "現在地の送信に失敗しました",
+      );
+    } finally {
+      setChatActionLoading(null);
+    }
+  }
+
+  async function handlePickChatPhoto(kind: "photo" | "outfit_photo") {
+    if (!detail || !user || !supabase) return;
+    if (kind === "outfit_photo" && detail.status !== "agreed") {
+      setError("服装写真は取引予定でのみ共有できます");
+      return;
+    }
+    setChatActionLoading(kind === "outfit_photo" ? "outfit" : "photo");
+    setError(null);
+    try {
+      const ImagePicker = await import("expo-image-picker");
+      const permission =
+        await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!permission.granted) {
+        setError("写真ライブラリの利用を許可してください");
+        return;
+      }
+      const result = await ImagePicker.launchImageLibraryAsync({
+        allowsEditing: true,
+        aspect: kind === "outfit_photo" ? [3, 4] : [1, 1],
+        mediaTypes: ["images"],
+        quality: 0.86,
+      });
+      if (result.canceled || !result.assets[0]) return;
+      const asset = result.assets[0];
+      const photoUrl = await uploadChatImage({
+        proposalId: detail.id,
+        uri: asset.uri,
+        mimeType: asset.mimeType ?? null,
+        fileName: asset.fileName ?? null,
+        kind,
+      });
+      const { error: insertError } = await supabase.from("messages").insert({
+        proposal_id: detail.id,
+        sender_id: user.id,
+        message_type: kind,
+        body: kind === "outfit_photo" ? "服装写真を共有しました" : null,
+        photo_url: photoUrl,
+      });
+      if (insertError) throw insertError;
+      await refreshDetail();
+    } catch (photoError) {
+      setError(
+        photoError instanceof Error
+          ? photoError.message
+          : "写真の送信に失敗しました",
+      );
+    } finally {
+      setChatActionLoading(null);
+    }
+  }
+
+  function handleAddEvidencePhoto() {
+    if (!detail || !user) return;
+    const currentDetail = detail;
+    Alert.alert(
+      "交換したグッズを撮影してください",
+      "両者の交換物が1枚に収まるように撮影してください。",
+      [
+        { text: "戻る", style: "cancel" },
+        {
+          text: "撮影する",
+          onPress: () => {
+            void (async () => {
+              setChatActionLoading("evidence");
+              setError(null);
+              try {
+                const ImagePicker = await import("expo-image-picker");
+                const permission = await ImagePicker.requestCameraPermissionsAsync();
+                if (!permission.granted) {
+                  setError("カメラの利用を許可してください");
+                  return;
+                }
+                const result = await ImagePicker.launchCameraAsync({
+                  allowsEditing: false,
+                  mediaTypes: ["images"],
+                  quality: 0.86,
+                });
+                if (result.canceled || !result.assets[0]) return;
+                const asset = result.assets[0];
+                const photoUrl = await uploadEvidenceImage({
+                  proposalId: currentDetail.id,
+                  uri: asset.uri,
+                  mimeType: asset.mimeType,
+                  fileName: asset.fileName,
+                });
+                const action = await addEvidencePhoto({
+                  proposalId: currentDetail.id,
+                  photoUrl,
+                  userId: user.id,
+                });
+                if (action.error) {
+                  setError(action.error);
+                  return;
+                }
+                await refreshDetail();
+              } catch (captureError) {
+                setError(
+                  captureError instanceof Error
+                    ? captureError.message
+                    : "証跡の追加に失敗しました",
+                );
+              } finally {
+                setChatActionLoading(null);
+              }
+            })();
+          },
+        },
+      ],
+    );
+  }
+
+  const bottomInset = Math.max(insets.bottom, 12);
+  const keyboardInset = useKeyboardInset();
+  const composerBottomInset = keyboardInset > 0 ? 8 : bottomInset;
+  const showComposer = !!detail && detail.status !== "completed" && !!canChat;
+
   return (
-    <Screen contentStyle={styles.screen}>
-      <View style={styles.header}>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="戻る"
-          onPress={() => router.back()}
-          style={styles.backButton}
-        >
-          <Text style={styles.backText}>‹</Text>
-        </Pressable>
-        <StatusPill label={detail ? statusLabel(detail) : "取引"} tone="lavender" />
-      </View>
+    <View style={styles.chatRoot}>
+      <Stack.Screen
+        options={{
+          headerShown: true,
+          title: detail
+            ? `@${(detail.partner.handle ?? detail.partner.display_name ?? "取引チャット").replace(
+                /^@/,
+                "",
+              )}`
+            : "取引チャット",
+          headerBackButtonDisplayMode: "minimal",
+          headerBlurEffect: "systemMaterial",
+          headerTintColor: megrumColors.lavender,
+        }}
+      />
+      {detail ? (
+        <ChatPartnerStrip detail={detail} />
+      ) : null}
 
       {loading ? <Text style={styles.inlineNotice}>取引を読み込み中…</Text> : null}
       {error ? <Text style={styles.inlineError}>{error}</Text> : null}
+
       {(previewMode || !user) && !detail ? (
-        <View style={styles.loginPrompt}>
-          <Text style={styles.loginPromptTitle}>michilionでログイン</Text>
-          <Text style={styles.loginPromptText}>
-            取引チャットは実アカウントの打診データに接続して表示します。
-          </Text>
-          <PrimaryButton
-            onPress={() => {
-              exitPreview();
-              router.replace("/login");
-            }}
-          >
-            ログインして取引チャットを見る
-          </PrimaryButton>
+        <View style={styles.loginPromptWrap}>
+          <View style={styles.loginPrompt}>
+            <Text style={styles.loginPromptTitle}>michilionでログイン</Text>
+            <Text style={styles.loginPromptText}>
+              取引チャットは実アカウントの打診データに接続して表示します。
+            </Text>
+            <PrimaryButton
+              onPress={() => {
+                exitPreview();
+                router.replace("/login");
+              }}
+            >
+              ログインして取引チャットを見る
+            </PrimaryButton>
+          </View>
         </View>
       ) : null}
 
       {detail ? (
         <>
-          <View style={styles.partnerCard}>
-            <View style={styles.partnerAvatar}>
-              {detail.partner.avatar_url ? (
-                <Image
-                  source={{ uri: detail.partner.avatar_url }}
-                  style={styles.partnerAvatarImage}
+          <View style={styles.chatPinnedArea}>
+            {detail.openDispute ? (
+              <OpenDisputeBanner dispute={detail.openDispute} />
+            ) : null}
+            <DealSummaryCard detail={detail} />
+            {detail.status === "sent" ||
+            detail.status === "negotiating" ||
+            detail.status === "agreement_one_side" ? (
+              <>
+                <ExpireBannerCompact
+                  detail={detail}
+                  loading={actionLoading === "extend"}
+                  onExtend={handleExtendProposal}
                 />
-              ) : (
-                <Text style={styles.partnerAvatarText}>
-                  {(detail.partner.handle ?? detail.partner.display_name ?? "?")
-                    .slice(0, 1)
-                    .toUpperCase()}
-                </Text>
-              )}
-            </View>
-            <View style={styles.partnerCopy}>
-              <Text style={styles.partnerName}>
-                @{detail.partner.handle ?? detail.partner.display_name ?? "unknown"}
-              </Text>
-              <Text style={styles.partnerMeta}>
-                {detail.partner.primary_area ?? "エリア未設定"}
-              </Text>
-            </View>
-            <View style={styles.agreeState}>
-              <Text style={styles.agreeStateText}>
-                {detail.myAgreed ? "合意済" : "未合意"}
-              </Text>
-            </View>
+                <AgreementBarCompact
+                  detail={detail}
+                  canAccept={canAccept}
+                  canReject={!!canReject}
+                  loading={actionLoading}
+                  onAccept={() => handleAction("accept")}
+                  onReject={() => handleAction("reject")}
+                />
+              </>
+            ) : null}
+            {detail.status === "agreed" ? (
+              <OutfitCompactRowNative
+                detail={detail}
+                uploading={chatActionLoading === "outfit"}
+                onTake={() => handlePickChatPhoto("outfit_photo")}
+              />
+            ) : null}
           </View>
 
-          <View style={styles.tradePanel}>
-            <TradeColumn title="受け取る" items={detail.receive} />
-            <View style={styles.tradeCenter}>
-              <Text style={styles.tradeArrow}>→</Text>
-              <Text style={styles.tradeArrowMuted}>←</Text>
-            </View>
-            <TradeColumn title="私が出す" items={detail.give} alignRight />
-          </View>
+          <ScrollView
+            ref={messagesScrollRef}
+            onContentSizeChange={() => {
+              if (!pendingMessageScrollRef.current) return;
+              scrollToLatestMessage(true);
+            }}
+            onLayout={(event) => {
+              messageViewportHeightRef.current = event.nativeEvent.layout.height;
+            }}
+            style={styles.chatMessagesScroll}
+            contentContainerStyle={[
+              styles.chatMessagesContent,
+              { paddingBottom: showComposer ? 14 : 24 + bottomInset },
+            ]}
+          >
+              <ChatMessageList
+                messages={detail.messages}
+                partnerLastReadAt={detail.partnerLastReadAt}
+                proposalId={detail.id}
+                userId={user?.id ?? ""}
+              />
+            <View
+              onLayout={(event) => {
+                messageEndYRef.current = event.nativeEvent.layout.y;
+                if (!pendingMessageScrollRef.current) return;
+                pendingMessageScrollRef.current = false;
+                scrollToLatestMessage(true);
+              }}
+              style={styles.chatMessageEndAnchor}
+            />
+            {detail.status === "agreed" && detail.evidencePhotoCount === 0 ? (
+              <EvidenceCalloutNative proposalId={detail.id} />
+            ) : null}
+            {detail.status === "agreed" || detail.status === "completed" ? (
+              <CompletionPanel
+                detail={detail}
+                evidenceUploading={chatActionLoading === "evidence"}
+                onAddEvidence={handleAddEvidencePhoto}
+              />
+            ) : null}
+          </ScrollView>
 
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>待ち合わせ候補</Text>
-            {detail.meetups.length > 0 ? (
-              detail.meetups.map((meetup, index) => (
-                <View key={`${meetup.startAt}-${index}`} style={styles.meetupCard}>
-                  <Text style={styles.meetupTime}>
-                    {formatDateTime(meetup.startAt, meetup.endAt)}
-                  </Text>
-                  <Text numberOfLines={1} style={styles.meetupPlace}>
-                    {meetup.placeName}
-                  </Text>
-                </View>
-              ))
-            ) : (
-              <Text style={styles.emptyText}>候補時間はまだありません</Text>
-            )}
-          </View>
-
-          {detail.message ? (
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>メッセージ</Text>
-              <Text style={styles.messageText}>{detail.message}</Text>
-            </View>
-          ) : null}
-
-          {canChat ? (
-            <View style={styles.chatSection}>
-              <View style={styles.chatHeader}>
-                <View>
-                  <Text style={styles.sectionTitle}>
-                    {detail.status === "agreed" || detail.status === "completed"
-                      ? "取引チャット"
-                      : "ネゴチャット"}
-                  </Text>
-                  <Text style={styles.chatSub}>
-                    {detail.messages.length}件
-                  </Text>
-                </View>
-                {detail.status === "agreed" ? (
-                  <View style={styles.arrivalActions}>
-                    <Pressable
-                      disabled={!!actionLoading}
-                      onPress={() => handleArrivalStatus("enroute")}
-                      style={styles.arrivalButton}
-                    >
-                      <Text style={styles.arrivalButtonText}>向かう</Text>
-                    </Pressable>
-                    <Pressable
-                      disabled={!!actionLoading}
-                      onPress={() => handleArrivalStatus("arrived")}
-                      style={[styles.arrivalButton, styles.arrivalButtonStrong]}
-                    >
-                      <Text
-                        style={[
-                          styles.arrivalButtonText,
-                          styles.arrivalButtonTextStrong,
-                        ]}
-                      >
-                        到着
-                      </Text>
-                    </Pressable>
-                  </View>
-                ) : null}
-              </View>
-
-              <View style={styles.messagesList}>
-                {detail.messages.length === 0 ? (
-                  <Text style={styles.emptyText}>まだメッセージはありません</Text>
-                ) : (
-                  detail.messages.map((message) => (
-                    <ChatBubble
-                      key={message.id}
-                      message={message}
-                      mine={message.senderId === user?.id}
-                      proposalId={detail.id}
-                      userId={user?.id ?? ""}
-                    />
-                  ))
-                )}
-              </View>
-
-              {detail.status !== "completed" ? (
-                <View style={styles.composer}>
-                  <TextInput
-                    value={draft}
-                    onChangeText={setDraft}
-                    placeholder="メッセージ"
-                    placeholderTextColor="rgba(58,50,74,0.38)"
-                    multiline
-                    style={styles.composerInput}
-                  />
-                  <Pressable
-                    disabled={sendingMessage || draft.trim().length === 0}
-                    onPress={handleSendMessage}
-                    style={[
-                      styles.sendButton,
-                      sendingMessage || draft.trim().length === 0
-                        ? styles.sendButtonDisabled
-                        : null,
-                    ]}
-                  >
-                    <Text style={styles.sendButtonText}>送信</Text>
-                  </Pressable>
-                </View>
+          {showComposer ? (
+            <View
+              style={[
+                styles.bottomComposer,
+                { marginBottom: keyboardInset, paddingBottom: composerBottomInset },
+              ]}
+            >
+              {!composerFocused ? (
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.webQuickActionRow}
+                >
+                  {detail.status === "agreed" ? (
+                    <>
+                      <QuickActionChip
+                        label={chatActionLoading === "location" ? "送信中…" : "現在地を送る"}
+                        icon="⌖"
+                        tone="lavender"
+                        disabled={!!chatActionLoading}
+                        onPress={handleSendCurrentLocation}
+                      />
+                      <QuickActionChip
+                        label={actionLoading === "enroute" ? "更新中…" : "向かっています"}
+                        icon="↗"
+                        tone={detail.myArrival === "enroute" ? "lavender" : "neutral"}
+                        disabled={!!actionLoading}
+                        onPress={() => handleArrivalStatus("enroute")}
+                      />
+                      <QuickActionChip
+                        label={actionLoading === "arrived" ? "更新中…" : "到着しました"}
+                        icon="✓"
+                        tone={detail.myArrival === "arrived" ? "lavender" : "neutral"}
+                        disabled={!!actionLoading}
+                        onPress={() => handleArrivalStatus("arrived")}
+                      />
+                      <QuickActionChip
+                        label={chatActionLoading === "outfit" ? "送信中…" : "服装写真"}
+                        icon="👕"
+                        tone="pink"
+                        disabled={!!chatActionLoading}
+                        onPress={() => handlePickChatPhoto("outfit_photo")}
+                      />
+                    </>
+                  ) : (
+                    <>
+                      <QuickActionChip
+                        label="カレンダー"
+                        icon="□"
+                        tone="lavender"
+                        disabled={!!chatActionLoading}
+                        onPress={() => router.push("/schedules")}
+                      />
+                      <QuickActionChip
+                        label="条件を変えて再打診"
+                        icon="↻"
+                        tone="pink"
+                        disabled={!!chatActionLoading}
+                        onPress={() =>
+                          router.push({
+                            pathname: "/proposal-select",
+                            params: {
+                              partnerId: detail.partner.id,
+                              proposalId: detail.id,
+                              revise: "1",
+                              tab: "meetup",
+                            },
+                          })
+                        }
+                      />
+                    </>
+                  )}
+                </ScrollView>
               ) : null}
+              <View style={styles.webComposerRow}>
+                <Pressable
+                  accessibilityRole="button"
+                  onPress={() => handlePickChatPhoto("photo")}
+                  style={styles.composerPlusButton}
+                >
+                  <Text style={styles.composerPlusText}>＋</Text>
+                </Pressable>
+                <TextInput
+                  value={draft}
+                  onChangeText={setDraft}
+                  placeholder="メッセージ…"
+                  placeholderTextColor="rgba(58,50,74,0.38)"
+                  multiline
+                  onBlur={() => setComposerFocused(false)}
+                  onFocus={() => setComposerFocused(true)}
+                  scrollEnabled
+                  style={styles.webComposerInput}
+                  textAlignVertical="top"
+                />
+                <Pressable
+                  disabled={sendingMessage || draft.trim().length === 0}
+                  onPress={handleSendMessage}
+                  style={[
+                    styles.webSendButton,
+                    sendingMessage || draft.trim().length === 0
+                      ? styles.sendButtonDisabled
+                      : null,
+                  ]}
+                >
+                  <Text style={styles.webSendButtonText}>➤</Text>
+                </Pressable>
+              </View>
             </View>
           ) : null}
-
-          {detail.status === "agreed" || detail.status === "completed" ? (
-            <CompletionPanel detail={detail} />
-          ) : null}
-
-          <View style={styles.actions}>
-            {canAccept ? (
-              <PrimaryButton
-                loading={actionLoading === "accept"}
-                onPress={() => handleAction("accept")}
-              >
-                この内容で合意する
-              </PrimaryButton>
-            ) : null}
-            {canNegotiate ? (
-              <PrimaryButton
-                variant="secondary"
-                loading={actionLoading === "negotiate"}
-                onPress={() => handleAction("negotiate")}
-              >
-                条件を相談する
-              </PrimaryButton>
-            ) : null}
-            {canReject ? (
-              <Pressable
-                disabled={!!actionLoading}
-                onPress={() => handleAction("reject")}
-                style={styles.rejectButton}
-              >
-                <Text style={styles.rejectText}>見送る</Text>
-              </Pressable>
-            ) : null}
-          </View>
         </>
       ) : null}
-    </Screen>
+    </View>
   );
+}
+
+type TransactionRouteParams = {
+  direction?: string | string[];
+  give?: string | string[];
+  note?: string | string[];
+  partner?: string | string[];
+  partnerAvatarUrl?: string | string[];
+  place?: string | string[];
+  receive?: string | string[];
+  status?: string | string[];
+  time?: string | string[];
+};
+
+type ChatUploadKind = "photo" | "outfit_photo";
+type ChatCoordinate = { latitude: number; longitude: number };
+
+async function reverseLocationLabel(coordinate: ChatCoordinate) {
+  try {
+    const ExpoLocation = await import("expo-location");
+    const addresses = await ExpoLocation.reverseGeocodeAsync(coordinate);
+    const first = addresses[0];
+    const parts = [
+      first?.city,
+      first?.district,
+      first?.street,
+      first?.name,
+    ].filter(Boolean);
+    return parts.length > 0 ? parts.join(" ") : "現在地を共有";
+  } catch {
+    return "現在地を共有";
+  }
+}
+
+async function uploadChatImage(input: {
+  proposalId: string;
+  uri: string;
+  mimeType?: string | null;
+  fileName?: string | null;
+  kind: ChatUploadKind;
+}) {
+  if (!supabase) throw new Error("Supabaseが未設定です");
+  const ext = extensionFrom(input.fileName ?? input.uri, input.mimeType);
+  const prefix = input.kind === "outfit_photo" ? "outfit" : "chat";
+  const path = `${input.proposalId}/${prefix}-${Date.now()}.${ext}`;
+  const response = await fetch(input.uri);
+  const body = await response.arrayBuffer();
+  const { error: uploadError } = await supabase.storage
+    .from("chat-photos")
+    .upload(path, body, {
+      contentType: input.mimeType ?? "image/jpeg",
+      upsert: false,
+    });
+  if (uploadError) throw uploadError;
+  const { data: signed, error: signedError } = await supabase.storage
+    .from("chat-photos")
+    .createSignedUrl(path, 60 * 60 * 24 * 365);
+  if (signedError) throw signedError;
+  return signed?.signedUrl ?? path;
+}
+
+function extensionFrom(nameOrUri: string, mimeType?: string | null) {
+  const fromName = nameOrUri.split("?")[0]?.split(".").pop()?.toLowerCase();
+  if (fromName && fromName.length <= 5 && /^[a-z0-9]+$/.test(fromName)) {
+    return fromName === "jpeg" ? "jpg" : fromName;
+  }
+  if (mimeType?.includes("png")) return "png";
+  if (mimeType?.includes("heic")) return "heic";
+  return "jpg";
+}
+
+type RouteTradeItem = {
+  id?: string;
+  glyph?: string;
+  hue?: string;
+  label?: string;
+  cash?: boolean;
+  photoUrl?: string | null;
+};
+
+function buildRouteFallbackDetail(
+  proposalId: string,
+  userId: string,
+  params: TransactionRouteParams,
+): TransactionDetail | null {
+  const partner = one(params.partner);
+  const status = one(params.status);
+  if (!partner || !status) return null;
+  const direction = one(params.direction);
+  const isSender = direction === "sent";
+  const place = one(params.place);
+  const time = one(params.time);
+  const avatarUrl = one(params.partnerAvatarUrl);
+  return {
+    id: proposalId,
+    status: normalizeStatus(status),
+    isSender,
+    isReceiver: !isSender,
+    myAgreed: status === "agreed" || status === "completed",
+    partnerAgreed: status === "agreed" || status === "completed",
+    myCompletionApproved: status === "completed",
+    partnerCompletionApproved: status === "completed",
+    hasEvidence: false,
+    evidencePhotoCount: 0,
+    evidenceTakenAt: null,
+    partner: {
+      id: "partner-from-list",
+      handle: partner,
+      display_name: partner,
+      primary_area: place ?? null,
+      avatar_url: avatarUrl || null,
+    },
+    receive: parseRouteItems(one(params.receive)),
+    give: parseRouteItems(one(params.give)),
+    cashOffer: false,
+    cashAmount: null,
+    meetups:
+      place && time
+        ? [
+            {
+              startAt: "",
+              endAt: "",
+              placeName: `${time} / ${place}`,
+              lat: null,
+              lng: null,
+            },
+          ]
+        : [],
+    message: one(params.note) ?? null,
+    expiresAt: null,
+    extensionCount: 0,
+    openDispute: null,
+    myArrival: null,
+    partnerArrival: null,
+    myOutfitPhoto: null,
+    partnerOutfitPhoto: null,
+    partnerLastReadAt: null,
+    messages: [],
+  };
+}
+
+function parseRouteItems(raw: string | undefined): DetailItem[] {
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed.map((item: RouteTradeItem, index) => {
+      const label = typeof item.label === "string" && item.label ? item.label : "グッズ";
+      return {
+        id: typeof item.id === "string" ? item.id : `route-item-${index}`,
+        label,
+        goodsType: item.cash ? "定価交換" : null,
+        photoUrl: typeof item.photoUrl === "string" ? item.photoUrl : null,
+        qty: 1,
+        hue: typeof item.hue === "string" ? item.hue : normalizeHue(null, label),
+      };
+    });
+  } catch {
+    return [];
+  }
+}
+
+function one(value: string | string[] | undefined) {
+  return Array.isArray(value) ? value[0] : value;
 }
 
 async function fetchTransactionDetail(
@@ -521,6 +1020,7 @@ async function fetchTransactionDetail(
     "message",
     "created_at",
     "expires_at",
+    "extension_count",
   ];
   const optionalProposalFields = [
     "meetup_lat",
@@ -553,6 +1053,7 @@ async function fetchTransactionDetail(
       evidence_taken_at: null,
       approved_by_sender: false,
       approved_by_receiver: false,
+      extension_count: 0,
       ...data,
     } as ProposalRow,
     userId,
@@ -610,6 +1111,20 @@ function getMissingColumnName(
   );
 }
 
+function isMissingRelationError(
+  error: { code?: string; message?: string } | null,
+  tableName: string,
+) {
+  const message = error?.message ?? "";
+  return (
+    error?.code === "42P01" ||
+    error?.code === "PGRST205" ||
+    message.includes(`relation "public.${tableName}" does not exist`) ||
+    message.includes(`Could not find the table '${tableName}'`) ||
+    message.includes(`Could not find the table 'public.${tableName}'`)
+  );
+}
+
 function toErrorMessage(error: unknown, fallback: string) {
   if (error instanceof Error) return error.message;
   if (
@@ -647,36 +1162,25 @@ async function buildDetail(
     : proposal.sender_have_qtys ?? [];
   const itemIds = Array.from(new Set([...giveIds, ...receiveIds]));
 
-  const [{ data: partnerData }, { data: inventoryData }, { data: evidencePhotos }] = await Promise.all([
-    supabase
-      .from("users")
-      .select("id, handle, display_name, primary_area, avatar_url")
-      .eq("id", partnerId)
-      .maybeSingle(),
-    itemIds.length > 0
-      ? supabase
-          .from("goods_inventory")
-          .select(
-            "id, title, photo_urls, hue, group:groups_master(name), character:characters_master(name), goods_type:goods_types_master(name)",
-          )
-          .in("id", itemIds)
-      : Promise.resolve({ data: [] }),
-    supabase
-      .from("proposal_evidence_photos")
-      .select("id, photo_url, position, taken_at")
-      .eq("proposal_id", proposal.id)
-      .order("position", { ascending: true }),
+  const [partnerData, inventoryData, evidencePhotos, openDispute] = await Promise.all([
+    fetchPartnerUser(partnerId),
+    fetchDetailInventoryRows(itemIds),
+    fetchEvidencePhotoRows(proposal.id),
+    fetchOpenDispute(proposal.id),
   ]);
 
   const inventoryById = new Map(
-    ((inventoryData as InventoryRow[] | null) ?? []).map((item) => [
+    inventoryData.map((item) => [
       item.id,
       item,
     ]),
   );
-  const evidencePhotoCount =
-    ((evidencePhotos as { id: string }[] | null) ?? []).length;
-  const messages = await fetchMessages(proposal.id, proposal);
+  const evidencePhotoCount = evidencePhotos.length;
+  const [messages, partnerLastReadAt] = await Promise.all([
+    fetchMessages(proposal.id, proposal),
+    fetchProposalLastReadAt(proposal.id, partnerId),
+  ]);
+  const liveState = summarizeLiveMessages(messages, userId, partnerId);
 
   return {
     id: proposal.id,
@@ -699,7 +1203,7 @@ async function buildDetail(
     evidencePhotoCount,
     evidenceTakenAt: proposal.evidence_taken_at,
     partner:
-      (partnerData as UserRow | null) ?? {
+      partnerData ?? {
         id: partnerId,
         handle: "unknown",
         display_name: "unknown",
@@ -717,8 +1221,161 @@ async function buildDetail(
     meetups: parseMeetups(proposal),
     message: proposal.message,
     expiresAt: proposal.expires_at,
+    extensionCount: Number(proposal.extension_count ?? 0),
+    openDispute,
+    myArrival: liveState.myArrival,
+    partnerArrival: liveState.partnerArrival,
+    myOutfitPhoto: liveState.myOutfitPhoto,
+    partnerOutfitPhoto: liveState.partnerOutfitPhoto,
+    partnerLastReadAt,
     messages,
   };
+}
+
+async function fetchProposalLastReadAt(proposalId: string, userId: string) {
+  if (!supabase) return null;
+  const { data, error } = await supabase
+    .from("proposal_read_states")
+    .select("last_read_at")
+    .eq("proposal_id", proposalId)
+    .eq("user_id", userId)
+    .maybeSingle();
+  if (error) {
+    if (!isMissingRelationError(error, "proposal_read_states")) {
+      console.warn("proposal read state fetch failed", error);
+    }
+    return null;
+  }
+  return ((data as ProposalReadStateRow | null)?.last_read_at) ?? null;
+}
+
+async function markProposalMessagesRead(
+  proposalId: string,
+  userId: string,
+  lastReadAt: string,
+) {
+  if (!supabase) return;
+  const { error } = await supabase
+    .from("proposal_read_states")
+    .upsert(
+      {
+        proposal_id: proposalId,
+        user_id: userId,
+        last_read_at: lastReadAt,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: "proposal_id,user_id" },
+    );
+  if (error && !isMissingRelationError(error, "proposal_read_states")) {
+    console.warn("proposal read state upsert failed", error);
+  }
+}
+
+async function fetchPartnerUser(partnerId: string): Promise<UserRow | null> {
+  if (!supabase) return null;
+  const rich = await supabase
+    .from("users")
+    .select("id, handle, display_name, primary_area, avatar_url")
+    .eq("id", partnerId)
+    .maybeSingle();
+  const missingColumn = getMissingColumnName(rich.error, "users");
+  if (!rich.error) return (rich.data as UserRow | null) ?? null;
+  if (missingColumn === "avatar_url") {
+    const fallback = await supabase
+      .from("users")
+      .select("id, handle, display_name, primary_area")
+      .eq("id", partnerId)
+      .maybeSingle();
+    if (!fallback.error && fallback.data) {
+      return { ...(fallback.data as Omit<UserRow, "avatar_url">), avatar_url: null };
+    }
+  }
+  console.warn("transaction detail partner fetch failed", rich.error);
+  return null;
+}
+
+async function fetchDetailInventoryRows(itemIds: string[]): Promise<InventoryRow[]> {
+  if (!supabase || itemIds.length === 0) return [];
+  const { data, error } = await supabase
+    .from("goods_inventory")
+    .select(
+      "id, title, photo_urls, hue, group:groups_master(name), character:characters_master(name), goods_type:goods_types_master(name)",
+    )
+    .in("id", itemIds);
+  if (error) {
+    console.warn("transaction detail inventory fetch failed", error);
+    return [];
+  }
+  return (data as InventoryRow[] | null) ?? [];
+}
+
+async function fetchEvidencePhotoRows(
+  proposalId: string,
+): Promise<{ id: string; photo_url: string | null; position: number | null; taken_at: string | null }[]> {
+  if (!supabase) return [];
+  const { data, error } = await supabase
+    .from("proposal_evidence_photos")
+    .select("id, photo_url, position, taken_at")
+    .eq("proposal_id", proposalId)
+    .order("position", { ascending: true });
+  if (error) {
+    console.warn("transaction detail evidence fetch failed", error);
+    return [];
+  }
+  return (
+    (data as
+      | { id: string; photo_url: string | null; position: number | null; taken_at: string | null }[]
+      | null) ?? []
+  );
+}
+
+async function fetchOpenDispute(proposalId: string): Promise<OpenDispute | null> {
+  if (!supabase) return null;
+  const { data, error } = await supabase
+    .from("disputes")
+    .select("id, ticket_no, status")
+    .eq("proposal_id", proposalId)
+    .neq("status", "closed")
+    .limit(1);
+  if (error) {
+    console.warn("transaction detail dispute fetch failed", error);
+    return null;
+  }
+  const row = (data as { id: string; ticket_no?: string | null }[] | null)?.[0];
+  if (!row) return null;
+  return {
+    id: row.id,
+    ticketNo: row.ticket_no ?? row.id.slice(0, 8),
+  };
+}
+
+function summarizeLiveMessages(
+  messages: ChatMessage[],
+  userId: string,
+  partnerId: string,
+) {
+  let myArrival: ArrivalStatus = null;
+  let partnerArrival: ArrivalStatus = null;
+  let myOutfitPhoto: string | null = null;
+  let partnerOutfitPhoto: string | null = null;
+
+  for (const message of messages) {
+    if (message.type === "arrival_status") {
+      const rawStatus = message.meta?.status;
+      const status =
+        rawStatus === "enroute" || rawStatus === "arrived" || rawStatus === "left"
+          ? rawStatus
+          : null;
+      if (status && message.senderId === userId) myArrival = status;
+      if (status && message.senderId === partnerId) partnerArrival = status;
+    }
+    if (message.type === "outfit_photo" && message.photoUrl) {
+      if (message.senderId === userId) myOutfitPhoto = message.photoUrl;
+      if (message.senderId === partnerId) partnerOutfitPhoto = message.photoUrl;
+    }
+  }
+
+  return { myArrival, partnerArrival, myOutfitPhoto, partnerOutfitPhoto };
 }
 
 async function fetchMessages(
@@ -830,6 +1487,627 @@ async function updateProposalAction(
   return fetchTransactionDetail(detail.id, userId);
 }
 
+function ChatPartnerStrip({ detail }: { detail: TransactionDetail }) {
+  const handle = detail.partner.handle ?? detail.partner.display_name ?? "unknown";
+  const isAgreed = detail.status === "agreed" || detail.status === "completed";
+  const arrivalColor =
+    detail.partnerArrival === "arrived"
+      ? megrumColors.ok
+      : detail.partnerArrival === "enroute"
+        ? "#e0a847"
+        : "rgba(58,50,74,0.42)";
+  const arrivalLabel = isAgreed
+    ? arrivalStatusLabel(detail.partnerArrival)
+    : detail.partner.primary_area
+      ? detail.partner.primary_area
+      : "取引チャット";
+  return (
+    <Pressable
+      accessibilityRole="button"
+      onPress={() =>
+        router.push({
+          pathname: "/user-profile",
+          params: { id: detail.partner.id },
+        })
+      }
+      style={styles.chatPartnerStrip}
+    >
+      <View style={styles.headerAvatar}>
+        {detail.partner.avatar_url ? (
+          <Image source={{ uri: detail.partner.avatar_url }} style={styles.headerAvatarImage} />
+        ) : (
+          <Text style={styles.headerAvatarText}>
+            {handle.replace(/^@/, "").slice(0, 1).toUpperCase()}
+          </Text>
+        )}
+      </View>
+      <View style={styles.chatHeaderCopy}>
+        <Text numberOfLines={1} style={styles.chatHeaderName}>@{handle.replace(/^@/, "")}</Text>
+        <View style={styles.chatHeaderMetaRow}>
+          <View
+            style={[
+              styles.chatHeaderDot,
+              { backgroundColor: isAgreed ? arrivalColor : megrumColors.lavender },
+            ]}
+          />
+          <Text
+            numberOfLines={1}
+            style={[
+              styles.chatHeaderMetaText,
+              { color: isAgreed ? arrivalColor : megrumColors.mutedInk },
+            ]}
+          >
+            {arrivalLabel}
+          </Text>
+          {isAgreed && detail.partner.primary_area ? (
+            <Text numberOfLines={1} style={styles.chatHeaderArea}>
+              · {detail.partner.primary_area}
+            </Text>
+          ) : null}
+        </View>
+      </View>
+      <AgreementHeaderBadge detail={detail} />
+    </Pressable>
+  );
+}
+
+function AgreementHeaderBadge({ detail }: { detail: TransactionDetail }) {
+  const label = headerAgreementLabel(detail);
+  const complete = detail.status === "agreed" || detail.status === "completed";
+  const waiting =
+    detail.status === "agreement_one_side" ||
+    detail.myAgreed ||
+    detail.partnerAgreed;
+  return (
+    <View
+      style={[
+        styles.chatHeaderStatusBadge,
+        complete
+          ? styles.chatHeaderStatusBadgeDone
+          : waiting
+            ? styles.chatHeaderStatusBadgeWaiting
+            : null,
+      ]}
+    >
+      <Text
+        numberOfLines={1}
+        style={[
+          styles.chatHeaderStatusText,
+          complete ? styles.chatHeaderStatusTextDone : null,
+        ]}
+      >
+        {label}
+      </Text>
+    </View>
+  );
+}
+
+function DealSummaryCard({ detail }: { detail: TransactionDetail }) {
+  const [detailOpen, setDetailOpen] = useState(false);
+  return (
+    <>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="取引内容の詳細を表示"
+        onPress={() => setDetailOpen(true)}
+        style={({ pressed }) => [
+          styles.dealCollapsedCard,
+          pressed ? styles.dealCollapsedCardPressed : null,
+        ]}
+      >
+        <Text style={styles.dealCollapsedLabel}>交換内容</Text>
+        <Text numberOfLines={1} style={styles.dealCollapsedSummary}>
+          {tradeSummaryLine(detail)}
+        </Text>
+        <Text style={styles.dealCollapsedAction}>詳細</Text>
+      </Pressable>
+      <DealDetailModal
+        detail={detail}
+        visible={detailOpen}
+        onClose={() => setDetailOpen(false)}
+      />
+    </>
+  );
+}
+
+function DealDetailModal({
+  detail,
+  visible,
+  onClose,
+}: {
+  detail: TransactionDetail;
+  visible: boolean;
+  onClose: () => void;
+}) {
+  const statusLabelText =
+    detail.status === "completed"
+      ? "完了"
+      : detail.status === "agreed"
+        ? "合意済"
+        : "提案中";
+  return (
+    <Modal animationType="fade" transparent visible={visible} onRequestClose={onClose}>
+      <Pressable style={styles.dealModalBackdrop} onPress={onClose}>
+        <Pressable style={styles.dealModalCard}>
+          <View style={styles.dealModalHeader}>
+            <View>
+              <Text style={styles.dealModalTitle}>取引内容</Text>
+              <Text style={styles.dealModalSub}>{statusLabelText}</Text>
+            </View>
+            <Pressable accessibilityRole="button" onPress={onClose} style={styles.dealModalClose}>
+              <Text style={styles.dealModalCloseText}>×</Text>
+            </Pressable>
+          </View>
+
+          <ScrollView
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={styles.dealModalContent}
+          >
+            <View style={styles.dealModalSection}>
+              <Text style={styles.dealModalSectionTitle}>交換内容</Text>
+              <DealExchangeCard detail={detail} />
+            </View>
+
+            <View style={styles.dealModalSection}>
+              <View style={styles.dealModalSectionHeader}>
+                <Text style={styles.dealModalSectionTitle}>交換できる候補</Text>
+                <Text style={styles.dealModalSectionCount}>{detail.meetups.length}件</Text>
+              </View>
+              <DealMeetupCandidateCard meetups={detail.meetups} />
+            </View>
+          </ScrollView>
+        </Pressable>
+      </Pressable>
+    </Modal>
+  );
+}
+
+function DealExchangeCard({ detail }: { detail: TransactionDetail }) {
+  return (
+    <View style={styles.dealExchangeCard}>
+      <DealSidePanel
+        label={`相手の譲（${detail.receive.length}）`}
+        items={detail.receive}
+        cashOffer={detail.cashOffer}
+        cashAmount={detail.cashAmount}
+      />
+      <View style={styles.dealExchangeSwapColumn}>
+        <DealArrowDot color={megrumColors.lavender} direction="right" />
+        <DealArrowDot color={megrumColors.sky} direction="left" />
+      </View>
+      <DealSidePanel
+        label={`あなたの譲（${detail.give.length}）`}
+        items={detail.give}
+        alignRight
+      />
+    </View>
+  );
+}
+
+function DealSidePanel({
+  label,
+  items,
+  cashOffer,
+  cashAmount,
+  alignRight,
+}: {
+  label: string;
+  items: DetailItem[];
+  cashOffer?: boolean;
+  cashAmount?: number | null;
+  alignRight?: boolean;
+}) {
+  return (
+    <View style={[styles.dealExchangeSidePanel, alignRight ? styles.dealExchangeSidePanelRight : null]}>
+      <Text
+        style={[
+          styles.dealExchangeSideLabel,
+          alignRight ? styles.dealExchangeSideLabelRight : null,
+        ]}
+      >
+        {label}
+      </Text>
+      {cashOffer && items.length === 0 ? (
+        <View style={[styles.dealExchangeCash, alignRight ? styles.dealExchangeCashRight : null]}>
+          <Text style={styles.dealExchangeCashText}>¥{cashAmount?.toLocaleString() ?? "—"}</Text>
+        </View>
+      ) : (
+        <DealModalItemThumbs items={items} alignRight={alignRight} />
+      )}
+    </View>
+  );
+}
+
+function DealArrowDot({
+  color,
+  direction,
+}: {
+  color: string;
+  direction: "left" | "right";
+}) {
+  return (
+    <View style={[styles.dealExchangeArrowDot, { backgroundColor: color }]}>
+      <Text style={styles.dealExchangeArrowText}>{direction === "right" ? "→" : "←"}</Text>
+    </View>
+  );
+}
+
+function DealModalItemThumbs({
+  items,
+  alignRight,
+}: {
+  items: DetailItem[];
+  alignRight?: boolean;
+}) {
+  if (items.length === 0) {
+    return <Text style={styles.dealModalEmpty}>—</Text>;
+  }
+  return (
+    <View style={[styles.dealModalItems, alignRight ? styles.dealModalItemsRight : null]}>
+      {items.map((item) => (
+        <View key={item.id} style={styles.dealModalThumb}>
+          {item.photoUrl ? (
+            <Image source={{ uri: item.photoUrl }} style={styles.dealModalThumbPhoto} />
+          ) : (
+            <View style={[styles.dealModalThumbFallback, { backgroundColor: item.hue }]}>
+              <View style={styles.dealModalThumbShine} />
+              <Text style={styles.dealModalThumbGlyph}>{item.label.slice(0, 1)}</Text>
+            </View>
+          )}
+          {item.qty > 1 ? (
+            <View style={styles.dealModalThumbQty}>
+              <Text style={styles.dealModalThumbQtyText}>×{item.qty}</Text>
+            </View>
+          ) : null}
+          <View style={styles.dealModalThumbMeta}>
+            <Text numberOfLines={1} style={styles.dealModalThumbLabel}>{item.label}</Text>
+            <Text numberOfLines={1} style={styles.dealModalThumbSub}>{item.goodsType ?? "グッズ"}</Text>
+          </View>
+        </View>
+      ))}
+    </View>
+  );
+}
+
+function DealMeetupCandidateCard({ meetups }: { meetups: MeetupCandidate[] }) {
+  if (meetups.length === 0) {
+    return <Text style={styles.dealModalEmpty}>候補は未設定です</Text>;
+  }
+  const mapMeetups = meetups
+    .map((meetup, index) => (hasMeetupCoordinate(meetup) ? { index, meetup } : null))
+    .filter(
+      (entry): entry is {
+        index: number;
+        meetup: MeetupCandidate & { lat: number; lng: number };
+      } => !!entry,
+    );
+  const center = getDealMeetupMapCenter(mapMeetups.map((entry) => entry.meetup));
+  return (
+    <View style={styles.dealMeetupMapCard}>
+      <View style={styles.dealMeetupMapPanel}>
+        {mapMeetups.length > 0 ? (
+          <NativeMapPreview
+            center={center}
+            height={184}
+            markers={mapMeetups.map(({ index, meetup }) => ({
+              id: `${meetup.startAt}-${meetup.endAt}-${index}`,
+              coordinate: {
+                latitude: meetup.lat,
+                longitude: meetup.lng,
+              },
+              label: String(index + 1),
+              title: meetup.placeName,
+            }))}
+          />
+        ) : (
+          <View style={styles.dealMeetupMapEmpty}>
+            <Text style={styles.dealMeetupMapEmptyText}>地図情報は未設定です</Text>
+          </View>
+        )}
+      </View>
+      <View style={styles.dealCandidateList}>
+        {meetups.map((meetup, index) => (
+          <View key={`${meetup.startAt}-${meetup.endAt}-${index}`} style={styles.dealCandidateRow}>
+            <View style={styles.dealCandidateNumber}>
+              <Text style={styles.dealCandidateNumberText}>{index + 1}</Text>
+            </View>
+            <View style={styles.dealCandidateCopy}>
+              <Text numberOfLines={1} style={styles.dealCandidateTime}>
+                {formatDateTime(meetup.startAt, meetup.endAt)}
+              </Text>
+              <Text numberOfLines={1} style={styles.dealCandidatePlace}>
+                {meetup.placeName}
+              </Text>
+            </View>
+          </View>
+        ))}
+      </View>
+    </View>
+  );
+}
+
+function hasMeetupCoordinate(
+  meetup: MeetupCandidate,
+): meetup is MeetupCandidate & { lat: number; lng: number } {
+  return Number.isFinite(meetup.lat) && Number.isFinite(meetup.lng);
+}
+
+function getDealMeetupMapCenter(
+  meetups: Array<MeetupCandidate & { lat: number; lng: number }>,
+): MapCoordinate {
+  if (meetups.length === 0) return FALLBACK_MEETUP_COORDINATE;
+  const total = meetups.reduce(
+    (acc, meetup) => ({
+      latitude: acc.latitude + meetup.lat,
+      longitude: acc.longitude + meetup.lng,
+    }),
+    { latitude: 0, longitude: 0 },
+  );
+  return {
+    latitude: total.latitude / meetups.length,
+    longitude: total.longitude / meetups.length,
+  };
+}
+function MiniItemRow({
+  items,
+  alignRight,
+}: {
+  items: DetailItem[];
+  alignRight?: boolean;
+}) {
+  const visible = items.slice(0, 2);
+  if (items.length === 0) {
+    return <Text style={styles.miniItemEmpty}>—</Text>;
+  }
+  return (
+    <View style={[styles.miniItemRow, alignRight ? styles.miniItemRowRight : null]}>
+      {visible.map((item) => (
+        <MiniItemThumb key={item.id} item={item} />
+      ))}
+      {items.length > visible.length ? (
+        <View style={styles.miniMore}>
+          <Text style={styles.miniMoreText}>+{items.length - visible.length}</Text>
+        </View>
+      ) : null}
+    </View>
+  );
+}
+
+function MiniItemThumb({ item }: { item: DetailItem }) {
+  return (
+    <View style={styles.miniThumb}>
+      {item.photoUrl ? (
+        <Image source={{ uri: item.photoUrl }} style={styles.miniThumbImage} />
+      ) : (
+        <View style={[styles.miniThumbFallback, { backgroundColor: item.hue }]}>
+          <Text style={styles.miniThumbGlyph}>{item.label.slice(0, 1)}</Text>
+        </View>
+      )}
+      {item.qty > 1 ? (
+        <View style={styles.miniQty}>
+          <Text style={styles.miniQtyText}>×{item.qty}</Text>
+        </View>
+      ) : null}
+    </View>
+  );
+}
+
+function CashChipNative({ amount }: { amount: number | null }) {
+  return (
+    <View style={styles.cashChipNative}>
+      <Text style={styles.cashChipText}>¥{amount?.toLocaleString() ?? "—"}</Text>
+    </View>
+  );
+}
+
+function ExpireBannerCompact({
+  detail,
+  loading,
+  onExtend,
+}: {
+  detail: TransactionDetail;
+  loading: boolean;
+  onExtend: () => void;
+}) {
+  if (!detail.expiresAt) return null;
+  const remainMs = new Date(detail.expiresAt).getTime() - Date.now();
+  const remainDays = Math.ceil(remainMs / (1000 * 60 * 60 * 24));
+  if (remainDays > 3) return null;
+  const warn = remainDays <= 1;
+  const canExtend = detail.extensionCount < 3;
+  return (
+    <View style={[styles.expireBanner, warn ? styles.expireBannerWarn : null]}>
+      <Text style={styles.expireIcon}>{warn ? "!" : "⏰"}</Text>
+      <View style={styles.expireCopy}>
+        <Text style={[styles.expireTitle, warn ? styles.expireTitleWarn : null]}>
+          {remainDays <= 0
+            ? "本日期限切れ"
+            : remainDays === 1
+              ? "あと1日で期限切れ"
+              : `あと${remainDays}日で期限切れ`}
+        </Text>
+        <Text style={styles.expireSub}>延長 {detail.extensionCount}/3 回 ・ +7日延長できます</Text>
+      </View>
+      <Pressable
+        accessibilityRole="button"
+        disabled={loading || !canExtend}
+        onPress={onExtend}
+        style={[styles.expireButton, warn ? styles.expireButtonWarn : null]}
+      >
+        <Text style={styles.expireButtonText}>{canExtend ? "+7日延長" : "上限"}</Text>
+      </Pressable>
+    </View>
+  );
+}
+
+function AgreementBarCompact({
+  detail,
+  canAccept,
+  canReject,
+  loading,
+  onAccept,
+  onReject,
+}: {
+  detail: TransactionDetail;
+  canAccept: boolean;
+  canReject: boolean;
+  loading: string | null;
+  onAccept: () => void;
+  onReject: () => void;
+}) {
+  const isInitialSenderWaiting = detail.status === "sent" && detail.isSender;
+  const statusText = isInitialSenderWaiting
+    ? `@${detail.partner.handle ?? detail.partner.display_name ?? "相手"} の返信待ちです`
+    : detail.myAgreed
+      ? "あなた合意済 · 相手の合意待ち"
+      : detail.partnerAgreed
+        ? "相手合意済 · あなたの確認をお願いします"
+        : "両者の合意で取引フェーズへ進めます";
+  return (
+    <View style={styles.agreementCompact}>
+      <Text style={styles.agreementCompactText}>{statusText}</Text>
+      <View style={styles.agreementCompactActions}>
+        {canReject ? (
+          <Pressable
+            accessibilityRole="button"
+            disabled={!!loading}
+            onPress={onReject}
+            style={styles.agreementRejectButton}
+          >
+            <Text style={styles.agreementRejectText}>拒否</Text>
+          </Pressable>
+        ) : null}
+        <Pressable
+          accessibilityRole="button"
+          disabled={!!loading || !canAccept || detail.myAgreed || isInitialSenderWaiting}
+          onPress={onAccept}
+          style={[
+            styles.agreementAcceptButton,
+            !!loading || !canAccept || detail.myAgreed || isInitialSenderWaiting
+              ? styles.actionDisabled
+              : null,
+          ]}
+        >
+          <Text style={styles.agreementAcceptText}>
+            {isInitialSenderWaiting
+              ? "相手の返信待ち"
+              : detail.myAgreed
+                ? "合意済（相手の合意待ち）"
+                : detail.partnerAgreed
+                  ? "✓ この内容で合意して取引へ進む →"
+                  : "✓ この内容で合意する"}
+          </Text>
+        </Pressable>
+      </View>
+    </View>
+  );
+}
+
+function OutfitCompactRowNative({
+  detail,
+  uploading,
+  onTake,
+}: {
+  detail: TransactionDetail;
+  uploading: boolean;
+  onTake: () => void;
+}) {
+  return (
+    <View style={styles.outfitCompactWeb}>
+      <Text style={styles.outfitIcon}>👕</Text>
+      <Text style={styles.outfitTitle}>服装写真</Text>
+      <Text numberOfLines={1} style={styles.outfitState}>あなた: {detail.myOutfitPhoto ? "共有済" : "未シェア"}</Text>
+      <Text style={styles.outfitSlash}>/</Text>
+      <Text numberOfLines={1} style={styles.outfitState}>相手: {detail.partnerOutfitPhoto ? "共有済" : "未シェア"}</Text>
+      <Pressable
+        accessibilityRole="button"
+        disabled={uploading}
+        onPress={onTake}
+        style={styles.outfitShootButton}
+      >
+        <Text style={styles.outfitShootText}>{uploading ? "送信中…" : detail.myOutfitPhoto ? "撮り直す" : "撮影"}</Text>
+      </Pressable>
+    </View>
+  );
+}
+
+function ChatMessageList({
+  messages,
+  partnerLastReadAt,
+  proposalId,
+  userId,
+}: {
+  messages: ChatMessage[];
+  partnerLastReadAt: string | null;
+  proposalId: string;
+  userId: string;
+}) {
+  if (messages.length === 0) {
+    return (
+      <View style={styles.emptyMessageCard}>
+        <Text style={styles.emptyMessageText}>まだメッセージがありません。挨拶から始めましょう</Text>
+      </View>
+    );
+  }
+  const nodes: ReactNode[] = [];
+  let lastDay: string | null = null;
+  for (const message of messages) {
+    const date = new Date(message.createdAt);
+    const dayKey = `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`;
+    if (dayKey !== lastDay) {
+      nodes.push(
+        <View key={`day-${dayKey}-${message.id}`} style={styles.daySeparator}>
+          <Text style={styles.daySeparatorText}>{dayLabel(message.createdAt)}</Text>
+        </View>,
+      );
+      lastDay = dayKey;
+    }
+    nodes.push(
+      <ChatBubble
+        key={message.id}
+        message={message}
+        mine={message.senderId === userId}
+        read={message.senderId === userId && isReadByPartner(message, partnerLastReadAt)}
+        proposalId={proposalId}
+        userId={userId}
+      />,
+    );
+  }
+  return <>{nodes}</>;
+}
+
+function isReadByPartner(message: ChatMessage, partnerLastReadAt: string | null) {
+  if (!partnerLastReadAt) return false;
+  if (message.type === "system" || message.type === "arrival_status") return false;
+  const readTime = new Date(partnerLastReadAt).getTime();
+  const messageTime = new Date(message.createdAt).getTime();
+  if (Number.isNaN(readTime) || Number.isNaN(messageTime)) return false;
+  return readTime >= messageTime;
+}
+
+function EvidenceCalloutNative({ proposalId }: { proposalId: string }) {
+  return (
+    <View style={styles.evidenceCalloutWeb}>
+      <View style={styles.evidenceCalloutIcon}>
+        <Text style={styles.evidenceCalloutIconText}>□</Text>
+      </View>
+      <View style={styles.evidenceCalloutCopy}>
+        <Text style={styles.evidenceCalloutTitle}>合流したら証跡を撮影</Text>
+        <Text style={styles.evidenceCalloutSub}>両者の交換物を1枚に収めます（複数枚可）</Text>
+      </View>
+      <Pressable
+        accessibilityRole="button"
+        onPress={() =>
+          router.push({ pathname: "/transaction-capture", params: { id: proposalId } })
+        }
+        style={styles.evidenceCalloutButton}
+      >
+        <Text style={styles.evidenceCalloutButtonText}>撮影へ</Text>
+      </Pressable>
+    </View>
+  );
+}
+
 function TradeColumn({
   title,
   items,
@@ -868,11 +2146,13 @@ function TradeColumn({
 function ChatBubble({
   message,
   mine,
+  read,
   proposalId,
   userId,
 }: {
   message: ChatMessage;
   mine: boolean;
+  read: boolean;
   proposalId: string;
   userId: string;
 }) {
@@ -965,24 +2245,345 @@ function ChatBubble({
     );
   }
 
+  if (message.type === "location") {
+    return <LocationChatBubble message={message} mine={mine} read={read} />;
+  }
+
   return (
     <View style={[styles.chatBubbleRow, mine ? styles.chatBubbleRowMine : null]}>
-      <View style={[styles.chatBubble, mine ? styles.chatBubbleMine : null]}>
-        {message.photoUrl ? (
-          <Image source={{ uri: message.photoUrl }} style={styles.chatPhoto} />
-        ) : null}
-        <Text style={[styles.chatBubbleText, mine ? styles.chatBubbleTextMine : null]}>
-          {text}
-        </Text>
-        <Text style={[styles.chatTime, mine ? styles.chatTimeMine : null]}>
-          {shortTime(message.createdAt)}
-        </Text>
+      <View style={mine ? styles.chatBubbleMineWrap : styles.chatBubblePartnerWrap}>
+        {mine ? <ChatMessageMeta createdAt={message.createdAt} read={read} /> : null}
+        <ChatGradientBubble mine={mine} style={[styles.chatBubble, mine ? styles.chatBubbleMine : null]}>
+          {message.photoUrl ? (
+            <Image source={{ uri: message.photoUrl }} style={styles.chatPhoto} />
+          ) : null}
+          <Text style={[styles.chatBubbleText, mine ? styles.chatBubbleTextMine : null]}>
+            {text}
+          </Text>
+        </ChatGradientBubble>
+        {!mine ? <ChatMessageMeta createdAt={message.createdAt} /> : null}
       </View>
     </View>
   );
 }
 
-function CompletionPanel({ detail }: { detail: TransactionDetail }) {
+function ChatMessageMeta({
+  createdAt,
+  read,
+}: {
+  createdAt: string;
+  read?: boolean;
+}) {
+  return (
+    <View style={styles.chatMessageMeta}>
+      {read ? <Text style={styles.chatMessageMetaText}>既読</Text> : null}
+      <Text style={styles.chatMessageMetaText}>{shortTime(createdAt)}</Text>
+    </View>
+  );
+}
+
+function LocationChatBubble({
+  message,
+  mine,
+  read,
+}: {
+  message: ChatMessage;
+  mine: boolean;
+  read: boolean;
+}) {
+  const hasCoordinate =
+    typeof message.locationLat === "number" &&
+    typeof message.locationLng === "number";
+  const coordinate = hasCoordinate
+    ? {
+        latitude: message.locationLat as number,
+        longitude: message.locationLng as number,
+      }
+    : null;
+
+  return (
+    <View style={[styles.chatBubbleRow, mine ? styles.chatBubbleRowMine : null]}>
+      <View style={mine ? styles.chatBubbleMineWrap : styles.chatBubblePartnerWrap}>
+        {mine ? <ChatMessageMeta createdAt={message.createdAt} read={read} /> : null}
+        <View
+          style={[
+            styles.locationBubble,
+            mine ? styles.locationBubbleMine : styles.locationBubblePartner,
+          ]}
+        >
+          {coordinate ? (
+            <NativeMapPreview
+              center={coordinate}
+              height={118}
+              markers={[
+                {
+                  id: "shared-location",
+                  coordinate,
+                  label: "!",
+                  title: message.locationLabel ?? "現在地",
+                },
+              ]}
+              style={styles.locationMap}
+            />
+          ) : null}
+          <View style={styles.locationBody}>
+            <Text style={styles.locationTitle}>
+              {message.locationLabel ?? "現在地を共有"}
+            </Text>
+            {coordinate ? (
+              <Pressable
+                accessibilityRole="button"
+                onPress={() =>
+                  Linking.openURL(
+                    `http://maps.apple.com/?ll=${coordinate.latitude},${coordinate.longitude}`,
+                  )
+                }
+              >
+                <Text style={styles.locationLink}>地図アプリで開く →</Text>
+              </Pressable>
+            ) : null}
+          </View>
+        </View>
+        {!mine ? <ChatMessageMeta createdAt={message.createdAt} /> : null}
+      </View>
+    </View>
+  );
+}
+
+function QuickActionChip({
+  label,
+  icon,
+  tone,
+  disabled,
+  onPress,
+}: {
+  label: string;
+  icon: string;
+  tone: "lavender" | "pink" | "neutral";
+  disabled?: boolean;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      disabled={disabled}
+      onPress={onPress}
+      style={[
+        styles.quickActionChip,
+        tone === "lavender"
+          ? styles.quickActionLavender
+          : tone === "pink"
+            ? styles.quickActionPink
+            : styles.quickActionNeutral,
+        disabled ? styles.quickActionDisabled : null,
+      ]}
+    >
+      <Text
+        style={[
+          styles.quickActionIcon,
+          tone === "neutral" ? styles.quickActionIconNeutral : null,
+        ]}
+      >
+        {icon}
+      </Text>
+      <Text style={styles.quickActionLabel}>{label}</Text>
+    </Pressable>
+  );
+}
+
+function OpenDisputeBanner({ dispute }: { dispute: OpenDispute }) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      onPress={() =>
+        router.push({ pathname: "/dispute-detail", params: { id: dispute.id } })
+      }
+      style={styles.disputeBanner}
+    >
+      <View style={styles.disputeIcon}>
+        <Text style={styles.disputeIconText}>!</Text>
+      </View>
+      <View style={styles.disputeCopy}>
+        <Text style={styles.disputeTitle}>申告 {dispute.ticketNo} ・ 仲裁中</Text>
+        <Text style={styles.disputeSub}>ステータス確認はタップ</Text>
+      </View>
+      <Text style={styles.disputeArrow}>›</Text>
+    </Pressable>
+  );
+}
+
+function ProposalNegotiationPanel({
+  detail,
+  canAccept,
+  canNegotiate,
+  canReject,
+  actionLoading,
+  onAccept,
+  onNegotiate,
+  onReject,
+  onExtend,
+}: {
+  detail: TransactionDetail;
+  canAccept: boolean;
+  canNegotiate: boolean;
+  canReject: boolean;
+  actionLoading: "accept" | "negotiate" | "reject" | "extend" | "enroute" | "arrived" | null;
+  onAccept: () => void;
+  onNegotiate: () => void;
+  onReject: () => void;
+  onExtend: () => void;
+}) {
+  const expired = detail.expiresAt
+    ? new Date(detail.expiresAt).getTime() < Date.now()
+    : false;
+  return (
+    <View style={styles.negotiationPanel}>
+      <View style={styles.negotiationHeader}>
+        <View>
+          <Text style={styles.negotiationTitle}>
+            {detail.status === "agreement_one_side"
+              ? detail.myAgreed
+                ? "相手の合意待ち"
+                : "あなたの合意待ち"
+              : detail.status === "negotiating"
+                ? "条件を相談中"
+                : "打診中"}
+          </Text>
+          <Text style={styles.negotiationSub}>
+            {detail.expiresAt
+              ? `${expired ? "期限切れ" : "期限"} ${formatDeadline(detail.expiresAt)}`
+              : "期限は未設定です"}
+            {detail.extensionCount > 0 ? ` / 延長${detail.extensionCount}回` : ""}
+          </Text>
+        </View>
+        <Pressable
+          accessibilityRole="button"
+          disabled={actionLoading === "extend"}
+          onPress={onExtend}
+          style={styles.extendButton}
+        >
+          <Text style={styles.extendButtonText}>
+            {actionLoading === "extend" ? "延長中…" : "7日延長"}
+          </Text>
+        </Pressable>
+      </View>
+      <View style={styles.agreementStateRow}>
+        <View style={[styles.agreementStateChip, detail.myAgreed ? styles.agreementStateChipDone : null]}>
+          <Text style={[styles.agreementStateChipText, detail.myAgreed ? styles.agreementStateChipTextDone : null]}>
+            私 {detail.myAgreed ? "合意済" : "未合意"}
+          </Text>
+        </View>
+        <View style={[styles.agreementStateChip, detail.partnerAgreed ? styles.agreementStateChipDone : null]}>
+          <Text style={[styles.agreementStateChipText, detail.partnerAgreed ? styles.agreementStateChipTextDone : null]}>
+            相手 {detail.partnerAgreed ? "合意済" : "未合意"}
+          </Text>
+        </View>
+      </View>
+      <View style={styles.negotiationActions}>
+        {canAccept ? (
+          <Pressable
+            accessibilityRole="button"
+            disabled={!!actionLoading}
+            onPress={onAccept}
+            style={[styles.negotiationPrimary, actionLoading ? styles.actionDisabled : null]}
+          >
+            <Text style={styles.negotiationPrimaryText}>
+              {actionLoading === "accept" ? "合意中…" : "この内容で合意する"}
+            </Text>
+          </Pressable>
+        ) : null}
+        {canNegotiate ? (
+          <Pressable
+            accessibilityRole="button"
+            disabled={!!actionLoading}
+            onPress={onNegotiate}
+            style={[styles.negotiationSecondary, actionLoading ? styles.actionDisabled : null]}
+          >
+            <Text style={styles.negotiationSecondaryText}>
+              {actionLoading === "negotiate" ? "更新中…" : "条件を相談する"}
+            </Text>
+          </Pressable>
+        ) : null}
+        {canReject ? (
+          <Pressable
+            accessibilityRole="button"
+            disabled={!!actionLoading}
+            onPress={onReject}
+            style={[styles.negotiationReject, actionLoading ? styles.actionDisabled : null]}
+          >
+            <Text style={styles.negotiationRejectText}>
+              {actionLoading === "reject" ? "処理中…" : "見送る"}
+            </Text>
+          </Pressable>
+        ) : null}
+      </View>
+    </View>
+  );
+}
+
+function AgreedLivePanel({
+  detail,
+  outfitLoading,
+  onShareOutfit,
+}: {
+  detail: TransactionDetail;
+  outfitLoading: boolean;
+  onShareOutfit: () => void;
+}) {
+  return (
+    <View style={styles.livePanel}>
+      <View style={styles.liveHeader}>
+        <View>
+          <Text style={styles.liveTitle}>当日の合流準備</Text>
+          <Text style={styles.liveSub}>現在地・到着・服装写真をここから共有できます</Text>
+        </View>
+        <StatusPill label="取引予定" tone="sky" />
+      </View>
+      <View style={styles.liveGrid}>
+        <LiveStateTile label="私" status={detail.myArrival} photoUrl={detail.myOutfitPhoto} />
+        <LiveStateTile label="相手" status={detail.partnerArrival} photoUrl={detail.partnerOutfitPhoto} />
+      </View>
+      <Pressable
+        accessibilityRole="button"
+        disabled={outfitLoading}
+        onPress={onShareOutfit}
+        style={[styles.outfitShareButton, outfitLoading ? styles.actionDisabled : null]}
+      >
+        <Text style={styles.outfitShareText}>
+          {outfitLoading ? "送信中…" : detail.myOutfitPhoto ? "服装写真を更新" : "服装写真を共有"}
+        </Text>
+      </Pressable>
+    </View>
+  );
+}
+
+function LiveStateTile({
+  label,
+  status,
+  photoUrl,
+}: {
+  label: string;
+  status: ArrivalStatus;
+  photoUrl: string | null;
+}) {
+  return (
+    <View style={styles.liveStateTile}>
+      <Text style={styles.liveStateLabel}>{label}</Text>
+      <Text style={styles.liveStateStatus}>{arrivalStatusLabel(status)}</Text>
+      {photoUrl ? <Image source={{ uri: photoUrl }} style={styles.liveStatePhoto} /> : null}
+    </View>
+  );
+}
+
+function CompletionPanel({
+  detail,
+  evidenceUploading,
+  onAddEvidence,
+}: {
+  detail: TransactionDetail;
+  evidenceUploading: boolean;
+  onAddEvidence: () => void;
+}) {
   if (detail.status === "completed") {
     return (
       <View style={styles.completionPanel}>
@@ -1042,12 +2643,13 @@ function CompletionPanel({ detail }: { detail: TransactionDetail }) {
       <View style={styles.evidenceActions}>
         <Pressable
           accessibilityRole="button"
-          onPress={() =>
-            router.push({ pathname: "/transaction-capture", params: { id: detail.id } })
-          }
+          disabled={evidenceUploading}
+          onPress={onAddEvidence}
           style={styles.evidenceSecondary}
         >
-          <Text style={styles.evidenceSecondaryText}>追加撮影</Text>
+          <Text style={styles.evidenceSecondaryText}>
+            {evidenceUploading ? "撮影中…" : "追加撮影"}
+          </Text>
         </Pressable>
         <Pressable
           accessibilityRole="button"
@@ -1059,7 +2661,6 @@ function CompletionPanel({ detail }: { detail: TransactionDetail }) {
           <Text style={styles.evidencePrimaryText}>確認へ</Text>
         </Pressable>
       </View>
-      <TradeSupportActions proposalId={detail.id} />
     </View>
   );
 }
@@ -1121,6 +2722,12 @@ function shortTime(value: string) {
   return `${String(date.getHours()).padStart(2, "0")}:${String(
     date.getMinutes(),
   ).padStart(2, "0")}`;
+}
+
+function dayLabel(value: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return `${date.getMonth() + 1}/${date.getDate()} (${"日月火水木金土"[date.getDay()]}) · ${shortTime(value)}`;
 }
 
 function toDetailItem(id: string, qty: number, row?: InventoryRow): DetailItem {
@@ -1205,9 +2812,42 @@ function statusLabel(detail: TransactionDetail) {
   return "キャンセル";
 }
 
+function headerAgreementLabel(detail: TransactionDetail) {
+  if (detail.status === "completed") return "完了";
+  if (detail.status === "agreed") return "合意済";
+  if (detail.status === "agreement_one_side") {
+    return detail.myAgreed ? "相手待ち" : "確認待ち";
+  }
+  if (detail.myAgreed && detail.partnerAgreed) return "合意済";
+  if (detail.myAgreed) return "相手待ち";
+  if (detail.partnerAgreed) return "確認待ち";
+  if (detail.status === "negotiating") return "相談中";
+  if (detail.status === "sent") return detail.isSender ? "返信待ち" : "未合意";
+  return statusLabel(detail);
+}
+
+function tradeSummaryLine(detail: TransactionDetail) {
+  const receiveSummary =
+    detail.cashOffer && detail.receive.length === 0
+      ? `¥${detail.cashAmount?.toLocaleString() ?? "—"}`
+      : itemSummary(detail.receive);
+  return `受け取る ${receiveSummary}  ⇄  出す ${itemSummary(detail.give)}`;
+}
+
+function itemSummary(items: DetailItem[]) {
+  if (items.length === 0) return "未設定";
+  const first = items[0];
+  const suffix = items.length > 1 ? ` 他${items.length - 1}点` : "";
+  return `${first.label}${first.qty > 1 ? `×${first.qty}` : ""}${suffix}`;
+}
+
 function formatDateTime(startAt: string, endAt: string) {
+  if (!startAt || !endAt) return "候補時間";
   const start = new Date(startAt);
   const end = new Date(endAt);
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
+    return "候補時間";
+  }
   return `${start.getMonth() + 1}/${start.getDate()} ${timeText(start)} - ${timeText(end)}`;
 }
 
@@ -1215,6 +2855,19 @@ function timeText(date: Date) {
   return `${String(date.getHours()).padStart(2, "0")}:${String(
     date.getMinutes(),
   ).padStart(2, "0")}`;
+}
+
+function formatDeadline(value: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "未設定";
+  return `${date.getMonth() + 1}/${date.getDate()} ${timeText(date)}`;
+}
+
+function arrivalStatusLabel(status: ArrivalStatus) {
+  if (status === "arrived") return "到着済み";
+  if (status === "enroute") return "向かっています";
+  if (status === "left") return "離れました";
+  return "未共有";
 }
 
 function pickName(
@@ -1248,6 +2901,1021 @@ function nameToHue(name: string) {
 }
 
 const styles = StyleSheet.create({
+  chatRoot: {
+    backgroundColor: megrumColors.background,
+    flex: 1,
+  },
+  chatHeaderBar: {
+    alignItems: "center",
+    backgroundColor: "rgba(255,255,255,0.98)",
+    borderBottomColor: "rgba(58,50,74,0.08)",
+    borderBottomWidth: 1,
+    flexDirection: "row",
+    gap: 10,
+    paddingBottom: 8,
+    paddingHorizontal: 14,
+  },
+  chatPartnerStrip: {
+    alignItems: "center",
+    backgroundColor: "rgba(255,255,255,0.96)",
+    borderBottomColor: "rgba(58,50,74,0.08)",
+    borderBottomWidth: 1,
+    flexDirection: "row",
+    gap: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+  },
+  chatBackButton: {
+    alignItems: "center",
+    backgroundColor: megrumColors.surface,
+    borderColor: "rgba(58,50,74,0.08)",
+    borderRadius: megrumRadii.pill,
+    borderWidth: 1,
+    height: 32,
+    justifyContent: "center",
+    width: 32,
+  },
+  chatBackText: {
+    color: megrumColors.ink,
+    fontSize: 25,
+    fontWeight: "800",
+    lineHeight: 27,
+  },
+  headerAvatar: {
+    alignItems: "center",
+    backgroundColor: "rgba(166,149,216,0.16)",
+    borderRadius: 16,
+    height: 32,
+    justifyContent: "center",
+    overflow: "hidden",
+    width: 32,
+  },
+  headerAvatarImage: {
+    height: "100%",
+    width: "100%",
+  },
+  headerAvatarText: {
+    color: megrumColors.ink,
+    fontSize: 12,
+    fontWeight: "900",
+  },
+  chatHeaderCopy: {
+    flex: 1,
+    minWidth: 0,
+  },
+  chatHeaderName: {
+    color: megrumColors.ink,
+    fontSize: 13.5,
+    fontWeight: "800",
+  },
+  chatHeaderMetaRow: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 4,
+    marginTop: 1,
+  },
+  chatHeaderDot: {
+    borderRadius: 3,
+    height: 6,
+    width: 6,
+  },
+  chatHeaderMetaText: {
+    fontSize: 10,
+    fontWeight: "900",
+  },
+  chatHeaderArea: {
+    color: megrumColors.mutedInk,
+    flexShrink: 1,
+    fontSize: 10,
+    fontWeight: "700",
+  },
+  chatHeaderChevron: {
+    color: "rgba(58,50,74,0.32)",
+    fontSize: 18,
+    fontWeight: "900",
+  },
+  chatHeaderStatusBadge: {
+    alignItems: "center",
+    backgroundColor: "rgba(58,50,74,0.06)",
+    borderColor: "rgba(58,50,74,0.08)",
+    borderRadius: megrumRadii.pill,
+    borderWidth: 1,
+    justifyContent: "center",
+    maxWidth: 78,
+    minWidth: 56,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  chatHeaderStatusBadgeWaiting: {
+    backgroundColor: "rgba(166,149,216,0.10)",
+    borderColor: "rgba(166,149,216,0.24)",
+  },
+  chatHeaderStatusBadgeDone: {
+    backgroundColor: megrumColors.ok,
+    borderColor: megrumColors.ok,
+  },
+  chatHeaderStatusText: {
+    color: megrumColors.ink,
+    fontSize: 10,
+    fontWeight: "900",
+  },
+  chatHeaderStatusTextDone: {
+    color: megrumColors.surface,
+  },
+  chatPinnedArea: {
+    backgroundColor: megrumColors.background,
+    borderBottomColor: "rgba(58,50,74,0.08)",
+    borderBottomWidth: 1,
+    gap: 6,
+    paddingBottom: 6,
+    paddingHorizontal: 14,
+    paddingTop: 10,
+  },
+  dealCollapsedCard: {
+    alignItems: "center",
+    backgroundColor: megrumColors.surface,
+    borderColor: "rgba(166,149,216,0.18)",
+    borderRadius: 12,
+    borderWidth: 1,
+    flexDirection: "row",
+    gap: 8,
+    minHeight: 42,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    shadowColor: megrumColors.lavender,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 7,
+  },
+  dealCollapsedCardPressed: {
+    opacity: 0.78,
+  },
+  dealCollapsedLabel: {
+    color: megrumColors.lavender,
+    fontSize: 10.5,
+    fontWeight: "900",
+  },
+  dealCollapsedSummary: {
+    color: megrumColors.ink,
+    flex: 1,
+    fontSize: 11.5,
+    fontWeight: "800",
+    minWidth: 0,
+  },
+  dealCollapsedAction: {
+    color: megrumColors.mutedInk,
+    fontSize: 10.5,
+    fontWeight: "900",
+  },
+  dealCardWeb: {
+    backgroundColor: megrumColors.surface,
+    borderColor: "rgba(166,149,216,0.20)",
+    borderRadius: 14,
+    borderWidth: 1,
+    overflow: "hidden",
+    shadowColor: megrumColors.lavender,
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 2 },
+  },
+  dealCardPressed: {
+    opacity: 0.78,
+  },
+  dealCardTopRow: {
+    alignItems: "center",
+    flexDirection: "row",
+    justifyContent: "space-between",
+    paddingHorizontal: 12,
+    paddingTop: 8,
+  },
+  dealCardEyebrow: {
+    color: megrumColors.lavender,
+    flex: 1,
+    fontSize: 9.5,
+    fontWeight: "900",
+    letterSpacing: 0.5,
+  },
+  dealCardBadge: {
+    backgroundColor: "rgba(217,130,107,0.14)",
+    borderRadius: megrumRadii.pill,
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+  },
+  dealCardBadgeDone: {
+    backgroundColor: megrumColors.ok,
+  },
+  dealCardBadgeText: {
+    color: megrumColors.surface,
+    fontSize: 9,
+    fontWeight: "900",
+    letterSpacing: 0.4,
+  },
+  dealTradeRow: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 6,
+    paddingBottom: 8,
+    paddingHorizontal: 12,
+    paddingTop: 5,
+  },
+  dealSide: {
+    flex: 1,
+    minWidth: 0,
+  },
+  dealSideRight: {
+    alignItems: "flex-end",
+  },
+  dealSideLabel: {
+    color: megrumColors.mutedInk,
+    fontSize: 8.5,
+    fontWeight: "900",
+    letterSpacing: 0.4,
+    marginBottom: 3,
+  },
+  dealSideLabelRight: {
+    textAlign: "right",
+  },
+  dealSwapIcon: {
+    color: megrumColors.lavender,
+    fontSize: 15,
+    fontWeight: "900",
+  },
+  miniItemRow: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 4,
+  },
+  miniItemRowRight: {
+    justifyContent: "flex-end",
+  },
+  miniItemEmpty: {
+    color: "rgba(58,50,74,0.28)",
+    fontSize: 10,
+    fontStyle: "italic",
+    fontWeight: "800",
+  },
+  miniThumb: {
+    borderColor: "rgba(255,255,255,0.66)",
+    borderRadius: 3,
+    borderWidth: 1,
+    height: 28,
+    overflow: "hidden",
+    position: "relative",
+    width: 22,
+  },
+  miniThumbImage: {
+    height: "100%",
+    width: "100%",
+  },
+  miniThumbFallback: {
+    alignItems: "center",
+    height: "100%",
+    justifyContent: "center",
+    width: "100%",
+  },
+  miniThumbGlyph: {
+    color: megrumColors.surface,
+    fontSize: 10,
+    fontWeight: "900",
+  },
+  miniQty: {
+    backgroundColor: "rgba(0,0,0,0.60)",
+    borderBottomLeftRadius: 3,
+    position: "absolute",
+    right: 0,
+    top: 0,
+    paddingHorizontal: 2,
+  },
+  miniQtyText: {
+    color: megrumColors.surface,
+    fontSize: 7,
+    fontWeight: "900",
+  },
+  miniMore: {
+    alignItems: "center",
+    backgroundColor: "rgba(58,50,74,0.04)",
+    borderRadius: 5,
+    height: 28,
+    justifyContent: "center",
+    minWidth: 22,
+    paddingHorizontal: 4,
+  },
+  miniMoreText: {
+    color: megrumColors.mutedInk,
+    fontSize: 9,
+    fontWeight: "900",
+  },
+  cashChipNative: {
+    alignSelf: "flex-start",
+    backgroundColor: "rgba(122,154,138,0.08)",
+    borderRadius: 6,
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+  },
+  cashChipText: {
+    color: "#7a9a8a",
+    fontSize: 11,
+    fontWeight: "900",
+  },
+  dealMeetupRow: {
+    alignItems: "center",
+    borderTopColor: "rgba(58,50,74,0.08)",
+    borderTopWidth: 1,
+    flexDirection: "row",
+    gap: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  dealMapThumb: {
+    borderColor: "rgba(58,50,74,0.08)",
+    borderRadius: 8,
+    borderWidth: 1,
+    height: 44,
+    overflow: "hidden",
+    width: 68,
+  },
+  dealMapEmpty: {
+    alignItems: "center",
+    backgroundColor: "#e8eef0",
+    flex: 1,
+    justifyContent: "center",
+  },
+  dealMapEmptyText: {
+    color: megrumColors.mutedInk,
+    fontSize: 9,
+    fontWeight: "800",
+  },
+  dealMeetupCopy: {
+    flex: 1,
+    minWidth: 0,
+  },
+  dealMeetupEyebrow: {
+    color: megrumColors.lavender,
+    fontSize: 8.5,
+    fontWeight: "900",
+    letterSpacing: 0.4,
+  },
+  dealMeetupTime: {
+    color: megrumColors.ink,
+    fontSize: 12,
+    fontWeight: "900",
+    marginTop: 1,
+  },
+  dealMeetupPlace: {
+    color: megrumColors.mutedInk,
+    fontSize: 10,
+    fontWeight: "800",
+    marginTop: 1,
+  },
+  dealMeetupArrow: {
+    color: megrumColors.mutedInk,
+    fontSize: 10.5,
+    fontWeight: "900",
+  },
+  dealModalBackdrop: {
+    alignItems: "center",
+    backgroundColor: "rgba(10,8,16,0.42)",
+    flex: 1,
+    justifyContent: "center",
+    paddingHorizontal: 18,
+  },
+  dealModalCard: {
+    backgroundColor: megrumColors.surface,
+    borderRadius: 22,
+    gap: 13,
+    maxHeight: "86%",
+    maxWidth: 420,
+    padding: 16,
+    width: "100%",
+  },
+  dealModalContent: {
+    gap: 13,
+    paddingBottom: 2,
+  },
+  dealModalHeader: {
+    alignItems: "center",
+    flexDirection: "row",
+    justifyContent: "space-between",
+  },
+  dealModalTitle: {
+    color: megrumColors.ink,
+    fontSize: 18,
+    fontWeight: "900",
+  },
+  dealModalSub: {
+    color: megrumColors.lavender,
+    fontSize: 11,
+    fontWeight: "900",
+    marginTop: 2,
+  },
+  dealModalClose: {
+    alignItems: "center",
+    backgroundColor: "rgba(58,50,74,0.06)",
+    borderRadius: megrumRadii.pill,
+    height: 34,
+    justifyContent: "center",
+    width: 34,
+  },
+  dealModalCloseText: {
+    color: megrumColors.ink,
+    fontSize: 20,
+    fontWeight: "800",
+    lineHeight: 22,
+  },
+  dealModalSection: {
+    backgroundColor: "rgba(58,50,74,0.035)",
+    borderRadius: 14,
+    gap: 8,
+    padding: 12,
+  },
+  dealModalSectionTitle: {
+    color: megrumColors.mutedInk,
+    fontSize: 10.5,
+    fontWeight: "900",
+  },
+  dealModalSectionHeader: {
+    alignItems: "center",
+    flexDirection: "row",
+    justifyContent: "space-between",
+  },
+  dealModalSectionCount: {
+    backgroundColor: "rgba(166,149,216,0.08)",
+    borderRadius: megrumRadii.pill,
+    color: megrumColors.lavender,
+    fontSize: 9.5,
+    fontWeight: "900",
+    overflow: "hidden",
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+  },
+  dealExchangeCard: {
+    alignItems: "flex-start",
+    backgroundColor: "rgba(168,212,230,0.08)",
+    borderRadius: 16,
+    flexDirection: "row",
+    gap: 9,
+    padding: 10,
+  },
+  dealExchangeSidePanel: {
+    backgroundColor: megrumColors.surface,
+    borderColor: "rgba(58,50,74,0.07)",
+    borderRadius: 13,
+    borderWidth: 1,
+    flex: 1,
+    minHeight: 118,
+    padding: 9,
+  },
+  dealExchangeSidePanelRight: {
+    backgroundColor: "rgba(243,197,212,0.08)",
+  },
+  dealExchangeSideLabel: {
+    color: "#5c8da8",
+    fontSize: 10.5,
+    fontWeight: "900",
+    marginBottom: 8,
+  },
+  dealExchangeSideLabelRight: {
+    color: megrumColors.lavender,
+    textAlign: "right",
+  },
+  dealExchangeSwapColumn: {
+    alignItems: "center",
+    gap: 4,
+    paddingTop: 24,
+  },
+  dealExchangeArrowDot: {
+    alignItems: "center",
+    borderRadius: 999,
+    height: 24,
+    justifyContent: "center",
+    width: 24,
+  },
+  dealExchangeArrowText: {
+    color: megrumColors.surface,
+    fontSize: 13,
+    fontWeight: "900",
+    lineHeight: 15,
+  },
+  dealExchangeCash: {
+    alignSelf: "flex-start",
+    backgroundColor: "rgba(122,154,138,0.10)",
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+  },
+  dealExchangeCashRight: {
+    alignSelf: "flex-end",
+  },
+  dealExchangeCashText: {
+    color: "#6b8c78",
+    fontSize: 13,
+    fontWeight: "900",
+  },
+  dealModalItems: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  dealModalItemsRight: {
+    justifyContent: "flex-end",
+  },
+  dealModalThumb: {
+    backgroundColor: "rgba(58,50,74,0.03)",
+    borderRadius: 10,
+    overflow: "hidden",
+    position: "relative",
+    width: 48,
+  },
+  dealModalThumbPhoto: {
+    height: 48,
+    width: 48,
+  },
+  dealModalThumbFallback: {
+    alignItems: "center",
+    height: 48,
+    justifyContent: "center",
+    overflow: "hidden",
+    position: "relative",
+    width: 48,
+  },
+  dealModalThumbShine: {
+    backgroundColor: "rgba(255,255,255,0.24)",
+    borderRadius: 999,
+    height: 34,
+    position: "absolute",
+    right: -8,
+    top: -8,
+    width: 34,
+  },
+  dealModalThumbGlyph: {
+    color: megrumColors.surface,
+    fontSize: 17,
+    fontWeight: "900",
+  },
+  dealModalThumbQty: {
+    backgroundColor: "rgba(0,0,0,0.60)",
+    borderBottomLeftRadius: 5,
+    paddingHorizontal: 3,
+    paddingVertical: 1,
+    position: "absolute",
+    right: 0,
+    top: 0,
+  },
+  dealModalThumbQtyText: {
+    color: megrumColors.surface,
+    fontSize: 8,
+    fontWeight: "900",
+  },
+  dealModalThumbMeta: {
+    paddingHorizontal: 4,
+    paddingVertical: 4,
+  },
+  dealModalThumbLabel: {
+    color: megrumColors.ink,
+    fontSize: 9.5,
+    fontWeight: "900",
+  },
+  dealModalThumbSub: {
+    color: megrumColors.mutedInk,
+    fontSize: 8.5,
+    fontWeight: "800",
+    marginTop: 1,
+  },
+  dealModalItem: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 10,
+  },
+  dealModalItemPhoto: {
+    borderRadius: 8,
+    height: 48,
+    width: 38,
+  },
+  dealModalItemFallback: {
+    alignItems: "center",
+    borderRadius: 8,
+    height: 48,
+    justifyContent: "center",
+    width: 38,
+  },
+  dealModalItemGlyph: {
+    color: megrumColors.surface,
+    fontSize: 15,
+    fontWeight: "900",
+  },
+  dealModalItemCopy: {
+    flex: 1,
+    minWidth: 0,
+  },
+  dealModalItemLabel: {
+    color: megrumColors.ink,
+    fontSize: 12.5,
+    fontWeight: "900",
+  },
+  dealModalItemMeta: {
+    color: megrumColors.mutedInk,
+    fontSize: 10.5,
+    fontWeight: "800",
+    marginTop: 2,
+  },
+  dealModalEmpty: {
+    color: megrumColors.mutedInk,
+    fontSize: 12,
+    fontWeight: "800",
+  },
+  dealModalCash: {
+    alignSelf: "flex-start",
+    backgroundColor: "rgba(122,154,138,0.10)",
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+  },
+  dealModalCashText: {
+    color: "#6b8c78",
+    fontSize: 15,
+    fontWeight: "900",
+  },
+  dealModalMeetup: {
+    gap: 3,
+  },
+  dealModalMeetupTime: {
+    color: megrumColors.ink,
+    fontSize: 13,
+    fontWeight: "900",
+  },
+  dealModalMeetupPlace: {
+    color: megrumColors.mutedInk,
+    fontSize: 11.5,
+    fontWeight: "800",
+  },
+  dealCandidateList: {
+    gap: 8,
+    padding: 12,
+  },
+  dealMeetupMapCard: {
+    backgroundColor: megrumColors.surface,
+    borderColor: "rgba(58,50,74,0.08)",
+    borderRadius: 14,
+    borderWidth: 1,
+    overflow: "hidden",
+  },
+  dealMeetupMapPanel: {
+    backgroundColor: "#edf3f4",
+    borderBottomColor: "rgba(58,50,74,0.08)",
+    borderBottomWidth: 1,
+    minHeight: 184,
+    overflow: "hidden",
+  },
+  dealMeetupMapEmpty: {
+    alignItems: "center",
+    flex: 1,
+    minHeight: 184,
+    justifyContent: "center",
+  },
+  dealMeetupMapEmptyText: {
+    color: megrumColors.mutedInk,
+    fontSize: 11,
+    fontWeight: "800",
+  },
+  dealCandidateRow: {
+    alignItems: "flex-start",
+    flexDirection: "row",
+    gap: 9,
+  },
+  dealCandidateNumber: {
+    alignItems: "center",
+    backgroundColor: megrumColors.lavender,
+    borderRadius: 999,
+    height: 22,
+    justifyContent: "center",
+    marginTop: 1,
+    width: 22,
+  },
+  dealCandidateNumberText: {
+    color: megrumColors.surface,
+    fontSize: 11,
+    fontWeight: "900",
+  },
+  dealCandidateCopy: {
+    flex: 1,
+    minWidth: 0,
+  },
+  dealCandidateTime: {
+    color: megrumColors.ink,
+    fontSize: 12,
+    fontWeight: "900",
+  },
+  dealCandidatePlace: {
+    color: megrumColors.mutedInk,
+    fontSize: 11,
+    fontWeight: "800",
+    marginTop: 2,
+  },
+  dealModalMessage: {
+    color: megrumColors.ink,
+    fontSize: 12,
+    fontWeight: "700",
+    lineHeight: 18,
+  },
+  expireBanner: {
+    alignItems: "center",
+    backgroundColor: "rgba(166,149,216,0.04)",
+    borderColor: "rgba(166,149,216,0.34)",
+    borderRadius: 10,
+    borderWidth: 1,
+    flexDirection: "row",
+    gap: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  expireBannerWarn: {
+    backgroundColor: "#fff5f0",
+    borderColor: "rgba(217,130,107,0.50)",
+  },
+  expireIcon: {
+    color: megrumColors.warn,
+    fontSize: 12,
+    fontWeight: "900",
+  },
+  expireCopy: {
+    flex: 1,
+  },
+  expireTitle: {
+    color: megrumColors.lavender,
+    fontSize: 11,
+    fontWeight: "900",
+  },
+  expireTitleWarn: {
+    color: megrumColors.warn,
+  },
+  expireSub: {
+    color: megrumColors.mutedInk,
+    fontSize: 9.5,
+    fontWeight: "800",
+    marginTop: 2,
+  },
+  expireButton: {
+    backgroundColor: megrumColors.lavender,
+    borderRadius: megrumRadii.pill,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+  },
+  expireButtonWarn: {
+    backgroundColor: megrumColors.warn,
+  },
+  expireButtonText: {
+    color: megrumColors.surface,
+    fontSize: 10,
+    fontWeight: "900",
+  },
+  agreementCompact: {
+    backgroundColor: "rgba(166,149,216,0.07)",
+    borderColor: "rgba(166,149,216,0.34)",
+    borderRadius: 12,
+    borderWidth: 1,
+    overflow: "hidden",
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+  },
+  agreementCompactText: {
+    color: megrumColors.ink,
+    fontSize: 10.5,
+    fontWeight: "700",
+    lineHeight: 16,
+  },
+  agreementCompactActions: {
+    flexDirection: "row",
+    gap: 6,
+    marginTop: 8,
+  },
+  agreementRejectButton: {
+    alignItems: "center",
+    backgroundColor: megrumColors.surface,
+    borderColor: "rgba(58,50,74,0.08)",
+    borderRadius: 10,
+    borderWidth: 1,
+    justifyContent: "center",
+    paddingHorizontal: 13,
+    paddingVertical: 7,
+  },
+  agreementRejectText: {
+    color: megrumColors.mutedInk,
+    fontSize: 11,
+    fontWeight: "800",
+  },
+  agreementAcceptButton: {
+    alignItems: "center",
+    backgroundColor: megrumColors.lavender,
+    borderRadius: 10,
+    flex: 1,
+    justifyContent: "center",
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+  },
+  agreementAcceptText: {
+    color: megrumColors.surface,
+    fontSize: 11.5,
+    fontWeight: "900",
+  },
+  outfitCompactWeb: {
+    alignItems: "center",
+    backgroundColor: "rgba(166,149,216,0.04)",
+    borderColor: "rgba(166,149,216,0.34)",
+    borderRadius: 10,
+    borderWidth: 1,
+    flexDirection: "row",
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+  },
+  outfitIcon: {
+    fontSize: 12,
+  },
+  outfitTitle: {
+    color: megrumColors.lavender,
+    fontSize: 10.5,
+    fontWeight: "900",
+  },
+  outfitState: {
+    color: megrumColors.ink,
+    flexShrink: 1,
+    fontSize: 10,
+    fontWeight: "700",
+  },
+  outfitSlash: {
+    color: megrumColors.mutedInk,
+    fontSize: 10,
+  },
+  outfitShootButton: {
+    backgroundColor: megrumColors.lavender,
+    borderRadius: megrumRadii.pill,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+  },
+  outfitShootText: {
+    color: megrumColors.surface,
+    fontSize: 10,
+    fontWeight: "900",
+  },
+  chatMessagesScroll: {
+    flex: 1,
+  },
+  chatMessagesContent: {
+    gap: 8,
+    paddingHorizontal: 14,
+    paddingTop: 8,
+  },
+  chatMessageEndAnchor: {
+    height: 1,
+  },
+  emptyMessageCard: {
+    backgroundColor: megrumColors.surface,
+    borderColor: "rgba(58,50,74,0.08)",
+    borderRadius: 12,
+    borderStyle: "dashed",
+    borderWidth: 1,
+    paddingHorizontal: 16,
+    paddingVertical: 22,
+  },
+  emptyMessageText: {
+    color: megrumColors.mutedInk,
+    fontSize: 11.5,
+    fontWeight: "800",
+    textAlign: "center",
+  },
+  daySeparator: {
+    alignItems: "center",
+    paddingVertical: 2,
+  },
+  daySeparatorText: {
+    backgroundColor: "rgba(58,50,74,0.04)",
+    borderRadius: megrumRadii.pill,
+    color: megrumColors.mutedInk,
+    fontSize: 10,
+    fontWeight: "700",
+    overflow: "hidden",
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+  },
+  evidenceCalloutWeb: {
+    alignItems: "center",
+    backgroundColor: megrumColors.surface,
+    borderColor: "rgba(166,149,216,0.40)",
+    borderRadius: 14,
+    borderStyle: "dashed",
+    borderWidth: 1,
+    flexDirection: "row",
+    gap: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  evidenceCalloutIcon: {
+    alignItems: "center",
+    backgroundColor: megrumColors.lavender,
+    borderRadius: 10,
+    height: 32,
+    justifyContent: "center",
+    width: 32,
+  },
+  evidenceCalloutIconText: {
+    color: megrumColors.surface,
+    fontSize: 14,
+    fontWeight: "900",
+  },
+  evidenceCalloutCopy: {
+    flex: 1,
+  },
+  evidenceCalloutTitle: {
+    color: megrumColors.ink,
+    fontSize: 12,
+    fontWeight: "900",
+  },
+  evidenceCalloutSub: {
+    color: megrumColors.mutedInk,
+    fontSize: 10,
+    fontWeight: "800",
+    marginTop: 2,
+  },
+  evidenceCalloutButton: {
+    backgroundColor: megrumColors.lavender,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  evidenceCalloutButtonText: {
+    color: megrumColors.surface,
+    fontSize: 11.5,
+    fontWeight: "900",
+  },
+  bottomComposer: {
+    backgroundColor: "rgba(255,255,255,0.96)",
+    borderTopColor: "rgba(166,149,216,0.13)",
+    borderTopWidth: 1,
+    paddingTop: 8,
+  },
+  webQuickActionRow: {
+    gap: 6,
+    paddingBottom: 6,
+    paddingHorizontal: 12,
+  },
+  webComposerRow: {
+    alignItems: "flex-end",
+    flexDirection: "row",
+    gap: 8,
+    paddingHorizontal: 12,
+  },
+  composerPlusButton: {
+    alignItems: "center",
+    alignSelf: "flex-end",
+    backgroundColor: "rgba(58,50,74,0.06)",
+    borderRadius: 18,
+    height: 36,
+    justifyContent: "center",
+    width: 36,
+  },
+  composerPlusText: {
+    color: megrumColors.ink,
+    fontSize: 18,
+    fontWeight: "700",
+  },
+  webComposerInput: {
+    backgroundColor: megrumColors.surface,
+    borderColor: "rgba(58,50,74,0.08)",
+    borderRadius: 18,
+    borderWidth: 1,
+    color: megrumColors.ink,
+    flex: 1,
+    fontSize: 16,
+    fontWeight: "700",
+    lineHeight: 20,
+    maxHeight: 156,
+    minHeight: 36,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+  },
+  webSendButton: {
+    alignItems: "center",
+    alignSelf: "flex-end",
+    backgroundColor: megrumColors.lavender,
+    borderRadius: 18,
+    height: 36,
+    justifyContent: "center",
+    shadowColor: megrumColors.lavender,
+    shadowOpacity: 0.36,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 2 },
+    width: 36,
+  },
+  webSendButtonText: {
+    color: megrumColors.surface,
+    fontSize: 15,
+    fontWeight: "900",
+  },
+  loginPromptWrap: {
+    flex: 1,
+    justifyContent: "center",
+    paddingHorizontal: 18,
+  },
   screen: {
     gap: 14,
   },
@@ -1258,62 +3926,62 @@ const styles = StyleSheet.create({
   },
   backButton: {
     alignItems: "center",
-    backgroundColor: ihubColors.surface,
+    backgroundColor: megrumColors.surface,
     borderColor: "rgba(58,50,74,0.08)",
-    borderRadius: ihubRadii.pill,
+    borderRadius: megrumRadii.pill,
     borderWidth: 1,
     height: 44,
     justifyContent: "center",
     width: 44,
-    ...ihubShadow,
+    ...megrumShadow,
   },
   backText: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 32,
     fontWeight: "800",
     lineHeight: 34,
   },
   inlineNotice: {
-    color: ihubColors.mutedInk,
+    color: megrumColors.mutedInk,
     fontSize: 12,
     fontWeight: "800",
   },
   inlineError: {
-    color: ihubColors.warn,
+    color: megrumColors.warn,
     fontSize: 12,
     fontWeight: "800",
     lineHeight: 18,
   },
   loginPrompt: {
-    backgroundColor: ihubColors.surface,
+    backgroundColor: megrumColors.surface,
     borderColor: "rgba(166,149,216,0.22)",
-    borderRadius: ihubRadii.xl,
+    borderRadius: megrumRadii.xl,
     borderWidth: 1,
     gap: 11,
     padding: 16,
-    ...ihubShadow,
+    ...megrumShadow,
   },
   loginPromptTitle: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 18,
     fontWeight: "900",
   },
   loginPromptText: {
-    color: ihubColors.mutedInk,
+    color: megrumColors.mutedInk,
     fontSize: 12,
     fontWeight: "800",
     lineHeight: 18,
   },
   partnerCard: {
     alignItems: "center",
-    backgroundColor: ihubColors.surface,
+    backgroundColor: megrumColors.surface,
     borderColor: "rgba(58,50,74,0.08)",
     borderRadius: 24,
     borderWidth: 1,
     flexDirection: "row",
     gap: 12,
     padding: 14,
-    ...ihubShadow,
+    ...megrumShadow,
   },
   partnerAvatar: {
     alignItems: "center",
@@ -1329,7 +3997,7 @@ const styles = StyleSheet.create({
     width: "100%",
   },
   partnerAvatarText: {
-    color: ihubColors.lavender,
+    color: megrumColors.lavender,
     fontSize: 18,
     fontWeight: "900",
   },
@@ -1337,30 +4005,247 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   partnerName: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 17,
     fontWeight: "900",
   },
   partnerMeta: {
-    color: ihubColors.mutedInk,
+    color: megrumColors.mutedInk,
     fontSize: 11,
     fontWeight: "800",
     marginTop: 2,
   },
   agreeState: {
     backgroundColor: "rgba(166,149,216,0.12)",
-    borderRadius: ihubRadii.pill,
+    borderRadius: megrumRadii.pill,
     paddingHorizontal: 10,
     paddingVertical: 6,
   },
   agreeStateText: {
-    color: ihubColors.lavender,
+    color: megrumColors.lavender,
     fontSize: 10.5,
     fontWeight: "900",
   },
+  disputeBanner: {
+    alignItems: "center",
+    backgroundColor: "#fff5f0",
+    borderColor: "rgba(217,130,107,0.25)",
+    borderRadius: 16,
+    borderWidth: 1,
+    flexDirection: "row",
+    gap: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  disputeIcon: {
+    alignItems: "center",
+    backgroundColor: megrumColors.warn,
+    borderRadius: 11,
+    height: 22,
+    justifyContent: "center",
+    width: 22,
+  },
+  disputeIconText: {
+    color: megrumColors.surface,
+    fontSize: 13,
+    fontWeight: "900",
+  },
+  disputeCopy: {
+    flex: 1,
+  },
+  disputeTitle: {
+    color: megrumColors.warn,
+    fontSize: 12,
+    fontWeight: "900",
+  },
+  disputeSub: {
+    color: megrumColors.mutedInk,
+    fontSize: 10.5,
+    fontWeight: "800",
+    marginTop: 2,
+  },
+  disputeArrow: {
+    color: megrumColors.warn,
+    fontSize: 18,
+    fontWeight: "900",
+  },
+  negotiationPanel: {
+    backgroundColor: megrumColors.surface,
+    borderColor: "rgba(166,149,216,0.20)",
+    borderRadius: 22,
+    borderWidth: 1,
+    gap: 12,
+    padding: 14,
+    ...megrumShadow,
+  },
+  negotiationHeader: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 10,
+    justifyContent: "space-between",
+  },
+  negotiationTitle: {
+    color: megrumColors.ink,
+    fontSize: 15,
+    fontWeight: "900",
+  },
+  negotiationSub: {
+    color: megrumColors.mutedInk,
+    fontSize: 10.5,
+    fontWeight: "800",
+    marginTop: 3,
+  },
+  extendButton: {
+    backgroundColor: "rgba(166,149,216,0.12)",
+    borderColor: "rgba(166,149,216,0.28)",
+    borderRadius: megrumRadii.pill,
+    borderWidth: 1,
+    paddingHorizontal: 11,
+    paddingVertical: 7,
+  },
+  extendButtonText: {
+    color: megrumColors.lavender,
+    fontSize: 10.5,
+    fontWeight: "900",
+  },
+  agreementStateRow: {
+    flexDirection: "row",
+    gap: 7,
+  },
+  agreementStateChip: {
+    backgroundColor: "rgba(58,50,74,0.06)",
+    borderRadius: megrumRadii.pill,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  agreementStateChipDone: {
+    backgroundColor: "rgba(34,197,94,0.12)",
+  },
+  agreementStateChipText: {
+    color: megrumColors.mutedInk,
+    fontSize: 10.5,
+    fontWeight: "900",
+  },
+  agreementStateChipTextDone: {
+    color: megrumColors.ok,
+  },
+  negotiationActions: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  negotiationPrimary: {
+    alignItems: "center",
+    backgroundColor: megrumColors.lavender,
+    borderRadius: megrumRadii.md,
+    flexGrow: 1,
+    justifyContent: "center",
+    minHeight: 42,
+    paddingHorizontal: 13,
+  },
+  negotiationPrimaryText: {
+    color: megrumColors.surface,
+    fontSize: 12,
+    fontWeight: "900",
+  },
+  negotiationSecondary: {
+    alignItems: "center",
+    backgroundColor: "rgba(168,212,230,0.18)",
+    borderRadius: megrumRadii.md,
+    justifyContent: "center",
+    minHeight: 42,
+    paddingHorizontal: 13,
+  },
+  negotiationSecondaryText: {
+    color: "#3a7c93",
+    fontSize: 12,
+    fontWeight: "900",
+  },
+  negotiationReject: {
+    alignItems: "center",
+    borderRadius: megrumRadii.md,
+    justifyContent: "center",
+    minHeight: 42,
+    paddingHorizontal: 10,
+  },
+  negotiationRejectText: {
+    color: megrumColors.warn,
+    fontSize: 12,
+    fontWeight: "900",
+  },
+  livePanel: {
+    backgroundColor: megrumColors.surface,
+    borderColor: "rgba(168,212,230,0.25)",
+    borderRadius: 22,
+    borderWidth: 1,
+    gap: 12,
+    padding: 14,
+    ...megrumShadow,
+  },
+  liveHeader: {
+    alignItems: "center",
+    flexDirection: "row",
+    justifyContent: "space-between",
+  },
+  liveTitle: {
+    color: megrumColors.ink,
+    fontSize: 15,
+    fontWeight: "900",
+  },
+  liveSub: {
+    color: megrumColors.mutedInk,
+    fontSize: 10.5,
+    fontWeight: "800",
+    marginTop: 3,
+  },
+  liveGrid: {
+    flexDirection: "row",
+    gap: 8,
+  },
+  liveStateTile: {
+    backgroundColor: "rgba(58,50,74,0.04)",
+    borderRadius: 15,
+    flex: 1,
+    minHeight: 74,
+    padding: 10,
+  },
+  liveStateLabel: {
+    color: megrumColors.mutedInk,
+    fontSize: 10,
+    fontWeight: "900",
+  },
+  liveStateStatus: {
+    color: megrumColors.ink,
+    fontSize: 12,
+    fontWeight: "900",
+    marginTop: 4,
+  },
+  liveStatePhoto: {
+    borderRadius: 8,
+    height: 36,
+    marginTop: 7,
+    width: 36,
+  },
+  outfitShareButton: {
+    alignItems: "center",
+    backgroundColor: "rgba(243,197,212,0.24)",
+    borderColor: "rgba(243,197,212,0.44)",
+    borderRadius: megrumRadii.md,
+    borderWidth: 1,
+    justifyContent: "center",
+    minHeight: 42,
+  },
+  outfitShareText: {
+    color: "#b85f80",
+    fontSize: 12,
+    fontWeight: "900",
+  },
+  actionDisabled: {
+    opacity: 0.55,
+  },
   tradePanel: {
     alignItems: "center",
-    backgroundColor: ihubColors.surface,
+    backgroundColor: megrumColors.surface,
     borderColor: "rgba(168,212,230,0.25)",
     borderRadius: 24,
     borderWidth: 1,
@@ -1372,7 +4257,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   tradeTitle: {
-    color: ihubColors.mutedInk,
+    color: megrumColors.mutedInk,
     fontSize: 11,
     fontWeight: "900",
     marginBottom: 8,
@@ -1405,19 +4290,19 @@ const styles = StyleSheet.create({
     width: 34,
   },
   itemGlyph: {
-    color: ihubColors.surface,
+    color: megrumColors.surface,
     fontSize: 15,
     fontWeight: "900",
   },
   itemLabel: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     flexShrink: 1,
     fontSize: 11.5,
     fontWeight: "900",
     maxWidth: 82,
   },
   itemQty: {
-    color: ihubColors.mutedInk,
+    color: megrumColors.mutedInk,
     fontSize: 10,
     fontWeight: "900",
   },
@@ -1426,34 +4311,34 @@ const styles = StyleSheet.create({
     width: 26,
   },
   tradeArrow: {
-    color: ihubColors.lavender,
+    color: megrumColors.lavender,
     fontSize: 18,
     fontWeight: "900",
     lineHeight: 18,
   },
   tradeArrowMuted: {
-    color: ihubColors.sky,
+    color: megrumColors.sky,
     fontSize: 18,
     fontWeight: "900",
     lineHeight: 18,
   },
   section: {
-    backgroundColor: ihubColors.surface,
+    backgroundColor: megrumColors.surface,
     borderColor: "rgba(58,50,74,0.08)",
-    borderRadius: ihubRadii.xl,
+    borderRadius: megrumRadii.xl,
     borderWidth: 1,
     gap: 10,
     padding: 14,
   },
   sectionTitle: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 14,
     fontWeight: "900",
   },
   chatSection: {
-    backgroundColor: ihubColors.surface,
+    backgroundColor: megrumColors.surface,
     borderColor: "rgba(58,50,74,0.08)",
-    borderRadius: ihubRadii.xl,
+    borderRadius: megrumRadii.xl,
     borderWidth: 1,
     gap: 12,
     padding: 14,
@@ -1464,7 +4349,7 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
   },
   chatSub: {
-    color: ihubColors.mutedInk,
+    color: megrumColors.mutedInk,
     fontSize: 10.5,
     fontWeight: "800",
     marginTop: 2,
@@ -1475,12 +4360,12 @@ const styles = StyleSheet.create({
   },
   arrivalButton: {
     backgroundColor: "rgba(168,212,230,0.18)",
-    borderRadius: ihubRadii.pill,
+    borderRadius: megrumRadii.pill,
     paddingHorizontal: 10,
     paddingVertical: 7,
   },
   arrivalButtonStrong: {
-    backgroundColor: ihubColors.lavender,
+    backgroundColor: megrumColors.lavender,
   },
   arrivalButtonText: {
     color: "#3a7c93",
@@ -1488,15 +4373,58 @@ const styles = StyleSheet.create({
     fontWeight: "900",
   },
   arrivalButtonTextStrong: {
-    color: ihubColors.surface,
+    color: megrumColors.surface,
   },
   messagesList: {
     gap: 8,
   },
+  quickActionRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 7,
+    marginTop: 8,
+  },
+  quickActionChip: {
+    alignItems: "center",
+    borderRadius: megrumRadii.pill,
+    borderWidth: 1,
+    flexDirection: "row",
+    gap: 5,
+    paddingHorizontal: 11,
+    paddingVertical: 7,
+  },
+  quickActionLavender: {
+    backgroundColor: "rgba(166,149,216,0.14)",
+    borderColor: "rgba(166,149,216,0.28)",
+  },
+  quickActionPink: {
+    backgroundColor: "rgba(243,197,212,0.22)",
+    borderColor: "rgba(243,197,212,0.42)",
+  },
+  quickActionNeutral: {
+    backgroundColor: megrumColors.surface,
+    borderColor: "rgba(58,50,74,0.10)",
+  },
+  quickActionDisabled: {
+    opacity: 0.55,
+  },
+  quickActionIcon: {
+    color: megrumColors.lavender,
+    fontSize: 12,
+    fontWeight: "900",
+  },
+  quickActionIconNeutral: {
+    color: megrumColors.ink,
+  },
+  quickActionLabel: {
+    color: megrumColors.ink,
+    fontSize: 11,
+    fontWeight: "900",
+  },
   systemMessage: {
     alignSelf: "center",
     backgroundColor: "rgba(58,50,74,0.06)",
-    borderRadius: ihubRadii.pill,
+    borderRadius: megrumRadii.pill,
     maxWidth: "86%",
     paddingHorizontal: 10,
     paddingVertical: 6,
@@ -1508,13 +4436,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
   },
   systemMessageText: {
-    color: ihubColors.mutedInk,
+    color: megrumColors.mutedInk,
     fontSize: 10.5,
     fontWeight: "800",
     textAlign: "center",
   },
   systemMessageArrow: {
-    color: ihubColors.lavender,
+    color: megrumColors.lavender,
     fontSize: 10,
     fontWeight: "900",
     marginTop: 2,
@@ -1524,7 +4452,7 @@ const styles = StyleSheet.create({
     alignSelf: "stretch",
     backgroundColor: "#fff5f0",
     borderColor: "rgba(217,130,107,0.25)",
-    borderRadius: ihubRadii.lg,
+    borderRadius: megrumRadii.lg,
     borderWidth: 1,
     overflow: "hidden",
   },
@@ -1537,26 +4465,26 @@ const styles = StyleSheet.create({
   },
   cancelRequestIcon: {
     alignItems: "center",
-    backgroundColor: ihubColors.warn,
+    backgroundColor: megrumColors.warn,
     borderRadius: 10,
     height: 20,
     justifyContent: "center",
     width: 20,
   },
   cancelRequestIconText: {
-    color: ihubColors.surface,
+    color: megrumColors.surface,
     fontSize: 12,
     fontWeight: "900",
     lineHeight: 14,
   },
   cancelRequestTitle: {
-    color: ihubColors.warn,
+    color: megrumColors.warn,
     fontSize: 11,
     fontWeight: "900",
     letterSpacing: 0.3,
   },
   cancelRequestBody: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 11.5,
     fontWeight: "700",
     lineHeight: 18,
@@ -1583,7 +4511,7 @@ const styles = StyleSheet.create({
   },
   cancelRequestSecondary: {
     alignItems: "center",
-    backgroundColor: ihubColors.surface,
+    backgroundColor: megrumColors.surface,
     borderColor: "rgba(58,50,74,0.08)",
     borderRadius: 10,
     borderWidth: 1,
@@ -1592,13 +4520,13 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
   },
   cancelRequestSecondaryText: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 11,
     fontWeight: "900",
   },
   cancelRequestPrimary: {
     alignItems: "center",
-    backgroundColor: ihubColors.warn,
+    backgroundColor: megrumColors.warn,
     borderRadius: 10,
     flex: 1,
     justifyContent: "center",
@@ -1609,7 +4537,7 @@ const styles = StyleSheet.create({
     opacity: 0.55,
   },
   cancelRequestPrimaryText: {
-    color: ihubColors.surface,
+    color: megrumColors.surface,
     fontSize: 12,
     fontWeight: "900",
   },
@@ -1619,27 +4547,38 @@ const styles = StyleSheet.create({
   chatBubbleRowMine: {
     alignItems: "flex-end",
   },
+  chatBubblePartnerWrap: {
+    alignItems: "flex-start",
+    maxWidth: "82%",
+  },
+  chatBubbleMineWrap: {
+    alignItems: "flex-end",
+    flexDirection: "row",
+    gap: 5,
+    justifyContent: "flex-end",
+    maxWidth: "88%",
+  },
   chatBubble: {
     backgroundColor: "rgba(58,50,74,0.06)",
     borderRadius: 17,
     borderTopLeftRadius: 6,
-    maxWidth: "82%",
+    maxWidth: "100%",
     paddingHorizontal: 12,
     paddingVertical: 9,
   },
   chatBubbleMine: {
-    backgroundColor: ihubColors.lavender,
+    backgroundColor: "transparent",
     borderTopLeftRadius: 17,
     borderTopRightRadius: 6,
   },
   chatBubbleText: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 12.5,
     fontWeight: "700",
     lineHeight: 19,
   },
   chatBubbleTextMine: {
-    color: ihubColors.surface,
+    color: megrumColors.surface,
   },
   chatPhoto: {
     borderRadius: 12,
@@ -1647,14 +4586,66 @@ const styles = StyleSheet.create({
     marginBottom: 7,
     width: 190,
   },
+  chatMessageMeta: {
+    alignItems: "flex-start",
+    gap: 1,
+    minWidth: 28,
+    paddingBottom: 3,
+  },
+  chatMessageMetaText: {
+    color: "rgba(58,50,74,0.48)",
+    fontSize: 9,
+    fontWeight: "800",
+    lineHeight: 11,
+  },
   chatTime: {
-    color: ihubColors.mutedInk,
+    color: megrumColors.mutedInk,
     fontSize: 9,
     fontWeight: "800",
     marginTop: 4,
   },
   chatTimeMine: {
     color: "rgba(255,255,255,0.72)",
+  },
+  locationBubble: {
+    borderRadius: 17,
+    maxWidth: "100%",
+    overflow: "hidden",
+  },
+  locationBubbleMine: {
+    backgroundColor: megrumColors.surface,
+    borderColor: "rgba(166,149,216,0.32)",
+    borderTopRightRadius: 6,
+    borderWidth: 1,
+  },
+  locationBubblePartner: {
+    backgroundColor: megrumColors.surface,
+    borderColor: "rgba(58,50,74,0.10)",
+    borderTopLeftRadius: 6,
+    borderWidth: 1,
+  },
+  locationMap: {
+    width: 232,
+  },
+  locationBody: {
+    gap: 3,
+    paddingHorizontal: 11,
+    paddingVertical: 9,
+  },
+  locationTitle: {
+    color: megrumColors.ink,
+    fontSize: 11.5,
+    fontWeight: "900",
+  },
+  locationLink: {
+    color: megrumColors.lavender,
+    fontSize: 10,
+    fontWeight: "900",
+  },
+  locationTime: {
+    color: megrumColors.mutedInk,
+    fontSize: 9,
+    fontWeight: "800",
   },
   composer: {
     alignItems: "flex-end",
@@ -1665,7 +4656,7 @@ const styles = StyleSheet.create({
     padding: 7,
   },
   composerInput: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     flex: 1,
     fontSize: 13,
     fontWeight: "700",
@@ -1676,8 +4667,8 @@ const styles = StyleSheet.create({
   },
   sendButton: {
     alignItems: "center",
-    backgroundColor: ihubColors.lavender,
-    borderRadius: ihubRadii.pill,
+    backgroundColor: megrumColors.lavender,
+    borderRadius: megrumRadii.pill,
     height: 38,
     justifyContent: "center",
     paddingHorizontal: 13,
@@ -1686,34 +4677,56 @@ const styles = StyleSheet.create({
     opacity: 0.45,
   },
   sendButtonText: {
-    color: ihubColors.surface,
+    color: megrumColors.surface,
     fontSize: 12,
     fontWeight: "900",
   },
   meetupCard: {
+    alignItems: "center",
     backgroundColor: "rgba(168,212,230,0.14)",
     borderRadius: 16,
+    flexDirection: "row",
     gap: 4,
+    overflow: "hidden",
     paddingHorizontal: 12,
     paddingVertical: 10,
   },
+  meetupMapThumb: {
+    borderColor: "rgba(58,50,74,0.10)",
+    borderRadius: 11,
+    borderWidth: 1,
+    height: 62,
+    marginRight: 9,
+    overflow: "hidden",
+    width: 84,
+  },
+  meetupCopy: {
+    flex: 1,
+    gap: 3,
+    minWidth: 0,
+  },
   meetupTime: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 13,
     fontWeight: "900",
   },
   meetupPlace: {
-    color: ihubColors.mutedInk,
+    color: megrumColors.mutedInk,
     fontSize: 11,
     fontWeight: "800",
   },
+  meetupMapLink: {
+    color: megrumColors.lavender,
+    fontSize: 10,
+    fontWeight: "900",
+  },
   emptyText: {
-    color: ihubColors.mutedInk,
+    color: megrumColors.mutedInk,
     fontSize: 12,
     fontWeight: "800",
   },
   messageText: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 12.5,
     fontWeight: "700",
     lineHeight: 20,
@@ -1722,21 +4735,21 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   evidenceCard: {
-    backgroundColor: ihubColors.surface,
+    backgroundColor: megrumColors.surface,
     borderColor: "rgba(166,149,216,0.18)",
-    borderRadius: ihubRadii.xl,
+    borderRadius: megrumRadii.xl,
     borderWidth: 1,
     gap: 12,
     padding: 15,
-    ...ihubShadow,
+    ...megrumShadow,
   },
   evidenceTitle: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 15,
     fontWeight: "900",
   },
   evidenceSub: {
-    color: ihubColors.mutedInk,
+    color: megrumColors.mutedInk,
     fontSize: 11.5,
     fontWeight: "800",
     lineHeight: 18,
@@ -1749,50 +4762,50 @@ const styles = StyleSheet.create({
   evidenceSecondary: {
     alignItems: "center",
     backgroundColor: "rgba(58,50,74,0.05)",
-    borderRadius: ihubRadii.md,
+    borderRadius: megrumRadii.md,
     flex: 1,
     justifyContent: "center",
     minHeight: 46,
   },
   evidenceSecondaryText: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 12.5,
     fontWeight: "900",
   },
   evidencePrimary: {
     alignItems: "center",
-    backgroundColor: ihubColors.lavender,
-    borderRadius: ihubRadii.md,
+    backgroundColor: megrumColors.lavender,
+    borderRadius: megrumRadii.md,
     flex: 1,
     justifyContent: "center",
     minHeight: 46,
   },
   evidencePrimaryText: {
-    color: ihubColors.surface,
+    color: megrumColors.surface,
     fontSize: 12.5,
     fontWeight: "900",
   },
   completionPanel: {
     alignItems: "center",
-    backgroundColor: ihubColors.surface,
+    backgroundColor: megrumColors.surface,
     borderColor: "rgba(34,197,94,0.18)",
-    borderRadius: ihubRadii.xl,
+    borderRadius: megrumRadii.xl,
     borderWidth: 1,
     flexDirection: "row",
     gap: 12,
     padding: 15,
-    ...ihubShadow,
+    ...megrumShadow,
   },
   completionIcon: {
     alignItems: "center",
-    backgroundColor: ihubColors.ok,
-    borderRadius: ihubRadii.pill,
+    backgroundColor: megrumColors.ok,
+    borderRadius: megrumRadii.pill,
     height: 42,
     justifyContent: "center",
     width: 42,
   },
   completionIconText: {
-    color: ihubColors.surface,
+    color: megrumColors.surface,
     fontSize: 22,
     fontWeight: "900",
   },
@@ -1800,12 +4813,12 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   completionTitle: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 15,
     fontWeight: "900",
   },
   completionSub: {
-    color: ihubColors.mutedInk,
+    color: megrumColors.mutedInk,
     fontSize: 11,
     fontWeight: "800",
     lineHeight: 16,
@@ -1813,14 +4826,14 @@ const styles = StyleSheet.create({
   },
   completionButton: {
     alignItems: "center",
-    backgroundColor: ihubColors.lavender,
-    borderRadius: ihubRadii.pill,
+    backgroundColor: megrumColors.lavender,
+    borderRadius: megrumRadii.pill,
     height: 42,
     justifyContent: "center",
     paddingHorizontal: 15,
   },
   completionButtonText: {
-    color: ihubColors.surface,
+    color: megrumColors.surface,
     fontSize: 12,
     fontWeight: "900",
   },
@@ -1831,7 +4844,7 @@ const styles = StyleSheet.create({
   tradeSupportButton: {
     alignItems: "center",
     backgroundColor: "rgba(168,212,230,0.16)",
-    borderRadius: ihubRadii.md,
+    borderRadius: megrumRadii.md,
     flex: 1,
     justifyContent: "center",
     minHeight: 42,
@@ -1845,7 +4858,7 @@ const styles = StyleSheet.create({
     fontWeight: "900",
   },
   tradeSupportWarnText: {
-    color: ihubColors.warn,
+    color: megrumColors.warn,
   },
   rejectButton: {
     alignItems: "center",
@@ -1853,7 +4866,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   rejectText: {
-    color: ihubColors.warn,
+    color: megrumColors.warn,
     fontSize: 13,
     fontWeight: "900",
   },

@@ -3,8 +3,8 @@
 > 合意後の当日合流に向けた連絡ハブ。場所・時間は合意前にfix済なので、当日のライブ運用に集中。
 
 最終更新: 2026-05-01（iter41）
-関連JSX: `iHub/c-flow.jsx::ChatScreen`、`CF_MiniMap`
-関連HTML: `iHub/iHub C Flow.html`
+関連JSX: `Megrum/c-flow.jsx::ChatScreen`、`CF_MiniMap`
+関連HTML: `Megrum/Megrum C Flow.html`
 関連 iter: 34
 
 ---

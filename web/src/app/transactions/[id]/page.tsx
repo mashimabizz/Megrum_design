@@ -6,7 +6,7 @@ import { ChatView, type ChatProposal, type ChatMessage } from "./ChatView";
 import type { CalEvent } from "@/components/schedule/CalendarOverlayModal";
 
 export const metadata = {
-  title: "取引チャット — iHub",
+  title: "取引チャット — Megrum",
 };
 
 type ProposalRaw = {

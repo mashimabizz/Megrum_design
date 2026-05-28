@@ -299,7 +299,7 @@ export async function resendVerification(formData: FormData): Promise<AuthResult
 // ベース URL（リダイレクト先）
 // ----------------------------------------------------------------------
 function getBaseUrl(): string {
-  // Vercel 本番: https://ihub.tokyo（カスタムドメイン）
+  // Vercel 本番: https://megrum.jp（カスタムドメイン）
   // Vercel Preview: https://xxxxx.vercel.app
   // ローカル: http://localhost:3000
   if (process.env.NEXT_PUBLIC_APP_URL) {

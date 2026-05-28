@@ -1,4 +1,4 @@
-export const ihubColors = {
+export const megrumColors = {
   background: "#fbf9fc",
   surface: "#ffffff",
   ink: "#3a324a",
@@ -10,7 +10,7 @@ export const ihubColors = {
   ok: "#22c55e",
 } as const;
 
-export const ihubRadii = {
+export const megrumRadii = {
   sm: 10,
   md: 14,
   lg: 18,
@@ -18,7 +18,7 @@ export const ihubRadii = {
   pill: 999,
 } as const;
 
-export const ihubSpacing = {
+export const megrumSpacing = {
   xs: 4,
   sm: 8,
   md: 12,
@@ -27,7 +27,7 @@ export const ihubSpacing = {
   xxl: 32,
 } as const;
 
-export const ihubShadows = {
+export const megrumShadows = {
   card: {
     shadowColor: "#3a324a",
     shadowOffset: { width: 0, height: 8 },

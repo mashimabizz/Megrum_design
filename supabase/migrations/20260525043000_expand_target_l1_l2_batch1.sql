@@ -4,7 +4,7 @@
 -- K-POP男性/女性、国内男性/女性、キャラクターIP、スポーツの既存L1について、
 -- 所属メンバー・キャラクターをレビューし、不足していたL2を追加する。
 
-create temporary table _ihub_seed_characters (
+create temporary table _megrum_seed_characters (
   genre_name text not null,
   group_name text not null,
   name text not null,
@@ -12,7 +12,7 @@ create temporary table _ihub_seed_characters (
   display_order integer not null
 ) on commit drop;
 
-insert into _ihub_seed_characters (genre_name, group_name, name, aliases, display_order) values
+insert into _megrum_seed_characters (genre_name, group_name, name, aliases, display_order) values
   ('K-POP女性', 'tripleS', 'クァク・ヨンジ', array[]::text[], 1),
   ('K-POP女性', 'tripleS', 'ニエン', array[]::text[], 2),
   ('K-POP女性', 'tripleS', 'パク・ソヒョン', array[]::text[], 3),
@@ -612,7 +612,7 @@ select
   sc.name,
   sc.aliases,
   sc.display_order
-from _ihub_seed_characters sc
+from _megrum_seed_characters sc
 join public.genres_master ge on ge.name = sc.genre_name
 join public.groups_master gm on gm.genre_id = ge.id and gm.name = sc.group_name
 where not exists (

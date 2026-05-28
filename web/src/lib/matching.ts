@@ -1,5 +1,5 @@
 /**
- * iHub マッチング演算（純関数）
+ * Megrum マッチング演算（純関数）
  *
  * 仕様: notes/18_matching_v2_design.md
  *

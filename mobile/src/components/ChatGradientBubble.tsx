@@ -1,14 +1,14 @@
 import { LinearGradient } from "expo-linear-gradient";
 import { type ReactNode } from "react";
 import { StyleSheet, View, type StyleProp, type ViewStyle } from "react-native";
-import { ihubColors } from "../theme/tokens";
+import { megrumColors } from "../theme/tokens";
 
 const outgoingGradientColors = [
-  ihubColors.lavender,
+  megrumColors.lavender,
   "#a7a3dd",
   "#a8b4e4",
   "#a8c5e9",
-  ihubColors.sky,
+  megrumColors.sky,
 ] as const;
 
 const outgoingGradientLocations = [0, 0.26, 0.52, 0.78, 1] as const;

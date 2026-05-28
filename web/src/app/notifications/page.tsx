@@ -8,7 +8,7 @@ import {
 } from "./NotificationsView";
 
 export const metadata = {
-  title: "通知 — iHub",
+  title: "通知 — Megrum",
 };
 
 export default async function NotificationsPage() {

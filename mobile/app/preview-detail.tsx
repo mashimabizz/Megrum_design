@@ -3,7 +3,7 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 import { PrimaryButton } from "../src/components/PrimaryButton";
 import { Screen } from "../src/components/Screen";
 import { StatusPill } from "../src/components/StatusPill";
-import { ihubColors, ihubRadii, ihubShadow } from "../src/theme/tokens";
+import { megrumColors, megrumRadii, megrumShadow } from "../src/theme/tokens";
 
 type DetailKind = "match" | "transaction" | "profile" | "generic";
 
@@ -143,31 +143,31 @@ const styles = StyleSheet.create({
   },
   backButton: {
     alignItems: "center",
-    backgroundColor: ihubColors.surface,
+    backgroundColor: megrumColors.surface,
     borderColor: "rgba(58,50,74,0.08)",
-    borderRadius: ihubRadii.pill,
+    borderRadius: megrumRadii.pill,
     borderWidth: 1,
     height: 44,
     justifyContent: "center",
     width: 44,
-    ...ihubShadow,
+    ...megrumShadow,
   },
   backText: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 32,
     fontWeight: "700",
     lineHeight: 34,
   },
   hero: {
     alignItems: "center",
-    backgroundColor: ihubColors.surface,
+    backgroundColor: megrumColors.surface,
     borderColor: "rgba(166,149,216,0.20)",
     borderRadius: 28,
     borderWidth: 1,
     minHeight: 260,
     overflow: "hidden",
     padding: 22,
-    ...ihubShadow,
+    ...megrumShadow,
   },
   heroAuraPink: {
     backgroundColor: "rgba(243,197,212,0.50)",
@@ -189,7 +189,7 @@ const styles = StyleSheet.create({
   },
   icon: {
     alignItems: "center",
-    backgroundColor: ihubColors.lavender,
+    backgroundColor: megrumColors.lavender,
     borderColor: "rgba(255,255,255,0.86)",
     borderRadius: 30,
     borderWidth: 2,
@@ -199,19 +199,19 @@ const styles = StyleSheet.create({
     width: 70,
   },
   iconText: {
-    color: ihubColors.surface,
+    color: megrumColors.surface,
     fontSize: 26,
     fontWeight: "900",
   },
   title: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 27,
     fontWeight: "900",
     marginTop: 18,
     textAlign: "center",
   },
   subtitle: {
-    color: ihubColors.mutedInk,
+    color: megrumColors.mutedInk,
     fontSize: 13,
     fontWeight: "800",
     lineHeight: 20,
@@ -219,15 +219,15 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
   panel: {
-    backgroundColor: ihubColors.surface,
+    backgroundColor: megrumColors.surface,
     borderColor: "rgba(58,50,74,0.08)",
-    borderRadius: ihubRadii.xl,
+    borderRadius: megrumRadii.xl,
     borderWidth: 1,
     gap: 14,
     padding: 16,
   },
   panelTitle: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 16,
     fontWeight: "900",
   },
@@ -236,7 +236,7 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   detailDot: {
-    backgroundColor: ihubColors.sky,
+    backgroundColor: megrumColors.sky,
     borderRadius: 999,
     height: 9,
     marginTop: 5,
@@ -247,12 +247,12 @@ const styles = StyleSheet.create({
     gap: 3,
   },
   detailLabel: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 13,
     fontWeight: "900",
   },
   detailText: {
-    color: ihubColors.mutedInk,
+    color: megrumColors.mutedInk,
     fontSize: 12,
     fontWeight: "800",
     lineHeight: 18,

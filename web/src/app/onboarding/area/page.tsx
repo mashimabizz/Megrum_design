@@ -5,7 +5,7 @@ import { HeaderBack } from "@/components/auth/HeaderBack";
 import { ProgressDots } from "@/components/auth/ProgressDots";
 
 export const metadata = {
-  title: "プロフィール設定 — iHub",
+  title: "プロフィール設定 — Megrum",
 };
 
 /**

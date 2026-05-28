@@ -6,7 +6,7 @@
 -- 新規・既存どちらの L1 でも、kind in ('group','work') は
 -- 最低1件以上の characters_master を持つ状態を目指す。
 
-create temporary table _ihub_seed_characters (
+create temporary table _megrum_seed_characters (
   genre_name text not null,
   group_name text not null,
   name text not null,
@@ -14,7 +14,7 @@ create temporary table _ihub_seed_characters (
   display_order integer not null
 ) on commit drop;
 
-insert into _ihub_seed_characters (genre_name, group_name, name, aliases, display_order) values
+insert into _megrum_seed_characters (genre_name, group_name, name, aliases, display_order) values
   -- K-POP男性
   ('K-POP男性','THE BOYZ','サンヨン',array['SANGYEON','상연']::text[],1),
   ('K-POP男性','THE BOYZ','ジェイコブ',array['JACOB','제이콥']::text[],2),
@@ -343,7 +343,7 @@ select
   sc.name,
   sc.aliases,
   sc.display_order
-from _ihub_seed_characters sc
+from _megrum_seed_characters sc
 join public.genres_master ge on ge.name = sc.genre_name
 join public.groups_master gm on gm.genre_id = ge.id and gm.name = sc.group_name
 where not exists (
@@ -464,7 +464,7 @@ where cm.id = me.character_id
   and cm.entity_id is distinct from e.id;
 
 -- 複数の選択文脈に出る同一人物・同一キャラを明示リンクする。
-create temporary table _ihub_manual_group_entities (
+create temporary table _megrum_manual_group_entities (
   genre_name text not null,
   group_name text not null,
   identity_key text not null,
@@ -474,13 +474,13 @@ create temporary table _ihub_manual_group_entities (
   display_order integer not null default 0
 ) on commit drop;
 
-insert into _ihub_manual_group_entities (genre_name, group_name, identity_key, canonical_name, entity_type, aliases, display_order) values
+insert into _megrum_manual_group_entities (genre_name, group_name, identity_key, canonical_name, entity_type, aliases, display_order) values
   ('歌い手','まふまふ','person:mafumafu','まふまふ','person',array['Mafumafu']::text[],1),
   ('歌い手','そらる','person:soraru','そらる','person',array['Soraru']::text[],2);
 
 insert into public.oshi_entities_master (identity_key, canonical_name, entity_type, aliases, display_order)
 select identity_key, canonical_name, entity_type, aliases, display_order
-from _ihub_manual_group_entities
+from _megrum_manual_group_entities
 on conflict (identity_key) do update
   set canonical_name = excluded.canonical_name,
       entity_type = excluded.entity_type,
@@ -496,14 +496,14 @@ on conflict (identity_key) do update
 
 update public.groups_master gm
 set entity_id = e.id
-from _ihub_manual_group_entities mge
+from _megrum_manual_group_entities mge
 join public.genres_master ge on ge.name = mge.genre_name
 join public.oshi_entities_master e on e.identity_key = mge.identity_key
 where gm.genre_id = ge.id
   and gm.name = mge.group_name
   and gm.entity_id is distinct from e.id;
 
-create temporary table _ihub_manual_character_entities (
+create temporary table _megrum_manual_character_entities (
   genre_name text not null,
   group_name text not null,
   character_name text not null,
@@ -514,7 +514,7 @@ create temporary table _ihub_manual_character_entities (
   display_order integer not null default 0
 ) on commit drop;
 
-insert into _ihub_manual_character_entities (
+insert into _megrum_manual_character_entities (
   genre_name,
   group_name,
   character_name,
@@ -565,14 +565,14 @@ select
   min(entity_type) as entity_type,
   array(
     select distinct alias
-    from _ihub_manual_character_entities m2
+    from _megrum_manual_character_entities m2
     cross join unnest(m2.aliases) as a(alias)
     where m2.identity_key = mce.identity_key
       and btrim(alias) <> ''
     order by alias
   ) as aliases,
   min(display_order) as display_order
-from _ihub_manual_character_entities mce
+from _megrum_manual_character_entities mce
 group by mce.identity_key
 on conflict (identity_key) do update
   set canonical_name = excluded.canonical_name,
@@ -589,7 +589,7 @@ on conflict (identity_key) do update
 
 update public.characters_master cm
 set entity_id = e.id
-from _ihub_manual_character_entities mce
+from _megrum_manual_character_entities mce
 join public.genres_master ge on ge.name = mce.genre_name
 join public.groups_master gm on gm.genre_id = ge.id and gm.name = mce.group_name
 join public.oshi_entities_master e on e.identity_key = mce.identity_key

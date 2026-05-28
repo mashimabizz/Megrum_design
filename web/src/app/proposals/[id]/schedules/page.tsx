@@ -4,7 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { HeaderBack } from "@/components/auth/HeaderBack";
 
 export const metadata = {
-  title: "相手のスケジュール — iHub",
+  title: "相手のスケジュール — Megrum",
 };
 
 /**

@@ -5,7 +5,7 @@ import { PrimaryButton } from "../../src/components/PrimaryButton";
 import { Screen } from "../../src/components/Screen";
 import { useAuth } from "../../src/auth/AuthProvider";
 import { supabase } from "../../src/lib/supabase";
-import { ihubColors, ihubRadii } from "../../src/theme/tokens";
+import { megrumColors, megrumRadii } from "../../src/theme/tokens";
 
 const PREFECTURE_GROUPS = [
   { region: "北海道・東北", prefs: ["北海道", "青森", "岩手", "宮城", "秋田", "山形", "福島"] },
@@ -157,16 +157,16 @@ const styles = StyleSheet.create({
   },
   backButton: {
     alignItems: "center",
-    backgroundColor: ihubColors.surface,
+    backgroundColor: megrumColors.surface,
     borderColor: "rgba(58,50,74,0.08)",
-    borderRadius: ihubRadii.pill,
+    borderRadius: megrumRadii.pill,
     borderWidth: 1,
     height: 42,
     justifyContent: "center",
     width: 42,
   },
   backText: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 30,
     fontWeight: "800",
     lineHeight: 32,
@@ -175,20 +175,20 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   headerTitle: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 17,
     fontWeight: "900",
   },
   headerSub: {
-    color: ihubColors.mutedInk,
+    color: megrumColors.mutedInk,
     fontSize: 11,
     fontWeight: "800",
     marginTop: 2,
   },
   progressText: {
     backgroundColor: "rgba(166,149,216,0.12)",
-    borderRadius: ihubRadii.pill,
-    color: ihubColors.lavender,
+    borderRadius: megrumRadii.pill,
+    color: megrumColors.lavender,
     fontSize: 12,
     fontWeight: "900",
     paddingHorizontal: 12,
@@ -206,16 +206,16 @@ const styles = StyleSheet.create({
     height: 5,
   },
   dotActive: {
-    backgroundColor: ihubColors.lavender,
+    backgroundColor: megrumColors.lavender,
   },
   title: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 22,
     fontWeight: "900",
     lineHeight: 28,
   },
   copy: {
-    color: ihubColors.mutedInk,
+    color: megrumColors.mutedInk,
     fontSize: 12,
     fontWeight: "800",
     lineHeight: 19,
@@ -223,12 +223,12 @@ const styles = StyleSheet.create({
   infoBox: {
     backgroundColor: "rgba(168,212,230,0.12)",
     borderColor: "rgba(168,212,230,0.34)",
-    borderRadius: ihubRadii.md,
+    borderRadius: megrumRadii.md,
     borderWidth: 1,
     padding: 12,
   },
   infoText: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 11.5,
     fontWeight: "800",
     lineHeight: 18,
@@ -240,7 +240,7 @@ const styles = StyleSheet.create({
     gap: 7,
   },
   region: {
-    color: ihubColors.mutedInk,
+    color: megrumColors.mutedInk,
     fontSize: 10.5,
     fontWeight: "900",
   },
@@ -250,32 +250,32 @@ const styles = StyleSheet.create({
     gap: 7,
   },
   prefChip: {
-    backgroundColor: ihubColors.surface,
+    backgroundColor: megrumColors.surface,
     borderColor: "rgba(58,50,74,0.10)",
-    borderRadius: ihubRadii.pill,
+    borderRadius: megrumRadii.pill,
     borderWidth: 1.5,
     paddingHorizontal: 12,
     paddingVertical: 8,
   },
   prefChipActive: {
     backgroundColor: "rgba(166,149,216,0.12)",
-    borderColor: ihubColors.lavender,
+    borderColor: megrumColors.lavender,
   },
   prefText: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 12,
     fontWeight: "900",
   },
   prefTextActive: {
-    color: ihubColors.lavender,
+    color: megrumColors.lavender,
   },
   selectedText: {
-    color: ihubColors.mutedInk,
+    color: megrumColors.mutedInk,
     fontSize: 11,
     fontWeight: "800",
   },
   error: {
-    color: ihubColors.warn,
+    color: megrumColors.warn,
     fontSize: 12,
     fontWeight: "800",
   },
@@ -288,7 +288,7 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
   },
   skipText: {
-    color: ihubColors.mutedInk,
+    color: megrumColors.mutedInk,
     fontSize: 13,
     fontWeight: "800",
   },

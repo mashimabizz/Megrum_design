@@ -3,7 +3,7 @@
 -- =====================================================================
 -- グッズ交換の母数が大きい定番キャラクターIP・長寿作品の主要キャラを補完する。
 
-create temporary table _ihub_seed_characters (
+create temporary table _megrum_seed_characters (
   genre_name text not null,
   group_name text not null,
   name text not null,
@@ -11,7 +11,7 @@ create temporary table _ihub_seed_characters (
   display_order integer not null
 ) on commit drop;
 
-insert into _ihub_seed_characters (genre_name, group_name, name, aliases, display_order) values
+insert into _megrum_seed_characters (genre_name, group_name, name, aliases, display_order) values
   -- キャラクターIP: 長寿/定番IP
   ('キャラクターIP','クレヨンしんちゃん','野原ひろし',array[]::text[],3),
   ('キャラクターIP','クレヨンしんちゃん','野原みさえ',array[]::text[],4),
@@ -151,7 +151,7 @@ select
   sc.name,
   sc.aliases,
   sc.display_order
-from _ihub_seed_characters sc
+from _megrum_seed_characters sc
 join public.genres_master ge on ge.name = sc.genre_name
 join public.groups_master gm on gm.genre_id = ge.id and gm.name = sc.group_name
 where not exists (

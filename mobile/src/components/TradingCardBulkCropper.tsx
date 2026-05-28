@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  GestureResponderEvent,
   Image,
   Modal,
   PanResponder,
@@ -14,7 +15,7 @@ import {
   useWindowDimensions,
   type LayoutChangeEvent,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import {
   cropTradingCardsAsync,
   detectTradingCardsAsync,
@@ -23,9 +24,9 @@ import {
   type TradingCardFrame,
   type TradingCardPoint,
 } from "../lib/tradingCardCropper";
-import { ihubColors, ihubRadii, ihubShadow } from "../theme/tokens";
+import { megrumColors, megrumRadii, megrumShadow } from "../theme/tokens";
 
-type CropperPhase = "guide" | "adjust" | "result";
+type CropperPhase = "guide" | "adjust" | "manual" | "result";
 type SourceKind = "camera" | "library";
 type CornerKey = "topLeft" | "topRight" | "bottomRight" | "bottomLeft";
 type ImageSize = { width: number; height: number };
@@ -37,14 +38,8 @@ type Props = {
   onComplete: (imageUris: string[]) => void;
 };
 
-const EMPTY_FRAME = makeFrame("manual", {
-  topLeft: { x: 0.31, y: 0.22 },
-  topRight: { x: 0.69, y: 0.22 },
-  bottomRight: { x: 0.69, y: 0.76 },
-  bottomLeft: { x: 0.31, y: 0.76 },
-});
-
 export function TradingCardBulkCropper({ visible, onClose, onComplete }: Props) {
+  const insets = useSafeAreaInsets();
   const nativeAvailable = isTradingCardCropperAvailable();
   const [phase, setPhase] = useState<CropperPhase>("guide");
   const [sourceUri, setSourceUri] = useState<string | null>(null);
@@ -53,8 +48,12 @@ export function TradingCardBulkCropper({ visible, onClose, onComplete }: Props) 
   const [selectedFrameId, setSelectedFrameId] = useState<string | null>(null);
   const [croppedUris, setCroppedUris] = useState<string[]>([]);
   const [rotations, setRotations] = useState<number[]>([]);
+  const [adjustPreviewUris, setAdjustPreviewUris] = useState<string[]>([]);
+  const [adjustPreviewLoading, setAdjustPreviewLoading] = useState(false);
+  const [adjustScrollEnabled, setAdjustScrollEnabled] = useState(true);
   const [working, setWorking] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const previewRequestRef = useRef(0);
 
   useEffect(() => {
     if (!visible) reset();
@@ -68,6 +67,9 @@ export function TradingCardBulkCropper({ visible, onClose, onComplete }: Props) 
     setSelectedFrameId(null);
     setCroppedUris([]);
     setRotations([]);
+    setAdjustPreviewUris([]);
+    setAdjustPreviewLoading(false);
+    setAdjustScrollEnabled(true);
     setWorking(false);
     setMessage(null);
   }
@@ -121,8 +123,8 @@ export function TradingCardBulkCropper({ visible, onClose, onComplete }: Props) 
       setSelectedFrameId(nextFrames[0]?.id ?? null);
       setMessage(
         nextFrames.length > 0
-          ? `${nextFrames.length}枚のカード候補を検出しました。枠を確認して、必要なら角を調整してください。`
-          : "カードが検出できませんでした。背景や明るさを変えて撮り直すか、手動で枠を追加してください。",
+          ? `${nextFrames.length}枚のカード候補を検出しました。枠を確認して、必要なら角を調整してください。手動追加は「切り出す」から進めます。`
+          : "カードが検出できませんでした。背景や明るさを変えて撮り直すか、「切り出す」から手動で枠を追加してください。",
       );
     } catch (error) {
       setFrames([]);
@@ -131,14 +133,6 @@ export function TradingCardBulkCropper({ visible, onClose, onComplete }: Props) 
     } finally {
       setWorking(false);
     }
-  }
-
-  function addManualFrame() {
-    const id = `manual-${Date.now()}`;
-    const next = makeFrame(id, EMPTY_FRAME);
-    setFrames((current) => [...current, next]);
-    setSelectedFrameId(id);
-    setMessage("追加した枠の四隅をドラッグしてカードに合わせてください。");
   }
 
   function deleteSelectedFrame() {
@@ -181,12 +175,39 @@ export function TradingCardBulkCropper({ visible, onClose, onComplete }: Props) 
     }
   }
 
+  function enterManualMode() {
+    if (!sourceUri) return;
+    setSelectedFrameId(null);
+    setPhase("manual");
+    setMessage("画像の上で指を置いて引いて離すと、新しい枠を追加できます。");
+  }
+
+  function clearSelection() {
+    setSelectedFrameId(null);
+    setMessage("選択中の枠を解除しました。");
+  }
+
   function rotatePreview(index: number) {
     setRotations((current) =>
       current.map((rotation, currentIndex) =>
         currentIndex === index ? (rotation + 1) % 4 : rotation,
       ),
     );
+  }
+
+  function deleteCroppedResult(index: number) {
+    setCroppedUris((current) => {
+      const next = current.filter((_, currentIndex) => currentIndex !== index);
+      setRotations((rotationCurrent) =>
+        rotationCurrent.filter((_, currentIndex) => currentIndex !== index),
+      );
+      if (next.length === 0) {
+        setMessage("切り出し結果がありません。枠調整に戻ってやり直してください。");
+      } else {
+        setMessage(`${next.length}枚を保持しています。不要なものは引き続き削除できます。`);
+      }
+      return next;
+    });
   }
 
   async function confirmCrops() {
@@ -216,10 +237,39 @@ export function TradingCardBulkCropper({ visible, onClose, onComplete }: Props) 
     onClose();
   }
 
+  useEffect(() => {
+    if (phase !== "adjust" || !sourceUri || frames.length === 0) {
+      setAdjustPreviewUris([]);
+      setAdjustPreviewLoading(false);
+      return;
+    }
+
+    const requestId = previewRequestRef.current + 1;
+    previewRequestRef.current = requestId;
+    setAdjustPreviewLoading(true);
+    const timeout = setTimeout(() => {
+      void cropTradingCardsAsync(sourceUri, frames)
+        .then((uris) => {
+          if (previewRequestRef.current !== requestId) return;
+          setAdjustPreviewUris(uris);
+        })
+        .catch(() => {
+          if (previewRequestRef.current !== requestId) return;
+          setAdjustPreviewUris([]);
+        })
+        .finally(() => {
+          if (previewRequestRef.current !== requestId) return;
+          setAdjustPreviewLoading(false);
+        });
+    }, 320);
+
+    return () => clearTimeout(timeout);
+  }, [frames, phase, sourceUri]);
+
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="fullScreen" onRequestClose={requestClose}>
-      <SafeAreaView style={styles.modal}>
-        <View style={styles.header}>
+      <SafeAreaView edges={["left", "right", "bottom"]} style={styles.modal}>
+        <View style={[styles.header, { paddingTop: Math.max(12, insets.top + 6) }]}>
           <Pressable onPress={requestClose} style={styles.closeButton}>
             <Text style={styles.closeText}>閉じる</Text>
           </Pressable>
@@ -268,42 +318,141 @@ export function TradingCardBulkCropper({ visible, onClose, onComplete }: Props) 
 
         {phase === "adjust" && sourceUri ? (
           <View style={styles.adjustContent}>
+            <ScrollView scrollEnabled={adjustScrollEnabled} contentContainerStyle={styles.adjustScrollContent}>
+              <FramePreview
+                frames={frames}
+                imageSize={imageSize}
+                imageUri={sourceUri}
+                interactionMode="select"
+                selectedFrameId={selectedFrameId}
+                onDragStateChange={setAdjustScrollEnabled}
+                onSelectFrame={setSelectedFrameId}
+                onUpdateCorner={updateCorner}
+              />
+
+              <View style={[styles.footerActions, styles.photoFooterActions]}>
+                <Pressable disabled={working} onPress={() => setPhase("guide")} style={styles.secondaryAction}>
+                  <Text style={styles.secondaryActionText}>撮り直す</Text>
+                </Pressable>
+                <Pressable
+                  disabled={working}
+                  onPress={enterManualMode}
+                  style={[styles.primaryAction, working ? styles.primaryActionDisabled : null]}
+                >
+                  {working ? <ActivityIndicator color={megrumColors.surface} /> : <Text style={styles.primaryActionText}>切り出す</Text>}
+                </Pressable>
+              </View>
+
+              <View style={styles.previewStripCard}>
+                <View style={styles.previewStripHeader}>
+                  <Text style={styles.previewStripTitle}>切り取りプレビュー</Text>
+                  <View style={styles.previewStripHeaderActions}>
+                    {selectedFrameId ? (
+                      <Pressable onPress={deleteSelectedFrame} style={styles.previewHeaderDeleteChip}>
+                        <Text style={styles.previewHeaderDeleteText}>選択枠を削除</Text>
+                      </Pressable>
+                    ) : null}
+                    {adjustPreviewLoading ? <Text style={styles.previewStripHint}>更新中…</Text> : null}
+                  </View>
+                </View>
+                {adjustPreviewUris.length > 0 ? (
+                  <View style={styles.previewStripGrid}>
+                    {adjustPreviewUris.map((uri, index) => {
+                      const frameId = frames[index]?.id ?? null;
+                      const selected = frameId !== null && frameId === selectedFrameId;
+                      return (
+                        <Pressable
+                          key={`${uri}-${index}`}
+                          onPress={() => setSelectedFrameId(frameId)}
+                          style={[
+                            styles.previewStripTile,
+                            selected ? styles.previewStripTileSelected : null,
+                          ]}
+                        >
+                          <Image source={{ uri }} resizeMode="cover" style={styles.previewStripImage} />
+                        </Pressable>
+                      );
+                    })}
+                  </View>
+                ) : (
+                  <Text style={styles.previewStripEmpty}>
+                    「切り出す」から手動切り取りモードへ進むと、ここに切り取り結果の一覧が追加されます。
+                  </Text>
+                )}
+              </View>
+
+              <View style={styles.dragHintCard}>
+                <Text style={styles.dragHintTitle}>枠の調整方法</Text>
+                <Text style={styles.dragHintText}>
+                  重なっている場所は連続タップで枠を切り替えられます。角の丸いハンドルを動かすと、選択中の枠だけ微調整できます。
+                </Text>
+              </View>
+
+              {message ? <InlineMessage>{message}</InlineMessage> : null}
+            </ScrollView>
+          </View>
+        ) : null}
+
+        {phase === "manual" && sourceUri ? (
+          <View style={styles.manualContent}>
             <FramePreview
               frames={frames}
               imageSize={imageSize}
               imageUri={sourceUri}
+              interactionMode="create"
               selectedFrameId={selectedFrameId}
+              fullHeight
+              onDragStateChange={() => undefined}
+              onCreateFrame={(frame) => {
+                const id = `drag-${Date.now()}`;
+                setFrames((current) => [...current, makeFrame(id, frame)]);
+                setSelectedFrameId(id);
+                setMessage("手動で枠を追加しました。下のプレビューに反映されています。");
+              }}
               onSelectFrame={setSelectedFrameId}
               onUpdateCorner={updateCorner}
             />
 
-            <View style={styles.adjustToolbar}>
-              <Pressable onPress={addManualFrame} style={styles.toolbarButton}>
-                <Text style={styles.toolbarButtonText}>枠を追加</Text>
-              </Pressable>
-              <Pressable
-                disabled={!selectedFrameId}
-                onPress={deleteSelectedFrame}
-                style={[styles.toolbarButton, !selectedFrameId ? styles.toolbarButtonDisabled : null]}
-              >
-                <Text style={styles.toolbarMutedText}>選択枠を削除</Text>
-              </Pressable>
+            <View style={styles.previewStripCard}>
+              <View style={styles.previewStripHeader}>
+                <Text style={styles.previewStripTitle}>切り取りプレビュー</Text>
+                <View style={styles.previewStripHeaderActions}>
+                  {adjustPreviewLoading ? <Text style={styles.previewStripHint}>更新中…</Text> : null}
+                </View>
+              </View>
+              {adjustPreviewUris.length > 0 ? (
+                <View style={styles.previewStripGrid}>
+                  {adjustPreviewUris.map((uri, index) => (
+                    <View key={`${uri}-${index}`} style={styles.previewStripTile}>
+                      <Image source={{ uri }} resizeMode="cover" style={styles.previewStripImage} />
+                    </View>
+                  ))}
+                </View>
+              ) : (
+                <Text style={styles.previewStripEmpty}>
+                  この画面ではドラッグで新しい枠を追加できます。追加した結果がここに並びます。
+                </Text>
+              )}
             </View>
 
-            {message ? <InlineMessage>{message}</InlineMessage> : null}
-
             <View style={styles.footerActions}>
-              <Pressable disabled={working} onPress={() => setPhase("guide")} style={styles.secondaryAction}>
-                <Text style={styles.secondaryActionText}>撮り直す</Text>
+              <Pressable disabled={working} onPress={clearSelection} style={styles.secondaryAction}>
+                <Text style={styles.secondaryActionText}>選択枠を解除</Text>
               </Pressable>
               <Pressable
                 disabled={working || frames.length === 0}
                 onPress={() => void cropFrames()}
                 style={[styles.primaryAction, working || frames.length === 0 ? styles.primaryActionDisabled : null]}
               >
-                {working ? <ActivityIndicator color={ihubColors.surface} /> : <Text style={styles.primaryActionText}>切り出す</Text>}
+                {working ? (
+                  <ActivityIndicator color={megrumColors.surface} />
+                ) : (
+                  <Text style={styles.primaryActionText}>角度調整に進む</Text>
+                )}
               </Pressable>
             </View>
+
+            {message ? <InlineMessage>{message}</InlineMessage> : null}
           </View>
         ) : null}
 
@@ -325,9 +474,14 @@ export function TradingCardBulkCropper({ visible, onClose, onComplete }: Props) 
                   </View>
                   <View style={styles.resultMeta}>
                     <Text style={styles.resultIndex}>{index + 1}枚目</Text>
-                    <Pressable onPress={() => rotatePreview(index)} style={styles.rotateButton}>
-                      <Text style={styles.rotateText}>90°回転</Text>
-                    </Pressable>
+                    <View style={styles.resultActions}>
+                      <Pressable onPress={() => rotatePreview(index)} style={styles.rotateButton}>
+                        <Text style={styles.rotateText}>90°回転</Text>
+                      </Pressable>
+                      <Pressable onPress={() => deleteCroppedResult(index)} style={styles.deleteButton}>
+                        <Text style={styles.deleteText}>削除</Text>
+                      </Pressable>
+                    </View>
                   </View>
                 </View>
               ))}
@@ -344,7 +498,7 @@ export function TradingCardBulkCropper({ visible, onClose, onComplete }: Props) 
                 onPress={() => void confirmCrops()}
                 style={[styles.primaryAction, working ? styles.primaryActionDisabled : null]}
               >
-                {working ? <ActivityIndicator color={ihubColors.surface} /> : <Text style={styles.primaryActionText}>この画像で追加</Text>}
+                {working ? <ActivityIndicator color={megrumColors.surface} /> : <Text style={styles.primaryActionText}>この画像で追加</Text>}
               </Pressable>
             </View>
           </View>
@@ -356,21 +510,33 @@ export function TradingCardBulkCropper({ visible, onClose, onComplete }: Props) 
 
 function FramePreview({
   frames,
+  fullHeight,
   imageSize,
   imageUri,
+  interactionMode,
+  onDragStateChange,
+  onCreateFrame,
   selectedFrameId,
   onSelectFrame,
   onUpdateCorner,
 }: {
   frames: TradingCardFrame[];
+  fullHeight?: boolean;
   imageSize: ImageSize | null;
   imageUri: string;
+  interactionMode: "select" | "create";
+  onDragStateChange: (enabled: boolean) => void;
+  onCreateFrame?: (frame: TradingCardFrame) => void;
   selectedFrameId: string | null;
   onSelectFrame: (id: string | null) => void;
   onUpdateCorner: (frameId: string, corner: CornerKey, point: TradingCardPoint) => void;
 }) {
   const { height } = useWindowDimensions();
   const [containerSize, setContainerSize] = useState<ImageSize | null>(null);
+  const [draftRect, setDraftRect] = useState<LayoutRect | null>(null);
+  const draftRectRef = useRef<LayoutRect | null>(null);
+  const lastTapCycleRef = useRef<{ ids: string[]; nextIndex: number } | null>(null);
+  const dragStartRef = useRef<TradingCardPoint | null>(null);
   const previewHeight = Math.max(360, Math.min(520, height * 0.58));
   const displayRect = useMemo(
     () => getContainedRect(containerSize, imageSize),
@@ -382,11 +548,151 @@ function FramePreview({
     setContainerSize({ width, height: layoutHeight });
   }
 
+  function handleOverlayPress(event: GestureResponderEvent) {
+    if (!displayRect) return;
+    const tapPoint = clampPointToRect(
+      { x: event.nativeEvent.locationX, y: event.nativeEvent.locationY },
+      displayRect,
+    );
+    const hitFrames = frames
+      .filter((frame) => frame.id)
+      .map((frame) => ({
+        area: frameArea(frame),
+        frame,
+      }))
+      .filter(({ frame }) => pointInsideFrame(tapPoint, frame, displayRect))
+      .sort((left, right) => left.area - right.area)
+      .map(({ frame }) => frame);
+
+    if (hitFrames.length === 0) {
+      lastTapCycleRef.current = null;
+      return;
+    }
+
+    const hitIds = hitFrames.map((frame) => frame.id ?? "");
+    const lastCycle = lastTapCycleRef.current;
+    const sameSet =
+      lastCycle &&
+      lastCycle.ids.length === hitIds.length &&
+      lastCycle.ids.every((id, index) => id === hitIds[index]);
+
+    const nextIndex = sameSet ? lastCycle.nextIndex % hitIds.length : 0;
+    const selected = hitFrames[nextIndex]?.id ?? null;
+    onSelectFrame(selected);
+    lastTapCycleRef.current = {
+      ids: hitIds,
+      nextIndex: nextIndex + 1,
+    };
+  }
+
+  const overlayResponder = useMemo(
+    () =>
+      PanResponder.create({
+        onStartShouldSetPanResponder: () => true,
+        onStartShouldSetPanResponderCapture: () => true,
+        onMoveShouldSetPanResponder: () => true,
+        onMoveShouldSetPanResponderCapture: () => true,
+        onPanResponderGrant: (event) => {
+          if (!displayRect) return;
+          onDragStateChange(false);
+          dragStartRef.current = clampPointToRect(
+            { x: event.nativeEvent.locationX, y: event.nativeEvent.locationY },
+            displayRect,
+          );
+          draftRectRef.current = null;
+          setDraftRect(null);
+        },
+        onPanResponderMove: (_, gesture) => {
+          if (!displayRect || !dragStartRef.current) return;
+          const currentPoint = clampPointToRect(
+            {
+              x: dragStartRef.current.x + gesture.dx,
+              y: dragStartRef.current.y + gesture.dy,
+            },
+            displayRect,
+          );
+          if (Math.abs(gesture.dx) < 8 && Math.abs(gesture.dy) < 8) {
+            draftRectRef.current = null;
+            setDraftRect(null);
+            return;
+          }
+          const nextRect = rectFromPoints(dragStartRef.current, currentPoint);
+          draftRectRef.current = nextRect;
+          setDraftRect(nextRect);
+        },
+        onPanResponderRelease: (_, gesture) => {
+          if (!displayRect || !dragStartRef.current) return;
+          const currentPoint = clampPointToRect(
+            {
+              x: dragStartRef.current.x + gesture.dx,
+              y: dragStartRef.current.y + gesture.dy,
+            },
+            displayRect,
+          );
+          const finalRect = draftRectRef.current ?? rectFromPoints(dragStartRef.current, currentPoint);
+          if (
+            interactionMode === "create" &&
+            onCreateFrame &&
+            Math.abs(gesture.dx) >= 8 &&
+            Math.abs(gesture.dy) >= 8 &&
+            finalRect.width >= 18 &&
+            finalRect.height >= 18
+          ) {
+            onCreateFrame(frameFromRect(dragStartRef.current, currentPoint, displayRect));
+          } else {
+            lastTapCycleRef.current = null;
+          }
+          dragStartRef.current = null;
+          draftRectRef.current = null;
+          setDraftRect(null);
+          onDragStateChange(true);
+        },
+        onPanResponderTerminate: () => {
+          dragStartRef.current = null;
+          draftRectRef.current = null;
+          setDraftRect(null);
+          onDragStateChange(true);
+        },
+      }),
+    [displayRect, interactionMode, onCreateFrame, onDragStateChange],
+  );
+
   return (
-    <View onLayout={handleLayout} style={[styles.previewBox, { height: previewHeight }]}>
+    <View
+      onLayout={handleLayout}
+      style={[styles.previewBox, fullHeight ? styles.previewBoxFullHeight : { height: previewHeight }]}
+    >
       <Image source={{ uri: imageUri }} resizeMode="contain" style={styles.previewImage} />
       {displayRect ? (
         <View pointerEvents="box-none" style={StyleSheet.absoluteFill}>
+          {interactionMode === "create" ? (
+            <View
+              {...overlayResponder.panHandlers}
+              style={[
+                styles.overlayHitArea,
+                {
+                  left: displayRect.left,
+                  top: displayRect.top,
+                  width: displayRect.width,
+                  height: displayRect.height,
+                },
+              ]}
+            />
+          ) : (
+            <Pressable
+              onPress={handleOverlayPress}
+              style={[
+                styles.overlayHitArea,
+                {
+                  left: displayRect.left,
+                  top: displayRect.top,
+                  width: displayRect.width,
+                  height: displayRect.height,
+                },
+              ]}
+            />
+          )}
+          {draftRect ? <View pointerEvents="none" style={[styles.draftRect, draftRect]} /> : null}
           {frames.map((frame) => {
             const selected = frame.id === selectedFrameId;
             return (
@@ -394,8 +700,7 @@ function FramePreview({
                 key={frame.id}
                 displayRect={displayRect}
                 frame={frame}
-                selected={selected}
-                onSelect={() => onSelectFrame(frame.id ?? null)}
+                selected={selected && interactionMode === "select"}
                 onUpdateCorner={onUpdateCorner}
               />
             );
@@ -410,26 +715,22 @@ function FrameOverlay({
   displayRect,
   frame,
   selected,
-  onSelect,
   onUpdateCorner,
 }: {
   displayRect: LayoutRect;
   frame: TradingCardFrame;
   selected: boolean;
-  onSelect: () => void;
   onUpdateCorner: (frameId: string, corner: CornerKey, point: TradingCardPoint) => void;
 }) {
-  const color = selected ? ihubColors.lavender : "rgba(255,255,255,0.92)";
+  const color = selected ? "#ffd84d" : "rgba(255,216,77,0.72)";
   const corners = [frame.topLeft, frame.topRight, frame.bottomRight, frame.bottomLeft].map((point) =>
     toScreenPoint(point, displayRect),
   );
-  const bounds = getBounds(corners);
 
   if (!frame.id) return null;
 
   return (
     <View pointerEvents="box-none" style={StyleSheet.absoluteFill}>
-      <Pressable onPress={onSelect} style={[styles.frameTouchTarget, bounds]} />
       <FrameLine from={corners[0]} to={corners[1]} color={color} />
       <FrameLine from={corners[1]} to={corners[2]} color={color} />
       <FrameLine from={corners[2]} to={corners[3]} color={color} />
@@ -583,25 +884,92 @@ function toScreenPoint(point: TradingCardPoint, rect: LayoutRect): TradingCardPo
   };
 }
 
-function getBounds(points: TradingCardPoint[]) {
-  const xs = points.map((point) => point.x);
-  const ys = points.map((point) => point.y);
-  const left = Math.min(...xs);
-  const top = Math.min(...ys);
-  const right = Math.max(...xs);
-  const bottom = Math.max(...ys);
+function frameArea(frame: TradingCardFrame) {
+  return Math.abs(
+    polygonArea([frame.topLeft, frame.topRight, frame.bottomRight, frame.bottomLeft]),
+  );
+}
+
+function pointInsideFrame(
+  point: TradingCardPoint,
+  frame: TradingCardFrame,
+  displayRect: LayoutRect,
+) {
+  const corners = [frame.topLeft, frame.topRight, frame.bottomRight, frame.bottomLeft].map((framePoint) =>
+    toScreenPoint(framePoint, displayRect),
+  );
+  return pointInPolygon(point, corners);
+}
+
+function pointInPolygon(point: TradingCardPoint, polygon: TradingCardPoint[]) {
+  let inside = false;
+  for (let index = 0, previous = polygon.length - 1; index < polygon.length; previous = index++) {
+    const currentPoint = polygon[index];
+    const previousPoint = polygon[previous];
+    const crosses =
+      (currentPoint.y > point.y) !== (previousPoint.y > point.y) &&
+      point.x <
+        ((previousPoint.x - currentPoint.x) * (point.y - currentPoint.y)) /
+          ((previousPoint.y - currentPoint.y) || Number.EPSILON) +
+          currentPoint.x;
+    if (crosses) inside = !inside;
+  }
+  return inside;
+}
+
+function polygonArea(points: TradingCardPoint[]) {
+  let sum = 0;
+  for (let index = 0; index < points.length; index += 1) {
+    const next = points[(index + 1) % points.length];
+    sum += points[index].x * next.y - next.x * points[index].y;
+  }
+  return sum / 2;
+}
+
+function clampPointToRect(point: TradingCardPoint, rect: LayoutRect) {
   return {
-    left,
-    top,
-    width: Math.max(24, right - left),
-    height: Math.max(24, bottom - top),
+    x: Math.max(rect.left, Math.min(rect.left + rect.width, point.x)),
+    y: Math.max(rect.top, Math.min(rect.top + rect.height, point.y)),
+  };
+}
+
+function rectFromPoints(start: TradingCardPoint, end: TradingCardPoint): LayoutRect {
+  return {
+    left: Math.min(start.x, end.x),
+    top: Math.min(start.y, end.y),
+    width: Math.abs(end.x - start.x),
+    height: Math.abs(end.y - start.y),
+  };
+}
+
+function frameFromRect(
+  start: TradingCardPoint,
+  end: TradingCardPoint,
+  displayRect: LayoutRect,
+): TradingCardFrame {
+  const rect = rectFromPoints(start, end);
+  return {
+    topLeft: toNormalizedPoint({ x: rect.left, y: rect.top }, displayRect),
+    topRight: toNormalizedPoint({ x: rect.left + rect.width, y: rect.top }, displayRect),
+    bottomRight: toNormalizedPoint(
+      { x: rect.left + rect.width, y: rect.top + rect.height },
+      displayRect,
+    ),
+    bottomLeft: toNormalizedPoint({ x: rect.left, y: rect.top + rect.height }, displayRect),
+  };
+}
+
+function toNormalizedPoint(point: TradingCardPoint, rect: LayoutRect): TradingCardPoint {
+  return {
+    x: clamp01((point.x - rect.left) / rect.width),
+    y: clamp01((point.y - rect.top) / rect.height),
   };
 }
 
 const styles = StyleSheet.create({
   modal: {
     flex: 1,
-    backgroundColor: ihubColors.background,
+    backgroundColor: megrumColors.background,
   },
   header: {
     alignItems: "center",
@@ -622,7 +990,7 @@ const styles = StyleSheet.create({
     width: 64,
   },
   closeText: {
-    color: ihubColors.mutedInk,
+    color: megrumColors.mutedInk,
     fontSize: 12,
     fontWeight: "800",
   },
@@ -633,13 +1001,13 @@ const styles = StyleSheet.create({
     width: 64,
   },
   kicker: {
-    color: ihubColors.lavender,
+    color: megrumColors.lavender,
     fontSize: 10,
     fontWeight: "900",
     letterSpacing: 0,
   },
   title: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 18,
     fontWeight: "900",
     marginTop: 2,
@@ -649,20 +1017,20 @@ const styles = StyleSheet.create({
     padding: 18,
   },
   guideCard: {
-    backgroundColor: ihubColors.surface,
-    borderRadius: ihubRadii.lg,
+    backgroundColor: megrumColors.surface,
+    borderRadius: megrumRadii.lg,
     gap: 12,
     padding: 16,
-    ...ihubShadow,
+    ...megrumShadow,
   },
   guideTitle: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 18,
     fontWeight: "900",
     lineHeight: 25,
   },
   guideText: {
-    color: ihubColors.mutedInk,
+    color: megrumColors.mutedInk,
     fontSize: 13,
     fontWeight: "700",
     lineHeight: 21,
@@ -670,7 +1038,7 @@ const styles = StyleSheet.create({
   warningBox: {
     backgroundColor: "rgba(245,158,11,0.12)",
     borderColor: "rgba(245,158,11,0.28)",
-    borderRadius: ihubRadii.md,
+    borderRadius: megrumRadii.md,
     borderWidth: 1,
     padding: 12,
   },
@@ -684,7 +1052,7 @@ const styles = StyleSheet.create({
     gap: 7,
   },
   guideBullet: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 13,
     fontWeight: "800",
     lineHeight: 19,
@@ -695,41 +1063,64 @@ const styles = StyleSheet.create({
   },
   sourceButton: {
     alignItems: "center",
-    backgroundColor: ihubColors.surface,
+    backgroundColor: megrumColors.surface,
     borderColor: "rgba(166,149,216,0.2)",
-    borderRadius: ihubRadii.lg,
+    borderRadius: megrumRadii.lg,
     borderWidth: 1,
     flex: 1,
     gap: 8,
     minHeight: 116,
     justifyContent: "center",
     padding: 16,
-    ...ihubShadow,
+    ...megrumShadow,
   },
   sourceIcon: {
-    color: ihubColors.lavender,
+    color: megrumColors.lavender,
     fontSize: 28,
     fontWeight: "900",
   },
   sourceText: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 14,
     fontWeight: "900",
   },
   adjustContent: {
     flex: 1,
+  },
+  adjustScrollContent: {
     gap: 12,
     padding: 14,
+    paddingBottom: 24,
+  },
+  manualContent: {
+    flex: 1,
+    gap: 12,
+    padding: 14,
+    paddingBottom: 20,
   },
   previewBox: {
     backgroundColor: "#111018",
-    borderRadius: ihubRadii.lg,
+    borderRadius: megrumRadii.lg,
     overflow: "hidden",
     width: "100%",
+  },
+  previewBoxFullHeight: {
+    flex: 1,
+    minHeight: 0,
   },
   previewImage: {
     height: "100%",
     width: "100%",
+  },
+  overlayHitArea: {
+    position: "absolute",
+  },
+  draftRect: {
+    borderColor: "#ffd84d",
+    borderRadius: 10,
+    borderStyle: "dashed",
+    borderWidth: 2,
+    position: "absolute",
   },
   frameTouchTarget: {
     position: "absolute",
@@ -740,52 +1131,111 @@ const styles = StyleSheet.create({
     position: "absolute",
   },
   cornerHandle: {
-    backgroundColor: ihubColors.surface,
-    borderColor: ihubColors.lavender,
+    backgroundColor: megrumColors.surface,
+    borderColor: "#ffd84d",
     borderRadius: 14,
     borderWidth: 4,
     height: 28,
     position: "absolute",
     width: 28,
   },
-  adjustToolbar: {
-    flexDirection: "row",
-    gap: 10,
-  },
-  toolbarButton: {
-    alignItems: "center",
-    backgroundColor: ihubColors.surface,
-    borderColor: "rgba(166,149,216,0.24)",
-    borderRadius: 999,
+  previewStripCard: {
+    backgroundColor: megrumColors.surface,
+    borderColor: "rgba(255,216,77,0.22)",
+    borderRadius: megrumRadii.lg,
     borderWidth: 1,
-    flex: 1,
-    justifyContent: "center",
-    minHeight: 42,
-    paddingHorizontal: 14,
+    gap: 10,
+    padding: 12,
   },
-  toolbarButtonDisabled: {
-    opacity: 0.45,
+  previewStripHeader: {
+    alignItems: "center",
+    flexDirection: "row",
+    justifyContent: "space-between",
   },
-  toolbarButtonText: {
-    color: ihubColors.lavender,
+  previewStripHeaderActions: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 8,
+  },
+  previewStripTitle: {
+    color: megrumColors.ink,
     fontSize: 13,
     fontWeight: "900",
   },
-  toolbarMutedText: {
-    color: ihubColors.mutedInk,
-    fontSize: 13,
+  previewStripHint: {
+    color: megrumColors.mutedInk,
+    fontSize: 11,
+    fontWeight: "800",
+  },
+  previewHeaderDeleteChip: {
+    backgroundColor: "rgba(239,68,68,0.08)",
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  previewHeaderDeleteText: {
+    color: "#dc2626",
+    fontSize: 11,
     fontWeight: "900",
+  },
+  previewStripGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  previewStripTile: {
+    aspectRatio: 0.71,
+    backgroundColor: "rgba(58,50,74,0.06)",
+    borderColor: "rgba(166,149,216,0.18)",
+    borderRadius: 10,
+    borderWidth: 1,
+    overflow: "hidden",
+    width: "18.4%",
+  },
+  previewStripTileSelected: {
+    borderColor: "#ffd84d",
+    borderWidth: 2,
+  },
+  previewStripImage: {
+    height: "100%",
+    width: "100%",
+  },
+  previewStripEmpty: {
+    color: megrumColors.mutedInk,
+    fontSize: 11,
+    fontWeight: "800",
+    lineHeight: 16,
+  },
+  dragHintCard: {
+    backgroundColor: "rgba(255,216,77,0.12)",
+    borderColor: "rgba(255,216,77,0.28)",
+    borderRadius: megrumRadii.md,
+    borderWidth: 1,
+    gap: 4,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  dragHintTitle: {
+    color: megrumColors.ink,
+    fontSize: 12,
+    fontWeight: "900",
+  },
+  dragHintText: {
+    color: megrumColors.mutedInk,
+    fontSize: 11,
+    fontWeight: "800",
+    lineHeight: 16,
   },
   messageBox: {
     backgroundColor: "rgba(168,212,230,0.18)",
     borderColor: "rgba(168,212,230,0.36)",
-    borderRadius: ihubRadii.md,
+    borderRadius: megrumRadii.md,
     borderWidth: 1,
     paddingHorizontal: 12,
     paddingVertical: 10,
   },
   messageText: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 12,
     fontWeight: "800",
     lineHeight: 18,
@@ -795,25 +1245,28 @@ const styles = StyleSheet.create({
     gap: 10,
     marginTop: "auto",
   },
+  photoFooterActions: {
+    marginTop: 2,
+  },
   secondaryAction: {
     alignItems: "center",
-    backgroundColor: ihubColors.surface,
+    backgroundColor: megrumColors.surface,
     borderColor: "rgba(166,149,216,0.22)",
-    borderRadius: ihubRadii.md,
+    borderRadius: megrumRadii.md,
     borderWidth: 1,
     flex: 1,
     justifyContent: "center",
     minHeight: 50,
   },
   secondaryActionText: {
-    color: ihubColors.mutedInk,
+    color: megrumColors.mutedInk,
     fontSize: 14,
     fontWeight: "900",
   },
   primaryAction: {
     alignItems: "center",
-    backgroundColor: ihubColors.lavender,
-    borderRadius: ihubRadii.md,
+    backgroundColor: megrumColors.lavender,
+    borderRadius: megrumRadii.md,
     flex: 1.25,
     justifyContent: "center",
     minHeight: 50,
@@ -822,7 +1275,7 @@ const styles = StyleSheet.create({
     opacity: 0.55,
   },
   primaryActionText: {
-    color: ihubColors.surface,
+    color: megrumColors.surface,
     fontSize: 15,
     fontWeight: "900",
   },
@@ -832,7 +1285,7 @@ const styles = StyleSheet.create({
     padding: 14,
   },
   resultLead: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 16,
     fontWeight: "900",
   },
@@ -843,9 +1296,9 @@ const styles = StyleSheet.create({
     paddingBottom: 12,
   },
   resultTile: {
-    backgroundColor: ihubColors.surface,
+    backgroundColor: megrumColors.surface,
     borderColor: "rgba(166,149,216,0.18)",
-    borderRadius: ihubRadii.lg,
+    borderRadius: megrumRadii.lg,
     borderWidth: 1,
     overflow: "hidden",
     width: "48%",
@@ -862,15 +1315,17 @@ const styles = StyleSheet.create({
     width: "92%",
   },
   resultMeta: {
-    alignItems: "center",
-    flexDirection: "row",
-    justifyContent: "space-between",
+    gap: 8,
     padding: 10,
   },
   resultIndex: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 12,
     fontWeight: "900",
+  },
+  resultActions: {
+    flexDirection: "row",
+    gap: 8,
   },
   rotateButton: {
     backgroundColor: "rgba(166,149,216,0.12)",
@@ -879,7 +1334,18 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
   },
   rotateText: {
-    color: ihubColors.lavender,
+    color: megrumColors.lavender,
+    fontSize: 11,
+    fontWeight: "900",
+  },
+  deleteButton: {
+    backgroundColor: "rgba(239,68,68,0.1)",
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  deleteText: {
+    color: "#dc2626",
     fontSize: 11,
     fontWeight: "900",
   },

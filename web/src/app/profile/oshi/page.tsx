@@ -4,7 +4,7 @@ import { HeaderBack } from "@/components/auth/HeaderBack";
 import { OshiEditView } from "./OshiEditView";
 
 export const metadata = {
-  title: "推し設定 — iHub",
+  title: "推し設定 — Megrum",
 };
 
 type OshiRow = {

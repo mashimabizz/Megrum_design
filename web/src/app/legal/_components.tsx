@@ -79,7 +79,7 @@ export function LPFooter({ updatedAt }: { updatedAt: string }) {
     <div className="border-t border-[#3a324a14] pb-8 pt-4 text-right text-[11px] leading-[1.7] text-[#3a324a8c]">
       {updatedAt}
       <br />
-      iHub 運営者
+      Megrum 運営者
     </div>
   );
 }

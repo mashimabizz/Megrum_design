@@ -6,7 +6,7 @@ import { RouteHeader } from "../../src/components/RouteHeader";
 import { Screen } from "../../src/components/Screen";
 import { TextField } from "../../src/components/TextField";
 import { supabase } from "../../src/lib/supabase";
-import { ihubColors, ihubRadii } from "../../src/theme/tokens";
+import { megrumColors, megrumRadii } from "../../src/theme/tokens";
 
 export default function PasswordResetConfirmScreen() {
   const { code, error_description } = useLocalSearchParams<{
@@ -116,16 +116,16 @@ export default function PasswordResetConfirmScreen() {
 
 function getPasswordStrength(password: string) {
   if (!password) return { level: 0, label: "", color: "rgba(58,50,74,0.14)" };
-  if (password.length < 8) return { level: 1, label: "弱い", color: ihubColors.warn };
+  if (password.length < 8) return { level: 1, label: "弱い", color: megrumColors.warn };
   const hasLetter = /[a-zA-Z]/.test(password);
   const hasDigit = /\d/.test(password);
   const hasSymbol = /[^a-zA-Z\d]/.test(password);
   if (hasLetter && hasDigit && hasSymbol && password.length >= 12) {
-    return { level: 4, label: "最強", color: ihubColors.ok };
+    return { level: 4, label: "最強", color: megrumColors.ok };
   }
-  if (hasLetter && hasDigit) return { level: 3, label: "強い", color: ihubColors.ok };
+  if (hasLetter && hasDigit) return { level: 3, label: "強い", color: megrumColors.ok };
   if (hasLetter || hasDigit) return { level: 2, label: "普通", color: "#eab308" };
-  return { level: 1, label: "弱い", color: ihubColors.warn };
+  return { level: 1, label: "弱い", color: megrumColors.warn };
 }
 
 const styles = StyleSheet.create({
@@ -155,16 +155,16 @@ const styles = StyleSheet.create({
   error: {
     backgroundColor: "rgba(217,130,107,0.10)",
     borderColor: "rgba(217,130,107,0.22)",
-    borderRadius: ihubRadii.md,
+    borderRadius: megrumRadii.md,
     borderWidth: 1,
-    color: ihubColors.warn,
+    color: megrumColors.warn,
     fontSize: 12,
     fontWeight: "800",
     lineHeight: 18,
     padding: 12,
   },
   helper: {
-    color: ihubColors.mutedInk,
+    color: megrumColors.mutedInk,
     fontSize: 12,
     fontWeight: "800",
   },

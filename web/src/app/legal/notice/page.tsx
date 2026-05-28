@@ -7,7 +7,7 @@ import {
 } from "../_components";
 
 export const metadata = {
-  title: "特定商取引法に基づく表記 — iHub",
+  title: "特定商取引法に基づく表記 — Megrum",
 };
 
 export default function LegalNoticePage() {
@@ -60,7 +60,7 @@ export default function LegalNoticePage() {
               </>
             }
           />
-          <LPDataRow label="メールアドレス" value="support@ihub.tokyo" />
+          <LPDataRow label="メールアドレス" value="support@megrum.jp" />
           <LPDataRow
             label="受付時間"
             value="平日 10:00〜18:00（土日祝・年末年始を除く）"
@@ -70,7 +70,7 @@ export default function LegalNoticePage() {
 
         {/* サービス情報 */}
         <div className="mb-4 rounded-[14px] border border-[#3a324a14] bg-white px-3.5">
-          <LPDataRow label="サービス名" value="iHub（アイハブ）" />
+          <LPDataRow label="サービス名" value="Megrum（メグルム）" />
           <LPDataRow
             label="サービス内容"
             value={
@@ -144,7 +144,7 @@ export default function LegalNoticePage() {
         <LPInfoBox tone="warn">
           <b>本サービスにおける取引の性質について</b>
           <br />
-          iHub は利用者間の
+          Megrum は利用者間の
           <b>物々交換（金銭授受を伴わない交換）</b>を仲介するプラットフォームです。当社は取引の当事者ではなく、利用者間の合意による交換を支援する立場です。利用者間で発生した取引に関する責任は、原則として当事者間で負うものとします。
         </LPInfoBox>
 

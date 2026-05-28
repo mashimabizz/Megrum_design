@@ -32,7 +32,7 @@ npm run mobile:start
 
 ### iPhone実機で見る場合（Development Build）
 
-Expo Go のQR読み込みを毎回やりたくない場合は、iHub専用の開発版アプリをiPhoneに入れる。
+Expo Go のQR読み込みを毎回やりたくない場合は、Megrum専用の開発版アプリをiPhoneに入れる。
 
 初回だけ、以下が必要：
 
@@ -42,24 +42,24 @@ Expo Go のQR読み込みを毎回やりたくない場合は、iHub専用の開
 - iPhoneのDeveloper Mode有効化（iOS 16以降）
 
 ```bash
-cd /Users/michitaka/Desktop/Claude/Goods_exchange_platfform_iHub/mobile
+cd /Users/michitaka/Desktop/Claude/Goods_exchange_platfform_Megrum/mobile
 npm install -g eas-cli
 eas login
 eas build --platform ios --profile development
 ```
 
-ビルドが完了すると、Expoのページにインストール用リンクが出る。iPhoneでそのリンクを開いてiHubをインストールする。
+ビルドが完了すると、Expoのページにインストール用リンクが出る。iPhoneでそのリンクを開いて Megrum をインストールする。
 
 インストール後の普段のレビューは以下：
 
 ```bash
-cd /Users/michitaka/Desktop/Claude/Goods_exchange_platfform_iHub
+cd /Users/michitaka/Desktop/Claude/Goods_exchange_platfform_Megrum
 git pull
 cd mobile
 npm run start:dev
 ```
 
-iPhone側は、ホーム画面の **iHub** アプリを開く。QRを毎回読む必要はない。
+iPhone側は、ホーム画面の **Megrum** アプリを開く。QRを毎回読む必要はない。
 
 ネイティブ依存を追加・変更した時だけ、開発版アプリを作り直す。
 
@@ -74,7 +74,7 @@ npm run mobile:ios
 Development BuildをSimulatorで見る場合：
 
 ```bash
-cd /Users/michitaka/Desktop/Claude/Goods_exchange_platfform_iHub/mobile
+cd /Users/michitaka/Desktop/Claude/Goods_exchange_platfform_Megrum/mobile
 eas build --platform ios --profile development-simulator
 ```
 
@@ -115,7 +115,7 @@ EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY=...
 - タブの位置・文字サイズ・押し心地が自然か
 - Web版と同じ情報構造として理解できるか
 - ログイン前後の導線に違和感がないか
-- 画面上の言葉がiHubの用語とズレていないか
+- 画面上の言葉が Megrum の用語とズレていないか
 
 ---
 
@@ -136,7 +136,7 @@ EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY=...
 Mac と iPhone が同じ Wi-Fi にいても、LAN接続が通らないことがある。その場合は tunnel で起動する。
 
 ```bash
-cd /Users/michitaka/Desktop/Claude/Goods_exchange_platfform_iHub/mobile
+cd /Users/michitaka/Desktop/Claude/Goods_exchange_platfform_Megrum/mobile
 npx expo start --tunnel --clear
 ```
 
@@ -149,7 +149,7 @@ monorepo の root `node_modules` が無い環境で Metro が監視しようと�
 `mobile/metro.config.js` で存在しない watch path を除外するようにしているため、最新版を取得したうえで再起動する。
 
 ```bash
-cd /Users/michitaka/Desktop/Claude/Goods_exchange_platfform_iHub
+cd /Users/michitaka/Desktop/Claude/Goods_exchange_platfform_Megrum
 git pull
 cd mobile
 npx expo start --tunnel --clear

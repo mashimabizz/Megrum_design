@@ -966,7 +966,7 @@ export function HomeView({
     url.searchParams.set(MATCH_DETAIL_QUERY_KEY, candidate.key);
     const state = {
       ...getHistoryState(),
-      ihubMatchDetail: true,
+      megrumMatchDetail: true,
       matchDetailKey: candidate.key,
     };
     if (mode === "replace") {
@@ -983,7 +983,7 @@ export function HomeView({
     url.searchParams.delete(MATCH_DETAIL_QUERY_KEY);
     const state = {
       ...getHistoryState(),
-      ihubMatchDetail: false,
+      megrumMatchDetail: false,
       matchDetailKey: null,
     };
     window.history.replaceState(state, "", url.toString());
@@ -993,10 +993,10 @@ export function HomeView({
     if (typeof window !== "undefined") {
       const url = new URL(window.location.href);
       const state = window.history.state as
-        | { ihubMatchDetail?: boolean }
+        | { megrumMatchDetail?: boolean }
         | null;
       if (url.searchParams.has(MATCH_DETAIL_QUERY_KEY)) {
-        if (state?.ihubMatchDetail) {
+        if (state?.megrumMatchDetail) {
           window.history.back();
           return;
         }
@@ -1207,7 +1207,7 @@ export function HomeView({
       <Link
         href="/search"
         scroll={false}
-        transitionTypes={["ihub-bottom-nav"]}
+        transitionTypes={["megrum-bottom-nav"]}
         className="fixed bottom-[calc(env(safe-area-inset-bottom)+88px)] left-[max(18px,calc((100vw-28rem)/2+18px))] z-50 flex h-[54px] w-[54px] items-center justify-center rounded-full border border-white/70 bg-white/62 text-[#3a324a] shadow-[0_16px_34px_rgba(58,50,74,0.18),inset_0_1px_0_rgba(255,255,255,0.9),inset_0_-1px_0_rgba(58,50,74,0.08)] backdrop-blur-[24px] backdrop-saturate-[180%] transition-transform active:scale-[0.94]"
         aria-label="検索"
       >

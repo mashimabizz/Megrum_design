@@ -4,7 +4,7 @@ import { HeaderBack } from "@/components/auth/HeaderBack";
 import { NotificationSettingsView } from "./NotificationSettingsView";
 
 export const metadata = {
-  title: "通知設定 — iHub",
+  title: "通知設定 — Megrum",
 };
 
 export default async function NotificationSettingsPage() {

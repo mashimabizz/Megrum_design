@@ -2,7 +2,7 @@ import { HeaderBack } from "@/components/auth/HeaderBack";
 import { LPArticle, LPFooter, LPInfoBox } from "../_components";
 
 export const metadata = {
-  title: "利用規約 — iHub",
+  title: "利用規約 — Megrum",
 };
 
 export default function TermsPage() {
@@ -11,8 +11,8 @@ export default function TermsPage() {
       <HeaderBack title="利用規約" sub="最終更新日：2026年4月30日" backHref="/" />
       <div className="mx-auto w-full max-w-md flex-1 overflow-y-auto px-5 pb-12 pt-4">
         <LPInfoBox>
-          この利用規約（以下「本規約」）は、iHub
-          運営者（以下「当社」）が提供するグッズ交換プラットフォーム「iHub」（以下「本サービス」）の利用条件を定めるものです。本サービスをご利用の方（以下「利用者」）は、本規約に同意したうえでご利用ください。
+          この利用規約（以下「本規約」）は、Megrum
+          運営者（以下「当社」）が提供するグッズ交換プラットフォーム「Megrum」（以下「本サービス」）の利用条件を定めるものです。本サービスをご利用の方（以下「利用者」）は、本規約に同意したうえでご利用ください。
         </LPInfoBox>
 
         <LPArticle num="第1条" title="本規約の適用">

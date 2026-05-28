@@ -20,7 +20,7 @@ import {
   type MeguriSceneMode,
   type MeguriSceneResident,
 } from "../src/components/meguri/MeguriThreeScene";
-import { ihubColors } from "../src/theme/tokens";
+import { megrumColors } from "../src/theme/tokens";
 import {
   USERS,
   WalkingCard,
@@ -268,7 +268,7 @@ export default function MeguriIntroScreen() {
   if (!self) {
     return (
       <Screen bottomInset={false} contentStyle={styles.loadingRoot} scroll={false} topInset={false}>
-        <ActivityIndicator color={ihubColors.lavender} />
+        <ActivityIndicator color={megrumColors.lavender} />
       </Screen>
     );
   }
@@ -298,14 +298,14 @@ export default function MeguriIntroScreen() {
         <View style={styles.stageShell}>
           {threeFailed ? (
             <View style={styles.threeUnavailable}>
-              <ActivityIndicator color={ihubColors.lavender} />
+              <ActivityIndicator color={megrumColors.lavender} />
               <Text style={styles.threeUnavailableText}>3Dアバターを読み込んでいます</Text>
             </View>
           ) : (
             <MeguriThreeBoundary
               fallback={
                 <View style={styles.threeUnavailable}>
-                  <ActivityIndicator color={ihubColors.lavender} />
+                  <ActivityIndicator color={megrumColors.lavender} />
                   <Text style={styles.threeUnavailableText}>3Dアバターを読み込んでいます</Text>
                 </View>
               }
@@ -740,7 +740,7 @@ function AreaUnlockOverlay({
   const [canContinue, setCanContinue] = useState(false);
   const activeArea = normalizePrefectureName(unlock.area);
   const activePref = MEGURI_MAP_TILES.find((pref) => pref.name === activeArea);
-  const activeColor = activePref ? MEGURI_MAP_REGION_COLORS[activePref.region] : ihubColors.lavender;
+  const activeColor = activePref ? MEGURI_MAP_REGION_COLORS[activePref.region] : megrumColors.lavender;
   const activeWidth = (activePref?.w ?? MEGURI_MAP_TILE_W) * AREA_UNLOCK_MAP_SCALE;
   const activeHeight = (activePref?.h ?? MEGURI_MAP_TILE_H) * AREA_UNLOCK_MAP_SCALE;
   const activeGlowSize = 72 * AREA_UNLOCK_MAP_SCALE;
@@ -1062,19 +1062,19 @@ const styles = StyleSheet.create({
     width: 42,
   },
   back: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 34,
     fontWeight: "800",
     lineHeight: 36,
   },
   kicker: {
-    color: ihubColors.lavender,
+    color: megrumColors.lavender,
     fontSize: 11,
     fontWeight: "900",
     letterSpacing: 1.8,
   },
   progress: {
-    color: ihubColors.mutedInk,
+    color: megrumColors.mutedInk,
     fontSize: 13,
     fontWeight: "900",
   },
@@ -1087,7 +1087,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
   },
   skipText: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 13,
     fontWeight: "900",
   },
@@ -1226,19 +1226,19 @@ const styles = StyleSheet.create({
     opacity: 0.72,
   },
   speaker: {
-    color: ihubColors.lavender,
+    color: megrumColors.lavender,
     fontSize: 13,
     fontWeight: "900",
   },
   dialogueText: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 18,
     fontWeight: "900",
     lineHeight: 27,
   },
   nextGlyph: {
     alignSelf: "flex-end",
-    color: ihubColors.lavender,
+    color: megrumColors.lavender,
     fontSize: 17,
     fontWeight: "900",
     lineHeight: 18,
@@ -1248,7 +1248,7 @@ const styles = StyleSheet.create({
     alignSelf: "flex-start",
     backgroundColor: hueTint("sky", 0.26),
     borderRadius: 999,
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 11,
     fontWeight: "900",
     marginBottom: 2,
@@ -1257,7 +1257,7 @@ const styles = StyleSheet.create({
   },
   primary: {
     alignItems: "center",
-    backgroundColor: ihubColors.lavender,
+    backgroundColor: megrumColors.lavender,
     borderRadius: 18,
     justifyContent: "center",
     left: 18,
@@ -1433,21 +1433,21 @@ const styles = StyleSheet.create({
     width: 18,
   },
   areaEyebrow: {
-    color: ihubColors.lavender,
+    color: megrumColors.lavender,
     fontSize: 13,
     fontWeight: "900",
     letterSpacing: 1.2,
     marginBottom: 6,
   },
   areaTitle: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 24,
     fontWeight: "900",
     lineHeight: 31,
     textAlign: "center",
   },
   areaBody: {
-    color: ihubColors.mutedInk,
+    color: megrumColors.mutedInk,
     fontSize: 15,
     fontWeight: "900",
     lineHeight: 22,
@@ -1455,13 +1455,13 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
   areaName: {
-    color: ihubColors.mutedInk,
+    color: megrumColors.mutedInk,
     fontSize: 12,
     fontWeight: "800",
     marginTop: 4,
   },
   areaNextGlyph: {
-    color: ihubColors.lavender,
+    color: megrumColors.lavender,
     fontSize: 18,
     fontWeight: "900",
     height: 20,
@@ -1498,7 +1498,7 @@ const styles = StyleSheet.create({
     width: 104,
   },
   fallbackGateText: {
-    color: ihubColors.lavender,
+    color: megrumColors.lavender,
     fontSize: 14,
     fontWeight: "900",
   },
@@ -1509,7 +1509,7 @@ const styles = StyleSheet.create({
     position: "absolute",
   },
   smallLabel: {
-    color: ihubColors.mutedInk,
+    color: megrumColors.mutedInk,
     fontSize: 11,
     fontWeight: "900",
     marginTop: 4,

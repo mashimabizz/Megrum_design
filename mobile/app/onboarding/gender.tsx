@@ -5,7 +5,7 @@ import { PrimaryButton } from "../../src/components/PrimaryButton";
 import { Screen } from "../../src/components/Screen";
 import { useAuth } from "../../src/auth/AuthProvider";
 import { supabase } from "../../src/lib/supabase";
-import { ihubColors, ihubRadii } from "../../src/theme/tokens";
+import { megrumColors, megrumRadii } from "../../src/theme/tokens";
 
 const OPTIONS = [
   { value: "female", label: "女性" },
@@ -144,16 +144,16 @@ const styles = StyleSheet.create({
   },
   backButton: {
     alignItems: "center",
-    backgroundColor: ihubColors.surface,
+    backgroundColor: megrumColors.surface,
     borderColor: "rgba(58,50,74,0.08)",
-    borderRadius: ihubRadii.pill,
+    borderRadius: megrumRadii.pill,
     borderWidth: 1,
     height: 42,
     justifyContent: "center",
     width: 42,
   },
   backText: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 30,
     fontWeight: "800",
     lineHeight: 32,
@@ -162,20 +162,20 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   headerTitle: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 17,
     fontWeight: "900",
   },
   headerSub: {
-    color: ihubColors.mutedInk,
+    color: megrumColors.mutedInk,
     fontSize: 11,
     fontWeight: "800",
     marginTop: 2,
   },
   progressText: {
     backgroundColor: "rgba(166,149,216,0.12)",
-    borderRadius: ihubRadii.pill,
-    color: ihubColors.lavender,
+    borderRadius: megrumRadii.pill,
+    color: megrumColors.lavender,
     fontSize: 12,
     fontWeight: "900",
     paddingHorizontal: 12,
@@ -193,17 +193,17 @@ const styles = StyleSheet.create({
     height: 5,
   },
   dotActive: {
-    backgroundColor: ihubColors.lavender,
+    backgroundColor: megrumColors.lavender,
   },
   title: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 22,
     fontWeight: "900",
     lineHeight: 28,
     marginTop: 6,
   },
   copy: {
-    color: ihubColors.mutedInk,
+    color: megrumColors.mutedInk,
     fontSize: 12,
     fontWeight: "800",
     lineHeight: 19,
@@ -214,7 +214,7 @@ const styles = StyleSheet.create({
   },
   option: {
     alignItems: "center",
-    backgroundColor: ihubColors.surface,
+    backgroundColor: megrumColors.surface,
     borderColor: "rgba(58,50,74,0.08)",
     borderRadius: 18,
     borderWidth: 1.5,
@@ -225,7 +225,7 @@ const styles = StyleSheet.create({
   },
   optionActive: {
     backgroundColor: "rgba(166,149,216,0.08)",
-    borderColor: ihubColors.lavender,
+    borderColor: megrumColors.lavender,
   },
   radio: {
     alignItems: "center",
@@ -237,22 +237,22 @@ const styles = StyleSheet.create({
     width: 22,
   },
   radioActive: {
-    backgroundColor: ihubColors.lavender,
-    borderColor: ihubColors.lavender,
+    backgroundColor: megrumColors.lavender,
+    borderColor: megrumColors.lavender,
   },
   radioDot: {
-    backgroundColor: ihubColors.surface,
+    backgroundColor: megrumColors.surface,
     borderRadius: 4,
     height: 8,
     width: 8,
   },
   optionText: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 14,
     fontWeight: "900",
   },
   error: {
-    color: ihubColors.warn,
+    color: megrumColors.warn,
     fontSize: 12,
     fontWeight: "800",
   },

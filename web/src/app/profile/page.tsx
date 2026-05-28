@@ -4,7 +4,7 @@ import { BottomNav } from "@/components/home/BottomNav";
 import { ProfileView } from "./ProfileView";
 
 export const metadata = {
-  title: "プロフ — iHub",
+  title: "プロフ — Megrum",
 };
 
 type OshiRow = {

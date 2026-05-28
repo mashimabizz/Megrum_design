@@ -4,7 +4,7 @@ import { HeaderBack } from "@/components/auth/HeaderBack";
 import { EditForm } from "./EditForm";
 
 export const metadata = {
-  title: "グッズを編集 — iHub",
+  title: "グッズを編集 — Megrum",
 };
 
 type ItemRow = {

@@ -1,24 +1,41 @@
-import { useEffect, useMemo, useState } from "react";
-import { router } from "expo-router";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
 import {
+  ActivityIndicator,
   Animated,
   Image,
+  type NativeScrollEvent,
+  type NativeSyntheticEvent,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
   View,
+  useWindowDimensions,
 } from "react-native";
 import {
   SectionTabs,
 } from "../../src/components/GoodsGrid";
+import { IconSymbol } from "../../src/components/IconSymbol";
+import { MeguriAvatarFace } from "../../src/components/meguri/MeguriAvatarFace";
 import { Screen } from "../../src/components/Screen";
 import { useAuth } from "../../src/auth/AuthProvider";
 import { supabase } from "../../src/lib/supabase";
-import { ihubColors, ihubRadii } from "../../src/theme/tokens";
+import { megrumColors, megrumRadii } from "../../src/theme/tokens";
+import { LETTERS, USERS, type Letter } from "./encounters";
+import {
+  loadMeguriGroomReplies,
+  loadMeguriMessageReadState,
+  loadMeguriThreadMessages,
+  markMeguriLetterRead,
+  unreadMeguriMessageCount,
+  type MeguriGroomReply,
+  type MeguriMessageReadState,
+  type MeguriThreadMessage,
+} from "../../src/lib/meguriMessages";
 
-type TopTab = "pending" | "ongoing" | "past";
-type PendingSubTab = "action" | "waiting";
+type PrimaryTab = "meguri" | "trade";
+type TopTab = "pending" | "ongoing";
 type PastFilter = "all" | "completed" | "cancelled" | "ended";
 
 type TradeItem = {
@@ -26,6 +43,7 @@ type TradeItem = {
   glyph: string;
   hue: string;
   label: string;
+  cash?: boolean;
   photoUrl?: string | null;
 };
 
@@ -42,9 +60,11 @@ type TransactionStatus =
 type Transaction = {
   id: string;
   partner: string;
+  partnerAvatarUrl?: string | null;
   direction: "sent" | "received";
   status: TransactionStatus;
   needsAction: boolean;
+  openDispute?: { id: string; ticketNo: string } | null;
   latestMessageFrom?: "me" | "partner" | null;
   receive: TradeItem[];
   give: TradeItem[];
@@ -53,6 +73,14 @@ type Transaction = {
   updated: string;
   note: string;
   stars?: number;
+};
+
+type MeguriConversation = {
+  id: string;
+  letter: Letter;
+  lastAt: string;
+  latestSentPreview?: string;
+  unread: number;
 };
 
 const TRANSACTIONS: Transaction[] = [
@@ -87,7 +115,7 @@ const TRANSACTIONS: Transaction[] = [
   },
   {
     id: "tx-03",
-    partner: "ihub_lily",
+    partner: "megrum_lily",
     direction: "sent",
     status: "sent",
     needsAction: false,
@@ -166,22 +194,47 @@ const TRANSACTIONS: Transaction[] = [
   },
 ];
 
+const PRIMARY_TABS = [
+  { id: "meguri" as const, label: "めぐりあい", color: megrumColors.lavender },
+  { id: "trade" as const, label: "取引", color: megrumColors.sky },
+];
 const TOP_TABS = [
-  { id: "pending" as const, label: "打診中", color: ihubColors.lavender },
-  { id: "ongoing" as const, label: "進行中", color: ihubColors.sky },
-  { id: "past" as const, label: "完了", color: ihubColors.pink },
+  { id: "pending" as const, label: "打診中", color: megrumColors.lavender },
+  { id: "ongoing" as const, label: "進行中", color: megrumColors.sky },
+];
+const MEGURI_TIMES = ["0:24", "昨日", "0:09", "土曜日", "金曜日", "木曜日", "水曜日", "月曜日"];
+const MEGURI_MESSAGE_BODIES = [
+  "今日の現場、空気感が最高でしたね。",
+  "同じ推しの話ができそうで、うれしくなりました。",
+  "またどこかでめぐれたらうれしいです。",
+  "プロフィールを見て、同じ作品が好きそうだと思いました。",
 ];
 
 export default function TransactionsScreen() {
   const { user, previewMode } = useAuth();
+  const params = useLocalSearchParams<{ archive?: string | string[] }>();
+  const { width: windowWidth } = useWindowDimensions();
+  const pageWidth = Math.max(1, windowWidth - 36);
+  const primaryPagerRef = useRef<ScrollView>(null);
+  const archiveParam = Array.isArray(params.archive) ? params.archive[0] : params.archive;
+  const archiveMode = archiveParam === "completed";
+  const [primaryTab, setPrimaryTab] = useState<PrimaryTab>("meguri");
+  const [primaryPagerPosition, setPrimaryPagerPosition] = useState(() =>
+    PRIMARY_TABS.findIndex((item) => item.id === "meguri"),
+  );
   const [tab, setTab] = useState<TopTab>("pending");
-  const [pendingSub, setPendingSub] = useState<PendingSubTab>("action");
-  const [pastFilter, setPastFilter] = useState<PastFilter>("all");
+  const [pastFilter, setPastFilter] = useState<PastFilter>(() =>
+    archiveMode ? "completed" : "all",
+  );
   const [transactions, setTransactions] = useState<Transaction[]>(() =>
     !supabase || previewMode ? TRANSACTIONS : [],
   );
   const [loading, setLoading] = useState(!!supabase && !previewMode);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [meguriReadState, setMeguriReadState] = useState<MeguriMessageReadState>({});
+  const [meguriGroomReplies, setMeguriGroomReplies] = useState<MeguriGroomReply[]>([]);
+  const [meguriThreadMessages, setMeguriThreadMessages] = useState<MeguriThreadMessage[]>([]);
+  const [meguriLoading, setMeguriLoading] = useState(!previewMode);
   const [animatedTabs, setAnimatedTabs] = useState<Set<TopTab>>(
     () => new Set(),
   );
@@ -201,6 +254,7 @@ export default function TransactionsScreen() {
     }
 
     let active = true;
+    setTransactions([]);
     setLoading(true);
     setLoadError(null);
     fetchTransactions(user.id)
@@ -222,6 +276,43 @@ export default function TransactionsScreen() {
     };
   }, [previewMode, user]);
 
+  useFocusEffect(
+    useCallback(() => {
+      let active = true;
+      if (previewMode) {
+        setMeguriLoading(false);
+        return () => {
+          active = false;
+        };
+      }
+      setMeguriLoading(true);
+      setMeguriGroomReplies([]);
+      setMeguriThreadMessages([]);
+      Promise.all([
+        loadMeguriMessageReadState(),
+        loadMeguriGroomReplies(),
+        loadMeguriThreadMessages(),
+      ])
+        .then(([nextReadState, nextGroomReplies, nextThreadMessages]) => {
+          if (!active) return;
+          setMeguriReadState(nextReadState);
+          setMeguriGroomReplies(nextGroomReplies);
+          setMeguriThreadMessages(nextThreadMessages);
+        })
+        .catch(() => {
+          if (!active) return;
+          setMeguriGroomReplies([]);
+          setMeguriThreadMessages([]);
+        })
+        .finally(() => {
+          if (active) setMeguriLoading(false);
+        });
+      return () => {
+        active = false;
+      };
+    }, [previewMode]),
+  );
+
   const grouped = useMemo(() => {
     const pending = transactions.filter((tx) =>
       ["sent", "negotiating", "agreement_one_side"].includes(tx.status),
@@ -236,10 +327,7 @@ export default function TransactionsScreen() {
   const counts = {
     pending: grouped.pending.length,
     ongoing: grouped.ongoing.length,
-    past: grouped.past.length,
   };
-  const pendingAction = grouped.pending.filter((tx) => tx.needsAction);
-  const pendingWaiting = grouped.pending.filter((tx) => !tx.needsAction);
   const pastCounts = useMemo(
     () => ({
       all: grouped.past.length,
@@ -259,15 +347,27 @@ export default function TransactionsScreen() {
             tx.status === "expired" || tx.status === "rejected",
           )
         : grouped.past.filter((tx) => tx.status === pastFilter);
-  const list =
-    tab === "pending"
-      ? pendingSub === "action"
-        ? pendingAction
-        : pendingWaiting
-      : tab === "past"
-        ? filteredPast
-        : grouped.ongoing;
-  const shouldAnimate = !animatedTabs.has(tab);
+  const listForTab = (target: TopTab) => {
+    if (target === "pending") return grouped.pending;
+    return grouped.ongoing;
+  };
+  const list = listForTab(tab);
+  const meguriConversations = useMemo(
+    () => createMeguriConversations(
+      meguriReadState,
+      meguriGroomReplies,
+      meguriThreadMessages,
+      previewMode,
+    ),
+    [meguriGroomReplies, meguriReadState, meguriThreadMessages, previewMode],
+  );
+  const primaryTabs = PRIMARY_TABS.map((item) => ({
+    ...item,
+    count:
+      item.id === "meguri"
+        ? meguriConversations.length
+        : grouped.pending.length + grouped.ongoing.length,
+  }));
   const topTabs = TOP_TABS.map((item) => ({
     ...item,
     count: counts[item.id],
@@ -279,76 +379,142 @@ export default function TransactionsScreen() {
     }
   }, [animatedTabs, list.length, tab]);
 
+  if (archiveMode) {
+    return (
+      <Screen scroll={false} contentStyle={styles.screenContent}>
+        <ScrollView
+          automaticallyAdjustsScrollIndicatorInsets
+          contentInsetAdjustmentBehavior="automatic"
+          showsVerticalScrollIndicator={false}
+          style={styles.nativeTabScroll}
+          contentContainerStyle={styles.nativeTabScrollContent}
+          scrollEventThrottle={16}
+        >
+          <View style={styles.header}>
+            <Text style={styles.kicker}>ARCHIVE</Text>
+            <Text style={styles.title}>完了した取引</Text>
+          </View>
+
+          {loading ? <Text style={styles.inlineNotice}>取引を読み込み中…</Text> : null}
+          {loadError ? <Text style={styles.inlineError}>{loadError}</Text> : null}
+
+          <PastFilterChips
+            filter={pastFilter}
+            counts={pastCounts}
+            onChange={setPastFilter}
+          />
+
+          <View style={styles.listContent}>
+            {filteredPast.length === 0 ? (
+              <View style={styles.emptyBox}>
+                <Text style={styles.emptyText}>完了した取引はまだありません</Text>
+              </View>
+            ) : (
+              filteredPast.map((tx, index) => (
+                <AnimatedTransactionCard
+                  key={tx.id}
+                  tx={tx}
+                  index={index}
+                  animate={false}
+                  onPress={() => openTransactionDetail(tx)}
+                />
+              ))
+            )}
+          </View>
+        </ScrollView>
+      </Screen>
+    );
+  }
+
   return (
     <Screen scroll={false} contentStyle={styles.screenContent}>
-      <View style={styles.header}>
-        <Text style={styles.kicker}>TRANSACTIONS</Text>
-        <Text style={styles.title}>取引</Text>
-      </View>
-
-      {loading ? <Text style={styles.inlineNotice}>取引を読み込み中…</Text> : null}
-      {loadError ? <Text style={styles.inlineError}>{loadError}</Text> : null}
-
-      <SectionTabs
-        value={tab}
-        tabs={topTabs}
-        onChange={setTab}
-      />
-
-      {tab === "pending" ? (
-        <SectionTabs
-          value={pendingSub}
-          tabs={[
-            {
-              id: "action",
-              label: "要対応",
-              count: pendingAction.length,
-              color: ihubColors.warn,
-            },
-            {
-              id: "waiting",
-              label: "相手待ち",
-              count: pendingWaiting.length,
-              color: ihubColors.sky,
-            },
-          ]}
-          onChange={setPendingSub}
-        />
-      ) : null}
-
-      {tab === "past" ? (
-        <PastFilterChips
-          filter={pastFilter}
-          counts={pastCounts}
-          onChange={setPastFilter}
-        />
-      ) : null}
-
       <ScrollView
+        automaticallyAdjustsScrollIndicatorInsets
+        contentInsetAdjustmentBehavior="automatic"
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.listContent}
+        style={styles.nativeTabScroll}
+        contentContainerStyle={styles.nativeTabScrollContent}
+        scrollEventThrottle={16}
       >
-        {list.length === 0 ? (
-          <View style={styles.emptyBox}>
-            <Text style={styles.emptyText}>{emptyLabel(tab, pendingSub)}</Text>
-          </View>
-        ) : (
-          list.map((tx, index) => (
-            <AnimatedTransactionCard
-              key={tx.id}
-              tx={tx}
-              index={index}
-              animate={shouldAnimate}
-              onAnimated={
-                index === list.length - 1 ? () => markTabAnimated(tab) : undefined
-              }
-              onPress={() => openTransactionDetail(tx)}
+        {loading ? <Text style={styles.inlineNotice}>取引を読み込み中…</Text> : null}
+        {loadError ? <Text style={styles.inlineError}>{loadError}</Text> : null}
+
+        <SectionTabs
+          value={primaryTab}
+          tabs={primaryTabs}
+          position={primaryPagerPosition}
+          onChange={selectPrimaryTab}
+        />
+
+        <ScrollView
+          ref={primaryPagerRef}
+          horizontal
+          pagingEnabled
+          bounces={false}
+          directionalLockEnabled
+          showsHorizontalScrollIndicator={false}
+          scrollEventThrottle={16}
+          style={styles.primaryPager}
+          onScroll={handlePrimaryPagerScroll}
+          onMomentumScrollEnd={handlePrimaryPagerSettled}
+        >
+          <View style={[styles.primaryPage, { width: pageWidth }]}>
+            <MeguriMessageList
+              conversations={meguriConversations}
+              loading={meguriLoading}
+              onRead={(next) => setMeguriReadState(next)}
             />
-          ))
-        )}
+          </View>
+          <View style={[styles.primaryPage, { width: pageWidth }]}>
+            <CompactTabs value={tab} tabs={topTabs} onChange={setTab} />
+            <View style={styles.listContent}>{renderListPage(tab)}</View>
+          </View>
+        </ScrollView>
       </ScrollView>
     </Screen>
   );
+
+  function selectPrimaryTab(next: PrimaryTab) {
+    const nextIndex = PRIMARY_TABS.findIndex((item) => item.id === next);
+    setPrimaryTab(next);
+    setPrimaryPagerPosition(nextIndex);
+    primaryPagerRef.current?.scrollTo({ x: nextIndex * pageWidth, animated: true });
+  }
+
+  function handlePrimaryPagerScroll(event: NativeSyntheticEvent<NativeScrollEvent>) {
+    setPrimaryPagerPosition(event.nativeEvent.contentOffset.x / pageWidth);
+  }
+
+  function handlePrimaryPagerSettled(event: NativeSyntheticEvent<NativeScrollEvent>) {
+    const nextIndex = Math.round(event.nativeEvent.contentOffset.x / pageWidth);
+    const next = PRIMARY_TABS[nextIndex]?.id ?? "meguri";
+    setPrimaryTab(next);
+    setPrimaryPagerPosition(nextIndex);
+  }
+
+  function renderListPage(pageTab: TopTab) {
+    const pageList = listForTab(pageTab);
+    const pageShouldAnimate = pageTab === tab && !animatedTabs.has(pageTab);
+    if (pageList.length === 0) {
+      return (
+        <View style={styles.emptyBox}>
+          <Text style={styles.emptyText}>{emptyLabel(pageTab)}</Text>
+        </View>
+      );
+    }
+    return pageList.map((tx, index) => (
+      <AnimatedTransactionCard
+        key={tx.id}
+        tx={tx}
+        index={index}
+        animate={pageShouldAnimate}
+        onAnimated={
+          index === pageList.length - 1 ? () => markTabAnimated(pageTab) : undefined
+        }
+        onPress={() => openTransactionDetail(tx)}
+      />
+    ));
+  }
 
   function markTabAnimated(target: TopTab) {
     setAnimatedTabs((current) => {
@@ -361,12 +527,306 @@ export default function TransactionsScreen() {
 }
 
 function openTransactionDetail(tx: Transaction) {
+  if (tx.openDispute) {
+    router.push({
+      pathname: "/dispute-detail",
+      params: { id: tx.openDispute.id },
+    });
+    return;
+  }
   router.push({
     pathname: "/transaction-detail",
     params: {
       id: tx.id,
+      partner: tx.partner,
+      partnerAvatarUrl: tx.partnerAvatarUrl ?? "",
+      direction: tx.direction,
+      status: tx.status,
+      place: tx.place,
+      time: tx.time,
+      note: tx.note,
+      receive: JSON.stringify(tx.receive),
+      give: JSON.stringify(tx.give),
     },
   });
+}
+
+function MeguriMessageList({
+  conversations,
+  loading,
+  onRead,
+}: {
+  conversations: MeguriConversation[];
+  loading: boolean;
+  onRead: (state: MeguriMessageReadState) => void;
+}) {
+  if (loading) {
+    return (
+      <View style={styles.meguriLoadingBox}>
+        <ActivityIndicator color={megrumColors.lavender} />
+        <Text style={styles.meguriLoadingText}>メッセージを読み込み中…</Text>
+      </View>
+    );
+  }
+  if (conversations.length === 0) {
+    return (
+      <View style={styles.emptyBox}>
+        <Text style={styles.emptyText}>めぐりあいメッセージはまだありません</Text>
+      </View>
+    );
+  }
+  return (
+    <View style={styles.meguriList}>
+      {conversations.map((conversation) => (
+        <MeguriConversationRow
+          key={conversation.id}
+          conversation={conversation}
+          onPress={() => openMeguriConversation(conversation, onRead)}
+        />
+      ))}
+    </View>
+  );
+}
+
+function MeguriConversationRow({
+  conversation,
+  onPress,
+}: {
+  conversation: MeguriConversation;
+  onPress: () => void;
+}) {
+  const { letter } = conversation;
+  const unreplied = !conversation.latestSentPreview;
+  return (
+    <Pressable
+      accessibilityRole="button"
+      onPress={onPress}
+      style={({ pressed }) => [
+        styles.meguriRow,
+        unreplied ? styles.meguriRowUnreplied : null,
+        pressed ? styles.meguriRowPressed : null,
+      ]}
+    >
+      <View style={styles.meguriAvatar}>
+        <MeguriAvatarFace
+          animalType={letter.from.animalType}
+          furColor={letter.from.furColor}
+          hue={letter.from.hue}
+          size={52}
+        />
+      </View>
+      <View style={styles.meguriCopy}>
+        <View style={styles.meguriNameLine}>
+          <Text numberOfLines={1} style={styles.meguriName}>
+            {letter.from.name}
+          </Text>
+        </View>
+        {unreplied ? (
+          <Text numberOfLines={1} style={styles.meguriPreview}>
+            <Text style={styles.meguriPendingWord}>未返信</Text>
+            <Text style={styles.meguriPendingMessage}>　メッセージが届いています！</Text>
+          </Text>
+        ) : (
+          <Text numberOfLines={1} style={[styles.meguriPreview, styles.meguriSentPreview]}>
+            {conversation.latestSentPreview}
+          </Text>
+        )}
+      </View>
+      <View style={styles.meguriMetaColumn}>
+        <Text style={styles.meguriTime}>{conversation.lastAt}</Text>
+        {conversation.unread > 0 ? (
+          <View style={styles.meguriUnread}>
+            <Text style={styles.meguriUnreadText}>{conversation.unread}</Text>
+          </View>
+        ) : null}
+      </View>
+      <IconSymbol name="chevron-forward" color="rgba(58,50,74,0.32)" size={18} />
+    </Pressable>
+  );
+}
+
+function openMeguriConversation(
+  conversation: MeguriConversation,
+  onRead?: (state: MeguriMessageReadState) => void,
+) {
+  if (conversation.unread > 0) {
+    markMeguriLetterRead(conversation.letter.id)
+      .then((next) => onRead?.(next))
+      .catch(() => undefined);
+  }
+  router.push({
+    pathname: "/meguri-letters",
+    params: {
+      open: "1",
+      userId: conversation.letter.from.id,
+    },
+  });
+}
+
+function createMeguriConversations(
+  readState: MeguriMessageReadState,
+  groomReplies: MeguriGroomReply[],
+  threadMessages: MeguriThreadMessage[],
+  includePreviewRows: boolean,
+): MeguriConversation[] {
+  if (!includePreviewRows) {
+    return createRemoteMeguriConversations(groomReplies, threadMessages);
+  }
+  const letterUserIds = new Set(LETTERS.map((letter) => letter.from.id));
+  const extras = USERS.filter((user) => !letterUserIds.has(user.id))
+    .slice(0, 4)
+    .map((user, index): Letter => ({
+      affinity: 74 + (index % 4) * 5,
+      body: MEGURI_MESSAGE_BODIES[index % MEGURI_MESSAGE_BODIES.length],
+      from: user,
+      id: `transaction-meguri-${user.id}`,
+      opened: index % 2 === 0,
+      placeHint: index % 2 === 0 ? "同じイベント圏内" : "最近、近いエリア",
+      timeHint: index < 2 ? "今日" : "今週",
+    }));
+  const latestSentByUser = latestMeguriMessagePreviewByUser(groomReplies, threadMessages);
+  return [...LETTERS, ...extras].map((letter, index) => {
+    const latestSent = latestSentByUser.get(letter.from.id) ?? latestSentByUser.get(letter.from.name);
+    return {
+      id: `transaction-message-${letter.id}`,
+      lastAt: latestSent ? currentMeguriTimeLabel(latestSent.sentAt) : MEGURI_TIMES[index] ?? "先週",
+      latestSentPreview: latestSent?.body,
+      letter,
+      unread: unreadMeguriMessageCount(letter, readState) + unreadMeguriRowsForPeer(letter.from.id, groomReplies, threadMessages),
+    };
+  });
+}
+
+function createRemoteMeguriConversations(
+  groomReplies: MeguriGroomReply[],
+  threadMessages: MeguriThreadMessage[],
+): MeguriConversation[] {
+  const peers = new Map<string, {
+    latestBody: string;
+    latestSentAt: number;
+    letter: Letter;
+    unread: number;
+  }>();
+  const upsertPeer = (
+    peerId: string,
+    peerName: string,
+    body: string,
+    sentAt: number,
+    unread: boolean,
+  ) => {
+    const key = peerId || peerName;
+    if (!key) return;
+    const current = peers.get(key);
+    const baseLetter = current?.letter ?? meguriPeerToLetter(peerId, peerName, body);
+    peers.set(key, {
+      latestBody: !current || sentAt >= current.latestSentAt ? body : current.latestBody,
+      latestSentAt: Math.max(current?.latestSentAt ?? 0, sentAt),
+      letter: baseLetter,
+      unread: (current?.unread ?? 0) + (unread ? 1 : 0),
+    });
+  };
+
+  for (const reply of groomReplies) {
+    upsertPeer(
+      reply.recipientId,
+      reply.recipientName,
+      reply.body,
+      reply.sentAt,
+      reply.mine === false && !reply.readAt,
+    );
+  }
+  for (const message of threadMessages) {
+    upsertPeer(
+      message.peerId,
+      message.peerName,
+      message.body || (message.imageUri ? "画像を送信しました" : "めぐりあいメッセージです。"),
+      message.sentAt,
+      message.mine === false && !message.readAt,
+    );
+  }
+
+  return Array.from(peers.entries())
+    .sort(([, a], [, b]) => b.latestSentAt - a.latestSentAt)
+    .map(([key, row]) => ({
+      id: `transaction-message-${row.letter.id || key}`,
+      lastAt: currentMeguriTimeLabel(row.latestSentAt),
+      latestSentPreview: row.latestBody,
+      letter: row.letter,
+      unread: row.unread,
+    }));
+}
+
+function meguriPeerToLetter(peerId: string, peerName: string, body: string): Letter {
+  const matched = USERS.find((user) => user.id === peerId || user.name === peerName);
+  const from = matched
+    ? { ...matched, id: peerId || matched.id, name: peerName || matched.name }
+    : {
+        animalType: "cat" as const,
+        area: "めぐりあい",
+        count: 1,
+        furColor: "lavender" as const,
+        group: "めぐり",
+        hitokoto: body,
+        hue: "lav" as const,
+        id: peerId,
+        name: peerName || "めぐりユーザー",
+        oshi: "推し",
+        recent: body,
+        since: "今日",
+        style: "推し活",
+      };
+  return {
+    affinity: 76,
+    body: body || "めぐりあいメッセージです。",
+    from,
+    id: `transaction-meguri-${peerId || peerName}`,
+    opened: true,
+    placeHint: "めぐりあい",
+    timeHint: "今日",
+  };
+}
+
+function latestMeguriMessagePreviewByUser(
+  replies: MeguriGroomReply[],
+  messages: MeguriThreadMessage[],
+) {
+  const latest = new Map<string, { body: string; sentAt: number }>();
+  for (const reply of replies) {
+    const keys = [reply.recipientId, reply.recipientName].filter(Boolean);
+    for (const key of keys) {
+      const current = latest.get(key);
+      if (!current || reply.sentAt > current.sentAt) {
+        latest.set(key, { body: reply.body, sentAt: reply.sentAt });
+      }
+    }
+  }
+  for (const message of messages) {
+    const keys = [message.peerId, message.peerName].filter(Boolean);
+    const body = message.body || (message.imageUri ? "画像を送信しました" : "めぐりあいメッセージです。");
+    for (const key of keys) {
+      const current = latest.get(key);
+      if (!current || message.sentAt > current.sentAt) {
+        latest.set(key, { body, sentAt: message.sentAt });
+      }
+    }
+  }
+  return latest;
+}
+
+function unreadMeguriRowsForPeer(
+  peerId: string,
+  replies: MeguriGroomReply[],
+  messages: MeguriThreadMessage[],
+) {
+  return (
+    replies.filter((reply) => reply.recipientId === peerId && reply.mine === false && !reply.readAt).length +
+    messages.filter((message) => message.peerId === peerId && message.mine === false && !message.readAt).length
+  );
+}
+
+function currentMeguriTimeLabel(value: number = Date.now()) {
+  const now = new Date(value);
+  return `${now.getHours()}:${now.getMinutes().toString().padStart(2, "0")}`;
 }
 
 type ProposalRow = {
@@ -374,6 +834,8 @@ type ProposalRow = {
   sender_id: string;
   receiver_id: string;
   status: string;
+  cash_offer: boolean | null;
+  cash_amount: number | null;
   sender_have_ids: string[] | null;
   sender_have_qtys: number[] | null;
   receiver_have_ids: string[] | null;
@@ -393,6 +855,7 @@ type UserRow = {
   id: string;
   handle: string | null;
   display_name: string | null;
+  avatar_url?: string | null;
 };
 
 type InventoryRow = {
@@ -411,6 +874,18 @@ type MessageSummaryRow = {
   created_at: string;
 };
 
+type EvaluationRow = {
+  proposal_id: string;
+  stars: number | null;
+};
+
+type DisputeRow = {
+  id: string;
+  proposal_id: string;
+  ticket_no: string | null;
+  status: string | null;
+};
+
 async function fetchTransactions(userId: string): Promise<Transaction[]> {
   if (!supabase) return TRANSACTIONS;
   const proposalFields = [
@@ -418,6 +893,8 @@ async function fetchTransactions(userId: string): Promise<Transaction[]> {
     "sender_id",
     "receiver_id",
     "status",
+    "cash_offer",
+    "cash_amount",
     "sender_have_ids",
     "sender_have_qtys",
     "receiver_have_ids",
@@ -435,6 +912,9 @@ async function fetchTransactions(userId: string): Promise<Transaction[]> {
   const proposals = await fetchProposalRows(userId, proposalFields);
   if (proposals.length === 0) return [];
   const proposalIds = proposals.map((row) => row.id);
+  const completedIds = proposals
+    .filter((row) => normalizeTransactionStatus(row.status) === "completed")
+    .map((row) => row.id);
 
   const partnerIds = Array.from(
     new Set(
@@ -452,10 +932,14 @@ async function fetchTransactions(userId: string): Promise<Transaction[]> {
     ),
   );
 
-  const [{ data: users }, { data: inventory }, latestMessageFromByProposalId] = await Promise.all([
-    partnerIds.length > 0
-      ? supabase.from("users").select("id, handle, display_name").in("id", partnerIds)
-      : Promise.resolve({ data: [] }),
+  const [
+    users,
+    { data: inventory },
+    latestMessageFromByProposalId,
+    myStarsByProposalId,
+    openDisputeByProposalId,
+  ] = await Promise.all([
+    fetchPartnerUsers(partnerIds),
     itemIds.length > 0
       ? supabase
           .from("goods_inventory")
@@ -465,10 +949,12 @@ async function fetchTransactions(userId: string): Promise<Transaction[]> {
           .in("id", itemIds)
       : Promise.resolve({ data: [] }),
     fetchLatestMessageFromByProposalId(proposalIds, userId),
+    fetchMyStarsByProposalId(completedIds, userId),
+    fetchOpenDisputesByProposalId(proposalIds),
   ]);
 
   const usersById = new Map(
-    ((users as UserRow[] | null) ?? []).map((user) => [user.id, user]),
+    users.map((user) => [user.id, user]),
   );
   const inventoryById = new Map(
     ((inventory as InventoryRow[] | null) ?? []).map((item) => [item.id, item]),
@@ -477,26 +963,90 @@ async function fetchTransactions(userId: string): Promise<Transaction[]> {
   return proposals.map((row): Transaction => {
     const isSender = row.sender_id === userId;
     const partner = usersById.get(isSender ? row.receiver_id : row.sender_id);
-    const giveIds = isSender ? row.sender_have_ids ?? [] : row.receiver_have_ids ?? [];
-    const receiveIds = isSender
-      ? row.receiver_have_ids ?? []
-      : row.sender_have_ids ?? [];
+    const receiverItems = row.cash_offer
+      ? [toCashTradeItem(row.id, row.cash_amount)]
+      : (row.receiver_have_ids ?? []).map((id) => toTradeItem(id, inventoryById.get(id)));
+    const senderItems = (row.sender_have_ids ?? []).map((id) =>
+      toTradeItem(id, inventoryById.get(id)),
+    );
+    const openDispute = openDisputeByProposalId.get(row.id) ?? null;
     const latestMessageFrom = latestMessageFromByProposalId.get(row.id) ?? null;
     return {
       id: row.id,
       partner: partner?.handle ?? partner?.display_name ?? "unknown",
+      partnerAvatarUrl: partner?.avatar_url ?? null,
       direction: isSender ? "sent" : "received",
       status: normalizeTransactionStatus(row.status),
-      needsAction: needsActionFor(row, userId, latestMessageFrom),
+      needsAction: !!openDispute || needsActionFor(row, userId, latestMessageFrom),
+      openDispute,
       latestMessageFrom,
-      receive: receiveIds.map((id) => toTradeItem(id, inventoryById.get(id))),
-      give: giveIds.map((id) => toTradeItem(id, inventoryById.get(id))),
+      receive: isSender ? receiverItems : senderItems,
+      give: isSender ? senderItems : receiverItems,
       place: row.meetup_place_name ?? "場所確認中",
       time: formatProposalTime(row.meetup_start_at, row.meetup_end_at),
       updated: formatRelative(row.last_action_at ?? row.created_at),
       note: noteFor(row, userId),
+      stars: myStarsByProposalId.get(row.id) ?? undefined,
     };
   });
+}
+
+async function fetchPartnerUsers(partnerIds: string[]): Promise<UserRow[]> {
+  if (!supabase || partnerIds.length === 0) return [];
+  const selectableFields = ["id", "handle", "display_name", "avatar_url"];
+  for (let attempt = 0; attempt < selectableFields.length; attempt += 1) {
+    const { data, error } = await supabase
+      .from("users")
+      .select(selectableFields.join(", "))
+      .in("id", partnerIds);
+    const missingColumn = getMissingColumnName(error, "users");
+    if (missingColumn && selectableFields.includes(missingColumn)) {
+      selectableFields.splice(selectableFields.indexOf(missingColumn), 1);
+      continue;
+    }
+    if (error) return [];
+    return ((data as unknown as UserRow[] | null) ?? []);
+  }
+  return [];
+}
+
+async function fetchMyStarsByProposalId(
+  proposalIds: string[],
+  userId: string,
+) {
+  const result = new Map<string, number>();
+  if (!supabase || proposalIds.length === 0) return result;
+  const { data, error } = await supabase
+    .from("user_evaluations")
+    .select("proposal_id, stars")
+    .eq("rater_id", userId)
+    .in("proposal_id", proposalIds);
+  if (error) return result;
+  for (const row of ((data as EvaluationRow[] | null) ?? [])) {
+    if (row.proposal_id && typeof row.stars === "number") {
+      result.set(row.proposal_id, row.stars);
+    }
+  }
+  return result;
+}
+
+async function fetchOpenDisputesByProposalId(proposalIds: string[]) {
+  const result = new Map<string, { id: string; ticketNo: string }>();
+  if (!supabase || proposalIds.length === 0) return result;
+  const { data, error } = await supabase
+    .from("disputes")
+    .select("id, proposal_id, ticket_no, status")
+    .in("proposal_id", proposalIds)
+    .neq("status", "closed");
+  if (error) return result;
+  for (const row of ((data as DisputeRow[] | null) ?? [])) {
+    if (!row.proposal_id) continue;
+    result.set(row.proposal_id, {
+      id: row.id,
+      ticketNo: row.ticket_no ?? "申告中",
+    });
+  }
+  return result;
 }
 
 async function fetchProposalRows(
@@ -606,6 +1156,18 @@ function toTradeItem(id: string, row?: InventoryRow): TradeItem {
     hue: normalizeHue(row?.hue, label),
     label,
     photoUrl: row?.photo_urls?.[0] ?? null,
+  };
+}
+
+function toCashTradeItem(proposalId: string, amount: number | null): TradeItem {
+  const label = `¥${amount?.toLocaleString() ?? "—"}`;
+  return {
+    id: `cash-${proposalId}`,
+    cash: true,
+    glyph: "¥",
+    hue: "rgba(122,154,138,0.20)",
+    label,
+    photoUrl: null,
   };
 }
 
@@ -818,6 +1380,57 @@ function PastFilterChips({
   );
 }
 
+function CompactTabs<T extends string>({
+  value,
+  tabs,
+  onChange,
+}: {
+  value: T;
+  tabs: { id: T; label: string; count: number; color: string }[];
+  onChange: (next: T) => void;
+}) {
+  const activeIndex = Math.max(0, tabs.findIndex((tab) => tab.id === value));
+  return (
+    <View style={styles.compactTabs}>
+      <View
+        pointerEvents="none"
+        style={[
+          styles.compactTabThumb,
+          {
+            left: `${(activeIndex / Math.max(1, tabs.length)) * 100}%`,
+            width: `${100 / Math.max(1, tabs.length)}%`,
+          },
+        ]}
+      />
+      {tabs.map((tab) => {
+        const active = tab.id === value;
+        return (
+          <Pressable
+            key={tab.id}
+            accessibilityRole="button"
+            accessibilityState={{ selected: active }}
+            onPress={() => onChange(tab.id)}
+            style={styles.compactTab}
+          >
+            <Text
+              numberOfLines={1}
+              style={[
+                styles.compactTabLabel,
+                active ? styles.compactTabLabelActive : null,
+              ]}
+            >
+              {tab.label}
+            </Text>
+            <Text style={[styles.compactTabCount, { color: tab.color }]}>
+              {tab.count}
+            </Text>
+          </Pressable>
+        );
+      })}
+    </View>
+  );
+}
+
 function TransactionCard({
   tx,
   onPress,
@@ -827,6 +1440,7 @@ function TransactionCard({
 }) {
   const tone = tx.needsAction ? "action" : tx.status === "agreed" ? "live" : "idle";
   const statusText = statusLabel(tx);
+  const responseText = pendingResponseLabel(tx);
 
   return (
     <Pressable
@@ -843,7 +1457,11 @@ function TransactionCard({
       {tx.needsAction ? <View style={styles.cardAccent} /> : null}
       <View style={styles.cardHeader}>
         <View style={styles.avatar}>
-          <Text style={styles.avatarText}>{tx.partner[0]?.toUpperCase()}</Text>
+          {tx.partnerAvatarUrl ? (
+            <Image source={{ uri: tx.partnerAvatarUrl }} style={styles.avatarImage} />
+          ) : (
+            <Text style={styles.avatarText}>{tx.partner[0]?.toUpperCase()}</Text>
+          )}
         </View>
         <View style={styles.partnerBlock}>
           <Text numberOfLines={1} style={styles.partner}>
@@ -898,7 +1516,31 @@ function TransactionCard({
             {statusText}
           </Text>
         </View>
+        {responseText ? (
+          <View
+            style={[
+              styles.responsePill,
+              tx.needsAction ? styles.responsePillAction : styles.responsePillWaiting,
+            ]}
+          >
+            <Text
+              style={[
+                styles.responsePillText,
+                tx.needsAction
+                  ? styles.responsePillTextAction
+                  : styles.responsePillTextWaiting,
+              ]}
+            >
+              {responseText}
+            </Text>
+          </View>
+        ) : null}
         {tx.stars ? <Text style={styles.stars}>★ {tx.stars}</Text> : null}
+        {tx.openDispute ? (
+          <Text numberOfLines={1} style={styles.disputeText}>
+            {tx.openDispute.ticketNo}
+          </Text>
+        ) : null}
       </View>
 
       <View style={styles.tradePair}>
@@ -940,12 +1582,18 @@ function TradePreview({
         {items.slice(0, 3).map((item) => (
           <View
             key={item.id}
-            style={[styles.tradeItem, { backgroundColor: item.hue }]}
+            style={[
+              styles.tradeItem,
+              { backgroundColor: item.hue },
+              item.cash ? styles.tradeItemCash : null,
+            ]}
           >
             {item.photoUrl ? (
               <Image source={{ uri: item.photoUrl }} style={styles.tradeItemImage} />
             ) : (
-              <Text style={styles.tradeItemText}>{item.glyph}</Text>
+              <Text style={[styles.tradeItemText, item.cash ? styles.tradeItemCashText : null]}>
+                {item.glyph}
+              </Text>
             )}
           </View>
         ))}
@@ -955,7 +1603,7 @@ function TradePreview({
 }
 
 function statusLabel(tx: Transaction) {
-  if (tx.status === "sent") return tx.needsAction ? "新着打診" : "相手待ち";
+  if (tx.status === "sent") return tx.needsAction ? "新着打診" : "送信済み";
   if (tx.status === "negotiating") {
     return tx.needsAction ? "返信が届いています" : "ネゴ中";
   }
@@ -969,47 +1617,116 @@ function statusLabel(tx: Transaction) {
   return "期限切れ";
 }
 
-function emptyLabel(tab: TopTab, sub: PendingSubTab) {
-  if (tab === "pending") {
-    return sub === "action"
-      ? "いま対応が必要な打診はありません"
-      : "相手待ちの打診はありません";
+function pendingResponseLabel(tx: Transaction) {
+  if (!["sent", "negotiating", "agreement_one_side"].includes(tx.status)) {
+    return null;
   }
+  return tx.needsAction ? "要対応" : "相手待ち";
+}
+
+function emptyLabel(tab: TopTab) {
+  if (tab === "pending") return "打診中のやりとりはありません";
   if (tab === "ongoing") return "進行中の取引はありません";
-  return "完了した取引はまだありません";
+  return "取引はまだありません";
 }
 
 const styles = StyleSheet.create({
   screenContent: {
-    gap: 12,
     paddingHorizontal: 18,
+  },
+  nativeTabScroll: {
+    flex: 1,
+  },
+  nativeTabScrollContent: {
+    gap: 12,
+    paddingBottom: 24,
   },
   header: {
     gap: 2,
   },
   kicker: {
-    color: ihubColors.lavender,
+    color: megrumColors.lavender,
     fontSize: 11,
     fontWeight: "900",
     letterSpacing: 0.6,
   },
   title: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 25,
     fontWeight: "900",
     letterSpacing: 0,
     lineHeight: 30,
   },
   inlineNotice: {
-    color: ihubColors.mutedInk,
+    color: megrumColors.mutedInk,
     fontSize: 11.5,
     fontWeight: "800",
   },
   inlineError: {
-    color: ihubColors.warn,
+    color: megrumColors.warn,
     fontSize: 11.5,
     fontWeight: "800",
     lineHeight: 17,
+  },
+  primaryPager: {
+    flexGrow: 0,
+    marginTop: -2,
+  },
+  primaryPage: {
+    gap: 8,
+    paddingBottom: 2,
+  },
+  compactTabs: {
+    backgroundColor: "rgba(255,255,255,0.58)",
+    borderColor: "rgba(255,255,255,0.8)",
+    borderRadius: megrumRadii.pill,
+    borderWidth: 1,
+    flexDirection: "row",
+    marginBottom: 2,
+    minHeight: 32,
+    padding: 3,
+    position: "relative",
+  },
+  compactTabThumb: {
+    backgroundColor: "rgba(255,255,255,0.94)",
+    borderColor: "rgba(255,255,255,0.94)",
+    borderRadius: megrumRadii.pill,
+    borderWidth: 1,
+    bottom: 3,
+    position: "absolute",
+    top: 3,
+    shadowColor: megrumColors.ink,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+  },
+  compactTab: {
+    alignItems: "center",
+    borderRadius: megrumRadii.pill,
+    flex: 1,
+    flexDirection: "row",
+    gap: 4,
+    justifyContent: "center",
+    minHeight: 28,
+    paddingHorizontal: 5,
+    paddingVertical: 4,
+    zIndex: 1,
+  },
+  compactTabLabel: {
+    color: "rgba(58,50,74,0.55)",
+    fontSize: 10.5,
+    fontWeight: "900",
+    includeFontPadding: false,
+    lineHeight: 13,
+  },
+  compactTabLabelActive: {
+    color: megrumColors.ink,
+  },
+  compactTabCount: {
+    fontSize: 9.5,
+    fontWeight: "900",
+    includeFontPadding: false,
+    lineHeight: 12,
   },
   listContent: {
     gap: 10,
@@ -1028,9 +1745,9 @@ const styles = StyleSheet.create({
   },
   filterChip: {
     alignItems: "center",
-    backgroundColor: ihubColors.surface,
+    backgroundColor: megrumColors.surface,
     borderColor: "rgba(58,50,74,0.08)",
-    borderRadius: ihubRadii.pill,
+    borderRadius: megrumRadii.pill,
     borderWidth: 1,
     flexDirection: "row",
     flexShrink: 0,
@@ -1042,23 +1759,23 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
   },
   filterChipActive: {
-    backgroundColor: ihubColors.ink,
-    borderColor: ihubColors.ink,
+    backgroundColor: megrumColors.ink,
+    borderColor: megrumColors.ink,
   },
   filterChipText: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 11.5,
     fontWeight: "900",
     includeFontPadding: false,
     lineHeight: 15,
   },
   filterChipTextActive: {
-    color: ihubColors.surface,
+    color: megrumColors.surface,
   },
   filterCountBadge: {
     alignItems: "center",
     backgroundColor: "rgba(58,50,74,0.06)",
-    borderRadius: ihubRadii.pill,
+    borderRadius: megrumRadii.pill,
     height: 20,
     justifyContent: "center",
     minWidth: 24,
@@ -1068,20 +1785,20 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(255,255,255,0.22)",
   },
   filterCountText: {
-    color: ihubColors.mutedInk,
+    color: megrumColors.mutedInk,
     fontSize: 10,
     fontWeight: "900",
     includeFontPadding: false,
     lineHeight: 12,
   },
   filterCountTextActive: {
-    color: ihubColors.surface,
+    color: megrumColors.surface,
   },
   emptyBox: {
     alignItems: "center",
-    backgroundColor: ihubColors.surface,
+    backgroundColor: megrumColors.surface,
     borderColor: "rgba(58,50,74,0.10)",
-    borderRadius: ihubRadii.lg,
+    borderRadius: megrumRadii.lg,
     borderStyle: "dashed",
     borderWidth: 1,
     justifyContent: "center",
@@ -1089,17 +1806,137 @@ const styles = StyleSheet.create({
     padding: 18,
   },
   emptyText: {
-    color: ihubColors.mutedInk,
+    color: megrumColors.mutedInk,
     fontSize: 12,
     fontWeight: "800",
   },
+  meguriList: {
+    gap: 9,
+    paddingBottom: 28,
+  },
+  meguriLoadingBox: {
+    alignItems: "center",
+    backgroundColor: megrumColors.surface,
+    borderColor: "rgba(58,50,74,0.10)",
+    borderRadius: megrumRadii.lg,
+    justifyContent: "center",
+    minHeight: 170,
+    padding: 18,
+  },
+  meguriLoadingText: {
+    color: megrumColors.mutedInk,
+    fontSize: 12,
+    fontWeight: "800",
+    marginTop: 10,
+  },
+  meguriRow: {
+    alignItems: "center",
+    backgroundColor: megrumColors.surface,
+    borderColor: "rgba(58,50,74,0.08)",
+    borderRadius: 18,
+    borderWidth: 1,
+    flexDirection: "row",
+    gap: 11,
+    minHeight: 76,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    shadowColor: megrumColors.ink,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.06,
+    shadowRadius: 14,
+  },
+  meguriRowUnreplied: {
+    borderColor: "rgba(235,84,112,0.58)",
+    borderWidth: 1.5,
+    shadowColor: "#eb5470",
+    shadowOpacity: 0.13,
+    shadowRadius: 18,
+  },
+  meguriRowPressed: {
+    backgroundColor: "rgba(166,149,216,0.08)",
+    transform: [{ scale: 0.992 }],
+  },
+  meguriAvatar: {
+    alignItems: "center",
+    borderColor: "rgba(255,255,255,0.86)",
+    borderRadius: 26,
+    borderWidth: 2,
+    height: 52,
+    justifyContent: "center",
+    width: 52,
+  },
+  meguriAvatarText: {
+    color: megrumColors.ink,
+    fontSize: 20,
+    fontWeight: "900",
+  },
+  meguriCopy: {
+    flex: 1,
+    gap: 3,
+    minWidth: 0,
+  },
+  meguriNameLine: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 8,
+  },
+  meguriName: {
+    color: megrumColors.ink,
+    flex: 1,
+    fontSize: 15.5,
+    fontWeight: "900",
+  },
+  meguriTime: {
+    color: "rgba(58,50,74,0.46)",
+    fontSize: 10.5,
+    fontWeight: "800",
+    textAlign: "right",
+  },
+  meguriMetaColumn: {
+    alignItems: "flex-end",
+    alignSelf: "stretch",
+    justifyContent: "flex-start",
+    minWidth: 42,
+    paddingTop: 2,
+    gap: 7,
+  },
+  meguriPreview: {
+    color: megrumColors.ink,
+    fontSize: 12.5,
+    fontWeight: "800",
+  },
+  meguriPendingWord: {
+    color: "#eb5470",
+    fontWeight: "900",
+  },
+  meguriPendingMessage: {
+    color: megrumColors.ink,
+    fontWeight: "900",
+  },
+  meguriSentPreview: {
+    color: "rgba(58,50,74,0.68)",
+    fontWeight: "700",
+  },
+  meguriUnread: {
+    alignItems: "center",
+    backgroundColor: megrumColors.lavender,
+    borderRadius: 999,
+    minWidth: 25,
+    paddingHorizontal: 7,
+    paddingVertical: 4,
+  },
+  meguriUnreadText: {
+    color: megrumColors.surface,
+    fontSize: 11,
+    fontWeight: "900",
+  },
   card: {
-    backgroundColor: ihubColors.surface,
+    backgroundColor: megrumColors.surface,
     borderRadius: 17,
     borderWidth: 1,
     overflow: "hidden",
     padding: 12,
-    shadowColor: ihubColors.ink,
+    shadowColor: megrumColors.ink,
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.08,
     shadowRadius: 16,
@@ -1114,7 +1951,7 @@ const styles = StyleSheet.create({
     borderColor: "rgba(58,50,74,0.08)",
   },
   cardAccent: {
-    backgroundColor: ihubColors.warn,
+    backgroundColor: megrumColors.warn,
     borderBottomRightRadius: 3,
     borderTopRightRadius: 3,
     bottom: 12,
@@ -1134,10 +1971,15 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     height: 34,
     justifyContent: "center",
+    overflow: "hidden",
     width: 34,
   },
+  avatarImage: {
+    height: "100%",
+    width: "100%",
+  },
   avatarText: {
-    color: ihubColors.lavender,
+    color: megrumColors.lavender,
     fontSize: 14,
     fontWeight: "900",
   },
@@ -1145,18 +1987,18 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   partner: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 13,
     fontWeight: "900",
   },
   updated: {
-    color: ihubColors.mutedInk,
+    color: megrumColors.mutedInk,
     fontSize: 10,
     fontWeight: "700",
     marginTop: 1,
   },
   directionBadge: {
-    borderRadius: ihubRadii.pill,
+    borderRadius: megrumRadii.pill,
     paddingHorizontal: 8,
     paddingVertical: 4,
   },
@@ -1171,7 +2013,7 @@ const styles = StyleSheet.create({
     fontWeight: "900",
   },
   directionTextReceived: {
-    color: ihubColors.lavender,
+    color: megrumColors.lavender,
   },
   directionTextSent: {
     color: "#3a7c93",
@@ -1183,7 +2025,7 @@ const styles = StyleSheet.create({
     marginTop: 9,
   },
   statusPill: {
-    borderRadius: ihubRadii.pill,
+    borderRadius: megrumRadii.pill,
     paddingHorizontal: 9,
     paddingVertical: 4,
   },
@@ -1201,18 +2043,50 @@ const styles = StyleSheet.create({
     fontWeight: "900",
   },
   statusPillTextAction: {
-    color: ihubColors.warn,
+    color: megrumColors.warn,
   },
   statusPillTextLive: {
     color: "#3a7c93",
   },
   statusPillTextIdle: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
+  },
+  responsePill: {
+    borderRadius: megrumRadii.pill,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  responsePillAction: {
+    backgroundColor: "rgba(217,130,107,0.10)",
+  },
+  responsePillWaiting: {
+    backgroundColor: "rgba(168,212,230,0.18)",
+  },
+  responsePillText: {
+    fontSize: 10,
+    fontWeight: "900",
+  },
+  responsePillTextAction: {
+    color: megrumColors.warn,
+  },
+  responsePillTextWaiting: {
+    color: "#3a7c93",
   },
   stars: {
     color: "#caa04f",
     fontSize: 10.5,
     fontWeight: "900",
+  },
+  disputeText: {
+    backgroundColor: "rgba(217,130,107,0.12)",
+    borderRadius: megrumRadii.pill,
+    color: megrumColors.warn,
+    fontSize: 10,
+    fontWeight: "900",
+    marginLeft: "auto",
+    maxWidth: 92,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
   },
   tradePair: {
     alignItems: "center",
@@ -1227,7 +2101,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   tradeLabel: {
-    color: ihubColors.mutedInk,
+    color: megrumColors.mutedInk,
     fontSize: 9.5,
     fontWeight: "900",
     marginBottom: 6,
@@ -1250,27 +2124,34 @@ const styles = StyleSheet.create({
     overflow: "hidden",
     width: 32,
   },
+  tradeItemCash: {
+    borderColor: "rgba(122,154,138,0.42)",
+    borderWidth: 1,
+  },
   tradeItemImage: {
     height: "100%",
     width: "100%",
   },
   tradeItemText: {
-    color: ihubColors.surface,
+    color: megrumColors.surface,
     fontSize: 16,
     fontWeight: "900",
+  },
+  tradeItemCashText: {
+    color: "#5f806d",
   },
   arrows: {
     alignItems: "center",
     width: 22,
   },
   arrowText: {
-    color: ihubColors.lavender,
+    color: megrumColors.lavender,
     fontSize: 16,
     fontWeight: "900",
     lineHeight: 16,
   },
   arrowTextMuted: {
-    color: ihubColors.sky,
+    color: megrumColors.sky,
     fontSize: 16,
     fontWeight: "900",
     lineHeight: 16,
@@ -1282,13 +2163,13 @@ const styles = StyleSheet.create({
     marginTop: 9,
   },
   meetupText: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     flex: 1,
     fontSize: 10.5,
     fontWeight: "900",
   },
   meetupPlace: {
-    color: ihubColors.mutedInk,
+    color: megrumColors.mutedInk,
     flex: 1,
     fontSize: 10.5,
     fontWeight: "700",

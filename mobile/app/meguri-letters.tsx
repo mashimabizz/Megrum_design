@@ -25,7 +25,7 @@ import { MeguriAvatarFace } from "../src/components/meguri/MeguriAvatarFace";
 import { Screen } from "../src/components/Screen";
 import { useAuth } from "../src/auth/AuthProvider";
 import { useKeyboardInset } from "../src/lib/useKeyboardInset";
-import { ihubColors } from "../src/theme/tokens";
+import { megrumColors } from "../src/theme/tokens";
 import {
   FREE_SEND_LIMIT,
   LETTERS,
@@ -103,7 +103,7 @@ const EXTRA_MESSAGE_BODIES = [
   "同じ作品の話ができる人を探していました。",
 ];
 const INITIAL_FREE_SEND_USED = 0;
-const MESSAGE_ACTIVE = ihubColors.lavender;
+const MESSAGE_ACTIVE = megrumColors.lavender;
 
 export default function MeguriLettersScreen() {
   const { previewMode, profile } = useAuth();
@@ -340,7 +340,7 @@ export default function MeguriLettersScreen() {
             }}
             style={styles.messageBackButton}
           >
-            <IconSymbol name="chevron-back" color={ihubColors.ink} size={22} />
+            <IconSymbol name="chevron-back" color={megrumColors.ink} size={22} />
           </Pressable>
         </View>
         <Text style={styles.messageHeaderTitle}>メッセージ</Text>
@@ -358,7 +358,7 @@ export default function MeguriLettersScreen() {
       >
         {!messagesReady ? (
           <View style={styles.messageLoading}>
-            <ActivityIndicator color={ihubColors.lavender} />
+            <ActivityIndicator color={megrumColors.lavender} />
           </View>
         ) : null}
         {messagesReady && conversations.length === 0 ? (
@@ -572,7 +572,7 @@ function MessageThreadScreen({
       <View style={[styles.chatHeader, { paddingTop: insetsTop }]}>
         <View style={styles.chatHeaderSide}>
           <Pressable accessibilityRole="button" onPress={onBack} style={styles.chatBack}>
-            <IconSymbol name="chevron-back" color={ihubColors.ink} size={26} />
+            <IconSymbol name="chevron-back" color={megrumColors.ink} size={26} />
           </Pressable>
         </View>
         <View style={styles.chatHeaderCenter}>
@@ -586,7 +586,7 @@ function MessageThreadScreen({
             <ReviewPlanToggleButton active={subscribed} onPress={onToggleReviewPlan} />
           ) : (
             <Pressable accessibilityRole="button" style={styles.chatMenu}>
-              <IconSymbol name="ellipsis-horizontal" color={ihubColors.ink} size={24} />
+              <IconSymbol name="ellipsis-horizontal" color={megrumColors.ink} size={24} />
             </Pressable>
           )}
         </View>
@@ -714,7 +714,7 @@ function MessageThreadScreen({
         ]}
       >
         <Pressable accessibilityRole="button" onPress={onPickImage} style={styles.composerIcon}>
-          <IconSymbol name="add-circle-outline" color={ihubColors.ink} size={25} />
+          <IconSymbol name="add-circle-outline" color={megrumColors.ink} size={25} />
         </Pressable>
         <TextInput
           editable={canSend}
@@ -1213,7 +1213,7 @@ const styles = StyleSheet.create({
     width: 42,
   },
   messageHeaderTitle: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     flex: 1,
     fontSize: 22,
     fontWeight: "900",
@@ -1237,7 +1237,7 @@ const styles = StyleSheet.create({
     paddingTop: 96,
   },
   messageEmptyTitle: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 16,
     fontWeight: "900",
   },
@@ -1296,7 +1296,7 @@ const styles = StyleSheet.create({
     width: 92,
   },
   avatarText: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 22,
     fontWeight: "900",
   },
@@ -1329,7 +1329,7 @@ const styles = StyleSheet.create({
     gap: 5,
   },
   conversationName: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     flexShrink: 1,
     fontSize: 16.5,
     fontWeight: "900",
@@ -1341,7 +1341,7 @@ const styles = StyleSheet.create({
     fontWeight: "900",
   },
   conversationPreview: {
-    color: ihubColors.mutedInk,
+    color: megrumColors.mutedInk,
     fontSize: 13.5,
     fontWeight: "700",
     lineHeight: 19,
@@ -1351,7 +1351,7 @@ const styles = StyleSheet.create({
     fontWeight: "900",
   },
   conversationPendingMessage: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontWeight: "900",
   },
   conversationSentPreview: {
@@ -1411,7 +1411,7 @@ const styles = StyleSheet.create({
     lineHeight: 28,
   },
   appTabGlyphActive: {
-    color: ihubColors.lavender,
+    color: megrumColors.lavender,
   },
   appTabBadge: {
     alignItems: "center",
@@ -1435,21 +1435,21 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
   appTabLabelActive: {
-    color: ihubColors.lavender,
+    color: megrumColors.lavender,
     fontWeight: "800",
   },
   chatRoot: {
-    backgroundColor: ihubColors.background,
+    backgroundColor: megrumColors.background,
     flex: 1,
     paddingHorizontal: 0,
   },
   chatKeyboardRoot: {
-    backgroundColor: ihubColors.background,
+    backgroundColor: megrumColors.background,
     flex: 1,
   },
   chatHeader: {
     alignItems: "center",
-    backgroundColor: ihubColors.surface,
+    backgroundColor: megrumColors.surface,
     flexDirection: "row",
     minHeight: 86,
     paddingBottom: 9,
@@ -1475,13 +1475,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
   },
   chatTitle: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 17,
     fontWeight: "900",
     maxWidth: "100%",
   },
   chatSubTitle: {
-    color: ihubColors.mutedInk,
+    color: megrumColors.mutedInk,
     fontSize: 10.5,
     fontWeight: "800",
     marginTop: 2,
@@ -1504,11 +1504,11 @@ const styles = StyleSheet.create({
     paddingVertical: 7,
   },
   reviewPlanToggleActive: {
-    backgroundColor: ihubColors.ink,
-    borderColor: ihubColors.ink,
+    backgroundColor: megrumColors.ink,
+    borderColor: megrumColors.ink,
   },
   reviewPlanToggleText: {
-    color: ihubColors.lavender,
+    color: megrumColors.lavender,
     fontSize: 11,
     fontWeight: "900",
   },
@@ -1516,7 +1516,7 @@ const styles = StyleSheet.create({
     color: "#fff",
   },
   chatScroll: {
-    backgroundColor: ihubColors.background,
+    backgroundColor: megrumColors.background,
     flex: 1,
   },
   chatContent: {
@@ -1526,7 +1526,7 @@ const styles = StyleSheet.create({
   },
   meguriPartnerStrip: {
     alignItems: "center",
-    backgroundColor: ihubColors.surface,
+    backgroundColor: megrumColors.surface,
     borderBottomColor: "rgba(58,50,74,0.08)",
     borderBottomWidth: StyleSheet.hairlineWidth,
     flexDirection: "row",
@@ -1548,7 +1548,7 @@ const styles = StyleSheet.create({
     width: 48,
   },
   meguriPartnerAvatarText: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 19,
     fontWeight: "900",
   },
@@ -1557,12 +1557,12 @@ const styles = StyleSheet.create({
     gap: 3,
   },
   meguriPartnerName: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 15.5,
     fontWeight: "900",
   },
   meguriPartnerMeta: {
-    color: ihubColors.mutedInk,
+    color: megrumColors.mutedInk,
     fontSize: 11,
     fontWeight: "800",
   },
@@ -1570,7 +1570,7 @@ const styles = StyleSheet.create({
     alignSelf: "center",
     backgroundColor: "rgba(58,50,74,0.12)",
     borderRadius: 999,
-    color: ihubColors.mutedInk,
+    color: megrumColors.mutedInk,
     fontSize: 11,
     fontWeight: "900",
     marginBottom: 3,
@@ -1580,7 +1580,7 @@ const styles = StyleSheet.create({
   },
   systemNotice: {
     alignSelf: "center",
-    backgroundColor: ihubColors.surface,
+    backgroundColor: megrumColors.surface,
     borderColor: "rgba(58,50,74,0.08)",
     borderWidth: 1,
     borderRadius: 14,
@@ -1589,13 +1589,13 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
   },
   systemNoticeTitle: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 12.5,
     fontWeight: "900",
     textAlign: "center",
   },
   systemNoticeText: {
-    color: ihubColors.mutedInk,
+    color: megrumColors.mutedInk,
     fontSize: 11,
     fontWeight: "800",
     lineHeight: 15,
@@ -1604,7 +1604,7 @@ const styles = StyleSheet.create({
   },
   systemNoticeButton: {
     alignSelf: "center",
-    backgroundColor: ihubColors.ink,
+    backgroundColor: megrumColors.ink,
     borderRadius: 999,
     marginTop: 8,
     paddingHorizontal: 12,
@@ -1665,7 +1665,7 @@ const styles = StyleSheet.create({
     paddingVertical: 9,
   },
   theirBubble: {
-    backgroundColor: ihubColors.surface,
+    backgroundColor: megrumColors.surface,
     borderBottomLeftRadius: 5,
   },
   lockedTheirBubble: {
@@ -1680,13 +1680,13 @@ const styles = StyleSheet.create({
     borderBottomRightRadius: 5,
   },
   bubbleText: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 15,
     fontWeight: "700",
     lineHeight: 21,
   },
   mineBubbleText: {
-    color: ihubColors.surface,
+    color: megrumColors.surface,
   },
   messageImage: {
     borderRadius: 14,
@@ -1809,7 +1809,7 @@ const styles = StyleSheet.create({
   },
   composerBar: {
     alignItems: "flex-end",
-    backgroundColor: ihubColors.surface,
+    backgroundColor: megrumColors.surface,
     borderTopColor: "rgba(58,50,74,0.08)",
     borderTopWidth: StyleSheet.hairlineWidth,
     flexDirection: "row",
@@ -1827,7 +1827,7 @@ const styles = StyleSheet.create({
   composerInput: {
     backgroundColor: "rgba(58,50,74,0.06)",
     borderRadius: 18,
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     flex: 1,
     fontSize: 15,
     fontWeight: "700",

@@ -17,17 +17,22 @@ import {
   GoodsGrid,
   SectionTabs,
   type ColumnCount,
+  type GoodsGridPressContext,
   type GoodsGridItem,
+  type SheetAnchor,
   type SheetAction,
 } from "../../src/components/GoodsGrid";
 import { useAuth } from "../../src/auth/AuthProvider";
 import { Screen } from "../../src/components/Screen";
+import { fetchInventoryTagLabels, formatHashTags } from "../../src/lib/inventoryTags";
 import { supabase } from "../../src/lib/supabase";
-import { ihubColors, ihubRadii } from "../../src/theme/tokens";
+import { megrumColors, megrumRadii } from "../../src/theme/tokens";
 
 type WishItem = GoodsGridItem & {
   priority: "最優先" | "優先" | "ゆる募";
   linkedListings: number;
+  group: string;
+  type: string;
   quantity?: number;
 };
 
@@ -127,8 +132,11 @@ const INITIAL_WISHES: WishItem[] = [
     glyph: "S",
     hue: "#cbbcf4",
     badge: "最優先",
+    tagLabels: ["ラキドロ", "最優先"],
     priority: "最優先",
     linkedListings: 2,
+    group: "LUMENA",
+    type: "トレカ",
   },
   {
     id: "wish-02",
@@ -137,8 +145,11 @@ const INITIAL_WISHES: WishItem[] = [
     glyph: "N",
     hue: "#a8d4e6",
     badge: "個別募集 1",
+    tagLabels: ["制服", "アクスタ"],
     priority: "優先",
     linkedListings: 1,
+    group: "aespa",
+    type: "アクスタ",
   },
   {
     id: "wish-03",
@@ -147,8 +158,11 @@ const INITIAL_WISHES: WishItem[] = [
     glyph: "K",
     hue: "#f3c5d4",
     badge: "未紐付け",
+    tagLabels: ["店舗特典"],
     priority: "ゆる募",
     linkedListings: 0,
+    group: "aespa",
+    type: "トレカ",
   },
   {
     id: "wish-04",
@@ -157,8 +171,11 @@ const INITIAL_WISHES: WishItem[] = [
     glyph: "W",
     hue: "#d5cff4",
     badge: "個別募集 1",
+    tagLabels: ["缶バッジ"],
     priority: "優先",
     linkedListings: 1,
+    group: "aespa",
+    type: "缶バッジ",
   },
   {
     id: "wish-05",
@@ -167,8 +184,11 @@ const INITIAL_WISHES: WishItem[] = [
     glyph: "R",
     hue: "#b7dceb",
     badge: "ゆる募",
+    tagLabels: ["トレカ"],
     priority: "ゆる募",
     linkedListings: 0,
+    group: "SKZ",
+    type: "トレカ",
   },
 ];
 
@@ -268,11 +288,16 @@ export default function WishesScreen() {
     !supabase || previewMode ? INITIAL_LISTINGS : [],
   );
   const [selectedWish, setSelectedWish] = useState<WishItem | null>(null);
+  const [selectedWishAnchor, setSelectedWishAnchor] = useState<SheetAnchor | null>(null);
   const [deleteConfirmWish, setDeleteConfirmWish] = useState<WishItem | null>(null);
   const [deletingWishIds, setDeletingWishIds] = useState<string[]>([]);
   const [selectedListing, setSelectedListing] = useState<ListingItem | null>(
     null,
   );
+  const [deleteConfirmListing, setDeleteConfirmListing] =
+    useState<ListingItem | null>(null);
+  const [activeGroup, setActiveGroup] = useState<string | null>(null);
+  const [activeType, setActiveType] = useState<string | null>(null);
   const [loading, setLoading] = useState(!!supabase && !previewMode);
   const [loadError, setLoadError] = useState<string | null>(null);
   const tabSwipeRef = useRef<{
@@ -369,52 +394,84 @@ export default function WishesScreen() {
     }
   }
 
+  function requestDeleteListing(listing: ListingItem) {
+    setSelectedListing(null);
+    setDeleteConfirmListing(listing);
+  }
+
+  function confirmListingDelete() {
+    if (!deleteConfirmListing) return;
+    const target = deleteConfirmListing;
+    setDeleteConfirmListing(null);
+    deleteListing(target.id);
+  }
+
+  const groupOptions = useMemo(() => {
+    const values = new Set<string>();
+    for (const wish of wishes) values.add(wish.group);
+    return Array.from(values).sort((a, b) => a.localeCompare(b, "ja"));
+  }, [wishes]);
+  const typeOptions = useMemo(() => {
+    const values = new Set<string>();
+    for (const wish of wishes) values.add(wish.type);
+    return Array.from(values).sort((a, b) => a.localeCompare(b, "ja"));
+  }, [wishes]);
+  const filteredWishes = useMemo(
+    () =>
+      wishes.filter((wish) => {
+        if (activeGroup && wish.group !== activeGroup) return false;
+        if (activeType && wish.type !== activeType) return false;
+        return true;
+      }),
+    [activeGroup, activeType, wishes],
+  );
+
   const tabs = useMemo(
     () => [
       {
         id: "wish" as const,
         label: "Wish",
-        count: wishes.length,
-        color: ihubColors.lavender,
+        count: filteredWishes.length,
+        color: megrumColors.lavender,
       },
       {
         id: "listings" as const,
         label: "個別募集",
         count: listings.length,
-        color: ihubColors.sky,
+        color: megrumColors.sky,
       },
     ],
-    [listings.length, wishes.length],
+    [filteredWishes.length, listings.length],
   );
   const wishGridItems = useMemo(
     () =>
-      wishes.map((wish) => ({
+      filteredWishes.map((wish) => ({
         ...wish,
         badge:
           wish.linkedListings === 0
             ? "未紐付け"
             : `募集 ${wish.linkedListings}`,
       })),
-    [wishes],
+    [filteredWishes],
   );
 
   const wishActions = selectedWish
     ? buildWishActions({
         item: selectedWish,
-        onClose: () => setSelectedWish(null),
+        onClose: closeSelectedWish,
         onEdit: () => {
           const wish = selectedWish;
-          setSelectedWish(null);
+          closeSelectedWish();
           openWishEditor(wish, "edit");
         },
         onListing: () => {
           const wish = selectedWish;
-          setSelectedWish(null);
+          closeSelectedWish();
           openListingEditor(null, "create", wish);
         },
         onDelete: () => {
           const wish = selectedWish;
-          setSelectedWish(null);
+          closeSelectedWish();
           setDeleteConfirmWish(wish);
         },
       })
@@ -464,44 +521,73 @@ export default function WishesScreen() {
           openListingEditor(listing, "edit");
         },
         onToggle: () => toggleListingStatus(selectedListing.id),
-        onDelete: () => deleteListing(selectedListing.id),
+        onDelete: () => requestDeleteListing(selectedListing),
       })
     : [];
 
   return (
     <Screen scroll={false} contentStyle={styles.screenContent}>
-      <View style={styles.header}>
-        <Text style={styles.title}>ウィッシュ</Text>
-        <View style={styles.headerActions}>
-          {tab === "wish" ? (
-            <ColumnSwitcher value={columns} onChange={setColumns} />
-          ) : null}
-        </View>
-      </View>
-
-      <SectionTabs
-        value={tab}
-        tabs={tabs}
-        onChange={(next) => {
-          setTab(next);
-          setSelectedWish(null);
-          setSelectedListing(null);
-        }}
-      />
-
-      {loading ? <Text style={styles.inlineNotice}>Wishを読み込み中…</Text> : null}
-      {loadError ? <Text style={styles.inlineError}>{loadError}</Text> : null}
-
-      <View
-        style={styles.contentHost}
-        onTouchStart={handleSwipeStart}
-        onTouchMove={handleSwipeMove}
-        onTouchEnd={handleSwipeEnd}
-        onTouchCancel={handleSwipeCancel}
+      <ScrollView
+        automaticallyAdjustsScrollIndicatorInsets
+        contentInsetAdjustmentBehavior="automatic"
+        showsVerticalScrollIndicator={false}
+        stickyHeaderIndices={[0]}
+        style={styles.screenScroll}
+        contentContainerStyle={styles.screenScrollContent}
       >
-        <ScrollView
-          showsVerticalScrollIndicator={false}
-          contentContainerStyle={styles.scrollContent}
+        <View style={styles.stickyHeaderBlock}>
+          <View style={styles.header}>
+            <Text style={styles.title}>ウィッシュ</Text>
+            <View style={styles.headerActions}>
+              {tab === "wish" ? (
+                <ColumnSwitcher value={columns} onChange={setColumns} />
+              ) : null}
+            </View>
+          </View>
+
+          <SectionTabs
+            value={tab}
+            tabs={tabs}
+            onChange={(next) => {
+              setTab(next);
+              closeSelectedWish();
+              setSelectedListing(null);
+            }}
+          />
+        </View>
+
+        {loading ? <Text style={styles.inlineNotice}>Wishを読み込み中…</Text> : null}
+        {loadError ? <Text style={styles.inlineError}>{loadError}</Text> : null}
+
+        {tab === "wish" ? (
+          <View style={styles.filters}>
+            <WishFilterRow
+              label="推し"
+              options={groupOptions}
+              active={activeGroup}
+              onChange={(next) => {
+                setActiveGroup(next);
+                closeSelectedWish();
+              }}
+            />
+            <WishFilterRow
+              label="種別"
+              options={typeOptions}
+              active={activeType}
+              onChange={(next) => {
+                setActiveType(next);
+                closeSelectedWish();
+              }}
+            />
+          </View>
+        ) : null}
+
+        <View
+          style={styles.contentHost}
+          onTouchStart={handleSwipeStart}
+          onTouchMove={handleSwipeMove}
+          onTouchEnd={handleSwipeEnd}
+          onTouchCancel={handleSwipeCancel}
         >
           {tab === "wish" ? (
             <GoodsGrid
@@ -510,10 +596,14 @@ export default function WishesScreen() {
               emptyLabel="まだ Wish がありません"
               deletingIds={deletingWishIds}
               onItemFadeOutEnd={completeWishDelete}
-              onPressItem={(gridItem) => {
+              showTopRow={false}
+              showUnlinkedWarning
+              onPressItem={(gridItem, context) => {
                 if (deletingWishIds.includes(gridItem.id)) return;
                 const wish = wishes.find((item) => item.id === gridItem.id);
-                if (wish) setSelectedWish(wish);
+                if (!wish) return;
+                setSelectedWishAnchor(normalizePressContext(context));
+                setSelectedWish(wish);
               }}
             />
           ) : (
@@ -521,12 +611,11 @@ export default function WishesScreen() {
               listings={listings}
               onSelect={setSelectedListing}
               onEdit={(listing) => openListingEditor(listing, "edit")}
-              onToggle={toggleListingStatus}
-              onDelete={deleteListing}
+              onDelete={requestDeleteListing}
             />
           )}
-        </ScrollView>
-      </View>
+        </View>
+      </ScrollView>
 
       <FloatingAddButton
         label={tab === "wish" ? "Wishを追加" : "個別募集を追加"}
@@ -543,15 +632,32 @@ export default function WishesScreen() {
       <BottomOptionSheet
         visible={!!selectedWish}
         title={selectedWish?.title ?? ""}
-        subtitle={selectedWish?.subtitle}
+        anchor={selectedWishAnchor}
+        presentation="glass"
+        preview={
+          selectedWish
+            ? {
+                glyph: selectedWish.glyph,
+                hue: selectedWish.hue,
+                photoUrl: selectedWish.photoUrl,
+              }
+            : null
+        }
+        subtitle={formatHashTags(selectedWish?.tagLabels) ?? "タグ未設定"}
         actions={wishActions}
-        onClose={() => setSelectedWish(null)}
+        onClose={closeSelectedWish}
       />
 
       <WishDeleteConfirmModal
         item={deleteConfirmWish}
         onCancel={() => setDeleteConfirmWish(null)}
         onConfirm={confirmWishDelete}
+      />
+
+      <ListingDeleteConfirmModal
+        item={deleteConfirmListing}
+        onCancel={() => setDeleteConfirmListing(null)}
+        onConfirm={confirmListingDelete}
       />
 
       <BottomOptionSheet
@@ -573,8 +679,13 @@ export default function WishesScreen() {
     const next = TAB_ORDER[currentIndex + direction];
     if (!next) return;
     setTab(next);
-    setSelectedWish(null);
+    closeSelectedWish();
     setSelectedListing(null);
+  }
+
+  function closeSelectedWish() {
+    setSelectedWish(null);
+    setSelectedWishAnchor(null);
   }
 
   function handleSwipeStart(event: GestureResponderEvent) {
@@ -648,6 +759,7 @@ async function fetchWishData(userId: string): Promise<WishData> {
   if (listingError) throw listingError;
 
   const wishRows = (wishRowsRaw as WishRow[] | null) ?? [];
+  const tagLabelsByWishId = await fetchInventoryTagLabels(wishRows.map((wish) => wish.id));
   const listingRows = (listingRowsRaw as ListingRow[] | null) ?? [];
   const listingIds = listingRows.map((listing) => listing.id);
   const { data: optionRowsRaw, error: optionError } =
@@ -700,7 +812,7 @@ async function fetchWishData(userId: string): Promise<WishData> {
 
   return {
     wishes: wishRows.map((wish) =>
-      toWishItem(wish, wishIdsInListings.get(wish.id) ?? 0),
+      toWishItem(wish, wishIdsInListings.get(wish.id) ?? 0, tagLabelsByWishId[wish.id] ?? []),
     ),
     listings: listingRows.map((listing) =>
       toListingItem(listing, optionsByListing.get(listing.id) ?? [], inventoryById),
@@ -708,7 +820,7 @@ async function fetchWishData(userId: string): Promise<WishData> {
   };
 }
 
-function toWishItem(row: WishRow, linkedListings: number): WishItem {
+function toWishItem(row: WishRow, linkedListings: number, tagLabels: string[] = []): WishItem {
   const groupName = pickName(row.group) ?? "未設定";
   const characterName = pickName(row.character) ?? groupName;
   const goodsType = pickName(row.goods_type) ?? "グッズ";
@@ -720,8 +832,11 @@ function toWishItem(row: WishRow, linkedListings: number): WishItem {
     glyph: characterName.slice(0, 1),
     hue: normalizeHue(row.hue, characterName),
     badge: linkedListings > 0 ? `募集 ${linkedListings}` : "未紐付け",
+    tagLabels,
     priority,
     linkedListings,
+    group: groupName,
+    type: goodsType,
     quantity: row.quantity,
     photoUrl: row.photo_urls?.[0] ?? null,
   };
@@ -852,6 +967,13 @@ function one(value?: string | string[]) {
   return Array.isArray(value) ? value[0] : value;
 }
 
+function normalizePressContext(context: GoodsGridPressContext): SheetAnchor {
+  return {
+    pageX: Number.isFinite(context.pageX) ? context.pageX : 0,
+    pageY: Number.isFinite(context.pageY) ? context.pageY : 0,
+  };
+}
+
 function openWishEditor(
   wish: WishItem | null,
   mode: "create" | "edit",
@@ -864,8 +986,8 @@ function openWishEditor(
       id: wish?.id ?? "",
       title: wish?.title ?? "",
       subtitle: wish?.subtitle ?? "",
-      group: wish?.subtitle.split(" / ")[0] ?? "",
-      goodsType: wish?.subtitle.split(" / ")[1] ?? "",
+      group: wish?.group ?? "",
+      goodsType: wish?.type ?? "",
       note: wish?.priority ?? "",
       glyph: wish?.glyph ?? "",
       hue: wish?.hue ?? "#f3c5d4",
@@ -899,18 +1021,81 @@ function openListingEditor(
   });
 }
 
+function WishFilterRow({
+  label,
+  options,
+  active,
+  onChange,
+}: {
+  label: string;
+  options: string[];
+  active: string | null;
+  onChange: (next: string | null) => void;
+}) {
+  if (options.length === 0) return null;
+
+  return (
+    <View style={styles.filterRow}>
+      <Text style={styles.filterLabel}>{label}</Text>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.filterChips}
+      >
+        <WishFilterChip
+          label="すべて"
+          active={active === null}
+          onPress={() => onChange(null)}
+        />
+        {options.map((option) => (
+          <WishFilterChip
+            key={option}
+            label={option}
+            active={active === option}
+            onPress={() => onChange(option)}
+          />
+        ))}
+      </ScrollView>
+    </View>
+  );
+}
+
+function WishFilterChip({
+  label,
+  active,
+  onPress,
+}: {
+  label: string;
+  active: boolean;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityState={{ selected: active }}
+      onPress={onPress}
+      style={[styles.filterChip, active ? styles.filterChipActive : null]}
+    >
+      <Text
+        numberOfLines={1}
+        style={[styles.filterChipText, active ? styles.filterChipTextActive : null]}
+      >
+        {label}
+      </Text>
+    </Pressable>
+  );
+}
+
 function ListingsPanel({
   listings,
   onSelect,
   onEdit,
-  onToggle,
   onDelete,
 }: {
   listings: ListingItem[];
   onSelect: (listing: ListingItem) => void;
   onEdit: (listing: ListingItem) => void;
-  onToggle: (id: string) => void;
-  onDelete: (id: string) => void;
+  onDelete: (listing: ListingItem) => void;
 }) {
   if (listings.length === 0) {
     return (
@@ -926,21 +1111,8 @@ function ListingsPanel({
         listings={listings}
         onSelect={onSelect}
         onEdit={onEdit}
-        onToggle={onToggle}
         onDelete={onDelete}
       />
-      <View style={styles.listingList}>
-        {listings.map((listing) => (
-          <ListingCard
-            key={listing.id}
-            listing={listing}
-            onPress={() => onSelect(listing)}
-            onEdit={() => onEdit(listing)}
-            onToggle={() => onToggle(listing.id)}
-            onDelete={() => onDelete(listing.id)}
-          />
-        ))}
-      </View>
     </View>
   );
 }
@@ -949,14 +1121,12 @@ function ListingDeck({
   listings,
   onSelect,
   onEdit,
-  onToggle,
   onDelete,
 }: {
   listings: ListingItem[];
   onSelect: (listing: ListingItem) => void;
   onEdit: (listing: ListingItem) => void;
-  onToggle: (id: string) => void;
-  onDelete: (id: string) => void;
+  onDelete: (listing: ListingItem) => void;
 }) {
   return (
     <View style={styles.deckSection}>
@@ -964,24 +1134,17 @@ function ListingDeck({
         <Text style={styles.deckTitle}>募集デッキ</Text>
         <Text style={styles.deckCount}>{listings.length}件</Text>
       </View>
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        snapToAlignment="center"
-        decelerationRate="fast"
-        contentContainerStyle={styles.deckScroller}
-      >
+      <View style={styles.deckList}>
         {listings.map((listing) => (
           <ListingDeckCard
             key={listing.id}
             listing={listing}
             onPress={() => onSelect(listing)}
             onEdit={() => onEdit(listing)}
-            onToggle={() => onToggle(listing.id)}
-            onDelete={() => onDelete(listing.id)}
+            onDelete={() => onDelete(listing)}
           />
         ))}
-      </ScrollView>
+      </View>
     </View>
   );
 }
@@ -990,13 +1153,11 @@ function ListingDeckCard({
   listing,
   onPress,
   onEdit,
-  onToggle,
   onDelete,
 }: {
   listing: ListingItem;
   onPress: () => void;
   onEdit: () => void;
-  onToggle: () => void;
   onDelete: () => void;
 }) {
   const slots = getListingWishSlots(listing);
@@ -1010,17 +1171,13 @@ function ListingDeckCard({
           {listing.logic}
         </Text>
         <View style={styles.listingActions}>
-          <MiniIcon label="E" onPress={onEdit} />
-          <MiniIcon
-            label={listing.status === "ACTIVE" ? "II" : "ON"}
-            onPress={onToggle}
-          />
-          <MiniIcon label="D" danger onPress={onDelete} />
+          <MiniIcon label="✎" accessibilityLabel="個別募集を編集" onPress={onEdit} />
+          <MiniIcon label="×" accessibilityLabel="個別募集を削除" danger onPress={onDelete} />
         </View>
       </View>
 
       <View style={styles.deckBodyRich}>
-        <DeckGoodsStack label="譲る" items={listing.haves} accent={ihubColors.sky} />
+        <DeckGoodsStack label="譲る" items={listing.haves} accent={megrumColors.sky} />
         <View style={styles.deckCord}>
           <View style={styles.deckCordLine} />
           <View style={styles.deckKnot}>
@@ -1068,20 +1225,24 @@ function DeckGoodsStack({
   items: ListingGoodsItem[];
   accent: string;
 }) {
-  const visible = items.slice(0, 3);
   return (
     <View style={styles.deckSide}>
       <Text style={styles.deckSideLabel}>{label}</Text>
-      <View style={styles.deckPhotoStack}>
-        {visible.map((item, index) => (
-          <View key={item.id} style={[styles.deckPhotoLayer, { marginLeft: index === 0 ? 0 : -18, marginTop: index * 8 }]}>
-            <DeckGoodsVisual item={item} size={78 - index * 7} accent={accent} />
+      <View style={styles.deckGoodsGrid}>
+        {items.map((item, index) => (
+          <View key={`${item.id}-${index}`} style={styles.deckGoodsTile}>
+            <DeckGoodsVisual item={item} size={54} accent={accent} />
+            <Text numberOfLines={2} style={styles.deckGoodsName}>
+              {shortItemLabel(item)}
+            </Text>
           </View>
         ))}
-        {items.length === 0 ? <DeckEmptyVisual label="譲" size={78} /> : null}
-        {items.length > visible.length ? (
-          <View style={styles.deckMorePhoto}>
-            <Text style={styles.deckMoreText}>+{items.length - visible.length}</Text>
+        {items.length === 0 ? (
+          <View style={styles.deckGoodsTile}>
+            <DeckEmptyVisual label="譲" size={54} />
+            <Text numberOfLines={1} style={styles.deckGoodsName}>
+              未設定
+            </Text>
           </View>
         ) : null}
       </View>
@@ -1090,40 +1251,44 @@ function DeckGoodsStack({
 }
 
 function DeckWishCluster({ slots }: { slots: ListingWishSlot[] }) {
-  const visible = slots.slice(0, 4);
   return (
     <View style={styles.deckSide}>
       <Text style={styles.deckSideLabel}>求める</Text>
-      <View style={styles.deckWishCluster}>
-        {visible.map((slot, index) => (
-          <View
-            key={slot.key}
-            style={[
-              styles.deckWishNode,
-              {
-                left: index % 2 === 0 ? 0 : 52,
-                top: index < 2 ? 0 : 58,
-              },
-            ]}
-          >
+      <View style={styles.deckGoodsGrid}>
+        {slots.map((slot) => (
+          <View key={slot.key} style={styles.deckGoodsTile}>
             {slot.option.isCashOffer ? (
-              <DeckCashVisual amount={slot.option.cashAmount} size={64} />
+              <DeckCashVisual amount={slot.option.cashAmount} size={54} />
             ) : slot.wish ? (
-              <DeckGoodsVisual item={slot.wish} size={64} accent={ihubColors.pink} />
+              <DeckGoodsVisual item={slot.wish} size={54} accent={megrumColors.pink} />
             ) : (
-              <DeckEmptyVisual label="求" size={64} />
+              <DeckEmptyVisual label="求" size={54} />
             )}
+            <Text numberOfLines={2} style={styles.deckGoodsName}>
+              {listingWishSlotLabel(slot)}
+            </Text>
           </View>
         ))}
-        {slots.length === 0 ? <DeckEmptyVisual label="求" size={72} /> : null}
-        {slots.length > visible.length ? (
-          <View style={styles.deckWishMore}>
-            <Text style={styles.deckMoreText}>+{slots.length - visible.length}</Text>
+        {slots.length === 0 ? (
+          <View style={styles.deckGoodsTile}>
+            <DeckEmptyVisual label="求" size={54} />
+            <Text numberOfLines={1} style={styles.deckGoodsName}>
+              未設定
+            </Text>
           </View>
         ) : null}
       </View>
     </View>
   );
+}
+
+function listingWishSlotLabel(slot: ListingWishSlot) {
+  if (slot.option.isCashOffer) {
+    return slot.option.cashAmount == null
+      ? "定価 相談"
+      : `定価 ${slot.option.cashAmount.toLocaleString()}円`;
+  }
+  return slot.wish ? shortItemLabel(slot.wish) : "求めるもの";
 }
 
 function DeckGoodsVisual({
@@ -1145,7 +1310,7 @@ function DeckGoodsVisual({
           height: size,
           width: size,
           borderRadius: size >= 76 ? 18 : 14,
-          backgroundColor: item.photoUrl ? ihubColors.surface : item.hue,
+          backgroundColor: item.photoUrl ? megrumColors.surface : item.hue,
         },
       ]}
     >
@@ -1212,12 +1377,13 @@ function ListingCard({
           <Text style={styles.listingSub}>{listing.logic}</Text>
         </View>
         <View style={styles.listingActions}>
-          <MiniIcon label="E" onPress={onEdit} />
+          <MiniIcon label="✎" accessibilityLabel="個別募集を編集" onPress={onEdit} />
           <MiniIcon
             label={listing.status === "ACTIVE" ? "II" : "ON"}
+            accessibilityLabel={listing.status === "ACTIVE" ? "個別募集を一時停止" : "個別募集を再開"}
             onPress={onToggle}
           />
-          <MiniIcon label="D" danger onPress={onDelete} />
+          <MiniIcon label="×" accessibilityLabel="個別募集を削除" danger onPress={onDelete} />
         </View>
       </View>
 
@@ -1249,16 +1415,19 @@ function ListingCard({
 
 function MiniIcon({
   label,
+  accessibilityLabel,
   danger,
   onPress,
 }: {
   label: string;
+  accessibilityLabel?: string;
   danger?: boolean;
   onPress: () => void;
 }) {
   return (
     <Pressable
       accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel}
       onPress={(event) => {
         event.stopPropagation();
         onPress();
@@ -1319,12 +1488,12 @@ function TradeSide({
           ]}
         >
           {items.length > 0
-            ? items.slice(0, 3).map((item) => (
+            ? items.slice(0, 3).map((item, index) => (
                 <DeckGoodsVisual
-                  key={item.id}
+                  key={`${item.id}-${index}`}
                   item={item}
                   size={38}
-                  accent={right ? ihubColors.pink : ihubColors.sky}
+                  accent={right ? megrumColors.pink : megrumColors.sky}
                 />
               ))
             : values.slice(0, 3).map((value, index) => (
@@ -1452,6 +1621,60 @@ function WishDeleteConfirmModal({
   );
 }
 
+function ListingDeleteConfirmModal({
+  item,
+  onCancel,
+  onConfirm,
+}: {
+  item: ListingItem | null;
+  onCancel: () => void;
+  onConfirm: () => void;
+}) {
+  return (
+    <Modal
+      visible={!!item}
+      transparent
+      animationType="fade"
+      onRequestClose={onCancel}
+    >
+      <View style={styles.deleteModalRoot}>
+        <Pressable style={styles.deleteModalBackdrop} onPress={onCancel} />
+        <View style={styles.deleteModalPanel}>
+          <Text style={styles.deleteModalTitle}>
+            本当に個別募集を削除しますか？
+          </Text>
+          {item ? (
+            <View style={styles.deleteModalPreview}>
+              <View style={styles.deleteModalListingIcon}>
+                <Text style={styles.deleteModalListingIconText}>募</Text>
+              </View>
+              <View style={styles.deleteModalCopy}>
+                <Text numberOfLines={2} style={styles.deleteModalItemTitle}>
+                  譲る: {item.give.join("、")}
+                </Text>
+                <Text numberOfLines={2} style={styles.deleteModalItemSub}>
+                  求める: {item.want.join("、")}
+                </Text>
+              </View>
+            </View>
+          ) : null}
+          <Text style={styles.deleteModalBody}>
+            削除すると、この個別募集は一覧やマッチング候補に表示されなくなります。
+          </Text>
+          <View style={styles.deleteModalActions}>
+            <Pressable onPress={onCancel} style={styles.deleteModalCancel}>
+              <Text style={styles.deleteModalCancelText}>閉じる</Text>
+            </Pressable>
+            <Pressable onPress={onConfirm} style={styles.deleteModalDanger}>
+              <Text style={styles.deleteModalDangerText}>削除する</Text>
+            </Pressable>
+          </View>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
 function buildListingActions({
   item,
   onClose,
@@ -1496,6 +1719,23 @@ const styles = StyleSheet.create({
     gap: 12,
     paddingHorizontal: 18,
   },
+  screenScroll: {
+    flex: 1,
+    marginHorizontal: -18,
+  },
+  screenScrollContent: {
+    gap: 12,
+    paddingBottom: 132,
+    paddingHorizontal: 18,
+  },
+  stickyHeaderBlock: {
+    backgroundColor: megrumColors.background,
+    gap: 12,
+    marginHorizontal: -18,
+    paddingBottom: 8,
+    paddingHorizontal: 18,
+    paddingTop: 2,
+  },
   deleteModalRoot: {
     alignItems: "center",
     flex: 1,
@@ -1507,24 +1747,24 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(20,18,28,0.50)",
   },
   deleteModalPanel: {
-    backgroundColor: ihubColors.surface,
+    backgroundColor: megrumColors.surface,
     borderRadius: 20,
     gap: 13,
     padding: 18,
-    shadowColor: ihubColors.ink,
+    shadowColor: megrumColors.ink,
     shadowOffset: { width: 0, height: 18 },
     shadowOpacity: 0.24,
     shadowRadius: 34,
     width: "100%",
   },
   deleteModalTitle: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 16,
     fontWeight: "900",
   },
   deleteModalPreview: {
     alignItems: "center",
-    backgroundColor: ihubColors.background,
+    backgroundColor: megrumColors.background,
     borderColor: "rgba(58,50,74,0.08)",
     borderRadius: 14,
     borderWidth: 1,
@@ -1545,26 +1785,41 @@ const styles = StyleSheet.create({
     width: 40,
   },
   deleteModalFallbackText: {
-    color: ihubColors.surface,
+    color: megrumColors.surface,
     fontSize: 18,
+    fontWeight: "900",
+  },
+  deleteModalListingIcon: {
+    alignItems: "center",
+    backgroundColor: "rgba(166,149,216,0.18)",
+    borderColor: "rgba(166,149,216,0.34)",
+    borderRadius: 12,
+    borderWidth: 1,
+    height: 54,
+    justifyContent: "center",
+    width: 54,
+  },
+  deleteModalListingIconText: {
+    color: megrumColors.lavender,
+    fontSize: 17,
     fontWeight: "900",
   },
   deleteModalCopy: {
     flex: 1,
   },
   deleteModalItemTitle: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 13,
     fontWeight: "900",
   },
   deleteModalItemSub: {
-    color: ihubColors.mutedInk,
+    color: megrumColors.mutedInk,
     fontSize: 11,
     fontWeight: "700",
     marginTop: 3,
   },
   deleteModalBody: {
-    color: ihubColors.mutedInk,
+    color: megrumColors.mutedInk,
     fontSize: 12,
     fontWeight: "700",
     lineHeight: 18,
@@ -1581,7 +1836,7 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
   },
   deleteModalCancelText: {
-    color: ihubColors.mutedInk,
+    color: megrumColors.mutedInk,
     fontSize: 13,
     fontWeight: "900",
   },
@@ -1601,7 +1856,7 @@ const styles = StyleSheet.create({
   },
   header: {
     alignItems: "center",
-    backgroundColor: ihubColors.surface,
+    backgroundColor: megrumColors.surface,
     borderColor: "rgba(58,50,74,0.08)",
     borderRadius: 16,
     borderWidth: 1,
@@ -1613,7 +1868,7 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
   },
   title: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 19,
     fontWeight: "900",
     letterSpacing: 0,
@@ -1626,12 +1881,12 @@ const styles = StyleSheet.create({
     justifyContent: "flex-end",
   },
   inlineNotice: {
-    color: ihubColors.mutedInk,
+    color: megrumColors.mutedInk,
     fontSize: 11.5,
     fontWeight: "800",
   },
   inlineError: {
-    color: ihubColors.warn,
+    color: megrumColors.warn,
     fontSize: 11.5,
     fontWeight: "800",
     lineHeight: 17,
@@ -1640,8 +1895,46 @@ const styles = StyleSheet.create({
     marginHorizontal: -18,
     paddingLeft: 18,
   },
+  filterRow: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 6,
+    marginBottom: 6,
+  },
+  filterLabel: {
+    color: megrumColors.mutedInk,
+    fontSize: 9.5,
+    fontWeight: "900",
+    letterSpacing: 0.4,
+    textAlign: "right",
+    width: 30,
+  },
+  filterChips: {
+    gap: 6,
+    paddingRight: 18,
+  },
+  filterChip: {
+    backgroundColor: megrumColors.surface,
+    borderColor: "rgba(58,50,74,0.08)",
+    borderRadius: megrumRadii.pill,
+    borderWidth: 1,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+  },
+  filterChipActive: {
+    backgroundColor: megrumColors.lavender,
+    borderColor: megrumColors.lavender,
+  },
+  filterChipText: {
+    color: megrumColors.ink,
+    fontSize: 11,
+    fontWeight: "800",
+  },
+  filterChipTextActive: {
+    color: megrumColors.surface,
+  },
   contentHost: {
-    flex: 1,
+    minHeight: 1,
   },
   scrollContent: {
     paddingBottom: 24,
@@ -1651,16 +1944,16 @@ const styles = StyleSheet.create({
   },
   listingEmpty: {
     alignItems: "center",
-    backgroundColor: ihubColors.surface,
+    backgroundColor: megrumColors.surface,
     borderColor: "rgba(58,50,74,0.08)",
-    borderRadius: ihubRadii.lg,
+    borderRadius: megrumRadii.lg,
     borderStyle: "dashed",
     borderWidth: 1,
     justifyContent: "center",
     paddingVertical: 38,
   },
   listingEmptyText: {
-    color: ihubColors.mutedInk,
+    color: megrumColors.mutedInk,
     fontSize: 12,
     fontWeight: "800",
   },
@@ -1674,39 +1967,39 @@ const styles = StyleSheet.create({
     paddingHorizontal: 18,
   },
   deckTitle: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 13,
     fontWeight: "900",
   },
   deckCount: {
     backgroundColor: "rgba(58,50,74,0.04)",
-    borderRadius: ihubRadii.pill,
-    color: ihubColors.mutedInk,
+    borderRadius: megrumRadii.pill,
+    color: megrumColors.mutedInk,
     fontSize: 10,
     fontWeight: "900",
     overflow: "hidden",
     paddingHorizontal: 10,
     paddingVertical: 4,
   },
-  deckScroller: {
+  deckList: {
     gap: 12,
     paddingHorizontal: 18,
     paddingTop: 8,
     paddingBottom: 4,
   },
   deckCard: {
-    backgroundColor: ihubColors.surface,
+    backgroundColor: megrumColors.surface,
     borderColor: "rgba(166,149,216,0.34)",
     borderRadius: 22,
     borderWidth: 1,
     minHeight: 246,
     overflow: "hidden",
     padding: 13,
-    shadowColor: ihubColors.ink,
+    shadowColor: megrumColors.ink,
     shadowOffset: { width: 0, height: 16 },
     shadowOpacity: 0.13,
     shadowRadius: 26,
-    width: 306,
+    width: "100%",
   },
   deckCardGlowPink: {
     backgroundColor: "rgba(243,197,212,0.34)",
@@ -1732,7 +2025,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   deckMeta: {
-    color: ihubColors.mutedInk,
+    color: megrumColors.mutedInk,
     flex: 1,
     fontSize: 10.5,
     fontWeight: "900",
@@ -1745,21 +2038,21 @@ const styles = StyleSheet.create({
     marginTop: 14,
   },
   deckBodyRich: {
-    alignItems: "center",
-    flexDirection: "row",
-    justifyContent: "space-between",
+    gap: 10,
     marginTop: 14,
-    minHeight: 166,
   },
   deckSide: {
-    alignItems: "center",
-    flex: 1,
+    backgroundColor: "rgba(255,255,255,0.62)",
+    borderColor: "rgba(58,50,74,0.06)",
+    borderRadius: 16,
+    borderWidth: 1,
     gap: 8,
+    padding: 10,
   },
   deckSideLabel: {
     backgroundColor: "rgba(255,255,255,0.78)",
-    borderRadius: ihubRadii.pill,
-    color: ihubColors.mutedInk,
+    borderRadius: megrumRadii.pill,
+    color: megrumColors.mutedInk,
     fontSize: 10,
     fontWeight: "900",
     overflow: "hidden",
@@ -1773,6 +2066,24 @@ const styles = StyleSheet.create({
     minHeight: 118,
     width: "100%",
   },
+  deckGoodsGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+    width: "100%",
+  },
+  deckGoodsTile: {
+    alignItems: "center",
+    gap: 5,
+    width: 64,
+  },
+  deckGoodsName: {
+    color: megrumColors.ink,
+    fontSize: 9.5,
+    fontWeight: "800",
+    lineHeight: 12,
+    textAlign: "center",
+  },
   deckPhotoStack: {
     alignItems: "center",
     flexDirection: "row",
@@ -1781,7 +2092,7 @@ const styles = StyleSheet.create({
     width: "100%",
   },
   deckPhotoLayer: {
-    shadowColor: ihubColors.ink,
+    shadowColor: megrumColors.ink,
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.14,
     shadowRadius: 14,
@@ -1789,7 +2100,7 @@ const styles = StyleSheet.create({
   deckMorePhoto: {
     alignItems: "center",
     backgroundColor: "rgba(58,50,74,0.78)",
-    borderRadius: ihubRadii.pill,
+    borderRadius: megrumRadii.pill,
     bottom: 10,
     height: 26,
     justifyContent: "center",
@@ -1808,7 +2119,7 @@ const styles = StyleSheet.create({
   deckWishMore: {
     alignItems: "center",
     backgroundColor: "rgba(58,50,74,0.78)",
-    borderRadius: ihubRadii.pill,
+    borderRadius: megrumRadii.pill,
     bottom: 0,
     height: 26,
     justifyContent: "center",
@@ -1821,7 +2132,7 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     justifyContent: "center",
     overflow: "hidden",
-    shadowColor: ihubColors.ink,
+    shadowColor: megrumColors.ink,
     shadowOffset: { width: 0, height: 7 },
     shadowOpacity: 0.15,
     shadowRadius: 13,
@@ -1831,7 +2142,7 @@ const styles = StyleSheet.create({
     width: "100%",
   },
   deckGoodsGlyph: {
-    color: ihubColors.surface,
+    color: megrumColors.surface,
     fontWeight: "900",
     textShadowColor: "rgba(58,50,74,0.24)",
     textShadowOffset: { width: 0, height: 1 },
@@ -1847,7 +2158,7 @@ const styles = StyleSheet.create({
     top: 0,
   },
   deckQtyText: {
-    color: ihubColors.surface,
+    color: megrumColors.surface,
     fontSize: 9,
     fontWeight: "900",
   },
@@ -1861,13 +2172,13 @@ const styles = StyleSheet.create({
     overflow: "hidden",
   },
   deckCashSymbol: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 22,
     fontWeight: "900",
     lineHeight: 24,
   },
   deckCashText: {
-    color: ihubColors.mutedInk,
+    color: megrumColors.mutedInk,
     fontSize: 9,
     fontWeight: "900",
     maxWidth: "82%",
@@ -1894,14 +2205,14 @@ const styles = StyleSheet.create({
     height: 96,
     justifyContent: "center",
     marginHorizontal: -18,
-    shadowColor: ihubColors.ink,
+    shadowColor: megrumColors.ink,
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.14,
     shadowRadius: 14,
     width: 72,
   },
   deckBubbleText: {
-    color: ihubColors.surface,
+    color: megrumColors.surface,
     fontSize: 25,
     fontWeight: "900",
     textShadowColor: "rgba(58,50,74,0.22)",
@@ -1911,7 +2222,7 @@ const styles = StyleSheet.create({
   deckMore: {
     alignItems: "center",
     backgroundColor: "rgba(58,50,74,0.76)",
-    borderRadius: ihubRadii.pill,
+    borderRadius: megrumRadii.pill,
     bottom: 8,
     height: 28,
     justifyContent: "center",
@@ -1920,39 +2231,40 @@ const styles = StyleSheet.create({
     width: 40,
   },
   deckMoreText: {
-    color: ihubColors.surface,
+    color: megrumColors.surface,
     fontSize: 11,
     fontWeight: "900",
   },
   deckCord: {
     alignItems: "center",
-    height: 92,
+    alignSelf: "center",
+    height: 28,
     justifyContent: "center",
-    width: 48,
+    width: 74,
   },
   deckCordLine: {
     backgroundColor: "rgba(166,149,216,0.34)",
     height: 2,
     position: "absolute",
-    width: 62,
+    width: 74,
   },
   deckKnot: {
     alignItems: "center",
-    backgroundColor: ihubColors.surface,
+    backgroundColor: megrumColors.surface,
     borderColor: "rgba(166,149,216,0.44)",
-    borderRadius: ihubRadii.pill,
+    borderRadius: megrumRadii.pill,
     borderWidth: 1,
-    height: 32,
+    height: 28,
     justifyContent: "center",
-    shadowColor: ihubColors.lavender,
+    shadowColor: megrumColors.lavender,
     shadowOffset: { width: 0, height: 5 },
     shadowOpacity: 0.2,
     shadowRadius: 12,
-    width: 32,
+    width: 28,
   },
   deckKnotText: {
-    color: ihubColors.lavender,
-    fontSize: 20,
+    color: megrumColors.lavender,
+    fontSize: 18,
     fontWeight: "900",
     lineHeight: 22,
   },
@@ -1960,12 +2272,12 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   listingCard: {
-    backgroundColor: ihubColors.surface,
+    backgroundColor: megrumColors.surface,
     borderColor: "rgba(58,50,74,0.08)",
-    borderRadius: ihubRadii.lg,
+    borderRadius: megrumRadii.lg,
     borderWidth: 1,
     padding: 13,
-    shadowColor: ihubColors.ink,
+    shadowColor: megrumColors.ink,
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.08,
     shadowRadius: 16,
@@ -1979,12 +2291,12 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   listingTitle: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 12.5,
     fontWeight: "900",
   },
   listingSub: {
-    color: ihubColors.mutedInk,
+    color: megrumColors.mutedInk,
     fontSize: 10,
     fontWeight: "800",
     marginTop: 2,
@@ -1996,22 +2308,22 @@ const styles = StyleSheet.create({
   statusBadge: {
     alignItems: "center",
     backgroundColor: "rgba(58,50,74,0.08)",
-    borderRadius: ihubRadii.pill,
+    borderRadius: megrumRadii.pill,
     justifyContent: "center",
     minWidth: 52,
     paddingHorizontal: 9,
     paddingVertical: 5,
   },
   statusBadgeActive: {
-    backgroundColor: ihubColors.ok,
+    backgroundColor: megrumColors.ok,
   },
   statusBadgeText: {
-    color: ihubColors.mutedInk,
+    color: megrumColors.mutedInk,
     fontSize: 9.5,
     fontWeight: "900",
   },
   statusBadgeTextActive: {
-    color: ihubColors.surface,
+    color: megrumColors.surface,
   },
   miniIcon: {
     alignItems: "center",
@@ -2031,10 +2343,10 @@ const styles = StyleSheet.create({
     fontWeight: "900",
   },
   miniIconTextDefault: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
   },
   miniIconTextDanger: {
-    color: ihubColors.warn,
+    color: megrumColors.warn,
   },
   tradeLine: {
     alignItems: "center",
@@ -2046,7 +2358,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   tradeSideLabel: {
-    color: ihubColors.mutedInk,
+    color: megrumColors.mutedInk,
     fontSize: 10,
     fontWeight: "900",
     marginBottom: 6,
@@ -2087,7 +2399,7 @@ const styles = StyleSheet.create({
     width: 36,
   },
   tradeMiniText: {
-    color: ihubColors.surface,
+    color: megrumColors.surface,
     fontSize: 16,
     fontWeight: "900",
   },
@@ -2100,13 +2412,13 @@ const styles = StyleSheet.create({
     width: 36,
   },
   tradeOverflowText: {
-    color: ihubColors.mutedInk,
+    color: megrumColors.mutedInk,
     fontSize: 11,
     fontWeight: "900",
   },
   logicTag: {
-    backgroundColor: ihubColors.lavender,
-    borderRadius: ihubRadii.pill,
+    backgroundColor: megrumColors.lavender,
+    borderRadius: megrumRadii.pill,
     left: 6,
     paddingHorizontal: 7,
     paddingVertical: 2,
@@ -2119,7 +2431,7 @@ const styles = StyleSheet.create({
     right: 6,
   },
   logicTagText: {
-    color: ihubColors.surface,
+    color: megrumColors.surface,
     fontSize: 9,
     fontWeight: "900",
   },
@@ -2128,7 +2440,7 @@ const styles = StyleSheet.create({
     width: 28,
   },
   tradeConnectorDot: {
-    backgroundColor: ihubColors.lavender,
+    backgroundColor: megrumColors.lavender,
     borderRadius: 5,
     height: 10,
     width: 10,

@@ -13,7 +13,7 @@ import {
 import { ListingNewForm } from "./ListingNewForm";
 
 export const metadata = {
-  title: "個別募集を追加 — iHub",
+  title: "個別募集を追加 — Megrum",
 };
 
 type Props = {

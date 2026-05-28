@@ -4,7 +4,7 @@ import { BottomNav } from "@/components/home/BottomNav";
 import { SearchView, type SearchHit } from "./SearchView";
 
 export const metadata = {
-  title: "検索 — iHub",
+  title: "検索 — Megrum",
 };
 
 type InventoryHitRow = {

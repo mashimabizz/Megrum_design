@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
 
-const BOTTOM_NAV_TRANSITION_KEY = "ihub-bottom-nav-transition";
+const BOTTOM_NAV_TRANSITION_KEY = "megrum-bottom-nav-transition";
 
 /**
  * ボトムナビ
@@ -53,7 +53,7 @@ export function BottomNav({ inline = false }: { inline?: boolean } = {}) {
         key={it.href}
         href={it.href}
         scroll={false}
-        transitionTypes={["ihub-bottom-nav"]}
+        transitionTypes={["megrum-bottom-nav"]}
         onNavigate={() => {
           if (!actualActive) {
             setOptimisticTarget({ href: it.href, fromPath: pathname });
@@ -62,7 +62,7 @@ export function BottomNav({ inline = false }: { inline?: boolean } = {}) {
         }}
         className={`relative z-10 flex h-[54px] flex-1 flex-col items-center justify-center gap-[3px] rounded-full text-[9.5px] leading-none transition-[color,transform,filter] duration-300 active:scale-[0.94] ${
           visualActive
-            ? "font-extrabold text-ihub-lavender drop-shadow-[0_2px_7px_rgba(58,50,74,0.18)]"
+            ? "font-extrabold text-megrum-lavender drop-shadow-[0_2px_7px_rgba(58,50,74,0.18)]"
             : "font-bold text-[#3a324a99]"
         }`}
         aria-current={actualActive ? "page" : undefined}
@@ -114,16 +114,16 @@ export function BottomNav({ inline = false }: { inline?: boolean } = {}) {
 
 function markBottomNavNavigation() {
   if (typeof window === "undefined") return;
-  window.document.body.classList.add("ihub-bottom-nav-loading");
-  window.document.body.classList.add("ihub-bottom-nav-transitioning");
+  window.document.body.classList.add("megrum-bottom-nav-loading");
+  window.document.body.classList.add("megrum-bottom-nav-transitioning");
   try {
     window.sessionStorage.setItem(BOTTOM_NAV_TRANSITION_KEY, "1");
   } catch {
     // sessionStorage が使えない環境でもナビゲーション自体は続行する。
   }
   window.setTimeout(() => {
-    window.document.body.classList.remove("ihub-bottom-nav-loading");
-    window.document.body.classList.remove("ihub-bottom-nav-transitioning");
+    window.document.body.classList.remove("megrum-bottom-nav-loading");
+    window.document.body.classList.remove("megrum-bottom-nav-transitioning");
   }, 900);
 }
 

@@ -3,7 +3,7 @@
 /**
  * iter79-C: D-1 + D-2 統合申告フォーム
  *
- * iHub/c-dispute.jsx の D1Category + D2Evidence 準拠：
+ * Megrum/c-dispute.jsx の D1Category + D2Evidence 準拠：
  * - 上部に warning バナー（送信後編集不可・運営 24h 確認）
  * - 取引メタ
  * - カテゴリ選択（5 種、ラジオ風）

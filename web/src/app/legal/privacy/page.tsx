@@ -2,7 +2,7 @@ import { HeaderBack } from "@/components/auth/HeaderBack";
 import { LPArticle, LPFooter, LPInfoBox } from "../_components";
 
 export const metadata = {
-  title: "プライバシーポリシー — iHub",
+  title: "プライバシーポリシー — Megrum",
 };
 
 export default function PrivacyPage() {
@@ -15,7 +15,7 @@ export default function PrivacyPage() {
       />
       <div className="mx-auto w-full max-w-md flex-1 overflow-y-auto px-5 pb-12 pt-4">
         <LPInfoBox>
-          iHub
+          Megrum
           運営者（以下「当社」）は、利用者の個人情報を尊重し、適切に取り扱うことを社会的責務と認識し、関連法令を遵守するとともに、本プライバシーポリシーに従って個人情報を取り扱います。
         </LPInfoBox>
 
@@ -96,9 +96,9 @@ export default function PrivacyPage() {
           個人情報の取り扱いに関するお問い合わせは、以下の窓口までご連絡ください。
           <br />
           <br />
-          <b className="text-[#3a324a]">iHub 個人情報保護管理者</b>
+          <b className="text-[#3a324a]">Megrum 個人情報保護管理者</b>
           <br />
-          メール：support@ihub.tokyo
+          メール：support@megrum.jp
           <br />
           受付時間：平日 10:00〜18:00（土日祝・年末年始を除く）
         </LPArticle>

@@ -8,7 +8,7 @@ import {
   MeguriThreeScene,
   type MeguriSceneResident,
 } from "../src/components/meguri/MeguriThreeScene";
-import { ihubColors, ihubShadow } from "../src/theme/tokens";
+import { megrumColors, megrumShadow } from "../src/theme/tokens";
 import {
   DEFAULT_MEGURI_AVATAR,
   loadMeguriAvatarSettings,
@@ -79,7 +79,7 @@ export default function MeguriAvatarEditScreen() {
       >
         <View style={styles.header}>
           <Pressable onPress={() => router.back()} style={styles.roundButton}>
-            <IconSymbol name="chevron-back" color={ihubColors.ink} size={20} />
+            <IconSymbol name="chevron-back" color={megrumColors.ink} size={20} />
           </Pressable>
           <Text style={styles.headerTitle}>アバター編集</Text>
           <Pressable onPress={save} style={styles.saveButton}>
@@ -89,7 +89,7 @@ export default function MeguriAvatarEditScreen() {
 
         <View style={styles.preview}>
           {!settings || !resident ? (
-            <ActivityIndicator color={ihubColors.lavender} />
+            <ActivityIndicator color={megrumColors.lavender} />
           ) : threeFailed ? (
             <Text style={styles.fallbackText}>3Dプレビューを準備できませんでした</Text>
           ) : (
@@ -150,7 +150,7 @@ export default function MeguriAvatarEditScreen() {
 
 const styles = StyleSheet.create({
   root: {
-    backgroundColor: ihubColors.background,
+    backgroundColor: megrumColors.background,
     flex: 1,
   },
   content: {
@@ -171,12 +171,12 @@ const styles = StyleSheet.create({
     width: 42,
   },
   headerTitle: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 18,
     fontWeight: "900",
   },
   saveButton: {
-    backgroundColor: ihubColors.ink,
+    backgroundColor: megrumColors.ink,
     borderRadius: 999,
     paddingHorizontal: 15,
     paddingVertical: 10,
@@ -191,17 +191,17 @@ const styles = StyleSheet.create({
     borderRadius: 28,
     height: 310,
     overflow: "hidden",
-    ...ihubShadow,
+    ...megrumShadow,
   },
   fallbackText: {
-    color: ihubColors.mutedInk,
+    color: megrumColors.mutedInk,
     fontSize: 13,
     fontWeight: "900",
     padding: 24,
     textAlign: "center",
   },
   sectionTitle: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 16,
     fontWeight: "900",
     paddingHorizontal: 4,
@@ -218,10 +218,10 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
   },
   segmentActive: {
-    backgroundColor: ihubColors.ink,
+    backgroundColor: megrumColors.ink,
   },
   segmentText: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 13,
     fontWeight: "900",
   },
@@ -244,7 +244,7 @@ const styles = StyleSheet.create({
     width: "31.7%",
   },
   swatchItemActive: {
-    borderColor: ihubColors.lavender,
+    borderColor: megrumColors.lavender,
     borderWidth: 2,
   },
   swatch: {
@@ -255,7 +255,7 @@ const styles = StyleSheet.create({
     width: 36,
   },
   swatchLabel: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 10.5,
     fontWeight: "900",
   },

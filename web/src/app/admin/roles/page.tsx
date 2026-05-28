@@ -90,7 +90,7 @@ export default async function AdminRolesPage() {
                 name="permissions"
                 rows={4}
                 placeholder="users.read, users.update_status, billing.read"
-                className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-[13px] font-semibold text-slate-900 outline-none focus:border-ihub-lavender focus:ring-2 focus:ring-ihub-lavender/20"
+                className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-[13px] font-semibold text-slate-900 outline-none focus:border-megrum-lavender focus:ring-2 focus:ring-megrum-lavender/20"
               />
             </label>
             <label className="flex items-center gap-2 text-[12px] font-bold text-slate-700">
@@ -98,7 +98,7 @@ export default async function AdminRolesPage() {
                 type="checkbox"
                 name="requires_mfa"
                 defaultChecked
-                className="h-4 w-4 accent-ihub-lavender"
+                className="h-4 w-4 accent-megrum-lavender"
               />
               MFA済みセッションだけ許可
             </label>

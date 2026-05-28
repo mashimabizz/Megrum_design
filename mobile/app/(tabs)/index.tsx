@@ -64,7 +64,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useImageReady } from "../../src/lib/useImageReady";
 import { formatHashTags } from "../../src/lib/inventoryTags";
 import { useKeyboardInset } from "../../src/lib/useKeyboardInset";
-import { ihubColors, ihubRadii } from "../../src/theme/tokens";
+import { megrumColors, megrumRadii } from "../../src/theme/tokens";
 import { USERS } from "./encounters";
 
 const FALLBACK_LOCAL_CENTER: MapCoordinate = {
@@ -519,7 +519,7 @@ export default function HomeScreen() {
               : undefined,
           title: "現地交換",
           userInterfaceStyle: "light",
-          tintColor: ihubColors.lavender,
+          tintColor: megrumColors.lavender,
         },
         (buttonIndex) => {
           actions[buttonIndex]?.onPress();
@@ -625,7 +625,7 @@ export default function HomeScreen() {
           options: [...actions.map((action) => action.label), "閉じる"],
           title: "グルーム",
           userInterfaceStyle: "dark",
-          tintColor: ihubColors.lavender,
+          tintColor: megrumColors.lavender,
         },
         (buttonIndex) => actions[buttonIndex]?.onPress(),
       );
@@ -1190,7 +1190,7 @@ function LocalModeSheet({
                         <View
                           style={[
                             styles.carryingThumb,
-                            { backgroundColor: item.photoUrl ? ihubColors.ink : item.hue },
+                            { backgroundColor: item.photoUrl ? megrumColors.ink : item.hue },
                           ]}
                         >
                           {item.photoUrl ? (
@@ -1280,7 +1280,7 @@ function FloatingHomeActionButton({
   localMode: boolean;
   onPress: () => void;
 }) {
-  const symbolColor = localMode ? ihubColors.lavender : ihubColors.ink;
+  const symbolColor = localMode ? megrumColors.lavender : megrumColors.ink;
   return (
     <Pressable
       accessibilityRole="button"
@@ -1389,7 +1389,7 @@ function FloatingSearchButton() {
       onPress={() => router.push("/search")}
       style={styles.floatingSearchButton}
     >
-      <IconSymbol name="search" size={24} color={ihubColors.ink} />
+      <IconSymbol name="search" size={24} color={megrumColors.ink} />
     </Pressable>
   );
 }
@@ -1425,7 +1425,7 @@ function HomeGroomRail({
         >
           <View style={[styles.homeGroomRing, styles.homeGroomAddRing]}>
             <View style={styles.homeGroomAddCircle}>
-              <IconSymbol name="add" color={ihubColors.lavender} size={27} />
+              <IconSymbol name="add" color={megrumColors.lavender} size={27} />
             </View>
           </View>
           <Text numberOfLines={1} style={styles.homeGroomName}>
@@ -1926,7 +1926,7 @@ function HomeGroomViewerModal({
                 >
                   <IconSymbol
                     name={post.liked ? "heart" : "heart-outline"}
-                    color={post.liked ? ihubColors.pink : "#fff"}
+                    color={post.liked ? megrumColors.pink : "#fff"}
                     size={31}
                   />
                 </Pressable>
@@ -2334,7 +2334,7 @@ function HomeGroomStoryDecorations({
             numberOfLines={3}
             style={[
               styles.homeGroomStoryTextOverlayText,
-              { color: overlay.tone === "solid" ? ihubColors.ink : overlay.color },
+              { color: overlay.tone === "solid" ? megrumColors.ink : overlay.color },
             ]}
           >
             {overlay.text}
@@ -2419,7 +2419,7 @@ function HomeGroomStoryAttachedChrome({
             </Text>
           </View>
           <View style={styles.homeGroomViewerAction}>
-            <IconSymbol name={post.liked ? "heart" : "heart-outline"} color={post.liked ? ihubColors.pink : "#fff"} size={31} />
+            <IconSymbol name={post.liked ? "heart" : "heart-outline"} color={post.liked ? megrumColors.pink : "#fff"} size={31} />
           </View>
           <View style={[styles.homeGroomViewerAction, !canSend ? styles.homeGroomSendButtonDisabled : null]}>
             <IconSymbol name="send-outline" color="#fff" size={31} />
@@ -2989,7 +2989,7 @@ function getPriorityFrameStyle(priority: CandidatePriority) {
     return {
       borderColor: "rgba(166,149,216,0.72)",
       borderWidth: 2,
-      shadowColor: ihubColors.lavender,
+      shadowColor: megrumColors.lavender,
       shadowOpacity: 0.22,
       shadowRadius: 16,
       shadowOffset: { width: 0, height: 8 },
@@ -3001,7 +3001,7 @@ function getPriorityFrameStyle(priority: CandidatePriority) {
     return {
       borderColor: "rgba(168,212,230,0.78)",
       borderWidth: 1.5,
-      shadowColor: ihubColors.sky,
+      shadowColor: megrumColors.sky,
       shadowOpacity: 0.18,
       shadowRadius: 12,
       shadowOffset: { width: 0, height: 7 },
@@ -3012,7 +3012,7 @@ function getPriorityFrameStyle(priority: CandidatePriority) {
   return {
     borderColor: "rgba(58,50,74,0.10)",
     borderWidth: 1,
-    shadowColor: ihubColors.ink,
+    shadowColor: megrumColors.ink,
     shadowOpacity: 0.08,
     shadowRadius: 10,
     shadowOffset: { width: 4, height: 8 },
@@ -3057,7 +3057,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     left: 18,
     position: "absolute",
-    shadowColor: ihubColors.ink,
+    shadowColor: megrumColors.ink,
     shadowOffset: { width: 0, height: 12 },
     shadowOpacity: 0.14,
     shadowRadius: 22,
@@ -3076,7 +3076,7 @@ const styles = StyleSheet.create({
     overflow: "hidden",
     position: "absolute",
     right: 18,
-    shadowColor: ihubColors.ink,
+    shadowColor: megrumColors.ink,
     shadowOffset: { width: 0, height: 16 },
     shadowOpacity: 0.13,
     shadowRadius: 28,
@@ -3086,7 +3086,7 @@ const styles = StyleSheet.create({
   homeActionButtonLive: {
     backgroundColor: "rgba(166,149,216,0.18)",
     borderColor: "rgba(255,255,255,0.9)",
-    shadowColor: ihubColors.lavender,
+    shadowColor: megrumColors.lavender,
     shadowOpacity: 0.3,
   },
   homeActionButtonPressed: {
@@ -3123,14 +3123,14 @@ const styles = StyleSheet.create({
   },
   localFocusLeft: {
     left: -12,
-    shadowColor: ihubColors.lavender,
+    shadowColor: megrumColors.lavender,
     shadowOffset: { width: 18, height: 0 },
     shadowOpacity: 0.55,
     shadowRadius: 30,
   },
   localFocusRight: {
     right: -12,
-    shadowColor: ihubColors.lavender,
+    shadowColor: megrumColors.lavender,
     shadowOffset: { width: -18, height: 0 },
     shadowOpacity: 0.55,
     shadowRadius: 30,
@@ -3140,7 +3140,7 @@ const styles = StyleSheet.create({
     alignSelf: "center",
     backgroundColor: "rgba(58,50,74,0.76)",
     borderColor: "rgba(255,255,255,0.40)",
-    borderRadius: ihubRadii.pill,
+    borderRadius: megrumRadii.pill,
     borderWidth: 1,
     paddingHorizontal: 16,
     paddingVertical: 9,
@@ -3149,7 +3149,7 @@ const styles = StyleSheet.create({
     zIndex: 30,
   },
   modeStatusText: {
-    color: ihubColors.surface,
+    color: megrumColors.surface,
     fontSize: 12,
     fontWeight: "900",
   },
@@ -3159,7 +3159,7 @@ const styles = StyleSheet.create({
     justifyContent: "flex-end",
   },
   localSheetNativeLayer: {
-    backgroundColor: ihubColors.background,
+    backgroundColor: megrumColors.background,
     justifyContent: "flex-start",
   },
   localSheetBackdrop: {
@@ -3179,13 +3179,13 @@ const styles = StyleSheet.create({
     paddingBottom: 18,
     paddingHorizontal: 20,
     paddingTop: 10,
-    shadowColor: ihubColors.ink,
+    shadowColor: megrumColors.ink,
     shadowOffset: { width: 0, height: -16 },
     shadowOpacity: 0.16,
     shadowRadius: 34,
   },
   localSheetNativePanel: {
-    backgroundColor: ihubColors.background,
+    backgroundColor: megrumColors.background,
     borderTopLeftRadius: 0,
     borderTopRightRadius: 0,
     borderWidth: 0,
@@ -3207,13 +3207,13 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
   },
   localSheetKicker: {
-    color: ihubColors.lavender,
+    color: megrumColors.lavender,
     fontSize: 10,
     fontWeight: "900",
     letterSpacing: 0.8,
   },
   localSheetTitle: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 22,
     fontWeight: "900",
     lineHeight: 27,
@@ -3234,7 +3234,7 @@ const styles = StyleSheet.create({
     lineHeight: 27,
   },
   localSheetLead: {
-    color: ihubColors.mutedInk,
+    color: megrumColors.mutedInk,
     fontSize: 12,
     fontWeight: "800",
     lineHeight: 18,
@@ -3254,12 +3254,12 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
   },
   localSectionTitle: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 13,
     fontWeight: "900",
   },
   localSectionMeta: {
-    color: ihubColors.mutedInk,
+    color: megrumColors.mutedInk,
     fontSize: 11,
     fontWeight: "900",
   },
@@ -3277,7 +3277,7 @@ const styles = StyleSheet.create({
   },
   carryingCardActive: {
     borderColor: "rgba(166,149,216,0.72)",
-    shadowColor: ihubColors.lavender,
+    shadowColor: megrumColors.lavender,
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.18,
     shadowRadius: 14,
@@ -3296,7 +3296,7 @@ const styles = StyleSheet.create({
     width: "100%",
   },
   carryingGlyph: {
-    color: ihubColors.surface,
+    color: megrumColors.surface,
     fontSize: 26,
     fontWeight: "900",
     textShadowColor: "rgba(58,50,74,0.24)",
@@ -3317,26 +3317,26 @@ const styles = StyleSheet.create({
     width: 24,
   },
   carryingCheckActive: {
-    backgroundColor: ihubColors.lavender,
-    borderColor: ihubColors.surface,
+    backgroundColor: megrumColors.lavender,
+    borderColor: megrumColors.surface,
   },
   carryingCheckText: {
-    color: ihubColors.lavender,
+    color: megrumColors.lavender,
     fontSize: 13,
     fontWeight: "900",
     lineHeight: 16,
   },
   carryingCheckTextActive: {
-    color: ihubColors.surface,
+    color: megrumColors.surface,
   },
   carryingTitle: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 11,
     fontWeight: "900",
     marginTop: 7,
   },
   carryingSub: {
-    color: ihubColors.mutedInk,
+    color: megrumColors.mutedInk,
     fontSize: 9.5,
     fontWeight: "800",
     marginTop: 2,
@@ -3350,7 +3350,7 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
   },
   carryingEmptyText: {
-    color: ihubColors.mutedInk,
+    color: megrumColors.mutedInk,
     fontSize: 11,
     fontWeight: "800",
     lineHeight: 16,
@@ -3358,13 +3358,13 @@ const styles = StyleSheet.create({
   currentLocationButton: {
     backgroundColor: "rgba(166,149,216,0.13)",
     borderColor: "rgba(166,149,216,0.32)",
-    borderRadius: ihubRadii.pill,
+    borderRadius: megrumRadii.pill,
     borderWidth: 1,
     paddingHorizontal: 12,
     paddingVertical: 7,
   },
   currentLocationText: {
-    color: ihubColors.lavender,
+    color: megrumColors.lavender,
     fontSize: 11,
     fontWeight: "900",
   },
@@ -3377,7 +3377,7 @@ const styles = StyleSheet.create({
     borderColor: "rgba(58,50,74,0.08)",
     borderRadius: 17,
     borderWidth: 1,
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 13,
     fontWeight: "800",
     paddingHorizontal: 14,
@@ -3391,7 +3391,7 @@ const styles = StyleSheet.create({
   localChip: {
     backgroundColor: "rgba(58,50,74,0.055)",
     borderColor: "rgba(58,50,74,0.08)",
-    borderRadius: ihubRadii.pill,
+    borderRadius: megrumRadii.pill,
     borderWidth: 1,
     paddingHorizontal: 13,
     paddingVertical: 9,
@@ -3406,7 +3406,7 @@ const styles = StyleSheet.create({
     fontWeight: "900",
   },
   localChipTextActive: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
   },
   localSheetError: {
     backgroundColor: "rgba(239,68,68,0.09)",
@@ -3417,7 +3417,7 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
   },
   localSheetErrorText: {
-    color: ihubColors.warn,
+    color: megrumColors.warn,
     fontSize: 11,
     fontWeight: "800",
     lineHeight: 16,
@@ -3442,12 +3442,12 @@ const styles = StyleSheet.create({
   },
   localApplyButton: {
     alignItems: "center",
-    backgroundColor: ihubColors.lavender,
+    backgroundColor: megrumColors.lavender,
     borderRadius: 18,
     flex: 0.64,
     justifyContent: "center",
     paddingVertical: 14,
-    shadowColor: ihubColors.lavender,
+    shadowColor: megrumColors.lavender,
     shadowOffset: { width: 0, height: 10 },
     shadowOpacity: 0.24,
     shadowRadius: 18,
@@ -3456,7 +3456,7 @@ const styles = StyleSheet.create({
     opacity: 0.45,
   },
   localApplyText: {
-    color: ihubColors.surface,
+    color: megrumColors.surface,
     fontSize: 13,
     fontWeight: "900",
   },
@@ -3470,26 +3470,26 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   kicker: {
-    color: ihubColors.lavender,
+    color: megrumColors.lavender,
     fontSize: 11,
     fontWeight: "900",
     letterSpacing: 0.4,
   },
   title: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 25,
     fontWeight: "900",
     letterSpacing: 0,
     lineHeight: 29,
   },
   inlineError: {
-    color: ihubColors.warn,
+    color: megrumColors.warn,
     fontSize: 11,
     fontWeight: "800",
     lineHeight: 16,
   },
   loadingText: {
-    color: ihubColors.mutedInk,
+    color: megrumColors.mutedInk,
     fontSize: 12,
     fontWeight: "800",
     lineHeight: 18,
@@ -3500,7 +3500,7 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   homeGroomTitle: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 22,
     fontWeight: "900",
     lineHeight: 27,
@@ -3516,22 +3516,22 @@ const styles = StyleSheet.create({
   },
   homeGroomRing: {
     alignItems: "center",
-    backgroundColor: ihubColors.surface,
-    borderColor: ihubColors.lavender,
+    backgroundColor: megrumColors.surface,
+    borderColor: megrumColors.lavender,
     borderRadius: 999,
     borderWidth: 2,
     height: 74,
     justifyContent: "center",
     padding: 3,
-    shadowColor: ihubColors.lavender,
+    shadowColor: megrumColors.lavender,
     shadowOffset: { width: 0, height: 5 },
     shadowOpacity: 0.16,
     shadowRadius: 12,
     width: 74,
   },
   homeGroomRingLiked: {
-    borderColor: ihubColors.pink,
-    shadowColor: ihubColors.pink,
+    borderColor: megrumColors.pink,
+    shadowColor: megrumColors.pink,
   },
   homeGroomRingViewed: {
     borderColor: "rgba(58,50,74,0.24)",
@@ -3693,7 +3693,7 @@ const styles = StyleSheet.create({
   homeGroomViewerMenuButton: {
     alignItems: "center",
     backgroundColor: "rgba(0,0,0,0.18)",
-    borderRadius: ihubRadii.pill,
+    borderRadius: megrumRadii.pill,
     height: 38,
     justifyContent: "center",
     width: 38,
@@ -3701,7 +3701,7 @@ const styles = StyleSheet.create({
   homeGroomViewerFace: {
     alignItems: "center",
     backgroundColor: "rgba(166,149,216,0.58)",
-    borderColor: ihubColors.pink,
+    borderColor: megrumColors.pink,
     borderRadius: 999,
     borderWidth: 2,
     height: 38,
@@ -3709,10 +3709,10 @@ const styles = StyleSheet.create({
     width: 38,
   },
   homeGroomViewerFaceLiked: {
-    borderColor: ihubColors.pink,
+    borderColor: megrumColors.pink,
   },
   homeGroomViewerFaceText: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 15,
     fontWeight: "900",
   },
@@ -3808,7 +3808,7 @@ const styles = StyleSheet.create({
   homeGroomReplyInput: {
     backgroundColor: "rgba(5,8,13,0.42)",
     borderColor: "rgba(255,255,255,0.46)",
-    borderRadius: ihubRadii.pill,
+    borderRadius: megrumRadii.pill,
     borderWidth: 1,
     color: "#fff",
     flex: 1,
@@ -3824,7 +3824,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     backgroundColor: "rgba(5,8,13,0.42)",
     borderColor: "rgba(255,255,255,0.46)",
-    borderRadius: ihubRadii.pill,
+    borderRadius: megrumRadii.pill,
     borderWidth: 1,
     flex: 1,
     justifyContent: "center",
@@ -3841,7 +3841,7 @@ const styles = StyleSheet.create({
   },
   homeGroomViewerAction: {
     alignItems: "center",
-    borderRadius: ihubRadii.pill,
+    borderRadius: megrumRadii.pill,
     height: 48,
     justifyContent: "center",
     width: 42,
@@ -3858,12 +3858,12 @@ const styles = StyleSheet.create({
     paddingVertical: 22,
   },
   emptyMatchesTitle: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 15,
     fontWeight: "900",
   },
   emptyMatchesText: {
-    color: ihubColors.mutedInk,
+    color: megrumColors.mutedInk,
     fontSize: 12,
     fontWeight: "700",
     lineHeight: 18,
@@ -3899,7 +3899,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 1,
   },
   rowCharacter: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 13,
     fontWeight: "900",
     maxWidth: 180,
@@ -3922,7 +3922,7 @@ const styles = StyleSheet.create({
     overflow: "visible",
   },
   tileCard: {
-    backgroundColor: ihubColors.surface,
+    backgroundColor: megrumColors.surface,
     borderRadius: 16,
     overflow: "hidden",
   },
@@ -3945,7 +3945,7 @@ const styles = StyleSheet.create({
     width: 92,
   },
   fakeImageLetter: {
-    color: ihubColors.surface,
+    color: megrumColors.surface,
     fontSize: 48,
     fontWeight: "900",
     textShadowColor: "rgba(58,50,74,0.16)",
@@ -3955,25 +3955,25 @@ const styles = StyleSheet.create({
   tagOverlay: {
     alignSelf: "center",
     backgroundColor: "rgba(255,255,255,0.92)",
-    borderRadius: ihubRadii.pill,
+    borderRadius: megrumRadii.pill,
     bottom: 8,
     maxWidth: "82%",
     paddingHorizontal: 9,
     paddingVertical: 4,
     position: "absolute",
-    shadowColor: ihubColors.ink,
+    shadowColor: megrumColors.ink,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.12,
     shadowRadius: 7,
   },
   tagText: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 9,
     fontWeight: "900",
   },
   liveBadge: {
-    backgroundColor: ihubColors.lavender,
-    borderRadius: ihubRadii.pill,
+    backgroundColor: megrumColors.lavender,
+    borderRadius: megrumRadii.pill,
     left: 8,
     paddingHorizontal: 8,
     paddingVertical: 4,
@@ -3981,7 +3981,7 @@ const styles = StyleSheet.create({
     top: 8,
   },
   liveBadgeText: {
-    color: ihubColors.surface,
+    color: megrumColors.surface,
     fontSize: 9,
     fontWeight: "900",
   },
@@ -3994,7 +3994,7 @@ const styles = StyleSheet.create({
     left: -5,
     position: "absolute",
     right: -5,
-    shadowColor: ihubColors.lavender,
+    shadowColor: megrumColors.lavender,
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.42,
     shadowRadius: 18,

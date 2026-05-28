@@ -4,7 +4,7 @@ import { HeaderBack } from "@/components/auth/HeaderBack";
 import { ApproveView, type ApproveData } from "./ApproveView";
 
 export const metadata = {
-  title: "取引完了の確認 — iHub",
+  title: "取引完了の確認 — Megrum",
 };
 
 type Row = {

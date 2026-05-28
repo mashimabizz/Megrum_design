@@ -6,7 +6,7 @@ import { BottomNav } from "@/components/home/BottomNav";
 import { SchedulesView, type ScheduleItem } from "./SchedulesView";
 
 export const metadata = {
-  title: "スケジュール — iHub",
+  title: "スケジュール — Megrum",
 };
 
 type ScheduleRow = {

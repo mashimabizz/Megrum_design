@@ -1,8 +1,8 @@
 {
   "expo": {
-    "name": "iHub",
-    "slug": "ihub",
-    "scheme": "ihub",
+    "name": "Megrum",
+    "slug": "megrum",
+    "scheme": "megrum",
     "version": "0.1.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -14,7 +14,7 @@
       "backgroundColor": "#ffffff"
     },
     "ios": {
-      "bundleIdentifier": "tokyo.ihub.app",
+      "bundleIdentifier": "tokyo.megrum.app",
       "supportsTablet": false,
       "usesAppleSignIn": true,
       "infoPlist": {

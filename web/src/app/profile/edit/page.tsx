@@ -4,7 +4,7 @@ import { HeaderBack } from "@/components/auth/HeaderBack";
 import { ProfileEditForm } from "./ProfileEditForm";
 
 export const metadata = {
-  title: "プロフィール編集 — iHub",
+  title: "プロフィール編集 — Megrum",
 };
 
 export default async function ProfileEditPage() {

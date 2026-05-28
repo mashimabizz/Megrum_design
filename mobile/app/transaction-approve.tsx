@@ -15,7 +15,7 @@ import { RouteHeader } from "../src/components/RouteHeader";
 import { Screen } from "../src/components/Screen";
 import { supabase } from "../src/lib/supabase";
 import { approveCompletion } from "../src/lib/transactionActions";
-import { ihubColors, ihubRadii, ihubShadow } from "../src/theme/tokens";
+import { megrumColors, megrumRadii, megrumShadow } from "../src/theme/tokens";
 
 type ProposalRow = {
   id: string;
@@ -37,6 +37,8 @@ type EvidencePhoto = {
   photoUrl: string;
   position: number;
   takenAt: string;
+  takenBy: string | null;
+  photographerLabel: string;
 };
 
 type GoodsRow = {
@@ -73,10 +75,17 @@ export default function TransactionApproveScreen() {
   const [loading, setLoading] = useState(false);
   const [approving, setApproving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const firstPhoto = data?.photos[0] ?? null;
+  const [selectedPhotoId, setSelectedPhotoId] = useState<string | null>(null);
+  const selectedPhoto = useMemo(
+    () =>
+      data?.photos.find((photo) => photo.id === selectedPhotoId) ??
+      data?.photos[0] ??
+      null,
+    [data?.photos, selectedPhotoId],
+  );
   const photoMeta = useMemo(
-    () => formatPhotoMeta(data?.photoTakenAt ?? firstPhoto?.takenAt ?? null),
-    [data?.photoTakenAt, firstPhoto?.takenAt],
+    () => formatPhotoMeta(data?.photoTakenAt ?? selectedPhoto?.takenAt ?? null),
+    [data?.photoTakenAt, selectedPhoto?.takenAt],
   );
 
   const reload = useCallback(async () => {
@@ -105,6 +114,18 @@ export default function TransactionApproveScreen() {
   useEffect(() => {
     void reload();
   }, [reload]);
+
+  useEffect(() => {
+    if (!data?.photos.length) {
+      setSelectedPhotoId(null);
+      return;
+    }
+    setSelectedPhotoId((current) =>
+      current && data.photos.some((photo) => photo.id === current)
+        ? current
+        : data.photos[0].id,
+    );
+  }, [data?.photos]);
 
   async function handleApprove() {
     if (!user || !proposalId) return;
@@ -147,18 +168,23 @@ export default function TransactionApproveScreen() {
     <View style={styles.root}>
       <Screen contentStyle={styles.screen}>
         <RouteHeader title="取引完了の確認" />
-        {loading ? <ActivityIndicator color={ihubColors.lavender} /> : null}
+        {loading ? <ActivityIndicator color={megrumColors.lavender} /> : null}
         {error ? <Text style={styles.errorText}>{error}</Text> : null}
 
         {data ? (
           <>
             <View style={styles.photoPanel}>
-              {firstPhoto ? (
-                <Image source={{ uri: firstPhoto.photoUrl }} style={styles.heroPhoto} />
+              {selectedPhoto ? (
+                <Image source={{ uri: selectedPhoto.photoUrl }} style={styles.heroPhoto} />
               ) : null}
               <View style={styles.photoMetaCard}>
-                <Text style={styles.photoMetaTitle}>取引証跡（{data.photos.length}枚）</Text>
+                <Text style={styles.photoMetaTitle}>
+                  取引証跡 #{selectedPhoto?.position ?? 1}（{data.photos.length}枚）
+                </Text>
                 <Text style={styles.photoMetaText}>{photoMeta}</Text>
+                <Text numberOfLines={1} style={styles.photoMetaText}>
+                  {selectedPhoto?.photographerLabel ?? "撮影者不明"}
+                </Text>
                 <Text numberOfLines={1} style={styles.photoMetaText}>
                   {data.placeName ?? "場所未設定"}
                 </Text>
@@ -172,7 +198,27 @@ export default function TransactionApproveScreen() {
                 contentContainerStyle={styles.photoList}
               >
                 {data.photos.map((photo) => (
-                  <Image key={photo.id} source={{ uri: photo.photoUrl }} style={styles.thumb} />
+                  <Pressable
+                    key={photo.id}
+                    accessibilityRole="button"
+                    accessibilityLabel={`証跡${photo.position}を選択`}
+                    onPress={() => setSelectedPhotoId(photo.id)}
+                    style={[
+                      styles.thumbButton,
+                      photo.id === selectedPhoto?.id ? styles.thumbButtonSelected : null,
+                    ]}
+                  >
+                    <Image source={{ uri: photo.photoUrl }} style={styles.thumb} />
+                    <Text
+                      numberOfLines={1}
+                      style={[
+                        styles.thumbLabel,
+                        photo.id === selectedPhoto?.id ? styles.thumbLabelSelected : null,
+                      ]}
+                    >
+                      #{photo.position} {photo.photographerLabel}
+                    </Text>
+                  </Pressable>
                 ))}
               </ScrollView>
             ) : null}
@@ -256,21 +302,17 @@ async function fetchApproveData(proposalId: string, userId: string): Promise<App
 
   const { data: photosData } = await supabase
     .from("proposal_evidence_photos")
-    .select("id, photo_url, position, taken_at")
+    .select("id, photo_url, position, taken_at, taken_by")
     .eq("proposal_id", proposalId)
     .order("position", { ascending: true });
-  const photos = ((photosData as {
+  const rawPhotos = ((photosData as {
     id: string;
     photo_url: string;
     position: number;
     taken_at: string;
-  }[] | null) ?? []).map((photo) => ({
-    id: photo.id,
-    photoUrl: photo.photo_url,
-    position: photo.position,
-    takenAt: photo.taken_at,
-  }));
-  if (photos.length === 0) throw new Error("NO_PHOTOS");
+    taken_by: string | null;
+  }[] | null) ?? []);
+  if (rawPhotos.length === 0) throw new Error("NO_PHOTOS");
 
   const isMeSender = proposal.sender_id === userId;
   const partnerId = isMeSender ? proposal.receiver_id : proposal.sender_id;
@@ -289,6 +331,19 @@ async function fetchApproveData(proposalId: string, userId: string): Promise<App
     (partner as { handle?: string | null; display_name?: string | null } | null)?.handle ??
     (partner as { display_name?: string | null } | null)?.display_name ??
     "?";
+  const photos = rawPhotos.map((photo) => ({
+    id: photo.id,
+    photoUrl: photo.photo_url,
+    position: photo.position,
+    takenAt: photo.taken_at,
+    takenBy: photo.taken_by,
+    photographerLabel:
+      photo.taken_by === userId
+        ? "あなたが撮影"
+        : photo.taken_by === partnerId
+          ? `@${partnerHandle} が撮影`
+          : "撮影者不明",
+  }));
   const senderIds = proposal.sender_have_ids ?? [];
   const senderQtys = proposal.sender_have_qtys ?? [];
   const receiverIds = proposal.receiver_have_ids ?? [];
@@ -431,7 +486,7 @@ function formatPhotoMeta(value: string | null) {
 
 const styles = StyleSheet.create({
   root: {
-    backgroundColor: ihubColors.background,
+    backgroundColor: megrumColors.background,
     flex: 1,
   },
   screen: {
@@ -439,27 +494,27 @@ const styles = StyleSheet.create({
     paddingBottom: 130,
   },
   noticeCard: {
-    backgroundColor: ihubColors.surface,
+    backgroundColor: megrumColors.surface,
     borderColor: "rgba(166,149,216,0.2)",
-    borderRadius: ihubRadii.xl,
+    borderRadius: megrumRadii.xl,
     borderWidth: 1,
     gap: 10,
     padding: 16,
-    ...ihubShadow,
+    ...megrumShadow,
   },
   noticeTitle: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 18,
     fontWeight: "900",
   },
   noticeText: {
-    color: ihubColors.mutedInk,
+    color: megrumColors.mutedInk,
     fontSize: 12.5,
     fontWeight: "800",
     lineHeight: 19,
   },
   errorText: {
-    color: ihubColors.warn,
+    color: megrumColors.warn,
     fontSize: 12,
     fontWeight: "900",
     lineHeight: 18,
@@ -499,13 +554,35 @@ const styles = StyleSheet.create({
     gap: 8,
     paddingRight: 18,
   },
+  thumbButton: {
+    borderColor: "transparent",
+    borderRadius: 13,
+    borderWidth: 2,
+    gap: 4,
+    padding: 3,
+    width: 78,
+  },
+  thumbButtonSelected: {
+    backgroundColor: "rgba(166,149,216,0.10)",
+    borderColor: megrumColors.lavender,
+  },
   thumb: {
     borderRadius: 10,
     height: 78,
     width: 60,
   },
+  thumbLabel: {
+    color: megrumColors.mutedInk,
+    fontSize: 8.5,
+    fontWeight: "900",
+    lineHeight: 11,
+    width: "100%",
+  },
+  thumbLabelSelected: {
+    color: megrumColors.lavender,
+  },
   rowsPanel: {
-    backgroundColor: ihubColors.surface,
+    backgroundColor: megrumColors.surface,
     borderColor: "rgba(58,50,74,0.08)",
     borderRadius: 16,
     borderWidth: 1,
@@ -520,7 +597,7 @@ const styles = StyleSheet.create({
   },
   sideBadge: {
     alignItems: "center",
-    borderRadius: ihubRadii.pill,
+    borderRadius: megrumRadii.pill,
     height: 30,
     justifyContent: "center",
     width: 30,
@@ -532,7 +609,7 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(168,212,230,0.34)",
   },
   sideBadgeText: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 11,
     fontWeight: "900",
   },
@@ -541,12 +618,12 @@ const styles = StyleSheet.create({
     minWidth: 0,
   },
   itemHandle: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 12.5,
     fontWeight: "900",
   },
   itemDesc: {
-    color: ihubColors.mutedInk,
+    color: megrumColors.mutedInk,
     fontSize: 10.5,
     fontWeight: "800",
     lineHeight: 15,
@@ -559,7 +636,7 @@ const styles = StyleSheet.create({
   },
   letterCard: {
     alignItems: "center",
-    backgroundColor: ihubColors.lavender,
+    backgroundColor: megrumColors.lavender,
     borderColor: "rgba(255,255,255,0.7)",
     borderRadius: 4,
     borderWidth: 1,
@@ -573,7 +650,7 @@ const styles = StyleSheet.create({
     fontWeight: "900",
   },
   moreLetters: {
-    color: ihubColors.mutedInk,
+    color: megrumColors.mutedInk,
     fontSize: 9,
     fontWeight: "900",
   },
@@ -582,7 +659,7 @@ const styles = StyleSheet.create({
     height: StyleSheet.hairlineWidth,
   },
   statusPanel: {
-    backgroundColor: ihubColors.surface,
+    backgroundColor: megrumColors.surface,
     borderColor: "rgba(58,50,74,0.08)",
     borderRadius: 16,
     borderWidth: 1,
@@ -590,7 +667,7 @@ const styles = StyleSheet.create({
     padding: 14,
   },
   statusTitle: {
-    color: ihubColors.mutedInk,
+    color: megrumColors.mutedInk,
     fontSize: 11,
     fontWeight: "900",
   },
@@ -602,7 +679,7 @@ const styles = StyleSheet.create({
   statusMark: {
     backgroundColor: "rgba(58,50,74,0.06)",
     borderColor: "rgba(166,149,216,0.55)",
-    borderRadius: ihubRadii.pill,
+    borderRadius: megrumRadii.pill,
     borderStyle: "dashed",
     borderWidth: 1.5,
     height: 30,
@@ -610,8 +687,8 @@ const styles = StyleSheet.create({
   },
   statusMarkDone: {
     alignItems: "center",
-    backgroundColor: ihubColors.ok,
-    borderColor: ihubColors.ok,
+    backgroundColor: megrumColors.ok,
+    borderColor: megrumColors.ok,
     borderStyle: "solid",
     justifyContent: "center",
   },
@@ -621,12 +698,12 @@ const styles = StyleSheet.create({
     fontWeight: "900",
   },
   statusLabel: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 12.5,
     fontWeight: "900",
   },
   statusSub: {
-    color: ihubColors.mutedInk,
+    color: megrumColors.mutedInk,
     fontSize: 10.5,
     fontWeight: "800",
     marginTop: 2,
@@ -634,7 +711,7 @@ const styles = StyleSheet.create({
   hintText: {
     backgroundColor: "rgba(58,50,74,0.04)",
     borderRadius: 11,
-    color: ihubColors.mutedInk,
+    color: megrumColors.mutedInk,
     fontSize: 11,
     fontWeight: "800",
     lineHeight: 17,
@@ -657,15 +734,15 @@ const styles = StyleSheet.create({
   },
   disputeButton: {
     alignItems: "center",
-    backgroundColor: ihubColors.surface,
+    backgroundColor: megrumColors.surface,
     borderColor: "rgba(58,50,74,0.08)",
-    borderRadius: ihubRadii.md,
+    borderRadius: megrumRadii.md,
     borderWidth: 1,
     justifyContent: "center",
     paddingHorizontal: 16,
   },
   disputeText: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 13,
     fontWeight: "900",
   },

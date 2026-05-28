@@ -3,7 +3,7 @@ import { HeaderBack } from "@/components/auth/HeaderBack";
 import { ResendButton } from "./ResendButton";
 
 export const metadata = {
-  title: "メール認証 — iHub",
+  title: "メール認証 — Megrum",
 };
 
 type Props = {

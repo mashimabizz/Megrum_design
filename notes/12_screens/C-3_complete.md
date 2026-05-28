@@ -3,8 +3,8 @@
 > 物理交換が終わったあとの3ステップ。証跡を残し、内容に間違いがないか相互確認し、評価する。
 
 最終更新: 2026-05-01（iter41）
-関連JSX: `iHub/c-flow.jsx::CompleteScreen`、`CaptureStep`、`ApproveStep`、`RateStep`
-関連HTML: `iHub/iHub C Flow.html`
+関連JSX: `Megrum/c-flow.jsx::CompleteScreen`、`CaptureStep`、`ApproveStep`、`RateStep`
+関連HTML: `Megrum/Megrum C Flow.html`
 関連 iter: 4（証跡レイアウト確定設計）/ 22（評価＋コレクション連携）
 
 ---

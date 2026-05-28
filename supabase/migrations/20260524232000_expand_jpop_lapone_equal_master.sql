@@ -4,7 +4,7 @@
 -- 邦アイの箱推し登録だけでなく、メンバー単位の推し登録にも使えるように
 -- JO1 / INI / ME:I / King & Prince / =LOVE / ≠ME を補完する。
 
-create temporary table _ihub_seed_characters (
+create temporary table _megrum_seed_characters (
   genre_name text not null,
   group_name text not null,
   name text not null,
@@ -12,7 +12,7 @@ create temporary table _ihub_seed_characters (
   display_order integer not null
 ) on commit drop;
 
-insert into _ihub_seed_characters (genre_name, group_name, name, aliases, display_order) values
+insert into _megrum_seed_characters (genre_name, group_name, name, aliases, display_order) values
   ('邦アイ','King & Prince','永瀬廉',array['Ren Nagase']::text[],1),
   ('邦アイ','King & Prince','髙橋海人',array['Kaito Takahashi']::text[],2),
   ('邦アイ','JO1','與那城奨',array['Sho Yonashiro']::text[],1),
@@ -73,7 +73,7 @@ insert into _ihub_seed_characters (genre_name, group_name, name, aliases, displa
 
 insert into public.characters_master (group_id, genre_id, name, aliases, display_order)
 select gm.id, ge.id, sc.name, sc.aliases, sc.display_order
-from _ihub_seed_characters sc
+from _megrum_seed_characters sc
 join public.genres_master ge on ge.name = sc.genre_name
 join public.groups_master gm on gm.genre_id = ge.id and gm.name = sc.group_name
 where not exists (

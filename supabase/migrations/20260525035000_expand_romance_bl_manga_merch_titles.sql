@@ -3,7 +3,7 @@
 -- =====================================================================
 -- 交換需要が出やすいアクリルスタンド・缶バッジ等のグッズ展開がある作品を補完する。
 
-create temporary table _ihub_seed_groups (
+create temporary table _megrum_seed_groups (
   genre_name text not null,
   name text not null,
   aliases text[] not null default '{}',
@@ -11,7 +11,7 @@ create temporary table _ihub_seed_groups (
   display_order integer not null
 ) on commit drop;
 
-insert into _ihub_seed_groups (genre_name, name, aliases, kind, display_order) values
+insert into _megrum_seed_groups (genre_name, name, aliases, kind, display_order) values
   ('アニメ・マンガ','ゆびさきと恋々',array['A Sign of Affection']::text[],'work',106),
   ('アニメ・マンガ','山田くんとLv999の恋をする',array['山田999','My Love Story with Yamada-kun at Lv999']::text[],'work',107),
   ('アニメ・マンガ','佐々木と宮野',array['Sasaki and Miyano']::text[],'work',108),
@@ -27,14 +27,14 @@ select
   sg.aliases,
   sg.kind,
   sg.display_order
-from _ihub_seed_groups sg
+from _megrum_seed_groups sg
 join public.genres_master ge on ge.name = sg.genre_name
 on conflict (genre_id, name) do update
   set aliases = excluded.aliases,
       kind = excluded.kind,
       display_order = excluded.display_order;
 
-create temporary table _ihub_seed_characters (
+create temporary table _megrum_seed_characters (
   genre_name text not null,
   group_name text not null,
   name text not null,
@@ -42,7 +42,7 @@ create temporary table _ihub_seed_characters (
   display_order integer not null
 ) on commit drop;
 
-insert into _ihub_seed_characters (genre_name, group_name, name, aliases, display_order) values
+insert into _megrum_seed_characters (genre_name, group_name, name, aliases, display_order) values
   -- ゆびさきと恋々
   ('アニメ・マンガ','ゆびさきと恋々','糸瀬雪',array[]::text[],1),
   ('アニメ・マンガ','ゆびさきと恋々','波岐逸臣',array[]::text[],2),
@@ -113,7 +113,7 @@ select
   sc.name,
   sc.aliases,
   sc.display_order
-from _ihub_seed_characters sc
+from _megrum_seed_characters sc
 join public.genres_master ge on ge.name = sc.genre_name
 join public.groups_master gm on gm.genre_id = ge.id and gm.name = sc.group_name
 where not exists (

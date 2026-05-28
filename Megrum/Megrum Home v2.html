@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Megrum — Home v2 (A brushup)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&family=Inter+Tight:wght@400;500;600;700&family=Zen+Maru+Gothic:wght@500;700&display=swap" rel="stylesheet">
+<style>
+  html, body { margin: 0; padding: 0; background: #f3eef7; height: 100%; -webkit-font-smoothing: antialiased; }
+  body { font-family: "Noto Sans JP", -apple-system, system-ui, sans-serif; }
+  #root { width: 100vw; height: 100vh; }
+</style>
+
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel" src="design-canvas.jsx"></script>
+<script type="text/babel" src="ios-frame.jsx"></script>
+<script type="text/babel" src="tweaks-panel.jsx"></script>
+<script type="text/babel" src="home-variations.jsx"></script>
+<script type="text/babel" src="home-v2.jsx"></script>
+
+<script type="text/babel">
+const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
+  "primary": "#a695d8",
+  "secondary": "#a8d4e6",
+  "accent": "#f3c5d4"
+}/*EDITMODE-END*/;
+
+const PRESETS = {
+  brand:    { primary: '#a695d8', secondary: '#a8d4e6', accent: '#f3c5d4', label: 'ブランド（推奨）' },
+  lavender: { primary: '#9b87d4', secondary: '#bcc5ee', accent: '#f0c6db', label: 'ラベンダー寄り' },
+  sky:      { primary: '#7eb6d9', secondary: '#c8d8e8', accent: '#f5cfd9', label: '水色寄り' },
+  rose:     { primary: '#c89bc4', secondary: '#a8c9dd', accent: '#f8d2dc', label: 'ローズミックス' },
+};
+
+function App() {
+  const [t, setTweak] = useTweaks(TWEAK_DEFAULTS);
+
+  const applyPreset = (key) => {
+    const p = PRESETS[key];
+    setTweak({ primary: p.primary, secondary: p.secondary, accent: p.accent });
+  };
+
+  return (
+    <>
+      <DesignCanvas
+        title="Megrum · ホーム画面 v2（A案ブラッシュアップ）"
+        subtitle="ブランドカラー反映 / パステル基調・柔らかタイポ・余白増 / 推し一致・評価・断った学習"
+      >
+        <DCSection id="home-v2" title="ホーム画面 v2">
+          <DCArtboard id="A2" label="A案 v2 — ブランドカラー反映" width={420} height={900}>
+            <IOSDevice width={420} height={900}>
+              <HomeV2 tweaks={t} />
+            </IOSDevice>
+          </DCArtboard>
+
+          <DCArtboard id="A1" label="A案 v1（参考・モノトーン基調）" width={420} height={900}>
+            <IOSDevice width={420} height={900}>
+              <VariationA accent={t.primary} />
+            </IOSDevice>
+          </DCArtboard>
+        </DCSection>
+      </DesignCanvas>
+
+      <TweaksPanel title="Megrum Tweaks">
+        <TweakSection label="プリセット" />
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
+          {Object.entries(PRESETS).map(([k, p]) => (
+            <button key={k} onClick={() => applyPreset(k)} style={{
+              appearance: 'none', textAlign: 'left',
+              padding: '8px 10px', borderRadius: 8,
+              border: '0.5px solid rgba(0,0,0,0.1)',
+              background: '#fff', cursor: 'pointer',
+              display: 'flex', flexDirection: 'column', gap: 5,
+              fontFamily: 'inherit',
+            }}>
+              <div style={{ display: 'flex', gap: 3 }}>
+                <div style={{ flex: 1, height: 14, borderRadius: 3, background: p.primary }} />
+                <div style={{ flex: 1, height: 14, borderRadius: 3, background: p.secondary }} />
+                <div style={{ flex: 1, height: 14, borderRadius: 3, background: p.accent }} />
+              </div>
+              <span style={{ fontSize: 10.5, fontWeight: 500 }}>{p.label}</span>
+            </button>
+          ))}
+        </div>
+        <TweakSection label="個別カラー" />
+        <TweakColor label="プライマリ" value={t.primary} onChange={(v) => setTweak('primary', v)} />
+        <TweakColor label="セカンダリ" value={t.secondary} onChange={(v) => setTweak('secondary', v)} />
+        <TweakColor label="アクセント" value={t.accent} onChange={(v) => setTweak('accent', v)} />
+      </TweaksPanel>
+    </>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>

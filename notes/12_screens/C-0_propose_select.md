@@ -3,8 +3,8 @@
 > 打診の準備段階。譲・受け取る・待ち合わせ の3要素をすべて確定してから C-1 に進む。
 
 最終更新: 2026-05-01（iter41）
-関連JSX: `iHub/propose-select.jsx::ProposeSelectScreen`
-関連HTML: `iHub/iHub Propose Select.html`
+関連JSX: `Megrum/propose-select.jsx::ProposeSelectScreen`
+関連HTML: `Megrum/Megrum Propose Select.html`
 関連 iter: 27 / 28 / 29 / 33
 
 ---

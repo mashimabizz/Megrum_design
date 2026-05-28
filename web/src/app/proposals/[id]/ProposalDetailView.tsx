@@ -453,7 +453,7 @@ export function ProposalDetailView({ detail }: { detail: ProposalDetail }) {
             <AttachRow
               label="個別募集経由"
               value={`listing #${detail.listingId.slice(0, 8)}`}
-              tag="@iHub"
+              tag="@Megrum"
               isLast={!detail.rejectedTemplate}
             />
           )}

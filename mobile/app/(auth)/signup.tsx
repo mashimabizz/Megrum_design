@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { router } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import {
   KeyboardAvoidingView,
   Platform,
@@ -8,23 +8,23 @@ import {
   Text,
   View,
 } from "react-native";
-import { AppleAuthButton } from "../../src/components/AppleAuthButton";
 import { PrimaryButton } from "../../src/components/PrimaryButton";
 import { Screen } from "../../src/components/Screen";
 import { TextField } from "../../src/components/TextField";
 import { useAuth } from "../../src/auth/AuthProvider";
 import { supabase } from "../../src/lib/supabase";
-import { ihubColors, ihubRadii } from "../../src/theme/tokens";
+import { megrumColors, megrumRadii } from "../../src/theme/tokens";
 
 type FieldErrors = Partial<Record<"handle" | "email" | "password" | "confirm" | "terms", string>>;
 
 export default function SignUpScreen() {
+  const params = useLocalSearchParams<{ terms?: string }>();
   const { signUp } = useAuth();
   const [handle, setHandle] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
-  const [terms, setTerms] = useState(false);
+  const [terms, setTerms] = useState(() => params.terms === "1");
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
@@ -98,7 +98,7 @@ export default function SignUpScreen() {
         <View>
           <Text style={styles.title}>はじめまして</Text>
           <Text style={styles.lead}>
-            メールアドレスとパスワードを設定して、iHub を始めましょう
+            メールアドレスとパスワードを設定して、Megrum を始めましょう
           </Text>
         </View>
 
@@ -108,7 +108,7 @@ export default function SignUpScreen() {
             value={handle}
             onChangeText={(value) => setHandle(value.toLowerCase())}
             autoCapitalize="none"
-            placeholder="ihub_xx"
+            placeholder="megrum_xx"
           />
           <Text style={styles.hint}>@から始まる英数字、後から変更可能</Text>
           {fieldErrors.handle ? <Text style={styles.fieldError}>{fieldErrors.handle}</Text> : null}
@@ -179,12 +179,6 @@ export default function SignUpScreen() {
           <PrimaryButton loading={pending} disabled={!canSubmit} onPress={submit}>
             次へ
           </PrimaryButton>
-          <View style={styles.divider}>
-            <View style={styles.dividerLine} />
-            <Text style={styles.dividerText}>または</Text>
-            <View style={styles.dividerLine} />
-          </View>
-          <AppleAuthButton disabled={!terms} mode="signUp" onError={setError} />
           <View style={styles.loginRow}>
             <Text style={styles.loginText}>すでにアカウントをお持ちの方は </Text>
             <Pressable onPress={() => router.replace("/login")}>
@@ -216,16 +210,16 @@ function AuthHeader({ title, backTo }: { title: string; backTo: string }) {
 
 function getPasswordStrength(password: string) {
   if (!password) return { level: 0, label: "", color: "rgba(58,50,74,0.14)" };
-  if (password.length < 8) return { level: 1, label: "弱い", color: ihubColors.warn };
+  if (password.length < 8) return { level: 1, label: "弱い", color: megrumColors.warn };
   const hasLetter = /[a-zA-Z]/.test(password);
   const hasDigit = /\d/.test(password);
   const hasSymbol = /[^a-zA-Z\d]/.test(password);
   if (hasLetter && hasDigit && hasSymbol && password.length >= 12) {
-    return { level: 4, label: "最強", color: ihubColors.ok };
+    return { level: 4, label: "最強", color: megrumColors.ok };
   }
-  if (hasLetter && hasDigit) return { level: 3, label: "強い", color: ihubColors.ok };
+  if (hasLetter && hasDigit) return { level: 3, label: "強い", color: megrumColors.ok };
   if (hasLetter || hasDigit) return { level: 2, label: "普通", color: "#eab308" };
-  return { level: 1, label: "弱い", color: ihubColors.warn };
+  return { level: 1, label: "弱い", color: megrumColors.warn };
 }
 
 function normalizeSignUpError(message: string) {
@@ -249,22 +243,22 @@ const styles = StyleSheet.create({
   },
   backButton: {
     alignItems: "center",
-    backgroundColor: ihubColors.surface,
+    backgroundColor: megrumColors.surface,
     borderColor: "rgba(58,50,74,0.08)",
-    borderRadius: ihubRadii.pill,
+    borderRadius: megrumRadii.pill,
     borderWidth: 1,
     height: 42,
     justifyContent: "center",
     width: 42,
   },
   backText: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 30,
     fontWeight: "800",
     lineHeight: 32,
   },
   headerTitle: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 18,
     fontWeight: "900",
   },
@@ -272,13 +266,13 @@ const styles = StyleSheet.create({
     width: 42,
   },
   title: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 22,
     fontWeight: "900",
     lineHeight: 28,
   },
   lead: {
-    color: ihubColors.mutedInk,
+    color: megrumColors.mutedInk,
     fontSize: 12,
     fontWeight: "800",
     lineHeight: 19,
@@ -288,13 +282,13 @@ const styles = StyleSheet.create({
     gap: 11,
   },
   hint: {
-    color: ihubColors.mutedInk,
+    color: megrumColors.mutedInk,
     fontSize: 11,
     fontWeight: "700",
     marginTop: -6,
   },
   fieldError: {
-    color: ihubColors.warn,
+    color: megrumColors.warn,
     fontSize: 11,
     fontWeight: "800",
     marginTop: -4,
@@ -333,16 +327,16 @@ const styles = StyleSheet.create({
     width: 20,
   },
   checkboxActive: {
-    backgroundColor: ihubColors.lavender,
-    borderColor: ihubColors.lavender,
+    backgroundColor: megrumColors.lavender,
+    borderColor: megrumColors.lavender,
   },
   checkText: {
-    color: ihubColors.surface,
+    color: megrumColors.surface,
     fontSize: 13,
     fontWeight: "900",
   },
   termsText: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     flex: 1,
     fontSize: 13,
     fontWeight: "700",
@@ -351,9 +345,9 @@ const styles = StyleSheet.create({
   error: {
     backgroundColor: "rgba(217,130,107,0.10)",
     borderColor: "rgba(217,130,107,0.22)",
-    borderRadius: ihubRadii.md,
+    borderRadius: megrumRadii.md,
     borderWidth: 1,
-    color: ihubColors.warn,
+    color: megrumColors.warn,
     fontSize: 12,
     fontWeight: "800",
     lineHeight: 18,
@@ -371,7 +365,7 @@ const styles = StyleSheet.create({
     height: 1,
   },
   dividerText: {
-    color: ihubColors.mutedInk,
+    color: megrumColors.mutedInk,
     fontSize: 11,
     fontWeight: "700",
   },
@@ -382,12 +376,12 @@ const styles = StyleSheet.create({
     paddingTop: 4,
   },
   loginText: {
-    color: ihubColors.mutedInk,
+    color: megrumColors.mutedInk,
     fontSize: 13,
     fontWeight: "700",
   },
   loginLink: {
-    color: ihubColors.lavender,
+    color: megrumColors.lavender,
     fontSize: 13,
     fontWeight: "900",
   },

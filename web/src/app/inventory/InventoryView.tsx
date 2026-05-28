@@ -260,7 +260,7 @@ export function InventoryFooter() {
       <div className="pointer-events-auto mx-auto max-w-md px-[18px] pb-2 pt-3">
         <Link
           href="/inventory/new"
-          className="flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-br from-ihub-lavender to-ihub-pink text-[14.5px] font-bold tracking-wider text-white shadow-[0_6px_16px_rgba(58,50,74,0.18)] transition-all duration-150 active:scale-[0.97]"
+          className="flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-br from-megrum-lavender to-megrum-pink text-[14.5px] font-bold tracking-wider text-white shadow-[0_6px_16px_rgba(58,50,74,0.18)] transition-all duration-150 active:scale-[0.97]"
         >
           <svg
             width="14"
@@ -579,7 +579,7 @@ function ItemCardWrapper({
           fallbackLabel={itemLabel}
           meta={
             item.qty > 1 ? (
-              <div className="rounded-md bg-ihub-lavender px-1.5 py-0.5 text-[10px] font-extrabold tabular-nums text-white">
+              <div className="rounded-md bg-megrum-lavender px-1.5 py-0.5 text-[10px] font-extrabold tabular-nums text-white">
                 ×{item.qty}
               </div>
             ) : null

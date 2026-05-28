@@ -23,7 +23,7 @@ import { IconSymbol } from "../src/components/IconSymbol";
 import { PrimaryButton } from "../src/components/PrimaryButton";
 import { Screen } from "../src/components/Screen";
 import { supabase } from "../src/lib/supabase";
-import { ihubColors, ihubRadii, ihubShadow } from "../src/theme/tokens";
+import { megrumColors, megrumRadii, megrumShadow } from "../src/theme/tokens";
 
 type GroupSource = "master" | "request";
 type MemberSource = "master" | "request";
@@ -431,13 +431,13 @@ export default function OshiSettingsScreen() {
             title: "推し設定",
             headerBackButtonDisplayMode: "minimal",
             headerBlurEffect: "systemMaterial",
-            headerTintColor: ihubColors.lavender,
+            headerTintColor: megrumColors.lavender,
           }}
         />
 
       {loading ? (
         <View style={styles.loadingRow}>
-          <ActivityIndicator color={ihubColors.lavender} />
+          <ActivityIndicator color={megrumColors.lavender} />
           <Text style={styles.inlineNotice}>推し設定を読み込み中…</Text>
         </View>
       ) : null}
@@ -498,7 +498,7 @@ export default function OshiSettingsScreen() {
           ]}
         >
           <View style={styles.fixedAddIcon}>
-            <IconSymbol name="add" size={18} color={ihubColors.surface} />
+            <IconSymbol name="add" size={18} color={megrumColors.surface} />
           </View>
           <Text style={styles.fixedAddText}>推しを追加</Text>
         </Pressable>
@@ -1382,7 +1382,7 @@ function sortByName<T extends { name: string }>(values: T[]) {
 
 const styles = StyleSheet.create({
   root: {
-    backgroundColor: ihubColors.background,
+    backgroundColor: megrumColors.background,
     flex: 1,
   },
   screen: {
@@ -1395,17 +1395,17 @@ const styles = StyleSheet.create({
   },
   backButton: {
     alignItems: "center",
-    backgroundColor: ihubColors.surface,
+    backgroundColor: megrumColors.surface,
     borderColor: "rgba(58,50,74,0.08)",
-    borderRadius: ihubRadii.pill,
+    borderRadius: megrumRadii.pill,
     borderWidth: 1,
     height: 44,
     justifyContent: "center",
     width: 44,
-    ...ihubShadow,
+    ...megrumShadow,
   },
   backText: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 32,
     fontWeight: "800",
     lineHeight: 34,
@@ -1414,12 +1414,12 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   title: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 20,
     fontWeight: "900",
   },
   subtitle: {
-    color: ihubColors.mutedInk,
+    color: megrumColors.mutedInk,
     fontSize: 11,
     fontWeight: "800",
     marginTop: 2,
@@ -1429,15 +1429,15 @@ const styles = StyleSheet.create({
   },
   requestEntryButton: {
     alignItems: "center",
-    backgroundColor: ihubColors.surface,
+    backgroundColor: megrumColors.surface,
     borderColor: "rgba(58,50,74,0.09)",
-    borderRadius: ihubRadii.lg,
+    borderRadius: megrumRadii.lg,
     borderWidth: 1,
     paddingHorizontal: 14,
     paddingVertical: 13,
   },
   requestEntryText: {
-    color: ihubColors.lavender,
+    color: megrumColors.lavender,
     fontSize: 12.5,
     fontWeight: "900",
   },
@@ -1447,14 +1447,14 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   inlineNotice: {
-    color: ihubColors.mutedInk,
+    color: megrumColors.mutedInk,
     fontSize: 11.5,
     fontWeight: "800",
   },
   inlineNoticeStrong: {
     backgroundColor: "rgba(168,212,230,0.18)",
-    borderRadius: ihubRadii.md,
-    color: ihubColors.ink,
+    borderRadius: megrumRadii.md,
+    color: megrumColors.ink,
     fontSize: 11.5,
     fontWeight: "900",
     lineHeight: 18,
@@ -1462,28 +1462,28 @@ const styles = StyleSheet.create({
     paddingVertical: 9,
   },
   inlineError: {
-    color: ihubColors.warn,
+    color: megrumColors.warn,
     fontSize: 12,
     fontWeight: "800",
     lineHeight: 18,
   },
   emptyBox: {
     alignItems: "center",
-    backgroundColor: ihubColors.surface,
+    backgroundColor: megrumColors.surface,
     borderColor: "rgba(58,50,74,0.10)",
-    borderRadius: ihubRadii.xl,
+    borderRadius: megrumRadii.xl,
     borderStyle: "dashed",
     borderWidth: 1,
     gap: 6,
     padding: 24,
   },
   emptyTitle: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 15,
     fontWeight: "900",
   },
   emptyText: {
-    color: ihubColors.mutedInk,
+    color: megrumColors.mutedInk,
     fontSize: 12,
     fontWeight: "800",
     lineHeight: 18,
@@ -1493,9 +1493,9 @@ const styles = StyleSheet.create({
     gap: 11,
   },
   groupCard: {
-    backgroundColor: ihubColors.surface,
+    backgroundColor: megrumColors.surface,
     borderColor: "rgba(58,50,74,0.08)",
-    borderRadius: ihubRadii.xl,
+    borderRadius: megrumRadii.xl,
     borderWidth: 1,
     gap: 12,
     padding: 14,
@@ -1515,36 +1515,36 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   groupName: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     flexShrink: 1,
     fontSize: 15,
     fontWeight: "900",
   },
   pendingBadge: {
     backgroundColor: "rgba(166,149,216,0.12)",
-    borderRadius: ihubRadii.pill,
+    borderRadius: megrumRadii.pill,
     paddingHorizontal: 7,
     paddingVertical: 2,
   },
   pendingText: {
-    color: ihubColors.lavender,
+    color: megrumColors.lavender,
     fontSize: 9,
     fontWeight: "900",
   },
   groupMeta: {
-    color: ihubColors.mutedInk,
+    color: megrumColors.mutedInk,
     fontSize: 10.5,
     fontWeight: "800",
     marginTop: 2,
   },
   removeButton: {
     backgroundColor: "rgba(217,130,107,0.12)",
-    borderRadius: ihubRadii.pill,
+    borderRadius: megrumRadii.pill,
     paddingHorizontal: 10,
     paddingVertical: 7,
   },
   removeButtonText: {
-    color: ihubColors.warn,
+    color: megrumColors.warn,
     fontSize: 10.5,
     fontWeight: "900",
   },
@@ -1557,7 +1557,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     backgroundColor: "rgba(166,149,216,0.12)",
     borderColor: "rgba(166,149,216,0.24)",
-    borderRadius: ihubRadii.pill,
+    borderRadius: megrumRadii.pill,
     borderWidth: 1,
     flexDirection: "row",
     gap: 5,
@@ -1565,51 +1565,51 @@ const styles = StyleSheet.create({
     paddingVertical: 7,
   },
   memberText: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 11.5,
     fontWeight: "900",
   },
   memberDelete: {
-    color: ihubColors.warn,
+    color: megrumColors.warn,
     fontSize: 12,
     fontWeight: "900",
   },
   addMemberChip: {
     borderColor: "rgba(58,50,74,0.20)",
-    borderRadius: ihubRadii.pill,
+    borderRadius: megrumRadii.pill,
     borderStyle: "dashed",
     borderWidth: 1,
     paddingHorizontal: 11,
     paddingVertical: 7,
   },
   addMemberText: {
-    color: ihubColors.mutedInk,
+    color: megrumColors.mutedInk,
     fontSize: 11.5,
     fontWeight: "900",
   },
   memberAddBox: {
-    backgroundColor: ihubColors.background,
+    backgroundColor: megrumColors.background,
     borderColor: "rgba(58,50,74,0.08)",
-    borderRadius: ihubRadii.lg,
+    borderRadius: megrumRadii.lg,
     borderWidth: 1,
     gap: 10,
     padding: 12,
   },
   memberAddTitle: {
-    color: ihubColors.mutedInk,
+    color: megrumColors.mutedInk,
     fontSize: 11,
     fontWeight: "900",
   },
   availableMemberChip: {
-    backgroundColor: ihubColors.surface,
+    backgroundColor: megrumColors.surface,
     borderColor: "rgba(58,50,74,0.10)",
-    borderRadius: ihubRadii.pill,
+    borderRadius: megrumRadii.pill,
     borderWidth: 1,
     paddingHorizontal: 11,
     paddingVertical: 7,
   },
   availableMemberText: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 11.5,
     fontWeight: "900",
   },
@@ -1620,12 +1620,12 @@ const styles = StyleSheet.create({
     paddingTop: 10,
   },
   memberRequestText: {
-    color: ihubColors.lavender,
+    color: megrumColors.lavender,
     fontSize: 11.5,
     fontWeight: "900",
   },
   noMemberText: {
-    color: ihubColors.mutedInk,
+    color: megrumColors.mutedInk,
     fontSize: 11.5,
     fontWeight: "800",
     lineHeight: 18,
@@ -1642,7 +1642,7 @@ const styles = StyleSheet.create({
   },
   nativeSheetLayer: {
     alignItems: "stretch",
-    backgroundColor: ihubColors.background,
+    backgroundColor: megrumColors.background,
     justifyContent: "flex-start",
     padding: 16,
   },
@@ -1656,7 +1656,7 @@ const styles = StyleSheet.create({
     shadowRadius: 0,
   },
   masterModal: {
-    backgroundColor: ihubColors.background,
+    backgroundColor: megrumColors.background,
     borderColor: "rgba(255,255,255,0.72)",
     borderRadius: 28,
     borderWidth: 1,
@@ -1664,7 +1664,7 @@ const styles = StyleSheet.create({
     maxHeight: "82%",
     padding: 16,
     width: "100%",
-    ...ihubShadow,
+    ...megrumShadow,
   },
   masterNativeSheetPanel: {
     flex: 1,
@@ -1674,14 +1674,14 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   requestModal: {
-    backgroundColor: ihubColors.background,
+    backgroundColor: megrumColors.background,
     borderColor: "rgba(255,255,255,0.72)",
     borderRadius: 28,
     borderWidth: 1,
     gap: 12,
     padding: 16,
     width: "100%",
-    ...ihubShadow,
+    ...megrumShadow,
   },
   modalHeader: {
     alignItems: "center",
@@ -1693,47 +1693,47 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   modalTitle: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 17,
     fontWeight: "900",
   },
   modalSub: {
-    color: ihubColors.mutedInk,
+    color: megrumColors.mutedInk,
     fontSize: 10.5,
     fontWeight: "800",
     marginTop: 2,
   },
   modalRequestButton: {
     backgroundColor: "rgba(166,149,216,0.12)",
-    borderRadius: ihubRadii.pill,
+    borderRadius: megrumRadii.pill,
     paddingHorizontal: 11,
     paddingVertical: 8,
   },
   modalRequestText: {
-    color: ihubColors.lavender,
+    color: megrumColors.lavender,
     fontSize: 10.5,
     fontWeight: "900",
   },
   modalCloseButton: {
     alignItems: "center",
     backgroundColor: "rgba(58,50,74,0.06)",
-    borderRadius: ihubRadii.pill,
+    borderRadius: megrumRadii.pill,
     height: 34,
     justifyContent: "center",
     width: 34,
   },
   modalCloseText: {
-    color: ihubColors.mutedInk,
+    color: megrumColors.mutedInk,
     fontSize: 20,
     fontWeight: "900",
     lineHeight: 22,
   },
   searchInput: {
-    backgroundColor: ihubColors.surface,
+    backgroundColor: megrumColors.surface,
     borderColor: "rgba(58,50,74,0.10)",
-    borderRadius: ihubRadii.lg,
+    borderRadius: megrumRadii.lg,
     borderWidth: 1,
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 13,
     fontWeight: "800",
     minHeight: 48,
@@ -1761,9 +1761,9 @@ const styles = StyleSheet.create({
   },
   filterChip: {
     alignItems: "center",
-    backgroundColor: ihubColors.surface,
+    backgroundColor: megrumColors.surface,
     borderColor: "rgba(58,50,74,0.10)",
-    borderRadius: ihubRadii.pill,
+    borderRadius: megrumRadii.pill,
     borderWidth: 1,
     flexShrink: 0,
     justifyContent: "center",
@@ -1772,18 +1772,18 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
   },
   filterChipActive: {
-    backgroundColor: ihubColors.lavender,
-    borderColor: ihubColors.lavender,
+    backgroundColor: megrumColors.lavender,
+    borderColor: megrumColors.lavender,
   },
   filterChipText: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 11,
     fontWeight: "900",
     includeFontPadding: false,
     lineHeight: 14,
   },
   filterChipTextActive: {
-    color: ihubColors.surface,
+    color: megrumColors.surface,
   },
   masterList: {
     gap: 9,
@@ -1802,7 +1802,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 1,
   },
   masterSearchDock: {
-    backgroundColor: ihubColors.background,
+    backgroundColor: megrumColors.background,
     borderTopColor: "rgba(58,50,74,0.08)",
     borderTopWidth: 1,
     gap: 9,
@@ -1812,7 +1812,7 @@ const styles = StyleSheet.create({
     position: "relative",
   },
   masterFloatingRegisterButton: {
-    borderRadius: ihubRadii.pill,
+    borderRadius: megrumRadii.pill,
     minHeight: 42,
     paddingHorizontal: 18,
     position: "absolute",
@@ -1821,9 +1821,9 @@ const styles = StyleSheet.create({
   },
   masterRow: {
     alignItems: "center",
-    backgroundColor: ihubColors.surface,
+    backgroundColor: megrumColors.surface,
     borderColor: "rgba(58,50,74,0.08)",
-    borderRadius: ihubRadii.lg,
+    borderRadius: megrumRadii.lg,
     borderWidth: 1,
     flexDirection: "row",
     gap: 11,
@@ -1834,19 +1834,19 @@ const styles = StyleSheet.create({
   },
   masterRowPicked: {
     backgroundColor: "rgba(166,149,216,0.12)",
-    borderColor: ihubColors.lavender,
+    borderColor: megrumColors.lavender,
   },
   masterCopy: {
     flex: 1,
     minWidth: 0,
   },
   masterName: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 13.5,
     fontWeight: "900",
   },
   masterMeta: {
-    color: ihubColors.mutedInk,
+    color: megrumColors.mutedInk,
     fontSize: 10.5,
     fontWeight: "800",
     marginTop: 2,
@@ -1862,7 +1862,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     backgroundColor: "rgba(255,255,255,0.92)",
     borderColor: "rgba(255,255,255,0.78)",
-    borderRadius: ihubRadii.pill,
+    borderRadius: megrumRadii.pill,
     borderWidth: 1,
     flexDirection: "row",
     gap: 8,
@@ -1871,7 +1871,7 @@ const styles = StyleSheet.create({
     paddingLeft: 8,
     paddingRight: 18,
     position: "absolute",
-    ...ihubShadow,
+    ...megrumShadow,
   },
   fixedAddButtonPressed: {
     opacity: 0.9,
@@ -1879,28 +1879,28 @@ const styles = StyleSheet.create({
   },
   fixedAddIcon: {
     alignItems: "center",
-    backgroundColor: ihubColors.lavender,
-    borderRadius: ihubRadii.pill,
+    backgroundColor: megrumColors.lavender,
+    borderRadius: megrumRadii.pill,
     height: 36,
     justifyContent: "center",
     width: 36,
   },
   fixedAddText: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 13,
     fontWeight: "900",
   },
   toast: {
     alignSelf: "center",
     backgroundColor: "rgba(58,50,74,0.92)",
-    borderRadius: ihubRadii.pill,
+    borderRadius: megrumRadii.pill,
     paddingHorizontal: 16,
     paddingVertical: 11,
     position: "absolute",
-    ...ihubShadow,
+    ...megrumShadow,
   },
   toastText: {
-    color: ihubColors.surface,
+    color: megrumColors.surface,
     fontSize: 12.5,
     fontWeight: "900",
   },

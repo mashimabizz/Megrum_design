@@ -135,7 +135,7 @@ export default async function AdminBillingPage() {
                 type="checkbox"
                 name="active"
                 defaultChecked
-                className="h-4 w-4 accent-ihub-lavender"
+                className="h-4 w-4 accent-megrum-lavender"
               />
               この権限を有効にする
             </label>

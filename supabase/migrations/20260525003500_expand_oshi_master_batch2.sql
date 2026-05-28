@@ -4,7 +4,7 @@
 -- 日本市場でグッズ交換・推し活対象になりやすい実在グループ/作品を追加。
 -- kind in ('group','work') の L1 は、同一 migration 内で必ず L2 を追加する。
 
-create temporary table _ihub_seed_groups (
+create temporary table _megrum_seed_groups (
   genre_name text not null,
   name text not null,
   aliases text[] not null default '{}',
@@ -12,7 +12,7 @@ create temporary table _ihub_seed_groups (
   display_order integer not null
 ) on commit drop;
 
-insert into _ihub_seed_groups (genre_name, name, aliases, kind, display_order) values
+insert into _megrum_seed_groups (genre_name, name, aliases, kind, display_order) values
   -- K-POP男性
   ('K-POP男性','P1Harmony',array['피원하모니']::text[],'group',50),
   ('K-POP男性','CRAVITY',array['크래비티']::text[],'group',51),
@@ -93,14 +93,14 @@ select
   sg.aliases,
   sg.kind,
   sg.display_order
-from _ihub_seed_groups sg
+from _megrum_seed_groups sg
 join public.genres_master ge on ge.name = sg.genre_name
 on conflict (genre_id, name) do update
   set aliases = excluded.aliases,
       kind = excluded.kind,
       display_order = excluded.display_order;
 
-create temporary table _ihub_seed_characters (
+create temporary table _megrum_seed_characters (
   genre_name text not null,
   group_name text not null,
   name text not null,
@@ -108,7 +108,7 @@ create temporary table _ihub_seed_characters (
   display_order integer not null
 ) on commit drop;
 
-insert into _ihub_seed_characters (genre_name, group_name, name, aliases, display_order) values
+insert into _megrum_seed_characters (genre_name, group_name, name, aliases, display_order) values
   -- K-POP男性
   ('K-POP男性','P1Harmony','ギホ',array['KEEHO','기호']::text[],1),
   ('K-POP男性','P1Harmony','テオ',array['THEO','테오']::text[],2),
@@ -396,7 +396,7 @@ select
   sc.name,
   sc.aliases,
   sc.display_order
-from _ihub_seed_characters sc
+from _megrum_seed_characters sc
 join public.genres_master ge on ge.name = sc.genre_name
 join public.groups_master gm on gm.genre_id = ge.id and gm.name = sc.group_name
 where not exists (
@@ -517,7 +517,7 @@ where cm.id = me.character_id
   and cm.entity_id is distinct from e.id;
 
 -- 別ジャンル/別文脈にある同一キャラを明示的に束ねる。
-create temporary table _ihub_manual_character_entities (
+create temporary table _megrum_manual_character_entities (
   genre_name text not null,
   group_name text not null,
   character_name text not null,
@@ -528,7 +528,7 @@ create temporary table _ihub_manual_character_entities (
   display_order integer not null default 0
 ) on commit drop;
 
-insert into _ihub_manual_character_entities (
+insert into _megrum_manual_character_entities (
   genre_name,
   group_name,
   character_name,
@@ -559,14 +559,14 @@ select
   min(entity_type) as entity_type,
   array(
     select distinct alias
-    from _ihub_manual_character_entities m2
+    from _megrum_manual_character_entities m2
     cross join unnest(m2.aliases) as a(alias)
     where m2.identity_key = mce.identity_key
       and btrim(alias) <> ''
     order by alias
   ) as aliases,
   min(display_order) as display_order
-from _ihub_manual_character_entities mce
+from _megrum_manual_character_entities mce
 group by mce.identity_key
 on conflict (identity_key) do update
   set canonical_name = excluded.canonical_name,
@@ -583,7 +583,7 @@ on conflict (identity_key) do update
 
 update public.characters_master cm
 set entity_id = e.id
-from _ihub_manual_character_entities mce
+from _megrum_manual_character_entities mce
 join public.genres_master ge on ge.name = mce.genre_name
 join public.groups_master gm on gm.genre_id = ge.id and gm.name = mce.group_name
 join public.oshi_entities_master e on e.identity_key = mce.identity_key

@@ -4,7 +4,7 @@ import { HeaderBack } from "@/components/auth/HeaderBack";
 import { DisputeNewForm } from "./DisputeNewForm";
 
 export const metadata = {
-  title: "取引について報告 — iHub",
+  title: "取引について報告 — Megrum",
 };
 
 type ProposalRow = {

@@ -6,7 +6,7 @@ import { Screen } from "../../src/components/Screen";
 import { useAuth } from "../../src/auth/AuthProvider";
 import { IconSymbol, type IconSymbolName } from "../../src/components/IconSymbol";
 import { supabase } from "../../src/lib/supabase";
-import { ihubColors, ihubRadii } from "../../src/theme/tokens";
+import { megrumColors, megrumRadii } from "../../src/theme/tokens";
 
 type NotificationKind =
   | "proposal_received"
@@ -424,10 +424,10 @@ function toneStyle(tone: Tone) {
 
 function toneColor(tone: Tone) {
   if (tone === "ok") return "#16a34a";
-  if (tone === "warn") return ihubColors.warn;
+  if (tone === "warn") return megrumColors.warn;
   if (tone === "amber") return "#b7791f";
   if (tone === "mute") return "rgba(58,50,74,0.55)";
-  return ihubColors.lavender;
+  return megrumColors.lavender;
 }
 
 const styles = StyleSheet.create({
@@ -435,15 +435,15 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   markAllButton: {
-    backgroundColor: ihubColors.surface,
+    backgroundColor: megrumColors.surface,
     borderColor: "rgba(58,50,74,0.08)",
-    borderRadius: ihubRadii.pill,
+    borderRadius: megrumRadii.pill,
     borderWidth: 1,
     paddingHorizontal: 12,
     paddingVertical: 6,
   },
   markAllText: {
-    color: ihubColors.mutedInk,
+    color: megrumColors.mutedInk,
     fontSize: 10.5,
     fontWeight: "900",
   },
@@ -466,22 +466,22 @@ const styles = StyleSheet.create({
     position: "relative",
   },
   tabButtonSelected: {
-    borderBottomColor: ihubColors.ink,
+    borderBottomColor: megrumColors.ink,
     borderBottomWidth: 2,
     opacity: 1,
   },
   tabText: {
-    color: ihubColors.mutedInk,
+    color: megrumColors.mutedInk,
     fontSize: 14,
     fontWeight: "900",
   },
   tabTextSelected: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
   },
   tabBadge: {
     backgroundColor: "rgba(58,50,74,0.07)",
-    borderRadius: ihubRadii.pill,
-    color: ihubColors.mutedInk,
+    borderRadius: megrumRadii.pill,
+    color: megrumColors.mutedInk,
     fontSize: 10,
     fontWeight: "900",
     minWidth: 20,
@@ -492,15 +492,15 @@ const styles = StyleSheet.create({
   },
   tabBadgeSelected: {
     backgroundColor: "rgba(166,149,216,0.16)",
-    color: ihubColors.lavender,
+    color: megrumColors.lavender,
   },
   loadingText: {
-    color: ihubColors.mutedInk,
+    color: megrumColors.mutedInk,
     fontSize: 12,
     fontWeight: "800",
   },
   inlineError: {
-    color: ihubColors.warn,
+    color: megrumColors.warn,
     fontSize: 12,
     fontWeight: "800",
     lineHeight: 18,
@@ -510,12 +510,12 @@ const styles = StyleSheet.create({
     paddingVertical: 48,
   },
   emptyTitle: {
-    color: ihubColors.mutedInk,
+    color: megrumColors.mutedInk,
     fontSize: 12,
     fontWeight: "800",
   },
   emptyLink: {
-    color: ihubColors.lavender,
+    color: megrumColors.lavender,
     fontSize: 12,
     fontWeight: "900",
     marginTop: 8,
@@ -524,7 +524,7 @@ const styles = StyleSheet.create({
     marginHorizontal: -18,
   },
   row: {
-    backgroundColor: ihubColors.background,
+    backgroundColor: megrumColors.background,
   },
   rowUnread: {
     backgroundColor: "rgba(166,149,216,0.045)",
@@ -547,7 +547,7 @@ const styles = StyleSheet.create({
   },
   iconBox: {
     alignItems: "center",
-    borderRadius: ihubRadii.pill,
+    borderRadius: megrumRadii.pill,
     height: 40,
     justifyContent: "center",
     width: 40,
@@ -578,7 +578,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   cardTitle: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     flex: 1,
     fontSize: 14.5,
     fontWeight: "800",
@@ -588,12 +588,12 @@ const styles = StyleSheet.create({
     fontWeight: "900",
   },
   timeText: {
-    color: ihubColors.mutedInk,
+    color: megrumColors.mutedInk,
     fontSize: 11,
     fontWeight: "800",
   },
   bodyText: {
-    color: ihubColors.mutedInk,
+    color: megrumColors.mutedInk,
     fontSize: 13,
     fontWeight: "700",
     lineHeight: 19,
@@ -608,8 +608,8 @@ const styles = StyleSheet.create({
     right: 0,
   },
   unreadDot: {
-    backgroundColor: ihubColors.lavender,
-    borderRadius: ihubRadii.pill,
+    backgroundColor: megrumColors.lavender,
+    borderRadius: megrumRadii.pill,
     height: 9,
     marginLeft: 9,
     marginTop: 9,

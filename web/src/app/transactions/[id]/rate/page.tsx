@@ -3,7 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { RateView, type RateData } from "./RateView";
 
 export const metadata = {
-  title: "取引完了 — iHub",
+  title: "取引完了 — Megrum",
 };
 
 type Row = {

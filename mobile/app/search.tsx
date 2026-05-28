@@ -1,20 +1,18 @@
 import { useEffect, useMemo, useState } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { router, useLocalSearchParams } from "expo-router";
+import { router, Stack, useLocalSearchParams } from "expo-router";
 import {
   Image,
   Pressable,
   StyleSheet,
   Text,
-  TextInput,
   View,
 } from "react-native";
-import { RouteHeader } from "../src/components/RouteHeader";
 import { Screen } from "../src/components/Screen";
 import { useAuth } from "../src/auth/AuthProvider";
 import { IconSymbol } from "../src/components/IconSymbol";
 import { supabase } from "../src/lib/supabase";
-import { ihubColors, ihubRadii, ihubShadow } from "../src/theme/tokens";
+import { megrumColors, megrumRadii, megrumShadow } from "../src/theme/tokens";
 
 type MasterName = { name: string | null } | { name: string | null }[] | null;
 
@@ -53,7 +51,7 @@ type WishRef = {
   goods_type_id: string | null;
 };
 
-const RECENT_KEY = "ihub-search-recent-v1";
+const RECENT_KEY = "megrum-search-recent-v1";
 const POPULAR_KEYWORDS = [
   "スア トレカ",
   "ヒナ 生写真",
@@ -189,32 +187,34 @@ export default function SearchScreen() {
   }
 
   return (
-    <Screen contentStyle={styles.screen}>
-      <RouteHeader
-        title="検索"
-        subtitle="他ユーザーの譲る候補から探す"
+    <Screen contentStyle={styles.screen} topInset={false}>
+      <Stack.Screen
+        options={{
+          headerShown: true,
+          title: "検索",
+          headerLargeTitleEnabled: true,
+          headerBlurEffect: "systemMaterial",
+          headerTransparent: false,
+          headerTintColor: megrumColors.lavender,
+          headerSearchBarOptions: {
+            autoCapitalize: "none",
+            hideWhenScrolling: false,
+            obscureBackground: false,
+            placement: "integratedButton",
+            placeholder: "グッズ・推し・ユーザーを検索",
+            tintColor: megrumColors.lavender,
+            onCancelButtonPress: clearQuery,
+            onChangeText: (event) => {
+              const next = event.nativeEvent.text;
+              setDraft(next);
+              setQuery(next);
+            },
+            onSearchButtonPress: (event) => {
+              submit(event.nativeEvent.text);
+            },
+          },
+        }}
       />
-
-      <View style={styles.searchBox}>
-        <IconSymbol name="search" size={17} color={ihubColors.mutedInk} />
-        <TextInput
-          autoCapitalize="none"
-          autoCorrect={false}
-          enterKeyHint="search"
-          onChangeText={setDraft}
-          onSubmitEditing={() => submit()}
-          placeholder="例：スア トレカ / WORLD TOUR"
-          placeholderTextColor="rgba(58,50,74,0.34)"
-          returnKeyType="search"
-          style={styles.searchInput}
-          value={draft}
-        />
-        {draft ? (
-          <Pressable accessibilityLabel="検索語を消す" onPress={clearQuery}>
-            <IconSymbol name="close" size={18} color={ihubColors.mutedInk} />
-          </Pressable>
-        ) : null}
-      </View>
 
       {query ? (
         <View style={styles.resultsBlock}>
@@ -305,7 +305,7 @@ function HitCard({ hit }: { hit: SearchHit }) {
             {[hit.groupName, hit.characterName, hit.goodsTypeName].filter(Boolean).join(" ・ ")}
           </Text>
         </View>
-        <IconSymbol name="chevron-forward" size={16} color={ihubColors.lavender} />
+        <IconSymbol name="chevron-forward" size={16} color={megrumColors.lavender} />
       </View>
     </Pressable>
   );
@@ -496,7 +496,7 @@ const styles = StyleSheet.create({
   },
   searchBox: {
     alignItems: "center",
-    backgroundColor: ihubColors.surface,
+    backgroundColor: megrumColors.surface,
     borderColor: "rgba(58,50,74,0.08)",
     borderRadius: 12,
     borderWidth: 1,
@@ -506,7 +506,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
   },
   searchInput: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     flex: 1,
     fontSize: 16,
     fontWeight: "700",
@@ -522,22 +522,22 @@ const styles = StyleSheet.create({
     paddingHorizontal: 2,
   },
   resultCount: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 15,
     fontWeight: "900",
   },
   resultQuery: {
-    color: ihubColors.mutedInk,
+    color: megrumColors.mutedInk,
     fontSize: 11,
     fontWeight: "800",
   },
   loadingText: {
-    color: ihubColors.mutedInk,
+    color: megrumColors.mutedInk,
     fontSize: 12,
     fontWeight: "800",
   },
   inlineError: {
-    color: ihubColors.warn,
+    color: megrumColors.warn,
     fontSize: 12,
     fontWeight: "800",
     lineHeight: 18,
@@ -545,18 +545,18 @@ const styles = StyleSheet.create({
   emptyBox: {
     alignItems: "center",
     borderColor: "rgba(58,50,74,0.10)",
-    borderRadius: ihubRadii.lg,
+    borderRadius: megrumRadii.lg,
     borderStyle: "dashed",
     borderWidth: 1,
     padding: 24,
   },
   emptyTitle: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 13,
     fontWeight: "900",
   },
   emptyText: {
-    color: ihubColors.mutedInk,
+    color: megrumColors.mutedInk,
     fontSize: 11,
     fontWeight: "800",
     marginTop: 5,
@@ -565,12 +565,12 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   hitCard: {
-    backgroundColor: ihubColors.surface,
+    backgroundColor: megrumColors.surface,
     borderColor: "rgba(58,50,74,0.08)",
-    borderRadius: ihubRadii.md,
+    borderRadius: megrumRadii.md,
     borderWidth: 1,
     padding: 14,
-    ...ihubShadow,
+    ...megrumShadow,
   },
   pressed: {
     opacity: 0.86,
@@ -585,13 +585,13 @@ const styles = StyleSheet.create({
   avatar: {
     alignItems: "center",
     backgroundColor: "rgba(166,149,216,0.20)",
-    borderRadius: ihubRadii.pill,
+    borderRadius: megrumRadii.pill,
     height: 38,
     justifyContent: "center",
     width: 38,
   },
   avatarText: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 13,
     fontWeight: "900",
   },
@@ -599,35 +599,35 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   handle: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 13,
     fontWeight: "900",
   },
   meta: {
-    color: ihubColors.mutedInk,
+    color: megrumColors.mutedInk,
     fontSize: 10.5,
     fontWeight: "800",
     marginTop: 1,
   },
   matchBadge: {
-    borderRadius: ihubRadii.pill,
+    borderRadius: megrumRadii.pill,
     paddingHorizontal: 8,
     paddingVertical: 3,
   },
   wishBadge: {
-    backgroundColor: ihubColors.lavender,
+    backgroundColor: megrumColors.lavender,
   },
   tradeBadge: {
-    backgroundColor: ihubColors.ok,
+    backgroundColor: megrumColors.ok,
   },
   matchBadgeText: {
-    color: ihubColors.surface,
+    color: megrumColors.surface,
     fontSize: 9,
     fontWeight: "900",
   },
   itemPreview: {
     alignItems: "center",
-    backgroundColor: ihubColors.background,
+    backgroundColor: megrumColors.background,
     borderRadius: 10,
     flexDirection: "row",
     gap: 10,
@@ -649,7 +649,7 @@ const styles = StyleSheet.create({
     width: "100%",
   },
   itemLetter: {
-    color: ihubColors.surface,
+    color: megrumColors.surface,
     fontSize: 14,
     fontWeight: "900",
   },
@@ -657,12 +657,12 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   itemTitle: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 12,
     fontWeight: "900",
   },
   itemMeta: {
-    color: ihubColors.mutedInk,
+    color: megrumColors.mutedInk,
     fontSize: 10.5,
     fontWeight: "800",
     marginTop: 2,
@@ -674,7 +674,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   suggestionTitle: {
-    color: ihubColors.mutedInk,
+    color: megrumColors.mutedInk,
     fontSize: 11,
     fontWeight: "900",
     paddingHorizontal: 2,
@@ -685,15 +685,15 @@ const styles = StyleSheet.create({
     gap: 7,
   },
   chip: {
-    backgroundColor: ihubColors.surface,
+    backgroundColor: megrumColors.surface,
     borderColor: "rgba(58,50,74,0.08)",
-    borderRadius: ihubRadii.pill,
+    borderRadius: megrumRadii.pill,
     borderWidth: 1,
     paddingHorizontal: 12,
     paddingVertical: 7,
   },
   chipText: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 11.5,
     fontWeight: "800",
   },

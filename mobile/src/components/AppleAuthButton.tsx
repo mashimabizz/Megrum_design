@@ -9,7 +9,7 @@ import {
   type ViewStyle,
 } from "react-native";
 import { useAuth } from "../auth/AuthProvider";
-import { ihubColors, ihubRadii } from "../theme/tokens";
+import { megrumColors, megrumRadii } from "../theme/tokens";
 
 type AppleAuthButtonProps = {
   disabled?: boolean;
@@ -83,12 +83,15 @@ export function AppleAuthButton({ disabled = false, mode, onError, style }: Appl
         return;
       }
       const profile = await refreshProfile();
-      const needsOnboarding =
-        mode === "signUp" ||
-        !profile ||
-        profile.accountStatus !== "active" ||
-        !profile.gender;
-      router.replace(needsOnboarding ? "/onboarding/gender" : "/");
+      const nextRoute =
+        mode === "signUp" || !profile?.gender
+          ? "/onboarding/gender"
+          : !profile.hasOshi
+            ? "/onboarding/oshi"
+            : profile.accountStatus !== "active"
+              ? "/onboarding/members"
+              : "/";
+      router.replace(nextRoute);
     } catch (error) {
       const code = typeof error === "object" && error && "code" in error ? error.code : null;
       if (code !== "ERR_REQUEST_CANCELED") {
@@ -104,7 +107,7 @@ export function AppleAuthButton({ disabled = false, mode, onError, style }: Appl
       <AppleAuthentication.AppleAuthenticationButton
         buttonStyle={AppleAuthentication.AppleAuthenticationButtonStyle.BLACK}
         buttonType={buttonType}
-        cornerRadius={ihubRadii.md}
+        cornerRadius={megrumRadii.md}
         onPress={handlePress}
         style={styles.button}
       />
@@ -144,7 +147,7 @@ const styles = StyleSheet.create({
   pendingOverlay: {
     alignItems: "center",
     backgroundColor: "rgba(0,0,0,0.18)",
-    borderRadius: ihubRadii.md,
+    borderRadius: megrumRadii.md,
     bottom: 0,
     justifyContent: "center",
     left: 0,
@@ -153,9 +156,9 @@ const styles = StyleSheet.create({
     top: 0,
   },
   placeholder: {
-    backgroundColor: ihubColors.surface,
+    backgroundColor: megrumColors.surface,
     borderColor: "rgba(58,50,74,0.08)",
-    borderRadius: ihubRadii.md,
+    borderRadius: megrumRadii.md,
     borderWidth: 1,
     height: 50,
   },

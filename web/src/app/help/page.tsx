@@ -2,7 +2,7 @@ import Link from "next/link";
 import { HeaderBack } from "@/components/auth/HeaderBack";
 
 export const metadata = {
-  title: "ヘルプ・FAQ — iHub",
+  title: "ヘルプ・FAQ — Megrum",
 };
 
 /**
@@ -31,10 +31,10 @@ export default function HelpPage() {
           </div>
           <div className="mt-2 flex gap-2">
             <a
-              href="mailto:support@ihub.tokyo"
+              href="mailto:support@megrum.jp"
               className="rounded-[10px] bg-[linear-gradient(135deg,#a695d8,#a8d4e6)] px-3 py-1.5 text-[11.5px] font-bold text-white shadow-[0_2px_5px_rgba(166,149,216,0.4)]"
             >
-              ✉ support@ihub.tokyo
+              ✉ support@megrum.jp
             </a>
           </div>
         </div>
@@ -42,8 +42,8 @@ export default function HelpPage() {
         {/* 取引の流れ */}
         <Section label="取引の流れ">
           <Faq
-            q="iHub とは？"
-            a="iHub は K-POP / アニメ等の推し活グッズを現地で物々交換するためのマッチング・取引プラットフォームです。郵送ではなく対面交換が前提です。"
+            q="Megrum とは？"
+            a="Megrum は K-POP / アニメ等の推し活グッズを現地で物々交換するためのマッチング・取引プラットフォームです。郵送ではなく対面交換が前提です。"
           />
           <Faq
             q="取引の基本フロー"
@@ -133,7 +133,7 @@ export default function HelpPage() {
           />
           <Faq
             q="アカウントを削除したい"
-            a="現在準備中の機能です。お急ぎの場合は support@ihub.tokyo までご連絡ください。"
+            a="現在準備中の機能です。お急ぎの場合は support@megrum.jp までご連絡ください。"
           />
         </Section>
 

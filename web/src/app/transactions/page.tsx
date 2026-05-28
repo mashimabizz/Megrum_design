@@ -8,7 +8,7 @@ import {
 } from "./TransactionsView";
 
 export const metadata = {
-  title: "取引 — iHub",
+  title: "取引 — Megrum",
 };
 
 type RawRow = {

@@ -186,7 +186,7 @@ export function ProfileView({
         </div>
 
         <div className="pb-3 pt-1 text-center text-[10px] text-[#3a324a4d]">
-          iHub MVP · build dev
+          Megrum MVP · build dev
         </div>
       </div>
     </main>

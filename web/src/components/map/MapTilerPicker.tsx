@@ -20,9 +20,9 @@ type Props = {
 };
 
 const MAPTILER_API_KEY = process.env.NEXT_PUBLIC_MAPTILER_API_KEY ?? "";
-const RADIUS_SOURCE_ID = "ihub-radius-source";
-const RADIUS_FILL_LAYER_ID = "ihub-radius-fill";
-const RADIUS_LINE_LAYER_ID = "ihub-radius-line";
+const RADIUS_SOURCE_ID = "megrum-radius-source";
+const RADIUS_FILL_LAYER_ID = "megrum-radius-fill";
+const RADIUS_LINE_LAYER_ID = "megrum-radius-line";
 
 function toLngLat(center: [number, number]): [number, number] {
   return [center[1], center[0]];
@@ -30,7 +30,7 @@ function toLngLat(center: [number, number]): [number, number] {
 
 function createPinElement(label?: string): HTMLDivElement {
   const el = document.createElement("div");
-  el.className = "ihub-maptiler-pin";
+  el.className = "megrum-maptiler-pin";
   el.innerHTML = `
     <div style="
       position: relative;
@@ -290,11 +290,11 @@ export default function MapTilerPicker({
 
   return (
     <div
-      className={`ihub-maptiler-picker relative overflow-hidden ${className ?? ""}`}
+      className={`megrum-maptiler-picker relative overflow-hidden ${className ?? ""}`}
     >
       <style>{`
-        .ihub-maptiler-picker .maplibregl-ctrl-attrib,
-        .ihub-maptiler-picker .maplibregl-ctrl-attrib.maplibregl-compact {
+        .megrum-maptiler-picker .maplibregl-ctrl-attrib,
+        .megrum-maptiler-picker .maplibregl-ctrl-attrib.maplibregl-compact {
           margin: 0 4px 3px 0;
           padding: 1px 4px;
           border-radius: 999px;
@@ -309,7 +309,7 @@ export default function MapTilerPicker({
           white-space: nowrap;
           box-shadow: 0 1px 4px rgba(58, 50, 74, 0.08);
         }
-        .ihub-maptiler-picker .maplibregl-ctrl-attrib a {
+        .megrum-maptiler-picker .maplibregl-ctrl-attrib a {
           color: inherit;
           text-decoration: none;
         }

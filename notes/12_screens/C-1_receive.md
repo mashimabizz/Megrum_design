@@ -3,8 +3,8 @@
 > 提案者から打診が届いた時の最初の画面。承諾／反対提案／拒否 の3択で次のフローを分岐。
 
 最終更新: 2026-05-01（iter41）
-関連JSX: `iHub/nego-flow.jsx::C1ReceiveScreen`
-関連HTML: `iHub/iHub Nego Flow.html`
+関連JSX: `Megrum/nego-flow.jsx::C1ReceiveScreen`
+関連HTML: `Megrum/Megrum Nego Flow.html`
 関連 iter: 30 / 33
 
 ---
@@ -103,7 +103,7 @@ iter33 で「推奨合流ポイント」削除（meetupに統合）。残り：
 
 - 相手の服装写真：`直前撮影で更新`
 - 評価サマリ：`★4.9 ・ 取引89回`
-- 直近トラブル：`なし`（@iHub バッジ）
+- 直近トラブル：`なし`（@Megrum バッジ）
 
 #### 5. アクション 3択
 

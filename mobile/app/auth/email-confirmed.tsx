@@ -5,10 +5,10 @@ import { PrimaryButton } from "../../src/components/PrimaryButton";
 import { Screen } from "../../src/components/Screen";
 import { useAuth } from "../../src/auth/AuthProvider";
 import { supabase } from "../../src/lib/supabase";
-import { ihubColors, ihubShadow } from "../../src/theme/tokens";
+import { megrumColors, megrumShadow } from "../../src/theme/tokens";
 
 export default function EmailConfirmedScreen() {
-  const { refreshProfile, user } = useAuth();
+  const { onboardingPath, refreshProfile, user } = useAuth();
   const { code, error_description } = useLocalSearchParams<{
     code?: string | string[];
     error_description?: string | string[];
@@ -59,7 +59,9 @@ export default function EmailConfirmedScreen() {
         ) : null}
       </View>
       <PrimaryButton
-        onPress={() => router.replace(user ? "/onboarding/gender" : "/login")}
+        onPress={() =>
+          router.replace(user ? onboardingPath ?? "/onboarding/gender" : "/login")
+        }
       >
         {user ? "プロフィール設定へ進む" : "ログインして続ける"}
       </PrimaryButton>
@@ -81,27 +83,27 @@ const styles = StyleSheet.create({
   },
   checkCircle: {
     alignItems: "center",
-    backgroundColor: ihubColors.lavender,
+    backgroundColor: megrumColors.lavender,
     borderRadius: 48,
     height: 96,
     justifyContent: "center",
     width: 96,
-    ...ihubShadow,
+    ...megrumShadow,
   },
   check: {
-    color: ihubColors.surface,
+    color: megrumColors.surface,
     fontSize: 52,
     fontWeight: "900",
     lineHeight: 58,
   },
   title: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 24,
     fontWeight: "900",
     marginTop: 26,
   },
   copy: {
-    color: ihubColors.mutedInk,
+    color: megrumColors.mutedInk,
     fontSize: 13,
     fontWeight: "800",
     lineHeight: 22,
@@ -109,7 +111,7 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
   errorText: {
-    color: ihubColors.warn,
+    color: megrumColors.warn,
     fontSize: 12,
     fontWeight: "800",
     lineHeight: 18,

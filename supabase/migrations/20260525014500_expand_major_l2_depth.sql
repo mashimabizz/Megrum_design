@@ -4,7 +4,7 @@
 -- 既存の有名L1で、主要キャラ/メンバーが少なかったものを補完する。
 -- 新規L1は追加せず、既存 group/work のL2密度を上げる。
 
-create temporary table _ihub_seed_characters (
+create temporary table _megrum_seed_characters (
   genre_name text not null,
   group_name text not null,
   name text not null,
@@ -12,7 +12,7 @@ create temporary table _ihub_seed_characters (
   display_order integer not null
 ) on commit drop;
 
-insert into _ihub_seed_characters (genre_name, group_name, name, aliases, display_order) values
+insert into _megrum_seed_characters (genre_name, group_name, name, aliases, display_order) values
   -- ONE PIECE
   ('アニメ・マンガ','ONE PIECE','ウソップ',array[]::text[],9),
   ('アニメ・マンガ','ONE PIECE','ニコ・ロビン',array[]::text[],10),
@@ -165,7 +165,7 @@ select
   sc.name,
   sc.aliases,
   sc.display_order
-from _ihub_seed_characters sc
+from _megrum_seed_characters sc
 join public.genres_master ge on ge.name = sc.genre_name
 join public.groups_master gm on gm.genre_id = ge.id and gm.name = sc.group_name
 where not exists (

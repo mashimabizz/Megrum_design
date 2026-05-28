@@ -13,7 +13,7 @@ import { PrimaryButton } from "../src/components/PrimaryButton";
 import { Screen } from "../src/components/Screen";
 import { supabase } from "../src/lib/supabase";
 import { submitEvaluation } from "../src/lib/transactionActions";
-import { ihubColors, ihubRadii, ihubShadow } from "../src/theme/tokens";
+import { megrumColors, megrumRadii, megrumShadow } from "../src/theme/tokens";
 
 type ProposalRow = {
   id: string;
@@ -112,7 +112,7 @@ export default function TransactionRateScreen() {
           </Text>
         </View>
 
-        {loading ? <ActivityIndicator color={ihubColors.lavender} /> : null}
+        {loading ? <ActivityIndicator color={megrumColors.lavender} /> : null}
         {error ? <Text style={styles.errorText}>{error}</Text> : null}
 
         {data ? (
@@ -221,7 +221,7 @@ async function fetchRateData(proposalId: string, userId: string): Promise<RateDa
 
 const styles = StyleSheet.create({
   root: {
-    backgroundColor: ihubColors.background,
+    backgroundColor: megrumColors.background,
     flex: 1,
   },
   screen: {
@@ -229,21 +229,21 @@ const styles = StyleSheet.create({
     paddingBottom: 130,
   },
   hero: {
-    backgroundColor: ihubColors.surface,
+    backgroundColor: megrumColors.surface,
     borderColor: "rgba(166,149,216,0.2)",
-    borderRadius: ihubRadii.xl,
+    borderRadius: megrumRadii.xl,
     borderWidth: 1,
     gap: 8,
     padding: 18,
-    ...ihubShadow,
+    ...megrumShadow,
   },
   heroTitle: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 20,
     fontWeight: "900",
   },
   heroSub: {
-    color: ihubColors.mutedInk,
+    color: megrumColors.mutedInk,
     fontSize: 12.5,
     fontWeight: "800",
     lineHeight: 19,
@@ -255,11 +255,11 @@ const styles = StyleSheet.create({
   },
   checkBadge: {
     alignItems: "center",
-    backgroundColor: ihubColors.lavender,
+    backgroundColor: megrumColors.lavender,
     borderRadius: 34,
     height: 68,
     justifyContent: "center",
-    shadowColor: ihubColors.lavender,
+    shadowColor: megrumColors.lavender,
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.28,
     shadowRadius: 18,
@@ -271,33 +271,33 @@ const styles = StyleSheet.create({
     fontWeight: "900",
   },
   doneTitle: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 22,
     fontWeight: "900",
     marginTop: 5,
   },
   doneSub: {
-    color: ihubColors.mutedInk,
+    color: megrumColors.mutedInk,
     fontSize: 12,
     fontWeight: "800",
   },
   errorText: {
-    color: ihubColors.warn,
+    color: megrumColors.warn,
     fontSize: 12,
     fontWeight: "900",
     lineHeight: 18,
   },
   ratingCard: {
-    backgroundColor: ihubColors.surface,
+    backgroundColor: megrumColors.surface,
     borderColor: "rgba(58,50,74,0.08)",
     borderRadius: 18,
     borderWidth: 1,
     gap: 12,
     padding: 17,
-    ...ihubShadow,
+    ...megrumShadow,
   },
   cardTitle: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 14,
     fontWeight: "900",
     textAlign: "center",
@@ -317,17 +317,17 @@ const styles = StyleSheet.create({
     lineHeight: 38,
   },
   starActive: {
-    color: ihubColors.lavender,
+    color: megrumColors.lavender,
   },
   starInactive: {
     color: "rgba(58,50,74,0.12)",
   },
   commentInput: {
-    backgroundColor: ihubColors.background,
+    backgroundColor: megrumColors.background,
     borderColor: "rgba(58,50,74,0.08)",
     borderRadius: 14,
     borderWidth: 1,
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 15,
     fontWeight: "700",
     minHeight: 96,
@@ -336,7 +336,7 @@ const styles = StyleSheet.create({
     textAlignVertical: "top",
   },
   ratedText: {
-    color: ihubColors.ok,
+    color: megrumColors.ok,
     fontSize: 12,
     fontWeight: "900",
     textAlign: "center",

@@ -4,7 +4,7 @@ import { HeaderBack } from "@/components/auth/HeaderBack";
 import { CarryingSelectView } from "./CarryingSelectView";
 
 export const metadata = {
-  title: "持参グッズを選択 — iHub",
+  title: "持参グッズを選択 — Megrum",
 };
 
 type Props = {

@@ -4,7 +4,7 @@
 -- グループ所属・別グループ所属・ソロ活動をまたいで推される実在人物を
 -- 追加し、明示的に同じ oshi_entities_master へ紐付ける。
 
-create temporary table _ihub_seed_groups (
+create temporary table _megrum_seed_groups (
   genre_name text not null,
   name text not null,
   aliases text[] not null default '{}',
@@ -12,7 +12,7 @@ create temporary table _ihub_seed_groups (
   display_order integer not null
 ) on commit drop;
 
-insert into _ihub_seed_groups (genre_name, name, aliases, kind, display_order) values
+insert into _megrum_seed_groups (genre_name, name, aliases, kind, display_order) values
   ('K-POP男性', 'ASTRO', array['아스트로']::text[], 'group', 38),
   ('K-POP女性', 'IZ*ONE', array['아이즈원', 'アイズワン', 'IZONE']::text[], 'group', 39),
   ('国内男性', 'DISH//', array['ディッシュ']::text[], 'group', 40),
@@ -41,14 +41,14 @@ select
   sg.aliases,
   sg.kind,
   sg.display_order
-from _ihub_seed_groups sg
+from _megrum_seed_groups sg
 join public.genres_master ge on ge.name = sg.genre_name
 on conflict (genre_id, name) do update
   set aliases = excluded.aliases,
       kind = excluded.kind,
       display_order = excluded.display_order;
 
-create temporary table _ihub_seed_characters (
+create temporary table _megrum_seed_characters (
   genre_name text not null,
   group_name text not null,
   name text not null,
@@ -56,7 +56,7 @@ create temporary table _ihub_seed_characters (
   display_order integer not null
 ) on commit drop;
 
-insert into _ihub_seed_characters (genre_name, group_name, name, aliases, display_order) values
+insert into _megrum_seed_characters (genre_name, group_name, name, aliases, display_order) values
   -- K-POP男性
   ('K-POP男性','ASTRO','MJ',array['エムジェイ','엠제이','Kim Myung-jun']::text[],1),
   ('K-POP男性','ASTRO','ジンジン',array['JINJIN','진진','Park Jin-woo']::text[],2),
@@ -134,7 +134,7 @@ select
   sc.name,
   sc.aliases,
   sc.display_order
-from _ihub_seed_characters sc
+from _megrum_seed_characters sc
 join public.genres_master ge on ge.name = sc.genre_name
 join public.groups_master gm on gm.genre_id = ge.id and gm.name = sc.group_name
 where not exists (
@@ -253,7 +253,7 @@ join public.oshi_entities_master e on e.identity_key = me.identity_key
 where cm.id = me.character_id
   and cm.entity_id is distinct from e.id;
 
-create temporary table _ihub_manual_entities (
+create temporary table _megrum_manual_entities (
   identity_key text not null,
   canonical_name text not null,
   entity_type text not null,
@@ -261,7 +261,7 @@ create temporary table _ihub_manual_entities (
   display_order integer not null default 0
 ) on commit drop;
 
-insert into _ihub_manual_entities (identity_key, canonical_name, entity_type, aliases, display_order) values
+insert into _megrum_manual_entities (identity_key, canonical_name, entity_type, aliases, display_order) values
   ('person:sakura-miyawaki','サクラ','person',array['SAKURA','宮脇咲良','Miyawaki Sakura','사쿠라']::text[],1),
   ('person:kim-chaewon','キム・チェウォン','person',array['KIM CHAEWON','チェウォン','김채원']::text[],2),
   ('person:ahn-yujin','ユジン','person',array['AN YUJIN','アン・ユジン','アンユジン','안유진']::text[],3),
@@ -287,7 +287,7 @@ select
   entity_type,
   aliases,
   display_order
-from _ihub_manual_entities
+from _megrum_manual_entities
 on conflict (identity_key) do update
   set canonical_name = excluded.canonical_name,
       entity_type = excluded.entity_type,
@@ -302,7 +302,7 @@ on conflict (identity_key) do update
       ),
       display_order = excluded.display_order;
 
-create temporary table _ihub_manual_entity_links (
+create temporary table _megrum_manual_entity_links (
   row_kind text not null check (row_kind in ('group', 'character')),
   genre_name text not null,
   group_name text,
@@ -310,7 +310,7 @@ create temporary table _ihub_manual_entity_links (
   identity_key text not null
 ) on commit drop;
 
-insert into _ihub_manual_entity_links (
+insert into _megrum_manual_entity_links (
   row_kind,
   genre_name,
   group_name,
@@ -342,7 +342,7 @@ insert into _ihub_manual_entity_links (
 
 update public.groups_master gm
 set entity_id = e.id
-from _ihub_manual_entity_links ml
+from _megrum_manual_entity_links ml
 join public.genres_master ge on ge.name = ml.genre_name
 join public.oshi_entities_master e on e.identity_key = ml.identity_key
 where ml.row_kind = 'group'
@@ -352,7 +352,7 @@ where ml.row_kind = 'group'
 
 update public.characters_master cm
 set entity_id = e.id
-from _ihub_manual_entity_links ml
+from _megrum_manual_entity_links ml
 join public.genres_master ge on ge.name = ml.genre_name
 join public.groups_master gm on gm.genre_id = ge.id and gm.name = ml.group_name
 join public.oshi_entities_master e on e.identity_key = ml.identity_key
@@ -378,6 +378,6 @@ where (
   )
   and not exists (
     select 1
-    from _ihub_manual_entities me
+    from _megrum_manual_entities me
     where me.identity_key = e.identity_key
   );

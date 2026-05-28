@@ -1,6 +1,6 @@
 import type { PropsWithChildren } from "react";
 import { StyleSheet, Text, View } from "react-native";
-import { ihubColors, ihubRadii, ihubShadow } from "../theme/tokens";
+import { megrumColors, megrumRadii, megrumShadow } from "../theme/tokens";
 
 type FoundationCardProps = PropsWithChildren<{
   eyebrow?: string;
@@ -28,26 +28,26 @@ const styles = StyleSheet.create({
   card: {
     borderWidth: 1,
     borderColor: "rgba(58,50,74,0.08)",
-    borderRadius: ihubRadii.lg,
-    backgroundColor: ihubColors.surface,
+    borderRadius: megrumRadii.lg,
+    backgroundColor: megrumColors.surface,
     padding: 16,
-    ...ihubShadow,
+    ...megrumShadow,
   },
   eyebrow: {
-    color: ihubColors.lavender,
+    color: megrumColors.lavender,
     fontSize: 11,
     fontWeight: "900",
     letterSpacing: 0.6,
     marginBottom: 5,
   },
   title: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 18,
     fontWeight: "900",
     letterSpacing: 0,
   },
   body: {
-    color: ihubColors.mutedInk,
+    color: megrumColors.mutedInk,
     fontSize: 12.5,
     fontWeight: "600",
     lineHeight: 19,

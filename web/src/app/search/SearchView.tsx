@@ -29,7 +29,7 @@ export type SearchHit = {
   wishHit: boolean;
 };
 
-const RECENT_KEY = "ihub-search-recent-v1";
+const RECENT_KEY = "megrum-search-recent-v1";
 const RECENT_MAX = 6;
 
 export function SearchView({

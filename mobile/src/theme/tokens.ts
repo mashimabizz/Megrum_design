@@ -1,4 +1,4 @@
-export const ihubColors = {
+export const megrumColors = {
   background: "#fbf9fc",
   surface: "#ffffff",
   ink: "#3a324a",
@@ -11,7 +11,7 @@ export const ihubColors = {
   ok: "#22c55e",
 } as const;
 
-export const ihubRadii = {
+export const megrumRadii = {
   sm: 10,
   md: 14,
   lg: 18,
@@ -19,7 +19,7 @@ export const ihubRadii = {
   pill: 999,
 } as const;
 
-export const ihubShadow = {
+export const megrumShadow = {
   shadowColor: "#3a324a",
   shadowOffset: { width: 0, height: 8 },
   shadowOpacity: 0.08,

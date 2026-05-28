@@ -4,7 +4,7 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 import { PrimaryButton } from "../../src/components/PrimaryButton";
 import { Screen } from "../../src/components/Screen";
 import { supabase } from "../../src/lib/supabase";
-import { ihubColors, ihubRadii, ihubShadow } from "../../src/theme/tokens";
+import { megrumColors, megrumRadii, megrumShadow } from "../../src/theme/tokens";
 
 export default function VerifyEmailScreen() {
   const { email } = useLocalSearchParams<{ email?: string | string[] }>();
@@ -89,22 +89,22 @@ const styles = StyleSheet.create({
   },
   backButton: {
     alignItems: "center",
-    backgroundColor: ihubColors.surface,
+    backgroundColor: megrumColors.surface,
     borderColor: "rgba(58,50,74,0.08)",
-    borderRadius: ihubRadii.pill,
+    borderRadius: megrumRadii.pill,
     borderWidth: 1,
     height: 42,
     justifyContent: "center",
     width: 42,
   },
   backText: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 30,
     fontWeight: "800",
     lineHeight: 32,
   },
   headerTitle: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 18,
     fontWeight: "900",
   },
@@ -122,21 +122,21 @@ const styles = StyleSheet.create({
     height: 80,
     justifyContent: "center",
     width: 80,
-    ...ihubShadow,
+    ...megrumShadow,
   },
   mailIcon: {
-    color: ihubColors.lavender,
+    color: megrumColors.lavender,
     fontSize: 36,
     fontWeight: "900",
   },
   title: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 20,
     fontWeight: "900",
     marginTop: 22,
   },
   copy: {
-    color: ihubColors.mutedInk,
+    color: megrumColors.mutedInk,
     fontSize: 13,
     fontWeight: "800",
     lineHeight: 21,
@@ -144,11 +144,11 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
   email: {
-    backgroundColor: ihubColors.surface,
+    backgroundColor: megrumColors.surface,
     borderColor: "rgba(58,50,74,0.10)",
-    borderRadius: ihubRadii.md,
+    borderRadius: megrumRadii.md,
     borderWidth: 1,
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 13,
     fontWeight: "900",
     marginTop: 20,
@@ -157,18 +157,18 @@ const styles = StyleSheet.create({
   },
   note: {
     backgroundColor: "rgba(243,197,212,0.42)",
-    borderRadius: ihubRadii.md,
+    borderRadius: megrumRadii.md,
     marginTop: 22,
     padding: 13,
   },
   noteText: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 11.5,
     fontWeight: "800",
     lineHeight: 18,
   },
   notice: {
-    color: ihubColors.ok,
+    color: megrumColors.ok,
     fontSize: 12,
     fontWeight: "900",
     marginTop: 14,
@@ -181,7 +181,7 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
   },
   linkText: {
-    color: ihubColors.lavender,
+    color: megrumColors.lavender,
     fontSize: 13,
     fontWeight: "900",
   },

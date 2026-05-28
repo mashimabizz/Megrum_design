@@ -4,7 +4,7 @@ import { HeaderBack } from "@/components/auth/HeaderBack";
 import { ScheduleForm } from "../ScheduleForm";
 
 export const metadata = {
-  title: "予定を追加 — iHub",
+  title: "予定を追加 — Megrum",
 };
 
 export default async function ScheduleNewPage() {

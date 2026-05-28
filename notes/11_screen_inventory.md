@@ -1,6 +1,6 @@
 # 11. 画面インベントリ（Screen Inventory）
 
-> **目的**：iHub の全画面を一覧化し、画面 ID・所属フロー・関連 JSX・関連 iter・関連 docs をクロスリファレンス。
+> **目的**：Megrum の全画面を一覧化し、画面 ID・所属フロー・関連 JSX・関連 iter・関連 docs をクロスリファレンス。
 > 実装着手時の「どの画面を作る？」「どの画面の仕様はどこ？」を一発で引けるようにする。
 
 最終更新: 2026-05-01
@@ -56,7 +56,7 @@
 
 ## A. 認証・オンボーディング
 
-ファイル：`iHub/auth-onboarding.jsx`、表示HTML：`iHub Auth Onboarding.html`
+ファイル：`Megrum/auth-onboarding.jsx`、表示HTML：`Megrum Auth Onboarding.html`
 
 ### 認証フロー（A-1）
 
@@ -88,7 +88,7 @@
 
 ### B-1. C-0 提示物選択（propose-select.jsx）
 
-ファイル：`iHub/propose-select.jsx`、表示HTML：`iHub Propose Select.html`
+ファイル：`Megrum/propose-select.jsx`、表示HTML：`Megrum Propose Select.html`
 
 | 画面ID | 名称 | 関連iter | 関連docs |
 |---|---|---|---|
@@ -101,7 +101,7 @@
 
 ### B-2. C-1 打診送信／受信
 
-ファイル：`iHub/c-flow.jsx`（送信側）、`iHub/nego-flow.jsx`（受信側）
+ファイル：`Megrum/c-flow.jsx`（送信側）、`Megrum/nego-flow.jsx`（受信側）
 
 | 画面ID | 名称 | 関連JSX関数 | 関連iter | 関連docs |
 |---|---|---|---|---|
@@ -112,7 +112,7 @@
 
 ### B-3. C-1.5 ネゴチャット
 
-ファイル：`iHub/nego-flow.jsx`
+ファイル：`Megrum/nego-flow.jsx`
 
 | 画面ID | 名称 | 関連JSX関数（scenario） | 関連iter | 関連docs |
 |---|---|---|---|---|
@@ -127,7 +127,7 @@
 
 ### B-4. C-2 取引チャット（合意後・当日のライブ運用）
 
-ファイル：`iHub/c-flow.jsx`
+ファイル：`Megrum/c-flow.jsx`
 
 | 画面ID | 名称 | 関連JSX関数 | 関連iter | 関連docs |
 |---|---|---|---|---|
@@ -135,7 +135,7 @@
 
 ### B-5. C-3 取引完了フロー
 
-ファイル：`iHub/c-flow.jsx`
+ファイル：`Megrum/c-flow.jsx`
 
 | 画面ID | 名称 | 関連JSX関数 | 関連iter | 関連docs |
 |---|---|---|---|---|
@@ -145,7 +145,7 @@
 
 ### B-6. D-flow（異議申し立て）
 
-ファイル：`iHub/c-dispute.jsx`、表示HTML：`iHub Dispute Flow.html`
+ファイル：`Megrum/c-dispute.jsx`、表示HTML：`Megrum Dispute Flow.html`
 
 | 画面ID | 名称 | 関連JSX関数 | 関連iter | 関連docs |
 |---|---|---|---|---|
@@ -171,7 +171,7 @@
 
 ### C-1. ホーム
 
-ファイル：`iHub/home-v2.jsx`、`iHub/home-variations.jsx`
+ファイル：`Megrum/home-v2.jsx`、`Megrum/home-variations.jsx`
 
 | 画面ID | 名称 | 関連JSX関数 | 関連iter | 関連docs |
 |---|---|---|---|---|
@@ -183,7 +183,7 @@
 
 ### C-2. プロフィール
 
-ファイル：`iHub/hub-screens.jsx`、`iHub/account-extras.jsx`
+ファイル：`Megrum/hub-screens.jsx`、`Megrum/account-extras.jsx`
 
 | 画面ID | 名称 | 関連JSX関数 | 関連iter | 関連docs |
 |---|---|---|---|---|
@@ -197,7 +197,7 @@
 
 ### C-3. ウィッシュ
 
-ファイル：`iHub/hub-screens.jsx`
+ファイル：`Megrum/hub-screens.jsx`
 
 | 画面ID | 名称 | 関連JSX関数 | 関連iter | 関連docs |
 |---|---|---|---|---|
@@ -210,7 +210,7 @@
 
 ### C-4. 在庫管理
 
-ファイル：`iHub/b-inventory.jsx`
+ファイル：`Megrum/b-inventory.jsx`
 
 | 画面ID | 名称 | 関連JSX関数 | 関連iter | 関連docs |
 |---|---|---|---|---|
@@ -222,7 +222,7 @@
 
 ### C-5. 検索
 
-ファイル：`iHub/search-filter.jsx`
+ファイル：`Megrum/search-filter.jsx`
 
 | 画面ID | 名称 | 関連JSX関数 | 関連iter | 関連docs |
 |---|---|---|---|---|
@@ -232,7 +232,7 @@
 
 ### C-6. AW（活動予定）
 
-ファイル：`iHub/aw-edit.jsx`
+ファイル：`Megrum/aw-edit.jsx`
 
 | 画面ID | 名称 | 関連JSX関数 | 関連iter | 関連docs |
 |---|---|---|---|---|
@@ -247,7 +247,7 @@
 
 ### D-1. 取引タブ
 
-ファイル：`iHub/account-support.jsx`
+ファイル：`Megrum/account-support.jsx`
 
 | 画面ID | 名称 | 関連JSX関数 | 関連iter | 関連docs |
 |---|---|---|---|---|
@@ -258,7 +258,7 @@
 
 ### D-2. 通報
 
-ファイル：`iHub/account-support.jsx`
+ファイル：`Megrum/account-support.jsx`
 
 | 画面ID | 名称 | 関連JSX関数 | 関連iter | 関連docs |
 |---|---|---|---|---|
@@ -267,7 +267,7 @@
 
 ### D-3. ヘルプ
 
-ファイル：`iHub/account-support.jsx`
+ファイル：`Megrum/account-support.jsx`
 
 | 画面ID | 名称 | 関連JSX関数 | 関連iter | 関連docs |
 |---|---|---|---|---|
@@ -276,7 +276,7 @@
 
 ### D-4. 設定
 
-ファイル：`iHub/account-support.jsx`、`iHub/account-extras.jsx`
+ファイル：`Megrum/account-support.jsx`、`Megrum/account-extras.jsx`
 
 | 画面ID | 名称 | 関連JSX関数 | 関連iter | 関連docs |
 |---|---|---|---|---|
@@ -287,7 +287,7 @@
 
 ### D-5. 法的画面
 
-ファイル：`iHub/legal-pages.jsx`
+ファイル：`Megrum/legal-pages.jsx`
 
 | 画面ID | 名称 | 関連JSX関数 | 関連iter | 関連docs |
 |---|---|---|---|---|
@@ -301,7 +301,7 @@
 
 ### E-1. コレクション図鑑
 
-ファイル：`iHub/pokedex.jsx`
+ファイル：`Megrum/pokedex.jsx`
 
 | 画面ID | 名称 | 関連JSX関数 | 関連iter | 関連docs |
 |---|---|---|---|---|
@@ -475,12 +475,12 @@ flowchart TD
 
 | 画面ID | 名称 | ファイル | 廃止理由・後継 |
 |---|---|---|---|
-| `LEGACY-home-A` | ホームA案 — ヒーロースタック型 | iHub Home.html | iter26 で v2 に統合 → `HOM-main` |
-| `LEGACY-home-B` | ホームB案 — フォトフィード型 | iHub Home.html | 同上 |
-| `LEGACY-home-C` | ホームC案 — 密度最大リスト型 | iHub Home.html | 同上 |
-| `LEGACY-mvp-v1-c2` | C-2 旧 — 場所合意・時間チップ | iHub MVP v1.html | iter34 で待ち合わせは合意前に前倒し → `C2-chat` |
-| `LEGACY-mvp-v1-aw` | AW編集旧 | iHub MVP v1.html | `AW-edit-event/location` で置換 |
-| `LEGACY-all-screens-*` | 旧統合画面群 | iHub All Screens.html | 部分的に古い、最新版は個別HTMLを参照 |
+| `LEGACY-home-A` | ホームA案 — ヒーロースタック型 | Megrum Home.html | iter26 で v2 に統合 → `HOM-main` |
+| `LEGACY-home-B` | ホームB案 — フォトフィード型 | Megrum Home.html | 同上 |
+| `LEGACY-home-C` | ホームC案 — 密度最大リスト型 | Megrum Home.html | 同上 |
+| `LEGACY-mvp-v1-c2` | C-2 旧 — 場所合意・時間チップ | Megrum MVP v1.html | iter34 で待ち合わせは合意前に前倒し → `C2-chat` |
+| `LEGACY-mvp-v1-aw` | AW編集旧 | Megrum MVP v1.html | `AW-edit-event/location` で置換 |
+| `LEGACY-all-screens-*` | 旧統合画面群 | Megrum All Screens.html | 部分的に古い、最新版は個別HTMLを参照 |
 | `LEGACY-collection-tab` | 在庫内コレクションタブ | （旧b-inventory） | iter19.5 で wish ベース統合 → `WSH-list` + `POK-list` |
 | `LEGACY-oshi-match-badge` | 推し一致バッジ | （旧badge-samples） | iter26 削除（マッチングと無関係のため） |
 | `LEGACY-c15-qr` | C-1.5 ネゴチャット内QR | （旧nego-flow） | iter32.5 削除（合流前は不要、QRは C-2 のみ） |
@@ -489,7 +489,7 @@ flowchart TD
 | `LEGACY-nego-quick-actions` | C-1.5 クイックアクション4種 | （旧nego-flow） | iter31 削除（+ボタンに集約） |
 
 参考用：
-| `BDG-samples` | バッジサンプル4パターン比較 | iHub Badge Samples.html | デザイン選定用、意図的に廃止バッジ含む |
+| `BDG-samples` | バッジサンプル4パターン比較 | Megrum Badge Samples.html | デザイン選定用、意図的に廃止バッジ含む |
 
 ---
 

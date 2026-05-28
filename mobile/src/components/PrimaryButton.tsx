@@ -6,7 +6,7 @@ import {
   Text,
   type PressableProps,
 } from "react-native";
-import { ihubColors, ihubRadii } from "../theme/tokens";
+import { megrumColors, megrumRadii } from "../theme/tokens";
 
 type PrimaryButtonProps = PropsWithChildren<
   PressableProps & {
@@ -37,7 +37,7 @@ export function PrimaryButton({
       ]}
     >
       {loading ? (
-        <ActivityIndicator color={variant === "primary" ? "#fff" : ihubColors.lavender} />
+        <ActivityIndicator color={variant === "primary" ? "#fff" : megrumColors.lavender} />
       ) : (
         <Text
           style={[
@@ -57,11 +57,11 @@ const styles = StyleSheet.create({
     minHeight: 50,
     alignItems: "center",
     justifyContent: "center",
-    borderRadius: ihubRadii.md,
+    borderRadius: megrumRadii.md,
     paddingHorizontal: 18,
   },
   primary: {
-    backgroundColor: ihubColors.lavender,
+    backgroundColor: megrumColors.lavender,
   },
   secondary: {
     borderWidth: 1.5,
@@ -84,6 +84,6 @@ const styles = StyleSheet.create({
     color: "#fff",
   },
   secondaryLabel: {
-    color: ihubColors.lavender,
+    color: megrumColors.lavender,
   },
 });

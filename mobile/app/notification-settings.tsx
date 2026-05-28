@@ -5,7 +5,7 @@ import { Screen } from "../src/components/Screen";
 import { useAuth } from "../src/auth/AuthProvider";
 import { IconSymbol, type IconSymbolName } from "../src/components/IconSymbol";
 import { supabase } from "../src/lib/supabase";
-import { ihubColors, ihubRadii } from "../src/theme/tokens";
+import { megrumColors, megrumRadii } from "../src/theme/tokens";
 
 export default function NotificationSettingsScreen() {
   const { previewMode, user } = useAuth();
@@ -146,7 +146,7 @@ function SettingsRow({
   return (
     <View style={styles.row}>
       <View style={styles.rowIcon}>
-        <IconSymbol name={icon} size={19} color={ihubColors.lavender} />
+        <IconSymbol name={icon} size={19} color={megrumColors.lavender} />
       </View>
       <View style={styles.rowCopy}>
         <Text style={styles.rowTitle}>{title}</Text>
@@ -207,20 +207,20 @@ const styles = StyleSheet.create({
     paddingHorizontal: 2,
   },
   sectionLabel: {
-    color: ihubColors.mutedInk,
+    color: megrumColors.mutedInk,
     fontSize: 10.5,
     fontWeight: "900",
     letterSpacing: 0.4,
   },
   sectionSub: {
-    color: ihubColors.mutedInk,
+    color: megrumColors.mutedInk,
     fontSize: 10.5,
     fontWeight: "700",
   },
   sectionCard: {
-    backgroundColor: ihubColors.surface,
+    backgroundColor: megrumColors.surface,
     borderColor: "rgba(58,50,74,0.08)",
-    borderRadius: ihubRadii.lg,
+    borderRadius: megrumRadii.lg,
     borderWidth: 1,
     overflow: "hidden",
   },
@@ -241,43 +241,43 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   rowTitle: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 13,
     fontWeight: "900",
   },
   rowSub: {
-    color: ihubColors.mutedInk,
+    color: megrumColors.mutedInk,
     fontSize: 10.5,
     fontWeight: "700",
     lineHeight: 15,
     marginTop: 2,
   },
   onBadge: {
-    backgroundColor: ihubColors.ok,
-    borderRadius: ihubRadii.pill,
+    backgroundColor: megrumColors.ok,
+    borderRadius: megrumRadii.pill,
     paddingHorizontal: 8,
     paddingVertical: 2,
   },
   onBadgeText: {
-    color: ihubColors.surface,
+    color: megrumColors.surface,
     fontSize: 9.5,
     fontWeight: "900",
   },
   toggle: {
-    borderRadius: ihubRadii.pill,
+    borderRadius: megrumRadii.pill,
     height: 26,
     justifyContent: "center",
     width: 44,
   },
   toggleOn: {
-    backgroundColor: ihubColors.ok,
+    backgroundColor: megrumColors.ok,
   },
   toggleOff: {
     backgroundColor: "rgba(58,50,74,0.22)",
   },
   knob: {
-    backgroundColor: ihubColors.surface,
-    borderRadius: ihubRadii.pill,
+    backgroundColor: megrumColors.surface,
+    borderRadius: megrumRadii.pill,
     height: 20,
     width: 20,
   },
@@ -290,12 +290,12 @@ const styles = StyleSheet.create({
     padding: 12,
   },
   noteTitle: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 11,
     fontWeight: "900",
   },
   noteText: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 10.5,
     fontWeight: "700",
     lineHeight: 16,
@@ -317,7 +317,7 @@ const styles = StyleSheet.create({
     borderColor: "rgba(217,130,107,0.22)",
     borderRadius: 10,
     borderWidth: 1,
-    color: ihubColors.warn,
+    color: megrumColors.warn,
     fontSize: 11,
     fontWeight: "800",
     padding: 10,

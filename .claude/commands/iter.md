@@ -45,7 +45,7 @@ grep -E "^## イテレーション" notes/08_design_iterations.md | head -3
 
 [何を変えたか。bullet で具体的に]
 
-#### `iHub/path/to/file.jsx`
+#### `Megrum/path/to/file.jsx`
 - 変更点1
 - 変更点2
 
@@ -55,12 +55,12 @@ grep -E "^## イテレーション" notes/08_design_iterations.md | head -3
 
 ### 確認方法
 
-- http://localhost:8000/iHub%20XXX.html
+- http://localhost:8000/Megrum%20XXX.html
 
 ### 関連ファイル
 
-- `iHub/xxx.jsx`
-- `iHub/iHub XXX.html`
+- `Megrum/xxx.jsx`
+- `Megrum/Megrum XXX.html`
 
 ---
 

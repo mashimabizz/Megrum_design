@@ -3,10 +3,10 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { LoginForm } from "./LoginForm";
 import { HeaderBack } from "@/components/auth/HeaderBack";
-import { IHubLogo } from "@/components/auth/IHubLogo";
+import { MegrumLogo } from "@/components/auth/MegrumLogo";
 
 export const metadata = {
-  title: "ログイン — iHub",
+  title: "ログイン — Megrum",
 };
 
 type Props = {
@@ -28,9 +28,9 @@ export default async function LoginPage({ searchParams }: Props) {
     <main className="flex flex-1 flex-col bg-[#fbf9fc]">
       <HeaderBack title="ログイン" backHref="/" />
       <div className="mx-auto w-full max-w-md flex-1 px-5 pb-8 pt-8">
-        {/* iHub ロゴ + おかえりなさい */}
+        {/* Megrum ロゴ + おかえりなさい */}
         <div className="mb-7 flex flex-col items-center">
-          <IHubLogo size={60} />
+          <MegrumLogo size={60} />
           <p className="mt-3.5 text-xs text-gray-500">おかえりなさい</p>
         </div>
 

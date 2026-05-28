@@ -1,4 +1,4 @@
-import { router, useLocalSearchParams } from "expo-router";
+import { router, Stack, useLocalSearchParams } from "expo-router";
 import {
   useEffect,
   useMemo,
@@ -20,7 +20,7 @@ import { Screen } from "../src/components/Screen";
 import { StatusPill } from "../src/components/StatusPill";
 import { useAuth } from "../src/auth/AuthProvider";
 import { hasSupabaseConfig, supabase } from "../src/lib/supabase";
-import { ihubColors, ihubRadii, ihubShadow } from "../src/theme/tokens";
+import { megrumColors, megrumRadii, megrumShadow } from "../src/theme/tokens";
 
 type ListingMode = "create" | "edit";
 type ListingLogic = "and" | "or";
@@ -451,6 +451,47 @@ export default function ListingEditorScreen() {
     ]);
   }
 
+  function toggleCashOffer(enabled: boolean) {
+    setOptions((current) => {
+      const normalized = current.filter((option) => !option.isCashOffer);
+      if (!enabled) {
+        return (normalized.length > 0 ? normalized : [blankOption(1)]).map((option, index) => ({
+          ...option,
+          position: index + 1,
+        }));
+      }
+      if (current.some((option) => option.isCashOffer)) return current;
+      const cashOption = {
+        ...blankOption(normalized.length + 1),
+        isCashOffer: true,
+        cashAmount: 1000,
+      };
+      if (normalized.length >= MAX_OPTIONS) {
+        showToast(`選択肢は最大${MAX_OPTIONS}件です`);
+        return current;
+      }
+      if (normalized.length === 1 && isBlankWishOption(normalized[0])) {
+        return [{ ...cashOption, position: 1 }];
+      }
+      return [...normalized, cashOption].map((option, index) => ({
+        ...option,
+        position: index + 1,
+      }));
+    });
+  }
+
+  function setCashOfferAmount(rawValue: string) {
+    const cleaned = rawValue.replace(/[^\d]/g, "");
+    const next = cleaned ? Number(cleaned) : null;
+    setOptions((current) =>
+      current.map((option) =>
+        option.isCashOffer
+          ? { ...option, cashAmount: Number.isFinite(next) ? next : null }
+          : option,
+      ),
+    );
+  }
+
   function removeOption(index: number) {
     setOptions((current) =>
       current
@@ -523,8 +564,9 @@ export default function ListingEditorScreen() {
 
   if (loading) {
     return (
-      <Screen contentStyle={styles.centerScreen}>
-        <ActivityIndicator color={ihubColors.lavender} />
+      <Screen contentStyle={styles.centerScreen} topInset={false}>
+        <NativeListingHeader title={mode === "create" ? "個別募集を作成" : "個別募集を編集"} />
+        <ActivityIndicator color={megrumColors.lavender} />
         <Text style={styles.loadingText}>個別募集を読み込み中…</Text>
       </Screen>
     );
@@ -532,8 +574,8 @@ export default function ListingEditorScreen() {
 
   if (loadError || !data) {
     return (
-      <Screen contentStyle={styles.screen}>
-        <Header title={mode === "create" ? "個別募集を作成" : "個別募集を編集"} />
+      <Screen contentStyle={styles.screen} topInset={false}>
+        <NativeListingHeader title={mode === "create" ? "個別募集を作成" : "個別募集を編集"} />
         <View style={styles.emptyNotice}>
           <Text style={styles.emptyTitle}>読み込みに失敗しました</Text>
           <Text style={styles.emptyText}>{loadError ?? "データが見つかりません"}</Text>
@@ -542,12 +584,13 @@ export default function ListingEditorScreen() {
     );
   }
 
-  const canCreate = data.inventoryItems.length > 0 && data.wishItems.length > 0;
+  const cashOffer = options.find((option) => option.isCashOffer) ?? null;
+  const canCreate = data.inventoryItems.length > 0;
   const locked = data.locked;
 
   return (
-    <Screen contentStyle={styles.screen}>
-      <Header title={mode === "create" ? "個別募集を作成" : "個別募集を編集"} />
+    <Screen contentStyle={styles.screen} topInset={false}>
+      <NativeListingHeader title={mode === "create" ? "個別募集を作成" : "個別募集を編集"} />
 
       {locked ? (
         <View style={styles.emptyNotice}>
@@ -560,9 +603,9 @@ export default function ListingEditorScreen() {
 
       {!locked && !canCreate ? (
         <View style={styles.emptyNotice}>
-          <Text style={styles.emptyTitle}>譲とWishの両方が必要です</Text>
+          <Text style={styles.emptyTitle}>譲る候補が必要です</Text>
           <Text style={styles.emptyText}>
-            個別募集を作るには、譲る候補と求めるWishをそれぞれ登録してください。
+            個別募集を作るには、まず譲る候補を登録してください。求めるものは Wish か定価で設定できます。
           </Text>
         </View>
       ) : null}
@@ -632,6 +675,12 @@ export default function ListingEditorScreen() {
                   onChange={setHaveLogic}
                 />
               ) : null}
+              <CashOfferControl
+                amount={cashOffer?.cashAmount ?? null}
+                enabled={!!cashOffer}
+                onAmountChange={setCashOfferAmount}
+                onToggle={toggleCashOffer}
+              />
             </FormSection>
 
             <View style={styles.optionHeader}>
@@ -708,23 +757,18 @@ export default function ListingEditorScreen() {
   );
 }
 
-function Header({ title }: { title: string }) {
+function NativeListingHeader({ title }: { title: string }) {
   return (
-    <View style={styles.header}>
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel="戻る"
-        onPress={() => router.back()}
-        style={styles.backButton}
-      >
-        <Text style={styles.backText}>‹</Text>
-      </Pressable>
-      <View style={styles.headerCopy}>
-        <Text style={styles.kicker}>LISTING</Text>
-        <Text style={styles.title}>{title}</Text>
-      </View>
-      <StatusPill label="条件設定" tone="lavender" />
-    </View>
+    <Stack.Screen
+      options={{
+        headerShown: true,
+        title,
+        headerBackButtonDisplayMode: "minimal",
+        headerBlurEffect: "systemMaterial",
+        headerTintColor: megrumColors.lavender,
+        headerRight: () => <StatusPill label="条件設定" tone="lavender" />,
+      }}
+    />
   );
 }
 
@@ -799,7 +843,7 @@ function PreviewSide({
               style={[
                 styles.previewBubble,
                 {
-                  backgroundColor: photoUrl ? ihubColors.ink : `hsl(${hue}, 55%, 78%)`,
+                  backgroundColor: photoUrl ? megrumColors.ink : `hsl(${hue}, 55%, 78%)`,
                   marginTop: index === 1 ? -8 : index === 2 ? 6 : 0,
                 },
               ]}
@@ -896,16 +940,64 @@ function ChoiceChip({
   );
 }
 
+function CashOfferControl({
+  amount,
+  enabled,
+  onAmountChange,
+  onToggle,
+}: {
+  amount: number | null;
+  enabled: boolean;
+  onAmountChange: (value: string) => void;
+  onToggle: (enabled: boolean) => void;
+}) {
+  return (
+    <View style={[styles.cashOfferBox, enabled ? styles.cashOfferBoxActive : null]}>
+      <Pressable
+        accessibilityRole="switch"
+        accessibilityState={{ checked: enabled }}
+        onPress={() => onToggle(!enabled)}
+        style={styles.cashOfferHeader}
+      >
+        <View>
+          <Text style={styles.cashOfferTitle}>定価でも譲る</Text>
+          <Text style={styles.cashOfferSub}>
+            Wishがなくても、相手には定価交換の選択肢として表示します。
+          </Text>
+        </View>
+        <View style={[styles.cashOfferSwitch, enabled ? styles.cashOfferSwitchActive : null]}>
+          <View style={[styles.cashOfferKnob, enabled ? styles.cashOfferKnobActive : null]} />
+        </View>
+      </Pressable>
+      {enabled ? (
+        <View style={styles.cashOfferAmountRow}>
+          <Text style={styles.choiceLabel}>定価（円）</Text>
+          <TextInput
+            keyboardType="number-pad"
+            onChangeText={onAmountChange}
+            placeholder="1000"
+            placeholderTextColor="rgba(58,50,74,0.35)"
+            style={styles.cashInput}
+            value={amount ? String(amount) : ""}
+          />
+        </View>
+      ) : null}
+    </View>
+  );
+}
+
 function GoodsPanelCard({
   item,
   selected,
   qty,
+  compact = false,
   onPress,
   onQty,
 }: {
   item: InventoryOpt | WishOpt;
   selected: boolean;
   qty: number;
+  compact?: boolean;
   onPress: () => void;
   onQty: (delta: number) => void;
 }) {
@@ -913,19 +1005,25 @@ function GoodsPanelCard({
   const hue = "hue" in item ? item.hue : nameToHue(name);
   const hasPhoto = !!item.photoUrl;
   return (
-    <View style={[styles.panelWrap, selected ? styles.panelWrapSelected : null]}>
+    <View
+      style={[
+        styles.panelWrap,
+        compact ? styles.panelWrapCompact : null,
+        selected ? styles.panelWrapSelected : null,
+      ]}
+    >
       <Pressable
         accessibilityRole="button"
         onPress={onPress}
         style={[
           styles.panelCard,
           {
-            backgroundColor: hasPhoto ? ihubColors.ink : `hsl(${hue}, 34%, 82%)`,
+            backgroundColor: hasPhoto ? megrumColors.ink : `hsl(${hue}, 34%, 82%)`,
           },
         ]}
       >
         {hasPhoto ? (
-          <Image source={{ uri: item.photoUrl! }} style={styles.panelImage} />
+          <Image source={{ uri: item.photoUrl! }} resizeMode="cover" style={styles.panelImage} />
         ) : (
           <>
             <View style={styles.panelShine} />
@@ -1161,6 +1259,7 @@ function OptionEditor({
                   <GoodsPanelCard
                     key={wish.id}
                     item={wish}
+                    compact
                     selected={!!selected}
                     qty={selected?.qty ?? 0}
                     onPress={() => onToggleWish(wish.id)}
@@ -1801,6 +1900,16 @@ function blankOption(position: number): WishOptionState {
   };
 }
 
+function isBlankWishOption(option: WishOptionState | undefined) {
+  return (
+    !!option &&
+    !option.isCashOffer &&
+    !option.groupId &&
+    !option.goodsTypeId &&
+    option.selected.length === 0
+  );
+}
+
 function toInventoryOpt(row: InventoryRow): InventoryOpt {
   const groupName = pickName(row.group);
   const characterName = pickName(row.character);
@@ -1881,7 +1990,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   loadingText: {
-    color: ihubColors.mutedInk,
+    color: megrumColors.mutedInk,
     fontSize: 12,
     fontWeight: "800",
   },
@@ -1892,17 +2001,17 @@ const styles = StyleSheet.create({
   },
   backButton: {
     alignItems: "center",
-    backgroundColor: ihubColors.surface,
+    backgroundColor: megrumColors.surface,
     borderColor: "rgba(58,50,74,0.08)",
-    borderRadius: ihubRadii.pill,
+    borderRadius: megrumRadii.pill,
     borderWidth: 1,
     height: 44,
     justifyContent: "center",
     width: 44,
-    ...ihubShadow,
+    ...megrumShadow,
   },
   backText: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 32,
     fontWeight: "700",
     lineHeight: 34,
@@ -1911,19 +2020,19 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   kicker: {
-    color: ihubColors.lavender,
+    color: megrumColors.lavender,
     fontSize: 10.5,
     fontWeight: "900",
     letterSpacing: 0.6,
   },
   title: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 20,
     fontWeight: "900",
     lineHeight: 25,
   },
   emptyNotice: {
-    backgroundColor: ihubColors.surface,
+    backgroundColor: megrumColors.surface,
     borderColor: "rgba(58,50,74,0.08)",
     borderRadius: 22,
     borderStyle: "dashed",
@@ -1931,13 +2040,13 @@ const styles = StyleSheet.create({
     padding: 18,
   },
   emptyTitle: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 14,
     fontWeight: "900",
     textAlign: "center",
   },
   emptyText: {
-    color: ihubColors.mutedInk,
+    color: megrumColors.mutedInk,
     fontSize: 12,
     fontWeight: "700",
     lineHeight: 18,
@@ -1945,13 +2054,13 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
   preview: {
-    backgroundColor: ihubColors.surface,
+    backgroundColor: megrumColors.surface,
     borderColor: "rgba(166,149,216,0.25)",
     borderRadius: 24,
     borderWidth: 1,
     overflow: "hidden",
     padding: 14,
-    ...ihubShadow,
+    ...megrumShadow,
   },
   previewHeader: {
     alignItems: "center",
@@ -1959,14 +2068,14 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
   },
   previewTitle: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 13,
     fontWeight: "900",
   },
   previewCash: {
     backgroundColor: "rgba(243,197,212,0.26)",
-    borderRadius: ihubRadii.pill,
-    color: ihubColors.ink,
+    borderRadius: megrumRadii.pill,
+    color: megrumColors.ink,
     fontSize: 10.5,
     fontWeight: "900",
     overflow: "hidden",
@@ -1986,8 +2095,8 @@ const styles = StyleSheet.create({
   },
   previewSideLabel: {
     backgroundColor: "rgba(58,50,74,0.05)",
-    borderRadius: ihubRadii.pill,
-    color: ihubColors.mutedInk,
+    borderRadius: megrumRadii.pill,
+    color: megrumColors.mutedInk,
     fontSize: 10,
     fontWeight: "900",
     overflow: "hidden",
@@ -2008,14 +2117,14 @@ const styles = StyleSheet.create({
     height: 82,
     justifyContent: "center",
     marginHorizontal: -15,
-    shadowColor: ihubColors.ink,
+    shadowColor: megrumColors.ink,
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.13,
     shadowRadius: 14,
     width: 62,
   },
   previewBubbleText: {
-    color: ihubColors.surface,
+    color: megrumColors.surface,
     fontSize: 23,
     fontWeight: "900",
   },
@@ -2025,15 +2134,15 @@ const styles = StyleSheet.create({
   },
   previewMore: {
     alignItems: "center",
-    backgroundColor: ihubColors.ink,
-    borderRadius: ihubRadii.pill,
+    backgroundColor: megrumColors.ink,
+    borderRadius: megrumRadii.pill,
     height: 24,
     justifyContent: "center",
     marginLeft: -12,
     width: 24,
   },
   previewMoreText: {
-    color: ihubColors.surface,
+    color: megrumColors.surface,
     fontSize: 9,
     fontWeight: "900",
   },
@@ -2051,16 +2160,16 @@ const styles = StyleSheet.create({
   },
   previewKnot: {
     alignItems: "center",
-    backgroundColor: ihubColors.surface,
+    backgroundColor: megrumColors.surface,
     borderColor: "rgba(166,149,216,0.42)",
-    borderRadius: ihubRadii.pill,
+    borderRadius: megrumRadii.pill,
     borderWidth: 1,
     height: 34,
     justifyContent: "center",
     width: 34,
   },
   previewKnotText: {
-    color: ihubColors.lavender,
+    color: megrumColors.lavender,
     fontSize: 20,
     fontWeight: "900",
     lineHeight: 22,
@@ -2078,20 +2187,20 @@ const styles = StyleSheet.create({
     paddingHorizontal: 2,
   },
   sectionLabel: {
-    color: ihubColors.lavender,
+    color: megrumColors.lavender,
     fontSize: 11,
     fontWeight: "900",
     letterSpacing: 0.5,
   },
   sectionRight: {
-    color: ihubColors.mutedInk,
+    color: megrumColors.mutedInk,
     fontSize: 10,
     fontWeight: "800",
   },
   sectionBody: {
-    backgroundColor: ihubColors.surface,
+    backgroundColor: megrumColors.surface,
     borderColor: "rgba(58,50,74,0.08)",
-    borderRadius: ihubRadii.lg,
+    borderRadius: megrumRadii.lg,
     borderWidth: 1,
     gap: 10,
     padding: 13,
@@ -2103,7 +2212,7 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   choiceLabel: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 11,
     fontWeight: "900",
   },
@@ -2114,22 +2223,22 @@ const styles = StyleSheet.create({
   choiceChip: {
     backgroundColor: "rgba(58,50,74,0.055)",
     borderColor: "rgba(58,50,74,0.08)",
-    borderRadius: ihubRadii.pill,
+    borderRadius: megrumRadii.pill,
     borderWidth: 1,
     paddingHorizontal: 12,
     paddingVertical: 8,
   },
   choiceChipActive: {
-    backgroundColor: ihubColors.lavender,
-    borderColor: ihubColors.lavender,
+    backgroundColor: megrumColors.lavender,
+    borderColor: megrumColors.lavender,
   },
   choiceChipText: {
-    color: ihubColors.mutedInk,
+    color: megrumColors.mutedInk,
     fontSize: 11,
     fontWeight: "900",
   },
   choiceChipTextActive: {
-    color: ihubColors.surface,
+    color: megrumColors.surface,
   },
   noticeBox: {
     backgroundColor: "rgba(166,149,216,0.06)",
@@ -2142,6 +2251,60 @@ const styles = StyleSheet.create({
     fontSize: 10.5,
     fontWeight: "700",
     lineHeight: 16,
+  },
+  cashOfferBox: {
+    backgroundColor: "rgba(168,212,230,0.10)",
+    borderColor: "rgba(168,212,230,0.24)",
+    borderRadius: 15,
+    borderWidth: 1,
+    gap: 10,
+    padding: 11,
+  },
+  cashOfferBoxActive: {
+    backgroundColor: "rgba(166,149,216,0.10)",
+    borderColor: "rgba(166,149,216,0.42)",
+  },
+  cashOfferHeader: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 12,
+    justifyContent: "space-between",
+  },
+  cashOfferTitle: {
+    color: megrumColors.ink,
+    fontSize: 12.5,
+    fontWeight: "900",
+  },
+  cashOfferSub: {
+    color: "rgba(58,50,74,0.56)",
+    fontSize: 10,
+    fontWeight: "700",
+    lineHeight: 14,
+    marginTop: 3,
+    maxWidth: 260,
+  },
+  cashOfferSwitch: {
+    backgroundColor: "rgba(58,50,74,0.14)",
+    borderRadius: megrumRadii.pill,
+    height: 25,
+    justifyContent: "center",
+    paddingHorizontal: 3,
+    width: 46,
+  },
+  cashOfferSwitchActive: {
+    backgroundColor: megrumColors.lavender,
+  },
+  cashOfferKnob: {
+    backgroundColor: megrumColors.surface,
+    borderRadius: megrumRadii.pill,
+    height: 19,
+    width: 19,
+  },
+  cashOfferKnobActive: {
+    alignSelf: "flex-end",
+  },
+  cashOfferAmountRow: {
+    gap: 7,
   },
   warnBox: {
     backgroundColor: "rgba(245,158,11,0.11)",
@@ -2164,10 +2327,15 @@ const styles = StyleSheet.create({
   },
   panelWrap: {
     borderRadius: 14,
+    position: "relative",
     width: "31%",
   },
+  panelWrapCompact: {
+    flexShrink: 0,
+    width: 88,
+  },
   panelWrapSelected: {
-    shadowColor: ihubColors.lavender,
+    shadowColor: megrumColors.lavender,
     shadowOffset: { width: 0, height: 7 },
     shadowOpacity: 0.22,
     shadowRadius: 13,
@@ -2193,7 +2361,7 @@ const styles = StyleSheet.create({
     width: 58,
   },
   panelGlyph: {
-    color: ihubColors.surface,
+    color: megrumColors.surface,
     fontSize: 27,
     fontWeight: "900",
     left: 0,
@@ -2216,7 +2384,7 @@ const styles = StyleSheet.create({
     top: 5,
   },
   panelName: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 8.5,
     fontWeight: "900",
   },
@@ -2230,15 +2398,15 @@ const styles = StyleSheet.create({
     right: 0,
   },
   panelType: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 9,
     fontWeight: "900",
   },
   panelAddMark: {
     alignItems: "center",
     backgroundColor: "rgba(255,255,255,0.70)",
-    borderColor: ihubColors.surface,
-    borderRadius: ihubRadii.pill,
+    borderColor: megrumColors.surface,
+    borderRadius: megrumRadii.pill,
     borderWidth: 1.5,
     height: 24,
     justifyContent: "center",
@@ -2248,7 +2416,7 @@ const styles = StyleSheet.create({
     width: 24,
   },
   panelAddText: {
-    color: ihubColors.lavender,
+    color: megrumColors.lavender,
     fontSize: 15,
     fontWeight: "900",
     lineHeight: 17,
@@ -2257,7 +2425,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     alignSelf: "center",
     backgroundColor: "rgba(255,255,255,0.96)",
-    borderRadius: ihubRadii.pill,
+    borderRadius: megrumRadii.pill,
     bottom: 6,
     flexDirection: "row",
     gap: 3,
@@ -2266,34 +2434,34 @@ const styles = StyleSheet.create({
   },
   qtyButton: {
     alignItems: "center",
-    backgroundColor: ihubColors.lavender,
-    borderRadius: ihubRadii.pill,
+    backgroundColor: megrumColors.lavender,
+    borderRadius: megrumRadii.pill,
     height: 20,
     justifyContent: "center",
     width: 20,
   },
   qtyButtonText: {
-    color: ihubColors.surface,
+    color: megrumColors.surface,
     fontSize: 12,
     fontWeight: "900",
     lineHeight: 14,
   },
   qtyText: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 10,
     fontWeight: "900",
     minWidth: 22,
     textAlign: "center",
   },
   logicBox: {
-    backgroundColor: ihubColors.background,
+    backgroundColor: megrumColors.background,
     borderColor: "rgba(58,50,74,0.08)",
     borderRadius: 14,
     borderWidth: 1,
     padding: 9,
   },
   logicLabel: {
-    color: ihubColors.mutedInk,
+    color: megrumColors.mutedInk,
     fontSize: 10.5,
     fontWeight: "900",
     marginBottom: 7,
@@ -2304,24 +2472,24 @@ const styles = StyleSheet.create({
   },
   logicButton: {
     alignItems: "center",
-    backgroundColor: ihubColors.surface,
+    backgroundColor: megrumColors.surface,
     borderRadius: 11,
     flex: 1,
     paddingVertical: 8,
   },
   logicButtonActive: {
-    backgroundColor: ihubColors.lavender,
+    backgroundColor: megrumColors.lavender,
   },
   logicButtonText: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 11.5,
     fontWeight: "900",
   },
   logicButtonTextActive: {
-    color: ihubColors.surface,
+    color: megrumColors.surface,
   },
   logicButtonSub: {
-    color: ihubColors.mutedInk,
+    color: megrumColors.mutedInk,
     fontSize: 9,
     fontWeight: "800",
     marginTop: 2,
@@ -2336,24 +2504,24 @@ const styles = StyleSheet.create({
     paddingHorizontal: 2,
   },
   optionHeaderLabel: {
-    color: ihubColors.lavender,
+    color: megrumColors.lavender,
     fontSize: 11,
     fontWeight: "900",
     letterSpacing: 0.5,
   },
   optionHeaderSub: {
-    color: ihubColors.mutedInk,
+    color: megrumColors.mutedInk,
     fontSize: 10,
     fontWeight: "700",
     marginTop: 2,
   },
   optionCounter: {
-    color: ihubColors.mutedInk,
+    color: megrumColors.mutedInk,
     fontSize: 10,
     fontWeight: "900",
   },
   optionCard: {
-    backgroundColor: ihubColors.surface,
+    backgroundColor: megrumColors.surface,
     borderColor: "rgba(166,149,216,0.34)",
     borderRadius: 19,
     borderWidth: 1,
@@ -2367,9 +2535,9 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   optionBadge: {
-    backgroundColor: ihubColors.lavender,
-    borderRadius: ihubRadii.pill,
-    color: ihubColors.surface,
+    backgroundColor: megrumColors.lavender,
+    borderRadius: megrumRadii.pill,
+    color: megrumColors.surface,
     fontSize: 10,
     fontWeight: "900",
     overflow: "hidden",
@@ -2377,29 +2545,29 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
   },
   cashToggle: {
-    backgroundColor: ihubColors.surface,
+    backgroundColor: megrumColors.surface,
     borderColor: "rgba(166,149,216,0.38)",
-    borderRadius: ihubRadii.pill,
+    borderRadius: megrumRadii.pill,
     borderWidth: 1,
     paddingHorizontal: 9,
     paddingVertical: 5,
   },
   cashToggleActive: {
-    backgroundColor: ihubColors.lavender,
+    backgroundColor: megrumColors.lavender,
   },
   cashToggleText: {
-    color: ihubColors.lavender,
+    color: megrumColors.lavender,
     fontSize: 10.5,
     fontWeight: "900",
   },
   cashToggleTextActive: {
-    color: ihubColors.surface,
+    color: megrumColors.surface,
   },
   removeButton: {
     marginLeft: "auto",
   },
   removeButtonText: {
-    color: ihubColors.warn,
+    color: megrumColors.warn,
     fontSize: 11,
     fontWeight: "900",
   },
@@ -2407,18 +2575,18 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   cashInput: {
-    backgroundColor: ihubColors.surface,
+    backgroundColor: megrumColors.surface,
     borderColor: "rgba(58,50,74,0.12)",
-    borderRadius: ihubRadii.md,
+    borderRadius: megrumRadii.md,
     borderWidth: 1,
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 18,
     fontWeight: "900",
     paddingHorizontal: 14,
     paddingVertical: 11,
   },
   helpText: {
-    color: ihubColors.mutedInk,
+    color: megrumColors.mutedInk,
     fontSize: 10.5,
     fontWeight: "700",
     lineHeight: 16,
@@ -2434,7 +2602,7 @@ const styles = StyleSheet.create({
     marginBottom: 7,
   },
   exchangeHint: {
-    color: ihubColors.mutedInk,
+    color: megrumColors.mutedInk,
     fontSize: 9.5,
     fontWeight: "800",
   },
@@ -2444,7 +2612,7 @@ const styles = StyleSheet.create({
   },
   exchangeButton: {
     alignItems: "center",
-    backgroundColor: ihubColors.surface,
+    backgroundColor: megrumColors.surface,
     borderColor: "rgba(58,50,74,0.10)",
     borderRadius: 12,
     borderWidth: 1,
@@ -2452,19 +2620,19 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
   },
   exchangeButtonActive: {
-    backgroundColor: ihubColors.lavender,
-    borderColor: ihubColors.lavender,
+    backgroundColor: megrumColors.lavender,
+    borderColor: megrumColors.lavender,
   },
   exchangeButtonText: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 11,
     fontWeight: "900",
   },
   exchangeButtonTextActive: {
-    color: ihubColors.surface,
+    color: megrumColors.surface,
   },
   exchangeButtonSub: {
-    color: ihubColors.mutedInk,
+    color: megrumColors.mutedInk,
     fontSize: 8.5,
     fontWeight: "800",
     marginTop: 2,
@@ -2474,25 +2642,25 @@ const styles = StyleSheet.create({
   },
   addOptionButton: {
     alignItems: "center",
-    backgroundColor: ihubColors.surface,
+    backgroundColor: megrumColors.surface,
     borderColor: "rgba(166,149,216,0.38)",
-    borderRadius: ihubRadii.md,
+    borderRadius: megrumRadii.md,
     borderStyle: "dashed",
     borderWidth: 1,
     justifyContent: "center",
     minHeight: 46,
   },
   addOptionText: {
-    color: ihubColors.lavender,
+    color: megrumColors.lavender,
     fontSize: 12,
     fontWeight: "900",
   },
   noteInput: {
-    backgroundColor: ihubColors.surface,
+    backgroundColor: megrumColors.surface,
     borderColor: "rgba(58,50,74,0.12)",
-    borderRadius: ihubRadii.md,
+    borderRadius: megrumRadii.md,
     borderWidth: 1,
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 13,
     fontWeight: "700",
     minHeight: 86,
@@ -2514,7 +2682,7 @@ const styles = StyleSheet.create({
     lineHeight: 18,
   },
   emptyBox: {
-    backgroundColor: ihubColors.background,
+    backgroundColor: megrumColors.background,
     borderColor: "rgba(58,50,74,0.12)",
     borderRadius: 14,
     borderStyle: "dashed",
@@ -2522,22 +2690,22 @@ const styles = StyleSheet.create({
     padding: 14,
   },
   emptyBoxText: {
-    color: ihubColors.mutedInk,
+    color: megrumColors.mutedInk,
     fontSize: 11,
     fontWeight: "800",
     textAlign: "center",
   },
   toast: {
     alignSelf: "center",
-    backgroundColor: ihubColors.ink,
-    borderRadius: ihubRadii.pill,
+    backgroundColor: megrumColors.ink,
+    borderRadius: megrumRadii.pill,
     bottom: 108,
     paddingHorizontal: 14,
     paddingVertical: 10,
     position: "absolute",
   },
   toastText: {
-    color: ihubColors.surface,
+    color: megrumColors.surface,
     fontSize: 12,
     fontWeight: "900",
   },

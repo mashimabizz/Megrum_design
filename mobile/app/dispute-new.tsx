@@ -14,7 +14,7 @@ import { PrimaryButton } from "../src/components/PrimaryButton";
 import { RouteHeader } from "../src/components/RouteHeader";
 import { Screen } from "../src/components/Screen";
 import { supabase } from "../src/lib/supabase";
-import { ihubColors, ihubRadii, ihubShadow } from "../src/theme/tokens";
+import { megrumColors, megrumRadii, megrumShadow } from "../src/theme/tokens";
 
 type Category = "short" | "wrong" | "noshow" | "cancel" | "other";
 
@@ -121,7 +121,7 @@ export default function DisputeNewScreen() {
   return (
     <Screen contentStyle={styles.screen}>
       <RouteHeader title="取引について報告" subtitle="該当する項目を1つ選んでください" />
-      {loading ? <ActivityIndicator color={ihubColors.lavender} /> : null}
+      {loading ? <ActivityIndicator color={megrumColors.lavender} /> : null}
       {error ? <Text style={styles.errorText}>{error}</Text> : null}
 
       {context ? (
@@ -315,33 +315,33 @@ const styles = StyleSheet.create({
     gap: 13,
   },
   card: {
-    backgroundColor: ihubColors.surface,
+    backgroundColor: megrumColors.surface,
     borderColor: "rgba(58,50,74,0.08)",
-    borderRadius: ihubRadii.xl,
+    borderRadius: megrumRadii.xl,
     borderWidth: 1,
     gap: 7,
     padding: 15,
-    ...ihubShadow,
+    ...megrumShadow,
   },
   caption: {
-    color: ihubColors.lavender,
+    color: megrumColors.lavender,
     fontSize: 11,
     fontWeight: "900",
     letterSpacing: 0.5,
   },
   title: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 18,
     fontWeight: "900",
   },
   text: {
-    color: ihubColors.mutedInk,
+    color: megrumColors.mutedInk,
     fontSize: 12.5,
     fontWeight: "800",
     lineHeight: 19,
   },
   errorText: {
-    color: ihubColors.warn,
+    color: megrumColors.warn,
     fontSize: 12,
     fontWeight: "900",
     lineHeight: 18,
@@ -351,7 +351,7 @@ const styles = StyleSheet.create({
   },
   categoryCard: {
     alignItems: "center",
-    backgroundColor: ihubColors.surface,
+    backgroundColor: megrumColors.surface,
     borderColor: "rgba(58,50,74,0.08)",
     borderRadius: 16,
     borderWidth: 1,
@@ -366,18 +366,18 @@ const styles = StyleSheet.create({
   radio: {
     alignItems: "center",
     borderColor: "rgba(58,50,74,0.18)",
-    borderRadius: ihubRadii.pill,
+    borderRadius: megrumRadii.pill,
     borderWidth: 2,
     height: 22,
     justifyContent: "center",
     width: 22,
   },
   radioActive: {
-    borderColor: ihubColors.lavender,
+    borderColor: megrumColors.lavender,
   },
   radioCore: {
-    backgroundColor: ihubColors.lavender,
-    borderRadius: ihubRadii.pill,
+    backgroundColor: megrumColors.lavender,
+    borderRadius: megrumRadii.pill,
     height: 10,
     width: 10,
   },
@@ -385,22 +385,22 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   categoryTitle: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 13,
     fontWeight: "900",
   },
   categorySub: {
-    color: ihubColors.mutedInk,
+    color: megrumColors.mutedInk,
     fontSize: 11,
     fontWeight: "800",
     marginTop: 2,
   },
   memo: {
-    backgroundColor: ihubColors.background,
+    backgroundColor: megrumColors.background,
     borderColor: "rgba(58,50,74,0.08)",
     borderRadius: 14,
     borderWidth: 1,
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 14,
     fontWeight: "700",
     minHeight: 120,

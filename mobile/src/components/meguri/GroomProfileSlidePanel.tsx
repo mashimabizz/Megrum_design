@@ -17,7 +17,7 @@ import {
   MeguriThreeScene,
   type MeguriSceneResident,
 } from "./MeguriThreeScene";
-import { ihubColors, ihubShadow } from "../../theme/tokens";
+import { megrumColors, megrumShadow } from "../../theme/tokens";
 
 type GroomProfileHue = "lav" | "sky" | "pink" | "mint" | "butter";
 type GroomProfileAnimalType = "cat" | "fox" | "rabbit";
@@ -159,7 +159,7 @@ export function GroomProfileSlidePanel({
             onPress={() => closePanel()}
             style={styles.roundButton}
           >
-            <IconSymbol name="chevron-back" color={ihubColors.ink} size={20} />
+            <IconSymbol name="chevron-back" color={megrumColors.ink} size={20} />
           </Pressable>
           <Text style={styles.headerTitle}>めぐりプロフィール</Text>
           <View style={styles.headerSpacer} />
@@ -304,7 +304,7 @@ function profileHueTint(hue: GroomProfileHue, alpha: number) {
 const styles = StyleSheet.create({
   panel: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: ihubColors.background,
+    backgroundColor: megrumColors.background,
     zIndex: 24,
   },
   edgeHandle: {
@@ -337,7 +337,7 @@ const styles = StyleSheet.create({
     width: 42,
   },
   headerTitle: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 17,
     fontWeight: "900",
   },
@@ -350,7 +350,7 @@ const styles = StyleSheet.create({
     borderRadius: 30,
     overflow: "hidden",
     paddingBottom: 18,
-    ...ihubShadow,
+    ...megrumShadow,
   },
   avatarStage: {
     height: 280,
@@ -371,7 +371,7 @@ const styles = StyleSheet.create({
     width: 88,
   },
   fallbackFaceText: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 34,
     fontWeight: "900",
   },
@@ -388,12 +388,12 @@ const styles = StyleSheet.create({
     width: 22,
   },
   name: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 26,
     fontWeight: "900",
   },
   handle: {
-    color: ihubColors.mutedInk,
+    color: megrumColors.mutedInk,
     fontSize: 13,
     fontWeight: "800",
     marginTop: 2,
@@ -408,7 +408,7 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
   },
   baseText: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 12,
     fontWeight: "900",
   },
@@ -427,7 +427,7 @@ const styles = StyleSheet.create({
     fontWeight: "900",
   },
   statLabel: {
-    color: ihubColors.mutedInk,
+    color: megrumColors.mutedInk,
     fontSize: 10.5,
     fontWeight: "800",
     marginTop: 3,
@@ -437,10 +437,10 @@ const styles = StyleSheet.create({
     borderRadius: 24,
     gap: 10,
     padding: 16,
-    ...ihubShadow,
+    ...megrumShadow,
   },
   sectionTitle: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 16,
     fontWeight: "900",
   },
@@ -451,12 +451,12 @@ const styles = StyleSheet.create({
     paddingTop: 10,
   },
   infoLabel: {
-    color: ihubColors.mutedInk,
+    color: megrumColors.mutedInk,
     fontSize: 11,
     fontWeight: "900",
   },
   infoValue: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 14,
     fontWeight: "800",
     lineHeight: 20,
@@ -480,12 +480,12 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   timelineTitle: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 14,
     fontWeight: "900",
   },
   timelineText: {
-    color: ihubColors.mutedInk,
+    color: megrumColors.mutedInk,
     fontSize: 12,
     fontWeight: "800",
     lineHeight: 17,
@@ -493,7 +493,7 @@ const styles = StyleSheet.create({
   },
   messageButton: {
     alignItems: "center",
-    backgroundColor: ihubColors.ink,
+    backgroundColor: megrumColors.ink,
     borderRadius: 999,
     flexDirection: "row",
     gap: 8,

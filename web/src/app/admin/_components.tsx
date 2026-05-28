@@ -41,10 +41,10 @@ export function AdminMetric({
 }) {
   const toneClass =
     tone === "warn"
-      ? "border-ihub-pink/70 bg-ihub-pink/15 text-rose-700"
+      ? "border-megrum-pink/70 bg-megrum-pink/15 text-rose-700"
       : tone === "ok"
         ? "border-emerald-200 bg-emerald-50 text-emerald-800"
-        : "border-ihub-sky/50 bg-ihub-sky/15 text-slate-900";
+        : "border-megrum-sky/50 bg-megrum-sky/15 text-slate-900";
 
   return (
     <div className={`rounded-lg border px-4 py-3 ${toneClass}`}>
@@ -63,12 +63,12 @@ export function StatusPill({
 }) {
   const toneClass =
     tone === "warn"
-      ? "bg-ihub-pink/15 text-rose-700 ring-ihub-pink/70"
+      ? "bg-megrum-pink/15 text-rose-700 ring-megrum-pink/70"
       : tone === "ok"
         ? "bg-emerald-50 text-emerald-700 ring-emerald-200"
         : tone === "mute"
           ? "bg-gray-100 text-gray-500 ring-gray-200"
-          : "bg-ihub-lavender/15 text-violet-700 ring-ihub-lavender/30";
+          : "bg-megrum-lavender/15 text-violet-700 ring-megrum-lavender/30";
 
   return (
     <span
@@ -105,7 +105,7 @@ export function AdminTextInput({
         required={required}
         defaultValue={defaultValue}
         placeholder={placeholder}
-        className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-[13px] font-semibold text-slate-900 outline-none focus:border-ihub-lavender focus:ring-2 focus:ring-ihub-lavender/20"
+        className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-[13px] font-semibold text-slate-900 outline-none focus:border-megrum-lavender focus:ring-2 focus:ring-megrum-lavender/20"
       />
     </label>
   );
@@ -130,7 +130,7 @@ export function AdminSelect({
       <select
         name={name}
         defaultValue={defaultValue}
-        className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-[13px] font-semibold text-slate-900 outline-none focus:border-ihub-lavender focus:ring-2 focus:ring-ihub-lavender/20"
+        className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-[13px] font-semibold text-slate-900 outline-none focus:border-megrum-lavender focus:ring-2 focus:ring-megrum-lavender/20"
       >
         {children}
       </select>
@@ -159,7 +159,7 @@ export function AdminLinkButton({
   return (
     <Link
       href={href}
-      className="inline-flex h-9 items-center rounded-lg border border-slate-200 bg-white px-3 text-[12px] font-bold text-slate-900 transition hover:border-ihub-lavender/50"
+      className="inline-flex h-9 items-center rounded-lg border border-slate-200 bg-white px-3 text-[12px] font-bold text-slate-900 transition hover:border-megrum-lavender/50"
     >
       {children}
     </Link>

@@ -37,7 +37,7 @@ type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
 };
 
 /**
- * iHub プライマリボタン
+ * Megrum プライマリボタン
  * - A: active:scale-[0.97] でタクタイル感
  * - B: pending 中スピナー
  * - F: pending 中の色シフト
@@ -92,7 +92,7 @@ type LinkProps = {
 };
 
 /**
- * iHub プライマリリンク（ボタン見た目の Link）
+ * Megrum プライマリリンク（ボタン見た目の Link）
  * - active:scale-[0.97] + Ripple
  */
 export function PrimaryLinkButton({

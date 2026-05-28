@@ -3,28 +3,31 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Image,
   Modal,
-  NativeScrollEvent,
-  NativeSyntheticEvent,
+  type NativeScrollEvent,
+  type NativeSyntheticEvent,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
-  useWindowDimensions,
   View,
+  useWindowDimensions,
 } from "react-native";
 import {
   BottomOptionSheet,
   ColumnSwitcher,
   GoodsGrid,
   type ColumnCount,
+  type GoodsGridPressContext,
   type GoodsGridItem,
+  type SheetAnchor,
   type SheetAction,
   SectionTabs,
 } from "../../src/components/GoodsGrid";
 import { useAuth } from "../../src/auth/AuthProvider";
 import { Screen } from "../../src/components/Screen";
+import { fetchInventoryTagLabels, formatHashTags } from "../../src/lib/inventoryTags";
 import { supabase } from "../../src/lib/supabase";
-import { ihubColors, ihubRadii } from "../../src/theme/tokens";
+import { megrumColors, megrumRadii } from "../../src/theme/tokens";
 
 type InventoryStatus = "active" | "keep" | "traded";
 
@@ -60,6 +63,7 @@ const INITIAL_ITEMS: InventoryItem[] = [
     hue: "#cbbcf4",
     badge: "譲る候補",
     note: "同種優先",
+    tagLabels: ["春ver.", "同種優先"],
     status: "active",
     group: "LUMENA",
     type: "トレカ",
@@ -72,6 +76,7 @@ const INITIAL_ITEMS: InventoryItem[] = [
     hue: "#a8d4e6",
     badge: "残 1",
     note: "タグ: ラキドロ",
+    tagLabels: ["ラキドロ"],
     status: "active",
     group: "NCT",
     type: "トレカ",
@@ -84,6 +89,7 @@ const INITIAL_ITEMS: InventoryItem[] = [
     hue: "#f3c5d4",
     badge: "現地OK",
     note: "会場持参予定",
+    tagLabels: ["現地OK", "アクスタ"],
     status: "active",
     group: "aespa",
     type: "アクスタ",
@@ -95,6 +101,7 @@ const INITIAL_ITEMS: InventoryItem[] = [
     glyph: "K",
     hue: "#d5cff4",
     badge: "残 2",
+    tagLabels: ["缶バッジ"],
     status: "active",
     group: "aespa",
     type: "缶バッジ",
@@ -107,6 +114,7 @@ const INITIAL_ITEMS: InventoryItem[] = [
     hue: "#b7dceb",
     badge: "キープ",
     note: "自分用",
+    tagLabels: ["自分用"],
     status: "keep",
     group: "BTS",
     type: "トレカ",
@@ -118,6 +126,7 @@ const INITIAL_ITEMS: InventoryItem[] = [
     glyph: "R",
     hue: "#f7d5df",
     badge: "キープ",
+    tagLabels: ["通常盤"],
     status: "keep",
     group: "SKZ",
     type: "トレカ",
@@ -130,6 +139,7 @@ const INITIAL_ITEMS: InventoryItem[] = [
     hue: "#c8e8f2",
     badge: "譲渡済",
     note: "2026/05/08",
+    tagLabels: ["会場"],
     status: "traded",
     group: "SVT",
     type: "トレカ",
@@ -141,8 +151,8 @@ const STATUS_TABS: {
   label: string;
   color: string;
 }[] = [
-  { id: "active", label: "譲る候補", color: ihubColors.lavender },
-  { id: "keep", label: "自分用キープ", color: ihubColors.pink },
+  { id: "active", label: "譲る候補", color: megrumColors.lavender },
+  { id: "keep", label: "自分用キープ", color: megrumColors.pink },
   { id: "traded", label: "過去に譲った", color: "#9aa3b0" },
 ];
 const STATUS_ORDER: InventoryStatus[] = ["active", "keep", "traded"];
@@ -150,6 +160,8 @@ const STATUS_ORDER: InventoryStatus[] = ["active", "keep", "traded"];
 export default function InventoryScreen() {
   const { user, previewMode } = useAuth();
   const params = useLocalSearchParams<{ refresh?: string | string[] }>();
+  const { width: windowWidth } = useWindowDimensions();
+  const pageWidth = Math.max(1, windowWidth - 36);
   const routeRefresh = one(params.refresh);
   const [items, setItems] = useState<InventoryItem[]>(() =>
     !supabase || previewMode ? INITIAL_ITEMS : [],
@@ -157,6 +169,7 @@ export default function InventoryScreen() {
   const [status, setStatus] = useState<InventoryStatus>("active");
   const [columns, setColumns] = useState<ColumnCount>(3);
   const [selected, setSelected] = useState<InventoryItem | null>(null);
+  const [selectedAnchor, setSelectedAnchor] = useState<SheetAnchor | null>(null);
   const [deleteConfirmItem, setDeleteConfirmItem] = useState<InventoryItem | null>(null);
   const [deletingItemIds, setDeletingItemIds] = useState<string[]>([]);
   const [activeGroup, setActiveGroup] = useState<string | null>(null);
@@ -164,8 +177,9 @@ export default function InventoryScreen() {
   const [loading, setLoading] = useState(!!supabase && !previewMode);
   const [loadError, setLoadError] = useState<string | null>(null);
   const pagerRef = useRef<ScrollView>(null);
-  const { width: windowWidth } = useWindowDimensions();
-  const pageWidth = Math.max(1, windowWidth - 36);
+  const [pagerPosition, setPagerPosition] = useState(
+    STATUS_ORDER.indexOf("active"),
+  );
 
   useEffect(() => {
     if (!supabase || previewMode) {
@@ -247,11 +261,11 @@ export default function InventoryScreen() {
   const selectedActions = selected
     ? buildActions({
         item: selected,
-        onClose: () => setSelected(null),
+        onClose: closeSelectedActions,
         onEdit: () => {
           const item = selected;
-          setSelected(null);
-          openInventoryEditor(item, "edit");
+          closeSelectedActions();
+          openInventoryEditor(item, item.status === "traded" ? "readonly" : "edit");
         },
         onMove: (nextStatus) => {
           const itemId = selected.id;
@@ -266,7 +280,7 @@ export default function InventoryScreen() {
                 : item,
             ),
           );
-          setSelected(null);
+          closeSelectedActions();
           if (supabase && user && !previewMode) {
             supabase
               .from("goods_inventory")
@@ -280,7 +294,7 @@ export default function InventoryScreen() {
         },
         onDelete: () => {
           const item = selected;
-          setSelected(null);
+          closeSelectedActions();
           setDeleteConfirmItem(item);
         },
       })
@@ -322,72 +336,100 @@ export default function InventoryScreen() {
 
   return (
     <Screen scroll={false} contentStyle={styles.screenContent}>
-      <View style={styles.header}>
-        <Text style={styles.title}>マイ在庫</Text>
-        <View style={styles.headerActions}>
-          <ColumnSwitcher value={columns} onChange={setColumns} />
-          <HeaderIconButton label="フィルタ" glyph="≡" />
-          <HeaderIconButton label="検索" glyph="⌕" />
+      <ScrollView
+        automaticallyAdjustsScrollIndicatorInsets
+        contentInsetAdjustmentBehavior="automatic"
+        showsVerticalScrollIndicator={false}
+        stickyHeaderIndices={[0]}
+        style={styles.screenScroll}
+        contentContainerStyle={styles.screenScrollContent}
+      >
+        <View style={styles.stickyHeaderBlock}>
+          <View style={styles.header}>
+            <Text style={styles.title}>マイ在庫</Text>
+            <View style={styles.headerActions}>
+              <ColumnSwitcher value={columns} onChange={setColumns} />
+              <HeaderIconButton label="フィルタ" glyph="≡" />
+              <HeaderIconButton label="検索" glyph="⌕" />
+            </View>
+          </View>
+
+          <SectionTabs
+            value={status}
+            tabs={tabs}
+            position={pagerPosition}
+            onChange={selectStatus}
+          />
         </View>
-      </View>
 
-      <SectionTabs
-        value={status}
-        tabs={tabs}
-        onChange={selectStatus}
-      />
+        {loading ? <Text style={styles.inlineNotice}>在庫を読み込み中…</Text> : null}
+        {loadError ? <Text style={styles.inlineError}>{loadError}</Text> : null}
 
-      {loading ? <Text style={styles.inlineNotice}>在庫を読み込み中…</Text> : null}
-      {loadError ? <Text style={styles.inlineError}>{loadError}</Text> : null}
+        <View style={styles.filters}>
+          <FilterRow
+            label="推し"
+            options={groupOptions}
+            active={activeGroup}
+            onChange={(next) => {
+              setActiveGroup(next);
+              closeSelectedActions();
+            }}
+          />
+          <FilterRow
+            label="種別"
+            options={typeOptions}
+            active={activeType}
+            onChange={(next) => {
+              setActiveType(next);
+              closeSelectedActions();
+            }}
+          />
+        </View>
 
-      <View style={styles.filters}>
-        <FilterRow
-          label="推し"
-          options={groupOptions}
-          active={activeGroup}
-          onChange={(next) => {
-            setActiveGroup(next);
-            setSelected(null);
-          }}
-        />
-        <FilterRow
-          label="種別"
-          options={typeOptions}
-          active={activeType}
-          onChange={(next) => {
-            setActiveType(next);
-            setSelected(null);
-          }}
-        />
-      </View>
-
-      <View style={styles.contentHost}>
         <ScrollView
           ref={pagerRef}
           horizontal
           pagingEnabled
+          bounces={false}
           directionalLockEnabled
           showsHorizontalScrollIndicator={false}
           scrollEventThrottle={16}
-          style={styles.pager}
+          style={styles.contentHost}
+          onScroll={handlePagerScroll}
           onMomentumScrollEnd={handlePagerSettled}
         >
-          {STATUS_ORDER.map((pageStatus) => renderInventoryPage(pageStatus))}
+          {STATUS_ORDER.map((pageStatus) => (
+            <View key={pageStatus} style={[styles.inventoryPage, { width: pageWidth }]}>
+              {renderInventoryContent(pageStatus)}
+            </View>
+          ))}
         </ScrollView>
-      </View>
+      </ScrollView>
 
       <BottomOptionSheet
         visible={!!selected}
         title={selected?.title ?? ""}
+        anchor={selectedAnchor}
+        presentation="glass"
+        preview={
+          selected
+            ? {
+                glyph: selected.glyph,
+                hue: selected.hue,
+                photoUrl: selected.photoUrl,
+              }
+            : null
+        }
         subtitle={
           selected
-            ? selected.status === "traded"
+            ? formatHashTags(selected.tagLabels) ??
+              (selected.status === "traded"
               ? "過去に譲ったグッズです。編集や削除はできません。"
-              : selected.note ?? selected.subtitle
+                : selected.note ?? "タグ未設定")
             : undefined
         }
         actions={selectedActions}
-        onClose={() => setSelected(null)}
+        onClose={closeSelectedActions}
       />
       <InventoryDeleteConfirmModal
         item={deleteConfirmItem}
@@ -398,66 +440,66 @@ export default function InventoryScreen() {
   );
 
   function selectStatus(next: InventoryStatus) {
-    const nextIndex = STATUS_ORDER.indexOf(next);
-    if (nextIndex < 0) return;
+    if (!STATUS_ORDER.includes(next)) return;
     setStatus(next);
-    setSelected(null);
+    closeSelectedActions();
+    const nextIndex = STATUS_ORDER.indexOf(next);
+    setPagerPosition(nextIndex);
     pagerRef.current?.scrollTo({ x: nextIndex * pageWidth, animated: true });
+  }
+
+  function handlePagerScroll(event: NativeSyntheticEvent<NativeScrollEvent>) {
+    setPagerPosition(event.nativeEvent.contentOffset.x / pageWidth);
   }
 
   function handlePagerSettled(event: NativeSyntheticEvent<NativeScrollEvent>) {
     const nextIndex = Math.max(
       0,
-      Math.min(
-        STATUS_ORDER.length - 1,
-        Math.round(event.nativeEvent.contentOffset.x / pageWidth),
-      ),
+      Math.min(STATUS_ORDER.length - 1, Math.round(event.nativeEvent.contentOffset.x / pageWidth)),
     );
-    const next = STATUS_ORDER[nextIndex];
-    if (!next || next === status) return;
+    const next = STATUS_ORDER[nextIndex] ?? "active";
     setStatus(next);
-    setSelected(null);
+    setPagerPosition(nextIndex);
+    closeSelectedActions();
   }
 
-  function renderInventoryPage(pageStatus: InventoryStatus) {
+  function renderInventoryContent(pageStatus: InventoryStatus) {
     return (
-      <View key={pageStatus} style={[styles.pagerPage, { width: pageWidth }]}>
-        <ScrollView
-          showsVerticalScrollIndicator={false}
-          contentContainerStyle={styles.gridScroll}
-        >
-          <GoodsGrid
-            items={itemsByStatus[pageStatus]}
-            columns={columns}
-            deletingIds={deletingItemIds}
-            onItemFadeOutEnd={completeInventoryDelete}
-            addTileLabel={pageStatus === "active" ? "追加" : undefined}
-            onPressAddTile={
-              pageStatus === "active"
-                ? () => openInventoryEditor(null, "create")
-                : undefined
-            }
-            emptyLabel={
-              pageStatus === "active"
-                ? "譲る候補のグッズはまだありません"
-                : pageStatus === "keep"
-                  ? "自分用キープのグッズはまだありません"
-                  : "過去に譲ったグッズはまだありません"
-            }
-            onPressItem={(gridItem) => {
-              if (deletingItemIds.includes(gridItem.id)) return;
-              const item = items.find((current) => current.id === gridItem.id);
-              if (!item) return;
-              if (item.status === "traded") {
-                openInventoryEditor(item, "readonly");
-                return;
-              }
-              setSelected(item);
-            }}
-          />
-        </ScrollView>
+      <View style={styles.gridScroll}>
+        <GoodsGrid
+          items={itemsByStatus[pageStatus]}
+          columns={columns}
+          showTopRow={false}
+          deletingIds={deletingItemIds}
+          onItemFadeOutEnd={completeInventoryDelete}
+          addTileLabel={pageStatus === "active" ? "追加" : undefined}
+          onPressAddTile={
+            pageStatus === "active"
+              ? () => openInventoryEditor(null, "create")
+              : undefined
+          }
+          emptyLabel={
+            pageStatus === "active"
+              ? "譲る候補のグッズはまだありません"
+              : pageStatus === "keep"
+                ? "自分用キープのグッズはまだありません"
+                : "過去に譲ったグッズはまだありません"
+          }
+          onPressItem={(gridItem, context) => {
+            if (deletingItemIds.includes(gridItem.id)) return;
+            const item = items.find((current) => current.id === gridItem.id);
+            if (!item) return;
+            setSelectedAnchor(normalizePressContext(context));
+            setSelected(item);
+          }}
+        />
       </View>
     );
+  }
+
+  function closeSelectedActions() {
+    setSelected(null);
+    setSelectedAnchor(null);
   }
 }
 
@@ -473,10 +515,12 @@ async function fetchInventoryItems(userId: string): Promise<InventoryItem[]> {
     .neq("status", "archived")
     .order("created_at", { ascending: false });
   if (error) throw error;
-  return ((data as InventoryRow[] | null) ?? []).map(toInventoryItem);
+  const rows = (data as InventoryRow[] | null) ?? [];
+  const tagLabelsById = await fetchInventoryTagLabels(rows.map((row) => row.id));
+  return rows.map((row) => toInventoryItem(row, tagLabelsById[row.id] ?? []));
 }
 
-function toInventoryItem(row: InventoryRow): InventoryItem {
+function toInventoryItem(row: InventoryRow, tagLabels: string[] = []): InventoryItem {
   const groupName = pickName(row.group) ?? "未設定";
   const characterName =
     pickName(row.character) ??
@@ -499,6 +543,7 @@ function toInventoryItem(row: InventoryRow): InventoryItem {
             ? `残 ${row.quantity}`
             : "譲る候補",
     note: row.quantity > 1 ? `交換可能数 ${row.quantity}` : undefined,
+    tagLabels,
     status,
     group: groupName,
     type: goodsType,
@@ -671,6 +716,11 @@ function buildActions({
   if (item.status === "traded") {
     return [
       {
+        id: "edit",
+        label: "詳細を見る",
+        onPress: onEdit,
+      },
+      {
         id: "close",
         label: "閉じる",
         tone: "muted",
@@ -776,10 +826,34 @@ function one(value?: string | string[]) {
   return Array.isArray(value) ? value[0] : value;
 }
 
+function normalizePressContext(context: GoodsGridPressContext): SheetAnchor {
+  return {
+    pageX: Number.isFinite(context.pageX) ? context.pageX : 0,
+    pageY: Number.isFinite(context.pageY) ? context.pageY : 0,
+  };
+}
+
 const styles = StyleSheet.create({
   screenContent: {
     gap: 12,
     paddingHorizontal: 18,
+  },
+  screenScroll: {
+    flex: 1,
+    marginHorizontal: -18,
+  },
+  screenScrollContent: {
+    gap: 12,
+    paddingBottom: 132,
+    paddingHorizontal: 18,
+  },
+  stickyHeaderBlock: {
+    backgroundColor: megrumColors.background,
+    gap: 12,
+    marginHorizontal: -18,
+    paddingBottom: 8,
+    paddingHorizontal: 18,
+    paddingTop: 2,
   },
   deleteModalRoot: {
     alignItems: "center",
@@ -792,24 +866,24 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(20,18,28,0.50)",
   },
   deleteModalPanel: {
-    backgroundColor: ihubColors.surface,
+    backgroundColor: megrumColors.surface,
     borderRadius: 20,
     gap: 13,
     padding: 18,
-    shadowColor: ihubColors.ink,
+    shadowColor: megrumColors.ink,
     shadowOffset: { width: 0, height: 18 },
     shadowOpacity: 0.24,
     shadowRadius: 34,
     width: "100%",
   },
   deleteModalTitle: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 16,
     fontWeight: "900",
   },
   deleteModalPreview: {
     alignItems: "center",
-    backgroundColor: ihubColors.background,
+    backgroundColor: megrumColors.background,
     borderColor: "rgba(58,50,74,0.08)",
     borderRadius: 14,
     borderWidth: 1,
@@ -830,7 +904,7 @@ const styles = StyleSheet.create({
     width: 40,
   },
   deleteModalFallbackText: {
-    color: ihubColors.surface,
+    color: megrumColors.surface,
     fontSize: 18,
     fontWeight: "900",
   },
@@ -838,18 +912,18 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   deleteModalItemTitle: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 13,
     fontWeight: "900",
   },
   deleteModalItemSub: {
-    color: ihubColors.mutedInk,
+    color: megrumColors.mutedInk,
     fontSize: 11,
     fontWeight: "700",
     marginTop: 3,
   },
   deleteModalBody: {
-    color: ihubColors.mutedInk,
+    color: megrumColors.mutedInk,
     fontSize: 12,
     fontWeight: "700",
     lineHeight: 18,
@@ -866,7 +940,7 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
   },
   deleteModalCancelText: {
-    color: ihubColors.mutedInk,
+    color: megrumColors.mutedInk,
     fontSize: 13,
     fontWeight: "900",
   },
@@ -886,7 +960,7 @@ const styles = StyleSheet.create({
   },
   header: {
     alignItems: "center",
-    backgroundColor: ihubColors.surface,
+    backgroundColor: megrumColors.surface,
     borderColor: "rgba(58,50,74,0.08)",
     borderRadius: 16,
     borderWidth: 1,
@@ -897,7 +971,7 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
   },
   title: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 19,
     fontWeight: "900",
     letterSpacing: 0,
@@ -910,7 +984,7 @@ const styles = StyleSheet.create({
   },
   headerIconButton: {
     alignItems: "center",
-    backgroundColor: ihubColors.surface,
+    backgroundColor: megrumColors.surface,
     borderColor: "rgba(58,50,74,0.08)",
     borderRadius: 10,
     borderWidth: 1,
@@ -919,17 +993,17 @@ const styles = StyleSheet.create({
     width: 34,
   },
   headerIconText: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 12,
     fontWeight: "900",
   },
   inlineNotice: {
-    color: ihubColors.mutedInk,
+    color: megrumColors.mutedInk,
     fontSize: 11.5,
     fontWeight: "800",
   },
   inlineError: {
-    color: ihubColors.warn,
+    color: megrumColors.warn,
     fontSize: 11.5,
     fontWeight: "800",
     lineHeight: 17,
@@ -945,7 +1019,7 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   filterLabel: {
-    color: ihubColors.mutedInk,
+    color: megrumColors.mutedInk,
     fontSize: 9.5,
     fontWeight: "900",
     letterSpacing: 0.4,
@@ -957,33 +1031,30 @@ const styles = StyleSheet.create({
     paddingRight: 18,
   },
   filterChip: {
-    backgroundColor: ihubColors.surface,
+    backgroundColor: megrumColors.surface,
     borderColor: "rgba(58,50,74,0.08)",
-    borderRadius: ihubRadii.pill,
+    borderRadius: megrumRadii.pill,
     borderWidth: 1,
     paddingHorizontal: 10,
     paddingVertical: 5,
   },
   filterChipActive: {
-    backgroundColor: ihubColors.lavender,
-    borderColor: ihubColors.lavender,
+    backgroundColor: megrumColors.lavender,
+    borderColor: megrumColors.lavender,
   },
   filterChipText: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 11,
     fontWeight: "800",
   },
   filterChipTextActive: {
-    color: ihubColors.surface,
+    color: megrumColors.surface,
   },
   contentHost: {
-    flex: 1,
+    minHeight: 1,
   },
-  pager: {
-    flex: 1,
-  },
-  pagerPage: {
-    flex: 1,
+  inventoryPage: {
+    minHeight: 220,
   },
   gridScroll: {
     paddingBottom: 24,

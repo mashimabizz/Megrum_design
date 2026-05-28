@@ -4,7 +4,7 @@
 -- 邦アイと2.5次元ジャンルが空だったため、グッズ・生写真・ランダム
 -- ブロマイド/缶バッジ/アクスタ交換で使われやすい主要グループ/作品を追加する。
 
-create temporary table _ihub_seed_groups (
+create temporary table _megrum_seed_groups (
   genre_name text not null,
   name text not null,
   aliases text[] not null default '{}',
@@ -12,7 +12,7 @@ create temporary table _ihub_seed_groups (
   display_order integer not null
 ) on commit drop;
 
-insert into _ihub_seed_groups (genre_name, name, aliases, kind, display_order) values
+insert into _megrum_seed_groups (genre_name, name, aliases, kind, display_order) values
   ('邦アイ', 'Snow Man', array['スノーマン', 'すの']::text[], 'group', 1),
   ('邦アイ', 'SixTONES', array['ストーンズ', 'スト']::text[], 'group', 2),
   ('邦アイ', 'なにわ男子', array['Naniwa Danshi', '728']::text[], 'group', 3),
@@ -38,14 +38,14 @@ insert into _ihub_seed_groups (genre_name, name, aliases, kind, display_order) v
 
 insert into public.groups_master (genre_id, name, aliases, kind, display_order)
 select ge.id, sg.name, sg.aliases, sg.kind, sg.display_order
-from _ihub_seed_groups sg
+from _megrum_seed_groups sg
 join public.genres_master ge on ge.name = sg.genre_name
 on conflict (genre_id, name) do update
   set aliases = excluded.aliases,
       kind = excluded.kind,
       display_order = excluded.display_order;
 
-create temporary table _ihub_seed_characters (
+create temporary table _megrum_seed_characters (
   genre_name text not null,
   group_name text not null,
   name text not null,
@@ -53,7 +53,7 @@ create temporary table _ihub_seed_characters (
   display_order integer not null
 ) on commit drop;
 
-insert into _ihub_seed_characters (genre_name, group_name, name, aliases, display_order) values
+insert into _megrum_seed_characters (genre_name, group_name, name, aliases, display_order) values
   -- 邦アイ members
   ('邦アイ','Snow Man','岩本照',array['Hikaru Iwamoto']::text[],1),
   ('邦アイ','Snow Man','深澤辰哉',array['Tatsuya Fukazawa']::text[],2),
@@ -130,7 +130,7 @@ insert into _ihub_seed_characters (genre_name, group_name, name, aliases, displa
 
 insert into public.characters_master (group_id, genre_id, name, aliases, display_order)
 select gm.id, ge.id, sc.name, sc.aliases, sc.display_order
-from _ihub_seed_characters sc
+from _megrum_seed_characters sc
 join public.genres_master ge on ge.name = sc.genre_name
 join public.groups_master gm on gm.genre_id = ge.id and gm.name = sc.group_name
 where not exists (

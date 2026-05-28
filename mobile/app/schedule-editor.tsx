@@ -7,7 +7,7 @@ import { Screen } from "../src/components/Screen";
 import { TextField } from "../src/components/TextField";
 import { useAuth } from "../src/auth/AuthProvider";
 import { supabase } from "../src/lib/supabase";
-import { ihubColors, ihubRadii } from "../src/theme/tokens";
+import { megrumColors, megrumRadii } from "../src/theme/tokens";
 
 export default function ScheduleEditorScreen() {
   const params = useLocalSearchParams<{ id?: string | string[] }>();
@@ -199,25 +199,25 @@ const styles = StyleSheet.create({
     width: 22,
   },
   checkboxOn: {
-    backgroundColor: ihubColors.lavender,
-    borderColor: ihubColors.lavender,
+    backgroundColor: megrumColors.lavender,
+    borderColor: megrumColors.lavender,
   },
   check: {
-    color: ihubColors.surface,
+    color: megrumColors.surface,
     fontSize: 13,
     fontWeight: "900",
   },
   toggleLabel: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 13,
     fontWeight: "800",
   },
   error: {
     backgroundColor: "rgba(217,130,107,0.10)",
     borderColor: "rgba(217,130,107,0.22)",
-    borderRadius: ihubRadii.md,
+    borderRadius: megrumRadii.md,
     borderWidth: 1,
-    color: ihubColors.warn,
+    color: megrumColors.warn,
     fontSize: 12,
     fontWeight: "800",
     lineHeight: 18,

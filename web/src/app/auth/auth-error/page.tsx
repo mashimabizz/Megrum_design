@@ -1,7 +1,7 @@
 import Link from "next/link";
 
 export const metadata = {
-  title: "認証エラー — iHub",
+  title: "認証エラー — Megrum",
 };
 
 export default function AuthErrorPage() {
@@ -10,7 +10,7 @@ export default function AuthErrorPage() {
       <div className="w-full max-w-md text-center">
         <Link href="/" className="inline-block">
           <span className="inline-block rounded-full bg-purple-100 px-4 py-1 text-xs font-bold tracking-widest text-purple-700">
-            ★ iHub
+            ★ Megrum
           </span>
         </Link>
 

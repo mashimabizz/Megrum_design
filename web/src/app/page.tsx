@@ -4,7 +4,7 @@ import {
   createClient,
   createServiceRoleClient,
 } from "@/lib/supabase/server";
-import { IHubLogo } from "@/components/auth/IHubLogo";
+import { MegrumLogo } from "@/components/auth/MegrumLogo";
 import { PrimaryLinkButton } from "@/components/auth/PrimaryButton";
 import { GoogleAuthButton } from "@/components/auth/GoogleAuthButton";
 import { HomeView } from "@/components/home/HomeView";
@@ -643,9 +643,9 @@ function WelcomeView() {
       <div className="mx-auto flex w-full max-w-md flex-1 flex-col">
         {/* 中央：ロゴ + タイトル + キャッチコピー */}
         <div className="flex flex-1 flex-col items-center justify-center text-center">
-          <IHubLogo size={88} />
+          <MegrumLogo size={88} />
           <h1 className="mt-6 text-[34px] font-extrabold tracking-wide text-gray-900">
-            iHub
+            Megrum
           </h1>
           <p className="mt-2.5 max-w-[280px] text-[13px] leading-relaxed text-gray-500">
             グッズ交換を、

@@ -1,6 +1,6 @@
-# iHub Design
+# Megrum Design
 
-K-POP / アニメ等の推し活グッズを **現地で交換**するプラットフォーム「iHub」の **設計・mockup・Web実装・iOS実装** リポジトリ。
+K-POP / アニメ等の推し活グッズを **現地で交換**するプラットフォーム「Megrum」の **設計・mockup・Web実装・iOS実装** リポジトリ。
 
 > Web版は Next.js、iOS版は Expo / React Native で同一 Supabase 基盤に接続する monorepo として運用。
 
@@ -23,9 +23,9 @@ K-POP / アニメ等の推し活グッズを **現地で交換**するプラッ�
 ├── web/                   # Next.js Webアプリ
 ├── mobile/                # Expo / React Native iOSアプリ
 ├── packages/              # Web/iOS共通ロジック・デザイン・Supabase補助
-├── iHub/                  # 画面 mockup（JSX + HTML）
+├── Megrum/                  # 画面 mockup（JSX + HTML）
 │   ├── *.jsx              # 各画面のコンポーネント
-│   ├── iHub *.html        # フロー単位の表示用 HTML
+│   ├── Megrum *.html        # フロー単位の表示用 HTML
 │   ├── design-canvas.jsx  # Figmaライクなアートボード基盤
 │   ├── ios-frame.jsx      # iPhone 枠
 │   └── tweaks-panel.jsx   # ブランドカラー切替パネル
@@ -54,17 +54,17 @@ K-POP / アニメ等の推し活グッズを **現地で交換**するプラッ�
 python3 -m http.server 8000
 
 # ブラウザで開く
-# http://localhost:8000/iHub%20MVP%20v1.html       — 全画面統合
-# http://localhost:8000/iHub%20Nego%20Flow.html    — 受諾前ネゴ
-# http://localhost:8000/iHub%20Propose%20Select.html — C-0 提示物選択
-# http://localhost:8000/iHub%20C%20Flow.html       — C-1〜C-3
-# http://localhost:8000/iHub%20Hub%20Screens.html  — ホーム/プロフ/ウィッシュ
-# http://localhost:8000/iHub%20B%20Inventory.html  — 在庫
-# http://localhost:8000/iHub%20Auth%20Onboarding.html — 認証＋オンボ
-# (他にもあり、iHub/ ディレクトリ参照)
+# http://localhost:8000/Megrum%20MVP%20v1.html       — 全画面統合
+# http://localhost:8000/Megrum%20Nego%20Flow.html    — 受諾前ネゴ
+# http://localhost:8000/Megrum%20Propose%20Select.html — C-0 提示物選択
+# http://localhost:8000/Megrum%20C%20Flow.html       — C-1〜C-3
+# http://localhost:8000/Megrum%20Hub%20Screens.html  — ホーム/プロフ/ウィッシュ
+# http://localhost:8000/Megrum%20B%20Inventory.html  — 在庫
+# http://localhost:8000/Megrum%20Auth%20Onboarding.html — 認証＋オンボ
+# (他にもあり、Megrum/ ディレクトリ参照)
 ```
 
-iHub フォルダ内 HTML を開けば即動作（依存は CDN から取得）。
+Megrum フォルダ内 HTML を開けば即動作（依存は CDN から取得）。
 
 ### Webアプリを起動
 
@@ -127,4 +127,4 @@ npm run mobile:ios
 
 ## 関連
 
-- 関連リポジトリ: [iHub_renewal](https://github.com/mashimabizz/iHub_renewal)（要確認）
+- 関連リポジトリ: [Megrum_renewal](https://github.com/mashimabizz/Megrum_renewal)（要確認）

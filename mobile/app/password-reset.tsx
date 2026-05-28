@@ -6,7 +6,7 @@ import { RouteHeader } from "../src/components/RouteHeader";
 import { Screen } from "../src/components/Screen";
 import { TextField } from "../src/components/TextField";
 import { supabase } from "../src/lib/supabase";
-import { ihubColors, ihubRadii } from "../src/theme/tokens";
+import { megrumColors, megrumRadii } from "../src/theme/tokens";
 
 export default function PasswordResetScreen() {
   const [email, setEmail] = useState("");
@@ -72,9 +72,9 @@ const styles = StyleSheet.create({
   error: {
     backgroundColor: "rgba(217,130,107,0.10)",
     borderColor: "rgba(217,130,107,0.22)",
-    borderRadius: ihubRadii.md,
+    borderRadius: megrumRadii.md,
     borderWidth: 1,
-    color: ihubColors.warn,
+    color: megrumColors.warn,
     fontSize: 12,
     fontWeight: "800",
     lineHeight: 18,
@@ -83,7 +83,7 @@ const styles = StyleSheet.create({
   message: {
     backgroundColor: "rgba(34,197,94,0.10)",
     borderColor: "rgba(34,197,94,0.24)",
-    borderRadius: ihubRadii.md,
+    borderRadius: megrumRadii.md,
     borderWidth: 1,
     color: "#15803d",
     fontSize: 12,

@@ -4,7 +4,7 @@ import { PasswordResetConfirmForm } from "./PasswordResetConfirmForm";
 import { HeaderBack } from "@/components/auth/HeaderBack";
 
 export const metadata = {
-  title: "新しいパスワード — iHub",
+  title: "新しいパスワード — Megrum",
 };
 
 type Props = {

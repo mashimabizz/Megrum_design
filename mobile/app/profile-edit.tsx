@@ -3,21 +3,23 @@ import * as ImagePicker from "expo-image-picker";
 import {
   ActivityIndicator,
   Alert,
+  ActionSheetIOS,
   Image,
   Modal,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
   View,
 } from "react-native";
-import { router } from "expo-router";
+import { router, Stack } from "expo-router";
 import { useAuth } from "../src/auth/AuthProvider";
 import { PrimaryButton } from "../src/components/PrimaryButton";
 import { Screen } from "../src/components/Screen";
 import { TextField } from "../src/components/TextField";
 import { supabase } from "../src/lib/supabase";
-import { ihubColors, ihubRadii, ihubShadow } from "../src/theme/tokens";
+import { megrumColors, megrumRadii, megrumShadow } from "../src/theme/tokens";
 
 type Gender = "female" | "male" | "other" | "no_answer";
 
@@ -95,7 +97,7 @@ const PREFECTURES = [
 ] as const;
 
 export default function ProfileEditScreen() {
-  const { user, previewMode } = useAuth();
+  const { refreshProfile, user, previewMode } = useAuth();
   const [form, setForm] = useState<ProfileForm>(() => fallbackForm(user?.email));
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -176,6 +178,7 @@ export default function ProfileEditScreen() {
         })
         .eq("id", user.id);
       if (updateError) throw updateError;
+      await refreshProfile();
       setSaved(true);
       setTimeout(() => {
         if (router.canGoBack()) router.back();
@@ -192,25 +195,40 @@ export default function ProfileEditScreen() {
       setError("ログイン後にアイコン画像を変更できます");
       return;
     }
-    Alert.alert(
-      form.avatarUrl ? "アイコン画像を変更" : "アイコン画像を選択",
-      "登録する画像を選んでください。",
-      [
+    const title = form.avatarUrl ? "アイコン画像を変更" : "アイコン画像を選択";
+    if (Platform.OS === "ios") {
+      ActionSheetIOS.showActionSheetWithOptions(
         {
-          text: "カメラで撮る",
-          onPress: () => {
-            void pickAvatar("camera");
-          },
+          title,
+          message: "登録する画像を選んでください。",
+          options: ["カメラで撮る", "写真を選ぶ", "閉じる"],
+          cancelButtonIndex: 2,
+          userInterfaceStyle: "light",
+          tintColor: megrumColors.lavender,
         },
-        {
-          text: "写真を選ぶ",
-          onPress: () => {
-            void pickAvatar("library");
-          },
+        (buttonIndex) => {
+          if (buttonIndex === 0) void pickAvatar("camera");
+          if (buttonIndex === 1) void pickAvatar("library");
         },
-        { text: "閉じる", style: "cancel" },
-      ],
-    );
+      );
+      return;
+    }
+
+    Alert.alert(title, "登録する画像を選んでください。", [
+      {
+        text: "カメラで撮る",
+        onPress: () => {
+          void pickAvatar("camera");
+        },
+      },
+      {
+        text: "写真を選ぶ",
+        onPress: () => {
+          void pickAvatar("library");
+        },
+      },
+      { text: "閉じる", style: "cancel" },
+    ]);
   }
 
   async function pickAvatar(source: "camera" | "library") {
@@ -252,21 +270,16 @@ export default function ProfileEditScreen() {
   }
 
   return (
-    <Screen contentStyle={styles.screen}>
-      <View style={styles.header}>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="戻る"
-          onPress={() => router.back()}
-          style={styles.backButton}
-        >
-          <Text style={styles.backText}>‹</Text>
-        </Pressable>
-        <View style={styles.headerCopy}>
-          <Text style={styles.title}>プロフィール編集</Text>
-          <Text style={styles.subtitle}>表示名・エリア・アイコン</Text>
-        </View>
-      </View>
+    <Screen contentStyle={styles.screen} topInset={false}>
+      <Stack.Screen
+        options={{
+          headerShown: true,
+          title: "プロフィール編集",
+          headerBackButtonDisplayMode: "minimal",
+          headerBlurEffect: "systemMaterial",
+          headerTintColor: megrumColors.lavender,
+        }}
+      />
 
       {shouldHoldFormForLoad ? (
         <Text style={styles.inlineNotice}>プロフィールを読み込み中…</Text>
@@ -296,7 +309,7 @@ export default function ProfileEditScreen() {
           style={styles.avatarChange}
         >
           {uploadingAvatar ? (
-            <ActivityIndicator color={ihubColors.lavender} size="small" />
+            <ActivityIndicator color={megrumColors.lavender} size="small" />
           ) : (
             <Text style={styles.avatarChangeText}>
               {form.avatarUrl ? "変更" : "選択"}
@@ -430,11 +443,18 @@ function AreaPickerModal({
   onClose: () => void;
   onSelect: (value: string) => void;
 }) {
+  const nativeSheet = Platform.OS === "ios";
   return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      <View style={styles.modalRoot}>
-        <Pressable style={styles.modalBackdropPressArea} onPress={onClose} />
-        <View style={styles.areaSheet}>
+    <Modal
+      visible={visible}
+      transparent={!nativeSheet}
+      animationType={nativeSheet ? "slide" : "fade"}
+      presentationStyle={nativeSheet ? "pageSheet" : "overFullScreen"}
+      onRequestClose={onClose}
+    >
+      <View style={[styles.modalRoot, nativeSheet ? styles.nativeSheetRoot : null]}>
+        {!nativeSheet ? <Pressable style={styles.modalBackdropPressArea} onPress={onClose} /> : null}
+        <View style={[styles.areaSheet, nativeSheet ? styles.nativeAreaSheet : null]}>
           <View style={styles.sheetGrabber} />
           <View style={styles.sheetHeader}>
             <View>
@@ -556,7 +576,7 @@ function validateForm(form: ProfileForm) {
 function makeHandle(email?: string) {
   if (!email) return "preview_hana";
   const local = email.split("@")[0]?.replace(/[^a-zA-Z0-9_]/g, "").toLowerCase();
-  return local || "ihub_user";
+  return local || "megrum_user";
 }
 
 const styles = StyleSheet.create({
@@ -570,17 +590,17 @@ const styles = StyleSheet.create({
   },
   backButton: {
     alignItems: "center",
-    backgroundColor: ihubColors.surface,
+    backgroundColor: megrumColors.surface,
     borderColor: "rgba(58,50,74,0.08)",
-    borderRadius: ihubRadii.pill,
+    borderRadius: megrumRadii.pill,
     borderWidth: 1,
     height: 44,
     justifyContent: "center",
     width: 44,
-    ...ihubShadow,
+    ...megrumShadow,
   },
   backText: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 32,
     fontWeight: "800",
     lineHeight: 34,
@@ -589,21 +609,21 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   title: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 20,
     fontWeight: "900",
   },
   subtitle: {
-    color: ihubColors.mutedInk,
+    color: megrumColors.mutedInk,
     fontSize: 11,
     fontWeight: "800",
     marginTop: 2,
   },
   avatarPanel: {
     alignItems: "center",
-    backgroundColor: ihubColors.surface,
+    backgroundColor: megrumColors.surface,
     borderColor: "rgba(58,50,74,0.08)",
-    borderRadius: ihubRadii.xl,
+    borderRadius: megrumRadii.xl,
     borderWidth: 1,
     flexDirection: "row",
     gap: 13,
@@ -611,7 +631,7 @@ const styles = StyleSheet.create({
   },
   avatar: {
     alignItems: "center",
-    backgroundColor: ihubColors.lavender,
+    backgroundColor: megrumColors.lavender,
     borderRadius: 27,
     height: 64,
     justifyContent: "center",
@@ -623,7 +643,7 @@ const styles = StyleSheet.create({
     width: "100%",
   },
   avatarText: {
-    color: ihubColors.surface,
+    color: megrumColors.surface,
     fontSize: 22,
     fontWeight: "900",
   },
@@ -631,12 +651,12 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   avatarTitle: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 13.5,
     fontWeight: "900",
   },
   avatarSub: {
-    color: ihubColors.mutedInk,
+    color: megrumColors.mutedInk,
     fontSize: 10.5,
     fontWeight: "800",
     lineHeight: 15,
@@ -644,9 +664,9 @@ const styles = StyleSheet.create({
   },
   avatarChange: {
     alignItems: "center",
-    backgroundColor: ihubColors.surface,
+    backgroundColor: megrumColors.surface,
     borderColor: "rgba(166,149,216,0.38)",
-    borderRadius: ihubRadii.pill,
+    borderRadius: megrumRadii.pill,
     borderWidth: 1,
     justifyContent: "center",
     minHeight: 34,
@@ -655,31 +675,31 @@ const styles = StyleSheet.create({
     paddingVertical: 7,
   },
   avatarChangeText: {
-    color: ihubColors.lavender,
+    color: megrumColors.lavender,
     fontSize: 10.5,
     fontWeight: "900",
   },
   avatarDelete: {
     backgroundColor: "rgba(217,130,107,0.12)",
-    borderRadius: ihubRadii.pill,
+    borderRadius: megrumRadii.pill,
     paddingHorizontal: 10,
     paddingVertical: 7,
   },
   avatarDeleteText: {
-    color: ihubColors.warn,
+    color: megrumColors.warn,
     fontSize: 10.5,
     fontWeight: "900",
   },
   section: {
-    backgroundColor: ihubColors.surface,
+    backgroundColor: megrumColors.surface,
     borderColor: "rgba(58,50,74,0.08)",
-    borderRadius: ihubRadii.xl,
+    borderRadius: megrumRadii.xl,
     borderWidth: 1,
     gap: 12,
     padding: 15,
   },
   sectionTitle: {
-    color: ihubColors.lavender,
+    color: megrumColors.lavender,
     fontSize: 11.5,
     fontWeight: "900",
     letterSpacing: 0.4,
@@ -690,7 +710,7 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
   },
   sectionHint: {
-    color: ihubColors.mutedInk,
+    color: megrumColors.mutedInk,
     fontSize: 10.5,
     fontWeight: "800",
   },
@@ -703,12 +723,12 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   fieldLabel: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 12,
     fontWeight: "900",
   },
   fieldHint: {
-    color: ihubColors.mutedInk,
+    color: megrumColors.mutedInk,
     fontSize: 10.5,
     fontWeight: "800",
   },
@@ -716,7 +736,7 @@ const styles = StyleSheet.create({
     gap: 7,
   },
   handlePrefix: {
-    color: ihubColors.mutedInk,
+    color: megrumColors.mutedInk,
     fontSize: 12,
     fontWeight: "900",
     position: "absolute",
@@ -734,28 +754,28 @@ const styles = StyleSheet.create({
   genderChip: {
     backgroundColor: "rgba(58,50,74,0.05)",
     borderColor: "rgba(58,50,74,0.08)",
-    borderRadius: ihubRadii.pill,
+    borderRadius: megrumRadii.pill,
     borderWidth: 1,
     paddingHorizontal: 12,
     paddingVertical: 9,
   },
   genderChipActive: {
-    backgroundColor: ihubColors.lavender,
-    borderColor: ihubColors.lavender,
+    backgroundColor: megrumColors.lavender,
+    borderColor: megrumColors.lavender,
   },
   genderChipText: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 12,
     fontWeight: "900",
   },
   genderChipTextActive: {
-    color: ihubColors.surface,
+    color: megrumColors.surface,
   },
   areaSelect: {
     alignItems: "center",
-    backgroundColor: ihubColors.surface,
+    backgroundColor: megrumColors.surface,
     borderColor: "rgba(58,50,74,0.08)",
-    borderRadius: ihubRadii.lg,
+    borderRadius: megrumRadii.lg,
     borderWidth: 1,
     flexDirection: "row",
     justifyContent: "space-between",
@@ -763,15 +783,15 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
   },
   areaSelectText: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 14,
     fontWeight: "800",
   },
   areaSelectPlaceholder: {
-    color: ihubColors.mutedInk,
+    color: megrumColors.mutedInk,
   },
   areaSelectIcon: {
-    color: ihubColors.lavender,
+    color: megrumColors.lavender,
     fontSize: 18,
     fontWeight: "900",
   },
@@ -780,23 +800,35 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "flex-end",
   },
+  nativeSheetRoot: {
+    backgroundColor: megrumColors.background,
+    justifyContent: "flex-start",
+  },
   modalBackdropPressArea: {
     ...StyleSheet.absoluteFillObject,
   },
   areaSheet: {
-    backgroundColor: ihubColors.background,
+    backgroundColor: megrumColors.background,
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
     maxHeight: "78%",
     paddingBottom: 20,
     paddingHorizontal: 18,
     paddingTop: 10,
-    ...ihubShadow,
+    ...megrumShadow,
+  },
+  nativeAreaSheet: {
+    borderTopLeftRadius: 0,
+    borderTopRightRadius: 0,
+    elevation: 0,
+    maxHeight: "100%",
+    shadowOpacity: 0,
+    shadowRadius: 0,
   },
   sheetGrabber: {
     alignSelf: "center",
     backgroundColor: "rgba(58,50,74,0.16)",
-    borderRadius: ihubRadii.pill,
+    borderRadius: megrumRadii.pill,
     height: 4,
     marginBottom: 14,
     width: 42,
@@ -808,28 +840,28 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   sheetTitle: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 18,
     fontWeight: "900",
   },
   sheetSub: {
-    color: ihubColors.mutedInk,
+    color: megrumColors.mutedInk,
     fontSize: 11,
     fontWeight: "800",
     marginTop: 2,
   },
   sheetClose: {
     alignItems: "center",
-    backgroundColor: ihubColors.surface,
+    backgroundColor: megrumColors.surface,
     borderColor: "rgba(58,50,74,0.08)",
-    borderRadius: ihubRadii.pill,
+    borderRadius: megrumRadii.pill,
     borderWidth: 1,
     height: 36,
     justifyContent: "center",
     width: 36,
   },
   sheetCloseText: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 20,
     fontWeight: "800",
     marginTop: -2,
@@ -844,9 +876,9 @@ const styles = StyleSheet.create({
   },
   areaOption: {
     alignItems: "center",
-    backgroundColor: ihubColors.surface,
+    backgroundColor: megrumColors.surface,
     borderColor: "rgba(58,50,74,0.08)",
-    borderRadius: ihubRadii.lg,
+    borderRadius: megrumRadii.lg,
     borderWidth: 1,
     flexDirection: "row",
     justifyContent: "space-between",
@@ -858,31 +890,31 @@ const styles = StyleSheet.create({
     borderColor: "rgba(166,149,216,0.42)",
   },
   areaOptionText: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 13.5,
     fontWeight: "800",
   },
   areaOptionTextActive: {
-    color: ihubColors.lavender,
+    color: megrumColors.lavender,
     fontWeight: "900",
   },
   areaOptionCheck: {
-    color: ihubColors.lavender,
+    color: megrumColors.lavender,
     fontSize: 16,
     fontWeight: "900",
   },
   inlineNotice: {
-    color: ihubColors.mutedInk,
+    color: megrumColors.mutedInk,
     fontSize: 11.5,
     fontWeight: "800",
   },
   inlineOk: {
-    color: ihubColors.ok,
+    color: megrumColors.ok,
     fontSize: 12,
     fontWeight: "900",
   },
   inlineError: {
-    color: ihubColors.warn,
+    color: megrumColors.warn,
     fontSize: 12,
     fontWeight: "800",
     lineHeight: 18,

@@ -9,7 +9,7 @@ const notoSansJP = Noto_Sans_JP({
   weight: ["400", "500", "700", "800"],
 });
 
-// IHubLogo の "iH" 表示用（モックアップ AOLogo 準拠）
+// MegrumLogo の "Mg" 表示用（モックアップ AOLogo 準拠）
 const interTight = Inter_Tight({
   variable: "--font-inter-tight",
   subsets: ["latin"],
@@ -17,7 +17,7 @@ const interTight = Inter_Tight({
 });
 
 export const metadata: Metadata = {
-  title: "iHub — 推し活グッズ交換",
+  title: "Megrum — 推し活グッズ交換",
   description: "K-POP / アニメ等のファンが現地でグッズを交換するプラットフォーム",
 };
 

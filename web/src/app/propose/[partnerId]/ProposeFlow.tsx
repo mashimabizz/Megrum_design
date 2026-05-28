@@ -2336,7 +2336,7 @@ function WeekMeetupCalendar({
       onSelect={(e) => e.preventDefault()}
     >
       <style>{`
-        @keyframes ihub-meetup-hint-breathe {
+        @keyframes megrum-meetup-hint-breathe {
           0%, 100% { transform: scale(0.985); opacity: 0.82; }
           50% { transform: scale(1.035); opacity: 0.94; }
         }
@@ -2571,7 +2571,7 @@ function WeekMeetupCalendar({
         </div>
         {showEmptyHint && (
           <div className="pointer-events-none absolute bottom-0 left-[52px] right-0 top-[58px] z-30 flex items-center justify-center px-4">
-            <div className="w-full max-w-[248px] rounded-[22px] bg-black/58 px-5 py-4 text-center shadow-[0_18px_42px_rgba(0,0,0,0.20)] [animation:ihub-meetup-hint-breathe_2.6s_ease-in-out_infinite]">
+            <div className="w-full max-w-[248px] rounded-[22px] bg-black/58 px-5 py-4 text-center shadow-[0_18px_42px_rgba(0,0,0,0.20)] [animation:megrum-meetup-hint-breathe_2.6s_ease-in-out_infinite]">
               <p className="text-[13px] font-extrabold leading-snug text-white">
                 長押しで時間を選択できるよ
               </p>

@@ -4,7 +4,7 @@ import { RequestForm } from "./RequestForm";
 import { HeaderBack } from "@/components/auth/HeaderBack";
 
 export const metadata = {
-  title: "メンバー追加リクエスト — iHub",
+  title: "メンバー追加リクエスト — Megrum",
 };
 
 type Props = {

@@ -8,7 +8,7 @@ import {
   MeguriThreeScene,
   type MeguriSceneResident,
 } from "../src/components/meguri/MeguriThreeScene";
-import { ihubColors, ihubShadow } from "../src/theme/tokens";
+import { megrumColors, megrumShadow } from "../src/theme/tokens";
 import { USERS, hueColor, hueTint, type MeguriUser } from "./(tabs)/encounters";
 
 const PROFILE_SELF: MeguriSceneResident = {
@@ -47,7 +47,7 @@ export default function MeguriProfileScreen() {
         >
           <View style={styles.header}>
             <Pressable accessibilityRole="button" onPress={() => router.back()} style={styles.roundButton}>
-              <IconSymbol name="chevron-back" color={ihubColors.ink} size={20} />
+              <IconSymbol name="chevron-back" color={megrumColors.ink} size={20} />
             </Pressable>
             <Text style={styles.headerTitle}>めぐりプロフィール</Text>
             <View style={styles.headerSpacer} />
@@ -72,7 +72,7 @@ export default function MeguriProfileScreen() {
       >
         <View style={styles.header}>
           <Pressable accessibilityRole="button" onPress={() => router.back()} style={styles.roundButton}>
-            <IconSymbol name="chevron-back" color={ihubColors.ink} size={20} />
+            <IconSymbol name="chevron-back" color={megrumColors.ink} size={20} />
           </Pressable>
           <Text style={styles.headerTitle}>めぐりプロフィール</Text>
           <View style={styles.headerSpacer} />
@@ -82,13 +82,13 @@ export default function MeguriProfileScreen() {
           <View style={styles.avatarStage}>
             {threeFailed ? (
               <View style={styles.fallbackAvatar}>
-                <ActivityIndicator color={ihubColors.lavender} />
+                <ActivityIndicator color={megrumColors.lavender} />
               </View>
             ) : (
               <MeguriThreeBoundary
                 fallback={
                   <View style={styles.fallbackAvatar}>
-                    <ActivityIndicator color={ihubColors.lavender} />
+                    <ActivityIndicator color={megrumColors.lavender} />
                   </View>
                 }
                 onError={() => setThreeFailed(true)}
@@ -115,7 +115,7 @@ export default function MeguriProfileScreen() {
             <Text style={styles.handle}>@{user.id}</Text>
           </View>
           <View style={styles.basePill}>
-            <IconSymbol name="sparkles-outline" color={ihubColors.lavender} size={15} />
+            <IconSymbol name="sparkles-outline" color={megrumColors.lavender} size={15} />
             <Text style={styles.baseText}>拠点: {user.area}</Text>
           </View>
         </View>
@@ -199,7 +199,7 @@ function InfoRow({ label, value }: { label: string; value: string }) {
 
 const styles = StyleSheet.create({
   root: {
-    backgroundColor: ihubColors.background,
+    backgroundColor: megrumColors.background,
     flex: 1,
   },
   content: {
@@ -222,7 +222,7 @@ const styles = StyleSheet.create({
     width: 42,
   },
   headerTitle: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 17,
     fontWeight: "900",
   },
@@ -235,7 +235,7 @@ const styles = StyleSheet.create({
     borderRadius: 30,
     overflow: "hidden",
     paddingBottom: 18,
-    ...ihubShadow,
+    ...megrumShadow,
   },
   avatarStage: {
     backgroundColor: "#c9f1ff",
@@ -254,10 +254,10 @@ const styles = StyleSheet.create({
     marginTop: 18,
     paddingHorizontal: 24,
     paddingVertical: 44,
-    ...ihubShadow,
+    ...megrumShadow,
   },
   emptyProfileTitle: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 17,
     fontWeight: "900",
   },
@@ -282,12 +282,12 @@ const styles = StyleSheet.create({
     width: 22,
   },
   name: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 26,
     fontWeight: "900",
   },
   handle: {
-    color: ihubColors.mutedInk,
+    color: megrumColors.mutedInk,
     fontSize: 13,
     fontWeight: "800",
     marginTop: 2,
@@ -303,7 +303,7 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
   },
   baseText: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 12,
     fontWeight: "900",
   },
@@ -322,7 +322,7 @@ const styles = StyleSheet.create({
     fontWeight: "900",
   },
   statLabel: {
-    color: ihubColors.mutedInk,
+    color: megrumColors.mutedInk,
     fontSize: 10.5,
     fontWeight: "800",
     marginTop: 3,
@@ -332,10 +332,10 @@ const styles = StyleSheet.create({
     borderRadius: 24,
     gap: 10,
     padding: 16,
-    ...ihubShadow,
+    ...megrumShadow,
   },
   sectionTitle: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 16,
     fontWeight: "900",
   },
@@ -346,12 +346,12 @@ const styles = StyleSheet.create({
     paddingTop: 10,
   },
   infoLabel: {
-    color: ihubColors.mutedInk,
+    color: megrumColors.mutedInk,
     fontSize: 11,
     fontWeight: "900",
   },
   infoValue: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 14,
     fontWeight: "800",
     lineHeight: 20,
@@ -375,12 +375,12 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   timelineTitle: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 14,
     fontWeight: "900",
   },
   timelineText: {
-    color: ihubColors.mutedInk,
+    color: megrumColors.mutedInk,
     fontSize: 12,
     fontWeight: "800",
     lineHeight: 17,
@@ -388,7 +388,7 @@ const styles = StyleSheet.create({
   },
   messageButton: {
     alignItems: "center",
-    backgroundColor: ihubColors.ink,
+    backgroundColor: megrumColors.ink,
     borderRadius: 999,
     flexDirection: "row",
     gap: 8,

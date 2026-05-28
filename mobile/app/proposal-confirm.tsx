@@ -25,7 +25,7 @@ import {
   type ProposalThumbItem,
 } from "../src/data/proposalItems";
 import { supabase } from "../src/lib/supabase";
-import { ihubColors, ihubRadii, ihubShadow } from "../src/theme/tokens";
+import { megrumColors, megrumRadii, megrumShadow } from "../src/theme/tokens";
 
 type MeetupCandidate = {
   id: string;
@@ -207,7 +207,7 @@ export default function ProposalConfirmScreen() {
               false: "rgba(58,50,74,0.14)",
               true: "rgba(166,149,216,0.46)",
             }}
-            thumbColor={shareSchedule ? ihubColors.lavender : ihubColors.surface}
+            thumbColor={shareSchedule ? megrumColors.lavender : megrumColors.surface}
           />
         </Pressable>
       </ScrollView>
@@ -285,14 +285,9 @@ export default function ProposalConfirmScreen() {
         cash_amount: null,
       };
 
-      let { error } = await supabase.from("proposals").insert(insertFields);
-      if (isMeetupCandidatesSchemaCacheError(error)) {
-        delete insertFields.meetup_candidates;
-        const retry = await supabase.from("proposals").insert(insertFields);
-        error = retry.error;
-      }
+      const { error } = await insertProposalWithSchemaFallback(insertFields);
       if (error) {
-        setSubmitError(error.message);
+        setSubmitError(formatProposalSubmitError(error));
         return;
       }
       setSubmitted(true);
@@ -323,12 +318,12 @@ function ProposalCompleteScreen({ partnerHandle }: { partnerHandle: string }) {
       <View style={styles.completeActions}>
         <PrimaryButton
           variant="secondary"
-          onPress={() => router.replace("/(tabs)")}
+          onPress={() => router.replace("/")}
         >
           まだ他に探す
         </PrimaryButton>
         <PrimaryButton
-          onPress={() => router.replace("/(tabs)/transactions")}
+          onPress={() => router.replace("/transactions")}
         >
           打診一覧に飛ぶ
         </PrimaryButton>
@@ -368,8 +363,8 @@ function ExchangeCard({
     <View style={styles.exchangeCard}>
       <SidePanel label={`相手の譲（${theirItems.length}）`} items={theirItems} />
       <View style={styles.swapColumn}>
-        <ArrowDot color={ihubColors.lavender} direction="right" />
-        <ArrowDot color={ihubColors.sky} direction="left" />
+        <ArrowDot color={megrumColors.lavender} direction="right" />
+        <ArrowDot color={megrumColors.sky} direction="left" />
       </View>
       <SidePanel label={`あなたの譲（${myItems.length}）`} items={myItems} alignRight />
     </View>
@@ -496,22 +491,86 @@ function parseMeetups(raw?: string): MeetupCandidate[] {
 }
 
 function normalizeProposalMatchType(value?: string) {
-  if (
-    value === "complete" ||
-    value === "they_want_you" ||
-    value === "you_want_them"
-  ) {
+  if (value === "perfect" || value === "forward" || value === "backward") {
     return value;
   }
-  return "complete";
+  if (value === "complete") return "perfect";
+  if (value === "you_want_them") return "forward";
+  if (value === "they_want_you") return "backward";
+  return "perfect";
 }
 
-function isMeetupCandidatesSchemaCacheError(error: { code?: string; message?: string } | null) {
+type ProposalInsertError = {
+  code?: string;
+  details?: string | null;
+  hint?: string | null;
+  message?: string;
+};
+
+const PROPOSAL_SCHEMA_FALLBACK_COLUMNS = new Set([
+  "message_tone",
+  "agreed_by_sender",
+  "agreed_by_receiver",
+  "last_action_at",
+  "expires_at",
+  "meetup_start_at",
+  "meetup_end_at",
+  "meetup_place_name",
+  "meetup_lat",
+  "meetup_lng",
+  "meetup_candidates",
+  "expose_calendar",
+  "listing_id",
+  "cash_offer",
+  "cash_amount",
+]);
+
+async function insertProposalWithSchemaFallback(fields: Record<string, unknown>) {
+  if (!supabase) return { error: null as ProposalInsertError | null };
+  const currentFields = { ...fields };
+  const maxAttempts = PROPOSAL_SCHEMA_FALLBACK_COLUMNS.size + 1;
+
+  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+    const { error } = await supabase.from("proposals").insert(currentFields);
+    if (!error) return { error: null as ProposalInsertError | null };
+
+    const missingColumn = getMissingProposalColumn(error);
+    if (
+      missingColumn &&
+      PROPOSAL_SCHEMA_FALLBACK_COLUMNS.has(missingColumn) &&
+      Object.prototype.hasOwnProperty.call(currentFields, missingColumn)
+    ) {
+      delete currentFields[missingColumn];
+      continue;
+    }
+
+    return { error };
+  }
+
+  return {
+    error: {
+      message: "打診送信の互換処理が完了しませんでした。時間を置いて再度お試しください。",
+    },
+  };
+}
+
+function getMissingProposalColumn(error: ProposalInsertError | null) {
   const message = error?.message ?? "";
-  return (
-    error?.code === "PGRST204" ||
-    (message.includes("meetup_candidates") && message.includes("schema cache"))
-  );
+  const missingColumnMatch = message.match(/'([^']+)' column of 'proposals'/);
+  if (missingColumnMatch?.[1]) return missingColumnMatch[1];
+  if (error?.code === "PGRST204" && message.includes("schema cache")) {
+    const quoted = message.match(/'([^']+)'/);
+    return quoted?.[1] ?? null;
+  }
+  return null;
+}
+
+function formatProposalSubmitError(error: ProposalInsertError) {
+  const missingColumn = getMissingProposalColumn(error);
+  if (missingColumn) {
+    return `打診の保存先とアプリの項目が一部ずれています（${missingColumn}）。少し時間を置いてもう一度お試しください。`;
+  }
+  return error.message ?? "打診を送信できませんでした。時間を置いて再度お試しください。";
 }
 
 function getMapCenter(candidates: MeetupCandidate[]): MapCoordinate {
@@ -540,17 +599,17 @@ const styles = StyleSheet.create({
   },
   backButton: {
     alignItems: "center",
-    backgroundColor: ihubColors.surface,
+    backgroundColor: megrumColors.surface,
     borderColor: "rgba(58,50,74,0.08)",
-    borderRadius: ihubRadii.pill,
+    borderRadius: megrumRadii.pill,
     borderWidth: 1,
     height: 42,
     justifyContent: "center",
     width: 42,
-    ...ihubShadow,
+    ...megrumShadow,
   },
   backText: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 31,
     fontWeight: "700",
     lineHeight: 33,
@@ -559,13 +618,13 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   kicker: {
-    color: ihubColors.lavender,
+    color: megrumColors.lavender,
     fontSize: 10,
     fontWeight: "900",
     letterSpacing: 0.7,
   },
   title: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 23,
     fontWeight: "900",
     lineHeight: 28,
@@ -584,9 +643,9 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
   },
   noticeBadge: {
-    backgroundColor: ihubColors.surface,
-    borderRadius: ihubRadii.pill,
-    color: ihubColors.lavender,
+    backgroundColor: megrumColors.surface,
+    borderRadius: megrumRadii.pill,
+    color: megrumColors.lavender,
     fontSize: 9.5,
     fontWeight: "900",
     overflow: "hidden",
@@ -594,7 +653,7 @@ const styles = StyleSheet.create({
     paddingVertical: 3,
   },
   noticeText: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     flex: 1,
     fontSize: 11.5,
     fontWeight: "800",
@@ -609,12 +668,12 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
   },
   sectionTitle: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 14,
     fontWeight: "900",
   },
   sectionRight: {
-    color: ihubColors.mutedInk,
+    color: megrumColors.mutedInk,
     fontSize: 10.5,
     fontWeight: "800",
   },
@@ -627,7 +686,7 @@ const styles = StyleSheet.create({
     padding: 10,
   },
   sidePanel: {
-    backgroundColor: ihubColors.surface,
+    backgroundColor: megrumColors.surface,
     borderColor: "rgba(58,50,74,0.07)",
     borderRadius: 13,
     borderWidth: 1,
@@ -645,7 +704,7 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   sideLabelRight: {
-    color: ihubColors.lavender,
+    color: megrumColors.lavender,
   },
   thumbRow: {
     flexDirection: "row",
@@ -680,7 +739,7 @@ const styles = StyleSheet.create({
     width: 34,
   },
   thumbGlyph: {
-    color: ihubColors.surface,
+    color: megrumColors.surface,
     fontSize: 17,
     fontWeight: "900",
   },
@@ -697,18 +756,18 @@ const styles = StyleSheet.create({
     width: 24,
   },
   arrowDotText: {
-    color: ihubColors.surface,
+    color: megrumColors.surface,
     fontSize: 13,
     fontWeight: "900",
     lineHeight: 15,
   },
   meetupCard: {
-    backgroundColor: ihubColors.surface,
+    backgroundColor: megrumColors.surface,
     borderColor: "rgba(58,50,74,0.08)",
     borderRadius: 18,
     borderWidth: 1,
     overflow: "hidden",
-    ...ihubShadow,
+    ...megrumShadow,
   },
   meetupCardHeader: {
     alignItems: "center",
@@ -721,7 +780,7 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
   },
   meetupCardTitle: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 12,
     fontWeight: "900",
   },
@@ -732,7 +791,7 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
   },
   meetupCardCountText: {
-    color: ihubColors.lavender,
+    color: megrumColors.lavender,
     fontSize: 9.5,
     fontWeight: "900",
   },
@@ -790,8 +849,8 @@ const styles = StyleSheet.create({
   },
   mapPin: {
     alignItems: "center",
-    backgroundColor: ihubColors.lavender,
-    borderColor: ihubColors.surface,
+    backgroundColor: megrumColors.lavender,
+    borderColor: megrumColors.surface,
     borderRadius: 999,
     borderWidth: 3,
     height: 34,
@@ -799,14 +858,14 @@ const styles = StyleSheet.create({
     marginLeft: -17,
     marginTop: -17,
     position: "absolute",
-    shadowColor: ihubColors.ink,
+    shadowColor: megrumColors.ink,
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.16,
     shadowRadius: 14,
     width: 34,
   },
   mapPinText: {
-    color: ihubColors.surface,
+    color: megrumColors.surface,
     fontSize: 13,
     fontWeight: "900",
   },
@@ -821,7 +880,7 @@ const styles = StyleSheet.create({
   },
   meetupNumber: {
     alignItems: "center",
-    backgroundColor: ihubColors.lavender,
+    backgroundColor: megrumColors.lavender,
     borderRadius: 999,
     height: 22,
     justifyContent: "center",
@@ -829,7 +888,7 @@ const styles = StyleSheet.create({
     width: 22,
   },
   meetupNumberText: {
-    color: ihubColors.surface,
+    color: megrumColors.surface,
     fontSize: 11,
     fontWeight: "900",
   },
@@ -837,29 +896,29 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   meetupTime: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 12,
     fontWeight: "900",
   },
   meetupPlace: {
-    color: ihubColors.mutedInk,
+    color: megrumColors.mutedInk,
     fontSize: 11,
     fontWeight: "800",
     marginTop: 2,
   },
   messageInput: {
-    backgroundColor: ihubColors.surface,
+    backgroundColor: megrumColors.surface,
     borderColor: "rgba(58,50,74,0.08)",
     borderRadius: 14,
     borderWidth: 1,
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 13,
     fontWeight: "700",
     minHeight: 110,
     padding: 12,
   },
   submitError: {
-    color: ihubColors.warn,
+    color: megrumColors.warn,
     fontSize: 12,
     fontWeight: "800",
     lineHeight: 18,
@@ -867,7 +926,7 @@ const styles = StyleSheet.create({
   },
   scheduleCard: {
     alignItems: "center",
-    backgroundColor: ihubColors.surface,
+    backgroundColor: megrumColors.surface,
     borderColor: "rgba(58,50,74,0.08)",
     borderRadius: 16,
     borderWidth: 1,
@@ -883,12 +942,12 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scheduleTitle: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 13,
     fontWeight: "900",
   },
   scheduleSub: {
-    color: ihubColors.mutedInk,
+    color: megrumColors.mutedInk,
     fontSize: 11,
     fontWeight: "800",
     marginTop: 2,
@@ -899,14 +958,14 @@ const styles = StyleSheet.create({
   },
   completeHero: {
     alignItems: "center",
-    backgroundColor: ihubColors.surface,
+    backgroundColor: megrumColors.surface,
     borderColor: "rgba(166,149,216,0.20)",
     borderRadius: 30,
     borderWidth: 1,
     minHeight: 360,
     overflow: "hidden",
     padding: 26,
-    ...ihubShadow,
+    ...megrumShadow,
   },
   completeSparkOne: {
     backgroundColor: "rgba(166,149,216,0.18)",
@@ -937,34 +996,34 @@ const styles = StyleSheet.create({
   },
   completeIcon: {
     alignItems: "center",
-    backgroundColor: ihubColors.lavender,
+    backgroundColor: megrumColors.lavender,
     borderColor: "rgba(255,255,255,0.90)",
     borderRadius: 42,
     borderWidth: 3,
     height: 84,
     justifyContent: "center",
     marginTop: 58,
-    shadowColor: ihubColors.lavender,
+    shadowColor: megrumColors.lavender,
     shadowOffset: { width: 0, height: 10 },
     shadowOpacity: 0.28,
     shadowRadius: 18,
     width: 84,
   },
   completeIconText: {
-    color: ihubColors.surface,
+    color: megrumColors.surface,
     fontSize: 38,
     fontWeight: "900",
     lineHeight: 42,
   },
   completeTitle: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 25,
     fontWeight: "900",
     marginTop: 24,
     textAlign: "center",
   },
   completeText: {
-    color: ihubColors.mutedInk,
+    color: megrumColors.mutedInk,
     fontSize: 13,
     fontWeight: "800",
     lineHeight: 20,

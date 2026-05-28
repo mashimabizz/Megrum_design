@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { router } from "expo-router";
 import { Pressable, StyleSheet, Text, View } from "react-native";
-import { ihubColors, ihubRadii, ihubShadow } from "../theme/tokens";
+import { megrumColors, megrumRadii } from "../theme/tokens";
 
 type RouteHeaderProps = {
   right?: ReactNode;
@@ -44,43 +44,55 @@ export function RouteHeader({ right, subtitle, title }: RouteHeaderProps) {
 const styles = StyleSheet.create({
   header: {
     alignItems: "center",
+    backgroundColor: "rgba(255,255,255,0.58)",
+    borderColor: "rgba(255,255,255,0.78)",
+    borderRadius: 24,
+    borderWidth: 1,
     flexDirection: "row",
-    gap: 12,
+    gap: 10,
+    padding: 6,
+    shadowColor: megrumColors.ink,
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.08,
+    shadowRadius: 22,
   },
   backButton: {
     alignItems: "center",
-    backgroundColor: ihubColors.surface,
-    borderColor: "rgba(58,50,74,0.08)",
-    borderRadius: ihubRadii.pill,
+    backgroundColor: "rgba(255,255,255,0.86)",
+    borderColor: "rgba(255,255,255,0.9)",
+    borderRadius: megrumRadii.pill,
     borderWidth: 1,
-    height: 42,
+    height: 38,
     justifyContent: "center",
-    width: 42,
-    ...ihubShadow,
+    shadowColor: megrumColors.ink,
+    shadowOffset: { width: 0, height: 5 },
+    shadowOpacity: 0.1,
+    shadowRadius: 10,
+    width: 38,
   },
   backText: {
-    color: ihubColors.ink,
-    fontSize: 30,
+    color: megrumColors.ink,
+    fontSize: 29,
     fontWeight: "800",
-    lineHeight: 32,
+    lineHeight: 30,
   },
   copy: {
     flex: 1,
   },
   title: {
-    color: ihubColors.ink,
+    color: megrumColors.ink,
     fontSize: 19,
     fontWeight: "900",
     lineHeight: 24,
   },
   subtitle: {
-    color: ihubColors.mutedInk,
+    color: megrumColors.mutedInk,
     fontSize: 11,
     fontWeight: "800",
     marginTop: 2,
   },
   right: {
     alignItems: "flex-end",
-    minWidth: 42,
+    minWidth: 38,
   },
 });
