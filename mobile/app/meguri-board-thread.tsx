@@ -152,6 +152,7 @@ export default function MeguriBoardThreadScreen() {
   const [replySortMode, setReplySortMode] = useState<BoardReplySortMode>("oldest");
   const [searchCursorIndex, setSearchCursorIndex] = useState(0);
   const scrollViewRef = useRef<ScrollView | null>(null);
+  const composerInputRef = useRef<TextInput | null>(null);
   const replyOffsetsRef = useRef<Record<string, number>>({});
 
   const actor = useMemo<MeguriBoardActor>(
@@ -377,6 +378,14 @@ export default function MeguriBoardThreadScreen() {
         return;
       }
       scrollViewRef.current?.scrollToEnd({ animated });
+    });
+  }
+
+  function focusReplyComposer() {
+    if (thread?.status === "locked") return;
+    requestAnimationFrame(() => {
+      scrollViewRef.current?.scrollToEnd({ animated: true });
+      composerInputRef.current?.focus();
     });
   }
 
@@ -1111,9 +1120,16 @@ export default function MeguriBoardThreadScreen() {
             </Text>
           </View>
           {thread ? (
-            <Pressable accessibilityRole="button" onPress={openThreadActions} style={styles.headerActionButton}>
-              <IconSymbol name="ellipsis-horizontal" color={megrumColors.ink} size={20} />
-            </Pressable>
+            <View style={styles.headerActions}>
+              {thread.status !== "locked" ? (
+                <Pressable accessibilityRole="button" onPress={focusReplyComposer} style={styles.headerActionButton}>
+                  <IconSymbol name="mail-outline" color={megrumColors.ink} size={18} />
+                </Pressable>
+              ) : null}
+              <Pressable accessibilityRole="button" onPress={openThreadActions} style={styles.headerActionButton}>
+                <IconSymbol name="ellipsis-horizontal" color={megrumColors.ink} size={20} />
+              </Pressable>
+            </View>
           ) : null}
         </View>
 
@@ -1576,6 +1592,7 @@ export default function MeguriBoardThreadScreen() {
                     />
                   </Pressable>
                   <TextInput
+                    ref={composerInputRef}
                     maxLength={REPLY_BODY_LIMIT}
                     multiline
                     onChangeText={setDraft}
@@ -2239,6 +2256,11 @@ const styles = StyleSheet.create({
     height: 40,
     justifyContent: "center",
     width: 40,
+  },
+  headerActions: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 8,
   },
   headerCopy: {
     flex: 1,

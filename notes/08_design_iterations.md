@@ -4,6 +4,53 @@
 
 ---
 
+## イテレーション218：掲示板詳細に返信欄フォーカスを追加
+
+### 背景・問題意識
+
+スレッド型掲示板では、読んだ後にすぐ返信できる導線が重要になる。詳細画面では返信欄が下部に固定表示されているが、ヘッダーから即座に入力へ移る操作がなかったため、返信開始の導線を追加した。
+
+### 変更内容
+
+#### `mobile/app/meguri-board-thread.tsx`
+- スレッド詳細ヘッダーに返信ボタンを追加した。
+- 返信ボタンを押すと、返信入力欄へフォーカスし、キーボードを開けるようにした。
+- 締め切り済みスレッドでは返信ボタンを表示しないようにした。
+
+#### `notes/09_state_machines.md`
+- Meguri Board Lifecycle に返信欄フォーカス導線の表示ルールを追記した。
+
+#### `notes/10_glossary.md`
+- 掲示板返信フォーカス導線を追加した。
+
+### 影響範囲
+
+- iOS版 スポット掲示板詳細
+- 返信入力欄
+- スレッド詳細ヘッダー
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- `EAS_UPDATE_PROJECT_SLUG=ihub EXPO_NO_GIT_STATUS=1 npm --prefix mobile run update:ios:preview -- --message "[iter218] add board reply focus action" --non-interactive`
+- Preview OTA: Update group `ad80ba71-a3b3-4fb5-bf6e-aeb590f31f07` / iOS update `019e75a9-70dc-7be9-910b-5f816a177c46`
+
+### 関連ファイル
+
+- `mobile/app/meguri-board-thread.tsx`
+- `notes/08_design_iterations.md`
+- `notes/09_state_machines.md`
+- `notes/10_glossary.md`
+
+### セルフレビュー結果
+
+- ✅ 既存の固定返信欄を活かし、DB変更なしで返信開始導線だけを追加した。
+- ✅ 締め切り済みスレッドでは返信ボタンを出さないようにした。
+- ✅ ネイティブ依存追加なしで、Preview OTA対象内に収めた。
+
+---
+
 ## イテレーション217：掲示板一覧に検索条件チップを追加
 
 ### 背景・問題意識
