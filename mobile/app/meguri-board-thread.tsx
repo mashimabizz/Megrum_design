@@ -124,6 +124,7 @@ export default function MeguriBoardThreadScreen() {
   const [imagePreviewUri, setImagePreviewUri] = useState<string | null>(null);
   const [previousReadAt, setPreviousReadAt] = useState<number | null>(null);
   const [participantsOpen, setParticipantsOpen] = useState(false);
+  const [searchCursorIndex, setSearchCursorIndex] = useState(0);
   const scrollViewRef = useRef<ScrollView | null>(null);
   const replyOffsetsRef = useRef<Record<string, number>>({});
 
@@ -261,6 +262,20 @@ export default function MeguriBoardThreadScreen() {
     });
   }, [actor.userId, replies, thread]);
 
+  useEffect(() => {
+    setSearchCursorIndex(0);
+  }, [replySearchQuery]);
+
+  useEffect(() => {
+    if (filteredReplies.length === 0) {
+      if (searchCursorIndex !== 0) setSearchCursorIndex(0);
+      return;
+    }
+    if (searchCursorIndex >= filteredReplies.length) {
+      setSearchCursorIndex(0);
+    }
+  }, [filteredReplies.length, searchCursorIndex]);
+
   function scrollToLatestReply(animated = true) {
     requestAnimationFrame(() => {
       scrollViewRef.current?.scrollToEnd({ animated });
@@ -293,6 +308,18 @@ export default function MeguriBoardThreadScreen() {
       return;
     }
     runScroll();
+  }
+
+  function jumpToSearchResult(direction: -1 | 1) {
+    if (!replySearchQuery || filteredReplies.length === 0) return;
+    const nextIndex =
+      (searchCursorIndex + direction + filteredReplies.length) % filteredReplies.length;
+    const targetReply = filteredReplies[nextIndex];
+    setSearchCursorIndex(nextIndex);
+    const y = targetReply ? replyOffsetsRef.current[targetReply.id] : undefined;
+    if (typeof y === "number") {
+      scrollViewRef.current?.scrollTo({ animated: true, y: Math.max(0, y - 12) });
+    }
   }
 
   const refreshDetail = useCallback(async (options: { silent?: boolean } = {}) => {
@@ -1058,6 +1085,29 @@ export default function MeguriBoardThreadScreen() {
                   </Pressable>
                 ) : null}
               </View>
+              {replySearchQuery && filteredReplies.length > 0 ? (
+                <View style={styles.replySearchNavigator}>
+                  <Text style={styles.replySearchNavigatorLabel}>
+                    {Math.min(searchCursorIndex + 1, filteredReplies.length)} / {filteredReplies.length}
+                  </Text>
+                  <View style={styles.replySearchNavigatorActions}>
+                    <Pressable
+                      accessibilityRole="button"
+                      onPress={() => jumpToSearchResult(-1)}
+                      style={styles.replySearchNavigatorButton}
+                    >
+                      <Text style={styles.replySearchNavigatorButtonText}>前へ</Text>
+                    </Pressable>
+                    <Pressable
+                      accessibilityRole="button"
+                      onPress={() => jumpToSearchResult(1)}
+                      style={styles.replySearchNavigatorButton}
+                    >
+                      <Text style={styles.replySearchNavigatorButtonText}>次へ</Text>
+                    </Pressable>
+                  </View>
+                </View>
+              ) : null}
               {replies.length === 0 ? (
                 <View style={styles.noRepliesCard}>
                   <Text style={styles.noRepliesTitle}>まだ返信はありません</Text>
@@ -2103,6 +2153,37 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: "800",
     padding: 0,
+  },
+  replySearchNavigator: {
+    alignItems: "center",
+    backgroundColor: "rgba(166,149,216,0.1)",
+    borderRadius: 16,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    minHeight: 38,
+    paddingHorizontal: 12,
+  },
+  replySearchNavigatorLabel: {
+    color: megrumColors.lavender,
+    fontSize: 11.5,
+    fontWeight: "900",
+  },
+  replySearchNavigatorActions: {
+    flexDirection: "row",
+    gap: 8,
+  },
+  replySearchNavigatorButton: {
+    alignItems: "center",
+    backgroundColor: "#fff",
+    borderRadius: 999,
+    minHeight: 28,
+    justifyContent: "center",
+    paddingHorizontal: 11,
+  },
+  replySearchNavigatorButtonText: {
+    color: megrumColors.lavender,
+    fontSize: 11,
+    fontWeight: "900",
   },
   noRepliesCard: {
     backgroundColor: "#fff",

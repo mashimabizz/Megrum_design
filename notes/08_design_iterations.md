@@ -4,6 +4,52 @@
 
 ---
 
+## イテレーション198：掲示板検索結果ナビを追加
+
+### 背景・問題意識
+
+スレッド内検索で複数の返信がヒットした時、一覧を手で探すだけでは長いスレッドで使いにくい。一般的な検索体験として、検索結果の前後へ移動できるナビゲーションを追加した。
+
+### 変更内容
+
+#### `mobile/app/meguri-board-thread.tsx`
+- スレッド内検索中、検索結果の現在位置と総件数を `1 / 3` のように表示するようにした。
+- `前へ` / `次へ` ボタンで検索結果の返信位置へスクロールできるようにした。
+- 検索語変更時は検索結果カーソルを先頭に戻し、結果件数が変わった時も範囲外カーソルにならないようにした。
+
+#### `notes/09_state_machines.md`
+- Meguri Board Lifecycle に検索結果ナビの表示ルールを追記した。
+
+#### `notes/10_glossary.md`
+- 掲示板検索結果ナビを追加した。
+
+### 影響範囲
+
+- iOS版 スポット掲示板詳細
+- スレッド内検索
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- `EAS_UPDATE_PROJECT_SLUG=ihub EXPO_NO_GIT_STATUS=1 npm --prefix mobile run update:ios:preview -- --message "[iter198] add board search result navigation" --non-interactive`
+- Preview OTA: Update group `c1f4a44a-cb0e-42ea-85aa-81f1e04a9cde` / iOS update `019e755b-6b8e-79e7-9467-36e240e9c553`
+
+### 関連ファイル
+
+- `mobile/app/meguri-board-thread.tsx`
+- `notes/08_design_iterations.md`
+- `notes/09_state_machines.md`
+- `notes/10_glossary.md`
+
+### セルフレビュー結果
+
+- ✅ 既存の返信位置記録を使い回し、検索結果の表示移動だけを追加した。
+- ✅ 検索語・検索結果件数が変わってもカーソルが破綻しないようにした。
+- ✅ スレッド/返信状態は変更せず、表示操作として実装した。
+
+---
+
 ## イテレーション197：掲示板検索語ハイライトを追加
 
 ### 背景・問題意識
