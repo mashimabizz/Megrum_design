@@ -4,6 +4,47 @@
 
 ---
 
+## イテレーション168.68：Preview ArchiveのBuild番号追従を修正
+
+### 背景・問題意識
+
+TestFlight向けに `MegrumPreview` のBuild番号を `3` へ上げたにもかかわらず、Xcode OrganizerのArchive一覧では `0.1.0 (2)` が作成され続けた。Xcode project側の `CURRENT_PROJECT_VERSION` は `3` だったが、`Info.plist` の `CFBundleVersion` が `2` で直書きされており、Archive表示・アップロード時のBuild番号が古いまま固定されていた。
+
+### 変更内容
+
+#### `mobile/ios/MegrumPreview/Info.plist`
+- `CFBundleVersion` を `2` 直書きから `$(CURRENT_PROJECT_VERSION)` 参照へ変更した。
+- `CFBundleShortVersionString` も `0.1.0` 直書きから `$(MARKETING_VERSION)` 参照へ変更し、XcodeのVersion/Build設定に追従するようにした。
+
+#### `mobile/app.json`
+- Expo設定の `ios.buildNumber` を `3` として明示し、iOSプロジェクト再生成時にもBuild番号が古い値へ戻らないようにした。
+
+### 影響範囲
+
+- iOS Preview Archive / TestFlight Upload のVersion/Build番号
+- Xcode Organizer上のArchive表示
+- Expo prebuild / iOS native project再生成時のBuild番号
+
+### 確認方法
+
+- `plutil -lint mobile/ios/MegrumPreview/Info.plist`
+- `rg -n "CFBundleVersion|CFBundleShortVersionString|CURRENT_PROJECT_VERSION|MARKETING_VERSION" mobile/ios/MegrumPreview/Info.plist mobile/ios/MegrumPreview.xcodeproj/project.pbxproj`
+- `rg -n "\"buildNumber\"" mobile/app.json`
+- Xcodeで再Archiveし、OrganizerのVersion欄が `0.1.0 (3)` になることを確認
+
+### 関連ファイル
+
+- `mobile/app.json`
+- `mobile/ios/MegrumPreview/Info.plist`
+
+### セルフレビュー結果
+
+- ✅ `Info.plist` がXcode側のVersion/Build設定に追従する
+- ✅ TestFlight再アップロード時に同じBuild番号 `2` を繰り返さない
+- ✅ 状態遷移・DBスキーマ・新用語の変更ではないため `notes/09_state_machines.md` / `notes/05_data_model.md` / `notes/10_glossary.md` の更新は不要
+
+---
+
 ## イテレーション168.67：打診送信のプレビューID混入を防止
 
 ### 背景・問題意識
