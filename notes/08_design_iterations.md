@@ -4,6 +4,51 @@
 
 ---
 
+## イテレーション211：掲示板返信の長押しアクションを追加
+
+### 背景・問題意識
+
+返信ごとの操作は右下メニューから使えるが、スマホの会話UIでは返信そのものを長押しして引用・共有・通報に入れる操作も自然。返信行の長押しで既存アクションシートを開けるようにした。
+
+### 変更内容
+
+#### `mobile/app/meguri-board-thread.tsx`
+- 返信行を長押しすると、既存の返信アクションシートを開くようにした。
+- 既存の `...` ボタンからの操作はそのまま維持した。
+
+#### `notes/09_state_machines.md`
+- Meguri Board Lifecycle に返信長押しアクションの表示ルールを追記した。
+
+#### `notes/10_glossary.md`
+- 掲示板返信長押しアクションを追加した。
+
+### 影響範囲
+
+- iOS版 スポット掲示板詳細
+- 返信操作導線
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- `EAS_UPDATE_PROJECT_SLUG=ihub EXPO_NO_GIT_STATUS=1 npm --prefix mobile run update:ios:preview -- --message "[iter211] add board reply long press actions" --non-interactive`
+- Preview OTA: Update group `3a2fb3f6-4d99-429b-87c9-3e6217598e32` / iOS update `019e758a-adf6-7474-a2db-9f7a412d0e6b`
+
+### 関連ファイル
+
+- `mobile/app/meguri-board-thread.tsx`
+- `notes/08_design_iterations.md`
+- `notes/09_state_machines.md`
+- `notes/10_glossary.md`
+
+### セルフレビュー結果
+
+- ✅ 既存の返信アクションシートを再利用し、操作結果の分岐を増やさないようにした。
+- ✅ 既存の `...` ボタンは維持し、長押しに気づかないユーザーも使えるようにした。
+- ✅ DB変更やネイティブ依存追加なしで、Preview OTA対象内に収めた。
+
+---
+
 ## イテレーション210：掲示板詳細に本文の続きを読むを追加
 
 ### 背景・問題意識

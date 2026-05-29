@@ -1361,7 +1361,9 @@ export default function MeguriBoardThreadScreen() {
                           <View style={styles.unreadSeparatorLine} />
                         </View>
                       ) : null}
-                      <View
+                      <Pressable
+                        accessibilityRole="button"
+                        onLongPress={() => openReplyActions(reply)}
                         style={[styles.replyRow, reply.mine ? styles.replyRowMine : null]}
                       >
                         {!reply.mine ? (
@@ -1464,7 +1466,7 @@ export default function MeguriBoardThreadScreen() {
                             </Pressable>
                           </View>
                         </View>
-                      </View>
+                      </Pressable>
                     </View>
                   );
                 })
