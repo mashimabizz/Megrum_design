@@ -100,6 +100,7 @@ type BoardMediaAttachment = {
 };
 
 type BoardReplySortMode = "oldest" | "newest" | "popular";
+type ReplySearchSource = { label: string; type: "mention" | "participant" } | null;
 
 const REPLY_SORT_OPTIONS: { label: string; value: BoardReplySortMode }[] = [
   { label: "古い順", value: "oldest" },
@@ -134,7 +135,7 @@ export default function MeguriBoardThreadScreen() {
   const [sending, setSending] = useState(false);
   const [sendError, setSendError] = useState<string | null>(null);
   const [replySearchText, setReplySearchText] = useState("");
-  const [replySearchSource, setReplySearchSource] = useState<{ label: string; type: "participant" } | null>(null);
+  const [replySearchSource, setReplySearchSource] = useState<ReplySearchSource>(null);
   const [replyJumpText, setReplyJumpText] = useState("");
   const [quoteTarget, setQuoteTarget] = useState<MeguriBoardReply | null>(null);
   const [threadEditorOpen, setThreadEditorOpen] = useState(false);
@@ -341,6 +342,10 @@ export default function MeguriBoardThreadScreen() {
   }, [replies, replyNumberById, thread]);
   const threadBodyCollapsible = (thread?.body.trim().length ?? 0) > 180;
   const hasReplyDraft = !!draft.trim() || draftImageUris.length > 0;
+  const viewerMentionReplies = useMemo(
+    () => replies.filter((reply) => !reply.mine && replyMentionsHandle(reply.body, actor.handle)),
+    [actor.handle, replies],
+  );
 
   useEffect(() => {
     setSearchCursorIndex(0);
@@ -394,6 +399,21 @@ export default function MeguriBoardThreadScreen() {
     setReplySearchText(participant.handle || participant.name);
     setReplySearchSource({ label: participant.name, type: "participant" });
     setParticipantsOpen(false);
+  }
+
+  function filterViewerMentions() {
+    const handle = actor.handle?.trim().replace(/^@/, "");
+    if (!handle || viewerMentionReplies.length === 0) return;
+    setReplySearchText(`@${handle}`);
+    setReplySearchSource({ label: `@${handle}`, type: "mention" });
+    setSearchCursorIndex(0);
+    const firstMention = [...viewerMentionReplies].sort((left, right) => left.createdAt - right.createdAt)[0];
+    setTimeout(() => {
+      const y = firstMention ? replyOffsetsRef.current[firstMention.id] : undefined;
+      if (typeof y === "number") {
+        scrollViewRef.current?.scrollTo({ animated: true, y: Math.max(0, y - 12) });
+      }
+    }, 120);
   }
 
   function handleReplySearchChange(text: string) {
@@ -1293,6 +1313,16 @@ export default function MeguriBoardThreadScreen() {
                       <Text style={styles.unreadJumpButtonText}>未読へ</Text>
                     </Pressable>
                   ) : null}
+                  {viewerMentionReplies.length > 0 ? (
+                    <Pressable
+                      accessibilityRole="button"
+                      hitSlop={8}
+                      onPress={filterViewerMentions}
+                      style={styles.mentionJumpButton}
+                    >
+                      <Text style={styles.mentionJumpButtonText}>あなた宛て {viewerMentionReplies.length}</Text>
+                    </Pressable>
+                  ) : null}
                 </View>
               </View>
               <View style={styles.replySearchBox}>
@@ -1313,7 +1343,9 @@ export default function MeguriBoardThreadScreen() {
               {replySearchQuery ? (
                 <View style={styles.replyActiveFilterBar}>
                   <Text numberOfLines={1} style={styles.replyActiveFilterText}>
-                    {replySearchSource?.type === "participant"
+                    {replySearchSource?.type === "mention"
+                      ? `あなた宛て: ${replySearchSource.label}`
+                      : replySearchSource?.type === "participant"
                       ? `参加者: ${replySearchSource.label}`
                       : `検索: ${replySearchText.trim()}`}
                   </Text>
@@ -2579,6 +2611,19 @@ const styles = StyleSheet.create({
   },
   unreadJumpButtonText: {
     color: "#4f7e92",
+    fontSize: 11,
+    fontWeight: "900",
+  },
+  mentionJumpButton: {
+    alignItems: "center",
+    backgroundColor: "rgba(243,197,212,0.28)",
+    borderRadius: 999,
+    minHeight: 26,
+    paddingHorizontal: 9,
+    justifyContent: "center",
+  },
+  mentionJumpButtonText: {
+    color: "#ba6d8d",
     fontSize: 11,
     fontWeight: "900",
   },

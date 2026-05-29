@@ -4,6 +4,55 @@
 
 ---
 
+## イテレーション221：掲示板詳細に自分宛て返信フィルタを追加
+
+### 背景・問題意識
+
+自分宛てメンションの強調表示を追加したが、返信数が多いスレッドでは自分宛てだけをまとめて追える導線も必要になる。一般的なスレッドUIとして、自分宛て返信がある時に専用ボタンを表示し、該当返信へ移動しながら絞り込めるようにした。
+
+### 変更内容
+
+#### `mobile/app/meguri-board-thread.tsx`
+- 自分の `@handle` を含む他ユーザー返信を `viewerMentionReplies` として集約した。
+- 自分宛て返信がある時、返信ヘッダーに `あなた宛て n` ボタンを表示するようにした。
+- `あなた宛て n` を押すと `@handle` で返信検索を適用し、最初の自分宛て返信へ移動するようにした。
+- 返信検索条件チップでは `あなた宛て: @handle` と表示するようにした。
+
+#### `notes/09_state_machines.md`
+- Meguri Board Lifecycle に自分宛て返信フィルタの表示ルールを追記した。
+
+#### `notes/10_glossary.md`
+- 掲示板自分宛て返信フィルタを追加した。
+
+### 影響範囲
+
+- iOS版 スポット掲示板詳細
+- 返信ヘッダー
+- スレッド内検索
+- 自分宛てメンション表示
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- `EAS_UPDATE_PROJECT_SLUG=ihub EXPO_NO_GIT_STATUS=1 npm --prefix mobile run update:ios:preview -- --message "[iter221] add board mention filter" --non-interactive`
+- Preview OTA: Update group `237a67d2-df05-4b8a-953f-8b6e83bf1866` / iOS update `019e75b5-3513-7c9a-b53a-a1eb276df899`
+
+### 関連ファイル
+
+- `mobile/app/meguri-board-thread.tsx`
+- `notes/08_design_iterations.md`
+- `notes/09_state_machines.md`
+- `notes/10_glossary.md`
+
+### セルフレビュー結果
+
+- ✅ 既存の返信検索を利用し、DB変更なしで自分宛て絞り込みを追加した。
+- ✅ 自分宛て返信がある時だけボタンを表示するようにした。
+- ✅ ネイティブ依存追加なしで、Preview OTA対象内に収めた。
+
+---
+
 ## イテレーション220：掲示板詳細に未読返信ジャンプを追加
 
 ### 背景・問題意識
