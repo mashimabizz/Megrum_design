@@ -75,6 +75,8 @@ import {
 import { useKeyboardInset } from "../src/lib/useKeyboardInset";
 import { megrumColors, megrumShadow } from "../src/theme/tokens";
 
+const REPLY_BODY_LIMIT = 500;
+
 type BoardParticipant = {
   handle: string | null;
   id: string;
@@ -1574,6 +1576,7 @@ export default function MeguriBoardThreadScreen() {
                     />
                   </Pressable>
                   <TextInput
+                    maxLength={REPLY_BODY_LIMIT}
                     multiline
                     onChangeText={setDraft}
                     placeholder="返信を書く"
@@ -1599,6 +1602,9 @@ export default function MeguriBoardThreadScreen() {
                     />
                   </Pressable>
                 </View>
+                <Text style={styles.composerInputCounter}>
+                  {draft.length}/{REPLY_BODY_LIMIT}
+                </Text>
                 {draftImageUris.length > 0 ? (
                   <PickedImageRail imageUris={draftImageUris} onRemove={removeDraftImage} />
                 ) : null}
@@ -2978,6 +2984,14 @@ const styles = StyleSheet.create({
     minHeight: 48,
     paddingHorizontal: 14,
     paddingTop: 13,
+  },
+  composerInputCounter: {
+    alignSelf: "flex-end",
+    color: megrumColors.mutedInk,
+    fontSize: 10.5,
+    fontWeight: "800",
+    marginTop: -4,
+    paddingRight: 56,
   },
   sendButton: {
     alignItems: "center",

@@ -78,6 +78,8 @@ import { IconSymbol } from "../src/components/IconSymbol";
 const SCOPE_SEGMENTS = ["3km圏内", "都道府県"];
 const VIEW_MODE_SEGMENTS = ["3km圏内", "都道府県"];
 const VIEW_MODE_OPTIONS = ["nearby_3km", "same_prefecture"] as const satisfies readonly MeguriBoardViewMode[];
+const THREAD_TITLE_LIMIT = 80;
+const THREAD_BODY_LIMIT = 500;
 
 export default function MeguriBoardScreen() {
   const insets = useSafeAreaInsets();
@@ -1012,9 +1014,14 @@ export default function MeguriBoardScreen() {
             ) : null}
 
             <View style={styles.field}>
-              <Text style={styles.fieldLabel}>タイトル</Text>
+              <View style={styles.fieldHeader}>
+                <Text style={styles.fieldLabel}>タイトル</Text>
+                <Text style={styles.inputCounter}>
+                  {composerTitle.length}/{THREAD_TITLE_LIMIT}
+                </Text>
+              </View>
               <TextInput
-                maxLength={80}
+                maxLength={THREAD_TITLE_LIMIT}
                 onChangeText={setComposerTitle}
                 placeholder="例: 物販列いまどれくらい？"
                 placeholderTextColor="rgba(58,50,74,0.35)"
@@ -1024,9 +1031,14 @@ export default function MeguriBoardScreen() {
             </View>
 
             <View style={styles.field}>
-              <Text style={styles.fieldLabel}>本文</Text>
+              <View style={styles.fieldHeader}>
+                <Text style={styles.fieldLabel}>本文</Text>
+                <Text style={styles.inputCounter}>
+                  {composerBody.length}/{THREAD_BODY_LIMIT}
+                </Text>
+              </View>
               <TextInput
-                maxLength={500}
+                maxLength={THREAD_BODY_LIMIT}
                 multiline
                 onChangeText={setComposerBody}
                 placeholder="現地で聞きたいことや、今の温度感をひとこと。"
@@ -1960,10 +1972,20 @@ const styles = StyleSheet.create({
   field: {
     gap: 8,
   },
+  fieldHeader: {
+    alignItems: "center",
+    flexDirection: "row",
+    justifyContent: "space-between",
+  },
   fieldLabel: {
     color: megrumColors.ink,
     fontSize: 12.5,
     fontWeight: "900",
+  },
+  inputCounter: {
+    color: megrumColors.mutedInk,
+    fontSize: 11,
+    fontWeight: "800",
   },
   attachmentHeader: {
     alignItems: "center",

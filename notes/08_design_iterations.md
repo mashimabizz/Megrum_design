@@ -4,6 +4,59 @@
 
 ---
 
+## イテレーション215：掲示板入力に文字数カウンターを追加
+
+### 背景・問題意識
+
+一般的なスレッドUIでは、投稿前に入力上限が分かることで書き直しや送信失敗の不安が減る。スレッド作成と返信入力に文字数カウンターを追加し、長文になりすぎる前にユーザーが調整できるようにした。
+
+### 変更内容
+
+#### `mobile/app/meguri-board.tsx`
+- スレッド作成モーダルのタイトル欄に `現在文字数/80` のカウンターを追加した。
+- スレッド作成モーダルの本文欄に `現在文字数/500` のカウンターを追加した。
+- 入力上限を定数化し、TextInput の `maxLength` と表示を揃えた。
+
+#### `mobile/app/meguri-board-thread.tsx`
+- 返信入力欄に `現在文字数/500` のカウンターを追加した。
+- 返信本文の `maxLength` を設定し、カウンターと上限を揃えた。
+
+#### `notes/09_state_machines.md`
+- Meguri Board Lifecycle にスレッド/返信入力上限表示のルールを追記した。
+
+#### `notes/10_glossary.md`
+- 掲示板文字数カウンターを追加した。
+
+### 影響範囲
+
+- iOS版 スポット掲示板一覧
+- スレッド作成モーダル
+- スポット掲示板詳細
+- 返信入力欄
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- `EAS_UPDATE_PROJECT_SLUG=ihub EXPO_NO_GIT_STATUS=1 npm --prefix mobile run update:ios:preview -- --message "[iter215] add board input counters" --non-interactive`
+- Preview OTA: Update group `b0e67e60-2369-44f7-ad32-2ceddaab824f` / iOS update `019e759d-72e6-7930-851d-3e44423c2976`
+
+### 関連ファイル
+
+- `mobile/app/meguri-board.tsx`
+- `mobile/app/meguri-board-thread.tsx`
+- `notes/08_design_iterations.md`
+- `notes/09_state_machines.md`
+- `notes/10_glossary.md`
+
+### セルフレビュー結果
+
+- ✅ 入力上限と表示カウンターを同じ定数から参照するようにした。
+- ✅ DB変更やネイティブ依存追加なしで、Preview OTA対象内に収めた。
+- ✅ 返信欄は送信ボタンの位置を避けて右寄せ表示にした。
+
+---
+
 ## イテレーション214：掲示板スレッド作成に下書き保存表示を追加
 
 ### 背景・問題意識
