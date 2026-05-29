@@ -2,6 +2,7 @@ import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Animated,
+  ActivityIndicator,
   Easing,
   Image,
   Modal,
@@ -189,6 +190,25 @@ export default function MatchDetailScreen() {
   const routeListingIds = parseRouteIds(one(params.listings));
   const routeListingIdsKey = routeListingIds.join(",");
   const routeMatchType = normalizeMatchType(one(params.matchType));
+  const shouldResolveCatalog =
+    !!supabase && !previewMode && routeItemIdsKey.length > 0;
+  const listingResolutionKey = [
+    user?.id ?? "guest",
+    routeListingIdsKey,
+    routeItemIdsKey,
+  ].join("|");
+  const shouldResolveRealListing =
+    !!supabase &&
+    !!user &&
+    !previewMode &&
+    routeListingIds.length > 0 &&
+    routeItemIdsKey.length > 0;
+  const [catalogResolvedKey, setCatalogResolvedKey] = useState(() =>
+    shouldResolveCatalog ? "" : routeItemIdsKey,
+  );
+  const [realListingResolvedKey, setRealListingResolvedKey] = useState(() =>
+    shouldResolveRealListing ? "" : listingResolutionKey,
+  );
   const hasRouteProposal =
     routeGiveIds.length > 0 || routeReceiveIds.length > 0 || routeListingIds.length > 0;
   const listingKind = inferListingKind(priority, tag);
@@ -207,6 +227,12 @@ export default function MatchDetailScreen() {
     ReturnType<typeof buildProposalCatalogOverrides>
   >(() => new Map());
   const [realListingData, setRealListingData] = useState<DetailData | null>(null);
+  const routeCatalogReady =
+    !shouldResolveCatalog || catalogResolvedKey === routeItemIdsKey;
+  const realListingReady =
+    !shouldResolveRealListing ||
+    realListingResolvedKey === listingResolutionKey;
+  const routeDataLoading = !routeCatalogReady || !realListingReady;
   const data = useMemo(
     () => {
       if (realListingData && listingKind !== "simple") return realListingData;
@@ -262,28 +288,38 @@ export default function MatchDetailScreen() {
   }, [data, highlightedItem.id]);
 
   useEffect(() => {
-    if (!supabase || routeItemIdsKey.length === 0) {
+    if (!supabase || previewMode || routeItemIdsKey.length === 0) {
       setCatalogOverrides(new Map());
+      setCatalogResolvedKey(routeItemIdsKey);
       return;
     }
     const ids = Array.from(new Set([...routeGiveIds, ...routeReceiveIds]));
     let active = true;
-    supabase
-      .from("goods_inventory")
-      .select(
-        "id, title, photo_urls, hue, group:groups_master(name), character:characters_master(name), goods_type:goods_types_master(name)",
-      )
-      .in("id", ids)
-      .then(({ data: rows }) => {
+    setCatalogOverrides(new Map());
+    setCatalogResolvedKey("");
+    void (async () => {
+      try {
+        const { data: rows } = await supabase
+          .from("goods_inventory")
+          .select(
+            "id, title, photo_urls, hue, group:groups_master(name), character:characters_master(name), goods_type:goods_types_master(name)",
+          )
+          .in("id", ids);
         if (!active) return;
         setCatalogOverrides(
           buildProposalCatalogOverrides((rows as ProposalInventoryRow[] | null) ?? []),
         );
-      });
+        setCatalogResolvedKey(routeItemIdsKey);
+      } catch {
+        if (!active) return;
+        setCatalogOverrides(new Map());
+        setCatalogResolvedKey(routeItemIdsKey);
+      }
+    })();
     return () => {
       active = false;
     };
-  }, [routeItemIdsKey]);
+  }, [previewMode, routeItemIdsKey]);
 
   useEffect(() => {
     if (
@@ -294,10 +330,13 @@ export default function MatchDetailScreen() {
       routeItemIdsKey.length === 0
     ) {
       setRealListingData(null);
+      setRealListingResolvedKey(listingResolutionKey);
       return;
     }
 
     let active = true;
+    setRealListingData(null);
+    setRealListingResolvedKey("");
     fetchRealListingDetail({
       listingIds: routeListingIds,
       userId: user.id,
@@ -305,15 +344,19 @@ export default function MatchDetailScreen() {
       routeReceiveIds,
     })
       .then((next) => {
-        if (active) setRealListingData(next);
+        if (!active) return;
+        setRealListingData(next);
+        setRealListingResolvedKey(listingResolutionKey);
       })
       .catch(() => {
-        if (active) setRealListingData(null);
+        if (!active) return;
+        setRealListingData(null);
+        setRealListingResolvedKey(listingResolutionKey);
       });
     return () => {
       active = false;
     };
-  }, [previewMode, routeItemIdsKey, routeListingIdsKey, user?.id]);
+  }, [listingResolutionKey, previewMode, routeItemIdsKey, routeListingIdsKey, user?.id]);
 
   const panResponder = useMemo(
     () =>
@@ -525,80 +568,92 @@ export default function MatchDetailScreen() {
               {
                 paddingBottom:
                   Math.max(insets.bottom, 12) +
-                  (totalSelected > 0 || hasSimpleRelation ? 96 : 24),
+                  (!routeDataLoading && (totalSelected > 0 || hasSimpleRelation) ? 96 : 24),
               },
             ]}
           >
-            {data.myListings.length > 0 ? (
-              <SectionGroup
-                title="あなたの個別募集"
-                subtitle="あなたが出している条件で、相手の在庫がヒット"
-                accentColor={megrumColors.lavender}
-              >
-                {data.myListings.map((listing, index) => (
-                  <ListingTree
-                    key={listing.listingId}
-                    listing={listing}
-                    index={index}
-                    viewpoint="mine"
+            {routeDataLoading ? (
+              <View style={styles.detailLoadingPanel}>
+                <ActivityIndicator color={megrumColors.lavender} size="small" />
+                <Text style={styles.detailLoadingTitle}>マッチ詳細を読み込み中…</Text>
+                <Text style={styles.detailLoadingText}>
+                  在庫と個別募集を確認しています
+                </Text>
+              </View>
+            ) : (
+              <>
+                {data.myListings.length > 0 ? (
+                  <SectionGroup
+                    title="あなたの個別募集"
+                    subtitle="あなたが出している条件で、相手の在庫がヒット"
+                    accentColor={megrumColors.lavender}
+                  >
+                    {data.myListings.map((listing, index) => (
+                      <ListingTree
+                        key={listing.listingId}
+                        listing={listing}
+                        index={index}
+                        viewpoint="mine"
+                        highlightedItemId={highlightedItem.id}
+                        selection={selection}
+                        haveSelection={haveSelection}
+                        onToggleCandidate={toggleCandidate}
+                        onToggleHave={toggleHave}
+                        onOpenPopup={setPopupTarget}
+                      />
+                    ))}
+                  </SectionGroup>
+                ) : null}
+
+                {data.partnerListings.length > 0 ? (
+                  <SectionGroup
+                    title={`@${partnerHandle} の個別募集`}
+                    subtitle="相手が出している条件で、あなたの在庫がヒット"
+                    accentColor={megrumColors.pink}
+                  >
+                    {data.partnerListings.map((listing, index) => (
+                      <ListingTree
+                        key={listing.listingId}
+                        listing={listing}
+                        index={index}
+                        viewpoint="partner"
+                        highlightedItemId={highlightedItem.id}
+                        selection={selection}
+                        haveSelection={haveSelection}
+                        onToggleCandidate={toggleCandidate}
+                        onToggleHave={toggleHave}
+                        onOpenPopup={setPopupTarget}
+                      />
+                    ))}
+                  </SectionGroup>
+                ) : null}
+
+                {!hasListingRelation ? (
+                  hasSimpleRelation ? (
+                    <SimpleRelationPanel
+                      receivesItems={data.simpleReceives}
+                      givesItems={data.simpleGives}
+                      highlightedItemId={highlightedItem.id}
+                    />
+                  ) : (
+                    <View style={styles.emptyRelation}>
+                      <Text style={styles.emptyRelationText}>個別募集経由のマッチはありません</Text>
+                    </View>
+                  )
+                ) : null}
+
+                {totalSelected > 0 ? (
+                  <GlobalSummary
+                    receivesItems={aggregated.receivesItems}
+                    givesItems={aggregated.givesItems}
                     highlightedItemId={highlightedItem.id}
-                    selection={selection}
-                    haveSelection={haveSelection}
-                    onToggleCandidate={toggleCandidate}
-                    onToggleHave={toggleHave}
-                    onOpenPopup={setPopupTarget}
                   />
-                ))}
-              </SectionGroup>
-            ) : null}
-
-            {data.partnerListings.length > 0 ? (
-              <SectionGroup
-                title={`@${partnerHandle} の個別募集`}
-                subtitle="相手が出している条件で、あなたの在庫がヒット"
-                accentColor={megrumColors.pink}
-              >
-                {data.partnerListings.map((listing, index) => (
-                  <ListingTree
-                    key={listing.listingId}
-                    listing={listing}
-                    index={index}
-                    viewpoint="partner"
-                    highlightedItemId={highlightedItem.id}
-                    selection={selection}
-                    haveSelection={haveSelection}
-                    onToggleCandidate={toggleCandidate}
-                    onToggleHave={toggleHave}
-                    onOpenPopup={setPopupTarget}
-                  />
-                ))}
-              </SectionGroup>
-            ) : null}
-
-            {!hasListingRelation ? (
-              hasSimpleRelation ? (
-                <SimpleRelationPanel
-                  receivesItems={data.simpleReceives}
-                  givesItems={data.simpleGives}
-                  highlightedItemId={highlightedItem.id}
-                />
-              ) : (
-                <View style={styles.emptyRelation}>
-                  <Text style={styles.emptyRelationText}>個別募集経由のマッチはありません</Text>
-                </View>
-              )
-            ) : null}
-
-            {totalSelected > 0 ? (
-              <GlobalSummary
-                receivesItems={aggregated.receivesItems}
-                givesItems={aggregated.givesItems}
-                highlightedItemId={highlightedItem.id}
-              />
-            ) : null}
+                ) : null}
+              </>
+            )}
           </ScrollView>
 
-          {totalSelected > 0 ? (
+          {!routeDataLoading && totalSelected > 0 ? (
             <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, 12) }]}>
               <Pressable
                 onPress={() => setSelection({})}
@@ -622,7 +677,7 @@ export default function MatchDetailScreen() {
             </View>
           ) : null}
 
-          {hasSimpleRelation ? (
+          {!routeDataLoading && hasSimpleRelation ? (
             <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, 12) }]}>
               <Pressable onPress={() => router.back()} style={styles.resetButton}>
                 <Text style={styles.resetButtonText}>閉じる</Text>
@@ -2243,6 +2298,29 @@ const styles = StyleSheet.create({
   content: {
     paddingHorizontal: 18,
     paddingTop: 16,
+  },
+  detailLoadingPanel: {
+    alignItems: "center",
+    backgroundColor: megrumColors.surface,
+    borderColor: "rgba(166,149,216,0.18)",
+    borderRadius: 18,
+    borderWidth: 1,
+    justifyContent: "center",
+    minHeight: 280,
+    paddingHorizontal: 24,
+    paddingVertical: 36,
+  },
+  detailLoadingTitle: {
+    color: megrumColors.ink,
+    fontSize: 15,
+    fontWeight: "900",
+    marginTop: 14,
+  },
+  detailLoadingText: {
+    color: megrumColors.mutedInk,
+    fontSize: 12,
+    fontWeight: "700",
+    marginTop: 6,
   },
   section: {
     marginBottom: 16,
