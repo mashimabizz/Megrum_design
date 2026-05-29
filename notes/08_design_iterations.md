@@ -4,6 +4,53 @@
 
 ---
 
+## イテレーション202：掲示板引用返信番号を追加
+
+### 背景・問題意識
+
+返信番号ジャンプを追加したことで、スレッド内では `#12` のような番号参照が読み方の軸になる。引用返信でも元の返信番号が見えるようにし、どの返信への反応なのかをより追いやすくした。
+
+### 変更内容
+
+#### `mobile/app/meguri-board-thread.tsx`
+- 引用返信の引用プレビューに、引用元の返信番号を `#12 名前` の形式で表示するようにした。
+- 返信入力中の引用バーにも、引用対象の返信番号を表示するようにした。
+- スレッド内検索で、引用元番号も検索対象に含めるようにした。
+
+#### `notes/09_state_machines.md`
+- Meguri Board Lifecycle に引用返信番号の表示ルールを追記した。
+
+#### `notes/10_glossary.md`
+- 掲示板引用返信番号を追加した。
+
+### 影響範囲
+
+- iOS版 スポット掲示板詳細
+- 引用返信
+- スレッド内検索と返信番号ジャンプ
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- `EAS_UPDATE_PROJECT_SLUG=ihub EXPO_NO_GIT_STATUS=1 npm --prefix mobile run update:ios:preview -- --message "[iter202] add quoted reply numbers" --non-interactive`
+- Preview OTA: Update group `2ab313ad-8f75-4c2e-b247-792b3cab84dc` / iOS update `019e756c-6781-722f-9b5a-f827e927f2b9`
+
+### 関連ファイル
+
+- `mobile/app/meguri-board-thread.tsx`
+- `notes/08_design_iterations.md`
+- `notes/09_state_machines.md`
+- `notes/10_glossary.md`
+
+### セルフレビュー結果
+
+- ✅ 引用元の番号は元スレッド内番号を使い、表示順を変えても参照先がブレないようにした。
+- ✅ 引用元番号も検索対象に含め、`#12` で引用している返信も見つけられるようにした。
+- ✅ DB変更やネイティブ依存追加なしで、Preview OTA対象内に収めた。
+
+---
+
 ## イテレーション201：掲示板返信番号ジャンプを追加
 
 ### 背景・問題意識

@@ -197,10 +197,12 @@ export default function MeguriBoardThreadScreen() {
 
   const filteredReplies = useMemo(() => {
     if (!replySearchQuery) return replies;
-    return replies.filter((reply) =>
-      normalizeReplySearch(
+    return replies.filter((reply) => {
+      const quotedReplyNumber = reply.parentReplyId ? replyNumberById.get(reply.parentReplyId) : null;
+      return normalizeReplySearch(
         [
           `#${replyNumberById.get(reply.id) ?? ""}`,
+          quotedReplyNumber ? `#${quotedReplyNumber}` : null,
           reply.authorName,
           reply.authorHandle,
           reply.body,
@@ -209,8 +211,8 @@ export default function MeguriBoardThreadScreen() {
         ]
           .filter(Boolean)
           .join(" "),
-      ).includes(replySearchQuery),
-    );
+      ).includes(replySearchQuery);
+    });
   }, [replies, replyNumberById, replySearchQuery]);
 
   const sortedReplies = useMemo(() => {
@@ -1299,6 +1301,10 @@ export default function MeguriBoardThreadScreen() {
                   const replyNumberMatchesQuery =
                     !!replySearchQuery && normalizeReplySearch(replyNumberLabel).includes(replySearchQuery);
                   const replyByThreadAuthor = reply.authorId === thread.authorId;
+                  const quotedReplyNumber = reply.parentReplyId ? replyNumberById.get(reply.parentReplyId) : null;
+                  const quoteAuthorLabel = quotedReplyNumber
+                    ? `#${quotedReplyNumber} ${reply.quotedAuthorName || "引用"}`
+                    : reply.quotedAuthorName || "引用";
                   return (
                     <View
                       key={reply.id}
@@ -1357,7 +1363,7 @@ export default function MeguriBoardThreadScreen() {
                                   numberOfLines={1}
                                   query={replySearchQuery}
                                   style={[styles.quoteAuthor, reply.mine ? styles.quoteAuthorMine : null]}
-                                  text={reply.quotedAuthorName || "引用"}
+                                  text={quoteAuthorLabel}
                                 />
                                 <HighlightedText
                                   highlightStyle={reply.mine ? styles.searchHighlightMine : null}
@@ -1448,7 +1454,9 @@ export default function MeguriBoardThreadScreen() {
                   <View style={styles.composerQuote}>
                     <View style={styles.composerQuoteCopy}>
                       <Text numberOfLines={1} style={styles.composerQuoteAuthor}>
-                        {quoteTarget.authorName}へ返信
+                        {replyNumberById.get(quoteTarget.id)
+                          ? `#${replyNumberById.get(quoteTarget.id)} ${quoteTarget.authorName}へ返信`
+                          : `${quoteTarget.authorName}へ返信`}
                       </Text>
                       <Text numberOfLines={1} style={styles.composerQuoteBody}>
                         {quoteTarget.body}
