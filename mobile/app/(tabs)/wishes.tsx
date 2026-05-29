@@ -3,12 +3,14 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Image,
   Modal,
+  type NativeScrollEvent,
+  type NativeSyntheticEvent,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
   View,
-  type GestureResponderEvent,
+  useWindowDimensions,
 } from "react-native";
 import {
   BottomOptionSheet,
@@ -277,6 +279,8 @@ export default function WishesScreen() {
   }>();
   const routeTab = one(params.tab);
   const routeRefresh = one(params.refresh);
+  const { width: windowWidth } = useWindowDimensions();
+  const pageWidth = Math.max(1, windowWidth - 36);
   const [tab, setTab] = useState<Tab>(
     routeTab === "listings" ? "listings" : "wish",
   );
@@ -300,18 +304,19 @@ export default function WishesScreen() {
   const [activeType, setActiveType] = useState<string | null>(null);
   const [loading, setLoading] = useState(!!supabase && !previewMode);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const tabSwipeRef = useRef<{
-    startX: number;
-    startY: number;
-    tracking: boolean;
-    swiping: boolean;
-  } | null>(null);
+  const pagerRef = useRef<ScrollView>(null);
+  const [pagerPosition, setPagerPosition] = useState(() =>
+    TAB_ORDER.indexOf(routeTab === "listings" ? "listings" : "wish"),
+  );
 
   useEffect(() => {
     if (routeTab === "listings" || routeTab === "wish") {
+      const nextIndex = TAB_ORDER.indexOf(routeTab);
       setTab(routeTab);
+      setPagerPosition(nextIndex);
+      pagerRef.current?.scrollTo({ x: nextIndex * pageWidth, animated: false });
     }
-  }, [routeTab]);
+  }, [pageWidth, routeTab]);
 
   useEffect(() => {
     if (!supabase || previewMode) {
@@ -548,11 +553,8 @@ export default function WishesScreen() {
           <SectionTabs
             value={tab}
             tabs={tabs}
-            onChange={(next) => {
-              setTab(next);
-              closeSelectedWish();
-              setSelectedListing(null);
-            }}
+            position={pagerPosition}
+            onChange={selectTab}
           />
         </View>
 
@@ -582,39 +584,24 @@ export default function WishesScreen() {
           </View>
         ) : null}
 
-        <View
+        <ScrollView
+          ref={pagerRef}
+          horizontal
+          pagingEnabled
+          bounces={false}
+          directionalLockEnabled
+          showsHorizontalScrollIndicator={false}
+          scrollEventThrottle={16}
           style={styles.contentHost}
-          onTouchStart={handleSwipeStart}
-          onTouchMove={handleSwipeMove}
-          onTouchEnd={handleSwipeEnd}
-          onTouchCancel={handleSwipeCancel}
+          onScroll={handlePagerScroll}
+          onMomentumScrollEnd={handlePagerSettled}
         >
-          {tab === "wish" ? (
-            <GoodsGrid
-              items={wishGridItems}
-              columns={columns}
-              emptyLabel="まだ Wish がありません"
-              deletingIds={deletingWishIds}
-              onItemFadeOutEnd={completeWishDelete}
-              showTopRow={false}
-              showUnlinkedWarning
-              onPressItem={(gridItem, context) => {
-                if (deletingWishIds.includes(gridItem.id)) return;
-                const wish = wishes.find((item) => item.id === gridItem.id);
-                if (!wish) return;
-                setSelectedWishAnchor(normalizePressContext(context));
-                setSelectedWish(wish);
-              }}
-            />
-          ) : (
-            <ListingsPanel
-              listings={listings}
-              onSelect={setSelectedListing}
-              onEdit={(listing) => openListingEditor(listing, "edit")}
-              onDelete={requestDeleteListing}
-            />
-          )}
-        </View>
+          {TAB_ORDER.map((pageTab) => (
+            <View key={pageTab} style={[styles.tabPage, { width: pageWidth }]}>
+              {renderTabPage(pageTab)}
+            </View>
+          ))}
+        </ScrollView>
       </ScrollView>
 
       <FloatingAddButton
@@ -674,13 +661,14 @@ export default function WishesScreen() {
     </Screen>
   );
 
-  function moveTabBySwipe(direction: 1 | -1) {
-    const currentIndex = TAB_ORDER.indexOf(tab);
-    const next = TAB_ORDER[currentIndex + direction];
-    if (!next) return;
+  function selectTab(next: Tab) {
+    if (!TAB_ORDER.includes(next)) return;
     setTab(next);
     closeSelectedWish();
     setSelectedListing(null);
+    const nextIndex = TAB_ORDER.indexOf(next);
+    setPagerPosition(nextIndex);
+    pagerRef.current?.scrollTo({ x: nextIndex * pageWidth, animated: true });
   }
 
   function closeSelectedWish() {
@@ -688,48 +676,51 @@ export default function WishesScreen() {
     setSelectedWishAnchor(null);
   }
 
-  function handleSwipeStart(event: GestureResponderEvent) {
-    const { pageX, pageY } = event.nativeEvent;
-    tabSwipeRef.current = {
-      startX: pageX,
-      startY: pageY,
-      tracking: true,
-      swiping: false,
-    };
+  function handlePagerScroll(event: NativeSyntheticEvent<NativeScrollEvent>) {
+    setPagerPosition(event.nativeEvent.contentOffset.x / pageWidth);
   }
 
-  function handleSwipeMove(event: GestureResponderEvent) {
-    const state = tabSwipeRef.current;
-    if (!state?.tracking) return;
-    const { pageX, pageY } = event.nativeEvent;
-    const dx = pageX - state.startX;
-    const dy = pageY - state.startY;
-    const absX = Math.abs(dx);
-    const absY = Math.abs(dy);
-    if (!state.swiping) {
-      if (absX > 14 && absX > absY * 1.25) {
-        state.swiping = true;
-      } else if (absY > 14 && absY > absX * 1.1) {
-        state.tracking = false;
-      }
+  function handlePagerSettled(event: NativeSyntheticEvent<NativeScrollEvent>) {
+    const nextIndex = Math.max(
+      0,
+      Math.min(TAB_ORDER.length - 1, Math.round(event.nativeEvent.contentOffset.x / pageWidth)),
+    );
+    const next = TAB_ORDER[nextIndex] ?? "wish";
+    setTab(next);
+    setPagerPosition(nextIndex);
+    closeSelectedWish();
+    setSelectedListing(null);
+  }
+
+  function renderTabPage(pageTab: Tab) {
+    if (pageTab === "wish") {
+      return (
+        <GoodsGrid
+          items={wishGridItems}
+          columns={columns}
+          emptyLabel="まだ Wish がありません"
+          deletingIds={deletingWishIds}
+          onItemFadeOutEnd={completeWishDelete}
+          showTopRow={false}
+          showUnlinkedWarning
+          onPressItem={(gridItem, context) => {
+            if (deletingWishIds.includes(gridItem.id)) return;
+            const wish = wishes.find((item) => item.id === gridItem.id);
+            if (!wish) return;
+            setSelectedWishAnchor(normalizePressContext(context));
+            setSelectedWish(wish);
+          }}
+        />
+      );
     }
-  }
-
-  function handleSwipeEnd(event: GestureResponderEvent) {
-    const state = tabSwipeRef.current;
-    tabSwipeRef.current = null;
-    if (!state?.tracking || !state.swiping) return;
-    const { pageX, pageY } = event.nativeEvent;
-    const dx = pageX - state.startX;
-    const dy = pageY - state.startY;
-    const absX = Math.abs(dx);
-    const absY = Math.abs(dy);
-    if (absX < 58 || absX < absY * 1.35) return;
-    moveTabBySwipe(dx < 0 ? 1 : -1);
-  }
-
-  function handleSwipeCancel() {
-    tabSwipeRef.current = null;
+    return (
+      <ListingsPanel
+        listings={listings}
+        onSelect={setSelectedListing}
+        onEdit={(listing) => openListingEditor(listing, "edit")}
+        onDelete={requestDeleteListing}
+      />
+    );
   }
 }
 
@@ -1935,6 +1926,9 @@ const styles = StyleSheet.create({
   },
   contentHost: {
     minHeight: 1,
+  },
+  tabPage: {
+    minHeight: 220,
   },
   scrollContent: {
     paddingBottom: 24,
