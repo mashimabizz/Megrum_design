@@ -3,8 +3,8 @@
 > **目的**：Megrum のバックエンドAPI（REST）の draft 仕様。実装着手時の正解集。
 > 全エンドポイントを `[METHOD /path]` の形式で網羅し、各々で入力・出力・認証要否・状態遷移・備考を定義。
 
-最終更新: 2026-05-30（iter176）
-ステータス: Draft v1.3
+最終更新: 2026-05-30（iter178）
+ステータス: Draft v1.4
 
 ---
 
@@ -348,6 +348,7 @@ Google OAuth経由ログイン or 新規登録。
 - **Auth**: 必須
 - **Request**: `{ user_id }`
 - **Response 201**: `{ user_id, blocked_at }`
+- **Side effects**: グルーム、めぐりメッセージ、スポット掲示板のスレッド/返信表示、掲示板返信通知、掲示板メンション通知を相互に抑制する
 
 ### DELETE /api/v1/accounts/me/blocks/:user_id
 
@@ -1023,6 +1024,7 @@ AW削除。
   - `prefecture?=東京都`
 - **Response 200**: `thread` 本体 + `replies[]`
 - **Side effects**: 詳細表示時に `meguri_board_thread_reads.read_at` を更新し、`view_count` を増やす
+- **備考**: ブロック関係にある相手が作成したスレッド、またはブロック関係にある返信者の返信は返さない
 - **Screen**: `meguri-board-thread`
 
 ### POST /api/v1/meguri-board/threads/:id/replies
@@ -1045,8 +1047,8 @@ AW削除。
   }
   ```
 - **Response 201**: `{ id, thread_id, body, image_paths, image_urls?, parent_reply_id, quote_author_name, quote_body, status, reaction_count, created_at, updated_at, deleted_at, viewer_reacted, viewer_reported, author }`
-- **備考**: `thread.status='locked'` の場合は返信不可。引用返信では `parent_reply_id` と表示用スナップショットを保存する。画像は最大4枚まで `meguri-board-media` private Storage path として保存し、閲覧可能な返信だけ署名URLで表示する
-- **Side effects**: 返信者をスレッド購読ONにし、購読中の他ユーザーへ `notifications.kind='meguri_board_reply'` を作成する。本文に `@handle` がある場合は、閲覧可能な対象ユーザーへ `notifications.kind='meguri_board_mention'` を作成し、通常の購読返信通知とは重複させない
+- **備考**: `thread.status='locked'` の場合は返信不可。ブロック関係にある相手のスレッドには返信不可。引用返信では `parent_reply_id` と表示用スナップショットを保存する。画像は最大4枚まで `meguri-board-media` private Storage path として保存し、閲覧可能な返信だけ署名URLで表示する
+- **Side effects**: 返信者をスレッド購読ONにし、購読中の他ユーザーへ `notifications.kind='meguri_board_reply'` を作成する。本文に `@handle` がある場合は、閲覧可能な対象ユーザーへ `notifications.kind='meguri_board_mention'` を作成し、通常の購読返信通知とは重複させない。返信者と通知先がブロック関係にある場合は通知を作成しない
 - **Screen**: `meguri-board-thread`
 
 ### PATCH /api/v1/meguri-board/threads/:id
@@ -1144,6 +1146,15 @@ AW削除。
 - **Auth**: 必須
 - **Response 204**: no content
 - **Side effects**: `meguri_board_hidden_threads` に保存。以降、本人の一覧から除外
+- **Screen**: `meguri-board`, `meguri-board-thread`
+
+### POST /api/v1/meguri-board/users/:user_id/block
+
+掲示板上のユーザーをブロックする。実体は `POST /api/v1/accounts/me/blocks` と同じ `groom_user_blocks`。
+
+- **Auth**: 必須
+- **Response 201**: `{ user_id, blocked_at }`
+- **Side effects**: 対象ユーザーの掲示板スレッド/返信を即時に一覧・詳細から除外する。対象ユーザーからの掲示板返信通知・掲示板メンション通知も作成しない
 - **Screen**: `meguri-board`, `meguri-board-thread`
 
 ### POST /api/v1/meguri-board/reports

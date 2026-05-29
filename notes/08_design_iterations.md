@@ -4,6 +4,80 @@
 
 ---
 
+## イテレーション178：掲示板ユーザーブロックを追加
+
+### 背景・問題意識
+
+一般的なスレッド型掲示板では、通報やスレッド非表示だけでは足りず、ユーザー単位で相手の投稿を見ない/通知を受けない制御が必要になる。スポット掲示板でも、合わない相手のスレッド・返信・通知をまとめて抑制できるようにした。
+
+### 変更内容
+
+#### `mobile/src/lib/meguriBoard.ts`
+- 掲示板用の `blockMeguriBoardUser()` を追加し、既存の `groom_user_blocks` にブロック関係を保存するようにした。
+- ローカル即時反映用に `meguri.board.userBlocks.v1` を追加し、ブロックした相手のスレッド/返信を端末上でも除外するようにした。
+- スレッド一覧・詳細・返信読み込み時にローカルブロック状態を反映するようにした。
+
+#### `mobile/app/meguri-board.tsx`
+- スレッド一覧カードのアクションシートに「このユーザーをブロック」を追加した。
+- ブロック後、対象ユーザーのスレッドを一覧から即時に消すようにした。
+
+#### `mobile/app/meguri-board-thread.tsx`
+- スレッド詳細のアクションシートに、スレッド作成者をブロックする導線を追加した。
+- 返信のアクションシートに、返信者をブロックする導線を追加した。
+- ブロック後、対象ユーザーの返信を詳細画面から即時に消すようにした。
+
+#### `supabase/migrations/20260530235000_add_meguri_board_user_blocks.sql`
+- `can_view_meguri_board_thread()` / `can_view_meguri_board_thread_with_context()` にブロック判定を追加した。
+- スレッド一覧RPC・返信一覧RPC・返信作成RPCで `groom_user_blocks` を参照するようにした。
+- 掲示板返信通知・掲示板メンション通知で、返信者と通知先がブロック関係にある場合は通知を作成しないようにした。
+
+#### `notes/05_data_model.md`
+- `groom_user_blocks` をスポット掲示板にも適用する方針を追記した。
+
+#### `notes/09_state_machines.md`
+- Meguri Board Lifecycle に掲示板ユーザーブロックのビジネスルールを追記した。
+
+#### `notes/10_glossary.md`
+- 掲示板ユーザーブロックを追加した。
+
+#### `notes/13_api_spec.md`
+- ブロックAPIのスポット掲示板での副作用と、掲示板専用導線を追記した。
+
+### 影響範囲
+
+- iOS版 スポット掲示板一覧
+- iOS版 スポット掲示板詳細
+- Supabase スポット掲示板表示判定/RPC/通知trigger
+- 掲示板のデータモデル・状態遷移・用語・API仕様
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `supabase db push --dry-run`
+- `supabase db push`（`20260530235000_add_meguri_board_user_blocks.sql` を remote DB に適用）
+- `npm --prefix mobile run export:ios:preview`
+- `EAS_UPDATE_PROJECT_SLUG=ihub EXPO_NO_GIT_STATUS=1 npm --prefix mobile run update:ios:preview -- --message "[iter178] add board user blocks" --non-interactive`
+- Preview OTA: Update group `cb96e640-6354-4c0b-b215-fbdcda829f9e` / iOS update `019e74fe-12dd-7beb-9112-0ef84efeb345`
+
+### 関連ファイル
+
+- `mobile/src/lib/meguriBoard.ts`
+- `mobile/app/meguri-board.tsx`
+- `mobile/app/meguri-board-thread.tsx`
+- `supabase/migrations/20260530235000_add_meguri_board_user_blocks.sql`
+- `notes/05_data_model.md`
+- `notes/09_state_machines.md`
+- `notes/10_glossary.md`
+- `notes/13_api_spec.md`
+
+### セルフレビュー結果
+
+- ✅ iOS標準の `ActionSheetIOS` / `Alert` を使い、独自のモーダル操作を増やしていない。
+- ✅ ブロックは一覧・詳細・返信・通知まで一貫して抑制する設計にした。
+- ✅ 既存の `groom_user_blocks` を共用し、ユーザー単位ブロックのテーブルを重複させていない。
+
+---
+
 ## イテレーション177：掲示板スレッド共有を追加
 
 ### 背景・問題意識

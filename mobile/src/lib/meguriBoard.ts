@@ -139,6 +139,7 @@ const THREADS_KEY = "meguri.board.threads.v1";
 const REPLIES_KEY = "meguri.board.replies.v1";
 const THREAD_STATE_KEY = "meguri.board.threadState.v1";
 const REPLY_STATE_KEY = "meguri.board.replyState.v1";
+const USER_BLOCKS_KEY = "meguri.board.userBlocks.v1";
 
 const MAX_LOCAL_THREADS = 120;
 const MAX_LOCAL_REPLIES = 480;
@@ -159,6 +160,7 @@ type LocalReplyState = {
 
 type LocalThreadStateMap = Record<string, LocalThreadState>;
 type LocalReplyStateMap = Record<string, LocalReplyState>;
+type LocalUserBlockMap = Record<string, number>;
 
 const PREVIEW_AUTHORS = {
   me: {
@@ -336,11 +338,13 @@ export async function loadMeguriBoardThreads(
 ) {
   const usePreviewData = shouldUsePreviewMeguriBoard(viewer.viewerId, options.previewMode);
   const viewMode = options.viewMode ?? "nearby_3km";
-  const [localThreads, localReplies, remoteThreads] = await Promise.all([
+  const [localThreads, localReplies, localUserBlocks, remoteThreads] = await Promise.all([
     loadLocalMeguriBoardThreads(),
     loadLocalMeguriBoardReplies(),
+    loadLocalMeguriBoardUserBlocks(),
     usePreviewData ? Promise.resolve([]) : loadRemoteMeguriBoardThreads(viewer, viewMode).catch(() => []),
   ]);
+  const blockedAuthorIds = new Set(Object.keys(localUserBlocks));
   const preview = usePreviewData ? createPreviewMeguriBoardDataset() : null;
   const mergedThreads = dedupeThreads([
     ...(preview?.threads ?? []),
@@ -350,11 +354,15 @@ export async function loadMeguriBoardThreads(
   const mergedReplies = dedupeReplies([
     ...(preview?.replies ?? []),
     ...localReplies,
-  ]);
+  ]).filter((reply) => !blockedAuthorIds.has(reply.authorId));
   const threadState = await loadLocalMeguriBoardThreadState();
   return hydrateMeguriBoardThreads(
     overlayReplySummaries(
-      mergedThreads.filter((thread) => canViewMeguriBoardThread(thread, viewer, viewMode)),
+      mergedThreads.filter(
+        (thread) =>
+          !blockedAuthorIds.has(thread.authorId) &&
+          canViewMeguriBoardThread(thread, viewer, viewMode),
+      ),
       mergedReplies,
     ),
     threadState,
@@ -405,15 +413,18 @@ export async function loadMeguriBoardThreadDetail(
   if (!thread) {
     return { replies: [] as MeguriBoardReply[], thread: null };
   }
-  const [threadState, replyState] = await Promise.all([
+  const [threadState, replyState, localUserBlocks] = await Promise.all([
     loadLocalMeguriBoardThreadState(),
     loadLocalMeguriBoardReplyState(),
+    loadLocalMeguriBoardUserBlocks(),
   ]);
   const replies = hydrateMeguriBoardReplies(dedupeReplies([
     ...(preview?.replies.filter((reply) => reply.threadId === threadId) ?? []),
     ...localReplies.filter((reply) => reply.threadId === threadId),
     ...remoteReplies,
-  ]), replyState).sort((left, right) => left.createdAt - right.createdAt);
+  ]), replyState)
+    .filter((reply) => !localUserBlocks[reply.authorId])
+    .sort((left, right) => left.createdAt - right.createdAt);
   return { replies, thread: hydrateMeguriBoardThread(thread, threadState) };
 }
 
@@ -578,6 +589,25 @@ export async function reportMeguriBoardReply(replyId: string, reason = "user_rep
     p_reason: reason,
     p_reply_id: replyId,
   });
+}
+
+export async function blockMeguriBoardUser(blockerId: string, blockedId: string) {
+  if (!blockedId || !blockerId || blockerId === blockedId) return;
+  await upsertLocalMeguriBoardUserBlock(blockedId);
+  await removeLocalMeguriBoardContentByAuthor(blockedId);
+  if (!supabase || !hasSupabaseConfig || !isUuidLike(blockerId) || !isUuidLike(blockedId)) {
+    return;
+  }
+  const { error } = await supabase
+    .from("groom_user_blocks")
+    .upsert(
+      {
+        blocked_id: blockedId,
+        blocker_id: blockerId,
+      },
+      { onConflict: "blocker_id,blocked_id" },
+    );
+  if (error) throw error;
 }
 
 export async function updateMeguriBoardThread(input: {
@@ -798,6 +828,23 @@ async function updateLocalMeguriBoardReply(
         .slice(-MAX_LOCAL_REPLIES),
     ),
   );
+}
+
+async function removeLocalMeguriBoardContentByAuthor(authorId: string) {
+  const [threads, replies] = await Promise.all([
+    loadLocalMeguriBoardThreads(),
+    loadLocalMeguriBoardReplies(),
+  ]);
+  await Promise.all([
+    AsyncStorage.setItem(
+      THREADS_KEY,
+      JSON.stringify(threads.filter((thread) => thread.authorId !== authorId)),
+    ),
+    AsyncStorage.setItem(
+      REPLIES_KEY,
+      JSON.stringify(replies.filter((reply) => reply.authorId !== authorId)),
+    ),
+  ]);
 }
 
 async function syncLocalMeguriBoardThreadForReply(reply: MeguriBoardReply, alreadyCounted: boolean) {
@@ -1467,6 +1514,17 @@ async function loadLocalMeguriBoardReplyState(): Promise<LocalReplyStateMap> {
   }
 }
 
+async function loadLocalMeguriBoardUserBlocks(): Promise<LocalUserBlockMap> {
+  const raw = await AsyncStorage.getItem(USER_BLOCKS_KEY);
+  if (!raw) return {};
+  try {
+    const parsed = JSON.parse(raw);
+    return objectValue(parsed) as LocalUserBlockMap;
+  } catch {
+    return {};
+  }
+}
+
 async function upsertThreadState(threadId: string, patch: LocalThreadState) {
   const current = await loadLocalMeguriBoardThreadState();
   const next = {
@@ -1489,6 +1547,17 @@ async function upsertReplyState(replyId: string, patch: LocalReplyState) {
     },
   };
   await AsyncStorage.setItem(REPLY_STATE_KEY, JSON.stringify(next));
+}
+
+async function upsertLocalMeguriBoardUserBlock(blockedId: string) {
+  const current = await loadLocalMeguriBoardUserBlocks();
+  await AsyncStorage.setItem(
+    USER_BLOCKS_KEY,
+    JSON.stringify({
+      ...current,
+      [blockedId]: Date.now(),
+    }),
+  );
 }
 
 function hydrateMeguriBoardThreads(

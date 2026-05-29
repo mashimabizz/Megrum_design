@@ -24,6 +24,7 @@ import { IconSymbol } from "../src/components/IconSymbol";
 import { Screen } from "../src/components/Screen";
 import {
   appendMeguriBoardReply,
+  blockMeguriBoardUser,
   deleteMeguriBoardReply,
   hideMeguriBoardThread,
   loadMeguriBoardThreadDetail,
@@ -330,6 +331,23 @@ export default function MeguriBoardThreadScreen() {
     Alert.alert("通報しました", "確認して対応します。");
   }
 
+  async function blockThreadAuthor() {
+    if (!thread || thread.mine) return;
+    const authorName = thread.authorName;
+    await blockMeguriBoardUser(actor.userId, thread.authorId).catch(() => undefined);
+    Alert.alert("ブロックしました", `${authorName}さんのスレッドと返信を表示しません。`, [
+      { onPress: () => router.back(), text: "OK" },
+    ]);
+  }
+
+  function confirmBlockThreadAuthor() {
+    if (!thread || thread.mine) return;
+    Alert.alert(`${thread.authorName}さんをブロックしますか？`, "このユーザーのスレッドと返信を表示しなくなります。", [
+      { style: "cancel", text: "キャンセル" },
+      { onPress: () => void blockThreadAuthor(), style: "destructive", text: "ブロック" },
+    ]);
+  }
+
   async function toggleReplyReaction(reply: MeguriBoardReply) {
     const reacted = !reply.reacted;
     setReplies((current) =>
@@ -355,6 +373,24 @@ export default function MeguriBoardThreadScreen() {
     );
     await reportMeguriBoardReply(reply.id);
     Alert.alert("通報しました", "確認して対応します。");
+  }
+
+  async function blockReplyAuthor(reply: MeguriBoardReply) {
+    if (reply.mine || reply.deleted) return;
+    setReplies((current) => current.filter((candidate) => candidate.authorId !== reply.authorId));
+    if (quoteTarget?.authorId === reply.authorId) {
+      setQuoteTarget(null);
+    }
+    await blockMeguriBoardUser(actor.userId, reply.authorId).catch(() => undefined);
+    Alert.alert("ブロックしました", `${reply.authorName}さんのスレッドと返信を表示しません。`);
+  }
+
+  function confirmBlockReplyAuthor(reply: MeguriBoardReply) {
+    if (reply.mine || reply.deleted) return;
+    Alert.alert(`${reply.authorName}さんをブロックしますか？`, "このユーザーのスレッドと返信を表示しなくなります。", [
+      { style: "cancel", text: "キャンセル" },
+      { onPress: () => void blockReplyAuthor(reply), style: "destructive", text: "ブロック" },
+    ]);
   }
 
   function openThreadEditor() {
@@ -503,12 +539,19 @@ export default function MeguriBoardThreadScreen() {
         run: () => void toggleThreadSubscription(),
       },
       { destructive: true, label: "非表示にする", run: () => void hideThread() },
-      {
-        disabled: thread.reported,
-        label: thread.reported ? "通報済み" : "通報する",
-        run: thread.reported ? undefined : () => void reportThread(),
-      },
     );
+    if (!thread.mine) {
+      actions.push({
+        destructive: true,
+        label: "このユーザーをブロック",
+        run: confirmBlockThreadAuthor,
+      });
+    }
+    actions.push({
+      disabled: thread.reported,
+      label: thread.reported ? "通報済み" : "通報する",
+      run: thread.reported ? undefined : () => void reportThread(),
+    });
     const labels = [...actions.map((action) => action.label), "キャンセル"];
     const cancelButtonIndex = labels.length - 1;
     const destructiveButtonIndices = actions
@@ -558,6 +601,12 @@ export default function MeguriBoardThreadScreen() {
           disabled: reply.reported || reply.deleted,
           label: reply.reported ? "通報済み" : "通報する",
           run: reply.reported ? undefined : () => void reportReply(reply),
+        },
+        {
+          destructive: true,
+          disabled: reply.deleted,
+          label: "このユーザーをブロック",
+          run: () => confirmBlockReplyAuthor(reply),
         },
       );
     }

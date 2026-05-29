@@ -4,7 +4,7 @@
 > 実装の正解集。`09_state_machines.md` と完全に整合させ、`10_glossary.md` の用語を使う。
 
 最終更新: 2026-05-30
-ステータス: Draft v2.22（iter176 掲示板画像添付を追加）
+ステータス: Draft v2.23（iter178 掲示板ユーザーブロックを追加）
 
 ## 最新化履歴
 
@@ -34,6 +34,7 @@
 | **v2.20** | **2026-05-30** | **iter174 反映（スポット掲示板のスレッド購読と `notifications.kind='meguri_board_reply'` を追加）** |
 | **v2.21** | **2026-05-30** | **iter175 反映（スポット掲示板返信の `@handle` メンション通知 `notifications.kind='meguri_board_mention'` を追加）** |
 | **v2.22** | **2026-05-30** | **iter176 反映（スポット掲示板のスレッド/返信画像添付と private Storage `meguri-board-media` を追加）** |
+| **v2.23** | **2026-05-30** | **iter178 反映（`groom_user_blocks` をスポット掲示板にも適用。スレッド/返信表示、返信通知、メンション通知を相互に抑制）** |
 | **v2.20** | **2026-05-29** | **iter168.90 反映（`search_query_logs` と人気検索RPCを追加。検索結果はマッチ分類つきグッズパネルで表示）** |
 | **v2.21** | **2026-05-30** | **iter168.97 反映（`schedules.place_name` 追加。合意時に `both` を単一手段へ固定し、現地交換の複数候補は1件へ固定する運用を追記）** |
 
@@ -276,9 +277,9 @@ iter162.49 で iOS めぐりホームに追加した、写真中心の24時間�
 | `groom_post_id` | uuid | → groom_posts。PKの一部 |
 | `created_at` | timestamptz | |
 
-### `groom_user_blocks`（グルームブロック / iter165）
+### `groom_user_blocks`（めぐり文脈ユーザーブロック / iter165, iter178）
 
-グルーム/めぐり文脈のユーザーブロック。`blocker_id` と `blocked_id` のどちらかに該当する関係では、相互にグルーム表示・めぐりメッセージ送信を抑制する。
+グルーム/めぐり文脈のユーザーブロック。`blocker_id` と `blocked_id` のどちらかに該当する関係では、相互にグルーム表示・めぐりメッセージ送信・スポット掲示板のスレッド/返信表示・掲示板通知を抑制する。
 
 | カラム | 型 | 説明 |
 |---|---|---|
@@ -352,6 +353,8 @@ iter168.43 以降、無料受信者に本文・画像パスを直接返さない
 
 > **画像添付方針（iter176）**：スレッド画像は `meguri-board-media` private Storage に保存し、DBには path のみを持つ。アプリは `list_meguri_board_threads_for_viewer()` で閲覧可能なスレッドを取得した後に署名URLを発行して表示する。
 
+> **ブロック方針（iter178）**：`groom_user_blocks` に保存されたブロック関係はスポット掲示板にも適用する。ブロックした/された相手のスレッドは `can_view_meguri_board_thread*()` と一覧RPCで除外し、ローカル表示も即時に消す。
+
 ### `meguri_board_replies`（スポット掲示板返信 / iter168.73）
 
 スレッド詳細で送るチャット形式の追記返信。iter172 以降、自分の返信は編集でき、削除時は物理削除ではなく `status='deleted'` としてプレースホルダ表示にする。
@@ -371,7 +374,7 @@ iter168.43 以降、無料受信者に本文・画像パスを直接返さない
 | `deleted_at` | timestamptz nullable | 削除済み表示に切り替えた時刻。iter172 追加 |
 | `created_at` / `updated_at` | timestamptz | |
 
-`after insert` trigger で `meguri_board_threads.reply_count / latest_reply_preview / latest_activity_at` を更新する。スレッド作成者は `status` を `locked` にして返信追加を止め、`visible` に戻して再開できる。削除は `archived` にするソフト削除。iter176以降、返信画像も `meguri-board-media` private Storage path として保存し、返信一覧RPCで閲覧可能な返信だけ署名URL化して表示する。
+`after insert` trigger で `meguri_board_threads.reply_count / latest_reply_preview / latest_activity_at` を更新する。スレッド作成者は `status` を `locked` にして返信追加を止め、`visible` に戻して再開できる。削除は `archived` にするソフト削除。iter176以降、返信画像も `meguri-board-media` private Storage path として保存し、返信一覧RPCで閲覧可能な返信だけ署名URL化して表示する。iter178以降、`groom_user_blocks` の関係にある返信者の返信は返信一覧RPCとローカル表示から除外する。
 
 ### `meguri_board_thread_bookmarks`（スポット掲示板スレッド保存 / iter171）
 
@@ -413,7 +416,7 @@ iter168.43 以降、無料受信者に本文・画像パスを直接返さない
 | `notification_enabled` | boolean | 返信通知を受け取るか |
 | `created_at` / `updated_at` | timestamptz | |
 
-スレッド作成者と返信者は自動で購読ONになる。ユーザーは一覧/詳細からON/OFFを切り替えられる。購読中スレッドに自分以外が返信した時は `notifications.kind='meguri_board_reply'` を作成し、`meguri_board_thread_id` / `meguri_board_reply_id` と `link_path='/meguri-board-thread?id=...'` を保存する。返信本文に `@handle` が含まれる場合は、本人以外かつスレッドを閲覧できる対象ユーザーに `notifications.kind='meguri_board_mention'` を作成し、通常の購読返信通知とは重複させない。
+スレッド作成者と返信者は自動で購読ONになる。ユーザーは一覧/詳細からON/OFFを切り替えられる。購読中スレッドに自分以外が返信した時は `notifications.kind='meguri_board_reply'` を作成し、`meguri_board_thread_id` / `meguri_board_reply_id` と `link_path='/meguri-board-thread?id=...'` を保存する。返信本文に `@handle` が含まれる場合は、本人以外かつスレッドを閲覧できる対象ユーザーに `notifications.kind='meguri_board_mention'` を作成し、通常の購読返信通知とは重複させない。iter178以降、返信者と通知先が `groom_user_blocks` で相互ブロック関係にある場合は返信通知・メンション通知を作成しない。
 
 ### `meguri_board_hidden_threads` / `meguri_board_reports`（非表示・通報 / iter171）
 

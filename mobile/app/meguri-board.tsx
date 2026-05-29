@@ -27,6 +27,7 @@ import {
   MEGURI_BOARD_CATEGORY_OPTIONS,
   MEGURI_BOARD_COMPOSER_CATEGORY_OPTIONS,
   MEGURI_BOARD_SORT_OPTIONS,
+  blockMeguriBoardUser,
   createMeguriBoardThread,
   filterMeguriBoardThreads,
   hideMeguriBoardThread,
@@ -412,32 +413,61 @@ export default function MeguriBoardScreen() {
     });
   }
 
+  async function blockThreadAuthor(thread: MeguriBoardThread) {
+    if (thread.mine) return;
+    setThreads((current) => current.filter((candidate) => candidate.authorId !== thread.authorId));
+    await blockMeguriBoardUser(actor.userId, thread.authorId).catch(() => undefined);
+    Alert.alert("ブロックしました", "このユーザーのスレッドと返信を表示しません。");
+  }
+
+  function confirmBlockThreadAuthor(thread: MeguriBoardThread) {
+    if (thread.mine) return;
+    Alert.alert(`${thread.authorName}さんをブロックしますか？`, "このユーザーのスレッドと返信を表示しなくなります。", [
+      { style: "cancel", text: "キャンセル" },
+      { onPress: () => void blockThreadAuthor(thread), style: "destructive", text: "ブロック" },
+    ]);
+  }
+
   function openThreadActions(thread: MeguriBoardThread) {
-    const labels = [
-      "共有する",
-      thread.bookmarked ? "保存を解除" : "保存する",
-      thread.reacted ? "参考になったを取り消す" : "参考になった",
-      thread.subscribed ? "通知を止める" : "通知を受け取る",
-      "非表示にする",
-      thread.reported ? "通報済み" : "通報する",
-      "キャンセル",
+    const actions: Array<{ destructive?: boolean; disabled?: boolean; label: string; run?: () => void }> = [
+      { label: "共有する", run: () => void shareThread(thread) },
+      { label: thread.bookmarked ? "保存を解除" : "保存する", run: () => void toggleThreadBookmark(thread) },
+      { label: thread.reacted ? "参考になったを取り消す" : "参考になった", run: () => void toggleThreadReaction(thread) },
+      {
+        label: thread.subscribed ? "通知を止める" : "通知を受け取る",
+        run: () => void toggleThreadSubscription(thread),
+      },
+      { destructive: true, label: "非表示にする", run: () => void hideThread(thread) },
     ];
+    if (!thread.mine) {
+      actions.push({
+        destructive: true,
+        label: "このユーザーをブロック",
+        run: () => confirmBlockThreadAuthor(thread),
+      });
+    }
+    actions.push({
+      disabled: thread.reported,
+      label: thread.reported ? "通報済み" : "通報する",
+      run: thread.reported ? undefined : () => void reportThread(thread),
+    });
+    const labels = [...actions.map((action) => action.label), "キャンセル"];
+    const cancelButtonIndex = labels.length - 1;
+    const destructiveButtonIndex = actions.findIndex((action) => action.destructive);
+    const disabledButtonIndices = actions
+      .map((action, index) => (action.disabled ? index : -1))
+      .filter((index) => index >= 0);
     if (Platform.OS === "ios") {
       ActionSheetIOS.showActionSheetWithOptions(
         {
-          cancelButtonIndex: 6,
-          destructiveButtonIndex: 4,
-          disabledButtonIndices: thread.reported ? [5] : undefined,
+          cancelButtonIndex,
+          destructiveButtonIndex: destructiveButtonIndex >= 0 ? destructiveButtonIndex : undefined,
+          disabledButtonIndices: disabledButtonIndices.length ? disabledButtonIndices : undefined,
           options: labels,
           title: thread.title,
         },
         (index) => {
-          if (index === 0) void shareThread(thread);
-          if (index === 1) void toggleThreadBookmark(thread);
-          if (index === 2) void toggleThreadReaction(thread);
-          if (index === 3) void toggleThreadSubscription(thread);
-          if (index === 4) void hideThread(thread);
-          if (index === 5 && !thread.reported) void reportThread(thread);
+          actions[index]?.run?.();
         },
       );
       return;
