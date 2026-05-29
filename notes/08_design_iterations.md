@@ -4,6 +4,47 @@
 
 ---
 
+## イテレーション168.79：Preview更新クラッシュを回避
+
+### 背景・問題意識
+
+Preview OTA update group `2a9a2fa0-8d06-44c5-8edf-4ba69dd6e42a` をアプリ内の `最新の更新を反映` から適用したところクラッシュした、という報告があった。直近で共通 `Screen` の非スクロール画面まで `KeyboardAvoidingView` 化しており、タブ・ホーム・チャットなど広範囲の画面構造へ影響する変更だったため、リリース前の安定性を優先して影響範囲を絞る。
+
+### 変更内容
+
+#### `mobile/src/components/Screen.tsx`
+- `scroll={false}` の画面は従来どおり通常の `View` へ戻した。
+- 住所設定などスクロール画面のキーボード追従は維持した。
+- `automaticallyAdjustKeyboardInsets` は iOS のときだけ有効にし、他プラットフォームへの影響を避けた。
+
+### 影響範囲
+
+- iOS版の全画面共通 `Screen`
+- 住所設定などのスクロール入力画面
+- タブホーム・めぐりホーム・一覧・チャットなど `scroll={false}` を使う画面
+- Preview OTA更新後の初回起動安定性
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- `git diff --check -- mobile/src/components/Screen.tsx`
+
+### 関連ファイル
+
+- `mobile/src/components/Screen.tsx`
+
+### セルフレビュー結果
+
+- ✅ `npm --prefix mobile run typecheck` 通過
+- ✅ `npm --prefix mobile run export:ios:preview` 通過
+- ✅ 住所設定のスクロール画面キーボード対応は維持
+- ✅ 非スクロール画面のラッパー変更を戻し、クラッシュ疑いの影響範囲を縮小
+- ✅ 09更新診断：状態遷移の追加・削除・名称変更はないため更新不要
+- ✅ 10更新診断：新規用語・廃止用語はないため更新不要
+
+---
+
 ## イテレーション168.78：めぐりホームをプロフィールアイコン表示へ統一
 
 ### 背景・問題意識
