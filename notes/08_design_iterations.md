@@ -4,6 +4,55 @@
 
 ---
 
+## イテレーション242：掲示板更新後に新着返信へ移動できるようにする
+
+### 背景・問題意識
+
+現地掲示板は短時間で返信が増えることがある。プル更新で一覧が差し替わるだけだと、どこに新しい返信が入ったか分かりにくいため、更新後に増えた返信件数を見せ、最初の新着返信へ移動できる導線を追加した。
+
+### 変更内容
+
+#### `mobile/app/meguri-board-thread.tsx`
+- プル更新前の返信IDを保持し、更新後に新しく増えた可視返信を検出するようにした。
+- 新着返信があった場合、返信ヘッダーに `新着 n` ボタンを表示するようにした。
+- `新着 n` を押すと検索/表示順を必要に応じて戻し、最初の新着返信へ移動するようにした。
+- 初回読み込みや通常フォーカス更新では新着表示を出さず、手動更新の差分だけを対象にした。
+
+#### `notes/09_state_machines.md`
+- Meguri Board Lifecycle に新着返信ジャンプの表示ルールを追記した。
+
+#### `notes/10_glossary.md`
+- 掲示板新着返信ジャンプを追加した。
+
+### 影響範囲
+
+- iOS版 スポット掲示板詳細
+- プル更新
+- 返信ヘッダー
+- 新着返信の追跡導線
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- `EAS_UPDATE_PROJECT_SLUG=ihub EXPO_NO_GIT_STATUS=1 npm --prefix mobile run update:ios:preview -- --message "[iter242] show board new replies" --non-interactive`
+- Preview OTA: Update group `7fd3595b-b21e-4380-9ed7-0d51f6d62e91` / iOS update `019e7625-e62a-7d81-9ade-e0f664dbe179`
+
+### 関連ファイル
+
+- `mobile/app/meguri-board-thread.tsx`
+- `notes/08_design_iterations.md`
+- `notes/09_state_machines.md`
+- `notes/10_glossary.md`
+
+### セルフレビュー結果
+
+- ✅ 既存返信IDとの差分で新着を判定し、返信番号や検索条件に依存しない形にした。
+- ✅ 初回表示では新着扱いにせず、手動更新で増えた返信だけに絞った。
+- ✅ DB変更なし、ネイティブ依存追加なしでPreview OTA対象内に収めた。
+
+---
+
 ## イテレーション241：返信入力中の引用元へ戻れるようにする
 
 ### 背景・問題意識

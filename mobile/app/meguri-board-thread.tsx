@@ -105,6 +105,7 @@ type BoardMediaAttachment = {
 
 type BoardReplySortMode = "oldest" | "newest" | "popular";
 type BoardParticipantSortMode = "recent" | "replies";
+type NewReplyNotice = { count: number; firstReplyId: string } | null;
 type ReplySearchSource =
   | {
       label: string;
@@ -149,6 +150,7 @@ export default function MeguriBoardThreadScreen() {
   const [replies, setReplies] = useState<MeguriBoardReply[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [newReplyNotice, setNewReplyNotice] = useState<NewReplyNotice>(null);
   const [locationContext, setLocationContext] = useState<MegrumLocationContext | null>(null);
   const [draft, setDraft] = useState("");
   const [draftImageUris, setDraftImageUris] = useState<string[]>([]);
@@ -182,6 +184,8 @@ export default function MeguriBoardThreadScreen() {
   const scrollViewRef = useRef<ScrollView | null>(null);
   const composerInputRef = useRef<TextInput | null>(null);
   const replyOffsetsRef = useRef<Record<string, number>>({});
+  const newReplyNoticeRef = useRef<NewReplyNotice>(null);
+  const repliesRef = useRef<MeguriBoardReply[]>([]);
   const sharedReplyScrollKeyRef = useRef<string | null>(null);
   const highlightedReplyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -505,6 +509,14 @@ export default function MeguriBoardThreadScreen() {
   }, [thread?.id]);
 
   useEffect(() => {
+    repliesRef.current = replies;
+  }, [replies]);
+
+  useEffect(() => {
+    newReplyNoticeRef.current = newReplyNotice;
+  }, [newReplyNotice]);
+
+  useEffect(() => {
     if (sortedReplies.length === 0) {
       if (searchCursorIndex !== 0) setSearchCursorIndex(0);
       return;
@@ -819,6 +831,16 @@ export default function MeguriBoardThreadScreen() {
     setTimeout(() => scrollToReply(unreadSeparatorReplyId), replySortMode === "oldest" ? 80 : 180);
   }
 
+  function jumpToNewReplyNotice() {
+    if (!newReplyNotice) return;
+    const targetId = newReplyNotice.firstReplyId;
+    setNewReplyNotice(null);
+    if (replySortMode !== "oldest") {
+      setReplySortMode("oldest");
+    }
+    setTimeout(() => scrollToReply(targetId), replySortMode === "oldest" ? 80 : 180);
+  }
+
   function jumpToMediaSource(attachment: BoardMediaAttachment) {
     setMediaGalleryOpen(false);
     if (!attachment.replyId) {
@@ -864,6 +886,26 @@ export default function MeguriBoardThreadScreen() {
       nextViewerContext,
       { previewMode, viewMode },
     ).catch(() => ({ replies: [] as MeguriBoardReply[], thread: null }));
+    const currentReplies = repliesRef.current;
+    if (options.silent && currentReplies.length > 0) {
+      const currentReplyIds = new Set(currentReplies.map((reply) => reply.id));
+      const newlyLoadedReplies = detail.replies
+        .filter((reply) => !reply.deleted && !currentReplyIds.has(reply.id))
+        .sort((left, right) => left.createdAt - right.createdAt);
+      if (newlyLoadedReplies.length > 0) {
+        setNewReplyNotice({
+          count: newlyLoadedReplies.length,
+          firstReplyId: newlyLoadedReplies[0].id,
+        });
+      } else if (
+        newReplyNoticeRef.current &&
+        !detail.replies.some((reply) => reply.id === newReplyNoticeRef.current?.firstReplyId)
+      ) {
+        setNewReplyNotice(null);
+      }
+    } else if (!options.silent) {
+      setNewReplyNotice(null);
+    }
     setPreviousReadAt(detail.thread?.readAt ?? null);
     setThread(detail.thread ? { ...detail.thread, readAt: Date.now() } : null);
     setReplies(detail.replies);
@@ -981,6 +1023,7 @@ export default function MeguriBoardThreadScreen() {
         : current,
     );
     setPreviousReadAt(Date.now());
+    setNewReplyNotice(null);
     setTimeout(() => scrollToLatestReply(), 80);
   }
 
@@ -1715,6 +1758,16 @@ export default function MeguriBoardThreadScreen() {
                       style={styles.unreadJumpButton}
                     >
                       <Text style={styles.unreadJumpButtonText}>未読へ</Text>
+                    </Pressable>
+                  ) : null}
+                  {newReplyNotice ? (
+                    <Pressable
+                      accessibilityRole="button"
+                      hitSlop={8}
+                      onPress={jumpToNewReplyNotice}
+                      style={styles.newReplyJumpButton}
+                    >
+                      <Text style={styles.newReplyJumpButtonText}>新着 {newReplyNotice.count}</Text>
                     </Pressable>
                   ) : null}
                   {viewerMentionReplies.length > 0 ? (
@@ -3369,6 +3422,19 @@ const styles = StyleSheet.create({
   },
   unreadJumpButtonText: {
     color: "#4f7e92",
+    fontSize: 11,
+    fontWeight: "900",
+  },
+  newReplyJumpButton: {
+    alignItems: "center",
+    backgroundColor: "rgba(116,191,155,0.18)",
+    borderRadius: 999,
+    minHeight: 26,
+    paddingHorizontal: 9,
+    justifyContent: "center",
+  },
+  newReplyJumpButtonText: {
+    color: "#3d8f6d",
     fontSize: 11,
     fontWeight: "900",
   },
