@@ -1,9 +1,11 @@
 import { useCallback, useMemo, useState } from "react";
 import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
+import * as ImagePicker from "expo-image-picker";
 import {
   ActionSheetIOS,
   ActivityIndicator,
   Alert,
+  Image,
   Modal,
   Platform,
   Pressable,
@@ -82,6 +84,7 @@ export default function MeguriBoardThreadScreen() {
   const [loading, setLoading] = useState(true);
   const [locationContext, setLocationContext] = useState<MegrumLocationContext | null>(null);
   const [draft, setDraft] = useState("");
+  const [draftImageUris, setDraftImageUris] = useState<string[]>([]);
   const [sending, setSending] = useState(false);
   const [sendError, setSendError] = useState<string | null>(null);
   const [replySearchText, setReplySearchText] = useState("");
@@ -212,13 +215,14 @@ export default function MeguriBoardThreadScreen() {
       setSendError("このスレッドは締め切られています。");
       return;
     }
-    const body = draft.trim();
+    const body = draft.trim() || (draftImageUris.length > 0 ? "画像を共有しました" : "");
     if (!body) return;
     setSending(true);
     setSendError(null);
     const reply = await appendMeguriBoardReply(
       {
         body,
+        imageUris: draftImageUris,
         parentReplyId: quoteTarget?.id ?? null,
         previewMode,
         quotedAuthorName: quoteTarget?.authorName ?? null,
@@ -235,6 +239,7 @@ export default function MeguriBoardThreadScreen() {
       return;
     }
     setDraft("");
+    setDraftImageUris([]);
     setQuoteTarget(null);
     setReplies((current) => [...current, reply].sort((left, right) => left.createdAt - right.createdAt));
     setThread((current) =>
@@ -248,6 +253,33 @@ export default function MeguriBoardThreadScreen() {
           }
         : current,
     );
+  }
+
+  async function pickDraftImages() {
+    const remaining = Math.max(0, 4 - draftImageUris.length);
+    if (remaining === 0 || thread?.status === "locked") return;
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permission.granted) {
+      Alert.alert("写真へのアクセスを許可してください", "返信に画像を添付するには写真ライブラリの許可が必要です。");
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      allowsEditing: false,
+      allowsMultipleSelection: true,
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      quality: 0.82,
+      selectionLimit: remaining,
+    });
+    if (result.canceled) return;
+    const nextUris = result.assets
+      .map((asset) => asset.uri)
+      .filter((uri): uri is string => !!uri)
+      .slice(0, remaining);
+    setDraftImageUris((current) => [...current, ...nextUris].slice(0, 4));
+  }
+
+  function removeDraftImage(uri: string) {
+    setDraftImageUris((current) => current.filter((candidate) => candidate !== uri));
   }
 
   function updateThread(nextThread: MeguriBoardThread) {
@@ -596,6 +628,7 @@ export default function MeguriBoardThreadScreen() {
                 </View>
                 <Text style={styles.heroTitle}>{thread.title}</Text>
                 <Text style={styles.heroBody}>{thread.body}</Text>
+                <AttachmentGrid imageUris={thread.imageUris} />
                 <Text style={styles.heroMeta}>
                   {meguriBoardAudienceMeta(thread)} · {thread.authorName}
                   {thread.updatedAt && thread.updatedAt > thread.createdAt + 60000 ? " · 編集済み" : ""}
@@ -722,6 +755,7 @@ export default function MeguriBoardThreadScreen() {
                         >
                           {reply.body}
                         </Text>
+                        {!reply.deleted ? <AttachmentGrid imageUris={reply.imageUris} compact /> : null}
                       </ChatGradientBubble>
                       <Text style={[styles.replyTime, reply.mine ? styles.replyTimeMine : null]}>
                         {formatRelativeTime(reply.createdAt)}
@@ -795,6 +829,18 @@ export default function MeguriBoardThreadScreen() {
                   </View>
                 ) : null}
                 <View style={styles.composerInputRow}>
+                  <Pressable
+                    accessibilityRole="button"
+                    disabled={sending || draftImageUris.length >= 4}
+                    onPress={pickDraftImages}
+                    style={[styles.attachButton, draftImageUris.length > 0 ? styles.attachButtonActive : null]}
+                  >
+                    <IconSymbol
+                      name="camera-outline"
+                      color={draftImageUris.length > 0 ? megrumColors.lavender : "rgba(58,50,74,0.48)"}
+                      size={18}
+                    />
+                  </Pressable>
                   <TextInput
                     multiline
                     onChangeText={setDraft}
@@ -806,21 +852,24 @@ export default function MeguriBoardThreadScreen() {
                   />
                   <Pressable
                     accessibilityRole="button"
-                    disabled={sending || !draft.trim()}
+                    disabled={sending || (!draft.trim() && draftImageUris.length === 0)}
                     onPress={handleSend}
                     style={[
                       styles.sendButton,
-                      draft.trim() ? styles.sendButtonActive : null,
+                      draft.trim() || draftImageUris.length > 0 ? styles.sendButtonActive : null,
                       sending ? styles.sendButtonDisabled : null,
                     ]}
                   >
                     <IconSymbol
                       name={sending ? "ellipsis-horizontal" : "send-outline"}
-                      color={draft.trim() ? "#fff" : "rgba(58,50,74,0.42)"}
+                      color={draft.trim() || draftImageUris.length > 0 ? "#fff" : "rgba(58,50,74,0.42)"}
                       size={18}
                     />
                   </Pressable>
                 </View>
+                {draftImageUris.length > 0 ? (
+                  <PickedImageRail imageUris={draftImageUris} onRemove={removeDraftImage} />
+                ) : null}
               </View>
             )}
             {sendError ? <Text style={styles.sendError}>{sendError}</Text> : null}
@@ -971,6 +1020,40 @@ function CategoryBadge({ category }: { category: Exclude<MeguriBoardThreadCatego
         {meguriBoardCategoryLabel(category)}
       </Text>
     </View>
+  );
+}
+
+function AttachmentGrid({ compact, imageUris }: { compact?: boolean; imageUris: string[] }) {
+  if (imageUris.length === 0) return null;
+  return (
+    <View style={compact ? styles.attachmentGridCompact : styles.attachmentGrid}>
+      {imageUris.slice(0, 4).map((uri, index) => (
+        <View key={`${uri}-${index}`} style={compact ? styles.attachmentThumbCompact : styles.attachmentThumb}>
+          <Image source={{ uri }} style={styles.attachmentImage} />
+        </View>
+      ))}
+    </View>
+  );
+}
+
+function PickedImageRail({
+  imageUris,
+  onRemove,
+}: {
+  imageUris: string[];
+  onRemove: (uri: string) => void;
+}) {
+  return (
+    <ScrollView horizontal contentContainerStyle={styles.pickedImageRail} showsHorizontalScrollIndicator={false}>
+      {imageUris.map((uri) => (
+        <View key={uri} style={styles.pickedImageWrap}>
+          <Image source={{ uri }} style={styles.pickedImage} />
+          <Pressable accessibilityRole="button" onPress={() => onRemove(uri)} style={styles.removeImageButton}>
+            <IconSymbol name="close" color="#fff" size={12} />
+          </Pressable>
+        </View>
+      ))}
+    </ScrollView>
   );
 }
 
@@ -1278,6 +1361,34 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     lineHeight: 20,
   },
+  attachmentGrid: {
+    flexDirection: "row",
+    gap: 8,
+  },
+  attachmentGridCompact: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 6,
+    marginTop: 8,
+  },
+  attachmentThumb: {
+    aspectRatio: 1,
+    borderRadius: 14,
+    flex: 1,
+    maxHeight: 132,
+    minHeight: 92,
+    overflow: "hidden",
+  },
+  attachmentThumbCompact: {
+    borderRadius: 12,
+    height: 78,
+    overflow: "hidden",
+    width: 78,
+  },
+  attachmentImage: {
+    height: "100%",
+    width: "100%",
+  },
   heroMeta: {
     color: megrumColors.mutedInk,
     fontSize: 11.5,
@@ -1530,6 +1641,17 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     gap: 10,
   },
+  attachButton: {
+    alignItems: "center",
+    backgroundColor: "rgba(58,50,74,0.08)",
+    borderRadius: 999,
+    height: 44,
+    justifyContent: "center",
+    width: 44,
+  },
+  attachButtonActive: {
+    backgroundColor: "rgba(166,149,216,0.16)",
+  },
   composerInput: {
     backgroundColor: "#fff",
     borderColor: "rgba(58,50,74,0.08)",
@@ -1557,6 +1679,31 @@ const styles = StyleSheet.create({
   },
   sendButtonDisabled: {
     opacity: 0.8,
+  },
+  pickedImageRail: {
+    gap: 8,
+    paddingRight: 18,
+  },
+  pickedImageWrap: {
+    borderRadius: 14,
+    height: 58,
+    overflow: "hidden",
+    width: 58,
+  },
+  pickedImage: {
+    height: "100%",
+    width: "100%",
+  },
+  removeImageButton: {
+    alignItems: "center",
+    backgroundColor: "rgba(26,20,38,0.68)",
+    borderRadius: 999,
+    height: 20,
+    justifyContent: "center",
+    position: "absolute",
+    right: 4,
+    top: 4,
+    width: 20,
   },
   lockedComposer: {
     alignItems: "center",

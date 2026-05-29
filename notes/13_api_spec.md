@@ -3,8 +3,8 @@
 > **目的**：Megrum のバックエンドAPI（REST）の draft 仕様。実装着手時の正解集。
 > 全エンドポイントを `[METHOD /path]` の形式で網羅し、各々で入力・出力・認証要否・状態遷移・備考を定義。
 
-最終更新: 2026-05-29（iter168.90）
-ステータス: Draft v1.2
+最終更新: 2026-05-30（iter176）
+ステータス: Draft v1.3
 
 ---
 
@@ -951,6 +951,8 @@ AW削除。
         "id": "uuid",
         "title": "物販列いまどれくらい？",
         "body": "string",
+        "image_paths": ["storage/path.jpg"],
+        "image_urls": ["signed-url"],
         "category": "question|info|chat|trade|lost_found",
         "status": "visible|hidden|archived|locked",
         "is_pinned": false,
@@ -983,6 +985,7 @@ AW削除。
   - `nearby_3km` はスレッド作成時の `origin_lat/origin_lng` と閲覧者現在地の距離で判定する
   - `same_prefecture` はスレッド作成時の `prefecture` と閲覧者側の都道府県で判定する
   - 正確な位置情報は一覧表示しない。レスポンスの座標はアプリ内部の距離判定・互換用途に限定する
+  - `image_paths` は private Storage path。クライアント表示時は閲覧可能なスレッドだけ署名URLへ変換する
 - **Screen**: `meguri-board`
 
 ### POST /api/v1/meguri-board/threads
@@ -995,6 +998,7 @@ AW削除。
   {
     "title": "string",
     "body": "string",
+    "image_paths": ["storage/path.jpg"],
     "category": "question|info|chat|trade|lost_found",
     "audience_scope": "nearby_3km|same_prefecture",
     "spot_key": "string?",
@@ -1005,7 +1009,7 @@ AW削除。
   }
   ```
 - **Response 201**: 作成された thread
-- **備考**: `nearby_3km` は `origin_lat` / `origin_lng` / `prefecture` 必須。基準地点はスレッドを立てた時の位置情報。`category` 未指定時は `chat`。作成者は自動でスレッド購読ONになる
+- **備考**: `nearby_3km` は `origin_lat` / `origin_lng` / `prefecture` 必須。基準地点はスレッドを立てた時の位置情報。`category` 未指定時は `chat`。作成者は自動でスレッド購読ONになる。画像は最大4枚まで `meguri-board-media` private Storage にアップロードしてから path を保存する
 - **Screen**: `meguri-board`
 
 ### GET /api/v1/meguri-board/threads/:id
@@ -1034,13 +1038,14 @@ AW削除。
   ```json
   {
     "body": "string",
+    "image_paths": ["storage/path.jpg"],
     "parent_reply_id": "uuid?",
     "quote_author_name": "string?",
     "quote_body": "string?"
   }
   ```
-- **Response 201**: `{ id, thread_id, body, parent_reply_id, quote_author_name, quote_body, status, reaction_count, created_at, updated_at, deleted_at, viewer_reacted, viewer_reported, author }`
-- **備考**: テキストのみ。`thread.status='locked'` の場合は返信不可。引用返信では `parent_reply_id` と表示用スナップショットを保存する
+- **Response 201**: `{ id, thread_id, body, image_paths, image_urls?, parent_reply_id, quote_author_name, quote_body, status, reaction_count, created_at, updated_at, deleted_at, viewer_reacted, viewer_reported, author }`
+- **備考**: `thread.status='locked'` の場合は返信不可。引用返信では `parent_reply_id` と表示用スナップショットを保存する。画像は最大4枚まで `meguri-board-media` private Storage path として保存し、閲覧可能な返信だけ署名URLで表示する
 - **Side effects**: 返信者をスレッド購読ONにし、購読中の他ユーザーへ `notifications.kind='meguri_board_reply'` を作成する。本文に `@handle` がある場合は、閲覧可能な対象ユーザーへ `notifications.kind='meguri_board_mention'` を作成し、通常の購読返信通知とは重複させない
 - **Screen**: `meguri-board-thread`
 

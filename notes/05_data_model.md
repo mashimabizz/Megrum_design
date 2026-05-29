@@ -4,7 +4,7 @@
 > 実装の正解集。`09_state_machines.md` と完全に整合させ、`10_glossary.md` の用語を使う。
 
 最終更新: 2026-05-30
-ステータス: Draft v2.21（iter168.97 応答時の条件選択とスケジュール場所を追加）
+ステータス: Draft v2.22（iter176 掲示板画像添付を追加）
 
 ## 最新化履歴
 
@@ -33,6 +33,7 @@
 | **v2.19** | **2026-05-29** | **iter168.89 反映（グルーム投稿とスポット掲示板スレッドに作成時位置 `origin_lat/origin_lng` を追加。グルームは現在地1km、掲示板は `nearby_3km` / `same_prefecture` で閲覧）** |
 | **v2.20** | **2026-05-30** | **iter174 反映（スポット掲示板のスレッド購読と `notifications.kind='meguri_board_reply'` を追加）** |
 | **v2.21** | **2026-05-30** | **iter175 反映（スポット掲示板返信の `@handle` メンション通知 `notifications.kind='meguri_board_mention'` を追加）** |
+| **v2.22** | **2026-05-30** | **iter176 反映（スポット掲示板のスレッド/返信画像添付と private Storage `meguri-board-media` を追加）** |
 | **v2.20** | **2026-05-29** | **iter168.90 反映（`search_query_logs` と人気検索RPCを追加。検索結果はマッチ分類つきグッズパネルで表示）** |
 | **v2.21** | **2026-05-30** | **iter168.97 反映（`schedules.place_name` 追加。合意時に `both` を単一手段へ固定し、現地交換の複数候補は1件へ固定する運用を追記）** |
 
@@ -330,6 +331,7 @@ iter168.43 以降、無料受信者に本文・画像パスを直接返さない
 | `author_id` | uuid | → users |
 | `title` | text | 1〜80字 |
 | `body` | text | 1〜500字 |
+| `image_paths` | text[] | iter176 追加。`meguri-board-media` private Storage path。最大4枚 |
 | `category` | text | `question` / `info` / `chat` / `trade` / `lost_found`。iter171 追加 |
 | `status` | text | `visible` / `hidden` / `archived` / `locked`。iter171 追加 |
 | `is_pinned` | boolean | 運営/将来管理用の固定表示フラグ。iter171 追加 |
@@ -348,6 +350,8 @@ iter168.43 以降、無料受信者に本文・画像パスを直接返さない
 
 > **公開範囲方針**：`nearby_3km` は現在地と `origin_lat/origin_lng` の距離でRPC判定する。`same_prefecture` はスレッド作成時の都道府県と閲覧者側の都道府県で判定する。正確な緯度経度は画面に表示しない。
 
+> **画像添付方針（iter176）**：スレッド画像は `meguri-board-media` private Storage に保存し、DBには path のみを持つ。アプリは `list_meguri_board_threads_for_viewer()` で閲覧可能なスレッドを取得した後に署名URLを発行して表示する。
+
 ### `meguri_board_replies`（スポット掲示板返信 / iter168.73）
 
 スレッド詳細で送るチャット形式の追記返信。iter172 以降、自分の返信は編集でき、削除時は物理削除ではなく `status='deleted'` としてプレースホルダ表示にする。
@@ -358,6 +362,7 @@ iter168.43 以降、無料受信者に本文・画像パスを直接返さない
 | `thread_id` | uuid | → `meguri_board_threads` |
 | `author_id` | uuid | → users |
 | `body` | text | 1〜1000字 |
+| `image_paths` | text[] | iter176 追加。`meguri-board-media` private Storage path。最大4枚 |
 | `parent_reply_id` | uuid nullable | 引用元返信。iter173 追加 |
 | `quote_author_name` | text nullable | 引用元の表示名スナップショット。iter173 追加 |
 | `quote_body` | text nullable | 引用元本文の先頭160字スナップショット。iter173 追加 |
@@ -366,7 +371,7 @@ iter168.43 以降、無料受信者に本文・画像パスを直接返さない
 | `deleted_at` | timestamptz nullable | 削除済み表示に切り替えた時刻。iter172 追加 |
 | `created_at` / `updated_at` | timestamptz | |
 
-`after insert` trigger で `meguri_board_threads.reply_count / latest_reply_preview / latest_activity_at` を更新する。スレッド作成者は `status` を `locked` にして返信追加を止め、`visible` に戻して再開できる。削除は `archived` にするソフト削除。
+`after insert` trigger で `meguri_board_threads.reply_count / latest_reply_preview / latest_activity_at` を更新する。スレッド作成者は `status` を `locked` にして返信追加を止め、`visible` に戻して再開できる。削除は `archived` にするソフト削除。iter176以降、返信画像も `meguri-board-media` private Storage path として保存し、返信一覧RPCで閲覧可能な返信だけ署名URL化して表示する。
 
 ### `meguri_board_thread_bookmarks`（スポット掲示板スレッド保存 / iter171）
 

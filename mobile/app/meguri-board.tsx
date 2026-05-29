@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
 import SegmentedControl from "@react-native-segmented-control/segmented-control";
+import * as ImagePicker from "expo-image-picker";
 import {
   ActionSheetIOS,
   ActivityIndicator,
   Alert,
+  Image,
   Modal,
   Platform,
   Pressable,
@@ -87,6 +89,7 @@ export default function MeguriBoardScreen() {
   const [composerOpen, setComposerOpen] = useState(false);
   const [composerTitle, setComposerTitle] = useState("");
   const [composerBody, setComposerBody] = useState("");
+  const [composerImageUris, setComposerImageUris] = useState<string[]>([]);
   const [composerCategory, setComposerCategory] =
     useState<Exclude<MeguriBoardThreadCategory, "all">>("question");
   const [composerScope, setComposerScope] = useState<MeguriBoardAudienceScope>("nearby_3km");
@@ -247,6 +250,37 @@ export default function MeguriBoardScreen() {
     void refreshThreads(normalized);
   }
 
+  async function pickComposerImages() {
+    const remaining = Math.max(0, 4 - composerImageUris.length);
+    if (remaining === 0) return;
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permission.granted) {
+      Alert.alert("写真へのアクセスを許可してください", "掲示板に画像を添付するには写真ライブラリの許可が必要です。");
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      allowsEditing: false,
+      allowsMultipleSelection: true,
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      quality: 0.82,
+      selectionLimit: remaining,
+    });
+    if (result.canceled) return;
+    const nextUris = result.assets
+      .map((asset) => asset.uri)
+      .filter((uri): uri is string => !!uri)
+      .slice(0, remaining);
+    setComposerImageUris((current) => [...current, ...nextUris].slice(0, 4));
+  }
+
+  function removeComposerImage(uri: string) {
+    setComposerImageUris((current) => current.filter((candidate) => candidate !== uri));
+  }
+
+  function closeComposer() {
+    setComposerOpen(false);
+  }
+
   async function handleCreateThread() {
     const title = composerTitle.trim();
     const body = composerBody.trim();
@@ -282,6 +316,7 @@ export default function MeguriBoardScreen() {
         audienceScope: composerScope,
         body,
         category: composerCategory,
+        imageUris: composerImageUris,
         origin: actionContext.coordinate ?? null,
         prefecture: actionContext.prefecture,
         previewMode,
@@ -299,6 +334,7 @@ export default function MeguriBoardScreen() {
     setComposerOpen(false);
     setComposerTitle("");
     setComposerBody("");
+    setComposerImageUris([]);
     setComposerCategory("question");
     setComposerScope("nearby_3km");
     setThreads((current) =>
@@ -589,6 +625,7 @@ export default function MeguriBoardScreen() {
                       <Text numberOfLines={3} style={styles.threadBody}>
                         {thread.body}
                       </Text>
+                      <AttachmentGrid imageUris={thread.imageUris} compact />
                       <Text numberOfLines={1} style={styles.threadMeta}>
                         {meguriBoardAudienceMeta(thread)} · {thread.authorName}
                       </Text>
@@ -649,9 +686,9 @@ export default function MeguriBoardScreen() {
         </ScrollView>
       </Screen>
 
-      <Modal animationType="slide" transparent visible={composerOpen} onRequestClose={() => setComposerOpen(false)}>
+      <Modal animationType="slide" transparent visible={composerOpen} onRequestClose={closeComposer}>
         <View style={styles.modalLayer}>
-          <Pressable style={styles.modalBackdrop} onPress={() => setComposerOpen(false)} />
+          <Pressable style={styles.modalBackdrop} onPress={closeComposer} />
           <View style={[styles.modalPanel, { paddingBottom: Math.max(insets.bottom, 14) + 12 }]}>
             <View style={styles.modalHandle} />
             <Text style={styles.modalTitle}>新しいスレッド</Text>
@@ -680,6 +717,18 @@ export default function MeguriBoardScreen() {
                 style={[styles.input, styles.textarea]}
                 textAlignVertical="top"
                 value={composerBody}
+              />
+            </View>
+
+            <View style={styles.field}>
+              <View style={styles.attachmentHeader}>
+                <Text style={styles.fieldLabel}>画像</Text>
+                <Text style={styles.attachmentLimit}>{composerImageUris.length}/4</Text>
+              </View>
+              <PickedImageRail
+                imageUris={composerImageUris}
+                onPick={pickComposerImages}
+                onRemove={removeComposerImage}
               />
             </View>
 
@@ -734,7 +783,7 @@ export default function MeguriBoardScreen() {
 
             <View style={styles.modalActions}>
               <PrimaryButton
-                onPress={() => setComposerOpen(false)}
+                onPress={closeComposer}
                 style={styles.modalSecondary}
                 variant="secondary"
               >
@@ -759,6 +808,53 @@ function ScopePreviewPill({ label, value }: { label: string; value: string }) {
         {value}
       </Text>
     </View>
+  );
+}
+
+function AttachmentGrid({ compact, imageUris }: { compact?: boolean; imageUris: string[] }) {
+  if (imageUris.length === 0) return null;
+  return (
+    <View style={compact ? styles.attachmentGridCompact : styles.attachmentGrid}>
+      {imageUris.slice(0, 4).map((uri, index) => (
+        <View key={`${uri}-${index}`} style={compact ? styles.attachmentThumbCompact : styles.attachmentThumb}>
+          <Image source={{ uri }} style={styles.attachmentImage} />
+          {index === 3 && imageUris.length > 4 ? (
+            <View style={styles.attachmentMoreOverlay}>
+              <Text style={styles.attachmentMoreText}>+{imageUris.length - 4}</Text>
+            </View>
+          ) : null}
+        </View>
+      ))}
+    </View>
+  );
+}
+
+function PickedImageRail({
+  imageUris,
+  onPick,
+  onRemove,
+}: {
+  imageUris: string[];
+  onPick: () => void;
+  onRemove: (uri: string) => void;
+}) {
+  return (
+    <ScrollView horizontal contentContainerStyle={styles.pickedImageRail} showsHorizontalScrollIndicator={false}>
+      {imageUris.map((uri) => (
+        <View key={uri} style={styles.pickedImageWrap}>
+          <Image source={{ uri }} style={styles.pickedImage} />
+          <Pressable accessibilityRole="button" onPress={() => onRemove(uri)} style={styles.removeImageButton}>
+            <IconSymbol name="close" color="#fff" size={12} />
+          </Pressable>
+        </View>
+      ))}
+      {imageUris.length < 4 ? (
+        <Pressable accessibilityRole="button" onPress={onPick} style={styles.addImageButton}>
+          <IconSymbol name="camera-outline" color={megrumColors.lavender} size={18} />
+          <Text style={styles.addImageText}>追加</Text>
+        </Pressable>
+      ) : null}
+    </ScrollView>
   );
 }
 
@@ -1271,6 +1367,43 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     lineHeight: 19,
   },
+  attachmentGrid: {
+    flexDirection: "row",
+    gap: 8,
+  },
+  attachmentGridCompact: {
+    flexDirection: "row",
+    gap: 7,
+  },
+  attachmentThumb: {
+    aspectRatio: 1,
+    borderRadius: 14,
+    flex: 1,
+    maxHeight: 112,
+    minHeight: 80,
+    overflow: "hidden",
+  },
+  attachmentThumbCompact: {
+    borderRadius: 12,
+    height: 58,
+    overflow: "hidden",
+    width: 58,
+  },
+  attachmentImage: {
+    height: "100%",
+    width: "100%",
+  },
+  attachmentMoreOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: "center",
+    backgroundColor: "rgba(26,20,38,0.44)",
+    justifyContent: "center",
+  },
+  attachmentMoreText: {
+    color: "#fff",
+    fontSize: 13,
+    fontWeight: "900",
+  },
   threadMeta: {
     color: megrumColors.mutedInk,
     fontSize: 11.5,
@@ -1357,6 +1490,57 @@ const styles = StyleSheet.create({
   fieldLabel: {
     color: megrumColors.ink,
     fontSize: 12.5,
+    fontWeight: "900",
+  },
+  attachmentHeader: {
+    alignItems: "center",
+    flexDirection: "row",
+    justifyContent: "space-between",
+  },
+  attachmentLimit: {
+    color: megrumColors.mutedInk,
+    fontSize: 11.5,
+    fontWeight: "800",
+  },
+  pickedImageRail: {
+    gap: 10,
+    paddingRight: 18,
+  },
+  pickedImageWrap: {
+    borderRadius: 16,
+    height: 72,
+    overflow: "hidden",
+    width: 72,
+  },
+  pickedImage: {
+    height: "100%",
+    width: "100%",
+  },
+  removeImageButton: {
+    alignItems: "center",
+    backgroundColor: "rgba(26,20,38,0.68)",
+    borderRadius: 999,
+    height: 22,
+    justifyContent: "center",
+    position: "absolute",
+    right: 5,
+    top: 5,
+    width: 22,
+  },
+  addImageButton: {
+    alignItems: "center",
+    backgroundColor: "rgba(166,149,216,0.1)",
+    borderColor: "rgba(166,149,216,0.28)",
+    borderRadius: 16,
+    borderWidth: 1,
+    gap: 4,
+    height: 72,
+    justifyContent: "center",
+    width: 72,
+  },
+  addImageText: {
+    color: megrumColors.lavender,
+    fontSize: 11,
     fontWeight: "900",
   },
   composerCategoryGrid: {

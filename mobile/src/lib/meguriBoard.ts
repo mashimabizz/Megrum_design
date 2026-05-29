@@ -4,6 +4,8 @@ import { isUuidLike } from "./groom";
 import type { MegrumCoordinate } from "./locationContext";
 import { hasSupabaseConfig, supabase } from "./supabase";
 
+const MEGURI_BOARD_MEDIA_BUCKET = "meguri-board-media";
+
 export type MeguriBoardAudienceScope =
   | "nearby_3km"
   | "same_prefecture"
@@ -48,6 +50,7 @@ export type MeguriBoardThread = {
   category: Exclude<MeguriBoardThreadCategory, "all">;
   createdAt: number;
   hidden: boolean;
+  imageUris: string[];
   isPinned: boolean;
   latestActivityAt: number;
   latestReplyPreview: string | null;
@@ -79,6 +82,7 @@ export type MeguriBoardReply = {
   createdAt: number;
   deleted: boolean;
   id: string;
+  imageUris: string[];
   mine: boolean;
   parentReplyId: string | null;
   quotedAuthorName: string | null;
@@ -110,6 +114,7 @@ type CreateMeguriBoardThreadInput = {
   audienceScope: MeguriBoardAudienceScope;
   body: string;
   category?: Exclude<MeguriBoardThreadCategory, "all">;
+  imageUris?: string[];
   origin?: MegrumCoordinate | null;
   prefecture: string | null;
   previewMode?: boolean;
@@ -120,6 +125,7 @@ type CreateMeguriBoardThreadInput = {
 
 type CreateMeguriBoardReplyInput = {
   body: string;
+  imageUris?: string[];
   parentReplyId?: string | null;
   quotedAuthorName?: string | null;
   quotedBody?: string | null;
@@ -437,6 +443,7 @@ export async function createMeguriBoardThread(
     distanceMeters: input.origin ? 0 : null,
     hidden: false,
     id: `meguri-board-thread-${createdAt}`,
+    imageUris: normalizeImageUris(input.imageUris),
     isPinned: false,
     latestActivityAt: createdAt,
     latestReplyPreview: null,
@@ -486,6 +493,7 @@ export async function appendMeguriBoardReply(
     createdAt,
     deleted: false,
     id: `meguri-board-reply-${createdAt}`,
+    imageUris: normalizeImageUris(input.imageUris),
     mine: true,
     parentReplyId: input.parentReplyId ?? null,
     quotedAuthorName: input.quotedAuthorName?.trim() || null,
@@ -831,8 +839,9 @@ async function loadRemoteMeguriBoardThreads(
   });
   if (!rpc.error) {
     const rows: unknown[] = Array.isArray(rpc.data) ? rpc.data : [];
+    const signedImageUrls = await signMeguriBoardImageUrls(rows.flatMap((row) => stringArrayValue((row as RemoteThreadRow).image_paths)));
     return rows
-      .map((row) => remoteMeguriBoardThreadToLocal(row as RemoteThreadRow, user.id))
+      .map((row) => remoteMeguriBoardThreadToLocal(row as RemoteThreadRow, user.id, signedImageUrls))
       .filter((thread): thread is MeguriBoardThread => !!thread);
   }
 
@@ -843,8 +852,9 @@ async function loadRemoteMeguriBoardThreads(
     .limit(120);
   if (error) throw error;
   const rows: unknown[] = Array.isArray(data) ? data : [];
+  const signedImageUrls = await signMeguriBoardImageUrls(rows.flatMap((row) => stringArrayValue((row as RemoteThreadRow).image_paths)));
   return rows
-    .map((row) => remoteMeguriBoardThreadToLocal(row as RemoteThreadRow, user.id))
+    .map((row) => remoteMeguriBoardThreadToLocal(row as RemoteThreadRow, user.id, signedImageUrls))
     .filter((thread): thread is MeguriBoardThread => !!thread)
     .filter((thread) => canViewMeguriBoardThread(thread, viewer, viewMode));
 }
@@ -869,8 +879,9 @@ async function loadRemoteMeguriBoardReplies(
     });
     if (!rpc.error) {
       const rows: unknown[] = Array.isArray(rpc.data) ? rpc.data : [];
+      const signedImageUrls = await signMeguriBoardImageUrls(rows.flatMap((row) => stringArrayValue((row as RemoteReplyRow).image_paths)));
       return rows
-        .map((row) => remoteMeguriBoardReplyToLocal(row as RemoteReplyRow, user.id))
+        .map((row) => remoteMeguriBoardReplyToLocal(row as RemoteReplyRow, user.id, signedImageUrls))
         .filter((reply): reply is MeguriBoardReply => !!reply);
     }
   }
@@ -884,8 +895,9 @@ async function loadRemoteMeguriBoardReplies(
     .limit(300);
   if (error) throw error;
   const rows: unknown[] = Array.isArray(data) ? data : [];
+  const signedImageUrls = await signMeguriBoardImageUrls(rows.flatMap((row) => stringArrayValue((row as RemoteReplyRow).image_paths)));
   return rows
-    .map((row) => remoteMeguriBoardReplyToLocal(row as RemoteReplyRow, user.id))
+    .map((row) => remoteMeguriBoardReplyToLocal(row as RemoteReplyRow, user.id, signedImageUrls))
     .filter((reply): reply is MeguriBoardReply => !!reply);
 }
 
@@ -902,11 +914,13 @@ async function appendRemoteMeguriBoardThread(
   ) {
     return null;
   }
+  const imagePaths = await uploadMeguriBoardImages(actor.userId, input.imageUris ?? []);
   const payload = {
     author_id: actor.userId,
     audience_scope: input.audienceScope,
     body: input.body.trim(),
     category: normalizeBoardCategory(input.category),
+    image_paths: imagePaths,
     origin_lat: input.origin?.latitude ?? null,
     origin_lng: input.origin?.longitude ?? null,
     prefecture: input.prefecture || actor.primaryArea || null,
@@ -920,7 +934,7 @@ async function appendRemoteMeguriBoardThread(
     .select(remoteThreadSelect(true))
     .single();
   if (error && shouldRetryLegacyBoardInsert(error)) {
-    const { category: _category, origin_lat: _originLat, origin_lng: _originLng, ...rest } = payload;
+    const { category: _category, image_paths: _imagePaths, origin_lat: _originLat, origin_lng: _originLng, ...rest } = payload;
     const retry = await supabase
       .from("meguri_board_threads")
       .insert({
@@ -932,8 +946,13 @@ async function appendRemoteMeguriBoardThread(
     data = retry.data;
     error = retry.error;
   }
-  if (error || !data) throw error ?? new Error("Failed to create meguri board thread.");
-  return remoteMeguriBoardThreadToLocal(data as unknown as RemoteThreadRow, actor.userId);
+  if (error || !data) {
+    await removeMeguriBoardImages(imagePaths);
+    throw error ?? new Error("Failed to create meguri board thread.");
+  }
+  const remoteThreadRow = data as unknown as RemoteThreadRow;
+  const signedImageUrls = await signMeguriBoardImageUrls(stringArrayValue(remoteThreadRow.image_paths));
+  return remoteMeguriBoardThreadToLocal(remoteThreadRow, actor.userId, signedImageUrls);
 }
 
 async function appendRemoteMeguriBoardReply(
@@ -949,9 +968,11 @@ async function appendRemoteMeguriBoardReply(
   ) {
     return null;
   }
+  const imagePaths = await uploadMeguriBoardImages(actor.userId, input.imageUris ?? []);
   if (input.viewer && isUuidLike(input.threadId)) {
     const rpc = await supabase.rpc("append_meguri_board_reply_for_viewer", {
       p_body: input.body.trim(),
+      p_image_paths: imagePaths,
       p_parent_reply_id: input.parentReplyId ?? null,
       p_prefecture: input.viewer.prefecture,
       p_quote_author_name: input.quotedAuthorName?.trim() || null,
@@ -963,8 +984,12 @@ async function appendRemoteMeguriBoardReply(
     });
     if (!rpc.error) {
       const row = Array.isArray(rpc.data) ? rpc.data[0] : null;
-      const reply = row
-        ? remoteMeguriBoardReplyToLocal(row as RemoteReplyRow, actor.userId)
+      const remoteReplyRow = row as unknown as RemoteReplyRow | null;
+      const signedImageUrls = row
+        ? await signMeguriBoardImageUrls(stringArrayValue(remoteReplyRow?.image_paths))
+        : new Map<string, string>();
+      const reply = remoteReplyRow
+        ? remoteMeguriBoardReplyToLocal(remoteReplyRow, actor.userId, signedImageUrls)
         : null;
       if (reply) return reply;
     }
@@ -974,6 +999,7 @@ async function appendRemoteMeguriBoardReply(
     .insert({
       author_id: actor.userId,
       body: input.body.trim(),
+      image_paths: imagePaths,
       parent_reply_id: input.parentReplyId ?? null,
       quote_author_name: input.quotedAuthorName?.trim() || null,
       quote_body: input.quotedBody?.trim().slice(0, 160) || null,
@@ -981,13 +1007,19 @@ async function appendRemoteMeguriBoardReply(
     })
     .select(remoteReplySelect())
     .single();
-  if (error || !data) throw error ?? new Error("Failed to create meguri board reply.");
-  return remoteMeguriBoardReplyToLocal(data as unknown as RemoteReplyRow, actor.userId);
+  if (error || !data) {
+    await removeMeguriBoardImages(imagePaths);
+    throw error ?? new Error("Failed to create meguri board reply.");
+  }
+  const remoteReplyRow = data as unknown as RemoteReplyRow;
+  const signedImageUrls = await signMeguriBoardImageUrls(stringArrayValue(remoteReplyRow.image_paths));
+  return remoteMeguriBoardReplyToLocal(remoteReplyRow, actor.userId, signedImageUrls);
 }
 
 function remoteMeguriBoardThreadToLocal(
   row: RemoteThreadRow,
   viewerId: string,
+  signedImageUrls: Map<string, string> = new Map(),
 ): MeguriBoardThread | null {
   const author = authorObject(row);
   const id = stringValue(row.id);
@@ -1011,6 +1043,7 @@ function remoteMeguriBoardThreadToLocal(
     createdAt: timestampValue(row.created_at, Date.now()),
     id,
     hidden: booleanValue(row.viewer_hidden),
+    imageUris: imageUrisForPaths(row.image_paths, signedImageUrls),
     isPinned: booleanValue(row.is_pinned),
     latestActivityAt: timestampValue(row.latest_activity_at, timestampValue(row.created_at, Date.now())),
     latestReplyPreview: nullableStringValue(row.latest_reply_preview),
@@ -1037,6 +1070,7 @@ function remoteMeguriBoardThreadToLocal(
 function remoteMeguriBoardReplyToLocal(
   row: RemoteReplyRow,
   viewerId: string,
+  signedImageUrls: Map<string, string> = new Map(),
 ): MeguriBoardReply | null {
   const author = authorObject(row);
   const id = stringValue(row.id);
@@ -1056,6 +1090,7 @@ function remoteMeguriBoardReplyToLocal(
     createdAt: timestampValue(row.created_at, Date.now()),
     deleted: normalizeReplyStatus(row.status) === "deleted" || !!timestampValueOrNull(row.deleted_at),
     id,
+    imageUris: imageUrisForPaths(row.image_paths, signedImageUrls),
     mine: authorId === viewerId,
     parentReplyId: nullableStringValue(row.parent_reply_id),
     quotedAuthorName: nullableStringValue(row.quote_author_name),
@@ -1204,6 +1239,9 @@ function createPreviewThread(
     createdAt,
     hidden: false,
     id,
+    imageUris: id === "preview-board-thread-1"
+      ? ["https://images.unsplash.com/photo-1517457373958-b7bdd4587205?auto=format&fit=crop&w=900&q=80"]
+      : [],
     isPinned: false,
     latestActivityAt: createdAt,
     latestReplyPreview: null,
@@ -1244,6 +1282,9 @@ function createPreviewReply(
     createdAt,
     deleted: false,
     id,
+    imageUris: id === "preview-board-reply-2"
+      ? ["https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=900&q=80"]
+      : [],
     mine: false,
     parentReplyId: quote?.id ?? null,
     quotedAuthorName: quote?.authorName ?? null,
@@ -1308,6 +1349,7 @@ function normalizeStoredThread(thread: MeguriBoardThread): MeguriBoardThread {
     category: normalizeBoardCategory(thread.category),
     distanceMeters: nullableNumberValue(thread.distanceMeters),
     hidden: Boolean(thread.hidden),
+    imageUris: normalizeImageUris(thread.imageUris),
     isPinned: Boolean(thread.isPinned),
     originLat: nullableNumberValue(thread.originLat),
     originLng: nullableNumberValue(thread.originLng),
@@ -1326,6 +1368,7 @@ function normalizeStoredReply(reply: MeguriBoardReply): MeguriBoardReply {
   return {
     ...reply,
     deleted: Boolean(reply.deleted),
+    imageUris: normalizeImageUris(reply.imageUris),
     parentReplyId: nullableStringValue(reply.parentReplyId),
     quotedAuthorName: nullableStringValue(reply.quotedAuthorName),
     quotedBody: nullableStringValue(reply.quotedBody),
@@ -1359,6 +1402,7 @@ function remoteThreadSelect(includeLocation: boolean) {
     "author_id",
     "title",
     "body",
+    "image_paths",
     "category",
     "status",
     "is_pinned",
@@ -1388,6 +1432,7 @@ function remoteReplySelect() {
     "thread_id",
     "author_id",
     "body",
+    "image_paths",
     "parent_reply_id",
     "quote_author_name",
     "quote_body",
@@ -1540,6 +1585,11 @@ function nullableStringValue(value: unknown) {
   return typeof value === "string" && value.length > 0 ? value : null;
 }
 
+function stringArrayValue(value: unknown) {
+  if (!Array.isArray(value)) return [];
+  return value.filter((item): item is string => typeof item === "string" && item.length > 0);
+}
+
 function numberValue(value: unknown, fallback: number) {
   return typeof value === "number" && Number.isFinite(value) ? value : fallback;
 }
@@ -1605,6 +1655,19 @@ function normalizeSearchQuery(value: string | null | undefined) {
   return (value ?? "").replace(/\s+/g, " ").trim().toLowerCase();
 }
 
+function normalizeImageUris(value: unknown) {
+  return stringArrayValue(value)
+    .filter((uri) => uri.trim().length > 0)
+    .slice(0, 4);
+}
+
+function imageUrisForPaths(value: unknown, signedImageUrls: Map<string, string>) {
+  return stringArrayValue(value)
+    .map((path) => signedImageUrls.get(path))
+    .filter((uri): uri is string => !!uri)
+    .slice(0, 4);
+}
+
 function compareThreads(
   left: MeguriBoardThread,
   right: MeguriBoardThread,
@@ -1657,6 +1720,70 @@ function legacyAudienceScope(scope: MeguriBoardAudienceScope): "same_spot" | "sa
   if (scope === "nearby_3km") return "same_spot";
   if (scope === "same_spot" || scope === "same_prefecture" || scope === "global") return scope;
   return "same_prefecture";
+}
+
+async function uploadMeguriBoardImages(userId: string, imageUris: string[]) {
+  if (!supabase || !hasSupabaseConfig || !isUuidLike(userId)) return [];
+  const targets = normalizeImageUris(imageUris);
+  const uploadedPaths: string[] = [];
+  try {
+    for (const uri of targets) {
+      const response = await fetch(uri);
+      if (!response.ok) {
+        throw new Error("掲示板画像を読み込めませんでした");
+      }
+      const body = await response.arrayBuffer();
+      const contentType = contentTypeForUri(uri, response.headers.get("content-type"));
+      const extension = extensionForContentType(contentType);
+      const path = `${userId}/board/${Date.now()}_${Math.random().toString(36).slice(2, 8)}.${extension}`;
+      const { error } = await supabase.storage
+        .from(MEGURI_BOARD_MEDIA_BUCKET)
+        .upload(path, body, {
+          contentType,
+          upsert: false,
+        });
+      if (error) throw error;
+      uploadedPaths.push(path);
+    }
+    return uploadedPaths;
+  } catch (error) {
+    await removeMeguriBoardImages(uploadedPaths);
+    throw error;
+  }
+}
+
+async function removeMeguriBoardImages(paths: string[]) {
+  if (!supabase || paths.length === 0) return;
+  await supabase.storage.from(MEGURI_BOARD_MEDIA_BUCKET).remove(paths).catch(() => undefined);
+}
+
+async function signMeguriBoardImageUrls(rawPaths: string[]) {
+  if (!supabase || !hasSupabaseConfig) return new Map<string, string>();
+  const paths = Array.from(new Set(rawPaths.filter((path) => path.length > 0)));
+  if (paths.length === 0) return new Map<string, string>();
+  const { data, error } = await supabase.storage
+    .from(MEGURI_BOARD_MEDIA_BUCKET)
+    .createSignedUrls(paths, 60 * 60);
+  if (error) return new Map<string, string>();
+  const signed = new Map<string, string>();
+  for (const item of data ?? []) {
+    if (item.path && item.signedUrl) signed.set(item.path, item.signedUrl);
+  }
+  return signed;
+}
+
+function contentTypeForUri(uri: string, header: string | null) {
+  if (header?.startsWith("image/")) return header;
+  const lower = uri.toLowerCase();
+  if (lower.includes(".png")) return "image/png";
+  if (lower.includes(".webp")) return "image/webp";
+  return "image/jpeg";
+}
+
+function extensionForContentType(contentType: string) {
+  if (contentType.includes("png")) return "png";
+  if (contentType.includes("webp")) return "webp";
+  return "jpg";
 }
 
 function shouldRetryLegacyBoardInsert(error: unknown) {

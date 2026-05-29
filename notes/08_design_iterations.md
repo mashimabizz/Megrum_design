@@ -4,6 +4,80 @@
 
 ---
 
+## イテレーション176：掲示板画像添付を追加
+
+### 背景・問題意識
+
+一般的なスレッド型掲示板では、列状況・会場の案内・落とし物などをテキストだけで説明するより、写真を添える方が伝わりやすい。スポット掲示板の用途にも合うため、スレッド作成と返信の両方で画像を最大4枚添付できるようにした。
+
+### 変更内容
+
+#### `mobile/src/lib/meguriBoard.ts`
+- `MeguriBoardThread` / `MeguriBoardReply` に `imageUris` を追加した。
+- Supabase Storage `meguri-board-media` へ画像をアップロードし、DBには private Storage path を保存するようにした。
+- スレッド/返信の取得時は、閲覧可能なデータに限って署名URLへ変換して表示するようにした。
+
+#### `mobile/app/meguri-board.tsx`
+- スレッド作成モーダルで写真ライブラリから最大4枚の画像を添付できるようにした。
+- スレッド一覧カードに添付画像のサムネイルを表示するようにした。
+
+#### `mobile/app/meguri-board-thread.tsx`
+- スレッド本文と返信に添付画像のサムネイルを表示するようにした。
+- 返信入力欄に画像添付ボタンを追加し、画像だけの返信は「画像を共有しました」として送信できるようにした。
+
+#### `supabase/migrations/20260530231500_add_meguri_board_image_attachments.sql`
+- private Storage bucket `meguri-board-media` を追加した。
+- `meguri_board_threads.image_paths` / `meguri_board_replies.image_paths` を追加した。
+- スレッド一覧RPC、返信一覧RPC、返信作成RPCで `image_paths` を扱うように更新した。
+
+#### `notes/05_data_model.md`
+- スポット掲示板の画像添付と Storage 方針を追記した。
+
+#### `notes/09_state_machines.md`
+- 掲示板画像添付のビジネスルールを追記した。
+
+#### `notes/10_glossary.md`
+- 掲示板画像添付を追加した。
+
+#### `notes/13_api_spec.md`
+- 掲示板の作成/返信レスポンスと画像添付仕様を追記した。
+
+### 影響範囲
+
+- iOS版 スポット掲示板一覧
+- iOS版 スポット掲示板詳細
+- Supabase スポット掲示板テーブル/RPC/Storage
+- 掲示板のデータモデル・状態遷移・API仕様・用語
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `supabase db push --dry-run`
+- `supabase db push`（`20260530231500_add_meguri_board_image_attachments.sql` を remote DB に適用）
+- `npm --prefix mobile run export:ios:preview`
+- `EAS_UPDATE_PROJECT_SLUG=ihub EXPO_NO_GIT_STATUS=1 npm --prefix mobile run update:ios:preview -- --message "[iter176] add board image attachments" --non-interactive`
+- Preview OTA: Update group `2e63b068-68de-4d12-b80d-34a0be157cfb` / iOS update `019e74ee-6b5e-75c1-b4ce-4a0116be2c8f`
+
+### 関連ファイル
+
+- `mobile/src/lib/meguriBoard.ts`
+- `mobile/app/meguri-board.tsx`
+- `mobile/app/meguri-board-thread.tsx`
+- `supabase/migrations/20260530231500_add_meguri_board_image_attachments.sql`
+- `notes/05_data_model.md`
+- `notes/09_state_machines.md`
+- `notes/10_glossary.md`
+- `notes/13_api_spec.md`
+
+### セルフレビュー結果
+
+- ✅ スレッド作成・返信の両方で最大4枚の画像を扱う実装にした。
+- ✅ 画像は private Storage path として保存し、アプリ表示時に署名URL化する。
+- ✅ Preview/local fallback でも添付画像表示が壊れないよう `imageUris` をローカル保持する。
+- ✅ データモデル・状態遷移・用語・API仕様を更新。
+
+---
+
 ## イテレーション175：掲示板メンション通知を追加
 
 ### 背景・問題意識
