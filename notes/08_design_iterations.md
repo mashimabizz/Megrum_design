@@ -4,6 +4,53 @@
 
 ---
 
+## イテレーション214：掲示板スレッド作成に下書き保存表示を追加
+
+### 背景・問題意識
+
+スレッド作成モーダルでも端末内に下書きが保存されるが、ユーザーから見ると保存中かどうかが分かりにくかった。返信欄と同じように、作成中のタイトル・本文・添付画像が残っている時は下書き保存中であることを明示し、不要ならすぐ破棄できるようにした。
+
+### 変更内容
+
+#### `mobile/app/meguri-board.tsx`
+- スレッド作成モーダルで、タイトル・本文・添付画像のいずれかがある時に `下書き保存中` チップを表示するようにした。
+- 添付画像がある場合は、下書きチップに画像枚数も表示するようにした。
+- `破棄` でタイトル・本文・添付画像・エラー表示を消し、端末内の作成下書きも削除するようにした。
+
+#### `notes/09_state_machines.md`
+- Meguri Board Lifecycle にスレッド作成下書き表示と破棄のルールを追記した。
+
+#### `notes/10_glossary.md`
+- 掲示板スレッド作成下書き表示を追加した。
+
+### 影響範囲
+
+- iOS版 スポット掲示板一覧
+- スレッド作成モーダル
+- スレッド作成下書き保存
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- `EAS_UPDATE_PROJECT_SLUG=ihub EXPO_NO_GIT_STATUS=1 npm --prefix mobile run update:ios:preview -- --message "[iter214] add board thread draft status" --non-interactive`
+- Preview OTA: Update group `ac8dfce1-509d-4687-9b1c-3b058f033364` / iOS update `019e7599-95ba-7315-9183-5c62393b7454`
+
+### 関連ファイル
+
+- `mobile/app/meguri-board.tsx`
+- `notes/08_design_iterations.md`
+- `notes/09_state_machines.md`
+- `notes/10_glossary.md`
+
+### セルフレビュー結果
+
+- ✅ 既存の端末内下書き保存を使い、DB変更なしで表示と破棄だけを追加した。
+- ✅ 返信欄の下書き表示と同じ情報設計に揃えた。
+- ✅ ネイティブ依存追加なしで、Preview OTA対象内に収めた。
+
+---
+
 ## イテレーション213：掲示板返信欄に下書き保存表示を追加
 
 ### 背景・問題意識

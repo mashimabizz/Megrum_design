@@ -172,6 +172,8 @@ export default function MeguriBoardScreen() {
   );
   const hasActiveFilters =
     categoryFilter !== "all" || !!searchText.trim() || sortMode !== "active" || mediaOnly;
+  const hasComposerDraft =
+    !!composerTitle.trim() || !!composerBody.trim() || composerImageUris.length > 0;
 
   const sections = useMemo(
     () =>
@@ -369,6 +371,14 @@ export default function MeguriBoardScreen() {
 
   function removeComposerImage(uri: string) {
     setComposerImageUris((current) => current.filter((candidate) => candidate !== uri));
+  }
+
+  async function discardComposerDraft() {
+    setComposerTitle("");
+    setComposerBody("");
+    setComposerImageUris([]);
+    setComposerError(null);
+    await clearMeguriBoardComposerDraft(viewerContext);
   }
 
   function openComposer() {
@@ -986,6 +996,20 @@ export default function MeguriBoardScreen() {
             <View style={styles.modalHandle} />
             <Text style={styles.modalTitle}>新しいスレッド</Text>
             <Text style={styles.modalSubTitle}>作成時の位置を基準に、見える範囲を選びます。</Text>
+            {hasComposerDraft ? (
+              <View style={styles.composerDraftStatus}>
+                <Text style={styles.composerDraftText}>
+                  下書き保存中{composerImageUris.length > 0 ? ` · 画像${composerImageUris.length}枚` : ""}
+                </Text>
+                <Pressable
+                  accessibilityRole="button"
+                  onPress={discardComposerDraft}
+                  style={styles.composerDraftDiscard}
+                >
+                  <Text style={styles.composerDraftDiscardText}>破棄</Text>
+                </Pressable>
+              </View>
+            ) : null}
 
             <View style={styles.field}>
               <Text style={styles.fieldLabel}>タイトル</Text>
@@ -1903,6 +1927,35 @@ const styles = StyleSheet.create({
     fontSize: 12.5,
     fontWeight: "700",
     marginTop: -10,
+  },
+  composerDraftStatus: {
+    alignItems: "center",
+    alignSelf: "flex-start",
+    backgroundColor: "rgba(166,149,216,0.1)",
+    borderRadius: 999,
+    flexDirection: "row",
+    gap: 8,
+    minHeight: 30,
+    paddingLeft: 12,
+    paddingRight: 5,
+  },
+  composerDraftText: {
+    color: megrumColors.lavender,
+    fontSize: 11,
+    fontWeight: "900",
+  },
+  composerDraftDiscard: {
+    alignItems: "center",
+    backgroundColor: "#fff",
+    borderRadius: 999,
+    justifyContent: "center",
+    minHeight: 22,
+    paddingHorizontal: 9,
+  },
+  composerDraftDiscardText: {
+    color: megrumColors.mutedInk,
+    fontSize: 10.5,
+    fontWeight: "900",
   },
   field: {
     gap: 8,
