@@ -26,6 +26,7 @@
 - `npm --prefix mobile run typecheck`
 - `git diff --check -- mobile/app/onboarding/done.tsx`
 - TestFlight / Preview でオンボーディング完了画面 → 「ホームへ」→ アプリ内ホームタブへ戻ることを確認
+- Preview channel OTA配信済み：Update group `774c4e4d-1782-4240-8d1b-54c545cf9d17` / iOS update ID `019e7129-6d83-78c5-873e-1bdae54c716b`
 
 ### 関連ファイル
 
