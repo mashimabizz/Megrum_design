@@ -40,6 +40,7 @@
 - `npm --prefix mobile run typecheck`
 - `git diff --check -- mobile/app/proposal-select.tsx mobile/app/proposal-confirm.tsx mobile/src/data/proposalItems.ts mobile/app/user-profile.tsx`
 - 実機 / TestFlight で相手プロフィール → 「この人に打診する」→ 「私が出す」に自分の在庫、「受け取る」に相手の在庫だけが出ることを確認
+- Preview channel OTA配信済み：Update group `8deafdb7-8ea6-40c5-99e1-22a902ed3bee` / iOS update ID `019e7125-8427-7c2d-80d5-d7664be76d68`
 
 ### 関連ファイル
 
