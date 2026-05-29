@@ -337,6 +337,7 @@ export default function MeguriBoardThreadScreen() {
     return attachments;
   }, [replies, replyNumberById, thread]);
   const threadBodyCollapsible = (thread?.body.trim().length ?? 0) > 180;
+  const hasReplyDraft = !!draft.trim() || draftImageUris.length > 0;
 
   useEffect(() => {
     setSearchCursorIndex(0);
@@ -634,6 +635,15 @@ export default function MeguriBoardThreadScreen() {
 
   function removeDraftImage(uri: string) {
     setDraftImageUris((current) => current.filter((candidate) => candidate !== uri));
+  }
+
+  async function discardReplyDraft() {
+    if (!threadId) return;
+    setDraft("");
+    setDraftImageUris([]);
+    setQuoteTarget(null);
+    setSendError(null);
+    await clearMeguriBoardReplyDraft(threadId);
   }
 
   function updateThread(nextThread: MeguriBoardThread) {
@@ -1536,6 +1546,20 @@ export default function MeguriBoardThreadScreen() {
                     </Pressable>
                   </View>
                 ) : null}
+                {hasReplyDraft ? (
+                  <View style={styles.composerDraftStatus}>
+                    <Text style={styles.composerDraftText}>
+                      下書き保存中{draftImageUris.length > 0 ? ` · 画像${draftImageUris.length}枚` : ""}
+                    </Text>
+                    <Pressable
+                      accessibilityRole="button"
+                      onPress={discardReplyDraft}
+                      style={styles.composerDraftDiscard}
+                    >
+                      <Text style={styles.composerDraftDiscardText}>破棄</Text>
+                    </Pressable>
+                  </View>
+                ) : null}
                 <View style={styles.composerInputRow}>
                   <Pressable
                     accessibilityRole="button"
@@ -1560,17 +1584,17 @@ export default function MeguriBoardThreadScreen() {
                   />
                   <Pressable
                     accessibilityRole="button"
-                    disabled={sending || (!draft.trim() && draftImageUris.length === 0)}
+                    disabled={sending || !hasReplyDraft}
                     onPress={handleSend}
                     style={[
                       styles.sendButton,
-                      draft.trim() || draftImageUris.length > 0 ? styles.sendButtonActive : null,
+                      hasReplyDraft ? styles.sendButtonActive : null,
                       sending ? styles.sendButtonDisabled : null,
                     ]}
                   >
                     <IconSymbol
                       name={sending ? "ellipsis-horizontal" : "send-outline"}
-                      color={draft.trim() || draftImageUris.length > 0 ? "#fff" : "rgba(58,50,74,0.42)"}
+                      color={hasReplyDraft ? "#fff" : "rgba(58,50,74,0.42)"}
                       size={18}
                     />
                   </Pressable>
@@ -2895,6 +2919,35 @@ const styles = StyleSheet.create({
     color: megrumColors.mutedInk,
     fontSize: 11.5,
     fontWeight: "800",
+  },
+  composerDraftStatus: {
+    alignItems: "center",
+    alignSelf: "flex-start",
+    backgroundColor: "rgba(166,149,216,0.1)",
+    borderRadius: 999,
+    flexDirection: "row",
+    gap: 8,
+    minHeight: 30,
+    paddingLeft: 12,
+    paddingRight: 5,
+  },
+  composerDraftText: {
+    color: megrumColors.lavender,
+    fontSize: 11,
+    fontWeight: "900",
+  },
+  composerDraftDiscard: {
+    alignItems: "center",
+    backgroundColor: "#fff",
+    borderRadius: 999,
+    minHeight: 22,
+    justifyContent: "center",
+    paddingHorizontal: 9,
+  },
+  composerDraftDiscardText: {
+    color: megrumColors.mutedInk,
+    fontSize: 10.5,
+    fontWeight: "900",
   },
   composerInputRow: {
     alignItems: "flex-end",

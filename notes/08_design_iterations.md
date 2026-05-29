@@ -4,6 +4,54 @@
 
 ---
 
+## イテレーション213：掲示板返信欄に下書き保存表示を追加
+
+### 背景・問題意識
+
+返信下書きは端末内に保存されていたが、ユーザーから見ると保存されているか分かりにくく、書きかけを消したい時の導線もなかった。一般的なスレッド/チャットUIとして、返信欄に下書き保存中の表示と破棄操作を追加した。
+
+### 変更内容
+
+#### `mobile/app/meguri-board-thread.tsx`
+- 返信本文または添付画像がある時、返信欄の上に `下書き保存中` チップを表示するようにした。
+- 添付画像がある場合は、下書きチップに画像枚数も表示するようにした。
+- `破棄` で返信本文・添付画像・引用対象・エラー表示を消し、端末内下書きも削除するようにした。
+- 送信ボタンの有効判定を `hasReplyDraft` に集約した。
+
+#### `notes/09_state_machines.md`
+- Meguri Board Lifecycle に返信下書き表示と破棄のルールを追記した。
+
+#### `notes/10_glossary.md`
+- 掲示板返信下書き表示を追加した。
+
+### 影響範囲
+
+- iOS版 スポット掲示板詳細
+- 返信入力欄
+- 返信下書き保存
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- `EAS_UPDATE_PROJECT_SLUG=ihub EXPO_NO_GIT_STATUS=1 npm --prefix mobile run update:ios:preview -- --message "[iter213] add board reply draft status" --non-interactive`
+- Preview OTA: Update group `12af5713-6640-4f8a-892d-fcd936037a8a` / iOS update `019e7592-cf3a-7716-a963-a17856b0f974`
+
+### 関連ファイル
+
+- `mobile/app/meguri-board-thread.tsx`
+- `notes/08_design_iterations.md`
+- `notes/09_state_machines.md`
+- `notes/10_glossary.md`
+
+### セルフレビュー結果
+
+- ✅ 既存の端末内下書き保存を使い、DB変更なしで表示と破棄だけを追加した。
+- ✅ 画像だけの返信下書きも表示・送信・破棄できるようにした。
+- ✅ DB変更やネイティブ依存追加なしで、Preview OTA対象内に収めた。
+
+---
+
 ## イテレーション212：掲示板返信の検索条件チップを追加
 
 ### 背景・問題意識
