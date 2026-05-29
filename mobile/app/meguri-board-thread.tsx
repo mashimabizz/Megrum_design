@@ -7,6 +7,7 @@ import {
   ActivityIndicator,
   Alert,
   Image,
+  Linking,
   Modal,
   Platform,
   Pressable,
@@ -109,6 +110,9 @@ const REPLY_SORT_OPTIONS: { label: string; value: BoardReplySortMode }[] = [
   { label: "新着順", value: "newest" },
   { label: "参考順", value: "popular" },
 ];
+
+const INLINE_URL_PATTERN = /(https?:\/\/[^\s]+)/gi;
+const URL_TRAILING_PUNCTUATION_PATTERN = /[.,!?;:)\]}]+$/;
 
 export default function MeguriBoardThreadScreen() {
   const insets = useSafeAreaInsets();
@@ -1256,12 +1260,13 @@ export default function MeguriBoardThreadScreen() {
                   <Text style={styles.heroTime}>{formatRelativeTime(thread.createdAt)}</Text>
                 </View>
                 <Text style={styles.heroTitle}>{thread.title}</Text>
-                <Text
+                <HighlightedText
+                  linkify
                   numberOfLines={threadBodyCollapsible && !threadBodyExpanded ? 5 : undefined}
+                  query=""
                   style={styles.heroBody}
-                >
-                  {thread.body}
-                </Text>
+                  text={thread.body}
+                />
                 {threadBodyCollapsible ? (
                   <Pressable
                     accessibilityRole="button"
@@ -1598,6 +1603,7 @@ export default function MeguriBoardThreadScreen() {
                               </Pressable>
                             ) : null}
                             <HighlightedText
+                              linkify
                               highlightStyle={reply.mine ? styles.searchHighlightMine : null}
                               query={replySearchQuery}
                               style={[
@@ -2172,17 +2178,43 @@ function PickedImageRail({
 
 function HighlightedText({
   highlightStyle,
+  linkify = false,
   numberOfLines,
   query,
   style,
   text,
 }: {
   highlightStyle?: StyleProp<TextStyle>;
+  linkify?: boolean;
   numberOfLines?: number;
   query: string;
   style: StyleProp<TextStyle>;
   text: string;
 }) {
+  if (linkify) {
+    const linkSegments = splitInlineUrlSegments(text);
+    if (linkSegments.some((segment) => segment.url)) {
+      return (
+        <Text numberOfLines={numberOfLines} style={style}>
+          {linkSegments.map((segment, index) =>
+            segment.url ? (
+              <Text
+                key={`${segment.text}-${index}`}
+                onPress={() => openInlineUrl(segment.url ?? segment.text)}
+                style={styles.inlineLinkText}
+              >
+                {renderHighlightedTextSegments(segment.text, query, highlightStyle)}
+              </Text>
+            ) : (
+              <Text key={`${segment.text}-${index}`}>
+                {renderHighlightedTextSegments(segment.text, query, highlightStyle)}
+              </Text>
+            ),
+          )}
+        </Text>
+      );
+    }
+  }
   const segments = splitHighlightSegments(text, query);
   if (!query || segments.length === 1 && !segments[0]?.match) {
     return (
@@ -2203,6 +2235,54 @@ function HighlightedText({
       ))}
     </Text>
   );
+}
+
+function renderHighlightedTextSegments(text: string, query: string, highlightStyle?: StyleProp<TextStyle>) {
+  const segments = splitHighlightSegments(text, query);
+  if (!query || segments.length === 1 && !segments[0]?.match) {
+    return text;
+  }
+  return segments.map((segment, index) => (
+    <Text
+      key={`${segment.text}-${index}`}
+      style={segment.match ? [styles.searchHighlight, highlightStyle] : null}
+    >
+      {segment.text}
+    </Text>
+  ));
+}
+
+function splitInlineUrlSegments(text: string) {
+  const segments: Array<{ text: string; url?: string }> = [];
+  INLINE_URL_PATTERN.lastIndex = 0;
+  let cursor = 0;
+  let match: RegExpExecArray | null;
+  while ((match = INLINE_URL_PATTERN.exec(text)) !== null) {
+    const matchedText = match[0] ?? "";
+    if (!matchedText) continue;
+    if (match.index > cursor) {
+      segments.push({ text: text.slice(cursor, match.index) });
+    }
+    const trimmedUrl = matchedText.replace(URL_TRAILING_PUNCTUATION_PATTERN, "");
+    const trailingText = matchedText.slice(trimmedUrl.length);
+    if (trimmedUrl) {
+      segments.push({ text: trimmedUrl, url: trimmedUrl });
+    }
+    if (trailingText) {
+      segments.push({ text: trailingText });
+    }
+    cursor = match.index + matchedText.length;
+  }
+  if (cursor < text.length) {
+    segments.push({ text: text.slice(cursor) });
+  }
+  return segments.length > 0 ? segments : [{ text }];
+}
+
+function openInlineUrl(url: string) {
+  Linking.openURL(url).catch(() => {
+    Alert.alert("リンクを開けません", "URLを確認して、もう一度お試しください。");
+  });
 }
 
 function categoryStyle(category: Exclude<MeguriBoardThreadCategory, "all">) {
@@ -3114,6 +3194,10 @@ const styles = StyleSheet.create({
   },
   searchHighlightMine: {
     backgroundColor: "rgba(255,255,255,0.24)",
+  },
+  inlineLinkText: {
+    fontWeight: "900",
+    textDecorationLine: "underline",
   },
   composer: {
     backgroundColor: "rgba(251,249,252,0.98)",

@@ -4,6 +4,55 @@
 
 ---
 
+## イテレーション226：掲示板本文と返信のURLを開けるようにする
+
+### 背景・問題意識
+
+スポット掲示板では、会場公式ページ、整理券案内、SNS投稿、地図共有などのURLが貼られる可能性が高い。一般的なスレッド機能として、本文中のURLを自動リンク化し、アプリ内から直接開けるようにした。
+
+### 変更内容
+
+#### `mobile/app/meguri-board-thread.tsx`
+- スレッド本文と返信本文の `https://` / `http://` URLを検出し、下線付きリンクとして表示するようにした。
+- URLタップ時に `Linking.openURL` で外部ブラウザ/対応アプリを開くようにした。
+- URL末尾の句読点や閉じ括弧はリンク対象から外し、文章末尾の記号でリンクが壊れにくいようにした。
+- 既存のスレッド内検索ハイライトとURLリンク表示を併用できるようにした。
+
+#### `notes/09_state_machines.md`
+- Meguri Board Lifecycle に本文/返信URL自動リンクの表示ルールを追記した。
+
+#### `notes/10_glossary.md`
+- 掲示板URL自動リンクを追加した。
+
+### 影響範囲
+
+- iOS版 スポット掲示板詳細
+- スレッド本文
+- 返信本文
+- スレッド内検索ハイライト
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- `EAS_UPDATE_PROJECT_SLUG=ihub EXPO_NO_GIT_STATUS=1 npm --prefix mobile run update:ios:preview -- --message "[iter226] link board urls" --non-interactive`
+- Preview OTA: Update group `4ce12532-c028-45bd-99f5-d23eaebe36db` / iOS update `019e75cf-f4ab-7deb-bb60-be791d271d07`
+
+### 関連ファイル
+
+- `mobile/app/meguri-board-thread.tsx`
+- `notes/08_design_iterations.md`
+- `notes/09_state_machines.md`
+- `notes/10_glossary.md`
+
+### セルフレビュー結果
+
+- ✅ React Native標準の `Linking` だけを使い、ネイティブ依存追加なしでURLリンク化した。
+- ✅ URL表示は既存の本文/返信レイアウト内に収め、カード構造を変えないようにした。
+- ✅ 検索ハイライトとURLリンク表示を同時に扱えるようにした。
+
+---
+
 ## イテレーション225：掲示板詳細に返信ツリー導線を追加
 
 ### 背景・問題意識
