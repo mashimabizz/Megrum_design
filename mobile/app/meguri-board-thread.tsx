@@ -132,6 +132,7 @@ export default function MeguriBoardThreadScreen() {
   const [sending, setSending] = useState(false);
   const [sendError, setSendError] = useState<string | null>(null);
   const [replySearchText, setReplySearchText] = useState("");
+  const [replyJumpText, setReplyJumpText] = useState("");
   const [quoteTarget, setQuoteTarget] = useState<MeguriBoardReply | null>(null);
   const [threadEditorOpen, setThreadEditorOpen] = useState(false);
   const [threadEditTitle, setThreadEditTitle] = useState("");
@@ -405,6 +406,22 @@ export default function MeguriBoardThreadScreen() {
     if (typeof y === "number") {
       scrollViewRef.current?.scrollTo({ animated: true, y: Math.max(0, y - 12) });
     }
+  }
+
+  function jumpToReplyNumber() {
+    const replyNumber = Number.parseInt(replyJumpText, 10);
+    if (!Number.isFinite(replyNumber) || replyNumber < 1 || replyNumber > replies.length) {
+      Alert.alert("返信が見つかりません", `1〜${replies.length}の番号を入力してください。`);
+      return;
+    }
+    const targetReply = replies[replyNumber - 1];
+    if (!targetReply) {
+      Alert.alert("返信が見つかりません", "指定された番号の返信が見つかりませんでした。");
+      return;
+    }
+    setReplySearchText("");
+    setReplyJumpText("");
+    setTimeout(() => scrollToReply(targetReply.id), 140);
   }
 
   function jumpToMediaSource(attachment: BoardMediaAttachment) {
@@ -1210,6 +1227,38 @@ export default function MeguriBoardThreadScreen() {
                   })}
                 </View>
               </View>
+              {replies.length > 0 ? (
+                <View style={styles.replyJumpRow}>
+                  <View style={styles.replyJumpInputWrap}>
+                    <Text style={styles.replyJumpPrefix}>#</Text>
+                    <TextInput
+                      keyboardType="number-pad"
+                      onChangeText={(text) => setReplyJumpText(text.replace(/\D/g, "").slice(0, 5))}
+                      onSubmitEditing={jumpToReplyNumber}
+                      placeholder="返信番号"
+                      placeholderTextColor="rgba(58,50,74,0.34)"
+                      returnKeyType="done"
+                      style={styles.replyJumpInput}
+                      value={replyJumpText}
+                    />
+                  </View>
+                  <Pressable
+                    accessibilityRole="button"
+                    disabled={!replyJumpText.trim()}
+                    onPress={jumpToReplyNumber}
+                    style={[styles.replyJumpButton, replyJumpText.trim() ? styles.replyJumpButtonActive : null]}
+                  >
+                    <Text
+                      style={[
+                        styles.replyJumpButtonText,
+                        replyJumpText.trim() ? styles.replyJumpButtonTextActive : null,
+                      ]}
+                    >
+                      移動
+                    </Text>
+                  </Pressable>
+                </View>
+              ) : null}
               {replySearchQuery && sortedReplies.length > 0 ? (
                 <View style={styles.replySearchNavigator}>
                   <Text style={styles.replySearchNavigatorLabel}>
@@ -2385,6 +2434,54 @@ const styles = StyleSheet.create({
     fontWeight: "900",
   },
   replySortOptionTextActive: {
+    color: megrumColors.lavender,
+  },
+  replyJumpRow: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 8,
+  },
+  replyJumpInputWrap: {
+    alignItems: "center",
+    backgroundColor: "#fff",
+    borderColor: "rgba(58,50,74,0.08)",
+    borderRadius: 15,
+    borderWidth: 1,
+    flex: 1,
+    flexDirection: "row",
+    gap: 4,
+    minHeight: 38,
+    paddingHorizontal: 12,
+  },
+  replyJumpPrefix: {
+    color: megrumColors.lavender,
+    fontSize: 12,
+    fontWeight: "900",
+  },
+  replyJumpInput: {
+    color: megrumColors.ink,
+    flex: 1,
+    fontSize: 12,
+    fontWeight: "900",
+    padding: 0,
+  },
+  replyJumpButton: {
+    alignItems: "center",
+    backgroundColor: "rgba(58,50,74,0.06)",
+    borderRadius: 999,
+    minHeight: 36,
+    justifyContent: "center",
+    paddingHorizontal: 14,
+  },
+  replyJumpButtonActive: {
+    backgroundColor: "rgba(166,149,216,0.16)",
+  },
+  replyJumpButtonText: {
+    color: "rgba(58,50,74,0.42)",
+    fontSize: 11,
+    fontWeight: "900",
+  },
+  replyJumpButtonTextActive: {
     color: megrumColors.lavender,
   },
   replySearchNavigator: {

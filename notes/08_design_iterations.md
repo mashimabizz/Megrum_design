@@ -4,6 +4,53 @@
 
 ---
 
+## イテレーション201：掲示板返信番号ジャンプを追加
+
+### 背景・問題意識
+
+スレッドに返信番号を付けたことで、ユーザー同士が「#12 見て」のように会話しやすくなった。一方、検索で番号を絞り込むだけでは本文の流れに戻る操作が少し遠いので、番号を入力して該当返信へ直接移動できるジャンプ操作を追加した。
+
+### 変更内容
+
+#### `mobile/app/meguri-board-thread.tsx`
+- 返信一覧の操作エリアに返信番号入力欄と `移動` ボタンを追加した。
+- `#` を前提にした番号入力で、指定した返信番号の位置へ直接スクロールできるようにした。
+- 表示順や検索条件が変わっていても、元スレッド内の返信番号を基準に移動するようにした。
+- 無効な番号では、入力可能な範囲を案内するアラートを表示するようにした。
+
+#### `notes/09_state_machines.md`
+- Meguri Board Lifecycle に返信番号ジャンプの表示ルールを追記した。
+
+#### `notes/10_glossary.md`
+- 掲示板返信番号ジャンプを追加した。
+
+### 影響範囲
+
+- iOS版 スポット掲示板詳細
+- 返信番号検索・返信表示順切り替えとの併用操作
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- `EAS_UPDATE_PROJECT_SLUG=ihub EXPO_NO_GIT_STATUS=1 npm --prefix mobile run update:ios:preview -- --message "[iter201] add board reply number jump" --non-interactive`
+- Preview OTA: Update group `2855123a-e763-4dba-b9df-4e42ba2c3cbc` / iOS update `019e7569-6c17-7244-a698-06629752780c`
+
+### 関連ファイル
+
+- `mobile/app/meguri-board-thread.tsx`
+- `notes/08_design_iterations.md`
+- `notes/09_state_machines.md`
+- `notes/10_glossary.md`
+
+### セルフレビュー結果
+
+- ✅ 返信番号は表示順に依存しない元スレッド内番号を使い、番号検索・引用と同じ基準にそろえた。
+- ✅ 検索中でもジャンプ時に検索条件を解除し、該当返信位置へ移動できるようにした。
+- ✅ 無効入力時はクラッシュや無反応にせず、入力範囲を明示するようにした。
+
+---
+
 ## イテレーション200：掲示板返信表示順を追加
 
 ### 背景・問題意識
