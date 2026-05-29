@@ -44,7 +44,7 @@
 - `npm --prefix mobile run export:ios:preview`
 - `git diff --check -- mobile/app/address-settings.tsx mobile/src/components/Screen.tsx mobile/app/settings-privacy.tsx mobile/src/lib/japanPostalCode.ts`
 - `https://zipcloud.ibsnet.co.jp/api/search?zipcode=1000001` が `東京都 / 千代田区 / 千代田` を返すことを確認
-- Preview channel OTA配信は後続で実施
+- Preview channel OTA配信済み：Update group `2a9a2fa0-8d06-44c5-8edf-4ba69dd6e42a` / iOS update ID `019e72d4-d941-756d-8e46-90921bab988c`
 
 ### 関連ファイル
 
