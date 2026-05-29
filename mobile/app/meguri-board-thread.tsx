@@ -73,6 +73,17 @@ import {
 import { useKeyboardInset } from "../src/lib/useKeyboardInset";
 import { megrumColors, megrumShadow } from "../src/theme/tokens";
 
+type BoardParticipant = {
+  handle: string | null;
+  id: string;
+  isAuthor: boolean;
+  lastActiveAt: number;
+  mine: boolean;
+  name: string;
+  primaryArea: string | null;
+  replyCount: number;
+};
+
 export default function MeguriBoardThreadScreen() {
   const insets = useSafeAreaInsets();
   const keyboardInset = useKeyboardInset();
@@ -110,6 +121,7 @@ export default function MeguriBoardThreadScreen() {
   const [replyEditBody, setReplyEditBody] = useState("");
   const [imagePreviewUri, setImagePreviewUri] = useState<string | null>(null);
   const [previousReadAt, setPreviousReadAt] = useState<number | null>(null);
+  const [participantsOpen, setParticipantsOpen] = useState(false);
   const scrollViewRef = useRef<ScrollView | null>(null);
 
   const actor = useMemo<MeguriBoardActor>(
@@ -173,6 +185,71 @@ export default function MeguriBoardThreadScreen() {
     const firstUnreadReply = replies.find((reply) => !previousReadAt || reply.createdAt > previousReadAt);
     return firstUnreadReply?.id ?? null;
   }, [previousReadAt, replies, replySearchText]);
+
+  const participants = useMemo<BoardParticipant[]>(() => {
+    if (!thread) return [];
+    const participantMap = new Map<string, BoardParticipant>();
+    const upsertParticipant = (input: {
+      handle: string | null;
+      id: string;
+      isAuthor?: boolean;
+      lastActiveAt: number;
+      mine?: boolean;
+      name: string;
+      primaryArea: string | null;
+      replyIncrement?: number;
+    }) => {
+      const existing = participantMap.get(input.id);
+      if (existing) {
+        participantMap.set(input.id, {
+          ...existing,
+          handle: existing.handle ?? input.handle,
+          isAuthor: existing.isAuthor || !!input.isAuthor,
+          lastActiveAt: Math.max(existing.lastActiveAt, input.lastActiveAt),
+          mine: existing.mine || !!input.mine,
+          name: existing.name || input.name,
+          primaryArea: existing.primaryArea ?? input.primaryArea,
+          replyCount: existing.replyCount + (input.replyIncrement ?? 0),
+        });
+        return;
+      }
+      participantMap.set(input.id, {
+        handle: input.handle,
+        id: input.id,
+        isAuthor: !!input.isAuthor,
+        lastActiveAt: input.lastActiveAt,
+        mine: !!input.mine,
+        name: input.name,
+        primaryArea: input.primaryArea,
+        replyCount: input.replyIncrement ?? 0,
+      });
+    };
+    upsertParticipant({
+      handle: thread.authorHandle,
+      id: thread.authorId,
+      isAuthor: true,
+      lastActiveAt: thread.createdAt,
+      mine: thread.mine || thread.authorId === actor.userId,
+      name: thread.authorName,
+      primaryArea: thread.authorPrimaryArea,
+    });
+    replies.forEach((reply) => {
+      if (reply.deleted) return;
+      upsertParticipant({
+        handle: reply.authorHandle,
+        id: reply.authorId,
+        lastActiveAt: reply.createdAt,
+        mine: reply.mine || reply.authorId === actor.userId,
+        name: reply.authorName,
+        primaryArea: reply.authorPrimaryArea,
+        replyIncrement: 1,
+      });
+    });
+    return Array.from(participantMap.values()).sort((left, right) => {
+      if (left.isAuthor !== right.isAuthor) return left.isAuthor ? -1 : 1;
+      return right.lastActiveAt - left.lastActiveAt;
+    });
+  }, [actor.userId, replies, thread]);
 
   function scrollToLatestReply(animated = true) {
     requestAnimationFrame(() => {
@@ -899,6 +976,13 @@ export default function MeguriBoardThreadScreen() {
                       {thread.subscribed ? "通知ON" : "通知"}
                     </Text>
                   </Pressable>
+                  <Pressable
+                    accessibilityRole="button"
+                    onPress={() => setParticipantsOpen(true)}
+                    style={styles.threadActionPill}
+                  >
+                    <Text style={styles.threadActionText}>参加者 {participants.length}</Text>
+                  </Pressable>
                 </View>
               </View>
 
@@ -1125,6 +1209,78 @@ export default function MeguriBoardThreadScreen() {
             {sendError ? <Text style={styles.sendError}>{sendError}</Text> : null}
           </>
         )}
+        <Modal
+          animationType="slide"
+          onRequestClose={() => setParticipantsOpen(false)}
+          transparent
+          visible={participantsOpen}
+        >
+          <View style={styles.modalOverlay}>
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => setParticipantsOpen(false)}
+              style={StyleSheet.absoluteFill}
+            />
+            <View style={[styles.editorCard, styles.participantsCard]}>
+              <View style={styles.participantsHeader}>
+                <View style={styles.participantsTitleBlock}>
+                  <Text style={styles.editorEyebrow}>THREAD</Text>
+                  <Text style={styles.editorTitle}>参加者</Text>
+                  <Text style={styles.participantsLead}>
+                    {participants.length}人がこのスレッドに参加しています
+                  </Text>
+                </View>
+                <Pressable
+                  accessibilityRole="button"
+                  onPress={() => setParticipantsOpen(false)}
+                  style={styles.participantsCloseButton}
+                >
+                  <IconSymbol name="close" color={megrumColors.mutedInk} size={16} />
+                </Pressable>
+              </View>
+              <ScrollView
+                contentContainerStyle={styles.participantsList}
+                showsVerticalScrollIndicator={false}
+              >
+                {participants.map((participant) => (
+                  <View key={participant.id} style={styles.participantRow}>
+                    <View
+                      style={[
+                        styles.participantAvatar,
+                        { backgroundColor: colorForAuthor(participant.id) },
+                      ]}
+                    >
+                      <Text style={styles.participantAvatarText}>{participant.name.slice(0, 1)}</Text>
+                    </View>
+                    <View style={styles.participantCopy}>
+                      <View style={styles.participantNameRow}>
+                        <Text numberOfLines={1} style={styles.participantName}>
+                          {participant.name}
+                        </Text>
+                        {participant.mine ? (
+                          <View style={styles.participantMiniBadge}>
+                            <Text style={styles.participantMiniBadgeText}>あなた</Text>
+                          </View>
+                        ) : null}
+                        {participant.isAuthor ? (
+                          <View style={styles.participantMiniBadge}>
+                            <Text style={styles.participantMiniBadgeText}>作成者</Text>
+                          </View>
+                        ) : null}
+                      </View>
+                      <Text numberOfLines={1} style={styles.participantMeta}>
+                        {participantSummary(participant)}
+                      </Text>
+                    </View>
+                    <Text style={styles.participantActiveAt}>
+                      {formatRelativeTime(participant.lastActiveAt)}
+                    </Text>
+                  </View>
+                ))}
+              </ScrollView>
+            </View>
+          </View>
+        </Modal>
         <Modal
           animationType="slide"
           onRequestClose={() => setThreadEditorOpen(false)}
@@ -1470,6 +1626,15 @@ function colorForAuthor(authorId: string) {
   return palette[sum % palette.length] || palette[0];
 }
 
+function participantSummary(participant: BoardParticipant) {
+  const parts: string[] = [];
+  if (participant.handle) parts.push(`@${participant.handle}`);
+  if (participant.primaryArea) parts.push(participant.primaryArea);
+  if (participant.replyCount > 0) parts.push(`返信 ${participant.replyCount}件`);
+  if (parts.length === 0) return "返信なし";
+  return parts.join(" · ");
+}
+
 const styles = StyleSheet.create({
   root: {
     backgroundColor: megrumColors.background,
@@ -1710,6 +1875,7 @@ const styles = StyleSheet.create({
   },
   threadActions: {
     flexDirection: "row",
+    flexWrap: "wrap",
     gap: 8,
     marginTop: 4,
   },
@@ -2199,5 +2365,94 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontSize: 13.5,
     fontWeight: "900",
+  },
+  participantsCard: {
+    maxHeight: "72%",
+  },
+  participantsHeader: {
+    alignItems: "flex-start",
+    flexDirection: "row",
+    gap: 12,
+    justifyContent: "space-between",
+  },
+  participantsTitleBlock: {
+    flex: 1,
+    gap: 4,
+  },
+  participantsLead: {
+    color: megrumColors.mutedInk,
+    fontSize: 12,
+    fontWeight: "800",
+  },
+  participantsCloseButton: {
+    alignItems: "center",
+    backgroundColor: "rgba(58,50,74,0.06)",
+    borderRadius: 999,
+    height: 34,
+    justifyContent: "center",
+    width: 34,
+  },
+  participantsList: {
+    gap: 8,
+    paddingTop: 4,
+  },
+  participantRow: {
+    alignItems: "center",
+    backgroundColor: "rgba(251,249,252,0.96)",
+    borderColor: "rgba(58,50,74,0.06)",
+    borderRadius: 18,
+    borderWidth: 1,
+    flexDirection: "row",
+    gap: 10,
+    paddingHorizontal: 11,
+    paddingVertical: 10,
+  },
+  participantAvatar: {
+    alignItems: "center",
+    borderRadius: 20,
+    height: 40,
+    justifyContent: "center",
+    width: 40,
+  },
+  participantAvatarText: {
+    color: "#fff",
+    fontSize: 14,
+    fontWeight: "900",
+  },
+  participantCopy: {
+    flex: 1,
+    gap: 3,
+  },
+  participantNameRow: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 5,
+  },
+  participantName: {
+    color: megrumColors.ink,
+    flexShrink: 1,
+    fontSize: 13.5,
+    fontWeight: "900",
+  },
+  participantMiniBadge: {
+    backgroundColor: "rgba(166,149,216,0.14)",
+    borderRadius: 999,
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+  },
+  participantMiniBadgeText: {
+    color: megrumColors.lavender,
+    fontSize: 9.5,
+    fontWeight: "900",
+  },
+  participantMeta: {
+    color: megrumColors.mutedInk,
+    fontSize: 11,
+    fontWeight: "800",
+  },
+  participantActiveAt: {
+    color: megrumColors.mutedInk,
+    fontSize: 10.5,
+    fontWeight: "800",
   },
 });

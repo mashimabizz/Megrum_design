@@ -4,6 +4,52 @@
 
 ---
 
+## イテレーション192：掲示板参加者一覧を追加
+
+### 背景・問題意識
+
+スポット掲示板の返信が増えると、誰がこのスレッドに参加しているのかを一目で確認できない。一般的なスレッド機能として、スレッド作成者と可視返信者をまとめた参加者一覧を追加した。
+
+### 変更内容
+
+#### `mobile/app/meguri-board-thread.tsx`
+- スレッド詳細のアクション列に `参加者` ボタンを追加した。
+- スレッド作成者と削除されていない返信の投稿者を集約し、参加者一覧モーダルで表示するようにした。
+- 参加者ごとに、作成者/自分のバッジ、返信数、handle、エリア、最終参加時刻を表示するようにした。
+
+#### `notes/09_state_machines.md`
+- Meguri Board Lifecycle に参加者一覧の表示ルールを追記した。
+
+#### `notes/10_glossary.md`
+- 掲示板参加者一覧を追加した。
+
+### 影響範囲
+
+- iOS版 スポット掲示板詳細
+- 掲示板の参加状況確認UI・用語
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- `EAS_UPDATE_PROJECT_SLUG=ihub EXPO_NO_GIT_STATUS=1 npm --prefix mobile run update:ios:preview -- --message "[iter192] add board participants list" --non-interactive`
+- Preview OTA: Update group `3bc7cc61-14c6-4b8c-96bc-9cbaf9e14f8a` / iOS update `019e7545-c200-715c-add4-8bb7ff8c29b9`
+
+### 関連ファイル
+
+- `mobile/app/meguri-board-thread.tsx`
+- `notes/08_design_iterations.md`
+- `notes/09_state_machines.md`
+- `notes/10_glossary.md`
+
+### セルフレビュー結果
+
+- ✅ DB変更なしで、既存のスレッド/返信データから参加者を集約した。
+- ✅ 削除済み返信は参加者集計から外し、現在見えている会話参加者だけを表示するようにした。
+- ✅ スレッド状態は変えず、表示操作として参加者一覧を追加した。
+
+---
+
 ## イテレーション191：掲示板固定スレッド表示を追加
 
 ### 背景・問題意識
