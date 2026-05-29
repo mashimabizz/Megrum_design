@@ -825,6 +825,7 @@ export default function MeguriBoardScreen() {
                         <View style={styles.threadBadgeRow}>
                           <CategoryBadge category={thread.category} />
                           <ScopeBadge scope={thread.audienceScope} />
+                          {thread.isPinned ? <StatusBadge label="固定" /> : null}
                           {thread.status === "locked" ? <StatusBadge label="締め切り" /> : null}
                           {thread.readAt && thread.readAt >= thread.latestActivityAt ? null : (
                             <View style={styles.unreadDot} />

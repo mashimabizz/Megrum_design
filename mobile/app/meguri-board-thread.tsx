@@ -844,6 +844,7 @@ export default function MeguriBoardThreadScreen() {
                   <View style={styles.heroBadgeRow}>
                     <CategoryBadge category={thread.category} />
                     <ScopeBadge scope={thread.audienceScope} />
+                    {thread.isPinned ? <StatusBadge label="固定" /> : null}
                     {thread.status === "locked" ? <StatusBadge label="締め切り" /> : null}
                   </View>
                   <Text style={styles.heroTime}>{formatRelativeTime(thread.createdAt)}</Text>

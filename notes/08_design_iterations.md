@@ -4,6 +4,54 @@
 
 ---
 
+## イテレーション191：掲示板固定スレッド表示を追加
+
+### 背景・問題意識
+
+スポット掲示板のデータモデルには固定表示用の `isPinned` があり、一覧の並び順にも反映されているが、画面上では固定スレッドであることが分からなかった。一般的なスレッド機能として、固定スレッドを明示するバッジを追加した。
+
+### 変更内容
+
+#### `mobile/app/meguri-board.tsx`
+- 掲示板一覧のスレッドカードで `thread.isPinned` が true の場合に `固定` バッジを表示するようにした。
+
+#### `mobile/app/meguri-board-thread.tsx`
+- スレッド詳細のヘッダー下バッジ列で `thread.isPinned` が true の場合に `固定` バッジを表示するようにした。
+
+#### `notes/09_state_machines.md`
+- Meguri Board Lifecycle に固定スレッド表示のルールを追記した。
+
+#### `notes/10_glossary.md`
+- 掲示板固定スレッドを追加した。
+
+### 影響範囲
+
+- iOS版 スポット掲示板一覧
+- iOS版 スポット掲示板詳細
+- 掲示板の表示ルール・用語
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- `EAS_UPDATE_PROJECT_SLUG=ihub EXPO_NO_GIT_STATUS=1 npm --prefix mobile run update:ios:preview -- --message "[iter191] show pinned board threads" --non-interactive`
+- Preview OTA: Update group `8d906d11-e98a-410a-9136-58ac4b6a8665` / iOS update `019e753f-a8d5-7a48-b2e9-3dae8b756db9`
+
+### 関連ファイル
+
+- `mobile/app/meguri-board.tsx`
+- `mobile/app/meguri-board-thread.tsx`
+- `notes/08_design_iterations.md`
+- `notes/09_state_machines.md`
+- `notes/10_glossary.md`
+
+### セルフレビュー結果
+
+- ✅ 既存の `isPinned` と状態バッジを使い回し、DB変更なしで表示だけを補完した。
+- ✅ 一覧と詳細の両方で固定状態が分かるようにした。
+
+---
+
 ## イテレーション190：掲示板詳細に未読区切りを追加
 
 ### 背景・問題意識
