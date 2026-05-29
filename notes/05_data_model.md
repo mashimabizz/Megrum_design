@@ -3,8 +3,8 @@
 > **目的**：Megrum の全エンティティのDBスキーマ設計と、状態・マッチング・取引のデータフロー定義。
 > 実装の正解集。`09_state_machines.md` と完全に整合させ、`10_glossary.md` の用語を使う。
 
-最終更新: 2026-05-29
-ステータス: Draft v2.20（iter168.90 検索実績ログと人気検索を追加）
+最終更新: 2026-05-30
+ステータス: Draft v2.21（iter168.97 応答時の条件選択とスケジュール場所を追加）
 
 ## 最新化履歴
 
@@ -32,6 +32,7 @@
 | **v2.18** | **2026-05-29** | **iter168.82 反映（`exchange_method='both'` を追加し、現地・郵送どちらも対応可の打診を保存できるように更新）** |
 | **v2.19** | **2026-05-29** | **iter168.89 反映（グルーム投稿とスポット掲示板スレッドに作成時位置 `origin_lat/origin_lng` を追加。グルームは現在地1km、掲示板は `nearby_3km` / `same_prefecture` で閲覧）** |
 | **v2.20** | **2026-05-29** | **iter168.90 反映（`search_query_logs` と人気検索RPCを追加。検索結果はマッチ分類つきグッズパネルで表示）** |
+| **v2.21** | **2026-05-30** | **iter168.97 反映（`schedules.place_name` 追加。合意時に `both` を単一手段へ固定し、現地交換の複数候補は1件へ固定する運用を追記）** |
 
 ## このドキュメントの位置付け
 
@@ -555,6 +556,7 @@ AW とは **別エンティティ**。AW = 「この時間ここに**いる**」
 | `id` | uuid | PK |
 | `user_id` | uuid | → users |
 | `title` | text | 予定名（例「出張」「友人ランチ」） |
+| `place_name` | text nullable | 任意の場所テキスト（例「横浜アリーナ 北口」）。地図座標は持たせない |
 | `start_at` | timestamptz | 開始 |
 | `end_at` | timestamptz | 終了（CHECK: end_at > start_at） |
 | `all_day` | bool default false | 終日フラグ |
@@ -564,6 +566,7 @@ AW とは **別エンティティ**。AW = 「この時間ここに**いる**」
 RLS：
 - 自分のスケジュールは自由に SELECT/INSERT/UPDATE/DELETE
 - `proposals.expose_calendar = true` かつ自分が `sender_id` の打診相手 (`receiver_id`) は SELECT 可（取引完了 status=`agreed`/`rejected`/`expired` で閲覧停止）
+- iter168.97: 打診時の待ち合わせ候補登録画面と取引チャットのスケジュール重ね見で、`place_name` を表示する
 
 ⚠️ 要確認：
 - 招待受諾型のスケジュール（複数人参加）を将来サポートするか
@@ -617,6 +620,11 @@ iter28（match_type）/ iter29（数量）/ iter30（7日期限）/ iter32（合
 
 CHECK 制約 `proposals_meetup_required`（iter168.82 更新）：`exchange_method='hand'` または `exchange_method='both'` かつ `status!='draft'` の時だけ 5 列すべて NOT NULL かつ `meetup_end_at > meetup_start_at`。`mail` の時は待ち合わせ列を必須にしない。
 CHECK 制約 `proposals_meetup_candidates_array`（iter154.34）：`meetup_candidates` は JSON 配列、最大3件。
+
+iter168.97 追加運用：
+- `exchange_method='both'` の打診に合意する時は、合意前に `hand` または `mail` のどちらか1つへ固定して保存する。
+- 現地交換で `meetup_candidates` が複数ある場合は、合意前に1件を選択し、その候補を既存 `meetup_*` 列へミラーする。
+- 条件変更の再打診は元 Proposal を直接更新せず、元の提示物/受け取り候補/交換手段/待ち合わせ候補をコピーした新規打診作成として扱う。
 
 派生ルール：
 - iter153: `status='agreed'` の proposal は、`sender_have_ids` / `receiver_have_ids` と各 qty を市場残数から差し引く。ただし `approved_by_sender` / `approved_by_receiver` が true の側は、取引完了承認処理で実在庫が既に減算されているため二重控除しない。

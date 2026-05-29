@@ -5,6 +5,7 @@ import {
   Image,
   Linking,
   Modal,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -117,6 +118,11 @@ type MeetupCandidate = {
   lng: number | null;
 };
 
+type AcceptDecision = {
+  exchangeMethod: Exclude<ExchangeMethod, "both">;
+  meetup: MeetupCandidate | null;
+};
+
 const FALLBACK_MEETUP_COORDINATE: MapCoordinate = {
   latitude: 35.5075,
   longitude: 139.6174,
@@ -226,6 +232,7 @@ export default function TransactionDetailScreen() {
   const [chatActionLoading, setChatActionLoading] = useState<
     "photo" | "outfit" | "location" | "evidence" | null
   >(null);
+  const [acceptDecisionOpen, setAcceptDecisionOpen] = useState(false);
   const [draft, setDraft] = useState("");
   const [sendingMessage, setSendingMessage] = useState(false);
   const [composerFocused, setComposerFocused] = useState(false);
@@ -320,12 +327,15 @@ export default function TransactionDetailScreen() {
     };
   }, [previewMode, proposalId, user]);
 
-  async function handleAction(action: "accept" | "negotiate" | "reject") {
+  async function handleAction(
+    action: "accept" | "negotiate" | "reject",
+    decision?: AcceptDecision,
+  ) {
     if (!detail || !user || !supabase) return;
     setActionLoading(action);
     setError(null);
     try {
-      const next = await updateProposalAction(detail, user.id, action);
+      const next = await updateProposalAction(detail, user.id, action, decision);
       setDetail(next);
     } catch (actionError) {
       setError(
@@ -336,6 +346,41 @@ export default function TransactionDetailScreen() {
     } finally {
       setActionLoading(null);
     }
+  }
+
+  function handleAcceptPress() {
+    if (!detail) return;
+    if (acceptDecisionRequired(detail)) {
+      setAcceptDecisionOpen(true);
+      return;
+    }
+    void handleAction("accept", defaultAcceptDecision(detail));
+  }
+
+  function openScheduleOverlay() {
+    if (!detail) return;
+    router.push({
+      pathname: "/transaction-schedule",
+      params: {
+        proposalId: detail.id,
+        partnerId: detail.partner.id,
+      },
+    });
+  }
+
+  function openRevisionProposal(method?: ExchangeMethod) {
+    if (!detail) return;
+    const nextMethod = method ?? detail.exchangeMethod;
+    router.push({
+      pathname: "/proposal-select",
+      params: {
+        partnerId: detail.partner.id,
+        proposalId: detail.id,
+        revise: "1",
+        tab: nextMethod === "mail" ? "receive" : "meetup",
+        exchangeMethod: nextMethod,
+      },
+    });
   }
 
   async function handleExtendProposal() {
@@ -652,7 +697,7 @@ export default function TransactionDetailScreen() {
                   canAccept={canAccept}
                   canReject={!!canReject}
                   loading={actionLoading}
-                  onAccept={() => handleAction("accept")}
+                  onAccept={handleAcceptPress}
                   onReject={() => handleAction("reject")}
                 />
               </>
@@ -756,29 +801,18 @@ export default function TransactionDetailScreen() {
                     ) : (
                       <>
                         <QuickActionChip
-                          label="カレンダー"
+                          label="スケジュール"
                           icon="□"
                           tone="lavender"
                           disabled={!!chatActionLoading}
-                          onPress={() => router.push("/schedules")}
+                          onPress={openScheduleOverlay}
                         />
                         <QuickActionChip
                           label="条件を変えて再打診"
                           icon="↻"
                           tone="pink"
                           disabled={!!chatActionLoading}
-                          onPress={() =>
-                            router.push({
-                              pathname: "/proposal-select",
-                              params: {
-                                partnerId: detail.partner.id,
-                                proposalId: detail.id,
-                                revise: "1",
-                                tab: detail.exchangeMethod === "mail" ? "receive" : "meetup",
-                                exchangeMethod: detail.exchangeMethod,
-                              },
-                            })
-                          }
+                          onPress={() => openRevisionProposal()}
                         />
                       </>
                     )}
@@ -820,6 +854,20 @@ export default function TransactionDetailScreen() {
               </View>
             </View>
           ) : null}
+          <AcceptDecisionModal
+            detail={detail}
+            visible={acceptDecisionOpen}
+            loading={actionLoading === "accept"}
+            onClose={() => setAcceptDecisionOpen(false)}
+            onCounter={(method) => {
+              setAcceptDecisionOpen(false);
+              openRevisionProposal(method);
+            }}
+            onConfirm={(decision) => {
+              setAcceptDecisionOpen(false);
+              void handleAction("accept", decision);
+            }}
+          />
         </>
       ) : null}
     </View>
@@ -1487,16 +1535,36 @@ async function updateProposalAction(
   detail: TransactionDetail,
   userId: string,
   action: "accept" | "negotiate" | "reject",
+  decision?: AcceptDecision,
 ) {
   if (!supabase) throw new Error("Supabaseが未設定です");
   const now = new Date().toISOString();
   const updates: Record<string, unknown> = { last_action_at: now };
 
   if (action === "accept") {
+    const acceptedMethod = decision?.exchangeMethod ?? resolveSingleExchangeMethod(detail);
+    if (!acceptedMethod) {
+      throw new Error("交換手段を1つ選んでください。");
+    }
+    updates.exchange_method = acceptedMethod;
+    if (acceptedMethod === "hand") {
+      const selectedMeetup =
+        decision?.meetup ??
+        (detail.meetups.length === 1 ? detail.meetups[0] : null);
+      if (!selectedMeetup) {
+        throw new Error("現地交換で進める候補日時を1つ選んでください。");
+      }
+      updates.meetup_start_at = selectedMeetup.startAt;
+      updates.meetup_end_at = selectedMeetup.endAt;
+      updates.meetup_place_name = selectedMeetup.placeName;
+      updates.meetup_lat = selectedMeetup.lat;
+      updates.meetup_lng = selectedMeetup.lng;
+      updates.meetup_candidates = [meetupToProposalJson(selectedMeetup, 0)];
+    }
     const senderId = detail.isSender ? userId : detail.partner.id;
     const receiverId = detail.isReceiver ? userId : detail.partner.id;
     let myMailingAddress: MailingAddressSnapshot | null = null;
-    if (supportsMailExchange(detail.exchangeMethod)) {
+    if (supportsMailExchange(acceptedMethod)) {
       myMailingAddress = await fetchMailingAddressSnapshot(userId, {
         tolerateMissingSchema: true,
       }).catch(() => null);
@@ -1516,7 +1584,7 @@ async function updateProposalAction(
     updates.agreed_by_receiver = agreedByReceiver;
     updates.status =
       agreedBySender && agreedByReceiver ? "agreed" : "agreement_one_side";
-    if (supportsMailExchange(detail.exchangeMethod) && updates.status === "agreed") {
+    if (supportsMailExchange(acceptedMethod) && updates.status === "agreed") {
       const [senderAddress, receiverAddress] = await Promise.all([
         detail.isSender
           ? Promise.resolve(myMailingAddress)
@@ -1561,10 +1629,50 @@ async function updateProposalAction(
     sender_id: userId,
     message_type: "system",
     body: systemBody,
-    meta: { action },
+    meta: { action, decision },
   });
 
   return fetchTransactionDetail(detail.id, userId);
+}
+
+function resolveSingleExchangeMethod(
+  detail: TransactionDetail,
+): AcceptDecision["exchangeMethod"] | null {
+  if (detail.exchangeMethod === "both") return null;
+  return detail.exchangeMethod;
+}
+
+function defaultAcceptDecision(detail: TransactionDetail): AcceptDecision | undefined {
+  const exchangeMethod = resolveSingleExchangeMethod(detail);
+  if (!exchangeMethod) return undefined;
+  return {
+    exchangeMethod,
+    meetup:
+      exchangeMethod === "hand" && detail.meetups.length === 1
+        ? detail.meetups[0]
+        : null,
+  };
+}
+
+function acceptDecisionRequired(detail: TransactionDetail) {
+  if (detail.exchangeMethod === "both") return true;
+  if (detail.exchangeMethod === "hand" && detail.meetups.length !== 1) return true;
+  return false;
+}
+
+function meetupToProposalJson(meetup: MeetupCandidate, index: number) {
+  return {
+    id: `accepted-${index + 1}`,
+    label: `候補${index + 1}`,
+    startAt: meetup.startAt,
+    endAt: meetup.endAt,
+    placeName: meetup.placeName,
+    place: meetup.placeName,
+    lat: meetup.lat,
+    lng: meetup.lng,
+    latitude: meetup.lat,
+    longitude: meetup.lng,
+  };
 }
 
 function ExchangeMethodSummaryCard({ detail }: { detail: TransactionDetail }) {
@@ -1639,14 +1747,17 @@ function ExchangeMethodDetailModal({
                   router.push("/address-settings");
                 }}
               />
-            ) : (
+            ) : null}
+
+            {supportsHandExchange(detail.exchangeMethod) ? (
               <View style={styles.dealModalSection}>
-                <Text style={styles.dealModalSectionTitle}>待ち合わせ</Text>
-                <Text style={styles.exchangeMethodModalBody}>
-                  待ち合わせ候補は「交換内容」の詳細から確認できます。
-                </Text>
+                <View style={styles.dealModalSectionHeader}>
+                  <Text style={styles.dealModalSectionTitle}>現地交換の候補</Text>
+                  <Text style={styles.dealModalSectionCount}>{detail.meetups.length}件</Text>
+                </View>
+                <DealMeetupCandidateCard meetups={detail.meetups} />
               </View>
-            )}
+            ) : null}
           </ScrollView>
         </Pressable>
       </Pressable>
@@ -1891,13 +2002,6 @@ function DealDetailModal({
               <DealExchangeCard detail={detail} />
             </View>
 
-            <View style={styles.dealModalSection}>
-              <View style={styles.dealModalSectionHeader}>
-                <Text style={styles.dealModalSectionTitle}>交換できる候補</Text>
-                <Text style={styles.dealModalSectionCount}>{detail.meetups.length}件</Text>
-              </View>
-              <DealMeetupCandidateCard meetups={detail.meetups} />
-            </View>
           </ScrollView>
         </Pressable>
       </Pressable>
@@ -2029,19 +2133,28 @@ function DealMeetupCandidateCard({ meetups }: { meetups: MeetupCandidate[] }) {
     <View style={styles.dealMeetupMapCard}>
       <View style={styles.dealMeetupMapPanel}>
         {mapMeetups.length > 0 ? (
-          <NativeMapPreview
-            center={center}
-            height={184}
-            markers={mapMeetups.map(({ index, meetup }) => ({
-              id: `${meetup.startAt}-${meetup.endAt}-${index}`,
-              coordinate: {
-                latitude: meetup.lat,
-                longitude: meetup.lng,
-              },
-              label: String(index + 1),
-              title: meetup.placeName,
-            }))}
-          />
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="地図アプリで待ち合わせ場所を開く"
+            onPress={() => openMeetupInMaps(mapMeetups[0].meetup)}
+          >
+            <NativeMapPreview
+              center={center}
+              height={184}
+              markers={mapMeetups.map(({ index, meetup }) => ({
+                id: `${meetup.startAt}-${meetup.endAt}-${index}`,
+                coordinate: {
+                  latitude: meetup.lat,
+                  longitude: meetup.lng,
+                },
+                label: String(index + 1),
+                title: meetup.placeName,
+              }))}
+            />
+            <View style={styles.dealMeetupMapOpenPill}>
+              <Text style={styles.dealMeetupMapOpenText}>地図で開く</Text>
+            </View>
+          </Pressable>
         ) : (
           <View style={styles.dealMeetupMapEmpty}>
             <Text style={styles.dealMeetupMapEmptyText}>地図情報は未設定です</Text>
@@ -2090,6 +2203,16 @@ function getDealMeetupMapCenter(
     latitude: total.latitude / meetups.length,
     longitude: total.longitude / meetups.length,
   };
+}
+
+function openMeetupInMaps(meetup: MeetupCandidate & { lat: number; lng: number }) {
+  const label = encodeURIComponent(meetup.placeName || "待ち合わせ場所");
+  const latLng = `${meetup.lat},${meetup.lng}`;
+  const url =
+    Platform.OS === "ios"
+      ? `http://maps.apple.com/?ll=${latLng}&q=${label}`
+      : `geo:${latLng}?q=${latLng}(${label})`;
+  Linking.openURL(url).catch(() => undefined);
 }
 function MiniItemRow({
   items,
@@ -2243,6 +2366,198 @@ function AgreementBarCompact({
         </Pressable>
       </View>
     </View>
+  );
+}
+
+function AcceptDecisionModal({
+  detail,
+  visible,
+  loading,
+  onClose,
+  onCounter,
+  onConfirm,
+}: {
+  detail: TransactionDetail;
+  visible: boolean;
+  loading: boolean;
+  onClose: () => void;
+  onCounter: (method?: ExchangeMethod) => void;
+  onConfirm: (decision: AcceptDecision) => void;
+}) {
+  const [selectedMethod, setSelectedMethod] =
+    useState<AcceptDecision["exchangeMethod"] | null>(null);
+  const [selectedMeetupIndex, setSelectedMeetupIndex] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (!visible) return;
+    const method = resolveSingleExchangeMethod(detail);
+    setSelectedMethod(method);
+    setSelectedMeetupIndex(method === "hand" && detail.meetups.length === 1 ? 0 : null);
+  }, [detail.id, detail.exchangeMethod, detail.meetups.length, visible]);
+
+  if (!visible) return null;
+
+  const needsMethodChoice = detail.exchangeMethod === "both";
+  const selectedMeetup =
+    selectedMethod === "hand" && selectedMeetupIndex !== null
+      ? detail.meetups[selectedMeetupIndex] ?? null
+      : null;
+  const canConfirm =
+    !!selectedMethod &&
+    (selectedMethod === "mail" || (selectedMethod === "hand" && !!selectedMeetup));
+
+  return (
+    <Modal animationType="fade" transparent visible={visible} onRequestClose={onClose}>
+      <Pressable style={styles.dealModalBackdrop} onPress={onClose}>
+        <Pressable style={styles.acceptModalCard}>
+          <View style={styles.dealModalHeader}>
+            <View>
+              <Text style={styles.dealModalTitle}>応じる条件を選択</Text>
+              <Text style={styles.dealModalSub}>
+                {needsMethodChoice
+                  ? "交換手段を1つ選んでください"
+                  : "現地交換の候補を1つ選んでください"}
+              </Text>
+            </View>
+            <Pressable accessibilityRole="button" onPress={onClose} style={styles.dealModalClose}>
+              <Text style={styles.dealModalCloseText}>×</Text>
+            </Pressable>
+          </View>
+
+          <ScrollView contentContainerStyle={styles.acceptModalContent}>
+            {needsMethodChoice ? (
+              <View style={styles.acceptChoiceGroup}>
+                <Text style={styles.dealModalSectionTitle}>交換手段</Text>
+                <View style={styles.acceptChoiceRow}>
+                  <AcceptChoiceButton
+                    active={selectedMethod === "hand"}
+                    label="現地交換"
+                    onPress={() => {
+                      setSelectedMethod("hand");
+                      setSelectedMeetupIndex(detail.meetups.length === 1 ? 0 : null);
+                    }}
+                  />
+                  <AcceptChoiceButton
+                    active={selectedMethod === "mail"}
+                    label="郵送交換"
+                    onPress={() => {
+                      setSelectedMethod("mail");
+                      setSelectedMeetupIndex(null);
+                    }}
+                  />
+                </View>
+              </View>
+            ) : null}
+
+            {selectedMethod === "hand" ? (
+              <View style={styles.acceptChoiceGroup}>
+                <View style={styles.dealModalSectionHeader}>
+                  <Text style={styles.dealModalSectionTitle}>現地交換の候補</Text>
+                  <Text style={styles.dealModalSectionCount}>{detail.meetups.length}件</Text>
+                </View>
+                {detail.meetups.length > 0 ? (
+                  detail.meetups.map((meetup, index) => {
+                    const active = selectedMeetupIndex === index;
+                    return (
+                      <Pressable
+                        key={`${meetup.startAt}-${meetup.endAt}-${index}`}
+                        accessibilityRole="button"
+                        onPress={() => setSelectedMeetupIndex(index)}
+                        style={[
+                          styles.acceptMeetupRow,
+                          active ? styles.acceptMeetupRowActive : null,
+                        ]}
+                      >
+                        <View
+                          style={[
+                            styles.acceptRadio,
+                            active ? styles.acceptRadioActive : null,
+                          ]}
+                        >
+                          {active ? <View style={styles.acceptRadioDot} /> : null}
+                        </View>
+                        <View style={styles.acceptMeetupCopy}>
+                          <Text style={styles.acceptMeetupTime}>
+                            {formatDateTime(meetup.startAt, meetup.endAt)}
+                          </Text>
+                          <Text numberOfLines={1} style={styles.acceptMeetupPlace}>
+                            {meetup.placeName}
+                          </Text>
+                        </View>
+                      </Pressable>
+                    );
+                  })
+                ) : (
+                  <Text style={styles.exchangeMethodModalBody}>
+                    現地交換の候補がありません。条件を変えて再打診してください。
+                  </Text>
+                )}
+              </View>
+            ) : null}
+
+            {selectedMethod === "mail" ? (
+              <View style={styles.acceptChoiceGroup}>
+                <Text style={styles.dealModalSectionTitle}>郵送交換</Text>
+                <Text style={styles.exchangeMethodModalBody}>
+                  郵送で応じる場合、合意成立後に当事者同士だけに住所が表示されます。
+                </Text>
+              </View>
+            ) : null}
+          </ScrollView>
+
+          <View style={styles.acceptModalFooter}>
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => onCounter(selectedMethod ?? detail.exchangeMethod)}
+              style={styles.acceptCounterButton}
+            >
+              <Text style={styles.acceptCounterText}>条件を変えて再打診</Text>
+            </Pressable>
+            <Pressable
+              accessibilityRole="button"
+              disabled={!canConfirm || loading}
+              onPress={() => {
+                if (!selectedMethod) return;
+                onConfirm({
+                  exchangeMethod: selectedMethod,
+                  meetup: selectedMethod === "hand" ? selectedMeetup : null,
+                });
+              }}
+              style={[
+                styles.acceptConfirmButton,
+                !canConfirm || loading ? styles.actionDisabled : null,
+              ]}
+            >
+              <Text style={styles.acceptConfirmText}>
+                {loading ? "更新中…" : "この条件で応じる"}
+              </Text>
+            </Pressable>
+          </View>
+        </Pressable>
+      </Pressable>
+    </Modal>
+  );
+}
+
+function AcceptChoiceButton({
+  active,
+  label,
+  onPress,
+}: {
+  active: boolean;
+  label: string;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      onPress={onPress}
+      style={[styles.acceptChoiceButton, active ? styles.acceptChoiceButtonActive : null]}
+    >
+      <Text style={[styles.acceptChoiceText, active ? styles.acceptChoiceTextActive : null]}>
+        {label}
+      </Text>
+    </Pressable>
   );
 }
 
@@ -3919,6 +4234,20 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: "800",
   },
+  dealMeetupMapOpenPill: {
+    backgroundColor: "rgba(58,50,74,0.78)",
+    borderRadius: megrumRadii.pill,
+    bottom: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    position: "absolute",
+    right: 10,
+  },
+  dealMeetupMapOpenText: {
+    color: megrumColors.surface,
+    fontSize: 10,
+    fontWeight: "900",
+  },
   dealCandidateRow: {
     alignItems: "flex-start",
     flexDirection: "row",
@@ -4055,6 +4384,130 @@ const styles = StyleSheet.create({
     paddingVertical: 7,
   },
   agreementAcceptText: {
+    color: megrumColors.surface,
+    fontSize: 11.5,
+    fontWeight: "900",
+  },
+  acceptModalCard: {
+    backgroundColor: megrumColors.surface,
+    borderRadius: 22,
+    maxHeight: "86%",
+    overflow: "hidden",
+    paddingTop: 16,
+    width: "92%",
+  },
+  acceptModalContent: {
+    gap: 12,
+    padding: 16,
+  },
+  acceptChoiceGroup: {
+    backgroundColor: "rgba(58,50,74,0.035)",
+    borderRadius: 14,
+    gap: 9,
+    padding: 12,
+  },
+  acceptChoiceRow: {
+    flexDirection: "row",
+    gap: 8,
+  },
+  acceptChoiceButton: {
+    alignItems: "center",
+    backgroundColor: megrumColors.surface,
+    borderColor: "rgba(58,50,74,0.10)",
+    borderRadius: 12,
+    borderWidth: 1,
+    flex: 1,
+    paddingHorizontal: 12,
+    paddingVertical: 11,
+  },
+  acceptChoiceButtonActive: {
+    backgroundColor: "rgba(166,149,216,0.12)",
+    borderColor: "rgba(166,149,216,0.48)",
+  },
+  acceptChoiceText: {
+    color: megrumColors.mutedInk,
+    fontSize: 12,
+    fontWeight: "900",
+  },
+  acceptChoiceTextActive: {
+    color: megrumColors.lavender,
+  },
+  acceptMeetupRow: {
+    alignItems: "center",
+    backgroundColor: megrumColors.surface,
+    borderColor: "rgba(58,50,74,0.08)",
+    borderRadius: 13,
+    borderWidth: 1,
+    flexDirection: "row",
+    gap: 10,
+    padding: 10,
+  },
+  acceptMeetupRowActive: {
+    backgroundColor: "rgba(166,149,216,0.10)",
+    borderColor: "rgba(166,149,216,0.46)",
+  },
+  acceptRadio: {
+    alignItems: "center",
+    borderColor: "rgba(58,50,74,0.20)",
+    borderRadius: 999,
+    borderWidth: 2,
+    height: 22,
+    justifyContent: "center",
+    width: 22,
+  },
+  acceptRadioActive: {
+    borderColor: megrumColors.lavender,
+  },
+  acceptRadioDot: {
+    backgroundColor: megrumColors.lavender,
+    borderRadius: 999,
+    height: 10,
+    width: 10,
+  },
+  acceptMeetupCopy: {
+    flex: 1,
+    minWidth: 0,
+  },
+  acceptMeetupTime: {
+    color: megrumColors.ink,
+    fontSize: 12.5,
+    fontWeight: "900",
+  },
+  acceptMeetupPlace: {
+    color: megrumColors.mutedInk,
+    fontSize: 11,
+    fontWeight: "800",
+    marginTop: 2,
+  },
+  acceptModalFooter: {
+    borderTopColor: "rgba(58,50,74,0.08)",
+    borderTopWidth: 1,
+    flexDirection: "row",
+    gap: 8,
+    padding: 14,
+  },
+  acceptCounterButton: {
+    alignItems: "center",
+    backgroundColor: "rgba(243,197,212,0.16)",
+    borderRadius: 12,
+    flex: 1,
+    justifyContent: "center",
+    paddingVertical: 11,
+  },
+  acceptCounterText: {
+    color: megrumColors.warn,
+    fontSize: 11.5,
+    fontWeight: "900",
+  },
+  acceptConfirmButton: {
+    alignItems: "center",
+    backgroundColor: megrumColors.lavender,
+    borderRadius: 12,
+    flex: 1,
+    justifyContent: "center",
+    paddingVertical: 11,
+  },
+  acceptConfirmText: {
     color: megrumColors.surface,
     fontSize: 11.5,
     fontWeight: "900",

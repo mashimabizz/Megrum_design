@@ -71,6 +71,29 @@ type MeetupDay = {
   isToday: boolean;
 };
 
+type MeetupCalendarMode = "week" | "month";
+
+type ProposalScheduleOverlayItem = {
+  id: string;
+  userId: string;
+  owner: "me" | "partner";
+  title: string;
+  placeName: string | null;
+  startAt: string;
+  endAt: string;
+  allDay: boolean;
+};
+
+type ProposalScheduleRow = {
+  id: string;
+  user_id: string;
+  title: string;
+  place_name?: string | null;
+  start_at: string;
+  end_at: string;
+  all_day: boolean;
+};
+
 type DragDraft = {
   dateId: string;
   dayIndex: number;
@@ -297,6 +320,9 @@ export default function ProposalSelectScreen() {
   const [meetupCandidates, setMeetupCandidates] = useState<MeetupCandidate[]>([]);
   const [activeMeetupId, setActiveMeetupId] = useState<string | null>(null);
   const [placeSheetId, setPlaceSheetId] = useState<string | null>(null);
+  const [scheduleOverlays, setScheduleOverlays] = useState<
+    ProposalScheduleOverlayItem[]
+  >([]);
   const tabSwipeRef = useRef<{
     startX: number;
     startY: number;
@@ -425,6 +451,24 @@ export default function ProposalSelectScreen() {
       setTab("receive");
     }
   }, [needsMeetup, tab]);
+
+  useEffect(() => {
+    if (!needsMeetup || !authUser || !supabase) {
+      setScheduleOverlays([]);
+      return;
+    }
+    let active = true;
+    void fetchProposalScheduleOverlays(authUser.id, effectivePartnerIdParam)
+      .then((next) => {
+        if (active) setScheduleOverlays(next);
+      })
+      .catch(() => {
+        if (active) setScheduleOverlays([]);
+      });
+    return () => {
+      active = false;
+    };
+  }, [authUser?.id, effectivePartnerIdParam, needsMeetup]);
 
   useEffect(() => {
     setGiveSelectedIds((current) => ensureChoiceSelection(current, giveChoices));
@@ -776,6 +820,7 @@ export default function ProposalSelectScreen() {
         {tab === "meetup" ? (
           <MeetupPane
             candidates={meetupCandidates}
+            scheduleOverlays={scheduleOverlays}
             activeCandidateId={activeMeetupId}
             placeSheetId={placeSheetId}
             onSelectCandidate={setActiveMeetupId}
@@ -1094,6 +1139,7 @@ function ChoicePane({
 
 function MeetupPane({
   candidates,
+  scheduleOverlays,
   activeCandidateId,
   placeSheetId,
   onSelectCandidate,
@@ -1104,6 +1150,7 @@ function MeetupPane({
   onUpdateCandidate,
 }: {
   candidates: MeetupCandidate[];
+  scheduleOverlays: ProposalScheduleOverlayItem[];
   activeCandidateId: string | null;
   placeSheetId: string | null;
   onSelectCandidate: (id: string | null) => void;
@@ -1120,8 +1167,10 @@ function MeetupPane({
 }) {
   const { width } = useWindowDimensions();
   const scrollRef = useRef<ScrollView>(null);
+  const [calendarMode, setCalendarMode] = useState<MeetupCalendarMode>("week");
   const [weekOffset, setWeekOffset] = useState(0);
   const days = useMemo(() => buildMeetupDays(weekOffset), [weekOffset]);
+  const monthDays = useMemo(() => buildMeetupMonthDays(weekOffset), [weekOffset]);
   const weekHeaderTouchRef = useRef<{
     startX: number;
     startY: number;
@@ -1612,6 +1661,36 @@ function MeetupPane({
 
   return (
     <View style={styles.meetupRoot}>
+      <View style={styles.calendarModeCard}>
+        <View style={styles.calendarModeHeader}>
+          <Text style={styles.calendarModeTitle}>相手と自分のスケジュール</Text>
+          <Text style={styles.calendarModeSub}>予定は背景として表示されます</Text>
+        </View>
+        <SegmentedControl
+          values={["5日", "月"]}
+          selectedIndex={calendarMode === "week" ? 0 : 1}
+          tintColor={megrumColors.lavender}
+          onChange={(event) =>
+            setCalendarMode(
+              event.nativeEvent.selectedSegmentIndex === 0 ? "week" : "month",
+            )
+          }
+        />
+      </View>
+
+      {calendarMode === "month" ? (
+        <MonthSchedulePanel
+          days={monthDays}
+          scheduleOverlays={scheduleOverlays}
+          onSelectDay={(dateId) => {
+            setWeekOffset(weekOffsetForDateId(dateId));
+            setCalendarMode("week");
+          }}
+        />
+      ) : null}
+
+      {calendarMode === "week" ? (
+        <>
       <View
         style={styles.daysViewport}
         onTouchStart={handleWeekSwipeStart}
@@ -1755,6 +1834,42 @@ function MeetupPane({
                   ))}
 
                   {isCurrentWeek
+                    ? buildWeekScheduleBlocks(scheduleOverlays, week.days).map((block) => (
+                        <View
+                          key={block.id}
+                          pointerEvents="none"
+                          style={[
+                            styles.scheduleOverlayBlock,
+                            block.owner === "me"
+                              ? styles.scheduleOverlayBlockMe
+                              : styles.scheduleOverlayBlockPartner,
+                            {
+                              left: TIME_LABEL_WIDTH + block.dayIndex * dayWidth + 3,
+                              top: calendarSlotTop(block.startSlot) + 2,
+                              width: dayWidth - 6,
+                              height:
+                                Math.max(1, block.endSlot - block.startSlot) *
+                                  SLOT_HEIGHT -
+                                4,
+                            },
+                          ]}
+                        >
+                          <Text numberOfLines={1} style={styles.scheduleOverlayOwner}>
+                            {block.owner === "me" ? "自分" : "相手"}
+                          </Text>
+                          <Text numberOfLines={2} style={styles.scheduleOverlayTitle}>
+                            {block.title}
+                          </Text>
+                          {block.placeName ? (
+                            <Text numberOfLines={1} style={styles.scheduleOverlayPlace}>
+                              {block.placeName}
+                            </Text>
+                          ) : null}
+                        </View>
+                      ))
+                    : null}
+
+                  {isCurrentWeek
                     ? candidates.map((candidate, index) => {
                         const visibleDayIndex = days.findIndex(
                           (day) => day.id === candidate.dateId,
@@ -1884,8 +1999,10 @@ function MeetupPane({
           })}
         </Animated.View>
       </ScrollView>
+        </>
+      ) : null}
 
-      {candidates.length === 0 && !preview ? (
+      {calendarMode === "week" && candidates.length === 0 && !preview ? (
         <Animated.View
           pointerEvents="none"
           style={[
@@ -1921,6 +2038,73 @@ function MeetupPane({
           onUpdateCandidate(activeCandidate.id, patch);
         }}
       />
+    </View>
+  );
+}
+
+function MonthSchedulePanel({
+  days,
+  scheduleOverlays,
+  onSelectDay,
+}: {
+  days: MeetupDay[];
+  scheduleOverlays: ProposalScheduleOverlayItem[];
+  onSelectDay: (dateId: string) => void;
+}) {
+  const grouped = useMemo(
+    () => groupScheduleOverlaysByDate(scheduleOverlays),
+    [scheduleOverlays],
+  );
+  return (
+    <View style={styles.monthPanel}>
+      <View style={styles.monthWeekdayRow}>
+        {["日", "月", "火", "水", "木", "金", "土"].map((day) => (
+          <Text key={day} style={styles.monthWeekday}>
+            {day}
+          </Text>
+        ))}
+      </View>
+      <View style={styles.monthGrid}>
+        {days.map((day) => {
+          const items = grouped.get(day.id) ?? [];
+          return (
+            <Pressable
+              key={day.id}
+              accessibilityRole="button"
+              onPress={() => onSelectDay(day.id)}
+              style={[
+                styles.monthDayCell,
+                day.isToday ? styles.monthDayCellToday : null,
+              ]}
+            >
+              <Text style={[styles.monthDayNumber, day.isToday ? styles.monthDayNumberToday : null]}>
+                {day.date}
+              </Text>
+              <View style={styles.monthScheduleList}>
+                {items.slice(0, 3).map((item) => (
+                  <View
+                    key={item.id}
+                    style={[
+                      styles.monthSchedulePill,
+                      item.owner === "me"
+                        ? styles.monthSchedulePillMe
+                        : styles.monthSchedulePillPartner,
+                    ]}
+                  >
+                    <Text numberOfLines={1} style={styles.monthScheduleText}>
+                      {item.title}
+                    </Text>
+                  </View>
+                ))}
+                {items.length > 3 ? (
+                  <Text style={styles.monthMoreText}>+{items.length - 3}</Text>
+                ) : null}
+              </View>
+            </Pressable>
+          );
+        })}
+      </View>
+      <Text style={styles.monthHint}>日付を押すと5日表示で候補を追加できます</Text>
     </View>
   );
 }
@@ -2186,6 +2370,39 @@ function buildMeetupDays(weekOffset = 0): MeetupDay[] {
   });
 }
 
+function buildMeetupMonthDays(weekOffset = 0): MeetupDay[] {
+  const weekday = ["日", "月", "火", "水", "木", "金", "土"];
+  const anchor = new Date();
+  anchor.setDate(anchor.getDate() + weekOffset * 5);
+  const monthStart = new Date(anchor.getFullYear(), anchor.getMonth(), 1);
+  const gridStart = new Date(monthStart);
+  gridStart.setDate(monthStart.getDate() - monthStart.getDay());
+  const todayKey = dateKey(new Date());
+  return Array.from({ length: 42 }, (_, index) => {
+    const date = new Date(gridStart);
+    date.setDate(gridStart.getDate() + index);
+    return {
+      id: dateKey(date),
+      day: weekday[date.getDay()] ?? "",
+      date: String(date.getDate()),
+      month: `${date.getMonth() + 1}月`,
+      isToday: dateKey(date) === todayKey,
+    };
+  });
+}
+
+function weekOffsetForDateId(dateId: string) {
+  const target = new Date(`${dateId}T00:00:00+09:00`);
+  if (Number.isNaN(target.getTime())) return 0;
+  const today = new Date();
+  const base = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  const targetBase = new Date(target.getFullYear(), target.getMonth(), target.getDate());
+  const diffDays = Math.round(
+    (targetBase.getTime() - base.getTime()) / (24 * 60 * 60 * 1000),
+  );
+  return Math.floor(diffDays / 5);
+}
+
 function dateKey(date: Date) {
   return [
     date.getFullYear(),
@@ -2225,6 +2442,92 @@ function formatSlot(slot: number) {
 
 function slotToIso(dateId: string, slot: number) {
   return new Date(`${dateId}T${formatSlot(slot)}:00+09:00`).toISOString();
+}
+
+function buildWeekScheduleBlocks(
+  schedules: ProposalScheduleOverlayItem[],
+  days: MeetupDay[],
+) {
+  return schedules
+    .map((item) => {
+      const dateId = dateIdFromIso(item.startAt);
+      const dayIndex = days.findIndex((day) => day.id === dateId);
+      if (dayIndex < 0) return null;
+      const startSlot = item.allDay ? 0 : slotFromIso(item.startAt);
+      const endSlot = item.allDay
+        ? SLOT_COUNT
+        : Math.max(startSlot + 1, slotFromIso(item.endAt));
+      return {
+        ...item,
+        dateId,
+        dayIndex,
+        startSlot: Math.max(0, Math.min(SLOT_COUNT - 1, startSlot)),
+        endSlot: Math.max(1, Math.min(SLOT_COUNT, endSlot)),
+      };
+    })
+    .filter(
+      (
+        item,
+      ): item is ProposalScheduleOverlayItem & {
+        dateId: string;
+        dayIndex: number;
+        startSlot: number;
+        endSlot: number;
+      } => !!item,
+    );
+}
+
+function groupScheduleOverlaysByDate(items: ProposalScheduleOverlayItem[]) {
+  const map = new Map<string, ProposalScheduleOverlayItem[]>();
+  items.forEach((item) => {
+    const key = dateIdFromIso(item.startAt);
+    map.set(key, [...(map.get(key) ?? []), item]);
+  });
+  return map;
+}
+
+async function fetchProposalScheduleOverlays(
+  userId: string,
+  partnerId?: string | null,
+): Promise<ProposalScheduleOverlayItem[]> {
+  if (!supabase) return [];
+  const userIds = Array.from(new Set([userId, partnerId].filter(Boolean) as string[]));
+  const rows = await selectProposalScheduleRows(userIds);
+  return rows
+    .map((row) => ({
+      id: row.id,
+      userId: row.user_id,
+      owner: (row.user_id === userId ? "me" : "partner") as "me" | "partner",
+      title: row.title,
+      placeName: row.place_name ?? null,
+      startAt: row.start_at,
+      endAt: row.end_at,
+      allDay: row.all_day,
+    }))
+    .sort((a, b) => new Date(a.startAt).getTime() - new Date(b.startAt).getTime());
+}
+
+async function selectProposalScheduleRows(userIds: string[]) {
+  if (!supabase || userIds.length === 0) return [];
+  const rich = await supabase
+    .from("schedules")
+    .select("id, user_id, title, place_name, start_at, end_at, all_day")
+    .in("user_id", userIds)
+    .order("start_at", { ascending: true });
+  if (!rich.error) return (rich.data as ProposalScheduleRow[] | null) ?? [];
+  if (!isMissingPlaceNameError(rich.error)) throw rich.error;
+  const fallback = await supabase
+    .from("schedules")
+    .select("id, user_id, title, start_at, end_at, all_day")
+    .in("user_id", userIds)
+    .order("start_at", { ascending: true });
+  if (fallback.error) throw fallback.error;
+  return (fallback.data as ProposalScheduleRow[] | null) ?? [];
+}
+
+function isMissingPlaceNameError(error: { message?: string; details?: string | null }) {
+  const message = `${error.message ?? ""} ${error.details ?? ""}`.toLowerCase();
+  return message.includes("place_name") && message.includes("column");
 }
 
 function formatCandidateRange(candidate: MeetupCandidate) {
@@ -2763,6 +3066,100 @@ const styles = StyleSheet.create({
     overflow: "hidden",
     position: "relative",
   },
+  calendarModeCard: {
+    backgroundColor: "rgba(166,149,216,0.07)",
+    borderBottomColor: "rgba(58,50,74,0.08)",
+    borderBottomWidth: 1,
+    gap: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+  },
+  calendarModeHeader: {
+    gap: 2,
+  },
+  calendarModeTitle: {
+    color: megrumColors.ink,
+    fontSize: 13,
+    fontWeight: "900",
+  },
+  calendarModeSub: {
+    color: megrumColors.mutedInk,
+    fontSize: 10.5,
+    fontWeight: "700",
+  },
+  monthPanel: {
+    flex: 1,
+    padding: 12,
+  },
+  monthWeekdayRow: {
+    flexDirection: "row",
+  },
+  monthWeekday: {
+    color: megrumColors.mutedInk,
+    flex: 1,
+    fontSize: 10.5,
+    fontWeight: "900",
+    textAlign: "center",
+  },
+  monthGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 4,
+    marginTop: 8,
+  },
+  monthDayCell: {
+    backgroundColor: "rgba(58,50,74,0.035)",
+    borderColor: "rgba(58,50,74,0.06)",
+    borderRadius: 10,
+    borderWidth: 1,
+    minHeight: 74,
+    padding: 6,
+    width: "13.72%",
+  },
+  monthDayCellToday: {
+    backgroundColor: "rgba(166,149,216,0.12)",
+    borderColor: "rgba(166,149,216,0.34)",
+  },
+  monthDayNumber: {
+    color: megrumColors.ink,
+    fontSize: 11,
+    fontWeight: "900",
+  },
+  monthDayNumberToday: {
+    color: megrumColors.lavender,
+  },
+  monthScheduleList: {
+    gap: 3,
+    marginTop: 5,
+  },
+  monthSchedulePill: {
+    borderRadius: 6,
+    paddingHorizontal: 3,
+    paddingVertical: 2,
+  },
+  monthSchedulePillMe: {
+    backgroundColor: "rgba(166,149,216,0.22)",
+  },
+  monthSchedulePillPartner: {
+    backgroundColor: "rgba(168,212,230,0.34)",
+  },
+  monthScheduleText: {
+    color: megrumColors.ink,
+    fontSize: 8,
+    fontWeight: "900",
+  },
+  monthMoreText: {
+    color: megrumColors.mutedInk,
+    fontSize: 8,
+    fontWeight: "900",
+  },
+  monthHint: {
+    color: megrumColors.mutedInk,
+    fontSize: 10.5,
+    fontWeight: "700",
+    marginTop: 10,
+    textAlign: "center",
+  },
   daysViewport: {
     borderBottomColor: "rgba(58,50,74,0.08)",
     borderBottomWidth: 1,
@@ -2838,6 +3235,39 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     position: "absolute",
     width: "100%",
+  },
+  scheduleOverlayBlock: {
+    borderRadius: 10,
+    borderWidth: 1,
+    justifyContent: "center",
+    overflow: "hidden",
+    padding: 4,
+    position: "absolute",
+  },
+  scheduleOverlayBlockMe: {
+    backgroundColor: "rgba(166,149,216,0.18)",
+    borderColor: "rgba(166,149,216,0.36)",
+  },
+  scheduleOverlayBlockPartner: {
+    backgroundColor: "rgba(168,212,230,0.25)",
+    borderColor: "rgba(92,141,168,0.36)",
+  },
+  scheduleOverlayOwner: {
+    color: megrumColors.mutedInk,
+    fontSize: 8,
+    fontWeight: "900",
+  },
+  scheduleOverlayTitle: {
+    color: megrumColors.ink,
+    fontSize: 9,
+    fontWeight: "900",
+    marginTop: 1,
+  },
+  scheduleOverlayPlace: {
+    color: megrumColors.mutedInk,
+    fontSize: 8,
+    fontWeight: "800",
+    marginTop: 1,
   },
   dragPreview: {
     backgroundColor: "rgba(36,167,242,0.20)",

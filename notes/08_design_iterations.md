@@ -4,6 +4,81 @@
 
 ---
 
+## イテレーション168.97：応答時の条件選択と予定重ね見
+
+### 背景・問題意識
+
+オーナーから、取引チャット内の交換内容詳細に現地交換の候補日時が混ざっているため、交換手段の詳細へ移したいという依頼があった。あわせて、相手からの打診に応じる時は、現地/郵送どちらもOKや複数候補のまま曖昧に合意せず、交換手段または候補を1つ選ぶ必要がある。条件を少し変えたい場合は、元打診をコピーして再打診できる導線も必要になった。
+
+### 変更内容
+
+#### `mobile/app/transaction-detail.tsx`
+- 交換内容詳細から待ち合わせ候補を外し、交換手段詳細へ移した。
+- 交換手段詳細の地図をタップすると、端末の地図アプリで候補地点を開くようにした。
+- `both` の打診、または複数候補の現地交換に応じる場合、交換手段/候補を1つ選ぶモーダルを追加した。
+- モーダルと「条件を変えて再打診」から、元打診の内容をコピーして `proposal-select` に進めるようにした。
+- チャット入力欄上の「カレンダー」を「スケジュール」に変更し、取引相手との予定重ね見画面へ遷移させるようにした。
+
+#### `mobile/app/transaction-schedule.tsx`
+- 取引チャット専用のスケジュール重ね見画面を追加した。
+- 自分と相手の予定を日別に並べ、ヘッダー右端の「更新」から自分のスケジュール管理へ進めるようにした。
+
+#### `mobile/app/schedules.tsx` / `mobile/app/schedule-editor.tsx`
+- スケジュールにテキスト入力の「場所」を追加した。
+- `place_name` 未適用のDBでも画面が落ちないように読み書きのフォールバックを追加した。
+
+#### `mobile/app/proposal-select.tsx`
+- 現地交換の待ち合わせ候補登録画面に、自分と相手のスケジュールを読み取り専用の背景として表示した。
+- 既存の5日表示に加え、月表示へ切り替えられるようにし、1日につき最大3件の予定を表示した。
+
+#### `supabase/migrations/20260530123000_add_schedule_place_name.sql`
+- `schedules.place_name` を追加する migration を作成した。
+
+### 影響範囲
+
+- iOS版 取引チャット
+- iOS版 打診への応答/再打診
+- iOS版 提示物選択の待ち合わせ候補登録
+- iOS版 スケジュール管理
+- Supabase `schedules` テーブル
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `git diff --check -- mobile/app/transaction-detail.tsx mobile/app/transaction-schedule.tsx mobile/app/proposal-select.tsx mobile/app/schedules.tsx mobile/app/schedule-editor.tsx supabase/migrations/20260530123000_add_schedule_place_name.sql notes/08_design_iterations.md notes/09_state_machines.md notes/10_glossary.md notes/05_data_model.md`
+- `npx supabase db push`
+- `npm --prefix mobile run export:ios:preview`
+- `EXPO_NO_GIT_STATUS=1 EAS_UPDATE_PROJECT_SLUG=ihub npm --prefix mobile run update:ios:preview -- --message "[iter168.97] 応答時の条件選択と予定重ね見" --non-interactive`
+- Preview channel OTA配信済み：Update group `8267f92d-f276-4def-ae02-a7900add18ef` / iOS update ID `019e7462-9a59-75b8-873a-5c8654ca7d91`
+- EAS Dashboard: `https://expo.dev/accounts/mashima.bizz/projects/ihub/updates/8267f92d-f276-4def-ae02-a7900add18ef`
+
+### 関連ファイル
+
+- `mobile/app/transaction-detail.tsx`
+- `mobile/app/transaction-schedule.tsx`
+- `mobile/app/proposal-select.tsx`
+- `mobile/app/schedules.tsx`
+- `mobile/app/schedule-editor.tsx`
+- `supabase/migrations/20260530123000_add_schedule_place_name.sql`
+- `notes/05_data_model.md`
+- `notes/09_state_machines.md`
+- `notes/10_glossary.md`
+
+### セルフレビュー結果
+
+- ✅ 交換内容詳細はグッズ内容に絞り、現地交換の候補は交換手段詳細へ移動
+- ✅ `both` / 複数候補のまま合意せず、応答前に1つ選択する導線を追加
+- ✅ 元打診をコピーして条件変更できる再打診導線を維持
+- ✅ スケジュール場所はテキスト入力のみで追加
+- ✅ 5日表示と月表示を切り替え可能にし、予定は編集不可の背景/一覧として表示
+- ✅ Supabase remote DBへ `schedules.place_name` migration 適用済み
+- ✅ 09更新診断：合意前の交換手段・候補選択ルールとカレンダー公開の対象を更新
+- ✅ 10更新診断：スケジュール/再打診/カレンダー重ね見の定義を更新
+- ✅ 05更新診断：`schedules.place_name` と合意時の候補固定ルールを追記
+- ✅ Preview channel / iOS runtime `0.1.0` へOTA配信済み
+
+---
+
 ## イテレーション168.96：掲示板の都道府県選択を保存
 
 ### 背景・問題意識
@@ -212,6 +287,73 @@
 - ✅ 09更新診断：状態遷移の追加・削除はないため更新不要
 - ✅ 10更新診断：既存の「証跡撮影」「打診」「取引」「譲」の範囲内のため更新不要
 - ✅ 05更新診断：DBスキーマ変更なし
+
+---
+
+## イテレーション168.93：iOS Google OAuth導線を接続
+
+### 背景・問題意識
+
+オーナーから、新規アカウント登録でGoogleアカウントを使えるようにしたいという相談があった。iOS版にはApple ID認証はあるが、GoogleはWelcome画面で無効ボタンのまま残っていた。リリース前の確認速度を落とさないため、ネイティブ依存を追加せず、既存のWeb callbackとmobile deep linkを再利用してGoogle OAuthを接続する方針にした。
+
+### 変更内容
+
+#### `mobile/src/auth/redirects.ts`
+- OAuth用のmobile callback URL生成 helper を追加した。
+- `next=mobile` / `scheme` / `provider=google` を `https://megrum.jp/auth/callback` に渡せるようにした。
+
+#### `mobile/src/auth/AuthProvider.tsx`
+- `supabase.auth.signInWithOAuth({ provider: "google" })` を使う `signInWithGoogleOAuth` を追加した。
+- `skipBrowserRedirect: true` でOAuth URLだけ取得し、React Nativeの `Linking.openURL` でGoogle認証画面を開くようにした。
+
+#### `mobile/src/components/GoogleAuthButton.tsx`
+- Google新規登録 / ログイン共通ボタンを追加した。
+- Supabase未設定時は表示せず、Provider未設定やredirect設定不備は日本語エラーへ寄せるようにした。
+
+#### `mobile/app/(auth)/welcome.tsx`
+- 無効化されていた「Googleで新規登録」ボタンを実際のOAuth導線へ差し替えた。
+- 利用規約 / プライバシーポリシー同意前はGoogle登録も進めないようにした。
+
+#### `mobile/app/(auth)/login.tsx`
+- ログイン画面のApple IDログイン下にGoogleログイン導線を追加した。
+
+#### `web/src/app/auth/callback/route.ts`
+- mobile callbackへ `provider=google` を引き継ぐようにした。
+
+#### `mobile/app/auth/email-confirmed.tsx`
+- Google OAuthから戻った場合は「Googleアカウントで認証できました」と表示するようにした。
+
+### 影響範囲
+
+- iOS新規登録入口
+- iOSログイン画面
+- Supabase Google OAuth callback
+- Web auth callback の mobile bridge 分岐
+
+### 確認方法
+
+- `git diff --check -- mobile/src/auth/AuthProvider.tsx mobile/src/auth/redirects.ts mobile/src/components/GoogleAuthButton.tsx 'mobile/app/(auth)/welcome.tsx' 'mobile/app/(auth)/login.tsx' mobile/app/auth/email-confirmed.tsx web/src/app/auth/callback/route.ts`
+- `npm run mobile:typecheck` は実行したが、今回触っていない `mobile/app/proposal-select.tsx` の既存型エラーで停止
+- Supabase DashboardでGoogle Providerを有効化し、Google Cloud OAuth Client ID / Secret とredirect設定を入れた後、Previewアプリで「Googleで新規登録」→ Google認証 → Megrumへ戻ることを確認
+
+### 関連ファイル
+
+- `mobile/src/auth/AuthProvider.tsx`
+- `mobile/src/auth/redirects.ts`
+- `mobile/src/components/GoogleAuthButton.tsx`
+- `mobile/app/(auth)/welcome.tsx`
+- `mobile/app/(auth)/login.tsx`
+- `mobile/app/auth/email-confirmed.tsx`
+- `web/src/app/auth/callback/route.ts`
+
+### セルフレビュー結果
+
+- ✅ 新しいネイティブ依存を追加していないため、コード差分自体はEAS Update反映対象
+- ✅ 既存のmobile email callbackと `exchangeCodeForSession` を再利用した
+- ✅ Google登録も規約同意前には開始できない
+- ⚠️ Supabase Dashboard / Google Cloud Console のGoogle Provider設定が別途必要
+- ⚠️ `npm run mobile:typecheck` は既存の `proposal-select.tsx` 型エラーで完走せず
+- ✅ 状態遷移・DBスキーマ・新用語の変更ではないため `notes/09_state_machines.md` / `notes/05_data_model.md` / `notes/10_glossary.md` の更新は不要
 
 ---
 

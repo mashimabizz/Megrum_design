@@ -111,6 +111,9 @@ stateDiagram-v2
 - **現地交換の入力条件**: `exchange_method='hand'` または `exchange_method='both'` の時は、送信前に待ち合わせの入力を必須とする。
 - **郵送交換の入力条件**: `exchange_method='mail'` または `exchange_method='both'` の時は、送信者が住所登録済みであることを送信前に確認する。受信者も合意までに住所登録が必要。
 - **住所の開示タイミング**: 住所は `agreed` になるまで相手へ見せず、合意後に当事者同士だけへ表示する。
+- **合意時の交換手段固定（iter168.97）**: `exchange_method='both'` の打診に応じる時は、合意前に `hand` または `mail` のどちらか1つを選び、選択した値で Proposal を固定する。
+- **合意時の待ち合わせ候補固定（iter168.97）**: 現地交換で候補が複数ある場合は、合意前に候補を1つ選び、選択候補を `meetup_start_at/end_at/place_name/lat/lng` と `meetup_candidates` にミラーする。
+- **逆打診 / 再打診（iter168.97）**: 条件を変えたい場合は、元 Proposal の提示物・受け取り候補・待ち合わせ候補・交換手段をコピーした新しい打診作成画面へ遷移し、元 Proposal を直接 mutate しない。
 
 ### 関連画面
 
@@ -544,14 +547,15 @@ stateDiagram-v2
 | 状態 | 説明 |
 |---|---|
 | `not_disclosed` | `proposals.expose_calendar = false`（既定） |
-| `disclosed` | `proposals.expose_calendar = true`、相手が overlay で AW を見られる |
+| `disclosed` | `proposals.expose_calendar = true`、相手が overlay でスケジュールを見られる |
 | `auto_revoked` | 取引完了時に自動的に閲覧不可。`expose_calendar` は履歴として `true` のまま、RLS で制御 |
 
 ### ビジネスルール
 
-- `expose_calendar = true` のとき、受信者は送信者の `availability_windows` を読める（RLS で許可）
+- `expose_calendar = true` のとき、相手は `schedules` を読める（RLS で許可）。AW はマッチング演算用で、重ね見の主対象にしない
 - ただし、関連する `deals` のステータスが `completed` / `disputed_resolved` などの terminal になったら、RLS で閲覧を遮断する
-- 閲覧側は **calendar overlay UI**（自分の AW と相手の AW を時系列で重ね描画）で時空交差を確認
+- 閲覧側は **スケジュール重ね見 UI**（自分と相手の `schedules` を時系列で重ね描画）で候補時間を確認
+- iter168.97 以降、スケジュールには任意の `place_name` を持たせ、重ね見画面や待ち合わせ候補登録時の背景表示に使う
 
 ---
 

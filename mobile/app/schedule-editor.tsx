@@ -15,6 +15,7 @@ export default function ScheduleEditorScreen() {
   const mode = scheduleId ? "edit" : "create";
   const { previewMode, user } = useAuth();
   const [title, setTitle] = useState("");
+  const [placeName, setPlaceName] = useState("");
   const [startAt, setStartAt] = useState(formatLocalInput(new Date()));
   const [endAt, setEndAt] = useState(formatLocalInput(new Date(Date.now() + 2 * 60 * 60 * 1000)));
   const [allDay, setAllDay] = useState(false);
@@ -25,13 +26,9 @@ export default function ScheduleEditorScreen() {
   useEffect(() => {
     if (!scheduleId || !supabase || !user || previewMode) return;
     let active = true;
-    supabase
-      .from("schedules")
-      .select("title, start_at, end_at, all_day, note")
-      .eq("id", scheduleId)
-      .eq("user_id", user.id)
-      .maybeSingle()
-      .then(({ data, error }) => {
+    void (async () => {
+      const result = await fetchScheduleForEditor(scheduleId, user.id);
+      const { data, error } = result;
         if (!active) return;
         if (error) {
           setError(error.message);
@@ -41,12 +38,21 @@ export default function ScheduleEditorScreen() {
           setError("予定が見つかりません");
           return;
         }
-        setTitle((data.title as string | null) ?? "");
-        setStartAt(formatLocalInput(new Date(data.start_at as string)));
-        setEndAt(formatLocalInput(new Date(data.end_at as string)));
-        setAllDay(Boolean(data.all_day));
-        setNote((data.note as string | null) ?? "");
-      });
+        const row = data as {
+          title?: string | null;
+          place_name?: string | null;
+          start_at: string;
+          end_at: string;
+          all_day?: boolean | null;
+          note?: string | null;
+        };
+        setTitle(row.title ?? "");
+        setPlaceName(row.place_name ?? "");
+        setStartAt(formatLocalInput(new Date(row.start_at)));
+        setEndAt(formatLocalInput(new Date(row.end_at)));
+        setAllDay(Boolean(row.all_day));
+        setNote(row.note ?? "");
+    })();
 
     return () => {
       active = false;
@@ -78,19 +84,13 @@ export default function ScheduleEditorScreen() {
     setPending(true);
     const payload = {
       title: trimmedTitle,
+      place_name: placeName.trim() || null,
       start_at: startDate.toISOString(),
       end_at: endDate.toISOString(),
       all_day: allDay,
       note: note.trim() || null,
     };
-    const result =
-      mode === "create"
-        ? await supabase.from("schedules").insert({ ...payload, user_id: user.id })
-        : await supabase
-            .from("schedules")
-            .update(payload)
-            .eq("id", scheduleId)
-            .eq("user_id", user.id);
+    const result = await saveScheduleForEditor(mode, scheduleId, user.id, payload);
     setPending(false);
     if (result.error) {
       setError(result.error.message);
@@ -112,6 +112,12 @@ export default function ScheduleEditorScreen() {
           onChangeText={setTitle}
           placeholder="例: 出張・友人ランチ・ライブ参戦"
           value={title}
+        />
+        <TextField
+          label="場所"
+          onChangeText={setPlaceName}
+          placeholder="例: 横浜アリーナ 北口"
+          value={placeName}
         />
         <View style={styles.toggleRow}>
           <Pressable
@@ -152,6 +158,57 @@ export default function ScheduleEditorScreen() {
       </PrimaryButton>
     </Screen>
   );
+}
+
+async function fetchScheduleForEditor(scheduleId: string, userId: string) {
+  if (!supabase) throw new Error("Supabaseが未設定です");
+  const rich = await supabase
+    .from("schedules")
+    .select("title, place_name, start_at, end_at, all_day, note")
+    .eq("id", scheduleId)
+    .eq("user_id", userId)
+    .maybeSingle();
+  if (!rich.error || !isMissingPlaceNameError(rich.error)) return rich;
+  return supabase
+    .from("schedules")
+    .select("title, start_at, end_at, all_day, note")
+    .eq("id", scheduleId)
+    .eq("user_id", userId)
+    .maybeSingle();
+}
+
+async function saveScheduleForEditor(
+  mode: "create" | "edit",
+  scheduleId: string | undefined,
+  userId: string,
+  payload: {
+    title: string;
+    place_name: string | null;
+    start_at: string;
+    end_at: string;
+    all_day: boolean;
+    note: string | null;
+  },
+) {
+  if (!supabase) throw new Error("Supabaseが未設定です");
+  const client = supabase;
+  const run = (nextPayload: typeof payload | Omit<typeof payload, "place_name">) =>
+    mode === "create"
+      ? client.from("schedules").insert({ ...nextPayload, user_id: userId })
+      : client
+          .from("schedules")
+          .update(nextPayload)
+          .eq("id", scheduleId)
+          .eq("user_id", userId);
+  const rich = await run(payload);
+  if (!rich.error || !isMissingPlaceNameError(rich.error)) return rich;
+  const { place_name: _placeName, ...fallbackPayload } = payload;
+  return run(fallbackPayload);
+}
+
+function isMissingPlaceNameError(error: { message?: string; details?: string | null }) {
+  const message = `${error.message ?? ""} ${error.details ?? ""}`.toLowerCase();
+  return message.includes("place_name") && message.includes("column");
 }
 
 function formatLocalInput(date: Date) {

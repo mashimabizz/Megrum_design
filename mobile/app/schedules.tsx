@@ -22,6 +22,7 @@ import { megrumColors, megrumRadii, megrumShadow } from "../src/theme/tokens";
 type ScheduleItem = {
   id: string;
   title: string;
+  placeName: string | null;
   startAt: string;
   endAt: string;
   allDay: boolean;
@@ -31,6 +32,7 @@ type ScheduleItem = {
 type ScheduleBlock = {
   id: string;
   title: string;
+  placeName: string | null;
   dateId: string;
   dayIndex: number;
   startSlot: number;
@@ -40,6 +42,7 @@ type ScheduleBlock = {
 type ScheduleDraft = {
   id: string | null;
   title: string;
+  placeName: string;
   dateId: string;
   startSlot: number;
   endSlot: number;
@@ -106,6 +109,7 @@ const PREVIEW_SCHEDULES: ScheduleItem[] = [
   {
     id: "preview-schedule-1",
     title: "ライブ参戦",
+    placeName: "横浜アリーナ",
     startAt: new Date(Date.now() + 1000 * 60 * 60 * 24).toISOString(),
     endAt: new Date(Date.now() + 1000 * 60 * 60 * 30).toISOString(),
     allDay: false,
@@ -167,6 +171,7 @@ export default function SchedulesScreen() {
     setDraft({
       id: null,
       title: "",
+      placeName: "",
       dateId,
       startSlot,
       endSlot,
@@ -181,6 +186,7 @@ export default function SchedulesScreen() {
     setDraft({
       id: block.id,
       title: block.title,
+      placeName: source?.placeName ?? "",
       dateId: block.dateId,
       startSlot: block.startSlot,
       endSlot: block.endSlot,
@@ -199,6 +205,7 @@ export default function SchedulesScreen() {
     setSaving(true);
     const payload = {
       title,
+      place_name: next.placeName.trim() || null,
       start_at: slotToIso(next.dateId, next.startSlot),
       end_at: slotToIso(next.dateId, next.endSlot),
       all_day: next.allDay,
@@ -209,6 +216,7 @@ export default function SchedulesScreen() {
       const localItem = rowToScheduleItem({
         id: next.id ?? `preview-schedule-${Date.now()}`,
         title: payload.title,
+        place_name: payload.place_name,
         start_at: payload.start_at,
         end_at: payload.end_at,
         all_day: payload.all_day,
@@ -224,19 +232,7 @@ export default function SchedulesScreen() {
       return;
     }
 
-    const result = next.id
-      ? await supabase
-          .from("schedules")
-          .update(payload)
-          .eq("id", next.id)
-          .eq("user_id", user.id)
-          .select("id, title, start_at, end_at, all_day, note")
-          .maybeSingle()
-      : await supabase
-          .from("schedules")
-          .insert({ ...payload, user_id: user.id })
-          .select("id, title, start_at, end_at, all_day, note")
-          .single();
+    const result = await saveScheduleRow(next.id, user.id, payload);
 
     setSaving(false);
     if (result.error) {
@@ -247,7 +243,7 @@ export default function SchedulesScreen() {
       setError("スケジュールを保存できませんでした");
       return;
     }
-    const saved = rowToScheduleItem(result.data as ScheduleRow);
+    const saved = rowToScheduleItem(result.data as unknown as ScheduleRow);
     setItems((current) =>
       next.id
         ? current.map((item) => (item.id === saved.id ? saved : item))
@@ -987,6 +983,11 @@ function ScheduleCalendar({
                             <Text numberOfLines={1} style={styles.scheduleBlockTime}>
                               {formatSlot(block.startSlot)}-{formatSlot(block.endSlot)}
                             </Text>
+                            {block.placeName ? (
+                              <Text numberOfLines={1} style={styles.scheduleBlockPlace}>
+                                {block.placeName}
+                              </Text>
+                            ) : null}
                             <Pressable
                               accessibilityLabel={`${block.title}の終了時間を変更`}
                               onTouchStart={(event) =>
@@ -1096,6 +1097,17 @@ function ScheduleSheet({
         />
       </View>
 
+      <View style={styles.fieldGroup}>
+        <Text style={styles.fieldLabel}>場所</Text>
+        <TextInput
+          value={draft.placeName}
+          onChangeText={(placeName) => onChange({ ...draft, placeName })}
+          placeholder="例: 横浜アリーナ 北口"
+          placeholderTextColor="rgba(58,50,74,0.34)"
+          style={styles.sheetInput}
+        />
+      </View>
+
       <PrimaryButton loading={loading} onPress={() => onSave(draft)}>
         {draft.id ? "変更を保存" : "この予定を追加"}
       </PrimaryButton>
@@ -1130,6 +1142,7 @@ function ScheduleSheet({
 type ScheduleRow = {
   id: string;
   title: string;
+  place_name?: string | null;
   start_at: string;
   end_at: string;
   all_day: boolean;
@@ -1138,24 +1151,73 @@ type ScheduleRow = {
 
 async function fetchSchedules(userId: string): Promise<ScheduleItem[]> {
   if (!supabase) return [];
-  const { data, error } = await supabase
+  const rich = await supabase
+    .from("schedules")
+    .select("id, title, place_name, start_at, end_at, all_day, note")
+    .eq("user_id", userId)
+    .order("start_at", { ascending: true });
+  if (!rich.error) return ((rich.data as ScheduleRow[] | null) ?? []).map(rowToScheduleItem);
+  if (!isMissingPlaceNameError(rich.error)) throw rich.error;
+  const fallback = await supabase
     .from("schedules")
     .select("id, title, start_at, end_at, all_day, note")
     .eq("user_id", userId)
     .order("start_at", { ascending: true });
-  if (error) throw error;
-  return ((data as ScheduleRow[] | null) ?? []).map(rowToScheduleItem);
+  if (fallback.error) throw fallback.error;
+  return ((fallback.data as ScheduleRow[] | null) ?? []).map(rowToScheduleItem);
+}
+
+async function saveScheduleRow(
+  id: string | null,
+  userId: string,
+  payload: {
+    title: string;
+    place_name: string | null;
+    start_at: string;
+    end_at: string;
+    all_day: boolean;
+    note: string | null;
+  },
+) {
+  if (!supabase) throw new Error("Supabaseが未設定です");
+  const client = supabase;
+  const selectRich = "id, title, place_name, start_at, end_at, all_day, note";
+  const selectFallback = "id, title, start_at, end_at, all_day, note";
+  const run = (nextPayload: typeof payload | Omit<typeof payload, "place_name">, select: string) =>
+    id
+      ? client
+          .from("schedules")
+          .update(nextPayload)
+          .eq("id", id)
+          .eq("user_id", userId)
+          .select(select)
+          .maybeSingle()
+      : client
+          .from("schedules")
+          .insert({ ...nextPayload, user_id: userId })
+          .select(select)
+          .single();
+  const rich = await run(payload, selectRich);
+  if (!rich.error || !isMissingPlaceNameError(rich.error)) return rich;
+  const { place_name: _placeName, ...fallbackPayload } = payload;
+  return run(fallbackPayload, selectFallback);
 }
 
 function rowToScheduleItem(row: ScheduleRow): ScheduleItem {
   return {
     id: row.id,
     title: row.title,
+    placeName: row.place_name ?? null,
     startAt: row.start_at,
     endAt: row.end_at,
     allDay: row.all_day,
     note: row.note,
   };
+}
+
+function isMissingPlaceNameError(error: { message?: string; details?: string | null }) {
+  const message = `${error.message ?? ""} ${error.details ?? ""}`.toLowerCase();
+  return message.includes("place_name") && message.includes("column");
 }
 
 function scheduleToBlock(item: ScheduleItem, days: CalendarDay[]) {
@@ -1170,6 +1232,7 @@ function scheduleToBlock(item: ScheduleItem, days: CalendarDay[]) {
   return {
     id: item.id,
     title: item.title,
+    placeName: item.placeName,
     dateId,
     dayIndex,
     startSlot,
@@ -1426,6 +1489,13 @@ const styles = StyleSheet.create({
     fontSize: 9,
     fontWeight: "900",
     marginTop: 2,
+    textAlign: "center",
+  },
+  scheduleBlockPlace: {
+    color: "rgba(37,106,168,0.70)",
+    fontSize: 8.5,
+    fontWeight: "800",
+    marginTop: 1,
     textAlign: "center",
   },
   scheduleResizeHandle: {
