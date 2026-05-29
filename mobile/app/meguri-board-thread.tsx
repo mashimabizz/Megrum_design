@@ -100,7 +100,9 @@ type BoardMediaAttachment = {
 };
 
 type BoardReplySortMode = "oldest" | "newest" | "popular";
-type ReplySearchSource = { label: string; type: "mention" | "mine" | "participant" } | null;
+type ReplySearchSource =
+  | { label: string; replyId?: string; type: "children" | "mention" | "mine" | "participant" }
+  | null;
 
 const REPLY_SORT_OPTIONS: { label: string; value: BoardReplySortMode }[] = [
   { label: "古い順", value: "oldest" },
@@ -199,9 +201,21 @@ export default function MeguriBoardThreadScreen() {
     return new Map(replies.map((reply, index) => [reply.id, index + 1]));
   }, [replies]);
 
+  const replyChildCountById = useMemo(() => {
+    const counts = new Map<string, number>();
+    replies.forEach((reply) => {
+      if (!reply.parentReplyId || reply.deleted) return;
+      counts.set(reply.parentReplyId, (counts.get(reply.parentReplyId) ?? 0) + 1);
+    });
+    return counts;
+  }, [replies]);
+
   const replySearchQuery = useMemo(() => normalizeReplySearch(replySearchText), [replySearchText]);
 
   const filteredReplies = useMemo(() => {
+    if (replySearchSource?.type === "children" && replySearchSource.replyId) {
+      return replies.filter((reply) => reply.parentReplyId === replySearchSource.replyId);
+    }
     if (replySearchSource?.type === "mine") {
       return replies.filter((reply) => reply.mine);
     }
@@ -222,7 +236,7 @@ export default function MeguriBoardThreadScreen() {
           .join(" "),
       ).includes(replySearchQuery);
     });
-  }, [replies, replyNumberById, replySearchQuery, replySearchSource?.type]);
+  }, [replies, replyNumberById, replySearchQuery, replySearchSource?.replyId, replySearchSource?.type]);
 
   const sortedReplies = useMemo(() => {
     const next = [...filteredReplies];
@@ -428,6 +442,23 @@ export default function MeguriBoardThreadScreen() {
     const firstOwnReply = [...viewerReplies].sort((left, right) => left.createdAt - right.createdAt)[0];
     setTimeout(() => {
       const y = firstOwnReply ? replyOffsetsRef.current[firstOwnReply.id] : undefined;
+      if (typeof y === "number") {
+        scrollViewRef.current?.scrollTo({ animated: true, y: Math.max(0, y - 12) });
+      }
+    }, 120);
+  }
+
+  function filterChildReplies(parentReply: MeguriBoardReply) {
+    const childReplies = replies.filter((reply) => reply.parentReplyId === parentReply.id);
+    if (childReplies.length === 0) return;
+    const parentNumber = replyNumberById.get(parentReply.id);
+    const label = parentNumber ? `#${parentNumber}への返信` : "この返信への返信";
+    setReplySearchText(label);
+    setReplySearchSource({ label, replyId: parentReply.id, type: "children" });
+    setSearchCursorIndex(0);
+    const firstChildReply = [...childReplies].sort((left, right) => left.createdAt - right.createdAt)[0];
+    setTimeout(() => {
+      const y = firstChildReply ? replyOffsetsRef.current[firstChildReply.id] : undefined;
       if (typeof y === "number") {
         scrollViewRef.current?.scrollTo({ animated: true, y: Math.max(0, y - 12) });
       }
@@ -1086,6 +1117,11 @@ export default function MeguriBoardThreadScreen() {
       run: () => quoteReply(reply),
     });
     actions.push({
+      disabled: (replyChildCountById.get(reply.id) ?? 0) === 0,
+      label: "この返信への返信を見る",
+      run: () => filterChildReplies(reply),
+    });
+    actions.push({
       disabled: reply.deleted,
       label: "返信を共有",
       run: () => void shareReply(reply),
@@ -1373,6 +1409,8 @@ export default function MeguriBoardThreadScreen() {
                   <Text numberOfLines={1} style={styles.replyActiveFilterText}>
                     {replySearchSource?.type === "mine"
                       ? replySearchSource.label
+                      : replySearchSource?.type === "children"
+                      ? replySearchSource.label
                       : replySearchSource?.type === "mention"
                       ? `あなた宛て: ${replySearchSource.label}`
                       : replySearchSource?.type === "participant"
@@ -1481,6 +1519,7 @@ export default function MeguriBoardThreadScreen() {
                     ? `#${quotedReplyNumber} ${reply.quotedAuthorName || "引用"}`
                     : reply.quotedAuthorName || "引用";
                   const mentionsViewer = !reply.mine && replyMentionsHandle(reply.body, actor.handle);
+                  const childReplyCount = replyChildCountById.get(reply.id) ?? 0;
                   return (
                     <View
                       key={reply.id}
@@ -1596,6 +1635,16 @@ export default function MeguriBoardThreadScreen() {
                                 {reply.reactionCount}
                               </Text>
                             </Pressable>
+                            {childReplyCount > 0 ? (
+                              <Pressable
+                                accessibilityRole="button"
+                                onPress={() => filterChildReplies(reply)}
+                                style={styles.replyActionPill}
+                              >
+                                <IconSymbol name="mail-outline" color={megrumColors.mutedInk} size={13} />
+                                <Text style={styles.replyActionText}>返信 {childReplyCount}</Text>
+                              </Pressable>
+                            ) : null}
                             <Pressable
                               accessibilityRole="button"
                               onPress={() => openReplyActions(reply)}

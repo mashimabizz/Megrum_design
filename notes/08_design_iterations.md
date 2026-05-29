@@ -4,6 +4,55 @@
 
 ---
 
+## イテレーション225：掲示板詳細に返信ツリー導線を追加
+
+### 背景・問題意識
+
+スポット掲示板の返信が増えると、引用返信や特定返信への返答だけを追うのが難しくなる。一般的なスレッドUIとして、ある返信に紐づいた子返信だけをすぐ確認できる導線を追加した。
+
+### 変更内容
+
+#### `mobile/app/meguri-board-thread.tsx`
+- `parentReplyId` をもとに返信ごとの子返信件数を集計する `replyChildCountById` を追加した。
+- 子返信がある返信のアクション行に `返信 n` チップを表示するようにした。
+- `返信 n` または返信アクションシートの `この返信への返信を見る` から、その返信に紐づく子返信だけを表示できるようにした。
+- 子返信フィルタ中は検索条件チップに `#nへの返信` を表示し、解除で通常の返信一覧へ戻れるようにした。
+
+#### `notes/09_state_machines.md`
+- Meguri Board Lifecycle に返信ツリー導線の表示ルールを追記した。
+
+#### `notes/10_glossary.md`
+- 掲示板返信ツリー導線を追加した。
+
+### 影響範囲
+
+- iOS版 スポット掲示板詳細
+- 返信アクション行
+- 返信アクションシート
+- スレッド内検索/フィルタ表示
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- `EAS_UPDATE_PROJECT_SLUG=ihub EXPO_NO_GIT_STATUS=1 npm --prefix mobile run update:ios:preview -- --message "[iter225] add board reply thread filter" --non-interactive`
+- Preview OTA: Update group `fc21adbd-210c-42cb-91ed-6de049e37228` / iOS update `019e75cb-8a46-78f8-bc64-49bcbe39e75a`
+
+### 関連ファイル
+
+- `mobile/app/meguri-board-thread.tsx`
+- `notes/08_design_iterations.md`
+- `notes/09_state_machines.md`
+- `notes/10_glossary.md`
+
+### セルフレビュー結果
+
+- ✅ 既存の `parentReplyId` を使い、DB変更なしで返信ツリー導線を追加した。
+- ✅ 子返信がある時だけチップを表示し、空の導線を出さないようにした。
+- ✅ ネイティブ依存追加なしで、Preview OTA対象内に収めた。
+
+---
+
 ## イテレーション224：掲示板一覧に返信下書き導線を追加
 
 ### 背景・問題意識
