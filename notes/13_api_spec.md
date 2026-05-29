@@ -972,6 +972,7 @@ AW削除。
         "viewer_reacted": false,
         "viewer_hidden": false,
         "viewer_reported": false,
+        "viewer_subscribed": true,
         "viewer_read_at": "2026-05-29T07:20:00Z",
         "author": { "id": "uuid", "display_name": "string", "handle": "string?" }
       }
@@ -1004,7 +1005,7 @@ AW削除。
   }
   ```
 - **Response 201**: 作成された thread
-- **備考**: `nearby_3km` は `origin_lat` / `origin_lng` / `prefecture` 必須。基準地点はスレッドを立てた時の位置情報。`category` 未指定時は `chat`
+- **備考**: `nearby_3km` は `origin_lat` / `origin_lng` / `prefecture` 必須。基準地点はスレッドを立てた時の位置情報。`category` 未指定時は `chat`。作成者は自動でスレッド購読ONになる
 - **Screen**: `meguri-board`
 
 ### GET /api/v1/meguri-board/threads/:id
@@ -1040,6 +1041,7 @@ AW削除。
   ```
 - **Response 201**: `{ id, thread_id, body, parent_reply_id, quote_author_name, quote_body, status, reaction_count, created_at, updated_at, deleted_at, viewer_reacted, viewer_reported, author }`
 - **備考**: テキストのみ。`thread.status='locked'` の場合は返信不可。引用返信では `parent_reply_id` と表示用スナップショットを保存する
+- **Side effects**: 返信者をスレッド購読ONにし、購読中の他ユーザーへ `notifications.kind='meguri_board_reply'` を作成する
 - **Screen**: `meguri-board-thread`
 
 ### PATCH /api/v1/meguri-board/threads/:id
@@ -1109,6 +1111,16 @@ AW削除。
 - **Response 204**: no content
 - **Side effects**: `meguri_board_thread_reactions` を insert/delete、`reaction_count` を同期
 - **Screen**: `meguri-board`, `meguri-board-thread`
+
+### PUT /api/v1/meguri-board/threads/:id/subscription
+
+スレッド返信通知の購読ON/OFF。
+
+- **Auth**: 必須
+- **Request**: `{ "enabled": true }`
+- **Response 204**: no content
+- **Side effects**: `meguri_board_thread_subscriptions.notification_enabled` を upsert。ON中のスレッドに自分以外が返信すると `notifications.kind='meguri_board_reply'` が作成される
+- **Screen**: `meguri-board`, `meguri-board-thread`, `notifications`
 
 ### PUT /api/v1/meguri-board/replies/:id/reaction
 

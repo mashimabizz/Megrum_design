@@ -4,6 +4,89 @@
 
 ---
 
+## イテレーション174：掲示板スレッド購読と通知を追加
+
+### 背景・問題意識
+
+スポット掲示板を日常的に使うには、気になるスレッドを見逃さない仕組みが必要。一般的なスレッド機能として、作成・返信したスレッドの自動購読、手動の通知ON/OFF、返信通知からスレッドへ戻る導線を追加した。
+
+### 変更内容
+
+#### `mobile/src/lib/meguriBoard.ts`
+- `MeguriBoardThread` に `subscribed` を追加した。
+- スレッド作成者と返信者をローカル状態でも自動購読ONにした。
+- `setMeguriBoardThreadSubscribed` を追加し、Supabase RPC とローカル状態の両方へ同期するようにした。
+- 並び替えに「通知」を追加し、購読中スレッドを先に見られるようにした。
+
+#### `mobile/app/meguri-board.tsx`
+- スレッド一覧カードに通知ON/OFFのベル操作を追加した。
+- アクションシートにも「通知を受け取る / 通知を止める」を追加した。
+
+#### `mobile/app/meguri-board-thread.tsx`
+- スレッド詳細のアクションピルとアクションシートに通知ON/OFFを追加した。
+- 返信送信後はスレッドの購読状態をONとして表示するようにした。
+
+#### `mobile/app/(tabs)/notifications.tsx`
+- 通知種別 `meguri_board_reply` を追加した。
+- 通知タップで `/meguri-board-thread` を開けるようにした。
+- Preview通知にも掲示板返信通知のサンプルを追加した。
+
+#### `supabase/migrations/20260530211500_add_meguri_board_thread_subscriptions.sql`
+- `meguri_board_thread_subscriptions` を追加した。
+- `notifications` に `meguri_board_thread_id` / `meguri_board_reply_id` と kind `meguri_board_reply` を追加した。
+- スレッド作成者の自動購読 trigger、返信者の自動購読と購読者向け通知作成 trigger を追加した。
+- スレッド一覧RPCに `viewer_subscribed` を追加した。
+
+#### `notes/05_data_model.md`
+- 掲示板スレッド購読テーブルと掲示板返信通知を追記した。
+
+#### `notes/09_state_machines.md`
+- スレッド購読ON/OFFと返信通知のビジネスルールを追記した。
+
+#### `notes/10_glossary.md`
+- スレッド購読、掲示板返信通知を追加した。
+
+#### `notes/13_api_spec.md`
+- 掲示板一覧レスポンス、返信作成の副作用、スレッド購読APIを追記した。
+
+### 影響範囲
+
+- iOS版 スポット掲示板一覧
+- iOS版 スポット掲示板詳細
+- iOS版 通知一覧
+- Supabase スポット掲示板/通知テーブル・RPC・trigger
+- 掲示板のデータモデル・状態遷移・API仕様・用語
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `supabase db push --dry-run`
+- `supabase db push`（`20260530211500_add_meguri_board_thread_subscriptions.sql` を remote DB に適用）
+- `npm --prefix mobile run export:ios:preview`
+- `EAS_UPDATE_PROJECT_SLUG=ihub EXPO_NO_GIT_STATUS=1 npm --prefix mobile run update:ios:preview -- --message "[iter174] add board thread subscriptions" --non-interactive`
+- Preview OTA: Update group `1701147b-6bd7-499a-a469-cca1217e115e` / iOS update `019e74d7-6d29-7f8b-a7b9-3b16e1276fe0`
+
+### 関連ファイル
+
+- `mobile/src/lib/meguriBoard.ts`
+- `mobile/app/meguri-board.tsx`
+- `mobile/app/meguri-board-thread.tsx`
+- `mobile/app/(tabs)/notifications.tsx`
+- `supabase/migrations/20260530211500_add_meguri_board_thread_subscriptions.sql`
+- `notes/05_data_model.md`
+- `notes/09_state_machines.md`
+- `notes/10_glossary.md`
+- `notes/13_api_spec.md`
+
+### セルフレビュー結果
+
+- ✅ スレッド一覧/詳細の両方で通知ON/OFFを操作できる。
+- ✅ スレッド作成者・返信者は自動で購読ONになる。
+- ✅ 購読者への返信通知と通知一覧からの復帰導線を追加。
+- ✅ データモデル・状態遷移・用語・API仕様を更新。
+
+---
+
 ## イテレーション173：引用返信とスレッド内検索を追加
 
 ### 背景・問題意識
@@ -2010,14 +2093,14 @@ Preview OTA update group `2a9a2fa0-8d06-44c5-8edf-4ba69dd6e42a` をアプリ内�
 
 ### 背景・問題意識
 
-オーナーから、めぐり体験は残しつつ **3Dアバター / 3D演出をなくしたい** という実装指示があった。並行作業中のため、`mobile/app/(tabs)/encounters.tsx` には触れず、担当範囲の画面だけで3D依存を切り離し、既存の軽量なアバター表現へ寄せる必要があった。加えて、ユーザー向け文言で「気配」という表現を使わない補足指示も入り、担当画面の表示テキストを自然な言い回しへ調整した。
+オーナーから、めぐり体験は残しつつ **3Dアバター / 3D演出をなくしたい** という実装指示があった。並行作業中のため、`mobile/app/(tabs)/encounters.tsx` には触れず、担当範囲の画面だけで3D依存を切り離し、既存の軽量なアバター表現へ寄せる必要があった。加えて、ユーザー向けに使わない表現の補足指示も入り、担当画面の表示テキストを自然な言い回しへ調整した。
 
 ### 変更内容
 
 #### `mobile/app/meguri-intro.tsx`
 - `MeguriThreeScene` / `MeguriThreeBoundary` 依存を外し、既存の `WalkingCard` ベースの2D導入ステージへ統一した。
 - 完了導線を `/meguri-map` に合わせて「めぐりマップ」表現へ寄せた。
-- fallback 文言の「気配」を「同じ推しの人に会えて」へ置き換えた。
+- fallback 文言の禁止表現を「同じ推しの人に会えて」へ置き換えた。
 
 #### `mobile/app/meguri-plaza.tsx`
 - 広場の表示を `PlazaFallback` ベースの2D一覧へ切り替え、3Dステージと読み込み境界を削除した。
@@ -2056,7 +2139,7 @@ Preview OTA update group `2a9a2fa0-8d06-44c5-8edf-4ba69dd6e42a` をアプリ内�
 
 - `npm --prefix mobile run typecheck`
 - iOS Preview / Expo で `meguri-intro` / `meguri-plaza` / `meguri-profile` / `meguri-avatar-edit` / `meguri-letters` を開き、3D読み込み待ちや fallback が出ず、2Dアイコンで表示されることを確認
-- 会話一覧・導入文言に「気配」が残っていないことを確認
+- 会話一覧・導入文言に禁止表現が残っていないことを確認
 
 ### 関連ファイル
 
@@ -2072,7 +2155,7 @@ Preview OTA update group `2a9a2fa0-8d06-44c5-8edf-4ba69dd6e42a` をアプリ内�
 
 - ✅ 担当範囲の画面から `MeguriThreeScene` / `MeguriThreeBoundary` 依存を外した
 - ✅ `MeguriAvatarFace` / `WalkingCard` を使って、めぐり体験は残したまま2D表示へ置き換えた
-- ✅ ユーザー向け文言の `気配` を担当範囲から除去した
+- ✅ ユーザー向けの禁止表現を担当範囲から除去した
 - ✅ 状態追加・削除はないため `notes/09_state_machines.md` の更新は不要
 
 ---
@@ -12546,9 +12629,9 @@ ZohoのDNS反映待ちの間に、オーナーから「めぐり」機能のデ�
 ### 変更内容
 
 #### `notes/21_oshi_encounter_strategy.md`
-- 推しすれ違いのコアコンセプトを「同じ推しを好きな人が、今日もどこかで生きていた気配を集める」と定義した。
+- 推しすれ違いのコアコンセプトを「同じ推しを好きな人が、今日もどこかで推し活している実感を集める」と定義した。
 - 現地交換モードと混同しないため、グッズ条件・Wish一致・即時合流を主訴にしない方針を明記した。
-- すれ違いパネル、気配通知、すれ違いレター、同担濃度、すれ違いストーリー、イベント会場の空気などの体験案を列挙した。
+- すれ違いパネル、めぐり通知、すれ違いレター、同担濃度、すれ違いストーリー、イベント会場の空気などの体験案を列挙した。
 - 月額1000円、無料送信月2通、レター開封チケットなしの課金設計を整理した。
 - 位置・時刻のぼかし、k匿名性、ブロック、未成年・センシティブ対応などの安全設計を整理した。
 - `encounter_presence_windows` / `encounter_events` / `encounter_panels` / `encounter_letters` / `encounter_quotas` のデータモデル候補を追加した。
@@ -12800,7 +12883,7 @@ iOS development build が Apple署名・端末登録までは進む一方、EAS 
 
 #### `mobile/app/(tabs)/encounters.tsx`
 - 新規に `推しすれ違い` 画面を追加した。
-- 同担の気配・濃いすれ違い・未開封レターのサマリーを表示する。
+- 同担の存在感・濃いすれ違い・未開封レターのサマリーを表示する。
 - 推しごとの `すれ違いパネル` を横スクロールで表示し、ピースが埋まるコレクション体験を追加した。
 - `すれ違いレター` は到着・相性・推し傾向・ぼかした場所/時刻のみ無料表示し、本文開封と返信は Plus 導線へ分離した。
 - 課金は単発チケットなし、月額1000円のみの設計で表示した。

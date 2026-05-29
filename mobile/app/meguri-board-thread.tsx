@@ -34,6 +34,7 @@ import {
   setMeguriBoardReplyReacted,
   setMeguriBoardThreadBookmarked,
   setMeguriBoardThreadReacted,
+  setMeguriBoardThreadSubscribed,
   updateMeguriBoardReply,
   updateMeguriBoardThread,
   type MeguriBoardActor,
@@ -243,6 +244,7 @@ export default function MeguriBoardThreadScreen() {
             latestActivityAt: Math.max(current.latestActivityAt, reply.createdAt),
             latestReplyPreview: reply.body,
             replyCount: current.replyCount + 1,
+            subscribed: true,
           }
         : current,
     );
@@ -272,6 +274,13 @@ export default function MeguriBoardThreadScreen() {
       reactionCount: Math.max(0, thread.reactionCount + (reacted ? 1 : -1)),
     });
     await setMeguriBoardThreadReacted(thread.id, reacted);
+  }
+
+  async function toggleThreadSubscription() {
+    if (!thread) return;
+    const subscribed = !thread.subscribed;
+    updateThread({ ...thread, subscribed });
+    await setMeguriBoardThreadSubscribed(thread.id, subscribed);
   }
 
   async function hideThread() {
@@ -444,6 +453,10 @@ export default function MeguriBoardThreadScreen() {
     actions.push(
       { label: thread.bookmarked ? "保存を解除" : "保存する", run: () => void toggleThreadBookmark() },
       { label: thread.reacted ? "参考になったを取り消す" : "参考になった", run: () => void toggleThreadReaction() },
+      {
+        label: thread.subscribed ? "通知を止める" : "通知を受け取る",
+        run: () => void toggleThreadSubscription(),
+      },
       { destructive: true, label: "非表示にする", run: () => void hideThread() },
       {
         disabled: thread.reported,
@@ -614,6 +627,20 @@ export default function MeguriBoardThreadScreen() {
                     />
                     <Text style={[styles.threadActionText, thread.bookmarked ? styles.threadActionTextActive : null]}>
                       保存
+                    </Text>
+                  </Pressable>
+                  <Pressable
+                    accessibilityRole="button"
+                    onPress={toggleThreadSubscription}
+                    style={[styles.threadActionPill, thread.subscribed ? styles.threadActionPillActive : null]}
+                  >
+                    <IconSymbol
+                      name="notifications-outline"
+                      color={thread.subscribed ? megrumColors.lavender : megrumColors.mutedInk}
+                      size={15}
+                    />
+                    <Text style={[styles.threadActionText, thread.subscribed ? styles.threadActionTextActive : null]}>
+                      {thread.subscribed ? "通知ON" : "通知"}
                     </Text>
                   </Pressable>
                 </View>

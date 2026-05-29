@@ -3,8 +3,8 @@
 > **目的**：Megrum の主要エンティティのライフサイクルと状態遷移ルールを定義。
 > 実装が状態遷移でブレないための一次資料。デザイン・実装・QA の共通言語。
 
-最終更新: 2026-05-29
-ステータス: Draft v1.4（iter168.96 掲示板の都道府県デフォルトを追記）
+最終更新: 2026-05-30
+ステータス: Draft v1.5（iter174 掲示板スレッド購読と通知を追記）
 
 ---
 
@@ -690,7 +690,9 @@ stateDiagram-v2
 stateDiagram-v2
     [*] --> visible: スレッド作成
     visible --> visible: 返信追加
+    visible --> visible: 購読ON/OFF
     visible --> locked: 作成者/運営判断で返信停止
+    locked --> locked: 購読ON/OFF
     locked --> visible: 作成者/運営判断で返信再開
     visible --> archived: 作成者が削除
     locked --> archived: 作成者が削除
@@ -719,6 +721,8 @@ stateDiagram-v2
 - iter172 以降、自分の返信は編集でき、削除時は `meguri_board_replies.status='deleted'` としてプレースホルダ表示にする。
 - iter173 以降、返信は他の返信を引用できる。引用は `parent_reply_id` と表示用スナップショットを保存し、引用元が編集・削除されても会話の文脈を保つ。
 - iter173 以降、スレッド詳細内で返信本文・引用本文・返信者名を対象に検索できる。検索は表示絞り込みで、スレッド状態は変えない。
+- iter174 以降、スレッド作成者と返信者は `meguri_board_thread_subscriptions.notification_enabled=true` で自動購読される。ユーザーは一覧/詳細から通知ON/OFFを切り替えられる。
+- iter174 以降、購読中スレッドに自分以外が返信すると `notifications.kind='meguri_board_reply'` を作成し、通知タップで該当スレッドへ戻れるようにする。通知OFFのユーザーと返信者本人には送らない。
 - iter171 以降、スレッドにはカテゴリ（質問/情報/雑談/交換/落とし物）、検索、並び替え（更新/新着/人気/保存）、保存、参考になった、既読、ユーザー単位の非表示、通報を持たせる。
 - スレッド詳細を開いたら `meguri_board_thread_reads.read_at` を更新し、一覧では `read_at < latest_activity_at` を未読として扱う。
 - 保存・参考になった・非表示・通報はユーザー単位で保存する。非表示にしたスレッドは本人の一覧から除外する。

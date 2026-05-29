@@ -34,6 +34,7 @@ import {
   reportMeguriBoardThread,
   setMeguriBoardThreadBookmarked,
   setMeguriBoardThreadReacted,
+  setMeguriBoardThreadSubscribed,
   type MeguriBoardActor,
   type MeguriBoardAudienceScope,
   type MeguriBoardThreadCategory,
@@ -347,6 +348,12 @@ export default function MeguriBoardScreen() {
     await setMeguriBoardThreadReacted(thread.id, reacted);
   }
 
+  async function toggleThreadSubscription(thread: MeguriBoardThread) {
+    const subscribed = !thread.subscribed;
+    updateThreadLocally({ ...thread, subscribed });
+    await setMeguriBoardThreadSubscribed(thread.id, subscribed);
+  }
+
   async function hideThread(thread: MeguriBoardThread) {
     setThreads((current) => current.filter((candidate) => candidate.id !== thread.id));
     await hideMeguriBoardThread(thread.id);
@@ -362,6 +369,7 @@ export default function MeguriBoardScreen() {
     const labels = [
       thread.bookmarked ? "保存を解除" : "保存する",
       thread.reacted ? "参考になったを取り消す" : "参考になった",
+      thread.subscribed ? "通知を止める" : "通知を受け取る",
       "非表示にする",
       thread.reported ? "通報済み" : "通報する",
       "キャンセル",
@@ -369,17 +377,18 @@ export default function MeguriBoardScreen() {
     if (Platform.OS === "ios") {
       ActionSheetIOS.showActionSheetWithOptions(
         {
-          cancelButtonIndex: 4,
-          destructiveButtonIndex: 2,
-          disabledButtonIndices: thread.reported ? [3] : undefined,
+          cancelButtonIndex: 5,
+          destructiveButtonIndex: 3,
+          disabledButtonIndices: thread.reported ? [4] : undefined,
           options: labels,
           title: thread.title,
         },
         (index) => {
           if (index === 0) void toggleThreadBookmark(thread);
           if (index === 1) void toggleThreadReaction(thread);
-          if (index === 2) void hideThread(thread);
-          if (index === 3 && !thread.reported) void reportThread(thread);
+          if (index === 2) void toggleThreadSubscription(thread);
+          if (index === 3) void hideThread(thread);
+          if (index === 4 && !thread.reported) void reportThread(thread);
         },
       );
       return;
@@ -611,6 +620,18 @@ export default function MeguriBoardScreen() {
                           <IconSymbol
                             name="star-outline"
                             color={thread.bookmarked ? megrumColors.lavender : megrumColors.mutedInk}
+                            size={14}
+                          />
+                        </Pressable>
+                        <Pressable
+                          accessibilityRole="button"
+                          hitSlop={8}
+                          onPress={() => toggleThreadSubscription(thread)}
+                          style={[styles.metricPill, thread.subscribed ? styles.metricPillActive : null]}
+                        >
+                          <IconSymbol
+                            name="notifications-outline"
+                            color={thread.subscribed ? megrumColors.lavender : megrumColors.mutedInk}
                             size={14}
                           />
                         </Pressable>

@@ -22,7 +22,8 @@ type NotificationKind =
   | "cancel_requested"
   | "expires_soon"
   | "groom_reply"
-  | "meguri_message";
+  | "meguri_message"
+  | "meguri_board_reply";
 
 type NotificationItem = {
   id: string;
@@ -52,6 +53,7 @@ const KIND_ICON: Record<NotificationKind, IconSymbolName> = {
   expires_soon: "time-outline",
   groom_reply: "mail-outline",
   meguri_message: "mail-outline",
+  meguri_board_reply: "notifications-outline",
 };
 
 const KIND_TONE: Record<NotificationKind, Tone> = {
@@ -69,6 +71,7 @@ const KIND_TONE: Record<NotificationKind, Tone> = {
   expires_soon: "amber",
   groom_reply: "lavender",
   meguri_message: "lavender",
+  meguri_board_reply: "lavender",
 };
 
 const PREVIEW_NOTIFICATIONS: NotificationItem[] = [
@@ -89,6 +92,15 @@ const PREVIEW_NOTIFICATIONS: NotificationItem[] = [
     linkPath: "/proposals/preview",
     readAt: new Date(Date.now() - 1000 * 60 * 60 * 2).toISOString(),
     createdAt: new Date(Date.now() - 1000 * 60 * 60 * 8).toISOString(),
+  },
+  {
+    id: "preview-notification-3",
+    kind: "meguri_board_reply",
+    title: "購読中のスレッドに返信がありました",
+    body: "みち: 物販列は今だと20分くらいです。",
+    linkPath: "/meguri-board-thread?id=preview-board-thread-1&viewMode=nearby_3km",
+    readAt: null,
+    createdAt: new Date(Date.now() - 1000 * 60 * 7).toISOString(),
   },
 ];
 
@@ -363,6 +375,19 @@ function routeFromLinkPath(path: string | null) {
       params: {
         open: params.get("open") ?? undefined,
         userId: params.get("userId") ?? undefined,
+      },
+    } as const;
+  }
+  const meguriBoardThread = path.match(/^\/meguri-board-thread(?:\?(.*))?$/);
+  if (meguriBoardThread) {
+    const params = new URLSearchParams(meguriBoardThread[1] ?? "");
+    const id = params.get("id");
+    if (!id) return null;
+    return {
+      pathname: "/meguri-board-thread",
+      params: {
+        id,
+        viewMode: params.get("viewMode") ?? undefined,
       },
     } as const;
   }
