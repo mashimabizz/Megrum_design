@@ -758,11 +758,11 @@ export default function HomeScreen() {
         scrollEventThrottle={16}
       >
         {homeError ? <Text style={styles.inlineError}>{homeError}</Text> : null}
+        <HomeGroomRail onOpen={openHomeGroom} posts={homeGroomPosts} />
         {homeLoading ? (
           <HomeFeedSkeleton />
         ) : (
           <>
-            <HomeGroomRail onOpen={openHomeGroom} posts={homeGroomPosts} />
             {visibleSections.length > 0 ? (
               visibleSections.map((section, sectionIndex) => [
                 <StickySectionHeader

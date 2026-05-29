@@ -25,7 +25,7 @@ import {
 } from "../../src/components/GoodsGrid";
 import { useAuth } from "../../src/auth/AuthProvider";
 import { Screen } from "../../src/components/Screen";
-import { GoodsGridSkeleton, SkeletonPillRow } from "../../src/components/SkeletonScreen";
+import { FilterRowsSkeleton, GoodsGridSkeleton } from "../../src/components/SkeletonScreen";
 import { fetchInventoryTagLabels, formatHashTags } from "../../src/lib/inventoryTags";
 import { supabase } from "../../src/lib/supabase";
 import { megrumColors, megrumRadii } from "../../src/theme/tokens";
@@ -376,8 +376,13 @@ export default function InventoryScreen() {
 
         {loading ? (
           <View style={styles.loadingSkeleton}>
-            <SkeletonPillRow count={2} />
-            <GoodsGridSkeleton columns={columns} count={9} />
+            <FilterRowsSkeleton rows={2} />
+            <GoodsGridSkeleton
+              columns={columns}
+              count={8}
+              includeAddTile={status === "active"}
+              showTopRow={false}
+            />
           </View>
         ) : (
           <>

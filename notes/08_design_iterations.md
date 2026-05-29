@@ -4,6 +4,68 @@
 
 ---
 
+## イテレーション168.98：読み込み骨格を実UI形状へ調整
+
+### 背景・問題意識
+
+オーナーから、ローディング中のスケルトンは「読み込みがかかるところだけ」に出し、表示後のコンポーネントの部品の形と位置に合わせるよう依頼があった。従来は一部の画面で汎用的な箱やローディング文言に寄っており、実際のカード/グリッド構造とズレて見える箇所があった。
+
+### 変更内容
+
+#### `mobile/src/components/SkeletonScreen.tsx`
+- 在庫/Wishのグッズグリッドと同じ列数・タイル比率で表示する `GoodsGridSkeleton` に作り直した。
+- 在庫/Wishのフィルタ行に合わせた `FilterRowsSkeleton` を追加した。
+- 個別募集の募集デッキ、取引カード、ホームの交換候補棚、掲示板スレッドカード、提示物選択カードの形状に合わせて各スケルトンを再設計した。
+- グルームの横並びスケルトンを、実際の丸アイコンサイズとラベル位置に合わせた。
+
+#### `mobile/app/(tabs)/index.tsx`
+- ホームのグルーム欄は読み込み対象ではないため、ホームの交換候補ロード中も実データを表示したままにした。
+- 交換候補棚だけを、行見出しとカード列に合わせたスケルトン表示に変更した。
+
+#### `mobile/app/(tabs)/inventory.tsx`
+- マイ在庫のロード中は、フィルタ行とグッズグリッドだけを実UI位置でスケルトン表示するようにした。
+- activeタブでは実表示と同じく追加タイル分も骨格表示するようにした。
+
+#### `mobile/app/(tabs)/wishes.tsx`
+- Wishタブはフィルタ行とグッズグリッド、個別募集タブは募集デッキだけをスケルトン表示するようにした。
+
+#### `mobile/app/(tabs)/encounters.tsx`
+- 掲示板ロード中のActivityIndicator文言カードを廃止し、実際のスレッドカード形状のスケルトンに置き換えた。
+
+### 影響範囲
+
+- iOS版 ホーム
+- iOS版 マイ在庫
+- iOS版 ウィッシュ / 個別募集
+- iOS版 めぐりホームのグルーム/掲示板
+- iOS版 やりとり一覧
+- iOS版 提示物選択
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `git diff --check -- mobile/src/components/SkeletonScreen.tsx mobile/app/(tabs)/index.tsx mobile/app/(tabs)/inventory.tsx mobile/app/(tabs)/wishes.tsx mobile/app/(tabs)/encounters.tsx`
+- `npm --prefix mobile run export:ios:preview`
+- `EAS_UPDATE_PROJECT_SLUG=ihub EXPO_NO_GIT_STATUS=1 npm --prefix mobile run update:ios:preview -- --message "[iter168.98] loading skeletons match components" --non-interactive`
+  - Update group ID: `35b340cb-5934-4ea0-b6dc-de89deb618dd`
+  - iOS update ID: `019e746c-300b-76f4-9b80-f6caa4d8c1dc`
+
+### 関連ファイル
+
+- `mobile/src/components/SkeletonScreen.tsx`
+- `mobile/app/(tabs)/index.tsx`
+- `mobile/app/(tabs)/inventory.tsx`
+- `mobile/app/(tabs)/wishes.tsx`
+- `mobile/app/(tabs)/encounters.tsx`
+
+### セルフレビュー結果
+
+- ✅ スケルトンは画面全体ではなく、読み込み対象のカード/グリッド/フィルタ/掲示板部分に限定。
+- ✅ 在庫/Wishのタイル比率、個別募集デッキ、取引カード、掲示板カードの主要な形と位置を実UIに合わせた。
+- ✅ 状態遷移・用語・データモデル変更はないため、`notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要。
+
+---
+
 ## イテレーション168.97：応答時の条件選択と予定重ね見
 
 ### 背景・問題意識

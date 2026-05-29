@@ -26,7 +26,10 @@ import * as MediaLibrary from "expo-media-library";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Screen } from "../../src/components/Screen";
-import { GroomRailSkeleton } from "../../src/components/SkeletonScreen";
+import {
+  BoardThreadListSkeleton,
+  GroomRailSkeleton,
+} from "../../src/components/SkeletonScreen";
 import { IconSymbol } from "../../src/components/IconSymbol";
 import { megrumColors, megrumRadii, megrumShadow } from "../../src/theme/tokens";
 import {
@@ -3730,10 +3733,7 @@ function MeguriBoardHomeSection({
         <MapLinkButton onPress={onOpenMap} />
       </View>
       {loading ? (
-        <View style={styles.boardLoadingCard}>
-          <ActivityIndicator color={megrumColors.lavender} />
-          <Text style={styles.boardLoadingText}>3km圏内のスレッドを読み込み中…</Text>
-        </View>
+        <BoardThreadListSkeleton count={3} />
       ) : threads.length === 0 ? (
         <View style={styles.boardEmptyCard}>
           <Text style={styles.boardEmptyTitle}>近くのスレッドはまだありません</Text>

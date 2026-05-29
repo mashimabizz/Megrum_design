@@ -27,9 +27,9 @@ import {
 import { useAuth } from "../../src/auth/AuthProvider";
 import { Screen } from "../../src/components/Screen";
 import {
+  FilterRowsSkeleton,
   GoodsGridSkeleton,
   ListingDeckSkeleton,
-  SkeletonPillRow,
 } from "../../src/components/SkeletonScreen";
 import { fetchInventoryTagLabels, formatHashTags } from "../../src/lib/inventoryTags";
 import { supabase } from "../../src/lib/supabase";
@@ -577,8 +577,8 @@ export default function WishesScreen() {
           <View style={styles.loadingSkeleton}>
             {tab === "wish" ? (
               <>
-                <SkeletonPillRow count={2} />
-                <GoodsGridSkeleton columns={columns} count={9} />
+                <FilterRowsSkeleton rows={2} />
+                <GoodsGridSkeleton columns={columns} count={9} showTopRow={false} />
               </>
             ) : (
               <ListingDeckSkeleton count={3} />
