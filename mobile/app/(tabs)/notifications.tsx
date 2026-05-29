@@ -23,7 +23,8 @@ type NotificationKind =
   | "expires_soon"
   | "groom_reply"
   | "meguri_message"
-  | "meguri_board_reply";
+  | "meguri_board_reply"
+  | "meguri_board_mention";
 
 type NotificationItem = {
   id: string;
@@ -54,6 +55,7 @@ const KIND_ICON: Record<NotificationKind, IconSymbolName> = {
   groom_reply: "mail-outline",
   meguri_message: "mail-outline",
   meguri_board_reply: "notifications-outline",
+  meguri_board_mention: "notifications-outline",
 };
 
 const KIND_TONE: Record<NotificationKind, Tone> = {
@@ -72,6 +74,7 @@ const KIND_TONE: Record<NotificationKind, Tone> = {
   groom_reply: "lavender",
   meguri_message: "lavender",
   meguri_board_reply: "lavender",
+  meguri_board_mention: "amber",
 };
 
 const PREVIEW_NOTIFICATIONS: NotificationItem[] = [
@@ -101,6 +104,15 @@ const PREVIEW_NOTIFICATIONS: NotificationItem[] = [
     linkPath: "/meguri-board-thread?id=preview-board-thread-1&viewMode=nearby_3km",
     readAt: null,
     createdAt: new Date(Date.now() - 1000 * 60 * 7).toISOString(),
+  },
+  {
+    id: "preview-notification-4",
+    kind: "meguri_board_mention",
+    title: "返信でメンションされました",
+    body: "ゆい: @preview_hana 25ゲート側の列、見えますか？",
+    linkPath: "/meguri-board-thread?id=preview-board-thread-1&viewMode=nearby_3km",
+    readAt: null,
+    createdAt: new Date(Date.now() - 1000 * 60 * 3).toISOString(),
   },
 ];
 

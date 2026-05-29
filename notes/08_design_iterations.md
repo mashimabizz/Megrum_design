@@ -4,6 +4,70 @@
 
 ---
 
+## イテレーション175：掲示板メンション通知を追加
+
+### 背景・問題意識
+
+スポット掲示板で返信が増えると、特定のユーザーに確認してほしい情報や、現地で詳しそうな人への呼びかけが流れやすい。一般的なスレッド機能として、返信本文の `@handle` を検出し、対象ユーザーへ専用通知を届ける仕組みを追加した。
+
+### 変更内容
+
+#### `mobile/app/(tabs)/notifications.tsx`
+- 通知種別 `meguri_board_mention` を追加した。
+- Preview通知に掲示板メンション通知のサンプルを追加した。
+
+#### `supabase/migrations/20260530223000_add_meguri_board_mentions.sql`
+- `notifications.kind='meguri_board_mention'` を追加した。
+- 返信本文から `@handle` を抽出する `meguri_board_mentioned_user_ids` を追加した。
+- 返信作成時、本人以外かつ対象スレッドを閲覧できるメンション先へ通知を作成する trigger を追加した。
+- メンション先には通常の購読返信通知を重複送信しないよう、購読通知 trigger を更新した。
+
+#### `notes/05_data_model.md`
+- 掲示板メンション通知のデータ方針を追記した。
+
+#### `notes/09_state_machines.md`
+- `@handle` メンションと通知重複回避のビジネスルールを追記した。
+
+#### `notes/10_glossary.md`
+- 掲示板メンションを追加した。
+
+#### `notes/13_api_spec.md`
+- 掲示板返信作成の副作用としてメンション通知を追記した。
+
+### 影響範囲
+
+- iOS版 通知一覧
+- Supabase スポット掲示板返信 trigger
+- Supabase 通知 kind
+- 掲示板のデータモデル・状態遷移・API仕様・用語
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `supabase db push --dry-run`
+- `supabase db push`（`20260530223000_add_meguri_board_mentions.sql` を remote DB に適用）
+- `npm --prefix mobile run export:ios:preview`
+- `EAS_UPDATE_PROJECT_SLUG=ihub EXPO_NO_GIT_STATUS=1 npm --prefix mobile run update:ios:preview -- --message "[iter175] add board mentions" --non-interactive`
+- Preview OTA: Update group `ab94b355-9dd5-46ba-8bfc-5c21cf79f5fb` / iOS update `019e74dd-ff35-7a42-8dec-b51ba7bc4d80`
+
+### 関連ファイル
+
+- `mobile/app/(tabs)/notifications.tsx`
+- `supabase/migrations/20260530223000_add_meguri_board_mentions.sql`
+- `notes/05_data_model.md`
+- `notes/09_state_machines.md`
+- `notes/10_glossary.md`
+- `notes/13_api_spec.md`
+
+### セルフレビュー結果
+
+- ✅ `@handle` から対象ユーザーを抽出するDB関数を追加。
+- ✅ メンション通知を購読返信通知と重複させないように調整。
+- ✅ 通知一覧で `meguri_board_mention` を扱える。
+- ✅ データモデル・状態遷移・用語・API仕様を更新。
+
+---
+
 ## イテレーション174：掲示板スレッド購読と通知を追加
 
 ### 背景・問題意識

@@ -32,6 +32,7 @@
 | **v2.18** | **2026-05-29** | **iter168.82 反映（`exchange_method='both'` を追加し、現地・郵送どちらも対応可の打診を保存できるように更新）** |
 | **v2.19** | **2026-05-29** | **iter168.89 反映（グルーム投稿とスポット掲示板スレッドに作成時位置 `origin_lat/origin_lng` を追加。グルームは現在地1km、掲示板は `nearby_3km` / `same_prefecture` で閲覧）** |
 | **v2.20** | **2026-05-30** | **iter174 反映（スポット掲示板のスレッド購読と `notifications.kind='meguri_board_reply'` を追加）** |
+| **v2.21** | **2026-05-30** | **iter175 反映（スポット掲示板返信の `@handle` メンション通知 `notifications.kind='meguri_board_mention'` を追加）** |
 | **v2.20** | **2026-05-29** | **iter168.90 反映（`search_query_logs` と人気検索RPCを追加。検索結果はマッチ分類つきグッズパネルで表示）** |
 | **v2.21** | **2026-05-30** | **iter168.97 反映（`schedules.place_name` 追加。合意時に `both` を単一手段へ固定し、現地交換の複数候補は1件へ固定する運用を追記）** |
 
@@ -407,7 +408,7 @@ iter168.43 以降、無料受信者に本文・画像パスを直接返さない
 | `notification_enabled` | boolean | 返信通知を受け取るか |
 | `created_at` / `updated_at` | timestamptz | |
 
-スレッド作成者と返信者は自動で購読ONになる。ユーザーは一覧/詳細からON/OFFを切り替えられる。購読中スレッドに自分以外が返信した時は `notifications.kind='meguri_board_reply'` を作成し、`meguri_board_thread_id` / `meguri_board_reply_id` と `link_path='/meguri-board-thread?id=...'` を保存する。
+スレッド作成者と返信者は自動で購読ONになる。ユーザーは一覧/詳細からON/OFFを切り替えられる。購読中スレッドに自分以外が返信した時は `notifications.kind='meguri_board_reply'` を作成し、`meguri_board_thread_id` / `meguri_board_reply_id` と `link_path='/meguri-board-thread?id=...'` を保存する。返信本文に `@handle` が含まれる場合は、本人以外かつスレッドを閲覧できる対象ユーザーに `notifications.kind='meguri_board_mention'` を作成し、通常の購読返信通知とは重複させない。
 
 ### `meguri_board_hidden_threads` / `meguri_board_reports`（非表示・通報 / iter171）
 

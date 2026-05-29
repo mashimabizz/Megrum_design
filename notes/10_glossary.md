@@ -4,7 +4,7 @@
 > 新環境（別Claudeセッション・別エンジニア）でも、これだけ読めばコンテキストがつかめる。
 
 最終更新: 2026-05-30
-ステータス: Draft v1.5（iter174 掲示板スレッド購読と通知を反映）
+ステータス: Draft v1.6（iter175 掲示板メンション通知を反映）
 
 ---
 
@@ -189,6 +189,7 @@
 | **スレッド内検索** | in-thread search | スレッド詳細内で返信本文・引用本文・返信者名を絞り込む機能 | iter173 |
 | **スレッド購読** | thread subscription, watch | スポット掲示板スレッドの返信通知を受け取る設定。スレッド作成者と返信者は自動で購読ONになり、ユーザーは一覧/詳細からON/OFFできる | iter174 |
 | **掲示板返信通知** | board reply notification | 購読中のスレッドに自分以外が返信した時に作成される通知。`notifications.kind='meguri_board_reply'` を使い、通知タップで該当スレッドを開く | iter174 |
+| **掲示板メンション** | board mention, @handle | スポット掲示板の返信本文で `@handle` を書き、特定ユーザーへ気づいてもらうための機能。本人以外かつ閲覧可能な相手に `notifications.kind='meguri_board_mention'` を作る | iter175 |
 
 ## G. 画面識別子
 
