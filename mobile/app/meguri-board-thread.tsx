@@ -10,6 +10,7 @@ import {
   Modal,
   Platform,
   Pressable,
+  RefreshControl,
   ScrollView,
   Share,
   StyleSheet,
@@ -91,6 +92,7 @@ export default function MeguriBoardThreadScreen() {
   const [thread, setThread] = useState<MeguriBoardThread | null>(null);
   const [replies, setReplies] = useState<MeguriBoardReply[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [locationContext, setLocationContext] = useState<MegrumLocationContext | null>(null);
   const [draft, setDraft] = useState("");
   const [draftImageUris, setDraftImageUris] = useState<string[]>([]);
@@ -164,14 +166,19 @@ export default function MeguriBoardThreadScreen() {
     );
   }, [replies, replySearchText]);
 
-  const refreshDetail = useCallback(async () => {
+  const refreshDetail = useCallback(async (options: { silent?: boolean } = {}) => {
     if (!threadId) {
       setThread(null);
       setReplies([]);
       setLoading(false);
+      setRefreshing(false);
       return;
     }
-    setLoading(true);
+    if (options.silent) {
+      setRefreshing(true);
+    } else {
+      setLoading(true);
+    }
     const settings = await loadMeguriProfileSettings().catch(() => DEFAULT_MEGURI_PROFILE);
     const currentLocation = await getCurrentLocationContext().catch(() => null);
     setLocationContext(currentLocation);
@@ -196,6 +203,7 @@ export default function MeguriBoardThreadScreen() {
     setThread(detail.thread ? { ...detail.thread, readAt: Date.now() } : null);
     setReplies(detail.replies);
     setLoading(false);
+    setRefreshing(false);
     if (detail.thread) {
       void markMeguriBoardThreadRead(detail.thread.id);
     }
@@ -213,6 +221,10 @@ export default function MeguriBoardThreadScreen() {
     user?.id,
     viewMode,
   ]);
+
+  const refreshDetailSilently = useCallback(() => {
+    void refreshDetail({ silent: true });
+  }, [refreshDetail]);
 
   useFocusEffect(
     useCallback(() => {
@@ -767,6 +779,13 @@ export default function MeguriBoardThreadScreen() {
                   paddingBottom: Math.max(insets.bottom, 12) + 112,
                 },
               ]}
+              refreshControl={
+                <RefreshControl
+                  refreshing={refreshing}
+                  tintColor={megrumColors.lavender}
+                  onRefresh={refreshDetailSilently}
+                />
+              }
               showsVerticalScrollIndicator={false}
               style={styles.scroll}
             >

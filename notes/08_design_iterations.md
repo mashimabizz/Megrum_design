@@ -4,6 +4,56 @@
 
 ---
 
+## イテレーション183：掲示板にプル更新を追加
+
+### 背景・問題意識
+
+スポット掲示板は現地情報や返信が短い間隔で更新されるため、画面を開き直さずに最新状態へ更新できる必要がある。一般的なスレッド機能として、一覧と詳細にiOS標準のプル更新を追加した。
+
+### 変更内容
+
+#### `mobile/app/meguri-board.tsx`
+- 掲示板一覧の `ScrollView` に `RefreshControl` を追加した。
+- 引っ張って更新した時は全画面ローディングに戻さず、既存表示を維持したまま最新スレッドを再取得するようにした。
+
+#### `mobile/app/meguri-board-thread.tsx`
+- スレッド詳細の `ScrollView` に `RefreshControl` を追加した。
+- 引っ張って更新した時は既存のスレッド本文・返信表示を維持したまま詳細を再取得するようにした。
+
+#### `notes/09_state_machines.md`
+- Meguri Board Lifecycle にプル更新の表示ルールを追記した。
+
+#### `notes/10_glossary.md`
+- 掲示板プル更新を追加した。
+
+### 影響範囲
+
+- iOS版 スポット掲示板一覧
+- iOS版 スポット掲示板詳細
+- 掲示板の表示ルール・用語
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- `EAS_UPDATE_PROJECT_SLUG=ihub EXPO_NO_GIT_STATUS=1 npm --prefix mobile run update:ios:preview -- --message "[iter183] add board pull refresh" --non-interactive`
+- Preview OTA: Update group `d58afa77-3079-4bf9-865a-d02ed6aef295` / iOS update `019e7518-33b6-7388-b277-5a60f8e123e2`
+
+### 関連ファイル
+
+- `mobile/app/meguri-board.tsx`
+- `mobile/app/meguri-board-thread.tsx`
+- `notes/08_design_iterations.md`
+- `notes/09_state_machines.md`
+- `notes/10_glossary.md`
+
+### セルフレビュー結果
+
+- ✅ iOS標準の `RefreshControl` を使い、独自ジェスチャーを増やしていない。
+- ✅ 通常読み込みとプル更新の状態を分け、更新時に表示が空白へ戻らないようにした。
+
+---
+
 ## イテレーション182：掲示板添付画像プレビューを追加
 
 ### 背景・問題意識

@@ -11,6 +11,7 @@ import {
   Modal,
   Platform,
   Pressable,
+  RefreshControl,
   ScrollView,
   Share,
   StyleSheet,
@@ -95,6 +96,7 @@ export default function MeguriBoardScreen() {
   );
   const [threads, setThreads] = useState<MeguriBoardThread[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [composerOpen, setComposerOpen] = useState(false);
   const [composerTitle, setComposerTitle] = useState("");
   const [composerBody, setComposerBody] = useState("");
@@ -179,8 +181,15 @@ export default function MeguriBoardScreen() {
     [sortMode, viewMode, visibleThreads],
   );
 
-  const refreshThreads = useCallback(async (prefectureOverride?: string | null) => {
-    setLoading(true);
+  const refreshThreads = useCallback(async (
+    prefectureOverride?: string | null,
+    options: { silent?: boolean } = {},
+  ) => {
+    if (options.silent) {
+      setRefreshing(true);
+    } else {
+      setLoading(true);
+    }
     const settings = await loadMeguriProfileSettings().catch(() => DEFAULT_MEGURI_PROFILE);
     const currentLocation = await getCurrentLocationContext().catch(() => null);
     const nextPrefecture =
@@ -211,6 +220,7 @@ export default function MeguriBoardScreen() {
     ).catch(() => []);
     setThreads(nextThreads);
     setLoading(false);
+    setRefreshing(false);
   }, [
     actor.primaryArea,
     actor.userId,
@@ -225,6 +235,10 @@ export default function MeguriBoardScreen() {
     user?.id,
     viewMode,
   ]);
+
+  const refreshThreadsSilently = useCallback(() => {
+    void refreshThreads(undefined, { silent: true });
+  }, [refreshThreads]);
 
   useFocusEffect(
     useCallback(() => {
@@ -590,6 +604,13 @@ export default function MeguriBoardScreen() {
             styles.content,
             { paddingBottom: Math.max(insets.bottom, 12) + 34 },
           ]}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              tintColor={megrumColors.lavender}
+              onRefresh={refreshThreadsSilently}
+            />
+          }
           showsVerticalScrollIndicator={false}
         >
           <View style={styles.heroCard}>
