@@ -4,6 +4,54 @@
 
 ---
 
+## イテレーション223：掲示板一覧にフィルタ件数バッジを追加
+
+### 背景・問題意識
+
+スポット掲示板の一覧には保存、通知、参加中、自分、未読の絞り込みがあるが、タップする前に対象があるか分からない。一般的なスレッドUIとして、絞り込み対象がある時だけ件数バッジを表示し、戻るべき会話や未読を見つけやすくした。
+
+### 変更内容
+
+#### `mobile/app/meguri-board.tsx`
+- 現在のカテゴリ、検索、画像あり条件を反映したベーススレッド集合を `sortCountBaseThreads` として作った。
+- 保存、通知、参加中、自分、未読の各絞り込み件数を `sortCounts` で算出するようにした。
+- 絞り込み対象がある場合だけ、ソート/フィルタボタン右上に小さな件数バッジを表示するようにした。
+- 件数バッジはボタンのレイアウト幅を増やさないよう、絶対配置で重ねた。
+
+#### `notes/09_state_machines.md`
+- Meguri Board Lifecycle に掲示板一覧フィルタ件数バッジの表示ルールを追記した。
+
+#### `notes/10_glossary.md`
+- 掲示板フィルタ件数バッジを追加した。
+
+### 影響範囲
+
+- iOS版 スポット掲示板一覧
+- 掲示板フィルタ/ソート行
+- 保存、通知、参加中、自分、未読スレッドの導線
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- `EAS_UPDATE_PROJECT_SLUG=ihub EXPO_NO_GIT_STATUS=1 npm --prefix mobile run update:ios:preview -- --message "[iter223] add board filter count badges" --non-interactive`
+- Preview OTA: Update group `f8f07928-d7d6-4844-b5fd-ea4fcf981a25` / iOS update `019e75bf-70fa-7321-8c3d-3df75214b651`
+
+### 関連ファイル
+
+- `mobile/app/meguri-board.tsx`
+- `notes/08_design_iterations.md`
+- `notes/09_state_machines.md`
+- `notes/10_glossary.md`
+
+### セルフレビュー結果
+
+- ✅ 既存の絞り込みロジックを使い回し、DB変更なしで件数バッジを追加した。
+- ✅ 件数バッジは対象がある時だけ表示し、空の導線を強調しないようにした。
+- ✅ ネイティブ依存追加なしで、Preview OTA対象内に収めた。
+
+---
+
 ## イテレーション222：掲示板詳細に自分の返信フィルタを追加
 
 ### 背景・問題意識

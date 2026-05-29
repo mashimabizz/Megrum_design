@@ -172,6 +172,32 @@ export default function MeguriBoardScreen() {
     },
     [categoryFilter, mediaOnly, searchText, sortMode, threads],
   );
+  const sortCountBaseThreads = useMemo(
+    () => {
+      const filteredThreads = filterMeguriBoardThreads(threads, {
+        category: categoryFilter,
+        query: searchText,
+        sort: "active",
+      });
+      return mediaOnly
+        ? filteredThreads.filter((thread) => thread.imageUris.length > 0)
+        : filteredThreads;
+    },
+    [categoryFilter, mediaOnly, searchText, threads],
+  );
+  const sortCounts = useMemo<Record<MeguriBoardThreadSort, number>>(
+    () => ({
+      active: sortCountBaseThreads.length,
+      new: sortCountBaseThreads.length,
+      hot: sortCountBaseThreads.length,
+      saved: sortCountBaseThreads.filter((thread) => thread.bookmarked).length,
+      subscribed: sortCountBaseThreads.filter((thread) => thread.subscribed).length,
+      participated: sortCountBaseThreads.filter((thread) => thread.participated).length,
+      mine: sortCountBaseThreads.filter((thread) => thread.mine).length,
+      unread: sortCountBaseThreads.filter(isThreadUnread).length,
+    }),
+    [sortCountBaseThreads],
+  );
   const hasActiveFilters =
     categoryFilter !== "all" || !!searchText.trim() || sortMode !== "active" || mediaOnly;
   const hasComposerDraft =
@@ -791,16 +817,30 @@ export default function MeguriBoardScreen() {
 
           <View style={styles.sortRail}>
             {MEGURI_BOARD_SORT_OPTIONS.map((sort) => (
-              <Pressable
-                key={sort}
-                accessibilityRole="button"
-                onPress={() => setSortMode(sort)}
-                style={[styles.sortButton, sortMode === sort ? styles.sortButtonActive : null]}
-              >
-                <Text style={[styles.sortButtonText, sortMode === sort ? styles.sortButtonTextActive : null]}>
-                  {meguriBoardSortLabel(sort)}
-                </Text>
-              </Pressable>
+              (() => {
+                const active = sortMode === sort;
+                const count = sortCounts[sort] ?? 0;
+                const showCount = sort !== "active" && sort !== "new" && sort !== "hot" && count > 0;
+                return (
+                  <Pressable
+                    key={sort}
+                    accessibilityRole="button"
+                    onPress={() => setSortMode(sort)}
+                    style={[styles.sortButton, active ? styles.sortButtonActive : null]}
+                  >
+                    <Text style={[styles.sortButtonText, active ? styles.sortButtonTextActive : null]}>
+                      {meguriBoardSortLabel(sort)}
+                    </Text>
+                    {showCount ? (
+                      <View style={[styles.sortCountBadge, active ? styles.sortCountBadgeActive : null]}>
+                        <Text style={[styles.sortCountText, active ? styles.sortCountTextActive : null]}>
+                          {count > 99 ? "99+" : count}
+                        </Text>
+                      </View>
+                    ) : null}
+                  </Pressable>
+                );
+              })()
             ))}
           </View>
 
@@ -1547,6 +1587,8 @@ const styles = StyleSheet.create({
     alignItems: "center",
     borderRadius: 999,
     flex: 1,
+    justifyContent: "center",
+    minHeight: 34,
     paddingVertical: 8,
   },
   sortButtonActive: {
@@ -1560,6 +1602,31 @@ const styles = StyleSheet.create({
   },
   sortButtonTextActive: {
     color: megrumColors.ink,
+  },
+  sortCountBadge: {
+    alignItems: "center",
+    backgroundColor: "rgba(168,212,230,0.9)",
+    borderColor: "#fff",
+    borderRadius: 999,
+    borderWidth: 1,
+    height: 16,
+    justifyContent: "center",
+    minWidth: 16,
+    paddingHorizontal: 4,
+    position: "absolute",
+    right: 1,
+    top: 1,
+  },
+  sortCountBadgeActive: {
+    backgroundColor: "rgba(166,149,216,0.92)",
+  },
+  sortCountText: {
+    color: "#fff",
+    fontSize: 8.5,
+    fontWeight: "900",
+  },
+  sortCountTextActive: {
+    color: "#fff",
   },
   mediaFilterButton: {
     alignItems: "center",
