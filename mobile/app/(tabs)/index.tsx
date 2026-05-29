@@ -332,7 +332,7 @@ export default function HomeScreen() {
   const modeSwitchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const { width } = useWindowDimensions();
   const insets = useSafeAreaInsets();
-  const tileWidth = Math.max(128, Math.min(148, (width - 54) / 2.55));
+  const tileWidth = (width - 36 - 10 * 2) / 3;
   const homeTopPadding = Math.max(insets.top, 18) + 12;
   const topEdgeFadeHeight = Math.max(insets.top + 22, 68);
   const selectedHomeGroomPost =
@@ -767,7 +767,7 @@ export default function HomeScreen() {
               visibleSections.map((section, sectionIndex) => [
                 <StickySectionHeader
                   key={`${section.id}-header`}
-                  title={section.title}
+                  title={section.id === "possible" ? "交換できるかも？" : section.title}
                 />,
                 <ShelfSectionRows
                   key={`${section.id}-rows`}
@@ -775,7 +775,7 @@ export default function HomeScreen() {
                   sectionIndex={sectionIndex}
                   tileWidth={tileWidth}
                   localMode={localMode}
-                  onCandidatePress={openMatchDetail}
+                  onCandidatePress={openHomeCandidate}
                 />,
               ])
             ) : (
@@ -2535,71 +2535,30 @@ function ShelfSectionRows({
   sectionIndex: number;
   tileWidth: number;
   localMode: boolean;
-  onCandidatePress: (row: ShelfRow, candidate: Candidate) => void;
+  onCandidatePress: (
+    section: ShelfSection,
+    row: ShelfRow,
+    candidate: Candidate,
+  ) => void;
 }) {
+  const entries = section.rows.flatMap((row) =>
+    row.candidates.map((candidate) => ({ candidate, row })),
+  );
+
   return (
     <View style={styles.shelfSectionRows}>
-      {section.rows.map((row, rowIndex) => (
-        <ShelfRowView
-          key={row.id}
-          row={row}
-          rowIndex={rowIndex}
-          sectionIndex={sectionIndex}
-          tileWidth={tileWidth}
-          localMode={localMode}
-          onCandidatePress={onCandidatePress}
-        />
-      ))}
-    </View>
-  );
-}
-
-function ShelfRowView({
-  row,
-  rowIndex,
-  sectionIndex,
-  tileWidth,
-  localMode,
-  onCandidatePress,
-}: {
-  row: ShelfRow;
-  rowIndex: number;
-  sectionIndex: number;
-  tileWidth: number;
-  localMode: boolean;
-  onCandidatePress: (row: ShelfRow, candidate: Candidate) => void;
-}) {
-  const baseDelay = sectionIndex * 190 + rowIndex * 95;
-
-  return (
-    <View style={styles.shelfRow}>
-      <View style={styles.rowTitleLine}>
-        <Text numberOfLines={1} style={styles.rowCharacter}>
-          {row.character}
-        </Text>
-        <Text style={styles.rowGoods}>× {row.goodsType}</Text>
-      </View>
-      <ScrollView
-        horizontal
-        alwaysBounceHorizontal
-        bounces
-        decelerationRate="normal"
-        showsHorizontalScrollIndicator={false}
-        directionalLockEnabled
-        scrollEventThrottle={16}
-        contentContainerStyle={styles.rowScroller}
-      >
-        {row.candidates.map((candidate, index) => (
+      <View style={styles.homeCandidateGrid}>
+        {entries.map(({ candidate, row }, index) => (
           <AnimatedCandidateTile
-            key={candidate.id}
+            key={`${row.id}-${candidate.id}`}
             candidate={candidate}
-            delayMs={baseDelay + index * 82}
+            delayMs={sectionIndex * 120 + index * 35}
             width={tileWidth}
             localMode={localMode}
-            onPress={() => onCandidatePress(row, candidate)}
+            onPress={() => onCandidatePress(section, row, candidate)}
           />
         ))}
-      </ScrollView>
+      </View>
     </View>
   );
 }
@@ -2637,9 +2596,13 @@ function AnimatedCandidateTile({
     return () => clearTimeout(timer);
   }, [appear, delayMs, imageReady, mountedAt]);
 
-  const translateX = appear.interpolate({
+  const translateY = appear.interpolate({
     inputRange: [0, 1],
-    outputRange: [52, 0],
+    outputRange: [14, 0],
+  });
+  const scale = appear.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0.96, 1],
   });
 
   return (
@@ -2647,7 +2610,8 @@ function AnimatedCandidateTile({
       pointerEvents={imageReady ? "auto" : "none"}
       style={{
         opacity: appear,
-        transform: [{ translateX }],
+        transform: [{ translateY }, { scale }],
+        width,
       }}
     >
       <CandidateTile
@@ -2688,7 +2652,7 @@ function CandidateTile({
       ]}
     >
       {showLocal ? <LocalAura /> : null}
-      <View style={[styles.tileCard, frameStyle, { width, height: width * 1.16 }]}>
+      <View style={[styles.tileCard, frameStyle, { width, height: width * 1.34 }]}>
         <View
           style={[
             styles.fakeImage,
@@ -2698,7 +2662,11 @@ function CandidateTile({
           ]}
         >
           {candidate.photoUrl ? (
-            <Image source={{ uri: candidate.photoUrl }} style={styles.realImage} />
+            <Image
+              resizeMode="cover"
+              source={{ uri: candidate.photoUrl }}
+              style={styles.realImage}
+            />
           ) : (
             <>
               <View style={styles.fakeImageGlow} />
@@ -2723,7 +2691,19 @@ function CandidateTile({
   );
 }
 
-function openMatchDetail(row: ShelfRow, candidate: Candidate) {
+function openHomeCandidate(
+  section: ShelfSection,
+  row: ShelfRow,
+  candidate: Candidate,
+) {
+  if (section.id === "possible") {
+    router.push({
+      pathname: "/user-profile",
+      params: { id: candidate.partnerId ?? candidate.id },
+    });
+    return;
+  }
+
   router.push({
     pathname: "/match-detail",
     params: buildMatchDetailParams(row, candidate),
@@ -3868,15 +3848,21 @@ const styles = StyleSheet.create({
     zIndex: 10,
   },
   shelfSectionRows: {
+    gap: 9,
+    marginBottom: 22,
+  },
+  homeCandidateGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
     gap: 10,
-    marginBottom: 20,
+    paddingBottom: 18,
   },
   sectionTitle: {
-    color: "#111111",
-    fontSize: 24,
+    color: megrumColors.ink,
+    fontSize: 16,
     fontWeight: "900",
     letterSpacing: 0,
-    lineHeight: 29,
+    lineHeight: 22,
     position: "relative",
   },
   shelfRow: {
@@ -3905,16 +3891,21 @@ const styles = StyleSheet.create({
     paddingTop: 9,
   },
   tileHitArea: {
-    borderRadius: 18,
-    padding: 2,
+    borderRadius: 13,
   },
   tileHitAreaLocal: {
     overflow: "visible",
   },
   tileCard: {
-    backgroundColor: megrumColors.surface,
-    borderRadius: 16,
+    backgroundColor: "rgba(58,50,74,0.05)",
+    borderColor: "rgba(58,50,74,0.08)",
+    borderRadius: 13,
+    borderWidth: 1,
     overflow: "hidden",
+    shadowColor: megrumColors.ink,
+    shadowOffset: { width: 3, height: 6 },
+    shadowOpacity: 0.08,
+    shadowRadius: 9,
   },
   fakeImage: {
     alignItems: "center",
@@ -3926,35 +3917,31 @@ const styles = StyleSheet.create({
     width: "100%",
   },
   fakeImageGlow: {
-    backgroundColor: "rgba(255,255,255,0.22)",
+    backgroundColor: "rgba(255,255,255,0.26)",
     borderRadius: 999,
-    height: 92,
+    height: 58,
     position: "absolute",
-    right: -18,
-    top: -20,
-    width: 92,
+    right: -17,
+    top: -12,
+    width: 58,
   },
   fakeImageLetter: {
     color: megrumColors.surface,
-    fontSize: 48,
+    fontSize: 32,
     fontWeight: "900",
     textShadowColor: "rgba(58,50,74,0.16)",
     textShadowOffset: { width: 0, height: 2 },
-    textShadowRadius: 7,
+    textShadowRadius: 5,
   },
   tagOverlay: {
-    alignSelf: "center",
-    backgroundColor: "rgba(255,255,255,0.92)",
-    borderRadius: megrumRadii.pill,
-    bottom: 8,
-    maxWidth: "82%",
-    paddingHorizontal: 9,
-    paddingVertical: 4,
+    backgroundColor: "rgba(255,255,255,0.86)",
+    borderRadius: 6,
+    left: 6,
+    maxWidth: "78%",
+    paddingHorizontal: 6,
+    paddingVertical: 3,
     position: "absolute",
-    shadowColor: megrumColors.ink,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.12,
-    shadowRadius: 7,
+    top: 6,
   },
   tagText: {
     color: megrumColors.ink,
@@ -3963,11 +3950,11 @@ const styles = StyleSheet.create({
   },
   liveBadge: {
     backgroundColor: megrumColors.lavender,
-    borderRadius: megrumRadii.pill,
-    left: 8,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
+    borderRadius: 6,
+    paddingHorizontal: 6,
+    paddingVertical: 3,
     position: "absolute",
+    right: 8,
     top: 8,
   },
   liveBadgeText: {

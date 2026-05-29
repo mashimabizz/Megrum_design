@@ -4,6 +4,50 @@
 
 ---
 
+## イテレーション169：ホーム候補を検索結果カードへ統一
+
+### 背景・問題意識
+
+オーナーから、ホーム画面の「交換できるかも？」はタップ時に相手プロフィールへ遷移し、各パネル左上には登録タグを表示したいという依頼があった。あわせて、ホームの交換候補パネルは検索結果画面のデザインを踏襲し、文字サイズと画像サイズを揃える必要があった。
+
+### 変更内容
+
+#### `mobile/app/(tabs)/index.tsx`
+- ホームの交換候補表示を、行ごとの横スクロール棚から検索結果と同じ3列グリッド型のカード表示へ変更した。
+- カード画像の比率を検索結果の `GoodsGrid` と同じ `width * 1.34` に揃え、タグ表示の文字サイズ・角丸・配置を検索結果のトップタグ表示に寄せた。
+- 各候補カード左上に `tagLabels` / `tag` 由来の登録タグを表示するようにした。
+- 「交換できるかも？」セクションの候補タップ時は、`partnerId` を使って `/user-profile` へ遷移するようにした。
+- ホームの「交換できるかも」見出しを検索結果と同じ「交換できるかも？」表記へ揃えた。
+
+### 影響範囲
+
+- iOS版 ホーム画面
+- ホームの「マッチしてるよ！」候補カード
+- ホームの「交換できるかも？」候補カード
+- 候補カードからのプロフィール/詳細遷移
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `git diff --check -- mobile/app/(tabs)/index.tsx notes/08_design_iterations.md`
+- `npm --prefix mobile run export:ios:preview`
+- `EAS_UPDATE_PROJECT_SLUG=ihub EXPO_NO_GIT_STATUS=1 npm --prefix mobile run update:ios:preview -- --message "[iter169] home candidate grid profile links" --non-interactive`
+  - Update group ID: `75545053-d78c-4c11-9ef5-81e53439a1ba`
+  - iOS update ID: `019e747a-6872-7eb8-af06-0b9ee912fd95`
+
+### 関連ファイル
+
+- `mobile/app/(tabs)/index.tsx`
+
+### セルフレビュー結果
+
+- ✅ 検索結果と同じ3列・同じ画像比率へ寄せた。
+- ✅ 登録タグはカード左上に表示される。
+- ✅ 「交換できるかも？」は相手プロフィールへ遷移し、「マッチしてるよ！」は既存の詳細遷移を維持。
+- ✅ 状態遷移・用語・データモデル変更はないため、`notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要。
+
+---
+
 ## イテレーション168.99：左ドロワーを背面レイヤー化
 
 ### 背景・問題意識
