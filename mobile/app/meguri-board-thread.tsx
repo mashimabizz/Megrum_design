@@ -916,6 +916,18 @@ export default function MeguriBoardThreadScreen() {
     });
   }
 
+  function openBoardUserProfile(userId: string) {
+    if (!userId) return;
+    if (userId === actor.userId) {
+      router.push("/(tabs)/profile");
+      return;
+    }
+    router.push({
+      pathname: "/user-profile",
+      params: { id: userId },
+    });
+  }
+
   function openThreadActions() {
     if (!thread) return;
     const actions: Array<{ disabled?: boolean; destructive?: boolean; label: string; run?: () => void }> = [];
@@ -931,6 +943,10 @@ export default function MeguriBoardThreadScreen() {
     }
     actions.push(
       { label: "共有する", run: () => void shareThread() },
+      {
+        label: thread.mine ? "自分のプロフィール" : "投稿者プロフィール",
+        run: () => openBoardUserProfile(thread.authorId),
+      },
       { label: thread.bookmarked ? "保存を解除" : "保存する", run: () => void toggleThreadBookmark() },
       { label: thread.reacted ? "参考になったを取り消す" : "参考になった", run: () => void toggleThreadReaction() },
       {
@@ -988,6 +1004,11 @@ export default function MeguriBoardThreadScreen() {
       disabled: reply.deleted,
       label: "返信を共有",
       run: () => void shareReply(reply),
+    });
+    actions.push({
+      disabled: reply.deleted,
+      label: reply.mine ? "自分のプロフィール" : "プロフィールを見る",
+      run: () => openBoardUserProfile(reply.authorId),
     });
     if (reply.mine) {
       actions.push(

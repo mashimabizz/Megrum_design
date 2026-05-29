@@ -4,6 +4,53 @@
 
 ---
 
+## イテレーション203：掲示板投稿者プロフィール導線を追加
+
+### 背景・問題意識
+
+スポット掲示板では、スレッドや返信の内容だけでなく「誰が言っているか」を確認したくなる。一般的なスレッド体験として、投稿者のプロフィールへ移動できる導線をアクションに追加した。
+
+### 変更内容
+
+#### `mobile/app/meguri-board-thread.tsx`
+- スレッドのアクションシートに `投稿者プロフィール` / `自分のプロフィール` を追加した。
+- 返信のアクションシートに `プロフィールを見る` / `自分のプロフィール` を追加した。
+- 自分の場合はタブ内プロフィールへ、相手の場合は `user-profile` へ遷移するようにした。
+
+#### `notes/09_state_machines.md`
+- Meguri Board Lifecycle に投稿者プロフィール導線の表示ルールを追記した。
+
+#### `notes/10_glossary.md`
+- 掲示板投稿者プロフィール導線を追加した。
+
+### 影響範囲
+
+- iOS版 スポット掲示板詳細
+- スレッド/返信アクションシート
+- 相手プロフィール閲覧導線
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- `EAS_UPDATE_PROJECT_SLUG=ihub EXPO_NO_GIT_STATUS=1 npm --prefix mobile run update:ios:preview -- --message "[iter203] add board author profile actions" --non-interactive`
+- Preview OTA: Update group `ec58d82d-2666-4584-9c2b-edd999faaaac` / iOS update `019e756f-89ee-75f3-a97f-d9f425d722c9`
+
+### 関連ファイル
+
+- `mobile/app/meguri-board-thread.tsx`
+- `notes/08_design_iterations.md`
+- `notes/09_state_machines.md`
+- `notes/10_glossary.md`
+
+### セルフレビュー結果
+
+- ✅ 参加者行のタップ挙動は返信フィルタのまま維持し、既存操作と競合しないようにした。
+- ✅ 自分のプロフィールと相手プロフィールで遷移先を分け、不要な相手プロフィール読み込みを避けた。
+- ✅ DB変更やネイティブ依存追加なしで、Preview OTA対象内に収めた。
+
+---
+
 ## イテレーション202：掲示板引用返信番号を追加
 
 ### 背景・問題意識
