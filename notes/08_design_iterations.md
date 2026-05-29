@@ -4,6 +4,55 @@
 
 ---
 
+## イテレーション186：掲示板に未読スレッド表示を追加
+
+### 背景・問題意識
+
+スポット掲示板では返信が増えるほど、まだ読んでいない更新だけを追いたくなる。未読ドット表示に加えて、一般的なスレッド機能として「未読」だけに絞り込める表示を追加した。
+
+### 変更内容
+
+#### `mobile/src/lib/meguriBoard.ts`
+- `MeguriBoardThreadSort` に `unread` を追加した。
+- `未読` 選択時、`readAt` がない、または `readAt < latestActivityAt` のスレッドだけを返すようにした。
+
+#### `mobile/app/meguri-board.tsx`
+- 掲示板一覧のソートレールに `未読` を追加した。
+- `未読` 選択時のセクションタイトルと空表示を専用文言にした。
+
+#### `notes/09_state_machines.md`
+- Meguri Board Lifecycle に未読表示のルールを追記した。
+
+#### `notes/10_glossary.md`
+- 掲示板未読表示を追加した。
+
+### 影響範囲
+
+- iOS版 スポット掲示板一覧
+- 掲示板の表示ルール・用語
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- `EAS_UPDATE_PROJECT_SLUG=ihub EXPO_NO_GIT_STATUS=1 npm --prefix mobile run update:ios:preview -- --message "[iter186] add board unread filter" --non-interactive`
+- Preview OTA: Update group `d564c8ff-5edb-4572-b8fb-7865d576e0a1` / iOS update `019e7522-7626-7238-b525-c77de5cfdbce`
+
+### 関連ファイル
+
+- `mobile/src/lib/meguriBoard.ts`
+- `mobile/app/meguri-board.tsx`
+- `notes/08_design_iterations.md`
+- `notes/09_state_machines.md`
+- `notes/10_glossary.md`
+
+### セルフレビュー結果
+
+- ✅ 既存の `readAt` / `latestActivityAt` 判定を使い、DB変更なしで実装した。
+- ✅ 検索・カテゴリ絞り込みと未読表示が同時に効くようにした。
+
+---
+
 ## イテレーション185：掲示板返信共有を追加
 
 ### 背景・問題意識

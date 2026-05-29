@@ -172,6 +172,8 @@ export default function MeguriBoardScreen() {
           title:
             sortMode === "mine"
               ? "自分のスレッド"
+              : sortMode === "unread"
+                ? "未読スレッド"
               : viewMode === "nearby_3km"
                 ? "近くのスレッド"
                 : "都道府県のスレッド",
@@ -724,11 +726,17 @@ export default function MeguriBoardScreen() {
           ) : sections.length === 0 ? (
             <View style={styles.emptyCard}>
               <Text style={styles.emptyTitle}>
-                {sortMode === "mine" ? "自分のスレッドはまだありません" : "まだスレッドはありません"}
+                {sortMode === "mine"
+                  ? "自分のスレッドはまだありません"
+                  : sortMode === "unread"
+                    ? "未読スレッドはありません"
+                    : "まだスレッドはありません"}
               </Text>
               <Text style={styles.emptyBody}>
                 {sortMode === "mine"
                   ? "スレッドを立てると、ここからすぐ戻れます。"
+                  : sortMode === "unread"
+                    ? "新しい返信がつくと、ここに表示されます。"
                   : "最初のひとことを置いておくと、あとから返事がつきやすいです。"}
               </Text>
             </View>

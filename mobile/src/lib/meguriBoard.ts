@@ -19,7 +19,14 @@ export type MeguriBoardThreadCategory =
   | "chat"
   | "trade"
   | "lost_found";
-export type MeguriBoardThreadSort = "active" | "new" | "hot" | "saved" | "subscribed" | "mine";
+export type MeguriBoardThreadSort =
+  | "active"
+  | "new"
+  | "hot"
+  | "saved"
+  | "subscribed"
+  | "mine"
+  | "unread";
 export type MeguriBoardReportReason =
   | "spam"
   | "harassment"
@@ -249,6 +256,7 @@ export const MEGURI_BOARD_SORT_OPTIONS = [
   "saved",
   "subscribed",
   "mine",
+  "unread",
 ] as const satisfies readonly MeguriBoardThreadSort[];
 
 export const MEGURI_BOARD_REPORT_REASONS = [
@@ -307,6 +315,8 @@ export function meguriBoardSortLabel(sort: MeguriBoardThreadSort) {
       return "通知";
     case "mine":
       return "自分";
+    case "unread":
+      return "未読";
     default:
       return "更新";
   }
@@ -345,6 +355,7 @@ export function filterMeguriBoardThreads(
     .filter((thread) => !thread.hidden && (thread.status === "visible" || thread.status === "locked"))
     .filter((thread) => category === "all" || thread.category === category)
     .filter((thread) => sort !== "mine" || thread.mine)
+    .filter((thread) => sort !== "unread" || isMeguriBoardThreadUnread(thread))
     .filter((thread) => {
       if (!query) return true;
       const haystack = normalizeSearchQuery(
@@ -1941,10 +1952,16 @@ function compareThreads(
       return right.latestActivityAt - left.latestActivityAt;
     case "mine":
       return right.latestActivityAt - left.latestActivityAt;
+    case "unread":
+      return right.latestActivityAt - left.latestActivityAt;
     case "active":
     default:
       return right.latestActivityAt - left.latestActivityAt;
   }
+}
+
+function isMeguriBoardThreadUnread(thread: Pick<MeguriBoardThread, "latestActivityAt" | "readAt">) {
+  return !thread.readAt || thread.readAt < thread.latestActivityAt;
 }
 
 function normalizeAreaKey(value: string | null) {
