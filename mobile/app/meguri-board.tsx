@@ -165,6 +165,8 @@ export default function MeguriBoardScreen() {
       }),
     [categoryFilter, searchText, sortMode, threads],
   );
+  const hasActiveFilters =
+    categoryFilter !== "all" || !!searchText.trim() || sortMode !== "active";
 
   const sections = useMemo(
     () =>
@@ -367,6 +369,12 @@ export default function MeguriBoardScreen() {
   function openComposer() {
     setComposerDraftReady(false);
     setComposerOpen(true);
+  }
+
+  function resetBoardFilters() {
+    setCategoryFilter("all");
+    setSearchText("");
+    setSortMode("active");
   }
 
   function closeComposer() {
@@ -741,6 +749,23 @@ export default function MeguriBoardScreen() {
               </Pressable>
             ))}
           </View>
+
+          {!loading ? (
+            <View style={styles.resultSummaryRow}>
+              <Text style={styles.resultSummaryText}>
+                表示 {visibleThreads.length}件
+              </Text>
+              {hasActiveFilters ? (
+                <Pressable
+                  accessibilityRole="button"
+                  onPress={resetBoardFilters}
+                  style={styles.resultResetButton}
+                >
+                  <Text style={styles.resultResetText}>条件をリセット</Text>
+                </Pressable>
+              ) : null}
+            </View>
+          ) : null}
 
           {!loading && sortMode === "unread" && visibleThreads.length > 0 ? (
             <Pressable
@@ -1405,6 +1430,30 @@ const styles = StyleSheet.create({
   },
   sortButtonTextActive: {
     color: megrumColors.ink,
+  },
+  resultSummaryRow: {
+    alignItems: "center",
+    flexDirection: "row",
+    justifyContent: "space-between",
+    minHeight: 32,
+  },
+  resultSummaryText: {
+    color: megrumColors.mutedInk,
+    fontSize: 11.5,
+    fontWeight: "900",
+  },
+  resultResetButton: {
+    alignItems: "center",
+    backgroundColor: "rgba(166,149,216,0.12)",
+    borderRadius: 999,
+    minHeight: 30,
+    justifyContent: "center",
+    paddingHorizontal: 12,
+  },
+  resultResetText: {
+    color: megrumColors.lavender,
+    fontSize: 11,
+    fontWeight: "900",
   },
   markReadCard: {
     alignItems: "center",

@@ -4,6 +4,52 @@
 
 ---
 
+## イテレーション205：掲示板一覧の結果サマリーを追加
+
+### 背景・問題意識
+
+掲示板一覧には検索・カテゴリ・並び替えがあるが、現在の条件で何件表示されているか、条件をすぐ戻せるかが見えにくかった。一般的な一覧UIとして、表示件数と条件リセット導線を追加した。
+
+### 変更内容
+
+#### `mobile/app/meguri-board.tsx`
+- 掲示板一覧のフィルタ操作群の下に `表示 N件` の結果サマリーを追加した。
+- 検索語、カテゴリ、並び替えのいずれかが既定値から変わっている時だけ `条件をリセット` を表示するようにした。
+- `条件をリセット` で検索語・カテゴリ・並び替えを既定値に戻すようにした。
+
+#### `notes/09_state_machines.md`
+- Meguri Board Lifecycle に一覧結果サマリーの表示ルールを追記した。
+
+#### `notes/10_glossary.md`
+- 掲示板一覧結果サマリーを追加した。
+
+### 影響範囲
+
+- iOS版 スポット掲示板一覧
+- 検索・カテゴリ・並び替え
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- `EAS_UPDATE_PROJECT_SLUG=ihub EXPO_NO_GIT_STATUS=1 npm --prefix mobile run update:ios:preview -- --message "[iter205] add board result summary" --non-interactive`
+- Preview OTA: Update group `f25fd123-6228-4a2e-9e30-757ed2c0bafc` / iOS update `019e7575-fd80-7cf6-a4bc-1490a2be49e5`
+
+### 関連ファイル
+
+- `mobile/app/meguri-board.tsx`
+- `notes/08_design_iterations.md`
+- `notes/09_state_machines.md`
+- `notes/10_glossary.md`
+
+### セルフレビュー結果
+
+- ✅ 既存の `visibleThreads` を使い、追加の取得やDB変更なしで表示件数を出した。
+- ✅ リセットボタンは条件変更時だけ表示し、通常時の画面ノイズを増やさないようにした。
+- ✅ DB変更やネイティブ依存追加なしで、Preview OTA対象内に収めた。
+
+---
+
 ## イテレーション204：掲示板一覧に投稿者プロフィール導線を追加
 
 ### 背景・問題意識
