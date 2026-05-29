@@ -11,8 +11,13 @@ import { createClient } from "@/lib/supabase/server";
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url);
   const code = searchParams.get("code");
+  const error = searchParams.get("error");
   // デフォルト遷移先：認証完了画面（onboarding 完了済なら自動的に / へ）
   const next = searchParams.get("next") ?? "/auth/email-confirmed";
+
+  if (next === "mobile") {
+    return NextResponse.redirect(buildMobileAuthRedirect(searchParams));
+  }
 
   if (code) {
     const supabase = await createClient();
@@ -47,5 +52,27 @@ export async function GET(request: Request) {
   }
 
   // エラー時はエラーページへ
+  if (error) {
+    return NextResponse.redirect(
+      `${origin}/auth/auth-error?${searchParams.toString()}`,
+    );
+  }
   return NextResponse.redirect(`${origin}/auth/auth-error`);
+}
+
+function buildMobileAuthRedirect(searchParams: URLSearchParams) {
+  const scheme = getMobileScheme(searchParams.get("scheme"));
+  const params = new URLSearchParams();
+
+  for (const key of ["code", "error", "error_code", "error_description"]) {
+    const value = searchParams.get(key);
+    if (value) params.set(key, value);
+  }
+
+  const query = params.toString();
+  return `${scheme}:///auth/email-confirmed${query ? `?${query}` : ""}`;
+}
+
+function getMobileScheme(value: string | null) {
+  return value === "megrum-preview" ? value : "megrum";
 }

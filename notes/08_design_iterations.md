@@ -4,6 +4,55 @@
 
 ---
 
+## イテレーション168.64：メール認証リンクをiOSアプリへ戻す
+
+### 背景・問題意識
+
+TestFlight版の新規登録で、メールアドレス登録後に届く確認メールをタップするとWeb側に遷移してしまうことが分かった。ユーザー向け体験はiOSアプリを正本にする方針なので、メール確認後もそのままアプリ側の認証完了画面へ戻す必要がある。
+
+### 変更内容
+
+#### `mobile/src/auth/redirects.ts`
+- mobile認証メール用のredirect URLを生成する helper を追加した。
+- Supabaseから直接custom schemeへ戻すのではなく、`https://megrum.jp/auth/callback?next=mobile&scheme=...` を経由する形にした。
+
+#### `mobile/src/auth/AuthProvider.tsx`
+- 新規登録時の `emailRedirectTo` を mobile用callback helper に変更した。
+
+#### `mobile/app/(auth)/verify-email.tsx`
+- 確認メール再送時も同じ mobile用callback に戻るよう `emailRedirectTo` を追加した。
+
+#### `web/src/app/auth/callback/route.ts`
+- `next=mobile` の場合はWeb側で認証コードを消費せず、`megrum:///auth/email-confirmed?...` へリダイレクトするようにした。
+- 通常Web callbackは従来通りWeb sessionへ交換する。
+
+### 影響範囲
+
+- iOS新規登録メール確認
+- iOS確認メール再送
+- Web auth callback の mobile bridge 分岐
+
+### 確認方法
+
+- `npm run typecheck`
+- `git diff --check`
+- 確認メールリンクが `https://megrum.jp/auth/callback?next=mobile...` 経由でiOSアプリの `/auth/email-confirmed` に戻ることをTestFlightで確認
+
+### 関連ファイル
+
+- `mobile/src/auth/redirects.ts`
+- `mobile/src/auth/AuthProvider.tsx`
+- `mobile/app/(auth)/verify-email.tsx`
+- `web/src/app/auth/callback/route.ts`
+
+### セルフレビュー結果
+
+- ✅ 新規登録と再送の両方で同じiOS復帰導線を使う
+- ✅ Web callback が mobile 用の認証コードを先に消費しない
+- ✅ 状態遷移・DBスキーマ・用語の変更ではないため `notes/09_state_machines.md` / `notes/05_data_model.md` / `notes/10_glossary.md` の更新は不要
+
+---
+
 ## イテレーション168.63：iOSアプリ集中方針を明文化
 
 ### 背景・問題意識

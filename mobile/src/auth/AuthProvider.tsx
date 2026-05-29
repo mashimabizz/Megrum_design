@@ -7,9 +7,9 @@ import {
   useState,
   type PropsWithChildren,
 } from "react";
-import * as Linking from "expo-linking";
 import type { Session, User } from "@supabase/supabase-js";
 import { hasSupabaseConfig, supabase } from "../lib/supabase";
+import { getMobileAuthEmailRedirectTo } from "./redirects";
 
 type SignUpProfile = {
   handle?: string;
@@ -154,7 +154,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
         email,
         password,
         options: {
-          emailRedirectTo: Linking.createURL("/auth/email-confirmed"),
+          emailRedirectTo: getMobileAuthEmailRedirectTo(),
           data: {
             handle: profile?.handle,
             display_name: profile?.displayName ?? profile?.handle,

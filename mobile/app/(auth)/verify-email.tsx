@@ -3,6 +3,7 @@ import { router, useLocalSearchParams } from "expo-router";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { PrimaryButton } from "../../src/components/PrimaryButton";
 import { Screen } from "../../src/components/Screen";
+import { getMobileAuthEmailRedirectTo } from "../../src/auth/redirects";
 import { supabase } from "../../src/lib/supabase";
 import { megrumColors, megrumRadii, megrumShadow } from "../../src/theme/tokens";
 
@@ -18,6 +19,9 @@ export default function VerifyEmailScreen() {
     const { error } = await supabase.auth.resend({
       type: "signup",
       email: address,
+      options: {
+        emailRedirectTo: getMobileAuthEmailRedirectTo(),
+      },
     });
     setPending(false);
     setNotice(error ? error.message : "確認メールを再送しました");
