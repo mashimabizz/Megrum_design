@@ -456,6 +456,14 @@ export default function MeguriBoardThreadScreen() {
     setTimeout(() => scrollToReply(targetReply.id), 140);
   }
 
+  function jumpToUnreadReply() {
+    if (!unreadSeparatorReplyId) return;
+    if (replySortMode !== "oldest") {
+      setReplySortMode("oldest");
+    }
+    setTimeout(() => scrollToReply(unreadSeparatorReplyId), replySortMode === "oldest" ? 80 : 180);
+  }
+
   function jumpToMediaSource(attachment: BoardMediaAttachment) {
     setMediaGalleryOpen(false);
     if (!attachment.replyId) {
@@ -1273,6 +1281,16 @@ export default function MeguriBoardThreadScreen() {
                     >
                       <Text style={styles.latestReplyButtonText}>最新へ</Text>
                       <IconSymbol name="chevron-down" color={megrumColors.lavender} size={13} />
+                    </Pressable>
+                  ) : null}
+                  {unreadSeparatorReplyId ? (
+                    <Pressable
+                      accessibilityRole="button"
+                      hitSlop={8}
+                      onPress={jumpToUnreadReply}
+                      style={styles.unreadJumpButton}
+                    >
+                      <Text style={styles.unreadJumpButtonText}>未読へ</Text>
                     </Pressable>
                   ) : null}
                 </View>
@@ -2548,6 +2566,19 @@ const styles = StyleSheet.create({
   },
   latestReplyButtonText: {
     color: megrumColors.lavender,
+    fontSize: 11,
+    fontWeight: "900",
+  },
+  unreadJumpButton: {
+    alignItems: "center",
+    backgroundColor: "rgba(168,212,230,0.24)",
+    borderRadius: 999,
+    minHeight: 26,
+    paddingHorizontal: 9,
+    justifyContent: "center",
+  },
+  unreadJumpButtonText: {
+    color: "#4f7e92",
     fontSize: 11,
     fontWeight: "900",
   },

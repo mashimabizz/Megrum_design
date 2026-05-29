@@ -4,6 +4,53 @@
 
 ---
 
+## イテレーション220：掲示板詳細に未読返信ジャンプを追加
+
+### 背景・問題意識
+
+返信数が増えたスレッドでは、どこから読めばよいかをすぐ見つけられることが重要になる。既に未読区切りは表示していたが、そこへ一発で移動する導線がなかったため、返信ヘッダーに未読返信ジャンプを追加した。
+
+### 変更内容
+
+#### `mobile/app/meguri-board-thread.tsx`
+- 未読返信がある時、返信ヘッダーに `未読へ` ボタンを表示するようにした。
+- `未読へ` を押すと、未読区切りの返信位置へスクロールするようにした。
+- 表示順が `古い順` 以外の場合は、未読区切りが成立する `古い順` に戻してから移動するようにした。
+
+#### `notes/09_state_machines.md`
+- Meguri Board Lifecycle に未読返信ジャンプの表示ルールを追記した。
+
+#### `notes/10_glossary.md`
+- 掲示板未読返信ジャンプを追加した。
+
+### 影響範囲
+
+- iOS版 スポット掲示板詳細
+- 返信ヘッダー
+- 未読区切り
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- `EAS_UPDATE_PROJECT_SLUG=ihub EXPO_NO_GIT_STATUS=1 npm --prefix mobile run update:ios:preview -- --message "[iter220] add board unread reply jump" --non-interactive`
+- Preview OTA: Update group `ddf44ea4-0cf9-44e7-80fc-bf62e8d230b4` / iOS update `019e75b1-4335-738a-9f4f-3c9556b3b88a`
+
+### 関連ファイル
+
+- `mobile/app/meguri-board-thread.tsx`
+- `notes/08_design_iterations.md`
+- `notes/09_state_machines.md`
+- `notes/10_glossary.md`
+
+### セルフレビュー結果
+
+- ✅ 既存の未読区切りロジックを使い、DB変更なしで移動導線だけを追加した。
+- ✅ 未読区切りが表示される `古い順` に表示順を戻してから移動するようにした。
+- ✅ ネイティブ依存追加なしで、Preview OTA対象内に収めた。
+
+---
+
 ## イテレーション219：掲示板返信の自分宛てメンションを強調
 
 ### 背景・問題意識
