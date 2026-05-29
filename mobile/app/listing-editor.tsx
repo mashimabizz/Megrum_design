@@ -11,6 +11,7 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
+  Switch,
   Text,
   TextInput,
   View,
@@ -37,6 +38,7 @@ type InventoryOpt = {
   groupName: string | null;
   characterName: string | null;
   goodsTypeName: string | null;
+  tagLabels: string[];
   hue: number;
   availableQty: number;
 };
@@ -50,6 +52,7 @@ type WishOpt = {
   groupName: string | null;
   characterName: string | null;
   goodsTypeName: string | null;
+  tagLabels: string[];
   photoUrl: string | null;
 };
 
@@ -126,6 +129,11 @@ type WishRow = {
   goods_type: RelationName;
 };
 
+type InventoryTagRow = {
+  inventory_id: string;
+  tag: { label: string | null } | { label: string | null }[] | null;
+};
+
 type ListingRow = {
   id: string;
   user_id: string;
@@ -177,6 +185,7 @@ const PREVIEW_INVENTORY: InventoryOpt[] = [
     groupName: "LUMENA",
     characterName: "スア",
     goodsTypeName: "トレカ",
+    tagLabels: ["春ver.", "同種優先"],
     hue: 260,
     availableQty: 2,
   },
@@ -189,6 +198,7 @@ const PREVIEW_INVENTORY: InventoryOpt[] = [
     groupName: "LUMENA",
     characterName: "ジョンウ",
     goodsTypeName: "トレカ",
+    tagLabels: ["ラキドロ"],
     hue: 198,
     availableQty: 1,
   },
@@ -201,6 +211,7 @@ const PREVIEW_INVENTORY: InventoryOpt[] = [
     groupName: "aespa",
     characterName: "ニンニン",
     goodsTypeName: "アクスタ",
+    tagLabels: ["現地OK", "アクスタ"],
     hue: 322,
     availableQty: 1,
   },
@@ -214,6 +225,7 @@ const PREVIEW_WISHES: WishOpt[] = [
     groupName: "LUMENA",
     characterName: "スア",
     goodsTypeName: "トレカ",
+    tagLabels: ["ラキドロ"],
     photoUrl: null,
     exchangeType: "any",
   },
@@ -225,6 +237,7 @@ const PREVIEW_WISHES: WishOpt[] = [
     groupName: "aespa",
     characterName: "ニンニン",
     goodsTypeName: "アクスタ",
+    tagLabels: ["制服"],
     photoUrl: null,
     exchangeType: "same_kind",
   },
@@ -236,6 +249,7 @@ const PREVIEW_WISHES: WishOpt[] = [
     groupName: "aespa",
     characterName: "ウィンター",
     goodsTypeName: "缶バッジ",
+    tagLabels: ["缶バッジ"],
     photoUrl: null,
     exchangeType: "any",
   },
@@ -390,14 +404,15 @@ export default function ListingEditorScreen() {
   function setHaveQty(id: string, delta: number) {
     const cap = inventoryItemById.get(id)?.availableQty ?? 1;
     setSelectedHaves((current) =>
-      current.map((item) => {
+      current.flatMap((item) => {
         if (item.id !== id) return item;
         const next = item.qty + delta;
+        if (next <= 0) return [];
         if (delta > 0 && next > cap) {
           showToast(`市場残数（${cap}）が上限です`);
-          return { ...item, qty: cap };
+          return [{ ...item, qty: cap }];
         }
-        return { ...item, qty: Math.max(1, Math.min(cap, next)) };
+        return [{ ...item, qty: Math.max(1, Math.min(cap, next)) }];
       }),
     );
   }
@@ -429,11 +444,12 @@ export default function ListingEditorScreen() {
         if (i !== index) return option;
         return {
           ...option,
-          selected: option.selected.map((item) =>
-            item.id === wishId
-              ? { ...item, qty: Math.max(1, Math.min(99, item.qty + delta)) }
-              : item,
-          ),
+          selected: option.selected.flatMap((item) => {
+            if (item.id !== wishId) return item;
+            const next = item.qty + delta;
+            if (next <= 0) return [];
+            return [{ ...item, qty: Math.max(1, Math.min(99, next)) }];
+          }),
         };
       }),
     );
@@ -633,6 +649,13 @@ export default function ListingEditorScreen() {
                   label="グループ"
                   value={haveGroupId}
                   options={data.inventoryGroups}
+                  right={
+                    <CashInlineToggle
+                      enabled={!!cashOffer}
+                      label="定価"
+                      onToggle={toggleCashOffer}
+                    />
+                  }
                   onChange={changeHaveGroup}
                 />
                 <ChoiceRow
@@ -675,12 +698,14 @@ export default function ListingEditorScreen() {
                   onChange={setHaveLogic}
                 />
               ) : null}
-              <CashOfferControl
-                amount={cashOffer?.cashAmount ?? null}
-                enabled={!!cashOffer}
-                onAmountChange={setCashOfferAmount}
-                onToggle={toggleCashOffer}
-              />
+              {cashOffer ? (
+                <CashAmountField
+                  amount={cashOffer.cashAmount}
+                  help="Wishがなくても、相手には定価交換の選択肢として表示します。"
+                  label="定価（円）"
+                  onAmountChange={setCashOfferAmount}
+                />
+              ) : null}
             </FormSection>
 
             <View style={styles.optionHeader}>
@@ -890,31 +915,40 @@ function ChoiceRow({
   label,
   value,
   options,
+  right,
+  hideChoices = false,
   onChange,
 }: {
   label: string;
   value: string | null;
   options: SelectOption[];
+  right?: ReactNode;
+  hideChoices?: boolean;
   onChange: (value: string | null) => void;
 }) {
   return (
     <View style={styles.choiceBlock}>
-      <Text style={styles.choiceLabel}>{label}</Text>
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.choiceScroller}
-      >
-        <ChoiceChip label="選択" active={!value} onPress={() => onChange(null)} />
-        {options.map((option) => (
-          <ChoiceChip
-            key={option.id}
-            label={option.name}
-            active={value === option.id}
-            onPress={() => onChange(option.id)}
-          />
-        ))}
-      </ScrollView>
+      <View style={styles.choiceHeaderRow}>
+        <Text style={styles.choiceLabel}>{label}</Text>
+        {right ? <View style={styles.choiceHeaderRight}>{right}</View> : null}
+      </View>
+      {!hideChoices ? (
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.choiceScroller}
+        >
+          <ChoiceChip label="選択" active={!value} onPress={() => onChange(null)} />
+          {options.map((option) => (
+            <ChoiceChip
+              key={option.id}
+              label={option.name}
+              active={value === option.id}
+              onPress={() => onChange(option.id)}
+            />
+          ))}
+        </ScrollView>
+      ) : null}
     </View>
   );
 }
@@ -940,48 +974,64 @@ function ChoiceChip({
   );
 }
 
-function CashOfferControl({
-  amount,
+function CashInlineToggle({
   enabled,
-  onAmountChange,
+  label,
   onToggle,
 }: {
-  amount: number | null;
   enabled: boolean;
-  onAmountChange: (value: string) => void;
+  label: string;
   onToggle: (enabled: boolean) => void;
 }) {
   return (
-    <View style={[styles.cashOfferBox, enabled ? styles.cashOfferBoxActive : null]}>
-      <Pressable
-        accessibilityRole="switch"
-        accessibilityState={{ checked: enabled }}
-        onPress={() => onToggle(!enabled)}
-        style={styles.cashOfferHeader}
+    <View
+      style={[styles.inlineCashToggle, enabled ? styles.inlineCashToggleActive : null]}
+    >
+      <Text
+        style={[
+          styles.inlineCashToggleText,
+          enabled ? styles.inlineCashToggleTextActive : null,
+        ]}
       >
-        <View>
-          <Text style={styles.cashOfferTitle}>定価でも譲る</Text>
-          <Text style={styles.cashOfferSub}>
-            Wishがなくても、相手には定価交換の選択肢として表示します。
-          </Text>
-        </View>
-        <View style={[styles.cashOfferSwitch, enabled ? styles.cashOfferSwitchActive : null]}>
-          <View style={[styles.cashOfferKnob, enabled ? styles.cashOfferKnobActive : null]} />
-        </View>
-      </Pressable>
-      {enabled ? (
-        <View style={styles.cashOfferAmountRow}>
-          <Text style={styles.choiceLabel}>定価（円）</Text>
-          <TextInput
-            keyboardType="number-pad"
-            onChangeText={onAmountChange}
-            placeholder="1000"
-            placeholderTextColor="rgba(58,50,74,0.35)"
-            style={styles.cashInput}
-            value={amount ? String(amount) : ""}
-          />
-        </View>
-      ) : null}
+        {label}
+      </Text>
+      <Switch
+        ios_backgroundColor="rgba(58,50,74,0.16)"
+        onValueChange={onToggle}
+        thumbColor={megrumColors.surface}
+        trackColor={{
+          false: "rgba(58,50,74,0.16)",
+          true: megrumColors.lavender,
+        }}
+        value={enabled}
+      />
+    </View>
+  );
+}
+
+function CashAmountField({
+  amount,
+  help,
+  label,
+  onAmountChange,
+}: {
+  amount: number | null;
+  help: string;
+  label: string;
+  onAmountChange: (value: string) => void;
+}) {
+  return (
+    <View style={styles.cashAmountField}>
+      <Text style={styles.choiceLabel}>{label}</Text>
+      <TextInput
+        keyboardType="number-pad"
+        onChangeText={onAmountChange}
+        placeholder="1000"
+        placeholderTextColor="rgba(58,50,74,0.35)"
+        style={styles.cashInput}
+        value={amount ? String(amount) : ""}
+      />
+      <Text style={styles.helpText}>{help}</Text>
     </View>
   );
 }
@@ -1001,9 +1051,10 @@ function GoodsPanelCard({
   onPress: () => void;
   onQty: (delta: number) => void;
 }) {
-  const name = item.characterName ?? item.groupName ?? item.title;
+  const name = item.title;
   const hue = "hue" in item ? item.hue : nameToHue(name);
   const hasPhoto = !!item.photoUrl;
+  const visibleTags = item.tagLabels.slice(0, 2);
   return (
     <View
       style={[
@@ -1035,11 +1086,19 @@ function GoodsPanelCard({
             {name}
           </Text>
         </View>
-        <View style={styles.panelBottom}>
-          <Text numberOfLines={1} style={styles.panelType}>
-            {item.goodsTypeName ?? "グッズ"}
-          </Text>
-        </View>
+        {visibleTags.length > 0 ? (
+          <View style={styles.panelTagStack}>
+            {visibleTags.map((tag, index) => (
+              <Text
+                key={`${item.id}-${tag}-${index}`}
+                numberOfLines={1}
+                style={styles.panelTagText}
+              >
+                #{tag}
+              </Text>
+            ))}
+          </View>
+        ) : null}
         {!selected ? (
           <View style={styles.panelAddMark}>
             <Text style={styles.panelAddText}>+</Text>
@@ -1049,13 +1108,12 @@ function GoodsPanelCard({
       {selected ? (
         <View style={styles.qtyOverlay}>
           <Pressable
-            disabled={qty <= 1}
             onPress={() => onQty(-1)}
             style={styles.qtyButton}
           >
             <Text style={styles.qtyButtonText}>−</Text>
           </Pressable>
-          <Text style={styles.qtyText}>×{qty}</Text>
+          <Text style={styles.qtyText}>{qty}</Text>
           <Pressable onPress={() => onQty(1)} style={styles.qtyButton}>
             <Text style={styles.qtyButtonText}>＋</Text>
           </Pressable>
@@ -1079,8 +1137,8 @@ function LogicToggle({
       <Text style={styles.logicLabel}>{label}</Text>
       <View style={styles.logicRow}>
         {[
-          { value: "and" as const, label: "全部", sub: "セット" },
-          { value: "or" as const, label: "1pick", sub: "どれか1つ" },
+          { value: "and" as const, label: "すべてほしい" },
+          { value: "or" as const, label: "どれか1つだけ" },
         ].map((option) => {
           const active = value === option.value;
           return (
@@ -1093,11 +1151,6 @@ function LogicToggle({
                 style={[styles.logicButtonText, active ? styles.logicButtonTextActive : null]}
               >
                 {option.label}
-              </Text>
-              <Text
-                style={[styles.logicButtonSub, active ? styles.logicButtonSubActive : null]}
-              >
-                {option.sub}
               </Text>
             </Pressable>
           );
@@ -1166,30 +1219,6 @@ function OptionEditor({
     <View style={styles.optionCard}>
       <View style={styles.optionTop}>
         <Text style={styles.optionBadge}>選択肢 {index + 1}</Text>
-        <Pressable
-          onPress={() =>
-            onPatch({
-              isCashOffer: !option.isCashOffer,
-              groupId: option.isCashOffer ? defaultGroupId : null,
-              goodsTypeId: option.isCashOffer ? defaultGoodsTypeId : null,
-              selected: [],
-              cashAmount: option.isCashOffer ? null : 1000,
-            })
-          }
-          style={[
-            styles.cashToggle,
-            option.isCashOffer ? styles.cashToggleActive : null,
-          ]}
-        >
-          <Text
-            style={[
-              styles.cashToggleText,
-              option.isCashOffer ? styles.cashToggleTextActive : null,
-            ]}
-          >
-            定価交換
-          </Text>
-        </Pressable>
         {onRemove ? (
           <Pressable onPress={onRemove} style={styles.removeButton}>
             <Text style={styles.removeButtonText}>削除</Text>
@@ -1197,52 +1226,63 @@ function OptionEditor({
         ) : null}
       </View>
 
-      {option.isCashOffer ? (
-        <View style={styles.cashEditor}>
-          <Text style={styles.choiceLabel}>希望金額（円）</Text>
-          <TextInput
-            value={String(option.cashAmount ?? "")}
-            onChangeText={(value) => {
-              const numeric = Number(value.replace(/[^\d]/g, ""));
-              onPatch({ cashAmount: Number.isFinite(numeric) ? numeric : null });
-            }}
-            keyboardType="number-pad"
-            placeholder="1000"
-            placeholderTextColor="rgba(58,50,74,0.35)"
-            style={styles.cashInput}
+      <View style={styles.twoColumn}>
+        <ChoiceRow
+          hideChoices={option.isCashOffer}
+          label="グループ"
+          value={option.groupId}
+          options={groups}
+          right={
+            <CashInlineToggle
+              enabled={option.isCashOffer}
+              label="定価"
+              onToggle={(enabled) =>
+                onPatch({
+                  isCashOffer: enabled,
+                  groupId: enabled ? null : defaultGroupId,
+                  goodsTypeId: enabled ? null : defaultGoodsTypeId,
+                  selected: [],
+                  cashAmount: enabled ? option.cashAmount ?? 1000 : null,
+                })
+              }
+            />
+          }
+          onChange={(value) =>
+            onPatch({
+              groupId: value,
+              groupCustomized: true,
+              selected: [],
+            })
+          }
+        />
+        {!option.isCashOffer ? (
+          <ChoiceRow
+            label="種別"
+            value={option.goodsTypeId}
+            options={goodsTypes}
+            onChange={(value) =>
+              onPatch({
+                goodsTypeId: value,
+                goodsTypeCustomized: true,
+                selected: [],
+              })
+            }
           />
-          <Text style={styles.helpText}>
-            この選択肢はマッチング演算には参加せず、定価交換として表示します。
-          </Text>
-        </View>
+        ) : null}
+      </View>
+
+      {option.isCashOffer ? (
+        <CashAmountField
+          amount={option.cashAmount}
+          help="この選択肢はマッチング演算には参加せず、定価交換として表示します。"
+          label="希望金額（円）"
+          onAmountChange={(value) => {
+            const numeric = Number(value.replace(/[^\d]/g, ""));
+            onPatch({ cashAmount: Number.isFinite(numeric) ? numeric : null });
+          }}
+        />
       ) : (
         <>
-          <View style={styles.twoColumn}>
-            <ChoiceRow
-              label="グループ"
-              value={option.groupId}
-              options={groups}
-              onChange={(value) =>
-                onPatch({
-                  groupId: value,
-                  groupCustomized: true,
-                  selected: [],
-                })
-              }
-            />
-            <ChoiceRow
-              label="種別"
-              value={option.goodsTypeId}
-              options={goodsTypes}
-              onChange={(value) =>
-                onPatch({
-                  goodsTypeId: value,
-                  goodsTypeCustomized: true,
-                  selected: [],
-                })
-              }
-            />
-          </View>
           {!option.groupId || !option.goodsTypeId ? (
             <EmptyBox label="先にグループと種別を選んでください" />
           ) : filteredWishes.length === 0 ? (
@@ -1444,8 +1484,15 @@ async function fetchEditorData(input: {
       quantity: Math.max(0, (row.quantity ?? 1) - (reservedQtyByInvId.get(row.id) ?? 0)),
     }))
     .filter((row) => (row.quantity ?? 0) > 0);
-  const inventoryItems = marketInventoryRows.map(toInventoryOpt);
-  const wishItems = [...((wishRowsRaw as WishRow[] | null) ?? []), ...extraWishRows].map(toWishOpt);
+  const wishRows = [...((wishRowsRaw as WishRow[] | null) ?? []), ...extraWishRows];
+  const tagLabelsById = await fetchListingEditorTagLabels([
+    ...marketInventoryRows.map((row) => row.id),
+    ...wishRows.map((row) => row.id),
+  ]);
+  const inventoryItems = marketInventoryRows.map((row) =>
+    toInventoryOpt(row, tagLabelsById),
+  );
+  const wishItems = wishRows.map((row) => toWishOpt(row, tagLabelsById));
   const inventoryGroups = uniqueOptions(
     marketInventoryRows.map((row) => ({
       id: row.group_id,
@@ -1459,13 +1506,13 @@ async function fetchEditorData(input: {
     })),
   );
   const wishGroups = uniqueOptions(
-    [...((wishRowsRaw as WishRow[] | null) ?? []), ...extraWishRows].map((row) => ({
+    wishRows.map((row) => ({
       id: row.group_id,
       name: pickName(row.group),
     })),
   );
   const wishGoodsTypes = uniqueOptions(
-    [...((wishRowsRaw as WishRow[] | null) ?? []), ...extraWishRows].map((row) => ({
+    wishRows.map((row) => ({
       id: row.goods_type_id,
       name: pickName(row.goods_type),
     })),
@@ -1910,7 +1957,30 @@ function isBlankWishOption(option: WishOptionState | undefined) {
   );
 }
 
-function toInventoryOpt(row: InventoryRow): InventoryOpt {
+async function fetchListingEditorTagLabels(ids: string[]) {
+  const uniqueIds = Array.from(new Set(ids.filter(Boolean)));
+  const result = new Map<string, string[]>();
+  if (!supabase || uniqueIds.length === 0) return result;
+  const { data, error } = await supabase
+    .from("goods_inventory_tags")
+    .select("inventory_id, tag:tags_master(label)")
+    .in("inventory_id", uniqueIds);
+  if (error) return result;
+  for (const row of (data as InventoryTagRow[] | null) ?? []) {
+    const tag = Array.isArray(row.tag) ? row.tag[0] : row.tag;
+    const label = tag?.label?.trim();
+    if (!label) continue;
+    const labels = result.get(row.inventory_id) ?? [];
+    if (!labels.includes(label)) labels.push(label);
+    result.set(row.inventory_id, labels);
+  }
+  return result;
+}
+
+function toInventoryOpt(
+  row: InventoryRow,
+  tagLabelsById: Map<string, string[]> = new Map(),
+): InventoryOpt {
   const groupName = pickName(row.group);
   const characterName = pickName(row.character);
   const goodsTypeName = pickName(row.goods_type);
@@ -1924,12 +1994,16 @@ function toInventoryOpt(row: InventoryRow): InventoryOpt {
     groupName,
     characterName,
     goodsTypeName,
+    tagLabels: tagLabelsById.get(row.id) ?? [],
     hue: normalizeHue(row.hue, seed),
     availableQty: row.quantity ?? 1,
   };
 }
 
-function toWishOpt(row: WishRow): WishOpt {
+function toWishOpt(
+  row: WishRow,
+  tagLabelsById: Map<string, string[]> = new Map(),
+): WishOpt {
   return {
     id: row.id,
     title: row.title,
@@ -1939,6 +2013,7 @@ function toWishOpt(row: WishRow): WishOpt {
     groupName: pickName(row.group),
     characterName: pickName(row.character),
     goodsTypeName: pickName(row.goods_type),
+    tagLabels: tagLabelsById.get(row.id) ?? [],
     photoUrl: row.photo_urls?.[0] ?? null,
   };
 }
@@ -2211,6 +2286,17 @@ const styles = StyleSheet.create({
   choiceBlock: {
     gap: 6,
   },
+  choiceHeaderRow: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 10,
+    justifyContent: "space-between",
+    minHeight: 32,
+  },
+  choiceHeaderRight: {
+    alignItems: "center",
+    flexShrink: 0,
+  },
   choiceLabel: {
     color: megrumColors.ink,
     fontSize: 11,
@@ -2252,59 +2338,37 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     lineHeight: 16,
   },
-  cashOfferBox: {
-    backgroundColor: "rgba(168,212,230,0.10)",
-    borderColor: "rgba(168,212,230,0.24)",
-    borderRadius: 15,
+  inlineCashToggle: {
+    alignItems: "center",
+    backgroundColor: "rgba(255,255,255,0.72)",
+    borderColor: "rgba(58,50,74,0.08)",
+    borderRadius: megrumRadii.pill,
     borderWidth: 1,
-    gap: 10,
-    padding: 11,
+    flexDirection: "row",
+    gap: 6,
+    minHeight: 32,
+    paddingLeft: 10,
+    paddingRight: 3,
   },
-  cashOfferBoxActive: {
+  inlineCashToggleActive: {
     backgroundColor: "rgba(166,149,216,0.10)",
     borderColor: "rgba(166,149,216,0.42)",
   },
-  cashOfferHeader: {
-    alignItems: "center",
-    flexDirection: "row",
-    gap: 12,
-    justifyContent: "space-between",
-  },
-  cashOfferTitle: {
+  inlineCashToggleText: {
     color: megrumColors.ink,
-    fontSize: 12.5,
+    fontSize: 11,
     fontWeight: "900",
   },
-  cashOfferSub: {
-    color: "rgba(58,50,74,0.56)",
-    fontSize: 10,
-    fontWeight: "700",
-    lineHeight: 14,
-    marginTop: 3,
-    maxWidth: 260,
+  inlineCashToggleTextActive: {
+    color: megrumColors.lavender,
   },
-  cashOfferSwitch: {
-    backgroundColor: "rgba(58,50,74,0.14)",
-    borderRadius: megrumRadii.pill,
-    height: 25,
-    justifyContent: "center",
-    paddingHorizontal: 3,
-    width: 46,
-  },
-  cashOfferSwitchActive: {
-    backgroundColor: megrumColors.lavender,
-  },
-  cashOfferKnob: {
-    backgroundColor: megrumColors.surface,
-    borderRadius: megrumRadii.pill,
-    height: 19,
-    width: 19,
-  },
-  cashOfferKnobActive: {
-    alignSelf: "flex-end",
-  },
-  cashOfferAmountRow: {
+  cashAmountField: {
+    backgroundColor: "rgba(166,149,216,0.06)",
+    borderColor: "rgba(166,149,216,0.18)",
+    borderRadius: 14,
+    borderWidth: 1,
     gap: 7,
+    padding: 10,
   },
   warnBox: {
     backgroundColor: "rgba(245,158,11,0.11)",
@@ -2327,6 +2391,7 @@ const styles = StyleSheet.create({
   },
   panelWrap: {
     borderRadius: 14,
+    gap: 6,
     position: "relative",
     width: "31%",
   },
@@ -2377,7 +2442,7 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(255,255,255,0.84)",
     borderRadius: 7,
     left: 5,
-    maxWidth: "76%",
+    maxWidth: "60%",
     paddingHorizontal: 5,
     paddingVertical: 3,
     position: "absolute",
@@ -2388,19 +2453,23 @@ const styles = StyleSheet.create({
     fontSize: 8.5,
     fontWeight: "900",
   },
-  panelBottom: {
-    backgroundColor: "rgba(255,255,255,0.92)",
-    bottom: 0,
-    left: 0,
-    paddingHorizontal: 6,
-    paddingVertical: 5,
+  panelTagStack: {
+    alignItems: "flex-end",
+    gap: 4,
+    maxWidth: "45%",
     position: "absolute",
-    right: 0,
+    right: 5,
+    top: 5,
   },
-  panelType: {
-    color: megrumColors.ink,
-    fontSize: 9,
+  panelTagText: {
+    backgroundColor: "rgba(255,255,255,0.88)",
+    borderRadius: megrumRadii.pill,
+    color: megrumColors.lavender,
+    fontSize: 8,
     fontWeight: "900",
+    overflow: "hidden",
+    paddingHorizontal: 5,
+    paddingVertical: 3,
   },
   panelAddMark: {
     alignItems: "center",
@@ -2412,7 +2481,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     position: "absolute",
     right: 5,
-    top: 5,
+    bottom: 5,
     width: 24,
   },
   panelAddText: {
@@ -2425,12 +2494,12 @@ const styles = StyleSheet.create({
     alignItems: "center",
     alignSelf: "center",
     backgroundColor: "rgba(255,255,255,0.96)",
+    borderColor: "rgba(166,149,216,0.22)",
     borderRadius: megrumRadii.pill,
-    bottom: 6,
+    borderWidth: 1,
     flexDirection: "row",
-    gap: 3,
-    padding: 3,
-    position: "absolute",
+    gap: 4,
+    padding: 4,
   },
   qtyButton: {
     alignItems: "center",
@@ -2488,15 +2557,6 @@ const styles = StyleSheet.create({
   logicButtonTextActive: {
     color: megrumColors.surface,
   },
-  logicButtonSub: {
-    color: megrumColors.mutedInk,
-    fontSize: 9,
-    fontWeight: "800",
-    marginTop: 2,
-  },
-  logicButtonSubActive: {
-    color: "rgba(255,255,255,0.78)",
-  },
   optionHeader: {
     alignItems: "center",
     flexDirection: "row",
@@ -2544,25 +2604,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 9,
     paddingVertical: 4,
   },
-  cashToggle: {
-    backgroundColor: megrumColors.surface,
-    borderColor: "rgba(166,149,216,0.38)",
-    borderRadius: megrumRadii.pill,
-    borderWidth: 1,
-    paddingHorizontal: 9,
-    paddingVertical: 5,
-  },
-  cashToggleActive: {
-    backgroundColor: megrumColors.lavender,
-  },
-  cashToggleText: {
-    color: megrumColors.lavender,
-    fontSize: 10.5,
-    fontWeight: "900",
-  },
-  cashToggleTextActive: {
-    color: megrumColors.surface,
-  },
   removeButton: {
     marginLeft: "auto",
   },
@@ -2570,9 +2611,6 @@ const styles = StyleSheet.create({
     color: megrumColors.warn,
     fontSize: 11,
     fontWeight: "900",
-  },
-  cashEditor: {
-    gap: 8,
   },
   cashInput: {
     backgroundColor: megrumColors.surface,
