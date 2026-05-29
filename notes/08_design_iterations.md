@@ -4,6 +4,55 @@
 
 ---
 
+## イテレーション231：掲示板返信を元の流れで見られるようにする
+
+### 背景・問題意識
+
+検索、メンション、自分の返信、参加者別、子返信などで返信を絞り込めるようになると、見つけた返信の前後の文脈を確認したくなる。一般的なスレッドUIとして、絞り込み中の返信を元スレッド全体の流れに戻して表示できる導線を追加した。
+
+### 変更内容
+
+#### `mobile/app/meguri-board-thread.tsx`
+- 検索/絞り込み中の現在対象返信を `activeFilteredReply` として保持し、条件チップから `元の流れ` で全体表示へ戻れるようにした。
+- 返信アクションシートに、検索/絞り込み中または表示順変更中のみ `元の流れで見る` を追加した。
+- `元の流れ` 実行時は検索条件を解除し、表示順を `oldest` に戻してから対象返信へスクロールし、一時ハイライトで着地位置を示すようにした。
+- 返信スクロール処理を `scrollToReplyOffset` に共通化し、検索結果ナビと引用元ジャンプで同じハイライト処理を使うようにした。
+
+#### `notes/09_state_machines.md`
+- Meguri Board Lifecycle に返信コンテキスト表示の表示ルールを追記した。
+
+#### `notes/10_glossary.md`
+- 掲示板返信コンテキスト表示を追加した。
+
+### 影響範囲
+
+- iOS版 スポット掲示板詳細
+- スレッド内検索
+- 参加者別/自分/メンション/子返信フィルタ
+- 返信アクションシート
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- `EAS_UPDATE_PROJECT_SLUG=ihub EXPO_NO_GIT_STATUS=1 npm --prefix mobile run update:ios:preview -- --message "[iter231] show board replies in context" --non-interactive`
+- Preview OTA: Update group `8ebff51f-5de2-4112-a5c3-e85e2562527a` / iOS update `019e75e9-0e10-77eb-a2c6-39dfb8841562`
+
+### 関連ファイル
+
+- `mobile/app/meguri-board-thread.tsx`
+- `notes/08_design_iterations.md`
+- `notes/09_state_machines.md`
+- `notes/10_glossary.md`
+
+### セルフレビュー結果
+
+- ✅ 既存の検索/絞り込み機能に追加導線を重ね、DB変更なしで文脈確認を強化した。
+- ✅ iOS標準の `ActionSheetIOS` を使い続け、ネイティブ依存追加なしで実装した。
+- ✅ 返信ジャンプハイライトとスクロール処理を使い回し、表示位置を見失いにくくした。
+
+---
+
 ## イテレーション230：掲示板返信ジャンプに一時ハイライトを追加
 
 ### 背景・問題意識

@@ -266,6 +266,12 @@ export default function MeguriBoardThreadScreen() {
     return next;
   }, [filteredReplies, replySortMode]);
 
+  const activeFilteredReply = useMemo(() => {
+    if (!replySearchQuery || sortedReplies.length === 0) return null;
+    const index = Math.min(Math.max(searchCursorIndex, 0), sortedReplies.length - 1);
+    return sortedReplies[index] ?? sortedReplies[0] ?? null;
+  }, [replySearchQuery, searchCursorIndex, sortedReplies]);
+
   const unreadSeparatorReplyId = useMemo(() => {
     if (replySearchQuery || replies.length === 0) return null;
     const firstUnreadReply = replies.find((reply) => !previousReadAt || reply.createdAt > previousReadAt);
@@ -556,16 +562,20 @@ export default function MeguriBoardThreadScreen() {
     replyOffsetsRef.current[replyId] = y;
   }
 
+  function scrollToReplyOffset(replyId: string) {
+    const y = replyOffsetsRef.current[replyId];
+    if (typeof y !== "number") return false;
+    highlightReply(replyId);
+    scrollViewRef.current?.scrollTo({ animated: true, y: Math.max(0, y - 12) });
+    return true;
+  }
+
   function scrollToReply(replyId: string | null) {
     if (!replyId) return;
     const runScroll = () => {
-      const y = replyOffsetsRef.current[replyId];
-      if (typeof y === "number") {
-        highlightReply(replyId);
-        scrollViewRef.current?.scrollTo({ animated: true, y: Math.max(0, y - 12) });
-        return;
+      if (!scrollToReplyOffset(replyId)) {
+        Alert.alert("引用元を表示できません", "検索条件を解除しても引用元が見つかりませんでした。");
       }
-      Alert.alert("引用元を表示できません", "検索条件を解除しても引用元が見つかりませんでした。");
     };
     if (replySearchText.trim()) {
       clearReplySearch();
@@ -575,16 +585,35 @@ export default function MeguriBoardThreadScreen() {
     runScroll();
   }
 
+  function revealReplyInThreadContext(replyId: string | null) {
+    if (!replyId) return;
+    const shouldResetSearch = replySearchText.trim().length > 0;
+    const shouldResetSort = replySortMode !== "oldest";
+    if (shouldResetSearch) {
+      clearReplySearch();
+    }
+    if (shouldResetSort) {
+      setReplySortMode("oldest");
+    }
+    const delay = shouldResetSearch || shouldResetSort ? 220 : 40;
+    setTimeout(() => {
+      if (scrollToReplyOffset(replyId)) return;
+      setTimeout(() => {
+        if (!scrollToReplyOffset(replyId)) {
+          Alert.alert("返信を表示できません", "元の流れに戻しても対象の返信が見つかりませんでした。");
+        }
+      }, 180);
+    }, delay);
+  }
+
   function jumpToSearchResult(direction: -1 | 1) {
     if (!replySearchQuery || sortedReplies.length === 0) return;
     const nextIndex =
       (searchCursorIndex + direction + sortedReplies.length) % sortedReplies.length;
     const targetReply = sortedReplies[nextIndex];
     setSearchCursorIndex(nextIndex);
-    const y = targetReply ? replyOffsetsRef.current[targetReply.id] : undefined;
-    if (typeof y === "number") {
-      highlightReply(targetReply.id);
-      scrollViewRef.current?.scrollTo({ animated: true, y: Math.max(0, y - 12) });
+    if (targetReply) {
+      scrollToReplyOffset(targetReply.id);
     }
   }
 
@@ -1200,6 +1229,12 @@ export default function MeguriBoardThreadScreen() {
       label: "この返信への返信を見る",
       run: () => filterChildReplies(reply),
     });
+    if (replySearchText.trim() || replySortMode !== "oldest") {
+      actions.push({
+        label: "元の流れで見る",
+        run: () => revealReplyInThreadContext(reply.id),
+      });
+    }
     actions.push({
       disabled: reply.deleted,
       label: "返信を共有",
@@ -1510,6 +1545,15 @@ export default function MeguriBoardThreadScreen() {
                       ? `参加者: ${replySearchSource.label}`
                       : `検索: ${replySearchText.trim()}`}
                   </Text>
+                  {activeFilteredReply ? (
+                    <Pressable
+                      accessibilityRole="button"
+                      onPress={() => revealReplyInThreadContext(activeFilteredReply.id)}
+                      style={styles.replyActiveFilterContext}
+                    >
+                      <Text style={styles.replyActiveFilterContextText}>元の流れ</Text>
+                    </Pressable>
+                  ) : null}
                   <Pressable accessibilityRole="button" onPress={clearReplySearch} style={styles.replyActiveFilterClear}>
                     <Text style={styles.replyActiveFilterClearText}>解除</Text>
                   </Pressable>
@@ -2994,6 +3038,19 @@ const styles = StyleSheet.create({
   },
   replyActiveFilterClearText: {
     color: megrumColors.lavender,
+    fontSize: 10.5,
+    fontWeight: "900",
+  },
+  replyActiveFilterContext: {
+    alignItems: "center",
+    backgroundColor: "rgba(168,212,230,0.24)",
+    borderRadius: 999,
+    minHeight: 24,
+    justifyContent: "center",
+    paddingHorizontal: 10,
+  },
+  replyActiveFilterContextText: {
+    color: "#4f7e92",
     fontSize: 10.5,
     fontWeight: "900",
   },
