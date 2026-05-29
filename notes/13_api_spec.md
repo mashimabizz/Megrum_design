@@ -3,8 +3,8 @@
 > **目的**：Megrum のバックエンドAPI（REST）の draft 仕様。実装着手時の正解集。
 > 全エンドポイントを `[METHOD /path]` の形式で網羅し、各々で入力・出力・認証要否・状態遷移・備考を定義。
 
-最終更新: 2026-05-01（iter42）
-ステータス: Draft v1.0
+最終更新: 2026-05-29（iter168.73）
+ステータス: Draft v1.1
 
 ---
 
@@ -890,6 +890,83 @@ AW削除。
 - **Response 201**: 作成された message（attachment_url 設定済）
 - **Screen**: `C15-*`、`C2-chat`
 
+### GET /api/v1/meguri-board/threads
+
+スポット掲示板のスレッド一覧。
+
+- **Auth**: 必須（preview fallback ではローカルデータ）
+- **Query**:
+  - `spot_key?=tokyo-dome-gate25`
+  - `prefecture?=東京都`
+  - `limit?=50`
+- **Response 200**:
+  ```json
+  {
+    "data": [
+      {
+        "id": "uuid",
+        "title": "物販列いまどれくらい？",
+        "body": "string",
+        "audience_scope": "same_spot|same_prefecture|global",
+        "spot_key": "tokyo-dome-gate25",
+        "spot_label": "東京ドーム 25ゲート前",
+        "prefecture": "東京都",
+        "reply_count": 2,
+        "latest_reply_preview": "string?",
+        "latest_activity_at": "2026-05-29T07:12:00Z",
+        "author": { "id": "uuid", "display_name": "string", "handle": "string?" }
+      }
+    ]
+  }
+  ```
+- **備考**:
+  - `same_spot` の exact 判定は MVP ではクライアント `spot_key` 比較を併用
+  - サーバー側は少なくとも author / global / same prefecture を防壁にする
+- **Screen**: `meguri-board`
+
+### POST /api/v1/meguri-board/threads
+
+スポット掲示板にスレッド作成。
+
+- **Auth**: 必須
+- **Request**:
+  ```json
+  {
+    "title": "string",
+    "body": "string",
+    "audience_scope": "same_spot|same_prefecture|global",
+    "spot_key": "string?",
+    "spot_label": "string?",
+    "prefecture": "string?"
+  }
+  ```
+- **Response 201**: 作成された thread
+- **備考**: `same_spot` は `spot_key` / `spot_label` / `prefecture` 必須
+- **Screen**: `meguri-board`
+
+### GET /api/v1/meguri-board/threads/:id
+
+スポット掲示板のスレッド詳細。
+
+- **Auth**: 必須（見える範囲の thread のみ）
+- **Response 200**: `thread` 本体 + `replies[]`
+- **Screen**: `meguri-board-thread`
+
+### POST /api/v1/meguri-board/threads/:id/replies
+
+スポット掲示板スレッドに返信。
+
+- **Auth**: 必須（見える範囲の thread のみ）
+- **Request**:
+  ```json
+  {
+    "body": "string"
+  }
+  ```
+- **Response 201**: `{ id, thread_id, body, created_at, author }`
+- **備考**: MVP はテキストのみ、編集・削除なし
+- **Screen**: `meguri-board-thread`
+
 ---
 
 ## 12. Deals（取引）
@@ -1407,7 +1484,7 @@ WebSocket でリアルタイム更新。
 | 27 | マッチング計算のバッチ頻度（毎日/6h/1h） | 実装着手 |
 | 28 | リアルタイム通知のスロットル | 実装着手 |
 | 29 | WebSocket 採用 vs polling（MVP） | 設計詰め |
-| 30 | スポット掲示板で先に定義すべきユーザー像とジョブをどこに保持するか | 設計詰め |
+| 30 | スポット掲示板の `same_spot` 判定に使う「現在のスポット」をユーザー状態のどこへ永続化するか | 設計詰め |
 
 ### 画像・ストレージ
 

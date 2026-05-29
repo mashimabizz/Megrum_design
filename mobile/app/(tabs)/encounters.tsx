@@ -27,18 +27,7 @@ import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Screen } from "../../src/components/Screen";
 import { IconSymbol } from "../../src/components/IconSymbol";
-import {
-  MeguriThreeBoundary,
-  MeguriThreeScene,
-  type MeguriSceneResident,
-} from "../../src/components/meguri/MeguriThreeScene";
 import { megrumColors, megrumRadii, megrumShadow } from "../../src/theme/tokens";
-import {
-  DEFAULT_MEGURI_AVATAR,
-  DEFAULT_MEGURI_PROFILE,
-  loadMeguriAvatarSettings,
-  loadMeguriProfileSettings,
-} from "../../src/lib/meguriSettings";
 import {
   MEGURI_PLUS_FREE_SEND_LIMIT,
   MEGURI_PLUS_MONTHLY_SEND_LIMIT,
@@ -577,11 +566,9 @@ export default function EncountersScreen() {
   const arrivals = useMemo(() => USERS.slice(0, 5), []);
   const todayCount = Math.min(USERS.length, 10);
   const [activeIndex, setActiveIndex] = useState(0);
-  const [homeThreeFailed, setHomeThreeFailed] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [meguriEnabled, setMeguriEnabled] = useState(true);
   const [plusActive, setPlusActive] = useState(false);
-  const [selfScene, setSelfScene] = useState<MeguriSceneResident | null>(null);
   const [groomPosts, setGroomPosts] = useState<GroomPost[]>(() => (previewMode ? GROOM_POSTS : []));
   const [groomLoading, setGroomLoading] = useState(!previewMode);
   const [selectedGroomId, setSelectedGroomId] = useState<string | null>(null);
@@ -599,7 +586,6 @@ export default function EncountersScreen() {
   const active = arrivals[activeIndex];
   const selectedGroomPost = groomPosts.find((post) => post.id === selectedGroomId) ?? null;
   const lockedLetters = previewMode && !plusActive ? LETTERS.length : 0;
-  const sceneResidents = useMemo(() => arrivals.map(toHomeSceneResident), [arrivals]);
   const headerTop = Math.max(insets.top, 18) + 8;
   const bottomPadding = Math.max(insets.bottom, 12) + 96;
 
@@ -609,34 +595,6 @@ export default function EncountersScreen() {
     }, 3200);
     return () => clearInterval(timer);
   }, [arrivals.length]);
-
-  useEffect(() => {
-    let mounted = true;
-    Promise.all([loadMeguriAvatarSettings(), loadMeguriProfileSettings()])
-      .then(([avatar, profile]) => {
-        if (!mounted) return;
-        setSelfScene({
-          animalType: avatar.animalType ?? DEFAULT_MEGURI_AVATAR.animalType,
-          furColor: avatar.furColor ?? DEFAULT_MEGURI_AVATAR.furColor,
-          hue: avatar.hue ?? DEFAULT_MEGURI_AVATAR.hue,
-          id: "me",
-          name: profile.displayName || DEFAULT_MEGURI_PROFILE.displayName,
-        });
-      })
-      .catch(() => {
-        if (!mounted) return;
-        setSelfScene({
-          animalType: DEFAULT_MEGURI_AVATAR.animalType,
-          furColor: DEFAULT_MEGURI_AVATAR.furColor,
-          hue: DEFAULT_MEGURI_AVATAR.hue,
-          id: "me",
-          name: DEFAULT_MEGURI_PROFILE.displayName,
-        });
-      });
-    return () => {
-      mounted = false;
-    };
-  }, []);
 
   useEffect(() => {
     loadMeguriPlusState(profile)
@@ -998,13 +956,6 @@ export default function EncountersScreen() {
         <View style={styles.stageCard}>
           <View style={styles.cloudA} />
           <View style={styles.cloudB} />
-          <Pressable
-            accessibilityRole="button"
-            onPress={() => router.push("/meguri-intro")}
-            style={styles.replayButton}
-          >
-            <Text style={styles.replayButtonText}>演出をもう一度見る</Text>
-          </Pressable>
           <Text style={[styles.eyebrow, styles.centerEyebrow]}>今日のめぐり</Text>
           <View style={styles.countRow}>
             <Text style={styles.bigCount}>{todayCount}</Text>
@@ -1013,36 +964,7 @@ export default function EncountersScreen() {
           <Text style={styles.stageTitle}>とめぐりあいました！</Text>
 
           <View style={styles.homeSceneFrame}>
-            {!selfScene ? (
-              <View style={styles.meguriSceneLoading}>
-                <ActivityIndicator color={megrumColors.lavender} />
-              </View>
-            ) : homeThreeFailed ? (
-              <View style={styles.meguriSceneLoading}>
-                <ActivityIndicator color={megrumColors.lavender} />
-              </View>
-            ) : (
-              <MeguriThreeBoundary
-                fallback={
-                  <View style={styles.meguriSceneLoading}>
-                    <ActivityIndicator color={megrumColors.lavender} />
-                  </View>
-                }
-                onError={() => setHomeThreeFailed(true)}
-              >
-                <MeguriThreeScene
-                  activeId={null}
-                  completedIds={[]}
-                  introPhase="ready"
-                  mode="summary"
-                  onUnavailable={() => setHomeThreeFailed(true)}
-                  presentation="home"
-                  residents={sceneResidents}
-                  self={selfScene}
-                  smilingId={active.id}
-                />
-              </MeguriThreeBoundary>
-            )}
+            <HomeResidentsFallback activeIndex={activeIndex} users={arrivals} />
 
             <View style={styles.speechBubble}>
               <Text style={styles.speechText}>「{active.recent}」</Text>
@@ -1063,8 +985,9 @@ export default function EncountersScreen() {
         </View>
 
         <View style={styles.shortcutGrid}>
-          <ShortcutCard title="広場" subtitle="14人とめぐり" hue="lav" onPress={() => router.push("/meguri-plaza")} />
+          <ShortcutCard title="メッセージ" subtitle={`${lockedLetters}件の未読`} hue="lav" onPress={() => router.push("/meguri-letters")} />
           <ShortcutCard title="マップ" subtitle="47 都道府県" hue="sky" onPress={() => router.push("/meguri-map")} />
+          <ShortcutCard title="掲示板" subtitle="現地の情報共有" hue="mint" onPress={() => router.push("/meguri-board")} />
           <ShortcutCard title="実績" subtitle="3 / 4 達成" hue="pink" onPress={() => router.push("/meguri-achievements")} />
           <ShortcutCard title="今日のレポート" subtitle="軽く振り返り" hue="butter" onPress={() => router.push("/meguri-report")} />
         </View>
@@ -1153,16 +1076,6 @@ export default function EncountersScreen() {
       />
     </Screen>
   );
-}
-
-function toHomeSceneResident(user: MeguriUser): MeguriSceneResident {
-  return {
-    animalType: user.animalType,
-    furColor: user.furColor,
-    hue: user.hue,
-    id: user.id,
-    name: user.name,
-  };
 }
 
 function groomAuthorName(post: GroomPost) {
@@ -3661,8 +3574,8 @@ export function MeguriSettingsModal({
             <SettingRow
               icon="sparkles-outline"
               onPress={onAvatarEdit}
-              subtitle="動物・毛色など"
-              title="アバター編集"
+              subtitle="アイコン・色味など"
+              title="アイコン編集"
             />
             <SettingRow
               icon="create-outline"

@@ -4,6 +4,243 @@
 
 ---
 
+## イテレーション168.74：郵送交換とスポット掲示板をiOSへ実装
+
+### 背景・問題意識
+
+オーナーから、交換手段として **現地交換に加えて郵送交換を使えるようにしたい**、また、めぐり配下に **現地の情報共有・雑談用のスポット掲示板** を実装したいという指示があった。加えて、めぐりトップからは3D演出を外し、軽い2D導線で新機能へ入れるように整理する必要があった。リリース直前のため、既存の交換フローを大きく壊さずに、`hand / mail` の分岐と掲示板MVPを差し込む実装が求められた。
+
+### 変更内容
+
+#### `mobile/app/proposal-select.tsx`
+- 打診作成の先頭に `現地交換 / 郵送交換` の segmented control を追加した。
+- `exchange_method` を revision 読み込み・次画面遷移へ乗せ、`mail` の時は待ち合わせ候補を必須にしない分岐へ変えた。
+- 郵送時の説明文を追加し、住所登録確認が次画面で行われる導線にした。
+
+#### `mobile/app/proposal-confirm.tsx`
+- `exchange_method` ごとに送信確認内容を出し分け、`mail` の時は待ち合わせカードとスケジュール共有トグルを隠すようにした。
+- 送信前に `user_mailing_addresses` を読み、未登録なら送信を止めて `address-settings` 導線を出すようにした。
+- `proposals.exchange_method` を insert / update へ含める互換処理を追加した。
+
+#### `mobile/app/address-settings.tsx`
+- 郵送交換用の住所設定画面を新規追加した。
+- 宛名、郵便番号、都道府県、市区町村、番地、補足住所、電話番号を保存できるようにした。
+- Preview / 未ログイン時はログイン導線へ分岐する。
+
+#### `mobile/app/transaction-detail.tsx`
+- proposal 読み込みに `exchange_method` と住所スナップショット列を含めた。
+- 郵送交換では `MailingAddressBanner` を上部に表示し、合意前は自分の登録状況だけ、合意後は当事者同士の住所を見せるようにした。
+- 郵送交換で合意する時は、双方の住所登録がそろっているか確認し、最終合意時に `sender_mailing_address / receiver_mailing_address` を proposal へ固定するようにした。
+- 郵送交換の合意後は、現地交換向けの現在地・到着・服装写真クイックアクションを出さないようにした。
+
+#### `mobile/app/transaction-approve.tsx`
+- 郵送交換の取引完了確認で「場所未設定」ではなく `郵送交換` と表示するようにした。
+
+#### `mobile/app/(tabs)/profile.tsx`
+- プロフィール配下に `郵送交換 > 住所設定` の入口を追加した。
+
+#### `mobile/app/(tabs)/encounters.tsx`
+- めぐりトップの3Dホームステージをやめ、`HomeResidentsFallback` ベースの2D表示に統一した。
+- ショートカット群へ `掲示板` を追加し、`/meguri-board` へ遷移できるようにした。
+- 設定メニューの `アバター編集` 表記を `アイコン編集` に変更した。
+
+#### `mobile/app/meguri-board.tsx`
+- めぐり配下のスポット掲示板一覧を追加した。
+- `same_spot / same_prefecture / global` の3つの公開範囲でセクション分けし、スレ立てモーダルから投稿できるようにした。
+- Preview / ローカル fallback でもスレッドが見えるようにした。
+
+#### `mobile/app/meguri-board-thread.tsx`
+- スレッド詳細とチャット形式の返信UIを追加した。
+- 返信送信は Supabase 優先、失敗時はローカル fallback へ保存する。
+
+#### `mobile/src/lib/mailingAddress.ts`
+- 郵送交換の共通型・住所取得・保存・整形ヘルパーを追加した。
+
+#### `mobile/src/lib/meguriBoard.ts`
+- 掲示板スレッド/返信の型、公開範囲判定、preview dataset、AsyncStorage fallback、Supabase read/write を実装した。
+
+#### `supabase/migrations/20260529163000_add_meguri_board.sql`
+- スレッド / 返信テーブル、reply count 更新 trigger、公開範囲ベースの最小 RLS を定義した。
+
+#### `supabase/migrations/20260529170000_add_mail_exchange_support.sql`
+- `user_mailing_addresses` テーブル、proposal の `exchange_method` と住所スナップショット列、郵送時の meetup 制約緩和を追加した。
+
+#### `notes/05_data_model.md`
+- `user_mailing_addresses` の実装前提を「案」から実装済み仕様へ寄せ、proposal 住所スナップショット列を追記した。
+
+### 影響範囲
+
+- iOS版の打診作成〜送信確認〜取引チャット〜取引完了確認
+- iOS版プロフィールの設定導線
+- iOS版めぐりトップ / 掲示板一覧 / 掲示板スレッド
+- Supabase の proposal / postal / meguri board 関連テーブル
+
+### 確認方法
+- `npm --prefix mobile run typecheck`
+- `git diff --check`
+- iOS Preview で `めぐり > 掲示板`、`プロフィール > 住所設定`、`打診 > 郵送交換` を確認
+
+### 関連ファイル
+- `mobile/app/proposal-select.tsx`
+- `mobile/app/proposal-confirm.tsx`
+- `mobile/app/address-settings.tsx`
+- `mobile/app/transaction-detail.tsx`
+- `mobile/app/transaction-approve.tsx`
+- `mobile/app/meguri-board.tsx`
+- `mobile/app/meguri-board-thread.tsx`
+- `mobile/app/(tabs)/encounters.tsx`
+- `mobile/src/lib/mailingAddress.ts`
+- `mobile/src/lib/meguriBoard.ts`
+- `supabase/migrations/20260529163000_add_meguri_board.sql`
+- `supabase/migrations/20260529170000_add_mail_exchange_support.sql`
+
+### セルフレビュー結果
+- ✅ `npm --prefix mobile run typecheck` 通過
+- ⏳ DB migration の適用前は、郵送交換の住所固定と掲示板の Supabase 永続化は有効にならない
+- ✅ めぐりトップの3D依存は親画面側でも外し、2D導線へ整理した
+
+## イテレーション168.73：めぐりの3D依存を2D表示へ置換
+
+### 背景・問題意識
+
+オーナーから、めぐり体験は残しつつ **3Dアバター / 3D演出をなくしたい** という実装指示があった。並行作業中のため、`mobile/app/(tabs)/encounters.tsx` には触れず、担当範囲の画面だけで3D依存を切り離し、既存の軽量なアバター表現へ寄せる必要があった。加えて、ユーザー向け文言で「気配」という表現を使わない補足指示も入り、担当画面の表示テキストを自然な言い回しへ調整した。
+
+### 変更内容
+
+#### `mobile/app/meguri-intro.tsx`
+- `MeguriThreeScene` / `MeguriThreeBoundary` 依存を外し、既存の `WalkingCard` ベースの2D導入ステージへ統一した。
+- 完了導線を `/meguri-map` に合わせて「めぐりマップ」表現へ寄せた。
+- fallback 文言の「気配」を「同じ推しの人に会えて」へ置き換えた。
+
+#### `mobile/app/meguri-plaza.tsx`
+- 広場の表示を `PlazaFallback` ベースの2D一覧へ切り替え、3Dステージと読み込み境界を削除した。
+- 各ユーザーのタップ対象アクセシビリティ文言を「キャラクター」ではなく「プロフィール」へ調整した。
+
+#### `mobile/app/meguri-profile.tsx`
+- 3Dアバター表示をやめ、`MeguriAvatarFace` を使った静的な公開アイコン表示へ変更した。
+- プロフィールヒーロー内の見せ方を、色付きのハロー + 公開アイコン表示に整理した。
+
+#### `mobile/app/meguri-avatar-edit.tsx`
+- 3Dプレビューを廃止し、選択中のどうぶつ / 毛色が分かる2Dプレビューへ差し替えた。
+- 既存の保存フローと色・どうぶつ選択UIは維持した。
+
+#### `mobile/app/meguri-letters.tsx`
+- 会話一覧の先頭アバターから `MeguriThreeScene` 依存を外し、`MeguriAvatarFace` へ統一した。
+- 3D用のクリップ / ズーム用スタイルを削除した。
+
+#### `mobile/src/components/meguri/GroomProfileSlidePanel.tsx`
+- スライドプロフィールのヒーローを `MeguriAvatarFace` ベースの2D表示へ変更した。
+- 3D失敗時の fallback 分岐をなくし、公開アイコン + スタイル表示の静的UIへ整理した。
+
+#### `notes/10_glossary.md`
+- めぐり関連の用語定義から3D前提の説明を外し、現行の2D UI前提の説明へ更新した。
+- 旧称として `めぐり3D演出` を廃止用語へ追加した。
+
+### 影響範囲
+
+- めぐり導入画面
+- めぐり広場
+- めぐりプロフィール
+- めぐりアバター編集
+- めぐりメッセージ一覧
+- グルームから開くめぐりプロフィール
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- iOS Preview / Expo で `meguri-intro` / `meguri-plaza` / `meguri-profile` / `meguri-avatar-edit` / `meguri-letters` を開き、3D読み込み待ちや fallback が出ず、2Dアイコンで表示されることを確認
+- 会話一覧・導入文言に「気配」が残っていないことを確認
+
+### 関連ファイル
+
+- `mobile/app/meguri-intro.tsx`
+- `mobile/app/meguri-plaza.tsx`
+- `mobile/app/meguri-profile.tsx`
+- `mobile/app/meguri-avatar-edit.tsx`
+- `mobile/app/meguri-letters.tsx`
+- `mobile/src/components/meguri/GroomProfileSlidePanel.tsx`
+- `notes/10_glossary.md`
+
+### セルフレビュー結果
+
+- ✅ 担当範囲の画面から `MeguriThreeScene` / `MeguriThreeBoundary` 依存を外した
+- ✅ `MeguriAvatarFace` / `WalkingCard` を使って、めぐり体験は残したまま2D表示へ置き換えた
+- ✅ ユーザー向け文言の `気配` を担当範囲から除去した
+- ✅ 状態追加・削除はないため `notes/09_state_machines.md` の更新は不要
+
+---
+
+## イテレーション168.73：めぐり掲示板MVPのiOS画面と土台を追加
+
+### 背景・問題意識
+
+オーナーから、めぐり配下に「現地の情報共有・雑談」向けのスポット掲示板MVPを入れたいという実装依頼があり、担当範囲として `mobile/app/meguri-board.tsx` / `meguri-board-thread.tsx` / `mobile/src/lib/meguriBoard.ts` と必要に応じた migration / notes 更新が指定された。親の `encounters.tsx` は別担当のため触らず、新規画面として差し込める形で完結させる必要があった。
+
+### 変更内容
+
+#### `mobile/src/lib/meguriBoard.ts`
+- スポット掲示板のスレッド・返信型を追加した。
+- `previewMode` / Supabase未設定 / 未ログインでも動くよう、`AsyncStorage` ベースのローカルfallbackと preview データを実装した。
+- Supabase が使える時は `meguri_board_threads` / `meguri_board_replies` を読む実装を追加した。
+- 公開範囲は MVP として `same_spot` / `same_prefecture` / `global` の3択にした。
+
+#### `mobile/app/meguri-board.tsx`
+- 掲示板一覧画面を追加した。
+- スレッド一覧、公開範囲ごとのセクション表示、スレ立てモーダルを実装した。
+- iOS標準寄せとして `SegmentedControl` で公開範囲を選べるようにした。
+
+#### `mobile/app/meguri-board-thread.tsx`
+- スレッド詳細画面を追加した。
+- 元投稿をカード表示し、その下にチャット形式の返信一覧と返信 composer を実装した。
+
+#### `supabase/migrations/20260529163000_add_meguri_board.sql`
+- `meguri_board_threads` / `meguri_board_replies` と最小RLSを追加した。
+- `reply_count` / `latest_reply_preview` / `latest_activity_at` を返信insertで更新する trigger を追加した。
+- `same_spot` は MVP では exact spot をRLSで持たず、author / global / same prefecture をサーバー側の最小防壁にした。
+
+#### `notes/05_data_model.md`
+- 掲示板スレッドと返信テーブルを追加し、MVPの簡略化方針も明記した。
+
+#### `notes/10_glossary.md`
+- 既存の「掲示板の公開範囲」定義に、MVPの enum (`same_spot` / `same_prefecture` / `global`) を追記した。
+
+#### `notes/13_api_spec.md`
+- 掲示板一覧 / スレッド作成 / スレッド詳細 / 返信作成の draft API を追加した。
+- 未確定項目を「ユーザー像」から「current spot の永続化」へ更新した。
+
+### 影響範囲
+
+- めぐり配下の新規掲示板体験
+- preview fallback と Supabase両対応の掲示板データ層
+- 掲示板MVPのデータモデル / API draft
+
+### 確認方法
+
+- [mobile/app/meguri-board.tsx](/Users/michitaka/Desktop/Megrum/mobile/app/meguri-board.tsx) を開き、一覧とスレ立てUIが存在することを確認
+- [mobile/app/meguri-board-thread.tsx](/Users/michitaka/Desktop/Megrum/mobile/app/meguri-board-thread.tsx) を開き、チャット形式の返信UIがあることを確認
+- `npm --prefix mobile run typecheck`
+  - 掲示板追加分の型エラーは解消済み
+  - ただし現時点では別担当差分由来で `transaction-detail.tsx` / `src/lib/mailingAddress.ts` の既存エラーが残る
+
+### 関連ファイル
+
+- `mobile/app/meguri-board.tsx`
+- `mobile/app/meguri-board-thread.tsx`
+- `mobile/src/lib/meguriBoard.ts`
+- `supabase/migrations/20260529163000_add_meguri_board.sql`
+- `notes/05_data_model.md`
+- `notes/10_glossary.md`
+- `notes/13_api_spec.md`
+
+### セルフレビュー結果
+
+- ✅ 交換成立用ではなく、現地の情報共有・雑談向けの掲示板として分離できた
+- ✅ preview fallback でもスレ立て・返信の最低限が動く形にした
+- ✅ 新規データモデル追加があるため `notes/05_data_model.md` を更新した
+- ✅ 用語の具体化があるため `notes/10_glossary.md` を更新した
+- ✅ 新規状態 machine は増やしていないため `notes/09_state_machines.md` は今回更新不要
+- ⚠️ `same_spot` の exact 判定は current spot 永続化が未整備のため、MVPではクライアント `spot_key` 比較 + RLSは same prefecture 近似に留めた
+
 ## イテレーション168.72：掲示板を現地スレッドとして定義
 
 ### 背景・問題意識

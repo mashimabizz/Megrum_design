@@ -3,11 +3,7 @@ import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from
 import { router } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { IconSymbol } from "../src/components/IconSymbol";
-import {
-  MeguriThreeBoundary,
-  MeguriThreeScene,
-  type MeguriSceneResident,
-} from "../src/components/meguri/MeguriThreeScene";
+import { MeguriAvatarFace } from "../src/components/meguri/MeguriAvatarFace";
 import { megrumColors, megrumShadow } from "../src/theme/tokens";
 import {
   DEFAULT_MEGURI_AVATAR,
@@ -32,27 +28,16 @@ const FURS: Array<{ id: MeguriAvatarSettings["furColor"]; label: string; color: 
   { id: "gray", label: "グレー", color: "#bfc3cb", hue: "sky" },
 ];
 
-const SELF: MeguriSceneResident = {
-  animalType: "rabbit",
-  furColor: "lavender",
-  hue: "lav",
-  id: "me",
-  name: "あなた",
-};
-
 export default function MeguriAvatarEditScreen() {
   const insets = useSafeAreaInsets();
   const [settings, setSettings] = useState<MeguriAvatarSettings | null>(null);
-  const [threeFailed, setThreeFailed] = useState(false);
-  const resident = useMemo<MeguriSceneResident | null>(
-    () => settings ? ({
-      animalType: settings.animalType,
-      furColor: settings.furColor,
-      hue: settings.hue,
-      id: "preview",
-      name: "あなた",
-    }) : null,
-    [settings],
+  const selectedAnimalLabel = useMemo(
+    () => ANIMALS.find((animal) => animal.id === settings?.animalType)?.label ?? "アバター",
+    [settings?.animalType],
+  );
+  const selectedFurLabel = useMemo(
+    () => FURS.find((fur) => fur.id === settings?.furColor)?.label ?? "",
+    [settings?.furColor],
   );
 
   useEffect(() => {
@@ -88,28 +73,20 @@ export default function MeguriAvatarEditScreen() {
         </View>
 
         <View style={styles.preview}>
-          {!settings || !resident ? (
+          {!settings ? (
             <ActivityIndicator color={megrumColors.lavender} />
-          ) : threeFailed ? (
-            <Text style={styles.fallbackText}>3Dプレビューを準備できませんでした</Text>
           ) : (
-            <MeguriThreeBoundary
-              fallback={<Text style={styles.fallbackText}>3Dプレビューを準備できませんでした</Text>}
-              onError={() => setThreeFailed(true)}
-            >
-              <MeguriThreeScene
-                activeId={null}
-                completedIds={[]}
-                focusedId={resident.id}
-                introPhase="ready"
-                mode="summary"
-                onUnavailable={() => setThreeFailed(true)}
-                presentation="profile"
-                residents={[resident]}
-                self={SELF}
-                smilingId={resident.id}
+            <View style={styles.previewInner}>
+              <View style={styles.previewHalo} />
+              <MeguriAvatarFace
+                animalType={settings.animalType}
+                furColor={settings.furColor}
+                hue={settings.hue}
+                size={160}
               />
-            </MeguriThreeBoundary>
+              <Text style={styles.previewLabel}>{selectedAnimalLabel}</Text>
+              <Text style={styles.previewMeta}>{selectedFurLabel}</Text>
+            </View>
           )}
         </View>
 
@@ -187,18 +164,35 @@ const styles = StyleSheet.create({
     fontWeight: "900",
   },
   preview: {
+    alignItems: "center",
     backgroundColor: "#c9f1ff",
     borderRadius: 28,
     height: 310,
+    justifyContent: "center",
     overflow: "hidden",
     ...megrumShadow,
   },
-  fallbackText: {
-    color: megrumColors.mutedInk,
-    fontSize: 13,
+  previewInner: {
+    alignItems: "center",
+    gap: 6,
+  },
+  previewHalo: {
+    backgroundColor: "rgba(255,255,255,0.42)",
+    borderRadius: 999,
+    height: 188,
+    position: "absolute",
+    width: 188,
+  },
+  previewLabel: {
+    color: megrumColors.ink,
+    fontSize: 18,
     fontWeight: "900",
-    padding: 24,
-    textAlign: "center",
+    marginTop: 14,
+  },
+  previewMeta: {
+    color: megrumColors.mutedInk,
+    fontSize: 12,
+    fontWeight: "800",
   },
   sectionTitle: {
     color: megrumColors.ink,

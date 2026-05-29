@@ -4,7 +4,7 @@
 > 実装の正解集。`09_state_machines.md` と完全に整合させ、`10_glossary.md` の用語を使う。
 
 最終更新: 2026-05-29
-ステータス: Draft v2.15（iter168.71 郵送交換ドラフトを追加）
+ステータス: Draft v2.16（iter168.73 スポット掲示板MVPを追加）
 
 ## 最新化履歴
 
@@ -27,6 +27,8 @@
 | **v2.13** | **2026-05-24** | **iter166 反映（admin_roles / admin_audit_logs / user_entitlements / plan_overrides / stripe_webhook_events と subscriptions 実テーブルを追加。管理者ページ・有料権限・Stripe webhookの土台を定義）** |
 | **v2.14** | **2026-05-25** | **iter168.43 反映（めぐりPlusを `user_entitlements(feature_key='meguri_plus')` に分離。`meguri_messages` 本文/画像は無料受信者へ直接返さず、専用RPCでロック済みメタ情報だけ返す）** |
 | **v2.15** | **2026-05-29** | **iter168.71 反映（郵送交換を交換手段に再追加。住所テーブル案、proposal.exchange_method、待ち合わせ必須条件の分岐、未確定項目を追記）** |
+| **v2.16** | **2026-05-29** | **iter168.73 反映（めぐり配下のスポット掲示板MVPを追加。`meguri_board_threads` / `meguri_board_replies` と scope=`same_spot|same_prefecture|global`、ローカルfallback前提の最小仕様を定義）** |
+| **v2.17** | **2026-05-29** | **iter168.74 反映（郵送交換MVPを実装。`user_mailing_addresses` 実テーブル、`proposals.sender_mailing_address/receiver_mailing_address` スナップショット、合意時固定ルールを追記）** |
 
 ## このドキュメントの位置付け
 
@@ -311,6 +313,41 @@ iter162.49 で iOS めぐりホームに追加した、写真中心の24時間�
 `notifications.kind='meguri_message'` と `notifications.meguri_message_id` を追加し、受信者に通知を残す。
 iter168.43 以降、無料受信者に本文・画像パスを直接返さないため、通常表示は `list_meguri_messages_for_viewer()` RPC を使う。直接 `meguri_messages` をSELECTできるのは送信者本人、または `user_entitlements(feature_key='meguri_plus', active=true)` を持つ受信者に限定する。
 
+### `meguri_board_threads`（スポット掲示板スレッド / iter168.73）
+
+めぐり配下で使う、現地の情報共有・雑談向けのスレッド。交換成立のための打診・取引とは切り離し、現地の温度感や列状況、導線、ゆるい雑談を残す。MVPでは exact な「同じスポット」判定は `spot_key` をアプリ側で比較し、DB/RLSでは `author` / `global` / `same prefecture` までを最小防壁にする。
+
+| カラム | 型 | 説明 |
+|---|---|---|
+| `id` | uuid | PK |
+| `author_id` | uuid | → users |
+| `title` | text | 1〜80字 |
+| `body` | text | 1〜500字 |
+| `audience_scope` | text | `same_spot` / `same_prefecture` / `global` |
+| `spot_key` | text nullable | 現在のスポットを表す粗いキー。`same_spot` の時は必須 |
+| `spot_label` | text nullable | 画面表示用のスポット名 |
+| `prefecture` | text nullable | 閲覧判定・表示用の都道府県。`same_prefecture` / `same_spot` の時は必須 |
+| `reply_count` | integer | 返信数のサマリ |
+| `latest_reply_preview` | text nullable | 最新返信の先頭160字 |
+| `latest_activity_at` | timestamptz | スレッド作成または最新返信時刻 |
+| `created_at` / `updated_at` | timestamptz | |
+
+> **MVP簡略化**：サーバー側は `same_spot` を「同じ都道府県までは見える」に寄せ、最終的な exact spot 判定はクライアントの `spot_key` で行う。将来、現在スポットを永続化できたら RLS / RPC 側へ寄せ直す。
+
+### `meguri_board_replies`（スポット掲示板返信 / iter168.73）
+
+スレッド詳細で送るチャット形式の追記返信。MVPではテキストのみ、編集なし、削除なしの append-only とする。
+
+| カラム | 型 | 説明 |
+|---|---|---|
+| `id` | uuid | PK |
+| `thread_id` | uuid | → `meguri_board_threads` |
+| `author_id` | uuid | → users |
+| `body` | text | 1〜1000字 |
+| `created_at` | timestamptz | |
+
+`after insert` trigger で `meguri_board_threads.reply_count / latest_reply_preview / latest_activity_at` を更新する。
+
 ---
 
 ## 3. 在庫・ウィッシュ
@@ -565,6 +602,8 @@ iter28（match_type）/ iter29（数量）/ iter30（7日期限）/ iter32（合
 | `meetup_lat` | numeric(9,6) nullable | iter67.1、緯度（地図上の位置） |
 | `meetup_lng` | numeric(9,6) nullable | iter67.1、経度 |
 | `meetup_candidates` | jsonb default `[]` | iter154.34、交換できる候補（最大3件）。各要素は `{ startAt, endAt, placeName, lat, lng, mode }`。候補1を既存 `meetup_*` 5列へミラーして旧画面・取引チャットと互換 |
+| `sender_mailing_address` | jsonb nullable | iter168.74、`exchange_method='mail'` で合意成立した時点の送信者住所スナップショット |
+| `receiver_mailing_address` | jsonb nullable | iter168.74、`exchange_method='mail'` で合意成立した時点の受信者住所スナップショット |
 | `expose_calendar` | bool default false | iter67 で再定義：送信者が自分の **個人スケジュール（schedules）** を相手に公開する ON/OFF。受信側は受信表示画面で送信者の予定を見られる（取引完了で自動的に RLS 不可）。AW は対象外 |
 | `listing_id` | uuid nullable | iter64、個別募集 (`listings`) 経由の打診ならその id。直接打診なら null |
 | `cash_offer` | bool default false | iter67.7、定価交換打診なら true（receiver_have_ids 空 + cash_amount 必須） |
@@ -577,7 +616,7 @@ CHECK 制約 `proposals_meetup_candidates_array`（iter154.34）：`meetup_candi
 派生ルール：
 - iter153: `status='agreed'` の proposal は、`sender_have_ids` / `receiver_have_ids` と各 qty を市場残数から差し引く。ただし `approved_by_sender` / `approved_by_receiver` が true の側は、取引完了承認処理で実在庫が既に減算されているため二重控除しない。
 - iter153: `sent` / `negotiating` / `agreement_one_side` は在庫確保前の状態として扱い、市場残数からは差し引かない。`agreed` へ遷移する直前にキャパ超過を検証する。
-- iter168.71: `exchange_method='mail'` の時、送信者は `user_mailing_addresses` の登録が必須。合意時点で双方の住所スナップショットを取引側へ固定し、当事者以外には返さない。
+- iter168.74: `exchange_method='mail'` の時、送信者は打診送信前に `user_mailing_addresses` の登録が必須。受信者も合意前に住所登録が必要で、最終合意時に双方の住所スナップショットを `proposals.sender_mailing_address / receiver_mailing_address` へ固定し、当事者以外には返さない。
 
 ⚠️ 要確認：
 - ネゴ中の提案修正で `last_action_at` リセットするか（09 未確定項目#1）

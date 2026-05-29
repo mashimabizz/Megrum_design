@@ -1,31 +1,17 @@
-import { useMemo, useState } from "react";
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { useMemo } from "react";
+import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { router, useLocalSearchParams } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { IconSymbol } from "../src/components/IconSymbol";
-import {
-  MeguriThreeBoundary,
-  MeguriThreeScene,
-  type MeguriSceneResident,
-} from "../src/components/meguri/MeguriThreeScene";
+import { MeguriAvatarFace } from "../src/components/meguri/MeguriAvatarFace";
 import { megrumColors, megrumShadow } from "../src/theme/tokens";
 import { USERS, hueColor, hueTint, type MeguriUser } from "./(tabs)/encounters";
-
-const PROFILE_SELF: MeguriSceneResident = {
-  animalType: "rabbit",
-  furColor: "lavender",
-  hue: "lav",
-  id: "me",
-  name: "あなた",
-};
 
 export default function MeguriProfileScreen() {
   const insets = useSafeAreaInsets();
   const params = useLocalSearchParams<{ id?: string | string[] }>();
   const profileId = Array.isArray(params.id) ? params.id[0] : params.id;
   const user = useMemo(() => USERS.find((item) => item.id === profileId) ?? null, [profileId]);
-  const resident = useMemo(() => (user ? toSceneResident(user) : null), [user]);
-  const [threeFailed, setThreeFailed] = useState(false);
 
   function openMessage() {
     if (!user) return;
@@ -35,7 +21,7 @@ export default function MeguriProfileScreen() {
     });
   }
 
-  if (!user || !resident) {
+  if (!user) {
     return (
       <View style={styles.root}>
         <ScrollView
@@ -79,34 +65,15 @@ export default function MeguriProfileScreen() {
         </View>
 
         <View style={styles.hero}>
-          <View style={styles.avatarStage}>
-            {threeFailed ? (
-              <View style={styles.fallbackAvatar}>
-                <ActivityIndicator color={megrumColors.lavender} />
-              </View>
-            ) : (
-              <MeguriThreeBoundary
-                fallback={
-                  <View style={styles.fallbackAvatar}>
-                    <ActivityIndicator color={megrumColors.lavender} />
-                  </View>
-                }
-                onError={() => setThreeFailed(true)}
-              >
-                <MeguriThreeScene
-                  activeId={null}
-                  completedIds={[]}
-                  focusedId={user.id}
-                  introPhase="ready"
-                  mode="summary"
-                  onUnavailable={() => setThreeFailed(true)}
-                  presentation="profile"
-                  residents={[resident]}
-                  self={PROFILE_SELF}
-                  smilingId={user.id}
-                />
-              </MeguriThreeBoundary>
-            )}
+          <View style={[styles.avatarStage, { backgroundColor: hueTint(user.hue, 0.14) }]}>
+            <View style={[styles.avatarHalo, { backgroundColor: hueTint(user.hue, 0.3) }]} />
+            <MeguriAvatarFace
+              animalType={user.animalType}
+              furColor={user.furColor}
+              hue={user.hue}
+              size={150}
+            />
+            <Text style={styles.avatarCaption}>公開アイコン</Text>
           </View>
 
           <View style={styles.identity}>
@@ -157,16 +124,6 @@ export default function MeguriProfileScreen() {
       </ScrollView>
     </View>
   );
-}
-
-function toSceneResident(user: MeguriUser): MeguriSceneResident {
-  return {
-    animalType: user.animalType,
-    furColor: user.furColor,
-    hue: user.hue,
-    id: user.id,
-    name: user.name,
-  };
 }
 
 function StatTile({
@@ -238,14 +195,22 @@ const styles = StyleSheet.create({
     ...megrumShadow,
   },
   avatarStage: {
-    backgroundColor: "#c9f1ff",
+    alignItems: "center",
     height: 280,
+    justifyContent: "center",
     width: "100%",
   },
-  fallbackAvatar: {
-    alignItems: "center",
-    flex: 1,
-    justifyContent: "center",
+  avatarHalo: {
+    borderRadius: 999,
+    height: 184,
+    position: "absolute",
+    width: 184,
+  },
+  avatarCaption: {
+    color: "rgba(58,50,74,0.56)",
+    fontSize: 12,
+    fontWeight: "900",
+    marginTop: 12,
   },
   emptyProfile: {
     alignItems: "center",

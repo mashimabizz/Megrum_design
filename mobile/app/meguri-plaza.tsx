@@ -1,22 +1,11 @@
-import { useEffect, useMemo, useState } from "react";
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-native";
+import { useMemo, useState } from "react";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 import { router } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { IconSymbol } from "../src/components/IconSymbol";
 import { Screen } from "../src/components/Screen";
-import {
-  MeguriThreeBoundary,
-  MeguriThreeScene,
-  type MeguriSceneResident,
-} from "../src/components/meguri/MeguriThreeScene";
 import { megrumColors } from "../src/theme/tokens";
 import { USERS, WalkingCard, hueColor, type MeguriUser } from "./(tabs)/encounters";
-import {
-  DEFAULT_MEGURI_AVATAR,
-  DEFAULT_MEGURI_PROFILE,
-  loadMeguriAvatarSettings,
-  loadMeguriProfileSettings,
-} from "../src/lib/meguriSettings";
 
 const TOUCH_SPOTS = [
   { left: "12%", top: "19%", bubbleLeft: "7%", bubbleTop: "10%" },
@@ -34,10 +23,7 @@ const TOUCH_SPOTS = [
 export default function MeguriPlazaScreen() {
   const insets = useSafeAreaInsets();
   const plazaUsers = useMemo(() => USERS.slice(0, 10), []);
-  const residents = useMemo(() => plazaUsers.map(toPlazaResident), [plazaUsers]);
-  const [threeFailed, setThreeFailed] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [selfScene, setSelfScene] = useState<MeguriSceneResident | null>(null);
   const selectedUser = plazaUsers.find((user) => user.id === selectedId) ?? null;
   const selectedIndex = selectedUser
     ? Math.max(0, plazaUsers.findIndex((user) => user.id === selectedUser.id))
@@ -51,34 +37,6 @@ export default function MeguriPlazaScreen() {
     });
   }
 
-  useEffect(() => {
-    let mounted = true;
-    Promise.all([loadMeguriAvatarSettings(), loadMeguriProfileSettings()])
-      .then(([avatar, profile]) => {
-        if (!mounted) return;
-        setSelfScene({
-          animalType: avatar.animalType ?? DEFAULT_MEGURI_AVATAR.animalType,
-          furColor: avatar.furColor ?? DEFAULT_MEGURI_AVATAR.furColor,
-          hue: avatar.hue ?? DEFAULT_MEGURI_AVATAR.hue,
-          id: "me",
-          name: profile.displayName || DEFAULT_MEGURI_PROFILE.displayName,
-        });
-      })
-      .catch(() => {
-        if (!mounted) return;
-        setSelfScene({
-          animalType: DEFAULT_MEGURI_AVATAR.animalType,
-          furColor: DEFAULT_MEGURI_AVATAR.furColor,
-          hue: DEFAULT_MEGURI_AVATAR.hue,
-          id: "me",
-          name: DEFAULT_MEGURI_PROFILE.displayName,
-        });
-      });
-    return () => {
-      mounted = false;
-    };
-  }, []);
-
   return (
     <Screen
       bottomInset={false}
@@ -87,55 +45,12 @@ export default function MeguriPlazaScreen() {
       topInset={false}
     >
       <View style={styles.scene}>
-        {!selfScene ? (
-          <View style={styles.sceneLoading}>
-            <ActivityIndicator color={megrumColors.lavender} />
-          </View>
-        ) : threeFailed ? (
-          <View style={styles.sceneLoading}>
-            <ActivityIndicator color={megrumColors.lavender} />
-          </View>
-        ) : (
-          <MeguriThreeBoundary
-            fallback={
-              <View style={styles.sceneLoading}>
-                <ActivityIndicator color={megrumColors.lavender} />
-              </View>
-            }
-            onError={() => setThreeFailed(true)}
-          >
-            <MeguriThreeScene
-              activeId={null}
-              completedIds={[]}
-              focusedId={selectedId}
-              introPhase="ready"
-              mode="summary"
-              onUnavailable={() => setThreeFailed(true)}
-              presentation="plaza"
-              residents={residents}
-              self={selfScene}
-              smilingId={selectedId}
-            />
-          </MeguriThreeBoundary>
-        )}
-
-        <View pointerEvents="box-none" style={styles.touchLayer}>
-          {plazaUsers.map((user, index) => {
-            const spot = TOUCH_SPOTS[index % TOUCH_SPOTS.length];
-            const selected = user.id === selectedId;
-            return (
-              <Pressable
-                key={user.id}
-                accessibilityLabel={`${user.name}のキャラクター`}
-                accessibilityRole="button"
-                onPress={() => setSelectedId(user.id)}
-                style={[styles.hotspot, { left: spot.left, top: spot.top }]}
-              >
-                {selected ? <View style={styles.focusRing} /> : null}
-              </Pressable>
-            );
-          })}
-        </View>
+        <PlazaFallback
+          onOpenDetail={openDetail}
+          onSelect={setSelectedId}
+          selectedId={selectedId}
+          users={plazaUsers}
+        />
 
         {selectedUser && selectedSpot ? (
           <View
@@ -171,16 +86,6 @@ export default function MeguriPlazaScreen() {
   );
 }
 
-function toPlazaResident(user: MeguriUser): MeguriSceneResident {
-  return {
-    animalType: user.animalType,
-    furColor: user.furColor,
-    hue: user.hue,
-    id: user.id,
-    name: user.name,
-  };
-}
-
 function PlazaFallback({
   onOpenDetail,
   onSelect,
@@ -201,6 +106,7 @@ function PlazaFallback({
         return (
           <Pressable
             key={user.id}
+            accessibilityLabel={`${user.name}のプロフィール`}
             accessibilityRole="button"
             onLongPress={() => onOpenDetail(user)}
             onPress={() => onSelect(user.id)}
@@ -231,33 +137,6 @@ const styles = StyleSheet.create({
     flex: 1,
     overflow: "hidden",
     position: "relative",
-  },
-  sceneLoading: {
-    alignItems: "center",
-    flex: 1,
-    justifyContent: "center",
-  },
-  touchLayer: {
-    ...StyleSheet.absoluteFillObject,
-  },
-  hotspot: {
-    alignItems: "center",
-    height: 102,
-    justifyContent: "center",
-    marginLeft: -40,
-    marginTop: -50,
-    position: "absolute",
-    width: 80,
-  },
-  focusRing: {
-    borderColor: "#fff",
-    borderRadius: 22,
-    borderWidth: 3,
-    height: 54,
-    shadowColor: "#2b9b5f",
-    shadowOpacity: 0.28,
-    shadowRadius: 10,
-    width: 54,
   },
   topBar: {
     alignItems: "center",

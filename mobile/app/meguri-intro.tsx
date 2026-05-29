@@ -13,13 +13,6 @@ import {
   displayPrefectureName,
   normalizePrefectureName,
 } from "../src/data/japanPrefectures";
-import {
-  MeguriThreeBoundary,
-  MeguriThreeScene,
-  type MeguriIntroPhase,
-  type MeguriSceneMode,
-  type MeguriSceneResident,
-} from "../src/components/meguri/MeguriThreeScene";
 import { megrumColors } from "../src/theme/tokens";
 import {
   USERS,
@@ -39,7 +32,7 @@ const AREA_UNLOCK_MAP_SCALE = 0.62;
 const fallbackHitokoto = [
   "今日はゆるっと推し活しています",
   "最近の供給をゆっくり味わっています",
-  "同じ推しの気配に少し元気をもらいました",
+  "同じ推しの人に会えて少し元気をもらいました",
 ];
 const farewellLines = [
   "またお会いしましょう！",
@@ -76,6 +69,9 @@ type AreaUnlock = {
   unlockedAreas: string[];
 };
 
+type MeguriIntroPhase = "camera" | "splash" | "walking" | "ready";
+type MeguriSceneMode = "summary" | "approaching" | "dialogue" | "exiting" | "done";
+
 export default function MeguriIntroScreen() {
   const insets = useSafeAreaInsets();
   const arrivals = USERS.slice(0, MAX_CHUNK_SIZE);
@@ -89,7 +85,6 @@ export default function MeguriIntroScreen() {
   const [unlockedAreas, setUnlockedAreas] = useState<Set<string>>(() => new Set());
   const [introPhase, setIntroPhase] = useState<MeguriIntroPhase>("camera");
   const [mode, setMode] = useState<MeguriSceneMode>("summary");
-  const [threeFailed, setThreeFailed] = useState(false);
   const active = arrivals[activeIndex] ?? null;
   const done = mode === "done";
   const currentLines = useMemo(
@@ -97,9 +92,6 @@ export default function MeguriIntroScreen() {
     [active, selfUser],
   );
   const currentLine = currentLines[dialogueIndex] ?? null;
-  const residents = useMemo(() => arrivals.map(toSceneResident), [arrivals]);
-  const self = useMemo(() => (selfUser ? toSceneResident(selfUser) : null), [selfUser]);
-  const activeId = mode === "summary" || done ? null : active?.id ?? null;
   const progressText = done
     ? `${arrivals.length} / ${arrivals.length}`
     : mode === "summary"
@@ -112,26 +104,7 @@ export default function MeguriIntroScreen() {
     mode === "exiting" ||
     Boolean(areaUnlock) ||
     (mode === "summary" && introPhase === "camera");
-  const headerTitle = getSceneHeaderTitle(mode, introPhase, done, arrivals.length);
   const showPrimary = mode === "done";
-  const speakingId =
-    mode === "dialogue" && currentLine
-      ? currentLine.speaker === "me"
-        ? self?.id ?? null
-        : active?.id ?? null
-      : null;
-  const smilingId =
-    mode === "dialogue" && currentLine
-      ? currentLine.kind === "farewell"
-        ? active?.id ?? null
-        : !bubbleReady
-          ? speakingId
-          : null
-      : null;
-  const wavingId =
-    mode === "dialogue" && currentLine?.kind === "farewell"
-      ? active?.id ?? null
-      : null;
 
   useEffect(() => {
     if (!selfUser) return undefined;
@@ -210,7 +183,7 @@ export default function MeguriIntroScreen() {
   }
 
   function advance() {
-    if (!self) return;
+    if (!selfUser) return;
     if (areaUnlock) {
       closeAreaUnlock();
       return;
@@ -261,7 +234,7 @@ export default function MeguriIntroScreen() {
         setRevealSignal((current) => current + 1);
         return;
       }
-      router.replace("/meguri-plaza");
+      router.replace("/meguri-map");
     }
   }
 
@@ -287,45 +260,17 @@ export default function MeguriIntroScreen() {
         onPress={advance}
         style={styles.scene}
       >
-        {mode === "summary" && introPhase !== "camera" ? (
-          <MeguriSplash count={arrivals.length} />
-        ) : headerTitle ? (
-          <View style={[styles.sceneHeader, { top: topInset + 70 }]}>
-            <Text style={styles.sceneTitle}>{headerTitle}</Text>
-          </View>
-        ) : null}
+        {mode === "summary" && introPhase !== "camera" ? <MeguriSplash count={arrivals.length} /> : null}
 
         <View style={styles.stageShell}>
-          {threeFailed ? (
-            <View style={styles.threeUnavailable}>
-              <ActivityIndicator color={megrumColors.lavender} />
-              <Text style={styles.threeUnavailableText}>3Dアバターを読み込んでいます</Text>
-            </View>
-          ) : (
-            <MeguriThreeBoundary
-              fallback={
-                <View style={styles.threeUnavailable}>
-                  <ActivityIndicator color={megrumColors.lavender} />
-                  <Text style={styles.threeUnavailableText}>3Dアバターを読み込んでいます</Text>
-                </View>
-              }
-              onError={() => setThreeFailed(true)}
-            >
-              <MeguriThreeScene
-                activeId={activeId}
-                completedIds={completedIds}
-                introPhase={introPhase}
-                mode={mode}
-                onUnavailable={() => setThreeFailed(true)}
-                residents={residents}
-                self={self}
-                smilingId={smilingId}
-                speaking={Boolean(speakingId) && !bubbleReady}
-                speakingId={speakingId}
-                wavingId={wavingId}
-              />
-            </MeguriThreeBoundary>
-          )}
+          <MeguriFallbackScene
+            active={active}
+            completedIds={completedIds}
+            done={done}
+            introPhase={introPhase}
+            residents={arrivals}
+            selfUser={selfUser ?? SELF_USER}
+          />
         </View>
       </Pressable>
 
@@ -361,11 +306,9 @@ export default function MeguriIntroScreen() {
           <SpeechBubble
             currentLine={currentLine}
             done={done}
-            mode={mode}
             onReadyChange={setBubbleReady}
             partner={active}
             revealSignal={revealSignal}
-            threeFailed={threeFailed}
           />
         ) : null}
       </Pressable>
@@ -381,7 +324,7 @@ export default function MeguriIntroScreen() {
             locked ? styles.primaryDisabled : null,
           ]}
         >
-          <Text style={styles.primaryText}>{buttonLabel(mode, introPhase)}</Text>
+          <Text style={styles.primaryText}>{buttonLabel(mode)}</Text>
         </Pressable>
       ) : null}
 
@@ -433,7 +376,7 @@ function pickFarewell(id: string) {
   return farewellLines[seed % farewellLines.length];
 }
 
-function buttonLabel(mode: MeguriSceneMode, introPhase: MeguriIntroPhase) {
+function buttonLabel(mode: MeguriSceneMode) {
   switch (mode) {
     case "summary":
       return "";
@@ -442,48 +385,24 @@ function buttonLabel(mode: MeguriSceneMode, introPhase: MeguriIntroPhase) {
     case "dialogue":
       return "次へ";
     case "exiting":
-      return "広場へ移動中…";
+      return "マップをひらいています…";
     case "done":
-      return "めぐり広場へ";
+      return "めぐりマップへ";
   }
-}
-
-function getSceneHeaderTitle(
-  mode: MeguriSceneMode,
-  introPhase: MeguriIntroPhase,
-  done: boolean,
-  count: number,
-) {
-  if (done || mode === "summary" || mode === "approaching" || mode === "exiting") return null;
-  return null;
-}
-
-function toSceneResident(user: MeguriUser): MeguriSceneResident {
-  return {
-    animalType: user.animalType,
-    furColor: user.furColor,
-    hue: user.hue,
-    id: user.id,
-    name: user.name,
-  };
 }
 
 function SpeechBubble({
   currentLine,
   done,
-  mode,
   onReadyChange,
   partner,
   revealSignal,
-  threeFailed,
 }: {
   currentLine: DialogueLine | null;
   done: boolean;
-  mode: MeguriSceneMode;
   onReadyChange: (ready: boolean) => void;
   partner: MeguriUser | null;
   revealSignal: number;
-  threeFailed: boolean;
 }) {
   const bubbleAnim = useRef(new Animated.Value(0)).current;
   const caretAnim = useRef(new Animated.Value(0)).current;
@@ -498,12 +417,12 @@ function SpeechBubble({
     : currentLine?.speaker ?? "partner";
   const isMe = speaker === "me";
   const speakerLabel = done
-    ? "めぐり広場"
+    ? "めぐりマップ"
     : isMe
       ? "自分"
       : `@${partner?.id} さん`;
   const body = done
-    ? "今日のめぐりが広場に入りました。"
+    ? "今日のめぐりがマップに記録されました。"
     : currentLine?.body;
   const visibleBody = (body ?? "").slice(0, visibleCount);
   const textComplete = Boolean(body) && visibleCount >= (body ?? "").length;
@@ -587,7 +506,6 @@ function SpeechBubble({
 
   return (
     <View style={styles.speechWrap}>
-      {threeFailed ? <Text style={styles.fallbackNote}>2D表示で再生中</Text> : null}
       <Animated.View
         style={[
           styles.speechBubble,
@@ -980,12 +898,14 @@ function MeguriFallbackScene({
   done,
   introPhase,
   residents,
+  selfUser,
 }: {
   active: MeguriUser | null;
   completedIds: string[];
   done: boolean;
   introPhase: MeguriIntroPhase;
   residents: MeguriUser[];
+  selfUser: MeguriUser;
 }) {
   const visible =
     introPhase === "splash"
@@ -995,10 +915,10 @@ function MeguriFallbackScene({
   return (
     <View style={styles.fallbackScene}>
       <View style={styles.fallbackGate}>
-        <Text style={styles.fallbackGateText}>広場</Text>
+        <Text style={styles.fallbackGateText}>MAP</Text>
       </View>
       <View style={styles.selfSpot}>
-        <WalkingCard user={SELF_USER} size={76} active />
+        <WalkingCard user={selfUser} size={76} active />
         <Text style={styles.smallLabel}>自分</Text>
       </View>
       <View style={styles.fallbackQueue}>
@@ -1136,32 +1056,6 @@ const styles = StyleSheet.create({
     lineHeight: 31,
     textAlign: "center",
   },
-  sceneHeader: {
-    alignItems: "center",
-    gap: 4,
-    position: "absolute",
-    width: "100%",
-    zIndex: 2,
-  },
-  sceneEyebrow: {
-    color: "#157a9a",
-    fontSize: 11,
-    fontWeight: "900",
-    letterSpacing: 1.6,
-    textShadowColor: "rgba(255,255,255,0.9)",
-    textShadowOffset: { height: 1, width: 0 },
-    textShadowRadius: 2,
-  },
-  sceneTitle: {
-    color: "#166c88",
-    fontSize: 25,
-    fontWeight: "900",
-    lineHeight: 31,
-    textAlign: "center",
-    textShadowColor: "rgba(255,255,255,0.95)",
-    textShadowOffset: { height: 2, width: 0 },
-    textShadowRadius: 3,
-  },
   stageShell: {
     flex: 1,
   },
@@ -1243,17 +1137,6 @@ const styles = StyleSheet.create({
     fontWeight: "900",
     lineHeight: 18,
     marginTop: 2,
-  },
-  fallbackNote: {
-    alignSelf: "flex-start",
-    backgroundColor: hueTint("sky", 0.26),
-    borderRadius: 999,
-    color: megrumColors.ink,
-    fontSize: 11,
-    fontWeight: "900",
-    marginBottom: 2,
-    paddingHorizontal: 9,
-    paddingVertical: 4,
   },
   primary: {
     alignItems: "center",
@@ -1472,17 +1355,6 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     position: "relative",
-  },
-  threeUnavailable: {
-    alignItems: "center",
-    flex: 1,
-    gap: 10,
-    justifyContent: "center",
-  },
-  threeUnavailableText: {
-    color: "rgba(58,50,74,0.58)",
-    fontSize: 12,
-    fontWeight: "800",
   },
   fallbackGate: {
     alignItems: "center",

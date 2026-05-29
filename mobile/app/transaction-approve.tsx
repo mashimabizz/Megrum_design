@@ -13,6 +13,11 @@ import { useAuth } from "../src/auth/AuthProvider";
 import { PrimaryButton } from "../src/components/PrimaryButton";
 import { RouteHeader } from "../src/components/RouteHeader";
 import { Screen } from "../src/components/Screen";
+import {
+  exchangeMethodLabel,
+  normalizeExchangeMethod,
+  type ExchangeMethod,
+} from "../src/lib/mailingAddress";
 import { supabase } from "../src/lib/supabase";
 import { approveCompletion } from "../src/lib/transactionActions";
 import { megrumColors, megrumRadii, megrumShadow } from "../src/theme/tokens";
@@ -22,10 +27,12 @@ type ProposalRow = {
   sender_id: string;
   receiver_id: string;
   status: string;
+  evidence_photo_url: string | null;
   evidence_taken_at: string | null;
   approved_by_sender: boolean | null;
   approved_by_receiver: boolean | null;
   meetup_place_name: string | null;
+  exchange_method: string | null;
   sender_have_ids: string[] | null;
   sender_have_qtys: number[] | null;
   receiver_have_ids: string[] | null;
@@ -61,6 +68,7 @@ type ApproveData = {
   photos: EvidencePhoto[];
   photoTakenAt: string | null;
   placeName: string | null;
+  exchangeMethod: ExchangeMethod;
   rows: ApproveRow[];
   partnerHandle: string;
   myApproved: boolean;
@@ -186,7 +194,9 @@ export default function TransactionApproveScreen() {
                   {selectedPhoto?.photographerLabel ?? "撮影者不明"}
                 </Text>
                 <Text numberOfLines={1} style={styles.photoMetaText}>
-                  {data.placeName ?? "場所未設定"}
+                  {data.exchangeMethod === "mail"
+                    ? exchangeMethodLabel(data.exchangeMethod)
+                    : data.placeName ?? "場所未設定"}
                 </Text>
               </View>
             </View>
@@ -287,7 +297,8 @@ async function fetchApproveData(proposalId: string, userId: string): Promise<App
     .select(
       `id, sender_id, receiver_id, status,
        evidence_taken_at, approved_by_sender, approved_by_receiver,
-       meetup_place_name, sender_have_ids, sender_have_qtys,
+       evidence_photo_url,
+       meetup_place_name, exchange_method, sender_have_ids, sender_have_qtys,
        receiver_have_ids, receiver_have_qtys`,
     )
     .eq("id", proposalId)
@@ -312,6 +323,15 @@ async function fetchApproveData(proposalId: string, userId: string): Promise<App
     taken_at: string;
     taken_by: string | null;
   }[] | null) ?? []);
+  if (rawPhotos.length === 0 && proposal.evidence_photo_url) {
+    rawPhotos.push({
+      id: "legacy-evidence",
+      photo_url: proposal.evidence_photo_url,
+      position: 1,
+      taken_at: proposal.evidence_taken_at ?? new Date().toISOString(),
+      taken_by: null,
+    });
+  }
   if (rawPhotos.length === 0) throw new Error("NO_PHOTOS");
 
   const isMeSender = proposal.sender_id === userId;
@@ -354,6 +374,7 @@ async function fetchApproveData(proposalId: string, userId: string): Promise<App
     photos,
     photoTakenAt: proposal.evidence_taken_at,
     placeName: proposal.meetup_place_name,
+    exchangeMethod: normalizeExchangeMethod(proposal.exchange_method),
     rows: [
       {
         side: isMeSender ? "them" : "me",

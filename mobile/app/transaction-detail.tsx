@@ -26,6 +26,16 @@ import {
   approveTradeCancel,
   uploadEvidenceImage,
 } from "../src/lib/transactionActions";
+import {
+  exchangeMethodLabel,
+  fetchMailingAddressSnapshot,
+  formatMailingAddressLines,
+  normalizeExchangeMethod,
+  parseMailingAddressSnapshot,
+  toMailingAddressSnapshot,
+  type ExchangeMethod,
+  type MailingAddressSnapshot,
+} from "../src/lib/mailingAddress";
 import { supabase } from "../src/lib/supabase";
 import { useKeyboardInset } from "../src/lib/useKeyboardInset";
 import { megrumColors, megrumRadii, megrumShadow } from "../src/theme/tokens";
@@ -59,6 +69,9 @@ type ProposalRow = {
   meetup_lat: number | null;
   meetup_lng: number | null;
   meetup_candidates: unknown;
+  exchange_method: string | null;
+  sender_mailing_address: unknown;
+  receiver_mailing_address: unknown;
   evidence_photo_url: string | null;
   evidence_taken_at: string | null;
   approved_by_sender: boolean | null;
@@ -113,6 +126,7 @@ const FALLBACK_MEETUP_COORDINATE: MapCoordinate = {
 type TransactionDetail = {
   id: string;
   status: ProposalStatus;
+  exchangeMethod: ExchangeMethod;
   isSender: boolean;
   isReceiver: boolean;
   myAgreed: boolean;
@@ -136,6 +150,10 @@ type TransactionDetail = {
   partnerArrival: ArrivalStatus;
   myOutfitPhoto: string | null;
   partnerOutfitPhoto: string | null;
+  mailingAddresses: {
+    mine: MailingAddressSnapshot | null;
+    partner: MailingAddressSnapshot | null;
+  };
   partnerLastReadAt: string | null;
   messages: ChatMessage[];
 };
@@ -646,6 +664,9 @@ export default function TransactionDetailScreen() {
             {detail.openDispute ? (
               <OpenDisputeBanner dispute={detail.openDispute} />
             ) : null}
+            {detail.exchangeMethod === "mail" ? (
+              <MailingAddressBanner detail={detail} />
+            ) : null}
             <DealSummaryCard detail={detail} />
             {detail.status === "sent" ||
             detail.status === "negotiating" ||
@@ -666,7 +687,7 @@ export default function TransactionDetailScreen() {
                 />
               </>
             ) : null}
-            {detail.status === "agreed" ? (
+            {detail.status === "agreed" && detail.exchangeMethod === "hand" ? (
               <OutfitCompactRowNative
                 detail={detail}
                 uploading={chatActionLoading === "outfit"}
@@ -725,71 +746,74 @@ export default function TransactionDetailScreen() {
               ]}
             >
               {!composerFocused ? (
-                <ScrollView
-                  horizontal
-                  showsHorizontalScrollIndicator={false}
-                  contentContainerStyle={styles.webQuickActionRow}
-                >
-                  {detail.status === "agreed" ? (
-                    <>
-                      <QuickActionChip
-                        label={chatActionLoading === "location" ? "送信中…" : "現在地を送る"}
-                        icon="⌖"
-                        tone="lavender"
-                        disabled={!!chatActionLoading}
-                        onPress={handleSendCurrentLocation}
-                      />
-                      <QuickActionChip
-                        label={actionLoading === "enroute" ? "更新中…" : "向かっています"}
-                        icon="↗"
-                        tone={detail.myArrival === "enroute" ? "lavender" : "neutral"}
-                        disabled={!!actionLoading}
-                        onPress={() => handleArrivalStatus("enroute")}
-                      />
-                      <QuickActionChip
-                        label={actionLoading === "arrived" ? "更新中…" : "到着しました"}
-                        icon="✓"
-                        tone={detail.myArrival === "arrived" ? "lavender" : "neutral"}
-                        disabled={!!actionLoading}
-                        onPress={() => handleArrivalStatus("arrived")}
-                      />
-                      <QuickActionChip
-                        label={chatActionLoading === "outfit" ? "送信中…" : "服装写真"}
-                        icon="👕"
-                        tone="pink"
-                        disabled={!!chatActionLoading}
-                        onPress={() => handlePickChatPhoto("outfit_photo")}
-                      />
-                    </>
-                  ) : (
-                    <>
-                      <QuickActionChip
-                        label="カレンダー"
-                        icon="□"
-                        tone="lavender"
-                        disabled={!!chatActionLoading}
-                        onPress={() => router.push("/schedules")}
-                      />
-                      <QuickActionChip
-                        label="条件を変えて再打診"
-                        icon="↻"
-                        tone="pink"
-                        disabled={!!chatActionLoading}
-                        onPress={() =>
-                          router.push({
-                            pathname: "/proposal-select",
-                            params: {
-                              partnerId: detail.partner.id,
-                              proposalId: detail.id,
-                              revise: "1",
-                              tab: "meetup",
-                            },
-                          })
-                        }
-                      />
-                    </>
-                  )}
-                </ScrollView>
+                detail.status === "agreed" && detail.exchangeMethod === "mail" ? null : (
+                  <ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    contentContainerStyle={styles.webQuickActionRow}
+                  >
+                    {detail.status === "agreed" ? (
+                      <>
+                        <QuickActionChip
+                          label={chatActionLoading === "location" ? "送信中…" : "現在地を送る"}
+                          icon="⌖"
+                          tone="lavender"
+                          disabled={!!chatActionLoading}
+                          onPress={handleSendCurrentLocation}
+                        />
+                        <QuickActionChip
+                          label={actionLoading === "enroute" ? "更新中…" : "向かっています"}
+                          icon="↗"
+                          tone={detail.myArrival === "enroute" ? "lavender" : "neutral"}
+                          disabled={!!actionLoading}
+                          onPress={() => handleArrivalStatus("enroute")}
+                        />
+                        <QuickActionChip
+                          label={actionLoading === "arrived" ? "更新中…" : "到着しました"}
+                          icon="✓"
+                          tone={detail.myArrival === "arrived" ? "lavender" : "neutral"}
+                          disabled={!!actionLoading}
+                          onPress={() => handleArrivalStatus("arrived")}
+                        />
+                        <QuickActionChip
+                          label={chatActionLoading === "outfit" ? "送信中…" : "服装写真"}
+                          icon="👕"
+                          tone="pink"
+                          disabled={!!chatActionLoading}
+                          onPress={() => handlePickChatPhoto("outfit_photo")}
+                        />
+                      </>
+                    ) : (
+                      <>
+                        <QuickActionChip
+                          label="カレンダー"
+                          icon="□"
+                          tone="lavender"
+                          disabled={!!chatActionLoading}
+                          onPress={() => router.push("/schedules")}
+                        />
+                        <QuickActionChip
+                          label="条件を変えて再打診"
+                          icon="↻"
+                          tone="pink"
+                          disabled={!!chatActionLoading}
+                          onPress={() =>
+                            router.push({
+                              pathname: "/proposal-select",
+                              params: {
+                                partnerId: detail.partner.id,
+                                proposalId: detail.id,
+                                revise: "1",
+                                tab: detail.exchangeMethod === "mail" ? "receive" : "meetup",
+                                exchangeMethod: detail.exchangeMethod,
+                              },
+                            })
+                          }
+                        />
+                      </>
+                    )}
+                  </ScrollView>
+                )
               ) : null}
               <View style={styles.webComposerRow}>
                 <Pressable
@@ -926,6 +950,7 @@ function buildRouteFallbackDetail(
   return {
     id: proposalId,
     status: normalizeStatus(status),
+    exchangeMethod: "hand",
     isSender,
     isReceiver: !isSender,
     myAgreed: status === "agreed" || status === "completed",
@@ -966,6 +991,10 @@ function buildRouteFallbackDetail(
     partnerArrival: null,
     myOutfitPhoto: null,
     partnerOutfitPhoto: null,
+    mailingAddresses: {
+      mine: null,
+      partner: null,
+    },
     partnerLastReadAt: null,
     messages: [],
   };
@@ -1021,6 +1050,7 @@ async function fetchTransactionDetail(
     "created_at",
     "expires_at",
     "extension_count",
+    "exchange_method",
   ];
   const optionalProposalFields = [
     "meetup_lat",
@@ -1031,6 +1061,8 @@ async function fetchTransactionDetail(
     "approved_by_sender",
     "approved_by_receiver",
     "last_action_at",
+    "sender_mailing_address",
+    "receiver_mailing_address",
   ];
   const proposalFields = [...coreProposalFields, ...optionalProposalFields];
   let data: Record<string, unknown> | null = null;
@@ -1054,6 +1086,9 @@ async function fetchTransactionDetail(
       approved_by_sender: false,
       approved_by_receiver: false,
       extension_count: 0,
+      exchange_method: "hand",
+      sender_mailing_address: null,
+      receiver_mailing_address: null,
       ...data,
     } as ProposalRow,
     userId,
@@ -1181,10 +1216,18 @@ async function buildDetail(
     fetchProposalLastReadAt(proposal.id, partnerId),
   ]);
   const liveState = summarizeLiveMessages(messages, userId, partnerId);
+  const exchangeMethod = normalizeExchangeMethod(proposal.exchange_method);
+  const mailingAddresses = await resolveProposalMailingAddresses({
+    exchangeMethod,
+    isSender,
+    proposal,
+    userId,
+  });
 
   return {
     id: proposal.id,
     status: normalizeStatus(proposal.status),
+    exchangeMethod,
     isSender,
     isReceiver,
     myAgreed: isSender
@@ -1227,8 +1270,39 @@ async function buildDetail(
     partnerArrival: liveState.partnerArrival,
     myOutfitPhoto: liveState.myOutfitPhoto,
     partnerOutfitPhoto: liveState.partnerOutfitPhoto,
+    mailingAddresses,
     partnerLastReadAt,
     messages,
+  };
+}
+
+async function resolveProposalMailingAddresses(input: {
+  exchangeMethod: ExchangeMethod;
+  isSender: boolean;
+  proposal: ProposalRow;
+  userId: string;
+}): Promise<TransactionDetail["mailingAddresses"]> {
+  if (input.exchangeMethod !== "mail") {
+    return { mine: null, partner: null };
+  }
+
+  const senderSnapshot = parseMailingAddressSnapshot(
+    input.proposal.sender_mailing_address,
+  );
+  const receiverSnapshot = parseMailingAddressSnapshot(
+    input.proposal.receiver_mailing_address,
+  );
+  const mineSnapshot = input.isSender ? senderSnapshot : receiverSnapshot;
+  const partnerSnapshot = input.isSender ? receiverSnapshot : senderSnapshot;
+  const finalised =
+    input.proposal.status === "agreed" || input.proposal.status === "completed";
+  const liveMine = await fetchMailingAddressSnapshot(input.userId, {
+    tolerateMissingSchema: true,
+  }).catch(() => null);
+
+  return {
+    mine: finalised ? mineSnapshot ?? liveMine : liveMine ?? mineSnapshot,
+    partner: finalised ? partnerSnapshot : null,
   };
 }
 
@@ -1449,12 +1523,48 @@ async function updateProposalAction(
   const updates: Record<string, unknown> = { last_action_at: now };
 
   if (action === "accept") {
+    const senderId = detail.isSender ? userId : detail.partner.id;
+    const receiverId = detail.isReceiver ? userId : detail.partner.id;
+    let myMailingAddress: MailingAddressSnapshot | null = null;
+    if (detail.exchangeMethod === "mail") {
+      myMailingAddress = await fetchMailingAddressSnapshot(userId, {
+        tolerateMissingSchema: true,
+      }).catch(() => null);
+      if (!myMailingAddress) {
+        throw new Error("郵送交換に合意する前に住所を登録してください。");
+      }
+      if (detail.isSender) {
+        updates.sender_mailing_address = toMailingAddressSnapshot(myMailingAddress);
+      }
+      if (detail.isReceiver) {
+        updates.receiver_mailing_address = toMailingAddressSnapshot(myMailingAddress);
+      }
+    }
     const agreedBySender = detail.isSender ? true : detail.partnerAgreed;
     const agreedByReceiver = detail.isReceiver ? true : detail.partnerAgreed;
     updates.agreed_by_sender = agreedBySender;
     updates.agreed_by_receiver = agreedByReceiver;
     updates.status =
       agreedBySender && agreedByReceiver ? "agreed" : "agreement_one_side";
+    if (detail.exchangeMethod === "mail" && updates.status === "agreed") {
+      const [senderAddress, receiverAddress] = await Promise.all([
+        detail.isSender
+          ? Promise.resolve(myMailingAddress)
+          : fetchMailingAddressSnapshot(senderId, { tolerateMissingSchema: true }).catch(
+              () => null,
+            ),
+        detail.isReceiver
+          ? Promise.resolve(myMailingAddress)
+          : fetchMailingAddressSnapshot(receiverId, {
+              tolerateMissingSchema: true,
+            }).catch(() => null),
+      ]);
+      if (!senderAddress || !receiverAddress) {
+        throw new Error("郵送交換を成立させるには、双方の住所登録が必要です。");
+      }
+      updates.sender_mailing_address = toMailingAddressSnapshot(senderAddress);
+      updates.receiver_mailing_address = toMailingAddressSnapshot(receiverAddress);
+    }
   } else if (action === "negotiate") {
     updates.status = "negotiating";
   } else {
@@ -1485,6 +1595,76 @@ async function updateProposalAction(
   });
 
   return fetchTransactionDetail(detail.id, userId);
+}
+
+function MailingAddressBanner({ detail }: { detail: TransactionDetail }) {
+  const finalised = detail.status === "agreed" || detail.status === "completed";
+  const partnerLabel = detail.partner.handle
+    ? `@${detail.partner.handle} の住所`
+    : `${detail.partner.display_name ?? "相手"}の住所`;
+  const mineLines = detail.mailingAddresses.mine
+    ? formatMailingAddressLines(detail.mailingAddresses.mine)
+    : ["未登録です。合意前に住所設定を済ませてください。"];
+  const partnerLines = detail.mailingAddresses.partner
+    ? formatMailingAddressLines(detail.mailingAddresses.partner)
+    : ["相手の住所は、合意後に表示されます。"];
+
+  return (
+    <View style={styles.mailBanner}>
+      <View style={styles.mailBannerHeader}>
+        <Text style={styles.mailBannerTitle}>
+          {exchangeMethodLabel(detail.exchangeMethod)}
+        </Text>
+        <StatusPill
+          label={finalised ? "住所表示中" : "合意後に表示"}
+          tone={finalised ? "lavender" : "sky"}
+        />
+      </View>
+      <Text style={styles.mailBannerBody}>
+        {finalised
+          ? "この取引の当事者だけに住所を表示しています。"
+          : "この取引は郵送です。合意が成立すると、当事者同士に住所を表示します。"}
+      </Text>
+      <MailingAddressCard lines={mineLines} title="あなたの住所" />
+      {finalised ? (
+        <MailingAddressCard lines={partnerLines} title={partnerLabel} />
+      ) : (
+        <View style={styles.mailBannerActionRow}>
+          <Text style={styles.mailBannerHint}>
+            未登録のままだと、最終合意の時点で止まります。
+          </Text>
+          {!detail.mailingAddresses.mine ? (
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => router.push("/address-settings")}
+              style={styles.mailBannerLinkButton}
+            >
+              <Text style={styles.mailBannerLinkText}>住所設定を開く</Text>
+            </Pressable>
+          ) : null}
+        </View>
+      )}
+    </View>
+  );
+}
+
+function MailingAddressCard({
+  lines,
+  title,
+}: {
+  lines: string[];
+  title: string;
+}) {
+  return (
+    <View style={styles.mailAddressCard}>
+      <Text style={styles.mailAddressTitle}>{title}</Text>
+      {lines.map((line, index) => (
+        <Text key={`${title}-${index}`} style={styles.mailAddressLine}>
+          {line}
+        </Text>
+      ))}
+    </View>
+  );
 }
 
 function ChatPartnerStrip({ detail }: { detail: TransactionDetail }) {
@@ -3030,6 +3210,74 @@ const styles = StyleSheet.create({
     paddingBottom: 6,
     paddingHorizontal: 14,
     paddingTop: 10,
+  },
+  mailBanner: {
+    backgroundColor: "rgba(255,255,255,0.96)",
+    borderColor: "rgba(166,149,216,0.20)",
+    borderRadius: 14,
+    borderWidth: 1,
+    gap: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    shadowColor: megrumColors.lavender,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.07,
+    shadowRadius: 8,
+  },
+  mailBannerHeader: {
+    alignItems: "center",
+    flexDirection: "row",
+    justifyContent: "space-between",
+  },
+  mailBannerTitle: {
+    color: megrumColors.ink,
+    fontSize: 13,
+    fontWeight: "900",
+  },
+  mailBannerBody: {
+    color: megrumColors.mutedInk,
+    fontSize: 11.5,
+    fontWeight: "700",
+    lineHeight: 17,
+  },
+  mailBannerActionRow: {
+    gap: 8,
+  },
+  mailBannerHint: {
+    color: megrumColors.mutedInk,
+    fontSize: 11,
+    fontWeight: "700",
+  },
+  mailBannerLinkButton: {
+    alignSelf: "flex-start",
+    backgroundColor: "rgba(166,149,216,0.12)",
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+  },
+  mailBannerLinkText: {
+    color: megrumColors.lavender,
+    fontSize: 11,
+    fontWeight: "900",
+  },
+  mailAddressCard: {
+    backgroundColor: "rgba(166,149,216,0.08)",
+    borderRadius: 12,
+    gap: 3,
+    paddingHorizontal: 11,
+    paddingVertical: 10,
+  },
+  mailAddressTitle: {
+    color: megrumColors.ink,
+    fontSize: 11,
+    fontWeight: "900",
+    marginBottom: 3,
+  },
+  mailAddressLine: {
+    color: megrumColors.ink,
+    fontSize: 11.5,
+    fontWeight: "700",
+    lineHeight: 16,
   },
   dealCollapsedCard: {
     alignItems: "center",

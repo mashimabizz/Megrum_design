@@ -4,6 +4,11 @@ import { Image, Pressable, StyleSheet, Text, View } from "react-native";
 import { Screen } from "../../src/components/Screen";
 import { useAuth } from "../../src/auth/AuthProvider";
 import { IconSymbol } from "../../src/components/IconSymbol";
+import {
+  fetchMailingAddress,
+  formatMailingAddressSummary,
+  type MailingAddressRecord,
+} from "../../src/lib/mailingAddress";
 import { supabase } from "../../src/lib/supabase";
 import { megrumColors, megrumRadii, megrumShadow } from "../../src/theme/tokens";
 
@@ -17,6 +22,7 @@ type ProfileData = {
   ratingAvg: number | null;
   ratingCount: number;
   listingsCount: number;
+  mailingAddress: MailingAddressRecord | null;
   oshiGroups: OshiGroup[];
   items: ProfileItem[];
 };
@@ -201,6 +207,30 @@ export default function ProfileScreen() {
             </Pressable>
           </ProfileSection>
 
+          <ProfileSection title="郵送交換">
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => router.push("/address-settings")}
+              style={({ pressed }) => [
+                styles.settingsRow,
+                pressed ? styles.rowPressed : null,
+              ]}
+            >
+              <View style={styles.settingsRowIcon}>
+                <IconSymbol name="mail-outline" color={megrumColors.lavender} size={19} />
+              </View>
+              <View style={styles.settingsRowCopy}>
+                <Text style={styles.settingsRowTitle}>住所設定</Text>
+                <Text numberOfLines={2} style={styles.settingsRowMeta}>
+                  {profile.mailingAddress
+                    ? formatMailingAddressSummary(profile.mailingAddress)
+                    : "未登録です。郵送交換の前に登録してください。"}
+                </Text>
+              </View>
+              <IconSymbol name="chevron-forward" color="rgba(58,50,74,0.34)" size={18} />
+            </Pressable>
+          </ProfileSection>
+
           <ProfileSection title="譲る候補" hint={`${profile.items.length}件`}>
             {profile.items.length === 0 ? (
               <Pressable
@@ -346,6 +376,7 @@ async function fetchProfileData(
     { count: listingsCount },
     { data: evaluations },
     { data: items },
+    mailingAddress,
   ] = await Promise.all([
     supabase
       .from("users")
@@ -379,6 +410,7 @@ async function fetchProfileData(
       .eq("kind", "for_trade")
       .eq("status", "active")
       .limit(6),
+    fetchMailingAddress(userId, { tolerateMissingSchema: true }),
   ]);
 
   const profileRow = profile as ProfileRow | null;
@@ -398,6 +430,7 @@ async function fetchProfileData(
     ratingAvg,
     ratingCount: stars.length,
     listingsCount: listingsCount ?? 0,
+    mailingAddress,
     oshiGroups: buildOshiGroups((oshi as OshiRow[] | null) ?? []),
     items: buildProfileItems((items as InventoryRow[] | null) ?? []),
   };
@@ -414,6 +447,20 @@ function fallbackProfile(email?: string, previewMode = false): ProfileData {
     ratingAvg: previewMode ? 4.9 : null,
     ratingCount: previewMode ? 12 : 0,
     listingsCount: previewMode ? 3 : 0,
+    mailingAddress: previewMode
+      ? {
+          userId: "preview-user-1",
+          recipientName: "michi",
+          postalCode: "1500001",
+          prefecture: "東京都",
+          city: "渋谷区",
+          line1: "神南1-2-3",
+          line2: "Megrumハイツ 101",
+          phoneNumber: "",
+          createdAt: null,
+          updatedAt: null,
+        }
+      : null,
     oshiGroups: previewMode
       ? [
           { groupName: "BTS", members: ["ジミン", "ジョングク"] },
@@ -859,5 +906,37 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: "800",
     marginTop: 4,
+  },
+  settingsRow: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 12,
+    minHeight: 76,
+    paddingHorizontal: 14,
+    paddingVertical: 13,
+  },
+  settingsRowIcon: {
+    alignItems: "center",
+    backgroundColor: "rgba(166,149,216,0.12)",
+    borderRadius: 14,
+    height: 38,
+    justifyContent: "center",
+    width: 38,
+  },
+  settingsRowCopy: {
+    flex: 1,
+    minWidth: 0,
+  },
+  settingsRowTitle: {
+    color: megrumColors.ink,
+    fontSize: 13.5,
+    fontWeight: "900",
+  },
+  settingsRowMeta: {
+    color: megrumColors.mutedInk,
+    fontSize: 11,
+    fontWeight: "800",
+    lineHeight: 17,
+    marginTop: 3,
   },
 });

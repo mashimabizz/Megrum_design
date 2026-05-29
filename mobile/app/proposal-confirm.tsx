@@ -25,6 +25,16 @@ import {
   type ProposalInventoryRow,
   type ProposalThumbItem,
 } from "../src/data/proposalItems";
+import {
+  exchangeMethodLabel,
+  fetchMailingAddress,
+  formatMailingAddressLines,
+  formatMailingAddressSummary,
+  isMailingAddressReady,
+  normalizeExchangeMethod,
+  type ExchangeMethod,
+  type MailingAddressRecord,
+} from "../src/lib/mailingAddress";
 import { supabase } from "../src/lib/supabase";
 import { megrumColors, megrumRadii, megrumShadow } from "../src/theme/tokens";
 
@@ -42,6 +52,14 @@ type ProposalOwnershipRow = {
   id: string;
   user_id: string | null;
   kind: string | null;
+  status: string | null;
+};
+
+type ProposalRevisionTargetRow = {
+  id: string;
+  sender_id: string;
+  receiver_id: string;
+  match_type: string | null;
   status: string | null;
 };
 
@@ -77,6 +95,9 @@ export default function ProposalConfirmScreen() {
     partnerId?: string | string[];
     partnerHandle?: string | string[];
     matchType?: string | string[];
+    proposalId?: string | string[];
+    revise?: string | string[];
+    exchangeMethod?: string | string[];
   }>();
   const meetupsParam = one(params.meetups);
   const givesParam = one(params.gives);
@@ -84,7 +105,11 @@ export default function ProposalConfirmScreen() {
   const listingsParam = one(params.listings);
   const partnerId = one(params.partnerId);
   const partnerHandle = one(params.partnerHandle) ?? PARTNER_HANDLE;
-  const matchType = normalizeProposalMatchType(one(params.matchType));
+  const matchTypeParam = one(params.matchType);
+  const matchType = normalizeProposalMatchType(matchTypeParam);
+  const proposalId = one(params.proposalId);
+  const isRevisionMode = one(params.revise) === "1" && !!proposalId;
+  const exchangeMethod = normalizeExchangeMethod(one(params.exchangeMethod));
   const giveIds = useMemo(() => parseProposalIdList(givesParam), [givesParam]);
   const receiveIds = useMemo(
     () => parseProposalIdList(receivesParam),
@@ -120,6 +145,8 @@ export default function ProposalConfirmScreen() {
   const [submitted, setSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [mailingAddress, setMailingAddress] = useState<MailingAddressRecord | null>(null);
+  const [addressLoading, setAddressLoading] = useState(false);
 
   useEffect(() => {
     if (!supabase) return;
@@ -148,8 +175,45 @@ export default function ProposalConfirmScreen() {
     };
   }, [giveIds, receiveIds]);
 
+  useEffect(() => {
+    if (exchangeMethod !== "mail" || !supabase) {
+      setMailingAddress(null);
+      setAddressLoading(false);
+      return;
+    }
+
+    let active = true;
+    setAddressLoading(true);
+    supabase.auth
+      .getUser()
+      .then(({ data }) => data.user?.id ?? null)
+      .then(async (userId) => {
+        if (!active || !userId) return;
+        const address = await fetchMailingAddress(userId, {
+          tolerateMissingSchema: true,
+        });
+        if (active) setMailingAddress(address);
+      })
+      .catch(() => {
+        if (active) setMailingAddress(null);
+      })
+      .finally(() => {
+        if (active) setAddressLoading(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [exchangeMethod]);
+
   if (submitted) {
-    return <ProposalCompleteScreen partnerHandle={partnerHandle} />;
+    return (
+      <ProposalCompleteScreen
+        partnerHandle={partnerHandle}
+        revision={isRevisionMode}
+        exchangeMethod={exchangeMethod}
+      />
+    );
   }
 
   return (
@@ -177,7 +241,9 @@ export default function ProposalConfirmScreen() {
         <View style={styles.notice}>
           <Text style={styles.noticeBadge}>送信確認</Text>
           <Text style={styles.noticeText}>
-            @{partnerHandle} に下記の内容で打診を送ります。
+            {isRevisionMode
+              ? `@${partnerHandle} との打診を下記の内容に更新します。`
+              : `@${partnerHandle} に下記の内容で打診を送ります。`}
           </Text>
         </View>
 
@@ -185,9 +251,20 @@ export default function ProposalConfirmScreen() {
           <ExchangeCard theirItems={theirItems} myItems={myItems} />
         </Section>
 
-        <Section title="交換できる候補">
-          <MeetupMapCard candidates={meetupCandidates} />
+        <Section title="受け渡し方法">
+          <ExchangeMethodCard
+            address={mailingAddress}
+            addressLoading={addressLoading}
+            exchangeMethod={exchangeMethod}
+            onOpenAddressSettings={() => router.push("/address-settings")}
+          />
         </Section>
+
+        {exchangeMethod === "hand" ? (
+          <Section title="交換できる候補">
+            <MeetupMapCard candidates={meetupCandidates} />
+          </Section>
+        ) : null}
 
         <Section title="メッセージ（任意）" right={`${message.length} / 400`}>
           <TextInput
@@ -201,53 +278,53 @@ export default function ProposalConfirmScreen() {
           />
         </Section>
 
-        <Pressable
-          onPress={() => setShareSchedule((current) => !current)}
-          style={[
-            styles.scheduleCard,
-            shareSchedule ? styles.scheduleCardOn : null,
-          ]}
-        >
-          <View style={styles.scheduleCopy}>
-            <Text style={styles.scheduleTitle}>スケジュールを共有する</Text>
-            <Text style={styles.scheduleSub}>
-              {shareSchedule ? "ON" : "OFF"}
-            </Text>
-          </View>
-          <Switch
-            value={shareSchedule}
-            onValueChange={setShareSchedule}
-            trackColor={{
-              false: "rgba(58,50,74,0.14)",
-              true: "rgba(166,149,216,0.46)",
-            }}
-            thumbColor={shareSchedule ? megrumColors.lavender : megrumColors.surface}
-          />
-        </Pressable>
+        {exchangeMethod === "hand" ? (
+          <Pressable
+            onPress={() => setShareSchedule((current) => !current)}
+            style={[
+              styles.scheduleCard,
+              shareSchedule ? styles.scheduleCardOn : null,
+            ]}
+          >
+            <View style={styles.scheduleCopy}>
+              <Text style={styles.scheduleTitle}>スケジュールを共有する</Text>
+              <Text style={styles.scheduleSub}>
+                {shareSchedule ? "ON" : "OFF"}
+              </Text>
+            </View>
+            <Switch
+              value={shareSchedule}
+              onValueChange={setShareSchedule}
+              trackColor={{
+                false: "rgba(58,50,74,0.14)",
+                true: "rgba(166,149,216,0.46)",
+              }}
+              thumbColor={shareSchedule ? megrumColors.lavender : megrumColors.surface}
+            />
+          </Pressable>
+        ) : null}
       </ScrollView>
 
       {submitError ? <Text style={styles.submitError}>{submitError}</Text> : null}
       <PrimaryButton loading={submitting} onPress={handleSubmit}>
-        この内容で打診を送信
+        {isRevisionMode ? "この内容で条件を更新" : "この内容で打診を送信"}
       </PrimaryButton>
     </Screen>
   );
 
   async function handleSubmit() {
     setSubmitError(null);
-    if (!partnerId || !supabase) {
+    if (!supabase) {
       setSubmitted(true);
       return;
     }
-    if (!isUuid(partnerId)) {
-      setSubmitError("相手情報を読み直してください");
-      return;
-    }
-    const primary = meetupCandidates[0];
-    const sendableMeetups = meetupCandidates
-      .filter((candidate) => candidate.startAt && candidate.endAt && candidate.place)
-      .slice(0, 3);
-    if (!primary || sendableMeetups.length === 0) {
+    const sendableMeetups =
+      exchangeMethod === "hand"
+        ? meetupCandidates
+            .filter((candidate) => candidate.startAt && candidate.endAt && candidate.place)
+            .slice(0, 3)
+        : [];
+    if (exchangeMethod === "hand" && sendableMeetups.length === 0) {
       setSubmitError("交換できる時間と場所を設定してください");
       return;
     }
@@ -265,9 +342,39 @@ export default function ProposalConfirmScreen() {
         setSubmitError("ログイン状態を確認してください");
         return;
       }
+      if (exchangeMethod === "mail") {
+        const address = await fetchMailingAddress(user.id);
+        if (!isMailingAddressReady(address)) {
+          setMailingAddress(address);
+          setSubmitError("郵送交換を送る前に住所を登録してください");
+          return;
+        }
+        setMailingAddress(address);
+      }
+      let targetPartnerId = partnerId;
+      let revisionTarget: ProposalRevisionTargetRow | null = null;
+      if (isRevisionMode) {
+        if (!proposalId || !isUuid(proposalId)) {
+          setSubmitError("打診情報を読み直してください");
+          return;
+        }
+        revisionTarget = await fetchProposalRevisionTarget(proposalId, user.id);
+        if (!revisionTarget) {
+          setSubmitError("更新する打診が見つかりません");
+          return;
+        }
+        targetPartnerId =
+          revisionTarget.sender_id === user.id
+            ? revisionTarget.receiver_id
+            : revisionTarget.sender_id;
+      }
+      if (!targetPartnerId || !isUuid(targetPartnerId)) {
+        setSubmitError("相手情報を読み直してください");
+        return;
+      }
       const ownershipError = await validateProposalInventoryOwnership({
         userId: user.id,
-        partnerId,
+        partnerId: targetPartnerId,
         giveIds,
         receiveIds,
       });
@@ -286,11 +393,60 @@ export default function ProposalConfirmScreen() {
         lng: candidate.coordinate.longitude,
         mode: "scheduled",
       }));
+      const primaryMeetup = meetupPayloads[0] ?? null;
       const listingId =
         listingIds.length === 1 && isUuid(listingIds[0]) ? listingIds[0] : null;
+      if (isRevisionMode && revisionTarget && proposalId) {
+        const isSender = revisionTarget.sender_id === user.id;
+        const nextMatchType = matchTypeParam
+          ? matchType
+          : normalizeProposalMatchType(revisionTarget.match_type ?? undefined);
+        const updateFields: Record<string, unknown> = {
+          match_type: nextMatchType,
+          sender_have_ids: isSender ? giveIds : receiveIds,
+          sender_have_qtys: (isSender ? giveIds : receiveIds).map(() => 1),
+          receiver_have_ids: isSender ? receiveIds : giveIds,
+          receiver_have_qtys: (isSender ? receiveIds : giveIds).map(() => 1),
+          message: message.trim(),
+          message_tone: "standard",
+          status: "negotiating",
+          agreed_by_sender: false,
+          agreed_by_receiver: false,
+          last_action_at: now.toISOString(),
+          exchange_method: exchangeMethod,
+          meetup_start_at: primaryMeetup?.startAt ?? null,
+          meetup_end_at: primaryMeetup?.endAt ?? null,
+          meetup_place_name: primaryMeetup?.placeName ?? null,
+          meetup_lat: primaryMeetup?.lat ?? null,
+          meetup_lng: primaryMeetup?.lng ?? null,
+          meetup_candidates: meetupPayloads,
+          expose_calendar: exchangeMethod === "hand" ? shareSchedule : false,
+          listing_id: listingId,
+          cash_offer: false,
+          cash_amount: null,
+        };
+
+        const { error } = await updateProposalWithSchemaFallback(
+          proposalId,
+          updateFields,
+        );
+        if (error) {
+          setSubmitError(formatProposalSubmitError(error));
+          return;
+        }
+        await insertProposalSystemMessage({
+          proposalId,
+          senderId: user.id,
+          body: "打診条件を更新しました",
+          meta: { action: "revise", status: "negotiating" },
+        });
+        setSubmitted(true);
+        return;
+      }
+
       const insertFields: Record<string, unknown> = {
         sender_id: user.id,
-        receiver_id: partnerId,
+        receiver_id: targetPartnerId,
         match_type: matchType,
         sender_have_ids: giveIds,
         sender_have_qtys: giveIds.map(() => 1),
@@ -303,13 +459,14 @@ export default function ProposalConfirmScreen() {
         agreed_by_receiver: false,
         last_action_at: now.toISOString(),
         expires_at: expires.toISOString(),
-        meetup_start_at: meetupPayloads[0].startAt,
-        meetup_end_at: meetupPayloads[0].endAt,
-        meetup_place_name: meetupPayloads[0].placeName,
-        meetup_lat: meetupPayloads[0].lat,
-        meetup_lng: meetupPayloads[0].lng,
+        exchange_method: exchangeMethod,
+        meetup_start_at: primaryMeetup?.startAt ?? null,
+        meetup_end_at: primaryMeetup?.endAt ?? null,
+        meetup_place_name: primaryMeetup?.placeName ?? null,
+        meetup_lat: primaryMeetup?.lat ?? null,
+        meetup_lng: primaryMeetup?.lng ?? null,
         meetup_candidates: meetupPayloads,
-        expose_calendar: shareSchedule,
+        expose_calendar: exchangeMethod === "hand" ? shareSchedule : false,
         listing_id: listingId,
         cash_offer: false,
         cash_amount: null,
@@ -321,6 +478,12 @@ export default function ProposalConfirmScreen() {
         return;
       }
       setSubmitted(true);
+    } catch (submitReason: unknown) {
+      setSubmitError(
+        submitReason instanceof Error
+          ? submitReason.message
+          : "打診を送信できませんでした。時間を置いて再度お試しください。",
+      );
     } finally {
       setSubmitting(false);
     }
@@ -372,9 +535,43 @@ function isActiveTradeInventory(row?: ProposalOwnershipRow): row is ProposalOwne
   return row?.kind === "for_trade" && row.status === "active";
 }
 
+async function fetchProposalRevisionTarget(
+  proposalId: string,
+  userId: string,
+): Promise<ProposalRevisionTargetRow | null> {
+  if (!supabase) return null;
+  const { data, error } = await supabase
+    .from("proposals")
+    .select("id, sender_id, receiver_id, match_type, status")
+    .eq("id", proposalId)
+    .maybeSingle();
+  if (error) throw error;
+  const row = data as ProposalRevisionTargetRow | null;
+  if (!row) return null;
+  if (row.sender_id !== userId && row.receiver_id !== userId) {
+    throw new Error("この打診には参加していません");
+  }
+  if (
+    row.status !== "sent" &&
+    row.status !== "negotiating" &&
+    row.status !== "agreement_one_side"
+  ) {
+    throw new Error("この状態の打診は条件変更できません");
+  }
+  return row;
+}
+
 const PARTNER_HANDLE = "michilion";
 
-function ProposalCompleteScreen({ partnerHandle }: { partnerHandle: string }) {
+function ProposalCompleteScreen({
+  partnerHandle,
+  revision,
+  exchangeMethod,
+}: {
+  partnerHandle: string;
+  revision?: boolean;
+  exchangeMethod: ExchangeMethod;
+}) {
   return (
     <Screen contentStyle={styles.completeScreen}>
       <View style={styles.completeHero}>
@@ -386,7 +583,11 @@ function ProposalCompleteScreen({ partnerHandle }: { partnerHandle: string }) {
         </View>
         <Text style={styles.completeTitle}>打診が完了しました</Text>
         <Text style={styles.completeText}>
-          @{partnerHandle} に打診を送りました。返事が届いたら通知と打診一覧で確認できます。
+          {revision
+            ? `@${partnerHandle} との条件を更新しました。ネゴ中として打診一覧に反映されます。`
+            : exchangeMethod === "mail"
+              ? `@${partnerHandle} に郵送交換の打診を送りました。双方が合意すると住所が表示されます。`
+              : `@${partnerHandle} に打診を送りました。返事が届いたら通知と打診一覧で確認できます。`}
         </Text>
       </View>
 
@@ -404,6 +605,57 @@ function ProposalCompleteScreen({ partnerHandle }: { partnerHandle: string }) {
         </PrimaryButton>
       </View>
     </Screen>
+  );
+}
+
+function ExchangeMethodCard({
+  address,
+  addressLoading,
+  exchangeMethod,
+  onOpenAddressSettings,
+}: {
+  address: MailingAddressRecord | null;
+  addressLoading: boolean;
+  exchangeMethod: ExchangeMethod;
+  onOpenAddressSettings: () => void;
+}) {
+  return (
+    <View style={styles.methodPanel}>
+      <View style={styles.methodBadge}>
+        <Text style={styles.methodBadgeText}>{exchangeMethodLabel(exchangeMethod)}</Text>
+      </View>
+      <Text style={styles.methodText}>
+        {exchangeMethod === "hand"
+          ? "現地交換では、待ち合わせ候補と場所を相手に送ります。"
+          : "郵送交換では、待ち合わせ候補は送りません。合意後にだけ当事者へ住所を表示します。"}
+      </Text>
+      {exchangeMethod === "mail" ? (
+        <View style={styles.addressStatusCard}>
+          <Text style={styles.addressStatusTitle}>あなたの住所登録</Text>
+          <Text style={styles.addressStatusSummary}>
+            {addressLoading
+              ? "確認中…"
+              : address
+                ? formatMailingAddressSummary(address)
+                : "未登録"}
+          </Text>
+          {address ? (
+            <View style={styles.addressStatusLines}>
+              {formatMailingAddressLines(address).slice(0, 3).map((line) => (
+                <Text key={line} numberOfLines={1} style={styles.addressStatusLine}>
+                  {line}
+                </Text>
+              ))}
+            </View>
+          ) : null}
+          <Pressable onPress={onOpenAddressSettings} style={styles.addressSettingsLink}>
+            <Text style={styles.addressSettingsLinkText}>
+              {address ? "住所を編集" : "住所を登録"}
+            </Text>
+          </Pressable>
+        </View>
+      ) : null}
+    </View>
   );
 }
 
@@ -584,6 +836,7 @@ type ProposalInsertError = {
 
 const PROPOSAL_SCHEMA_FALLBACK_COLUMNS = new Set([
   "message_tone",
+  "exchange_method",
   "agreed_by_sender",
   "agreed_by_receiver",
   "last_action_at",
@@ -627,6 +880,57 @@ async function insertProposalWithSchemaFallback(fields: Record<string, unknown>)
       message: "打診送信の互換処理が完了しませんでした。時間を置いて再度お試しください。",
     },
   };
+}
+
+async function updateProposalWithSchemaFallback(
+  proposalId: string,
+  fields: Record<string, unknown>,
+) {
+  if (!supabase) return { error: null as ProposalInsertError | null };
+  const currentFields = { ...fields };
+  const maxAttempts = PROPOSAL_SCHEMA_FALLBACK_COLUMNS.size + 1;
+
+  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+    const { error } = await supabase
+      .from("proposals")
+      .update(currentFields)
+      .eq("id", proposalId);
+    if (!error) return { error: null as ProposalInsertError | null };
+
+    const missingColumn = getMissingProposalColumn(error);
+    if (
+      missingColumn &&
+      PROPOSAL_SCHEMA_FALLBACK_COLUMNS.has(missingColumn) &&
+      Object.prototype.hasOwnProperty.call(currentFields, missingColumn)
+    ) {
+      delete currentFields[missingColumn];
+      continue;
+    }
+
+    return { error };
+  }
+
+  return {
+    error: {
+      message: "打診更新の互換処理が完了しませんでした。時間を置いて再度お試しください。",
+    },
+  };
+}
+
+async function insertProposalSystemMessage(input: {
+  proposalId: string;
+  senderId: string;
+  body: string;
+  meta: Record<string, unknown>;
+}) {
+  if (!supabase) return;
+  await supabase.from("messages").insert({
+    proposal_id: input.proposalId,
+    sender_id: input.senderId,
+    message_type: "system",
+    body: input.body,
+    meta: input.meta,
+  });
 }
 
 function getMissingProposalColumn(error: ProposalInsertError | null) {
@@ -835,6 +1139,67 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: "900",
     lineHeight: 15,
+  },
+  methodPanel: {
+    backgroundColor: megrumColors.surface,
+    borderColor: "rgba(58,50,74,0.08)",
+    borderRadius: 18,
+    borderWidth: 1,
+    gap: 10,
+    padding: 14,
+    ...megrumShadow,
+  },
+  methodBadge: {
+    alignSelf: "flex-start",
+    backgroundColor: "rgba(166,149,216,0.12)",
+    borderRadius: megrumRadii.pill,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+  },
+  methodBadgeText: {
+    color: megrumColors.lavender,
+    fontSize: 11,
+    fontWeight: "900",
+  },
+  methodText: {
+    color: megrumColors.mutedInk,
+    fontSize: 11.5,
+    fontWeight: "800",
+    lineHeight: 18,
+  },
+  addressStatusCard: {
+    backgroundColor: "rgba(58,50,74,0.04)",
+    borderRadius: megrumRadii.lg,
+    gap: 6,
+    padding: 12,
+  },
+  addressStatusTitle: {
+    color: megrumColors.ink,
+    fontSize: 12.5,
+    fontWeight: "900",
+  },
+  addressStatusSummary: {
+    color: megrumColors.mutedInk,
+    fontSize: 11,
+    fontWeight: "800",
+    lineHeight: 17,
+  },
+  addressStatusLines: {
+    gap: 2,
+  },
+  addressStatusLine: {
+    color: megrumColors.mutedInk,
+    fontSize: 10.5,
+    fontWeight: "800",
+  },
+  addressSettingsLink: {
+    alignSelf: "flex-start",
+    paddingTop: 2,
+  },
+  addressSettingsLinkText: {
+    color: megrumColors.lavender,
+    fontSize: 11,
+    fontWeight: "900",
   },
   meetupCard: {
     backgroundColor: megrumColors.surface,

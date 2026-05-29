@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import {
   Animated,
   Easing,
@@ -12,11 +12,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { IconSymbol } from "../IconSymbol";
-import {
-  MeguriThreeBoundary,
-  MeguriThreeScene,
-  type MeguriSceneResident,
-} from "./MeguriThreeScene";
+import { MeguriAvatarFace } from "./MeguriAvatarFace";
 import { megrumColors, megrumShadow } from "../../theme/tokens";
 
 type GroomProfileHue = "lav" | "sky" | "pink" | "mint" | "butter";
@@ -46,14 +42,6 @@ export type GroomProfileUser = {
   since: string;
 };
 
-const PROFILE_SELF: MeguriSceneResident = {
-  animalType: "rabbit",
-  furColor: "lavender",
-  hue: "lav",
-  id: "me",
-  name: "あなた",
-};
-
 const HUE_RGB: Record<GroomProfileHue, [number, number, number]> = {
   butter: [242, 199, 92],
   lav: [166, 149, 216],
@@ -74,8 +62,6 @@ export function GroomProfileSlidePanel({
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
   const slideX = useRef(new Animated.Value(width)).current;
-  const [threeFailed, setThreeFailed] = useState(false);
-  const resident = useMemo(() => (user ? toSceneResident(user) : null), [user]);
 
   function closePanel(afterClose?: () => void) {
     Animated.timing(slideX, {
@@ -127,7 +113,6 @@ export function GroomProfileSlidePanel({
 
   useEffect(() => {
     if (!user) return;
-    setThreeFailed(false);
     slideX.setValue(width);
     Animated.timing(slideX, {
       toValue: 0,
@@ -137,7 +122,7 @@ export function GroomProfileSlidePanel({
     }).start();
   }, [slideX, user?.id, width]);
 
-  if (!user || !resident) return null;
+  if (!user) return null;
 
   return (
     <Animated.View
@@ -167,24 +152,7 @@ export function GroomProfileSlidePanel({
 
         <View style={styles.hero}>
           <View style={[styles.avatarStage, { backgroundColor: profileHueTint(user.hue, 0.22) }]}>
-            {threeFailed ? (
-              <FallbackAvatar user={user} />
-            ) : (
-              <MeguriThreeBoundary fallback={<FallbackAvatar user={user} />} onError={() => setThreeFailed(true)}>
-                <MeguriThreeScene
-                  activeId={null}
-                  completedIds={[]}
-                  focusedId={user.id}
-                  introPhase="ready"
-                  mode="summary"
-                  onUnavailable={() => setThreeFailed(true)}
-                  presentation="profile"
-                  residents={[resident]}
-                  self={PROFILE_SELF}
-                  smilingId={user.id}
-                />
-              </MeguriThreeBoundary>
-            )}
+            <ProfileAvatar user={user} />
           </View>
 
           <View style={styles.identity}>
@@ -243,21 +211,19 @@ export function GroomProfileSlidePanel({
   );
 }
 
-function toSceneResident(user: GroomProfileUser): MeguriSceneResident {
-  return {
-    animalType: user.animalType,
-    furColor: user.furColor,
-    hue: user.hue,
-    id: user.id,
-    name: user.name,
-  };
-}
-
-function FallbackAvatar({ user }: { user: GroomProfileUser }) {
+function ProfileAvatar({ user }: { user: GroomProfileUser }) {
   return (
     <View style={styles.fallbackAvatar}>
-      <View style={[styles.fallbackFace, { backgroundColor: profileHueTint(user.hue, 0.46) }]}>
-        <Text style={styles.fallbackFaceText}>{user.name.slice(0, 1)}</Text>
+      <View style={[styles.fallbackGlow, { backgroundColor: profileHueTint(user.hue, 0.24) }]} />
+      <MeguriAvatarFace
+        animalType={user.animalType}
+        furColor={user.furColor}
+        hue={user.hue}
+        size={148}
+      />
+      <Text style={styles.fallbackFaceText}>公開アイコン</Text>
+      <View style={[styles.fallbackFace, { backgroundColor: profileHueTint(user.hue, 0.14) }]}>
+        <Text style={styles.fallbackSubText}>{user.style}</Text>
       </View>
     </View>
   );
@@ -359,21 +325,31 @@ const styles = StyleSheet.create({
   fallbackAvatar: {
     alignItems: "center",
     flex: 1,
+    gap: 10,
     justifyContent: "center",
+  },
+  fallbackGlow: {
+    borderRadius: 999,
+    height: 188,
+    position: "absolute",
+    width: 188,
   },
   fallbackFace: {
     alignItems: "center",
-    borderColor: "rgba(255,255,255,0.86)",
-    borderRadius: 44,
-    borderWidth: 4,
-    height: 88,
+    borderRadius: 999,
     justifyContent: "center",
-    width: 88,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
   },
   fallbackFaceText: {
     color: megrumColors.ink,
-    fontSize: 34,
+    fontSize: 13,
     fontWeight: "900",
+  },
+  fallbackSubText: {
+    color: "rgba(58,50,74,0.58)",
+    fontSize: 11,
+    fontWeight: "800",
   },
   identity: {
     alignItems: "center",

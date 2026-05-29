@@ -1,5 +1,6 @@
 import { router, useLocalSearchParams } from "expo-router";
 import type { LocationGeocodedAddress } from "expo-location";
+import SegmentedControl from "@react-native-segmented-control/segmented-control";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Animated,
@@ -32,6 +33,11 @@ import {
   type ProposalInventoryRow,
 } from "../src/data/proposalItems";
 import { supabase } from "../src/lib/supabase";
+import {
+  exchangeMethodLabel,
+  normalizeExchangeMethod,
+  type ExchangeMethod,
+} from "../src/lib/mailingAddress";
 import { megrumColors, megrumRadii, megrumShadow } from "../src/theme/tokens";
 
 type ProposalTab = "give" | "receive" | "meetup";
@@ -105,6 +111,31 @@ type ScopedProposalInventoryRow = ProposalInventoryRow & {
   user_id: string | null;
 };
 
+type RevisionProposalContext = {
+  proposalId: string;
+  partnerId: string;
+  giveIds: string[];
+  receiveIds: string[];
+  meetupCandidates: MeetupCandidate[];
+  exchangeMethod: ExchangeMethod;
+};
+
+type RevisionProposalRow = {
+  id: string;
+  sender_id: string;
+  receiver_id: string;
+  status: string | null;
+  sender_have_ids: string[] | null;
+  receiver_have_ids: string[] | null;
+  meetup_start_at: string | null;
+  meetup_end_at: string | null;
+  meetup_place_name: string | null;
+  meetup_lat: number | string | null;
+  meetup_lng: number | string | null;
+  meetup_candidates: unknown;
+  exchange_method: string | null;
+};
+
 const DAYS = buildMeetupDays(0);
 const HOURS = Array.from({ length: 24 }, (_, hour) => hour);
 const SLOT_MINUTES = 15;
@@ -145,6 +176,9 @@ export default function ProposalSelectScreen() {
     partnerId?: string | string[];
     partnerHandle?: string | string[];
     matchType?: string | string[];
+    proposalId?: string | string[];
+    revise?: string | string[];
+    exchangeMethod?: string | string[];
   }>();
   const initialTab = parseTab(one(params.tab));
   const givesParam = one(params.gives);
@@ -154,6 +188,13 @@ export default function ProposalSelectScreen() {
   const partnerIdParam = one(params.partnerId);
   const partnerHandleParam = one(params.partnerHandle);
   const matchTypeParam = one(params.matchType);
+  const proposalIdParam = one(params.proposalId);
+  const reviseParam = one(params.revise);
+  const exchangeMethodParam = one(params.exchangeMethod);
+  const isRevisionMode = reviseParam === "1" && !!proposalIdParam;
+  const [exchangeMethod, setExchangeMethod] = useState<ExchangeMethod>(() =>
+    normalizeExchangeMethod(exchangeMethodParam),
+  );
   const initialGiveIds = useMemo(
     () => parseProposalIdList(givesParam),
     [givesParam],
@@ -162,10 +203,19 @@ export default function ProposalSelectScreen() {
     () => parseProposalIdList(receivesParam),
     [receivesParam],
   );
+  const [revisionContext, setRevisionContext] =
+    useState<RevisionProposalContext | null>(null);
+  const [revisionLoading, setRevisionLoading] = useState(false);
+  const [revisionError, setRevisionError] = useState<string | null>(null);
+  const candidateGiveIds = revisionContext?.giveIds ?? initialGiveIds;
+  const candidateReceiveIds = revisionContext?.receiveIds ?? initialReceiveIds;
+  const effectivePartnerIdParam = revisionContext?.partnerId ?? partnerIdParam;
   const initialGiveNeedsInventory =
-    !!partnerIdParam && !hasSendableInventoryIds(initialGiveIds);
+    !!effectivePartnerIdParam &&
+    (isRevisionMode || !hasSendableInventoryIds(candidateGiveIds));
   const initialReceiveNeedsInventory =
-    !!partnerIdParam && !hasSendableInventoryIds(initialReceiveIds);
+    !!effectivePartnerIdParam &&
+    (isRevisionMode || !hasSendableInventoryIds(candidateReceiveIds));
   const usesProfileInventory =
     initialGiveNeedsInventory || initialReceiveNeedsInventory;
   const [profileInventoryScope, setProfileInventoryScope] =
@@ -174,26 +224,26 @@ export default function ProposalSelectScreen() {
   const [profileInventoryError, setProfileInventoryError] = useState<string | null>(null);
   const giveChoiceIds = initialGiveNeedsInventory
     ? profileInventoryScope?.giveIds ?? []
-    : initialGiveIds;
+    : candidateGiveIds;
   const receiveChoiceIds = initialReceiveNeedsInventory
     ? profileInventoryScope?.receiveIds ?? []
-    : initialReceiveIds;
+    : candidateReceiveIds;
   const [catalogOverrides, setCatalogOverrides] = useState<
     ReturnType<typeof buildProposalCatalogOverrides>
   >(() => new Map());
   const giveChoices = useMemo(
     () =>
       buildProposalChoices(giveChoiceIds, "give", catalogOverrides, {
-        includeFallback: !partnerIdParam,
+        includeFallback: !effectivePartnerIdParam,
       }),
-    [catalogOverrides, giveChoiceIds, partnerIdParam],
+    [catalogOverrides, effectivePartnerIdParam, giveChoiceIds],
   );
   const receiveChoices = useMemo(
     () =>
       buildProposalChoices(receiveChoiceIds, "receive", catalogOverrides, {
-        includeFallback: !partnerIdParam,
+        includeFallback: !effectivePartnerIdParam,
       }),
-    [catalogOverrides, receiveChoiceIds, partnerIdParam],
+    [catalogOverrides, effectivePartnerIdParam, receiveChoiceIds],
   );
   const [tab, setTab] = useState<ProposalTab>(initialTab);
   const [giveSelectedIds, setGiveSelectedIds] = useState<string[]>(() =>
@@ -223,10 +273,104 @@ export default function ProposalSelectScreen() {
     tracking: boolean;
     swiping: boolean;
   } | null>(null);
+  const needsMeetup = exchangeMethod === "hand";
   const meetupReady =
     meetupCandidates.length > 0 &&
     meetupCandidates.every((candidate) => candidate.place.trim().length > 0);
   const meetupHasTimeDraft = meetupCandidates.length > 0;
+
+  useEffect(() => {
+    if (!isRevisionMode) {
+      setRevisionContext(null);
+      setRevisionLoading(false);
+      setRevisionError(null);
+      return;
+    }
+    if (!proposalIdParam || !isUuid(proposalIdParam)) {
+      setRevisionContext(null);
+      setRevisionLoading(false);
+      setRevisionError("打診情報を読み直してください");
+      return;
+    }
+    if (!supabase) {
+      setRevisionContext(null);
+      setRevisionLoading(false);
+      setRevisionError(null);
+      return;
+    }
+
+    let active = true;
+    setRevisionLoading(true);
+    setRevisionError(null);
+
+    void (async () => {
+      try {
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
+        if (!user) throw new Error("ログイン状態を確認してください");
+
+        const { data, error } = await supabase
+          .from("proposals")
+          .select(
+            "id, sender_id, receiver_id, status, sender_have_ids, receiver_have_ids, meetup_start_at, meetup_end_at, meetup_place_name, meetup_lat, meetup_lng, meetup_candidates, exchange_method",
+          )
+          .eq("id", proposalIdParam)
+          .maybeSingle();
+        if (error) throw error;
+        const row = data as RevisionProposalRow | null;
+        if (!row) throw new Error("打診が見つかりません");
+
+        const isSender = row.sender_id === user.id;
+        const isReceiver = row.receiver_id === user.id;
+        if (!isSender && !isReceiver) {
+          throw new Error("この打診には参加していません");
+        }
+
+        if (!active) return;
+        setRevisionContext({
+          proposalId: row.id,
+          partnerId: isSender ? row.receiver_id : row.sender_id,
+          giveIds: isSender
+            ? safeStringArray(row.sender_have_ids)
+            : safeStringArray(row.receiver_have_ids),
+          receiveIds: isSender
+            ? safeStringArray(row.receiver_have_ids)
+            : safeStringArray(row.sender_have_ids),
+          meetupCandidates: parseRevisionMeetupCandidates(row),
+          exchangeMethod: normalizeExchangeMethod(row.exchange_method),
+        });
+      } catch (reason: unknown) {
+        if (!active) return;
+        setRevisionContext(null);
+        setRevisionError(
+          reason instanceof Error ? reason.message : "打診の条件を読み込めませんでした",
+        );
+      } finally {
+        if (active) setRevisionLoading(false);
+      }
+    })();
+
+    return () => {
+      active = false;
+    };
+  }, [isRevisionMode, proposalIdParam]);
+
+  useEffect(() => {
+    if (!revisionContext) return;
+    setGiveSelectedIds(revisionContext.giveIds);
+    setReceiveSelectedIds(revisionContext.receiveIds);
+    setMeetupCandidates(revisionContext.meetupCandidates);
+    setActiveMeetupId(revisionContext.meetupCandidates[0]?.id ?? null);
+    setPlaceSheetId(null);
+    setExchangeMethod(revisionContext.exchangeMethod);
+  }, [revisionContext]);
+
+  useEffect(() => {
+    if (!needsMeetup && tab === "meetup") {
+      setTab("receive");
+    }
+  }, [needsMeetup, tab]);
 
   useEffect(() => {
     setGiveSelectedIds((current) => ensureChoiceSelection(current, giveChoices));
@@ -241,7 +385,7 @@ export default function ProposalSelectScreen() {
   useEffect(() => {
     if (!supabase) return;
     if (usesProfileInventory) return;
-    const ids = Array.from(new Set([...initialGiveIds, ...initialReceiveIds]));
+    const ids = Array.from(new Set([...candidateGiveIds, ...candidateReceiveIds]));
     if (ids.length === 0) {
       setCatalogOverrides(new Map());
       return;
@@ -264,7 +408,7 @@ export default function ProposalSelectScreen() {
     return () => {
       active = false;
     };
-  }, [initialGiveIds, initialReceiveIds, usesProfileInventory]);
+  }, [candidateGiveIds, candidateReceiveIds, usesProfileInventory]);
 
   useEffect(() => {
     if (!usesProfileInventory) {
@@ -273,12 +417,12 @@ export default function ProposalSelectScreen() {
       setProfileInventoryError(null);
       return;
     }
-    if (!supabase || !partnerIdParam) {
+    if (!supabase || !effectivePartnerIdParam) {
       setProfileInventoryScope(null);
       setProfileInventoryError(null);
       return;
     }
-    if (!isUuid(partnerIdParam)) {
+    if (!isUuid(effectivePartnerIdParam)) {
       setProfileInventoryScope({ giveIds: [], receiveIds: [] });
       setProfileInventoryLoading(false);
       setProfileInventoryError("相手情報を読み直してください");
@@ -301,27 +445,30 @@ export default function ProposalSelectScreen() {
           .select(
             "id, user_id, title, photo_urls, hue, group:groups_master(name), character:characters_master(name), goods_type:goods_types_master(name)",
           )
-          .in("user_id", [user.id, partnerIdParam])
+          .in("user_id", [user.id, effectivePartnerIdParam])
           .eq("kind", "for_trade")
           .eq("status", "active")
           .limit(120);
         if (error) throw error;
 
         const rows = ((data as ScopedProposalInventoryRow[] | null) ?? []).filter(
-          (row) => row.user_id === user.id || row.user_id === partnerIdParam,
+          (row) => row.user_id === user.id || row.user_id === effectivePartnerIdParam,
         );
         const giveRows = rows.filter((row) => row.user_id === user.id);
-        const receiveRows = rows.filter((row) => row.user_id === partnerIdParam);
+        const receiveRows = rows.filter((row) => row.user_id === effectivePartnerIdParam);
 
         if (!active) return;
         setCatalogOverrides(buildProposalCatalogOverrides(rows));
         setProfileInventoryScope({
           giveIds: initialGiveNeedsInventory
-            ? giveRows.map((row) => row.id)
-            : initialGiveIds,
+            ? uniqueStrings([...candidateGiveIds, ...giveRows.map((row) => row.id)])
+            : candidateGiveIds,
           receiveIds: initialReceiveNeedsInventory
-            ? receiveRows.map((row) => row.id)
-            : initialReceiveIds,
+            ? uniqueStrings([
+                ...candidateReceiveIds,
+                ...receiveRows.map((row) => row.id),
+              ])
+            : candidateReceiveIds,
         });
       } catch (reason: unknown) {
         if (!active) return;
@@ -339,11 +486,11 @@ export default function ProposalSelectScreen() {
       active = false;
     };
   }, [
-    initialGiveIds,
+    candidateGiveIds,
+    candidateReceiveIds,
+    effectivePartnerIdParam,
     initialGiveNeedsInventory,
-    initialReceiveIds,
     initialReceiveNeedsInventory,
-    partnerIdParam,
     usesProfileInventory,
   ]);
 
@@ -361,33 +508,49 @@ export default function ProposalSelectScreen() {
         count: receiveSelectedIds.length,
         color: megrumColors.sky,
       },
-      { id: "meetup" as const, label: "待ち合わせ", count: 1, color: megrumColors.pink },
+      ...(needsMeetup
+        ? [
+            {
+              id: "meetup" as const,
+              label: "待ち合わせ",
+              count: 1,
+              color: megrumColors.pink,
+            },
+          ]
+        : []),
     ],
-    [giveSelectedIds.length, receiveSelectedIds.length],
+    [giveSelectedIds.length, needsMeetup, receiveSelectedIds.length],
   );
-  const itemSelectionMissing =
-    tab === "give"
-      ? giveSelectedIds.length === 0
-      : tab === "receive"
-        ? receiveSelectedIds.length === 0
-        : false;
+  const giveSelectionMissing = giveSelectedIds.length === 0;
+  const receiveSelectionMissing = receiveSelectedIds.length === 0;
+  const itemSelectionMissing = giveSelectionMissing || receiveSelectionMissing;
   const primaryButtonDisabled =
+    revisionLoading ||
     profileInventoryLoading ||
+    !!revisionError ||
     itemSelectionMissing ||
-    (tab === "meetup" && !meetupReady);
-  const primaryButtonLabel = profileInventoryLoading
-    ? "在庫を読み込んでいます"
-    : itemSelectionMissing
-      ? tab === "give"
-        ? "私が出すものを選択してください"
-        : "受け取るものを選択してください"
-      : tab === "meetup"
-        ? meetupReady
-          ? "次へ：送信確認 →"
-          : meetupHasTimeDraft
-            ? "場所未設定の候補があります"
-            : "交換できる時間を設定してください"
-        : "待ち合わせへ進む";
+    (needsMeetup && tab === "meetup" && !meetupReady);
+  const primaryButtonLabel = (() => {
+    if (revisionLoading) return "打診の条件を読み込んでいます";
+    if (profileInventoryLoading) return "在庫を読み込んでいます";
+    if (revisionError) return revisionError;
+    if (giveSelectionMissing) return "私が出すものを選択してください";
+    if (receiveSelectionMissing) return "受け取るものを選択してください";
+    if (!needsMeetup) {
+      return tab === "give"
+        ? "受け取るものへ進む"
+        : isRevisionMode
+          ? "次へ：変更確認 →"
+          : "次へ：送信確認 →";
+    }
+    if (tab !== "meetup") return "待ち合わせへ進む";
+    if (meetupReady) {
+      return isRevisionMode ? "次へ：変更確認 →" : "次へ：送信確認 →";
+    }
+    return meetupHasTimeDraft
+      ? "場所未設定の候補があります"
+      : "交換できる時間を設定してください";
+  })();
 
   return (
     <Screen scroll={false} contentStyle={styles.screen}>
@@ -405,6 +568,28 @@ export default function ProposalSelectScreen() {
           <Text style={styles.title}>提示物の選択</Text>
         </View>
         <StatusPill label="STEP 1/2" tone="lavender" />
+      </View>
+
+      <View style={styles.methodCard}>
+        <View style={styles.methodHeader}>
+          <Text style={styles.methodTitle}>交換手段</Text>
+          <Text style={styles.methodSub}>{exchangeMethodLabel(exchangeMethod)}</Text>
+        </View>
+        <SegmentedControl
+          values={["現地交換", "郵送交換"]}
+          selectedIndex={exchangeMethod === "mail" ? 1 : 0}
+          tintColor={megrumColors.lavender}
+          onChange={(event) =>
+            setExchangeMethod(
+              event.nativeEvent.selectedSegmentIndex === 1 ? "mail" : "hand",
+            )
+          }
+        />
+        <Text style={styles.methodHint}>
+          {exchangeMethod === "mail"
+            ? "郵送では待ち合わせ候補は不要です。送信前に住所登録を確認します。"
+            : "現地交換では、送信前に待ち合わせ候補の入力が必要です。"}
+        </Text>
       </View>
 
       <SectionTabs value={tab} tabs={tabs} onChange={setTab} />
@@ -490,10 +675,21 @@ export default function ProposalSelectScreen() {
 
       <PrimaryButton
         onPress={() => {
-          if (profileInventoryLoading) return;
-          if (tab === "give" && giveSelectedIds.length === 0) return;
-          if (tab === "receive" && receiveSelectedIds.length === 0) return;
-          if (tab !== "meetup") {
+          if (profileInventoryLoading || revisionLoading || revisionError) return;
+          if (giveSelectedIds.length === 0) {
+            setTab("give");
+            return;
+          }
+          if (receiveSelectedIds.length === 0) {
+            setTab("receive");
+            return;
+          }
+          if (!needsMeetup) {
+            if (tab !== "receive") {
+              setTab("receive");
+              return;
+            }
+          } else if (tab !== "meetup") {
             setTab("meetup");
             return;
           }
@@ -505,21 +701,30 @@ export default function ProposalSelectScreen() {
               ...(listingsParam ? { listings: listingsParam } : {}),
               ...(candidateIdParam ? { candidateId: candidateIdParam } : {}),
               ...(partnerIdParam ? { partnerId: partnerIdParam } : {}),
+              ...(revisionContext?.partnerId
+                ? { partnerId: revisionContext.partnerId }
+                : {}),
               ...(partnerHandleParam ? { partnerHandle: partnerHandleParam } : {}),
               ...(matchTypeParam ? { matchType: matchTypeParam } : {}),
+              ...(isRevisionMode && proposalIdParam
+                ? { proposalId: proposalIdParam, revise: "1" }
+                : {}),
+              exchangeMethod,
               meetups: JSON.stringify(
-                meetupCandidates
-                  .filter((candidate) => candidate.place.trim())
-                  .map((candidate, index) => ({
-                    id: candidate.id,
-                    label: `候補${index + 1}`,
-                    time: `${formatCandidateDate(candidate.dateId)} ${formatSlot(candidate.startSlot)} - ${formatSlot(candidate.endSlot)}`,
-                    startAt: slotToIso(candidate.dateId, candidate.startSlot),
-                    endAt: slotToIso(candidate.dateId, candidate.endSlot),
-                    place: candidate.place,
-                    latitude: candidate.coordinate.latitude,
-                    longitude: candidate.coordinate.longitude,
-                  })),
+                needsMeetup
+                  ? meetupCandidates
+                      .filter((candidate) => candidate.place.trim())
+                      .map((candidate, index) => ({
+                        id: candidate.id,
+                        label: `候補${index + 1}`,
+                        time: `${formatCandidateDate(candidate.dateId)} ${formatSlot(candidate.startSlot)} - ${formatSlot(candidate.endSlot)}`,
+                        startAt: slotToIso(candidate.dateId, candidate.startSlot),
+                        endAt: slotToIso(candidate.dateId, candidate.endSlot),
+                        place: candidate.place,
+                        latitude: candidate.coordinate.latitude,
+                        longitude: candidate.coordinate.longitude,
+                      }))
+                  : [],
               ),
             },
           });
@@ -1871,6 +2076,98 @@ function parseTab(value?: string): ProposalTab {
   return "give";
 }
 
+function safeStringArray(value: unknown): string[] {
+  return Array.isArray(value)
+    ? value.filter((item): item is string => typeof item === "string")
+    : [];
+}
+
+function uniqueStrings(values: string[]) {
+  return Array.from(new Set(values.filter(Boolean)));
+}
+
+function parseRevisionMeetupCandidates(
+  row: RevisionProposalRow,
+): MeetupCandidate[] {
+  const fromJson = Array.isArray(row.meetup_candidates)
+    ? row.meetup_candidates
+        .map((raw, index) => meetupCandidateFromRaw(raw, index))
+        .filter((candidate): candidate is MeetupCandidate => !!candidate)
+    : [];
+  if (fromJson.length > 0) return fromJson.slice(0, 3);
+  const legacyCandidate = meetupCandidateFromRaw(
+    {
+      startAt: row.meetup_start_at,
+      endAt: row.meetup_end_at,
+      placeName: row.meetup_place_name,
+      lat: row.meetup_lat,
+      lng: row.meetup_lng,
+    },
+    0,
+  );
+  return legacyCandidate ? [legacyCandidate] : [];
+}
+
+function meetupCandidateFromRaw(
+  value: unknown,
+  index: number,
+): MeetupCandidate | null {
+  if (!value || typeof value !== "object") return null;
+  const raw = value as Record<string, unknown>;
+  const startAt = typeof raw.startAt === "string" ? raw.startAt : null;
+  const endAt = typeof raw.endAt === "string" ? raw.endAt : null;
+  const place =
+    typeof raw.placeName === "string"
+      ? raw.placeName
+      : typeof raw.place === "string"
+        ? raw.place
+        : "";
+  if (!startAt || !endAt) return null;
+  const dateId = dateIdFromIso(startAt);
+  const dayIndex = Math.max(
+    0,
+    DAYS.findIndex((day) => day.id === dateId),
+  );
+  const latitude = Number(raw.lat ?? raw.latitude);
+  const longitude = Number(raw.lng ?? raw.longitude);
+  const startSlot = slotFromIso(startAt);
+  return {
+    id: typeof raw.id === "string" ? raw.id : `candidate-${index + 1}`,
+    dateId,
+    dayIndex,
+    startSlot,
+    endSlot: Math.max(startSlot + 1, Math.min(SLOT_COUNT, slotFromIso(endAt))),
+    place,
+    coordinate: {
+      latitude: Number.isFinite(latitude)
+        ? latitude
+        : FALLBACK_COORDINATE.latitude,
+      longitude: Number.isFinite(longitude)
+        ? longitude
+        : FALLBACK_COORDINATE.longitude,
+    },
+  };
+}
+
+function dateIdFromIso(value: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return DAYS[0].id;
+  const jst = new Date(date.getTime() + 9 * 60 * 60 * 1000);
+  return [
+    jst.getUTCFullYear(),
+    String(jst.getUTCMonth() + 1).padStart(2, "0"),
+    String(jst.getUTCDate()).padStart(2, "0"),
+  ].join("-");
+}
+
+function slotFromIso(value: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return 0;
+  const jst = new Date(date.getTime() + 9 * 60 * 60 * 1000);
+  const minutes = jst.getUTCHours() * 60 + jst.getUTCMinutes();
+  return Math.max(0, Math.min(SLOT_COUNT, Math.round(minutes / SLOT_MINUTES)));
+}
+
 function hasSendableInventoryIds(ids: string[]) {
   return ids.length > 0 && ids.every(isUuid);
 }
@@ -1937,6 +2234,36 @@ const styles = StyleSheet.create({
   },
   paneHost: {
     flex: 1,
+  },
+  methodCard: {
+    backgroundColor: megrumColors.surface,
+    borderColor: "rgba(58,50,74,0.08)",
+    borderRadius: megrumRadii.xl,
+    borderWidth: 1,
+    gap: 10,
+    padding: 14,
+    ...megrumShadow,
+  },
+  methodHeader: {
+    alignItems: "center",
+    flexDirection: "row",
+    justifyContent: "space-between",
+  },
+  methodTitle: {
+    color: megrumColors.ink,
+    fontSize: 13.5,
+    fontWeight: "900",
+  },
+  methodSub: {
+    color: megrumColors.lavender,
+    fontSize: 11,
+    fontWeight: "900",
+  },
+  methodHint: {
+    color: megrumColors.mutedInk,
+    fontSize: 11,
+    fontWeight: "800",
+    lineHeight: 17,
   },
   choiceList: {
     gap: 10,

@@ -16,11 +16,6 @@ import { router, useLocalSearchParams } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { ChatGradientBubble } from "../src/components/ChatGradientBubble";
 import { IconSymbol } from "../src/components/IconSymbol";
-import {
-  MeguriThreeBoundary,
-  MeguriThreeScene,
-  type MeguriSceneResident,
-} from "../src/components/meguri/MeguriThreeScene";
 import { MeguriAvatarFace } from "../src/components/meguri/MeguriAvatarFace";
 import { Screen } from "../src/components/Screen";
 import { useAuth } from "../src/auth/AuthProvider";
@@ -80,13 +75,6 @@ type ChatMessage = {
 };
 
 const CONVERSATION_TIMES = ["0:24", "昨日", "0:09", "土曜日", "土曜日", "金曜日", "木曜日", "水曜日", "月曜日", "先週"];
-const MESSAGE_LIST_SELF: MeguriSceneResident = {
-  animalType: "rabbit",
-  furColor: "lavender",
-  hue: "lav",
-  id: "me",
-  name: "あなた",
-};
 const LOCKED_TEXT_MOSAIC_ROWS = [
   [0.86, 0.54],
   [0.72, 0.38],
@@ -461,45 +449,15 @@ function ConversationRow({
 }
 
 function ConversationAvatar({ user }: { user: MeguriUser }) {
-  const [threeFailed, setThreeFailed] = useState(false);
-  const resident = useMemo((): MeguriSceneResident => toSceneResident(user), [user]);
-
-  if (threeFailed) {
-    return <ConversationAvatarFallback user={user} />;
-  }
-
   return (
-    <View style={styles.avatarThreeClip}>
-      <View style={styles.avatarThreeZoom}>
-        <MeguriThreeBoundary
-          fallback={<ConversationAvatarFallback user={user} />}
-          onError={() => setThreeFailed(true)}
-        >
-          <MeguriThreeScene
-            activeId={resident.id}
-            completedIds={[resident.id]}
-            focusedId={resident.id}
-            mode="summary"
-            onUnavailable={() => setThreeFailed(true)}
-            presentation="profile"
-            residents={[resident]}
-            self={MESSAGE_LIST_SELF}
-            smilingId={resident.id}
-          />
-        </MeguriThreeBoundary>
-      </View>
+    <View style={styles.avatarFaceWrap}>
+      <MeguriAvatarFace
+        animalType={user.animalType}
+        furColor={user.furColor}
+        hue={user.hue}
+        size={52}
+      />
     </View>
-  );
-}
-
-function ConversationAvatarFallback({ user }: { user: MeguriUser }) {
-  return (
-    <MeguriAvatarFace
-      animalType={user.animalType}
-      furColor={user.furColor}
-      hue={user.hue}
-      size={52}
-    />
   );
 }
 
@@ -999,16 +957,6 @@ function messagePeerToMeguriUser(message: MeguriThreadMessage): MeguriUser {
   };
 }
 
-function toSceneResident(user: MeguriUser): MeguriSceneResident {
-  return {
-    animalType: user.animalType,
-    furColor: user.furColor,
-    hue: user.hue,
-    id: user.id,
-    name: user.name,
-  };
-}
-
 function latestConversationTimestamp(
   letter: Letter,
   groomReplies: MeguriGroomReply[],
@@ -1282,23 +1230,11 @@ const styles = StyleSheet.create({
     position: "relative",
     width: 52,
   },
-  avatarThreeClip: {
+  avatarFaceWrap: {
     borderRadius: 26,
     height: 52,
-    overflow: "hidden",
+    justifyContent: "center",
     width: 52,
-  },
-  avatarThreeZoom: {
-    height: 92,
-    left: -20,
-    position: "absolute",
-    top: -24,
-    width: 92,
-  },
-  avatarText: {
-    color: megrumColors.ink,
-    fontSize: 22,
-    fontWeight: "900",
   },
   pinBadge: {
     alignItems: "center",
