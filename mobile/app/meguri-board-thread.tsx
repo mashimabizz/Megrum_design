@@ -170,6 +170,7 @@ export default function MeguriBoardThreadScreen() {
       normalizeReplySearch(
         [
           reply.authorName,
+          reply.authorHandle,
           reply.body,
           reply.quotedAuthorName,
           reply.quotedBody,
@@ -255,6 +256,12 @@ export default function MeguriBoardThreadScreen() {
     requestAnimationFrame(() => {
       scrollViewRef.current?.scrollToEnd({ animated });
     });
+  }
+
+  function filterRepliesByParticipant(participant: BoardParticipant) {
+    if (participant.replyCount === 0) return;
+    setReplySearchText(participant.handle || participant.name);
+    setParticipantsOpen(false);
   }
 
   const refreshDetail = useCallback(async (options: { silent?: boolean } = {}) => {
@@ -1229,6 +1236,9 @@ export default function MeguriBoardThreadScreen() {
                   <Text style={styles.participantsLead}>
                     {participants.length}人がこのスレッドに参加しています
                   </Text>
+                  <Text style={styles.participantsHint}>
+                    返信している人をタップすると、その人の返信だけを表示します
+                  </Text>
                 </View>
                 <Pressable
                   accessibilityRole="button"
@@ -1243,7 +1253,16 @@ export default function MeguriBoardThreadScreen() {
                 showsVerticalScrollIndicator={false}
               >
                 {participants.map((participant) => (
-                  <View key={participant.id} style={styles.participantRow}>
+                  <Pressable
+                    accessibilityRole="button"
+                    disabled={participant.replyCount === 0}
+                    key={participant.id}
+                    onPress={() => filterRepliesByParticipant(participant)}
+                    style={[
+                      styles.participantRow,
+                      participant.replyCount === 0 ? styles.participantRowDisabled : null,
+                    ]}
+                  >
                     <View
                       style={[
                         styles.participantAvatar,
@@ -1272,10 +1291,20 @@ export default function MeguriBoardThreadScreen() {
                         {participantSummary(participant)}
                       </Text>
                     </View>
-                    <Text style={styles.participantActiveAt}>
-                      {formatRelativeTime(participant.lastActiveAt)}
-                    </Text>
-                  </View>
+                    <View style={styles.participantTail}>
+                      <Text style={styles.participantActiveAt}>
+                        {formatRelativeTime(participant.lastActiveAt)}
+                      </Text>
+                      <Text
+                        style={[
+                          styles.participantFilterHint,
+                          participant.replyCount === 0 ? styles.participantFilterHintDisabled : null,
+                        ]}
+                      >
+                        {participant.replyCount > 0 ? "返信を見る" : "返信なし"}
+                      </Text>
+                    </View>
+                  </Pressable>
                 ))}
               </ScrollView>
             </View>
@@ -2384,6 +2413,12 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "800",
   },
+  participantsHint: {
+    color: "rgba(58,50,74,0.48)",
+    fontSize: 11,
+    fontWeight: "800",
+    lineHeight: 16,
+  },
   participantsCloseButton: {
     alignItems: "center",
     backgroundColor: "rgba(58,50,74,0.06)",
@@ -2406,6 +2441,9 @@ const styles = StyleSheet.create({
     gap: 10,
     paddingHorizontal: 11,
     paddingVertical: 10,
+  },
+  participantRowDisabled: {
+    opacity: 0.72,
   },
   participantAvatar: {
     alignItems: "center",
@@ -2454,5 +2492,17 @@ const styles = StyleSheet.create({
     color: megrumColors.mutedInk,
     fontSize: 10.5,
     fontWeight: "800",
+  },
+  participantTail: {
+    alignItems: "flex-end",
+    gap: 3,
+  },
+  participantFilterHint: {
+    color: megrumColors.lavender,
+    fontSize: 10.5,
+    fontWeight: "900",
+  },
+  participantFilterHintDisabled: {
+    color: "rgba(58,50,74,0.34)",
   },
 });

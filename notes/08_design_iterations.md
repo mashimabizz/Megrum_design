@@ -4,6 +4,52 @@
 
 ---
 
+## イテレーション193：掲示板参加者別返信フィルタを追加
+
+### 背景・問題意識
+
+スポット掲示板のスレッドが伸びると、特定の参加者の発言だけを追いたい場面が出る。参加者一覧を確認するだけでなく、そこから返信検索へつなげることで、一般的なスレッドの読み返し体験に近づけた。
+
+### 変更内容
+
+#### `mobile/app/meguri-board-thread.tsx`
+- スレッド内検索対象に返信者の handle を追加した。
+- 参加者一覧の返信している参加者をタップすると、その参加者名または handle で返信を絞り込むようにした。
+- 参加者一覧に `返信を見る` / `返信なし` の補助表示を追加した。
+
+#### `notes/09_state_machines.md`
+- Meguri Board Lifecycle に参加者別返信フィルタの表示ルールを追記した。
+
+#### `notes/10_glossary.md`
+- 掲示板参加者別返信フィルタを追加した。
+
+### 影響範囲
+
+- iOS版 スポット掲示板詳細
+- スレッド内検索・参加者一覧
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- `EAS_UPDATE_PROJECT_SLUG=ihub EXPO_NO_GIT_STATUS=1 npm --prefix mobile run update:ios:preview -- --message "[iter193] filter board replies by participant" --non-interactive`
+- Preview OTA: Update group `72f0be16-821d-4b33-a8b6-75414cf32962` / iOS update `019e7548-fba7-71bb-8fce-869fe589c3c2`
+
+### 関連ファイル
+
+- `mobile/app/meguri-board-thread.tsx`
+- `notes/08_design_iterations.md`
+- `notes/09_state_machines.md`
+- `notes/10_glossary.md`
+
+### セルフレビュー結果
+
+- ✅ 既存のスレッド内検索を使い回し、追加DBなしで参加者別の絞り込みを実現した。
+- ✅ 返信がない作成者はタップ不可にし、空検索へ誘導しないようにした。
+- ✅ 検索条件の変更だけなので、スレッド/返信状態は変更しない。
+
+---
+
 ## イテレーション192：掲示板参加者一覧を追加
 
 ### 背景・問題意識
