@@ -4,6 +4,51 @@
 
 ---
 
+## イテレーション207：掲示板一覧の画像枚数バッジを追加
+
+### 背景・問題意識
+
+掲示板では画像付きスレッドを開く前に見分けられることが、現地の状況確認や迷子・落とし物確認の効率に直結する。詳細画面には画像一覧があるため、一覧側にも添付画像の有無と枚数を軽く表示する。
+
+### 変更内容
+
+#### `mobile/app/meguri-board.tsx`
+- 画像が添付されているスレッドカードの右上アクション列に、画像枚数バッジを追加した。
+- 既存の `IconSymbol` にあるカメラ系アイコンを使い、アイコン定義ファイルは変更しないようにした。
+
+#### `notes/09_state_machines.md`
+- Meguri Board Lifecycle に画像枚数バッジの表示ルールを追記した。
+
+#### `notes/10_glossary.md`
+- 掲示板画像枚数バッジを追加した。
+
+### 影響範囲
+
+- iOS版 スポット掲示板一覧
+- 画像付きスレッドの視認性
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- `EAS_UPDATE_PROJECT_SLUG=ihub EXPO_NO_GIT_STATUS=1 npm --prefix mobile run update:ios:preview -- --message "[iter207] add board media count badges" --non-interactive`
+- Preview OTA: Update group `658b5cc8-3dfa-46a6-8774-dc8a4724dff0` / iOS update `019e757d-efb4-72c1-8eaa-49501b26eb8d`
+
+### 関連ファイル
+
+- `mobile/app/meguri-board.tsx`
+- `notes/08_design_iterations.md`
+- `notes/09_state_machines.md`
+- `notes/10_glossary.md`
+
+### セルフレビュー結果
+
+- ✅ 添付画像がないスレッドには表示せず、一覧の情報量を増やしすぎないようにした。
+- ✅ 既存アイコン型にある `camera-outline` を使い、共通アイコン定義の追加変更を避けた。
+- ✅ DB変更やネイティブ依存追加なしで、Preview OTA対象内に収めた。
+
+---
+
 ## イテレーション206：掲示板参加者プロフィール導線を追加
 
 ### 背景・問題意識

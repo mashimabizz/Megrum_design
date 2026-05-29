@@ -873,6 +873,12 @@ export default function MeguriBoardScreen() {
                           )}
                         </View>
                         <View style={styles.threadTopActions}>
+                          {thread.imageUris.length > 0 ? (
+                            <View style={styles.mediaCountBadge}>
+                              <IconSymbol name="camera-outline" color={megrumColors.lavender} size={13} />
+                              <Text style={styles.mediaCountText}>{thread.imageUris.length}</Text>
+                            </View>
+                          ) : null}
                           <Text style={styles.threadTime}>{formatRelativeTime(thread.latestActivityAt)}</Text>
                           <Pressable
                             accessibilityRole="button"
@@ -1614,6 +1620,20 @@ const styles = StyleSheet.create({
     alignItems: "center",
     flexDirection: "row",
     gap: 8,
+  },
+  mediaCountBadge: {
+    alignItems: "center",
+    backgroundColor: "rgba(166,149,216,0.12)",
+    borderRadius: 999,
+    flexDirection: "row",
+    gap: 3,
+    minHeight: 24,
+    paddingHorizontal: 8,
+  },
+  mediaCountText: {
+    color: megrumColors.lavender,
+    fontSize: 10.5,
+    fontWeight: "900",
   },
   moreButton: {
     alignItems: "center",
