@@ -1,4 +1,5 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { normalizePrefectureName } from "../data/japanPrefectures";
 import { isUuidLike } from "./groom";
 import type { MegrumCoordinate } from "./locationContext";
 import { hasSupabaseConfig, supabase } from "./supabase";
@@ -986,7 +987,7 @@ function timestampValue(value: unknown, fallback: number) {
 
 function normalizeAreaKey(value: string | null) {
   if (!value) return null;
-  return value.replace(/\s+/g, "").trim();
+  return normalizePrefectureName(value).replace(/\s+/g, "").trim();
 }
 
 function formatDistance(value: number) {

@@ -35,6 +35,10 @@ import {
   DEFAULT_MEGURI_PROFILE,
   loadMeguriProfileSettings,
 } from "../src/lib/meguriSettings";
+import {
+  displayMeguriBoardPrefecture,
+  normalizeMeguriBoardPrefecture,
+} from "../src/lib/meguriBoardPreferences";
 import { useKeyboardInset } from "../src/lib/useKeyboardInset";
 import { megrumColors, megrumShadow } from "../src/theme/tokens";
 
@@ -371,8 +375,12 @@ function buildViewerContext(input: {
   viewerId?: string | null;
 }): MeguriBoardViewerContext {
   const prefecture =
-    input.resolvedPrefecture || input.prefecture || input.fallbackArea || DEFAULT_MEGURI_PROFILE.baseArea;
-  const spotLabel = input.spotLabel || `${prefecture}のめぐりスポット`;
+    normalizeMeguriBoardPrefecture(input.prefecture) ||
+    normalizeMeguriBoardPrefecture(input.resolvedPrefecture) ||
+    normalizeMeguriBoardPrefecture(input.fallbackArea) ||
+    normalizeMeguriBoardPrefecture(DEFAULT_MEGURI_PROFILE.baseArea) ||
+    "東京";
+  const spotLabel = input.spotLabel || `${displayMeguriBoardPrefecture(prefecture)}のめぐりスポット`;
   const spotKey = input.spotKey || `${slugify(prefecture)}-meguri-board`;
   return {
     coordinate: input.coordinate ?? null,

@@ -20,6 +20,11 @@ import {
   type MeguriBoardViewerContext,
 } from "../src/lib/meguriBoard";
 import { getCurrentLocationContext, type MegrumCoordinate } from "../src/lib/locationContext";
+import {
+  displayMeguriBoardPrefecture,
+  loadMeguriBoardDefaultPrefecture,
+  normalizeMeguriBoardPrefecture,
+} from "../src/lib/meguriBoardPreferences";
 import { DEFAULT_MEGURI_PROFILE } from "../src/lib/meguriSettings";
 import { megrumColors, megrumShadow } from "../src/theme/tokens";
 
@@ -62,13 +67,13 @@ export default function MeguriBoardMapScreen() {
   const loadThreads = useCallback(async () => {
     setLoading(true);
     const location = previewMode ? null : await getCurrentLocationContext().catch(() => null);
+    const boardPrefecture = await loadMeguriBoardDefaultPrefecture(
+      profile?.primaryArea || DEFAULT_MEGURI_PROFILE.baseArea,
+    );
     const nextViewer = buildViewerContext({
       coordinate: location?.coordinate ?? null,
-      fallbackArea:
-        location?.prefecture ||
-        profile?.primaryArea ||
-        DEFAULT_MEGURI_PROFILE.baseArea,
-      prefecture: location?.prefecture ?? null,
+      fallbackArea: profile?.primaryArea || DEFAULT_MEGURI_PROFILE.baseArea,
+      prefecture: boardPrefecture,
       spotLabel: location?.label ?? null,
       viewerId: user?.id ?? "preview-me",
     });
@@ -138,7 +143,7 @@ export default function MeguriBoardMapScreen() {
         <View style={styles.headerCopy}>
           <Text style={styles.headerTitle}>掲示板マップ</Text>
           <Text numberOfLines={1} style={styles.headerSubtitle}>
-            3km圏内または都道府県単位のスレッド
+            3km圏内または{displayMeguriBoardPrefecture(viewerContext.prefecture)}のスレッド
           </Text>
         </View>
       </View>
@@ -199,8 +204,12 @@ function buildViewerContext(input: {
   spotLabel?: string | null;
   viewerId?: string | null;
 }): MeguriBoardViewerContext {
-  const prefecture = input.prefecture || input.fallbackArea || DEFAULT_MEGURI_PROFILE.baseArea;
-  const spotLabel = input.spotLabel || `${prefecture}のめぐりスポット`;
+  const prefecture =
+    normalizeMeguriBoardPrefecture(input.prefecture) ||
+    normalizeMeguriBoardPrefecture(input.fallbackArea) ||
+    normalizeMeguriBoardPrefecture(DEFAULT_MEGURI_PROFILE.baseArea) ||
+    "東京";
+  const spotLabel = input.spotLabel || `${displayMeguriBoardPrefecture(prefecture)}のめぐりスポット`;
   return {
     coordinate: input.coordinate ?? null,
     prefecture,

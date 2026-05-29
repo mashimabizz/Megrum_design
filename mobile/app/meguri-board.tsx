@@ -2,8 +2,10 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
 import SegmentedControl from "@react-native-segmented-control/segmented-control";
 import {
+  ActionSheetIOS,
   ActivityIndicator,
   Modal,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -36,6 +38,13 @@ import {
   DEFAULT_MEGURI_PROFILE,
   loadMeguriProfileSettings,
 } from "../src/lib/meguriSettings";
+import {
+  displayMeguriBoardPrefecture,
+  loadMeguriBoardDefaultPrefecture,
+  MEGURI_BOARD_PREFECTURE_OPTIONS,
+  normalizeMeguriBoardPrefecture,
+  saveMeguriBoardDefaultPrefecture,
+} from "../src/lib/meguriBoardPreferences";
 import { megrumColors, megrumShadow } from "../src/theme/tokens";
 import { IconSymbol } from "../src/components/IconSymbol";
 
@@ -56,6 +65,9 @@ export default function MeguriBoardScreen() {
   const { previewMode, profile, user } = useAuth();
   const [localArea, setLocalArea] = useState(DEFAULT_MEGURI_PROFILE.baseArea);
   const [localDisplayName, setLocalDisplayName] = useState(DEFAULT_MEGURI_PROFILE.displayName);
+  const [selectedPrefecture, setSelectedPrefecture] = useState<string | null>(() =>
+    normalizeMeguriBoardPrefecture(readParam(params.prefecture)),
+  );
   const [threads, setThreads] = useState<MeguriBoardThread[]>([]);
   const [loading, setLoading] = useState(true);
   const [composerOpen, setComposerOpen] = useState(false);
@@ -85,8 +97,11 @@ export default function MeguriBoardScreen() {
           latitude: params.viewerLat,
           longitude: params.viewerLng,
         }),
-        prefecture: readParam(params.prefecture),
-        resolvedPrefecture: locationContext?.prefecture ?? null,
+        prefecture:
+          selectedPrefecture ??
+          normalizeMeguriBoardPrefecture(readParam(params.prefecture)) ??
+          normalizeMeguriBoardPrefecture(actor.primaryArea),
+        resolvedPrefecture: null,
         spotKey: readParam(params.spotKey),
         spotLabel: readParam(params.spotLabel),
         viewerId: user?.id ?? actor.userId,
@@ -95,12 +110,12 @@ export default function MeguriBoardScreen() {
       actor.primaryArea,
       actor.userId,
       locationContext?.coordinate,
-      locationContext?.prefecture,
       params.prefecture,
       params.spotKey,
       params.spotLabel,
       params.viewerLat,
       params.viewerLng,
+      selectedPrefecture,
       user?.id,
     ],
   );
@@ -117,13 +132,21 @@ export default function MeguriBoardScreen() {
     [threads, viewMode],
   );
 
-  const refreshThreads = useCallback(async () => {
+  const refreshThreads = useCallback(async (prefectureOverride?: string | null) => {
     setLoading(true);
     const settings = await loadMeguriProfileSettings().catch(() => DEFAULT_MEGURI_PROFILE);
     const currentLocation = await getCurrentLocationContext().catch(() => null);
+    const nextPrefecture =
+      normalizeMeguriBoardPrefecture(prefectureOverride) ??
+      selectedPrefecture ??
+      normalizeMeguriBoardPrefecture(readParam(params.prefecture)) ??
+      (await loadMeguriBoardDefaultPrefecture(
+        profile?.primaryArea || settings.baseArea || actor.primaryArea,
+      ));
     setLocationContext(currentLocation);
     setLocalArea(settings.baseArea || DEFAULT_MEGURI_PROFILE.baseArea);
     setLocalDisplayName(settings.displayName || DEFAULT_MEGURI_PROFILE.displayName);
+    setSelectedPrefecture(nextPrefecture);
     const nextThreads = await loadMeguriBoardThreads(
       buildViewerContext({
         fallbackArea: profile?.primaryArea || settings.baseArea || actor.primaryArea,
@@ -131,8 +154,8 @@ export default function MeguriBoardScreen() {
           latitude: params.viewerLat,
           longitude: params.viewerLng,
         }),
-        prefecture: readParam(params.prefecture),
-        resolvedPrefecture: currentLocation?.prefecture ?? null,
+        prefecture: nextPrefecture,
+        resolvedPrefecture: null,
         spotKey: readParam(params.spotKey),
         spotLabel: readParam(params.spotLabel),
         viewerId: user?.id ?? actor.userId,
@@ -151,6 +174,7 @@ export default function MeguriBoardScreen() {
     params.viewerLng,
     previewMode,
     profile?.primaryArea,
+    selectedPrefecture,
     user?.id,
     viewMode,
   ]);
@@ -166,6 +190,33 @@ export default function MeguriBoardScreen() {
       setComposerOpen(true);
     }
   }, [params.compose]);
+
+  function openPrefecturePicker() {
+    if (Platform.OS !== "ios") return;
+    const optionLabels = MEGURI_BOARD_PREFECTURE_OPTIONS.map(displayMeguriBoardPrefecture);
+    const cancelButtonIndex = optionLabels.length;
+    ActionSheetIOS.showActionSheetWithOptions(
+      {
+        cancelButtonIndex,
+        options: [...optionLabels, "キャンセル"],
+        title: "都道府県を選択",
+      },
+      (buttonIndex) => {
+        if (buttonIndex === cancelButtonIndex) return;
+        const nextPrefecture = MEGURI_BOARD_PREFECTURE_OPTIONS[buttonIndex];
+        if (nextPrefecture) {
+          void handleSelectPrefecture(nextPrefecture);
+        }
+      },
+    );
+  }
+
+  async function handleSelectPrefecture(nextPrefecture: string) {
+    const normalized = await saveMeguriBoardDefaultPrefecture(nextPrefecture);
+    if (!normalized) return;
+    setSelectedPrefecture(normalized);
+    void refreshThreads(normalized);
+  }
 
   async function handleCreateThread() {
     const title = composerTitle.trim();
@@ -186,7 +237,7 @@ export default function MeguriBoardScreen() {
       fallbackArea: actor.primaryArea,
       fallbackCoordinate: actionLocation?.coordinate ?? viewerContext.coordinate ?? null,
       prefecture: viewerContext.prefecture,
-      resolvedPrefecture: actionLocation?.prefecture ?? viewerContext.prefecture,
+      resolvedPrefecture: null,
       spotKey: viewerContext.spotKey,
       spotLabel: viewerContext.spotLabel,
       viewerId: viewerContext.viewerId,
@@ -248,7 +299,7 @@ export default function MeguriBoardScreen() {
           <View style={styles.headerCopy}>
             <Text style={styles.headerTitle}>スポット掲示板</Text>
             <Text numberOfLines={1} style={styles.headerSubtitle}>
-              {viewerContext.spotLabel} / {viewerContext.prefecture}
+              {viewerContext.spotLabel} / {displayMeguriBoardPrefecture(viewerContext.prefecture)}
             </Text>
           </View>
           <Pressable accessibilityRole="button" onPress={() => setComposerOpen(true)} style={styles.composeButton}>
@@ -274,11 +325,11 @@ export default function MeguriBoardScreen() {
             </View>
             <Text style={styles.heroTitle}>現地の温度感をゆるく共有</Text>
             <Text style={styles.heroBody}>
-              いま見えているのは、現在地から3km圏内、または {viewerContext.prefecture || "このエリア"} のスレッドです。
+              いま見えているのは、現在地から3km圏内、または {displayMeguriBoardPrefecture(viewerContext.prefecture)} のスレッドです。
             </Text>
             <View style={styles.heroMetaRow}>
               <ScopePreviewPill label="3km圏内" value={viewerContext.coordinate ? "現在地から表示" : "位置情報待ち"} />
-              <ScopePreviewPill label="都道府県" value={viewerContext.prefecture || "未設定"} />
+              <ScopePreviewPill label="都道府県" value={displayMeguriBoardPrefecture(viewerContext.prefecture)} />
             </View>
           </View>
 
@@ -291,6 +342,23 @@ export default function MeguriBoardScreen() {
               )
             }
           />
+
+          <Pressable
+            accessibilityRole="button"
+            onPress={openPrefecturePicker}
+            style={({ pressed }) => [
+              styles.prefectureSelector,
+              pressed ? styles.prefectureSelectorPressed : null,
+            ]}
+          >
+            <View style={styles.prefectureSelectorCopy}>
+              <Text style={styles.prefectureSelectorLabel}>都道府県</Text>
+              <Text style={styles.prefectureSelectorValue}>
+                {displayMeguriBoardPrefecture(viewerContext.prefecture)}
+              </Text>
+            </View>
+            <IconSymbol name="chevron-down" color={megrumColors.lavender} size={18} />
+          </Pressable>
 
           <PrimaryButton onPress={() => setComposerOpen(true)}>スレッドを立てる</PrimaryButton>
 
@@ -413,8 +481,8 @@ export default function MeguriBoardScreen() {
                 {composerScope === "nearby_3km" || composerScope === "same_spot"
                   ? "現在地から3km圏内にいる人向け"
                   : composerScope === "same_prefecture"
-                    ? `${viewerContext.prefecture} を拠点に見ている人向け`
-                    : `${viewerContext.prefecture} を拠点に見ている人向け`}
+                    ? `${displayMeguriBoardPrefecture(viewerContext.prefecture)} を拠点に見ている人向け`
+                    : `${displayMeguriBoardPrefecture(viewerContext.prefecture)} を拠点に見ている人向け`}
               </Text>
             </View>
 
@@ -488,8 +556,12 @@ function buildViewerContext(input: {
   viewerId?: string | null;
 }): MeguriBoardViewerContext {
   const prefecture =
-    input.resolvedPrefecture || input.prefecture || input.fallbackArea || DEFAULT_MEGURI_PROFILE.baseArea;
-  const spotLabel = input.spotLabel || `${prefecture}のめぐりスポット`;
+    normalizeMeguriBoardPrefecture(input.prefecture) ||
+    normalizeMeguriBoardPrefecture(input.resolvedPrefecture) ||
+    normalizeMeguriBoardPrefecture(input.fallbackArea) ||
+    normalizeMeguriBoardPrefecture(DEFAULT_MEGURI_PROFILE.baseArea) ||
+    "東京";
+  const spotLabel = input.spotLabel || `${displayMeguriBoardPrefecture(prefecture)}のめぐりスポット`;
   const spotKey = input.spotKey || `${slugify(prefecture)}-meguri-board`;
   return {
     coordinate: input.fallbackCoordinate ?? null,
@@ -632,6 +704,34 @@ const styles = StyleSheet.create({
     color: megrumColors.ink,
     fontSize: 12.5,
     fontWeight: "800",
+  },
+  prefectureSelector: {
+    alignItems: "center",
+    backgroundColor: "#fff",
+    borderColor: "rgba(166,149,216,0.2)",
+    borderRadius: 18,
+    borderWidth: 1,
+    flexDirection: "row",
+    gap: 12,
+    justifyContent: "space-between",
+    paddingHorizontal: 16,
+    paddingVertical: 13,
+  },
+  prefectureSelectorPressed: {
+    opacity: 0.9,
+  },
+  prefectureSelectorCopy: {
+    gap: 3,
+  },
+  prefectureSelectorLabel: {
+    color: megrumColors.mutedInk,
+    fontSize: 10.5,
+    fontWeight: "800",
+  },
+  prefectureSelectorValue: {
+    color: megrumColors.ink,
+    fontSize: 15,
+    fontWeight: "900",
   },
   loadingBox: {
     alignItems: "center",

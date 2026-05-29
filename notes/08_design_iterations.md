@@ -4,6 +4,72 @@
 
 ---
 
+## イテレーション168.96：掲示板の都道府県選択を保存
+
+### 背景・問題意識
+
+オーナーから、スポット掲示板の都道府県は掲示板画面内で選べるようにし、初期値はプロフィールの都道府県、以降はユーザーが最後に選んだ都道府県をデフォルトにしたいという依頼があった。現地3km圏内と都道府県単位の閲覧を分けつつ、都道府県側は現在地ではなくユーザーが掲示板で選んだ値を使う必要がある。
+
+### 変更内容
+
+#### `mobile/src/lib/meguriBoardPreferences.ts`
+- 掲示板専用の都道府県デフォルト保存 helper を追加した。
+- 初回はプロフィール由来の都道府県を正規化し、変更後は AsyncStorage の保存値を返すようにした。
+- 47都道府県の選択肢と、表示名変換 helper をまとめた。
+
+#### `mobile/app/meguri-board.tsx`
+- スポット掲示板画面に、iOS標準のアクションシートで都道府県を選べるセレクタを追加した。
+- `same_prefecture` の一覧取得、投稿作成、詳細遷移で、選択済み都道府県を使うようにした。
+- 現在地から取れる都道府県が、ユーザーの選択値を上書きしないようにした。
+
+#### `mobile/app/meguri-board-map.tsx`
+- 掲示板マップでも、掲示板画面で保存した都道府県デフォルトを使って都道府県単位のスレッドを取得するようにした。
+
+#### `mobile/app/meguri-board-thread.tsx`
+- スレッド詳細で、一覧やマップから渡された都道府県を現在地の都道府県より優先するようにした。
+
+#### `mobile/src/lib/meguriBoard.ts`
+- 都道府県の一致判定で `東京都` と `東京` のような表記ゆれを同一視するようにした。
+
+### 影響範囲
+
+- iOS版 スポット掲示板
+- iOS版 掲示板マップ
+- iOS版 掲示板スレッド詳細
+- 掲示板の都道府県単位表示・投稿作成
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `git diff --check -- mobile/app/meguri-board.tsx mobile/app/meguri-board-map.tsx mobile/app/meguri-board-thread.tsx mobile/src/lib/meguriBoard.ts mobile/src/lib/meguriBoardPreferences.ts notes/09_state_machines.md notes/10_glossary.md`
+- `npm --prefix mobile run export:ios:preview`
+- `EXPO_NO_GIT_STATUS=1 EAS_UPDATE_PROJECT_SLUG=ihub npm --prefix mobile run update:ios:preview -- --message "[iter168.96] 掲示板の都道府県選択" --non-interactive`
+- Preview channel OTA配信済み：Update group `db76fc17-5ee0-4db0-8354-3afdf32bcb78` / iOS update ID `019e744e-0e19-7faa-9663-c450eb089278`
+- EAS Dashboard: `https://expo.dev/accounts/mashima.bizz/projects/ihub/updates/db76fc17-5ee0-4db0-8354-3afdf32bcb78`
+
+### 関連ファイル
+
+- `mobile/app/meguri-board.tsx`
+- `mobile/app/meguri-board-map.tsx`
+- `mobile/app/meguri-board-thread.tsx`
+- `mobile/src/lib/meguriBoard.ts`
+- `mobile/src/lib/meguriBoardPreferences.ts`
+- `notes/09_state_machines.md`
+- `notes/10_glossary.md`
+
+### セルフレビュー結果
+
+- ✅ 初回デフォルトはプロフィールの都道府県から取得
+- ✅ 画面内で変更した都道府県を端末に保存し、次回以降の既定値にする
+- ✅ `same_prefecture` の閲覧・投稿で、現在地ではなく掲示板の選択値を優先
+- ✅ iOS標準のアクションシートで都道府県を選択
+- ✅ 09更新診断：掲示板の都道府県既定値ルールを追記
+- ✅ 10更新診断：スポット掲示板と掲示板の都道府県設定を更新
+- ✅ 05更新診断：端末保存値のみのためDBスキーマ変更なし
+- ✅ Preview channel / iOS runtime `0.1.0` へOTA配信済み
+
+---
+
 ## イテレーション168.95：めぐり地図と掲示板ホームを追加
 
 ### 背景・問題意識
