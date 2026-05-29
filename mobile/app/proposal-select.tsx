@@ -1,6 +1,7 @@
 import { router, useLocalSearchParams } from "expo-router";
 import type { LocationGeocodedAddress } from "expo-location";
 import SegmentedControl from "@react-native-segmented-control/segmented-control";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
@@ -39,7 +40,6 @@ import {
 } from "../src/data/proposalItems";
 import { supabase } from "../src/lib/supabase";
 import {
-  exchangeMethodLabel,
   normalizeExchangeMethod,
   supportsHandExchange,
   type ExchangeMethod,
@@ -220,6 +220,7 @@ const PROFILE_INVENTORY_PAGE_SIZE = 10;
 
 export default function ProposalSelectScreen() {
   const { user: authUser } = useAuth();
+  const insets = useSafeAreaInsets();
   const params = useLocalSearchParams<{
     tab?: ProposalTab | ProposalTab[];
     gives?: string | string[];
@@ -779,7 +780,7 @@ export default function ProposalSelectScreen() {
   }
 
   return (
-    <Screen scroll={false} contentStyle={styles.screen}>
+    <Screen bottomInset={false} scroll={false} contentStyle={styles.screen}>
       <View style={styles.header}>
         <Pressable
           accessibilityRole="button"
@@ -797,10 +798,7 @@ export default function ProposalSelectScreen() {
       </View>
 
       <View style={styles.methodCard}>
-        <View style={styles.methodHeader}>
-          <Text style={styles.methodTitle}>交換手段</Text>
-          <Text style={styles.methodSub}>{exchangeMethodLabel(exchangeMethod)}</Text>
-        </View>
+        <Text style={styles.methodTitle}>交換手段</Text>
         <SegmentedControl
           values={["現地交換", "郵送交換", "どちらもOK"]}
           selectedIndex={exchangeMethodToIndex(exchangeMethod)}
@@ -809,13 +807,6 @@ export default function ProposalSelectScreen() {
             setExchangeMethod(exchangeMethodFromIndex(event.nativeEvent.selectedSegmentIndex))
           }
         />
-        <Text style={styles.methodHint}>
-          {exchangeMethod === "mail"
-            ? "郵送では待ち合わせ候補は不要です。送信前に住所登録を確認します。"
-            : exchangeMethod === "both"
-              ? "現地候補と住所登録の両方を確認します。相手とは合意までに受け渡し方法を調整できます。"
-              : "現地交換では、送信前に待ち合わせ候補の入力が必要です。"}
-        </Text>
       </View>
 
       <SectionTabs value={tab} tabs={tabs} onChange={setTab} />
@@ -906,66 +897,69 @@ export default function ProposalSelectScreen() {
         ) : null}
       </View>
 
-      <PrimaryButton
-        onPress={() => {
-          if (profileInventoryLoading || revisionLoading || revisionError) return;
-          if (giveSelectedIds.length === 0) {
-            setTab("give");
-            return;
-          }
-          if (receiveSelectedIds.length === 0) {
-            setTab("receive");
-            return;
-          }
-          if (!needsMeetup) {
-            if (tab !== "receive") {
+      <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, 12) }]}>
+        <PrimaryButton
+          style={styles.footerButton}
+          onPress={() => {
+            if (profileInventoryLoading || revisionLoading || revisionError) return;
+            if (giveSelectedIds.length === 0) {
+              setTab("give");
+              return;
+            }
+            if (receiveSelectedIds.length === 0) {
               setTab("receive");
               return;
             }
-          } else if (tab !== "meetup") {
-            setTab("meetup");
-            return;
-          }
-          router.push({
-            pathname: "/proposal-confirm",
-            params: {
-              gives: giveSelectedIds.join(","),
-              receives: receiveSelectedIds.join(","),
-              ...(listingsParam ? { listings: listingsParam } : {}),
-              ...(candidateIdParam ? { candidateId: candidateIdParam } : {}),
-              ...(partnerIdParam ? { partnerId: partnerIdParam } : {}),
-              ...(revisionContext?.partnerId
-                ? { partnerId: revisionContext.partnerId }
-                : {}),
-              ...(partnerHandleParam ? { partnerHandle: partnerHandleParam } : {}),
-              ...(matchTypeParam ? { matchType: matchTypeParam } : {}),
-              ...(isRevisionMode && proposalIdParam
-                ? { proposalId: proposalIdParam, revise: "1" }
-                : {}),
-              exchangeMethod,
-              meetups: JSON.stringify(
-                needsMeetup
-                  ? meetupCandidates
-                      .filter((candidate) => candidate.place.trim())
-                      .map((candidate, index) => ({
-                        id: candidate.id,
-                        label: `候補${index + 1}`,
-                        time: `${formatCandidateDate(candidate.dateId)} ${formatSlot(candidate.startSlot)} - ${formatSlot(candidate.endSlot)}`,
-                        startAt: slotToIso(candidate.dateId, candidate.startSlot),
-                        endAt: slotToIso(candidate.dateId, candidate.endSlot),
-                        place: candidate.place,
-                        latitude: candidate.coordinate.latitude,
-                        longitude: candidate.coordinate.longitude,
-                      }))
-                  : [],
-              ),
-            },
-          });
-        }}
-        disabled={primaryButtonDisabled}
-      >
-        {primaryButtonLabel}
-      </PrimaryButton>
+            if (!needsMeetup) {
+              if (tab !== "receive") {
+                setTab("receive");
+                return;
+              }
+            } else if (tab !== "meetup") {
+              setTab("meetup");
+              return;
+            }
+            router.push({
+              pathname: "/proposal-confirm",
+              params: {
+                gives: giveSelectedIds.join(","),
+                receives: receiveSelectedIds.join(","),
+                ...(listingsParam ? { listings: listingsParam } : {}),
+                ...(candidateIdParam ? { candidateId: candidateIdParam } : {}),
+                ...(partnerIdParam ? { partnerId: partnerIdParam } : {}),
+                ...(revisionContext?.partnerId
+                  ? { partnerId: revisionContext.partnerId }
+                  : {}),
+                ...(partnerHandleParam ? { partnerHandle: partnerHandleParam } : {}),
+                ...(matchTypeParam ? { matchType: matchTypeParam } : {}),
+                ...(isRevisionMode && proposalIdParam
+                  ? { proposalId: proposalIdParam, revise: "1" }
+                  : {}),
+                exchangeMethod,
+                meetups: JSON.stringify(
+                  needsMeetup
+                    ? meetupCandidates
+                        .filter((candidate) => candidate.place.trim())
+                        .map((candidate, index) => ({
+                          id: candidate.id,
+                          label: `候補${index + 1}`,
+                          time: `${formatCandidateDate(candidate.dateId)} ${formatSlot(candidate.startSlot)} - ${formatSlot(candidate.endSlot)}`,
+                          startAt: slotToIso(candidate.dateId, candidate.startSlot),
+                          endAt: slotToIso(candidate.dateId, candidate.endSlot),
+                          place: candidate.place,
+                          latitude: candidate.coordinate.latitude,
+                          longitude: candidate.coordinate.longitude,
+                        }))
+                    : [],
+                ),
+              },
+            });
+          }}
+          disabled={primaryButtonDisabled}
+        >
+          {primaryButtonLabel}
+        </PrimaryButton>
+      </View>
     </Screen>
   );
 
@@ -1261,16 +1255,30 @@ function MeetupPane({
         .reverse()
         .find((candidate) => candidate.place.trim()) ?? null
     : null;
+  const focusSlot = useMemo(() => {
+    const visibleDateIds = new Set(days.map((day) => day.id));
+    const scheduleSlots = buildWeekScheduleBlocks(scheduleOverlays, days).map(
+      (block) => block.startSlot,
+    );
+    const candidateSlots = candidates
+      .filter((candidate) => visibleDateIds.has(candidate.dateId))
+      .map((candidate) => candidate.startSlot);
+    const slots = [...scheduleSlots, ...candidateSlots].filter((slot) =>
+      Number.isFinite(slot),
+    );
+    if (slots.length === 0) return 10 * 4;
+    return Math.max(0, Math.min(...slots) - 2);
+  }, [candidates, days, scheduleOverlays]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
       scrollRef.current?.scrollTo({
-        y: Math.max(0, calendarSlotTop(10 * 4) - 10),
+        y: Math.max(0, calendarSlotTop(focusSlot) - 10),
         animated: false,
       });
     }, 60);
     return () => clearTimeout(timer);
-  }, []);
+  }, [calendarMode, focusSlot, weekOffset]);
 
   useEffect(() => {
     const listenerId = weekDragX.addListener(({ value }) => {
@@ -1705,21 +1713,32 @@ function MeetupPane({
 
   return (
     <View style={styles.meetupRoot}>
-      <View style={styles.calendarModeCard}>
-        <View style={styles.calendarModeHeader}>
-          <Text style={styles.calendarModeTitle}>相手と自分のスケジュール</Text>
-          <Text style={styles.calendarModeSub}>予定は背景として表示されます</Text>
+      <View style={styles.calendarToolbar}>
+        <View style={styles.calendarModeToggle}>
+          {(["week", "month"] as MeetupCalendarMode[]).map((mode) => {
+            const active = calendarMode === mode;
+            return (
+              <Pressable
+                key={mode}
+                accessibilityRole="button"
+                onPress={() => setCalendarMode(mode)}
+                style={[
+                  styles.calendarModeButton,
+                  active ? styles.calendarModeButtonActive : null,
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.calendarModeButtonText,
+                    active ? styles.calendarModeButtonTextActive : null,
+                  ]}
+                >
+                  {mode === "week" ? "週" : "月"}
+                </Text>
+              </Pressable>
+            );
+          })}
         </View>
-        <SegmentedControl
-          values={["5日", "月"]}
-          selectedIndex={calendarMode === "week" ? 0 : 1}
-          tintColor={megrumColors.lavender}
-          onChange={(event) =>
-            setCalendarMode(
-              event.nativeEvent.selectedSegmentIndex === 0 ? "week" : "month",
-            )
-          }
-        />
       </View>
 
       {calendarMode === "month" ? (
@@ -2136,7 +2155,7 @@ function MonthSchedulePanel({
                     ]}
                   >
                     <Text numberOfLines={1} style={styles.monthScheduleText}>
-                      {item.title}
+                      {formatMonthScheduleLabel(item)}
                     </Text>
                   </View>
                 ))}
@@ -2148,7 +2167,6 @@ function MonthSchedulePanel({
           );
         })}
       </View>
-      <Text style={styles.monthHint}>日付を押すと5日表示で候補を追加できます</Text>
     </View>
   );
 }
@@ -2399,9 +2417,9 @@ function buildMeetupDays(weekOffset = 0): MeetupDay[] {
   const weekday = ["日", "月", "火", "水", "木", "金", "土"];
   const now = new Date();
   const base = new Date(now);
-  base.setDate(now.getDate() + weekOffset * 5);
+  base.setDate(now.getDate() + weekOffset * 7);
   const todayKey = dateKey(now);
-  return Array.from({ length: 5 }, (_, index) => {
+  return Array.from({ length: 7 }, (_, index) => {
     const date = new Date(base);
     date.setDate(base.getDate() + index);
     return {
@@ -2417,7 +2435,7 @@ function buildMeetupDays(weekOffset = 0): MeetupDay[] {
 function buildMeetupMonthDays(weekOffset = 0): MeetupDay[] {
   const weekday = ["日", "月", "火", "水", "木", "金", "土"];
   const anchor = new Date();
-  anchor.setDate(anchor.getDate() + weekOffset * 5);
+  anchor.setDate(anchor.getDate() + weekOffset * 7);
   const monthStart = new Date(anchor.getFullYear(), anchor.getMonth(), 1);
   const gridStart = new Date(monthStart);
   gridStart.setDate(monthStart.getDate() - monthStart.getDay());
@@ -2444,7 +2462,7 @@ function weekOffsetForDateId(dateId: string) {
   const diffDays = Math.round(
     (targetBase.getTime() - base.getTime()) / (24 * 60 * 60 * 1000),
   );
-  return Math.floor(diffDays / 5);
+  return Math.floor(diffDays / 7);
 }
 
 function dateKey(date: Date) {
@@ -2528,6 +2546,10 @@ function groupScheduleOverlaysByDate(items: ProposalScheduleOverlayItem[]) {
     map.set(key, [...(map.get(key) ?? []), item]);
   });
   return map;
+}
+
+function formatMonthScheduleLabel(item: ProposalScheduleOverlayItem) {
+  return item.placeName ? `${item.title}・${item.placeName}` : item.title;
 }
 
 async function fetchProposalScheduleOverlays(
@@ -2951,35 +2973,26 @@ const styles = StyleSheet.create({
   paneHost: {
     flex: 1,
   },
+  footer: {
+    backgroundColor: megrumColors.background,
+    paddingTop: 10,
+  },
+  footerButton: {
+    minHeight: 56,
+  },
   methodCard: {
     backgroundColor: megrumColors.surface,
     borderColor: "rgba(58,50,74,0.08)",
     borderRadius: megrumRadii.xl,
     borderWidth: 1,
-    gap: 10,
+    gap: 9,
     padding: 14,
     ...megrumShadow,
-  },
-  methodHeader: {
-    alignItems: "center",
-    flexDirection: "row",
-    justifyContent: "space-between",
   },
   methodTitle: {
     color: megrumColors.ink,
     fontSize: 13.5,
     fontWeight: "900",
-  },
-  methodSub: {
-    color: megrumColors.lavender,
-    fontSize: 11,
-    fontWeight: "900",
-  },
-  methodHint: {
-    color: megrumColors.mutedInk,
-    fontSize: 11,
-    fontWeight: "800",
-    lineHeight: 17,
   },
   choiceList: {
     gap: 10,
@@ -3110,26 +3123,37 @@ const styles = StyleSheet.create({
     overflow: "hidden",
     position: "relative",
   },
-  calendarModeCard: {
-    backgroundColor: "rgba(166,149,216,0.07)",
+  calendarToolbar: {
+    alignItems: "flex-end",
+    backgroundColor: megrumColors.surface,
     borderBottomColor: "rgba(58,50,74,0.08)",
     borderBottomWidth: 1,
-    gap: 10,
     paddingHorizontal: 14,
-    paddingVertical: 12,
+    paddingVertical: 9,
   },
-  calendarModeHeader: {
-    gap: 2,
+  calendarModeToggle: {
+    backgroundColor: "rgba(58,50,74,0.07)",
+    borderRadius: megrumRadii.pill,
+    flexDirection: "row",
+    padding: 3,
   },
-  calendarModeTitle: {
-    color: megrumColors.ink,
-    fontSize: 13,
+  calendarModeButton: {
+    alignItems: "center",
+    borderRadius: megrumRadii.pill,
+    height: 30,
+    justifyContent: "center",
+    width: 38,
+  },
+  calendarModeButtonActive: {
+    backgroundColor: megrumColors.lavender,
+  },
+  calendarModeButtonText: {
+    color: megrumColors.mutedInk,
+    fontSize: 14,
     fontWeight: "900",
   },
-  calendarModeSub: {
-    color: megrumColors.mutedInk,
-    fontSize: 10.5,
-    fontWeight: "700",
+  calendarModeButtonTextActive: {
+    color: megrumColors.surface,
   },
   monthPanel: {
     flex: 1,
@@ -3196,13 +3220,6 @@ const styles = StyleSheet.create({
     color: megrumColors.mutedInk,
     fontSize: 8,
     fontWeight: "900",
-  },
-  monthHint: {
-    color: megrumColors.mutedInk,
-    fontSize: 10.5,
-    fontWeight: "700",
-    marginTop: 10,
-    textAlign: "center",
   },
   daysViewport: {
     borderBottomColor: "rgba(58,50,74,0.08)",

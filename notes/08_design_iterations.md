@@ -4,6 +4,52 @@
 
 ---
 
+## イテレーション170.1：提示物選択の待ち合わせUI整理
+
+### 背景・問題意識
+
+オーナーから、提示物選択画面の交換手段セレクタに残っている説明文と右上サマリー表示、待ち合わせタブ内の「相手と自分のスケジュール」見出しと説明文を削除したいという依頼があった。あわせて、待ち合わせタブ下部の余計な灰色領域をなくし、週/月カレンダー内に自分と相手の予定が見える状態にしたいという指摘があった。
+
+### 変更内容
+
+#### `mobile/app/proposal-select.tsx`
+- 交換手段カードから、選択中の交換手段サマリーと下部説明文を削除した。
+- 待ち合わせタブから「相手と自分のスケジュール」見出しと説明文を削除した。
+- カレンダー切り替えを「週 / 月」の小さな右上ボタンに変更した。
+- 週表示を5日単位から7日単位に変更した。
+- 待ち合わせカレンダー内の予定表示を、候補/予定のある時間帯へ初期スクロールするようにした。
+- 月表示の予定にも予定名と場所を1行で出すようにした。
+- 画面下部のPrimaryButtonを安全領域込みのフッターに移し、`Screen` の大きな下部余白を使わない構造にした。
+
+### 影響範囲
+
+- iOS版 提示物選択画面
+- 交換手段選択
+- 待ち合わせ候補選択カレンダー
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `git diff --check -- mobile/app/proposal-select.tsx notes/08_design_iterations.md`
+- `npm --prefix mobile run export:ios:preview`
+- `EAS_UPDATE_PROJECT_SLUG=ihub EXPO_NO_GIT_STATUS=1 npm --prefix mobile run update:ios:preview -- --message "[iter170.1] proposal meetup calendar cleanup" --non-interactive`
+- Preview OTA: Update group `d0f82e7a-66f6-4f29-8ddb-0616d70fcecd` / iOS update `019e7491-5b6c-7238-94c4-f847d854191e`
+
+### 関連ファイル
+
+- `mobile/app/proposal-select.tsx`
+
+### セルフレビュー結果
+
+- ✅ 交換手段の説明文と右上サマリーを削除。
+- ✅ 待ち合わせタブの見出し/説明文を削除。
+- ✅ 週/月切り替えは右上の小型ボタン化。
+- ✅ 週表示は7日単位へ変更。
+- ✅ 予定名と場所は週/月どちらにも表示される構造。
+- ✅ 状態遷移・用語・データモデルの変更はないため、`notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要。
+
+---
+
 ## イテレーション170：タグ右上統一と打診フィルター拡張
 
 ### 背景・問題意識
