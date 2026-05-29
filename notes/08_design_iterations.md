@@ -4,6 +4,50 @@
 
 ---
 
+## イテレーション196：掲示板返信番号検索を追加
+
+### 背景・問題意識
+
+返信番号を表示しても、番号で直接探せなければ長いスレッドでは活用しにくい。スクショや会話で `#12` のように参照された時にすぐ該当返信へ近づけるよう、スレッド内検索に返信番号を含めた。
+
+### 変更内容
+
+#### `mobile/app/meguri-board-thread.tsx`
+- スレッド内検索の対象に返信番号 `#1` / `#2` ... を追加した。
+- 検索中の返信件数表示を `検索結果/全件` の形式にした。
+
+#### `notes/09_state_machines.md`
+- Meguri Board Lifecycle に返信番号検索の表示ルールを追記した。
+
+#### `notes/10_glossary.md`
+- 掲示板返信番号検索を追加した。
+
+### 影響範囲
+
+- iOS版 スポット掲示板詳細
+- スレッド内検索
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- `EAS_UPDATE_PROJECT_SLUG=ihub EXPO_NO_GIT_STATUS=1 npm --prefix mobile run update:ios:preview -- --message "[iter196] search board replies by number" --non-interactive`
+- Preview OTA: Update group `34a32228-3073-4696-8fc0-b27282862af7` / iOS update `019e7553-3475-7a1b-93cb-b1dd6ae67072`
+
+### 関連ファイル
+
+- `mobile/app/meguri-board-thread.tsx`
+- `notes/08_design_iterations.md`
+- `notes/09_state_machines.md`
+- `notes/10_glossary.md`
+
+### セルフレビュー結果
+
+- ✅ 返信番号を既存検索インデックスに追加するだけに留め、DBや返信状態は変更していない。
+- ✅ 検索中はヒット件数と全件数を同時に表示し、絞り込み状態が分かるようにした。
+
+---
+
 ## イテレーション195：掲示板引用元ジャンプを追加
 
 ### 背景・問題意識

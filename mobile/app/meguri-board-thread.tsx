@@ -164,12 +164,17 @@ export default function MeguriBoardThreadScreen() {
     ],
   );
 
+  const replyNumberById = useMemo(() => {
+    return new Map(replies.map((reply, index) => [reply.id, index + 1]));
+  }, [replies]);
+
   const filteredReplies = useMemo(() => {
     const query = normalizeReplySearch(replySearchText);
     if (!query) return replies;
     return replies.filter((reply) =>
       normalizeReplySearch(
         [
+          `#${replyNumberById.get(reply.id) ?? ""}`,
           reply.authorName,
           reply.authorHandle,
           reply.body,
@@ -180,17 +185,13 @@ export default function MeguriBoardThreadScreen() {
           .join(" "),
       ).includes(query),
     );
-  }, [replies, replySearchText]);
+  }, [replies, replyNumberById, replySearchText]);
 
   const unreadSeparatorReplyId = useMemo(() => {
     if (replySearchText.trim() || replies.length === 0) return null;
     const firstUnreadReply = replies.find((reply) => !previousReadAt || reply.createdAt > previousReadAt);
     return firstUnreadReply?.id ?? null;
   }, [previousReadAt, replies, replySearchText]);
-
-  const replyNumberById = useMemo(() => {
-    return new Map(replies.map((reply, index) => [reply.id, index + 1]));
-  }, [replies]);
 
   const participants = useMemo<BoardParticipant[]>(() => {
     if (!thread) return [];
@@ -1023,7 +1024,9 @@ export default function MeguriBoardThreadScreen() {
               <View style={styles.replyHeaderRow}>
                 <Text style={styles.replySectionTitle}>返信</Text>
                 <View style={styles.replyHeaderActions}>
-                  <Text style={styles.replyCountMeta}>{replies.length}件</Text>
+                  <Text style={styles.replyCountMeta}>
+                    {replySearchText.trim() ? `${filteredReplies.length}/${replies.length}件` : `${replies.length}件`}
+                  </Text>
                   {replies.length > 0 ? (
                     <Pressable
                       accessibilityRole="button"
