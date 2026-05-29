@@ -25,6 +25,7 @@ import {
 } from "../../src/components/GoodsGrid";
 import { useAuth } from "../../src/auth/AuthProvider";
 import { Screen } from "../../src/components/Screen";
+import { GoodsGridSkeleton, SkeletonPillRow } from "../../src/components/SkeletonScreen";
 import { fetchInventoryTagLabels, formatHashTags } from "../../src/lib/inventoryTags";
 import { supabase } from "../../src/lib/supabase";
 import { megrumColors, megrumRadii } from "../../src/theme/tokens";
@@ -269,6 +270,7 @@ export default function InventoryScreen() {
         },
         onMove: (nextStatus) => {
           const itemId = selected.id;
+          const previousStatus = selected.status;
           setItems((current) =>
             current.map((item) =>
               item.id === itemId
@@ -282,14 +284,25 @@ export default function InventoryScreen() {
           );
           closeSelectedActions();
           if (supabase && user && !previewMode) {
-            supabase
-              .from("goods_inventory")
-              .update({ status: nextStatus })
-              .eq("id", itemId)
-              .eq("user_id", user.id)
-              .then(({ error }) => {
-                if (error) setLoadError(error.message);
-              });
+            void updateInventoryStatus({
+              itemId,
+              nextStatus,
+              previousStatus,
+              userId: user.id,
+            }).catch((error: unknown) => {
+              setLoadError(error instanceof Error ? error.message : "状態変更に失敗しました");
+              setItems((current) =>
+                current.map((item) =>
+                  item.id === itemId
+                    ? {
+                        ...item,
+                        status: previousStatus,
+                        badge: previousStatus === "active" ? "譲る候補" : "キープ",
+                      }
+                    : item,
+                ),
+              );
+            });
           }
         },
         onDelete: () => {
@@ -314,15 +327,12 @@ export default function InventoryScreen() {
     setDeletingItemIds((current) => current.filter((itemId) => itemId !== id));
     setItems((current) => current.filter((item) => item.id !== id));
     if (supabase && user && !previewMode) {
-      supabase
-        .from("goods_inventory")
-        .delete()
-        .eq("id", id)
-        .eq("user_id", user.id)
-        .eq("kind", "for_trade")
-        .then(({ error }) => {
-          if (!error) return;
-          setLoadError(error.message);
+      void archiveInventoryItem({ itemId: id, userId: user.id })
+        .then(() => {
+          setLoadError(null);
+        })
+        .catch((error: unknown) => {
+          setLoadError(error instanceof Error ? error.message : "削除に失敗しました");
           if (target) {
             setItems((current) =>
               current.some((item) => item.id === target.id)
@@ -362,48 +372,56 @@ export default function InventoryScreen() {
           />
         </View>
 
-        {loading ? <Text style={styles.inlineNotice}>在庫を読み込み中…</Text> : null}
         {loadError ? <Text style={styles.inlineError}>{loadError}</Text> : null}
 
-        <View style={styles.filters}>
-          <FilterRow
-            label="推し"
-            options={groupOptions}
-            active={activeGroup}
-            onChange={(next) => {
-              setActiveGroup(next);
-              closeSelectedActions();
-            }}
-          />
-          <FilterRow
-            label="種別"
-            options={typeOptions}
-            active={activeType}
-            onChange={(next) => {
-              setActiveType(next);
-              closeSelectedActions();
-            }}
-          />
-        </View>
-
-        <ScrollView
-          ref={pagerRef}
-          horizontal
-          pagingEnabled
-          bounces={false}
-          directionalLockEnabled
-          showsHorizontalScrollIndicator={false}
-          scrollEventThrottle={16}
-          style={styles.contentHost}
-          onScroll={handlePagerScroll}
-          onMomentumScrollEnd={handlePagerSettled}
-        >
-          {STATUS_ORDER.map((pageStatus) => (
-            <View key={pageStatus} style={[styles.inventoryPage, { width: pageWidth }]}>
-              {renderInventoryContent(pageStatus)}
+        {loading ? (
+          <View style={styles.loadingSkeleton}>
+            <SkeletonPillRow count={2} />
+            <GoodsGridSkeleton columns={columns} count={9} />
+          </View>
+        ) : (
+          <>
+            <View style={styles.filters}>
+              <FilterRow
+                label="推し"
+                options={groupOptions}
+                active={activeGroup}
+                onChange={(next) => {
+                  setActiveGroup(next);
+                  closeSelectedActions();
+                }}
+              />
+              <FilterRow
+                label="種別"
+                options={typeOptions}
+                active={activeType}
+                onChange={(next) => {
+                  setActiveType(next);
+                  closeSelectedActions();
+                }}
+              />
             </View>
-          ))}
-        </ScrollView>
+
+            <ScrollView
+              ref={pagerRef}
+              horizontal
+              pagingEnabled
+              bounces={false}
+              directionalLockEnabled
+              showsHorizontalScrollIndicator={false}
+              scrollEventThrottle={16}
+              style={styles.contentHost}
+              onScroll={handlePagerScroll}
+              onMomentumScrollEnd={handlePagerSettled}
+            >
+              {STATUS_ORDER.map((pageStatus) => (
+                <View key={pageStatus} style={[styles.inventoryPage, { width: pageWidth }]}>
+                  {renderInventoryContent(pageStatus)}
+                </View>
+              ))}
+            </ScrollView>
+          </>
+        )}
       </ScrollView>
 
       <BottomOptionSheet
@@ -556,6 +574,94 @@ function normalizeInventoryStatus(status: InventoryRow["status"]): InventoryStat
   if (status === "traded") return "traded";
   if (status === "active") return "active";
   return "keep";
+}
+
+async function updateInventoryStatus({
+  itemId,
+  nextStatus,
+  previousStatus,
+  userId,
+}: {
+  itemId: string;
+  nextStatus: InventoryStatus;
+  previousStatus: InventoryStatus;
+  userId: string;
+}) {
+  if (!supabase) return;
+  if (previousStatus === "active" && nextStatus !== "active") {
+    await removeUnavailableHavesFromListings(userId, [itemId]);
+  }
+
+  const { error } = await supabase
+    .from("goods_inventory")
+    .update({ status: nextStatus })
+    .eq("id", itemId)
+    .eq("user_id", userId)
+    .eq("kind", "for_trade");
+  if (error) throw error;
+}
+
+async function archiveInventoryItem({
+  itemId,
+  userId,
+}: {
+  itemId: string;
+  userId: string;
+}) {
+  if (!supabase) return;
+  await removeUnavailableHavesFromListings(userId, [itemId]);
+  const { error } = await supabase
+    .from("goods_inventory")
+    .update({ status: "archived" })
+    .eq("id", itemId)
+    .eq("user_id", userId)
+    .eq("kind", "for_trade")
+    .neq("status", "traded");
+  if (error) throw error;
+}
+
+async function removeUnavailableHavesFromListings(userId: string, inventoryIds: string[]) {
+  if (!supabase || inventoryIds.length === 0) return;
+  const removeSet = new Set(inventoryIds);
+  const { data, error } = await supabase
+    .from("listings")
+    .select("id, have_ids, have_qtys")
+    .eq("user_id", userId)
+    .in("status", ["active", "paused"]);
+  if (error) throw error;
+
+  for (const listing of
+    (data as {
+      id: string;
+      have_ids: string[] | null;
+      have_qtys: number[] | null;
+    }[] | null) ?? []) {
+    const haveIds = listing.have_ids ?? [];
+    if (!haveIds.some((id) => removeSet.has(id))) continue;
+
+    const nextIds: string[] = [];
+    const nextQtys: number[] = [];
+    for (let index = 0; index < haveIds.length; index += 1) {
+      const haveId = haveIds[index];
+      if (removeSet.has(haveId)) continue;
+      nextIds.push(haveId);
+      nextQtys.push(listing.have_qtys?.[index] ?? 1);
+    }
+
+    const { error: updateError } =
+      nextIds.length === 0
+        ? await supabase
+            .from("listings")
+            .update({ status: "closed" })
+            .eq("id", listing.id)
+            .eq("user_id", userId)
+        : await supabase
+            .from("listings")
+            .update({ have_ids: nextIds, have_qtys: nextQtys })
+            .eq("id", listing.id)
+            .eq("user_id", userId);
+    if (updateError) throw updateError;
+  }
 }
 
 function pickName(
@@ -854,6 +960,9 @@ const styles = StyleSheet.create({
     paddingBottom: 8,
     paddingHorizontal: 18,
     paddingTop: 2,
+  },
+  loadingSkeleton: {
+    gap: 14,
   },
   deleteModalRoot: {
     alignItems: "center",

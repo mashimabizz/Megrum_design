@@ -31,6 +31,7 @@ import {
   useWindowDimensions,
 } from "react-native";
 import { Screen } from "../../src/components/Screen";
+import { HomeFeedSkeleton } from "../../src/components/SkeletonScreen";
 import { useAuth } from "../../src/auth/AuthProvider";
 import { IconSymbol, type IconSymbolName } from "../../src/components/IconSymbol";
 import { hasSupabaseConfig, supabase } from "../../src/lib/supabase";
@@ -757,30 +758,35 @@ export default function HomeScreen() {
         scrollEventThrottle={16}
       >
         {homeError ? <Text style={styles.inlineError}>{homeError}</Text> : null}
-        {homeLoading ? <Text style={styles.loadingText}>マッチを読み込み中…</Text> : null}
-        <HomeGroomRail onOpen={openHomeGroom} posts={homeGroomPosts} />
-        {visibleSections.length > 0 ? (
-          visibleSections.map((section, sectionIndex) => [
-            <StickySectionHeader
-              key={`${section.id}-header`}
-              title={section.title}
-            />,
-            <ShelfSectionRows
-              key={`${section.id}-rows`}
-              section={section}
-              sectionIndex={sectionIndex}
-              tileWidth={tileWidth}
-              localMode={localMode}
-              onCandidatePress={openMatchDetail}
-            />,
-          ])
+        {homeLoading ? (
+          <HomeFeedSkeleton />
         ) : (
-          <View style={styles.emptyMatches}>
-            <Text style={styles.emptyMatchesTitle}>まだ候補がありません</Text>
-            <Text style={styles.emptyMatchesText}>
-              Wish と譲る候補が増えると、ここに交換候補が並びます。
-            </Text>
-          </View>
+          <>
+            <HomeGroomRail onOpen={openHomeGroom} posts={homeGroomPosts} />
+            {visibleSections.length > 0 ? (
+              visibleSections.map((section, sectionIndex) => [
+                <StickySectionHeader
+                  key={`${section.id}-header`}
+                  title={section.title}
+                />,
+                <ShelfSectionRows
+                  key={`${section.id}-rows`}
+                  section={section}
+                  sectionIndex={sectionIndex}
+                  tileWidth={tileWidth}
+                  localMode={localMode}
+                  onCandidatePress={openMatchDetail}
+                />,
+              ])
+            ) : (
+              <View style={styles.emptyMatches}>
+                <Text style={styles.emptyMatchesTitle}>まだ候補がありません</Text>
+                <Text style={styles.emptyMatchesText}>
+                  Wish と譲る候補が増えると、ここに交換候補が並びます。
+                </Text>
+              </View>
+            )}
+          </>
         )}
       </ScrollView>
       <TopEdgeFade height={topEdgeFadeHeight} />
@@ -2718,22 +2724,6 @@ function CandidateTile({
 }
 
 function openMatchDetail(row: ShelfRow, candidate: Candidate) {
-  if (!candidate.listingIds?.length && (candidate.giveIds?.length || candidate.receiveIds?.length)) {
-    router.push({
-      pathname: "/proposal-select",
-      params: {
-        tab: "meetup",
-        candidateId: candidate.id,
-        partnerId: candidate.partnerId ?? "",
-        partnerHandle: candidate.partnerHandle ?? "",
-        matchType: candidate.matchType ?? "",
-        gives: candidate.giveIds?.join(",") ?? "",
-        receives: candidate.receiveIds?.join(",") ?? "",
-      },
-    });
-    return;
-  }
-
   router.push({
     pathname: "/match-detail",
     params: buildMatchDetailParams(row, candidate),

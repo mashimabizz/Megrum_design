@@ -26,6 +26,7 @@ import * as MediaLibrary from "expo-media-library";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Screen } from "../../src/components/Screen";
+import { GroomRailSkeleton } from "../../src/components/SkeletonScreen";
 import { IconSymbol } from "../../src/components/IconSymbol";
 import { megrumColors, megrumRadii, megrumShadow } from "../../src/theme/tokens";
 import {
@@ -1149,11 +1150,7 @@ function GroomRail({
           </Text>
         </Pressable>
 
-        {loading ? (
-          <View style={styles.groomRailLoading}>
-            <ActivityIndicator color={megrumColors.lavender} />
-          </View>
-        ) : null}
+        {loading ? <GroomRailSkeleton /> : null}
 
         {!loading && groups.map((group) => {
           const post = groomLatestStoryPost(group);

@@ -18,8 +18,10 @@ import {
 } from "react-native";
 import { PrimaryButton } from "../src/components/PrimaryButton";
 import { Screen } from "../src/components/Screen";
+import { ProposalChoiceSkeleton } from "../src/components/SkeletonScreen";
 import { StatusPill } from "../src/components/StatusPill";
 import { SectionTabs } from "../src/components/GoodsGrid";
+import { useAuth } from "../src/auth/AuthProvider";
 import {
   NativeMapPreview,
   type MapCoordinate,
@@ -182,8 +184,19 @@ const PRESET_PLACES: PlaceSuggestion[] = [
   },
 ];
 const TAB_ORDER: ProposalTab[] = ["give", "receive", "meetup"];
+const PROFILE_INVENTORY_CACHE_MS = 45_000;
+const PROFILE_INVENTORY_LIMIT_PER_USER = 80;
+const profileInventoryCache = new Map<
+  string,
+  {
+    expiresAt: number;
+    promise?: Promise<ScopedProposalInventoryRow[]>;
+    rows?: ScopedProposalInventoryRow[];
+  }
+>();
 
 export default function ProposalSelectScreen() {
+  const { user: authUser } = useAuth();
   const params = useLocalSearchParams<{
     tab?: ProposalTab | ProposalTab[];
     gives?: string | string[];
@@ -310,6 +323,12 @@ export default function ProposalSelectScreen() {
       setRevisionError("打診情報を読み直してください");
       return;
     }
+    if (!authUser) {
+      setRevisionContext(null);
+      setRevisionLoading(false);
+      setRevisionError("ログイン状態を確認してください");
+      return;
+    }
     if (!supabase) {
       setRevisionContext(null);
       setRevisionLoading(false);
@@ -323,11 +342,6 @@ export default function ProposalSelectScreen() {
 
     void (async () => {
       try {
-        const {
-          data: { user },
-        } = await supabase.auth.getUser();
-        if (!user) throw new Error("ログイン状態を確認してください");
-
         const { data, error } = await supabase
           .from("proposals")
           .select(
@@ -339,8 +353,8 @@ export default function ProposalSelectScreen() {
         const row = data as RevisionProposalRow | null;
         if (!row) throw new Error("打診が見つかりません");
 
-        const isSender = row.sender_id === user.id;
-        const isReceiver = row.receiver_id === user.id;
+        const isSender = row.sender_id === authUser.id;
+        const isReceiver = row.receiver_id === authUser.id;
         if (!isSender && !isReceiver) {
           throw new Error("この打診には参加していません");
         }
@@ -372,7 +386,7 @@ export default function ProposalSelectScreen() {
     return () => {
       active = false;
     };
-  }, [isRevisionMode, proposalIdParam]);
+  }, [authUser?.id, isRevisionMode, proposalIdParam]);
 
   useEffect(() => {
     if (!revisionContext) return;
@@ -462,6 +476,12 @@ export default function ProposalSelectScreen() {
       setProfileInventoryError(null);
       return;
     }
+    if (!authUser) {
+      setProfileInventoryScope(null);
+      setProfileInventoryLoading(false);
+      setProfileInventoryError("ログイン状態を確認してください");
+      return;
+    }
     if (!isUuid(effectivePartnerIdParam)) {
       setProfileInventoryScope({ giveIds: [], receiveIds: [] });
       setProfileInventoryLoading(false);
@@ -475,26 +495,11 @@ export default function ProposalSelectScreen() {
 
     void (async () => {
       try {
-        const {
-          data: { user },
-        } = await supabase.auth.getUser();
-        if (!user) throw new Error("ログイン状態を確認してください");
-
-        const { data, error } = await supabase
-          .from("goods_inventory")
-          .select(
-            "id, user_id, title, photo_urls, hue, group:groups_master(name), character:characters_master(name), goods_type:goods_types_master(name)",
-          )
-          .in("user_id", [user.id, effectivePartnerIdParam])
-          .eq("kind", "for_trade")
-          .eq("status", "active")
-          .limit(120);
-        if (error) throw error;
-
-        const rows = ((data as ScopedProposalInventoryRow[] | null) ?? []).filter(
-          (row) => row.user_id === user.id || row.user_id === effectivePartnerIdParam,
+        const rows = await loadProfileProposalInventoryRows(
+          authUser.id,
+          effectivePartnerIdParam,
         );
-        const giveRows = rows.filter((row) => row.user_id === user.id);
+        const giveRows = rows.filter((row) => row.user_id === authUser.id);
         const receiveRows = rows.filter((row) => row.user_id === effectivePartnerIdParam);
 
         if (!active) return;
@@ -529,6 +534,7 @@ export default function ProposalSelectScreen() {
     candidateGiveIds,
     candidateReceiveIds,
     effectivePartnerIdParam,
+    authUser?.id,
     initialGiveNeedsInventory,
     initialReceiveNeedsInventory,
     usesProfileInventory,
@@ -645,7 +651,7 @@ export default function ProposalSelectScreen() {
           <ChoicePane
             items={giveChoices}
             selectedIds={giveSelectedIds}
-            loading={usesProfileInventory && profileInventoryLoading}
+            loading={revisionLoading || (usesProfileInventory && profileInventoryLoading)}
             emptyText={
               profileInventoryError ?? "私が出せる譲る在庫がありません"
             }
@@ -659,7 +665,7 @@ export default function ProposalSelectScreen() {
           <ChoicePane
             items={receiveChoices}
             selectedIds={receiveSelectedIds}
-            loading={usesProfileInventory && profileInventoryLoading}
+            loading={revisionLoading || (usesProfileInventory && profileInventoryLoading)}
             emptyText={
               profileInventoryError ?? "相手の譲る在庫がありません"
             }
@@ -829,6 +835,65 @@ export default function ProposalSelectScreen() {
   }
 }
 
+async function loadProfileProposalInventoryRows(
+  userId: string,
+  partnerId: string,
+): Promise<ScopedProposalInventoryRow[]> {
+  if (!supabase) return [];
+  const cacheKey = `${userId}:${partnerId}`;
+  const now = Date.now();
+  const cached = profileInventoryCache.get(cacheKey);
+  if (cached?.rows && cached.expiresAt > now) {
+    return cached.rows;
+  }
+  if (cached?.promise) {
+    return cached.promise;
+  }
+
+  const promise = Promise.all([
+    fetchProposalInventoryRowsForUser(userId),
+    userId === partnerId
+      ? Promise.resolve<ScopedProposalInventoryRow[]>([])
+      : fetchProposalInventoryRowsForUser(partnerId),
+  ]).then(([mineRows, partnerRows]) => [...mineRows, ...partnerRows]);
+
+  profileInventoryCache.set(cacheKey, {
+    expiresAt: now + PROFILE_INVENTORY_CACHE_MS,
+    promise,
+    rows: cached?.rows,
+  });
+
+  try {
+    const rows = await promise;
+    profileInventoryCache.set(cacheKey, {
+      expiresAt: Date.now() + PROFILE_INVENTORY_CACHE_MS,
+      rows,
+    });
+    return rows;
+  } catch (error) {
+    profileInventoryCache.delete(cacheKey);
+    throw error;
+  }
+}
+
+async function fetchProposalInventoryRowsForUser(
+  userId: string,
+): Promise<ScopedProposalInventoryRow[]> {
+  if (!supabase) return [];
+  const { data, error } = await supabase
+    .from("goods_inventory")
+    .select(
+      "id, user_id, title, photo_urls, hue, group:groups_master(name), character:characters_master(name), goods_type:goods_types_master(name)",
+    )
+    .eq("user_id", userId)
+    .eq("kind", "for_trade")
+    .eq("status", "active")
+    .order("created_at", { ascending: false })
+    .limit(PROFILE_INVENTORY_LIMIT_PER_USER);
+  if (error) throw error;
+  return (data as ScopedProposalInventoryRow[] | null) ?? [];
+}
+
 function ChoicePane({
   items,
   selectedIds,
@@ -843,11 +908,15 @@ function ChoicePane({
   onToggle: (id: string) => void;
 }) {
   const selectedSet = useMemo(() => new Set(selectedIds), [selectedIds]);
-  if (loading || items.length === 0) {
+  if (loading) {
+    return <ProposalChoiceSkeleton />;
+  }
+
+  if (items.length === 0) {
     return (
       <View style={styles.choiceState}>
         <Text style={styles.choiceStateText}>
-          {loading ? "在庫を読み込み中…" : emptyText ?? "選択できるグッズがありません"}
+          {emptyText ?? "選択できるグッズがありません"}
         </Text>
       </View>
     );

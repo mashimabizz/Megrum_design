@@ -26,6 +26,11 @@ import {
 } from "../../src/components/GoodsGrid";
 import { useAuth } from "../../src/auth/AuthProvider";
 import { Screen } from "../../src/components/Screen";
+import {
+  GoodsGridSkeleton,
+  ListingDeckSkeleton,
+  SkeletonPillRow,
+} from "../../src/components/SkeletonScreen";
 import { fetchInventoryTagLabels, formatHashTags } from "../../src/lib/inventoryTags";
 import { supabase } from "../../src/lib/supabase";
 import { megrumColors, megrumRadii } from "../../src/theme/tokens";
@@ -40,7 +45,7 @@ type WishItem = GoodsGridItem & {
 
 type ListingItem = {
   id: string;
-  status: "ACTIVE" | "PAUSED";
+  status: "ACTIVE" | "PAUSED" | "MATCHED";
   haves: ListingGoodsItem[];
   options: ListingOptionItem[];
   give: string[];
@@ -80,7 +85,7 @@ type WishRow = {
   id: string;
   title: string;
   quantity: number;
-  priority: number | null;
+  priority: "top" | "second" | "flexible" | null;
   hue: number | string | null;
   photo_urls: string[] | null;
   group: { name: string | null } | { name: string | null }[] | null;
@@ -360,6 +365,7 @@ export default function WishesScreen() {
 
   function toggleListingStatus(id: string) {
     const current = listings.find((item) => item.id === id);
+    if (!current || current.status === "MATCHED") return;
     const nextStatus = current?.status === "ACTIVE" ? "paused" : "active";
     setListings((current) =>
       current.map((item) =>
@@ -385,21 +391,24 @@ export default function WishesScreen() {
   }
 
   function deleteListing(id: string) {
+    const target = listings.find((item) => item.id === id);
+    if (target?.status === "MATCHED") return;
     setListings((current) => current.filter((item) => item.id !== id));
     setSelectedListing(null);
     if (supabase && user && !previewMode) {
-      supabase
-        .from("listings")
-        .delete()
-        .eq("id", id)
-        .eq("user_id", user.id)
-        .then(({ error }) => {
-          if (error) setLoadError(error.message);
-        });
+      void closeListing({ listingId: id, userId: user.id }).catch((error: unknown) => {
+        setLoadError(error instanceof Error ? error.message : "個別募集の削除に失敗しました");
+        if (target) {
+          setListings((current) =>
+            current.some((item) => item.id === target.id) ? current : [target, ...current],
+          );
+        }
+      });
     }
   }
 
   function requestDeleteListing(listing: ListingItem) {
+    if (listing.status === "MATCHED") return;
     setSelectedListing(null);
     setDeleteConfirmListing(listing);
   }
@@ -496,15 +505,19 @@ export default function WishesScreen() {
     setDeletingWishIds((current) => current.filter((itemId) => itemId !== id));
     setWishes((current) => current.filter((item) => item.id !== id));
     if (supabase && user && !previewMode) {
-      supabase
-        .from("goods_inventory")
-        .delete()
-        .eq("id", id)
-        .eq("user_id", user.id)
-        .eq("kind", "wanted")
-        .then(({ error }) => {
-          if (!error) return;
-          setLoadError(error.message);
+      void archiveWish({ userId: user.id, wishId: id })
+        .then(() => {
+          setListings((current) =>
+            current.filter((listing) =>
+              listing.options.every((option) =>
+                option.wishes.every((wish) => wish.id !== id),
+              ),
+            ),
+          );
+          setLoadError(null);
+        })
+        .catch((error: unknown) => {
+          setLoadError(error instanceof Error ? error.message : "wish の削除に失敗しました");
           if (target) {
             setWishes((current) =>
               current.some((item) => item.id === target.id)
@@ -558,50 +571,64 @@ export default function WishesScreen() {
           />
         </View>
 
-        {loading ? <Text style={styles.inlineNotice}>Wishを読み込み中…</Text> : null}
         {loadError ? <Text style={styles.inlineError}>{loadError}</Text> : null}
 
-        {tab === "wish" ? (
-          <View style={styles.filters}>
-            <WishFilterRow
-              label="推し"
-              options={groupOptions}
-              active={activeGroup}
-              onChange={(next) => {
-                setActiveGroup(next);
-                closeSelectedWish();
-              }}
-            />
-            <WishFilterRow
-              label="種別"
-              options={typeOptions}
-              active={activeType}
-              onChange={(next) => {
-                setActiveType(next);
-                closeSelectedWish();
-              }}
-            />
+        {loading ? (
+          <View style={styles.loadingSkeleton}>
+            {tab === "wish" ? (
+              <>
+                <SkeletonPillRow count={2} />
+                <GoodsGridSkeleton columns={columns} count={9} />
+              </>
+            ) : (
+              <ListingDeckSkeleton count={3} />
+            )}
           </View>
-        ) : null}
+        ) : (
+          <>
+            {tab === "wish" ? (
+              <View style={styles.filters}>
+                <WishFilterRow
+                  label="推し"
+                  options={groupOptions}
+                  active={activeGroup}
+                  onChange={(next) => {
+                    setActiveGroup(next);
+                    closeSelectedWish();
+                  }}
+                />
+                <WishFilterRow
+                  label="種別"
+                  options={typeOptions}
+                  active={activeType}
+                  onChange={(next) => {
+                    setActiveType(next);
+                    closeSelectedWish();
+                  }}
+                />
+              </View>
+            ) : null}
 
-        <ScrollView
-          ref={pagerRef}
-          horizontal
-          pagingEnabled
-          bounces={false}
-          directionalLockEnabled
-          showsHorizontalScrollIndicator={false}
-          scrollEventThrottle={16}
-          style={styles.contentHost}
-          onScroll={handlePagerScroll}
-          onMomentumScrollEnd={handlePagerSettled}
-        >
-          {TAB_ORDER.map((pageTab) => (
-            <View key={pageTab} style={[styles.tabPage, { width: pageWidth }]}>
-              {renderTabPage(pageTab)}
-            </View>
-          ))}
-        </ScrollView>
+            <ScrollView
+              ref={pagerRef}
+              horizontal
+              pagingEnabled
+              bounces={false}
+              directionalLockEnabled
+              showsHorizontalScrollIndicator={false}
+              scrollEventThrottle={16}
+              style={styles.contentHost}
+              onScroll={handlePagerScroll}
+              onMomentumScrollEnd={handlePagerSettled}
+            >
+              {TAB_ORDER.map((pageTab) => (
+                <View key={pageTab} style={[styles.tabPage, { width: pageWidth }]}>
+                  {renderTabPage(pageTab)}
+                </View>
+              ))}
+            </ScrollView>
+          </>
+        )}
       </ScrollView>
 
       <FloatingAddButton
@@ -652,7 +679,7 @@ export default function WishesScreen() {
         title="個別募集"
         subtitle={
           selectedListing
-            ? `${selectedListing.status === "ACTIVE" ? "ACTIVE" : "一時停止"} / ${selectedListing.logic}`
+            ? `${listingStatusLabel(selectedListing.status)} / ${selectedListing.logic}`
             : undefined
         }
         actions={listingActions}
@@ -866,7 +893,12 @@ function toListingItem(
   const seed = giveLabels[0] ?? wantLabels[0] ?? "募集";
   return {
     id: row.id,
-    status: row.status === "active" ? "ACTIVE" : "PAUSED",
+    status:
+      row.status === "active"
+        ? "ACTIVE"
+        : row.status === "matched"
+          ? "MATCHED"
+          : "PAUSED",
     haves,
     options: optionItems,
     give: giveLabels.length > 0 ? giveLabels : ["譲る候補"],
@@ -918,10 +950,90 @@ function previewListingGoods(
   };
 }
 
-function priorityLabel(priority: number | null): WishItem["priority"] {
-  if (priority != null && priority <= 1) return "最優先";
-  if (priority != null && priority >= 4) return "ゆる募";
+function priorityLabel(priority: WishRow["priority"]): WishItem["priority"] {
+  if (priority === "top") return "最優先";
+  if (priority === "flexible") return "ゆる募";
   return "優先";
+}
+
+function listingStatusLabel(status: ListingItem["status"]) {
+  if (status === "ACTIVE") return "ACTIVE";
+  if (status === "MATCHED") return "取引中";
+  return "一時停止";
+}
+
+async function closeListing({
+  listingId,
+  userId,
+}: {
+  listingId: string;
+  userId: string;
+}) {
+  if (!supabase) return;
+  const { error } = await supabase
+    .from("listings")
+    .update({ status: "closed" })
+    .eq("id", listingId)
+    .eq("user_id", userId)
+    .in("status", ["active", "paused"]);
+  if (error) throw error;
+}
+
+async function archiveWish({
+  userId,
+  wishId,
+}: {
+  userId: string;
+  wishId: string;
+}) {
+  if (!supabase) return;
+  await closeListingsUsingWishes(userId, [wishId]);
+  const { error } = await supabase
+    .from("goods_inventory")
+    .update({ status: "archived" })
+    .eq("id", wishId)
+    .eq("user_id", userId)
+    .eq("kind", "wanted");
+  if (error) throw error;
+}
+
+async function closeListingsUsingWishes(userId: string, wishIds: string[]) {
+  if (!supabase || wishIds.length === 0) return;
+  const listingIds = new Set<string>();
+
+  for (const wishId of wishIds) {
+    const { data, error } = await supabase
+      .from("listing_wish_options")
+      .select("listing_id, listing:listings!inner(user_id, status)")
+      .contains("wish_ids", [wishId]);
+    if (error) throw error;
+
+    for (const row of
+      (data as {
+        listing_id: string;
+        listing:
+          | { user_id?: string | null; status?: string | null }
+          | { user_id?: string | null; status?: string | null }[]
+          | null;
+      }[] | null) ?? []) {
+      const listing = Array.isArray(row.listing) ? row.listing[0] : row.listing;
+      if (
+        listing?.user_id === userId &&
+        (listing.status === "active" || listing.status === "paused")
+      ) {
+        listingIds.add(row.listing_id);
+      }
+    }
+  }
+
+  const ids = Array.from(listingIds);
+  if (ids.length === 0) return;
+  const { error: updateError } = await supabase
+    .from("listings")
+    .update({ status: "closed" })
+    .eq("user_id", userId)
+    .in("id", ids);
+  if (updateError) throw updateError;
 }
 
 function pickName(
@@ -1162,8 +1274,16 @@ function ListingDeckCard({
           {listing.logic}
         </Text>
         <View style={styles.listingActions}>
-          <MiniIcon label="✎" accessibilityLabel="個別募集を編集" onPress={onEdit} />
-          <MiniIcon label="×" accessibilityLabel="個別募集を削除" danger onPress={onDelete} />
+          <MiniIcon
+            label="✎"
+            accessibilityLabel={
+              listing.status === "MATCHED" ? "個別募集の詳細" : "個別募集を編集"
+            }
+            onPress={onEdit}
+          />
+          {listing.status !== "MATCHED" ? (
+            <MiniIcon label="×" accessibilityLabel="個別募集を削除" danger onPress={onDelete} />
+          ) : null}
         </View>
       </View>
 
@@ -1183,10 +1303,23 @@ function ListingDeckCard({
 
 function StatusBadge({ status }: { status: ListingItem["status"] }) {
   const active = status === "ACTIVE";
+  const matched = status === "MATCHED";
   return (
-    <View style={[styles.statusBadge, active ? styles.statusBadgeActive : null]}>
-      <Text style={[styles.statusBadgeText, active ? styles.statusBadgeTextActive : null]}>
-        {active ? "ACTIVE" : "一時停止"}
+    <View
+      style={[
+        styles.statusBadge,
+        active ? styles.statusBadgeActive : null,
+        matched ? styles.statusBadgeMatched : null,
+      ]}
+    >
+      <Text
+        style={[
+          styles.statusBadgeText,
+          active ? styles.statusBadgeTextActive : null,
+          matched ? styles.statusBadgeTextMatched : null,
+        ]}
+      >
+        {listingStatusLabel(status)}
       </Text>
     </View>
   );
@@ -1679,6 +1812,22 @@ function buildListingActions({
   onToggle: () => void;
   onDelete: () => void;
 }): SheetAction[] {
+  if (item.status === "MATCHED") {
+    return [
+      {
+        id: "edit",
+        label: "詳細を見る",
+        onPress: onEdit,
+      },
+      {
+        id: "close",
+        label: "閉じる",
+        tone: "muted",
+        onPress: onClose,
+      },
+    ];
+  }
+
   return [
     {
       id: "edit",
@@ -1726,6 +1875,9 @@ const styles = StyleSheet.create({
     paddingBottom: 8,
     paddingHorizontal: 18,
     paddingTop: 2,
+  },
+  loadingSkeleton: {
+    gap: 14,
   },
   deleteModalRoot: {
     alignItems: "center",
@@ -2311,6 +2463,9 @@ const styles = StyleSheet.create({
   statusBadgeActive: {
     backgroundColor: megrumColors.ok,
   },
+  statusBadgeMatched: {
+    backgroundColor: "rgba(166,149,216,0.16)",
+  },
   statusBadgeText: {
     color: megrumColors.mutedInk,
     fontSize: 9.5,
@@ -2318,6 +2473,9 @@ const styles = StyleSheet.create({
   },
   statusBadgeTextActive: {
     color: megrumColors.surface,
+  },
+  statusBadgeTextMatched: {
+    color: megrumColors.lavender,
   },
   miniIcon: {
     alignItems: "center",

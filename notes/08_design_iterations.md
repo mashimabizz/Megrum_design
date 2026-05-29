@@ -4,6 +4,81 @@
 
 ---
 
+## イテレーション168.92：読み込み中をスケルトン表示へ統一
+
+### 背景・問題意識
+
+オーナーから、ホーム画面、在庫、Wish、個別募集、やりとり、グルーム、打診時の提示物選択で、読み込み中のテキスト表示ではなくスケルトンスクリーンにしたいという依頼があった。あわせて、提示物選択では在庫候補の読み込みが遅いため、体感速度を改善したい。
+
+### 変更内容
+
+#### `mobile/src/components/SkeletonScreen.tsx`
+- 共通のスケルトン表示コンポーネントを追加した。
+- ホームフィード、グッズグリッド、個別募集デッキ、取引一覧、グルーム横並び、提示物選択カードに使えるプレースホルダを用意した。
+
+#### `mobile/app/(tabs)/index.tsx`
+- ホームのマッチ候補読み込み中は、グルーム列と候補棚を含むホーム用スケルトンを表示するようにした。
+
+#### `mobile/app/(tabs)/inventory.tsx`
+- マイ在庫の読み込み中は、フィルタチップとグッズグリッドのスケルトンを表示するようにした。
+
+#### `mobile/app/(tabs)/wishes.tsx`
+- Wishタブの読み込み中は、フィルタチップとグッズグリッドのスケルトンを表示するようにした。
+- 個別募集タブの読み込み中は、募集デッキ型のスケルトンを表示するようにした。
+
+#### `mobile/app/(tabs)/transactions.tsx`
+- やりとり一覧と完了取引一覧の読み込み中は、取引カード型のスケルトンを表示するようにした。
+
+#### `mobile/app/(tabs)/encounters.tsx`
+- グルームの読み込み中は、丸アイコン列のスケルトンを表示するようにした。
+
+#### `mobile/app/proposal-select.tsx`
+- 提示物選択の在庫読み込み中は、提示物カード型のスケルトンを表示するようにした。
+- 相手プロフィール起点の在庫候補取得を、自分・相手の在庫を並列取得する方式へ変更した。
+- 同じ自分/相手ペアの在庫候補を45秒キャッシュし、戻る/再打診時の再読み込みを軽くした。
+- `supabase.auth.getUser()` の追加呼び出しを避け、既存のAuthProviderのユーザー情報を使うようにした。
+
+### 影響範囲
+
+- iOS版ホーム
+- iOS版マイ在庫
+- iOS版Wish / 個別募集
+- iOS版やりとり
+- iOS版めぐり内グルーム
+- iOS版提示物選択
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `git diff --check -- mobile/app/'(tabs)'/index.tsx mobile/app/'(tabs)'/inventory.tsx mobile/app/'(tabs)'/wishes.tsx mobile/app/'(tabs)'/transactions.tsx mobile/app/'(tabs)'/encounters.tsx mobile/app/proposal-select.tsx mobile/src/components/SkeletonScreen.tsx`
+- `npm --prefix mobile run export:ios:preview`
+- `EXPO_NO_GIT_STATUS=1 EAS_UPDATE_PROJECT_SLUG=ihub npm --prefix mobile run update:ios:preview -- --message "[iter168.92] 読み込みスケルトンと提示物高速化" --non-interactive`
+- Preview channel OTA配信済み：Update group `eae3bb2b-be7a-4f4a-9cfc-ada3fa8d9553` / iOS update ID `019e7426-79d4-78d3-a0ff-79f5add4e4fb`
+- EAS Dashboard: `https://expo.dev/accounts/mashima.bizz/projects/ihub/updates/eae3bb2b-be7a-4f4a-9cfc-ada3fa8d9553`
+
+### 関連ファイル
+
+- `mobile/src/components/SkeletonScreen.tsx`
+- `mobile/app/(tabs)/index.tsx`
+- `mobile/app/(tabs)/inventory.tsx`
+- `mobile/app/(tabs)/wishes.tsx`
+- `mobile/app/(tabs)/transactions.tsx`
+- `mobile/app/(tabs)/encounters.tsx`
+- `mobile/app/proposal-select.tsx`
+
+### セルフレビュー結果
+
+- ✅ 読み込み中のテキスト表示を主要画面でスケルトン表示へ置き換え
+- ✅ Wish と個別募集はタブごとに形の違うスケルトンを表示
+- ✅ 提示物選択はカード型スケルトンへ変更
+- ✅ 提示物選択の在庫候補取得を並列化し、短時間キャッシュを追加
+- ✅ Preview channel / iOS runtime `0.1.0` へOTA配信済み
+- ✅ 09更新診断：状態遷移の追加・削除はないため更新不要
+- ✅ 10更新診断：ドメイン用語の追加ではなくUI表示パターンのため更新不要
+- ✅ 05更新診断：DBスキーマ変更なし
+
+---
+
 ## イテレーション168.91：取引チャットの交換手段表示を圧縮
 
 ### 背景・問題意識

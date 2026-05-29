@@ -10,6 +10,7 @@ import {
   View,
 } from "react-native";
 import { Screen } from "../../src/components/Screen";
+import { TransactionListSkeleton } from "../../src/components/SkeletonScreen";
 import { useAuth } from "../../src/auth/AuthProvider";
 import { supabase } from "../../src/lib/supabase";
 import { megrumColors, megrumRadii } from "../../src/theme/tokens";
@@ -291,7 +292,6 @@ export default function TransactionsScreen() {
             <Text style={styles.title}>完了した取引</Text>
           </View>
 
-          {loading ? <Text style={styles.inlineNotice}>取引を読み込み中…</Text> : null}
           {loadError ? <Text style={styles.inlineError}>{loadError}</Text> : null}
 
           <PastFilterChips
@@ -301,7 +301,9 @@ export default function TransactionsScreen() {
           />
 
           <View style={styles.listContent}>
-            {filteredPast.length === 0 ? (
+            {loading ? (
+              <TransactionListSkeleton count={4} />
+            ) : filteredPast.length === 0 ? (
               <View style={styles.emptyBox}>
                 <Text style={styles.emptyText}>完了した取引はまだありません</Text>
               </View>
@@ -332,11 +334,12 @@ export default function TransactionsScreen() {
         contentContainerStyle={styles.nativeTabScrollContent}
         scrollEventThrottle={16}
       >
-        {loading ? <Text style={styles.inlineNotice}>取引を読み込み中…</Text> : null}
         {loadError ? <Text style={styles.inlineError}>{loadError}</Text> : null}
 
         <CompactTabs value={tab} tabs={topTabs} onChange={setTab} />
-        <View style={styles.listContent}>{renderListPage(tab)}</View>
+        <View style={styles.listContent}>
+          {loading ? <TransactionListSkeleton /> : renderListPage(tab)}
+        </View>
       </ScrollView>
     </Screen>
   );
