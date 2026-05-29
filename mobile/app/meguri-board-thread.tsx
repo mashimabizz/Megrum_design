@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Constants from "expo-constants";
 import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
 import * as ImagePicker from "expo-image-picker";
@@ -37,11 +37,14 @@ import {
   meguriBoardReportReasonLabel,
   reportMeguriBoardReply,
   reportMeguriBoardThread,
+  clearMeguriBoardReplyDraft,
   setMeguriBoardThreadStatus,
   setMeguriBoardReplyReacted,
   setMeguriBoardThreadBookmarked,
   setMeguriBoardThreadReacted,
   setMeguriBoardThreadSubscribed,
+  loadMeguriBoardReplyDraft,
+  saveMeguriBoardReplyDraft,
   updateMeguriBoardReply,
   updateMeguriBoardThread,
   type MeguriBoardActor,
@@ -91,6 +94,7 @@ export default function MeguriBoardThreadScreen() {
   const [locationContext, setLocationContext] = useState<MegrumLocationContext | null>(null);
   const [draft, setDraft] = useState("");
   const [draftImageUris, setDraftImageUris] = useState<string[]>([]);
+  const [replyDraftReady, setReplyDraftReady] = useState(false);
   const [sending, setSending] = useState(false);
   const [sendError, setSendError] = useState<string | null>(null);
   const [replySearchText, setReplySearchText] = useState("");
@@ -215,6 +219,44 @@ export default function MeguriBoardThreadScreen() {
     }, [refreshDetail]),
   );
 
+  useEffect(() => {
+    setDraft("");
+    setDraftImageUris([]);
+    setQuoteTarget(null);
+    setReplyDraftReady(false);
+  }, [threadId]);
+
+  useEffect(() => {
+    if (!threadId || replyDraftReady) return;
+    let alive = true;
+    void loadMeguriBoardReplyDraft(threadId)
+      .then((savedDraft) => {
+        if (!alive) return;
+        if (savedDraft) {
+          setDraft(savedDraft.body);
+          setDraftImageUris(savedDraft.imageUris);
+        }
+        setReplyDraftReady(true);
+      })
+      .catch(() => {
+        if (alive) setReplyDraftReady(true);
+      });
+    return () => {
+      alive = false;
+    };
+  }, [replyDraftReady, threadId]);
+
+  useEffect(() => {
+    if (!threadId || !replyDraftReady || thread?.status === "locked") return;
+    const handle = setTimeout(() => {
+      void saveMeguriBoardReplyDraft(threadId, {
+        body: draft,
+        imageUris: draftImageUris,
+      });
+    }, 350);
+    return () => clearTimeout(handle);
+  }, [draft, draftImageUris, replyDraftReady, thread?.status, threadId]);
+
   async function handleSend() {
     if (!threadId) return;
     if (thread?.status === "locked") {
@@ -247,6 +289,7 @@ export default function MeguriBoardThreadScreen() {
     setDraft("");
     setDraftImageUris([]);
     setQuoteTarget(null);
+    await clearMeguriBoardReplyDraft(threadId);
     setReplies((current) => [...current, reply].sort((left, right) => left.createdAt - right.createdAt));
     setThread((current) =>
       current

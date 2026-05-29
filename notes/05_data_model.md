@@ -4,7 +4,7 @@
 > 実装の正解集。`09_state_machines.md` と完全に整合させ、`10_glossary.md` の用語を使う。
 
 最終更新: 2026-05-30
-ステータス: Draft v2.24（iter179 掲示板通報理由を追加）
+ステータス: Draft v2.25（iter180 掲示板下書き自動保存を追加）
 
 ## 最新化履歴
 
@@ -36,6 +36,7 @@
 | **v2.22** | **2026-05-30** | **iter176 反映（スポット掲示板のスレッド/返信画像添付と private Storage `meguri-board-media` を追加）** |
 | **v2.23** | **2026-05-30** | **iter178 反映（`groom_user_blocks` をスポット掲示板にも適用。スレッド/返信表示、返信通知、メンション通知を相互に抑制）** |
 | **v2.24** | **2026-05-30** | **iter179 反映（スポット掲示板の通報理由をUIで選択。`meguri_board_reports.reason` は `spam` / `harassment` / `privacy` / `unsafe` / `off_topic` / `other` を保存）** |
+| **v2.25** | **2026-05-30** | **iter180 反映（スポット掲示板のスレッド作成・返信下書きを端末内 `meguri.board.composerDrafts.v1` / `meguri.board.replyDrafts.v1` に自動保存）** |
 | **v2.20** | **2026-05-29** | **iter168.90 反映（`search_query_logs` と人気検索RPCを追加。検索結果はマッチ分類つきグッズパネルで表示）** |
 | **v2.21** | **2026-05-30** | **iter168.97 反映（`schedules.place_name` 追加。合意時に `both` を単一手段へ固定し、現地交換の複数候補は1件へ固定する運用を追記）** |
 
@@ -422,6 +423,10 @@ iter168.43 以降、無料受信者に本文・画像パスを直接返さない
 ### `meguri_board_hidden_threads` / `meguri_board_reports`（非表示・通報 / iter171）
 
 ユーザー単位の非表示は `meguri_board_hidden_threads`、通報は `meguri_board_reports` に保存する。通報はスレッドまたは返信のどちらか一方を対象にし、運営側で `open` / `reviewing` / `resolved` / `rejected` を管理する。iter179以降、アプリ側では `reason` を `spam` / `harassment` / `privacy` / `unsafe` / `off_topic` / `other` から選ばせる。
+
+### スポット掲示板下書き（端末内状態 / iter180）
+
+スレッド作成中の下書きは `meguri.board.composerDrafts.v1`、返信中の下書きは `meguri.board.replyDrafts.v1` として端末内に保存する。DBテーブルは作らない。スレッド作成下書きは掲示板文脈（閲覧者・都道府県・スポット）単位、返信下書きは `thread_id` 単位で復元する。投稿または返信の成功時に該当下書きを削除し、空の下書きは保存しない。
 
 ---
 

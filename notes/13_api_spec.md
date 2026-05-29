@@ -3,8 +3,8 @@
 > **目的**：Megrum のバックエンドAPI（REST）の draft 仕様。実装着手時の正解集。
 > 全エンドポイントを `[METHOD /path]` の形式で網羅し、各々で入力・出力・認証要否・状態遷移・備考を定義。
 
-最終更新: 2026-05-30（iter179）
-ステータス: Draft v1.5
+最終更新: 2026-05-30（iter180）
+ステータス: Draft v1.6
 
 ---
 
@@ -1050,6 +1050,10 @@ AW削除。
 - **備考**: `thread.status='locked'` の場合は返信不可。ブロック関係にある相手のスレッドには返信不可。引用返信では `parent_reply_id` と表示用スナップショットを保存する。画像は最大4枚まで `meguri-board-media` private Storage path として保存し、閲覧可能な返信だけ署名URLで表示する
 - **Side effects**: 返信者をスレッド購読ONにし、購読中の他ユーザーへ `notifications.kind='meguri_board_reply'` を作成する。本文に `@handle` がある場合は、閲覧可能な対象ユーザーへ `notifications.kind='meguri_board_mention'` を作成し、通常の購読返信通知とは重複させない。返信者と通知先がブロック関係にある場合は通知を作成しない
 - **Screen**: `meguri-board-thread`
+
+### Meguri Board Drafts（端末内状態）
+
+スポット掲示板のスレッド作成下書きと返信下書きはAPIを持たない。iOSアプリ内で `meguri.board.composerDrafts.v1` / `meguri.board.replyDrafts.v1` に自動保存し、投稿/返信成功時に削除する。別端末同期は初回リリース対象外。
 
 ### PATCH /api/v1/meguri-board/threads/:id
 

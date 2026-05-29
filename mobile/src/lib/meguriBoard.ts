@@ -102,6 +102,21 @@ export type MeguriBoardReply = {
   updatedAt: number | null;
 };
 
+export type MeguriBoardComposerDraft = {
+  audienceScope: MeguriBoardAudienceScope;
+  body: string;
+  category: Exclude<MeguriBoardThreadCategory, "all">;
+  imageUris: string[];
+  title: string;
+  updatedAt: number;
+};
+
+export type MeguriBoardReplyDraft = {
+  body: string;
+  imageUris: string[];
+  updatedAt: number;
+};
+
 type RemoteUserRow = {
   display_name?: unknown;
   handle?: unknown;
@@ -147,9 +162,12 @@ const REPLIES_KEY = "meguri.board.replies.v1";
 const THREAD_STATE_KEY = "meguri.board.threadState.v1";
 const REPLY_STATE_KEY = "meguri.board.replyState.v1";
 const USER_BLOCKS_KEY = "meguri.board.userBlocks.v1";
+const COMPOSER_DRAFTS_KEY = "meguri.board.composerDrafts.v1";
+const REPLY_DRAFTS_KEY = "meguri.board.replyDrafts.v1";
 
 const MAX_LOCAL_THREADS = 120;
 const MAX_LOCAL_REPLIES = 480;
+const MAX_LOCAL_DRAFTS = 40;
 
 type LocalThreadState = {
   bookmarked?: boolean;
@@ -644,6 +662,85 @@ export async function blockMeguriBoardUser(blockerId: string, blockedId: string)
   if (error) throw error;
 }
 
+export async function loadMeguriBoardComposerDraft(
+  viewer: MeguriBoardViewerContext,
+): Promise<MeguriBoardComposerDraft | null> {
+  const map = await loadLocalDraftMap<MeguriBoardComposerDraft>(COMPOSER_DRAFTS_KEY);
+  const draft = map[composerDraftKey(viewer)];
+  if (!draft || !hasComposerDraftContent(draft)) return null;
+  return {
+    audienceScope: normalizeAudienceScope(draft.audienceScope),
+    body: typeof draft.body === "string" ? draft.body : "",
+    category: normalizeBoardCategory(draft.category),
+    imageUris: normalizeImageUris(draft.imageUris),
+    title: typeof draft.title === "string" ? draft.title : "",
+    updatedAt: numberValue(draft.updatedAt, Date.now()),
+  };
+}
+
+export async function saveMeguriBoardComposerDraft(
+  viewer: MeguriBoardViewerContext,
+  draft: Omit<MeguriBoardComposerDraft, "updatedAt">,
+) {
+  const key = composerDraftKey(viewer);
+  if (!hasComposerDraftContent(draft)) {
+    await clearMeguriBoardComposerDraft(viewer);
+    return;
+  }
+  const map = await loadLocalDraftMap<MeguriBoardComposerDraft>(COMPOSER_DRAFTS_KEY);
+  map[key] = {
+    audienceScope: normalizeAudienceScope(draft.audienceScope),
+    body: draft.body,
+    category: normalizeBoardCategory(draft.category),
+    imageUris: normalizeImageUris(draft.imageUris),
+    title: draft.title,
+    updatedAt: Date.now(),
+  };
+  await saveLocalDraftMap(COMPOSER_DRAFTS_KEY, map);
+}
+
+export async function clearMeguriBoardComposerDraft(viewer: MeguriBoardViewerContext) {
+  const map = await loadLocalDraftMap<MeguriBoardComposerDraft>(COMPOSER_DRAFTS_KEY);
+  delete map[composerDraftKey(viewer)];
+  await saveLocalDraftMap(COMPOSER_DRAFTS_KEY, map);
+}
+
+export async function loadMeguriBoardReplyDraft(threadId: string): Promise<MeguriBoardReplyDraft | null> {
+  const map = await loadLocalDraftMap<MeguriBoardReplyDraft>(REPLY_DRAFTS_KEY);
+  const draft = map[replyDraftKey(threadId)];
+  if (!draft || !hasReplyDraftContent(draft)) return null;
+  return {
+    body: typeof draft.body === "string" ? draft.body : "",
+    imageUris: normalizeImageUris(draft.imageUris),
+    updatedAt: numberValue(draft.updatedAt, Date.now()),
+  };
+}
+
+export async function saveMeguriBoardReplyDraft(
+  threadId: string,
+  draft: Omit<MeguriBoardReplyDraft, "updatedAt">,
+) {
+  if (!threadId) return;
+  if (!hasReplyDraftContent(draft)) {
+    await clearMeguriBoardReplyDraft(threadId);
+    return;
+  }
+  const map = await loadLocalDraftMap<MeguriBoardReplyDraft>(REPLY_DRAFTS_KEY);
+  map[replyDraftKey(threadId)] = {
+    body: draft.body,
+    imageUris: normalizeImageUris(draft.imageUris),
+    updatedAt: Date.now(),
+  };
+  await saveLocalDraftMap(REPLY_DRAFTS_KEY, map);
+}
+
+export async function clearMeguriBoardReplyDraft(threadId: string) {
+  if (!threadId) return;
+  const map = await loadLocalDraftMap<MeguriBoardReplyDraft>(REPLY_DRAFTS_KEY);
+  delete map[replyDraftKey(threadId)];
+  await saveLocalDraftMap(REPLY_DRAFTS_KEY, map);
+}
+
 export async function updateMeguriBoardThread(input: {
   body: string;
   category: Exclude<MeguriBoardThreadCategory, "all">;
@@ -812,6 +909,52 @@ async function loadLocalMeguriBoardReplies(): Promise<MeguriBoardReply[]> {
   } catch {
     return [];
   }
+}
+
+async function loadLocalDraftMap<T extends { updatedAt?: number }>(storageKey: string): Promise<Record<string, T>> {
+  const raw = await AsyncStorage.getItem(storageKey);
+  if (!raw) return {};
+  try {
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return {};
+    return parsed as Record<string, T>;
+  } catch {
+    return {};
+  }
+}
+
+async function saveLocalDraftMap<T extends { updatedAt?: number }>(
+  storageKey: string,
+  map: Record<string, T>,
+) {
+  const prunedEntries = Object.entries(map)
+    .sort(([, left], [, right]) => numberValue(right.updatedAt, 0) - numberValue(left.updatedAt, 0))
+    .slice(0, MAX_LOCAL_DRAFTS);
+  await AsyncStorage.setItem(storageKey, JSON.stringify(Object.fromEntries(prunedEntries)));
+}
+
+function composerDraftKey(viewer: MeguriBoardViewerContext) {
+  const viewerKey = viewer.viewerId || "anon";
+  const areaKey = normalizeAreaKey(viewer.prefecture) || "unknown";
+  const spotKey = viewer.spotKey || "area";
+  return `${viewerKey}:${areaKey}:${spotKey}`;
+}
+
+function replyDraftKey(threadId: string) {
+  return threadId || "unknown";
+}
+
+function hasComposerDraftContent(
+  draft: Partial<Pick<MeguriBoardComposerDraft, "body" | "imageUris" | "title">>,
+) {
+  const title = typeof draft.title === "string" ? draft.title : "";
+  const body = typeof draft.body === "string" ? draft.body : "";
+  return !!title.trim() || !!body.trim() || normalizeImageUris(draft.imageUris).length > 0;
+}
+
+function hasReplyDraftContent(draft: Partial<Pick<MeguriBoardReplyDraft, "body" | "imageUris">>) {
+  const body = typeof draft.body === "string" ? draft.body : "";
+  return !!body.trim() || normalizeImageUris(draft.imageUris).length > 0;
 }
 
 async function storeLocalMeguriBoardThread(nextThread: MeguriBoardThread) {

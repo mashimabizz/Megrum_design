@@ -29,9 +29,11 @@ import {
   MEGURI_BOARD_REPORT_REASONS,
   MEGURI_BOARD_SORT_OPTIONS,
   blockMeguriBoardUser,
+  clearMeguriBoardComposerDraft,
   createMeguriBoardThread,
   filterMeguriBoardThreads,
   hideMeguriBoardThread,
+  loadMeguriBoardComposerDraft,
   loadMeguriBoardThreads,
   meguriBoardAudienceLabel,
   meguriBoardAudienceMeta,
@@ -39,6 +41,7 @@ import {
   meguriBoardReportReasonLabel,
   meguriBoardSortLabel,
   reportMeguriBoardThread,
+  saveMeguriBoardComposerDraft,
   setMeguriBoardThreadBookmarked,
   setMeguriBoardThreadReacted,
   setMeguriBoardThreadSubscribed,
@@ -96,6 +99,7 @@ export default function MeguriBoardScreen() {
   const [composerTitle, setComposerTitle] = useState("");
   const [composerBody, setComposerBody] = useState("");
   const [composerImageUris, setComposerImageUris] = useState<string[]>([]);
+  const [composerDraftReady, setComposerDraftReady] = useState(false);
   const [composerCategory, setComposerCategory] =
     useState<Exclude<MeguriBoardThreadCategory, "all">>("question");
   const [composerScope, setComposerScope] = useState<MeguriBoardAudienceScope>("nearby_3km");
@@ -225,9 +229,61 @@ export default function MeguriBoardScreen() {
 
   useEffect(() => {
     if (readParam(params.compose) === "1") {
-      setComposerOpen(true);
+      openComposer();
     }
   }, [params.compose]);
+
+  useEffect(() => {
+    if (!composerOpen) {
+      setComposerDraftReady(false);
+      return;
+    }
+    if (composerDraftReady) return;
+    let alive = true;
+    void loadMeguriBoardComposerDraft(viewerContext)
+      .then((draft) => {
+        if (!alive) return;
+        if (draft) {
+          setComposerTitle(draft.title);
+          setComposerBody(draft.body);
+          setComposerImageUris(draft.imageUris);
+          setComposerCategory(draft.category);
+          setComposerScope(
+            draft.audienceScope === "same_prefecture" ? "same_prefecture" : "nearby_3km",
+          );
+        }
+        setComposerDraftReady(true);
+      })
+      .catch(() => {
+        if (alive) setComposerDraftReady(true);
+      });
+    return () => {
+      alive = false;
+    };
+  }, [composerDraftReady, composerOpen, viewerContext]);
+
+  useEffect(() => {
+    if (!composerOpen || !composerDraftReady) return;
+    const handle = setTimeout(() => {
+      void saveMeguriBoardComposerDraft(viewerContext, {
+        audienceScope: composerScope,
+        body: composerBody,
+        category: composerCategory,
+        imageUris: composerImageUris,
+        title: composerTitle,
+      });
+    }, 350);
+    return () => clearTimeout(handle);
+  }, [
+    composerBody,
+    composerCategory,
+    composerDraftReady,
+    composerImageUris,
+    composerOpen,
+    composerScope,
+    composerTitle,
+    viewerContext,
+  ]);
 
   function openPrefecturePicker() {
     if (Platform.OS !== "ios") return;
@@ -281,6 +337,11 @@ export default function MeguriBoardScreen() {
 
   function removeComposerImage(uri: string) {
     setComposerImageUris((current) => current.filter((candidate) => candidate !== uri));
+  }
+
+  function openComposer() {
+    setComposerDraftReady(false);
+    setComposerOpen(true);
   }
 
   function closeComposer() {
@@ -341,6 +402,7 @@ export default function MeguriBoardScreen() {
     setComposerTitle("");
     setComposerBody("");
     setComposerImageUris([]);
+    await clearMeguriBoardComposerDraft(actionContext);
     setComposerCategory("question");
     setComposerScope("nearby_3km");
     setThreads((current) =>
@@ -513,7 +575,7 @@ export default function MeguriBoardScreen() {
               {viewerContext.spotLabel} / {displayMeguriBoardPrefecture(viewerContext.prefecture)}
             </Text>
           </View>
-          <Pressable accessibilityRole="button" onPress={() => setComposerOpen(true)} style={styles.composeButton}>
+          <Pressable accessibilityRole="button" onPress={openComposer} style={styles.composeButton}>
             <IconSymbol name="add" color="#fff" size={18} />
           </Pressable>
         </View>
@@ -626,7 +688,7 @@ export default function MeguriBoardScreen() {
             <IconSymbol name="chevron-down" color={megrumColors.lavender} size={18} />
           </Pressable>
 
-          <PrimaryButton onPress={() => setComposerOpen(true)}>スレッドを立てる</PrimaryButton>
+          <PrimaryButton onPress={openComposer}>スレッドを立てる</PrimaryButton>
 
           {loading ? (
             <View style={styles.loadingBox}>

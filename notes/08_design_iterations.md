@@ -4,6 +4,73 @@
 
 ---
 
+## イテレーション180：掲示板下書き自動保存を追加
+
+### 背景・問題意識
+
+スポット掲示板は現地で短時間に書き込む用途が多く、スレッド作成中や返信中に画面を閉じると入力内容が失われるのはストレスになる。一般的なスレッド機能として、作成途中のスレッドと返信を端末内に自動保存し、再度開いた時に復元できるようにした。
+
+### 変更内容
+
+#### `mobile/src/lib/meguriBoard.ts`
+- スレッド作成下書き `MeguriBoardComposerDraft` と返信下書き `MeguriBoardReplyDraft` を追加した。
+- `meguri.board.composerDrafts.v1` / `meguri.board.replyDrafts.v1` に端末内保存する load/save/clear 関数を追加した。
+- 下書きは最新40件まで保持し、空になったら自動で削除するようにした。
+
+#### `mobile/app/meguri-board.tsx`
+- スレッド作成モーダルを開いた時、同じ掲示板文脈の下書きを復元するようにした。
+- タイトル・本文・画像・カテゴリ・公開範囲を入力中に自動保存するようにした。
+- 投稿成功後は該当下書きを削除するようにした。
+
+#### `mobile/app/meguri-board-thread.tsx`
+- スレッド返信欄の本文と添付画像をスレッド単位で自動保存するようにした。
+- スレッド詳細を開いた時、未送信の返信下書きを復元するようにした。
+- 返信送信後は該当下書きを削除するようにした。
+
+#### `notes/05_data_model.md`
+- 掲示板下書きはDBに保存せず、端末内下書きとして扱う方針を追記した。
+
+#### `notes/09_state_machines.md`
+- Meguri Board Lifecycle に下書き自動保存・投稿成功時削除のルールを追記した。
+
+#### `notes/10_glossary.md`
+- 掲示板下書きを追加した。
+
+#### `notes/13_api_spec.md`
+- 掲示板下書きはAPIを持たない端末内状態として明記した。
+
+### 影響範囲
+
+- iOS版 スポット掲示板一覧のスレッド作成モーダル
+- iOS版 スポット掲示板詳細の返信欄
+- 掲示板の端末内状態・仕様ドキュメント
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- `EAS_UPDATE_PROJECT_SLUG=ihub EXPO_NO_GIT_STATUS=1 npm --prefix mobile run update:ios:preview -- --message "[iter180] add board drafts" --non-interactive`
+- Preview OTA: Update group `638cb56c-36b7-4c6a-99f8-84e1b50f1e3b` / iOS update `019e750c-8069-7aed-a3ae-fa8c7c73d080`
+
+### 関連ファイル
+
+- `mobile/src/lib/meguriBoard.ts`
+- `mobile/app/meguri-board.tsx`
+- `mobile/app/meguri-board-thread.tsx`
+- `notes/05_data_model.md`
+- `notes/08_design_iterations.md`
+- `notes/09_state_machines.md`
+- `notes/10_glossary.md`
+- `notes/13_api_spec.md`
+
+### セルフレビュー結果
+
+- ✅ 新しいDB列やネイティブ依存を追加せず、OTA反映可能なJS実装に収めた。
+- ✅ スレッド作成下書きと返信下書きを分け、投稿成功時に自動削除するようにした。
+- ✅ 空の下書きは残さず、端末内保存件数も上限を設けた。
+
+---
+
 ## イテレーション179：掲示板通報理由を追加
 
 ### 背景・問題意識
