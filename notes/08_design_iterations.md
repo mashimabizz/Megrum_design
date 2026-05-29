@@ -4,6 +4,60 @@
 
 ---
 
+## イテレーション168.87：取引証跡撮影と通報導線の整理
+
+### 背景・問題意識
+
+オーナーから、取引チャットで証跡を撮る時に、撮影前の案内画面を挟まず、追加撮影と同じように「交換したグッズを撮影してください」の確認ポップアップを出してからカメラを起動したいという指定があった。あわせて、通常撮影・追加撮影のどちらでも撮影中に左側から自分のアルバムへ入り、複数枚を選んでアップロードできるようにしたい。取引チャットのヘッダー右側には通報導線を常設したい。
+
+### 変更内容
+
+#### `mobile/app/transaction-detail.tsx`
+- 証跡撮影の初回CTAと追加撮影CTAを、同じ確認ポップアップから `/transaction-capture` へ遷移する流れに統一した。
+- 以前の追加撮影だけが取引チャット内で直接カメラを開いてアップロードする処理を削除し、撮影画面へ集約した。
+- 取引チャットのネイティブヘッダー右側に `通報` ボタンを追加し、`/dispute-new` へ遷移するようにした。
+
+#### `mobile/app/transaction-capture.tsx`
+- `expo-camera` の `CameraView` を使い、画面自体を実カメラとして起動するようにした。
+- 撮影中の左側にアルバムボタンを表示し、最新写真のサムネイルまたはフォールバック表示を出すようにした。
+- アルバムボタンから写真ライブラリを開き、複数枚を選んで順番に証跡アップロードできるようにした。
+- カメラの反転、撮影済み証跡の削除、完了通知は既存フローを維持した。
+
+#### `notes/10_glossary.md`
+- `dispute` の別名に `通報` を追加し、ヘッダーの `通報` ボタンが既存の申告フローに接続することを明確化した。
+
+### 影響範囲
+
+- iOS版 `/transaction-detail`
+- iOS版 `/transaction-capture`
+- 取引チャットの証跡撮影導線
+- 取引チャットの通報導線
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- `git diff --check -- mobile/app/transaction-detail.tsx mobile/app/transaction-capture.tsx notes/08_design_iterations.md notes/10_glossary.md`
+
+### 関連ファイル
+
+- `mobile/app/transaction-detail.tsx`
+- `mobile/app/transaction-capture.tsx`
+- `notes/10_glossary.md`
+
+### セルフレビュー結果
+
+- ✅ 初回撮影と追加撮影の入口を同一ポップアップに統一
+- ✅ 証跡撮影画面は実カメラを直接表示
+- ✅ 撮影中の左側にアルバム入口を表示
+- ✅ アルバムから複数枚選択して証跡アップロード可能
+- ✅ 取引チャットヘッダー右側に `通報` ボタンを追加
+- ✅ 09更新診断：Deal / Dispute の状態遷移は変えないため更新不要
+- ✅ 10更新診断：`dispute` の別名に `通報` を追加
+- ✅ 05更新診断：既存 `proposal_evidence_photos` / `disputes` を使うためスキーマ更新不要
+
+---
+
 ## イテレーション168.86：個別募集作成UIの条件操作整理
 
 ### 背景・問題意識

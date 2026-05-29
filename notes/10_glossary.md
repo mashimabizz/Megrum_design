@@ -113,7 +113,7 @@
 | **証跡撮影** | evidence | 物理交換時の両者品物を1枚撮影。「左=相手 / 右=自分」固定 | C-3 |
 | **両者承認** | dual approve | 取引内容の相互確認 | C-3 |
 | **評価** | rating | 1-5 stars＋コメント | C-3 |
-| **dispute** | 異議、申告、D-flow | 取引異常時の申し立てフロー | D-flow |
+| **dispute** | 異議、申告、通報、D-flow | 取引異常時の申し立てフロー。取引チャットの `通報` ボタンはこの申告フローに接続する | D-flow / iter168.87 |
 | **反論** | reply | dispute 申告に対する弁明 | D-flow |
 | **仲裁** | arbitration | 運営による決定 | D-flow |
 | **凍結** | freeze | dispute 中に新規打診を停止 | iter14 |

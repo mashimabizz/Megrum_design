@@ -1,6 +1,8 @@
+import { CameraView, useCameraPermissions, type CameraType } from "expo-camera";
 import * as ImagePicker from "expo-image-picker";
+import * as MediaLibrary from "expo-media-library";
 import { router, useLocalSearchParams } from "expo-router";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -49,15 +51,27 @@ type CaptureData = {
   photos: EvidencePhoto[];
 };
 
+type EvidenceAsset = {
+  uri: string;
+  mimeType?: string | null;
+  fileName?: string | null;
+};
+
 export default function TransactionCaptureScreen() {
   const { id } = useLocalSearchParams<{ id?: string | string[] }>();
   const proposalId = Array.isArray(id) ? id[0] : id;
   const { user, previewMode, exitPreview } = useAuth();
   const insets = useSafeAreaInsets();
+  const cameraRef = useRef<CameraView>(null);
+  const [permission, requestPermission] = useCameraPermissions();
   const [data, setData] = useState<CaptureData | null>(null);
   const [loading, setLoading] = useState(false);
   const [busy, setBusy] = useState<"camera" | "library" | "delete" | "finish" | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [facing, setFacing] = useState<CameraType>("back");
+  const [latestLibraryPhotoUri, setLatestLibraryPhotoUri] = useState<string | null>(null);
+  const [latestLibraryLoading, setLatestLibraryLoading] = useState(false);
+  const [pictureSize, setPictureSize] = useState<string | undefined>(undefined);
 
   const reload = useCallback(async () => {
     if (!proposalId || !user || previewMode) return;
@@ -76,57 +90,142 @@ export default function TransactionCaptureScreen() {
     void reload();
   }, [reload]);
 
-  async function pickImage(source: "camera" | "library") {
+  useEffect(() => {
+    if (permission?.granted) return;
+    void requestPermission();
+  }, [permission?.granted, requestPermission]);
+
+  useEffect(() => {
+    void refreshLatestLibraryPhoto(false);
+  }, []);
+
+  async function ensurePhotoLibraryPermission(prompt: boolean) {
+    const current = await MediaLibrary.getPermissionsAsync(false, ["photo"]);
+    if (current.granted) return true;
+    if (!prompt || !current.canAskAgain) return false;
+    const next = await MediaLibrary.requestPermissionsAsync(false, ["photo"]);
+    return next.granted;
+  }
+
+  async function refreshLatestLibraryPhoto(prompt: boolean) {
+    setLatestLibraryLoading(true);
+    try {
+      const granted = await ensurePhotoLibraryPermission(prompt);
+      if (!granted) {
+        setLatestLibraryPhotoUri(null);
+        return;
+      }
+      const page = await MediaLibrary.getAssetsAsync({
+        first: 1,
+        mediaType: MediaLibrary.MediaType.photo,
+        sortBy: [[MediaLibrary.SortBy.creationTime, false]],
+      });
+      const latestAsset = page.assets[0];
+      if (!latestAsset) {
+        setLatestLibraryPhotoUri(null);
+        return;
+      }
+      const latestInfo = await MediaLibrary.getAssetInfoAsync(latestAsset);
+      setLatestLibraryPhotoUri(latestInfo.localUri ?? latestInfo.uri ?? latestAsset.uri);
+    } catch {
+      setLatestLibraryPhotoUri(null);
+    } finally {
+      setLatestLibraryLoading(false);
+    }
+  }
+
+  async function addEvidenceAssets(assets: EvidenceAsset[]) {
     if (!proposalId || !user) return;
-    setBusy(source);
+    if (assets.length === 0) return;
     setError(null);
     try {
-      const permission =
-        source === "camera"
-          ? await ImagePicker.requestCameraPermissionsAsync()
-          : await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (!permission.granted) {
-        setError(
-          source === "camera"
-            ? "カメラの利用を許可してください"
-            : "写真ライブラリの利用を許可してください",
-        );
-        return;
-      }
-      const result =
-        source === "camera"
-          ? await ImagePicker.launchCameraAsync({
-              allowsEditing: false,
-              mediaTypes: ["images"],
-              quality: 0.86,
-            })
-          : await ImagePicker.launchImageLibraryAsync({
-              allowsEditing: false,
-              mediaTypes: ["images"],
-              quality: 0.86,
-            });
-      if (result.canceled || !result.assets[0]) return;
-      const asset = result.assets[0];
-      const photoUrl = await uploadEvidenceImage({
-        proposalId,
-        uri: asset.uri,
-        mimeType: asset.mimeType,
-        fileName: asset.fileName,
-      });
-      const action = await addEvidencePhoto({
-        proposalId,
-        photoUrl,
-        userId: user.id,
-      });
-      if (action.error) {
-        setError(action.error);
-        return;
+      for (const asset of assets) {
+        const photoUrl = await uploadEvidenceImage({
+          proposalId,
+          uri: asset.uri,
+          mimeType: asset.mimeType,
+          fileName: asset.fileName,
+        });
+        const action = await addEvidencePhoto({
+          proposalId,
+          photoUrl,
+          userId: user.id,
+        });
+        if (action.error) {
+          setError(action.error);
+          return;
+        }
       }
       await reload();
-    } catch (pickError) {
-      setError(pickError instanceof Error ? pickError.message : "証跡の追加に失敗しました");
+      void refreshLatestLibraryPhoto(false);
+    } catch (uploadError) {
+      setError(uploadError instanceof Error ? uploadError.message : "証跡の追加に失敗しました");
+    }
+  }
+
+  async function takePhoto() {
+    if (!permission?.granted || busy) return;
+    setBusy("camera");
+    try {
+      const picture = await cameraRef.current?.takePictureAsync({
+        imageType: "jpg",
+        quality: 0.86,
+        skipProcessing: false,
+      });
+      if (picture?.uri) {
+        await addEvidenceAssets([
+          {
+            uri: picture.uri,
+            mimeType: "image/jpeg",
+            fileName: `evidence-${Date.now()}.jpg`,
+          },
+        ]);
+      }
+    } catch (captureError) {
+      setError(captureError instanceof Error ? captureError.message : "撮影できませんでした");
     } finally {
       setBusy(null);
+    }
+  }
+
+  async function pickFromLibrary() {
+    if (busy) return;
+    setBusy("library");
+    try {
+      const granted = await ensurePhotoLibraryPermission(true);
+      if (!granted) {
+        setError("写真ライブラリの利用を許可してください");
+        return;
+      }
+      const result = await ImagePicker.launchImageLibraryAsync({
+        allowsEditing: false,
+        allowsMultipleSelection: true,
+        mediaTypes: ["images"],
+        orderedSelection: true,
+        quality: 0.86,
+        selectionLimit: 0,
+      });
+      if (result.canceled || result.assets.length === 0) return;
+      await addEvidenceAssets(
+        result.assets.map((asset) => ({
+          uri: asset.uri,
+          mimeType: asset.mimeType,
+          fileName: asset.fileName,
+        })),
+      );
+    } catch (libraryError) {
+      setError(libraryError instanceof Error ? libraryError.message : "アルバムから追加できませんでした");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function updatePictureSize() {
+    try {
+      const sizes = await cameraRef.current?.getAvailablePictureSizesAsync();
+      setPictureSize(selectBestEvidencePictureSize(sizes ?? []));
+    } catch {
+      setPictureSize(undefined);
     }
   }
 
@@ -195,7 +294,29 @@ export default function TransactionCaptureScreen() {
 
   return (
     <View style={styles.root}>
-      <View style={styles.glow} />
+      {permission?.granted ? (
+        <CameraView
+          facing={facing}
+          mode="picture"
+          onCameraReady={() => void updatePictureSize()}
+          pictureSize={pictureSize}
+          ref={cameraRef}
+          responsiveOrientationWhenOrientationLocked
+          style={StyleSheet.absoluteFillObject}
+        />
+      ) : (
+        <View style={styles.cameraPermission}>
+          <Text style={styles.cameraPermissionTitle}>カメラを許可してください</Text>
+          <Text style={styles.cameraPermissionText}>
+            交換したグッズを撮影するためにカメラを使用します。
+          </Text>
+          <Pressable onPress={() => void requestPermission()} style={styles.cameraPermissionButton}>
+            <Text style={styles.cameraPermissionButtonText}>許可する</Text>
+          </Pressable>
+        </View>
+      )}
+      <View pointerEvents="none" style={styles.cameraScrimTop} />
+      <View pointerEvents="none" style={styles.cameraScrimBottom} />
       <View style={[styles.topBar, { paddingTop: Math.max(insets.top, 18) }]}>
         <Pressable
           accessibilityRole="button"
@@ -207,7 +328,7 @@ export default function TransactionCaptureScreen() {
         </Pressable>
         <View style={styles.statusChip}>
           <View style={styles.statusDot} />
-          <Text style={styles.statusChipText}>オフライン保存</Text>
+          <Text style={styles.statusChipText}>証跡保存</Text>
         </View>
         <Text style={styles.photoCount}>{data?.photos.length ?? 0}枚</Text>
       </View>
@@ -232,11 +353,11 @@ export default function TransactionCaptureScreen() {
       </ScrollView>
 
       <View style={styles.centerCopy}>
-        <Text style={styles.title}>取引証跡を撮影</Text>
+        <Text style={styles.title}>交換したグッズを撮影してください</Text>
         <Text style={styles.subtitle}>両者の交換物を1枚に収めてください</Text>
       </View>
 
-      <View style={styles.viewFinder}>
+      <View pointerEvents="none" style={styles.viewFinder}>
         <View style={styles.viewHalf}>
           <GoodsStack count={data?.theirCount ?? 0} label={`相手の${data?.theirCount ?? 0}点`} />
         </View>
@@ -262,19 +383,43 @@ export default function TransactionCaptureScreen() {
 
       {error ? <Text style={styles.errorText}>{error}</Text> : null}
 
+      <View style={[styles.albumRail, { top: Math.max(insets.top, 18) + 158 }]}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="アルバムから複数選択"
+          disabled={busy !== null}
+          onPress={() => void pickFromLibrary()}
+          style={styles.albumButton}
+        >
+          {latestLibraryPhotoUri ? (
+            <Image source={{ uri: latestLibraryPhotoUri }} style={styles.albumImage} />
+          ) : (
+            <View style={styles.albumFallback}>
+              <Text style={styles.albumFallbackText}>□</Text>
+            </View>
+          )}
+          {busy === "library" || latestLibraryLoading ? (
+            <View style={styles.albumBusy}>
+              <ActivityIndicator color="#fff" />
+            </View>
+          ) : null}
+        </Pressable>
+        <Text style={styles.albumLabel}>アルバム</Text>
+      </View>
+
       <View style={[styles.controls, { paddingBottom: Math.max(insets.bottom, 18) + 18 }]}>
         <Pressable
           disabled={!!busy}
-          onPress={() => void pickImage("library")}
+          onPress={() => setFacing((current) => (current === "back" ? "front" : "back"))}
           style={styles.secondaryCircle}
         >
-          <Text style={styles.secondaryCircleText}>履歴</Text>
+          <Text style={styles.secondaryCircleText}>反転</Text>
         </Pressable>
         <Pressable
           disabled={!!busy}
           accessibilityRole="button"
           accessibilityLabel="撮影"
-          onPress={() => void pickImage("camera")}
+          onPress={() => void takePhoto()}
           style={styles.shutter}
         >
           {busy === "camera" || busy === "library" ? <ActivityIndicator color={megrumColors.lavender} /> : null}
@@ -375,20 +520,70 @@ function timeNow() {
   return `${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
 }
 
+function selectBestEvidencePictureSize(sizes: string[]) {
+  const numericSizes = sizes
+    .map((size) => {
+      const [width, height] = size.split("x").map((value) => Number(value));
+      return { size, width, height, pixels: width * height };
+    })
+    .filter((item) => Number.isFinite(item.width) && Number.isFinite(item.height));
+  if (numericSizes.length === 0) return undefined;
+  numericSizes.sort((a, b) => b.pixels - a.pixels);
+  return numericSizes[0]?.size;
+}
+
 const styles = StyleSheet.create({
   root: {
     backgroundColor: "#0a0810",
     flex: 1,
     overflow: "hidden",
   },
-  glow: {
-    backgroundColor: "rgba(166,149,216,0.28)",
-    borderRadius: 180,
-    height: 360,
-    left: "14%",
+  cameraScrimTop: {
+    backgroundColor: "rgba(0,0,0,0.22)",
+    height: 162,
+    left: 0,
     position: "absolute",
-    top: "28%",
-    width: 360,
+    right: 0,
+    top: 0,
+  },
+  cameraScrimBottom: {
+    backgroundColor: "rgba(0,0,0,0.34)",
+    bottom: 0,
+    height: 202,
+    left: 0,
+    position: "absolute",
+    right: 0,
+  },
+  cameraPermission: {
+    alignItems: "center",
+    flex: 1,
+    gap: 14,
+    justifyContent: "center",
+    paddingHorizontal: 26,
+  },
+  cameraPermissionTitle: {
+    color: "#fff",
+    fontSize: 19,
+    fontWeight: "900",
+    textAlign: "center",
+  },
+  cameraPermissionText: {
+    color: "rgba(255,255,255,0.72)",
+    fontSize: 12.5,
+    fontWeight: "800",
+    lineHeight: 19,
+    textAlign: "center",
+  },
+  cameraPermissionButton: {
+    backgroundColor: megrumColors.lavender,
+    borderRadius: megrumRadii.pill,
+    paddingHorizontal: 20,
+    paddingVertical: 11,
+  },
+  cameraPermissionButtonText: {
+    color: "#fff",
+    fontSize: 12,
+    fontWeight: "900",
   },
   topBar: {
     alignItems: "center",
@@ -500,6 +695,7 @@ const styles = StyleSheet.create({
     position: "absolute",
     right: 30,
     top: "29%",
+    zIndex: 2,
   },
   viewHalf: {
     alignItems: "center",
@@ -600,6 +796,55 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     position: "absolute",
     textAlign: "center",
+  },
+  albumRail: {
+    alignItems: "center",
+    gap: 7,
+    left: 16,
+    position: "absolute",
+    zIndex: 8,
+  },
+  albumButton: {
+    alignItems: "center",
+    backgroundColor: "rgba(5,8,13,0.48)",
+    borderColor: "rgba(255,255,255,0.36)",
+    borderRadius: 16,
+    borderWidth: 1,
+    height: 60,
+    justifyContent: "center",
+    overflow: "hidden",
+    width: 60,
+  },
+  albumImage: {
+    height: "100%",
+    width: "100%",
+  },
+  albumFallback: {
+    alignItems: "center",
+    backgroundColor: "rgba(255,255,255,0.16)",
+    height: "100%",
+    justifyContent: "center",
+    width: "100%",
+  },
+  albumFallbackText: {
+    color: "#fff",
+    fontSize: 24,
+    fontWeight: "900",
+  },
+  albumBusy: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: "center",
+    backgroundColor: "rgba(5,8,13,0.45)",
+    justifyContent: "center",
+  },
+  albumLabel: {
+    backgroundColor: "rgba(0,0,0,0.5)",
+    borderRadius: megrumRadii.pill,
+    color: "#fff",
+    fontSize: 9.5,
+    fontWeight: "900",
+    paddingHorizontal: 7,
+    paddingVertical: 3,
   },
   controls: {
     alignItems: "center",

@@ -22,9 +22,7 @@ import {
 } from "../src/components/NativeMapPreview";
 import { StatusPill } from "../src/components/StatusPill";
 import {
-  addEvidencePhoto,
   approveTradeCancel,
-  uploadEvidenceImage,
 } from "../src/lib/transactionActions";
 import {
   exchangeMethodLabel,
@@ -553,9 +551,9 @@ export default function TransactionDetailScreen() {
     }
   }
 
-  function handleAddEvidencePhoto() {
-    if (!detail || !user) return;
-    const currentDetail = detail;
+  function openEvidenceCapturePrompt() {
+    if (!detail) return;
+    const targetId = detail.id;
     Alert.alert(
       "交換したグッズを撮影してください",
       "両者の交換物が1枚に収まるように撮影してください。",
@@ -563,51 +561,8 @@ export default function TransactionDetailScreen() {
         { text: "戻る", style: "cancel" },
         {
           text: "撮影する",
-          onPress: () => {
-            void (async () => {
-              setChatActionLoading("evidence");
-              setError(null);
-              try {
-                const ImagePicker = await import("expo-image-picker");
-                const permission = await ImagePicker.requestCameraPermissionsAsync();
-                if (!permission.granted) {
-                  setError("カメラの利用を許可してください");
-                  return;
-                }
-                const result = await ImagePicker.launchCameraAsync({
-                  allowsEditing: false,
-                  mediaTypes: ["images"],
-                  quality: 0.86,
-                });
-                if (result.canceled || !result.assets[0]) return;
-                const asset = result.assets[0];
-                const photoUrl = await uploadEvidenceImage({
-                  proposalId: currentDetail.id,
-                  uri: asset.uri,
-                  mimeType: asset.mimeType,
-                  fileName: asset.fileName,
-                });
-                const action = await addEvidencePhoto({
-                  proposalId: currentDetail.id,
-                  photoUrl,
-                  userId: user.id,
-                });
-                if (action.error) {
-                  setError(action.error);
-                  return;
-                }
-                await refreshDetail();
-              } catch (captureError) {
-                setError(
-                  captureError instanceof Error
-                    ? captureError.message
-                    : "証跡の追加に失敗しました",
-                );
-              } finally {
-                setChatActionLoading(null);
-              }
-            })();
-          },
+          onPress: () =>
+            router.push({ pathname: "/transaction-capture", params: { id: targetId } }),
         },
       ],
     );
@@ -632,6 +587,22 @@ export default function TransactionDetailScreen() {
           headerBackButtonDisplayMode: "minimal",
           headerBlurEffect: "systemMaterial",
           headerTintColor: megrumColors.lavender,
+          headerRight: () =>
+            detail ? (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="取引を通報"
+                onPress={() =>
+                  router.push({
+                    pathname: "/dispute-new",
+                    params: { proposalId: detail.id },
+                  })
+                }
+                style={styles.headerReportButton}
+              >
+                <Text style={styles.headerReportText}>通報</Text>
+              </Pressable>
+            ) : null,
         }}
       />
       {detail ? (
@@ -729,13 +700,13 @@ export default function TransactionDetailScreen() {
               style={styles.chatMessageEndAnchor}
             />
             {detail.status === "agreed" && detail.evidencePhotoCount === 0 ? (
-              <EvidenceCalloutNative proposalId={detail.id} />
+              <EvidenceCalloutNative onStartCapture={openEvidenceCapturePrompt} />
             ) : null}
             {detail.status === "agreed" || detail.status === "completed" ? (
               <CompletionPanel
                 detail={detail}
-                evidenceUploading={chatActionLoading === "evidence"}
-                onAddEvidence={handleAddEvidencePhoto}
+                evidenceUploading={false}
+                onAddEvidence={openEvidenceCapturePrompt}
               />
             ) : null}
           </ScrollView>
@@ -2269,7 +2240,7 @@ function isReadByPartner(message: ChatMessage, partnerLastReadAt: string | null)
   return readTime >= messageTime;
 }
 
-function EvidenceCalloutNative({ proposalId }: { proposalId: string }) {
+function EvidenceCalloutNative({ onStartCapture }: { onStartCapture: () => void }) {
   return (
     <View style={styles.evidenceCalloutWeb}>
       <View style={styles.evidenceCalloutIcon}>
@@ -2281,9 +2252,7 @@ function EvidenceCalloutNative({ proposalId }: { proposalId: string }) {
       </View>
       <Pressable
         accessibilityRole="button"
-        onPress={() =>
-          router.push({ pathname: "/transaction-capture", params: { id: proposalId } })
-        }
+        onPress={onStartCapture}
         style={styles.evidenceCalloutButton}
       >
         <Text style={styles.evidenceCalloutButtonText}>撮影へ</Text>
@@ -2801,9 +2770,7 @@ function CompletionPanel({
           </Text>
         </View>
         <PrimaryButton
-          onPress={() =>
-            router.push({ pathname: "/transaction-capture", params: { id: detail.id } })
-          }
+          onPress={onAddEvidence}
         >
           撮影する
         </PrimaryButton>
@@ -3098,6 +3065,19 @@ const styles = StyleSheet.create({
     gap: 10,
     paddingBottom: 8,
     paddingHorizontal: 14,
+  },
+  headerReportButton: {
+    backgroundColor: "rgba(217,130,107,0.10)",
+    borderColor: "rgba(217,130,107,0.28)",
+    borderRadius: megrumRadii.pill,
+    borderWidth: 1,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  headerReportText: {
+    color: megrumColors.warn,
+    fontSize: 12,
+    fontWeight: "900",
   },
   chatPartnerStrip: {
     alignItems: "center",
