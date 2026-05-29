@@ -610,6 +610,18 @@ export default function MeguriBoardThreadScreen() {
     setSendError(null);
   }
 
+  function mentionReplyAuthor(reply: MeguriBoardReply) {
+    if (reply.deleted || reply.mine || thread?.status === "locked") return;
+    const mention = reply.authorHandle ? `@${reply.authorHandle}` : `@${reply.authorName.replace(/\s+/g, "")}`;
+    setDraft((current) => {
+      const trimmed = current.trimStart();
+      if (trimmed.startsWith(`${mention} `) || trimmed === mention) return current;
+      return current ? `${mention} ${current}` : `${mention} `;
+    });
+    setQuoteTarget(null);
+    setSendError(null);
+  }
+
   async function shareThread() {
     if (!thread) return;
     const url = buildThreadShareUrl(thread, viewerContext, viewMode);
@@ -695,6 +707,11 @@ export default function MeguriBoardThreadScreen() {
       );
     } else {
       actions.push(
+        {
+          disabled: reply.deleted || thread?.status === "locked",
+          label: "メンションして返信",
+          run: () => mentionReplyAuthor(reply),
+        },
         {
           disabled: reply.deleted,
           label: reply.reacted ? "参考になったを取り消す" : "参考になった",

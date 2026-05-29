@@ -4,6 +4,51 @@
 
 ---
 
+## イテレーション184：掲示板にメンション返信導線を追加
+
+### 背景・問題意識
+
+スポット掲示板には `@handle` メンション通知の仕組みがあるが、ユーザーが手入力する前提だと使われにくい。一般的なスレッド機能として、返信アクションから相手のhandleを本文へ挿入できるようにした。
+
+### 変更内容
+
+#### `mobile/app/meguri-board-thread.tsx`
+- 他ユーザーの返信アクションに「メンションして返信」を追加した。
+- 選択すると返信入力欄の先頭へ `@handle` を挿入するようにした。
+- handle がない場合は表示名から空白を除いた簡易メンションを挿入するようにした。
+
+#### `notes/09_state_machines.md`
+- Meguri Board Lifecycle にメンション返信導線のルールを追記した。
+
+#### `notes/10_glossary.md`
+- 掲示板メンション返信を追加した。
+
+### 影響範囲
+
+- iOS版 スポット掲示板詳細
+- 掲示板の表示ルール・用語
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- `EAS_UPDATE_PROJECT_SLUG=ihub EXPO_NO_GIT_STATUS=1 npm --prefix mobile run update:ios:preview -- --message "[iter184] add board mention reply" --non-interactive`
+- Preview OTA: Update group `e2d6542c-61f7-449e-84f0-4e1fbefb727c` / iOS update `019e751b-3612-7d99-a5c3-6eea381c63cb`
+
+### 関連ファイル
+
+- `mobile/app/meguri-board-thread.tsx`
+- `notes/08_design_iterations.md`
+- `notes/09_state_machines.md`
+- `notes/10_glossary.md`
+
+### セルフレビュー結果
+
+- ✅ 既存のメンション通知仕様を活かし、DB/API追加なしで導線だけを足した。
+- ✅ 自分の返信・削除済み返信・締め切りスレッドではメンション挿入しないようにした。
+
+---
+
 ## イテレーション183：掲示板にプル更新を追加
 
 ### 背景・問題意識
