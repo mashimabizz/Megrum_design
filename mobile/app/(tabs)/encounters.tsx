@@ -68,6 +68,7 @@ export type MeguriFurColor =
 
 export type MeguriUser = {
   id: string;
+  avatarUrl?: string | null;
   name: string;
   animalType: MeguriAnimalType;
   furColor: MeguriFurColor;
@@ -527,6 +528,7 @@ function remoteAuthorToMeguriUser(author: GroomRemoteAuthor): MeguriUser {
     return {
       ...matched,
       area: author.primaryArea || matched.area,
+      avatarUrl: author.avatarUrl ?? matched.avatarUrl ?? null,
       id: author.id,
       name: author.displayName || matched.name,
     };
@@ -534,6 +536,7 @@ function remoteAuthorToMeguriUser(author: GroomRemoteAuthor): MeguriUser {
   return {
     animalType: "cat",
     area: author.primaryArea || "イベント周辺",
+    avatarUrl: author.avatarUrl,
     count: 1,
     furColor: "lavender",
     group: "めぐり",
@@ -563,8 +566,6 @@ export default function EncountersScreen() {
   const { previewMode, profile, user } = useAuth();
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const arrivals = useMemo(() => USERS.slice(0, 5), []);
-  const todayCount = Math.min(USERS.length, 10);
   const [activeIndex, setActiveIndex] = useState(0);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [meguriEnabled, setMeguriEnabled] = useState(true);
@@ -583,7 +584,18 @@ export default function EncountersScreen() {
   const [groomViewerSession, setGroomViewerSession] = useState(0);
   const [viewedGroomKeys, setViewedGroomKeys] = useState<Set<string>>(() => new Set());
   const groomToastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const active = arrivals[activeIndex];
+  const arrivals = useMemo(() => {
+    const seen = new Set<string>();
+    const groomAuthors: MeguriUser[] = [];
+    for (const post of groomPosts) {
+      if (!post.author || seen.has(post.author.id)) continue;
+      seen.add(post.author.id);
+      groomAuthors.push(post.author);
+    }
+    return groomAuthors.length > 0 ? groomAuthors.slice(0, 5) : USERS.slice(0, 5);
+  }, [groomPosts]);
+  const todayCount = arrivals.length;
+  const active = arrivals[activeIndex] ?? arrivals[0] ?? USERS[0];
   const selectedGroomPost = groomPosts.find((post) => post.id === selectedGroomId) ?? null;
   const lockedLetters = previewMode && !plusActive ? LETTERS.length : 0;
   const headerTop = Math.max(insets.top, 18) + 8;
@@ -595,6 +607,10 @@ export default function EncountersScreen() {
     }, 3200);
     return () => clearInterval(timer);
   }, [arrivals.length]);
+
+  useEffect(() => {
+    if (activeIndex >= arrivals.length) setActiveIndex(0);
+  }, [activeIndex, arrivals.length]);
 
   useEffect(() => {
     loadMeguriPlusState(profile)
@@ -954,15 +970,6 @@ export default function EncountersScreen() {
         />
 
         <View style={styles.stageCard}>
-          <View style={styles.cloudA} />
-          <View style={styles.cloudB} />
-          <Text style={[styles.eyebrow, styles.centerEyebrow]}>今日のめぐり</Text>
-          <View style={styles.countRow}>
-            <Text style={styles.bigCount}>{todayCount}</Text>
-            <Text style={styles.countUnit}>人</Text>
-          </View>
-          <Text style={styles.stageTitle}>とめぐりあいました！</Text>
-
           <View style={styles.homeSceneFrame}>
             <HomeResidentsFallback activeIndex={activeIndex} users={arrivals} />
 
@@ -1021,7 +1028,7 @@ export default function EncountersScreen() {
         enabled={meguriEnabled}
         onAvatarEdit={() => {
           setSettingsOpen(false);
-          router.push("/meguri-avatar-edit");
+          router.push("/profile-edit");
         }}
         onClose={() => setSettingsOpen(false)}
         onProfileEdit={() => {
@@ -3525,7 +3532,11 @@ function HomeResidentsFallback({
               index === activeIndex ? styles.homeFallbackPersonActive : null,
             ]}
           >
-            <WalkingCard user={user} size={index === activeIndex ? 66 : 58} active={index === activeIndex} />
+            <MeguriHomeProfileIcon
+              active={index === activeIndex}
+              size={index === activeIndex ? 70 : 60}
+              user={user}
+            />
           </View>
         ))}
       </View>
@@ -3574,8 +3585,8 @@ export function MeguriSettingsModal({
             <SettingRow
               icon="sparkles-outline"
               onPress={onAvatarEdit}
-              subtitle="アイコン・色味など"
-              title="アイコン編集"
+              subtitle="交換側と同じアイコンを使います"
+              title="プロフィールアイコン"
             />
             <SettingRow
               icon="create-outline"
@@ -3635,7 +3646,7 @@ export function SettingRow({
   );
 }
 
-export function WalkingCard({
+export function MeguriHomeProfileIcon({
   active,
   size,
   user,
@@ -3644,94 +3655,47 @@ export function WalkingCard({
   size: number;
   user: MeguriUser;
 }) {
-  const bob = useRef(new Animated.Value(0)).current;
   const accent = hueColor(user.hue);
-
-  useEffect(() => {
-    const loop = Animated.loop(
-      Animated.sequence([
-        Animated.timing(bob, {
-          toValue: 1,
-          duration: active ? 840 : 1300,
-          easing: Easing.inOut(Easing.sin),
-          useNativeDriver: true,
-        }),
-        Animated.timing(bob, {
-          toValue: 0,
-          duration: active ? 840 : 1300,
-          easing: Easing.inOut(Easing.sin),
-          useNativeDriver: true,
-        }),
-      ]),
-    );
-    loop.start();
-    return () => loop.stop();
-  }, [active, bob]);
-
-  const translateY = bob.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0, active ? -5 : -2],
-  });
-  const rotateLeft = bob.interpolate({
-    inputRange: [0, 1],
-    outputRange: ["-12deg", active ? "22deg" : "4deg"],
-  });
-  const rotateRight = bob.interpolate({
-    inputRange: [0, 1],
-    outputRange: ["12deg", active ? "-20deg" : "-4deg"],
-  });
+  const initial = user.name.trim().slice(0, 2) || "?";
 
   return (
-    <Animated.View style={[styles.walker, { width: size, transform: [{ translateY }] }]}>
-      <View style={[styles.armRow, { top: size * 0.36 }]}>
-        <Animated.View
-          style={[
-            styles.arm,
-            styles.leftArm,
-            { backgroundColor: accent, transform: [{ rotate: rotateLeft }] },
-          ]}
-        />
-        <Animated.View
-          style={[
-            styles.arm,
-            styles.rightArm,
-            { backgroundColor: accent, transform: [{ rotate: rotateRight }] },
-          ]}
-        />
-      </View>
+    <View style={[styles.homeProfileIconWrap, { width: size }]}>
       <View
         style={[
-          styles.walkerBody,
+          styles.homeProfileIconRing,
           {
             width: size,
             height: size,
-            borderRadius: Math.round(size * 0.24),
+            borderRadius: Math.round(size / 2),
             borderColor: accent,
           },
+          active ? styles.homeProfileIconRingActive : null,
         ]}
       >
-        <View style={[styles.avatarPattern, { backgroundColor: hueTint(user.hue, 0.54) }]} />
-        <Text style={[styles.walkerInitial, { fontSize: Math.round(size * 0.42) }]}>
-          {user.name.charAt(0)}
-        </Text>
+        {user.avatarUrl ? (
+          <Image source={{ uri: user.avatarUrl }} style={styles.homeProfileIconImage} />
+        ) : (
+          <View style={[styles.homeProfileIconFallback, { backgroundColor: hueTint(user.hue, 0.78) }]}>
+            <Text style={[styles.homeProfileIconInitial, { fontSize: Math.round(size * 0.3) }]}>
+              {initial}
+            </Text>
+          </View>
+        )}
       </View>
-      <View style={styles.legs}>
-        <Animated.View
-          style={[
-            styles.leg,
-            { backgroundColor: accent, transform: [{ rotate: rotateRight }] },
-          ]}
-        />
-        <Animated.View
-          style={[
-            styles.leg,
-            { backgroundColor: accent, transform: [{ rotate: rotateLeft }] },
-          ]}
-        />
-      </View>
-      <View style={styles.walkerShadow} />
-    </Animated.View>
+      <Text numberOfLines={1} style={styles.homeProfileIconName}>
+        {user.name}
+      </Text>
+      <View style={styles.homeProfileIconShadow} />
+    </View>
   );
+}
+
+export function WalkingCard(props: {
+  active?: boolean;
+  size: number;
+  user: MeguriUser;
+}) {
+  return <MeguriHomeProfileIcon {...props} />;
 }
 
 export function MiniChip({ label }: { label: string }) {
@@ -5069,10 +5033,10 @@ const styles = StyleSheet.create({
   stageCard: {
     backgroundColor: "#f5ecf7",
     borderRadius: 28,
-    minHeight: 452,
+    minHeight: 304,
     overflow: "hidden",
-    paddingBottom: 18,
-    paddingTop: 56,
+    paddingBottom: 14,
+    paddingTop: 14,
     position: "relative",
     shadowColor: megrumColors.lavender,
     shadowOffset: { width: 0, height: 14 },
@@ -5129,54 +5093,6 @@ const styles = StyleSheet.create({
     fontSize: 11.5,
     fontWeight: "800",
   },
-  cloudA: {
-    backgroundColor: "rgba(255,255,255,0.72)",
-    borderRadius: 999,
-    height: 18,
-    left: 20,
-    position: "absolute",
-    top: 28,
-    width: 78,
-  },
-  cloudB: {
-    backgroundColor: "rgba(255,255,255,0.48)",
-    borderRadius: 999,
-    height: 14,
-    position: "absolute",
-    right: 28,
-    top: 52,
-    width: 62,
-  },
-  centerEyebrow: {
-    textAlign: "center",
-  },
-  countRow: {
-    alignItems: "flex-end",
-    flexDirection: "row",
-    justifyContent: "center",
-    marginTop: 4,
-  },
-  bigCount: {
-    color: megrumColors.lavender,
-    fontSize: 62,
-    fontWeight: "900",
-    letterSpacing: 0,
-    lineHeight: 66,
-  },
-  countUnit: {
-    color: megrumColors.ink,
-    fontSize: 24,
-    fontWeight: "900",
-    marginBottom: 8,
-    marginLeft: 4,
-  },
-  stageTitle: {
-    color: megrumColors.ink,
-    fontSize: 19,
-    fontWeight: "900",
-    marginTop: -2,
-    textAlign: "center",
-  },
   speechBubble: {
     alignSelf: "center",
     backgroundColor: "rgba(255,255,255,0.9)",
@@ -5208,9 +5124,8 @@ const styles = StyleSheet.create({
     borderColor: "rgba(255,255,255,0.76)",
     borderRadius: 24,
     borderWidth: 1,
-    height: 226,
+    height: 258,
     marginHorizontal: 10,
-    marginTop: 14,
     overflow: "hidden",
     position: "relative",
   },
@@ -5239,10 +5154,10 @@ const styles = StyleSheet.create({
     alignItems: "flex-end",
     flexDirection: "row",
     justifyContent: "center",
-    paddingBottom: 12,
+    paddingBottom: 20,
   },
   homeFallbackPerson: {
-    marginHorizontal: -3,
+    marginHorizontal: 2,
     opacity: 0.92,
     transform: [{ scale: 0.94 }],
   },
@@ -5360,73 +5275,57 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "900",
   },
-  walker: {
+  homeProfileIconWrap: {
     alignItems: "center",
-    paddingBottom: 20,
     position: "relative",
   },
-  armRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    left: -8,
-    position: "absolute",
-    right: -8,
-    zIndex: 0,
-  },
-  arm: {
-    borderRadius: 99,
-    height: 7,
-    opacity: 0.85,
-    width: 20,
-  },
-  leftArm: {
-    transformOrigin: "100% 50%",
-  },
-  rightArm: {
-    transformOrigin: "0% 50%",
-  },
-  walkerBody: {
+  homeProfileIconRing: {
     alignItems: "center",
     backgroundColor: "#fff",
-    borderWidth: 2,
+    borderWidth: 3,
     justifyContent: "center",
     overflow: "hidden",
     position: "relative",
     zIndex: 1,
   },
-  avatarPattern: {
+  homeProfileIconRingActive: {
+    shadowColor: megrumColors.lavender,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.22,
+    shadowRadius: 14,
+  },
+  homeProfileIconImage: {
     height: "100%",
-    opacity: 0.92,
-    position: "absolute",
     width: "100%",
   },
-  walkerInitial: {
+  homeProfileIconFallback: {
+    alignItems: "center",
+    height: "100%",
+    justifyContent: "center",
+    width: "100%",
+  },
+  homeProfileIconInitial: {
     color: "#fff",
     fontWeight: "900",
     textShadowColor: "rgba(58,50,74,0.26)",
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 2,
   },
-  legs: {
-    bottom: 12,
-    flexDirection: "row",
-    gap: 10,
-    position: "absolute",
-    zIndex: 0,
+  homeProfileIconName: {
+    color: "rgba(58,50,74,0.68)",
+    fontSize: 10.5,
+    fontWeight: "900",
+    marginTop: 6,
+    maxWidth: 72,
+    textAlign: "center",
   },
-  leg: {
-    borderRadius: 99,
-    height: 19,
-    opacity: 0.82,
-    width: 7,
-  },
-  walkerShadow: {
+  homeProfileIconShadow: {
     backgroundColor: "rgba(0,0,0,0.16)",
     borderRadius: 999,
-    bottom: 5,
+    bottom: 21,
     height: 6,
     position: "absolute",
-    width: "76%",
+    width: "70%",
   },
   statsRow: {
     flexDirection: "row",
