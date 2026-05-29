@@ -4,6 +4,51 @@
 
 ---
 
+## イテレーション209：掲示板カード長押しアクションを追加
+
+### 背景・問題意識
+
+スレッド一覧では、詳細を開かずに共有・保存・通知・通報などの操作をしたい場面がある。右上のメニューに加えて、スマホ掲示板で自然な長押し操作から同じアクションへ入れるようにした。
+
+### 変更内容
+
+#### `mobile/app/meguri-board.tsx`
+- スレッドカード本体の長押しで、既存のスレッドアクションシートを開くようにした。
+- 通常タップはこれまで通りスレッド詳細遷移のまま維持した。
+
+#### `notes/09_state_machines.md`
+- Meguri Board Lifecycle にカード長押しアクションの表示ルールを追記した。
+
+#### `notes/10_glossary.md`
+- 掲示板カード長押しアクションを追加した。
+
+### 影響範囲
+
+- iOS版 スポット掲示板一覧
+- スレッド操作導線
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- `EAS_UPDATE_PROJECT_SLUG=ihub EXPO_NO_GIT_STATUS=1 npm --prefix mobile run update:ios:preview -- --message "[iter209] add board card long press actions" --non-interactive`
+- Preview OTA: Update group `6d2b3570-821f-4b99-a878-4ad0a915287f` / iOS update `019e7584-65ab-7a0c-96f3-1617adc87782`
+
+### 関連ファイル
+
+- `mobile/app/meguri-board.tsx`
+- `notes/08_design_iterations.md`
+- `notes/09_state_machines.md`
+- `notes/10_glossary.md`
+
+### セルフレビュー結果
+
+- ✅ 既存のアクションシートを再利用し、操作の分岐を増やしすぎないようにした。
+- ✅ 通常タップの詳細遷移は維持した。
+- ✅ DB変更やネイティブ依存追加なしで、Preview OTA対象内に収めた。
+
+---
+
 ## イテレーション208：掲示板一覧に画像ありフィルタを追加
 
 ### 背景・問題意識

@@ -878,6 +878,7 @@ export default function MeguriBoardScreen() {
                           },
                         })
                       }
+                      onLongPress={() => openThreadActions(thread)}
                       style={({ pressed }) => [
                         styles.threadCard,
                         pressed ? styles.threadCardPressed : null,
