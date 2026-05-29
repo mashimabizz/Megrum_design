@@ -403,6 +403,21 @@ export default function MeguriBoardThreadScreen() {
     return next;
   }, [filteredParticipants, participantSortMode]);
 
+  const activeMentionQuery = useMemo(() => extractDraftMentionQuery(draft), [draft]);
+  const mentionSuggestions = useMemo(() => {
+    if (activeMentionQuery === null) return [];
+    return participants
+      .filter((participant) => !participant.mine && (participant.handle || participant.name))
+      .filter((participant) => {
+        const needle = activeMentionQuery;
+        if (!needle) return true;
+        return normalizeReplySearch(
+          [participant.name, participant.handle, participant.primaryArea].filter(Boolean).join(" "),
+        ).includes(needle);
+      })
+      .slice(0, 6);
+  }, [activeMentionQuery, participants]);
+
   const mediaAttachments = useMemo<BoardMediaAttachment[]>(() => {
     if (!thread) return [];
     const attachments: BoardMediaAttachment[] = thread.imageUris.map((uri, index) => ({
@@ -1247,6 +1262,17 @@ export default function MeguriBoardThreadScreen() {
     setSendError(null);
   }
 
+  function insertMentionSuggestion(participant: BoardParticipant) {
+    const mention = participant.handle ? `@${participant.handle}` : `@${participant.name.replace(/\s+/g, "")}`;
+    setDraft((current) => {
+      if (extractDraftMentionQuery(current) === null) return current ? `${current.trimEnd()} ${mention} ` : `${mention} `;
+      return current.replace(/(^|\s)@([^\s@]{0,24})$/, `$1${mention} `);
+    });
+    setQuoteTarget(null);
+    setSendError(null);
+    requestAnimationFrame(() => composerInputRef.current?.focus());
+  }
+
   async function shareThread() {
     if (!thread) return;
     const url = buildThreadShareUrl(thread, viewerContext, viewMode);
@@ -2051,6 +2077,34 @@ export default function MeguriBoardThreadScreen() {
                     </Pressable>
                   </View>
                 ) : null}
+                {mentionSuggestions.length > 0 ? (
+                  <View style={styles.mentionSuggestionBox}>
+                    <Text style={styles.mentionSuggestionTitle}>メンション候補</Text>
+                    <ScrollView
+                      horizontal
+                      keyboardShouldPersistTaps="handled"
+                      showsHorizontalScrollIndicator={false}
+                    >
+                      <View style={styles.mentionSuggestionRail}>
+                        {mentionSuggestions.map((participant) => (
+                          <Pressable
+                            accessibilityRole="button"
+                            key={participant.id}
+                            onPress={() => insertMentionSuggestion(participant)}
+                            style={styles.mentionSuggestionChip}
+                          >
+                            <Text numberOfLines={1} style={styles.mentionSuggestionHandle}>
+                              {participant.handle ? `@${participant.handle}` : `@${participant.name.replace(/\s+/g, "")}`}
+                            </Text>
+                            <Text numberOfLines={1} style={styles.mentionSuggestionName}>
+                              {participant.name}
+                            </Text>
+                          </Pressable>
+                        ))}
+                      </View>
+                    </ScrollView>
+                  </View>
+                ) : null}
                 <View style={styles.composerInputRow}>
                   <Pressable
                     accessibilityRole="button"
@@ -2832,6 +2886,12 @@ function formatAbsoluteDateTime(value: number) {
 
 function normalizeReplySearch(value: string | null | undefined) {
   return (value ?? "").replace(/\s+/g, " ").trim().toLowerCase();
+}
+
+function extractDraftMentionQuery(value: string) {
+  const match = value.match(/(^|\s)@([^\s@]{0,24})$/);
+  if (!match) return null;
+  return normalizeReplySearch(match[2] ?? "");
 }
 
 function splitHighlightSegments(value: string, query: string) {
@@ -3766,6 +3826,41 @@ const styles = StyleSheet.create({
     color: megrumColors.mutedInk,
     fontSize: 10.5,
     fontWeight: "900",
+  },
+  mentionSuggestionBox: {
+    gap: 7,
+  },
+  mentionSuggestionTitle: {
+    color: "rgba(58,50,74,0.48)",
+    fontSize: 10.5,
+    fontWeight: "900",
+    paddingLeft: 2,
+  },
+  mentionSuggestionRail: {
+    flexDirection: "row",
+    gap: 8,
+    paddingRight: 10,
+  },
+  mentionSuggestionChip: {
+    backgroundColor: "#fff",
+    borderColor: "rgba(166,149,216,0.2)",
+    borderRadius: 999,
+    borderWidth: 1,
+    maxWidth: 146,
+    minHeight: 34,
+    paddingHorizontal: 11,
+    justifyContent: "center",
+    ...megrumShadow,
+  },
+  mentionSuggestionHandle: {
+    color: megrumColors.lavender,
+    fontSize: 11,
+    fontWeight: "900",
+  },
+  mentionSuggestionName: {
+    color: megrumColors.mutedInk,
+    fontSize: 9.5,
+    fontWeight: "800",
   },
   composerInputRow: {
     alignItems: "flex-end",

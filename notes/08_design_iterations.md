@@ -4,6 +4,55 @@
 
 ---
 
+## イテレーション237：掲示板返信入力にメンション候補を出す
+
+### 背景・問題意識
+
+スレッドが伸びるほど、特定の参加者へ返答したい場面が増える。返信アクションからのメンションだけでは、入力中に自然に相手を呼び出す流れが弱いため、`@` 入力中に参加者候補を表示してタップ挿入できるようにした。
+
+### 変更内容
+
+#### `mobile/app/meguri-board-thread.tsx`
+- 返信入力末尾の `@` または `@文字列` を検出する `extractDraftMentionQuery` を追加した。
+- スレッド参加者からメンション候補を最大6件表示し、名前・handle・エリアで絞り込めるようにした。
+- 候補をタップすると `@handle` または `@名前` を入力中の `@...` に置換して、返信入力へフォーカスを戻すようにした。
+- 返信入力欄の上に、既存のピルUIに合わせたメンション候補レールを追加した。
+
+#### `notes/09_state_machines.md`
+- Meguri Board Lifecycle にメンション候補表示の表示ルールを追記した。
+
+#### `notes/10_glossary.md`
+- 掲示板メンション候補を追加した。
+
+### 影響範囲
+
+- iOS版 スポット掲示板詳細
+- 返信入力欄
+- 掲示板メンション
+- スレッド参加者一覧の派生表示
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- `EAS_UPDATE_PROJECT_SLUG=ihub EXPO_NO_GIT_STATUS=1 npm --prefix mobile run update:ios:preview -- --message "[iter237] suggest board mentions" --non-interactive`
+- Preview OTA: Update group `0dbc0904-3099-42e8-81b2-b23391281658` / iOS update `019e760e-0c63-7464-8f64-d5abb545bbad`
+
+### 関連ファイル
+
+- `mobile/app/meguri-board-thread.tsx`
+- `notes/08_design_iterations.md`
+- `notes/09_state_machines.md`
+- `notes/10_glossary.md`
+
+### セルフレビュー結果
+
+- ✅ 既存の参加者集計を使い、新しいDB取得やネイティブ依存を増やさずに実装した。
+- ✅ 候補は自分以外の参加者に絞り、返信先として自然な対象だけを表示するようにした。
+- ✅ `@` 入力中だけ表示されるため、通常の返信入力を邪魔しない。
+
+---
+
 ## イテレーション236：掲示板返信を保存して読み返せるようにする
 
 ### 背景・問題意識
