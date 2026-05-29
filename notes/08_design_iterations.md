@@ -4,6 +4,230 @@
 
 ---
 
+## イテレーション168.72：掲示板を現地スレッドとして定義
+
+### 背景・問題意識
+
+オーナーから、スポット掲示板は交換成立のための補助機能ではなく、**現地の情報や温度感を見たい人向け** の機能だと明確な補足があった。さらに、仕組みとしては誰でもスレッドを立てられ、参加者がチャット形式で返信できるイメージであり、スレッドごとに「この範囲の人だけ見られる」公開範囲を設定したいという要件が共有された。前段の docs では掲示板の対象ユーザー像が曖昧だったため、ここを言語化しておく必要があった。
+
+### 変更内容
+
+#### `notes/02_system_requirements.md`
+- F5.5 として、スポット掲示板を「現地の情報共有・雑談のためのスレッド型掲示板」と定義した。
+- めぐり機能の中に置くこと、誰でもスレッドを立てられること、チャット形式で返信できること、公開範囲を指定できることを追記した。
+
+#### `notes/10_glossary.md`
+- **スポット掲示板**、**スレッド**、**掲示板の公開範囲** を正式用語として追加した。
+
+#### `notes/22_release_triage_tracker.csv`
+- RL-025 を `進行中` に更新し、対象ユーザー像が「現地の情報や温度感を見たい人」で固まったことをメモした。
+- RL-026 に、スレ立て + チャット形式返信 + 公開範囲指定を最小要件候補として追記した。
+
+#### `notes/23_release_operating_guide.md`
+- Decision Today の補足に、掲示板の位置づけが「交換のためではなく、現地の情報共有」だと分かる一文を追加した。
+
+### 影響範囲
+
+- スポット掲示板のユーザー像
+- 掲示板MVPの切り方
+- めぐり機能の役割整理
+
+### 確認方法
+
+- [notes/02_system_requirements.md](/Users/michitaka/Desktop/Megrum/notes/02_system_requirements.md) の F5.5 を確認
+- [notes/22_release_triage_tracker.csv](/Users/michitaka/Desktop/Megrum/notes/22_release_triage_tracker.csv) の RL-025 / RL-026 を確認
+- [notes/10_glossary.md](/Users/michitaka/Desktop/Megrum/notes/10_glossary.md) に新用語が追加されていることを確認
+
+### 関連ファイル
+
+- `notes/02_system_requirements.md`
+- `notes/10_glossary.md`
+- `notes/22_release_triage_tracker.csv`
+- `notes/23_release_operating_guide.md`
+
+### セルフレビュー結果
+
+- ✅ 掲示板を「交換掲示板」ではなく「現地スレッド」として整理できた
+- ✅ 用語追加があったため `notes/10_glossary.md` を更新した
+- ✅ 状態名やDB列の追加ではないため `notes/09_state_machines.md` / `notes/05_data_model.md` は今回この論点では追加更新不要
+
+---
+
+## イテレーション168.70：グルーム継続と掲示板MVP判断を反映
+
+### 背景・問題意識
+
+オーナーから、今回の提出スコープでは「めぐり3Dは切るが、既に実装しているグルーム（Instagramストーリー的な体験）は残す」方針と、「スポット掲示板は今回入れたいが、まだ仕様が決まっていない」という補足があった。前イテレーションの運用トラッカーでは、新規投稿体験を一律 `cut_for_now` に寄せていたため、現状の優先度とズレていた。3日で審査提出まで進めるには、既存グルームを守ることと、掲示板は仕様決定を先に置くことを明文化する必要があった。
+
+### 変更内容
+
+#### `notes/22_release_triage_tracker.csv`
+- 既存グルーム（ストーリー投稿 / 閲覧）を「残すべき既存機能」として `must / P1` で追加した。
+- スポット掲示板は、いきなり実装ではなく「MVP仕様を今日決める」を `must / P0` として追加した。
+- 掲示板実装本体は `decision_pending / P1` とし、Day 1で仕様が凍結できた場合のみ着手する整理に変更した。
+- リリース定義の行番号を1つ後ろへずらし、整合を保った。
+
+#### `notes/23_release_operating_guide.md`
+- Must に「既存グルームを壊さず残す」を追記した。
+- `Decision Today` セクションを追加し、スポット掲示板は仕様確定の速度で採否を決める方針を明記した。
+- `Cut For Now` から Instagram的な既存体験の扱いを外し、めぐり3Dのみ明確に切る整理へ変更した。
+- 3日計画の Day 1 / Day 2 と、最後のおすすめ判断を最新方針に合わせて更新した。
+
+### 影響範囲
+
+- リリーススコープの優先順位づけ
+- 既存グルーム機能の扱い
+- スポット掲示板の着手条件
+
+### 確認方法
+
+- [22_release_triage_tracker.csv](/Users/michitaka/Desktop/Megrum/notes/22_release_triage_tracker.csv) を開き、RL-018 以降の優先度とステータスが最新方針に合うことを確認
+- [23_release_operating_guide.md](/Users/michitaka/Desktop/Megrum/notes/23_release_operating_guide.md) の `Must / Decision Today / Cut For Now` が現状の意思決定に沿っていることを確認
+- `git diff --check -- notes/22_release_triage_tracker.csv notes/23_release_operating_guide.md notes/08_design_iterations.md`
+
+### 関連ファイル
+
+- `notes/22_release_triage_tracker.csv`
+- `notes/23_release_operating_guide.md`
+
+### セルフレビュー結果
+
+- ✅ 「既存グルームを残す」と「新規掲示板は仕様確定が先」の差をトラッカーへ落とした
+- ✅ 3日間の進め方が、現実的な実行順になるよう更新した
+- ✅ 状態遷移・DBスキーマ・新用語の追加ではないため `notes/09_state_machines.md` / `notes/05_data_model.md` / `notes/10_glossary.md` の更新は不要
+
+---
+
+## イテレーション168.71：郵送交換を要件へ戻し、掲示板前段のニーズ整理を追加
+
+### 背景・問題意識
+
+オーナーから、現場での手渡し交換だけではなく、**郵送交換を強いユーザーニーズとして初回提出スコープへ戻したい** という判断が共有された。また、wish登録中に推し未登録へ気づいた時の戻り導線、交換しやすい場面を示すタグ、グッズ検索結果UIの整理、スポット掲示板の前段として「どんなユーザーが欲しがっているか」を先に明確化したいという要望もあった。既存ドキュメントは現地交換専用前提だったため、要件・用語・状態・データ・法務メモをまとめて更新する必要があった。
+
+### 変更内容
+
+#### `notes/02_system_requirements.md`
+- MVP範囲を「現地交換のみ」から「現地交換を主軸にしつつ、郵送交換も選べる」へ更新した。
+- F3に、wish登録中にその場から推し追加画面へ遷移できる導線を追加した。
+- F4に、終演後交換OK / グッズ販売中交換OK などの交換シーンタグ要件を追加した。
+- F5/F7に、郵送交換の最小ルール（待ち合わせ不要、送信前の住所確認、合意後だけ住所開示、初回は本人確認なし）を追記した。
+- 設計論点に、スポット掲示板のユーザー像整理とグッズ検索結果UI整理を追加した。
+
+#### `notes/10_glossary.md`
+- 正式用語として **郵送交換**、**交換手段**、**住所**、**交換シーンタグ** を追加した。
+- 「現地交換のみ」前提を廃止語側へ移し、最新方針との差分が見えるようにした。
+
+#### `notes/05_data_model.md`
+- `user_mailing_addresses` テーブル案を追加した。
+- `proposals.exchange_method` と、`mail` の時は待ち合わせ必須を外す前提を追記した。
+- 郵送交換の住所スナップショットや、Deal側で専用状態を切るかどうかを未確定項目へ追加した。
+
+#### `notes/09_state_machines.md`
+- Proposal Lifecycle のビジネスルールに、`hand` / `mail` の分岐と住所開示タイミングを追記した。
+- Deal Lifecycle が現地交換主軸で、郵送交換の詳細状態は未確定であることを明記した。
+- 未確定項目に、郵送交換専用状態と受信者住所登録の必須タイミングを追加した。
+
+#### `notes/12_screens/C-0_propose_select.md`
+- C-0 を「譲・受け取る・交換手段」の画面として再定義し、郵送選択時は待ち合わせタブを出さず住所登録確認を行う仕様へ更新した。
+
+#### `notes/17_legal_alignment.md`
+- 郵送交換を初回提出候補へ戻すと、現行の法務整理はそのままでは整合しないことを追記した。
+
+#### `notes/13_api_spec.md`
+- proposal / deal / 掲示板まわりの未確定API論点に、郵送交換と掲示板前段整理の項目を追加した。
+
+#### `notes/22_release_triage_tracker.csv`
+- 郵送交換のP0論点（交換手段、住所登録確認、合意後住所表示）を追加した。
+- wishから推し追加へ戻れる導線、交換シーンタグ、グッズ検索結果UI整理を追記した。
+- スポット掲示板は、いきなり仕様ではなく「欲しがるユーザー像を今日決める」を先に置く形へ更新した。
+
+#### `notes/23_release_operating_guide.md`
+- Must に郵送交換の最小導線を追加した。
+- Day 1 / Day 2 の進め方に、郵送交換の仕様凍結と最小実装を追加した。
+
+### 影響範囲
+
+- リリーススコープ
+- 打診フロー（C-0）
+- 郵送交換のデータモデル
+- 法務整合の前提
+- 掲示板の要件定義順序
+
+### 確認方法
+
+- [notes/22_release_triage_tracker.csv](/Users/michitaka/Desktop/Megrum/notes/22_release_triage_tracker.csv) を開き、RL-019 以降に郵送交換・wish導線・掲示板ニーズ整理が追加されていることを確認
+- [notes/02_system_requirements.md](/Users/michitaka/Desktop/Megrum/notes/02_system_requirements.md) の MVP 範囲と F3 / F4 / F5 / F7 が最新方針に沿っていることを確認
+- [notes/12_screens/C-0_propose_select.md](/Users/michitaka/Desktop/Megrum/notes/12_screens/C-0_propose_select.md) の交換手段分岐を確認
+- [notes/13_api_spec.md](/Users/michitaka/Desktop/Megrum/notes/13_api_spec.md) の未確定項目に郵送交換論点が増えていることを確認
+- `git diff --check -- notes/02_system_requirements.md notes/05_data_model.md notes/09_state_machines.md notes/10_glossary.md notes/12_screens/C-0_propose_select.md notes/13_api_spec.md notes/17_legal_alignment.md notes/22_release_triage_tracker.csv notes/23_release_operating_guide.md notes/08_design_iterations.md`
+
+### 関連ファイル
+
+- `notes/02_system_requirements.md`
+- `notes/05_data_model.md`
+- `notes/09_state_machines.md`
+- `notes/10_glossary.md`
+- `notes/12_screens/C-0_propose_select.md`
+- `notes/13_api_spec.md`
+- `notes/17_legal_alignment.md`
+- `notes/22_release_triage_tracker.csv`
+- `notes/23_release_operating_guide.md`
+
+### セルフレビュー結果
+
+- ✅ ユーザー要望を「実装項目」と「仕様を先に決める項目」に分けて残した
+- ✅ 郵送交換を、用語・要件・データ・状態・法務メモの5箇所で同期した
+- ✅ 類義語の追加があったため `notes/10_glossary.md` を更新した
+- ✅ 状態ルールの追加があったため `notes/09_state_machines.md` を更新した
+- ✅ データモデル変更案があったため `notes/05_data_model.md` を更新した
+
+---
+
+## イテレーション168.69：リリース運用トラッカーとリポジトリ地図を追加
+
+### 背景・問題意識
+
+オーナーから、3日でApp Store審査提出まで持っていくために、P0/P1/P2の線引きを後から見返せる表形式ファイルが欲しい、また現在のMegrumフォルダ内で「どこが何を担っているか」「GitHub / デスクトップ / サーバー / DB がどう繋がっているか」を把握したいという要望があった。リリース直前の判断速度を上げるには、バグ表と構成ガイドを先に置くのが最も効率的だと判断した。
+
+### 変更内容
+
+#### `notes/22_release_triage_tracker.csv`
+- Excel / Numbers でそのまま開けるCSVのリリーストラッカーを追加した。
+- Auth、在庫、ウィッシュ、個別条件、打診、ネゴ、取引、法的導線、TestFlight運用などの必須項目を初期行として整理した。
+- めぐり3Dは今回スコープから外し、Instagram的投稿機能とスポット掲示板は `cut_for_now` / `P2` として明記した。
+
+#### `notes/23_release_operating_guide.md`
+- 今回のリリース目標を「App Store審査へ初回提出すること」と明文化した。
+- `mobile/`, `web/`, `supabase/`, `Megrum/`, `notes/` など各フォルダの役割を整理した。
+- GitHub とローカル作業フォルダの関係、iPhoneアプリ / Web / Supabase / EAS / App Store Connect の住み分けを説明した。
+- 3日間の進め方と、オーナーがCodexへ渡すと最速で動ける情報の型をまとめた。
+
+### 影響範囲
+
+- リリース前の優先順位づけ
+- バグトリアージ運用
+- オーナーのリポジトリ把握
+- Codexへの依頼フォーマット
+
+### 確認方法
+
+- [22_release_triage_tracker.csv](/Users/michitaka/Desktop/Megrum/notes/22_release_triage_tracker.csv) をExcelまたはNumbersで開く
+- [23_release_operating_guide.md](/Users/michitaka/Desktop/Megrum/notes/23_release_operating_guide.md) を読み、フォルダ役割・インフラ説明が現在の理解と一致することを確認
+- `git diff --check -- notes/22_release_triage_tracker.csv notes/23_release_operating_guide.md notes/08_design_iterations.md`
+
+### 関連ファイル
+
+- `notes/22_release_triage_tracker.csv`
+- `notes/23_release_operating_guide.md`
+
+### セルフレビュー結果
+
+- ✅ リリース優先度をそのまま運用に使える表形式で置いた
+- ✅ ローカル / GitHub / Supabase / Apple 側の住み分けを一箇所で確認できるようにした
+- ✅ 状態遷移・DBスキーマ・新用語の追加ではないため `notes/09_state_machines.md` / `notes/05_data_model.md` / `notes/10_glossary.md` の更新は不要
+
+---
+
 ## イテレーション168.68：Preview ArchiveのBuild番号追従を修正
 
 ### 背景・問題意識

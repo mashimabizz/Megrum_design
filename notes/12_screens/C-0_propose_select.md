@@ -1,11 +1,11 @@
 # C-0: 提示物選択（Propose Select）
 
-> 打診の準備段階。譲・受け取る・待ち合わせ の3要素をすべて確定してから C-1 に進む。
+> 打診の準備段階。譲・受け取る・交換手段 を確定し、現地交換なら待ち合わせ、郵送交換なら住所条件を確認してから C-1 に進む。
 
-最終更新: 2026-05-01（iter41）
+最終更新: 2026-05-29（iter168.71）
 関連JSX: `Megrum/propose-select.jsx::ProposeSelectScreen`
 関連HTML: `Megrum/Megrum Propose Select.html`
-関連 iter: 27 / 28 / 29 / 33
+関連 iter: 27 / 28 / 29 / 33 / 168.71
 
 ---
 
@@ -14,9 +14,10 @@
 ホーム or 検索からマッチング相手のプロフを見て「打診する」を押した直後の画面。
 - **何を出すか**（自分の在庫から）
 - **何を受け取るか**（相手の譲一覧から）
-- **いつ・どこで会うか**（待ち合わせ）
+- **どう交換するか**（現地交換 / 郵送交換）
+- **いつ・どこで会うか**（現地交換を選んだ場合のみ）
 
-の3つを1画面（3タブ）でセットアップし、最終確認のメッセージ作成（C-1 propose）に進む。
+の3つを1画面でセットアップし、最終確認のメッセージ作成（C-1 propose）に進む。
 
 ## 画面ID
 
@@ -41,7 +42,7 @@
 {
   tweaks: BrandColors,                           // 全画面共通のブランドカラー
   scenario: 'full' | 'forward' | 'backward',     // どのマッチタイプから来たか
-  initialTab: 'mine' | 'theirs' | 'meetup',      // 初期表示タブ
+  initialTab: 'mine' | 'theirs' | 'meetup',      // 初期表示タブ（mail時は meetup を使わない）
   initialMeetupType: 'now' | 'scheduled',        // 待ち合わせタブの初期モード
 }
 ```
@@ -50,6 +51,7 @@
 
 ```ts
 const [tab, setTab] = useState(initialTab);
+const [exchangeMethod, setExchangeMethod] = useState<'hand' | 'mail'>('hand');
 
 // 提示物（譲 / 受け取る）
 const [myItems, setMyItems] = useState<Item[]>(myInitial);   // 自分の在庫＋selected/selectedQty
@@ -63,6 +65,7 @@ const [customDate, setCustomDate] = useState('');
 const [customTime, setCustomTime] = useState('');
 const [customLocation, setCustomLocation] = useState('');
 const [registerAsAW, setRegisterAsAW] = useState(true);            // ☑ AW自動登録（デフォルトON）
+const [hasMyMailingAddress, setHasMyMailingAddress] = useState(false);
 ```
 
 ### 前画面からの引き継ぎ
@@ -86,10 +89,13 @@ const [registerAsAW, setRegisterAsAW] = useState(true);            // ☑ AW自�
 - 戻るボタン（`<` アイコン）
 - タイトル「提示物の選択」＋ 相手情報（`@handle`・★rating・取引N回・距離m）
 - ステップバッジ（紫 pill）：`STEP 1/3`
+- **交換手段セグメント**：
+  - 「現地交換」
+  - 「郵送」
 - **3タブ**：
   - 「私が出す」（カウントバッジ：選択数の合計）
   - 「受け取る」（カウントバッジ：選択数の合計）
-  - 「待ち合わせ」（バッジ：✓ 緑 or ! warn色）
+  - 「待ち合わせ」（`exchangeMethod='hand'` の時だけ表示。バッジ：✓ 緑 or ! warn色）
 
 ### 本体（タブごとに切り替え）
 
@@ -110,6 +116,8 @@ const [registerAsAW, setRegisterAsAW] = useState(true);            // ☑ AW自�
 
 #### C. meetup タブ（待ち合わせ）
 
+`exchangeMethod='hand'` の時だけ表示する。
+
 - **モード切替**（紫 pill toggle）：🚀 いますぐ ／ 📅 日時指定
 - **🚀 いますぐ モード**：
   - 合流可能時間チップ：5分以内 / 10分以内 / 15分以内 / 30分以内
@@ -127,11 +135,13 @@ const [registerAsAW, setRegisterAsAW] = useState(true);            // ☑ AW自�
   - 「あなたが出す ×N枚」 + 商品名サマリ
   - ↔ アイコン
   - 「あなたが受け取る ×N枚」 + 商品名サマリ
-- **待ち合わせ summary**：📍 + 待ち合わせ要約（「5/3 (土) 14:00〜」等）
+- **待ち合わせ summary**：`exchangeMethod='hand'` の時だけ表示。📍 + 待ち合わせ要約（「5/3 (土) 14:00〜」等）
+- **郵送 summary**：`exchangeMethod='mail'` の時は「住所は合意後に当事者間だけ表示されます」。未登録なら「住所を登録してください」
 - **CTA**（紫→水色グラデ）：
   - 全条件OK時：`次へ：メッセージ作成 →`
   - 提示物不足：`提示物を両方から選んでください`
   - 待ち合わせ未設定：`待ち合わせを設定してください`
+  - 郵送で住所未登録：`住所を登録してください`
 
 ---
 
@@ -141,12 +151,14 @@ const [registerAsAW, setRegisterAsAW] = useState(true);            // ☑ AW自�
 |---|---|---|
 | アイテムタップ | 選択トグル。ON時、selectedQty=max にセット | `myItems`/`theirItems`[i].selected, selectedQty 更新 |
 | ステッパー +/- | 数量増減（範囲：1〜在庫数） | `selectedQty` 更新 |
+| 交換手段セグメント | 「現地交換」/「郵送」を切替 | `exchangeMethod` 更新 |
 | meetup モード切替 | 🚀 / 📅 のトグル | `meetupType` 更新 |
 | 即時：分数チップ | 5/10/15/30 をタップ | `meetupMinutes` 更新 |
 | 日時指定：AW radio | リストの中から1つ選択 | `selectedAW = aw.id` |
 | 日時指定：カスタム選択 | カスタムカードをタップ | `selectedAW = 'custom'` |
 | カスタム：日付/時刻/場所入力 | （実装は OS picker、現状はモック） | `customDate`/`customTime`/`customLocation` 更新 |
 | AW自動登録チェック | ☑ トグル | `registerAsAW` 更新 |
+| 「住所を登録」 | 設定 > 住所管理へ遷移 | 住所登録画面へ |
 | 「次へ：メッセージ作成 →」 | C-1 打診作成画面へ遷移 | `Proposal.status = 'draft'` で記録 |
 | 戻る | 1つ前の画面（プロフ or マッチカード） | 状態破棄（draft 保存は要確認） |
 
@@ -165,14 +177,16 @@ const [registerAsAW, setRegisterAsAW] = useState(true);            // ☑ AW自�
 const canProceed =
   myCount > 0
   && theirCount > 0
-  && meetupSet;
+  && methodRequirementMet;
 
-const meetupSet =
-  meetupType === 'now'
-    ? true                                     // 即時はチップ選択済が前提
-    : selectedAW === 'custom'
-      ? !!(customDate && customTime && customLocation)
-      : true;                                  // 既存AW選択は無条件OK
+const methodRequirementMet =
+  exchangeMethod === 'mail'
+    ? hasMyMailingAddress
+    : meetupType === 'now'
+      ? true
+      : selectedAW === 'custom'
+        ? !!(customDate && customTime && customLocation)
+        : true;
 ```
 
 ### 表示時のバリデーション
@@ -181,7 +195,8 @@ const meetupSet =
 |---|---|
 | myCount === 0 && theirCount === 0 | CTA: `提示物を両方から選んでください`、disabled |
 | myCount === 0 \|\| theirCount === 0 | 同上 |
-| 提示物OK、meetup未設定 | CTA: `待ち合わせを設定してください`、disabled |
+| `exchangeMethod='hand'` で提示物OK、meetup未設定 | CTA: `待ち合わせを設定してください`、disabled |
+| `exchangeMethod='mail'` で住所未登録 | CTA: `住所を登録してください`、disabled |
 | 提示物OK、meetup設定済 | CTA: `次へ：メッセージ作成 →`、enabled |
 
 ### カスタム日時の必須項目
@@ -198,6 +213,7 @@ const meetupSet =
 | 相手の譲が空 | theirs タブが空状態：「相手は譲を登録していません」（実質マッチしないので来ない想定） |
 | 自分の AW が空 | meetup タブの 日時指定モード：「カスタム日時のみ表示」+ カスタム自動選択 |
 | 相手と被る AW がない | 「★ 相手と一致」バッジは出ない、リスト全部表示 |
+| 郵送を選択した | meetup タブを出さず、住所登録の有無だけ確認する |
 | 通信失敗（在庫取得） | エラー表示 + retry ボタン （⚠️ 要確認） |
 | 既に同じ相手と negotiating な Proposal がある | C-1.5 へリダイレクト or 警告（⚠️ 要確認） |
 | 提示中のアイテムが他のネゴで `in_deal` になった | リアルタイム反映 or 提案送信時にエラー（⚠️ 要確認） |
@@ -228,6 +244,7 @@ const meetupSet =
   "receiver_have_ids": ["uuid", ...],
   "receiver_have_qtys": [3],
   "message": "（C-1 で書く）",
+  "exchange_method": "hand",
   "meetup_type": "scheduled",
   "meetup_now_minutes": null,
   "meetup_scheduled_aw_id": "uuid",
@@ -235,7 +252,7 @@ const meetupSet =
 }
 ```
 
-または `meetup_scheduled_aw_id=null` ＋ `meetup_scheduled_custom={...}` のどちらか。
+郵送の場合は `exchange_method="mail"` とし、待ち合わせ項目は送らない。代わりに送信前に自分の住所登録を要求する。
 
 `register_as_aw=true` の場合、サーバ側で AW を `created_via='auto_from_proposal'` で同時作成 → その id を `meetup_scheduled_aw_id` にセット。
 
