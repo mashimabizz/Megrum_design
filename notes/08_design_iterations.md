@@ -4,6 +4,55 @@
 
 ---
 
+## イテレーション238：掲示板詳細で画像付き返信だけ拾えるようにする
+
+### 背景・問題意識
+
+スポット掲示板では、現地の列、案内板、落とし物、会場導線など、写真付き返信だけをすばやく見たい場面がある。画像一覧は全画像を集約できる一方で、会話内の返信として確認したい時には一段遠いため、返信一覧そのものを画像付き返信だけに絞り込める導線を追加した。
+
+### 変更内容
+
+#### `mobile/app/meguri-board-thread.tsx`
+- `ReplySearchSource` に `media` を追加し、画像付き返信だけを表示できるようにした。
+- `mediaReplies` と `filterMediaReplies` を追加し、最初の画像付き返信へスクロールしながら絞り込むようにした。
+- 画像付き返信がある場合、返信ヘッダーに `画像 n` ボタンを表示するようにした。
+- 検索条件チップに `画像付き返信` を表示し、既存の解除導線で元に戻せるようにした。
+
+#### `notes/09_state_machines.md`
+- Meguri Board Lifecycle に画像付き返信フィルタの表示ルールを追記した。
+
+#### `notes/10_glossary.md`
+- 掲示板画像付き返信フィルタを追加した。
+
+### 影響範囲
+
+- iOS版 スポット掲示板詳細
+- 返信ヘッダー
+- スレッド内返信フィルタ
+- 画像付き返信の探索導線
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- `EAS_UPDATE_PROJECT_SLUG=ihub EXPO_NO_GIT_STATUS=1 npm --prefix mobile run update:ios:preview -- --message "[iter238] filter board media replies" --non-interactive`
+- Preview OTA: Update group `fd68aa5d-667c-4e9c-8615-ae124398bf6d` / iOS update `019e7613-e53d-74b9-8350-f0dcd085bb10`
+
+### 関連ファイル
+
+- `mobile/app/meguri-board-thread.tsx`
+- `notes/08_design_iterations.md`
+- `notes/09_state_machines.md`
+- `notes/10_glossary.md`
+
+### セルフレビュー結果
+
+- ✅ 既存の返信フィルタの仕組みに追加し、解除・件数表示・空状態を共通化した。
+- ✅ 画像一覧とは別に、返信本文や引用文脈込みで画像付き返信を見られる導線にした。
+- ✅ DB変更なし、ネイティブ依存追加なしでPreview OTA対象内に収めた。
+
+---
+
 ## イテレーション237：掲示板返信入力にメンション候補を出す
 
 ### 背景・問題意識

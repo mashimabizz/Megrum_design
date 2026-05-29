@@ -106,7 +106,7 @@ type BoardMediaAttachment = {
 type BoardReplySortMode = "oldest" | "newest" | "popular";
 type BoardParticipantSortMode = "recent" | "replies";
 type ReplySearchSource =
-  | { label: string; replyId?: string; type: "bookmarked" | "children" | "mention" | "mine" | "participant" }
+  | { label: string; replyId?: string; type: "bookmarked" | "children" | "media" | "mention" | "mine" | "participant" }
   | null;
 
 const REPLY_SORT_OPTIONS: { label: string; value: BoardReplySortMode }[] = [
@@ -244,6 +244,9 @@ export default function MeguriBoardThreadScreen() {
     }
     if (replySearchSource?.type === "bookmarked") {
       return replies.filter((reply) => reply.bookmarked && !reply.deleted);
+    }
+    if (replySearchSource?.type === "media") {
+      return replies.filter((reply) => !reply.deleted && reply.imageUris.length > 0);
     }
     if (!replySearchQuery) return replies;
     return replies.filter((reply) => {
@@ -477,6 +480,10 @@ export default function MeguriBoardThreadScreen() {
     () => replies.filter((reply) => reply.bookmarked && !reply.deleted),
     [replies],
   );
+  const mediaReplies = useMemo(
+    () => replies.filter((reply) => !reply.deleted && reply.imageUris.length > 0),
+    [replies],
+  );
 
   useEffect(() => {
     setSearchCursorIndex(0);
@@ -628,6 +635,20 @@ export default function MeguriBoardThreadScreen() {
     const firstBookmarkedReply = [...bookmarkedReplies].sort((left, right) => left.createdAt - right.createdAt)[0];
     setTimeout(() => {
       const y = firstBookmarkedReply ? replyOffsetsRef.current[firstBookmarkedReply.id] : undefined;
+      if (typeof y === "number") {
+        scrollViewRef.current?.scrollTo({ animated: true, y: Math.max(0, y - 12) });
+      }
+    }, 120);
+  }
+
+  function filterMediaReplies() {
+    if (mediaReplies.length === 0) return;
+    setReplySearchText("画像付き返信");
+    setReplySearchSource({ label: "画像付き返信", type: "media" });
+    setSearchCursorIndex(0);
+    const firstMediaReply = [...mediaReplies].sort((left, right) => left.createdAt - right.createdAt)[0];
+    setTimeout(() => {
+      const y = firstMediaReply ? replyOffsetsRef.current[firstMediaReply.id] : undefined;
       if (typeof y === "number") {
         scrollViewRef.current?.scrollTo({ animated: true, y: Math.max(0, y - 12) });
       }
@@ -1702,6 +1723,17 @@ export default function MeguriBoardThreadScreen() {
                       <Text style={styles.savedReplyJumpButtonText}>保存 {bookmarkedReplies.length}</Text>
                     </Pressable>
                   ) : null}
+                  {mediaReplies.length > 0 ? (
+                    <Pressable
+                      accessibilityRole="button"
+                      hitSlop={8}
+                      onPress={filterMediaReplies}
+                      style={styles.mediaReplyJumpButton}
+                    >
+                      <IconSymbol name="camera-outline" color="#4f7e92" size={12} />
+                      <Text style={styles.mediaReplyJumpButtonText}>画像 {mediaReplies.length}</Text>
+                    </Pressable>
+                  ) : null}
                 </View>
               </View>
               <View style={styles.replySearchBox}>
@@ -1727,6 +1759,8 @@ export default function MeguriBoardThreadScreen() {
                       : replySearchSource?.type === "children"
                       ? replySearchSource.label
                       : replySearchSource?.type === "bookmarked"
+                      ? replySearchSource.label
+                      : replySearchSource?.type === "media"
                       ? replySearchSource.label
                       : replySearchSource?.type === "mention"
                       ? `あなた宛て: ${replySearchSource.label}`
@@ -3322,6 +3356,21 @@ const styles = StyleSheet.create({
   },
   savedReplyJumpButtonText: {
     color: megrumColors.lavender,
+    fontSize: 11,
+    fontWeight: "900",
+  },
+  mediaReplyJumpButton: {
+    alignItems: "center",
+    backgroundColor: "rgba(168,212,230,0.24)",
+    borderRadius: 999,
+    flexDirection: "row",
+    gap: 4,
+    minHeight: 26,
+    paddingHorizontal: 9,
+    justifyContent: "center",
+  },
+  mediaReplyJumpButtonText: {
+    color: "#4f7e92",
     fontSize: 11,
     fontWeight: "900",
   },
