@@ -35,6 +35,7 @@ import {
   filterMeguriBoardThreads,
   hideMeguriBoardThread,
   loadMeguriBoardComposerDraft,
+  loadMeguriBoardReplyDraftThreadIds,
   loadMeguriBoardThreads,
   markMeguriBoardThreadRead,
   meguriBoardAudienceLabel,
@@ -117,6 +118,7 @@ export default function MeguriBoardScreen() {
   const [sortMode, setSortMode] = useState<MeguriBoardThreadSort>("active");
   const [mediaOnly, setMediaOnly] = useState(false);
   const [markingVisibleRead, setMarkingVisibleRead] = useState(false);
+  const [replyDraftThreadIds, setReplyDraftThreadIds] = useState<Set<string>>(new Set());
 
   const actor = useMemo<MeguriBoardActor>(
     () => ({
@@ -163,6 +165,7 @@ export default function MeguriBoardScreen() {
     () => {
       const filteredThreads = filterMeguriBoardThreads(threads, {
         category: categoryFilter,
+        draftThreadIds: replyDraftThreadIds,
         query: searchText,
         sort: sortMode,
       });
@@ -170,7 +173,7 @@ export default function MeguriBoardScreen() {
         ? filteredThreads.filter((thread) => thread.imageUris.length > 0)
         : filteredThreads;
     },
-    [categoryFilter, mediaOnly, searchText, sortMode, threads],
+    [categoryFilter, mediaOnly, replyDraftThreadIds, searchText, sortMode, threads],
   );
   const sortCountBaseThreads = useMemo(
     () => {
@@ -193,10 +196,11 @@ export default function MeguriBoardScreen() {
       saved: sortCountBaseThreads.filter((thread) => thread.bookmarked).length,
       subscribed: sortCountBaseThreads.filter((thread) => thread.subscribed).length,
       participated: sortCountBaseThreads.filter((thread) => thread.participated).length,
+      drafts: sortCountBaseThreads.filter((thread) => replyDraftThreadIds.has(thread.id)).length,
       mine: sortCountBaseThreads.filter((thread) => thread.mine).length,
       unread: sortCountBaseThreads.filter(isThreadUnread).length,
     }),
-    [sortCountBaseThreads],
+    [replyDraftThreadIds, sortCountBaseThreads],
   );
   const hasActiveFilters =
     categoryFilter !== "all" || !!searchText.trim() || sortMode !== "active" || mediaOnly;
@@ -230,6 +234,8 @@ export default function MeguriBoardScreen() {
               ? "自分のスレッド"
               : sortMode === "participated"
                 ? "参加中のスレッド"
+              : sortMode === "drafts"
+                ? "下書き中のスレッド"
               : sortMode === "unread"
                 ? "未読スレッド"
               : viewMode === "nearby_3km"
@@ -263,22 +269,26 @@ export default function MeguriBoardScreen() {
     setLocalArea(settings.baseArea || DEFAULT_MEGURI_PROFILE.baseArea);
     setLocalDisplayName(settings.displayName || DEFAULT_MEGURI_PROFILE.displayName);
     setSelectedPrefecture(nextPrefecture);
-    const nextThreads = await loadMeguriBoardThreads(
-      buildViewerContext({
-        fallbackArea: profile?.primaryArea || settings.baseArea || actor.primaryArea,
-        fallbackCoordinate: currentLocation?.coordinate ?? coordinateFromParams({
-          latitude: params.viewerLat,
-          longitude: params.viewerLng,
+    const [nextThreads, draftThreadIds] = await Promise.all([
+      loadMeguriBoardThreads(
+        buildViewerContext({
+          fallbackArea: profile?.primaryArea || settings.baseArea || actor.primaryArea,
+          fallbackCoordinate: currentLocation?.coordinate ?? coordinateFromParams({
+            latitude: params.viewerLat,
+            longitude: params.viewerLng,
+          }),
+          prefecture: nextPrefecture,
+          resolvedPrefecture: null,
+          spotKey: readParam(params.spotKey),
+          spotLabel: readParam(params.spotLabel),
+          viewerId: user?.id ?? actor.userId,
         }),
-        prefecture: nextPrefecture,
-        resolvedPrefecture: null,
-        spotKey: readParam(params.spotKey),
-        spotLabel: readParam(params.spotLabel),
-        viewerId: user?.id ?? actor.userId,
-      }),
-      { previewMode, viewMode },
-    ).catch(() => []);
+        { previewMode, viewMode },
+      ).catch(() => []),
+      loadMeguriBoardReplyDraftThreadIds().catch(() => []),
+    ]);
     setThreads(nextThreads);
+    setReplyDraftThreadIds(new Set(draftThreadIds));
     setLoading(false);
     setRefreshing(false);
   }, [
@@ -949,6 +959,8 @@ export default function MeguriBoardScreen() {
                   ? "自分のスレッドはまだありません"
                   : sortMode === "participated"
                     ? "参加中のスレッドはまだありません"
+                  : sortMode === "drafts"
+                    ? "返信下書きのあるスレッドはありません"
                   : sortMode === "unread"
                     ? "未読スレッドはありません"
                     : "まだスレッドはありません"}
@@ -958,6 +970,8 @@ export default function MeguriBoardScreen() {
                   ? "スレッドを立てると、ここからすぐ戻れます。"
                   : sortMode === "participated"
                     ? "スレッドに返信すると、ここから会話へ戻れます。"
+                  : sortMode === "drafts"
+                    ? "返信を書きかけると、ここからすぐ再開できます。"
                   : sortMode === "unread"
                     ? "新しい返信がつくと、ここに表示されます。"
                   : "最初のひとことを置いておくと、あとから返事がつきやすいです。"}
@@ -999,6 +1013,7 @@ export default function MeguriBoardScreen() {
                           <ScopeBadge scope={thread.audienceScope} />
                           {thread.isPinned ? <StatusBadge label="固定" /> : null}
                           {thread.status === "locked" ? <StatusBadge label="締め切り" /> : null}
+                          {replyDraftThreadIds.has(thread.id) ? <StatusBadge label="下書きあり" /> : null}
                           {isThreadUnread(thread) ? (
                             <View style={styles.unreadBadge}>
                               <Text style={styles.unreadBadgeText}>未読</Text>

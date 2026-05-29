@@ -26,6 +26,7 @@ export type MeguriBoardThreadSort =
   | "saved"
   | "subscribed"
   | "participated"
+  | "drafts"
   | "mine"
   | "unread";
 export type MeguriBoardReportReason =
@@ -259,6 +260,7 @@ export const MEGURI_BOARD_SORT_OPTIONS = [
   "saved",
   "subscribed",
   "participated",
+  "drafts",
   "mine",
   "unread",
 ] as const satisfies readonly MeguriBoardThreadSort[];
@@ -319,6 +321,8 @@ export function meguriBoardSortLabel(sort: MeguriBoardThreadSort) {
       return "通知";
     case "participated":
       return "参加中";
+    case "drafts":
+      return "下書き";
     case "mine":
       return "自分";
     case "unread":
@@ -350,11 +354,13 @@ export function filterMeguriBoardThreads(
   threads: MeguriBoardThread[],
   options: {
     category?: MeguriBoardThreadCategory;
+    draftThreadIds?: ReadonlySet<string>;
     query?: string;
     sort?: MeguriBoardThreadSort;
   } = {},
 ) {
   const category = options.category ?? "all";
+  const draftThreadIds = options.draftThreadIds ?? new Set<string>();
   const sort = options.sort ?? "active";
   const query = normalizeSearchQuery(options.query);
   return [...threads]
@@ -362,6 +368,7 @@ export function filterMeguriBoardThreads(
     .filter((thread) => category === "all" || thread.category === category)
     .filter((thread) => sort !== "mine" || thread.mine)
     .filter((thread) => sort !== "participated" || thread.participated)
+    .filter((thread) => sort !== "drafts" || draftThreadIds.has(thread.id))
     .filter((thread) => sort !== "unread" || isMeguriBoardThreadUnread(thread))
     .filter((thread) => {
       if (!query) return true;
@@ -737,6 +744,14 @@ export async function loadMeguriBoardReplyDraft(threadId: string): Promise<Megur
     imageUris: normalizeImageUris(draft.imageUris),
     updatedAt: numberValue(draft.updatedAt, Date.now()),
   };
+}
+
+export async function loadMeguriBoardReplyDraftThreadIds(): Promise<string[]> {
+  const map = await loadLocalDraftMap<MeguriBoardReplyDraft>(REPLY_DRAFTS_KEY);
+  return Object.entries(map)
+    .filter(([threadId, draft]) => !!threadId && threadId !== "unknown" && hasReplyDraftContent(draft))
+    .sort(([, left], [, right]) => numberValue(right.updatedAt, 0) - numberValue(left.updatedAt, 0))
+    .map(([threadId]) => threadId);
 }
 
 export async function saveMeguriBoardReplyDraft(
@@ -1964,6 +1979,8 @@ function compareThreads(
       if (left.subscribed !== right.subscribed) return left.subscribed ? -1 : 1;
       return right.latestActivityAt - left.latestActivityAt;
     case "participated":
+      return right.latestActivityAt - left.latestActivityAt;
+    case "drafts":
       return right.latestActivityAt - left.latestActivityAt;
     case "mine":
       return right.latestActivityAt - left.latestActivityAt;

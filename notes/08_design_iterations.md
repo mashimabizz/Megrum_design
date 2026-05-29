@@ -4,6 +4,61 @@
 
 ---
 
+## イテレーション224：掲示板一覧に返信下書き導線を追加
+
+### 背景・問題意識
+
+スレッド詳細で返信を書きかけたまま戻った時、あとからどのスレッドに下書きが残っているか分からない。一般的なスレッドUIとして、返信下書きのあるスレッドを一覧で見つけ、すぐ再開できる導線を追加した。
+
+### 変更内容
+
+#### `mobile/src/lib/meguriBoard.ts`
+- `MeguriBoardThreadSort` に `drafts` を追加した。
+- ソート/フィルタ選択肢に `下書き` を追加した。
+- `filterMeguriBoardThreads` が `draftThreadIds` を受け取り、下書きありスレッドだけを絞り込めるようにした。
+- 端末内の返信下書き保存マップから、下書きが残っているスレッドIDを返す `loadMeguriBoardReplyDraftThreadIds` を追加した。
+
+#### `mobile/app/meguri-board.tsx`
+- 掲示板一覧読み込み時に返信下書きスレッドIDも並行取得するようにした。
+- ソート/フィルタ行に `下書き` を追加し、下書きありスレッドだけを表示できるようにした。
+- 下書きが残っているスレッドカードに `下書きあり` バッジを表示するようにした。
+- 下書きフィルタの空表示コピーを追加した。
+
+#### `notes/09_state_machines.md`
+- Meguri Board Lifecycle に返信下書きフィルタとカードバッジのルールを追記した。
+
+#### `notes/10_glossary.md`
+- 掲示板返信下書きフィルタを追加した。
+
+### 影響範囲
+
+- iOS版 スポット掲示板一覧
+- スポット掲示板詳細の返信下書き再開導線
+- 返信下書きの端末内保存情報
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- `EAS_UPDATE_PROJECT_SLUG=ihub EXPO_NO_GIT_STATUS=1 npm --prefix mobile run update:ios:preview -- --message "[iter224] add board reply draft filter" --non-interactive`
+- Preview OTA: Update group `97b59d6b-abb2-4313-9069-fe1bc17b65bb` / iOS update `019e75c3-fcbe-7b82-9a8e-d46a64390ef0`
+
+### 関連ファイル
+
+- `mobile/app/meguri-board.tsx`
+- `mobile/src/lib/meguriBoard.ts`
+- `notes/08_design_iterations.md`
+- `notes/09_state_machines.md`
+- `notes/10_glossary.md`
+
+### セルフレビュー結果
+
+- ✅ 既存の端末内返信下書き保存を使い、DB変更なしで下書き導線を追加した。
+- ✅ 一覧の検索/カテゴリ/画像あり条件と下書きフィルタを併用できるようにした。
+- ✅ ネイティブ依存追加なしで、Preview OTA対象内に収めた。
+
+---
+
 ## イテレーション223：掲示板一覧にフィルタ件数バッジを追加
 
 ### 背景・問題意識
