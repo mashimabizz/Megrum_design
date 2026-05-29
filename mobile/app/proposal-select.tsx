@@ -36,6 +36,7 @@ import { supabase } from "../src/lib/supabase";
 import {
   exchangeMethodLabel,
   normalizeExchangeMethod,
+  supportsHandExchange,
   type ExchangeMethod,
 } from "../src/lib/mailingAddress";
 import { megrumColors, megrumRadii, megrumShadow } from "../src/theme/tokens";
@@ -273,7 +274,7 @@ export default function ProposalSelectScreen() {
     tracking: boolean;
     swiping: boolean;
   } | null>(null);
-  const needsMeetup = exchangeMethod === "hand";
+  const needsMeetup = supportsHandExchange(exchangeMethod);
   const meetupReady =
     meetupCandidates.length > 0 &&
     meetupCandidates.every((candidate) => candidate.place.trim().length > 0);
@@ -576,19 +577,19 @@ export default function ProposalSelectScreen() {
           <Text style={styles.methodSub}>{exchangeMethodLabel(exchangeMethod)}</Text>
         </View>
         <SegmentedControl
-          values={["現地交換", "郵送交換"]}
-          selectedIndex={exchangeMethod === "mail" ? 1 : 0}
+          values={["現地交換", "郵送交換", "どちらもOK"]}
+          selectedIndex={exchangeMethodToIndex(exchangeMethod)}
           tintColor={megrumColors.lavender}
           onChange={(event) =>
-            setExchangeMethod(
-              event.nativeEvent.selectedSegmentIndex === 1 ? "mail" : "hand",
-            )
+            setExchangeMethod(exchangeMethodFromIndex(event.nativeEvent.selectedSegmentIndex))
           }
         />
         <Text style={styles.methodHint}>
           {exchangeMethod === "mail"
             ? "郵送では待ち合わせ候補は不要です。送信前に住所登録を確認します。"
-            : "現地交換では、送信前に待ち合わせ候補の入力が必要です。"}
+            : exchangeMethod === "both"
+              ? "現地候補と住所登録の両方を確認します。相手とは合意までに受け渡し方法を調整できます。"
+              : "現地交換では、送信前に待ち合わせ候補の入力が必要です。"}
         </Text>
       </View>
 
@@ -2074,6 +2075,18 @@ function parseTab(value?: string): ProposalTab {
     return value;
   }
   return "give";
+}
+
+function exchangeMethodToIndex(method: ExchangeMethod) {
+  if (method === "mail") return 1;
+  if (method === "both") return 2;
+  return 0;
+}
+
+function exchangeMethodFromIndex(index: number): ExchangeMethod {
+  if (index === 1) return "mail";
+  if (index === 2) return "both";
+  return "hand";
 }
 
 function safeStringArray(value: unknown): string[] {

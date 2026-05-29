@@ -32,6 +32,8 @@ import {
   formatMailingAddressLines,
   normalizeExchangeMethod,
   parseMailingAddressSnapshot,
+  supportsHandExchange,
+  supportsMailExchange,
   toMailingAddressSnapshot,
   type ExchangeMethod,
   type MailingAddressSnapshot,
@@ -664,7 +666,7 @@ export default function TransactionDetailScreen() {
             {detail.openDispute ? (
               <OpenDisputeBanner dispute={detail.openDispute} />
             ) : null}
-            {detail.exchangeMethod === "mail" ? (
+            {supportsMailExchange(detail.exchangeMethod) ? (
               <MailingAddressBanner detail={detail} />
             ) : null}
             <DealSummaryCard detail={detail} />
@@ -687,7 +689,7 @@ export default function TransactionDetailScreen() {
                 />
               </>
             ) : null}
-            {detail.status === "agreed" && detail.exchangeMethod === "hand" ? (
+            {detail.status === "agreed" && supportsHandExchange(detail.exchangeMethod) ? (
               <OutfitCompactRowNative
                 detail={detail}
                 uploading={chatActionLoading === "outfit"}
@@ -1282,7 +1284,7 @@ async function resolveProposalMailingAddresses(input: {
   proposal: ProposalRow;
   userId: string;
 }): Promise<TransactionDetail["mailingAddresses"]> {
-  if (input.exchangeMethod !== "mail") {
+  if (!supportsMailExchange(input.exchangeMethod)) {
     return { mine: null, partner: null };
   }
 
@@ -1526,7 +1528,7 @@ async function updateProposalAction(
     const senderId = detail.isSender ? userId : detail.partner.id;
     const receiverId = detail.isReceiver ? userId : detail.partner.id;
     let myMailingAddress: MailingAddressSnapshot | null = null;
-    if (detail.exchangeMethod === "mail") {
+    if (supportsMailExchange(detail.exchangeMethod)) {
       myMailingAddress = await fetchMailingAddressSnapshot(userId, {
         tolerateMissingSchema: true,
       }).catch(() => null);
@@ -1546,7 +1548,7 @@ async function updateProposalAction(
     updates.agreed_by_receiver = agreedByReceiver;
     updates.status =
       agreedBySender && agreedByReceiver ? "agreed" : "agreement_one_side";
-    if (detail.exchangeMethod === "mail" && updates.status === "agreed") {
+    if (supportsMailExchange(detail.exchangeMethod) && updates.status === "agreed") {
       const [senderAddress, receiverAddress] = await Promise.all([
         detail.isSender
           ? Promise.resolve(myMailingAddress)
@@ -1623,7 +1625,9 @@ function MailingAddressBanner({ detail }: { detail: TransactionDetail }) {
       <Text style={styles.mailBannerBody}>
         {finalised
           ? "この取引の当事者だけに住所を表示しています。"
-          : "この取引は郵送です。合意が成立すると、当事者同士に住所を表示します。"}
+          : detail.exchangeMethod === "both"
+            ? "この取引は現地交換も郵送交換も選べます。郵送で進める場合、合意が成立すると当事者同士に住所を表示します。"
+            : "この取引は郵送です。合意が成立すると、当事者同士に住所を表示します。"}
       </Text>
       <MailingAddressCard lines={mineLines} title="あなたの住所" />
       {finalised ? (

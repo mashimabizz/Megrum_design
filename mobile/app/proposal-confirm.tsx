@@ -1,5 +1,5 @@
-import { router, useLocalSearchParams } from "expo-router";
-import { useEffect, useMemo, useState } from "react";
+import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Image,
   Pressable,
@@ -32,6 +32,8 @@ import {
   formatMailingAddressSummary,
   isMailingAddressReady,
   normalizeExchangeMethod,
+  supportsHandExchange,
+  supportsMailExchange,
   type ExchangeMethod,
   type MailingAddressRecord,
 } from "../src/lib/mailingAddress";
@@ -110,6 +112,8 @@ export default function ProposalConfirmScreen() {
   const proposalId = one(params.proposalId);
   const isRevisionMode = one(params.revise) === "1" && !!proposalId;
   const exchangeMethod = normalizeExchangeMethod(one(params.exchangeMethod));
+  const usesHandExchange = supportsHandExchange(exchangeMethod);
+  const usesMailExchange = supportsMailExchange(exchangeMethod);
   const giveIds = useMemo(() => parseProposalIdList(givesParam), [givesParam]);
   const receiveIds = useMemo(
     () => parseProposalIdList(receivesParam),
@@ -175,36 +179,38 @@ export default function ProposalConfirmScreen() {
     };
   }, [giveIds, receiveIds]);
 
-  useEffect(() => {
-    if (exchangeMethod !== "mail" || !supabase) {
-      setMailingAddress(null);
-      setAddressLoading(false);
-      return;
-    }
+  useFocusEffect(
+    useCallback(() => {
+      if (!usesMailExchange || !supabase) {
+        setMailingAddress(null);
+        setAddressLoading(false);
+        return undefined;
+      }
 
-    let active = true;
-    setAddressLoading(true);
-    supabase.auth
-      .getUser()
-      .then(({ data }) => data.user?.id ?? null)
-      .then(async (userId) => {
-        if (!active || !userId) return;
-        const address = await fetchMailingAddress(userId, {
-          tolerateMissingSchema: true,
+      let active = true;
+      setAddressLoading(true);
+      supabase.auth
+        .getUser()
+        .then(({ data }) => data.user?.id ?? null)
+        .then(async (userId) => {
+          if (!active || !userId) return;
+          const address = await fetchMailingAddress(userId, {
+            tolerateMissingSchema: true,
+          });
+          if (active) setMailingAddress(address);
+        })
+        .catch(() => {
+          if (active) setMailingAddress(null);
+        })
+        .finally(() => {
+          if (active) setAddressLoading(false);
         });
-        if (active) setMailingAddress(address);
-      })
-      .catch(() => {
-        if (active) setMailingAddress(null);
-      })
-      .finally(() => {
-        if (active) setAddressLoading(false);
-      });
 
-    return () => {
-      active = false;
-    };
-  }, [exchangeMethod]);
+      return () => {
+        active = false;
+      };
+    }, [usesMailExchange]),
+  );
 
   if (submitted) {
     return (
@@ -260,7 +266,7 @@ export default function ProposalConfirmScreen() {
           />
         </Section>
 
-        {exchangeMethod === "hand" ? (
+        {usesHandExchange ? (
           <Section title="交換できる候補">
             <MeetupMapCard candidates={meetupCandidates} />
           </Section>
@@ -278,7 +284,7 @@ export default function ProposalConfirmScreen() {
           />
         </Section>
 
-        {exchangeMethod === "hand" ? (
+        {usesHandExchange ? (
           <Pressable
             onPress={() => setShareSchedule((current) => !current)}
             style={[
@@ -319,12 +325,12 @@ export default function ProposalConfirmScreen() {
       return;
     }
     const sendableMeetups =
-      exchangeMethod === "hand"
+      usesHandExchange
         ? meetupCandidates
             .filter((candidate) => candidate.startAt && candidate.endAt && candidate.place)
             .slice(0, 3)
         : [];
-    if (exchangeMethod === "hand" && sendableMeetups.length === 0) {
+    if (usesHandExchange && sendableMeetups.length === 0) {
       setSubmitError("交換できる時間と場所を設定してください");
       return;
     }
@@ -342,7 +348,7 @@ export default function ProposalConfirmScreen() {
         setSubmitError("ログイン状態を確認してください");
         return;
       }
-      if (exchangeMethod === "mail") {
+      if (usesMailExchange) {
         const address = await fetchMailingAddress(user.id);
         if (!isMailingAddressReady(address)) {
           setMailingAddress(address);
@@ -420,7 +426,7 @@ export default function ProposalConfirmScreen() {
           meetup_lat: primaryMeetup?.lat ?? null,
           meetup_lng: primaryMeetup?.lng ?? null,
           meetup_candidates: meetupPayloads,
-          expose_calendar: exchangeMethod === "hand" ? shareSchedule : false,
+          expose_calendar: usesHandExchange ? shareSchedule : false,
           listing_id: listingId,
           cash_offer: false,
           cash_amount: null,
@@ -466,7 +472,7 @@ export default function ProposalConfirmScreen() {
         meetup_lat: primaryMeetup?.lat ?? null,
         meetup_lng: primaryMeetup?.lng ?? null,
         meetup_candidates: meetupPayloads,
-        expose_calendar: exchangeMethod === "hand" ? shareSchedule : false,
+        expose_calendar: usesHandExchange ? shareSchedule : false,
         listing_id: listingId,
         cash_offer: false,
         cash_amount: null,
@@ -587,7 +593,9 @@ function ProposalCompleteScreen({
             ? `@${partnerHandle} との条件を更新しました。ネゴ中として打診一覧に反映されます。`
             : exchangeMethod === "mail"
               ? `@${partnerHandle} に郵送交換の打診を送りました。双方が合意すると住所が表示されます。`
-              : `@${partnerHandle} に打診を送りました。返事が届いたら通知と打診一覧で確認できます。`}
+              : exchangeMethod === "both"
+                ? `@${partnerHandle} に現地・郵送どちらも可能な打診を送りました。返事が届いたら打診一覧で確認できます。`
+                : `@${partnerHandle} に打診を送りました。返事が届いたら通知と打診一覧で確認できます。`}
         </Text>
       </View>
 
@@ -619,6 +627,7 @@ function ExchangeMethodCard({
   exchangeMethod: ExchangeMethod;
   onOpenAddressSettings: () => void;
 }) {
+  const usesMailExchange = supportsMailExchange(exchangeMethod);
   return (
     <View style={styles.methodPanel}>
       <View style={styles.methodBadge}>
@@ -627,9 +636,11 @@ function ExchangeMethodCard({
       <Text style={styles.methodText}>
         {exchangeMethod === "hand"
           ? "現地交換では、待ち合わせ候補と場所を相手に送ります。"
-          : "郵送交換では、待ち合わせ候補は送りません。合意後にだけ当事者へ住所を表示します。"}
+          : exchangeMethod === "both"
+            ? "現地交換の候補と、郵送に使う住所登録の両方を確認します。合意後にだけ当事者へ住所を表示します。"
+            : "郵送交換では、待ち合わせ候補は送りません。合意後にだけ当事者へ住所を表示します。"}
       </Text>
-      {exchangeMethod === "mail" ? (
+      {usesMailExchange ? (
         <View style={styles.addressStatusCard}>
           <Text style={styles.addressStatusTitle}>あなたの住所登録</Text>
           <Text style={styles.addressStatusSummary}>

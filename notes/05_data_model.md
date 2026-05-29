@@ -4,7 +4,7 @@
 > 実装の正解集。`09_state_machines.md` と完全に整合させ、`10_glossary.md` の用語を使う。
 
 最終更新: 2026-05-29
-ステータス: Draft v2.16（iter168.73 スポット掲示板MVPを追加）
+ステータス: Draft v2.18（iter168.82 現地・郵送どちらもOKの打診を追加）
 
 ## 最新化履歴
 
@@ -29,6 +29,7 @@
 | **v2.15** | **2026-05-29** | **iter168.71 反映（郵送交換を交換手段に再追加。住所テーブル案、proposal.exchange_method、待ち合わせ必須条件の分岐、未確定項目を追記）** |
 | **v2.16** | **2026-05-29** | **iter168.73 反映（めぐり配下のスポット掲示板MVPを追加。`meguri_board_threads` / `meguri_board_replies` と scope=`same_spot|same_prefecture|global`、ローカルfallback前提の最小仕様を定義）** |
 | **v2.17** | **2026-05-29** | **iter168.74 反映（郵送交換MVPを実装。`user_mailing_addresses` 実テーブル、`proposals.sender_mailing_address/receiver_mailing_address` スナップショット、合意時固定ルールを追記）** |
+| **v2.18** | **2026-05-29** | **iter168.82 反映（`exchange_method='both'` を追加し、現地・郵送どちらも対応可の打診を保存できるように更新）** |
 
 ## このドキュメントの位置付け
 
@@ -167,11 +168,11 @@ iter24 で「推し2階層」（グループ/作品 → メンバー/キャラ�
 | `city` | text | 市区町村 |
 | `line1` | text | 番地・建物名など |
 | `line2` | text nullable | 補足住所 |
-| `phone_number` | text nullable | 任意。配送トラブル時の補助連絡先 |
+| `phone_number` | text nullable | 任意。郵送トラブル時の補助連絡先 |
 | `created_at` / `updated_at` | timestamptz | |
 
 運用ルール：
-- 打診で `exchange_method='mail'` を含める場合、送信者はこの行が存在しないと送れない
+- 打診で `exchange_method='mail'` または `exchange_method='both'` を含める場合、送信者はこの行が存在しないと送れない
 - 合意後にだけ、当事者双方へ相手の住所を表示する
 - 取引途中で設定画面の住所が変わっても履歴が壊れないよう、合意時点で取引側へスナップショット保存する前提
 
@@ -583,7 +584,7 @@ iter28（match_type）/ iter29（数量）/ iter30（7日期限）/ iter32（合
 | `receiver_have_ids` | uuid[] | 受信者が出す `user_haves` IDs |
 | `receiver_have_qtys` | int[] | 各 IDの選択数 |
 | `message` | text | |
-| `exchange_method` | text | `hand` / `mail`。提案単位の受け渡し方法 |
+| `exchange_method` | text | `hand` / `mail` / `both`。提案単位の受け渡し方法 |
 | `status` | text | `draft` / `sent` / `negotiating` / `agreement_one_side` / `agreed` / `rejected` / `expired`（09と一致） |
 | `agreed_by_sender` | boolean default false | iter32、agreement_one_side 判定用 |
 | `agreed_by_receiver` | boolean default false | iter32 |
@@ -596,27 +597,27 @@ iter28（match_type）/ iter29（数量）/ iter30（7日期限）/ iter32（合
 | ~~`meetup_now_minutes`~~ | — | **iter67.1 で廃止** |
 | ~~`meetup_scheduled_aw_id`~~ | — | **iter67 で廃止**。AW はマッチング演算専用に分離 |
 | ~~`meetup_scheduled_custom`~~ | — | **iter67.1 で廃止**。下記 5 列に分解 |
-| `meetup_start_at` | timestamptz nullable | iter67.1、待ち合わせ開始時刻（`exchange_method='hand'` で必須） |
+| `meetup_start_at` | timestamptz nullable | iter67.1、待ち合わせ開始時刻（`exchange_method='hand'` / `both` で必須） |
 | `meetup_end_at` | timestamptz nullable | iter67.1、待ち合わせ終了時刻（CHECK: end > start） |
 | `meetup_place_name` | text(≤200) nullable | iter67.1、場所名（駅・施設名など） |
 | `meetup_lat` | numeric(9,6) nullable | iter67.1、緯度（地図上の位置） |
 | `meetup_lng` | numeric(9,6) nullable | iter67.1、経度 |
 | `meetup_candidates` | jsonb default `[]` | iter154.34、交換できる候補（最大3件）。各要素は `{ startAt, endAt, placeName, lat, lng, mode }`。候補1を既存 `meetup_*` 5列へミラーして旧画面・取引チャットと互換 |
-| `sender_mailing_address` | jsonb nullable | iter168.74、`exchange_method='mail'` で合意成立した時点の送信者住所スナップショット |
-| `receiver_mailing_address` | jsonb nullable | iter168.74、`exchange_method='mail'` で合意成立した時点の受信者住所スナップショット |
+| `sender_mailing_address` | jsonb nullable | iter168.74、`exchange_method='mail'` / `both` で合意成立した時点の送信者住所スナップショット |
+| `receiver_mailing_address` | jsonb nullable | iter168.74、`exchange_method='mail'` / `both` で合意成立した時点の受信者住所スナップショット |
 | `expose_calendar` | bool default false | iter67 で再定義：送信者が自分の **個人スケジュール（schedules）** を相手に公開する ON/OFF。受信側は受信表示画面で送信者の予定を見られる（取引完了で自動的に RLS 不可）。AW は対象外 |
 | `listing_id` | uuid nullable | iter64、個別募集 (`listings`) 経由の打診ならその id。直接打診なら null |
 | `cash_offer` | bool default false | iter67.7、定価交換打診なら true（receiver_have_ids 空 + cash_amount 必須） |
 | `cash_amount` | int nullable | iter67.7、定価交換金額（1〜9,999,999）。cash_offer=true のときのみ |
 | `created_at` / `updated_at` | timestamptz | |
 
-CHECK 制約 `proposals_meetup_required`（iter168.71 想定更新）：`exchange_method='hand'` かつ `status!='draft'` の時だけ 5 列すべて NOT NULL かつ `meetup_end_at > meetup_start_at`。`mail` の時は待ち合わせ列を必須にしない。
+CHECK 制約 `proposals_meetup_required`（iter168.82 更新）：`exchange_method='hand'` または `exchange_method='both'` かつ `status!='draft'` の時だけ 5 列すべて NOT NULL かつ `meetup_end_at > meetup_start_at`。`mail` の時は待ち合わせ列を必須にしない。
 CHECK 制約 `proposals_meetup_candidates_array`（iter154.34）：`meetup_candidates` は JSON 配列、最大3件。
 
 派生ルール：
 - iter153: `status='agreed'` の proposal は、`sender_have_ids` / `receiver_have_ids` と各 qty を市場残数から差し引く。ただし `approved_by_sender` / `approved_by_receiver` が true の側は、取引完了承認処理で実在庫が既に減算されているため二重控除しない。
 - iter153: `sent` / `negotiating` / `agreement_one_side` は在庫確保前の状態として扱い、市場残数からは差し引かない。`agreed` へ遷移する直前にキャパ超過を検証する。
-- iter168.74: `exchange_method='mail'` の時、送信者は打診送信前に `user_mailing_addresses` の登録が必須。受信者も合意前に住所登録が必要で、最終合意時に双方の住所スナップショットを `proposals.sender_mailing_address / receiver_mailing_address` へ固定し、当事者以外には返さない。
+- iter168.74/168.82: `exchange_method='mail'` または `exchange_method='both'` の時、送信者は打診送信前に `user_mailing_addresses` の登録が必須。受信者も合意前に住所登録が必要で、最終合意時に双方の住所スナップショットを `proposals.sender_mailing_address / receiver_mailing_address` へ固定し、当事者以外には返さない。
 
 ⚠️ 要確認：
 - ネゴ中の提案修正で `last_action_at` リセットするか（09 未確定項目#1）

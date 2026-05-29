@@ -106,9 +106,9 @@ stateDiagram-v2
 - **24時間無応答での自動拒否は廃止**（旧仕様、iter30）
 - **市場残数の確保（iter153）**: `agreed` に到達した時点で、`sender_have_ids` / `receiver_have_ids` の数量をマッチング市場の残数から差し引く。マイ在庫の表示数量はこの時点では減らさず、取引完了承認時に実在庫を減算する。
 - **キャパ超過防止（iter153）**: `agreed` へ遷移する直前に、双方の譲在庫について `quantity - 合意済み未完了予約数 >= proposal qty` を満たすことを検証する。不足している場合は合意成立させない。
-- **交換手段（iter168.71）**: Proposal は `exchange_method='hand'`（現地交換）または `exchange_method='mail'`（郵送交換）を持つ。
-- **現地交換の入力条件**: `exchange_method='hand'` の時だけ、送信前に待ち合わせの入力を必須とする。
-- **郵送交換の入力条件**: `exchange_method='mail'` の時は、送信者が住所登録済みであることを送信前に確認する。受信者も合意までに住所登録が必要。
+- **交換手段（iter168.71, iter168.82）**: Proposal は `exchange_method='hand'`（現地交換）、`exchange_method='mail'`（郵送交換）、`exchange_method='both'`（現地・郵送どちらも対応可）を持つ。
+- **現地交換の入力条件**: `exchange_method='hand'` または `exchange_method='both'` の時は、送信前に待ち合わせの入力を必須とする。
+- **郵送交換の入力条件**: `exchange_method='mail'` または `exchange_method='both'` の時は、送信者が住所登録済みであることを送信前に確認する。受信者も合意までに住所登録が必要。
 - **住所の開示タイミング**: 住所は `agreed` になるまで相手へ見せず、合意後に当事者同士だけへ表示する。
 
 ### 関連画面

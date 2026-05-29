@@ -196,6 +196,8 @@ export default function TransactionApproveScreen() {
                 <Text numberOfLines={1} style={styles.photoMetaText}>
                   {data.exchangeMethod === "mail"
                     ? exchangeMethodLabel(data.exchangeMethod)
+                    : data.exchangeMethod === "both"
+                      ? `${exchangeMethodLabel(data.exchangeMethod)} / ${data.placeName ?? "場所未設定"}`
                     : data.placeName ?? "場所未設定"}
                 </Text>
               </View>

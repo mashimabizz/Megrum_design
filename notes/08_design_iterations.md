@@ -4,6 +4,70 @@
 
 ---
 
+## イテレーション168.82：住所再読込と交換手段both対応
+
+### 背景・問題意識
+
+オーナーから、打診前の送信確認画面で住所未登録リンクから住所設定へ移動して保存しても、戻った後の「あなたの住所登録」に登録済み住所が表示されないという指摘があった。また、受け渡し方法は現地交換と郵送交換を二者択一にせず、どちらも対応可能な打診を作れるようにしたいという要望があった。
+
+### 変更内容
+
+#### `mobile/app/proposal-confirm.tsx`
+- 送信確認画面が再フォーカスされた時に住所を再取得するようにし、住所設定から戻った直後に「あなたの住所登録」へ反映されるようにした。
+- `both` の打診では、待ち合わせ候補と住所登録の両方を確認し、住所未登録時は送信前に止めるようにした。
+
+#### `mobile/app/proposal-select.tsx`
+- 交換手段を `現地交換` / `郵送交換` / `どちらもOK` の3択に変更した。
+- `どちらもOK` の場合は待ち合わせタブを表示し、確認画面へ `exchangeMethod=both` を渡すようにした。
+
+#### `mobile/src/lib/mailingAddress.ts`
+- `ExchangeMethod` に `both` を追加し、現地対応・郵送対応の判定ヘルパーを追加した。
+
+#### `mobile/app/transaction-detail.tsx`, `mobile/app/transaction-approve.tsx`
+- `both` の取引で、住所表示と現地交換用の取引アクションを両方扱えるようにした。
+
+#### `supabase/migrations/20260529184000_allow_both_exchange_method.sql`
+- `proposals.exchange_method` のCHECK制約に `both` を追加した。
+- `both` では待ち合わせ情報を必須にするよう、`proposals_meetup_required` を更新した。
+
+#### `notes/05_data_model.md`, `notes/09_state_machines.md`, `notes/10_glossary.md`
+- `exchange_method='both'` と、現地・郵送どちらも対応可のビジネスルールを反映した。
+
+### 影響範囲
+
+- iOS版 `/proposal-select`
+- iOS版 `/proposal-confirm`
+- iOS版 `/address-settings` から送信確認画面へ戻る導線
+- iOS版 `/transaction-detail`, `/transaction-approve`
+- Supabase `proposals.exchange_method` CHECK制約
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- `supabase db push --yes`
+- `git diff --check -- mobile/src/lib/mailingAddress.ts mobile/app/proposal-select.tsx mobile/app/proposal-confirm.tsx mobile/app/transaction-detail.tsx mobile/app/transaction-approve.tsx notes/05_data_model.md notes/09_state_machines.md notes/10_glossary.md supabase/migrations/20260529184000_allow_both_exchange_method.sql`
+
+### 関連ファイル
+
+- `mobile/app/proposal-select.tsx`
+- `mobile/app/proposal-confirm.tsx`
+- `mobile/src/lib/mailingAddress.ts`
+- `mobile/app/transaction-detail.tsx`
+- `mobile/app/transaction-approve.tsx`
+- `supabase/migrations/20260529184000_allow_both_exchange_method.sql`
+
+### セルフレビュー結果
+
+- ✅ 住所設定から戻った時に送信確認画面で住所を再取得
+- ✅ 現地交換・郵送交換・どちらもOKの3択に対応
+- ✅ `both` は現地候補と住所登録の両方を送信前チェック対象にした
+- ✅ 09更新診断：交換手段ルールに `both` を追加したため更新済み
+- ✅ 10更新診断：既存用語 `交換手段` に `both` を追加したため更新済み
+- ✅ 05更新診断：DB制約・カラム説明の変更があるため更新済み
+
+---
+
 ## イテレーション168.81：マッチ詳細の初期チラつきを抑止
 
 ### 背景・問題意識

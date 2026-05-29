@@ -1,6 +1,6 @@
 import { supabase } from "./supabase";
 
-export type ExchangeMethod = "hand" | "mail";
+export type ExchangeMethod = "hand" | "mail" | "both";
 
 export type MailingAddressInput = {
   recipientName: string;
@@ -98,11 +98,22 @@ export async function upsertMailingAddress(
 }
 
 export function normalizeExchangeMethod(value?: string | null): ExchangeMethod {
+  if (value === "both") return "both";
   return value === "mail" ? "mail" : "hand";
 }
 
 export function exchangeMethodLabel(method: ExchangeMethod) {
-  return method === "mail" ? "郵送交換" : "現地交換";
+  if (method === "mail") return "郵送交換";
+  if (method === "both") return "現地・郵送どちらもOK";
+  return "現地交換";
+}
+
+export function supportsHandExchange(method: ExchangeMethod) {
+  return method === "hand" || method === "both";
+}
+
+export function supportsMailExchange(method: ExchangeMethod) {
+  return method === "mail" || method === "both";
 }
 
 export function isMailingAddressReady(
