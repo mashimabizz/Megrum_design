@@ -4,6 +4,55 @@
 
 ---
 
+## イテレーション200：掲示板返信表示順を追加
+
+### 背景・問題意識
+
+スポット掲示板のスレッドが長くなると、時系列で読むだけでなく、最新の状況を先に見たい時や参考になった返信を拾いたい時がある。一般的なスレッド閲覧体験として、返信の表示順を切り替えられるようにした。
+
+### 変更内容
+
+#### `mobile/app/meguri-board-thread.tsx`
+- 返信一覧に `古い順` / `新着順` / `参考順` の表示順切り替えを追加した。
+- 返信番号は元スレッド内の通し番号のまま維持し、表示順だけを切り替えるようにした。
+- 検索結果ナビは現在の表示順に合わせて前後移動するようにした。
+- 未読区切りは時系列の `古い順` 表示時だけ出すようにした。
+- `最新へ` は現在の表示順に関係なく最新返信へ移動するようにした。
+
+#### `notes/09_state_machines.md`
+- Meguri Board Lifecycle に返信表示順の表示ルールを追記した。
+
+#### `notes/10_glossary.md`
+- 掲示板返信表示順を追加した。
+
+### 影響範囲
+
+- iOS版 スポット掲示板詳細
+- スレッド内検索
+- 未読区切りと最新返信ジャンプ
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- `EAS_UPDATE_PROJECT_SLUG=ihub EXPO_NO_GIT_STATUS=1 npm --prefix mobile run update:ios:preview -- --message "[iter200] add board reply sort modes" --non-interactive`
+- Preview OTA: Update group `a291a04d-5762-47a2-83b7-aa9961d2f437` / iOS update `019e7566-28b3-74d8-9f53-763ed2410718`
+
+### 関連ファイル
+
+- `mobile/app/meguri-board-thread.tsx`
+- `notes/08_design_iterations.md`
+- `notes/09_state_machines.md`
+- `notes/10_glossary.md`
+
+### セルフレビュー結果
+
+- ✅ 返信番号は表示順に依存させず、引用・検索・番号検索の文脈が崩れないようにした。
+- ✅ 未読区切りは時系列表示に限定し、並び替え後に誤解を生まないようにした。
+- ✅ 検索結果ナビは現在の表示順に合わせて移動するため、見えている順番と操作が一致する。
+
+---
+
 ## イテレーション199：掲示板画像一覧を追加
 
 ### 背景・問題意識

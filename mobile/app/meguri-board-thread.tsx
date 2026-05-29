@@ -97,6 +97,14 @@ type BoardMediaAttachment = {
   uri: string;
 };
 
+type BoardReplySortMode = "oldest" | "newest" | "popular";
+
+const REPLY_SORT_OPTIONS: { label: string; value: BoardReplySortMode }[] = [
+  { label: "古い順", value: "oldest" },
+  { label: "新着順", value: "newest" },
+  { label: "参考順", value: "popular" },
+];
+
 export default function MeguriBoardThreadScreen() {
   const insets = useSafeAreaInsets();
   const keyboardInset = useKeyboardInset();
@@ -136,6 +144,7 @@ export default function MeguriBoardThreadScreen() {
   const [previousReadAt, setPreviousReadAt] = useState<number | null>(null);
   const [participantsOpen, setParticipantsOpen] = useState(false);
   const [mediaGalleryOpen, setMediaGalleryOpen] = useState(false);
+  const [replySortMode, setReplySortMode] = useState<BoardReplySortMode>("oldest");
   const [searchCursorIndex, setSearchCursorIndex] = useState(0);
   const scrollViewRef = useRef<ScrollView | null>(null);
   const replyOffsetsRef = useRef<Record<string, number>>({});
@@ -202,6 +211,24 @@ export default function MeguriBoardThreadScreen() {
       ).includes(replySearchQuery),
     );
   }, [replies, replyNumberById, replySearchQuery]);
+
+  const sortedReplies = useMemo(() => {
+    const next = [...filteredReplies];
+    if (replySortMode === "newest") {
+      next.sort((left, right) => right.createdAt - left.createdAt);
+      return next;
+    }
+    if (replySortMode === "popular") {
+      next.sort((left, right) => {
+        const scoreDiff = right.reactionCount - left.reactionCount;
+        if (scoreDiff !== 0) return scoreDiff;
+        return right.createdAt - left.createdAt;
+      });
+      return next;
+    }
+    next.sort((left, right) => left.createdAt - right.createdAt);
+    return next;
+  }, [filteredReplies, replySortMode]);
 
   const unreadSeparatorReplyId = useMemo(() => {
     if (replySearchQuery || replies.length === 0) return null;
@@ -307,20 +334,35 @@ export default function MeguriBoardThreadScreen() {
 
   useEffect(() => {
     setSearchCursorIndex(0);
-  }, [replySearchQuery]);
+  }, [replySearchQuery, replySortMode]);
 
   useEffect(() => {
-    if (filteredReplies.length === 0) {
+    if (sortedReplies.length === 0) {
       if (searchCursorIndex !== 0) setSearchCursorIndex(0);
       return;
     }
-    if (searchCursorIndex >= filteredReplies.length) {
+    if (searchCursorIndex >= sortedReplies.length) {
       setSearchCursorIndex(0);
     }
-  }, [filteredReplies.length, searchCursorIndex]);
+  }, [searchCursorIndex, sortedReplies.length]);
 
   function scrollToLatestReply(animated = true) {
+    const latestReply = replies.reduce<MeguriBoardReply | null>((latest, reply) => {
+      if (!latest || reply.createdAt > latest.createdAt) return reply;
+      return latest;
+    }, null);
     requestAnimationFrame(() => {
+      if (latestReply) {
+        const y = replyOffsetsRef.current[latestReply.id];
+        if (typeof y === "number") {
+          scrollViewRef.current?.scrollTo({ animated, y: Math.max(0, y - 12) });
+          return;
+        }
+      }
+      if (replySortMode === "newest") {
+        scrollViewRef.current?.scrollTo({ animated, y: 0 });
+        return;
+      }
       scrollViewRef.current?.scrollToEnd({ animated });
     });
   }
@@ -354,10 +396,10 @@ export default function MeguriBoardThreadScreen() {
   }
 
   function jumpToSearchResult(direction: -1 | 1) {
-    if (!replySearchQuery || filteredReplies.length === 0) return;
+    if (!replySearchQuery || sortedReplies.length === 0) return;
     const nextIndex =
-      (searchCursorIndex + direction + filteredReplies.length) % filteredReplies.length;
-    const targetReply = filteredReplies[nextIndex];
+      (searchCursorIndex + direction + sortedReplies.length) % sortedReplies.length;
+    const targetReply = sortedReplies[nextIndex];
     setSearchCursorIndex(nextIndex);
     const y = targetReply ? replyOffsetsRef.current[targetReply.id] : undefined;
     if (typeof y === "number") {
@@ -1118,7 +1160,7 @@ export default function MeguriBoardThreadScreen() {
                 <Text style={styles.replySectionTitle}>返信</Text>
                 <View style={styles.replyHeaderActions}>
                   <Text style={styles.replyCountMeta}>
-                    {replySearchQuery ? `${filteredReplies.length}/${replies.length}件` : `${replies.length}件`}
+                    {replySearchQuery ? `${sortedReplies.length}/${replies.length}件` : `${replies.length}件`}
                   </Text>
                   {replies.length > 0 ? (
                     <Pressable
@@ -1148,10 +1190,30 @@ export default function MeguriBoardThreadScreen() {
                   </Pressable>
                 ) : null}
               </View>
-              {replySearchQuery && filteredReplies.length > 0 ? (
+              <View style={styles.replySortRow}>
+                <Text style={styles.replySortLabel}>表示順</Text>
+                <View style={styles.replySortSegment}>
+                  {REPLY_SORT_OPTIONS.map((option) => {
+                    const active = replySortMode === option.value;
+                    return (
+                      <Pressable
+                        accessibilityRole="button"
+                        key={option.value}
+                        onPress={() => setReplySortMode(option.value)}
+                        style={[styles.replySortOption, active ? styles.replySortOptionActive : null]}
+                      >
+                        <Text style={[styles.replySortOptionText, active ? styles.replySortOptionTextActive : null]}>
+                          {option.label}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              </View>
+              {replySearchQuery && sortedReplies.length > 0 ? (
                 <View style={styles.replySearchNavigator}>
                   <Text style={styles.replySearchNavigatorLabel}>
-                    {Math.min(searchCursorIndex + 1, filteredReplies.length)} / {filteredReplies.length}
+                    {Math.min(searchCursorIndex + 1, sortedReplies.length)} / {sortedReplies.length}
                   </Text>
                   <View style={styles.replySearchNavigatorActions}>
                     <Pressable
@@ -1176,13 +1238,13 @@ export default function MeguriBoardThreadScreen() {
                   <Text style={styles.noRepliesTitle}>まだ返信はありません</Text>
                   <Text style={styles.noRepliesBody}>最初のひとことで温度感をつなげていくイメージです。</Text>
                 </View>
-              ) : filteredReplies.length === 0 ? (
+              ) : sortedReplies.length === 0 ? (
                 <View style={styles.noRepliesCard}>
                   <Text style={styles.noRepliesTitle}>検索結果がありません</Text>
                   <Text style={styles.noRepliesBody}>別の言葉で探してみてください。</Text>
                 </View>
               ) : (
-                filteredReplies.map((reply, index) => {
+                sortedReplies.map((reply, index) => {
                   const replyNumber = replyNumberById.get(reply.id) ?? index + 1;
                   const replyNumberLabel = `#${replyNumber}`;
                   const replyNumberMatchesQuery =
@@ -1194,7 +1256,7 @@ export default function MeguriBoardThreadScreen() {
                       onLayout={(event) => rememberReplyOffset(reply.id, event.nativeEvent.layout.y)}
                       style={styles.replyGroup}
                     >
-                      {reply.id === unreadSeparatorReplyId ? (
+                      {replySortMode === "oldest" && reply.id === unreadSeparatorReplyId ? (
                         <View style={styles.unreadSeparator}>
                           <View style={styles.unreadSeparatorLine} />
                           <Text style={styles.unreadSeparatorText}>ここから未読</Text>
@@ -2288,6 +2350,42 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: "800",
     padding: 0,
+  },
+  replySortRow: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 10,
+  },
+  replySortLabel: {
+    color: megrumColors.mutedInk,
+    fontSize: 11,
+    fontWeight: "900",
+  },
+  replySortSegment: {
+    backgroundColor: "rgba(58,50,74,0.06)",
+    borderRadius: 999,
+    flex: 1,
+    flexDirection: "row",
+    padding: 3,
+  },
+  replySortOption: {
+    alignItems: "center",
+    borderRadius: 999,
+    flex: 1,
+    minHeight: 30,
+    justifyContent: "center",
+  },
+  replySortOptionActive: {
+    backgroundColor: "#fff",
+    ...megrumShadow,
+  },
+  replySortOptionText: {
+    color: "rgba(58,50,74,0.54)",
+    fontSize: 11,
+    fontWeight: "900",
+  },
+  replySortOptionTextActive: {
+    color: megrumColors.lavender,
   },
   replySearchNavigator: {
     alignItems: "center",
