@@ -4,6 +4,56 @@
 
 ---
 
+## イテレーション232：掲示板の長い返信を折りたためるようにする
+
+### 背景・問題意識
+
+スポット掲示板では、列状況、注意点、現地レポートなどで長い返信が投稿されやすい。長文返信が続くと一覧性が落ちるため、一定以上の返信本文は初期表示で折りたたみ、必要な時だけ全文を読めるようにした。
+
+### 変更内容
+
+#### `mobile/app/meguri-board-thread.tsx`
+- 返信本文が一定文字数を超える場合、検索中を除いて初期表示を6行までに制限するようにした。
+- 長い返信に `続きを読む` / `閉じる` ボタンを追加し、返信ごとに展開状態を保持するようにした。
+- 返信アクションシートにも `返信を全文表示` / `返信を折りたたむ` を追加した。
+- 折りたたみ対象の返信でもURL自動リンク、検索ハイライト、引用表示、画像添付は従来通り扱うようにした。
+- 返信なし表示の文言から不適切な表現を外し、現地情報共有の文脈へ変更した。
+
+#### `notes/09_state_machines.md`
+- Meguri Board Lifecycle に返信本文折りたたみの表示ルールを追記した。
+
+#### `notes/10_glossary.md`
+- 掲示板返信本文折りたたみを追加した。
+
+### 影響範囲
+
+- iOS版 スポット掲示板詳細
+- 返信本文表示
+- 返信アクションシート
+- スレッド内検索表示
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- `EAS_UPDATE_PROJECT_SLUG=ihub EXPO_NO_GIT_STATUS=1 npm --prefix mobile run update:ios:preview -- --message "[iter232] collapse long board replies" --non-interactive`
+- Preview OTA: Update group `35f8ccaf-6ac8-4abc-9bf6-0fd8b1a3e67c` / iOS update `019e75ed-e042-7feb-8bed-a273a4da8c3a`
+
+### 関連ファイル
+
+- `mobile/app/meguri-board-thread.tsx`
+- `notes/08_design_iterations.md`
+- `notes/09_state_machines.md`
+- `notes/10_glossary.md`
+
+### セルフレビュー結果
+
+- ✅ 長文返信だけを対象にし、短い返信や削除済み返信の表示は変えないようにした。
+- ✅ 検索中は一致箇所を見落とさないように全文表示を維持した。
+- ✅ DB変更なし、ネイティブ依存追加なしでPreview OTA対象内に収めた。
+
+---
+
 ## イテレーション231：掲示板返信を元の流れで見られるようにする
 
 ### 背景・問題意識

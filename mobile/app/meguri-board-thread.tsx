@@ -77,6 +77,8 @@ import { useKeyboardInset } from "../src/lib/useKeyboardInset";
 import { megrumColors, megrumShadow } from "../src/theme/tokens";
 
 const REPLY_BODY_LIMIT = 500;
+const REPLY_BODY_COLLAPSE_THRESHOLD = 180;
+const REPLY_BODY_COLLAPSED_LINES = 6;
 
 type BoardParticipant = {
   handle: string | null;
@@ -159,6 +161,7 @@ export default function MeguriBoardThreadScreen() {
   const [mediaGalleryOpen, setMediaGalleryOpen] = useState(false);
   const [threadInfoOpen, setThreadInfoOpen] = useState(false);
   const [threadBodyExpanded, setThreadBodyExpanded] = useState(false);
+  const [expandedReplyIds, setExpandedReplyIds] = useState<Set<string>>(() => new Set());
   const [replySortMode, setReplySortMode] = useState<BoardReplySortMode>("oldest");
   const [searchCursorIndex, setSearchCursorIndex] = useState(0);
   const [highlightedReplyId, setHighlightedReplyId] = useState<string | null>(null);
@@ -560,6 +563,22 @@ export default function MeguriBoardThreadScreen() {
 
   function rememberReplyOffset(replyId: string, y: number) {
     replyOffsetsRef.current[replyId] = y;
+  }
+
+  function isReplyBodyCollapsible(reply: MeguriBoardReply) {
+    return !reply.deleted && reply.body.trim().length > REPLY_BODY_COLLAPSE_THRESHOLD;
+  }
+
+  function toggleReplyBodyExpanded(replyId: string) {
+    setExpandedReplyIds((current) => {
+      const next = new Set(current);
+      if (next.has(replyId)) {
+        next.delete(replyId);
+      } else {
+        next.add(replyId);
+      }
+      return next;
+    });
   }
 
   function scrollToReplyOffset(replyId: string) {
@@ -1229,6 +1248,12 @@ export default function MeguriBoardThreadScreen() {
       label: "この返信への返信を見る",
       run: () => filterChildReplies(reply),
     });
+    if (isReplyBodyCollapsible(reply) && !replySearchText.trim()) {
+      actions.push({
+        label: expandedReplyIds.has(reply.id) ? "返信を折りたたむ" : "返信を全文表示",
+        run: () => toggleReplyBodyExpanded(reply.id),
+      });
+    }
     if (replySearchText.trim() || replySortMode !== "oldest") {
       actions.push({
         label: "元の流れで見る",
@@ -1637,7 +1662,7 @@ export default function MeguriBoardThreadScreen() {
               {replies.length === 0 ? (
                 <View style={styles.noRepliesCard}>
                   <Text style={styles.noRepliesTitle}>まだ返信はありません</Text>
-                  <Text style={styles.noRepliesBody}>最初のひとことで温度感をつなげていくイメージです。</Text>
+                  <Text style={styles.noRepliesBody}>最初のひとことで現地の様子を共有できます。</Text>
                 </View>
               ) : sortedReplies.length === 0 ? (
                 <View style={styles.noRepliesCard}>
@@ -1657,6 +1682,8 @@ export default function MeguriBoardThreadScreen() {
                     : reply.quotedAuthorName || "引用";
                   const mentionsViewer = !reply.mine && replyMentionsHandle(reply.body, actor.handle);
                   const childReplyCount = replyChildCountById.get(reply.id) ?? 0;
+                  const replyBodyCollapsible = isReplyBodyCollapsible(reply) && !replySearchQuery;
+                  const replyBodyExpanded = expandedReplyIds.has(reply.id);
                   return (
                     <View
                       key={reply.id}
@@ -1738,6 +1765,9 @@ export default function MeguriBoardThreadScreen() {
                             <HighlightedText
                               linkify
                               highlightStyle={reply.mine ? styles.searchHighlightMine : null}
+                              numberOfLines={
+                                replyBodyCollapsible && !replyBodyExpanded ? REPLY_BODY_COLLAPSED_LINES : undefined
+                              }
                               query={replySearchQuery}
                               style={[
                                 styles.replyBody,
@@ -1746,6 +1776,25 @@ export default function MeguriBoardThreadScreen() {
                               ]}
                               text={reply.body}
                             />
+                            {replyBodyCollapsible ? (
+                              <Pressable
+                                accessibilityRole="button"
+                                onPress={() => toggleReplyBodyExpanded(reply.id)}
+                                style={[
+                                  styles.replyReadMoreButton,
+                                  reply.mine ? styles.replyReadMoreButtonMine : null,
+                                ]}
+                              >
+                                <Text
+                                  style={[
+                                    styles.replyReadMoreText,
+                                    reply.mine ? styles.replyReadMoreTextMine : null,
+                                  ]}
+                                >
+                                  {replyBodyExpanded ? "閉じる" : "続きを読む"}
+                                </Text>
+                              </Pressable>
+                            ) : null}
                             {!reply.deleted ? (
                               <AttachmentGrid
                                 compact
@@ -3358,6 +3407,28 @@ const styles = StyleSheet.create({
   replyBodyDeleted: {
     color: "rgba(58,50,74,0.48)",
     fontStyle: "italic",
+  },
+  replyReadMoreButton: {
+    alignItems: "center",
+    alignSelf: "flex-start",
+    backgroundColor: "rgba(166,149,216,0.12)",
+    borderRadius: 999,
+    marginTop: 7,
+    minHeight: 26,
+    justifyContent: "center",
+    paddingHorizontal: 10,
+  },
+  replyReadMoreButtonMine: {
+    alignSelf: "flex-end",
+    backgroundColor: "rgba(255,255,255,0.18)",
+  },
+  replyReadMoreText: {
+    color: megrumColors.lavender,
+    fontSize: 10.5,
+    fontWeight: "900",
+  },
+  replyReadMoreTextMine: {
+    color: "#fff",
   },
   replyTime: {
     color: megrumColors.mutedInk,
