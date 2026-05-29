@@ -3,6 +3,7 @@ const appJson = require("./app.json");
 const variant = process.env.APP_VARIANT || process.env.EXPO_PUBLIC_APP_VARIANT || "development";
 const isPreview = variant === "preview";
 const projectId = appJson.expo.extra.eas.projectId;
+const easUpdateProjectSlug = process.env.EAS_UPDATE_PROJECT_SLUG;
 
 module.exports = () => {
   const base = appJson.expo;
@@ -10,6 +11,7 @@ module.exports = () => {
   return {
     ...base,
     name: isPreview ? "Megrum Preview" : base.name,
+    slug: easUpdateProjectSlug || base.slug,
     scheme: isPreview ? "megrum-preview" : base.scheme,
     runtimeVersion: {
       policy: "appVersion",

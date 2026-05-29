@@ -4,6 +4,52 @@
 
 ---
 
+## イテレーション168.88：Preview OTA配信設定の復旧
+
+### 背景・問題意識
+
+オーナーから、TestFlightへ毎回Uploadするのではなく、直近のJS/TS変更をOTA配信で反映したいという依頼があった。EAS Update実行時に、既存TestFlightビルドへ埋め込まれている `extra.eas.projectId` はそのまま必要だが、Expo側の既存プロジェクトslugが旧名のため、現在の `slug: megrum` と不一致になり配信が止まっていた。
+
+### 変更内容
+
+#### `mobile/app.config.js`
+- 通常のアプリ設定では `slug: megrum` を維持したまま、EAS Update実行時だけ `EAS_UPDATE_PROJECT_SLUG` でslugを上書きできるようにした。
+- 既存TestFlightビルドに届くよう、今回は `EAS_UPDATE_PROJECT_SLUG=ihub` を指定して `preview` チャンネルへiOS OTA配信した。
+
+#### EAS Update
+- `preview` ブランチ / iOS / runtime `0.1.0` へOTA配信した。
+- Update group ID: `68a9389f-05f0-4d37-8619-b4fee1d9109b`
+- iOS update ID: `019e73f4-83dc-7101-97cf-635be78a59ec`
+- Dashboard: `https://expo.dev/accounts/mashima.bizz/projects/ihub/updates/68a9389f-05f0-4d37-8619-b4fee1d9109b`
+
+### 影響範囲
+
+- iOS版 Preview OTA配信
+- TestFlight配布済みの `tokyo.megrum.app.preview`
+- `preview` channel / runtime `0.1.0`
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `EXPO_NO_GIT_STATUS=1 EAS_UPDATE_PROJECT_SLUG=ihub npm --prefix mobile run update:ios:preview -- --message "[iter168.85-168.87] Preview OTA" --non-interactive`
+- `git diff --check -- mobile/app.config.js notes/08_design_iterations.md notes/10_glossary.md`
+
+### 関連ファイル
+
+- `mobile/app.config.js`
+- `notes/10_glossary.md`
+
+### セルフレビュー結果
+
+- ✅ 通常ビルド時のMegrum slugは維持
+- ✅ OTA配信時だけ既存EAS project slugへ合わせられる
+- ✅ iOS Preview / runtime `0.1.0` へOTA publish成功
+- ✅ 09更新診断：アプリ状態遷移は変えないため更新不要
+- ✅ 10更新診断：OTA配信の用語を追加
+- ✅ 05更新診断：DBスキーマ更新なし
+
+---
+
 ## イテレーション168.87：取引証跡撮影と通報導線の整理
 
 ### 背景・問題意識
