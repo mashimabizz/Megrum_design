@@ -4,6 +4,52 @@
 
 ---
 
+## イテレーション208：掲示板一覧に画像ありフィルタを追加
+
+### 背景・問題意識
+
+スレッド型掲示板では、写真付きの情報だけを素早く探したい場面がある。現地の列、落とし物、会場周辺の様子などは画像があると判断しやすいため、一覧で画像付きスレッドだけに絞れる表示フィルタを追加した。
+
+### 変更内容
+
+#### `mobile/app/meguri-board.tsx`
+- 掲示板一覧の並び替え操作の下に `画像あり` フィルタボタンを追加した。
+- `画像あり` が有効な時は、検索・カテゴリ・並び替え後の結果から添付画像があるスレッドだけを表示するようにした。
+- `条件をリセット` で `画像あり` フィルタも解除されるようにした。
+
+#### `notes/09_state_machines.md`
+- Meguri Board Lifecycle に画像ありフィルタの表示ルールを追記した。
+
+#### `notes/10_glossary.md`
+- 掲示板画像フィルタを追加した。
+
+### 影響範囲
+
+- iOS版 スポット掲示板一覧
+- 検索・カテゴリ・並び替え・結果サマリー
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- `EAS_UPDATE_PROJECT_SLUG=ihub EXPO_NO_GIT_STATUS=1 npm --prefix mobile run update:ios:preview -- --message "[iter208] add board media filter" --non-interactive`
+- Preview OTA: Update group `4a1e2cf3-e3bc-4aa4-b69a-3a9b7c3e509c` / iOS update `019e7581-9f12-7dc8-877b-67037a891f3e`
+
+### 関連ファイル
+
+- `mobile/app/meguri-board.tsx`
+- `notes/08_design_iterations.md`
+- `notes/09_state_machines.md`
+- `notes/10_glossary.md`
+
+### セルフレビュー結果
+
+- ✅ 既存の取得処理やDBには触れず、一覧上の表示フィルタとして追加した。
+- ✅ 検索・カテゴリ・並び替えと併用できるようにした。
+- ✅ `条件をリセット` で戻せるため、フィルタ状態が残り続けないようにした。
+
+---
+
 ## イテレーション207：掲示板一覧の画像枚数バッジを追加
 
 ### 背景・問題意識

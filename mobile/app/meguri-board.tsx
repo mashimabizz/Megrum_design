@@ -113,6 +113,7 @@ export default function MeguriBoardScreen() {
   const [categoryFilter, setCategoryFilter] = useState<MeguriBoardThreadCategory>("all");
   const [searchText, setSearchText] = useState("");
   const [sortMode, setSortMode] = useState<MeguriBoardThreadSort>("active");
+  const [mediaOnly, setMediaOnly] = useState(false);
   const [markingVisibleRead, setMarkingVisibleRead] = useState(false);
 
   const actor = useMemo<MeguriBoardActor>(
@@ -157,16 +158,20 @@ export default function MeguriBoardScreen() {
   );
 
   const visibleThreads = useMemo(
-    () =>
-      filterMeguriBoardThreads(threads, {
+    () => {
+      const filteredThreads = filterMeguriBoardThreads(threads, {
         category: categoryFilter,
         query: searchText,
         sort: sortMode,
-      }),
-    [categoryFilter, searchText, sortMode, threads],
+      });
+      return mediaOnly
+        ? filteredThreads.filter((thread) => thread.imageUris.length > 0)
+        : filteredThreads;
+    },
+    [categoryFilter, mediaOnly, searchText, sortMode, threads],
   );
   const hasActiveFilters =
-    categoryFilter !== "all" || !!searchText.trim() || sortMode !== "active";
+    categoryFilter !== "all" || !!searchText.trim() || sortMode !== "active" || mediaOnly;
 
   const sections = useMemo(
     () =>
@@ -375,6 +380,7 @@ export default function MeguriBoardScreen() {
     setCategoryFilter("all");
     setSearchText("");
     setSortMode("active");
+    setMediaOnly(false);
   }
 
   function closeComposer() {
@@ -749,6 +755,21 @@ export default function MeguriBoardScreen() {
               </Pressable>
             ))}
           </View>
+
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => setMediaOnly((current) => !current)}
+            style={[styles.mediaFilterButton, mediaOnly ? styles.mediaFilterButtonActive : null]}
+          >
+            <IconSymbol
+              name="camera-outline"
+              color={mediaOnly ? megrumColors.lavender : megrumColors.mutedInk}
+              size={14}
+            />
+            <Text style={[styles.mediaFilterText, mediaOnly ? styles.mediaFilterTextActive : null]}>
+              画像あり
+            </Text>
+          </Pressable>
 
           {!loading ? (
             <View style={styles.resultSummaryRow}>
@@ -1436,6 +1457,30 @@ const styles = StyleSheet.create({
   },
   sortButtonTextActive: {
     color: megrumColors.ink,
+  },
+  mediaFilterButton: {
+    alignItems: "center",
+    alignSelf: "flex-start",
+    backgroundColor: "#fff",
+    borderColor: "rgba(58,50,74,0.08)",
+    borderRadius: 999,
+    borderWidth: 1,
+    flexDirection: "row",
+    gap: 5,
+    minHeight: 34,
+    paddingHorizontal: 13,
+  },
+  mediaFilterButtonActive: {
+    backgroundColor: "rgba(166,149,216,0.14)",
+    borderColor: "rgba(166,149,216,0.42)",
+  },
+  mediaFilterText: {
+    color: megrumColors.mutedInk,
+    fontSize: 11.5,
+    fontWeight: "900",
+  },
+  mediaFilterTextActive: {
+    color: megrumColors.lavender,
   },
   resultSummaryRow: {
     alignItems: "center",
