@@ -4,6 +4,52 @@
 
 ---
 
+## イテレーション194：掲示板返信番号と作成者バッジを追加
+
+### 背景・問題意識
+
+掲示板スレッドでは、返信が増えた時に「何番の返信か」「スレッド作成者の発言か」を追えることが重要になる。一般的なスレッドUIとして、返信ごとの通し番号と作成者バッジを追加した。
+
+### 変更内容
+
+#### `mobile/app/meguri-board-thread.tsx`
+- 返信一覧に、スレッド内の通し番号 `#1` / `#2` ... を表示するようにした。
+- スレッド作成者による返信には `作成者` バッジを表示するようにした。
+- 検索で絞り込んだ場合も、番号は元スレッド内の通し番号を維持するようにした。
+
+#### `notes/09_state_machines.md`
+- Meguri Board Lifecycle に返信番号・作成者バッジの表示ルールを追記した。
+
+#### `notes/10_glossary.md`
+- 掲示板返信番号と掲示板作成者バッジを追加した。
+
+### 影響範囲
+
+- iOS版 スポット掲示板詳細
+- 返信一覧の読み返しUI・用語
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- `EAS_UPDATE_PROJECT_SLUG=ihub EXPO_NO_GIT_STATUS=1 npm --prefix mobile run update:ios:preview -- --message "[iter194] show board reply numbers" --non-interactive`
+- Preview OTA: Update group `a0df9987-8b4a-4dbb-8703-01660c53a1b7` / iOS update `019e754d-4fcb-7122-8876-e6e52a9e3317`
+
+### 関連ファイル
+
+- `mobile/app/meguri-board-thread.tsx`
+- `notes/08_design_iterations.md`
+- `notes/09_state_machines.md`
+- `notes/10_glossary.md`
+
+### セルフレビュー結果
+
+- ✅ 返信状態は変更せず、既存の返信配列から表示番号を派生した。
+- ✅ 検索結果でも元スレッドの番号を保ち、会話参照がずれないようにした。
+- ✅ 作成者バッジは `thread.authorId` と返信者IDの比較だけで判定し、追加DBなしで実装した。
+
+---
+
 ## イテレーション193：掲示板参加者別返信フィルタを追加
 
 ### 背景・問題意識
