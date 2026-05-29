@@ -4,6 +4,54 @@
 
 ---
 
+## イテレーション228：掲示板詳細にスレッド情報シートを追加
+
+### 背景・問題意識
+
+スレッドが伸びると、公開範囲、場所、作成日時、最終更新、返信数、参加者数などの基本情報を本文から読み取り直すのが面倒になる。一般的なスレッドUIとして、スレッドのメタ情報をまとめて確認できる情報シートを追加した。
+
+### 変更内容
+
+#### `mobile/app/meguri-board-thread.tsx`
+- スレッド詳細のアクション行に `情報` チップを追加した。
+- `情報` から、カテゴリ、公開範囲、場所、作成者、作成日時、最終更新、返信数、参加者数、画像数、参考数、保存数、閲覧数、状態を表示するシートを開けるようにした。
+- 日時表示用に `formatAbsoluteDateTime` を追加した。
+- 参加者数や画像数は既存の参加者集計・画像集約を使い回すようにした。
+
+#### `notes/09_state_machines.md`
+- Meguri Board Lifecycle にスレッド情報シートの表示ルールを追記した。
+
+#### `notes/10_glossary.md`
+- 掲示板スレッド情報シートを追加した。
+
+### 影響範囲
+
+- iOS版 スポット掲示板詳細
+- スレッドアクション行
+- スレッド詳細メタ情報
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- `EAS_UPDATE_PROJECT_SLUG=ihub EXPO_NO_GIT_STATUS=1 npm --prefix mobile run update:ios:preview -- --message "[iter228] add board thread info sheet" --non-interactive`
+- Preview OTA: Update group `32491449-ec57-4d54-a71c-d238c38ded9b` / iOS update `019e75d8-722b-7829-aaeb-6d691a42d62e`
+
+### 関連ファイル
+
+- `mobile/app/meguri-board-thread.tsx`
+- `notes/08_design_iterations.md`
+- `notes/09_state_machines.md`
+- `notes/10_glossary.md`
+
+### セルフレビュー結果
+
+- ✅ 既存のスレッド/返信集計データを使い、DB変更なしで情報確認導線を追加した。
+- ✅ 参加者・画像一覧と同じ下部シート文脈で表示し、画面構造を大きく変えないようにした。
+- ✅ ネイティブ依存追加なしで、Preview OTA対象内に収めた。
+
+---
+
 ## イテレーション227：返信アクションから投稿者別に絞り込めるようにする
 
 ### 背景・問題意識

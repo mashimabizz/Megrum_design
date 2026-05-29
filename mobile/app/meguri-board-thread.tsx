@@ -155,6 +155,7 @@ export default function MeguriBoardThreadScreen() {
   const [previousReadAt, setPreviousReadAt] = useState<number | null>(null);
   const [participantsOpen, setParticipantsOpen] = useState(false);
   const [mediaGalleryOpen, setMediaGalleryOpen] = useState(false);
+  const [threadInfoOpen, setThreadInfoOpen] = useState(false);
   const [threadBodyExpanded, setThreadBodyExpanded] = useState(false);
   const [replySortMode, setReplySortMode] = useState<BoardReplySortMode>("oldest");
   const [searchCursorIndex, setSearchCursorIndex] = useState(0);
@@ -361,6 +362,24 @@ export default function MeguriBoardThreadScreen() {
     });
     return attachments;
   }, [replies, replyNumberById, thread]);
+  const threadInfoRows = useMemo(() => {
+    if (!thread) return [];
+    return [
+      { label: "カテゴリ", value: meguriBoardCategoryLabel(thread.category) },
+      { label: "公開範囲", value: meguriBoardAudienceLabel(thread.audienceScope) },
+      { label: "場所", value: thread.spotLabel || thread.prefecture || "未設定" },
+      { label: "作成者", value: thread.authorName },
+      { label: "作成日時", value: formatAbsoluteDateTime(thread.createdAt) },
+      { label: "最終更新", value: formatAbsoluteDateTime(thread.latestActivityAt) },
+      { label: "返信", value: `${thread.replyCount}件` },
+      { label: "参加者", value: `${participants.length}人` },
+      { label: "画像", value: `${mediaAttachments.length}枚` },
+      { label: "参考", value: `${thread.reactionCount}件` },
+      { label: "保存", value: `${thread.bookmarkCount}件` },
+      { label: "閲覧", value: `${thread.viewCount}回` },
+      { label: "状態", value: thread.status === "locked" ? "締め切り" : "表示中" },
+    ];
+  }, [mediaAttachments.length, participants.length, thread]);
   const threadBodyCollapsible = (thread?.body.trim().length ?? 0) > 180;
   const hasReplyDraft = !!draft.trim() || draftImageUris.length > 0;
   const viewerMentionReplies = useMemo(
@@ -1339,6 +1358,14 @@ export default function MeguriBoardThreadScreen() {
                   </Pressable>
                   <Pressable
                     accessibilityRole="button"
+                    onPress={() => setThreadInfoOpen(true)}
+                    style={styles.threadActionPill}
+                  >
+                    <IconSymbol name="document-text-outline" color={megrumColors.mutedInk} size={15} />
+                    <Text style={styles.threadActionText}>情報</Text>
+                  </Pressable>
+                  <Pressable
+                    accessibilityRole="button"
                     onPress={() => setParticipantsOpen(true)}
                     style={styles.threadActionPill}
                   >
@@ -1965,6 +1992,48 @@ export default function MeguriBoardThreadScreen() {
         </Modal>
         <Modal
           animationType="slide"
+          onRequestClose={() => setThreadInfoOpen(false)}
+          transparent
+          visible={threadInfoOpen}
+        >
+          <View style={styles.modalOverlay}>
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => setThreadInfoOpen(false)}
+              style={StyleSheet.absoluteFill}
+            />
+            <View style={[styles.editorCard, styles.threadInfoCard]}>
+              <View style={styles.participantsHeader}>
+                <View style={styles.participantsTitleBlock}>
+                  <Text style={styles.editorEyebrow}>THREAD</Text>
+                  <Text style={styles.editorTitle}>スレッド情報</Text>
+                  <Text style={styles.participantsLead}>
+                    表示範囲、参加状況、更新状況をまとめて確認できます
+                  </Text>
+                </View>
+                <Pressable
+                  accessibilityRole="button"
+                  onPress={() => setThreadInfoOpen(false)}
+                  style={styles.participantsCloseButton}
+                >
+                  <IconSymbol name="close" color={megrumColors.mutedInk} size={16} />
+                </Pressable>
+              </View>
+              <View style={styles.threadInfoList}>
+                {threadInfoRows.map((row) => (
+                  <View key={row.label} style={styles.threadInfoRow}>
+                    <Text style={styles.threadInfoLabel}>{row.label}</Text>
+                    <Text numberOfLines={2} style={styles.threadInfoValue}>
+                      {row.value}
+                    </Text>
+                  </View>
+                ))}
+              </View>
+            </View>
+          </View>
+        </Modal>
+        <Modal
+          animationType="slide"
           onRequestClose={() => setThreadEditorOpen(false)}
           transparent
           visible={threadEditorOpen}
@@ -2404,6 +2473,15 @@ function formatRelativeTime(value: number) {
   if (hours < 24) return `${hours}時間前`;
   const days = Math.floor(hours / 24);
   return `${days}日前`;
+}
+
+function formatAbsoluteDateTime(value: number) {
+  return new Intl.DateTimeFormat("ja-JP", {
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    month: "numeric",
+  }).format(new Date(value));
 }
 
 function normalizeReplySearch(value: string | null | undefined) {
@@ -3615,6 +3693,37 @@ const styles = StyleSheet.create({
     color: megrumColors.lavender,
     fontSize: 10,
     fontWeight: "900",
+  },
+  threadInfoCard: {
+    maxHeight: "72%",
+  },
+  threadInfoList: {
+    backgroundColor: "rgba(251,249,252,0.72)",
+    borderRadius: 20,
+    gap: 1,
+    overflow: "hidden",
+  },
+  threadInfoRow: {
+    alignItems: "center",
+    backgroundColor: "rgba(255,255,255,0.82)",
+    flexDirection: "row",
+    gap: 12,
+    justifyContent: "space-between",
+    minHeight: 42,
+    paddingHorizontal: 13,
+    paddingVertical: 9,
+  },
+  threadInfoLabel: {
+    color: megrumColors.mutedInk,
+    fontSize: 11.5,
+    fontWeight: "900",
+  },
+  threadInfoValue: {
+    color: megrumColors.ink,
+    flex: 1,
+    fontSize: 12.5,
+    fontWeight: "900",
+    textAlign: "right",
   },
   mediaGalleryCard: {
     maxHeight: "78%",
