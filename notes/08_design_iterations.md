@@ -4,6 +4,55 @@
 
 ---
 
+## イテレーション235：掲示板参加者一覧を並び替えられるようにする
+
+### 背景・問題意識
+
+スポット掲示板の参加者が増えると、最近発言した人を見たい場合と、返信数が多い中心人物を見たい場合で探し方が変わる。参加者一覧に並び替えを追加し、会話の流れと発言量のどちらからでも参加者を追えるようにした。
+
+### 変更内容
+
+#### `mobile/app/meguri-board-thread.tsx`
+- `participantSortMode` と `PARTICIPANT_SORT_OPTIONS` を追加し、参加者一覧を `最近` / `返信数` で切り替えられるようにした。
+- 検索後の参加者一覧にも同じ並び替えを適用する `sortedParticipants` を追加した。
+- `最近` では作成者を優先しつつ最終活動順、`返信数` では返信数の多い順に並べるようにした。
+- 参加者一覧モーダルに、返信表示順と同じセグメントUIで並び替えボタンを追加した。
+
+#### `notes/09_state_machines.md`
+- Meguri Board Lifecycle に参加者一覧並び替えの表示ルールを追記した。
+
+#### `notes/10_glossary.md`
+- 掲示板参加者並び替えを追加した。
+
+### 影響範囲
+
+- iOS版 スポット掲示板詳細
+- 参加者一覧モーダル
+- 参加者検索
+- 参加者別返信フィルタ
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- `EAS_UPDATE_PROJECT_SLUG=ihub EXPO_NO_GIT_STATUS=1 npm --prefix mobile run update:ios:preview -- --message "[iter235] sort board participants" --non-interactive`
+- Preview OTA: Update group `35424857-bf53-4237-8015-fd39f235b211` / iOS update `019e7602-6374-75ca-9976-08136d8721ad`
+
+### 関連ファイル
+
+- `mobile/app/meguri-board-thread.tsx`
+- `notes/08_design_iterations.md`
+- `notes/09_state_machines.md`
+- `notes/10_glossary.md`
+
+### セルフレビュー結果
+
+- ✅ 既存の参加者検索と参加者別返信フィルタを維持し、表示順だけを切り替える実装にした。
+- ✅ 返信一覧の表示順UIと同じセグメント表現を使い、操作感を揃えた。
+- ✅ DB変更なし、ネイティブ依存追加なしでPreview OTA対象内に収めた。
+
+---
+
 ## イテレーション234：掲示板参加者一覧を検索できるようにする
 
 ### 背景・問題意識

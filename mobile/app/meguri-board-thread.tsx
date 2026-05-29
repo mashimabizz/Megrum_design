@@ -103,6 +103,7 @@ type BoardMediaAttachment = {
 };
 
 type BoardReplySortMode = "oldest" | "newest" | "popular";
+type BoardParticipantSortMode = "recent" | "replies";
 type ReplySearchSource =
   | { label: string; replyId?: string; type: "children" | "mention" | "mine" | "participant" }
   | null;
@@ -111,6 +112,11 @@ const REPLY_SORT_OPTIONS: { label: string; value: BoardReplySortMode }[] = [
   { label: "古い順", value: "oldest" },
   { label: "新着順", value: "newest" },
   { label: "参考順", value: "popular" },
+];
+
+const PARTICIPANT_SORT_OPTIONS: { label: string; value: BoardParticipantSortMode }[] = [
+  { label: "最近", value: "recent" },
+  { label: "返信数", value: "replies" },
 ];
 
 const INLINE_URL_PATTERN = /(https?:\/\/[^\s]+)/gi;
@@ -159,6 +165,7 @@ export default function MeguriBoardThreadScreen() {
   const [previousReadAt, setPreviousReadAt] = useState<number | null>(null);
   const [participantsOpen, setParticipantsOpen] = useState(false);
   const [participantSearchText, setParticipantSearchText] = useState("");
+  const [participantSortMode, setParticipantSortMode] = useState<BoardParticipantSortMode>("recent");
   const [mediaGalleryOpen, setMediaGalleryOpen] = useState(false);
   const [threadInfoOpen, setThreadInfoOpen] = useState(false);
   const [threadBodyExpanded, setThreadBodyExpanded] = useState(false);
@@ -374,6 +381,23 @@ export default function MeguriBoardThreadScreen() {
       return normalizeReplySearch(searchable).includes(participantSearchQuery);
     });
   }, [participantSearchQuery, participants]);
+
+  const sortedParticipants = useMemo(() => {
+    const next = [...filteredParticipants];
+    next.sort((left, right) => {
+      if (participantSortMode === "replies") {
+        const replyDiff = right.replyCount - left.replyCount;
+        if (replyDiff !== 0) return replyDiff;
+      } else if (left.isAuthor !== right.isAuthor) {
+        return left.isAuthor ? -1 : 1;
+      }
+      const activeDiff = right.lastActiveAt - left.lastActiveAt;
+      if (activeDiff !== 0) return activeDiff;
+      if (left.isAuthor !== right.isAuthor) return left.isAuthor ? -1 : 1;
+      return left.name.localeCompare(right.name, "ja");
+    });
+    return next;
+  }, [filteredParticipants, participantSortMode]);
 
   const mediaAttachments = useMemo<BoardMediaAttachment[]>(() => {
     if (!thread) return [];
@@ -2037,7 +2061,7 @@ export default function MeguriBoardThreadScreen() {
                   <Text style={styles.editorTitle}>参加者</Text>
                   <Text style={styles.participantsLead}>
                     {participantSearchQuery
-                      ? `${filteredParticipants.length}/${participants.length}人が該当しています`
+                      ? `${sortedParticipants.length}/${participants.length}人が該当しています`
                       : `${participants.length}人がこのスレッドに参加しています`}
                   </Text>
                   <Text style={styles.participantsHint}>
@@ -2071,17 +2095,39 @@ export default function MeguriBoardThreadScreen() {
                   </Pressable>
                 ) : null}
               </View>
+              <View style={styles.participantsSortSegment}>
+                {PARTICIPANT_SORT_OPTIONS.map((option) => {
+                  const active = participantSortMode === option.value;
+                  return (
+                    <Pressable
+                      accessibilityRole="button"
+                      key={option.value}
+                      onPress={() => setParticipantSortMode(option.value)}
+                      style={[styles.participantsSortOption, active ? styles.participantsSortOptionActive : null]}
+                    >
+                      <Text
+                        style={[
+                          styles.participantsSortOptionText,
+                          active ? styles.participantsSortOptionTextActive : null,
+                        ]}
+                      >
+                        {option.label}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
               <ScrollView
                 contentContainerStyle={styles.participantsList}
                 showsVerticalScrollIndicator={false}
               >
-                {filteredParticipants.length === 0 ? (
+                {sortedParticipants.length === 0 ? (
                   <View style={styles.participantsEmptyCard}>
                     <Text style={styles.participantsEmptyTitle}>該当する参加者がいません</Text>
                     <Text style={styles.participantsEmptyBody}>名前、@ID、エリアを変えて探してみてください。</Text>
                   </View>
                 ) : null}
-                {filteredParticipants.map((participant) => (
+                {sortedParticipants.map((participant) => (
                   <Pressable
                     accessibilityRole="button"
                     disabled={participant.replyCount === 0}
@@ -3913,6 +3959,31 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: "800",
     padding: 0,
+  },
+  participantsSortSegment: {
+    backgroundColor: "rgba(58,50,74,0.06)",
+    borderRadius: 999,
+    flexDirection: "row",
+    padding: 3,
+  },
+  participantsSortOption: {
+    alignItems: "center",
+    borderRadius: 999,
+    flex: 1,
+    minHeight: 30,
+    justifyContent: "center",
+  },
+  participantsSortOptionActive: {
+    backgroundColor: "#fff",
+    ...megrumShadow,
+  },
+  participantsSortOptionText: {
+    color: "rgba(58,50,74,0.54)",
+    fontSize: 11,
+    fontWeight: "900",
+  },
+  participantsSortOptionTextActive: {
+    color: megrumColors.lavender,
   },
   participantsList: {
     gap: 8,
