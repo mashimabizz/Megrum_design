@@ -4,6 +4,52 @@
 
 ---
 
+## イテレーション210：掲示板詳細に本文の続きを読むを追加
+
+### 背景・問題意識
+
+スポット掲示板では、長いスレッド本文が返信一覧や検索導線を押し下げることがある。一般的なスレッド詳細のように、長文は最初だけ折りたたみ、必要な時に全文を読めるようにした。
+
+### 変更内容
+
+#### `mobile/app/meguri-board-thread.tsx`
+- スレッド本文が長い場合、初期表示では5行までに制限した。
+- `続きを読む` / `閉じる` で本文の展開状態を切り替えられるようにした。
+- 別スレッドを開いた時は展開状態をリセットするようにした。
+
+#### `notes/09_state_machines.md`
+- Meguri Board Lifecycle に本文折りたたみ表示のルールを追記した。
+
+#### `notes/10_glossary.md`
+- 掲示板本文折りたたみを追加した。
+
+### 影響範囲
+
+- iOS版 スポット掲示板詳細
+- 長文スレッド本文の閲覧
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- `EAS_UPDATE_PROJECT_SLUG=ihub EXPO_NO_GIT_STATUS=1 npm --prefix mobile run update:ios:preview -- --message "[iter210] add board thread body read more" --non-interactive`
+- Preview OTA: Update group `072041f3-a7ae-44d6-8ac3-eafff0bd6a90` / iOS update `019e7588-3fed-7af2-92c5-dfe15fc03bbd`
+
+### 関連ファイル
+
+- `mobile/app/meguri-board-thread.tsx`
+- `notes/08_design_iterations.md`
+- `notes/09_state_machines.md`
+- `notes/10_glossary.md`
+
+### セルフレビュー結果
+
+- ✅ 長文時だけ表示し、短文スレッドには余計な操作を出さないようにした。
+- ✅ 展開状態は画面内表示だけに閉じ、DB変更なしで実装した。
+- ✅ DB変更やネイティブ依存追加なしで、Preview OTA対象内に収めた。
+
+---
+
 ## イテレーション209：掲示板カード長押しアクションを追加
 
 ### 背景・問題意識

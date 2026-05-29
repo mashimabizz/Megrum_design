@@ -145,6 +145,7 @@ export default function MeguriBoardThreadScreen() {
   const [previousReadAt, setPreviousReadAt] = useState<number | null>(null);
   const [participantsOpen, setParticipantsOpen] = useState(false);
   const [mediaGalleryOpen, setMediaGalleryOpen] = useState(false);
+  const [threadBodyExpanded, setThreadBodyExpanded] = useState(false);
   const [replySortMode, setReplySortMode] = useState<BoardReplySortMode>("oldest");
   const [searchCursorIndex, setSearchCursorIndex] = useState(0);
   const scrollViewRef = useRef<ScrollView | null>(null);
@@ -334,10 +335,15 @@ export default function MeguriBoardThreadScreen() {
     });
     return attachments;
   }, [replies, replyNumberById, thread]);
+  const threadBodyCollapsible = (thread?.body.trim().length ?? 0) > 180;
 
   useEffect(() => {
     setSearchCursorIndex(0);
   }, [replySearchQuery, replySortMode]);
+
+  useEffect(() => {
+    setThreadBodyExpanded(false);
+  }, [thread?.id]);
 
   useEffect(() => {
     if (sortedReplies.length === 0) {
@@ -1128,7 +1134,23 @@ export default function MeguriBoardThreadScreen() {
                   <Text style={styles.heroTime}>{formatRelativeTime(thread.createdAt)}</Text>
                 </View>
                 <Text style={styles.heroTitle}>{thread.title}</Text>
-                <Text style={styles.heroBody}>{thread.body}</Text>
+                <Text
+                  numberOfLines={threadBodyCollapsible && !threadBodyExpanded ? 5 : undefined}
+                  style={styles.heroBody}
+                >
+                  {thread.body}
+                </Text>
+                {threadBodyCollapsible ? (
+                  <Pressable
+                    accessibilityRole="button"
+                    onPress={() => setThreadBodyExpanded((current) => !current)}
+                    style={styles.heroReadMoreButton}
+                  >
+                    <Text style={styles.heroReadMoreText}>
+                      {threadBodyExpanded ? "閉じる" : "続きを読む"}
+                    </Text>
+                  </Pressable>
+                ) : null}
                 <AttachmentGrid imageUris={thread.imageUris} onPressImage={setImagePreviewUri} />
                 <Text style={styles.heroMeta}>
                   {meguriBoardAudienceMeta(thread)} · {thread.authorName}
@@ -2330,6 +2352,18 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: "700",
     lineHeight: 20,
+  },
+  heroReadMoreButton: {
+    alignSelf: "flex-start",
+    backgroundColor: "rgba(166,149,216,0.12)",
+    borderRadius: 999,
+    paddingHorizontal: 11,
+    paddingVertical: 6,
+  },
+  heroReadMoreText: {
+    color: megrumColors.lavender,
+    fontSize: 11,
+    fontWeight: "900",
   },
   attachmentGrid: {
     flexDirection: "row",
