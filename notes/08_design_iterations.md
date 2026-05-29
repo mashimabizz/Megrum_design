@@ -4,6 +4,49 @@
 
 ---
 
+## イテレーション168.99：左ドロワーを背面レイヤー化
+
+### 背景・問題意識
+
+オーナーから、左ドロワーを添付画像のように「ドロワーが下層にあり、元の画面が右へ動いて境界の端が丸くなる」デザインへ変更したいという依頼があった。あわせて、右スワイプ量に応じて元画面が白くホワイトアウトする動きと、ドロワー内テキストサイズを画像に近づける必要があった。
+
+### 変更内容
+
+#### `mobile/app/(tabs)/_layout.tsx`
+- 既存の前面オーバーレイドロワーをやめ、`ProfileDrawerShell` で `NativeTabs` 自体を前景レイヤーとして包む構造に変更した。
+- ドロワーを背面レイヤーとして常駐させ、左端スワイプで前景のタブ画面を右へスライドさせるようにした。
+- 前景画面の左上/左下角を開閉量に応じて大きく丸め、境界に奥行きが出るシャドウを付けた。
+- 開閉量に応じて前景画面の上に白いフェードを重ね、右へスワイプするほど元画面が白く薄れるようにした。
+- ドロワー内のメイン項目/コンパクト項目のアイコン・文字サイズ・行間を拡大し、添付画像の密度に近づけた。
+
+### 影響範囲
+
+- iOS版 全タブ画面
+- 左端スワイプで開くプロフィールドロワー
+- ドロワー内のプロフィール/設定/更新導線
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `git diff --check -- mobile/app/(tabs)/_layout.tsx notes/08_design_iterations.md`
+- `npm --prefix mobile run export:ios:preview`
+- `EAS_UPDATE_PROJECT_SLUG=ihub EXPO_NO_GIT_STATUS=1 npm --prefix mobile run update:ios:preview -- --message "[iter168.99] drawer layered swipe design" --non-interactive`
+  - Update group ID: `36b63d99-b298-47ff-b7b4-8d551a84ce68`
+  - iOS update ID: `019e7471-9254-7657-94fe-c1fdd346d951`
+
+### 関連ファイル
+
+- `mobile/app/(tabs)/_layout.tsx`
+
+### セルフレビュー結果
+
+- ✅ ドロワーを背面、タブ画面を前景として動かす構造に変更。
+- ✅ 前景画面の左境界に丸みとシャドウを付け、下層ドロワーらしい見え方へ調整。
+- ✅ スワイプ量に応じた白フェードを追加。
+- ✅ 状態遷移・用語・データモデル変更はないため、`notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要。
+
+---
+
 ## イテレーション168.98：読み込み骨格を実UI形状へ調整
 
 ### 背景・問題意識

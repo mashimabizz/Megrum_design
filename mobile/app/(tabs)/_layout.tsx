@@ -81,7 +81,7 @@ export default function TabLayout() {
   }
 
   return (
-    <>
+    <ProfileDrawerShell>
       <NativeTabs
         backgroundColor={null}
         blurEffect="systemDefault"
@@ -127,15 +127,15 @@ export default function TabLayout() {
         <NativeTabs.Trigger hidden name="notifications" />
         <NativeTabs.Trigger hidden name="profile" />
       </NativeTabs>
-      <ProfileDrawerOverlay />
-    </>
+    </ProfileDrawerShell>
   );
 }
 
-function ProfileDrawerOverlay() {
+function ProfileDrawerShell({ children }: { children: ReactNode }) {
   const { width } = useWindowDimensions();
-  const drawerWidth = Math.min(360, Math.max(300, width * 0.82));
-  const translateX = useRef(new Animated.Value(-drawerWidth)).current;
+  const drawerWidth = Math.min(380, Math.max(320, width * 0.9));
+  const openX = Math.min(drawerWidth - 34, width * 0.68);
+  const screenX = useRef(new Animated.Value(0)).current;
   const [visible, setVisible] = useState(false);
   const visibleRef = useRef(false);
 
@@ -145,24 +145,24 @@ function ProfileDrawerOverlay() {
 
   const openDrawer = () => {
     setVisible(true);
-    translateX.stopAnimation();
-    Animated.spring(translateX, {
-      toValue: 0,
-      damping: 24,
-      stiffness: 210,
+    screenX.stopAnimation();
+    Animated.spring(screenX, {
+      toValue: openX,
+      damping: 25,
+      stiffness: 190,
       mass: 0.82,
-      useNativeDriver: true,
+      useNativeDriver: false,
     }).start();
   };
 
   const closeDrawer = (afterClose?: () => void) => {
-    translateX.stopAnimation();
-    Animated.spring(translateX, {
-      toValue: -drawerWidth,
-      damping: 24,
-      stiffness: 210,
+    screenX.stopAnimation();
+    Animated.spring(screenX, {
+      toValue: 0,
+      damping: 25,
+      stiffness: 190,
       mass: 0.82,
-      useNativeDriver: true,
+      useNativeDriver: false,
     }).start(({ finished }) => {
       if (finished) {
         setVisible(false);
@@ -172,8 +172,8 @@ function ProfileDrawerOverlay() {
   };
 
   useEffect(() => {
-    translateX.setValue(visibleRef.current ? 0 : -drawerWidth);
-  }, [drawerWidth, translateX]);
+    screenX.setValue(visibleRef.current ? openX : 0);
+  }, [openX, screenX]);
 
   const edgePanResponder = useMemo(
     () =>
@@ -183,14 +183,14 @@ function ProfileDrawerOverlay() {
           gesture.dx > 5 && Math.abs(gesture.dx) > Math.abs(gesture.dy),
         onPanResponderGrant: () => {
           setVisible(true);
-          translateX.stopAnimation();
+          screenX.stopAnimation();
         },
         onPanResponderMove: (_event, gesture) => {
-          const next = Math.min(0, Math.max(-drawerWidth, -drawerWidth + gesture.dx));
-          translateX.setValue(next);
+          const next = Math.min(openX, Math.max(0, gesture.dx));
+          screenX.setValue(next);
         },
         onPanResponderRelease: (_event, gesture) => {
-          if (gesture.dx > drawerWidth * 0.24 || gesture.vx > 0.35) {
+          if (gesture.dx > openX * 0.24 || gesture.vx > 0.35) {
             openDrawer();
             return;
           }
@@ -198,56 +198,113 @@ function ProfileDrawerOverlay() {
         },
         onPanResponderTerminate: () => closeDrawer(),
       }),
-    [drawerWidth, translateX],
+    [openX, screenX],
   );
 
-  const drawerPanResponder = useMemo(
+  const foregroundPanResponder = useMemo(
     () =>
       PanResponder.create({
+        onMoveShouldSetPanResponderCapture: (_event, gesture) =>
+          visibleRef.current &&
+          Math.abs(gesture.dx) > 6 &&
+          Math.abs(gesture.dx) > Math.abs(gesture.dy),
         onMoveShouldSetPanResponder: (_event, gesture) =>
-          gesture.dx < -6 && Math.abs(gesture.dx) > Math.abs(gesture.dy),
+          visibleRef.current &&
+          Math.abs(gesture.dx) > 6 &&
+          Math.abs(gesture.dx) > Math.abs(gesture.dy),
+        onPanResponderGrant: () => {
+          screenX.stopAnimation();
+        },
         onPanResponderMove: (_event, gesture) => {
-          const next = Math.min(0, Math.max(-drawerWidth, gesture.dx));
-          translateX.setValue(next);
+          const next = Math.min(openX, Math.max(0, openX + gesture.dx));
+          screenX.setValue(next);
         },
         onPanResponderRelease: (_event, gesture) => {
-          if (gesture.dx < -drawerWidth * 0.22 || gesture.vx < -0.35) {
+          if (gesture.dx < -openX * 0.22 || gesture.vx < -0.35) {
             closeDrawer();
             return;
           }
           openDrawer();
         },
+        onPanResponderTerminate: () => openDrawer(),
       }),
-    [drawerWidth, translateX],
+    [openX, screenX],
   );
 
-  const backdropOpacity = translateX.interpolate({
-    inputRange: [-drawerWidth, 0],
-    outputRange: [0, 0.26],
+  const drawerOpacity = screenX.interpolate({
+    inputRange: [0, openX * 0.3, openX],
+    outputRange: [0, 1, 1],
+    extrapolate: "clamp",
+  });
+  const drawerParallax = screenX.interpolate({
+    inputRange: [0, openX],
+    outputRange: [-22, 0],
+    extrapolate: "clamp",
+  });
+  const whiteoutOpacity = screenX.interpolate({
+    inputRange: [0, openX],
+    outputRange: [0, 0.82],
+    extrapolate: "clamp",
+  });
+  const screenRadius = screenX.interpolate({
+    inputRange: [0, openX],
+    outputRange: [0, 68],
+    extrapolate: "clamp",
+  });
+  const screenShadowOpacity = screenX.interpolate({
+    inputRange: [0, openX],
+    outputRange: [0, 0.16],
     extrapolate: "clamp",
   });
 
   return (
-    <View pointerEvents="box-none" style={styles.drawerOverlayRoot}>
-      <View style={styles.edgeSwipeHandle} {...edgePanResponder.panHandlers} />
-      {visible ? (
-        <Animated.View
-          pointerEvents="auto"
-          style={[styles.drawerBackdrop, { opacity: backdropOpacity }]}
-        >
-          <Pressable style={StyleSheet.absoluteFill} onPress={() => closeDrawer()} />
-        </Animated.View>
-      ) : null}
+    <View style={styles.drawerShellRoot}>
       <Animated.View
         pointerEvents={visible ? "auto" : "none"}
         style={[
-          styles.profileDrawer,
-          { width: drawerWidth, transform: [{ translateX }] },
+          styles.drawerUnderlay,
+          {
+            opacity: drawerOpacity,
+            width: drawerWidth,
+            transform: [{ translateX: drawerParallax }],
+          },
         ]}
-        {...drawerPanResponder.panHandlers}
       >
         <ProfileDrawerContent onNavigate={closeDrawer} />
       </Animated.View>
+
+      <Animated.View
+        style={[
+          styles.drawerForeground,
+          {
+            borderBottomLeftRadius: screenRadius,
+            borderTopLeftRadius: screenRadius,
+            shadowOpacity: screenShadowOpacity,
+            transform: [{ translateX: screenX }],
+          },
+        ]}
+        {...foregroundPanResponder.panHandlers}
+      >
+        {children}
+        <Animated.View
+          pointerEvents="none"
+          style={[styles.drawerWhiteout, { opacity: whiteoutOpacity }]}
+        />
+        {visible ? (
+          <Pressable
+            accessibilityLabel="メニューを閉じる"
+            accessibilityRole="button"
+            style={StyleSheet.absoluteFill}
+            onPress={() => closeDrawer()}
+          />
+        ) : null}
+      </Animated.View>
+
+      <View
+        pointerEvents={visible ? "none" : "auto"}
+        style={styles.edgeSwipeHandle}
+        {...edgePanResponder.panHandlers}
+      />
     </View>
   );
 }
@@ -319,7 +376,7 @@ function ProfileDrawerContent({
   }
 
   return (
-    <View style={[styles.drawerContent, { paddingTop: insets.top + 20, paddingBottom: insets.bottom + 20 }]}>
+    <View style={[styles.drawerContent, { paddingTop: insets.top + 28, paddingBottom: insets.bottom + 20 }]}>
       <View style={styles.drawerProfile}>
         <View style={styles.drawerAvatar}>
           {avatarUrl ? (
@@ -400,7 +457,7 @@ function DrawerItem({
         pressed ? styles.drawerItemPressed : null,
       ]}
     >
-      <IconSymbol name={icon} color={megrumColors.ink} size={compact ? 18 : 24} />
+      <IconSymbol name={icon} color={megrumColors.ink} size={compact ? 24 : 31} />
       <Text style={[styles.drawerItemText, compact ? styles.drawerItemTextCompact : null]}>
         {label}
       </Text>
@@ -414,42 +471,47 @@ function stringMeta(value: unknown) {
 }
 
 const styles = StyleSheet.create({
-  drawerOverlayRoot: {
-    ...StyleSheet.absoluteFillObject,
-    zIndex: 40,
+  drawerShellRoot: {
+    backgroundColor: megrumColors.surface,
+    flex: 1,
   },
   edgeSwipeHandle: {
     bottom: 0,
     left: 0,
     position: "absolute",
     top: 0,
-    width: 22,
-    zIndex: 20,
+    width: 24,
+    zIndex: 40,
   },
-  drawerBackdrop: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: megrumColors.ink,
-    zIndex: 30,
-  },
-  profileDrawer: {
+  drawerUnderlay: {
     backgroundColor: megrumColors.surface,
     bottom: 0,
     left: 0,
     position: "absolute",
     top: 0,
-    zIndex: 31,
+    zIndex: 1,
+  },
+  drawerForeground: {
+    backgroundColor: megrumColors.background,
+    flex: 1,
+    overflow: "hidden",
     shadowColor: megrumColors.ink,
-    shadowOffset: { width: 18, height: 0 },
-    shadowOpacity: 0.18,
-    shadowRadius: 28,
+    shadowOffset: { width: -18, height: 0 },
+    shadowRadius: 32,
+    zIndex: 2,
+  },
+  drawerWhiteout: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "#fff",
+    zIndex: 3,
   },
   drawerContent: {
     flex: 1,
-    paddingHorizontal: 26,
+    paddingHorizontal: 30,
   },
   drawerProfile: {
     gap: 5,
-    marginBottom: 26,
+    marginBottom: 30,
   },
   drawerAvatar: {
     alignItems: "center",
@@ -472,38 +534,38 @@ const styles = StyleSheet.create({
   },
   drawerName: {
     color: megrumColors.ink,
-    fontSize: 24,
+    fontSize: 26,
     fontWeight: "900",
     letterSpacing: 0,
   },
   drawerHandle: {
     color: megrumColors.mutedInk,
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: "800",
   },
   drawerArea: {
     color: megrumColors.ink,
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: "800",
     marginTop: 6,
   },
   drawerMenu: {
-    gap: 11,
+    gap: 14,
   },
   drawerMenuCompact: {
-    gap: 7,
+    gap: 10,
   },
   drawerItem: {
     alignItems: "center",
-    borderRadius: 16,
+    borderRadius: 20,
     flexDirection: "row",
-    gap: 20,
-    minHeight: 50,
+    gap: 28,
+    minHeight: 58,
     paddingHorizontal: 3,
   },
   drawerItemCompact: {
-    gap: 16,
-    minHeight: 42,
+    gap: 24,
+    minHeight: 48,
   },
   drawerItemPressed: {
     backgroundColor: "rgba(58,50,74,0.05)",
@@ -513,7 +575,8 @@ const styles = StyleSheet.create({
   },
   drawerItemText: {
     color: megrumColors.ink,
-    fontSize: 24,
+    flexShrink: 0,
+    fontSize: 25,
     fontWeight: "900",
     letterSpacing: 0,
   },
@@ -521,12 +584,12 @@ const styles = StyleSheet.create({
     marginLeft: "auto",
   },
   drawerItemTextCompact: {
-    fontSize: 17,
+    fontSize: 19,
     fontWeight: "800",
   },
   drawerDivider: {
     backgroundColor: "rgba(58,50,74,0.12)",
     height: StyleSheet.hairlineWidth,
-    marginVertical: 24,
+    marginVertical: 28,
   },
 });
