@@ -4,6 +4,51 @@
 
 ---
 
+## イテレーション189：掲示板詳細に最新返信ジャンプを追加
+
+### 背景・問題意識
+
+スポット掲示板の返信数が増えると、スレッド本文や古い返信から最新の会話位置へ戻る操作が必要になる。一般的なスレッド機能として、詳細画面で最新返信へすぐ移動できる導線を追加した。
+
+### 変更内容
+
+#### `mobile/app/meguri-board-thread.tsx`
+- スレッド詳細の `ScrollView` に ref を持たせ、`scrollToEnd()` で最新位置へ移動できるようにした。
+- 返信ヘッダー右側に `最新へ` ボタンを追加した。
+- 自分が返信を送信した直後、自動で最新返信位置へスクロールするようにした。
+
+#### `notes/09_state_machines.md`
+- Meguri Board Lifecycle に最新返信ジャンプの表示ルールを追記した。
+
+#### `notes/10_glossary.md`
+- 掲示板最新返信ジャンプを追加した。
+
+### 影響範囲
+
+- iOS版 スポット掲示板詳細
+- 掲示板の表示ルール・用語
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- `EAS_UPDATE_PROJECT_SLUG=ihub EXPO_NO_GIT_STATUS=1 npm --prefix mobile run update:ios:preview -- --message "[iter189] add board latest reply jump" --non-interactive`
+- Preview OTA: Update group `f6c08039-75a2-438a-b6bb-1f7a1b163fb5` / iOS update `019e7536-acb8-7539-af77-8268ea3d1907`
+
+### 関連ファイル
+
+- `mobile/app/meguri-board-thread.tsx`
+- `notes/08_design_iterations.md`
+- `notes/09_state_machines.md`
+- `notes/10_glossary.md`
+
+### セルフレビュー結果
+
+- ✅ 新しいネイティブ依存を追加せず、既存のScrollViewで実装した。
+- ✅ 返信数が0件の時はボタンを表示しないようにした。
+
+---
+
 ## イテレーション188：掲示板に参加中スレッド表示を追加
 
 ### 背景・問題意識

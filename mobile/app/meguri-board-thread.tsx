@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Constants from "expo-constants";
 import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
 import * as ImagePicker from "expo-image-picker";
@@ -109,6 +109,7 @@ export default function MeguriBoardThreadScreen() {
   const [replyEditor, setReplyEditor] = useState<MeguriBoardReply | null>(null);
   const [replyEditBody, setReplyEditBody] = useState("");
   const [imagePreviewUri, setImagePreviewUri] = useState<string | null>(null);
+  const scrollViewRef = useRef<ScrollView | null>(null);
 
   const actor = useMemo<MeguriBoardActor>(
     () => ({
@@ -165,6 +166,12 @@ export default function MeguriBoardThreadScreen() {
       ).includes(query),
     );
   }, [replies, replySearchText]);
+
+  function scrollToLatestReply(animated = true) {
+    requestAnimationFrame(() => {
+      scrollViewRef.current?.scrollToEnd({ animated });
+    });
+  }
 
   const refreshDetail = useCallback(async (options: { silent?: boolean } = {}) => {
     if (!threadId) {
@@ -315,6 +322,7 @@ export default function MeguriBoardThreadScreen() {
           }
         : current,
     );
+    setTimeout(() => scrollToLatestReply(), 80);
   }
 
   async function pickDraftImages() {
@@ -805,6 +813,7 @@ export default function MeguriBoardThreadScreen() {
         ) : (
           <>
             <ScrollView
+              ref={scrollViewRef}
               contentContainerStyle={[
                 styles.content,
                 {
@@ -885,7 +894,20 @@ export default function MeguriBoardThreadScreen() {
 
               <View style={styles.replyHeaderRow}>
                 <Text style={styles.replySectionTitle}>返信</Text>
-                <Text style={styles.replyCountMeta}>{replies.length}件</Text>
+                <View style={styles.replyHeaderActions}>
+                  <Text style={styles.replyCountMeta}>{replies.length}件</Text>
+                  {replies.length > 0 ? (
+                    <Pressable
+                      accessibilityRole="button"
+                      hitSlop={8}
+                      onPress={() => scrollToLatestReply()}
+                      style={styles.latestReplyButton}
+                    >
+                      <Text style={styles.latestReplyButtonText}>最新へ</Text>
+                      <IconSymbol name="chevron-down" color={megrumColors.lavender} size={13} />
+                    </Pressable>
+                  ) : null}
+                </View>
               </View>
               <View style={styles.replySearchBox}>
                 <IconSymbol name="search" color="rgba(58,50,74,0.42)" size={15} />
@@ -1704,10 +1726,29 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     marginTop: 6,
   },
+  replyHeaderActions: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 8,
+  },
   replyCountMeta: {
     color: megrumColors.mutedInk,
     fontSize: 11.5,
     fontWeight: "800",
+  },
+  latestReplyButton: {
+    alignItems: "center",
+    backgroundColor: "rgba(166,149,216,0.12)",
+    borderRadius: 999,
+    flexDirection: "row",
+    gap: 3,
+    minHeight: 26,
+    paddingHorizontal: 9,
+  },
+  latestReplyButtonText: {
+    color: megrumColors.lavender,
+    fontSize: 11,
+    fontWeight: "900",
   },
   replySearchBox: {
     alignItems: "center",
