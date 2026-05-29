@@ -2124,17 +2124,25 @@ export default function MeguriBoardThreadScreen() {
                               <IconSymbol name="create-outline" color={megrumColors.mutedInk} size={13} />
                               <Text style={styles.replyActionText}>返信する</Text>
                             </Pressable>
-                            {reply.bookmarked ? (
-                              <Pressable
-                                accessibilityRole="button"
-                                disabled={reply.deleted}
-                                onPress={() => toggleReplyBookmark(reply)}
-                                style={[styles.replyActionPill, styles.replyActionPillActive]}
-                              >
-                                <IconSymbol name="star-outline" color={megrumColors.lavender} size={13} />
-                                <Text style={[styles.replyActionText, styles.replyActionTextActive]}>保存</Text>
-                              </Pressable>
-                            ) : null}
+                            <Pressable
+                              accessibilityRole="button"
+                              disabled={reply.deleted}
+                              onPress={() => toggleReplyBookmark(reply)}
+                              style={[
+                                styles.replyActionPill,
+                                reply.bookmarked ? styles.replyActionPillActive : null,
+                                reply.deleted ? styles.replyActionPillDisabled : null,
+                              ]}
+                            >
+                              <IconSymbol
+                                name="star-outline"
+                                color={reply.bookmarked ? megrumColors.lavender : megrumColors.mutedInk}
+                                size={13}
+                              />
+                              <Text style={[styles.replyActionText, reply.bookmarked ? styles.replyActionTextActive : null]}>
+                                {reply.bookmarked ? "保存済み" : "保存"}
+                              </Text>
+                            </Pressable>
                             {childReplyCount > 0 ? (
                               <Pressable
                                 accessibilityRole="button"

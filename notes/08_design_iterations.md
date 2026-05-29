@@ -4,6 +4,53 @@
 
 ---
 
+## イテレーション243：掲示板返信の保存ボタンを常に見えるようにする
+
+### 背景・問題意識
+
+スポット掲示板では、あとで読み返したい列情報や現地メモを返信単位で保存できる。ただし保存操作がメニュー内中心だと、一般的なスレッドのブックマークに比べて発見しづらいため、各返信のアクション列に保存ボタンを常時表示するようにした。
+
+### 変更内容
+
+#### `mobile/app/meguri-board-thread.tsx`
+- 各返信のアクション列に `保存` ボタンを常時表示するようにした。
+- 保存済みの場合は `保存済み` 表記とアクティブ色に切り替えるようにした。
+- 削除済み返信では保存操作を無効化し、既存の返信保存状態更新処理をそのまま利用した。
+
+#### `notes/09_state_machines.md`
+- Meguri Board Lifecycle に返信保存ボタンの表示ルールを追記した。
+
+#### `notes/10_glossary.md`
+- 掲示板返信保存ボタンを追加した。
+
+### 影響範囲
+
+- iOS版 スポット掲示板詳細
+- 返信アクション列
+- 返信保存/保存解除の発見性
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- `EAS_UPDATE_PROJECT_SLUG=ihub EXPO_NO_GIT_STATUS=1 npm --prefix mobile run update:ios:preview -- --message "[iter243] show board reply save action" --non-interactive`
+- Preview OTA: Update group `a3512293-4f2b-463d-9867-98b0397dccbf` / iOS update `019e7629-715e-73a8-9d11-f5db85599fb8`
+
+### 関連ファイル
+
+- `mobile/app/meguri-board-thread.tsx`
+- `notes/08_design_iterations.md`
+- `notes/09_state_machines.md`
+- `notes/10_glossary.md`
+
+### セルフレビュー結果
+
+- ✅ 既存の `toggleReplyBookmark` を再利用し、保存状態の永続化経路を変えずに見える導線だけを増やした。
+- ✅ 保存済み/未保存が一目で分かる表記にした。
+- ✅ DB変更なし、ネイティブ依存追加なしでPreview OTA対象内に収めた。
+
+---
+
 ## イテレーション242：掲示板更新後に新着返信へ移動できるようにする
 
 ### 背景・問題意識
