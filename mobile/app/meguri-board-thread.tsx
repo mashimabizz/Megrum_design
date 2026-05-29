@@ -1,4 +1,5 @@
 import { useCallback, useMemo, useState } from "react";
+import Constants from "expo-constants";
 import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
 import * as ImagePicker from "expo-image-picker";
 import {
@@ -10,6 +11,7 @@ import {
   Platform,
   Pressable,
   ScrollView,
+  Share,
   StyleSheet,
   Text,
   TextInput,
@@ -469,6 +471,16 @@ export default function MeguriBoardThreadScreen() {
     setSendError(null);
   }
 
+  async function shareThread() {
+    if (!thread) return;
+    const url = buildThreadShareUrl(thread, viewerContext, viewMode);
+    await Share.share({
+      message: `${thread.title}\n${thread.body}\n${url}`,
+      title: thread.title,
+      url,
+    });
+  }
+
   function openThreadActions() {
     if (!thread) return;
     const actions: Array<{ disabled?: boolean; destructive?: boolean; label: string; run?: () => void }> = [];
@@ -483,6 +495,7 @@ export default function MeguriBoardThreadScreen() {
       );
     }
     actions.push(
+      { label: "共有する", run: () => void shareThread() },
       { label: thread.bookmarked ? "保存を解除" : "保存する", run: () => void toggleThreadBookmark() },
       { label: thread.reacted ? "参考になったを取り消す" : "参考になった", run: () => void toggleThreadReaction() },
       {
@@ -1121,6 +1134,28 @@ function buildViewerContext(input: {
 
 function normalizeViewMode(value: string | null | undefined): MeguriBoardViewMode {
   return value === "same_prefecture" ? "same_prefecture" : "nearby_3km";
+}
+
+function buildThreadShareUrl(
+  thread: MeguriBoardThread,
+  viewer: MeguriBoardViewerContext,
+  viewMode: MeguriBoardViewMode,
+) {
+  const params = new URLSearchParams({
+    id: thread.id,
+    prefecture: viewer.prefecture ?? "",
+    spotKey: viewer.spotKey ?? "",
+    spotLabel: viewer.spotLabel ?? "",
+    viewMode,
+  });
+  return `${getAppScheme()}://meguri-board-thread?${params.toString()}`;
+}
+
+function getAppScheme() {
+  const configuredScheme = Constants.expoConfig?.scheme;
+  if (Array.isArray(configuredScheme) && configuredScheme[0]) return configuredScheme[0];
+  if (typeof configuredScheme === "string" && configuredScheme) return configuredScheme;
+  return Constants.expoConfig?.extra?.appVariant === "preview" ? "megrum-preview" : "megrum";
 }
 
 function slugify(value: string) {

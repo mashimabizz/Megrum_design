@@ -4,7 +4,7 @@
 > 新環境（別Claudeセッション・別エンジニア）でも、これだけ読めばコンテキストがつかめる。
 
 最終更新: 2026-05-30
-ステータス: Draft v1.7（iter176 掲示板画像添付を反映）
+ステータス: Draft v1.8（iter177 スレッド共有を反映）
 
 ---
 
@@ -191,6 +191,7 @@
 | **掲示板返信通知** | board reply notification | 購読中のスレッドに自分以外が返信した時に作成される通知。`notifications.kind='meguri_board_reply'` を使い、通知タップで該当スレッドを開く | iter174 |
 | **掲示板メンション** | board mention, @handle | スポット掲示板の返信本文で `@handle` を書き、特定ユーザーへ気づいてもらうための機能。本人以外かつ閲覧可能な相手に `notifications.kind='meguri_board_mention'` を作る | iter175 |
 | **掲示板画像添付** | board image attachment | スポット掲示板のスレッドまたは返信に最大4枚まで添付できる画像。private Storage path をDBに保存し、閲覧可能な時だけ署名URLで表示する | iter176 |
+| **スレッド共有** | thread share | スポット掲示板のスレッドをiOS標準共有シートで共有する機能。タイトル・本文・アプリ内deep linkを渡す | iter177 |
 
 ## G. 画面識別子
 

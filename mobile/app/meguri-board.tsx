@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import Constants from "expo-constants";
 import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
 import SegmentedControl from "@react-native-segmented-control/segmented-control";
 import * as ImagePicker from "expo-image-picker";
@@ -11,6 +12,7 @@ import {
   Platform,
   Pressable,
   ScrollView,
+  Share,
   StyleSheet,
   Text,
   TextInput,
@@ -401,8 +403,18 @@ export default function MeguriBoardScreen() {
     Alert.alert("通報しました", "確認して対応します。");
   }
 
+  async function shareThread(thread: MeguriBoardThread) {
+    const url = buildThreadShareUrl(thread, viewerContext, viewMode);
+    await Share.share({
+      message: `${thread.title}\n${thread.body}\n${url}`,
+      title: thread.title,
+      url,
+    });
+  }
+
   function openThreadActions(thread: MeguriBoardThread) {
     const labels = [
+      "共有する",
       thread.bookmarked ? "保存を解除" : "保存する",
       thread.reacted ? "参考になったを取り消す" : "参考になった",
       thread.subscribed ? "通知を止める" : "通知を受け取る",
@@ -413,23 +425,24 @@ export default function MeguriBoardScreen() {
     if (Platform.OS === "ios") {
       ActionSheetIOS.showActionSheetWithOptions(
         {
-          cancelButtonIndex: 5,
-          destructiveButtonIndex: 3,
-          disabledButtonIndices: thread.reported ? [4] : undefined,
+          cancelButtonIndex: 6,
+          destructiveButtonIndex: 4,
+          disabledButtonIndices: thread.reported ? [5] : undefined,
           options: labels,
           title: thread.title,
         },
         (index) => {
-          if (index === 0) void toggleThreadBookmark(thread);
-          if (index === 1) void toggleThreadReaction(thread);
-          if (index === 2) void toggleThreadSubscription(thread);
-          if (index === 3) void hideThread(thread);
-          if (index === 4 && !thread.reported) void reportThread(thread);
+          if (index === 0) void shareThread(thread);
+          if (index === 1) void toggleThreadBookmark(thread);
+          if (index === 2) void toggleThreadReaction(thread);
+          if (index === 3) void toggleThreadSubscription(thread);
+          if (index === 4) void hideThread(thread);
+          if (index === 5 && !thread.reported) void reportThread(thread);
         },
       );
       return;
     }
-    void toggleThreadBookmark(thread);
+    void shareThread(thread);
   }
 
   return (
@@ -968,6 +981,28 @@ function readParam(value: string | string[] | undefined) {
 
 function slugify(value: string) {
   return value.toLowerCase().replace(/\s+/g, "-");
+}
+
+function buildThreadShareUrl(
+  thread: MeguriBoardThread,
+  viewer: MeguriBoardViewerContext,
+  viewMode: MeguriBoardViewMode,
+) {
+  const params = new URLSearchParams({
+    id: thread.id,
+    prefecture: viewer.prefecture ?? "",
+    spotKey: viewer.spotKey ?? "",
+    spotLabel: viewer.spotLabel ?? "",
+    viewMode,
+  });
+  return `${getAppScheme()}://meguri-board-thread?${params.toString()}`;
+}
+
+function getAppScheme() {
+  const configuredScheme = Constants.expoConfig?.scheme;
+  if (Array.isArray(configuredScheme) && configuredScheme[0]) return configuredScheme[0];
+  if (typeof configuredScheme === "string" && configuredScheme) return configuredScheme;
+  return Constants.expoConfig?.extra?.appVariant === "preview" ? "megrum-preview" : "megrum";
 }
 
 function formatRelativeTime(value: number) {

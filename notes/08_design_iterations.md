@@ -4,6 +4,53 @@
 
 ---
 
+## イテレーション177：掲示板スレッド共有を追加
+
+### 背景・問題意識
+
+スポット掲示板で有用な現地情報が出た時、友達や同行者へスレッドを渡せる導線が必要。一般的なスレッド機能として、iOS標準の共有シートからスレッドタイトル・本文・アプリ内リンクを共有できるようにした。
+
+### 変更内容
+
+#### `mobile/app/meguri-board.tsx`
+- スレッド一覧カードのアクションシートに「共有する」を追加した。
+- 共有時は現在の `viewMode` と掲示板コンテキストを含めた `megrum://` / `megrum-preview://` deep link を生成するようにした。
+
+#### `mobile/app/meguri-board-thread.tsx`
+- スレッド詳細のアクションシートに「共有する」を追加した。
+- iOS標準の `Share.share` で、スレッドタイトル・本文・deep link を共有するようにした。
+
+#### `notes/10_glossary.md`
+- スレッド共有を追加した。
+
+### 影響範囲
+
+- iOS版 スポット掲示板一覧
+- iOS版 スポット掲示板詳細
+- 掲示板の用語
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- `EAS_UPDATE_PROJECT_SLUG=ihub EXPO_NO_GIT_STATUS=1 npm --prefix mobile run update:ios:preview -- --message "[iter177] add board sharing" --non-interactive`
+- Preview OTA: Update group `7aab9b26-db4c-480e-a549-49fc26a37219` / iOS update `019e74f3-e0f7-7d6c-97f2-054645f98499`
+
+### 関連ファイル
+
+- `mobile/app/meguri-board.tsx`
+- `mobile/app/meguri-board-thread.tsx`
+- `notes/08_design_iterations.md`
+- `notes/10_glossary.md`
+
+### セルフレビュー結果
+
+- ✅ iOS標準の共有シートを使い、独自共有UIを増やしていない。
+- ✅ Preview/本番で scheme が切り替わるようにした。
+- ✅ スレッドの閲覧範囲判定は既存詳細画面側に委ね、共有自体で状態を変えない。
+
+---
+
 ## イテレーション176：掲示板画像添付を追加
 
 ### 背景・問題意識
