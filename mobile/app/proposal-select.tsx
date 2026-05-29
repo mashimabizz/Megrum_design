@@ -270,6 +270,8 @@ export default function ProposalSelectScreen() {
   const [profileInventoryScope, setProfileInventoryScope] =
     useState<ProfileProposalInventoryScope | null>(null);
   const [profileInventoryLoading, setProfileInventoryLoading] = useState(false);
+  const [profileInventoryInitialLoading, setProfileInventoryInitialLoading] =
+    useState<ProfileInventoryLoadingMore>({ give: false, receive: false });
   const [profileInventoryLoadingMore, setProfileInventoryLoadingMore] =
     useState<ProfileInventoryLoadingMore>({ give: false, receive: false });
   const [profileInventoryOffsets, setProfileInventoryOffsets] =
@@ -512,6 +514,7 @@ export default function ProposalSelectScreen() {
     if (!usesProfileInventory) {
       setProfileInventoryScope(null);
       setProfileInventoryLoading(false);
+      setProfileInventoryInitialLoading({ give: false, receive: false });
       setProfileInventoryLoadingMore({ give: false, receive: false });
       setProfileInventoryOffsets({ give: 0, receive: 0 });
       setProfileInventoryError(null);
@@ -520,6 +523,7 @@ export default function ProposalSelectScreen() {
     if (!supabase || !effectivePartnerIdParam) {
       setProfileInventoryScope(null);
       setProfileInventoryLoadingMore({ give: false, receive: false });
+      setProfileInventoryInitialLoading({ give: false, receive: false });
       setProfileInventoryOffsets({ give: 0, receive: 0 });
       setProfileInventoryError(null);
       return;
@@ -527,6 +531,7 @@ export default function ProposalSelectScreen() {
     if (!authUser) {
       setProfileInventoryScope(null);
       setProfileInventoryLoading(false);
+      setProfileInventoryInitialLoading({ give: false, receive: false });
       setProfileInventoryLoadingMore({ give: false, receive: false });
       setProfileInventoryOffsets({ give: 0, receive: 0 });
       setProfileInventoryError("ログイン状態を確認してください");
@@ -540,6 +545,7 @@ export default function ProposalSelectScreen() {
         receiveHasMore: false,
       });
       setProfileInventoryLoading(false);
+      setProfileInventoryInitialLoading({ give: false, receive: false });
       setProfileInventoryLoadingMore({ give: false, receive: false });
       setProfileInventoryOffsets({ give: 0, receive: 0 });
       setProfileInventoryError("相手情報を読み直してください");
@@ -548,50 +554,34 @@ export default function ProposalSelectScreen() {
 
     let active = true;
     setProfileInventoryLoading(true);
+    setProfileInventoryInitialLoading({ give: true, receive: true });
     setProfileInventoryLoadingMore({ give: false, receive: false });
     setProfileInventoryOffsets({ give: 0, receive: 0 });
     setProfileInventoryError(null);
+    setProfileInventoryScope({
+      giveIds: initialGiveNeedsInventory ? [] : candidateGiveIds,
+      receiveIds: initialReceiveNeedsInventory ? [] : candidateReceiveIds,
+      giveHasMore: false,
+      receiveHasMore: false,
+    });
 
     void (async () => {
       try {
-        const [
-          selectedGiveRows,
-          selectedReceiveRows,
-          firstGiveRows,
-          firstReceiveRows,
-        ] = await Promise.all([
-          fetchProposalInventoryRowsByIds(candidateGiveIds, authUser.id),
-          fetchProposalInventoryRowsByIds(candidateReceiveIds, effectivePartnerIdParam),
-          fetchProposalInventoryRowsForUser(authUser.id, 0),
-          authUser.id === effectivePartnerIdParam
-            ? Promise.resolve<ScopedProposalInventoryRow[]>([])
-            : fetchProposalInventoryRowsForUser(effectivePartnerIdParam, 0),
+        await Promise.all([
+          loadInitialProfileInventorySide("give", {
+            active: () => active,
+            candidateIds: candidateGiveIds,
+            includeInventory: initialGiveNeedsInventory,
+            ownerId: authUser.id,
+          }),
+          loadInitialProfileInventorySide("receive", {
+            active: () => active,
+            candidateIds: candidateReceiveIds,
+            includeInventory: initialReceiveNeedsInventory,
+            ownerId: effectivePartnerIdParam,
+            skipPagedRows: authUser.id === effectivePartnerIdParam,
+          }),
         ]);
-        const giveRows = mergeInventoryRows(selectedGiveRows, firstGiveRows);
-        const receiveRows = mergeInventoryRows(
-          selectedReceiveRows,
-          firstReceiveRows,
-        );
-        const rows = [...giveRows, ...receiveRows];
-
-        if (!active) return;
-        setCatalogOverrides(buildProposalCatalogOverrides(rows));
-        setProfileInventoryOffsets({
-          give: PROFILE_INVENTORY_PAGE_SIZE,
-          receive: PROFILE_INVENTORY_PAGE_SIZE,
-        });
-        setProfileInventoryScope({
-          giveIds: initialGiveNeedsInventory
-            ? uniqueStrings(giveRows.map((row) => row.id))
-            : candidateGiveIds,
-          receiveIds: initialReceiveNeedsInventory
-            ? uniqueStrings(receiveRows.map((row) => row.id))
-            : candidateReceiveIds,
-          giveHasMore: firstGiveRows.length === PROFILE_INVENTORY_PAGE_SIZE,
-          receiveHasMore:
-            authUser.id !== effectivePartnerIdParam &&
-            firstReceiveRows.length === PROFILE_INVENTORY_PAGE_SIZE,
-        });
       } catch (reason: unknown) {
         if (!active) return;
         setCatalogOverrides(new Map());
@@ -605,7 +595,10 @@ export default function ProposalSelectScreen() {
           reason instanceof Error ? reason.message : "在庫候補を読み込めませんでした",
         );
       } finally {
-        if (active) setProfileInventoryLoading(false);
+        if (active) {
+          setProfileInventoryLoading(false);
+          setProfileInventoryInitialLoading({ give: false, receive: false });
+        }
       }
     })();
 
@@ -679,6 +672,57 @@ export default function ProposalSelectScreen() {
       ? "場所未設定の候補があります"
       : "交換できる時間を設定してください";
   })();
+
+  async function loadInitialProfileInventorySide(
+    side: ProposalSide,
+    input: {
+      active: () => boolean;
+      candidateIds: string[];
+      includeInventory: boolean;
+      ownerId: string;
+      skipPagedRows?: boolean;
+    },
+  ) {
+    try {
+      const [selectedRows, firstRows] = await Promise.all([
+        fetchProposalInventoryRowsByIds(input.candidateIds, input.ownerId),
+        input.skipPagedRows
+          ? Promise.resolve<ScopedProposalInventoryRow[]>([])
+          : fetchProposalInventoryRowsForUser(input.ownerId, 0),
+      ]);
+      if (!input.active()) return;
+      const rows = mergeInventoryRows(selectedRows, firstRows);
+      setCatalogOverrides((current) => mergeCatalogOverrides(current, rows));
+      setProfileInventoryOffsets((current) => ({
+        ...current,
+        [side]: PROFILE_INVENTORY_PAGE_SIZE,
+      }));
+      setProfileInventoryScope((current) => {
+        const base =
+          current ?? {
+            giveIds: [],
+            receiveIds: [],
+            giveHasMore: false,
+            receiveHasMore: false,
+          };
+        const ids = input.includeInventory
+          ? uniqueStrings(rows.map((row) => row.id))
+          : input.candidateIds;
+        const hasMore =
+          !input.skipPagedRows && firstRows.length === PROFILE_INVENTORY_PAGE_SIZE;
+        return side === "give"
+          ? { ...base, giveIds: ids, giveHasMore: hasMore }
+          : { ...base, receiveIds: ids, receiveHasMore: hasMore };
+      });
+    } finally {
+      if (input.active()) {
+        setProfileInventoryInitialLoading((current) => ({
+          ...current,
+          [side]: false,
+        }));
+      }
+    }
+  }
 
   async function loadMoreProfileInventory(side: ProposalSide) {
     if (!usesProfileInventory || !authUser || !effectivePartnerIdParam) return;
@@ -787,7 +831,7 @@ export default function ProposalSelectScreen() {
           <ChoicePane
             items={giveChoices}
             selectedIds={giveSelectedIds}
-            loading={revisionLoading || (usesProfileInventory && profileInventoryLoading)}
+            loading={revisionLoading || (usesProfileInventory && profileInventoryInitialLoading.give)}
             loadingMore={profileInventoryLoadingMore.give}
             hasMore={profileInventoryScope?.giveHasMore ?? false}
             emptyText={
@@ -804,7 +848,7 @@ export default function ProposalSelectScreen() {
           <ChoicePane
             items={receiveChoices}
             selectedIds={receiveSelectedIds}
-            loading={revisionLoading || (usesProfileInventory && profileInventoryLoading)}
+            loading={revisionLoading || (usesProfileInventory && profileInventoryInitialLoading.receive)}
             loadingMore={profileInventoryLoadingMore.receive}
             hasMore={profileInventoryScope?.receiveHasMore ?? false}
             emptyText={

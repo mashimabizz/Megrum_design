@@ -3936,11 +3936,11 @@ const styles = StyleSheet.create({
   tagOverlay: {
     backgroundColor: "rgba(255,255,255,0.86)",
     borderRadius: 6,
-    left: 6,
     maxWidth: "78%",
     paddingHorizontal: 6,
     paddingVertical: 3,
     position: "absolute",
+    right: 6,
     top: 6,
   },
   tagText: {
@@ -3955,7 +3955,7 @@ const styles = StyleSheet.create({
     paddingVertical: 3,
     position: "absolute",
     right: 8,
-    top: 8,
+    top: 31,
   },
   liveBadgeText: {
     color: megrumColors.surface,

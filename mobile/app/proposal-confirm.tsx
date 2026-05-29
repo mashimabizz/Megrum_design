@@ -88,6 +88,15 @@ const MEETUP_CANDIDATES: MeetupCandidate[] = [
   },
 ];
 
+const BASE_OPTION_TAGS = [
+  "開演前OK",
+  "終演後OK",
+  "グッズ販売中OK",
+  "短時間OK",
+  "同種優先",
+];
+const MAIL_OPTION_TAGS = ["即日発送", "同日発送"];
+
 export default function ProposalConfirmScreen() {
   const params = useLocalSearchParams<{
     meetups?: string | string[];
@@ -145,12 +154,20 @@ export default function ProposalConfirmScreen() {
     [catalogOverrides, partnerId, receiveIds],
   );
   const [message, setMessage] = useState("");
+  const [selectedOptionTags, setSelectedOptionTags] = useState<string[]>([]);
   const [shareSchedule, setShareSchedule] = useState(true);
   const [submitted, setSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [mailingAddress, setMailingAddress] = useState<MailingAddressRecord | null>(null);
   const [addressLoading, setAddressLoading] = useState(false);
+  const optionTags = useMemo(
+    () =>
+      usesMailExchange
+        ? Array.from(new Set([...MAIL_OPTION_TAGS, ...BASE_OPTION_TAGS]))
+        : BASE_OPTION_TAGS,
+    [usesMailExchange],
+  );
 
   useEffect(() => {
     if (!supabase) return;
@@ -263,6 +280,20 @@ export default function ProposalConfirmScreen() {
             addressLoading={addressLoading}
             exchangeMethod={exchangeMethod}
             onOpenAddressSettings={() => router.push("/address-settings")}
+          />
+        </Section>
+
+        <Section title="オプションタグ">
+          <OptionTagChips
+            options={optionTags}
+            selected={selectedOptionTags}
+            onToggle={(tag) =>
+              setSelectedOptionTags((current) =>
+                current.includes(tag)
+                  ? current.filter((item) => item !== tag)
+                  : [...current, tag],
+              )
+            }
           />
         </Section>
 
@@ -420,6 +451,7 @@ export default function ProposalConfirmScreen() {
           agreed_by_receiver: false,
           last_action_at: now.toISOString(),
           exchange_method: exchangeMethod,
+          option_tags: selectedOptionTags,
           meetup_start_at: primaryMeetup?.startAt ?? null,
           meetup_end_at: primaryMeetup?.endAt ?? null,
           meetup_place_name: primaryMeetup?.placeName ?? null,
@@ -466,6 +498,7 @@ export default function ProposalConfirmScreen() {
         last_action_at: now.toISOString(),
         expires_at: expires.toISOString(),
         exchange_method: exchangeMethod,
+        option_tags: selectedOptionTags,
         meetup_start_at: primaryMeetup?.startAt ?? null,
         meetup_end_at: primaryMeetup?.endAt ?? null,
         meetup_place_name: primaryMeetup?.placeName ?? null,
@@ -690,6 +723,50 @@ function Section({
   );
 }
 
+function OptionTagChips({
+  onToggle,
+  options,
+  selected,
+}: {
+  onToggle: (tag: string) => void;
+  options: string[];
+  selected: string[];
+}) {
+  return (
+    <View style={styles.optionTagPanel}>
+      <Text style={styles.optionTagHint}>
+        打診の条件として相手に伝えたいものを選べます。
+      </Text>
+      <View style={styles.optionTagChips}>
+        {options.map((tag) => {
+          const active = selected.includes(tag);
+          return (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityState={{ selected: active }}
+              key={tag}
+              onPress={() => onToggle(tag)}
+              style={[
+                styles.optionTagChip,
+                active ? styles.optionTagChipActive : null,
+              ]}
+            >
+              <Text
+                style={[
+                  styles.optionTagChipText,
+                  active ? styles.optionTagChipTextActive : null,
+                ]}
+              >
+                {tag}
+              </Text>
+            </Pressable>
+          );
+        })}
+      </View>
+    </View>
+  );
+}
+
 function ExchangeCard({
   theirItems,
   myItems,
@@ -848,6 +925,7 @@ type ProposalInsertError = {
 const PROPOSAL_SCHEMA_FALLBACK_COLUMNS = new Set([
   "message_tone",
   "exchange_method",
+  "option_tags",
   "agreed_by_sender",
   "agreed_by_receiver",
   "last_action_at",
@@ -1066,6 +1144,45 @@ const styles = StyleSheet.create({
     color: megrumColors.mutedInk,
     fontSize: 10.5,
     fontWeight: "800",
+  },
+  optionTagPanel: {
+    backgroundColor: megrumColors.surface,
+    borderColor: "rgba(58,50,74,0.08)",
+    borderRadius: 15,
+    borderWidth: 1,
+    gap: 10,
+    padding: 12,
+  },
+  optionTagHint: {
+    color: megrumColors.mutedInk,
+    fontSize: 11,
+    fontWeight: "800",
+    lineHeight: 16,
+  },
+  optionTagChips: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 7,
+  },
+  optionTagChip: {
+    backgroundColor: "rgba(58,50,74,0.05)",
+    borderColor: "rgba(58,50,74,0.08)",
+    borderRadius: megrumRadii.pill,
+    borderWidth: 1,
+    paddingHorizontal: 11,
+    paddingVertical: 7,
+  },
+  optionTagChipActive: {
+    backgroundColor: "rgba(166,149,216,0.16)",
+    borderColor: "rgba(166,149,216,0.42)",
+  },
+  optionTagChipText: {
+    color: megrumColors.ink,
+    fontSize: 11,
+    fontWeight: "900",
+  },
+  optionTagChipTextActive: {
+    color: megrumColors.lavender,
   },
   exchangeCard: {
     alignItems: "flex-start",

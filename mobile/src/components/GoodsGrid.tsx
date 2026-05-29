@@ -466,8 +466,18 @@ function AnimatedGoodsTile({
             </View>
           ) : null}
           {showTopRow ? (
-            <View style={styles.tileTopRow}>
-              <View style={styles.tileTitlePlate}>
+            <View
+              style={[
+                styles.tileTopRow,
+                topRowMode === "tag" ? styles.tileTopRowTag : null,
+              ]}
+            >
+              <View
+                style={[
+                  styles.tileTitlePlate,
+                  topRowMode === "tag" ? styles.tileTagPlate : null,
+                ]}
+              >
                 <Text numberOfLines={1} style={styles.tileTitlePlateText}>
                   {topRowLabel}
                 </Text>
@@ -1094,6 +1104,9 @@ const styles = StyleSheet.create({
     right: 6,
     top: 6,
   },
+  tileTopRowTag: {
+    justifyContent: "flex-end",
+  },
   tileTitlePlate: {
     backgroundColor: "rgba(255,255,255,0.86)",
     borderRadius: 6,
@@ -1101,6 +1114,10 @@ const styles = StyleSheet.create({
     minWidth: 0,
     paddingHorizontal: 6,
     paddingVertical: 3,
+  },
+  tileTagPlate: {
+    flex: 0,
+    maxWidth: "78%",
   },
   tileTitlePlateText: {
     color: megrumColors.ink,

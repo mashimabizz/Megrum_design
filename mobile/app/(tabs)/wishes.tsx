@@ -544,7 +544,7 @@ export default function WishesScreen() {
     : [];
 
   return (
-    <Screen scroll={false} contentStyle={styles.screenContent}>
+    <Screen bottomInset={false} scroll={false} contentStyle={styles.screenContent}>
       <ScrollView
         automaticallyAdjustsScrollIndicatorInsets
         contentInsetAdjustmentBehavior="automatic"
@@ -578,7 +578,7 @@ export default function WishesScreen() {
             {tab === "wish" ? (
               <>
                 <FilterRowsSkeleton rows={2} />
-                <GoodsGridSkeleton columns={columns} count={9} showTopRow={false} />
+                <GoodsGridSkeleton columns={columns} count={9} showTopRow />
               </>
             ) : (
               <ListingDeckSkeleton count={3} />
@@ -728,7 +728,9 @@ export default function WishesScreen() {
           emptyLabel="まだ Wish がありません"
           deletingIds={deletingWishIds}
           onItemFadeOutEnd={completeWishDelete}
-          showTopRow={false}
+          showTopRow
+          topRowMode="tag"
+          showBottomStrip={false}
           showUnlinkedWarning
           onPressItem={(gridItem, context) => {
             if (deletingWishIds.includes(gridItem.id)) return;
@@ -1865,7 +1867,7 @@ const styles = StyleSheet.create({
   },
   screenScrollContent: {
     gap: 12,
-    paddingBottom: 132,
+    paddingBottom: 24,
     paddingHorizontal: 18,
   },
   stickyHeaderBlock: {

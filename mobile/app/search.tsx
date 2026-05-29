@@ -2,7 +2,9 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router, Stack, useLocalSearchParams } from "expo-router";
 import {
+  Modal,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   View,
@@ -15,6 +17,7 @@ import {
 import { Screen } from "../src/components/Screen";
 import { useAuth } from "../src/auth/AuthProvider";
 import { fetchInventoryTagLabels } from "../src/lib/inventoryTags";
+import { IconSymbol } from "../src/components/IconSymbol";
 import { supabase } from "../src/lib/supabase";
 import { megrumColors, megrumRadii } from "../src/theme/tokens";
 
@@ -62,6 +65,17 @@ type SearchResultItem = GoodsGridItem & {
   matchBucket: SearchMatchBucket;
 };
 
+type SearchFilterState = {
+  groups: string[];
+  members: string[];
+  goodsTypes: string[];
+  meetupDates: string[];
+  meetupPlaces: string[];
+  optionTags: string[];
+  tags: string[];
+  exchangeMethods: string[];
+};
+
 type PopularSearchRow = {
   term: string | null;
   search_count: number | null;
@@ -74,6 +88,18 @@ type TagSearchRow = {
 };
 
 const RECENT_KEY = "megrum-search-recent-v1";
+const EMPTY_FILTERS: SearchFilterState = {
+  groups: [],
+  members: [],
+  goodsTypes: [],
+  meetupDates: [],
+  meetupPlaces: [],
+  optionTags: [],
+  tags: [],
+  exchangeMethods: [],
+};
+const EXCHANGE_FILTERS = ["現地交換", "郵送", "どちらもOK"];
+const DEFAULT_OPTION_TAGS = ["即日発送", "同日発送", "開演前OK", "終演後OK", "グッズ販売中OK"];
 
 const PREVIEW_HITS: SearchHit[] = [
   {
@@ -149,6 +175,8 @@ export default function SearchScreen() {
   const [popular, setPopular] = useState<string[]>([]);
   const [popularLoading, setPopularLoading] = useState(false);
   const [hits, setHits] = useState<SearchHit[]>([]);
+  const [filters, setFilters] = useState<SearchFilterState>(EMPTY_FILTERS);
+  const [filterOpen, setFilterOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -236,18 +264,25 @@ export default function SearchScreen() {
     };
   }, [loadPopularSearches, previewMode, query, user]);
 
+  const filteredHits = useMemo(
+    () => hits.filter((hit) => searchHitPassesFilters(hit, filters)),
+    [filters, hits],
+  );
+  const filterOptions = useMemo(() => buildSearchFilterOptions(hits), [hits]);
+  const activeFilterCount = countActiveSearchFilters(filters);
+
   const sections = useMemo(
     () =>
       RESULT_SECTIONS.map((section) => ({
         ...section,
-        items: hits
+        items: filteredHits
           .filter((hit) => hit.matchBucket === section.id)
           .map(toResultItem),
       })),
-    [hits],
+    [filteredHits],
   );
 
-  const totalCount = hits.length;
+  const totalCount = filteredHits.length;
 
   function submit(nextQuery = draft) {
     const q = nextQuery.trim();
@@ -341,6 +376,28 @@ export default function SearchScreen() {
           />
         </View>
       )}
+      {query ? (
+        <Pressable
+          accessibilityRole="button"
+          onPress={() => setFilterOpen(true)}
+          style={styles.filterButton}
+        >
+          <IconSymbol name="settings-outline" size={17} color={megrumColors.surface} />
+          <Text style={styles.filterButtonText}>
+            フィルター{activeFilterCount > 0 ? ` ${activeFilterCount}` : ""}
+          </Text>
+        </Pressable>
+      ) : null}
+      <SearchFilterSheet
+        filters={filters}
+        open={filterOpen}
+        options={filterOptions}
+        onClose={() => setFilterOpen(false)}
+        onReset={() => setFilters(EMPTY_FILTERS)}
+        onToggle={(key, value) =>
+          setFilters((current) => toggleSearchFilterValue(current, key, value))
+        }
+      />
     </Screen>
   );
 }
@@ -415,6 +472,150 @@ function SuggestionGroup({
           ))}
         </View>
       ) : null}
+    </View>
+  );
+}
+
+function SearchFilterSheet({
+  filters,
+  onClose,
+  onReset,
+  onToggle,
+  open,
+  options,
+}: {
+  filters: SearchFilterState;
+  onClose: () => void;
+  onReset: () => void;
+  onToggle: (key: keyof SearchFilterState, value: string) => void;
+  open: boolean;
+  options: SearchFilterState;
+}) {
+  return (
+    <Modal animationType="slide" transparent visible={open} onRequestClose={onClose}>
+      <View style={styles.filterSheetRoot}>
+        <Pressable style={styles.filterSheetBackdrop} onPress={onClose} />
+        <View style={styles.filterSheet}>
+          <View style={styles.filterSheetHeader}>
+            <Text style={styles.filterSheetTitle}>検索フィルター</Text>
+            <Pressable accessibilityRole="button" onPress={onReset} style={styles.filterReset}>
+              <Text style={styles.filterResetText}>リセット</Text>
+            </Pressable>
+          </View>
+          <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.filterSheetContent}>
+            <FilterChipGroup
+              active={filters.groups}
+              filterKey="groups"
+              options={options.groups}
+              title="グループ"
+              onToggle={onToggle}
+            />
+            <FilterChipGroup
+              active={filters.members}
+              filterKey="members"
+              options={options.members}
+              title="メンバー"
+              onToggle={onToggle}
+            />
+            <FilterChipGroup
+              active={filters.goodsTypes}
+              filterKey="goodsTypes"
+              options={options.goodsTypes}
+              title="グッズ種別"
+              onToggle={onToggle}
+            />
+            <FilterChipGroup
+              active={filters.meetupDates}
+              filterKey="meetupDates"
+              options={options.meetupDates}
+              title="現地交換日付"
+              empty="検索結果に日付情報がある時に表示されます"
+              onToggle={onToggle}
+            />
+            <FilterChipGroup
+              active={filters.meetupPlaces}
+              filterKey="meetupPlaces"
+              options={options.meetupPlaces}
+              title="現地交換場所"
+              empty="検索結果に場所情報がある時に表示されます"
+              onToggle={onToggle}
+            />
+            <FilterChipGroup
+              active={filters.optionTags}
+              filterKey="optionTags"
+              options={options.optionTags}
+              title="オプションタグ"
+              onToggle={onToggle}
+            />
+            <FilterChipGroup
+              active={filters.tags}
+              filterKey="tags"
+              options={options.tags}
+              title="タグ"
+              onToggle={onToggle}
+            />
+            <FilterChipGroup
+              active={filters.exchangeMethods}
+              filterKey="exchangeMethods"
+              options={options.exchangeMethods}
+              title="交換手段"
+              onToggle={onToggle}
+            />
+          </ScrollView>
+          <Pressable accessibilityRole="button" onPress={onClose} style={styles.filterApply}>
+            <Text style={styles.filterApplyText}>結果を見る</Text>
+          </Pressable>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
+function FilterChipGroup({
+  active,
+  empty,
+  filterKey,
+  onToggle,
+  options,
+  title,
+}: {
+  active: string[];
+  empty?: string;
+  filterKey: keyof SearchFilterState;
+  onToggle: (key: keyof SearchFilterState, value: string) => void;
+  options: string[];
+  title: string;
+}) {
+  return (
+    <View style={styles.filterGroup}>
+      <Text style={styles.filterGroupTitle}>{title}</Text>
+      {options.length === 0 ? (
+        <Text style={styles.filterGroupEmpty}>{empty ?? "候補がありません"}</Text>
+      ) : (
+        <View style={styles.filterGroupChips}>
+          {options.map((value) => {
+            const selected = active.includes(value);
+            return (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityState={{ selected }}
+                key={value}
+                onPress={() => onToggle(filterKey, value)}
+                style={[styles.filterChipOption, selected ? styles.filterChipOptionActive : null]}
+              >
+                <Text
+                  style={[
+                    styles.filterChipOptionText,
+                    selected ? styles.filterChipOptionTextActive : null,
+                  ]}
+                >
+                  {value}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
+      )}
     </View>
   );
 }
@@ -677,6 +878,86 @@ function matchPreviewHit(hit: SearchHit, q: string) {
   return haystack.includes(q.toLowerCase());
 }
 
+function buildSearchFilterOptions(hits: SearchHit[]): SearchFilterState {
+  const groups = new Set<string>();
+  const members = new Set<string>();
+  const goodsTypes = new Set<string>();
+  const tags = new Set<string>();
+  for (const hit of hits) {
+    if (hit.groupName) groups.add(hit.groupName);
+    if (hit.characterName) members.add(hit.characterName);
+    if (hit.goodsTypeName) goodsTypes.add(hit.goodsTypeName);
+    hit.tagLabels.forEach((tag) => tags.add(tag));
+  }
+  const tagList = Array.from(tags).sort((a, b) => a.localeCompare(b, "ja"));
+  return {
+    groups: Array.from(groups).sort((a, b) => a.localeCompare(b, "ja")),
+    members: Array.from(members).sort((a, b) => a.localeCompare(b, "ja")),
+    goodsTypes: Array.from(goodsTypes).sort((a, b) => a.localeCompare(b, "ja")),
+    meetupDates: [],
+    meetupPlaces: [],
+    optionTags: Array.from(new Set([...DEFAULT_OPTION_TAGS, ...tagList])).slice(0, 16),
+    tags: tagList,
+    exchangeMethods: EXCHANGE_FILTERS,
+  };
+}
+
+function searchHitPassesFilters(hit: SearchHit, filters: SearchFilterState) {
+  if (filters.groups.length > 0 && (!hit.groupName || !filters.groups.includes(hit.groupName))) {
+    return false;
+  }
+  if (
+    filters.members.length > 0 &&
+    (!hit.characterName || !filters.members.includes(hit.characterName))
+  ) {
+    return false;
+  }
+  if (
+    filters.goodsTypes.length > 0 &&
+    (!hit.goodsTypeName || !filters.goodsTypes.includes(hit.goodsTypeName))
+  ) {
+    return false;
+  }
+  if (
+    filters.tags.length > 0 &&
+    !filters.tags.some((tag) => hit.tagLabels.includes(tag))
+  ) {
+    return false;
+  }
+  if (
+    filters.optionTags.length > 0 &&
+    !filters.optionTags.some((tag) => hit.tagLabels.includes(tag))
+  ) {
+    return false;
+  }
+  if (filters.exchangeMethods.length > 0) {
+    const haystack = hit.tagLabels.join(" ");
+    const matchesMethod = filters.exchangeMethods.some((method) => {
+      if (method === "現地交換") return /現地|会場|終演|開演|手渡し/.test(haystack);
+      if (method === "郵送") return /郵送|発送|即日発送|同日発送/.test(haystack);
+      return /どちらも|両方/.test(haystack);
+    });
+    if (!matchesMethod) return false;
+  }
+  return true;
+}
+
+function toggleSearchFilterValue(
+  current: SearchFilterState,
+  key: keyof SearchFilterState,
+  value: string,
+): SearchFilterState {
+  const values = current[key];
+  const nextValues = values.includes(value)
+    ? values.filter((item) => item !== value)
+    : [...values, value];
+  return { ...current, [key]: nextValues };
+}
+
+function countActiveSearchFilters(filters: SearchFilterState) {
+  return Object.values(filters).reduce((sum, values) => sum + values.length, 0);
+}
+
 function pickName(value: MasterName): string | null {
   if (!value) return null;
   return Array.isArray(value) ? value[0]?.name ?? null : value.name;
@@ -819,6 +1100,121 @@ const styles = StyleSheet.create({
     color: megrumColors.ink,
     fontSize: 11.5,
     fontWeight: "800",
+  },
+  filterButton: {
+    alignItems: "center",
+    alignSelf: "center",
+    backgroundColor: megrumColors.lavender,
+    borderColor: "rgba(255,255,255,0.92)",
+    borderRadius: megrumRadii.pill,
+    borderWidth: 1,
+    flexDirection: "row",
+    gap: 6,
+    marginTop: 4,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+  },
+  filterButtonText: {
+    color: megrumColors.surface,
+    fontSize: 12,
+    fontWeight: "900",
+  },
+  filterSheetRoot: {
+    backgroundColor: "rgba(20,16,29,0.32)",
+    flex: 1,
+    justifyContent: "flex-end",
+  },
+  filterSheetBackdrop: {
+    bottom: 0,
+    left: 0,
+    position: "absolute",
+    right: 0,
+    top: 0,
+  },
+  filterSheet: {
+    backgroundColor: megrumColors.background,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    maxHeight: "84%",
+    paddingBottom: 18,
+    paddingHorizontal: 18,
+    paddingTop: 16,
+  },
+  filterSheetHeader: {
+    alignItems: "center",
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginBottom: 12,
+  },
+  filterSheetTitle: {
+    color: megrumColors.ink,
+    fontSize: 18,
+    fontWeight: "900",
+  },
+  filterReset: {
+    backgroundColor: "rgba(58,50,74,0.06)",
+    borderRadius: megrumRadii.pill,
+    paddingHorizontal: 11,
+    paddingVertical: 7,
+  },
+  filterResetText: {
+    color: megrumColors.mutedInk,
+    fontSize: 11,
+    fontWeight: "900",
+  },
+  filterSheetContent: {
+    gap: 15,
+    paddingBottom: 16,
+  },
+  filterGroup: {
+    gap: 8,
+  },
+  filterGroupTitle: {
+    color: megrumColors.ink,
+    fontSize: 13,
+    fontWeight: "900",
+  },
+  filterGroupEmpty: {
+    color: megrumColors.mutedInk,
+    fontSize: 11,
+    fontWeight: "800",
+    lineHeight: 16,
+  },
+  filterGroupChips: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 7,
+  },
+  filterChipOption: {
+    backgroundColor: megrumColors.surface,
+    borderColor: "rgba(58,50,74,0.08)",
+    borderRadius: megrumRadii.pill,
+    borderWidth: 1,
+    paddingHorizontal: 11,
+    paddingVertical: 7,
+  },
+  filterChipOptionActive: {
+    backgroundColor: "rgba(166,149,216,0.16)",
+    borderColor: "rgba(166,149,216,0.42)",
+  },
+  filterChipOptionText: {
+    color: megrumColors.ink,
+    fontSize: 11,
+    fontWeight: "900",
+  },
+  filterChipOptionTextActive: {
+    color: megrumColors.lavender,
+  },
+  filterApply: {
+    alignItems: "center",
+    backgroundColor: megrumColors.lavender,
+    borderRadius: 15,
+    paddingVertical: 14,
+  },
+  filterApplyText: {
+    color: megrumColors.surface,
+    fontSize: 14,
+    fontWeight: "900",
   },
   pressed: {
     opacity: 0.86,

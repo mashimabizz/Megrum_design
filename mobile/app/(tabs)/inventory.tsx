@@ -345,7 +345,7 @@ export default function InventoryScreen() {
   }
 
   return (
-    <Screen scroll={false} contentStyle={styles.screenContent}>
+    <Screen bottomInset={false} scroll={false} contentStyle={styles.screenContent}>
       <ScrollView
         automaticallyAdjustsScrollIndicatorInsets
         contentInsetAdjustmentBehavior="automatic"
@@ -359,8 +359,6 @@ export default function InventoryScreen() {
             <Text style={styles.title}>マイ在庫</Text>
             <View style={styles.headerActions}>
               <ColumnSwitcher value={columns} onChange={setColumns} />
-              <HeaderIconButton label="フィルタ" glyph="≡" />
-              <HeaderIconButton label="検索" glyph="⌕" />
             </View>
           </View>
 
@@ -381,7 +379,7 @@ export default function InventoryScreen() {
               columns={columns}
               count={8}
               includeAddTile={status === "active"}
-              showTopRow={false}
+              showTopRow
             />
           </View>
         ) : (
@@ -492,7 +490,9 @@ export default function InventoryScreen() {
         <GoodsGrid
           items={itemsByStatus[pageStatus]}
           columns={columns}
-          showTopRow={false}
+          showTopRow
+          topRowMode="tag"
+          showBottomStrip={false}
           deletingIds={deletingItemIds}
           onItemFadeOutEnd={completeInventoryDelete}
           addTileLabel={pageStatus === "active" ? "追加" : undefined}
@@ -709,18 +709,6 @@ function nameToHue(name: string) {
     hash |= 0;
   }
   return Math.abs(hash) % 360;
-}
-
-function HeaderIconButton({ label, glyph }: { label: string; glyph: string }) {
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={label}
-      style={styles.headerIconButton}
-    >
-      <Text style={styles.headerIconText}>{glyph}</Text>
-    </Pressable>
-  );
 }
 
 function openInventoryEditor(
@@ -955,7 +943,7 @@ const styles = StyleSheet.create({
   },
   screenScrollContent: {
     gap: 12,
-    paddingBottom: 132,
+    paddingBottom: 24,
     paddingHorizontal: 18,
   },
   stickyHeaderBlock: {
@@ -1092,21 +1080,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     flexDirection: "row",
     gap: 6,
-  },
-  headerIconButton: {
-    alignItems: "center",
-    backgroundColor: megrumColors.surface,
-    borderColor: "rgba(58,50,74,0.08)",
-    borderRadius: 10,
-    borderWidth: 1,
-    height: 34,
-    justifyContent: "center",
-    width: 34,
-  },
-  headerIconText: {
-    color: megrumColors.ink,
-    fontSize: 12,
-    fontWeight: "900",
   },
   inlineNotice: {
     color: megrumColors.mutedInk,

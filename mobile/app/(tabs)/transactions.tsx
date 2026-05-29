@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { router, useLocalSearchParams } from "expo-router";
+import SegmentedControl from "@react-native-segmented-control/segmented-control";
 import {
   Animated,
   Image,
@@ -297,7 +298,7 @@ export default function TransactionsScreen() {
 
   if (archiveMode) {
     return (
-      <Screen scroll={false} contentStyle={styles.screenContent}>
+      <Screen bottomInset={false} scroll={false} contentStyle={styles.screenContent}>
         <ScrollView
           automaticallyAdjustsScrollIndicatorInsets
           contentInsetAdjustmentBehavior="automatic"
@@ -344,7 +345,7 @@ export default function TransactionsScreen() {
   }
 
   return (
-    <Screen scroll={false} contentStyle={styles.screenContent}>
+    <Screen bottomInset={false} scroll={false} contentStyle={styles.screenContent}>
       <ScrollView
         ref={pagerRef}
         bounces={false}
@@ -376,11 +377,15 @@ export default function TransactionsScreen() {
         ))}
       </ScrollView>
       <View style={styles.footerTabsWrap}>
-        <CompactTabs
-          value={tab}
-          tabs={topTabs}
-          position={pagerPosition}
-          onChange={selectTab}
+        <SegmentedControl
+          values={topTabs.map((item) => `${item.label} ${item.count}`)}
+          selectedIndex={Math.max(0, TOP_TABS.findIndex((item) => item.id === tab))}
+          tintColor={megrumColors.lavender}
+          onChange={(event) => {
+            const next = TOP_TABS[event.nativeEvent.selectedSegmentIndex]?.id;
+            if (next) selectTab(next);
+          }}
+          style={styles.footerSegmented}
         />
       </View>
     </Screen>
@@ -1351,8 +1356,12 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   footerTabsWrap: {
-    backgroundColor: "rgba(251,249,252,0.92)",
-    paddingTop: 10,
+    backgroundColor: "transparent",
+    paddingBottom: 8,
+    paddingTop: 8,
+  },
+  footerSegmented: {
+    height: 36,
   },
   compactTabs: {
     backgroundColor: "rgba(255,255,255,0.58)",

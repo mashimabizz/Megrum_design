@@ -592,6 +592,7 @@ iter28（match_type）/ iter29（数量）/ iter30（7日期限）/ iter32（合
 | `receiver_have_qtys` | int[] | 各 IDの選択数 |
 | `message` | text | |
 | `exchange_method` | text | `hand` / `mail` / `both`。提案単位の受け渡し方法 |
+| `option_tags` | text[] default `{}` | iter170、打診条件タグ。例：即日発送 / 同日発送 / 終演後OK |
 | `status` | text | `draft` / `sent` / `negotiating` / `agreement_one_side` / `agreed` / `rejected` / `expired`（09と一致） |
 | `agreed_by_sender` | boolean default false | iter32、agreement_one_side 判定用 |
 | `agreed_by_receiver` | boolean default false | iter32 |

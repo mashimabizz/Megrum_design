@@ -4,18 +4,109 @@
 
 ---
 
+## イテレーション170：タグ右上統一と打診フィルター拡張
+
+### 背景・問題意識
+
+オーナーから、ホーム・マイ在庫・Wish・検索結果のカードタグを右上表示で統一し、マイ在庫の未使用ヘッダーアイコンやフッター上の余計な灰色領域を削除したいという依頼があった。あわせて、やりとり画面の下部タブを提示物選択の交換手段セレクタに寄せ、提示物選択の在庫表示速度、打診時のオプションタグ、検索フィルターを改善する必要があった。
+
+### 変更内容
+
+#### `mobile/src/components/GoodsGrid.tsx`
+- `topRowMode="tag"` のタグ表示をカード右上に寄せ、検索結果・在庫・Wishで共通化した。
+
+#### `mobile/app/(tabs)/index.tsx`
+- ホーム候補カードのタグを右上表示に変更した。
+
+#### `mobile/app/(tabs)/inventory.tsx`
+- 右上の未使用フィルター/検索アイコンを削除した。
+- グッズカードに右上タグを表示し、下部タグ帯は非表示にした。
+- 外側の大きな下余白を削り、フッター上の余計な背景領域が出にくい構造にした。
+
+#### `mobile/app/(tabs)/wishes.tsx`
+- Wishカードに右上タグを表示し、下部タグ帯は非表示にした。
+- 外側の大きな下余白を削った。
+
+#### `mobile/app/(tabs)/transactions.tsx`
+- やりとり画面下部の「打診中 / 進行中」切り替えを iOS の `SegmentedControl` に変更し、提示物選択の交換手段セレクタと揃えた。
+- 外側の大きな下余白を削った。
+
+#### `mobile/app/proposal-select.tsx`
+- 提示物選択の初期在庫読み込みを「私が出す」「受け取る」それぞれ独立して表示できるようにし、先に返った10件から表示するようにした。
+
+#### `mobile/app/proposal-confirm.tsx`
+- 打診確認画面にオプションタグ選択を追加した。
+- 郵送を含む交換では「即日発送」「同日発送」を候補に含めるようにした。
+- 選択したタグを `proposals.option_tags` に保存するようにした。
+
+#### `mobile/app/search.tsx`
+- 検索結果画面にフィルター導線を追加した。
+- グループ、メンバー、グッズ種別、現地交換日付、現地交換場所、オプションタグ、タグ、交換手段で絞り込めるUIを追加した。
+
+#### `supabase/migrations/20260530152000_add_proposal_option_tags.sql`
+- `proposals.option_tags text[]` を追加した。
+
+#### `notes/05_data_model.md`
+- `proposals.option_tags` を追記した。
+
+#### `notes/10_glossary.md`
+- 「オプションタグ」を交換シーンタグの打診単位UI名として追加した。
+
+### 影響範囲
+
+- iOS版 ホーム
+- iOS版 マイ在庫
+- iOS版 Wish
+- iOS版 やりとり
+- iOS版 提示物選択 / 送信確認
+- iOS版 検索
+- Supabase `proposals` スキーマ
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `git diff --check -- mobile/src/components/GoodsGrid.tsx mobile/app/(tabs)/index.tsx mobile/app/(tabs)/inventory.tsx mobile/app/(tabs)/wishes.tsx mobile/app/(tabs)/transactions.tsx mobile/app/proposal-select.tsx mobile/app/proposal-confirm.tsx mobile/app/search.tsx notes/05_data_model.md notes/10_glossary.md notes/08_design_iterations.md supabase/migrations/20260530152000_add_proposal_option_tags.sql`
+- `npm --prefix mobile run export:ios:preview`
+- `EAS_UPDATE_PROJECT_SLUG=ihub EXPO_NO_GIT_STATUS=1 npm --prefix mobile run update:ios:preview -- --message "[iter170] tag placement filters option tags" --non-interactive`
+- Preview OTA: Update group `b427d4cb-b30d-41df-bb21-209e0b3f153c` / iOS update `019e7489-38b0-7a7e-92c8-89b63774e1ea`
+
+### 関連ファイル
+
+- `mobile/src/components/GoodsGrid.tsx`
+- `mobile/app/(tabs)/index.tsx`
+- `mobile/app/(tabs)/inventory.tsx`
+- `mobile/app/(tabs)/wishes.tsx`
+- `mobile/app/(tabs)/transactions.tsx`
+- `mobile/app/proposal-select.tsx`
+- `mobile/app/proposal-confirm.tsx`
+- `mobile/app/search.tsx`
+- `supabase/migrations/20260530152000_add_proposal_option_tags.sql`
+- `notes/05_data_model.md`
+- `notes/10_glossary.md`
+
+### セルフレビュー結果
+
+- ✅ カードタグ表示は右上に統一。
+- ✅ マイ在庫の未使用ヘッダーアイコンを削除。
+- ✅ やりとり下部タブは iOS 標準の `SegmentedControl` に変更。
+- ✅ 提示物選択は片側ずつ初期表示できるようにした。
+- ✅ `proposals.option_tags` の migration / データモデル / 用語を更新。
+- ✅ 状態遷移の追加・変更はないため、`notes/09_state_machines.md` の更新は不要。
+
+---
+
 ## イテレーション169：ホーム候補を検索結果カードへ統一
 
 ### 背景・問題意識
 
-オーナーから、ホーム画面の「交換できるかも？」はタップ時に相手プロフィールへ遷移し、各パネル左上には登録タグを表示したいという依頼があった。あわせて、ホームの交換候補パネルは検索結果画面のデザインを踏襲し、文字サイズと画像サイズを揃える必要があった。
+オーナーから、ホーム画面の「交換できるかも？」はタップ時に相手プロフィールへ遷移し、各パネル右上には登録タグを表示したいという依頼があった。あわせて、ホームの交換候補パネルは検索結果画面のデザインを踏襲し、文字サイズと画像サイズを揃える必要があった。
 
 ### 変更内容
 
 #### `mobile/app/(tabs)/index.tsx`
 - ホームの交換候補表示を、行ごとの横スクロール棚から検索結果と同じ3列グリッド型のカード表示へ変更した。
 - カード画像の比率を検索結果の `GoodsGrid` と同じ `width * 1.34` に揃え、タグ表示の文字サイズ・角丸・配置を検索結果のトップタグ表示に寄せた。
-- 各候補カード左上に `tagLabels` / `tag` 由来の登録タグを表示するようにした。
+- 各候補カード右上に `tagLabels` / `tag` 由来の登録タグを表示するようにした。
 - 「交換できるかも？」セクションの候補タップ時は、`partnerId` を使って `/user-profile` へ遷移するようにした。
 - ホームの「交換できるかも」見出しを検索結果と同じ「交換できるかも？」表記へ揃えた。
 
@@ -42,7 +133,7 @@
 ### セルフレビュー結果
 
 - ✅ 検索結果と同じ3列・同じ画像比率へ寄せた。
-- ✅ 登録タグはカード左上に表示される。
+- ✅ 登録タグはカード右上に表示される。
 - ✅ 「交換できるかも？」は相手プロフィールへ遷移し、「マッチしてるよ！」は既存の詳細遷移を維持。
 - ✅ 状態遷移・用語・データモデル変更はないため、`notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要。
 
