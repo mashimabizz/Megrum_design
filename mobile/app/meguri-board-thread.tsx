@@ -1,7 +1,10 @@
 import { useCallback, useMemo, useState } from "react";
 import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
 import {
+  ActionSheetIOS,
   ActivityIndicator,
+  Alert,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -16,13 +19,22 @@ import { IconSymbol } from "../src/components/IconSymbol";
 import { Screen } from "../src/components/Screen";
 import {
   appendMeguriBoardReply,
+  hideMeguriBoardThread,
   loadMeguriBoardThreadDetail,
+  markMeguriBoardThreadRead,
   meguriBoardAudienceLabel,
   meguriBoardAudienceMeta,
+  meguriBoardCategoryLabel,
+  reportMeguriBoardReply,
+  reportMeguriBoardThread,
+  setMeguriBoardReplyReacted,
+  setMeguriBoardThreadBookmarked,
+  setMeguriBoardThreadReacted,
   type MeguriBoardActor,
   type MeguriBoardAudienceScope,
   type MeguriBoardReply,
   type MeguriBoardThread,
+  type MeguriBoardThreadCategory,
   type MeguriBoardViewMode,
   type MeguriBoardViewerContext,
 } from "../src/lib/meguriBoard";
@@ -134,9 +146,12 @@ export default function MeguriBoardThreadScreen() {
       nextViewerContext,
       { previewMode, viewMode },
     ).catch(() => ({ replies: [] as MeguriBoardReply[], thread: null }));
-    setThread(detail.thread);
+    setThread(detail.thread ? { ...detail.thread, readAt: Date.now() } : null);
     setReplies(detail.replies);
     setLoading(false);
+    if (detail.thread) {
+      void markMeguriBoardThreadRead(detail.thread.id);
+    }
   }, [
     actor.primaryArea,
     actor.userId,
@@ -193,6 +208,123 @@ export default function MeguriBoardThreadScreen() {
     );
   }
 
+  function updateThread(nextThread: MeguriBoardThread) {
+    setThread(nextThread);
+  }
+
+  async function toggleThreadBookmark() {
+    if (!thread) return;
+    const bookmarked = !thread.bookmarked;
+    updateThread({
+      ...thread,
+      bookmarkCount: Math.max(0, thread.bookmarkCount + (bookmarked ? 1 : -1)),
+      bookmarked,
+    });
+    await setMeguriBoardThreadBookmarked(thread.id, bookmarked);
+  }
+
+  async function toggleThreadReaction() {
+    if (!thread) return;
+    const reacted = !thread.reacted;
+    updateThread({
+      ...thread,
+      reacted,
+      reactionCount: Math.max(0, thread.reactionCount + (reacted ? 1 : -1)),
+    });
+    await setMeguriBoardThreadReacted(thread.id, reacted);
+  }
+
+  async function hideThread() {
+    if (!thread) return;
+    await hideMeguriBoardThread(thread.id);
+    router.back();
+  }
+
+  async function reportThread() {
+    if (!thread || thread.reported) return;
+    updateThread({ ...thread, reported: true });
+    await reportMeguriBoardThread(thread.id);
+    Alert.alert("通報しました", "確認して対応します。");
+  }
+
+  async function toggleReplyReaction(reply: MeguriBoardReply) {
+    const reacted = !reply.reacted;
+    setReplies((current) =>
+      current.map((candidate) =>
+        candidate.id === reply.id
+          ? {
+              ...candidate,
+              reacted,
+              reactionCount: Math.max(0, candidate.reactionCount + (reacted ? 1 : -1)),
+            }
+          : candidate,
+      ),
+    );
+    await setMeguriBoardReplyReacted(reply.id, reacted);
+  }
+
+  async function reportReply(reply: MeguriBoardReply) {
+    if (reply.reported) return;
+    setReplies((current) =>
+      current.map((candidate) =>
+        candidate.id === reply.id ? { ...candidate, reported: true } : candidate,
+      ),
+    );
+    await reportMeguriBoardReply(reply.id);
+    Alert.alert("通報しました", "確認して対応します。");
+  }
+
+  function openThreadActions() {
+    if (!thread) return;
+    const labels = [
+      thread.bookmarked ? "保存を解除" : "保存する",
+      thread.reacted ? "参考になったを取り消す" : "参考になった",
+      "非表示にする",
+      thread.reported ? "通報済み" : "通報する",
+      "キャンセル",
+    ];
+    if (Platform.OS === "ios") {
+      ActionSheetIOS.showActionSheetWithOptions(
+        {
+          cancelButtonIndex: 4,
+          destructiveButtonIndex: 2,
+          disabledButtonIndices: thread.reported ? [3] : undefined,
+          options: labels,
+          title: thread.title,
+        },
+        (index) => {
+          if (index === 0) void toggleThreadBookmark();
+          if (index === 1) void toggleThreadReaction();
+          if (index === 2) void hideThread();
+          if (index === 3 && !thread.reported) void reportThread();
+        },
+      );
+      return;
+    }
+    void toggleThreadBookmark();
+  }
+
+  function openReplyActions(reply: MeguriBoardReply) {
+    const labels = [
+      reply.reacted ? "参考になったを取り消す" : "参考になった",
+      reply.reported ? "通報済み" : "通報する",
+      "キャンセル",
+    ];
+    if (Platform.OS === "ios") {
+      ActionSheetIOS.showActionSheetWithOptions(
+        {
+          cancelButtonIndex: 2,
+          disabledButtonIndices: reply.reported ? [1] : undefined,
+          options: labels,
+        },
+        (index) => {
+          if (index === 0) void toggleReplyReaction(reply);
+          if (index === 1 && !reply.reported) void reportReply(reply);
+        },
+      );
+    }
+  }
+
   return (
     <View style={styles.root}>
       <Screen bottomInset={false} contentStyle={styles.screen} scroll={false} topInset={false}>
@@ -208,6 +340,11 @@ export default function MeguriBoardThreadScreen() {
               {thread ? meguriBoardAudienceMeta(thread) : viewerContext.spotLabel}
             </Text>
           </View>
+          {thread ? (
+            <Pressable accessibilityRole="button" onPress={openThreadActions} style={styles.headerActionButton}>
+              <IconSymbol name="ellipsis-horizontal" color={megrumColors.ink} size={20} />
+            </Pressable>
+          ) : null}
         </View>
 
         {loading ? (
@@ -234,7 +371,10 @@ export default function MeguriBoardThreadScreen() {
             >
               <View style={styles.heroCard}>
                 <View style={styles.heroTopRow}>
-                  <ScopeBadge scope={thread.audienceScope} />
+                  <View style={styles.heroBadgeRow}>
+                    <CategoryBadge category={thread.category} />
+                    <ScopeBadge scope={thread.audienceScope} />
+                  </View>
                   <Text style={styles.heroTime}>{formatRelativeTime(thread.createdAt)}</Text>
                 </View>
                 <Text style={styles.heroTitle}>{thread.title}</Text>
@@ -242,6 +382,36 @@ export default function MeguriBoardThreadScreen() {
                 <Text style={styles.heroMeta}>
                   {meguriBoardAudienceMeta(thread)} · {thread.authorName}
                 </Text>
+                <View style={styles.threadActions}>
+                  <Pressable
+                    accessibilityRole="button"
+                    onPress={toggleThreadReaction}
+                    style={[styles.threadActionPill, thread.reacted ? styles.threadActionPillActive : null]}
+                  >
+                    <IconSymbol
+                      name={thread.reacted ? "heart" : "heart-outline"}
+                      color={thread.reacted ? megrumColors.lavender : megrumColors.mutedInk}
+                      size={16}
+                    />
+                    <Text style={[styles.threadActionText, thread.reacted ? styles.threadActionTextActive : null]}>
+                      参考 {thread.reactionCount}
+                    </Text>
+                  </Pressable>
+                  <Pressable
+                    accessibilityRole="button"
+                    onPress={toggleThreadBookmark}
+                    style={[styles.threadActionPill, thread.bookmarked ? styles.threadActionPillActive : null]}
+                  >
+                    <IconSymbol
+                      name="star-outline"
+                      color={thread.bookmarked ? megrumColors.lavender : megrumColors.mutedInk}
+                      size={15}
+                    />
+                    <Text style={[styles.threadActionText, thread.bookmarked ? styles.threadActionTextActive : null]}>
+                      保存
+                    </Text>
+                  </Pressable>
+                </View>
               </View>
 
               <Text style={styles.replySectionTitle}>返信</Text>
@@ -284,6 +454,29 @@ export default function MeguriBoardThreadScreen() {
                       <Text style={[styles.replyTime, reply.mine ? styles.replyTimeMine : null]}>
                         {formatRelativeTime(reply.createdAt)}
                       </Text>
+                      <View style={[styles.replyActionRow, reply.mine ? styles.replyActionRowMine : null]}>
+                        <Pressable
+                          accessibilityRole="button"
+                          onPress={() => toggleReplyReaction(reply)}
+                          style={[styles.replyActionPill, reply.reacted ? styles.replyActionPillActive : null]}
+                        >
+                          <IconSymbol
+                            name={reply.reacted ? "heart" : "heart-outline"}
+                            color={reply.reacted ? megrumColors.lavender : megrumColors.mutedInk}
+                            size={13}
+                          />
+                          <Text style={[styles.replyActionText, reply.reacted ? styles.replyActionTextActive : null]}>
+                            {reply.reactionCount}
+                          </Text>
+                        </Pressable>
+                        <Pressable
+                          accessibilityRole="button"
+                          onPress={() => openReplyActions(reply)}
+                          style={styles.replyActionPill}
+                        >
+                          <IconSymbol name="ellipsis-horizontal" color={megrumColors.mutedInk} size={13} />
+                        </Pressable>
+                      </View>
                     </View>
                   </View>
                 ))
@@ -359,6 +552,48 @@ function ScopeBadge({ scope }: { scope: MeguriBoardAudienceScope }) {
       </Text>
     </View>
   );
+}
+
+function CategoryBadge({ category }: { category: Exclude<MeguriBoardThreadCategory, "all"> }) {
+  return (
+    <View style={[styles.categoryBadge, categoryStyle(category)]}>
+      <Text style={[styles.categoryBadgeText, categoryTextStyle(category)]}>
+        {meguriBoardCategoryLabel(category)}
+      </Text>
+    </View>
+  );
+}
+
+function categoryStyle(category: Exclude<MeguriBoardThreadCategory, "all">) {
+  switch (category) {
+    case "question":
+      return styles.categoryBadgeQuestion;
+    case "info":
+      return styles.categoryBadgeInfo;
+    case "trade":
+      return styles.categoryBadgeTrade;
+    case "lost_found":
+      return styles.categoryBadgeLost;
+    case "chat":
+    default:
+      return styles.categoryBadgeChat;
+  }
+}
+
+function categoryTextStyle(category: Exclude<MeguriBoardThreadCategory, "all">) {
+  switch (category) {
+    case "question":
+      return styles.categoryBadgeTextQuestion;
+    case "info":
+      return styles.categoryBadgeTextInfo;
+    case "trade":
+      return styles.categoryBadgeTextTrade;
+    case "lost_found":
+      return styles.categoryBadgeTextLost;
+    case "chat":
+    default:
+      return styles.categoryBadgeTextChat;
+  }
 }
 
 function readParam(value: string | string[] | undefined) {
@@ -452,6 +687,14 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     width: 40,
   },
+  headerActionButton: {
+    alignItems: "center",
+    backgroundColor: "rgba(58,50,74,0.06)",
+    borderRadius: 999,
+    height: 40,
+    justifyContent: "center",
+    width: 40,
+  },
   headerCopy: {
     flex: 1,
     gap: 2,
@@ -521,6 +764,51 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
   },
+  heroBadgeRow: {
+    alignItems: "center",
+    flexDirection: "row",
+    flex: 1,
+    gap: 6,
+  },
+  categoryBadge: {
+    borderRadius: 999,
+    paddingHorizontal: 9,
+    paddingVertical: 4,
+  },
+  categoryBadgeQuestion: {
+    backgroundColor: "rgba(166,149,216,0.16)",
+  },
+  categoryBadgeInfo: {
+    backgroundColor: "rgba(168,212,230,0.26)",
+  },
+  categoryBadgeChat: {
+    backgroundColor: "rgba(58,50,74,0.08)",
+  },
+  categoryBadgeTrade: {
+    backgroundColor: "rgba(243,197,212,0.3)",
+  },
+  categoryBadgeLost: {
+    backgroundColor: "rgba(239,217,155,0.32)",
+  },
+  categoryBadgeText: {
+    fontSize: 10.5,
+    fontWeight: "900",
+  },
+  categoryBadgeTextQuestion: {
+    color: megrumColors.lavender,
+  },
+  categoryBadgeTextInfo: {
+    color: "#4f7e92",
+  },
+  categoryBadgeTextChat: {
+    color: megrumColors.mutedInk,
+  },
+  categoryBadgeTextTrade: {
+    color: "#ba6d8d",
+  },
+  categoryBadgeTextLost: {
+    color: "#9a722c",
+  },
   scopeBadge: {
     borderRadius: 999,
     paddingHorizontal: 9,
@@ -569,6 +857,31 @@ const styles = StyleSheet.create({
     color: megrumColors.mutedInk,
     fontSize: 11.5,
     fontWeight: "800",
+  },
+  threadActions: {
+    flexDirection: "row",
+    gap: 8,
+    marginTop: 4,
+  },
+  threadActionPill: {
+    alignItems: "center",
+    backgroundColor: "rgba(58,50,74,0.06)",
+    borderRadius: 999,
+    flexDirection: "row",
+    gap: 5,
+    minHeight: 32,
+    paddingHorizontal: 11,
+  },
+  threadActionPillActive: {
+    backgroundColor: "rgba(166,149,216,0.16)",
+  },
+  threadActionText: {
+    color: megrumColors.mutedInk,
+    fontSize: 11.5,
+    fontWeight: "900",
+  },
+  threadActionTextActive: {
+    color: megrumColors.lavender,
   },
   replySectionTitle: {
     color: megrumColors.ink,
@@ -662,6 +975,34 @@ const styles = StyleSheet.create({
   },
   replyTimeMine: {
     textAlign: "right",
+  },
+  replyActionRow: {
+    flexDirection: "row",
+    gap: 6,
+    paddingHorizontal: 4,
+  },
+  replyActionRowMine: {
+    justifyContent: "flex-end",
+  },
+  replyActionPill: {
+    alignItems: "center",
+    backgroundColor: "rgba(58,50,74,0.06)",
+    borderRadius: 999,
+    flexDirection: "row",
+    gap: 3,
+    minHeight: 24,
+    paddingHorizontal: 8,
+  },
+  replyActionPillActive: {
+    backgroundColor: "rgba(166,149,216,0.16)",
+  },
+  replyActionText: {
+    color: megrumColors.mutedInk,
+    fontSize: 10.5,
+    fontWeight: "900",
+  },
+  replyActionTextActive: {
+    color: megrumColors.lavender,
   },
   composer: {
     alignItems: "flex-end",

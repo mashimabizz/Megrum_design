@@ -10,6 +10,14 @@ export type MeguriBoardAudienceScope =
   | "same_spot"
   | "global";
 export type MeguriBoardViewMode = "nearby_3km" | "same_prefecture";
+export type MeguriBoardThreadCategory =
+  | "all"
+  | "question"
+  | "info"
+  | "chat"
+  | "trade"
+  | "lost_found";
+export type MeguriBoardThreadSort = "active" | "new" | "hot" | "saved";
 
 export type MeguriBoardViewerContext = {
   coordinate?: MegrumCoordinate | null;
@@ -34,7 +42,12 @@ export type MeguriBoardThread = {
   authorPrimaryArea: string | null;
   audienceScope: MeguriBoardAudienceScope;
   body: string;
+  bookmarkCount: number;
+  bookmarked: boolean;
+  category: Exclude<MeguriBoardThreadCategory, "all">;
   createdAt: number;
+  hidden: boolean;
+  isPinned: boolean;
   latestActivityAt: number;
   latestReplyPreview: string | null;
   mine: boolean;
@@ -42,10 +55,16 @@ export type MeguriBoardThread = {
   originLat: number | null;
   originLng: number | null;
   prefecture: string | null;
+  reacted: boolean;
+  reactionCount: number;
+  readAt: number | null;
+  reported: boolean;
   replyCount: number;
   spotKey: string | null;
   spotLabel: string | null;
+  status: "visible" | "hidden" | "archived" | "locked";
   title: string;
+  viewCount: number;
 };
 
 export type MeguriBoardReply = {
@@ -57,6 +76,9 @@ export type MeguriBoardReply = {
   createdAt: number;
   id: string;
   mine: boolean;
+  reacted: boolean;
+  reactionCount: number;
+  reported: boolean;
   threadId: string;
 };
 
@@ -78,6 +100,7 @@ type RemoteReplyRow = Record<string, unknown> & {
 type CreateMeguriBoardThreadInput = {
   audienceScope: MeguriBoardAudienceScope;
   body: string;
+  category?: Exclude<MeguriBoardThreadCategory, "all">;
   origin?: MegrumCoordinate | null;
   prefecture: string | null;
   previewMode?: boolean;
@@ -96,9 +119,27 @@ type CreateMeguriBoardReplyInput = {
 
 const THREADS_KEY = "meguri.board.threads.v1";
 const REPLIES_KEY = "meguri.board.replies.v1";
+const THREAD_STATE_KEY = "meguri.board.threadState.v1";
+const REPLY_STATE_KEY = "meguri.board.replyState.v1";
 
 const MAX_LOCAL_THREADS = 120;
 const MAX_LOCAL_REPLIES = 480;
+
+type LocalThreadState = {
+  bookmarked?: boolean;
+  hidden?: boolean;
+  reacted?: boolean;
+  readAt?: number | null;
+  reported?: boolean;
+};
+
+type LocalReplyState = {
+  reacted?: boolean;
+  reported?: boolean;
+};
+
+type LocalThreadStateMap = Record<string, LocalThreadState>;
+type LocalReplyStateMap = Record<string, LocalReplyState>;
 
 const PREVIEW_AUTHORS = {
   me: {
@@ -138,6 +179,30 @@ export const MEGURI_BOARD_AUDIENCE_OPTIONS = [
   "same_prefecture",
 ] as const satisfies readonly MeguriBoardAudienceScope[];
 
+export const MEGURI_BOARD_CATEGORY_OPTIONS = [
+  "all",
+  "question",
+  "info",
+  "chat",
+  "trade",
+  "lost_found",
+] as const satisfies readonly MeguriBoardThreadCategory[];
+
+export const MEGURI_BOARD_COMPOSER_CATEGORY_OPTIONS = [
+  "question",
+  "info",
+  "chat",
+  "trade",
+  "lost_found",
+] as const satisfies readonly Exclude<MeguriBoardThreadCategory, "all">[];
+
+export const MEGURI_BOARD_SORT_OPTIONS = [
+  "active",
+  "new",
+  "hot",
+  "saved",
+] as const satisfies readonly MeguriBoardThreadSort[];
+
 export function meguriBoardAudienceLabel(scope: MeguriBoardAudienceScope) {
   switch (scope) {
     case "nearby_3km":
@@ -150,6 +215,74 @@ export function meguriBoardAudienceLabel(scope: MeguriBoardAudienceScope) {
     default:
       return "全体";
   }
+}
+
+export function meguriBoardCategoryLabel(category: MeguriBoardThreadCategory) {
+  switch (category) {
+    case "all":
+      return "すべて";
+    case "question":
+      return "質問";
+    case "info":
+      return "情報";
+    case "chat":
+      return "雑談";
+    case "trade":
+      return "交換";
+    case "lost_found":
+      return "落とし物";
+    default:
+      return "雑談";
+  }
+}
+
+export function meguriBoardSortLabel(sort: MeguriBoardThreadSort) {
+  switch (sort) {
+    case "active":
+      return "更新";
+    case "new":
+      return "新着";
+    case "hot":
+      return "人気";
+    case "saved":
+      return "保存";
+    default:
+      return "更新";
+  }
+}
+
+export function filterMeguriBoardThreads(
+  threads: MeguriBoardThread[],
+  options: {
+    category?: MeguriBoardThreadCategory;
+    query?: string;
+    sort?: MeguriBoardThreadSort;
+  } = {},
+) {
+  const category = options.category ?? "all";
+  const sort = options.sort ?? "active";
+  const query = normalizeSearchQuery(options.query);
+  return [...threads]
+    .filter((thread) => !thread.hidden && thread.status === "visible")
+    .filter((thread) => category === "all" || thread.category === category)
+    .filter((thread) => {
+      if (!query) return true;
+      const haystack = normalizeSearchQuery(
+        [
+          thread.title,
+          thread.body,
+          thread.latestReplyPreview,
+          thread.authorName,
+          thread.spotLabel,
+          thread.prefecture,
+          meguriBoardCategoryLabel(thread.category),
+        ]
+          .filter(Boolean)
+          .join(" "),
+      );
+      return haystack.includes(query);
+    })
+    .sort((left, right) => compareThreads(left, right, sort));
 }
 
 export function meguriBoardAudienceMeta(
@@ -196,10 +329,14 @@ export async function loadMeguriBoardThreads(
     ...(preview?.replies ?? []),
     ...localReplies,
   ]);
-  return overlayReplySummaries(
-    mergedThreads.filter((thread) => canViewMeguriBoardThread(thread, viewer, viewMode)),
-    mergedReplies,
-  );
+  const threadState = await loadLocalMeguriBoardThreadState();
+  return hydrateMeguriBoardThreads(
+    overlayReplySummaries(
+      mergedThreads.filter((thread) => canViewMeguriBoardThread(thread, viewer, viewMode)),
+      mergedReplies,
+    ),
+    threadState,
+  ).filter((thread) => !thread.hidden);
 }
 
 export async function loadMeguriBoardMapThreads(
@@ -246,12 +383,16 @@ export async function loadMeguriBoardThreadDetail(
   if (!thread) {
     return { replies: [] as MeguriBoardReply[], thread: null };
   }
-  const replies = dedupeReplies([
+  const [threadState, replyState] = await Promise.all([
+    loadLocalMeguriBoardThreadState(),
+    loadLocalMeguriBoardReplyState(),
+  ]);
+  const replies = hydrateMeguriBoardReplies(dedupeReplies([
     ...(preview?.replies.filter((reply) => reply.threadId === threadId) ?? []),
     ...localReplies.filter((reply) => reply.threadId === threadId),
     ...remoteReplies,
-  ]).sort((left, right) => left.createdAt - right.createdAt);
-  return { replies, thread };
+  ]), replyState).sort((left, right) => left.createdAt - right.createdAt);
+  return { replies, thread: hydrateMeguriBoardThread(thread, threadState) };
 }
 
 export async function createMeguriBoardThread(
@@ -270,20 +411,31 @@ export async function createMeguriBoardThread(
     authorName: actor.displayName,
     authorPrimaryArea: actor.primaryArea,
     audienceScope: input.audienceScope,
+    bookmarkCount: 0,
+    bookmarked: false,
     body: input.body.trim(),
+    category: normalizeBoardCategory(input.category),
     createdAt,
     distanceMeters: input.origin ? 0 : null,
+    hidden: false,
     id: `meguri-board-thread-${createdAt}`,
+    isPinned: false,
     latestActivityAt: createdAt,
     latestReplyPreview: null,
     mine: true,
     originLat: input.origin?.latitude ?? null,
     originLng: input.origin?.longitude ?? null,
     prefecture: input.prefecture || actor.primaryArea || null,
+    reacted: false,
+    reactionCount: 0,
+    readAt: null,
+    reported: false,
     replyCount: 0,
     spotKey: input.spotKey,
     spotLabel: input.spotLabel,
+    status: "visible",
     title: input.title.trim(),
+    viewCount: 0,
   };
   await storeLocalMeguriBoardThread(localThread);
   return localThread;
@@ -308,10 +460,73 @@ export async function appendMeguriBoardReply(
     createdAt,
     id: `meguri-board-reply-${createdAt}`,
     mine: true,
+    reacted: false,
+    reactionCount: 0,
+    reported: false,
     threadId: input.threadId,
   };
   await storeLocalMeguriBoardReply(reply);
   return reply;
+}
+
+export async function markMeguriBoardThreadRead(threadId: string) {
+  if (!threadId) return;
+  await upsertThreadState(threadId, { readAt: Date.now() });
+  await callBoardStateRpc("mark_meguri_board_thread_read", { p_thread_id: threadId });
+}
+
+export async function setMeguriBoardThreadBookmarked(threadId: string, bookmarked: boolean) {
+  if (!threadId) return bookmarked;
+  await upsertThreadState(threadId, { bookmarked });
+  await callBoardStateRpc("set_meguri_board_thread_bookmark", {
+    p_enabled: bookmarked,
+    p_thread_id: threadId,
+  });
+  return bookmarked;
+}
+
+export async function setMeguriBoardThreadReacted(threadId: string, reacted: boolean) {
+  if (!threadId) return reacted;
+  await upsertThreadState(threadId, { reacted });
+  await callBoardStateRpc("set_meguri_board_thread_reaction", {
+    p_enabled: reacted,
+    p_thread_id: threadId,
+  });
+  return reacted;
+}
+
+export async function hideMeguriBoardThread(threadId: string) {
+  if (!threadId) return;
+  await upsertThreadState(threadId, { hidden: true });
+  await callBoardStateRpc("hide_meguri_board_thread", { p_thread_id: threadId });
+}
+
+export async function reportMeguriBoardThread(threadId: string, reason = "user_report") {
+  if (!threadId) return;
+  await upsertThreadState(threadId, { reported: true });
+  await callBoardStateRpc("report_meguri_board_thread", {
+    p_reason: reason,
+    p_thread_id: threadId,
+  });
+}
+
+export async function setMeguriBoardReplyReacted(replyId: string, reacted: boolean) {
+  if (!replyId) return reacted;
+  await upsertReplyState(replyId, { reacted });
+  await callBoardStateRpc("set_meguri_board_reply_reaction", {
+    p_enabled: reacted,
+    p_reply_id: replyId,
+  });
+  return reacted;
+}
+
+export async function reportMeguriBoardReply(replyId: string, reason = "user_report") {
+  if (!replyId) return;
+  await upsertReplyState(replyId, { reported: true });
+  await callBoardStateRpc("report_meguri_board_reply", {
+    p_reason: reason,
+    p_reply_id: replyId,
+  });
 }
 
 function shouldUsePreviewMeguriBoard(viewerId?: string | null, previewMode?: boolean) {
@@ -401,7 +616,7 @@ async function loadLocalMeguriBoardReplies(): Promise<MeguriBoardReply[]> {
   try {
     const parsed = JSON.parse(raw);
     if (!Array.isArray(parsed)) return [];
-    return parsed.filter(isMeguriBoardReply);
+    return parsed.filter(isMeguriBoardReply).map(normalizeStoredReply);
   } catch {
     return [];
   }
@@ -539,6 +754,7 @@ async function appendRemoteMeguriBoardThread(
     author_id: actor.userId,
     audience_scope: input.audienceScope,
     body: input.body.trim(),
+    category: normalizeBoardCategory(input.category),
     origin_lat: input.origin?.latitude ?? null,
     origin_lng: input.origin?.longitude ?? null,
     prefecture: input.prefecture || actor.primaryArea || null,
@@ -552,7 +768,7 @@ async function appendRemoteMeguriBoardThread(
     .select(remoteThreadSelect(true))
     .single();
   if (error && shouldRetryLegacyBoardInsert(error)) {
-    const { origin_lat: _originLat, origin_lng: _originLng, ...rest } = payload;
+    const { category: _category, origin_lat: _originLat, origin_lng: _originLng, ...rest } = payload;
     const retry = await supabase
       .from("meguri_board_threads")
       .insert({
@@ -630,9 +846,14 @@ function remoteMeguriBoardThreadToLocal(
       "めぐりユーザー",
     authorPrimaryArea: nullableStringValue(author.primary_area),
     audienceScope: normalizeAudienceScope(row.audience_scope),
+    bookmarkCount: numberValue(row.bookmark_count, 0),
+    bookmarked: booleanValue(row.viewer_bookmarked),
     body,
+    category: normalizeBoardCategory(row.category),
     createdAt: timestampValue(row.created_at, Date.now()),
     id,
+    hidden: booleanValue(row.viewer_hidden),
+    isPinned: booleanValue(row.is_pinned),
     latestActivityAt: timestampValue(row.latest_activity_at, timestampValue(row.created_at, Date.now())),
     latestReplyPreview: nullableStringValue(row.latest_reply_preview),
     mine: authorId === viewerId,
@@ -640,10 +861,16 @@ function remoteMeguriBoardThreadToLocal(
     originLat: nullableNumberValue(row.origin_lat),
     originLng: nullableNumberValue(row.origin_lng),
     prefecture: nullableStringValue(row.prefecture),
+    reacted: booleanValue(row.viewer_reacted),
+    reactionCount: numberValue(row.reaction_count, 0),
+    readAt: timestampValueOrNull(row.viewer_read_at),
+    reported: booleanValue(row.viewer_reported),
     replyCount: numberValue(row.reply_count, 0),
     spotKey: nullableStringValue(row.spot_key),
     spotLabel: nullableStringValue(row.spot_label),
+    status: normalizeBoardStatus(row.status),
     title,
+    viewCount: numberValue(row.view_count, 0),
   };
 }
 
@@ -669,6 +896,9 @@ function remoteMeguriBoardReplyToLocal(
     createdAt: timestampValue(row.created_at, Date.now()),
     id,
     mine: authorId === viewerId,
+    reacted: booleanValue(row.viewer_reacted),
+    reactionCount: numberValue(row.reaction_count, 0),
+    reported: booleanValue(row.viewer_reported),
     threadId,
   };
 }
@@ -713,6 +943,7 @@ function createPreviewMeguriBoardDataset() {
         PREVIEW_AUTHORS.michi,
         "物販列いまどれくらい？",
         "25ゲート前から見える範囲で、今から並ぶか迷っています。",
+        "question",
         "nearby_3km",
         "tokyo-dome-gate25",
         "東京ドーム 25ゲート前",
@@ -727,6 +958,7 @@ function createPreviewMeguriBoardDataset() {
         PREVIEW_AUTHORS.yui,
         "終演後の駅導線どんな感じでした？",
         "有明アリーナから出たあと、混み方が穏やかなルートがあれば知りたいです。",
+        "info",
         "same_prefecture",
         "ariake-arena-main",
         "有明アリーナ",
@@ -741,6 +973,7 @@ function createPreviewMeguriBoardDataset() {
         PREVIEW_AUTHORS.kiko,
         "今週の現地で持っていって助かったもの",
         "遠征組でも現地勢でも、これは便利だったという小物があれば知りたいです。",
+        "chat",
         "same_prefecture",
         null,
         "今週の現地",
@@ -755,6 +988,7 @@ function createPreviewMeguriBoardDataset() {
         PREVIEW_AUTHORS.kiko,
         "京セラの入場列、手前は空いてます",
         "2ゲート寄りはまだ余裕ありました。大阪勢向けのメモです。",
+        "info",
         "nearby_3km",
         "kyocera-dome-gate2",
         "京セラドーム 2ゲート前",
@@ -776,6 +1010,7 @@ function createPreviewThread(
   author: (typeof PREVIEW_AUTHORS)[keyof typeof PREVIEW_AUTHORS],
   title: string,
   body: string,
+  category: Exclude<MeguriBoardThreadCategory, "all">,
   audienceScope: MeguriBoardAudienceScope,
   spotKey: string | null,
   spotLabel: string | null,
@@ -791,9 +1026,14 @@ function createPreviewThread(
     authorName: author.displayName,
     authorPrimaryArea: author.primaryArea,
     audienceScope,
+    bookmarkCount: 0,
+    bookmarked: false,
     body,
+    category,
     createdAt,
+    hidden: false,
     id,
+    isPinned: false,
     latestActivityAt: createdAt,
     latestReplyPreview: null,
     mine: false,
@@ -801,10 +1041,16 @@ function createPreviewThread(
     originLat,
     originLng,
     prefecture,
+    reacted: false,
+    reactionCount: 0,
+    readAt: null,
+    reported: false,
     replyCount: 0,
     spotKey,
     spotLabel,
+    status: "visible",
     title,
+    viewCount: 0,
   };
 }
 
@@ -824,6 +1070,9 @@ function createPreviewReply(
     createdAt,
     id,
     mine: false,
+    reacted: false,
+    reactionCount: 0,
+    reported: false,
     threadId,
   };
 }
@@ -874,9 +1123,29 @@ function normalizeStoredThread(thread: MeguriBoardThread): MeguriBoardThread {
   return {
     ...thread,
     audienceScope: normalizeAudienceScope(thread.audienceScope),
+    bookmarkCount: numberValue(thread.bookmarkCount, 0),
+    bookmarked: Boolean(thread.bookmarked),
+    category: normalizeBoardCategory(thread.category),
     distanceMeters: nullableNumberValue(thread.distanceMeters),
+    hidden: Boolean(thread.hidden),
+    isPinned: Boolean(thread.isPinned),
     originLat: nullableNumberValue(thread.originLat),
     originLng: nullableNumberValue(thread.originLng),
+    reacted: Boolean(thread.reacted),
+    reactionCount: numberValue(thread.reactionCount, 0),
+    readAt: nullableNumberValue(thread.readAt),
+    reported: Boolean(thread.reported),
+    status: normalizeBoardStatus(thread.status),
+    viewCount: numberValue(thread.viewCount, 0),
+  };
+}
+
+function normalizeStoredReply(reply: MeguriBoardReply): MeguriBoardReply {
+  return {
+    ...reply,
+    reacted: Boolean(reply.reacted),
+    reactionCount: numberValue(reply.reactionCount, 0),
+    reported: Boolean(reply.reported),
   };
 }
 
@@ -929,6 +1198,116 @@ function remoteReplySelect() {
   ].join(", ");
 }
 
+async function loadLocalMeguriBoardThreadState(): Promise<LocalThreadStateMap> {
+  const raw = await AsyncStorage.getItem(THREAD_STATE_KEY);
+  if (!raw) return {};
+  try {
+    const parsed = JSON.parse(raw);
+    return objectValue(parsed) as LocalThreadStateMap;
+  } catch {
+    return {};
+  }
+}
+
+async function loadLocalMeguriBoardReplyState(): Promise<LocalReplyStateMap> {
+  const raw = await AsyncStorage.getItem(REPLY_STATE_KEY);
+  if (!raw) return {};
+  try {
+    const parsed = JSON.parse(raw);
+    return objectValue(parsed) as LocalReplyStateMap;
+  } catch {
+    return {};
+  }
+}
+
+async function upsertThreadState(threadId: string, patch: LocalThreadState) {
+  const current = await loadLocalMeguriBoardThreadState();
+  const next = {
+    ...current,
+    [threadId]: {
+      ...(current[threadId] ?? {}),
+      ...patch,
+    },
+  };
+  await AsyncStorage.setItem(THREAD_STATE_KEY, JSON.stringify(next));
+}
+
+async function upsertReplyState(replyId: string, patch: LocalReplyState) {
+  const current = await loadLocalMeguriBoardReplyState();
+  const next = {
+    ...current,
+    [replyId]: {
+      ...(current[replyId] ?? {}),
+      ...patch,
+    },
+  };
+  await AsyncStorage.setItem(REPLY_STATE_KEY, JSON.stringify(next));
+}
+
+function hydrateMeguriBoardThreads(
+  threads: MeguriBoardThread[],
+  state: LocalThreadStateMap,
+) {
+  return threads.map((thread) => hydrateMeguriBoardThread(thread, state));
+}
+
+function hydrateMeguriBoardThread(
+  thread: MeguriBoardThread,
+  state: LocalThreadStateMap,
+) {
+  const local = state[thread.id];
+  if (!local) return thread;
+  return {
+    ...thread,
+    bookmarkCount: adjustCount(thread.bookmarkCount, thread.bookmarked, local.bookmarked),
+    bookmarked: local.bookmarked ?? thread.bookmarked,
+    hidden: local.hidden ?? thread.hidden,
+    reacted: local.reacted ?? thread.reacted,
+    reactionCount: adjustCount(thread.reactionCount, thread.reacted, local.reacted),
+    readAt: local.readAt ?? thread.readAt,
+    reported: local.reported ?? thread.reported,
+  };
+}
+
+function hydrateMeguriBoardReplies(
+  replies: MeguriBoardReply[],
+  state: LocalReplyStateMap,
+) {
+  return replies.map((reply) => {
+    const local = state[reply.id];
+    if (!local) return reply;
+    return {
+      ...reply,
+      reacted: local.reacted ?? reply.reacted,
+      reactionCount: adjustCount(reply.reactionCount, reply.reacted, local.reacted),
+      reported: local.reported ?? reply.reported,
+    };
+  });
+}
+
+function adjustCount(count: number, currentValue: boolean, nextValue?: boolean) {
+  if (typeof nextValue !== "boolean" || currentValue === nextValue) return count;
+  return Math.max(0, count + (nextValue ? 1 : -1));
+}
+
+async function callBoardStateRpc(
+  fn: string,
+  params: Record<string, unknown>,
+) {
+  if (!supabase || !hasSupabaseConfig) return;
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return;
+  const id = params.p_thread_id ?? params.p_reply_id;
+  if (typeof id !== "string" || !isUuidLike(id)) return;
+  try {
+    await supabase.rpc(fn, params);
+  } catch {
+    // Local state already reflects the action; remote sync can lag until the DB migration is applied.
+  }
+}
+
 function authorObject(row: RemoteThreadRow | RemoteReplyRow): Record<string, unknown> {
   const nested = relationObject(row.author);
   if (Object.keys(nested).length > 0) return nested;
@@ -962,8 +1341,37 @@ function numberValue(value: unknown, fallback: number) {
   return typeof value === "number" && Number.isFinite(value) ? value : fallback;
 }
 
+function booleanValue(value: unknown) {
+  return value === true;
+}
+
 function nullableNumberValue(value: unknown) {
   return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
+function timestampValueOrNull(value: unknown) {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value !== "string") return null;
+  const parsed = Date.parse(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function normalizeBoardCategory(value: unknown): Exclude<MeguriBoardThreadCategory, "all"> {
+  if (
+    value === "question" ||
+    value === "info" ||
+    value === "chat" ||
+    value === "trade" ||
+    value === "lost_found"
+  ) {
+    return value;
+  }
+  return "chat";
+}
+
+function normalizeBoardStatus(value: unknown): MeguriBoardThread["status"] {
+  if (value === "hidden" || value === "archived" || value === "locked") return value;
+  return "visible";
 }
 
 function normalizeAudienceScope(value: unknown): MeguriBoardAudienceScope {
@@ -983,6 +1391,34 @@ function timestampValue(value: unknown, fallback: number) {
   if (typeof value !== "string") return fallback;
   const parsed = Date.parse(value);
   return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+function normalizeSearchQuery(value: string | null | undefined) {
+  return (value ?? "").replace(/\s+/g, " ").trim().toLowerCase();
+}
+
+function compareThreads(
+  left: MeguriBoardThread,
+  right: MeguriBoardThread,
+  sort: MeguriBoardThreadSort,
+) {
+  if (left.isPinned !== right.isPinned) return left.isPinned ? -1 : 1;
+  switch (sort) {
+    case "new":
+      return right.createdAt - left.createdAt;
+    case "hot": {
+      const leftScore = left.replyCount * 3 + left.reactionCount * 2 + left.bookmarkCount + left.viewCount * 0.1;
+      const rightScore = right.replyCount * 3 + right.reactionCount * 2 + right.bookmarkCount + right.viewCount * 0.1;
+      if (leftScore !== rightScore) return rightScore - leftScore;
+      return right.latestActivityAt - left.latestActivityAt;
+    }
+    case "saved":
+      if (left.bookmarked !== right.bookmarked) return left.bookmarked ? -1 : 1;
+      return right.latestActivityAt - left.latestActivityAt;
+    case "active":
+    default:
+      return right.latestActivityAt - left.latestActivityAt;
+  }
 }
 
 function normalizeAreaKey(value: string | null) {
@@ -1020,6 +1456,7 @@ function shouldRetryLegacyBoardInsert(error: unknown) {
   return (
     message.includes("origin_lat") ||
     message.includes("origin_lng") ||
+    message.includes("category") ||
     message.includes("audience_scope") ||
     message.includes("meguri_board_threads_audience_scope_check") ||
     message.includes("meguri_board_scope_context")

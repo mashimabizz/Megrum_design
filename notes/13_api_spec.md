@@ -951,6 +951,9 @@ AW削除。
         "id": "uuid",
         "title": "物販列いまどれくらい？",
         "body": "string",
+        "category": "question|info|chat|trade|lost_found",
+        "status": "visible|hidden|archived|locked",
+        "is_pinned": false,
         "audience_scope": "nearby_3km|same_prefecture",
         "spot_key": "tokyo-dome-gate25",
         "spot_label": "東京ドーム 25ゲート前",
@@ -959,8 +962,16 @@ AW削除。
         "origin_lng": 139.7519,
         "distance_m": 420,
         "reply_count": 2,
+        "reaction_count": 4,
+        "bookmark_count": 1,
+        "view_count": 12,
         "latest_reply_preview": "string?",
         "latest_activity_at": "2026-05-29T07:12:00Z",
+        "viewer_bookmarked": false,
+        "viewer_reacted": false,
+        "viewer_hidden": false,
+        "viewer_reported": false,
+        "viewer_read_at": "2026-05-29T07:20:00Z",
         "author": { "id": "uuid", "display_name": "string", "handle": "string?" }
       }
     ]
@@ -982,6 +993,7 @@ AW削除。
   {
     "title": "string",
     "body": "string",
+    "category": "question|info|chat|trade|lost_found",
     "audience_scope": "nearby_3km|same_prefecture",
     "spot_key": "string?",
     "spot_label": "string?",
@@ -991,7 +1003,7 @@ AW削除。
   }
   ```
 - **Response 201**: 作成された thread
-- **備考**: `nearby_3km` は `origin_lat` / `origin_lng` / `prefecture` 必須。基準地点はスレッドを立てた時の位置情報
+- **備考**: `nearby_3km` は `origin_lat` / `origin_lng` / `prefecture` 必須。基準地点はスレッドを立てた時の位置情報。`category` 未指定時は `chat`
 - **Screen**: `meguri-board`
 
 ### GET /api/v1/meguri-board/threads/:id
@@ -1004,6 +1016,7 @@ AW削除。
   - `viewer_lng?=139.7671`
   - `prefecture?=東京都`
 - **Response 200**: `thread` 本体 + `replies[]`
+- **Side effects**: 詳細表示時に `meguri_board_thread_reads.read_at` を更新し、`view_count` を増やす
 - **Screen**: `meguri-board-thread`
 
 ### POST /api/v1/meguri-board/threads/:id/replies
@@ -1021,9 +1034,75 @@ AW削除。
     "body": "string"
   }
   ```
-- **Response 201**: `{ id, thread_id, body, created_at, author }`
-- **備考**: MVP はテキストのみ、編集・削除なし
+- **Response 201**: `{ id, thread_id, body, reaction_count, created_at, viewer_reacted, viewer_reported, author }`
+- **備考**: テキストのみ。編集・削除は提供せず、通報・運営非表示で対応する
 - **Screen**: `meguri-board-thread`
+
+### POST /api/v1/meguri-board/threads/:id/read
+
+スポット掲示板スレッドを既読にする。
+
+- **Auth**: 必須（見える範囲の thread のみ）
+- **Response 204**: no content
+- **Side effects**: `meguri_board_thread_reads` を upsert、`view_count` を加算
+- **Screen**: `meguri-board-thread`
+
+### PUT /api/v1/meguri-board/threads/:id/bookmark
+
+スレッド保存/保存解除。
+
+- **Auth**: 必須
+- **Request**: `{ "enabled": true }`
+- **Response 204**: no content
+- **Side effects**: `meguri_board_thread_bookmarks` を insert/delete、`bookmark_count` を同期
+- **Screen**: `meguri-board`, `meguri-board-thread`
+
+### PUT /api/v1/meguri-board/threads/:id/reaction
+
+スレッドへの「参考になった」リアクション。
+
+- **Auth**: 必須
+- **Request**: `{ "enabled": true, "reaction_type": "useful" }`
+- **Response 204**: no content
+- **Side effects**: `meguri_board_thread_reactions` を insert/delete、`reaction_count` を同期
+- **Screen**: `meguri-board`, `meguri-board-thread`
+
+### PUT /api/v1/meguri-board/replies/:id/reaction
+
+返信への「参考になった」リアクション。
+
+- **Auth**: 必須
+- **Request**: `{ "enabled": true, "reaction_type": "useful" }`
+- **Response 204**: no content
+- **Side effects**: `meguri_board_reply_reactions` を insert/delete、`reaction_count` を同期
+- **Screen**: `meguri-board-thread`
+
+### POST /api/v1/meguri-board/threads/:id/hide
+
+ユーザー単位でスレッドを非表示にする。
+
+- **Auth**: 必須
+- **Response 204**: no content
+- **Side effects**: `meguri_board_hidden_threads` に保存。以降、本人の一覧から除外
+- **Screen**: `meguri-board`, `meguri-board-thread`
+
+### POST /api/v1/meguri-board/reports
+
+スレッドまたは返信を通報する。
+
+- **Auth**: 必須
+- **Request**:
+  ```json
+  {
+    "thread_id": "uuid?",
+    "reply_id": "uuid?",
+    "reason": "user_report",
+    "body": "string?"
+  }
+  ```
+- **Response 201**: `{ id, status, created_at }`
+- **備考**: `thread_id` と `reply_id` はどちらか一方だけ指定。運営画面で `open` / `reviewing` / `resolved` / `rejected` を管理する
+- **Screen**: `meguri-board`, `meguri-board-thread`
 
 ---
 

@@ -4,6 +4,7 @@ import SegmentedControl from "@react-native-segmented-control/segmented-control"
 import {
   ActionSheetIOS,
   ActivityIndicator,
+  Alert,
   Modal,
   Platform,
   Pressable,
@@ -19,12 +20,24 @@ import { PrimaryButton } from "../src/components/PrimaryButton";
 import { Screen } from "../src/components/Screen";
 import {
   MEGURI_BOARD_AUDIENCE_OPTIONS,
+  MEGURI_BOARD_CATEGORY_OPTIONS,
+  MEGURI_BOARD_COMPOSER_CATEGORY_OPTIONS,
+  MEGURI_BOARD_SORT_OPTIONS,
   createMeguriBoardThread,
+  filterMeguriBoardThreads,
+  hideMeguriBoardThread,
   loadMeguriBoardThreads,
   meguriBoardAudienceLabel,
   meguriBoardAudienceMeta,
+  meguriBoardCategoryLabel,
+  meguriBoardSortLabel,
+  reportMeguriBoardThread,
+  setMeguriBoardThreadBookmarked,
+  setMeguriBoardThreadReacted,
   type MeguriBoardActor,
   type MeguriBoardAudienceScope,
+  type MeguriBoardThreadCategory,
+  type MeguriBoardThreadSort,
   type MeguriBoardThread,
   type MeguriBoardViewMode,
   type MeguriBoardViewerContext,
@@ -73,11 +86,16 @@ export default function MeguriBoardScreen() {
   const [composerOpen, setComposerOpen] = useState(false);
   const [composerTitle, setComposerTitle] = useState("");
   const [composerBody, setComposerBody] = useState("");
+  const [composerCategory, setComposerCategory] =
+    useState<Exclude<MeguriBoardThreadCategory, "all">>("question");
   const [composerScope, setComposerScope] = useState<MeguriBoardAudienceScope>("nearby_3km");
   const [composerError, setComposerError] = useState<string | null>(null);
   const [locationContext, setLocationContext] = useState<MegrumLocationContext | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [viewMode, setViewMode] = useState<MeguriBoardViewMode>("nearby_3km");
+  const [categoryFilter, setCategoryFilter] = useState<MeguriBoardThreadCategory>("all");
+  const [searchText, setSearchText] = useState("");
+  const [sortMode, setSortMode] = useState<MeguriBoardThreadSort>("active");
 
   const actor = useMemo<MeguriBoardActor>(
     () => ({
@@ -120,16 +138,26 @@ export default function MeguriBoardScreen() {
     ],
   );
 
+  const visibleThreads = useMemo(
+    () =>
+      filterMeguriBoardThreads(threads, {
+        category: categoryFilter,
+        query: searchText,
+        sort: sortMode,
+      }),
+    [categoryFilter, searchText, sortMode, threads],
+  );
+
   const sections = useMemo(
     () =>
       [
         {
           key: viewMode,
           title: viewMode === "nearby_3km" ? "近くのスレッド" : "都道府県のスレッド",
-          rows: threads,
+          rows: visibleThreads,
         },
       ].filter((section) => section.rows.length > 0),
-    [threads, viewMode],
+    [viewMode, visibleThreads],
   );
 
   const refreshThreads = useCallback(async (prefectureOverride?: string | null) => {
@@ -252,6 +280,7 @@ export default function MeguriBoardScreen() {
       {
         audienceScope: composerScope,
         body,
+        category: composerCategory,
         origin: actionContext.coordinate ?? null,
         prefecture: actionContext.prefecture,
         previewMode,
@@ -269,6 +298,7 @@ export default function MeguriBoardScreen() {
     setComposerOpen(false);
     setComposerTitle("");
     setComposerBody("");
+    setComposerCategory("question");
     setComposerScope("nearby_3km");
     setThreads((current) =>
       [thread, ...current.filter((candidate) => candidate.id !== thread.id)].sort(
@@ -287,6 +317,74 @@ export default function MeguriBoardScreen() {
         viewMode,
       },
     });
+  }
+
+  function updateThreadLocally(nextThread: MeguriBoardThread) {
+    setThreads((current) =>
+      current
+        .map((thread) => (thread.id === nextThread.id ? nextThread : thread))
+        .sort((left, right) => right.latestActivityAt - left.latestActivityAt),
+    );
+  }
+
+  async function toggleThreadBookmark(thread: MeguriBoardThread) {
+    const bookmarked = !thread.bookmarked;
+    updateThreadLocally({
+      ...thread,
+      bookmarkCount: Math.max(0, thread.bookmarkCount + (bookmarked ? 1 : -1)),
+      bookmarked,
+    });
+    await setMeguriBoardThreadBookmarked(thread.id, bookmarked);
+  }
+
+  async function toggleThreadReaction(thread: MeguriBoardThread) {
+    const reacted = !thread.reacted;
+    updateThreadLocally({
+      ...thread,
+      reacted,
+      reactionCount: Math.max(0, thread.reactionCount + (reacted ? 1 : -1)),
+    });
+    await setMeguriBoardThreadReacted(thread.id, reacted);
+  }
+
+  async function hideThread(thread: MeguriBoardThread) {
+    setThreads((current) => current.filter((candidate) => candidate.id !== thread.id));
+    await hideMeguriBoardThread(thread.id);
+  }
+
+  async function reportThread(thread: MeguriBoardThread) {
+    updateThreadLocally({ ...thread, reported: true });
+    await reportMeguriBoardThread(thread.id);
+    Alert.alert("通報しました", "確認して対応します。");
+  }
+
+  function openThreadActions(thread: MeguriBoardThread) {
+    const labels = [
+      thread.bookmarked ? "保存を解除" : "保存する",
+      thread.reacted ? "参考になったを取り消す" : "参考になった",
+      "非表示にする",
+      thread.reported ? "通報済み" : "通報する",
+      "キャンセル",
+    ];
+    if (Platform.OS === "ios") {
+      ActionSheetIOS.showActionSheetWithOptions(
+        {
+          cancelButtonIndex: 4,
+          destructiveButtonIndex: 2,
+          disabledButtonIndices: thread.reported ? [3] : undefined,
+          options: labels,
+          title: thread.title,
+        },
+        (index) => {
+          if (index === 0) void toggleThreadBookmark(thread);
+          if (index === 1) void toggleThreadReaction(thread);
+          if (index === 2) void hideThread(thread);
+          if (index === 3 && !thread.reported) void reportThread(thread);
+        },
+      );
+      return;
+    }
+    void toggleThreadBookmark(thread);
   }
 
   return (
@@ -342,6 +440,61 @@ export default function MeguriBoardScreen() {
               )
             }
           />
+
+          <View style={styles.searchBox}>
+            <IconSymbol name="search" color="rgba(58,50,74,0.42)" size={17} />
+            <TextInput
+              autoCapitalize="none"
+              clearButtonMode="while-editing"
+              onChangeText={setSearchText}
+              placeholder="スレッドを検索"
+              placeholderTextColor="rgba(58,50,74,0.34)"
+              style={styles.searchInput}
+              value={searchText}
+            />
+          </View>
+
+          <ScrollView
+            horizontal
+            contentContainerStyle={styles.filterRail}
+            showsHorizontalScrollIndicator={false}
+          >
+            {MEGURI_BOARD_CATEGORY_OPTIONS.map((category) => (
+              <Pressable
+                key={category}
+                accessibilityRole="button"
+                onPress={() => setCategoryFilter(category)}
+                style={[
+                  styles.filterChip,
+                  categoryFilter === category ? styles.filterChipActive : null,
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.filterChipText,
+                    categoryFilter === category ? styles.filterChipTextActive : null,
+                  ]}
+                >
+                  {meguriBoardCategoryLabel(category)}
+                </Text>
+              </Pressable>
+            ))}
+          </ScrollView>
+
+          <View style={styles.sortRail}>
+            {MEGURI_BOARD_SORT_OPTIONS.map((sort) => (
+              <Pressable
+                key={sort}
+                accessibilityRole="button"
+                onPress={() => setSortMode(sort)}
+                style={[styles.sortButton, sortMode === sort ? styles.sortButtonActive : null]}
+              >
+                <Text style={[styles.sortButtonText, sortMode === sort ? styles.sortButtonTextActive : null]}>
+                  {meguriBoardSortLabel(sort)}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
 
           <Pressable
             accessibilityRole="button"
@@ -401,8 +554,24 @@ export default function MeguriBoardScreen() {
                       ]}
                     >
                       <View style={styles.threadTopRow}>
-                        <ScopeBadge scope={thread.audienceScope} />
-                        <Text style={styles.threadTime}>{formatRelativeTime(thread.latestActivityAt)}</Text>
+                        <View style={styles.threadBadgeRow}>
+                          <CategoryBadge category={thread.category} />
+                          <ScopeBadge scope={thread.audienceScope} />
+                          {thread.readAt && thread.readAt >= thread.latestActivityAt ? null : (
+                            <View style={styles.unreadDot} />
+                          )}
+                        </View>
+                        <View style={styles.threadTopActions}>
+                          <Text style={styles.threadTime}>{formatRelativeTime(thread.latestActivityAt)}</Text>
+                          <Pressable
+                            accessibilityRole="button"
+                            hitSlop={8}
+                            onPress={() => openThreadActions(thread)}
+                            style={styles.moreButton}
+                          >
+                            <IconSymbol name="ellipsis-horizontal" color={megrumColors.mutedInk} size={17} />
+                          </Pressable>
+                        </View>
                       </View>
                       <Text numberOfLines={2} style={styles.threadTitle}>
                         {thread.title}
@@ -417,6 +586,33 @@ export default function MeguriBoardScreen() {
                         <Text numberOfLines={1} style={styles.replyPreview}>
                           {thread.latestReplyPreview || "まだ返信はありません"}
                         </Text>
+                        <Pressable
+                          accessibilityRole="button"
+                          hitSlop={8}
+                          onPress={() => toggleThreadReaction(thread)}
+                          style={[styles.metricPill, thread.reacted ? styles.metricPillActive : null]}
+                        >
+                          <IconSymbol
+                            name="heart"
+                            color={thread.reacted ? megrumColors.lavender : megrumColors.mutedInk}
+                            size={14}
+                          />
+                          <Text style={[styles.metricPillText, thread.reacted ? styles.metricPillTextActive : null]}>
+                            {thread.reactionCount}
+                          </Text>
+                        </Pressable>
+                        <Pressable
+                          accessibilityRole="button"
+                          hitSlop={8}
+                          onPress={() => toggleThreadBookmark(thread)}
+                          style={[styles.metricPill, thread.bookmarked ? styles.metricPillActive : null]}
+                        >
+                          <IconSymbol
+                            name="star-outline"
+                            color={thread.bookmarked ? megrumColors.lavender : megrumColors.mutedInk}
+                            size={14}
+                          />
+                        </Pressable>
                         <View style={styles.replyCount}>
                           <IconSymbol name="mail-outline" color={megrumColors.mutedInk} size={15} />
                           <Text style={styles.replyCountText}>{thread.replyCount}</Text>
@@ -463,6 +659,32 @@ export default function MeguriBoardScreen() {
                 textAlignVertical="top"
                 value={composerBody}
               />
+            </View>
+
+            <View style={styles.field}>
+              <Text style={styles.fieldLabel}>カテゴリ</Text>
+              <View style={styles.composerCategoryGrid}>
+                {MEGURI_BOARD_COMPOSER_CATEGORY_OPTIONS.map((category) => (
+                  <Pressable
+                    key={category}
+                    accessibilityRole="button"
+                    onPress={() => setComposerCategory(category)}
+                    style={[
+                      styles.composerCategoryChip,
+                      composerCategory === category ? styles.composerCategoryChipActive : null,
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.composerCategoryText,
+                        composerCategory === category ? styles.composerCategoryTextActive : null,
+                      ]}
+                    >
+                      {meguriBoardCategoryLabel(category)}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
             </View>
 
             <View style={styles.field}>
@@ -544,6 +766,48 @@ function ScopeBadge({ scope }: { scope: MeguriBoardAudienceScope }) {
       </Text>
     </View>
   );
+}
+
+function CategoryBadge({ category }: { category: Exclude<MeguriBoardThreadCategory, "all"> }) {
+  return (
+    <View style={[styles.categoryBadge, categoryStyle(category)]}>
+      <Text style={[styles.categoryBadgeText, categoryTextStyle(category)]}>
+        {meguriBoardCategoryLabel(category)}
+      </Text>
+    </View>
+  );
+}
+
+function categoryStyle(category: Exclude<MeguriBoardThreadCategory, "all">) {
+  switch (category) {
+    case "question":
+      return styles.categoryBadgeQuestion;
+    case "info":
+      return styles.categoryBadgeInfo;
+    case "trade":
+      return styles.categoryBadgeTrade;
+    case "lost_found":
+      return styles.categoryBadgeLost;
+    case "chat":
+    default:
+      return styles.categoryBadgeChat;
+  }
+}
+
+function categoryTextStyle(category: Exclude<MeguriBoardThreadCategory, "all">) {
+  switch (category) {
+    case "question":
+      return styles.categoryBadgeTextQuestion;
+    case "info":
+      return styles.categoryBadgeTextInfo;
+    case "trade":
+      return styles.categoryBadgeTextTrade;
+    case "lost_found":
+      return styles.categoryBadgeTextLost;
+    case "chat":
+    default:
+      return styles.categoryBadgeTextChat;
+  }
 }
 
 function buildViewerContext(input: {
@@ -687,6 +951,73 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     gap: 10,
   },
+  searchBox: {
+    alignItems: "center",
+    backgroundColor: "#fff",
+    borderColor: "rgba(58,50,74,0.08)",
+    borderRadius: 18,
+    borderWidth: 1,
+    flexDirection: "row",
+    gap: 8,
+    paddingHorizontal: 13,
+    paddingVertical: 11,
+  },
+  searchInput: {
+    color: megrumColors.ink,
+    flex: 1,
+    fontSize: 14,
+    fontWeight: "800",
+    minHeight: 22,
+    padding: 0,
+  },
+  filterRail: {
+    gap: 8,
+    paddingRight: 18,
+  },
+  filterChip: {
+    backgroundColor: "#fff",
+    borderColor: "rgba(58,50,74,0.08)",
+    borderRadius: 999,
+    borderWidth: 1,
+    paddingHorizontal: 13,
+    paddingVertical: 8,
+  },
+  filterChipActive: {
+    backgroundColor: "rgba(166,149,216,0.18)",
+    borderColor: "rgba(166,149,216,0.46)",
+  },
+  filterChipText: {
+    color: megrumColors.mutedInk,
+    fontSize: 12,
+    fontWeight: "900",
+  },
+  filterChipTextActive: {
+    color: megrumColors.lavender,
+  },
+  sortRail: {
+    backgroundColor: "rgba(58,50,74,0.07)",
+    borderRadius: 999,
+    flexDirection: "row",
+    padding: 4,
+  },
+  sortButton: {
+    alignItems: "center",
+    borderRadius: 999,
+    flex: 1,
+    paddingVertical: 8,
+  },
+  sortButtonActive: {
+    backgroundColor: "#fff",
+    ...megrumShadow,
+  },
+  sortButtonText: {
+    color: megrumColors.mutedInk,
+    fontSize: 11.5,
+    fontWeight: "900",
+  },
+  sortButtonTextActive: {
+    color: megrumColors.ink,
+  },
   scopePreviewPill: {
     backgroundColor: "rgba(166,149,216,0.1)",
     borderRadius: 16,
@@ -793,6 +1124,68 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
   },
+  threadBadgeRow: {
+    alignItems: "center",
+    flexDirection: "row",
+    flex: 1,
+    gap: 6,
+  },
+  threadTopActions: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 8,
+  },
+  moreButton: {
+    alignItems: "center",
+    height: 26,
+    justifyContent: "center",
+    width: 26,
+  },
+  unreadDot: {
+    backgroundColor: megrumColors.sky,
+    borderRadius: 999,
+    height: 7,
+    width: 7,
+  },
+  categoryBadge: {
+    borderRadius: 999,
+    paddingHorizontal: 9,
+    paddingVertical: 4,
+  },
+  categoryBadgeQuestion: {
+    backgroundColor: "rgba(166,149,216,0.16)",
+  },
+  categoryBadgeInfo: {
+    backgroundColor: "rgba(168,212,230,0.26)",
+  },
+  categoryBadgeChat: {
+    backgroundColor: "rgba(58,50,74,0.08)",
+  },
+  categoryBadgeTrade: {
+    backgroundColor: "rgba(243,197,212,0.3)",
+  },
+  categoryBadgeLost: {
+    backgroundColor: "rgba(239,217,155,0.32)",
+  },
+  categoryBadgeText: {
+    fontSize: 10.5,
+    fontWeight: "900",
+  },
+  categoryBadgeTextQuestion: {
+    color: megrumColors.lavender,
+  },
+  categoryBadgeTextInfo: {
+    color: "#4f7e92",
+  },
+  categoryBadgeTextChat: {
+    color: megrumColors.mutedInk,
+  },
+  categoryBadgeTextTrade: {
+    color: "#ba6d8d",
+  },
+  categoryBadgeTextLost: {
+    color: "#9a722c",
+  },
   scopeBadge: {
     borderRadius: 999,
     paddingHorizontal: 9,
@@ -863,6 +1256,26 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "900",
   },
+  metricPill: {
+    alignItems: "center",
+    backgroundColor: "rgba(58,50,74,0.06)",
+    borderRadius: 999,
+    flexDirection: "row",
+    gap: 3,
+    minHeight: 26,
+    paddingHorizontal: 8,
+  },
+  metricPillActive: {
+    backgroundColor: "rgba(166,149,216,0.16)",
+  },
+  metricPillText: {
+    color: megrumColors.mutedInk,
+    fontSize: 11,
+    fontWeight: "900",
+  },
+  metricPillTextActive: {
+    color: megrumColors.lavender,
+  },
   modalLayer: {
     flex: 1,
     justifyContent: "flex-end",
@@ -904,6 +1317,31 @@ const styles = StyleSheet.create({
     color: megrumColors.ink,
     fontSize: 12.5,
     fontWeight: "900",
+  },
+  composerCategoryGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  composerCategoryChip: {
+    backgroundColor: "rgba(58,50,74,0.06)",
+    borderColor: "rgba(58,50,74,0.08)",
+    borderRadius: 999,
+    borderWidth: 1,
+    paddingHorizontal: 13,
+    paddingVertical: 8,
+  },
+  composerCategoryChipActive: {
+    backgroundColor: "rgba(166,149,216,0.18)",
+    borderColor: "rgba(166,149,216,0.44)",
+  },
+  composerCategoryText: {
+    color: megrumColors.mutedInk,
+    fontSize: 12,
+    fontWeight: "900",
+  },
+  composerCategoryTextActive: {
+    color: megrumColors.lavender,
   },
   input: {
     backgroundColor: "rgba(166,149,216,0.08)",

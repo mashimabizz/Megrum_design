@@ -4,6 +4,85 @@
 
 ---
 
+## イテレーション171：スポット掲示板の基本スレッド機能を拡充
+
+### 背景・問題意識
+
+オーナーから、めぐり機能、とくに掲示板を継続的に拡充し、一般的なスレッドに備わっている機能を載せていきたいという依頼があった。既存のスポット掲示板は一覧・作成・返信の土台はあるが、カテゴリ、検索、並び替え、保存、リアクション、既読、非表示、通報といった日常利用に必要な操作が不足していた。
+
+### 変更内容
+
+#### `mobile/src/lib/meguriBoard.ts`
+- スレッドカテゴリ（質問/情報/雑談/交換/落とし物）を追加した。
+- スレッド検索、カテゴリ絞り込み、更新/新着/人気/保存の並び替え関数を追加した。
+- スレッド保存、スレッド/返信の「参考になった」、既読、非表示、通報のローカル状態管理を追加した。
+- Supabase RPC があれば各状態を同期し、migration 未適用時もローカル状態で操作できるようにした。
+
+#### `mobile/app/meguri-board.tsx`
+- 掲示板一覧に検索欄、カテゴリチップ、並び替えボタンを追加した。
+- スレッドカードにカテゴリ、未読ドット、保存、参考になった、アクションメニューを追加した。
+- スレッド作成モーダルにカテゴリ選択を追加した。
+- スレッドの非表示・通報をアクションシートから実行できるようにした。
+
+#### `mobile/app/meguri-board-thread.tsx`
+- スレッド詳細にカテゴリ、保存、参考になった、アクションメニューを追加した。
+- 詳細表示時に既読を記録するようにした。
+- 返信ごとに参考になったと通報アクションを追加した。
+
+#### `supabase/migrations/20260530174000_expand_meguri_board_threads.sql`
+- `meguri_board_threads` に `category` / `status` / `is_pinned` / `view_count` / `reaction_count` / `bookmark_count` を追加した。
+- `meguri_board_replies` に `reaction_count` を追加した。
+- 保存、リアクション、既読、非表示、通報用テーブルと同期 trigger / RPC を追加した。
+- 一覧・返信RPCを viewer 状態込みで返すように拡張した。
+
+#### `notes/05_data_model.md`
+- 掲示板の追加カラムと新テーブルを追記した。
+
+#### `notes/09_state_machines.md`
+- 掲示板の `locked` 状態と、カテゴリ/検索/保存/参考になった/既読/非表示/通報のルールを追記した。
+
+#### `notes/10_glossary.md`
+- スポット掲示板、スレッドカテゴリ、保存、参考になった、掲示板既読、ユーザー単位の非表示、掲示板通報を追加した。
+
+#### `notes/13_api_spec.md`
+- 掲示板一覧/作成/詳細/返信のレスポンスを拡張し、既読・保存・リアクション・非表示・通報エンドポイントを追記した。
+
+### 影響範囲
+
+- iOS版 スポット掲示板一覧
+- iOS版 スポット掲示板詳細
+- Supabase スポット掲示板関連テーブル/RPC
+- 掲示板のデータモデル・状態遷移・API仕様・用語
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `git diff --check -- mobile/src/lib/meguriBoard.ts mobile/app/meguri-board.tsx mobile/app/meguri-board-thread.tsx supabase/migrations/20260530174000_expand_meguri_board_threads.sql notes/05_data_model.md notes/09_state_machines.md notes/10_glossary.md notes/13_api_spec.md notes/08_design_iterations.md`
+- `npm --prefix mobile run export:ios:preview`
+- `EAS_UPDATE_PROJECT_SLUG=ihub EXPO_NO_GIT_STATUS=1 npm --prefix mobile run update:ios:preview -- --message "[iter171] expand meguri board thread basics" --non-interactive`
+- Preview OTA: Update group `1abfdecf-ee5b-48b4-8c7a-2c9e221c1a58` / iOS update `019e74ad-88df-7fad-be96-cd638dedeb1b`
+- `supabase db push`（`20260530152000_add_proposal_option_tags.sql` / `20260530174000_expand_meguri_board_threads.sql` を remote DB に適用）
+
+### 関連ファイル
+
+- `mobile/src/lib/meguriBoard.ts`
+- `mobile/app/meguri-board.tsx`
+- `mobile/app/meguri-board-thread.tsx`
+- `supabase/migrations/20260530174000_expand_meguri_board_threads.sql`
+- `notes/05_data_model.md`
+- `notes/09_state_machines.md`
+- `notes/10_glossary.md`
+- `notes/13_api_spec.md`
+
+### セルフレビュー結果
+
+- ✅ 掲示板一覧にカテゴリ/検索/並び替え/未読/保存/参考になった/アクションを追加。
+- ✅ 掲示板詳細に保存/参考になった/既読/返信リアクション/通報を追加。
+- ✅ migration 未適用でもローカル状態で落ちないフォールバックを実装。
+- ✅ 状態遷移・用語・データモデル・API仕様を更新。
+
+---
+
 ## イテレーション170.3：左ドロワーの奥行きと間隔調整
 
 ### 背景・問題意識

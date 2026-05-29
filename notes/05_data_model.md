@@ -328,12 +328,18 @@ iter168.43 以降、無料受信者に本文・画像パスを直接返さない
 | `author_id` | uuid | → users |
 | `title` | text | 1〜80字 |
 | `body` | text | 1〜500字 |
+| `category` | text | `question` / `info` / `chat` / `trade` / `lost_found`。iter171 追加 |
+| `status` | text | `visible` / `hidden` / `archived` / `locked`。iter171 追加 |
+| `is_pinned` | boolean | 運営/将来管理用の固定表示フラグ。iter171 追加 |
 | `audience_scope` | text | `nearby_3km` / `same_prefecture`。`same_spot` / `global` は過去データ互換 |
 | `spot_key` | text nullable | 互換用の粗いスポットキー。新規仕様では閲覧判定の主軸にしない |
 | `spot_label` | text nullable | 画面表示用のスポット名 |
 | `prefecture` | text nullable | 閲覧判定・表示用の都道府県。`nearby_3km` / `same_prefecture` の時は必須 |
 | `origin_lat` / `origin_lng` | double precision nullable | iter168.89 追加。スレッド作成時の位置。`nearby_3km` では必須 |
 | `reply_count` | integer | 返信数のサマリ |
+| `reaction_count` | integer | 「参考になった」の集計。iter171 追加 |
+| `bookmark_count` | integer | 保存数の集計。iter171 追加 |
+| `view_count` | integer | 詳細を開いた回数の集計。iter171 追加 |
 | `latest_reply_preview` | text nullable | 最新返信の先頭160字 |
 | `latest_activity_at` | timestamptz | スレッド作成または最新返信時刻 |
 | `created_at` / `updated_at` | timestamptz | |
@@ -350,9 +356,45 @@ iter168.43 以降、無料受信者に本文・画像パスを直接返さない
 | `thread_id` | uuid | → `meguri_board_threads` |
 | `author_id` | uuid | → users |
 | `body` | text | 1〜1000字 |
+| `reaction_count` | integer | 返信への「参考になった」の集計。iter171 追加 |
 | `created_at` | timestamptz | |
 
 `after insert` trigger で `meguri_board_threads.reply_count / latest_reply_preview / latest_activity_at` を更新する。
+
+### `meguri_board_thread_bookmarks`（スポット掲示板スレッド保存 / iter171）
+
+| カラム | 型 | 説明 |
+|---|---|---|
+| `thread_id` | uuid | → `meguri_board_threads` |
+| `user_id` | uuid | → users |
+| `created_at` | timestamptz | |
+
+ユーザーごとの保存状態。`thread_id,user_id` を PK とし、trigger で `bookmark_count` を同期する。
+
+### `meguri_board_thread_reactions` / `meguri_board_reply_reactions`（スポット掲示板リアクション / iter171）
+
+| カラム | 型 | 説明 |
+|---|---|---|
+| `thread_id` / `reply_id` | uuid | 対象スレッドまたは返信 |
+| `user_id` | uuid | → users |
+| `reaction_type` | text | MVPでは `useful` のみ |
+| `created_at` | timestamptz | |
+
+スレッド/返信への「参考になった」。各対象・ユーザー・reaction_typeで一意。trigger で `reaction_count` を同期する。
+
+### `meguri_board_thread_reads`（スポット掲示板既読 / iter171）
+
+| カラム | 型 | 説明 |
+|---|---|---|
+| `thread_id` | uuid | → `meguri_board_threads` |
+| `user_id` | uuid | → users |
+| `read_at` | timestamptz | 最後に詳細を開いた時刻 |
+
+一覧の未読ドット判定に使う。詳細を開くたびに upsert し、`view_count` も増やす。
+
+### `meguri_board_hidden_threads` / `meguri_board_reports`（非表示・通報 / iter171）
+
+ユーザー単位の非表示は `meguri_board_hidden_threads`、通報は `meguri_board_reports` に保存する。通報はスレッドまたは返信のどちらか一方を対象にし、運営側で `open` / `reviewing` / `resolved` / `rejected` を管理する。
 
 ---
 
