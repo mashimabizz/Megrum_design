@@ -106,6 +106,7 @@ export default function MeguriBoardThreadScreen() {
     useState<Exclude<MeguriBoardThreadCategory, "all">>("chat");
   const [replyEditor, setReplyEditor] = useState<MeguriBoardReply | null>(null);
   const [replyEditBody, setReplyEditBody] = useState("");
+  const [imagePreviewUri, setImagePreviewUri] = useState<string | null>(null);
 
   const actor = useMemo<MeguriBoardActor>(
     () => ({
@@ -780,7 +781,7 @@ export default function MeguriBoardThreadScreen() {
                 </View>
                 <Text style={styles.heroTitle}>{thread.title}</Text>
                 <Text style={styles.heroBody}>{thread.body}</Text>
-                <AttachmentGrid imageUris={thread.imageUris} />
+                <AttachmentGrid imageUris={thread.imageUris} onPressImage={setImagePreviewUri} />
                 <Text style={styles.heroMeta}>
                   {meguriBoardAudienceMeta(thread)} · {thread.authorName}
                   {thread.updatedAt && thread.updatedAt > thread.createdAt + 60000 ? " · 編集済み" : ""}
@@ -907,7 +908,13 @@ export default function MeguriBoardThreadScreen() {
                         >
                           {reply.body}
                         </Text>
-                        {!reply.deleted ? <AttachmentGrid imageUris={reply.imageUris} compact /> : null}
+                        {!reply.deleted ? (
+                          <AttachmentGrid
+                            compact
+                            imageUris={reply.imageUris}
+                            onPressImage={setImagePreviewUri}
+                          />
+                        ) : null}
                       </ChatGradientBubble>
                       <Text style={[styles.replyTime, reply.mine ? styles.replyTimeMine : null]}>
                         {formatRelativeTime(reply.createdAt)}
@@ -1124,6 +1131,34 @@ export default function MeguriBoardThreadScreen() {
             </View>
           </View>
         </Modal>
+        <Modal
+          animationType="fade"
+          onRequestClose={() => setImagePreviewUri(null)}
+          transparent
+          visible={!!imagePreviewUri}
+        >
+          <View style={styles.imagePreviewLayer}>
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => setImagePreviewUri(null)}
+              style={StyleSheet.absoluteFill}
+            />
+            {imagePreviewUri ? (
+              <Image
+                resizeMode="contain"
+                source={{ uri: imagePreviewUri }}
+                style={styles.imagePreview}
+              />
+            ) : null}
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => setImagePreviewUri(null)}
+              style={[styles.imagePreviewClose, { top: Math.max(insets.top, 10) + 10 }]}
+            >
+              <IconSymbol name="close" color="#fff" size={18} />
+            </Pressable>
+          </View>
+        </Modal>
       </Screen>
     </View>
   );
@@ -1175,14 +1210,28 @@ function CategoryBadge({ category }: { category: Exclude<MeguriBoardThreadCatego
   );
 }
 
-function AttachmentGrid({ compact, imageUris }: { compact?: boolean; imageUris: string[] }) {
+function AttachmentGrid({
+  compact,
+  imageUris,
+  onPressImage,
+}: {
+  compact?: boolean;
+  imageUris: string[];
+  onPressImage?: (uri: string) => void;
+}) {
   if (imageUris.length === 0) return null;
   return (
     <View style={compact ? styles.attachmentGridCompact : styles.attachmentGrid}>
       {imageUris.slice(0, 4).map((uri, index) => (
-        <View key={`${uri}-${index}`} style={compact ? styles.attachmentThumbCompact : styles.attachmentThumb}>
+        <Pressable
+          key={`${uri}-${index}`}
+          accessibilityRole="button"
+          disabled={!onPressImage}
+          onPress={() => onPressImage?.(uri)}
+          style={compact ? styles.attachmentThumbCompact : styles.attachmentThumb}
+        >
           <Image source={{ uri }} style={styles.attachmentImage} />
-        </View>
+        </Pressable>
       ))}
     </View>
   );
@@ -1910,6 +1959,28 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "flex-end",
     padding: 14,
+  },
+  imagePreviewLayer: {
+    alignItems: "center",
+    backgroundColor: "rgba(12,10,16,0.92)",
+    flex: 1,
+    justifyContent: "center",
+    paddingHorizontal: 14,
+  },
+  imagePreview: {
+    borderRadius: 18,
+    height: "78%",
+    width: "100%",
+  },
+  imagePreviewClose: {
+    alignItems: "center",
+    backgroundColor: "rgba(255,255,255,0.18)",
+    borderRadius: 999,
+    height: 42,
+    justifyContent: "center",
+    position: "absolute",
+    right: 16,
+    width: 42,
   },
   editorCard: {
     backgroundColor: "#fff",

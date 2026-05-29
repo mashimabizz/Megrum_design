@@ -4,6 +4,51 @@
 
 ---
 
+## イテレーション182：掲示板添付画像プレビューを追加
+
+### 背景・問題意識
+
+スポット掲示板では画像付きのスレッドや返信が増えるため、サムネイルだけでは現地情報を確認しにくい。一般的なスレッド機能として、スレッド詳細内の添付画像をタップして大きく確認できるようにした。
+
+### 変更内容
+
+#### `mobile/app/meguri-board-thread.tsx`
+- スレッド本文と返信本文の添付画像をタップ可能にした。
+- 画像タップ時に全画面の暗背景プレビューを表示するようにした。
+- 画面タップまたは右上の閉じるボタンでプレビューを閉じるようにした。
+
+#### `notes/09_state_machines.md`
+- Meguri Board Lifecycle に添付画像プレビューの表示ルールを追記した。
+
+#### `notes/10_glossary.md`
+- 掲示板添付画像プレビューを追加した。
+
+### 影響範囲
+
+- iOS版 スポット掲示板詳細
+- 掲示板の表示ルール・用語
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- `EAS_UPDATE_PROJECT_SLUG=ihub EXPO_NO_GIT_STATUS=1 npm --prefix mobile run update:ios:preview -- --message "[iter182] add board image preview" --non-interactive`
+- Preview OTA: Update group `265f2050-cf15-4721-ba3f-976186210d4e` / iOS update `019e7514-d61f-7b02-b340-d2a73841bf0e`
+
+### 関連ファイル
+
+- `mobile/app/meguri-board-thread.tsx`
+- `notes/08_design_iterations.md`
+- `notes/09_state_machines.md`
+- `notes/10_glossary.md`
+
+### セルフレビュー結果
+
+- ✅ 添付画像の保存・取得ロジックには触れず、詳細画面の表示だけに限定した。
+- ✅ モーダルは画面タップと閉じるボタンの両方で閉じられる。
+
+---
+
 ## イテレーション181：掲示板に自分のスレッド表示を追加
 
 ### 背景・問題意識
