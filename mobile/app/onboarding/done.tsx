@@ -64,7 +64,7 @@ export default function OnboardingDoneScreen() {
           <SummaryRow label="エリア" value={summary.area ?? "あとで設定"} />
         </View>
       </View>
-      <PrimaryButton onPress={() => router.replace("/")}>
+      <PrimaryButton onPress={() => router.replace("/(tabs)")}>
         ホームへ
       </PrimaryButton>
     </Screen>
