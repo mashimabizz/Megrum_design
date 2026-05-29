@@ -4,6 +4,56 @@
 
 ---
 
+## イテレーション181：掲示板に自分のスレッド表示を追加
+
+### 背景・問題意識
+
+スポット掲示板でスレッド数が増えると、自分が立てたスレッドへ戻る導線が必要になる。一般的なスレッド機能として、保存・通知中だけでなく「自分のスレッド」だけを一覧で確認できるようにした。
+
+### 変更内容
+
+#### `mobile/src/lib/meguriBoard.ts`
+- `MeguriBoardThreadSort` に `mine` を追加した。
+- 並び替え/絞り込み候補に `自分` を追加し、`mine` 選択時は `thread.mine` のスレッドだけを返すようにした。
+
+#### `mobile/app/meguri-board.tsx`
+- 掲示板一覧のソートレールに `自分` を追加した。
+- `自分` 選択時のセクションタイトルを「自分のスレッド」にした。
+- 自分のスレッドがない時の空表示を専用文言にした。
+
+#### `notes/09_state_machines.md`
+- Meguri Board Lifecycle に `自分` 表示のルールを追記した。
+
+#### `notes/10_glossary.md`
+- 自分のスレッドを追加した。
+
+### 影響範囲
+
+- iOS版 スポット掲示板一覧
+- 掲示板の表示ルール・用語
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- `EAS_UPDATE_PROJECT_SLUG=ihub EXPO_NO_GIT_STATUS=1 npm --prefix mobile run update:ios:preview -- --message "[iter181] add my board threads" --non-interactive`
+- Preview OTA: Update group `4e6448c3-f5dc-41dc-9055-31fd9ad7e6f6` / iOS update `019e7510-d164-7014-bee3-fe1beafb710b`
+
+### 関連ファイル
+
+- `mobile/src/lib/meguriBoard.ts`
+- `mobile/app/meguri-board.tsx`
+- `notes/08_design_iterations.md`
+- `notes/09_state_machines.md`
+- `notes/10_glossary.md`
+
+### セルフレビュー結果
+
+- ✅ DB変更なしで、既存の `thread.mine` 判定だけを使っている。
+- ✅ 保存/通知/人気など既存の並び替え挙動を壊さず、`mine` 選択時だけ絞り込むようにした。
+
+---
+
 ## イテレーション180：掲示板下書き自動保存を追加
 
 ### 背景・問題意識

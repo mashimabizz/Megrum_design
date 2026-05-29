@@ -167,11 +167,16 @@ export default function MeguriBoardScreen() {
       [
         {
           key: viewMode,
-          title: viewMode === "nearby_3km" ? "近くのスレッド" : "都道府県のスレッド",
+          title:
+            sortMode === "mine"
+              ? "自分のスレッド"
+              : viewMode === "nearby_3km"
+                ? "近くのスレッド"
+                : "都道府県のスレッド",
           rows: visibleThreads,
         },
       ].filter((section) => section.rows.length > 0),
-    [viewMode, visibleThreads],
+    [sortMode, viewMode, visibleThreads],
   );
 
   const refreshThreads = useCallback(async (prefectureOverride?: string | null) => {
@@ -697,8 +702,14 @@ export default function MeguriBoardScreen() {
             </View>
           ) : sections.length === 0 ? (
             <View style={styles.emptyCard}>
-              <Text style={styles.emptyTitle}>まだスレッドはありません</Text>
-              <Text style={styles.emptyBody}>最初のひとことを置いておくと、あとから返事がつきやすいです。</Text>
+              <Text style={styles.emptyTitle}>
+                {sortMode === "mine" ? "自分のスレッドはまだありません" : "まだスレッドはありません"}
+              </Text>
+              <Text style={styles.emptyBody}>
+                {sortMode === "mine"
+                  ? "スレッドを立てると、ここからすぐ戻れます。"
+                  : "最初のひとことを置いておくと、あとから返事がつきやすいです。"}
+              </Text>
             </View>
           ) : (
             sections.map((section) => (
