@@ -4,6 +4,53 @@
 
 ---
 
+## イテレーション212：掲示板返信の検索条件チップを追加
+
+### 背景・問題意識
+
+参加者一覧から返信を絞り込んだ時、検索欄には名前やhandleが入るが、現在どの条件で返信が絞られているかが一目で分かりにくかった。一般的なスレッド検索UIとして、検索/参加者フィルタの状態をチップで表示し、すぐ解除できるようにした。
+
+### 変更内容
+
+#### `mobile/app/meguri-board-thread.tsx`
+- スレッド内検索が有効な時、検索欄の下に現在の検索条件チップを表示するようにした。
+- 参加者一覧から絞り込んだ場合は `参加者: 名前`、手入力検索の場合は `検索: キーワード` と表示するようにした。
+- チップ内の `解除` で検索条件と参加者フィルタ状態をまとめて解除するようにした。
+
+#### `notes/09_state_machines.md`
+- Meguri Board Lifecycle に返信検索条件チップの表示ルールを追記した。
+
+#### `notes/10_glossary.md`
+- 掲示板返信検索条件チップを追加した。
+
+### 影響範囲
+
+- iOS版 スポット掲示板詳細
+- スレッド内検索
+- 参加者別返信フィルタ
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- `EAS_UPDATE_PROJECT_SLUG=ihub EXPO_NO_GIT_STATUS=1 npm --prefix mobile run update:ios:preview -- --message "[iter212] add board reply search filter chip" --non-interactive`
+- Preview OTA: Update group `485da616-6ac2-43e5-a427-29fbb5c75cf8` / iOS update `019e758f-2524-755f-8fbb-8bfc9c6ac4f0`
+
+### 関連ファイル
+
+- `mobile/app/meguri-board-thread.tsx`
+- `notes/08_design_iterations.md`
+- `notes/09_state_machines.md`
+- `notes/10_glossary.md`
+
+### セルフレビュー結果
+
+- ✅ 参加者フィルタと手入力検索を区別して表示できるようにした。
+- ✅ 既存の検索欄クリアと同じ解除処理を使い、検索状態が残りにくいようにした。
+- ✅ DB変更やネイティブ依存追加なしで、Preview OTA対象内に収めた。
+
+---
+
 ## イテレーション211：掲示板返信の長押しアクションを追加
 
 ### 背景・問題意識

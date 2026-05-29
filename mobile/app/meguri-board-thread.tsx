@@ -132,6 +132,7 @@ export default function MeguriBoardThreadScreen() {
   const [sending, setSending] = useState(false);
   const [sendError, setSendError] = useState<string | null>(null);
   const [replySearchText, setReplySearchText] = useState("");
+  const [replySearchSource, setReplySearchSource] = useState<{ label: string; type: "participant" } | null>(null);
   const [replyJumpText, setReplyJumpText] = useState("");
   const [quoteTarget, setQuoteTarget] = useState<MeguriBoardReply | null>(null);
   const [threadEditorOpen, setThreadEditorOpen] = useState(false);
@@ -379,7 +380,18 @@ export default function MeguriBoardThreadScreen() {
   function filterRepliesByParticipant(participant: BoardParticipant) {
     if (participant.replyCount === 0) return;
     setReplySearchText(participant.handle || participant.name);
+    setReplySearchSource({ label: participant.name, type: "participant" });
     setParticipantsOpen(false);
+  }
+
+  function handleReplySearchChange(text: string) {
+    setReplySearchText(text);
+    setReplySearchSource(null);
+  }
+
+  function clearReplySearch() {
+    setReplySearchText("");
+    setReplySearchSource(null);
   }
 
   function rememberReplyOffset(replyId: string, y: number) {
@@ -397,7 +409,7 @@ export default function MeguriBoardThreadScreen() {
       Alert.alert("引用元を表示できません", "検索条件を解除しても引用元が見つかりませんでした。");
     };
     if (replySearchText.trim()) {
-      setReplySearchText("");
+      clearReplySearch();
       setTimeout(runScroll, 140);
       return;
     }
@@ -427,7 +439,7 @@ export default function MeguriBoardThreadScreen() {
       Alert.alert("返信が見つかりません", "指定された番号の返信が見つかりませんでした。");
       return;
     }
-    setReplySearchText("");
+    clearReplySearch();
     setReplyJumpText("");
     setTimeout(() => scrollToReply(targetReply.id), 140);
   }
@@ -1240,18 +1252,30 @@ export default function MeguriBoardThreadScreen() {
               <View style={styles.replySearchBox}>
                 <IconSymbol name="search" color="rgba(58,50,74,0.42)" size={15} />
                 <TextInput
-                  onChangeText={setReplySearchText}
+                  onChangeText={handleReplySearchChange}
                   placeholder="スレッド内を検索"
                   placeholderTextColor="rgba(58,50,74,0.34)"
                   style={styles.replySearchInput}
                   value={replySearchText}
                 />
                 {replySearchText.trim() ? (
-                  <Pressable accessibilityRole="button" hitSlop={8} onPress={() => setReplySearchText("")}>
+                  <Pressable accessibilityRole="button" hitSlop={8} onPress={clearReplySearch}>
                     <IconSymbol name="close" color="rgba(58,50,74,0.42)" size={15} />
                   </Pressable>
                 ) : null}
               </View>
+              {replySearchQuery ? (
+                <View style={styles.replyActiveFilterBar}>
+                  <Text numberOfLines={1} style={styles.replyActiveFilterText}>
+                    {replySearchSource?.type === "participant"
+                      ? `参加者: ${replySearchSource.label}`
+                      : `検索: ${replySearchText.trim()}`}
+                  </Text>
+                  <Pressable accessibilityRole="button" onPress={clearReplySearch} style={styles.replyActiveFilterClear}>
+                    <Text style={styles.replyActiveFilterClearText}>解除</Text>
+                  </Pressable>
+                </View>
+              ) : null}
               <View style={styles.replySortRow}>
                 <Text style={styles.replySortLabel}>表示順</Text>
                 <View style={styles.replySortSegment}>
@@ -2478,6 +2502,39 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: "800",
     padding: 0,
+  },
+  replyActiveFilterBar: {
+    alignItems: "center",
+    alignSelf: "flex-start",
+    backgroundColor: "rgba(166,149,216,0.12)",
+    borderColor: "rgba(166,149,216,0.24)",
+    borderRadius: 999,
+    borderWidth: 1,
+    flexDirection: "row",
+    gap: 8,
+    maxWidth: "100%",
+    minHeight: 32,
+    paddingLeft: 12,
+    paddingRight: 5,
+  },
+  replyActiveFilterText: {
+    color: megrumColors.lavender,
+    flexShrink: 1,
+    fontSize: 11.5,
+    fontWeight: "900",
+  },
+  replyActiveFilterClear: {
+    alignItems: "center",
+    backgroundColor: "#fff",
+    borderRadius: 999,
+    minHeight: 24,
+    justifyContent: "center",
+    paddingHorizontal: 10,
+  },
+  replyActiveFilterClearText: {
+    color: megrumColors.lavender,
+    fontSize: 10.5,
+    fontWeight: "900",
   },
   replySortRow: {
     alignItems: "center",
