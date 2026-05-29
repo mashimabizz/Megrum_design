@@ -4,6 +4,51 @@
 
 ---
 
+## イテレーション185：掲示板返信共有を追加
+
+### 背景・問題意識
+
+掲示板の返信には列状況や現地メモなど、後から別アプリへ共有したい情報が含まれる。クリップボード機能は未導入ネイティブモジュールが必要になるため、OTAで反映できる範囲として、iOS共有シートから返信本文とスレッドURLを共有できるようにした。
+
+### 変更内容
+
+#### `mobile/app/meguri-board-thread.tsx`
+- 返信アクションに「返信を共有」を追加した。
+- 共有内容にスレッドタイトル、返信者名、返信本文、スレッドURLを含めるようにした。
+- 削除済み返信は共有できないようにした。
+
+#### `notes/09_state_machines.md`
+- Meguri Board Lifecycle に返信共有の表示ルールを追記した。
+
+#### `notes/10_glossary.md`
+- 掲示板返信共有を追加した。
+
+### 影響範囲
+
+- iOS版 スポット掲示板詳細
+- 掲示板の表示ルール・用語
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- `EAS_UPDATE_PROJECT_SLUG=ihub EXPO_NO_GIT_STATUS=1 npm --prefix mobile run update:ios:preview -- --message "[iter185] add board reply share" --non-interactive`
+- Preview OTA: Update group `08be98fc-b890-4db7-aed5-947869db8881` / iOS update `019e751e-a2f4-79f7-9b95-23c66b295e1c`
+
+### 関連ファイル
+
+- `mobile/app/meguri-board-thread.tsx`
+- `notes/08_design_iterations.md`
+- `notes/09_state_machines.md`
+- `notes/10_glossary.md`
+
+### セルフレビュー結果
+
+- ✅ 新しいネイティブ依存を追加せず、既存の `Share` API で実装した。
+- ✅ 削除済み返信は共有対象から外した。
+
+---
+
 ## イテレーション184：掲示板にメンション返信導線を追加
 
 ### 背景・問題意識

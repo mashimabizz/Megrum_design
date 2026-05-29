@@ -632,6 +632,16 @@ export default function MeguriBoardThreadScreen() {
     });
   }
 
+  async function shareReply(reply: MeguriBoardReply) {
+    if (!thread || reply.deleted) return;
+    const url = buildThreadShareUrl(thread, viewerContext, viewMode);
+    await Share.share({
+      message: `${thread.title}\n${reply.authorName}: ${reply.body}\n${url}`,
+      title: thread.title,
+      url,
+    });
+  }
+
   function openThreadActions() {
     if (!thread) return;
     const actions: Array<{ disabled?: boolean; destructive?: boolean; label: string; run?: () => void }> = [];
@@ -699,6 +709,11 @@ export default function MeguriBoardThreadScreen() {
       disabled: reply.deleted || thread?.status === "locked",
       label: "引用して返信",
       run: () => quoteReply(reply),
+    });
+    actions.push({
+      disabled: reply.deleted,
+      label: "返信を共有",
+      run: () => void shareReply(reply),
     });
     if (reply.mine) {
       actions.push(
