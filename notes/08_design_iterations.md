@@ -4,6 +4,55 @@
 
 ---
 
+## イテレーション222：掲示板詳細に自分の返信フィルタを追加
+
+### 背景・問題意識
+
+スレッドが伸びた時、自分がどこで何を言ったかをすぐ確認できると、会話の続きを追いやすい。自分宛て返信フィルタに続き、自分が投稿した返信だけをまとめて見られる導線を追加した。
+
+### 変更内容
+
+#### `mobile/app/meguri-board-thread.tsx`
+- 自分の返信を `viewerReplies` として集約した。
+- 自分の返信がある時、返信ヘッダーに `自分 n` ボタンを表示するようにした。
+- `自分 n` を押すと自分の返信だけを表示し、最初の自分の返信へ移動するようにした。
+- 返信検索条件チップでは `自分の返信` と表示するようにした。
+- 返信ヘッダーのアクション行を折り返し可能にし、ボタンが増えても収まりやすくした。
+
+#### `notes/09_state_machines.md`
+- Meguri Board Lifecycle に自分の返信フィルタの表示ルールを追記した。
+
+#### `notes/10_glossary.md`
+- 掲示板自分の返信フィルタを追加した。
+
+### 影響範囲
+
+- iOS版 スポット掲示板詳細
+- 返信ヘッダー
+- スレッド内検索
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- `EAS_UPDATE_PROJECT_SLUG=ihub EXPO_NO_GIT_STATUS=1 npm --prefix mobile run update:ios:preview -- --message "[iter222] add board own reply filter" --non-interactive`
+- Preview OTA: Update group `8e0af36b-c517-4717-895f-332f6c3c0de4` / iOS update `019e75ba-5f41-7138-b80b-37f7e28534c9`
+
+### 関連ファイル
+
+- `mobile/app/meguri-board-thread.tsx`
+- `notes/08_design_iterations.md`
+- `notes/09_state_machines.md`
+- `notes/10_glossary.md`
+
+### セルフレビュー結果
+
+- ✅ 既存の返信検索表示を使い、DB変更なしで自分の返信フィルタを追加した。
+- ✅ 自分の返信がある時だけボタンを表示するようにした。
+- ✅ ネイティブ依存追加なしで、Preview OTA対象内に収めた。
+
+---
+
 ## イテレーション221：掲示板詳細に自分宛て返信フィルタを追加
 
 ### 背景・問題意識

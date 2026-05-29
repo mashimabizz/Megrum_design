@@ -100,7 +100,7 @@ type BoardMediaAttachment = {
 };
 
 type BoardReplySortMode = "oldest" | "newest" | "popular";
-type ReplySearchSource = { label: string; type: "mention" | "participant" } | null;
+type ReplySearchSource = { label: string; type: "mention" | "mine" | "participant" } | null;
 
 const REPLY_SORT_OPTIONS: { label: string; value: BoardReplySortMode }[] = [
   { label: "古い順", value: "oldest" },
@@ -202,6 +202,9 @@ export default function MeguriBoardThreadScreen() {
   const replySearchQuery = useMemo(() => normalizeReplySearch(replySearchText), [replySearchText]);
 
   const filteredReplies = useMemo(() => {
+    if (replySearchSource?.type === "mine") {
+      return replies.filter((reply) => reply.mine);
+    }
     if (!replySearchQuery) return replies;
     return replies.filter((reply) => {
       const quotedReplyNumber = reply.parentReplyId ? replyNumberById.get(reply.parentReplyId) : null;
@@ -219,7 +222,7 @@ export default function MeguriBoardThreadScreen() {
           .join(" "),
       ).includes(replySearchQuery);
     });
-  }, [replies, replyNumberById, replySearchQuery]);
+  }, [replies, replyNumberById, replySearchQuery, replySearchSource?.type]);
 
   const sortedReplies = useMemo(() => {
     const next = [...filteredReplies];
@@ -346,6 +349,7 @@ export default function MeguriBoardThreadScreen() {
     () => replies.filter((reply) => !reply.mine && replyMentionsHandle(reply.body, actor.handle)),
     [actor.handle, replies],
   );
+  const viewerReplies = useMemo(() => replies.filter((reply) => reply.mine), [replies]);
 
   useEffect(() => {
     setSearchCursorIndex(0);
@@ -410,6 +414,20 @@ export default function MeguriBoardThreadScreen() {
     const firstMention = [...viewerMentionReplies].sort((left, right) => left.createdAt - right.createdAt)[0];
     setTimeout(() => {
       const y = firstMention ? replyOffsetsRef.current[firstMention.id] : undefined;
+      if (typeof y === "number") {
+        scrollViewRef.current?.scrollTo({ animated: true, y: Math.max(0, y - 12) });
+      }
+    }, 120);
+  }
+
+  function filterViewerReplies() {
+    if (viewerReplies.length === 0) return;
+    setReplySearchText("自分の返信");
+    setReplySearchSource({ label: "自分の返信", type: "mine" });
+    setSearchCursorIndex(0);
+    const firstOwnReply = [...viewerReplies].sort((left, right) => left.createdAt - right.createdAt)[0];
+    setTimeout(() => {
+      const y = firstOwnReply ? replyOffsetsRef.current[firstOwnReply.id] : undefined;
       if (typeof y === "number") {
         scrollViewRef.current?.scrollTo({ animated: true, y: Math.max(0, y - 12) });
       }
@@ -1323,6 +1341,16 @@ export default function MeguriBoardThreadScreen() {
                       <Text style={styles.mentionJumpButtonText}>あなた宛て {viewerMentionReplies.length}</Text>
                     </Pressable>
                   ) : null}
+                  {viewerReplies.length > 0 ? (
+                    <Pressable
+                      accessibilityRole="button"
+                      hitSlop={8}
+                      onPress={filterViewerReplies}
+                      style={styles.mineJumpButton}
+                    >
+                      <Text style={styles.mineJumpButtonText}>自分 {viewerReplies.length}</Text>
+                    </Pressable>
+                  ) : null}
                 </View>
               </View>
               <View style={styles.replySearchBox}>
@@ -1343,7 +1371,9 @@ export default function MeguriBoardThreadScreen() {
               {replySearchQuery ? (
                 <View style={styles.replyActiveFilterBar}>
                   <Text numberOfLines={1} style={styles.replyActiveFilterText}>
-                    {replySearchSource?.type === "mention"
+                    {replySearchSource?.type === "mine"
+                      ? replySearchSource.label
+                      : replySearchSource?.type === "mention"
                       ? `あなた宛て: ${replySearchSource.label}`
                       : replySearchSource?.type === "participant"
                       ? `参加者: ${replySearchSource.label}`
@@ -2579,8 +2609,11 @@ const styles = StyleSheet.create({
   },
   replyHeaderActions: {
     alignItems: "center",
+    flex: 1,
+    flexWrap: "wrap",
     flexDirection: "row",
     gap: 8,
+    justifyContent: "flex-end",
   },
   replyCountMeta: {
     color: megrumColors.mutedInk,
@@ -2624,6 +2657,19 @@ const styles = StyleSheet.create({
   },
   mentionJumpButtonText: {
     color: "#ba6d8d",
+    fontSize: 11,
+    fontWeight: "900",
+  },
+  mineJumpButton: {
+    alignItems: "center",
+    backgroundColor: "rgba(166,149,216,0.14)",
+    borderRadius: 999,
+    minHeight: 26,
+    paddingHorizontal: 9,
+    justifyContent: "center",
+  },
+  mineJumpButtonText: {
+    color: megrumColors.lavender,
     fontSize: 11,
     fontWeight: "900",
   },
