@@ -4,6 +4,52 @@
 
 ---
 
+## イテレーション217：掲示板一覧に検索条件チップを追加
+
+### 背景・問題意識
+
+掲示板一覧では検索語、カテゴリ、並び替え、画像ありを組み合わせて絞り込めるが、複数条件を使った時に現在の条件が見えにくかった。一般的な検索/掲示板UIとして、適用中の条件をチップで表示し、条件単位で解除できるようにした。
+
+### 変更内容
+
+#### `mobile/app/meguri-board.tsx`
+- 掲示板一覧の検索/カテゴリ/並び替え/画像ありの適用中条件を `activeFilterChips` として集約した。
+- 検索結果件数の下に、現在の検索条件チップを横スクロールで表示するようにした。
+- 各チップを押すと、その条件だけ解除できるようにした。
+
+#### `notes/09_state_machines.md`
+- Meguri Board Lifecycle に一覧検索条件チップの表示ルールを追記した。
+
+#### `notes/10_glossary.md`
+- 掲示板一覧検索条件チップを追加した。
+
+### 影響範囲
+
+- iOS版 スポット掲示板一覧
+- 検索/カテゴリ/並び替え/画像ありフィルタ
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- `EAS_UPDATE_PROJECT_SLUG=ihub EXPO_NO_GIT_STATUS=1 npm --prefix mobile run update:ios:preview -- --message "[iter217] add board list filter chips" --non-interactive`
+- Preview OTA: Update group `4dba622a-f9c9-425a-8a6d-275d200b3e53` / iOS update `019e75a4-f119-7306-a9e6-b66bf1cc700a`
+
+### 関連ファイル
+
+- `mobile/app/meguri-board.tsx`
+- `notes/08_design_iterations.md`
+- `notes/09_state_machines.md`
+- `notes/10_glossary.md`
+
+### セルフレビュー結果
+
+- ✅ 既存の検索/フィルタ状態だけを使い、DB変更なしで表示と解除導線を追加した。
+- ✅ 条件リセット全体と、条件単位の解除を両立した。
+- ✅ ネイティブ依存追加なしで、Preview OTA対象内に収めた。
+
+---
+
 ## イテレーション216：掲示板一覧の未読表示を強化
 
 ### 背景・問題意識

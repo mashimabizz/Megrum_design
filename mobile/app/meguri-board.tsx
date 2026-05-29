@@ -176,6 +176,23 @@ export default function MeguriBoardScreen() {
     categoryFilter !== "all" || !!searchText.trim() || sortMode !== "active" || mediaOnly;
   const hasComposerDraft =
     !!composerTitle.trim() || !!composerBody.trim() || composerImageUris.length > 0;
+  const activeFilterChips = useMemo(() => {
+    const chips: { key: string; label: string }[] = [];
+    const query = searchText.trim();
+    if (query) {
+      chips.push({ key: "search", label: `検索: ${query.length > 18 ? `${query.slice(0, 18)}...` : query}` });
+    }
+    if (categoryFilter !== "all") {
+      chips.push({ key: "category", label: `カテゴリ: ${meguriBoardCategoryLabel(categoryFilter)}` });
+    }
+    if (sortMode !== "active") {
+      chips.push({ key: "sort", label: `並び替え: ${meguriBoardSortLabel(sortMode)}` });
+    }
+    if (mediaOnly) {
+      chips.push({ key: "media", label: "画像あり" });
+    }
+    return chips;
+  }, [categoryFilter, mediaOnly, searchText, sortMode]);
 
   const sections = useMemo(
     () =>
@@ -393,6 +410,25 @@ export default function MeguriBoardScreen() {
     setSearchText("");
     setSortMode("active");
     setMediaOnly(false);
+  }
+
+  function clearFilterChip(key: string) {
+    switch (key) {
+      case "search":
+        setSearchText("");
+        break;
+      case "category":
+        setCategoryFilter("all");
+        break;
+      case "sort":
+        setSortMode("active");
+        break;
+      case "media":
+        setMediaOnly(false);
+        break;
+      default:
+        break;
+    }
   }
 
   function closeComposer() {
@@ -798,6 +834,26 @@ export default function MeguriBoardScreen() {
                 </Pressable>
               ) : null}
             </View>
+          ) : null}
+
+          {!loading && activeFilterChips.length > 0 ? (
+            <ScrollView
+              horizontal
+              contentContainerStyle={styles.activeFilterRail}
+              showsHorizontalScrollIndicator={false}
+            >
+              {activeFilterChips.map((chip) => (
+                <Pressable
+                  key={chip.key}
+                  accessibilityRole="button"
+                  onPress={() => clearFilterChip(chip.key)}
+                  style={styles.activeFilterChip}
+                >
+                  <Text style={styles.activeFilterText}>{chip.label}</Text>
+                  <IconSymbol name="close" color={megrumColors.lavender} size={13} />
+                </Pressable>
+              ))}
+            </ScrollView>
           ) : null}
 
           {!loading && sortMode === "unread" && visibleThreads.length > 0 ? (
@@ -1551,6 +1607,26 @@ const styles = StyleSheet.create({
   resultResetText: {
     color: megrumColors.lavender,
     fontSize: 11,
+    fontWeight: "900",
+  },
+  activeFilterRail: {
+    gap: 8,
+    paddingRight: 18,
+  },
+  activeFilterChip: {
+    alignItems: "center",
+    backgroundColor: "rgba(166,149,216,0.1)",
+    borderColor: "rgba(166,149,216,0.28)",
+    borderRadius: 999,
+    borderWidth: 1,
+    flexDirection: "row",
+    gap: 5,
+    minHeight: 30,
+    paddingHorizontal: 11,
+  },
+  activeFilterText: {
+    color: megrumColors.lavender,
+    fontSize: 10.8,
     fontWeight: "900",
   },
   markReadCard: {
