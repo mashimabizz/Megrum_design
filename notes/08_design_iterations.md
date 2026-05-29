@@ -4,6 +4,53 @@
 
 ---
 
+## イテレーション240：掲示板返信へすぐ返信できるボタンを追加
+
+### 背景・問題意識
+
+一般的なスレッドでは、特定の発言へすぐ返す操作が目に見える形で用意されていることが多い。Megrumの掲示板詳細では引用返信自体は使えるが、長押しまたはメニュー操作が必要だったため、会話の流れの中で素早く返せる導線を追加した。
+
+### 変更内容
+
+#### `mobile/app/meguri-board-thread.tsx`
+- 各返信のアクション列に `返信する` ボタンを追加した。
+- `返信する` を押すと既存の引用返信処理 `quoteReply` を使い、返信入力欄へ引用対象をセットするようにした。
+- 削除済み返信や締め切り済みスレッドでは `返信する` を無効化するようにした。
+
+#### `notes/09_state_machines.md`
+- Meguri Board Lifecycle に返信ボタンの表示ルールを追記した。
+
+#### `notes/10_glossary.md`
+- 掲示板返信ボタンを追加した。
+
+### 影響範囲
+
+- iOS版 スポット掲示板詳細
+- 返信アクション列
+- 引用返信開始導線
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- `EAS_UPDATE_PROJECT_SLUG=ihub EXPO_NO_GIT_STATUS=1 npm --prefix mobile run update:ios:preview -- --message "[iter240] add inline board reply action" --non-interactive`
+- Preview OTA: Update group `4dd9b748-3e03-482b-bacc-b52c5855111f` / iOS update `019e761e-2ecf-7ef3-b479-732a6c5db180`
+
+### 関連ファイル
+
+- `mobile/app/meguri-board-thread.tsx`
+- `notes/08_design_iterations.md`
+- `notes/09_state_machines.md`
+- `notes/10_glossary.md`
+
+### セルフレビュー結果
+
+- ✅ 既存の引用返信ロジックを再利用し、新しいDB変更やネイティブ依存を増やさずに実装した。
+- ✅ 締め切り済みスレッドと削除済み返信では誤操作できないようにした。
+- ✅ 返信の発見性を上げつつ、既存の長押し/メニュー操作も維持した。
+
+---
+
 ## イテレーション239：掲示板で作成者の返信だけ拾えるようにする
 
 ### 背景・問題意識

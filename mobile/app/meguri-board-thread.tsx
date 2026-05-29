@@ -2059,6 +2059,18 @@ export default function MeguriBoardThreadScreen() {
                                 {reply.reactionCount}
                               </Text>
                             </Pressable>
+                            <Pressable
+                              accessibilityRole="button"
+                              disabled={reply.deleted || thread.status === "locked"}
+                              onPress={() => quoteReply(reply)}
+                              style={[
+                                styles.replyActionPill,
+                                reply.deleted || thread.status === "locked" ? styles.replyActionPillDisabled : null,
+                              ]}
+                            >
+                              <IconSymbol name="create-outline" color={megrumColors.mutedInk} size={13} />
+                              <Text style={styles.replyActionText}>返信する</Text>
+                            </Pressable>
                             {reply.bookmarked ? (
                               <Pressable
                                 accessibilityRole="button"
@@ -3846,6 +3858,9 @@ const styles = StyleSheet.create({
   },
   replyActionPillActive: {
     backgroundColor: "rgba(166,149,216,0.16)",
+  },
+  replyActionPillDisabled: {
+    opacity: 0.42,
   },
   replyActionText: {
     color: megrumColors.mutedInk,
