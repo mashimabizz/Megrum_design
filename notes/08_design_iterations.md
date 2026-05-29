@@ -4,6 +4,54 @@
 
 ---
 
+## イテレーション229：掲示板返信共有リンクを返信位置に着地させる
+
+### 背景・問題意識
+
+返信単位で共有した時、受け取った側がスレッド先頭に着地すると対象発言を探し直す必要がある。一般的なスレッドUIとして、返信共有リンクに返信IDを含め、リンクから開いた時に対象返信へ直接移動できるようにした。
+
+### 変更内容
+
+#### `mobile/app/meguri-board-thread.tsx`
+- 返信共有時のURLに `replyId` を付与するようにした。
+- 画面パラメータで `replyId` を受け取り、スレッド詳細の読み込み完了後に対象返信へ自動スクロールするようにした。
+- レイアウト計測がまだ終わっていない場合に備え、短いリトライを入れて対象返信へ移動しやすくした。
+- スレッド共有は従来通りスレッド全体へのリンクを維持した。
+
+#### `notes/09_state_machines.md`
+- Meguri Board Lifecycle に返信共有ディープリンクの表示ルールを追記した。
+
+#### `notes/10_glossary.md`
+- 掲示板返信ディープリンクを追加した。
+
+### 影響範囲
+
+- iOS版 スポット掲示板詳細
+- 返信共有
+- deep link 起動時の初期スクロール
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- `EAS_UPDATE_PROJECT_SLUG=ihub EXPO_NO_GIT_STATUS=1 npm --prefix mobile run update:ios:preview -- --message "[iter229] deep link board replies" --non-interactive`
+- Preview OTA: Update group `b6367d1a-fe67-47ea-b064-7995c5fba246` / iOS update `019e75dd-19f6-7728-bf1c-eabb877eb27f`
+
+### 関連ファイル
+
+- `mobile/app/meguri-board-thread.tsx`
+- `notes/08_design_iterations.md`
+- `notes/09_state_machines.md`
+- `notes/10_glossary.md`
+
+### セルフレビュー結果
+
+- ✅ 既存の共有URLに任意の `replyId` を追加し、スレッド共有の挙動は維持した。
+- ✅ DB変更なしで、共有された返信への初期スクロールを追加した。
+- ✅ ネイティブ依存追加なしで、Preview OTA対象内に収めた。
+
+---
+
 ## イテレーション228：掲示板詳細にスレッド情報シートを追加
 
 ### 背景・問題意識

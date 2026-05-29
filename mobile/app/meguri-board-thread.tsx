@@ -120,6 +120,7 @@ export default function MeguriBoardThreadScreen() {
   const params = useLocalSearchParams<{
     id?: string | string[];
     prefecture?: string | string[];
+    replyId?: string | string[];
     spotKey?: string | string[];
     spotLabel?: string | string[];
     viewerLat?: string | string[];
@@ -127,6 +128,7 @@ export default function MeguriBoardThreadScreen() {
     viewMode?: string | string[];
   }>();
   const threadId = readParam(params.id);
+  const sharedReplyId = readParam(params.replyId);
   const { previewMode, profile, user } = useAuth();
   const [localArea, setLocalArea] = useState(DEFAULT_MEGURI_PROFILE.baseArea);
   const [localDisplayName, setLocalDisplayName] = useState(DEFAULT_MEGURI_PROFILE.displayName);
@@ -162,6 +164,7 @@ export default function MeguriBoardThreadScreen() {
   const scrollViewRef = useRef<ScrollView | null>(null);
   const composerInputRef = useRef<TextInput | null>(null);
   const replyOffsetsRef = useRef<Record<string, number>>({});
+  const sharedReplyScrollKeyRef = useRef<string | null>(null);
 
   const actor = useMemo<MeguriBoardActor>(
     () => ({
@@ -405,6 +408,29 @@ export default function MeguriBoardThreadScreen() {
       setSearchCursorIndex(0);
     }
   }, [searchCursorIndex, sortedReplies.length]);
+
+  useEffect(() => {
+    if (!sharedReplyId || loading || replies.length === 0) return;
+    if (sharedReplyScrollKeyRef.current === sharedReplyId) return;
+    if (!replies.some((reply) => reply.id === sharedReplyId)) return;
+    sharedReplyScrollKeyRef.current = sharedReplyId;
+    let attempts = 0;
+    const runScroll = () => {
+      const y = replyOffsetsRef.current[sharedReplyId];
+      if (typeof y === "number") {
+        if (replySearchText.trim()) {
+          clearReplySearch();
+        }
+        scrollViewRef.current?.scrollTo({ animated: true, y: Math.max(0, y - 12) });
+        return;
+      }
+      attempts += 1;
+      if (attempts < 5) {
+        setTimeout(runScroll, 160);
+      }
+    };
+    setTimeout(runScroll, 240);
+  }, [loading, replies, replySearchText, sharedReplyId]);
 
   function scrollToLatestReply(animated = true) {
     const latestReply = replies.reduce<MeguriBoardReply | null>((latest, reply) => {
@@ -1053,7 +1079,7 @@ export default function MeguriBoardThreadScreen() {
 
   async function shareReply(reply: MeguriBoardReply) {
     if (!thread || reply.deleted) return;
-    const url = buildThreadShareUrl(thread, viewerContext, viewMode);
+    const url = buildThreadShareUrl(thread, viewerContext, viewMode, reply.id);
     await Share.share({
       message: `${thread.title}\n${reply.authorName}: ${reply.body}\n${url}`,
       title: thread.title,
@@ -2442,6 +2468,7 @@ function buildThreadShareUrl(
   thread: MeguriBoardThread,
   viewer: MeguriBoardViewerContext,
   viewMode: MeguriBoardViewMode,
+  replyId?: string,
 ) {
   const params = new URLSearchParams({
     id: thread.id,
@@ -2450,6 +2477,9 @@ function buildThreadShareUrl(
     spotLabel: viewer.spotLabel ?? "",
     viewMode,
   });
+  if (replyId) {
+    params.set("replyId", replyId);
+  }
   return `${getAppScheme()}://meguri-board-thread?${params.toString()}`;
 }
 
