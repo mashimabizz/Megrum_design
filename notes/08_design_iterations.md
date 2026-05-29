@@ -4,6 +4,53 @@
 
 ---
 
+## イテレーション199：掲示板画像一覧を追加
+
+### 背景・問題意識
+
+スポット掲示板では、列状況・現地案内・落とし物などの画像が返信内に散らばりやすい。長いスレッドでも画像だけをまとめて確認できるよう、スレッド内の添付画像を集約する画像一覧を追加した。
+
+### 変更内容
+
+#### `mobile/app/meguri-board-thread.tsx`
+- スレッド本文と削除されていない返信の添付画像を `mediaAttachments` として集約するようにした。
+- スレッド詳細のアクション列に `画像 N` ボタンを追加した。
+- 画像一覧モーダルを追加し、画像、投稿元、本文プレビュー、投稿時刻を確認できるようにした。
+- 画像一覧から画像プレビューを開けるようにし、`本文へ` / `返信へ` で該当位置へ移動できるようにした。
+
+#### `notes/09_state_machines.md`
+- Meguri Board Lifecycle に画像一覧の表示ルールを追記した。
+
+#### `notes/10_glossary.md`
+- 掲示板画像一覧を追加した。
+
+### 影響範囲
+
+- iOS版 スポット掲示板詳細
+- スレッド内添付画像の閲覧体験
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- `EAS_UPDATE_PROJECT_SLUG=ihub EXPO_NO_GIT_STATUS=1 npm --prefix mobile run update:ios:preview -- --message "[iter199] add board media gallery" --non-interactive`
+- Preview OTA: Update group `700819f9-3b37-4527-88c4-235caaf27287` / iOS update `019e7562-0e67-74be-807b-f97bdfab408a`
+
+### 関連ファイル
+
+- `mobile/app/meguri-board-thread.tsx`
+- `notes/08_design_iterations.md`
+- `notes/09_state_machines.md`
+- `notes/10_glossary.md`
+
+### セルフレビュー結果
+
+- ✅ 既存の添付画像データから表示用リストを派生し、DB変更なしで実装した。
+- ✅ 削除済み返信の画像は一覧に含めず、現在見えているスレッド内容と整合させた。
+- ✅ 画像一覧から本文・返信位置へ戻れるようにして、単なる閲覧だけでなく文脈確認までつなげた。
+
+---
+
 ## イテレーション198：掲示板検索結果ナビを追加
 
 ### 背景・問題意識

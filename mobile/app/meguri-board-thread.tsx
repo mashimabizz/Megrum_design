@@ -86,6 +86,17 @@ type BoardParticipant = {
   replyCount: number;
 };
 
+type BoardMediaAttachment = {
+  authorName: string;
+  body: string;
+  createdAt: number;
+  id: string;
+  replyId: string | null;
+  replyNumber: number | null;
+  source: "thread" | "reply";
+  uri: string;
+};
+
 export default function MeguriBoardThreadScreen() {
   const insets = useSafeAreaInsets();
   const keyboardInset = useKeyboardInset();
@@ -124,6 +135,7 @@ export default function MeguriBoardThreadScreen() {
   const [imagePreviewUri, setImagePreviewUri] = useState<string | null>(null);
   const [previousReadAt, setPreviousReadAt] = useState<number | null>(null);
   const [participantsOpen, setParticipantsOpen] = useState(false);
+  const [mediaGalleryOpen, setMediaGalleryOpen] = useState(false);
   const [searchCursorIndex, setSearchCursorIndex] = useState(0);
   const scrollViewRef = useRef<ScrollView | null>(null);
   const replyOffsetsRef = useRef<Record<string, number>>({});
@@ -262,6 +274,37 @@ export default function MeguriBoardThreadScreen() {
     });
   }, [actor.userId, replies, thread]);
 
+  const mediaAttachments = useMemo<BoardMediaAttachment[]>(() => {
+    if (!thread) return [];
+    const attachments: BoardMediaAttachment[] = thread.imageUris.map((uri, index) => ({
+      authorName: thread.authorName,
+      body: thread.body,
+      createdAt: thread.createdAt,
+      id: `thread-${index}-${uri}`,
+      replyId: null,
+      replyNumber: null,
+      source: "thread",
+      uri,
+    }));
+    replies.forEach((reply) => {
+      if (reply.deleted) return;
+      const replyNumber = replyNumberById.get(reply.id) ?? null;
+      reply.imageUris.forEach((uri, index) => {
+        attachments.push({
+          authorName: reply.authorName,
+          body: reply.body,
+          createdAt: reply.createdAt,
+          id: `reply-${reply.id}-${index}-${uri}`,
+          replyId: reply.id,
+          replyNumber,
+          source: "reply",
+          uri,
+        });
+      });
+    });
+    return attachments;
+  }, [replies, replyNumberById, thread]);
+
   useEffect(() => {
     setSearchCursorIndex(0);
   }, [replySearchQuery]);
@@ -320,6 +363,17 @@ export default function MeguriBoardThreadScreen() {
     if (typeof y === "number") {
       scrollViewRef.current?.scrollTo({ animated: true, y: Math.max(0, y - 12) });
     }
+  }
+
+  function jumpToMediaSource(attachment: BoardMediaAttachment) {
+    setMediaGalleryOpen(false);
+    if (!attachment.replyId) {
+      requestAnimationFrame(() => {
+        scrollViewRef.current?.scrollTo({ animated: true, y: 0 });
+      });
+      return;
+    }
+    setTimeout(() => scrollToReply(attachment.replyId), 80);
   }
 
   const refreshDetail = useCallback(async (options: { silent?: boolean } = {}) => {
@@ -1048,6 +1102,15 @@ export default function MeguriBoardThreadScreen() {
                   >
                     <Text style={styles.threadActionText}>参加者 {participants.length}</Text>
                   </Pressable>
+                  {mediaAttachments.length > 0 ? (
+                    <Pressable
+                      accessibilityRole="button"
+                      onPress={() => setMediaGalleryOpen(true)}
+                      style={styles.threadActionPill}
+                    >
+                      <Text style={styles.threadActionText}>画像 {mediaAttachments.length}</Text>
+                    </Pressable>
+                  ) : null}
                 </View>
               </View>
 
@@ -1421,6 +1484,78 @@ export default function MeguriBoardThreadScreen() {
                       </Text>
                     </View>
                   </Pressable>
+                ))}
+              </ScrollView>
+            </View>
+          </View>
+        </Modal>
+        <Modal
+          animationType="slide"
+          onRequestClose={() => setMediaGalleryOpen(false)}
+          transparent
+          visible={mediaGalleryOpen}
+        >
+          <View style={styles.modalOverlay}>
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => setMediaGalleryOpen(false)}
+              style={StyleSheet.absoluteFill}
+            />
+            <View style={[styles.editorCard, styles.mediaGalleryCard]}>
+              <View style={styles.participantsHeader}>
+                <View style={styles.participantsTitleBlock}>
+                  <Text style={styles.editorEyebrow}>MEDIA</Text>
+                  <Text style={styles.editorTitle}>画像一覧</Text>
+                  <Text style={styles.participantsLead}>
+                    このスレッド内の画像 {mediaAttachments.length}枚
+                  </Text>
+                </View>
+                <Pressable
+                  accessibilityRole="button"
+                  onPress={() => setMediaGalleryOpen(false)}
+                  style={styles.participantsCloseButton}
+                >
+                  <IconSymbol name="close" color={megrumColors.mutedInk} size={16} />
+                </Pressable>
+              </View>
+              <ScrollView
+                contentContainerStyle={styles.mediaGalleryGrid}
+                showsVerticalScrollIndicator={false}
+              >
+                {mediaAttachments.map((attachment) => (
+                  <View key={attachment.id} style={styles.mediaGalleryItem}>
+                    <Pressable
+                      accessibilityRole="imagebutton"
+                      onPress={() => setImagePreviewUri(attachment.uri)}
+                      style={styles.mediaGalleryThumb}
+                    >
+                      <Image source={{ uri: attachment.uri }} style={styles.mediaGalleryImage} />
+                    </Pressable>
+                    <View style={styles.mediaGalleryCopy}>
+                      <Text numberOfLines={1} style={styles.mediaGallerySource}>
+                        {attachment.source === "thread"
+                          ? "スレッド本文"
+                          : `#${attachment.replyNumber ?? "-"} ${attachment.authorName}`}
+                      </Text>
+                      <Text numberOfLines={2} style={styles.mediaGalleryBody}>
+                        {attachment.body}
+                      </Text>
+                      <View style={styles.mediaGalleryFooter}>
+                        <Text style={styles.mediaGalleryTime}>
+                          {formatRelativeTime(attachment.createdAt)}
+                        </Text>
+                        <Pressable
+                          accessibilityRole="button"
+                          onPress={() => jumpToMediaSource(attachment)}
+                          style={styles.mediaGalleryJumpButton}
+                        >
+                          <Text style={styles.mediaGalleryJumpText}>
+                            {attachment.source === "thread" ? "本文へ" : "返信へ"}
+                          </Text>
+                        </Pressable>
+                      </View>
+                    </View>
+                  </View>
                 ))}
               </ScrollView>
             </View>
@@ -2750,5 +2885,71 @@ const styles = StyleSheet.create({
   },
   participantFilterHintDisabled: {
     color: "rgba(58,50,74,0.34)",
+  },
+  mediaGalleryCard: {
+    maxHeight: "78%",
+  },
+  mediaGalleryGrid: {
+    gap: 10,
+    paddingTop: 4,
+  },
+  mediaGalleryItem: {
+    backgroundColor: "rgba(251,249,252,0.96)",
+    borderColor: "rgba(58,50,74,0.06)",
+    borderRadius: 18,
+    borderWidth: 1,
+    flexDirection: "row",
+    gap: 11,
+    padding: 10,
+  },
+  mediaGalleryThumb: {
+    aspectRatio: 1,
+    borderRadius: 15,
+    overflow: "hidden",
+    width: 92,
+  },
+  mediaGalleryImage: {
+    height: "100%",
+    width: "100%",
+  },
+  mediaGalleryCopy: {
+    flex: 1,
+    gap: 5,
+    justifyContent: "center",
+  },
+  mediaGallerySource: {
+    color: megrumColors.ink,
+    fontSize: 12,
+    fontWeight: "900",
+  },
+  mediaGalleryBody: {
+    color: megrumColors.mutedInk,
+    fontSize: 11.5,
+    fontWeight: "800",
+    lineHeight: 16,
+  },
+  mediaGalleryFooter: {
+    alignItems: "center",
+    flexDirection: "row",
+    justifyContent: "space-between",
+    paddingTop: 2,
+  },
+  mediaGalleryTime: {
+    color: "rgba(58,50,74,0.46)",
+    fontSize: 10.5,
+    fontWeight: "800",
+  },
+  mediaGalleryJumpButton: {
+    alignItems: "center",
+    backgroundColor: "rgba(166,149,216,0.14)",
+    borderRadius: 999,
+    minHeight: 28,
+    justifyContent: "center",
+    paddingHorizontal: 10,
+  },
+  mediaGalleryJumpText: {
+    color: megrumColors.lavender,
+    fontSize: 10.5,
+    fontWeight: "900",
   },
 });
