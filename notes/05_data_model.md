@@ -4,7 +4,7 @@
 > 実装の正解集。`09_state_machines.md` と完全に整合させ、`10_glossary.md` の用語を使う。
 
 最終更新: 2026-05-29
-ステータス: Draft v2.18（iter168.82 現地・郵送どちらもOKの打診を追加）
+ステータス: Draft v2.20（iter168.90 検索実績ログと人気検索を追加）
 
 ## 最新化履歴
 
@@ -31,6 +31,7 @@
 | **v2.17** | **2026-05-29** | **iter168.74 反映（郵送交換MVPを実装。`user_mailing_addresses` 実テーブル、`proposals.sender_mailing_address/receiver_mailing_address` スナップショット、合意時固定ルールを追記）** |
 | **v2.18** | **2026-05-29** | **iter168.82 反映（`exchange_method='both'` を追加し、現地・郵送どちらも対応可の打診を保存できるように更新）** |
 | **v2.19** | **2026-05-29** | **iter168.89 反映（グルーム投稿とスポット掲示板スレッドに作成時位置 `origin_lat/origin_lng` を追加。グルームは現在地1km、掲示板は `nearby_3km` / `same_prefecture` で閲覧）** |
+| **v2.20** | **2026-05-29** | **iter168.90 反映（`search_query_logs` と人気検索RPCを追加。検索結果はマッチ分類つきグッズパネルで表示）** |
 
 ## このドキュメントの位置付け
 
@@ -1087,6 +1088,28 @@ RLS:
 - **バッチ**：定期計算（夜間など、低頻度）
 - **オンデマンド**：ユーザーがタブを開いたときに最新計算
 - **リアルタイム**：完全マッチ発見時のみ即時通知（MVPではここのみ通知）
+
+### `search_query_logs`（検索実績ログ / iter168.90）
+
+ホーム右下の検索画面で、固定サンプルではなく実際の検索実績から「人気の検索」を表示するためのログ。
+
+| カラム | 型 | 説明 |
+|---|---|---|
+| `id` | uuid | PK |
+| `user_id` | uuid nullable | → users。削除時はNULL |
+| `term` | text | ユーザーが確定実行した検索語。1〜80文字 |
+| `normalized_term` | text | NFKC + lowercase + 空白正規化済みの集計キー |
+| `result_count` | integer | 検索実行時のヒット件数 |
+| `created_at` | timestamptz | 検索実行日時 |
+
+RPC:
+- `record_search_query(p_query, p_result_count)`：検索確定時に実績を記録する。
+- `get_popular_search_terms(p_limit)`：直近30日の検索実績から人気検索を返す。
+
+検索結果分類:
+- `matched`：検索ヒットした相手の譲が自分のwishに合い、相手も自分の譲候補を求めている。
+- `possible`：自分のwishまたは相手のwishのどちらか一方に合う。
+- `none`：検索にはヒットしたが、現時点の交換条件には合わない。
 
 ⚠️ 要確認：
 - バッチ頻度（毎日 / 6h おき / 1h おき）

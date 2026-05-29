@@ -3,8 +3,8 @@
 > **目的**：Megrum のバックエンドAPI（REST）の draft 仕様。実装着手時の正解集。
 > 全エンドポイントを `[METHOD /path]` の形式で網羅し、各々で入力・出力・認証要否・状態遷移・備考を定義。
 
-最終更新: 2026-05-29（iter168.73）
-ステータス: Draft v1.1
+最終更新: 2026-05-29（iter168.90）
+ステータス: Draft v1.2
 
 ---
 
@@ -678,6 +678,48 @@ AW削除。
 - **Query**: `?cursor=...`
 - **Response 200**: cursor pagination
 - **Screen**: `HOM-main`（探索タブ）
+
+### GET /api/v1/matches/search
+
+ホーム右下の検索画面。グッズ名・推し・タグにヒットする他ユーザーの譲候補を返す。
+
+- **Auth**: 必須
+- **Query**: `?q=...`
+- **Response 200**:
+  ```json
+  {
+    "results": [
+      {
+        "item": { "id": "...", "title": "...", "photo_url": "...", "tag_labels": ["会場限定"] },
+        "owner_user_id": "...",
+        "match_bucket": "matched|possible|none"
+      }
+    ]
+  }
+  ```
+- **分類**:
+  - `matched`: 検索ヒットした相手の譲が自分のwishに合い、相手も自分の譲を求めている
+  - `possible`: 自分のwishまたは相手のwishのどちらか一方に合う
+  - `none`: 検索にはヒットしたが、交換条件には合わない
+- **Screen**: `mobile/app/search.tsx`
+
+### POST /api/v1/matches/search-queries
+
+検索実績を記録する。UI上の「人気の検索」はこの実績から集計し、固定サンプルは使わない。
+
+- **Auth**: 必須
+- **Request**: `{ "query": "スア トレカ", "result_count": 12 }`
+- **Response 204**: no content
+- **DB/RPC**: `search_query_logs`, `record_search_query`
+
+### GET /api/v1/matches/popular-searches
+
+直近30日の検索実績から人気検索語を返す。
+
+- **Auth**: 必須
+- **Query**: `?limit=10`
+- **Response 200**: `{ "terms": [{ "term": "スア トレカ", "search_count": 18, "last_searched_at": "..." }] }`
+- **DB/RPC**: `get_popular_search_terms`
 
 ### POST /api/v1/matches/saved-searches
 

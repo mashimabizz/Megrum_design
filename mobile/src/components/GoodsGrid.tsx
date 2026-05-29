@@ -253,6 +253,8 @@ export function GoodsGrid({
   deletingIds = [],
   onItemFadeOutEnd,
   showTopRow = true,
+  topRowMode = "title",
+  showBottomStrip = true,
   showUnlinkedWarning = false,
 }: {
   items: GoodsGridItem[];
@@ -264,6 +266,8 @@ export function GoodsGrid({
   deletingIds?: string[];
   onItemFadeOutEnd?: (id: string) => void;
   showTopRow?: boolean;
+  topRowMode?: "title" | "tag";
+  showBottomStrip?: boolean;
   showUnlinkedWarning?: boolean;
 }) {
   const { width } = useWindowDimensions();
@@ -299,6 +303,8 @@ export function GoodsGrid({
           onFadeOutEnd={onItemFadeOutEnd}
           onPress={(context) => onPressItem(item, context)}
           showTopRow={showTopRow}
+          topRowMode={topRowMode}
+          showBottomStrip={showBottomStrip}
           showUnlinkedWarning={showUnlinkedWarning}
         />
       ))}
@@ -365,6 +371,8 @@ function AnimatedGoodsTile({
   onFadeOutEnd,
   onPress,
   showTopRow,
+  topRowMode,
+  showBottomStrip,
   showUnlinkedWarning,
 }: {
   item: GoodsGridItem;
@@ -374,6 +382,8 @@ function AnimatedGoodsTile({
   onFadeOutEnd?: (id: string) => void;
   onPress: (context: GoodsGridPressContext) => void;
   showTopRow: boolean;
+  topRowMode: "title" | "tag";
+  showBottomStrip: boolean;
   showUnlinkedWarning: boolean;
 }) {
   const appear = useRef(new Animated.Value(0)).current;
@@ -383,6 +393,7 @@ function AnimatedGoodsTile({
   const unlinkedWarningVisible =
     showUnlinkedWarning && item.badge === "未紐付け";
   const tagLine = formatHashTags(item.tagLabels);
+  const topRowLabel = topRowMode === "tag" ? tagLine ?? item.badge ?? "タグ未設定" : item.title;
 
   useEffect(() => {
     if (deleting || !imageReady || hasAnimated.current) return;
@@ -470,10 +481,10 @@ function AnimatedGoodsTile({
             <View style={styles.tileTopRow}>
               <View style={styles.tileTitlePlate}>
                 <Text numberOfLines={1} style={styles.tileTitlePlateText}>
-                  {item.title}
+                  {topRowLabel}
                 </Text>
               </View>
-              {item.badge ? (
+              {topRowMode === "title" && item.badge ? (
                 <View
                   style={[
                     styles.tileBadge,
@@ -487,14 +498,16 @@ function AnimatedGoodsTile({
               ) : null}
             </View>
           ) : null}
-          <View style={styles.tileBottomStrip}>
-            <Text
-              numberOfLines={1}
-              style={[styles.tileSubtitle, !tagLine ? styles.tileSubtitleEmpty : null]}
-            >
-              {tagLine ?? "タグ未設定"}
-            </Text>
-          </View>
+          {showBottomStrip ? (
+            <View style={styles.tileBottomStrip}>
+              <Text
+                numberOfLines={1}
+                style={[styles.tileSubtitle, !tagLine ? styles.tileSubtitleEmpty : null]}
+              >
+                {tagLine ?? "タグ未設定"}
+              </Text>
+            </View>
+          ) : null}
         </View>
       </Pressable>
     </Animated.View>

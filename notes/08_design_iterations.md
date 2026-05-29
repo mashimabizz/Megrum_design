@@ -4,6 +4,73 @@
 
 ---
 
+## イテレーション168.90：検索結果を実績とマッチ分類へ整理
+
+### 背景・問題意識
+
+オーナーから、ホーム右下の検索アイコンから開く検索画面について、左上の `(tabs)` 表示を消し、人気の検索は固定サンプルではなく実際の検索実績から出したいという依頼があった。あわせて、検索結果はユーザー名の縦カードではなくマイ在庫のようなグッズパネルで表示し、ホームと同じく「マッチしてるよ！」「交換できるかも？」「マッチなし」に分類したい。
+
+### 変更内容
+
+#### `mobile/app/search.tsx`
+- Native Stack の戻る表示を `minimal` にして、左上に `(tabs)` が出ないようにした。
+- 検索バーの入力変更だけでは検索実績を記録せず、検索確定時だけ検索するようにした。
+- 人気の検索を `get_popular_search_terms` RPC から取得し、固定サンプルの人気ワードを廃止した。
+- 検索実行後に `record_search_query` RPC で検索語とヒット件数を記録するようにした。
+- 検索結果をグッズパネル表示へ変更し、ユーザー名・ハンドル・評価表示を削除した。
+- 検索結果を `matched` / `possible` / `none` に分類し、「マッチしてるよ！」「交換できるかも？」「マッチなし」の3セクションで表示するようにした。
+- タイトル・推し・タグ検索に対応し、タグはパネル左上に表示するようにした。
+
+#### `mobile/src/components/GoodsGrid.tsx`
+- 既存のマイ在庫グリッドを検索結果でも使えるよう、上部表示をタイトルではなくタグにできる `topRowMode="tag"` を追加した。
+- 検索結果では下部タグ帯を消せるよう `showBottomStrip` を追加した。
+
+#### `supabase/migrations/20260529193000_add_search_query_logs.sql`
+- `search_query_logs` を追加し、検索語・正規化検索語・ヒット件数・検索日時を保存するようにした。
+- `record_search_query` / `get_popular_search_terms` RPC を追加した。
+
+### 影響範囲
+
+- iOS版 `/search`
+- iOS版ホーム右下検索導線
+- Supabase `search_query_logs` / 検索実績RPC
+- notes 05 / 10 / 13
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npx supabase db push`
+- `npm --prefix mobile run export:ios:preview`
+- `EXPO_NO_GIT_STATUS=1 EAS_UPDATE_PROJECT_SLUG=ihub npm --prefix mobile run update:ios:preview -- --message "[iter168.90] 検索結果と人気検索" --non-interactive`
+- Preview channel OTA配信済み：Update group `a53553a0-2d90-4ce0-bb5f-fe36ac040181` / iOS update ID `019e7415-4307-7b37-97c4-596fd2bb9b40`
+- EAS Dashboard: `https://expo.dev/accounts/mashima.bizz/projects/ihub/updates/a53553a0-2d90-4ce0-bb5f-fe36ac040181`
+- `git diff --check -- mobile/app/search.tsx mobile/src/components/GoodsGrid.tsx supabase/migrations/20260529193000_add_search_query_logs.sql notes/05_data_model.md notes/08_design_iterations.md notes/10_glossary.md notes/13_api_spec.md`
+
+### 関連ファイル
+
+- `mobile/app/search.tsx`
+- `mobile/src/components/GoodsGrid.tsx`
+- `supabase/migrations/20260529193000_add_search_query_logs.sql`
+- `notes/05_data_model.md`
+- `notes/10_glossary.md`
+- `notes/13_api_spec.md`
+
+### セルフレビュー結果
+
+- ✅ `(tabs)` 戻るタイトルを非表示化
+- ✅ 人気の検索から固定サンプルを削除
+- ✅ 検索実績ログ/RPCをremote DBへmigration適用済み
+- ✅ Preview channel / iOS runtime `0.1.0` へOTA配信済み
+- ✅ 検索結果をグッズパネル形式へ変更
+- ✅ ユーザー名・ハンドル・評価は検索結果カードから削除
+- ✅ タグはパネル左上に表示
+- ✅ 検索結果を「マッチしてるよ！」「交換できるかも？」「マッチなし」に分類
+- ✅ 09更新診断：状態遷移の追加・削除はないため更新不要
+- ✅ 10更新診断：検索実績 / マッチなしを追加
+- ✅ 05更新診断：`search_query_logs` とRPC追加を反映
+
+---
+
 ## イテレーション168.89：グルームと掲示板の位置スコープ整理
 
 ### 背景・問題意識
