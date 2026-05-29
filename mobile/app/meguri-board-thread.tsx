@@ -83,6 +83,8 @@ export default function MeguriBoardThreadScreen() {
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
   const [sendError, setSendError] = useState<string | null>(null);
+  const [replySearchText, setReplySearchText] = useState("");
+  const [quoteTarget, setQuoteTarget] = useState<MeguriBoardReply | null>(null);
   const [threadEditorOpen, setThreadEditorOpen] = useState(false);
   const [threadEditTitle, setThreadEditTitle] = useState("");
   const [threadEditBody, setThreadEditBody] = useState("");
@@ -129,6 +131,23 @@ export default function MeguriBoardThreadScreen() {
       user?.id,
     ],
   );
+
+  const filteredReplies = useMemo(() => {
+    const query = normalizeReplySearch(replySearchText);
+    if (!query) return replies;
+    return replies.filter((reply) =>
+      normalizeReplySearch(
+        [
+          reply.authorName,
+          reply.body,
+          reply.quotedAuthorName,
+          reply.quotedBody,
+        ]
+          .filter(Boolean)
+          .join(" "),
+      ).includes(query),
+    );
+  }, [replies, replySearchText]);
 
   const refreshDetail = useCallback(async () => {
     if (!threadId) {
@@ -199,7 +218,10 @@ export default function MeguriBoardThreadScreen() {
     const reply = await appendMeguriBoardReply(
       {
         body,
+        parentReplyId: quoteTarget?.id ?? null,
         previewMode,
+        quotedAuthorName: quoteTarget?.authorName ?? null,
+        quotedBody: quoteTarget?.body ?? null,
         threadId,
         viewer: viewerContext,
         viewMode,
@@ -212,6 +234,7 @@ export default function MeguriBoardThreadScreen() {
       return;
     }
     setDraft("");
+    setQuoteTarget(null);
     setReplies((current) => [...current, reply].sort((left, right) => left.createdAt - right.createdAt));
     setThread((current) =>
       current
@@ -399,6 +422,12 @@ export default function MeguriBoardThreadScreen() {
     ]);
   }
 
+  function quoteReply(reply: MeguriBoardReply) {
+    if (reply.deleted || thread?.status === "locked") return;
+    setQuoteTarget(reply);
+    setSendError(null);
+  }
+
   function openThreadActions() {
     if (!thread) return;
     const actions: Array<{ disabled?: boolean; destructive?: boolean; label: string; run?: () => void }> = [];
@@ -450,6 +479,11 @@ export default function MeguriBoardThreadScreen() {
 
   function openReplyActions(reply: MeguriBoardReply) {
     const actions: Array<{ disabled?: boolean; destructive?: boolean; label: string; run?: () => void }> = [];
+    actions.push({
+      disabled: reply.deleted || thread?.status === "locked",
+      label: "引用して返信",
+      run: () => quoteReply(reply),
+    });
     if (reply.mine) {
       actions.push(
         { disabled: reply.deleted, label: "編集する", run: () => openReplyEditor(reply) },
@@ -585,14 +619,37 @@ export default function MeguriBoardThreadScreen() {
                 </View>
               </View>
 
-              <Text style={styles.replySectionTitle}>返信</Text>
+              <View style={styles.replyHeaderRow}>
+                <Text style={styles.replySectionTitle}>返信</Text>
+                <Text style={styles.replyCountMeta}>{replies.length}件</Text>
+              </View>
+              <View style={styles.replySearchBox}>
+                <IconSymbol name="search" color="rgba(58,50,74,0.42)" size={15} />
+                <TextInput
+                  onChangeText={setReplySearchText}
+                  placeholder="スレッド内を検索"
+                  placeholderTextColor="rgba(58,50,74,0.34)"
+                  style={styles.replySearchInput}
+                  value={replySearchText}
+                />
+                {replySearchText.trim() ? (
+                  <Pressable accessibilityRole="button" hitSlop={8} onPress={() => setReplySearchText("")}>
+                    <IconSymbol name="close" color="rgba(58,50,74,0.42)" size={15} />
+                  </Pressable>
+                ) : null}
+              </View>
               {replies.length === 0 ? (
                 <View style={styles.noRepliesCard}>
                   <Text style={styles.noRepliesTitle}>まだ返信はありません</Text>
                   <Text style={styles.noRepliesBody}>最初のひとことで温度感をつなげていくイメージです。</Text>
                 </View>
+              ) : filteredReplies.length === 0 ? (
+                <View style={styles.noRepliesCard}>
+                  <Text style={styles.noRepliesTitle}>検索結果がありません</Text>
+                  <Text style={styles.noRepliesBody}>別の言葉で探してみてください。</Text>
+                </View>
               ) : (
-                replies.map((reply) => (
+                filteredReplies.map((reply) => (
                   <View
                     key={reply.id}
                     style={[styles.replyRow, reply.mine ? styles.replyRowMine : null]}
@@ -613,6 +670,22 @@ export default function MeguriBoardThreadScreen() {
                           reply.mine ? styles.replyBubbleMine : styles.replyBubbleTheirs,
                         ]}
                       >
+                        {reply.quotedBody ? (
+                          <View style={[styles.quotePreview, reply.mine ? styles.quotePreviewMine : null]}>
+                            <Text
+                              numberOfLines={1}
+                              style={[styles.quoteAuthor, reply.mine ? styles.quoteAuthorMine : null]}
+                            >
+                              {reply.quotedAuthorName || "引用"}
+                            </Text>
+                            <Text
+                              numberOfLines={2}
+                              style={[styles.quoteBody, reply.mine ? styles.quoteBodyMine : null]}
+                            >
+                              {reply.quotedBody}
+                            </Text>
+                          </View>
+                        ) : null}
                         <Text
                           style={[
                             styles.replyBody,
@@ -679,31 +752,48 @@ export default function MeguriBoardThreadScreen() {
                   },
                 ]}
               >
-                <TextInput
-                  multiline
-                  onChangeText={setDraft}
-                  placeholder="返信を書く"
-                  placeholderTextColor="rgba(58,50,74,0.34)"
-                  style={styles.composerInput}
-                  textAlignVertical="top"
-                  value={draft}
-                />
-                <Pressable
-                  accessibilityRole="button"
-                  disabled={sending || !draft.trim()}
-                  onPress={handleSend}
-                  style={[
-                    styles.sendButton,
-                    draft.trim() ? styles.sendButtonActive : null,
-                    sending ? styles.sendButtonDisabled : null,
-                  ]}
-                >
-                  <IconSymbol
-                    name={sending ? "ellipsis-horizontal" : "send-outline"}
-                    color={draft.trim() ? "#fff" : "rgba(58,50,74,0.42)"}
-                    size={18}
+                {quoteTarget ? (
+                  <View style={styles.composerQuote}>
+                    <View style={styles.composerQuoteCopy}>
+                      <Text numberOfLines={1} style={styles.composerQuoteAuthor}>
+                        {quoteTarget.authorName}へ返信
+                      </Text>
+                      <Text numberOfLines={1} style={styles.composerQuoteBody}>
+                        {quoteTarget.body}
+                      </Text>
+                    </View>
+                    <Pressable accessibilityRole="button" hitSlop={8} onPress={() => setQuoteTarget(null)}>
+                      <IconSymbol name="close" color="rgba(58,50,74,0.52)" size={15} />
+                    </Pressable>
+                  </View>
+                ) : null}
+                <View style={styles.composerInputRow}>
+                  <TextInput
+                    multiline
+                    onChangeText={setDraft}
+                    placeholder="返信を書く"
+                    placeholderTextColor="rgba(58,50,74,0.34)"
+                    style={styles.composerInput}
+                    textAlignVertical="top"
+                    value={draft}
                   />
-                </Pressable>
+                  <Pressable
+                    accessibilityRole="button"
+                    disabled={sending || !draft.trim()}
+                    onPress={handleSend}
+                    style={[
+                      styles.sendButton,
+                      draft.trim() ? styles.sendButtonActive : null,
+                      sending ? styles.sendButtonDisabled : null,
+                    ]}
+                  >
+                    <IconSymbol
+                      name={sending ? "ellipsis-horizontal" : "send-outline"}
+                      color={draft.trim() ? "#fff" : "rgba(58,50,74,0.42)"}
+                      size={18}
+                    />
+                  </Pressable>
+                </View>
               </View>
             )}
             {sendError ? <Text style={styles.sendError}>{sendError}</Text> : null}
@@ -936,6 +1026,10 @@ function formatRelativeTime(value: number) {
   if (hours < 24) return `${hours}時間前`;
   const days = Math.floor(hours / 24);
   return `${days}日前`;
+}
+
+function normalizeReplySearch(value: string | null | undefined) {
+  return (value ?? "").replace(/\s+/g, " ").trim().toLowerCase();
 }
 
 function colorForAuthor(authorId: string) {
@@ -1191,7 +1285,35 @@ const styles = StyleSheet.create({
     color: megrumColors.ink,
     fontSize: 14,
     fontWeight: "900",
+  },
+  replyHeaderRow: {
+    alignItems: "center",
+    flexDirection: "row",
+    justifyContent: "space-between",
     marginTop: 6,
+  },
+  replyCountMeta: {
+    color: megrumColors.mutedInk,
+    fontSize: 11.5,
+    fontWeight: "800",
+  },
+  replySearchBox: {
+    alignItems: "center",
+    backgroundColor: "#fff",
+    borderColor: "rgba(58,50,74,0.08)",
+    borderRadius: 16,
+    borderWidth: 1,
+    flexDirection: "row",
+    gap: 8,
+    minHeight: 42,
+    paddingHorizontal: 12,
+  },
+  replySearchInput: {
+    color: megrumColors.ink,
+    flex: 1,
+    fontSize: 13,
+    fontWeight: "800",
+    padding: 0,
   },
   noRepliesCard: {
     backgroundColor: "#fff",
@@ -1262,6 +1384,37 @@ const styles = StyleSheet.create({
   replyBubbleTheirs: {
     borderBottomLeftRadius: 8,
   },
+  quotePreview: {
+    backgroundColor: "rgba(58,50,74,0.07)",
+    borderLeftColor: "rgba(166,149,216,0.72)",
+    borderLeftWidth: 3,
+    borderRadius: 10,
+    gap: 2,
+    marginBottom: 8,
+    paddingHorizontal: 9,
+    paddingVertical: 7,
+  },
+  quotePreviewMine: {
+    backgroundColor: "rgba(255,255,255,0.18)",
+    borderLeftColor: "rgba(255,255,255,0.72)",
+  },
+  quoteAuthor: {
+    color: megrumColors.lavender,
+    fontSize: 10.5,
+    fontWeight: "900",
+  },
+  quoteAuthorMine: {
+    color: "#fff",
+  },
+  quoteBody: {
+    color: megrumColors.mutedInk,
+    fontSize: 11.5,
+    fontWeight: "800",
+    lineHeight: 16,
+  },
+  quoteBodyMine: {
+    color: "rgba(255,255,255,0.82)",
+  },
   replyBody: {
     color: megrumColors.ink,
     fontSize: 14,
@@ -1313,14 +1466,42 @@ const styles = StyleSheet.create({
     color: megrumColors.lavender,
   },
   composer: {
-    alignItems: "flex-end",
     backgroundColor: "rgba(251,249,252,0.98)",
     borderTopColor: "rgba(58,50,74,0.08)",
     borderTopWidth: StyleSheet.hairlineWidth,
-    flexDirection: "row",
     gap: 10,
     paddingHorizontal: 14,
     paddingTop: 12,
+  },
+  composerQuote: {
+    alignItems: "center",
+    backgroundColor: "#fff",
+    borderColor: "rgba(166,149,216,0.22)",
+    borderRadius: 16,
+    borderWidth: 1,
+    flexDirection: "row",
+    gap: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+  },
+  composerQuoteCopy: {
+    flex: 1,
+    gap: 2,
+  },
+  composerQuoteAuthor: {
+    color: megrumColors.lavender,
+    fontSize: 11,
+    fontWeight: "900",
+  },
+  composerQuoteBody: {
+    color: megrumColors.mutedInk,
+    fontSize: 11.5,
+    fontWeight: "800",
+  },
+  composerInputRow: {
+    alignItems: "flex-end",
+    flexDirection: "row",
+    gap: 10,
   },
   composerInput: {
     backgroundColor: "#fff",

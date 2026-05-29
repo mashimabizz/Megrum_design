@@ -4,6 +4,75 @@
 
 ---
 
+## イテレーション173：引用返信とスレッド内検索を追加
+
+### 背景・問題意識
+
+スポット掲示板を現地の情報共有や雑談に使う場合、返信が増えるほど「どの発言への返事か」と「過去にその話が出ているか」が追いづらくなる。一般的なスレッド機能として、引用返信とスレッド内検索を追加した。
+
+### 変更内容
+
+#### `mobile/src/lib/meguriBoard.ts`
+- `MeguriBoardReply` に `parentReplyId` / `quotedAuthorName` / `quotedBody` を追加した。
+- 返信作成時に引用元のID・表示名・本文スナップショットを保存できるようにした。
+- remote select / RPC / local fallback / preview data に引用返信フィールドを反映した。
+
+#### `mobile/app/meguri-board-thread.tsx`
+- 返信アクションに「引用して返信」を追加した。
+- 返信入力欄の上に引用プレビューと解除ボタンを表示するようにした。
+- 返信バブル内に引用元プレビューを表示するようにした。
+- 返信本文・引用本文・返信者名を対象にしたスレッド内検索を追加した。
+
+#### `supabase/migrations/20260530204000_add_meguri_board_reply_quotes.sql`
+- `meguri_board_replies` に `parent_reply_id` / `quote_author_name` / `quote_body` を追加した。
+- 返信一覧RPCと返信追加RPCを引用返信フィールド込みに更新した。
+
+#### `notes/05_data_model.md`
+- 掲示板返信の引用フィールドを追記した。
+
+#### `notes/09_state_machines.md`
+- 引用返信とスレッド内検索のルールを追記した。
+
+#### `notes/10_glossary.md`
+- 引用返信、スレッド内検索を追加した。
+
+#### `notes/13_api_spec.md`
+- 掲示板返信作成の引用フィールドを追記した。
+
+### 影響範囲
+
+- iOS版 スポット掲示板詳細
+- Supabase スポット掲示板返信RPC
+- 掲示板のデータモデル・状態遷移・API仕様・用語
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `git diff --check -- mobile/src/lib/meguriBoard.ts mobile/app/meguri-board-thread.tsx supabase/migrations/20260530204000_add_meguri_board_reply_quotes.sql notes/05_data_model.md notes/09_state_machines.md notes/10_glossary.md notes/13_api_spec.md notes/08_design_iterations.md`
+- `npm --prefix mobile run export:ios:preview`
+- `EAS_UPDATE_PROJECT_SLUG=ihub EXPO_NO_GIT_STATUS=1 npm --prefix mobile run update:ios:preview -- --message "[iter173] add quoted replies and thread search" --non-interactive`
+- Preview OTA: Update group `c1068115-0cd4-4cdd-91a9-3810e362fbec` / iOS update `019e74ca-5255-7f6c-88ab-99abee8e227b`
+- `supabase db push`（`20260530204000_add_meguri_board_reply_quotes.sql` を remote DB に適用）
+
+### 関連ファイル
+
+- `mobile/src/lib/meguriBoard.ts`
+- `mobile/app/meguri-board-thread.tsx`
+- `supabase/migrations/20260530204000_add_meguri_board_reply_quotes.sql`
+- `notes/05_data_model.md`
+- `notes/09_state_machines.md`
+- `notes/10_glossary.md`
+- `notes/13_api_spec.md`
+
+### セルフレビュー結果
+
+- ✅ 返信アクションに引用返信を追加。
+- ✅ 返信入力欄と返信バブルに引用プレビューを追加。
+- ✅ スレッド内検索を返信本文・引用本文・返信者名に対応。
+- ✅ データモデル・状態遷移・用語・API仕様を更新。
+
+---
+
 ## イテレーション172：掲示板の編集と締め切りを追加
 
 ### 背景・問題意識

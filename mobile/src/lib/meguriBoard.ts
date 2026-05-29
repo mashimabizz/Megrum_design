@@ -79,6 +79,9 @@ export type MeguriBoardReply = {
   deleted: boolean;
   id: string;
   mine: boolean;
+  parentReplyId: string | null;
+  quotedAuthorName: string | null;
+  quotedBody: string | null;
   reacted: boolean;
   reactionCount: number;
   reported: boolean;
@@ -116,6 +119,9 @@ type CreateMeguriBoardThreadInput = {
 
 type CreateMeguriBoardReplyInput = {
   body: string;
+  parentReplyId?: string | null;
+  quotedAuthorName?: string | null;
+  quotedBody?: string | null;
   previewMode?: boolean;
   threadId: string;
   viewer?: MeguriBoardViewerContext | null;
@@ -467,6 +473,9 @@ export async function appendMeguriBoardReply(
     deleted: false,
     id: `meguri-board-reply-${createdAt}`,
     mine: true,
+    parentReplyId: input.parentReplyId ?? null,
+    quotedAuthorName: input.quotedAuthorName?.trim() || null,
+    quotedBody: input.quotedBody?.trim().slice(0, 160) || null,
     reacted: false,
     reactionCount: 0,
     reported: false,
@@ -918,7 +927,10 @@ async function appendRemoteMeguriBoardReply(
   if (input.viewer && isUuidLike(input.threadId)) {
     const rpc = await supabase.rpc("append_meguri_board_reply_for_viewer", {
       p_body: input.body.trim(),
+      p_parent_reply_id: input.parentReplyId ?? null,
       p_prefecture: input.viewer.prefecture,
+      p_quote_author_name: input.quotedAuthorName?.trim() || null,
+      p_quote_body: input.quotedBody?.trim().slice(0, 160) || null,
       p_scope: input.viewMode ?? "nearby_3km",
       p_thread_id: input.threadId,
       p_viewer_lat: input.viewer.coordinate?.latitude ?? null,
@@ -937,6 +949,9 @@ async function appendRemoteMeguriBoardReply(
     .insert({
       author_id: actor.userId,
       body: input.body.trim(),
+      parent_reply_id: input.parentReplyId ?? null,
+      quote_author_name: input.quotedAuthorName?.trim() || null,
+      quote_body: input.quotedBody?.trim().slice(0, 160) || null,
       thread_id: input.threadId,
     })
     .select(remoteReplySelect())
@@ -1016,6 +1031,9 @@ function remoteMeguriBoardReplyToLocal(
     deleted: normalizeReplyStatus(row.status) === "deleted" || !!timestampValueOrNull(row.deleted_at),
     id,
     mine: authorId === viewerId,
+    parentReplyId: nullableStringValue(row.parent_reply_id),
+    quotedAuthorName: nullableStringValue(row.quote_author_name),
+    quotedBody: nullableStringValue(row.quote_body),
     reacted: booleanValue(row.viewer_reacted),
     reactionCount: numberValue(row.reaction_count, 0),
     reported: booleanValue(row.viewer_reported),
@@ -1041,6 +1059,11 @@ function createPreviewMeguriBoardDataset() {
       PREVIEW_AUTHORS.yui,
       "25ゲート側は日陰が少ないので、水だけあると助かります。",
       now - 31 * 60000,
+      {
+        authorName: PREVIEW_AUTHORS.ren.displayName,
+        body: "いま 20 分くらいです。スタッフさんが列を3本に分けてました。",
+        id: "preview-board-reply-1",
+      },
     ),
     createPreviewReply(
       "preview-board-reply-3",
@@ -1183,6 +1206,7 @@ function createPreviewReply(
   author: (typeof PREVIEW_AUTHORS)[keyof typeof PREVIEW_AUTHORS],
   body: string,
   createdAt: number,
+  quote?: { authorName: string; body: string; id: string },
 ): MeguriBoardReply {
   return {
     authorHandle: author.handle,
@@ -1194,6 +1218,9 @@ function createPreviewReply(
     deleted: false,
     id,
     mine: false,
+    parentReplyId: quote?.id ?? null,
+    quotedAuthorName: quote?.authorName ?? null,
+    quotedBody: quote?.body ?? null,
     reacted: false,
     reactionCount: 0,
     reported: false,
@@ -1271,6 +1298,9 @@ function normalizeStoredReply(reply: MeguriBoardReply): MeguriBoardReply {
   return {
     ...reply,
     deleted: Boolean(reply.deleted),
+    parentReplyId: nullableStringValue(reply.parentReplyId),
+    quotedAuthorName: nullableStringValue(reply.quotedAuthorName),
+    quotedBody: nullableStringValue(reply.quotedBody),
     reacted: Boolean(reply.reacted),
     reactionCount: numberValue(reply.reactionCount, 0),
     reported: Boolean(reply.reported),
@@ -1330,6 +1360,9 @@ function remoteReplySelect() {
     "thread_id",
     "author_id",
     "body",
+    "parent_reply_id",
+    "quote_author_name",
+    "quote_body",
     "status",
     "reaction_count",
     "created_at",

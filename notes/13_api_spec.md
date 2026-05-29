@@ -1032,11 +1032,14 @@ AW削除。
 - **Request**:
   ```json
   {
-    "body": "string"
+    "body": "string",
+    "parent_reply_id": "uuid?",
+    "quote_author_name": "string?",
+    "quote_body": "string?"
   }
   ```
-- **Response 201**: `{ id, thread_id, body, status, reaction_count, created_at, updated_at, deleted_at, viewer_reacted, viewer_reported, author }`
-- **備考**: テキストのみ。`thread.status='locked'` の場合は返信不可
+- **Response 201**: `{ id, thread_id, body, parent_reply_id, quote_author_name, quote_body, status, reaction_count, created_at, updated_at, deleted_at, viewer_reacted, viewer_reported, author }`
+- **備考**: テキストのみ。`thread.status='locked'` の場合は返信不可。引用返信では `parent_reply_id` と表示用スナップショットを保存する
 - **Screen**: `meguri-board-thread`
 
 ### PATCH /api/v1/meguri-board/threads/:id

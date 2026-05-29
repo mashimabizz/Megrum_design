@@ -356,6 +356,9 @@ iter168.43 以降、無料受信者に本文・画像パスを直接返さない
 | `thread_id` | uuid | → `meguri_board_threads` |
 | `author_id` | uuid | → users |
 | `body` | text | 1〜1000字 |
+| `parent_reply_id` | uuid nullable | 引用元返信。iter173 追加 |
+| `quote_author_name` | text nullable | 引用元の表示名スナップショット。iter173 追加 |
+| `quote_body` | text nullable | 引用元本文の先頭160字スナップショット。iter173 追加 |
 | `status` | text | `visible` / `deleted`。iter172 追加 |
 | `reaction_count` | integer | 返信への「参考になった」の集計。iter171 追加 |
 | `deleted_at` | timestamptz nullable | 削除済み表示に切り替えた時刻。iter172 追加 |
