@@ -4,6 +4,54 @@
 
 ---
 
+## イテレーション216：掲示板一覧の未読表示を強化
+
+### 背景・問題意識
+
+一般的なスレッド型掲示板では、未読や新着の見落としを減らす表示が重要になる。従来は小さな点だけで未読を示していたため、一覧を流し見した時に分かりにくかった。未読バッジとカード強調で、未読スレッドを一目で判別できるようにした。
+
+### 変更内容
+
+#### `mobile/app/meguri-board.tsx`
+- 未読判定を `isThreadUnread` helper に集約した。
+- 掲示板一覧カードで未読スレッドに `未読` バッジを表示するようにした。
+- 未読スレッドのカードに薄い水色の枠を追加した。
+- 未読スレッドの最新返信プレビューを強調表示するようにした。
+
+#### `notes/09_state_machines.md`
+- Meguri Board Lifecycle に一覧未読バッジの表示ルールを追記した。
+
+#### `notes/10_glossary.md`
+- 掲示板未読バッジを追加した。
+
+### 影響範囲
+
+- iOS版 スポット掲示板一覧
+- 未読スレッド表示
+- 未読表示モード
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- `EAS_UPDATE_PROJECT_SLUG=ihub EXPO_NO_GIT_STATUS=1 npm --prefix mobile run update:ios:preview -- --message "[iter216] improve board unread badges" --non-interactive`
+- Preview OTA: Update group `04dbe387-3e8a-4dfa-835b-830662fe6e16` / iOS update `019e75a1-527c-70a6-bb37-ade447c69940`
+
+### 関連ファイル
+
+- `mobile/app/meguri-board.tsx`
+- `notes/08_design_iterations.md`
+- `notes/09_state_machines.md`
+- `notes/10_glossary.md`
+
+### セルフレビュー結果
+
+- ✅ 既存の `readAt < latestActivityAt` ルールを維持し、表示だけを強化した。
+- ✅ DB変更やネイティブ依存追加なしで、Preview OTA対象内に収めた。
+- ✅ 未読バッジは既存カテゴリ/スコープバッジの行に収めた。
+
+---
+
 ## イテレーション215：掲示板入力に文字数カウンターを追加
 
 ### 背景・問題意識

@@ -893,6 +893,7 @@ export default function MeguriBoardScreen() {
                       onLongPress={() => openThreadActions(thread)}
                       style={({ pressed }) => [
                         styles.threadCard,
+                        isThreadUnread(thread) ? styles.threadCardUnread : null,
                         pressed ? styles.threadCardPressed : null,
                       ]}
                     >
@@ -902,9 +903,11 @@ export default function MeguriBoardScreen() {
                           <ScopeBadge scope={thread.audienceScope} />
                           {thread.isPinned ? <StatusBadge label="固定" /> : null}
                           {thread.status === "locked" ? <StatusBadge label="締め切り" /> : null}
-                          {thread.readAt && thread.readAt >= thread.latestActivityAt ? null : (
-                            <View style={styles.unreadDot} />
-                          )}
+                          {isThreadUnread(thread) ? (
+                            <View style={styles.unreadBadge}>
+                              <Text style={styles.unreadBadgeText}>未読</Text>
+                            </View>
+                          ) : null}
                         </View>
                         <View style={styles.threadTopActions}>
                           {thread.imageUris.length > 0 ? (
@@ -935,7 +938,10 @@ export default function MeguriBoardScreen() {
                         {meguriBoardAudienceMeta(thread)} · {thread.authorName}
                       </Text>
                       <View style={styles.threadFooter}>
-                        <Text numberOfLines={1} style={styles.replyPreview}>
+                        <Text
+                          numberOfLines={1}
+                          style={[styles.replyPreview, isThreadUnread(thread) ? styles.replyPreviewUnread : null]}
+                        >
                           {thread.latestReplyPreview || "まだ返信はありません"}
                         </Text>
                         <Pressable
@@ -1293,6 +1299,10 @@ function buildViewerContext(input: {
 
 function readParam(value: string | string[] | undefined) {
   return Array.isArray(value) ? value[0] : value;
+}
+
+function isThreadUnread(thread: Pick<MeguriBoardThread, "latestActivityAt" | "readAt">) {
+  return !thread.readAt || thread.readAt < thread.latestActivityAt;
 }
 
 function slugify(value: string) {
@@ -1683,6 +1693,10 @@ const styles = StyleSheet.create({
     paddingVertical: 15,
     ...megrumShadow,
   },
+  threadCardUnread: {
+    borderColor: "rgba(168,212,230,0.55)",
+    borderWidth: 1,
+  },
   threadCardPressed: {
     opacity: 0.94,
     transform: [{ scale: 0.992 }],
@@ -1723,11 +1737,17 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     width: 26,
   },
-  unreadDot: {
-    backgroundColor: megrumColors.sky,
+  unreadBadge: {
+    backgroundColor: "rgba(168,212,230,0.24)",
     borderRadius: 999,
-    height: 7,
-    width: 7,
+    minHeight: 24,
+    paddingHorizontal: 9,
+    justifyContent: "center",
+  },
+  unreadBadgeText: {
+    color: "#4f7e92",
+    fontSize: 10.5,
+    fontWeight: "900",
   },
   categoryBadge: {
     borderRadius: 999,
@@ -1875,6 +1895,10 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 12,
     fontWeight: "700",
+  },
+  replyPreviewUnread: {
+    color: "#4f7e92",
+    fontWeight: "900",
   },
   replyCount: {
     alignItems: "center",
