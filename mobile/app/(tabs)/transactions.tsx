@@ -1,40 +1,19 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
+import { useEffect, useMemo, useState } from "react";
+import { router, useLocalSearchParams } from "expo-router";
 import {
-  ActivityIndicator,
   Animated,
   Image,
-  type NativeScrollEvent,
-  type NativeSyntheticEvent,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
   View,
-  useWindowDimensions,
 } from "react-native";
-import {
-  SectionTabs,
-} from "../../src/components/GoodsGrid";
-import { IconSymbol } from "../../src/components/IconSymbol";
-import { MeguriAvatarFace } from "../../src/components/meguri/MeguriAvatarFace";
 import { Screen } from "../../src/components/Screen";
 import { useAuth } from "../../src/auth/AuthProvider";
 import { supabase } from "../../src/lib/supabase";
 import { megrumColors, megrumRadii } from "../../src/theme/tokens";
-import { LETTERS, USERS, type Letter } from "./encounters";
-import {
-  loadMeguriGroomReplies,
-  loadMeguriMessageReadState,
-  loadMeguriThreadMessages,
-  markMeguriLetterRead,
-  unreadMeguriMessageCount,
-  type MeguriGroomReply,
-  type MeguriMessageReadState,
-  type MeguriThreadMessage,
-} from "../../src/lib/meguriMessages";
 
-type PrimaryTab = "meguri" | "trade";
 type TopTab = "pending" | "ongoing";
 type PastFilter = "all" | "completed" | "cancelled" | "ended";
 
@@ -73,14 +52,6 @@ type Transaction = {
   updated: string;
   note: string;
   stars?: number;
-};
-
-type MeguriConversation = {
-  id: string;
-  letter: Letter;
-  lastAt: string;
-  latestSentPreview?: string;
-  unread: number;
 };
 
 const TRANSACTIONS: Transaction[] = [
@@ -194,34 +165,16 @@ const TRANSACTIONS: Transaction[] = [
   },
 ];
 
-const PRIMARY_TABS = [
-  { id: "meguri" as const, label: "めぐりあい", color: megrumColors.lavender },
-  { id: "trade" as const, label: "取引", color: megrumColors.sky },
-];
 const TOP_TABS = [
   { id: "pending" as const, label: "打診中", color: megrumColors.lavender },
   { id: "ongoing" as const, label: "進行中", color: megrumColors.sky },
-];
-const MEGURI_TIMES = ["0:24", "昨日", "0:09", "土曜日", "金曜日", "木曜日", "水曜日", "月曜日"];
-const MEGURI_MESSAGE_BODIES = [
-  "今日の現場、空気感が最高でしたね。",
-  "同じ推しの話ができそうで、うれしくなりました。",
-  "またどこかでめぐれたらうれしいです。",
-  "プロフィールを見て、同じ作品が好きそうだと思いました。",
 ];
 
 export default function TransactionsScreen() {
   const { user, previewMode } = useAuth();
   const params = useLocalSearchParams<{ archive?: string | string[] }>();
-  const { width: windowWidth } = useWindowDimensions();
-  const pageWidth = Math.max(1, windowWidth - 36);
-  const primaryPagerRef = useRef<ScrollView>(null);
   const archiveParam = Array.isArray(params.archive) ? params.archive[0] : params.archive;
   const archiveMode = archiveParam === "completed";
-  const [primaryTab, setPrimaryTab] = useState<PrimaryTab>("meguri");
-  const [primaryPagerPosition, setPrimaryPagerPosition] = useState(() =>
-    PRIMARY_TABS.findIndex((item) => item.id === "meguri"),
-  );
   const [tab, setTab] = useState<TopTab>("pending");
   const [pastFilter, setPastFilter] = useState<PastFilter>(() =>
     archiveMode ? "completed" : "all",
@@ -231,10 +184,6 @@ export default function TransactionsScreen() {
   );
   const [loading, setLoading] = useState(!!supabase && !previewMode);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [meguriReadState, setMeguriReadState] = useState<MeguriMessageReadState>({});
-  const [meguriGroomReplies, setMeguriGroomReplies] = useState<MeguriGroomReply[]>([]);
-  const [meguriThreadMessages, setMeguriThreadMessages] = useState<MeguriThreadMessage[]>([]);
-  const [meguriLoading, setMeguriLoading] = useState(!previewMode);
   const [animatedTabs, setAnimatedTabs] = useState<Set<TopTab>>(
     () => new Set(),
   );
@@ -276,43 +225,6 @@ export default function TransactionsScreen() {
     };
   }, [previewMode, user]);
 
-  useFocusEffect(
-    useCallback(() => {
-      let active = true;
-      if (previewMode) {
-        setMeguriLoading(false);
-        return () => {
-          active = false;
-        };
-      }
-      setMeguriLoading(true);
-      setMeguriGroomReplies([]);
-      setMeguriThreadMessages([]);
-      Promise.all([
-        loadMeguriMessageReadState(),
-        loadMeguriGroomReplies(),
-        loadMeguriThreadMessages(),
-      ])
-        .then(([nextReadState, nextGroomReplies, nextThreadMessages]) => {
-          if (!active) return;
-          setMeguriReadState(nextReadState);
-          setMeguriGroomReplies(nextGroomReplies);
-          setMeguriThreadMessages(nextThreadMessages);
-        })
-        .catch(() => {
-          if (!active) return;
-          setMeguriGroomReplies([]);
-          setMeguriThreadMessages([]);
-        })
-        .finally(() => {
-          if (active) setMeguriLoading(false);
-        });
-      return () => {
-        active = false;
-      };
-    }, [previewMode]),
-  );
-
   const grouped = useMemo(() => {
     const pending = transactions.filter((tx) =>
       ["sent", "negotiating", "agreement_one_side"].includes(tx.status),
@@ -352,22 +264,6 @@ export default function TransactionsScreen() {
     return grouped.ongoing;
   };
   const list = listForTab(tab);
-  const meguriConversations = useMemo(
-    () => createMeguriConversations(
-      meguriReadState,
-      meguriGroomReplies,
-      meguriThreadMessages,
-      previewMode,
-    ),
-    [meguriGroomReplies, meguriReadState, meguriThreadMessages, previewMode],
-  );
-  const primaryTabs = PRIMARY_TABS.map((item) => ({
-    ...item,
-    count:
-      item.id === "meguri"
-        ? meguriConversations.length
-        : grouped.pending.length + grouped.ongoing.length,
-  }));
   const topTabs = TOP_TABS.map((item) => ({
     ...item,
     count: counts[item.id],
@@ -439,58 +335,11 @@ export default function TransactionsScreen() {
         {loading ? <Text style={styles.inlineNotice}>取引を読み込み中…</Text> : null}
         {loadError ? <Text style={styles.inlineError}>{loadError}</Text> : null}
 
-        <SectionTabs
-          value={primaryTab}
-          tabs={primaryTabs}
-          position={primaryPagerPosition}
-          onChange={selectPrimaryTab}
-        />
-
-        <ScrollView
-          ref={primaryPagerRef}
-          horizontal
-          pagingEnabled
-          bounces={false}
-          directionalLockEnabled
-          showsHorizontalScrollIndicator={false}
-          scrollEventThrottle={16}
-          style={styles.primaryPager}
-          onScroll={handlePrimaryPagerScroll}
-          onMomentumScrollEnd={handlePrimaryPagerSettled}
-        >
-          <View style={[styles.primaryPage, { width: pageWidth }]}>
-            <MeguriMessageList
-              conversations={meguriConversations}
-              loading={meguriLoading}
-              onRead={(next) => setMeguriReadState(next)}
-            />
-          </View>
-          <View style={[styles.primaryPage, { width: pageWidth }]}>
-            <CompactTabs value={tab} tabs={topTabs} onChange={setTab} />
-            <View style={styles.listContent}>{renderListPage(tab)}</View>
-          </View>
-        </ScrollView>
+        <CompactTabs value={tab} tabs={topTabs} onChange={setTab} />
+        <View style={styles.listContent}>{renderListPage(tab)}</View>
       </ScrollView>
     </Screen>
   );
-
-  function selectPrimaryTab(next: PrimaryTab) {
-    const nextIndex = PRIMARY_TABS.findIndex((item) => item.id === next);
-    setPrimaryTab(next);
-    setPrimaryPagerPosition(nextIndex);
-    primaryPagerRef.current?.scrollTo({ x: nextIndex * pageWidth, animated: true });
-  }
-
-  function handlePrimaryPagerScroll(event: NativeSyntheticEvent<NativeScrollEvent>) {
-    setPrimaryPagerPosition(event.nativeEvent.contentOffset.x / pageWidth);
-  }
-
-  function handlePrimaryPagerSettled(event: NativeSyntheticEvent<NativeScrollEvent>) {
-    const nextIndex = Math.round(event.nativeEvent.contentOffset.x / pageWidth);
-    const next = PRIMARY_TABS[nextIndex]?.id ?? "meguri";
-    setPrimaryTab(next);
-    setPrimaryPagerPosition(nextIndex);
-  }
 
   function renderListPage(pageTab: TopTab) {
     const pageList = listForTab(pageTab);
@@ -549,284 +398,6 @@ function openTransactionDetail(tx: Transaction) {
       give: JSON.stringify(tx.give),
     },
   });
-}
-
-function MeguriMessageList({
-  conversations,
-  loading,
-  onRead,
-}: {
-  conversations: MeguriConversation[];
-  loading: boolean;
-  onRead: (state: MeguriMessageReadState) => void;
-}) {
-  if (loading) {
-    return (
-      <View style={styles.meguriLoadingBox}>
-        <ActivityIndicator color={megrumColors.lavender} />
-        <Text style={styles.meguriLoadingText}>メッセージを読み込み中…</Text>
-      </View>
-    );
-  }
-  if (conversations.length === 0) {
-    return (
-      <View style={styles.emptyBox}>
-        <Text style={styles.emptyText}>めぐりあいメッセージはまだありません</Text>
-      </View>
-    );
-  }
-  return (
-    <View style={styles.meguriList}>
-      {conversations.map((conversation) => (
-        <MeguriConversationRow
-          key={conversation.id}
-          conversation={conversation}
-          onPress={() => openMeguriConversation(conversation, onRead)}
-        />
-      ))}
-    </View>
-  );
-}
-
-function MeguriConversationRow({
-  conversation,
-  onPress,
-}: {
-  conversation: MeguriConversation;
-  onPress: () => void;
-}) {
-  const { letter } = conversation;
-  const unreplied = !conversation.latestSentPreview;
-  return (
-    <Pressable
-      accessibilityRole="button"
-      onPress={onPress}
-      style={({ pressed }) => [
-        styles.meguriRow,
-        unreplied ? styles.meguriRowUnreplied : null,
-        pressed ? styles.meguriRowPressed : null,
-      ]}
-    >
-      <View style={styles.meguriAvatar}>
-        <MeguriAvatarFace
-          animalType={letter.from.animalType}
-          furColor={letter.from.furColor}
-          hue={letter.from.hue}
-          size={52}
-        />
-      </View>
-      <View style={styles.meguriCopy}>
-        <View style={styles.meguriNameLine}>
-          <Text numberOfLines={1} style={styles.meguriName}>
-            {letter.from.name}
-          </Text>
-        </View>
-        {unreplied ? (
-          <Text numberOfLines={1} style={styles.meguriPreview}>
-            <Text style={styles.meguriPendingWord}>未返信</Text>
-            <Text style={styles.meguriPendingMessage}>　メッセージが届いています！</Text>
-          </Text>
-        ) : (
-          <Text numberOfLines={1} style={[styles.meguriPreview, styles.meguriSentPreview]}>
-            {conversation.latestSentPreview}
-          </Text>
-        )}
-      </View>
-      <View style={styles.meguriMetaColumn}>
-        <Text style={styles.meguriTime}>{conversation.lastAt}</Text>
-        {conversation.unread > 0 ? (
-          <View style={styles.meguriUnread}>
-            <Text style={styles.meguriUnreadText}>{conversation.unread}</Text>
-          </View>
-        ) : null}
-      </View>
-      <IconSymbol name="chevron-forward" color="rgba(58,50,74,0.32)" size={18} />
-    </Pressable>
-  );
-}
-
-function openMeguriConversation(
-  conversation: MeguriConversation,
-  onRead?: (state: MeguriMessageReadState) => void,
-) {
-  if (conversation.unread > 0) {
-    markMeguriLetterRead(conversation.letter.id)
-      .then((next) => onRead?.(next))
-      .catch(() => undefined);
-  }
-  router.push({
-    pathname: "/meguri-letters",
-    params: {
-      open: "1",
-      userId: conversation.letter.from.id,
-    },
-  });
-}
-
-function createMeguriConversations(
-  readState: MeguriMessageReadState,
-  groomReplies: MeguriGroomReply[],
-  threadMessages: MeguriThreadMessage[],
-  includePreviewRows: boolean,
-): MeguriConversation[] {
-  if (!includePreviewRows) {
-    return createRemoteMeguriConversations(groomReplies, threadMessages);
-  }
-  const letterUserIds = new Set(LETTERS.map((letter) => letter.from.id));
-  const extras = USERS.filter((user) => !letterUserIds.has(user.id))
-    .slice(0, 4)
-    .map((user, index): Letter => ({
-      affinity: 74 + (index % 4) * 5,
-      body: MEGURI_MESSAGE_BODIES[index % MEGURI_MESSAGE_BODIES.length],
-      from: user,
-      id: `transaction-meguri-${user.id}`,
-      opened: index % 2 === 0,
-      placeHint: index % 2 === 0 ? "同じイベント圏内" : "最近、近いエリア",
-      timeHint: index < 2 ? "今日" : "今週",
-    }));
-  const latestSentByUser = latestMeguriMessagePreviewByUser(groomReplies, threadMessages);
-  return [...LETTERS, ...extras].map((letter, index) => {
-    const latestSent = latestSentByUser.get(letter.from.id) ?? latestSentByUser.get(letter.from.name);
-    return {
-      id: `transaction-message-${letter.id}`,
-      lastAt: latestSent ? currentMeguriTimeLabel(latestSent.sentAt) : MEGURI_TIMES[index] ?? "先週",
-      latestSentPreview: latestSent?.body,
-      letter,
-      unread: unreadMeguriMessageCount(letter, readState) + unreadMeguriRowsForPeer(letter.from.id, groomReplies, threadMessages),
-    };
-  });
-}
-
-function createRemoteMeguriConversations(
-  groomReplies: MeguriGroomReply[],
-  threadMessages: MeguriThreadMessage[],
-): MeguriConversation[] {
-  const peers = new Map<string, {
-    latestBody: string;
-    latestSentAt: number;
-    letter: Letter;
-    unread: number;
-  }>();
-  const upsertPeer = (
-    peerId: string,
-    peerName: string,
-    body: string,
-    sentAt: number,
-    unread: boolean,
-  ) => {
-    const key = peerId || peerName;
-    if (!key) return;
-    const current = peers.get(key);
-    const baseLetter = current?.letter ?? meguriPeerToLetter(peerId, peerName, body);
-    peers.set(key, {
-      latestBody: !current || sentAt >= current.latestSentAt ? body : current.latestBody,
-      latestSentAt: Math.max(current?.latestSentAt ?? 0, sentAt),
-      letter: baseLetter,
-      unread: (current?.unread ?? 0) + (unread ? 1 : 0),
-    });
-  };
-
-  for (const reply of groomReplies) {
-    upsertPeer(
-      reply.recipientId,
-      reply.recipientName,
-      reply.body,
-      reply.sentAt,
-      reply.mine === false && !reply.readAt,
-    );
-  }
-  for (const message of threadMessages) {
-    upsertPeer(
-      message.peerId,
-      message.peerName,
-      message.body || (message.imageUri ? "画像を送信しました" : "めぐりあいメッセージです。"),
-      message.sentAt,
-      message.mine === false && !message.readAt,
-    );
-  }
-
-  return Array.from(peers.entries())
-    .sort(([, a], [, b]) => b.latestSentAt - a.latestSentAt)
-    .map(([key, row]) => ({
-      id: `transaction-message-${row.letter.id || key}`,
-      lastAt: currentMeguriTimeLabel(row.latestSentAt),
-      latestSentPreview: row.latestBody,
-      letter: row.letter,
-      unread: row.unread,
-    }));
-}
-
-function meguriPeerToLetter(peerId: string, peerName: string, body: string): Letter {
-  const matched = USERS.find((user) => user.id === peerId || user.name === peerName);
-  const from = matched
-    ? { ...matched, id: peerId || matched.id, name: peerName || matched.name }
-    : {
-        animalType: "cat" as const,
-        area: "めぐりあい",
-        count: 1,
-        furColor: "lavender" as const,
-        group: "めぐり",
-        hitokoto: body,
-        hue: "lav" as const,
-        id: peerId,
-        name: peerName || "めぐりユーザー",
-        oshi: "推し",
-        recent: body,
-        since: "今日",
-        style: "推し活",
-      };
-  return {
-    affinity: 76,
-    body: body || "めぐりあいメッセージです。",
-    from,
-    id: `transaction-meguri-${peerId || peerName}`,
-    opened: true,
-    placeHint: "めぐりあい",
-    timeHint: "今日",
-  };
-}
-
-function latestMeguriMessagePreviewByUser(
-  replies: MeguriGroomReply[],
-  messages: MeguriThreadMessage[],
-) {
-  const latest = new Map<string, { body: string; sentAt: number }>();
-  for (const reply of replies) {
-    const keys = [reply.recipientId, reply.recipientName].filter(Boolean);
-    for (const key of keys) {
-      const current = latest.get(key);
-      if (!current || reply.sentAt > current.sentAt) {
-        latest.set(key, { body: reply.body, sentAt: reply.sentAt });
-      }
-    }
-  }
-  for (const message of messages) {
-    const keys = [message.peerId, message.peerName].filter(Boolean);
-    const body = message.body || (message.imageUri ? "画像を送信しました" : "めぐりあいメッセージです。");
-    for (const key of keys) {
-      const current = latest.get(key);
-      if (!current || message.sentAt > current.sentAt) {
-        latest.set(key, { body, sentAt: message.sentAt });
-      }
-    }
-  }
-  return latest;
-}
-
-function unreadMeguriRowsForPeer(
-  peerId: string,
-  replies: MeguriGroomReply[],
-  messages: MeguriThreadMessage[],
-) {
-  return (
-    replies.filter((reply) => reply.recipientId === peerId && reply.mine === false && !reply.readAt).length +
-    messages.filter((message) => message.peerId === peerId && message.mine === false && !message.readAt).length
-  );
-}
-
-function currentMeguriTimeLabel(value: number = Date.now()) {
-  const now = new Date(value);
-  return `${now.getHours()}:${now.getMinutes().toString().padStart(2, "0")}`;
 }
 
 type ProposalRow = {

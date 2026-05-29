@@ -116,13 +116,13 @@ export default function TabLayout() {
           <Icon sf={TAB_CONFIG.wishes.sf} />
           <Label>{TAB_CONFIG.wishes.label}</Label>
         </NativeTabs.Trigger>
-        <NativeTabs.Trigger name="encounters">
-          <Icon sf={TAB_CONFIG.encounters.sf} />
-          <Label>{TAB_CONFIG.encounters.label}</Label>
-        </NativeTabs.Trigger>
         <NativeTabs.Trigger name="transactions">
           <Icon sf={TAB_CONFIG.transactions.sf} />
           <Label>{TAB_CONFIG.transactions.label}</Label>
+        </NativeTabs.Trigger>
+        <NativeTabs.Trigger name="encounters">
+          <Icon sf={TAB_CONFIG.encounters.sf} />
+          <Label>{TAB_CONFIG.encounters.label}</Label>
         </NativeTabs.Trigger>
         <NativeTabs.Trigger hidden name="notifications" />
         <NativeTabs.Trigger hidden name="profile" />

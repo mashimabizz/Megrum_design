@@ -566,7 +566,6 @@ export default function EncountersScreen() {
   const { previewMode, profile, user } = useAuth();
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const [activeIndex, setActiveIndex] = useState(0);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [meguriEnabled, setMeguriEnabled] = useState(true);
   const [plusActive, setPlusActive] = useState(false);
@@ -584,33 +583,10 @@ export default function EncountersScreen() {
   const [groomViewerSession, setGroomViewerSession] = useState(0);
   const [viewedGroomKeys, setViewedGroomKeys] = useState<Set<string>>(() => new Set());
   const groomToastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const arrivals = useMemo(() => {
-    const seen = new Set<string>();
-    const groomAuthors: MeguriUser[] = [];
-    for (const post of groomPosts) {
-      if (!post.author || seen.has(post.author.id)) continue;
-      seen.add(post.author.id);
-      groomAuthors.push(post.author);
-    }
-    return groomAuthors.length > 0 ? groomAuthors.slice(0, 5) : USERS.slice(0, 5);
-  }, [groomPosts]);
-  const todayCount = arrivals.length;
-  const active = arrivals[activeIndex] ?? arrivals[0] ?? USERS[0];
   const selectedGroomPost = groomPosts.find((post) => post.id === selectedGroomId) ?? null;
   const lockedLetters = previewMode && !plusActive ? LETTERS.length : 0;
   const headerTop = Math.max(insets.top, 18) + 8;
   const bottomPadding = Math.max(insets.bottom, 12) + 96;
-
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setActiveIndex((current) => (current + 1) % arrivals.length);
-    }, 3200);
-    return () => clearInterval(timer);
-  }, [arrivals.length]);
-
-  useEffect(() => {
-    if (activeIndex >= arrivals.length) setActiveIndex(0);
-  }, [activeIndex, arrivals.length]);
 
   useEffect(() => {
     loadMeguriPlusState(profile)
@@ -969,47 +945,12 @@ export default function EncountersScreen() {
           viewedKeys={viewedGroomKeys}
         />
 
-        <View style={styles.stageCard}>
-          <View style={styles.homeSceneFrame}>
-            <HomeResidentsFallback activeIndex={activeIndex} users={arrivals} />
-
-            <View style={styles.speechBubble}>
-              <Text style={styles.speechText}>「{active.recent}」</Text>
-              <View
-                style={[
-                  styles.bubbleTail,
-                  { left: `${12 + activeIndex * 19}%` },
-                ]}
-              />
-            </View>
-          </View>
-        </View>
-
-        <View style={styles.statsRow}>
-          <NumLine value={todayCount} label="今日のめぐり" />
-          <NumLine value={14} label="出会った人" />
-          <NumLine value={lockedLetters} label="未読メッセージ" />
-        </View>
+        <BoardBanner onPress={() => router.push("/meguri-board")} />
 
         <View style={styles.shortcutGrid}>
           <ShortcutCard title="メッセージ" subtitle={`${lockedLetters}件の未読`} hue="lav" onPress={() => router.push("/meguri-letters")} />
           <ShortcutCard title="マップ" subtitle="47 都道府県" hue="sky" onPress={() => router.push("/meguri-map")} />
-          <ShortcutCard title="掲示板" subtitle="現地の情報共有" hue="mint" onPress={() => router.push("/meguri-board")} />
           <ShortcutCard title="実績" subtitle="3 / 4 達成" hue="pink" onPress={() => router.push("/meguri-achievements")} />
-          <ShortcutCard title="今日のレポート" subtitle="軽く振り返り" hue="butter" onPress={() => router.push("/meguri-report")} />
-        </View>
-
-        <View style={styles.hitokotoCard}>
-          <View style={styles.hitokotoIcon}>
-            <IconSymbol name="create-outline" color={megrumColors.lavender} size={20} />
-          </View>
-          <View style={styles.hitokotoCopy}>
-            <Text style={styles.hitokotoTitle}>今日のひとこと</Text>
-            <Text style={styles.hitokotoSub}>お題: 最近の推し活は？</Text>
-          </View>
-          <Pressable onPress={() => router.push("/meguri-hitokoto")} style={styles.hitokotoButton}>
-            <Text style={styles.hitokotoButtonText}>書く</Text>
-          </Pressable>
         </View>
       </ScrollView>
 
@@ -3513,37 +3454,6 @@ function GroomComposerModal({
   );
 }
 
-function HomeResidentsFallback({
-  activeIndex,
-  users,
-}: {
-  activeIndex: number;
-  users: MeguriUser[];
-}) {
-  return (
-    <View style={styles.homeFallbackScene}>
-      <View style={styles.homeFallbackGround} />
-      <View style={styles.homeFallbackRow}>
-        {users.map((user, index) => (
-          <View
-            key={user.id}
-            style={[
-              styles.homeFallbackPerson,
-              index === activeIndex ? styles.homeFallbackPersonActive : null,
-            ]}
-          >
-            <MeguriHomeProfileIcon
-              active={index === activeIndex}
-              size={index === activeIndex ? 70 : 60}
-              user={user}
-            />
-          </View>
-        ))}
-      </View>
-    </View>
-  );
-}
-
 export function RoundButton({
   icon,
   onPress,
@@ -3706,12 +3616,29 @@ export function MiniChip({ label }: { label: string }) {
   );
 }
 
-export function NumLine({ label, value }: { label: string; value: number }) {
+function BoardBanner({ onPress }: { onPress: () => void }) {
   return (
-    <View style={styles.numLine}>
-      <Text style={styles.numValue}>{value}</Text>
-      <Text style={styles.numLabel}>{label}</Text>
-    </View>
+    <Pressable
+      accessibilityRole="button"
+      onPress={onPress}
+      style={({ pressed }) => [
+        styles.boardBanner,
+        pressed ? styles.boardBannerPressed : null,
+      ]}
+    >
+      <View style={styles.boardBannerIcon}>
+        <IconSymbol name="document-text-outline" color="#fff" size={23} />
+      </View>
+      <View style={styles.boardBannerCopy}>
+        <Text style={styles.boardBannerTitle}>現地掲示板</Text>
+        <Text style={styles.boardBannerSub}>
+          会場の混雑、物販、集合場所の話題をまとめて確認
+        </Text>
+      </View>
+      <View style={styles.boardBannerCta}>
+        <Text style={styles.boardBannerCtaText}>開く</Text>
+      </View>
+    </Pressable>
   );
 }
 
@@ -5350,6 +5277,60 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     flexWrap: "wrap",
     gap: 10,
+  },
+  boardBanner: {
+    alignItems: "center",
+    backgroundColor: megrumColors.surface,
+    borderColor: "rgba(166,149,216,0.22)",
+    borderRadius: 24,
+    borderWidth: 1,
+    flexDirection: "row",
+    gap: 13,
+    minHeight: 108,
+    padding: 16,
+    ...megrumShadow,
+  },
+  boardBannerPressed: {
+    opacity: 0.86,
+    transform: [{ scale: 0.99 }],
+  },
+  boardBannerIcon: {
+    alignItems: "center",
+    backgroundColor: megrumColors.lavender,
+    borderRadius: 18,
+    height: 48,
+    justifyContent: "center",
+    width: 48,
+  },
+  boardBannerCopy: {
+    flex: 1,
+    gap: 4,
+    minWidth: 0,
+  },
+  boardBannerTitle: {
+    color: megrumColors.ink,
+    fontSize: 18,
+    fontWeight: "900",
+    lineHeight: 23,
+  },
+  boardBannerSub: {
+    color: "rgba(58,50,74,0.6)",
+    fontSize: 12.5,
+    fontWeight: "800",
+    lineHeight: 18,
+  },
+  boardBannerCta: {
+    alignItems: "center",
+    backgroundColor: "rgba(166,149,216,0.14)",
+    borderRadius: megrumRadii.pill,
+    justifyContent: "center",
+    paddingHorizontal: 13,
+    paddingVertical: 9,
+  },
+  boardBannerCtaText: {
+    color: megrumColors.lavender,
+    fontSize: 12,
+    fontWeight: "900",
   },
   shortcutCard: {
     borderRadius: 20,

@@ -4,6 +4,71 @@
 
 ---
 
+## イテレーション168.84：めぐりとやりとりの導線整理
+
+### 背景・問題意識
+
+オーナーから、フッターでは「やりとり」を右から2番目、「めぐり」を一番右にしたいという指定があった。また、`やりとり` に混在していた `めぐりあい` メッセージ一覧はめぐりホームの「メッセージ」ボタンへ移し、`やりとり` は取引一覧だけに絞る。あわせて、めぐりホーム上部のユーザーアイコン・一言・今日のレポート・今日のひとことを外し、グルーム直下に掲示板導線を強く出す。
+
+### 変更内容
+
+#### `mobile/app/(tabs)/_layout.tsx`
+- NativeTabs の並びを `ホーム / 在庫 / Wish / やりとり / めぐり` に変更した。
+
+#### `mobile/app/(tabs)/transactions.tsx`
+- `めぐりあい` タブとメッセージ一覧を削除し、`打診中` / `進行中` の取引一覧だけを表示する構成にした。
+- めぐりメッセージ読み込み・既読処理・会話行UIは `めぐり` 側の `/meguri-letters` に集約した。
+
+#### `mobile/app/(tabs)/encounters.tsx`
+- グルーム直下に `現地掲示板` の大きめバナーを追加し、`/meguri-board` へ遷移するようにした。
+- 画面上部のめぐりユーザー表示、一言吹き出し、統計行、今日のレポート、今日のひとこと導線を削除した。
+- ショートカットは `メッセージ` / `マップ` / `実績` に整理し、`メッセージ` は `/meguri-letters` を開くように維持した。
+
+#### `mobile/app/meguri-hitokoto.tsx`, `mobile/app/meguri-report.tsx`
+- 今日のひとこと画面と今日のレポート画面を削除した。
+
+#### `mobile/app/meguri-profile-edit.tsx`, `mobile/app/meguri-profile.tsx`, `mobile/src/components/meguri/GroomProfileSlidePanel.tsx`, `mobile/app/meguri-letters.tsx`
+- 画面上に残っていた「今日のひとこと」表示・編集導線・サンプル文言を削除または公開メモ文脈へ置き換えた。
+
+### 影響範囲
+
+- iOS版フッタータブ順
+- iOS版 `/transactions`
+- iOS版 `/encounters`
+- iOS版 `/meguri-letters`
+- iOS版 `/meguri-board` への導線
+- めぐりプロフィール表示・編集
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- `git diff --check -- mobile/app/(tabs)/_layout.tsx mobile/app/(tabs)/transactions.tsx mobile/app/(tabs)/encounters.tsx mobile/app/meguri-letters.tsx mobile/app/meguri-profile-edit.tsx mobile/app/meguri-profile.tsx mobile/src/components/meguri/GroomProfileSlidePanel.tsx notes/08_design_iterations.md`
+
+### 関連ファイル
+
+- `mobile/app/(tabs)/_layout.tsx`
+- `mobile/app/(tabs)/transactions.tsx`
+- `mobile/app/(tabs)/encounters.tsx`
+- `mobile/app/meguri-letters.tsx`
+- `mobile/app/meguri-profile-edit.tsx`
+- `mobile/app/meguri-profile.tsx`
+- `mobile/src/components/meguri/GroomProfileSlidePanel.tsx`
+- `mobile/app/meguri-hitokoto.tsx`
+- `mobile/app/meguri-report.tsx`
+
+### セルフレビュー結果
+
+- ✅ フッターで `やりとり` が右から2番目、`めぐり` が一番右になる順序に変更
+- ✅ `やりとり` は取引一覧のみ表示
+- ✅ めぐりホームの `メッセージ` から `/meguri-letters` へ遷移
+- ✅ グルーム直下に掲示板バナーを追加
+- ✅ 今日のレポート / 今日のひとことの画面導線と画面本体を削除
+- ✅ 09更新診断：状態遷移の追加・削除・名称変更はないため更新不要
+- ✅ 10更新診断：既存用語 `めぐりメッセージ` / `スポット掲示板` の範囲内のため更新不要
+
+---
+
 ## イテレーション168.83：Wishタブの追従ページャー化
 
 ### 背景・問題意識

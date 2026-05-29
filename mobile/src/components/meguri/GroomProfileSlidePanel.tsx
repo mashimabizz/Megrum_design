@@ -177,7 +177,6 @@ export function GroomProfileSlidePanel({
           <InfoRow label="グループ / 作品" value={user.group} />
           <InfoRow label="推し" value={user.oshi} />
           <InfoRow label="推し活スタイル" value={user.style} />
-          <InfoRow label="今日のひとこと" value={user.hitokoto} />
           <InfoRow label="最近の公開メモ" value={user.recent} />
         </View>
 

@@ -61,13 +61,6 @@ export default function MeguriProfileEditScreen() {
             value={settings.baseArea}
           />
           <Field
-            label="今日のひとこと"
-            maxLength={60}
-            multiline
-            onChangeText={(value) => update("hitokoto", value)}
-            value={settings.hitokoto}
-          />
-          <Field
             label="公開メモ"
             maxLength={80}
             multiline
@@ -86,7 +79,6 @@ export default function MeguriProfileEditScreen() {
           <Text style={styles.previewKicker}>公開プレビュー</Text>
           <Text style={styles.previewName}>{settings.displayName || "あなた"}</Text>
           <Text style={styles.previewMeta}>拠点: {settings.baseArea || "未設定"}</Text>
-          <Text style={styles.previewBubble}>「{settings.hitokoto || "今日のひとこと未設定"}」</Text>
           <Text style={styles.previewFarewell}>別れ際: {settings.farewellMessage || "未設定"}</Text>
         </View>
       </ScrollView>
