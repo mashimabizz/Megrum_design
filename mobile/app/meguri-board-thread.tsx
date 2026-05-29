@@ -1400,6 +1400,7 @@ export default function MeguriBoardThreadScreen() {
                   const quoteAuthorLabel = quotedReplyNumber
                     ? `#${quotedReplyNumber} ${reply.quotedAuthorName || "引用"}`
                     : reply.quotedAuthorName || "引用";
+                  const mentionsViewer = !reply.mine && replyMentionsHandle(reply.body, actor.handle);
                   return (
                     <View
                       key={reply.id}
@@ -1441,12 +1442,18 @@ export default function MeguriBoardThreadScreen() {
                                 <Text style={styles.replyAuthorBadgeText}>作成者</Text>
                               </View>
                             ) : null}
+                            {mentionsViewer ? (
+                              <View style={styles.replyMentionBadge}>
+                                <Text style={styles.replyMentionBadgeText}>あなた宛て</Text>
+                              </View>
+                            ) : null}
                           </View>
                           <ChatGradientBubble
                             mine={reply.mine}
                             style={[
                               styles.replyBubble,
                               reply.mine ? styles.replyBubbleMine : styles.replyBubbleTheirs,
+                              mentionsViewer ? styles.replyBubbleMention : null,
                             ]}
                           >
                             {reply.quotedBody ? (
@@ -2103,6 +2110,13 @@ function categoryTextStyle(category: Exclude<MeguriBoardThreadCategory, "all">) 
 
 function readParam(value: string | string[] | undefined) {
   return Array.isArray(value) ? value[0] : value;
+}
+
+function replyMentionsHandle(body: string, handle: string | null) {
+  const normalizedHandle = handle?.trim().replace(/^@/, "").toLowerCase();
+  if (!normalizedHandle) return false;
+  const mentions = body.toLowerCase().match(/@[a-z0-9._-]+/g) ?? [];
+  return mentions.some((mention) => mention.slice(1) === normalizedHandle);
 }
 
 function buildViewerContext(input: {
@@ -2813,12 +2827,27 @@ const styles = StyleSheet.create({
     fontSize: 9.5,
     fontWeight: "900",
   },
+  replyMentionBadge: {
+    backgroundColor: "rgba(168,212,230,0.24)",
+    borderRadius: 999,
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+  },
+  replyMentionBadgeText: {
+    color: "#4f7e92",
+    fontSize: 9.5,
+    fontWeight: "900",
+  },
   replyBubble: {
     borderRadius: 18,
     maxWidth: "100%",
     overflow: "hidden",
     paddingHorizontal: 14,
     paddingVertical: 11,
+  },
+  replyBubbleMention: {
+    borderColor: "rgba(168,212,230,0.72)",
+    borderWidth: 1,
   },
   replyBubbleMine: {
     borderBottomRightRadius: 8,

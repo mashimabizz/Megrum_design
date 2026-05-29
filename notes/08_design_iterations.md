@@ -4,6 +4,53 @@
 
 ---
 
+## イテレーション219：掲示板返信の自分宛てメンションを強調
+
+### 背景・問題意識
+
+スレッド型掲示板では、会話が伸びた時に自分宛ての返信を見逃しにくいことが重要になる。既に本文中の `@handle` はメンションとして扱っているが、スレッド内で見返した時の視覚的な目印が弱かった。自分のhandleを含む返信を強調し、会話の追跡性を高めた。
+
+### 変更内容
+
+#### `mobile/app/meguri-board-thread.tsx`
+- 返信本文に自分のhandleが含まれるかを判定する `replyMentionsHandle` helper を追加した。
+- 自分宛てメンションを含む他ユーザー返信に `あなた宛て` バッジを表示するようにした。
+- 自分宛てメンションを含む返信バブルに薄い水色の枠を表示するようにした。
+
+#### `notes/09_state_machines.md`
+- Meguri Board Lifecycle に自分宛てメンション強調の表示ルールを追記した。
+
+#### `notes/10_glossary.md`
+- 掲示板自分宛てメンション強調を追加した。
+
+### 影響範囲
+
+- iOS版 スポット掲示板詳細
+- 返信一覧
+- 掲示板メンション表示
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- `EAS_UPDATE_PROJECT_SLUG=ihub EXPO_NO_GIT_STATUS=1 npm --prefix mobile run update:ios:preview -- --message "[iter219] highlight board mentions" --non-interactive`
+- Preview OTA: Update group `a0c7d8c4-86ab-481c-82c0-3f1a20c41df4` / iOS update `019e75ad-720d-7fb1-b8f8-daf775af806c`
+
+### 関連ファイル
+
+- `mobile/app/meguri-board-thread.tsx`
+- `notes/08_design_iterations.md`
+- `notes/09_state_machines.md`
+- `notes/10_glossary.md`
+
+### セルフレビュー結果
+
+- ✅ 既存の `@handle` 記法に合わせ、DB変更なしで表示だけを強化した。
+- ✅ 自分の返信は強調対象外にし、他ユーザーから自分宛ての返信だけ拾えるようにした。
+- ✅ ネイティブ依存追加なしで、Preview OTA対象内に収めた。
+
+---
+
 ## イテレーション218：掲示板詳細に返信欄フォーカスを追加
 
 ### 背景・問題意識
