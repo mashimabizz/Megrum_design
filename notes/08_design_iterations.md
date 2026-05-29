@@ -36,7 +36,7 @@
 - `npm --prefix mobile run export:ios:preview`
 - `git diff --check -- 'mobile/app/(tabs)/encounters.tsx' notes/10_glossary.md`
 - `mobile/app/(tabs)/encounters.tsx` に `出会いました` / `とめぐりあいました` / `bigCount` / `countRow` / `stageTitle` が残っていないことを確認
-- Preview channel OTA配信は後続で実施
+- Preview channel OTA配信済み：Update group `904754b1-c41e-448a-a469-f80a444ff2be` / iOS update ID `019e72dd-d74b-7c63-996f-70740c51f75e`
 
 ### 関連ファイル
 
