@@ -4,6 +4,65 @@
 
 ---
 
+## イテレーション168.94：証跡撮影と提示物選択を整理
+
+### 背景・問題意識
+
+オーナーから、証跡撮影中のカメラ画面をグルーム撮影時のカメラデザインに揃えたいという依頼があった。あわせて、提示物選択では個別募集で指定された一部候補だけではなく、自分のグッズと相手のグッズを選べるようにし、読み込みが重くならないよう10件ずつ追加読み込みしたい。やりとり一覧では「打診中」「進行中」の切り替えをフッター上部に置き、横フリックでも同時に切り替えたい。
+
+### 変更内容
+
+#### `mobile/app/transaction-capture.tsx`
+- 証跡撮影カメラの上部バー、背景スクリム、シャッター、アルバム導線をグルーム撮影カメラの見た目に寄せた。
+- 上部タイトルは `証跡の撮影` に変更した。
+- 撮影済み写真のサムネイルは下部操作エリアの上にまとめ、削除操作は維持した。
+- 撮影サイズ選択をグルーム撮影と同じくアップロード向きの長辺上限付きにした。
+
+#### `mobile/app/proposal-select.tsx`
+- 相手プロフィール/個別募集起点の提示物選択で、「私が出す」は自分の譲る在庫、「受け取る」は相手の譲る在庫を候補にするようにした。
+- 初回は各10件だけ読み込み、下へスクロールすると10件ずつ追加取得する方式にした。
+- 既にrouteで渡された候補は先頭側に含めつつ、候補全体をその一部だけに制限しないようにした。
+- 追加読み込み中はカードリスト末尾に読み込み表示を出すようにした。
+
+#### `mobile/app/(tabs)/transactions.tsx`
+- 「打診中」「進行中」の切り替えを画面下部、ネイティブタブバーの上に固定表示した。
+- 一覧本体を横ページングにし、横フリックの指の動きに合わせて下部タブの選択位置も動くようにした。
+- 読み込み中のスケルトン表示と既存の空表示をページごとに維持した。
+
+### 影響範囲
+
+- iOS版 `/transaction-capture`
+- iOS版 `/proposal-select`
+- iOS版 やりとりタブ
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `git diff --check -- mobile/app/proposal-select.tsx mobile/app/transaction-capture.tsx mobile/app/'(tabs)'/transactions.tsx`
+- `npm --prefix mobile run export:ios:preview`
+- `EXPO_NO_GIT_STATUS=1 EAS_UPDATE_PROJECT_SLUG=ihub npm --prefix mobile run update:ios:preview -- --message "[iter168.94] 証跡カメラと提示物ページング" --non-interactive`
+- Preview channel OTA配信済み：Update group `7159488b-c834-40f5-92df-e1859a17a700` / iOS update ID `019e7434-203e-7384-9835-ff7b38f13f0f`
+- EAS Dashboard: `https://expo.dev/accounts/mashima.bizz/projects/ihub/updates/7159488b-c834-40f5-92df-e1859a17a700`
+
+### 関連ファイル
+
+- `mobile/app/transaction-capture.tsx`
+- `mobile/app/proposal-select.tsx`
+- `mobile/app/(tabs)/transactions.tsx`
+
+### セルフレビュー結果
+
+- ✅ 証跡撮影中のカメラUIをグルーム撮影の構造に統一
+- ✅ 提示物選択は自分/相手それぞれの譲る在庫を10件ずつページング取得
+- ✅ やりとり一覧の「打診中」「進行中」を下部固定タブ化
+- ✅ 横フリック中も下部タブの選択位置が追従
+- ✅ Preview channel / iOS runtime `0.1.0` へOTA配信済み
+- ✅ 09更新診断：状態遷移の追加・削除はないため更新不要
+- ✅ 10更新診断：既存の「証跡撮影」「打診」「取引」「譲」の範囲内のため更新不要
+- ✅ 05更新診断：DBスキーマ変更なし
+
+---
+
 ## イテレーション168.92：読み込み中をスケルトン表示へ統一
 
 ### 背景・問題意識

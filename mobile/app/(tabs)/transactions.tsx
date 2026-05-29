@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { router, useLocalSearchParams } from "expo-router";
 import {
   Animated,
@@ -8,6 +8,9 @@ import {
   StyleSheet,
   Text,
   View,
+  useWindowDimensions,
+  type NativeScrollEvent,
+  type NativeSyntheticEvent,
 } from "react-native";
 import { Screen } from "../../src/components/Screen";
 import { TransactionListSkeleton } from "../../src/components/SkeletonScreen";
@@ -188,6 +191,10 @@ export default function TransactionsScreen() {
   const [animatedTabs, setAnimatedTabs] = useState<Set<TopTab>>(
     () => new Set(),
   );
+  const { width } = useWindowDimensions();
+  const pagerRef = useRef<ScrollView>(null);
+  const pagerPosition = useRef(new Animated.Value(0)).current;
+  const pageWidth = Math.max(1, width - 36);
 
   useEffect(() => {
     if (!supabase || previewMode) {
@@ -269,12 +276,24 @@ export default function TransactionsScreen() {
     ...item,
     count: counts[item.id],
   }));
+  const activeTabIndex = Math.max(
+    0,
+    TOP_TABS.findIndex((item) => item.id === tab),
+  );
 
   useEffect(() => {
     if (list.length === 0 && !animatedTabs.has(tab)) {
       markTabAnimated(tab);
     }
   }, [animatedTabs, list.length, tab]);
+
+  useEffect(() => {
+    pagerRef.current?.scrollTo({
+      x: activeTabIndex * pageWidth,
+      animated: false,
+    });
+    pagerPosition.setValue(activeTabIndex);
+  }, [pageWidth]);
 
   if (archiveMode) {
     return (
@@ -327,20 +346,43 @@ export default function TransactionsScreen() {
   return (
     <Screen scroll={false} contentStyle={styles.screenContent}>
       <ScrollView
-        automaticallyAdjustsScrollIndicatorInsets
-        contentInsetAdjustmentBehavior="automatic"
-        showsVerticalScrollIndicator={false}
-        style={styles.nativeTabScroll}
-        contentContainerStyle={styles.nativeTabScrollContent}
+        ref={pagerRef}
+        bounces={false}
+        directionalLockEnabled
+        horizontal
+        pagingEnabled
+        showsHorizontalScrollIndicator={false}
+        style={styles.primaryPager}
         scrollEventThrottle={16}
+        onMomentumScrollEnd={handlePagerSettled}
+        onScroll={handlePagerScroll}
       >
-        {loadError ? <Text style={styles.inlineError}>{loadError}</Text> : null}
-
-        <CompactTabs value={tab} tabs={topTabs} onChange={setTab} />
-        <View style={styles.listContent}>
-          {loading ? <TransactionListSkeleton /> : renderListPage(tab)}
-        </View>
+        {TOP_TABS.map((item) => (
+          <View key={item.id} style={[styles.primaryPage, { width: pageWidth }]}>
+            <ScrollView
+              automaticallyAdjustsScrollIndicatorInsets
+              contentInsetAdjustmentBehavior="automatic"
+              showsVerticalScrollIndicator={false}
+              style={styles.nativeTabScroll}
+              contentContainerStyle={styles.nativeTabScrollContent}
+              scrollEventThrottle={16}
+            >
+              {loadError ? <Text style={styles.inlineError}>{loadError}</Text> : null}
+              <View style={styles.listContent}>
+                {loading ? <TransactionListSkeleton /> : renderListPage(item.id)}
+              </View>
+            </ScrollView>
+          </View>
+        ))}
       </ScrollView>
+      <View style={styles.footerTabsWrap}>
+        <CompactTabs
+          value={tab}
+          tabs={topTabs}
+          position={pagerPosition}
+          onChange={selectTab}
+        />
+      </View>
     </Screen>
   );
 
@@ -375,6 +417,28 @@ export default function TransactionsScreen() {
       next.add(target);
       return next;
     });
+  }
+
+  function selectTab(next: TopTab) {
+    setTab(next);
+    const nextIndex = TOP_TABS.findIndex((item) => item.id === next);
+    if (nextIndex < 0) return;
+    pagerRef.current?.scrollTo({
+      x: nextIndex * pageWidth,
+      animated: true,
+    });
+  }
+
+  function handlePagerScroll(event: NativeSyntheticEvent<NativeScrollEvent>) {
+    pagerPosition.setValue(event.nativeEvent.contentOffset.x / pageWidth);
+  }
+
+  function handlePagerSettled(event: NativeSyntheticEvent<NativeScrollEvent>) {
+    const nextIndex = Math.round(event.nativeEvent.contentOffset.x / pageWidth);
+    const next = TOP_TABS[nextIndex]?.id;
+    if (next && next !== tab) {
+      setTab(next);
+    }
   }
 }
 
@@ -957,25 +1021,62 @@ function PastFilterChips({
 function CompactTabs<T extends string>({
   value,
   tabs,
+  position,
   onChange,
 }: {
   value: T;
   tabs: { id: T; label: string; count: number; color: string }[];
+  position?: number | Animated.Value | Animated.AnimatedInterpolation<number>;
   onChange: (next: T) => void;
 }) {
+  const [width, setWidth] = useState(0);
+  const progress = useRef(new Animated.Value(0)).current;
   const activeIndex = Math.max(0, tabs.findIndex((tab) => tab.id === value));
+  const thumbWidth = width > 0 ? (width - 6) / Math.max(1, tabs.length) : 0;
+  const animatedPosition =
+    typeof position === "number" || !position ? progress : position;
+
+  useEffect(() => {
+    if (typeof position === "number") {
+      progress.setValue(position);
+      return;
+    }
+    if (position) return;
+    Animated.spring(progress, {
+      toValue: activeIndex,
+      damping: 22,
+      stiffness: 190,
+      mass: 0.74,
+      useNativeDriver: true,
+    }).start();
+  }, [activeIndex, position, progress]);
+
+  const translateX =
+    tabs.length > 1
+      ? animatedPosition.interpolate({
+          inputRange: tabs.map((_, index) => index),
+          outputRange: tabs.map((_, index) => index * thumbWidth),
+          extrapolate: "clamp",
+        })
+      : 0;
+
   return (
-    <View style={styles.compactTabs}>
-      <View
-        pointerEvents="none"
-        style={[
-          styles.compactTabThumb,
-          {
-            left: `${(activeIndex / Math.max(1, tabs.length)) * 100}%`,
-            width: `${100 / Math.max(1, tabs.length)}%`,
-          },
-        ]}
-      />
+    <View
+      onLayout={(event) => setWidth(event.nativeEvent.layout.width)}
+      style={styles.compactTabs}
+    >
+      {thumbWidth > 0 ? (
+        <Animated.View
+          pointerEvents="none"
+          style={[
+            styles.compactTabThumb,
+            {
+              width: thumbWidth,
+              transform: [{ translateX }],
+            },
+          ]}
+        />
+      ) : null}
       {tabs.map((tab) => {
         const active = tab.id === value;
         return (
@@ -1243,12 +1344,15 @@ const styles = StyleSheet.create({
     lineHeight: 17,
   },
   primaryPager: {
-    flexGrow: 0,
+    flex: 1,
     marginTop: -2,
   },
   primaryPage: {
-    gap: 8,
-    paddingBottom: 2,
+    flex: 1,
+  },
+  footerTabsWrap: {
+    backgroundColor: "rgba(251,249,252,0.92)",
+    paddingTop: 10,
   },
   compactTabs: {
     backgroundColor: "rgba(255,255,255,0.58)",
@@ -1267,6 +1371,7 @@ const styles = StyleSheet.create({
     borderRadius: megrumRadii.pill,
     borderWidth: 1,
     bottom: 3,
+    left: 3,
     position: "absolute",
     top: 3,
     shadowColor: megrumColors.ink,

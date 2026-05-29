@@ -15,6 +15,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAuth } from "../src/auth/AuthProvider";
+import { IconSymbol } from "../src/components/IconSymbol";
 import { PrimaryButton } from "../src/components/PrimaryButton";
 import { supabase } from "../src/lib/supabase";
 import {
@@ -24,6 +25,9 @@ import {
   uploadEvidenceImage,
 } from "../src/lib/transactionActions";
 import { megrumColors, megrumRadii } from "../src/theme/tokens";
+
+const EVIDENCE_CAMERA_QUALITY = 0.88;
+const EVIDENCE_MAX_CAMERA_LONG_EDGE = 2400;
 
 type ProposalRow = {
   id: string;
@@ -169,7 +173,8 @@ export default function TransactionCaptureScreen() {
     try {
       const picture = await cameraRef.current?.takePictureAsync({
         imageType: "jpg",
-        quality: 0.86,
+        maxDownsampling: 1,
+        quality: EVIDENCE_CAMERA_QUALITY,
         skipProcessing: false,
       });
       if (picture?.uri) {
@@ -317,59 +322,47 @@ export default function TransactionCaptureScreen() {
       )}
       <View pointerEvents="none" style={styles.cameraScrimTop} />
       <View pointerEvents="none" style={styles.cameraScrimBottom} />
-      <View style={[styles.topBar, { paddingTop: Math.max(insets.top, 18) }]}>
+      <View style={[styles.cameraTopBar, { paddingTop: Math.max(insets.top, 14) + 8 }]}>
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="取引チャットに戻る"
           onPress={() => router.replace({ pathname: "/transaction-detail", params: { id: proposalId ?? "" } })}
-          style={styles.topButton}
+          style={styles.cameraCloseButton}
         >
-          <Text style={styles.topButtonText}>‹</Text>
+          <IconSymbol name="close" color="#fff" size={24} />
         </Pressable>
-        <View style={styles.statusChip}>
-          <View style={styles.statusDot} />
-          <Text style={styles.statusChipText}>証跡保存</Text>
-        </View>
-        <Text style={styles.photoCount}>{data?.photos.length ?? 0}枚</Text>
+        <Text style={styles.cameraTitle}>証跡の撮影</Text>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="カメラを切り替える"
+          disabled={!!busy}
+          onPress={() => setFacing((current) => (current === "back" ? "front" : "back"))}
+          style={styles.cameraTopButton}
+        >
+          <Text style={styles.cameraFlipText}>↻</Text>
+        </Pressable>
       </View>
 
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.photoStrip}
-        style={[styles.photoStripWrap, { top: Math.max(insets.top, 18) + 74 }]}
-      >
-        {data?.photos.map((photo) => (
-          <Pressable
-            key={photo.id}
-            disabled={!photo.isMine || busy === "delete"}
-            onPress={() => handleDelete(photo)}
-            style={styles.photoChip}
-          >
-            <Image source={{ uri: photo.photoUrl }} style={styles.photoChipImage} />
-            <Text style={styles.photoChipLabel}>#{photo.position}</Text>
-          </Pressable>
-        ))}
-      </ScrollView>
-
-      <View style={styles.centerCopy}>
-        <Text style={styles.title}>交換したグッズを撮影してください</Text>
-        <Text style={styles.subtitle}>両者の交換物を1枚に収めてください</Text>
-      </View>
-
-      <View pointerEvents="none" style={styles.viewFinder}>
-        <View style={styles.viewHalf}>
-          <GoodsStack count={data?.theirCount ?? 0} label={`相手の${data?.theirCount ?? 0}点`} />
-        </View>
-        <View style={styles.splitLine}>
-          <View style={styles.splitBadge}>
-            <Text style={styles.splitBadgeText}>↔</Text>
-          </View>
-        </View>
-        <View style={[styles.viewHalf, styles.viewHalfMine]}>
-          <GoodsStack count={data?.myCount ?? 0} label={`あなたの${data?.myCount ?? 0}点`} />
-        </View>
-      </View>
+      {data?.photos.length ? (
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.photoStrip}
+          style={[styles.photoStripWrap, { bottom: Math.max(insets.bottom, 12) + 168 }]}
+        >
+          {data.photos.map((photo) => (
+            <Pressable
+              key={photo.id}
+              disabled={!photo.isMine || busy === "delete"}
+              onPress={() => handleDelete(photo)}
+              style={styles.photoChip}
+            >
+              <Image source={{ uri: photo.photoUrl }} style={styles.photoChipImage} />
+              <Text style={styles.photoChipLabel}>#{photo.position}</Text>
+            </Pressable>
+          ))}
+        </ScrollView>
+      ) : null}
 
       {loading ? (
         <View style={styles.loadingOverlay}>
@@ -377,53 +370,42 @@ export default function TransactionCaptureScreen() {
         </View>
       ) : null}
 
-      <View style={styles.metaChip}>
-        <Text style={styles.metaText}>自動メタ: {timeNow()} · {data?.placeName ?? "—"}</Text>
-      </View>
-
       {error ? <Text style={styles.errorText}>{error}</Text> : null}
 
-      <View style={[styles.albumRail, { top: Math.max(insets.top, 18) + 158 }]}>
+      <View style={[styles.cameraBottomBar, { paddingBottom: Math.max(insets.bottom, 12) + 8 }]}>
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="アルバムから複数選択"
           disabled={busy !== null}
           onPress={() => void pickFromLibrary()}
-          style={styles.albumButton}
+          style={styles.cameraLibraryButton}
         >
           {latestLibraryPhotoUri ? (
-            <Image source={{ uri: latestLibraryPhotoUri }} style={styles.albumImage} />
+            <Image source={{ uri: latestLibraryPhotoUri }} style={styles.cameraLibraryImage} />
           ) : (
-            <View style={styles.albumFallback}>
-              <Text style={styles.albumFallbackText}>□</Text>
+            <View style={styles.cameraLibraryFallback}>
+              <IconSymbol name="camera-outline" color="#fff" size={24} />
             </View>
           )}
           {busy === "library" || latestLibraryLoading ? (
-            <View style={styles.albumBusy}>
+            <View style={styles.cameraLibraryBusy}>
               <ActivityIndicator color="#fff" />
             </View>
           ) : null}
         </Pressable>
-        <Text style={styles.albumLabel}>アルバム</Text>
-      </View>
 
-      <View style={[styles.controls, { paddingBottom: Math.max(insets.bottom, 18) + 18 }]}>
-        <Pressable
-          disabled={!!busy}
-          onPress={() => setFacing((current) => (current === "back" ? "front" : "back"))}
-          style={styles.secondaryCircle}
-        >
-          <Text style={styles.secondaryCircleText}>反転</Text>
-        </Pressable>
         <Pressable
           disabled={!!busy}
           accessibilityRole="button"
           accessibilityLabel="撮影"
           onPress={() => void takePhoto()}
-          style={styles.shutter}
+          style={styles.cameraShutter}
         >
-          {busy === "camera" || busy === "library" ? <ActivityIndicator color={megrumColors.lavender} /> : null}
+          <View style={styles.cameraShutterInner}>
+            {busy === "camera" ? <ActivityIndicator color="#fff" /> : null}
+          </View>
         </Pressable>
+
         <Pressable
           disabled={!!busy || !data || data.photos.length === 0}
           onPress={() => void handleFinish()}
@@ -432,7 +414,9 @@ export default function TransactionCaptureScreen() {
             !data || data.photos.length === 0 ? styles.finishButtonDisabled : null,
           ]}
         >
-          <Text style={styles.finishButtonText}>完了 →</Text>
+          <Text style={styles.finishButtonText}>
+            {data?.photos.length ? `${data.photos.length}枚で完了` : "完了"}
+          </Text>
         </Pressable>
       </View>
     </View>
@@ -523,33 +507,43 @@ function timeNow() {
 function selectBestEvidencePictureSize(sizes: string[]) {
   const numericSizes = sizes
     .map((size) => {
-      const [width, height] = size.split("x").map((value) => Number(value));
-      return { size, width, height, pixels: width * height };
+      const match = size.match(/^(\d+)x(\d+)$/);
+      if (!match) return null;
+      const width = Number(match[1]);
+      const height = Number(match[2]);
+      return Number.isFinite(width) && Number.isFinite(height)
+        ? { area: width * height, longEdge: Math.max(width, height), size }
+        : null;
     })
-    .filter((item) => Number.isFinite(item.width) && Number.isFinite(item.height));
-  if (numericSizes.length === 0) return undefined;
-  numericSizes.sort((a, b) => b.pixels - a.pixels);
-  return numericSizes[0]?.size;
+    .filter((item): item is { area: number; longEdge: number; size: string } => !!item)
+    .sort((a, b) => b.area - a.area);
+  const uploadFriendlySize = numericSizes.find(
+    (item) => item.longEdge <= EVIDENCE_MAX_CAMERA_LONG_EDGE,
+  );
+  if (uploadFriendlySize) return uploadFriendlySize.size;
+  if (numericSizes.length > 0) return numericSizes[numericSizes.length - 1]?.size;
+  if (sizes.includes("High")) return "High";
+  return sizes[0];
 }
 
 const styles = StyleSheet.create({
   root: {
-    backgroundColor: "#0a0810",
+    backgroundColor: "#05080d",
     flex: 1,
     overflow: "hidden",
   },
   cameraScrimTop: {
-    backgroundColor: "rgba(0,0,0,0.22)",
-    height: 162,
+    backgroundColor: "rgba(0,0,0,0.24)",
+    height: 150,
     left: 0,
     position: "absolute",
     right: 0,
     top: 0,
   },
   cameraScrimBottom: {
-    backgroundColor: "rgba(0,0,0,0.34)",
+    backgroundColor: "rgba(0,0,0,0.28)",
     bottom: 0,
-    height: 202,
+    height: 178,
     left: 0,
     position: "absolute",
     right: 0,
@@ -584,6 +578,103 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontSize: 12,
     fontWeight: "900",
+  },
+  cameraTopBar: {
+    alignItems: "center",
+    flexDirection: "row",
+    justifyContent: "space-between",
+    left: 0,
+    paddingHorizontal: 18,
+    position: "absolute",
+    right: 0,
+    top: 0,
+    zIndex: 12,
+  },
+  cameraCloseButton: {
+    alignItems: "center",
+    backgroundColor: "rgba(5,8,13,0.38)",
+    borderRadius: 999,
+    height: 46,
+    justifyContent: "center",
+    width: 46,
+  },
+  cameraTopButton: {
+    alignItems: "center",
+    backgroundColor: "rgba(5,8,13,0.38)",
+    borderRadius: 999,
+    height: 46,
+    justifyContent: "center",
+    width: 46,
+  },
+  cameraFlipText: {
+    color: "#fff",
+    fontSize: 23,
+    fontWeight: "900",
+    lineHeight: 26,
+  },
+  cameraTitle: {
+    color: "rgba(255,255,255,0.9)",
+    fontSize: 14,
+    fontWeight: "900",
+    letterSpacing: 2,
+  },
+  cameraBottomBar: {
+    alignItems: "center",
+    bottom: 0,
+    height: 158,
+    justifyContent: "center",
+    left: 0,
+    paddingHorizontal: 22,
+    position: "absolute",
+    right: 0,
+    zIndex: 12,
+  },
+  cameraShutter: {
+    alignItems: "center",
+    backgroundColor: "rgba(255,255,255,0.34)",
+    borderRadius: 999,
+    height: 108,
+    justifyContent: "center",
+    width: 108,
+  },
+  cameraShutterInner: {
+    alignItems: "center",
+    backgroundColor: "rgba(255,255,255,0.28)",
+    borderRadius: 28,
+    height: 56,
+    justifyContent: "center",
+    width: 56,
+  },
+  cameraLibraryButton: {
+    alignItems: "center",
+    backgroundColor: "rgba(5,8,13,0.44)",
+    borderColor: "rgba(255,255,255,0.34)",
+    borderRadius: 15,
+    borderWidth: 1,
+    height: 58,
+    justifyContent: "center",
+    left: 26,
+    overflow: "hidden",
+    position: "absolute",
+    top: 42,
+    width: 58,
+  },
+  cameraLibraryImage: {
+    height: "100%",
+    width: "100%",
+  },
+  cameraLibraryFallback: {
+    alignItems: "center",
+    backgroundColor: "rgba(255,255,255,0.16)",
+    height: "100%",
+    justifyContent: "center",
+    width: "100%",
+  },
+  cameraLibraryBusy: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: "center",
+    backgroundColor: "rgba(5,8,13,0.42)",
+    justifyContent: "center",
   },
   topBar: {
     alignItems: "center",
@@ -881,19 +972,27 @@ const styles = StyleSheet.create({
   },
   finishButton: {
     alignItems: "center",
-    backgroundColor: megrumColors.lavender,
-    borderRadius: megrumRadii.pill,
-    height: 48,
+    backgroundColor: "rgba(5,8,13,0.44)",
+    borderColor: "rgba(255,255,255,0.34)",
+    borderRadius: 18,
+    borderWidth: 1,
+    height: 58,
     justifyContent: "center",
-    paddingHorizontal: 15,
+    minWidth: 82,
+    paddingHorizontal: 12,
+    position: "absolute",
+    right: 22,
+    top: 42,
   },
   finishButtonDisabled: {
-    backgroundColor: "rgba(255,255,255,0.14)",
+    opacity: 0.46,
   },
   finishButtonText: {
     color: "#fff",
-    fontSize: 11.5,
+    fontSize: 10.5,
     fontWeight: "900",
+    lineHeight: 13,
+    textAlign: "center",
   },
   authFallback: {
     backgroundColor: megrumColors.background,

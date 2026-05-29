@@ -3,7 +3,9 @@ import type { LocationGeocodedAddress } from "expo-location";
 import SegmentedControl from "@react-native-segmented-control/segmented-control";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
+  ActivityIndicator,
   Animated,
+  FlatList,
   Image,
   Modal,
   Platform,
@@ -33,6 +35,7 @@ import {
   parseProposalIdList,
   type ProposalChoiceItem,
   type ProposalInventoryRow,
+  type ProposalSide,
 } from "../src/data/proposalItems";
 import { supabase } from "../src/lib/supabase";
 import {
@@ -108,7 +111,13 @@ type CandidateTouchState = {
 type ProfileProposalInventoryScope = {
   giveIds: string[];
   receiveIds: string[];
+  giveHasMore: boolean;
+  receiveHasMore: boolean;
 };
+
+type ProfileInventoryLoadingMore = Record<ProposalSide, boolean>;
+
+type ProfileInventoryOffsets = Record<ProposalSide, number>;
 
 type ScopedProposalInventoryRow = ProposalInventoryRow & {
   user_id: string | null;
@@ -184,16 +193,7 @@ const PRESET_PLACES: PlaceSuggestion[] = [
   },
 ];
 const TAB_ORDER: ProposalTab[] = ["give", "receive", "meetup"];
-const PROFILE_INVENTORY_CACHE_MS = 45_000;
-const PROFILE_INVENTORY_LIMIT_PER_USER = 80;
-const profileInventoryCache = new Map<
-  string,
-  {
-    expiresAt: number;
-    promise?: Promise<ScopedProposalInventoryRow[]>;
-    rows?: ScopedProposalInventoryRow[];
-  }
->();
+const PROFILE_INVENTORY_PAGE_SIZE = 10;
 
 export default function ProposalSelectScreen() {
   const { user: authUser } = useAuth();
@@ -240,17 +240,17 @@ export default function ProposalSelectScreen() {
   const candidateGiveIds = revisionContext?.giveIds ?? initialGiveIds;
   const candidateReceiveIds = revisionContext?.receiveIds ?? initialReceiveIds;
   const effectivePartnerIdParam = revisionContext?.partnerId ?? partnerIdParam;
-  const initialGiveNeedsInventory =
-    !!effectivePartnerIdParam &&
-    (isRevisionMode || !hasSendableInventoryIds(candidateGiveIds));
-  const initialReceiveNeedsInventory =
-    !!effectivePartnerIdParam &&
-    (isRevisionMode || !hasSendableInventoryIds(candidateReceiveIds));
+  const initialGiveNeedsInventory = !!effectivePartnerIdParam;
+  const initialReceiveNeedsInventory = !!effectivePartnerIdParam;
   const usesProfileInventory =
     initialGiveNeedsInventory || initialReceiveNeedsInventory;
   const [profileInventoryScope, setProfileInventoryScope] =
     useState<ProfileProposalInventoryScope | null>(null);
   const [profileInventoryLoading, setProfileInventoryLoading] = useState(false);
+  const [profileInventoryLoadingMore, setProfileInventoryLoadingMore] =
+    useState<ProfileInventoryLoadingMore>({ give: false, receive: false });
+  const [profileInventoryOffsets, setProfileInventoryOffsets] =
+    useState<ProfileInventoryOffsets>({ give: 0, receive: 0 });
   const [profileInventoryError, setProfileInventoryError] = useState<string | null>(null);
   const giveChoiceIds = initialGiveNeedsInventory
     ? profileInventoryScope?.giveIds ?? []
@@ -278,7 +278,7 @@ export default function ProposalSelectScreen() {
   const [tab, setTab] = useState<ProposalTab>(initialTab);
   const [giveSelectedIds, setGiveSelectedIds] = useState<string[]>(() =>
     initialGiveNeedsInventory
-      ? []
+      ? initialGiveIds
       : initialGiveIds.length > 0
       ? initialGiveIds
       : giveChoices[0]
@@ -287,7 +287,7 @@ export default function ProposalSelectScreen() {
   );
   const [receiveSelectedIds, setReceiveSelectedIds] = useState<string[]>(() =>
     initialReceiveNeedsInventory
-      ? []
+      ? initialReceiveIds
       : initialReceiveIds.length > 0
       ? initialReceiveIds
       : receiveChoices[0]
@@ -468,57 +468,95 @@ export default function ProposalSelectScreen() {
     if (!usesProfileInventory) {
       setProfileInventoryScope(null);
       setProfileInventoryLoading(false);
+      setProfileInventoryLoadingMore({ give: false, receive: false });
+      setProfileInventoryOffsets({ give: 0, receive: 0 });
       setProfileInventoryError(null);
       return;
     }
     if (!supabase || !effectivePartnerIdParam) {
       setProfileInventoryScope(null);
+      setProfileInventoryLoadingMore({ give: false, receive: false });
+      setProfileInventoryOffsets({ give: 0, receive: 0 });
       setProfileInventoryError(null);
       return;
     }
     if (!authUser) {
       setProfileInventoryScope(null);
       setProfileInventoryLoading(false);
+      setProfileInventoryLoadingMore({ give: false, receive: false });
+      setProfileInventoryOffsets({ give: 0, receive: 0 });
       setProfileInventoryError("ログイン状態を確認してください");
       return;
     }
     if (!isUuid(effectivePartnerIdParam)) {
-      setProfileInventoryScope({ giveIds: [], receiveIds: [] });
+      setProfileInventoryScope({
+        giveIds: [],
+        receiveIds: [],
+        giveHasMore: false,
+        receiveHasMore: false,
+      });
       setProfileInventoryLoading(false);
+      setProfileInventoryLoadingMore({ give: false, receive: false });
+      setProfileInventoryOffsets({ give: 0, receive: 0 });
       setProfileInventoryError("相手情報を読み直してください");
       return;
     }
 
     let active = true;
     setProfileInventoryLoading(true);
+    setProfileInventoryLoadingMore({ give: false, receive: false });
+    setProfileInventoryOffsets({ give: 0, receive: 0 });
     setProfileInventoryError(null);
 
     void (async () => {
       try {
-        const rows = await loadProfileProposalInventoryRows(
-          authUser.id,
-          effectivePartnerIdParam,
+        const [
+          selectedGiveRows,
+          selectedReceiveRows,
+          firstGiveRows,
+          firstReceiveRows,
+        ] = await Promise.all([
+          fetchProposalInventoryRowsByIds(candidateGiveIds, authUser.id),
+          fetchProposalInventoryRowsByIds(candidateReceiveIds, effectivePartnerIdParam),
+          fetchProposalInventoryRowsForUser(authUser.id, 0),
+          authUser.id === effectivePartnerIdParam
+            ? Promise.resolve<ScopedProposalInventoryRow[]>([])
+            : fetchProposalInventoryRowsForUser(effectivePartnerIdParam, 0),
+        ]);
+        const giveRows = mergeInventoryRows(selectedGiveRows, firstGiveRows);
+        const receiveRows = mergeInventoryRows(
+          selectedReceiveRows,
+          firstReceiveRows,
         );
-        const giveRows = rows.filter((row) => row.user_id === authUser.id);
-        const receiveRows = rows.filter((row) => row.user_id === effectivePartnerIdParam);
+        const rows = [...giveRows, ...receiveRows];
 
         if (!active) return;
         setCatalogOverrides(buildProposalCatalogOverrides(rows));
+        setProfileInventoryOffsets({
+          give: PROFILE_INVENTORY_PAGE_SIZE,
+          receive: PROFILE_INVENTORY_PAGE_SIZE,
+        });
         setProfileInventoryScope({
           giveIds: initialGiveNeedsInventory
-            ? uniqueStrings([...candidateGiveIds, ...giveRows.map((row) => row.id)])
+            ? uniqueStrings(giveRows.map((row) => row.id))
             : candidateGiveIds,
           receiveIds: initialReceiveNeedsInventory
-            ? uniqueStrings([
-                ...candidateReceiveIds,
-                ...receiveRows.map((row) => row.id),
-              ])
+            ? uniqueStrings(receiveRows.map((row) => row.id))
             : candidateReceiveIds,
+          giveHasMore: firstGiveRows.length === PROFILE_INVENTORY_PAGE_SIZE,
+          receiveHasMore:
+            authUser.id !== effectivePartnerIdParam &&
+            firstReceiveRows.length === PROFILE_INVENTORY_PAGE_SIZE,
         });
       } catch (reason: unknown) {
         if (!active) return;
         setCatalogOverrides(new Map());
-        setProfileInventoryScope({ giveIds: [], receiveIds: [] });
+        setProfileInventoryScope({
+          giveIds: [],
+          receiveIds: [],
+          giveHasMore: false,
+          receiveHasMore: false,
+        });
         setProfileInventoryError(
           reason instanceof Error ? reason.message : "在庫候補を読み込めませんでした",
         );
@@ -598,6 +636,60 @@ export default function ProposalSelectScreen() {
       : "交換できる時間を設定してください";
   })();
 
+  async function loadMoreProfileInventory(side: ProposalSide) {
+    if (!usesProfileInventory || !authUser || !effectivePartnerIdParam) return;
+    if (!profileInventoryScope) return;
+    const hasMore =
+      side === "give"
+        ? profileInventoryScope.giveHasMore
+        : profileInventoryScope.receiveHasMore;
+    if (!hasMore || profileInventoryLoadingMore[side]) return;
+    const ownerId = side === "give" ? authUser.id : effectivePartnerIdParam;
+    if (side === "receive" && ownerId === authUser.id) return;
+
+    const offset = profileInventoryOffsets[side];
+    setProfileInventoryLoadingMore((current) => ({ ...current, [side]: true }));
+    try {
+      const rows = await fetchProposalInventoryRowsForUser(ownerId, offset);
+      setCatalogOverrides((current) => mergeCatalogOverrides(current, rows));
+      setProfileInventoryScope((current) => {
+        if (!current) return current;
+        const nextIds = rows.map((row) => row.id);
+        if (side === "give") {
+          return {
+            ...current,
+            giveIds: uniqueStrings([...current.giveIds, ...nextIds]),
+            giveHasMore: rows.length === PROFILE_INVENTORY_PAGE_SIZE,
+          };
+        }
+        return {
+          ...current,
+          receiveIds: uniqueStrings([...current.receiveIds, ...nextIds]),
+          receiveHasMore: rows.length === PROFILE_INVENTORY_PAGE_SIZE,
+        };
+      });
+      setProfileInventoryOffsets((current) => ({
+        ...current,
+        [side]: offset + PROFILE_INVENTORY_PAGE_SIZE,
+      }));
+    } catch (reason: unknown) {
+      setProfileInventoryError(
+        reason instanceof Error ? reason.message : "在庫候補を追加で読み込めませんでした",
+      );
+      setProfileInventoryScope((current) => {
+        if (!current) return current;
+        return side === "give"
+          ? { ...current, giveHasMore: false }
+          : { ...current, receiveHasMore: false };
+      });
+    } finally {
+      setProfileInventoryLoadingMore((current) => ({
+        ...current,
+        [side]: false,
+      }));
+    }
+  }
+
   return (
     <Screen scroll={false} contentStyle={styles.screen}>
       <View style={styles.header}>
@@ -652,9 +744,12 @@ export default function ProposalSelectScreen() {
             items={giveChoices}
             selectedIds={giveSelectedIds}
             loading={revisionLoading || (usesProfileInventory && profileInventoryLoading)}
+            loadingMore={profileInventoryLoadingMore.give}
+            hasMore={profileInventoryScope?.giveHasMore ?? false}
             emptyText={
               profileInventoryError ?? "私が出せる譲る在庫がありません"
             }
+            onLoadMore={() => void loadMoreProfileInventory("give")}
             onToggle={(id) =>
               setGiveSelectedIds((current) => toggleChoiceId(current, id))
             }
@@ -666,9 +761,12 @@ export default function ProposalSelectScreen() {
             items={receiveChoices}
             selectedIds={receiveSelectedIds}
             loading={revisionLoading || (usesProfileInventory && profileInventoryLoading)}
+            loadingMore={profileInventoryLoadingMore.receive}
+            hasMore={profileInventoryScope?.receiveHasMore ?? false}
             emptyText={
               profileInventoryError ?? "相手の譲る在庫がありません"
             }
+            onLoadMore={() => void loadMoreProfileInventory("receive")}
             onToggle={(id) =>
               setReceiveSelectedIds((current) => toggleChoiceId(current, id))
             }
@@ -835,49 +933,9 @@ export default function ProposalSelectScreen() {
   }
 }
 
-async function loadProfileProposalInventoryRows(
-  userId: string,
-  partnerId: string,
-): Promise<ScopedProposalInventoryRow[]> {
-  if (!supabase) return [];
-  const cacheKey = `${userId}:${partnerId}`;
-  const now = Date.now();
-  const cached = profileInventoryCache.get(cacheKey);
-  if (cached?.rows && cached.expiresAt > now) {
-    return cached.rows;
-  }
-  if (cached?.promise) {
-    return cached.promise;
-  }
-
-  const promise = Promise.all([
-    fetchProposalInventoryRowsForUser(userId),
-    userId === partnerId
-      ? Promise.resolve<ScopedProposalInventoryRow[]>([])
-      : fetchProposalInventoryRowsForUser(partnerId),
-  ]).then(([mineRows, partnerRows]) => [...mineRows, ...partnerRows]);
-
-  profileInventoryCache.set(cacheKey, {
-    expiresAt: now + PROFILE_INVENTORY_CACHE_MS,
-    promise,
-    rows: cached?.rows,
-  });
-
-  try {
-    const rows = await promise;
-    profileInventoryCache.set(cacheKey, {
-      expiresAt: Date.now() + PROFILE_INVENTORY_CACHE_MS,
-      rows,
-    });
-    return rows;
-  } catch (error) {
-    profileInventoryCache.delete(cacheKey);
-    throw error;
-  }
-}
-
 async function fetchProposalInventoryRowsForUser(
   userId: string,
+  offset: number,
 ): Promise<ScopedProposalInventoryRow[]> {
   if (!supabase) return [];
   const { data, error } = await supabase
@@ -889,22 +947,76 @@ async function fetchProposalInventoryRowsForUser(
     .eq("kind", "for_trade")
     .eq("status", "active")
     .order("created_at", { ascending: false })
-    .limit(PROFILE_INVENTORY_LIMIT_PER_USER);
+    .range(offset, offset + PROFILE_INVENTORY_PAGE_SIZE - 1);
   if (error) throw error;
   return (data as ScopedProposalInventoryRow[] | null) ?? [];
+}
+
+async function fetchProposalInventoryRowsByIds(
+  ids: string[],
+  userId: string,
+): Promise<ScopedProposalInventoryRow[]> {
+  const validIds = uniqueStrings(ids.filter(isUuid));
+  if (!supabase || validIds.length === 0) return [];
+  const { data, error } = await supabase
+    .from("goods_inventory")
+    .select(
+      "id, user_id, title, photo_urls, hue, group:groups_master(name), character:characters_master(name), goods_type:goods_types_master(name)",
+    )
+    .eq("user_id", userId)
+    .in("id", validIds);
+  if (error) throw error;
+  const byId = new Map(
+    ((data as ScopedProposalInventoryRow[] | null) ?? []).map((row) => [
+      row.id,
+      row,
+    ]),
+  );
+  return validIds.flatMap((id) => (byId.has(id) ? [byId.get(id)!] : []));
+}
+
+function mergeInventoryRows(
+  first: ScopedProposalInventoryRow[],
+  second: ScopedProposalInventoryRow[],
+) {
+  const seen = new Set<string>();
+  const merged: ScopedProposalInventoryRow[] = [];
+  for (const row of [...first, ...second]) {
+    if (seen.has(row.id)) continue;
+    seen.add(row.id);
+    merged.push(row);
+  }
+  return merged;
+}
+
+function mergeCatalogOverrides(
+  current: ReturnType<typeof buildProposalCatalogOverrides>,
+  rows: ScopedProposalInventoryRow[],
+) {
+  const next = new Map(current);
+  for (const [id, item] of buildProposalCatalogOverrides(rows)) {
+    next.set(id, item);
+  }
+  return next;
 }
 
 function ChoicePane({
   items,
   selectedIds,
   loading,
+  loadingMore,
+  hasMore,
   emptyText,
+  onLoadMore,
   onToggle,
 }: {
   items: ProposalChoiceItem[];
   selectedIds: string[];
   loading?: boolean;
+  loadingMore?: boolean;
+  hasMore?: boolean;
   emptyText?: string;
+  onLoadMore?: () => void;
   onToggle: (id: string) => void;
 }) {
   const selectedSet = useMemo(() => new Set(selectedIds), [selectedIds]);
@@ -923,15 +1035,25 @@ function ChoicePane({
   }
 
   return (
-    <ScrollView
+    <FlatList
+      data={items}
+      keyExtractor={(item) => item.id}
       showsVerticalScrollIndicator={false}
       contentContainerStyle={styles.choiceList}
-    >
-      {items.map((item) => {
+      onEndReached={hasMore ? onLoadMore : undefined}
+      onEndReachedThreshold={0.55}
+      ListFooterComponent={
+        loadingMore ? (
+          <View style={styles.choiceLoadingMore}>
+            <ActivityIndicator color={megrumColors.lavender} />
+            <Text style={styles.choiceLoadingMoreText}>さらに読み込み中</Text>
+          </View>
+        ) : null
+      }
+      renderItem={({ item }) => {
         const selected = selectedSet.has(item.id);
         return (
           <Pressable
-            key={item.id}
             onPress={() => onToggle(item.id)}
             style={[styles.choiceCard, selected ? styles.choiceCardSelected : null]}
           >
@@ -965,8 +1087,8 @@ function ChoicePane({
             </View>
           </Pressable>
         );
-      })}
-    </ScrollView>
+      }}
+    />
   );
 }
 
@@ -2515,6 +2637,18 @@ const styles = StyleSheet.create({
   choiceList: {
     gap: 10,
     paddingBottom: 18,
+  },
+  choiceLoadingMore: {
+    alignItems: "center",
+    gap: 7,
+    justifyContent: "center",
+    paddingBottom: 8,
+    paddingTop: 10,
+  },
+  choiceLoadingMoreText: {
+    color: megrumColors.mutedInk,
+    fontSize: 11,
+    fontWeight: "800",
   },
   choiceState: {
     alignItems: "center",
