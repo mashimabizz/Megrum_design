@@ -29,6 +29,7 @@ Preview OTA update group `2a9a2fa0-8d06-44c5-8edf-4ba69dd6e42a` をアプリ内�
 - `npm --prefix mobile run typecheck`
 - `npm --prefix mobile run export:ios:preview`
 - `git diff --check -- mobile/src/components/Screen.tsx`
+- Preview channel OTA配信済み：Update group `2d776847-ac6d-46b8-a1f4-1094bb0012b8` / iOS update ID `019e72e3-4146-7da3-aa93-4429df08ff94`
 
 ### 関連ファイル
 
