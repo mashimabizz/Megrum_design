@@ -1548,10 +1548,10 @@ export default function MeguriBoardThreadScreen() {
               style={StyleSheet.absoluteFill}
             />
             <View style={[styles.editorCard, styles.participantsCard]}>
-              <View style={styles.participantsHeader}>
-                <View style={styles.participantsTitleBlock}>
-                  <Text style={styles.editorEyebrow}>THREAD</Text>
-                  <Text style={styles.editorTitle}>参加者</Text>
+                  <View style={styles.participantsHeader}>
+                    <View style={styles.participantsTitleBlock}>
+                      <Text style={styles.editorEyebrow}>THREAD</Text>
+                      <Text style={styles.editorTitle}>参加者</Text>
                   <Text style={styles.participantsLead}>
                     {participants.length}人がこのスレッドに参加しています
                   </Text>
@@ -1614,14 +1614,28 @@ export default function MeguriBoardThreadScreen() {
                       <Text style={styles.participantActiveAt}>
                         {formatRelativeTime(participant.lastActiveAt)}
                       </Text>
-                      <Text
-                        style={[
-                          styles.participantFilterHint,
-                          participant.replyCount === 0 ? styles.participantFilterHintDisabled : null,
-                        ]}
-                      >
-                        {participant.replyCount > 0 ? "返信を見る" : "返信なし"}
-                      </Text>
+                      <View style={styles.participantTailActions}>
+                        <Text
+                          style={[
+                            styles.participantFilterHint,
+                            participant.replyCount === 0 ? styles.participantFilterHintDisabled : null,
+                          ]}
+                        >
+                          {participant.replyCount > 0 ? "返信を見る" : "返信なし"}
+                        </Text>
+                        <Pressable
+                          accessibilityRole="button"
+                          hitSlop={8}
+                          onPress={(event) => {
+                            event.stopPropagation();
+                            setParticipantsOpen(false);
+                            openBoardUserProfile(participant.id);
+                          }}
+                          style={styles.participantProfileButton}
+                        >
+                          <Text style={styles.participantProfileText}>プロフィール</Text>
+                        </Pressable>
+                      </View>
                     </View>
                   </Pressable>
                 ))}
@@ -3102,6 +3116,10 @@ const styles = StyleSheet.create({
     alignItems: "flex-end",
     gap: 3,
   },
+  participantTailActions: {
+    alignItems: "flex-end",
+    gap: 5,
+  },
   participantFilterHint: {
     color: megrumColors.lavender,
     fontSize: 10.5,
@@ -3109,6 +3127,17 @@ const styles = StyleSheet.create({
   },
   participantFilterHintDisabled: {
     color: "rgba(58,50,74,0.34)",
+  },
+  participantProfileButton: {
+    backgroundColor: "rgba(166,149,216,0.12)",
+    borderRadius: 999,
+    paddingHorizontal: 9,
+    paddingVertical: 5,
+  },
+  participantProfileText: {
+    color: megrumColors.lavender,
+    fontSize: 10,
+    fontWeight: "900",
   },
   mediaGalleryCard: {
     maxHeight: "78%",

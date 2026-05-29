@@ -4,6 +4,53 @@
 
 ---
 
+## イテレーション206：掲示板参加者プロフィール導線を追加
+
+### 背景・問題意識
+
+参加者一覧では、特定の参加者の返信だけを確認できる一方で、その人のプロフィールを見たい時は返信アクションまで戻る必要があった。参加者一覧からもプロフィールへ移動できる導線を追加し、会話の文脈確認とユーザー確認を両立させた。
+
+### 変更内容
+
+#### `mobile/app/meguri-board-thread.tsx`
+- 参加者一覧の各行に `プロフィール` ボタンを追加した。
+- 参加者行のタップはこれまで通り返信フィルタ、プロフィールボタンはプロフィール遷移として役割を分けた。
+- 自分の場合はプロフィールタブへ、相手の場合は `user-profile` へ遷移するようにした。
+
+#### `notes/09_state_machines.md`
+- Meguri Board Lifecycle に参加者プロフィール導線の表示ルールを追記した。
+
+#### `notes/10_glossary.md`
+- 掲示板参加者プロフィール導線を追加した。
+
+### 影響範囲
+
+- iOS版 スポット掲示板詳細
+- 参加者一覧モーダル
+- 相手プロフィール閲覧導線
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- `EAS_UPDATE_PROJECT_SLUG=ihub EXPO_NO_GIT_STATUS=1 npm --prefix mobile run update:ios:preview -- --message "[iter206] add participant profile actions" --non-interactive`
+- Preview OTA: Update group `3677774a-e57c-4631-81d3-649056f5c0b1` / iOS update `019e757a-309a-7cef-8669-bea25a9bedc7`
+
+### 関連ファイル
+
+- `mobile/app/meguri-board-thread.tsx`
+- `notes/08_design_iterations.md`
+- `notes/09_state_machines.md`
+- `notes/10_glossary.md`
+
+### セルフレビュー結果
+
+- ✅ 参加者行の返信フィルタ操作は維持し、プロフィール遷移を独立したボタンにした。
+- ✅ 自分/相手で遷移先を分け、既存のプロフィール導線と整合させた。
+- ✅ DB変更やネイティブ依存追加なしで、Preview OTA対象内に収めた。
+
+---
+
 ## イテレーション205：掲示板一覧の結果サマリーを追加
 
 ### 背景・問題意識
