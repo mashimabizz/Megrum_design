@@ -78,6 +78,8 @@
 ### 確認方法
 - `npm --prefix mobile run typecheck`
 - `git diff --check`
+- `npm --prefix mobile run export:ios:preview`
+- Preview channel OTA配信済み：Update group `e691bbdc-5ea0-4133-afb2-b0c5fb01ee4b` / iOS update ID `019e72a2-2632-70ac-a46d-2798b3ce608a`
 - iOS Preview で `めぐり > 掲示板`、`プロフィール > 住所設定`、`打診 > 郵送交換` を確認
 
 ### 関連ファイル
@@ -96,6 +98,7 @@
 
 ### セルフレビュー結果
 - ✅ `npm --prefix mobile run typecheck` 通過
+- ✅ Preview channel OTA配信済み。既存Previewバイナリが旧EAS project slugに紐づいているため、配信時のみclean worktree側でslug互換を合わせた
 - ⏳ DB migration の適用前は、郵送交換の住所固定と掲示板の Supabase 永続化は有効にならない
 - ✅ めぐりトップの3D依存は親画面側でも外し、2D導線へ整理した
 
