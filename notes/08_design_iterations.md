@@ -4,6 +4,81 @@
 
 ---
 
+## イテレーション172：掲示板の編集と締め切りを追加
+
+### 背景・問題意識
+
+掲示板を一般的なスレッド機能に近づけるには、投稿後の修正、返信停止、削除済み表示といった運用操作が必要。iter171 で保存・検索・通報などの基本操作を入れたため、次の段階として作成者による管理操作を追加した。
+
+### 変更内容
+
+#### `mobile/src/lib/meguriBoard.ts`
+- スレッド/返信に `updatedAt`、返信に `status` / `deleted` を追加した。
+- 自分のスレッド編集、締め切り/再開/削除、返信編集/削除の操作関数を追加した。
+- `locked` スレッドは一覧・詳細で閲覧できるが、返信追加はできないようにした。
+
+#### `mobile/app/meguri-board.tsx`
+- 一覧カードに締め切りバッジを追加した。
+
+#### `mobile/app/meguri-board-thread.tsx`
+- スレッド作成者向けに編集、締め切り/再開、削除をアクションメニューへ追加した。
+- 自分の返信に編集・削除を追加した。
+- 締め切り中のスレッドでは返信入力欄を締め切り表示に置き換えた。
+- 編集済み表示と削除済み返信のプレースホルダ表示を追加した。
+
+#### `supabase/migrations/20260530193000_add_meguri_board_edit_controls.sql`
+- `meguri_board_replies` に `status` / `updated_at` / `deleted_at` を追加した。
+- `locked` スレッドを閲覧可能・返信不可にするよう RPC を更新した。
+- `update_meguri_board_thread` / `set_meguri_board_thread_status` / `update_meguri_board_reply` / `delete_meguri_board_reply` を追加した。
+
+#### `notes/05_data_model.md`
+- 掲示板返信の編集・削除済み表示、スレッド締め切り/削除のデータ方針を追記した。
+
+#### `notes/09_state_machines.md`
+- スレッド作成者による締め切り/再開/削除と返信編集/削除のルールを追記した。
+
+#### `notes/10_glossary.md`
+- スレッド締め切り、掲示板ソフト削除を追加した。
+
+#### `notes/13_api_spec.md`
+- 掲示板のスレッド編集、ステータス変更、返信編集、返信削除APIを追記した。
+
+### 影響範囲
+
+- iOS版 スポット掲示板一覧
+- iOS版 スポット掲示板詳細
+- Supabase スポット掲示板関連テーブル/RPC
+- 掲示板のデータモデル・状態遷移・API仕様・用語
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `git diff --check -- mobile/src/lib/meguriBoard.ts mobile/app/meguri-board.tsx mobile/app/meguri-board-thread.tsx supabase/migrations/20260530193000_add_meguri_board_edit_controls.sql notes/05_data_model.md notes/09_state_machines.md notes/10_glossary.md notes/13_api_spec.md notes/08_design_iterations.md`
+- `npm --prefix mobile run export:ios:preview`
+- `EAS_UPDATE_PROJECT_SLUG=ihub EXPO_NO_GIT_STATUS=1 npm --prefix mobile run update:ios:preview -- --message "[iter172] add meguri board edit controls" --non-interactive`
+- Preview OTA: Update group `f22890b6-763b-4705-868c-23537626f904` / iOS update `019e74c0-9e4b-73eb-a455-437eae549698`
+- `supabase db push`（`20260530193000_add_meguri_board_edit_controls.sql` を remote DB に適用）
+
+### 関連ファイル
+
+- `mobile/src/lib/meguriBoard.ts`
+- `mobile/app/meguri-board.tsx`
+- `mobile/app/meguri-board-thread.tsx`
+- `supabase/migrations/20260530193000_add_meguri_board_edit_controls.sql`
+- `notes/05_data_model.md`
+- `notes/09_state_machines.md`
+- `notes/10_glossary.md`
+- `notes/13_api_spec.md`
+
+### セルフレビュー結果
+
+- ✅ 自分のスレッド編集・締め切り/再開・削除を追加。
+- ✅ 自分の返信編集・削除済み表示を追加。
+- ✅ `locked` スレッドは閲覧可能、返信不可に調整。
+- ✅ 状態遷移・用語・データモデル・API仕様を更新。
+
+---
+
 ## イテレーション171：スポット掲示板の基本スレッド機能を拡充
 
 ### 背景・問題意識

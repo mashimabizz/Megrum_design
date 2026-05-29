@@ -18,6 +18,7 @@ export type MeguriBoardThreadCategory =
   | "trade"
   | "lost_found";
 export type MeguriBoardThreadSort = "active" | "new" | "hot" | "saved";
+export type MeguriBoardReplyStatus = "visible" | "deleted";
 
 export type MeguriBoardViewerContext = {
   coordinate?: MegrumCoordinate | null;
@@ -64,6 +65,7 @@ export type MeguriBoardThread = {
   spotLabel: string | null;
   status: "visible" | "hidden" | "archived" | "locked";
   title: string;
+  updatedAt: number | null;
   viewCount: number;
 };
 
@@ -74,12 +76,15 @@ export type MeguriBoardReply = {
   authorPrimaryArea: string | null;
   body: string;
   createdAt: number;
+  deleted: boolean;
   id: string;
   mine: boolean;
   reacted: boolean;
   reactionCount: number;
   reported: boolean;
+  status: MeguriBoardReplyStatus;
   threadId: string;
+  updatedAt: number | null;
 };
 
 type RemoteUserRow = {
@@ -263,7 +268,7 @@ export function filterMeguriBoardThreads(
   const sort = options.sort ?? "active";
   const query = normalizeSearchQuery(options.query);
   return [...threads]
-    .filter((thread) => !thread.hidden && thread.status === "visible")
+    .filter((thread) => !thread.hidden && (thread.status === "visible" || thread.status === "locked"))
     .filter((thread) => category === "all" || thread.category === category)
     .filter((thread) => {
       if (!query) return true;
@@ -435,6 +440,7 @@ export async function createMeguriBoardThread(
     spotLabel: input.spotLabel,
     status: "visible",
     title: input.title.trim(),
+    updatedAt: null,
     viewCount: 0,
   };
   await storeLocalMeguriBoardThread(localThread);
@@ -458,12 +464,15 @@ export async function appendMeguriBoardReply(
     authorPrimaryArea: actor.primaryArea,
     body: input.body.trim(),
     createdAt,
+    deleted: false,
     id: `meguri-board-reply-${createdAt}`,
     mine: true,
     reacted: false,
     reactionCount: 0,
     reported: false,
+    status: "visible",
     threadId: input.threadId,
+    updatedAt: null,
   };
   await storeLocalMeguriBoardReply(reply);
   return reply;
@@ -527,6 +536,83 @@ export async function reportMeguriBoardReply(replyId: string, reason = "user_rep
     p_reason: reason,
     p_reply_id: replyId,
   });
+}
+
+export async function updateMeguriBoardThread(input: {
+  body: string;
+  category: Exclude<MeguriBoardThreadCategory, "all">;
+  threadId: string;
+  title: string;
+}) {
+  const title = input.title.trim();
+  const body = input.body.trim();
+  if (!input.threadId || !title || !body) return;
+  const updatedAt = Date.now();
+  await updateLocalMeguriBoardThread(input.threadId, (thread) => ({
+    ...thread,
+    body,
+    category: normalizeBoardCategory(input.category),
+    latestActivityAt: Math.max(thread.latestActivityAt, updatedAt),
+    title,
+    updatedAt,
+  }));
+  await callBoardStateRpc("update_meguri_board_thread", {
+    p_body: body,
+    p_category: normalizeBoardCategory(input.category),
+    p_thread_id: input.threadId,
+    p_title: title,
+  });
+}
+
+export async function setMeguriBoardThreadStatus(
+  threadId: string,
+  status: Extract<MeguriBoardThread["status"], "visible" | "locked" | "archived">,
+) {
+  if (!threadId) return;
+  const updatedAt = Date.now();
+  await updateLocalMeguriBoardThread(threadId, (thread) => ({
+    ...thread,
+    hidden: status === "archived" ? true : thread.hidden,
+    latestActivityAt: Math.max(thread.latestActivityAt, updatedAt),
+    status,
+    updatedAt,
+  }));
+  await callBoardStateRpc("set_meguri_board_thread_status", {
+    p_status: status,
+    p_thread_id: threadId,
+  });
+}
+
+export async function updateMeguriBoardReply(replyId: string, body: string) {
+  const nextBody = body.trim();
+  if (!replyId || !nextBody) return;
+  const updatedAt = Date.now();
+  await updateLocalMeguriBoardReply(replyId, (reply) => ({
+    ...reply,
+    body: nextBody,
+    deleted: false,
+    status: "visible",
+    updatedAt,
+  }));
+  await callBoardStateRpc("update_meguri_board_reply", {
+    p_body: nextBody,
+    p_reply_id: replyId,
+  });
+}
+
+export async function deleteMeguriBoardReply(replyId: string) {
+  if (!replyId) return;
+  const updatedAt = Date.now();
+  await updateLocalMeguriBoardReply(replyId, (reply) => ({
+    ...reply,
+    body: "この返信は削除されました",
+    deleted: true,
+    reacted: false,
+    reactionCount: 0,
+    status: "deleted",
+    updatedAt,
+  }));
+  await callBoardStateRpc("delete_meguri_board_reply", { p_reply_id: replyId });
 }
 
 function shouldUsePreviewMeguriBoard(viewerId?: string | null, previewMode?: boolean) {
@@ -638,6 +724,38 @@ async function storeLocalMeguriBoardReply(nextReply: MeguriBoardReply) {
     .slice(-MAX_LOCAL_REPLIES);
   await AsyncStorage.setItem(REPLIES_KEY, JSON.stringify(next));
   await syncLocalMeguriBoardThreadForReply(nextReply, exists);
+}
+
+async function updateLocalMeguriBoardThread(
+  threadId: string,
+  updater: (thread: MeguriBoardThread) => MeguriBoardThread,
+) {
+  const current = await loadLocalMeguriBoardThreads();
+  const next = current.map((thread) => (thread.id === threadId ? updater(thread) : thread));
+  await AsyncStorage.setItem(
+    THREADS_KEY,
+    JSON.stringify(
+      next
+        .sort((left, right) => right.latestActivityAt - left.latestActivityAt)
+        .slice(0, MAX_LOCAL_THREADS),
+    ),
+  );
+}
+
+async function updateLocalMeguriBoardReply(
+  replyId: string,
+  updater: (reply: MeguriBoardReply) => MeguriBoardReply,
+) {
+  const current = await loadLocalMeguriBoardReplies();
+  const next = current.map((reply) => (reply.id === replyId ? updater(reply) : reply));
+  await AsyncStorage.setItem(
+    REPLIES_KEY,
+    JSON.stringify(
+      next
+        .sort((left, right) => left.createdAt - right.createdAt)
+        .slice(-MAX_LOCAL_REPLIES),
+    ),
+  );
 }
 
 async function syncLocalMeguriBoardThreadForReply(reply: MeguriBoardReply, alreadyCounted: boolean) {
@@ -870,6 +988,7 @@ function remoteMeguriBoardThreadToLocal(
     spotLabel: nullableStringValue(row.spot_label),
     status: normalizeBoardStatus(row.status),
     title,
+    updatedAt: timestampValueOrNull(row.updated_at),
     viewCount: numberValue(row.view_count, 0),
   };
 }
@@ -894,12 +1013,15 @@ function remoteMeguriBoardReplyToLocal(
     authorPrimaryArea: nullableStringValue(author.primary_area),
     body,
     createdAt: timestampValue(row.created_at, Date.now()),
+    deleted: normalizeReplyStatus(row.status) === "deleted" || !!timestampValueOrNull(row.deleted_at),
     id,
     mine: authorId === viewerId,
     reacted: booleanValue(row.viewer_reacted),
     reactionCount: numberValue(row.reaction_count, 0),
     reported: booleanValue(row.viewer_reported),
+    status: normalizeReplyStatus(row.status),
     threadId,
+    updatedAt: timestampValueOrNull(row.updated_at),
   };
 }
 
@@ -1050,6 +1172,7 @@ function createPreviewThread(
     spotLabel,
     status: "visible",
     title,
+    updatedAt: null,
     viewCount: 0,
   };
 }
@@ -1068,12 +1191,15 @@ function createPreviewReply(
     authorPrimaryArea: author.primaryArea,
     body,
     createdAt,
+    deleted: false,
     id,
     mine: false,
     reacted: false,
     reactionCount: 0,
     reported: false,
+    status: "visible",
     threadId,
+    updatedAt: null,
   };
 }
 
@@ -1136,6 +1262,7 @@ function normalizeStoredThread(thread: MeguriBoardThread): MeguriBoardThread {
     readAt: nullableNumberValue(thread.readAt),
     reported: Boolean(thread.reported),
     status: normalizeBoardStatus(thread.status),
+    updatedAt: nullableNumberValue(thread.updatedAt),
     viewCount: numberValue(thread.viewCount, 0),
   };
 }
@@ -1143,9 +1270,12 @@ function normalizeStoredThread(thread: MeguriBoardThread): MeguriBoardThread {
 function normalizeStoredReply(reply: MeguriBoardReply): MeguriBoardReply {
   return {
     ...reply,
+    deleted: Boolean(reply.deleted),
     reacted: Boolean(reply.reacted),
     reactionCount: numberValue(reply.reactionCount, 0),
     reported: Boolean(reply.reported),
+    status: normalizeReplyStatus(reply.status),
+    updatedAt: nullableNumberValue(reply.updatedAt),
   };
 }
 
@@ -1171,6 +1301,9 @@ function remoteThreadSelect(includeLocation: boolean) {
     "author_id",
     "title",
     "body",
+    "category",
+    "status",
+    "is_pinned",
     "audience_scope",
     "spot_key",
     "spot_label",
@@ -1178,9 +1311,13 @@ function remoteThreadSelect(includeLocation: boolean) {
     includeLocation ? "origin_lat" : null,
     includeLocation ? "origin_lng" : null,
     "reply_count",
+    "reaction_count",
+    "bookmark_count",
+    "view_count",
     "latest_reply_preview",
     "latest_activity_at",
     "created_at",
+    "updated_at",
     "author:users!meguri_board_threads_author_id_fkey(id, display_name, handle, primary_area)",
   ]
     .filter(Boolean)
@@ -1193,7 +1330,11 @@ function remoteReplySelect() {
     "thread_id",
     "author_id",
     "body",
+    "status",
+    "reaction_count",
     "created_at",
+    "updated_at",
+    "deleted_at",
     "author:users!meguri_board_replies_author_id_fkey(id, display_name, handle, primary_area)",
   ].join(", ");
 }
@@ -1371,6 +1512,11 @@ function normalizeBoardCategory(value: unknown): Exclude<MeguriBoardThreadCatego
 
 function normalizeBoardStatus(value: unknown): MeguriBoardThread["status"] {
   if (value === "hidden" || value === "archived" || value === "locked") return value;
+  return "visible";
+}
+
+function normalizeReplyStatus(value: unknown): MeguriBoardReplyStatus {
+  if (value === "deleted") return "deleted";
   return "visible";
 }
 

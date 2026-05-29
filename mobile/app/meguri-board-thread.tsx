@@ -4,6 +4,7 @@ import {
   ActionSheetIOS,
   ActivityIndicator,
   Alert,
+  Modal,
   Platform,
   Pressable,
   ScrollView,
@@ -19,17 +20,22 @@ import { IconSymbol } from "../src/components/IconSymbol";
 import { Screen } from "../src/components/Screen";
 import {
   appendMeguriBoardReply,
+  deleteMeguriBoardReply,
   hideMeguriBoardThread,
   loadMeguriBoardThreadDetail,
   markMeguriBoardThreadRead,
   meguriBoardAudienceLabel,
   meguriBoardAudienceMeta,
+  MEGURI_BOARD_COMPOSER_CATEGORY_OPTIONS,
   meguriBoardCategoryLabel,
   reportMeguriBoardReply,
   reportMeguriBoardThread,
+  setMeguriBoardThreadStatus,
   setMeguriBoardReplyReacted,
   setMeguriBoardThreadBookmarked,
   setMeguriBoardThreadReacted,
+  updateMeguriBoardReply,
+  updateMeguriBoardThread,
   type MeguriBoardActor,
   type MeguriBoardAudienceScope,
   type MeguriBoardReply,
@@ -77,6 +83,13 @@ export default function MeguriBoardThreadScreen() {
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
   const [sendError, setSendError] = useState<string | null>(null);
+  const [threadEditorOpen, setThreadEditorOpen] = useState(false);
+  const [threadEditTitle, setThreadEditTitle] = useState("");
+  const [threadEditBody, setThreadEditBody] = useState("");
+  const [threadEditCategory, setThreadEditCategory] =
+    useState<Exclude<MeguriBoardThreadCategory, "all">>("chat");
+  const [replyEditor, setReplyEditor] = useState<MeguriBoardReply | null>(null);
+  const [replyEditBody, setReplyEditBody] = useState("");
 
   const actor = useMemo<MeguriBoardActor>(
     () => ({
@@ -175,6 +188,10 @@ export default function MeguriBoardThreadScreen() {
 
   async function handleSend() {
     if (!threadId) return;
+    if (thread?.status === "locked") {
+      setSendError("このスレッドは締め切られています。");
+      return;
+    }
     const body = draft.trim();
     if (!body) return;
     setSending(true);
@@ -274,55 +291,207 @@ export default function MeguriBoardThreadScreen() {
     Alert.alert("通報しました", "確認して対応します。");
   }
 
+  function openThreadEditor() {
+    if (!thread || !thread.mine) return;
+    setThreadEditTitle(thread.title);
+    setThreadEditBody(thread.body);
+    setThreadEditCategory(thread.category);
+    setThreadEditorOpen(true);
+  }
+
+  async function saveThreadEditor() {
+    if (!thread) return;
+    const title = threadEditTitle.trim();
+    const body = threadEditBody.trim();
+    if (!title || !body) return;
+    const updatedAt = Date.now();
+    const nextThread = {
+      ...thread,
+      body,
+      category: threadEditCategory,
+      latestActivityAt: Math.max(thread.latestActivityAt, updatedAt),
+      title,
+      updatedAt,
+    };
+    setThread(nextThread);
+    setThreadEditorOpen(false);
+    await updateMeguriBoardThread({
+      body,
+      category: threadEditCategory,
+      threadId: thread.id,
+      title,
+    });
+  }
+
+  async function toggleThreadLocked() {
+    if (!thread || !thread.mine) return;
+    const nextStatus = thread.status === "locked" ? "visible" : "locked";
+    const updatedAt = Date.now();
+    updateThread({
+      ...thread,
+      latestActivityAt: Math.max(thread.latestActivityAt, updatedAt),
+      status: nextStatus,
+      updatedAt,
+    });
+    await setMeguriBoardThreadStatus(thread.id, nextStatus);
+  }
+
+  async function archiveThread() {
+    if (!thread || !thread.mine) return;
+    await setMeguriBoardThreadStatus(thread.id, "archived");
+    router.back();
+  }
+
+  function confirmArchiveThread() {
+    Alert.alert("スレッドを削除しますか？", "一覧と詳細から見えなくなります。", [
+      { style: "cancel", text: "キャンセル" },
+      { onPress: () => void archiveThread(), style: "destructive", text: "削除する" },
+    ]);
+  }
+
+  function openReplyEditor(reply: MeguriBoardReply) {
+    if (!reply.mine || reply.deleted) return;
+    setReplyEditor(reply);
+    setReplyEditBody(reply.body);
+  }
+
+  async function saveReplyEditor() {
+    if (!replyEditor) return;
+    const body = replyEditBody.trim();
+    if (!body) return;
+    const updatedAt = Date.now();
+    setReplies((current) =>
+      current.map((candidate) =>
+        candidate.id === replyEditor.id
+          ? { ...candidate, body, deleted: false, status: "visible", updatedAt }
+          : candidate,
+      ),
+    );
+    setReplyEditor(null);
+    await updateMeguriBoardReply(replyEditor.id, body);
+  }
+
+  async function deleteReply(reply: MeguriBoardReply) {
+    if (!reply.mine || reply.deleted) return;
+    const updatedAt = Date.now();
+    setReplies((current) =>
+      current.map((candidate) =>
+        candidate.id === reply.id
+          ? {
+              ...candidate,
+              body: "この返信は削除されました",
+              deleted: true,
+              reacted: false,
+              reactionCount: 0,
+              status: "deleted",
+              updatedAt,
+            }
+          : candidate,
+      ),
+    );
+    await deleteMeguriBoardReply(reply.id);
+  }
+
+  function confirmDeleteReply(reply: MeguriBoardReply) {
+    Alert.alert("返信を削除しますか？", "削除済みの表示に変わります。", [
+      { style: "cancel", text: "キャンセル" },
+      { onPress: () => void deleteReply(reply), style: "destructive", text: "削除する" },
+    ]);
+  }
+
   function openThreadActions() {
     if (!thread) return;
-    const labels = [
-      thread.bookmarked ? "保存を解除" : "保存する",
-      thread.reacted ? "参考になったを取り消す" : "参考になった",
-      "非表示にする",
-      thread.reported ? "通報済み" : "通報する",
-      "キャンセル",
-    ];
+    const actions: Array<{ disabled?: boolean; destructive?: boolean; label: string; run?: () => void }> = [];
+    if (thread.mine) {
+      actions.push(
+        { label: "編集する", run: openThreadEditor },
+        {
+          label: thread.status === "locked" ? "再開する" : "締め切る",
+          run: () => void toggleThreadLocked(),
+        },
+        { destructive: true, label: "削除する", run: confirmArchiveThread },
+      );
+    }
+    actions.push(
+      { label: thread.bookmarked ? "保存を解除" : "保存する", run: () => void toggleThreadBookmark() },
+      { label: thread.reacted ? "参考になったを取り消す" : "参考になった", run: () => void toggleThreadReaction() },
+      { destructive: true, label: "非表示にする", run: () => void hideThread() },
+      {
+        disabled: thread.reported,
+        label: thread.reported ? "通報済み" : "通報する",
+        run: thread.reported ? undefined : () => void reportThread(),
+      },
+    );
+    const labels = [...actions.map((action) => action.label), "キャンセル"];
+    const cancelButtonIndex = labels.length - 1;
+    const destructiveButtonIndices = actions
+      .map((action, index) => (action.destructive ? index : -1))
+      .filter((index) => index >= 0);
+    const disabledButtonIndices = actions
+      .map((action, index) => (action.disabled ? index : -1))
+      .filter((index) => index >= 0);
     if (Platform.OS === "ios") {
       ActionSheetIOS.showActionSheetWithOptions(
         {
-          cancelButtonIndex: 4,
-          destructiveButtonIndex: 2,
-          disabledButtonIndices: thread.reported ? [3] : undefined,
+          cancelButtonIndex,
+          destructiveButtonIndex: destructiveButtonIndices[0],
+          disabledButtonIndices: disabledButtonIndices.length ? disabledButtonIndices : undefined,
           options: labels,
           title: thread.title,
         },
         (index) => {
-          if (index === 0) void toggleThreadBookmark();
-          if (index === 1) void toggleThreadReaction();
-          if (index === 2) void hideThread();
-          if (index === 3 && !thread.reported) void reportThread();
+          actions[index]?.run?.();
         },
       );
       return;
     }
-    void toggleThreadBookmark();
+    actions[0]?.run?.();
   }
 
   function openReplyActions(reply: MeguriBoardReply) {
-    const labels = [
-      reply.reacted ? "参考になったを取り消す" : "参考になった",
-      reply.reported ? "通報済み" : "通報する",
-      "キャンセル",
-    ];
-    if (Platform.OS === "ios") {
-      ActionSheetIOS.showActionSheetWithOptions(
+    const actions: Array<{ disabled?: boolean; destructive?: boolean; label: string; run?: () => void }> = [];
+    if (reply.mine) {
+      actions.push(
+        { disabled: reply.deleted, label: "編集する", run: () => openReplyEditor(reply) },
+        { destructive: true, disabled: reply.deleted, label: "削除する", run: () => confirmDeleteReply(reply) },
+      );
+    } else {
+      actions.push(
         {
-          cancelButtonIndex: 2,
-          disabledButtonIndices: reply.reported ? [1] : undefined,
-          options: labels,
+          disabled: reply.deleted,
+          label: reply.reacted ? "参考になったを取り消す" : "参考になった",
+          run: () => void toggleReplyReaction(reply),
         },
-        (index) => {
-          if (index === 0) void toggleReplyReaction(reply);
-          if (index === 1 && !reply.reported) void reportReply(reply);
+        {
+          disabled: reply.reported || reply.deleted,
+          label: reply.reported ? "通報済み" : "通報する",
+          run: reply.reported ? undefined : () => void reportReply(reply),
         },
       );
     }
+    const labels = [...actions.map((action) => action.label), "キャンセル"];
+    const cancelButtonIndex = labels.length - 1;
+    const destructiveButtonIndices = actions
+      .map((action, index) => (action.destructive ? index : -1))
+      .filter((index) => index >= 0);
+    const disabledButtonIndices = actions
+      .map((action, index) => (action.disabled ? index : -1))
+      .filter((index) => index >= 0);
+    if (Platform.OS === "ios") {
+      ActionSheetIOS.showActionSheetWithOptions(
+        {
+          cancelButtonIndex,
+          destructiveButtonIndex: destructiveButtonIndices[0],
+          disabledButtonIndices: disabledButtonIndices.length ? disabledButtonIndices : undefined,
+          options: labels,
+        },
+        (index) => {
+          actions[index]?.run?.();
+        },
+      );
+      return;
+    }
+    actions[0]?.run?.();
   }
 
   return (
@@ -374,6 +543,7 @@ export default function MeguriBoardThreadScreen() {
                   <View style={styles.heroBadgeRow}>
                     <CategoryBadge category={thread.category} />
                     <ScopeBadge scope={thread.audienceScope} />
+                    {thread.status === "locked" ? <StatusBadge label="締め切り" /> : null}
                   </View>
                   <Text style={styles.heroTime}>{formatRelativeTime(thread.createdAt)}</Text>
                 </View>
@@ -381,6 +551,7 @@ export default function MeguriBoardThreadScreen() {
                 <Text style={styles.heroBody}>{thread.body}</Text>
                 <Text style={styles.heroMeta}>
                   {meguriBoardAudienceMeta(thread)} · {thread.authorName}
+                  {thread.updatedAt && thread.updatedAt > thread.createdAt + 60000 ? " · 編集済み" : ""}
                 </Text>
                 <View style={styles.threadActions}>
                   <Pressable
@@ -446,6 +617,7 @@ export default function MeguriBoardThreadScreen() {
                           style={[
                             styles.replyBody,
                             reply.mine ? styles.replyBodyMine : null,
+                            reply.deleted ? styles.replyBodyDeleted : null,
                           ]}
                         >
                           {reply.body}
@@ -453,10 +625,12 @@ export default function MeguriBoardThreadScreen() {
                       </ChatGradientBubble>
                       <Text style={[styles.replyTime, reply.mine ? styles.replyTimeMine : null]}>
                         {formatRelativeTime(reply.createdAt)}
+                        {reply.updatedAt && reply.updatedAt > reply.createdAt + 60000 ? " · 編集済み" : ""}
                       </Text>
                       <View style={[styles.replyActionRow, reply.mine ? styles.replyActionRowMine : null]}>
                         <Pressable
                           accessibilityRole="button"
+                          disabled={reply.deleted}
                           onPress={() => toggleReplyReaction(reply)}
                           style={[styles.replyActionPill, reply.reacted ? styles.replyActionPillActive : null]}
                         >
@@ -483,44 +657,155 @@ export default function MeguriBoardThreadScreen() {
               )}
             </ScrollView>
 
-            <View
-              style={[
-                styles.composer,
-                {
-                  marginBottom: keyboardInset,
-                  paddingBottom: keyboardInset > 0 ? 8 : Math.max(insets.bottom, 12) + 10,
-                },
-              ]}
-            >
-              <TextInput
-                multiline
-                onChangeText={setDraft}
-                placeholder="返信を書く"
-                placeholderTextColor="rgba(58,50,74,0.34)"
-                style={styles.composerInput}
-                textAlignVertical="top"
-                value={draft}
-              />
-              <Pressable
-                accessibilityRole="button"
-                disabled={sending || !draft.trim()}
-                onPress={handleSend}
+            {thread.status === "locked" ? (
+              <View
                 style={[
-                  styles.sendButton,
-                  draft.trim() ? styles.sendButtonActive : null,
-                  sending ? styles.sendButtonDisabled : null,
+                  styles.lockedComposer,
+                  {
+                    marginBottom: keyboardInset,
+                    paddingBottom: keyboardInset > 0 ? 8 : Math.max(insets.bottom, 12) + 10,
+                  },
                 ]}
               >
-                <IconSymbol
-                  name={sending ? "ellipsis-horizontal" : "send-outline"}
-                  color={draft.trim() ? "#fff" : "rgba(58,50,74,0.42)"}
-                  size={18}
+                <Text style={styles.lockedComposerText}>このスレッドは締め切られています</Text>
+              </View>
+            ) : (
+              <View
+                style={[
+                  styles.composer,
+                  {
+                    marginBottom: keyboardInset,
+                    paddingBottom: keyboardInset > 0 ? 8 : Math.max(insets.bottom, 12) + 10,
+                  },
+                ]}
+              >
+                <TextInput
+                  multiline
+                  onChangeText={setDraft}
+                  placeholder="返信を書く"
+                  placeholderTextColor="rgba(58,50,74,0.34)"
+                  style={styles.composerInput}
+                  textAlignVertical="top"
+                  value={draft}
                 />
-              </Pressable>
-            </View>
+                <Pressable
+                  accessibilityRole="button"
+                  disabled={sending || !draft.trim()}
+                  onPress={handleSend}
+                  style={[
+                    styles.sendButton,
+                    draft.trim() ? styles.sendButtonActive : null,
+                    sending ? styles.sendButtonDisabled : null,
+                  ]}
+                >
+                  <IconSymbol
+                    name={sending ? "ellipsis-horizontal" : "send-outline"}
+                    color={draft.trim() ? "#fff" : "rgba(58,50,74,0.42)"}
+                    size={18}
+                  />
+                </Pressable>
+              </View>
+            )}
             {sendError ? <Text style={styles.sendError}>{sendError}</Text> : null}
           </>
         )}
+        <Modal
+          animationType="slide"
+          onRequestClose={() => setThreadEditorOpen(false)}
+          transparent
+          visible={threadEditorOpen}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={styles.editorCard}>
+              <Text style={styles.editorEyebrow}>THREAD</Text>
+              <Text style={styles.editorTitle}>スレッドを編集</Text>
+              <TextInput
+                onChangeText={setThreadEditTitle}
+                placeholder="タイトル"
+                placeholderTextColor="rgba(58,50,74,0.34)"
+                style={styles.editorInput}
+                value={threadEditTitle}
+              />
+              <TextInput
+                multiline
+                onChangeText={setThreadEditBody}
+                placeholder="本文"
+                placeholderTextColor="rgba(58,50,74,0.34)"
+                style={[styles.editorInput, styles.editorBodyInput]}
+                textAlignVertical="top"
+                value={threadEditBody}
+              />
+              <View style={styles.editorChipRow}>
+                {MEGURI_BOARD_COMPOSER_CATEGORY_OPTIONS.map((category) => (
+                  <Pressable
+                    accessibilityRole="button"
+                    key={category}
+                    onPress={() => setThreadEditCategory(category)}
+                    style={[
+                      styles.editorCategoryChip,
+                      threadEditCategory === category ? styles.editorCategoryChipActive : null,
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.editorCategoryChipText,
+                        threadEditCategory === category ? styles.editorCategoryChipTextActive : null,
+                      ]}
+                    >
+                      {meguriBoardCategoryLabel(category)}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
+              <View style={styles.editorFooter}>
+                <Pressable
+                  accessibilityRole="button"
+                  onPress={() => setThreadEditorOpen(false)}
+                  style={styles.editorSecondary}
+                >
+                  <Text style={styles.editorSecondaryText}>キャンセル</Text>
+                </Pressable>
+                <Pressable accessibilityRole="button" onPress={saveThreadEditor} style={styles.editorPrimary}>
+                  <Text style={styles.editorPrimaryText}>保存</Text>
+                </Pressable>
+              </View>
+            </View>
+          </View>
+        </Modal>
+        <Modal
+          animationType="slide"
+          onRequestClose={() => setReplyEditor(null)}
+          transparent
+          visible={!!replyEditor}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={styles.editorCard}>
+              <Text style={styles.editorEyebrow}>REPLY</Text>
+              <Text style={styles.editorTitle}>返信を編集</Text>
+              <TextInput
+                multiline
+                onChangeText={setReplyEditBody}
+                placeholder="返信を書く"
+                placeholderTextColor="rgba(58,50,74,0.34)"
+                style={[styles.editorInput, styles.editorBodyInput]}
+                textAlignVertical="top"
+                value={replyEditBody}
+              />
+              <View style={styles.editorFooter}>
+                <Pressable
+                  accessibilityRole="button"
+                  onPress={() => setReplyEditor(null)}
+                  style={styles.editorSecondary}
+                >
+                  <Text style={styles.editorSecondaryText}>キャンセル</Text>
+                </Pressable>
+                <Pressable accessibilityRole="button" onPress={saveReplyEditor} style={styles.editorPrimary}>
+                  <Text style={styles.editorPrimaryText}>保存</Text>
+                </Pressable>
+              </View>
+            </View>
+          </View>
+        </Modal>
       </Screen>
     </View>
   );
@@ -550,6 +835,14 @@ function ScopeBadge({ scope }: { scope: MeguriBoardAudienceScope }) {
       >
         {meguriBoardAudienceLabel(scope)}
       </Text>
+    </View>
+  );
+}
+
+function StatusBadge({ label }: { label: string }) {
+  return (
+    <View style={styles.statusBadge}>
+      <Text style={styles.statusBadgeText}>{label}</Text>
     </View>
   );
 }
@@ -836,6 +1129,17 @@ const styles = StyleSheet.create({
   scopeBadgeTextGlobal: {
     color: "#ba6d8d",
   },
+  statusBadge: {
+    backgroundColor: "rgba(58,50,74,0.08)",
+    borderRadius: 999,
+    paddingHorizontal: 9,
+    paddingVertical: 4,
+  },
+  statusBadgeText: {
+    color: megrumColors.mutedInk,
+    fontSize: 10.5,
+    fontWeight: "900",
+  },
   heroTime: {
     color: megrumColors.mutedInk,
     fontSize: 11,
@@ -967,6 +1271,10 @@ const styles = StyleSheet.create({
   replyBodyMine: {
     color: "#fff",
   },
+  replyBodyDeleted: {
+    color: "rgba(58,50,74,0.48)",
+    fontStyle: "italic",
+  },
   replyTime: {
     color: megrumColors.mutedInk,
     fontSize: 10.5,
@@ -1042,6 +1350,24 @@ const styles = StyleSheet.create({
   sendButtonDisabled: {
     opacity: 0.8,
   },
+  lockedComposer: {
+    alignItems: "center",
+    backgroundColor: "rgba(251,249,252,0.98)",
+    borderTopColor: "rgba(58,50,74,0.08)",
+    borderTopWidth: StyleSheet.hairlineWidth,
+    paddingHorizontal: 14,
+    paddingTop: 12,
+  },
+  lockedComposerText: {
+    backgroundColor: "rgba(58,50,74,0.06)",
+    borderRadius: 999,
+    color: megrumColors.mutedInk,
+    fontSize: 12.5,
+    fontWeight: "900",
+    overflow: "hidden",
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+  },
   sendError: {
     color: megrumColors.warn,
     fontSize: 11.5,
@@ -1049,5 +1375,99 @@ const styles = StyleSheet.create({
     paddingHorizontal: 18,
     paddingTop: 6,
     paddingBottom: 4,
+  },
+  modalOverlay: {
+    backgroundColor: "rgba(24,20,32,0.28)",
+    flex: 1,
+    justifyContent: "flex-end",
+    padding: 14,
+  },
+  editorCard: {
+    backgroundColor: "#fff",
+    borderRadius: 24,
+    gap: 12,
+    paddingHorizontal: 18,
+    paddingTop: 18,
+    paddingBottom: 16,
+    ...megrumShadow,
+  },
+  editorEyebrow: {
+    color: megrumColors.lavender,
+    fontSize: 11,
+    fontWeight: "900",
+    letterSpacing: 0,
+  },
+  editorTitle: {
+    color: megrumColors.ink,
+    fontSize: 20,
+    fontWeight: "900",
+  },
+  editorInput: {
+    backgroundColor: "rgba(251,249,252,0.96)",
+    borderColor: "rgba(58,50,74,0.08)",
+    borderRadius: 16,
+    borderWidth: 1,
+    color: megrumColors.ink,
+    fontSize: 14,
+    fontWeight: "800",
+    minHeight: 48,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+  },
+  editorBodyInput: {
+    minHeight: 132,
+  },
+  editorChipRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  editorCategoryChip: {
+    backgroundColor: "rgba(58,50,74,0.06)",
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  editorCategoryChipActive: {
+    backgroundColor: "rgba(166,149,216,0.18)",
+  },
+  editorCategoryChipText: {
+    color: megrumColors.mutedInk,
+    fontSize: 12,
+    fontWeight: "900",
+  },
+  editorCategoryChipTextActive: {
+    color: megrumColors.lavender,
+  },
+  editorFooter: {
+    flexDirection: "row",
+    gap: 10,
+    paddingTop: 2,
+  },
+  editorSecondary: {
+    alignItems: "center",
+    backgroundColor: "rgba(58,50,74,0.06)",
+    borderRadius: 16,
+    flex: 1,
+    minHeight: 46,
+    justifyContent: "center",
+  },
+  editorSecondaryText: {
+    color: megrumColors.mutedInk,
+    fontSize: 13.5,
+    fontWeight: "900",
+  },
+  editorPrimary: {
+    alignItems: "center",
+    backgroundColor: megrumColors.lavender,
+    borderRadius: 16,
+    flex: 1,
+    minHeight: 46,
+    justifyContent: "center",
+  },
+  editorPrimaryText: {
+    color: "#fff",
+    fontSize: 13.5,
+    fontWeight: "900",
   },
 });

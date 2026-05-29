@@ -967,6 +967,7 @@ AW削除。
         "view_count": 12,
         "latest_reply_preview": "string?",
         "latest_activity_at": "2026-05-29T07:12:00Z",
+        "updated_at": "2026-05-29T07:18:00Z",
         "viewer_bookmarked": false,
         "viewer_reacted": false,
         "viewer_hidden": false,
@@ -1034,8 +1035,47 @@ AW削除。
     "body": "string"
   }
   ```
-- **Response 201**: `{ id, thread_id, body, reaction_count, created_at, viewer_reacted, viewer_reported, author }`
-- **備考**: テキストのみ。編集・削除は提供せず、通報・運営非表示で対応する
+- **Response 201**: `{ id, thread_id, body, status, reaction_count, created_at, updated_at, deleted_at, viewer_reacted, viewer_reported, author }`
+- **備考**: テキストのみ。`thread.status='locked'` の場合は返信不可
+- **Screen**: `meguri-board-thread`
+
+### PATCH /api/v1/meguri-board/threads/:id
+
+スレッド作成者がタイトル/本文/カテゴリを編集する。
+
+- **Auth**: 必須（author のみ）
+- **Request**: `{ "title": "string", "body": "string", "category": "question|info|chat|trade|lost_found" }`
+- **Response 204**: no content
+- **Side effects**: `updated_at` と `latest_activity_at` を更新
+- **Screen**: `meguri-board-thread`
+
+### PUT /api/v1/meguri-board/threads/:id/status
+
+スレッド作成者が締め切り/再開/削除を行う。
+
+- **Auth**: 必須（author のみ）
+- **Request**: `{ "status": "visible|locked|archived" }`
+- **Response 204**: no content
+- **備考**: `locked` は閲覧可能だが返信不可。`archived` は通常ユーザーには表示しない
+- **Screen**: `meguri-board-thread`
+
+### PATCH /api/v1/meguri-board/replies/:id
+
+返信作成者が本文を編集する。
+
+- **Auth**: 必須（author のみ）
+- **Request**: `{ "body": "string" }`
+- **Response 204**: no content
+- **Side effects**: `updated_at` を更新
+- **Screen**: `meguri-board-thread`
+
+### DELETE /api/v1/meguri-board/replies/:id
+
+返信作成者が返信を削除済み表示へ切り替える。
+
+- **Auth**: 必須（author のみ）
+- **Response 204**: no content
+- **Side effects**: `status='deleted'` / `deleted_at=now()` / `body='この返信は削除されました'`
 - **Screen**: `meguri-board-thread`
 
 ### POST /api/v1/meguri-board/threads/:id/read

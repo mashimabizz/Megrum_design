@@ -557,6 +557,7 @@ export default function MeguriBoardScreen() {
                         <View style={styles.threadBadgeRow}>
                           <CategoryBadge category={thread.category} />
                           <ScopeBadge scope={thread.audienceScope} />
+                          {thread.status === "locked" ? <StatusBadge label="締め切り" /> : null}
                           {thread.readAt && thread.readAt >= thread.latestActivityAt ? null : (
                             <View style={styles.unreadDot} />
                           )}
@@ -764,6 +765,14 @@ function ScopeBadge({ scope }: { scope: MeguriBoardAudienceScope }) {
       >
         {meguriBoardAudienceLabel(scope)}
       </Text>
+    </View>
+  );
+}
+
+function StatusBadge({ label }: { label: string }) {
+  return (
+    <View style={styles.statusBadge}>
+      <Text style={styles.statusBadgeText}>{label}</Text>
     </View>
   );
 }
@@ -1212,6 +1221,17 @@ const styles = StyleSheet.create({
   },
   scopeBadgeTextGlobal: {
     color: "#ba6d8d",
+  },
+  statusBadge: {
+    backgroundColor: "rgba(58,50,74,0.08)",
+    borderRadius: 999,
+    paddingHorizontal: 9,
+    paddingVertical: 4,
+  },
+  statusBadgeText: {
+    color: megrumColors.mutedInk,
+    fontSize: 10,
+    fontWeight: "900",
   },
   threadTime: {
     color: megrumColors.mutedInk,

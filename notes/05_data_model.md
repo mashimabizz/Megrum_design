@@ -348,7 +348,7 @@ iter168.43 以降、無料受信者に本文・画像パスを直接返さない
 
 ### `meguri_board_replies`（スポット掲示板返信 / iter168.73）
 
-スレッド詳細で送るチャット形式の追記返信。MVPではテキストのみ、編集なし、削除なしの append-only とする。
+スレッド詳細で送るチャット形式の追記返信。iter172 以降、自分の返信は編集でき、削除時は物理削除ではなく `status='deleted'` としてプレースホルダ表示にする。
 
 | カラム | 型 | 説明 |
 |---|---|---|
@@ -356,10 +356,12 @@ iter168.43 以降、無料受信者に本文・画像パスを直接返さない
 | `thread_id` | uuid | → `meguri_board_threads` |
 | `author_id` | uuid | → users |
 | `body` | text | 1〜1000字 |
+| `status` | text | `visible` / `deleted`。iter172 追加 |
 | `reaction_count` | integer | 返信への「参考になった」の集計。iter171 追加 |
-| `created_at` | timestamptz | |
+| `deleted_at` | timestamptz nullable | 削除済み表示に切り替えた時刻。iter172 追加 |
+| `created_at` / `updated_at` | timestamptz | |
 
-`after insert` trigger で `meguri_board_threads.reply_count / latest_reply_preview / latest_activity_at` を更新する。
+`after insert` trigger で `meguri_board_threads.reply_count / latest_reply_preview / latest_activity_at` を更新する。スレッド作成者は `status` を `locked` にして返信追加を止め、`visible` に戻して再開できる。削除は `archived` にするソフト削除。
 
 ### `meguri_board_thread_bookmarks`（スポット掲示板スレッド保存 / iter171）
 
