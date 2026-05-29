@@ -32,7 +32,6 @@ import { megrumColors, megrumRadii, megrumShadow } from "../../src/theme/tokens"
 import {
   MEGURI_PLUS_FREE_SEND_LIMIT,
   MEGURI_PLUS_MONTHLY_SEND_LIMIT,
-  loadMeguriPlusState,
 } from "../../src/lib/meguriPlus";
 import { GroomProfileSlidePanel, type GroomProfileUser } from "../../src/components/meguri/GroomProfileSlidePanel";
 import { useAuth } from "../../src/auth/AuthProvider";
@@ -52,6 +51,12 @@ import {
 import { appendMeguriGroomReply } from "../../src/lib/meguriMessages";
 import { useKeyboardInset } from "../../src/lib/useKeyboardInset";
 import { getCurrentLocationContext, type MegrumLocationContext } from "../../src/lib/locationContext";
+import {
+  loadMeguriBoardThreads,
+  meguriBoardAudienceMeta,
+  type MeguriBoardThread,
+  type MeguriBoardViewerContext,
+} from "../../src/lib/meguriBoard";
 
 const GROOM_CAMERA_QUALITY = 0.88;
 const GROOM_LIBRARY_QUALITY = 0.88;
@@ -570,7 +575,6 @@ export default function EncountersScreen() {
   const insets = useSafeAreaInsets();
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [meguriEnabled, setMeguriEnabled] = useState(true);
-  const [plusActive, setPlusActive] = useState(false);
   const [groomPosts, setGroomPosts] = useState<GroomPost[]>(() => (previewMode ? GROOM_POSTS : []));
   const [groomLoading, setGroomLoading] = useState(!previewMode);
   const [selectedGroomId, setSelectedGroomId] = useState<string | null>(null);
@@ -585,19 +589,18 @@ export default function EncountersScreen() {
   const [groomViewerSession, setGroomViewerSession] = useState(0);
   const [viewedGroomKeys, setViewedGroomKeys] = useState<Set<string>>(() => new Set());
   const [groomLocationContext, setGroomLocationContext] = useState<MegrumLocationContext | null>(null);
+  const [boardThreads, setBoardThreads] = useState<MeguriBoardThread[]>([]);
+  const [boardLoading, setBoardLoading] = useState(!previewMode);
+  const [boardViewerContext, setBoardViewerContext] = useState<MeguriBoardViewerContext>(() =>
+    buildMeguriBoardHomeViewerContext({
+      fallbackArea: profile?.primaryArea ?? null,
+      viewerId: user?.id ?? "preview-me",
+    }),
+  );
   const groomToastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const selectedGroomPost = groomPosts.find((post) => post.id === selectedGroomId) ?? null;
-  const lockedLetters = previewMode && !plusActive ? LETTERS.length : 0;
   const headerTop = Math.max(insets.top, 18) + 8;
   const bottomPadding = Math.max(insets.bottom, 12) + 96;
-
-  useEffect(() => {
-    loadMeguriPlusState(profile)
-      .then((settings) => {
-        setPlusActive(settings.active);
-      })
-      .catch(() => undefined);
-  }, [profile?.handle]);
 
   async function refreshGroomPosts() {
     if (previewMode) {
@@ -632,6 +635,14 @@ export default function EncountersScreen() {
   }, [previewMode, user]);
 
   useEffect(() => {
+    setBoardLoading(true);
+    refreshBoardThreads().catch(() => {
+      setBoardThreads([]);
+      setBoardLoading(false);
+    });
+  }, [previewMode, profile?.primaryArea, user]);
+
+  useEffect(() => {
     if (previewMode || !user) return undefined;
     const subscription = AppState.addEventListener("change", (state) => {
       if (state === "active") refreshGroomPosts().catch(() => undefined);
@@ -641,6 +652,48 @@ export default function EncountersScreen() {
 
   function openGroomCamera() {
     setGroomCameraOpen(true);
+  }
+
+  async function refreshBoardThreads() {
+    const locationContext = previewMode ? null : await getCurrentLocationContext().catch(() => null);
+    const viewerContext = buildMeguriBoardHomeViewerContext({
+      coordinate: locationContext?.coordinate ?? null,
+      fallbackArea:
+        locationContext?.prefecture ||
+        profile?.primaryArea ||
+        groomLocationContext?.prefecture ||
+        "東京都",
+      prefecture: locationContext?.prefecture ?? groomLocationContext?.prefecture ?? null,
+      spotLabel: locationContext?.label ?? groomLocationContext?.label ?? null,
+      viewerId: user?.id ?? "preview-me",
+    });
+    setBoardViewerContext(viewerContext);
+    if (!user && !previewMode) {
+      setBoardThreads([]);
+      setBoardLoading(false);
+      return;
+    }
+    const nextThreads = await loadMeguriBoardThreads(viewerContext, {
+      previewMode,
+      viewMode: "nearby_3km",
+    }).catch(() => []);
+    setBoardThreads(nextThreads);
+    setBoardLoading(false);
+  }
+
+  function openBoardThread(thread: MeguriBoardThread) {
+    router.push({
+      pathname: "/meguri-board-thread",
+      params: {
+        id: thread.id,
+        prefecture: boardViewerContext.prefecture || "",
+        spotKey: boardViewerContext.spotKey || "",
+        spotLabel: boardViewerContext.spotLabel || "",
+        viewerLat: boardViewerContext.coordinate ? String(boardViewerContext.coordinate.latitude) : "",
+        viewerLng: boardViewerContext.coordinate ? String(boardViewerContext.coordinate.longitude) : "",
+        viewMode: "nearby_3km",
+      },
+    });
   }
 
   function openGroomEditor(capture: GroomCapturePayload) {
@@ -957,19 +1010,36 @@ export default function EncountersScreen() {
         <GroomRail
           loading={groomLoading}
           onAdd={openGroomCamera}
+          onOpenMap={() => router.push("/groom-map")}
           onOpen={openGroomPost}
           posts={groomPosts}
           viewedKeys={viewedGroomKeys}
         />
 
-        <BoardBanner onPress={() => router.push("/meguri-board")} />
-
-        <View style={styles.shortcutGrid}>
-          <ShortcutCard title="メッセージ" subtitle={`${lockedLetters}件の未読`} hue="lav" onPress={() => router.push("/meguri-letters")} />
-          <ShortcutCard title="マップ" subtitle="47 都道府県" hue="sky" onPress={() => router.push("/meguri-map")} />
-          <ShortcutCard title="実績" subtitle="3 / 4 達成" hue="pink" onPress={() => router.push("/meguri-achievements")} />
-        </View>
+        <MeguriBoardHomeSection
+          loading={boardLoading}
+          onOpenMap={() => router.push("/meguri-board-map")}
+          onOpenThread={openBoardThread}
+          threads={boardThreads}
+        />
       </ScrollView>
+
+      <Pressable
+        accessibilityRole="button"
+        onPress={() =>
+          router.push({
+            pathname: "/meguri-board",
+            params: { compose: "1" },
+          })
+        }
+        style={[
+          styles.threadFab,
+          { bottom: Math.max(insets.bottom, 12) + 92 },
+        ]}
+      >
+        <IconSymbol name="add" color="#fff" size={17} />
+        <Text style={styles.threadFabText}>スレッドを立てる</Text>
+      </Pressable>
 
       <View pointerEvents="box-none" style={[styles.fixedHeader, { top: headerTop }]}>
         <Pressable
@@ -1115,12 +1185,14 @@ function normalizeGroomOpenOrigin(origin: GroomOpenOrigin | null | undefined) {
 function GroomRail({
   loading,
   onAdd,
+  onOpenMap,
   onOpen,
   posts,
   viewedKeys,
 }: {
   loading: boolean;
   onAdd: () => void;
+  onOpenMap: () => void;
   onOpen: (post: GroomPost, origin?: GroomOpenOrigin | null) => void;
   posts: GroomPost[];
   viewedKeys: Set<string>;
@@ -1128,7 +1200,10 @@ function GroomRail({
   const groups = useMemo(() => groomAccountGroups(posts), [posts]);
   return (
     <View style={styles.groomRail}>
-      <Text style={styles.groomRailTitle}>グルーム</Text>
+      <View style={styles.groomRailHeader}>
+        <Text style={styles.groomRailTitle}>グルーム</Text>
+        <MapLinkButton onPress={onOpenMap} />
+      </View>
       <ScrollView
         horizontal
         contentContainerStyle={styles.groomListContent}
@@ -3629,6 +3704,93 @@ export function MiniChip({ label }: { label: string }) {
   );
 }
 
+function MapLinkButton({ onPress }: { onPress: () => void }) {
+  return (
+    <Pressable accessibilityRole="button" onPress={onPress} style={styles.mapLinkButton}>
+      <Text style={styles.mapLinkButtonText}>地図で見る</Text>
+    </Pressable>
+  );
+}
+
+function MeguriBoardHomeSection({
+  loading,
+  onOpenMap,
+  onOpenThread,
+  threads,
+}: {
+  loading: boolean;
+  onOpenMap: () => void;
+  onOpenThread: (thread: MeguriBoardThread) => void;
+  threads: MeguriBoardThread[];
+}) {
+  return (
+    <View style={styles.boardHomeSection}>
+      <View style={styles.boardHomeHeader}>
+        <Text style={styles.boardHomeTitle}>掲示板</Text>
+        <MapLinkButton onPress={onOpenMap} />
+      </View>
+      {loading ? (
+        <View style={styles.boardLoadingCard}>
+          <ActivityIndicator color={megrumColors.lavender} />
+          <Text style={styles.boardLoadingText}>3km圏内のスレッドを読み込み中…</Text>
+        </View>
+      ) : threads.length === 0 ? (
+        <View style={styles.boardEmptyCard}>
+          <Text style={styles.boardEmptyTitle}>近くのスレッドはまだありません</Text>
+          <Text style={styles.boardEmptyBody}>
+            現地の情報を知りたい時は、右下から最初のスレッドを立てられます。
+          </Text>
+        </View>
+      ) : (
+        <View style={styles.boardThreadList}>
+          {threads.slice(0, 8).map((thread) => (
+            <Pressable
+              accessibilityRole="button"
+              key={thread.id}
+              onPress={() => onOpenThread(thread)}
+              style={({ pressed }) => [
+                styles.boardThreadCard,
+                pressed ? styles.boardThreadCardPressed : null,
+              ]}
+            >
+              <View style={styles.boardThreadTopRow}>
+                <Text numberOfLines={1} style={styles.boardThreadScope}>
+                  {meguriBoardAudienceMeta(thread)}
+                </Text>
+                <Text style={styles.boardThreadReplies}>{thread.replyCount}件</Text>
+              </View>
+              <Text numberOfLines={2} style={styles.boardThreadTitle}>
+                {thread.title}
+              </Text>
+              <Text numberOfLines={2} style={styles.boardThreadBody}>
+                {thread.latestReplyPreview || thread.body}
+              </Text>
+            </Pressable>
+          ))}
+        </View>
+      )}
+    </View>
+  );
+}
+
+function buildMeguriBoardHomeViewerContext(input: {
+  coordinate?: MeguriBoardViewerContext["coordinate"];
+  fallbackArea: string | null;
+  prefecture?: string | null;
+  spotLabel?: string | null;
+  viewerId?: string | null;
+}): MeguriBoardViewerContext {
+  const prefecture = input.prefecture || input.fallbackArea || "東京都";
+  const spotLabel = input.spotLabel || `${prefecture}のめぐりスポット`;
+  return {
+    coordinate: input.coordinate ?? null,
+    prefecture,
+    spotKey: `${prefecture.replace(/\s+/g, "-")}-meguri-board`,
+    spotLabel,
+    viewerId: input.viewerId,
+  };
+}
+
 function BoardBanner({ onPress }: { onPress: () => void }) {
   return (
     <Pressable
@@ -4041,11 +4203,29 @@ const styles = StyleSheet.create({
     gap: 11,
     marginTop: 2,
   },
+  groomRailHeader: {
+    alignItems: "center",
+    flexDirection: "row",
+    justifyContent: "space-between",
+  },
   groomRailTitle: {
     color: megrumColors.ink,
     fontSize: 22,
     fontWeight: "900",
     lineHeight: 27,
+  },
+  mapLinkButton: {
+    backgroundColor: "rgba(166,149,216,0.12)",
+    borderColor: "rgba(166,149,216,0.24)",
+    borderRadius: megrumRadii.pill,
+    borderWidth: 1,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+  },
+  mapLinkButtonText: {
+    color: megrumColors.lavender,
+    fontSize: 12,
+    fontWeight: "900",
   },
 	  groomListContent: {
 	    gap: 13,
@@ -5290,6 +5470,118 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     flexWrap: "wrap",
     gap: 10,
+  },
+  boardHomeSection: {
+    gap: 12,
+  },
+  boardHomeHeader: {
+    alignItems: "center",
+    flexDirection: "row",
+    justifyContent: "space-between",
+  },
+  boardHomeTitle: {
+    color: megrumColors.ink,
+    fontSize: 22,
+    fontWeight: "900",
+    lineHeight: 27,
+  },
+  boardLoadingCard: {
+    alignItems: "center",
+    backgroundColor: megrumColors.surface,
+    borderColor: "rgba(166,149,216,0.18)",
+    borderRadius: 20,
+    borderWidth: 1,
+    flexDirection: "row",
+    gap: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 14,
+  },
+  boardLoadingText: {
+    color: megrumColors.mutedInk,
+    fontSize: 12,
+    fontWeight: "800",
+  },
+  boardEmptyCard: {
+    backgroundColor: megrumColors.surface,
+    borderColor: "rgba(166,149,216,0.18)",
+    borderRadius: 20,
+    borderWidth: 1,
+    gap: 5,
+    padding: 15,
+  },
+  boardEmptyTitle: {
+    color: megrumColors.ink,
+    fontSize: 14.5,
+    fontWeight: "900",
+  },
+  boardEmptyBody: {
+    color: megrumColors.mutedInk,
+    fontSize: 12,
+    fontWeight: "700",
+    lineHeight: 18,
+  },
+  boardThreadList: {
+    gap: 10,
+  },
+  boardThreadCard: {
+    backgroundColor: megrumColors.surface,
+    borderColor: "rgba(166,149,216,0.18)",
+    borderRadius: 20,
+    borderWidth: 1,
+    gap: 7,
+    padding: 14,
+    ...megrumShadow,
+  },
+  boardThreadCardPressed: {
+    opacity: 0.88,
+    transform: [{ scale: 0.99 }],
+  },
+  boardThreadTopRow: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 8,
+    justifyContent: "space-between",
+  },
+  boardThreadScope: {
+    color: megrumColors.lavender,
+    flex: 1,
+    fontSize: 11,
+    fontWeight: "900",
+  },
+  boardThreadReplies: {
+    color: megrumColors.mutedInk,
+    fontSize: 11,
+    fontWeight: "900",
+  },
+  boardThreadTitle: {
+    color: megrumColors.ink,
+    fontSize: 15,
+    fontWeight: "900",
+    lineHeight: 20,
+  },
+  boardThreadBody: {
+    color: megrumColors.mutedInk,
+    fontSize: 12.5,
+    fontWeight: "700",
+    lineHeight: 18,
+  },
+  threadFab: {
+    alignItems: "center",
+    backgroundColor: megrumColors.lavender,
+    borderRadius: megrumRadii.pill,
+    flexDirection: "row",
+    gap: 5,
+    paddingHorizontal: 15,
+    paddingVertical: 12,
+    position: "absolute",
+    right: 16,
+    zIndex: 24,
+    ...megrumShadow,
+  },
+  threadFabText: {
+    color: "#fff",
+    fontSize: 12.5,
+    fontWeight: "900",
   },
   boardBanner: {
     alignItems: "center",

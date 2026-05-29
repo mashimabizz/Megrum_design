@@ -4,6 +4,92 @@
 
 ---
 
+## イテレーション168.95：めぐり地図と掲示板ホームを追加
+
+### 背景・問題意識
+
+オーナーから、グルームを地図上に吹き出し付き丸アイコンとして表示し、1km圏内だけ内容を開けるようにしたいという依頼があった。あわせて、めぐりホームのメッセージ/マップ/実績導線は廃止し、掲示板一覧と掲示板マップ、スレッド作成導線を主軸にしたい。マイ在庫とWishでは、ヘッダーの囲いを外し、列数変更を現在の列数が分かるアイコンにしたい。
+
+### 変更内容
+
+#### `mobile/src/lib/groom.ts`
+- グルーム取得結果に `origin_lat/origin_lng` を含めるようにした。
+- 地図用に、位置情報付きのグルーム投稿を取得し、閲覧者からの距離を計算する `fetchGroomMapPosts` を追加した。
+
+#### `mobile/app/groom-map.tsx`
+- グルーム投稿を地図上の吹き出し付き丸アイコンとして表示する全画面マップを追加した。
+- 1km圏内の投稿だけ内容モーダルを開けるようにし、圏外タップ時は「1km圏外のグルームは見れません」を表示するようにした。
+
+#### `mobile/src/lib/meguriBoard.ts`
+- 掲示板マップ用に、3km圏内と都道府県単位のスレッドをまとめて取得し、距離で並べる `loadMeguriBoardMapThreads` を追加した。
+
+#### `mobile/app/meguri-board-map.tsx`
+- 掲示板スレッドを地図上に表示する全画面マップを追加した。
+- 3km圏内または都道府県単位で閲覧可能なスレッドだけ詳細へ遷移するようにした。
+
+#### `mobile/app/(tabs)/encounters.tsx`
+- グルーム見出し右に「地図で見る」を追加し、グルームマップへ遷移するようにした。
+- メッセージ/マップ/実績のショートカットをホームから外した。
+- 掲示板見出し、3km圏内スレッド一覧、掲示板マップ導線を追加した。
+- 右下固定の「スレッドを立てる」ボタンを追加し、掲示板作成モーダルを開けるようにした。
+
+#### `mobile/app/meguri-board.tsx`
+- `compose=1` パラメータでスレッド作成モーダルを自動表示できるようにした。
+
+#### `mobile/src/components/GoodsGrid.tsx`
+- 列数変更UIを、3/4/5の数字ボタンから、現在の列数分だけ四角が並ぶ単一アイコンボタンに変更した。
+
+#### `mobile/app/(tabs)/inventory.tsx`
+- マイ在庫ヘッダーの枠・背景を外し、フラットな行にした。
+
+#### `mobile/app/(tabs)/wishes.tsx`
+- Wishヘッダーの枠・背景を外し、フラットな行にした。
+
+### 影響範囲
+
+- iOS版 めぐりタブ
+- iOS版 グルームマップ
+- iOS版 掲示板マップ
+- iOS版 掲示板作成導線
+- iOS版 マイ在庫 / Wish のヘッダーと列数変更UI
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `git diff --check -- mobile/app/groom-map.tsx mobile/app/meguri-board-map.tsx mobile/src/lib/groom.ts mobile/src/lib/meguriBoard.ts mobile/app/'(tabs)'/encounters.tsx mobile/src/components/GoodsGrid.tsx mobile/app/'(tabs)'/inventory.tsx mobile/app/'(tabs)'/wishes.tsx mobile/app/meguri-board.tsx notes/09_state_machines.md notes/10_glossary.md`
+- `npm --prefix mobile run export:ios:preview`
+- `EXPO_NO_GIT_STATUS=1 EAS_UPDATE_PROJECT_SLUG=ihub npm --prefix mobile run update:ios:preview -- --message "[iter168.95] めぐり地図と掲示板ホーム" --non-interactive`
+- Preview channel OTA配信済み：Update group `1fdd9c59-2086-4408-a487-6e70e75ef8e6` / iOS update ID `019e7444-3bd0-778f-9bb2-2d6dcb84da0d`
+- EAS Dashboard: `https://expo.dev/accounts/mashima.bizz/projects/ihub/updates/1fdd9c59-2086-4408-a487-6e70e75ef8e6`
+
+### 関連ファイル
+
+- `mobile/app/groom-map.tsx`
+- `mobile/app/meguri-board-map.tsx`
+- `mobile/app/(tabs)/encounters.tsx`
+- `mobile/app/meguri-board.tsx`
+- `mobile/src/lib/groom.ts`
+- `mobile/src/lib/meguriBoard.ts`
+- `mobile/src/components/GoodsGrid.tsx`
+- `mobile/app/(tabs)/inventory.tsx`
+- `mobile/app/(tabs)/wishes.tsx`
+- `notes/09_state_machines.md`
+- `notes/10_glossary.md`
+
+### セルフレビュー結果
+
+- ✅ グルームマップは1km圏外もアイコン表示し、内容閲覧だけを1km圏内に制限
+- ✅ めぐりホームからメッセージ/マップ/実績ショートカットを撤去し、掲示板一覧と作成導線へ置換
+- ✅ 掲示板マップは3km圏内/都道府県単位の閲覧条件を維持
+- ✅ マイ在庫/Wishのヘッダー枠を撤去
+- ✅ 列数変更アイコンは現在の3/4/5列に応じて四角数が変わる
+- ✅ 09更新診断：グルーム/掲示板の地図閲覧ルールを追記
+- ✅ 10更新診断：グルームマップ/掲示板マップを用語として追記
+- ✅ 05更新診断：既存の `origin_lat/origin_lng` を利用するためDBスキーマ変更なし
+- ✅ Preview channel / iOS runtime `0.1.0` へOTA配信済み
+
+---
+
 ## イテレーション168.94：証跡撮影と提示物選択を整理
 
 ### 背景・問題意識

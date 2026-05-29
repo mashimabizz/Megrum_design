@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
 import SegmentedControl from "@react-native-segmented-control/segmented-control";
 import {
@@ -46,6 +46,7 @@ const VIEW_MODE_OPTIONS = ["nearby_3km", "same_prefecture"] as const satisfies r
 export default function MeguriBoardScreen() {
   const insets = useSafeAreaInsets();
   const params = useLocalSearchParams<{
+    compose?: string | string[];
     prefecture?: string | string[];
     spotKey?: string | string[];
     spotLabel?: string | string[];
@@ -159,6 +160,12 @@ export default function MeguriBoardScreen() {
       void refreshThreads();
     }, [refreshThreads]),
   );
+
+  useEffect(() => {
+    if (readParam(params.compose) === "1") {
+      setComposerOpen(true);
+    }
+  }, [params.compose]);
 
   async function handleCreateThread() {
     const title = composerTitle.trim();

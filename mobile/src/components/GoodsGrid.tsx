@@ -115,36 +115,24 @@ export function ColumnSwitcher({
   onChange: (next: ColumnCount) => void;
 }) {
   const values: ColumnCount[] = [3, 4, 5];
+  const nextValue = values[(values.indexOf(value) + 1) % values.length] ?? 3;
 
   return (
-    <View style={styles.columnSwitcher}>
-      {values.map((count) => {
-        const active = value === count;
-        return (
-          <Pressable
-            key={count}
-            accessibilityRole="button"
-            accessibilityState={{ selected: active }}
-            onPress={() => onChange(count)}
-            style={[
-              styles.columnButton,
-              active ? styles.columnButtonActive : styles.columnButtonInactive,
-            ]}
-          >
-            <Text
-              style={[
-                styles.columnButtonText,
-                active
-                  ? styles.columnButtonTextActive
-                  : styles.columnButtonTextInactive,
-              ]}
-            >
-              {count}
-            </Text>
-          </Pressable>
-        );
-      })}
-    </View>
+    <Pressable
+      accessibilityLabel={`表示列数を${nextValue}列に変更`}
+      accessibilityRole="button"
+      onPress={() => onChange(nextValue)}
+      style={({ pressed }) => [
+        styles.columnSwitcher,
+        pressed ? styles.columnSwitcherPressed : null,
+      ]}
+    >
+      <View style={styles.columnIconRow}>
+        {Array.from({ length: value }).map((_, index) => (
+          <View key={`${value}-${index}`} style={styles.columnIconCell} />
+        ))}
+      </View>
+    </Pressable>
   );
 }
 
@@ -921,44 +909,33 @@ export function FilterChips({
 
 const styles = StyleSheet.create({
   columnSwitcher: {
+    alignItems: "center",
     backgroundColor: "rgba(255,255,255,0.62)",
     borderColor: "rgba(255,255,255,0.84)",
     borderRadius: megrumRadii.pill,
     borderWidth: 1,
-    flexDirection: "row",
-    gap: 3,
-    padding: 3,
+    height: 34,
+    justifyContent: "center",
+    minWidth: 46,
+    paddingHorizontal: 9,
     shadowColor: megrumColors.ink,
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.07,
     shadowRadius: 14,
   },
-  columnButton: {
-    alignItems: "center",
-    borderRadius: megrumRadii.pill,
-    height: 28,
-    justifyContent: "center",
-    width: 28,
+  columnSwitcherPressed: {
+    opacity: 0.78,
+    transform: [{ scale: 0.96 }],
   },
-  columnButtonActive: {
-    backgroundColor: "rgba(255,255,255,0.94)",
-    shadowColor: megrumColors.ink,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.12,
-    shadowRadius: 9,
+  columnIconRow: {
+    flexDirection: "row",
+    gap: 3,
   },
-  columnButtonInactive: {
-    backgroundColor: "transparent",
-  },
-  columnButtonText: {
-    fontSize: 11,
-    fontWeight: "900",
-  },
-  columnButtonTextActive: {
-    color: megrumColors.lavender,
-  },
-  columnButtonTextInactive: {
-    color: "rgba(58,50,74,0.54)",
+  columnIconCell: {
+    backgroundColor: megrumColors.lavender,
+    borderRadius: 2.5,
+    height: 9,
+    width: 9,
   },
   sectionTabs: {
     backgroundColor: "rgba(255,255,255,0.58)",

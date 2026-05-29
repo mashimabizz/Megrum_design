@@ -29,6 +29,8 @@ export type GroomRemotePost = {
   imageUrl: string;
   liked: boolean;
   mine: boolean;
+  originLat: number | null;
+  originLng: number | null;
   placeHint: string;
   publishedAt: string;
   stickers: unknown[];
@@ -73,6 +75,8 @@ function groomPostSelect() {
     "text_overlays",
     "stickers",
     "doodles",
+    "origin_lat",
+    "origin_lng",
     "published_at",
     "expires_at",
     "users!groom_posts_user_id_fkey(id, display_name, handle, avatar_url, primary_area)",
@@ -109,6 +113,53 @@ export async function fetchGroomFeed(
   return rows
     .map((row) => normalizeRemotePost(row, currentUserId, likedIds, viewedIds, signedUrls))
     .filter((post): post is GroomRemotePost => !!post);
+}
+
+export async function fetchGroomMapPosts(
+  currentUserId: string,
+  viewerCoordinate?: MegrumCoordinate | null,
+): Promise<GroomRemotePost[]> {
+  if (!supabase || !hasSupabaseConfig) return [];
+  await supabase.rpc("expire_groom_posts").throwOnError();
+  const { data, error } = await supabase
+    .from("groom_posts")
+    .select(groomPostSelect())
+    .eq("status", "published")
+    .gt("expires_at", new Date().toISOString())
+    .order("published_at", { ascending: false })
+    .limit(160);
+
+  if (error) {
+    if (isMissingLocationColumnError(error)) {
+      return fetchGroomFeed(currentUserId, viewerCoordinate);
+    }
+    throw error;
+  }
+
+  const rows = (Array.isArray(data) ? data : []) as unknown as Record<string, unknown>[];
+  const ids = rows.map((row) => stringValue(row.id)).filter(Boolean);
+  const [likedIds, viewedIds, signedUrls] = await Promise.all([
+    fetchGroomReactionIds(currentUserId, ids),
+    fetchGroomViewIds(currentUserId, ids),
+    signGroomImageUrls(rows),
+  ]);
+
+  return rows
+    .map((row) => normalizeRemotePost(row, currentUserId, likedIds, viewedIds, signedUrls))
+    .filter((post): post is GroomRemotePost => !!post)
+    .map((post) => ({
+      ...post,
+      distanceMeters:
+        viewerCoordinate && post.originLat !== null && post.originLng !== null
+          ? haversineMeters(
+              viewerCoordinate.latitude,
+              viewerCoordinate.longitude,
+              post.originLat,
+              post.originLng,
+            )
+          : post.distanceMeters,
+    }))
+    .filter((post) => post.originLat !== null && post.originLng !== null);
 }
 
 async function fetchNearbyGroomFeed(
@@ -493,6 +544,8 @@ function normalizeRemotePost(
     imageUrl,
     liked: likedIds.has(id),
     mine: userId === currentUserId,
+    originLat: nullableNumberValue(row.origin_lat),
+    originLng: nullableNumberValue(row.origin_lng),
     placeHint: stringValue(row.place_hint) || "同じイベント圏内",
     publishedAt,
     stickers: arrayValue(row.stickers),
@@ -591,6 +644,17 @@ function numberValue(value: unknown, fallback: number) {
 
 function nullableNumberValue(value: unknown) {
   return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
+function haversineMeters(lat1: number, lng1: number, lat2: number, lng2: number) {
+  const radius = 6371000;
+  const toRad = (value: number) => (value * Math.PI) / 180;
+  const dLat = toRad(lat2 - lat1);
+  const dLng = toRad(lng2 - lng1);
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2;
+  return radius * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
 function isMissingLocationColumnError(error: unknown) {

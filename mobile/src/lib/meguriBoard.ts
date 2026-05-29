@@ -201,6 +201,31 @@ export async function loadMeguriBoardThreads(
   );
 }
 
+export async function loadMeguriBoardMapThreads(
+  viewer: MeguriBoardViewerContext,
+  options: { previewMode?: boolean } = {},
+) {
+  const [nearbyThreads, prefectureThreads] = await Promise.all([
+    loadMeguriBoardThreads(viewer, {
+      previewMode: options.previewMode,
+      viewMode: "nearby_3km",
+    }),
+    loadMeguriBoardThreads(viewer, {
+      previewMode: options.previewMode,
+      viewMode: "same_prefecture",
+    }),
+  ]);
+  return dedupeThreads([...nearbyThreads, ...prefectureThreads])
+    .map((thread) => attachViewerDistance(thread, viewer.coordinate ?? null))
+    .filter((thread) => thread.originLat !== null && thread.originLng !== null)
+    .sort((left, right) => {
+      const leftDistance = left.distanceMeters ?? Number.MAX_SAFE_INTEGER;
+      const rightDistance = right.distanceMeters ?? Number.MAX_SAFE_INTEGER;
+      if (leftDistance !== rightDistance) return leftDistance - rightDistance;
+      return right.latestActivityAt - left.latestActivityAt;
+    });
+}
+
 export async function loadMeguriBoardThreadDetail(
   threadId: string,
   viewer: MeguriBoardViewerContext,
@@ -851,6 +876,22 @@ function normalizeStoredThread(thread: MeguriBoardThread): MeguriBoardThread {
     distanceMeters: nullableNumberValue(thread.distanceMeters),
     originLat: nullableNumberValue(thread.originLat),
     originLng: nullableNumberValue(thread.originLng),
+  };
+}
+
+function attachViewerDistance(
+  thread: MeguriBoardThread,
+  coordinate: MegrumCoordinate | null,
+): MeguriBoardThread {
+  if (!coordinate || thread.originLat === null || thread.originLng === null) return thread;
+  return {
+    ...thread,
+    distanceMeters: haversineMeters(
+      coordinate.latitude,
+      coordinate.longitude,
+      thread.originLat,
+      thread.originLng,
+    ),
   };
 }
 
