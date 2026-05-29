@@ -423,6 +423,12 @@ export default function MeguriBoardThreadScreen() {
     setParticipantsOpen(false);
   }
 
+  function filterRepliesByReplyAuthor(reply: MeguriBoardReply) {
+    const participant = participants.find((candidate) => candidate.id === reply.authorId);
+    if (!participant) return;
+    filterRepliesByParticipant(participant);
+  }
+
   function filterViewerMentions() {
     const handle = actor.handle?.trim().replace(/^@/, "");
     if (!handle || viewerMentionReplies.length === 0) return;
@@ -1134,6 +1140,11 @@ export default function MeguriBoardThreadScreen() {
       disabled: reply.deleted,
       label: reply.mine ? "自分のプロフィール" : "プロフィールを見る",
       run: () => openBoardUserProfile(reply.authorId),
+    });
+    actions.push({
+      disabled: reply.deleted,
+      label: reply.mine ? "自分の返信を見る" : "この人の返信を見る",
+      run: () => filterRepliesByReplyAuthor(reply),
     });
     if (reply.mine) {
       actions.push(

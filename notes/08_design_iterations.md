@@ -4,6 +4,53 @@
 
 ---
 
+## イテレーション227：返信アクションから投稿者別に絞り込めるようにする
+
+### 背景・問題意識
+
+スレッドが伸びた時、特定の参加者の発言だけを追いたい場面がある。参加者一覧からの絞り込みは既にあるが、読んでいる返信そのものからすぐ投稿者別に絞り込めるようにした。
+
+### 変更内容
+
+#### `mobile/app/meguri-board-thread.tsx`
+- 返信アクションシートに `この人の返信を見る` / `自分の返信を見る` を追加した。
+- 選択した返信の投稿者を参加者一覧から解決し、既存の参加者別返信フィルタへつなげる `filterRepliesByReplyAuthor` を追加した。
+- 既存の検索条件チップ表示を使い、投稿者別フィルタを解除できるようにした。
+
+#### `notes/09_state_machines.md`
+- Meguri Board Lifecycle に返信アクションからの投稿者別フィルタ導線を追記した。
+
+#### `notes/10_glossary.md`
+- 掲示板返信投稿者フィルタを追加した。
+
+### 影響範囲
+
+- iOS版 スポット掲示板詳細
+- 返信アクションシート
+- 参加者別返信フィルタ
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- `EAS_UPDATE_PROJECT_SLUG=ihub EXPO_NO_GIT_STATUS=1 npm --prefix mobile run update:ios:preview -- --message "[iter227] add reply author filter action" --non-interactive`
+- Preview OTA: Update group `98147141-4d11-4e6c-aae2-48b14c06b04e` / iOS update `019e75d3-0623-7c82-8f41-69a6f877434d`
+
+### 関連ファイル
+
+- `mobile/app/meguri-board-thread.tsx`
+- `notes/08_design_iterations.md`
+- `notes/09_state_machines.md`
+- `notes/10_glossary.md`
+
+### セルフレビュー結果
+
+- ✅ 既存の参加者別フィルタを使い回し、新しい表示状態を増やさずに導線を追加した。
+- ✅ 自分の返信と他人の返信でアクション文言を自然に切り替えた。
+- ✅ ネイティブ依存追加なしで、Preview OTA対象内に収めた。
+
+---
+
 ## イテレーション226：掲示板本文と返信のURLを開けるようにする
 
 ### 背景・問題意識
