@@ -87,9 +87,7 @@ type EditorData = {
 const REQ_PREFIX = "req:";
 const TAG_LIMIT = 5;
 const TAG_SUGGESTION_LIMIT = 8;
-const INVENTORY_DESCRIPTION_LIMIT = 1000;
-const INVENTORY_EDIT_DESCRIPTION_LIMIT = 500;
-const WISH_DESCRIPTION_LIMIT = 200;
+const GROUP_TAG_SUGGESTION_LIMIT = 10;
 export default function GoodsEditorScreen() {
   const { user, previewMode } = useAuth();
   const params = useLocalSearchParams<{
@@ -131,17 +129,24 @@ export default function GoodsEditorScreen() {
   const [quantity, setQuantity] = useState(() =>
     Math.max(1, Number(one(params.quantity) ?? "1") || 1),
   );
-  const [description, setDescription] = useState(one(params.note) ?? "");
+  const [description, setDescription] = useState("");
   const [photoUrls, setPhotoUrls] = useState<string[]>([]);
   const [startCarrying, setStartCarrying] = useState(false);
   const [tags, setTags] = useState<TagValue[]>([]);
   const [tagDraft, setTagDraft] = useState("");
   const [tagSuggestions, setTagSuggestions] = useState<TagSuggestion[]>([]);
+  const [groupTagSuggestions, setGroupTagSuggestions] = useState<TagSuggestion[]>([]);
   const hydratedKey = useRef<string | null>(null);
   const filteredTagSuggestions = useMemo(() => {
     const selected = new Set(tags.map((tag) => tag.label.toLowerCase()));
     return tagSuggestions.filter((suggestion) => !selected.has(suggestion.label.toLowerCase()));
   }, [tagSuggestions, tags]);
+  const filteredGroupTagSuggestions = useMemo(() => {
+    const selected = new Set(tags.map((tag) => tag.label.toLowerCase()));
+    return groupTagSuggestions.filter(
+      (suggestion) => !selected.has(suggestion.label.toLowerCase()),
+    );
+  }, [groupTagSuggestions, tags]);
 
   const screenTitle = useMemo(() => {
     if (readonly) return isWish ? "ウィッシュ詳細" : "グッズ詳細";
@@ -208,6 +213,7 @@ export default function GoodsEditorScreen() {
     setTags(data.tags);
     setTagDraft("");
     setTagSuggestions([]);
+    setGroupTagSuggestions([]);
     setError(null);
   }, [data, initialQuantity, initialTitle, kind, mode]);
 
@@ -225,6 +231,26 @@ export default function GoodsEditorScreen() {
 
     return () => clearTimeout(timer);
   }, [previewMode, tagDraft]);
+
+  useEffect(() => {
+    if (!supabase || previewMode || !groupId) {
+      setGroupTagSuggestions([]);
+      return;
+    }
+
+    let active = true;
+    void fetchGroupTagSuggestions(groupId)
+      .then((suggestions) => {
+        if (active) setGroupTagSuggestions(suggestions);
+      })
+      .catch(() => {
+        if (active) setGroupTagSuggestions([]);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [groupId, previewMode]);
 
   function handleGroupSelect(nextGroupId: string) {
     if (itemIsReadOnly) return;
@@ -386,14 +412,6 @@ export default function GoodsEditorScreen() {
     if (isOther && !title.trim()) return "タイトルを入力してください（その他選択時は必須）";
     if (title.trim().length > 100) return "タイトルは 100 文字以内で入力してください";
     if (series.trim().length > 80) return "シリーズ・弾名は 80 文字以内で入力してください";
-    if (isWish && description.length > WISH_DESCRIPTION_LIMIT) return "メモは 200 文字以内で入力してください";
-    if (
-      !isWish &&
-      description.length >
-        (mode === "edit" ? INVENTORY_EDIT_DESCRIPTION_LIMIT : INVENTORY_DESCRIPTION_LIMIT)
-    ) {
-      return `説明は ${mode === "edit" ? INVENTORY_EDIT_DESCRIPTION_LIMIT : INVENTORY_DESCRIPTION_LIMIT} 文字以内で入力してください`;
-    }
     if (mode === "edit" && !id) return "編集対象が見つかりません";
     return null;
   }
@@ -572,11 +590,6 @@ export default function GoodsEditorScreen() {
     ? characterLabel(characterValue, data.characters, data.pendingMembers).slice(0, 1)
     : selectedGroup?.name.slice(0, 1) || one(params.glyph) || "Mg";
   const previewHue = one(params.hue) ?? "#cbbcf4";
-  const descriptionLimit = isWish
-    ? WISH_DESCRIPTION_LIMIT
-    : mode === "edit"
-      ? INVENTORY_EDIT_DESCRIPTION_LIMIT
-      : INVENTORY_DESCRIPTION_LIMIT;
 
   if (!isWish && mode === "create") {
     return (
@@ -751,28 +764,12 @@ export default function GoodsEditorScreen() {
           <TagEditor
             value={tags}
             draft={tagDraft}
+            groupSuggestions={filteredGroupTagSuggestions}
             suggestions={filteredTagSuggestions}
             readonly={itemIsReadOnly}
             onChangeDraft={setTagDraft}
             onAdd={addTag}
             onRemove={removeTag}
-          />
-        </Section>
-
-        <Section
-          label={isWish ? "メモ" : "説明 / メモ"}
-          hint={`${description.length} / ${descriptionLimit}`}
-        >
-          <TextInput
-            value={description}
-            editable={!itemIsReadOnly}
-            multiline
-            maxLength={descriptionLimit}
-            onChangeText={setDescription}
-            placeholder={isWish ? "例: 4/27 横アリで取引できる人優先" : "補足やコンディションの詳細"}
-            placeholderTextColor="rgba(58,50,74,0.35)"
-            style={styles.noteInput}
-            textAlignVertical="top"
           />
         </Section>
       </View>
@@ -874,6 +871,7 @@ function InventoryCreateFlow({
   const [tags, setTags] = useState<TagValue[]>([]);
   const [tagDraft, setTagDraft] = useState("");
   const [tagSuggestions, setTagSuggestions] = useState<TagSuggestion[]>([]);
+  const [groupTagSuggestions, setGroupTagSuggestions] = useState<TagSuggestion[]>([]);
   const [requestOpen, setRequestOpen] = useState(false);
   const [requestName, setRequestName] = useState("");
   const [requestNote, setRequestNote] = useState("");
@@ -887,6 +885,12 @@ function InventoryCreateFlow({
     const selected = new Set(tags.map((tag) => tag.label.toLowerCase()));
     return tagSuggestions.filter((suggestion) => !selected.has(suggestion.label.toLowerCase()));
   }, [tagSuggestions, tags]);
+  const filteredGroupTagSuggestions = useMemo(() => {
+    const selected = new Set(tags.map((tag) => tag.label.toLowerCase()));
+    return groupTagSuggestions.filter(
+      (suggestion) => !selected.has(suggestion.label.toLowerCase()),
+    );
+  }, [groupTagSuggestions, tags]);
 
   const selectedGroup = data.groups.find((group) => group.id === groupId);
   const selectedGoodsType = data.goodsTypes.find((goodsType) => goodsType.id === goodsTypeId);
@@ -921,6 +925,26 @@ function InventoryCreateFlow({
 
     return () => clearTimeout(timer);
   }, [previewMode, tagDraft]);
+
+  useEffect(() => {
+    if (!supabase || previewMode || !groupId) {
+      setGroupTagSuggestions([]);
+      return;
+    }
+
+    let active = true;
+    void fetchGroupTagSuggestions(groupId)
+      .then((suggestions) => {
+        if (active) setGroupTagSuggestions(suggestions);
+      })
+      .catch(() => {
+        if (active) setGroupTagSuggestions([]);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [groupId, previewMode]);
 
   function addTag(raw: string, existingId: string | null = null) {
     const label = raw.replace(/^#+/, "").trim();
@@ -1257,6 +1281,7 @@ function InventoryCreateFlow({
           <TagEditor
             value={tags}
             draft={tagDraft}
+            groupSuggestions={filteredGroupTagSuggestions}
             suggestions={filteredTagSuggestions}
             readonly={false}
             onChangeDraft={setTagDraft}
@@ -1748,6 +1773,7 @@ function QuantityStepper({
 function TagEditor({
   value,
   draft,
+  groupSuggestions,
   suggestions,
   readonly,
   onChangeDraft,
@@ -1756,6 +1782,7 @@ function TagEditor({
 }: {
   value: TagValue[];
   draft: string;
+  groupSuggestions: TagSuggestion[];
   suggestions: TagSuggestion[];
   readonly: boolean;
   onChangeDraft: (value: string) => void;
@@ -1783,6 +1810,29 @@ function TagEditor({
       </View>
       {!readonly ? (
         <>
+          {groupSuggestions.length > 0 ? (
+            <View style={styles.groupSuggestionBlock}>
+              <Text style={styles.groupSuggestionTitle}>
+                このグループでよく使われるタグ
+              </Text>
+              <View style={styles.groupSuggestionWrap}>
+                {groupSuggestions.map((suggestion) => (
+                  <Pressable
+                    key={suggestion.id}
+                    onPress={() => onAdd(suggestion.label, suggestion.id)}
+                    style={styles.groupSuggestionChip}
+                  >
+                    <Text numberOfLines={1} style={styles.groupSuggestionText}>
+                      #{suggestion.label}
+                    </Text>
+                    <Text style={styles.groupSuggestionCountText}>
+                      {suggestion.userCount.toLocaleString("ja-JP")}件
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
+            </View>
+          ) : null}
           <View style={styles.tagInputRow}>
             <TextInput
               value={draft}
@@ -2035,7 +2085,7 @@ function fallbackEditorData(
             goodsTypeId: goodsType[0]?.id ?? "",
             title,
             series: "",
-            description: one((params as { note?: string | string[] }).note) ?? "",
+            description: "",
             condition: "good",
             quantity: Math.max(1, Number(one((params as { quantity?: string | string[] }).quantity) ?? "1") || 1),
             photoUrls: [],
@@ -2150,6 +2200,46 @@ async function searchTags(q: string): Promise<TagSuggestion[]> {
     }))
     .sort((a, b) => b.userCount - a.userCount || a.label.localeCompare(b.label, "ja"))
     .slice(0, TAG_SUGGESTION_LIMIT);
+}
+
+async function fetchGroupTagSuggestions(groupId: string): Promise<TagSuggestion[]> {
+  if (!supabase || !groupId) return [];
+  const { data: inventoryRows, error: inventoryError } = await supabase
+    .from("goods_inventory")
+    .select("id")
+    .eq("group_id", groupId)
+    .in("status", ["active", "reserved", "keep"])
+    .limit(500);
+  if (inventoryError) return [];
+  const inventoryIds = ((inventoryRows as { id: string }[] | null) ?? [])
+    .map((row) => row.id)
+    .filter(Boolean);
+  if (inventoryIds.length === 0) return [];
+
+  const { data: tagRows, error: tagError } = await supabase
+    .from("goods_inventory_tags")
+    .select("tag:tags_master(id, label)")
+    .in("inventory_id", inventoryIds)
+    .limit(1000);
+  if (tagError) return [];
+
+  const counts = new Map<string, TagSuggestion>();
+  for (const row of (tagRows as { tag: unknown }[] | null) ?? []) {
+    const tag = pickOne(row.tag) as { id?: unknown; label?: unknown } | null;
+    const id = typeof tag?.id === "string" ? tag.id : null;
+    const label = typeof tag?.label === "string" ? tag.label.trim() : "";
+    if (!id || !label) continue;
+    const current = counts.get(id);
+    counts.set(id, {
+      id,
+      label,
+      userCount: (current?.userCount ?? 0) + 1,
+    });
+  }
+
+  return Array.from(counts.values())
+    .sort((a, b) => b.userCount - a.userCount || a.label.localeCompare(b.label, "ja"))
+    .slice(0, GROUP_TAG_SUGGESTION_LIMIT);
 }
 
 async function syncTags(inventoryId: string, currentTags: TagValue[], existingTags: TagValue[]) {
@@ -2997,6 +3087,42 @@ const styles = StyleSheet.create({
   tagAddText: {
     color: megrumColors.surface,
     fontSize: 12,
+    fontWeight: "900",
+  },
+  groupSuggestionBlock: {
+    gap: 8,
+  },
+  groupSuggestionTitle: {
+    color: megrumColors.mutedInk,
+    fontSize: 11,
+    fontWeight: "900",
+  },
+  groupSuggestionWrap: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  groupSuggestionChip: {
+    alignItems: "center",
+    backgroundColor: megrumColors.surface,
+    borderColor: "rgba(166,149,216,0.22)",
+    borderRadius: megrumRadii.pill,
+    borderWidth: 1,
+    flexDirection: "row",
+    gap: 6,
+    minHeight: 38,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  groupSuggestionText: {
+    color: megrumColors.ink,
+    fontSize: 12,
+    fontWeight: "900",
+    maxWidth: 132,
+  },
+  groupSuggestionCountText: {
+    color: megrumColors.mutedInk,
+    fontSize: 10,
     fontWeight: "900",
   },
   suggestionWrap: {

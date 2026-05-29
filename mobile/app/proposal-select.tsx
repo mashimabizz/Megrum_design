@@ -137,6 +137,22 @@ type RevisionProposalRow = {
   exchange_method: string | null;
 };
 
+type LocalModeSettingsRow = {
+  enabled: boolean | null;
+  aw_id: string | null;
+  last_lat: number | string | null;
+  last_lng: number | string | null;
+};
+
+type ActivityWindowLocationRow = {
+  id: string;
+  venue: string | null;
+  center_lat: number | string | null;
+  center_lng: number | string | null;
+  start_at: string | null;
+  end_at: string | null;
+};
+
 const DAYS = buildMeetupDays(0);
 const HOURS = Array.from({ length: 24 }, (_, hour) => hour);
 const SLOT_MINUTES = 15;
@@ -274,6 +290,7 @@ export default function ProposalSelectScreen() {
     tracking: boolean;
     swiping: boolean;
   } | null>(null);
+  const autoMeetupAttemptedRef = useRef(false);
   const needsMeetup = supportsHandExchange(exchangeMethod);
   const meetupReady =
     meetupCandidates.length > 0 &&
@@ -366,6 +383,28 @@ export default function ProposalSelectScreen() {
     setPlaceSheetId(null);
     setExchangeMethod(revisionContext.exchangeMethod);
   }, [revisionContext]);
+
+  useEffect(() => {
+    if (isRevisionMode || !needsMeetup || meetupCandidates.length > 0) return;
+    if (autoMeetupAttemptedRef.current || !supabase) return;
+    autoMeetupAttemptedRef.current = true;
+
+    let active = true;
+    void buildLocalModeAutoMeetupCandidate()
+      .then((candidate) => {
+        if (!active || !candidate) return;
+        setMeetupCandidates([candidate]);
+        setActiveMeetupId(candidate.id);
+        setPlaceSheetId(null);
+      })
+      .catch(() => {
+        // 自動候補は補助機能なので、失敗しても手動入力へフォールバックする。
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [isRevisionMode, meetupCandidates.length, needsMeetup]);
 
   useEffect(() => {
     if (!needsMeetup && tab === "meetup") {
@@ -2087,6 +2126,132 @@ function exchangeMethodFromIndex(index: number): ExchangeMethod {
   if (index === 1) return "mail";
   if (index === 2) return "both";
   return "hand";
+}
+
+async function buildLocalModeAutoMeetupCandidate(): Promise<MeetupCandidate | null> {
+  if (!supabase) return null;
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return null;
+
+  const { data: settingsData, error: settingsError } = await supabase
+    .from("user_local_mode_settings")
+    .select("enabled, aw_id, last_lat, last_lng")
+    .eq("user_id", user.id)
+    .maybeSingle();
+  if (settingsError) return null;
+
+  const settings = settingsData as LocalModeSettingsRow | null;
+  if (!settings?.enabled) return null;
+
+  const activityWindow = await fetchLocalModeActivityWindow(
+    user.id,
+    settings.aw_id,
+  );
+  const locationDraft = await getCurrentLocationDraft();
+  const coordinate =
+    locationDraft?.coordinate ??
+    coordinateFromValues(settings.last_lat, settings.last_lng) ??
+    coordinateFromValues(
+      activityWindow?.center_lat ?? null,
+      activityWindow?.center_lng ?? null,
+    ) ??
+    FALLBACK_COORDINATE;
+  const range = buildCurrentMeetupRange(new Date());
+  return {
+    id: `candidate-auto-${Date.now()}`,
+    ...range,
+    place:
+      locationDraft?.label ??
+      cleanAddressPart(activityWindow?.venue) ??
+      "現在地周辺",
+    coordinate,
+  };
+}
+
+async function fetchLocalModeActivityWindow(
+  userId: string,
+  awId?: string | null,
+): Promise<ActivityWindowLocationRow | null> {
+  if (!supabase) return null;
+  let query = supabase
+    .from("activity_windows")
+    .select("id, venue, center_lat, center_lng, start_at, end_at")
+    .eq("user_id", userId)
+    .eq("status", "enabled")
+    .limit(1);
+  query = awId
+    ? query.eq("id", awId)
+    : query.order("start_at", { ascending: true });
+
+  const { data, error } = await query;
+  if (error) return null;
+  return ((data as ActivityWindowLocationRow[] | null) ?? [])[0] ?? null;
+}
+
+async function getCurrentLocationDraft(): Promise<{
+  coordinate: MapCoordinate;
+  label: string | null;
+} | null> {
+  try {
+    const ExpoLocation = await import("expo-location");
+    const permission = await ExpoLocation.requestForegroundPermissionsAsync();
+    if (permission.status !== "granted") return null;
+    const current = await ExpoLocation.getCurrentPositionAsync({
+      accuracy: ExpoLocation.Accuracy.Balanced,
+    });
+    const coordinate = {
+      latitude: current.coords.latitude,
+      longitude: current.coords.longitude,
+    };
+    let label: string | null = null;
+    try {
+      const addresses = await ExpoLocation.reverseGeocodeAsync(coordinate);
+      label = labelFromGeocodedAddress(addresses[0]);
+    } catch {
+      label = null;
+    }
+    return {
+      coordinate,
+      label: label ?? "現在地周辺",
+    };
+  } catch {
+    return null;
+  }
+}
+
+function coordinateFromValues(
+  latitude: number | string | null,
+  longitude: number | string | null,
+): MapCoordinate | null {
+  const lat = Number(latitude);
+  const lng = Number(longitude);
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+  return { latitude: lat, longitude: lng };
+}
+
+function buildCurrentMeetupRange(now: Date) {
+  const dateId = dateKey(now);
+  const dayIndex = Math.max(
+    0,
+    DAYS.findIndex((day) => day.id === dateId),
+  );
+  const minutes = now.getHours() * 60 + now.getMinutes();
+  const startSlot = Math.max(
+    0,
+    Math.min(SLOT_COUNT - 1, Math.floor(minutes / SLOT_MINUTES)),
+  );
+  const durationSlots = Math.max(1, Math.round(30 / SLOT_MINUTES));
+  return {
+    dateId: DAYS[dayIndex]?.id ?? dateId,
+    dayIndex,
+    startSlot,
+    endSlot: Math.max(
+      startSlot + 1,
+      Math.min(SLOT_COUNT, startSlot + durationSlots),
+    ),
+  };
 }
 
 function safeStringArray(value: unknown): string[] {
