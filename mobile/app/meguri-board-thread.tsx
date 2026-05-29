@@ -16,6 +16,8 @@ import {
   StyleSheet,
   Text,
   TextInput,
+  type StyleProp,
+  type TextStyle,
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -168,9 +170,10 @@ export default function MeguriBoardThreadScreen() {
     return new Map(replies.map((reply, index) => [reply.id, index + 1]));
   }, [replies]);
 
+  const replySearchQuery = useMemo(() => normalizeReplySearch(replySearchText), [replySearchText]);
+
   const filteredReplies = useMemo(() => {
-    const query = normalizeReplySearch(replySearchText);
-    if (!query) return replies;
+    if (!replySearchQuery) return replies;
     return replies.filter((reply) =>
       normalizeReplySearch(
         [
@@ -183,15 +186,15 @@ export default function MeguriBoardThreadScreen() {
         ]
           .filter(Boolean)
           .join(" "),
-      ).includes(query),
+      ).includes(replySearchQuery),
     );
-  }, [replies, replyNumberById, replySearchText]);
+  }, [replies, replyNumberById, replySearchQuery]);
 
   const unreadSeparatorReplyId = useMemo(() => {
-    if (replySearchText.trim() || replies.length === 0) return null;
+    if (replySearchQuery || replies.length === 0) return null;
     const firstUnreadReply = replies.find((reply) => !previousReadAt || reply.createdAt > previousReadAt);
     return firstUnreadReply?.id ?? null;
-  }, [previousReadAt, replies, replySearchText]);
+  }, [previousReadAt, replies, replySearchQuery]);
 
   const participants = useMemo<BoardParticipant[]>(() => {
     if (!thread) return [];
@@ -1025,7 +1028,7 @@ export default function MeguriBoardThreadScreen() {
                 <Text style={styles.replySectionTitle}>返信</Text>
                 <View style={styles.replyHeaderActions}>
                   <Text style={styles.replyCountMeta}>
-                    {replySearchText.trim() ? `${filteredReplies.length}/${replies.length}件` : `${replies.length}件`}
+                    {replySearchQuery ? `${filteredReplies.length}/${replies.length}件` : `${replies.length}件`}
                   </Text>
                   {replies.length > 0 ? (
                     <Pressable
@@ -1068,6 +1071,9 @@ export default function MeguriBoardThreadScreen() {
               ) : (
                 filteredReplies.map((reply, index) => {
                   const replyNumber = replyNumberById.get(reply.id) ?? index + 1;
+                  const replyNumberLabel = `#${replyNumber}`;
+                  const replyNumberMatchesQuery =
+                    !!replySearchQuery && normalizeReplySearch(replyNumberLabel).includes(replySearchQuery);
                   const replyByThreadAuthor = reply.authorId === thread.authorId;
                   return (
                     <View
@@ -1093,9 +1099,16 @@ export default function MeguriBoardThreadScreen() {
                         <View style={reply.mine ? styles.replyContentMine : styles.replyContent}>
                           <View style={reply.mine ? styles.replyMetaRowMine : styles.replyMetaRow}>
                             {!reply.mine ? (
-                              <Text numberOfLines={1} style={styles.replyAuthor}>{reply.authorName}</Text>
+                              <HighlightedText
+                                numberOfLines={1}
+                                query={replySearchQuery}
+                                style={styles.replyAuthor}
+                                text={reply.authorName}
+                              />
                             ) : null}
-                            <Text style={styles.replyNumber}>#{replyNumber}</Text>
+                            <Text style={[styles.replyNumber, replyNumberMatchesQuery ? styles.replyNumberActive : null]}>
+                              {replyNumberLabel}
+                            </Text>
                             {replyByThreadAuthor ? (
                               <View style={styles.replyAuthorBadge}>
                                 <Text style={styles.replyAuthorBadgeText}>作成者</Text>
@@ -1116,29 +1129,31 @@ export default function MeguriBoardThreadScreen() {
                                 onPress={() => scrollToReply(reply.parentReplyId)}
                                 style={[styles.quotePreview, reply.mine ? styles.quotePreviewMine : null]}
                               >
-                                <Text
+                                <HighlightedText
                                   numberOfLines={1}
+                                  query={replySearchQuery}
                                   style={[styles.quoteAuthor, reply.mine ? styles.quoteAuthorMine : null]}
-                                >
-                                  {reply.quotedAuthorName || "引用"}
-                                </Text>
-                                <Text
+                                  text={reply.quotedAuthorName || "引用"}
+                                />
+                                <HighlightedText
+                                  highlightStyle={reply.mine ? styles.searchHighlightMine : null}
                                   numberOfLines={2}
+                                  query={replySearchQuery}
                                   style={[styles.quoteBody, reply.mine ? styles.quoteBodyMine : null]}
-                                >
-                                  {reply.quotedBody}
-                                </Text>
+                                  text={reply.quotedBody}
+                                />
                               </Pressable>
                             ) : null}
-                            <Text
+                            <HighlightedText
+                              highlightStyle={reply.mine ? styles.searchHighlightMine : null}
+                              query={replySearchQuery}
                               style={[
                                 styles.replyBody,
                                 reply.mine ? styles.replyBodyMine : null,
                                 reply.deleted ? styles.replyBodyDeleted : null,
                               ]}
-                            >
-                              {reply.body}
-                            </Text>
+                              text={reply.body}
+                            />
                             {!reply.deleted ? (
                               <AttachmentGrid
                                 compact
@@ -1585,6 +1600,41 @@ function PickedImageRail({
   );
 }
 
+function HighlightedText({
+  highlightStyle,
+  numberOfLines,
+  query,
+  style,
+  text,
+}: {
+  highlightStyle?: StyleProp<TextStyle>;
+  numberOfLines?: number;
+  query: string;
+  style: StyleProp<TextStyle>;
+  text: string;
+}) {
+  const segments = splitHighlightSegments(text, query);
+  if (!query || segments.length === 1 && !segments[0]?.match) {
+    return (
+      <Text numberOfLines={numberOfLines} style={style}>
+        {text}
+      </Text>
+    );
+  }
+  return (
+    <Text numberOfLines={numberOfLines} style={style}>
+      {segments.map((segment, index) => (
+        <Text
+          key={`${segment.text}-${index}`}
+          style={segment.match ? [styles.searchHighlight, highlightStyle] : null}
+        >
+          {segment.text}
+        </Text>
+      ))}
+    </Text>
+  );
+}
+
 function categoryStyle(category: Exclude<MeguriBoardThreadCategory, "all">) {
   switch (category) {
     case "question":
@@ -1690,6 +1740,28 @@ function formatRelativeTime(value: number) {
 
 function normalizeReplySearch(value: string | null | undefined) {
   return (value ?? "").replace(/\s+/g, " ").trim().toLowerCase();
+}
+
+function splitHighlightSegments(value: string, query: string) {
+  const normalizedQuery = normalizeReplySearch(query);
+  if (!normalizedQuery) return [{ match: false, text: value }];
+  const lowerValue = value.toLowerCase();
+  const segments: Array<{ match: boolean; text: string }> = [];
+  let cursor = 0;
+  while (cursor < value.length) {
+    const nextIndex = lowerValue.indexOf(normalizedQuery, cursor);
+    if (nextIndex < 0) {
+      segments.push({ match: false, text: value.slice(cursor) });
+      break;
+    }
+    if (nextIndex > cursor) {
+      segments.push({ match: false, text: value.slice(cursor, nextIndex) });
+    }
+    const endIndex = nextIndex + normalizedQuery.length;
+    segments.push({ match: true, text: value.slice(nextIndex, endIndex) });
+    cursor = endIndex;
+  }
+  return segments.filter((segment) => segment.text.length > 0);
 }
 
 function colorForAuthor(authorId: string) {
@@ -2128,6 +2200,9 @@ const styles = StyleSheet.create({
     fontSize: 10.5,
     fontWeight: "900",
   },
+  replyNumberActive: {
+    color: megrumColors.lavender,
+  },
   replyAuthorBadge: {
     backgroundColor: "rgba(166,149,216,0.14)",
     borderRadius: 999,
@@ -2232,6 +2307,14 @@ const styles = StyleSheet.create({
   },
   replyActionTextActive: {
     color: megrumColors.lavender,
+  },
+  searchHighlight: {
+    backgroundColor: "rgba(239,217,155,0.55)",
+    borderRadius: 5,
+    overflow: "hidden",
+  },
+  searchHighlightMine: {
+    backgroundColor: "rgba(255,255,255,0.24)",
   },
   composer: {
     backgroundColor: "rgba(251,249,252,0.98)",

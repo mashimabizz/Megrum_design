@@ -4,6 +4,52 @@
 
 ---
 
+## イテレーション197：掲示板検索語ハイライトを追加
+
+### 背景・問題意識
+
+スレッド内検索で返信を絞り込めても、本文や引用内のどの語に反応したのかが分かりにくい。一般的なスレッド検索の体験として、検索語に一致した箇所をハイライト表示するようにした。
+
+### 変更内容
+
+#### `mobile/app/meguri-board-thread.tsx`
+- スレッド内検索語を正規化した `replySearchQuery` として共有し、検索結果表示・未読区切り判定・ハイライトで使い回すようにした。
+- 返信本文、引用本文、引用者名、返信者名に検索語ハイライトを表示する `HighlightedText` を追加した。
+- 返信番号が検索語に一致した場合、返信番号の色を強調するようにした。
+
+#### `notes/09_state_machines.md`
+- Meguri Board Lifecycle に検索語ハイライトの表示ルールを追記した。
+
+#### `notes/10_glossary.md`
+- 掲示板検索語ハイライトを追加した。
+
+### 影響範囲
+
+- iOS版 スポット掲示板詳細
+- スレッド内検索
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- `EAS_UPDATE_PROJECT_SLUG=ihub EXPO_NO_GIT_STATUS=1 npm --prefix mobile run update:ios:preview -- --message "[iter197] highlight board search terms" --non-interactive`
+- Preview OTA: Update group `81140fba-f2d9-487a-8fd9-cddc36a89cef` / iOS update `019e7558-19f9-7b89-8cf7-8ef61494002a`
+
+### 関連ファイル
+
+- `mobile/app/meguri-board-thread.tsx`
+- `notes/08_design_iterations.md`
+- `notes/09_state_machines.md`
+- `notes/10_glossary.md`
+
+### セルフレビュー結果
+
+- ✅ 検索条件の表示補助だけを追加し、返信・スレッド状態は変更していない。
+- ✅ 自分の返信バブル上でも読めるよう、濃色バブル用のハイライト色を分けた。
+- ✅ 検索語がない時は通常の `Text` 表示へ戻し、不要な分割描画を避けた。
+
+---
+
 ## イテレーション196：掲示板返信番号検索を追加
 
 ### 背景・問題意識
