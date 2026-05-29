@@ -4,6 +4,53 @@
 
 ---
 
+## イテレーション168.91：取引チャットの交換手段表示を圧縮
+
+### 背景・問題意識
+
+オーナーから、郵送を選択した取引チャットで「郵送交換」「現地・郵送どちらもOK」と住所情報がヘッダー直下に大きく表示され、チャット上部の領域を取りすぎているという指摘があった。交換内容と同じ粒度で、初期表示はサマリーだけにし、詳細を押した時だけ住所情報を確認できるようにしたい。
+
+### 変更内容
+
+#### `mobile/app/transaction-detail.tsx`
+- 取引チャットのピン留め領域に常時表示していた郵送住所ブロックを廃止した。
+- 交換内容カードと同じ形で、`交換手段` の1行サマリーカードを追加した。
+- サマリー文言を `郵送のみ` / `郵送・現地交換どちらもOK` / `現地交換のみ` に整理した。
+- `詳細` を押した時だけ交換手段の説明と住所情報をモーダル表示するようにした。
+- 郵送対応の取引では、合意前は自分の住所と住所設定導線、合意後は自分と相手の住所を詳細内に表示するようにした。
+- 現地交換のみの取引では、詳細内に待ち合わせ候補は交換内容詳細で確認できる旨を表示するようにした。
+
+### 影響範囲
+
+- iOS版 `/transaction-detail`
+- 取引チャット上部のピン留め領域
+- 郵送交換 / 現地・郵送どちらも対応可 / 現地交換のみの表示
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `git diff --check -- mobile/app/transaction-detail.tsx`
+- `npm --prefix mobile run export:ios:preview`
+- `EXPO_NO_GIT_STATUS=1 EAS_UPDATE_PROJECT_SLUG=ihub npm --prefix mobile run update:ios:preview -- --message "[iter168.91] 取引チャット交換手段サマリー" --non-interactive`
+- Preview channel OTA配信済み：Update group `1007782d-67c7-4e51-86f7-b4a0b9fd0281` / iOS update ID `019e741a-928c-72b2-baf8-cb290126a91e`
+- EAS Dashboard: `https://expo.dev/accounts/mashima.bizz/projects/ihub/updates/1007782d-67c7-4e51-86f7-b4a0b9fd0281`
+
+### 関連ファイル
+
+- `mobile/app/transaction-detail.tsx`
+
+### セルフレビュー結果
+
+- ✅ 住所情報の常時表示をやめ、初期表示を1行サマリーへ圧縮
+- ✅ `詳細` から合意前/合意後の住所表示を確認できる
+- ✅ 交換内容カードと同じ操作粒度に統一
+- ✅ Preview channel / iOS runtime `0.1.0` へOTA配信済み
+- ✅ 09更新診断：状態遷移の追加・削除はないため更新不要
+- ✅ 10更新診断：既存の「交換手段」「郵送交換」「住所」の範囲内のため更新不要
+- ✅ 05更新診断：DBスキーマ変更なし
+
+---
+
 ## イテレーション168.90：検索結果を実績とマッチ分類へ整理
 
 ### 背景・問題意識

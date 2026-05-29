@@ -25,7 +25,6 @@ import {
   approveTradeCancel,
 } from "../src/lib/transactionActions";
 import {
-  exchangeMethodLabel,
   fetchMailingAddressSnapshot,
   formatMailingAddressLines,
   normalizeExchangeMethod,
@@ -637,9 +636,7 @@ export default function TransactionDetailScreen() {
             {detail.openDispute ? (
               <OpenDisputeBanner dispute={detail.openDispute} />
             ) : null}
-            {supportsMailExchange(detail.exchangeMethod) ? (
-              <MailingAddressBanner detail={detail} />
-            ) : null}
+            <ExchangeMethodSummaryCard detail={detail} />
             <DealSummaryCard detail={detail} />
             {detail.status === "sent" ||
             detail.status === "negotiating" ||
@@ -1570,7 +1567,100 @@ async function updateProposalAction(
   return fetchTransactionDetail(detail.id, userId);
 }
 
-function MailingAddressBanner({ detail }: { detail: TransactionDetail }) {
+function ExchangeMethodSummaryCard({ detail }: { detail: TransactionDetail }) {
+  const [detailOpen, setDetailOpen] = useState(false);
+  return (
+    <>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="交換手段の詳細を表示"
+        onPress={() => setDetailOpen(true)}
+        style={({ pressed }) => [
+          styles.dealCollapsedCard,
+          pressed ? styles.dealCollapsedCardPressed : null,
+        ]}
+      >
+        <Text style={styles.dealCollapsedLabel}>交換手段</Text>
+        <Text numberOfLines={1} style={styles.dealCollapsedSummary}>
+          {exchangeMethodSummary(detail.exchangeMethod)}
+        </Text>
+        <Text style={styles.dealCollapsedAction}>詳細</Text>
+      </Pressable>
+      <ExchangeMethodDetailModal
+        detail={detail}
+        visible={detailOpen}
+        onClose={() => setDetailOpen(false)}
+      />
+    </>
+  );
+}
+
+function ExchangeMethodDetailModal({
+  detail,
+  visible,
+  onClose,
+}: {
+  detail: TransactionDetail;
+  visible: boolean;
+  onClose: () => void;
+}) {
+  return (
+    <Modal animationType="fade" transparent visible={visible} onRequestClose={onClose}>
+      <Pressable style={styles.dealModalBackdrop} onPress={onClose}>
+        <Pressable style={styles.dealModalCard}>
+          <View style={styles.dealModalHeader}>
+            <View>
+              <Text style={styles.dealModalTitle}>交換手段</Text>
+              <Text style={styles.dealModalSub}>
+                交換手段：{exchangeMethodSummary(detail.exchangeMethod)}
+              </Text>
+            </View>
+            <Pressable accessibilityRole="button" onPress={onClose} style={styles.dealModalClose}>
+              <Text style={styles.dealModalCloseText}>×</Text>
+            </Pressable>
+          </View>
+
+          <ScrollView
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={styles.dealModalContent}
+          >
+            <View style={styles.dealModalSection}>
+              <Text style={styles.dealModalSectionTitle}>交換手段</Text>
+              <Text style={styles.exchangeMethodModalBody}>
+                {exchangeMethodDescription(detail.exchangeMethod)}
+              </Text>
+            </View>
+
+            {supportsMailExchange(detail.exchangeMethod) ? (
+              <MailingAddressDetailPanel
+                detail={detail}
+                onOpenSettings={() => {
+                  onClose();
+                  router.push("/address-settings");
+                }}
+              />
+            ) : (
+              <View style={styles.dealModalSection}>
+                <Text style={styles.dealModalSectionTitle}>待ち合わせ</Text>
+                <Text style={styles.exchangeMethodModalBody}>
+                  待ち合わせ候補は「交換内容」の詳細から確認できます。
+                </Text>
+              </View>
+            )}
+          </ScrollView>
+        </Pressable>
+      </Pressable>
+    </Modal>
+  );
+}
+
+function MailingAddressDetailPanel({
+  detail,
+  onOpenSettings,
+}: {
+  detail: TransactionDetail;
+  onOpenSettings: () => void;
+}) {
   const finalised = detail.status === "agreed" || detail.status === "completed";
   const partnerLabel = detail.partner.handle
     ? `@${detail.partner.handle} の住所`
@@ -1585,9 +1675,7 @@ function MailingAddressBanner({ detail }: { detail: TransactionDetail }) {
   return (
     <View style={styles.mailBanner}>
       <View style={styles.mailBannerHeader}>
-        <Text style={styles.mailBannerTitle}>
-          {exchangeMethodLabel(detail.exchangeMethod)}
-        </Text>
+        <Text style={styles.mailBannerTitle}>住所</Text>
         <StatusPill
           label={finalised ? "住所表示中" : "合意後に表示"}
           tone={finalised ? "lavender" : "sky"}
@@ -1611,7 +1699,7 @@ function MailingAddressBanner({ detail }: { detail: TransactionDetail }) {
           {!detail.mailingAddresses.mine ? (
             <Pressable
               accessibilityRole="button"
-              onPress={() => router.push("/address-settings")}
+              onPress={onOpenSettings}
               style={styles.mailBannerLinkButton}
             >
               <Text style={styles.mailBannerLinkText}>住所設定を開く</Text>
@@ -2977,6 +3065,22 @@ function headerAgreementLabel(detail: TransactionDetail) {
   return statusLabel(detail);
 }
 
+function exchangeMethodSummary(method: ExchangeMethod) {
+  if (method === "mail") return "郵送のみ";
+  if (method === "both") return "郵送・現地交換どちらもOK";
+  return "現地交換のみ";
+}
+
+function exchangeMethodDescription(method: ExchangeMethod) {
+  if (method === "mail") {
+    return "この取引は郵送のみで進めます。住所は当事者だけに表示されます。";
+  }
+  if (method === "both") {
+    return "この取引は郵送でも現地交換でも進められます。郵送で進める場合は、成立後に当事者同士の住所を表示します。";
+  }
+  return "この取引は現地交換のみで進めます。";
+}
+
 function tradeSummaryLine(detail: TransactionDetail) {
   const receiveSummary =
     detail.cashOffer && detail.receive.length === 0
@@ -3262,6 +3366,12 @@ const styles = StyleSheet.create({
     fontSize: 11.5,
     fontWeight: "700",
     lineHeight: 16,
+  },
+  exchangeMethodModalBody: {
+    color: megrumColors.ink,
+    fontSize: 12,
+    fontWeight: "700",
+    lineHeight: 18,
   },
   dealCollapsedCard: {
     alignItems: "center",
