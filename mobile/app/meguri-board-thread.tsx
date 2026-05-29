@@ -165,6 +165,7 @@ export default function MeguriBoardThreadScreen() {
   const [replySortMode, setReplySortMode] = useState<BoardReplySortMode>("oldest");
   const [searchCursorIndex, setSearchCursorIndex] = useState(0);
   const [highlightedReplyId, setHighlightedReplyId] = useState<string | null>(null);
+  const [replyReturnTargetId, setReplyReturnTargetId] = useState<string | null>(null);
   const scrollViewRef = useRef<ScrollView | null>(null);
   const composerInputRef = useRef<TextInput | null>(null);
   const replyOffsetsRef = useRef<Record<string, number>>({});
@@ -274,6 +275,11 @@ export default function MeguriBoardThreadScreen() {
     const index = Math.min(Math.max(searchCursorIndex, 0), sortedReplies.length - 1);
     return sortedReplies[index] ?? sortedReplies[0] ?? null;
   }, [replySearchQuery, searchCursorIndex, sortedReplies]);
+
+  const replyReturnTarget = useMemo(() => {
+    if (!replyReturnTargetId) return null;
+    return replies.find((reply) => reply.id === replyReturnTargetId) ?? null;
+  }, [replies, replyReturnTargetId]);
 
   const unreadSeparatorReplyId = useMemo(() => {
     if (replySearchQuery || replies.length === 0) return null;
@@ -602,6 +608,19 @@ export default function MeguriBoardThreadScreen() {
       return;
     }
     runScroll();
+  }
+
+  function jumpToQuotedReply(parentReplyId: string | null, fromReplyId: string) {
+    if (!parentReplyId) return;
+    setReplyReturnTargetId(fromReplyId);
+    scrollToReply(parentReplyId);
+  }
+
+  function returnToQuotedFromReply() {
+    if (!replyReturnTargetId) return;
+    const targetId = replyReturnTargetId;
+    setReplyReturnTargetId(null);
+    revealReplyInThreadContext(targetId);
   }
 
   function revealReplyInThreadContext(replyId: string | null) {
@@ -1499,6 +1518,18 @@ export default function MeguriBoardThreadScreen() {
                   <Text style={styles.replyCountMeta}>
                     {replySearchQuery ? `${sortedReplies.length}/${replies.length}件` : `${replies.length}件`}
                   </Text>
+                  {replyReturnTarget ? (
+                    <Pressable
+                      accessibilityRole="button"
+                      hitSlop={8}
+                      onPress={returnToQuotedFromReply}
+                      style={styles.replyReturnButton}
+                    >
+                      <Text style={styles.replyReturnButtonText}>
+                        戻る #{replyNumberById.get(replyReturnTarget.id) ?? "?"}
+                      </Text>
+                    </Pressable>
+                  ) : null}
                   {replies.length > 0 ? (
                     <Pressable
                       accessibilityRole="button"
@@ -1744,7 +1775,7 @@ export default function MeguriBoardThreadScreen() {
                               <Pressable
                                 accessibilityRole="button"
                                 disabled={!reply.parentReplyId}
-                                onPress={() => scrollToReply(reply.parentReplyId)}
+                                onPress={() => jumpToQuotedReply(reply.parentReplyId, reply.id)}
                                 style={[styles.quotePreview, reply.mine ? styles.quotePreviewMine : null]}
                               >
                                 <HighlightedText
@@ -2997,6 +3028,19 @@ const styles = StyleSheet.create({
   },
   latestReplyButtonText: {
     color: megrumColors.lavender,
+    fontSize: 11,
+    fontWeight: "900",
+  },
+  replyReturnButton: {
+    alignItems: "center",
+    backgroundColor: "rgba(243,197,212,0.28)",
+    borderRadius: 999,
+    minHeight: 26,
+    paddingHorizontal: 9,
+    justifyContent: "center",
+  },
+  replyReturnButtonText: {
+    color: "#ba6d8d",
     fontSize: 11,
     fontWeight: "900",
   },

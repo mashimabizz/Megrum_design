@@ -4,6 +4,55 @@
 
 ---
 
+## イテレーション233：引用元から読んでいた返信へ戻れるようにする
+
+### 背景・問題意識
+
+引用返信を読む時、引用元へ移動できるだけだと、元の返信へ戻るために番号を覚えたりスクロールし直したりする必要がある。長いスレッドほど往復の負担が大きいため、引用元へ飛んだ後に読んでいた返信へ戻れる導線を追加した。
+
+### 変更内容
+
+#### `mobile/app/meguri-board-thread.tsx`
+- 引用プレビューをタップした時、移動元の返信IDを `replyReturnTargetId` として保持するようにした。
+- 返信ヘッダーに `戻る #n` ボタンを表示し、引用元から読んでいた返信へ戻れるようにした。
+- 戻る時は既存の返信コンテキスト表示を使い、必要なら検索条件解除/古い順表示へ戻して対象返信をハイライトするようにした。
+- 引用元ジャンプ自体は既存の引用プレビューUIとスクロール挙動を維持した。
+
+#### `notes/09_state_machines.md`
+- Meguri Board Lifecycle に引用元戻り導線の表示ルールを追記した。
+
+#### `notes/10_glossary.md`
+- 掲示板引用元戻り導線を追加した。
+
+### 影響範囲
+
+- iOS版 スポット掲示板詳細
+- 引用返信プレビュー
+- 返信ヘッダーアクション
+- 返信ジャンプハイライト
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- `EAS_UPDATE_PROJECT_SLUG=ihub EXPO_NO_GIT_STATUS=1 npm --prefix mobile run update:ios:preview -- --message "[iter233] return from quoted board replies" --non-interactive`
+- Preview OTA: Update group `cc731bee-0f53-42e1-82d9-d174bab120b9` / iOS update `019e75f2-d6a6-78a1-ba6a-3c4f82005f0e`
+
+### 関連ファイル
+
+- `mobile/app/meguri-board-thread.tsx`
+- `notes/08_design_iterations.md`
+- `notes/09_state_machines.md`
+- `notes/10_glossary.md`
+
+### セルフレビュー結果
+
+- ✅ 引用元ジャンプの既存挙動を壊さず、戻り先だけを一時保持する表示状態として追加した。
+- ✅ 戻り先表示は返信ヘッダー内の小さなチップに収め、スレッド本文や返信カードの構造は変えなかった。
+- ✅ DB変更なし、ネイティブ依存追加なしでPreview OTA対象内に収めた。
+
+---
+
 ## イテレーション232：掲示板の長い返信を折りたためるようにする
 
 ### 背景・問題意識
