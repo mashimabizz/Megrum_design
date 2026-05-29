@@ -25,6 +25,7 @@ export type MeguriBoardThreadSort =
   | "hot"
   | "saved"
   | "subscribed"
+  | "participated"
   | "mine"
   | "unread";
 export type MeguriBoardReportReason =
@@ -72,6 +73,7 @@ export type MeguriBoardThread = {
   distanceMeters: number | null;
   originLat: number | null;
   originLng: number | null;
+  participated: boolean;
   prefecture: string | null;
   reacted: boolean;
   reactionCount: number;
@@ -179,6 +181,7 @@ const MAX_LOCAL_DRAFTS = 40;
 type LocalThreadState = {
   bookmarked?: boolean;
   hidden?: boolean;
+  participated?: boolean;
   reacted?: boolean;
   readAt?: number | null;
   reported?: boolean;
@@ -255,6 +258,7 @@ export const MEGURI_BOARD_SORT_OPTIONS = [
   "hot",
   "saved",
   "subscribed",
+  "participated",
   "mine",
   "unread",
 ] as const satisfies readonly MeguriBoardThreadSort[];
@@ -313,6 +317,8 @@ export function meguriBoardSortLabel(sort: MeguriBoardThreadSort) {
       return "保存";
     case "subscribed":
       return "通知";
+    case "participated":
+      return "参加中";
     case "mine":
       return "自分";
     case "unread":
@@ -355,6 +361,7 @@ export function filterMeguriBoardThreads(
     .filter((thread) => !thread.hidden && (thread.status === "visible" || thread.status === "locked"))
     .filter((thread) => category === "all" || thread.category === category)
     .filter((thread) => sort !== "mine" || thread.mine)
+    .filter((thread) => sort !== "participated" || thread.participated)
     .filter((thread) => sort !== "unread" || isMeguriBoardThreadUnread(thread))
     .filter((thread) => {
       if (!query) return true;
@@ -501,9 +508,9 @@ export async function createMeguriBoardThread(
 ) {
   const remote = await appendRemoteMeguriBoardThread(input, actor).catch(() => null);
   if (remote) {
-    const subscribedRemote = { ...remote, subscribed: true };
+    const subscribedRemote = { ...remote, participated: true, subscribed: true };
     await storeLocalMeguriBoardThread(subscribedRemote);
-    await upsertThreadState(subscribedRemote.id, { subscribed: true });
+    await upsertThreadState(subscribedRemote.id, { participated: true, subscribed: true });
     return subscribedRemote;
   }
   const createdAt = Date.now();
@@ -528,6 +535,7 @@ export async function createMeguriBoardThread(
     mine: true,
     originLat: input.origin?.latitude ?? null,
     originLng: input.origin?.longitude ?? null,
+    participated: true,
     prefecture: input.prefecture || actor.primaryArea || null,
     reacted: false,
     reactionCount: 0,
@@ -543,7 +551,7 @@ export async function createMeguriBoardThread(
     viewCount: 0,
   };
   await storeLocalMeguriBoardThread(localThread);
-  await upsertThreadState(localThread.id, { subscribed: true });
+  await upsertThreadState(localThread.id, { participated: true, subscribed: true });
   return localThread;
 }
 
@@ -554,7 +562,7 @@ export async function appendMeguriBoardReply(
   const remote = await appendRemoteMeguriBoardReply(input, actor).catch(() => null);
   if (remote) {
     await storeLocalMeguriBoardReply(remote);
-    await upsertThreadState(remote.threadId, { subscribed: true });
+    await upsertThreadState(remote.threadId, { participated: true, subscribed: true });
     await callBoardStateRpc("set_meguri_board_thread_subscription", {
       p_enabled: true,
       p_thread_id: remote.threadId,
@@ -584,7 +592,7 @@ export async function appendMeguriBoardReply(
     updatedAt: null,
   };
   await storeLocalMeguriBoardReply(reply);
-  await upsertThreadState(reply.threadId, { subscribed: true });
+  await upsertThreadState(reply.threadId, { participated: true, subscribed: true });
   return reply;
 }
 
@@ -1047,6 +1055,7 @@ async function syncLocalMeguriBoardThreadForReply(reply: MeguriBoardReply, alrea
           ...thread,
           latestActivityAt: Math.max(thread.latestActivityAt, reply.createdAt),
           latestReplyPreview: reply.body,
+          participated: thread.participated || reply.mine,
           replyCount: thread.replyCount + (alreadyCounted ? 0 : 1),
         }
       : thread,
@@ -1290,6 +1299,7 @@ function remoteMeguriBoardThreadToLocal(
     distanceMeters: nullableNumberValue(row.distance_m),
     originLat: nullableNumberValue(row.origin_lat),
     originLng: nullableNumberValue(row.origin_lng),
+    participated: authorId === viewerId || booleanValue(row.viewer_participated),
     prefecture: nullableStringValue(row.prefecture),
     reacted: booleanValue(row.viewer_reacted),
     reactionCount: numberValue(row.reaction_count, 0),
@@ -1488,6 +1498,7 @@ function createPreviewThread(
     distanceMeters,
     originLat,
     originLng,
+    participated: false,
     prefecture,
     reacted: false,
     reactionCount: 0,
@@ -1592,6 +1603,7 @@ function normalizeStoredThread(thread: MeguriBoardThread): MeguriBoardThread {
     isPinned: Boolean(thread.isPinned),
     originLat: nullableNumberValue(thread.originLat),
     originLng: nullableNumberValue(thread.originLng),
+    participated: Boolean(thread.participated),
     reacted: Boolean(thread.reacted),
     reactionCount: numberValue(thread.reactionCount, 0),
     readAt: nullableNumberValue(thread.readAt),
@@ -1770,6 +1782,7 @@ function hydrateMeguriBoardThread(
     bookmarkCount: adjustCount(thread.bookmarkCount, thread.bookmarked, local.bookmarked),
     bookmarked: local.bookmarked ?? thread.bookmarked,
     hidden: local.hidden ?? thread.hidden,
+    participated: local.participated ?? thread.participated,
     reacted: local.reacted ?? thread.reacted,
     reactionCount: adjustCount(thread.reactionCount, thread.reacted, local.reacted),
     readAt: local.readAt ?? thread.readAt,
@@ -1949,6 +1962,8 @@ function compareThreads(
       return right.latestActivityAt - left.latestActivityAt;
     case "subscribed":
       if (left.subscribed !== right.subscribed) return left.subscribed ? -1 : 1;
+      return right.latestActivityAt - left.latestActivityAt;
+    case "participated":
       return right.latestActivityAt - left.latestActivityAt;
     case "mine":
       return right.latestActivityAt - left.latestActivityAt;

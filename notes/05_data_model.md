@@ -4,7 +4,7 @@
 > 実装の正解集。`09_state_machines.md` と完全に整合させ、`10_glossary.md` の用語を使う。
 
 最終更新: 2026-05-30
-ステータス: Draft v2.25（iter180 掲示板下書き自動保存を追加）
+ステータス: Draft v2.26（iter188 掲示板参加中表示を追加）
 
 ## 最新化履歴
 
@@ -37,6 +37,7 @@
 | **v2.23** | **2026-05-30** | **iter178 反映（`groom_user_blocks` をスポット掲示板にも適用。スレッド/返信表示、返信通知、メンション通知を相互に抑制）** |
 | **v2.24** | **2026-05-30** | **iter179 反映（スポット掲示板の通報理由をUIで選択。`meguri_board_reports.reason` は `spam` / `harassment` / `privacy` / `unsafe` / `off_topic` / `other` を保存）** |
 | **v2.25** | **2026-05-30** | **iter180 反映（スポット掲示板のスレッド作成・返信下書きを端末内 `meguri.board.composerDrafts.v1` / `meguri.board.replyDrafts.v1` に自動保存）** |
+| **v2.26** | **2026-05-30** | **iter188 反映（`list_meguri_board_threads_for_viewer()` に `viewer_participated` を追加。スレッド作成者または可視返信済みユーザーを参加中として返す）** |
 | **v2.20** | **2026-05-29** | **iter168.90 反映（`search_query_logs` と人気検索RPCを追加。検索結果はマッチ分類つきグッズパネルで表示）** |
 | **v2.21** | **2026-05-30** | **iter168.97 反映（`schedules.place_name` 追加。合意時に `both` を単一手段へ固定し、現地交換の複数候補は1件へ固定する運用を追記）** |
 
@@ -356,6 +357,8 @@ iter168.43 以降、無料受信者に本文・画像パスを直接返さない
 > **画像添付方針（iter176）**：スレッド画像は `meguri-board-media` private Storage に保存し、DBには path のみを持つ。アプリは `list_meguri_board_threads_for_viewer()` で閲覧可能なスレッドを取得した後に署名URLを発行して表示する。
 
 > **ブロック方針（iter178）**：`groom_user_blocks` に保存されたブロック関係はスポット掲示板にも適用する。ブロックした/された相手のスレッドは `can_view_meguri_board_thread*()` と一覧RPCで除外し、ローカル表示も即時に消す。
+
+> **参加中判定（iter188）**：`list_meguri_board_threads_for_viewer()` は `viewer_participated` を返す。閲覧者がスレッド作成者、または `status='visible'` の返信を書いている場合に true とする。通知購読 `viewer_subscribed` とは別概念。
 
 ### `meguri_board_replies`（スポット掲示板返信 / iter168.73）
 

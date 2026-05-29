@@ -174,6 +174,8 @@ export default function MeguriBoardScreen() {
           title:
             sortMode === "mine"
               ? "自分のスレッド"
+              : sortMode === "participated"
+                ? "参加中のスレッド"
               : sortMode === "unread"
                 ? "未読スレッド"
               : viewMode === "nearby_3km"
@@ -775,6 +777,8 @@ export default function MeguriBoardScreen() {
               <Text style={styles.emptyTitle}>
                 {sortMode === "mine"
                   ? "自分のスレッドはまだありません"
+                  : sortMode === "participated"
+                    ? "参加中のスレッドはまだありません"
                   : sortMode === "unread"
                     ? "未読スレッドはありません"
                     : "まだスレッドはありません"}
@@ -782,6 +786,8 @@ export default function MeguriBoardScreen() {
               <Text style={styles.emptyBody}>
                 {sortMode === "mine"
                   ? "スレッドを立てると、ここからすぐ戻れます。"
+                  : sortMode === "participated"
+                    ? "スレッドに返信すると、ここから会話へ戻れます。"
                   : sortMode === "unread"
                     ? "新しい返信がつくと、ここに表示されます。"
                   : "最初のひとことを置いておくと、あとから返事がつきやすいです。"}

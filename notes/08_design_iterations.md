@@ -4,6 +4,71 @@
 
 ---
 
+## イテレーション188：掲示板に参加中スレッド表示を追加
+
+### 背景・問題意識
+
+スポット掲示板では、返信したスレッドや自分が立てたスレッドに後から戻る必要がある。通知ONだけを参加扱いにすると、読むために通知を付けたスレッドと実際に会話へ参加したスレッドが混ざるため、一般的なスレッド機能として「参加中」表示を別概念で追加した。
+
+### 変更内容
+
+#### `mobile/src/lib/meguriBoard.ts`
+- `MeguriBoardThreadSort` に `participated` を追加し、掲示板一覧で参加中スレッドだけを絞り込めるようにした。
+- `MeguriBoardThread` に `participated` を追加した。
+- スレッド作成時・返信時はローカル状態にも `participated=true` を保存するようにした。
+- リモート取得時は `viewer_participated` を読み取り、作成者本人も参加中として扱うようにした。
+
+#### `mobile/app/meguri-board.tsx`
+- ソートレールに `参加中` を追加した。
+- 参加中表示のセクションタイトルと空表示文言を追加した。
+
+#### `supabase/migrations/20260530235900_add_meguri_board_thread_participation.sql`
+- `list_meguri_board_threads_for_viewer()` の返却値に `viewer_participated` を追加した。
+- 閲覧者がスレッド作成者、または可視返信を書いている場合に参加中として返すようにした。
+
+#### `notes/05_data_model.md`
+- 掲示板の参加中判定を追記した。
+
+#### `notes/09_state_machines.md`
+- Meguri Board Lifecycle に参加中表示のルールを追記した。
+
+#### `notes/10_glossary.md`
+- 掲示板参加中表示を追加した。
+
+#### `notes/13_api_spec.md`
+- スポット掲示板一覧レスポンスに `viewer_participated` を追記した。
+
+### 影響範囲
+
+- iOS版 スポット掲示板一覧
+- Supabase RPC `list_meguri_board_threads_for_viewer()`
+- 掲示板の表示ルール・データモデル・API仕様・用語
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- `EAS_UPDATE_PROJECT_SLUG=ihub EXPO_NO_GIT_STATUS=1 npm --prefix mobile run update:ios:preview -- --message "[iter188] add board participated filter" --non-interactive`
+- Preview OTA: Update group `aa5b7816-08eb-4499-a4f1-581aa96d9f90` / iOS update `019e7532-7844-752f-bd1a-d1139ecadd3c`
+
+### 関連ファイル
+
+- `mobile/src/lib/meguriBoard.ts`
+- `mobile/app/meguri-board.tsx`
+- `supabase/migrations/20260530235900_add_meguri_board_thread_participation.sql`
+- `notes/05_data_model.md`
+- `notes/08_design_iterations.md`
+- `notes/09_state_machines.md`
+- `notes/10_glossary.md`
+- `notes/13_api_spec.md`
+
+### セルフレビュー結果
+
+- ✅ 通知購読とは別に参加中を定義し、表示の意味が混ざらないようにした。
+- ✅ Migration適用前でも、端末内で作成・返信したスレッドはローカル状態から参加中へ出せるようにした。
+
+---
+
 ## イテレーション187：掲示板未読一括既読を追加
 
 ### 背景・問題意識

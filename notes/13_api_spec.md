@@ -976,6 +976,7 @@ AW削除。
         "viewer_hidden": false,
         "viewer_reported": false,
         "viewer_subscribed": true,
+        "viewer_participated": true,
         "viewer_read_at": "2026-05-29T07:20:00Z",
         "author": { "id": "uuid", "display_name": "string", "handle": "string?" }
       }
@@ -987,6 +988,7 @@ AW削除。
   - `same_prefecture` はスレッド作成時の `prefecture` と閲覧者側の都道府県で判定する
   - 正確な位置情報は一覧表示しない。レスポンスの座標はアプリ内部の距離判定・互換用途に限定する
   - `image_paths` は private Storage path。クライアント表示時は閲覧可能なスレッドだけ署名URLへ変換する
+  - `viewer_participated` はスレッド作成者、または可視返信を投稿済みの閲覧者で true。通知購読 `viewer_subscribed` とは別に扱う
 - **Screen**: `meguri-board`
 
 ### POST /api/v1/meguri-board/threads
