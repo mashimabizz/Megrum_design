@@ -896,7 +896,9 @@ AW削除。
 
 - **Auth**: 必須（preview fallback ではローカルデータ）
 - **Query**:
-  - `spot_key?=tokyo-dome-gate25`
+  - `scope?=nearby_3km|same_prefecture`
+  - `viewer_lat?=35.6812`
+  - `viewer_lng?=139.7671`
   - `prefecture?=東京都`
   - `limit?=50`
 - **Response 200**:
@@ -907,10 +909,13 @@ AW削除。
         "id": "uuid",
         "title": "物販列いまどれくらい？",
         "body": "string",
-        "audience_scope": "same_spot|same_prefecture|global",
+        "audience_scope": "nearby_3km|same_prefecture",
         "spot_key": "tokyo-dome-gate25",
         "spot_label": "東京ドーム 25ゲート前",
         "prefecture": "東京都",
+        "origin_lat": 35.7056,
+        "origin_lng": 139.7519,
+        "distance_m": 420,
         "reply_count": 2,
         "latest_reply_preview": "string?",
         "latest_activity_at": "2026-05-29T07:12:00Z",
@@ -920,8 +925,9 @@ AW削除。
   }
   ```
 - **備考**:
-  - `same_spot` の exact 判定は MVP ではクライアント `spot_key` 比較を併用
-  - サーバー側は少なくとも author / global / same prefecture を防壁にする
+  - `nearby_3km` はスレッド作成時の `origin_lat/origin_lng` と閲覧者現在地の距離で判定する
+  - `same_prefecture` はスレッド作成時の `prefecture` と閲覧者側の都道府県で判定する
+  - 正確な位置情報は一覧表示しない。レスポンスの座標はアプリ内部の距離判定・互換用途に限定する
 - **Screen**: `meguri-board`
 
 ### POST /api/v1/meguri-board/threads
@@ -934,14 +940,16 @@ AW削除。
   {
     "title": "string",
     "body": "string",
-    "audience_scope": "same_spot|same_prefecture|global",
+    "audience_scope": "nearby_3km|same_prefecture",
     "spot_key": "string?",
     "spot_label": "string?",
-    "prefecture": "string?"
+    "prefecture": "string?",
+    "origin_lat": 35.7056,
+    "origin_lng": 139.7519
   }
   ```
 - **Response 201**: 作成された thread
-- **備考**: `same_spot` は `spot_key` / `spot_label` / `prefecture` 必須
+- **備考**: `nearby_3km` は `origin_lat` / `origin_lng` / `prefecture` 必須。基準地点はスレッドを立てた時の位置情報
 - **Screen**: `meguri-board`
 
 ### GET /api/v1/meguri-board/threads/:id
@@ -949,6 +957,10 @@ AW削除。
 スポット掲示板のスレッド詳細。
 
 - **Auth**: 必須（見える範囲の thread のみ）
+- **Query**:
+  - `viewer_lat?=35.6812`
+  - `viewer_lng?=139.7671`
+  - `prefecture?=東京都`
 - **Response 200**: `thread` 本体 + `replies[]`
 - **Screen**: `meguri-board-thread`
 
@@ -957,6 +969,10 @@ AW削除。
 スポット掲示板スレッドに返信。
 
 - **Auth**: 必須（見える範囲の thread のみ）
+- **Query**:
+  - `viewer_lat?=35.6812`
+  - `viewer_lng?=139.7671`
+  - `prefecture?=東京都`
 - **Request**:
   ```json
   {
@@ -1484,7 +1500,7 @@ WebSocket でリアルタイム更新。
 | 27 | マッチング計算のバッチ頻度（毎日/6h/1h） | 実装着手 |
 | 28 | リアルタイム通知のスロットル | 実装着手 |
 | 29 | WebSocket 採用 vs polling（MVP） | 設計詰め |
-| 30 | スポット掲示板の `same_spot` 判定に使う「現在のスポット」をユーザー状態のどこへ永続化するか | 設計詰め |
+| 30 | スポット掲示板の `same_spot` 判定に使う「現在のスポット」をユーザー状態のどこへ永続化するか | iter168.89でlegacy化。新規は `nearby_3km` / `same_prefecture` |
 
 ### 画像・ストレージ
 

@@ -24,8 +24,14 @@ import {
   type MeguriBoardActor,
   type MeguriBoardAudienceScope,
   type MeguriBoardThread,
+  type MeguriBoardViewMode,
   type MeguriBoardViewerContext,
 } from "../src/lib/meguriBoard";
+import {
+  coordinateFromParams,
+  getCurrentLocationContext,
+  type MegrumLocationContext,
+} from "../src/lib/locationContext";
 import {
   DEFAULT_MEGURI_PROFILE,
   loadMeguriProfileSettings,
@@ -33,7 +39,9 @@ import {
 import { megrumColors, megrumShadow } from "../src/theme/tokens";
 import { IconSymbol } from "../src/components/IconSymbol";
 
-const SCOPE_SEGMENTS = ["同じスポット", "同じ都道府県", "全体"];
+const SCOPE_SEGMENTS = ["3km圏内", "都道府県"];
+const VIEW_MODE_SEGMENTS = ["3km圏内", "都道府県"];
+const VIEW_MODE_OPTIONS = ["nearby_3km", "same_prefecture"] as const satisfies readonly MeguriBoardViewMode[];
 
 export default function MeguriBoardScreen() {
   const insets = useSafeAreaInsets();
@@ -41,6 +49,8 @@ export default function MeguriBoardScreen() {
     prefecture?: string | string[];
     spotKey?: string | string[];
     spotLabel?: string | string[];
+    viewerLat?: string | string[];
+    viewerLng?: string | string[];
   }>();
   const { previewMode, profile, user } = useAuth();
   const [localArea, setLocalArea] = useState(DEFAULT_MEGURI_PROFILE.baseArea);
@@ -50,9 +60,11 @@ export default function MeguriBoardScreen() {
   const [composerOpen, setComposerOpen] = useState(false);
   const [composerTitle, setComposerTitle] = useState("");
   const [composerBody, setComposerBody] = useState("");
-  const [composerScope, setComposerScope] = useState<MeguriBoardAudienceScope>("same_spot");
+  const [composerScope, setComposerScope] = useState<MeguriBoardAudienceScope>("nearby_3km");
   const [composerError, setComposerError] = useState<string | null>(null);
+  const [locationContext, setLocationContext] = useState<MegrumLocationContext | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [viewMode, setViewMode] = useState<MeguriBoardViewMode>("nearby_3km");
 
   const actor = useMemo<MeguriBoardActor>(
     () => ({
@@ -68,46 +80,79 @@ export default function MeguriBoardScreen() {
     () =>
       buildViewerContext({
         fallbackArea: actor.primaryArea,
+        fallbackCoordinate: locationContext?.coordinate ?? coordinateFromParams({
+          latitude: params.viewerLat,
+          longitude: params.viewerLng,
+        }),
         prefecture: readParam(params.prefecture),
+        resolvedPrefecture: locationContext?.prefecture ?? null,
         spotKey: readParam(params.spotKey),
         spotLabel: readParam(params.spotLabel),
         viewerId: user?.id ?? actor.userId,
       }),
-    [actor.primaryArea, actor.userId, params.prefecture, params.spotKey, params.spotLabel, user?.id],
+    [
+      actor.primaryArea,
+      actor.userId,
+      locationContext?.coordinate,
+      locationContext?.prefecture,
+      params.prefecture,
+      params.spotKey,
+      params.spotLabel,
+      params.viewerLat,
+      params.viewerLng,
+      user?.id,
+    ],
   );
 
   const sections = useMemo(
     () =>
       [
-        { key: "same_spot" as const, title: "同じスポット", rows: threads.filter((item) => item.audienceScope === "same_spot") },
         {
-          key: "same_prefecture" as const,
-          title: "同じ都道府県",
-          rows: threads.filter((item) => item.audienceScope === "same_prefecture"),
+          key: viewMode,
+          title: viewMode === "nearby_3km" ? "近くのスレッド" : "都道府県のスレッド",
+          rows: threads,
         },
-        { key: "global" as const, title: "全体", rows: threads.filter((item) => item.audienceScope === "global") },
       ].filter((section) => section.rows.length > 0),
-    [threads],
+    [threads, viewMode],
   );
 
   const refreshThreads = useCallback(async () => {
     setLoading(true);
     const settings = await loadMeguriProfileSettings().catch(() => DEFAULT_MEGURI_PROFILE);
+    const currentLocation = await getCurrentLocationContext().catch(() => null);
+    setLocationContext(currentLocation);
     setLocalArea(settings.baseArea || DEFAULT_MEGURI_PROFILE.baseArea);
     setLocalDisplayName(settings.displayName || DEFAULT_MEGURI_PROFILE.displayName);
     const nextThreads = await loadMeguriBoardThreads(
       buildViewerContext({
         fallbackArea: profile?.primaryArea || settings.baseArea || actor.primaryArea,
+        fallbackCoordinate: currentLocation?.coordinate ?? coordinateFromParams({
+          latitude: params.viewerLat,
+          longitude: params.viewerLng,
+        }),
         prefecture: readParam(params.prefecture),
+        resolvedPrefecture: currentLocation?.prefecture ?? null,
         spotKey: readParam(params.spotKey),
         spotLabel: readParam(params.spotLabel),
         viewerId: user?.id ?? actor.userId,
       }),
-      { previewMode },
+      { previewMode, viewMode },
     ).catch(() => []);
     setThreads(nextThreads);
     setLoading(false);
-  }, [actor.primaryArea, actor.userId, params.prefecture, params.spotKey, params.spotLabel, previewMode, profile?.primaryArea, user?.id]);
+  }, [
+    actor.primaryArea,
+    actor.userId,
+    params.prefecture,
+    params.spotKey,
+    params.spotLabel,
+    params.viewerLat,
+    params.viewerLng,
+    previewMode,
+    profile?.primaryArea,
+    user?.id,
+    viewMode,
+  ]);
 
   useFocusEffect(
     useCallback(() => {
@@ -128,14 +173,32 @@ export default function MeguriBoardScreen() {
     }
     setSubmitting(true);
     setComposerError(null);
+    const actionLocation =
+      locationContext ?? (await getCurrentLocationContext().catch(() => null));
+    const actionContext = buildViewerContext({
+      fallbackArea: actor.primaryArea,
+      fallbackCoordinate: actionLocation?.coordinate ?? viewerContext.coordinate ?? null,
+      prefecture: viewerContext.prefecture,
+      resolvedPrefecture: actionLocation?.prefecture ?? viewerContext.prefecture,
+      spotKey: viewerContext.spotKey,
+      spotLabel: viewerContext.spotLabel,
+      viewerId: viewerContext.viewerId,
+    });
+    setLocationContext(actionLocation);
+    if (composerScope === "nearby_3km" && !actionContext.coordinate) {
+      setSubmitting(false);
+      setComposerError("3km圏内のスレッドを立てるには、位置情報の許可が必要です。");
+      return;
+    }
     const thread = await createMeguriBoardThread(
       {
         audienceScope: composerScope,
         body,
-        prefecture: viewerContext.prefecture,
+        origin: actionContext.coordinate ?? null,
+        prefecture: actionContext.prefecture,
         previewMode,
-        spotKey: composerScope === "same_spot" ? viewerContext.spotKey : viewerContext.spotKey,
-        spotLabel: composerScope === "same_spot" ? viewerContext.spotLabel : viewerContext.spotLabel,
+        spotKey: actionContext.spotKey,
+        spotLabel: actionContext.spotLabel,
         title,
       },
       actor,
@@ -148,7 +211,7 @@ export default function MeguriBoardScreen() {
     setComposerOpen(false);
     setComposerTitle("");
     setComposerBody("");
-    setComposerScope("same_spot");
+    setComposerScope("nearby_3km");
     setThreads((current) =>
       [thread, ...current.filter((candidate) => candidate.id !== thread.id)].sort(
         (left, right) => right.latestActivityAt - left.latestActivityAt,
@@ -158,9 +221,12 @@ export default function MeguriBoardScreen() {
       pathname: "/meguri-board-thread",
       params: {
         id: thread.id,
-        prefecture: viewerContext.prefecture || "",
-        spotKey: viewerContext.spotKey || "",
-        spotLabel: viewerContext.spotLabel || "",
+        prefecture: actionContext.prefecture || "",
+        spotKey: actionContext.spotKey || "",
+        spotLabel: actionContext.spotLabel || "",
+        viewerLat: actionContext.coordinate ? String(actionContext.coordinate.latitude) : "",
+        viewerLng: actionContext.coordinate ? String(actionContext.coordinate.longitude) : "",
+        viewMode,
       },
     });
   }
@@ -199,15 +265,25 @@ export default function MeguriBoardScreen() {
                 </View>
               ) : null}
             </View>
-            <Text style={styles.heroTitle}>現地の空気感をゆるく共有</Text>
+            <Text style={styles.heroTitle}>現地の温度感をゆるく共有</Text>
             <Text style={styles.heroBody}>
-              いま見えているのは {viewerContext.spotLabel || "このスポット"} と {viewerContext.prefecture || "このエリア"} を起点にしたスレッドです。
+              いま見えているのは、現在地から3km圏内、または {viewerContext.prefecture || "このエリア"} のスレッドです。
             </Text>
             <View style={styles.heroMetaRow}>
-              <ScopePreviewPill label="同じスポット" value={viewerContext.spotLabel || "同じスポット"} />
+              <ScopePreviewPill label="3km圏内" value={viewerContext.coordinate ? "現在地から表示" : "位置情報待ち"} />
               <ScopePreviewPill label="都道府県" value={viewerContext.prefecture || "未設定"} />
             </View>
           </View>
+
+          <SegmentedControl
+            selectedIndex={VIEW_MODE_OPTIONS.indexOf(viewMode)}
+            values={VIEW_MODE_SEGMENTS}
+            onChange={(event) =>
+              setViewMode(
+                VIEW_MODE_OPTIONS[event.nativeEvent.selectedSegmentIndex] ?? "nearby_3km",
+              )
+            }
+          />
 
           <PrimaryButton onPress={() => setComposerOpen(true)}>スレッドを立てる</PrimaryButton>
 
@@ -238,6 +314,9 @@ export default function MeguriBoardScreen() {
                             prefecture: viewerContext.prefecture || "",
                             spotKey: viewerContext.spotKey || "",
                             spotLabel: viewerContext.spotLabel || "",
+                            viewerLat: viewerContext.coordinate ? String(viewerContext.coordinate.latitude) : "",
+                            viewerLng: viewerContext.coordinate ? String(viewerContext.coordinate.longitude) : "",
+                            viewMode,
                           },
                         })
                       }
@@ -283,7 +362,7 @@ export default function MeguriBoardScreen() {
           <View style={[styles.modalPanel, { paddingBottom: Math.max(insets.bottom, 14) + 12 }]}>
             <View style={styles.modalHandle} />
             <Text style={styles.modalTitle}>新しいスレッド</Text>
-            <Text style={styles.modalSubTitle}>{viewerContext.spotLabel} から見える範囲を選びます。</Text>
+            <Text style={styles.modalSubTitle}>作成時の位置を基準に、見える範囲を選びます。</Text>
 
             <View style={styles.field}>
               <Text style={styles.fieldLabel}>タイトル</Text>
@@ -303,7 +382,7 @@ export default function MeguriBoardScreen() {
                 maxLength={500}
                 multiline
                 onChangeText={setComposerBody}
-                placeholder="現地で聞きたいことや、今の空気感をひとこと。"
+                placeholder="現地で聞きたいことや、今の温度感をひとこと。"
                 placeholderTextColor="rgba(58,50,74,0.35)"
                 style={[styles.input, styles.textarea]}
                 textAlignVertical="top"
@@ -314,21 +393,21 @@ export default function MeguriBoardScreen() {
             <View style={styles.field}>
               <Text style={styles.fieldLabel}>公開範囲</Text>
               <SegmentedControl
-                selectedIndex={MEGURI_BOARD_AUDIENCE_OPTIONS.indexOf(composerScope)}
+                selectedIndex={composerScope === "same_prefecture" ? 1 : 0}
                 values={SCOPE_SEGMENTS}
                 onChange={(event) =>
                   setComposerScope(
                     MEGURI_BOARD_AUDIENCE_OPTIONS[event.nativeEvent.selectedSegmentIndex] ??
-                      "same_spot",
+                      "nearby_3km",
                   )
                 }
               />
               <Text style={styles.scopeHelp}>
-                {composerScope === "same_spot"
-                  ? `${viewerContext.spotLabel} を見ている人向け`
+                {composerScope === "nearby_3km" || composerScope === "same_spot"
+                  ? "現在地から3km圏内にいる人向け"
                   : composerScope === "same_prefecture"
                     ? `${viewerContext.prefecture} を拠点に見ている人向け`
-                    : "めぐり全体から見えるスレッド"}
+                    : `${viewerContext.prefecture} を拠点に見ている人向け`}
               </Text>
             </View>
 
@@ -369,7 +448,7 @@ function ScopeBadge({ scope }: { scope: MeguriBoardAudienceScope }) {
     <View
       style={[
         styles.scopeBadge,
-        scope === "same_spot"
+        scope === "nearby_3km" || scope === "same_spot"
           ? styles.scopeBadgeSpot
           : scope === "same_prefecture"
             ? styles.scopeBadgePrefecture
@@ -379,7 +458,7 @@ function ScopeBadge({ scope }: { scope: MeguriBoardAudienceScope }) {
       <Text
         style={[
           styles.scopeBadgeText,
-          scope === "same_spot"
+          scope === "nearby_3km" || scope === "same_spot"
             ? styles.scopeBadgeTextSpot
             : scope === "same_prefecture"
               ? styles.scopeBadgeTextPrefecture
@@ -394,15 +473,19 @@ function ScopeBadge({ scope }: { scope: MeguriBoardAudienceScope }) {
 
 function buildViewerContext(input: {
   fallbackArea: string | null;
+  fallbackCoordinate?: MeguriBoardViewerContext["coordinate"];
   prefecture?: string | null;
+  resolvedPrefecture?: string | null;
   spotKey?: string | null;
   spotLabel?: string | null;
   viewerId?: string | null;
 }): MeguriBoardViewerContext {
-  const prefecture = input.prefecture || input.fallbackArea || DEFAULT_MEGURI_PROFILE.baseArea;
+  const prefecture =
+    input.resolvedPrefecture || input.prefecture || input.fallbackArea || DEFAULT_MEGURI_PROFILE.baseArea;
   const spotLabel = input.spotLabel || `${prefecture}のめぐりスポット`;
   const spotKey = input.spotKey || `${slugify(prefecture)}-meguri-board`;
   return {
+    coordinate: input.fallbackCoordinate ?? null,
     prefecture,
     spotKey,
     spotLabel,

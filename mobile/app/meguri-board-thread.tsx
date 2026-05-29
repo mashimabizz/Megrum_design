@@ -23,8 +23,14 @@ import {
   type MeguriBoardAudienceScope,
   type MeguriBoardReply,
   type MeguriBoardThread,
+  type MeguriBoardViewMode,
   type MeguriBoardViewerContext,
 } from "../src/lib/meguriBoard";
+import {
+  coordinateFromParams,
+  getCurrentLocationContext,
+  type MegrumLocationContext,
+} from "../src/lib/locationContext";
 import {
   DEFAULT_MEGURI_PROFILE,
   loadMeguriProfileSettings,
@@ -40,6 +46,9 @@ export default function MeguriBoardThreadScreen() {
     prefecture?: string | string[];
     spotKey?: string | string[];
     spotLabel?: string | string[];
+    viewerLat?: string | string[];
+    viewerLng?: string | string[];
+    viewMode?: string | string[];
   }>();
   const threadId = readParam(params.id);
   const { previewMode, profile, user } = useAuth();
@@ -48,6 +57,7 @@ export default function MeguriBoardThreadScreen() {
   const [thread, setThread] = useState<MeguriBoardThread | null>(null);
   const [replies, setReplies] = useState<MeguriBoardReply[]>([]);
   const [loading, setLoading] = useState(true);
+  const [locationContext, setLocationContext] = useState<MegrumLocationContext | null>(null);
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
   const [sendError, setSendError] = useState<string | null>(null);
@@ -62,32 +72,33 @@ export default function MeguriBoardThreadScreen() {
     [localArea, localDisplayName, previewMode, profile?.displayName, profile?.handle, profile?.primaryArea, user?.id],
   );
 
+  const viewMode = normalizeViewMode(readParam(params.viewMode));
   const viewerContext = useMemo<MeguriBoardViewerContext>(
-    () => ({
-      prefecture:
-        readParam(params.prefecture) ||
-        profile?.primaryArea ||
-        localArea ||
-        DEFAULT_MEGURI_PROFILE.baseArea,
-      spotKey:
-        readParam(params.spotKey) ||
-        `${slugify(
-          readParam(params.prefecture) ||
-            profile?.primaryArea ||
-            localArea ||
-            DEFAULT_MEGURI_PROFILE.baseArea,
-        )}-meguri-board`,
-      spotLabel:
-        readParam(params.spotLabel) ||
-        `${
-          readParam(params.prefecture) ||
-          profile?.primaryArea ||
-          localArea ||
-          DEFAULT_MEGURI_PROFILE.baseArea
-        }のめぐりスポット`,
-      viewerId: user?.id ?? actor.userId,
-    }),
-    [actor.userId, localArea, params.prefecture, params.spotKey, params.spotLabel, profile?.primaryArea, user?.id],
+    () =>
+      buildViewerContext({
+        coordinate:
+          locationContext?.coordinate ??
+          coordinateFromParams({ latitude: params.viewerLat, longitude: params.viewerLng }),
+        fallbackArea: profile?.primaryArea || localArea || DEFAULT_MEGURI_PROFILE.baseArea,
+        prefecture: readParam(params.prefecture),
+        resolvedPrefecture: locationContext?.prefecture ?? null,
+        spotKey: readParam(params.spotKey),
+        spotLabel: readParam(params.spotLabel),
+        viewerId: user?.id ?? actor.userId,
+      }),
+    [
+      actor.userId,
+      localArea,
+      locationContext?.coordinate,
+      locationContext?.prefecture,
+      params.prefecture,
+      params.spotKey,
+      params.spotLabel,
+      params.viewerLat,
+      params.viewerLng,
+      profile?.primaryArea,
+      user?.id,
+    ],
   );
 
   const refreshDetail = useCallback(async () => {
@@ -99,42 +110,43 @@ export default function MeguriBoardThreadScreen() {
     }
     setLoading(true);
     const settings = await loadMeguriProfileSettings().catch(() => DEFAULT_MEGURI_PROFILE);
+    const currentLocation = await getCurrentLocationContext().catch(() => null);
+    setLocationContext(currentLocation);
     setLocalArea(settings.baseArea || DEFAULT_MEGURI_PROFILE.baseArea);
     setLocalDisplayName(settings.displayName || DEFAULT_MEGURI_PROFILE.displayName);
+    const nextViewerContext = buildViewerContext({
+      coordinate:
+        currentLocation?.coordinate ??
+        coordinateFromParams({ latitude: params.viewerLat, longitude: params.viewerLng }),
+      fallbackArea: profile?.primaryArea || settings.baseArea || actor.primaryArea,
+      prefecture: readParam(params.prefecture),
+      resolvedPrefecture: currentLocation?.prefecture ?? null,
+      spotKey: readParam(params.spotKey),
+      spotLabel: readParam(params.spotLabel),
+      viewerId: user?.id ?? actor.userId,
+    });
     const detail = await loadMeguriBoardThreadDetail(
       threadId,
-      {
-        prefecture:
-          readParam(params.prefecture) ||
-          profile?.primaryArea ||
-          settings.baseArea ||
-          actor.primaryArea,
-        spotKey:
-          readParam(params.spotKey) ||
-          `${slugify(
-            readParam(params.prefecture) ||
-              profile?.primaryArea ||
-              settings.baseArea ||
-              actor.primaryArea ||
-              DEFAULT_MEGURI_PROFILE.baseArea,
-          )}-meguri-board`,
-        spotLabel:
-          readParam(params.spotLabel) ||
-          `${
-            readParam(params.prefecture) ||
-            profile?.primaryArea ||
-            settings.baseArea ||
-            actor.primaryArea ||
-            DEFAULT_MEGURI_PROFILE.baseArea
-          }のめぐりスポット`,
-        viewerId: user?.id ?? actor.userId,
-      },
-      { previewMode },
+      nextViewerContext,
+      { previewMode, viewMode },
     ).catch(() => ({ replies: [] as MeguriBoardReply[], thread: null }));
     setThread(detail.thread);
     setReplies(detail.replies);
     setLoading(false);
-  }, [actor.primaryArea, actor.userId, params.prefecture, params.spotKey, params.spotLabel, previewMode, profile?.primaryArea, threadId, user?.id]);
+  }, [
+    actor.primaryArea,
+    actor.userId,
+    params.prefecture,
+    params.spotKey,
+    params.spotLabel,
+    params.viewerLat,
+    params.viewerLng,
+    previewMode,
+    profile?.primaryArea,
+    threadId,
+    user?.id,
+    viewMode,
+  ]);
 
   useFocusEffect(
     useCallback(() => {
@@ -153,6 +165,8 @@ export default function MeguriBoardThreadScreen() {
         body,
         previewMode,
         threadId,
+        viewer: viewerContext,
+        viewMode,
       },
       actor,
     ).catch(() => null);
@@ -320,7 +334,7 @@ function ScopeBadge({ scope }: { scope: MeguriBoardAudienceScope }) {
     <View
       style={[
         styles.scopeBadge,
-        scope === "same_spot"
+        scope === "nearby_3km" || scope === "same_spot"
           ? styles.scopeBadgeSpot
           : scope === "same_prefecture"
             ? styles.scopeBadgePrefecture
@@ -330,7 +344,7 @@ function ScopeBadge({ scope }: { scope: MeguriBoardAudienceScope }) {
       <Text
         style={[
           styles.scopeBadgeText,
-          scope === "same_spot"
+          scope === "nearby_3km" || scope === "same_spot"
             ? styles.scopeBadgeTextSpot
             : scope === "same_prefecture"
               ? styles.scopeBadgeTextPrefecture
@@ -345,6 +359,32 @@ function ScopeBadge({ scope }: { scope: MeguriBoardAudienceScope }) {
 
 function readParam(value: string | string[] | undefined) {
   return Array.isArray(value) ? value[0] : value;
+}
+
+function buildViewerContext(input: {
+  coordinate?: MeguriBoardViewerContext["coordinate"];
+  fallbackArea: string | null;
+  prefecture?: string | null;
+  resolvedPrefecture?: string | null;
+  spotKey?: string | null;
+  spotLabel?: string | null;
+  viewerId?: string | null;
+}): MeguriBoardViewerContext {
+  const prefecture =
+    input.resolvedPrefecture || input.prefecture || input.fallbackArea || DEFAULT_MEGURI_PROFILE.baseArea;
+  const spotLabel = input.spotLabel || `${prefecture}のめぐりスポット`;
+  const spotKey = input.spotKey || `${slugify(prefecture)}-meguri-board`;
+  return {
+    coordinate: input.coordinate ?? null,
+    prefecture,
+    spotKey,
+    spotLabel,
+    viewerId: input.viewerId,
+  };
+}
+
+function normalizeViewMode(value: string | null | undefined): MeguriBoardViewMode {
+  return value === "same_prefecture" ? "same_prefecture" : "nearby_3km";
 }
 
 function slugify(value: string) {

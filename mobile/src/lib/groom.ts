@@ -1,4 +1,5 @@
 import { hasSupabaseConfig, supabase } from "./supabase";
+import type { MegrumCoordinate } from "./locationContext";
 
 export type GroomRemoteAuthor = {
   avatarUrl: string | null;
@@ -19,6 +20,7 @@ export type GroomRemotePost = {
   audienceScope: string;
   author: GroomRemoteAuthor;
   caption: string;
+  distanceMeters: number | null;
   doodles: unknown[];
   expiresAt: string;
   id: string;
@@ -41,6 +43,7 @@ export type GroomCreatePostInput = {
   imageContentType?: string | null;
   imageTransform: GroomRemoteImageTransform;
   imageUri: string;
+  origin?: MegrumCoordinate | null;
   placeHint?: string;
   stickers: unknown[];
   textOverlays: unknown[];
@@ -76,9 +79,16 @@ function groomPostSelect() {
   ].join(", ");
 }
 
-export async function fetchGroomFeed(currentUserId: string): Promise<GroomRemotePost[]> {
+export async function fetchGroomFeed(
+  currentUserId: string,
+  viewerCoordinate?: MegrumCoordinate | null,
+): Promise<GroomRemotePost[]> {
   if (!supabase || !hasSupabaseConfig) return [];
   await supabase.rpc("expire_groom_posts").throwOnError();
+  if (viewerCoordinate) {
+    const nearby = await fetchNearbyGroomFeed(currentUserId, viewerCoordinate).catch(() => null);
+    if (nearby) return nearby;
+  }
   const { data, error } = await supabase
     .from("groom_posts")
     .select(groomPostSelect())
@@ -87,6 +97,30 @@ export async function fetchGroomFeed(currentUserId: string): Promise<GroomRemote
     .order("published_at", { ascending: false })
     .limit(40);
 
+  if (error) throw error;
+  const rows = (Array.isArray(data) ? data : []) as unknown as Record<string, unknown>[];
+  const ids = rows.map((row) => stringValue(row.id)).filter(Boolean);
+  const [likedIds, viewedIds, signedUrls] = await Promise.all([
+    fetchGroomReactionIds(currentUserId, ids),
+    fetchGroomViewIds(currentUserId, ids),
+    signGroomImageUrls(rows),
+  ]);
+
+  return rows
+    .map((row) => normalizeRemotePost(row, currentUserId, likedIds, viewedIds, signedUrls))
+    .filter((post): post is GroomRemotePost => !!post);
+}
+
+async function fetchNearbyGroomFeed(
+  currentUserId: string,
+  viewerCoordinate: MegrumCoordinate,
+): Promise<GroomRemotePost[]> {
+  if (!supabase) return [];
+  const { data, error } = await supabase.rpc("list_groom_feed_nearby", {
+    p_radius_m: 1000,
+    p_viewer_lat: viewerCoordinate.latitude,
+    p_viewer_lng: viewerCoordinate.longitude,
+  });
   if (error) throw error;
   const rows = (Array.isArray(data) ? data : []) as unknown as Record<string, unknown>[];
   const ids = rows.map((row) => stringValue(row.id)).filter(Boolean);
@@ -127,25 +161,38 @@ export async function createGroomPost(
     input.imageContentType,
   );
   const audience = await buildGroomAudience(currentUserId);
-  const { data, error } = await supabase
+  const insertPayload = {
+    audience_scope: "encountered_people",
+    audience_user_ids: audience.userIds,
+    area_key: audience.areaKey,
+    caption: input.caption || null,
+    doodles: input.doodles,
+    image_path: uploaded.path,
+    image_transform: input.imageTransform,
+    image_url: uploaded.storedUrl,
+    origin_lat: input.origin?.latitude ?? null,
+    origin_lng: input.origin?.longitude ?? null,
+    place_hint: input.placeHint ?? "今日の現場付近",
+    status: "published",
+    stickers: input.stickers,
+    text_overlays: input.textOverlays,
+    user_id: currentUserId,
+  };
+  let { data, error } = await supabase
     .from("groom_posts")
-    .insert({
-      audience_scope: "encountered_people",
-      audience_user_ids: audience.userIds,
-      area_key: audience.areaKey,
-      caption: input.caption || null,
-      doodles: input.doodles,
-      image_path: uploaded.path,
-      image_transform: input.imageTransform,
-      image_url: uploaded.storedUrl,
-      place_hint: input.placeHint ?? "今日の現場付近",
-      status: "published",
-      stickers: input.stickers,
-      text_overlays: input.textOverlays,
-      user_id: currentUserId,
-    })
+    .insert(insertPayload)
     .select(groomPostSelect())
     .single();
+  if (error && isMissingLocationColumnError(error)) {
+    const { origin_lat: _originLat, origin_lng: _originLng, ...legacyPayload } = insertPayload;
+    const retry = await supabase
+      .from("groom_posts")
+      .insert(legacyPayload)
+      .select(groomPostSelect())
+      .single();
+    data = retry.data;
+    error = retry.error;
+  }
 
   if (error) {
     if (uploaded.path) {
@@ -425,7 +472,7 @@ function normalizeRemotePost(
   const publishedAt = stringValue(row.published_at);
   const expiresAt = stringValue(row.expires_at);
   if (!id || !userId || !imageUrl || !publishedAt || !expiresAt) return null;
-  const userRow = objectValue(row.users);
+  const userRow = authorObjectValue(row);
   return {
     audienceScope: stringValue(row.audience_scope) || "encountered_people",
     author: {
@@ -437,6 +484,7 @@ function normalizeRemotePost(
       primaryArea: nullableStringValue(userRow.primary_area),
     },
     caption: stringValue(row.caption),
+    distanceMeters: nullableNumberValue(row.distance_m),
     doodles: arrayValue(row.doodles),
     expiresAt,
     id,
@@ -513,6 +561,18 @@ function objectValue(value: unknown): Record<string, unknown> {
   return value as Record<string, unknown>;
 }
 
+function authorObjectValue(row: Record<string, unknown>): Record<string, unknown> {
+  const nested = objectValue(row.users);
+  if (Object.keys(nested).length > 0) return nested;
+  return {
+    avatar_url: row.author_avatar_url,
+    display_name: row.author_display_name,
+    handle: row.author_handle,
+    id: row.author_id,
+    primary_area: row.author_primary_area,
+  };
+}
+
 function arrayValue(value: unknown): unknown[] {
   return Array.isArray(value) ? value : [];
 }
@@ -527,4 +587,16 @@ function nullableStringValue(value: unknown): string | null {
 
 function numberValue(value: unknown, fallback: number) {
   return typeof value === "number" && Number.isFinite(value) ? value : fallback;
+}
+
+function nullableNumberValue(value: unknown) {
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
+function isMissingLocationColumnError(error: unknown) {
+  const message =
+    typeof error === "object" && error && "message" in error
+      ? String((error as { message?: unknown }).message ?? "")
+      : String(error);
+  return message.includes("origin_lat") || message.includes("origin_lng");
 }

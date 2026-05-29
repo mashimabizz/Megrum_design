@@ -1,10 +1,17 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { isUuidLike } from "./groom";
+import type { MegrumCoordinate } from "./locationContext";
 import { hasSupabaseConfig, supabase } from "./supabase";
 
-export type MeguriBoardAudienceScope = "same_spot" | "same_prefecture" | "global";
+export type MeguriBoardAudienceScope =
+  | "nearby_3km"
+  | "same_prefecture"
+  | "same_spot"
+  | "global";
+export type MeguriBoardViewMode = "nearby_3km" | "same_prefecture";
 
 export type MeguriBoardViewerContext = {
+  coordinate?: MegrumCoordinate | null;
   prefecture: string | null;
   spotKey: string | null;
   spotLabel: string | null;
@@ -30,6 +37,9 @@ export type MeguriBoardThread = {
   latestActivityAt: number;
   latestReplyPreview: string | null;
   mine: boolean;
+  distanceMeters: number | null;
+  originLat: number | null;
+  originLng: number | null;
   prefecture: string | null;
   replyCount: number;
   spotKey: string | null;
@@ -67,6 +77,7 @@ type RemoteReplyRow = Record<string, unknown> & {
 type CreateMeguriBoardThreadInput = {
   audienceScope: MeguriBoardAudienceScope;
   body: string;
+  origin?: MegrumCoordinate | null;
   prefecture: string | null;
   previewMode?: boolean;
   spotKey: string | null;
@@ -78,6 +89,8 @@ type CreateMeguriBoardReplyInput = {
   body: string;
   previewMode?: boolean;
   threadId: string;
+  viewer?: MeguriBoardViewerContext | null;
+  viewMode?: MeguriBoardViewMode;
 };
 
 const THREADS_KEY = "meguri.board.threads.v1";
@@ -120,15 +133,16 @@ const PREVIEW_AUTHORS = {
 } as const;
 
 export const MEGURI_BOARD_AUDIENCE_OPTIONS = [
-  "same_spot",
+  "nearby_3km",
   "same_prefecture",
-  "global",
 ] as const satisfies readonly MeguriBoardAudienceScope[];
 
 export function meguriBoardAudienceLabel(scope: MeguriBoardAudienceScope) {
   switch (scope) {
+    case "nearby_3km":
+      return "3km圏内";
     case "same_spot":
-      return "同じスポット";
+      return "3km圏内";
     case "same_prefecture":
       return "同じ都道府県";
     case "global":
@@ -138,11 +152,20 @@ export function meguriBoardAudienceLabel(scope: MeguriBoardAudienceScope) {
 }
 
 export function meguriBoardAudienceMeta(
-  thread: Pick<MeguriBoardThread, "audienceScope" | "prefecture" | "spotLabel">,
+  thread: Pick<
+    MeguriBoardThread,
+    "audienceScope" | "distanceMeters" | "prefecture" | "spotLabel"
+  >,
 ) {
   switch (thread.audienceScope) {
+    case "nearby_3km":
+      return thread.distanceMeters !== null
+        ? `現在地から${formatDistance(thread.distanceMeters)}`
+        : "3km圏内";
     case "same_spot":
-      return thread.spotLabel || "同じスポット";
+      return thread.distanceMeters !== null
+        ? `現在地から${formatDistance(thread.distanceMeters)}`
+        : thread.spotLabel || "3km圏内";
     case "same_prefecture":
       return thread.prefecture || "同じ都道府県";
     case "global":
@@ -153,13 +176,14 @@ export function meguriBoardAudienceMeta(
 
 export async function loadMeguriBoardThreads(
   viewer: MeguriBoardViewerContext,
-  options: { previewMode?: boolean } = {},
+  options: { previewMode?: boolean; viewMode?: MeguriBoardViewMode } = {},
 ) {
   const usePreviewData = shouldUsePreviewMeguriBoard(viewer.viewerId, options.previewMode);
+  const viewMode = options.viewMode ?? "nearby_3km";
   const [localThreads, localReplies, remoteThreads] = await Promise.all([
     loadLocalMeguriBoardThreads(),
     loadLocalMeguriBoardReplies(),
-    usePreviewData ? Promise.resolve([]) : loadRemoteMeguriBoardThreads().catch(() => []),
+    usePreviewData ? Promise.resolve([]) : loadRemoteMeguriBoardThreads(viewer, viewMode).catch(() => []),
   ]);
   const preview = usePreviewData ? createPreviewMeguriBoardDataset() : null;
   const mergedThreads = dedupeThreads([
@@ -172,7 +196,7 @@ export async function loadMeguriBoardThreads(
     ...localReplies,
   ]);
   return overlayReplySummaries(
-    mergedThreads.filter((thread) => canViewMeguriBoardThread(thread, viewer)),
+    mergedThreads.filter((thread) => canViewMeguriBoardThread(thread, viewer, viewMode)),
     mergedReplies,
   );
 }
@@ -180,13 +204,16 @@ export async function loadMeguriBoardThreads(
 export async function loadMeguriBoardThreadDetail(
   threadId: string,
   viewer: MeguriBoardViewerContext,
-  options: { previewMode?: boolean } = {},
+  options: { previewMode?: boolean; viewMode?: MeguriBoardViewMode } = {},
 ) {
   const usePreviewData = shouldUsePreviewMeguriBoard(viewer.viewerId, options.previewMode);
+  const viewMode = options.viewMode ?? "nearby_3km";
   const [threads, localReplies, remoteReplies] = await Promise.all([
     loadMeguriBoardThreads(viewer, options),
     loadLocalMeguriBoardReplies(),
-    usePreviewData || !threadId ? Promise.resolve([]) : loadRemoteMeguriBoardReplies(threadId).catch(() => []),
+    usePreviewData || !threadId
+      ? Promise.resolve([])
+      : loadRemoteMeguriBoardReplies(threadId, viewer, viewMode).catch(() => []),
   ]);
   const preview = usePreviewData ? createPreviewMeguriBoardDataset() : null;
   const thread = threads.find((candidate) => candidate.id === threadId) ?? null;
@@ -219,10 +246,13 @@ export async function createMeguriBoardThread(
     audienceScope: input.audienceScope,
     body: input.body.trim(),
     createdAt,
+    distanceMeters: input.origin ? 0 : null,
     id: `meguri-board-thread-${createdAt}`,
     latestActivityAt: createdAt,
     latestReplyPreview: null,
     mine: true,
+    originLat: input.origin?.latitude ?? null,
+    originLng: input.origin?.longitude ?? null,
     prefecture: input.prefecture || actor.primaryArea || null,
     replyCount: 0,
     spotKey: input.spotKey,
@@ -266,15 +296,37 @@ function shouldUsePreviewMeguriBoard(viewerId?: string | null, previewMode?: boo
 }
 
 function canViewMeguriBoardThread(
-  thread: Pick<MeguriBoardThread, "audienceScope" | "authorId" | "prefecture" | "spotKey">,
+  thread: Pick<
+    MeguriBoardThread,
+    | "audienceScope"
+    | "authorId"
+    | "distanceMeters"
+    | "originLat"
+    | "originLng"
+    | "prefecture"
+    | "spotKey"
+  >,
   viewer: MeguriBoardViewerContext,
+  viewMode: MeguriBoardViewMode,
 ) {
   if (viewer.viewerId && viewer.viewerId === thread.authorId) return true;
-  if (thread.audienceScope === "global") return true;
   const viewerPrefecture = normalizeAreaKey(viewer.prefecture);
   const threadPrefecture = normalizeAreaKey(thread.prefecture);
-  if (thread.audienceScope === "same_prefecture") {
+  if (viewMode === "same_prefecture") {
+    if (thread.audienceScope !== "same_prefecture" && thread.audienceScope !== "global") return false;
     return !!viewerPrefecture && !!threadPrefecture && viewerPrefecture === threadPrefecture;
+  }
+  if (thread.audienceScope !== "nearby_3km" && thread.audienceScope !== "same_spot") return false;
+  if (thread.distanceMeters !== null) return thread.distanceMeters <= 3000;
+  if (viewer.coordinate && thread.originLat !== null && thread.originLng !== null) {
+    return (
+      haversineMeters(
+        viewer.coordinate.latitude,
+        viewer.coordinate.longitude,
+        thread.originLat,
+        thread.originLng,
+      ) <= 3000
+    );
   }
   if (!viewer.spotKey || !thread.spotKey) {
     return !!viewerPrefecture && !!threadPrefecture && viewerPrefecture === threadPrefecture;
@@ -311,7 +363,7 @@ async function loadLocalMeguriBoardThreads(): Promise<MeguriBoardThread[]> {
   try {
     const parsed = JSON.parse(raw);
     if (!Array.isArray(parsed)) return [];
-    return parsed.filter(isMeguriBoardThread);
+    return parsed.filter(isMeguriBoardThread).map(normalizeStoredThread);
   } catch {
     return [];
   }
@@ -369,58 +421,71 @@ async function syncLocalMeguriBoardThreadForReply(reply: MeguriBoardReply, alrea
   );
 }
 
-async function loadRemoteMeguriBoardThreads(): Promise<MeguriBoardThread[]> {
+async function loadRemoteMeguriBoardThreads(
+  viewer: MeguriBoardViewerContext,
+  viewMode: MeguriBoardViewMode,
+): Promise<MeguriBoardThread[]> {
   if (!supabase || !hasSupabaseConfig) return [];
   const {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return [];
+  const rpc = await supabase.rpc("list_meguri_board_threads_for_viewer", {
+    p_prefecture: viewer.prefecture,
+    p_scope: viewMode,
+    p_viewer_lat: viewer.coordinate?.latitude ?? null,
+    p_viewer_lng: viewer.coordinate?.longitude ?? null,
+  });
+  if (!rpc.error) {
+    const rows: unknown[] = Array.isArray(rpc.data) ? rpc.data : [];
+    return rows
+      .map((row) => remoteMeguriBoardThreadToLocal(row as RemoteThreadRow, user.id))
+      .filter((thread): thread is MeguriBoardThread => !!thread);
+  }
+
   const { data, error } = await supabase
     .from("meguri_board_threads")
-    .select(
-      [
-        "id",
-        "author_id",
-        "title",
-        "body",
-        "audience_scope",
-        "spot_key",
-        "spot_label",
-        "prefecture",
-        "reply_count",
-        "latest_reply_preview",
-        "latest_activity_at",
-        "created_at",
-        "author:users!meguri_board_threads_author_id_fkey(id, display_name, handle, primary_area)",
-      ].join(", "),
-    )
+    .select(remoteThreadSelect(false))
     .order("latest_activity_at", { ascending: false })
     .limit(120);
   if (error) throw error;
   const rows: unknown[] = Array.isArray(data) ? data : [];
   return rows
     .map((row) => remoteMeguriBoardThreadToLocal(row as RemoteThreadRow, user.id))
-    .filter((thread): thread is MeguriBoardThread => !!thread);
+    .filter((thread): thread is MeguriBoardThread => !!thread)
+    .filter((thread) => canViewMeguriBoardThread(thread, viewer, viewMode));
 }
 
-async function loadRemoteMeguriBoardReplies(threadId: string): Promise<MeguriBoardReply[]> {
+async function loadRemoteMeguriBoardReplies(
+  threadId: string,
+  viewer: MeguriBoardViewerContext,
+  viewMode: MeguriBoardViewMode = "nearby_3km",
+): Promise<MeguriBoardReply[]> {
   if (!supabase || !hasSupabaseConfig || !threadId) return [];
   const {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return [];
+  if (isUuidLike(threadId)) {
+    const rpc = await supabase.rpc("list_meguri_board_replies_for_viewer", {
+      p_prefecture: viewer.prefecture,
+      p_scope: viewMode,
+      p_thread_id: threadId,
+      p_viewer_lat: viewer.coordinate?.latitude ?? null,
+      p_viewer_lng: viewer.coordinate?.longitude ?? null,
+    });
+    if (!rpc.error) {
+      const rows: unknown[] = Array.isArray(rpc.data) ? rpc.data : [];
+      return rows
+        .map((row) => remoteMeguriBoardReplyToLocal(row as RemoteReplyRow, user.id))
+        .filter((reply): reply is MeguriBoardReply => !!reply);
+    }
+  }
+  if (!isUuidLike(threadId)) return [];
+
   const { data, error } = await supabase
     .from("meguri_board_replies")
-    .select(
-      [
-        "id",
-        "thread_id",
-        "author_id",
-        "body",
-        "created_at",
-        "author:users!meguri_board_replies_author_id_fkey(id, display_name, handle, primary_area)",
-      ].join(", "),
-    )
+    .select(remoteReplySelect())
     .eq("thread_id", threadId)
     .order("created_at", { ascending: true })
     .limit(300);
@@ -448,32 +513,31 @@ async function appendRemoteMeguriBoardThread(
     author_id: actor.userId,
     audience_scope: input.audienceScope,
     body: input.body.trim(),
+    origin_lat: input.origin?.latitude ?? null,
+    origin_lng: input.origin?.longitude ?? null,
     prefecture: input.prefecture || actor.primaryArea || null,
     spot_key: input.spotKey,
     spot_label: input.spotLabel,
     title: input.title.trim(),
   };
-  const { data, error } = await supabase
+  let { data, error } = await supabase
     .from("meguri_board_threads")
     .insert(payload)
-    .select(
-      [
-        "id",
-        "author_id",
-        "title",
-        "body",
-        "audience_scope",
-        "spot_key",
-        "spot_label",
-        "prefecture",
-        "reply_count",
-        "latest_reply_preview",
-        "latest_activity_at",
-        "created_at",
-        "author:users!meguri_board_threads_author_id_fkey(id, display_name, handle, primary_area)",
-      ].join(", "),
-    )
+    .select(remoteThreadSelect(true))
     .single();
+  if (error && shouldRetryLegacyBoardInsert(error)) {
+    const { origin_lat: _originLat, origin_lng: _originLng, ...rest } = payload;
+    const retry = await supabase
+      .from("meguri_board_threads")
+      .insert({
+        ...rest,
+        audience_scope: legacyAudienceScope(input.audienceScope),
+      })
+      .select(remoteThreadSelect(false))
+      .single();
+    data = retry.data;
+    error = retry.error;
+  }
   if (error || !data) throw error ?? new Error("Failed to create meguri board thread.");
   return remoteMeguriBoardThreadToLocal(data as unknown as RemoteThreadRow, actor.userId);
 }
@@ -491,6 +555,23 @@ async function appendRemoteMeguriBoardReply(
   ) {
     return null;
   }
+  if (input.viewer && isUuidLike(input.threadId)) {
+    const rpc = await supabase.rpc("append_meguri_board_reply_for_viewer", {
+      p_body: input.body.trim(),
+      p_prefecture: input.viewer.prefecture,
+      p_scope: input.viewMode ?? "nearby_3km",
+      p_thread_id: input.threadId,
+      p_viewer_lat: input.viewer.coordinate?.latitude ?? null,
+      p_viewer_lng: input.viewer.coordinate?.longitude ?? null,
+    });
+    if (!rpc.error) {
+      const row = Array.isArray(rpc.data) ? rpc.data[0] : null;
+      const reply = row
+        ? remoteMeguriBoardReplyToLocal(row as RemoteReplyRow, actor.userId)
+        : null;
+      if (reply) return reply;
+    }
+  }
   const { data, error } = await supabase
     .from("meguri_board_replies")
     .insert({
@@ -498,16 +579,7 @@ async function appendRemoteMeguriBoardReply(
       body: input.body.trim(),
       thread_id: input.threadId,
     })
-    .select(
-      [
-        "id",
-        "thread_id",
-        "author_id",
-        "body",
-        "created_at",
-        "author:users!meguri_board_replies_author_id_fkey(id, display_name, handle, primary_area)",
-      ].join(", "),
-    )
+    .select(remoteReplySelect())
     .single();
   if (error || !data) throw error ?? new Error("Failed to create meguri board reply.");
   return remoteMeguriBoardReplyToLocal(data as unknown as RemoteReplyRow, actor.userId);
@@ -517,7 +589,7 @@ function remoteMeguriBoardThreadToLocal(
   row: RemoteThreadRow,
   viewerId: string,
 ): MeguriBoardThread | null {
-  const author = relationObject(row.author);
+  const author = authorObject(row);
   const id = stringValue(row.id);
   const authorId = stringValue(row.author_id) || stringValue(author.id);
   const title = stringValue(row.title);
@@ -538,6 +610,9 @@ function remoteMeguriBoardThreadToLocal(
     latestActivityAt: timestampValue(row.latest_activity_at, timestampValue(row.created_at, Date.now())),
     latestReplyPreview: nullableStringValue(row.latest_reply_preview),
     mine: authorId === viewerId,
+    distanceMeters: nullableNumberValue(row.distance_m),
+    originLat: nullableNumberValue(row.origin_lat),
+    originLng: nullableNumberValue(row.origin_lng),
     prefecture: nullableStringValue(row.prefecture),
     replyCount: numberValue(row.reply_count, 0),
     spotKey: nullableStringValue(row.spot_key),
@@ -550,7 +625,7 @@ function remoteMeguriBoardReplyToLocal(
   row: RemoteReplyRow,
   viewerId: string,
 ): MeguriBoardReply | null {
-  const author = relationObject(row.author);
+  const author = authorObject(row);
   const id = stringValue(row.id);
   const threadId = stringValue(row.thread_id);
   const authorId = stringValue(row.author_id) || stringValue(author.id);
@@ -611,11 +686,14 @@ function createPreviewMeguriBoardDataset() {
         "preview-board-thread-1",
         PREVIEW_AUTHORS.michi,
         "物販列いまどれくらい？",
-        "25ゲート前から見える範囲で、今から並くか迷っています。",
-        "same_spot",
+        "25ゲート前から見える範囲で、今から並ぶか迷っています。",
+        "nearby_3km",
         "tokyo-dome-gate25",
         "東京ドーム 25ゲート前",
         "東京",
+        35.7056,
+        139.7519,
+        420,
         now - 54 * 60000,
       ),
       createPreviewThread(
@@ -627,6 +705,9 @@ function createPreviewMeguriBoardDataset() {
         "ariake-arena-main",
         "有明アリーナ",
         "東京",
+        35.6432,
+        139.7949,
+        null,
         now - 2 * 3600000,
       ),
       createPreviewThread(
@@ -634,10 +715,13 @@ function createPreviewMeguriBoardDataset() {
         PREVIEW_AUTHORS.kiko,
         "今週の現地で持っていって助かったもの",
         "遠征組でも現地勢でも、これは便利だったという小物があれば知りたいです。",
-        "global",
+        "same_prefecture",
         null,
         "今週の現地",
         "大阪",
+        34.6694,
+        135.4762,
+        null,
         now - 7 * 3600000,
       ),
       createPreviewThread(
@@ -645,10 +729,13 @@ function createPreviewMeguriBoardDataset() {
         PREVIEW_AUTHORS.kiko,
         "京セラの入場列、手前は空いてます",
         "2ゲート寄りはまだ余裕ありました。大阪勢向けのメモです。",
-        "same_spot",
+        "nearby_3km",
         "kyocera-dome-gate2",
         "京セラドーム 2ゲート前",
         "大阪",
+        34.6694,
+        135.4762,
+        7800,
         now - 36 * 60000,
       ),
     ],
@@ -667,6 +754,9 @@ function createPreviewThread(
   spotKey: string | null,
   spotLabel: string | null,
   prefecture: string | null,
+  originLat: number | null,
+  originLng: number | null,
+  distanceMeters: number | null,
   createdAt: number,
 ): MeguriBoardThread {
   return {
@@ -681,6 +771,9 @@ function createPreviewThread(
     latestActivityAt: createdAt,
     latestReplyPreview: null,
     mine: false,
+    distanceMeters,
+    originLat,
+    originLng,
     prefecture,
     replyCount: 0,
     spotKey,
@@ -751,6 +844,60 @@ function isMeguriBoardReply(value: unknown): value is MeguriBoardReply {
   );
 }
 
+function normalizeStoredThread(thread: MeguriBoardThread): MeguriBoardThread {
+  return {
+    ...thread,
+    audienceScope: normalizeAudienceScope(thread.audienceScope),
+    distanceMeters: nullableNumberValue(thread.distanceMeters),
+    originLat: nullableNumberValue(thread.originLat),
+    originLng: nullableNumberValue(thread.originLng),
+  };
+}
+
+function remoteThreadSelect(includeLocation: boolean) {
+  return [
+    "id",
+    "author_id",
+    "title",
+    "body",
+    "audience_scope",
+    "spot_key",
+    "spot_label",
+    "prefecture",
+    includeLocation ? "origin_lat" : null,
+    includeLocation ? "origin_lng" : null,
+    "reply_count",
+    "latest_reply_preview",
+    "latest_activity_at",
+    "created_at",
+    "author:users!meguri_board_threads_author_id_fkey(id, display_name, handle, primary_area)",
+  ]
+    .filter(Boolean)
+    .join(", ");
+}
+
+function remoteReplySelect() {
+  return [
+    "id",
+    "thread_id",
+    "author_id",
+    "body",
+    "created_at",
+    "author:users!meguri_board_replies_author_id_fkey(id, display_name, handle, primary_area)",
+  ].join(", ");
+}
+
+function authorObject(row: RemoteThreadRow | RemoteReplyRow): Record<string, unknown> {
+  const nested = relationObject(row.author);
+  if (Object.keys(nested).length > 0) return nested;
+  return {
+    display_name: row.author_display_name,
+    handle: row.author_handle,
+    id: row.author_id,
+    primary_area: row.author_primary_area,
+  };
+}
+
 function relationObject(value: unknown): Record<string, unknown> {
   if (Array.isArray(value)) return objectValue(value[0]);
   return objectValue(value);
@@ -773,11 +920,20 @@ function numberValue(value: unknown, fallback: number) {
   return typeof value === "number" && Number.isFinite(value) ? value : fallback;
 }
 
+function nullableNumberValue(value: unknown) {
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
 function normalizeAudienceScope(value: unknown): MeguriBoardAudienceScope {
-  if (value === "same_spot" || value === "same_prefecture" || value === "global") {
+  if (
+    value === "nearby_3km" ||
+    value === "same_spot" ||
+    value === "same_prefecture" ||
+    value === "global"
+  ) {
     return value;
   }
-  return "global";
+  return "same_prefecture";
 }
 
 function timestampValue(value: unknown, fallback: number) {
@@ -790,4 +946,40 @@ function timestampValue(value: unknown, fallback: number) {
 function normalizeAreaKey(value: string | null) {
   if (!value) return null;
   return value.replace(/\s+/g, "").trim();
+}
+
+function formatDistance(value: number) {
+  if (value < 1000) return `${Math.max(50, Math.round(value / 50) * 50)}m`;
+  return `${(value / 1000).toFixed(value < 10000 ? 1 : 0)}km`;
+}
+
+function haversineMeters(lat1: number, lng1: number, lat2: number, lng2: number) {
+  const radius = 6371000;
+  const toRad = (value: number) => (value * Math.PI) / 180;
+  const dLat = toRad(lat2 - lat1);
+  const dLng = toRad(lng2 - lng1);
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2;
+  return radius * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+function legacyAudienceScope(scope: MeguriBoardAudienceScope): "same_spot" | "same_prefecture" | "global" {
+  if (scope === "nearby_3km") return "same_spot";
+  if (scope === "same_spot" || scope === "same_prefecture" || scope === "global") return scope;
+  return "same_prefecture";
+}
+
+function shouldRetryLegacyBoardInsert(error: unknown) {
+  const message =
+    typeof error === "object" && error && "message" in error
+      ? String((error as { message?: unknown }).message ?? "")
+      : String(error);
+  return (
+    message.includes("origin_lat") ||
+    message.includes("origin_lng") ||
+    message.includes("audience_scope") ||
+    message.includes("meguri_board_threads_audience_scope_check") ||
+    message.includes("meguri_board_scope_context")
+  );
 }

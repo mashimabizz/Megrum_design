@@ -30,6 +30,7 @@
 | **v2.16** | **2026-05-29** | **iter168.73 反映（めぐり配下のスポット掲示板MVPを追加。`meguri_board_threads` / `meguri_board_replies` と scope=`same_spot|same_prefecture|global`、ローカルfallback前提の最小仕様を定義）** |
 | **v2.17** | **2026-05-29** | **iter168.74 反映（郵送交換MVPを実装。`user_mailing_addresses` 実テーブル、`proposals.sender_mailing_address/receiver_mailing_address` スナップショット、合意時固定ルールを追記）** |
 | **v2.18** | **2026-05-29** | **iter168.82 反映（`exchange_method='both'` を追加し、現地・郵送どちらも対応可の打診を保存できるように更新）** |
+| **v2.19** | **2026-05-29** | **iter168.89 反映（グルーム投稿とスポット掲示板スレッドに作成時位置 `origin_lat/origin_lng` を追加。グルームは現在地1km、掲示板は `nearby_3km` / `same_prefecture` で閲覧）** |
 
 ## このドキュメントの位置付け
 
@@ -198,7 +199,7 @@ iter24 で「推し2階層」（グループ/作品 → メンバー/キャラ�
 
 ### `groom_posts`（グルーム投稿 / iter164）
 
-iter162.49 で iOS めぐりホームに追加した、写真中心の24時間スナップ投稿。iter164 で Supabase Storage + DB 永続化へ移行し、iter165 で `groom-posts` Storage を private bucket 化した。閲覧対象は `audience_scope='encountered_people'` かつ `audience_user_ids` に含まれるユーザー、または `same_area` の `area_key` 一致ユーザーだけに制限する。空配列は公開フィード扱いにしない。
+iter162.49 で iOS めぐりホームに追加した、写真中心の24時間スナップ投稿。iter164 で Supabase Storage + DB 永続化へ移行し、iter165 で `groom-posts` Storage を private bucket 化した。iter168.89 以降、通常フィードは投稿時の `origin_lat/origin_lng` と閲覧者の現在地を使い、1km圏内の投稿だけを `list_groom_feed_nearby()` で返す。空配列は公開フィード扱いにしない。
 
 | カラム | 型 | 説明 |
 |---|---|---|
@@ -212,6 +213,7 @@ iter162.49 で iOS めぐりホームに追加した、写真中心の24時間�
 | `audience_user_ids` | uuid[] | 閲覧できるユーザー。`encountered_people` / `followers` では含まれるユーザーのみ表示可 |
 | `place_hint` | text nullable | 「同じイベント圏内」など丸めた場所表示 |
 | `area_key` | text nullable | 厳密位置ではなく、閲覧判定用の粗いエリアキー |
+| `origin_lat` / `origin_lng` | double precision nullable | iter168.89 追加。投稿作成時の位置。画面には正確値を出さず、1km圏内フィード判定に使う |
 | `image_transform` | jsonb | 編集画面での画像の `rotation` / `scale` / `x` / `y` |
 | `text_overlays` | jsonb | テキストオーバーレイ配列 |
 | `stickers` | jsonb | スタンプ等の拡張配列 |
@@ -316,7 +318,7 @@ iter168.43 以降、無料受信者に本文・画像パスを直接返さない
 
 ### `meguri_board_threads`（スポット掲示板スレッド / iter168.73）
 
-めぐり配下で使う、現地の情報共有・雑談向けのスレッド。交換成立のための打診・取引とは切り離し、現地の温度感や列状況、導線、ゆるい雑談を残す。MVPでは exact な「同じスポット」判定は `spot_key` をアプリ側で比較し、DB/RLSでは `author` / `global` / `same prefecture` までを最小防壁にする。
+めぐり配下で使う、現地の情報共有・雑談向けのスレッド。交換成立のための打診・取引とは切り離し、現地の温度感や列状況、導線、ゆるい雑談を残す。iter168.89 以降、スレッド作成時の位置を `origin_lat/origin_lng` に保存し、閲覧は `nearby_3km`（作成地点から3km圏内）または `same_prefecture`（都道府県単位）に絞る。
 
 | カラム | 型 | 説明 |
 |---|---|---|
@@ -324,16 +326,17 @@ iter168.43 以降、無料受信者に本文・画像パスを直接返さない
 | `author_id` | uuid | → users |
 | `title` | text | 1〜80字 |
 | `body` | text | 1〜500字 |
-| `audience_scope` | text | `same_spot` / `same_prefecture` / `global` |
-| `spot_key` | text nullable | 現在のスポットを表す粗いキー。`same_spot` の時は必須 |
+| `audience_scope` | text | `nearby_3km` / `same_prefecture`。`same_spot` / `global` は過去データ互換 |
+| `spot_key` | text nullable | 互換用の粗いスポットキー。新規仕様では閲覧判定の主軸にしない |
 | `spot_label` | text nullable | 画面表示用のスポット名 |
-| `prefecture` | text nullable | 閲覧判定・表示用の都道府県。`same_prefecture` / `same_spot` の時は必須 |
+| `prefecture` | text nullable | 閲覧判定・表示用の都道府県。`nearby_3km` / `same_prefecture` の時は必須 |
+| `origin_lat` / `origin_lng` | double precision nullable | iter168.89 追加。スレッド作成時の位置。`nearby_3km` では必須 |
 | `reply_count` | integer | 返信数のサマリ |
 | `latest_reply_preview` | text nullable | 最新返信の先頭160字 |
 | `latest_activity_at` | timestamptz | スレッド作成または最新返信時刻 |
 | `created_at` / `updated_at` | timestamptz | |
 
-> **MVP簡略化**：サーバー側は `same_spot` を「同じ都道府県までは見える」に寄せ、最終的な exact spot 判定はクライアントの `spot_key` で行う。将来、現在スポットを永続化できたら RLS / RPC 側へ寄せ直す。
+> **公開範囲方針**：`nearby_3km` は現在地と `origin_lat/origin_lng` の距離でRPC判定する。`same_prefecture` はスレッド作成時の都道府県と閲覧者側の都道府県で判定する。正確な緯度経度は画面に表示しない。
 
 ### `meguri_board_replies`（スポット掲示板返信 / iter168.73）
 

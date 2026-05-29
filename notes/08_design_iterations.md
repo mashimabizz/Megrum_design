@@ -4,6 +4,92 @@
 
 ---
 
+## イテレーション168.89：グルームと掲示板の位置スコープ整理
+
+### 背景・問題意識
+
+オーナーから、グルームは周囲1km圏内にいる人のものが一覧に出るようにし、掲示板は都道府県単位または3km圏内のスレッドを見られるようにしたいという依頼があった。掲示板の3km判定は、スレッドを立てた時の位置情報を基準にする。
+
+### 変更内容
+
+#### `mobile/src/lib/locationContext.ts`
+- 現在地・都道府県・表示用ラベルを取得する共通ヘルパーを追加した。
+- 掲示板詳細への遷移時に渡す緯度経度パラメータを安全に数値化する補助関数を追加した。
+
+#### `mobile/src/lib/groom.ts`
+- `fetchGroomFeed()` に閲覧者の現在地を渡せるようにし、Supabase RPC `list_groom_feed_nearby` が使える場合は1km圏内の投稿だけを取得するようにした。
+- `createGroomPost()` に投稿時位置を保存する `origin` を追加した。
+- migration未適用時は従来カラムのみでリトライし、アプリが即時クラッシュしないようにした。
+
+#### `mobile/app/(tabs)/encounters.tsx`
+- グルーム一覧取得時に現在地を取得し、1km圏内フィードへ渡すようにした。
+- グルーム投稿時は位置情報を必須にし、投稿時位置をDBへ渡すようにした。
+
+#### `mobile/src/lib/meguriBoard.ts`
+- 掲示板の公開範囲を `nearby_3km` / `same_prefecture` に更新し、`same_spot` / `global` はlegacy互換扱いにした。
+- スレッドに `originLat/originLng/distanceMeters` を持たせ、3km圏内判定と距離表示に使うようにした。
+- 一覧・返信・返信追加は位置コンテキスト付きRPCを優先し、ローカル/preview fallbackも同じ公開範囲で絞るようにした。
+
+#### `mobile/app/meguri-board.tsx`
+- 掲示板一覧を `3km圏内` / `都道府県` のセグメント切り替えに変更した。
+- スレッド作成時の公開範囲も `3km圏内` / `都道府県` に変更した。
+- `3km圏内` スレッド作成時は位置情報を必須にし、作成時位置を保存するようにした。
+
+#### `mobile/app/meguri-board-thread.tsx`
+- スレッド詳細と返信送信にも閲覧者の位置・都道府県・表示モードを渡し、公開範囲内のスレッドだけ開けるようにした。
+
+#### `supabase/migrations/20260529191000_add_location_scoped_groom_board.sql`
+- `groom_posts` / `meguri_board_threads` に `origin_lat/origin_lng` を追加した。
+- Haversine距離計算関数を追加した。
+- グルーム1kmフィード用RPC、掲示板3km/都道府県一覧・返信用RPCを追加した。
+
+#### `notes/23_meguri_board_thread_spec.md`
+- 掲示板を欲しがるユーザー、参考にするスレッド型体験、MVP仕様、後回し項目を整理した。
+
+### 影響範囲
+
+- iOS版 めぐりホームのグルーム一覧/投稿
+- iOS版 `/meguri-board`
+- iOS版 `/meguri-board-thread`
+- Supabase `groom_posts` / `meguri_board_threads` / 掲示板RPC
+- notes 05 / 09 / 10 / 13 / 23
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npx supabase db push`
+- `npm --prefix mobile run export:ios:preview`
+- `EXPO_NO_GIT_STATUS=1 EAS_UPDATE_PROJECT_SLUG=ihub npm --prefix mobile run update:ios:preview -- --message "[iter168.89] グルーム掲示板位置スコープ" --non-interactive`
+- Preview channel OTA配信済み：Update group `222049ff-154c-4e15-ac2b-35bbedd445ac` / iOS update ID `019e7409-5342-7603-b461-6a576fec6a2a`
+- EAS Dashboard: `https://expo.dev/accounts/mashima.bizz/projects/ihub/updates/222049ff-154c-4e15-ac2b-35bbedd445ac`
+- `git diff --check -- mobile/src/lib/locationContext.ts mobile/src/lib/groom.ts mobile/src/lib/meguriBoard.ts mobile/app/(tabs)/encounters.tsx mobile/app/meguri-board.tsx mobile/app/meguri-board-thread.tsx supabase/migrations/20260529191000_add_location_scoped_groom_board.sql notes/05_data_model.md notes/09_state_machines.md notes/10_glossary.md notes/13_api_spec.md notes/23_meguri_board_thread_spec.md`
+
+### 関連ファイル
+
+- `mobile/src/lib/locationContext.ts`
+- `mobile/src/lib/groom.ts`
+- `mobile/src/lib/meguriBoard.ts`
+- `mobile/app/(tabs)/encounters.tsx`
+- `mobile/app/meguri-board.tsx`
+- `mobile/app/meguri-board-thread.tsx`
+- `supabase/migrations/20260529191000_add_location_scoped_groom_board.sql`
+- `notes/23_meguri_board_thread_spec.md`
+
+### セルフレビュー結果
+
+- ✅ グルーム一覧は現在地1km圏内をRPC優先で取得
+- ✅ グルーム投稿時に作成時位置を保存
+- ✅ 掲示板一覧は `3km圏内` / `都道府県` の2択へ変更
+- ✅ 3km圏内スレッドの基準地点は作成時位置
+- ✅ Supabase remote DBへmigration適用済み
+- ✅ Preview channel / iOS runtime `0.1.0` へOTA配信済み
+- ✅ 正確な緯度経度を画面表示しない
+- ✅ 09更新診断：GroomのビジネスルールとBoard Lifecycleを更新
+- ✅ 10更新診断：グルーム/掲示板/スレッド/掲示板公開範囲を更新
+- ✅ 05更新診断：`origin_lat/origin_lng` とRPC追加を反映
+
+---
+
 ## イテレーション168.88：Preview OTA配信設定の復旧
 
 ### 背景・問題意識

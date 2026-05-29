@@ -50,6 +50,7 @@ import {
 } from "../../src/lib/groom";
 import { appendMeguriGroomReply } from "../../src/lib/meguriMessages";
 import { useKeyboardInset } from "../../src/lib/useKeyboardInset";
+import { getCurrentLocationContext, type MegrumLocationContext } from "../../src/lib/locationContext";
 
 const GROOM_CAMERA_QUALITY = 0.88;
 const GROOM_LIBRARY_QUALITY = 0.88;
@@ -582,6 +583,7 @@ export default function EncountersScreen() {
   const [groomOpenOrigin, setGroomOpenOrigin] = useState<GroomOpenOrigin | null>(null);
   const [groomViewerSession, setGroomViewerSession] = useState(0);
   const [viewedGroomKeys, setViewedGroomKeys] = useState<Set<string>>(() => new Set());
+  const [groomLocationContext, setGroomLocationContext] = useState<MegrumLocationContext | null>(null);
   const groomToastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const selectedGroomPost = groomPosts.find((post) => post.id === selectedGroomId) ?? null;
   const lockedLetters = previewMode && !plusActive ? LETTERS.length : 0;
@@ -610,7 +612,9 @@ export default function EncountersScreen() {
       return;
     }
     try {
-      const remotePosts = await fetchGroomFeed(user.id);
+      const locationContext = await getCurrentLocationContext().catch(() => null);
+      setGroomLocationContext(locationContext);
+      const remotePosts = await fetchGroomFeed(user.id, locationContext?.coordinate ?? null);
       const nextPosts = remotePosts.map(remotePostToGroomPost);
       setGroomPosts(nextPosts);
       setViewedGroomKeys(
@@ -696,6 +700,17 @@ export default function EncountersScreen() {
     const draftUri = groomDraftUri;
     const draftBase64 = groomDraftBase64;
     const draftContentType = groomDraftContentType;
+    const locationContext =
+      previewMode || !user ? groomLocationContext : await getCurrentLocationContext().catch(() => null);
+    if (!previewMode && user && !locationContext?.coordinate) {
+      Alert.alert(
+        "位置情報を確認できませんでした",
+        "グルームは周囲1km圏内の一覧に出すため、投稿時の位置情報が必要です。位置情報の許可を確認してからもう一度投稿してください。",
+      );
+      return;
+    }
+    setGroomLocationContext(locationContext);
+    const placeHint = locationContext?.label ? `${locationContext.label}付近` : "今日の現場付近";
     const optimisticId = `groom-mine-${Date.now()}`;
     const newPost: GroomPost = {
       id: optimisticId,
@@ -706,7 +721,7 @@ export default function EncountersScreen() {
       imageTransform: payload.imageTransform,
       liked: false,
       mine: true,
-      placeHint: "今日の現場付近",
+      placeHint,
       stickers: payload.stickers,
       textOverlays: payload.textOverlays,
       timeLabel: "たった今",
@@ -725,7 +740,8 @@ export default function EncountersScreen() {
         imageContentType: draftContentType,
         imageTransform: payload.imageTransform,
         imageUri: draftUri,
-        placeHint: "今日の現場付近",
+        origin: locationContext?.coordinate ?? null,
+        placeHint,
         stickers: payload.stickers,
         textOverlays: payload.textOverlays,
       });

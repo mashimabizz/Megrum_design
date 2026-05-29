@@ -4,7 +4,7 @@
 > 実装が状態遷移でブレないための一次資料。デザイン・実装・QA の共通言語。
 
 最終更新: 2026-05-29
-ステータス: Draft v1.2（iter168.71 郵送交換のビジネスルールを追記）
+ステータス: Draft v1.3（iter168.89 グルーム/掲示板の位置スコープを追記）
 
 ---
 
@@ -36,8 +36,9 @@
 10. [Local Mode（現地モード / iter63〜）](#10-local-mode)
 11. [Meguri Message Lifecycle（めぐりメッセージ）](#11-meguri-message-lifecycle)
 12. [Groom Lifecycle（グルーム）](#12-groom-lifecycle)
-13. [Admin / Billing Lifecycle（管理者・有料権限）](#13-admin--billing-lifecycle管理者有料権限)
-14. [付録：エンティティ間の関係](#14-付録エンティティ間の関係)
+13. [Meguri Board Lifecycle（スポット掲示板）](#13-meguri-board-lifecycleスポット掲示板)
+14. [Admin / Billing Lifecycle（管理者・有料権限）](#14-admin--billing-lifecycle管理者有料権限)
+15. [付録：エンティティ間の関係](#15-付録エンティティ間の関係)
 
 ---
 
@@ -659,7 +660,8 @@ stateDiagram-v2
 
 ### ビジネスルール
 
-- 表示対象は「めぐりあった人」または同じ現場圏内に限定し、フォロー/フォロワー関係を前提にしない。
+- 表示対象は現在地から1km圏内の投稿に限定し、フォロー/フォロワー関係を前提にしない。
+- 投稿時に `origin_lat/origin_lng` を保存する。画面には正確な位置を出さず、`place_hint` の丸めた表示だけを使う。
 - 場所と時刻は必ず丸め、正確な現在地・生活導線・滞在時刻を特定できる表示にしない。
 - グルームへの返信は、めぐりメッセージ導線へつなげる。交換・打診・取引へは自動遷移しない。
 - iter165 以降、`encountered_people` の閲覧は `audience_user_ids` に含まれるユーザーだけに制限する。空配列を公開フィード扱いにしない。
@@ -673,7 +675,40 @@ stateDiagram-v2
 
 ---
 
-## 13. Admin / Billing Lifecycle（管理者・有料権限）
+## 13. Meguri Board Lifecycle（スポット掲示板）
+
+めぐり内のスレッド型掲示板。交換成立そのものではなく、現地の情報共有・雑談・列状況・導線共有を扱う。
+
+### 状態図
+
+```mermaid
+stateDiagram-v2
+    [*] --> visible: スレッド作成
+    visible --> visible: 返信追加
+    visible --> hidden: 通報対応 / 管理者非表示
+    hidden --> archived: 保全期間終了
+```
+
+### 状態定義
+
+| 状態 | 説明 |
+|---|---|
+| `visible` | 公開範囲に入るユーザーが一覧・詳細で閲覧できる状態 |
+| `hidden` | 通報対応や管理者判断で通常表示から外した状態 |
+| `archived` | 保全・分析用に残し、通常ユーザーには表示しない状態 |
+
+### ビジネスルール
+
+- 新規スレッドの公開範囲は `nearby_3km` / `same_prefecture` の2択。
+- `nearby_3km` はスレッド作成時の `origin_lat/origin_lng` を基準に、閲覧者の現在地から3km以内なら表示する。
+- `same_prefecture` はスレッド作成時の都道府県を基準に、閲覧者側の都道府県と一致する場合に表示する。
+- 返信はチャット形式の追記型。MVPでは編集・削除は提供せず、通報・管理者非表示で対応する。
+- スレッドは交換依頼・取引チャットへ自動遷移しない。必要ならユーザープロフィールやグッズ交換導線から別フローで開始する。
+- 正確な緯度経度は画面に表示しない。表示上は「3km圏内」「都道府県」などの丸めた文言だけを使う。
+
+---
+
+## 14. Admin / Billing Lifecycle（管理者・有料権限）
 
 iter166 で、管理者ページ・管理者権限・Premium等の有料権限を実装するための状態を追加した。
 管理者の操作は必ず `admin_audit_logs` に記録し、ユーザー側の有料機能判定は `subscriptions` の生状態ではなく `user_entitlements` の集約結果を見る。
@@ -732,7 +767,7 @@ stateDiagram-v2
 - Stripe webhook は `stripe_webhook_events.event_id` で重複処理を防ぎ、`subscriptions` 更新後に plan_type に応じて `user_entitlements(feature_key='premium' | 'meguri_plus')` を upsert する。
 - 手動上書きは `plan_overrides` に履歴を残し、同時に `user_entitlements` を更新する。
 
-## 14. 付録：エンティティ間の関係
+## 15. 付録：エンティティ間の関係
 
 ```mermaid
 graph LR
