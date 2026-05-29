@@ -4,6 +4,52 @@
 
 ---
 
+## イテレーション204：掲示板一覧に投稿者プロフィール導線を追加
+
+### 背景・問題意識
+
+スレッド詳細では投稿者プロフィールへ移動できるようにしたが、一覧で気になったスレッドの作者を確認したい場面もある。掲示板一覧のアクションからも投稿者プロフィールへ移動できるようにした。
+
+### 変更内容
+
+#### `mobile/app/meguri-board.tsx`
+- 掲示板一覧のスレッドアクションシートに `投稿者プロフィール` / `自分のプロフィール` を追加した。
+- 自分のスレッドの場合はプロフィールタブへ、相手のスレッドの場合は `user-profile` へ遷移するようにした。
+
+#### `notes/09_state_machines.md`
+- Meguri Board Lifecycle に一覧側の投稿者プロフィール導線を追記した。
+
+#### `notes/10_glossary.md`
+- 掲示板一覧投稿者プロフィール導線を追加した。
+
+### 影響範囲
+
+- iOS版 スポット掲示板一覧
+- スレッドアクションシート
+- 相手プロフィール閲覧導線
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- `EAS_UPDATE_PROJECT_SLUG=ihub EXPO_NO_GIT_STATUS=1 npm --prefix mobile run update:ios:preview -- --message "[iter204] add board list author profile action" --non-interactive`
+- Preview OTA: Update group `473ce146-728f-4517-a29c-19e0580e7780` / iOS update `019e7572-4220-714a-ac46-6a5a6e1e691b`
+
+### 関連ファイル
+
+- `mobile/app/meguri-board.tsx`
+- `notes/08_design_iterations.md`
+- `notes/09_state_machines.md`
+- `notes/10_glossary.md`
+
+### セルフレビュー結果
+
+- ✅ 詳細画面と同じ遷移方針にそろえ、自分/相手で遷移先を分けた。
+- ✅ スレッドカード本体のタップは詳細表示のまま維持し、既存操作と競合しないようにした。
+- ✅ DB変更やネイティブ依存追加なしで、Preview OTA対象内に収めた。
+
+---
+
 ## イテレーション203：掲示板投稿者プロフィール導線を追加
 
 ### 背景・問題意識
