@@ -4,6 +4,55 @@
 
 ---
 
+## イテレーション234：掲示板参加者一覧を検索できるようにする
+
+### 背景・問題意識
+
+スポット掲示板のスレッドが伸びると参加者数も増え、参加者一覧から特定の人を探すのが難しくなる。一般的なスレッド機能として、参加者一覧内で名前、@ID、エリア、自分/作成者ラベルを検索できるようにした。
+
+### 変更内容
+
+#### `mobile/app/meguri-board-thread.tsx`
+- 参加者一覧モーダルに検索欄を追加した。
+- `participantSearchText` / `filteredParticipants` を追加し、名前、handle、`@handle`、エリア、あなた/作成者ラベルで絞り込めるようにした。
+- 検索中は `該当人数/全参加者数` を表示し、該当なしの場合は空状態カードを出すようにした。
+- 参加者一覧を閉じる時や参加者から返信フィルタ/プロフィールへ進む時は検索語をクリアするようにした。
+
+#### `notes/09_state_machines.md`
+- Meguri Board Lifecycle に参加者一覧検索の表示ルールを追記した。
+
+#### `notes/10_glossary.md`
+- 掲示板参加者検索を追加した。
+
+### 影響範囲
+
+- iOS版 スポット掲示板詳細
+- 参加者一覧モーダル
+- 参加者別返信フィルタ
+- 投稿者プロフィール導線
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- `EAS_UPDATE_PROJECT_SLUG=ihub EXPO_NO_GIT_STATUS=1 npm --prefix mobile run update:ios:preview -- --message "[iter234] search board participants" --non-interactive`
+- Preview OTA: Update group `f93f12ad-3f89-4dac-a21d-59bf5b1ed028` / iOS update `019e75fb-18c9-7364-ac15-4f715c6ebbed`
+
+### 関連ファイル
+
+- `mobile/app/meguri-board-thread.tsx`
+- `notes/08_design_iterations.md`
+- `notes/09_state_machines.md`
+- `notes/10_glossary.md`
+
+### セルフレビュー結果
+
+- ✅ 既存の参加者一覧/参加者別返信フィルタを維持したまま、一覧内検索だけを追加した。
+- ✅ DB変更なし、ネイティブ依存追加なしでPreview OTA対象内に収めた。
+- ✅ 検索語はモーダル内の一時状態に留め、スレッドや返信状態を変えないようにした。
+
+---
+
 ## イテレーション233：引用元から読んでいた返信へ戻れるようにする
 
 ### 背景・問題意識

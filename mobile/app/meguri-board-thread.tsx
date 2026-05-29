@@ -158,6 +158,7 @@ export default function MeguriBoardThreadScreen() {
   const [imagePreviewUri, setImagePreviewUri] = useState<string | null>(null);
   const [previousReadAt, setPreviousReadAt] = useState<number | null>(null);
   const [participantsOpen, setParticipantsOpen] = useState(false);
+  const [participantSearchText, setParticipantSearchText] = useState("");
   const [mediaGalleryOpen, setMediaGalleryOpen] = useState(false);
   const [threadInfoOpen, setThreadInfoOpen] = useState(false);
   const [threadBodyExpanded, setThreadBodyExpanded] = useState(false);
@@ -352,6 +353,28 @@ export default function MeguriBoardThreadScreen() {
     });
   }, [actor.userId, replies, thread]);
 
+  const participantSearchQuery = useMemo(
+    () => normalizeReplySearch(participantSearchText),
+    [participantSearchText],
+  );
+
+  const filteredParticipants = useMemo(() => {
+    if (!participantSearchQuery) return participants;
+    return participants.filter((participant) => {
+      const searchable = [
+        participant.name,
+        participant.handle,
+        participant.handle ? `@${participant.handle.replace(/^@/, "")}` : null,
+        participant.primaryArea,
+        participant.mine ? "あなた" : null,
+        participant.isAuthor ? "作成者" : null,
+      ]
+        .filter(Boolean)
+        .join(" ");
+      return normalizeReplySearch(searchable).includes(participantSearchQuery);
+    });
+  }, [participantSearchQuery, participants]);
+
   const mediaAttachments = useMemo<BoardMediaAttachment[]>(() => {
     if (!thread) return [];
     const attachments: BoardMediaAttachment[] = thread.imageUris.map((uri, index) => ({
@@ -498,11 +521,21 @@ export default function MeguriBoardThreadScreen() {
     });
   }
 
+  function openParticipants() {
+    setParticipantSearchText("");
+    setParticipantsOpen(true);
+  }
+
+  function closeParticipants() {
+    setParticipantsOpen(false);
+    setParticipantSearchText("");
+  }
+
   function filterRepliesByParticipant(participant: BoardParticipant) {
     if (participant.replyCount === 0) return;
     setReplySearchText(participant.handle || participant.name);
     setReplySearchSource({ label: participant.name, type: "participant" });
-    setParticipantsOpen(false);
+    closeParticipants();
   }
 
   function filterRepliesByReplyAuthor(reply: MeguriBoardReply) {
@@ -1495,7 +1528,7 @@ export default function MeguriBoardThreadScreen() {
                   </Pressable>
                   <Pressable
                     accessibilityRole="button"
-                    onPress={() => setParticipantsOpen(true)}
+                    onPress={openParticipants}
                     style={styles.threadActionPill}
                   >
                     <Text style={styles.threadActionText}>参加者 {participants.length}</Text>
@@ -1987,23 +2020,25 @@ export default function MeguriBoardThreadScreen() {
         )}
         <Modal
           animationType="slide"
-          onRequestClose={() => setParticipantsOpen(false)}
+          onRequestClose={closeParticipants}
           transparent
           visible={participantsOpen}
         >
           <View style={styles.modalOverlay}>
             <Pressable
               accessibilityRole="button"
-              onPress={() => setParticipantsOpen(false)}
+              onPress={closeParticipants}
               style={StyleSheet.absoluteFill}
             />
             <View style={[styles.editorCard, styles.participantsCard]}>
-                  <View style={styles.participantsHeader}>
-                    <View style={styles.participantsTitleBlock}>
-                      <Text style={styles.editorEyebrow}>THREAD</Text>
-                      <Text style={styles.editorTitle}>参加者</Text>
+              <View style={styles.participantsHeader}>
+                <View style={styles.participantsTitleBlock}>
+                  <Text style={styles.editorEyebrow}>THREAD</Text>
+                  <Text style={styles.editorTitle}>参加者</Text>
                   <Text style={styles.participantsLead}>
-                    {participants.length}人がこのスレッドに参加しています
+                    {participantSearchQuery
+                      ? `${filteredParticipants.length}/${participants.length}人が該当しています`
+                      : `${participants.length}人がこのスレッドに参加しています`}
                   </Text>
                   <Text style={styles.participantsHint}>
                     返信している人をタップすると、その人の返信だけを表示します
@@ -2011,17 +2046,42 @@ export default function MeguriBoardThreadScreen() {
                 </View>
                 <Pressable
                   accessibilityRole="button"
-                  onPress={() => setParticipantsOpen(false)}
+                  onPress={closeParticipants}
                   style={styles.participantsCloseButton}
                 >
                   <IconSymbol name="close" color={megrumColors.mutedInk} size={16} />
                 </Pressable>
               </View>
+              <View style={styles.participantsSearchBox}>
+                <IconSymbol name="search" color="rgba(58,50,74,0.42)" size={15} />
+                <TextInput
+                  onChangeText={setParticipantSearchText}
+                  placeholder="名前・@ID・エリアで検索"
+                  placeholderTextColor="rgba(58,50,74,0.34)"
+                  style={styles.participantsSearchInput}
+                  value={participantSearchText}
+                />
+                {participantSearchText.trim() ? (
+                  <Pressable
+                    accessibilityRole="button"
+                    hitSlop={8}
+                    onPress={() => setParticipantSearchText("")}
+                  >
+                    <IconSymbol name="close" color="rgba(58,50,74,0.42)" size={15} />
+                  </Pressable>
+                ) : null}
+              </View>
               <ScrollView
                 contentContainerStyle={styles.participantsList}
                 showsVerticalScrollIndicator={false}
               >
-                {participants.map((participant) => (
+                {filteredParticipants.length === 0 ? (
+                  <View style={styles.participantsEmptyCard}>
+                    <Text style={styles.participantsEmptyTitle}>該当する参加者がいません</Text>
+                    <Text style={styles.participantsEmptyBody}>名前、@ID、エリアを変えて探してみてください。</Text>
+                  </View>
+                ) : null}
+                {filteredParticipants.map((participant) => (
                   <Pressable
                     accessibilityRole="button"
                     disabled={participant.replyCount === 0}
@@ -2078,7 +2138,7 @@ export default function MeguriBoardThreadScreen() {
                           hitSlop={8}
                           onPress={(event) => {
                             event.stopPropagation();
-                            setParticipantsOpen(false);
+                            closeParticipants();
                             openBoardUserProfile(participant.id);
                           }}
                           style={styles.participantProfileButton}
@@ -3836,9 +3896,49 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     width: 34,
   },
+  participantsSearchBox: {
+    alignItems: "center",
+    backgroundColor: "#fff",
+    borderColor: "rgba(58,50,74,0.08)",
+    borderRadius: 16,
+    borderWidth: 1,
+    flexDirection: "row",
+    gap: 8,
+    minHeight: 42,
+    paddingHorizontal: 12,
+  },
+  participantsSearchInput: {
+    color: megrumColors.ink,
+    flex: 1,
+    fontSize: 13,
+    fontWeight: "800",
+    padding: 0,
+  },
   participantsList: {
     gap: 8,
     paddingTop: 4,
+  },
+  participantsEmptyCard: {
+    alignItems: "center",
+    backgroundColor: "rgba(251,249,252,0.96)",
+    borderColor: "rgba(58,50,74,0.06)",
+    borderRadius: 18,
+    borderWidth: 1,
+    gap: 5,
+    paddingHorizontal: 14,
+    paddingVertical: 18,
+  },
+  participantsEmptyTitle: {
+    color: megrumColors.ink,
+    fontSize: 13,
+    fontWeight: "900",
+  },
+  participantsEmptyBody: {
+    color: megrumColors.mutedInk,
+    fontSize: 11.5,
+    fontWeight: "800",
+    lineHeight: 17,
+    textAlign: "center",
   },
   participantRow: {
     alignItems: "center",
