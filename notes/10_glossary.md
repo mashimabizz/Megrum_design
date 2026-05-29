@@ -4,7 +4,7 @@
 > 新環境（別Claudeセッション・別エンジニア）でも、これだけ読めばコンテキストがつかめる。
 
 最終更新: 2026-05-30
-ステータス: Draft v1.9（iter178 掲示板ユーザーブロックを反映）
+ステータス: Draft v2.0（iter179 掲示板通報理由を反映）
 
 ---
 
@@ -193,6 +193,7 @@
 | **掲示板画像添付** | board image attachment | スポット掲示板のスレッドまたは返信に最大4枚まで添付できる画像。private Storage path をDBに保存し、閲覧可能な時だけ署名URLで表示する | iter176 |
 | **スレッド共有** | thread share | スポット掲示板のスレッドをiOS標準共有シートで共有する機能。タイトル・本文・アプリ内deep linkを渡す | iter177 |
 | **掲示板ユーザーブロック** | board user block | スポット掲示板で特定ユーザーのスレッド/返信を表示しない機能。`groom_user_blocks` を共用し、相互に表示・返信通知・メンション通知を抑制する | iter178 |
+| **掲示板通報理由** | board report reason | スポット掲示板のスレッド/返信を通報する時に選ぶ理由。`spam` / `harassment` / `privacy` / `unsafe` / `off_topic` / `other` を使う | iter179 |
 
 ## G. 画面識別子
 

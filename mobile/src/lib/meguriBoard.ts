@@ -20,6 +20,13 @@ export type MeguriBoardThreadCategory =
   | "trade"
   | "lost_found";
 export type MeguriBoardThreadSort = "active" | "new" | "hot" | "saved" | "subscribed";
+export type MeguriBoardReportReason =
+  | "spam"
+  | "harassment"
+  | "privacy"
+  | "unsafe"
+  | "off_topic"
+  | "other";
 export type MeguriBoardReplyStatus = "visible" | "deleted";
 
 export type MeguriBoardViewerContext = {
@@ -225,6 +232,15 @@ export const MEGURI_BOARD_SORT_OPTIONS = [
   "subscribed",
 ] as const satisfies readonly MeguriBoardThreadSort[];
 
+export const MEGURI_BOARD_REPORT_REASONS = [
+  "spam",
+  "harassment",
+  "privacy",
+  "unsafe",
+  "off_topic",
+  "other",
+] as const satisfies readonly MeguriBoardReportReason[];
+
 export function meguriBoardAudienceLabel(scope: MeguriBoardAudienceScope) {
   switch (scope) {
     case "nearby_3km":
@@ -272,6 +288,24 @@ export function meguriBoardSortLabel(sort: MeguriBoardThreadSort) {
       return "通知";
     default:
       return "更新";
+  }
+}
+
+export function meguriBoardReportReasonLabel(reason: MeguriBoardReportReason) {
+  switch (reason) {
+    case "spam":
+      return "迷惑投稿";
+    case "harassment":
+      return "嫌がらせ";
+    case "privacy":
+      return "個人情報";
+    case "unsafe":
+      return "危険・違法";
+    case "off_topic":
+      return "掲示板に無関係";
+    case "other":
+    default:
+      return "その他";
   }
 }
 

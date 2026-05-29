@@ -3,8 +3,8 @@
 > **目的**：Megrum のバックエンドAPI（REST）の draft 仕様。実装着手時の正解集。
 > 全エンドポイントを `[METHOD /path]` の形式で網羅し、各々で入力・出力・認証要否・状態遷移・備考を定義。
 
-最終更新: 2026-05-30（iter178）
-ステータス: Draft v1.4
+最終更新: 2026-05-30（iter179）
+ステータス: Draft v1.5
 
 ---
 
@@ -1167,12 +1167,12 @@ AW削除。
   {
     "thread_id": "uuid?",
     "reply_id": "uuid?",
-    "reason": "user_report",
+    "reason": "spam|harassment|privacy|unsafe|off_topic|other",
     "body": "string?"
   }
   ```
 - **Response 201**: `{ id, status, created_at }`
-- **備考**: `thread_id` と `reply_id` はどちらか一方だけ指定。運営画面で `open` / `reviewing` / `resolved` / `rejected` を管理する
+- **備考**: `thread_id` と `reply_id` はどちらか一方だけ指定。iOSでは送信前に理由選択のActionSheetを表示する。運営画面で `open` / `reviewing` / `resolved` / `rejected` を管理する
 - **Screen**: `meguri-board`, `meguri-board-thread`
 
 ---

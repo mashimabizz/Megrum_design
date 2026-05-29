@@ -26,6 +26,7 @@ import {
   MEGURI_BOARD_AUDIENCE_OPTIONS,
   MEGURI_BOARD_CATEGORY_OPTIONS,
   MEGURI_BOARD_COMPOSER_CATEGORY_OPTIONS,
+  MEGURI_BOARD_REPORT_REASONS,
   MEGURI_BOARD_SORT_OPTIONS,
   blockMeguriBoardUser,
   createMeguriBoardThread,
@@ -35,6 +36,7 @@ import {
   meguriBoardAudienceLabel,
   meguriBoardAudienceMeta,
   meguriBoardCategoryLabel,
+  meguriBoardReportReasonLabel,
   meguriBoardSortLabel,
   reportMeguriBoardThread,
   setMeguriBoardThreadBookmarked,
@@ -42,6 +44,7 @@ import {
   setMeguriBoardThreadSubscribed,
   type MeguriBoardActor,
   type MeguriBoardAudienceScope,
+  type MeguriBoardReportReason,
   type MeguriBoardThreadCategory,
   type MeguriBoardThreadSort,
   type MeguriBoardThread,
@@ -398,10 +401,32 @@ export default function MeguriBoardScreen() {
     await hideMeguriBoardThread(thread.id);
   }
 
-  async function reportThread(thread: MeguriBoardThread) {
+  async function reportThread(thread: MeguriBoardThread, reason: MeguriBoardReportReason) {
     updateThreadLocally({ ...thread, reported: true });
-    await reportMeguriBoardThread(thread.id);
+    await reportMeguriBoardThread(thread.id, reason);
     Alert.alert("通報しました", "確認して対応します。");
+  }
+
+  function openReportReasonPicker(thread: MeguriBoardThread) {
+    if (thread.reported) return;
+    if (Platform.OS !== "ios") {
+      void reportThread(thread, "other");
+      return;
+    }
+    const labels = MEGURI_BOARD_REPORT_REASONS.map(meguriBoardReportReasonLabel);
+    const cancelButtonIndex = labels.length;
+    ActionSheetIOS.showActionSheetWithOptions(
+      {
+        cancelButtonIndex,
+        options: [...labels, "キャンセル"],
+        title: "通報理由を選択",
+      },
+      (index) => {
+        const reason = MEGURI_BOARD_REPORT_REASONS[index];
+        if (!reason) return;
+        void reportThread(thread, reason);
+      },
+    );
   }
 
   async function shareThread(thread: MeguriBoardThread) {
@@ -449,7 +474,7 @@ export default function MeguriBoardScreen() {
     actions.push({
       disabled: thread.reported,
       label: thread.reported ? "通報済み" : "通報する",
-      run: thread.reported ? undefined : () => void reportThread(thread),
+      run: thread.reported ? undefined : () => openReportReasonPicker(thread),
     });
     const labels = [...actions.map((action) => action.label), "キャンセル"];
     const cancelButtonIndex = labels.length - 1;

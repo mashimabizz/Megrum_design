@@ -31,8 +31,10 @@ import {
   markMeguriBoardThreadRead,
   meguriBoardAudienceLabel,
   meguriBoardAudienceMeta,
+  MEGURI_BOARD_REPORT_REASONS,
   MEGURI_BOARD_COMPOSER_CATEGORY_OPTIONS,
   meguriBoardCategoryLabel,
+  meguriBoardReportReasonLabel,
   reportMeguriBoardReply,
   reportMeguriBoardThread,
   setMeguriBoardThreadStatus,
@@ -45,6 +47,7 @@ import {
   type MeguriBoardActor,
   type MeguriBoardAudienceScope,
   type MeguriBoardReply,
+  type MeguriBoardReportReason,
   type MeguriBoardThread,
   type MeguriBoardThreadCategory,
   type MeguriBoardViewMode,
@@ -324,11 +327,33 @@ export default function MeguriBoardThreadScreen() {
     router.back();
   }
 
-  async function reportThread() {
+  async function reportThread(reason: MeguriBoardReportReason) {
     if (!thread || thread.reported) return;
     updateThread({ ...thread, reported: true });
-    await reportMeguriBoardThread(thread.id);
+    await reportMeguriBoardThread(thread.id, reason);
     Alert.alert("通報しました", "確認して対応します。");
+  }
+
+  function openThreadReportReasonPicker() {
+    if (!thread || thread.reported) return;
+    if (Platform.OS !== "ios") {
+      void reportThread("other");
+      return;
+    }
+    const labels = MEGURI_BOARD_REPORT_REASONS.map(meguriBoardReportReasonLabel);
+    const cancelButtonIndex = labels.length;
+    ActionSheetIOS.showActionSheetWithOptions(
+      {
+        cancelButtonIndex,
+        options: [...labels, "キャンセル"],
+        title: "通報理由を選択",
+      },
+      (index) => {
+        const reason = MEGURI_BOARD_REPORT_REASONS[index];
+        if (!reason) return;
+        void reportThread(reason);
+      },
+    );
   }
 
   async function blockThreadAuthor() {
@@ -364,15 +389,37 @@ export default function MeguriBoardThreadScreen() {
     await setMeguriBoardReplyReacted(reply.id, reacted);
   }
 
-  async function reportReply(reply: MeguriBoardReply) {
+  async function reportReply(reply: MeguriBoardReply, reason: MeguriBoardReportReason) {
     if (reply.reported) return;
     setReplies((current) =>
       current.map((candidate) =>
         candidate.id === reply.id ? { ...candidate, reported: true } : candidate,
       ),
     );
-    await reportMeguriBoardReply(reply.id);
+    await reportMeguriBoardReply(reply.id, reason);
     Alert.alert("通報しました", "確認して対応します。");
+  }
+
+  function openReplyReportReasonPicker(reply: MeguriBoardReply) {
+    if (reply.reported || reply.deleted) return;
+    if (Platform.OS !== "ios") {
+      void reportReply(reply, "other");
+      return;
+    }
+    const labels = MEGURI_BOARD_REPORT_REASONS.map(meguriBoardReportReasonLabel);
+    const cancelButtonIndex = labels.length;
+    ActionSheetIOS.showActionSheetWithOptions(
+      {
+        cancelButtonIndex,
+        options: [...labels, "キャンセル"],
+        title: "通報理由を選択",
+      },
+      (index) => {
+        const reason = MEGURI_BOARD_REPORT_REASONS[index];
+        if (!reason) return;
+        void reportReply(reply, reason);
+      },
+    );
   }
 
   async function blockReplyAuthor(reply: MeguriBoardReply) {
@@ -550,7 +597,7 @@ export default function MeguriBoardThreadScreen() {
     actions.push({
       disabled: thread.reported,
       label: thread.reported ? "通報済み" : "通報する",
-      run: thread.reported ? undefined : () => void reportThread(),
+      run: thread.reported ? undefined : openThreadReportReasonPicker,
     });
     const labels = [...actions.map((action) => action.label), "キャンセル"];
     const cancelButtonIndex = labels.length - 1;
@@ -600,7 +647,7 @@ export default function MeguriBoardThreadScreen() {
         {
           disabled: reply.reported || reply.deleted,
           label: reply.reported ? "通報済み" : "通報する",
-          run: reply.reported ? undefined : () => void reportReply(reply),
+          run: reply.reported ? undefined : () => openReplyReportReasonPicker(reply),
         },
         {
           destructive: true,

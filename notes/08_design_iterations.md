@@ -4,6 +4,68 @@
 
 ---
 
+## イテレーション179：掲示板通報理由を追加
+
+### 背景・問題意識
+
+スポット掲示板の通報が即送信だと、運営側で何を確認すべきか分かりにくい。一般的なスレッド機能として、通報前に理由を選ばせ、スレッド/返信の通報に理由コードを保存できるようにした。
+
+### 変更内容
+
+#### `mobile/src/lib/meguriBoard.ts`
+- `MeguriBoardReportReason` と `MEGURI_BOARD_REPORT_REASONS` を追加した。
+- 通報理由の表示ラベル `meguriBoardReportReasonLabel()` を追加した。
+
+#### `mobile/app/meguri-board.tsx`
+- スレッド一覧から通報する時、iOS標準ActionSheetで理由を選択してから送信するようにした。
+
+#### `mobile/app/meguri-board-thread.tsx`
+- スレッド詳細と返信の通報で、同じ理由選択ActionSheetを表示するようにした。
+
+#### `notes/05_data_model.md`
+- `meguri_board_reports.reason` の運用理由コードを追記した。
+
+#### `notes/09_state_machines.md`
+- Meguri Board Lifecycle に通報理由選択のビジネスルールを追記した。
+
+#### `notes/10_glossary.md`
+- 掲示板通報理由を追加した。
+
+#### `notes/13_api_spec.md`
+- 掲示板通報APIの `reason` を具体的な選択肢に更新した。
+
+### 影響範囲
+
+- iOS版 スポット掲示板一覧
+- iOS版 スポット掲示板詳細
+- 掲示板のデータモデル・状態遷移・用語・API仕様
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- `EAS_UPDATE_PROJECT_SLUG=ihub EXPO_NO_GIT_STATUS=1 npm --prefix mobile run update:ios:preview -- --message "[iter179] add board report reasons" --non-interactive`
+- Preview OTA: Update group `b0546f3d-8e70-4e5d-b319-bb5dce63942d` / iOS update `019e7503-a4bf-7ff1-950f-aa68087ef1df`
+
+### 関連ファイル
+
+- `mobile/src/lib/meguriBoard.ts`
+- `mobile/app/meguri-board.tsx`
+- `mobile/app/meguri-board-thread.tsx`
+- `notes/05_data_model.md`
+- `notes/08_design_iterations.md`
+- `notes/09_state_machines.md`
+- `notes/10_glossary.md`
+- `notes/13_api_spec.md`
+
+### セルフレビュー結果
+
+- ✅ iOS標準の `ActionSheetIOS` を使い、独自UIを増やしていない。
+- ✅ スレッド通報と返信通報で同じ理由セットを使うようにした。
+- ✅ DB列追加なしで既存の `meguri_board_reports.reason` を活用した。
+
+---
+
 ## イテレーション178：掲示板ユーザーブロックを追加
 
 ### 背景・問題意識
