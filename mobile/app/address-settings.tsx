@@ -2,8 +2,6 @@ import { useEffect, useMemo, useState } from "react";
 import { router } from "expo-router";
 import {
   ActivityIndicator,
-  KeyboardAvoidingView,
-  Platform,
   StyleSheet,
   Text,
   TextInput,
@@ -20,6 +18,7 @@ import {
   upsertMailingAddress,
   type MailingAddressInput,
 } from "../src/lib/mailingAddress";
+import { lookupJapanesePostalCode } from "../src/lib/japanPostalCode";
 import { megrumColors, megrumRadii, megrumShadow } from "../src/theme/tokens";
 
 const EMPTY_FORM: MailingAddressInput = {
@@ -39,6 +38,9 @@ export default function AddressSettingsScreen() {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [postalLookup, setPostalLookup] = useState<
+    "idle" | "loading" | "found" | "not_found" | "error"
+  >("idle");
 
   useEffect(() => {
     if (!user || previewMode) {
@@ -80,6 +82,46 @@ export default function AddressSettingsScreen() {
       active = false;
     };
   }, [previewMode, user]);
+
+  useEffect(() => {
+    const postalCode = form.postalCode.replace(/[^\d]/g, "").slice(0, 7);
+    if (postalCode.length !== 7) {
+      setPostalLookup("idle");
+      return undefined;
+    }
+
+    let active = true;
+    const timer = setTimeout(() => {
+      setPostalLookup("loading");
+      lookupJapanesePostalCode(postalCode)
+        .then((address) => {
+          if (!active) return;
+          if (!address) {
+            setPostalLookup("not_found");
+            return;
+          }
+          setForm((current) => {
+            const currentPostalCode = current.postalCode.replace(/[^\d]/g, "").slice(0, 7);
+            if (currentPostalCode !== postalCode) return current;
+            return {
+              ...current,
+              city: address.city || current.city,
+              line1: current.line1.trim() ? current.line1 : address.town,
+              prefecture: address.prefecture || current.prefecture,
+            };
+          });
+          setPostalLookup("found");
+        })
+        .catch(() => {
+          if (active) setPostalLookup("error");
+        });
+    }, 360);
+
+    return () => {
+      active = false;
+      clearTimeout(timer);
+    };
+  }, [form.postalCode]);
 
   const canSave = useMemo(
     () =>
@@ -153,83 +195,106 @@ export default function AddressSettingsScreen() {
   }
 
   return (
-    <Screen scroll={false} contentStyle={styles.screen}>
+    <Screen contentStyle={styles.screen}>
       <RouteHeader title="住所設定" subtitle="郵送交換で使う住所を登録" />
-      <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
-        style={styles.body}
-      >
-        <View style={styles.tipCard}>
-          <Text style={styles.tipTitle}>相手に見えるタイミング</Text>
-          <Text style={styles.tipText}>
-            郵送交換で合意が成立した後にだけ、当事者同士へ住所を表示します。
-          </Text>
-          <Text style={styles.tipSummary}>
-            現在の表示: {formatMailingAddressSummary(form)}
-          </Text>
-        </View>
+      <View style={styles.tipCard}>
+        <Text style={styles.tipTitle}>相手に見えるタイミング</Text>
+        <Text style={styles.tipText}>
+          郵送交換で合意が成立した後にだけ、当事者同士へ住所を表示します。
+        </Text>
+        <Text style={styles.tipSummary}>
+          現在の表示: {formatMailingAddressSummary(form)}
+        </Text>
+      </View>
 
-        {loading ? <ActivityIndicator color={megrumColors.lavender} /> : null}
-        {error ? <Text style={styles.errorText}>{error}</Text> : null}
-        {saved && !error ? <Text style={styles.savedText}>住所を保存しました</Text> : null}
+      {loading ? <ActivityIndicator color={megrumColors.lavender} /> : null}
+      {error ? <Text style={styles.errorText}>{error}</Text> : null}
+      {saved && !error ? <Text style={styles.savedText}>住所を保存しました</Text> : null}
 
-        <View style={styles.formCard}>
-          <Field
-            label="宛名"
-            placeholder="山田 花子"
-            value={form.recipientName}
-            onChangeText={(value) => update("recipientName", value)}
-          />
-          <Field
-            label="郵便番号"
-            placeholder="1234567"
-            keyboardType="number-pad"
-            value={form.postalCode}
-            onChangeText={(value) => update("postalCode", value)}
-          />
-          <Field
-            label="都道府県"
-            placeholder="東京都"
-            value={form.prefecture}
-            onChangeText={(value) => update("prefecture", value)}
-          />
-          <Field
-            label="市区町村"
-            placeholder="渋谷区"
-            value={form.city}
-            onChangeText={(value) => update("city", value)}
-          />
-          <Field
-            label="番地・建物名"
-            placeholder="神南1-2-3 〇〇マンション 101"
-            value={form.line1}
-            onChangeText={(value) => update("line1", value)}
-          />
-          <Field
-            label="補足住所（任意）"
-            placeholder="部屋番号、会社名など"
-            value={form.line2}
-            onChangeText={(value) => update("line2", value)}
-          />
-          <Field
-            label="電話番号（任意）"
-            placeholder="09012345678"
-            keyboardType="phone-pad"
-            value={form.phoneNumber}
-            onChangeText={(value) => update("phoneNumber", value)}
-          />
-        </View>
+      <View style={styles.formCard}>
+        <Field
+          label="宛名"
+          placeholder="山田 花子"
+          value={form.recipientName}
+          onChangeText={(value) => update("recipientName", value)}
+        />
+        <Field
+          label="郵便番号"
+          placeholder="1234567"
+          keyboardType="number-pad"
+          value={form.postalCode}
+          onChangeText={(value) => update("postalCode", value)}
+        />
+        <PostalLookupStatus status={postalLookup} />
+        <Field
+          label="都道府県"
+          placeholder="東京都"
+          value={form.prefecture}
+          onChangeText={(value) => update("prefecture", value)}
+        />
+        <Field
+          label="市区町村"
+          placeholder="渋谷区"
+          value={form.city}
+          onChangeText={(value) => update("city", value)}
+        />
+        <Field
+          label="町域・番地・建物名"
+          placeholder="神南1-2-3 〇〇マンション 101"
+          value={form.line1}
+          onChangeText={(value) => update("line1", value)}
+        />
+        <Field
+          label="補足住所（任意）"
+          placeholder="部屋番号、会社名など"
+          value={form.line2}
+          onChangeText={(value) => update("line2", value)}
+        />
+        <Field
+          label="電話番号（任意）"
+          placeholder="09012345678"
+          keyboardType="phone-pad"
+          value={form.phoneNumber}
+          onChangeText={(value) => update("phoneNumber", value)}
+        />
+      </View>
 
-        <View style={styles.footer}>
-          <PrimaryButton variant="secondary" onPress={() => router.back()}>
-            戻る
-          </PrimaryButton>
-          <PrimaryButton disabled={!canSave} loading={saving} onPress={() => void handleSave()}>
-            この住所を保存
-          </PrimaryButton>
-        </View>
-      </KeyboardAvoidingView>
+      <View style={styles.footer}>
+        <PrimaryButton variant="secondary" onPress={() => router.back()}>
+          戻る
+        </PrimaryButton>
+        <PrimaryButton disabled={!canSave} loading={saving} onPress={() => void handleSave()}>
+          この住所を保存
+        </PrimaryButton>
+      </View>
     </Screen>
+  );
+}
+
+function PostalLookupStatus({
+  status,
+}: {
+  status: "idle" | "loading" | "found" | "not_found" | "error";
+}) {
+  if (status === "idle") return null;
+  const copy =
+    status === "loading"
+      ? "郵便番号から住所を確認しています"
+      : status === "found"
+        ? "郵便番号から住所を入力しました"
+        : status === "not_found"
+          ? "該当する住所が見つかりませんでした"
+          : "住所の自動入力に失敗しました";
+  return (
+    <Text
+      style={[
+        styles.postalLookupText,
+        status === "found" ? styles.postalLookupSuccess : null,
+        status === "error" || status === "not_found" ? styles.postalLookupWarning : null,
+      ]}
+    >
+      {copy}
+    </Text>
   );
 }
 
@@ -259,10 +324,6 @@ function Field({
 
 const styles = StyleSheet.create({
   screen: {
-    gap: 14,
-  },
-  body: {
-    flex: 1,
     gap: 14,
   },
   noticeCard: {
@@ -322,6 +383,19 @@ const styles = StyleSheet.create({
   field: {
     gap: 6,
   },
+  postalLookupText: {
+    color: megrumColors.mutedInk,
+    fontSize: 11,
+    fontWeight: "900",
+    lineHeight: 16,
+    marginTop: -4,
+  },
+  postalLookupSuccess: {
+    color: megrumColors.ok,
+  },
+  postalLookupWarning: {
+    color: megrumColors.warn,
+  },
   fieldLabel: {
     color: megrumColors.ink,
     fontSize: 11.5,
@@ -353,7 +427,7 @@ const styles = StyleSheet.create({
   },
   footer: {
     gap: 10,
-    marginTop: "auto",
+    marginTop: 2,
     paddingBottom: 8,
   },
 });

@@ -4,6 +4,63 @@
 
 ---
 
+## イテレーション168.77：住所設定導線と入力体験を改善
+
+### 背景・問題意識
+
+オーナーから、左ドロワーの設定一覧に住所設定を追加したいこと、住所設定画面で入力中の項目がキーボードに隠れないようにしたいこと、郵便番号入力から住所を自動入力したいことが指示された。郵送交換をリリース対象に戻したため、住所登録は打診送信前だけでなく、設定からいつでも管理できる必要がある。
+
+### 変更内容
+
+#### `mobile/app/settings-privacy.tsx`
+- 設定一覧の主要項目に `住所設定` を追加した。
+- 左ドロワーの `設定とプライバシー` から、住所設定へ進める導線を作った。
+
+#### `mobile/app/address-settings.tsx`
+- 住所設定画面をスクロール可能な `Screen` 構成へ戻し、キーボード表示中でも下部の項目と保存ボタンへ到達しやすくした。
+- 郵便番号が7桁になったら住所検索を行い、都道府県・市区町村・町域を自動入力するようにした。
+- 自動入力中 / 成功 / 未検出 / 失敗の状態文言を追加した。
+- 町域まで自動入力されるため、番地入力欄のラベルを `町域・番地・建物名` に変更した。
+
+#### `mobile/src/components/Screen.tsx`
+- 共通 `Screen` のスクロール画面に `automaticallyAdjustKeyboardInsets` / `keyboardShouldPersistTaps` / `keyboardDismissMode` を設定した。
+- `scroll={false}` の画面も `KeyboardAvoidingView` で包み、チャットや一覧内入力でもキーボードに隠れにくくした。
+- Android は既存の `useKeyboardInset` を使って下部余白を増やすようにした。
+
+#### `mobile/src/lib/japanPostalCode.ts`
+- zipcloud 郵便番号検索APIを使う住所補完ヘルパーを追加した。
+- APIの `address1 / address2 / address3` を、都道府県・市区町村・町域へ正規化して返すようにした。
+
+### 影響範囲
+
+- iOS版の左ドロワー `設定とプライバシー`
+- iOS版 `/address-settings`
+- 共通 `Screen` を使う入力画面全般
+- 郵送交換前の住所登録体験
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- `git diff --check -- mobile/app/address-settings.tsx mobile/src/components/Screen.tsx mobile/app/settings-privacy.tsx mobile/src/lib/japanPostalCode.ts`
+- `https://zipcloud.ibsnet.co.jp/api/search?zipcode=1000001` が `東京都 / 千代田区 / 千代田` を返すことを確認
+- Preview channel OTA配信は後続で実施
+
+### 関連ファイル
+
+- `mobile/app/settings-privacy.tsx`
+- `mobile/app/address-settings.tsx`
+- `mobile/src/components/Screen.tsx`
+- `mobile/src/lib/japanPostalCode.ts`
+
+### セルフレビュー結果
+
+- ✅ `npm --prefix mobile run typecheck` 通過
+- ✅ `npm --prefix mobile run export:ios:preview` 通過
+- ✅ zipcloud公式API仕様の `address1 / address2 / address3` と実装マッピングが一致
+- ✅ 09更新診断：状態遷移の追加・削除・名称変更はないため更新不要
+- ✅ 10更新診断：既存用語 `住所` / `郵送交換` の範囲内のため更新不要
+
 ## イテレーション168.76：めぐり導入演出を廃止
 
 ### 背景・問題意識
