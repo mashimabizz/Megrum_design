@@ -161,10 +161,12 @@ export default function MeguriBoardThreadScreen() {
   const [threadBodyExpanded, setThreadBodyExpanded] = useState(false);
   const [replySortMode, setReplySortMode] = useState<BoardReplySortMode>("oldest");
   const [searchCursorIndex, setSearchCursorIndex] = useState(0);
+  const [highlightedReplyId, setHighlightedReplyId] = useState<string | null>(null);
   const scrollViewRef = useRef<ScrollView | null>(null);
   const composerInputRef = useRef<TextInput | null>(null);
   const replyOffsetsRef = useRef<Record<string, number>>({});
   const sharedReplyScrollKeyRef = useRef<string | null>(null);
+  const highlightedReplyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const actor = useMemo<MeguriBoardActor>(
     () => ({
@@ -410,6 +412,14 @@ export default function MeguriBoardThreadScreen() {
   }, [searchCursorIndex, sortedReplies.length]);
 
   useEffect(() => {
+    return () => {
+      if (highlightedReplyTimerRef.current) {
+        clearTimeout(highlightedReplyTimerRef.current);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
     if (!sharedReplyId || loading || replies.length === 0) return;
     if (sharedReplyScrollKeyRef.current === sharedReplyId) return;
     if (!replies.some((reply) => reply.id === sharedReplyId)) return;
@@ -421,6 +431,7 @@ export default function MeguriBoardThreadScreen() {
         if (replySearchText.trim()) {
           clearReplySearch();
         }
+        highlightReply(sharedReplyId);
         scrollViewRef.current?.scrollTo({ animated: true, y: Math.max(0, y - 12) });
         return;
       }
@@ -431,6 +442,17 @@ export default function MeguriBoardThreadScreen() {
     };
     setTimeout(runScroll, 240);
   }, [loading, replies, replySearchText, sharedReplyId]);
+
+  function highlightReply(replyId: string) {
+    setHighlightedReplyId(replyId);
+    if (highlightedReplyTimerRef.current) {
+      clearTimeout(highlightedReplyTimerRef.current);
+    }
+    highlightedReplyTimerRef.current = setTimeout(() => {
+      setHighlightedReplyId((current) => (current === replyId ? null : current));
+      highlightedReplyTimerRef.current = null;
+    }, 2600);
+  }
 
   function scrollToLatestReply(animated = true) {
     const latestReply = replies.reduce<MeguriBoardReply | null>((latest, reply) => {
@@ -539,6 +561,7 @@ export default function MeguriBoardThreadScreen() {
     const runScroll = () => {
       const y = replyOffsetsRef.current[replyId];
       if (typeof y === "number") {
+        highlightReply(replyId);
         scrollViewRef.current?.scrollTo({ animated: true, y: Math.max(0, y - 12) });
         return;
       }
@@ -560,6 +583,7 @@ export default function MeguriBoardThreadScreen() {
     setSearchCursorIndex(nextIndex);
     const y = targetReply ? replyOffsetsRef.current[targetReply.id] : undefined;
     if (typeof y === "number") {
+      highlightReply(targetReply.id);
       scrollViewRef.current?.scrollTo({ animated: true, y: Math.max(0, y - 12) });
     }
   }
@@ -1642,6 +1666,7 @@ export default function MeguriBoardThreadScreen() {
                               styles.replyBubble,
                               reply.mine ? styles.replyBubbleMine : styles.replyBubbleTheirs,
                               mentionsViewer ? styles.replyBubbleMention : null,
+                              highlightedReplyId === reply.id ? styles.replyBubbleHighlighted : null,
                             ]}
                           >
                             {reply.quotedBody ? (
@@ -3218,6 +3243,14 @@ const styles = StyleSheet.create({
   replyBubbleMention: {
     borderColor: "rgba(168,212,230,0.72)",
     borderWidth: 1,
+  },
+  replyBubbleHighlighted: {
+    borderColor: "rgba(166,149,216,0.72)",
+    borderWidth: 2,
+    shadowColor: megrumColors.lavender,
+    shadowOffset: { height: 8, width: 0 },
+    shadowOpacity: 0.22,
+    shadowRadius: 14,
   },
   replyBubbleMine: {
     borderBottomRightRadius: 8,

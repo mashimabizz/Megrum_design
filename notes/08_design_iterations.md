@@ -4,6 +4,54 @@
 
 ---
 
+## イテレーション230：掲示板返信ジャンプに一時ハイライトを追加
+
+### 背景・問題意識
+
+返信共有リンクや引用元ジャンプで対象返信へ移動できても、長いスレッドでは着地直後にどの返信へ飛んだのか見失いやすい。一般的なスレッドUIとして、移動先の返信を短時間だけ強調表示するようにした。
+
+### 変更内容
+
+#### `mobile/app/meguri-board-thread.tsx`
+- `highlightedReplyId` とタイマーを追加し、対象返信を約2.6秒だけ強調できるようにした。
+- 返信共有リンクからの初期スクロール、引用元ジャンプ、返信番号ジャンプ、検索結果ジャンプで同じハイライトを使うようにした。
+- 対象返信のバブルに紫の枠と軽い影を付け、既存の本文/返信レイアウトを変えずに視認性を上げた。
+- 画面離脱時にハイライト用タイマーを破棄するようにした。
+
+#### `notes/09_state_machines.md`
+- Meguri Board Lifecycle に返信ジャンプハイライトの表示ルールを追記した。
+
+#### `notes/10_glossary.md`
+- 掲示板返信ジャンプハイライトを追加した。
+
+### 影響範囲
+
+- iOS版 スポット掲示板詳細
+- 返信共有リンク
+- 引用元/返信番号/検索結果ジャンプ
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- `EAS_UPDATE_PROJECT_SLUG=ihub EXPO_NO_GIT_STATUS=1 npm --prefix mobile run update:ios:preview -- --message "[iter230] highlight board reply jumps" --non-interactive`
+- Preview OTA: Update group `7bf2d62f-6886-4f14-b954-9b157e994d13` / iOS update `019e75e2-a354-7f81-a6ff-145376e97ee1`
+
+### 関連ファイル
+
+- `mobile/app/meguri-board-thread.tsx`
+- `notes/08_design_iterations.md`
+- `notes/09_state_machines.md`
+- `notes/10_glossary.md`
+
+### セルフレビュー結果
+
+- ✅ 返信ジャンプ系の既存導線に共通の視覚フィードバックを追加した。
+- ✅ DB変更なし、ネイティブ依存追加なしで実装した。
+- ✅ タイマー破棄を入れ、画面離脱後の状態更新を避けるようにした。
+
+---
+
 ## イテレーション229：掲示板返信共有リンクを返信位置に着地させる
 
 ### 背景・問題意識
