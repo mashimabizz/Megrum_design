@@ -3,8 +3,8 @@
 > **目的**：Megrum の全エンティティのDBスキーマ設計と、状態・マッチング・取引のデータフロー定義。
 > 実装の正解集。`09_state_machines.md` と完全に整合させ、`10_glossary.md` の用語を使う。
 
-最終更新: 2026-05-25
-ステータス: Draft v2.14（iter168.43 反映済）
+最終更新: 2026-05-29
+ステータス: Draft v2.15（iter168.71 郵送交換ドラフトを追加）
 
 ## 最新化履歴
 
@@ -26,6 +26,7 @@
 | **v2.12** | **2026-05-24** | **iter165 反映（グルーム公開範囲をRLS/Private Storageで厳格化。groom_hidden_posts / groom_user_blocks / groom_reports / meguri_messages と meguri-message-media Storage を追加）** |
 | **v2.13** | **2026-05-24** | **iter166 反映（admin_roles / admin_audit_logs / user_entitlements / plan_overrides / stripe_webhook_events と subscriptions 実テーブルを追加。管理者ページ・有料権限・Stripe webhookの土台を定義）** |
 | **v2.14** | **2026-05-25** | **iter168.43 反映（めぐりPlusを `user_entitlements(feature_key='meguri_plus')` に分離。`meguri_messages` 本文/画像は無料受信者へ直接返さず、専用RPCでロック済みメタ情報だけ返す）** |
+| **v2.15** | **2026-05-29** | **iter168.71 反映（郵送交換を交換手段に再追加。住所テーブル案、proposal.exchange_method、待ち合わせ必須条件の分岐、未確定項目を追記）** |
 
 ## このドキュメントの位置付け
 
@@ -150,6 +151,27 @@ iter24 で「推し2階層」（グループ/作品 → メンバー/キャラ�
 ⚠️ 要確認：
 - パスワード以外の auth method（passkey, magic link）対応するか
 - `gender` を必須にするか任意にするか（マッチング条件に使う？）
+
+### `user_mailing_addresses`（住所 / iter168.71）
+
+郵送交換で使うユーザー設定の住所。初回リリースでは 1 ユーザー 1 住所を基本とし、設定画面から登録・更新する。本人確認は行わず、自己申告住所として扱う。
+
+| カラム | 型 | 説明 |
+|---|---|---|
+| `user_id` | uuid | → users。PK 相当（MVPでは1ユーザー1件） |
+| `recipient_name` | text | 宛名 |
+| `postal_code` | text | 郵便番号 |
+| `prefecture` | text | 都道府県 |
+| `city` | text | 市区町村 |
+| `line1` | text | 番地・建物名など |
+| `line2` | text nullable | 補足住所 |
+| `phone_number` | text nullable | 任意。配送トラブル時の補助連絡先 |
+| `created_at` / `updated_at` | timestamptz | |
+
+運用ルール：
+- 打診で `exchange_method='mail'` を含める場合、送信者はこの行が存在しないと送れない
+- 合意後にだけ、当事者双方へ相手の住所を表示する
+- 取引途中で設定画面の住所が変わっても履歴が壊れないよう、合意時点で取引側へスナップショット保存する前提
 
 ### `user_oshi`（推し登録）
 
@@ -307,7 +329,7 @@ iter29 で 1行=1個 の方針確定。UI で集約表示し、選択時は N �
 | `title` | text | 旧 `genre_name`/`character_name` 由来の表示名 |
 | `description` | text nullable | |
 | `condition_tags` | text[] | 美品 / コーティング有 / シリアル付き 等 |
-| `exchange_method` | text | 'hand'（手渡し）/ 'mail'（郵送、MVPでは UI 非表示） |
+| `exchange_method` | text | 'hand'（現地交換）/ 'mail'（郵送交換）。アイテム単位の許容手段の自己申告 |
 | `kind` | text | `for_trade`（譲る候補）/ `keep`（自分用キープ） |
 | `status` | text | `available` / `in_negotiation` / `in_deal` / `traded`（09 Item Lifecycleと整合） |
 
@@ -524,6 +546,7 @@ iter28（match_type）/ iter29（数量）/ iter30（7日期限）/ iter32（合
 | `receiver_have_ids` | uuid[] | 受信者が出す `user_haves` IDs |
 | `receiver_have_qtys` | int[] | 各 IDの選択数 |
 | `message` | text | |
+| `exchange_method` | text | `hand` / `mail`。提案単位の受け渡し方法 |
 | `status` | text | `draft` / `sent` / `negotiating` / `agreement_one_side` / `agreed` / `rejected` / `expired`（09と一致） |
 | `agreed_by_sender` | boolean default false | iter32、agreement_one_side 判定用 |
 | `agreed_by_receiver` | boolean default false | iter32 |
@@ -536,11 +559,11 @@ iter28（match_type）/ iter29（数量）/ iter30（7日期限）/ iter32（合
 | ~~`meetup_now_minutes`~~ | — | **iter67.1 で廃止** |
 | ~~`meetup_scheduled_aw_id`~~ | — | **iter67 で廃止**。AW はマッチング演算専用に分離 |
 | ~~`meetup_scheduled_custom`~~ | — | **iter67.1 で廃止**。下記 5 列に分解 |
-| `meetup_start_at` | timestamptz | iter67.1、待ち合わせ開始時刻 |
-| `meetup_end_at` | timestamptz | iter67.1、待ち合わせ終了時刻（CHECK: end > start） |
-| `meetup_place_name` | text(≤200) | iter67.1、場所名（駅・施設名など） |
-| `meetup_lat` | numeric(9,6) | iter67.1、緯度（地図上の位置） |
-| `meetup_lng` | numeric(9,6) | iter67.1、経度 |
+| `meetup_start_at` | timestamptz nullable | iter67.1、待ち合わせ開始時刻（`exchange_method='hand'` で必須） |
+| `meetup_end_at` | timestamptz nullable | iter67.1、待ち合わせ終了時刻（CHECK: end > start） |
+| `meetup_place_name` | text(≤200) nullable | iter67.1、場所名（駅・施設名など） |
+| `meetup_lat` | numeric(9,6) nullable | iter67.1、緯度（地図上の位置） |
+| `meetup_lng` | numeric(9,6) nullable | iter67.1、経度 |
 | `meetup_candidates` | jsonb default `[]` | iter154.34、交換できる候補（最大3件）。各要素は `{ startAt, endAt, placeName, lat, lng, mode }`。候補1を既存 `meetup_*` 5列へミラーして旧画面・取引チャットと互換 |
 | `expose_calendar` | bool default false | iter67 で再定義：送信者が自分の **個人スケジュール（schedules）** を相手に公開する ON/OFF。受信側は受信表示画面で送信者の予定を見られる（取引完了で自動的に RLS 不可）。AW は対象外 |
 | `listing_id` | uuid nullable | iter64、個別募集 (`listings`) 経由の打診ならその id。直接打診なら null |
@@ -548,12 +571,13 @@ iter28（match_type）/ iter29（数量）/ iter30（7日期限）/ iter32（合
 | `cash_amount` | int nullable | iter67.7、定価交換金額（1〜9,999,999）。cash_offer=true のときのみ |
 | `created_at` / `updated_at` | timestamptz | |
 
-CHECK 制約 `proposals_meetup_required`（iter67.1）：`status='draft'` 以外なら 5 列すべて NOT NULL かつ `meetup_end_at > meetup_start_at`。
+CHECK 制約 `proposals_meetup_required`（iter168.71 想定更新）：`exchange_method='hand'` かつ `status!='draft'` の時だけ 5 列すべて NOT NULL かつ `meetup_end_at > meetup_start_at`。`mail` の時は待ち合わせ列を必須にしない。
 CHECK 制約 `proposals_meetup_candidates_array`（iter154.34）：`meetup_candidates` は JSON 配列、最大3件。
 
 派生ルール：
 - iter153: `status='agreed'` の proposal は、`sender_have_ids` / `receiver_have_ids` と各 qty を市場残数から差し引く。ただし `approved_by_sender` / `approved_by_receiver` が true の側は、取引完了承認処理で実在庫が既に減算されているため二重控除しない。
 - iter153: `sent` / `negotiating` / `agreement_one_side` は在庫確保前の状態として扱い、市場残数からは差し引かない。`agreed` へ遷移する直前にキャパ超過を検証する。
+- iter168.71: `exchange_method='mail'` の時、送信者は `user_mailing_addresses` の登録が必須。合意時点で双方の住所スナップショットを取引側へ固定し、当事者以外には返さない。
 
 ⚠️ 要確認：
 - ネゴ中の提案修正で `last_action_at` リセットするか（09 未確定項目#1）
@@ -1070,6 +1094,9 @@ RLS:
 | 28 | matching | リアルタイム通知のスロットル | 通知頻度 |
 | 29 | users | パスワード以外の auth method（passkey 等） | スコープ |
 | 30 | groups_master | グループ非所属のジャンル（ソロアーティスト・声優）の `kind` 設計 | iter24 の派生 |
+| 31 | mail | 合意後の郵送交換を `deals.status` の別分岐にするか、住所表示だけで既存状態を使うか | 状態遷移 / UI |
+| 32 | mail | 住所スナップショットを `proposals` に置くか `deals` に置くか | 監査 / 実装容易性 |
+| 33 | exchange tags | 「終演後交換OK」「グッズ販売中交換OK」を user profile / AW / proposal のどこへ持つか | UI / データ設計 |
 
 ---
 
