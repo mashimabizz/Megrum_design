@@ -16,6 +16,9 @@ module.exports = () => {
     },
     updates: {
       url: `https://u.expo.dev/${projectId}`,
+      requestHeaders: {
+        "expo-channel-name": isPreview ? "preview" : "production",
+      },
     },
     plugins: [
       ...(base.plugins ?? []),

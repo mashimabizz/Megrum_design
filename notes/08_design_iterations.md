@@ -4,6 +4,56 @@
 
 ---
 
+## イテレーション168.75：Preview iOSの更新チャンネルを固定
+
+### 背景・問題意識
+
+オーナーから、iter168.74 の郵送交換・スポット掲示板・3D演出削除を **Megrum Preview iOS** で見られるようにしてほしいという指示があった。EAS Update 自体は `preview` ブランチに配信済みだったが、Xcode Archive で作ったPreviewバイナリ側に `preview` チャンネルを要求するヘッダーが入っていなかったため、OTA更新を拾えない可能性があった。
+
+### 変更内容
+
+#### `mobile/app.config.js`
+- `updates.requestHeaders["expo-channel-name"]` を追加し、Preview variant では `preview`、通常variantでは `production` を見るようにした。
+
+#### `mobile/app.json`
+- iOS `buildNumber` を `9` に上げ、次回TestFlightアップロードでネイティブ設定変更を配布できるようにした。
+
+#### `mobile/ios/MegrumPreview/Supporting/Expo.plist`（ローカル生成物）
+- `EXUpdatesRequestHeaders` に `expo-channel-name = preview` を追加した。
+- `mobile/ios` はgitignore対象なので、Xcode Archive用のローカル設定として反映した。
+
+#### `mobile/ios/MegrumPreview.xcodeproj/project.pbxproj`（ローカル生成物）
+- Xcode側の `CURRENT_PROJECT_VERSION` を `9` に更新した。
+- `mobile/ios` はgitignore対象なので、Xcode Archive用のローカル設定として反映した。
+
+### 影響範囲
+
+- Megrum Preview iOS のOTA更新取得設定
+- TestFlightへ次に上げるBuild 9
+
+### 確認方法
+
+- `plutil -lint mobile/ios/MegrumPreview/Supporting/Expo.plist`
+- `cd mobile && APP_VARIANT=preview npx expo config --json`
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- Build 9をArchiveしてTestFlightへアップロード後、Megrum Preview iOSを完全終了して再起動し、`めぐり > 掲示板` / `プロフィール > 住所設定` / `打診 > 郵送交換` を確認する
+
+### 関連ファイル
+
+- `mobile/app.config.js`
+- `mobile/app.json`
+- `mobile/ios/MegrumPreview/Supporting/Expo.plist`
+- `mobile/ios/MegrumPreview.xcodeproj/project.pbxproj`
+
+### セルフレビュー結果
+
+- ✅ `Expo.plist` のplist構文チェック通過
+- ✅ Preview variant のExpo configで `updates.requestHeaders.expo-channel-name = preview` と `ios.buildNumber = 9` を確認
+- ✅ `npm --prefix mobile run typecheck` 通過
+- ✅ `npm --prefix mobile run export:ios:preview` 通過
+- ℹ️ 09/10更新診断：状態・用語の追加変更はないため更新不要
+
 ## イテレーション168.74：郵送交換とスポット掲示板をiOSへ実装
 
 ### 背景・問題意識

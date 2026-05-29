@@ -15,7 +15,7 @@
     },
     "ios": {
       "bundleIdentifier": "tokyo.megrum.app",
-      "buildNumber": "3",
+      "buildNumber": "9",
       "supportsTablet": false,
       "usesAppleSignIn": true,
       "infoPlist": {
