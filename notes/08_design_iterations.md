@@ -4,6 +4,55 @@
 
 ---
 
+## イテレーション168.67：打診送信のプレビューID混入を防止
+
+### 背景・問題意識
+
+友達が打診送信した時に、確認画面で `invalid input syntax for type uuid: "give-1"` が表示された。`give-1` はモック/プレビュー用のIDであり、`proposals.sender_have_ids` / `receiver_have_ids` に保存できる実在庫UUIDではない。ホーム・マッチ起点で片側の実IDが空になった場合、プレビュー候補が選択状態になり、DB送信まで混ざる経路を塞ぐ必要がある。
+
+### 変更内容
+
+#### `mobile/app/proposal-select.tsx`
+- `partnerId` がある実送信フローでは、`give-1` などUUIDではない候補や空の片側候補をプレビュー候補で補わないようにした。
+- 片側の候補が空、またはUUIDではない場合は、現在ログインユーザーと相手の `goods_inventory` から active な `for_trade` 在庫を読み直して候補化するようにした。
+- 相手ID自体がUUIDではない場合はDB問い合わせに進まず、「相手情報を読み直してください」を表示するようにした。
+
+#### `mobile/app/proposal-confirm.tsx`
+- 実送信の確認画面では、候補サムネイルにプレビューIDのフォールバックを表示しないようにした。
+- 送信前の在庫所有者チェックでUUID以外のIDを先に検出し、DBへ投げる前に「提示するグッズを最新の在庫から選び直してください。」を返すようにした。
+- `listing_id` もUUIDの時だけ送信し、古い/プレビュー由来の値がDBエラーにならないようにした。
+
+#### `mobile/src/data/proposalItems.ts`
+- `buildProposalThumbs` に `includeFallback` オプションを追加した。
+- 実在庫UUID判定用の `isUuid` helper を追加し、打診選択・確認で共通利用するようにした。
+
+### 影響範囲
+
+- iOSホーム/マッチ詳細/プロフィール起点の打診作成
+- iOS打診送信確認画面
+- TestFlight / Preview での実在庫UUIDバリデーション
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `git diff --check -- mobile/app/proposal-select.tsx mobile/app/proposal-confirm.tsx mobile/src/data/proposalItems.ts`
+- TestFlight / Preview でホームまたは相手プロフィールから打診へ進み、`give-1` などのプレビューIDが送信エラーとして露出しないことを確認
+- Preview channel OTA配信済み：Update group `1690f63d-47be-4b75-9cab-cf50fb064a9f` / iOS update ID `019e7143-444d-744c-af80-e82bc0290b41`
+
+### 関連ファイル
+
+- `mobile/app/proposal-select.tsx`
+- `mobile/app/proposal-confirm.tsx`
+- `mobile/src/data/proposalItems.ts`
+
+### セルフレビュー結果
+
+- ✅ 実送信フローでプレビューIDを候補補完に使わない
+- ✅ DBへ送る前にUUID形式を確認し、Raw DBエラーをユーザーに見せない
+- ✅ 状態遷移・DBスキーマ・新用語の変更ではないため `notes/09_state_machines.md` / `notes/05_data_model.md` / `notes/10_glossary.md` の更新は不要
+
+---
+
 ## イテレーション168.66：オンボ完了後のホーム遷移を修正
 
 ### 背景・問題意識

@@ -161,9 +161,19 @@ export function buildProposalThumbs(
   ids: string[],
   side: ProposalSide,
   overrides?: ProposalCatalogOverrides,
+  options?: { includeFallback?: boolean },
 ): ProposalThumbItem[] {
-  const orderedIds = ids.length > 0 ? uniqueIds(ids) : BASE_IDS[side];
+  const orderedIds =
+    options?.includeFallback === false
+      ? uniqueIds(ids)
+      : uniqueIds(ids.length > 0 ? ids : BASE_IDS[side]);
   return orderedIds.map((id) => toProposalThumb(id, side, overrides));
+}
+
+export function isUuid(value: string) {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+    value,
+  );
 }
 
 export function buildProposalCatalogOverrides(rows: ProposalInventoryRow[]) {

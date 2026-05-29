@@ -26,6 +26,7 @@ import {
 import {
   buildProposalCatalogOverrides,
   buildProposalChoices,
+  isUuid,
   parseProposalIdList,
   type ProposalChoiceItem,
   type ProposalInventoryRow,
@@ -161,16 +162,20 @@ export default function ProposalSelectScreen() {
     () => parseProposalIdList(receivesParam),
     [receivesParam],
   );
+  const initialGiveNeedsInventory =
+    !!partnerIdParam && !hasSendableInventoryIds(initialGiveIds);
+  const initialReceiveNeedsInventory =
+    !!partnerIdParam && !hasSendableInventoryIds(initialReceiveIds);
   const usesProfileInventory =
-    !!partnerIdParam && initialGiveIds.length === 0 && initialReceiveIds.length === 0;
+    initialGiveNeedsInventory || initialReceiveNeedsInventory;
   const [profileInventoryScope, setProfileInventoryScope] =
     useState<ProfileProposalInventoryScope | null>(null);
   const [profileInventoryLoading, setProfileInventoryLoading] = useState(false);
   const [profileInventoryError, setProfileInventoryError] = useState<string | null>(null);
-  const giveChoiceIds = usesProfileInventory
+  const giveChoiceIds = initialGiveNeedsInventory
     ? profileInventoryScope?.giveIds ?? []
     : initialGiveIds;
-  const receiveChoiceIds = usesProfileInventory
+  const receiveChoiceIds = initialReceiveNeedsInventory
     ? profileInventoryScope?.receiveIds ?? []
     : initialReceiveIds;
   const [catalogOverrides, setCatalogOverrides] = useState<
@@ -179,27 +184,31 @@ export default function ProposalSelectScreen() {
   const giveChoices = useMemo(
     () =>
       buildProposalChoices(giveChoiceIds, "give", catalogOverrides, {
-        includeFallback: !usesProfileInventory,
+        includeFallback: !partnerIdParam,
       }),
-    [catalogOverrides, giveChoiceIds, usesProfileInventory],
+    [catalogOverrides, giveChoiceIds, partnerIdParam],
   );
   const receiveChoices = useMemo(
     () =>
       buildProposalChoices(receiveChoiceIds, "receive", catalogOverrides, {
-        includeFallback: !usesProfileInventory,
+        includeFallback: !partnerIdParam,
       }),
-    [catalogOverrides, receiveChoiceIds, usesProfileInventory],
+    [catalogOverrides, receiveChoiceIds, partnerIdParam],
   );
   const [tab, setTab] = useState<ProposalTab>(initialTab);
   const [giveSelectedIds, setGiveSelectedIds] = useState<string[]>(() =>
-    initialGiveIds.length > 0
+    initialGiveNeedsInventory
+      ? []
+      : initialGiveIds.length > 0
       ? initialGiveIds
       : giveChoices[0]
         ? [giveChoices[0].id]
         : [],
   );
   const [receiveSelectedIds, setReceiveSelectedIds] = useState<string[]>(() =>
-    initialReceiveIds.length > 0
+    initialReceiveNeedsInventory
+      ? []
+      : initialReceiveIds.length > 0
       ? initialReceiveIds
       : receiveChoices[0]
         ? [receiveChoices[0].id]
@@ -269,6 +278,12 @@ export default function ProposalSelectScreen() {
       setProfileInventoryError(null);
       return;
     }
+    if (!isUuid(partnerIdParam)) {
+      setProfileInventoryScope({ giveIds: [], receiveIds: [] });
+      setProfileInventoryLoading(false);
+      setProfileInventoryError("相手情報を読み直してください");
+      return;
+    }
 
     let active = true;
     setProfileInventoryLoading(true);
@@ -301,8 +316,12 @@ export default function ProposalSelectScreen() {
         if (!active) return;
         setCatalogOverrides(buildProposalCatalogOverrides(rows));
         setProfileInventoryScope({
-          giveIds: giveRows.map((row) => row.id),
-          receiveIds: receiveRows.map((row) => row.id),
+          giveIds: initialGiveNeedsInventory
+            ? giveRows.map((row) => row.id)
+            : initialGiveIds,
+          receiveIds: initialReceiveNeedsInventory
+            ? receiveRows.map((row) => row.id)
+            : initialReceiveIds,
         });
       } catch (reason: unknown) {
         if (!active) return;
@@ -319,7 +338,14 @@ export default function ProposalSelectScreen() {
     return () => {
       active = false;
     };
-  }, [partnerIdParam, usesProfileInventory]);
+  }, [
+    initialGiveIds,
+    initialGiveNeedsInventory,
+    initialReceiveIds,
+    initialReceiveNeedsInventory,
+    partnerIdParam,
+    usesProfileInventory,
+  ]);
 
   const tabs = useMemo(
     () => [
@@ -1843,6 +1869,10 @@ function parseTab(value?: string): ProposalTab {
     return value;
   }
   return "give";
+}
+
+function hasSendableInventoryIds(ids: string[]) {
+  return ids.length > 0 && ids.every(isUuid);
 }
 
 function ensureChoiceSelection(

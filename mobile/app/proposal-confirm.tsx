@@ -20,6 +20,7 @@ import {
 import {
   buildProposalCatalogOverrides,
   buildProposalThumbs,
+  isUuid,
   parseProposalIdList,
   type ProposalInventoryRow,
   type ProposalThumbItem,
@@ -101,12 +102,18 @@ export default function ProposalConfirmScreen() {
     [meetupsParam],
   );
   const myItems = useMemo(
-    () => buildProposalThumbs(giveIds, "give", catalogOverrides),
-    [catalogOverrides, giveIds],
+    () =>
+      buildProposalThumbs(giveIds, "give", catalogOverrides, {
+        includeFallback: !partnerId,
+      }),
+    [catalogOverrides, giveIds, partnerId],
   );
   const theirItems = useMemo(
-    () => buildProposalThumbs(receiveIds, "receive", catalogOverrides),
-    [catalogOverrides, receiveIds],
+    () =>
+      buildProposalThumbs(receiveIds, "receive", catalogOverrides, {
+        includeFallback: !partnerId,
+      }),
+    [catalogOverrides, partnerId, receiveIds],
   );
   const [message, setMessage] = useState("");
   const [shareSchedule, setShareSchedule] = useState(true);
@@ -116,7 +123,7 @@ export default function ProposalConfirmScreen() {
 
   useEffect(() => {
     if (!supabase) return;
-    const ids = Array.from(new Set([...giveIds, ...receiveIds]));
+    const ids = Array.from(new Set([...giveIds, ...receiveIds])).filter(isUuid);
     if (ids.length === 0) {
       setCatalogOverrides(new Map());
       return;
@@ -232,6 +239,10 @@ export default function ProposalConfirmScreen() {
       setSubmitted(true);
       return;
     }
+    if (!isUuid(partnerId)) {
+      setSubmitError("相手情報を読み直してください");
+      return;
+    }
     const primary = meetupCandidates[0];
     const sendableMeetups = meetupCandidates
       .filter((candidate) => candidate.startAt && candidate.endAt && candidate.place)
@@ -275,6 +286,8 @@ export default function ProposalConfirmScreen() {
         lng: candidate.coordinate.longitude,
         mode: "scheduled",
       }));
+      const listingId =
+        listingIds.length === 1 && isUuid(listingIds[0]) ? listingIds[0] : null;
       const insertFields: Record<string, unknown> = {
         sender_id: user.id,
         receiver_id: partnerId,
@@ -297,7 +310,7 @@ export default function ProposalConfirmScreen() {
         meetup_lng: meetupPayloads[0].lng,
         meetup_candidates: meetupPayloads,
         expose_calendar: shareSchedule,
-        listing_id: listingIds.length === 1 ? listingIds[0] : null,
+        listing_id: listingId,
         cash_offer: false,
         cash_amount: null,
       };
@@ -322,6 +335,9 @@ async function validateProposalInventoryOwnership(input: {
 }) {
   if (!supabase) return null;
   const ids = Array.from(new Set([...input.giveIds, ...input.receiveIds]));
+  if (!ids.every(isUuid)) {
+    return "提示するグッズを最新の在庫から選び直してください。";
+  }
   const { data, error } = await supabase
     .from("goods_inventory")
     .select("id, user_id, kind, status")
