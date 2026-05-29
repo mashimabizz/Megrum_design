@@ -4,6 +4,52 @@
 
 ---
 
+## イテレーション195：掲示板引用元ジャンプを追加
+
+### 背景・問題意識
+
+引用返信が増えると、引用元の文脈まで戻って確認したくなる。一般的なスレッド機能として、引用プレビューをタップした時に引用元の返信へ移動できるようにした。
+
+### 変更内容
+
+#### `mobile/app/meguri-board-thread.tsx`
+- 返信ごとの画面内位置を保持し、引用プレビューから元返信へスクロールできるようにした。
+- スレッド内検索中に引用元へ移動する場合は、検索条件を解除してから引用元へ移動するようにした。
+- 引用元が見つからない場合は、理由が分かるアラートを表示するようにした。
+
+#### `notes/09_state_machines.md`
+- Meguri Board Lifecycle に引用元ジャンプの表示ルールを追記した。
+
+#### `notes/10_glossary.md`
+- 掲示板引用元ジャンプを追加した。
+
+### 影響範囲
+
+- iOS版 スポット掲示板詳細
+- 引用返信の読み返し体験
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- `EAS_UPDATE_PROJECT_SLUG=ihub EXPO_NO_GIT_STATUS=1 npm --prefix mobile run update:ios:preview -- --message "[iter195] jump to quoted board reply" --non-interactive`
+- Preview OTA: Update group `2c972e9f-9c45-4370-989b-8c112db8a85f` / iOS update `019e7550-406b-7cd9-a809-7570774df2c2`
+
+### 関連ファイル
+
+- `mobile/app/meguri-board-thread.tsx`
+- `notes/08_design_iterations.md`
+- `notes/09_state_machines.md`
+- `notes/10_glossary.md`
+
+### セルフレビュー結果
+
+- ✅ 引用スナップショットはそのまま保持し、表示上の移動だけを追加した。
+- ✅ 検索中でも引用元に戻れるよう、検索条件を解除してからスクロールする設計にした。
+- ✅ 引用元が削除・取得外などで見つからない時は、無反応にならないよう案内を出す。
+
+---
+
 ## イテレーション194：掲示板返信番号と作成者バッジを追加
 
 ### 背景・問題意識

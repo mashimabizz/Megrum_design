@@ -123,6 +123,7 @@ export default function MeguriBoardThreadScreen() {
   const [previousReadAt, setPreviousReadAt] = useState<number | null>(null);
   const [participantsOpen, setParticipantsOpen] = useState(false);
   const scrollViewRef = useRef<ScrollView | null>(null);
+  const replyOffsetsRef = useRef<Record<string, number>>({});
 
   const actor = useMemo<MeguriBoardActor>(
     () => ({
@@ -266,6 +267,28 @@ export default function MeguriBoardThreadScreen() {
     if (participant.replyCount === 0) return;
     setReplySearchText(participant.handle || participant.name);
     setParticipantsOpen(false);
+  }
+
+  function rememberReplyOffset(replyId: string, y: number) {
+    replyOffsetsRef.current[replyId] = y;
+  }
+
+  function scrollToReply(replyId: string | null) {
+    if (!replyId) return;
+    const runScroll = () => {
+      const y = replyOffsetsRef.current[replyId];
+      if (typeof y === "number") {
+        scrollViewRef.current?.scrollTo({ animated: true, y: Math.max(0, y - 12) });
+        return;
+      }
+      Alert.alert("引用元を表示できません", "検索条件を解除しても引用元が見つかりませんでした。");
+    };
+    if (replySearchText.trim()) {
+      setReplySearchText("");
+      setTimeout(runScroll, 140);
+      return;
+    }
+    runScroll();
   }
 
   const refreshDetail = useCallback(async (options: { silent?: boolean } = {}) => {
@@ -1044,7 +1067,11 @@ export default function MeguriBoardThreadScreen() {
                   const replyNumber = replyNumberById.get(reply.id) ?? index + 1;
                   const replyByThreadAuthor = reply.authorId === thread.authorId;
                   return (
-                    <View key={reply.id} style={styles.replyGroup}>
+                    <View
+                      key={reply.id}
+                      onLayout={(event) => rememberReplyOffset(reply.id, event.nativeEvent.layout.y)}
+                      style={styles.replyGroup}
+                    >
                       {reply.id === unreadSeparatorReplyId ? (
                         <View style={styles.unreadSeparator}>
                           <View style={styles.unreadSeparatorLine} />
@@ -1080,7 +1107,12 @@ export default function MeguriBoardThreadScreen() {
                             ]}
                           >
                             {reply.quotedBody ? (
-                              <View style={[styles.quotePreview, reply.mine ? styles.quotePreviewMine : null]}>
+                              <Pressable
+                                accessibilityRole="button"
+                                disabled={!reply.parentReplyId}
+                                onPress={() => scrollToReply(reply.parentReplyId)}
+                                style={[styles.quotePreview, reply.mine ? styles.quotePreviewMine : null]}
+                              >
                                 <Text
                                   numberOfLines={1}
                                   style={[styles.quoteAuthor, reply.mine ? styles.quoteAuthorMine : null]}
@@ -1093,7 +1125,7 @@ export default function MeguriBoardThreadScreen() {
                                 >
                                   {reply.quotedBody}
                                 </Text>
-                              </View>
+                              </Pressable>
                             ) : null}
                             <Text
                               style={[
