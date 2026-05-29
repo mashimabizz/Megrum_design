@@ -137,13 +137,17 @@ function ProfileDrawerShell({ children }: { children: ReactNode }) {
   const openX = Math.min(drawerWidth - 34, width * 0.68);
   const screenX = useRef(new Animated.Value(0)).current;
   const [visible, setVisible] = useState(false);
+  const [closing, setClosing] = useState(false);
   const visibleRef = useRef(false);
+  const closingRef = useRef(false);
 
   useEffect(() => {
     visibleRef.current = visible;
   }, [visible]);
 
   const openDrawer = () => {
+    closingRef.current = false;
+    setClosing(false);
     setVisible(true);
     screenX.stopAnimation();
     Animated.spring(screenX, {
@@ -156,6 +160,8 @@ function ProfileDrawerShell({ children }: { children: ReactNode }) {
   };
 
   const closeDrawer = (afterClose?: () => void) => {
+    closingRef.current = true;
+    setClosing(true);
     screenX.stopAnimation();
     Animated.spring(screenX, {
       toValue: 0,
@@ -165,6 +171,8 @@ function ProfileDrawerShell({ children }: { children: ReactNode }) {
       useNativeDriver: false,
     }).start(({ finished }) => {
       if (finished) {
+        closingRef.current = false;
+        setClosing(false);
         setVisible(false);
         afterClose?.();
       }
@@ -178,10 +186,15 @@ function ProfileDrawerShell({ children }: { children: ReactNode }) {
   const edgePanResponder = useMemo(
     () =>
       PanResponder.create({
-        onStartShouldSetPanResponder: () => true,
+        onStartShouldSetPanResponder: () => !visibleRef.current && !closingRef.current,
         onMoveShouldSetPanResponder: (_event, gesture) =>
-          gesture.dx > 5 && Math.abs(gesture.dx) > Math.abs(gesture.dy),
+          !visibleRef.current &&
+          !closingRef.current &&
+          gesture.dx > 5 &&
+          Math.abs(gesture.dx) > Math.abs(gesture.dy),
         onPanResponderGrant: () => {
+          closingRef.current = false;
+          setClosing(false);
           setVisible(true);
           screenX.stopAnimation();
         },
@@ -213,6 +226,8 @@ function ProfileDrawerShell({ children }: { children: ReactNode }) {
           Math.abs(gesture.dx) > 6 &&
           Math.abs(gesture.dx) > Math.abs(gesture.dy),
         onPanResponderGrant: () => {
+          closingRef.current = false;
+          setClosing(false);
           screenX.stopAnimation();
         },
         onPanResponderMove: (_event, gesture) => {
@@ -220,13 +235,19 @@ function ProfileDrawerShell({ children }: { children: ReactNode }) {
           screenX.setValue(next);
         },
         onPanResponderRelease: (_event, gesture) => {
-          if (gesture.dx < -openX * 0.22 || gesture.vx < -0.35) {
+          if (gesture.dx < -8 || gesture.vx < -0.18) {
             closeDrawer();
             return;
           }
           openDrawer();
         },
-        onPanResponderTerminate: () => openDrawer(),
+        onPanResponderTerminate: () => {
+          if (closingRef.current) {
+            closeDrawer();
+            return;
+          }
+          openDrawer();
+        },
       }),
     [openX, screenX],
   );
@@ -253,14 +274,14 @@ function ProfileDrawerShell({ children }: { children: ReactNode }) {
   });
   const screenShadowOpacity = screenX.interpolate({
     inputRange: [0, openX],
-    outputRange: [0, 0.16],
+    outputRange: [0, 0.24],
     extrapolate: "clamp",
   });
 
   return (
     <View style={styles.drawerShellRoot}>
       <Animated.View
-        pointerEvents={visible ? "auto" : "none"}
+        pointerEvents={visible && !closing ? "auto" : "none"}
         style={[
           styles.drawerUnderlay,
           {
@@ -285,23 +306,33 @@ function ProfileDrawerShell({ children }: { children: ReactNode }) {
         ]}
         {...foregroundPanResponder.panHandlers}
       >
-        {children}
         <Animated.View
-          pointerEvents="none"
-          style={[styles.drawerWhiteout, { opacity: whiteoutOpacity }]}
-        />
-        {visible ? (
-          <Pressable
-            accessibilityLabel="メニューを閉じる"
-            accessibilityRole="button"
-            style={StyleSheet.absoluteFill}
-            onPress={() => closeDrawer()}
+          style={[
+            styles.drawerForegroundClip,
+            {
+              borderBottomLeftRadius: screenRadius,
+              borderTopLeftRadius: screenRadius,
+            },
+          ]}
+        >
+          {children}
+          <Animated.View
+            pointerEvents="none"
+            style={[styles.drawerWhiteout, { opacity: whiteoutOpacity }]}
           />
-        ) : null}
+          {visible && !closing ? (
+            <Pressable
+              accessibilityLabel="メニューを閉じる"
+              accessibilityRole="button"
+              style={StyleSheet.absoluteFill}
+              onPress={() => closeDrawer()}
+            />
+          ) : null}
+        </Animated.View>
       </Animated.View>
 
       <View
-        pointerEvents={visible ? "none" : "auto"}
+        pointerEvents={visible || closing ? "none" : "auto"}
         style={styles.edgeSwipeHandle}
         {...edgePanResponder.panHandlers}
       />
@@ -457,7 +488,7 @@ function DrawerItem({
         pressed ? styles.drawerItemPressed : null,
       ]}
     >
-      <IconSymbol name={icon} color={megrumColors.ink} size={compact ? 24 : 31} />
+      <IconSymbol name={icon} color={megrumColors.ink} size={compact ? 21 : 25} />
       <Text style={[styles.drawerItemText, compact ? styles.drawerItemTextCompact : null]}>
         {label}
       </Text>
@@ -494,11 +525,15 @@ const styles = StyleSheet.create({
   drawerForeground: {
     backgroundColor: megrumColors.background,
     flex: 1,
-    overflow: "hidden",
     shadowColor: megrumColors.ink,
-    shadowOffset: { width: -18, height: 0 },
-    shadowRadius: 32,
+    shadowOffset: { width: -30, height: 0 },
+    shadowRadius: 46,
     zIndex: 2,
+  },
+  drawerForegroundClip: {
+    backgroundColor: megrumColors.background,
+    flex: 1,
+    overflow: "hidden",
   },
   drawerWhiteout: {
     ...StyleSheet.absoluteFillObject,
@@ -507,11 +542,11 @@ const styles = StyleSheet.create({
   },
   drawerContent: {
     flex: 1,
-    paddingHorizontal: 30,
+    paddingHorizontal: 24,
   },
   drawerProfile: {
     gap: 5,
-    marginBottom: 30,
+    marginBottom: 22,
   },
   drawerAvatar: {
     alignItems: "center",
@@ -550,22 +585,22 @@ const styles = StyleSheet.create({
     marginTop: 6,
   },
   drawerMenu: {
-    gap: 14,
+    gap: 5,
   },
   drawerMenuCompact: {
-    gap: 10,
+    gap: 4,
   },
   drawerItem: {
     alignItems: "center",
-    borderRadius: 20,
+    borderRadius: 16,
     flexDirection: "row",
-    gap: 28,
-    minHeight: 58,
+    gap: 18,
+    minHeight: 46,
     paddingHorizontal: 3,
   },
   drawerItemCompact: {
-    gap: 24,
-    minHeight: 48,
+    gap: 16,
+    minHeight: 40,
   },
   drawerItemPressed: {
     backgroundColor: "rgba(58,50,74,0.05)",
@@ -575,21 +610,23 @@ const styles = StyleSheet.create({
   },
   drawerItemText: {
     color: megrumColors.ink,
-    flexShrink: 0,
-    fontSize: 25,
+    flex: 1,
+    flexShrink: 1,
+    fontSize: 20,
     fontWeight: "900",
     letterSpacing: 0,
+    minWidth: 0,
   },
   drawerItemAccessory: {
     marginLeft: "auto",
   },
   drawerItemTextCompact: {
-    fontSize: 19,
+    fontSize: 16.5,
     fontWeight: "800",
   },
   drawerDivider: {
     backgroundColor: "rgba(58,50,74,0.12)",
     height: StyleSheet.hairlineWidth,
-    marginVertical: 28,
+    marginVertical: 20,
   },
 });

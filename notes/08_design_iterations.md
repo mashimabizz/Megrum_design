@@ -4,6 +4,48 @@
 
 ---
 
+## イテレーション170.3：左ドロワーの奥行きと間隔調整
+
+### 背景・問題意識
+
+オーナーから、左ドロワーは下層にあるように見せたいので元画面側から影が落ちる表現にしたい、行間が広すぎる、文字が大きく「プロフィール編集」が入りきっていない、閉じる途中にドロワーをタップすると再表示される挙動が不自然、という指摘があった。
+
+### 変更内容
+
+#### `mobile/app/(tabs)/_layout.tsx`
+- 元画面を影を落とす外側レイヤーと、角丸で内容を切り抜く内側レイヤーに分け、ドロワー側へ落ちる影を強めた。
+- ドロワーメニューの行間、アイコンサイズ、文字サイズ、区切り線余白を詰めた。
+- メニュー文字を伸縮可能にし、「プロフィール編集」のような長い項目が入りやすいようにした。
+- ドロワーを閉じるアニメーション中はドロワー側とエッジハンドルのタップを無効化し、閉じる途中のタップで再表示されないようにした。
+- 閉じる方向のスワイプ判定を軽くし、少し左へ引いた時点で閉じる挙動に寄せた。
+
+### 影響範囲
+
+- iOS版 共通タブレイアウト
+- 左ドロワー
+- 左ドロワーの開閉ジェスチャー
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `git diff --check -- mobile/app/(tabs)/_layout.tsx notes/08_design_iterations.md`
+- `npm --prefix mobile run export:ios:preview`
+- `EAS_UPDATE_PROJECT_SLUG=ihub EXPO_NO_GIT_STATUS=1 npm --prefix mobile run update:ios:preview -- --message "[iter170.3] drawer depth spacing polish" --non-interactive`
+- Preview OTA: Update group `ba9c9644-259f-4580-9c31-73f315942d98` / iOS update `019e749d-4582-7702-bdaa-2e4294a748ad`
+
+### 関連ファイル
+
+- `mobile/app/(tabs)/_layout.tsx`
+
+### セルフレビュー結果
+
+- ✅ 元画面側の影を強め、ドロワーが下層に見える構造へ変更。
+- ✅ 行間・アイコン・文字サイズを縮小し、長い項目が収まりやすい表示へ変更。
+- ✅ 閉じる途中のドロワータップによる再表示を防止。
+- ✅ 状態遷移・用語・データモデルの変更はないため、`notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要。
+
+---
+
 ## イテレーション170.2：関係図ヘッダーと個別募集見出し調整
 
 ### 背景・問題意識
