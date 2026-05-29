@@ -29,6 +29,7 @@
 
 - `npm --prefix mobile run typecheck`
 - `npm --prefix mobile run export:ios:preview`
+- Preview channel OTA配信済み：Update group `3a5c52c5-95bd-4a20-a0dc-f87125aca617` / iOS update ID `019e72c6-9c72-7e26-8bcd-d94dfd17ce40`
 - iOS Previewで `/meguri-intro` を開いても演出画面が表示されず、`めぐりマップ` へ進むことを確認
 
 ### 関連ファイル
@@ -40,6 +41,7 @@
 
 - ✅ `npm --prefix mobile run typecheck` 通過
 - ✅ `npm --prefix mobile run export:ios:preview` 通過
+- ✅ Preview channel OTA配信済み
 - ✅ 09更新診断：状態遷移の変更はないため更新不要
 - ✅ 10更新診断：廃止用語を更新済み
 
