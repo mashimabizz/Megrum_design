@@ -95,6 +95,15 @@ type CandidateTouchState = {
   pointerStartOffsetSlots: number;
 };
 
+type ProfileProposalInventoryScope = {
+  giveIds: string[];
+  receiveIds: string[];
+};
+
+type ScopedProposalInventoryRow = ProposalInventoryRow & {
+  user_id: string | null;
+};
+
 const DAYS = buildMeetupDays(0);
 const HOURS = Array.from({ length: 24 }, (_, hour) => hour);
 const SLOT_MINUTES = 15;
@@ -152,16 +161,34 @@ export default function ProposalSelectScreen() {
     () => parseProposalIdList(receivesParam),
     [receivesParam],
   );
+  const usesProfileInventory =
+    !!partnerIdParam && initialGiveIds.length === 0 && initialReceiveIds.length === 0;
+  const [profileInventoryScope, setProfileInventoryScope] =
+    useState<ProfileProposalInventoryScope | null>(null);
+  const [profileInventoryLoading, setProfileInventoryLoading] = useState(false);
+  const [profileInventoryError, setProfileInventoryError] = useState<string | null>(null);
+  const giveChoiceIds = usesProfileInventory
+    ? profileInventoryScope?.giveIds ?? []
+    : initialGiveIds;
+  const receiveChoiceIds = usesProfileInventory
+    ? profileInventoryScope?.receiveIds ?? []
+    : initialReceiveIds;
   const [catalogOverrides, setCatalogOverrides] = useState<
     ReturnType<typeof buildProposalCatalogOverrides>
   >(() => new Map());
   const giveChoices = useMemo(
-    () => buildProposalChoices(initialGiveIds, "give", catalogOverrides),
-    [catalogOverrides, initialGiveIds],
+    () =>
+      buildProposalChoices(giveChoiceIds, "give", catalogOverrides, {
+        includeFallback: !usesProfileInventory,
+      }),
+    [catalogOverrides, giveChoiceIds, usesProfileInventory],
   );
   const receiveChoices = useMemo(
-    () => buildProposalChoices(initialReceiveIds, "receive", catalogOverrides),
-    [catalogOverrides, initialReceiveIds],
+    () =>
+      buildProposalChoices(receiveChoiceIds, "receive", catalogOverrides, {
+        includeFallback: !usesProfileInventory,
+      }),
+    [catalogOverrides, receiveChoiceIds, usesProfileInventory],
   );
   const [tab, setTab] = useState<ProposalTab>(initialTab);
   const [giveSelectedIds, setGiveSelectedIds] = useState<string[]>(() =>
@@ -204,6 +231,7 @@ export default function ProposalSelectScreen() {
 
   useEffect(() => {
     if (!supabase) return;
+    if (usesProfileInventory) return;
     const ids = Array.from(new Set([...initialGiveIds, ...initialReceiveIds]));
     if (ids.length === 0) {
       setCatalogOverrides(new Map());
@@ -227,7 +255,71 @@ export default function ProposalSelectScreen() {
     return () => {
       active = false;
     };
-  }, [initialGiveIds, initialReceiveIds]);
+  }, [initialGiveIds, initialReceiveIds, usesProfileInventory]);
+
+  useEffect(() => {
+    if (!usesProfileInventory) {
+      setProfileInventoryScope(null);
+      setProfileInventoryLoading(false);
+      setProfileInventoryError(null);
+      return;
+    }
+    if (!supabase || !partnerIdParam) {
+      setProfileInventoryScope(null);
+      setProfileInventoryError(null);
+      return;
+    }
+
+    let active = true;
+    setProfileInventoryLoading(true);
+    setProfileInventoryError(null);
+
+    void (async () => {
+      try {
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
+        if (!user) throw new Error("ログイン状態を確認してください");
+
+        const { data, error } = await supabase
+          .from("goods_inventory")
+          .select(
+            "id, user_id, title, photo_urls, hue, group:groups_master(name), character:characters_master(name), goods_type:goods_types_master(name)",
+          )
+          .in("user_id", [user.id, partnerIdParam])
+          .eq("kind", "for_trade")
+          .eq("status", "active")
+          .limit(120);
+        if (error) throw error;
+
+        const rows = ((data as ScopedProposalInventoryRow[] | null) ?? []).filter(
+          (row) => row.user_id === user.id || row.user_id === partnerIdParam,
+        );
+        const giveRows = rows.filter((row) => row.user_id === user.id);
+        const receiveRows = rows.filter((row) => row.user_id === partnerIdParam);
+
+        if (!active) return;
+        setCatalogOverrides(buildProposalCatalogOverrides(rows));
+        setProfileInventoryScope({
+          giveIds: giveRows.map((row) => row.id),
+          receiveIds: receiveRows.map((row) => row.id),
+        });
+      } catch (reason: unknown) {
+        if (!active) return;
+        setCatalogOverrides(new Map());
+        setProfileInventoryScope({ giveIds: [], receiveIds: [] });
+        setProfileInventoryError(
+          reason instanceof Error ? reason.message : "在庫候補を読み込めませんでした",
+        );
+      } finally {
+        if (active) setProfileInventoryLoading(false);
+      }
+    })();
+
+    return () => {
+      active = false;
+    };
+  }, [partnerIdParam, usesProfileInventory]);
 
   const tabs = useMemo(
     () => [
@@ -247,6 +339,29 @@ export default function ProposalSelectScreen() {
     ],
     [giveSelectedIds.length, receiveSelectedIds.length],
   );
+  const itemSelectionMissing =
+    tab === "give"
+      ? giveSelectedIds.length === 0
+      : tab === "receive"
+        ? receiveSelectedIds.length === 0
+        : false;
+  const primaryButtonDisabled =
+    profileInventoryLoading ||
+    itemSelectionMissing ||
+    (tab === "meetup" && !meetupReady);
+  const primaryButtonLabel = profileInventoryLoading
+    ? "在庫を読み込んでいます"
+    : itemSelectionMissing
+      ? tab === "give"
+        ? "私が出すものを選択してください"
+        : "受け取るものを選択してください"
+      : tab === "meetup"
+        ? meetupReady
+          ? "次へ：送信確認 →"
+          : meetupHasTimeDraft
+            ? "場所未設定の候補があります"
+            : "交換できる時間を設定してください"
+        : "待ち合わせへ進む";
 
   return (
     <Screen scroll={false} contentStyle={styles.screen}>
@@ -279,6 +394,10 @@ export default function ProposalSelectScreen() {
           <ChoicePane
             items={giveChoices}
             selectedIds={giveSelectedIds}
+            loading={usesProfileInventory && profileInventoryLoading}
+            emptyText={
+              profileInventoryError ?? "私が出せる譲る在庫がありません"
+            }
             onToggle={(id) =>
               setGiveSelectedIds((current) => toggleChoiceId(current, id))
             }
@@ -289,6 +408,10 @@ export default function ProposalSelectScreen() {
           <ChoicePane
             items={receiveChoices}
             selectedIds={receiveSelectedIds}
+            loading={usesProfileInventory && profileInventoryLoading}
+            emptyText={
+              profileInventoryError ?? "相手の譲る在庫がありません"
+            }
             onToggle={(id) =>
               setReceiveSelectedIds((current) => toggleChoiceId(current, id))
             }
@@ -341,6 +464,9 @@ export default function ProposalSelectScreen() {
 
       <PrimaryButton
         onPress={() => {
+          if (profileInventoryLoading) return;
+          if (tab === "give" && giveSelectedIds.length === 0) return;
+          if (tab === "receive" && receiveSelectedIds.length === 0) return;
           if (tab !== "meetup") {
             setTab("meetup");
             return;
@@ -372,15 +498,9 @@ export default function ProposalSelectScreen() {
             },
           });
         }}
-        disabled={tab === "meetup" && !meetupReady}
+        disabled={primaryButtonDisabled}
       >
-        {tab === "meetup"
-          ? meetupReady
-            ? "次へ：送信確認 →"
-            : meetupHasTimeDraft
-              ? "場所未設定の候補があります"
-              : "交換できる時間を設定してください"
-          : "待ち合わせへ進む"}
+        {primaryButtonLabel}
       </PrimaryButton>
     </Screen>
   );
@@ -441,13 +561,27 @@ export default function ProposalSelectScreen() {
 function ChoicePane({
   items,
   selectedIds,
+  loading,
+  emptyText,
   onToggle,
 }: {
   items: ProposalChoiceItem[];
   selectedIds: string[];
+  loading?: boolean;
+  emptyText?: string;
   onToggle: (id: string) => void;
 }) {
   const selectedSet = useMemo(() => new Set(selectedIds), [selectedIds]);
+  if (loading || items.length === 0) {
+    return (
+      <View style={styles.choiceState}>
+        <Text style={styles.choiceStateText}>
+          {loading ? "在庫を読み込み中…" : emptyText ?? "選択できるグッズがありません"}
+        </Text>
+      </View>
+    );
+  }
+
   return (
     <ScrollView
       showsVerticalScrollIndicator={false}
@@ -1777,6 +1911,23 @@ const styles = StyleSheet.create({
   choiceList: {
     gap: 10,
     paddingBottom: 18,
+  },
+  choiceState: {
+    alignItems: "center",
+    backgroundColor: "rgba(255,255,255,0.74)",
+    borderColor: "rgba(58,50,74,0.08)",
+    borderRadius: megrumRadii.lg,
+    borderWidth: 1,
+    justifyContent: "center",
+    minHeight: 168,
+    padding: 18,
+  },
+  choiceStateText: {
+    color: megrumColors.mutedInk,
+    fontSize: 13,
+    fontWeight: "800",
+    lineHeight: 20,
+    textAlign: "center",
   },
   choiceCard: {
     alignItems: "center",

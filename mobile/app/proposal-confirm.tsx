@@ -37,6 +37,13 @@ type MeetupCandidate = {
   coordinate: MapCoordinate;
 };
 
+type ProposalOwnershipRow = {
+  id: string;
+  user_id: string | null;
+  kind: string | null;
+  status: string | null;
+};
+
 const MEETUP_CANDIDATES: MeetupCandidate[] = [
   {
     id: "candidate-1",
@@ -247,6 +254,16 @@ export default function ProposalConfirmScreen() {
         setSubmitError("ログイン状態を確認してください");
         return;
       }
+      const ownershipError = await validateProposalInventoryOwnership({
+        userId: user.id,
+        partnerId,
+        giveIds,
+        receiveIds,
+      });
+      if (ownershipError) {
+        setSubmitError(ownershipError);
+        return;
+      }
 
       const now = new Date();
       const expires = new Date(now.getTime() + 7 * 24 * 60 * 60_000);
@@ -295,6 +312,48 @@ export default function ProposalConfirmScreen() {
       setSubmitting(false);
     }
   }
+}
+
+async function validateProposalInventoryOwnership(input: {
+  userId: string;
+  partnerId: string;
+  giveIds: string[];
+  receiveIds: string[];
+}) {
+  if (!supabase) return null;
+  const ids = Array.from(new Set([...input.giveIds, ...input.receiveIds]));
+  const { data, error } = await supabase
+    .from("goods_inventory")
+    .select("id, user_id, kind, status")
+    .in("id", ids);
+  if (error) {
+    return "提示するグッズを確認できませんでした。時間を置いて再度お試しください。";
+  }
+
+  const rowsById = new Map(
+    ((data as ProposalOwnershipRow[] | null) ?? []).map((row) => [row.id, row]),
+  );
+  const invalidGiveId = input.giveIds.find((id) => {
+    const row = rowsById.get(id);
+    return !isActiveTradeInventory(row) || row.user_id !== input.userId;
+  });
+  if (invalidGiveId) {
+    return "私が出すものは、自分の譲る在庫から選択してください。";
+  }
+
+  const invalidReceiveId = input.receiveIds.find((id) => {
+    const row = rowsById.get(id);
+    return !isActiveTradeInventory(row) || row.user_id !== input.partnerId;
+  });
+  if (invalidReceiveId) {
+    return "受け取るものは、相手の譲る在庫から選択してください。";
+  }
+
+  return null;
+}
+
+function isActiveTradeInventory(row?: ProposalOwnershipRow): row is ProposalOwnershipRow {
+  return row?.kind === "for_trade" && row.status === "active";
 }
 
 const PARTNER_HANDLE = "michilion";

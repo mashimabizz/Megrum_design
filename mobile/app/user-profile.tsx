@@ -182,7 +182,7 @@ export default function UserProfileScreen() {
               onPress={() =>
                 router.push({
                   pathname: "/proposal-select",
-                  params: { partnerId: profile.id },
+                  params: { partnerId: profile.id, partnerHandle: profile.handle },
                 })
               }
               style={styles.cta}

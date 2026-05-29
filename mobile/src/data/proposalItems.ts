@@ -148,8 +148,12 @@ export function buildProposalChoices(
   ids: string[],
   side: ProposalSide,
   overrides?: ProposalCatalogOverrides,
+  options?: { includeFallback?: boolean },
 ): ProposalChoiceItem[] {
-  const orderedIds = uniqueIds([...ids, ...BASE_IDS[side]]);
+  const orderedIds =
+    options?.includeFallback === false
+      ? uniqueIds(ids)
+      : uniqueIds(ids.length > 0 ? ids : BASE_IDS[side]);
   return orderedIds.map((id) => toProposalChoice(id, side, overrides));
 }
 

@@ -4,6 +4,58 @@
 
 ---
 
+## イテレーション168.65：プロフィール打診候補を実在庫化
+
+### 背景・問題意識
+
+ユーザープロフィールから「この人に打診する」を押した時、`partnerId` だけで打診選択画面へ遷移していたため、私が出すもの・相手から受け取るものが固定のプレビュー候補になっていた。プロフィール起点でも、私が出すものは自分の在庫、受け取るものは相手の在庫から選ばせる必要がある。
+
+### 変更内容
+
+#### `mobile/app/user-profile.tsx`
+- プロフィールから打診選択へ遷移する時に `partnerHandle` も渡すようにした。
+
+#### `mobile/app/proposal-select.tsx`
+- `partnerId` のみで開かれたプロフィール起点の打診では、ログインユーザーと相手ユーザーの `goods_inventory` を読み込むようにした。
+- 「私が出す」は自分の `kind='for_trade'` / `status='active'` の在庫だけを候補化した。
+- 「受け取る」は相手の `kind='for_trade'` / `status='active'` の在庫だけを候補化した。
+- 実在庫がある時は固定プレビュー候補を混ぜず、空の場合は選択不可メッセージを出すようにした。
+
+#### `mobile/app/proposal-confirm.tsx`
+- 送信直前に、`sender_have_ids` が自分の active な譲る在庫、`receiver_have_ids` が相手の active な譲る在庫であることを検証するようにした。
+- URLパラメータや古い候補が混ざった場合でも、不正な所有者のグッズを proposals に保存しないようにした。
+
+#### `mobile/src/data/proposalItems.ts`
+- 実IDが渡っている時は固定プレビュー候補を追加しないようにした。
+- プロフィール起点では明示的に fallback を無効化できるようにした。
+
+### 影響範囲
+
+- iOSプロフィール画面からの打診作成
+- iOSマッチ詳細・ホームから打診作成へ渡る実ID候補
+- iOS打診送信直前の在庫所有者バリデーション
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `git diff --check -- mobile/app/proposal-select.tsx mobile/app/proposal-confirm.tsx mobile/src/data/proposalItems.ts mobile/app/user-profile.tsx`
+- 実機 / TestFlight で相手プロフィール → 「この人に打診する」→ 「私が出す」に自分の在庫、「受け取る」に相手の在庫だけが出ることを確認
+
+### 関連ファイル
+
+- `mobile/app/user-profile.tsx`
+- `mobile/app/proposal-select.tsx`
+- `mobile/app/proposal-confirm.tsx`
+- `mobile/src/data/proposalItems.ts`
+
+### セルフレビュー結果
+
+- ✅ プロフィール起点の打診候補が実在庫由来になる
+- ✅ 送信直前にも在庫所有者を検証する
+- ✅ 状態遷移・DBスキーマ・新用語の変更ではないため `notes/09_state_machines.md` / `notes/05_data_model.md` / `notes/10_glossary.md` の更新は不要
+
+---
+
 ## イテレーション168.64：メール認証リンクをiOSアプリへ戻す
 
 ### 背景・問題意識
