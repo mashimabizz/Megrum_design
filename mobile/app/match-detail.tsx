@@ -555,9 +555,6 @@ export default function MatchDetailScreen() {
             </Pressable>
             <View style={styles.headerCopy}>
               <Text style={styles.headerTitle}>関係図</Text>
-              <Text numberOfLines={1} style={styles.headerSubtitle}>
-                @{partnerHandle} とのマッチ詳細
-              </Text>
             </View>
           </View>
 
@@ -585,7 +582,8 @@ export default function MatchDetailScreen() {
                 {data.myListings.length > 0 ? (
                   <SectionGroup
                     title="あなたの個別募集"
-                    subtitle="あなたが出している条件で、相手の在庫がヒット"
+                    titleOnly
+                    subtitle=""
                     accentColor={megrumColors.lavender}
                   >
                     {data.myListings.map((listing, index) => (
@@ -794,9 +792,6 @@ function SwipePreview({
         </View>
         <View style={styles.headerCopy}>
           <Text style={styles.headerTitle}>関係図</Text>
-          <Text numberOfLines={1} style={styles.headerSubtitle}>
-            @{PARTNER_HANDLE} とのマッチ詳細
-          </Text>
         </View>
       </View>
 
@@ -808,7 +803,8 @@ function SwipePreview({
         {data.myListings.length > 0 ? (
           <SectionGroup
             title="あなたの個別募集"
-            subtitle="あなたが出している条件で、相手の在庫がヒット"
+            titleOnly
+            subtitle=""
             accentColor={megrumColors.lavender}
           >
             {data.myListings.map((listing, index) => (
@@ -913,9 +909,6 @@ function SwipeSettledCover({
         </View>
         <View style={styles.headerCopy}>
           <Text style={styles.headerTitle}>関係図</Text>
-          <Text numberOfLines={1} style={styles.headerSubtitle}>
-            @{PARTNER_HANDLE} とのマッチ詳細
-          </Text>
         </View>
       </View>
 
@@ -927,7 +920,8 @@ function SwipeSettledCover({
         {data.myListings.length > 0 ? (
           <SectionGroup
             title="あなたの個別募集"
-            subtitle="あなたが出している条件で、相手の在庫がヒット"
+            titleOnly
+            subtitle=""
             accentColor={megrumColors.lavender}
           >
             {data.myListings.map((listing, index) => (
@@ -1595,17 +1589,33 @@ function SectionGroup({
   subtitle,
   accentColor,
   children,
+  titleOnly = false,
 }: {
   title: string;
   subtitle: string;
   accentColor: string;
   children: React.ReactNode;
+  titleOnly?: boolean;
 }) {
   return (
     <View style={styles.section}>
-      <View style={[styles.sectionHeader, { backgroundColor: alpha(accentColor, 0.08) }]}>
-        <Text style={[styles.sectionTitle, { color: accentColor }]}>{title}</Text>
-        <Text style={styles.sectionSubtitle}>{subtitle}</Text>
+      <View
+        style={[
+          styles.sectionHeader,
+          titleOnly
+            ? styles.sectionHeaderPlain
+            : { backgroundColor: alpha(accentColor, 0.08) },
+        ]}
+      >
+        <Text
+          style={[
+            styles.sectionTitle,
+            titleOnly ? styles.sectionTitlePlain : { color: accentColor },
+          ]}
+        >
+          {title}
+        </Text>
+        {!titleOnly ? <Text style={styles.sectionSubtitle}>{subtitle}</Text> : null}
       </View>
       {children}
     </View>
@@ -2331,10 +2341,20 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 9,
   },
+  sectionHeaderPlain: {
+    backgroundColor: "transparent",
+    paddingHorizontal: 0,
+    paddingVertical: 2,
+  },
   sectionTitle: {
     fontSize: 11,
     fontWeight: "900",
     letterSpacing: 0.4,
+  },
+  sectionTitlePlain: {
+    color: megrumColors.ink,
+    fontSize: 15,
+    letterSpacing: 0,
   },
   sectionSubtitle: {
     color: megrumColors.mutedInk,

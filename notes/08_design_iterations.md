@@ -4,6 +4,43 @@
 
 ---
 
+## イテレーション170.2：関係図ヘッダーと個別募集見出し調整
+
+### 背景・問題意識
+
+オーナーから、関係図画面のヘッダーに表示される「@michiとのマッチ詳細」のような説明書きは不要であり、ボディ側の「あなたの個別募集」は黒太字の見出しだけでよいという依頼があった。
+
+### 変更内容
+
+#### `mobile/app/match-detail.tsx`
+- 関係図ヘッダーからマッチ詳細のサブタイトルを削除した。
+- 「あなたの個別募集」セクションを黒太字の見出しのみで表示する `titleOnly` 表示に変更した。
+
+### 影響範囲
+
+- iOS版 関係図画面
+- 関係図のスワイププレビュー / 切り替えカバー表示
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `git diff --check -- mobile/app/match-detail.tsx notes/08_design_iterations.md`
+- `npm --prefix mobile run export:ios:preview`
+- `EAS_UPDATE_PROJECT_SLUG=ihub EXPO_NO_GIT_STATUS=1 npm --prefix mobile run update:ios:preview -- --message "[iter170.2] match detail copy cleanup" --non-interactive`
+- Preview OTA: Update group `049f859b-f945-4e3b-a0a7-8436844b4e66` / iOS update `019e7495-3eb1-7157-b029-414977b0f05b`
+
+### 関連ファイル
+
+- `mobile/app/match-detail.tsx`
+
+### セルフレビュー結果
+
+- ✅ ヘッダーの説明書きは削除済み。
+- ✅ 「あなたの個別募集」は黒太字の見出しのみで表示。
+- ✅ 状態遷移・用語・データモデルの変更はないため、`notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要。
+
+---
+
 ## イテレーション170.1：提示物選択の待ち合わせUI整理
 
 ### 背景・問題意識
