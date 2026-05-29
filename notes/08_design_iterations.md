@@ -4,6 +4,52 @@
 
 ---
 
+## イテレーション190：掲示板詳細に未読区切りを追加
+
+### 背景・問題意識
+
+スポット掲示板の返信が増えると、前回読んだ位置からどこが新しい返信なのか分かりにくくなる。一般的なスレッド機能として、詳細画面に「ここから未読」の区切りを追加した。
+
+### 変更内容
+
+#### `mobile/app/meguri-board-thread.tsx`
+- スレッド詳細を開いた時、既読更新前の `readAt` を `previousReadAt` として保持するようにした。
+- `previousReadAt` より新しい最初の返信の上に `ここから未読` 区切りを表示するようにした。
+- スレッド内検索中は、検索結果の位置と混ざらないよう未読区切りを非表示にした。
+- 自分が返信を送信した直後は、その返信を未読扱いにしないよう既読基準時刻を更新するようにした。
+
+#### `notes/09_state_machines.md`
+- Meguri Board Lifecycle に未読区切りの表示ルールを追記した。
+
+#### `notes/10_glossary.md`
+- 掲示板未読区切りを追加した。
+
+### 影響範囲
+
+- iOS版 スポット掲示板詳細
+- 掲示板の既読表示ルール・用語
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- `EAS_UPDATE_PROJECT_SLUG=ihub EXPO_NO_GIT_STATUS=1 npm --prefix mobile run update:ios:preview -- --message "[iter190] add board unread separator" --non-interactive`
+- Preview OTA: Update group `f3d51032-70d8-402d-abee-cae94520f3d1` / iOS update `019e753b-a508-7c74-add4-00582b14875f`
+
+### 関連ファイル
+
+- `mobile/app/meguri-board-thread.tsx`
+- `notes/08_design_iterations.md`
+- `notes/09_state_machines.md`
+- `notes/10_glossary.md`
+
+### セルフレビュー結果
+
+- ✅ 既存の `readAt` / 返信 `createdAt` 判定だけで実装し、DB変更なしで済ませた。
+- ✅ 検索中と自分の送信直後に不自然な未読表示が出ないようにした。
+
+---
+
 ## イテレーション189：掲示板詳細に最新返信ジャンプを追加
 
 ### 背景・問題意識

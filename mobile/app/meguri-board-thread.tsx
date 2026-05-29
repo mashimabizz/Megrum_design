@@ -109,6 +109,7 @@ export default function MeguriBoardThreadScreen() {
   const [replyEditor, setReplyEditor] = useState<MeguriBoardReply | null>(null);
   const [replyEditBody, setReplyEditBody] = useState("");
   const [imagePreviewUri, setImagePreviewUri] = useState<string | null>(null);
+  const [previousReadAt, setPreviousReadAt] = useState<number | null>(null);
   const scrollViewRef = useRef<ScrollView | null>(null);
 
   const actor = useMemo<MeguriBoardActor>(
@@ -167,6 +168,12 @@ export default function MeguriBoardThreadScreen() {
     );
   }, [replies, replySearchText]);
 
+  const unreadSeparatorReplyId = useMemo(() => {
+    if (replySearchText.trim() || replies.length === 0) return null;
+    const firstUnreadReply = replies.find((reply) => !previousReadAt || reply.createdAt > previousReadAt);
+    return firstUnreadReply?.id ?? null;
+  }, [previousReadAt, replies, replySearchText]);
+
   function scrollToLatestReply(animated = true) {
     requestAnimationFrame(() => {
       scrollViewRef.current?.scrollToEnd({ animated });
@@ -207,6 +214,7 @@ export default function MeguriBoardThreadScreen() {
       nextViewerContext,
       { previewMode, viewMode },
     ).catch(() => ({ replies: [] as MeguriBoardReply[], thread: null }));
+    setPreviousReadAt(detail.thread?.readAt ?? null);
     setThread(detail.thread ? { ...detail.thread, readAt: Date.now() } : null);
     setReplies(detail.replies);
     setLoading(false);
@@ -322,6 +330,7 @@ export default function MeguriBoardThreadScreen() {
           }
         : current,
     );
+    setPreviousReadAt(Date.now());
     setTimeout(() => scrollToLatestReply(), 80);
   }
 
@@ -936,86 +945,94 @@ export default function MeguriBoardThreadScreen() {
                 </View>
               ) : (
                 filteredReplies.map((reply) => (
-                  <View
-                    key={reply.id}
-                    style={[styles.replyRow, reply.mine ? styles.replyRowMine : null]}
-                  >
-                    {!reply.mine ? (
-                      <View style={[styles.replyAvatar, { backgroundColor: colorForAuthor(reply.authorId) }]}>
-                        <Text style={styles.replyAvatarText}>{reply.authorName.slice(0, 1)}</Text>
+                  <View key={reply.id} style={styles.replyGroup}>
+                    {reply.id === unreadSeparatorReplyId ? (
+                      <View style={styles.unreadSeparator}>
+                        <View style={styles.unreadSeparatorLine} />
+                        <Text style={styles.unreadSeparatorText}>ここから未読</Text>
+                        <View style={styles.unreadSeparatorLine} />
                       </View>
                     ) : null}
-                    <View style={reply.mine ? styles.replyContentMine : styles.replyContent}>
+                    <View
+                      style={[styles.replyRow, reply.mine ? styles.replyRowMine : null]}
+                    >
                       {!reply.mine ? (
-                        <Text style={styles.replyAuthor}>{reply.authorName}</Text>
+                        <View style={[styles.replyAvatar, { backgroundColor: colorForAuthor(reply.authorId) }]}>
+                          <Text style={styles.replyAvatarText}>{reply.authorName.slice(0, 1)}</Text>
+                        </View>
                       ) : null}
-                      <ChatGradientBubble
-                        mine={reply.mine}
-                        style={[
-                          styles.replyBubble,
-                          reply.mine ? styles.replyBubbleMine : styles.replyBubbleTheirs,
-                        ]}
-                      >
-                        {reply.quotedBody ? (
-                          <View style={[styles.quotePreview, reply.mine ? styles.quotePreviewMine : null]}>
-                            <Text
-                              numberOfLines={1}
-                              style={[styles.quoteAuthor, reply.mine ? styles.quoteAuthorMine : null]}
-                            >
-                              {reply.quotedAuthorName || "引用"}
-                            </Text>
-                            <Text
-                              numberOfLines={2}
-                              style={[styles.quoteBody, reply.mine ? styles.quoteBodyMine : null]}
-                            >
-                              {reply.quotedBody}
-                            </Text>
-                          </View>
+                      <View style={reply.mine ? styles.replyContentMine : styles.replyContent}>
+                        {!reply.mine ? (
+                          <Text style={styles.replyAuthor}>{reply.authorName}</Text>
                         ) : null}
-                        <Text
+                        <ChatGradientBubble
+                          mine={reply.mine}
                           style={[
-                            styles.replyBody,
-                            reply.mine ? styles.replyBodyMine : null,
-                            reply.deleted ? styles.replyBodyDeleted : null,
+                            styles.replyBubble,
+                            reply.mine ? styles.replyBubbleMine : styles.replyBubbleTheirs,
                           ]}
                         >
-                          {reply.body}
-                        </Text>
-                        {!reply.deleted ? (
-                          <AttachmentGrid
-                            compact
-                            imageUris={reply.imageUris}
-                            onPressImage={setImagePreviewUri}
-                          />
-                        ) : null}
-                      </ChatGradientBubble>
-                      <Text style={[styles.replyTime, reply.mine ? styles.replyTimeMine : null]}>
-                        {formatRelativeTime(reply.createdAt)}
-                        {reply.updatedAt && reply.updatedAt > reply.createdAt + 60000 ? " · 編集済み" : ""}
-                      </Text>
-                      <View style={[styles.replyActionRow, reply.mine ? styles.replyActionRowMine : null]}>
-                        <Pressable
-                          accessibilityRole="button"
-                          disabled={reply.deleted}
-                          onPress={() => toggleReplyReaction(reply)}
-                          style={[styles.replyActionPill, reply.reacted ? styles.replyActionPillActive : null]}
-                        >
-                          <IconSymbol
-                            name={reply.reacted ? "heart" : "heart-outline"}
-                            color={reply.reacted ? megrumColors.lavender : megrumColors.mutedInk}
-                            size={13}
-                          />
-                          <Text style={[styles.replyActionText, reply.reacted ? styles.replyActionTextActive : null]}>
-                            {reply.reactionCount}
+                          {reply.quotedBody ? (
+                            <View style={[styles.quotePreview, reply.mine ? styles.quotePreviewMine : null]}>
+                              <Text
+                                numberOfLines={1}
+                                style={[styles.quoteAuthor, reply.mine ? styles.quoteAuthorMine : null]}
+                              >
+                                {reply.quotedAuthorName || "引用"}
+                              </Text>
+                              <Text
+                                numberOfLines={2}
+                                style={[styles.quoteBody, reply.mine ? styles.quoteBodyMine : null]}
+                              >
+                                {reply.quotedBody}
+                              </Text>
+                            </View>
+                          ) : null}
+                          <Text
+                            style={[
+                              styles.replyBody,
+                              reply.mine ? styles.replyBodyMine : null,
+                              reply.deleted ? styles.replyBodyDeleted : null,
+                            ]}
+                          >
+                            {reply.body}
                           </Text>
-                        </Pressable>
-                        <Pressable
-                          accessibilityRole="button"
-                          onPress={() => openReplyActions(reply)}
-                          style={styles.replyActionPill}
-                        >
-                          <IconSymbol name="ellipsis-horizontal" color={megrumColors.mutedInk} size={13} />
-                        </Pressable>
+                          {!reply.deleted ? (
+                            <AttachmentGrid
+                              compact
+                              imageUris={reply.imageUris}
+                              onPressImage={setImagePreviewUri}
+                            />
+                          ) : null}
+                        </ChatGradientBubble>
+                        <Text style={[styles.replyTime, reply.mine ? styles.replyTimeMine : null]}>
+                          {formatRelativeTime(reply.createdAt)}
+                          {reply.updatedAt && reply.updatedAt > reply.createdAt + 60000 ? " · 編集済み" : ""}
+                        </Text>
+                        <View style={[styles.replyActionRow, reply.mine ? styles.replyActionRowMine : null]}>
+                          <Pressable
+                            accessibilityRole="button"
+                            disabled={reply.deleted}
+                            onPress={() => toggleReplyReaction(reply)}
+                            style={[styles.replyActionPill, reply.reacted ? styles.replyActionPillActive : null]}
+                          >
+                            <IconSymbol
+                              name={reply.reacted ? "heart" : "heart-outline"}
+                              color={reply.reacted ? megrumColors.lavender : megrumColors.mutedInk}
+                              size={13}
+                            />
+                            <Text style={[styles.replyActionText, reply.reacted ? styles.replyActionTextActive : null]}>
+                              {reply.reactionCount}
+                            </Text>
+                          </Pressable>
+                          <Pressable
+                            accessibilityRole="button"
+                            onPress={() => openReplyActions(reply)}
+                            style={styles.replyActionPill}
+                          >
+                            <IconSymbol name="ellipsis-horizontal" color={megrumColors.mutedInk} size={13} />
+                          </Pressable>
+                        </View>
                       </View>
                     </View>
                   </View>
@@ -1787,6 +1804,26 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "700",
     lineHeight: 18,
+  },
+  replyGroup: {
+    gap: 10,
+  },
+  unreadSeparator: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 9,
+    paddingHorizontal: 4,
+    paddingVertical: 2,
+  },
+  unreadSeparatorLine: {
+    backgroundColor: "rgba(166,149,216,0.28)",
+    flex: 1,
+    height: StyleSheet.hairlineWidth,
+  },
+  unreadSeparatorText: {
+    color: megrumColors.lavender,
+    fontSize: 11,
+    fontWeight: "900",
   },
   replyRow: {
     alignItems: "flex-end",
