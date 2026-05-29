@@ -4,6 +4,53 @@
 
 ---
 
+## イテレーション241：返信入力中の引用元へ戻れるようにする
+
+### 背景・問題意識
+
+引用返信を書いている途中で、元の発言をもう一度確認したい場面がある。引用バーには相手名と本文の抜粋が出ているが、これまでは閉じる操作だけで、元返信へ戻るにはスレッド内を探す必要があったため、引用バーから元返信へ直接戻れるようにした。
+
+### 変更内容
+
+#### `mobile/app/meguri-board-thread.tsx`
+- 返信入力欄の引用バー本文部分をタップ可能にした。
+- 引用バーを押すと `revealReplyInThreadContext` を使い、検索/並び替え状態を戻しながら元返信へ移動するようにした。
+- 引用解除の `×` ボタンは従来通り独立して残した。
+
+#### `notes/09_state_machines.md`
+- Meguri Board Lifecycle に引用バーから元返信へ戻る表示ルールを追記した。
+
+#### `notes/10_glossary.md`
+- 掲示板返信入力引用元ジャンプを追加した。
+
+### 影響範囲
+
+- iOS版 スポット掲示板詳細
+- 返信入力欄
+- 引用返信作成中の確認導線
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- `EAS_UPDATE_PROJECT_SLUG=ihub EXPO_NO_GIT_STATUS=1 npm --prefix mobile run update:ios:preview -- --message "[iter241] jump from composer quote" --non-interactive`
+- Preview OTA: Update group `21a7c33c-7f1e-4fb6-a0c7-35617d6fc737` / iOS update `019e7620-de4d-70b0-a7ba-6426f56350d2`
+
+### 関連ファイル
+
+- `mobile/app/meguri-board-thread.tsx`
+- `notes/08_design_iterations.md`
+- `notes/09_state_machines.md`
+- `notes/10_glossary.md`
+
+### セルフレビュー結果
+
+- ✅ 既存の `revealReplyInThreadContext` を再利用し、検索中・並び替え中でも元返信に戻れるようにした。
+- ✅ 引用解除ボタンはそのまま残し、誤って引用を外さず確認だけできるようにした。
+- ✅ DB変更なし、ネイティブ依存追加なしでPreview OTA対象内に収めた。
+
+---
+
 ## イテレーション240：掲示板返信へすぐ返信できるボタンを追加
 
 ### 背景・問題意識

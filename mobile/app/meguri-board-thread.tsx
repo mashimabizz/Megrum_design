@@ -2132,7 +2132,11 @@ export default function MeguriBoardThreadScreen() {
               >
                 {quoteTarget ? (
                   <View style={styles.composerQuote}>
-                    <View style={styles.composerQuoteCopy}>
+                    <Pressable
+                      accessibilityRole="button"
+                      onPress={() => revealReplyInThreadContext(quoteTarget.id)}
+                      style={styles.composerQuoteCopy}
+                    >
                       <Text numberOfLines={1} style={styles.composerQuoteAuthor}>
                         {replyNumberById.get(quoteTarget.id)
                           ? `#${replyNumberById.get(quoteTarget.id)} ${quoteTarget.authorName}へ返信`
@@ -2141,7 +2145,7 @@ export default function MeguriBoardThreadScreen() {
                       <Text numberOfLines={1} style={styles.composerQuoteBody}>
                         {quoteTarget.body}
                       </Text>
-                    </View>
+                    </Pressable>
                     <Pressable accessibilityRole="button" hitSlop={8} onPress={() => setQuoteTarget(null)}>
                       <IconSymbol name="close" color="rgba(58,50,74,0.52)" size={15} />
                     </Pressable>
