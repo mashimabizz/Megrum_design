@@ -95,6 +95,7 @@ export type MeguriBoardReply = {
   authorId: string;
   authorName: string;
   authorPrimaryArea: string | null;
+  bookmarked: boolean;
   body: string;
   createdAt: number;
   deleted: boolean;
@@ -190,6 +191,7 @@ type LocalThreadState = {
 };
 
 type LocalReplyState = {
+  bookmarked?: boolean;
   reacted?: boolean;
   reported?: boolean;
 };
@@ -582,6 +584,7 @@ export async function appendMeguriBoardReply(
     authorId: actor.userId,
     authorName: actor.displayName,
     authorPrimaryArea: actor.primaryArea,
+    bookmarked: false,
     body: input.body.trim(),
     createdAt,
     deleted: false,
@@ -662,6 +665,12 @@ export async function setMeguriBoardReplyReacted(replyId: string, reacted: boole
     p_reply_id: replyId,
   });
   return reacted;
+}
+
+export async function setMeguriBoardReplyBookmarked(replyId: string, bookmarked: boolean) {
+  if (!replyId) return bookmarked;
+  await upsertReplyState(replyId, { bookmarked });
+  return bookmarked;
 }
 
 export async function reportMeguriBoardReply(replyId: string, reason = "user_report") {
@@ -847,6 +856,7 @@ export async function deleteMeguriBoardReply(replyId: string) {
   await updateLocalMeguriBoardReply(replyId, (reply) => ({
     ...reply,
     body: "この返信は削除されました",
+    bookmarked: false,
     deleted: true,
     reacted: false,
     reactionCount: 0,
@@ -1350,6 +1360,7 @@ function remoteMeguriBoardReplyToLocal(
       nullableStringValue(author.handle) ||
       "めぐりユーザー",
     authorPrimaryArea: nullableStringValue(author.primary_area),
+    bookmarked: false,
     body,
     createdAt: timestampValue(row.created_at, Date.now()),
     deleted: normalizeReplyStatus(row.status) === "deleted" || !!timestampValueOrNull(row.deleted_at),
@@ -1543,6 +1554,7 @@ function createPreviewReply(
     authorId: author.id,
     authorName: author.displayName,
     authorPrimaryArea: author.primaryArea,
+    bookmarked: false,
     body,
     createdAt,
     deleted: false,
@@ -1633,6 +1645,7 @@ function normalizeStoredThread(thread: MeguriBoardThread): MeguriBoardThread {
 function normalizeStoredReply(reply: MeguriBoardReply): MeguriBoardReply {
   return {
     ...reply,
+    bookmarked: Boolean(reply.bookmarked),
     deleted: Boolean(reply.deleted),
     imageUris: normalizeImageUris(reply.imageUris),
     parentReplyId: nullableStringValue(reply.parentReplyId),
@@ -1815,6 +1828,7 @@ function hydrateMeguriBoardReplies(
     if (!local) return reply;
     return {
       ...reply,
+      bookmarked: local.bookmarked ?? reply.bookmarked,
       reacted: local.reacted ?? reply.reacted,
       reactionCount: adjustCount(reply.reactionCount, reply.reacted, local.reacted),
       reported: local.reported ?? reply.reported,

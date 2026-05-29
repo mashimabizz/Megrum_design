@@ -42,6 +42,7 @@ import {
   reportMeguriBoardReply,
   reportMeguriBoardThread,
   clearMeguriBoardReplyDraft,
+  setMeguriBoardReplyBookmarked,
   setMeguriBoardThreadStatus,
   setMeguriBoardReplyReacted,
   setMeguriBoardThreadBookmarked,
@@ -105,7 +106,7 @@ type BoardMediaAttachment = {
 type BoardReplySortMode = "oldest" | "newest" | "popular";
 type BoardParticipantSortMode = "recent" | "replies";
 type ReplySearchSource =
-  | { label: string; replyId?: string; type: "children" | "mention" | "mine" | "participant" }
+  | { label: string; replyId?: string; type: "bookmarked" | "children" | "mention" | "mine" | "participant" }
   | null;
 
 const REPLY_SORT_OPTIONS: { label: string; value: BoardReplySortMode }[] = [
@@ -240,6 +241,9 @@ export default function MeguriBoardThreadScreen() {
     }
     if (replySearchSource?.type === "mine") {
       return replies.filter((reply) => reply.mine);
+    }
+    if (replySearchSource?.type === "bookmarked") {
+      return replies.filter((reply) => reply.bookmarked && !reply.deleted);
     }
     if (!replySearchQuery) return replies;
     return replies.filter((reply) => {
@@ -454,6 +458,10 @@ export default function MeguriBoardThreadScreen() {
     [actor.handle, replies],
   );
   const viewerReplies = useMemo(() => replies.filter((reply) => reply.mine), [replies]);
+  const bookmarkedReplies = useMemo(
+    () => replies.filter((reply) => reply.bookmarked && !reply.deleted),
+    [replies],
+  );
 
   useEffect(() => {
     setSearchCursorIndex(0);
@@ -591,6 +599,20 @@ export default function MeguriBoardThreadScreen() {
     const firstOwnReply = [...viewerReplies].sort((left, right) => left.createdAt - right.createdAt)[0];
     setTimeout(() => {
       const y = firstOwnReply ? replyOffsetsRef.current[firstOwnReply.id] : undefined;
+      if (typeof y === "number") {
+        scrollViewRef.current?.scrollTo({ animated: true, y: Math.max(0, y - 12) });
+      }
+    }, 120);
+  }
+
+  function filterBookmarkedReplies() {
+    if (bookmarkedReplies.length === 0) return;
+    setReplySearchText("保存した返信");
+    setReplySearchSource({ label: "保存した返信", type: "bookmarked" });
+    setSearchCursorIndex(0);
+    const firstBookmarkedReply = [...bookmarkedReplies].sort((left, right) => left.createdAt - right.createdAt)[0];
+    setTimeout(() => {
+      const y = firstBookmarkedReply ? replyOffsetsRef.current[firstBookmarkedReply.id] : undefined;
       if (typeof y === "number") {
         scrollViewRef.current?.scrollTo({ animated: true, y: Math.max(0, y - 12) });
       }
@@ -1038,6 +1060,15 @@ export default function MeguriBoardThreadScreen() {
     await setMeguriBoardReplyReacted(reply.id, reacted);
   }
 
+  async function toggleReplyBookmark(reply: MeguriBoardReply) {
+    if (reply.deleted) return;
+    const bookmarked = !reply.bookmarked;
+    setReplies((current) =>
+      current.map((candidate) => (candidate.id === reply.id ? { ...candidate, bookmarked } : candidate)),
+    );
+    await setMeguriBoardReplyBookmarked(reply.id, bookmarked);
+  }
+
   async function reportReply(reply: MeguriBoardReply, reason: MeguriBoardReportReason) {
     if (reply.reported) return;
     setReplies((current) =>
@@ -1177,6 +1208,7 @@ export default function MeguriBoardThreadScreen() {
         candidate.id === reply.id
           ? {
               ...candidate,
+              bookmarked: false,
               body: "この返信は削除されました",
               deleted: true,
               reacted: false,
@@ -1340,6 +1372,11 @@ export default function MeguriBoardThreadScreen() {
       disabled: reply.deleted,
       label: "返信を共有",
       run: () => void shareReply(reply),
+    });
+    actions.push({
+      disabled: reply.deleted,
+      label: reply.bookmarked ? "返信の保存を解除" : "返信を保存",
+      run: () => void toggleReplyBookmark(reply),
     });
     actions.push({
       disabled: reply.deleted,
@@ -1628,6 +1665,17 @@ export default function MeguriBoardThreadScreen() {
                       <Text style={styles.mineJumpButtonText}>自分 {viewerReplies.length}</Text>
                     </Pressable>
                   ) : null}
+                  {bookmarkedReplies.length > 0 ? (
+                    <Pressable
+                      accessibilityRole="button"
+                      hitSlop={8}
+                      onPress={filterBookmarkedReplies}
+                      style={styles.savedReplyJumpButton}
+                    >
+                      <IconSymbol name="star-outline" color={megrumColors.lavender} size={12} />
+                      <Text style={styles.savedReplyJumpButtonText}>保存 {bookmarkedReplies.length}</Text>
+                    </Pressable>
+                  ) : null}
                 </View>
               </View>
               <View style={styles.replySearchBox}>
@@ -1651,6 +1699,8 @@ export default function MeguriBoardThreadScreen() {
                     {replySearchSource?.type === "mine"
                       ? replySearchSource.label
                       : replySearchSource?.type === "children"
+                      ? replySearchSource.label
+                      : replySearchSource?.type === "bookmarked"
                       ? replySearchSource.label
                       : replySearchSource?.type === "mention"
                       ? `あなた宛て: ${replySearchSource.label}`
@@ -1911,6 +1961,17 @@ export default function MeguriBoardThreadScreen() {
                                 {reply.reactionCount}
                               </Text>
                             </Pressable>
+                            {reply.bookmarked ? (
+                              <Pressable
+                                accessibilityRole="button"
+                                disabled={reply.deleted}
+                                onPress={() => toggleReplyBookmark(reply)}
+                                style={[styles.replyActionPill, styles.replyActionPillActive]}
+                              >
+                                <IconSymbol name="star-outline" color={megrumColors.lavender} size={13} />
+                                <Text style={[styles.replyActionText, styles.replyActionTextActive]}>保存</Text>
+                              </Pressable>
+                            ) : null}
                             {childReplyCount > 0 ? (
                               <Pressable
                                 accessibilityRole="button"
@@ -3185,6 +3246,21 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   mineJumpButtonText: {
+    color: megrumColors.lavender,
+    fontSize: 11,
+    fontWeight: "900",
+  },
+  savedReplyJumpButton: {
+    alignItems: "center",
+    backgroundColor: "rgba(166,149,216,0.14)",
+    borderRadius: 999,
+    flexDirection: "row",
+    gap: 4,
+    minHeight: 26,
+    paddingHorizontal: 9,
+    justifyContent: "center",
+  },
+  savedReplyJumpButtonText: {
     color: megrumColors.lavender,
     fontSize: 11,
     fontWeight: "900",

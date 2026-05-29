@@ -4,6 +4,60 @@
 
 ---
 
+## イテレーション236：掲示板返信を保存して読み返せるようにする
+
+### 背景・問題意識
+
+スポット掲示板では、列状況、落とし物、持ち物メモなど、あとで読み返したい返信がスレッド内に混ざる。スレッド全体の保存だけでは粒度が粗いため、返信単位で保存し、保存した返信だけにすぐ戻れるようにした。
+
+### 変更内容
+
+#### `mobile/src/lib/meguriBoard.ts`
+- `MeguriBoardReply.bookmarked` と `LocalReplyState.bookmarked` を追加し、返信単位の保存状態を端末内で保持できるようにした。
+- `setMeguriBoardReplyBookmarked` を追加し、既存の返信状態オーバーレイに保存状態を統合した。
+- 返信削除時は保存状態も解除し、削除済み返信が保存済み一覧に残らないようにした。
+
+#### `mobile/app/meguri-board-thread.tsx`
+- 返信アクションシートに `返信を保存` / `返信の保存を解除` を追加した。
+- 保存済み返信がある場合、返信ヘッダーに `保存 n` ボタンを表示し、保存した返信だけに絞り込めるようにした。
+- 保存済み返信には返信アクション列に小さな保存ピルを表示し、そこから解除できるようにした。
+
+#### `notes/09_state_machines.md`
+- Meguri Board Lifecycle に返信単位保存の表示ルールを追記した。
+
+#### `notes/10_glossary.md`
+- 掲示板返信保存を追加した。
+
+### 影響範囲
+
+- iOS版 スポット掲示板詳細
+- 返信アクションシート
+- スレッド内返信フィルタ
+- 端末内返信状態
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- `EAS_UPDATE_PROJECT_SLUG=ihub EXPO_NO_GIT_STATUS=1 npm --prefix mobile run update:ios:preview -- --message "[iter236] save board replies" --non-interactive`
+- Preview OTA: Update group `79622ea3-9419-49b8-983e-d721fb67b27f` / iOS update `019e7609-774d-7c8b-abd5-33b41b4cac8c`
+
+### 関連ファイル
+
+- `mobile/app/meguri-board-thread.tsx`
+- `mobile/src/lib/meguriBoard.ts`
+- `notes/08_design_iterations.md`
+- `notes/09_state_machines.md`
+- `notes/10_glossary.md`
+
+### セルフレビュー結果
+
+- ✅ 新しいネイティブ依存やDB migrationを増やさず、Preview OTAで反映できる範囲に収めた。
+- ✅ 返信削除時に保存状態を落とし、削除済み返信が保存済みフィルタに残らないようにした。
+- ✅ 既存の検索・参加者フィルタと同じ `replySearchSource` の仕組みに乗せ、解除導線を共通化した。
+
+---
+
 ## イテレーション235：掲示板参加者一覧を並び替えられるようにする
 
 ### 背景・問題意識
