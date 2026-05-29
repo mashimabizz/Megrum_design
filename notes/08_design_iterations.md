@@ -4,6 +4,51 @@
 
 ---
 
+## イテレーション187：掲示板未読一括既読を追加
+
+### 背景・問題意識
+
+スポット掲示板に未読表示を追加したことで、返信が多い現場では「今は全部確認済みにしたい」という操作が必要になる。一般的なスレッド機能として、未読表示に出ているスレッドをまとめて既読扱いにできる導線を追加した。
+
+### 変更内容
+
+#### `mobile/app/meguri-board.tsx`
+- `未読` 表示中かつ未読スレッドがある時だけ、「表示中を既読にする」カードを表示するようにした。
+- 表示中の未読スレッドIDを抽出し、既存の `markMeguriBoardThreadRead` をまとめて実行するようにした。
+- 既読化は先にローカル表示へ反映し、処理中表示を出すようにした。
+
+#### `notes/09_state_machines.md`
+- Meguri Board Lifecycle に未読一括既読のルールを追記した。
+
+#### `notes/10_glossary.md`
+- 掲示板未読一括既読を追加した。
+
+### 影響範囲
+
+- iOS版 スポット掲示板一覧
+- 掲示板の既読管理・用語
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- `EAS_UPDATE_PROJECT_SLUG=ihub EXPO_NO_GIT_STATUS=1 npm --prefix mobile run update:ios:preview -- --message "[iter187] add board bulk mark read" --non-interactive`
+- Preview OTA: Update group `853f9ff5-885d-4ad7-b9da-eec8dbdfc134` / iOS update `019e752a-90f8-7867-996e-8174759038c8`
+
+### 関連ファイル
+
+- `mobile/app/meguri-board.tsx`
+- `notes/08_design_iterations.md`
+- `notes/09_state_machines.md`
+- `notes/10_glossary.md`
+
+### セルフレビュー結果
+
+- ✅ 既存の既読状態管理を使い、DB変更なしで実装した。
+- ✅ `未読` 表示中だけに導線を限定し、通常の掲示板閲覧を邪魔しないようにした。
+
+---
+
 ## イテレーション186：掲示板に未読スレッド表示を追加
 
 ### 背景・問題意識

@@ -36,6 +36,7 @@ import {
   hideMeguriBoardThread,
   loadMeguriBoardComposerDraft,
   loadMeguriBoardThreads,
+  markMeguriBoardThreadRead,
   meguriBoardAudienceLabel,
   meguriBoardAudienceMeta,
   meguriBoardCategoryLabel,
@@ -112,6 +113,7 @@ export default function MeguriBoardScreen() {
   const [categoryFilter, setCategoryFilter] = useState<MeguriBoardThreadCategory>("all");
   const [searchText, setSearchText] = useState("");
   const [sortMode, setSortMode] = useState<MeguriBoardThreadSort>("active");
+  const [markingVisibleRead, setMarkingVisibleRead] = useState(false);
 
   const actor = useMemo<MeguriBoardActor>(
     () => ({
@@ -453,6 +455,29 @@ export default function MeguriBoardScreen() {
     );
   }
 
+  async function markVisibleUnreadThreadsRead() {
+    if (markingVisibleRead) return;
+    const unreadIds = visibleThreads
+      .filter((thread) => !thread.readAt || thread.readAt < thread.latestActivityAt)
+      .map((thread) => thread.id);
+    if (unreadIds.length === 0) return;
+    const unreadIdSet = new Set(unreadIds);
+    const nextReadAt = Date.now();
+    setMarkingVisibleRead(true);
+    setThreads((current) =>
+      current.map((thread) =>
+        unreadIdSet.has(thread.id)
+          ? { ...thread, readAt: Math.max(nextReadAt, thread.latestActivityAt) }
+          : thread,
+      ),
+    );
+    try {
+      await Promise.all(unreadIds.map((threadId) => markMeguriBoardThreadRead(threadId)));
+    } finally {
+      setMarkingVisibleRead(false);
+    }
+  }
+
   async function toggleThreadBookmark(thread: MeguriBoardThread) {
     const bookmarked = !thread.bookmarked;
     updateThreadLocally({
@@ -698,6 +723,28 @@ export default function MeguriBoardScreen() {
               </Pressable>
             ))}
           </View>
+
+          {!loading && sortMode === "unread" && visibleThreads.length > 0 ? (
+            <Pressable
+              accessibilityRole="button"
+              onPress={markVisibleUnreadThreadsRead}
+              style={({ pressed }) => [
+                styles.markReadCard,
+                pressed ? styles.markReadCardPressed : null,
+              ]}
+            >
+              <View style={styles.markReadCopy}>
+                <Text style={styles.markReadLabel}>未読の整理</Text>
+                <Text style={styles.markReadBody}>表示中の {visibleThreads.length} 件を既読にします</Text>
+              </View>
+              <View style={styles.markReadPill}>
+                <IconSymbol name="checkmark-circle-outline" color={megrumColors.lavender} size={15} />
+                <Text style={styles.markReadPillText}>
+                  {markingVisibleRead ? "処理中" : "既読にする"}
+                </Text>
+              </View>
+            </Pressable>
+          ) : null}
 
           <Pressable
             accessibilityRole="button"
@@ -1335,6 +1382,49 @@ const styles = StyleSheet.create({
   },
   sortButtonTextActive: {
     color: megrumColors.ink,
+  },
+  markReadCard: {
+    alignItems: "center",
+    backgroundColor: "rgba(166,149,216,0.11)",
+    borderColor: "rgba(166,149,216,0.24)",
+    borderRadius: 18,
+    borderWidth: 1,
+    flexDirection: "row",
+    gap: 12,
+    justifyContent: "space-between",
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+  },
+  markReadCardPressed: {
+    opacity: 0.9,
+  },
+  markReadCopy: {
+    flex: 1,
+    gap: 3,
+  },
+  markReadLabel: {
+    color: megrumColors.ink,
+    fontSize: 12.5,
+    fontWeight: "900",
+  },
+  markReadBody: {
+    color: megrumColors.mutedInk,
+    fontSize: 11.5,
+    fontWeight: "700",
+  },
+  markReadPill: {
+    alignItems: "center",
+    backgroundColor: "#fff",
+    borderRadius: 999,
+    flexDirection: "row",
+    gap: 5,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+  },
+  markReadPillText: {
+    color: megrumColors.lavender,
+    fontSize: 11.5,
+    fontWeight: "900",
   },
   scopePreviewPill: {
     backgroundColor: "rgba(166,149,216,0.1)",
