@@ -106,7 +106,11 @@ type BoardMediaAttachment = {
 type BoardReplySortMode = "oldest" | "newest" | "popular";
 type BoardParticipantSortMode = "recent" | "replies";
 type ReplySearchSource =
-  | { label: string; replyId?: string; type: "bookmarked" | "children" | "media" | "mention" | "mine" | "participant" }
+  | {
+      label: string;
+      replyId?: string;
+      type: "author" | "bookmarked" | "children" | "media" | "mention" | "mine" | "participant";
+    }
   | null;
 
 const REPLY_SORT_OPTIONS: { label: string; value: BoardReplySortMode }[] = [
@@ -248,6 +252,9 @@ export default function MeguriBoardThreadScreen() {
     if (replySearchSource?.type === "media") {
       return replies.filter((reply) => !reply.deleted && reply.imageUris.length > 0);
     }
+    if (replySearchSource?.type === "author" && thread) {
+      return replies.filter((reply) => !reply.deleted && reply.authorId === thread.authorId);
+    }
     if (!replySearchQuery) return replies;
     return replies.filter((reply) => {
       const quotedReplyNumber = reply.parentReplyId ? replyNumberById.get(reply.parentReplyId) : null;
@@ -265,7 +272,7 @@ export default function MeguriBoardThreadScreen() {
           .join(" "),
       ).includes(replySearchQuery);
     });
-  }, [replies, replyNumberById, replySearchQuery, replySearchSource?.replyId, replySearchSource?.type]);
+  }, [replies, replyNumberById, replySearchQuery, replySearchSource?.replyId, replySearchSource?.type, thread]);
 
   const sortedReplies = useMemo(() => {
     const next = [...filteredReplies];
@@ -484,6 +491,10 @@ export default function MeguriBoardThreadScreen() {
     () => replies.filter((reply) => !reply.deleted && reply.imageUris.length > 0),
     [replies],
   );
+  const threadAuthorReplies = useMemo(() => {
+    if (!thread) return [];
+    return replies.filter((reply) => !reply.deleted && reply.authorId === thread.authorId);
+  }, [replies, thread]);
 
   useEffect(() => {
     setSearchCursorIndex(0);
@@ -649,6 +660,20 @@ export default function MeguriBoardThreadScreen() {
     const firstMediaReply = [...mediaReplies].sort((left, right) => left.createdAt - right.createdAt)[0];
     setTimeout(() => {
       const y = firstMediaReply ? replyOffsetsRef.current[firstMediaReply.id] : undefined;
+      if (typeof y === "number") {
+        scrollViewRef.current?.scrollTo({ animated: true, y: Math.max(0, y - 12) });
+      }
+    }, 120);
+  }
+
+  function filterThreadAuthorReplies() {
+    if (!thread || threadAuthorReplies.length === 0) return;
+    setReplySearchText("作成者の返信");
+    setReplySearchSource({ label: "作成者の返信", type: "author" });
+    setSearchCursorIndex(0);
+    const firstAuthorReply = [...threadAuthorReplies].sort((left, right) => left.createdAt - right.createdAt)[0];
+    setTimeout(() => {
+      const y = firstAuthorReply ? replyOffsetsRef.current[firstAuthorReply.id] : undefined;
       if (typeof y === "number") {
         scrollViewRef.current?.scrollTo({ animated: true, y: Math.max(0, y - 12) });
       }
@@ -1734,6 +1759,17 @@ export default function MeguriBoardThreadScreen() {
                       <Text style={styles.mediaReplyJumpButtonText}>画像 {mediaReplies.length}</Text>
                     </Pressable>
                   ) : null}
+                  {threadAuthorReplies.length > 0 ? (
+                    <Pressable
+                      accessibilityRole="button"
+                      hitSlop={8}
+                      onPress={filterThreadAuthorReplies}
+                      style={styles.authorReplyJumpButton}
+                    >
+                      <IconSymbol name="sparkles-outline" color="#7a6fc2" size={12} />
+                      <Text style={styles.authorReplyJumpButtonText}>作成者 {threadAuthorReplies.length}</Text>
+                    </Pressable>
+                  ) : null}
                 </View>
               </View>
               <View style={styles.replySearchBox}>
@@ -1761,6 +1797,8 @@ export default function MeguriBoardThreadScreen() {
                       : replySearchSource?.type === "bookmarked"
                       ? replySearchSource.label
                       : replySearchSource?.type === "media"
+                      ? replySearchSource.label
+                      : replySearchSource?.type === "author"
                       ? replySearchSource.label
                       : replySearchSource?.type === "mention"
                       ? `あなた宛て: ${replySearchSource.label}`
@@ -3371,6 +3409,21 @@ const styles = StyleSheet.create({
   },
   mediaReplyJumpButtonText: {
     color: "#4f7e92",
+    fontSize: 11,
+    fontWeight: "900",
+  },
+  authorReplyJumpButton: {
+    alignItems: "center",
+    backgroundColor: "rgba(166,149,216,0.14)",
+    borderRadius: 999,
+    flexDirection: "row",
+    gap: 4,
+    minHeight: 26,
+    paddingHorizontal: 9,
+    justifyContent: "center",
+  },
+  authorReplyJumpButtonText: {
+    color: "#7a6fc2",
     fontSize: 11,
     fontWeight: "900",
   },

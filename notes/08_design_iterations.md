@@ -4,6 +4,55 @@
 
 ---
 
+## イテレーション239：掲示板で作成者の返信だけ拾えるようにする
+
+### 背景・問題意識
+
+スポット掲示板では、スレッド作成者が後から補足した情報や現地の更新だけを追いたい場面がある。参加者別フィルタは既にあるが、作成者の返信へ一発で絞り込む導線がないため、長いスレッドでも主情報をすぐ拾えるようにした。
+
+### 変更内容
+
+#### `mobile/app/meguri-board-thread.tsx`
+- `ReplySearchSource` に `author` を追加し、スレッド作成者の返信だけを表示できるようにした。
+- `threadAuthorReplies` と `filterThreadAuthorReplies` を追加し、最初の作成者返信へスクロールしながら絞り込むようにした。
+- 作成者の可視返信がある場合、返信ヘッダーに `作成者 n` ボタンを表示するようにした。
+- 検索条件チップに `作成者の返信` を表示し、既存の解除導線で元に戻せるようにした。
+
+#### `notes/09_state_machines.md`
+- Meguri Board Lifecycle に作成者返信フィルタの表示ルールを追記した。
+
+#### `notes/10_glossary.md`
+- 掲示板作成者返信フィルタを追加した。
+
+### 影響範囲
+
+- iOS版 スポット掲示板詳細
+- 返信ヘッダー
+- スレッド内返信フィルタ
+- スレッド作成者の補足確認導線
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- `EAS_UPDATE_PROJECT_SLUG=ihub EXPO_NO_GIT_STATUS=1 npm --prefix mobile run update:ios:preview -- --message "[iter239] filter board author replies" --non-interactive`
+- Preview OTA: Update group `8135afc7-69f4-470a-9d66-4c00ea985282` / iOS update `019e761a-1b17-7d22-a3c3-0962611d357e`
+
+### 関連ファイル
+
+- `mobile/app/meguri-board-thread.tsx`
+- `notes/08_design_iterations.md`
+- `notes/09_state_machines.md`
+- `notes/10_glossary.md`
+
+### セルフレビュー結果
+
+- ✅ 既存の返信フィルタ構造に `author` を追加し、検索解除・件数表示・空状態を共通化した。
+- ✅ 参加者一覧を開かなくても、スレッド作成者の補足だけを追えるようにした。
+- ✅ DB変更なし、ネイティブ依存追加なしでPreview OTA対象内に収めた。
+
+---
+
 ## イテレーション238：掲示板詳細で画像付き返信だけ拾えるようにする
 
 ### 背景・問題意識
