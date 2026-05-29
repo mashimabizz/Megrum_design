@@ -4,6 +4,45 @@
 
 ---
 
+## イテレーション168.76：めぐり導入演出を廃止
+
+### 背景・問題意識
+
+オーナーから「めぐり演出はなくしてください」と明確な指示があった。iter168.73 で3D依存は外していたが、`meguri-intro` には2Dの導入・会話・エリア解放演出が残っていたため、リリース前の不要な体験として完全に外す必要があった。
+
+### 変更内容
+
+#### `mobile/app/meguri-intro.tsx`
+- 導入・会話・エリア解放演出の実装を削除した。
+- 既存のディープリンクや古い導線で `/meguri-intro` が開かれても、即座に `/meguri-map` へ遷移する軽量ルートへ置き換えた。
+
+#### `notes/10_glossary.md`
+- `めぐり` の定義を、演出中心ではなくマップ・掲示板・グルームを確認する入口として更新した。
+- `めぐり3D演出 / めぐり演出 / めぐりイントロ` を廃止用語へ統合し、後継を `めぐり` / `めぐりマップ` / `スポット掲示板` とした。
+
+### 影響範囲
+
+- iOS版 `/meguri-intro` ルート
+- めぐり関連の用語定義
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- iOS Previewで `/meguri-intro` を開いても演出画面が表示されず、`めぐりマップ` へ進むことを確認
+
+### 関連ファイル
+
+- `mobile/app/meguri-intro.tsx`
+- `notes/10_glossary.md`
+
+### セルフレビュー結果
+
+- ✅ `npm --prefix mobile run typecheck` 通過
+- ✅ `npm --prefix mobile run export:ios:preview` 通過
+- ✅ 09更新診断：状態遷移の変更はないため更新不要
+- ✅ 10更新診断：廃止用語を更新済み
+
 ## イテレーション168.75：Preview iOSの更新チャンネルを固定
 
 ### 背景・問題意識
