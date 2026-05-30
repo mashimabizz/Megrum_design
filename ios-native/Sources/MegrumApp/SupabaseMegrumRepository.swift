@@ -4,10 +4,12 @@ import MegrumData
 
 public struct SupabaseMegrumRepository: MegrumRepository {
     private let client: SupabaseRESTClient
+    private let oshiClient: SupabaseOshiClient
     private let viewerID: UUID
 
     public init(client: SupabaseRESTClient, viewerID: UUID) {
         self.client = client
+        self.oshiClient = SupabaseOshiClient(client: client)
         self.viewerID = viewerID
     }
 
@@ -45,7 +47,29 @@ public struct SupabaseMegrumRepository: MegrumRepository {
         )
     }
 
+    public func loadOshiGroups(searchText: String?, limit: Int) async throws -> [OshiGroup] {
+        try await oshiClient.loadGroups(searchText: searchText, limit: limit)
+    }
+
+    public func loadOshiCharacters(groupID: UUID, limit: Int) async throws -> [OshiCharacter] {
+        try await oshiClient.loadCharacters(groupID: groupID, limit: limit)
+    }
+
     public func completeAccountSetup(_ input: AccountSetupInput) async throws -> UserProfile {
+        let selections = input.oshiSelections.map { selection in
+            UserOshiSelection(
+                id: UUID(),
+                userID: viewerID,
+                groupID: selection.groupID,
+                characterID: selection.characterID,
+                kind: selection.kind,
+                priority: selection.priority
+            )
+        }
+        if !selections.isEmpty {
+            _ = try await oshiClient.replaceUserSelections(userID: viewerID, selections: selections)
+        }
+
         let rows: [UserRow] = try await client.updateRows(
             in: "users",
             values: UserProfileUpdatePayload(

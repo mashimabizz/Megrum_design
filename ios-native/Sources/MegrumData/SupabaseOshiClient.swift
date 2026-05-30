@@ -8,6 +8,10 @@ public final class SupabaseOshiClient: @unchecked Sendable {
         self.client = SupabaseRESTClient(configuration: configuration, session: session)
     }
 
+    public init(client: SupabaseRESTClient) {
+        self.client = client
+    }
+
     public func loadGroups(searchText: String? = nil, limit: Int = 30) async throws -> [OshiGroup] {
         let rows: [OshiGroupRow] = try await client.fetchRows(
             from: "groups_master",
@@ -26,6 +30,23 @@ public final class SupabaseOshiClient: @unchecked Sendable {
         return rows.map(\.character)
     }
 
+    public func replaceUserSelections(userID: UUID, selections: [UserOshiSelection]) async throws -> [UserOshiSelection] {
+        try await client.deleteRows(
+            from: "user_oshi",
+            queryItems: userSelectionFilterItems(userID: userID)
+        )
+        guard !selections.isEmpty else {
+            return []
+        }
+
+        let rows: [UserOshiSelectionRow] = try await client.upsertRows(
+            into: "user_oshi",
+            values: selections.map(UserOshiSelectionPayload.init(selection:)),
+            select: userSelectionSelect
+        )
+        return rows.map(\.selection)
+    }
+
     public func makeGroupsRequest(searchText: String? = nil, limit: Int = 30) throws -> URLRequest {
         try client.makeRequest(
             path: "/rest/v1/groups_master",
@@ -37,6 +58,28 @@ public final class SupabaseOshiClient: @unchecked Sendable {
         try client.makeRequest(
             path: "/rest/v1/characters_master",
             queryItems: [URLQueryItem(name: "select", value: "id,group_id,name,aliases,display_order")] + characterQueryItems(groupID: groupID, limit: limit)
+        )
+    }
+
+    public func makeDeleteUserSelectionsRequest(userID: UUID) throws -> URLRequest {
+        try client.makeMutationRequest(
+            path: "/rest/v1/user_oshi",
+            queryItems: userSelectionFilterItems(userID: userID),
+            method: "DELETE",
+            body: nil,
+            prefer: "return=minimal"
+        )
+    }
+
+    public func makeUpsertUserSelectionsRequest(_ selections: [UserOshiSelection]) throws -> URLRequest {
+        let encoder = JSONEncoder()
+        encoder.keyEncodingStrategy = .convertToSnakeCase
+        return try client.makeMutationRequest(
+            path: "/rest/v1/user_oshi",
+            queryItems: [URLQueryItem(name: "select", value: userSelectionSelect)],
+            method: "POST",
+            body: encoder.encode(selections.map(UserOshiSelectionPayload.init(selection:))),
+            prefer: "resolution=merge-duplicates,return=representation"
         )
     }
 
@@ -58,6 +101,14 @@ public final class SupabaseOshiClient: @unchecked Sendable {
             URLQueryItem(name: "order", value: "display_order.asc,name.asc"),
             URLQueryItem(name: "limit", value: "\(limit)")
         ]
+    }
+
+    private var userSelectionSelect: String {
+        "id,user_id,group_id,character_id,kind,priority"
+    }
+
+    private func userSelectionFilterItems(userID: UUID) -> [URLQueryItem] {
+        [URLQueryItem(name: "user_id", value: "eq.\(userID.uuidString.lowercased())")]
     }
 }
 
@@ -91,6 +142,44 @@ private struct OshiCharacterRow: Decodable, Sendable {
             name: name,
             aliases: aliases ?? [],
             displayOrder: displayOrder ?? 0
+        )
+    }
+}
+
+private struct UserOshiSelectionPayload: Encodable, Sendable {
+    var id: UUID
+    var userId: UUID
+    var groupId: UUID?
+    var characterId: UUID?
+    var kind: OshiKind
+    var priority: Int
+
+    init(selection: UserOshiSelection) {
+        self.id = selection.id
+        self.userId = selection.userID
+        self.groupId = selection.groupID
+        self.characterId = selection.characterID
+        self.kind = selection.kind
+        self.priority = selection.priority
+    }
+}
+
+private struct UserOshiSelectionRow: Decodable, Sendable {
+    var id: UUID
+    var userId: UUID
+    var groupId: UUID?
+    var characterId: UUID?
+    var kind: OshiKind
+    var priority: Int
+
+    var selection: UserOshiSelection {
+        UserOshiSelection(
+            id: id,
+            userID: userId,
+            groupID: groupId,
+            characterID: characterId,
+            kind: kind,
+            priority: priority
         )
     }
 }

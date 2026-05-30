@@ -30,10 +30,26 @@ public struct MegrumAppSnapshot: Sendable {
 public struct AccountSetupInput: Equatable, Sendable {
     public var displayName: String
     public var prefecture: String?
+    public var oshiSelections: [AccountSetupOshiInput]
 
-    public init(displayName: String, prefecture: String? = nil) {
+    public init(displayName: String, prefecture: String? = nil, oshiSelections: [AccountSetupOshiInput] = []) {
         self.displayName = displayName
         self.prefecture = prefecture
+        self.oshiSelections = oshiSelections
+    }
+}
+
+public struct AccountSetupOshiInput: Equatable, Sendable {
+    public var groupID: UUID?
+    public var characterID: UUID?
+    public var kind: OshiKind
+    public var priority: Int
+
+    public init(groupID: UUID?, characterID: UUID?, kind: OshiKind, priority: Int = 1) {
+        self.groupID = groupID
+        self.characterID = characterID
+        self.kind = kind
+        self.priority = priority
     }
 }
 
@@ -43,10 +59,20 @@ public enum MegrumRepositoryError: Error, Equatable, Sendable {
 
 public protocol MegrumRepository: Sendable {
     func loadInitialSnapshot() async throws -> MegrumAppSnapshot
+    func loadOshiGroups(searchText: String?, limit: Int) async throws -> [OshiGroup]
+    func loadOshiCharacters(groupID: UUID, limit: Int) async throws -> [OshiCharacter]
     func completeAccountSetup(_ input: AccountSetupInput) async throws -> UserProfile
 }
 
 public extension MegrumRepository {
+    func loadOshiGroups(searchText: String?, limit: Int) async throws -> [OshiGroup] {
+        []
+    }
+
+    func loadOshiCharacters(groupID: UUID, limit: Int) async throws -> [OshiCharacter] {
+        []
+    }
+
     func completeAccountSetup(_ input: AccountSetupInput) async throws -> UserProfile {
         throw MegrumRepositoryError.unsupportedMutation
     }
@@ -76,6 +102,18 @@ public struct PreviewMegrumRepository: MegrumRepository {
             accountStatus: .active
         )
     }
+
+    public func loadOshiGroups(searchText: String?, limit: Int) async throws -> [OshiGroup] {
+        let groups = NativePreviewData.oshiGroups
+        guard let searchText = searchText?.trimmingCharacters(in: .whitespacesAndNewlines), !searchText.isEmpty else {
+            return Array(groups.prefix(limit))
+        }
+        return Array(groups.filter { $0.name.localizedCaseInsensitiveContains(searchText) }.prefix(limit))
+    }
+
+    public func loadOshiCharacters(groupID: UUID, limit: Int) async throws -> [OshiCharacter] {
+        Array(NativePreviewData.oshiCharacters.filter { $0.groupID == groupID }.prefix(limit))
+    }
 }
 
 @MainActor
@@ -86,7 +124,11 @@ public final class MegrumAppState: ObservableObject {
     @Published public private(set) var proposals: [TradeProposal] = []
     @Published public private(set) var grooms: [GroomPost] = []
     @Published public private(set) var threads: [BoardThread] = []
+    @Published public private(set) var oshiGroups: [OshiGroup] = []
+    @Published public private(set) var oshiCharacters: [OshiCharacter] = []
     @Published public private(set) var isLoading = false
+    @Published public private(set) var isLoadingOshiGroups = false
+    @Published public private(set) var isLoadingOshiCharacters = false
     @Published public private(set) var isSavingAccountSetup = false
     @Published public private(set) var errorMessage: String?
 
@@ -122,13 +164,55 @@ public final class MegrumAppState: ObservableObject {
         await loadInitialData()
     }
 
-    public func completeAccountSetup(displayName: String, prefecture: String?) async -> Bool {
+    public func loadOshiGroups(searchText: String? = nil) async {
+        guard !isLoadingOshiGroups else {
+            return
+        }
+
+        isLoadingOshiGroups = true
+        errorMessage = nil
+        do {
+            oshiGroups = try await repository.loadOshiGroups(searchText: searchText, limit: 30)
+        } catch {
+            errorMessage = "推しグループを読み込めませんでした"
+        }
+        isLoadingOshiGroups = false
+    }
+
+    public func loadOshiCharacters(group: OshiGroup?) async {
+        guard !isLoadingOshiCharacters else {
+            return
+        }
+        guard let group else {
+            oshiCharacters = []
+            return
+        }
+
+        isLoadingOshiCharacters = true
+        errorMessage = nil
+        do {
+            oshiCharacters = try await repository.loadOshiCharacters(groupID: group.id, limit: 80)
+        } catch {
+            errorMessage = "推しメンバーを読み込めませんでした"
+        }
+        isLoadingOshiCharacters = false
+    }
+
+    public func completeAccountSetup(
+        displayName: String,
+        prefecture: String?,
+        oshiSelections: [AccountSetupOshiInput] = []
+    ) async -> Bool {
         guard !isSavingAccountSetup else {
             return false
         }
         let trimmedDisplayName = displayName.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmedDisplayName.isEmpty else {
             errorMessage = "表示名を入力してください"
+            return false
+        }
+        guard !oshiSelections.isEmpty else {
+            errorMessage = "推しを選択してください"
             return false
         }
 
@@ -139,7 +223,8 @@ public final class MegrumAppState: ObservableObject {
             viewer = try await repository.completeAccountSetup(
                 AccountSetupInput(
                     displayName: trimmedDisplayName,
-                    prefecture: prefecture?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfBlank
+                    prefecture: prefecture?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfBlank,
+                    oshiSelections: oshiSelections
                 )
             )
             isSavingAccountSetup = false

@@ -50,7 +50,7 @@ After email/password signup returns a session, `SupabaseMegrumAuthRepository` ca
 
 `UserProfile.accountStatus` mirrors `users.account_status`. `registered`, `verified`, and `onboarding` route into `AccountSetupScreen`; `active` routes into the main native tab shell.
 
-`OshiGroup` and `OshiCharacter` mirror `groups_master` and `characters_master`. `SupabaseOshiClient` can load L1 groups and L2 characters for onboarding, inventory/Wish editing, and search filters. Saving `user_oshi` selections is the next native account setup step.
+`OshiGroup` and `OshiCharacter` mirror `groups_master` and `characters_master`. `SupabaseOshiClient` can load L1 groups and L2 characters for onboarding, inventory/Wish editing, and search filters. Account setup now saves the selected group/member into `user_oshi` before moving the profile to `active`.
 
 For the Xcode app host, use CLI-first verification:
 

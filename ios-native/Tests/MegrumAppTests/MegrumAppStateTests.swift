@@ -45,14 +45,40 @@ final class MegrumAppStateTests: XCTestCase {
 
     func testAppStateCompletesAccountSetupThroughRepository() async {
         let state = MegrumAppState(repository: PreviewMegrumRepository())
+        let groupID = UUID(uuidString: "00000000-0000-0000-0000-000000000011")!
 
-        let completed = await state.completeAccountSetup(displayName: "みちりおん", prefecture: "山形県")
+        let completed = await state.completeAccountSetup(
+            displayName: "みちりおん",
+            prefecture: "山形県",
+            oshiSelections: [
+                AccountSetupOshiInput(groupID: groupID, characterID: nil, kind: .box)
+            ]
+        )
 
         XCTAssertTrue(completed)
         XCTAssertEqual(state.viewer?.displayName, "みちりおん")
         XCTAssertEqual(state.viewer?.prefecture, "山形県")
         XCTAssertEqual(state.viewer?.accountStatus, .active)
         XCTAssertFalse(state.isSavingAccountSetup)
+    }
+
+    func testAppStateRequiresOshiSelectionForAccountSetup() async {
+        let state = MegrumAppState(repository: PreviewMegrumRepository())
+
+        let completed = await state.completeAccountSetup(displayName: "みちりおん", prefecture: "山形県")
+
+        XCTAssertFalse(completed)
+        XCTAssertEqual(state.errorMessage, "推しを選択してください")
+    }
+
+    func testAppStateLoadsPreviewOshiGroupsAndCharacters() async {
+        let state = MegrumAppState(repository: PreviewMegrumRepository())
+
+        await state.loadOshiGroups(searchText: "TWICE")
+        await state.loadOshiCharacters(group: state.oshiGroups.first)
+
+        XCTAssertEqual(state.oshiGroups.first?.name, "TWICE")
+        XCTAssertEqual(state.oshiCharacters.first?.name, "SANA")
     }
 
     func testAuthStateSignsInThroughRepository() async {

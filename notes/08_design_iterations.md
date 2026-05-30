@@ -4,6 +4,82 @@
 
 ---
 
+## イテレーション310：Swift初回推し設定保存を追加
+
+### 背景・問題意識
+
+iter309で推しL1/L2マスタをSwift側から読めるようになったが、初回プロフィール設定はまだ表示名と都道府県だけで完了していた。Megrumでは在庫・Wish・検索・マッチングの前提としてユーザーの推し設定が必要なので、Swift Native版の初回設定画面から推しグループ/メンバーを選び、`user_oshi` に保存してから `account_status='active'` へ進む流れを追加した。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/AccountSetupScreen.swift`
+- 初回設定画面に「推しを選ぶ」セクションを追加した。
+- グループ検索、グループ選択、選択グループ配下のメンバー選択をSwiftUIで表示するようにした。
+- メンバー未選択時はグループ全体、メンバー選択時は特定推しとして保存するようにした。
+- 推し未選択では完了ボタンを押せないようにした。
+
+#### `ios-native/Sources/MegrumApp/MegrumAppState.swift`
+- `AccountSetupOshiInput` を追加し、初回設定保存時に推し選択を渡せるようにした。
+- `loadOshiGroups(searchText:)` / `loadOshiCharacters(group:)` を追加し、画面からrepository経由でマスタを読めるようにした。
+- 推し未選択時のvalidationを追加した。
+
+#### `ios-native/Sources/MegrumData/SupabaseRESTClient.swift`
+- PostgREST DELETEに対応する `deleteRows(...)` を追加した。
+
+#### `ios-native/Sources/MegrumData/SupabaseOshiClient.swift`
+- `replaceUserSelections(userID:selections:)` を追加した。
+- `user_oshi` の既存行を削除してから現在の選択を保存し、初回設定の再試行時にも重複を残しにくい形にした。
+- DELETE / POST request生成メソッドをテスト可能にした。
+
+#### `ios-native/Sources/MegrumApp/SupabaseMegrumRepository.swift`
+- 初回設定完了時に `user_oshi` を保存してから `users` を `active` に更新するようにした。
+- `groups_master` / `characters_master` 読込を `MegrumRepository` へ接続した。
+
+#### `ios-native/Sources/MegrumApp/NativePreviewData.swift`
+- Preview用の推しグループ/メンバーを追加した。
+
+#### `ios-native/Tests/`
+- 推し未選択時の初回設定validationを追加した。
+- Preview repositoryで推しグループ/メンバーを読めることを検証した。
+- `user_oshi` DELETE / POST requestのURL、method、Prefer header、bodyを検証した。
+
+### 影響範囲
+
+- Swift Native版の初回オンボーディング
+- `user_oshi` 保存境界
+- 推しマスタ読込と初回設定UI
+- 今後の在庫/Wish登録、検索フィルター、マッチング前提データ
+
+### 確認方法
+
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-build --enable-xctest --disable-swift-testing -j 1`
+- `git diff --check -- ios-native/Sources/MegrumApp/AccountSetupScreen.swift ios-native/Sources/MegrumApp/MegrumAppState.swift ios-native/Sources/MegrumApp/SupabaseMegrumRepository.swift ios-native/Sources/MegrumApp/NativePreviewData.swift ios-native/Sources/MegrumData/SupabaseRESTClient.swift ios-native/Sources/MegrumData/SupabaseOshiClient.swift ios-native/Tests/MegrumAppTests/MegrumAppStateTests.swift ios-native/Tests/MegrumDataTests/SupabaseOshiClientTests.swift ios-native/README.md notes/22_swift_native_migration.md notes/08_design_iterations.md`
+
+### 関連ファイル
+
+- `ios-native/Sources/MegrumApp/AccountSetupScreen.swift`
+- `ios-native/Sources/MegrumApp/MegrumAppState.swift`
+- `ios-native/Sources/MegrumApp/SupabaseMegrumRepository.swift`
+- `ios-native/Sources/MegrumApp/NativePreviewData.swift`
+- `ios-native/Sources/MegrumData/SupabaseRESTClient.swift`
+- `ios-native/Sources/MegrumData/SupabaseOshiClient.swift`
+- `ios-native/Tests/MegrumAppTests/MegrumAppStateTests.swift`
+- `ios-native/Tests/MegrumDataTests/SupabaseOshiClientTests.swift`
+- `ios-native/README.md`
+- `notes/22_swift_native_migration.md`
+- `notes/08_design_iterations.md`
+
+### セルフレビュー結果
+
+- ✅ `user_oshi` は既存DBスキーマを使い、migrationは追加していない。
+- ✅ 既存の `MegrumRepository` 境界に沿わせ、画面から直接Supabaseへ触らない構造にした。
+- ✅ Swift Package testsが25件成功した。
+- ✅ 状態遷移・新用語・DBスキーマ変更はないため、`notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要。
+- ⚠️ Apple/Googleログイン、メールリンク復帰、住所設定は次工程以降で実装する。
+- ✅ TestFlight配布はまだ行っていないため、Preview OTA / TestFlight配信は不要。
+
+---
+
 ## イテレーション309：Swift推しマスタ読込境界を追加
 
 ### 背景・問題意識

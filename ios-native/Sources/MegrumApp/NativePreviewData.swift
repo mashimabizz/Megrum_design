@@ -6,6 +6,8 @@ enum NativePreviewData {
     static let partnerID = UUID(uuidString: "00000000-0000-0000-0000-000000000002")!
     static let groupID = UUID(uuidString: "00000000-0000-0000-0000-000000000011")!
     static let memberID = UUID(uuidString: "00000000-0000-0000-0000-000000000012")!
+    static let secondGroupID = UUID(uuidString: "00000000-0000-0000-0000-000000000013")!
+    static let secondMemberID = UUID(uuidString: "00000000-0000-0000-0000-000000000014")!
 
     static let viewer = UserProfile(
         id: viewerID,
@@ -25,6 +27,16 @@ enum NativePreviewData {
         GoodsTag(id: UUID(uuidString: "00000000-0000-0000-0000-000000000101")!, name: "東京2026"),
         GoodsTag(id: UUID(uuidString: "00000000-0000-0000-0000-000000000102")!, name: "会場限定"),
         GoodsTag(id: UUID(uuidString: "00000000-0000-0000-0000-000000000103")!, name: "トレカ")
+    ]
+
+    static let oshiGroups = [
+        OshiGroup(id: groupID, name: "TWICE", aliases: ["トゥワイス"], displayOrder: 1),
+        OshiGroup(id: secondGroupID, name: "LE SSERAFIM", aliases: ["ルセラフィム"], displayOrder: 2)
+    ]
+
+    static let oshiCharacters = [
+        OshiCharacter(id: memberID, groupID: groupID, name: "SANA", aliases: ["サナ"], displayOrder: 1),
+        OshiCharacter(id: secondMemberID, groupID: secondGroupID, name: "SAKURA", aliases: ["サクラ"], displayOrder: 1)
     ]
 
     static let inventory: [GoodsItem] = [
