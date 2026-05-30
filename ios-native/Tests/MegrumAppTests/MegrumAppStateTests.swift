@@ -116,6 +116,23 @@ final class MegrumAppStateTests: XCTestCase {
         XCTAssertFalse(state.isCreatingGroomPost)
     }
 
+    func testAppStateMarksPreviewGroomViewedAndLiked() async {
+        let state = MegrumAppState(repository: PreviewMegrumRepository())
+        let postID = UUID(uuidString: "00000000-0000-0000-0000-000000000501")!
+
+        await state.loadInitialData()
+        await state.markGroomViewed(postID)
+        await state.setGroomLiked(postID, isLiked: true)
+
+        XCTAssertTrue(state.isGroomLiked(postID))
+        XCTAssertNil(state.errorMessage)
+
+        await state.setGroomLiked(postID, isLiked: false)
+
+        XCTAssertFalse(state.isGroomLiked(postID))
+        XCTAssertNil(state.errorMessage)
+    }
+
     func testAppStateCreatesPreviewBoardThreadWithPrefectureOverride() async {
         let state = MegrumAppState(repository: PreviewMegrumRepository())
         await state.loadInitialData()

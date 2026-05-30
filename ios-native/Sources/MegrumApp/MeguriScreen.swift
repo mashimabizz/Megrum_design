@@ -142,7 +142,13 @@ struct MeguriScreen: View {
             .presentationDetents([.medium, .large])
             .presentationDragIndicator(.visible)
         }
-        .modifier(GroomViewerPresentationModifier(selectedGroom: $selectedGroom, grooms: appState.grooms))
+        .modifier(
+            GroomViewerPresentationModifier(
+                selectedGroom: $selectedGroom,
+                grooms: appState.grooms,
+                appState: appState
+            )
+        )
         .modifier(
             MeguriMapPresentationModifier(
                 activeMap: $activeMap,
@@ -371,15 +377,16 @@ private struct BoardThreadComposerSheet: View {
 private struct GroomViewerPresentationModifier: ViewModifier {
     @Binding var selectedGroom: GroomPost?
     var grooms: [GroomPost]
+    @ObservedObject var appState: MegrumAppState
 
     func body(content: Content) -> some View {
         #if os(iOS)
         content.fullScreenCover(item: $selectedGroom) { groom in
-            GroomViewerScreen(grooms: grooms, initialGroom: groom)
+            GroomViewerScreen(grooms: grooms, initialGroom: groom, appState: appState)
         }
         #else
         content.sheet(item: $selectedGroom) { groom in
-            GroomViewerScreen(grooms: grooms, initialGroom: groom)
+            GroomViewerScreen(grooms: grooms, initialGroom: groom, appState: appState)
         }
         #endif
     }
@@ -424,19 +431,25 @@ private struct MeguriMapPresentationModifier: ViewModifier {
 private struct GroomViewerScreen: View {
     var grooms: [GroomPost]
     var initialGroom: GroomPost
+    @ObservedObject var appState: MegrumAppState
     @Environment(\.dismiss) private var dismiss
     @State private var currentIndex: Int
     @State private var dragOffset: CGSize = .zero
 
-    init(grooms: [GroomPost], initialGroom: GroomPost) {
+    init(grooms: [GroomPost], initialGroom: GroomPost, appState: MegrumAppState) {
         let fallbackGrooms = grooms.isEmpty ? [initialGroom] : grooms
         self.grooms = fallbackGrooms
         self.initialGroom = initialGroom
+        self.appState = appState
         _currentIndex = State(initialValue: fallbackGrooms.firstIndex(where: { $0.id == initialGroom.id }) ?? 0)
     }
 
     private var currentGroom: GroomPost {
         grooms[max(0, min(currentIndex, grooms.count - 1))]
+    }
+
+    private var isCurrentGroomLiked: Bool {
+        appState.isGroomLiked(currentGroom.id)
     }
 
     var body: some View {
@@ -508,7 +521,30 @@ private struct GroomViewerScreen: View {
                 .padding(.top, 10)
 
                 Spacer()
+
+                HStack {
+                    Spacer()
+
+                    Button {
+                        Task {
+                            await appState.setGroomLiked(currentGroom.id, isLiked: !isCurrentGroomLiked)
+                        }
+                    } label: {
+                        Image(systemName: isCurrentGroomLiked ? "heart.fill" : "heart")
+                            .font(.system(size: 24, weight: .heavy))
+                            .foregroundStyle(isCurrentGroomLiked ? MegrumTheme.pink : .white)
+                            .frame(width: 54, height: 54)
+                            .background(.black.opacity(0.28), in: Circle())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(isCurrentGroomLiked ? "いいねを取り消す" : "いいね")
+                }
+                .padding(.horizontal, 18)
+                .padding(.bottom, 24)
             }
+        }
+        .task(id: currentGroom.id) {
+            await appState.markGroomViewed(currentGroom.id)
         }
         .gesture(
             DragGesture(minimumDistance: 12)

@@ -54,6 +54,34 @@ final class SupabaseGroomClientTests: XCTestCase {
         XCTAssertEqual(payload["origin_lng"] as? Double, 139.767125)
     }
 
+    func testBuildsGroomViewAndReactionRequests() throws {
+        let client = SupabaseGroomClient(configuration: configuration)
+        let userID = UUID(uuidString: "00000000-0000-0000-0000-000000000001")!
+        let postID = UUID(uuidString: "00000000-0000-0000-0000-000000000501")!
+
+        let viewRequest = try client.makeMarkViewedRequest(userID: userID, postID: postID)
+        let viewBody = try XCTUnwrap(viewRequest.httpBody)
+        let viewRows = try XCTUnwrap(JSONSerialization.jsonObject(with: viewBody) as? [[String: Any]])
+
+        XCTAssertEqual(viewRequest.httpMethod, "POST")
+        XCTAssertEqual(viewRequest.url?.absoluteString, "https://example.supabase.co/rest/v1/groom_views?select=*&on_conflict=groom_post_id,user_id")
+        XCTAssertEqual(viewRequest.value(forHTTPHeaderField: "Prefer"), "resolution=merge-duplicates,return=representation")
+        XCTAssertEqual(viewRows.first?["groom_post_id"] as? String, postID.uuidString.lowercased())
+        XCTAssertEqual(viewRows.first?["user_id"] as? String, userID.uuidString.lowercased())
+
+        let likeRequest = try client.makeSetLikedRequest(userID: userID, postID: postID, isLiked: true)
+        let likeBody = try XCTUnwrap(likeRequest.httpBody)
+        let likeRows = try XCTUnwrap(JSONSerialization.jsonObject(with: likeBody) as? [[String: Any]])
+
+        XCTAssertEqual(likeRequest.url?.absoluteString, "https://example.supabase.co/rest/v1/groom_reactions?select=*&on_conflict=groom_post_id,user_id,reaction_type")
+        XCTAssertEqual(likeRows.first?["reaction_type"] as? String, "like")
+
+        let unlikeRequest = try client.makeSetLikedRequest(userID: userID, postID: postID, isLiked: false)
+
+        XCTAssertEqual(unlikeRequest.httpMethod, "DELETE")
+        XCTAssertEqual(unlikeRequest.url?.absoluteString, "https://example.supabase.co/rest/v1/groom_reactions?groom_post_id=eq.00000000-0000-0000-0000-000000000501&user_id=eq.00000000-0000-0000-0000-000000000001&reaction_type=eq.like")
+    }
+
     private var configuration: SupabaseConfiguration {
         SupabaseConfiguration(
             projectURL: URL(string: "https://example.supabase.co")!,

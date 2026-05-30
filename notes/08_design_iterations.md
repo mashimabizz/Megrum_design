@@ -4,6 +4,79 @@
 
 ---
 
+## イテレーション332：Swiftグルーム閲覧アクション境界を追加
+
+### 背景・問題意識
+
+Swift Native版のグルームは閲覧と投稿まで進んだが、閲覧済みやいいねの操作がまだNative境界に入っていなかった。ストーリー型の体験をSwift側で完結させるため、`groom_views` と `groom_reactions` の更新をAppState、Repository、Supabase client、全画面ビューアへ接続する。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumCore/MegrumModels.swift`
+- `GroomPost` に `liked` を追加し、Native viewerがいいね状態を扱えるようにした。
+
+#### `ios-native/Sources/MegrumData/SupabaseRESTClient.swift`
+- PostgREST upsert requestを作る `makeUpsertRequest` を追加した。
+- PostgREST delete requestを作る `makeDeleteRequest` を追加した。
+
+#### `ios-native/Sources/MegrumData/SupabaseGroomClient.swift`
+- `groom_views` へ閲覧済みをupsertする `markViewed` を追加した。
+- `groom_reactions` へlikeをupsertし、取り消し時はdeleteする `setLiked` を追加した。
+- request builderをテストから検証できるようにした。
+
+#### `ios-native/Sources/MegrumApp/MegrumAppState.swift` / `ios-native/Sources/MegrumApp/SupabaseMegrumRepository.swift`
+- repository境界に `markGroomViewed` / `setGroomLiked` を追加した。
+- AppStateに `likedGroomIDs` と optimistic update を追加した。
+- 更新失敗時はいいね状態をrollbackし、エラーメッセージを表示できるようにした。
+
+#### `ios-native/Sources/MegrumApp/MeguriScreen.swift`
+- グルーム全画面ビューアに `MegrumAppState` を渡し、開いた投稿ごとに閲覧済みを登録するようにした。
+- ビューア右下にNativeのハートボタンを追加し、いいね/取り消しを実行できるようにした。
+
+#### `ios-native/Tests/MegrumDataTests/SupabaseGroomClientTests.swift`
+- `groom_views` upsert、`groom_reactions` upsert/deleteのURL、HTTP method、payload、Prefer headerを検証した。
+
+#### `ios-native/Tests/MegrumAppTests/MegrumAppStateTests.swift`
+- Preview repositoryで閲覧済み登録といいね/取り消しがAppStateから実行できることを検証した。
+
+#### `ios-native/README.md` / `notes/22_swift_native_migration.md`
+- Swift NativeめぐりPhaseの進捗として、グルーム閲覧アクション境界を追記した。
+
+### 影響範囲
+
+- Swift Native版のグルーム全画面ビューア
+- Swift Native版の `groom_views` 更新境界
+- Swift Native版の `groom_reactions` 更新境界
+- Swift Native版のめぐりAppState
+
+### 確認方法
+
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-build --enable-xctest --disable-swift-testing -j 1`
+- `xcodebuild -quiet -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -destination 'generic/platform=iOS Simulator' -derivedDataPath /tmp/megrum-native-xcodebuild CODE_SIGNING_ALLOWED=NO build`
+
+### 関連ファイル
+
+- `ios-native/Sources/MegrumCore/MegrumModels.swift`
+- `ios-native/Sources/MegrumData/SupabaseRESTClient.swift`
+- `ios-native/Sources/MegrumData/SupabaseGroomClient.swift`
+- `ios-native/Sources/MegrumApp/MegrumAppState.swift`
+- `ios-native/Sources/MegrumApp/SupabaseMegrumRepository.swift`
+- `ios-native/Sources/MegrumApp/MeguriScreen.swift`
+- `ios-native/Tests/MegrumDataTests/SupabaseGroomClientTests.swift`
+- `ios-native/Tests/MegrumAppTests/MegrumAppStateTests.swift`
+- `ios-native/README.md`
+- `notes/22_swift_native_migration.md`
+- `notes/08_design_iterations.md`
+
+### セルフレビュー結果
+
+- ✅ Swift Package testsが75件成功した。
+- ✅ Xcode project buildが成功した。
+- ✅ 既存の `groom_views` / `groom_reactions` を使うため、新規migrationは追加していない。
+- ✅ グルームのライフサイクル状態は追加していないため、`notes/09_state_machines.md` の更新は不要。
+- ✅ 既存用語の範囲内であり、新しい用語や廃止用語は追加していないため、`notes/10_glossary.md` の更新は不要。
+- ✅ DBスキーマ自体は変更していないため、`notes/05_data_model.md` の更新は不要。
+
 ## イテレーション331：Swiftグルーム投稿境界を追加
 
 ### 背景・問題意識

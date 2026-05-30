@@ -86,6 +86,59 @@ public final class SupabaseGroomClient: @unchecked Sendable {
         )
     }
 
+    public func markViewed(userID: UUID, postID: UUID) async throws {
+        let _: [GroomViewRow] = try await client.upsertRows(
+            into: "groom_views",
+            values: [GroomViewPayload(groomPostID: postID, userID: userID)],
+            onConflict: "groom_post_id,user_id"
+        )
+    }
+
+    public func setLiked(userID: UUID, postID: UUID, isLiked: Bool) async throws {
+        if isLiked {
+            let _: [GroomReactionRow] = try await client.upsertRows(
+                into: "groom_reactions",
+                values: [GroomReactionPayload(groomPostID: postID, userID: userID)],
+                onConflict: "groom_post_id,user_id,reaction_type"
+            )
+        } else {
+            try await client.deleteRows(
+                from: "groom_reactions",
+                queryItems: [
+                    URLQueryItem(name: "groom_post_id", value: "eq.\(postID.uuidString.lowercased())"),
+                    URLQueryItem(name: "user_id", value: "eq.\(userID.uuidString.lowercased())"),
+                    URLQueryItem(name: "reaction_type", value: "eq.like")
+                ]
+            )
+        }
+    }
+
+    public func makeMarkViewedRequest(userID: UUID, postID: UUID) throws -> URLRequest {
+        try client.makeUpsertRequest(
+            into: "groom_views",
+            values: [GroomViewPayload(groomPostID: postID, userID: userID)],
+            onConflict: "groom_post_id,user_id"
+        )
+    }
+
+    public func makeSetLikedRequest(userID: UUID, postID: UUID, isLiked: Bool) throws -> URLRequest {
+        if isLiked {
+            return try client.makeUpsertRequest(
+                into: "groom_reactions",
+                values: [GroomReactionPayload(groomPostID: postID, userID: userID)],
+                onConflict: "groom_post_id,user_id,reaction_type"
+            )
+        }
+        return try client.makeDeleteRequest(
+            from: "groom_reactions",
+            queryItems: [
+                URLQueryItem(name: "groom_post_id", value: "eq.\(postID.uuidString.lowercased())"),
+                URLQueryItem(name: "user_id", value: "eq.\(userID.uuidString.lowercased())"),
+                URLQueryItem(name: "reaction_type", value: "eq.like")
+            ]
+        )
+    }
+
     private func signedURLMap(for rows: [GroomFeedRow]) async throws -> [String: URL] {
         var signedURLs: [String: URL] = [:]
         for path in rows.compactMap(\.imagePath) {
@@ -216,6 +269,28 @@ private struct GroomImageTransformPayload: Encodable, Sendable {
     var scale = 1
     var x = 0
     var y = 0
+}
+
+private struct GroomViewPayload: Encodable, Sendable {
+    var groomPostID: UUID
+    var userID: UUID
+}
+
+private struct GroomViewRow: Decodable, Sendable {
+    var groomPostID: UUID?
+    var userID: UUID?
+}
+
+private struct GroomReactionPayload: Encodable, Sendable {
+    var groomPostID: UUID
+    var userID: UUID
+    var reactionType = "like"
+}
+
+private struct GroomReactionRow: Decodable, Sendable {
+    var groomPostID: UUID?
+    var userID: UUID?
+    var reactionType: String?
 }
 
 private func normalizedImageContentType(_ value: String) -> String {

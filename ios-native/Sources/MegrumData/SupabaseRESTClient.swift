@@ -226,6 +226,34 @@ public final class SupabaseRESTClient: @unchecked Sendable {
         )
     }
 
+    public func makeUpsertRequest<Payload: Encodable & Sendable>(
+        into table: String,
+        values: [Payload],
+        select: String = "*",
+        onConflict: String? = nil
+    ) throws -> URLRequest {
+        try makeMutationRequest(
+            path: "/rest/v1/\(table)",
+            queryItems: mutationQueryItems(select: select, onConflict: onConflict),
+            method: "POST",
+            body: encoder.encode(values),
+            prefer: "resolution=merge-duplicates,return=representation"
+        )
+    }
+
+    public func makeDeleteRequest(
+        from table: String,
+        queryItems: [URLQueryItem]
+    ) throws -> URLRequest {
+        try makeMutationRequest(
+            path: "/rest/v1/\(table)",
+            queryItems: queryItems,
+            method: "DELETE",
+            body: nil,
+            prefer: "return=minimal"
+        )
+    }
+
     public func makeStorageObjectUploadRequest(
         bucket: String,
         path: String,

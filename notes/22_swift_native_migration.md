@@ -1,7 +1,7 @@
 # 22. Swift Native Migration
 
 最終更新: 2026-05-31
-ステータス: Active draft（iter331）
+ステータス: Active draft（iter332）
 
 ## 目的
 
@@ -141,6 +141,7 @@ tar -xzf /Users/michitaka/Desktop/Megrum_backups/pre-swift-migration-20260531-03
 - iter329で、めぐりホーム右下の「スレッドを立てる」からNative composer sheetを開き、`meguri_board_threads` へ作成できるPostgREST insert境界を追加した。
 - iter330で、掲示板の3km圏内/都道府県表示をNative画面で切り替えられるようにし、プロフィール都道府県を初期値にしながら変更後の都道府県を `AppStorage` へ保存する導線を追加した。
 - iter331で、Supabase Storageのアップロード/署名URL境界と `groom_posts` 作成境界を追加し、めぐりホームのグルーム横並びからPhotosPickerで投稿できる最小Native導線を追加した。
+- iter332で、`groom_views` と `groom_reactions` のSwift Native更新境界を追加し、グルーム全画面ビューアから閲覧済み登録といいね/取り消しを行えるようにした。
 
 ### Phase 5: Cutover
 

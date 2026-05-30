@@ -652,6 +652,7 @@ public struct GroomPost: Identifiable, Codable, Hashable, Sendable {
     public var latitude: Double
     public var longitude: Double
     public var createdAt: Date
+    public var liked: Bool
 
     public init(
         id: UUID,
@@ -659,7 +660,8 @@ public struct GroomPost: Identifiable, Codable, Hashable, Sendable {
         imageURL: URL,
         latitude: Double,
         longitude: Double,
-        createdAt: Date = .now
+        createdAt: Date = .now,
+        liked: Bool = false
     ) {
         self.id = id
         self.authorID = authorID
@@ -667,6 +669,7 @@ public struct GroomPost: Identifiable, Codable, Hashable, Sendable {
         self.latitude = latitude
         self.longitude = longitude
         self.createdAt = createdAt
+        self.liked = liked
     }
 }
 

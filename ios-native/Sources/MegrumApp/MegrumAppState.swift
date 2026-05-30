@@ -69,6 +69,8 @@ public protocol MegrumRepository: Sendable {
     func sendMessage(_ input: TradeMessageCreateInput) async throws -> TradeMessage
     func loadGrooms(latitude: Double?, longitude: Double?, radiusMeters: Int) async throws -> [GroomPost]
     func createGroomPost(_ input: GroomPostCreateInput) async throws -> GroomPost
+    func markGroomViewed(postID: UUID) async throws
+    func setGroomLiked(postID: UUID, isLiked: Bool) async throws
     func loadBoardThreads(latitude: Double?, longitude: Double?, prefecture: String?, scope: BoardThread.Audience) async throws -> [BoardThread]
     func loadBoardReplies(threadID: UUID, latitude: Double?, longitude: Double?, prefecture: String?, scope: BoardThread.Audience) async throws -> [BoardReply]
     func sendBoardReply(_ input: BoardReplyCreateInput) async throws -> BoardReply
@@ -124,6 +126,10 @@ public extension MegrumRepository {
     func createGroomPost(_ input: GroomPostCreateInput) async throws -> GroomPost {
         throw MegrumRepositoryError.unsupportedMutation
     }
+
+    func markGroomViewed(postID: UUID) async throws {}
+
+    func setGroomLiked(postID: UUID, isLiked: Bool) async throws {}
 
     func loadBoardThreads(latitude: Double?, longitude: Double?, prefecture: String?, scope: BoardThread.Audience) async throws -> [BoardThread] {
         []
@@ -286,6 +292,10 @@ public struct PreviewMegrumRepository: MegrumRepository {
         )
     }
 
+    public func markGroomViewed(postID: UUID) async throws {}
+
+    public func setGroomLiked(postID: UUID, isLiked: Bool) async throws {}
+
     public func loadBoardThreads(latitude: Double?, longitude: Double?, prefecture: String?, scope: BoardThread.Audience) async throws -> [BoardThread] {
         NativePreviewData.threads.filter { thread in
             switch scope {
@@ -381,6 +391,7 @@ public final class MegrumAppState: ObservableObject {
     @Published public private(set) var messagesByProposalID: [UUID: [TradeMessage]] = [:]
     @Published public private(set) var boardRepliesByThreadID: [UUID: [BoardReply]] = [:]
     @Published public private(set) var grooms: [GroomPost] = []
+    @Published public private(set) var likedGroomIDs: Set<UUID> = []
     @Published public private(set) var threads: [BoardThread] = []
     @Published public private(set) var oshiGroups: [OshiGroup] = []
     @Published public private(set) var oshiCharacters: [OshiCharacter] = []
@@ -430,6 +441,10 @@ public final class MegrumAppState: ObservableObject {
 
     public func boardReplies(for threadID: UUID) -> [BoardReply] {
         boardRepliesByThreadID[threadID] ?? []
+    }
+
+    public func isGroomLiked(_ postID: UUID) -> Bool {
+        likedGroomIDs.contains(postID)
     }
 
     public func loadInitialData() async {
@@ -530,6 +545,29 @@ public final class MegrumAppState: ObservableObject {
             errorMessage = "グルームを投稿できませんでした"
             isCreatingGroomPost = false
             return false
+        }
+    }
+
+    public func markGroomViewed(_ postID: UUID) async {
+        do {
+            try await repository.markGroomViewed(postID: postID)
+        } catch {
+            errorMessage = "グルームの閲覧状態を更新できませんでした"
+        }
+    }
+
+    public func setGroomLiked(_ postID: UUID, isLiked: Bool) async {
+        let previousLikedIDs = likedGroomIDs
+        if isLiked {
+            likedGroomIDs.insert(postID)
+        } else {
+            likedGroomIDs.remove(postID)
+        }
+        do {
+            try await repository.setGroomLiked(postID: postID, isLiked: isLiked)
+        } catch {
+            likedGroomIDs = previousLikedIDs
+            errorMessage = "グルームのいいねを更新できませんでした"
         }
     }
 
@@ -1076,6 +1114,7 @@ public final class MegrumAppState: ObservableObject {
         wishes = snapshot.wishes
         proposals = snapshot.proposals
         grooms = snapshot.grooms
+        likedGroomIDs = Set(snapshot.grooms.filter(\.liked).map(\.id))
         threads = snapshot.threads
     }
 
