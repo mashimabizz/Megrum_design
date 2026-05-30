@@ -4,6 +4,53 @@
 
 ---
 
+## イテレーション254：掲示板一覧カードに保存済み・通知ONラベルを追加する
+
+### 背景・問題意識
+
+一般的なスレッド一覧では、保存したスレッドや通知を受け取っているスレッドを、一覧上で一目で判別できることが重要になる。スポット掲示板では保存/通知ONはフッターの小さなアイコンで分かるが、カードを流し見した時に見落としやすかったため、上部バッジにも状態を表示するようにした。
+
+### 変更内容
+
+#### `mobile/app/meguri-board.tsx`
+- `thread.bookmarked` が true の場合、スレッドカードのバッジ列に `保存済み` を表示するようにした。
+- `thread.subscribed` が true の場合、スレッドカードのバッジ列に `通知ON` を表示するようにした。
+- 固定/締め切り/参加中/保存済み/通知ON/下書き/未読が重なっても崩れにくいよう、バッジ列を折り返し可能にした。
+
+#### `notes/09_state_machines.md`
+- Meguri Board Lifecycle に保存済み/通知ONラベルの表示ルールを追記した。
+
+#### `notes/10_glossary.md`
+- 掲示板一覧保存通知ラベルを追加した。
+
+### 影響範囲
+
+- iOS版 スポット掲示板一覧
+- スレッドカードのバッジ列
+- 保存済み/通知ONスレッドの視認性
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- `EAS_UPDATE_PROJECT_SLUG=ihub EXPO_NO_GIT_STATUS=1 npm --prefix mobile run update:ios:preview -- --message "[iter254] show saved subscribed board labels" --non-interactive`
+- Preview OTA: Update group ID `94d0e5f8-fa46-4fa2-93d4-6e057c1d7cf2` / iOS update ID `019e7659-4b43-7926-8d32-70219b57727f`
+
+### 関連ファイル
+
+- `mobile/app/meguri-board.tsx`
+- `notes/08_design_iterations.md`
+- `notes/09_state_machines.md`
+- `notes/10_glossary.md`
+
+### セルフレビュー結果
+
+- ✅ 既存の保存/通知ON状態を表示に使い、DBや状態管理を増やしていない。
+- ✅ 既存 `StatusBadge` を使い回し、他の一覧ステータスと見た目を揃えた。
+- ✅ バッジ増加で横幅が詰まりすぎないよう、バッジ列を折り返し可能にした。
+
+---
+
 ## イテレーション253：掲示板一覧カードに共有ボタンを追加する
 
 ### 背景・問題意識

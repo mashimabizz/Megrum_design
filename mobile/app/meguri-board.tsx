@@ -1021,6 +1021,8 @@ export default function MeguriBoardScreen() {
                           {thread.isPinned ? <StatusBadge label="固定" /> : null}
                           {thread.status === "locked" ? <StatusBadge label="締め切り" /> : null}
                           {thread.participated ? <StatusBadge label="参加中" /> : null}
+                          {thread.bookmarked ? <StatusBadge label="保存済み" /> : null}
+                          {thread.subscribed ? <StatusBadge label="通知ON" /> : null}
                           {replyDraftThreadIds.has(thread.id) ? <StatusBadge label="下書きあり" /> : null}
                           {isThreadUnread(thread) ? (
                             <View style={styles.unreadBadge}>
@@ -1933,6 +1935,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     flexDirection: "row",
     flex: 1,
+    flexWrap: "wrap",
     gap: 6,
   },
   threadTopActions: {
