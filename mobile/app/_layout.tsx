@@ -3,14 +3,17 @@ import { StatusBar } from "expo-status-bar";
 import { ActivityIndicator, View } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { AuthProvider, useAuth } from "../src/auth/AuthProvider";
+import { KeyboardDismissView } from "../src/components/KeyboardDismissView";
 import { megrumColors } from "../src/theme/tokens";
 
 export default function RootLayout() {
   return (
     <SafeAreaProvider>
       <AuthProvider>
-        <StatusBar style="dark" />
-        <RootNavigator />
+        <KeyboardDismissView>
+          <StatusBar style="dark" />
+          <RootNavigator />
+        </KeyboardDismissView>
       </AuthProvider>
     </SafeAreaProvider>
   );

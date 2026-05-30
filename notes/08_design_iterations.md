@@ -4,6 +4,48 @@
 
 ---
 
+## イテレーション267：全画面で外側タップ時にキーボードを閉じる
+
+### 背景・問題意識
+
+オーナーから、どの画面でもキーボード表示中にキーボード以外の場所をタップしたら、キーボードが閉じるようにしたいという依頼があった。入力フォーム画面ごとに個別対応すると漏れやすいため、アプリのルートに共通のタッチ捕捉を入れる必要があった。
+
+### 変更内容
+
+#### `mobile/src/components/KeyboardDismissView.tsx`
+- アプリ全体を包む `KeyboardDismissView` を追加した。
+- 現在フォーカス中の `TextInput` 以外にタッチが始まった場合だけ `Keyboard.dismiss()` を呼ぶようにし、同じ入力欄をタップした時は閉じないようにした。
+- `onStartShouldSetResponderCapture` は `false` を返し、ボタン・カード・スクロールなど子要素の通常操作を止めないようにした。
+
+#### `mobile/app/_layout.tsx`
+- `RootNavigator` 全体を `KeyboardDismissView` で包み、`Screen` を使っていない画面も含めて共通挙動が効くようにした。
+
+### 影響範囲
+
+- iOS版 全画面の入力中タップ挙動
+- ログイン・新規登録・設定・住所設定・在庫/Wish編集・打診・取引チャットなど、`TextInput` を含む画面全般
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- `EAS_UPDATE_PROJECT_SLUG=ihub EXPO_NO_GIT_STATUS=1 npm --prefix mobile run update:ios:preview -- --message "[iter267] dismiss keyboard on outside tap" --non-interactive`
+- Preview OTA: Update group ID `7aaeb338-397c-4370-bf64-8aca47f362fb` / iOS update ID `019e7697-52c1-746e-86cd-fb6a5a1618cb`
+
+### 関連ファイル
+
+- `mobile/app/_layout.tsx`
+- `mobile/src/components/KeyboardDismissView.tsx`
+- `notes/08_design_iterations.md`
+
+### セルフレビュー結果
+
+- ✅ 画面単位ではなくルート単位で実装し、特殊画面にも効くようにした。
+- ✅ 子要素のタップ操作を妨げないよう、captureではキーボードを閉じるだけにして responder は奪わない設計にした。
+- ✅ 状態名・新用語・DBスキーマに影響しないため、`notes/09_state_machines.md` と `notes/10_glossary.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション266：完了フローの戻り履歴を階層化する
 
 ### 背景・問題意識
