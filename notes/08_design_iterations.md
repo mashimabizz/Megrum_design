@@ -4,6 +4,85 @@
 
 ---
 
+## イテレーション299：Swift Native全面移行を開始
+
+### 背景・問題意識
+
+オーナーから「iOS一本で勝つ」ため、Expo / React Native中心ではなくSwift中心へ全面移行したいという意思決定があった。移行前の現行バージョンへ戻れる状態を確保しつつ、npaka氏の記事とOpenAI DevelopersのNative development方針を踏まえ、Megrumの新しい主線をSwift Native iOSへ切り替える必要がある。
+
+### 変更内容
+
+#### バックアップ
+- `backup/pre-swift-migration-20260531-030401` ブランチを作成し、GitHubへpushした。
+- `/Users/michitaka/Desktop/Megrum_backups/pre-swift-migration-20260531-030401` に、HEAD、status、tracked patch、staged patch、untracked archiveを保存した。
+
+#### `ios-native/`
+- Swift Native移行用の新しい作業場を追加した。
+- `Package.swift` を追加し、`MegrumCore` / `MegrumDesign` / `MegrumCoreTests` を定義した。
+- `MegrumCore` に、既存状態遷移・用語と揃う `ExchangeMethod`、`ProposalStatus`、`GoodsItem`、`WishItem`、`TradeProposal`、`GroomPost`、`BoardThread` などの初期モデルを追加した。
+- `MegrumDesign` に、SwiftUIのテーマ色とLiquid Glass風検索ボタンの最初のprimitiveを追加した。
+- `swift build` / `swift test` で検証できる最低限のSwift基盤を作った。
+
+#### `notes/22_swift_native_migration.md`
+- Swift Native全面移行の一次資料を新規作成した。
+- 移行方針、バックアップ、技術方針、Supabase継続、フェーズ、完了条件を整理した。
+
+#### `AGENTS.md`
+- 実装対象の優先方針を、`mobile/` 主線から `ios-native/` Swift Native主線へ更新した。
+- iOS作業時に `notes/22_swift_native_migration.md` を読むルールを追加した。
+- Swift向けの `swift build` / `swift test` / 将来の `xcodebuild` 検証ループを追加した。
+- `mobile/` はlegacy Expo版として、緊急修正・比較・rollback線に位置づけた。
+
+#### `notes/USER_PLAYBOOK.md`
+- 現在のフェーズをSwift Native全面移行へ更新した。
+- オーナーがCodexへSwift移行やLiquid Glass実装を依頼する時の前提を更新した。
+
+#### `notes/10_glossary.md`
+- `Swift Native iOS版` と `legacy Expo版` を正式用語として追加した。
+
+### 影響範囲
+
+- 今後のユーザー向けiOS実装の主対象
+- Swift Native移行の検証ループ
+- `mobile/` の位置づけ
+- Codexセッションの作業規約
+- オーナーの依頼テンプレート
+
+### 確認方法
+
+- `swift build --package-path ios-native`
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-build --enable-xctest --disable-swift-testing -j 1`
+- `git diff --check -- AGENTS.md notes/USER_PLAYBOOK.md notes/10_glossary.md notes/08_design_iterations.md notes/22_swift_native_migration.md ios-native/README.md ios-native/Package.swift ios-native/Sources/MegrumCore/MegrumModels.swift ios-native/Sources/MegrumDesign/MegrumTheme.swift ios-native/Tests/MegrumCoreTests/MegrumCoreTests.swift`
+- 参考確認: `https://note.com/npaka/n/n51962b239b68`
+- 参考確認: `https://developers.openai.com/codex/use-cases/collections/native-development`
+- 参考確認: `https://developer.apple.com/documentation/technologyoverviews/adopting-liquid-glass`
+- 参考確認: `https://developer.apple.com/documentation/swiftui/applying-liquid-glass-to-custom-views`
+
+### 関連ファイル
+
+- `ios-native/Package.swift`
+- `ios-native/Sources/MegrumCore/MegrumModels.swift`
+- `ios-native/Sources/MegrumDesign/MegrumTheme.swift`
+- `ios-native/Tests/MegrumCoreTests/MegrumCoreTests.swift`
+- `ios-native/.gitignore`
+- `ios-native/README.md`
+- `notes/22_swift_native_migration.md`
+- `AGENTS.md`
+- `notes/USER_PLAYBOOK.md`
+- `notes/10_glossary.md`
+- `notes/08_design_iterations.md`
+
+### セルフレビュー結果
+
+- ✅ 現行版へ戻るためのGitブランチとローカル差分バックアップを先に作成した。
+- ✅ `mobile/` を削除せず、Swift版が機能同等になるまでrollback線として残す方針にした。
+- ✅ Swift Packageとして最小のNative foundationを追加し、今後の画面移行の置き場所を作った。
+- ✅ `ProposalStatus.agreement_one_side` など、状態名は `notes/09_state_machines.md` と一致させた。
+- ✅ 新用語は `notes/10_glossary.md` に追加した。
+- ✅ DBスキーマは変更していないため、`notes/05_data_model.md` の更新は不要。
+- ✅ 状態の追加・削除・改名はないため、`notes/09_state_machines.md` の更新は不要。
+- ✅ iOSユーザー向け配布物はまだ作っていないため、Preview OTA / TestFlight配信は不要。
+
 ## イテレーション298：Codex iOS開発運用規約を反映
 
 ### 背景・問題意識

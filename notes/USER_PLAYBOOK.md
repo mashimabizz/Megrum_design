@@ -7,7 +7,7 @@
 > Claudeセッションでも参照する：「USER_PLAYBOOK.md を見て、タスク◯◯を進めて」と言えば、このドキュメント通りに動作する。
 
 最終更新: 2026-05-31
-ステータス: Active（Codex iOS開発ループ / iter298）
+ステータス: Active（Swift Native全面移行 / iter299）
 
 ---
 
@@ -30,10 +30,13 @@
 
 ### 🎯 現在の実装方針（最重要）
 
-- ユーザー向けMegrumは `mobile/` の iOSアプリに一点特化する。
+- ユーザー向けMegrumはSwift Native iOSへ全面移行する。
+- 新しいユーザー向け実装は原則 `ios-native/` を対象にする。
+- `mobile/` はExpo / React Native版の移行元・バックアップ・仕様参照として残す。
 - `web/` は通常ユーザー向けWeb版としては使わず、管理者画面・運用画面・サポート確認画面が必要な時だけ触る。
-- 「画面を直して」「ユーザー体験を作って」という依頼は、原則 iOS / `mobile/` の実装対象として扱う。
-- mobile のユーザー向け変更は、完了前に Preview channel / EAS build 反映要否を必ず確認する。
+- 「画面を直して」「ユーザー体験を作って」という依頼は、原則 Swift iOS / `ios-native/` の実装対象として扱う。
+- Swift版がTestFlightに乗るまでは、既存 `mobile/` Previewはrollback線として維持する。
+- Swift移行方針の一次資料は `notes/22_swift_native_migration.md`。
 
 ---
 
@@ -67,20 +70,20 @@ Codexへ依頼する時は、できるだけ次の4点を渡す。
 - ログイン、特殊なテストデータ、友達側の画面など、Codexが直接見られない条件だけ渡す。
 - 「ついでに全部直す」より、検証できる小さな単位を積む方が速い。
 
-### iOS UI / Liquid Glassを頼む時
+### Swift Native / Liquid Glassを頼む時
 
 - いきなり全画面を変えるより、ホーム、検索、シート、タブ、取引チャットなど、よく使うフローを1つ選ぶ。
 - Codexには最初に「どこをガラス化し、どこは普通のコンテンツとして残すか」を監査させる。
 - 可読性が大事なカードや本文まで全部ガラス化しない。
-- iOS標準コンポーネント、既存の `LiquidGlassSurface`、system material fallback を優先させる。
+- SwiftUI / UIKit / Apple標準コンポーネント、`Material`、iOS 26以上のLiquid Glass API、旧OS向けfallbackを優先させる。
 - 古いiOSやReduce Motion / Reduce Transparencyでの見え方も確認対象にする。
 
 ### 大きな画面を整理してほしい時
 
 ```
-この画面は挙動と見た目を変えずに整理してください。
-大きなJSXを意味のある小さなコンポーネントに分け、
-副作用や保存処理はrender直下から外してください。
+この画面は挙動と見た目を変えずにSwift Nativeへ移してください。
+SwiftUIの小さなViewへ分け、必要な値だけを渡してください。
+保存処理や通信処理はView直下に混ぜず、service / modelへ分けてください。
 変更しなかった挙動も最後に報告してください。
 ```
 

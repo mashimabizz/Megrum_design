@@ -3,8 +3,8 @@
 > **目的**：Megrum で使う用語の定義を一元化。実装・デザイン・仕様書で「同じ用語を同じ意味で」使うための基準。
 > 新環境（別Claudeセッション・別エンジニア）でも、これだけ読めばコンテキストがつかめる。
 
-最終更新: 2026-05-30
-ステータス: Draft v3.75（iter276 モバイル通知を反映）
+最終更新: 2026-05-31
+ステータス: Draft v3.76（iter299 Swift Native全面移行を反映）
 
 ---
 
@@ -46,7 +46,8 @@
 |---|---|---|---|
 | **Megrum** | メグルム、正式サービス名 | 推し活グッズ交換・推しすれ違いプラットフォーム名 | iter158 |
 | **Web管理画面** | Web版、運用画面 | `web/` で実装する Next.js 版 Megrum。通常ユーザー向けWeb版ではなく、管理者・運用・サポート確認用途を主対象にする | iter168.63 |
-| **iOSアプリ版** | iOS版、ネイティブ版 | `mobile/` で実装する React Native / Expo 版 Megrum。ユーザー向け体験の主対象で、iOS特有の遷移・通知・地図・カメラ体験を担う | iter168.63 |
+| **Swift Native iOS版** | iOSネイティブ版、Swift版 | `ios-native/` で実装する Swift / SwiftUI / UIKit 版 Megrum。iter299以降のユーザー向けiOS体験の主対象で、Apple標準の遷移・通知・地図・カメラ・Liquid Glass表現を担う | iter299 |
+| **legacy Expo版** | 旧iOSアプリ版、React Native版、Expo版 | `mobile/` で実装されている移行元アプリ。Swift Native版が機能同等になるまで、バックアップ・仕様参照・緊急修正の対象として残す | iter168.63, iter299 |
 | **モバイル通知** | push notification, 端末通知 | iOS/Android端末に届くMegrumの通知。`notification_devices` にExpo Push Tokenを登録し、`notifications` の新規行を端末へ配送する | iter276 |
 | **通知一覧** | notification center | アプリ内で受信通知を確認する一覧。未読/既読を `notifications.read_at` で管理し、通知タップで対象画面へ遷移する | iter92, iter276 |
 | **通知バッジ** | unread badge | 未読通知数を示す小さな件数表示。左ドロワーの「通知」項目やアプリアイコンバッジで使う | iter276 |

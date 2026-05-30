@@ -15,7 +15,7 @@
 4. **`notes/08_design_iterations.md` の最新 iter を 1〜2件読む**（直近のコンテキスト）
 5. **オーナーがタスク的な指示をした場合は `notes/USER_PLAYBOOK.md` を確認**（Phase 2 タスク・指示テンプレ・チェックポイントが集約されている）
 6. **法的文書（規約・プライバシー・特商法）に関わる作業は `notes/17_legal_alignment.md` を確認**（弁護士納品の規約原典との整合性管理）
-7. **`mobile/` の作業では本ファイルの「Codex iOS開発運用規約」を必ず確認**（小さな検証ループ、証拠つきデバッグ、Liquid Glass方針）
+7. **iOS作業では本ファイルの「Codex iOS開発運用規約」と `notes/22_swift_native_migration.md` を必ず確認**（Swift Native移行、小さな検証ループ、証拠つきデバッグ、Liquid Glass方針）
 
 これらを読まずに作業を始めない。
 
@@ -146,26 +146,33 @@ bg-megrum-lavender / text-megrum-sky / border-megrum-pink / megrum-warn / megrum
 - **MVP の範囲**: 現地交換（郵送は Yahoo フリマ等と棲み分け）、ランダム封入の小型グッズが主な交換対象
 - **特徴**: AW（Activity Window = 「この時間ここにいる」予定）と wish のマッチング、受諾前ネゴ、合意前に待ち合わせfix
 
-## 🎯 実装対象の優先方針（iter168.63）
+## 🎯 実装対象の優先方針（iter299）
 
-- **ユーザー向けアプリは `mobile/` の iOSアプリに一点特化する。** 新機能・UI修正・ユーザーフロー・Preview反映は原則 `mobile/` を対象にする。
+- **ユーザー向けアプリはSwift Native iOSに全面移行する。** 新機能・UI修正・ユーザーフローは原則 `ios-native/` を正とする。
+- **`mobile/` はExpo / React Native版の移行元・バックアップ・仕様参照として残す。** Swift版が機能同等になるまで削除しない。
 - **`web/` は通常ユーザー向けWeb版としては育てない。** 管理者画面、運用画面、サポート確認、法務確認など、運営側に必要な場合だけ更新する。
-- WebとiOSの見た目・導線を完全同期する必要はない。共通化が必要なものは `packages/core/` / `packages/supabase/` に寄せ、画面体験はiOSを正とする。
-- mobile のユーザー向け変更は、完了前に Preview channel / EAS build 反映要否を必ず確認する。web 管理画面だけの変更では iOS Preview 更新は不要。
+- WebとiOSの見た目・導線を完全同期する必要はない。共通化が必要なものは Swift側の `MegrumCore` と既存Supabaseスキーマの境界で整理し、画面体験はSwift iOSを正とする。
+- Swift版がTestFlight運用に入るまでは、`mobile/` の既存Previewをrollback線として維持する。
 
-## 🧭 Codex iOS開発運用規約（iter298）
+## 🧭 Codex iOS開発運用規約（iter299）
 
-> 参考：npaka「Codex のiOSアプリ開発のためのプロンプトまとめ」と OpenAI Developers「Native development」の方針を、Megrum の Expo / React Native + iOS Preview 運用に合わせて落とし込んだもの。
+> 参考：npaka「Codex のiOSアプリ開発のためのプロンプトまとめ」と OpenAI Developers「Native development」の方針を、Megrum の Swift Native iOS 移行に合わせて落とし込んだもの。
 
 ### 1. CLI優先・小さな検証ループ
 
 - 変更ごとに、まず**最小限で意味のある検証コマンド**を選ぶ。いきなり全ビルドに飛ばない。
-- `mobile/` の JS/TS 変更は原則として次を基本ループにする：
+- `ios-native/` のSwift変更は原則として次を基本ループにする：
+  - `swift build --package-path ios-native`
+  - `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-build --enable-xctest --disable-swift-testing -j 1`
+  - Xcode app shell追加後は `xcodebuild -list -project ios-native/MegrumNative.xcodeproj`
+  - Xcode app shell追加後は `xcodebuild -scheme MegrumNative -destination 'platform=iOS Simulator,name=iPhone 16' build`
+- legacy `mobile/` の JS/TS 変更が必要な場合だけ次を使う：
   - `npm --prefix mobile run typecheck`
   - ユーザー向け変更なら `npm --prefix mobile run export:ios:preview`
   - OTA可能なら `EAS_UPDATE_PROJECT_SLUG=ihub EXPO_NO_GIT_STATUS=1 npm --prefix mobile run update:ios:preview -- --message "[iter◯◯] ..." --non-interactive`
 - iOSネイティブ層、Expo local module、Info.plist、権限、依存追加、Pod、Xcode設定を触った場合はOTAでは足りない。Preview用のEAS buildまたはXcode Archiveが必要であることを明示する。
-- Xcodeで確認する場合は、原則 `mobile/ios/MegrumPreview.xcworkspace` / `MegrumPreview` scheme を前提にし、使ったworkspace、scheme、デバイス、OS、確認コマンドを最終報告に書く。
+- Swift NativeでXcode確認する場合は、使ったproject/workspace、scheme、デバイス、OS、確認コマンドを最終報告に書く。
+- legacy Expo版でXcode確認する場合だけ、`mobile/ios/MegrumPreview.xcworkspace` / `MegrumPreview` scheme を前提にする。
 
 ### 2. バグ修正は「再現 → 証拠 → 最小修正 → 再検証」
 
@@ -190,7 +197,7 @@ bg-megrum-lavender / text-megrum-sky / border-megrum-pink / megrum-warn / megrum
 - まず対象フローを監査し、ガラス化すべき面、プレーンなまま残すべき面、削除すべき過剰なカスタムblur/装飾を分けてから実装する。
 - iOS標準・ネイティブ素材で実現できる場合は、独自Viewより標準コンポーネントや既存の `LiquidGlassSurface` / system material fallback を優先する。
 - 透明表現を使う場合でも、可読性、コントラスト、Reduce Transparency / Reduce Motion を必ず守る。
-- iOS 26専用APIを使う場合は、それ以前のruntime向けフォールバックを明示する。Expo/React Native上でネイティブAPIが使えない場合は、近似表現と限界を報告する。
+- iOS 26専用APIを使う場合は、それ以前のruntime向けフォールバックを明示する。Swift NativeではApple標準APIを優先し、Expo/React Native近似表現はlegacy側に閉じ込める。
 
 ### 5. App Intents / システム連携は小さく始める
 
@@ -226,6 +233,31 @@ bg-megrum-lavender / text-megrum-sky / border-megrum-pink / megrum-warn / megrum
 ---
 
 ## 📁 ファイル構造マップ
+
+### `ios-native/`（Swift Native iOS・新主線）
+
+**Swift 6 + SwiftUI / UIKit / Apple framework**
+
+| パス | 内容 |
+|---|---|
+| `ios-native/Package.swift` | Swift Native移行の最初のPackage定義 |
+| `ios-native/Sources/MegrumCore/` | 状態名・主要モデル・ドメイン型 |
+| `ios-native/Sources/MegrumDesign/` | 色、タイポグラフィ、Liquid Glass primitive |
+| `ios-native/Tests/` | 状態名・用語・モデルの基本テスト |
+| `ios-native/README.md` | Swift Native作業場の使い方 |
+
+実装着手中の動作確認：
+
+```bash
+swift build --package-path ios-native
+swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-build --enable-xctest --disable-swift-testing -j 1
+```
+
+SwiftUI App shell追加後は `xcodebuild` によるSimulator build / screenshot確認を基本にする。
+
+### `mobile/`（legacy Expo / React Native・移行元）
+
+Swift版が機能同等になるまでのrollback線。新しいユーザー向け実装は原則 `ios-native/` に寄せる。既存TestFlightの緊急修正や比較検証が必要な時だけ触る。
 
 ### `web/`（管理者・運用画面）
 
@@ -328,18 +360,22 @@ Phase 0a 完了後、Supabase CLI で初期化予定。
 
 ```
 □ 1. 変更内容を実装（JSX編集等）
-□ 2. 最小限で意味のある検証を実行（例：`npm --prefix mobile run typecheck`、該当画面の再現確認、差分チェック）
+□ 2. 最小限で意味のある検証を実行（例：`swift build --package-path ios-native`、`swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-build --enable-xctest --disable-swift-testing -j 1`、legacy mobileなら `npm --prefix mobile run typecheck`、該当画面の再現確認、差分チェック）
 □ 3. notes/08_design_iterations.md に新しい iteration エントリを追加
 □ 4. 状態遷移に影響あるか？ → あれば notes/09_state_machines.md を更新
 □ 5. 新用語・廃止用語があるか？ → あれば notes/10_glossary.md を更新
 □ 6. データモデルに影響あるか？ → あれば notes/05_data_model.md にメモ追加
 □ 7. commit メッセージは [iter◯◯] [タイトル] 形式で
 □ 8. push
-□ 9. **iOS版 / mobile のユーザー向け変更は、完了前に必ず Preview channel にも反映**
+□ 9. **Swift Nativeのユーザー向け変更は、Swift build/test または xcodebuild で検証**
+   - Package段階：`swift build --package-path ios-native` → `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-build --enable-xctest --disable-swift-testing -j 1`
+   - App shell追加後：`xcodebuild -scheme MegrumNative -destination 'platform=iOS Simulator,name=iPhone 16' build`
+   - TestFlight配布前は、Swift版Preview buildのBundle ID / build番号 / 確認端末を `notes/08_design_iterations.md` に記録
+□ 10. **legacy mobile のユーザー向け変更をした場合のみ、完了前に Preview channel にも反映**
    - JS/TSだけの変更：`npm --prefix mobile run export:ios:preview` → `EXPO_NO_GIT_STATUS=1 npm --prefix mobile run update:ios:preview -- --message "[iter◯◯] ..." --non-interactive`
    - Swift / Expo local module / native config / 依存追加を含む変更：EAS Updateだけでは反映されないため、Preview用のEAS buildが必要。必要ならオーナーにビルド手順を渡す
    - Preview更新した場合は、EAS Update ID / Update group を `notes/08_design_iterations.md` の確認方法へ記録
-□ 10. **ユーザー向け変更は原則 `mobile/` のみ更新**。`web/` は管理者画面・運用画面として必要な時だけ更新する
+□ 11. **ユーザー向け新規実装は原則 `ios-native/` を更新**。`mobile/` はlegacy緊急修正、`web/` は管理者画面・運用画面として必要な時だけ更新する
 ```
 
 **省略禁止**：チェックリストの 2-6 を飛ばすと、別環境の Codex が同じ判断を再現できなくなる。
