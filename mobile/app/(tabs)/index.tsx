@@ -9,6 +9,7 @@ import {
 } from "react";
 import { router } from "expo-router";
 import type { SFSymbol, SymbolViewProps } from "expo-symbols";
+import { LinearGradient } from "expo-linear-gradient";
 import {
   ActionSheetIOS,
   Alert,
@@ -1439,16 +1440,45 @@ function FloatingSearchButton() {
       accessibilityLabel="検索"
       accessibilityRole="button"
       onPress={() => router.push("/search")}
-      style={styles.floatingSearchButton}
+      style={({ pressed }) => [
+        styles.floatingSearchButton,
+        pressed ? styles.floatingSearchButtonPressed : null,
+      ]}
     >
-      <LiquidGlassSurface
-        isInteractive
-        pointerEvents="none"
-        style={StyleSheet.absoluteFillObject}
-        fallbackStyle={styles.floatingSearchFallback}
-        tintColor="rgba(255,255,255,0.26)"
-      />
-      <IconSymbol name="search" size={24} color={megrumColors.ink} />
+      <View pointerEvents="none" style={styles.floatingSearchGlassClip}>
+        <LiquidGlassSurface
+          blurIntensity={70}
+          glassEffectStyle={{
+            style: "clear",
+            animate: true,
+            animationDuration: 0.22,
+          }}
+          isInteractive
+          pointerEvents="none"
+          style={StyleSheet.absoluteFillObject}
+          fallbackStyle={styles.floatingSearchFallback}
+          tintColor="rgba(255,255,255,0.2)"
+        />
+        <View pointerEvents="none" style={styles.floatingSearchOverlay} />
+        <LinearGradient
+          colors={[
+            "rgba(255,255,255,0.92)",
+            "rgba(255,255,255,0.34)",
+            "rgba(255,255,255,0.04)",
+          ]}
+          end={{ x: 0.94, y: 0.96 }}
+          pointerEvents="none"
+          start={{ x: 0.12, y: 0.06 }}
+          style={styles.floatingSearchSpecular}
+        />
+        <View pointerEvents="none" style={styles.floatingSearchInnerGlow} />
+        <View style={styles.floatingSearchIconLayer}>
+          <View style={styles.searchGlyph}>
+            <View style={styles.searchGlyphRing} />
+            <View style={styles.searchGlyphHandle} />
+          </View>
+        </View>
+      </View>
     </Pressable>
   );
 }
@@ -3175,24 +3205,93 @@ const styles = StyleSheet.create({
   },
   floatingSearchButton: {
     alignItems: "center",
-    borderColor: "rgba(255,255,255,0.86)",
     borderRadius: 999,
-    borderWidth: 1,
-    bottom: 104,
-    height: 54,
+    bottom: 102,
+    height: 62,
     justifyContent: "center",
-    left: 18,
+    left: 16,
     position: "absolute",
     shadowColor: megrumColors.ink,
-    shadowOffset: { width: 0, height: 12 },
-    shadowOpacity: 0.14,
-    shadowRadius: 22,
-    width: 54,
+    shadowOffset: { width: 0, height: 16 },
+    shadowOpacity: 0.18,
+    shadowRadius: 28,
+    width: 62,
     zIndex: 20,
-    overflow: "hidden",
+  },
+  floatingSearchButtonPressed: {
+    opacity: 0.9,
+    transform: [{ scale: 0.94 }],
   },
   floatingSearchFallback: {
-    backgroundColor: "rgba(255,255,255,0.9)",
+    backgroundColor: "rgba(255,255,255,0.42)",
+  },
+  floatingSearchGlassClip: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: "center",
+    backgroundColor: "rgba(255,255,255,0.2)",
+    borderColor: "rgba(255,255,255,0.92)",
+    borderRadius: 999,
+    borderWidth: StyleSheet.hairlineWidth,
+    justifyContent: "center",
+    overflow: "hidden",
+  },
+  floatingSearchOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(255,255,255,0.24)",
+  },
+  floatingSearchSpecular: {
+    borderRadius: 999,
+    bottom: 0,
+    left: 0,
+    opacity: 0.86,
+    position: "absolute",
+    right: 0,
+    top: 0,
+  },
+  floatingSearchInnerGlow: {
+    ...StyleSheet.absoluteFillObject,
+    borderColor: "rgba(255,255,255,0.84)",
+    borderRadius: 999,
+    borderWidth: 1,
+    shadowColor: "#ffffff",
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.7,
+    shadowRadius: 8,
+  },
+  floatingSearchIconLayer: {
+    alignItems: "center",
+    backgroundColor: "rgba(255,255,255,0.2)",
+    borderColor: "rgba(255,255,255,0.36)",
+    borderRadius: 999,
+    borderWidth: StyleSheet.hairlineWidth,
+    height: 42,
+    justifyContent: "center",
+    width: 42,
+  },
+  searchGlyph: {
+    height: 30,
+    position: "relative",
+    width: 30,
+  },
+  searchGlyphRing: {
+    borderColor: megrumColors.ink,
+    borderRadius: 999,
+    borderWidth: 3,
+    height: 18,
+    left: 3,
+    position: "absolute",
+    top: 3,
+    width: 18,
+  },
+  searchGlyphHandle: {
+    backgroundColor: megrumColors.ink,
+    borderRadius: 999,
+    bottom: 5,
+    height: 3,
+    position: "absolute",
+    right: 2,
+    transform: [{ rotate: "45deg" }],
+    width: 12,
   },
   homeActionButton: {
     alignItems: "center",

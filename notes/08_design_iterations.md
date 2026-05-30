@@ -4,6 +4,45 @@
 
 ---
 
+## イテレーション286：ホーム検索をリキッドグラス化
+
+### 背景・問題意識
+
+オーナーから、CodePen `https://codepen.io/samarkandiy/pen/yyNvNGQ` にあるリキッドグラス表現を踏襲して、ホーム画面の検索アイコンを作り直したいという要望があった。既存の検索ボタンは白い丸ボタンに近く、ガラスの層感・反射・押下感が弱かった。
+
+### 変更内容
+
+#### `mobile/app/(tabs)/index.tsx`
+- ホーム左下の検索ボタンを、既存の検索遷移は維持したまま、`LiquidGlassSurface` と白い薄膜、斜めのハイライト、内側の発光を重ねたガラス表現へ変更した。
+- 検索アイコンはテキストグリフではなく、円とハンドルを組み合わせた専用の虫眼鏡形状にした。
+- 押下時に少し縮むフィードバックを追加し、CodePen の hover/press に近い触感へ寄せた。
+
+### 影響範囲
+
+- iOS版 ホーム画面
+- ホーム左下の検索導線
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- `EAS_UPDATE_PROJECT_SLUG=ihub EXPO_NO_GIT_STATUS=1 npm --prefix mobile run update:ios:preview -- --message "[iter286] ホーム検索をリキッドグラス化" --non-interactive`
+- Preview OTA: Update group ID `cdac01fc-74b5-4a18-8039-e8e971ed97c6` / iOS update ID `019e7883-b5a8-70e8-8b30-d38f07a736bf`
+- EAS Dashboard: `https://expo.dev/accounts/mashima.bizz/projects/ihub/updates/cdac01fc-74b5-4a18-8039-e8e971ed97c6`
+
+### 関連ファイル
+
+- `mobile/app/(tabs)/index.tsx`
+- `notes/08_design_iterations.md`
+
+### セルフレビュー結果
+
+- ✅ 検索ボタンの遷移先は `/search` のまま維持した。
+- ✅ ガラス表現は既存の `LiquidGlassSurface` を使い、追加のネイティブ依存は入れていない。
+- ✅ CodePen の構造（透明ベース、白オーバーレイ、内側ハイライト、柔らかい影、押下縮小）をReact Native側で再現できる範囲に置き換えた。
+- ✅ iOS Preview channel へOTA配信済み。
+- ✅ 状態遷移・用語・DBスキーマ変更はないため、`notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要。
+
 ## イテレーション285：取引チャット写真を全画面表示に対応
 
 ### 背景・問題意識
