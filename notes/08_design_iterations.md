@@ -4,6 +4,58 @@
 
 ---
 
+## イテレーション316：Swiftグッズ長押しメニューを追加
+
+### 背景・問題意識
+
+RN版ではマイ在庫の各パネルを長押しした時に、詳細、交換リスト追加、非表示、通報、削除などのアクションを出す設計になっている。Swift Native版の `GoodsGrid` は一覧表示だけだったため、iOS標準挙動を優先し、タップで詳細、長押しで標準context menuを出す土台を追加した。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/GoodsGrid.swift`
+- `GoodsGrid` に選択中詳細アイテムとアクションmessage状態を追加した。
+- `GoodsTile` をタップ可能にし、タップで `GoodsDetailSheet` を表示するようにした。
+- `GoodsTileAction` を追加し、詳細を見る、交換リストに追加、非表示にする、通報する、削除するをcontext menuで表示するようにした。
+- `GoodsDetailSheet` を追加し、グッズ画像/タグ/タイトル/数量/状態をNative sheetで確認できるようにした。
+- 画像URLがある場合は `AsyncImage`、ない場合は既存のグラデーションplaceholderを使うようにした。
+
+#### `ios-native/README.md`
+- `GoodsGrid` のタップ詳細と長押しメニューの方針を追記した。
+
+#### `notes/22_swift_native_migration.md`
+- Phase 3のExchange coreに、iter316のグッズ操作土台を追記した。
+
+### 影響範囲
+
+- Swift Native版のホーム内グッズグリッド
+- Swift Native版の在庫一覧
+- Swift Native版のWish一覧
+- 今後の打診フロー、通報、削除API接続の受け口
+
+### 確認方法
+
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-build --enable-xctest --disable-swift-testing -j 1`
+- `xcodebuild -quiet -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -destination 'generic/platform=iOS Simulator' -derivedDataPath /tmp/megrum-native-xcodebuild CODE_SIGNING_ALLOWED=NO build`
+
+### 関連ファイル
+
+- `ios-native/Sources/MegrumApp/GoodsGrid.swift`
+- `ios-native/README.md`
+- `notes/22_swift_native_migration.md`
+- `notes/08_design_iterations.md`
+
+### セルフレビュー結果
+
+- ✅ iOS標準の `contextMenu` を使い、独自gestureや独自メニュー実装を増やさずに長押し操作をNative化した。
+- ✅ destructive actionである削除はcontext menu内でdestructive roleにした。
+- ✅ タップ詳細は `sheet` + `NavigationStack` + 標準toolbar closeで構成した。
+- ✅ Swift Package testsが44件成功した。
+- ✅ Xcode project buildが成功した。
+- ✅ 状態遷移・新用語・DBスキーマ変更はないため、`notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要。
+- ✅ TestFlight配布はまだ行っていないため、Preview OTA / TestFlight配信は不要。
+
+---
+
 ## イテレーション315：Swift通知一覧を追加
 
 ### 背景・問題意識

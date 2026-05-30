@@ -1,7 +1,7 @@
 # 22. Swift Native Migration
 
 最終更新: 2026-05-31
-ステータス: Active draft（iter315）
+ステータス: Active draft（iter316）
 
 ## 目的
 
@@ -120,6 +120,7 @@ tar -xzf /Users/michitaka/Desktop/Megrum_backups/pre-swift-migration-20260531-03
 
 - ホーム、検索、在庫、Wish、個別募集、打診、取引チャットをSwift化する。
 - 取引の状態名は `notes/09_state_machines.md` と完全一致させる。
+- iter316で、在庫/Wish共通グリッドにタップ詳細シートとiOS標準の長押しアクションメニューを追加した。各アクションのDB接続は、該当フローSwift化時に接続する。
 
 ### Phase 4: Meguri core
 
