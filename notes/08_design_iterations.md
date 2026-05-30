@@ -4,6 +4,73 @@
 
 ---
 
+## イテレーション334：Swiftめぐりメッセージ境界を追加
+
+### 背景・問題意識
+
+Swift Native版のグルーム返信は `groom_replies` へ送信できるようになったが、その先のめぐりメッセージ一覧・送信境界がまだNative側に存在しなかった。画面入口を増やす前に、既存DBの `meguri_messages` と `list_meguri_messages_for_viewer` RPCをSwift型、Repository、AppStateへ接続し、後続の通知・グルーム返信・めぐりメッセージ画面を同じ境界で扱えるようにする。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumCore/MegrumModels.swift`
+- `MeguriMessageType`、`MeguriMessage`、`MeguriMessageCreateInput` を追加し、めぐりメッセージをSwift型で扱えるようにした。
+
+#### `ios-native/Sources/MegrumData/SupabaseMeguriMessageClient.swift`
+- `list_meguri_messages_for_viewer` RPCを呼ぶ `loadMessages` を追加した。
+- `meguri_messages` へテキストメッセージをinsertする `sendTextMessage` を追加した。
+- RPCとinsertのrequest builderをテスト可能にした。
+
+#### `ios-native/Sources/MegrumApp/MegrumAppState.swift` / `ios-native/Sources/MegrumApp/SupabaseMegrumRepository.swift`
+- repository境界に `loadMeguriMessages` / `sendMeguriMessage` を追加した。
+- AppStateに `meguriMessages`、`isLoadingMeguriMessages`、`sendingMeguriMessageRecipientID` を追加した。
+- 相手別のメッセージ抽出、空文字・自分宛て・二重送信の防止、送信成功時の一覧反映を追加した。
+
+#### `ios-native/Sources/MegrumApp/NativePreviewData.swift`
+- Preview repositoryで確認できるめぐりメッセージfixtureを追加した。
+
+#### `ios-native/Tests/MegrumDataTests/SupabaseMeguriMessageClientTests.swift`
+- `list_meguri_messages_for_viewer` RPC requestと `meguri_messages` insert requestのURL、HTTP method、payload、selectを検証した。
+
+#### `ios-native/Tests/MegrumAppTests/MegrumAppStateTests.swift`
+- Preview repositoryでめぐりメッセージを読み込み、相手別抽出と送信反映ができることを検証した。
+
+#### `ios-native/README.md` / `notes/22_swift_native_migration.md`
+- Swift NativeめぐりPhaseの進捗として、めぐりメッセージ境界を追記した。
+
+### 影響範囲
+
+- Swift Native版のめぐりメッセージデータ境界
+- Swift Native版の `meguri_messages` 作成境界
+- Swift Native版のめぐりAppState
+- 後続の通知一覧、グルーム返信後導線、めぐりメッセージ画面
+
+### 確認方法
+
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-build --enable-xctest --disable-swift-testing -j 1`
+- `xcodebuild -quiet -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -destination 'generic/platform=iOS Simulator' -derivedDataPath /tmp/megrum-native-xcodebuild CODE_SIGNING_ALLOWED=NO build`
+
+### 関連ファイル
+
+- `ios-native/Sources/MegrumCore/MegrumModels.swift`
+- `ios-native/Sources/MegrumData/SupabaseMeguriMessageClient.swift`
+- `ios-native/Sources/MegrumApp/MegrumAppState.swift`
+- `ios-native/Sources/MegrumApp/SupabaseMegrumRepository.swift`
+- `ios-native/Sources/MegrumApp/NativePreviewData.swift`
+- `ios-native/Tests/MegrumDataTests/SupabaseMeguriMessageClientTests.swift`
+- `ios-native/Tests/MegrumAppTests/MegrumAppStateTests.swift`
+- `ios-native/README.md`
+- `notes/22_swift_native_migration.md`
+- `notes/08_design_iterations.md`
+
+### セルフレビュー結果
+
+- ✅ Swift Package testsが80件成功した。
+- ✅ Xcode project buildが成功した。
+- ✅ 既存の `meguri_messages` とRPCを使うため、新規migrationは追加していない。
+- ✅ `notes/09_state_machines.md` には既にめぐりメッセージのルールがあるため、状態遷移の更新は不要。
+- ✅ 既存用語の範囲内であり、新しい用語や廃止用語は追加していないため、`notes/10_glossary.md` の更新は不要。
+- ✅ DBスキーマ自体は変更していないため、`notes/05_data_model.md` の更新は不要。
+
 ## イテレーション333：Swiftグルーム返信境界を追加
 
 ### 背景・問題意識

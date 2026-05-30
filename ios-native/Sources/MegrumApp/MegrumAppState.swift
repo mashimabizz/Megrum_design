@@ -72,6 +72,8 @@ public protocol MegrumRepository: Sendable {
     func markGroomViewed(postID: UUID) async throws
     func setGroomLiked(postID: UUID, isLiked: Bool) async throws
     func sendGroomReply(_ input: GroomReplyCreateInput) async throws -> GroomReply
+    func loadMeguriMessages() async throws -> [MeguriMessage]
+    func sendMeguriMessage(_ input: MeguriMessageCreateInput) async throws -> MeguriMessage
     func loadBoardThreads(latitude: Double?, longitude: Double?, prefecture: String?, scope: BoardThread.Audience) async throws -> [BoardThread]
     func loadBoardReplies(threadID: UUID, latitude: Double?, longitude: Double?, prefecture: String?, scope: BoardThread.Audience) async throws -> [BoardReply]
     func sendBoardReply(_ input: BoardReplyCreateInput) async throws -> BoardReply
@@ -133,6 +135,14 @@ public extension MegrumRepository {
     func setGroomLiked(postID: UUID, isLiked: Bool) async throws {}
 
     func sendGroomReply(_ input: GroomReplyCreateInput) async throws -> GroomReply {
+        throw MegrumRepositoryError.unsupportedMutation
+    }
+
+    func loadMeguriMessages() async throws -> [MeguriMessage] {
+        []
+    }
+
+    func sendMeguriMessage(_ input: MeguriMessageCreateInput) async throws -> MeguriMessage {
         throw MegrumRepositoryError.unsupportedMutation
     }
 
@@ -312,6 +322,20 @@ public struct PreviewMegrumRepository: MegrumRepository {
         )
     }
 
+    public func loadMeguriMessages() async throws -> [MeguriMessage] {
+        NativePreviewData.meguriMessages
+    }
+
+    public func sendMeguriMessage(_ input: MeguriMessageCreateInput) async throws -> MeguriMessage {
+        MeguriMessage(
+            id: UUID(),
+            senderID: input.senderID,
+            recipientID: input.recipientID,
+            sourceGroomReplyID: input.sourceGroomReplyID,
+            body: input.body
+        )
+    }
+
     public func loadBoardThreads(latitude: Double?, longitude: Double?, prefecture: String?, scope: BoardThread.Audience) async throws -> [BoardThread] {
         NativePreviewData.threads.filter { thread in
             switch scope {
@@ -407,6 +431,7 @@ public final class MegrumAppState: ObservableObject {
     @Published public private(set) var messagesByProposalID: [UUID: [TradeMessage]] = [:]
     @Published public private(set) var boardRepliesByThreadID: [UUID: [BoardReply]] = [:]
     @Published public private(set) var groomRepliesByPostID: [UUID: [GroomReply]] = [:]
+    @Published public private(set) var meguriMessages: [MeguriMessage] = []
     @Published public private(set) var grooms: [GroomPost] = []
     @Published public private(set) var likedGroomIDs: Set<UUID> = []
     @Published public private(set) var threads: [BoardThread] = []
@@ -426,6 +451,7 @@ public final class MegrumAppState: ObservableObject {
     @Published public private(set) var isLoadingBlockedUsers = false
     @Published public private(set) var isLoadingNotifications = false
     @Published public private(set) var isLoadingMeguri = false
+    @Published public private(set) var isLoadingMeguriMessages = false
     @Published public private(set) var isLookingUpPostalCode = false
     @Published public private(set) var isSavingMailingAddress = false
     @Published public private(set) var isCreatingGoodsEntry = false
@@ -435,6 +461,7 @@ public final class MegrumAppState: ObservableObject {
     @Published public private(set) var loadingMessagesProposalID: UUID?
     @Published public private(set) var sendingMessageProposalID: UUID?
     @Published public private(set) var sendingGroomReplyPostID: UUID?
+    @Published public private(set) var sendingMeguriMessageRecipientID: UUID?
     @Published public private(set) var loadingBoardRepliesThreadID: UUID?
     @Published public private(set) var sendingBoardReplyThreadID: UUID?
     @Published public private(set) var unblockingUserID: UUID?
@@ -463,6 +490,12 @@ public final class MegrumAppState: ObservableObject {
 
     public func groomReplies(for postID: UUID) -> [GroomReply] {
         groomRepliesByPostID[postID] ?? []
+    }
+
+    public func meguriMessages(with peerID: UUID) -> [MeguriMessage] {
+        meguriMessages.filter { message in
+            message.senderID == peerID || message.recipientID == peerID
+        }
     }
 
     public func isGroomLiked(_ postID: UUID) -> Bool {
@@ -633,6 +666,63 @@ public final class MegrumAppState: ObservableObject {
         } catch {
             errorMessage = "グルームに返信できませんでした"
             sendingGroomReplyPostID = nil
+            return false
+        }
+    }
+
+    public func loadMeguriMessages() async {
+        guard !isLoadingMeguriMessages else {
+            return
+        }
+
+        isLoadingMeguriMessages = true
+        errorMessage = nil
+        do {
+            meguriMessages = try await repository.loadMeguriMessages()
+        } catch {
+            errorMessage = "めぐりメッセージを読み込めませんでした"
+        }
+        isLoadingMeguriMessages = false
+    }
+
+    public func sendMeguriMessage(
+        recipientID: UUID,
+        body: String,
+        sourceGroomReplyID: UUID? = nil
+    ) async -> Bool {
+        let trimmed = body.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else {
+            return false
+        }
+        guard let viewer else {
+            errorMessage = "プロフィールを確認してから送信してください"
+            return false
+        }
+        guard viewer.id != recipientID else {
+            errorMessage = "自分には送信できません"
+            return false
+        }
+        guard sendingMeguriMessageRecipientID != recipientID else {
+            return false
+        }
+
+        sendingMeguriMessageRecipientID = recipientID
+        errorMessage = nil
+        do {
+            let message = try await repository.sendMeguriMessage(
+                MeguriMessageCreateInput(
+                    senderID: viewer.id,
+                    recipientID: recipientID,
+                    sourceGroomReplyID: sourceGroomReplyID,
+                    body: trimmed
+                )
+            )
+            meguriMessages.append(message)
+            sendingMeguriMessageRecipientID = nil
+            return true
+        } catch {
+            errorMessage = "めぐりメッセージを送信できませんでした"
+            sendingMeguriMessageRecipientID = nil
             return false
         }
     }

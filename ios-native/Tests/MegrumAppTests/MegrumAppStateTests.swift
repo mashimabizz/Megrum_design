@@ -154,6 +154,27 @@ final class MegrumAppStateTests: XCTestCase {
         XCTAssertNil(state.errorMessage)
     }
 
+    func testAppStateLoadsAndSendsPreviewMeguriMessages() async {
+        let state = MegrumAppState(repository: PreviewMegrumRepository())
+        let recipientID = UUID(uuidString: "22222222-2222-2222-2222-222222222222")!
+
+        await state.loadInitialData()
+        await state.loadMeguriMessages()
+
+        XCTAssertEqual(state.meguriMessages.first?.body, "グルーム見ました。会場付近ですか？")
+
+        let sent = await state.sendMeguriMessage(
+            recipientID: recipientID,
+            body: " 近くにいます "
+        )
+
+        XCTAssertTrue(sent)
+        XCTAssertEqual(state.meguriMessages.last?.body, "近くにいます")
+        XCTAssertEqual(state.meguriMessages(with: recipientID).last?.recipientID, recipientID)
+        XCTAssertNil(state.sendingMeguriMessageRecipientID)
+        XCTAssertNil(state.errorMessage)
+    }
+
     func testAppStateCreatesPreviewBoardThreadWithPrefectureOverride() async {
         let state = MegrumAppState(repository: PreviewMegrumRepository())
         await state.loadInitialData()

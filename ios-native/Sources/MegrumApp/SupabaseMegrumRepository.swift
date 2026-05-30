@@ -13,6 +13,7 @@ public struct SupabaseMegrumRepository: MegrumRepository {
     private let proposalClient: SupabaseProposalClient
     private let messageClient: SupabaseMessageClient
     private let groomClient: SupabaseGroomClient
+    private let meguriMessageClient: SupabaseMeguriMessageClient
     private let boardClient: SupabaseBoardClient
     private let viewerID: UUID
 
@@ -27,6 +28,7 @@ public struct SupabaseMegrumRepository: MegrumRepository {
         self.proposalClient = SupabaseProposalClient(client: client)
         self.messageClient = SupabaseMessageClient(client: client)
         self.groomClient = SupabaseGroomClient(client: client)
+        self.meguriMessageClient = SupabaseMeguriMessageClient(client: client)
         self.boardClient = SupabaseBoardClient(client: client)
         self.viewerID = viewerID
     }
@@ -126,6 +128,14 @@ public struct SupabaseMegrumRepository: MegrumRepository {
 
     public func sendGroomReply(_ input: GroomReplyCreateInput) async throws -> GroomReply {
         try await groomClient.sendReply(input)
+    }
+
+    public func loadMeguriMessages() async throws -> [MeguriMessage] {
+        try await meguriMessageClient.loadMessages()
+    }
+
+    public func sendMeguriMessage(_ input: MeguriMessageCreateInput) async throws -> MeguriMessage {
+        try await meguriMessageClient.sendTextMessage(input)
     }
 
     public func loadBoardThreads(

@@ -1,7 +1,7 @@
 # 22. Swift Native Migration
 
 最終更新: 2026-05-31
-ステータス: Active draft（iter333）
+ステータス: Active draft（iter334）
 
 ## 目的
 
@@ -143,6 +143,7 @@ tar -xzf /Users/michitaka/Desktop/Megrum_backups/pre-swift-migration-20260531-03
 - iter331で、Supabase Storageのアップロード/署名URL境界と `groom_posts` 作成境界を追加し、めぐりホームのグルーム横並びからPhotosPickerで投稿できる最小Native導線を追加した。
 - iter332で、`groom_views` と `groom_reactions` のSwift Native更新境界を追加し、グルーム全画面ビューアから閲覧済み登録といいね/取り消しを行えるようにした。
 - iter333で、`groom_replies` 作成と `notifications.kind='groom_reply'` のSwift Native境界を追加し、グルーム全画面ビューアから返信を送れるようにした。
+- iter334で、`list_meguri_messages_for_viewer` RPCと `meguri_messages` text insert境界をSwift Nativeに追加し、めぐりメッセージをAppStateで読み書きできるようにした。
 
 ### Phase 5: Cutover
 

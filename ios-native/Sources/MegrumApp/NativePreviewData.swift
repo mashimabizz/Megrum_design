@@ -205,6 +205,18 @@ enum NativePreviewData {
         ]
     ]
 
+    static let meguriMessages: [MeguriMessage] = [
+        MeguriMessage(
+            id: UUID(uuidString: "00000000-0000-0000-0000-000000000801")!,
+            senderID: partnerID,
+            recipientID: viewerID,
+            messageType: .text,
+            body: "グルーム見ました。会場付近ですか？",
+            senderDisplayName: "まさき",
+            senderHandle: "masaki"
+        )
+    ]
+
     static let grooms: [GroomPost] = [
         GroomPost(
             id: UUID(uuidString: "00000000-0000-0000-0000-000000000501")!,
