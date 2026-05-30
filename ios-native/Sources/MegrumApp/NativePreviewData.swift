@@ -235,4 +235,32 @@ enum NativePreviewData {
             prefecture: "東京都"
         )
     ]
+
+    static let boardReplies: [UUID: [BoardReply]] = [
+        UUID(uuidString: "00000000-0000-0000-0000-000000000601")!: [
+            BoardReply(
+                id: UUID(uuidString: "00000000-0000-0000-0000-000000000701")!,
+                threadID: UUID(uuidString: "00000000-0000-0000-0000-000000000601")!,
+                authorID: partnerID,
+                body: "北口はまだ列が動いています。",
+                createdAt: Date(timeIntervalSince1970: 1_780_170_000)
+            ),
+            BoardReply(
+                id: UUID(uuidString: "00000000-0000-0000-0000-000000000702")!,
+                threadID: UUID(uuidString: "00000000-0000-0000-0000-000000000601")!,
+                authorID: viewerID,
+                body: "ありがとう、広場側で待ちます。",
+                createdAt: Date(timeIntervalSince1970: 1_780_170_180)
+            )
+        ],
+        UUID(uuidString: "00000000-0000-0000-0000-000000000602")!: [
+            BoardReply(
+                id: UUID(uuidString: "00000000-0000-0000-0000-000000000703")!,
+                threadID: UUID(uuidString: "00000000-0000-0000-0000-000000000602")!,
+                authorID: viewerID,
+                body: "会場横の照明がある場所が見つけやすいです。",
+                createdAt: Date(timeIntervalSince1970: 1_780_170_360)
+            )
+        ]
+    ]
 }

@@ -45,6 +45,25 @@ final class MegrumAppStateTests: XCTestCase {
         XCTAssertTrue(state.threads.contains { $0.audience == .nearby3km })
     }
 
+    func testAppStateLoadsAndSendsPreviewBoardReplies() async {
+        let state = MegrumAppState(repository: PreviewMegrumRepository())
+        let threadID = UUID(uuidString: "00000000-0000-0000-0000-000000000601")!
+
+        await state.loadInitialData()
+        await state.loadBoardReplies(threadID: threadID)
+
+        let initialCount = state.boardReplies(for: threadID).count
+        XCTAssertGreaterThan(initialCount, 0)
+
+        let sent = await state.sendBoardReply(threadID: threadID, body: " いま向かいます ")
+
+        XCTAssertTrue(sent)
+        XCTAssertEqual(state.boardReplies(for: threadID).count, initialCount + 1)
+        XCTAssertEqual(state.boardReplies(for: threadID).last?.body, "いま向かいます")
+        XCTAssertFalse(state.isLoadingMeguri)
+        XCTAssertNil(state.sendingBoardReplyThreadID)
+    }
+
     func testAppStateCanReplaceRepositoryAfterAuthChanges() async {
         let state = MegrumAppState(repository: PreviewMegrumRepository())
         let nextViewer = UserProfile(

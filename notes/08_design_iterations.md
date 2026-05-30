@@ -4,6 +4,85 @@
 
 ---
 
+## イテレーション325：Swift掲示板返信境界を追加
+
+### 背景・問題意識
+
+Swift Native版のめぐり掲示板は一覧RPCまで接続できたが、スレッド詳細と返信の読み込み・送信はまだPreview構造に留まっていた。掲示板は取引チャットに近い会話体験として使うため、まず既存DB/RPCに沿った返信境界とNative詳細UIを作り、MapKitや範囲制御の拡張前に会話の基本導線を固める必要がある。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumCore/MegrumModels.swift`
+- `BoardReply` と `BoardReplyCreateInput` を追加し、掲示板返信の本文、作成者、状態、作成日時をSwift型で扱えるようにした。
+
+#### `ios-native/Sources/MegrumData/SupabaseBoardClient.swift`
+- `list_meguri_board_replies_for_viewer` を呼ぶ返信一覧RPC境界を追加した。
+- `append_meguri_board_reply_for_viewer` を呼ぶ返信送信RPC境界を追加した。
+- 位置情報/都道府県/scopeをpayload化し、未指定値はJSON nullとして送るようにした。
+
+#### `ios-native/Sources/MegrumApp/MegrumAppState.swift`
+- `boardRepliesByThreadID`、読み込み中/送信中状態、`loadBoardReplies(...)`、`sendBoardReply(...)` を追加した。
+- Preview repositoryでもスレッド詳細の返信読み込みと送信を確認できるようにした。
+
+#### `ios-native/Sources/MegrumApp/NativePreviewData.swift`
+- Preview用の掲示板返信を追加した。
+
+#### `ios-native/Sources/MegrumApp/SupabaseMegrumRepository.swift`
+- `SupabaseBoardClient` の返信読み込み/送信をrepositoryへ接続した。
+
+#### `ios-native/Sources/MegrumApp/MeguriScreen.swift`
+- 掲示板カードをタップ可能にし、スレッド詳細sheetを開くようにした。
+- 詳細sheetにNativeの返信一覧、吹き出し表示、送信入力欄を追加した。
+- 詳細表示時に対象threadの返信を読み込み、送信成功後に一覧へ即時反映するようにした。
+
+#### `ios-native/Tests/MegrumDataTests/SupabaseBoardClientTests.swift`
+- 掲示板返信一覧RPCと返信送信RPCのrequest/payloadを検証するテストを追加した。
+
+#### `ios-native/Tests/MegrumAppTests/MegrumAppStateTests.swift`
+- Preview repositoryで掲示板返信を読み込み、送信後に状態へ追加されることを検証した。
+
+#### `ios-native/README.md`
+- 掲示板返信RPC境界とめぐりスレッド詳細sheetを追記した。
+
+#### `notes/22_swift_native_migration.md`
+- Swift Native移行のステータスをiter325へ更新し、Phase 4の進捗に掲示板返信境界を追記した。
+
+### 影響範囲
+
+- Swift Native版のめぐり掲示板
+- Swift Native版の掲示板スレッド詳細
+- Swift Native版の掲示板返信読み込み/送信RPC境界
+
+### 確認方法
+
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-build --enable-xctest --disable-swift-testing -j 1`
+- `xcodebuild -quiet -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -destination 'generic/platform=iOS Simulator' -derivedDataPath /tmp/megrum-native-xcodebuild CODE_SIGNING_ALLOWED=NO build`
+
+### 関連ファイル
+
+- `ios-native/Sources/MegrumCore/MegrumModels.swift`
+- `ios-native/Sources/MegrumData/SupabaseBoardClient.swift`
+- `ios-native/Sources/MegrumApp/MegrumAppState.swift`
+- `ios-native/Sources/MegrumApp/NativePreviewData.swift`
+- `ios-native/Sources/MegrumApp/SupabaseMegrumRepository.swift`
+- `ios-native/Sources/MegrumApp/MeguriScreen.swift`
+- `ios-native/Tests/MegrumDataTests/SupabaseBoardClientTests.swift`
+- `ios-native/Tests/MegrumAppTests/MegrumAppStateTests.swift`
+- `ios-native/README.md`
+- `notes/22_swift_native_migration.md`
+- `notes/08_design_iterations.md`
+
+### セルフレビュー結果
+
+- ✅ Swift Package testsが64件成功した。
+- ✅ Xcode project buildが成功した。
+- ✅ 既存RPC/tableをSwift側から呼ぶだけで新規DBスキーマは増やしていないため、`notes/05_data_model.md` の更新は不要。
+- ✅ `BoardReply.Status` は既存の `visible` / `deleted` をSwift型化しただけで状態遷移を増やしていないため、`notes/09_state_machines.md` の更新は不要。
+- ✅ 新しいユーザー向け用語は追加していないため、`notes/10_glossary.md` の更新は不要。
+- ✅ TestFlight配布はまだ行っていないため、Preview OTA / TestFlight配信は不要。
+
+---
+
 ## イテレーション324：SwiftめぐりRPC境界を追加
 
 ### 背景・問題意識

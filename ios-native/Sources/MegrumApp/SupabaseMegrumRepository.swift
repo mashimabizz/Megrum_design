@@ -126,6 +126,26 @@ public struct SupabaseMegrumRepository: MegrumRepository {
         )
     }
 
+    public func loadBoardReplies(
+        threadID: UUID,
+        latitude: Double?,
+        longitude: Double?,
+        prefecture: String?,
+        scope: BoardThread.Audience
+    ) async throws -> [BoardReply] {
+        try await boardClient.loadReplies(
+            threadID: threadID,
+            latitude: latitude,
+            longitude: longitude,
+            prefecture: prefecture,
+            scope: scope
+        )
+    }
+
+    public func sendBoardReply(_ input: BoardReplyCreateInput) async throws -> BoardReply {
+        try await boardClient.appendReply(input)
+    }
+
     public func loadMailingAddress() async throws -> MailingAddress? {
         try await mailingAddressClient.loadAddress(userID: viewerID)
     }

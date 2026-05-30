@@ -25,7 +25,7 @@ The existing Expo / React Native app under `mobile/` remains the rollback source
 - `Sources/MegrumData/SupabaseProposalClient.swift` contains the request layer for loading and creating `proposals`.
 - `Sources/MegrumData/SupabaseMessageClient.swift` contains the request layer for loading and sending trade chat `messages`.
 - `Sources/MegrumData/SupabaseGroomClient.swift` contains the RPC request layer for `list_groom_feed_nearby`.
-- `Sources/MegrumData/SupabaseBoardClient.swift` contains the RPC request layer for `list_meguri_board_threads_for_viewer`.
+- `Sources/MegrumData/SupabaseBoardClient.swift` contains the RPC request layer for board thread lists, board replies, and reply submission.
 - `Sources/MegrumData/SupabaseMailingAddressClient.swift` contains the request layer for reading and upserting `user_mailing_addresses`.
 - `Sources/MegrumData/PostalCodeAddressClient.swift` contains the zipcloud postal code lookup boundary for address autofill.
 - `Sources/MegrumData/SupabaseBlockClient.swift` contains the request layer for listing and deleting `groom_user_blocks`.
@@ -75,7 +75,7 @@ Supabase redirect URLs are handled by `MegrumRootView.onOpenURL`. `SupabaseAuthR
 
 `TradesScreen` splits proposals into "打診中" and "進行中" with a floating native segmented control above the tab bar. Horizontal swipes switch the stage, and tapping a trade card opens a native detail sheet. The detail sheet now loads trade chat messages through `MegrumAppState`, shows native message bubbles, and can send text messages through `SupabaseMessageClient`.
 
-`MeguriScreen` is wired to `MegrumAppState` and can refresh native groom and board lists. Live data loads through the existing location-scoped Supabase RPCs; preview data remains available without Supabase configuration.
+`MeguriScreen` is wired to `MegrumAppState` and can refresh native groom and board lists. Live data loads through the existing location-scoped Supabase RPCs; preview data remains available without Supabase configuration. Tapping a board thread opens a native thread detail sheet with reply bubbles and a reply input backed by the board reply RPC boundary.
 
 For the Xcode app host, use CLI-first verification:
 

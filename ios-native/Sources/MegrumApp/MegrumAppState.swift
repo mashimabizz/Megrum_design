@@ -69,6 +69,8 @@ public protocol MegrumRepository: Sendable {
     func sendMessage(_ input: TradeMessageCreateInput) async throws -> TradeMessage
     func loadGrooms(latitude: Double?, longitude: Double?, radiusMeters: Int) async throws -> [GroomPost]
     func loadBoardThreads(latitude: Double?, longitude: Double?, prefecture: String?, scope: BoardThread.Audience) async throws -> [BoardThread]
+    func loadBoardReplies(threadID: UUID, latitude: Double?, longitude: Double?, prefecture: String?, scope: BoardThread.Audience) async throws -> [BoardReply]
+    func sendBoardReply(_ input: BoardReplyCreateInput) async throws -> BoardReply
     func loadMailingAddress() async throws -> MailingAddress?
     func saveMailingAddress(_ address: MailingAddress) async throws -> MailingAddress
     func lookupAddress(postalCode: String) async throws -> PostalCodeAddress?
@@ -119,6 +121,14 @@ public extension MegrumRepository {
 
     func loadBoardThreads(latitude: Double?, longitude: Double?, prefecture: String?, scope: BoardThread.Audience) async throws -> [BoardThread] {
         []
+    }
+
+    func loadBoardReplies(threadID: UUID, latitude: Double?, longitude: Double?, prefecture: String?, scope: BoardThread.Audience) async throws -> [BoardReply] {
+        []
+    }
+
+    func sendBoardReply(_ input: BoardReplyCreateInput) async throws -> BoardReply {
+        throw MegrumRepositoryError.unsupportedMutation
     }
 
     func loadMailingAddress() async throws -> MailingAddress? {
@@ -269,6 +279,19 @@ public struct PreviewMegrumRepository: MegrumRepository {
         }
     }
 
+    public func loadBoardReplies(threadID: UUID, latitude: Double?, longitude: Double?, prefecture: String?, scope: BoardThread.Audience) async throws -> [BoardReply] {
+        NativePreviewData.boardReplies[threadID] ?? []
+    }
+
+    public func sendBoardReply(_ input: BoardReplyCreateInput) async throws -> BoardReply {
+        BoardReply(
+            id: UUID(),
+            threadID: input.threadID,
+            authorID: NativePreviewData.viewerID,
+            body: input.body.trimmingCharacters(in: .whitespacesAndNewlines)
+        )
+    }
+
     public func loadMailingAddress() async throws -> MailingAddress? {
         NativePreviewData.mailingAddress
     }
@@ -323,6 +346,7 @@ public final class MegrumAppState: ObservableObject {
     @Published public private(set) var wishes: [WishItem] = []
     @Published public private(set) var proposals: [TradeProposal] = []
     @Published public private(set) var messagesByProposalID: [UUID: [TradeMessage]] = [:]
+    @Published public private(set) var boardRepliesByThreadID: [UUID: [BoardReply]] = [:]
     @Published public private(set) var grooms: [GroomPost] = []
     @Published public private(set) var threads: [BoardThread] = []
     @Published public private(set) var oshiGroups: [OshiGroup] = []
@@ -347,6 +371,8 @@ public final class MegrumAppState: ObservableObject {
     @Published public private(set) var isCreatingProposal = false
     @Published public private(set) var loadingMessagesProposalID: UUID?
     @Published public private(set) var sendingMessageProposalID: UUID?
+    @Published public private(set) var loadingBoardRepliesThreadID: UUID?
+    @Published public private(set) var sendingBoardReplyThreadID: UUID?
     @Published public private(set) var unblockingUserID: UUID?
     @Published public private(set) var isMarkingNotificationsRead = false
     @Published public private(set) var isSavingAccountSetup = false
@@ -365,6 +391,10 @@ public final class MegrumAppState: ObservableObject {
 
     public func messages(for proposalID: UUID) -> [TradeMessage] {
         messagesByProposalID[proposalID] ?? []
+    }
+
+    public func boardReplies(for threadID: UUID) -> [BoardReply] {
+        boardRepliesByThreadID[threadID] ?? []
     }
 
     public func loadInitialData() async {
@@ -417,6 +447,62 @@ public final class MegrumAppState: ObservableObject {
             errorMessage = "めぐりを読み込めませんでした"
         }
         isLoadingMeguri = false
+    }
+
+    public func loadBoardReplies(
+        threadID: UUID,
+        latitude: Double? = nil,
+        longitude: Double? = nil,
+        scope: BoardThread.Audience = .nearby3km
+    ) async {
+        guard loadingBoardRepliesThreadID != threadID else {
+            return
+        }
+
+        loadingBoardRepliesThreadID = threadID
+        errorMessage = nil
+        do {
+            boardRepliesByThreadID[threadID] = try await repository.loadBoardReplies(
+                threadID: threadID,
+                latitude: latitude,
+                longitude: longitude,
+                prefecture: viewer?.prefecture,
+                scope: scope
+            )
+        } catch {
+            errorMessage = "掲示板の返信を読み込めませんでした"
+        }
+        loadingBoardRepliesThreadID = nil
+    }
+
+    public func sendBoardReply(threadID: UUID, body: String, scope: BoardThread.Audience = .nearby3km) async -> Bool {
+        let trimmed = body.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else {
+            return false
+        }
+        guard sendingBoardReplyThreadID != threadID else {
+            return false
+        }
+
+        sendingBoardReplyThreadID = threadID
+        errorMessage = nil
+        do {
+            let reply = try await repository.sendBoardReply(
+                BoardReplyCreateInput(
+                    threadID: threadID,
+                    body: trimmed,
+                    prefecture: viewer?.prefecture,
+                    scope: scope
+                )
+            )
+            boardRepliesByThreadID[threadID, default: []].append(reply)
+            sendingBoardReplyThreadID = nil
+            return true
+        } catch {
+            errorMessage = "掲示板に返信できませんでした"
+            sendingBoardReplyThreadID = nil
+            return false
+        }
     }
 
     public func replaceRepository(_ repository: any MegrumRepository) async {
