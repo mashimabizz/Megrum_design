@@ -4,6 +4,75 @@
 
 ---
 
+## イテレーション338：Swift APNs端末登録境界を追加
+
+### 背景・問題意識
+
+Swift Native版の通知一覧、未読処理、モバイル通知ON/OFFは移植済みだが、iOSネイティブの端末通知ではExpo Push TokenではなくAPNs device tokenを扱う。既存Expo版の配送経路を壊さず、Swift Native iOS版だけAPNs tokenを保存できる境界を先に作る。
+
+### 変更内容
+
+#### `supabase/migrations/20260531004000_add_apns_notification_devices.sql`
+- `notification_devices` に `push_provider` と `native_device_token` を追加した。
+- `expo_push_token` をnullableにし、Expo tokenまたはAPNs tokenのどちらかが必ず存在するCHECKへ更新した。
+- `user_id, native_device_token` の重複登録防止indexを追加した。
+- 既存のDBトリガーは `push_provider='expo'` の端末だけへExpo Pushを送るようにし、APNs実配送は後続接続に残した。
+
+#### `ios-native/Sources/MegrumData/SupabaseNotificationClient.swift`
+- APNs tokenを正規化して `notification_devices` へupsertする `registerNativePushDevice` を追加した。
+- APNs tokenの `Data` を16進文字列へ変換する `nativeDeviceTokenString(from:)` を追加した。
+- request builderを追加し、URL、Prefer header、payloadをテスト可能にした。
+
+#### `ios-native/Sources/MegrumApp/MegrumAppState.swift` / `ios-native/Sources/MegrumApp/SupabaseMegrumRepository.swift`
+- repository境界に `registerNativePushDeviceToken` を追加した。
+- AppStateからAPNs token登録を実行できる状態とエラーハンドリングを追加した。
+- Supabase repositoryではviewerIDつきで `SupabaseNotificationClient` へ委譲するようにした。
+
+#### `ios-native/Tests/MegrumDataTests/SupabaseNotificationClientTests.swift`
+- APNs端末登録requestのURL、method、Prefer header、payload、`revoked_at=null` を検証した。
+- APNs tokenのData→16進文字列変換を検証した。
+
+#### `ios-native/Tests/MegrumAppTests/MegrumAppStateTests.swift`
+- AppStateがrepository境界を通じてAPNs token登録を呼び出せることを検証した。
+
+#### `notes/05_data_model.md` / `notes/10_glossary.md` / `ios-native/README.md` / `notes/22_swift_native_migration.md`
+- `notification_devices` のAPNs対応列、用語、Swift移行進捗を追記した。
+
+### 影響範囲
+
+- Swift Native版のモバイル通知端末登録境界
+- Supabase `notification_devices`
+- 後続のAppDelegate / APNs許可 / バッジ同期実装の土台
+- legacy Expo版のExpo Push配送経路
+
+### 確認方法
+
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-build --enable-xctest --disable-swift-testing -j 1`
+- `xcodebuild -quiet -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -destination 'generic/platform=iOS Simulator' -derivedDataPath /tmp/megrum-native-xcodebuild CODE_SIGNING_ALLOWED=NO build`
+
+### 関連ファイル
+
+- `supabase/migrations/20260531004000_add_apns_notification_devices.sql`
+- `ios-native/Sources/MegrumData/SupabaseNotificationClient.swift`
+- `ios-native/Sources/MegrumApp/MegrumAppState.swift`
+- `ios-native/Sources/MegrumApp/SupabaseMegrumRepository.swift`
+- `ios-native/Tests/MegrumDataTests/SupabaseNotificationClientTests.swift`
+- `ios-native/Tests/MegrumAppTests/MegrumAppStateTests.swift`
+- `ios-native/README.md`
+- `notes/05_data_model.md`
+- `notes/10_glossary.md`
+- `notes/22_swift_native_migration.md`
+- `notes/08_design_iterations.md`
+
+### セルフレビュー結果
+
+- ✅ Swift Package testsが88件成功した。
+- ✅ Xcode project buildが成功した。
+- ✅ 既存Expo Push配送は `push_provider='expo'` の行だけを対象にして温存した。
+- ✅ `notification_devices` のAPNs列を `notes/05_data_model.md` に反映した。
+- ✅ 新用語 `APNs device token` を `notes/10_glossary.md` に追加した。
+- ✅ 状態遷移は変えていないため、`notes/09_state_machines.md` の更新は不要。
+
 ## イテレーション337：Swiftモバイル通知設定を追加
 
 ### 背景・問題意識

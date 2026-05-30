@@ -48,7 +48,8 @@
 | **Web管理画面** | Web版、運用画面 | `web/` で実装する Next.js 版 Megrum。通常ユーザー向けWeb版ではなく、管理者・運用・サポート確認用途を主対象にする | iter168.63 |
 | **Swift Native iOS版** | iOSネイティブ版、Swift版 | `ios-native/` で実装する Swift / SwiftUI / UIKit 版 Megrum。iter299以降のユーザー向けiOS体験の主対象で、Apple標準の遷移・通知・地図・カメラ・Liquid Glass表現を担う | iter299 |
 | **legacy Expo版** | 旧iOSアプリ版、React Native版、Expo版 | `mobile/` で実装されている移行元アプリ。Swift Native版が機能同等になるまで、バックアップ・仕様参照・緊急修正の対象として残す | iter168.63, iter299 |
-| **モバイル通知** | push notification, 端末通知 | iOS/Android端末に届くMegrumの通知。`notification_devices` にExpo Push Tokenを登録し、`notifications` の新規行を端末へ配送する | iter276 |
+| **モバイル通知** | push notification, 端末通知 | iOS/Android端末に届くMegrumの通知。Expo版はExpo Push Token、Swift Native iOS版はAPNs device tokenを `notification_devices` に登録し、`notifications` の新規行を端末へ配送する | iter276, iter338 |
+| **APNs device token** | native device token, APNsトークン | Swift Native iOS版がApple Push Notification serviceから受け取る端末トークン。`notification_devices.push_provider='apns'` / `native_device_token` に保存する | iter338 |
 | **通知一覧** | notification center | アプリ内で受信通知を確認する一覧。未読/既読を `notifications.read_at` で管理し、通知タップで対象画面へ遷移する | iter92, iter276 |
 | **通知バッジ** | unread badge | 未読通知数を示す小さな件数表示。左ドロワーの「通知」項目やアプリアイコンバッジで使う | iter276 |
 | **共通ロジック** | shared core | Web/iOSで挙動を揃えるため `packages/core/` に切り出す状態判定・マッチング優先度・市場残数などの処理 | iter154.75 |

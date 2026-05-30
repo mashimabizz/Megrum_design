@@ -67,6 +67,39 @@ final class SupabaseNotificationClientTests: XCTestCase {
         XCTAssertEqual(payload["push_enabled"] as? Bool, false)
     }
 
+    func testBuildsRegisterNativePushDeviceRequest() throws {
+        let client = SupabaseNotificationClient(configuration: configuration)
+        let userID = UUID(uuidString: "11111111-1111-1111-1111-111111111111")!
+        let seenAt = Date(timeIntervalSince1970: 1_779_900_000)
+
+        let request = try client.makeRegisterNativePushDeviceRequest(
+            userID: userID,
+            deviceToken: " <AA BB cc> ",
+            appVersion: " 0.1.0 ",
+            seenAt: seenAt
+        )
+        let body = try XCTUnwrap(request.httpBody)
+        let rows = try XCTUnwrap(JSONSerialization.jsonObject(with: body) as? [[String: Any]])
+        let payload = try XCTUnwrap(rows.first)
+
+        XCTAssertEqual(request.url?.absoluteString, "https://example.supabase.co/rest/v1/notification_devices?select=id&on_conflict=user_id,native_device_token")
+        XCTAssertEqual(request.httpMethod, "POST")
+        XCTAssertEqual(request.value(forHTTPHeaderField: "Prefer"), "resolution=merge-duplicates,return=representation")
+        XCTAssertEqual(payload["user_id"] as? String, userID.uuidString.lowercased())
+        XCTAssertEqual(payload["platform"] as? String, "ios")
+        XCTAssertEqual(payload["push_provider"] as? String, "apns")
+        XCTAssertEqual(payload["native_device_token"] as? String, "aabbcc")
+        XCTAssertEqual(payload["app_version"] as? String, "0.1.0")
+        XCTAssertEqual(payload["last_seen_at"] as? String, "2026-05-27T16:40:00Z")
+        XCTAssertTrue(payload["revoked_at"] is NSNull)
+    }
+
+    func testFormatsNativeDeviceTokenData() {
+        let data = Data([0x00, 0x0f, 0xab, 0xff])
+
+        XCTAssertEqual(SupabaseNotificationClient.nativeDeviceTokenString(from: data), "000fabff")
+    }
+
     private var configuration: SupabaseConfiguration {
         SupabaseConfiguration(
             projectURL: URL(string: "https://example.supabase.co")!,

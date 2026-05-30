@@ -491,6 +491,21 @@ final class MegrumAppStateTests: XCTestCase {
         XCTAssertNil(state.errorMessage)
     }
 
+    func testAppStateRegistersNativePushDeviceTokenThroughRepository() async {
+        let repository = PushDeviceRecordingRepository()
+        let state = MegrumAppState(repository: repository)
+
+        let registered = await state.registerNativePushDeviceToken(" apns-device-token ", appVersion: "0.1.0")
+
+        XCTAssertTrue(registered)
+        XCTAssertFalse(state.isRegisteringNativePushDevice)
+        XCTAssertNil(state.errorMessage)
+
+        let registrations = await repository.registrationsSnapshot()
+        XCTAssertEqual(registrations.first?.token, "apns-device-token")
+        XCTAssertEqual(registrations.first?.appVersion, "0.1.0")
+    }
+
     func testAuthStateSignsInThroughRepository() async {
         let state = MegrumAuthState(repository: StubAuthRepository())
 
@@ -605,6 +620,38 @@ private struct SingleSnapshotRepository: MegrumRepository {
             threads: []
         )
     }
+}
+
+private actor PushDeviceRecordingRepository: MegrumRepository {
+    private var registrations: [PushDeviceRegistration] = []
+
+    func loadInitialSnapshot() async throws -> MegrumAppSnapshot {
+        MegrumAppSnapshot(
+            viewer: UserProfile(
+                id: NativePreviewIDs.viewerID,
+                handle: "michilion",
+                displayName: "みちりおん"
+            ),
+            inventory: [],
+            wishes: [],
+            proposals: [],
+            grooms: [],
+            threads: []
+        )
+    }
+
+    func registerNativePushDeviceToken(_ token: String, appVersion: String?) async throws {
+        registrations.append(PushDeviceRegistration(token: token, appVersion: appVersion))
+    }
+
+    func registrationsSnapshot() -> [PushDeviceRegistration] {
+        registrations
+    }
+}
+
+private struct PushDeviceRegistration: Equatable, Sendable {
+    var token: String
+    var appVersion: String?
 }
 
 private enum NativePreviewIDs {

@@ -89,6 +89,7 @@ public protocol MegrumRepository: Sendable {
     func markAllNotificationsRead() async throws -> [MegrumNotification]
     func loadPushNotificationsEnabled() async throws -> Bool
     func setPushNotificationsEnabled(_ enabled: Bool) async throws -> Bool
+    func registerNativePushDeviceToken(_ token: String, appVersion: String?) async throws
     func completeAccountSetup(_ input: AccountSetupInput) async throws -> UserProfile
 }
 
@@ -206,6 +207,8 @@ public extension MegrumRepository {
     func setPushNotificationsEnabled(_ enabled: Bool) async throws -> Bool {
         enabled
     }
+
+    func registerNativePushDeviceToken(_ token: String, appVersion: String?) async throws {}
 
     func completeAccountSetup(_ input: AccountSetupInput) async throws -> UserProfile {
         throw MegrumRepositoryError.unsupportedMutation
@@ -454,6 +457,8 @@ public struct PreviewMegrumRepository: MegrumRepository {
     public func setPushNotificationsEnabled(_ enabled: Bool) async throws -> Bool {
         enabled
     }
+
+    public func registerNativePushDeviceToken(_ token: String, appVersion: String?) async throws {}
 }
 
 @MainActor
@@ -486,6 +491,7 @@ public final class MegrumAppState: ObservableObject {
     @Published public private(set) var isLoadingBlockedUsers = false
     @Published public private(set) var isLoadingNotifications = false
     @Published public private(set) var isLoadingPushNotificationSetting = false
+    @Published public private(set) var isRegisteringNativePushDevice = false
     @Published public private(set) var isLoadingMeguri = false
     @Published public private(set) var isLoadingMeguriMessages = false
     @Published public private(set) var isLookingUpPostalCode = false
@@ -1330,6 +1336,29 @@ public final class MegrumAppState: ObservableObject {
             pushNotificationsEnabled = previous
             errorMessage = "モバイル通知設定を保存できませんでした"
             isSavingPushNotificationSetting = false
+            return false
+        }
+    }
+
+    @discardableResult
+    public func registerNativePushDeviceToken(_ token: String, appVersion: String? = nil) async -> Bool {
+        let trimmedToken = token.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedToken.isEmpty else {
+            return false
+        }
+        guard !isRegisteringNativePushDevice else {
+            return false
+        }
+
+        isRegisteringNativePushDevice = true
+        errorMessage = nil
+        do {
+            try await repository.registerNativePushDeviceToken(trimmedToken, appVersion: appVersion)
+            isRegisteringNativePushDevice = false
+            return true
+        } catch {
+            errorMessage = "モバイル通知の端末登録に失敗しました"
+            isRegisteringNativePushDevice = false
             return false
         }
     }

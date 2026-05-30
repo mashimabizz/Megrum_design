@@ -220,6 +220,14 @@ public struct SupabaseMegrumRepository: MegrumRepository {
         try await notificationClient.setPushNotificationsEnabled(userID: viewerID, enabled: enabled)
     }
 
+    public func registerNativePushDeviceToken(_ token: String, appVersion: String?) async throws {
+        _ = try await notificationClient.registerNativePushDevice(
+            userID: viewerID,
+            deviceToken: token,
+            appVersion: appVersion
+        )
+    }
+
     public func completeAccountSetup(_ input: AccountSetupInput) async throws -> UserProfile {
         let selections = input.oshiSelections.map { selection in
             UserOshiSelection(

@@ -70,6 +70,33 @@ public final class SupabaseNotificationClient: @unchecked Sendable {
         return rows.first?.pushEnabled ?? enabled
     }
 
+    @discardableResult
+    public func registerNativePushDevice(
+        userID: UUID,
+        deviceToken: String,
+        appVersion: String? = nil,
+        seenAt: Date = .now
+    ) async throws -> UUID? {
+        let rows: [NotificationDeviceRow] = try await client.upsertRows(
+            into: "notification_devices",
+            values: [
+                NativePushDevicePayload(
+                    userID: userID,
+                    deviceToken: deviceToken,
+                    appVersion: appVersion,
+                    seenAt: seenAt
+                )
+            ],
+            select: NotificationDeviceRow.select,
+            onConflict: "user_id,native_device_token"
+        )
+        return rows.first?.id
+    }
+
+    public static func nativeDeviceTokenString(from data: Data) -> String {
+        data.map { String(format: "%02x", $0) }.joined()
+    }
+
     public func makeLoadNotificationsRequest(userID: UUID, limit: Int = 100) throws -> URLRequest {
         try client.makeRequest(
             path: "/rest/v1/notifications",
@@ -122,6 +149,27 @@ public final class SupabaseNotificationClient: @unchecked Sendable {
             values: [NotificationSettingPayload(userID: userID, pushEnabled: enabled)],
             select: NotificationSettingRow.select,
             onConflict: "user_id"
+        )
+    }
+
+    public func makeRegisterNativePushDeviceRequest(
+        userID: UUID,
+        deviceToken: String,
+        appVersion: String? = nil,
+        seenAt: Date = .now
+    ) throws -> URLRequest {
+        try client.makeUpsertRequest(
+            into: "notification_devices",
+            values: [
+                NativePushDevicePayload(
+                    userID: userID,
+                    deviceToken: deviceToken,
+                    appVersion: appVersion,
+                    seenAt: seenAt
+                )
+            ],
+            select: NotificationDeviceRow.select,
+            onConflict: "user_id,native_device_token"
         )
     }
 
@@ -199,6 +247,64 @@ private struct NotificationSettingPayload: Encodable, Sendable {
     var pushEnabled: Bool
 }
 
+private struct NotificationDeviceRow: Decodable, Sendable {
+    static let select = "id"
+    var id: UUID
+}
+
+private struct NativePushDevicePayload: Encodable, Sendable {
+    var userID: UUID
+    var platform: String
+    var pushProvider: String
+    var nativeDeviceToken: String
+    var appVersion: String?
+    var lastSeenAt: String
+
+    init(userID: UUID, deviceToken: String, appVersion: String?, seenAt: Date) {
+        self.userID = userID
+        self.platform = "ios"
+        self.pushProvider = "apns"
+        self.nativeDeviceToken = deviceToken.normalizedNativeDeviceToken
+        self.appVersion = appVersion?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfBlank
+        self.lastSeenAt = isoTimestamp(seenAt)
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case userID
+        case platform
+        case pushProvider
+        case nativeDeviceToken
+        case appVersion
+        case lastSeenAt
+        case revokedAt
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(userID, forKey: .userID)
+        try container.encode(platform, forKey: .platform)
+        try container.encode(pushProvider, forKey: .pushProvider)
+        try container.encode(nativeDeviceToken, forKey: .nativeDeviceToken)
+        try container.encodeIfPresent(appVersion, forKey: .appVersion)
+        try container.encode(lastSeenAt, forKey: .lastSeenAt)
+        try container.encodeNil(forKey: .revokedAt)
+    }
+}
+
 private func isoTimestamp(_ date: Date) -> String {
     ISO8601DateFormatter().string(from: date)
+}
+
+private extension String {
+    var normalizedNativeDeviceToken: String {
+        trimmingCharacters(in: .whitespacesAndNewlines)
+            .replacingOccurrences(of: " ", with: "")
+            .replacingOccurrences(of: "<", with: "")
+            .replacingOccurrences(of: ">", with: "")
+            .lowercased()
+    }
+
+    var nilIfBlank: String? {
+        isEmpty ? nil : self
+    }
 }

@@ -3,8 +3,8 @@
 > **目的**：Megrum の全エンティティのDBスキーマ設計と、状態・マッチング・取引のデータフロー定義。
 > 実装の正解集。`09_state_machines.md` と完全に整合させ、`10_glossary.md` の用語を使う。
 
-最終更新: 2026-05-30
-ステータス: Draft v2.28（iter278 セキュリティ監査とRLS強化を追加）
+最終更新: 2026-05-31
+ステータス: Draft v2.29（iter338 APNs端末登録境界を追加）
 
 ## 最新化履歴
 
@@ -40,6 +40,7 @@
 | **v2.26** | **2026-05-30** | **iter188 反映（`list_meguri_board_threads_for_viewer()` に `viewer_participated` を追加。スレッド作成者または可視返信済みユーザーを参加中として返す）** |
 | **v2.27** | **2026-05-30** | **iter276 反映（`notification_devices` と `user_notification_settings.push_enabled` を追加し、`notifications` INSERTからExpo Pushへ配送する）** |
 | **v2.28** | **2026-05-30** | **iter278 反映（公開プロフィール列制限、削除済み/停止中ユーザー非公開、AW匿名読み取り停止、所有者更新系RLSの `WITH CHECK` 追加）** |
+| **v2.29** | **2026-05-31** | **iter338 反映（Swift Native iOS版のAPNs device token保存用に `notification_devices.push_provider` / `native_device_token` を追加）** |
 | **v2.20** | **2026-05-29** | **iter168.90 反映（`search_query_logs` と人気検索RPCを追加。検索結果はマッチ分類つきグッズパネルで表示）** |
 | **v2.21** | **2026-05-30** | **iter168.97 反映（`schedules.place_name` 追加。合意時に `both` を単一手段へ固定し、現地交換の複数候補は1件へ固定する運用を追記）** |
 
@@ -209,7 +210,7 @@ RLS / 権限（iter278）：
 | `read_at` | timestamptz nullable | nullなら未読 |
 | `created_at` | timestamptz | |
 
-iter276以降、`notifications` に行が追加されると、`notification_devices` の有効トークンへExpo Pushを送るDBトリガーが動く。
+iter276以降、`notifications` に行が追加されると、`notification_devices` の有効トークンへExpo Pushを送るDBトリガーが動く。iter338時点ではSwift Native iOS版のAPNs token保存までを追加し、APNs配送ワーカー/Edge Functionは後続で接続する。
 
 ### `user_notification_settings`（通知設定 / iter93, iter276）
 
@@ -222,20 +223,22 @@ iter276以降、`notifications` に行が追加されると、`notification_devi
 
 アプリ内通知一覧は常時残る。`push_enabled=false` の場合は端末通知だけを止める。
 
-### `notification_devices`（モバイル通知端末 / iter276）
+### `notification_devices`（モバイル通知端末 / iter276, iter338）
 
 | カラム | 型 | 説明 |
 |---|---|---|
 | `id` | uuid | PK |
 | `user_id` | uuid | → auth.users |
 | `platform` | text | `ios` / `android` / `web` |
-| `expo_push_token` | text | Expo Push Token |
+| `push_provider` | text | `expo` / `apns`。Expo版はExpo Push、Swift Native iOS版はAPNs |
+| `expo_push_token` | text nullable | Expo Push Token。Expo版の配送先 |
+| `native_device_token` | text nullable | APNs device token。Swift Native iOS版の配送先 |
 | `app_version` | text nullable | 登録時のアプリバージョン |
 | `last_seen_at` | timestamptz | 最終登録/更新時刻 |
 | `revoked_at` | timestamptz nullable | ログアウト等で無効化した時刻 |
 | `created_at` / `updated_at` | timestamptz | |
 
-`unique(user_id, expo_push_token)` で同一ユーザー・同一端末の重複登録を防ぐ。`revoked_at is null` の端末だけが配送対象。
+`unique(user_id, expo_push_token)` と `unique(user_id, native_device_token) where native_device_token is not null` で同一ユーザー・同一端末の重複登録を防ぐ。`revoked_at is null` の端末だけが配送対象。既存DBトリガーは `push_provider='expo'` の行だけをExpo Pushへ送るため、APNs配送は後続のSwift Native通知Phaseで追加する。
 
 ### `user_oshi`（推し登録）
 
