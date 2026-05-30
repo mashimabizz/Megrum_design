@@ -4,6 +4,53 @@
 
 ---
 
+## イテレーション250：掲示板一覧の並び替えチップを横スクロール化する
+
+### 背景・問題意識
+
+スポット掲示板の一覧には、更新順、新着、人気、保存、通知、参加中、下書き、自分、未読など複数の並び替え・表示モードがある。これらを1行に均等配置すると、端末幅によって文字が潰れやすく、一般的な掲示板のフィルタとして使いづらい。横スクロールのチップ列にして、各ボタンの読みやすさを優先した。
+
+### 変更内容
+
+#### `mobile/app/meguri-board.tsx`
+- 並び替えボタン列を `View` から横スクロール `ScrollView` に変更した。
+- `sortButton` の `flex: 1` を外し、最小幅と横余白を持つチップとして表示するようにした。
+- `sortRail` に gap と右余白を追加し、件数バッジつきのボタンでも窮屈に見えないようにした。
+
+#### `notes/09_state_machines.md`
+- Meguri Board Lifecycle に一覧並び替えチップ横スクロールの表示ルールを追記した。
+
+#### `notes/10_glossary.md`
+- 掲示板一覧並び替えチップを追加した。
+
+### 影響範囲
+
+- iOS版 スポット掲示板一覧
+- 並び替え/表示モードの切り替え
+- 保存・通知・未読などの件数バッジ表示
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- `EAS_UPDATE_PROJECT_SLUG=ihub EXPO_NO_GIT_STATUS=1 npm --prefix mobile run update:ios:preview -- --message "[iter250] make board sort chips scrollable" --non-interactive`
+- Preview OTA: Update group ID `0729cd3b-7e4b-4702-a806-d090b122377b` / iOS update ID `019e7649-00a2-7a0e-a1e7-d206c468a389`
+
+### 関連ファイル
+
+- `mobile/app/meguri-board.tsx`
+- `notes/08_design_iterations.md`
+- `notes/09_state_machines.md`
+- `notes/10_glossary.md`
+
+### セルフレビュー結果
+
+- ✅ 既存の並び替えロジックは変えず、操作面の読みやすさだけを改善した。
+- ✅ 件数バッジがある表示モードでも文字と重なりにくい固定幅チップにした。
+- ✅ DB変更なし、ネイティブ依存追加なしでPreview OTA対象内に収めた。
+
+---
+
 ## イテレーション249：掲示板一覧で作成・更新・返信時刻を見分けられるようにする
 
 ### 背景・問題意識

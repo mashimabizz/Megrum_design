@@ -825,7 +825,11 @@ export default function MeguriBoardScreen() {
             ))}
           </ScrollView>
 
-          <View style={styles.sortRail}>
+          <ScrollView
+            horizontal
+            contentContainerStyle={styles.sortRail}
+            showsHorizontalScrollIndicator={false}
+          >
             {MEGURI_BOARD_SORT_OPTIONS.map((sort) => (
               (() => {
                 const active = sortMode === sort;
@@ -852,7 +856,7 @@ export default function MeguriBoardScreen() {
                 );
               })()
             ))}
-          </View>
+          </ScrollView>
 
           <Pressable
             accessibilityRole="button"
@@ -1621,14 +1625,17 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(58,50,74,0.07)",
     borderRadius: 999,
     flexDirection: "row",
+    gap: 4,
     padding: 4,
+    paddingRight: 18,
   },
   sortButton: {
     alignItems: "center",
     borderRadius: 999,
-    flex: 1,
     justifyContent: "center",
+    minWidth: 68,
     minHeight: 34,
+    paddingHorizontal: 12,
     paddingVertical: 8,
   },
   sortButtonActive: {
