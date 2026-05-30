@@ -1,7 +1,7 @@
 # 22. Swift Native Migration
 
 最終更新: 2026-05-31
-ステータス: Active draft（iter299）
+ステータス: Active draft（iter301）
 
 ## 目的
 
@@ -90,7 +90,7 @@ tar -xzf /Users/michitaka/Desktop/Megrum_backups/pre-swift-migration-20260531-03
 
 ### Phase 1: App shell
 
-- SwiftUI App project / targetを追加する。
+- `ios-native/MegrumNative.xcodeproj` と `App/MegrumNativeApp.swift` でSwiftUI App hostを追加済み。
 - Swift Package側では `MegrumApp` にRootView、TabView、主要タブ画面の骨格を置く。
 - Bundle IDは最初は比較用Previewを分け、最終的に本番IDへ寄せる。
 - TabView / NavigationStack / deep link / auth restore / app lifecycleを組む。

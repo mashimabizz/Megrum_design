@@ -7,6 +7,8 @@ The existing Expo / React Native app under `mobile/` remains the rollback source
 ## Current Contents
 
 - `Package.swift` defines the first native Swift package.
+- `MegrumNative.xcodeproj` contains the first buildable iOS app host for the Swift version.
+- `App/MegrumNativeApp.swift` is the app entry point and mounts `MegrumRootView`.
 - `Sources/MegrumCore` contains portable domain models that mirror the current Supabase-backed product concepts.
 - `Sources/MegrumDesign` contains native SwiftUI design primitives, starting with a Liquid Glass-style search button.
 - `Sources/MegrumApp` contains the SwiftUI app shell and first native screens for Home, Search, Inventory, Wish, Trades, and Meguri.
@@ -21,11 +23,11 @@ swift build --package-path ios-native
 swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-build --enable-xctest --disable-swift-testing -j 1
 ```
 
-When the Xcode app shell is added, use CLI-first verification:
+For the Xcode app host, use CLI-first verification:
 
 ```bash
 xcodebuild -list -project ios-native/MegrumNative.xcodeproj
-xcodebuild -scheme MegrumNative -destination 'platform=iOS Simulator,name=iPhone 16' build
+xcodebuild -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -destination 'generic/platform=iOS Simulator' -derivedDataPath /tmp/megrum-native-xcodebuild CODE_SIGNING_ALLOWED=NO build
 ```
 
 ## Migration Rule

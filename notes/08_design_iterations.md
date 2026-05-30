@@ -4,6 +4,63 @@
 
 ---
 
+## イテレーション301：Xcode App Hostを追加
+
+### 背景・問題意識
+
+iter300でSwiftUIのRootViewと主要タブ画面をSwift Package側に作ったが、そのままではTestFlightや実機検証へ進めるアプリバイナリにならない。Swift Native移行を継続するため、Xcodeで開けてSimulator向けにbuildできる最小のiOS App Hostを用意する必要があった。
+
+### 変更内容
+
+#### `ios-native/App/MegrumNativeApp.swift`
+- Swift版の `@main` App entry pointを追加し、`MegrumApp.MegrumRootView` を起動する構成にした。
+
+#### `ios-native/MegrumNative.xcodeproj/`
+- `MegrumNative` iOS app targetを追加した。
+- local Swift Packageとして `ios-native/Package.swift` を参照し、`MegrumApp` productをアプリターゲットへリンクした。
+- shared scheme `MegrumNative` を追加し、XcodeとCLIの両方から同じschemeでbuildできるようにした。
+- Bundle IDは比較用Previewとして `tokyo.megrum.native.preview` にした。
+
+#### `ios-native/README.md`
+- Xcode App Hostの役割と `xcodebuild` 検証コマンドを追記した。
+
+#### `notes/22_swift_native_migration.md`
+- Phase 1の進捗として、Xcode App Host追加済みであることを追記した。
+
+### 影響範囲
+
+- Swift Native iOS版の起動入口
+- 今後のSimulator / 実機 / TestFlight検証ライン
+- Swift Packageで作った `MegrumApp` 画面群の表示先
+
+### 確認方法
+
+- `xcodebuild -list -project ios-native/MegrumNative.xcodeproj`
+- `xcodebuild -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -destination 'generic/platform=iOS Simulator' -derivedDataPath /tmp/megrum-native-xcodebuild CODE_SIGNING_ALLOWED=NO build`
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-build --enable-xctest --disable-swift-testing -j 1`
+- `git diff --check -- ios-native/App ios-native/MegrumNative.xcodeproj ios-native/README.md notes/22_swift_native_migration.md notes/08_design_iterations.md`
+
+### 関連ファイル
+
+- `ios-native/App/MegrumNativeApp.swift`
+- `ios-native/MegrumNative.xcodeproj/project.pbxproj`
+- `ios-native/MegrumNative.xcodeproj/project.xcworkspace/contents.xcworkspacedata`
+- `ios-native/MegrumNative.xcodeproj/xcshareddata/xcschemes/MegrumNative.xcscheme`
+- `ios-native/README.md`
+- `notes/22_swift_native_migration.md`
+- `notes/08_design_iterations.md`
+
+### セルフレビュー結果
+
+- ✅ Xcodeが `MegrumNative` target / schemeを認識することを確認した。
+- ✅ Simulator向け `xcodebuild` が成功し、Swift版がアプリバイナリとしてbuild可能になった。
+- ✅ Swift Package側の既存テストも引き続き成功することを確認した。
+- ✅ 既存 `mobile/` は触らず、Swift版の新規作業場だけに閉じて進めた。
+- ✅ 状態遷移・用語・DBスキーマ変更はないため、`notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要。
+- ✅ TestFlight配布はまだ行っていないため、Preview OTA / TestFlight配信は不要。
+
+---
+
 ## イテレーション300：SwiftUIアプリシェルを追加
 
 ### 背景・問題意識
