@@ -13,13 +13,15 @@ struct MegrumNativeApp: App {
     @UIApplicationDelegateAdaptor(NativePushAppDelegate.self) private var appDelegate
     @State private var didRequestNativePushAuthorization = false
     @State private var pendingNativePushToken: String?
+    @State private var notificationDestinationTab: MegrumTab?
     #endif
 
     var body: some Scene {
         WindowGroup {
             MegrumRootView(
                 appState: appState,
-                authState: authState
+                authState: authState,
+                notificationDestinationTab: $notificationDestinationTab
             )
             #if os(iOS)
             .task {
@@ -43,6 +45,24 @@ struct MegrumNativeApp: App {
                 pendingNativePushToken = token
                 Task {
                     await registerPendingNativePushToken()
+                }
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .megrumNativeNotificationResponseDidReceive)) { notification in
+                let linkPath = notification.userInfo?[NativePushAppDelegate.linkPathUserInfoKey] as? String
+                notificationDestinationTab = MegrumTab(notificationLinkPath: linkPath) ?? .home
+
+                guard
+                    let notificationIDString = notification.userInfo?[NativePushAppDelegate.notificationIDUserInfoKey] as? String,
+                    let notificationID = UUID(uuidString: notificationIDString)
+                else {
+                    return
+                }
+
+                Task {
+                    if appState.notifications.isEmpty {
+                        await appState.loadNotifications()
+                    }
+                    await appState.markNotificationRead(notificationID)
                 }
             }
             #endif
@@ -98,7 +118,9 @@ struct MegrumNativeApp: App {
 
 #if os(iOS)
 private final class NativePushAppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDelegate {
-    static let deviceTokenUserInfoKey = "deviceToken"
+    nonisolated static let deviceTokenUserInfoKey = "deviceToken"
+    nonisolated static let linkPathUserInfoKey = "linkPath"
+    nonisolated static let notificationIDUserInfoKey = "notificationID"
 
     func application(
         _ application: UIApplication,
@@ -136,9 +158,31 @@ private final class NativePushAppDelegate: NSObject, UIApplicationDelegate, UNUs
     ) async -> UNNotificationPresentationOptions {
         [.banner, .sound, .badge]
     }
+
+    nonisolated func userNotificationCenter(
+        _ center: UNUserNotificationCenter,
+        didReceive response: UNNotificationResponse
+    ) async {
+        let userInfo = response.notification.request.content.userInfo
+        var routedUserInfo: [String: String] = [:]
+
+        if let linkPath = userInfo["linkPath"] as? String ?? userInfo["link_path"] as? String {
+            routedUserInfo[Self.linkPathUserInfoKey] = linkPath
+        }
+        if let notificationID = userInfo["notificationId"] as? String ?? userInfo["notification_id"] as? String {
+            routedUserInfo[Self.notificationIDUserInfoKey] = notificationID
+        }
+
+        NotificationCenter.default.post(
+            name: .megrumNativeNotificationResponseDidReceive,
+            object: nil,
+            userInfo: routedUserInfo
+        )
+    }
 }
 
 private extension Notification.Name {
     static let megrumNativeAPNsTokenDidUpdate = Notification.Name("megrumNativeAPNsTokenDidUpdate")
+    static let megrumNativeNotificationResponseDidReceive = Notification.Name("megrumNativeNotificationResponseDidReceive")
 }
 #endif

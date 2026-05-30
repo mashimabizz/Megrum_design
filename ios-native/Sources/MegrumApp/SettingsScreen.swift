@@ -586,7 +586,7 @@ private extension MegrumNotificationKind {
     }
 }
 
-private extension MegrumTab {
+public extension MegrumTab {
     init?(notificationLinkPath: String?) {
         guard let linkPath = notificationLinkPath?.lowercased(), !linkPath.isEmpty else {
             return nil

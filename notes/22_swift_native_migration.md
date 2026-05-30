@@ -117,6 +117,7 @@ tar -xzf /Users/michitaka/Desktop/Megrum_backups/pre-swift-migration-20260531-03
 - iter337で、設定一覧にモバイル通知の標準Toggleを追加し、`user_notification_settings.push_enabled` の読み込み/upsert境界をSwift版へ移植した。
 - iter338で、Swift Native iOS版のAPNs device tokenを `notification_devices.push_provider='apns'` / `native_device_token` へupsertする境界を追加した。APNs実配送は後続で接続する。
 - iter339で、XcodeアプリホストにiOS標準の通知許可リクエスト、APNs登録、device tokenをAppStateへ渡すdelegate bridgeを追加した。
+- iter340で、端末通知タップ時の `linkPath` を既存通知一覧と同じ規則でNativeタブへ変換し、該当カテゴリへ移れるbridgeを追加した。
 - 現時点のAuthはApple/Google OAuthまでは未完了。次のPhase 2作業でApple/Googleへ広げる。
 
 ### Phase 3: Exchange core

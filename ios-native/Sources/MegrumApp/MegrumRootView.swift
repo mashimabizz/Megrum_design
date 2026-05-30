@@ -49,16 +49,19 @@ public struct MegrumRootView: View {
     @State private var selectedTab: MegrumTab = .home
     @State private var showsSearch = false
     @State private var showsSettings = false
+    @Binding private var notificationDestinationTab: MegrumTab?
 
     public init(
         appState: MegrumAppState = MegrumAppState(),
         authState: MegrumAuthState = MegrumAuthState(
             repository: PreviewMegrumAuthRepository(),
             initialSession: PreviewMegrumAuthRepository.previewSession()
-        )
+        ),
+        notificationDestinationTab: Binding<MegrumTab?> = .constant(nil)
     ) {
         _appState = StateObject(wrappedValue: appState)
         _authState = StateObject(wrappedValue: authState)
+        _notificationDestinationTab = notificationDestinationTab
     }
 
     public var body: some View {
@@ -73,6 +76,13 @@ public struct MegrumRootView: View {
             Task {
                 await authState.handleOpenURL(url)
             }
+        }
+        .onChange(of: notificationDestinationTab) { _, destination in
+            guard let destination else {
+                return
+            }
+            selectedTab = destination
+            notificationDestinationTab = nil
         }
     }
 

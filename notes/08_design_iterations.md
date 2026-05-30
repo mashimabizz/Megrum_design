@@ -4,6 +4,59 @@
 
 ---
 
+## イテレーション340：Swift通知タップのタブ遷移を追加
+
+### 背景・問題意識
+
+iter339でAPNs登録までは接続したが、ユーザーが端末通知をタップした時にSwift Native版のどこへ移るかが未接続だった。既存のアプリ内通知一覧では `linkPath` をタブへ変換する規則があるため、その規則を公開し、端末通知タップにも再利用する。
+
+### 変更内容
+
+#### `ios-native/App/MegrumNativeApp.swift`
+- `UNUserNotificationCenterDelegate.didReceive` を追加し、端末通知タップ時の `linkPath` / `notificationId` を受け取るようにした。
+- `linkPath` を `MegrumTab(notificationLinkPath:)` でタブへ変換し、SwiftUI側へ渡すようにした。
+- `notificationId` がある場合は通知一覧を読み込み、該当通知を既読化できるようにした。
+
+#### `ios-native/Sources/MegrumApp/MegrumRootView.swift`
+- 外部から渡された通知遷移先タブを受け取り、`TabView` の選択へ反映するbindingを追加した。
+- 遷移後はpending destinationを消して、同じ通知が何度も処理されないようにした。
+
+#### `ios-native/Sources/MegrumApp/SettingsScreen.swift`
+- アプリ内通知一覧で使っていた `MegrumTab(notificationLinkPath:)` をpublic extensionにし、Appホストからも同じルールを使えるようにした。
+
+#### `ios-native/README.md` / `notes/22_swift_native_migration.md`
+- Swift Native通知Phaseの進捗として、端末通知タップのタブ遷移bridgeを追記した。
+
+### 影響範囲
+
+- Swift Native版の端末通知タップ導線
+- Swift Native版のアプリ内通知一覧と共通の `linkPath` 解釈
+- 後続の詳細画面復元、めぐり会話・取引チャット直行の土台
+
+### 確認方法
+
+- `xcodebuild -quiet -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -destination 'generic/platform=iOS Simulator' -derivedDataPath /tmp/megrum-native-xcodebuild CODE_SIGNING_ALLOWED=NO build`
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-build --enable-xctest --disable-swift-testing -j 1`
+
+### 関連ファイル
+
+- `ios-native/App/MegrumNativeApp.swift`
+- `ios-native/Sources/MegrumApp/MegrumRootView.swift`
+- `ios-native/Sources/MegrumApp/SettingsScreen.swift`
+- `ios-native/README.md`
+- `notes/22_swift_native_migration.md`
+- `notes/08_design_iterations.md`
+
+### セルフレビュー結果
+
+- ✅ Xcode project buildが成功した。
+- ✅ Swift Package testsが88件成功した。
+- ✅ 通知一覧と端末通知で同じ `linkPath` → tab変換を使うようにした。
+- ✅ 詳細画面の直行は未接続だが、タブ遷移の土台として小さく閉じた。
+- ✅ データモデルは変えていないため、`notes/05_data_model.md` の更新は不要。
+- ✅ 状態遷移は変えていないため、`notes/09_state_machines.md` の更新は不要。
+- ✅ 新用語は追加していないため、`notes/10_glossary.md` の更新は不要。
+
 ## イテレーション339：Swift APNs登録をAppホストへ接続
 
 ### 背景・問題意識
