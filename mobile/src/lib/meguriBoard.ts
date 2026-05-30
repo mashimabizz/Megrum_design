@@ -701,6 +701,20 @@ export async function blockMeguriBoardUser(blockerId: string, blockedId: string)
   if (error) throw error;
 }
 
+export async function unblockMeguriBoardUser(blockerId: string, blockedId: string) {
+  if (!blockedId || !blockerId || blockerId === blockedId) return;
+  await removeLocalMeguriBoardUserBlock(blockedId);
+  if (!supabase || !hasSupabaseConfig || !isUuidLike(blockerId) || !isUuidLike(blockedId)) {
+    return;
+  }
+  const { error } = await supabase
+    .from("groom_user_blocks")
+    .delete()
+    .eq("blocker_id", blockerId)
+    .eq("blocked_id", blockedId);
+  if (error) throw error;
+}
+
 export async function loadMeguriBoardComposerDraft(
   viewer: MeguriBoardViewerContext,
 ): Promise<MeguriBoardComposerDraft | null> {
@@ -1790,6 +1804,14 @@ async function upsertLocalMeguriBoardUserBlock(blockedId: string) {
       [blockedId]: Date.now(),
     }),
   );
+}
+
+async function removeLocalMeguriBoardUserBlock(blockedId: string) {
+  const current = await loadLocalMeguriBoardUserBlocks();
+  if (!(blockedId in current)) return;
+  const next = { ...current };
+  delete next[blockedId];
+  await AsyncStorage.setItem(USER_BLOCKS_KEY, JSON.stringify(next));
 }
 
 function hydrateMeguriBoardThreads(

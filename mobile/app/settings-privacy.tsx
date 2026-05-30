@@ -33,6 +33,12 @@ const PRIMARY_SETTINGS_ROWS: SettingsRow[] = [
     href: "/address-settings",
   },
   {
+    title: "ブロックした人",
+    description: "ブロック中のユーザーを確認し、必要に応じて解除します。",
+    icon: "ban-outline",
+    href: "/blocked-users",
+  },
+  {
     title: "ヘルプ",
     description: "使い方、FAQ、問い合わせ先を確認します。",
     icon: "mail-outline",

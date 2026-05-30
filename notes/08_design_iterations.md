@@ -4,6 +4,57 @@
 
 ---
 
+## イテレーション275：ブロック一覧と解除画面を追加
+
+### 背景・問題意識
+
+オーナーから、設定一覧から「ブロックした人」を開き、ブロック中ユーザーの確認とブロック解除ができるようにしたいという指示があった。既に `groom_user_blocks` はグルーム・掲示板共通のユーザーブロックとして使われているが、ユーザー自身が一覧管理する画面がなかった。
+
+### 変更内容
+
+#### `mobile/app/settings-privacy.tsx`
+- 設定一覧に「ブロックした人」を追加し、`/blocked-users` へ遷移できるようにした。
+
+#### `mobile/app/blocked-users.tsx`
+- ブロック中ユーザー一覧画面を新規追加した。
+- `groom_user_blocks` から自分がブロックしているユーザーを取得し、`users` のプロフィール情報と合わせて表示するようにした。
+- 各ユーザー行から確認ダイアログを経てブロック解除できるようにした。
+- ログイン前・空状態・読み込み・エラー状態を用意した。
+
+#### `mobile/src/lib/meguriBoard.ts`
+- ブロック解除時に `groom_user_blocks` の行を削除する `unblockMeguriBoardUser` を追加した。
+- 掲示板側のローカルブロックキャッシュも同時に削除するようにした。
+
+### 影響範囲
+
+- iOS版 設定一覧
+- iOS版 ブロック管理画面
+- グルーム/めぐり掲示板で共有しているユーザーブロック解除
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- `EAS_UPDATE_PROJECT_SLUG=ihub EXPO_NO_GIT_STATUS=1 npm --prefix mobile run update:ios:preview -- --message "[iter275] ブロック一覧と解除画面を追加" --non-interactive`
+- Preview OTA: Update group ID `7f2d0eea-fbfe-4924-ae82-e0c5abdfa07d` / iOS update ID `019e76cf-996d-7f5d-8cdc-69d2b03f81c8`
+
+### 関連ファイル
+
+- `mobile/app/settings-privacy.tsx`
+- `mobile/app/blocked-users.tsx`
+- `mobile/src/lib/meguriBoard.ts`
+- `notes/08_design_iterations.md`
+
+### セルフレビュー結果
+
+- ✅ 既存の `groom_user_blocks` を使い、DBスキーマ追加なしで一覧・解除を実装した。
+- ✅ 解除時に掲示板側のローカルブロックキャッシュも削除するため、解除後に投稿が再表示対象へ戻る。
+- ✅ DBスキーマ変更はないため、`notes/05_data_model.md` の更新は不要と判断した。
+- ✅ 状態名・状態遷移の変更はないため、`notes/09_state_machines.md` の更新は不要と判断した。
+- ✅ 「ブロック」は既存の掲示板/グルーム共通概念として記録済みのため、`notes/10_glossary.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション274：他人プロフィール上部を自分プロフィールに揃える
 
 ### 背景・問題意識
