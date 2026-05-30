@@ -45,14 +45,32 @@ public enum MegrumTab: String, CaseIterable, Identifiable, Sendable {
 @MainActor
 public struct MegrumRootView: View {
     @StateObject private var appState: MegrumAppState
+    @StateObject private var authState: MegrumAuthState
     @State private var selectedTab: MegrumTab = .home
     @State private var showsSearch = false
 
-    public init(appState: MegrumAppState = MegrumAppState()) {
+    public init(
+        appState: MegrumAppState = MegrumAppState(),
+        authState: MegrumAuthState = MegrumAuthState(
+            repository: PreviewMegrumAuthRepository(),
+            initialSession: PreviewMegrumAuthRepository.previewSession()
+        )
+    ) {
         _appState = StateObject(wrappedValue: appState)
+        _authState = StateObject(wrappedValue: authState)
     }
 
     public var body: some View {
+        Group {
+            if authState.isAuthenticated {
+                authenticatedTabs
+            } else {
+                AuthScreen(authState: authState)
+            }
+        }
+    }
+
+    private var authenticatedTabs: some View {
         TabView(selection: $selectedTab) {
             NavigationStack {
                 HomeScreen(
@@ -108,6 +126,14 @@ public struct MegrumRootView: View {
         .tint(MegrumTheme.lavender)
         .task {
             await appState.loadInitialData()
+        }
+        .onChange(of: authState.session?.user.id) { _, userID in
+            guard userID != nil else {
+                return
+            }
+            Task {
+                await appState.loadInitialData()
+            }
         }
         .sheet(isPresented: $showsSearch) {
             NavigationStack {

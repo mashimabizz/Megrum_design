@@ -4,6 +4,86 @@
 
 ---
 
+## イテレーション304：Swift Auth基盤を追加
+
+### 背景・問題意識
+
+Swift Native版はApp shellとSupabaseのPostgREST境界まで進んだが、ログイン・新規登録がReact Native版の `AuthProvider` に残ったままだと、実データをユーザー単位で扱う次工程に進めない。全面移行のPhase 2として、まずSwift側にメール/パスワード認証の最小基盤を作り、後続でメールリンク復帰・Apple/Google・プロフィール作成へ広げられる構造にした。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumCore/MegrumModels.swift`
+- `AuthUser` と `AuthSession` を追加し、Swift側でSupabase AuthのユーザーID・メール・アクセストークンを型として扱えるようにした。
+
+#### `ios-native/Sources/MegrumData/SupabaseAuthClient.swift`
+- Supabase Auth向けの薄いclientを追加した。
+- `POST /auth/v1/token?grant_type=password`、`POST /auth/v1/signup`、`POST /auth/v1/logout` のrequest生成とresponse decodeを実装した。
+- `apikey` / `Authorization` / JSON headerをテスト可能な形にした。
+
+#### `ios-native/Sources/MegrumApp/MegrumAuthState.swift`
+- `MegrumAuthRepository`、preview auth repository、Supabase auth repository bridgeを追加した。
+- `MegrumAuthState` を追加し、ログイン・新規登録・ログアウト・preview modeの状態をSwiftUIから監視できるようにした。
+- `MegrumAuthStateFactory` を追加し、Supabase設定がある時はlive auth、ない時はpreview sessionで起動するようにした。
+
+#### `ios-native/Sources/MegrumApp/AuthScreen.swift`
+- SwiftUIのログイン/新規登録画面を追加した。
+- segmented picker、TextField / SecureField、標準Button、Material背景で、iOS標準寄りの入力体験にした。
+
+#### `ios-native/Sources/MegrumApp/MegrumRootView.swift`
+- `MegrumAuthState` をRootに注入し、未ログイン時は `AuthScreen`、ログイン済みまたはpreview session時は既存TabViewを表示する構成にした。
+
+#### `ios-native/App/MegrumNativeApp.swift`
+- `MegrumAuthStateFactory.makeDefault()` を起動時に渡すよう変更した。
+
+#### `ios-native/Tests/`
+- `SupabaseAuthClientTests` を追加し、ログイン・登録・ログアウトのrequest URL / header / bodyを検証した。
+- `MegrumAppStateTests` にAuthStateのログイン成功と登録validationのテストを追加した。
+
+#### `ios-native/README.md`
+- Swift Auth基盤のファイル構成、設定キー、現時点の対応範囲を追記した。
+
+#### `notes/22_swift_native_migration.md`
+- Phase 2の進捗として、Auth基盤追加と未完了範囲を追記した。
+
+### 影響範囲
+
+- Swift Native iOS版の認証入口
+- Supabase Auth接続のrequest境界
+- 起動時のRoot表示分岐
+- 今後のプロフィール、推し設定、住所設定、実データ接続
+
+### 確認方法
+
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-build --enable-xctest --disable-swift-testing -j 1`
+- `xcodebuild -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -destination 'generic/platform=iOS Simulator' -derivedDataPath /tmp/megrum-native-xcodebuild CODE_SIGNING_ALLOWED=NO build`
+- `git diff --check -- ios-native/Sources/MegrumCore/MegrumModels.swift ios-native/Sources/MegrumData/SupabaseAuthClient.swift ios-native/Sources/MegrumApp/MegrumAuthState.swift ios-native/Sources/MegrumApp/AuthScreen.swift ios-native/Sources/MegrumApp/MegrumRootView.swift ios-native/App/MegrumNativeApp.swift ios-native/Tests/MegrumDataTests/SupabaseAuthClientTests.swift ios-native/Tests/MegrumAppTests/MegrumAppStateTests.swift ios-native/README.md notes/22_swift_native_migration.md notes/08_design_iterations.md`
+
+### 関連ファイル
+
+- `ios-native/Sources/MegrumCore/MegrumModels.swift`
+- `ios-native/Sources/MegrumData/SupabaseAuthClient.swift`
+- `ios-native/Sources/MegrumApp/MegrumAuthState.swift`
+- `ios-native/Sources/MegrumApp/AuthScreen.swift`
+- `ios-native/Sources/MegrumApp/MegrumRootView.swift`
+- `ios-native/App/MegrumNativeApp.swift`
+- `ios-native/Tests/MegrumDataTests/SupabaseAuthClientTests.swift`
+- `ios-native/Tests/MegrumAppTests/MegrumAppStateTests.swift`
+- `ios-native/README.md`
+- `notes/22_swift_native_migration.md`
+- `notes/08_design_iterations.md`
+
+### セルフレビュー結果
+
+- ✅ Supabase secret keyを扱わず、公開キーとユーザーsession tokenだけを前提にした。
+- ✅ Swift Package testsが11件成功し、Auth request生成とAuthStateの基本動作を検証した。
+- ✅ Xcode App HostのiOS Simulator buildが成功した。
+- ✅ Supabase設定がない場合はpreview sessionで起動し、現在のSwift app shell検証を止めない構成にした。
+- ✅ 状態遷移・用語・DBスキーマ変更はないため、`notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要。
+- ⚠️ セッション永続化、メールリンク復帰、Apple/Google、プロフィール自動作成、オンボーディング判定は次のPhase 2作業で実装する。
+- ✅ TestFlight配布はまだ行っていないため、Preview OTA / TestFlight配信は不要。
+
+---
+
 ## イテレーション303：Swift Supabase境界を追加
 
 ### 背景・問題意識

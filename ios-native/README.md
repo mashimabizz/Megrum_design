@@ -14,6 +14,8 @@ The existing Expo / React Native app under `mobile/` remains the rollback source
 - `Sources/MegrumDesign` contains native SwiftUI design primitives, starting with a Liquid Glass-style search button.
 - `Sources/MegrumApp` contains the SwiftUI app shell and first native screens for Home, Search, Inventory, Wish, Trades, and Meguri.
 - `Sources/MegrumApp/MegrumAppState.swift` contains the first app state and repository boundary for Supabase integration.
+- `Sources/MegrumApp/MegrumAuthState.swift` and `AuthScreen.swift` contain the first native auth state, Supabase auth repository bridge, and SwiftUI login/signup screen.
+- `Sources/MegrumData/SupabaseAuthClient.swift` contains the first Supabase Auth request layer for email/password login, signup, and logout.
 - `Tests/MegrumCoreTests`, `Tests/MegrumDataTests`, and `Tests/MegrumAppTests` verify state names, display labels, Supabase request construction, and the preview repository load path.
 
 ## Build Loop
@@ -30,8 +32,11 @@ To run the native app against Supabase from Xcode or CLI, provide only public/cl
 - `MegrumSupabaseURL` / `MEGRUM_SUPABASE_URL`
 - `MegrumSupabasePublishableKey` / `MEGRUM_SUPABASE_PUBLISHABLE_KEY`
 - `MegrumSupabaseViewerID` / `MEGRUM_SUPABASE_VIEWER_ID`
+- `MegrumAuthEmailRedirectURL` / `MEGRUM_AUTH_EMAIL_REDIRECT_URL`
 
 If these values are absent, the Swift app intentionally falls back to preview data.
+
+Auth currently supports the first native email/password path. If Supabase config is present and no session is available, `MegrumRootView` shows `AuthScreen`; without config, it starts signed into preview mode so the app shell remains immediately inspectable.
 
 For the Xcode app host, use CLI-first verification:
 

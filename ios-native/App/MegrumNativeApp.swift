@@ -5,7 +5,10 @@ import SwiftUI
 struct MegrumNativeApp: App {
     var body: some Scene {
         WindowGroup {
-            MegrumRootView(appState: MegrumAppStateFactory.makeDefault())
+            MegrumRootView(
+                appState: MegrumAppStateFactory.makeDefault(),
+                authState: MegrumAuthStateFactory.makeDefault()
+            )
         }
     }
 }
