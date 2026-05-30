@@ -106,7 +106,10 @@ public struct MegrumRootView: View {
         }
         .sheet(isPresented: $showsSettings) {
             NavigationStack {
-                SettingsScreen(appState: appState)
+                SettingsScreen(appState: appState) { tab in
+                    selectedTab = tab
+                    showsSettings = false
+                }
             }
         }
     }

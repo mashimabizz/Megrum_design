@@ -4,6 +4,83 @@
 
 ---
 
+## イテレーション315：Swift通知一覧を追加
+
+### 背景・問題意識
+
+RN版では左ドロワーの「通知」から通知一覧へ遷移し、未読件数、既読化、通知タップ時の遷移を扱っていた。Swift Native版では設定一覧が現在のユーザー導線になっているため、まず `notifications` テーブルを読むNative通知一覧と未読バッジを移植した。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumCore/MegrumModels.swift`
+- `MegrumNotificationKind` と `MegrumNotification` を追加し、通知種別、本文、link path、既読日時、作成日時をdomain modelとして扱えるようにした。
+
+#### `ios-native/Sources/MegrumData/SupabaseNotificationClient.swift`
+- `notifications` の一覧取得requestを追加した。
+- `read_at` を更新する単体既読化と全件既読化requestを追加した。
+- request生成をテスト可能にした。
+
+#### `ios-native/Sources/MegrumApp/MegrumAppState.swift`
+- `notifications`、`unreadNotificationCount`、通知読込/既読化状態を追加した。
+- `loadNotifications()`、`markNotificationRead(_:)`、`markAllNotificationsRead()` を追加した。
+
+#### `ios-native/Sources/MegrumApp/SettingsScreen.swift`
+- 設定一覧に「通知」を追加し、未読件数をバッジで表示するようにした。
+- `NotificationsScreen` を追加し、すべて/未読/取引フィルタ、pull-to-refresh、すべて既読、通知行タップを実装した。
+- 通知の `link_path` から、めぐり/やりとり/在庫/Wish/ホームの大分類タブへ戻れるようにした。
+
+#### `ios-native/Sources/MegrumApp/MegrumRootView.swift`
+- 設定内の通知一覧から大分類タブへ戻るclosureを接続した。
+
+#### `ios-native/Sources/MegrumApp/SupabaseMegrumRepository.swift`
+- live repositoryに `SupabaseNotificationClient` を接続した。
+
+#### `ios-native/Sources/MegrumApp/NativePreviewData.swift`
+- Preview用の通知を追加し、未読/既読の状態を確認できるようにした。
+
+#### `ios-native/Tests/`
+- `SupabaseNotificationClient` の一覧取得、単体既読化、全件既読化requestを検証した。
+- `MegrumAppState` のPreview通知読込、単体既読化、全件既読化を検証した。
+
+### 影響範囲
+
+- Swift Native版の設定一覧
+- Swift Native版の通知一覧
+- Swift Native版の未読バッジ
+- `notifications.read_at` 更新境界
+
+### 確認方法
+
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-build --enable-xctest --disable-swift-testing -j 1`
+- `xcodebuild -quiet -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -destination 'generic/platform=iOS Simulator' -derivedDataPath /tmp/megrum-native-xcodebuild CODE_SIGNING_ALLOWED=NO build`
+
+### 関連ファイル
+
+- `ios-native/Sources/MegrumCore/MegrumModels.swift`
+- `ios-native/Sources/MegrumData/SupabaseNotificationClient.swift`
+- `ios-native/Tests/MegrumDataTests/SupabaseNotificationClientTests.swift`
+- `ios-native/Sources/MegrumApp/SettingsScreen.swift`
+- `ios-native/Sources/MegrumApp/MegrumAppState.swift`
+- `ios-native/Sources/MegrumApp/SupabaseMegrumRepository.swift`
+- `ios-native/Sources/MegrumApp/MegrumRootView.swift`
+- `ios-native/Sources/MegrumApp/NativePreviewData.swift`
+- `ios-native/Tests/MegrumAppTests/MegrumAppStateTests.swift`
+- `ios-native/README.md`
+- `notes/22_swift_native_migration.md`
+- `notes/08_design_iterations.md`
+
+### セルフレビュー結果
+
+- ✅ 既存の `notifications` / `read_at` を使い、DBスキーマ追加なしでSwift版へ移植した。
+- ✅ 一覧画面はSwiftUIの `List` / `Picker(.segmented)` / `refreshable` / toolbar buttonを使い、iOS標準寄りの挙動にした。
+- ✅ 通知タップ時は現時点で実装済みのNative大分類タブへ戻す。個別画面のdeep linkは各画面Swift化時に拡張する。
+- ✅ Swift Package testsが44件成功した。
+- ✅ Xcode project buildが成功した。
+- ✅ 状態遷移・新用語・DBスキーマ変更はないため、`notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要。
+- ✅ TestFlight配布はまだ行っていないため、Preview OTA / TestFlight配信は不要。
+
+---
+
 ## イテレーション314：Swiftブロック管理画面を追加
 
 ### 背景・問題意識

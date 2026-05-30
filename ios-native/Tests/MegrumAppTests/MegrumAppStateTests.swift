@@ -148,6 +148,24 @@ final class MegrumAppStateTests: XCTestCase {
         XCTAssertNil(state.unblockingUserID)
     }
 
+    func testAppStateLoadsAndMarksPreviewNotificationsRead() async {
+        let state = MegrumAppState(repository: PreviewMegrumRepository())
+
+        await state.loadNotifications()
+
+        XCTAssertEqual(state.unreadNotificationCount, 2)
+
+        let notificationID = try! XCTUnwrap(state.notifications.first?.id)
+        await state.markNotificationRead(notificationID)
+
+        XCTAssertEqual(state.unreadNotificationCount, 1)
+
+        await state.markAllNotificationsRead()
+
+        XCTAssertEqual(state.unreadNotificationCount, 0)
+        XCTAssertFalse(state.isMarkingNotificationsRead)
+    }
+
     func testAuthStateSignsInThroughRepository() async {
         let state = MegrumAuthState(repository: StubAuthRepository())
 

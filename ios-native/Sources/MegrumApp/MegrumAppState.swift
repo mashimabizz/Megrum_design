@@ -66,6 +66,9 @@ public protocol MegrumRepository: Sendable {
     func lookupAddress(postalCode: String) async throws -> PostalCodeAddress?
     func loadBlockedUsers() async throws -> [BlockedUser]
     func unblockUser(_ userID: UUID) async throws
+    func loadNotifications(limit: Int) async throws -> [MegrumNotification]
+    func markNotificationRead(_ notificationID: UUID) async throws -> MegrumNotification?
+    func markAllNotificationsRead() async throws -> [MegrumNotification]
     func completeAccountSetup(_ input: AccountSetupInput) async throws -> UserProfile
 }
 
@@ -95,6 +98,18 @@ public extension MegrumRepository {
     }
 
     func unblockUser(_ userID: UUID) async throws {}
+
+    func loadNotifications(limit: Int) async throws -> [MegrumNotification] {
+        []
+    }
+
+    func markNotificationRead(_ notificationID: UUID) async throws -> MegrumNotification? {
+        nil
+    }
+
+    func markAllNotificationsRead() async throws -> [MegrumNotification] {
+        []
+    }
 
     func completeAccountSetup(_ input: AccountSetupInput) async throws -> UserProfile {
         throw MegrumRepositoryError.unsupportedMutation
@@ -163,6 +178,26 @@ public struct PreviewMegrumRepository: MegrumRepository {
     }
 
     public func unblockUser(_ userID: UUID) async throws {}
+
+    public func loadNotifications(limit: Int) async throws -> [MegrumNotification] {
+        Array(NativePreviewData.notifications.prefix(limit))
+    }
+
+    public func markNotificationRead(_ notificationID: UUID) async throws -> MegrumNotification? {
+        guard var notification = NativePreviewData.notifications.first(where: { $0.id == notificationID }) else {
+            return nil
+        }
+        notification.readAt = notification.readAt ?? .now
+        return notification
+    }
+
+    public func markAllNotificationsRead() async throws -> [MegrumNotification] {
+        NativePreviewData.notifications.map { notification in
+            var next = notification
+            next.readAt = next.readAt ?? .now
+            return next
+        }
+    }
 }
 
 @MainActor
@@ -177,14 +212,17 @@ public final class MegrumAppState: ObservableObject {
     @Published public private(set) var oshiCharacters: [OshiCharacter] = []
     @Published public private(set) var mailingAddress: MailingAddress?
     @Published public private(set) var blockedUsers: [BlockedUser] = []
+    @Published public private(set) var notifications: [MegrumNotification] = []
     @Published public private(set) var isLoading = false
     @Published public private(set) var isLoadingOshiGroups = false
     @Published public private(set) var isLoadingOshiCharacters = false
     @Published public private(set) var isLoadingMailingAddress = false
     @Published public private(set) var isLoadingBlockedUsers = false
+    @Published public private(set) var isLoadingNotifications = false
     @Published public private(set) var isLookingUpPostalCode = false
     @Published public private(set) var isSavingMailingAddress = false
     @Published public private(set) var unblockingUserID: UUID?
+    @Published public private(set) var isMarkingNotificationsRead = false
     @Published public private(set) var isSavingAccountSetup = false
     @Published public private(set) var errorMessage: String?
 
@@ -192,6 +230,10 @@ public final class MegrumAppState: ObservableObject {
 
     public init(repository: any MegrumRepository = PreviewMegrumRepository()) {
         self.repository = repository
+    }
+
+    public var unreadNotificationCount: Int {
+        notifications.filter(\.isUnread).count
     }
 
     public func loadInitialData() async {
@@ -350,6 +392,71 @@ public final class MegrumAppState: ObservableObject {
             unblockingUserID = nil
             return false
         }
+    }
+
+    public func loadNotifications() async {
+        guard !isLoadingNotifications else {
+            return
+        }
+
+        isLoadingNotifications = true
+        errorMessage = nil
+        do {
+            notifications = try await repository.loadNotifications(limit: 100)
+        } catch {
+            errorMessage = "通知を読み込めませんでした"
+        }
+        isLoadingNotifications = false
+    }
+
+    public func markNotificationRead(_ notificationID: UUID) async {
+        guard let index = notifications.firstIndex(where: { $0.id == notificationID }) else {
+            return
+        }
+        guard notifications[index].isUnread else {
+            return
+        }
+
+        let readAt = Date()
+        notifications[index].readAt = readAt
+        do {
+            if let updated = try await repository.markNotificationRead(notificationID) {
+                notifications[index] = updated
+            }
+        } catch {
+            notifications[index].readAt = nil
+            errorMessage = "通知を既読にできませんでした"
+        }
+    }
+
+    public func markAllNotificationsRead() async {
+        guard !isMarkingNotificationsRead else {
+            return
+        }
+        guard unreadNotificationCount > 0 else {
+            return
+        }
+
+        isMarkingNotificationsRead = true
+        errorMessage = nil
+        let previous = notifications
+        let readAt = Date()
+        notifications = notifications.map { notification in
+            var next = notification
+            next.readAt = next.readAt ?? readAt
+            return next
+        }
+        do {
+            let updated = try await repository.markAllNotificationsRead()
+            if !updated.isEmpty {
+                let updatedByID = Dictionary(uniqueKeysWithValues: updated.map { ($0.id, $0) })
+                notifications = notifications.map { updatedByID[$0.id] ?? $0 }
+            }
+        } catch {
+            notifications = previous
+            errorMessage = "通知を既読にできませんでした"
+        }
+        isMarkingNotificationsRead = false
     }
 
     public func completeAccountSetup(

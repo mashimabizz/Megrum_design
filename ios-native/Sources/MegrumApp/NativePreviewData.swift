@@ -59,6 +59,34 @@ enum NativePreviewData {
         )
     ]
 
+    static let notifications = [
+        MegrumNotification(
+            id: UUID(uuidString: "00000000-0000-0000-0000-000000000081")!,
+            kind: .proposalReceived,
+            title: "新しい打診が届いています",
+            body: "ランダムトレカAについて交換の打診があります。",
+            linkPath: "/proposals/preview",
+            createdAt: Date(timeIntervalSinceNow: -1_080)
+        ),
+        MegrumNotification(
+            id: UUID(uuidString: "00000000-0000-0000-0000-000000000082")!,
+            kind: .meguriBoardReply,
+            title: "掲示板に返信がありました",
+            body: "物販列は今だと20分くらいです。",
+            linkPath: "/meguri-board-thread?id=preview-board-thread-1",
+            createdAt: Date(timeIntervalSinceNow: -420)
+        ),
+        MegrumNotification(
+            id: UUID(uuidString: "00000000-0000-0000-0000-000000000083")!,
+            kind: .tradeCompleted,
+            title: "取引が完了しました",
+            body: "評価を入力できます。",
+            linkPath: "/trades/preview",
+            readAt: Date(timeIntervalSinceNow: -3_600),
+            createdAt: Date(timeIntervalSinceNow: -7_200)
+        )
+    ]
+
     static let inventory: [GoodsItem] = [
         GoodsItem(
             id: UUID(uuidString: "00000000-0000-0000-0000-000000000201")!,

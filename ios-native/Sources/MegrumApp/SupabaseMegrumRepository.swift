@@ -8,6 +8,7 @@ public struct SupabaseMegrumRepository: MegrumRepository {
     private let mailingAddressClient: SupabaseMailingAddressClient
     private let postalCodeAddressClient: PostalCodeAddressClient
     private let blockClient: SupabaseBlockClient
+    private let notificationClient: SupabaseNotificationClient
     private let viewerID: UUID
 
     public init(client: SupabaseRESTClient, viewerID: UUID) {
@@ -16,6 +17,7 @@ public struct SupabaseMegrumRepository: MegrumRepository {
         self.mailingAddressClient = SupabaseMailingAddressClient(client: client)
         self.postalCodeAddressClient = PostalCodeAddressClient()
         self.blockClient = SupabaseBlockClient(client: client)
+        self.notificationClient = SupabaseNotificationClient(client: client)
         self.viewerID = viewerID
     }
 
@@ -79,6 +81,18 @@ public struct SupabaseMegrumRepository: MegrumRepository {
 
     public func unblockUser(_ userID: UUID) async throws {
         try await blockClient.unblockUser(blockerID: viewerID, blockedID: userID)
+    }
+
+    public func loadNotifications(limit: Int) async throws -> [MegrumNotification] {
+        try await notificationClient.loadNotifications(userID: viewerID, limit: limit)
+    }
+
+    public func markNotificationRead(_ notificationID: UUID) async throws -> MegrumNotification? {
+        try await notificationClient.markNotificationRead(userID: viewerID, notificationID: notificationID)
+    }
+
+    public func markAllNotificationsRead() async throws -> [MegrumNotification] {
+        try await notificationClient.markAllNotificationsRead(userID: viewerID)
     }
 
     public func completeAccountSetup(_ input: AccountSetupInput) async throws -> UserProfile {

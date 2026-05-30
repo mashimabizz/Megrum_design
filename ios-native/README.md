@@ -24,6 +24,7 @@ The existing Expo / React Native app under `mobile/` remains the rollback source
 - `Sources/MegrumData/SupabaseMailingAddressClient.swift` contains the request layer for reading and upserting `user_mailing_addresses`.
 - `Sources/MegrumData/PostalCodeAddressClient.swift` contains the zipcloud postal code lookup boundary for address autofill.
 - `Sources/MegrumData/SupabaseBlockClient.swift` contains the request layer for listing and deleting `groom_user_blocks`.
+- `Sources/MegrumData/SupabaseNotificationClient.swift` contains the request layer for loading and marking `notifications` read.
 - `Sources/MegrumData/AuthSessionStore.swift` contains the session persistence boundary. Live auth uses Keychain; tests and preview mode use an in-memory store.
 - `Tests/MegrumCoreTests`, `Tests/MegrumDataTests`, and `Tests/MegrumAppTests` verify state names, display labels, Supabase request construction, and the preview repository load path.
 
@@ -62,6 +63,8 @@ Supabase redirect URLs are handled by `MegrumRootView.onOpenURL`. `SupabaseAuthR
 `MailingAddress` mirrors `user_mailing_addresses`. `SettingsScreen` is reachable from the home header avatar and lets the user review or save an address through `MegrumAppState` and `SupabaseMailingAddressClient`. Postal code input is normalized to seven digits and can autofill prefecture, city, and town through `PostalCodeAddressClient`.
 
 `BlockedUser` mirrors the viewer's `groom_user_blocks` relationships. `SettingsScreen` exposes a native blocked users list with pull-to-refresh and confirmation before unblock.
+
+`MegrumNotification` mirrors `notifications`. `SettingsScreen` shows an unread badge, and the native notification list can filter unread/trade notices, mark items read, mark all read, and route broad notification targets back to the matching native tab.
 
 For the Xcode app host, use CLI-first verification:
 

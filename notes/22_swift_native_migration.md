@@ -1,7 +1,7 @@
 # 22. Swift Native Migration
 
 最終更新: 2026-05-31
-ステータス: Active draft（iter314）
+ステータス: Active draft（iter315）
 
 ## 目的
 
@@ -113,6 +113,7 @@ tar -xzf /Users/michitaka/Desktop/Megrum_backups/pre-swift-migration-20260531-03
 - iter312で、郵便番号7桁入力からzipcloud公式APIで住所候補を取得し、住所設定フォームへ反映する境界を追加した。
 - iter313で、Supabase redirect URLのquery / fragmentからsession tokenを復元し、SwiftUI `.onOpenURL` でアプリへ反映する境界を追加した。
 - iter314で、設定一覧に「ブロックした人」を追加し、`groom_user_blocks` の一覧取得と解除をSwift版へ移植した。
+- iter315で、設定一覧に通知入口と未読バッジを追加し、`notifications` の一覧取得・既読化・大分類遷移をSwift版へ移植した。
 - 現時点のAuthはApple/Google OAuthまでは未完了。次のPhase 2作業でApple/Googleへ広げる。
 
 ### Phase 3: Exchange core
