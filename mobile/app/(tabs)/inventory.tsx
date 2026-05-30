@@ -15,6 +15,7 @@ import {
 import {
   BottomOptionSheet,
   ColumnSwitcher,
+  FloatingAddButton,
   GoodsGrid,
   type ColumnCount,
   type GoodsGridPressContext,
@@ -378,7 +379,6 @@ export default function InventoryScreen() {
             <GoodsGridSkeleton
               columns={columns}
               count={8}
-              includeAddTile={status === "active"}
               showTopRow
             />
           </View>
@@ -426,6 +426,12 @@ export default function InventoryScreen() {
           </>
         )}
       </ScrollView>
+
+      <FloatingAddButton
+        align="left"
+        label="在庫を追加"
+        onPress={() => openInventoryEditor(null, "create")}
+      />
 
       <BottomOptionSheet
         visible={!!selected}
@@ -495,12 +501,6 @@ export default function InventoryScreen() {
           showBottomStrip={false}
           deletingIds={deletingItemIds}
           onItemFadeOutEnd={completeInventoryDelete}
-          addTileLabel={pageStatus === "active" ? "追加" : undefined}
-          onPressAddTile={
-            pageStatus === "active"
-              ? () => openInventoryEditor(null, "create")
-              : undefined
-          }
           emptyLabel={
             pageStatus === "active"
               ? "譲る候補のグッズはまだありません"

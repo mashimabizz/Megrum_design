@@ -859,9 +859,11 @@ function actionIconName(action: SheetAction): IconSymbolName {
 }
 
 export function FloatingAddButton({
+  align = "right",
   label,
   onPress,
 }: {
+  align?: "left" | "right";
   label: string;
   onPress: () => void;
 }) {
@@ -876,6 +878,8 @@ export function FloatingAddButton({
         styles.floatingAdd,
         {
           bottom: Math.max(insets.bottom, 10) + 92,
+          left: align === "left" ? 20 : undefined,
+          right: align === "right" ? 20 : undefined,
         },
       ]}
     >
@@ -1490,7 +1494,6 @@ const styles = StyleSheet.create({
     height: 58,
     justifyContent: "center",
     position: "absolute",
-    right: 20,
     shadowColor: megrumColors.lavender,
     shadowOffset: { width: 0, height: 12 },
     shadowOpacity: 0.32,

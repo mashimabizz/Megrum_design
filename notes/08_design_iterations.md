@@ -4,6 +4,50 @@
 
 ---
 
+## イテレーション290：在庫追加を左フッターへ移動
+
+### 背景・問題意識
+
+オーナーから、在庫一覧の一枚目に「追加」カードが表示されているが、Wish一覧と同じようにフッターの追加ボタンとして表示したいという指摘があった。Wish一覧と導線を揃えつつ、在庫画面では追加ボタンを左側に置く必要がある。
+
+### 変更内容
+
+#### `mobile/app/(tabs)/inventory.tsx`
+- 在庫一覧の `GoodsGrid` から先頭の追加タイルを削除した。
+- 読み込み中スケルトンからも追加タイル枠を削除し、実表示と同じグリッド構造にした。
+- Wish一覧と同じ `FloatingAddButton` を在庫画面にも追加し、左下固定で「在庫を追加」導線を表示するようにした。
+
+#### `mobile/src/components/GoodsGrid.tsx`
+- `FloatingAddButton` に `align="left" | "right"` を追加した。
+- 既存のWish一覧ではデフォルトの右寄せを維持し、在庫画面だけ左寄せで使えるようにした。
+
+### 影響範囲
+
+- iOS版 在庫一覧
+- iOS版 Wish一覧の追加ボタン共通コンポーネント
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- `EAS_UPDATE_PROJECT_SLUG=ihub EXPO_NO_GIT_STATUS=1 npm --prefix mobile run update:ios:preview -- --message "[iter290] 在庫追加を左フッターへ移動" --non-interactive`
+- Preview OTA: Update group ID `518ba64d-ed0e-4869-b5f8-78bce0b27ea8` / iOS update ID `019e7899-b4c4-777a-9318-01499c95b7be`
+- EAS Dashboard: `https://expo.dev/accounts/mashima.bizz/projects/ihub/updates/518ba64d-ed0e-4869-b5f8-78bce0b27ea8`
+
+### 関連ファイル
+
+- `mobile/app/(tabs)/inventory.tsx`
+- `mobile/src/components/GoodsGrid.tsx`
+- `notes/08_design_iterations.md`
+
+### セルフレビュー結果
+
+- ✅ 在庫グリッドの一枚目に追加カードが出ないようにした。
+- ✅ Wish一覧の追加ボタンは既存通り右寄せのまま維持した。
+- ✅ 在庫画面の追加ボタンだけ左下固定になるようにした。
+- ✅ iOS Preview channel へOTA配信済み。
+- ✅ 状態遷移・用語・DBスキーマ変更はないため、`notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要。
+
 ## イテレーション289：左ドロワー内スワイプで閉じる
 
 ### 背景・問題意識
