@@ -38,6 +38,7 @@ import {
 } from "../src/lib/mailingAddress";
 import { supabase } from "../src/lib/supabase";
 import { useKeyboardInset } from "../src/lib/useKeyboardInset";
+import { goToTabRoot } from "../src/navigation/hierarchy";
 import { megrumColors, megrumRadii, megrumShadow } from "../src/theme/tokens";
 
 type ProposalStatus =
@@ -2738,7 +2739,7 @@ function ChatBubble({
               setError(result.error);
               return;
             }
-            router.replace("/transactions");
+            goToTabRoot("/transactions");
           },
         },
       ],

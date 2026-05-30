@@ -42,7 +42,7 @@ function RootNavigator() {
         contentStyle: { backgroundColor: megrumColors.background },
       }}
     >
-      <Stack.Screen name="(tabs)" />
+      <Stack.Screen name="(tabs)" options={{ gestureEnabled: false }} />
       <Stack.Screen name="(auth)" />
     </Stack>
   );

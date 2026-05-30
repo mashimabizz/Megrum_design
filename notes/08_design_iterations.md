@@ -4,6 +4,64 @@
 
 ---
 
+## イテレーション266：完了フローの戻り履歴を階層化する
+
+### 背景・問題意識
+
+オーナーから、左端スワイプの戻りが単純な履歴戻りになっており、タブ直下を最下層とする階層構造として破綻しない戻り方にしたいという指摘があった。特に、打診完了後に左端スワイプで打診入力画面へ戻れたり、完了画面から打診一覧へ移動した後に入力フローへ戻れたりするのは、取引系の完了フローとして不自然だった。
+
+### 変更内容
+
+#### `mobile/app/_layout.tsx`
+- ルートStackの `(tabs)` 画面では `gestureEnabled: false` にし、ホーム・在庫・Wish・やりとり・めぐりのタブ直下を戻り階層の最下層として扱うようにした。
+
+#### `mobile/src/navigation/hierarchy.ts`
+- 完了フローからタブ直下へ戻すための `goToTabRoot` を追加した。
+- `router.dismissTo(..., { withAnchor: true })` を使い、入力フローの履歴を残さず目的のタブ直下へ戻す共通導線にした。
+
+#### `mobile/app/proposal-confirm.tsx`
+- 打診完了画面ではネイティブ戻りスワイプを無効化し、打診入力画面へ戻れないようにした。
+- `まだ他に探す` / `打診一覧に飛ぶ` は `goToTabRoot` 経由にし、完了後にホームまたはやりとり一覧へ移動した後も入力フローへ戻らないようにした。
+
+#### `mobile/app/transaction-rate.tsx`
+- 評価送信後と評価済み画面の `取引一覧に戻る` を `goToTabRoot("/transactions")` に変更し、完了した取引フローの履歴を残さないようにした。
+
+#### `mobile/app/transaction-detail.tsx`
+- キャンセル同意後にやりとり一覧へ戻る導線を `goToTabRoot("/transactions")` に変更した。
+
+### 影響範囲
+
+- iOS版 ルートナビゲーション
+- タブ直下の左端スワイプ戻り
+- 打診完了画面
+- 取引評価完了後の一覧復帰
+- 取引キャンセル同意後の一覧復帰
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- `EAS_UPDATE_PROJECT_SLUG=ihub EXPO_NO_GIT_STATUS=1 npm --prefix mobile run update:ios:preview -- --message "[iter266] enforce hierarchy back navigation" --non-interactive`
+- Preview OTA: Update group ID `f085af6c-123f-4004-a876-575c4bbeb935` / iOS update ID `019e768f-3f03-71b0-bda3-c50b352d2fa5`
+
+### 関連ファイル
+
+- `mobile/app/_layout.tsx`
+- `mobile/app/proposal-confirm.tsx`
+- `mobile/app/transaction-detail.tsx`
+- `mobile/app/transaction-rate.tsx`
+- `mobile/src/navigation/hierarchy.ts`
+- `notes/08_design_iterations.md`
+
+### セルフレビュー結果
+
+- ✅ タブ直下を最下層として扱い、タブ画面自体では左端スワイプで下層へ戻らないようにした。
+- ✅ 打診完了画面では入力フローへ戻るジェスチャーを無効化した。
+- ✅ 完了後のホーム/やりとり復帰は `dismissTo` で履歴を折りたたむ共通関数に寄せた。
+- ✅ 状態名・新用語・DBスキーマに影響しないため、`notes/09_state_machines.md` と `notes/10_glossary.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション265：提示物選択に推し種別フィルタを追加する
 
 ### 背景・問題意識

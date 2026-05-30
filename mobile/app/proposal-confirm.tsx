@@ -1,4 +1,4 @@
-import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
+import { Stack, router, useFocusEffect, useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Image,
@@ -38,6 +38,7 @@ import {
   type MailingAddressRecord,
 } from "../src/lib/mailingAddress";
 import { supabase } from "../src/lib/supabase";
+import { goToTabRoot } from "../src/navigation/hierarchy";
 import { megrumColors, megrumRadii, megrumShadow } from "../src/theme/tokens";
 
 type MeetupCandidate = {
@@ -231,122 +232,134 @@ export default function ProposalConfirmScreen() {
 
   if (submitted) {
     return (
-      <ProposalCompleteScreen
-        partnerHandle={partnerHandle}
-        revision={isRevisionMode}
-        exchangeMethod={exchangeMethod}
-      />
+      <>
+        <Stack.Screen options={{ gestureEnabled: false }} />
+        <ProposalCompleteScreen
+          partnerHandle={partnerHandle}
+          revision={isRevisionMode}
+          exchangeMethod={exchangeMethod}
+          onFindMore={() => goToTabRoot("/")}
+          onOpenTransactions={() => goToTabRoot("/transactions")}
+        />
+      </>
     );
   }
 
   return (
-    <Screen contentStyle={styles.screen}>
-      <View style={styles.header}>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="戻る"
-          onPress={() => router.back()}
-          style={styles.backButton}
-        >
-          <Text style={styles.backText}>‹</Text>
-        </Pressable>
-        <View style={styles.headerCopy}>
-          <Text style={styles.kicker}>PROPOSAL</Text>
-          <Text style={styles.title}>送信確認</Text>
-        </View>
-        <StatusPill label="STEP 2/2" tone="sky" />
-      </View>
-
-      <ScrollView
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.content}
-      >
-        <View style={styles.notice}>
-          <Text style={styles.noticeBadge}>送信確認</Text>
-          <Text style={styles.noticeText}>
-            {isRevisionMode
-              ? `@${partnerHandle} との打診を下記の内容に更新します。`
-              : `@${partnerHandle} に下記の内容で打診を送ります。`}
-          </Text>
-        </View>
-
-        <Section title="交換内容">
-          <ExchangeCard theirItems={theirItems} myItems={myItems} />
-        </Section>
-
-        <Section title="受け渡し方法">
-          <ExchangeMethodCard
-            address={mailingAddress}
-            addressLoading={addressLoading}
-            exchangeMethod={exchangeMethod}
-            onOpenAddressSettings={() => router.push("/address-settings")}
-          />
-        </Section>
-
-        <Section title="オプションタグ">
-          <OptionTagChips
-            options={optionTags}
-            selected={selectedOptionTags}
-            onToggle={(tag) =>
-              setSelectedOptionTags((current) =>
-                current.includes(tag)
-                  ? current.filter((item) => item !== tag)
-                  : [...current, tag],
-              )
-            }
-          />
-        </Section>
-
-        {usesHandExchange ? (
-          <Section title="交換できる候補">
-            <MeetupMapCard candidates={meetupCandidates} />
-          </Section>
-        ) : null}
-
-        <Section title="メッセージ（任意）" right={`${message.length} / 400`}>
-          <TextInput
-            value={message}
-            onChangeText={setMessage}
-            maxLength={400}
-            multiline
-            placeholderTextColor="rgba(58,50,74,0.32)"
-            style={styles.messageInput}
-            textAlignVertical="top"
-          />
-        </Section>
-
-        {usesHandExchange ? (
+    <>
+      <Stack.Screen options={{ gestureEnabled: true }} />
+      <Screen contentStyle={styles.screen}>
+        <View style={styles.header}>
           <Pressable
-            onPress={() => setShareSchedule((current) => !current)}
-            style={[
-              styles.scheduleCard,
-              shareSchedule ? styles.scheduleCardOn : null,
-            ]}
+            accessibilityRole="button"
+            accessibilityLabel="戻る"
+            onPress={() => router.back()}
+            style={styles.backButton}
           >
-            <View style={styles.scheduleCopy}>
-              <Text style={styles.scheduleTitle}>スケジュールを共有する</Text>
-              <Text style={styles.scheduleSub}>
-                {shareSchedule ? "ON" : "OFF"}
-              </Text>
-            </View>
-            <Switch
-              value={shareSchedule}
-              onValueChange={setShareSchedule}
-              trackColor={{
-                false: "rgba(58,50,74,0.14)",
-                true: "rgba(166,149,216,0.46)",
-              }}
-              thumbColor={shareSchedule ? megrumColors.lavender : megrumColors.surface}
-            />
+            <Text style={styles.backText}>‹</Text>
           </Pressable>
-        ) : null}
-      </ScrollView>
+          <View style={styles.headerCopy}>
+            <Text style={styles.kicker}>PROPOSAL</Text>
+            <Text style={styles.title}>送信確認</Text>
+          </View>
+          <StatusPill label="STEP 2/2" tone="sky" />
+        </View>
 
-      {submitError ? <Text style={styles.submitError}>{submitError}</Text> : null}
-      <PrimaryButton loading={submitting} onPress={handleSubmit}>
-        {isRevisionMode ? "この内容で条件を更新" : "この内容で打診を送信"}
-      </PrimaryButton>
-    </Screen>
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={styles.content}
+        >
+          <View style={styles.notice}>
+            <Text style={styles.noticeBadge}>送信確認</Text>
+            <Text style={styles.noticeText}>
+              {isRevisionMode
+                ? `@${partnerHandle} との打診を下記の内容に更新します。`
+                : `@${partnerHandle} に下記の内容で打診を送ります。`}
+            </Text>
+          </View>
+
+          <Section title="交換内容">
+            <ExchangeCard theirItems={theirItems} myItems={myItems} />
+          </Section>
+
+          <Section title="受け渡し方法">
+            <ExchangeMethodCard
+              address={mailingAddress}
+              addressLoading={addressLoading}
+              exchangeMethod={exchangeMethod}
+              onOpenAddressSettings={() => router.push("/address-settings")}
+            />
+          </Section>
+
+          <Section title="オプションタグ">
+            <OptionTagChips
+              options={optionTags}
+              selected={selectedOptionTags}
+              onToggle={(tag) =>
+                setSelectedOptionTags((current) =>
+                  current.includes(tag)
+                    ? current.filter((item) => item !== tag)
+                    : [...current, tag],
+                )
+              }
+            />
+          </Section>
+
+          {usesHandExchange ? (
+            <Section title="交換できる候補">
+              <MeetupMapCard candidates={meetupCandidates} />
+            </Section>
+          ) : null}
+
+          <Section title="メッセージ（任意）" right={`${message.length} / 400`}>
+            <TextInput
+              value={message}
+              onChangeText={setMessage}
+              maxLength={400}
+              multiline
+              placeholderTextColor="rgba(58,50,74,0.32)"
+              style={styles.messageInput}
+              textAlignVertical="top"
+            />
+          </Section>
+
+          {usesHandExchange ? (
+            <Pressable
+              onPress={() => setShareSchedule((current) => !current)}
+              style={[
+                styles.scheduleCard,
+                shareSchedule ? styles.scheduleCardOn : null,
+              ]}
+            >
+              <View style={styles.scheduleCopy}>
+                <Text style={styles.scheduleTitle}>スケジュールを共有する</Text>
+                <Text style={styles.scheduleSub}>
+                  {shareSchedule ? "ON" : "OFF"}
+                </Text>
+              </View>
+              <Switch
+                value={shareSchedule}
+                onValueChange={setShareSchedule}
+                trackColor={{
+                  false: "rgba(58,50,74,0.14)",
+                  true: "rgba(166,149,216,0.46)",
+                }}
+                thumbColor={
+                  shareSchedule ? megrumColors.lavender : megrumColors.surface
+                }
+              />
+            </Pressable>
+          ) : null}
+        </ScrollView>
+
+        {submitError ? (
+          <Text style={styles.submitError}>{submitError}</Text>
+        ) : null}
+        <PrimaryButton loading={submitting} onPress={handleSubmit}>
+          {isRevisionMode ? "この内容で条件を更新" : "この内容で打診を送信"}
+        </PrimaryButton>
+      </Screen>
+    </>
   );
 
   async function handleSubmit() {
@@ -606,10 +619,14 @@ function ProposalCompleteScreen({
   partnerHandle,
   revision,
   exchangeMethod,
+  onFindMore,
+  onOpenTransactions,
 }: {
   partnerHandle: string;
   revision?: boolean;
   exchangeMethod: ExchangeMethod;
+  onFindMore: () => void;
+  onOpenTransactions: () => void;
 }) {
   return (
     <Screen contentStyle={styles.completeScreen}>
@@ -635,12 +652,12 @@ function ProposalCompleteScreen({
       <View style={styles.completeActions}>
         <PrimaryButton
           variant="secondary"
-          onPress={() => router.replace("/")}
+          onPress={onFindMore}
         >
           まだ他に探す
         </PrimaryButton>
         <PrimaryButton
-          onPress={() => router.replace("/transactions")}
+          onPress={onOpenTransactions}
         >
           打診一覧に飛ぶ
         </PrimaryButton>

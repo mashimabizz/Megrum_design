@@ -13,6 +13,7 @@ import { PrimaryButton } from "../src/components/PrimaryButton";
 import { Screen } from "../src/components/Screen";
 import { supabase } from "../src/lib/supabase";
 import { submitEvaluation } from "../src/lib/transactionActions";
+import { goToTabRoot } from "../src/navigation/hierarchy";
 import { megrumColors, megrumRadii, megrumShadow } from "../src/theme/tokens";
 
 type ProposalRow = {
@@ -74,7 +75,7 @@ export default function TransactionRateScreen() {
         comment: comment.trim() || undefined,
       });
       if (action.error) setError(action.error);
-      else router.replace("/transactions");
+      else goToTabRoot("/transactions");
     } finally {
       setSubmitting(false);
     }
@@ -159,7 +160,7 @@ export default function TransactionRateScreen() {
       {data ? (
         <View style={styles.stickyCta}>
           {data.alreadyRated ? (
-            <PrimaryButton onPress={() => router.replace("/transactions")}>
+            <PrimaryButton onPress={() => goToTabRoot("/transactions")}>
               取引一覧に戻る
             </PrimaryButton>
           ) : (
