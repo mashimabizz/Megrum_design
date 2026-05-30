@@ -4,6 +4,52 @@
 
 ---
 
+## イテレーション262：掲示板本文カードに通報ボタンを追加する
+
+### 背景・問題意識
+
+一般的なスレッド型掲示板では、不適切な投稿を見つけた時にすぐ通報できる導線が必要になる。スポット掲示板ではメニュー内から通報できたが、本文カードの主要アクション列には出ていなかったため、他人のスレッド本文から直接通報理由を選べるようにした。
+
+### 変更内容
+
+#### `mobile/app/meguri-board-thread.tsx`
+- 他人のスレッド本文カードアクション列に `通報` ボタンを追加した。
+- 押下時は既存の `openThreadReportReasonPicker` を使い、通報理由選択から既存の通報処理へつなげるようにした。
+- 通報済みのスレッドでは `通報済み` 表示に切り替え、ボタンを無効化するようにした。
+
+#### `notes/09_state_machines.md`
+- Meguri Board Lifecycle に本文カード通報ボタンの表示/操作ルールを追記した。
+
+#### `notes/10_glossary.md`
+- 掲示板本文カード通報ボタンを追加した。
+
+### 影響範囲
+
+- iOS版 スポット掲示板スレッド詳細
+- スレッド本文カードの安全導線
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- `EAS_UPDATE_PROJECT_SLUG=ihub EXPO_NO_GIT_STATUS=1 npm --prefix mobile run update:ios:preview -- --message "[iter262] add thread detail report button" --non-interactive`
+- Preview OTA: Update group ID `f2c0d40e-eb10-4f3b-95eb-e35364ae0792` / iOS update ID `019e7677-bf4f-7f25-82f0-da554ee960ff`
+
+### 関連ファイル
+
+- `mobile/app/meguri-board-thread.tsx`
+- `notes/08_design_iterations.md`
+- `notes/09_state_machines.md`
+- `notes/10_glossary.md`
+
+### セルフレビュー結果
+
+- ✅ 既存の通報理由選択と通報APIを使い回し、通報フローを重複実装していない。
+- ✅ 自分のスレッドには表示せず、通報済みは無効化して二重通報を避けた。
+- ✅ ネイティブ依存追加なしでPreview OTA対象内に収めた。
+
+---
+
 ## イテレーション261：掲示板本文の日時詳細を見られるようにする
 
 ### 背景・問題意識

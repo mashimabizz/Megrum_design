@@ -1776,6 +1776,26 @@ export default function MeguriBoardThreadScreen() {
                     <IconSymbol name="document-text-outline" color={megrumColors.mutedInk} size={15} />
                     <Text style={styles.threadActionText}>情報</Text>
                   </Pressable>
+                  {!thread.mine ? (
+                    <Pressable
+                      accessibilityRole="button"
+                      disabled={thread.reported}
+                      onPress={openThreadReportReasonPicker}
+                      style={[
+                        styles.threadActionPill,
+                        thread.reported ? styles.threadActionPillActive : null,
+                      ]}
+                    >
+                      <IconSymbol
+                        name="warning-outline"
+                        color={thread.reported ? megrumColors.lavender : megrumColors.mutedInk}
+                        size={15}
+                      />
+                      <Text style={[styles.threadActionText, thread.reported ? styles.threadActionTextActive : null]}>
+                        {thread.reported ? "通報済み" : "通報"}
+                      </Text>
+                    </Pressable>
+                  ) : null}
                   <Pressable
                     accessibilityRole="button"
                     onPress={openParticipants}
