@@ -19,4 +19,11 @@ final class MegrumCoreTests: XCTestCase {
         XCTAssertFalse(AccountStatus.active.requiresSetup)
         XCTAssertEqual(AccountStatus.deletionRequested.rawValue, "deletion_requested")
     }
+
+    func testBoardAudienceRawValuesMatchDatabase() {
+        XCTAssertEqual(BoardThread.Audience.nearby3km.rawValue, "nearby_3km")
+        XCTAssertEqual(BoardThread.Audience.samePrefecture.rawValue, "same_prefecture")
+        XCTAssertEqual(BoardThread.Audience.sameSpot.rawValue, "same_spot")
+        XCTAssertEqual(BoardThread.Audience.global.rawValue, "global")
+    }
 }

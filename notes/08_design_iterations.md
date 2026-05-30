@@ -4,6 +4,106 @@
 
 ---
 
+## イテレーション324：SwiftめぐりRPC境界を追加
+
+### 背景・問題意識
+
+Swift Native版のめぐりホームはPreview配列を表示するだけで、既存Supabaseのグルーム/掲示板RPCへ接続していなかった。めぐり機能をNativeへ移すには、まず現在のDB/RLS/RPC設計をそのまま読み込める境界を作り、MapKitや投稿UIへ進む前のデータ導線を固める必要がある。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumData/SupabaseRESTClient.swift`
+- PostgREST RPCを呼ぶ `rpcRows(function:payload:)` と `makeRPCRequest(function:payload:)` を追加した。
+
+#### `ios-native/Sources/MegrumData/SupabaseGroomClient.swift`
+- `list_groom_feed_nearby` を呼ぶNative clientを追加した。
+- 緯度/経度/半径をpayload化し、半径は100m〜1000mに丸めるようにした。
+- RPC戻り値を `GroomPost` へマッピングした。
+
+#### `ios-native/Sources/MegrumData/SupabaseBoardClient.swift`
+- `list_meguri_board_threads_for_viewer` を呼ぶNative clientを追加した。
+- 緯度/経度/都道府県/表示範囲をpayload化し、RPC戻り値を `BoardThread` へマッピングした。
+
+#### `ios-native/Sources/MegrumCore/MegrumModels.swift`
+- `BoardThread.Audience` のraw valueをDB仕様に合わせ、`same_prefecture` / `same_spot` / `global` を扱えるようにした。
+
+#### `ios-native/Sources/MegrumApp/SupabaseMegrumRepository.swift`
+- `SupabaseGroomClient` と `SupabaseBoardClient` をrepositoryへ接続した。
+- live初期snapshotでグルームと掲示板を読み込むようにした。
+
+#### `ios-native/Sources/MegrumApp/MegrumAppState.swift`
+- `loadMeguriFeed(latitude:longitude:scope:)` と `isLoadingMeguri` を追加し、めぐりホームから再読込できる状態境界を作った。
+- Preview repositoryでも3km/都道府県の表示範囲を切り替えて読み込めるようにした。
+
+#### `ios-native/Sources/MegrumApp/MeguriScreen.swift`
+- `MegrumAppState` を直接受け取り、pull-to-refreshでグルーム/掲示板を再読込するようにした。
+- 掲示板scope表示をDB raw valueに合わせて更新した。
+
+#### `ios-native/Sources/MegrumApp/MegrumRootView.swift`
+- めぐりタブから `MeguriScreen(appState:)` を開くようにした。
+
+#### `ios-native/Sources/MegrumApp/NativePreviewData.swift`
+- Preview掲示板の都道府県scopeを `same_prefecture` に合わせた。
+
+#### `ios-native/Tests/MegrumDataTests/SupabaseGroomClientTests.swift`
+- グルームRPC requestのURL、HTTP method、payload、半径丸めを検証した。
+
+#### `ios-native/Tests/MegrumDataTests/SupabaseBoardClientTests.swift`
+- 掲示板RPC requestのURL、HTTP method、payload、都道府県trim、scope raw valueを検証した。
+
+#### `ios-native/Tests/MegrumCoreTests/MegrumCoreTests.swift`
+- `BoardThread.Audience` がDB raw valueと一致することを検証した。
+
+#### `ios-native/Tests/MegrumAppTests/MegrumAppStateTests.swift`
+- Previewめぐり再読込で3km/都道府県scopeを切り替えられることを検証した。
+
+#### `ios-native/README.md`
+- めぐりRPC clientと `MeguriScreen` の状態接続を追記した。
+
+#### `notes/22_swift_native_migration.md`
+- Swift Native移行のステータスをiter324へ更新し、Phase 4の進捗にめぐりRPC境界を追記した。
+
+### 影響範囲
+
+- Swift Native版のめぐりホーム
+- Swift Native版のグルーム一覧読込
+- Swift Native版のスポット掲示板一覧読込
+- Swift Native版のPostgREST RPC共通境界
+
+### 確認方法
+
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-build --enable-xctest --disable-swift-testing -j 1`
+- `xcodebuild -quiet -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -destination 'generic/platform=iOS Simulator' -derivedDataPath /tmp/megrum-native-xcodebuild CODE_SIGNING_ALLOWED=NO build`
+
+### 関連ファイル
+
+- `ios-native/Sources/MegrumData/SupabaseRESTClient.swift`
+- `ios-native/Sources/MegrumData/SupabaseGroomClient.swift`
+- `ios-native/Sources/MegrumData/SupabaseBoardClient.swift`
+- `ios-native/Sources/MegrumCore/MegrumModels.swift`
+- `ios-native/Sources/MegrumApp/SupabaseMegrumRepository.swift`
+- `ios-native/Sources/MegrumApp/MegrumAppState.swift`
+- `ios-native/Sources/MegrumApp/MeguriScreen.swift`
+- `ios-native/Sources/MegrumApp/MegrumRootView.swift`
+- `ios-native/Sources/MegrumApp/NativePreviewData.swift`
+- `ios-native/Tests/MegrumDataTests/SupabaseGroomClientTests.swift`
+- `ios-native/Tests/MegrumDataTests/SupabaseBoardClientTests.swift`
+- `ios-native/Tests/MegrumCoreTests/MegrumCoreTests.swift`
+- `ios-native/Tests/MegrumAppTests/MegrumAppStateTests.swift`
+- `ios-native/README.md`
+- `notes/22_swift_native_migration.md`
+- `notes/08_design_iterations.md`
+
+### セルフレビュー結果
+
+- ✅ Swift Package testsが62件成功した。
+- ✅ Xcode project buildが成功した。
+- ✅ `BoardThread.Audience` は `notes/09_state_machines.md` / `notes/10_glossary.md` に既にある `nearby_3km` / `same_prefecture` / `same_spot` / `global` に合わせたため、09/10の更新は不要。
+- ✅ 既存RPCをSwift側から呼ぶだけで新規DBスキーマは増やしていないため、`notes/05_data_model.md` の更新は不要。
+- ✅ TestFlight配布はまだ行っていないため、Preview OTA / TestFlight配信は不要。
+
+---
+
 ## イテレーション323：Swift取引チャット境界を追加
 
 ### 背景・問題意識

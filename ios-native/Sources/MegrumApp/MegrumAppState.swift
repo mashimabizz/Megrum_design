@@ -67,6 +67,8 @@ public protocol MegrumRepository: Sendable {
     func createProposal(_ input: ProposalCreateInput) async throws -> TradeProposal
     func loadMessages(proposalID: UUID, limit: Int) async throws -> [TradeMessage]
     func sendMessage(_ input: TradeMessageCreateInput) async throws -> TradeMessage
+    func loadGrooms(latitude: Double?, longitude: Double?, radiusMeters: Int) async throws -> [GroomPost]
+    func loadBoardThreads(latitude: Double?, longitude: Double?, prefecture: String?, scope: BoardThread.Audience) async throws -> [BoardThread]
     func loadMailingAddress() async throws -> MailingAddress?
     func saveMailingAddress(_ address: MailingAddress) async throws -> MailingAddress
     func lookupAddress(postalCode: String) async throws -> PostalCodeAddress?
@@ -109,6 +111,14 @@ public extension MegrumRepository {
 
     func sendMessage(_ input: TradeMessageCreateInput) async throws -> TradeMessage {
         throw MegrumRepositoryError.unsupportedMutation
+    }
+
+    func loadGrooms(latitude: Double?, longitude: Double?, radiusMeters: Int) async throws -> [GroomPost] {
+        []
+    }
+
+    func loadBoardThreads(latitude: Double?, longitude: Double?, prefecture: String?, scope: BoardThread.Audience) async throws -> [BoardThread] {
+        []
     }
 
     func loadMailingAddress() async throws -> MailingAddress? {
@@ -242,6 +252,23 @@ public struct PreviewMegrumRepository: MegrumRepository {
         )
     }
 
+    public func loadGrooms(latitude: Double?, longitude: Double?, radiusMeters: Int) async throws -> [GroomPost] {
+        NativePreviewData.grooms
+    }
+
+    public func loadBoardThreads(latitude: Double?, longitude: Double?, prefecture: String?, scope: BoardThread.Audience) async throws -> [BoardThread] {
+        NativePreviewData.threads.filter { thread in
+            switch scope {
+            case .nearby3km:
+                return thread.audience == .nearby3km
+            case .samePrefecture:
+                return thread.prefecture == prefecture || prefecture == nil
+            case .sameSpot, .global:
+                return thread.audience == scope
+            }
+        }
+    }
+
     public func loadMailingAddress() async throws -> MailingAddress? {
         NativePreviewData.mailingAddress
     }
@@ -313,6 +340,7 @@ public final class MegrumAppState: ObservableObject {
     @Published public private(set) var isLoadingMailingAddress = false
     @Published public private(set) var isLoadingBlockedUsers = false
     @Published public private(set) var isLoadingNotifications = false
+    @Published public private(set) var isLoadingMeguri = false
     @Published public private(set) var isLookingUpPostalCode = false
     @Published public private(set) var isSavingMailingAddress = false
     @Published public private(set) var isCreatingGoodsEntry = false
@@ -358,6 +386,37 @@ public final class MegrumAppState: ObservableObject {
 
     public func refresh() async {
         await loadInitialData()
+    }
+
+    public func loadMeguriFeed(
+        latitude: Double? = nil,
+        longitude: Double? = nil,
+        scope: BoardThread.Audience = .nearby3km
+    ) async {
+        guard !isLoadingMeguri else {
+            return
+        }
+
+        isLoadingMeguri = true
+        errorMessage = nil
+        do {
+            async let loadedGrooms = repository.loadGrooms(
+                latitude: latitude,
+                longitude: longitude,
+                radiusMeters: 1_000
+            )
+            async let loadedThreads = repository.loadBoardThreads(
+                latitude: latitude,
+                longitude: longitude,
+                prefecture: viewer?.prefecture,
+                scope: scope
+            )
+            grooms = try await loadedGrooms
+            threads = try await loadedThreads
+        } catch {
+            errorMessage = "めぐりを読み込めませんでした"
+        }
+        isLoadingMeguri = false
     }
 
     public func replaceRepository(_ repository: any MegrumRepository) async {

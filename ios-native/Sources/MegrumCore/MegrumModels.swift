@@ -673,7 +673,9 @@ public struct GroomPost: Identifiable, Codable, Hashable, Sendable {
 public struct BoardThread: Identifiable, Codable, Hashable, Sendable {
     public enum Audience: String, Codable, Sendable, CaseIterable, Identifiable {
         case nearby3km = "nearby_3km"
-        case prefecture
+        case samePrefecture = "same_prefecture"
+        case sameSpot = "same_spot"
+        case global
 
         public var id: String { rawValue }
     }

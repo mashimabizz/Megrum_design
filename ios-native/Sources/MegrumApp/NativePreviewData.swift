@@ -231,7 +231,7 @@ enum NativePreviewData {
             authorID: viewerID,
             title: "終演後の交換場所",
             body: "駅側より会場横の広場が落ち着いています。",
-            audience: .prefecture,
+            audience: .samePrefecture,
             prefecture: "東京都"
         )
     ]

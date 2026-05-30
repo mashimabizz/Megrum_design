@@ -3,8 +3,7 @@ import MegrumDesign
 import SwiftUI
 
 struct MeguriScreen: View {
-    var grooms: [GroomPost]
-    var threads: [BoardThread]
+    @ObservedObject var appState: MegrumAppState
 
     var body: some View {
         ScrollView {
@@ -13,13 +12,19 @@ struct MeguriScreen: View {
 
                 VStack(alignment: .leading, spacing: 14) {
                     SectionHeader(title: "グルーム", actionTitle: "地図で見る")
-                    GroomStrip(grooms: grooms)
+                    GroomStrip(grooms: appState.grooms)
                 }
 
                 VStack(alignment: .leading, spacing: 14) {
-                    SectionHeader(title: "掲示板", actionTitle: "地図で見る")
+                    HStack {
+                        SectionHeader(title: "掲示板", actionTitle: "地図で見る")
+                        if appState.isLoadingMeguri {
+                            ProgressView()
+                                .controlSize(.small)
+                        }
+                    }
 
-                    ForEach(threads) { thread in
+                    ForEach(appState.threads) { thread in
                         BoardThreadCard(thread: thread)
                     }
                 }
@@ -30,6 +35,9 @@ struct MeguriScreen: View {
         }
         .background(MegrumTheme.canvas.ignoresSafeArea())
         .megrumHiddenNavigationBar()
+        .refreshable {
+            await appState.loadMeguriFeed()
+        }
         .safeAreaInset(edge: .bottom, alignment: .trailing) {
             Button {
             } label: {
@@ -137,8 +145,12 @@ private struct BoardThreadCard: View {
         switch thread.audience {
         case .nearby3km:
             "3km圏内"
-        case .prefecture:
+        case .samePrefecture:
             thread.prefecture ?? "都道府県"
+        case .sameSpot:
+            "スポット"
+        case .global:
+            "全体"
         }
     }
 }

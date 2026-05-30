@@ -29,6 +29,22 @@ final class MegrumAppStateTests: XCTestCase {
         XCTAssertFalse(state.inventory.isEmpty)
     }
 
+    func testAppStateRefreshesPreviewMeguriFeed() async {
+        let state = MegrumAppState(repository: PreviewMegrumRepository())
+
+        await state.loadInitialData()
+        await state.loadMeguriFeed(scope: .nearby3km)
+
+        XCTAssertFalse(state.grooms.isEmpty)
+        XCTAssertEqual(state.threads.map(\.audience), [.nearby3km])
+        XCTAssertFalse(state.isLoadingMeguri)
+
+        await state.loadMeguriFeed(scope: .samePrefecture)
+
+        XCTAssertTrue(state.threads.contains { $0.audience == .samePrefecture })
+        XCTAssertTrue(state.threads.contains { $0.audience == .nearby3km })
+    }
+
     func testAppStateCanReplaceRepositoryAfterAuthChanges() async {
         let state = MegrumAppState(repository: PreviewMegrumRepository())
         let nextViewer = UserProfile(

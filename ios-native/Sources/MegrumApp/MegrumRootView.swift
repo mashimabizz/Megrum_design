@@ -166,7 +166,7 @@ public struct MegrumRootView: View {
             }
 
             NavigationStack {
-                MeguriScreen(grooms: appState.grooms, threads: appState.threads)
+                MeguriScreen(appState: appState)
             }
             .tag(MegrumTab.meguri)
             .tabItem {

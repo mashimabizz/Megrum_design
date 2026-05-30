@@ -86,6 +86,21 @@ public final class SupabaseRESTClient: @unchecked Sendable {
         return try decoder.decode([Row].self, from: data)
     }
 
+    public func rpcRows<Payload: Encodable & Sendable, Row: Decodable & Sendable>(
+        function name: String,
+        payload: Payload
+    ) async throws -> [Row] {
+        let request = try makeRPCRequest(function: name, payload: payload)
+        let (data, response) = try await session.data(for: request)
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw SupabaseRESTError.unexpectedStatus(-1)
+        }
+        guard (200..<300).contains(httpResponse.statusCode) else {
+            throw SupabaseRESTError.unexpectedStatus(httpResponse.statusCode)
+        }
+        return try decoder.decode([Row].self, from: data)
+    }
+
     public func deleteRows(
         from table: String,
         queryItems: [URLQueryItem]
@@ -123,6 +138,17 @@ public final class SupabaseRESTClient: @unchecked Sendable {
         request.setValue("Bearer \(configuration.accessToken ?? configuration.publishableKey)", forHTTPHeaderField: "Authorization")
         request.setValue("application/json", forHTTPHeaderField: "Accept")
         return request
+    }
+
+    public func makeRPCRequest<Payload: Encodable & Sendable>(
+        function name: String,
+        payload: Payload
+    ) throws -> URLRequest {
+        try makeMutationRequest(
+            path: "/rest/v1/rpc/\(name)",
+            method: "POST",
+            body: encoder.encode(payload)
+        )
     }
 
     public func makeMutationRequest(

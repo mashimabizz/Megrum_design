@@ -12,6 +12,8 @@ public struct SupabaseMegrumRepository: MegrumRepository {
     private let notificationClient: SupabaseNotificationClient
     private let proposalClient: SupabaseProposalClient
     private let messageClient: SupabaseMessageClient
+    private let groomClient: SupabaseGroomClient
+    private let boardClient: SupabaseBoardClient
     private let viewerID: UUID
 
     public init(client: SupabaseRESTClient, viewerID: UUID) {
@@ -24,22 +26,31 @@ public struct SupabaseMegrumRepository: MegrumRepository {
         self.notificationClient = SupabaseNotificationClient(client: client)
         self.proposalClient = SupabaseProposalClient(client: client)
         self.messageClient = SupabaseMessageClient(client: client)
+        self.groomClient = SupabaseGroomClient(client: client)
+        self.boardClient = SupabaseBoardClient(client: client)
         self.viewerID = viewerID
     }
 
     public func loadInitialSnapshot() async throws -> MegrumAppSnapshot {
-        async let viewer = loadViewer()
+        let viewer = try await loadViewer()
         async let inventory = loadGoods(kind: "for_trade")
         async let wishes = loadWishes()
         async let proposals = loadProposals()
+        async let grooms = loadGrooms(latitude: nil, longitude: nil, radiusMeters: 1_000)
+        async let threads = loadBoardThreads(
+            latitude: nil,
+            longitude: nil,
+            prefecture: viewer.prefecture,
+            scope: viewer.prefecture == nil ? .nearby3km : .samePrefecture
+        )
 
         return MegrumAppSnapshot(
-            viewer: try await viewer,
+            viewer: viewer,
             inventory: try await inventory,
             wishes: try await wishes,
             proposals: try await proposals,
-            grooms: [],
-            threads: []
+            grooms: try await grooms,
+            threads: try await threads
         )
     }
 
@@ -91,6 +102,28 @@ public struct SupabaseMegrumRepository: MegrumRepository {
 
     public func sendMessage(_ input: TradeMessageCreateInput) async throws -> TradeMessage {
         try await messageClient.sendTextMessage(senderID: viewerID, input: input)
+    }
+
+    public func loadGrooms(latitude: Double?, longitude: Double?, radiusMeters: Int) async throws -> [GroomPost] {
+        try await groomClient.loadNearbyGrooms(
+            latitude: latitude,
+            longitude: longitude,
+            radiusMeters: radiusMeters
+        )
+    }
+
+    public func loadBoardThreads(
+        latitude: Double?,
+        longitude: Double?,
+        prefecture: String?,
+        scope: BoardThread.Audience
+    ) async throws -> [BoardThread] {
+        try await boardClient.loadThreads(
+            latitude: latitude,
+            longitude: longitude,
+            prefecture: prefecture,
+            scope: scope
+        )
     }
 
     public func loadMailingAddress() async throws -> MailingAddress? {
