@@ -16,6 +16,12 @@ public struct SupabaseAuthProfileMetadata: Equatable, Sendable {
     }
 }
 
+public enum SupabaseIDTokenProvider: String, Equatable, Sendable {
+    case apple
+    case google
+    case facebook
+}
+
 public final class SupabaseAuthClient: @unchecked Sendable {
     private let configuration: SupabaseConfiguration
     private let session: URLSession
@@ -47,6 +53,21 @@ public final class SupabaseAuthClient: @unchecked Sendable {
             password: password,
             metadata: metadata,
             emailRedirectTo: emailRedirectTo
+        )
+        return try await performAuthRequest(request)
+    }
+
+    public func signInWithIDToken(
+        provider: SupabaseIDTokenProvider,
+        idToken: String,
+        accessToken: String? = nil,
+        nonce: String? = nil
+    ) async throws -> AuthSession {
+        let request = try makeIDTokenSignInRequest(
+            provider: provider,
+            idToken: idToken,
+            accessToken: accessToken,
+            nonce: nonce
         )
         return try await performAuthRequest(request)
     }
@@ -118,6 +139,27 @@ public final class SupabaseAuthClient: @unchecked Sendable {
         )
         return try makeAuthRequest(
             path: "/auth/v1/signup",
+            method: "POST",
+            body: encoder.encode(payload),
+            bearerToken: configuration.publishableKey
+        )
+    }
+
+    public func makeIDTokenSignInRequest(
+        provider: SupabaseIDTokenProvider,
+        idToken: String,
+        accessToken: String? = nil,
+        nonce: String? = nil
+    ) throws -> URLRequest {
+        let payload = IDTokenPayload(
+            provider: provider.rawValue,
+            idToken: idToken,
+            accessToken: accessToken,
+            nonce: nonce
+        )
+        return try makeAuthRequest(
+            path: "/auth/v1/token",
+            queryItems: [URLQueryItem(name: "grant_type", value: "id_token")],
             method: "POST",
             body: encoder.encode(payload),
             bearerToken: configuration.publishableKey
@@ -198,6 +240,20 @@ private struct SignUpPayload: Encodable {
         case password
         case data
         case emailRedirectTo = "email_redirect_to"
+    }
+}
+
+private struct IDTokenPayload: Encodable {
+    var provider: String
+    var idToken: String
+    var accessToken: String?
+    var nonce: String?
+
+    enum CodingKeys: String, CodingKey {
+        case provider
+        case idToken = "id_token"
+        case accessToken = "access_token"
+        case nonce
     }
 }
 

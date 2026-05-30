@@ -1,3 +1,7 @@
+#if canImport(AuthenticationServices)
+import AuthenticationServices
+import CryptoKit
+#endif
 import MegrumDesign
 import SwiftUI
 
@@ -24,6 +28,8 @@ public struct AuthScreen: View {
     @State private var email = ""
     @State private var password = ""
     @State private var handle = ""
+    @State private var appleSignInNonce: String?
+    @State private var appleSignInError: String?
     @FocusState private var focusedField: Field?
 
     public init(authState: MegrumAuthState) {
@@ -158,12 +164,9 @@ public struct AuthScreen: View {
     private var actionArea: some View {
         VStack(spacing: 14) {
             if let errorMessage = authState.errorMessage {
-                Text(errorMessage)
-                    .font(.system(size: 13, weight: .bold, design: .rounded))
-                    .foregroundStyle(Color(red: 0.851, green: 0.51, blue: 0.42))
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(14)
-                    .background(Color(red: 0.851, green: 0.51, blue: 0.42).opacity(0.1), in: RoundedRectangle(cornerRadius: 16))
+                errorLabel(errorMessage)
+            } else if let appleSignInError {
+                errorLabel(appleSignInError)
             }
 
             Button {
@@ -185,6 +188,8 @@ public struct AuthScreen: View {
             .tint(MegrumTheme.lavender)
             .disabled(authState.isLoading || !canSubmit)
 
+            appleSignInButton
+
             if !authState.isConfigured {
                 Button("画面だけプレビューする") {
                     authState.enterPreview()
@@ -194,6 +199,49 @@ public struct AuthScreen: View {
                 .frame(maxWidth: .infinity)
             }
         }
+    }
+
+    private func errorLabel(_ message: String) -> some View {
+        Text(message)
+            .font(.system(size: 13, weight: .bold, design: .rounded))
+            .foregroundStyle(Color(red: 0.851, green: 0.51, blue: 0.42))
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(14)
+            .background(Color(red: 0.851, green: 0.51, blue: 0.42).opacity(0.1), in: RoundedRectangle(cornerRadius: 16))
+    }
+
+    @ViewBuilder
+    private var appleSignInButton: some View {
+        #if canImport(AuthenticationServices)
+        VStack(spacing: 12) {
+            HStack(spacing: 10) {
+                Rectangle()
+                    .fill(MegrumTheme.muted.opacity(0.18))
+                    .frame(height: 1)
+                Text("または")
+                    .font(.system(size: 12, weight: .bold, design: .rounded))
+                    .foregroundStyle(MegrumTheme.muted)
+                Rectangle()
+                    .fill(MegrumTheme.muted.opacity(0.18))
+                    .frame(height: 1)
+            }
+
+            SignInWithAppleButton(.continue) { request in
+                let nonce = AppleSignInNonce.make()
+                appleSignInNonce = nonce
+                appleSignInError = nil
+                request.requestedScopes = [.fullName, .email]
+                request.nonce = AppleSignInNonce.sha256(nonce)
+            } onCompletion: { result in
+                handleAppleSignIn(result)
+            }
+            .signInWithAppleButtonStyle(.black)
+            .frame(height: 54)
+            .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+            .disabled(authState.isLoading)
+            .accessibilityLabel("Appleで続ける")
+        }
+        #endif
     }
 
     private var canSubmit: Bool {
@@ -206,6 +254,7 @@ public struct AuthScreen: View {
 
     private func submit() async {
         focusedField = nil
+        appleSignInError = nil
         switch mode {
         case .signIn:
             await authState.signIn(email: email, password: password)
@@ -220,3 +269,56 @@ public struct AuthScreen: View {
         case handle
     }
 }
+
+#if canImport(AuthenticationServices)
+private extension AuthScreen {
+    func handleAppleSignIn(_ result: Result<ASAuthorization, Error>) {
+        switch result {
+        case let .success(authorization):
+            guard
+                let credential = authorization.credential as? ASAuthorizationAppleIDCredential,
+                let nonce = appleSignInNonce,
+                let tokenData = credential.identityToken,
+                let idToken = String(data: tokenData, encoding: .utf8)
+            else {
+                appleSignInError = "Appleログイン情報を取得できませんでした。もう一度お試しください"
+                appleSignInNonce = nil
+                return
+            }
+
+            appleSignInNonce = nil
+            let fullName = AppleSignInNonce.displayName(from: credential.fullName)
+            Task {
+                await authState.signInWithApple(idToken: idToken, nonce: nonce, fullName: fullName)
+            }
+        case let .failure(error):
+            appleSignInNonce = nil
+            if let authorizationError = error as? ASAuthorizationError, authorizationError.code == .canceled {
+                return
+            }
+            appleSignInError = "Appleでのログインに失敗しました。もう一度お試しください"
+        }
+    }
+}
+
+private enum AppleSignInNonce {
+    static func make() -> String {
+        "\(UUID().uuidString).\(UUID().uuidString)"
+    }
+
+    static func sha256(_ input: String) -> String {
+        SHA256.hash(data: Data(input.utf8))
+            .map { String(format: "%02x", $0) }
+            .joined()
+    }
+
+    static func displayName(from components: PersonNameComponents?) -> String? {
+        guard let components else {
+            return nil
+        }
+        let value = PersonNameComponentsFormatter.localizedString(from: components, style: .default)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        return value.isEmpty ? nil : value
+    }
+}
+#endif

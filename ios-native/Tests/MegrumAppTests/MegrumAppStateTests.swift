@@ -534,6 +534,17 @@ final class MegrumAppStateTests: XCTestCase {
         XCTAssertNil(state.errorMessage)
     }
 
+    func testAuthStateSignsInWithAppleThroughRepository() async {
+        let state = MegrumAuthState(repository: AppleAuthRepository())
+
+        await state.signInWithApple(idToken: " apple_id_token ", nonce: " raw_nonce ", fullName: " みちりおん ")
+
+        XCTAssertEqual(state.session?.user.email, "apple@example.com")
+        XCTAssertTrue(state.isAuthenticated)
+        XCTAssertFalse(state.isLoading)
+        XCTAssertNil(state.errorMessage)
+    }
+
     func testAuthStateRestoresSessionFromStore() async {
         let store = InMemoryAuthSessionStore()
         let firstState = MegrumAuthState(repository: StubAuthRepository(), sessionStore: store)
@@ -622,6 +633,33 @@ private struct RedirectAuthRepository: MegrumAuthRepository {
             )
         )
     }
+}
+
+private struct AppleAuthRepository: MegrumAuthRepository {
+    var isConfigured: Bool { true }
+
+    func signIn(email: String, password: String) async throws -> AuthSession {
+        throw MegrumRepositoryError.unsupportedMutation
+    }
+
+    func signInWithApple(idToken: String, nonce: String, fullName: String?) async throws -> AuthSession {
+        XCTAssertEqual(idToken, "apple_id_token")
+        XCTAssertEqual(nonce, "raw_nonce")
+        XCTAssertEqual(fullName, "みちりおん")
+        return AuthSession(
+            accessToken: "apple_access_token",
+            user: AuthUser(
+                id: UUID(uuidString: "44444444-4444-4444-4444-444444444444")!,
+                email: "apple@example.com"
+            )
+        )
+    }
+
+    func signUp(_ input: AuthSignUpInput) async throws -> AuthSession {
+        throw MegrumRepositoryError.unsupportedMutation
+    }
+
+    func signOut(session: AuthSession) async throws {}
 }
 
 private struct SingleSnapshotRepository: MegrumRepository {

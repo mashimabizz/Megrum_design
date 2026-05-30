@@ -9,7 +9,7 @@ The existing Expo / React Native app under `mobile/` remains the rollback source
 - `Package.swift` defines the first native Swift package.
 - `MegrumNative.xcodeproj` contains the first buildable iOS app host for the Swift version.
 - `App/MegrumNativeApp.swift` is the app entry point and mounts `MegrumRootView`.
-- `App/MegrumNative.entitlements` declares the native Push Notifications entitlement for APNs registration.
+- `App/MegrumNative.entitlements` declares the native Push Notifications entitlement for APNs registration and the Sign in with Apple capability.
 - `Sources/MegrumCore` contains portable domain models that mirror the current Supabase-backed product concepts.
 - `Sources/MegrumData` contains the first Supabase/PostgREST configuration and request layer.
 - `Sources/MegrumDesign` contains native SwiftUI design primitives, starting with a Liquid Glass-style search button.
@@ -19,7 +19,7 @@ The existing Expo / React Native app under `mobile/` remains the rollback source
 - `Sources/MegrumApp/AccountSetupScreen.swift` contains the first native account setup screen for users whose `account_status` still requires onboarding.
 - `Sources/MegrumApp/SettingsScreen.swift` contains the first native settings list and address settings form.
 - `Sources/MegrumApp/MegrumLocationState.swift` contains the CoreLocation boundary used by native location-aware Meguri surfaces.
-- `Sources/MegrumData/SupabaseAuthClient.swift` contains the first Supabase Auth request layer for email/password login, signup, and logout.
+- `Sources/MegrumData/SupabaseAuthClient.swift` contains the first Supabase Auth request layer for email/password login, signup, native Apple ID token login, and logout.
 - `Sources/MegrumData/SupabaseAuthRedirect.swift` contains redirect URL parsing for Supabase email/OAuth callbacks.
 - `Sources/MegrumData/SupabaseAccountClient.swift` contains the account bootstrap request layer that ensures a Megrum `public.users` profile after signup.
 - `Sources/MegrumData/SupabaseOshiClient.swift` contains the first request layer for reading `groups_master` and `characters_master` into native oshi selection flows.
@@ -54,13 +54,15 @@ To run the native app against Supabase from Xcode or CLI, provide only public/cl
 
 If these values are absent, the Swift app intentionally falls back to preview data.
 
-Auth currently supports the first native email/password path. If Supabase config is present and no session is available, `MegrumRootView` shows `AuthScreen`; without config, it starts signed into preview mode so the app shell remains immediately inspectable.
+Auth currently supports the native email/password path and Sign in with Apple. If Supabase config is present and no session is available, `MegrumRootView` shows `AuthScreen`; without config, it starts signed into preview mode so the app shell remains immediately inspectable.
 
 Live sessions are encoded as `AuthSession` and persisted through `KeychainAuthSessionStore`. The Swift app can restore a saved session on launch, while still keeping the storage abstraction replaceable in tests.
 
 When an auth session is available, `MegrumAppStateFactory.repository(authSession:)` rebuilds the live Supabase repository with that session's access token and user id. This keeps the app shell preview-friendly while allowing signed-in users to drive authenticated data loading.
 
 After email/password signup returns a session, `SupabaseMegrumAuthRepository` calls `SupabaseAccountClient.ensureUserProfile(...)` so the native app has a matching Megrum profile row before moving into account setup screens.
+
+Sign in with Apple uses SwiftUI's native `SignInWithAppleButton`. The app sends Apple's identity token and the raw nonce to Supabase Auth via `/auth/v1/token?grant_type=id_token`, then persists the returned session through the same Keychain-backed session store.
 
 Supabase redirect URLs are handled by `MegrumRootView.onOpenURL`. `SupabaseAuthRedirectParser` reads query or fragment tokens, then `SupabaseAuthClient` loads `/auth/v1/user` before saving the restored `AuthSession`.
 
@@ -78,7 +80,7 @@ The Xcode app host requests iOS notification authorization for configured signed
 
 Remote notification taps read `linkPath` / `notificationId` from the payload, reuse the same tab routing rules as the in-app notification list, and can mark the matching notification read after loading the notification center.
 
-The Xcode target uses `App/MegrumNative.entitlements` for Push Notifications. Debug builds set `APS_ENVIRONMENT=development`; Release builds set `APS_ENVIRONMENT=production` so TestFlight/App Store distribution can use the production APNs environment with the matching Apple provisioning profile.
+The Xcode target uses `App/MegrumNative.entitlements` for Push Notifications and Sign in with Apple. Debug builds set `APS_ENVIRONMENT=development`; Release builds set `APS_ENVIRONMENT=production` so TestFlight/App Store distribution can use the production APNs environment with the matching Apple provisioning profile.
 
 `GoodsGrid` is shared by Home, Search, Inventory, and Wish surfaces. It now opens a native detail sheet on tap and uses SwiftUI's native context menu for long-press actions, keeping the action surface close to iOS Home Screen quick actions while preserving standard accessibility behavior. Search reads tradeable goods through `MegrumAppState`, groups results into match buckets, and exposes group/goods type filter chips from the same master data as Inventory and Wish. From a search result, the exchange-list action can open a native proposal creation sheet that selects one of the viewer's inventory items, chooses an exchange method and condition tags, then creates a `proposals` row through `SupabaseProposalClient`. Inventory and Wish collection screens also expose a native 3/4/5-column toggle, group/goods type filter chips, and a left-side add button. The add button opens a native sheet that loads groups and goods types, then creates a `goods_inventory` row through `MegrumAppState`.
 

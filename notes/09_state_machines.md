@@ -466,7 +466,7 @@ stateDiagram-v2
 
 ### ビジネスルール
 
-- **OAuth経路（Google等）**: メール認証 skip → `verified` に直行（iter20）
+- **OAuth経路（Apple/Google等）**: メール認証 skip → `verified` に直行（iter20, iter343）
 - **削除30日猶予**: その間にログインで `active` に復帰可能
 - **オンボーディング段階**: 性別→推しグループ→メンバー→AWエリア→完了（iter20）
 

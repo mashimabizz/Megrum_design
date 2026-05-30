@@ -120,7 +120,8 @@ tar -xzf /Users/michitaka/Desktop/Megrum_backups/pre-swift-migration-20260531-03
 - iter340で、端末通知タップ時の `linkPath` を既存通知一覧と同じ規則でNativeタブへ変換し、該当カテゴリへ移れるbridgeを追加した。
 - iter341で、Xcode targetに `App/MegrumNative.entitlements` を接続し、Debugはdevelopment、ReleaseはproductionのAPNs entitlementを使えるようにした。
 - iter342で、ログアウト時に登録済みAPNs device tokenの `revoked_at` を更新する境界と設定画面のログアウト導線を追加した。
-- 現時点のAuthはApple/Google OAuthまでは未完了。次のPhase 2作業でApple/Googleへ広げる。
+- iter343で、SwiftUI標準の `SignInWithAppleButton`、nonce生成、Supabase Authの `grant_type=id_token` 境界、Sign in with Apple entitlementを追加した。
+- 現時点のAuthはAppleログインまで追加済み。Google OAuthは後続のPhase 2作業で広げる。
 
 ### Phase 3: Exchange core
 

@@ -4,6 +4,75 @@
 
 ---
 
+## イテレーション343：Swift Appleログインを追加
+
+### 背景・問題意識
+
+Swift Native iOS版をリリース主線にするには、メール/パスワードだけでなくiOS標準のAppleログインが必要になる。Supabase AuthはネイティブApple認証で取得したidentity tokenとraw nonceを `grant_type=id_token` へ渡す方式を持つため、SwiftUI標準ボタンから同じセッション保存・復元境界へつなぐ。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumData/SupabaseAuthClient.swift`
+- `SupabaseIDTokenProvider` と `signInWithIDToken` / `makeIDTokenSignInRequest` を追加した。
+- Appleのidentity tokenとraw nonceを `/auth/v1/token?grant_type=id_token` へ送るrequest builderを追加した。
+
+#### `ios-native/Sources/MegrumApp/MegrumAuthState.swift`
+- auth repository境界に `signInWithApple(idToken:nonce:fullName:)` を追加した。
+- Appleログイン成功時も既存のKeychain-backed `AuthSessionStore` へ保存されるようにした。
+- preview repositoryではAppleログインでもpreview sessionを返せるようにした。
+
+#### `ios-native/Sources/MegrumApp/AuthScreen.swift`
+- SwiftUI標準の `SignInWithAppleButton` を追加した。
+- Apple requestごとにraw nonceを生成し、SHA-256化したnonceをAppleへ渡すようにした。
+- 取得したidentity tokenとraw nonceを `MegrumAuthState.signInWithApple` へ渡すようにした。
+- Appleログイン失敗時のローカルエラー表示を追加した。
+
+#### `ios-native/App/MegrumNative.entitlements`
+- `com.apple.developer.applesignin` capabilityを追加した。
+
+#### `ios-native/README.md` / `notes/22_swift_native_migration.md`
+- Swift Native Authの現状を、メール/パスワード + Appleログインへ更新した。
+
+#### `notes/09_state_machines.md` / `notes/10_glossary.md`
+- OAuth経路にAppleを明記した。
+- Appleログインの用語定義を追加した。
+
+### 影響範囲
+
+- Swift Native版のログイン/新規登録画面
+- Swift Native版のSupabase Auth境界
+- Xcode targetのentitlements
+- Auth state machine上のOAuth経路の説明
+
+### 確認方法
+
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-build --enable-xctest --disable-swift-testing -j 1`
+- `xcodebuild -quiet -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -destination 'generic/platform=iOS Simulator' -derivedDataPath /tmp/megrum-native-xcodebuild CODE_SIGNING_ALLOWED=NO build`
+- `plutil -lint ios-native/App/MegrumNative.entitlements`
+
+### 関連ファイル
+
+- `ios-native/Sources/MegrumData/SupabaseAuthClient.swift`
+- `ios-native/Sources/MegrumApp/MegrumAuthState.swift`
+- `ios-native/Sources/MegrumApp/AuthScreen.swift`
+- `ios-native/App/MegrumNative.entitlements`
+- `ios-native/README.md`
+- `notes/22_swift_native_migration.md`
+- `notes/09_state_machines.md`
+- `notes/10_glossary.md`
+- `notes/08_design_iterations.md`
+
+### セルフレビュー結果
+
+- ✅ Swift Package testsが92件成功した。
+- ✅ Xcode project buildが成功した。
+- ✅ entitlements plist lintが成功した。
+- ✅ AppleログインUIは `SignInWithAppleButton` を使い、独自ボタンで置き換えていない。
+- ✅ Supabase Auth requestは `grant_type=id_token`、`provider=apple`、`id_token`、`nonce` をテストで検証した。
+- ✅ 認証状態は既存の `registered -> verified -> active` 経路を変えないため、状態遷移は説明文のみ更新した。
+- ✅ 新用語として `Appleログイン` を `notes/10_glossary.md` に追加した。
+- ✅ DBスキーマは変更していないため、`notes/05_data_model.md` の更新は不要。
+
 ## イテレーション342：Swift通知端末解除を追加
 
 ### 背景・問題意識

@@ -20,12 +20,17 @@ public protocol MegrumAuthRepository: Sendable {
     var isConfigured: Bool { get }
 
     func signIn(email: String, password: String) async throws -> AuthSession
+    func signInWithApple(idToken: String, nonce: String, fullName: String?) async throws -> AuthSession
     func signUp(_ input: AuthSignUpInput) async throws -> AuthSession
     func signOut(session: AuthSession) async throws
     func restoreSession(fromRedirectURL url: URL) async throws -> AuthSession?
 }
 
 public extension MegrumAuthRepository {
+    func signInWithApple(idToken: String, nonce: String, fullName: String?) async throws -> AuthSession {
+        throw MegrumRepositoryError.unsupportedMutation
+    }
+
     func restoreSession(fromRedirectURL url: URL) async throws -> AuthSession? {
         nil
     }
@@ -38,6 +43,10 @@ public struct PreviewMegrumAuthRepository: MegrumAuthRepository {
 
     public func signIn(email: String, password: String) async throws -> AuthSession {
         Self.previewSession(email: email)
+    }
+
+    public func signInWithApple(idToken: String, nonce: String, fullName: String?) async throws -> AuthSession {
+        Self.previewSession(email: "apple-preview@megrum.jp")
     }
 
     public func signUp(_ input: AuthSignUpInput) async throws -> AuthSession {
@@ -78,6 +87,14 @@ public struct SupabaseMegrumAuthRepository: MegrumAuthRepository {
 
     public func signIn(email: String, password: String) async throws -> AuthSession {
         try await client.signIn(email: email, password: password)
+    }
+
+    public func signInWithApple(idToken: String, nonce: String, fullName: String?) async throws -> AuthSession {
+        try await client.signInWithIDToken(
+            provider: .apple,
+            idToken: idToken,
+            nonce: nonce
+        )
     }
 
     public func signUp(_ input: AuthSignUpInput) async throws -> AuthSession {
@@ -144,6 +161,26 @@ public final class MegrumAuthState: ObservableObject {
 
         await runAuthAction {
             try await repository.signIn(email: trimmedEmail, password: password)
+        }
+    }
+
+    public func signInWithApple(idToken: String, nonce: String, fullName: String?) async {
+        guard !isLoading else {
+            return
+        }
+        let trimmedIDToken = idToken.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmedNonce = nonce.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedIDToken.isEmpty, !trimmedNonce.isEmpty else {
+            errorMessage = "Appleログイン情報を取得できませんでした。もう一度お試しください"
+            return
+        }
+
+        await runAuthAction {
+            try await repository.signInWithApple(
+                idToken: trimmedIDToken,
+                nonce: trimmedNonce,
+                fullName: fullName?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfBlank
+            )
         }
     }
 
@@ -242,6 +279,12 @@ public final class MegrumAuthState: ObservableObject {
             return message
         }
         return "認証に失敗しました。時間をおいてもう一度お試しください"
+    }
+}
+
+private extension String {
+    var nilIfBlank: String? {
+        isEmpty ? nil : self
     }
 }
 

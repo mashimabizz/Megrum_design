@@ -43,6 +43,27 @@ final class SupabaseAuthClientTests: XCTestCase {
         XCTAssertEqual(data["display_name"] as? String, "みちりおん")
     }
 
+    func testBuildsIDTokenSignInRequestForApple() throws {
+        let client = SupabaseAuthClient(configuration: configuration)
+
+        let request = try client.makeIDTokenSignInRequest(
+            provider: .apple,
+            idToken: "apple_id_token",
+            nonce: "raw_nonce"
+        )
+
+        XCTAssertEqual(request.url?.absoluteString, "https://example.supabase.co/auth/v1/token?grant_type=id_token")
+        XCTAssertEqual(request.httpMethod, "POST")
+        XCTAssertEqual(request.value(forHTTPHeaderField: "apikey"), "sb_publishable_test")
+        XCTAssertEqual(request.value(forHTTPHeaderField: "Authorization"), "Bearer sb_publishable_test")
+
+        let body = try XCTUnwrap(request.jsonBody)
+        XCTAssertEqual(body["provider"] as? String, "apple")
+        XCTAssertEqual(body["id_token"] as? String, "apple_id_token")
+        XCTAssertEqual(body["nonce"] as? String, "raw_nonce")
+        XCTAssertNil(body["access_token"])
+    }
+
     func testBuildsSignOutRequestWithSessionBearer() throws {
         let client = SupabaseAuthClient(configuration: configuration)
 
