@@ -762,6 +762,15 @@ export default function MeguriBoardScreen() {
               {viewerContext.spotLabel} / {displayMeguriBoardPrefecture(viewerContext.prefecture)}
             </Text>
           </View>
+          <Pressable
+            accessibilityLabel="掲示板を更新"
+            accessibilityRole="button"
+            disabled={loading || refreshing}
+            onPress={refreshThreadsSilently}
+            style={[styles.roundButton, loading || refreshing ? styles.roundButtonDisabled : null]}
+          >
+            <IconSymbol name="arrow-clockwise" color={megrumColors.ink} size={18} />
+          </Pressable>
           <Pressable accessibilityRole="button" onPress={openComposer} style={styles.composeButton}>
             <IconSymbol name="add" color="#fff" size={18} />
           </Pressable>
@@ -1549,6 +1558,9 @@ const styles = StyleSheet.create({
     height: 40,
     justifyContent: "center",
     width: 40,
+  },
+  roundButtonDisabled: {
+    opacity: 0.42,
   },
   headerCopy: {
     flex: 1,

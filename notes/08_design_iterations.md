@@ -4,6 +4,53 @@
 
 ---
 
+## イテレーション256：掲示板一覧ヘッダーに更新ボタンを追加する
+
+### 背景・問題意識
+
+一般的なスレッド一覧では、プル更新だけでなく、明示的に最新状態を取り直すボタンがあると分かりやすい。スポット掲示板はプル更新に対応しているが、初見では更新操作に気づきにくいため、ヘッダーから掲示板一覧を更新できるようにした。
+
+### 変更内容
+
+#### `mobile/app/meguri-board.tsx`
+- 掲示板一覧ヘッダーに更新ボタンを追加した。
+- 押下時は既存の `refreshThreadsSilently` を使い、現在の表示条件を保ったままスレッド一覧と返信下書きIDを再取得するようにした。
+- 初期読み込み中または更新中はボタンを無効化し、二重実行を避けるようにした。
+
+#### `notes/09_state_machines.md`
+- Meguri Board Lifecycle にヘッダー更新ボタンの表示/操作ルールを追記した。
+
+#### `notes/10_glossary.md`
+- 掲示板ヘッダー更新を追加した。
+
+### 影響範囲
+
+- iOS版 スポット掲示板一覧
+- ヘッダー操作
+- スレッド一覧の更新導線
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- `EAS_UPDATE_PROJECT_SLUG=ihub EXPO_NO_GIT_STATUS=1 npm --prefix mobile run update:ios:preview -- --message "[iter256] add board refresh button" --non-interactive`
+- Preview OTA: Update group ID `1c7fb294-a312-4188-832d-72ac9603e219` / iOS update ID `019e7660-e658-7b97-ac51-848802441a77`
+
+### 関連ファイル
+
+- `mobile/app/meguri-board.tsx`
+- `notes/08_design_iterations.md`
+- `notes/09_state_machines.md`
+- `notes/10_glossary.md`
+
+### セルフレビュー結果
+
+- ✅ 既存のプル更新処理を使い回し、取得ロジックを重複させていない。
+- ✅ 読み込み中/更新中は無効化し、連打で複数更新が走るのを避けた。
+- ✅ ネイティブ依存追加なしでPreview OTA対象内に収めた。
+
+---
+
 ## イテレーション255：掲示板一覧に個別既読操作を追加する
 
 ### 背景・問題意識
