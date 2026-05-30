@@ -4,6 +4,44 @@
 
 ---
 
+## イテレーション269：他人プロフィール下部の空白を解消する
+
+### 背景・問題意識
+
+オーナーから、他人のプロフィールを見た時に画面下部5cmほどが背景色の空白で覆われ、コンポーネントが下まで見えないという指摘があった。対象画面は外側の `Screen` に下部余白を持たせたまま、内側にも独自 `ScrollView` を置いていたため、スクロール領域の下に不要な余白が残っていた。
+
+### 変更内容
+
+#### `mobile/app/user-profile.tsx`
+- 他人プロフィール画面の `Screen` に `bottomInset={false}` を指定し、外側の大きな下部余白を削除した。
+- 画面内の `ScrollView` と既存の `scrollContent.paddingBottom` に余白管理を寄せ、下のコンポーネントが表示領域内に入るようにした。
+
+### 影響範囲
+
+- iOS版 他人プロフィール画面
+- 譲る候補 / 個別募集タブ下部
+- `この人に打診する` CTA 周辺の表示領域
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- `EAS_UPDATE_PROJECT_SLUG=ihub EXPO_NO_GIT_STATUS=1 npm --prefix mobile run update:ios:preview -- --message "[iter269] fix user profile bottom gap" --non-interactive`
+- Preview OTA: Update group ID `2d8eaf25-7a7d-46ed-8fc1-3a4f8f7d458d` / iOS update ID `019e76a2-15f5-75b0-bbb3-eb8f13911096`
+
+### 関連ファイル
+
+- `mobile/app/user-profile.tsx`
+- `notes/08_design_iterations.md`
+
+### セルフレビュー結果
+
+- ✅ 他人プロフィール画面だけに絞り、共通 `Screen` の挙動は変えないようにした。
+- ✅ スクロール画面内の既存余白は維持しつつ、外側の過剰な下部余白だけを外した。
+- ✅ 状態名・新用語・DBスキーマに影響しないため、`notes/09_state_machines.md` と `notes/10_glossary.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション268：ホームヘッダーと検索フィルター導線を整える
 
 ### 背景・問題意識

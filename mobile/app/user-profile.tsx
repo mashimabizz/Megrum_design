@@ -339,7 +339,7 @@ export default function UserProfileScreen() {
   }
 
   return (
-    <Screen scroll={false} contentStyle={styles.screen}>
+    <Screen bottomInset={false} scroll={false} contentStyle={styles.screen}>
       <ScrollView
         automaticallyAdjustsScrollIndicatorInsets
         contentInsetAdjustmentBehavior="automatic"
