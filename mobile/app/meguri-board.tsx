@@ -1027,7 +1027,7 @@ export default function MeguriBoardScreen() {
                               <Text style={styles.mediaCountText}>{thread.imageUris.length}</Text>
                             </View>
                           ) : null}
-                          <Text style={styles.threadTime}>{formatRelativeTime(thread.latestActivityAt)}</Text>
+                          <Text style={styles.threadTime}>{formatThreadListTimeLabel(thread)}</Text>
                           <Pressable
                             accessibilityRole="button"
                             hitSlop={8}
@@ -1466,6 +1466,16 @@ function formatRelativeTime(value: number) {
   if (hours < 24) return `${hours}時間前`;
   const days = Math.floor(hours / 24);
   return `${days}日前`;
+}
+
+function formatThreadListTimeLabel(thread: MeguriBoardThread) {
+  if (thread.replyCount > 0) {
+    return `返信 ${formatRelativeTime(thread.latestActivityAt)}`;
+  }
+  if (thread.updatedAt && thread.updatedAt > thread.createdAt + 60000) {
+    return `更新 ${formatRelativeTime(thread.updatedAt)}`;
+  }
+  return `作成 ${formatRelativeTime(thread.createdAt)}`;
 }
 
 const styles = StyleSheet.create({

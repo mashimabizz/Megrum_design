@@ -4,6 +4,53 @@
 
 ---
 
+## イテレーション249：掲示板一覧で作成・更新・返信時刻を見分けられるようにする
+
+### 背景・問題意識
+
+スレッド一覧では、右上の相対時刻だけだと、新しく立ったスレッドなのか、既存スレッドに返信がついたのか、本文が更新されたのかを判別しにくい。現地情報の掲示板では更新理由の見分けが重要なため、一覧カードの時刻表示に種別ラベルを付けた。
+
+### 変更内容
+
+#### `mobile/app/meguri-board.tsx`
+- スレッドカード右上の時刻を `formatThreadListTimeLabel` 経由に変更した。
+- 返信があるスレッドは `返信 n分前` と表示するようにした。
+- 返信がなく本文更新があるスレッドは `更新 n分前`、それ以外は `作成 n分前` と表示するようにした。
+
+#### `notes/09_state_machines.md`
+- Meguri Board Lifecycle に一覧時刻ラベルのルールを追記した。
+
+#### `notes/10_glossary.md`
+- 掲示板一覧時刻ラベルを追加した。
+
+### 影響範囲
+
+- iOS版 スポット掲示板一覧
+- スレッドカード右上の時刻表示
+- 未読・更新確認のしやすさ
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- `EAS_UPDATE_PROJECT_SLUG=ihub EXPO_NO_GIT_STATUS=1 npm --prefix mobile run update:ios:preview -- --message "[iter249] label board list activity time" --non-interactive`
+- Preview OTA: Update group ID `cebefe25-43fb-4981-9b5a-bd1017a18228` / iOS update ID `019e7644-ad4d-7087-b8a7-0bb2e179fea4`
+
+### 関連ファイル
+
+- `mobile/app/meguri-board.tsx`
+- `notes/08_design_iterations.md`
+- `notes/09_state_machines.md`
+- `notes/10_glossary.md`
+
+### セルフレビュー結果
+
+- ✅ 相対時刻は維持しつつ、スレッドが動いた理由だけを短いラベルで補足した。
+- ✅ 既存の並び替え・未読判定・データモデルには影響させず、一覧表示だけの改善にした。
+- ✅ DB変更なし、ネイティブ依存追加なしでPreview OTA対象内に収めた。
+
+---
+
 ## イテレーション248：掲示板一覧カードから投稿者プロフィールへ移動できるようにする
 
 ### 背景・問題意識
