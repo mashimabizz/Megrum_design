@@ -4,6 +4,50 @@
 
 ---
 
+## イテレーション335：Swift通知からめぐり会話へ遷移
+
+### 背景・問題意識
+
+Swift Native版では通知一覧とめぐりメッセージのデータ境界はできたが、通知をタップしても対象画面へ深く入る導線がまだ弱かった。`groom_reply` / `meguri_message` の通知はタブ切替だけではなく、通知の `link_path` から相手ユーザーIDを解釈して、相手別のめぐりメッセージ画面へ直接pushできるようにする。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/SettingsScreen.swift`
+- 通知一覧に `MeguriMessagePeerRoute` を追加し、めぐり系通知をタップした時だけ相手別メッセージ画面へ遷移するようにした。
+- `MegrumNotification.meguriMessagePeerID` を追加し、`userId` / `user_id` / `peerId` / `peer_id` queryまたはpath中のUUIDを解釈できるようにした。
+- `MeguriMessagesScreen` を追加し、`MegrumAppState.meguriMessages(with:)` を表示するNativeチャット画面を作った。
+- 取引チャットの設計に寄せた吹き出し、時刻表示、入力欄、送信ボタンを追加した。
+
+#### `ios-native/README.md` / `notes/22_swift_native_migration.md`
+- Swift NativeめぐりPhaseの進捗として、通知からめぐりメッセージへ入る導線を追記した。
+
+### 影響範囲
+
+- Swift Native版の通知一覧
+- Swift Native版のめぐりメッセージ画面
+- `groom_reply` / `meguri_message` 通知の遷移
+
+### 確認方法
+
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-build --enable-xctest --disable-swift-testing -j 1`
+- `xcodebuild -quiet -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -destination 'generic/platform=iOS Simulator' -derivedDataPath /tmp/megrum-native-xcodebuild CODE_SIGNING_ALLOWED=NO build`
+
+### 関連ファイル
+
+- `ios-native/Sources/MegrumApp/SettingsScreen.swift`
+- `ios-native/README.md`
+- `notes/22_swift_native_migration.md`
+- `notes/08_design_iterations.md`
+
+### セルフレビュー結果
+
+- ✅ Swift Package testsが80件成功した。
+- ✅ Xcode project buildが成功した。
+- ✅ 既存の `notifications.link_path` と `meguri_messages` を使うため、新規migrationは追加していない。
+- ✅ 既存の通知とめぐりメッセージの状態内で完結しているため、`notes/09_state_machines.md` の更新は不要。
+- ✅ 新規用語・廃止用語は追加していないため、`notes/10_glossary.md` の更新は不要。
+- ✅ DBスキーマ自体は変更していないため、`notes/05_data_model.md` の更新は不要。
+
 ## イテレーション334：Swiftめぐりメッセージ境界を追加
 
 ### 背景・問題意識
