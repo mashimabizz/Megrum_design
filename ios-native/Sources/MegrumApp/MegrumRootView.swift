@@ -63,9 +63,39 @@ public struct MegrumRootView: View {
     public var body: some View {
         Group {
             if authState.isAuthenticated {
-                authenticatedTabs
+                authenticatedRoot
             } else {
                 AuthScreen(authState: authState)
+            }
+        }
+    }
+
+    private var authenticatedRoot: some View {
+        Group {
+            if appState.viewer == nil {
+                NativeLoadingScreen(title: "Megrumを読み込んでいます")
+            } else if appState.viewer?.accountStatus.requiresSetup == true {
+                NavigationStack {
+                    AccountSetupScreen(appState: appState)
+                }
+            } else {
+                authenticatedTabs
+            }
+        }
+        .task {
+            await syncRepositoryWithAuthSession()
+        }
+        .onChange(of: authState.session?.user.id) { _, userID in
+            guard userID != nil else {
+                return
+            }
+            Task {
+                await syncRepositoryWithAuthSession()
+            }
+        }
+        .sheet(isPresented: $showsSearch) {
+            NavigationStack {
+                SearchScreen(items: appState.inventory)
             }
         }
     }
@@ -124,27 +154,26 @@ public struct MegrumRootView: View {
             }
         }
         .tint(MegrumTheme.lavender)
-        .task {
-            await syncRepositoryWithAuthSession()
-        }
-        .onChange(of: authState.session?.user.id) { _, userID in
-            guard userID != nil else {
-                return
-            }
-            Task {
-                await syncRepositoryWithAuthSession()
-            }
-        }
-        .sheet(isPresented: $showsSearch) {
-            NavigationStack {
-                SearchScreen(items: appState.inventory)
-            }
-        }
     }
 
     private func syncRepositoryWithAuthSession() async {
         await appState.replaceRepository(
             MegrumAppStateFactory.repository(authSession: authState.session)
         )
+    }
+}
+
+private struct NativeLoadingScreen: View {
+    var title: String
+
+    var body: some View {
+        VStack(spacing: 14) {
+            ProgressView()
+            Text(title)
+                .font(.system(size: 14, weight: .bold, design: .rounded))
+                .foregroundStyle(MegrumTheme.muted)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(MegrumTheme.canvas.ignoresSafeArea())
     }
 }

@@ -11,4 +11,12 @@ final class MegrumCoreTests: XCTestCase {
     func testProposalStatusRawValueMatchesExistingStateMachine() {
         XCTAssertEqual(ProposalStatus.agreementOneSide.rawValue, "agreement_one_side")
     }
+
+    func testAccountStatusSetupBoundary() {
+        XCTAssertTrue(AccountStatus.registered.requiresSetup)
+        XCTAssertTrue(AccountStatus.verified.requiresSetup)
+        XCTAssertTrue(AccountStatus.onboarding.requiresSetup)
+        XCTAssertFalse(AccountStatus.active.requiresSetup)
+        XCTAssertEqual(AccountStatus.deletionRequested.rawValue, "deletion_requested")
+    }
 }

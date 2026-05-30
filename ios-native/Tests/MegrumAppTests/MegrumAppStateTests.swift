@@ -43,6 +43,18 @@ final class MegrumAppStateTests: XCTestCase {
         XCTAssertTrue(state.inventory.isEmpty)
     }
 
+    func testAppStateCompletesAccountSetupThroughRepository() async {
+        let state = MegrumAppState(repository: PreviewMegrumRepository())
+
+        let completed = await state.completeAccountSetup(displayName: "みちりおん", prefecture: "山形県")
+
+        XCTAssertTrue(completed)
+        XCTAssertEqual(state.viewer?.displayName, "みちりおん")
+        XCTAssertEqual(state.viewer?.prefecture, "山形県")
+        XCTAssertEqual(state.viewer?.accountStatus, .active)
+        XCTAssertFalse(state.isSavingAccountSetup)
+    }
+
     func testAuthStateSignsInThroughRepository() async {
         let state = MegrumAuthState(repository: StubAuthRepository())
 

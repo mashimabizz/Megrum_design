@@ -27,8 +27,29 @@ public struct MegrumAppSnapshot: Sendable {
     }
 }
 
+public struct AccountSetupInput: Equatable, Sendable {
+    public var displayName: String
+    public var prefecture: String?
+
+    public init(displayName: String, prefecture: String? = nil) {
+        self.displayName = displayName
+        self.prefecture = prefecture
+    }
+}
+
+public enum MegrumRepositoryError: Error, Equatable, Sendable {
+    case unsupportedMutation
+}
+
 public protocol MegrumRepository: Sendable {
     func loadInitialSnapshot() async throws -> MegrumAppSnapshot
+    func completeAccountSetup(_ input: AccountSetupInput) async throws -> UserProfile
+}
+
+public extension MegrumRepository {
+    func completeAccountSetup(_ input: AccountSetupInput) async throws -> UserProfile {
+        throw MegrumRepositoryError.unsupportedMutation
+    }
 }
 
 public struct PreviewMegrumRepository: MegrumRepository {
@@ -44,6 +65,17 @@ public struct PreviewMegrumRepository: MegrumRepository {
             threads: NativePreviewData.threads
         )
     }
+
+    public func completeAccountSetup(_ input: AccountSetupInput) async throws -> UserProfile {
+        UserProfile(
+            id: NativePreviewData.viewer.id,
+            handle: NativePreviewData.viewer.handle,
+            displayName: input.displayName,
+            avatarURL: NativePreviewData.viewer.avatarURL,
+            prefecture: input.prefecture,
+            accountStatus: .active
+        )
+    }
 }
 
 @MainActor
@@ -55,6 +87,7 @@ public final class MegrumAppState: ObservableObject {
     @Published public private(set) var grooms: [GroomPost] = []
     @Published public private(set) var threads: [BoardThread] = []
     @Published public private(set) var isLoading = false
+    @Published public private(set) var isSavingAccountSetup = false
     @Published public private(set) var errorMessage: String?
 
     private var repository: any MegrumRepository
@@ -89,6 +122,35 @@ public final class MegrumAppState: ObservableObject {
         await loadInitialData()
     }
 
+    public func completeAccountSetup(displayName: String, prefecture: String?) async -> Bool {
+        guard !isSavingAccountSetup else {
+            return false
+        }
+        let trimmedDisplayName = displayName.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedDisplayName.isEmpty else {
+            errorMessage = "表示名を入力してください"
+            return false
+        }
+
+        isSavingAccountSetup = true
+        errorMessage = nil
+
+        do {
+            viewer = try await repository.completeAccountSetup(
+                AccountSetupInput(
+                    displayName: trimmedDisplayName,
+                    prefecture: prefecture?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfBlank
+                )
+            )
+            isSavingAccountSetup = false
+            return true
+        } catch {
+            errorMessage = "プロフィールを保存できませんでした"
+            isSavingAccountSetup = false
+            return false
+        }
+    }
+
     private func apply(_ snapshot: MegrumAppSnapshot) {
         viewer = snapshot.viewer
         inventory = snapshot.inventory
@@ -96,5 +158,11 @@ public final class MegrumAppState: ObservableObject {
         proposals = snapshot.proposals
         grooms = snapshot.grooms
         threads = snapshot.threads
+    }
+}
+
+private extension String {
+    var nilIfBlank: String? {
+        isEmpty ? nil : self
     }
 }

@@ -63,6 +63,29 @@ public final class SupabaseRESTClient: @unchecked Sendable {
         return try decoder.decode([Row].self, from: data)
     }
 
+    public func updateRows<Payload: Encodable & Sendable, Row: Decodable & Sendable>(
+        in table: String,
+        values: Payload,
+        select: String = "*",
+        queryItems: [URLQueryItem]
+    ) async throws -> [Row] {
+        let request = try makeMutationRequest(
+            path: "/rest/v1/\(table)",
+            queryItems: [URLQueryItem(name: "select", value: select)] + queryItems,
+            method: "PATCH",
+            body: encoder.encode(values),
+            prefer: "return=representation"
+        )
+        let (data, response) = try await session.data(for: request)
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw SupabaseRESTError.unexpectedStatus(-1)
+        }
+        guard (200..<300).contains(httpResponse.statusCode) else {
+            throw SupabaseRESTError.unexpectedStatus(httpResponse.statusCode)
+        }
+        return try decoder.decode([Row].self, from: data)
+    }
+
     public func makeRequest(path: String, queryItems: [URLQueryItem] = []) throws -> URLRequest {
         guard var components = URLComponents(url: configuration.projectURL, resolvingAgainstBaseURL: false) else {
             throw SupabaseRESTError.invalidURL

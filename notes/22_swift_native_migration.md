@@ -1,7 +1,7 @@
 # 22. Swift Native Migration
 
 最終更新: 2026-05-31
-ステータス: Active draft（iter307）
+ステータス: Active draft（iter308）
 
 ## 目的
 
@@ -106,7 +106,8 @@ tar -xzf /Users/michitaka/Desktop/Megrum_backups/pre-swift-migration-20260531-03
 - iter305で、`AuthSessionStore`、`KeychainAuthSessionStore`、`InMemoryAuthSessionStore` を追加し、Swift版がログインsessionを保存・復元できる境界を持った。
 - iter306で、保存済みまたはログイン直後の `AuthSession` を `MegrumAppStateFactory.repository(authSession:)` に渡し、session access tokenとuser idを `SupabaseMegrumRepository` へ反映できるようにした。
 - iter307で、Supabase Authの新規登録成功後に `public.users` のMegrumプロフィール行をupsertする `SupabaseAccountClient` を追加した。
-- 現時点のAuthはOAuth・メールリンク復帰・オンボーディング判定までは未完了。次のPhase 2作業で認証リンク処理、Apple/Google、初回プロフィール編集へ広げる。
+- iter308で、`users.account_status` を `AccountStatus` としてSwift型化し、`registered / verified / onboarding` のユーザーを初回プロフィール設定画面へ分岐できるようにした。
+- 現時点のAuthはOAuth・メールリンク復帰・推し設定を含むフルオンボーディングまでは未完了。次のPhase 2作業で認証リンク処理、Apple/Google、初回推し設定へ広げる。
 
 ### Phase 3: Exchange core
 

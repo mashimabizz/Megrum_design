@@ -36,7 +36,7 @@ public final class SupabaseAccountClient: @unchecked Sendable {
         return try SupabaseRESTClient(configuration: configuration.withAccessToken(session.accessToken)).makeMutationRequest(
             path: "/rest/v1/users",
             queryItems: [
-                URLQueryItem(name: "select", value: "id,handle,display_name,avatar_url,primary_area"),
+                URLQueryItem(name: "select", value: "id,handle,display_name,avatar_url,primary_area,account_status"),
                 URLQueryItem(name: "on_conflict", value: "id")
             ],
             method: "POST",
@@ -114,6 +114,7 @@ private struct SupabaseUserProfileRow: Decodable, Sendable {
     var displayName: String?
     var avatarUrl: URL?
     var primaryArea: String?
+    var accountStatus: String?
 
     var profile: UserProfile {
         UserProfile(
@@ -121,7 +122,8 @@ private struct SupabaseUserProfileRow: Decodable, Sendable {
             handle: handle ?? "megrum",
             displayName: displayName ?? handle ?? "Megrum",
             avatarURL: avatarUrl,
-            prefecture: primaryArea
+            prefecture: primaryArea,
+            accountStatus: AccountStatus(rawValue: accountStatus ?? "") ?? .onboarding
         )
     }
 }

@@ -30,7 +30,7 @@ public struct SupabaseMegrumRepository: MegrumRepository {
     private func loadViewer() async throws -> UserProfile {
         let rows: [UserRow] = try await client.fetchRows(
             from: "users",
-            select: "id,handle,display_name,avatar_url,primary_area",
+            select: "id,handle,display_name,avatar_url,primary_area,account_status",
             queryItems: [
                 URLQueryItem(name: "id", value: "eq.\(viewerID.uuidString.lowercased())"),
                 URLQueryItem(name: "limit", value: "1")
@@ -40,7 +40,31 @@ public struct SupabaseMegrumRepository: MegrumRepository {
             id: viewerID,
             handle: "megrum",
             displayName: "Megrum",
-            prefecture: nil
+            prefecture: nil,
+            accountStatus: .onboarding
+        )
+    }
+
+    public func completeAccountSetup(_ input: AccountSetupInput) async throws -> UserProfile {
+        let rows: [UserRow] = try await client.updateRows(
+            in: "users",
+            values: UserProfileUpdatePayload(
+                displayName: input.displayName,
+                primaryArea: input.prefecture,
+                accountStatus: AccountStatus.active.rawValue
+            ),
+            select: "id,handle,display_name,avatar_url,primary_area,account_status",
+            queryItems: [
+                URLQueryItem(name: "id", value: "eq.\(viewerID.uuidString.lowercased())"),
+                URLQueryItem(name: "limit", value: "1")
+            ]
+        )
+        return rows.first?.profile ?? UserProfile(
+            id: viewerID,
+            handle: "megrum",
+            displayName: input.displayName,
+            prefecture: input.prefecture,
+            accountStatus: .active
         )
     }
 
@@ -90,6 +114,7 @@ private struct UserRow: Decodable, Sendable {
     var displayName: String?
     var avatarUrl: URL?
     var primaryArea: String?
+    var accountStatus: String?
 
     var profile: UserProfile {
         UserProfile(
@@ -97,9 +122,16 @@ private struct UserRow: Decodable, Sendable {
             handle: handle ?? "unknown",
             displayName: displayName ?? handle ?? "Megrum",
             avatarURL: avatarUrl,
-            prefecture: primaryArea
+            prefecture: primaryArea,
+            accountStatus: AccountStatus(rawValue: accountStatus ?? "") ?? .active
         )
     }
+}
+
+private struct UserProfileUpdatePayload: Encodable, Sendable {
+    var displayName: String
+    var primaryArea: String?
+    var accountStatus: String
 }
 
 private struct GoodsInventoryRow: Decodable, Sendable {

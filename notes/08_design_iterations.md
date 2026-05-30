@@ -4,6 +4,98 @@
 
 ---
 
+## イテレーション308：Swift初回プロフィール設定分岐を追加
+
+### 背景・問題意識
+
+iter307で新規登録後にMegrumプロフィール行を作れるようになったが、Swift app shellは `account_status='onboarding'` のユーザーもそのまま通常タブへ入れていた。初回設定が未完了のままホーム・在庫・取引へ進むと、表示名や都道府県を前提にする画面で不整合が起きる。既存のAccount Lifecycleに合わせ、Swift側でも初回プロフィール設定へ分岐できるようにした。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumCore/MegrumModels.swift`
+- `AccountStatus` enumを追加し、`registered / verified / onboarding / active / suspended / deletion_requested / deleted` をSwift型で扱えるようにした。
+- `requiresSetup` を追加し、初回設定が必要な状態を判定できるようにした。
+- `UserProfile` に `accountStatus` を追加した。
+
+#### `ios-native/Sources/MegrumApp/MegrumAppState.swift`
+- `AccountSetupInput` と `MegrumRepositoryError` を追加した。
+- `MegrumRepository.completeAccountSetup(_:)` を追加し、repository経由で初回設定完了を保存できるようにした。
+- `MegrumAppState.completeAccountSetup(displayName:prefecture:)` を追加し、表示名validation、保存中状態、エラー表示、viewer更新を扱うようにした。
+
+#### `ios-native/Sources/MegrumApp/SupabaseMegrumRepository.swift`
+- `users.account_status` を読み込んで `UserProfile.accountStatus` に反映するようにした。
+- `completeAccountSetup(_:)` を実装し、`display_name` / `primary_area` / `account_status='active'` をSupabaseへPATCHできるようにした。
+
+#### `ios-native/Sources/MegrumData/SupabaseRESTClient.swift`
+- `updateRows(...)` を追加し、PostgRESTのPATCH + `Prefer: return=representation` に対応した。
+
+#### `ios-native/Sources/MegrumApp/AccountSetupScreen.swift`
+- SwiftUIの初回プロフィール設定画面を追加した。
+- 表示名と都道府県を入力し、保存後に `active` へ進めるようにした。
+
+#### `ios-native/Sources/MegrumApp/MegrumRootView.swift`
+- Auth済みでもviewer未ロード中はloadingを表示するようにした。
+- `accountStatus.requiresSetup == true` の場合は通常TabViewではなく `AccountSetupScreen` を表示するようにした。
+- 起動時/session変更時のrepository同期をauthenticated root側へ移し、初回設定画面でもデータロードが走るようにした。
+
+#### `ios-native/Sources/MegrumApp/AppChrome.swift`
+- Auth画面と初回設定画面で共用するtext field styleを共通化した。
+- iOS/macOS両方でtestできるinline navigation title helperを追加した。
+
+#### `ios-native/Tests/`
+- AccountStatusの初回設定判定を検証した。
+- AppStateがrepository経由で初回設定完了を反映できることを検証した。
+- Supabase Account clientのselect対象に `account_status` を含めるようテストを更新した。
+
+#### `ios-native/README.md`
+- 初回プロフィール設定分岐とAccountStatusの扱いを追記した。
+
+#### `notes/22_swift_native_migration.md`
+- Phase 2の進捗として、Swift側の初回設定分岐を追記した。
+
+### 影響範囲
+
+- Swift Native iOS版のAuth後Root分岐
+- 初回登録後のプロフィール設定
+- `users.account_status` とSwift UIの接続
+- プロフィール編集、推し設定、住所設定へ広げる前段階
+
+### 確認方法
+
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-build --enable-xctest --disable-swift-testing -j 1`
+- `xcodebuild -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -destination 'generic/platform=iOS Simulator' -derivedDataPath /tmp/megrum-native-xcodebuild CODE_SIGNING_ALLOWED=NO build`
+- `git diff --check -- ios-native/Sources/MegrumCore/MegrumModels.swift ios-native/Sources/MegrumData/SupabaseRESTClient.swift ios-native/Sources/MegrumData/SupabaseAccountClient.swift ios-native/Sources/MegrumApp/AppChrome.swift ios-native/Sources/MegrumApp/AuthScreen.swift ios-native/Sources/MegrumApp/AccountSetupScreen.swift ios-native/Sources/MegrumApp/MegrumAppState.swift ios-native/Sources/MegrumApp/MegrumRootView.swift ios-native/Sources/MegrumApp/SupabaseMegrumRepository.swift ios-native/Tests/MegrumCoreTests/MegrumCoreTests.swift ios-native/Tests/MegrumAppTests/MegrumAppStateTests.swift ios-native/Tests/MegrumDataTests/SupabaseAccountClientTests.swift ios-native/README.md notes/22_swift_native_migration.md notes/08_design_iterations.md`
+
+### 関連ファイル
+
+- `ios-native/Sources/MegrumCore/MegrumModels.swift`
+- `ios-native/Sources/MegrumData/SupabaseRESTClient.swift`
+- `ios-native/Sources/MegrumData/SupabaseAccountClient.swift`
+- `ios-native/Sources/MegrumApp/AppChrome.swift`
+- `ios-native/Sources/MegrumApp/AuthScreen.swift`
+- `ios-native/Sources/MegrumApp/AccountSetupScreen.swift`
+- `ios-native/Sources/MegrumApp/MegrumAppState.swift`
+- `ios-native/Sources/MegrumApp/MegrumRootView.swift`
+- `ios-native/Sources/MegrumApp/SupabaseMegrumRepository.swift`
+- `ios-native/Tests/MegrumCoreTests/MegrumCoreTests.swift`
+- `ios-native/Tests/MegrumAppTests/MegrumAppStateTests.swift`
+- `ios-native/Tests/MegrumDataTests/SupabaseAccountClientTests.swift`
+- `ios-native/README.md`
+- `notes/22_swift_native_migration.md`
+- `notes/08_design_iterations.md`
+
+### セルフレビュー結果
+
+- ✅ Account Lifecycleの既存状態名に合わせてSwift型を追加した。
+- ✅ `onboarding` ユーザーを通常タブへ入れず、初回プロフィール設定へ分岐できるようにした。
+- ✅ Swift Package testsが19件成功した。
+- ✅ 状態遷移名は既存 `notes/09_state_machines.md` と一致しており、新しい状態追加はないため09更新は不要。
+- ✅ 用語・DBスキーマ変更はないため、`notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要。
+- ⚠️ 推し設定、メンバー設定、住所設定を含む本来のフルオンボーディングは次工程で段階追加する。
+- ✅ TestFlight配布はまだ行っていないため、Preview OTA / TestFlight配信は不要。
+
+---
+
 ## イテレーション307：Swift登録後プロフィール作成を追加
 
 ### 背景・問題意識

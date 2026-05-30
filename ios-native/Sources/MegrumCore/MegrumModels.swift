@@ -39,25 +39,49 @@ public enum MatchBucket: String, Codable, Sendable, CaseIterable, Identifiable {
     public var id: String { rawValue }
 }
 
+public enum AccountStatus: String, Codable, Sendable, CaseIterable, Identifiable {
+    case registered
+    case verified
+    case onboarding
+    case active
+    case suspended
+    case deletionRequested = "deletion_requested"
+    case deleted
+
+    public var id: String { rawValue }
+
+    public var requiresSetup: Bool {
+        switch self {
+        case .registered, .verified, .onboarding:
+            true
+        case .active, .suspended, .deletionRequested, .deleted:
+            false
+        }
+    }
+}
+
 public struct UserProfile: Identifiable, Codable, Hashable, Sendable {
     public var id: UUID
     public var handle: String
     public var displayName: String
     public var avatarURL: URL?
     public var prefecture: String?
+    public var accountStatus: AccountStatus
 
     public init(
         id: UUID,
         handle: String,
         displayName: String,
         avatarURL: URL? = nil,
-        prefecture: String? = nil
+        prefecture: String? = nil,
+        accountStatus: AccountStatus = .active
     ) {
         self.id = id
         self.handle = handle
         self.displayName = displayName
         self.avatarURL = avatarURL
         self.prefecture = prefecture
+        self.accountStatus = accountStatus
     }
 }
 
