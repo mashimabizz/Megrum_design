@@ -5,6 +5,8 @@ import { RouteHeader } from "../../src/components/RouteHeader";
 import { Screen } from "../../src/components/Screen";
 import { useAuth } from "../../src/auth/AuthProvider";
 import { IconSymbol, type IconSymbolName } from "../../src/components/IconSymbol";
+import { routeFromNotificationLinkPath } from "../../src/lib/notificationRoutes";
+import { setMobileNotificationBadgeCount } from "../../src/lib/notifications";
 import { supabase } from "../../src/lib/supabase";
 import { megrumColors, megrumRadii } from "../../src/theme/tokens";
 
@@ -188,6 +190,10 @@ export default function NotificationsScreen() {
     return items;
   }, [filter, items]);
 
+  useEffect(() => {
+    void setMobileNotificationBadgeCount(unreadCount);
+  }, [unreadCount]);
+
   async function markAllRead() {
     const readAt = new Date().toISOString();
     setItems((current) => current.map((item) => ({ ...item, readAt: item.readAt ?? readAt })));
@@ -219,7 +225,7 @@ export default function NotificationsScreen() {
           });
       }
     }
-    const route = routeFromLinkPath(item.linkPath);
+    const route = routeFromNotificationLinkPath(item.linkPath);
     if (route) router.push(route);
   }
 
@@ -374,68 +380,6 @@ async function fetchNotifications(userId: string): Promise<NotificationItem[]> {
 
 function normalizeKind(value: string): NotificationKind {
   return value in KIND_ICON ? (value as NotificationKind) : "proposal_received";
-}
-
-function routeFromLinkPath(path: string | null) {
-  if (!path) return null;
-  if (path === "/" || path === "/profile" || path === "/search") return path;
-  const meguriLetters = path.match(/^\/meguri-letters(?:\?(.*))?$/);
-  if (meguriLetters) {
-    const params = new URLSearchParams(meguriLetters[1] ?? "");
-    return {
-      pathname: "/meguri-letters",
-      params: {
-        open: params.get("open") ?? undefined,
-        userId: params.get("userId") ?? undefined,
-      },
-    } as const;
-  }
-  const meguriBoardThread = path.match(/^\/meguri-board-thread(?:\?(.*))?$/);
-  if (meguriBoardThread) {
-    const params = new URLSearchParams(meguriBoardThread[1] ?? "");
-    const id = params.get("id");
-    if (!id) return null;
-    return {
-      pathname: "/meguri-board-thread",
-      params: {
-        id,
-        viewMode: params.get("viewMode") ?? undefined,
-      },
-    } as const;
-  }
-  const dispute = path.match(/^\/disputes\/([^/]+)/);
-  if (dispute) {
-    return { pathname: "/dispute-detail", params: { id: dispute[1] } } as const;
-  }
-  const proposal = path.match(/^\/proposals\/([^/]+)/);
-  if (proposal) {
-    return { pathname: "/transaction-detail", params: { id: proposal[1] } } as const;
-  }
-  const transaction = path.match(/^\/transactions\/([^/]+)/);
-  if (transaction) {
-    if (path.endsWith("/capture")) {
-      return { pathname: "/transaction-capture", params: { id: transaction[1] } } as const;
-    }
-    if (path.endsWith("/approve")) {
-      return { pathname: "/transaction-approve", params: { id: transaction[1] } } as const;
-    }
-    if (path.endsWith("/rate")) {
-      return { pathname: "/transaction-rate", params: { id: transaction[1] } } as const;
-    }
-    if (path.includes("/cancel-or-late")) {
-      const kind = path.includes("kind=late") ? "late" : "cancel";
-      return {
-        pathname: "/transaction-cancel-or-late",
-        params: { id: transaction[1], kind },
-      } as const;
-    }
-    return { pathname: "/transaction-detail", params: { id: transaction[1] } } as const;
-  }
-  const user = path.match(/^\/users\/([^/]+)/);
-  if (user) {
-    return { pathname: "/user-profile", params: { id: user[1] } } as const;
-  }
-  return null;
 }
 
 function formatRelative(iso: string): string {

@@ -4,36 +4,36 @@ import { RouteHeader } from "../src/components/RouteHeader";
 import { Screen } from "../src/components/Screen";
 import { useAuth } from "../src/auth/AuthProvider";
 import { IconSymbol, type IconSymbolName } from "../src/components/IconSymbol";
-import { supabase } from "../src/lib/supabase";
+import {
+  getPushNotificationsEnabled,
+  registerExpoPushTokenForUser,
+  setPushNotificationsEnabled,
+} from "../src/lib/notifications";
 import { megrumColors, megrumRadii } from "../src/theme/tokens";
 
 export default function NotificationSettingsScreen() {
   const { previewMode, user } = useAuth();
-  const [emailEnabled, setEmailEnabled] = useState(true);
+  const [pushEnabled, setPushEnabled] = useState(true);
   const [saved, setSaved] = useState(false);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!supabase || !user || previewMode) {
-      setEmailEnabled(true);
+    if (!user || previewMode) {
+      setPushEnabled(true);
       setError(null);
       return;
     }
 
     let active = true;
-    supabase
-      .from("user_notification_settings")
-      .select("email_enabled")
-      .eq("user_id", user.id)
-      .maybeSingle()
-      .then(({ data, error }) => {
-        if (!active) return;
-        if (error) {
-          setError(error.message);
-          return;
+    getPushNotificationsEnabled(user.id)
+      .then((enabled) => {
+        if (active) setPushEnabled(enabled);
+      })
+      .catch((reason: unknown) => {
+        if (active) {
+          setError(reason instanceof Error ? reason.message : "通知設定を読み込めませんでした");
         }
-        setEmailEnabled((data?.email_enabled as boolean | undefined) ?? true);
       });
 
     return () => {
@@ -41,38 +41,45 @@ export default function NotificationSettingsScreen() {
     };
   }, [previewMode, user]);
 
-  async function toggleEmail() {
-    const next = !emailEnabled;
-    setEmailEnabled(next);
+  async function togglePush() {
+    const next = !pushEnabled;
+    setPushEnabled(next);
     setSaved(false);
     setError(null);
-    if (!supabase || !user || previewMode) {
+    if (!user || previewMode) {
       setSaved(true);
       return;
     }
 
     setPending(true);
-    const { error } = await supabase
-      .from("user_notification_settings")
-      .upsert(
-        {
-          user_id: user.id,
-          email_enabled: next,
-        },
-        { onConflict: "user_id" },
-      );
-    setPending(false);
-    if (error) {
-      setEmailEnabled(!next);
-      setError(error.message);
-      return;
+    try {
+      await setPushNotificationsEnabled(user.id, next);
+      if (next) {
+        await registerExpoPushTokenForUser(user.id);
+      }
+      setSaved(true);
+    } catch (reason) {
+      setPushEnabled(!next);
+      setError(reason instanceof Error ? reason.message : "通知設定を保存できませんでした");
+    } finally {
+      setPending(false);
     }
-    setSaved(true);
   }
 
   return (
     <Screen contentStyle={styles.screen}>
-      <RouteHeader title="通知設定" subtitle="チャネルごとのON/OFFを切替" />
+      <RouteHeader title="通知設定" subtitle="iPhoneへの通知を管理" />
+
+      <SettingsSection label="モバイル通知" sub="打診、取引チャット、掲示板返信を端末に通知">
+        <SettingsRow
+          icon="notifications-outline"
+          title="プッシュ通知"
+          sub={pushEnabled ? "ON：Megrumの通知を端末で受け取ります" : "OFF：通知一覧には残ります"}
+          control={
+            <Toggle disabled={pending} on={pushEnabled} onPress={togglePush} />
+          }
+        />
+      </SettingsSection>
 
       <SettingsSection label="アプリ内通知" sub="ホームのベルと通知一覧で確認">
         <SettingsRow
@@ -83,24 +90,10 @@ export default function NotificationSettingsScreen() {
         />
       </SettingsSection>
 
-      <SettingsSection
-        label="メール通知"
-        sub={user?.email ? `送信先：${user.email}` : "メールアドレス未設定"}
-      >
-        <SettingsRow
-          icon="mail-outline"
-          title="メール通知"
-          sub="重要イベント（打診着信・合意・申告など）をメールで通知"
-          control={
-            <Toggle disabled={pending} on={emailEnabled} onPress={toggleEmail} />
-          }
-        />
-      </SettingsSection>
-
       <View style={styles.noteBox}>
-        <Text style={styles.noteTitle}>メール送信について</Text>
+        <Text style={styles.noteTitle}>通知の残り方</Text>
         <Text style={styles.noteText}>
-          現在は設定の保存のみ動作します。実際のメール送信機能は次フェーズで対応します。
+          端末通知をOFFにしても、アプリ内の通知一覧には打診や返信の通知が残ります。
         </Text>
       </View>
 

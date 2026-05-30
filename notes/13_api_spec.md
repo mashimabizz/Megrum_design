@@ -1609,6 +1609,7 @@ Native ad（マッチカード型広告）取得。
 - **Auth**: 必須
 - **Request**: `{ platform: "ios|android|web", token }`
 - **Response 201**: `{ device_id }`
+- **DB**: `notification_devices` にExpo Push Tokenを保存。`notifications` INSERT時に有効端末へExpo Pushを配送する
 
 ### DELETE /api/v1/notifications/devices/:id
 
@@ -1622,7 +1623,7 @@ Native ad（マッチカード型広告）取得。
 通知設定取得。
 
 - **Auth**: 必須
-- **Response 200**: `{ topics: { match_found, message_received, agreement_reached, dispute_filed, ... }, quiet_hours }`
+- **Response 200**: `{ push_enabled, topics: { match_found, message_received, agreement_reached, dispute_filed, ... }, quiet_hours }`
 - **Screen**: `SET-notif`
 
 ### PATCH /api/v1/notifications/settings
@@ -1630,7 +1631,7 @@ Native ad（マッチカード型広告）取得。
 通知設定更新。
 
 - **Auth**: 必須
-- **Request**: 部分更新
+- **Request**: 部分更新。MVPでは `{ push_enabled }`
 
 ### WS /api/v1/ws
 

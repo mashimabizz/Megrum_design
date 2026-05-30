@@ -4,7 +4,7 @@
 > 実装の正解集。`09_state_machines.md` と完全に整合させ、`10_glossary.md` の用語を使う。
 
 最終更新: 2026-05-30
-ステータス: Draft v2.26（iter188 掲示板参加中表示を追加）
+ステータス: Draft v2.27（iter276 モバイル通知を追加）
 
 ## 最新化履歴
 
@@ -38,6 +38,7 @@
 | **v2.24** | **2026-05-30** | **iter179 反映（スポット掲示板の通報理由をUIで選択。`meguri_board_reports.reason` は `spam` / `harassment` / `privacy` / `unsafe` / `off_topic` / `other` を保存）** |
 | **v2.25** | **2026-05-30** | **iter180 反映（スポット掲示板のスレッド作成・返信下書きを端末内 `meguri.board.composerDrafts.v1` / `meguri.board.replyDrafts.v1` に自動保存）** |
 | **v2.26** | **2026-05-30** | **iter188 反映（`list_meguri_board_threads_for_viewer()` に `viewer_participated` を追加。スレッド作成者または可視返信済みユーザーを参加中として返す）** |
+| **v2.27** | **2026-05-30** | **iter276 反映（`notification_devices` と `user_notification_settings.push_enabled` を追加し、`notifications` INSERTからExpo Pushへ配送する）** |
 | **v2.20** | **2026-05-29** | **iter168.90 反映（`search_query_logs` と人気検索RPCを追加。検索結果はマッチ分類つきグッズパネルで表示）** |
 | **v2.21** | **2026-05-30** | **iter168.97 反映（`schedules.place_name` 追加。合意時に `both` を単一手段へ固定し、現地交換の複数候補は1件へ固定する運用を追記）** |
 
@@ -185,6 +186,49 @@ iter24 で「推し2階層」（グループ/作品 → メンバー/キャラ�
 - 打診で `exchange_method='mail'` または `exchange_method='both'` を含める場合、送信者はこの行が存在しないと送れない
 - 合意後にだけ、当事者双方へ相手の住所を表示する
 - 取引途中で設定画面の住所が変わっても履歴が壊れないよう、合意時点で取引側へスナップショット保存する前提
+
+### `notifications`（通知一覧 / iter92, iter276）
+
+アプリ内の通知一覧と未読バッジの基礎テーブル。打診、取引チャット、グルーム返信、めぐりメッセージ、スポット掲示板返信/メンションなどの通知を保存する。
+
+| カラム | 型 | 説明 |
+|---|---|---|
+| `id` | uuid | PK |
+| `user_id` | uuid | 通知を受け取るユーザー |
+| `kind` | text | `proposal_received` / `groom_reply` / `meguri_board_reply` など |
+| `title` / `body` | text | 通知一覧と端末通知に表示する内容 |
+| `link_path` | text nullable | タップ時の遷移先 |
+| `proposal_id` / `dispute_id` ほか | uuid nullable | 関連エンティティ |
+| `read_at` | timestamptz nullable | nullなら未読 |
+| `created_at` | timestamptz | |
+
+iter276以降、`notifications` に行が追加されると、`notification_devices` の有効トークンへExpo Pushを送るDBトリガーが動く。
+
+### `user_notification_settings`（通知設定 / iter93, iter276）
+
+| カラム | 型 | 説明 |
+|---|---|---|
+| `user_id` | uuid | PK |
+| `email_enabled` | boolean | 既存互換の通知チャネル設定 |
+| `push_enabled` | boolean | iOS/Androidのモバイル通知を受け取るか |
+| `created_at` / `updated_at` | timestamptz | |
+
+アプリ内通知一覧は常時残る。`push_enabled=false` の場合は端末通知だけを止める。
+
+### `notification_devices`（モバイル通知端末 / iter276）
+
+| カラム | 型 | 説明 |
+|---|---|---|
+| `id` | uuid | PK |
+| `user_id` | uuid | → auth.users |
+| `platform` | text | `ios` / `android` / `web` |
+| `expo_push_token` | text | Expo Push Token |
+| `app_version` | text nullable | 登録時のアプリバージョン |
+| `last_seen_at` | timestamptz | 最終登録/更新時刻 |
+| `revoked_at` | timestamptz nullable | ログアウト等で無効化した時刻 |
+| `created_at` / `updated_at` | timestamptz | |
+
+`unique(user_id, expo_push_token)` で同一ユーザー・同一端末の重複登録を防ぐ。`revoked_at is null` の端末だけが配送対象。
 
 ### `user_oshi`（推し登録）
 

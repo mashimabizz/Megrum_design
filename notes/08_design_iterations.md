@@ -4,6 +4,89 @@
 
 ---
 
+## イテレーション276：モバイル通知と通知ドロワー導線を実装
+
+### 背景・問題意識
+
+オーナーから、メールではなくモバイルアプリとして通知を届けること、左ドロワーに「通知」を追加して未読数バッジを表示すること、通知一覧から対象画面へ遷移できるようにすることが求められた。既存の `notifications` テーブルと通知一覧画面はあったが、端末通知の登録・配送、左ドロワー導線、未読バッジの接続が不足していた。
+
+### 変更内容
+
+#### `mobile/src/lib/notifications.ts`
+- Expo Notifications の表示ハンドラを設定し、iOS/Android端末通知の表示・サウンド・バッジ更新を有効化した。
+- Expo Push Token を取得し、`notification_devices` へ登録する処理を追加した。
+- 通知設定 `push_enabled`、未読通知数取得、通知既読化、アプリアイコンバッジ更新、通知レスポンス解析の共通処理を追加した。
+
+#### `mobile/app/_layout.tsx`
+- ログイン中ユーザーの端末通知登録をアプリ起動時に行う `NotificationBootstrap` を追加した。
+- `notifications` のRealtime更新を監視し、未読バッジを同期するようにした。
+- OS通知をタップした時、`linkPath` から対象画面へ遷移し、該当通知を既読化するようにした。
+
+#### `mobile/app/(tabs)/_layout.tsx`
+- 左ドロワーに「通知」を追加した。
+- 未読通知数を取得し、通知項目の右側にバッジ表示するようにした。
+- `notifications` のRealtime更新でバッジ件数を更新するようにした。
+
+#### `mobile/app/(tabs)/notifications.tsx`
+- 通知タップ時の遷移ロジックを共通化し、未読数に応じてアプリアイコンバッジを同期するようにした。
+
+#### `mobile/app/notification-settings.tsx`
+- 通知設定をモバイル通知中心に変更し、`push_enabled` のON/OFFを保存できるようにした。
+- ONにした時は端末のExpo Push Token登録も実行するようにした。
+
+#### `mobile/src/lib/notificationRoutes.ts`
+- 通知の `link_path` をExpo Routerの遷移先へ変換する共通ルート解決関数を追加した。
+
+#### `supabase/migrations/20260531000000_add_mobile_push_notifications.sql`
+- `notification_devices` テーブルを追加した。
+- `user_notification_settings.push_enabled` を追加した。
+- `notifications` INSERT時にExpo Push APIへ配送するDBトリガーを追加した。
+
+#### `notes/05_data_model.md` / `notes/10_glossary.md` / `notes/13_api_spec.md`
+- モバイル通知、通知一覧、通知バッジ、通知端末、`push_enabled` の仕様を追記した。
+
+### 影響範囲
+
+- iOS版 通知登録・通知タップ遷移
+- iOS版 左ドロワー
+- iOS版 通知一覧
+- iOS版 通知設定
+- Supabase通知配送基盤
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- `EAS_UPDATE_PROJECT_SLUG=ihub EXPO_NO_GIT_STATUS=1 npm --prefix mobile run update:ios:preview -- --message "[iter276] モバイル通知を実装" --non-interactive`
+- Preview OTA: Update group ID `bbfff11b-5e3f-4272-8f26-c11cf14b2d03` / iOS update ID `019e76dc-ec38-7444-b03f-b5c3933ece86`
+- DB反映: `npx supabase db push --linked --yes` で `20260530235900_add_meguri_board_thread_participation.sql` と `20260531000000_add_mobile_push_notifications.sql` を適用済み
+
+### 関連ファイル
+
+- `mobile/app/_layout.tsx`
+- `mobile/app/(tabs)/_layout.tsx`
+- `mobile/app/(tabs)/notifications.tsx`
+- `mobile/app/notification-settings.tsx`
+- `mobile/src/lib/notifications.ts`
+- `mobile/src/lib/notificationRoutes.ts`
+- `supabase/migrations/20260531000000_add_mobile_push_notifications.sql`
+- `notes/05_data_model.md`
+- `notes/08_design_iterations.md`
+- `notes/10_glossary.md`
+- `notes/13_api_spec.md`
+
+### セルフレビュー結果
+
+- ✅ 既存の `notifications` テーブルを活かし、端末通知・通知一覧・未読バッジを同じ未読状態で同期するようにした。
+- ✅ 左ドロワーの通知項目から `/notifications` へ遷移でき、未読数がバッジ表示される。
+- ✅ 通知タップ時は `link_path` を共通ルート解決し、取引・掲示板・めぐりメッセージなどの対象画面へ遷移する。
+- ✅ データモデル変更があるため、`notes/05_data_model.md` を更新した。
+- ✅ 新用語があるため、`notes/10_glossary.md` を更新した。
+- ✅ API仕様の通知設定・端末登録が変わるため、`notes/13_api_spec.md` を更新した。
+- ✅ 状態名・状態遷移の追加はないため、`notes/09_state_machines.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション275：ブロック一覧と解除画面を追加
 
 ### 背景・問題意識

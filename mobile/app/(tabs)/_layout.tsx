@@ -19,6 +19,8 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAuth } from "../../src/auth/AuthProvider";
 import { IconSymbol, type IconSymbolName } from "../../src/components/IconSymbol";
 import { ProfileDrawerProvider } from "../../src/components/ProfileDrawerContext";
+import { fetchUnreadNotificationCount } from "../../src/lib/notifications";
+import { supabase } from "../../src/lib/supabase";
 import { megrumColors } from "../../src/theme/tokens";
 
 const TAB_CONFIG = {
@@ -351,6 +353,7 @@ function ProfileDrawerContent({
   const insets = useSafeAreaInsets();
   const { profile, previewMode, user, signOut, exitPreview } = useAuth();
   const [updateChecking, setUpdateChecking] = useState(false);
+  const [unreadNotificationCount, setUnreadNotificationCount] = useState(previewMode ? 3 : 0);
   const metadata = user?.user_metadata as Record<string, unknown> | undefined;
   const appVariant = String(Constants.expoConfig?.extra?.appVariant ?? "");
   const canApplyPreviewUpdate = appVariant === "preview" || Updates.channel === "preview";
@@ -370,6 +373,48 @@ function ProfileDrawerContent({
     stringMeta(metadata?.avatar_url) ??
     stringMeta(metadata?.picture);
   const area = profile?.primaryArea ?? "エリア未設定";
+
+  useEffect(() => {
+    if (previewMode) {
+      setUnreadNotificationCount(3);
+      return;
+    }
+    const client = supabase;
+    if (!client || !user?.id) {
+      setUnreadNotificationCount(0);
+      return;
+    }
+
+    let active = true;
+    const refresh = () => {
+      fetchUnreadNotificationCount(user.id)
+        .then((count) => {
+          if (active) setUnreadNotificationCount(count);
+        })
+        .catch(() => {
+          if (active) setUnreadNotificationCount(0);
+        });
+    };
+    refresh();
+    const channel = client
+      .channel(`drawer-notifications:${user.id}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          filter: `user_id=eq.${user.id}`,
+          schema: "public",
+          table: "notifications",
+        },
+        refresh,
+      )
+      .subscribe();
+
+    return () => {
+      active = false;
+      void client.removeChannel(channel);
+    };
+  }, [previewMode, user?.id]);
 
   function go(path: Parameters<typeof router.push>[0]) {
     router.push(path);
@@ -426,6 +471,12 @@ function ProfileDrawerContent({
 
       <View style={styles.drawerMenu}>
         <DrawerItem icon="star-outline" label="プロフィール" onPress={() => go("/me")} />
+        <DrawerItem
+          accessory={<DrawerNotificationBadge count={unreadNotificationCount} />}
+          icon="notifications-outline"
+          label="通知"
+          onPress={() => go("/notifications")}
+        />
         <DrawerItem icon="create-outline" label="プロフィール編集" onPress={() => go("/profile-edit")} />
         <DrawerItem icon="sparkles-outline" label="推し設定" onPress={() => go("/oshi-settings")} />
         <DrawerItem icon="calendar-outline" label="スケジュール" onPress={() => go("/schedules")} />
@@ -460,6 +511,15 @@ function ProfileDrawerContent({
         <DrawerItem compact icon="document-text-outline" label="ヘルプ" onPress={() => go("/help")} />
         <DrawerItem compact icon="ban-outline" label={previewMode ? "プレビューを終了" : "ログアウト"} onPress={handleSignOut} />
       </View>
+    </View>
+  );
+}
+
+function DrawerNotificationBadge({ count }: { count: number }) {
+  if (count <= 0) return null;
+  return (
+    <View style={styles.drawerBadge}>
+      <Text style={styles.drawerBadgeText}>{count > 99 ? "99+" : count}</Text>
     </View>
   );
 }
@@ -622,6 +682,20 @@ const styles = StyleSheet.create({
   },
   drawerItemAccessory: {
     marginLeft: "auto",
+  },
+  drawerBadge: {
+    alignItems: "center",
+    backgroundColor: megrumColors.warn,
+    borderRadius: 999,
+    minWidth: 24,
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+  },
+  drawerBadgeText: {
+    color: "#fff",
+    fontSize: 11,
+    fontWeight: "900",
+    lineHeight: 14,
   },
   drawerItemTextCompact: {
     fontSize: 16.5,
