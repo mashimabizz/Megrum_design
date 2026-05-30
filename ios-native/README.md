@@ -23,6 +23,7 @@ The existing Expo / React Native app under `mobile/` remains the rollback source
 - `Sources/MegrumData/SupabaseOshiClient.swift` contains the first request layer for reading `groups_master` and `characters_master` into native oshi selection flows.
 - `Sources/MegrumData/SupabaseGoodsInventoryClient.swift` contains the request layer for reading `goods_types_master`, creating `goods_inventory` rows for Inventory/Wish, and searching tradeable goods.
 - `Sources/MegrumData/SupabaseProposalClient.swift` contains the request layer for loading and creating `proposals`.
+- `Sources/MegrumData/SupabaseMessageClient.swift` contains the request layer for loading and sending trade chat `messages`.
 - `Sources/MegrumData/SupabaseMailingAddressClient.swift` contains the request layer for reading and upserting `user_mailing_addresses`.
 - `Sources/MegrumData/PostalCodeAddressClient.swift` contains the zipcloud postal code lookup boundary for address autofill.
 - `Sources/MegrumData/SupabaseBlockClient.swift` contains the request layer for listing and deleting `groom_user_blocks`.
@@ -70,7 +71,7 @@ Supabase redirect URLs are handled by `MegrumRootView.onOpenURL`. `SupabaseAuthR
 
 `GoodsGrid` is shared by Home, Search, Inventory, and Wish surfaces. It now opens a native detail sheet on tap and uses SwiftUI's native context menu for long-press actions, keeping the action surface close to iOS Home Screen quick actions while preserving standard accessibility behavior. Search reads tradeable goods through `MegrumAppState`, groups results into match buckets, and exposes group/goods type filter chips from the same master data as Inventory and Wish. From a search result, the exchange-list action can open a native proposal creation sheet that selects one of the viewer's inventory items, chooses an exchange method and condition tags, then creates a `proposals` row through `SupabaseProposalClient`. Inventory and Wish collection screens also expose a native 3/4/5-column toggle, group/goods type filter chips, and a left-side add button. The add button opens a native sheet that loads groups and goods types, then creates a `goods_inventory` row through `MegrumAppState`.
 
-`TradesScreen` splits proposals into "打診中" and "進行中" with a floating native segmented control above the tab bar. Horizontal swipes switch the stage, and tapping a trade card opens a native detail sheet.
+`TradesScreen` splits proposals into "打診中" and "進行中" with a floating native segmented control above the tab bar. Horizontal swipes switch the stage, and tapping a trade card opens a native detail sheet. The detail sheet now loads trade chat messages through `MegrumAppState`, shows native message bubbles, and can send text messages through `SupabaseMessageClient`.
 
 For the Xcode app host, use CLI-first verification:
 

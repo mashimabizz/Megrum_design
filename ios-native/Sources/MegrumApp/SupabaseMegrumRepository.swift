@@ -11,6 +11,7 @@ public struct SupabaseMegrumRepository: MegrumRepository {
     private let blockClient: SupabaseBlockClient
     private let notificationClient: SupabaseNotificationClient
     private let proposalClient: SupabaseProposalClient
+    private let messageClient: SupabaseMessageClient
     private let viewerID: UUID
 
     public init(client: SupabaseRESTClient, viewerID: UUID) {
@@ -22,6 +23,7 @@ public struct SupabaseMegrumRepository: MegrumRepository {
         self.blockClient = SupabaseBlockClient(client: client)
         self.notificationClient = SupabaseNotificationClient(client: client)
         self.proposalClient = SupabaseProposalClient(client: client)
+        self.messageClient = SupabaseMessageClient(client: client)
         self.viewerID = viewerID
     }
 
@@ -81,6 +83,14 @@ public struct SupabaseMegrumRepository: MegrumRepository {
 
     public func createProposal(_ input: ProposalCreateInput) async throws -> TradeProposal {
         try await proposalClient.createProposal(senderID: viewerID, input: input)
+    }
+
+    public func loadMessages(proposalID: UUID, limit: Int) async throws -> [TradeMessage] {
+        try await messageClient.loadMessages(proposalID: proposalID, limit: limit)
+    }
+
+    public func sendMessage(_ input: TradeMessageCreateInput) async throws -> TradeMessage {
+        try await messageClient.sendTextMessage(senderID: viewerID, input: input)
     }
 
     public func loadMailingAddress() async throws -> MailingAddress? {

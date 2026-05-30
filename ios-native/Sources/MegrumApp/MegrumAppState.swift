@@ -65,6 +65,8 @@ public protocol MegrumRepository: Sendable {
     func createGoodsEntry(_ input: GoodsEntryInput) async throws -> GoodsItem
     func searchGoods(_ input: GoodsSearchInput) async throws -> [GoodsItem]
     func createProposal(_ input: ProposalCreateInput) async throws -> TradeProposal
+    func loadMessages(proposalID: UUID, limit: Int) async throws -> [TradeMessage]
+    func sendMessage(_ input: TradeMessageCreateInput) async throws -> TradeMessage
     func loadMailingAddress() async throws -> MailingAddress?
     func saveMailingAddress(_ address: MailingAddress) async throws -> MailingAddress
     func lookupAddress(postalCode: String) async throws -> PostalCodeAddress?
@@ -98,6 +100,14 @@ public extension MegrumRepository {
     }
 
     func createProposal(_ input: ProposalCreateInput) async throws -> TradeProposal {
+        throw MegrumRepositoryError.unsupportedMutation
+    }
+
+    func loadMessages(proposalID: UUID, limit: Int) async throws -> [TradeMessage] {
+        []
+    }
+
+    func sendMessage(_ input: TradeMessageCreateInput) async throws -> TradeMessage {
         throw MegrumRepositoryError.unsupportedMutation
     }
 
@@ -218,6 +228,20 @@ public struct PreviewMegrumRepository: MegrumRepository {
         )
     }
 
+    public func loadMessages(proposalID: UUID, limit: Int) async throws -> [TradeMessage] {
+        NativePreviewData.messages[proposalID] ?? []
+    }
+
+    public func sendMessage(_ input: TradeMessageCreateInput) async throws -> TradeMessage {
+        TradeMessage(
+            id: UUID(),
+            proposalID: input.proposalID,
+            senderID: NativePreviewData.viewerID,
+            messageType: .text,
+            body: input.body
+        )
+    }
+
     public func loadMailingAddress() async throws -> MailingAddress? {
         NativePreviewData.mailingAddress
     }
@@ -271,6 +295,7 @@ public final class MegrumAppState: ObservableObject {
     @Published public private(set) var inventory: [GoodsItem] = []
     @Published public private(set) var wishes: [WishItem] = []
     @Published public private(set) var proposals: [TradeProposal] = []
+    @Published public private(set) var messagesByProposalID: [UUID: [TradeMessage]] = [:]
     @Published public private(set) var grooms: [GroomPost] = []
     @Published public private(set) var threads: [BoardThread] = []
     @Published public private(set) var oshiGroups: [OshiGroup] = []
@@ -292,6 +317,8 @@ public final class MegrumAppState: ObservableObject {
     @Published public private(set) var isSavingMailingAddress = false
     @Published public private(set) var isCreatingGoodsEntry = false
     @Published public private(set) var isCreatingProposal = false
+    @Published public private(set) var loadingMessagesProposalID: UUID?
+    @Published public private(set) var sendingMessageProposalID: UUID?
     @Published public private(set) var unblockingUserID: UUID?
     @Published public private(set) var isMarkingNotificationsRead = false
     @Published public private(set) var isSavingAccountSetup = false
@@ -306,6 +333,10 @@ public final class MegrumAppState: ObservableObject {
 
     public var unreadNotificationCount: Int {
         notifications.filter(\.isUnread).count
+    }
+
+    public func messages(for proposalID: UUID) -> [TradeMessage] {
+        messagesByProposalID[proposalID] ?? []
     }
 
     public func loadInitialData() async {
@@ -485,6 +516,45 @@ public final class MegrumAppState: ObservableObject {
         } catch {
             errorMessage = "打診を作成できませんでした"
             isCreatingProposal = false
+            return false
+        }
+    }
+
+    public func loadMessages(proposalID: UUID, limit: Int = 80) async {
+        guard loadingMessagesProposalID != proposalID else {
+            return
+        }
+        loadingMessagesProposalID = proposalID
+        errorMessage = nil
+        do {
+            messagesByProposalID[proposalID] = try await repository.loadMessages(proposalID: proposalID, limit: limit)
+        } catch {
+            errorMessage = "メッセージを読み込めませんでした"
+        }
+        loadingMessagesProposalID = nil
+    }
+
+    public func sendMessage(proposalID: UUID, body: String) async -> Bool {
+        let trimmed = body.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else {
+            return false
+        }
+        guard sendingMessageProposalID != proposalID else {
+            return false
+        }
+
+        sendingMessageProposalID = proposalID
+        errorMessage = nil
+        do {
+            let message = try await repository.sendMessage(
+                TradeMessageCreateInput(proposalID: proposalID, body: trimmed)
+            )
+            messagesByProposalID[proposalID, default: []].append(message)
+            sendingMessageProposalID = nil
+            return true
+        } catch {
+            errorMessage = "メッセージを送信できませんでした"
+            sendingMessageProposalID = nil
             return false
         }
     }

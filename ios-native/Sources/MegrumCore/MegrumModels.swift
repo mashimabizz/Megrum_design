@@ -596,6 +596,55 @@ public struct TradeProposal: Identifiable, Codable, Hashable, Sendable {
     }
 }
 
+public enum TradeMessageType: String, Codable, Sendable, CaseIterable, Identifiable {
+    case text
+    case photo
+    case outfitPhoto = "outfit_photo"
+    case location
+    case arrivalStatus = "arrival_status"
+    case system
+
+    public var id: String { rawValue }
+}
+
+public struct TradeMessage: Identifiable, Codable, Hashable, Sendable {
+    public var id: UUID
+    public var proposalID: UUID
+    public var senderID: UUID
+    public var messageType: TradeMessageType
+    public var body: String?
+    public var photoURL: URL?
+    public var createdAt: Date
+
+    public init(
+        id: UUID,
+        proposalID: UUID,
+        senderID: UUID,
+        messageType: TradeMessageType,
+        body: String? = nil,
+        photoURL: URL? = nil,
+        createdAt: Date = .now
+    ) {
+        self.id = id
+        self.proposalID = proposalID
+        self.senderID = senderID
+        self.messageType = messageType
+        self.body = body
+        self.photoURL = photoURL
+        self.createdAt = createdAt
+    }
+}
+
+public struct TradeMessageCreateInput: Equatable, Sendable {
+    public var proposalID: UUID
+    public var body: String
+
+    public init(proposalID: UUID, body: String) {
+        self.proposalID = proposalID
+        self.body = body
+    }
+}
+
 public struct GroomPost: Identifiable, Codable, Hashable, Sendable {
     public var id: UUID
     public var authorID: UUID

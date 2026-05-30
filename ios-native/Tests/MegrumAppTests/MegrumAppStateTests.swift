@@ -167,6 +167,23 @@ final class MegrumAppStateTests: XCTestCase {
         XCTAssertFalse(state.isCreatingProposal)
     }
 
+    func testAppStateLoadsAndSendsPreviewMessages() async {
+        let state = MegrumAppState(repository: PreviewMegrumRepository())
+        await state.loadInitialData()
+        let proposalID = try! XCTUnwrap(state.proposals.first?.id)
+
+        await state.loadMessages(proposalID: proposalID)
+        let initialCount = state.messages(for: proposalID).count
+
+        let sent = await state.sendMessage(proposalID: proposalID, body: " 了解しました ")
+
+        XCTAssertTrue(sent)
+        XCTAssertEqual(state.messages(for: proposalID).count, initialCount + 1)
+        XCTAssertEqual(state.messages(for: proposalID).last?.body, "了解しました")
+        XCTAssertFalse(state.isCreatingProposal)
+        XCTAssertNil(state.sendingMessageProposalID)
+    }
+
     func testAppStateValidatesGoodsEntryTitle() async {
         let state = MegrumAppState(repository: PreviewMegrumRepository())
         let created = await state.createGoodsEntry(

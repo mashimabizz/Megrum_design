@@ -3,10 +3,14 @@ import MegrumDesign
 import SwiftUI
 
 struct TradesScreen: View {
-    var proposals: [TradeProposal]
+    @ObservedObject var appState: MegrumAppState
 
     @State private var selectedStage: TradeStage = .pending
     @State private var selectedProposal: TradeProposal?
+
+    private var proposals: [TradeProposal] {
+        appState.proposals
+    }
 
     private var visibleProposals: [TradeProposal] {
         proposals.filter { selectedStage.contains($0.status) }
@@ -54,7 +58,7 @@ struct TradesScreen: View {
         )
         .sheet(item: $selectedProposal) { proposal in
             NavigationStack {
-                TradeDetailScreen(proposal: proposal)
+                TradeDetailScreen(appState: appState, proposal: proposal)
             }
         }
     }
@@ -222,31 +226,76 @@ private struct EmptyTradeStage: View {
 }
 
 private struct TradeDetailScreen: View {
+    @ObservedObject var appState: MegrumAppState
     var proposal: TradeProposal
     @Environment(\.dismiss) private var dismiss
+    @State private var draftMessage = ""
+
+    private var messages: [TradeMessage] {
+        appState.messages(for: proposal.id)
+    }
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 18) {
-                ScreenTitle(title: "取引詳細", subtitle: proposal.exchangeMethod.displayName)
-                TradeCard(proposal: proposal) {}
+        VStack(spacing: 0) {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 18) {
+                    ScreenTitle(title: "取引詳細", subtitle: proposal.exchangeMethod.displayName)
+                    TradeCard(proposal: proposal) {}
 
-                VStack(alignment: .leading, spacing: 12) {
-                    detailRow(title: "ステータス", value: statusText)
-                    detailRow(title: "交換条件タグ", value: proposal.conditionTags.isEmpty ? "未設定" : proposal.conditionTags.joined(separator: " / "))
-                    detailRow(title: "私が出す", value: "\(proposal.senderGoodsIDs.count)件")
-                    detailRow(title: "受け取る", value: "\(proposal.receiverGoodsIDs.count)件")
+                    VStack(alignment: .leading, spacing: 12) {
+                        detailRow(title: "ステータス", value: statusText)
+                        detailRow(title: "交換条件タグ", value: proposal.conditionTags.isEmpty ? "未設定" : proposal.conditionTags.joined(separator: " / "))
+                        detailRow(title: "私が出す", value: "\(proposal.senderGoodsIDs.count)件")
+                        detailRow(title: "受け取る", value: "\(proposal.receiverGoodsIDs.count)件")
+                    }
+                    .padding(18)
+                    .background(.white.opacity(0.84), in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+
+                    VStack(alignment: .leading, spacing: 12) {
+                        HStack {
+                            Text("メッセージ")
+                                .font(.system(size: 20, weight: .heavy, design: .rounded))
+                                .foregroundStyle(MegrumTheme.ink)
+                            if appState.loadingMessagesProposalID == proposal.id {
+                                ProgressView()
+                                    .controlSize(.small)
+                            }
+                        }
+
+                        ForEach(messages) { message in
+                            TradeMessageBubble(
+                                message: message,
+                                isMine: message.senderID == appState.viewer?.id
+                            )
+                        }
+                    }
                 }
-                .padding(18)
-                .background(.white.opacity(0.84), in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+                .padding(.horizontal, 20)
+                .padding(.top, 18)
+                .padding(.bottom, 22)
             }
-            .padding(.horizontal, 20)
-            .padding(.top, 18)
-            .padding(.bottom, 40)
+
+            TradeMessageInput(
+                text: $draftMessage,
+                isSending: appState.sendingMessageProposalID == proposal.id
+            ) {
+                Task {
+                    let sent = await appState.sendMessage(proposalID: proposal.id, body: draftMessage)
+                    if sent {
+                        draftMessage = ""
+                    }
+                }
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 10)
+            .background(.regularMaterial)
         }
         .background(MegrumTheme.canvas.ignoresSafeArea())
         .navigationTitle("取引詳細")
         .megrumInlineNavigationTitle()
+        .task {
+            await appState.loadMessages(proposalID: proposal.id)
+        }
         .toolbar {
             ToolbarItem(placement: .cancellationAction) {
                 Button("閉じる") {
@@ -284,6 +333,62 @@ private struct TradeDetailScreen: View {
             "拒否済"
         case .expired:
             "期限切れ"
+        }
+    }
+}
+
+private struct TradeMessageBubble: View {
+    var message: TradeMessage
+    var isMine: Bool
+
+    var body: some View {
+        VStack(alignment: isMine ? .trailing : .leading, spacing: 4) {
+            Text(message.body ?? "")
+                .font(.system(size: 15, weight: .bold, design: .rounded))
+                .foregroundStyle(isMine ? .white : MegrumTheme.ink)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 10)
+                .background(isMine ? AnyShapeStyle(MegrumTheme.lavender) : AnyShapeStyle(.white.opacity(0.9)), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+
+            Text(message.createdAt.formatted(date: .omitted, time: .shortened))
+                .font(.system(size: 11, weight: .bold, design: .rounded))
+                .foregroundStyle(MegrumTheme.muted)
+        }
+        .frame(maxWidth: .infinity, alignment: isMine ? .trailing : .leading)
+    }
+}
+
+private struct TradeMessageInput: View {
+    @Binding var text: String
+    var isSending: Bool
+    var onSend: () -> Void
+
+    var body: some View {
+        HStack(spacing: 10) {
+            TextField("メッセージ", text: $text, axis: .vertical)
+                .font(.system(size: 16, weight: .bold, design: .rounded))
+                .lineLimit(1...4)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 11)
+                .background(.white.opacity(0.82), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+
+            Button(action: onSend) {
+                Group {
+                    if isSending {
+                        ProgressView()
+                            .controlSize(.small)
+                    } else {
+                        Image(systemName: "arrow.up")
+                            .font(.system(size: 17, weight: .heavy))
+                    }
+                }
+                .foregroundStyle(.white)
+                .frame(width: 42, height: 42)
+                .background(MegrumTheme.lavender, in: Circle())
+            }
+            .buttonStyle(.plain)
+            .disabled(text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isSending)
+            .opacity(text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? 0.45 : 1)
         }
     }
 }

@@ -177,6 +177,34 @@ enum NativePreviewData {
         )
     ]
 
+    static let messages: [UUID: [TradeMessage]] = [
+        proposals[0].id: [
+            TradeMessage(
+                id: UUID(uuidString: "00000000-0000-0000-0000-000000000451")!,
+                proposalID: proposals[0].id,
+                senderID: viewerID,
+                messageType: .text,
+                body: "こちらの内容でお願いできますか？"
+            ),
+            TradeMessage(
+                id: UUID(uuidString: "00000000-0000-0000-0000-000000000452")!,
+                proposalID: proposals[0].id,
+                senderID: partnerID,
+                messageType: .text,
+                body: "大丈夫です。よろしくお願いします。"
+            )
+        ],
+        proposals[1].id: [
+            TradeMessage(
+                id: UUID(uuidString: "00000000-0000-0000-0000-000000000453")!,
+                proposalID: proposals[1].id,
+                senderID: partnerID,
+                messageType: .text,
+                body: "合流したらここで連絡します。"
+            )
+        ]
+    ]
+
     static let grooms: [GroomPost] = [
         GroomPost(
             id: UUID(uuidString: "00000000-0000-0000-0000-000000000501")!,

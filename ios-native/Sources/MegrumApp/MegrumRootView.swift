@@ -158,7 +158,7 @@ public struct MegrumRootView: View {
             }
 
             NavigationStack {
-                TradesScreen(proposals: appState.proposals)
+                TradesScreen(appState: appState)
             }
             .tag(MegrumTab.trades)
             .tabItem {

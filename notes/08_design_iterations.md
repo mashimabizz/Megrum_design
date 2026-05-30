@@ -4,6 +4,88 @@
 
 ---
 
+## イテレーション323：Swift取引チャット境界を追加
+
+### 背景・問題意識
+
+Swift Native版のやりとり画面は打診中/進行中の分離まで進んだが、取引詳細sheet内ではまだメッセージの読み込み・送信ができなかった。取引チャットは交換成立後だけでなく、条件確認や再調整の中心になるため、まず既存 `messages` テーブルに接続するNative境界を作る必要がある。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumCore/MegrumModels.swift`
+- `TradeMessageType`、`TradeMessage`、`TradeMessageCreateInput` を追加し、取引チャットのメッセージ種別・本文・写真URL・作成日時をSwift型で扱えるようにした。
+
+#### `ios-native/Sources/MegrumData/SupabaseMessageClient.swift`
+- `messages` の一覧読み込みrequest境界を追加した。
+- textメッセージ送信request境界を追加し、本文trimと `message_type='text'` の保存payloadをSwift側で生成するようにした。
+
+#### `ios-native/Sources/MegrumApp/MegrumAppState.swift`
+- `messagesByProposalID`、読み込み中/送信中状態、`loadMessages(proposalID:)`、`sendMessage(proposalID:body:)` を追加した。
+- Preview repositoryでも取引詳細のメッセージ読み込みと送信を確認できるようにした。
+
+#### `ios-native/Sources/MegrumApp/NativePreviewData.swift`
+- Preview用の取引チャットメッセージを追加した。
+
+#### `ios-native/Sources/MegrumApp/SupabaseMegrumRepository.swift`
+- `SupabaseMessageClient` をrepositoryへ接続し、live環境で `messages` を読み書きできるようにした。
+
+#### `ios-native/Sources/MegrumApp/MegrumRootView.swift`
+- `TradesScreen` へ `MegrumAppState` を渡し、取引詳細sheetが同じ状態境界を使えるようにした。
+
+#### `ios-native/Sources/MegrumApp/TradesScreen.swift`
+- 取引詳細sheetにNativeのメッセージ一覧、吹き出し表示、送信入力欄を追加した。
+- 詳細表示時に対象proposalのメッセージを読み込み、送信成功後に一覧へ即時反映するようにした。
+
+#### `ios-native/Tests/MegrumDataTests/SupabaseMessageClientTests.swift`
+- `messages` 読み込みrequestとtext送信payloadを検証するテストを追加した。
+
+#### `ios-native/Tests/MegrumAppTests/MegrumAppStateTests.swift`
+- Preview repositoryで取引チャットを読み込み、送信後に状態へ追加されることを検証した。
+
+#### `ios-native/README.md`
+- `SupabaseMessageClient` と取引詳細sheetのチャット境界を追記した。
+
+#### `notes/22_swift_native_migration.md`
+- Swift Native移行のステータスをiter323へ更新し、Phase 3の進捗に取引チャット境界を追記した。
+
+### 影響範囲
+
+- Swift Native版のやりとり詳細
+- Swift Native版の取引チャット
+- Swift Native版の `messages` PostgREST request境界
+
+### 確認方法
+
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-build --enable-xctest --disable-swift-testing -j 1`
+- `xcodebuild -quiet -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -destination 'generic/platform=iOS Simulator' -derivedDataPath /tmp/megrum-native-xcodebuild CODE_SIGNING_ALLOWED=NO build`
+
+### 関連ファイル
+
+- `ios-native/Sources/MegrumCore/MegrumModels.swift`
+- `ios-native/Sources/MegrumData/SupabaseMessageClient.swift`
+- `ios-native/Sources/MegrumApp/MegrumAppState.swift`
+- `ios-native/Sources/MegrumApp/NativePreviewData.swift`
+- `ios-native/Sources/MegrumApp/SupabaseMegrumRepository.swift`
+- `ios-native/Sources/MegrumApp/MegrumRootView.swift`
+- `ios-native/Sources/MegrumApp/TradesScreen.swift`
+- `ios-native/Tests/MegrumDataTests/SupabaseMessageClientTests.swift`
+- `ios-native/Tests/MegrumAppTests/MegrumAppStateTests.swift`
+- `ios-native/README.md`
+- `notes/22_swift_native_migration.md`
+- `notes/08_design_iterations.md`
+
+### セルフレビュー結果
+
+- ✅ Swift Package testsが58件成功した。
+- ✅ Xcode project buildが成功した。
+- ✅ 既存の `messages` テーブルに対する読み書き境界の追加であり、新規migrationは不要。
+- ✅ Proposal状態名は変更していないため、`notes/09_state_machines.md` の更新は不要。
+- ✅ 新しいユーザー向け用語は追加していないため、`notes/10_glossary.md` の更新は不要。
+- ✅ データモデルは既存DBテーブルのSwift型追加に留まるため、`notes/05_data_model.md` の更新は不要。
+- ✅ TestFlight配布はまだ行っていないため、Preview OTA / TestFlight配信は不要。
+
+---
+
 ## イテレーション322：Swiftやりとりタブを分離
 
 ### 背景・問題意識
