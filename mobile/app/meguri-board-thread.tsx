@@ -132,6 +132,7 @@ export default function MeguriBoardThreadScreen() {
   const insets = useSafeAreaInsets();
   const keyboardInset = useKeyboardInset();
   const params = useLocalSearchParams<{
+    focusReply?: string | string[];
     id?: string | string[];
     prefecture?: string | string[];
     replyId?: string | string[];
@@ -143,6 +144,7 @@ export default function MeguriBoardThreadScreen() {
   }>();
   const threadId = readParam(params.id);
   const sharedReplyId = readParam(params.replyId);
+  const shouldFocusReplyComposer = readParam(params.focusReply) === "1";
   const { previewMode, profile, user } = useAuth();
   const [localArea, setLocalArea] = useState(DEFAULT_MEGURI_PROFILE.baseArea);
   const [localDisplayName, setLocalDisplayName] = useState(DEFAULT_MEGURI_PROFILE.displayName);
@@ -186,6 +188,7 @@ export default function MeguriBoardThreadScreen() {
   const replyOffsetsRef = useRef<Record<string, number>>({});
   const newReplyNoticeRef = useRef<NewReplyNotice>(null);
   const repliesRef = useRef<MeguriBoardReply[]>([]);
+  const focusReplyThreadIdRef = useRef<string | null>(null);
   const sharedReplyScrollKeyRef = useRef<string | null>(null);
   const highlightedReplyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -944,6 +947,7 @@ export default function MeguriBoardThreadScreen() {
     setDraftImageUris([]);
     setQuoteTarget(null);
     setReplyDraftReady(false);
+    focusReplyThreadIdRef.current = null;
   }, [threadId]);
 
   useEffect(() => {
@@ -976,6 +980,16 @@ export default function MeguriBoardThreadScreen() {
     }, 350);
     return () => clearTimeout(handle);
   }, [draft, draftImageUris, replyDraftReady, thread?.status, threadId]);
+
+  useEffect(() => {
+    if (!shouldFocusReplyComposer || loading || !thread || !replyDraftReady || thread.status === "locked") return;
+    if (focusReplyThreadIdRef.current === thread.id) return;
+    focusReplyThreadIdRef.current = thread.id;
+    const handle = setTimeout(() => {
+      focusReplyComposer();
+    }, 220);
+    return () => clearTimeout(handle);
+  }, [loading, replyDraftReady, shouldFocusReplyComposer, thread]);
 
   async function handleSend() {
     if (!threadId) return;

@@ -4,6 +4,58 @@
 
 ---
 
+## イテレーション252：掲示板返信下書きの再開導線を追加する
+
+### 背景・問題意識
+
+一般的なスレッド型掲示板では、返信を書きかけたスレッドへすぐ戻れることが重要になる。スポット掲示板には返信下書き保存と下書きフィルタがあるが、一覧カード上では `下書きあり` の表示に留まっており、ユーザーが再開するには一度スレッドを開いてから返信欄まで移動する必要があった。
+
+### 変更内容
+
+#### `mobile/app/meguri-board.tsx`
+- 返信下書きがあるスレッドカードに `下書きから返信する` ボタンを表示するようにした。
+- ボタンを押すとスレッド詳細へ遷移し、返信欄へフォーカスするための `focusReply=1` パラメータを渡すようにした。
+- スレッド詳細遷移の処理を `openThread` に集約し、通常タップと下書き再開導線で同じ文脈パラメータを使うようにした。
+
+#### `mobile/app/meguri-board-thread.tsx`
+- `focusReply=1` を受け取った時、スレッド詳細の読み込みと返信下書き復元が終わってから返信入力欄へ自動フォーカスするようにした。
+- 同じスレッド内でフォーカス処理が何度も走らないよう、スレッドID単位で一度だけ実行する制御を追加した。
+
+#### `notes/09_state_machines.md`
+- Meguri Board Lifecycle に返信下書き再開導線の表示/遷移ルールを追記した。
+
+#### `notes/10_glossary.md`
+- 掲示板返信下書き再開導線を追加した。
+
+### 影響範囲
+
+- iOS版 スポット掲示板一覧
+- スレッド詳細の返信入力欄
+- 返信下書きの再開体験
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- `EAS_UPDATE_PROJECT_SLUG=ihub EXPO_NO_GIT_STATUS=1 npm --prefix mobile run update:ios:preview -- --message "[iter252] resume board reply drafts" --non-interactive`
+- Preview OTA: Update group ID `f30678ac-0b72-4ad3-bbd0-f59910635930` / iOS update ID `019e7651-d0ad-772c-8199-498e8ce337ae`
+
+### 関連ファイル
+
+- `mobile/app/meguri-board.tsx`
+- `mobile/app/meguri-board-thread.tsx`
+- `notes/08_design_iterations.md`
+- `notes/09_state_machines.md`
+- `notes/10_glossary.md`
+
+### セルフレビュー結果
+
+- ✅ 返信下書きの保存形式やDBスキーマは増やさず、既存の `replyDraftThreadIds` を利用した。
+- ✅ 一覧カード本体の通常タップと、下書き再開ボタンのタップを分け、意図しない二重遷移を避けた。
+- ✅ ネイティブ依存追加なしでPreview OTA対象内に収めた。
+
+---
+
 ## イテレーション251：掲示板一覧カードに参加中ラベルを表示する
 
 ### 背景・問題意識

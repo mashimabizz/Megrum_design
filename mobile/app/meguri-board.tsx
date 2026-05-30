@@ -471,6 +471,22 @@ export default function MeguriBoardScreen() {
     setComposerOpen(false);
   }
 
+  function openThread(thread: MeguriBoardThread, options: { focusReply?: boolean } = {}) {
+    router.push({
+      pathname: "/meguri-board-thread",
+      params: {
+        focusReply: options.focusReply ? "1" : "",
+        id: thread.id,
+        prefecture: viewerContext.prefecture || "",
+        spotKey: viewerContext.spotKey || "",
+        spotLabel: viewerContext.spotLabel || "",
+        viewerLat: viewerContext.coordinate ? String(viewerContext.coordinate.latitude) : "",
+        viewerLng: viewerContext.coordinate ? String(viewerContext.coordinate.longitude) : "",
+        viewMode,
+      },
+    });
+  }
+
   async function handleCreateThread() {
     const title = composerTitle.trim();
     const body = composerBody.trim();
@@ -990,20 +1006,7 @@ export default function MeguriBoardScreen() {
                     <Pressable
                       key={thread.id}
                       accessibilityRole="button"
-                      onPress={() =>
-                        router.push({
-                          pathname: "/meguri-board-thread",
-                          params: {
-                            id: thread.id,
-                            prefecture: viewerContext.prefecture || "",
-                            spotKey: viewerContext.spotKey || "",
-                            spotLabel: viewerContext.spotLabel || "",
-                            viewerLat: viewerContext.coordinate ? String(viewerContext.coordinate.latitude) : "",
-                            viewerLng: viewerContext.coordinate ? String(viewerContext.coordinate.longitude) : "",
-                            viewMode,
-                          },
-                        })
-                      }
+                      onPress={() => openThread(thread)}
                       onLongPress={() => openThreadActions(thread)}
                       style={({ pressed }) => [
                         styles.threadCard,
@@ -1068,6 +1071,23 @@ export default function MeguriBoardScreen() {
                           </Text>
                         </Pressable>
                       </View>
+                      {replyDraftThreadIds.has(thread.id) ? (
+                        <Pressable
+                          accessibilityRole="button"
+                          onPress={(event) => {
+                            event.stopPropagation();
+                            openThread(thread, { focusReply: true });
+                          }}
+                          style={({ pressed }) => [
+                            styles.resumeDraftButton,
+                            pressed ? styles.resumeDraftButtonPressed : null,
+                          ]}
+                        >
+                          <IconSymbol name="create-outline" color={megrumColors.lavender} size={14} />
+                          <Text style={styles.resumeDraftText}>下書きから返信する</Text>
+                          <IconSymbol name="chevron-forward" color={megrumColors.lavender} size={13} />
+                        </Pressable>
+                      ) : null}
                       <View style={styles.threadFooter}>
                         <Text
                           numberOfLines={1}
@@ -2086,6 +2106,24 @@ const styles = StyleSheet.create({
     flexShrink: 1,
   },
   threadAuthorText: {
+    color: megrumColors.lavender,
+    fontSize: 11.5,
+    fontWeight: "900",
+  },
+  resumeDraftButton: {
+    alignItems: "center",
+    alignSelf: "flex-start",
+    backgroundColor: "rgba(166,149,216,0.1)",
+    borderRadius: 999,
+    flexDirection: "row",
+    gap: 6,
+    minHeight: 30,
+    paddingHorizontal: 11,
+  },
+  resumeDraftButtonPressed: {
+    opacity: 0.72,
+  },
+  resumeDraftText: {
     color: megrumColors.lavender,
     fontSize: 11.5,
     fontWeight: "900",
