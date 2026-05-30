@@ -40,6 +40,15 @@ public final class SupabaseGoodsInventoryClient: @unchecked Sendable {
         )
     }
 
+    public func searchGoods(viewerID: UUID, input: GoodsSearchInput) async throws -> [GoodsItem] {
+        let rows: [GoodsInventoryRow] = try await client.fetchRows(
+            from: "goods_inventory",
+            select: GoodsInventoryRow.select,
+            queryItems: searchQueryItems(viewerID: viewerID, input: input)
+        )
+        return rows.map(\.goodsItem)
+    }
+
     public func makeLoadGoodsTypesRequest(limit: Int = 40) throws -> URLRequest {
         try client.makeRequest(
             path: "/rest/v1/goods_types_master",
@@ -61,11 +70,42 @@ public final class SupabaseGoodsInventoryClient: @unchecked Sendable {
         )
     }
 
+    public func makeSearchGoodsRequest(viewerID: UUID, input: GoodsSearchInput) throws -> URLRequest {
+        try client.makeRequest(
+            path: "/rest/v1/goods_inventory",
+            queryItems: [
+                URLQueryItem(name: "select", value: GoodsInventoryRow.select)
+            ] + searchQueryItems(viewerID: viewerID, input: input)
+        )
+    }
+
     private func goodsTypeQueryItems(limit: Int) -> [URLQueryItem] {
         [
             URLQueryItem(name: "order", value: "display_order.asc,name.asc"),
             URLQueryItem(name: "limit", value: "\(limit)")
         ]
+    }
+
+    private func searchQueryItems(viewerID: UUID, input: GoodsSearchInput) -> [URLQueryItem] {
+        var queryItems = [
+            URLQueryItem(name: "kind", value: "eq.for_trade"),
+            URLQueryItem(name: "status", value: "in.(active,reserved)"),
+            URLQueryItem(name: "user_id", value: "neq.\(viewerID.uuidString.lowercased())"),
+            URLQueryItem(name: "order", value: "updated_at.desc"),
+            URLQueryItem(name: "limit", value: "\(max(1, min(input.limit, 100)))")
+        ]
+
+        let query = input.query.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !query.isEmpty {
+            queryItems.append(URLQueryItem(name: "title", value: "ilike.*\(query)*"))
+        }
+        if let groupID = input.groupID {
+            queryItems.append(URLQueryItem(name: "group_id", value: "eq.\(groupID.uuidString.lowercased())"))
+        }
+        if let goodsTypeID = input.goodsTypeID {
+            queryItems.append(URLQueryItem(name: "goods_type_id", value: "eq.\(goodsTypeID.uuidString.lowercased())"))
+        }
+        return queryItems
     }
 
     private static func makeEncoder() -> JSONEncoder {

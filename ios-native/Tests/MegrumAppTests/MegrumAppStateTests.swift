@@ -129,6 +129,18 @@ final class MegrumAppStateTests: XCTestCase {
         XCTAssertFalse(state.isCreatingGoodsEntry)
     }
 
+    func testAppStateSearchesPreviewGoods() async {
+        let state = MegrumAppState(repository: PreviewMegrumRepository())
+        await state.loadInitialData()
+
+        await state.searchGoods(query: "ランダム")
+
+        XCTAssertEqual(state.searchResults.first?.item.title, "ランダムトレカ B")
+        XCTAssertEqual(state.searchResults.first?.bucket, .possible)
+        XCTAssertFalse(state.isSearchingGoods)
+        XCTAssertNil(state.errorMessage)
+    }
+
     func testAppStateValidatesGoodsEntryTitle() async {
         let state = MegrumAppState(repository: PreviewMegrumRepository())
         let created = await state.createGoodsEntry(

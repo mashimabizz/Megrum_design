@@ -4,6 +4,84 @@
 
 ---
 
+## イテレーション320：Swift検索結果境界を追加
+
+### 背景・問題意識
+
+Swift Native版の検索画面は端末内の在庫配列を表示するだけで、実ユーザーの交換候補をSupabaseから取得する境界がなかった。ホーム検索からの体験をNativeへ移すには、`goods_inventory` を検索し、マッチ度別に並べる最小の検索基盤が必要になる。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumCore/MegrumModels.swift`
+- `GoodsSearchInput` を追加し、検索語・グループ・グッズ種別・件数上限をまとめて扱えるようにした。
+- `SearchMatchBucket` / `SearchResultItem` を追加し、検索結果を「マッチしてるよ！」「交換できるかも？」「マッチなし」に分類できるようにした。
+
+#### `ios-native/Sources/MegrumData/SupabaseGoodsInventoryClient.swift`
+- `goods_inventory` の検索request境界を追加した。
+- `kind=for_trade`、`status=active/reserved`、viewer本人除外、titleの `ilike`、グループ・グッズ種別filterをPostgREST queryとして生成するようにした。
+
+#### `ios-native/Sources/MegrumApp/MegrumAppState.swift`
+- `searchResults` / `isSearchingGoods` を追加し、検索状態をSwiftUIから購読できるようにした。
+- Preview repositoryでも相手の在庫だけを検索し、現在のWishに近い結果を「交換できるかも？」へ分類するようにした。
+- 連続検索時に古い結果が後から上書きしないよう、検索リクエストIDで最新結果だけ反映するようにした。
+
+#### `ios-native/Sources/MegrumApp/SearchScreen.swift`
+- 検索画面を `MegrumAppState` 駆動に変更した。
+- グループ・グッズ種別filter chipsを追加し、検索結果をbucket別セクションで表示するようにした。
+- 読み込み中のスケルトンと0件表示を追加した。
+
+#### `ios-native/Sources/MegrumApp/MegrumRootView.swift`
+- ホーム検索sheetから新しい `SearchScreen(appState:)` を開くようにした。
+
+#### `ios-native/Tests/MegrumDataTests/SupabaseGoodsInventoryClientTests.swift`
+- 検索requestのPostgREST query生成を検証した。
+
+#### `ios-native/Tests/MegrumAppTests/MegrumAppStateTests.swift`
+- Preview repositoryで検索結果とbucket分類が反映されることを検証した。
+
+#### `ios-native/README.md`
+- Searchが `goods_inventory` 検索境界と共通 `GoodsGrid` を使うことを追記した。
+
+#### `notes/22_swift_native_migration.md`
+- Swift Native移行のステータスをiter320へ更新し、Phase 3の進捗に検索結果境界を追記した。
+
+### 影響範囲
+
+- Swift Native版の検索画面
+- Swift Native版のホーム検索sheet
+- Swift Native版の `goods_inventory` 読み込み境界
+- Swift Native版の検索結果分類
+
+### 確認方法
+
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-build --enable-xctest --disable-swift-testing -j 1`
+- `xcodebuild -quiet -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -destination 'generic/platform=iOS Simulator' -derivedDataPath /tmp/megrum-native-xcodebuild CODE_SIGNING_ALLOWED=NO build`
+
+### 関連ファイル
+
+- `ios-native/Sources/MegrumCore/MegrumModels.swift`
+- `ios-native/Sources/MegrumData/SupabaseGoodsInventoryClient.swift`
+- `ios-native/Sources/MegrumApp/MegrumAppState.swift`
+- `ios-native/Sources/MegrumApp/SupabaseMegrumRepository.swift`
+- `ios-native/Sources/MegrumApp/SearchScreen.swift`
+- `ios-native/Sources/MegrumApp/MegrumRootView.swift`
+- `ios-native/Tests/MegrumDataTests/SupabaseGoodsInventoryClientTests.swift`
+- `ios-native/Tests/MegrumAppTests/MegrumAppStateTests.swift`
+- `ios-native/README.md`
+- `notes/22_swift_native_migration.md`
+- `notes/08_design_iterations.md`
+
+### セルフレビュー結果
+
+- ✅ Swift Package testsが52件成功した。
+- ✅ Xcode project buildが成功した。
+- ✅ 検索は既存の `goods_inventory` / `groups_master` / `goods_types_master` を使うため、新規DBスキーマは不要。
+- ✅ 状態遷移名は追加していないため、`notes/09_state_machines.md` の更新は不要。
+- ✅ 「マッチしてるよ！」「交換できるかも？」「マッチなし」は既存検索体験の表示分類として扱うため、`notes/10_glossary.md` の更新は不要。
+- ✅ TestFlight配布はまだ行っていないため、Preview OTA / TestFlight配信は不要。
+
+---
+
 ## イテレーション319：Swift在庫Wishフィルターを追加
 
 ### 背景・問題意識

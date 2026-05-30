@@ -101,7 +101,7 @@ public struct MegrumRootView: View {
         }
         .sheet(isPresented: $showsSearch) {
             NavigationStack {
-                SearchScreen(items: appState.inventory)
+                SearchScreen(appState: appState)
             }
         }
         .sheet(isPresented: $showsSettings) {

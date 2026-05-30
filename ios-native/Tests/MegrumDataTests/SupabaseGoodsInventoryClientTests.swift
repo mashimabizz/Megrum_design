@@ -63,6 +63,31 @@ final class SupabaseGoodsInventoryClientTests: XCTestCase {
         XCTAssertEqual(json.first?["exchange_type"] as? String, "any")
     }
 
+    func testBuildsSearchGoodsRequest() throws {
+        let client = SupabaseGoodsInventoryClient(configuration: configuration)
+        let viewerID = UUID(uuidString: "11111111-1111-1111-1111-111111111111")!
+        let input = GoodsSearchInput(
+            query: "トレカ",
+            groupID: UUID(uuidString: "22222222-2222-2222-2222-222222222222")!,
+            goodsTypeID: UUID(uuidString: "33333333-3333-3333-3333-333333333333")!,
+            limit: 25
+        )
+
+        let request = try client.makeSearchGoodsRequest(viewerID: viewerID, input: input)
+        let url = try XCTUnwrap(request.url?.absoluteString)
+
+        XCTAssertEqual(request.httpMethod, "GET")
+        XCTAssertTrue(url.hasPrefix("https://example.supabase.co/rest/v1/goods_inventory?select=id,user_id,group_id,character_id,goods_type_id,title,photo_urls,quantity"))
+        XCTAssertTrue(url.contains("kind=eq.for_trade"))
+        XCTAssertTrue(url.contains("status=in.(active,reserved)"))
+        XCTAssertTrue(url.contains("user_id=neq.11111111-1111-1111-1111-111111111111"))
+        XCTAssertTrue(url.contains("order=updated_at.desc"))
+        XCTAssertTrue(url.contains("limit=25"))
+        XCTAssertTrue(url.contains("title=ilike.*%E3%83%88%E3%83%AC%E3%82%AB*"))
+        XCTAssertTrue(url.contains("group_id=eq.22222222-2222-2222-2222-222222222222"))
+        XCTAssertTrue(url.contains("goods_type_id=eq.33333333-3333-3333-3333-333333333333"))
+    }
+
     private var configuration: SupabaseConfiguration {
         SupabaseConfiguration(
             projectURL: URL(string: "https://example.supabase.co")!,

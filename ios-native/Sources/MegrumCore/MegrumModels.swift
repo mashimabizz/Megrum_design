@@ -448,6 +448,53 @@ public struct GoodsEntryInput: Equatable, Sendable {
     }
 }
 
+public struct GoodsSearchInput: Equatable, Sendable {
+    public var query: String
+    public var groupID: UUID?
+    public var goodsTypeID: UUID?
+    public var limit: Int
+
+    public init(query: String, groupID: UUID? = nil, goodsTypeID: UUID? = nil, limit: Int = 60) {
+        self.query = query
+        self.groupID = groupID
+        self.goodsTypeID = goodsTypeID
+        self.limit = limit
+    }
+}
+
+public enum SearchMatchBucket: String, Codable, Sendable, CaseIterable, Identifiable {
+    case matched
+    case possible
+    case none
+
+    public var id: String { rawValue }
+
+    public var displayName: String {
+        switch self {
+        case .matched:
+            "マッチしてるよ！"
+        case .possible:
+            "交換できるかも？"
+        case .none:
+            "マッチなし"
+        }
+    }
+}
+
+public struct SearchResultItem: Identifiable, Codable, Hashable, Sendable {
+    public var id: UUID
+    public var item: GoodsItem
+    public var ownerUserID: UUID
+    public var bucket: SearchMatchBucket
+
+    public init(item: GoodsItem, ownerUserID: UUID, bucket: SearchMatchBucket) {
+        self.id = item.id
+        self.item = item
+        self.ownerUserID = ownerUserID
+        self.bucket = bucket
+    }
+}
+
 public struct WishItem: Identifiable, Codable, Hashable, Sendable {
     public var id: UUID
     public var ownerID: UUID

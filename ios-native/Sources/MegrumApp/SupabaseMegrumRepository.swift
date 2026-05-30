@@ -73,6 +73,10 @@ public struct SupabaseMegrumRepository: MegrumRepository {
         try await goodsInventoryClient.createGoodsEntry(userID: viewerID, input: input)
     }
 
+    public func searchGoods(_ input: GoodsSearchInput) async throws -> [GoodsItem] {
+        try await goodsInventoryClient.searchGoods(viewerID: viewerID, input: input)
+    }
+
     public func loadMailingAddress() async throws -> MailingAddress? {
         try await mailingAddressClient.loadAddress(userID: viewerID)
     }

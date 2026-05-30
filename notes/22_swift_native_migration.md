@@ -1,7 +1,7 @@
 # 22. Swift Native Migration
 
 最終更新: 2026-05-31
-ステータス: Active draft（iter319）
+ステータス: Active draft（iter320）
 
 ## 目的
 
@@ -124,6 +124,7 @@ tar -xzf /Users/michitaka/Desktop/Megrum_backups/pre-swift-migration-20260531-03
 - iter317で、在庫/Wish一覧に3/4/5列切り替えアイコンと左下の追加ボタン土台を追加した。追加フォーム本体は次のSwift化対象として残す。
 - iter318で、`goods_types_master` 読み込みと `goods_inventory` 作成境界を追加し、在庫/Wishの左下追加ボタンからNative sheetで最小登録できるようにした。
 - iter319で、在庫/Wish一覧にグループとグッズ種別のNative filter chipsを追加し、マスタ読み込み済みの一覧を端末内で絞り込めるようにした。
+- iter320で、検索画面をSwift Nativeの `goods_inventory` 検索境界につなぎ、結果を「マッチしてるよ！」「交換できるかも？」「マッチなし」に分類して表示できるようにした。
 
 ### Phase 4: Meguri core
 

@@ -63,6 +63,7 @@ public protocol MegrumRepository: Sendable {
     func loadOshiCharacters(groupID: UUID, limit: Int) async throws -> [OshiCharacter]
     func loadGoodsTypes(limit: Int) async throws -> [GoodsType]
     func createGoodsEntry(_ input: GoodsEntryInput) async throws -> GoodsItem
+    func searchGoods(_ input: GoodsSearchInput) async throws -> [GoodsItem]
     func loadMailingAddress() async throws -> MailingAddress?
     func saveMailingAddress(_ address: MailingAddress) async throws -> MailingAddress
     func lookupAddress(postalCode: String) async throws -> PostalCodeAddress?
@@ -89,6 +90,10 @@ public extension MegrumRepository {
 
     func createGoodsEntry(_ input: GoodsEntryInput) async throws -> GoodsItem {
         throw MegrumRepositoryError.unsupportedMutation
+    }
+
+    func searchGoods(_ input: GoodsSearchInput) async throws -> [GoodsItem] {
+        []
     }
 
     func loadMailingAddress() async throws -> MailingAddress? {
@@ -178,6 +183,23 @@ public struct PreviewMegrumRepository: MegrumRepository {
         )
     }
 
+    public func searchGoods(_ input: GoodsSearchInput) async throws -> [GoodsItem] {
+        let query = input.query.trimmingCharacters(in: .whitespacesAndNewlines)
+        return NativePreviewData.inventory.filter { item in
+            guard item.ownerID != NativePreviewData.viewerID else {
+                return false
+            }
+            let matchesQuery = query.isEmpty
+                || item.title.localizedCaseInsensitiveContains(query)
+                || item.tags.contains { $0.name.localizedCaseInsensitiveContains(query) }
+            let matchesGroup = input.groupID == nil || item.groupID == input.groupID
+            let matchesGoodsType = input.goodsTypeID == nil || item.goodsTypeID == input.goodsTypeID
+            return matchesQuery && matchesGroup && matchesGoodsType
+        }
+        .prefix(max(0, input.limit))
+        .map { $0 }
+    }
+
     public func loadMailingAddress() async throws -> MailingAddress? {
         NativePreviewData.mailingAddress
     }
@@ -236,6 +258,7 @@ public final class MegrumAppState: ObservableObject {
     @Published public private(set) var oshiGroups: [OshiGroup] = []
     @Published public private(set) var oshiCharacters: [OshiCharacter] = []
     @Published public private(set) var goodsTypes: [GoodsType] = []
+    @Published public private(set) var searchResults: [SearchResultItem] = []
     @Published public private(set) var mailingAddress: MailingAddress?
     @Published public private(set) var blockedUsers: [BlockedUser] = []
     @Published public private(set) var notifications: [MegrumNotification] = []
@@ -243,6 +266,7 @@ public final class MegrumAppState: ObservableObject {
     @Published public private(set) var isLoadingOshiGroups = false
     @Published public private(set) var isLoadingOshiCharacters = false
     @Published public private(set) var isLoadingGoodsTypes = false
+    @Published public private(set) var isSearchingGoods = false
     @Published public private(set) var isLoadingMailingAddress = false
     @Published public private(set) var isLoadingBlockedUsers = false
     @Published public private(set) var isLoadingNotifications = false
@@ -255,6 +279,7 @@ public final class MegrumAppState: ObservableObject {
     @Published public private(set) var errorMessage: String?
 
     private var repository: any MegrumRepository
+    private var activeSearchRequestID: UUID?
 
     public init(repository: any MegrumRepository = PreviewMegrumRepository()) {
         self.repository = repository
@@ -384,6 +409,41 @@ public final class MegrumAppState: ObservableObject {
             errorMessage = "グッズを保存できませんでした"
             isCreatingGoodsEntry = false
             return false
+        }
+    }
+
+    public func searchGoods(query: String, groupID: UUID? = nil, goodsTypeID: UUID? = nil) async {
+        let requestID = UUID()
+        activeSearchRequestID = requestID
+        isSearchingGoods = true
+        errorMessage = nil
+        do {
+            let items = try await repository.searchGoods(
+                GoodsSearchInput(
+                    query: query,
+                    groupID: groupID,
+                    goodsTypeID: goodsTypeID
+                )
+            )
+            let results = items.map { item in
+                SearchResultItem(
+                    item: item,
+                    ownerUserID: item.ownerID,
+                    bucket: searchBucket(for: item)
+                )
+            }
+            guard activeSearchRequestID == requestID else {
+                return
+            }
+            searchResults = results
+        } catch {
+            if activeSearchRequestID == requestID {
+                errorMessage = "検索結果を読み込めませんでした"
+            }
+        }
+        if activeSearchRequestID == requestID {
+            activeSearchRequestID = nil
+            isSearchingGoods = false
         }
     }
 
@@ -595,6 +655,15 @@ public final class MegrumAppState: ObservableObject {
         proposals = snapshot.proposals
         grooms = snapshot.grooms
         threads = snapshot.threads
+    }
+
+    private func searchBucket(for item: GoodsItem) -> SearchMatchBucket {
+        let matchesWish = wishes.contains { wish in
+            let groupMatches = wish.groupID == nil || item.groupID == wish.groupID
+            let typeMatches = wish.goodsTypeID == nil || item.goodsTypeID == wish.goodsTypeID
+            return groupMatches && typeMatches
+        }
+        return matchesWish ? .possible : .none
     }
 }
 
