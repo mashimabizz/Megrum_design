@@ -1,7 +1,7 @@
 # 22. Swift Native Migration
 
 最終更新: 2026-05-31
-ステータス: Active draft（iter325）
+ステータス: Active draft（iter326）
 
 ## 目的
 
@@ -135,6 +135,7 @@ tar -xzf /Users/michitaka/Desktop/Megrum_backups/pre-swift-migration-20260531-03
 - MapKit、PhotosUI、AVFoundation、UserNotificationsをネイティブに使う。
 - iter324で、`list_groom_feed_nearby` と `list_meguri_board_threads_for_viewer` を呼ぶSwift Native RPC境界を追加し、めぐりホームが `MegrumAppState` 経由でグルーム/掲示板を再読込できるようにした。
 - iter325で、掲示板スレッド詳細、返信一覧、返信送信のSwift Native RPC境界を追加し、めぐりホームからチャット形式の掲示板詳細へ進めるようにした。
+- iter326で、めぐりホームの「地図で見る」からグルーム/掲示板のMapKit画面を開き、ピンと範囲円を表示できるようにした。
 
 ### Phase 5: Cutover
 

@@ -4,6 +4,58 @@
 
 ---
 
+## イテレーション326：SwiftめぐりMapKit導線を追加
+
+### 背景・問題意識
+
+Swift Native版のめぐりホームはグルーム/掲示板の一覧と返信までつながったが、ユーザーが求めている地図ベースの閲覧体験はまだ移行できていなかった。めぐりは位置連動が核になるため、まずApple標準のMapKitで「地図で見る」導線、ピン、範囲円をNative側に作り、現在地連動や距離判定を後続iterで足せる土台を作る。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/MeguriScreen.swift`
+- めぐりホームの「グルーム」「掲示板」見出しの `地図で見る` ボタンに表示処理を接続した。
+- `MeguriMapScreen` を追加し、グルームマップ/掲示板マップをMapKitで表示できるようにした。
+- iOSでは地図をfull-screen coverで表示し、SwiftPMのmacOS検証環境ではsheetへfallbackするpresentation modifierを追加した。
+- グルーム投稿は丸い画像ピン、掲示板はタイトル付きピンとして表示するようにした。
+- グルームは1km、掲示板は3kmの範囲円をMapKit上に描画するようにした。
+- 掲示板ピンのタップから既存のスレッド詳細sheetへ進めるようにした。
+- グルームピンのタップ時に画像を確認できるNative sheetを追加した。
+
+#### `ios-native/README.md`
+- めぐりMapKit画面と範囲円表示を追記した。
+
+#### `notes/22_swift_native_migration.md`
+- Swift Native移行のステータスをiter326へ更新し、Phase 4の進捗にMapKit導線を追記した。
+
+### 影響範囲
+
+- Swift Native版のめぐりホーム
+- Swift Native版のグルームマップ
+- Swift Native版の掲示板マップ
+
+### 確認方法
+
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-build --enable-xctest --disable-swift-testing -j 1`
+- `xcodebuild -quiet -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -destination 'generic/platform=iOS Simulator' -derivedDataPath /tmp/megrum-native-xcodebuild CODE_SIGNING_ALLOWED=NO build`
+
+### 関連ファイル
+
+- `ios-native/Sources/MegrumApp/MeguriScreen.swift`
+- `ios-native/README.md`
+- `notes/22_swift_native_migration.md`
+- `notes/08_design_iterations.md`
+
+### セルフレビュー結果
+
+- ✅ Swift Package testsが64件成功した。
+- ✅ Xcode project buildが成功した。
+- ✅ Apple標準のMapKit / SwiftUI Mapを採用し、独自地図Viewは増やしていない。
+- ✅ 新規DBスキーマや状態名は追加していないため、`notes/05_data_model.md` / `notes/09_state_machines.md` の更新は不要。
+- ✅ 新しいユーザー向け用語は追加していないため、`notes/10_glossary.md` の更新は不要。
+- ✅ TestFlight配布はまだ行っていないため、Preview OTA / TestFlight配信は不要。
+
+---
+
 ## イテレーション325：Swift掲示板返信境界を追加
 
 ### 背景・問題意識

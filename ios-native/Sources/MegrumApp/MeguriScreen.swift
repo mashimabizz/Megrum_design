@@ -1,10 +1,12 @@
 import MegrumCore
 import MegrumDesign
+import MapKit
 import SwiftUI
 
 struct MeguriScreen: View {
     @ObservedObject var appState: MegrumAppState
     @State private var selectedThread: BoardThread?
+    @State private var activeMap: MeguriMapKind?
 
     var body: some View {
         ScrollView {
@@ -12,13 +14,17 @@ struct MeguriScreen: View {
                 ScreenTitle(title: "グルーム", subtitle: "近くの投稿と掲示板")
 
                 VStack(alignment: .leading, spacing: 14) {
-                    SectionHeader(title: "グルーム", actionTitle: "地図で見る")
+                    SectionHeader(title: "グルーム", actionTitle: "地図で見る") {
+                        activeMap = .grooms
+                    }
                     GroomStrip(grooms: appState.grooms)
                 }
 
                 VStack(alignment: .leading, spacing: 14) {
                     HStack {
-                        SectionHeader(title: "掲示板", actionTitle: "地図で見る")
+                        SectionHeader(title: "掲示板", actionTitle: "地図で見る") {
+                            activeMap = .boards
+                        }
                         if appState.isLoadingMeguri {
                             ProgressView()
                                 .controlSize(.small)
@@ -49,6 +55,7 @@ struct MeguriScreen: View {
                 BoardThreadDetailScreen(appState: appState, thread: thread)
             }
         }
+        .modifier(MeguriMapPresentationModifier(activeMap: $activeMap, appState: appState))
         .safeAreaInset(edge: .bottom, alignment: .trailing) {
             Button {
             } label: {
@@ -64,6 +71,274 @@ struct MeguriScreen: View {
             .padding(.trailing, 20)
             .padding(.bottom, 10)
         }
+    }
+}
+
+private struct MeguriMapPresentationModifier: ViewModifier {
+    @Binding var activeMap: MeguriMapKind?
+    @ObservedObject var appState: MegrumAppState
+
+    func body(content: Content) -> some View {
+        #if os(iOS)
+        content.fullScreenCover(item: $activeMap) { kind in
+            NavigationStack {
+                MeguriMapScreen(kind: kind, appState: appState)
+            }
+        }
+        #else
+        content.sheet(item: $activeMap) { kind in
+            NavigationStack {
+                MeguriMapScreen(kind: kind, appState: appState)
+            }
+        }
+        #endif
+    }
+}
+
+private enum MeguriMapKind: String, Identifiable {
+    case grooms
+    case boards
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .grooms:
+            "グルームマップ"
+        case .boards:
+            "掲示板マップ"
+        }
+    }
+
+    var radiusMeters: CLLocationDistance {
+        switch self {
+        case .grooms:
+            1_000
+        case .boards:
+            3_000
+        }
+    }
+
+    var regionSpan: MKCoordinateSpan {
+        switch self {
+        case .grooms:
+            MKCoordinateSpan(latitudeDelta: 0.024, longitudeDelta: 0.024)
+        case .boards:
+            MKCoordinateSpan(latitudeDelta: 0.07, longitudeDelta: 0.07)
+        }
+    }
+}
+
+private struct MeguriMapScreen: View {
+    var kind: MeguriMapKind
+    @ObservedObject var appState: MegrumAppState
+    @Environment(\.dismiss) private var dismiss
+    @State private var cameraPosition: MapCameraPosition
+    @State private var selectedGroom: GroomPost?
+    @State private var selectedThread: BoardThread?
+
+    init(kind: MeguriMapKind, appState: MegrumAppState) {
+        self.kind = kind
+        self.appState = appState
+        _cameraPosition = State(initialValue: .region(MKCoordinateRegion(center: kind.initialCenter(grooms: appState.grooms, threads: appState.threads), span: kind.regionSpan)))
+    }
+
+    var body: some View {
+        ZStack(alignment: .top) {
+            Map(position: $cameraPosition, interactionModes: [.pan, .zoom, .rotate]) {
+                MapCircle(center: centerCoordinate, radius: kind.radiusMeters)
+                    .foregroundStyle(MegrumTheme.lavender.opacity(0.08))
+                    .stroke(MegrumTheme.lavender.opacity(0.42), lineWidth: 1.5)
+
+                switch kind {
+                case .grooms:
+                    ForEach(appState.grooms) { groom in
+                        Annotation("グルーム", coordinate: groom.coordinate) {
+                            Button {
+                                selectedGroom = groom
+                            } label: {
+                                GroomMapPin(groom: groom)
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                case .boards:
+                    ForEach(appState.threads.compactMap(BoardMapAnnotation.init(thread:))) { annotation in
+                        Annotation(annotation.thread.title, coordinate: annotation.coordinate) {
+                            Button {
+                                selectedThread = annotation.thread
+                            } label: {
+                                BoardMapPin(thread: annotation.thread)
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                }
+            }
+            .mapControls {
+                MapUserLocationButton()
+                MapCompass()
+                MapScaleView()
+            }
+            .ignoresSafeArea()
+
+            MapGlassHeader(title: kind.title) {
+                dismiss()
+            }
+            .padding(.horizontal, 18)
+            .padding(.top, 14)
+        }
+        .task {
+            await appState.loadMeguriFeed()
+            withAnimation(.smooth(duration: 0.28)) {
+                cameraPosition = .region(MKCoordinateRegion(center: kind.initialCenter(grooms: appState.grooms, threads: appState.threads), span: kind.regionSpan))
+            }
+        }
+        .sheet(item: $selectedGroom) { groom in
+            GroomMapDetailSheet(groom: groom)
+                .presentationDetents([.height(280)])
+                .presentationDragIndicator(.visible)
+        }
+        .sheet(item: $selectedThread) { thread in
+            NavigationStack {
+                BoardThreadDetailScreen(appState: appState, thread: thread)
+            }
+        }
+    }
+
+    private var centerCoordinate: CLLocationCoordinate2D {
+        kind.initialCenter(grooms: appState.grooms, threads: appState.threads)
+    }
+}
+
+private struct MapGlassHeader: View {
+    var title: String
+    var onClose: () -> Void
+
+    var body: some View {
+        HStack {
+            Button(action: onClose) {
+                Image(systemName: "xmark")
+                    .font(.system(size: 15, weight: .heavy))
+                    .foregroundStyle(MegrumTheme.ink)
+                    .frame(width: 42, height: 42)
+                    .background(.regularMaterial, in: Circle())
+            }
+            .buttonStyle(.plain)
+
+            Spacer()
+
+            Text(title)
+                .font(.system(size: 18, weight: .heavy, design: .rounded))
+                .foregroundStyle(MegrumTheme.ink)
+                .padding(.horizontal, 16)
+                .frame(height: 42)
+                .background(.regularMaterial, in: Capsule())
+
+            Spacer()
+
+            Color.clear
+                .frame(width: 42, height: 42)
+        }
+    }
+}
+
+private struct GroomMapPin: View {
+    var groom: GroomPost
+
+    var body: some View {
+        VStack(spacing: 0) {
+            AsyncImage(url: groom.imageURL) { phase in
+                switch phase {
+                case .success(let image):
+                    image
+                        .resizable()
+                        .scaledToFill()
+                default:
+                    LinearGradient(
+                        colors: [MegrumTheme.sky, MegrumTheme.pink],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                    .overlay {
+                        Image(systemName: "photo")
+                            .font(.system(size: 18, weight: .bold))
+                            .foregroundStyle(.white)
+                    }
+                }
+            }
+            .frame(width: 58, height: 58)
+            .clipShape(Circle())
+            .overlay(Circle().stroke(.white, lineWidth: 3))
+            .shadow(color: MegrumTheme.ink.opacity(0.22), radius: 12, y: 8)
+
+            Triangle()
+                .fill(.white)
+                .frame(width: 14, height: 8)
+                .offset(y: -1)
+        }
+        .accessibilityLabel("グルーム")
+    }
+}
+
+private struct BoardMapPin: View {
+    var thread: BoardThread
+
+    var body: some View {
+        Text(thread.title)
+            .font(.system(size: 12, weight: .heavy, design: .rounded))
+            .foregroundStyle(.white)
+            .lineLimit(1)
+            .padding(.horizontal, 12)
+            .frame(height: 34)
+            .background(MegrumTheme.lavender, in: Capsule())
+            .overlay(alignment: .bottom) {
+                Triangle()
+                    .fill(MegrumTheme.lavender)
+                    .frame(width: 14, height: 8)
+                    .offset(y: 6)
+            }
+            .shadow(color: MegrumTheme.ink.opacity(0.2), radius: 12, y: 7)
+            .accessibilityLabel("掲示板 \(thread.title)")
+    }
+}
+
+private struct GroomMapDetailSheet: View {
+    var groom: GroomPost
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text("グルーム")
+                .font(.system(size: 26, weight: .heavy, design: .rounded))
+                .foregroundStyle(MegrumTheme.ink)
+
+            AsyncImage(url: groom.imageURL) { phase in
+                switch phase {
+                case .success(let image):
+                    image
+                        .resizable()
+                        .scaledToFill()
+                default:
+                    RoundedRectangle(cornerRadius: 24, style: .continuous)
+                        .fill(
+                            LinearGradient(
+                                colors: [MegrumTheme.sky, MegrumTheme.pink],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                        .overlay {
+                            ProgressView()
+                                .tint(.white)
+                        }
+                }
+            }
+            .frame(maxWidth: .infinity)
+            .frame(height: 160)
+            .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+        }
+        .padding(20)
+        .background(MegrumTheme.canvas)
     }
 }
 
@@ -199,6 +474,7 @@ private struct BoardReplyInput: View {
 private struct SectionHeader: View {
     var title: String
     var actionTitle: String
+    var action: () -> Void = {}
 
     var body: some View {
         HStack {
@@ -208,8 +484,7 @@ private struct SectionHeader: View {
 
             Spacer()
 
-            Button(actionTitle) {
-            }
+            Button(actionTitle, action: action)
             .font(.system(size: 14, weight: .heavy, design: .rounded))
             .foregroundStyle(MegrumTheme.lavender)
         }
@@ -292,5 +567,57 @@ private struct BoardThreadCard: View {
         case .global:
             "全体"
         }
+    }
+}
+
+private struct BoardMapAnnotation: Identifiable {
+    var thread: BoardThread
+    var coordinate: CLLocationCoordinate2D
+
+    var id: UUID { thread.id }
+
+    init?(thread: BoardThread) {
+        guard let latitude = thread.latitude, let longitude = thread.longitude else {
+            return nil
+        }
+        self.thread = thread
+        self.coordinate = CLLocationCoordinate2D(latitude: latitude, longitude: longitude)
+    }
+}
+
+private struct Triangle: Shape {
+    func path(in rect: CGRect) -> Path {
+        var path = Path()
+        path.move(to: CGPoint(x: rect.midX, y: rect.maxY))
+        path.addLine(to: CGPoint(x: rect.minX, y: rect.minY))
+        path.addLine(to: CGPoint(x: rect.maxX, y: rect.minY))
+        path.closeSubpath()
+        return path
+    }
+}
+
+private extension GroomPost {
+    var coordinate: CLLocationCoordinate2D {
+        CLLocationCoordinate2D(latitude: latitude, longitude: longitude)
+    }
+}
+
+private extension MeguriMapKind {
+    func initialCenter(grooms: [GroomPost], threads: [BoardThread]) -> CLLocationCoordinate2D {
+        switch self {
+        case .grooms:
+            return grooms.first?.coordinate ?? Self.fallbackCenter
+        case .boards:
+            if let thread = threads.first(where: { $0.latitude != nil && $0.longitude != nil }),
+               let latitude = thread.latitude,
+               let longitude = thread.longitude {
+                return CLLocationCoordinate2D(latitude: latitude, longitude: longitude)
+            }
+            return Self.fallbackCenter
+        }
+    }
+
+    static var fallbackCenter: CLLocationCoordinate2D {
+        CLLocationCoordinate2D(latitude: 35.681236, longitude: 139.767125)
     }
 }

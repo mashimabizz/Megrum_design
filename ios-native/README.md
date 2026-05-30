@@ -75,7 +75,7 @@ Supabase redirect URLs are handled by `MegrumRootView.onOpenURL`. `SupabaseAuthR
 
 `TradesScreen` splits proposals into "打診中" and "進行中" with a floating native segmented control above the tab bar. Horizontal swipes switch the stage, and tapping a trade card opens a native detail sheet. The detail sheet now loads trade chat messages through `MegrumAppState`, shows native message bubbles, and can send text messages through `SupabaseMessageClient`.
 
-`MeguriScreen` is wired to `MegrumAppState` and can refresh native groom and board lists. Live data loads through the existing location-scoped Supabase RPCs; preview data remains available without Supabase configuration. Tapping a board thread opens a native thread detail sheet with reply bubbles and a reply input backed by the board reply RPC boundary.
+`MeguriScreen` is wired to `MegrumAppState` and can refresh native groom and board lists. Live data loads through the existing location-scoped Supabase RPCs; preview data remains available without Supabase configuration. Tapping a board thread opens a native thread detail sheet with reply bubbles and a reply input backed by the board reply RPC boundary. The groom and board section headers can also open native MapKit screens with pins and radius overlays.
 
 For the Xcode app host, use CLI-first verification:
 
