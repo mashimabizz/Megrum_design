@@ -2218,6 +2218,18 @@ export default function MeguriBoardThreadScreen() {
                                 {reply.bookmarked ? "保存済み" : "保存"}
                               </Text>
                             </Pressable>
+                            <Pressable
+                              accessibilityRole="button"
+                              disabled={reply.deleted}
+                              onPress={() => void shareReply(reply)}
+                              style={[
+                                styles.replyActionPill,
+                                reply.deleted ? styles.replyActionPillDisabled : null,
+                              ]}
+                            >
+                              <IconSymbol name="send-outline" color={megrumColors.mutedInk} size={13} />
+                              <Text style={styles.replyActionText}>共有</Text>
+                            </Pressable>
                             {childReplyCount > 0 ? (
                               <Pressable
                                 accessibilityRole="button"

@@ -4,6 +4,53 @@
 
 ---
 
+## イテレーション259：掲示板返信行に共有ボタンを追加する
+
+### 背景・問題意識
+
+一般的なスレッド型掲示板では、スレッド全体だけでなく、特定の返信を共有したい場面がある。スポット掲示板では返信共有は長押しメニュー内にあったが、現地情報や画像付き返信をすぐ共有するには操作が深かったため、返信行のアクション列に共有ボタンを追加した。
+
+### 変更内容
+
+#### `mobile/app/meguri-board-thread.tsx`
+- 各返信のアクション列に `共有` ボタンを追加した。
+- 押下時は既存の `shareReply` を使い、返信ID付きのスレッド共有URLをiOS標準共有シートへ渡すようにした。
+- 削除済み返信では共有ボタンを無効化するようにした。
+
+#### `notes/09_state_machines.md`
+- Meguri Board Lifecycle に返信行共有ボタンの表示/操作ルールを追記した。
+
+#### `notes/10_glossary.md`
+- 掲示板返信行共有ボタンを追加した。
+
+### 影響範囲
+
+- iOS版 スポット掲示板スレッド詳細
+- 返信行のアクション列
+- 返信共有導線
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- `EAS_UPDATE_PROJECT_SLUG=ihub EXPO_NO_GIT_STATUS=1 npm --prefix mobile run update:ios:preview -- --message "[iter259] add inline reply share button" --non-interactive`
+- Preview OTA: Update group ID `68907c25-e2e3-4e48-ab66-ba6a72256c02` / iOS update ID `019e766c-f393-7221-a861-502e84266144`
+
+### 関連ファイル
+
+- `mobile/app/meguri-board-thread.tsx`
+- `notes/08_design_iterations.md`
+- `notes/09_state_machines.md`
+- `notes/10_glossary.md`
+
+### セルフレビュー結果
+
+- ✅ 既存の `shareReply` を使い回し、共有URL生成やdeep link仕様を増やしていない。
+- ✅ 削除済み返信では操作できないため、共有すべきでない本文を出さない。
+- ✅ ネイティブ依存追加なしでPreview OTA対象内に収めた。
+
+---
+
 ## イテレーション258：掲示板の通報済み表示を追加する
 
 ### 背景・問題意識
