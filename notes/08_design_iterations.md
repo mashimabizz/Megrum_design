@@ -4,6 +4,57 @@
 
 ---
 
+## イテレーション341：Swift通知entitlementを追加
+
+### 背景・問題意識
+
+iter338〜340でSwift Native版はAPNs token登録、通知許可、通知タップ遷移のアプリ内処理を持ったが、Xcode target側のPush Notifications entitlementが未接続だった。実機/TestFlightでAPNs登録を成立させるには、App hostにentitlementsファイルを接続し、Debug/Releaseで適切なAPNs環境を明示する必要がある。
+
+### 変更内容
+
+#### `ios-native/App/MegrumNative.entitlements`
+- `aps-environment` を追加し、Xcode build setting `$(APS_ENVIRONMENT)` でDebug/ReleaseのAPNs環境を切り替えられるようにした。
+
+#### `ios-native/MegrumNative.xcodeproj/project.pbxproj`
+- App groupに `MegrumNative.entitlements` を追加した。
+- `CODE_SIGN_ENTITLEMENTS = App/MegrumNative.entitlements` をDebug/Release両方へ設定した。
+- Debugは `APS_ENVIRONMENT=development`、Releaseは `APS_ENVIRONMENT=production` にした。
+
+#### `ios-native/README.md` / `notes/22_swift_native_migration.md`
+- Swift Native通知Phaseの進捗として、Push Notifications entitlement接続を追記した。
+
+### 影響範囲
+
+- Swift Native Xcode targetの署名設定
+- 実機/TestFlightでのAPNs登録前提
+- 後続のAPNs配送ワーカー・TestFlight検証
+
+### 確認方法
+
+- `xcodebuild -quiet -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -destination 'generic/platform=iOS Simulator' -derivedDataPath /tmp/megrum-native-xcodebuild CODE_SIGNING_ALLOWED=NO build`
+- `plutil -lint ios-native/App/MegrumNative.entitlements`
+- `xcodebuild -project ios-native/MegrumNative.xcodeproj -showBuildSettings -scheme MegrumNative -configuration Debug | rg -n "CODE_SIGN_ENTITLEMENTS|APS_ENVIRONMENT"`
+- `xcodebuild -project ios-native/MegrumNative.xcodeproj -showBuildSettings -scheme MegrumNative -configuration Release | rg -n "CODE_SIGN_ENTITLEMENTS|APS_ENVIRONMENT"`
+
+### 関連ファイル
+
+- `ios-native/App/MegrumNative.entitlements`
+- `ios-native/MegrumNative.xcodeproj/project.pbxproj`
+- `ios-native/README.md`
+- `notes/22_swift_native_migration.md`
+- `notes/08_design_iterations.md`
+
+### セルフレビュー結果
+
+- ✅ Xcode project buildが成功した。
+- ✅ entitlements plist lintが成功した。
+- ✅ Debug/Releaseのbuild settingsで `CODE_SIGN_ENTITLEMENTS` と `APS_ENVIRONMENT` を確認した。
+- ✅ Debug/ReleaseでAPNs環境を分け、Release/TestFlightはproduction entitlementを使う設定にした。
+- ✅ Swift Package APIは変えていないため、Swift Package testsの追加実行は不要と判断した。
+- ✅ データモデルは変えていないため、`notes/05_data_model.md` の更新は不要。
+- ✅ 状態遷移は変えていないため、`notes/09_state_machines.md` の更新は不要。
+- ✅ 新用語は追加していないため、`notes/10_glossary.md` の更新は不要。
+
 ## イテレーション340：Swift通知タップのタブ遷移を追加
 
 ### 背景・問題意識

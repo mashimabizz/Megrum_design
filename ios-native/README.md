@@ -9,6 +9,7 @@ The existing Expo / React Native app under `mobile/` remains the rollback source
 - `Package.swift` defines the first native Swift package.
 - `MegrumNative.xcodeproj` contains the first buildable iOS app host for the Swift version.
 - `App/MegrumNativeApp.swift` is the app entry point and mounts `MegrumRootView`.
+- `App/MegrumNative.entitlements` declares the native Push Notifications entitlement for APNs registration.
 - `Sources/MegrumCore` contains portable domain models that mirror the current Supabase-backed product concepts.
 - `Sources/MegrumData` contains the first Supabase/PostgREST configuration and request layer.
 - `Sources/MegrumDesign` contains native SwiftUI design primitives, starting with a Liquid Glass-style search button.
@@ -76,6 +77,8 @@ Supabase redirect URLs are handled by `MegrumRootView.onOpenURL`. `SupabaseAuthR
 The Xcode app host requests iOS notification authorization for configured signed-in sessions, registers with APNs, and forwards the native device token into `MegrumAppState.registerNativePushDeviceToken(...)`.
 
 Remote notification taps read `linkPath` / `notificationId` from the payload, reuse the same tab routing rules as the in-app notification list, and can mark the matching notification read after loading the notification center.
+
+The Xcode target uses `App/MegrumNative.entitlements` for Push Notifications. Debug builds set `APS_ENVIRONMENT=development`; Release builds set `APS_ENVIRONMENT=production` so TestFlight/App Store distribution can use the production APNs environment with the matching Apple provisioning profile.
 
 `GoodsGrid` is shared by Home, Search, Inventory, and Wish surfaces. It now opens a native detail sheet on tap and uses SwiftUI's native context menu for long-press actions, keeping the action surface close to iOS Home Screen quick actions while preserving standard accessibility behavior. Search reads tradeable goods through `MegrumAppState`, groups results into match buckets, and exposes group/goods type filter chips from the same master data as Inventory and Wish. From a search result, the exchange-list action can open a native proposal creation sheet that selects one of the viewer's inventory items, chooses an exchange method and condition tags, then creates a `proposals` row through `SupabaseProposalClient`. Inventory and Wish collection screens also expose a native 3/4/5-column toggle, group/goods type filter chips, and a left-side add button. The add button opens a native sheet that loads groups and goods types, then creates a `goods_inventory` row through `MegrumAppState`.
 

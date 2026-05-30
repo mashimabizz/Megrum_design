@@ -12,6 +12,7 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		3DF98E9464FC46B3A1D22EAA /* MegrumNative.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = MegrumNative.entitlements; sourceTree = "<group>"; };
 		D3FBF9C8C95D427FAF75EE97 /* MegrumNative.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = MegrumNative.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		EB317683D09049DF88A9DF5A /* MegrumNativeApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MegrumNativeApp.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -39,6 +40,7 @@
 		62E971A7479443AEBA8CB754 /* App */ = {
 			isa = PBXGroup;
 			children = (
+				3DF98E9464FC46B3A1D22EAA /* MegrumNative.entitlements */,
 				EB317683D09049DF88A9DF5A /* MegrumNativeApp.swift */,
 			);
 			path = App;
@@ -128,6 +130,8 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				APS_ENVIRONMENT = development;
+				CODE_SIGN_ENTITLEMENTS = App/MegrumNative.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_ASSET_PATHS = "";
@@ -159,6 +163,8 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				APS_ENVIRONMENT = production;
+				CODE_SIGN_ENTITLEMENTS = App/MegrumNative.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_ASSET_PATHS = "";
