@@ -440,12 +440,14 @@ public final class MegrumAppState: ObservableObject {
     public func loadMeguriFeed(
         latitude: Double? = nil,
         longitude: Double? = nil,
+        prefecture: String? = nil,
         scope: BoardThread.Audience = .nearby3km
     ) async {
         guard !isLoadingMeguri else {
             return
         }
 
+        let selectedPrefecture = normalizedPrefecture(prefecture) ?? normalizedPrefecture(viewer?.prefecture)
         isLoadingMeguri = true
         errorMessage = nil
         do {
@@ -457,7 +459,7 @@ public final class MegrumAppState: ObservableObject {
             async let loadedThreads = repository.loadBoardThreads(
                 latitude: latitude,
                 longitude: longitude,
-                prefecture: viewer?.prefecture,
+                prefecture: selectedPrefecture,
                 scope: scope
             )
             grooms = try await loadedGrooms
@@ -472,12 +474,14 @@ public final class MegrumAppState: ObservableObject {
         threadID: UUID,
         latitude: Double? = nil,
         longitude: Double? = nil,
+        prefecture: String? = nil,
         scope: BoardThread.Audience = .nearby3km
     ) async {
         guard loadingBoardRepliesThreadID != threadID else {
             return
         }
 
+        let selectedPrefecture = normalizedPrefecture(prefecture) ?? normalizedPrefecture(viewer?.prefecture)
         loadingBoardRepliesThreadID = threadID
         errorMessage = nil
         do {
@@ -485,7 +489,7 @@ public final class MegrumAppState: ObservableObject {
                 threadID: threadID,
                 latitude: latitude,
                 longitude: longitude,
-                prefecture: viewer?.prefecture,
+                prefecture: selectedPrefecture,
                 scope: scope
             )
         } catch {
@@ -494,7 +498,12 @@ public final class MegrumAppState: ObservableObject {
         loadingBoardRepliesThreadID = nil
     }
 
-    public func sendBoardReply(threadID: UUID, body: String, scope: BoardThread.Audience = .nearby3km) async -> Bool {
+    public func sendBoardReply(
+        threadID: UUID,
+        body: String,
+        prefecture: String? = nil,
+        scope: BoardThread.Audience = .nearby3km
+    ) async -> Bool {
         let trimmed = body.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else {
             return false
@@ -503,6 +512,7 @@ public final class MegrumAppState: ObservableObject {
             return false
         }
 
+        let selectedPrefecture = normalizedPrefecture(prefecture) ?? normalizedPrefecture(viewer?.prefecture)
         sendingBoardReplyThreadID = threadID
         errorMessage = nil
         do {
@@ -510,7 +520,7 @@ public final class MegrumAppState: ObservableObject {
                 BoardReplyCreateInput(
                     threadID: threadID,
                     body: trimmed,
-                    prefecture: viewer?.prefecture,
+                    prefecture: selectedPrefecture,
                     scope: scope
                 )
             )
@@ -529,7 +539,8 @@ public final class MegrumAppState: ObservableObject {
         body: String,
         scope: BoardThread.Audience = .nearby3km,
         latitude: Double? = nil,
-        longitude: Double? = nil
+        longitude: Double? = nil,
+        prefecture: String? = nil
     ) async -> Bool {
         guard !isCreatingBoardThread else {
             return false
@@ -550,7 +561,7 @@ public final class MegrumAppState: ObservableObject {
             return false
         }
 
-        let normalizedPrefecture = viewer.prefecture?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfBlank
+        let normalizedPrefecture = normalizedPrefecture(prefecture) ?? normalizedPrefecture(viewer.prefecture)
         switch scope {
         case .nearby3km:
             guard latitude != nil, longitude != nil, normalizedPrefecture != nil else {
@@ -590,6 +601,10 @@ public final class MegrumAppState: ObservableObject {
             isCreatingBoardThread = false
             return false
         }
+    }
+
+    private func normalizedPrefecture(_ value: String?) -> String? {
+        value?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfBlank
     }
 
     public func replaceRepository(_ repository: any MegrumRepository) async {

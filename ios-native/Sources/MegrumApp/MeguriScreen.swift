@@ -6,10 +6,25 @@ import SwiftUI
 struct MeguriScreen: View {
     @ObservedObject var appState: MegrumAppState
     @StateObject private var locationState = MegrumLocationState()
+    @AppStorage("megrum.meguri.board.prefecture") private var storedBoardPrefecture = ""
+    @AppStorage("megrum.meguri.board.scope") private var storedBoardScopeRaw = BoardThread.Audience.nearby3km.rawValue
     @State private var selectedThread: BoardThread?
     @State private var selectedGroom: GroomPost?
     @State private var activeMap: MeguriMapKind?
     @State private var isShowingThreadComposer = false
+    @State private var isShowingPrefecturePicker = false
+
+    private var selectedBoardScope: BoardThread.Audience {
+        BoardThread.Audience(rawValue: storedBoardScopeRaw) ?? .nearby3km
+    }
+
+    private var selectedBoardPrefecture: String? {
+        let stored = storedBoardPrefecture.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !stored.isEmpty {
+            return stored
+        }
+        return appState.viewer?.prefecture?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfBlank
+    }
 
     var body: some View {
         ScrollView {
@@ -36,6 +51,17 @@ struct MeguriScreen: View {
                         }
                     }
 
+                    BoardScopeSelector(
+                        selectedScope: selectedBoardScope,
+                        prefectureTitle: selectedBoardPrefecture ?? "都道府県を選択",
+                        onNearbyTap: {
+                            updateBoardScope(.nearby3km)
+                        },
+                        onPrefectureTap: {
+                            isShowingPrefecturePicker = true
+                        }
+                    )
+
                     ForEach(appState.threads) { thread in
                         Button {
                             selectedThread = thread
@@ -53,36 +79,65 @@ struct MeguriScreen: View {
         .background(MegrumTheme.canvas.ignoresSafeArea())
         .megrumHiddenNavigationBar()
         .refreshable {
-            await appState.loadMeguriFeed(
-                latitude: locationState.coordinate?.latitude,
-                longitude: locationState.coordinate?.longitude
-            )
+            await reloadMeguriFeed()
         }
         .task {
             locationState.requestCurrentLocation()
         }
         .onReceive(locationState.$coordinate.compactMap { $0 }) { coordinate in
             Task {
-                await appState.loadMeguriFeed(latitude: coordinate.latitude, longitude: coordinate.longitude)
+                await appState.loadMeguriFeed(
+                    latitude: coordinate.latitude,
+                    longitude: coordinate.longitude,
+                    prefecture: selectedBoardPrefecture,
+                    scope: selectedBoardScope
+                )
             }
         }
         .sheet(item: $selectedThread) { thread in
             NavigationStack {
-                BoardThreadDetailScreen(appState: appState, thread: thread)
+                BoardThreadDetailScreen(
+                    appState: appState,
+                    thread: thread,
+                    selectedPrefecture: selectedBoardPrefecture
+                )
             }
         }
         .sheet(isPresented: $isShowingThreadComposer) {
             NavigationStack {
                 BoardThreadComposerSheet(
                     appState: appState,
-                    coordinate: locationState.coordinate
+                    coordinate: locationState.coordinate,
+                    selectedPrefecture: selectedBoardPrefecture,
+                    initialScope: selectedBoardScope
                 )
             }
             .presentationDetents([.large])
             .presentationDragIndicator(.visible)
         }
+        .sheet(isPresented: $isShowingPrefecturePicker) {
+            NavigationStack {
+                BoardPrefecturePickerSheet(selectedPrefecture: selectedBoardPrefecture) { prefecture in
+                    storedBoardPrefecture = prefecture
+                    storedBoardScopeRaw = BoardThread.Audience.samePrefecture.rawValue
+                    Task {
+                        await reloadMeguriFeed(scope: .samePrefecture)
+                    }
+                }
+            }
+            .presentationDetents([.medium, .large])
+            .presentationDragIndicator(.visible)
+        }
         .modifier(GroomViewerPresentationModifier(selectedGroom: $selectedGroom, grooms: appState.grooms))
-        .modifier(MeguriMapPresentationModifier(activeMap: $activeMap, appState: appState, locationState: locationState))
+        .modifier(
+            MeguriMapPresentationModifier(
+                activeMap: $activeMap,
+                appState: appState,
+                locationState: locationState,
+                selectedPrefecture: selectedBoardPrefecture,
+                boardScope: selectedBoardScope
+            )
+        )
         .safeAreaInset(edge: .bottom, alignment: .trailing) {
             Button {
                 isShowingThreadComposer = true
@@ -100,15 +155,44 @@ struct MeguriScreen: View {
             .padding(.bottom, 10)
         }
     }
+
+    private func updateBoardScope(_ scope: BoardThread.Audience) {
+        storedBoardScopeRaw = scope.rawValue
+        Task {
+            await reloadMeguriFeed(scope: scope)
+        }
+    }
+
+    private func reloadMeguriFeed(scope: BoardThread.Audience? = nil) async {
+        await appState.loadMeguriFeed(
+            latitude: locationState.coordinate?.latitude,
+            longitude: locationState.coordinate?.longitude,
+            prefecture: selectedBoardPrefecture,
+            scope: scope ?? selectedBoardScope
+        )
+    }
 }
 
 private struct BoardThreadComposerSheet: View {
     @ObservedObject var appState: MegrumAppState
     var coordinate: MegrumLocationCoordinate?
+    var selectedPrefecture: String?
     @Environment(\.dismiss) private var dismiss
     @State private var title = ""
     @State private var bodyText = ""
     @State private var scope: BoardThread.Audience = .nearby3km
+
+    init(
+        appState: MegrumAppState,
+        coordinate: MegrumLocationCoordinate?,
+        selectedPrefecture: String?,
+        initialScope: BoardThread.Audience = .nearby3km
+    ) {
+        self.appState = appState
+        self.coordinate = coordinate
+        self.selectedPrefecture = selectedPrefecture
+        _scope = State(initialValue: initialScope)
+    }
 
     private var canSubmit: Bool {
         !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
@@ -131,7 +215,7 @@ private struct BoardThreadComposerSheet: View {
 
                 Picker("公開範囲", selection: $scope) {
                     Text("3km圏内").tag(BoardThread.Audience.nearby3km)
-                    Text(appState.viewer?.prefecture ?? "都道府県").tag(BoardThread.Audience.samePrefecture)
+                    Text(selectedPrefecture ?? appState.viewer?.prefecture ?? "都道府県").tag(BoardThread.Audience.samePrefecture)
                 }
                 .pickerStyle(.segmented)
 
@@ -187,7 +271,8 @@ private struct BoardThreadComposerSheet: View {
                         body: bodyText,
                         scope: scope,
                         latitude: coordinate?.latitude,
-                        longitude: coordinate?.longitude
+                        longitude: coordinate?.longitude,
+                        prefecture: selectedPrefecture
                     )
                     if created {
                         dismiss()
@@ -248,18 +333,32 @@ private struct MeguriMapPresentationModifier: ViewModifier {
     @Binding var activeMap: MeguriMapKind?
     @ObservedObject var appState: MegrumAppState
     @ObservedObject var locationState: MegrumLocationState
+    var selectedPrefecture: String?
+    var boardScope: BoardThread.Audience
 
     func body(content: Content) -> some View {
         #if os(iOS)
         content.fullScreenCover(item: $activeMap) { kind in
             NavigationStack {
-                MeguriMapScreen(kind: kind, appState: appState, locationState: locationState)
+                MeguriMapScreen(
+                    kind: kind,
+                    appState: appState,
+                    locationState: locationState,
+                    selectedPrefecture: selectedPrefecture,
+                    boardScope: boardScope
+                )
             }
         }
         #else
         content.sheet(item: $activeMap) { kind in
             NavigationStack {
-                MeguriMapScreen(kind: kind, appState: appState, locationState: locationState)
+                MeguriMapScreen(
+                    kind: kind,
+                    appState: appState,
+                    locationState: locationState,
+                    selectedPrefecture: selectedPrefecture,
+                    boardScope: boardScope
+                )
             }
         }
         #endif
@@ -426,15 +525,25 @@ private struct MeguriMapScreen: View {
     var kind: MeguriMapKind
     @ObservedObject var appState: MegrumAppState
     @ObservedObject var locationState: MegrumLocationState
+    var selectedPrefecture: String?
+    var boardScope: BoardThread.Audience
     @Environment(\.dismiss) private var dismiss
     @State private var cameraPosition: MapCameraPosition
     @State private var selectedGroom: GroomPost?
     @State private var selectedThread: BoardThread?
 
-    init(kind: MeguriMapKind, appState: MegrumAppState, locationState: MegrumLocationState) {
+    init(
+        kind: MeguriMapKind,
+        appState: MegrumAppState,
+        locationState: MegrumLocationState,
+        selectedPrefecture: String?,
+        boardScope: BoardThread.Audience
+    ) {
         self.kind = kind
         self.appState = appState
         self.locationState = locationState
+        self.selectedPrefecture = selectedPrefecture
+        self.boardScope = boardScope
         _cameraPosition = State(initialValue: .region(MKCoordinateRegion(center: kind.initialCenter(userCoordinate: locationState.coordinate, grooms: appState.grooms, threads: appState.threads), span: kind.regionSpan)))
     }
 
@@ -487,7 +596,9 @@ private struct MeguriMapScreen: View {
             locationState.requestCurrentLocation()
             await appState.loadMeguriFeed(
                 latitude: locationState.coordinate?.latitude,
-                longitude: locationState.coordinate?.longitude
+                longitude: locationState.coordinate?.longitude,
+                prefecture: selectedPrefecture,
+                scope: mapBoardScope
             )
             withAnimation(.smooth(duration: 0.28)) {
                 cameraPosition = .region(MKCoordinateRegion(center: centerCoordinate, span: kind.regionSpan))
@@ -495,7 +606,12 @@ private struct MeguriMapScreen: View {
         }
         .onReceive(locationState.$coordinate.compactMap { $0 }) { coordinate in
             Task {
-                await appState.loadMeguriFeed(latitude: coordinate.latitude, longitude: coordinate.longitude)
+                await appState.loadMeguriFeed(
+                    latitude: coordinate.latitude,
+                    longitude: coordinate.longitude,
+                    prefecture: selectedPrefecture,
+                    scope: mapBoardScope
+                )
             }
             withAnimation(.smooth(duration: 0.28)) {
                 cameraPosition = .region(MKCoordinateRegion(center: coordinate.clLocationCoordinate, span: kind.regionSpan))
@@ -508,13 +624,26 @@ private struct MeguriMapScreen: View {
         }
         .sheet(item: $selectedThread) { thread in
             NavigationStack {
-                BoardThreadDetailScreen(appState: appState, thread: thread)
+                BoardThreadDetailScreen(
+                    appState: appState,
+                    thread: thread,
+                    selectedPrefecture: selectedPrefecture
+                )
             }
         }
     }
 
     private var centerCoordinate: CLLocationCoordinate2D {
         kind.initialCenter(userCoordinate: locationState.coordinate, grooms: appState.grooms, threads: appState.threads)
+    }
+
+    private var mapBoardScope: BoardThread.Audience {
+        switch kind {
+        case .grooms:
+            .nearby3km
+        case .boards:
+            boardScope
+        }
     }
 }
 
@@ -652,6 +781,7 @@ private struct GroomMapDetailSheet: View {
 private struct BoardThreadDetailScreen: View {
     @ObservedObject var appState: MegrumAppState
     var thread: BoardThread
+    var selectedPrefecture: String?
     @Environment(\.dismiss) private var dismiss
     @State private var draftReply = ""
 
@@ -693,7 +823,12 @@ private struct BoardThreadDetailScreen: View {
                 isSending: appState.sendingBoardReplyThreadID == thread.id
             ) {
                 Task {
-                    let sent = await appState.sendBoardReply(threadID: thread.id, body: draftReply, scope: thread.audience)
+                    let sent = await appState.sendBoardReply(
+                        threadID: thread.id,
+                        body: draftReply,
+                        prefecture: selectedPrefecture,
+                        scope: thread.audience
+                    )
                     if sent {
                         draftReply = ""
                     }
@@ -707,7 +842,11 @@ private struct BoardThreadDetailScreen: View {
         .navigationTitle("掲示板")
         .megrumInlineNavigationTitle()
         .task {
-            await appState.loadBoardReplies(threadID: thread.id, scope: thread.audience)
+            await appState.loadBoardReplies(
+                threadID: thread.id,
+                prefecture: selectedPrefecture,
+                scope: thread.audience
+            )
         }
         .toolbar {
             ToolbarItem(placement: .cancellationAction) {
@@ -774,6 +913,97 @@ private struct BoardReplyInput: View {
             .buttonStyle(.plain)
             .disabled(text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isSending)
             .opacity(text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? 0.45 : 1)
+        }
+    }
+}
+
+private struct BoardScopeSelector: View {
+    var selectedScope: BoardThread.Audience
+    var prefectureTitle: String
+    var onNearbyTap: () -> Void
+    var onPrefectureTap: () -> Void
+
+    var body: some View {
+        HStack(spacing: 10) {
+            Button(action: onNearbyTap) {
+                scopeChip(
+                    title: "3km圏内",
+                    systemImage: "location.fill",
+                    isSelected: selectedScope == .nearby3km
+                )
+            }
+            .buttonStyle(.plain)
+
+            Button(action: onPrefectureTap) {
+                scopeChip(
+                    title: prefectureTitle,
+                    systemImage: "map.fill",
+                    isSelected: selectedScope == .samePrefecture
+                )
+            }
+            .buttonStyle(.plain)
+        }
+        .accessibilityElement(children: .contain)
+    }
+
+    private func scopeChip(title: String, systemImage: String, isSelected: Bool) -> some View {
+        Label(title, systemImage: systemImage)
+            .font(.system(size: 14, weight: .heavy, design: .rounded))
+            .lineLimit(1)
+            .minimumScaleFactor(0.82)
+            .foregroundStyle(isSelected ? .white : MegrumTheme.ink)
+            .padding(.horizontal, 14)
+            .frame(height: 42)
+            .frame(maxWidth: .infinity)
+            .background(
+                isSelected ? AnyShapeStyle(MegrumTheme.lavender) : AnyShapeStyle(.white.opacity(0.9)),
+                in: Capsule()
+            )
+            .overlay {
+                Capsule()
+                    .stroke(isSelected ? .white.opacity(0.28) : MegrumTheme.lavender.opacity(0.18), lineWidth: 1)
+            }
+            .shadow(color: isSelected ? MegrumTheme.lavender.opacity(0.22) : MegrumTheme.ink.opacity(0.05), radius: 10, y: 5)
+    }
+}
+
+private struct BoardPrefecturePickerSheet: View {
+    var selectedPrefecture: String?
+    var onSelect: (String) -> Void
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        List(japanesePrefectures, id: \.self) { prefecture in
+            Button {
+                onSelect(prefecture)
+                dismiss()
+            } label: {
+                HStack {
+                    Text(prefecture)
+                        .font(.system(size: 17, weight: .bold, design: .rounded))
+                        .foregroundStyle(MegrumTheme.ink)
+
+                    Spacer()
+
+                    if selectedPrefecture == prefecture {
+                        Image(systemName: "checkmark.circle.fill")
+                            .font(.system(size: 19, weight: .bold))
+                            .foregroundStyle(MegrumTheme.lavender)
+                    }
+                }
+                .padding(.vertical, 6)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("\(prefecture)を掲示板の都道府県に設定")
+        }
+        .navigationTitle("都道府県を選択")
+        .megrumInlineNavigationTitle()
+        .toolbar {
+            ToolbarItem(placement: .cancellationAction) {
+                Button("閉じる") {
+                    dismiss()
+                }
+            }
         }
     }
 }
@@ -938,3 +1168,59 @@ private extension MeguriMapKind {
         CLLocationCoordinate2D(latitude: 35.681236, longitude: 139.767125)
     }
 }
+
+private extension String {
+    var nilIfBlank: String? {
+        isEmpty ? nil : self
+    }
+}
+
+private let japanesePrefectures = [
+    "北海道",
+    "青森県",
+    "岩手県",
+    "宮城県",
+    "秋田県",
+    "山形県",
+    "福島県",
+    "茨城県",
+    "栃木県",
+    "群馬県",
+    "埼玉県",
+    "千葉県",
+    "東京都",
+    "神奈川県",
+    "新潟県",
+    "富山県",
+    "石川県",
+    "福井県",
+    "山梨県",
+    "長野県",
+    "岐阜県",
+    "静岡県",
+    "愛知県",
+    "三重県",
+    "滋賀県",
+    "京都府",
+    "大阪府",
+    "兵庫県",
+    "奈良県",
+    "和歌山県",
+    "鳥取県",
+    "島根県",
+    "岡山県",
+    "広島県",
+    "山口県",
+    "徳島県",
+    "香川県",
+    "愛媛県",
+    "高知県",
+    "福岡県",
+    "佐賀県",
+    "長崎県",
+    "熊本県",
+    "大分県",
+    "宮崎県",
+    "鹿児島県",
+    "沖縄県"
+]

@@ -4,6 +4,64 @@
 
 ---
 
+## イテレーション330：Swift掲示板都道府県設定を追加
+
+### 背景・問題意識
+
+めぐり掲示板は、3km圏内だけでなく都道府県単位でも見たいという要望がある。都道府県の初期値はプロフィールの都道府県にし、ユーザーが掲示板側で変更したら以後それをデフォルトにする必要があるため、Swift Native版に表示範囲と都道府県選択の状態境界を追加する。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/MegrumAppState.swift`
+- `loadMeguriFeed`、`loadBoardReplies`、`sendBoardReply`、`createBoardThread` に都道府県の上書き値を渡せるようにした。
+- 上書き値が空の場合は従来通りプロフィール都道府県へフォールバックするようにした。
+- スレッド作成時の都道府県検証も、掲示板側で選択した都道府県を優先するようにした。
+
+#### `ios-native/Sources/MegrumApp/MeguriScreen.swift`
+- `@AppStorage` で掲示板の都道府県と表示範囲を端末保存できるようにした。
+- 掲示板セクションへ「3km圏内」と選択中都道府県のNativeチップを追加した。
+- 都道府県チップから47都道府県のNative picker sheetを開き、選択後に同じ条件でfeedを再読込するようにした。
+- 掲示板詳細、返信送信、掲示板Map、スレッド作成sheetにも選択中都道府県を渡すようにした。
+
+#### `ios-native/Tests/MegrumAppTests/MegrumAppStateTests.swift`
+- 都道府県上書きで掲示板feedが絞り込まれることを検証した。
+- 都道府県上書きでスレッド作成時の `prefecture` が更新されることを検証した。
+
+#### `ios-native/README.md` / `notes/22_swift_native_migration.md`
+- Swift NativeめぐりPhaseの進捗として掲示板都道府県設定を追記した。
+
+### 影響範囲
+
+- Swift Native版のめぐりホーム
+- Swift Native版の掲示板一覧、掲示板詳細、掲示板Map
+- Swift Native版の掲示板スレッド作成
+- Swift Native版の掲示板RPC呼び出し境界
+
+### 確認方法
+
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-build --enable-xctest --disable-swift-testing -j 1`
+- `xcodebuild -quiet -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -destination 'generic/platform=iOS Simulator' -derivedDataPath /tmp/megrum-native-xcodebuild CODE_SIGNING_ALLOWED=NO build`
+
+### 関連ファイル
+
+- `ios-native/Sources/MegrumApp/MegrumAppState.swift`
+- `ios-native/Sources/MegrumApp/MeguriScreen.swift`
+- `ios-native/Tests/MegrumAppTests/MegrumAppStateTests.swift`
+- `ios-native/README.md`
+- `notes/22_swift_native_migration.md`
+- `notes/08_design_iterations.md`
+
+### セルフレビュー結果
+
+- ✅ Swift Package testsが69件成功した。
+- ✅ Xcode project buildが成功した。
+- ✅ 既存の `BoardThread.Audience.samePrefecture` を使っており、新しい状態名は追加していないため、`notes/09_state_machines.md` の更新は不要。
+- ✅ 「掲示板」「都道府県」「3km圏内」は既存の用語範囲であり、`notes/10_glossary.md` の更新は不要。
+- ✅ 既存RPC payloadへ都道府県を渡す画面状態の追加で、DBスキーマ変更はないため、`notes/05_data_model.md` の更新は不要。
+- ✅ TestFlight配布はまだ行っていないため、Preview OTA / TestFlight配信は不要。
+
+---
+
 ## イテレーション329：Swift掲示板作成導線を追加
 
 ### 背景・問題意識

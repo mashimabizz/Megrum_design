@@ -45,6 +45,19 @@ final class MegrumAppStateTests: XCTestCase {
         XCTAssertTrue(state.threads.contains { $0.audience == .nearby3km })
     }
 
+    func testAppStateRefreshesPreviewMeguriFeedWithPrefectureOverride() async {
+        let state = MegrumAppState(repository: PreviewMegrumRepository())
+
+        await state.loadInitialData()
+        await state.loadMeguriFeed(prefecture: "大阪府", scope: .samePrefecture)
+
+        XCTAssertTrue(state.threads.isEmpty)
+
+        await state.loadMeguriFeed(prefecture: "東京都", scope: .samePrefecture)
+
+        XCTAssertTrue(state.threads.contains { $0.prefecture == "東京都" })
+    }
+
     func testAppStateLoadsAndSendsPreviewBoardReplies() async {
         let state = MegrumAppState(repository: PreviewMegrumRepository())
         let threadID = UUID(uuidString: "00000000-0000-0000-0000-000000000601")!
@@ -83,6 +96,22 @@ final class MegrumAppStateTests: XCTestCase {
         XCTAssertEqual(state.threads.first?.body, "北口はまだゆっくり進めます")
         XCTAssertEqual(state.threads.first?.audience, .nearby3km)
         XCTAssertFalse(state.isCreatingBoardThread)
+    }
+
+    func testAppStateCreatesPreviewBoardThreadWithPrefectureOverride() async {
+        let state = MegrumAppState(repository: PreviewMegrumRepository())
+        await state.loadInitialData()
+
+        let created = await state.createBoardThread(
+            title: "大阪の交換場所",
+            body: "駅側の広場が見やすいです",
+            scope: .samePrefecture,
+            prefecture: "大阪府"
+        )
+
+        XCTAssertTrue(created)
+        XCTAssertEqual(state.threads.first?.audience, .samePrefecture)
+        XCTAssertEqual(state.threads.first?.prefecture, "大阪府")
     }
 
     func testAppStateRequiresLocationForNearbyBoardThread() async {

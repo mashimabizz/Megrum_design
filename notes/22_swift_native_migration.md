@@ -1,7 +1,7 @@
 # 22. Swift Native Migration
 
 最終更新: 2026-05-31
-ステータス: Active draft（iter329）
+ステータス: Active draft（iter330）
 
 ## 目的
 
@@ -139,6 +139,7 @@ tar -xzf /Users/michitaka/Desktop/Megrum_backups/pre-swift-migration-20260531-03
 - iter327で、CoreLocation境界と位置情報利用文言を追加し、めぐりのfeed再読込とMapKit初期中心を現在地に寄せられるようにした。
 - iter328で、グルーム横並びから全画面ビューアを開き、画像読み込み中はローディングだけを表示するNative閲覧導線を追加した。
 - iter329で、めぐりホーム右下の「スレッドを立てる」からNative composer sheetを開き、`meguri_board_threads` へ作成できるPostgREST insert境界を追加した。
+- iter330で、掲示板の3km圏内/都道府県表示をNative画面で切り替えられるようにし、プロフィール都道府県を初期値にしながら変更後の都道府県を `AppStorage` へ保存する導線を追加した。
 
 ### Phase 5: Cutover
 
