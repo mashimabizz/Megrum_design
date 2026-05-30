@@ -1,7 +1,7 @@
 # 22. Swift Native Migration
 
 最終更新: 2026-05-31
-ステータス: Active draft（iter321）
+ステータス: Active draft（iter322）
 
 ## 目的
 
@@ -126,6 +126,7 @@ tar -xzf /Users/michitaka/Desktop/Megrum_backups/pre-swift-migration-20260531-03
 - iter319で、在庫/Wish一覧にグループとグッズ種別のNative filter chipsを追加し、マスタ読み込み済みの一覧を端末内で絞り込めるようにした。
 - iter320で、検索画面をSwift Nativeの `goods_inventory` 検索境界につなぎ、結果を「マッチしてるよ！」「交換できるかも？」「マッチなし」に分類して表示できるようにした。
 - iter321で、`proposals` の読み込み/作成境界をSwift Nativeへ追加し、検索結果から打診作成sheetを開いて最小proposalを作れるようにした。
+- iter322で、やりとり画面を「打診中」「進行中」に分け、フッター上のNative切り替えバーと横スワイプ切り替え、取引詳細sheetを追加した。
 
 ### Phase 4: Meguri core
 

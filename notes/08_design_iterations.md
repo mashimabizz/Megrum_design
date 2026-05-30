@@ -4,6 +4,56 @@
 
 ---
 
+## イテレーション322：Swiftやりとりタブを分離
+
+### 背景・問題意識
+
+Swift Native版のやりとり画面は `proposals` をすべて同じ一覧に出しており、RN版で求めていた「打診中」と「進行中」の分離に到達していなかった。交換コアをNativeへ移すうえで、送信・調整中の打診と成立後の取引を明確に分ける必要がある。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/TradesScreen.swift`
+- `TradeStage` を追加し、`draft/sent/negotiating/agreement_one_side` を「打診中」、`agreed` を「進行中」として表示分離した。
+- `TradeStageBar` を `safeAreaInset(edge: .bottom)` で追加し、標準タブバーの上に打診中/進行中の切り替えボタンを表示するようにした。
+- 横スワイプでステージを切り替えられるようにした。
+- 各 `TradeCard` をタップ可能にし、`TradeDetailScreen` のsheetで交換手段・ステータス・交換条件タグ・件数サマリーを見られるようにした。
+- ステージごとの0件表示を追加した。
+
+#### `ios-native/README.md`
+- やりとり画面のステージ分離とNative切り替えバーを追記した。
+
+#### `notes/22_swift_native_migration.md`
+- Swift Native移行のステータスをiter322へ更新し、Phase 3の進捗にやりとりタブ分離を追記した。
+
+### 影響範囲
+
+- Swift Native版のやりとり一覧
+- Swift Native版のproposal状態別表示
+- Swift Native版の取引詳細sheet
+
+### 確認方法
+
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-build --enable-xctest --disable-swift-testing -j 1`
+- `xcodebuild -quiet -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -destination 'generic/platform=iOS Simulator' -derivedDataPath /tmp/megrum-native-xcodebuild CODE_SIGNING_ALLOWED=NO build`
+
+### 関連ファイル
+
+- `ios-native/Sources/MegrumApp/TradesScreen.swift`
+- `ios-native/README.md`
+- `notes/22_swift_native_migration.md`
+- `notes/08_design_iterations.md`
+
+### セルフレビュー結果
+
+- ✅ Swift Package testsが55件成功した。
+- ✅ Xcode project buildが成功した。
+- ✅ Proposal状態名は既存の `draft` / `sent` / `negotiating` / `agreement_one_side` / `agreed` を使うため、`notes/09_state_machines.md` の更新は不要。
+- ✅ 新規DBスキーマは不要。
+- ✅ 新しいユーザー用語は追加していないため、`notes/10_glossary.md` の更新は不要。
+- ✅ TestFlight配布はまだ行っていないため、Preview OTA / TestFlight配信は不要。
+
+---
+
 ## イテレーション321：Swift打診作成境界を追加
 
 ### 背景・問題意識
