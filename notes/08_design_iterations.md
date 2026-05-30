@@ -4,6 +4,44 @@
 
 ---
 
+## イテレーション282：ドロワー閉じ中の項目タップを抑止
+
+### 背景・問題意識
+
+オーナーから、左ドロワーが閉じている途中にドロワー項目を触ると、たとえば「プロフィール」が反応してプロフィール画面へ遷移してしまうという指摘があった。ドロワーは見えていても、閉じアニメ中やスワイプ操作中は項目操作を受け付けない必要がある。
+
+### 変更内容
+
+#### `mobile/app/(tabs)/_layout.tsx`
+- `drawerInteractive` / `drawerInteractiveRef` を追加し、ドロワー項目が押せる状態を「完全に開き切った後」だけに限定した。
+- `openDrawer()` 開始時、`closeDrawer()` 開始時、エッジスワイプ開始時、前面画面スワイプ開始時にドロワー項目の `pointerEvents` を無効化するようにした。
+- 開くアニメーションが完了した場合のみ、ドロワー項目の `pointerEvents` を再度有効化するようにした。
+
+### 影響範囲
+
+- iOS版 左ドロワー
+- ドロワー内メニュー項目のタップ判定
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- `EAS_UPDATE_PROJECT_SLUG=ihub EXPO_NO_GIT_STATUS=1 npm --prefix mobile run update:ios:preview -- --message "[iter282] ドロワー閉じ中の項目タップを抑止" --non-interactive`
+- Preview OTA: Update group ID `56949385-3e11-490f-bbc9-d13aec19edc9` / iOS update ID `019e785f-69ad-7a34-aa44-515cc8a2d297`
+- EAS Dashboard: `https://expo.dev/accounts/mashima.bizz/projects/ihub/updates/56949385-3e11-490f-bbc9-d13aec19edc9`
+
+### 関連ファイル
+
+- `mobile/app/(tabs)/_layout.tsx`
+- `notes/08_design_iterations.md`
+
+### セルフレビュー結果
+
+- ✅ ドロワーが完全に開いている時だけ項目が押せる。
+- ✅ 閉じアニメ中、スワイプで閉じようとしている途中、開き途中は項目タップを受け付けない。
+- ✅ 新しいDBテーブル・状態・用語は追加していないため、`notes/05_data_model.md` / `notes/09_state_machines.md` / `notes/10_glossary.md` の更新は不要。
+- ✅ iOS Preview channel へOTA配信済み。
+
 ## イテレーション281：左ドロワー通知導線を確実化
 
 ### 背景・問題意識

@@ -141,15 +141,24 @@ function ProfileDrawerShell({ children }: { children: ReactNode }) {
   const screenX = useRef(new Animated.Value(0)).current;
   const [visible, setVisible] = useState(false);
   const [closing, setClosing] = useState(false);
+  const [drawerInteractive, setDrawerInteractive] = useState(false);
   const visibleRef = useRef(false);
   const closingRef = useRef(false);
+  const drawerInteractiveRef = useRef(false);
 
   useEffect(() => {
     visibleRef.current = visible;
   }, [visible]);
 
+  function setDrawerInteractionEnabled(enabled: boolean) {
+    if (drawerInteractiveRef.current === enabled) return;
+    drawerInteractiveRef.current = enabled;
+    setDrawerInteractive(enabled);
+  }
+
   const openDrawer = () => {
     closingRef.current = false;
+    setDrawerInteractionEnabled(false);
     setClosing(false);
     setVisible(true);
     screenX.stopAnimation();
@@ -159,11 +168,14 @@ function ProfileDrawerShell({ children }: { children: ReactNode }) {
       stiffness: 190,
       mass: 0.82,
       useNativeDriver: false,
-    }).start();
+    }).start(({ finished }) => {
+      if (finished) setDrawerInteractionEnabled(true);
+    });
   };
 
   const closeDrawer = (afterClose?: () => void) => {
     closingRef.current = true;
+    setDrawerInteractionEnabled(false);
     setClosing(true);
     screenX.stopAnimation();
     Animated.spring(screenX, {
@@ -177,6 +189,7 @@ function ProfileDrawerShell({ children }: { children: ReactNode }) {
         closingRef.current = false;
         setClosing(false);
         setVisible(false);
+        setDrawerInteractionEnabled(false);
         afterClose?.();
       }
     });
@@ -197,6 +210,7 @@ function ProfileDrawerShell({ children }: { children: ReactNode }) {
           Math.abs(gesture.dx) > Math.abs(gesture.dy),
         onPanResponderGrant: () => {
           closingRef.current = false;
+          setDrawerInteractionEnabled(false);
           setClosing(false);
           setVisible(true);
           screenX.stopAnimation();
@@ -230,6 +244,7 @@ function ProfileDrawerShell({ children }: { children: ReactNode }) {
           Math.abs(gesture.dx) > Math.abs(gesture.dy),
         onPanResponderGrant: () => {
           closingRef.current = false;
+          setDrawerInteractionEnabled(false);
           setClosing(false);
           screenX.stopAnimation();
         },
@@ -285,7 +300,7 @@ function ProfileDrawerShell({ children }: { children: ReactNode }) {
     <ProfileDrawerProvider openDrawer={openDrawer}>
       <View style={styles.drawerShellRoot}>
         <Animated.View
-          pointerEvents={visible && !closing ? "auto" : "none"}
+          pointerEvents={visible && !closing && drawerInteractive ? "auto" : "none"}
           style={[
             styles.drawerUnderlay,
             {
