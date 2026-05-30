@@ -1,7 +1,7 @@
 # 22. Swift Native Migration
 
 最終更新: 2026-05-31
-ステータス: Active draft（iter302）
+ステータス: Active draft（iter303）
 
 ## 目的
 
@@ -77,7 +77,7 @@ tar -xzf /Users/michitaka/Desktop/Megrum_backups/pre-swift-migration-20260531-03
 ### 4. Supabase / DBは当面維持する
 
 - DBスキーマとRLSは既存Supabaseを継続する。
-- Swift版はSupabase Swift SDKまたは薄いREST clientで同じデータを読む。
+- Swift版はまず `MegrumData` の薄いPostgREST clientで同じデータを読む。必要性が明確になった段階でSupabase Swift SDK導入を判断する。
 - DB変更はSwift移行そのものとは分ける。画面移行中にスキーマまで同時に壊さない。
 
 ## 実装フェーズ
@@ -94,6 +94,7 @@ tar -xzf /Users/michitaka/Desktop/Megrum_backups/pre-swift-migration-20260531-03
 - `ios-native/MegrumNative.xcodeproj` と `App/MegrumNativeApp.swift` でSwiftUI App hostを追加済み。
 - Swift Package側では `MegrumApp` にRootView、TabView、主要タブ画面の骨格を置く。
 - `MegrumAppState` と `MegrumRepository` で初期データロード境界を追加済み。
+- `MegrumData` にSupabase設定とPostgRESTリクエスト境界を追加済み。環境/Info.plistに公開設定とviewer idがあればlive repository、なければpreview repositoryにfallbackする。
 - Bundle IDは最初は比較用Previewを分け、最終的に本番IDへ寄せる。
 - TabView / NavigationStack / deep link / auth restore / app lifecycleを組む。
 

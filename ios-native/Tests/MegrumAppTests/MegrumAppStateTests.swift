@@ -17,4 +17,13 @@ final class MegrumAppStateTests: XCTestCase {
         XCTAssertFalse(state.isLoading)
         XCTAssertNil(state.errorMessage)
     }
+
+    func testFactoryFallsBackToPreviewWithoutSupabaseConfig() async {
+        let state = MegrumAppStateFactory.make(environment: [:], infoDictionary: [:])
+
+        await state.loadInitialData()
+
+        XCTAssertEqual(state.viewer?.handle, "michilion")
+        XCTAssertFalse(state.inventory.isEmpty)
+    }
 }

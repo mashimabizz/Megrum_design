@@ -4,6 +4,84 @@
 
 ---
 
+## イテレーション303：Swift Supabase境界を追加
+
+### 背景・問題意識
+
+Swift版はAppStateまでできたが、実データ接続の入口がないままだと、ホーム・在庫・Wish・取引を本番DBへ移す作業が始められない。既存Expo版と同じSupabaseを継続する方針なので、まずSwift側に公開キー前提のPostgREST境界を作り、環境値がある場合だけlive repositoryへ切り替えられる状態にした。
+
+### 変更内容
+
+#### `ios-native/Package.swift`
+- `MegrumData` library product / targetを追加した。
+- `MegrumApp` が `MegrumData` に依存する構成にした。
+- `MegrumDataTests` を追加した。
+
+#### `ios-native/Sources/MegrumData/`
+- `SupabaseConfiguration` を追加し、環境変数・Info.plistからSupabase URL / publishable key / access tokenを読めるようにした。
+- `SupabaseRESTClient` を追加し、PostgREST向けGET request生成、`apikey` / `Authorization` header、JSON decodeを担当させた。
+
+#### `ios-native/Sources/MegrumApp/SupabaseMegrumRepository.swift`
+- `MegrumRepository` のSupabase実装を追加した。
+- `users` / `goods_inventory` / `proposals` からviewer、在庫、Wish、打診をロードして `MegrumAppSnapshot` に変換する入口を作った。
+
+#### `ios-native/Sources/MegrumApp/MegrumAppStateFactory.swift`
+- 環境変数またはInfo.plistにSupabase設定とviewer idがあれば `SupabaseMegrumRepository` を使うようにした。
+- 設定がない場合は `PreviewMegrumRepository` にfallbackするようにした。
+
+#### `ios-native/App/MegrumNativeApp.swift`
+- 起動時に `MegrumAppStateFactory.makeDefault()` を使うよう変更した。
+
+#### `ios-native/MegrumNative.xcodeproj/project.pbxproj`
+- `MegrumSupabaseURL` / `MegrumSupabasePublishableKey` / `MegrumSupabaseViewerID` のInfo.plistキーを追加した。
+
+#### `ios-native/Tests/MegrumDataTests/`
+- Supabase設定の読み取りとPostgREST request header生成をテストした。
+
+#### `ios-native/README.md`
+- `MegrumData` の役割と、Supabase設定値の渡し方を追記した。
+
+#### `notes/22_swift_native_migration.md`
+- Swift版のSupabase接続方針を、薄いPostgREST clientから始める方針へ具体化した。
+
+### 影響範囲
+
+- Swift Native iOS版のデータ接続基盤
+- ホーム / 在庫 / Wish / 取引の将来の実データ接続
+- Xcode / CLI実行時の環境設定
+
+### 確認方法
+
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-build --enable-xctest --disable-swift-testing -j 1`
+- `xcodebuild -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -destination 'generic/platform=iOS Simulator' -derivedDataPath /tmp/megrum-native-xcodebuild CODE_SIGNING_ALLOWED=NO build`
+- `git diff --check -- ios-native/Package.swift ios-native/Sources/MegrumData ios-native/Sources/MegrumApp ios-native/Tests/MegrumDataTests ios-native/Tests/MegrumAppTests ios-native/App ios-native/MegrumNative.xcodeproj ios-native/README.md notes/22_swift_native_migration.md notes/08_design_iterations.md`
+
+### 関連ファイル
+
+- `ios-native/Package.swift`
+- `ios-native/Sources/MegrumData/SupabaseConfiguration.swift`
+- `ios-native/Sources/MegrumData/SupabaseRESTClient.swift`
+- `ios-native/Sources/MegrumApp/SupabaseMegrumRepository.swift`
+- `ios-native/Sources/MegrumApp/MegrumAppStateFactory.swift`
+- `ios-native/App/MegrumNativeApp.swift`
+- `ios-native/MegrumNative.xcodeproj/project.pbxproj`
+- `ios-native/Tests/MegrumDataTests/SupabaseConfigurationTests.swift`
+- `ios-native/Tests/MegrumAppTests/MegrumAppStateTests.swift`
+- `ios-native/README.md`
+- `notes/22_swift_native_migration.md`
+- `notes/08_design_iterations.md`
+
+### セルフレビュー結果
+
+- ✅ Supabaseの公開設定だけを扱い、secret keyをSwiftアプリへ入れない構造にした。
+- ✅ 設定がない時はpreview dataへfallbackするため、Xcodeの初期起動が壊れない。
+- ✅ Swift Package testsが6件成功し、Supabase設定/リクエスト生成とAppState fallbackを検証した。
+- ✅ Xcode App HostのSimulator buildが引き続き成功することを確認した。
+- ✅ 状態遷移・用語・DBスキーマ変更はないため、`notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要。
+- ✅ TestFlight配布はまだ行っていないため、Preview OTA / TestFlight配信は不要。
+
+---
+
 ## イテレーション302：Swift AppStateを追加
 
 ### 背景・問題意識

@@ -10,10 +10,11 @@ The existing Expo / React Native app under `mobile/` remains the rollback source
 - `MegrumNative.xcodeproj` contains the first buildable iOS app host for the Swift version.
 - `App/MegrumNativeApp.swift` is the app entry point and mounts `MegrumRootView`.
 - `Sources/MegrumCore` contains portable domain models that mirror the current Supabase-backed product concepts.
+- `Sources/MegrumData` contains the first Supabase/PostgREST configuration and request layer.
 - `Sources/MegrumDesign` contains native SwiftUI design primitives, starting with a Liquid Glass-style search button.
 - `Sources/MegrumApp` contains the SwiftUI app shell and first native screens for Home, Search, Inventory, Wish, Trades, and Meguri.
-- `Sources/MegrumApp/MegrumAppState.swift` contains the first app state and repository boundary for later Supabase integration.
-- `Tests/MegrumCoreTests` and `Tests/MegrumAppTests` verify state names, display labels, and the preview repository load path.
+- `Sources/MegrumApp/MegrumAppState.swift` contains the first app state and repository boundary for Supabase integration.
+- `Tests/MegrumCoreTests`, `Tests/MegrumDataTests`, and `Tests/MegrumAppTests` verify state names, display labels, Supabase request construction, and the preview repository load path.
 
 ## Build Loop
 
@@ -23,6 +24,14 @@ Use the smallest useful native check first:
 swift build --package-path ios-native
 swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-build --enable-xctest --disable-swift-testing -j 1
 ```
+
+To run the native app against Supabase from Xcode or CLI, provide only public/client-side configuration:
+
+- `MegrumSupabaseURL` / `MEGRUM_SUPABASE_URL`
+- `MegrumSupabasePublishableKey` / `MEGRUM_SUPABASE_PUBLISHABLE_KEY`
+- `MegrumSupabaseViewerID` / `MEGRUM_SUPABASE_VIEWER_ID`
+
+If these values are absent, the Swift app intentionally falls back to preview data.
 
 For the Xcode app host, use CLI-first verification:
 

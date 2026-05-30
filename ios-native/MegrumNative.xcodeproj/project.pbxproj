@@ -136,6 +136,9 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = Megrum;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.social-networking";
+				INFOPLIST_KEY_MegrumSupabasePublishableKey = "";
+				INFOPLIST_KEY_MegrumSupabaseURL = "";
+				INFOPLIST_KEY_MegrumSupabaseViewerID = "";
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UIStatusBarStyle = UIStatusBarStyleDefault;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
@@ -163,6 +166,9 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = Megrum;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.social-networking";
+				INFOPLIST_KEY_MegrumSupabasePublishableKey = "";
+				INFOPLIST_KEY_MegrumSupabaseURL = "";
+				INFOPLIST_KEY_MegrumSupabaseViewerID = "";
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UIStatusBarStyle = UIStatusBarStyleDefault;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
