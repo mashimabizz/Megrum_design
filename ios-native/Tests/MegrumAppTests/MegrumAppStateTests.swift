@@ -133,6 +133,21 @@ final class MegrumAppStateTests: XCTestCase {
         XCTAssertNil(state.errorMessage)
     }
 
+    func testAppStateLoadsAndUnblocksPreviewBlockedUsers() async {
+        let state = MegrumAppState(repository: PreviewMegrumRepository())
+
+        await state.loadBlockedUsers()
+
+        XCTAssertEqual(state.blockedUsers.first?.handle, "blocked_sample")
+
+        let userID = try! XCTUnwrap(state.blockedUsers.first?.userID)
+        let unblocked = await state.unblockUser(userID)
+
+        XCTAssertTrue(unblocked)
+        XCTAssertTrue(state.blockedUsers.isEmpty)
+        XCTAssertNil(state.unblockingUserID)
+    }
+
     func testAuthStateSignsInThroughRepository() async {
         let state = MegrumAuthState(repository: StubAuthRepository())
 

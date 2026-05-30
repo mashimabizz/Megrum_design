@@ -64,6 +64,8 @@ public protocol MegrumRepository: Sendable {
     func loadMailingAddress() async throws -> MailingAddress?
     func saveMailingAddress(_ address: MailingAddress) async throws -> MailingAddress
     func lookupAddress(postalCode: String) async throws -> PostalCodeAddress?
+    func loadBlockedUsers() async throws -> [BlockedUser]
+    func unblockUser(_ userID: UUID) async throws
     func completeAccountSetup(_ input: AccountSetupInput) async throws -> UserProfile
 }
 
@@ -87,6 +89,12 @@ public extension MegrumRepository {
     func lookupAddress(postalCode: String) async throws -> PostalCodeAddress? {
         nil
     }
+
+    func loadBlockedUsers() async throws -> [BlockedUser] {
+        []
+    }
+
+    func unblockUser(_ userID: UUID) async throws {}
 
     func completeAccountSetup(_ input: AccountSetupInput) async throws -> UserProfile {
         throw MegrumRepositoryError.unsupportedMutation
@@ -149,6 +157,12 @@ public struct PreviewMegrumRepository: MegrumRepository {
             town: "千代田"
         )
     }
+
+    public func loadBlockedUsers() async throws -> [BlockedUser] {
+        NativePreviewData.blockedUsers
+    }
+
+    public func unblockUser(_ userID: UUID) async throws {}
 }
 
 @MainActor
@@ -162,12 +176,15 @@ public final class MegrumAppState: ObservableObject {
     @Published public private(set) var oshiGroups: [OshiGroup] = []
     @Published public private(set) var oshiCharacters: [OshiCharacter] = []
     @Published public private(set) var mailingAddress: MailingAddress?
+    @Published public private(set) var blockedUsers: [BlockedUser] = []
     @Published public private(set) var isLoading = false
     @Published public private(set) var isLoadingOshiGroups = false
     @Published public private(set) var isLoadingOshiCharacters = false
     @Published public private(set) var isLoadingMailingAddress = false
+    @Published public private(set) var isLoadingBlockedUsers = false
     @Published public private(set) var isLookingUpPostalCode = false
     @Published public private(set) var isSavingMailingAddress = false
+    @Published public private(set) var unblockingUserID: UUID?
     @Published public private(set) var isSavingAccountSetup = false
     @Published public private(set) var errorMessage: String?
 
@@ -298,6 +315,40 @@ public final class MegrumAppState: ObservableObject {
         } catch {
             errorMessage = "郵便番号から住所を取得できませんでした"
             return nil
+        }
+    }
+
+    public func loadBlockedUsers() async {
+        guard !isLoadingBlockedUsers else {
+            return
+        }
+
+        isLoadingBlockedUsers = true
+        errorMessage = nil
+        do {
+            blockedUsers = try await repository.loadBlockedUsers()
+        } catch {
+            errorMessage = "ブロックした人を読み込めませんでした"
+        }
+        isLoadingBlockedUsers = false
+    }
+
+    public func unblockUser(_ userID: UUID) async -> Bool {
+        guard unblockingUserID == nil else {
+            return false
+        }
+
+        unblockingUserID = userID
+        errorMessage = nil
+        do {
+            try await repository.unblockUser(userID)
+            blockedUsers.removeAll { $0.userID == userID }
+            unblockingUserID = nil
+            return true
+        } catch {
+            errorMessage = "ブロックを解除できませんでした"
+            unblockingUserID = nil
+            return false
         }
     }
 

@@ -4,6 +4,76 @@
 
 ---
 
+## イテレーション314：Swiftブロック管理画面を追加
+
+### 背景・問題意識
+
+RN版では設定一覧から「ブロックした人」を開き、`groom_user_blocks` の一覧確認と解除ができる。Swift Native版の設定画面にはまだ住所設定しかなかったため、既存DBスキーマを使ってブロック管理を移植した。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumCore/MegrumModels.swift`
+- `BlockedUser` を追加し、ブロック対象ユーザーのhandle、表示名、avatar、ブロック日時をdomain modelとして扱えるようにした。
+
+#### `ios-native/Sources/MegrumData/SupabaseBlockClient.swift`
+- `groom_user_blocks` から自分がブロックしたユーザーIDと日時を取得するclientを追加した。
+- ブロック対象の公開プロフィールを `users` から取得して `BlockedUser` に組み立てるようにした。
+- ブロック解除用のDELETE requestを追加した。
+
+#### `ios-native/Sources/MegrumApp/SettingsScreen.swift`
+- 設定一覧に「ブロックした人」を追加した。
+- `BlockedUsersScreen` を追加し、一覧、空状態、pull-to-refresh、解除確認dialog、解除中状態を表示するようにした。
+
+#### `ios-native/Sources/MegrumApp/MegrumAppState.swift`
+- `loadBlockedUsers()` / `unblockUser(_:)` と読込/解除中状態を追加した。
+
+#### `ios-native/Sources/MegrumApp/SupabaseMegrumRepository.swift`
+- live repositoryに `SupabaseBlockClient` を接続した。
+
+#### `ios-native/Sources/MegrumApp/NativePreviewData.swift`
+- Preview用のブロック中ユーザーを追加した。
+
+#### `ios-native/Tests/`
+- `SupabaseBlockClient` の一覧取得、プロフィール取得、解除requestを検証した。
+- `MegrumAppState` のPreviewブロック一覧読込と解除を検証した。
+
+### 影響範囲
+
+- Swift Native版の設定一覧
+- Swift Native版のブロック管理
+- `groom_user_blocks` 読み取り/削除境界
+
+### 確認方法
+
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-build --enable-xctest --disable-swift-testing -j 1`
+- `xcodebuild -quiet -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -destination 'generic/platform=iOS Simulator' -derivedDataPath /tmp/megrum-native-xcodebuild CODE_SIGNING_ALLOWED=NO build`
+- `git diff --check -- ios-native/Sources/MegrumCore/MegrumModels.swift ios-native/Sources/MegrumData/SupabaseBlockClient.swift ios-native/Tests/MegrumDataTests/SupabaseBlockClientTests.swift ios-native/Sources/MegrumApp/MegrumAppState.swift ios-native/Sources/MegrumApp/SupabaseMegrumRepository.swift ios-native/Sources/MegrumApp/SettingsScreen.swift ios-native/Sources/MegrumApp/NativePreviewData.swift ios-native/Tests/MegrumAppTests/MegrumAppStateTests.swift ios-native/README.md notes/22_swift_native_migration.md notes/08_design_iterations.md`
+
+### 関連ファイル
+
+- `ios-native/Sources/MegrumCore/MegrumModels.swift`
+- `ios-native/Sources/MegrumData/SupabaseBlockClient.swift`
+- `ios-native/Tests/MegrumDataTests/SupabaseBlockClientTests.swift`
+- `ios-native/Sources/MegrumApp/SettingsScreen.swift`
+- `ios-native/Sources/MegrumApp/MegrumAppState.swift`
+- `ios-native/Sources/MegrumApp/SupabaseMegrumRepository.swift`
+- `ios-native/Sources/MegrumApp/NativePreviewData.swift`
+- `ios-native/Tests/MegrumAppTests/MegrumAppStateTests.swift`
+- `ios-native/README.md`
+- `notes/22_swift_native_migration.md`
+- `notes/08_design_iterations.md`
+
+### セルフレビュー結果
+
+- ✅ 既存の `groom_user_blocks` を使い、DBスキーマ追加なしでSwift版へ移植した。
+- ✅ 一覧画面はSwiftUIの `List` / `confirmationDialog` / `refreshable` を使い、iOS標準寄りの挙動にした。
+- ✅ Swift Package testsが40件成功した。
+- ✅ Xcode project buildが成功した。
+- ✅ 状態遷移・新用語・DBスキーマ変更はないため、`notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要。
+- ✅ TestFlight配布はまだ行っていないため、Preview OTA / TestFlight配信は不要。
+
+---
+
 ## イテレーション313：Swift認証リダイレクト復帰を追加
 
 ### 背景・問題意識

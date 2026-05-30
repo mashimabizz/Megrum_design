@@ -7,6 +7,7 @@ public struct SupabaseMegrumRepository: MegrumRepository {
     private let oshiClient: SupabaseOshiClient
     private let mailingAddressClient: SupabaseMailingAddressClient
     private let postalCodeAddressClient: PostalCodeAddressClient
+    private let blockClient: SupabaseBlockClient
     private let viewerID: UUID
 
     public init(client: SupabaseRESTClient, viewerID: UUID) {
@@ -14,6 +15,7 @@ public struct SupabaseMegrumRepository: MegrumRepository {
         self.oshiClient = SupabaseOshiClient(client: client)
         self.mailingAddressClient = SupabaseMailingAddressClient(client: client)
         self.postalCodeAddressClient = PostalCodeAddressClient()
+        self.blockClient = SupabaseBlockClient(client: client)
         self.viewerID = viewerID
     }
 
@@ -69,6 +71,14 @@ public struct SupabaseMegrumRepository: MegrumRepository {
 
     public func lookupAddress(postalCode: String) async throws -> PostalCodeAddress? {
         try await postalCodeAddressClient.lookup(postalCode: postalCode)
+    }
+
+    public func loadBlockedUsers() async throws -> [BlockedUser] {
+        try await blockClient.loadBlockedUsers(blockerID: viewerID)
+    }
+
+    public func unblockUser(_ userID: UUID) async throws {
+        try await blockClient.unblockUser(blockerID: viewerID, blockedID: userID)
     }
 
     public func completeAccountSetup(_ input: AccountSetupInput) async throws -> UserProfile {

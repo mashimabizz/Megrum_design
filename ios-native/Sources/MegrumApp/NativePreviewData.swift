@@ -50,6 +50,15 @@ enum NativePreviewData {
         phoneNumber: "0312345678"
     )
 
+    static let blockedUsers = [
+        BlockedUser(
+            userID: UUID(uuidString: "00000000-0000-0000-0000-000000000071")!,
+            handle: "blocked_sample",
+            displayName: "ブロック中ユーザー",
+            blockedAt: Date(timeIntervalSince1970: 1_779_800_000)
+        )
+    ]
+
     static let inventory: [GoodsItem] = [
         GoodsItem(
             id: UUID(uuidString: "00000000-0000-0000-0000-000000000201")!,
