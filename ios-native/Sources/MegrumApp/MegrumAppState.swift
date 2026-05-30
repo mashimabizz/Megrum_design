@@ -68,6 +68,7 @@ public protocol MegrumRepository: Sendable {
     func loadMessages(proposalID: UUID, limit: Int) async throws -> [TradeMessage]
     func sendMessage(_ input: TradeMessageCreateInput) async throws -> TradeMessage
     func loadGrooms(latitude: Double?, longitude: Double?, radiusMeters: Int) async throws -> [GroomPost]
+    func createGroomPost(_ input: GroomPostCreateInput) async throws -> GroomPost
     func loadBoardThreads(latitude: Double?, longitude: Double?, prefecture: String?, scope: BoardThread.Audience) async throws -> [BoardThread]
     func loadBoardReplies(threadID: UUID, latitude: Double?, longitude: Double?, prefecture: String?, scope: BoardThread.Audience) async throws -> [BoardReply]
     func sendBoardReply(_ input: BoardReplyCreateInput) async throws -> BoardReply
@@ -118,6 +119,10 @@ public extension MegrumRepository {
 
     func loadGrooms(latitude: Double?, longitude: Double?, radiusMeters: Int) async throws -> [GroomPost] {
         []
+    }
+
+    func createGroomPost(_ input: GroomPostCreateInput) async throws -> GroomPost {
+        throw MegrumRepositoryError.unsupportedMutation
     }
 
     func loadBoardThreads(latitude: Double?, longitude: Double?, prefecture: String?, scope: BoardThread.Audience) async throws -> [BoardThread] {
@@ -271,6 +276,16 @@ public struct PreviewMegrumRepository: MegrumRepository {
         NativePreviewData.grooms
     }
 
+    public func createGroomPost(_ input: GroomPostCreateInput) async throws -> GroomPost {
+        GroomPost(
+            id: UUID(),
+            authorID: NativePreviewData.viewerID,
+            imageURL: URL(string: "https://example.com/native-groom-preview.jpg")!,
+            latitude: input.latitude ?? NativePreviewData.grooms.first?.latitude ?? 35.681236,
+            longitude: input.longitude ?? NativePreviewData.grooms.first?.longitude ?? 139.767125
+        )
+    }
+
     public func loadBoardThreads(latitude: Double?, longitude: Double?, prefecture: String?, scope: BoardThread.Audience) async throws -> [BoardThread] {
         NativePreviewData.threads.filter { thread in
             switch scope {
@@ -387,6 +402,7 @@ public final class MegrumAppState: ObservableObject {
     @Published public private(set) var isSavingMailingAddress = false
     @Published public private(set) var isCreatingGoodsEntry = false
     @Published public private(set) var isCreatingProposal = false
+    @Published public private(set) var isCreatingGroomPost = false
     @Published public private(set) var isCreatingBoardThread = false
     @Published public private(set) var loadingMessagesProposalID: UUID?
     @Published public private(set) var sendingMessageProposalID: UUID?
@@ -468,6 +484,53 @@ public final class MegrumAppState: ObservableObject {
             errorMessage = "めぐりを読み込めませんでした"
         }
         isLoadingMeguri = false
+    }
+
+    public func createGroomPost(
+        imageData: Data,
+        imageContentType: String,
+        caption: String? = nil,
+        latitude: Double? = nil,
+        longitude: Double? = nil
+    ) async -> Bool {
+        guard !isCreatingGroomPost else {
+            return false
+        }
+        guard let viewer else {
+            errorMessage = "プロフィールを読み込んでから投稿してください"
+            return false
+        }
+        guard !imageData.isEmpty else {
+            errorMessage = "投稿する画像を選択してください"
+            return false
+        }
+        guard let latitude, let longitude else {
+            errorMessage = "現在地を確認してから投稿してください"
+            return false
+        }
+
+        isCreatingGroomPost = true
+        errorMessage = nil
+        do {
+            let post = try await repository.createGroomPost(
+                GroomPostCreateInput(
+                    authorID: viewer.id,
+                    imageData: imageData,
+                    imageContentType: imageContentType,
+                    caption: caption,
+                    latitude: latitude,
+                    longitude: longitude
+                )
+            )
+            grooms.removeAll { $0.id == post.id }
+            grooms.insert(post, at: 0)
+            isCreatingGroomPost = false
+            return true
+        } catch {
+            errorMessage = "グルームを投稿できませんでした"
+            isCreatingGroomPost = false
+            return false
+        }
     }
 
     public func loadBoardReplies(

@@ -45,4 +45,46 @@ final class SupabaseConfigurationTests: XCTestCase {
         XCTAssertEqual(authenticatedConfig.publishableKey, config.publishableKey)
         XCTAssertEqual(authenticatedConfig.accessToken, "session_token")
     }
+
+    func testBuildsStorageObjectUploadRequest() throws {
+        let client = SupabaseRESTClient(configuration: configuration)
+        let data = Data([0x01, 0x02, 0x03])
+
+        let request = try client.makeStorageObjectUploadRequest(
+            bucket: "groom-posts",
+            path: "user-id/photo.jpg",
+            data: data,
+            contentType: "image/jpeg"
+        )
+
+        XCTAssertEqual(request.httpMethod, "POST")
+        XCTAssertEqual(request.url?.absoluteString, "https://example.supabase.co/storage/v1/object/groom-posts/user-id/photo.jpg")
+        XCTAssertEqual(request.httpBody, data)
+        XCTAssertEqual(request.value(forHTTPHeaderField: "Content-Type"), "image/jpeg")
+        XCTAssertEqual(request.value(forHTTPHeaderField: "cache-control"), "3600")
+        XCTAssertNil(request.value(forHTTPHeaderField: "x-upsert"))
+    }
+
+    func testBuildsStorageSignedURLRequest() throws {
+        let client = SupabaseRESTClient(configuration: configuration)
+
+        let request = try client.makeStorageSignedURLRequest(
+            bucket: "groom-posts",
+            path: "user-id/photo.jpg",
+            expiresIn: 7200
+        )
+        let body = try XCTUnwrap(request.httpBody)
+        let json = try XCTUnwrap(JSONSerialization.jsonObject(with: body) as? [String: Any])
+
+        XCTAssertEqual(request.httpMethod, "POST")
+        XCTAssertEqual(request.url?.absoluteString, "https://example.supabase.co/storage/v1/object/sign/groom-posts/user-id/photo.jpg")
+        XCTAssertEqual(json["expiresIn"] as? Int, 7200)
+    }
+
+    private var configuration: SupabaseConfiguration {
+        SupabaseConfiguration(
+            projectURL: URL(string: "https://example.supabase.co")!,
+            publishableKey: "sb_publishable_test"
+        )
+    }
 }

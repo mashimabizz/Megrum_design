@@ -112,6 +112,10 @@ public struct SupabaseMegrumRepository: MegrumRepository {
         )
     }
 
+    public func createGroomPost(_ input: GroomPostCreateInput) async throws -> GroomPost {
+        try await groomClient.createPost(input)
+    }
+
     public func loadBoardThreads(
         latitude: Double?,
         longitude: Double?,

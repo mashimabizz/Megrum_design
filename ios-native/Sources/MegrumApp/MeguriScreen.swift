@@ -1,6 +1,7 @@
 import MegrumCore
 import MegrumDesign
 import MapKit
+import PhotosUI
 import SwiftUI
 
 struct MeguriScreen: View {
@@ -10,6 +11,7 @@ struct MeguriScreen: View {
     @AppStorage("megrum.meguri.board.scope") private var storedBoardScopeRaw = BoardThread.Audience.nearby3km.rawValue
     @State private var selectedThread: BoardThread?
     @State private var selectedGroom: GroomPost?
+    @State private var selectedGroomPhotoItem: PhotosPickerItem?
     @State private var activeMap: MeguriMapKind?
     @State private var isShowingThreadComposer = false
     @State private var isShowingPrefecturePicker = false
@@ -35,7 +37,11 @@ struct MeguriScreen: View {
                     SectionHeader(title: "グルーム", actionTitle: "地図で見る") {
                         activeMap = .grooms
                     }
-                    GroomStrip(grooms: appState.grooms) { groom in
+                    GroomStrip(
+                        grooms: appState.grooms,
+                        selectedPhotoItem: $selectedGroomPhotoItem,
+                        isCreating: appState.isCreatingGroomPost
+                    ) { groom in
                         selectedGroom = groom
                     }
                 }
@@ -92,6 +98,14 @@ struct MeguriScreen: View {
                     prefecture: selectedBoardPrefecture,
                     scope: selectedBoardScope
                 )
+            }
+        }
+        .onChange(of: selectedGroomPhotoItem) { _, item in
+            guard let item else {
+                return
+            }
+            Task {
+                await publishSelectedGroomPhoto(item)
             }
         }
         .sheet(item: $selectedThread) { thread in
@@ -170,6 +184,48 @@ struct MeguriScreen: View {
             prefecture: selectedBoardPrefecture,
             scope: scope ?? selectedBoardScope
         )
+    }
+
+    private func publishSelectedGroomPhoto(_ item: PhotosPickerItem) async {
+        defer {
+            selectedGroomPhotoItem = nil
+        }
+
+        guard let data = try? await item.loadTransferable(type: Data.self) else {
+            return
+        }
+        let created = await appState.createGroomPost(
+            imageData: data,
+            imageContentType: inferredImageContentType(from: data),
+            latitude: locationState.coordinate?.latitude,
+            longitude: locationState.coordinate?.longitude
+        )
+        if created {
+            await reloadMeguriFeed()
+        }
+    }
+
+    private func inferredImageContentType(from data: Data) -> String {
+        let bytes = [UInt8](data.prefix(12))
+        if bytes.count >= 8,
+           bytes[0] == 0x89,
+           bytes[1] == 0x50,
+           bytes[2] == 0x4E,
+           bytes[3] == 0x47 {
+            return "image/png"
+        }
+        if bytes.count >= 12,
+           bytes[0] == 0x52,
+           bytes[1] == 0x49,
+           bytes[2] == 0x46,
+           bytes[3] == 0x46,
+           bytes[8] == 0x57,
+           bytes[9] == 0x45,
+           bytes[10] == 0x42,
+           bytes[11] == 0x50 {
+            return "image/webp"
+        }
+        return "image/jpeg"
     }
 }
 
@@ -1030,11 +1086,41 @@ private struct SectionHeader: View {
 
 private struct GroomStrip: View {
     var grooms: [GroomPost]
+    @Binding var selectedPhotoItem: PhotosPickerItem?
+    var isCreating: Bool
     var onSelect: (GroomPost) -> Void
 
     var body: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 14) {
+                PhotosPicker(selection: $selectedPhotoItem, matching: .images) {
+                    VStack(spacing: 8) {
+                        Circle()
+                            .fill(.white.opacity(0.9))
+                            .frame(width: 72, height: 72)
+                            .overlay {
+                                if isCreating {
+                                    ProgressView()
+                                        .tint(MegrumTheme.lavender)
+                                } else {
+                                    Image(systemName: "plus")
+                                        .font(.system(size: 26, weight: .heavy))
+                                        .foregroundStyle(MegrumTheme.lavender)
+                                }
+                            }
+                            .overlay {
+                                Circle()
+                                    .stroke(MegrumTheme.lavender.opacity(0.18), lineWidth: 1)
+                            }
+
+                        Text("追加")
+                            .font(.system(size: 11, weight: .heavy, design: .rounded))
+                            .foregroundStyle(MegrumTheme.muted)
+                    }
+                }
+                .buttonStyle(.plain)
+                .disabled(isCreating)
+
                 ForEach(grooms) { groom in
                     Button {
                         onSelect(groom)

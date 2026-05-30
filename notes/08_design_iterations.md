@@ -4,6 +4,85 @@
 
 ---
 
+## イテレーション331：Swiftグルーム投稿境界を追加
+
+### 背景・問題意識
+
+Swift Native版のグルームは閲覧とMap表示までは移行できたが、グルームを投稿する導線がまだReact Native側に残っていた。iOS一本化に向けて、写真選択からStorageアップロード、`groom_posts` 作成、feed反映までの最小Native境界を追加する。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumCore/MegrumModels.swift`
+- `GroomPostCreateInput` を追加し、投稿者、画像データ、content type、位置情報、キャプションをSwift型で渡せるようにした。
+
+#### `ios-native/Sources/MegrumData/SupabaseRESTClient.swift`
+- Supabase Storage object upload requestを作れる `uploadObject` / `makeStorageObjectUploadRequest` を追加した。
+- Storage signed URL requestを作れる `createSignedURL` / `makeStorageSignedURLRequest` を追加した。
+
+#### `ios-native/Sources/MegrumData/SupabaseGroomClient.swift`
+- `groom-posts` bucketへ画像をアップロードし、`groom_posts` にpublished投稿をinsertする `createPost` を追加した。
+- `image_path` があるグルームはStorage signed URLを作って `GroomPost.imageURL` に渡すようにした。
+
+#### `ios-native/Sources/MegrumApp/MegrumAppState.swift` / `ios-native/Sources/MegrumApp/SupabaseMegrumRepository.swift`
+- repository境界とAppStateに `createGroomPost` を追加した。
+- プロフィール、画像、現在地を検証し、作成成功時にグルーム一覧の先頭へ反映するようにした。
+
+#### `ios-native/Sources/MegrumApp/MeguriScreen.swift`
+- グルーム横並びの先頭にNative `PhotosPicker` の追加ボタンを置いた。
+- 選択した画像データからcontent typeを推定し、現在地つきで `createGroomPost` を呼ぶようにした。
+- 投稿中は追加ボタン内にProgressViewを表示するようにした。
+
+#### `ios-native/Tests/MegrumDataTests/SupabaseConfigurationTests.swift`
+- Storage upload / signed URL requestのURL、body、headersを検証した。
+
+#### `ios-native/Tests/MegrumDataTests/SupabaseGroomClientTests.swift`
+- `groom_posts` 作成requestのpayloadを検証した。
+
+#### `ios-native/Tests/MegrumAppTests/MegrumAppStateTests.swift`
+- Preview repositoryでグルーム投稿が一覧先頭へ反映されることを検証した。
+
+#### `ios-native/README.md` / `notes/22_swift_native_migration.md`
+- Swift NativeめぐりPhaseの進捗としてグルーム投稿導線を追記した。
+
+### 影響範囲
+
+- Swift Native版のめぐりホーム
+- Swift Native版のグルーム投稿
+- Swift Native版のSupabase Storage境界
+- Swift Native版の `groom_posts` 作成境界
+
+### 確認方法
+
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-build --enable-xctest --disable-swift-testing -j 1`
+- `xcodebuild -quiet -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -destination 'generic/platform=iOS Simulator' -derivedDataPath /tmp/megrum-native-xcodebuild CODE_SIGNING_ALLOWED=NO build`
+
+### 関連ファイル
+
+- `ios-native/Sources/MegrumCore/MegrumModels.swift`
+- `ios-native/Sources/MegrumData/SupabaseRESTClient.swift`
+- `ios-native/Sources/MegrumData/SupabaseGroomClient.swift`
+- `ios-native/Sources/MegrumApp/MegrumAppState.swift`
+- `ios-native/Sources/MegrumApp/SupabaseMegrumRepository.swift`
+- `ios-native/Sources/MegrumApp/MeguriScreen.swift`
+- `ios-native/Tests/MegrumDataTests/SupabaseConfigurationTests.swift`
+- `ios-native/Tests/MegrumDataTests/SupabaseGroomClientTests.swift`
+- `ios-native/Tests/MegrumAppTests/MegrumAppStateTests.swift`
+- `ios-native/README.md`
+- `notes/22_swift_native_migration.md`
+- `notes/08_design_iterations.md`
+
+### セルフレビュー結果
+
+- ✅ Swift Package testsが73件成功した。
+- ✅ Xcode project buildが成功した。
+- ✅ 既存の `groom_posts` / `groom-posts` Storageを使うため、新規migrationは追加していない。
+- ✅ Groom lifecycleの新状態は追加していないため、`notes/09_state_machines.md` の更新は不要。
+- ✅ 「グルーム」「Storage」「署名URL」は既存用語と実装境界の説明であり、`notes/10_glossary.md` の更新は不要。
+- ✅ DBスキーマの変更はなく、既存 `notes/05_data_model.md` の `groom_posts` 定義に沿った接続のため、`notes/05_data_model.md` の更新は不要。
+- ✅ TestFlight配布はまだ行っていないため、Preview OTA / TestFlight配信は不要。
+
+---
+
 ## イテレーション330：Swift掲示板都道府県設定を追加
 
 ### 背景・問題意識

@@ -137,6 +137,51 @@ public final class SupabaseRESTClient: @unchecked Sendable {
         }
     }
 
+    public func uploadObject(
+        bucket: String,
+        path: String,
+        data: Data,
+        contentType: String,
+        cacheControl: String = "3600",
+        upsert: Bool = false
+    ) async throws {
+        let request = try makeStorageObjectUploadRequest(
+            bucket: bucket,
+            path: path,
+            data: data,
+            contentType: contentType,
+            cacheControl: cacheControl,
+            upsert: upsert
+        )
+        let (_, response) = try await session.data(for: request)
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw SupabaseRESTError.unexpectedStatus(-1)
+        }
+        guard (200..<300).contains(httpResponse.statusCode) else {
+            throw SupabaseRESTError.unexpectedStatus(httpResponse.statusCode)
+        }
+    }
+
+    public func createSignedURL(bucket: String, path: String, expiresIn: Int = 3_600) async throws -> URL {
+        let request = try makeStorageSignedURLRequest(bucket: bucket, path: path, expiresIn: expiresIn)
+        let (data, response) = try await session.data(for: request)
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw SupabaseRESTError.unexpectedStatus(-1)
+        }
+        guard (200..<300).contains(httpResponse.statusCode) else {
+            throw SupabaseRESTError.unexpectedStatus(httpResponse.statusCode)
+        }
+
+        let signed = try decoder.decode(StorageSignedURLResponse.self, from: data).signedURL
+        if let absoluteURL = URL(string: signed), absoluteURL.scheme != nil {
+            return absoluteURL
+        }
+        guard let relativeURL = URL(string: signed, relativeTo: configuration.projectURL)?.absoluteURL else {
+            throw SupabaseRESTError.invalidURL
+        }
+        return relativeURL
+    }
+
     public func makeRequest(path: String, queryItems: [URLQueryItem] = []) throws -> URLRequest {
         guard var components = URLComponents(url: configuration.projectURL, resolvingAgainstBaseURL: false) else {
             throw SupabaseRESTError.invalidURL
@@ -181,6 +226,36 @@ public final class SupabaseRESTClient: @unchecked Sendable {
         )
     }
 
+    public func makeStorageObjectUploadRequest(
+        bucket: String,
+        path: String,
+        data: Data,
+        contentType: String,
+        cacheControl: String = "3600",
+        upsert: Bool = false
+    ) throws -> URLRequest {
+        var request = try makeMutationRequest(
+            path: "/storage/v1/object/\(bucket)/\(path)",
+            method: "POST",
+            body: data
+        )
+        request.setValue(contentType, forHTTPHeaderField: "Content-Type")
+        request.setValue(cacheControl, forHTTPHeaderField: "cache-control")
+        if upsert {
+            request.setValue("true", forHTTPHeaderField: "x-upsert")
+        }
+        return request
+    }
+
+    public func makeStorageSignedURLRequest(bucket: String, path: String, expiresIn: Int = 3_600) throws -> URLRequest {
+        let body = try JSONSerialization.data(withJSONObject: ["expiresIn": expiresIn])
+        return try makeMutationRequest(
+            path: "/storage/v1/object/sign/\(bucket)/\(path)",
+            method: "POST",
+            body: body
+        )
+    }
+
     public func makeMutationRequest(
         path: String,
         queryItems: [URLQueryItem] = [],
@@ -221,5 +296,13 @@ public final class SupabaseRESTClient: @unchecked Sendable {
             queryItems.append(URLQueryItem(name: "on_conflict", value: onConflict))
         }
         return queryItems
+    }
+}
+
+private struct StorageSignedURLResponse: Decodable, Sendable {
+    var signedURL: String
+
+    enum CodingKeys: String, CodingKey {
+        case signedURL
     }
 }

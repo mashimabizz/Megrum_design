@@ -98,6 +98,24 @@ final class MegrumAppStateTests: XCTestCase {
         XCTAssertFalse(state.isCreatingBoardThread)
     }
 
+    func testAppStateCreatesPreviewGroomPost() async {
+        let state = MegrumAppState(repository: PreviewMegrumRepository())
+        await state.loadInitialData()
+        let initialCount = state.grooms.count
+
+        let created = await state.createGroomPost(
+            imageData: Data([0xff, 0xd8, 0xff]),
+            imageContentType: "image/jpeg",
+            latitude: 35.681236,
+            longitude: 139.767125
+        )
+
+        XCTAssertTrue(created)
+        XCTAssertEqual(state.grooms.count, initialCount + 1)
+        XCTAssertEqual(state.grooms.first?.authorID, state.viewer?.id)
+        XCTAssertFalse(state.isCreatingGroomPost)
+    }
+
     func testAppStateCreatesPreviewBoardThreadWithPrefectureOverride() async {
         let state = MegrumAppState(repository: PreviewMegrumRepository())
         await state.loadInitialData()

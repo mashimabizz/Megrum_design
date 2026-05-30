@@ -670,6 +670,34 @@ public struct GroomPost: Identifiable, Codable, Hashable, Sendable {
     }
 }
 
+public struct GroomPostCreateInput: Equatable, Sendable {
+    public var authorID: UUID
+    public var imageData: Data
+    public var imageContentType: String
+    public var caption: String?
+    public var latitude: Double?
+    public var longitude: Double?
+    public var placeHint: String?
+
+    public init(
+        authorID: UUID,
+        imageData: Data,
+        imageContentType: String,
+        caption: String? = nil,
+        latitude: Double? = nil,
+        longitude: Double? = nil,
+        placeHint: String? = nil
+    ) {
+        self.authorID = authorID
+        self.imageData = imageData
+        self.imageContentType = imageContentType
+        self.caption = caption
+        self.latitude = latitude
+        self.longitude = longitude
+        self.placeHint = placeHint
+    }
+}
+
 public struct BoardThread: Identifiable, Codable, Hashable, Sendable {
     public enum Audience: String, Codable, Sendable, CaseIterable, Identifiable {
         case nearby3km = "nearby_3km"
