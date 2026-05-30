@@ -13,6 +13,7 @@
  */
 
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { participantOrFilter } from "@/lib/supabaseFilters";
 
 export async function autoExpireProposals(
   supabase: SupabaseClient,
@@ -22,7 +23,7 @@ export async function autoExpireProposals(
   await supabase
     .from("proposals")
     .update({ status: "expired", last_action_at: nowIso })
-    .or(`sender_id.eq.${userId},receiver_id.eq.${userId}`)
+    .or(participantOrFilter("sender_id", "receiver_id", userId))
     .in("status", ["sent", "negotiating", "agreement_one_side"])
     .lt("expires_at", nowIso);
 }

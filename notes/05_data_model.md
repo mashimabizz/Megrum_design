@@ -4,7 +4,7 @@
 > 実装の正解集。`09_state_machines.md` と完全に整合させ、`10_glossary.md` の用語を使う。
 
 最終更新: 2026-05-30
-ステータス: Draft v2.27（iter276 モバイル通知を追加）
+ステータス: Draft v2.28（iter278 セキュリティ監査とRLS強化を追加）
 
 ## 最新化履歴
 
@@ -39,6 +39,7 @@
 | **v2.25** | **2026-05-30** | **iter180 反映（スポット掲示板のスレッド作成・返信下書きを端末内 `meguri.board.composerDrafts.v1` / `meguri.board.replyDrafts.v1` に自動保存）** |
 | **v2.26** | **2026-05-30** | **iter188 反映（`list_meguri_board_threads_for_viewer()` に `viewer_participated` を追加。スレッド作成者または可視返信済みユーザーを参加中として返す）** |
 | **v2.27** | **2026-05-30** | **iter276 反映（`notification_devices` と `user_notification_settings.push_enabled` を追加し、`notifications` INSERTからExpo Pushへ配送する）** |
+| **v2.28** | **2026-05-30** | **iter278 反映（公開プロフィール列制限、削除済み/停止中ユーザー非公開、AW匿名読み取り停止、所有者更新系RLSの `WITH CHECK` 追加）** |
 | **v2.20** | **2026-05-29** | **iter168.90 反映（`search_query_logs` と人気検索RPCを追加。検索結果はマッチ分類つきグッズパネルで表示）** |
 | **v2.21** | **2026-05-30** | **iter168.97 反映（`schedules.place_name` 追加。合意時に `both` を単一手段へ固定し、現地交換の複数候補は1件へ固定する運用を追記）** |
 
@@ -165,6 +166,12 @@ iter24 で「推し2階層」（グループ/作品 → メンバー/キャラ�
 ⚠️ 要確認：
 - パスワード以外の auth method（passkey, magic link）対応するか
 - `gender` を必須にするか任意にするか（マッチング条件に使う？）
+
+RLS / 権限（iter278）：
+- `anon` / `authenticated` に公開する `users` のSELECT列は、公開プロフィール表示に使う `id, handle, display_name, avatar_url, gender, primary_area, account_status, created_at` に限定する。
+- `email_verified_at` / `deletion_requested_at` / `last_login_at` / `updated_at` などの内部運用列は公開SELECT権限を付与しない。
+- 公開プロフィール読み取りは `account_status not in ('deleted', 'suspended')` のユーザーだけに限定する。
+- 本人更新ポリシーは `using (auth.uid() = id)` に加えて `with check (auth.uid() = id)` を必須にし、直接API操作で `id` を別ユーザーへ移す更新を拒否する。
 
 ### `user_mailing_addresses`（住所 / iter168.71）
 
@@ -649,6 +656,10 @@ iter33 で AW自動登録機能追加（C-0 待ち合わせタブから）。
 - `ended` から `archived` への自動遷移時間（09 未確定項目#2）
 - `auto_from_proposal` で作られた AW は、対応する取引が cancel/dispute になったら削除？保持？
 
+RLS / 権限（iter278）：
+- `status='enabled'` のAW読み取りは `authenticated` のみに限定し、匿名ユーザーには公開しない。
+- 更新ポリシーは `using (auth.uid() = user_id)` と `with check (auth.uid() = user_id)` の両方を持たせる。
+
 ### `events`（公演／物販イベントタグ）
 
 | カラム | 型 | 説明 |
@@ -752,6 +763,10 @@ iter168.97 追加運用：
 - iter153: `status='agreed'` の proposal は、`sender_have_ids` / `receiver_have_ids` と各 qty を市場残数から差し引く。ただし `approved_by_sender` / `approved_by_receiver` が true の側は、取引完了承認処理で実在庫が既に減算されているため二重控除しない。
 - iter153: `sent` / `negotiating` / `agreement_one_side` は在庫確保前の状態として扱い、市場残数からは差し引かない。`agreed` へ遷移する直前にキャパ超過を検証する。
 - iter168.74/168.82: `exchange_method='mail'` または `exchange_method='both'` の時、送信者は打診送信前に `user_mailing_addresses` の登録が必須。受信者も合意前に住所登録が必要で、最終合意時に双方の住所スナップショットを `proposals.sender_mailing_address / receiver_mailing_address` へ固定し、当事者以外には返さない。
+
+RLS / 権限（iter278）：
+- 参加者更新ポリシーは `using (auth.uid() = sender_id or auth.uid() = receiver_id)` に加えて `with check (auth.uid() = sender_id or auth.uid() = receiver_id)` を必須にする。
+- これにより、直接API操作で `sender_id` / `receiver_id` を第三者へ変更して打診の所有関係を移す更新を拒否する。
 
 ⚠️ 要確認：
 - ネゴ中の提案修正で `last_action_at` リセットするか（09 未確定項目#1）

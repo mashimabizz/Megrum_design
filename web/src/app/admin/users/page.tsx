@@ -11,6 +11,7 @@ import {
   getAdminContext,
   hasAdminPermission,
 } from "@/lib/admin/permissions";
+import { sanitizePostgrestSearchTerm } from "@/lib/supabaseFilters";
 import { createServiceRoleClient } from "@/lib/supabase/server";
 
 type Props = {
@@ -43,9 +44,9 @@ export default async function AdminUsersPage({ searchParams }: Props) {
     .limit(80);
 
   if (q) {
-    const escaped = q.replace(/[%_,]/g, "");
-    if (escaped) {
-      query = query.or(`handle.ilike.%${escaped}%,display_name.ilike.%${escaped}%`);
+    const safeTerm = sanitizePostgrestSearchTerm(q);
+    if (safeTerm) {
+      query = query.or(`handle.ilike.%${safeTerm}%,display_name.ilike.%${safeTerm}%`);
     }
   }
 

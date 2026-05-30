@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { BottomNav } from "@/components/home/BottomNav";
 import { autoExpireProposals } from "@/lib/expire";
+import { participantOrFilter } from "@/lib/supabaseFilters";
 import {
   TransactionsView,
   type TransactionRow,
@@ -78,7 +79,7 @@ export default async function TransactionsPage() {
        meetup_start_at, meetup_end_at, meetup_place_name,
        expires_at, created_at, last_action_at, completed_at, message`,
     )
-    .or(`sender_id.eq.${user.id},receiver_id.eq.${user.id}`)
+    .or(participantOrFilter("sender_id", "receiver_id", user.id))
     .neq("status", "draft")
     .order("last_action_at", { ascending: false });
 

@@ -3,8 +3,8 @@
 > **目的**：Megrum MVP の品質特性（プライバシー・セキュリティ・性能・可用性等）を明文化。
 > 機能要件（02）が「何を作るか」、こちらは「**どのレベルで作るか**」を定義。
 
-最終更新: 2026-05-01（iter44）
-ステータス: Draft v1.0
+最終更新: 2026-05-30（iter278）
+ステータス: Draft v1.1
 
 ---
 
@@ -257,6 +257,30 @@ Phase β 以降のブースト・Premium 会員導入時：
 - 通報
 
 監査ログの保管期間：1年 ⚠️
+
+### 3-9. 実装済みセキュリティ強化（iter278）
+
+2026-05-30 のリリース前監査で、以下を実施済み。
+
+#### 依存関係
+- `mobile` / `web` ともに `npm audit --omit=dev` と通常の `npm audit` を実行し、0 vulnerabilities を確認した。
+- Webは Next.js / eslint-config-next を `16.2.6` へ更新した。
+- 既存依存ツリー内で脆弱版が解決されないよう、`postcss` / `ws` / `uuid` に overrides を設定した。
+
+#### PostgREST クエリ入力
+- Supabase `.or(...)` の参加者フィルタは、UUID検証済みの `participantOrFilter(...)` を通す。
+- ユーザーIDや打診IDをURLパラメータから受ける画面は、UUID以外を 404 / エラー扱いにする。
+- 管理者ユーザー検索の自由入力は、NFKC正規化、許可文字制限、長さ制限を通してから `.or(...)` に渡す。
+
+#### RLS / 権限
+- `public.users` は公開プロフィールに必要な列だけSELECTを許可し、内部運用列を公開SELECTから外す。
+- `account_status in ('deleted', 'suspended')` のユーザーは公開プロフィール読み取り対象から除外する。
+- `activity_windows` の有効AW読み取りはログイン済みユーザーのみに限定する。
+- 所有者・参加者ベースの更新ポリシーは `USING` だけでなく `WITH CHECK` を追加し、直接API操作による所有者ID/参加者IDのすり替えを拒否する。
+
+#### 適用状況
+- Supabase migration: `20260531002000_harden_public_rls_and_ownership.sql` を `npx supabase db push --linked --yes` で適用済み。
+- iOS Preview channel: Update group ID `904e5c23-8aa0-4fb4-ad48-4e858c8d511c` へOTA配信済み。
 
 ---
 

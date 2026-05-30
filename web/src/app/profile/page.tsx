@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { BottomNav } from "@/components/home/BottomNav";
 import { ProfileView } from "./ProfileView";
+import { participantOrFilter } from "@/lib/supabaseFilters";
 
 export const metadata = {
   title: "プロフ — Megrum",
@@ -53,7 +54,7 @@ export default async function ProfilePage() {
     supabase
       .from("users")
       .select(
-        "handle, display_name, gender, primary_area, email_verified_at, account_status, avatar_url",
+        "handle, display_name, gender, primary_area, account_status, avatar_url",
       )
       .eq("id", user.id)
       .maybeSingle(),
@@ -72,7 +73,7 @@ export default async function ProfilePage() {
     supabase
       .from("proposals")
       .select("id", { count: "exact", head: true })
-      .or(`sender_id.eq.${user.id},receiver_id.eq.${user.id}`)
+      .or(participantOrFilter("sender_id", "receiver_id", user.id))
       .eq("status", "completed"),
     supabase
       .from("listings")
@@ -142,7 +143,7 @@ export default async function ProfilePage() {
           displayName: profile?.display_name ?? "",
           gender: profile?.gender ?? null,
           primaryArea: profile?.primary_area ?? null,
-          emailVerifiedAt: profile?.email_verified_at ?? null,
+          emailVerifiedAt: user.email_confirmed_at ?? null,
           avatarUrl: (profile?.avatar_url as string | null) ?? null,
         }}
         oshiGroups={oshiSummary}

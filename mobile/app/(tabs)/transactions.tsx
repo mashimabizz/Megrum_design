@@ -19,6 +19,7 @@ import { Screen } from "../../src/components/Screen";
 import { TransactionListSkeleton } from "../../src/components/SkeletonScreen";
 import { useAuth } from "../../src/auth/AuthProvider";
 import { supabase } from "../../src/lib/supabase";
+import { participantOrFilter } from "../../src/lib/supabaseFilters";
 import { megrumColors, megrumRadii } from "../../src/theme/tokens";
 
 type TopTab = "pending" | "ongoing";
@@ -742,7 +743,7 @@ async function fetchProposalRows(
     const { data, error } = await supabase
       .from("proposals")
       .select(selectableFields.join(", "))
-      .or(`sender_id.eq.${userId},receiver_id.eq.${userId}`)
+      .or(participantOrFilter("sender_id", "receiver_id", userId))
       .neq("status", "draft")
       .order("last_action_at", { ascending: false });
     const missingColumn = getMissingProposalColumn(error);

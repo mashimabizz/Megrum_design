@@ -2,6 +2,7 @@ import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { HeaderBack } from "@/components/auth/HeaderBack";
 import { autoExpireProposals } from "@/lib/expire";
+import { isUuid, participantOrFilter } from "@/lib/supabaseFilters";
 import { ProposalDetailView, type ProposalDetail } from "./ProposalDetailView";
 
 export const metadata = {
@@ -139,6 +140,7 @@ export default async function ProposalDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
+  if (!isUuid(id)) notFound();
   const supabase = await createClient();
   const {
     data: { user },
@@ -231,7 +233,7 @@ export default async function ProposalDetailPage({
     supabase
       .from("proposals")
       .select("id", { count: "exact", head: true })
-      .or(`sender_id.eq.${partnerId},receiver_id.eq.${partnerId}`)
+      .or(participantOrFilter("sender_id", "receiver_id", partnerId))
       .eq("status", "completed"),
     // 自分の AW（受信者なら自分側、送信者でも自分の AW）と提案 meetup の重なり判定用
     p.meetup_start_at && p.meetup_end_at

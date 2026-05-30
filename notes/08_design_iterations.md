@@ -4,6 +4,96 @@
 
 ---
 
+## イテレーション278：セキュリティ監査とRLS強化
+
+### 背景・問題意識
+
+オーナーから、その他のセキュリティ関連の脆弱性を探し、見つけたものを解消しきる依頼があった。iOS Previewリリース直前のため、依存関係、認証済みクエリ、公開プロフィール、RLS更新ポリシーを横断して確認した。
+
+### 変更内容
+
+#### `mobile/src/lib/supabaseFilters.ts`
+- Supabase `.or(...)` に渡す UUID を事前検証する `isUuid` / `participantOrFilter` を追加した。
+- ログインユーザーIDや相手ユーザーIDを文字列連結する箇所で、UUID以外をクエリへ流さないようにした。
+
+#### `web/src/lib/supabaseFilters.ts`
+- Web側にも同じ UUID 検証ヘルパーを追加した。
+- 管理者ユーザー検索用に、PostgREST検索文字列へ渡す検索語をNFKC正規化・許可文字制限・長さ制限する `sanitizePostgrestSearchTerm` を追加した。
+
+#### `mobile/app/(tabs)/profile.tsx`
+#### `mobile/app/(tabs)/transactions.tsx`
+#### `mobile/app/user-profile.tsx`
+#### `mobile/src/lib/meguriMessages.ts`
+#### `web/src/app/profile/page.tsx`
+#### `web/src/app/proposals/[id]/page.tsx`
+#### `web/src/app/transactions/page.tsx`
+#### `web/src/app/users/[id]/page.tsx`
+#### `web/src/lib/expire.ts`
+- `sender_id.eq.${id},receiver_id.eq.${id}` 形式の動的 `.or(...)` を `participantOrFilter(...)` 経由に置き換えた。
+- Webの動的ユーザー/打診詳細ルートは UUID 以外なら `notFound()` に落とすようにした。
+
+#### `web/src/app/admin/users/page.tsx`
+- 管理者ユーザー検索の `.or(handle.ilike...,display_name.ilike...)` に渡す検索語をサニタイズするようにした。
+
+#### `supabase/migrations/20260531002000_harden_public_rls_and_ownership.sql`
+- `public.users` のテーブル単位SELECTを取り消し、公開プロフィール表示に必要な列だけを `anon` / `authenticated` に許可した。
+- `deleted` / `suspended` ユーザーを公開プロフィール読み取りから除外し、自分自身のプロフィールは本人のみ追加で読めるようにした。
+- `activity_windows` の有効AW読み取りを匿名ユーザーへ開かず、ログイン済みユーザーだけにした。
+- `users` / `user_oshi` / `activity_windows` / `goods_inventory` / `proposals` / `notifications` / `disputes` / `groom_views` / `groom_replies` / `meguri_messages` の更新ポリシーに `WITH CHECK` を追加し、直接API操作で所有者IDや参加者IDを別アカウントへ移せないようにした。
+
+#### `mobile/package.json`
+#### `mobile/package-lock.json`
+#### `web/package.json`
+#### `web/package-lock.json`
+- `npm audit` で検出された脆弱な依存関係を更新した。
+- Webは Next.js / eslint-config-next を `16.2.6` へ更新した。
+- `postcss` / `ws` / `uuid` は既存依存ツリー内の脆弱版が使われないよう overrides を追加した。
+
+#### `notes/05_data_model.md`
+#### `notes/15_non_functional.md`
+- 公開プロフィール列、AW読み取り範囲、更新系RLSの `WITH CHECK` 方針を記録した。
+- 依存監査・PostgRESTフィルタ・RLS強化の完了状況を非機能要件に追記した。
+
+### 影響範囲
+
+- iOS版 プロフィール、相手プロフィール、やりとり一覧、めぐりメッセージ返信読み込み
+- Web版 プロフィール、相手プロフィール、打診詳細、やりとり一覧、期限切れ処理、管理者ユーザー検索
+- Supabase `users` / `activity_windows` / 所有者更新系テーブルのRLS
+- mobile / web の依存関係
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix web run build`
+- `npm --prefix mobile audit --omit=dev`
+- `npm --prefix mobile audit`
+- `npm --prefix web audit --omit=dev`
+- `npm --prefix web audit`
+- `npx supabase db push --linked --yes`
+- `npm --prefix mobile run export:ios:preview`
+- `EAS_UPDATE_PROJECT_SLUG=ihub EXPO_NO_GIT_STATUS=1 npm --prefix mobile run update:ios:preview -- --message "[iter278] セキュリティ監査とRLS強化" --non-interactive`
+- Preview OTA: Update group ID `904e5c23-8aa0-4fb4-ad48-4e858c8d511c` / iOS update ID `019e76f0-a51e-7096-9a7a-4ba200f54bb4`
+- EAS Dashboard: `https://expo.dev/accounts/mashima.bizz/projects/ihub/updates/904e5c23-8aa0-4fb4-ad48-4e858c8d511c`
+
+### 関連ファイル
+
+- `mobile/src/lib/supabaseFilters.ts`
+- `web/src/lib/supabaseFilters.ts`
+- `supabase/migrations/20260531002000_harden_public_rls_and_ownership.sql`
+- `notes/05_data_model.md`
+- `notes/15_non_functional.md`
+- `notes/08_design_iterations.md`
+
+### セルフレビュー結果
+
+- ✅ mobile / web ともに `npm audit --omit=dev` と通常の `npm audit` が 0 vulnerabilities。
+- ✅ PostgREST `.or(...)` に渡すユーザーIDは UUID 検証を通すようにした。
+- ✅ 管理者検索の自由入力はサニタイズ済み。
+- ✅ RLS更新ポリシーは `USING` だけでなく `WITH CHECK` を持つようにし、所有者・参加者のすり替えを防ぐ。
+- ✅ `public.users` の公開列を絞り、削除済み・停止中アカウントを公開プロフィールから除外した。
+- ✅ DB migration 適用済み、iOS Preview channel へOTA配信済み。
+- ✅ 状態名・新規用語の追加はなし。`notes/09_state_machines.md` / `notes/10_glossary.md` の更新は不要。
+
 ## イテレーション277：相手プロフィール評価導線を接続
 
 ### 背景・問題意識

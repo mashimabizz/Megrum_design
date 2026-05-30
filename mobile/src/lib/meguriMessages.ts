@@ -1,6 +1,7 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { hasSupabaseConfig, supabase } from "./supabase";
 import { isUuidLike } from "./groom";
+import { participantOrFilter } from "./supabaseFilters";
 
 export type MeguriMessageReadState = Record<string, string[]>;
 
@@ -238,7 +239,7 @@ async function loadRemoteMeguriGroomReplies(): Promise<MeguriGroomReply[]> {
         "recipient:users!groom_replies_recipient_id_fkey(id, display_name, handle)",
       ].join(", "),
     )
-    .or(`sender_id.eq.${user.id},recipient_id.eq.${user.id}`)
+    .or(participantOrFilter("sender_id", "recipient_id", user.id))
     .order("created_at", { ascending: true })
     .limit(120);
   if (error) throw error;

@@ -10,6 +10,7 @@ import {
   type MailingAddressRecord,
 } from "../../src/lib/mailingAddress";
 import { supabase } from "../../src/lib/supabase";
+import { participantOrFilter } from "../../src/lib/supabaseFilters";
 import { megrumColors, megrumRadii, megrumShadow } from "../../src/theme/tokens";
 
 type ProfileData = {
@@ -393,7 +394,7 @@ async function fetchProfileData(
     supabase
       .from("proposals")
       .select("id", { count: "exact", head: true })
-      .or(`sender_id.eq.${userId},receiver_id.eq.${userId}`)
+      .or(participantOrFilter("sender_id", "receiver_id", userId))
       .eq("status", "completed"),
     supabase
       .from("listings")

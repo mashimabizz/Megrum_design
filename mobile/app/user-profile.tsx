@@ -24,6 +24,7 @@ import { useAuth } from "../src/auth/AuthProvider";
 import { IconSymbol } from "../src/components/IconSymbol";
 import { fetchInventoryTagLabels } from "../src/lib/inventoryTags";
 import { supabase } from "../src/lib/supabase";
+import { isUuid, participantOrFilter } from "../src/lib/supabaseFilters";
 import { megrumColors, megrumRadii, megrumShadow } from "../src/theme/tokens";
 
 type MasterName = { name: string | null } | { name: string | null }[] | null;
@@ -802,6 +803,7 @@ function ListingEmptyVisual({ label }: { label: string }) {
 
 async function fetchUserProfile(id: string): Promise<UserProfile> {
   if (!supabase) return PREVIEW_PROFILE;
+  if (!isUuid(id)) throw new Error("ユーザーIDが不正です");
   const [
     { data: userRow },
     { data: evaluations },
@@ -818,7 +820,7 @@ async function fetchUserProfile(id: string): Promise<UserProfile> {
     supabase
       .from("proposals")
       .select("id", { count: "exact", head: true })
-      .or(`sender_id.eq.${id},receiver_id.eq.${id}`)
+      .or(participantOrFilter("sender_id", "receiver_id", id))
       .eq("status", "completed"),
     supabase
       .from("goods_inventory")

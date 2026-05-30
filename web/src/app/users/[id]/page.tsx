@@ -1,6 +1,7 @@
 import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { HeaderBack } from "@/components/auth/HeaderBack";
+import { isUuid, participantOrFilter } from "@/lib/supabaseFilters";
 import { UserProfileView, type UserProfileData } from "./UserProfileView";
 import type {
   ListingItem,
@@ -24,6 +25,7 @@ export default async function UserPublicPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
+  if (!isUuid(id)) notFound();
   const supabase = await createClient();
   const {
     data: { user: me },
@@ -59,7 +61,7 @@ export default async function UserPublicPage({
   const { count: completedCount } = await supabase
     .from("proposals")
     .select("id", { count: "exact", head: true })
-    .or(`sender_id.eq.${id},receiver_id.eq.${id}`)
+    .or(participantOrFilter("sender_id", "receiver_id", id))
     .eq("status", "completed");
 
   // iter97: 譲るグッズ一覧
