@@ -302,6 +302,12 @@ export default function ProposalSelectScreen() {
     [catalogOverrides, effectivePartnerIdParam, receiveChoiceIds],
   );
   const [tab, setTab] = useState<ProposalTab>(initialTab);
+  const [giveActiveGroup, setGiveActiveGroup] = useState<string | null>(null);
+  const [giveActiveType, setGiveActiveType] = useState<string | null>(null);
+  const [receiveActiveGroup, setReceiveActiveGroup] = useState<string | null>(
+    null,
+  );
+  const [receiveActiveType, setReceiveActiveType] = useState<string | null>(null);
   const [giveSelectedIds, setGiveSelectedIds] = useState<string[]>(() =>
     initialGiveNeedsInventory
       ? initialGiveIds
@@ -319,6 +325,35 @@ export default function ProposalSelectScreen() {
       : receiveChoices[0]
         ? [receiveChoices[0].id]
         : [],
+  );
+  const giveGroupOptions = useMemo(
+    () => buildChoiceFilterOptions(giveChoices, "group"),
+    [giveChoices],
+  );
+  const giveTypeOptions = useMemo(
+    () => buildChoiceFilterOptions(giveChoices, "goodsType"),
+    [giveChoices],
+  );
+  const receiveGroupOptions = useMemo(
+    () => buildChoiceFilterOptions(receiveChoices, "group"),
+    [receiveChoices],
+  );
+  const receiveTypeOptions = useMemo(
+    () => buildChoiceFilterOptions(receiveChoices, "goodsType"),
+    [receiveChoices],
+  );
+  const filteredGiveChoices = useMemo(
+    () => filterProposalChoices(giveChoices, giveActiveGroup, giveActiveType),
+    [giveActiveGroup, giveActiveType, giveChoices],
+  );
+  const filteredReceiveChoices = useMemo(
+    () =>
+      filterProposalChoices(
+        receiveChoices,
+        receiveActiveGroup,
+        receiveActiveType,
+      ),
+    [receiveActiveGroup, receiveActiveType, receiveChoices],
   );
   const [meetupCandidates, setMeetupCandidates] = useState<MeetupCandidate[]>([]);
   const [activeMeetupId, setActiveMeetupId] = useState<string | null>(null);
@@ -482,6 +517,33 @@ export default function ProposalSelectScreen() {
       ensureChoiceSelection(current, receiveChoices),
     );
   }, [receiveChoices]);
+
+  useEffect(() => {
+    if (giveActiveGroup && !giveGroupOptions.includes(giveActiveGroup)) {
+      setGiveActiveGroup(null);
+    }
+  }, [giveActiveGroup, giveGroupOptions]);
+
+  useEffect(() => {
+    if (giveActiveType && !giveTypeOptions.includes(giveActiveType)) {
+      setGiveActiveType(null);
+    }
+  }, [giveActiveType, giveTypeOptions]);
+
+  useEffect(() => {
+    if (
+      receiveActiveGroup &&
+      !receiveGroupOptions.includes(receiveActiveGroup)
+    ) {
+      setReceiveActiveGroup(null);
+    }
+  }, [receiveActiveGroup, receiveGroupOptions]);
+
+  useEffect(() => {
+    if (receiveActiveType && !receiveTypeOptions.includes(receiveActiveType)) {
+      setReceiveActiveType(null);
+    }
+  }, [receiveActiveType, receiveTypeOptions]);
 
   useEffect(() => {
     if (!supabase) return;
@@ -820,8 +882,14 @@ export default function ProposalSelectScreen() {
       >
         {tab === "give" ? (
           <ChoicePane
-            items={giveChoices}
+            items={filteredGiveChoices}
             selectedIds={giveSelectedIds}
+            groupOptions={giveGroupOptions}
+            activeGroup={giveActiveGroup}
+            onGroupChange={setGiveActiveGroup}
+            typeOptions={giveTypeOptions}
+            activeType={giveActiveType}
+            onTypeChange={setGiveActiveType}
             loading={revisionLoading || (usesProfileInventory && profileInventoryInitialLoading.give)}
             loadingMore={profileInventoryLoadingMore.give}
             hasMore={profileInventoryScope?.giveHasMore ?? false}
@@ -837,8 +905,14 @@ export default function ProposalSelectScreen() {
 
         {tab === "receive" ? (
           <ChoicePane
-            items={receiveChoices}
+            items={filteredReceiveChoices}
             selectedIds={receiveSelectedIds}
+            groupOptions={receiveGroupOptions}
+            activeGroup={receiveActiveGroup}
+            onGroupChange={setReceiveActiveGroup}
+            typeOptions={receiveTypeOptions}
+            activeType={receiveActiveType}
+            onTypeChange={setReceiveActiveType}
             loading={revisionLoading || (usesProfileInventory && profileInventoryInitialLoading.receive)}
             loadingMore={profileInventoryLoadingMore.receive}
             hasMore={profileInventoryScope?.receiveHasMore ?? false}
@@ -1086,6 +1160,12 @@ function mergeCatalogOverrides(
 function ChoicePane({
   items,
   selectedIds,
+  groupOptions,
+  activeGroup,
+  onGroupChange,
+  typeOptions,
+  activeType,
+  onTypeChange,
   loading,
   loadingMore,
   hasMore,
@@ -1095,6 +1175,12 @@ function ChoicePane({
 }: {
   items: ProposalChoiceItem[];
   selectedIds: string[];
+  groupOptions: string[];
+  activeGroup: string | null;
+  onGroupChange: (next: string | null) => void;
+  typeOptions: string[];
+  activeType: string | null;
+  onTypeChange: (next: string | null) => void;
   loading?: boolean;
   loadingMore?: boolean;
   hasMore?: boolean;
@@ -1107,71 +1193,172 @@ function ChoicePane({
     return <ProposalChoiceSkeleton />;
   }
 
+  const filtersApplied = !!activeGroup || !!activeType;
+
+  const filterRows = (
+    <View style={styles.choiceFilters}>
+      <ChoiceFilterRow
+        label="推し"
+        options={groupOptions}
+        active={activeGroup}
+        onChange={onGroupChange}
+      />
+      <ChoiceFilterRow
+        label="種別"
+        options={typeOptions}
+        active={activeType}
+        onChange={onTypeChange}
+      />
+    </View>
+  );
+
   if (items.length === 0) {
     return (
-      <View style={styles.choiceState}>
-        <Text style={styles.choiceStateText}>
-          {emptyText ?? "選択できるグッズがありません"}
-        </Text>
+      <View style={styles.choicePane}>
+        {filterRows}
+        <View style={styles.choiceState}>
+          <Text style={styles.choiceStateText}>
+            {filtersApplied
+              ? "条件に合うグッズがありません"
+              : emptyText ?? "選択できるグッズがありません"}
+          </Text>
+        </View>
       </View>
     );
   }
 
   return (
-    <FlatList
-      data={items}
-      keyExtractor={(item) => item.id}
-      showsVerticalScrollIndicator={false}
-      contentContainerStyle={styles.choiceList}
-      onEndReached={hasMore ? onLoadMore : undefined}
-      onEndReachedThreshold={0.55}
-      ListFooterComponent={
-        loadingMore ? (
-          <View style={styles.choiceLoadingMore}>
-            <ActivityIndicator color={megrumColors.lavender} />
-            <Text style={styles.choiceLoadingMoreText}>さらに読み込み中</Text>
-          </View>
-        ) : null
-      }
-      renderItem={({ item }) => {
-        const selected = selectedSet.has(item.id);
-        return (
-          <Pressable
-            onPress={() => onToggle(item.id)}
-            style={[styles.choiceCard, selected ? styles.choiceCardSelected : null]}
-          >
-            <View style={[styles.choiceImage, { backgroundColor: item.hue }]}>
-              {item.photoUrl ? (
-                <Image source={{ uri: item.photoUrl }} style={styles.choicePhoto} />
-              ) : (
-                <>
-                  <View style={styles.choiceShine} />
-                  <Text style={styles.choiceGlyph}>{item.glyph}</Text>
-                </>
-              )}
+    <View style={styles.choicePane}>
+      {filterRows}
+      <FlatList
+        data={items}
+        keyExtractor={(item) => item.id}
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.choiceList}
+        onEndReached={hasMore ? onLoadMore : undefined}
+        onEndReachedThreshold={0.55}
+        style={styles.choiceListScroll}
+        ListFooterComponent={
+          loadingMore ? (
+            <View style={styles.choiceLoadingMore}>
+              <ActivityIndicator color={megrumColors.lavender} />
+              <Text style={styles.choiceLoadingMoreText}>さらに読み込み中</Text>
             </View>
-            <View style={styles.choiceCopy}>
-              <Text numberOfLines={1} style={styles.choiceTitle}>
-                {item.title}
-              </Text>
-              <Text numberOfLines={1} style={styles.choiceSubtitle}>
-                {item.subtitle}
-              </Text>
-              <View style={styles.choiceHint}>
-                <Text numberOfLines={1} style={styles.choiceHintText}>
-                  {item.hint}
+          ) : null
+        }
+        renderItem={({ item }) => {
+          const selected = selectedSet.has(item.id);
+          return (
+            <Pressable
+              onPress={() => onToggle(item.id)}
+              style={[styles.choiceCard, selected ? styles.choiceCardSelected : null]}
+            >
+              <View style={[styles.choiceImage, { backgroundColor: item.hue }]}>
+                {item.photoUrl ? (
+                  <Image source={{ uri: item.photoUrl }} style={styles.choicePhoto} />
+                ) : (
+                  <>
+                    <View style={styles.choiceShine} />
+                    <Text style={styles.choiceGlyph}>{item.glyph}</Text>
+                  </>
+                )}
+              </View>
+              <View style={styles.choiceCopy}>
+                <Text numberOfLines={1} style={styles.choiceTitle}>
+                  {item.title}
+                </Text>
+                <Text numberOfLines={1} style={styles.choiceSubtitle}>
+                  {item.subtitle}
+                </Text>
+                <View style={styles.choiceHint}>
+                  <Text numberOfLines={1} style={styles.choiceHintText}>
+                    {item.hint}
+                  </Text>
+                </View>
+              </View>
+              <View
+                style={[styles.checkCircle, selected ? styles.checkCircleOn : null]}
+              >
+                <Text style={[styles.checkText, selected ? styles.checkTextOn : null]}>
+                  {selected ? "✓" : ""}
                 </Text>
               </View>
-            </View>
-            <View style={[styles.checkCircle, selected ? styles.checkCircleOn : null]}>
-              <Text style={[styles.checkText, selected ? styles.checkTextOn : null]}>
-                {selected ? "✓" : ""}
-              </Text>
-            </View>
-          </Pressable>
-        );
-      }}
-    />
+            </Pressable>
+          );
+        }}
+      />
+    </View>
+  );
+}
+
+function ChoiceFilterRow({
+  label,
+  options,
+  active,
+  onChange,
+}: {
+  label: string;
+  options: string[];
+  active: string | null;
+  onChange: (next: string | null) => void;
+}) {
+  if (options.length === 0) return null;
+
+  return (
+    <View style={styles.choiceFilterRow}>
+      <Text style={styles.choiceFilterLabel}>{label}</Text>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.choiceFilterChips}
+      >
+        <ChoiceFilterChip
+          label="すべて"
+          active={active === null}
+          onPress={() => onChange(null)}
+        />
+        {options.map((option) => (
+          <ChoiceFilterChip
+            key={option}
+            label={option}
+            active={active === option}
+            onPress={() => onChange(option)}
+          />
+        ))}
+      </ScrollView>
+    </View>
+  );
+}
+
+function ChoiceFilterChip({
+  label,
+  active,
+  onPress,
+}: {
+  label: string;
+  active: boolean;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityState={{ selected: active }}
+      onPress={onPress}
+      style={[
+        styles.choiceFilterChip,
+        active ? styles.choiceFilterChipActive : null,
+      ]}
+    >
+      <Text
+        numberOfLines={1}
+        style={[
+          styles.choiceFilterChipText,
+          active ? styles.choiceFilterChipTextActive : null,
+        ]}
+      >
+        {label}
+      </Text>
+    </Pressable>
   );
 }
 
@@ -2920,6 +3107,30 @@ function ensureChoiceSelection(
   return choices[0] ? [choices[0].id] : [];
 }
 
+function buildChoiceFilterOptions(
+  items: ProposalChoiceItem[],
+  key: "group" | "goodsType",
+) {
+  const values = new Set<string>();
+  for (const item of items) {
+    const value = item[key]?.trim();
+    if (value) values.add(value);
+  }
+  return Array.from(values).sort((a, b) => a.localeCompare(b, "ja"));
+}
+
+function filterProposalChoices(
+  items: ProposalChoiceItem[],
+  activeGroup: string | null,
+  activeType: string | null,
+) {
+  return items.filter((item) => {
+    if (activeGroup && item.group !== activeGroup) return false;
+    if (activeType && item.goodsType !== activeType) return false;
+    return true;
+  });
+}
+
 function toggleChoiceId(current: string[], id: string) {
   if (current.includes(id)) {
     return current.length > 1
@@ -2993,6 +3204,55 @@ const styles = StyleSheet.create({
     color: megrumColors.ink,
     fontSize: 13.5,
     fontWeight: "900",
+  },
+  choicePane: {
+    flex: 1,
+    gap: 10,
+  },
+  choiceFilters: {
+    gap: 6,
+    marginHorizontal: -18,
+    paddingLeft: 18,
+  },
+  choiceFilterRow: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 6,
+  },
+  choiceFilterLabel: {
+    color: megrumColors.mutedInk,
+    fontSize: 9.5,
+    fontWeight: "900",
+    letterSpacing: 0.4,
+    textAlign: "right",
+    width: 30,
+  },
+  choiceFilterChips: {
+    gap: 6,
+    paddingRight: 18,
+  },
+  choiceFilterChip: {
+    backgroundColor: megrumColors.surface,
+    borderColor: "rgba(58,50,74,0.08)",
+    borderRadius: megrumRadii.pill,
+    borderWidth: 1,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+  },
+  choiceFilterChipActive: {
+    backgroundColor: megrumColors.lavender,
+    borderColor: megrumColors.lavender,
+  },
+  choiceFilterChipText: {
+    color: megrumColors.ink,
+    fontSize: 11,
+    fontWeight: "800",
+  },
+  choiceFilterChipTextActive: {
+    color: megrumColors.surface,
+  },
+  choiceListScroll: {
+    flex: 1,
   },
   choiceList: {
     gap: 10,

@@ -6,6 +6,8 @@ export type ProposalChoiceItem = {
   id: string;
   title: string;
   subtitle: string;
+  group?: string;
+  goodsType?: string;
   glyph: string;
   hue: string;
   photoUrl?: string | null;
@@ -23,6 +25,8 @@ export type ProposalThumbItem = {
 type CatalogItem = {
   title: string;
   subtitle: string;
+  group?: string;
+  goodsType?: string;
   glyph: string;
   hue: string;
   photoUrl?: string | null;
@@ -189,6 +193,8 @@ export function buildProposalCatalogOverrides(rows: ProposalInventoryRow[]) {
         {
           title,
           subtitle: [group, goodsType].filter(Boolean).join(" / ") || "グッズ",
+          group: group ?? undefined,
+          goodsType: goodsType ?? undefined,
           glyph: (label || "?").slice(0, 1),
           hue: normalizeHue(row.hue, label || title),
           photoUrl: row.photo_urls?.[0] ?? null,
@@ -204,10 +210,13 @@ function toProposalChoice(
   overrides?: ProposalCatalogOverrides,
 ): ProposalChoiceItem {
   const item = resolveItem(id, side, overrides);
+  const meta = inferCatalogMeta(item);
   return {
     id,
     title: item.title,
     subtitle: item.subtitle,
+    group: meta.group,
+    goodsType: meta.goodsType,
     glyph: item.glyph,
     hue: item.hue,
     photoUrl: item.photoUrl,
@@ -246,6 +255,8 @@ function resolveItem(
     return {
       title: context.candidate.label,
       subtitle: `${context.row.character} / ${context.row.goodsType}`,
+      group: context.row.character,
+      goodsType: context.row.goodsType,
       glyph: context.candidate.member,
       hue: context.candidate.hue,
       photoUrl: context.candidate.photoUrl,
@@ -256,9 +267,27 @@ function resolveItem(
   return {
     title: label,
     subtitle: "プレビュー / グッズ",
+    group: "プレビュー",
+    goodsType: "グッズ",
     glyph: label.slice(0, 1).toUpperCase() || "?",
     hue: side === "give" ? "#a8d4e6" : "#cbbcf4",
   };
+}
+
+function inferCatalogMeta(item: CatalogItem) {
+  const [groupFromSubtitle, goodsTypeFromSubtitle] = item.subtitle
+    .split("/")
+    .map((part) => part.trim())
+    .filter(Boolean);
+  return {
+    group: normalizeMetaValue(item.group ?? groupFromSubtitle),
+    goodsType: normalizeMetaValue(item.goodsType ?? goodsTypeFromSubtitle),
+  };
+}
+
+function normalizeMetaValue(value: string | null | undefined) {
+  const trimmed = value?.trim();
+  return trimmed ? trimmed : undefined;
 }
 
 function uniqueIds(ids: string[]): string[] {

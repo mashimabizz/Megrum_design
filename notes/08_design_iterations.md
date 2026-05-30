@@ -4,6 +4,54 @@
 
 ---
 
+## イテレーション265：提示物選択に推し種別フィルタを追加する
+
+### 背景・問題意識
+
+オーナーから、提示物の選択画面でも `私が出す` / `受け取る` の各タブ内で、マイ在庫画面と同様に L1マスタやグッズ種別で絞り込めるようにしたいという依頼があった。相手プロフィールから大量の在庫候補を読み込む運用では、選択候補をただ並べるだけだと目的のグッズにたどり着きにくい。
+
+### 変更内容
+
+#### `mobile/src/data/proposalItems.ts`
+- `ProposalChoiceItem` に `group` と `goodsType` を追加し、提示物選択UIまで推し・グッズ種別のメタ情報を渡せるようにした。
+- Supabase の `goods_inventory` 由来の候補では `groups_master(name)` と `goods_types_master(name)` をそのままフィルタ用メタに使うようにした。
+- 既存の固定カタログ・ホーム候補由来の候補でも、subtitle から推し・種別を補完してフィルタ候補に出せるようにした。
+
+#### `mobile/app/proposal-select.tsx`
+- `私が出す` と `受け取る` それぞれに、独立した `推し` / `種別` フィルタ状態を追加した。
+- マイ在庫画面のフィルタチップに合わせて、横スクロールの `すべて` / 各候補チップを提示物選択タブ内に表示するようにした。
+- フィルタ変更後も既に選んだグッズの選択状態は保持し、表示候補だけを絞り込むようにした。
+- 現在の候補群に存在しないフィルタ値は自動で解除し、候補再読込後に空条件で詰まらないようにした。
+
+### 影響範囲
+
+- iOS版 提示物の選択画面
+- `私が出す` / `受け取る` タブ
+- プロフィール在庫から10件ずつ読み込む候補表示
+- 固定カタログ・ホーム候補から開いた時の表示候補
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- `EAS_UPDATE_PROJECT_SLUG=ihub EXPO_NO_GIT_STATUS=1 npm --prefix mobile run update:ios:preview -- --message "[iter265] add proposal item filters" --non-interactive`
+- Preview OTA: Update group ID `f402b6d5-8df1-4fd0-abbb-ff015fb5e3c7` / iOS update ID `019e7687-e0f8-7029-b4d2-1e0521ee24a7`
+
+### 関連ファイル
+
+- `mobile/app/proposal-select.tsx`
+- `mobile/src/data/proposalItems.ts`
+- `notes/08_design_iterations.md`
+
+### セルフレビュー結果
+
+- ✅ マイ在庫画面と同じ `推し` / `種別` のチップ型フィルタに揃えた。
+- ✅ フィルタは表示候補だけに効き、送信対象の選択状態は維持するようにした。
+- ✅ 新しい状態遷移・用語・DBスキーマは追加していないため、`notes/09_state_machines.md` と `notes/10_glossary.md` の更新は不要と判断した。
+- ✅ ネイティブ依存追加なしでPreview OTA対象内に収めた。
+
+---
+
 ## イテレーション264：やりとり下部タブをフッター上へ逃がす
 
 ### 背景・問題意識
