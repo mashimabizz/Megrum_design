@@ -56,10 +56,16 @@ public struct SupabaseMegrumAuthRepository: MegrumAuthRepository {
     public var isConfigured: Bool { true }
 
     private let client: SupabaseAuthClient
+    private let accountClient: SupabaseAccountClient?
     private let emailRedirectTo: URL?
 
-    public init(client: SupabaseAuthClient, emailRedirectTo: URL? = nil) {
+    public init(
+        client: SupabaseAuthClient,
+        accountClient: SupabaseAccountClient? = nil,
+        emailRedirectTo: URL? = nil
+    ) {
         self.client = client
+        self.accountClient = accountClient
         self.emailRedirectTo = emailRedirectTo
     }
 
@@ -68,7 +74,7 @@ public struct SupabaseMegrumAuthRepository: MegrumAuthRepository {
     }
 
     public func signUp(_ input: AuthSignUpInput) async throws -> AuthSession {
-        try await client.signUp(
+        let session = try await client.signUp(
             email: input.email,
             password: input.password,
             metadata: SupabaseAuthProfileMetadata(
@@ -77,6 +83,12 @@ public struct SupabaseMegrumAuthRepository: MegrumAuthRepository {
             ),
             emailRedirectTo: emailRedirectTo
         )
+        _ = try await accountClient?.ensureUserProfile(
+            session: session,
+            handle: input.handle,
+            displayName: input.displayName
+        )
+        return session
     }
 
     public func signOut(session: AuthSession) async throws {
@@ -234,6 +246,7 @@ public enum MegrumAuthStateFactory {
         MegrumAuthState(
             repository: SupabaseMegrumAuthRepository(
                 client: SupabaseAuthClient(configuration: configuration),
+                accountClient: SupabaseAccountClient(configuration: configuration),
                 emailRedirectTo: emailRedirectTo
             ),
             sessionStore: KeychainAuthSessionStore()

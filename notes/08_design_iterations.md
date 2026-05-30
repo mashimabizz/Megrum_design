@@ -4,6 +4,73 @@
 
 ---
 
+## イテレーション307：Swift登録後プロフィール作成を追加
+
+### 背景・問題意識
+
+Swift Native版のAuthはsession保存とAppState接続まで進んだが、新規登録後に `public.users` のプロフィール行を作る経路がまだSwift側にない。プロフィール行がないと、ホームの自分アイコン、プロフィール編集、推し設定、住所設定、通知設定などのアカウント系画面が安定して動かない。Phase 2の続きとして、Supabase Authの登録成功後にMegrum用プロフィールを作成/更新できる境界を追加した。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumData/SupabaseRESTClient.swift`
+- PostgRESTのmutation requestを作れる `makeMutationRequest(...)` を追加した。
+- `upsertRows(...)` を追加し、`Prefer: resolution=merge-duplicates,return=representation` で行をupsertできるようにした。
+- mutation body用の `JSONEncoder` を追加し、snake_case payloadを扱えるようにした。
+
+#### `ios-native/Sources/MegrumData/SupabaseAccountClient.swift`
+- `SupabaseAccountClient` を追加した。
+- Auth sessionのaccess tokenで `public.users` にMegrum用プロフィール行をupsertする `ensureUserProfile(...)` を追加した。
+- handle未入力時はuser idから衝突しにくいfallback handleを生成するようにした。
+- request生成を公開し、テストでURL / header / bodyを検証できるようにした。
+
+#### `ios-native/Sources/MegrumApp/MegrumAuthState.swift`
+- `SupabaseMegrumAuthRepository` が任意の `SupabaseAccountClient` を受け取れるようにした。
+- 新規登録成功後、sessionを返す前にMegrum用プロフィールをensureするようにした。
+- live Auth factoryで `SupabaseAccountClient(configuration:)` を注入するようにした。
+
+#### `ios-native/Tests/MegrumDataTests/SupabaseAccountClientTests.swift`
+- プロフィールupsert requestがsession bearer、`on_conflict=id`、snake_case bodyを使うことを検証した。
+- handle未入力時のfallback生成を検証した。
+
+#### `ios-native/README.md`
+- 登録後プロフィール作成の責務を追記した。
+
+#### `notes/22_swift_native_migration.md`
+- Phase 2の進捗として、Swift側のプロフィールensure境界を追記した。
+
+### 影響範囲
+
+- Swift Native iOS版の新規登録フロー
+- `public.users` プロフィール行の作成/更新
+- プロフィール編集、推し設定、住所設定、通知設定へ進むためのアカウント基盤
+
+### 確認方法
+
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-build --enable-xctest --disable-swift-testing -j 1`
+- `xcodebuild -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -destination 'generic/platform=iOS Simulator' -derivedDataPath /tmp/megrum-native-xcodebuild CODE_SIGNING_ALLOWED=NO build`
+- `git diff --check -- ios-native/Sources/MegrumData/SupabaseRESTClient.swift ios-native/Sources/MegrumData/SupabaseAccountClient.swift ios-native/Sources/MegrumApp/MegrumAuthState.swift ios-native/Tests/MegrumDataTests/SupabaseAccountClientTests.swift ios-native/README.md notes/22_swift_native_migration.md notes/08_design_iterations.md`
+
+### 関連ファイル
+
+- `ios-native/Sources/MegrumData/SupabaseRESTClient.swift`
+- `ios-native/Sources/MegrumData/SupabaseAccountClient.swift`
+- `ios-native/Sources/MegrumApp/MegrumAuthState.swift`
+- `ios-native/Tests/MegrumDataTests/SupabaseAccountClientTests.swift`
+- `ios-native/README.md`
+- `notes/22_swift_native_migration.md`
+- `notes/08_design_iterations.md`
+
+### セルフレビュー結果
+
+- ✅ 新規登録後にAuth sessionのaccess tokenでMegrumプロフィールを作る経路を追加した。
+- ✅ REST mutationのheader、Prefer、bodyをテストで検証した。
+- ✅ Swift Package testsが17件成功した。
+- ✅ 状態遷移・用語・DBスキーマ変更はないため、`notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要。
+- ⚠️ Supabaseのメール確認設定によって新規登録時にsessionが返らない場合の分岐は、メールリンク復帰実装と合わせて次工程で扱う。
+- ✅ TestFlight配布はまだ行っていないため、Preview OTA / TestFlight配信は不要。
+
+---
+
 ## イテレーション306：Swift Auth sessionをAppStateへ接続
 
 ### 背景・問題意識
