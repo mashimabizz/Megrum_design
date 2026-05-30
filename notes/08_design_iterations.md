@@ -4,6 +4,79 @@
 
 ---
 
+## イテレーション329：Swift掲示板作成導線を追加
+
+### 背景・問題意識
+
+Swift Native版のめぐり掲示板は一覧、詳細、返信まで移行できたが、めぐりホーム右下の「スレッドを立てる」ボタンは未接続だった。掲示板は現地情報や雑談をユーザーが自分で始められることが重要なため、既存Supabaseスキーマに合わせてスレッド作成導線をNative側へ追加する。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumCore/MegrumModels.swift`
+- `BoardThreadCreateInput` を追加し、スレッド作成に必要な作成者、タイトル、本文、公開範囲、位置、都道府県をSwift型で渡せるようにした。
+
+#### `ios-native/Sources/MegrumData/SupabaseRESTClient.swift`
+- PostgRESTのinsertを再利用できる `insertRows` / `makeInsertRequest` を追加した。
+
+#### `ios-native/Sources/MegrumData/SupabaseBoardClient.swift`
+- `meguri_board_threads` へinsertする `createThread` とrequest生成を追加した。
+- 既存React Native版と同じく `category='chat'`、`image_paths=[]`、位置情報/都道府県をpayload化した。
+
+#### `ios-native/Sources/MegrumApp/MegrumAppState.swift`
+- repository境界へ `createBoardThread` を追加した。
+- タイトル/本文、3km圏内作成時の現在地、都道府県作成時のプロフィール都道府県を検証するNative状態更新を追加した。
+- 作成成功時に新しいスレッドを一覧の先頭へ反映するようにした。
+
+#### `ios-native/Sources/MegrumApp/MeguriScreen.swift`
+- めぐりホーム右下の「スレッドを立てる」ボタンをNative composer sheetに接続した。
+- タイトル、本文、公開範囲（3km圏内 / 都道府県）の入力UIと作成CTAを追加した。
+
+#### `ios-native/Tests/MegrumDataTests/SupabaseBoardClientTests.swift`
+- 掲示板スレッド作成requestのURL、Prefer header、insert payloadを検証した。
+
+#### `ios-native/Tests/MegrumAppTests/MegrumAppStateTests.swift`
+- Preview repositoryでスレッド作成が一覧先頭へ反映されること、3km圏内作成で現在地が必須になることを検証した。
+
+#### `ios-native/README.md` / `notes/22_swift_native_migration.md`
+- Swift NativeめぐりPhaseの進捗として掲示板作成導線を追記した。
+
+### 影響範囲
+
+- Swift Native版のめぐりホーム
+- Swift Native版のスポット掲示板
+- Swift Native版のSupabase PostgREST insert境界
+
+### 確認方法
+
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-build --enable-xctest --disable-swift-testing -j 1`
+- `xcodebuild -quiet -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -destination 'generic/platform=iOS Simulator' -derivedDataPath /tmp/megrum-native-xcodebuild CODE_SIGNING_ALLOWED=NO build`
+
+### 関連ファイル
+
+- `ios-native/Sources/MegrumCore/MegrumModels.swift`
+- `ios-native/Sources/MegrumData/SupabaseRESTClient.swift`
+- `ios-native/Sources/MegrumData/SupabaseBoardClient.swift`
+- `ios-native/Sources/MegrumApp/MegrumAppState.swift`
+- `ios-native/Sources/MegrumApp/SupabaseMegrumRepository.swift`
+- `ios-native/Sources/MegrumApp/MeguriScreen.swift`
+- `ios-native/Tests/MegrumDataTests/SupabaseBoardClientTests.swift`
+- `ios-native/Tests/MegrumAppTests/MegrumAppStateTests.swift`
+- `ios-native/README.md`
+- `notes/22_swift_native_migration.md`
+- `notes/08_design_iterations.md`
+
+### セルフレビュー結果
+
+- ✅ Swift Package testsが67件成功した。
+- ✅ Xcode project buildが成功した。
+- ✅ 既存のDBテーブル `meguri_board_threads` を使うため、新規migrationは追加していない。
+- ✅ 新しい状態名は追加していないため、`notes/09_state_machines.md` の更新は不要。
+- ✅ 「スレッド」「スポット掲示板」「掲示板の公開範囲」は既存用語を使っており、`notes/10_glossary.md` の更新は不要。
+- ✅ データモデルは既存 `meguri_board_threads` の作成境界をSwiftへ接続しただけなので、`notes/05_data_model.md` の更新は不要。
+- ✅ TestFlight配布はまだ行っていないため、Preview OTA / TestFlight配信は不要。
+
+---
+
 ## イテレーション328：Swiftグルーム閲覧導線を追加
 
 ### 背景・問題意識

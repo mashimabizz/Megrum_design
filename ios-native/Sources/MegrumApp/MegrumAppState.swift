@@ -71,6 +71,7 @@ public protocol MegrumRepository: Sendable {
     func loadBoardThreads(latitude: Double?, longitude: Double?, prefecture: String?, scope: BoardThread.Audience) async throws -> [BoardThread]
     func loadBoardReplies(threadID: UUID, latitude: Double?, longitude: Double?, prefecture: String?, scope: BoardThread.Audience) async throws -> [BoardReply]
     func sendBoardReply(_ input: BoardReplyCreateInput) async throws -> BoardReply
+    func createBoardThread(_ input: BoardThreadCreateInput) async throws -> BoardThread
     func loadMailingAddress() async throws -> MailingAddress?
     func saveMailingAddress(_ address: MailingAddress) async throws -> MailingAddress
     func lookupAddress(postalCode: String) async throws -> PostalCodeAddress?
@@ -128,6 +129,10 @@ public extension MegrumRepository {
     }
 
     func sendBoardReply(_ input: BoardReplyCreateInput) async throws -> BoardReply {
+        throw MegrumRepositoryError.unsupportedMutation
+    }
+
+    func createBoardThread(_ input: BoardThreadCreateInput) async throws -> BoardThread {
         throw MegrumRepositoryError.unsupportedMutation
     }
 
@@ -292,6 +297,19 @@ public struct PreviewMegrumRepository: MegrumRepository {
         )
     }
 
+    public func createBoardThread(_ input: BoardThreadCreateInput) async throws -> BoardThread {
+        BoardThread(
+            id: UUID(),
+            authorID: NativePreviewData.viewerID,
+            title: input.title.trimmingCharacters(in: .whitespacesAndNewlines),
+            body: input.body.trimmingCharacters(in: .whitespacesAndNewlines),
+            audience: input.audience,
+            latitude: input.latitude,
+            longitude: input.longitude,
+            prefecture: input.prefecture
+        )
+    }
+
     public func loadMailingAddress() async throws -> MailingAddress? {
         NativePreviewData.mailingAddress
     }
@@ -369,6 +387,7 @@ public final class MegrumAppState: ObservableObject {
     @Published public private(set) var isSavingMailingAddress = false
     @Published public private(set) var isCreatingGoodsEntry = false
     @Published public private(set) var isCreatingProposal = false
+    @Published public private(set) var isCreatingBoardThread = false
     @Published public private(set) var loadingMessagesProposalID: UUID?
     @Published public private(set) var sendingMessageProposalID: UUID?
     @Published public private(set) var loadingBoardRepliesThreadID: UUID?
@@ -501,6 +520,74 @@ public final class MegrumAppState: ObservableObject {
         } catch {
             errorMessage = "掲示板に返信できませんでした"
             sendingBoardReplyThreadID = nil
+            return false
+        }
+    }
+
+    public func createBoardThread(
+        title: String,
+        body: String,
+        scope: BoardThread.Audience = .nearby3km,
+        latitude: Double? = nil,
+        longitude: Double? = nil
+    ) async -> Bool {
+        guard !isCreatingBoardThread else {
+            return false
+        }
+        guard let viewer else {
+            errorMessage = "プロフィールを読み込んでから投稿してください"
+            return false
+        }
+
+        let trimmedTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmedBody = body.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedTitle.isEmpty else {
+            errorMessage = "タイトルを入力してください"
+            return false
+        }
+        guard !trimmedBody.isEmpty else {
+            errorMessage = "本文を入力してください"
+            return false
+        }
+
+        let normalizedPrefecture = viewer.prefecture?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfBlank
+        switch scope {
+        case .nearby3km:
+            guard latitude != nil, longitude != nil, normalizedPrefecture != nil else {
+                errorMessage = "現在地と都道府県を確認してから投稿してください"
+                return false
+            }
+        case .samePrefecture:
+            guard normalizedPrefecture != nil else {
+                errorMessage = "プロフィールの都道府県を設定してください"
+                return false
+            }
+        case .sameSpot, .global:
+            errorMessage = "この公開範囲はまだ作成できません"
+            return false
+        }
+
+        isCreatingBoardThread = true
+        errorMessage = nil
+        do {
+            let created = try await repository.createBoardThread(
+                BoardThreadCreateInput(
+                    authorID: viewer.id,
+                    title: trimmedTitle,
+                    body: trimmedBody,
+                    audience: scope,
+                    latitude: latitude,
+                    longitude: longitude,
+                    prefecture: normalizedPrefecture
+                )
+            )
+            threads.removeAll { $0.id == created.id }
+            threads.insert(created, at: 0)
+            isCreatingBoardThread = false
+            return true
+        } catch {
+            errorMessage = "掲示板を作成できませんでした"
+            isCreatingBoardThread = false
             return false
         }
     }

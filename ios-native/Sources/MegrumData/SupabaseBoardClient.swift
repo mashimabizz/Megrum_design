@@ -2,6 +2,8 @@ import Foundation
 import MegrumCore
 
 public final class SupabaseBoardClient: @unchecked Sendable {
+    private static let threadSelect = "id,author_id,title,body,audience_scope,origin_lat,origin_lng,prefecture,latest_activity_at,created_at"
+
     private let client: SupabaseRESTClient
 
     public init(configuration: SupabaseConfiguration, session: URLSession = .shared) {
@@ -63,6 +65,24 @@ public final class SupabaseBoardClient: @unchecked Sendable {
         )
     }
 
+    public func createThread(_ input: BoardThreadCreateInput) async throws -> BoardThread {
+        let rows: [BoardThreadRow] = try await client.insertRows(
+            into: "meguri_board_threads",
+            values: [BoardThreadInsertPayload(input: input)],
+            select: Self.threadSelect
+        )
+        return rows.first?.thread ?? BoardThread(
+            id: UUID(),
+            authorID: input.authorID,
+            title: input.title.trimmingCharacters(in: .whitespacesAndNewlines),
+            body: input.body.trimmingCharacters(in: .whitespacesAndNewlines),
+            audience: input.audience,
+            latitude: input.latitude,
+            longitude: input.longitude,
+            prefecture: input.prefecture?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
+        )
+    }
+
     public func makeLoadThreadsRequest(
         latitude: Double?,
         longitude: Double?,
@@ -103,6 +123,14 @@ public final class SupabaseBoardClient: @unchecked Sendable {
         try client.makeRPCRequest(
             function: "append_meguri_board_reply_for_viewer",
             payload: BoardReplyAppendPayload(input: input)
+        )
+    }
+
+    public func makeCreateThreadRequest(_ input: BoardThreadCreateInput) throws -> URLRequest {
+        try client.makeInsertRequest(
+            into: "meguri_board_threads",
+            values: [BoardThreadInsertPayload(input: input)],
+            select: Self.threadSelect
         )
     }
 }
@@ -173,6 +201,75 @@ private struct BoardThreadRow: Decodable, Sendable {
             prefecture: prefecture,
             createdAt: latestActivityAt ?? createdAt ?? .now
         )
+    }
+}
+
+private struct BoardThreadInsertPayload: Encodable, Sendable {
+    var authorId: UUID
+    var audienceScope: String
+    var body: String
+    var category: String
+    var imagePaths: [String]
+    var originLat: Double?
+    var originLng: Double?
+    var prefecture: String?
+    var spotKey: String?
+    var spotLabel: String?
+    var title: String
+
+    init(input: BoardThreadCreateInput) {
+        self.authorId = input.authorID
+        self.audienceScope = input.audience.rawValue
+        self.body = input.body.trimmingCharacters(in: .whitespacesAndNewlines)
+        self.category = "chat"
+        self.imagePaths = []
+        self.originLat = input.latitude
+        self.originLng = input.longitude
+        self.prefecture = input.prefecture?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
+        self.spotKey = nil
+        self.spotLabel = nil
+        self.title = input.title.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case authorId
+        case audienceScope
+        case body
+        case category
+        case imagePaths
+        case originLat
+        case originLng
+        case prefecture
+        case spotKey
+        case spotLabel
+        case title
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(authorId, forKey: .authorId)
+        try container.encode(audienceScope, forKey: .audienceScope)
+        try container.encode(body, forKey: .body)
+        try container.encode(category, forKey: .category)
+        try container.encode(imagePaths, forKey: .imagePaths)
+        if let originLat {
+            try container.encode(originLat, forKey: .originLat)
+        } else {
+            try container.encodeNil(forKey: .originLat)
+        }
+        if let originLng {
+            try container.encode(originLng, forKey: .originLng)
+        } else {
+            try container.encodeNil(forKey: .originLng)
+        }
+        if let prefecture {
+            try container.encode(prefecture, forKey: .prefecture)
+        } else {
+            try container.encodeNil(forKey: .prefecture)
+        }
+        try container.encodeNil(forKey: .spotKey)
+        try container.encodeNil(forKey: .spotLabel)
+        try container.encode(title, forKey: .title)
     }
 }
 

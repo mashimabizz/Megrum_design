@@ -713,6 +713,34 @@ public struct BoardThread: Identifiable, Codable, Hashable, Sendable {
     }
 }
 
+public struct BoardThreadCreateInput: Equatable, Sendable {
+    public var authorID: UUID
+    public var title: String
+    public var body: String
+    public var audience: BoardThread.Audience
+    public var latitude: Double?
+    public var longitude: Double?
+    public var prefecture: String?
+
+    public init(
+        authorID: UUID,
+        title: String,
+        body: String,
+        audience: BoardThread.Audience = .nearby3km,
+        latitude: Double? = nil,
+        longitude: Double? = nil,
+        prefecture: String? = nil
+    ) {
+        self.authorID = authorID
+        self.title = title
+        self.body = body
+        self.audience = audience
+        self.latitude = latitude
+        self.longitude = longitude
+        self.prefecture = prefecture
+    }
+}
+
 public struct BoardReply: Identifiable, Codable, Hashable, Sendable {
     public enum Status: String, Codable, Sendable, CaseIterable, Identifiable {
         case visible

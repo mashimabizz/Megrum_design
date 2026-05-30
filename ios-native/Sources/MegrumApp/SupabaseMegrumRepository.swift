@@ -146,6 +146,10 @@ public struct SupabaseMegrumRepository: MegrumRepository {
         try await boardClient.appendReply(input)
     }
 
+    public func createBoardThread(_ input: BoardThreadCreateInput) async throws -> BoardThread {
+        try await boardClient.createThread(input)
+    }
+
     public func loadMailingAddress() async throws -> MailingAddress? {
         try await mailingAddressClient.loadAddress(userID: viewerID)
     }

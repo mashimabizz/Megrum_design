@@ -9,6 +9,7 @@ struct MeguriScreen: View {
     @State private var selectedThread: BoardThread?
     @State private var selectedGroom: GroomPost?
     @State private var activeMap: MeguriMapKind?
+    @State private var isShowingThreadComposer = false
 
     var body: some View {
         ScrollView {
@@ -70,10 +71,21 @@ struct MeguriScreen: View {
                 BoardThreadDetailScreen(appState: appState, thread: thread)
             }
         }
+        .sheet(isPresented: $isShowingThreadComposer) {
+            NavigationStack {
+                BoardThreadComposerSheet(
+                    appState: appState,
+                    coordinate: locationState.coordinate
+                )
+            }
+            .presentationDetents([.large])
+            .presentationDragIndicator(.visible)
+        }
         .modifier(GroomViewerPresentationModifier(selectedGroom: $selectedGroom, grooms: appState.grooms))
         .modifier(MeguriMapPresentationModifier(activeMap: $activeMap, appState: appState, locationState: locationState))
         .safeAreaInset(edge: .bottom, alignment: .trailing) {
             Button {
+                isShowingThreadComposer = true
             } label: {
                 Label("スレッドを立てる", systemImage: "plus")
                     .font(.system(size: 15, weight: .heavy, design: .rounded))
@@ -86,6 +98,131 @@ struct MeguriScreen: View {
             .buttonStyle(.plain)
             .padding(.trailing, 20)
             .padding(.bottom, 10)
+        }
+    }
+}
+
+private struct BoardThreadComposerSheet: View {
+    @ObservedObject var appState: MegrumAppState
+    var coordinate: MegrumLocationCoordinate?
+    @Environment(\.dismiss) private var dismiss
+    @State private var title = ""
+    @State private var bodyText = ""
+    @State private var scope: BoardThread.Audience = .nearby3km
+
+    private var canSubmit: Bool {
+        !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            && !bodyText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            && !appState.isCreatingBoardThread
+    }
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 20) {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("スレッドを立てる")
+                        .font(.system(size: 30, weight: .heavy, design: .rounded))
+                        .foregroundStyle(MegrumTheme.ink)
+
+                    Text("周辺の人と現地情報を共有できます")
+                        .font(.system(size: 14, weight: .bold, design: .rounded))
+                        .foregroundStyle(MegrumTheme.muted)
+                }
+
+                Picker("公開範囲", selection: $scope) {
+                    Text("3km圏内").tag(BoardThread.Audience.nearby3km)
+                    Text(appState.viewer?.prefecture ?? "都道府県").tag(BoardThread.Audience.samePrefecture)
+                }
+                .pickerStyle(.segmented)
+
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("タイトル")
+                        .font(.system(size: 14, weight: .heavy, design: .rounded))
+                        .foregroundStyle(MegrumTheme.ink)
+
+                    TextField("例：物販列どのくらい？", text: $title)
+                        .font(.system(size: 17, weight: .bold, design: .rounded))
+                        .padding(15)
+                        .background(.white.opacity(0.9), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                }
+
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("本文")
+                        .font(.system(size: 14, weight: .heavy, design: .rounded))
+                        .foregroundStyle(MegrumTheme.ink)
+
+                    ZStack(alignment: .topLeading) {
+                        if bodyText.isEmpty {
+                            Text("いま見えている状況や聞きたいことを書いてください")
+                                .font(.system(size: 16, weight: .bold, design: .rounded))
+                                .foregroundStyle(MegrumTheme.muted.opacity(0.72))
+                                .padding(.horizontal, 18)
+                                .padding(.vertical, 18)
+                        }
+
+                        TextEditor(text: $bodyText)
+                            .font(.system(size: 16, weight: .bold, design: .rounded))
+                            .scrollContentBackground(.hidden)
+                            .padding(12)
+                            .frame(minHeight: 170)
+                            .background(.clear)
+                    }
+                    .background(.white.opacity(0.9), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                }
+
+                if let errorMessage = appState.errorMessage {
+                    Text(errorMessage)
+                        .font(.system(size: 13, weight: .heavy, design: .rounded))
+                        .foregroundStyle(.red)
+                }
+            }
+            .padding(20)
+        }
+        .background(MegrumTheme.canvas.ignoresSafeArea())
+        .safeAreaInset(edge: .bottom) {
+            Button {
+                Task {
+                    let created = await appState.createBoardThread(
+                        title: title,
+                        body: bodyText,
+                        scope: scope,
+                        latitude: coordinate?.latitude,
+                        longitude: coordinate?.longitude
+                    )
+                    if created {
+                        dismiss()
+                    }
+                }
+            } label: {
+                Group {
+                    if appState.isCreatingBoardThread {
+                        ProgressView()
+                            .tint(.white)
+                    } else {
+                        Text("作成する")
+                    }
+                }
+                .font(.system(size: 17, weight: .heavy, design: .rounded))
+                .frame(maxWidth: .infinity)
+                .frame(height: 56)
+                .background(MegrumTheme.lavender, in: Capsule())
+                .foregroundStyle(.white)
+                .padding(.horizontal, 20)
+                .padding(.vertical, 10)
+                .background(.regularMaterial)
+            }
+            .buttonStyle(.plain)
+            .disabled(!canSubmit)
+            .opacity(canSubmit ? 1 : 0.48)
+        }
+        .navigationTitle("掲示板")
+        .megrumInlineNavigationTitle()
+        .toolbar {
+            ToolbarItem(placement: .cancellationAction) {
+                Button("閉じる") {
+                    dismiss()
+                }
+            }
         }
     }
 }

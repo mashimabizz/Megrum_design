@@ -64,6 +64,41 @@ final class MegrumAppStateTests: XCTestCase {
         XCTAssertNil(state.sendingBoardReplyThreadID)
     }
 
+    func testAppStateCreatesPreviewBoardThread() async {
+        let state = MegrumAppState(repository: PreviewMegrumRepository())
+        await state.loadInitialData()
+        let initialCount = state.threads.count
+
+        let created = await state.createBoardThread(
+            title: " 終演後の混雑 ",
+            body: " 北口はまだゆっくり進めます ",
+            scope: .nearby3km,
+            latitude: 35.681236,
+            longitude: 139.767125
+        )
+
+        XCTAssertTrue(created)
+        XCTAssertEqual(state.threads.count, initialCount + 1)
+        XCTAssertEqual(state.threads.first?.title, "終演後の混雑")
+        XCTAssertEqual(state.threads.first?.body, "北口はまだゆっくり進めます")
+        XCTAssertEqual(state.threads.first?.audience, .nearby3km)
+        XCTAssertFalse(state.isCreatingBoardThread)
+    }
+
+    func testAppStateRequiresLocationForNearbyBoardThread() async {
+        let state = MegrumAppState(repository: PreviewMegrumRepository())
+        await state.loadInitialData()
+
+        let created = await state.createBoardThread(
+            title: "物販列どのくらい？",
+            body: "北口側です",
+            scope: .nearby3km
+        )
+
+        XCTAssertFalse(created)
+        XCTAssertEqual(state.errorMessage, "現在地と都道府県を確認してから投稿してください")
+    }
+
     func testAppStateCanReplaceRepositoryAfterAuthChanges() async {
         let state = MegrumAppState(repository: PreviewMegrumRepository())
         let nextViewer = UserProfile(

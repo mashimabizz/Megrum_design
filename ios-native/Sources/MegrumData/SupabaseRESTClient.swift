@@ -63,6 +63,22 @@ public final class SupabaseRESTClient: @unchecked Sendable {
         return try decoder.decode([Row].self, from: data)
     }
 
+    public func insertRows<Payload: Encodable & Sendable, Row: Decodable & Sendable>(
+        into table: String,
+        values: [Payload],
+        select: String = "*"
+    ) async throws -> [Row] {
+        let request = try makeInsertRequest(into: table, values: values, select: select)
+        let (data, response) = try await session.data(for: request)
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw SupabaseRESTError.unexpectedStatus(-1)
+        }
+        guard (200..<300).contains(httpResponse.statusCode) else {
+            throw SupabaseRESTError.unexpectedStatus(httpResponse.statusCode)
+        }
+        return try decoder.decode([Row].self, from: data)
+    }
+
     public func updateRows<Payload: Encodable & Sendable, Row: Decodable & Sendable>(
         in table: String,
         values: Payload,
@@ -148,6 +164,20 @@ public final class SupabaseRESTClient: @unchecked Sendable {
             path: "/rest/v1/rpc/\(name)",
             method: "POST",
             body: encoder.encode(payload)
+        )
+    }
+
+    public func makeInsertRequest<Payload: Encodable & Sendable>(
+        into table: String,
+        values: [Payload],
+        select: String = "*"
+    ) throws -> URLRequest {
+        try makeMutationRequest(
+            path: "/rest/v1/\(table)",
+            queryItems: [URLQueryItem(name: "select", value: select)],
+            method: "POST",
+            body: encoder.encode(values),
+            prefer: "return=representation"
         )
     }
 
