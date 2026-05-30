@@ -174,10 +174,29 @@ function ProfileDrawerShell({ children }: { children: ReactNode }) {
   };
 
   const closeDrawer = (afterClose?: () => void) => {
+    let didFinalize = false;
+    let fallbackTimer: ReturnType<typeof setTimeout> | null = null;
+    const finalizeClose = () => {
+      if (didFinalize) return;
+      didFinalize = true;
+      if (fallbackTimer) {
+        clearTimeout(fallbackTimer);
+        fallbackTimer = null;
+      }
+      closingRef.current = false;
+      setClosing(false);
+      setVisible(false);
+      setDrawerInteractionEnabled(false);
+      afterClose?.();
+    };
+
     closingRef.current = true;
     setDrawerInteractionEnabled(false);
     setClosing(true);
     screenX.stopAnimation();
+    if (afterClose) {
+      fallbackTimer = setTimeout(finalizeClose, 420);
+    }
     Animated.spring(screenX, {
       toValue: 0,
       damping: 25,
@@ -185,13 +204,7 @@ function ProfileDrawerShell({ children }: { children: ReactNode }) {
       mass: 0.82,
       useNativeDriver: false,
     }).start(({ finished }) => {
-      if (finished) {
-        closingRef.current = false;
-        setClosing(false);
-        setVisible(false);
-        setDrawerInteractionEnabled(false);
-        afterClose?.();
-      }
+      if (finished || afterClose) finalizeClose();
     });
   };
 
@@ -478,8 +491,7 @@ function ProfileDrawerContent({
   }
 
   function openNotifications() {
-    router.push("/(tabs)/notifications");
-    onNavigate();
+    go("/notifications");
   }
 
   async function handleSignOut() {

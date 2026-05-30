@@ -4,6 +4,45 @@
 
 ---
 
+## イテレーション291：左ドロワー項目の遷移を確実化
+
+### 背景・問題意識
+
+オーナーから、左ドロワーの項目をタップしても、ドロワーが閉じるだけで各項目先の画面に遷移しないという指摘があった。ドロワー項目の遷移は、閉じアニメーションの完了コールバックに依存していたため、完了扱いが返らないケースで遷移処理が実行されない可能性があった。
+
+### 変更内容
+
+#### `mobile/app/(tabs)/_layout.tsx`
+- `closeDrawer(afterClose)` にフォールバックタイマーを追加し、閉じアニメーション完了扱いが返らない場合でも項目タップ時の遷移コールバックを実行できるようにした。
+- すでにコールバックを実行した後にアニメーション完了が返っても二重実行されないよう、`didFinalize` ガードを追加した。
+- 通知項目も他のドロワー項目と同じ `go()` 経由に揃え、`/notifications` へ遷移してからドロワーを閉じる流れに統一した。
+
+### 影響範囲
+
+- iOS版 左ドロワー
+- ドロワー内のプロフィール、通知、プロフィール編集、推し設定、スケジュール、完了した取引、設定、ヘルプへの遷移
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- `EAS_UPDATE_PROJECT_SLUG=ihub EXPO_NO_GIT_STATUS=1 npm --prefix mobile run update:ios:preview -- --message "[iter291] 左ドロワー項目の遷移を確実化" --non-interactive`
+- Preview OTA: Update group ID `7f2aa41f-e049-4128-b913-9656f82c375b` / iOS update ID `019e79c3-7f39-7c5a-a82f-fda4f169556a`
+- EAS Dashboard: `https://expo.dev/accounts/mashima.bizz/projects/ihub/updates/7f2aa41f-e049-4128-b913-9656f82c375b`
+
+### 関連ファイル
+
+- `mobile/app/(tabs)/_layout.tsx`
+- `notes/08_design_iterations.md`
+
+### セルフレビュー結果
+
+- ✅ ドロワー項目のタップ後に、閉じるだけで遷移しないケースを避けるためのフォールバックを追加した。
+- ✅ 遷移コールバックの二重実行を防ぐガードを入れた。
+- ✅ 通知項目の遷移も他項目と同じ経路に統一した。
+- ✅ iOS Preview channel へOTA配信済み。
+- ✅ 状態遷移・用語・DBスキーマ変更はないため、`notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要。
+
 ## イテレーション290：在庫追加を左フッターへ移動
 
 ### 背景・問題意識
