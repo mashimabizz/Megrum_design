@@ -82,6 +82,56 @@ final class SupabaseGroomClientTests: XCTestCase {
         XCTAssertEqual(unlikeRequest.url?.absoluteString, "https://example.supabase.co/rest/v1/groom_reactions?groom_post_id=eq.00000000-0000-0000-0000-000000000501&user_id=eq.00000000-0000-0000-0000-000000000001&reaction_type=eq.like")
     }
 
+    func testBuildsGroomReplyAndNotificationRequests() throws {
+        let client = SupabaseGroomClient(configuration: configuration)
+        let senderID = UUID(uuidString: "00000000-0000-0000-0000-000000000001")!
+        let recipientID = UUID(uuidString: "00000000-0000-0000-0000-000000000002")!
+        let postID = UUID(uuidString: "00000000-0000-0000-0000-000000000501")!
+        let replyID = UUID(uuidString: "00000000-0000-0000-0000-000000000701")!
+
+        let request = try client.makeSendReplyRequest(
+            GroomReplyCreateInput(
+                groomPostID: postID,
+                senderID: senderID,
+                recipientID: recipientID,
+                body: " かわいいです ",
+                groomImageURL: URL(string: "https://example.com/groom.jpg")
+            )
+        )
+        let body = try XCTUnwrap(request.httpBody)
+        let rows = try XCTUnwrap(JSONSerialization.jsonObject(with: body) as? [[String: Any]])
+        let payload = try XCTUnwrap(rows.first)
+        let snapshot = try XCTUnwrap(payload["groom_snapshot"] as? [String: Any])
+
+        XCTAssertEqual(request.httpMethod, "POST")
+        XCTAssertEqual(request.url?.absoluteString, "https://example.supabase.co/rest/v1/groom_replies?select=id,groom_post_id,sender_id,recipient_id,body,groom_snapshot,read_at,created_at")
+        XCTAssertEqual(payload["body"] as? String, "かわいいです")
+        XCTAssertEqual(payload["groom_post_id"] as? String, postID.uuidString.lowercased())
+        XCTAssertEqual(payload["sender_id"] as? String, senderID.uuidString.lowercased())
+        XCTAssertEqual(payload["recipient_id"] as? String, recipientID.uuidString.lowercased())
+        XCTAssertEqual(snapshot["image_url"] as? String, "https://example.com/groom.jpg")
+
+        let notificationRequest = try client.makeReplyNotificationRequest(
+            reply: GroomReply(
+                id: replyID,
+                groomPostID: postID,
+                senderID: senderID,
+                recipientID: recipientID,
+                body: "かわいいです",
+                groomImageURL: URL(string: "https://example.com/groom.jpg")
+            )
+        )
+        let notificationBody = try XCTUnwrap(notificationRequest.httpBody)
+        let notificationRows = try XCTUnwrap(JSONSerialization.jsonObject(with: notificationBody) as? [[String: Any]])
+        let notificationPayload = try XCTUnwrap(notificationRows.first)
+
+        XCTAssertEqual(notificationRequest.url?.absoluteString, "https://example.supabase.co/rest/v1/notifications?select=id")
+        XCTAssertEqual(notificationPayload["kind"] as? String, "groom_reply")
+        XCTAssertEqual(notificationPayload["groom_reply_id"] as? String, replyID.uuidString.lowercased())
+        XCTAssertEqual(notificationPayload["user_id"] as? String, recipientID.uuidString.lowercased())
+        XCTAssertEqual(notificationPayload["title"] as? String, "グルームに返信が届きました")
+    }
+
     private var configuration: SupabaseConfiguration {
         SupabaseConfiguration(
             projectURL: URL(string: "https://example.supabase.co")!,

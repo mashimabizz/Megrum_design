@@ -435,6 +435,7 @@ private struct GroomViewerScreen: View {
     @Environment(\.dismiss) private var dismiss
     @State private var currentIndex: Int
     @State private var dragOffset: CGSize = .zero
+    @State private var replyDraft = ""
 
     init(grooms: [GroomPost], initialGroom: GroomPost, appState: MegrumAppState) {
         let fallbackGrooms = grooms.isEmpty ? [initialGroom] : grooms
@@ -450,6 +451,14 @@ private struct GroomViewerScreen: View {
 
     private var isCurrentGroomLiked: Bool {
         appState.isGroomLiked(currentGroom.id)
+    }
+
+    private var canReplyToCurrentGroom: Bool {
+        appState.viewer?.id != currentGroom.authorID
+    }
+
+    private var isSendingReply: Bool {
+        appState.sendingGroomReplyPostID == currentGroom.id
     }
 
     var body: some View {
@@ -522,8 +531,44 @@ private struct GroomViewerScreen: View {
 
                 Spacer()
 
-                HStack {
-                    Spacer()
+                HStack(spacing: 10) {
+                    if canReplyToCurrentGroom {
+                        TextField("返信を送る", text: $replyDraft)
+                            .font(.system(size: 15, weight: .bold, design: .rounded))
+                            .foregroundStyle(.white)
+                            .tint(.white)
+                            .submitLabel(.send)
+                            .padding(.horizontal, 14)
+                            .frame(height: 46)
+                            .background(.white.opacity(0.16), in: Capsule())
+                            .overlay(Capsule().stroke(.white.opacity(0.22), lineWidth: 1))
+                            .onSubmit {
+                                submitGroomReply()
+                            }
+
+                        Button {
+                            submitGroomReply()
+                        } label: {
+                            Group {
+                                if isSendingReply {
+                                    ProgressView()
+                                        .controlSize(.small)
+                                        .tint(.white)
+                                } else {
+                                    Image(systemName: "arrow.up")
+                                        .font(.system(size: 18, weight: .heavy))
+                                }
+                            }
+                            .foregroundStyle(.white)
+                            .frame(width: 46, height: 46)
+                            .background(MegrumTheme.lavender, in: Circle())
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(replyDraft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isSendingReply)
+                        .opacity(replyDraft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? 0.52 : 1)
+                    } else {
+                        Spacer()
+                    }
 
                     Button {
                         Task {
@@ -575,6 +620,24 @@ private struct GroomViewerScreen: View {
         }
         withAnimation(.smooth(duration: 0.18)) {
             currentIndex = nextIndex
+        }
+    }
+
+    private func submitGroomReply() {
+        let body = replyDraft.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !body.isEmpty, !isSendingReply else {
+            return
+        }
+        Task {
+            let sent = await appState.sendGroomReply(
+                postID: currentGroom.id,
+                recipientID: currentGroom.authorID,
+                body: body,
+                groomImageURL: currentGroom.imageURL
+            )
+            if sent {
+                replyDraft = ""
+            }
         }
     }
 }

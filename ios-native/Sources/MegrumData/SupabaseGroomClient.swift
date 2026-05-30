@@ -139,12 +139,49 @@ public final class SupabaseGroomClient: @unchecked Sendable {
         )
     }
 
+    public func sendReply(_ input: GroomReplyCreateInput) async throws -> GroomReply {
+        let rows: [GroomReplyRow] = try await client.insertRows(
+            into: "groom_replies",
+            values: [GroomReplyPayload(input: input)],
+            select: GroomReplyRow.select
+        )
+        guard let reply = rows.first?.reply else {
+            throw SupabaseGroomClientError.malformedResponse
+        }
+        try? await createReplyNotification(reply: reply)
+        return reply
+    }
+
+    public func makeSendReplyRequest(_ input: GroomReplyCreateInput) throws -> URLRequest {
+        try client.makeInsertRequest(
+            into: "groom_replies",
+            values: [GroomReplyPayload(input: input)],
+            select: GroomReplyRow.select
+        )
+    }
+
+    public func makeReplyNotificationRequest(reply: GroomReply) throws -> URLRequest {
+        try client.makeInsertRequest(
+            into: "notifications",
+            values: [GroomReplyNotificationPayload(reply: reply)],
+            select: "id"
+        )
+    }
+
     private func signedURLMap(for rows: [GroomFeedRow]) async throws -> [String: URL] {
         var signedURLs: [String: URL] = [:]
         for path in rows.compactMap(\.imagePath) {
             signedURLs[path] = try await client.createSignedURL(bucket: Self.groomBucket, path: path)
         }
         return signedURLs
+    }
+
+    private func createReplyNotification(reply: GroomReply) async throws {
+        let _: [NotificationAckRow] = try await client.insertRows(
+            into: "notifications",
+            values: [GroomReplyNotificationPayload(reply: reply)],
+            select: "id"
+        )
     }
 
     private func groomImagePath(userID: UUID, contentType: String) -> String {
@@ -291,6 +328,99 @@ private struct GroomReactionRow: Decodable, Sendable {
     var groomPostID: UUID?
     var userID: UUID?
     var reactionType: String?
+}
+
+private struct GroomReplyPayload: Encodable, Sendable {
+    var body: String
+    var groomPostID: UUID
+    var groomSnapshot: GroomSnapshotPayload
+    var recipientID: UUID
+    var senderID: UUID
+
+    init(input: GroomReplyCreateInput) {
+        self.body = input.body.trimmingCharacters(in: .whitespacesAndNewlines)
+        self.groomPostID = input.groomPostID
+        self.groomSnapshot = GroomSnapshotPayload(imageURL: input.groomImageURL)
+        self.recipientID = input.recipientID
+        self.senderID = input.senderID
+    }
+}
+
+private struct GroomSnapshotPayload: Encodable, Sendable {
+    var caption = ""
+    var imagePath: String?
+    var imageURL: String?
+
+    init(imageURL: URL?) {
+        self.imageURL = imageURL?.absoluteString
+    }
+}
+
+private struct GroomReplyRow: Decodable, Sendable {
+    static let select = [
+        "id",
+        "groom_post_id",
+        "sender_id",
+        "recipient_id",
+        "body",
+        "groom_snapshot",
+        "read_at",
+        "created_at"
+    ].joined(separator: ",")
+
+    var id: UUID
+    var groomPostID: UUID
+    var senderID: UUID
+    var recipientID: UUID
+    var body: String
+    var groomSnapshot: GroomSnapshotRow?
+    var readAt: Date?
+    var createdAt: Date?
+
+    var reply: GroomReply {
+        GroomReply(
+            id: id,
+            groomPostID: groomPostID,
+            senderID: senderID,
+            recipientID: recipientID,
+            body: body,
+            groomImageURL: groomSnapshot?.resolvedImageURL,
+            readAt: readAt,
+            createdAt: createdAt ?? .now
+        )
+    }
+}
+
+private struct GroomSnapshotRow: Decodable, Sendable {
+    var imageUrl: String?
+    var imagePath: String?
+
+    var resolvedImageURL: URL? {
+        guard let imageUrl else {
+            return nil
+        }
+        return URL(string: imageUrl)
+    }
+}
+
+private struct GroomReplyNotificationPayload: Encodable, Sendable {
+    var body: String
+    var groomReplyID: UUID
+    var kind = "groom_reply"
+    var linkPath: String
+    var title = "グルームに返信が届きました"
+    var userID: UUID
+
+    init(reply: GroomReply) {
+        self.body = String(reply.body.prefix(120))
+        self.groomReplyID = reply.id
+        self.linkPath = "/meguri-letters?open=1&userId=\(reply.senderID.uuidString.lowercased())"
+        self.userID = reply.recipientID
+    }
+}
+
+private struct NotificationAckRow: Decodable, Sendable {
+    var id: UUID?
 }
 
 private func normalizedImageContentType(_ value: String) -> String {

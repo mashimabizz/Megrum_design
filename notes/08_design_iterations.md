@@ -4,6 +4,74 @@
 
 ---
 
+## イテレーション333：Swiftグルーム返信境界を追加
+
+### 背景・問題意識
+
+Swift Native版のグルームは閲覧、投稿、いいねまで移行したが、ユーザーがグルームから返信してめぐりメッセージへつなぐ入口がまだReact Native側に残っていた。既存DBの `groom_replies` と `notifications.kind='groom_reply'` を使い、全画面ビューアから最小のテキスト返信を送れるNative境界を追加する。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumCore/MegrumModels.swift`
+- `GroomReply` と `GroomReplyCreateInput` を追加し、グルーム返信をSwift型で扱えるようにした。
+
+#### `ios-native/Sources/MegrumData/SupabaseGroomClient.swift`
+- `groom_replies` へ返信をinsertする `sendReply` を追加した。
+- 返信成功後に `notifications.kind='groom_reply'` をbest-effortでinsertする境界を追加した。
+- 返信作成と通知作成のrequest builderをテスト可能にした。
+
+#### `ios-native/Sources/MegrumApp/MegrumAppState.swift` / `ios-native/Sources/MegrumApp/SupabaseMegrumRepository.swift`
+- repository境界に `sendGroomReply` を追加した。
+- AppStateに `groomRepliesByPostID` と `sendingGroomReplyPostID` を追加した。
+- 空文字、自分宛て返信、二重送信を防ぎ、成功時に返信を投稿単位で保持するようにした。
+
+#### `ios-native/Sources/MegrumApp/MeguriScreen.swift`
+- グルーム全画面ビューア下部に返信入力と送信ボタンを追加した。
+- 自分のグルームでは返信入力を出さず、他人のグルームだけ返信できるようにした。
+
+#### `ios-native/Tests/MegrumDataTests/SupabaseGroomClientTests.swift`
+- `groom_replies` insert requestと `notifications` insert requestのURL、payload、selectを検証した。
+
+#### `ios-native/Tests/MegrumAppTests/MegrumAppStateTests.swift`
+- Preview repositoryでグルーム返信が投稿単位に追加されることを検証した。
+
+#### `ios-native/README.md` / `notes/22_swift_native_migration.md`
+- Swift NativeめぐりPhaseの進捗として、グルーム返信導線を追記した。
+
+### 影響範囲
+
+- Swift Native版のグルーム全画面ビューア
+- Swift Native版の `groom_replies` 作成境界
+- Swift Native版のグルーム返信通知作成境界
+- Swift Native版のめぐりAppState
+
+### 確認方法
+
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-build --enable-xctest --disable-swift-testing -j 1`
+- `xcodebuild -quiet -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -destination 'generic/platform=iOS Simulator' -derivedDataPath /tmp/megrum-native-xcodebuild CODE_SIGNING_ALLOWED=NO build`
+
+### 関連ファイル
+
+- `ios-native/Sources/MegrumCore/MegrumModels.swift`
+- `ios-native/Sources/MegrumData/SupabaseGroomClient.swift`
+- `ios-native/Sources/MegrumApp/MegrumAppState.swift`
+- `ios-native/Sources/MegrumApp/SupabaseMegrumRepository.swift`
+- `ios-native/Sources/MegrumApp/MeguriScreen.swift`
+- `ios-native/Tests/MegrumDataTests/SupabaseGroomClientTests.swift`
+- `ios-native/Tests/MegrumAppTests/MegrumAppStateTests.swift`
+- `ios-native/README.md`
+- `notes/22_swift_native_migration.md`
+- `notes/08_design_iterations.md`
+
+### セルフレビュー結果
+
+- ✅ Swift Package testsが77件成功した。
+- ✅ Xcode project buildが成功した。
+- ✅ 既存の `groom_replies` / `notifications` を使うため、新規migrationは追加していない。
+- ✅ `notes/09_state_machines.md` には既にグルーム返信のビジネスルールがあるため、状態遷移の更新は不要。
+- ✅ 既存用語の範囲内であり、新しい用語や廃止用語は追加していないため、`notes/10_glossary.md` の更新は不要。
+- ✅ DBスキーマ自体は変更していないため、`notes/05_data_model.md` の更新は不要。
+
 ## イテレーション332：Swiftグルーム閲覧アクション境界を追加
 
 ### 背景・問題意識

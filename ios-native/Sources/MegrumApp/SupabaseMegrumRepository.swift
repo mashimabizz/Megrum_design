@@ -124,6 +124,10 @@ public struct SupabaseMegrumRepository: MegrumRepository {
         try await groomClient.setLiked(userID: viewerID, postID: postID, isLiked: isLiked)
     }
 
+    public func sendGroomReply(_ input: GroomReplyCreateInput) async throws -> GroomReply {
+        try await groomClient.sendReply(input)
+    }
+
     public func loadBoardThreads(
         latitude: Double?,
         longitude: Double?,

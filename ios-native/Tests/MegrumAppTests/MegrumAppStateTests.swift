@@ -133,6 +133,27 @@ final class MegrumAppStateTests: XCTestCase {
         XCTAssertNil(state.errorMessage)
     }
 
+    func testAppStateSendsPreviewGroomReply() async {
+        let state = MegrumAppState(repository: PreviewMegrumRepository())
+        let postID = UUID(uuidString: "00000000-0000-0000-0000-000000000501")!
+        let recipientID = UUID(uuidString: "22222222-2222-2222-2222-222222222222")!
+
+        await state.loadInitialData()
+
+        let sent = await state.sendGroomReply(
+            postID: postID,
+            recipientID: recipientID,
+            body: " かわいいです ",
+            groomImageURL: URL(string: "https://example.com/groom-a.jpg")
+        )
+
+        XCTAssertTrue(sent)
+        XCTAssertEqual(state.groomReplies(for: postID).last?.body, "かわいいです")
+        XCTAssertEqual(state.groomReplies(for: postID).last?.recipientID, recipientID)
+        XCTAssertNil(state.sendingGroomReplyPostID)
+        XCTAssertNil(state.errorMessage)
+    }
+
     func testAppStateCreatesPreviewBoardThreadWithPrefectureOverride() async {
         let state = MegrumAppState(repository: PreviewMegrumRepository())
         await state.loadInitialData()

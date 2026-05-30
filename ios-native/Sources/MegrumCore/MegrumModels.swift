@@ -701,6 +701,59 @@ public struct GroomPostCreateInput: Equatable, Sendable {
     }
 }
 
+public struct GroomReply: Identifiable, Codable, Hashable, Sendable {
+    public var id: UUID
+    public var groomPostID: UUID
+    public var senderID: UUID
+    public var recipientID: UUID
+    public var body: String
+    public var groomImageURL: URL?
+    public var readAt: Date?
+    public var createdAt: Date
+
+    public init(
+        id: UUID,
+        groomPostID: UUID,
+        senderID: UUID,
+        recipientID: UUID,
+        body: String,
+        groomImageURL: URL? = nil,
+        readAt: Date? = nil,
+        createdAt: Date = .now
+    ) {
+        self.id = id
+        self.groomPostID = groomPostID
+        self.senderID = senderID
+        self.recipientID = recipientID
+        self.body = body
+        self.groomImageURL = groomImageURL
+        self.readAt = readAt
+        self.createdAt = createdAt
+    }
+}
+
+public struct GroomReplyCreateInput: Equatable, Sendable {
+    public var groomPostID: UUID
+    public var senderID: UUID
+    public var recipientID: UUID
+    public var body: String
+    public var groomImageURL: URL?
+
+    public init(
+        groomPostID: UUID,
+        senderID: UUID,
+        recipientID: UUID,
+        body: String,
+        groomImageURL: URL? = nil
+    ) {
+        self.groomPostID = groomPostID
+        self.senderID = senderID
+        self.recipientID = recipientID
+        self.body = body
+        self.groomImageURL = groomImageURL
+    }
+}
+
 public struct BoardThread: Identifiable, Codable, Hashable, Sendable {
     public enum Audience: String, Codable, Sendable, CaseIterable, Identifiable {
         case nearby3km = "nearby_3km"

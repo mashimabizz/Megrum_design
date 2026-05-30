@@ -71,6 +71,7 @@ public protocol MegrumRepository: Sendable {
     func createGroomPost(_ input: GroomPostCreateInput) async throws -> GroomPost
     func markGroomViewed(postID: UUID) async throws
     func setGroomLiked(postID: UUID, isLiked: Bool) async throws
+    func sendGroomReply(_ input: GroomReplyCreateInput) async throws -> GroomReply
     func loadBoardThreads(latitude: Double?, longitude: Double?, prefecture: String?, scope: BoardThread.Audience) async throws -> [BoardThread]
     func loadBoardReplies(threadID: UUID, latitude: Double?, longitude: Double?, prefecture: String?, scope: BoardThread.Audience) async throws -> [BoardReply]
     func sendBoardReply(_ input: BoardReplyCreateInput) async throws -> BoardReply
@@ -130,6 +131,10 @@ public extension MegrumRepository {
     func markGroomViewed(postID: UUID) async throws {}
 
     func setGroomLiked(postID: UUID, isLiked: Bool) async throws {}
+
+    func sendGroomReply(_ input: GroomReplyCreateInput) async throws -> GroomReply {
+        throw MegrumRepositoryError.unsupportedMutation
+    }
 
     func loadBoardThreads(latitude: Double?, longitude: Double?, prefecture: String?, scope: BoardThread.Audience) async throws -> [BoardThread] {
         []
@@ -296,6 +301,17 @@ public struct PreviewMegrumRepository: MegrumRepository {
 
     public func setGroomLiked(postID: UUID, isLiked: Bool) async throws {}
 
+    public func sendGroomReply(_ input: GroomReplyCreateInput) async throws -> GroomReply {
+        GroomReply(
+            id: UUID(),
+            groomPostID: input.groomPostID,
+            senderID: input.senderID,
+            recipientID: input.recipientID,
+            body: input.body,
+            groomImageURL: input.groomImageURL
+        )
+    }
+
     public func loadBoardThreads(latitude: Double?, longitude: Double?, prefecture: String?, scope: BoardThread.Audience) async throws -> [BoardThread] {
         NativePreviewData.threads.filter { thread in
             switch scope {
@@ -390,6 +406,7 @@ public final class MegrumAppState: ObservableObject {
     @Published public private(set) var proposals: [TradeProposal] = []
     @Published public private(set) var messagesByProposalID: [UUID: [TradeMessage]] = [:]
     @Published public private(set) var boardRepliesByThreadID: [UUID: [BoardReply]] = [:]
+    @Published public private(set) var groomRepliesByPostID: [UUID: [GroomReply]] = [:]
     @Published public private(set) var grooms: [GroomPost] = []
     @Published public private(set) var likedGroomIDs: Set<UUID> = []
     @Published public private(set) var threads: [BoardThread] = []
@@ -417,6 +434,7 @@ public final class MegrumAppState: ObservableObject {
     @Published public private(set) var isCreatingBoardThread = false
     @Published public private(set) var loadingMessagesProposalID: UUID?
     @Published public private(set) var sendingMessageProposalID: UUID?
+    @Published public private(set) var sendingGroomReplyPostID: UUID?
     @Published public private(set) var loadingBoardRepliesThreadID: UUID?
     @Published public private(set) var sendingBoardReplyThreadID: UUID?
     @Published public private(set) var unblockingUserID: UUID?
@@ -441,6 +459,10 @@ public final class MegrumAppState: ObservableObject {
 
     public func boardReplies(for threadID: UUID) -> [BoardReply] {
         boardRepliesByThreadID[threadID] ?? []
+    }
+
+    public func groomReplies(for postID: UUID) -> [GroomReply] {
+        groomRepliesByPostID[postID] ?? []
     }
 
     public func isGroomLiked(_ postID: UUID) -> Bool {
@@ -568,6 +590,50 @@ public final class MegrumAppState: ObservableObject {
         } catch {
             likedGroomIDs = previousLikedIDs
             errorMessage = "グルームのいいねを更新できませんでした"
+        }
+    }
+
+    public func sendGroomReply(
+        postID: UUID,
+        recipientID: UUID,
+        body: String,
+        groomImageURL: URL?
+    ) async -> Bool {
+        let trimmed = body.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else {
+            return false
+        }
+        guard let viewer else {
+            errorMessage = "プロフィールを確認してから返信してください"
+            return false
+        }
+        guard viewer.id != recipientID else {
+            errorMessage = "自分のグルームには返信できません"
+            return false
+        }
+        guard sendingGroomReplyPostID != postID else {
+            return false
+        }
+
+        sendingGroomReplyPostID = postID
+        errorMessage = nil
+        do {
+            let reply = try await repository.sendGroomReply(
+                GroomReplyCreateInput(
+                    groomPostID: postID,
+                    senderID: viewer.id,
+                    recipientID: recipientID,
+                    body: trimmed,
+                    groomImageURL: groomImageURL
+                )
+            )
+            groomRepliesByPostID[postID, default: []].append(reply)
+            sendingGroomReplyPostID = nil
+            return true
+        } catch {
+            errorMessage = "グルームに返信できませんでした"
+            sendingGroomReplyPostID = nil
+            return false
         }
     }
 
