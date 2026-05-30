@@ -139,7 +139,9 @@ public struct MegrumRootView: View {
                     title: "在庫",
                     subtitle: "交換に出せるグッズ",
                     items: appState.inventory,
-                    showsAddButton: true
+                    showsAddButton: true,
+                    appState: appState,
+                    entryKind: .inventory
                 )
             }
             .tag(MegrumTab.inventory)
@@ -148,7 +150,7 @@ public struct MegrumRootView: View {
             }
 
             NavigationStack {
-                WishCollectionScreen(items: appState.wishes)
+                WishCollectionScreen(items: appState.wishes, appState: appState)
             }
             .tag(MegrumTab.wish)
             .tabItem {

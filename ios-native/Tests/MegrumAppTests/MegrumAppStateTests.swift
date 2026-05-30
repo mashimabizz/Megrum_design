@@ -81,6 +81,69 @@ final class MegrumAppStateTests: XCTestCase {
         XCTAssertEqual(state.oshiCharacters.first?.name, "SANA")
     }
 
+    func testAppStateLoadsPreviewGoodsTypes() async {
+        let state = MegrumAppState(repository: PreviewMegrumRepository())
+
+        await state.loadGoodsTypes()
+
+        XCTAssertEqual(state.goodsTypes.first?.name, "トレカ")
+        XCTAssertFalse(state.isLoadingGoodsTypes)
+    }
+
+    func testAppStateCreatesPreviewInventoryAndWishEntries() async {
+        let state = MegrumAppState(repository: PreviewMegrumRepository())
+        await state.loadInitialData()
+        await state.loadOshiGroups()
+        await state.loadGoodsTypes()
+
+        let groupID = try! XCTUnwrap(state.oshiGroups.first?.id)
+        let goodsTypeID = try! XCTUnwrap(state.goodsTypes.first?.id)
+        let inventoryCount = state.inventory.count
+        let wishCount = state.wishes.count
+
+        let createdInventory = await state.createGoodsEntry(
+            GoodsEntryInput(
+                kind: .inventory,
+                title: " 新しい在庫 ",
+                groupID: groupID,
+                goodsTypeID: goodsTypeID,
+                quantity: 2
+            )
+        )
+        let createdWish = await state.createGoodsEntry(
+            GoodsEntryInput(
+                kind: .wish,
+                title: "新しいWish",
+                groupID: groupID,
+                goodsTypeID: goodsTypeID
+            )
+        )
+
+        XCTAssertTrue(createdInventory)
+        XCTAssertTrue(createdWish)
+        XCTAssertEqual(state.inventory.count, inventoryCount + 1)
+        XCTAssertEqual(state.inventory.first?.title, "新しい在庫")
+        XCTAssertEqual(state.inventory.first?.quantity, 2)
+        XCTAssertEqual(state.wishes.count, wishCount + 1)
+        XCTAssertEqual(state.wishes.first?.title, "新しいWish")
+        XCTAssertFalse(state.isCreatingGoodsEntry)
+    }
+
+    func testAppStateValidatesGoodsEntryTitle() async {
+        let state = MegrumAppState(repository: PreviewMegrumRepository())
+        let created = await state.createGoodsEntry(
+            GoodsEntryInput(
+                kind: .inventory,
+                title: " ",
+                groupID: NativePreviewIDs.groupID,
+                goodsTypeID: NativePreviewIDs.cardGoodsTypeID
+            )
+        )
+
+        XCTAssertFalse(created)
+        XCTAssertEqual(state.errorMessage, "グッズ名を入力してください")
+    }
+
     func testAppStateLoadsAndSavesPreviewMailingAddress() async {
         let state = MegrumAppState(repository: PreviewMegrumRepository())
 
@@ -284,4 +347,6 @@ private struct SingleSnapshotRepository: MegrumRepository {
 
 private enum NativePreviewIDs {
     static let viewerID = UUID(uuidString: "00000000-0000-0000-0000-000000000001")!
+    static let groupID = UUID(uuidString: "00000000-0000-0000-0000-000000000011")!
+    static let cardGoodsTypeID = UUID(uuidString: "00000000-0000-0000-0000-000000000021")!
 }

@@ -61,6 +61,8 @@ public protocol MegrumRepository: Sendable {
     func loadInitialSnapshot() async throws -> MegrumAppSnapshot
     func loadOshiGroups(searchText: String?, limit: Int) async throws -> [OshiGroup]
     func loadOshiCharacters(groupID: UUID, limit: Int) async throws -> [OshiCharacter]
+    func loadGoodsTypes(limit: Int) async throws -> [GoodsType]
+    func createGoodsEntry(_ input: GoodsEntryInput) async throws -> GoodsItem
     func loadMailingAddress() async throws -> MailingAddress?
     func saveMailingAddress(_ address: MailingAddress) async throws -> MailingAddress
     func lookupAddress(postalCode: String) async throws -> PostalCodeAddress?
@@ -79,6 +81,14 @@ public extension MegrumRepository {
 
     func loadOshiCharacters(groupID: UUID, limit: Int) async throws -> [OshiCharacter] {
         []
+    }
+
+    func loadGoodsTypes(limit: Int) async throws -> [GoodsType] {
+        []
+    }
+
+    func createGoodsEntry(_ input: GoodsEntryInput) async throws -> GoodsItem {
+        throw MegrumRepositoryError.unsupportedMutation
     }
 
     func loadMailingAddress() async throws -> MailingAddress? {
@@ -153,6 +163,21 @@ public struct PreviewMegrumRepository: MegrumRepository {
         Array(NativePreviewData.oshiCharacters.filter { $0.groupID == groupID }.prefix(limit))
     }
 
+    public func loadGoodsTypes(limit: Int) async throws -> [GoodsType] {
+        Array(NativePreviewData.goodsTypes.prefix(limit))
+    }
+
+    public func createGoodsEntry(_ input: GoodsEntryInput) async throws -> GoodsItem {
+        GoodsItem(
+            id: UUID(),
+            ownerID: NativePreviewData.viewerID,
+            groupID: input.groupID,
+            goodsTypeID: input.goodsTypeID,
+            title: input.title,
+            quantity: input.quantity
+        )
+    }
+
     public func loadMailingAddress() async throws -> MailingAddress? {
         NativePreviewData.mailingAddress
     }
@@ -210,17 +235,20 @@ public final class MegrumAppState: ObservableObject {
     @Published public private(set) var threads: [BoardThread] = []
     @Published public private(set) var oshiGroups: [OshiGroup] = []
     @Published public private(set) var oshiCharacters: [OshiCharacter] = []
+    @Published public private(set) var goodsTypes: [GoodsType] = []
     @Published public private(set) var mailingAddress: MailingAddress?
     @Published public private(set) var blockedUsers: [BlockedUser] = []
     @Published public private(set) var notifications: [MegrumNotification] = []
     @Published public private(set) var isLoading = false
     @Published public private(set) var isLoadingOshiGroups = false
     @Published public private(set) var isLoadingOshiCharacters = false
+    @Published public private(set) var isLoadingGoodsTypes = false
     @Published public private(set) var isLoadingMailingAddress = false
     @Published public private(set) var isLoadingBlockedUsers = false
     @Published public private(set) var isLoadingNotifications = false
     @Published public private(set) var isLookingUpPostalCode = false
     @Published public private(set) var isSavingMailingAddress = false
+    @Published public private(set) var isCreatingGoodsEntry = false
     @Published public private(set) var unblockingUserID: UUID?
     @Published public private(set) var isMarkingNotificationsRead = false
     @Published public private(set) var isSavingAccountSetup = false
@@ -294,6 +322,69 @@ public final class MegrumAppState: ObservableObject {
             errorMessage = "推しメンバーを読み込めませんでした"
         }
         isLoadingOshiCharacters = false
+    }
+
+    public func loadGoodsTypes() async {
+        guard !isLoadingGoodsTypes else {
+            return
+        }
+
+        isLoadingGoodsTypes = true
+        errorMessage = nil
+        do {
+            goodsTypes = try await repository.loadGoodsTypes(limit: 40)
+        } catch {
+            errorMessage = "グッズ種別を読み込めませんでした"
+        }
+        isLoadingGoodsTypes = false
+    }
+
+    public func createGoodsEntry(_ input: GoodsEntryInput) async -> Bool {
+        guard !isCreatingGoodsEntry else {
+            return false
+        }
+
+        let trimmedTitle = input.title.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedTitle.isEmpty else {
+            errorMessage = "グッズ名を入力してください"
+            return false
+        }
+        let normalizedInput = GoodsEntryInput(
+            kind: input.kind,
+            title: trimmedTitle,
+            groupID: input.groupID,
+            goodsTypeID: input.goodsTypeID,
+            quantity: max(1, min(input.quantity, 999))
+        )
+
+        isCreatingGoodsEntry = true
+        errorMessage = nil
+        do {
+            let created = try await repository.createGoodsEntry(normalizedInput)
+            switch normalizedInput.kind {
+            case .inventory:
+                inventory.insert(created, at: 0)
+            case .wish:
+                wishes.insert(
+                    WishItem(
+                        id: created.id,
+                        ownerID: created.ownerID,
+                        groupID: created.groupID,
+                        memberID: created.memberID,
+                        goodsTypeID: created.goodsTypeID,
+                        title: created.title,
+                        tags: created.tags
+                    ),
+                    at: 0
+                )
+            }
+            isCreatingGoodsEntry = false
+            return true
+        } catch {
+            errorMessage = "グッズを保存できませんでした"
+            isCreatingGoodsEntry = false
+            return false
+        }
     }
 
     public func loadMailingAddress() async {

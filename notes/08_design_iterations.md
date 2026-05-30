@@ -4,6 +4,90 @@
 
 ---
 
+## イテレーション318：Swift在庫Wish追加フォームを追加
+
+### 背景・問題意識
+
+Swift Native版の在庫/Wish一覧には左下追加ボタンの土台だけがあり、実データを登録できなかった。Swift全面移行を進めるうえで、検索・打診・プロフィールの前提になる `goods_inventory` をNative側から作れる必要があるため、最小登録フォームとSupabase境界を追加した。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumCore/MegrumModels.swift`
+- `GoodsType` を追加し、`goods_types_master` をSwift型で扱えるようにした。
+- `GoodsEntryKind` / `GoodsEntryInput` を追加し、在庫とWishの登録入力を共通化した。
+
+#### `ios-native/Sources/MegrumData/SupabaseGoodsInventoryClient.swift`
+- `goods_types_master` の読み込みリクエスト境界を追加した。
+- `goods_inventory` へ在庫/Wishを作成するリクエスト境界を追加した。
+- 在庫は `kind=for_trade`、Wishは `kind=wanted` として既存スキーマに保存するようにした。
+
+#### `ios-native/Sources/MegrumApp/MegrumAppState.swift`
+- `goodsTypes` / `isLoadingGoodsTypes` / `isCreatingGoodsEntry` を追加した。
+- グッズ種別読み込みと在庫/Wish作成の状態管理を追加した。
+- 作成成功時に、在庫またはWish配列の先頭へ即時反映するようにした。
+
+#### `ios-native/Sources/MegrumApp/CollectionScreens.swift`
+- 在庫/Wishの追加ボタンからNative sheetを開くようにした。
+- 追加sheetでグッズ名、グループ、グッズ種別、個数を入力・選択できるようにした。
+- グループとグッズ種別は既存マスタから読み込み、横並びのchipで選べるようにした。
+
+#### `ios-native/Sources/MegrumApp/SupabaseMegrumRepository.swift`
+- `SupabaseGoodsInventoryClient` をrepositoryへ接続した。
+
+#### `ios-native/Sources/MegrumApp/NativePreviewData.swift`
+- Preview用のグッズ種別マスタと既存在庫/Wishへの `goodsTypeID` を追加した。
+
+#### `ios-native/Tests/MegrumDataTests/SupabaseGoodsInventoryClientTests.swift`
+- グッズ種別読み込み、在庫作成、Wish作成のPostgREST request生成を検証した。
+
+#### `ios-native/Tests/MegrumAppTests/MegrumAppStateTests.swift`
+- Preview repositoryでグッズ種別を読み込めること、在庫/Wishを作成して即時反映できることを検証した。
+
+#### `ios-native/README.md`
+- `SupabaseGoodsInventoryClient` と在庫/Wish追加sheetの役割を追記した。
+
+#### `notes/22_swift_native_migration.md`
+- Swift Native移行のステータスをiter318へ更新し、Phase 3の進捗に在庫/Wish追加フォームを追記した。
+
+### 影響範囲
+
+- Swift Native版の在庫一覧
+- Swift Native版のWish一覧
+- Swift Native版のマスタ読み込み境界
+- Swift Native版の `goods_inventory` 作成境界
+
+### 確認方法
+
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-build --enable-xctest --disable-swift-testing -j 1`
+- `xcodebuild -quiet -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -destination 'generic/platform=iOS Simulator' -derivedDataPath /tmp/megrum-native-xcodebuild CODE_SIGNING_ALLOWED=NO build`
+
+### 関連ファイル
+
+- `ios-native/Sources/MegrumCore/MegrumModels.swift`
+- `ios-native/Sources/MegrumData/SupabaseGoodsInventoryClient.swift`
+- `ios-native/Sources/MegrumApp/MegrumAppState.swift`
+- `ios-native/Sources/MegrumApp/CollectionScreens.swift`
+- `ios-native/Sources/MegrumApp/MegrumRootView.swift`
+- `ios-native/Sources/MegrumApp/SupabaseMegrumRepository.swift`
+- `ios-native/Sources/MegrumApp/NativePreviewData.swift`
+- `ios-native/Tests/MegrumDataTests/SupabaseGoodsInventoryClientTests.swift`
+- `ios-native/Tests/MegrumAppTests/MegrumAppStateTests.swift`
+- `ios-native/README.md`
+- `notes/22_swift_native_migration.md`
+- `notes/08_design_iterations.md`
+
+### セルフレビュー結果
+
+- ✅ Swift Package testsが50件成功した。
+- ✅ Xcode project buildが成功した。
+- ✅ 既存DBスキーマの `goods_types_master` / `goods_inventory` を使うため、新規migrationは不要。
+- ✅ 在庫/Wishの状態遷移名は追加していないため、`notes/09_state_machines.md` の更新は不要。
+- ✅ 「グッズ種別」は既存用語であり、`notes/10_glossary.md` の更新は不要。
+- ✅ フォームはSwiftUIのsheet、TextField、Stepper、Buttonを使い、独自実装を最小限にした。
+- ✅ TestFlight配布はまだ行っていないため、Preview OTA / TestFlight配信は不要。
+
+---
+
 ## イテレーション317：Swift在庫Wish一覧操作を追加
 
 ### 背景・問題意識

@@ -5,6 +5,7 @@ import MegrumData
 public struct SupabaseMegrumRepository: MegrumRepository {
     private let client: SupabaseRESTClient
     private let oshiClient: SupabaseOshiClient
+    private let goodsInventoryClient: SupabaseGoodsInventoryClient
     private let mailingAddressClient: SupabaseMailingAddressClient
     private let postalCodeAddressClient: PostalCodeAddressClient
     private let blockClient: SupabaseBlockClient
@@ -14,6 +15,7 @@ public struct SupabaseMegrumRepository: MegrumRepository {
     public init(client: SupabaseRESTClient, viewerID: UUID) {
         self.client = client
         self.oshiClient = SupabaseOshiClient(client: client)
+        self.goodsInventoryClient = SupabaseGoodsInventoryClient(client: client)
         self.mailingAddressClient = SupabaseMailingAddressClient(client: client)
         self.postalCodeAddressClient = PostalCodeAddressClient()
         self.blockClient = SupabaseBlockClient(client: client)
@@ -61,6 +63,14 @@ public struct SupabaseMegrumRepository: MegrumRepository {
 
     public func loadOshiCharacters(groupID: UUID, limit: Int) async throws -> [OshiCharacter] {
         try await oshiClient.loadCharacters(groupID: groupID, limit: limit)
+    }
+
+    public func loadGoodsTypes(limit: Int) async throws -> [GoodsType] {
+        try await goodsInventoryClient.loadGoodsTypes(limit: limit)
+    }
+
+    public func createGoodsEntry(_ input: GoodsEntryInput) async throws -> GoodsItem {
+        try await goodsInventoryClient.createGoodsEntry(userID: viewerID, input: input)
     }
 
     public func loadMailingAddress() async throws -> MailingAddress? {

@@ -170,6 +170,20 @@ public struct OshiCharacter: Identifiable, Codable, Hashable, Sendable {
     }
 }
 
+public struct GoodsType: Identifiable, Codable, Hashable, Sendable {
+    public var id: UUID
+    public var name: String
+    public var category: String?
+    public var displayOrder: Int
+
+    public init(id: UUID, name: String, category: String? = nil, displayOrder: Int = 0) {
+        self.id = id
+        self.name = name
+        self.category = category
+        self.displayOrder = displayOrder
+    }
+}
+
 public struct UserOshiSelection: Identifiable, Codable, Hashable, Sendable {
     public var id: UUID
     public var userID: UUID
@@ -398,6 +412,38 @@ public struct GoodsItem: Identifiable, Codable, Hashable, Sendable {
         self.title = title
         self.imageURL = imageURL
         self.tags = tags
+        self.quantity = quantity
+    }
+}
+
+public enum GoodsEntryKind: String, Codable, Sendable, CaseIterable, Identifiable {
+    case inventory
+    case wish
+
+    public var id: String { rawValue }
+
+    public var inventoryKind: String {
+        switch self {
+        case .inventory:
+            "for_trade"
+        case .wish:
+            "wanted"
+        }
+    }
+}
+
+public struct GoodsEntryInput: Equatable, Sendable {
+    public var kind: GoodsEntryKind
+    public var title: String
+    public var groupID: UUID
+    public var goodsTypeID: UUID
+    public var quantity: Int
+
+    public init(kind: GoodsEntryKind, title: String, groupID: UUID, goodsTypeID: UUID, quantity: Int = 1) {
+        self.kind = kind
+        self.title = title
+        self.groupID = groupID
+        self.goodsTypeID = goodsTypeID
         self.quantity = quantity
     }
 }

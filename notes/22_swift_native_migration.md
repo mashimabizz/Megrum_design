@@ -1,7 +1,7 @@
 # 22. Swift Native Migration
 
 最終更新: 2026-05-31
-ステータス: Active draft（iter317）
+ステータス: Active draft（iter318）
 
 ## 目的
 
@@ -122,6 +122,7 @@ tar -xzf /Users/michitaka/Desktop/Megrum_backups/pre-swift-migration-20260531-03
 - 取引の状態名は `notes/09_state_machines.md` と完全一致させる。
 - iter316で、在庫/Wish共通グリッドにタップ詳細シートとiOS標準の長押しアクションメニューを追加した。各アクションのDB接続は、該当フローSwift化時に接続する。
 - iter317で、在庫/Wish一覧に3/4/5列切り替えアイコンと左下の追加ボタン土台を追加した。追加フォーム本体は次のSwift化対象として残す。
+- iter318で、`goods_types_master` 読み込みと `goods_inventory` 作成境界を追加し、在庫/Wishの左下追加ボタンからNative sheetで最小登録できるようにした。
 
 ### Phase 4: Meguri core
 

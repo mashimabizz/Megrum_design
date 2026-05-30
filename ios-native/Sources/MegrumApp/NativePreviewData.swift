@@ -8,6 +8,8 @@ enum NativePreviewData {
     static let memberID = UUID(uuidString: "00000000-0000-0000-0000-000000000012")!
     static let secondGroupID = UUID(uuidString: "00000000-0000-0000-0000-000000000013")!
     static let secondMemberID = UUID(uuidString: "00000000-0000-0000-0000-000000000014")!
+    static let cardGoodsTypeID = UUID(uuidString: "00000000-0000-0000-0000-000000000021")!
+    static let photoGoodsTypeID = UUID(uuidString: "00000000-0000-0000-0000-000000000022")!
 
     static let viewer = UserProfile(
         id: viewerID,
@@ -37,6 +39,17 @@ enum NativePreviewData {
     static let oshiCharacters = [
         OshiCharacter(id: memberID, groupID: groupID, name: "SANA", aliases: ["サナ"], displayOrder: 1),
         OshiCharacter(id: secondMemberID, groupID: secondGroupID, name: "SAKURA", aliases: ["サクラ"], displayOrder: 1)
+    ]
+
+    static let goodsTypes = [
+        GoodsType(id: cardGoodsTypeID, name: "トレカ", category: "card", displayOrder: 1),
+        GoodsType(id: photoGoodsTypeID, name: "生写真", category: "photo", displayOrder: 2),
+        GoodsType(
+            id: UUID(uuidString: "00000000-0000-0000-0000-000000000023")!,
+            name: "アクスタ",
+            category: "figure",
+            displayOrder: 3
+        )
     ]
 
     static let mailingAddress = MailingAddress(
@@ -93,6 +106,7 @@ enum NativePreviewData {
             ownerID: viewerID,
             groupID: groupID,
             memberID: memberID,
+            goodsTypeID: cardGoodsTypeID,
             title: "ランダムトレカ A",
             tags: [tags[0], tags[2]],
             quantity: 2
@@ -102,6 +116,7 @@ enum NativePreviewData {
             ownerID: viewerID,
             groupID: groupID,
             memberID: memberID,
+            goodsTypeID: photoGoodsTypeID,
             title: "会場限定フォト",
             tags: [tags[1]],
             quantity: 1
@@ -111,6 +126,7 @@ enum NativePreviewData {
             ownerID: partnerID,
             groupID: groupID,
             memberID: memberID,
+            goodsTypeID: cardGoodsTypeID,
             title: "ランダムトレカ B",
             tags: [tags[2]],
             quantity: 1
@@ -123,6 +139,7 @@ enum NativePreviewData {
             ownerID: viewerID,
             groupID: groupID,
             memberID: memberID,
+            goodsTypeID: photoGoodsTypeID,
             title: "会場限定フォト",
             tags: [tags[1]]
         ),
@@ -131,6 +148,7 @@ enum NativePreviewData {
             ownerID: viewerID,
             groupID: groupID,
             memberID: memberID,
+            goodsTypeID: cardGoodsTypeID,
             title: "ランダムトレカ B",
             tags: [tags[2]]
         )
