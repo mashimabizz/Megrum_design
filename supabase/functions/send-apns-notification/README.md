@@ -39,6 +39,26 @@ The function accepts either:
 
 Do not expose this function to client apps. It is for trusted server-side dispatch only.
 
+## Database trigger integration
+
+Migration `20260531005000_dispatch_apns_notifications.sql` calls this function after a `notifications` insert only when both database settings exist:
+
+- `app.settings.apns_dispatch_url`
+- `app.settings.apns_dispatch_secret`
+
+Example:
+
+```sql
+alter database postgres
+  set app.settings.apns_dispatch_url =
+    'https://<project-ref>.supabase.co/functions/v1/send-apns-notification';
+
+alter database postgres
+  set app.settings.apns_dispatch_secret = '<same value as MEGRUM_APNS_DISPATCH_SECRET>';
+```
+
+Keep the dispatch secret out of migrations and source control.
+
 ## Local syntax check
 
 This repository does not require Deno to be installed locally. A TypeScript syntax check can be run with:

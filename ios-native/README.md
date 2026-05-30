@@ -80,7 +80,7 @@ The Xcode app host requests iOS notification authorization for configured signed
 
 Remote notification taps read `linkPath` / `notificationId` from the payload, reuse the same tab routing rules as the in-app notification list, and can mark the matching notification read after loading the notification center.
 
-`supabase/functions/send-apns-notification` is the trusted server-side APNs dispatch entry point. It accepts a `notification_id`, reads the matching `notifications` row and active APNs devices, signs an APNs provider token with Edge Function secrets, and revokes invalid devices when APNs reports them as unusable.
+`supabase/functions/send-apns-notification` is the trusted server-side APNs dispatch entry point. It accepts a `notification_id`, reads the matching `notifications` row and active APNs devices, signs an APNs provider token with Edge Function secrets, and revokes invalid devices when APNs reports them as unusable. The database trigger calls it only when the target project has `app.settings.apns_dispatch_url` and `app.settings.apns_dispatch_secret` configured.
 
 The Xcode target uses `App/MegrumNative.entitlements` for Push Notifications and Sign in with Apple. Debug builds set `APS_ENVIRONMENT=development`; Release builds set `APS_ENVIRONMENT=production` so TestFlight/App Store distribution can use the production APNs environment with the matching Apple provisioning profile.
 

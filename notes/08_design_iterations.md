@@ -4,6 +4,61 @@
 
 ---
 
+## イテレーション345：Swift APNs配送をDB triggerに接続
+
+### 背景・問題意識
+
+iter344でAPNs配送Functionを作ったが、通知行が作られた時に自動で呼ばれなければ実機通知の運用には足りない。一方でAPNs dispatch secretをmigrationやクライアントに置くのは避ける必要があるため、DB設定値が揃っている時だけFunctionを呼ぶ段階接続にする。
+
+### 変更内容
+
+#### `supabase/migrations/20260531005000_dispatch_apns_notifications.sql`
+- `public.send_mobile_push_for_notification()` を更新し、既存Expo Push配送は維持した。
+- `notification_devices.push_provider='apns'` の有効端末がある場合だけAPNs配送候補にした。
+- `current_setting('app.settings.apns_dispatch_url', true)` と `current_setting('app.settings.apns_dispatch_secret', true)` が設定済みの場合のみ、`send-apns-notification` Edge Functionへ `notification_id` をPOSTするようにした。
+- dispatch URL/secretの設定例をmigrationコメントに残した。
+
+#### `supabase/functions/send-apns-notification/README.md`
+- DB triggerからの接続に必要なDB設定値を追記した。
+- dispatch secretをmigration/source controlへ入れない運用を明記した。
+
+#### `ios-native/README.md` / `notes/22_swift_native_migration.md`
+- Swift Native通知Phaseの進捗として、APNs配送FunctionのDB trigger接続を追記した。
+
+#### `notes/05_data_model.md` / `notes/10_glossary.md`
+- `notifications` / `notification_devices` と `APNs配送Function` の説明を、DB設定値によるtrigger接続込みに更新した。
+
+### 影響範囲
+
+- `notifications` insert時の端末通知配送
+- Expo Push既存経路
+- Swift Native iOS版APNs配送
+- Supabase projectのDB設定値運用
+
+### 確認方法
+
+- `web/node_modules/.bin/tsc --noEmit --target es2022 --lib es2022,dom --module nodenext --moduleResolution nodenext --skipLibCheck supabase/functions/send-apns-notification/index.ts`
+- `git diff --check -- supabase/migrations/20260531005000_dispatch_apns_notifications.sql supabase/functions/send-apns-notification/README.md ios-native/README.md notes/22_swift_native_migration.md notes/05_data_model.md notes/10_glossary.md notes/08_design_iterations.md`
+
+### 関連ファイル
+
+- `supabase/migrations/20260531005000_dispatch_apns_notifications.sql`
+- `supabase/functions/send-apns-notification/README.md`
+- `ios-native/README.md`
+- `notes/22_swift_native_migration.md`
+- `notes/05_data_model.md`
+- `notes/10_glossary.md`
+- `notes/08_design_iterations.md`
+
+### セルフレビュー結果
+
+- ✅ 既存Expo Push配送payloadと条件は維持した。
+- ✅ APNs配送FunctionはDB設定値が未設定なら呼ばれず、段階導入できる。
+- ✅ dispatch secretはmigrationに書かず、プロジェクト設定値として注入する設計にした。
+- ✅ TypeScript構文チェックはiter344のFunctionに対して引き続き成功した。
+- ✅ 状態遷移は変えていないため、`notes/09_state_machines.md` の更新は不要。
+- ✅ 新用語は追加していないため、`notes/10_glossary.md` は既存用語の説明更新に留めた。
+
 ## イテレーション344：Swift APNs配送Functionを追加
 
 ### 背景・問題意識

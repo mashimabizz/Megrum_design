@@ -210,7 +210,7 @@ RLS / 権限（iter278）：
 | `read_at` | timestamptz nullable | nullなら未読 |
 | `created_at` | timestamptz | |
 
-iter276以降、`notifications` に行が追加されると、`notification_devices` の有効トークンへExpo Pushを送るDBトリガーが動く。iter338以降、Swift Native iOS版はAPNs tokenを保存する。iter344で `send-apns-notification` Edge Functionを追加し、信頼済みサーバー側呼び出しから `notification_id` をAPNsへ配送できる入口を作った。DBトリガーからの自動呼び出しは、秘密情報の置き場を確定してから接続する。
+iter276以降、`notifications` に行が追加されると、`notification_devices` の有効トークンへExpo Pushを送るDBトリガーが動く。iter338以降、Swift Native iOS版はAPNs tokenを保存する。iter344で `send-apns-notification` Edge Functionを追加し、iter345でDB triggerからも `app.settings.apns_dispatch_url` / `app.settings.apns_dispatch_secret` が設定済みの場合だけAPNs配送Functionへ `notification_id` を渡すようにした。
 
 ### `user_notification_settings`（通知設定 / iter93, iter276）
 
@@ -238,7 +238,7 @@ iter276以降、`notifications` に行が追加されると、`notification_devi
 | `revoked_at` | timestamptz nullable | ログアウト等で無効化した時刻 |
 | `created_at` / `updated_at` | timestamptz | |
 
-`unique(user_id, expo_push_token)` と `unique(user_id, native_device_token) where native_device_token is not null` で同一ユーザー・同一端末の重複登録を防ぐ。`revoked_at is null` の端末だけが配送対象。既存DBトリガーは `push_provider='expo'` の行だけをExpo Pushへ送る。APNs配送は `send-apns-notification` Edge Functionが `push_provider='apns'` の有効端末を読み、Apple Push Notification serviceへ送る。
+`unique(user_id, expo_push_token)` と `unique(user_id, native_device_token) where native_device_token is not null` で同一ユーザー・同一端末の重複登録を防ぐ。`revoked_at is null` の端末だけが配送対象。既存DBトリガーは `push_provider='expo'` の行だけをExpo Pushへ送る。APNs配送は `send-apns-notification` Edge Functionが `push_provider='apns'` の有効端末を読み、Apple Push Notification serviceへ送る。Function接続用のdispatch URL/secretはDB設定値で管理し、migrationには秘密値を書かない。
 
 ### `user_oshi`（推し登録）
 

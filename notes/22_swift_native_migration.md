@@ -122,6 +122,7 @@ tar -xzf /Users/michitaka/Desktop/Megrum_backups/pre-swift-migration-20260531-03
 - iter342で、ログアウト時に登録済みAPNs device tokenの `revoked_at` を更新する境界と設定画面のログアウト導線を追加した。
 - iter343で、SwiftUI標準の `SignInWithAppleButton`、nonce生成、Supabase Authの `grant_type=id_token` 境界、Sign in with Apple entitlementを追加した。
 - iter344で、`send-apns-notification` Supabase Edge Functionを追加し、信頼済みサーバー側呼び出しからAPNsへ通知を配送できる入口を作った。DBトリガー直結は秘密情報の置き場を確定してから接続する。
+- iter345で、`notifications` insert後のDB triggerから、DB設定値が揃っている場合だけ `send-apns-notification` Edge Functionを呼ぶようにした。dispatch secretはmigrationに書かず、プロジェクト設定で注入する。
 - 現時点のAuthはAppleログインまで追加済み。Google OAuthは後続のPhase 2作業で広げる。
 
 ### Phase 3: Exchange core
