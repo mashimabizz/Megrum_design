@@ -1603,6 +1603,18 @@ export default function MeguriBoardThreadScreen() {
           </View>
           {thread ? (
             <View style={styles.headerActions}>
+              <Pressable
+                accessibilityLabel="スレッドを更新"
+                accessibilityRole="button"
+                disabled={loading || refreshing}
+                onPress={refreshDetailSilently}
+                style={[
+                  styles.headerActionButton,
+                  loading || refreshing ? styles.headerActionButtonDisabled : null,
+                ]}
+              >
+                <IconSymbol name="arrow-clockwise" color={megrumColors.ink} size={17} />
+              </Pressable>
               {thread.status !== "locked" ? (
                 <Pressable accessibilityRole="button" onPress={focusReplyComposer} style={styles.headerActionButton}>
                   <IconSymbol name="mail-outline" color={megrumColors.ink} size={18} />
@@ -3191,6 +3203,9 @@ const styles = StyleSheet.create({
     height: 40,
     justifyContent: "center",
     width: 40,
+  },
+  headerActionButtonDisabled: {
+    opacity: 0.42,
   },
   headerActions: {
     alignItems: "center",
