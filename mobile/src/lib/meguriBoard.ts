@@ -259,7 +259,6 @@ export const MEGURI_BOARD_SORT_OPTIONS = [
   "active",
   "new",
   "hot",
-  "saved",
   "subscribed",
   "participated",
   "drafts",
@@ -283,7 +282,7 @@ export function meguriBoardAudienceLabel(scope: MeguriBoardAudienceScope) {
     case "same_spot":
       return "3km圏内";
     case "same_prefecture":
-      return "同じ都道府県";
+      return "都道府県単位";
     case "global":
     default:
       return "全体";
@@ -408,7 +407,7 @@ export function meguriBoardAudienceMeta(
         ? `現在地から${formatDistance(thread.distanceMeters)}`
         : thread.spotLabel || "3km圏内";
     case "same_prefecture":
-      return thread.prefecture || "同じ都道府県";
+      return thread.prefecture ? `${thread.prefecture}全域` : "都道府県単位";
     case "global":
     default:
       return "どこからでも見える";

@@ -4,6 +4,61 @@
 
 ---
 
+## イテレーション294：めぐり掲示板をチャットUIへ整理
+
+### 背景・問題意識
+
+オーナーから、めぐり掲示板の詳細画面にある「保存」、返信見出し配下の絞り込み・表示順・返信番号ジャンプ、返信ごとの `#1` 表示、各チャット下の常時表示ボタンが不要という指摘があった。また、掲示板の表示範囲は無料では選択した現在地3km圏内、有料では都道府県単位に整理したいという要望があった。
+
+### 変更内容
+
+#### `mobile/app/meguri-board-thread.tsx`
+- スレッド詳細上部のタイトル・説明・作成者メタ・ヘッダー内アクションを削除し、本文を取引チャット寄せの吹き出しとして表示する構造へ変更した。
+- 返信見出し配下の検索・絞り込み・表示順・返信番号ジャンプ・返信ごとの常時アクション行を表示しないようにした。
+- 返信ごとの `#1` のような番号表示と、画像一覧内の番号ラベルを削除した。
+- メッセージを長押しした時だけ、黒いコンテキストメニューでリプライ・転送・プロフィール・編集・削除・通報・ブロックを出すようにした。
+- 時刻は吹き出し外の左下に出るよう、返信時刻の配置を統一した。
+
+#### `mobile/app/meguri-board.tsx`
+- スレッド一覧の保存アクション、保存済みバッジ、保存ボタンを削除した。
+- 「同じ都道府県」表記を廃止し、表示範囲は「3km圏内」「都道府県単位」に統一した。
+- 都道府県単位の閲覧・投稿範囲はめぐりPlusが有効な場合のみ選択でき、無料状態では3km圏内に戻すようにした。
+
+#### `mobile/src/lib/meguriBoard.ts`
+- 掲示板の表示範囲ラベルを「都道府県単位」に統一した。
+- 掲示板一覧の表示順オプションから保存順を削除した。
+
+### 影響範囲
+
+- iOS版 めぐり掲示板一覧
+- iOS版 めぐり掲示板スレッド詳細
+- めぐりPlusによる都道府県単位表示の導線
+- 掲示板返信の長押し操作
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- `EAS_UPDATE_PROJECT_SLUG=ihub EXPO_NO_GIT_STATUS=1 npm --prefix mobile run update:ios:preview -- --message "[iter294] めぐり掲示板をチャットUIへ整理" --non-interactive`
+- Preview OTA: Update group ID `ab0830d2-f373-4849-bb9f-8757bf93554d` / iOS update ID `019e79e3-80c5-73db-9332-918ac6ed2696`
+- EAS Dashboard: `https://expo.dev/accounts/mashima.bizz/projects/ihub/updates/ab0830d2-f373-4849-bb9f-8757bf93554d`
+
+### 関連ファイル
+
+- `mobile/app/meguri-board.tsx`
+- `mobile/app/meguri-board-thread.tsx`
+- `mobile/src/lib/meguriBoard.ts`
+- `notes/08_design_iterations.md`
+
+### セルフレビュー結果
+
+- ✅ 保存機能の表示導線、保存済みバッジ、保存順の選択肢を掲示板UIから外した。
+- ✅ 返信番号・返信番号ジャンプ・表示順切り替え・返信下の常時ボタンを表示しないようにした。
+- ✅ 長押しメニューは黒い吹き出し型で、必要な操作だけを表示するようにした。
+- ✅ 無料は3km圏内、めぐりPlusは都道府県単位という範囲に整理した。
+- ✅ iOS Preview channel へOTA配信済み。
+- ✅ 状態遷移・用語・DBスキーマ変更はないため、`notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要。
+
 ## イテレーション293：ホーム検索を標準Liquid Glassへ再設計
 
 ### 背景・問題意識

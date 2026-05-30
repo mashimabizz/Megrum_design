@@ -45,7 +45,6 @@ import {
   meguriBoardSortLabel,
   reportMeguriBoardThread,
   saveMeguriBoardComposerDraft,
-  setMeguriBoardThreadBookmarked,
   setMeguriBoardThreadReacted,
   setMeguriBoardThreadSubscribed,
   type MeguriBoardActor,
@@ -73,11 +72,12 @@ import {
   normalizeMeguriBoardPrefecture,
   saveMeguriBoardDefaultPrefecture,
 } from "../src/lib/meguriBoardPreferences";
+import { loadMeguriPlusState } from "../src/lib/meguriPlus";
 import { megrumColors, megrumShadow } from "../src/theme/tokens";
 import { IconSymbol } from "../src/components/IconSymbol";
 
-const SCOPE_SEGMENTS = ["3km圏内", "都道府県"];
-const VIEW_MODE_SEGMENTS = ["3km圏内", "都道府県"];
+const SCOPE_SEGMENTS = ["3km圏内", "都道府県単位"];
+const VIEW_MODE_SEGMENTS = ["3km圏内", "都道府県単位"];
 const VIEW_MODE_OPTIONS = ["nearby_3km", "same_prefecture"] as const satisfies readonly MeguriBoardViewMode[];
 const THREAD_TITLE_LIMIT = 80;
 const THREAD_BODY_LIMIT = 500;
@@ -113,6 +113,7 @@ export default function MeguriBoardScreen() {
   const [locationContext, setLocationContext] = useState<MegrumLocationContext | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [viewMode, setViewMode] = useState<MeguriBoardViewMode>("nearby_3km");
+  const [meguriPlusActive, setMeguriPlusActive] = useState(false);
   const [categoryFilter, setCategoryFilter] = useState<MeguriBoardThreadCategory>("all");
   const [searchText, setSearchText] = useState("");
   const [sortMode, setSortMode] = useState<MeguriBoardThreadSort>("active");
@@ -310,11 +311,62 @@ export default function MeguriBoardScreen() {
     void refreshThreads(undefined, { silent: true });
   }, [refreshThreads]);
 
+  function requireMeguriPlusForPrefectureScope() {
+    Alert.alert(
+      "都道府県単位はめぐりPlusです",
+      "無料では現在地から3km圏内の掲示板を表示します。都道府県単位で見るにはめぐりPlusが必要です。",
+      [
+        { style: "cancel", text: "閉じる" },
+        { onPress: () => router.push("/meguri-plus"), text: "めぐりPlusを見る" },
+      ],
+    );
+  }
+
+  function selectViewMode(nextMode: MeguriBoardViewMode) {
+    if (nextMode === "same_prefecture" && !meguriPlusActive) {
+      requireMeguriPlusForPrefectureScope();
+      return;
+    }
+    setViewMode(nextMode);
+  }
+
+  function selectComposerScope(nextScope: MeguriBoardAudienceScope) {
+    if (nextScope === "same_prefecture" && !meguriPlusActive) {
+      requireMeguriPlusForPrefectureScope();
+      return;
+    }
+    setComposerScope(nextScope);
+  }
+
   useFocusEffect(
     useCallback(() => {
       void refreshThreads();
     }, [refreshThreads]),
   );
+
+  useEffect(() => {
+    let alive = true;
+    void loadMeguriPlusState(profile)
+      .then((state) => {
+        if (alive) setMeguriPlusActive(state.active);
+      })
+      .catch(() => {
+        if (alive) setMeguriPlusActive(false);
+      });
+    return () => {
+      alive = false;
+    };
+  }, [profile]);
+
+  useEffect(() => {
+    if (meguriPlusActive) return;
+    if (viewMode === "same_prefecture") {
+      setViewMode("nearby_3km");
+    }
+    if (composerScope === "same_prefecture") {
+      setComposerScope("nearby_3km");
+    }
+  }, [composerScope, meguriPlusActive, viewMode]);
 
   useEffect(() => {
     if (readParam(params.compose) === "1") {
@@ -600,16 +652,6 @@ export default function MeguriBoardScreen() {
     await markMeguriBoardThreadRead(thread.id);
   }
 
-  async function toggleThreadBookmark(thread: MeguriBoardThread) {
-    const bookmarked = !thread.bookmarked;
-    updateThreadLocally({
-      ...thread,
-      bookmarkCount: Math.max(0, thread.bookmarkCount + (bookmarked ? 1 : -1)),
-      bookmarked,
-    });
-    await setMeguriBoardThreadBookmarked(thread.id, bookmarked);
-  }
-
   async function toggleThreadReaction(thread: MeguriBoardThread) {
     const reacted = !thread.reacted;
     updateThreadLocally({
@@ -705,7 +747,6 @@ export default function MeguriBoardScreen() {
         label: thread.mine ? "自分のプロフィール" : "投稿者プロフィール",
         run: () => openBoardUserProfile(thread.authorId),
       },
-      { label: thread.bookmarked ? "保存を解除" : "保存する", run: () => void toggleThreadBookmark(thread) },
       { label: thread.reacted ? "参考になったを取り消す" : "参考になった", run: () => void toggleThreadReaction(thread) },
       {
         label: thread.subscribed ? "通知を止める" : "通知を受け取る",
@@ -801,11 +842,14 @@ export default function MeguriBoardScreen() {
             </View>
             <Text style={styles.heroTitle}>現地の温度感をゆるく共有</Text>
             <Text style={styles.heroBody}>
-              いま見えているのは、現在地から3km圏内、または {displayMeguriBoardPrefecture(viewerContext.prefecture)} のスレッドです。
+              無料では現在地から3km圏内、めぐりPlusでは都道府県単位のスレッドを表示できます。
             </Text>
             <View style={styles.heroMetaRow}>
               <ScopePreviewPill label="3km圏内" value={viewerContext.coordinate ? "現在地から表示" : "位置情報待ち"} />
-              <ScopePreviewPill label="都道府県" value={displayMeguriBoardPrefecture(viewerContext.prefecture)} />
+              <ScopePreviewPill
+                label="都道府県単位"
+                value={meguriPlusActive ? displayMeguriBoardPrefecture(viewerContext.prefecture) : "めぐりPlus"}
+              />
             </View>
           </View>
 
@@ -813,7 +857,7 @@ export default function MeguriBoardScreen() {
             selectedIndex={VIEW_MODE_OPTIONS.indexOf(viewMode)}
             values={VIEW_MODE_SEGMENTS}
             onChange={(event) =>
-              setViewMode(
+              selectViewMode(
                 VIEW_MODE_OPTIONS[event.nativeEvent.selectedSegmentIndex] ?? "nearby_3km",
               )
             }
@@ -1039,7 +1083,6 @@ export default function MeguriBoardScreen() {
                           {thread.isPinned ? <StatusBadge label="固定" /> : null}
                           {thread.status === "locked" ? <StatusBadge label="締め切り" /> : null}
                           {thread.participated ? <StatusBadge label="参加中" /> : null}
-                          {thread.bookmarked ? <StatusBadge label="保存済み" /> : null}
                           {thread.subscribed ? <StatusBadge label="通知ON" /> : null}
                           {thread.reported ? <StatusBadge label="通報済み" /> : null}
                           {replyDraftThreadIds.has(thread.id) ? <StatusBadge label="下書きあり" /> : null}
@@ -1142,18 +1185,6 @@ export default function MeguriBoardScreen() {
                         >
                           <IconSymbol name="send-outline" color={megrumColors.lavender} size={13} />
                           <Text style={styles.sharePillText}>共有</Text>
-                        </Pressable>
-                        <Pressable
-                          accessibilityRole="button"
-                          hitSlop={8}
-                          onPress={() => toggleThreadBookmark(thread)}
-                          style={[styles.metricPill, thread.bookmarked ? styles.metricPillActive : null]}
-                        >
-                          <IconSymbol
-                            name="star-outline"
-                            color={thread.bookmarked ? megrumColors.lavender : megrumColors.mutedInk}
-                            size={14}
-                          />
                         </Pressable>
                         <Pressable
                           accessibilityRole="button"
@@ -1283,7 +1314,7 @@ export default function MeguriBoardScreen() {
                 selectedIndex={composerScope === "same_prefecture" ? 1 : 0}
                 values={SCOPE_SEGMENTS}
                 onChange={(event) =>
-                  setComposerScope(
+                  selectComposerScope(
                     MEGURI_BOARD_AUDIENCE_OPTIONS[event.nativeEvent.selectedSegmentIndex] ??
                       "nearby_3km",
                   )
@@ -1293,8 +1324,8 @@ export default function MeguriBoardScreen() {
                 {composerScope === "nearby_3km" || composerScope === "same_spot"
                   ? "現在地から3km圏内にいる人向け"
                   : composerScope === "same_prefecture"
-                    ? `${displayMeguriBoardPrefecture(viewerContext.prefecture)} を拠点に見ている人向け`
-                    : `${displayMeguriBoardPrefecture(viewerContext.prefecture)} を拠点に見ている人向け`}
+                    ? `${displayMeguriBoardPrefecture(viewerContext.prefecture)} 全域に公開します`
+                    : `${displayMeguriBoardPrefecture(viewerContext.prefecture)} 全域に公開します`}
               </Text>
             </View>
 

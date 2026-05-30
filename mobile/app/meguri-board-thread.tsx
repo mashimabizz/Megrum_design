@@ -24,7 +24,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAuth } from "../src/auth/AuthProvider";
 import { ChatGradientBubble } from "../src/components/ChatGradientBubble";
-import { IconSymbol } from "../src/components/IconSymbol";
+import { IconSymbol, type IconSymbolName } from "../src/components/IconSymbol";
 import { Screen } from "../src/components/Screen";
 import {
   appendMeguriBoardReply,
@@ -42,12 +42,7 @@ import {
   reportMeguriBoardReply,
   reportMeguriBoardThread,
   clearMeguriBoardReplyDraft,
-  setMeguriBoardReplyBookmarked,
   setMeguriBoardThreadStatus,
-  setMeguriBoardReplyReacted,
-  setMeguriBoardThreadBookmarked,
-  setMeguriBoardThreadReacted,
-  setMeguriBoardThreadSubscribed,
   loadMeguriBoardReplyDraft,
   saveMeguriBoardReplyDraft,
   updateMeguriBoardReply,
@@ -98,7 +93,6 @@ type BoardMediaAttachment = {
   createdAt: number;
   id: string;
   replyId: string | null;
-  replyNumber: number | null;
   source: "thread" | "reply";
   uri: string;
 };
@@ -106,11 +100,19 @@ type BoardMediaAttachment = {
 type BoardReplySortMode = "oldest" | "newest" | "popular";
 type BoardParticipantSortMode = "recent" | "replies";
 type NewReplyNotice = { count: number; firstReplyId: string } | null;
+type BoardContextAction = {
+  destructive?: boolean;
+  disabled?: boolean;
+  icon: IconSymbolName;
+  key: string;
+  label: string;
+  onPress: () => void;
+};
 type ReplySearchSource =
   | {
       label: string;
       replyId?: string;
-      type: "author" | "bookmarked" | "children" | "media" | "mention" | "mine" | "participant";
+      type: "author" | "children" | "media" | "mention" | "mine" | "participant";
     }
   | null;
 
@@ -177,6 +179,8 @@ export default function MeguriBoardThreadScreen() {
   const [participantSortMode, setParticipantSortMode] = useState<BoardParticipantSortMode>("recent");
   const [mediaGalleryOpen, setMediaGalleryOpen] = useState(false);
   const [threadInfoOpen, setThreadInfoOpen] = useState(false);
+  const [threadActionMenuOpen, setThreadActionMenuOpen] = useState(false);
+  const [replyActionMenuReply, setReplyActionMenuReply] = useState<MeguriBoardReply | null>(null);
   const [threadBodyExpanded, setThreadBodyExpanded] = useState(false);
   const [expandedReplyIds, setExpandedReplyIds] = useState<Set<string>>(() => new Set());
   const [replySortMode, setReplySortMode] = useState<BoardReplySortMode>("oldest");
@@ -253,9 +257,6 @@ export default function MeguriBoardThreadScreen() {
     if (replySearchSource?.type === "mine") {
       return replies.filter((reply) => reply.mine);
     }
-    if (replySearchSource?.type === "bookmarked") {
-      return replies.filter((reply) => reply.bookmarked && !reply.deleted);
-    }
     if (replySearchSource?.type === "media") {
       return replies.filter((reply) => !reply.deleted && reply.imageUris.length > 0);
     }
@@ -264,11 +265,8 @@ export default function MeguriBoardThreadScreen() {
     }
     if (!replySearchQuery) return replies;
     return replies.filter((reply) => {
-      const quotedReplyNumber = reply.parentReplyId ? replyNumberById.get(reply.parentReplyId) : null;
       return normalizeReplySearch(
         [
-          `#${replyNumberById.get(reply.id) ?? ""}`,
-          quotedReplyNumber ? `#${quotedReplyNumber}` : null,
           reply.authorName,
           reply.authorHandle,
           reply.body,
@@ -443,13 +441,11 @@ export default function MeguriBoardThreadScreen() {
       createdAt: thread.createdAt,
       id: `thread-${index}-${uri}`,
       replyId: null,
-      replyNumber: null,
       source: "thread",
       uri,
     }));
     replies.forEach((reply) => {
       if (reply.deleted) return;
-      const replyNumber = replyNumberById.get(reply.id) ?? null;
       reply.imageUris.forEach((uri, index) => {
         attachments.push({
           authorName: reply.authorName,
@@ -457,14 +453,13 @@ export default function MeguriBoardThreadScreen() {
           createdAt: reply.createdAt,
           id: `reply-${reply.id}-${index}-${uri}`,
           replyId: reply.id,
-          replyNumber,
           source: "reply",
           uri,
         });
       });
     });
     return attachments;
-  }, [replies, replyNumberById, thread]);
+  }, [replies, thread]);
   const threadInfoRows = useMemo(() => {
     if (!thread) return [];
     return [
@@ -478,7 +473,6 @@ export default function MeguriBoardThreadScreen() {
       { label: "参加者", value: `${participants.length}人` },
       { label: "画像", value: `${mediaAttachments.length}枚` },
       { label: "参考", value: `${thread.reactionCount}件` },
-      { label: "保存", value: `${thread.bookmarkCount}件` },
       { label: "閲覧", value: `${thread.viewCount}回` },
       { label: "状態", value: thread.status === "locked" ? "締め切り" : "表示中" },
     ];
@@ -490,10 +484,6 @@ export default function MeguriBoardThreadScreen() {
     [actor.handle, replies],
   );
   const viewerReplies = useMemo(() => replies.filter((reply) => reply.mine), [replies]);
-  const bookmarkedReplies = useMemo(
-    () => replies.filter((reply) => reply.bookmarked && !reply.deleted),
-    [replies],
-  );
   const mediaReplies = useMemo(
     () => replies.filter((reply) => !reply.deleted && reply.imageUris.length > 0),
     [replies],
@@ -653,20 +643,6 @@ export default function MeguriBoardThreadScreen() {
     }, 120);
   }
 
-  function filterBookmarkedReplies() {
-    if (bookmarkedReplies.length === 0) return;
-    setReplySearchText("保存した返信");
-    setReplySearchSource({ label: "保存した返信", type: "bookmarked" });
-    setSearchCursorIndex(0);
-    const firstBookmarkedReply = [...bookmarkedReplies].sort((left, right) => left.createdAt - right.createdAt)[0];
-    setTimeout(() => {
-      const y = firstBookmarkedReply ? replyOffsetsRef.current[firstBookmarkedReply.id] : undefined;
-      if (typeof y === "number") {
-        scrollViewRef.current?.scrollTo({ animated: true, y: Math.max(0, y - 12) });
-      }
-    }, 120);
-  }
-
   function filterMediaReplies() {
     if (mediaReplies.length === 0) return;
     setReplySearchText("画像付き返信");
@@ -698,8 +674,7 @@ export default function MeguriBoardThreadScreen() {
   function filterChildReplies(parentReply: MeguriBoardReply) {
     const childReplies = replies.filter((reply) => reply.parentReplyId === parentReply.id);
     if (childReplies.length === 0) return;
-    const parentNumber = replyNumberById.get(parentReply.id);
-    const label = parentNumber ? `#${parentNumber}への返信` : "この返信への返信";
+    const label = "この返信への返信";
     setReplySearchText(label);
     setReplySearchSource({ label, replyId: parentReply.id, type: "children" });
     setSearchCursorIndex(0);
@@ -1081,35 +1056,6 @@ export default function MeguriBoardThreadScreen() {
     setThread(nextThread);
   }
 
-  async function toggleThreadBookmark() {
-    if (!thread) return;
-    const bookmarked = !thread.bookmarked;
-    updateThread({
-      ...thread,
-      bookmarkCount: Math.max(0, thread.bookmarkCount + (bookmarked ? 1 : -1)),
-      bookmarked,
-    });
-    await setMeguriBoardThreadBookmarked(thread.id, bookmarked);
-  }
-
-  async function toggleThreadReaction() {
-    if (!thread) return;
-    const reacted = !thread.reacted;
-    updateThread({
-      ...thread,
-      reacted,
-      reactionCount: Math.max(0, thread.reactionCount + (reacted ? 1 : -1)),
-    });
-    await setMeguriBoardThreadReacted(thread.id, reacted);
-  }
-
-  async function toggleThreadSubscription() {
-    if (!thread) return;
-    const subscribed = !thread.subscribed;
-    updateThread({ ...thread, subscribed });
-    await setMeguriBoardThreadSubscribed(thread.id, subscribed);
-  }
-
   async function hideThread() {
     if (!thread) return;
     await hideMeguriBoardThread(thread.id);
@@ -1160,31 +1106,6 @@ export default function MeguriBoardThreadScreen() {
       { style: "cancel", text: "キャンセル" },
       { onPress: () => void blockThreadAuthor(), style: "destructive", text: "ブロック" },
     ]);
-  }
-
-  async function toggleReplyReaction(reply: MeguriBoardReply) {
-    const reacted = !reply.reacted;
-    setReplies((current) =>
-      current.map((candidate) =>
-        candidate.id === reply.id
-          ? {
-              ...candidate,
-              reacted,
-              reactionCount: Math.max(0, candidate.reactionCount + (reacted ? 1 : -1)),
-            }
-          : candidate,
-      ),
-    );
-    await setMeguriBoardReplyReacted(reply.id, reacted);
-  }
-
-  async function toggleReplyBookmark(reply: MeguriBoardReply) {
-    if (reply.deleted) return;
-    const bookmarked = !reply.bookmarked;
-    setReplies((current) =>
-      current.map((candidate) => (candidate.id === reply.id ? { ...candidate, bookmarked } : candidate)),
-    );
-    await setMeguriBoardReplyBookmarked(reply.id, bookmarked);
   }
 
   async function reportReply(reply: MeguriBoardReply, reason: MeguriBoardReportReason) {
@@ -1427,173 +1348,136 @@ export default function MeguriBoardThreadScreen() {
 
   function openThreadActions() {
     if (!thread) return;
-    const actions: Array<{ disabled?: boolean; destructive?: boolean; label: string; run?: () => void }> = [];
-    if (thread.mine) {
-      actions.push(
-        { label: "編集する", run: openThreadEditor },
-        {
-          label: thread.status === "locked" ? "再開する" : "締め切る",
-          run: () => void toggleThreadLocked(),
-        },
-        { destructive: true, label: "削除する", run: confirmArchiveThread },
-      );
-    }
-    actions.push(
-      { label: "共有する", run: () => void shareThread() },
-      {
-        label: thread.mine ? "自分のプロフィール" : "投稿者プロフィール",
-        run: () => openBoardUserProfile(thread.authorId),
-      },
-      { label: thread.bookmarked ? "保存を解除" : "保存する", run: () => void toggleThreadBookmark() },
-      { label: thread.reacted ? "参考になったを取り消す" : "参考になった", run: () => void toggleThreadReaction() },
-      {
-        label: thread.subscribed ? "通知を止める" : "通知を受け取る",
-        run: () => void toggleThreadSubscription(),
-      },
-      { destructive: true, label: "非表示にする", run: () => void hideThread() },
-    );
-    if (!thread.mine) {
-      actions.push({
-        destructive: true,
-        label: "このユーザーをブロック",
-        run: confirmBlockThreadAuthor,
-      });
-    }
-    actions.push({
-      disabled: thread.reported,
-      label: thread.reported ? "通報済み" : "通報する",
-      run: thread.reported ? undefined : openThreadReportReasonPicker,
-    });
-    const labels = [...actions.map((action) => action.label), "キャンセル"];
-    const cancelButtonIndex = labels.length - 1;
-    const destructiveButtonIndices = actions
-      .map((action, index) => (action.destructive ? index : -1))
-      .filter((index) => index >= 0);
-    const disabledButtonIndices = actions
-      .map((action, index) => (action.disabled ? index : -1))
-      .filter((index) => index >= 0);
-    if (Platform.OS === "ios") {
-      ActionSheetIOS.showActionSheetWithOptions(
-        {
-          cancelButtonIndex,
-          destructiveButtonIndex: destructiveButtonIndices[0],
-          disabledButtonIndices: disabledButtonIndices.length ? disabledButtonIndices : undefined,
-          options: labels,
-          title: thread.title,
-        },
-        (index) => {
-          actions[index]?.run?.();
-        },
-      );
-      return;
-    }
-    actions[0]?.run?.();
+    setThreadActionMenuOpen(true);
   }
 
   function openReplyActions(reply: MeguriBoardReply) {
-    const actions: Array<{ disabled?: boolean; destructive?: boolean; label: string; run?: () => void }> = [];
-    actions.push({
-      disabled: reply.deleted || thread?.status === "locked",
-      label: "引用して返信",
-      run: () => quoteReply(reply),
-    });
-    actions.push({
-      disabled: (replyChildCountById.get(reply.id) ?? 0) === 0,
-      label: "この返信への返信を見る",
-      run: () => filterChildReplies(reply),
-    });
-    if (isReplyBodyCollapsible(reply) && !replySearchText.trim()) {
-      actions.push({
-        label: expandedReplyIds.has(reply.id) ? "返信を折りたたむ" : "返信を全文表示",
-        run: () => toggleReplyBodyExpanded(reply.id),
-      });
-    }
-    if (reply.parentReplyId) {
-      actions.push({
-        label: "引用元を見る",
-        run: () => jumpToQuotedReply(reply.parentReplyId, reply.id),
-      });
-    }
-    if (replySearchText.trim() || replySortMode !== "oldest") {
-      actions.push({
-        label: "元の流れで見る",
-        run: () => revealReplyInThreadContext(reply.id),
-      });
-    }
-    actions.push({
-      disabled: reply.deleted,
-      label: "返信を共有",
-      run: () => void shareReply(reply),
-    });
-    actions.push({
-      disabled: reply.deleted,
-      label: reply.bookmarked ? "返信の保存を解除" : "返信を保存",
-      run: () => void toggleReplyBookmark(reply),
-    });
-    actions.push({
-      disabled: reply.deleted,
-      label: reply.mine ? "自分のプロフィール" : "プロフィールを見る",
-      run: () => openBoardUserProfile(reply.authorId),
-    });
-    actions.push({
-      disabled: reply.deleted,
-      label: reply.mine ? "自分の返信を見る" : "この人の返信を見る",
-      run: () => filterRepliesByReplyAuthor(reply),
-    });
-    if (reply.mine) {
-      actions.push(
-        { disabled: reply.deleted, label: "編集する", run: () => openReplyEditor(reply) },
-        { destructive: true, disabled: reply.deleted, label: "削除する", run: () => confirmDeleteReply(reply) },
-      );
-    } else {
-      actions.push(
-        {
-          disabled: reply.deleted || thread?.status === "locked",
-          label: "メンションして返信",
-          run: () => mentionReplyAuthor(reply),
-        },
-        {
-          disabled: reply.deleted,
-          label: reply.reacted ? "参考になったを取り消す" : "参考になった",
-          run: () => void toggleReplyReaction(reply),
-        },
-        {
-          disabled: reply.reported || reply.deleted,
-          label: reply.reported ? "通報済み" : "通報する",
-          run: reply.reported ? undefined : () => openReplyReportReasonPicker(reply),
-        },
-        {
-          destructive: true,
-          disabled: reply.deleted,
-          label: "このユーザーをブロック",
-          run: () => confirmBlockReplyAuthor(reply),
-        },
-      );
-    }
-    const labels = [...actions.map((action) => action.label), "キャンセル"];
-    const cancelButtonIndex = labels.length - 1;
-    const destructiveButtonIndices = actions
-      .map((action, index) => (action.destructive ? index : -1))
-      .filter((index) => index >= 0);
-    const disabledButtonIndices = actions
-      .map((action, index) => (action.disabled ? index : -1))
-      .filter((index) => index >= 0);
-    if (Platform.OS === "ios") {
-      ActionSheetIOS.showActionSheetWithOptions(
-        {
-          cancelButtonIndex,
-          destructiveButtonIndex: destructiveButtonIndices[0],
-          disabledButtonIndices: disabledButtonIndices.length ? disabledButtonIndices : undefined,
-          options: labels,
-        },
-        (index) => {
-          actions[index]?.run?.();
-        },
-      );
-      return;
-    }
-    actions[0]?.run?.();
+    setReplyActionMenuReply(reply);
   }
+
+  function runReplyContextAction(reply: MeguriBoardReply, action: (target: MeguriBoardReply) => void) {
+    setReplyActionMenuReply(null);
+    requestAnimationFrame(() => action(reply));
+  }
+
+  function runThreadContextAction(action: () => void) {
+    setThreadActionMenuOpen(false);
+    requestAnimationFrame(action);
+  }
+
+  const threadContextActions: BoardContextAction[] = thread
+    ? [
+        ...(thread.status === "locked"
+          ? []
+          : [
+              {
+                icon: "create-outline" as const,
+                key: "reply",
+                label: "リプライ",
+                onPress: () => runThreadContextAction(focusReplyComposer),
+              },
+            ]),
+        {
+          icon: "send-outline",
+          key: "share",
+          label: "転送",
+          onPress: () => runThreadContextAction(() => void shareThread()),
+        },
+        ...(thread.mine
+          ? [
+              {
+                icon: "document-text-outline" as const,
+                key: "edit",
+                label: "編集",
+                onPress: () => runThreadContextAction(openThreadEditor),
+              },
+              {
+                destructive: true,
+                icon: "close-circle-outline" as const,
+                key: "delete",
+                label: "削除",
+                onPress: () => runThreadContextAction(confirmArchiveThread),
+              },
+            ]
+          : [
+              {
+                disabled: thread.reported,
+                icon: "warning-outline" as const,
+                key: "report",
+                label: thread.reported ? "通報済み" : "通報",
+                onPress: () => runThreadContextAction(openThreadReportReasonPicker),
+              },
+              {
+                destructive: true,
+                icon: "ban-outline" as const,
+                key: "block",
+                label: "ブロック",
+                onPress: () => runThreadContextAction(confirmBlockThreadAuthor),
+              },
+            ]),
+      ]
+    : [];
+
+  const replyContextActions: BoardContextAction[] = replyActionMenuReply
+    ? [
+        {
+          disabled: replyActionMenuReply.deleted || thread?.status === "locked",
+          icon: "create-outline",
+          key: "reply",
+          label: "リプライ",
+          onPress: () => runReplyContextAction(replyActionMenuReply, quoteReply),
+        },
+        {
+          disabled: replyActionMenuReply.deleted,
+          icon: "send-outline",
+          key: "share",
+          label: "転送",
+          onPress: () => runReplyContextAction(replyActionMenuReply, (reply) => void shareReply(reply)),
+        },
+        {
+          disabled: replyActionMenuReply.deleted,
+          icon: "document-text-outline",
+          key: "profile",
+          label: "プロフィール",
+          onPress: () => runReplyContextAction(replyActionMenuReply, (reply) => openBoardUserProfile(reply.authorId)),
+        },
+        ...(replyActionMenuReply.mine
+          ? [
+              {
+                disabled: replyActionMenuReply.deleted,
+                icon: "document-text-outline" as const,
+                key: "edit",
+                label: "編集",
+                onPress: () => runReplyContextAction(replyActionMenuReply, openReplyEditor),
+              },
+              {
+                destructive: true,
+                disabled: replyActionMenuReply.deleted,
+                icon: "close-circle-outline" as const,
+                key: "delete",
+                label: "削除",
+                onPress: () => runReplyContextAction(replyActionMenuReply, confirmDeleteReply),
+              },
+            ]
+          : [
+              {
+                disabled: replyActionMenuReply.reported || replyActionMenuReply.deleted,
+                icon: "warning-outline" as const,
+                key: "report",
+                label: replyActionMenuReply.reported ? "通報済み" : "通報",
+                onPress: () => runReplyContextAction(replyActionMenuReply, openReplyReportReasonPicker),
+              },
+              {
+                destructive: true,
+                disabled: replyActionMenuReply.deleted,
+                icon: "ban-outline" as const,
+                key: "block",
+                label: "ブロック",
+                onPress: () => runReplyContextAction(replyActionMenuReply, confirmBlockReplyAuthor),
+              },
+            ]),
+      ]
+    : [];
 
   return (
     <View style={styles.root}>
@@ -1604,36 +1488,9 @@ export default function MeguriBoardThreadScreen() {
           </Pressable>
           <View style={styles.headerCopy}>
             <Text numberOfLines={1} style={styles.headerTitle}>
-              {thread?.title || "スレッド"}
-            </Text>
-            <Text numberOfLines={1} style={styles.headerSubtitle}>
-              {thread ? meguriBoardAudienceMeta(thread) : viewerContext.spotLabel}
+              掲示板
             </Text>
           </View>
-          {thread ? (
-            <View style={styles.headerActions}>
-              <Pressable
-                accessibilityLabel="スレッドを更新"
-                accessibilityRole="button"
-                disabled={loading || refreshing}
-                onPress={refreshDetailSilently}
-                style={[
-                  styles.headerActionButton,
-                  loading || refreshing ? styles.headerActionButtonDisabled : null,
-                ]}
-              >
-                <IconSymbol name="arrow-clockwise" color={megrumColors.ink} size={17} />
-              </Pressable>
-              {thread.status !== "locked" ? (
-                <Pressable accessibilityRole="button" onPress={focusReplyComposer} style={styles.headerActionButton}>
-                  <IconSymbol name="mail-outline" color={megrumColors.ink} size={18} />
-                </Pressable>
-              ) : null}
-              <Pressable accessibilityRole="button" onPress={openThreadActions} style={styles.headerActionButton}>
-                <IconSymbol name="ellipsis-horizontal" color={megrumColors.ink} size={20} />
-              </Pressable>
-            </View>
-          ) : null}
         </View>
 
         {loading ? (
@@ -1666,392 +1523,84 @@ export default function MeguriBoardThreadScreen() {
               showsVerticalScrollIndicator={false}
               style={styles.scroll}
             >
-              <View style={styles.heroCard}>
-                <View style={styles.heroTopRow}>
-                  <View style={styles.heroBadgeRow}>
-                    <CategoryBadge category={thread.category} />
-                    <ScopeBadge scope={thread.audienceScope} />
-                    {thread.isPinned ? <StatusBadge label="固定" /> : null}
-                    {thread.status === "locked" ? <StatusBadge label="締め切り" /> : null}
-                    {thread.reported ? <StatusBadge label="通報済み" /> : null}
-                  </View>
-                  <Pressable
-                    accessibilityRole="button"
-                    hitSlop={8}
-                    onPress={showThreadTimestamp}
-                  >
-                    <Text style={styles.heroTime}>{formatRelativeTime(thread.createdAt)}</Text>
-                  </Pressable>
-                </View>
-                <Text style={styles.heroTitle}>{thread.title}</Text>
-                <HighlightedText
-                  linkify
-                  numberOfLines={threadBodyCollapsible && !threadBodyExpanded ? 5 : undefined}
-                  query=""
-                  style={styles.heroBody}
-                  text={thread.body}
-                />
-                {threadBodyCollapsible ? (
-                  <Pressable
-                    accessibilityRole="button"
-                    onPress={() => setThreadBodyExpanded((current) => !current)}
-                    style={styles.heroReadMoreButton}
-                  >
-                    <Text style={styles.heroReadMoreText}>
-                      {threadBodyExpanded ? "閉じる" : "続きを読む"}
-                    </Text>
-                  </Pressable>
-                ) : null}
-                <AttachmentGrid imageUris={thread.imageUris} onPressImage={setImagePreviewUri} />
-                <View style={styles.heroMetaRow}>
-                  <Text style={styles.heroMeta}>{meguriBoardAudienceMeta(thread)} · </Text>
-                  <Pressable
-                    accessibilityRole="button"
-                    hitSlop={8}
-                    onPress={() => openBoardUserProfile(thread.authorId)}
-                    style={styles.heroMetaAuthorButton}
-                  >
-                    <Text style={styles.heroMetaAuthor}>{thread.authorName}</Text>
-                  </Pressable>
-                  {thread.updatedAt && thread.updatedAt > thread.createdAt + 60000 ? (
-                    <Text style={styles.heroMeta}> · 編集済み</Text>
-                  ) : null}
-                </View>
-                <View style={styles.threadActions}>
-                  <Pressable
-                    accessibilityRole="button"
-                    onPress={toggleThreadReaction}
-                    style={[styles.threadActionPill, thread.reacted ? styles.threadActionPillActive : null]}
-                  >
-                    <IconSymbol
-                      name={thread.reacted ? "heart" : "heart-outline"}
-                      color={thread.reacted ? megrumColors.lavender : megrumColors.mutedInk}
-                      size={16}
-                    />
-                    <Text style={[styles.threadActionText, thread.reacted ? styles.threadActionTextActive : null]}>
-                      参考 {thread.reactionCount}
-                    </Text>
-                  </Pressable>
-                  <Pressable
-                    accessibilityRole="button"
-                    onPress={toggleThreadBookmark}
-                    style={[styles.threadActionPill, thread.bookmarked ? styles.threadActionPillActive : null]}
-                  >
-                    <IconSymbol
-                      name="star-outline"
-                      color={thread.bookmarked ? megrumColors.lavender : megrumColors.mutedInk}
-                      size={15}
-                    />
-                    <Text style={[styles.threadActionText, thread.bookmarked ? styles.threadActionTextActive : null]}>
-                      保存
-                    </Text>
-                  </Pressable>
-                  <Pressable
-                    accessibilityRole="button"
-                    onPress={() => void shareThread()}
-                    style={styles.threadActionPill}
-                  >
-                    <IconSymbol name="send-outline" color={megrumColors.mutedInk} size={15} />
-                    <Text style={styles.threadActionText}>共有</Text>
-                  </Pressable>
-                  <Pressable
-                    accessibilityRole="button"
-                    onPress={toggleThreadSubscription}
-                    style={[styles.threadActionPill, thread.subscribed ? styles.threadActionPillActive : null]}
-                  >
-                    <IconSymbol
-                      name="notifications-outline"
-                      color={thread.subscribed ? megrumColors.lavender : megrumColors.mutedInk}
-                      size={15}
-                    />
-                    <Text style={[styles.threadActionText, thread.subscribed ? styles.threadActionTextActive : null]}>
-                      {thread.subscribed ? "通知ON" : "通知"}
-                    </Text>
-                  </Pressable>
-                  <Pressable
-                    accessibilityRole="button"
-                    onPress={() => setThreadInfoOpen(true)}
-                    style={styles.threadActionPill}
-                  >
-                    <IconSymbol name="document-text-outline" color={megrumColors.mutedInk} size={15} />
-                    <Text style={styles.threadActionText}>情報</Text>
-                  </Pressable>
+              <View style={styles.replyGroup}>
+                <Pressable
+                  accessibilityRole="button"
+                  onLongPress={openThreadActions}
+                  style={[styles.replyRow, thread.mine ? styles.replyRowMine : null]}
+                >
                   {!thread.mine ? (
                     <Pressable
                       accessibilityRole="button"
-                      disabled={thread.reported}
-                      onPress={openThreadReportReasonPicker}
+                      hitSlop={8}
+                      onPress={() => openBoardUserProfile(thread.authorId)}
+                      style={[styles.replyAvatar, { backgroundColor: colorForAuthor(thread.authorId) }]}
+                    >
+                      <Text style={styles.replyAvatarText}>{thread.authorName.slice(0, 1)}</Text>
+                    </Pressable>
+                  ) : null}
+                  <View style={thread.mine ? styles.replyContentMine : styles.replyContent}>
+                    {!thread.mine ? (
+                      <View style={styles.replyMetaRow}>
+                        <Pressable
+                          accessibilityRole="button"
+                          hitSlop={8}
+                          onPress={() => openBoardUserProfile(thread.authorId)}
+                          style={styles.replyAuthorButton}
+                        >
+                          <Text numberOfLines={1} style={styles.replyAuthor}>{thread.authorName}</Text>
+                        </Pressable>
+                      </View>
+                    ) : null}
+                    <ChatGradientBubble
+                      mine={thread.mine}
                       style={[
-                        styles.threadActionPill,
-                        thread.reported ? styles.threadActionPillActive : null,
+                        styles.replyBubble,
+                        thread.mine ? styles.replyBubbleMine : styles.replyBubbleTheirs,
                       ]}
                     >
-                      <IconSymbol
-                        name="warning-outline"
-                        color={thread.reported ? megrumColors.lavender : megrumColors.mutedInk}
-                        size={15}
+                      <HighlightedText
+                        linkify
+                        numberOfLines={threadBodyCollapsible && !threadBodyExpanded ? 5 : undefined}
+                        query=""
+                        style={[styles.replyBody, thread.mine ? styles.replyBodyMine : null]}
+                        text={thread.body}
                       />
-                      <Text style={[styles.threadActionText, thread.reported ? styles.threadActionTextActive : null]}>
-                        {thread.reported ? "通報済み" : "通報"}
+                      {threadBodyCollapsible ? (
+                        <Pressable
+                          accessibilityRole="button"
+                          onPress={() => setThreadBodyExpanded((current) => !current)}
+                          style={[
+                            styles.replyReadMoreButton,
+                            thread.mine ? styles.replyReadMoreButtonMine : null,
+                          ]}
+                        >
+                          <Text
+                            style={[
+                              styles.replyReadMoreText,
+                              thread.mine ? styles.replyReadMoreTextMine : null,
+                            ]}
+                          >
+                            {threadBodyExpanded ? "閉じる" : "続きを読む"}
+                          </Text>
+                        </Pressable>
+                      ) : null}
+                      <AttachmentGrid compact imageUris={thread.imageUris} onPressImage={setImagePreviewUri} />
+                    </ChatGradientBubble>
+                    <Pressable
+                      accessibilityRole="button"
+                      hitSlop={8}
+                      onPress={showThreadTimestamp}
+                      style={styles.replyTimeButton}
+                    >
+                      <Text style={styles.replyTime}>
+                        {formatRelativeTime(thread.createdAt)}
+                        {thread.updatedAt && thread.updatedAt > thread.createdAt + 60000 ? " · 編集済み" : ""}
                       </Text>
                     </Pressable>
-                  ) : null}
-                  {!thread.mine ? (
-                    <Pressable
-                      accessibilityRole="button"
-                      onPress={confirmBlockThreadAuthor}
-                      style={styles.threadActionPill}
-                    >
-                      <IconSymbol name="ban-outline" color={megrumColors.mutedInk} size={15} />
-                      <Text style={styles.threadActionText}>ブロック</Text>
-                    </Pressable>
-                  ) : null}
-                  <Pressable
-                    accessibilityRole="button"
-                    onPress={openParticipants}
-                    style={styles.threadActionPill}
-                  >
-                    <Text style={styles.threadActionText}>参加者 {participants.length}</Text>
-                  </Pressable>
-                  {mediaAttachments.length > 0 ? (
-                    <Pressable
-                      accessibilityRole="button"
-                      onPress={() => setMediaGalleryOpen(true)}
-                      style={styles.threadActionPill}
-                    >
-                      <Text style={styles.threadActionText}>画像 {mediaAttachments.length}</Text>
-                    </Pressable>
-                  ) : null}
-                </View>
-              </View>
-
-              <View style={styles.replyHeaderRow}>
-                <Text style={styles.replySectionTitle}>返信</Text>
-                <View style={styles.replyHeaderActions}>
-                  <Text style={styles.replyCountMeta}>
-                    {replySearchQuery ? `${sortedReplies.length}/${replies.length}件` : `${replies.length}件`}
-                  </Text>
-                  {replyReturnTarget ? (
-                    <Pressable
-                      accessibilityRole="button"
-                      hitSlop={8}
-                      onPress={returnToQuotedFromReply}
-                      style={styles.replyReturnButton}
-                    >
-                      <Text style={styles.replyReturnButtonText}>
-                        戻る #{replyNumberById.get(replyReturnTarget.id) ?? "?"}
-                      </Text>
-                    </Pressable>
-                  ) : null}
-                  {replies.length > 0 ? (
-                    <Pressable
-                      accessibilityRole="button"
-                      hitSlop={8}
-                      onPress={() => scrollToLatestReply()}
-                      style={styles.latestReplyButton}
-                    >
-                      <Text style={styles.latestReplyButtonText}>最新へ</Text>
-                      <IconSymbol name="chevron-down" color={megrumColors.lavender} size={13} />
-                    </Pressable>
-                  ) : null}
-                  {unreadSeparatorReplyId ? (
-                    <Pressable
-                      accessibilityRole="button"
-                      hitSlop={8}
-                      onPress={jumpToUnreadReply}
-                      style={styles.unreadJumpButton}
-                    >
-                      <Text style={styles.unreadJumpButtonText}>未読へ</Text>
-                    </Pressable>
-                  ) : null}
-                  {newReplyNotice ? (
-                    <Pressable
-                      accessibilityRole="button"
-                      hitSlop={8}
-                      onPress={jumpToNewReplyNotice}
-                      style={styles.newReplyJumpButton}
-                    >
-                      <Text style={styles.newReplyJumpButtonText}>新着 {newReplyNotice.count}</Text>
-                    </Pressable>
-                  ) : null}
-                  {viewerMentionReplies.length > 0 ? (
-                    <Pressable
-                      accessibilityRole="button"
-                      hitSlop={8}
-                      onPress={filterViewerMentions}
-                      style={styles.mentionJumpButton}
-                    >
-                      <Text style={styles.mentionJumpButtonText}>あなた宛て {viewerMentionReplies.length}</Text>
-                    </Pressable>
-                  ) : null}
-                  {viewerReplies.length > 0 ? (
-                    <Pressable
-                      accessibilityRole="button"
-                      hitSlop={8}
-                      onPress={filterViewerReplies}
-                      style={styles.mineJumpButton}
-                    >
-                      <Text style={styles.mineJumpButtonText}>自分 {viewerReplies.length}</Text>
-                    </Pressable>
-                  ) : null}
-                  {bookmarkedReplies.length > 0 ? (
-                    <Pressable
-                      accessibilityRole="button"
-                      hitSlop={8}
-                      onPress={filterBookmarkedReplies}
-                      style={styles.savedReplyJumpButton}
-                    >
-                      <IconSymbol name="star-outline" color={megrumColors.lavender} size={12} />
-                      <Text style={styles.savedReplyJumpButtonText}>保存 {bookmarkedReplies.length}</Text>
-                    </Pressable>
-                  ) : null}
-                  {mediaReplies.length > 0 ? (
-                    <Pressable
-                      accessibilityRole="button"
-                      hitSlop={8}
-                      onPress={filterMediaReplies}
-                      style={styles.mediaReplyJumpButton}
-                    >
-                      <IconSymbol name="camera-outline" color="#4f7e92" size={12} />
-                      <Text style={styles.mediaReplyJumpButtonText}>画像 {mediaReplies.length}</Text>
-                    </Pressable>
-                  ) : null}
-                  {threadAuthorReplies.length > 0 ? (
-                    <Pressable
-                      accessibilityRole="button"
-                      hitSlop={8}
-                      onPress={filterThreadAuthorReplies}
-                      style={styles.authorReplyJumpButton}
-                    >
-                      <IconSymbol name="sparkles-outline" color="#7a6fc2" size={12} />
-                      <Text style={styles.authorReplyJumpButtonText}>作成者 {threadAuthorReplies.length}</Text>
-                    </Pressable>
-                  ) : null}
-                </View>
-              </View>
-              <View style={styles.replySearchBox}>
-                <IconSymbol name="search" color="rgba(58,50,74,0.42)" size={15} />
-                <TextInput
-                  onChangeText={handleReplySearchChange}
-                  placeholder="スレッド内を検索"
-                  placeholderTextColor="rgba(58,50,74,0.34)"
-                  style={styles.replySearchInput}
-                  value={replySearchText}
-                />
-                {replySearchText.trim() ? (
-                  <Pressable accessibilityRole="button" hitSlop={8} onPress={clearReplySearch}>
-                    <IconSymbol name="close" color="rgba(58,50,74,0.42)" size={15} />
-                  </Pressable>
-                ) : null}
-              </View>
-              {replySearchQuery ? (
-                <View style={styles.replyActiveFilterBar}>
-                  <Text numberOfLines={1} style={styles.replyActiveFilterText}>
-                    {replySearchSource?.type === "mine"
-                      ? replySearchSource.label
-                      : replySearchSource?.type === "children"
-                      ? replySearchSource.label
-                      : replySearchSource?.type === "bookmarked"
-                      ? replySearchSource.label
-                      : replySearchSource?.type === "media"
-                      ? replySearchSource.label
-                      : replySearchSource?.type === "author"
-                      ? replySearchSource.label
-                      : replySearchSource?.type === "mention"
-                      ? `あなた宛て: ${replySearchSource.label}`
-                      : replySearchSource?.type === "participant"
-                      ? `参加者: ${replySearchSource.label}`
-                      : `検索: ${replySearchText.trim()}`}
-                  </Text>
-                  {activeFilteredReply ? (
-                    <Pressable
-                      accessibilityRole="button"
-                      onPress={() => revealReplyInThreadContext(activeFilteredReply.id)}
-                      style={styles.replyActiveFilterContext}
-                    >
-                      <Text style={styles.replyActiveFilterContextText}>元の流れ</Text>
-                    </Pressable>
-                  ) : null}
-                  <Pressable accessibilityRole="button" onPress={clearReplySearch} style={styles.replyActiveFilterClear}>
-                    <Text style={styles.replyActiveFilterClearText}>解除</Text>
-                  </Pressable>
-                </View>
-              ) : null}
-              <View style={styles.replySortRow}>
-                <Text style={styles.replySortLabel}>表示順</Text>
-                <View style={styles.replySortSegment}>
-                  {REPLY_SORT_OPTIONS.map((option) => {
-                    const active = replySortMode === option.value;
-                    return (
-                      <Pressable
-                        accessibilityRole="button"
-                        key={option.value}
-                        onPress={() => setReplySortMode(option.value)}
-                        style={[styles.replySortOption, active ? styles.replySortOptionActive : null]}
-                      >
-                        <Text style={[styles.replySortOptionText, active ? styles.replySortOptionTextActive : null]}>
-                          {option.label}
-                        </Text>
-                      </Pressable>
-                    );
-                  })}
-                </View>
-              </View>
-              {replies.length > 0 ? (
-                <View style={styles.replyJumpRow}>
-                  <View style={styles.replyJumpInputWrap}>
-                    <Text style={styles.replyJumpPrefix}>#</Text>
-                    <TextInput
-                      keyboardType="number-pad"
-                      onChangeText={(text) => setReplyJumpText(text.replace(/\D/g, "").slice(0, 5))}
-                      onSubmitEditing={jumpToReplyNumber}
-                      placeholder="返信番号"
-                      placeholderTextColor="rgba(58,50,74,0.34)"
-                      returnKeyType="done"
-                      style={styles.replyJumpInput}
-                      value={replyJumpText}
-                    />
                   </View>
-                  <Pressable
-                    accessibilityRole="button"
-                    disabled={!replyJumpText.trim()}
-                    onPress={jumpToReplyNumber}
-                    style={[styles.replyJumpButton, replyJumpText.trim() ? styles.replyJumpButtonActive : null]}
-                  >
-                    <Text
-                      style={[
-                        styles.replyJumpButtonText,
-                        replyJumpText.trim() ? styles.replyJumpButtonTextActive : null,
-                      ]}
-                    >
-                      移動
-                    </Text>
-                  </Pressable>
-                </View>
-              ) : null}
-              {replySearchQuery && sortedReplies.length > 0 ? (
-                <View style={styles.replySearchNavigator}>
-                  <Text style={styles.replySearchNavigatorLabel}>
-                    {Math.min(searchCursorIndex + 1, sortedReplies.length)} / {sortedReplies.length}
-                  </Text>
-                  <View style={styles.replySearchNavigatorActions}>
-                    <Pressable
-                      accessibilityRole="button"
-                      onPress={() => jumpToSearchResult(-1)}
-                      style={styles.replySearchNavigatorButton}
-                    >
-                      <Text style={styles.replySearchNavigatorButtonText}>前へ</Text>
-                    </Pressable>
-                    <Pressable
-                      accessibilityRole="button"
-                      onPress={() => jumpToSearchResult(1)}
-                      style={styles.replySearchNavigatorButton}
-                    >
-                      <Text style={styles.replySearchNavigatorButtonText}>次へ</Text>
-                    </Pressable>
-                  </View>
-                </View>
-              ) : null}
+                </Pressable>
+              </View>
               {replies.length === 0 ? (
                 <View style={styles.noRepliesCard}>
                   <Text style={styles.noRepliesTitle}>まだ返信はありません</Text>
@@ -2063,18 +1612,10 @@ export default function MeguriBoardThreadScreen() {
                   <Text style={styles.noRepliesBody}>別の言葉で探してみてください。</Text>
                 </View>
               ) : (
-                sortedReplies.map((reply, index) => {
-                  const replyNumber = replyNumberById.get(reply.id) ?? index + 1;
-                  const replyNumberLabel = `#${replyNumber}`;
-                  const replyNumberMatchesQuery =
-                    !!replySearchQuery && normalizeReplySearch(replyNumberLabel).includes(replySearchQuery);
+                sortedReplies.map((reply) => {
                   const replyByThreadAuthor = reply.authorId === thread.authorId;
-                  const quotedReplyNumber = reply.parentReplyId ? replyNumberById.get(reply.parentReplyId) : null;
-                  const quoteAuthorLabel = quotedReplyNumber
-                    ? `#${quotedReplyNumber} ${reply.quotedAuthorName || "引用"}`
-                    : reply.quotedAuthorName || "引用";
+                  const quoteAuthorLabel = reply.quotedAuthorName || "引用";
                   const mentionsViewer = !reply.mine && replyMentionsHandle(reply.body, actor.handle);
-                  const childReplyCount = replyChildCountById.get(reply.id) ?? 0;
                   const replyBodyCollapsible = isReplyBodyCollapsible(reply) && !replySearchQuery;
                   const replyBodyExpanded = expandedReplyIds.has(reply.id);
                   return (
@@ -2122,9 +1663,6 @@ export default function MeguriBoardThreadScreen() {
                                 />
                               </Pressable>
                             ) : null}
-                            <Text style={[styles.replyNumber, replyNumberMatchesQuery ? styles.replyNumberActive : null]}>
-                              {replyNumberLabel}
-                            </Text>
                             {replyByThreadAuthor ? (
                               <View style={styles.replyAuthorBadge}>
                                 <Text style={styles.replyAuthorBadgeText}>作成者</Text>
@@ -2217,90 +1755,13 @@ export default function MeguriBoardThreadScreen() {
                             accessibilityRole="button"
                             hitSlop={8}
                             onPress={() => showReplyTimestamp(reply)}
-                            style={reply.mine ? styles.replyTimeButtonMine : styles.replyTimeButton}
+                            style={styles.replyTimeButton}
                           >
-                            <Text style={[styles.replyTime, reply.mine ? styles.replyTimeMine : null]}>
+                            <Text style={styles.replyTime}>
                               {formatRelativeTime(reply.createdAt)}
                               {reply.updatedAt && reply.updatedAt > reply.createdAt + 60000 ? " · 編集済み" : ""}
                             </Text>
                           </Pressable>
-                          <View style={[styles.replyActionRow, reply.mine ? styles.replyActionRowMine : null]}>
-                            <Pressable
-                              accessibilityRole="button"
-                              disabled={reply.deleted}
-                              onPress={() => toggleReplyReaction(reply)}
-                              style={[styles.replyActionPill, reply.reacted ? styles.replyActionPillActive : null]}
-                            >
-                              <IconSymbol
-                                name={reply.reacted ? "heart" : "heart-outline"}
-                                color={reply.reacted ? megrumColors.lavender : megrumColors.mutedInk}
-                                size={13}
-                              />
-                              <Text style={[styles.replyActionText, reply.reacted ? styles.replyActionTextActive : null]}>
-                                {reply.reactionCount}
-                              </Text>
-                            </Pressable>
-                            <Pressable
-                              accessibilityRole="button"
-                              disabled={reply.deleted || thread.status === "locked"}
-                              onPress={() => quoteReply(reply)}
-                              style={[
-                                styles.replyActionPill,
-                                reply.deleted || thread.status === "locked" ? styles.replyActionPillDisabled : null,
-                              ]}
-                            >
-                              <IconSymbol name="create-outline" color={megrumColors.mutedInk} size={13} />
-                              <Text style={styles.replyActionText}>返信する</Text>
-                            </Pressable>
-                            <Pressable
-                              accessibilityRole="button"
-                              disabled={reply.deleted}
-                              onPress={() => toggleReplyBookmark(reply)}
-                              style={[
-                                styles.replyActionPill,
-                                reply.bookmarked ? styles.replyActionPillActive : null,
-                                reply.deleted ? styles.replyActionPillDisabled : null,
-                              ]}
-                            >
-                              <IconSymbol
-                                name="star-outline"
-                                color={reply.bookmarked ? megrumColors.lavender : megrumColors.mutedInk}
-                                size={13}
-                              />
-                              <Text style={[styles.replyActionText, reply.bookmarked ? styles.replyActionTextActive : null]}>
-                                {reply.bookmarked ? "保存済み" : "保存"}
-                              </Text>
-                            </Pressable>
-                            <Pressable
-                              accessibilityRole="button"
-                              disabled={reply.deleted}
-                              onPress={() => void shareReply(reply)}
-                              style={[
-                                styles.replyActionPill,
-                                reply.deleted ? styles.replyActionPillDisabled : null,
-                              ]}
-                            >
-                              <IconSymbol name="send-outline" color={megrumColors.mutedInk} size={13} />
-                              <Text style={styles.replyActionText}>共有</Text>
-                            </Pressable>
-                            {childReplyCount > 0 ? (
-                              <Pressable
-                                accessibilityRole="button"
-                                onPress={() => filterChildReplies(reply)}
-                                style={styles.replyActionPill}
-                              >
-                                <IconSymbol name="mail-outline" color={megrumColors.mutedInk} size={13} />
-                                <Text style={styles.replyActionText}>返信 {childReplyCount}</Text>
-                              </Pressable>
-                            ) : null}
-                            <Pressable
-                              accessibilityRole="button"
-                              onPress={() => openReplyActions(reply)}
-                              style={styles.replyActionPill}
-                            >
-                              <IconSymbol name="ellipsis-horizontal" color={megrumColors.mutedInk} size={13} />
-                            </Pressable>
-                          </View>
                         </View>
                       </Pressable>
                     </View>
@@ -2339,9 +1800,7 @@ export default function MeguriBoardThreadScreen() {
                       style={styles.composerQuoteCopy}
                     >
                       <Text numberOfLines={1} style={styles.composerQuoteAuthor}>
-                        {replyNumberById.get(quoteTarget.id)
-                          ? `#${replyNumberById.get(quoteTarget.id)} ${quoteTarget.authorName}へ返信`
-                          : `${quoteTarget.authorName}へ返信`}
+                        {`${quoteTarget.authorName}へ返信`}
                       </Text>
                       <Text numberOfLines={1} style={styles.composerQuoteBody}>
                         {quoteTarget.body}
@@ -2444,6 +1903,16 @@ export default function MeguriBoardThreadScreen() {
               </View>
             )}
             {sendError ? <Text style={styles.sendError}>{sendError}</Text> : null}
+            <BoardContextMenuModal
+              actions={threadContextActions}
+              onClose={() => setThreadActionMenuOpen(false)}
+              visible={threadActionMenuOpen}
+            />
+            <BoardContextMenuModal
+              actions={replyContextActions}
+              onClose={() => setReplyActionMenuReply(null)}
+              visible={!!replyActionMenuReply}
+            />
           </>
         )}
         <Modal
@@ -2647,9 +2116,7 @@ export default function MeguriBoardThreadScreen() {
                     </Pressable>
                     <View style={styles.mediaGalleryCopy}>
                       <Text numberOfLines={1} style={styles.mediaGallerySource}>
-                        {attachment.source === "thread"
-                          ? "スレッド本文"
-                          : `#${attachment.replyNumber ?? "-"} ${attachment.authorName}`}
+                        {attachment.source === "thread" ? "スレッド本文" : attachment.authorName}
                       </Text>
                       <Text numberOfLines={2} style={styles.mediaGalleryBody}>
                         {attachment.body}
@@ -2917,6 +2384,57 @@ function AttachmentGrid({
         </Pressable>
       ))}
     </View>
+  );
+}
+
+function BoardContextMenuModal({
+  actions,
+  onClose,
+  visible,
+}: {
+  actions: BoardContextAction[];
+  onClose: () => void;
+  visible: boolean;
+}) {
+  return (
+    <Modal animationType="fade" onRequestClose={onClose} transparent visible={visible}>
+      <Pressable accessibilityRole="button" onPress={onClose} style={styles.contextMenuOverlay}>
+        <View style={styles.contextMenuWrap}>
+          <View style={styles.contextMenuBubble}>
+            {actions.map((action) => (
+              <Pressable
+                accessibilityRole="button"
+                disabled={action.disabled}
+                key={action.key}
+                onPress={action.onPress}
+                style={[
+                  styles.contextMenuItem,
+                  action.disabled ? styles.contextMenuItemDisabled : null,
+                ]}
+              >
+                <IconSymbol
+                  name={action.icon}
+                  color={action.destructive ? "#ff8f8f" : "#fff"}
+                  size={24}
+                />
+                <Text
+                  adjustsFontSizeToFit
+                  minimumFontScale={0.82}
+                  numberOfLines={1}
+                  style={[
+                    styles.contextMenuText,
+                    action.destructive ? styles.contextMenuTextDestructive : null,
+                  ]}
+                >
+                  {action.label}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+          <View style={styles.contextMenuPointer} />
+        </View>
+      </Pressable>
+    </Modal>
   );
 }
 
@@ -4099,10 +3617,67 @@ const styles = StyleSheet.create({
     alignSelf: "flex-start",
   },
   replyTimeButtonMine: {
-    alignSelf: "flex-end",
+    alignSelf: "flex-start",
   },
   replyTimeMine: {
-    textAlign: "right",
+    textAlign: "left",
+  },
+  contextMenuOverlay: {
+    alignItems: "center",
+    backgroundColor: "rgba(0,0,0,0.06)",
+    flex: 1,
+    justifyContent: "center",
+    paddingHorizontal: 22,
+  },
+  contextMenuWrap: {
+    alignItems: "center",
+    maxWidth: 360,
+    width: "100%",
+  },
+  contextMenuBubble: {
+    backgroundColor: "rgba(4,4,5,0.94)",
+    borderColor: "rgba(255,255,255,0.08)",
+    borderRadius: 18,
+    borderWidth: StyleSheet.hairlineWidth,
+    flexDirection: "row",
+    flexWrap: "wrap",
+    overflow: "hidden",
+    width: "100%",
+  },
+  contextMenuItem: {
+    alignItems: "center",
+    borderColor: "rgba(255,255,255,0.08)",
+    borderRightWidth: StyleSheet.hairlineWidth,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    gap: 8,
+    justifyContent: "center",
+    minHeight: 92,
+    paddingHorizontal: 10,
+    paddingVertical: 12,
+    width: "33.333%",
+  },
+  contextMenuItemDisabled: {
+    opacity: 0.28,
+  },
+  contextMenuText: {
+    color: "rgba(255,255,255,0.72)",
+    fontSize: 12.5,
+    fontWeight: "800",
+    lineHeight: 16,
+    textAlign: "center",
+  },
+  contextMenuTextDestructive: {
+    color: "#ffb2b2",
+  },
+  contextMenuPointer: {
+    borderLeftColor: "transparent",
+    borderLeftWidth: 12,
+    borderRightColor: "transparent",
+    borderRightWidth: 12,
+    borderTopColor: "rgba(4,4,5,0.94)",
+    borderTopWidth: 12,
+    height: 0,
+    width: 0,
   },
   replyActionRow: {
     flexDirection: "row",
