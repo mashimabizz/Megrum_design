@@ -4,6 +4,69 @@
 
 ---
 
+## イテレーション313：Swift認証リダイレクト復帰を追加
+
+### 背景・問題意識
+
+Swift Native版のAuthはメール/パスワードでログイン・登録できるようになったが、メール確認リンクや将来のOAuthからアプリへ戻るURLを処理する境界がなかった。以前の課題で、メール確認後にWebへ飛んでしまいアプリへ戻れない問題があったため、Swift側でSupabaseのredirect tokenを受け取り、sessionへ復元する基礎を追加した。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumData/SupabaseAuthRedirect.swift`
+- Supabase redirect URLのquery / fragmentから `access_token`、`refresh_token`、`expires_in`、`expires_at`、`token_type` を取り出すparserを追加した。
+
+#### `ios-native/Sources/MegrumData/SupabaseAuthClient.swift`
+- redirect URLからpayloadをparseし、`/auth/v1/user` でユーザー情報を取得して `AuthSession` を復元する `session(fromRedirectURL:)` を追加した。
+- `makeUserRequest(accessToken:)` を追加し、request生成をテスト可能にした。
+
+#### `ios-native/Sources/MegrumApp/MegrumAuthState.swift`
+- `MegrumAuthRepository.restoreSession(fromRedirectURL:)` を追加した。
+- `handleOpenURL(_:)` を追加し、redirect URLからsessionを保存・反映できるようにした。
+
+#### `ios-native/Sources/MegrumApp/MegrumRootView.swift`
+- SwiftUIの `.onOpenURL` で `MegrumAuthState.handleOpenURL(_:)` を呼ぶようにした。
+
+#### `ios-native/Tests/`
+- Supabase redirect fragment parsingを検証した。
+- `/auth/v1/user` requestのURLとBearer tokenを検証した。
+- `MegrumAuthState` がredirect URLからsessionを復元できることを検証した。
+
+### 影響範囲
+
+- Swift Native版のメール確認リンク復帰
+- 将来のApple/Google OAuth callback
+- Auth session保存とRootViewのURLハンドリング
+
+### 確認方法
+
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-build --enable-xctest --disable-swift-testing -j 1`
+- `xcodebuild -quiet -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -destination 'generic/platform=iOS Simulator' -derivedDataPath /tmp/megrum-native-xcodebuild CODE_SIGNING_ALLOWED=NO build`
+- `git diff --check -- ios-native/Sources/MegrumData/SupabaseAuthRedirect.swift ios-native/Sources/MegrumData/SupabaseAuthClient.swift ios-native/Sources/MegrumApp/MegrumAuthState.swift ios-native/Sources/MegrumApp/MegrumRootView.swift ios-native/Tests/MegrumDataTests/SupabaseAuthClientTests.swift ios-native/Tests/MegrumAppTests/MegrumAppStateTests.swift ios-native/README.md notes/22_swift_native_migration.md notes/08_design_iterations.md`
+
+### 関連ファイル
+
+- `ios-native/Sources/MegrumData/SupabaseAuthRedirect.swift`
+- `ios-native/Sources/MegrumData/SupabaseAuthClient.swift`
+- `ios-native/Sources/MegrumApp/MegrumAuthState.swift`
+- `ios-native/Sources/MegrumApp/MegrumRootView.swift`
+- `ios-native/Tests/MegrumDataTests/SupabaseAuthClientTests.swift`
+- `ios-native/Tests/MegrumAppTests/MegrumAppStateTests.swift`
+- `ios-native/README.md`
+- `notes/22_swift_native_migration.md`
+- `notes/08_design_iterations.md`
+
+### セルフレビュー結果
+
+- ✅ redirect token parsingはqueryとfragmentの両方に対応した。
+- ✅ session復元時はaccess tokenだけで済ませず、`/auth/v1/user` でユーザー情報を取得する設計にした。
+- ✅ Swift Package testsが36件成功した。
+- ✅ Xcode project buildが成功した。
+- ✅ 状態遷移・新用語・DBスキーマ変更はないため、`notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要。
+- ⚠️ Associated Domains / URL scheme / Supabase redirect許可URLのApp Store Connect側設定は、TestFlight前のネイティブ設定工程で確認する。
+- ✅ TestFlight配布はまだ行っていないため、Preview OTA / TestFlight配信は不要。
+
+---
+
 ## イテレーション312：Swift住所の郵便番号補完を追加
 
 ### 背景・問題意識

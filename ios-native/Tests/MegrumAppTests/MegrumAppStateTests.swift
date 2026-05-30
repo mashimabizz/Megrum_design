@@ -155,6 +155,18 @@ final class MegrumAppStateTests: XCTestCase {
         XCTAssertTrue(restoredState.isAuthenticated)
     }
 
+    func testAuthStateRestoresSessionFromRedirectURL() async throws {
+        let state = MegrumAuthState(repository: RedirectAuthRepository())
+        let url = try XCTUnwrap(URL(string: "megrum-preview://auth/callback#access_token=redirect_access_token"))
+
+        let handled = await state.handleOpenURL(url)
+
+        XCTAssertTrue(handled)
+        XCTAssertEqual(state.session?.accessToken, "redirect_access_token")
+        XCTAssertEqual(state.session?.user.email, "redirect@example.com")
+        XCTAssertTrue(state.isAuthenticated)
+    }
+
     func testAuthStateValidatesSignUpPasswordLength() async {
         let state = MegrumAuthState(repository: StubAuthRepository())
 
@@ -189,6 +201,37 @@ private struct StubAuthRepository: MegrumAuthRepository {
     }
 
     func signOut(session: AuthSession) async throws {}
+}
+
+private struct RedirectAuthRepository: MegrumAuthRepository {
+    var isConfigured: Bool { true }
+
+    func signIn(email: String, password: String) async throws -> AuthSession {
+        throw MegrumRepositoryError.unsupportedMutation
+    }
+
+    func signUp(_ input: AuthSignUpInput) async throws -> AuthSession {
+        throw MegrumRepositoryError.unsupportedMutation
+    }
+
+    func signOut(session: AuthSession) async throws {}
+
+    func restoreSession(fromRedirectURL url: URL) async throws -> AuthSession? {
+        guard let payload = SupabaseAuthRedirectParser.parse(url) else {
+            return nil
+        }
+        return AuthSession(
+            accessToken: payload.accessToken,
+            refreshToken: payload.refreshToken,
+            expiresIn: payload.expiresIn,
+            expiresAt: payload.expiresAt,
+            tokenType: payload.tokenType,
+            user: AuthUser(
+                id: UUID(uuidString: "33333333-3333-3333-3333-333333333333")!,
+                email: "redirect@example.com"
+            )
+        )
+    }
 }
 
 private struct SingleSnapshotRepository: MegrumRepository {

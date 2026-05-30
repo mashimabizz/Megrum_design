@@ -22,6 +22,13 @@ public protocol MegrumAuthRepository: Sendable {
     func signIn(email: String, password: String) async throws -> AuthSession
     func signUp(_ input: AuthSignUpInput) async throws -> AuthSession
     func signOut(session: AuthSession) async throws
+    func restoreSession(fromRedirectURL url: URL) async throws -> AuthSession?
+}
+
+public extension MegrumAuthRepository {
+    func restoreSession(fromRedirectURL url: URL) async throws -> AuthSession? {
+        nil
+    }
 }
 
 public struct PreviewMegrumAuthRepository: MegrumAuthRepository {
@@ -94,6 +101,10 @@ public struct SupabaseMegrumAuthRepository: MegrumAuthRepository {
     public func signOut(session: AuthSession) async throws {
         try await client.signOut(accessToken: session.accessToken)
     }
+
+    public func restoreSession(fromRedirectURL url: URL) async throws -> AuthSession? {
+        try await client.session(fromRedirectURL: url)
+    }
 }
 
 @MainActor
@@ -160,6 +171,31 @@ public final class MegrumAuthState: ObservableObject {
     public func enterPreview() {
         session = PreviewMegrumAuthRepository.previewSession()
         errorMessage = nil
+    }
+
+    @discardableResult
+    public func handleOpenURL(_ url: URL) async -> Bool {
+        guard !isLoading else {
+            return false
+        }
+
+        isLoading = true
+        errorMessage = nil
+        defer {
+            isLoading = false
+        }
+
+        do {
+            guard let nextSession = try await repository.restoreSession(fromRedirectURL: url) else {
+                return false
+            }
+            try sessionStore.save(nextSession)
+            session = nextSession
+            return true
+        } catch {
+            errorMessage = normalizedMessage(from: error)
+            return false
+        }
     }
 
     public func signOut() async {

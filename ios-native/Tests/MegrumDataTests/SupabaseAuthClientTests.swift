@@ -53,6 +53,27 @@ final class SupabaseAuthClientTests: XCTestCase {
         XCTAssertEqual(request.value(forHTTPHeaderField: "Authorization"), "Bearer session_token")
     }
 
+    func testBuildsUserRequestWithRedirectBearer() throws {
+        let client = SupabaseAuthClient(configuration: configuration)
+
+        let request = try client.makeUserRequest(accessToken: "redirect_access_token")
+
+        XCTAssertEqual(request.url?.absoluteString, "https://example.supabase.co/auth/v1/user")
+        XCTAssertEqual(request.httpMethod, "GET")
+        XCTAssertEqual(request.value(forHTTPHeaderField: "Authorization"), "Bearer redirect_access_token")
+    }
+
+    func testParsesRedirectFragmentTokens() throws {
+        let url = try XCTUnwrap(URL(string: "megrum-preview://auth/callback#access_token=redirect_access_token&refresh_token=refresh_token&expires_in=3600&token_type=bearer"))
+
+        let payload = SupabaseAuthRedirectParser.parse(url)
+
+        XCTAssertEqual(payload?.accessToken, "redirect_access_token")
+        XCTAssertEqual(payload?.refreshToken, "refresh_token")
+        XCTAssertEqual(payload?.expiresIn, 3600)
+        XCTAssertEqual(payload?.tokenType, "bearer")
+    }
+
     private var configuration: SupabaseConfiguration {
         SupabaseConfiguration(
             projectURL: URL(string: "https://example.supabase.co")!,

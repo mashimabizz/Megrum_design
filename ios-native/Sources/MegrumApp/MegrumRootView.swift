@@ -69,6 +69,11 @@ public struct MegrumRootView: View {
                 AuthScreen(authState: authState)
             }
         }
+        .onOpenURL { url in
+            Task {
+                await authState.handleOpenURL(url)
+            }
+        }
     }
 
     private var authenticatedRoot: some View {

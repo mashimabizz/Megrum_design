@@ -62,6 +62,34 @@ public final class SupabaseAuthClient: @unchecked Sendable {
         }
     }
 
+    public func session(fromRedirectURL url: URL) async throws -> AuthSession? {
+        guard let payload = SupabaseAuthRedirectParser.parse(url) else {
+            return nil
+        }
+        let user = try await loadUser(accessToken: payload.accessToken)
+        return AuthSession(
+            accessToken: payload.accessToken,
+            refreshToken: payload.refreshToken,
+            expiresIn: payload.expiresIn,
+            expiresAt: payload.expiresAt,
+            tokenType: payload.tokenType,
+            user: user
+        )
+    }
+
+    public func loadUser(accessToken: String) async throws -> AuthUser {
+        let request = try makeUserRequest(accessToken: accessToken)
+        let (data, response) = try await session.data(for: request)
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw SupabaseAuthError.unexpectedStatus(-1, nil)
+        }
+        guard (200..<300).contains(httpResponse.statusCode) else {
+            let message = try? decoder.decode(AuthErrorResponse.self, from: data).message
+            throw SupabaseAuthError.unexpectedStatus(httpResponse.statusCode, message)
+        }
+        return try decoder.decode(UserResponse.self, from: data).authUser
+    }
+
     public func makePasswordSignInRequest(email: String, password: String) throws -> URLRequest {
         let payload = PasswordPayload(email: email, password: password)
         return try makeAuthRequest(
@@ -101,6 +129,15 @@ public final class SupabaseAuthClient: @unchecked Sendable {
             path: "/auth/v1/logout",
             method: "POST",
             body: Data(),
+            bearerToken: accessToken
+        )
+    }
+
+    public func makeUserRequest(accessToken: String) throws -> URLRequest {
+        try makeAuthRequest(
+            path: "/auth/v1/user",
+            method: "GET",
+            body: nil,
             bearerToken: accessToken
         )
     }
