@@ -90,6 +90,7 @@ public protocol MegrumRepository: Sendable {
     func loadPushNotificationsEnabled() async throws -> Bool
     func setPushNotificationsEnabled(_ enabled: Bool) async throws -> Bool
     func registerNativePushDeviceToken(_ token: String, appVersion: String?) async throws
+    func revokeNativePushDeviceToken(_ token: String, revokedAt: Date) async throws
     func completeAccountSetup(_ input: AccountSetupInput) async throws -> UserProfile
 }
 
@@ -209,6 +210,8 @@ public extension MegrumRepository {
     }
 
     func registerNativePushDeviceToken(_ token: String, appVersion: String?) async throws {}
+
+    func revokeNativePushDeviceToken(_ token: String, revokedAt: Date) async throws {}
 
     func completeAccountSetup(_ input: AccountSetupInput) async throws -> UserProfile {
         throw MegrumRepositoryError.unsupportedMutation
@@ -459,6 +462,8 @@ public struct PreviewMegrumRepository: MegrumRepository {
     }
 
     public func registerNativePushDeviceToken(_ token: String, appVersion: String?) async throws {}
+
+    public func revokeNativePushDeviceToken(_ token: String, revokedAt: Date) async throws {}
 }
 
 @MainActor
@@ -492,6 +497,7 @@ public final class MegrumAppState: ObservableObject {
     @Published public private(set) var isLoadingNotifications = false
     @Published public private(set) var isLoadingPushNotificationSetting = false
     @Published public private(set) var isRegisteringNativePushDevice = false
+    @Published public private(set) var isRevokingNativePushDevice = false
     @Published public private(set) var isLoadingMeguri = false
     @Published public private(set) var isLoadingMeguriMessages = false
     @Published public private(set) var isLookingUpPostalCode = false
@@ -514,6 +520,7 @@ public final class MegrumAppState: ObservableObject {
 
     private var repository: any MegrumRepository
     private var activeSearchRequestID: UUID?
+    private var registeredNativePushDeviceToken: String?
 
     public init(repository: any MegrumRepository = PreviewMegrumRepository()) {
         self.repository = repository
@@ -1354,11 +1361,38 @@ public final class MegrumAppState: ObservableObject {
         errorMessage = nil
         do {
             try await repository.registerNativePushDeviceToken(trimmedToken, appVersion: appVersion)
+            registeredNativePushDeviceToken = trimmedToken
             isRegisteringNativePushDevice = false
             return true
         } catch {
             errorMessage = "モバイル通知の端末登録に失敗しました"
             isRegisteringNativePushDevice = false
+            return false
+        }
+    }
+
+    @discardableResult
+    public func revokeRegisteredNativePushDeviceToken(revokedAt: Date = .now) async -> Bool {
+        guard let registeredNativePushDeviceToken, !registeredNativePushDeviceToken.isEmpty else {
+            return false
+        }
+        guard !isRevokingNativePushDevice else {
+            return false
+        }
+
+        isRevokingNativePushDevice = true
+        errorMessage = nil
+        do {
+            try await repository.revokeNativePushDeviceToken(
+                registeredNativePushDeviceToken,
+                revokedAt: revokedAt
+            )
+            self.registeredNativePushDeviceToken = nil
+            isRevokingNativePushDevice = false
+            return true
+        } catch {
+            errorMessage = "モバイル通知の端末登録を解除できませんでした"
+            isRevokingNativePushDevice = false
             return false
         }
     }

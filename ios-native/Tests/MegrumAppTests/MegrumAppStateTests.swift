@@ -506,6 +506,23 @@ final class MegrumAppStateTests: XCTestCase {
         XCTAssertEqual(registrations.first?.appVersion, "0.1.0")
     }
 
+    func testAppStateRevokesRegisteredNativePushDeviceTokenThroughRepository() async {
+        let repository = PushDeviceRecordingRepository()
+        let state = MegrumAppState(repository: repository)
+        let revokedAt = Date(timeIntervalSince1970: 1_779_900_000)
+
+        _ = await state.registerNativePushDeviceToken(" apns-device-token ", appVersion: "0.1.0")
+        let revoked = await state.revokeRegisteredNativePushDeviceToken(revokedAt: revokedAt)
+
+        XCTAssertTrue(revoked)
+        XCTAssertFalse(state.isRevokingNativePushDevice)
+        XCTAssertNil(state.errorMessage)
+
+        let revocations = await repository.revocationsSnapshot()
+        XCTAssertEqual(revocations.first?.token, "apns-device-token")
+        XCTAssertEqual(revocations.first?.revokedAt, revokedAt)
+    }
+
     func testAuthStateSignsInThroughRepository() async {
         let state = MegrumAuthState(repository: StubAuthRepository())
 
@@ -624,6 +641,7 @@ private struct SingleSnapshotRepository: MegrumRepository {
 
 private actor PushDeviceRecordingRepository: MegrumRepository {
     private var registrations: [PushDeviceRegistration] = []
+    private var revocations: [PushDeviceRevocation] = []
 
     func loadInitialSnapshot() async throws -> MegrumAppSnapshot {
         MegrumAppSnapshot(
@@ -644,14 +662,27 @@ private actor PushDeviceRecordingRepository: MegrumRepository {
         registrations.append(PushDeviceRegistration(token: token, appVersion: appVersion))
     }
 
+    func revokeNativePushDeviceToken(_ token: String, revokedAt: Date) async throws {
+        revocations.append(PushDeviceRevocation(token: token, revokedAt: revokedAt))
+    }
+
     func registrationsSnapshot() -> [PushDeviceRegistration] {
         registrations
+    }
+
+    func revocationsSnapshot() -> [PushDeviceRevocation] {
+        revocations
     }
 }
 
 private struct PushDeviceRegistration: Equatable, Sendable {
     var token: String
     var appVersion: String?
+}
+
+private struct PushDeviceRevocation: Equatable, Sendable {
+    var token: String
+    var revokedAt: Date
 }
 
 private enum NativePreviewIDs {

@@ -1,7 +1,7 @@
 # 22. Swift Native Migration
 
 最終更新: 2026-05-31
-ステータス: Active draft（iter341）
+ステータス: Active draft（iter342）
 
 ## 目的
 
@@ -119,6 +119,7 @@ tar -xzf /Users/michitaka/Desktop/Megrum_backups/pre-swift-migration-20260531-03
 - iter339で、XcodeアプリホストにiOS標準の通知許可リクエスト、APNs登録、device tokenをAppStateへ渡すdelegate bridgeを追加した。
 - iter340で、端末通知タップ時の `linkPath` を既存通知一覧と同じ規則でNativeタブへ変換し、該当カテゴリへ移れるbridgeを追加した。
 - iter341で、Xcode targetに `App/MegrumNative.entitlements` を接続し、Debugはdevelopment、ReleaseはproductionのAPNs entitlementを使えるようにした。
+- iter342で、ログアウト時に登録済みAPNs device tokenの `revoked_at` を更新する境界と設定画面のログアウト導線を追加した。
 - 現時点のAuthはApple/Google OAuthまでは未完了。次のPhase 2作業でApple/Googleへ広げる。
 
 ### Phase 3: Exchange core

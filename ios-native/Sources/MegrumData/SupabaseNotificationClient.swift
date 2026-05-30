@@ -93,6 +93,21 @@ public final class SupabaseNotificationClient: @unchecked Sendable {
         return rows.first?.id
     }
 
+    @discardableResult
+    public func revokeNativePushDevice(
+        userID: UUID,
+        deviceToken: String,
+        revokedAt: Date = .now
+    ) async throws -> UUID? {
+        let rows: [NotificationDeviceRow] = try await client.updateRows(
+            in: "notification_devices",
+            values: RevokeNativePushDevicePayload(revokedAt: isoTimestamp(revokedAt)),
+            select: NotificationDeviceRow.select,
+            queryItems: revokeNativePushDeviceQueryItems(userID: userID, deviceToken: deviceToken)
+        )
+        return rows.first?.id
+    }
+
     public static func nativeDeviceTokenString(from data: Data) -> String {
         data.map { String(format: "%02x", $0) }.joined()
     }
@@ -173,6 +188,22 @@ public final class SupabaseNotificationClient: @unchecked Sendable {
         )
     }
 
+    public func makeRevokeNativePushDeviceRequest(
+        userID: UUID,
+        deviceToken: String,
+        revokedAt: Date = .now
+    ) throws -> URLRequest {
+        try client.makeMutationRequest(
+            path: "/rest/v1/notification_devices",
+            queryItems: [
+                URLQueryItem(name: "select", value: NotificationDeviceRow.select)
+            ] + revokeNativePushDeviceQueryItems(userID: userID, deviceToken: deviceToken),
+            method: "PATCH",
+            body: encoder.encode(RevokeNativePushDevicePayload(revokedAt: isoTimestamp(revokedAt))),
+            prefer: "return=representation"
+        )
+    }
+
     private func loadQueryItems(userID: UUID, limit: Int) -> [URLQueryItem] {
         [
             URLQueryItem(name: "user_id", value: "eq.\(userID.uuidString.lowercased())"),
@@ -199,6 +230,15 @@ public final class SupabaseNotificationClient: @unchecked Sendable {
         [
             URLQueryItem(name: "user_id", value: "eq.\(userID.uuidString.lowercased())"),
             URLQueryItem(name: "limit", value: "1")
+        ]
+    }
+
+    private func revokeNativePushDeviceQueryItems(userID: UUID, deviceToken: String) -> [URLQueryItem] {
+        [
+            URLQueryItem(name: "user_id", value: "eq.\(userID.uuidString.lowercased())"),
+            URLQueryItem(name: "push_provider", value: "eq.apns"),
+            URLQueryItem(name: "native_device_token", value: "eq.\(deviceToken.normalizedNativeDeviceToken)"),
+            URLQueryItem(name: "revoked_at", value: "is.null")
         ]
     }
 
@@ -250,6 +290,10 @@ private struct NotificationSettingPayload: Encodable, Sendable {
 private struct NotificationDeviceRow: Decodable, Sendable {
     static let select = "id"
     var id: UUID
+}
+
+private struct RevokeNativePushDevicePayload: Encodable, Sendable {
+    var revokedAt: String
 }
 
 private struct NativePushDevicePayload: Encodable, Sendable {

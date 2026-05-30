@@ -228,6 +228,14 @@ public struct SupabaseMegrumRepository: MegrumRepository {
         )
     }
 
+    public func revokeNativePushDeviceToken(_ token: String, revokedAt: Date) async throws {
+        _ = try await notificationClient.revokeNativePushDevice(
+            userID: viewerID,
+            deviceToken: token,
+            revokedAt: revokedAt
+        )
+    }
+
     public func completeAccountSetup(_ input: AccountSetupInput) async throws -> UserProfile {
         let selections = input.oshiSelections.map { selection in
             UserOshiSelection(

@@ -94,6 +94,25 @@ final class SupabaseNotificationClientTests: XCTestCase {
         XCTAssertTrue(payload["revoked_at"] is NSNull)
     }
 
+    func testBuildsRevokeNativePushDeviceRequest() throws {
+        let client = SupabaseNotificationClient(configuration: configuration)
+        let userID = UUID(uuidString: "11111111-1111-1111-1111-111111111111")!
+        let revokedAt = Date(timeIntervalSince1970: 1_779_900_000)
+
+        let request = try client.makeRevokeNativePushDeviceRequest(
+            userID: userID,
+            deviceToken: " <AA BB cc> ",
+            revokedAt: revokedAt
+        )
+        let body = try XCTUnwrap(request.httpBody)
+        let payload = try XCTUnwrap(JSONSerialization.jsonObject(with: body) as? [String: Any])
+
+        XCTAssertEqual(request.url?.absoluteString, "https://example.supabase.co/rest/v1/notification_devices?select=id&user_id=eq.11111111-1111-1111-1111-111111111111&push_provider=eq.apns&native_device_token=eq.aabbcc&revoked_at=is.null")
+        XCTAssertEqual(request.httpMethod, "PATCH")
+        XCTAssertEqual(request.value(forHTTPHeaderField: "Prefer"), "return=representation")
+        XCTAssertEqual(payload["revoked_at"] as? String, "2026-05-27T16:40:00Z")
+    }
+
     func testFormatsNativeDeviceTokenData() {
         let data = Data([0x00, 0x0f, 0xab, 0xff])
 

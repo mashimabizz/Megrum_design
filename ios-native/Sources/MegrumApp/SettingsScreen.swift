@@ -6,6 +6,7 @@ import SwiftUI
 struct SettingsScreen: View {
     @ObservedObject var appState: MegrumAppState
     var onOpenNotificationDestination: (MegrumTab) -> Void = { _ in }
+    var onSignOut: () async -> Void = {}
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
@@ -112,6 +113,17 @@ struct SettingsScreen: View {
                         Image(systemName: "person.crop.circle.badge.xmark")
                             .foregroundStyle(MegrumTheme.lavender)
                     }
+                }
+            }
+
+            Section {
+                Button(role: .destructive) {
+                    Task {
+                        await onSignOut()
+                        dismiss()
+                    }
+                } label: {
+                    Label("ログアウト", systemImage: "rectangle.portrait.and.arrow.right")
                 }
             }
         }

@@ -4,6 +4,74 @@
 
 ---
 
+## イテレーション342：Swift通知端末解除を追加
+
+### 背景・問題意識
+
+Swift Native版はAPNs token登録、通知許可、entitlementまでつながったが、ログアウト後も登録済み端末が有効なままだと、旧セッションの端末へ通知が届き続ける可能性がある。端末通知は登録と解除を一組で扱う必要があるため、登録済みAPNs tokenを `revoked_at` で無効化する境界を追加する。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumData/SupabaseNotificationClient.swift`
+- `notification_devices` の `push_provider='apns'` / `native_device_token` を対象に、`revoked_at` を更新する `revokeNativePushDevice` を追加した。
+- request builder `makeRevokeNativePushDeviceRequest` を追加し、URL、payload、Prefer headerをテストできるようにした。
+
+#### `ios-native/Sources/MegrumApp/MegrumAppState.swift`
+- repository境界に `revokeNativePushDeviceToken` を追加した。
+- APNs token登録成功後に、登録済みtokenをAppState内に保持するようにした。
+- `revokeRegisteredNativePushDeviceToken` を追加し、ログアウト前に登録済みtokenを無効化できるようにした。
+
+#### `ios-native/Sources/MegrumApp/SupabaseMegrumRepository.swift`
+- AppStateの解除要求を `SupabaseNotificationClient.revokeNativePushDevice` へ委譲するようにした。
+
+#### `ios-native/Sources/MegrumApp/SettingsScreen.swift` / `ios-native/Sources/MegrumApp/MegrumRootView.swift`
+- 設定画面の末尾にiOS標準Listの破壊的操作として「ログアウト」を追加した。
+- ログアウト時は登録済みAPNs tokenを解除してから `MegrumAuthState.signOut()` を呼ぶようにした。
+
+#### `ios-native/Tests/MegrumDataTests/SupabaseNotificationClientTests.swift`
+- APNs端末解除requestのURL、method、Prefer header、payloadを検証した。
+
+#### `ios-native/Tests/MegrumAppTests/MegrumAppStateTests.swift`
+- AppStateが登録済みAPNs tokenをrepository境界経由で解除できることを検証した。
+
+#### `ios-native/README.md` / `notes/22_swift_native_migration.md`
+- Swift Native通知Phaseの進捗として、APNs token解除とログアウト導線を追記した。
+
+### 影響範囲
+
+- Swift Native版の設定画面
+- Swift Native版のログアウト導線
+- Swift Native版のAPNs端末登録ライフサイクル
+- `notification_devices.revoked_at` の利用
+
+### 確認方法
+
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-build --enable-xctest --disable-swift-testing -j 1`
+- `xcodebuild -quiet -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -destination 'generic/platform=iOS Simulator' -derivedDataPath /tmp/megrum-native-xcodebuild CODE_SIGNING_ALLOWED=NO build`
+
+### 関連ファイル
+
+- `ios-native/Sources/MegrumData/SupabaseNotificationClient.swift`
+- `ios-native/Sources/MegrumApp/MegrumAppState.swift`
+- `ios-native/Sources/MegrumApp/SupabaseMegrumRepository.swift`
+- `ios-native/Sources/MegrumApp/SettingsScreen.swift`
+- `ios-native/Sources/MegrumApp/MegrumRootView.swift`
+- `ios-native/Tests/MegrumDataTests/SupabaseNotificationClientTests.swift`
+- `ios-native/Tests/MegrumAppTests/MegrumAppStateTests.swift`
+- `ios-native/README.md`
+- `notes/22_swift_native_migration.md`
+- `notes/08_design_iterations.md`
+
+### セルフレビュー結果
+
+- ✅ Swift Package testsが90件成功した。
+- ✅ Xcode project buildが成功した。
+- ✅ APNs tokenの登録・解除が同じ `notification_devices` 境界で扱えるようになった。
+- ✅ ログアウト導線はiOS標準List/Buttonの範囲に留めた。
+- ✅ データモデルは既存 `revoked_at` の利用に留まるため、`notes/05_data_model.md` の更新は不要。
+- ✅ 状態遷移は変えていないため、`notes/09_state_machines.md` の更新は不要。
+- ✅ 新用語は追加していないため、`notes/10_glossary.md` の更新は不要。
+
 ## イテレーション341：Swift通知entitlementを追加
 
 ### 背景・問題意識

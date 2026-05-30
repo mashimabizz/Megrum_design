@@ -116,10 +116,18 @@ public struct MegrumRootView: View {
         }
         .sheet(isPresented: $showsSettings) {
             NavigationStack {
-                SettingsScreen(appState: appState) { tab in
-                    selectedTab = tab
-                    showsSettings = false
-                }
+                SettingsScreen(
+                    appState: appState,
+                    onOpenNotificationDestination: { tab in
+                        selectedTab = tab
+                        showsSettings = false
+                    },
+                    onSignOut: {
+                        await appState.revokeRegisteredNativePushDeviceToken()
+                        await authState.signOut()
+                        showsSettings = false
+                    }
+                )
             }
         }
     }
