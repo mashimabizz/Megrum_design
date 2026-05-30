@@ -212,6 +212,14 @@ public struct SupabaseMegrumRepository: MegrumRepository {
         try await notificationClient.markAllNotificationsRead(userID: viewerID)
     }
 
+    public func loadPushNotificationsEnabled() async throws -> Bool {
+        try await notificationClient.loadPushNotificationsEnabled(userID: viewerID)
+    }
+
+    public func setPushNotificationsEnabled(_ enabled: Bool) async throws -> Bool {
+        try await notificationClient.setPushNotificationsEnabled(userID: viewerID, enabled: enabled)
+    }
+
     public func completeAccountSetup(_ input: AccountSetupInput) async throws -> UserProfile {
         let selections = input.oshiSelections.map { selection in
             UserOshiSelection(

@@ -41,6 +41,32 @@ final class SupabaseNotificationClientTests: XCTestCase {
         XCTAssertEqual(request.value(forHTTPHeaderField: "Prefer"), "return=representation")
     }
 
+    func testBuildsLoadPushSettingRequest() throws {
+        let client = SupabaseNotificationClient(configuration: configuration)
+        let userID = UUID(uuidString: "11111111-1111-1111-1111-111111111111")!
+
+        let request = try client.makeLoadPushSettingRequest(userID: userID)
+
+        XCTAssertEqual(request.url?.absoluteString, "https://example.supabase.co/rest/v1/user_notification_settings?select=push_enabled&user_id=eq.11111111-1111-1111-1111-111111111111&limit=1")
+        XCTAssertEqual(request.httpMethod, "GET")
+    }
+
+    func testBuildsSetPushSettingRequest() throws {
+        let client = SupabaseNotificationClient(configuration: configuration)
+        let userID = UUID(uuidString: "11111111-1111-1111-1111-111111111111")!
+
+        let request = try client.makeSetPushSettingRequest(userID: userID, enabled: false)
+        let body = try XCTUnwrap(request.httpBody)
+        let rows = try XCTUnwrap(JSONSerialization.jsonObject(with: body) as? [[String: Any]])
+        let payload = try XCTUnwrap(rows.first)
+
+        XCTAssertEqual(request.url?.absoluteString, "https://example.supabase.co/rest/v1/user_notification_settings?select=push_enabled&on_conflict=user_id")
+        XCTAssertEqual(request.httpMethod, "POST")
+        XCTAssertEqual(request.value(forHTTPHeaderField: "Prefer"), "resolution=merge-duplicates,return=representation")
+        XCTAssertEqual(payload["user_id"] as? String, userID.uuidString.lowercased())
+        XCTAssertEqual(payload["push_enabled"] as? Bool, false)
+    }
+
     private var configuration: SupabaseConfiguration {
         SupabaseConfiguration(
             projectURL: URL(string: "https://example.supabase.co")!,

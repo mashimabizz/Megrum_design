@@ -50,6 +50,26 @@ public final class SupabaseNotificationClient: @unchecked Sendable {
         return rows.map(\.notification)
     }
 
+    public func loadPushNotificationsEnabled(userID: UUID) async throws -> Bool {
+        let rows: [NotificationSettingRow] = try await client.fetchRows(
+            from: "user_notification_settings",
+            select: NotificationSettingRow.select,
+            queryItems: pushSettingQueryItems(userID: userID)
+        )
+        return rows.first?.pushEnabled ?? true
+    }
+
+    @discardableResult
+    public func setPushNotificationsEnabled(userID: UUID, enabled: Bool) async throws -> Bool {
+        let rows: [NotificationSettingRow] = try await client.upsertRows(
+            into: "user_notification_settings",
+            values: [NotificationSettingPayload(userID: userID, pushEnabled: enabled)],
+            select: NotificationSettingRow.select,
+            onConflict: "user_id"
+        )
+        return rows.first?.pushEnabled ?? enabled
+    }
+
     public func makeLoadNotificationsRequest(userID: UUID, limit: Int = 100) throws -> URLRequest {
         try client.makeRequest(
             path: "/rest/v1/notifications",
@@ -87,6 +107,24 @@ public final class SupabaseNotificationClient: @unchecked Sendable {
         )
     }
 
+    public func makeLoadPushSettingRequest(userID: UUID) throws -> URLRequest {
+        try client.makeRequest(
+            path: "/rest/v1/user_notification_settings",
+            queryItems: [
+                URLQueryItem(name: "select", value: NotificationSettingRow.select)
+            ] + pushSettingQueryItems(userID: userID)
+        )
+    }
+
+    public func makeSetPushSettingRequest(userID: UUID, enabled: Bool) throws -> URLRequest {
+        try client.makeUpsertRequest(
+            into: "user_notification_settings",
+            values: [NotificationSettingPayload(userID: userID, pushEnabled: enabled)],
+            select: NotificationSettingRow.select,
+            onConflict: "user_id"
+        )
+    }
+
     private func loadQueryItems(userID: UUID, limit: Int) -> [URLQueryItem] {
         [
             URLQueryItem(name: "user_id", value: "eq.\(userID.uuidString.lowercased())"),
@@ -106,6 +144,13 @@ public final class SupabaseNotificationClient: @unchecked Sendable {
         [
             URLQueryItem(name: "user_id", value: "eq.\(userID.uuidString.lowercased())"),
             URLQueryItem(name: "read_at", value: "is.null")
+        ]
+    }
+
+    private func pushSettingQueryItems(userID: UUID) -> [URLQueryItem] {
+        [
+            URLQueryItem(name: "user_id", value: "eq.\(userID.uuidString.lowercased())"),
+            URLQueryItem(name: "limit", value: "1")
         ]
     }
 
@@ -142,6 +187,16 @@ private struct NotificationRow: Decodable, Sendable {
 
 private struct MarkReadPayload: Encodable, Sendable {
     var readAt: String
+}
+
+private struct NotificationSettingRow: Decodable, Sendable {
+    static let select = "push_enabled"
+    var pushEnabled: Bool
+}
+
+private struct NotificationSettingPayload: Encodable, Sendable {
+    var userID: UUID
+    var pushEnabled: Bool
 }
 
 private func isoTimestamp(_ date: Date) -> String {

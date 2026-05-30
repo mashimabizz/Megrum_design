@@ -44,6 +44,42 @@ struct SettingsScreen: View {
                     }
                 }
 
+                HStack(spacing: 12) {
+                    Label {
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text("モバイル通知")
+                                .font(.body.weight(.semibold))
+                            Text(pushNotificationStatusText)
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(MegrumTheme.muted)
+                        }
+                    } icon: {
+                        Image(systemName: "iphone.radiowaves.left.and.right")
+                            .foregroundStyle(MegrumTheme.lavender)
+                    }
+
+                    Spacer(minLength: 12)
+
+                    if appState.isLoadingPushNotificationSetting {
+                        ProgressView()
+                            .controlSize(.small)
+                    } else {
+                        Toggle(
+                            "モバイル通知",
+                            isOn: Binding(
+                                get: { appState.pushNotificationsEnabled },
+                                set: { enabled in
+                                    Task {
+                                        await appState.setPushNotificationsEnabled(enabled)
+                                    }
+                                }
+                            )
+                        )
+                        .labelsHidden()
+                        .disabled(appState.isSavingPushNotificationSetting)
+                    }
+                }
+
                 NavigationLink {
                     AddressSettingsScreen(appState: appState)
                 } label: {
@@ -95,6 +131,7 @@ struct SettingsScreen: View {
             if appState.notifications.isEmpty {
                 await appState.loadNotifications()
             }
+            await appState.loadPushNotificationSetting()
         }
     }
 
@@ -106,6 +143,10 @@ struct SettingsScreen: View {
             return "未読 \(appState.unreadNotificationCount)件"
         }
         return "すべて既読"
+    }
+
+    private var pushNotificationStatusText: String {
+        appState.pushNotificationsEnabled ? "端末に通知を届ける" : "端末通知はOFF"
     }
 
     private var addressStatusText: String {

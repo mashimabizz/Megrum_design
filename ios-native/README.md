@@ -31,7 +31,7 @@ The existing Expo / React Native app under `mobile/` remains the rollback source
 - `Sources/MegrumData/SupabaseMailingAddressClient.swift` contains the request layer for reading and upserting `user_mailing_addresses`.
 - `Sources/MegrumData/PostalCodeAddressClient.swift` contains the zipcloud postal code lookup boundary for address autofill.
 - `Sources/MegrumData/SupabaseBlockClient.swift` contains the request layer for listing and deleting `groom_user_blocks`.
-- `Sources/MegrumData/SupabaseNotificationClient.swift` contains the request layer for loading and marking `notifications` read.
+- `Sources/MegrumData/SupabaseNotificationClient.swift` contains the request layer for loading and marking `notifications` read, plus the mobile push notification setting.
 - `Sources/MegrumData/AuthSessionStore.swift` contains the session persistence boundary. Live auth uses Keychain; tests and preview mode use an in-memory store.
 - `Tests/MegrumCoreTests`, `Tests/MegrumDataTests`, and `Tests/MegrumAppTests` verify state names, display labels, Supabase request construction, and the preview repository load path.
 
@@ -71,7 +71,7 @@ Supabase redirect URLs are handled by `MegrumRootView.onOpenURL`. `SupabaseAuthR
 
 `BlockedUser` mirrors the viewer's `groom_user_blocks` relationships. `SettingsScreen` exposes a native blocked users list with pull-to-refresh and confirmation before unblock.
 
-`MegrumNotification` mirrors `notifications`. `SettingsScreen` shows an unread badge, and the native notification list can filter unread/trade notices, mark items read, mark all read, and route broad notification targets back to the matching native tab.
+`MegrumNotification` mirrors `notifications`. `SettingsScreen` shows an unread badge, and the native notification list can filter unread/trade notices, mark items read, mark all read, and route broad notification targets back to the matching native tab. The settings list also reads and writes `user_notification_settings.push_enabled` through a native iOS Toggle, so users can turn off device notifications while keeping the in-app notification list available.
 
 `GoodsGrid` is shared by Home, Search, Inventory, and Wish surfaces. It now opens a native detail sheet on tap and uses SwiftUI's native context menu for long-press actions, keeping the action surface close to iOS Home Screen quick actions while preserving standard accessibility behavior. Search reads tradeable goods through `MegrumAppState`, groups results into match buckets, and exposes group/goods type filter chips from the same master data as Inventory and Wish. From a search result, the exchange-list action can open a native proposal creation sheet that selects one of the viewer's inventory items, chooses an exchange method and condition tags, then creates a `proposals` row through `SupabaseProposalClient`. Inventory and Wish collection screens also expose a native 3/4/5-column toggle, group/goods type filter chips, and a left-side add button. The add button opens a native sheet that loads groups and goods types, then creates a `goods_inventory` row through `MegrumAppState`.
 

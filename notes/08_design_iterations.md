@@ -4,6 +4,70 @@
 
 ---
 
+## イテレーション337：Swiftモバイル通知設定を追加
+
+### 背景・問題意識
+
+Swift Native版の通知一覧と未読処理は移植済みだが、端末通知のON/OFFを既存DBの `user_notification_settings.push_enabled` と同期する境界がなかった。APNs登録へ進む前に、アプリ内通知一覧は残しつつ端末通知だけを止められる設定をNative側へ追加する。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumData/SupabaseNotificationClient.swift`
+- `user_notification_settings.push_enabled` を読み込む `loadPushNotificationsEnabled` を追加した。
+- `user_notification_settings` を `user_id` でupsertする `setPushNotificationsEnabled` を追加した。
+- load/upsertのrequest builderを追加し、URL、method、payloadをテスト可能にした。
+
+#### `ios-native/Sources/MegrumApp/MegrumAppState.swift` / `ios-native/Sources/MegrumApp/SupabaseMegrumRepository.swift`
+- repository境界に `loadPushNotificationsEnabled` / `setPushNotificationsEnabled` を追加した。
+- AppStateに `pushNotificationsEnabled`、読み込み中、保存中の状態を追加した。
+- 設定保存は楽観的に反映し、失敗時は前の値へ戻すようにした。
+
+#### `ios-native/Sources/MegrumApp/SettingsScreen.swift`
+- 設定一覧にiOS標準Toggleの「モバイル通知」を追加した。
+- 設定画面表示時に通知一覧、住所、モバイル通知設定を読み込むようにした。
+
+#### `ios-native/Tests/MegrumDataTests/SupabaseNotificationClientTests.swift`
+- push通知設定のGET/upsert requestを検証した。
+
+#### `ios-native/Tests/MegrumAppTests/MegrumAppStateTests.swift`
+- Preview repositoryでモバイル通知設定を読み込み、OFFへ切り替えられることを検証した。
+
+#### `ios-native/README.md` / `notes/22_swift_native_migration.md`
+- Swift Native通知Phaseの進捗として、モバイル通知設定の読み書きを追記した。
+
+### 影響範囲
+
+- Swift Native版の設定画面
+- Swift Native版の通知設定状態
+- 既存DBの `user_notification_settings.push_enabled`
+- 後続のAPNs端末登録・通知許可導線の土台
+
+### 確認方法
+
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-build --enable-xctest --disable-swift-testing -j 1`
+- `xcodebuild -quiet -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -destination 'generic/platform=iOS Simulator' -derivedDataPath /tmp/megrum-native-xcodebuild CODE_SIGNING_ALLOWED=NO build`
+
+### 関連ファイル
+
+- `ios-native/Sources/MegrumData/SupabaseNotificationClient.swift`
+- `ios-native/Sources/MegrumApp/MegrumAppState.swift`
+- `ios-native/Sources/MegrumApp/SupabaseMegrumRepository.swift`
+- `ios-native/Sources/MegrumApp/SettingsScreen.swift`
+- `ios-native/Tests/MegrumDataTests/SupabaseNotificationClientTests.swift`
+- `ios-native/Tests/MegrumAppTests/MegrumAppStateTests.swift`
+- `ios-native/README.md`
+- `notes/22_swift_native_migration.md`
+- `notes/08_design_iterations.md`
+
+### セルフレビュー結果
+
+- ✅ Swift Package testsが85件成功した。
+- ✅ Xcode project buildが成功した。
+- ✅ 既存の `user_notification_settings.push_enabled` を使うため、新規migrationは追加していない。
+- ✅ 通知の状態遷移は変えていないため、`notes/09_state_machines.md` の更新は不要。
+- ✅ `モバイル通知` は既に `notes/10_glossary.md` に定義済みのため、用語更新は不要。
+- ✅ `notes/05_data_model.md` には既に `user_notification_settings.push_enabled` が記載済みのため、データモデル更新は不要。
+
 ## イテレーション336：Swiftめぐり会話既読化を追加
 
 ### 背景・問題意識

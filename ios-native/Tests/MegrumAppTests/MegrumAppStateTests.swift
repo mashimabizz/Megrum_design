@@ -475,6 +475,22 @@ final class MegrumAppStateTests: XCTestCase {
         XCTAssertFalse(state.isMarkingNotificationsRead)
     }
 
+    func testAppStateLoadsAndTogglesPreviewPushNotificationSetting() async {
+        let state = MegrumAppState(repository: PreviewMegrumRepository())
+
+        await state.loadPushNotificationSetting()
+
+        XCTAssertTrue(state.pushNotificationsEnabled)
+        XCTAssertFalse(state.isLoadingPushNotificationSetting)
+
+        let saved = await state.setPushNotificationsEnabled(false)
+
+        XCTAssertTrue(saved)
+        XCTAssertFalse(state.pushNotificationsEnabled)
+        XCTAssertFalse(state.isSavingPushNotificationSetting)
+        XCTAssertNil(state.errorMessage)
+    }
+
     func testAuthStateSignsInThroughRepository() async {
         let state = MegrumAuthState(repository: StubAuthRepository())
 

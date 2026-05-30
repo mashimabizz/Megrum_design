@@ -87,6 +87,8 @@ public protocol MegrumRepository: Sendable {
     func loadNotifications(limit: Int) async throws -> [MegrumNotification]
     func markNotificationRead(_ notificationID: UUID) async throws -> MegrumNotification?
     func markAllNotificationsRead() async throws -> [MegrumNotification]
+    func loadPushNotificationsEnabled() async throws -> Bool
+    func setPushNotificationsEnabled(_ enabled: Bool) async throws -> Bool
     func completeAccountSetup(_ input: AccountSetupInput) async throws -> UserProfile
 }
 
@@ -195,6 +197,14 @@ public extension MegrumRepository {
 
     func markAllNotificationsRead() async throws -> [MegrumNotification] {
         []
+    }
+
+    func loadPushNotificationsEnabled() async throws -> Bool {
+        true
+    }
+
+    func setPushNotificationsEnabled(_ enabled: Bool) async throws -> Bool {
+        enabled
     }
 
     func completeAccountSetup(_ input: AccountSetupInput) async throws -> UserProfile {
@@ -436,6 +446,14 @@ public struct PreviewMegrumRepository: MegrumRepository {
             return next
         }
     }
+
+    public func loadPushNotificationsEnabled() async throws -> Bool {
+        true
+    }
+
+    public func setPushNotificationsEnabled(_ enabled: Bool) async throws -> Bool {
+        enabled
+    }
 }
 
 @MainActor
@@ -458,6 +476,7 @@ public final class MegrumAppState: ObservableObject {
     @Published public private(set) var mailingAddress: MailingAddress?
     @Published public private(set) var blockedUsers: [BlockedUser] = []
     @Published public private(set) var notifications: [MegrumNotification] = []
+    @Published public private(set) var pushNotificationsEnabled = true
     @Published public private(set) var isLoading = false
     @Published public private(set) var isLoadingOshiGroups = false
     @Published public private(set) var isLoadingOshiCharacters = false
@@ -466,6 +485,7 @@ public final class MegrumAppState: ObservableObject {
     @Published public private(set) var isLoadingMailingAddress = false
     @Published public private(set) var isLoadingBlockedUsers = false
     @Published public private(set) var isLoadingNotifications = false
+    @Published public private(set) var isLoadingPushNotificationSetting = false
     @Published public private(set) var isLoadingMeguri = false
     @Published public private(set) var isLoadingMeguriMessages = false
     @Published public private(set) var isLookingUpPostalCode = false
@@ -482,6 +502,7 @@ public final class MegrumAppState: ObservableObject {
     @Published public private(set) var sendingBoardReplyThreadID: UUID?
     @Published public private(set) var unblockingUserID: UUID?
     @Published public private(set) var isMarkingNotificationsRead = false
+    @Published public private(set) var isSavingPushNotificationSetting = false
     @Published public private(set) var isSavingAccountSetup = false
     @Published public private(set) var errorMessage: String?
 
@@ -1274,6 +1295,43 @@ public final class MegrumAppState: ObservableObject {
             errorMessage = "通知を既読にできませんでした"
         }
         isMarkingNotificationsRead = false
+    }
+
+    public func loadPushNotificationSetting() async {
+        guard !isLoadingPushNotificationSetting else {
+            return
+        }
+
+        isLoadingPushNotificationSetting = true
+        errorMessage = nil
+        do {
+            pushNotificationsEnabled = try await repository.loadPushNotificationsEnabled()
+        } catch {
+            errorMessage = "モバイル通知設定を読み込めませんでした"
+        }
+        isLoadingPushNotificationSetting = false
+    }
+
+    @discardableResult
+    public func setPushNotificationsEnabled(_ enabled: Bool) async -> Bool {
+        guard !isSavingPushNotificationSetting else {
+            return false
+        }
+
+        let previous = pushNotificationsEnabled
+        pushNotificationsEnabled = enabled
+        isSavingPushNotificationSetting = true
+        errorMessage = nil
+        do {
+            pushNotificationsEnabled = try await repository.setPushNotificationsEnabled(enabled)
+            isSavingPushNotificationSetting = false
+            return true
+        } catch {
+            pushNotificationsEnabled = previous
+            errorMessage = "モバイル通知設定を保存できませんでした"
+            isSavingPushNotificationSetting = false
+            return false
+        }
     }
 
     public func completeAccountSetup(
