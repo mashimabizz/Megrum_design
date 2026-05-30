@@ -12,6 +12,7 @@ import type { SFSymbol, SymbolViewProps } from "expo-symbols";
 import {
   ActionSheetIOS,
   Alert,
+  ActivityIndicator,
   Animated,
   AppState,
   Easing,
@@ -1552,13 +1553,25 @@ function HomeGroomViewerModal({
   const gestureMode = useRef<"horizontal" | "vertical" | null>(null);
   const [replyFocused, setReplyFocused] = useState(false);
   const [horizontalSwiping, setHorizontalSwiping] = useState(false);
+  const [readyImageKeys, setReadyImageKeys] = useState<Set<string>>(() => new Set());
   const horizontalSwipingRef = useRef(false);
   const [profileUser, setProfileUser] = useState<GroomProfileUser | null>(null);
   const canSend = reply.trim().length > 0;
   const currentIndex = post ? posts.findIndex((item) => item.id === post.id) : -1;
+  const currentImageReady = post ? readyImageKeys.has(homeGroomImageReadyKey(post)) : false;
   const previousPost = currentIndex > 0 ? posts[currentIndex - 1] ?? null : null;
   const nextPost =
     currentIndex >= 0 && currentIndex < posts.length - 1 ? posts[currentIndex + 1] ?? null : null;
+
+  function markImageReady(postToMark: HomeGroomPost) {
+    const key = homeGroomImageReadyKey(postToMark);
+    setReadyImageKeys((current) => {
+      if (current.has(key)) return current;
+      const next = new Set(current);
+      next.add(key);
+      return next;
+    });
+  }
 
   function commitRelativePost(offset: -1 | 1) {
     if (currentIndex < 0) return;
@@ -1744,7 +1757,7 @@ function HomeGroomViewerModal({
 
     progress.stopAnimation((value) => {
       progressValueRef.current = value;
-      if (cancelled || !post || replyFocused || profileUser || horizontalSwiping) return;
+      if (cancelled || !post || !currentImageReady || replyFocused || profileUser || horizontalSwiping) return;
 
       const currentValue = Math.max(0, Math.min(0.99, value));
       animation = Animated.timing(progress, {
@@ -1765,7 +1778,7 @@ function HomeGroomViewerModal({
         progressValueRef.current = value;
       });
     };
-  }, [horizontalSwiping, post?.id, profileUser, progress, replyFocused]);
+  }, [currentImageReady, horizontalSwiping, post?.id, profileUser, progress, replyFocused]);
 
   useEffect(() => {
     const hideSubscription = Keyboard.addListener("keyboardDidHide", () => {
@@ -1801,7 +1814,7 @@ function HomeGroomViewerModal({
   });
   const chromeTopPadding = Math.max(insets.top, 14) + 8;
   const chromeFooterBottom = Math.max(insets.bottom, 12) + 10 + keyboardInset;
-  const currentChrome = post ? (
+  const currentChrome = post && currentImageReady ? (
     <HomeGroomStoryAttachedChrome
       canSend={canSend}
       footerBottom={chromeFooterBottom}
@@ -1846,8 +1859,9 @@ function HomeGroomViewerModal({
             <HomeGroomStoryCube
               currentChrome={currentChrome}
               currentPost={post}
+              imageReadyKeys={readyImageKeys}
               nextChrome={
-                nextPost ? (
+                nextPost && readyImageKeys.has(homeGroomImageReadyKey(nextPost)) ? (
                   <HomeGroomStoryAttachedChrome
                     canSend={false}
                     footerBottom={chromeFooterBottom}
@@ -1860,8 +1874,9 @@ function HomeGroomViewerModal({
                 ) : null
               }
               nextPost={nextPost}
+              onImageReady={markImageReady}
               previousChrome={
-                previousPost ? (
+                previousPost && readyImageKeys.has(homeGroomImageReadyKey(previousPost)) ? (
                   <HomeGroomStoryAttachedChrome
                     canSend={false}
                     footerBottom={chromeFooterBottom}
@@ -1878,42 +1893,44 @@ function HomeGroomViewerModal({
               width={width}
             />
 
-            <Animated.View
-              style={[
-                styles.homeGroomViewerHeader,
-                { opacity: staticChromeOpacity, paddingTop: chromeTopPadding },
-              ]}
-            >
-              <HomeGroomProgressBar currentIndex={Math.max(currentIndex, 0)} posts={posts} progress={progress} />
-              <View style={styles.homeGroomViewerHeaderRow}>
-                <Pressable
-                  accessibilityLabel={`${post.name}のめぐりプロフィールを開く`}
-                  accessibilityRole="button"
-                  onPress={() => openProfileFromGroom(post)}
-                  style={({ pressed }) => [
-                    styles.homeGroomViewerAuthor,
-                    styles.homeGroomViewerAuthorInRow,
-                    pressed ? styles.homeGroomViewerAuthorPressed : null,
-                  ]}
-                >
-                  <View style={[styles.homeGroomViewerFace, post.liked ? styles.homeGroomViewerFaceLiked : null]}>
-                    <Text style={styles.homeGroomViewerFaceText}>{post.name.slice(0, 1)}</Text>
-                  </View>
-                  <View style={styles.homeGroomViewerNameWrap}>
-                    <Text numberOfLines={1} style={styles.homeGroomViewerName}>{post.name}</Text>
-                    <Text numberOfLines={1} style={styles.homeGroomViewerMeta}>{post.timeLabel}</Text>
-                  </View>
-                </Pressable>
-                <Pressable
-                  accessibilityLabel="グルームのメニューを開く"
-                  accessibilityRole="button"
-                  onPress={() => onOpenActions(post)}
-                  style={styles.homeGroomViewerMenuButton}
-                >
-                  <IconSymbol name="ellipsis-horizontal" color="#fff" size={25} />
-                </Pressable>
-              </View>
-            </Animated.View>
+            {currentImageReady ? (
+              <Animated.View
+                style={[
+                  styles.homeGroomViewerHeader,
+                  { opacity: staticChromeOpacity, paddingTop: chromeTopPadding },
+                ]}
+              >
+                <HomeGroomProgressBar currentIndex={Math.max(currentIndex, 0)} posts={posts} progress={progress} />
+                <View style={styles.homeGroomViewerHeaderRow}>
+                  <Pressable
+                    accessibilityLabel={`${post.name}のめぐりプロフィールを開く`}
+                    accessibilityRole="button"
+                    onPress={() => openProfileFromGroom(post)}
+                    style={({ pressed }) => [
+                      styles.homeGroomViewerAuthor,
+                      styles.homeGroomViewerAuthorInRow,
+                      pressed ? styles.homeGroomViewerAuthorPressed : null,
+                    ]}
+                  >
+                    <View style={[styles.homeGroomViewerFace, post.liked ? styles.homeGroomViewerFaceLiked : null]}>
+                      <Text style={styles.homeGroomViewerFaceText}>{post.name.slice(0, 1)}</Text>
+                    </View>
+                    <View style={styles.homeGroomViewerNameWrap}>
+                      <Text numberOfLines={1} style={styles.homeGroomViewerName}>{post.name}</Text>
+                      <Text numberOfLines={1} style={styles.homeGroomViewerMeta}>{post.timeLabel}</Text>
+                    </View>
+                  </Pressable>
+                  <Pressable
+                    accessibilityLabel="グルームのメニューを開く"
+                    accessibilityRole="button"
+                    onPress={() => onOpenActions(post)}
+                    style={styles.homeGroomViewerMenuButton}
+                  >
+                    <IconSymbol name="ellipsis-horizontal" color="#fff" size={25} />
+                  </Pressable>
+                </View>
+              </Animated.View>
+            ) : null}
 
             <View pointerEvents="box-none" style={styles.homeGroomTapLayer}>
               <Pressable
@@ -1930,7 +1947,7 @@ function HomeGroomViewerModal({
               />
             </View>
 
-            {post.caption.trim() ? (
+            {currentImageReady && post.caption.trim() ? (
               <Animated.View style={[styles.homeGroomCaptionPanel, { opacity: staticChromeOpacity }]}>
                 {post.caption.trim() ? (
                   <Text style={styles.homeGroomCaptionText}>{post.caption}</Text>
@@ -1938,13 +1955,13 @@ function HomeGroomViewerModal({
               </Animated.View>
             ) : null}
 
-            {feedback ? (
+            {currentImageReady && feedback ? (
               <View pointerEvents="none" style={styles.homeGroomCenterToast}>
                 <Text style={styles.homeGroomCenterToastText}>{feedback}</Text>
               </View>
             ) : null}
 
-            {replyFocused ? (
+            {currentImageReady && replyFocused ? (
               <Pressable
                 accessibilityLabel="メッセージ入力を閉じる"
                 accessibilityRole="button"
@@ -1956,49 +1973,52 @@ function HomeGroomViewerModal({
               />
             ) : null}
 
-            <Animated.View
-              style={[
-                styles.homeGroomViewerFooter,
-                { opacity: staticChromeOpacity, paddingBottom: chromeFooterBottom },
-              ]}
-            >
-              <View style={styles.homeGroomReplyRow}>
-                <TextInput
-                  maxLength={180}
-                  multiline
-                  onBlur={() => setReplyFocused(false)}
-                  onChangeText={onChangeReply}
-                  onFocus={() => setReplyFocused(true)}
-                  placeholder="メッセージを送信..."
-                  placeholderTextColor="rgba(255,255,255,0.78)"
-                  ref={replyInputRef}
-                  scrollEnabled={false}
-                  style={styles.homeGroomReplyInput}
-                  value={reply}
-                />
-                <Pressable
-                  accessibilityLabel={post.liked ? "いいねを取り消す" : "いいねする"}
-                  accessibilityRole="button"
-                  onPress={onLike}
-                  style={styles.homeGroomViewerAction}
-                >
-                  <IconSymbol
-                    name={post.liked ? "heart" : "heart-outline"}
-                    color={post.liked ? megrumColors.pink : "#fff"}
-                    size={31}
+            {currentImageReady ? (
+              <Animated.View
+                style={[
+                  styles.homeGroomViewerFooter,
+                  { opacity: staticChromeOpacity, paddingBottom: chromeFooterBottom },
+                ]}
+              >
+                <View style={styles.homeGroomReplyRow}>
+                  <TextInput
+                    maxLength={180}
+                    multiline
+                    onBlur={() => setReplyFocused(false)}
+                    onChangeText={onChangeReply}
+                    onFocus={() => setReplyFocused(true)}
+                    placeholder="メッセージを送信..."
+                    placeholderTextColor="rgba(255,255,255,0.78)"
+                    ref={replyInputRef}
+                    scrollEnabled={false}
+                    style={styles.homeGroomReplyInput}
+                    value={reply}
                   />
-                </Pressable>
-                <Pressable
-                  accessibilityLabel="メッセージを送信"
-                  accessibilityRole="button"
-                  disabled={!canSend}
-                  onPress={sendReplyAndDismiss}
-                  style={[styles.homeGroomViewerAction, !canSend ? styles.homeGroomSendButtonDisabled : null]}
-                >
-                  <IconSymbol name="send-outline" color="#fff" size={31} />
-                </Pressable>
-              </View>
-            </Animated.View>
+                  <Pressable
+                    accessibilityLabel={post.liked ? "いいねを取り消す" : "いいねする"}
+                    accessibilityRole="button"
+                    onPress={onLike}
+                    style={styles.homeGroomViewerAction}
+                  >
+                    <IconSymbol
+                      name={post.liked ? "heart" : "heart-outline"}
+                      color={post.liked ? megrumColors.pink : "#fff"}
+                      size={31}
+                    />
+                  </Pressable>
+                  <Pressable
+                    accessibilityLabel="メッセージを送信"
+                    accessibilityRole="button"
+                    disabled={!canSend}
+                    onPress={sendReplyAndDismiss}
+                    style={[styles.homeGroomViewerAction, !canSend ? styles.homeGroomSendButtonDisabled : null]}
+                  >
+                    <IconSymbol name="send-outline" color="#fff" size={31} />
+                  </Pressable>
+                </View>
+              </Animated.View>
+            ) : null}
+
             <GroomProfileSlidePanel
               onClose={() => setProfileUser(null)}
               onReply={focusReplyInputAfterProfile}
@@ -2036,11 +2056,25 @@ function homeGroomProfileUser(post: HomeGroomPost): GroomProfileUser {
   };
 }
 
+function homeGroomImageReadyKey(post: HomeGroomPost) {
+  return `${post.id}:${post.imageUri}`;
+}
+
+function HomeGroomImageLoadingOverlay() {
+  return (
+    <View pointerEvents="none" style={styles.homeGroomImageLoadingOverlay}>
+      <ActivityIndicator color="#fff" size="large" />
+    </View>
+  );
+}
+
 function HomeGroomStoryCube({
   currentPost,
   currentChrome,
+  imageReadyKeys,
   nextPost,
   nextChrome,
+  onImageReady,
   previousPost,
   previousChrome,
   swipeX,
@@ -2048,8 +2082,10 @@ function HomeGroomStoryCube({
 }: {
   currentPost: HomeGroomPost;
   currentChrome?: ReactNode;
+  imageReadyKeys: ReadonlySet<string>;
   nextPost: HomeGroomPost | null;
   nextChrome?: ReactNode;
+  onImageReady: (post: HomeGroomPost) => void;
   previousPost: HomeGroomPost | null;
   previousChrome?: ReactNode;
   swipeX: Animated.Value;
@@ -2167,6 +2203,8 @@ function HomeGroomStoryCube({
         >
           <HomeGroomStoryFaceContent
             chrome={previousChrome}
+            imageReady={imageReadyKeys.has(homeGroomImageReadyKey(previousPost))}
+            onImageReady={() => onImageReady(previousPost)}
             post={previousPost}
             shadeOpacity={previousShadeOpacity}
           />
@@ -2187,7 +2225,13 @@ function HomeGroomStoryCube({
             },
           ]}
         >
-          <HomeGroomStoryFaceContent chrome={nextChrome} post={nextPost} shadeOpacity={nextShadeOpacity} />
+          <HomeGroomStoryFaceContent
+            chrome={nextChrome}
+            imageReady={imageReadyKeys.has(homeGroomImageReadyKey(nextPost))}
+            onImageReady={() => onImageReady(nextPost)}
+            post={nextPost}
+            shadeOpacity={nextShadeOpacity}
+          />
         </Animated.View>
       ) : null}
       <Animated.View
@@ -2207,6 +2251,8 @@ function HomeGroomStoryCube({
         <HomeGroomStoryFaceContent
           chrome={currentChrome}
           chromeOpacity={currentToNextChromeOpacity}
+          imageReady={imageReadyKeys.has(homeGroomImageReadyKey(currentPost))}
+          onImageReady={() => onImageReady(currentPost)}
           post={currentPost}
           shadeOpacity={currentToNextShadeOpacity}
         />
@@ -2228,6 +2274,8 @@ function HomeGroomStoryCube({
         <HomeGroomStoryFaceContent
           chrome={currentChrome}
           chromeOpacity={currentToPreviousChromeOpacity}
+          imageReady={imageReadyKeys.has(homeGroomImageReadyKey(currentPost))}
+          onImageReady={() => onImageReady(currentPost)}
           post={currentPost}
           shadeOpacity={currentToPreviousShadeOpacity}
         />
@@ -2239,29 +2287,37 @@ function HomeGroomStoryCube({
 function HomeGroomStoryFaceContent({
   chrome,
   chromeOpacity = 1,
+  imageReady,
+  onImageReady,
   post,
   shadeOpacity,
 }: {
   chrome?: ReactNode;
   chromeOpacity?: number | Animated.AnimatedInterpolation<number>;
+  imageReady: boolean;
+  onImageReady: () => void;
   post: HomeGroomPost;
   shadeOpacity?: number | Animated.AnimatedInterpolation<number>;
 }) {
   return (
     <>
-      <HomeGroomStoryImageLayer transform={post.imageTransform} uri={post.imageUri} />
-      <HomeGroomStoryDecorations
-        doodles={post.doodles ?? []}
-        stickers={post.stickers ?? []}
-        textOverlays={post.textOverlays ?? []}
-      />
-      {shadeOpacity !== undefined ? (
+      <HomeGroomStoryImageLayer onReady={onImageReady} transform={post.imageTransform} uri={post.imageUri} />
+      {imageReady ? (
+        <HomeGroomStoryDecorations
+          doodles={post.doodles ?? []}
+          stickers={post.stickers ?? []}
+          textOverlays={post.textOverlays ?? []}
+        />
+      ) : (
+        <HomeGroomImageLoadingOverlay />
+      )}
+      {imageReady && shadeOpacity !== undefined ? (
         <Animated.View
           pointerEvents="none"
           style={[styles.homeGroomStoryCubeShade, { opacity: shadeOpacity }]}
         />
       ) : null}
-      {chrome ? (
+      {imageReady && chrome ? (
         <Animated.View
           pointerEvents="none"
           style={[StyleSheet.absoluteFillObject, { opacity: chromeOpacity }]}
@@ -2274,9 +2330,11 @@ function HomeGroomStoryFaceContent({
 }
 
 function HomeGroomStoryImageLayer({
+  onReady,
   transform,
   uri,
 }: {
+  onReady?: () => void;
   transform?: HomeGroomImageTransform;
   uri: string;
 }) {
@@ -2301,7 +2359,7 @@ function HomeGroomStoryImageLayer({
   }, [uri]);
 
   if (!transform || isDefaultHomeGroomImageTransform(transform)) {
-    return <Image resizeMode="cover" source={{ uri }} style={StyleSheet.absoluteFillObject} />;
+    return <Image onLoadEnd={onReady} resizeMode="cover" source={{ uri }} style={StyleSheet.absoluteFillObject} />;
   }
 
   const canvasWidth = Math.max(canvasSize.width, 1);
@@ -2339,7 +2397,7 @@ function HomeGroomStoryImageLayer({
           },
         ]}
       >
-        <Image resizeMode="cover" source={{ uri }} style={StyleSheet.absoluteFillObject} />
+        <Image onLoadEnd={onReady} resizeMode="cover" source={{ uri }} style={StyleSheet.absoluteFillObject} />
       </Animated.View>
     </View>
   );
@@ -3666,6 +3724,13 @@ const styles = StyleSheet.create({
   homeGroomStoryCubeShade: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: "#000",
+  },
+  homeGroomImageLoadingOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: "center",
+    backgroundColor: "#05080d",
+    justifyContent: "center",
+    zIndex: 10,
   },
   homeGroomStoryBackdrop: {
     ...StyleSheet.absoluteFillObject,

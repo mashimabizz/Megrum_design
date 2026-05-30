@@ -1412,6 +1412,7 @@ function GroomViewerModal({
   const gestureMode = useRef<"horizontal" | "vertical" | null>(null);
   const [replyFocused, setReplyFocused] = useState(false);
   const [horizontalSwiping, setHorizontalSwiping] = useState(false);
+  const [readyImageKeys, setReadyImageKeys] = useState<Set<string>>(() => new Set());
   const horizontalSwipingRef = useRef(false);
   const [profileUser, setProfileUser] = useState<GroomProfileUser | null>(null);
   const canSend = reply.trim().length > 0;
@@ -1446,6 +1447,17 @@ function GroomViewerModal({
   );
   const previousAccountPost = previousAccountPosts[previousAccountPosts.length - 1] ?? null;
   const nextAccountPost = nextAccountPosts[0] ?? null;
+  const currentImageReady = post ? readyImageKeys.has(groomImageReadyKey(post)) : false;
+
+  function markImageReady(postToMark: GroomPost) {
+    const key = groomImageReadyKey(postToMark);
+    setReadyImageKeys((current) => {
+      if (current.has(key)) return current;
+      const next = new Set(current);
+      next.add(key);
+      return next;
+    });
+  }
 
   function setHorizontalSwipeActive(active: boolean) {
     if (horizontalSwipingRef.current === active) return;
@@ -1668,7 +1680,7 @@ function GroomViewerModal({
 
     progress.stopAnimation((value) => {
       progressValueRef.current = value;
-      if (cancelled || !post || replyFocused || profileUser || horizontalSwiping) return;
+      if (cancelled || !post || !currentImageReady || replyFocused || profileUser || horizontalSwiping) return;
 
       const currentValue = Math.max(0, Math.min(0.99, value));
       animation = Animated.timing(progress, {
@@ -1689,7 +1701,7 @@ function GroomViewerModal({
         progressValueRef.current = value;
       });
     };
-  }, [horizontalSwiping, post?.id, profileUser, progress, replyFocused]);
+  }, [currentImageReady, horizontalSwiping, post?.id, profileUser, progress, replyFocused]);
 
   useEffect(() => {
     const hideSubscription = Keyboard.addListener("keyboardDidHide", () => {
@@ -1771,7 +1783,7 @@ function GroomViewerModal({
   });
   const chromeTopPadding = Math.max(insets.top, 14) + 8;
   const chromeFooterBottom = Math.max(insets.bottom, 12) + 10 + keyboardInset;
-  const currentChrome = post ? (
+  const currentChrome = post && currentImageReady ? (
     <GroomStoryAttachedChrome
       canSend={canSend}
       footerBottom={chromeFooterBottom}
@@ -1835,8 +1847,9 @@ function GroomViewerModal({
               <GroomStoryCube
                 currentChrome={currentChrome}
                 currentPost={post}
+                imageReadyKeys={readyImageKeys}
                 nextChrome={
-                  nextAccountPost ? (
+                  nextAccountPost && readyImageKeys.has(groomImageReadyKey(nextAccountPost)) ? (
                     <GroomStoryAttachedChrome
                       canSend={false}
                       footerBottom={chromeFooterBottom}
@@ -1848,8 +1861,9 @@ function GroomViewerModal({
                   ) : null
                 }
                 nextPost={nextAccountPost}
+                onImageReady={markImageReady}
                 previousChrome={
-                  previousAccountPost ? (
+                  previousAccountPost && readyImageKeys.has(groomImageReadyKey(previousAccountPost)) ? (
                     <GroomStoryAttachedChrome
                       canSend={false}
                       footerBottom={chromeFooterBottom}
@@ -1866,49 +1880,51 @@ function GroomViewerModal({
                 width={width}
               />
 
-              <Animated.View
-                style={[
-                  styles.groomViewerHeader,
-                  { opacity: staticChromeOpacity, paddingTop: chromeTopPadding },
-                ]}
-              >
-                <GroomProgressBar
-                  currentIndex={Math.max(currentPostIndex, 0)}
-                  posts={currentGroupPosts.length ? currentGroupPosts : post ? [post] : []}
-                  progress={progress}
-                />
-                <View style={styles.groomViewerHeaderRow}>
-                  <Pressable
-                    accessibilityLabel={`${groomAuthorName(post)}のめぐりプロフィールを開く`}
-                    accessibilityRole="button"
-                    disabled={!post.author}
-                    onPress={() => openProfileFromGroom(post)}
-                    style={({ pressed }) => [
-                      styles.groomViewerAuthor,
-                      pressed ? styles.groomViewerAuthorPressed : null,
-                      !post.author ? styles.groomViewerAuthorDisabled : null,
-                    ]}
-                  >
-                    <GroomFaceAvatar post={post} />
-                    <View style={styles.groomViewerNameWrap}>
-                      <Text numberOfLines={1} style={styles.groomViewerName}>
-                        {groomAuthorName(post)}
-                      </Text>
-                      <Text numberOfLines={1} style={styles.groomViewerMeta}>
-                        {post.timeLabel}
-                      </Text>
-                    </View>
-                  </Pressable>
-                  <Pressable
-                    accessibilityLabel="グルームのメニューを開く"
-                    accessibilityRole="button"
-                    onPress={() => onOpenActions(post)}
-                    style={styles.groomViewerMenuButton}
-                  >
-                    <IconSymbol name="ellipsis-horizontal" color="#fff" size={25} />
-                  </Pressable>
-                </View>
-              </Animated.View>
+              {currentImageReady ? (
+                <Animated.View
+                  style={[
+                    styles.groomViewerHeader,
+                    { opacity: staticChromeOpacity, paddingTop: chromeTopPadding },
+                  ]}
+                >
+                  <GroomProgressBar
+                    currentIndex={Math.max(currentPostIndex, 0)}
+                    posts={currentGroupPosts.length ? currentGroupPosts : post ? [post] : []}
+                    progress={progress}
+                  />
+                  <View style={styles.groomViewerHeaderRow}>
+                    <Pressable
+                      accessibilityLabel={`${groomAuthorName(post)}のめぐりプロフィールを開く`}
+                      accessibilityRole="button"
+                      disabled={!post.author}
+                      onPress={() => openProfileFromGroom(post)}
+                      style={({ pressed }) => [
+                        styles.groomViewerAuthor,
+                        pressed ? styles.groomViewerAuthorPressed : null,
+                        !post.author ? styles.groomViewerAuthorDisabled : null,
+                      ]}
+                    >
+                      <GroomFaceAvatar post={post} />
+                      <View style={styles.groomViewerNameWrap}>
+                        <Text numberOfLines={1} style={styles.groomViewerName}>
+                          {groomAuthorName(post)}
+                        </Text>
+                        <Text numberOfLines={1} style={styles.groomViewerMeta}>
+                          {post.timeLabel}
+                        </Text>
+                      </View>
+                    </Pressable>
+                    <Pressable
+                      accessibilityLabel="グルームのメニューを開く"
+                      accessibilityRole="button"
+                      onPress={() => onOpenActions(post)}
+                      style={styles.groomViewerMenuButton}
+                    >
+                      <IconSymbol name="ellipsis-horizontal" color="#fff" size={25} />
+                    </Pressable>
+                  </View>
+                </Animated.View>
+              ) : null}
 
               <View pointerEvents="box-none" style={styles.groomTapLayer}>
                 <Pressable
@@ -1925,7 +1941,7 @@ function GroomViewerModal({
                 />
               </View>
 
-              {post.caption.trim() ? (
+              {currentImageReady && post.caption.trim() ? (
                 <Animated.View style={[styles.groomCaptionPanel, { opacity: staticChromeOpacity }]}>
                   {post.caption.trim() ? (
                     <Text style={styles.groomCaptionText}>{post.caption}</Text>
@@ -1933,13 +1949,13 @@ function GroomViewerModal({
                 </Animated.View>
               ) : null}
 
-              {feedback ? (
+              {currentImageReady && feedback ? (
                 <View pointerEvents="none" style={styles.groomCenterToast}>
                   <Text style={styles.groomCenterToastText}>{feedback}</Text>
                 </View>
               ) : null}
 
-              {replyFocused ? (
+              {currentImageReady && replyFocused ? (
                 <Pressable
                   accessibilityLabel="メッセージ入力を閉じる"
                   accessibilityRole="button"
@@ -1951,49 +1967,51 @@ function GroomViewerModal({
                 />
               ) : null}
 
-              <Animated.View
-                style={[
-                  styles.groomViewerFooter,
-                  { opacity: staticChromeOpacity, paddingBottom: chromeFooterBottom },
-                ]}
-              >
-                <View style={styles.groomReplyRow}>
-                  <TextInput
-                    maxLength={180}
-                    multiline
-                    onChangeText={onChangeReply}
-                    onBlur={() => setReplyFocused(false)}
-                    onFocus={() => setReplyFocused(true)}
-                    placeholder="メッセージを送信..."
-                    placeholderTextColor="rgba(255,255,255,0.78)"
-                    ref={replyInputRef}
-                    scrollEnabled={false}
-                    style={styles.groomReplyInput}
-                    value={reply}
-                  />
-                  <Pressable
-                    accessibilityLabel={post.liked ? "いいねを取り消す" : "いいねする"}
-                    accessibilityRole="button"
-                    onPress={onLike}
-                    style={styles.groomViewerAction}
-                  >
-                    <IconSymbol
-                      name={post.liked ? "heart" : "heart-outline"}
-                      color={post.liked ? megrumColors.pink : "#fff"}
-                      size={31}
+              {currentImageReady ? (
+                <Animated.View
+                  style={[
+                    styles.groomViewerFooter,
+                    { opacity: staticChromeOpacity, paddingBottom: chromeFooterBottom },
+                  ]}
+                >
+                  <View style={styles.groomReplyRow}>
+                    <TextInput
+                      maxLength={180}
+                      multiline
+                      onChangeText={onChangeReply}
+                      onBlur={() => setReplyFocused(false)}
+                      onFocus={() => setReplyFocused(true)}
+                      placeholder="メッセージを送信..."
+                      placeholderTextColor="rgba(255,255,255,0.78)"
+                      ref={replyInputRef}
+                      scrollEnabled={false}
+                      style={styles.groomReplyInput}
+                      value={reply}
                     />
-                  </Pressable>
-                  <Pressable
-                    accessibilityLabel="メッセージを送信"
-                    accessibilityRole="button"
-                    disabled={!canSend}
-                    onPress={sendReplyAndDismiss}
-                    style={[styles.groomViewerAction, !canSend ? styles.groomSendButtonDisabled : null]}
-                  >
-                    <IconSymbol name="send-outline" color="#fff" size={31} />
-                  </Pressable>
-                </View>
-              </Animated.View>
+                    <Pressable
+                      accessibilityLabel={post.liked ? "いいねを取り消す" : "いいねする"}
+                      accessibilityRole="button"
+                      onPress={onLike}
+                      style={styles.groomViewerAction}
+                    >
+                      <IconSymbol
+                        name={post.liked ? "heart" : "heart-outline"}
+                        color={post.liked ? megrumColors.pink : "#fff"}
+                        size={31}
+                      />
+                    </Pressable>
+                    <Pressable
+                      accessibilityLabel="メッセージを送信"
+                      accessibilityRole="button"
+                      disabled={!canSend}
+                      onPress={sendReplyAndDismiss}
+                      style={[styles.groomViewerAction, !canSend ? styles.groomSendButtonDisabled : null]}
+                    >
+                      <IconSymbol name="send-outline" color="#fff" size={31} />
+                    </Pressable>
+                  </View>
+                </Animated.View>
+              ) : null}
               <GroomProfileSlidePanel
                 onClose={() => setProfileUser(null)}
                 onReply={focusReplyInputAfterProfile}
@@ -2007,11 +2025,25 @@ function GroomViewerModal({
   );
 }
 
+function groomImageReadyKey(post: GroomPost) {
+  return `${post.id}:${post.imageUri}`;
+}
+
+function GroomImageLoadingOverlay() {
+  return (
+    <View pointerEvents="none" style={styles.groomImageLoadingOverlay}>
+      <ActivityIndicator color="#fff" size="large" />
+    </View>
+  );
+}
+
 function GroomStoryCube({
   currentPost,
   currentChrome,
+  imageReadyKeys,
   nextPost,
   nextChrome,
+  onImageReady,
   previousPost,
   previousChrome,
   swipeX,
@@ -2019,8 +2051,10 @@ function GroomStoryCube({
 }: {
   currentPost: GroomPost;
   currentChrome?: ReactNode;
+  imageReadyKeys: ReadonlySet<string>;
   nextPost: GroomPost | null;
   nextChrome?: ReactNode;
+  onImageReady: (post: GroomPost) => void;
   previousPost: GroomPost | null;
   previousChrome?: ReactNode;
   swipeX: Animated.Value;
@@ -2140,6 +2174,8 @@ function GroomStoryCube({
         >
           <GroomStoryFaceContent
             chrome={previousChrome}
+            imageReady={imageReadyKeys.has(groomImageReadyKey(previousPost))}
+            onImageReady={() => onImageReady(previousPost)}
             post={previousPost}
             shadeOpacity={previousShadeOpacity}
           />
@@ -2160,7 +2196,13 @@ function GroomStoryCube({
             },
           ]}
         >
-          <GroomStoryFaceContent chrome={nextChrome} post={nextPost} shadeOpacity={nextShadeOpacity} />
+          <GroomStoryFaceContent
+            chrome={nextChrome}
+            imageReady={imageReadyKeys.has(groomImageReadyKey(nextPost))}
+            onImageReady={() => onImageReady(nextPost)}
+            post={nextPost}
+            shadeOpacity={nextShadeOpacity}
+          />
         </Animated.View>
       ) : null}
       <Animated.View
@@ -2180,6 +2222,8 @@ function GroomStoryCube({
         <GroomStoryFaceContent
           chrome={currentChrome}
           chromeOpacity={currentToNextChromeOpacity}
+          imageReady={imageReadyKeys.has(groomImageReadyKey(currentPost))}
+          onImageReady={() => onImageReady(currentPost)}
           post={currentPost}
           shadeOpacity={currentToNextShadeOpacity}
         />
@@ -2201,6 +2245,8 @@ function GroomStoryCube({
         <GroomStoryFaceContent
           chrome={currentChrome}
           chromeOpacity={currentToPreviousChromeOpacity}
+          imageReady={imageReadyKeys.has(groomImageReadyKey(currentPost))}
+          onImageReady={() => onImageReady(currentPost)}
           post={currentPost}
           shadeOpacity={currentToPreviousShadeOpacity}
         />
@@ -2212,29 +2258,37 @@ function GroomStoryCube({
 function GroomStoryFaceContent({
   chrome,
   chromeOpacity = 1,
+  imageReady,
+  onImageReady,
   post,
   shadeOpacity,
 }: {
   chrome?: ReactNode;
   chromeOpacity?: number | Animated.AnimatedInterpolation<number>;
+  imageReady: boolean;
+  onImageReady: () => void;
   post: GroomPost;
   shadeOpacity?: number | Animated.AnimatedInterpolation<number>;
 }) {
   return (
     <>
-      <GroomStoryImageLayer transform={post.imageTransform} uri={post.imageUri} />
-      <GroomStoryDecorations
-        doodles={post.doodles ?? []}
-        stickers={post.stickers ?? []}
-        textOverlays={post.textOverlays ?? []}
-      />
-      {shadeOpacity !== undefined ? (
+      <GroomStoryImageLayer onReady={onImageReady} transform={post.imageTransform} uri={post.imageUri} />
+      {imageReady ? (
+        <GroomStoryDecorations
+          doodles={post.doodles ?? []}
+          stickers={post.stickers ?? []}
+          textOverlays={post.textOverlays ?? []}
+        />
+      ) : (
+        <GroomImageLoadingOverlay />
+      )}
+      {imageReady && shadeOpacity !== undefined ? (
         <Animated.View
           pointerEvents="none"
           style={[styles.groomStoryCubeShade, { opacity: shadeOpacity }]}
         />
       ) : null}
-      {chrome ? (
+      {imageReady && chrome ? (
         <Animated.View
           pointerEvents="none"
           style={[StyleSheet.absoluteFillObject, { opacity: chromeOpacity }]}
@@ -2247,9 +2301,11 @@ function GroomStoryFaceContent({
 }
 
 function GroomStoryImageLayer({
+  onReady,
   transform,
   uri,
 }: {
+  onReady?: () => void;
   transform?: GroomImageTransform;
   uri: string;
 }) {
@@ -2283,7 +2339,7 @@ function GroomStoryImageLayer({
   const top = (canvasHeight - frameHeight) / 2;
 
   if (!transform || isDefaultGroomImageTransform(transform)) {
-    return <Image resizeMode="cover" source={{ uri }} style={StyleSheet.absoluteFillObject} />;
+    return <Image onLoadEnd={onReady} resizeMode="cover" source={{ uri }} style={StyleSheet.absoluteFillObject} />;
   }
 
   return (
@@ -2313,6 +2369,7 @@ function GroomStoryImageLayer({
         ]}
       >
         <Image
+          onLoadEnd={onReady}
           resizeMode="cover"
           source={{ uri }}
           style={[StyleSheet.absoluteFillObject, styles.groomStoryForegroundImage]}
@@ -4415,6 +4472,13 @@ const styles = StyleSheet.create({
   groomStoryCubeShade: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: "#000",
+  },
+  groomImageLoadingOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: "center",
+    backgroundColor: "#05080d",
+    justifyContent: "center",
+    zIndex: 10,
   },
   groomDoodleDot: {
     borderRadius: 999,
