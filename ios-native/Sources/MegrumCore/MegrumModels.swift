@@ -126,6 +126,75 @@ public struct AuthSession: Codable, Hashable, Sendable {
     }
 }
 
+public enum OshiKind: String, Codable, Sendable, CaseIterable, Identifiable {
+    case box
+    case specific
+    case multi
+
+    public var id: String { rawValue }
+}
+
+public struct OshiGroup: Identifiable, Codable, Hashable, Sendable {
+    public var id: UUID
+    public var name: String
+    public var aliases: [String]
+    public var displayOrder: Int
+
+    public init(id: UUID, name: String, aliases: [String] = [], displayOrder: Int = 0) {
+        self.id = id
+        self.name = name
+        self.aliases = aliases
+        self.displayOrder = displayOrder
+    }
+}
+
+public struct OshiCharacter: Identifiable, Codable, Hashable, Sendable {
+    public var id: UUID
+    public var groupID: UUID
+    public var name: String
+    public var aliases: [String]
+    public var displayOrder: Int
+
+    public init(
+        id: UUID,
+        groupID: UUID,
+        name: String,
+        aliases: [String] = [],
+        displayOrder: Int = 0
+    ) {
+        self.id = id
+        self.groupID = groupID
+        self.name = name
+        self.aliases = aliases
+        self.displayOrder = displayOrder
+    }
+}
+
+public struct UserOshiSelection: Identifiable, Codable, Hashable, Sendable {
+    public var id: UUID
+    public var userID: UUID
+    public var groupID: UUID?
+    public var characterID: UUID?
+    public var kind: OshiKind
+    public var priority: Int
+
+    public init(
+        id: UUID,
+        userID: UUID,
+        groupID: UUID?,
+        characterID: UUID?,
+        kind: OshiKind,
+        priority: Int
+    ) {
+        self.id = id
+        self.userID = userID
+        self.groupID = groupID
+        self.characterID = characterID
+        self.kind = kind
+        self.priority = priority
+    }
+}
+
 public struct GoodsTag: Identifiable, Codable, Hashable, Sendable {
     public var id: UUID
     public var name: String

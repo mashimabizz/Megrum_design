@@ -18,6 +18,7 @@ The existing Expo / React Native app under `mobile/` remains the rollback source
 - `Sources/MegrumApp/AccountSetupScreen.swift` contains the first native account setup screen for users whose `account_status` still requires onboarding.
 - `Sources/MegrumData/SupabaseAuthClient.swift` contains the first Supabase Auth request layer for email/password login, signup, and logout.
 - `Sources/MegrumData/SupabaseAccountClient.swift` contains the account bootstrap request layer that ensures a Megrum `public.users` profile after signup.
+- `Sources/MegrumData/SupabaseOshiClient.swift` contains the first request layer for reading `groups_master` and `characters_master` into native oshi selection flows.
 - `Sources/MegrumData/AuthSessionStore.swift` contains the session persistence boundary. Live auth uses Keychain; tests and preview mode use an in-memory store.
 - `Tests/MegrumCoreTests`, `Tests/MegrumDataTests`, and `Tests/MegrumAppTests` verify state names, display labels, Supabase request construction, and the preview repository load path.
 
@@ -48,6 +49,8 @@ When an auth session is available, `MegrumAppStateFactory.repository(authSession
 After email/password signup returns a session, `SupabaseMegrumAuthRepository` calls `SupabaseAccountClient.ensureUserProfile(...)` so the native app has a matching Megrum profile row before moving into account setup screens.
 
 `UserProfile.accountStatus` mirrors `users.account_status`. `registered`, `verified`, and `onboarding` route into `AccountSetupScreen`; `active` routes into the main native tab shell.
+
+`OshiGroup` and `OshiCharacter` mirror `groups_master` and `characters_master`. `SupabaseOshiClient` can load L1 groups and L2 characters for onboarding, inventory/Wish editing, and search filters. Saving `user_oshi` selections is the next native account setup step.
 
 For the Xcode app host, use CLI-first verification:
 

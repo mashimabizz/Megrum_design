@@ -4,6 +4,60 @@
 
 ---
 
+## イテレーション309：Swift推しマスタ読込境界を追加
+
+### 背景・問題意識
+
+iter308で初回プロフィール設定画面への分岐が入ったが、Megrumのオンボーディングは表示名だけでは足りず、推しグループ/メンバーの選択が必要になる。既存DBでは `groups_master` / `characters_master` / `user_oshi` が正のデータモデルなので、次にUIを作る前にSwift側へL1/L2マスタを読む型とSupabase client境界を追加した。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumCore/MegrumModels.swift`
+- `OshiKind`、`OshiGroup`、`OshiCharacter`、`UserOshiSelection` を追加した。
+- 推しグループ、推しメンバー、ユーザーの推し選択をSwift側のdomain modelとして扱えるようにした。
+
+#### `ios-native/Sources/MegrumData/SupabaseOshiClient.swift`
+- `SupabaseOshiClient` を追加した。
+- `groups_master` からL1マスタを検索/取得する `loadGroups(searchText:limit:)` を追加した。
+- `characters_master` から選択グループ配下のL2マスタを取得する `loadCharacters(groupID:limit:)` を追加した。
+- request生成メソッドを公開し、テストでURL / query / headerを検証できるようにした。
+
+#### `ios-native/Tests/MegrumDataTests/SupabaseOshiClientTests.swift`
+- L1検索requestが `groups_master` に対して `name=ilike.*...*` とorder/limitを付けることを検証した。
+- L2取得requestが `characters_master` に対して `group_id=eq.<uuid>` とorder/limitを付けることを検証した。
+
+### 影響範囲
+
+- Swift Native版の初回推し設定
+- 在庫/Wish登録時のグループ・メンバー選択
+- 検索フィルターのグループ・メンバー選択
+- 既存SupabaseマスタのSwift利用境界
+
+### 確認方法
+
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-build --enable-xctest --disable-swift-testing -j 1`
+- `git diff --check -- ios-native/Sources/MegrumCore/MegrumModels.swift ios-native/Sources/MegrumData/SupabaseOshiClient.swift ios-native/Tests/MegrumDataTests/SupabaseOshiClientTests.swift ios-native/README.md notes/22_swift_native_migration.md notes/08_design_iterations.md`
+
+### 関連ファイル
+
+- `ios-native/Sources/MegrumCore/MegrumModels.swift`
+- `ios-native/Sources/MegrumData/SupabaseOshiClient.swift`
+- `ios-native/Tests/MegrumDataTests/SupabaseOshiClientTests.swift`
+- `ios-native/README.md`
+- `notes/22_swift_native_migration.md`
+- `notes/08_design_iterations.md`
+
+### セルフレビュー結果
+
+- ✅ 既存DBの `groups_master` / `characters_master` を前提にした。
+- ✅ UI実装前にrequest境界をテスト可能に分離した。
+- ✅ Swift Package testsが21件成功した。
+- ✅ 状態遷移・用語・DBスキーマ変更はないため、`notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要。
+- ⚠️ `user_oshi` への保存と初回推し設定UIは次工程で実装する。
+- ✅ TestFlight配布はまだ行っていないため、Preview OTA / TestFlight配信は不要。
+
+---
+
 ## イテレーション308：Swift初回プロフィール設定分岐を追加
 
 ### 背景・問題意識

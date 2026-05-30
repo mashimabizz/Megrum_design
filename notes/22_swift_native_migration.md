@@ -1,7 +1,7 @@
 # 22. Swift Native Migration
 
 最終更新: 2026-05-31
-ステータス: Active draft（iter308）
+ステータス: Active draft（iter309）
 
 ## 目的
 
@@ -107,7 +107,8 @@ tar -xzf /Users/michitaka/Desktop/Megrum_backups/pre-swift-migration-20260531-03
 - iter306で、保存済みまたはログイン直後の `AuthSession` を `MegrumAppStateFactory.repository(authSession:)` に渡し、session access tokenとuser idを `SupabaseMegrumRepository` へ反映できるようにした。
 - iter307で、Supabase Authの新規登録成功後に `public.users` のMegrumプロフィール行をupsertする `SupabaseAccountClient` を追加した。
 - iter308で、`users.account_status` を `AccountStatus` としてSwift型化し、`registered / verified / onboarding` のユーザーを初回プロフィール設定画面へ分岐できるようにした。
-- 現時点のAuthはOAuth・メールリンク復帰・推し設定を含むフルオンボーディングまでは未完了。次のPhase 2作業で認証リンク処理、Apple/Google、初回推し設定へ広げる。
+- iter309で、`OshiKind` / `OshiGroup` / `OshiCharacter` / `UserOshiSelection` と `SupabaseOshiClient` を追加し、`groups_master` と `characters_master` をSwift側から読める境界を作った。
+- 現時点のAuthはOAuth・メールリンク復帰・推し設定保存を含むフルオンボーディングまでは未完了。次のPhase 2作業で認証リンク処理、Apple/Google、`user_oshi` 保存、初回推し設定UIへ広げる。
 
 ### Phase 3: Exchange core
 
