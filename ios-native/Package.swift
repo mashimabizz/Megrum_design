@@ -10,11 +10,13 @@ let package = Package(
     ],
     products: [
         .library(name: "MegrumCore", targets: ["MegrumCore"]),
-        .library(name: "MegrumDesign", targets: ["MegrumDesign"])
+        .library(name: "MegrumDesign", targets: ["MegrumDesign"]),
+        .library(name: "MegrumApp", targets: ["MegrumApp"])
     ],
     targets: [
         .target(name: "MegrumCore"),
         .target(name: "MegrumDesign", dependencies: ["MegrumCore"]),
+        .target(name: "MegrumApp", dependencies: ["MegrumCore", "MegrumDesign"]),
         .testTarget(name: "MegrumCoreTests", dependencies: ["MegrumCore"])
     ]
 )

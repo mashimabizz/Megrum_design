@@ -4,6 +4,71 @@
 
 ---
 
+## イテレーション300：SwiftUIアプリシェルを追加
+
+### 背景・問題意識
+
+オーナーから、止めるまでSwiftへの完全移行を進めるよう指示があった。iter299でSwift Nativeの土台を作ったため、次の段階として、Xcodeアプリターゲットからそのまま載せられるSwiftUIのRootViewと主要タブ画面を作り、ホーム・検索・在庫・Wish・やりとり・めぐりをSwift側で組み始める必要があった。
+
+### 変更内容
+
+#### `ios-native/Package.swift`
+- `MegrumApp` library product / targetを追加した。
+
+#### `ios-native/Sources/MegrumApp/`
+- `MegrumRootView` を追加し、SwiftUI `TabView` でホーム、在庫、Wish、やりとり、めぐりの5タブ構成を作った。
+- `HomeScreen` を追加し、中央 `Megrum` ヘッダー、自分アイコン、Liquid Glass検索ボタン、マッチ系セクションをSwiftUIで実装した。
+- `SearchScreen` を追加し、検索タイトル、グッズグリッド、下部検索バーをSwiftUIで実装した。
+- `GoodsGrid` / `GoodsTile` を追加し、在庫・Wish・検索で使えるカードグリッドを実装した。
+- `TradesScreen` を追加し、打診中/進行中の取引カードの最初の表示骨格を実装した。
+- `MeguriScreen` を追加し、グルーム、掲示板、固定の「スレッドを立てる」導線の最初の表示骨格を実装した。
+- `NativePreviewData` を追加し、SwiftUI画面をSupabase接続前でも表示確認できる固定データを用意した。
+- `AppChrome` を追加し、iOSではnavigation barを隠し、macOS buildでは無効化する共通modifierを用意した。
+
+#### `ios-native/README.md`
+- `MegrumApp` の役割を追記した。
+
+#### `notes/22_swift_native_migration.md`
+- Phase 1に、Swift Package側の `MegrumApp` へRootView / TabView / 主要タブ骨格を置く方針を追記した。
+
+### 影響範囲
+
+- Swift Native iOS版のアプリシェル
+- SwiftUI主要タブ画面の移行開始
+- 今後のXcode App target追加時の利用対象
+
+### 確認方法
+
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-build`
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-build --enable-xctest --disable-swift-testing -j 1`
+- `git diff --check -- ios-native/Package.swift ios-native/Sources/MegrumApp ios-native/README.md notes/22_swift_native_migration.md notes/08_design_iterations.md`
+
+### 関連ファイル
+
+- `ios-native/Package.swift`
+- `ios-native/Sources/MegrumApp/AppChrome.swift`
+- `ios-native/Sources/MegrumApp/CollectionScreens.swift`
+- `ios-native/Sources/MegrumApp/GoodsGrid.swift`
+- `ios-native/Sources/MegrumApp/HomeScreen.swift`
+- `ios-native/Sources/MegrumApp/MeguriScreen.swift`
+- `ios-native/Sources/MegrumApp/MegrumRootView.swift`
+- `ios-native/Sources/MegrumApp/NativePreviewData.swift`
+- `ios-native/Sources/MegrumApp/SearchScreen.swift`
+- `ios-native/Sources/MegrumApp/TradesScreen.swift`
+- `ios-native/README.md`
+- `notes/22_swift_native_migration.md`
+- `notes/08_design_iterations.md`
+
+### セルフレビュー結果
+
+- ✅ SwiftUIのRootViewと5タブ構成を `MegrumApp` として追加した。
+- ✅ 既存 `mobile/` は触らず、Swift版の新規作業場に閉じて進めた。
+- ✅ `MegrumDesign.LiquidGlassSearchButton` をホームの検索導線に使った。
+- ✅ 画面骨格はSupabase接続前の固定データで表示できるようにした。
+- ✅ `swift build` が通ることを確認した。
+- ✅ 状態遷移・用語・DBスキーマ変更はないため、`notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要。
+- ✅ iOSユーザー向け配布物はまだ作っていないため、Preview OTA / TestFlight配信は不要。
+
 ## イテレーション299：Swift Native全面移行を開始
 
 ### 背景・問題意識

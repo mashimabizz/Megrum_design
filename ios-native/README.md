@@ -9,6 +9,7 @@ The existing Expo / React Native app under `mobile/` remains the rollback source
 - `Package.swift` defines the first native Swift package.
 - `Sources/MegrumCore` contains portable domain models that mirror the current Supabase-backed product concepts.
 - `Sources/MegrumDesign` contains native SwiftUI design primitives, starting with a Liquid Glass-style search button.
+- `Sources/MegrumApp` contains the SwiftUI app shell and first native screens for Home, Search, Inventory, Wish, Trades, and Meguri.
 - `Tests/MegrumCoreTests` verifies state names and display labels that must stay aligned with `notes/09_state_machines.md` and `notes/10_glossary.md`.
 
 ## Build Loop
