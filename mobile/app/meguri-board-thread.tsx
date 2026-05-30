@@ -1664,6 +1664,7 @@ export default function MeguriBoardThreadScreen() {
                     <ScopeBadge scope={thread.audienceScope} />
                     {thread.isPinned ? <StatusBadge label="固定" /> : null}
                     {thread.status === "locked" ? <StatusBadge label="締め切り" /> : null}
+                    {thread.reported ? <StatusBadge label="通報済み" /> : null}
                   </View>
                   <Text style={styles.heroTime}>{formatRelativeTime(thread.createdAt)}</Text>
                 </View>
@@ -2079,6 +2080,11 @@ export default function MeguriBoardThreadScreen() {
                             {mentionsViewer ? (
                               <View style={styles.replyMentionBadge}>
                                 <Text style={styles.replyMentionBadgeText}>あなた宛て</Text>
+                              </View>
+                            ) : null}
+                            {reply.reported ? (
+                              <View style={styles.replyReportedBadge}>
+                                <Text style={styles.replyReportedBadgeText}>通報済み</Text>
                               </View>
                             ) : null}
                           </View>
@@ -3913,6 +3919,17 @@ const styles = StyleSheet.create({
   },
   replyMentionBadgeText: {
     color: "#4f7e92",
+    fontSize: 9.5,
+    fontWeight: "900",
+  },
+  replyReportedBadge: {
+    backgroundColor: "rgba(220,120,94,0.16)",
+    borderRadius: 999,
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+  },
+  replyReportedBadgeText: {
+    color: "#c06c52",
     fontSize: 9.5,
     fontWeight: "900",
   },

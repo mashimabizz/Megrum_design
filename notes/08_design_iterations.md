@@ -4,6 +4,56 @@
 
 ---
 
+## イテレーション258：掲示板の通報済み表示を追加する
+
+### 背景・問題意識
+
+一般的なスレッド型掲示板では、通報した投稿や返信に対して、ユーザーが「すでに通報した」と分かる表示が必要になる。スポット掲示板では通報操作と通報済みアクションの無効化はあったが、一覧や本文上では状態が見えづらかったため、通報済みラベルを追加した。
+
+### 変更内容
+
+#### `mobile/app/meguri-board.tsx`
+- スレッド一覧カードで `thread.reported` が true の場合、バッジ列に `通報済み` を表示するようにした。
+
+#### `mobile/app/meguri-board-thread.tsx`
+- スレッド詳細の本文カードで `thread.reported` が true の場合、`通報済み` ラベルを表示するようにした。
+- 返信行で `reply.reported` が true の場合、返信メタ行に `通報済み` ラベルを表示するようにした。
+
+#### `notes/09_state_machines.md`
+- Meguri Board Lifecycle に通報済み表示のルールを追記した。
+
+#### `notes/10_glossary.md`
+- 掲示板通報済み表示を追加した。
+
+### 影響範囲
+
+- iOS版 スポット掲示板一覧
+- スポット掲示板スレッド詳細
+- 通報済みスレッド/返信の視認性
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- `EAS_UPDATE_PROJECT_SLUG=ihub EXPO_NO_GIT_STATUS=1 npm --prefix mobile run update:ios:preview -- --message "[iter258] show reported board labels" --non-interactive`
+- Preview OTA: Update group ID `860c7634-28e9-4b97-85d7-e4d9bb785567` / iOS update ID `019e7668-ab8e-7b01-92e7-5177b6aa4860`
+
+### 関連ファイル
+
+- `mobile/app/meguri-board.tsx`
+- `mobile/app/meguri-board-thread.tsx`
+- `notes/08_design_iterations.md`
+- `notes/09_state_machines.md`
+- `notes/10_glossary.md`
+
+### セルフレビュー結果
+
+- ✅ 既存の `reported` 状態を表示に使い、通報処理やDBスキーマを増やしていない。
+- ✅ スレッド一覧・本文・返信の3箇所で同じ意味のラベルを表示し、通報済み状態の見落としを減らした。
+- ✅ ネイティブ依存追加なしでPreview OTA対象内に収めた。
+
+---
+
 ## イテレーション257：掲示板スレッド詳細に更新ボタンを追加する
 
 ### 背景・問題意識

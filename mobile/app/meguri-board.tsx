@@ -1041,6 +1041,7 @@ export default function MeguriBoardScreen() {
                           {thread.participated ? <StatusBadge label="参加中" /> : null}
                           {thread.bookmarked ? <StatusBadge label="保存済み" /> : null}
                           {thread.subscribed ? <StatusBadge label="通知ON" /> : null}
+                          {thread.reported ? <StatusBadge label="通報済み" /> : null}
                           {replyDraftThreadIds.has(thread.id) ? <StatusBadge label="下書きあり" /> : null}
                           {isThreadUnread(thread) ? (
                             <View style={styles.unreadBadge}>
