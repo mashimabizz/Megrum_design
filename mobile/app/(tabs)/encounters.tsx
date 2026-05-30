@@ -13,6 +13,7 @@ import {
   Platform,
   type PanResponderGestureState,
   Pressable,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
@@ -597,6 +598,7 @@ export default function EncountersScreen() {
   const [groomLocationContext, setGroomLocationContext] = useState<MegrumLocationContext | null>(null);
   const [boardThreads, setBoardThreads] = useState<MeguriBoardThread[]>([]);
   const [boardLoading, setBoardLoading] = useState(!previewMode);
+  const [meguriRefreshing, setMeguriRefreshing] = useState(false);
   const [boardViewerContext, setBoardViewerContext] = useState<MeguriBoardViewerContext>(() =>
     buildMeguriBoardHomeViewerContext({
       fallbackArea: profile?.primaryArea ?? null,
@@ -685,6 +687,23 @@ export default function EncountersScreen() {
     }).catch(() => []);
     setBoardThreads(nextThreads);
     setBoardLoading(false);
+  }
+
+  async function handleMeguriRefresh() {
+    setMeguriRefreshing(true);
+    setGroomLoading(true);
+    setBoardLoading(true);
+    try {
+      await Promise.all([
+        refreshGroomPosts().catch(() => undefined),
+        refreshBoardThreads().catch(() => {
+          setBoardThreads([]);
+          setBoardLoading(false);
+        }),
+      ]);
+    } finally {
+      setMeguriRefreshing(false);
+    }
   }
 
   function openBoardThread(thread: MeguriBoardThread) {
@@ -1033,6 +1052,13 @@ export default function EncountersScreen() {
           { paddingBottom: bottomPadding, paddingTop: headerTop + 48 },
         ]}
         contentInsetAdjustmentBehavior="never"
+        refreshControl={
+          <RefreshControl
+            refreshing={meguriRefreshing}
+            onRefresh={handleMeguriRefresh}
+            tintColor={megrumColors.lavender}
+          />
+        }
         showsVerticalScrollIndicator={false}
       >
         <GroomRail

@@ -4,6 +4,59 @@
 
 ---
 
+## イテレーション271：主要画面にプル更新を追加する
+
+### 背景・問題意識
+
+オーナーから、ホーム画面、やりとり一覧、めぐりホームについて、一番上までスクロールした状態でさらに上に引いたら画面更新処理を走らせたいという指示があった。各画面は既にデータ取得処理を持っていたため、iOS標準の `RefreshControl` を使い、既存の取得関数を再利用する形で追加する。
+
+### 変更内容
+
+#### `mobile/app/(tabs)/index.tsx`
+- ホーム画面のメイン `ScrollView` に `RefreshControl` を追加した。
+- pull-to-refresh 時に、ホームのマッチ候補とホーム内グルーム一覧を再取得するようにした。
+- 既存の初回ロード処理を `loadHomeData` に整理し、通常ロードと手動更新で共通利用できるようにした。
+
+#### `mobile/app/(tabs)/transactions.tsx`
+- やりとり一覧のアーカイブ表示、および打診中/進行中の各縦スクロールに `RefreshControl` を追加した。
+- pull-to-refresh 時に取引一覧を再取得し、既存データを表示したまま更新スピナーだけを出すようにした。
+- 既存の初回ロード処理を `loadTransactions` に整理した。
+
+#### `mobile/app/(tabs)/encounters.tsx`
+- めぐりホームのメイン `ScrollView` に `RefreshControl` を追加した。
+- pull-to-refresh 時にグルーム一覧と掲示板一覧を同時に再取得するようにした。
+
+### 影響範囲
+
+- iOS版 ホーム画面
+- iOS版 やりとり一覧画面
+- iOS版 めぐりホーム
+- 各画面の手動更新時のローディング挙動
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- `EAS_UPDATE_PROJECT_SLUG=ihub EXPO_NO_GIT_STATUS=1 npm --prefix mobile run update:ios:preview -- --message "[iter271] 主要画面にプル更新を追加" --non-interactive`
+- Preview OTA: Update group ID `27933ba8-5bad-44e0-93c3-f4568c66adb6` / iOS update ID `019e76b2-8ca8-7146-983b-2857430de22c`
+
+### 関連ファイル
+
+- `mobile/app/(tabs)/index.tsx`
+- `mobile/app/(tabs)/transactions.tsx`
+- `mobile/app/(tabs)/encounters.tsx`
+- `notes/08_design_iterations.md`
+
+### セルフレビュー結果
+
+- ✅ iOS標準の `RefreshControl` を使い、独自ジェスチャー実装は追加しなかった。
+- ✅ 既存の初回ロード・再取得処理を再利用し、画面ごとのデータ責務を変えないようにした。
+- ✅ 手動更新中は既存データを残すため、ユーザーの画面が空にちらつきにくい。
+- ✅ 状態名・DBスキーマの変更はないため、`notes/09_state_machines.md` と `notes/05_data_model.md` の更新は不要と判断した。
+- ✅ 新しいプロダクト用語は追加していないため、`notes/10_glossary.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション270：Liquid Glass共通化とグルーム投稿体験を整える
 
 ### 背景・問題意識

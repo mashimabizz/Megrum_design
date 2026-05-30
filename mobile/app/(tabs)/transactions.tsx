@@ -5,6 +5,7 @@ import {
   Animated,
   Image,
   Pressable,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
@@ -189,6 +190,7 @@ export default function TransactionsScreen() {
     !supabase || previewMode ? TRANSACTIONS : [],
   );
   const [loading, setLoading] = useState(!!supabase && !previewMode);
+  const [refreshing, setRefreshing] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [animatedTabs, setAnimatedTabs] = useState<Set<TopTab>>(
     () => new Set(),
@@ -200,42 +202,63 @@ export default function TransactionsScreen() {
   const pageWidth = Math.max(1, width - 36);
   const footerTabsBottomPadding = Math.max(insets.bottom, 12) + 68;
 
-  useEffect(() => {
+  async function loadTransactions({
+    isActive = () => true,
+    showLoading = true,
+  }: {
+    isActive?: () => boolean;
+    showLoading?: boolean;
+  } = {}) {
     if (!supabase || previewMode) {
+      if (!isActive()) return;
       setTransactions(TRANSACTIONS);
       setLoading(false);
       setLoadError(null);
       return;
     }
     if (!user) {
+      if (!isActive()) return;
       setTransactions([]);
       setLoading(false);
       setLoadError(null);
       return;
     }
 
-    let active = true;
-    setTransactions([]);
-    setLoading(true);
+    if (showLoading) {
+      setTransactions([]);
+      setLoading(true);
+    }
     setLoadError(null);
-    fetchTransactions(user.id)
-      .then((rows) => {
-        if (!active) return;
-        setTransactions(rows.length > 0 ? rows : []);
-      })
-      .catch((error: unknown) => {
-        if (!active) return;
-        setTransactions([]);
-        setLoadError(toErrorMessage(error, "読み込みに失敗しました"));
-      })
-      .finally(() => {
-        if (active) setLoading(false);
-      });
+    try {
+      const rows = await fetchTransactions(user.id);
+      if (!isActive()) return;
+      setTransactions(rows.length > 0 ? rows : []);
+    } catch (error: unknown) {
+      if (!isActive()) return;
+      setTransactions([]);
+      setLoadError(toErrorMessage(error, "読み込みに失敗しました"));
+    } finally {
+      if (isActive()) setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    let active = true;
+    loadTransactions({ isActive: () => active }).catch(() => undefined);
 
     return () => {
       active = false;
     };
   }, [previewMode, user]);
+
+  async function handleRefresh() {
+    setRefreshing(true);
+    try {
+      await loadTransactions({ showLoading: false });
+    } finally {
+      setRefreshing(false);
+    }
+  }
 
   const grouped = useMemo(() => {
     const pending = transactions.filter((tx) =>
@@ -308,6 +331,13 @@ export default function TransactionsScreen() {
           showsVerticalScrollIndicator={false}
           style={styles.nativeTabScroll}
           contentContainerStyle={styles.nativeTabScrollContent}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={handleRefresh}
+              tintColor={megrumColors.lavender}
+            />
+          }
           scrollEventThrottle={16}
         >
           <View style={styles.header}>
@@ -369,6 +399,13 @@ export default function TransactionsScreen() {
               showsVerticalScrollIndicator={false}
               style={styles.nativeTabScroll}
               contentContainerStyle={styles.nativeTabScrollContent}
+              refreshControl={
+                <RefreshControl
+                  refreshing={refreshing}
+                  onRefresh={handleRefresh}
+                  tintColor={megrumColors.lavender}
+                />
+              }
               scrollEventThrottle={16}
             >
               {loadError ? <Text style={styles.inlineError}>{loadError}</Text> : null}

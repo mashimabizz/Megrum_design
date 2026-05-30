@@ -21,6 +21,7 @@ import {
   PanResponder,
   Platform,
   Pressable,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
@@ -300,6 +301,7 @@ export default function HomeScreen() {
   const [localSheetOpen, setLocalSheetOpen] = useState(false);
   const [revertLocalOnSheetClose, setRevertLocalOnSheetClose] = useState(false);
   const [modeSwitching, setModeSwitching] = useState<HomeModeView | null>(null);
+  const [homeRefreshing, setHomeRefreshing] = useState(false);
   const [homeGroomPosts, setHomeGroomPosts] = useState(HOME_GROOM_POSTS);
   const [selectedHomeGroomId, setSelectedHomeGroomId] = useState<string | null>(null);
   const [homeGroomViewerSession, setHomeGroomViewerSession] = useState(0);
@@ -340,43 +342,53 @@ export default function HomeScreen() {
       }))
       .filter((section) => section.rows.length > 0);
   }, [localMode, sections]);
-  function refreshHomeData() {
+  async function loadHomeData({
+    isActive = () => true,
+    showLoading = true,
+  }: {
+    isActive?: () => boolean;
+    showLoading?: boolean;
+  } = {}) {
     if (previewMode || !hasSupabaseConfig) {
+      if (!isActive()) return;
       setSections(MATCH_SECTIONS);
       setLocalMode(usePreviewData);
       setPlaceName("守口市地区 豊秀町一丁目");
       setHomeLoading(false);
       setHomeError(null);
-      return () => {};
+      return;
     }
     if (!user) {
+      if (!isActive()) return;
       setSections([]);
       setLocalMode(false);
       setPlaceName("");
       setHomeLoading(false);
       setHomeError(null);
-      return () => {};
+      return;
     }
 
-    let active = true;
-    setHomeLoading(true);
+    if (showLoading) setHomeLoading(true);
     setHomeError(null);
-    fetchHomeSupabaseSections(user.id)
-      .then((result) => {
-        if (!active) return;
-        setSections(result.sections.length > 0 ? result.sections : []);
-        const nextLocalMode = result.localModeEnabled;
-        setLocalMode(nextLocalMode);
-        setPlaceName(result.placeLabel ?? "場所未設定");
-      })
-      .catch((error: unknown) => {
-        if (!active) return;
-        setSections([]);
-        setHomeError(error instanceof Error ? error.message : "読み込みに失敗しました");
-      })
-      .finally(() => {
-        if (active) setHomeLoading(false);
-      });
+    try {
+      const result = await fetchHomeSupabaseSections(user.id);
+      if (!isActive()) return;
+      setSections(result.sections.length > 0 ? result.sections : []);
+      const nextLocalMode = result.localModeEnabled;
+      setLocalMode(nextLocalMode);
+      setPlaceName(result.placeLabel ?? "場所未設定");
+    } catch (error: unknown) {
+      if (!isActive()) return;
+      setSections([]);
+      setHomeError(error instanceof Error ? error.message : "読み込みに失敗しました");
+    } finally {
+      if (isActive()) setHomeLoading(false);
+    }
+  }
+
+  function refreshHomeData() {
+    let active = true;
+    loadHomeData({ isActive: () => active }).catch(() => undefined);
 
     return () => {
       active = false;
@@ -394,6 +406,18 @@ export default function HomeScreen() {
     }
     const remotePosts = await fetchGroomFeed(user.id);
     setHomeGroomPosts(remotePosts.map(remotePostToHomeGroomPost));
+  }
+
+  async function handleHomeRefresh() {
+    setHomeRefreshing(true);
+    try {
+      await Promise.all([
+        loadHomeData({ showLoading: false }),
+        refreshHomeGroomPosts().catch(() => undefined),
+      ]);
+    } finally {
+      setHomeRefreshing(false);
+    }
   }
 
   useEffect(() => {
@@ -749,6 +773,13 @@ export default function HomeScreen() {
         showsVerticalScrollIndicator={false}
         style={styles.homeScroll}
         contentContainerStyle={styles.homeScrollContent}
+        refreshControl={
+          <RefreshControl
+            refreshing={homeRefreshing}
+            onRefresh={handleHomeRefresh}
+            tintColor={megrumColors.lavender}
+          />
+        }
         scrollEventThrottle={16}
       >
         {homeError ? <Text style={styles.inlineError}>{homeError}</Text> : null}
