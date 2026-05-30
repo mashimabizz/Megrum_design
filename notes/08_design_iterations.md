@@ -4,6 +4,53 @@
 
 ---
 
+## イテレーション247：掲示板スレッド投稿者へ本文から直接移動できるようにする
+
+### 背景・問題意識
+
+スポット掲示板では、返信者だけでなくスレッドを立てた人のプロフィールもすぐ確認したい場面がある。従来はスレッドのアクションシートから投稿者プロフィールを開けたが、本文を読んでいる流れからは遠いため、本文カード内の投稿者名を直接タップできるようにした。
+
+### 変更内容
+
+#### `mobile/app/meguri-board-thread.tsx`
+- スレッド本文カードのメタ表示を `heroMetaRow` に分割し、投稿者名だけをタップ可能にした。
+- 投稿者名タップで `openBoardUserProfile(thread.authorId)` を呼び出し、投稿者プロフィールへ遷移するようにした。
+- 投稿者名を lavender 強調にし、タップできるテキストとして認識しやすくした。
+
+#### `notes/09_state_machines.md`
+- Meguri Board Lifecycle にスレッド投稿者プロフィール導線のルールを追記した。
+
+#### `notes/10_glossary.md`
+- 掲示板スレッド投稿者プロフィール導線を追加した。
+
+### 影響範囲
+
+- iOS版 スポット掲示板詳細
+- スレッド本文カード
+- スレッド投稿者プロフィールへの導線
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- `EAS_UPDATE_PROJECT_SLUG=ihub EXPO_NO_GIT_STATUS=1 npm --prefix mobile run update:ios:preview -- --message "[iter247] open thread author profile" --non-interactive`
+- Preview OTA: Update group ID `839981cf-e326-4843-b3cc-dfeb85f70e57` / iOS update ID `019e763d-df6d-791c-b793-bdae611c8832`
+
+### 関連ファイル
+
+- `mobile/app/meguri-board-thread.tsx`
+- `notes/08_design_iterations.md`
+- `notes/09_state_machines.md`
+- `notes/10_glossary.md`
+
+### セルフレビュー結果
+
+- ✅ 既存のアクションシート導線は残しつつ、読む流れから自然に投稿者プロフィールへ移動できるようにした。
+- ✅ メタ行の表示情報は維持し、投稿者名だけをリンク的に強調した。
+- ✅ DB変更なし、ネイティブ依存追加なしでPreview OTA対象内に収めた。
+
+---
+
 ## イテレーション246：掲示板返信メニューから引用元を見られるようにする
 
 ### 背景・問題意識

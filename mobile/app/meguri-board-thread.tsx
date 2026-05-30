@@ -1661,10 +1661,20 @@ export default function MeguriBoardThreadScreen() {
                   </Pressable>
                 ) : null}
                 <AttachmentGrid imageUris={thread.imageUris} onPressImage={setImagePreviewUri} />
-                <Text style={styles.heroMeta}>
-                  {meguriBoardAudienceMeta(thread)} · {thread.authorName}
-                  {thread.updatedAt && thread.updatedAt > thread.createdAt + 60000 ? " · 編集済み" : ""}
-                </Text>
+                <View style={styles.heroMetaRow}>
+                  <Text style={styles.heroMeta}>{meguriBoardAudienceMeta(thread)} · </Text>
+                  <Pressable
+                    accessibilityRole="button"
+                    hitSlop={8}
+                    onPress={() => openBoardUserProfile(thread.authorId)}
+                    style={styles.heroMetaAuthorButton}
+                  >
+                    <Text style={styles.heroMetaAuthor}>{thread.authorName}</Text>
+                  </Pressable>
+                  {thread.updatedAt && thread.updatedAt > thread.createdAt + 60000 ? (
+                    <Text style={styles.heroMeta}> · 編集済み</Text>
+                  ) : null}
+                </View>
                 <View style={styles.threadActions}>
                   <Pressable
                     accessibilityRole="button"
@@ -3382,10 +3392,23 @@ const styles = StyleSheet.create({
     height: "100%",
     width: "100%",
   },
+  heroMetaRow: {
+    alignItems: "center",
+    flexDirection: "row",
+    flexWrap: "wrap",
+  },
   heroMeta: {
     color: megrumColors.mutedInk,
     fontSize: 11.5,
     fontWeight: "800",
+  },
+  heroMetaAuthorButton: {
+    alignSelf: "center",
+  },
+  heroMetaAuthor: {
+    color: megrumColors.lavender,
+    fontSize: 11.5,
+    fontWeight: "900",
   },
   threadActions: {
     flexDirection: "row",
