@@ -4,6 +4,53 @@
 
 ---
 
+## イテレーション245：掲示板返信者プロフィール導線を直接開けるようにする
+
+### 背景・問題意識
+
+一般的なスレッドでは、返信者のアイコンや名前からその人のプロフィールへすぐ移動できる。スポット掲示板でも、現地で役立つ投稿をした人や、同じ現場にいる人を自然に確認できるようにするため、返信者表示からプロフィールへ直接遷移できる導線を追加した。
+
+### 変更内容
+
+#### `mobile/app/meguri-board-thread.tsx`
+- 他ユーザー返信の丸アイコンをタップ可能にし、返信者プロフィールへ遷移するようにした。
+- 他ユーザー返信の名前表示をタップ可能にし、同じく返信者プロフィールへ遷移するようにした。
+- `replyAuthorButton` を追加し、既存の返信メタ行レイアウトを崩さずにタップ領域を持たせた。
+
+#### `notes/09_state_machines.md`
+- Meguri Board Lifecycle に返信者プロフィール導線のルールを追記した。
+
+#### `notes/10_glossary.md`
+- 掲示板返信者プロフィール導線を追加した。
+
+### 影響範囲
+
+- iOS版 スポット掲示板詳細
+- 返信者プロフィールへの導線
+- めぐり内のユーザー確認体験
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- `EAS_UPDATE_PROJECT_SLUG=ihub EXPO_NO_GIT_STATUS=1 npm --prefix mobile run update:ios:preview -- --message "[iter245] open reply author profile" --non-interactive`
+- Preview OTA: Update group ID `968358ad-f449-457c-8274-1b21781ff6d2` / iOS update ID `019e7636-893b-7f3e-8c6e-ba09d99cab66`
+
+### 関連ファイル
+
+- `mobile/app/meguri-board-thread.tsx`
+- `notes/08_design_iterations.md`
+- `notes/09_state_machines.md`
+- `notes/10_glossary.md`
+
+### セルフレビュー結果
+
+- ✅ 既存の長押しアクションは残しつつ、頻度の高いプロフィール確認だけを直接操作にした。
+- ✅ 自分の返信には不要な導線を追加せず、他ユーザー返信だけに限定した。
+- ✅ DB変更なし、ネイティブ依存追加なしでPreview OTA対象内に収めた。
+
+---
+
 ## イテレーション244：掲示板返信の正確な投稿日時を確認できるようにする
 
 ### 背景・問題意識

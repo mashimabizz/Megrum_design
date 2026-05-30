@@ -2000,19 +2000,31 @@ export default function MeguriBoardThreadScreen() {
                         style={[styles.replyRow, reply.mine ? styles.replyRowMine : null]}
                       >
                         {!reply.mine ? (
-                          <View style={[styles.replyAvatar, { backgroundColor: colorForAuthor(reply.authorId) }]}>
+                          <Pressable
+                            accessibilityRole="button"
+                            hitSlop={8}
+                            onPress={() => openBoardUserProfile(reply.authorId)}
+                            style={[styles.replyAvatar, { backgroundColor: colorForAuthor(reply.authorId) }]}
+                          >
                             <Text style={styles.replyAvatarText}>{reply.authorName.slice(0, 1)}</Text>
-                          </View>
+                          </Pressable>
                         ) : null}
                         <View style={reply.mine ? styles.replyContentMine : styles.replyContent}>
                           <View style={reply.mine ? styles.replyMetaRowMine : styles.replyMetaRow}>
                             {!reply.mine ? (
-                              <HighlightedText
-                                numberOfLines={1}
-                                query={replySearchQuery}
-                                style={styles.replyAuthor}
-                                text={reply.authorName}
-                              />
+                              <Pressable
+                                accessibilityRole="button"
+                                hitSlop={8}
+                                onPress={() => openBoardUserProfile(reply.authorId)}
+                                style={styles.replyAuthorButton}
+                              >
+                                <HighlightedText
+                                  numberOfLines={1}
+                                  query={replySearchQuery}
+                                  style={styles.replyAuthor}
+                                  text={reply.authorName}
+                                />
+                              </Pressable>
                             ) : null}
                             <Text style={[styles.replyNumber, replyNumberMatchesQuery ? styles.replyNumberActive : null]}>
                               {replyNumberLabel}
@@ -3806,6 +3818,9 @@ const styles = StyleSheet.create({
     gap: 6,
     justifyContent: "flex-end",
     paddingHorizontal: 4,
+  },
+  replyAuthorButton: {
+    flexShrink: 1,
   },
   replyAuthor: {
     color: megrumColors.mutedInk,
