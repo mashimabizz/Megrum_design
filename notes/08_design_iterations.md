@@ -4,6 +4,52 @@
 
 ---
 
+## イテレーション295：ホーム検索をLiquid Glassインタラクションへ再設計
+
+### 背景・問題意識
+
+オーナーから、ホーム画面左下の検索アイコンを、半透明ガラス、タップ位置起点の内部ハイライト、長押し時の厚み、ドラッグ時の屈折追従、リリース時の自然なスプリングまで含めた Liquid Glass 風の検索ボタンとして実装し直したいという指示があった。前回の標準素材寄せでは、タップ位置に反応する光やドラッグ中の屈折中心の移動が不足していた。
+
+### 変更内容
+
+#### `mobile/app/(tabs)/index.tsx`
+- `FloatingSearchButton` を `Pressable` の単純な押下表現から、`Animated` + `PanResponder` によるタッチ位置追従型のガラスボタンへ変更した。
+- 通常状態に frosted glass、soft drop shadow、thin inner highlight、specular highlight、subtle refraction layer、白い虫眼鏡アイコンを重ねた。
+- Touch Down では 80〜120ms 程度で scale / shadow / glow / highlight を変化させ、タップ位置から白い内部グローが広がるようにした。
+- Press Hold では厚みが増したように、highlight と refraction の強度を少し上げ、角丸の柔らかさをわずかに変えるようにした。
+- Drag While Pressing では drag offset に応じて本体を控えめに引っ張り、ハイライトと屈折レイヤーをタップ位置へ追従させた。
+- Release では scale / drag / highlight を 250〜400ms 程度の高減衰スプリングで戻し、glow は自然にフェードアウトするようにした。
+- `AccessibilityInfo` で Reduce Motion / Reduce Transparency を読み、モーション弱め・透明度低めの分岐を入れた。
+
+### 影響範囲
+
+- iOS版 ホーム画面
+- ホーム左下の検索導線
+- 検索ボタンのタップ/長押し/ドラッグ操作
+- Reduce Motion / Reduce Transparency 有効時のホーム検索ボタン表示
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- `EAS_UPDATE_PROJECT_SLUG=ihub EXPO_NO_GIT_STATUS=1 npm --prefix mobile run update:ios:preview -- --message "[iter295] ホーム検索をLiquid Glassインタラクションへ再設計" --non-interactive`
+- Preview OTA: Update group ID `7caf30b2-16ea-4a99-ac31-a2f3858362c1` / iOS update ID `019e79ec-ba5e-766c-8336-3358974fb237`
+- EAS Dashboard: `https://expo.dev/accounts/mashima.bizz/projects/ihub/updates/7caf30b2-16ea-4a99-ac31-a2f3858362c1`
+
+### 関連ファイル
+
+- `mobile/app/(tabs)/index.tsx`
+- `notes/08_design_iterations.md`
+
+### セルフレビュー結果
+
+- ✅ 検索ボタンの遷移先は `/search` のまま維持した。
+- ✅ opacity を下げるだけではなく、scale、shadow、glow、highlight、refraction、drag offset を組み合わせた反応にした。
+- ✅ 長押し・ドラッグ・リリースの各状態で指定に沿った軽い変形と復帰を入れた。
+- ✅ Reduce Motion / Reduce Transparency のアクセシビリティ設定に対応した。
+- ✅ iOS Preview channel へOTA配信済み。
+- ✅ 状態遷移・用語・DBスキーマ変更はないため、`notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要。
+
 ## イテレーション294：めぐり掲示板をチャットUIへ整理
 
 ### 背景・問題意識

@@ -12,6 +12,7 @@ import type { SFSymbol, SymbolViewProps } from "expo-symbols";
 import {
   ActionSheetIOS,
   Alert,
+  AccessibilityInfo,
   ActivityIndicator,
   Animated,
   AppState,
@@ -88,6 +89,8 @@ const LOCAL_DURATION_OPTIONS = [
   { label: "6時間", value: 360 },
 ];
 const LOCAL_RADIUS_OPTIONS = [300, 500, 1000, 2000];
+const HOME_SEARCH_BUTTON_SIZE = 66;
+const HOME_SEARCH_TOUCH_TRAVEL_LIMIT = 10;
 const PREVIEW_CARRYING_ITEMS: LocalCarryingItem[] = [
   {
     id: "preview-carry-1",
@@ -1412,6 +1415,10 @@ function NativeHomeActionSymbol({
   return <IconSymbol color={color} name={fallbackName} size={26} />;
 }
 
+function clampHomeSearchValue(value: number, min: number, max: number) {
+  return Math.min(max, Math.max(min, value));
+}
+
 function LocalFocusVignette({ pulse }: { pulse: Animated.Value }) {
   const opacity = pulse.interpolate({
     inputRange: [0, 1],
@@ -1434,40 +1441,329 @@ function LocalFocusVignette({ pulse }: { pulse: Animated.Value }) {
 }
 
 function FloatingSearchButton() {
+  const [reduceMotion, setReduceMotion] = useState(false);
+  const [reduceTransparency, setReduceTransparency] = useState(false);
+  const pressProgress = useRef(new Animated.Value(0)).current;
+  const holdProgress = useRef(new Animated.Value(0)).current;
+  const glowProgress = useRef(new Animated.Value(0)).current;
+  const dragX = useRef(new Animated.Value(0)).current;
+  const dragY = useRef(new Animated.Value(0)).current;
+  const lightX = useRef(new Animated.Value(0)).current;
+  const lightY = useRef(new Animated.Value(0)).current;
+  const holdTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const touchStartRef = useRef({ moved: false });
+
+  useEffect(() => {
+    let mounted = true;
+    void AccessibilityInfo.isReduceMotionEnabled().then((enabled) => {
+      if (mounted) setReduceMotion(enabled);
+    });
+    void AccessibilityInfo.isReduceTransparencyEnabled().then((enabled) => {
+      if (mounted) setReduceTransparency(enabled);
+    });
+    const motionSubscription = AccessibilityInfo.addEventListener("reduceMotionChanged", setReduceMotion);
+    const transparencySubscription = AccessibilityInfo.addEventListener(
+      "reduceTransparencyChanged",
+      setReduceTransparency,
+    );
+    return () => {
+      mounted = false;
+      motionSubscription.remove();
+      transparencySubscription.remove();
+      if (holdTimerRef.current) {
+        clearTimeout(holdTimerRef.current);
+      }
+    };
+  }, []);
+
+  function setLightFromTouch(locationX?: number, locationY?: number) {
+    if (typeof locationX === "number" && Number.isFinite(locationX)) {
+      lightX.setValue(
+        clampHomeSearchValue(
+          (locationX - HOME_SEARCH_BUTTON_SIZE / 2) / (HOME_SEARCH_BUTTON_SIZE / 2),
+          -1,
+          1,
+        ),
+      );
+    }
+    if (typeof locationY === "number" && Number.isFinite(locationY)) {
+      lightY.setValue(
+        clampHomeSearchValue(
+          (locationY - HOME_SEARCH_BUTTON_SIZE / 2) / (HOME_SEARCH_BUTTON_SIZE / 2),
+          -1,
+          1,
+        ),
+      );
+    }
+  }
+
+  const animateTouchDown = () => {
+    Animated.parallel([
+      Animated.timing(pressProgress, {
+        duration: reduceMotion ? 60 : 96,
+        easing: Easing.out(Easing.cubic),
+        toValue: 1,
+        useNativeDriver: false,
+      }),
+      Animated.timing(glowProgress, {
+        duration: reduceMotion ? 80 : 118,
+        easing: Easing.out(Easing.quad),
+        toValue: 1,
+        useNativeDriver: false,
+      }),
+    ]).start();
+    holdTimerRef.current = setTimeout(() => {
+      Animated.timing(holdProgress, {
+        duration: reduceMotion ? 90 : 220,
+        easing: Easing.out(Easing.cubic),
+        toValue: 1,
+        useNativeDriver: false,
+      }).start();
+    }, reduceMotion ? 260 : 180);
+  };
+
+  const animateRelease = () => {
+    if (holdTimerRef.current) {
+      clearTimeout(holdTimerRef.current);
+      holdTimerRef.current = null;
+    }
+    const duration = reduceMotion ? 120 : 310;
+    Animated.parallel([
+      Animated.timing(pressProgress, {
+        duration,
+        easing: Easing.out(Easing.cubic),
+        toValue: 0,
+        useNativeDriver: false,
+      }),
+      Animated.timing(holdProgress, {
+        duration: reduceMotion ? 120 : 260,
+        easing: Easing.out(Easing.cubic),
+        toValue: 0,
+        useNativeDriver: false,
+      }),
+      Animated.timing(glowProgress, {
+        duration: reduceMotion ? 140 : 280,
+        easing: Easing.out(Easing.cubic),
+        toValue: 0,
+        useNativeDriver: false,
+      }),
+      reduceMotion
+        ? Animated.timing(dragX, { duration: 120, toValue: 0, useNativeDriver: false })
+        : Animated.spring(dragX, { friction: 10, tension: 148, toValue: 0, useNativeDriver: false }),
+      reduceMotion
+        ? Animated.timing(dragY, { duration: 120, toValue: 0, useNativeDriver: false })
+        : Animated.spring(dragY, { friction: 10, tension: 148, toValue: 0, useNativeDriver: false }),
+      reduceMotion
+        ? Animated.timing(lightX, { duration: 120, toValue: 0, useNativeDriver: false })
+        : Animated.spring(lightX, { friction: 11, tension: 140, toValue: 0, useNativeDriver: false }),
+      reduceMotion
+        ? Animated.timing(lightY, { duration: 120, toValue: 0, useNativeDriver: false })
+        : Animated.spring(lightY, { friction: 11, tension: 140, toValue: 0, useNativeDriver: false }),
+    ]).start();
+  };
+
+  const panResponder = useMemo(
+    () =>
+      PanResponder.create({
+        onMoveShouldSetPanResponder: (_event, gesture) =>
+          Math.abs(gesture.dx) > 2 || Math.abs(gesture.dy) > 2,
+        onPanResponderGrant: (event) => {
+          touchStartRef.current = { moved: false };
+          setLightFromTouch(event.nativeEvent.locationX, event.nativeEvent.locationY);
+          animateTouchDown();
+        },
+        onPanResponderMove: (event, gesture) => {
+          const dragLimit = reduceMotion ? 3.5 : 8;
+          if (
+            Math.abs(gesture.dx) > HOME_SEARCH_TOUCH_TRAVEL_LIMIT ||
+            Math.abs(gesture.dy) > HOME_SEARCH_TOUCH_TRAVEL_LIMIT
+          ) {
+            touchStartRef.current.moved = true;
+          }
+          dragX.setValue(
+            clampHomeSearchValue(gesture.dx * (reduceMotion ? 0.06 : 0.16), -dragLimit, dragLimit),
+          );
+          dragY.setValue(
+            clampHomeSearchValue(gesture.dy * (reduceMotion ? 0.05 : 0.14), -dragLimit, dragLimit),
+          );
+          setLightFromTouch(event.nativeEvent.locationX, event.nativeEvent.locationY);
+        },
+        onPanResponderRelease: (_event, gesture) => {
+          const shouldOpen =
+            !touchStartRef.current.moved &&
+            Math.hypot(gesture.dx, gesture.dy) < HOME_SEARCH_TOUCH_TRAVEL_LIMIT * 1.2;
+          animateRelease();
+          if (shouldOpen) {
+            router.push("/search");
+          }
+        },
+        onPanResponderTerminate: animateRelease,
+        onStartShouldSetPanResponder: () => true,
+      }),
+    [reduceMotion],
+  );
+
+  const pressScale = pressProgress.interpolate({
+    inputRange: [0, 1],
+    outputRange: [1, reduceMotion ? 0.99 : 0.972],
+  });
+  const holdScale = holdProgress.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, reduceMotion ? 0 : 0.008],
+  });
+  const searchScale = Animated.add(pressScale, holdScale);
+  const radius = holdProgress.interpolate({
+    inputRange: [0, 1],
+    outputRange: [
+      HOME_SEARCH_BUTTON_SIZE / 2,
+      reduceMotion ? HOME_SEARCH_BUTTON_SIZE / 2 : HOME_SEARCH_BUTTON_SIZE / 2 + 4,
+    ],
+  });
+  const dragStretchX = dragX.interpolate({
+    inputRange: [-8, 0, 8],
+    outputRange: [reduceMotion ? 1 : 1.012, 1, reduceMotion ? 1 : 1.012],
+  });
+  const dragStretchY = dragY.interpolate({
+    inputRange: [-8, 0, 8],
+    outputRange: [reduceMotion ? 1 : 1.01, 1, reduceMotion ? 1 : 1.01],
+  });
+  const shadowOpacity = pressProgress.interpolate({
+    inputRange: [0, 1],
+    outputRange: [reduceTransparency ? 0.24 : 0.18, reduceTransparency ? 0.15 : 0.09],
+  });
+  const shadowRadius = pressProgress.interpolate({
+    inputRange: [0, 1],
+    outputRange: [26, 15],
+  });
+  const highlightTranslateX = lightX.interpolate({ inputRange: [-1, 1], outputRange: [-19, 19] });
+  const highlightTranslateY = lightY.interpolate({ inputRange: [-1, 1], outputRange: [-19, 19] });
+  const glowOpacity = glowProgress.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, reduceTransparency ? 0.16 : 0.34],
+  });
+  const glowScale = glowProgress.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0.38, reduceMotion ? 0.95 : 1.26],
+  });
+  const holdGlowOpacity = holdProgress.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, reduceTransparency ? 0.08 : 0.18],
+  });
+  const specularOpacity = Animated.add(
+    pressProgress.interpolate({ inputRange: [0, 1], outputRange: [0.54, 0.78] }),
+    holdProgress.interpolate({ inputRange: [0, 1], outputRange: [0, 0.12] }),
+  );
+  const refractionOpacity = Animated.add(
+    pressProgress.interpolate({ inputRange: [0, 1], outputRange: [0.32, 0.48] }),
+    holdProgress.interpolate({ inputRange: [0, 1], outputRange: [0, 0.12] }),
+  );
+
   return (
-    <Pressable
+    <Animated.View
       accessibilityLabel="検索"
       accessibilityRole="button"
-      hitSlop={10}
-      onPress={() => router.push("/search")}
-      style={({ pressed }) => [
+      accessibilityHint="グッズや推し、タグを検索します"
+      onAccessibilityTap={() => router.push("/search")}
+      style={[
         styles.floatingSearchButton,
-        pressed ? styles.floatingSearchButtonPressed : null,
+        {
+          borderRadius: radius,
+          shadowOpacity,
+          shadowRadius,
+          transform: [
+            { translateX: dragX },
+            { translateY: dragY },
+            { scale: searchScale },
+            { scaleX: dragStretchX },
+            { scaleY: dragStretchY },
+          ],
+        },
       ]}
+      {...panResponder.panHandlers}
     >
       <LiquidGlassSurface
-        blurIntensity={58}
+        blurIntensity={reduceTransparency ? 24 : 64}
         blurTint="systemThinMaterialLight"
         glassEffectStyle={{
-          style: "regular",
+          style: "clear",
           animate: true,
-          animationDuration: 0.2,
+          animationDuration: reduceMotion ? 0.08 : 0.22,
         }}
         isInteractive
         pointerEvents="none"
         style={styles.floatingSearchGlassSurface}
-        fallbackStyle={styles.floatingSearchFallback}
-        tintColor="rgba(255,255,255,0.12)"
+        fallbackStyle={[
+          styles.floatingSearchFallback,
+          reduceTransparency ? styles.floatingSearchFallbackReducedTransparency : null,
+        ]}
+        tintColor={reduceTransparency ? "rgba(145,132,190,0.76)" : "rgba(166,149,216,0.26)"}
       >
+        <Animated.View
+          pointerEvents="none"
+          style={[
+            styles.floatingSearchGlow,
+            {
+              opacity: glowOpacity,
+              transform: [
+                { translateX: highlightTranslateX },
+                { translateY: highlightTranslateY },
+                { scale: glowScale },
+              ],
+            },
+          ]}
+        />
+        <Animated.View
+          pointerEvents="none"
+          style={[
+            styles.floatingSearchHoldGlow,
+            {
+              opacity: holdGlowOpacity,
+              transform: [
+                { translateX: highlightTranslateX },
+                { translateY: highlightTranslateY },
+              ],
+            },
+          ]}
+        />
+        <Animated.View
+          pointerEvents="none"
+          style={[
+            styles.floatingSearchRefraction,
+            {
+              opacity: refractionOpacity,
+              transform: [
+                { translateX: highlightTranslateX },
+                { translateY: highlightTranslateY },
+                { rotate: "-18deg" },
+              ],
+            },
+          ]}
+        />
+        <Animated.View
+          pointerEvents="none"
+          style={[
+            styles.floatingSearchSpecular,
+            {
+              opacity: specularOpacity,
+              transform: [
+                { translateX: highlightTranslateX },
+                { translateY: highlightTranslateY },
+                { rotate: "-18deg" },
+              ],
+            },
+          ]}
+        />
+        <View pointerEvents="none" style={styles.floatingSearchInnerHighlight} />
+        <View pointerEvents="none" style={styles.floatingSearchLowerRefraction} />
         <View style={styles.floatingSearchIconLayer}>
           <NativeHomeActionSymbol
-            color="rgba(28,25,38,0.86)"
+            color="#fff"
             fallbackName="search"
             name="magnifyingglass"
           />
         </View>
       </LiquidGlassSurface>
-    </Pressable>
+    </Animated.View>
   );
 }
 
@@ -3195,27 +3491,28 @@ const styles = StyleSheet.create({
     alignItems: "center",
     borderRadius: 999,
     bottom: 102,
-    height: 62,
+    height: HOME_SEARCH_BUTTON_SIZE,
     justifyContent: "center",
     left: 16,
+    overflow: "hidden",
     position: "absolute",
     shadowColor: megrumColors.ink,
-    shadowOffset: { width: 0, height: 12 },
-    shadowOpacity: 0.14,
-    shadowRadius: 24,
-    width: 62,
+    shadowOffset: { width: 0, height: 16 },
+    shadowOpacity: 0.18,
+    shadowRadius: 26,
+    width: HOME_SEARCH_BUTTON_SIZE,
     zIndex: 20,
   },
-  floatingSearchButtonPressed: {
-    opacity: 0.92,
-    transform: [{ scale: 0.97 }],
-  },
   floatingSearchFallback: {
-    backgroundColor: "rgba(255,255,255,0.36)",
+    backgroundColor: "rgba(166,149,216,0.30)",
+  },
+  floatingSearchFallbackReducedTransparency: {
+    backgroundColor: "rgba(129,116,178,0.84)",
   },
   floatingSearchGlassSurface: {
     alignItems: "center",
-    borderColor: "rgba(255,255,255,0.56)",
+    backgroundColor: "rgba(166,149,216,0.16)",
+    borderColor: "rgba(255,255,255,0.62)",
     borderRadius: 999,
     borderWidth: StyleSheet.hairlineWidth,
     height: "100%",
@@ -3223,12 +3520,74 @@ const styles = StyleSheet.create({
     overflow: "hidden",
     width: "100%",
   },
+  floatingSearchGlow: {
+    backgroundColor: "rgba(255,255,255,0.84)",
+    borderRadius: 60,
+    height: 98,
+    left: -16,
+    position: "absolute",
+    top: -16,
+    width: 98,
+  },
+  floatingSearchHoldGlow: {
+    backgroundColor: "rgba(255,255,255,0.38)",
+    borderRadius: 999,
+    height: 54,
+    left: 6,
+    position: "absolute",
+    top: 6,
+    width: 54,
+  },
+  floatingSearchRefraction: {
+    backgroundColor: "rgba(150,223,255,0.22)",
+    borderRadius: 999,
+    height: 82,
+    left: 13,
+    position: "absolute",
+    top: -14,
+    width: 28,
+  },
+  floatingSearchSpecular: {
+    backgroundColor: "rgba(255,255,255,0.72)",
+    borderRadius: 999,
+    height: 48,
+    left: 13,
+    position: "absolute",
+    top: -18,
+    width: 18,
+  },
+  floatingSearchInnerHighlight: {
+    borderColor: "rgba(255,255,255,0.76)",
+    borderRadius: 999,
+    borderWidth: StyleSheet.hairlineWidth,
+    bottom: 1,
+    left: 1,
+    opacity: 0.72,
+    position: "absolute",
+    right: 1,
+    top: 1,
+  },
+  floatingSearchLowerRefraction: {
+    backgroundColor: "rgba(48,42,74,0.10)",
+    borderBottomLeftRadius: 999,
+    borderBottomRightRadius: 999,
+    bottom: 0,
+    height: 28,
+    left: 0,
+    position: "absolute",
+    right: 0,
+  },
   floatingSearchIconLayer: {
     alignItems: "center",
+    backgroundColor: "rgba(42,34,72,0.16)",
     borderRadius: 999,
-    height: 44,
+    height: 46,
     justifyContent: "center",
-    width: 44,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 5,
+    width: 46,
   },
   homeActionButton: {
     alignItems: "center",
