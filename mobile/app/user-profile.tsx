@@ -351,45 +351,22 @@ export default function UserProfileScreen() {
         {error ? <Text style={styles.inlineError}>{error}</Text> : null}
         {profile ? (
           <>
-            <View style={styles.hero}>
-              <View style={styles.avatar}>
-                {profile.avatarUrl ? (
-                  <Image source={{ uri: profile.avatarUrl }} style={styles.avatarImage} />
-                ) : (
-                  <Text style={styles.avatarText}>
-                    {profile.displayName.slice(0, 2) || "?"}
-                  </Text>
-                )}
-              </View>
-              <View style={styles.identity}>
-                <Text numberOfLines={1} style={styles.handle}>
-                  @{profile.handle}
-                </Text>
-                <Text numberOfLines={1} style={styles.name}>
-                  {profile.displayName} ・ {profile.primaryArea ?? "エリア未設定"}
-                </Text>
-              </View>
-              <View style={styles.statsRow}>
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityLabel="評価一覧を見る"
-                  onPress={() =>
-                    router.push({
-                      pathname: "/user-evaluations",
-                      params: { id: profile.id },
-                    })
-                  }
-                  style={styles.statButton}
-                >
-                  <Stat
-                    label="評価"
-                    value={profile.ratingAvg == null ? "—" : `★${profile.ratingAvg.toFixed(1)}`}
-                  />
-                </Pressable>
-                <Stat label="取引" value={`${profile.tradeCount}`} />
-                <Stat label="譲る候補" value={`${profile.items.length}`} />
-                <Stat label="個別募集" value={`${profile.listings.length}`} />
-              </View>
+            <ProfileHero profile={profile} />
+
+            <View style={styles.statsStrip}>
+              <MiniStat
+                label="評価"
+                value={profile.ratingAvg == null ? "★—" : `★${profile.ratingAvg.toFixed(1)}`}
+                onPress={() =>
+                  router.push({
+                    pathname: "/user-evaluations",
+                    params: { id: profile.id },
+                  })
+                }
+              />
+              <MiniStat label="取引" value={`${profile.tradeCount}`} />
+              <MiniStat label="譲る候補" value={`${profile.items.length}`} />
+              <MiniStat label="個別募集" value={`${profile.listings.length}`} />
             </View>
 
             <View style={styles.sectionHeader}>
@@ -493,12 +470,81 @@ export default function UserProfileScreen() {
   );
 }
 
-function Stat({ label, value }: { label: string; value: string }) {
+function ProfileHero({ profile }: { profile: UserProfile }) {
   return (
-    <View style={styles.stat}>
-      <Text style={styles.statValue}>{value}</Text>
-      <Text style={styles.statLabel}>{label}</Text>
+    <View style={styles.hero}>
+      <View style={styles.heroGlowPink} />
+      <View style={styles.heroGlowSky} />
+      <View style={styles.heroTop}>
+        <View style={styles.avatar}>
+          {profile.avatarUrl ? (
+            <Image source={{ uri: profile.avatarUrl }} style={styles.avatarImage} />
+          ) : (
+            <Text style={styles.avatarText}>
+              {(profile.displayName || profile.handle || "Mg").slice(0, 2)}
+            </Text>
+          )}
+        </View>
+        <View style={styles.heroIdentity}>
+          <Text numberOfLines={1} style={styles.handle}>
+            @{profile.handle || "未設定"}
+          </Text>
+          <Text numberOfLines={1} style={styles.displayName}>
+            {profile.displayName || "（表示名未設定）"}
+          </Text>
+          <Text numberOfLines={1} style={styles.heroMeta}>
+            {profile.primaryArea ?? "エリア未設定"} ・ 取引 {profile.tradeCount} 回
+          </Text>
+        </View>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="評価一覧を見る"
+          onPress={() =>
+            router.push({
+              pathname: "/user-evaluations",
+              params: { id: profile.id },
+            })
+          }
+          style={styles.ratingPanel}
+        >
+          <Text style={styles.ratingValue}>
+            {profile.ratingAvg == null ? "★—" : `★${profile.ratingAvg.toFixed(1)}`}
+          </Text>
+          <Text style={styles.ratingCount}>{profile.ratingCount} 件</Text>
+          <Text style={styles.ratingLink}>詳細 ›</Text>
+        </Pressable>
+      </View>
     </View>
+  );
+}
+
+function MiniStat({
+  label,
+  value,
+  onPress,
+}: {
+  label: string;
+  value: string;
+  onPress?: () => void;
+}) {
+  const content = (
+    <>
+      <Text style={styles.miniStatValue}>{value}</Text>
+      <Text style={styles.miniStatLabel}>{label}</Text>
+    </>
+  );
+  if (!onPress) return <View style={styles.miniStat}>{content}</View>;
+  return (
+    <Pressable
+      accessibilityRole="button"
+      onPress={onPress}
+      style={({ pressed }) => [
+        styles.miniStat,
+        pressed ? styles.rowPressed : null,
+      ]}
+    >
+      {content}
+    </Pressable>
   );
 }
 
@@ -1027,72 +1073,137 @@ const styles = StyleSheet.create({
     fontWeight: "800",
   },
   hero: {
-    backgroundColor: megrumColors.surface,
-    borderColor: "rgba(166,149,216,0.22)",
-    borderRadius: megrumRadii.xl,
-    borderWidth: 1,
-    padding: 18,
-    ...megrumShadow,
+    backgroundColor: megrumColors.lavender,
+    borderRadius: 18,
+    overflow: "hidden",
+    padding: 20,
+    shadowColor: megrumColors.lavender,
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.3,
+    shadowRadius: 24,
+  },
+  heroGlowPink: {
+    backgroundColor: "rgba(243,197,212,0.34)",
+    borderRadius: 999,
+    height: 132,
+    position: "absolute",
+    right: -34,
+    top: -48,
+    width: 132,
+  },
+  heroGlowSky: {
+    backgroundColor: "rgba(168,212,230,0.62)",
+    borderRadius: 999,
+    bottom: -58,
+    height: 154,
+    left: -46,
+    position: "absolute",
+    width: 154,
+  },
+  heroTop: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 13,
   },
   avatar: {
     alignItems: "center",
-    alignSelf: "center",
-    backgroundColor: "rgba(166,149,216,0.18)",
-    borderRadius: 24,
-    height: 86,
+    backgroundColor: "rgba(255,255,255,0.18)",
+    borderColor: "rgba(255,255,255,0.30)",
+    borderRadius: 16,
+    borderWidth: 2,
+    height: 58,
     justifyContent: "center",
     overflow: "hidden",
-    width: 86,
+    width: 58,
   },
   avatarImage: {
     height: "100%",
     width: "100%",
   },
   avatarText: {
-    color: megrumColors.lavender,
-    fontSize: 24,
+    color: megrumColors.surface,
+    fontSize: 19,
     fontWeight: "900",
   },
-  identity: {
-    alignItems: "center",
-    marginTop: 12,
+  heroIdentity: {
+    flex: 1,
+    minWidth: 0,
   },
   handle: {
-    color: megrumColors.ink,
-    fontSize: 20,
+    color: megrumColors.surface,
+    fontSize: 16,
     fontWeight: "900",
   },
-  name: {
-    color: megrumColors.mutedInk,
+  displayName: {
+    color: "rgba(255,255,255,0.92)",
     fontSize: 12,
+    fontWeight: "800",
+    marginTop: 2,
+  },
+  heroMeta: {
+    color: "rgba(255,255,255,0.84)",
+    fontSize: 10.5,
     fontWeight: "800",
     marginTop: 3,
   },
-  statsRow: {
-    flexDirection: "row",
-    gap: 8,
-    marginTop: 16,
-  },
-  statButton: {
-    flex: 1,
-  },
-  stat: {
+  ratingPanel: {
     alignItems: "center",
-    backgroundColor: megrumColors.background,
-    borderRadius: megrumRadii.md,
-    flex: 1,
-    paddingVertical: 10,
+    backgroundColor: "rgba(255,255,255,0.15)",
+    borderRadius: 12,
+    flexShrink: 0,
+    justifyContent: "center",
+    minWidth: 58,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
   },
-  statValue: {
-    color: megrumColors.ink,
+  ratingValue: {
+    color: megrumColors.surface,
     fontSize: 15,
     fontWeight: "900",
+    lineHeight: 16,
   },
-  statLabel: {
-    color: megrumColors.mutedInk,
-    fontSize: 10,
+  ratingCount: {
+    color: "rgba(255,255,255,0.90)",
+    fontSize: 9.5,
     fontWeight: "800",
     marginTop: 2,
+  },
+  ratingLink: {
+    color: "rgba(255,255,255,0.78)",
+    fontSize: 8.5,
+    fontWeight: "800",
+    marginTop: 2,
+  },
+  statsStrip: {
+    backgroundColor: megrumColors.surface,
+    borderColor: "rgba(58,50,74,0.08)",
+    borderRadius: 16,
+    borderWidth: 1,
+    flexDirection: "row",
+    overflow: "hidden",
+    ...megrumShadow,
+  },
+  miniStat: {
+    alignItems: "center",
+    flex: 1,
+    justifyContent: "center",
+    minHeight: 58,
+    paddingHorizontal: 4,
+    paddingVertical: 10,
+  },
+  miniStatValue: {
+    color: megrumColors.ink,
+    fontSize: 14,
+    fontWeight: "900",
+  },
+  miniStatLabel: {
+    color: megrumColors.mutedInk,
+    fontSize: 9.5,
+    fontWeight: "800",
+    marginTop: 3,
+  },
+  rowPressed: {
+    backgroundColor: "rgba(166,149,216,0.08)",
   },
   sectionHeader: {
     alignItems: "center",
