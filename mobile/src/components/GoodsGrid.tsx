@@ -1,6 +1,8 @@
-import { useEffect, useRef, useState, type ComponentType, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ComponentType, type ReactNode } from "react";
+import { BlurView } from "expo-blur";
 import {
   ActionSheetIOS,
+  AccessibilityInfo,
   Animated,
   Easing,
   type GestureResponderEvent,
@@ -12,6 +14,7 @@ import {
   StyleSheet,
   type StyleProp,
   Text,
+  Vibration,
   View,
   type ViewStyle,
   useWindowDimensions,
@@ -235,6 +238,7 @@ export function GoodsGrid({
   items,
   columns,
   onPressItem,
+  onLongPressItem,
   emptyLabel,
   addTileLabel,
   onPressAddTile,
@@ -248,6 +252,7 @@ export function GoodsGrid({
   items: GoodsGridItem[];
   columns: ColumnCount;
   onPressItem: (item: GoodsGridItem, context: GoodsGridPressContext) => void;
+  onLongPressItem?: (item: GoodsGridItem, context: GoodsGridPressContext) => void;
   emptyLabel: string;
   addTileLabel?: string;
   onPressAddTile?: () => void;
@@ -290,6 +295,9 @@ export function GoodsGrid({
           deleting={deletingIds.includes(item.id)}
           onFadeOutEnd={onItemFadeOutEnd}
           onPress={(context) => onPressItem(item, context)}
+          onLongPress={
+            onLongPressItem ? (context) => onLongPressItem(item, context) : undefined
+          }
           showTopRow={showTopRow}
           topRowMode={topRowMode}
           showBottomStrip={showBottomStrip}
@@ -358,6 +366,7 @@ function AnimatedGoodsTile({
   deleting,
   onFadeOutEnd,
   onPress,
+  onLongPress,
   showTopRow,
   topRowMode,
   showBottomStrip,
@@ -369,6 +378,7 @@ function AnimatedGoodsTile({
   deleting?: boolean;
   onFadeOutEnd?: (id: string) => void;
   onPress: (context: GoodsGridPressContext) => void;
+  onLongPress?: (context: GoodsGridPressContext) => void;
   showTopRow: boolean;
   topRowMode: "title" | "tag";
   showBottomStrip: boolean;
@@ -431,6 +441,18 @@ function AnimatedGoodsTile({
       }}
     >
       <Pressable
+        delayLongPress={500}
+        onLongPress={
+          onLongPress
+            ? (event: GestureResponderEvent) => {
+                Vibration.vibrate(8);
+                onLongPress({
+                  pageX: event.nativeEvent.pageX,
+                  pageY: event.nativeEvent.pageY,
+                });
+              }
+            : undefined
+        }
         onPress={(event: GestureResponderEvent) =>
           onPress({
             pageX: event.nativeEvent.pageX,
@@ -527,21 +549,35 @@ export function BottomOptionSheet({
   subtitle?: string;
   actions: SheetAction[];
   onClose: () => void;
-  presentation?: "native" | "glass";
+  presentation?: "native" | "glass" | "quickActions";
   anchor?: SheetAnchor | null;
   preview?: SheetPreview | null;
 }) {
   const insets = useSafeAreaInsets();
   const { height, width } = useWindowDimensions();
   const translateY = useRef(new Animated.Value(220)).current;
+  const quickActionProgress = useRef(new Animated.Value(0)).current;
   const nativeSheetOpenRef = useRef(false);
   const glassMode = presentation === "glass";
-  const glassKit = glassMode ? getIOSGlassKit() : null;
-  const useLiquidGlassPopover = glassMode && (Platform.OS !== "ios" || !!glassKit);
+  const quickActionMode = presentation === "quickActions";
+  const glassKit = glassMode || quickActionMode ? getIOSGlassKit() : null;
+  const useLiquidGlassPopover =
+    quickActionMode || (glassMode && (Platform.OS !== "ios" || !!glassKit));
+  const quickActions = useMemo(() => orderQuickActions(actions), [actions]);
+  const [quickActionVisible, setQuickActionVisible] = useState(visible);
+  const [reduceMotion, setReduceMotion] = useState(false);
+  const [reduceTransparency, setReduceTransparency] = useState(false);
   const floatingPanelWidth = Math.min(318, width - 28);
   const floatingPanelHeight = actions.length > 2 ? 220 : 158;
   const anchorX = anchor?.pageX ?? width / 2;
   const anchorY = anchor?.pageY ?? height * 0.58;
+  const quickMenuWidth = Math.min(286, width - 32);
+  const quickRowHeight = 54;
+  const quickHasDanger = quickActions.some((action) => action.tone === "danger");
+  const quickMenuHeight =
+    12 + quickActions.length * quickRowHeight + (quickHasDanger ? 8 : 0);
+  const previewWidth = 86;
+  const previewHeight = 116;
   const floatingLeft = Math.max(
     14,
     Math.min(width - floatingPanelWidth - 14, anchorX - floatingPanelWidth / 2),
@@ -552,10 +588,43 @@ export function BottomOptionSheet({
     insets.top + 12,
     Math.min(height - floatingPanelHeight - Math.max(insets.bottom, 12) - 18, preferredTop),
   );
+  const quickLeft = clamp(anchorX - quickMenuWidth / 2, 16, width - quickMenuWidth - 16);
+  const spaceBelow = height - anchorY - Math.max(insets.bottom, 10);
+  const preferredQuickTop =
+    spaceBelow > quickMenuHeight + previewHeight * 0.56 + 24
+      ? anchorY + previewHeight * 0.48 + 12
+      : anchorY - quickMenuHeight - previewHeight * 0.46 - 12;
+  const quickTop = clamp(
+    preferredQuickTop,
+    insets.top + 16,
+    height - quickMenuHeight - Math.max(insets.bottom, 12) - 16,
+  );
+  const previewLeft = clamp(anchorX - previewWidth / 2, 18, width - previewWidth - 18);
+  const previewTop = clamp(
+    anchorY - previewHeight / 2,
+    insets.top + 18,
+    height - previewHeight - Math.max(insets.bottom, 12) - 18,
+  );
   const popoverScale = translateY.interpolate({
     inputRange: [0, 220],
     outputRange: [1, 0.92],
     extrapolate: "clamp",
+  });
+  const quickBackdropOpacity = quickActionProgress.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, reduceTransparency ? 0.32 : 0.72],
+  });
+  const quickMenuScale = quickActionProgress.interpolate({
+    inputRange: [0, 1],
+    outputRange: [reduceMotion ? 1 : 0.94, 1],
+  });
+  const quickPreviewScale = quickActionProgress.interpolate({
+    inputRange: [0, 1],
+    outputRange: [reduceMotion ? 1 : 0.96, 1.045],
+  });
+  const quickMenuTranslateY = quickActionProgress.interpolate({
+    inputRange: [0, 1],
+    outputRange: [reduceMotion ? 0 : 8, 0],
   });
 
   useEffect(() => {
@@ -594,6 +663,42 @@ export function BottomOptionSheet({
   }, [actions, onClose, subtitle, title, useLiquidGlassPopover, visible]);
 
   useEffect(() => {
+    let mounted = true;
+    AccessibilityInfo.isReduceMotionEnabled()
+      .then((enabled) => {
+        if (mounted) setReduceMotion(enabled);
+      })
+      .catch(() => undefined);
+    const reduceMotionSubscription = AccessibilityInfo.addEventListener(
+      "reduceMotionChanged",
+      setReduceMotion,
+    );
+
+    const accessibilityExtras = AccessibilityInfo as typeof AccessibilityInfo & {
+      isReduceTransparencyEnabled?: () => Promise<boolean>;
+      addEventListener?: (
+        eventName: "reduceTransparencyChanged",
+        handler: (enabled: boolean) => void,
+      ) => { remove: () => void };
+    };
+    accessibilityExtras.isReduceTransparencyEnabled?.()
+      .then((enabled) => {
+        if (mounted) setReduceTransparency(enabled);
+      })
+      .catch(() => undefined);
+    const reduceTransparencySubscription = accessibilityExtras.addEventListener?.(
+      "reduceTransparencyChanged",
+      setReduceTransparency,
+    );
+
+    return () => {
+      mounted = false;
+      reduceMotionSubscription.remove();
+      reduceTransparencySubscription?.remove();
+    };
+  }, []);
+
+  useEffect(() => {
     Animated.spring(translateY, {
       toValue: visible ? 0 : glassMode ? 18 : 220,
       damping: 22,
@@ -603,92 +708,334 @@ export function BottomOptionSheet({
     }).start();
   }, [translateY, visible]);
 
+  useEffect(() => {
+    if (!quickActionMode) return;
+    if (visible) {
+      setQuickActionVisible(true);
+      quickActionProgress.setValue(0);
+      Animated.spring(quickActionProgress, {
+        toValue: 1,
+        damping: reduceMotion ? 30 : 21,
+        stiffness: reduceMotion ? 260 : 230,
+        mass: 0.74,
+        useNativeDriver: true,
+      }).start();
+      return;
+    }
+
+    Animated.timing(quickActionProgress, {
+      toValue: 0,
+      duration: reduceMotion ? 80 : 150,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    }).start(({ finished }) => {
+      if (finished) setQuickActionVisible(false);
+    });
+  }, [quickActionMode, quickActionProgress, reduceMotion, visible]);
+
   if (Platform.OS === "ios" && !useLiquidGlassPopover) return null;
+  if (quickActionMode && !quickActionVisible) return null;
 
   return (
     <Modal
-      visible={visible}
+      visible={quickActionMode ? quickActionVisible : visible}
       transparent
-      animationType={glassMode ? "none" : "fade"}
+      animationType={glassMode || quickActionMode ? "none" : "fade"}
       onRequestClose={onClose}
     >
-      <View style={[styles.sheetRoot, glassMode ? styles.glassPopoverRoot : null]}>
-        <Pressable
-          style={[styles.sheetBackdrop, glassMode ? styles.glassPopoverBackdrop : null]}
-          onPress={onClose}
-        />
-        <Animated.View
-          style={[
-            glassMode
-              ? [
-                  styles.glassPopoverPanel,
-                  {
-                    left: floatingLeft,
-                    top: floatingTop,
-                    width: floatingPanelWidth,
-                    transform: [{ translateY }, { scale: popoverScale }],
-                  },
-                ]
-              : [
-                  styles.sheetPanel,
-                  {
-                    paddingBottom: Math.max(insets.bottom, 12) + 10,
-                    transform: [{ translateY }],
-                  },
-                ],
-          ]}
-        >
-          {glassMode ? (
-            <GlassActionPopover
-              actions={actions}
-              glassKit={glassKit}
-              preview={preview}
-              subtitle={subtitle}
-              title={title}
+      <View
+        style={[
+          styles.sheetRoot,
+          glassMode ? styles.glassPopoverRoot : null,
+          quickActionMode ? styles.quickActionRoot : null,
+        ]}
+      >
+        {quickActionMode ? (
+          <>
+            <Animated.View
+              pointerEvents="none"
+              style={[styles.quickActionBackdropMaterial, { opacity: quickBackdropOpacity }]}
+            >
+              {reduceTransparency ? (
+                <View style={styles.quickActionOpaqueBackdrop} />
+              ) : (
+                <BlurView
+                  intensity={24}
+                  style={StyleSheet.absoluteFill}
+                  tint="systemThinMaterialLight"
+                />
+              )}
+              <View style={styles.quickActionBackdropTint} />
+            </Animated.View>
+            <Pressable style={styles.sheetBackdrop} onPress={onClose} />
+            <Animated.View
+              pointerEvents="none"
+              style={[
+                styles.quickActionLiftedPreview,
+                {
+                  left: previewLeft,
+                  opacity: quickActionProgress,
+                  top: previewTop,
+                  transform: [{ scale: quickPreviewScale }],
+                  width: previewWidth,
+                },
+              ]}
+            >
+              <QuickActionPreviewCard preview={preview} title={title} />
+            </Animated.View>
+            <Animated.View
+              style={[
+                styles.quickActionMenuPanel,
+                {
+                  left: quickLeft,
+                  opacity: quickActionProgress,
+                  top: quickTop,
+                  transform: [{ translateY: quickMenuTranslateY }, { scale: quickMenuScale }],
+                  width: quickMenuWidth,
+                },
+              ]}
+            >
+              <QuickActionMenu
+                actions={quickActions}
+                glassKit={glassKit}
+                onActionPress={(action) => {
+                  Vibration.vibrate(5);
+                  onClose();
+                  setTimeout(action.onPress, reduceMotion ? 45 : 120);
+                }}
+                reduceTransparency={reduceTransparency}
+              />
+            </Animated.View>
+          </>
+        ) : (
+          <>
+            <Pressable
+              style={[styles.sheetBackdrop, glassMode ? styles.glassPopoverBackdrop : null]}
+              onPress={onClose}
             />
-          ) : (
-            <>
-              <View style={styles.sheetHandle} />
-              <Text style={styles.sheetTitle}>{title}</Text>
-              {subtitle ? (
-                <Text numberOfLines={2} style={styles.sheetSubtitle}>
-                  {subtitle}
-                </Text>
-              ) : null}
-              <View style={styles.sheetActions}>
-                {actions.map((action) => (
-                  <Pressable
-                    key={action.id}
-                    onPress={action.onPress}
-                    style={[
-                      styles.sheetAction,
-                      action.tone === "danger"
-                        ? styles.sheetActionDanger
-                        : action.tone === "muted"
-                          ? styles.sheetActionMuted
-                          : styles.sheetActionDefault,
-                    ]}
-                  >
-                    <Text
-                      style={[
-                        styles.sheetActionText,
-                        action.tone === "danger"
-                          ? styles.sheetActionTextDanger
-                          : action.tone === "muted"
-                            ? styles.sheetActionTextMuted
-                            : styles.sheetActionTextDefault,
-                      ]}
-                    >
-                      {action.label}
+            <Animated.View
+              style={[
+                glassMode
+                  ? [
+                      styles.glassPopoverPanel,
+                      {
+                        left: floatingLeft,
+                        top: floatingTop,
+                        width: floatingPanelWidth,
+                        transform: [{ translateY }, { scale: popoverScale }],
+                      },
+                    ]
+                  : [
+                      styles.sheetPanel,
+                      {
+                        paddingBottom: Math.max(insets.bottom, 12) + 10,
+                        transform: [{ translateY }],
+                      },
+                    ],
+              ]}
+            >
+              {glassMode ? (
+                <GlassActionPopover
+                  actions={actions}
+                  glassKit={glassKit}
+                  preview={preview}
+                  subtitle={subtitle}
+                  title={title}
+                />
+              ) : (
+                <>
+                  <View style={styles.sheetHandle} />
+                  <Text style={styles.sheetTitle}>{title}</Text>
+                  {subtitle ? (
+                    <Text numberOfLines={2} style={styles.sheetSubtitle}>
+                      {subtitle}
                     </Text>
-                  </Pressable>
-                ))}
-              </View>
-            </>
-          )}
-        </Animated.View>
+                  ) : null}
+                  <View style={styles.sheetActions}>
+                    {actions.map((action) => (
+                      <Pressable
+                        key={action.id}
+                        onPress={action.onPress}
+                        style={[
+                          styles.sheetAction,
+                          action.tone === "danger"
+                            ? styles.sheetActionDanger
+                            : action.tone === "muted"
+                              ? styles.sheetActionMuted
+                              : styles.sheetActionDefault,
+                        ]}
+                      >
+                        <Text
+                          style={[
+                            styles.sheetActionText,
+                            action.tone === "danger"
+                              ? styles.sheetActionTextDanger
+                              : action.tone === "muted"
+                                ? styles.sheetActionTextMuted
+                                : styles.sheetActionTextDefault,
+                          ]}
+                        >
+                          {action.label}
+                        </Text>
+                      </Pressable>
+                    ))}
+                  </View>
+                </>
+              )}
+            </Animated.View>
+          </>
+        )}
       </View>
     </Modal>
+  );
+}
+
+function QuickActionMenu({
+  actions,
+  glassKit,
+  onActionPress,
+  reduceTransparency,
+}: {
+  actions: SheetAction[];
+  glassKit: IOSGlassKit | null;
+  onActionPress: (action: SheetAction) => void;
+  reduceTransparency: boolean;
+}) {
+  return (
+    <QuickActionSurface glassKit={glassKit} reduceTransparency={reduceTransparency}>
+      <View style={styles.quickActionInnerHighlight} pointerEvents="none" />
+      {actions.map((action, index) => {
+        const previous = actions[index - 1];
+        const next = actions[index + 1];
+        const startsDangerGroup = action.tone === "danger" && previous?.tone !== "danger";
+        const showSeparator = !!next && next.tone === action.tone;
+
+        return (
+          <View key={action.id}>
+            {startsDangerGroup ? <View style={styles.quickActionGroupGap} /> : null}
+            <Pressable
+              accessibilityLabel={action.label}
+              accessibilityRole="button"
+              onPress={() => onActionPress(action)}
+              style={({ pressed }) => [
+                styles.quickActionRow,
+                pressed ? styles.quickActionRowPressed : null,
+              ]}
+            >
+              <Text
+                numberOfLines={2}
+                style={[
+                  styles.quickActionLabel,
+                  action.tone === "danger"
+                    ? styles.quickActionLabelDanger
+                    : action.tone === "muted"
+                      ? styles.quickActionLabelMuted
+                      : null,
+                ]}
+              >
+                {action.label}
+              </Text>
+              <IconSymbol
+                color={
+                  action.tone === "danger"
+                    ? megrumColors.warn
+                    : action.tone === "muted"
+                      ? megrumColors.mutedInk
+                      : megrumColors.ink
+                }
+                name={actionIconName(action)}
+                size={18}
+                style={styles.quickActionIcon}
+              />
+            </Pressable>
+            {showSeparator ? <View style={styles.quickActionSeparator} /> : null}
+          </View>
+        );
+      })}
+    </QuickActionSurface>
+  );
+}
+
+function QuickActionSurface({
+  children,
+  glassKit,
+  reduceTransparency,
+}: {
+  children: ReactNode;
+  glassKit: IOSGlassKit | null;
+  reduceTransparency: boolean;
+}) {
+  const GlassView = reduceTransparency ? null : glassKit?.GlassView;
+  if (GlassView) {
+    return (
+      <GlassView
+        colorScheme="light"
+        glassEffectStyle={{
+          style: "regular",
+          animate: true,
+          animationDuration: 0.2,
+        }}
+        isInteractive={false}
+        style={styles.quickActionSurface}
+        tintColor="rgba(255,255,255,0.34)"
+      >
+        {children}
+      </GlassView>
+    );
+  }
+
+  if (Platform.OS === "ios" && !reduceTransparency) {
+    return (
+      <BlurView
+        intensity={62}
+        style={[styles.quickActionSurface, styles.quickActionSurfaceBlurFallback]}
+        tint="systemThinMaterialLight"
+      >
+        {children}
+      </BlurView>
+    );
+  }
+
+  return (
+    <View style={[styles.quickActionSurface, styles.quickActionSurfaceOpaque]}>
+      {children}
+    </View>
+  );
+}
+
+function QuickActionPreviewCard({
+  preview,
+  title,
+}: {
+  preview?: SheetPreview | null;
+  title: string;
+}) {
+  return (
+    <View style={styles.quickActionPreviewCard}>
+      {preview?.photoUrl ? (
+        <Image
+          source={{ uri: preview.photoUrl }}
+          resizeMode="cover"
+          style={styles.quickActionPreviewImage}
+        />
+      ) : (
+        <View
+          style={[
+            styles.quickActionPreviewFallback,
+            { backgroundColor: preview?.hue ?? "rgba(166,149,216,0.26)" },
+          ]}
+        >
+          <Text style={styles.quickActionPreviewGlyph}>
+            {preview?.glyph || title.slice(0, 1) || "?"}
+          </Text>
+        </View>
+      )}
+      <View style={styles.quickActionPreviewPlate}>
+        <Text numberOfLines={1} style={styles.quickActionPreviewTitle}>
+          {title}
+        </Text>
+      </View>
+    </View>
   );
 }
 
@@ -851,11 +1198,23 @@ function LiquidGlassSurface({
 }
 
 function actionIconName(action: SheetAction): IconSymbolName {
+  if (action.label.includes("詳細")) return "search-outline";
   if (action.id.includes("edit")) return "create-outline";
   if (action.id.includes("move")) return "arrow-forward";
   if (action.id.includes("delete")) return "warning-outline";
   if (action.id.includes("close")) return "close";
   return "ellipsis-horizontal";
+}
+
+function orderQuickActions(actions: SheetAction[]) {
+  const regular = actions.filter((action) => action.tone !== "danger");
+  const danger = actions.filter((action) => action.tone === "danger");
+  return [...regular, ...danger];
+}
+
+function clamp(value: number, min: number, max: number) {
+  if (max < min) return min;
+  return Math.max(min, Math.min(max, value));
 }
 
 export function FloatingAddButton({
@@ -1197,6 +1556,137 @@ const styles = StyleSheet.create({
   },
   glassPopoverBackdrop: {
     backgroundColor: "transparent",
+  },
+  quickActionRoot: {
+    backgroundColor: "transparent",
+    justifyContent: "flex-start",
+  },
+  quickActionBackdropMaterial: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  quickActionOpaqueBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(251,249,252,0.94)",
+  },
+  quickActionBackdropTint: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(18,14,29,0.18)",
+  },
+  quickActionLiftedPreview: {
+    position: "absolute",
+    shadowColor: megrumColors.ink,
+    shadowOffset: { width: 0, height: 16 },
+    shadowOpacity: 0.22,
+    shadowRadius: 26,
+  },
+  quickActionPreviewCard: {
+    backgroundColor: "rgba(255,255,255,0.86)",
+    borderColor: "rgba(255,255,255,0.78)",
+    borderRadius: 18,
+    borderWidth: 1,
+    height: 116,
+    overflow: "hidden",
+  },
+  quickActionPreviewImage: {
+    flex: 1,
+    width: "100%",
+  },
+  quickActionPreviewFallback: {
+    alignItems: "center",
+    flex: 1,
+    justifyContent: "center",
+  },
+  quickActionPreviewGlyph: {
+    color: megrumColors.surface,
+    fontSize: 30,
+    fontWeight: "900",
+    textShadowColor: "rgba(58,50,74,0.20)",
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 5,
+  },
+  quickActionPreviewPlate: {
+    backgroundColor: "rgba(255,255,255,0.94)",
+    bottom: 0,
+    left: 0,
+    paddingHorizontal: 7,
+    paddingVertical: 5,
+    position: "absolute",
+    right: 0,
+  },
+  quickActionPreviewTitle: {
+    color: megrumColors.ink,
+    fontSize: 10,
+    fontWeight: "900",
+    lineHeight: 13,
+  },
+  quickActionMenuPanel: {
+    position: "absolute",
+    shadowColor: megrumColors.ink,
+    shadowOffset: { width: 0, height: 19 },
+    shadowOpacity: 0.2,
+    shadowRadius: 34,
+  },
+  quickActionSurface: {
+    borderColor: "rgba(255,255,255,0.64)",
+    borderRadius: 25,
+    borderWidth: 1,
+    overflow: "hidden",
+    paddingVertical: 6,
+    position: "relative",
+  },
+  quickActionSurfaceBlurFallback: {
+    backgroundColor: "rgba(255,255,255,0.46)",
+  },
+  quickActionSurfaceOpaque: {
+    backgroundColor: "rgba(255,255,255,0.98)",
+  },
+  quickActionInnerHighlight: {
+    borderColor: "rgba(255,255,255,0.52)",
+    borderRadius: 24,
+    borderWidth: 1,
+    bottom: 1,
+    left: 1,
+    position: "absolute",
+    right: 1,
+    top: 1,
+  },
+  quickActionRow: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 14,
+    justifyContent: "space-between",
+    minHeight: 54,
+    paddingHorizontal: 17,
+    paddingVertical: 11,
+  },
+  quickActionRowPressed: {
+    backgroundColor: "rgba(166,149,216,0.14)",
+  },
+  quickActionLabel: {
+    color: megrumColors.ink,
+    flex: 1,
+    fontSize: 15,
+    fontWeight: "800",
+    lineHeight: 20,
+  },
+  quickActionLabelDanger: {
+    color: megrumColors.warn,
+  },
+  quickActionLabelMuted: {
+    color: megrumColors.mutedInk,
+  },
+  quickActionIcon: {
+    minWidth: 20,
+  },
+  quickActionSeparator: {
+    backgroundColor: "rgba(58,50,74,0.10)",
+    height: StyleSheet.hairlineWidth,
+    marginLeft: 17,
+  },
+  quickActionGroupGap: {
+    backgroundColor: "rgba(58,50,74,0.08)",
+    height: 8,
+    marginVertical: 2,
   },
   glassPopoverPanel: {
     position: "absolute",

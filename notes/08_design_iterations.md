@@ -4,6 +4,55 @@
 
 ---
 
+## イテレーション296：マイ在庫パネルにクイックアクションメニューを追加
+
+### 背景・問題意識
+
+オーナーから、マイ在庫の各パネルを長押しした時に、iOS Home Screen quick actions と同等の構造・質感・挙動を持つアプリ内メニューとして表示したいという指示があった。既存の選択肢は維持しつつ、通常タップとは明確に分け、長押し時だけ背景をぼかし、対象パネルとメニューへ視線が集まる形にする必要があった。
+
+### 変更内容
+
+#### `mobile/src/components/GoodsGrid.tsx`
+- `GoodsGrid` / `AnimatedGoodsTile` に `onLongPressItem` を追加し、500ms 長押しで軽い触覚フィードバック相当の反応を出してからコンテキストメニューを開けるようにした。
+- `BottomOptionSheet` に `presentation="quickActions"` を追加し、既存の action 配列をそのまま使って縦型のクイックアクションメニューを表示できるようにした。
+- メニューは対象パネル付近に自動配置し、画面端では上下左右の余白に応じて位置をクランプするようにした。
+- 背景 blur / 半透明マテリアル / soft shadow / inner highlight / separator / destructive action の赤表示を入れ、行押下時はその行だけ軽くハイライトするようにした。
+- 対象グッズのプレビューカードを軽く浮かせ、メニューの open / close を opacity + scale + spring 寄りのアニメーションで制御した。
+- Reduce Motion / Reduce Transparency を読み取り、モーションや透明表現を弱める分岐を入れた。
+
+#### `mobile/app/(tabs)/inventory.tsx`
+- マイ在庫の通常タップは編集/詳細表示へ直接遷移するようにし、長押し時だけ既存の「編集する / 自分キープへ / 削除 / 閉じる」等の選択肢をクイックアクションとして表示するようにした。
+- 既存のアクション内容と削除確認フローは維持した。
+
+### 影響範囲
+
+- iOS版 マイ在庫画面
+- 在庫パネルの通常タップ/長押し操作
+- `GoodsGrid` の長押しイベント拡張
+- `BottomOptionSheet` の新しい `quickActions` 表示モード
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- `EAS_UPDATE_PROJECT_SLUG=ihub EXPO_NO_GIT_STATUS=1 npm --prefix mobile run update:ios:preview -- --message "[iter296] マイ在庫クイックアクションメニュー" --non-interactive`
+- Preview OTA: Update group ID `e362b6d6-b694-40ba-9eee-1dc454fa6b42` / iOS update ID `019e79f6-1a80-7a0e-b108-dafcef5f8e87`
+- EAS Dashboard: `https://expo.dev/accounts/mashima.bizz/projects/ihub/updates/e362b6d6-b694-40ba-9eee-1dc454fa6b42`
+
+### 関連ファイル
+
+- `mobile/src/components/GoodsGrid.tsx`
+- `mobile/app/(tabs)/inventory.tsx`
+- `notes/08_design_iterations.md`
+
+### セルフレビュー結果
+
+- ✅ 既存の在庫アクション配列を流用し、選択肢の意味は変更していない。
+- ✅ 通常タップと長押しの役割を分離し、長押し時だけクイックアクションを出すようにした。
+- ✅ メニュー外タップ、行ハイライト、destructive action の下部配置、VoiceOver向けのラベル、Reduce Motion / Reduce Transparency に対応した。
+- ✅ iOS Preview channel へOTA配信済み。
+- ✅ 状態遷移・用語・DBスキーマ変更はないため、`notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要。
+
 ## イテレーション295：ホーム検索をLiquid Glassインタラクションへ再設計
 
 ### 背景・問題意識

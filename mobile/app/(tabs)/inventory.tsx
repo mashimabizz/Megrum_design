@@ -437,7 +437,7 @@ export default function InventoryScreen() {
         visible={!!selected}
         title={selected?.title ?? ""}
         anchor={selectedAnchor}
-        presentation="glass"
+        presentation="quickActions"
         preview={
           selected
             ? {
@@ -508,7 +508,13 @@ export default function InventoryScreen() {
                 ? "自分用キープのグッズはまだありません"
                 : "過去に譲ったグッズはまだありません"
           }
-          onPressItem={(gridItem, context) => {
+          onPressItem={(gridItem) => {
+            if (deletingItemIds.includes(gridItem.id)) return;
+            const item = items.find((current) => current.id === gridItem.id);
+            if (!item) return;
+            openInventoryEditor(item, item.status === "traded" ? "readonly" : "edit");
+          }}
+          onLongPressItem={(gridItem, context) => {
             if (deletingItemIds.includes(gridItem.id)) return;
             const item = items.find((current) => current.id === gridItem.id);
             if (!item) return;
