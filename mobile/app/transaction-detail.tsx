@@ -71,6 +71,7 @@ type ProposalRow = {
   meetup_lng: number | null;
   meetup_candidates: unknown;
   exchange_method: string | null;
+  option_tags: string[] | null;
   sender_mailing_address: unknown;
   receiver_mailing_address: unknown;
   evidence_photo_url: string | null;
@@ -147,6 +148,7 @@ type TransactionDetail = {
   give: DetailItem[];
   cashOffer: boolean;
   cashAmount: number | null;
+  optionTags: string[];
   meetups: MeetupCandidate[];
   message: string | null;
   expiresAt: string | null;
@@ -742,10 +744,8 @@ export default function TransactionDetailScreen() {
               }}
               style={styles.chatMessageEndAnchor}
             />
-            {detail.status === "agreed" && detail.evidencePhotoCount === 0 ? (
-              <EvidenceCalloutNative onStartCapture={openEvidenceCapturePrompt} />
-            ) : null}
-            {detail.status === "agreed" || detail.status === "completed" ? (
+            {detail.status === "completed" ||
+            (detail.status === "agreed" && detail.hasEvidence) ? (
               <CompletionPanel
                 detail={detail}
                 evidenceUploading={false}
@@ -761,15 +761,25 @@ export default function TransactionDetailScreen() {
                 { marginBottom: keyboardInset, paddingBottom: composerBottomInset },
               ]}
             >
+              {detail.status === "agreed" && !detail.hasEvidence ? (
+                <Pressable
+                  accessibilityRole="button"
+                  onPress={openEvidenceCapturePrompt}
+                  style={styles.evidenceFixedFooterButton}
+                >
+                  <Text style={styles.evidenceFixedFooterText}>交換後にグッズを撮影</Text>
+                </Pressable>
+              ) : null}
               {!composerFocused ? (
-                detail.status === "agreed" && detail.exchangeMethod === "mail" ? null : (
-                  <ScrollView
-                    horizontal
-                    showsHorizontalScrollIndicator={false}
-                    contentContainerStyle={styles.webQuickActionRow}
-                  >
-                    {detail.status === "agreed" ? (
-                      <>
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.webQuickActionRow}
+                >
+                  {detail.status === "agreed" ? (
+                    <>
+                      {supportsHandExchange(detail.exchangeMethod) ? (
+                        <>
                         <QuickActionChip
                           label={chatActionLoading === "location" ? "送信中…" : "現在地を送る"}
                           icon="⌖"
@@ -798,27 +808,52 @@ export default function TransactionDetailScreen() {
                           disabled={!!chatActionLoading}
                           onPress={() => handlePickChatPhoto("outfit_photo")}
                         />
-                      </>
-                    ) : (
-                      <>
                         <QuickActionChip
-                          label="スケジュール"
-                          icon="□"
-                          tone="lavender"
+                          label="遅刻を申請"
+                          icon="!"
+                          tone="neutral"
                           disabled={!!chatActionLoading}
-                          onPress={openScheduleOverlay}
-                        />
-                        <QuickActionChip
-                          label="条件を変えて再打診"
-                          icon="↻"
-                          tone="pink"
-                          disabled={!!chatActionLoading}
-                          onPress={() => openRevisionProposal()}
+                          onPress={() =>
+                            router.push({
+                              pathname: "/transaction-cancel-or-late",
+                              params: { id: detail.id, kind: "late" },
+                            })
+                          }
                         />
                       </>
-                    )}
-                  </ScrollView>
-                )
+                      ) : null}
+                      <QuickActionChip
+                        label="キャンセル申請"
+                        icon="!"
+                        tone="pink"
+                        disabled={!!chatActionLoading}
+                        onPress={() =>
+                          router.push({
+                            pathname: "/transaction-cancel-or-late",
+                            params: { id: detail.id, kind: "cancel" },
+                          })
+                        }
+                      />
+                    </>
+                  ) : (
+                    <>
+                      <QuickActionChip
+                        label="スケジュール"
+                        icon="□"
+                        tone="lavender"
+                        disabled={!!chatActionLoading}
+                        onPress={openScheduleOverlay}
+                      />
+                      <QuickActionChip
+                        label="条件を変えて再打診"
+                        icon="↻"
+                        tone="pink"
+                        disabled={!!chatActionLoading}
+                        onPress={() => openRevisionProposal()}
+                      />
+                    </>
+                  )}
+                </ScrollView>
               ) : null}
               <View style={styles.webComposerRow}>
                 <Pressable
@@ -990,6 +1025,7 @@ function buildRouteFallbackDetail(
     give: parseRouteItems(one(params.give)),
     cashOffer: false,
     cashAmount: null,
+    optionTags: [],
     meetups:
       place && time
         ? [
@@ -1044,6 +1080,12 @@ function one(value: string | string[] | undefined) {
   return Array.isArray(value) ? value[0] : value;
 }
 
+function normalizeStringArray(value: unknown) {
+  return Array.isArray(value)
+    ? value.filter((item): item is string => typeof item === "string" && item.trim().length > 0)
+    : [];
+}
+
 async function fetchTransactionDetail(
   proposalId: string,
   userId: string,
@@ -1070,6 +1112,7 @@ async function fetchTransactionDetail(
     "expires_at",
     "extension_count",
     "exchange_method",
+    "option_tags",
   ];
   const optionalProposalFields = [
     "meetup_lat",
@@ -1106,10 +1149,11 @@ async function fetchTransactionDetail(
       approved_by_receiver: false,
       extension_count: 0,
       exchange_method: "hand",
+      option_tags: [],
       sender_mailing_address: null,
       receiver_mailing_address: null,
       ...data,
-    } as ProposalRow,
+    } as unknown as ProposalRow,
     userId,
   );
 }
@@ -1280,6 +1324,7 @@ async function buildDetail(
     ),
     cashOffer: !!proposal.cash_offer,
     cashAmount: proposal.cash_amount,
+    optionTags: normalizeStringArray(proposal.option_tags),
     meetups: parseMeetups(proposal),
     message: proposal.message,
     expiresAt: proposal.expires_at,
@@ -1956,6 +2001,19 @@ function DealSummaryCard({ detail }: { detail: TransactionDetail }) {
         </Text>
         <Text style={styles.dealCollapsedAction}>詳細</Text>
       </Pressable>
+      {detail.optionTags.length > 0 ? (
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.dealConditionTagRow}
+        >
+          {detail.optionTags.map((tag) => (
+            <View key={tag} style={styles.dealConditionTag}>
+              <Text style={styles.dealConditionTagText}>{tag}</Text>
+            </View>
+          ))}
+        </ScrollView>
+      ) : null}
       <DealDetailModal
         detail={detail}
         visible={detailOpen}
@@ -2644,27 +2702,6 @@ function isReadByPartner(message: ChatMessage, partnerLastReadAt: string | null)
   return readTime >= messageTime;
 }
 
-function EvidenceCalloutNative({ onStartCapture }: { onStartCapture: () => void }) {
-  return (
-    <View style={styles.evidenceCalloutWeb}>
-      <View style={styles.evidenceCalloutIcon}>
-        <Text style={styles.evidenceCalloutIconText}>□</Text>
-      </View>
-      <View style={styles.evidenceCalloutCopy}>
-        <Text style={styles.evidenceCalloutTitle}>合流したら証跡を撮影</Text>
-        <Text style={styles.evidenceCalloutSub}>両者の交換物を1枚に収めます（複数枚可）</Text>
-      </View>
-      <Pressable
-        accessibilityRole="button"
-        onPress={onStartCapture}
-        style={styles.evidenceCalloutButton}
-      >
-        <Text style={styles.evidenceCalloutButtonText}>撮影へ</Text>
-      </Pressable>
-    </View>
-  );
-}
-
 function TradeColumn({
   title,
   items,
@@ -3164,24 +3201,7 @@ function CompletionPanel({
     );
   }
 
-  if (!detail.hasEvidence) {
-    return (
-      <View style={styles.evidenceCard}>
-        <View>
-          <Text style={styles.evidenceTitle}>合流したら証跡を撮影</Text>
-          <Text style={styles.evidenceSub}>
-            両者の交換物を1枚に収めると、完了承認へ進めます。
-          </Text>
-        </View>
-        <PrimaryButton
-          onPress={onAddEvidence}
-        >
-          撮影する
-        </PrimaryButton>
-        <TradeSupportActions proposalId={detail.id} />
-      </View>
-    );
-  }
+  if (!detail.hasEvidence) return null;
 
   return (
     <View style={styles.evidenceCard}>
@@ -3216,39 +3236,6 @@ function CompletionPanel({
           <Text style={styles.evidencePrimaryText}>確認へ</Text>
         </Pressable>
       </View>
-    </View>
-  );
-}
-
-function TradeSupportActions({ proposalId }: { proposalId: string }) {
-  return (
-    <View style={styles.tradeSupportActions}>
-      <Pressable
-        accessibilityRole="button"
-        onPress={() =>
-          router.push({
-            pathname: "/transaction-cancel-or-late",
-            params: { id: proposalId, kind: "late" },
-          })
-        }
-        style={styles.tradeSupportButton}
-      >
-        <Text style={styles.tradeSupportText}>遅刻を連絡</Text>
-      </Pressable>
-      <Pressable
-        accessibilityRole="button"
-        onPress={() =>
-          router.push({
-            pathname: "/transaction-cancel-or-late",
-            params: { id: proposalId, kind: "cancel" },
-          })
-        }
-        style={[styles.tradeSupportButton, styles.tradeSupportWarn]}
-      >
-        <Text style={[styles.tradeSupportText, styles.tradeSupportWarnText]}>
-          キャンセル相談
-        </Text>
-      </Pressable>
     </View>
   );
 }
@@ -3723,6 +3710,23 @@ const styles = StyleSheet.create({
   dealCollapsedAction: {
     color: megrumColors.mutedInk,
     fontSize: 10.5,
+    fontWeight: "900",
+  },
+  dealConditionTagRow: {
+    gap: 6,
+    paddingTop: 7,
+  },
+  dealConditionTag: {
+    backgroundColor: "rgba(168,212,230,0.16)",
+    borderColor: "rgba(168,212,230,0.36)",
+    borderRadius: megrumRadii.pill,
+    borderWidth: 1,
+    paddingHorizontal: 9,
+    paddingVertical: 5,
+  },
+  dealConditionTagText: {
+    color: "#3a7c93",
+    fontSize: 10,
     fontWeight: "900",
   },
   dealCardWeb: {
@@ -4648,6 +4652,24 @@ const styles = StyleSheet.create({
     borderTopColor: "rgba(166,149,216,0.13)",
     borderTopWidth: 1,
     paddingTop: 8,
+  },
+  evidenceFixedFooterButton: {
+    alignItems: "center",
+    backgroundColor: megrumColors.lavender,
+    borderRadius: 16,
+    justifyContent: "center",
+    marginBottom: 7,
+    marginHorizontal: 12,
+    minHeight: 48,
+    shadowColor: megrumColors.lavender,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.20,
+    shadowRadius: 14,
+  },
+  evidenceFixedFooterText: {
+    color: megrumColors.surface,
+    fontSize: 14,
+    fontWeight: "900",
   },
   webQuickActionRow: {
     gap: 6,

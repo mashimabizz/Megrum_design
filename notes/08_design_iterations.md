@@ -4,6 +4,70 @@
 
 ---
 
+## イテレーション284：検索フィルター用語と成立後CTAを整理
+
+### 背景・問題意識
+
+オーナーから、検索フィルターの「オプションタグ」にグッズ単位のタグまで混ざって表示されているという指摘があった。打診単位の条件タグは「交換条件タグ」、グッズ単位のタグは「グッズタグ」として明確に分ける必要がある。あわせて、現地交換日付は検索結果に日付情報がある時だけではなく最初からカレンダーで複数選択でき、現地交換場所は都道府県で絞り込める必要がある。取引チャットでは、打診時に登録した交換条件タグを交換内容の下へ表示し、成立後の証跡撮影導線と遅刻・キャンセル申請の位置を整理したい。
+
+### 変更内容
+
+#### `mobile/app/search.tsx`
+- 検索フィルターの「オプションタグ」を「交換条件タグ」へ、「タグ」を「グッズタグ」へ変更した。
+- 交換条件タグの候補を `DEFAULT_OPTION_TAGS` のみに限定し、`goods_inventory_tags` 由来のグッズタグを混ぜないようにした。
+- グッズタグは従来どおり検索結果の `tagLabels` から候補化し、交換条件タグとは別フィルターにした。
+- 現地交換日付フィルターを、検索結果の有無に関わらず今日から35日分のカレンダー型複数選択UIとして表示するようにした。
+- 現地交換場所フィルターを、47都道府県のチップから複数選択できるようにした。
+- 既に参加者として読める打診データがある場合は、`proposals.option_tags` / `meetup_start_at` / `meetup_place_name` / `exchange_method` を検索結果メタデータとして読み込み、交換条件タグ・日付・都道府県・交換手段の絞り込みに使うようにした。
+
+#### `mobile/app/proposal-confirm.tsx`
+- 打診確認画面のセクション名を「交換条件タグ」へ変更した。
+
+#### `mobile/app/transaction-detail.tsx`
+- 取引詳細で `proposals.option_tags` を読み込み、交換内容の行の下に交換条件タグを横一列で表示するようにした。
+- 成立後、証跡撮影を促す説明カードを表示しないようにした。
+- 証跡未撮影の成立済み取引では、下部固定エリアに「交換後にグッズを撮影」ボタンだけを表示するようにした。
+- 遅刻申請・キャンセル申請を、固定フッターではなくメッセージ入力欄上のクイックアクションに移動した。
+
+#### `notes/10_glossary.md`
+- 「交換条件タグ」「グッズタグ」を追加し、旧UI名「オプションタグ」を廃止用語へ移した。
+
+### 影響範囲
+
+- iOS版 検索画面
+- iOS版 打診確認画面
+- iOS版 取引チャット
+- 用語集
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- `EAS_UPDATE_PROJECT_SLUG=ihub EXPO_NO_GIT_STATUS=1 npm --prefix mobile run update:ios:preview -- --message "[iter284] 検索フィルターと取引CTAを調整" --non-interactive`
+- Preview OTA: Update group ID `924600ce-941f-4840-a613-544eb7bf1470` / iOS update ID `019e7877-438f-76b6-94b6-1731f2efe8e9`
+- EAS Dashboard: `https://expo.dev/accounts/mashima.bizz/projects/ihub/updates/924600ce-941f-4840-a613-544eb7bf1470`
+
+### 関連ファイル
+
+- `mobile/app/search.tsx`
+- `mobile/app/proposal-confirm.tsx`
+- `mobile/app/transaction-detail.tsx`
+- `notes/08_design_iterations.md`
+- `notes/10_glossary.md`
+
+### セルフレビュー結果
+
+- ✅ 交換条件タグにグッズタグを混ぜないよう分離した。
+- ✅ グッズ単位のタグは「グッズタグ」として別表示にした。
+- ✅ 現地交換日付は最初から複数選択できるカレンダー型UIにした。
+- ✅ 現地交換場所は都道府県で絞り込めるようにした。
+- ✅ 打診時の交換条件タグは取引チャットの交換内容直下に表示される。
+- ✅ 成立後の説明カードを外し、撮影CTAは固定ボタンだけにした。
+- ✅ 遅刻申請・キャンセル申請はメッセージ入力欄上のクイックアクションに移した。
+- ✅ `notes/09_state_machines.md` は状態追加なしのため更新不要。
+- ✅ `notes/05_data_model.md` は既存 `proposals.option_tags` の表示利用のみのため更新不要。
+- ✅ iOS Preview channel へOTA配信済み。
+
 ## イテレーション283：検索フッターとキーボード挙動を調整
 
 ### 背景・問題意識

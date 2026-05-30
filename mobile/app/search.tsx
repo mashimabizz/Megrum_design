@@ -21,6 +21,7 @@ import {
 } from "../src/components/GoodsGrid";
 import { Screen } from "../src/components/Screen";
 import { useAuth } from "../src/auth/AuthProvider";
+import { JAPAN_PREFECTURES, displayPrefectureName } from "../src/data/japanPrefectures";
 import { fetchInventoryTagLabels } from "../src/lib/inventoryTags";
 import { supabase } from "../src/lib/supabase";
 import { megrumColors, megrumRadii } from "../src/theme/tokens";
@@ -64,6 +65,10 @@ type SearchHit = {
   ownerLoginRank: number | null;
   hue: string;
   tagLabels: string[];
+  optionTags: string[];
+  meetupDates: string[];
+  meetupPrefectures: string[];
+  exchangeMethods: string[];
   matchBucket: SearchMatchBucket;
 };
 
@@ -99,6 +104,29 @@ type OwnerLoginRankRow = {
   login_rank: number | null;
 };
 
+type ProposalSearchMetadataRow = {
+  sender_have_ids: string[] | null;
+  receiver_have_ids: string[] | null;
+  option_tags: string[] | null;
+  meetup_start_at: string | null;
+  meetup_place_name: string | null;
+  exchange_method: string | null;
+};
+
+type SearchFilterDateOption = {
+  value: string;
+  day: string;
+  weekday: string;
+  month: string;
+};
+
+type SearchMetadata = {
+  optionTags: string[];
+  meetupDates: string[];
+  meetupPrefectures: string[];
+  exchangeMethods: string[];
+};
+
 type SearchSortKey = "recentLogin" | "newest";
 
 const RECENT_KEY = "megrum-search-recent-v1";
@@ -114,6 +142,9 @@ const EMPTY_FILTERS: SearchFilterState = {
 };
 const EXCHANGE_FILTERS = ["現地交換", "郵送", "どちらもOK"];
 const DEFAULT_OPTION_TAGS = ["即日発送", "同日発送", "開演前OK", "終演後OK", "グッズ販売中OK"];
+const PREFECTURE_FILTERS = JAPAN_PREFECTURES.map((prefecture) =>
+  displayPrefectureName(prefecture.name),
+);
 const SORT_LABELS: Record<SearchSortKey, string> = {
   recentLogin: "ログインが新しい順",
   newest: "新着順",
@@ -132,6 +163,10 @@ const PREVIEW_HITS: SearchHit[] = [
     ownerLoginRank: 1,
     hue: "#cbbcf4",
     tagLabels: ["春ver.", "同種優先"],
+    optionTags: ["終演後OK"],
+    meetupDates: [toLocalDateKey(new Date())],
+    meetupPrefectures: ["東京都"],
+    exchangeMethods: ["現地交換"],
     matchBucket: "matched",
   },
   {
@@ -146,6 +181,10 @@ const PREVIEW_HITS: SearchHit[] = [
     ownerLoginRank: 2,
     hue: "#a8d4e6",
     tagLabels: ["制服", "現地OK"],
+    optionTags: ["即日発送"],
+    meetupDates: [toLocalDateKey(addDays(new Date(), 1))],
+    meetupPrefectures: ["神奈川県"],
+    exchangeMethods: ["どちらもOK"],
     matchBucket: "possible",
   },
   {
@@ -160,6 +199,10 @@ const PREVIEW_HITS: SearchHit[] = [
     ownerLoginRank: 3,
     hue: "#f3c5d4",
     tagLabels: ["会場限定"],
+    optionTags: [],
+    meetupDates: [],
+    meetupPrefectures: [],
+    exchangeMethods: [],
     matchBucket: "none",
   },
 ];
@@ -625,34 +668,31 @@ function SearchFilterSheet({
               title="グッズ種別"
               onToggle={onToggle}
             />
-            <FilterChipGroup
+            <FilterDateCalendar
               active={filters.meetupDates}
-              filterKey="meetupDates"
-              options={options.meetupDates}
               title="現地交換日付"
-              empty="検索結果に日付情報がある時に表示されます"
-              onToggle={onToggle}
+              dates={buildMeetupDateOptions()}
+              onToggle={(value) => onToggle("meetupDates", value)}
             />
             <FilterChipGroup
               active={filters.meetupPlaces}
               filterKey="meetupPlaces"
               options={options.meetupPlaces}
               title="現地交換場所"
-              empty="検索結果に場所情報がある時に表示されます"
               onToggle={onToggle}
             />
             <FilterChipGroup
               active={filters.optionTags}
               filterKey="optionTags"
               options={options.optionTags}
-              title="オプションタグ"
+              title="交換条件タグ"
               onToggle={onToggle}
             />
             <FilterChipGroup
               active={filters.tags}
               filterKey="tags"
               options={options.tags}
-              title="タグ"
+              title="グッズタグ"
               onToggle={onToggle}
             />
             <FilterChipGroup
@@ -669,6 +709,66 @@ function SearchFilterSheet({
         </View>
       </View>
     </Modal>
+  );
+}
+
+function FilterDateCalendar({
+  active,
+  dates,
+  onToggle,
+  title,
+}: {
+  active: string[];
+  dates: SearchFilterDateOption[];
+  onToggle: (value: string) => void;
+  title: string;
+}) {
+  return (
+    <View style={styles.filterGroup}>
+      <Text style={styles.filterGroupTitle}>{title}</Text>
+      <View style={styles.filterCalendarGrid}>
+        {dates.map((date) => {
+          const selected = active.includes(date.value);
+          return (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityState={{ selected }}
+              key={date.value}
+              onPress={() => onToggle(date.value)}
+              style={[
+                styles.filterDateCell,
+                selected ? styles.filterDateCellActive : null,
+              ]}
+            >
+              <Text
+                style={[
+                  styles.filterDateMonth,
+                  selected ? styles.filterDateTextActive : null,
+                ]}
+              >
+                {date.month}
+              </Text>
+              <Text
+                style={[
+                  styles.filterDateDay,
+                  selected ? styles.filterDateTextActive : null,
+                ]}
+              >
+                {date.day}
+              </Text>
+              <Text
+                style={[
+                  styles.filterDateWeekday,
+                  selected ? styles.filterDateTextActive : null,
+                ]}
+              >
+                {date.weekday}
+              </Text>
+            </Pressable>
+          );
+        })}
+      </View>
+    </View>
   );
 }
 
@@ -749,7 +849,7 @@ async function fetchSearchHits(userId: string, q: string): Promise<SearchHit[]> 
   }
   const allHits = Array.from(merged.values()).slice(0, 60);
   const userIds = Array.from(new Set(allHits.map((row) => row.user_id)));
-  const [myInventory, myWishes, partnerWishesByUser, tagLabelsById, ownerLoginRanks] = await Promise.all([
+  const [myInventory, myWishes, partnerWishesByUser, tagLabelsById, ownerLoginRanks, metadataById] = await Promise.all([
     fetchMyInventoryRefs(userId),
     fetchMyWishRefs(userId),
     fetchPartnerWishRefs(userIds),
@@ -757,6 +857,7 @@ async function fetchSearchHits(userId: string, q: string): Promise<SearchHit[]> 
       () => ({} as Record<string, string[]>),
     ),
     fetchOwnerLoginRanks(userIds),
+    fetchProposalSearchMetadata(allHits.map((row) => row.id)),
   ]);
 
   return allHits
@@ -778,6 +879,7 @@ async function fetchSearchHits(userId: string, q: string): Promise<SearchHit[]> 
       const groupName = pickName(row.group);
       const goodsTypeName = pickName(row.goods_type);
       const label = characterName ?? groupName ?? row.title;
+      const metadata = metadataById.get(row.id);
       return {
         id: row.id,
         userId: row.user_id,
@@ -790,10 +892,46 @@ async function fetchSearchHits(userId: string, q: string): Promise<SearchHit[]> 
         ownerLoginRank: ownerLoginRanks.get(row.user_id) ?? null,
         hue: normalizeHue(row.hue, label),
         tagLabels,
+        optionTags: metadata?.optionTags ?? [],
+        meetupDates: metadata?.meetupDates ?? [],
+        meetupPrefectures: metadata?.meetupPrefectures ?? [],
+        exchangeMethods: metadata?.exchangeMethods ?? [],
         matchBucket,
       };
     })
     .sort(compareSearchHits);
+}
+
+async function fetchProposalSearchMetadata(inventoryIds: string[]) {
+  const metadataById = new Map<string, SearchMetadata>();
+  if (!supabase || inventoryIds.length === 0) return metadataById;
+  const select =
+    "sender_have_ids, receiver_have_ids, option_tags, meetup_start_at, meetup_place_name, exchange_method";
+  const statuses = ["sent", "negotiating", "agreement_one_side", "agreed"];
+  try {
+    const [senderResult, receiverResult] = await Promise.all([
+      supabase
+        .from("proposals")
+        .select(select)
+        .overlaps("sender_have_ids", inventoryIds)
+        .in("status", statuses)
+        .limit(120),
+      supabase
+        .from("proposals")
+        .select(select)
+        .overlaps("receiver_have_ids", inventoryIds)
+        .in("status", statuses)
+        .limit(120),
+    ]);
+    if (senderResult.error && receiverResult.error) return metadataById;
+    const rows = [
+      ...(((senderResult.data as ProposalSearchMetadataRow[] | null) ?? [])),
+      ...(((receiverResult.data as ProposalSearchMetadataRow[] | null) ?? [])),
+    ];
+    return mapProposalSearchMetadata(rows, inventoryIds);
+  } catch {
+    return metadataById;
+  }
 }
 
 async function fetchOwnerLoginRanks(userIds: string[]) {
@@ -1045,9 +1183,9 @@ function buildSearchFilterOptions(hits: SearchHit[]): SearchFilterState {
     groups: Array.from(groups).sort((a, b) => a.localeCompare(b, "ja")),
     members: Array.from(members).sort((a, b) => a.localeCompare(b, "ja")),
     goodsTypes: Array.from(goodsTypes).sort((a, b) => a.localeCompare(b, "ja")),
-    meetupDates: [],
-    meetupPlaces: [],
-    optionTags: Array.from(new Set([...DEFAULT_OPTION_TAGS, ...tagList])).slice(0, 16),
+    meetupDates: buildMeetupDateOptions().map((date) => date.value),
+    meetupPlaces: PREFECTURE_FILTERS,
+    optionTags: DEFAULT_OPTION_TAGS,
     tags: tagList,
     exchangeMethods: EXCHANGE_FILTERS,
   };
@@ -1077,20 +1215,130 @@ function searchHitPassesFilters(hit: SearchHit, filters: SearchFilterState) {
   }
   if (
     filters.optionTags.length > 0 &&
-    !filters.optionTags.some((tag) => hit.tagLabels.includes(tag))
+    !filters.optionTags.some((tag) => hit.optionTags.includes(tag))
+  ) {
+    return false;
+  }
+  if (
+    filters.meetupDates.length > 0 &&
+    !filters.meetupDates.some((date) => hit.meetupDates.includes(date))
+  ) {
+    return false;
+  }
+  if (
+    filters.meetupPlaces.length > 0 &&
+    !filters.meetupPlaces.some((place) => hit.meetupPrefectures.includes(place))
   ) {
     return false;
   }
   if (filters.exchangeMethods.length > 0) {
-    const haystack = hit.tagLabels.join(" ");
-    const matchesMethod = filters.exchangeMethods.some((method) => {
-      if (method === "現地交換") return /現地|会場|終演|開演|手渡し/.test(haystack);
-      if (method === "郵送") return /郵送|発送|即日発送|同日発送/.test(haystack);
-      return /どちらも|両方/.test(haystack);
-    });
+    const matchesMethod = filters.exchangeMethods.some((method) =>
+      hit.exchangeMethods.includes(method),
+    );
     if (!matchesMethod) return false;
   }
   return true;
+}
+
+function buildMeetupDateOptions() {
+  const today = startOfLocalDay(new Date());
+  return Array.from({ length: 35 }, (_, index): SearchFilterDateOption => {
+    const date = addDays(today, index);
+    return {
+      value: toLocalDateKey(date),
+      month: `${date.getMonth() + 1}月`,
+      day: String(date.getDate()),
+      weekday: "日月火水木金土"[date.getDay()] ?? "",
+    };
+  });
+}
+
+function mapProposalSearchMetadata(
+  rows: ProposalSearchMetadataRow[],
+  inventoryIds: string[],
+) {
+  const inventoryIdSet = new Set(inventoryIds);
+  const maps = new Map<
+    string,
+    {
+      optionTags: Set<string>;
+      meetupDates: Set<string>;
+      meetupPrefectures: Set<string>;
+      exchangeMethods: Set<string>;
+    }
+  >();
+
+  for (const row of rows) {
+    const rowInventoryIds = Array.from(
+      new Set([...(row.sender_have_ids ?? []), ...(row.receiver_have_ids ?? [])]),
+    ).filter((id) => inventoryIdSet.has(id));
+    if (rowInventoryIds.length === 0) continue;
+    const optionTags = (row.option_tags ?? []).filter(Boolean);
+    const meetupDate = row.meetup_start_at ? toLocalDateKey(new Date(row.meetup_start_at)) : null;
+    const meetupPrefectures = extractPrefecturesFromText(row.meetup_place_name ?? "");
+    const exchangeMethod = searchExchangeMethodLabel(row.exchange_method);
+
+    for (const id of rowInventoryIds) {
+      const target =
+        maps.get(id) ??
+        {
+          optionTags: new Set<string>(),
+          meetupDates: new Set<string>(),
+          meetupPrefectures: new Set<string>(),
+          exchangeMethods: new Set<string>(),
+        };
+      optionTags.forEach((tag) => target.optionTags.add(tag));
+      if (meetupDate) target.meetupDates.add(meetupDate);
+      meetupPrefectures.forEach((prefecture) => target.meetupPrefectures.add(prefecture));
+      if (exchangeMethod) target.exchangeMethods.add(exchangeMethod);
+      maps.set(id, target);
+    }
+  }
+
+  return new Map(
+    Array.from(maps.entries()).map(([id, value]) => [
+      id,
+      {
+        optionTags: Array.from(value.optionTags),
+        meetupDates: Array.from(value.meetupDates),
+        meetupPrefectures: Array.from(value.meetupPrefectures),
+        exchangeMethods: Array.from(value.exchangeMethods),
+      },
+    ]),
+  );
+}
+
+function extractPrefecturesFromText(text: string) {
+  if (!text.trim()) return [];
+  return PREFECTURE_FILTERS.filter((prefecture) => {
+    const short = prefecture.replace(/[都府県]$/, "");
+    return text.includes(prefecture) || text.includes(short);
+  });
+}
+
+function searchExchangeMethodLabel(value: string | null | undefined) {
+  if (value === "mail") return "郵送";
+  if (value === "both") return "どちらもOK";
+  if (value === "hand") return "現地交換";
+  return null;
+}
+
+function startOfLocalDay(date: Date) {
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate());
+}
+
+function addDays(date: Date, days: number) {
+  const next = new Date(date);
+  next.setDate(next.getDate() + days);
+  return next;
+}
+
+function toLocalDateKey(date: Date) {
+  if (Number.isNaN(date.getTime())) return "";
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
 }
 
 function toggleSearchFilterValue(
@@ -1393,6 +1641,46 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     flexWrap: "wrap",
     gap: 7,
+  },
+  filterCalendarGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 7,
+  },
+  filterDateCell: {
+    alignItems: "center",
+    backgroundColor: megrumColors.surface,
+    borderColor: "rgba(58,50,74,0.08)",
+    borderRadius: 14,
+    borderWidth: 1,
+    minHeight: 58,
+    paddingHorizontal: 7,
+    paddingVertical: 7,
+    width: 58,
+  },
+  filterDateCellActive: {
+    backgroundColor: "rgba(166,149,216,0.16)",
+    borderColor: "rgba(166,149,216,0.44)",
+  },
+  filterDateMonth: {
+    color: megrumColors.mutedInk,
+    fontSize: 8.5,
+    fontWeight: "800",
+  },
+  filterDateDay: {
+    color: megrumColors.ink,
+    fontSize: 15,
+    fontWeight: "900",
+    lineHeight: 18,
+    marginTop: 1,
+  },
+  filterDateWeekday: {
+    color: megrumColors.mutedInk,
+    fontSize: 9,
+    fontWeight: "900",
+  },
+  filterDateTextActive: {
+    color: megrumColors.lavender,
   },
   filterChipOption: {
     backgroundColor: megrumColors.surface,

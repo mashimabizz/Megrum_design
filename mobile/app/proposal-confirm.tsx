@@ -291,7 +291,7 @@ export default function ProposalConfirmScreen() {
             />
           </Section>
 
-          <Section title="オプションタグ">
+          <Section title="交換条件タグ">
             <OptionTagChips
               options={optionTags}
               selected={selectedOptionTags}
