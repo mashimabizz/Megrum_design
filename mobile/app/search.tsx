@@ -2,7 +2,11 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router, Stack, useLocalSearchParams } from "expo-router";
 import {
+  ActionSheetIOS,
+  Alert,
+  Keyboard,
   Modal,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -18,7 +22,6 @@ import {
 import { Screen } from "../src/components/Screen";
 import { useAuth } from "../src/auth/AuthProvider";
 import { fetchInventoryTagLabels } from "../src/lib/inventoryTags";
-import { IconSymbol } from "../src/components/IconSymbol";
 import { supabase } from "../src/lib/supabase";
 import { megrumColors, megrumRadii } from "../src/theme/tokens";
 
@@ -32,6 +35,7 @@ type InventoryHitRow = {
   group_id: string | null;
   character_id: string | null;
   goods_type_id: string | null;
+  created_at: string | null;
   hue?: number | string | null;
   group: MasterName;
   character: MasterName;
@@ -56,6 +60,8 @@ type SearchHit = {
   groupName: string | null;
   characterName: string | null;
   goodsTypeName: string | null;
+  createdAt: string | null;
+  ownerLoginRank: number | null;
   hue: string;
   tagLabels: string[];
   matchBucket: SearchMatchBucket;
@@ -88,6 +94,13 @@ type TagSearchRow = {
   label?: string | null;
 };
 
+type OwnerLoginRankRow = {
+  user_id: string | null;
+  login_rank: number | null;
+};
+
+type SearchSortKey = "recentLogin" | "newest";
+
 const RECENT_KEY = "megrum-search-recent-v1";
 const EMPTY_FILTERS: SearchFilterState = {
   groups: [],
@@ -101,6 +114,10 @@ const EMPTY_FILTERS: SearchFilterState = {
 };
 const EXCHANGE_FILTERS = ["現地交換", "郵送", "どちらもOK"];
 const DEFAULT_OPTION_TAGS = ["即日発送", "同日発送", "開演前OK", "終演後OK", "グッズ販売中OK"];
+const SORT_LABELS: Record<SearchSortKey, string> = {
+  recentLogin: "ログインが新しい順",
+  newest: "新着順",
+};
 
 const PREVIEW_HITS: SearchHit[] = [
   {
@@ -111,6 +128,8 @@ const PREVIEW_HITS: SearchHit[] = [
     groupName: "LUMENA",
     characterName: "スア",
     goodsTypeName: "トレカ",
+    createdAt: "2026-05-30T07:00:00.000Z",
+    ownerLoginRank: 1,
     hue: "#cbbcf4",
     tagLabels: ["春ver.", "同種優先"],
     matchBucket: "matched",
@@ -123,6 +142,8 @@ const PREVIEW_HITS: SearchHit[] = [
     groupName: "aespa",
     characterName: "ニンニン",
     goodsTypeName: "アクスタ",
+    createdAt: "2026-05-29T12:00:00.000Z",
+    ownerLoginRank: 2,
     hue: "#a8d4e6",
     tagLabels: ["制服", "現地OK"],
     matchBucket: "possible",
@@ -135,6 +156,8 @@ const PREVIEW_HITS: SearchHit[] = [
     groupName: "SEVENTEEN",
     characterName: "ミンギュ",
     goodsTypeName: "トレカ",
+    createdAt: "2026-05-28T12:00:00.000Z",
+    ownerLoginRank: 3,
     hue: "#f3c5d4",
     tagLabels: ["会場限定"],
     matchBucket: "none",
@@ -164,7 +187,7 @@ const RESULT_SECTIONS: {
 ];
 
 const GOODS_SELECT =
-  "id, user_id, title, photo_urls, group_id, character_id, goods_type_id, hue, group:groups_master(name), character:characters_master(name), goods_type:goods_types_master(name)";
+  "id, user_id, title, photo_urls, group_id, character_id, goods_type_id, created_at, hue, group:groups_master(name), character:characters_master(name), goods_type:goods_types_master(name)";
 
 export default function SearchScreen() {
   const params = useLocalSearchParams<{ q?: string | string[] }>();
@@ -179,6 +202,7 @@ export default function SearchScreen() {
   const [hits, setHits] = useState<SearchHit[]>([]);
   const [filters, setFilters] = useState<SearchFilterState>(EMPTY_FILTERS);
   const [filterOpen, setFilterOpen] = useState(false);
+  const [sortKey, setSortKey] = useState<SearchSortKey>("recentLogin");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -270,6 +294,10 @@ export default function SearchScreen() {
     () => hits.filter((hit) => searchHitPassesFilters(hit, filters)),
     [filters, hits],
   );
+  const sortedHits = useMemo(
+    () => sortSearchHits(filteredHits, sortKey),
+    [filteredHits, sortKey],
+  );
   const filterOptions = useMemo(() => buildSearchFilterOptions(hits), [hits]);
   const activeFilterCount = countActiveSearchFilters(filters);
 
@@ -277,15 +305,19 @@ export default function SearchScreen() {
     () =>
       RESULT_SECTIONS.map((section) => ({
         ...section,
-        items: filteredHits
+        items: sortedHits
           .filter((hit) => hit.matchBucket === section.id)
           .map(toResultItem),
       })),
-    [filteredHits],
+    [sortedHits],
   );
 
-  const totalCount = filteredHits.length;
+  const totalCount = sortedHits.length;
   const filterFooterBottom = Math.max(insets.bottom, 12) + 16;
+  const footerBottomPadding = filterFooterBottom + 86;
+  const dismissKeyboard = useCallback(() => {
+    Keyboard.dismiss();
+  }, []);
 
   function submit(nextQuery = draft) {
     const q = nextQuery.trim();
@@ -301,6 +333,29 @@ export default function SearchScreen() {
     router.setParams({ q: "" });
   }
 
+  function openSortOptions() {
+    Keyboard.dismiss();
+    if (Platform.OS === "ios") {
+      ActionSheetIOS.showActionSheetWithOptions(
+        {
+          cancelButtonIndex: 0,
+          options: ["キャンセル", SORT_LABELS.recentLogin, SORT_LABELS.newest],
+          title: "並び替え",
+        },
+        (buttonIndex) => {
+          if (buttonIndex === 1) setSortKey("recentLogin");
+          if (buttonIndex === 2) setSortKey("newest");
+        },
+      );
+      return;
+    }
+    Alert.alert("並び替え", undefined, [
+      { text: SORT_LABELS.recentLogin, onPress: () => setSortKey("recentLogin") },
+      { text: SORT_LABELS.newest, onPress: () => setSortKey("newest") },
+      { text: "キャンセル", style: "cancel" },
+    ]);
+  }
+
   function openResult(item: SearchResultItem, _context: GoodsGridPressContext) {
     router.push({
       pathname: "/user-profile",
@@ -313,7 +368,7 @@ export default function SearchScreen() {
       scroll={false}
       contentStyle={StyleSheet.flatten([
         styles.screen,
-        query ? { paddingBottom: filterFooterBottom + 70 } : null,
+        { paddingBottom: footerBottomPadding },
       ])}
       topInset={false}
     >
@@ -348,6 +403,9 @@ export default function SearchScreen() {
       <ScrollView
         automaticallyAdjustsScrollIndicatorInsets
         contentInsetAdjustmentBehavior="automatic"
+        keyboardDismissMode="interactive"
+        keyboardShouldPersistTaps="handled"
+        onTouchStart={dismissKeyboard}
         showsVerticalScrollIndicator={false}
         style={styles.searchScroll}
         contentContainerStyle={styles.searchContent}
@@ -394,26 +452,43 @@ export default function SearchScreen() {
           </View>
         )}
       </ScrollView>
-      {query ? (
-        <View pointerEvents="box-none" style={[styles.filterFooter, { bottom: filterFooterBottom }]}>
+      <View pointerEvents="box-none" style={[styles.filterFooter, { bottom: filterFooterBottom }]}>
+        <View style={styles.filterFooterPill}>
           <Pressable
             accessibilityLabel="検索フィルターを開く"
             accessibilityRole="button"
             onPress={() => setFilterOpen(true)}
             style={({ pressed }) => [
-              styles.filterIconButton,
+              styles.filterFooterButton,
               pressed ? styles.filterIconButtonPressed : null,
             ]}
           >
-            <IconSymbol name="settings-outline" size={22} color={megrumColors.surface} />
+            <Text style={styles.filterFooterIcon}>☷</Text>
             {activeFilterCount > 0 ? (
               <View style={styles.filterCountBadge}>
                 <Text style={styles.filterCountBadgeText}>{activeFilterCount}</Text>
               </View>
             ) : null}
           </Pressable>
+          <Text
+            accessibilityLabel={`検索結果 ${totalCount}件`}
+            style={styles.filterFooterCount}
+          >
+            {loading ? "…" : formatSearchCount(totalCount)}
+          </Text>
+          <Pressable
+            accessibilityLabel={`並び替え ${SORT_LABELS[sortKey]}`}
+            accessibilityRole="button"
+            onPress={openSortOptions}
+            style={({ pressed }) => [
+              styles.filterFooterButton,
+              pressed ? styles.filterIconButtonPressed : null,
+            ]}
+          >
+            <Text style={styles.filterFooterIcon}>↕</Text>
+          </Pressable>
         </View>
-      ) : null}
+      </View>
       <SearchFilterSheet
         filters={filters}
         open={filterOpen}
@@ -674,13 +749,14 @@ async function fetchSearchHits(userId: string, q: string): Promise<SearchHit[]> 
   }
   const allHits = Array.from(merged.values()).slice(0, 60);
   const userIds = Array.from(new Set(allHits.map((row) => row.user_id)));
-  const [myInventory, myWishes, partnerWishesByUser, tagLabelsById] = await Promise.all([
+  const [myInventory, myWishes, partnerWishesByUser, tagLabelsById, ownerLoginRanks] = await Promise.all([
     fetchMyInventoryRefs(userId),
     fetchMyWishRefs(userId),
     fetchPartnerWishRefs(userIds),
     fetchInventoryTagLabels(allHits.map((row) => row.id)).catch(
       () => ({} as Record<string, string[]>),
     ),
+    fetchOwnerLoginRanks(userIds),
   ]);
 
   return allHits
@@ -710,12 +786,29 @@ async function fetchSearchHits(userId: string, q: string): Promise<SearchHit[]> 
         groupName,
         characterName,
         goodsTypeName,
+        createdAt: row.created_at,
+        ownerLoginRank: ownerLoginRanks.get(row.user_id) ?? null,
         hue: normalizeHue(row.hue, label),
         tagLabels,
         matchBucket,
       };
     })
     .sort(compareSearchHits);
+}
+
+async function fetchOwnerLoginRanks(userIds: string[]) {
+  const ranks = new Map<string, number>();
+  if (!supabase || userIds.length === 0) return ranks;
+  const { data, error } = await supabase.rpc("rank_users_by_recent_login", {
+    p_user_ids: userIds,
+  });
+  if (error) return ranks;
+  for (const row of (data as OwnerLoginRankRow[] | null) ?? []) {
+    if (row.user_id && typeof row.login_rank === "number") {
+      ranks.set(row.user_id, row.login_rank);
+    }
+  }
+  return ranks;
 }
 
 async function fetchInventoryRowsByTitle(userId: string, ilike: string) {
@@ -888,6 +981,38 @@ function compareSearchHits(a: SearchHit, b: SearchHit) {
   const tagCount = b.tagLabels.length - a.tagLabels.length;
   if (tagCount !== 0) return tagCount;
   return a.title.localeCompare(b.title, "ja");
+}
+
+function sortSearchHits(hits: SearchHit[], sortKey: SearchSortKey) {
+  const next = [...hits];
+  if (sortKey === "newest") {
+    return next.sort(compareSearchHitsByCreatedAt);
+  }
+  return next.sort(compareSearchHitsByLoginRank);
+}
+
+function compareSearchHitsByLoginRank(a: SearchHit, b: SearchHit) {
+  const aRank = a.ownerLoginRank ?? Number.MAX_SAFE_INTEGER;
+  const bRank = b.ownerLoginRank ?? Number.MAX_SAFE_INTEGER;
+  if (aRank !== bRank) return aRank - bRank;
+  return compareSearchHitsByCreatedAt(a, b);
+}
+
+function compareSearchHitsByCreatedAt(a: SearchHit, b: SearchHit) {
+  const created = timestampValue(b.createdAt) - timestampValue(a.createdAt);
+  if (created !== 0) return created;
+  return compareSearchHits(a, b);
+}
+
+function timestampValue(value: string | null | undefined) {
+  if (!value) return 0;
+  const time = Date.parse(value);
+  return Number.isFinite(time) ? time : 0;
+}
+
+function formatSearchCount(count: number) {
+  if (count >= 1000) return "1000+";
+  return String(count);
 }
 
 function matchPreviewHit(hit: SearchHit, q: string) {
@@ -1141,19 +1266,44 @@ const styles = StyleSheet.create({
     position: "absolute",
     right: 0,
   },
-  filterIconButton: {
+  filterFooterPill: {
     alignItems: "center",
-    backgroundColor: megrumColors.lavender,
+    backgroundColor: "rgba(255,255,255,0.96)",
     borderColor: "rgba(255,255,255,0.92)",
-    borderRadius: 999,
     borderWidth: 1,
-    height: 54,
+    borderRadius: 44,
+    flexDirection: "row",
+    gap: 22,
     justifyContent: "center",
     shadowColor: megrumColors.ink,
     shadowOffset: { width: 0, height: 12 },
-    shadowOpacity: 0.14,
-    shadowRadius: 22,
-    width: 54,
+    shadowOpacity: 0.12,
+    shadowRadius: 26,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+  },
+  filterFooterButton: {
+    alignItems: "center",
+    backgroundColor: "rgba(168,212,230,0.14)",
+    borderRadius: 999,
+    height: 58,
+    justifyContent: "center",
+    width: 58,
+  },
+  filterFooterCount: {
+    color: "#07333a",
+    fontSize: 25,
+    fontWeight: "500",
+    letterSpacing: 0,
+    minWidth: 76,
+    textAlign: "center",
+  },
+  filterFooterIcon: {
+    color: megrumColors.sky,
+    fontSize: 27,
+    fontWeight: "900",
+    lineHeight: 31,
+    textAlign: "center",
   },
   filterIconButtonPressed: {
     opacity: 0.86,

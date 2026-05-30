@@ -4,6 +4,65 @@
 
 ---
 
+## イテレーション283：検索フッターとキーボード挙動を調整
+
+### 背景・問題意識
+
+オーナーから、ホーム画面の検索から入った検索画面で、下部の検索入力欄を押してキーボードが出た後、キーボード以外をタップしてもキーボードが閉じないという指摘があった。また、フィルターは検索結果が出た後だけではなく検索前から表示し、フッターは左にフィルター、中央にヒット件数、右に並び替えを置くデザインにしたいという要望があった。並び替えは「ログインが新しい順」「新着順」の2種類に限定する。
+
+### 変更内容
+
+#### `mobile/app/search.tsx`
+- 検索画面の `ScrollView` に `Keyboard.dismiss()` を明示的に入れ、検索入力中にコンテンツ領域をタップした時にキーボードが閉じるようにした。
+- 検索結果の有無に関わらず、下部に検索操作フッターを常時表示するようにした。
+- フッターを、左フィルター、中央ヒット件数、右並び替えの3要素構成に変更した。
+- 右側の並び替えボタンから、iOSでは `ActionSheetIOS` で「ログインが新しい順」「新着順」を選べるようにした。
+- 検索結果に `created_at` とログイン順ランクを持たせ、検索結果セクション内の表示順へ反映した。
+- ログイン順ランクが取得できない場合は、新着順へ自然にフォールバックするようにした。
+
+#### `mobile/src/components/IconSymbol.tsx`
+- 検索フッター用に `options-outline` と `swap-vertical-outline` を追加した。
+
+#### `supabase/migrations/20260531003000_rank_users_by_recent_login.sql`
+- 検索結果の候補ユーザー内で、`last_login_at` に基づく相対順位だけを返す `rank_users_by_recent_login(...)` を追加した。
+- ログイン時刻そのものはクライアントへ返さず、並び替えに必要な順位のみ返す。
+- リモートDBへ適用済み。
+
+### 影響範囲
+
+- iOS版 検索画面
+- 検索フィルター導線
+- 検索結果の並び替え
+- Supabase RPC
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- `EAS_UPDATE_PROJECT_SLUG=ihub EXPO_NO_GIT_STATUS=1 npm --prefix mobile run update:ios:preview -- --message "[iter283] 検索フッターとキーボード挙動を調整" --non-interactive`
+- `supabase db push`
+- `supabase migration list --linked`
+- Preview OTA: Update group ID `b6d483d7-b0c2-4aa6-b1c8-f1bef6f845eb` / iOS update ID `019e7865-db17-75ee-bbe5-35053d1c19a6`
+- EAS Dashboard: `https://expo.dev/accounts/mashima.bizz/projects/ihub/updates/b6d483d7-b0c2-4aa6-b1c8-f1bef6f845eb`
+
+### 関連ファイル
+
+- `mobile/app/search.tsx`
+- `mobile/src/components/IconSymbol.tsx`
+- `supabase/migrations/20260531003000_rank_users_by_recent_login.sql`
+- `notes/08_design_iterations.md`
+
+### セルフレビュー結果
+
+- ✅ 検索前からフッターが表示される。
+- ✅ フッターは左フィルター、中央ヒット件数、右並び替えの構成になっている。
+- ✅ 並び替えは「ログインが新しい順」「新着順」の2択にした。
+- ✅ ログイン時刻はクライアントへ返さず、順位だけを返すRPCにした。
+- ✅ 状態遷移・用語の追加はないため、`notes/09_state_machines.md` / `notes/10_glossary.md` の更新は不要。
+- ✅ テーブル・カラム追加ではないため、`notes/05_data_model.md` の本文更新は不要。
+- ✅ iOS Preview channel へOTA配信済み。
+- ✅ Supabase migration remote適用済み。
+
 ## イテレーション282：ドロワー閉じ中の項目タップを抑止
 
 ### 背景・問題意識
