@@ -1733,6 +1733,14 @@ export default function MeguriBoardThreadScreen() {
                   </Pressable>
                   <Pressable
                     accessibilityRole="button"
+                    onPress={() => void shareThread()}
+                    style={styles.threadActionPill}
+                  >
+                    <IconSymbol name="send-outline" color={megrumColors.mutedInk} size={15} />
+                    <Text style={styles.threadActionText}>共有</Text>
+                  </Pressable>
+                  <Pressable
+                    accessibilityRole="button"
                     onPress={toggleThreadSubscription}
                     style={[styles.threadActionPill, thread.subscribed ? styles.threadActionPillActive : null]}
                   >

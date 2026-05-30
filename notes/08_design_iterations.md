@@ -4,6 +4,53 @@
 
 ---
 
+## イテレーション260：掲示板本文カードに共有ボタンを追加する
+
+### 背景・問題意識
+
+一般的なスレッド型掲示板では、詳細画面の本文を読んだ直後にスレッド全体を共有できる導線がある。スポット掲示板ではヘッダーのメニューから共有できたが、本文カードの主要アクション列には出ていなかったため、保存や通知と同じ階層に共有ボタンを追加した。
+
+### 変更内容
+
+#### `mobile/app/meguri-board-thread.tsx`
+- スレッド詳細の本文カードアクション列に `共有` ボタンを追加した。
+- 押下時は既存の `shareThread` を使い、スレッドタイトル・本文・deep linkをiOS標準共有シートへ渡すようにした。
+- 新しい依存やネイティブ変更は追加せず、既存の共有仕様を直接呼び出すだけに留めた。
+
+#### `notes/09_state_machines.md`
+- Meguri Board Lifecycle に本文カード共有ボタンの表示/操作ルールを追記した。
+
+#### `notes/10_glossary.md`
+- 掲示板本文カード共有ボタンを追加した。
+
+### 影響範囲
+
+- iOS版 スポット掲示板スレッド詳細
+- スレッド本文カードのアクション列
+- スレッド共有導線
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- `EAS_UPDATE_PROJECT_SLUG=ihub EXPO_NO_GIT_STATUS=1 npm --prefix mobile run update:ios:preview -- --message "[iter260] add thread detail share button" --non-interactive`
+- Preview OTA: Update group ID `45ee8073-a8d8-4295-912a-d7554c1a2e4d` / iOS update ID `019e7671-e5f6-7b0b-9a27-e0664e46b915`
+
+### 関連ファイル
+
+- `mobile/app/meguri-board-thread.tsx`
+- `notes/08_design_iterations.md`
+- `notes/09_state_machines.md`
+- `notes/10_glossary.md`
+
+### セルフレビュー結果
+
+- ✅ 既存の `shareThread` を使い回し、URL生成や共有文面の仕様を増やしていない。
+- ✅ 本文カードの保存・通知と同じアクション列に置いたため、スレッド全体の共有導線として見つけやすい。
+- ✅ ネイティブ依存追加なしでPreview OTA対象内に収めた。
+
+---
+
 ## イテレーション259：掲示板返信行に共有ボタンを追加する
 
 ### 背景・問題意識
