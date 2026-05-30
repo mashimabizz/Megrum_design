@@ -4,6 +4,55 @@
 
 ---
 
+## イテレーション319：Swift在庫Wishフィルターを追加
+
+### 背景・問題意識
+
+在庫/Wishは点数が増えるほど一覧から目的のグッズを探しにくくなる。RN版で求められていたL1マスタやグッズ種別での絞り込みをSwift Native版にも先に載せ、追加フォームで読み込んだマスタを一覧操作にも再利用できるようにした。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/CollectionScreens.swift`
+- `GoodsCollectionScreen` に `selectedGroupID` / `selectedGoodsTypeID` を追加し、表示アイテムを端末内で絞り込むようにした。
+- `CollectionFilterBar` を追加し、グループとグッズ種別を横並びchipで選べるようにした。
+- `FilterChoiceRow` と `EmptyCollectionMessage` を追加し、読み込み中と0件時の表示を崩さないようにした。
+- 一覧表示時にも `loadOshiGroups()` / `loadGoodsTypes()` を必要に応じて実行するようにした。
+
+#### `ios-native/README.md`
+- 在庫/Wish collection screenにグループ・グッズ種別filter chipsがあることを追記した。
+
+#### `notes/22_swift_native_migration.md`
+- Swift Native移行のステータスをiter319へ更新し、Phase 3の進捗に在庫/Wishフィルターを追記した。
+
+### 影響範囲
+
+- Swift Native版の在庫一覧
+- Swift Native版のWish一覧
+- `goods_types_master` / `groups_master` 読み込み済みデータのUI利用
+
+### 確認方法
+
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-build --enable-xctest --disable-swift-testing -j 1`
+- `xcodebuild -quiet -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -destination 'generic/platform=iOS Simulator' -derivedDataPath /tmp/megrum-native-xcodebuild CODE_SIGNING_ALLOWED=NO build`
+
+### 関連ファイル
+
+- `ios-native/Sources/MegrumApp/CollectionScreens.swift`
+- `ios-native/README.md`
+- `notes/22_swift_native_migration.md`
+- `notes/08_design_iterations.md`
+
+### セルフレビュー結果
+
+- ✅ Swift Package testsが50件成功した。
+- ✅ Xcode project buildが成功した。
+- ✅ フィルターは既存の `groupID` / `goodsTypeID` と既存マスタ読み込みを使うため、新規DBスキーマは不要。
+- ✅ 状態遷移名は追加していないため、`notes/09_state_machines.md` の更新は不要。
+- ✅ 新しいユーザー用語は追加していないため、`notes/10_glossary.md` の更新は不要。
+- ✅ TestFlight配布はまだ行っていないため、Preview OTA / TestFlight配信は不要。
+
+---
+
 ## イテレーション318：Swift在庫Wish追加フォームを追加
 
 ### 背景・問題意識

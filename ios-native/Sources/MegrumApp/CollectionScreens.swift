@@ -12,13 +12,34 @@ struct GoodsCollectionScreen: View {
     @State private var columns = 3
     @State private var isShowingAddForm = false
     @State private var isShowingUnavailableAlert = false
+    @State private var selectedGroupID: UUID?
+    @State private var selectedGoodsTypeID: UUID?
+
+    private var filteredItems: [GoodsItem] {
+        items.filter { item in
+            let matchesGroup = selectedGroupID == nil || item.groupID == selectedGroupID
+            let matchesGoodsType = selectedGoodsTypeID == nil || item.goodsTypeID == selectedGoodsTypeID
+            return matchesGroup && matchesGoodsType
+        }
+    }
 
     var body: some View {
         ZStack(alignment: .bottomLeading) {
             ScrollView {
                 VStack(alignment: .leading, spacing: 20) {
                     CollectionHeader(title: title, subtitle: subtitle, columns: $columns)
-                    GoodsGrid(items: items, columns: columns)
+                    if let appState {
+                        CollectionFilterBar(
+                            appState: appState,
+                            selectedGroupID: $selectedGroupID,
+                            selectedGoodsTypeID: $selectedGoodsTypeID
+                        )
+                    }
+                    if filteredItems.isEmpty {
+                        EmptyCollectionMessage(title: "条件に合うグッズがありません")
+                    } else {
+                        GoodsGrid(items: filteredItems, columns: columns)
+                    }
                 }
                 .padding(.horizontal, 20)
                 .padding(.top, 18)
@@ -54,6 +75,21 @@ struct GoodsCollectionScreen: View {
             Button("OK", role: .cancel) {}
         } message: {
             Text("データ保存の準備がまだ整っていません。")
+        }
+        .task {
+            await loadFilterChoicesIfNeeded()
+        }
+    }
+
+    private func loadFilterChoicesIfNeeded() async {
+        guard let appState else {
+            return
+        }
+        if appState.oshiGroups.isEmpty {
+            await appState.loadOshiGroups()
+        }
+        if appState.goodsTypes.isEmpty {
+            await appState.loadGoodsTypes()
         }
     }
 }
@@ -166,6 +202,89 @@ private struct AddGoodsButton: View {
         }
         .buttonStyle(.plain)
         .accessibilityLabel("追加")
+    }
+}
+
+private struct CollectionFilterBar: View {
+    @ObservedObject var appState: MegrumAppState
+    @Binding var selectedGroupID: UUID?
+    @Binding var selectedGoodsTypeID: UUID?
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            FilterChoiceRow(title: "グループ", isLoading: appState.isLoadingOshiGroups) {
+                ChoiceChip(title: "すべて", isSelected: selectedGroupID == nil) {
+                    selectedGroupID = nil
+                }
+                ForEach(appState.oshiGroups) { group in
+                    ChoiceChip(title: group.name, isSelected: selectedGroupID == group.id) {
+                        selectedGroupID = group.id
+                    }
+                }
+            }
+
+            FilterChoiceRow(title: "グッズ種別", isLoading: appState.isLoadingGoodsTypes) {
+                ChoiceChip(title: "すべて", isSelected: selectedGoodsTypeID == nil) {
+                    selectedGoodsTypeID = nil
+                }
+                ForEach(appState.goodsTypes) { goodsType in
+                    ChoiceChip(title: goodsType.name, isSelected: selectedGoodsTypeID == goodsType.id) {
+                        selectedGoodsTypeID = goodsType.id
+                    }
+                }
+            }
+        }
+        .padding(.vertical, 2)
+    }
+}
+
+private struct FilterChoiceRow<Content: View>: View {
+    var title: String
+    var isLoading: Bool
+    var content: Content
+
+    init(title: String, isLoading: Bool, @ViewBuilder content: () -> Content) {
+        self.title = title
+        self.isLoading = isLoading
+        self.content = content()
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 8) {
+                Text(title)
+                    .font(.system(size: 13, weight: .heavy, design: .rounded))
+                    .foregroundStyle(MegrumTheme.muted)
+                if isLoading {
+                    ProgressView()
+                        .controlSize(.small)
+                }
+            }
+
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 10) {
+                    content
+                }
+                .padding(.vertical, 2)
+            }
+        }
+    }
+}
+
+private struct EmptyCollectionMessage: View {
+    var title: String
+
+    var body: some View {
+        Text(title)
+            .font(.system(size: 15, weight: .heavy, design: .rounded))
+            .foregroundStyle(MegrumTheme.muted)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 34)
+            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: 24, style: .continuous)
+                    .strokeBorder(.white.opacity(0.55), lineWidth: 1)
+            }
     }
 }
 
@@ -427,6 +546,7 @@ private struct ChoiceChip: View {
         Button(action: action) {
             Text(title)
                 .font(.system(size: 15, weight: .heavy, design: .rounded))
+                .lineLimit(1)
                 .foregroundStyle(isSelected ? .white : MegrumTheme.ink)
                 .padding(.horizontal, 16)
                 .frame(height: 42)
