@@ -34,6 +34,7 @@ import { Screen } from "../../src/components/Screen";
 import { HomeFeedSkeleton } from "../../src/components/SkeletonScreen";
 import { useAuth } from "../../src/auth/AuthProvider";
 import { IconSymbol, type IconSymbolName } from "../../src/components/IconSymbol";
+import { useProfileDrawer } from "../../src/components/ProfileDrawerContext";
 import { hasSupabaseConfig, supabase } from "../../src/lib/supabase";
 import {
   MATCH_SECTIONS,
@@ -308,7 +309,8 @@ function getIOSSFSymbolView() {
 }
 
 export default function HomeScreen() {
-  const { previewMode, user } = useAuth();
+  const { previewMode, profile, user } = useAuth();
+  const { openDrawer } = useProfileDrawer();
   const usePreviewData = previewMode || !hasSupabaseConfig;
   const [localMode, setLocalMode] = useState(usePreviewData);
   const [sections, setSections] = useState<ShelfSection[]>(() =>
@@ -335,6 +337,17 @@ export default function HomeScreen() {
   const tileWidth = (width - 36 - 10 * 2) / 3;
   const homeTopPadding = Math.max(insets.top, 18) + 12;
   const topEdgeFadeHeight = Math.max(insets.top + 22, 68);
+  const metadata = user?.user_metadata as Record<string, unknown> | undefined;
+  const homeDisplayName =
+    profile?.displayName ??
+    stringMetadata(metadata?.display_name) ??
+    stringMetadata(metadata?.name) ??
+    user?.email?.split("@")[0] ??
+    "Megrum";
+  const homeAvatarUrl =
+    profile?.avatarUrl ??
+    stringMetadata(metadata?.avatar_url) ??
+    stringMetadata(metadata?.picture);
   const selectedHomeGroomPost =
     homeGroomPosts.find((post) => post.id === selectedHomeGroomId) ?? null;
   const visibleSections = useMemo(() => {
@@ -749,6 +762,11 @@ export default function HomeScreen() {
       topPadding={homeTopPadding}
       contentStyle={styles.screenContent}
     >
+      <HomeHeader
+        avatarUrl={homeAvatarUrl}
+        displayName={homeDisplayName}
+        onOpenDrawer={openDrawer}
+      />
       <ScrollView
         automaticallyAdjustsScrollIndicatorInsets
         contentInsetAdjustmentBehavior="automatic"
@@ -842,6 +860,40 @@ export default function HomeScreen() {
         onError={setHomeError}
       />
     </Screen>
+  );
+}
+
+function HomeHeader({
+  avatarUrl,
+  displayName,
+  onOpenDrawer,
+}: {
+  avatarUrl?: string | null;
+  displayName: string;
+  onOpenDrawer: () => void;
+}) {
+  return (
+    <View style={styles.homeHeader}>
+      <Pressable
+        accessibilityLabel="プロフィールメニューを開く"
+        accessibilityRole="button"
+        onPress={onOpenDrawer}
+        style={({ pressed }) => [
+          styles.homeHeaderAvatarButton,
+          pressed ? styles.homeHeaderAvatarPressed : null,
+        ]}
+      >
+        {avatarUrl ? (
+          <Image source={{ uri: avatarUrl }} style={styles.homeHeaderAvatarImage} />
+        ) : (
+          <Text style={styles.homeHeaderAvatarText}>
+            {displayName.slice(0, 1).toUpperCase()}
+          </Text>
+        )}
+      </Pressable>
+      <Text style={styles.homeHeaderLogo}>Megrum</Text>
+      <View pointerEvents="none" style={styles.homeHeaderSpacer} />
+    </View>
   );
 }
 
@@ -2721,6 +2773,10 @@ function toNumber(value: unknown) {
   return null;
 }
 
+function stringMetadata(value: unknown) {
+  return typeof value === "string" && value.trim() ? value.trim() : null;
+}
+
 async function getCurrentCoordinate(): Promise<MapCoordinate | null> {
   try {
     const Location = await import("expo-location");
@@ -3003,7 +3059,52 @@ const styles = StyleSheet.create({
   homeScrollContent: {
     paddingBottom: 132,
     paddingHorizontal: 18,
-    paddingTop: 6,
+    paddingTop: 10,
+  },
+  homeHeader: {
+    alignItems: "center",
+    flexDirection: "row",
+    height: 44,
+    justifyContent: "space-between",
+    marginBottom: 6,
+    zIndex: 28,
+  },
+  homeHeaderAvatarButton: {
+    alignItems: "center",
+    backgroundColor: "rgba(166,149,216,0.16)",
+    borderColor: "rgba(255,255,255,0.92)",
+    borderRadius: 999,
+    borderWidth: 1,
+    height: 38,
+    justifyContent: "center",
+    overflow: "hidden",
+    shadowColor: megrumColors.ink,
+    shadowOffset: { width: 0, height: 7 },
+    shadowOpacity: 0.08,
+    shadowRadius: 14,
+    width: 38,
+  },
+  homeHeaderAvatarPressed: {
+    opacity: 0.82,
+    transform: [{ scale: 0.97 }],
+  },
+  homeHeaderAvatarImage: {
+    height: "100%",
+    width: "100%",
+  },
+  homeHeaderAvatarText: {
+    color: megrumColors.lavender,
+    fontSize: 16,
+    fontWeight: "900",
+  },
+  homeHeaderLogo: {
+    color: megrumColors.ink,
+    fontSize: 21,
+    fontWeight: "900",
+    letterSpacing: 0,
+  },
+  homeHeaderSpacer: {
+    width: 38,
   },
   topEdgeFade: {
     left: -18,

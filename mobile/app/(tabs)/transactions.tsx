@@ -1654,16 +1654,16 @@ const styles = StyleSheet.create({
   cardHeader: {
     alignItems: "center",
     flexDirection: "row",
-    gap: 8,
+    gap: 7,
   },
   avatar: {
     alignItems: "center",
     backgroundColor: "rgba(166,149,216,0.16)",
-    borderRadius: 12,
-    height: 34,
+    borderRadius: 10,
+    height: 28,
     justifyContent: "center",
     overflow: "hidden",
-    width: 34,
+    width: 28,
   },
   avatarImage: {
     height: "100%",
@@ -1671,7 +1671,7 @@ const styles = StyleSheet.create({
   },
   avatarText: {
     color: megrumColors.lavender,
-    fontSize: 14,
+    fontSize: 12,
     fontWeight: "900",
   },
   partnerBlock: {
@@ -1679,12 +1679,12 @@ const styles = StyleSheet.create({
   },
   partner: {
     color: megrumColors.ink,
-    fontSize: 13,
+    fontSize: 11.5,
     fontWeight: "900",
   },
   updated: {
     color: megrumColors.mutedInk,
-    fontSize: 10,
+    fontSize: 9,
     fontWeight: "700",
     marginTop: 1,
   },

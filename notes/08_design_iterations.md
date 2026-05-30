@@ -4,6 +4,63 @@
 
 ---
 
+## イテレーション268：ホームヘッダーと検索フィルター導線を整える
+
+### 背景・問題意識
+
+オーナーから、ホーム画面に中央 `Megrum` ロゴと左端の自分アイコンを持つヘッダーを置き、そのアイコンから左ドロワーを開けるようにしたいという依頼があった。また、ホームから検索した画面ではフィルターを画面下部の固定アイコンとして出し、やりとり画面の各パネル内のユーザー名とアイコンを小さくしたいという指摘があった。
+
+### 変更内容
+
+#### `mobile/src/components/ProfileDrawerContext.tsx`
+- 既存の左ドロワーをホームヘッダーから開くため、`openDrawer` を共有するContextを追加した。
+
+#### `mobile/app/(tabs)/_layout.tsx`
+- `ProfileDrawerShell` を `ProfileDrawerProvider` で包み、タブ配下の画面から左ドロワーを開けるようにした。
+
+#### `mobile/app/(tabs)/index.tsx`
+- ホーム画面上部にヘッダーを追加し、中央に `Megrum`、左端に自分のプロフィールアイコンを表示した。
+- 自分のアイコンをタップすると、既存の左ドロワーが開くようにした。
+
+#### `mobile/app/search.tsx`
+- 検索結果表示時のフィルター導線を、本文内ボタンから画面下部の固定アイコンボタンへ変更した。
+- 適用中フィルター数はアイコン右上の小さなバッジで表示するようにした。
+
+#### `mobile/app/(tabs)/transactions.tsx`
+- やりとり画面の各パネル内で、相手アイコン・ユーザー名・更新時刻の表示を小さくした。
+
+### 影響範囲
+
+- iOS版 ホーム画面
+- 左ドロワー起動導線
+- 検索画面のフィルター導線
+- やりとり画面のカードヘッダー表示
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- `EAS_UPDATE_PROJECT_SLUG=ihub EXPO_NO_GIT_STATUS=1 npm --prefix mobile run update:ios:preview -- --message "[iter268] refine home header and search filter" --non-interactive`
+- Preview OTA: Update group ID `9eb369da-79d1-4b9c-bde6-376217dac7bc` / iOS update ID `019e769e-84e4-75b8-9673-66fab9a3b575`
+
+### 関連ファイル
+
+- `mobile/app/(tabs)/_layout.tsx`
+- `mobile/app/(tabs)/index.tsx`
+- `mobile/app/(tabs)/transactions.tsx`
+- `mobile/app/search.tsx`
+- `mobile/src/components/ProfileDrawerContext.tsx`
+- `notes/08_design_iterations.md`
+
+### セルフレビュー結果
+
+- ✅ 既存の左ドロワーを流用し、新しい独自ドロワーは作らない構成にした。
+- ✅ ホームヘッダーは中央ロゴと左右同幅の要素でセンターがずれないようにした。
+- ✅ 検索フィルターは固定フッター化し、本文スクロールから独立して押せるようにした。
+- ✅ 状態名・新用語・DBスキーマに影響しないため、`notes/09_state_machines.md` と `notes/10_glossary.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション267：全画面で外側タップ時にキーボードを閉じる
 
 ### 背景・問題意識

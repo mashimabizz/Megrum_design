@@ -9,6 +9,7 @@ import {
   Text,
   View,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
   GoodsGrid,
   type GoodsGridItem,
@@ -169,6 +170,7 @@ export default function SearchScreen() {
   const params = useLocalSearchParams<{ q?: string | string[] }>();
   const initialQuery = Array.isArray(params.q) ? params.q[0] : params.q;
   const { previewMode, user } = useAuth();
+  const insets = useSafeAreaInsets();
   const [draft, setDraft] = useState(initialQuery ?? "");
   const [query, setQuery] = useState(initialQuery ?? "");
   const [recent, setRecent] = useState<string[]>([]);
@@ -283,6 +285,7 @@ export default function SearchScreen() {
   );
 
   const totalCount = filteredHits.length;
+  const filterFooterBottom = Math.max(insets.bottom, 12) + 16;
 
   function submit(nextQuery = draft) {
     const q = nextQuery.trim();
@@ -306,7 +309,14 @@ export default function SearchScreen() {
   }
 
   return (
-    <Screen contentStyle={styles.screen} topInset={false}>
+    <Screen
+      scroll={false}
+      contentStyle={StyleSheet.flatten([
+        styles.screen,
+        query ? { paddingBottom: filterFooterBottom + 70 } : null,
+      ])}
+      topInset={false}
+    >
       <Stack.Screen
         options={{
           headerShown: true,
@@ -335,58 +345,74 @@ export default function SearchScreen() {
         }}
       />
 
-      {query ? (
-        <View style={styles.resultsBlock}>
-          <View style={styles.resultSummary}>
-            <Text style={styles.resultCount}>{totalCount}件</Text>
-            <Text style={styles.resultQuery}>「{query}」</Text>
+      <ScrollView
+        automaticallyAdjustsScrollIndicatorInsets
+        contentInsetAdjustmentBehavior="automatic"
+        showsVerticalScrollIndicator={false}
+        style={styles.searchScroll}
+        contentContainerStyle={styles.searchContent}
+      >
+        {query ? (
+          <View style={styles.resultsBlock}>
+            <View style={styles.resultSummary}>
+              <Text style={styles.resultCount}>{totalCount}件</Text>
+              <Text style={styles.resultQuery}>「{query}」</Text>
+            </View>
+            {loading ? <Text style={styles.loadingText}>検索中…</Text> : null}
+            {error ? <Text style={styles.inlineError}>{error}</Text> : null}
+            {!loading && totalCount === 0 ? (
+              <View style={styles.emptyBox}>
+                <Text style={styles.emptyTitle}>該当する譲が見つかりませんでした</Text>
+                <Text style={styles.emptyText}>キーワードを短くするか、タグ名で検索してみてください。</Text>
+              </View>
+            ) : (
+              <View style={styles.sectionList}>
+                {sections.map((section) => (
+                  <ResultSection
+                    key={section.id}
+                    title={section.title}
+                    empty={section.empty}
+                    items={section.items}
+                    onPressItem={openResult}
+                  />
+                ))}
+              </View>
+            )}
           </View>
-          {loading ? <Text style={styles.loadingText}>検索中…</Text> : null}
-          {error ? <Text style={styles.inlineError}>{error}</Text> : null}
-          {!loading && totalCount === 0 ? (
-            <View style={styles.emptyBox}>
-              <Text style={styles.emptyTitle}>該当する譲が見つかりませんでした</Text>
-              <Text style={styles.emptyText}>キーワードを短くするか、タグ名で検索してみてください。</Text>
-            </View>
-          ) : (
-            <View style={styles.sectionList}>
-              {sections.map((section) => (
-                <ResultSection
-                  key={section.id}
-                  title={section.title}
-                  empty={section.empty}
-                  items={section.items}
-                  onPressItem={openResult}
-                />
-              ))}
-            </View>
-          )}
-        </View>
-      ) : (
-        <View style={styles.suggestions}>
-          {recent.length > 0 ? (
-            <SuggestionGroup title="履歴" values={recent} onPress={submit} />
-          ) : null}
-          <SuggestionGroup
-            title="人気の検索"
-            values={popular}
-            loading={popularLoading}
-            emptyLabel="検索実績がまだありません"
-            onPress={submit}
-          />
-        </View>
-      )}
+        ) : (
+          <View style={styles.suggestions}>
+            {recent.length > 0 ? (
+              <SuggestionGroup title="履歴" values={recent} onPress={submit} />
+            ) : null}
+            <SuggestionGroup
+              title="人気の検索"
+              values={popular}
+              loading={popularLoading}
+              emptyLabel="検索実績がまだありません"
+              onPress={submit}
+            />
+          </View>
+        )}
+      </ScrollView>
       {query ? (
-        <Pressable
-          accessibilityRole="button"
-          onPress={() => setFilterOpen(true)}
-          style={styles.filterButton}
-        >
-          <IconSymbol name="settings-outline" size={17} color={megrumColors.surface} />
-          <Text style={styles.filterButtonText}>
-            フィルター{activeFilterCount > 0 ? ` ${activeFilterCount}` : ""}
-          </Text>
-        </Pressable>
+        <View pointerEvents="box-none" style={[styles.filterFooter, { bottom: filterFooterBottom }]}>
+          <Pressable
+            accessibilityLabel="検索フィルターを開く"
+            accessibilityRole="button"
+            onPress={() => setFilterOpen(true)}
+            style={({ pressed }) => [
+              styles.filterIconButton,
+              pressed ? styles.filterIconButtonPressed : null,
+            ]}
+          >
+            <IconSymbol name="settings-outline" size={22} color={megrumColors.surface} />
+            {activeFilterCount > 0 ? (
+              <View style={styles.filterCountBadge}>
+                <Text style={styles.filterCountBadgeText}>{activeFilterCount}</Text>
+              </View>
+            ) : null}
+          </Pressable>
+        </View>
       ) : null}
       <SearchFilterSheet
         filters={filters}
@@ -984,7 +1010,15 @@ function nameToHue(name: string) {
 
 const styles = StyleSheet.create({
   screen: {
+    flex: 1,
     gap: 16,
+  },
+  searchScroll: {
+    flex: 1,
+  },
+  searchContent: {
+    gap: 16,
+    paddingBottom: 8,
   },
   resultsBlock: {
     gap: 12,
@@ -1101,22 +1135,47 @@ const styles = StyleSheet.create({
     fontSize: 11.5,
     fontWeight: "800",
   },
-  filterButton: {
+  filterFooter: {
     alignItems: "center",
-    alignSelf: "center",
+    left: 0,
+    position: "absolute",
+    right: 0,
+  },
+  filterIconButton: {
+    alignItems: "center",
     backgroundColor: megrumColors.lavender,
     borderColor: "rgba(255,255,255,0.92)",
-    borderRadius: megrumRadii.pill,
+    borderRadius: 999,
     borderWidth: 1,
-    flexDirection: "row",
-    gap: 6,
-    marginTop: 4,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
+    height: 54,
+    justifyContent: "center",
+    shadowColor: megrumColors.ink,
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.14,
+    shadowRadius: 22,
+    width: 54,
   },
-  filterButtonText: {
+  filterIconButtonPressed: {
+    opacity: 0.86,
+    transform: [{ scale: 0.96 }],
+  },
+  filterCountBadge: {
+    alignItems: "center",
+    backgroundColor: megrumColors.sky,
+    borderColor: megrumColors.surface,
+    borderRadius: 999,
+    borderWidth: 1,
+    height: 19,
+    justifyContent: "center",
+    minWidth: 19,
+    paddingHorizontal: 5,
+    position: "absolute",
+    right: -3,
+    top: -3,
+  },
+  filterCountBadgeText: {
     color: megrumColors.surface,
-    fontSize: 12,
+    fontSize: 10,
     fontWeight: "900",
   },
   filterSheetRoot: {

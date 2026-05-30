@@ -18,6 +18,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAuth } from "../../src/auth/AuthProvider";
 import { IconSymbol, type IconSymbolName } from "../../src/components/IconSymbol";
+import { ProfileDrawerProvider } from "../../src/components/ProfileDrawerContext";
 import { megrumColors } from "../../src/theme/tokens";
 
 const TAB_CONFIG = {
@@ -279,64 +280,66 @@ function ProfileDrawerShell({ children }: { children: ReactNode }) {
   });
 
   return (
-    <View style={styles.drawerShellRoot}>
-      <Animated.View
-        pointerEvents={visible && !closing ? "auto" : "none"}
-        style={[
-          styles.drawerUnderlay,
-          {
-            opacity: drawerOpacity,
-            width: drawerWidth,
-            transform: [{ translateX: drawerParallax }],
-          },
-        ]}
-      >
-        <ProfileDrawerContent onNavigate={closeDrawer} />
-      </Animated.View>
-
-      <Animated.View
-        style={[
-          styles.drawerForeground,
-          {
-            borderBottomLeftRadius: screenRadius,
-            borderTopLeftRadius: screenRadius,
-            shadowOpacity: screenShadowOpacity,
-            transform: [{ translateX: screenX }],
-          },
-        ]}
-        {...foregroundPanResponder.panHandlers}
-      >
+    <ProfileDrawerProvider openDrawer={openDrawer}>
+      <View style={styles.drawerShellRoot}>
         <Animated.View
+          pointerEvents={visible && !closing ? "auto" : "none"}
           style={[
-            styles.drawerForegroundClip,
+            styles.drawerUnderlay,
             {
-              borderBottomLeftRadius: screenRadius,
-              borderTopLeftRadius: screenRadius,
+              opacity: drawerOpacity,
+              width: drawerWidth,
+              transform: [{ translateX: drawerParallax }],
             },
           ]}
         >
-          {children}
-          <Animated.View
-            pointerEvents="none"
-            style={[styles.drawerWhiteout, { opacity: whiteoutOpacity }]}
-          />
-          {visible && !closing ? (
-            <Pressable
-              accessibilityLabel="メニューを閉じる"
-              accessibilityRole="button"
-              style={StyleSheet.absoluteFill}
-              onPress={() => closeDrawer()}
-            />
-          ) : null}
+          <ProfileDrawerContent onNavigate={closeDrawer} />
         </Animated.View>
-      </Animated.View>
 
-      <View
-        pointerEvents={visible || closing ? "none" : "auto"}
-        style={styles.edgeSwipeHandle}
-        {...edgePanResponder.panHandlers}
-      />
-    </View>
+        <Animated.View
+          style={[
+            styles.drawerForeground,
+            {
+              borderBottomLeftRadius: screenRadius,
+              borderTopLeftRadius: screenRadius,
+              shadowOpacity: screenShadowOpacity,
+              transform: [{ translateX: screenX }],
+            },
+          ]}
+          {...foregroundPanResponder.panHandlers}
+        >
+          <Animated.View
+            style={[
+              styles.drawerForegroundClip,
+              {
+                borderBottomLeftRadius: screenRadius,
+                borderTopLeftRadius: screenRadius,
+              },
+            ]}
+          >
+            {children}
+            <Animated.View
+              pointerEvents="none"
+              style={[styles.drawerWhiteout, { opacity: whiteoutOpacity }]}
+            />
+            {visible && !closing ? (
+              <Pressable
+                accessibilityLabel="メニューを閉じる"
+                accessibilityRole="button"
+                style={StyleSheet.absoluteFill}
+                onPress={() => closeDrawer()}
+              />
+            ) : null}
+          </Animated.View>
+        </Animated.View>
+
+        <View
+          pointerEvents={visible || closing ? "none" : "auto"}
+          style={styles.edgeSwipeHandle}
+          {...edgePanResponder.panHandlers}
+        />
+      </View>
+    </ProfileDrawerProvider>
   );
 }
 
