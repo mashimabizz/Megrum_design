@@ -1113,6 +1113,18 @@ export default function MeguriBoardScreen() {
                         <Pressable
                           accessibilityRole="button"
                           hitSlop={8}
+                          onPress={(event) => {
+                            event.stopPropagation();
+                            void shareThread(thread);
+                          }}
+                          style={styles.sharePill}
+                        >
+                          <IconSymbol name="send-outline" color={megrumColors.lavender} size={13} />
+                          <Text style={styles.sharePillText}>共有</Text>
+                        </Pressable>
+                        <Pressable
+                          accessibilityRole="button"
+                          hitSlop={8}
                           onPress={() => toggleThreadBookmark(thread)}
                           style={[styles.metricPill, thread.bookmarked ? styles.metricPillActive : null]}
                         >
@@ -2172,6 +2184,20 @@ const styles = StyleSheet.create({
   },
   metricPillTextActive: {
     color: megrumColors.lavender,
+  },
+  sharePill: {
+    alignItems: "center",
+    backgroundColor: "rgba(166,149,216,0.1)",
+    borderRadius: 999,
+    flexDirection: "row",
+    gap: 4,
+    minHeight: 26,
+    paddingHorizontal: 8,
+  },
+  sharePillText: {
+    color: megrumColors.lavender,
+    fontSize: 10.5,
+    fontWeight: "900",
   },
   modalLayer: {
     flex: 1,

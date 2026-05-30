@@ -4,6 +4,53 @@
 
 ---
 
+## イテレーション253：掲示板一覧カードに共有ボタンを追加する
+
+### 背景・問題意識
+
+一般的なスレッド型掲示板では、気になるスレッドを外部に共有する操作がよく使われる。スポット掲示板でもスレッド共有は長押し/メニュー内にあったが、一覧で見つけたスレッドをすぐ共有するには操作が一段深かったため、カードのフッターに共有ボタンを追加した。
+
+### 変更内容
+
+#### `mobile/app/meguri-board.tsx`
+- スレッドカードのフッターに `共有` ボタンを追加した。
+- 押下時は既存の `shareThread` を使い、iOS標準の共有シートを開くようにした。
+- カード本体の詳細遷移と干渉しないよう、共有ボタン押下時はイベント伝播を止めるようにした。
+
+#### `notes/09_state_machines.md`
+- Meguri Board Lifecycle に一覧カード共有ボタンの表示ルールを追記した。
+
+#### `notes/10_glossary.md`
+- 掲示板一覧共有ボタンを追加した。
+
+### 影響範囲
+
+- iOS版 スポット掲示板一覧
+- スレッドカードのフッター操作
+- スレッド共有導線
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- `EAS_UPDATE_PROJECT_SLUG=ihub EXPO_NO_GIT_STATUS=1 npm --prefix mobile run update:ios:preview -- --message "[iter253] add board list share button" --non-interactive`
+- Preview OTA: Update group ID `c10f695d-4161-4c3f-a75f-7633b24bda0d` / iOS update ID `019e7655-863d-7e3b-b908-0f0ccacbaedf`
+
+### 関連ファイル
+
+- `mobile/app/meguri-board.tsx`
+- `notes/08_design_iterations.md`
+- `notes/09_state_machines.md`
+- `notes/10_glossary.md`
+
+### セルフレビュー結果
+
+- ✅ 既存の共有処理を使い回し、新しい依存や保存形式を増やしていない。
+- ✅ 共有ボタン押下時にカード本体の詳細遷移が同時に走らないようにした。
+- ✅ ネイティブ依存追加なしでPreview OTA対象内に収めた。
+
+---
+
 ## イテレーション252：掲示板返信下書きの再開導線を追加する
 
 ### 背景・問題意識
