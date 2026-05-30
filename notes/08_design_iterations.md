@@ -4,6 +4,86 @@
 
 ---
 
+## イテレーション270：Liquid Glass共通化とグルーム投稿体験を整える
+
+### 背景・問題意識
+
+オーナーから、Megrum の各コンポーネントを iOS 最新の Liquid Glass 仕様へ寄せ、グルーム関連は投稿時の挙動を Instagram Stories に準拠する形へ近づけたいという指示があった。既に一部画面では `expo-glass-effect` を使っていたが、共通ボタン・ヘッダー・ピル・入力欄などの基礎部品には同じ方針が行き渡っておらず、グルーム投稿後も自分のストーリーとして即座に確認する導線が弱かった。
+
+### 変更内容
+
+#### `mobile/src/components/LiquidGlass.tsx`
+- `expo-glass-effect` の `GlassView` / `GlassContainer` を動的に取得し、iOS で Liquid Glass API が利用できる場合だけネイティブ Liquid Glass を使う共通ラッパーを追加した。
+- Liquid Glass API が利用できない iOS では `expo-blur`、iOS以外では通常 `View` にフォールバックするようにした。
+
+#### `mobile/src/components/PrimaryButton.tsx`
+- 主ボタン / セカンダリボタンを共通 `LiquidGlassSurface` 上に描画する構造へ変更した。
+- 押下・ローディング・無効状態は維持しつつ、背景の表現だけをLiquid Glassレイヤーへ分離した。
+
+#### `mobile/src/components/RouteHeader.tsx`
+- 戻るヘッダーと戻るボタンを `LiquidGlassSurface` 化した。
+- 既存のタイトル・サブタイトル・右側アクション構成は維持した。
+
+#### `mobile/src/components/StatusPill.tsx`
+- ステータスピルを `LiquidGlassSurface` 化し、既存トーン色を tint / fallback に使うようにした。
+
+#### `mobile/src/components/FoundationCard.tsx`
+- 基本カードをガラス面として描画し、非対応環境では従来の白いカードに戻るようにした。
+
+#### `mobile/src/components/TextField.tsx`
+- 共通入力欄をLiquid Glass面の中に配置し、入力テキストの余白・フォントは維持した。
+
+#### `mobile/app/(tabs)/index.tsx`
+- ホーム右下の現地交換ボタンと左下検索ボタンを共通 `LiquidGlassSurface` ベースへ切り替えた。
+- ホーム固有のネイティブガラス取得処理を削除し、共通ラッパーへ寄せた。
+
+#### `mobile/app/(tabs)/encounters.tsx`
+- グルーム投稿時、楽観投稿を自分のグルームとして即時に先頭追加し、投稿後すぐビューアで確認できるようにした。
+- 投稿成功後はリモート投稿IDへ差し替え、ビューアの選択中IDも追従するようにした。
+- 投稿失敗時は仮投稿とビューアを閉じ、下書きを復元するようにした。
+- めぐりホームの設定ボタン、スレッド作成FAB、グルームカメラの上部操作、シャッター、ストーリー編集ツール、投稿/撮り直しボタンをLiquid Glass面で描画するようにした。
+
+#### `mobile/app/groom-map.tsx`
+- グルームマップの戻るボタン、ヘッダー、ローディングカード、空状態カードをLiquid Glass面へ切り替えた。
+
+### 影響範囲
+
+- iOS版 共通ボタン / ヘッダー / ピル / 入力欄 / 基本カード
+- iOS版 ホーム画面の浮遊操作ボタン
+- iOS版 めぐりホーム / グルームカメラ / グルームストーリー編集
+- iOS版 グルーム投稿直後の表示フロー
+- iOS版 グルームマップ
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- `EAS_UPDATE_PROJECT_SLUG=ihub EXPO_NO_GIT_STATUS=1 npm --prefix mobile run update:ios:preview -- --message "[iter270] Liquid Glassとグルーム体験を更新" --non-interactive`
+- Preview OTA: Update group ID `af7f30df-7cd3-4a63-a597-ff76c265c0d7` / iOS update ID `019e76ad-f77a-7346-b9bb-3511d3350de4`
+
+### 関連ファイル
+
+- `mobile/src/components/LiquidGlass.tsx`
+- `mobile/src/components/PrimaryButton.tsx`
+- `mobile/src/components/RouteHeader.tsx`
+- `mobile/src/components/StatusPill.tsx`
+- `mobile/src/components/FoundationCard.tsx`
+- `mobile/src/components/TextField.tsx`
+- `mobile/app/(tabs)/index.tsx`
+- `mobile/app/(tabs)/encounters.tsx`
+- `mobile/app/groom-map.tsx`
+- `notes/08_design_iterations.md`
+
+### セルフレビュー結果
+
+- ✅ Liquid Glass の取得処理を共通化し、画面ごとの独自実装を増やさない形にした。
+- ✅ ネイティブ Liquid Glass が使えない環境でも、既存画面が壊れないフォールバックを入れた。
+- ✅ グルーム投稿後に自分の投稿が先頭へ出て、そのまま確認できるストーリー型の挙動へ寄せた。
+- ✅ 今回は状態名・DBスキーマの変更はないため、`notes/09_state_machines.md` と `notes/05_data_model.md` の更新は不要と判断した。
+- ✅ プロダクト用語の追加・廃止はないため、`notes/10_glossary.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション269：他人プロフィール下部の空白を解消する
 
 ### 背景・問題意識

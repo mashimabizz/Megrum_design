@@ -1,5 +1,6 @@
 import type { PropsWithChildren } from "react";
 import { StyleSheet, Text, View } from "react-native";
+import { LiquidGlassSurface } from "./LiquidGlass";
 import { megrumColors, megrumRadii, megrumShadow } from "../theme/tokens";
 
 type FoundationCardProps = PropsWithChildren<{
@@ -15,23 +16,31 @@ export function FoundationCard({
   children,
 }: FoundationCardProps) {
   return (
-    <View style={styles.card}>
+    <LiquidGlassSurface
+      isInteractive
+      style={styles.card}
+      fallbackStyle={styles.cardFallback}
+      tintColor="rgba(255,255,255,0.30)"
+    >
       {eyebrow ? <Text style={styles.eyebrow}>{eyebrow}</Text> : null}
       <Text style={styles.title}>{title}</Text>
       {body ? <Text style={styles.body}>{body}</Text> : null}
       {children ? <View style={styles.children}>{children}</View> : null}
-    </View>
+    </LiquidGlassSurface>
   );
 }
 
 const styles = StyleSheet.create({
   card: {
     borderWidth: 1,
-    borderColor: "rgba(58,50,74,0.08)",
+    borderColor: "rgba(255,255,255,0.72)",
     borderRadius: megrumRadii.lg,
-    backgroundColor: megrumColors.surface,
+    overflow: "hidden",
     padding: 16,
     ...megrumShadow,
+  },
+  cardFallback: {
+    backgroundColor: megrumColors.surface,
   },
   eyebrow: {
     color: megrumColors.lavender,

@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { router } from "expo-router";
 import { Pressable, StyleSheet, Text, View } from "react-native";
+import { LiquidGlassSurface } from "./LiquidGlass";
 import { megrumColors, megrumRadii } from "../theme/tokens";
 
 type RouteHeaderProps = {
@@ -11,7 +12,12 @@ type RouteHeaderProps = {
 
 export function RouteHeader({ right, subtitle, title }: RouteHeaderProps) {
   return (
-    <View style={styles.header}>
+    <LiquidGlassSurface
+      isInteractive
+      style={styles.header}
+      fallbackStyle={styles.headerFallback}
+      tintColor="rgba(255,255,255,0.28)"
+    >
       <Pressable
         accessibilityLabel="戻る"
         accessibilityRole="button"
@@ -24,6 +30,12 @@ export function RouteHeader({ right, subtitle, title }: RouteHeaderProps) {
         }}
         style={styles.backButton}
       >
+        <LiquidGlassSurface
+          pointerEvents="none"
+          style={StyleSheet.absoluteFillObject}
+          fallbackStyle={styles.backButtonFallback}
+          tintColor="rgba(255,255,255,0.32)"
+        />
         <Text style={styles.backText}>‹</Text>
       </Pressable>
       <View style={styles.copy}>
@@ -37,14 +49,13 @@ export function RouteHeader({ right, subtitle, title }: RouteHeaderProps) {
         ) : null}
       </View>
       <View style={styles.right}>{right}</View>
-    </View>
+    </LiquidGlassSurface>
   );
 }
 
 const styles = StyleSheet.create({
   header: {
     alignItems: "center",
-    backgroundColor: "rgba(255,255,255,0.58)",
     borderColor: "rgba(255,255,255,0.78)",
     borderRadius: 24,
     borderWidth: 1,
@@ -55,10 +66,13 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 12 },
     shadowOpacity: 0.08,
     shadowRadius: 22,
+    overflow: "hidden",
+  },
+  headerFallback: {
+    backgroundColor: "rgba(255,255,255,0.78)",
   },
   backButton: {
     alignItems: "center",
-    backgroundColor: "rgba(255,255,255,0.86)",
     borderColor: "rgba(255,255,255,0.9)",
     borderRadius: megrumRadii.pill,
     borderWidth: 1,
@@ -69,6 +83,10 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 10,
     width: 38,
+    overflow: "hidden",
+  },
+  backButtonFallback: {
+    backgroundColor: "rgba(255,255,255,0.86)",
   },
   backText: {
     color: megrumColors.ink,

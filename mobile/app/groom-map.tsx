@@ -14,6 +14,7 @@ import MapView, { Marker, type Region } from "react-native-maps";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAuth } from "../src/auth/AuthProvider";
 import { IconSymbol } from "../src/components/IconSymbol";
+import { LiquidGlassSurface } from "../src/components/LiquidGlass";
 import {
   fetchGroomMapPosts,
   isUuidLike,
@@ -112,26 +113,48 @@ export default function GroomMapScreen() {
 
       <View style={[styles.header, { paddingTop: Math.max(insets.top, 12) + 8 }]}>
         <Pressable accessibilityRole="button" onPress={() => router.back()} style={styles.roundButton}>
+          <LiquidGlassSurface
+            isInteractive
+            pointerEvents="none"
+            style={StyleSheet.absoluteFillObject}
+            fallbackStyle={styles.roundButtonFallback}
+            tintColor="rgba(255,255,255,0.28)"
+          />
           <IconSymbol name="chevron-back" color={megrumColors.ink} size={20} />
         </Pressable>
-        <View style={styles.headerCopy}>
+        <LiquidGlassSurface
+          isInteractive
+          style={styles.headerCopy}
+          fallbackStyle={styles.headerCopyFallback}
+          tintColor="rgba(255,255,255,0.30)"
+        >
           <Text style={styles.headerTitle}>グルームマップ</Text>
           <Text numberOfLines={1} style={styles.headerSubtitle}>
             1km圏内の投稿だけ開けます
           </Text>
-        </View>
+        </LiquidGlassSurface>
       </View>
 
       {loading ? (
-        <View style={styles.loadingCard}>
+        <LiquidGlassSurface
+          isInteractive
+          style={styles.loadingCard}
+          fallbackStyle={styles.floatingCardFallback}
+          tintColor="rgba(255,255,255,0.30)"
+        >
           <ActivityIndicator color={megrumColors.lavender} />
           <Text style={styles.loadingText}>グルームを読み込み中…</Text>
-        </View>
+        </LiquidGlassSurface>
       ) : posts.length === 0 ? (
-        <View style={styles.emptyCard}>
+        <LiquidGlassSurface
+          isInteractive
+          style={styles.emptyCard}
+          fallbackStyle={styles.floatingCardFallback}
+          tintColor="rgba(255,255,255,0.30)"
+        >
           <Text style={styles.emptyTitle}>表示できるグルームがありません</Text>
           <Text style={styles.emptyBody}>位置情報を許可すると、近くの投稿を地図で見られます。</Text>
-        </View>
+        </LiquidGlassSurface>
       ) : null}
 
       <Modal
@@ -224,21 +247,27 @@ const styles = StyleSheet.create({
   },
   roundButton: {
     alignItems: "center",
-    backgroundColor: "rgba(255,255,255,0.92)",
     borderRadius: 18,
     height: 42,
     justifyContent: "center",
+    overflow: "hidden",
     width: 42,
     ...megrumShadow,
   },
-  headerCopy: {
+  roundButtonFallback: {
     backgroundColor: "rgba(255,255,255,0.92)",
+  },
+  headerCopy: {
     borderRadius: 18,
     flex: 1,
     gap: 2,
+    overflow: "hidden",
     paddingHorizontal: 14,
     paddingVertical: 9,
     ...megrumShadow,
+  },
+  headerCopyFallback: {
+    backgroundColor: "rgba(255,255,255,0.92)",
   },
   headerTitle: {
     color: megrumColors.ink,
@@ -295,11 +324,11 @@ const styles = StyleSheet.create({
   },
   loadingCard: {
     alignItems: "center",
-    backgroundColor: "rgba(255,255,255,0.94)",
     borderRadius: 18,
     flexDirection: "row",
     gap: 10,
     left: 16,
+    overflow: "hidden",
     paddingHorizontal: 14,
     paddingVertical: 12,
     position: "absolute",
@@ -313,14 +342,17 @@ const styles = StyleSheet.create({
     fontWeight: "800",
   },
   emptyCard: {
-    backgroundColor: "rgba(255,255,255,0.94)",
     borderRadius: 20,
     left: 16,
+    overflow: "hidden",
     padding: 16,
     position: "absolute",
     right: 16,
     top: 118,
     ...megrumShadow,
+  },
+  floatingCardFallback: {
+    backgroundColor: "rgba(255,255,255,0.94)",
   },
   emptyTitle: {
     color: megrumColors.ink,

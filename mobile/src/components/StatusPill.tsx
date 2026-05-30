@@ -1,4 +1,5 @@
-import { StyleSheet, Text, View } from "react-native";
+import { StyleSheet, Text } from "react-native";
+import { LiquidGlassSurface } from "./LiquidGlass";
 import { megrumColors, megrumRadii } from "../theme/tokens";
 
 type Tone = "lavender" | "sky" | "pink" | "ok";
@@ -18,11 +19,16 @@ export function StatusPill({
   tone?: Tone;
 }) {
   return (
-    <View style={[styles.pill, { backgroundColor: toneStyles[tone].bg }]}>
+    <LiquidGlassSurface
+      isInteractive
+      style={styles.pill}
+      fallbackStyle={{ backgroundColor: toneStyles[tone].bg }}
+      tintColor={toneStyles[tone].bg}
+    >
       <Text style={[styles.label, { color: toneStyles[tone].fg }]}>
         {label}
       </Text>
-    </View>
+    </LiquidGlassSurface>
   );
 }
 

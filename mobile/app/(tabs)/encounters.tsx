@@ -17,8 +17,10 @@ import {
   StyleSheet,
   Text,
   TextInput,
+  type StyleProp,
   useWindowDimensions,
   View,
+  type ViewStyle,
 } from "react-native";
 import { CameraView, useCameraPermissions, type CameraType } from "expo-camera";
 import * as ImagePicker from "expo-image-picker";
@@ -31,6 +33,7 @@ import {
   GroomRailSkeleton,
 } from "../../src/components/SkeletonScreen";
 import { IconSymbol } from "../../src/components/IconSymbol";
+import { LiquidGlassSurface } from "../../src/components/LiquidGlass";
 import { megrumColors, megrumRadii, megrumShadow } from "../../src/theme/tokens";
 import {
   MEGURI_PLUS_FREE_SEND_LIMIT,
@@ -769,6 +772,7 @@ export default function EncountersScreen() {
     setGroomLocationContext(locationContext);
     const placeHint = locationContext?.label ? `${locationContext.label}付近` : "今日の現場付近";
     const optimisticId = `groom-mine-${Date.now()}`;
+    const publishedAt = new Date().toISOString();
     const newPost: GroomPost = {
       id: optimisticId,
       author: null,
@@ -779,11 +783,27 @@ export default function EncountersScreen() {
       liked: false,
       mine: true,
       placeHint,
+      publishedAt,
       stickers: payload.stickers,
       textOverlays: payload.textOverlays,
       timeLabel: "たった今",
     };
     setGroomPosts((current) => [newPost, ...current]);
+    setViewedGroomKeys((current) => {
+      const next = new Set(current);
+      next.add(groomAccountKey(newPost));
+      return next;
+    });
+    setGroomOpenOrigin(null);
+    setGroomReply("");
+    setGroomReplyNotice("グルームを投稿しました");
+    setGroomViewerSession((current) => current + 1);
+    setSelectedGroomId(optimisticId);
+    clearGroomToastTimer();
+    groomToastTimerRef.current = setTimeout(() => {
+      setGroomReplyNotice("");
+      groomToastTimerRef.current = null;
+    }, 1800);
     setGroomDraftUri(null);
     setGroomDraftBase64(null);
     setGroomDraftContentType(null);
@@ -802,17 +822,22 @@ export default function EncountersScreen() {
         stickers: payload.stickers,
         textOverlays: payload.textOverlays,
       });
+      const nextPost = remotePostToGroomPost(remotePost);
       setGroomPosts((current) =>
-        current.map((post) => (post.id === optimisticId ? remotePostToGroomPost(remotePost) : post)),
+        current.map((post) => (post.id === optimisticId ? nextPost : post)),
       );
+      setSelectedGroomId(nextPost.id);
       setViewedGroomKeys((current) => {
         const next = new Set(current);
-        next.add(groomAccountKey(remotePostToGroomPost(remotePost)));
+        next.add(groomAccountKey(nextPost));
         return next;
       });
     } catch (error) {
       console.warn("Failed to publish groom post", error);
       setGroomPosts((current) => current.filter((post) => post.id !== optimisticId));
+      setSelectedGroomId(null);
+      setGroomReplyNotice("");
+      clearGroomToastTimer();
       setGroomDraftUri(draftUri);
       setGroomDraftBase64(draftBase64);
       setGroomDraftContentType(draftContentType);
@@ -1040,6 +1065,7 @@ export default function EncountersScreen() {
           { bottom: Math.max(insets.bottom, 12) + 92 },
         ]}
       >
+        <GroomGlassFill fallbackStyle={styles.threadFabFallback} tintColor="rgba(166,149,216,0.34)" />
         <IconSymbol name="add" color="#fff" size={17} />
         <Text style={styles.threadFabText}>スレッドを立てる</Text>
       </Pressable>
@@ -1051,6 +1077,7 @@ export default function EncountersScreen() {
           onPress={() => setSettingsOpen(true)}
           style={styles.settingsButton}
         >
+          <GroomGlassFill fallbackStyle={styles.settingsButtonFallback} tintColor="rgba(255,255,255,0.28)" />
           <IconSymbol name="settings-outline" color={megrumColors.ink} size={20} />
         </Pressable>
       </View>
@@ -2811,6 +2838,7 @@ function GroomCameraModal({
             onPress={onClose}
             style={styles.groomCameraCloseButton}
           >
+            <GroomGlassFill fallbackStyle={styles.groomCameraDarkGlassFallback} tintColor="rgba(255,255,255,0.14)" />
             <IconSymbol name="close" color="#fff" size={24} />
           </Pressable>
           <Text style={styles.groomCameraTitle}>グルーム</Text>
@@ -2820,6 +2848,7 @@ function GroomCameraModal({
             onPress={() => setFacing((current) => (current === "back" ? "front" : "back"))}
             style={styles.groomCameraTopButton}
           >
+            <GroomGlassFill fallbackStyle={styles.groomCameraDarkGlassFallback} tintColor="rgba(255,255,255,0.14)" />
             <Text style={styles.groomCameraFlipText}>↻</Text>
           </Pressable>
         </View>
@@ -2852,6 +2881,7 @@ function GroomCameraModal({
             onPress={takePhoto}
             style={styles.groomCameraShutter}
           >
+            <GroomGlassFill fallbackStyle={styles.groomCameraShutterFallback} tintColor="rgba(255,255,255,0.26)" />
             <View style={styles.groomCameraShutterInner}>
               {busy === "camera" ? <ActivityIndicator color="#fff" /> : null}
             </View>
@@ -2904,6 +2934,24 @@ function groomPublishFailureMessage(error: unknown) {
     }
   }
   return "通信状況を確認して、もう一度投稿してください。";
+}
+
+function GroomGlassFill({
+  fallbackStyle,
+  tintColor,
+}: {
+  fallbackStyle?: StyleProp<ViewStyle>;
+  tintColor: string;
+}) {
+  return (
+    <LiquidGlassSurface
+      isInteractive
+      pointerEvents="none"
+      style={StyleSheet.absoluteFillObject}
+      fallbackStyle={fallbackStyle}
+      tintColor={tintColor}
+    />
+  );
 }
 
 function GroomComposerModal({
@@ -3389,6 +3437,7 @@ function GroomComposerModal({
               onPress={onClose}
               style={styles.groomStoryToolButton}
             >
+              <GroomGlassFill fallbackStyle={styles.groomStoryToolFallback} tintColor="rgba(255,255,255,0.14)" />
               <IconSymbol name="close" color="#fff" size={23} />
             </Pressable>
             <View style={styles.groomStoryToolCluster}>
@@ -3398,6 +3447,7 @@ function GroomComposerModal({
                 onPress={() => openTextInputAtPoint(null)}
                 style={styles.groomStoryToolButton}
               >
+                <GroomGlassFill fallbackStyle={styles.groomStoryToolFallback} tintColor="rgba(255,255,255,0.14)" />
                 <Text style={styles.groomStoryToolText}>Aa</Text>
               </Pressable>
               <Pressable
@@ -3406,6 +3456,14 @@ function GroomComposerModal({
                 onPress={() => setTool((current) => (current === "draw" ? "none" : "draw"))}
                 style={[styles.groomStoryToolButton, tool === "draw" ? styles.groomStoryToolButtonActive : null]}
               >
+                <GroomGlassFill
+                  fallbackStyle={
+                    tool === "draw"
+                      ? styles.groomStoryToolActiveFallback
+                      : styles.groomStoryToolFallback
+                  }
+                  tintColor={tool === "draw" ? "rgba(255,255,255,0.26)" : "rgba(255,255,255,0.14)"}
+                />
                 <IconSymbol name="create-outline" color="#fff" size={22} />
               </Pressable>
               <Pressable
@@ -3414,6 +3472,7 @@ function GroomComposerModal({
                 onPress={undoLatest}
                 style={styles.groomStoryToolButton}
               >
+                <GroomGlassFill fallbackStyle={styles.groomStoryToolFallback} tintColor="rgba(255,255,255,0.14)" />
                 <Text style={styles.groomStoryToolText}>↶</Text>
               </Pressable>
             </View>
@@ -3532,9 +3591,11 @@ function GroomComposerModal({
             />
             <View style={styles.groomStoryBottomActions}>
               <Pressable onPress={onRetake} style={styles.groomStoryRetakeButton}>
+                <GroomGlassFill fallbackStyle={styles.groomStoryRetakeFallback} tintColor="rgba(255,255,255,0.12)" />
                 <Text style={styles.groomStoryRetakeText}>撮り直す</Text>
               </Pressable>
               <Pressable onPress={publishEditedGroom} style={styles.groomStoryPublishButton}>
+                <GroomGlassFill fallbackStyle={styles.groomStoryPublishFallback} tintColor="rgba(255,255,255,0.36)" />
                 <Text style={styles.groomStoryPublishText}>投稿する</Text>
               </Pressable>
             </View>
@@ -4190,14 +4251,17 @@ const styles = StyleSheet.create({
   },
   settingsButton: {
     alignItems: "center",
-    backgroundColor: "rgba(255,255,255,0.86)",
     borderColor: "rgba(58,50,74,0.08)",
     borderRadius: megrumRadii.pill,
     borderWidth: 1,
     height: 40,
     justifyContent: "center",
+    overflow: "hidden",
     width: 40,
     ...megrumShadow,
+  },
+  settingsButtonFallback: {
+    backgroundColor: "rgba(255,255,255,0.86)",
   },
   groomRail: {
     gap: 11,
@@ -4641,19 +4705,22 @@ const styles = StyleSheet.create({
   },
   groomCameraCloseButton: {
     alignItems: "center",
-    backgroundColor: "rgba(5,8,13,0.38)",
     borderRadius: 999,
     height: 46,
     justifyContent: "center",
+    overflow: "hidden",
     width: 46,
   },
   groomCameraTopButton: {
     alignItems: "center",
-    backgroundColor: "rgba(5,8,13,0.38)",
     borderRadius: 999,
     height: 46,
     justifyContent: "center",
+    overflow: "hidden",
     width: 46,
+  },
+  groomCameraDarkGlassFallback: {
+    backgroundColor: "rgba(5,8,13,0.38)",
   },
   groomCameraFlipText: {
     color: "#fff",
@@ -4711,11 +4778,14 @@ const styles = StyleSheet.create({
   },
   groomCameraShutter: {
     alignItems: "center",
-    backgroundColor: "rgba(255,255,255,0.34)",
     borderRadius: 999,
     height: 108,
     justifyContent: "center",
+    overflow: "hidden",
     width: 108,
+  },
+  groomCameraShutterFallback: {
+    backgroundColor: "rgba(255,255,255,0.34)",
   },
   groomCameraShutterInner: {
     alignItems: "center",
@@ -4825,17 +4895,22 @@ const styles = StyleSheet.create({
   },
   groomStoryToolButton: {
     alignItems: "center",
-    backgroundColor: "rgba(5,8,13,0.34)",
     borderColor: "rgba(255,255,255,0.22)",
     borderRadius: 999,
     borderWidth: 1,
     height: 42,
     justifyContent: "center",
+    overflow: "hidden",
     width: 42,
   },
   groomStoryToolButtonActive: {
-    backgroundColor: "rgba(255,255,255,0.24)",
     borderColor: "rgba(255,255,255,0.7)",
+  },
+  groomStoryToolFallback: {
+    backgroundColor: "rgba(5,8,13,0.34)",
+  },
+  groomStoryToolActiveFallback: {
+    backgroundColor: "rgba(255,255,255,0.24)",
   },
   groomStoryToolText: {
     color: "#fff",
@@ -5030,12 +5105,15 @@ const styles = StyleSheet.create({
   },
   groomStoryRetakeButton: {
     alignItems: "center",
-    backgroundColor: "rgba(255,255,255,0.16)",
     borderColor: "rgba(255,255,255,0.26)",
     borderRadius: 999,
     borderWidth: 1,
     flex: 1,
+    overflow: "hidden",
     paddingVertical: 13,
+  },
+  groomStoryRetakeFallback: {
+    backgroundColor: "rgba(255,255,255,0.16)",
   },
   groomStoryRetakeText: {
     color: "#fff",
@@ -5044,10 +5122,13 @@ const styles = StyleSheet.create({
   },
   groomStoryPublishButton: {
     alignItems: "center",
-    backgroundColor: "#fff",
     borderRadius: 999,
     flex: 1,
+    overflow: "hidden",
     paddingVertical: 13,
+  },
+  groomStoryPublishFallback: {
+    backgroundColor: "#fff",
   },
   groomStoryPublishText: {
     color: megrumColors.ink,
@@ -5567,16 +5648,21 @@ const styles = StyleSheet.create({
   },
   threadFab: {
     alignItems: "center",
-    backgroundColor: megrumColors.lavender,
+    borderColor: "rgba(255,255,255,0.62)",
+    borderWidth: 1,
     borderRadius: megrumRadii.pill,
     flexDirection: "row",
     gap: 5,
+    overflow: "hidden",
     paddingHorizontal: 15,
     paddingVertical: 12,
     position: "absolute",
     right: 16,
     zIndex: 24,
     ...megrumShadow,
+  },
+  threadFabFallback: {
+    backgroundColor: megrumColors.lavender,
   },
   threadFabText: {
     color: "#fff",

@@ -8,8 +8,6 @@ import {
   type ReactNode,
 } from "react";
 import { router } from "expo-router";
-import { BlurView } from "expo-blur";
-import type { GlassViewProps } from "expo-glass-effect";
 import type { SFSymbol, SymbolViewProps } from "expo-symbols";
 import {
   ActionSheetIOS,
@@ -34,6 +32,7 @@ import { Screen } from "../../src/components/Screen";
 import { HomeFeedSkeleton } from "../../src/components/SkeletonScreen";
 import { useAuth } from "../../src/auth/AuthProvider";
 import { IconSymbol, type IconSymbolName } from "../../src/components/IconSymbol";
+import { LiquidGlassSurface } from "../../src/components/LiquidGlass";
 import { useProfileDrawer } from "../../src/components/ProfileDrawerContext";
 import { hasSupabaseConfig, supabase } from "../../src/lib/supabase";
 import {
@@ -260,35 +259,12 @@ function relativeHomeGroomTimeLabel(value: string) {
   return "昨日";
 }
 
-type GlassEffectModule = {
-  GlassView: ComponentType<GlassViewProps>;
-};
-
 type SymbolModule = {
   SymbolView: ComponentType<SymbolViewProps>;
 };
 
-let cachedGlassView: ComponentType<GlassViewProps> | null | undefined;
 let cachedSymbolView: ComponentType<SymbolViewProps> | null | undefined;
 const ENABLE_NATIVE_HOME_EFFECTS = false;
-
-function getIOSGlassView() {
-  if (!ENABLE_NATIVE_HOME_EFFECTS) {
-    return null;
-  }
-  if (Platform.OS !== "ios") {
-    return null;
-  }
-  if (cachedGlassView !== undefined) {
-    return cachedGlassView;
-  }
-  try {
-    cachedGlassView = (require("expo-glass-effect") as GlassEffectModule).GlassView;
-  } catch {
-    cachedGlassView = null;
-  }
-  return cachedGlassView;
-}
 
 function getIOSSFSymbolView() {
   if (!ENABLE_NATIVE_HOME_EFFECTS) {
@@ -1363,34 +1339,20 @@ function FloatingHomeActionButton({
 }
 
 function HomeActionGlass({ active }: { active: boolean }) {
-  const GlassView = getIOSGlassView();
-  if (GlassView) {
-    return (
-      <GlassView
-        colorScheme="light"
-        glassEffectStyle={{
-          style: active ? "regular" : "clear",
-          animate: true,
-          animationDuration: 0.2,
-        }}
-        isInteractive
-        pointerEvents="none"
-        style={StyleSheet.absoluteFillObject}
-        tintColor={active ? "rgba(166,149,216,0.24)" : "rgba(255,255,255,0.12)"}
-      />
-    );
-  }
-  if (Platform.OS === "ios" && ENABLE_NATIVE_HOME_EFFECTS) {
-    return (
-      <BlurView
-        intensity={54}
-        pointerEvents="none"
-        style={StyleSheet.absoluteFillObject}
-        tint="systemThinMaterialLight"
-      />
-    );
-  }
-  return <View pointerEvents="none" style={styles.homeActionFallbackGlass} />;
+  return (
+    <LiquidGlassSurface
+      glassEffectStyle={{
+        style: active ? "regular" : "clear",
+        animate: true,
+        animationDuration: 0.2,
+      }}
+      isInteractive
+      pointerEvents="none"
+      style={StyleSheet.absoluteFillObject}
+      fallbackStyle={styles.homeActionFallbackGlass}
+      tintColor={active ? "rgba(166,149,216,0.24)" : "rgba(255,255,255,0.12)"}
+    />
+  );
 }
 
 function NativeHomeActionSymbol({
@@ -1447,6 +1409,13 @@ function FloatingSearchButton() {
       onPress={() => router.push("/search")}
       style={styles.floatingSearchButton}
     >
+      <LiquidGlassSurface
+        isInteractive
+        pointerEvents="none"
+        style={StyleSheet.absoluteFillObject}
+        fallbackStyle={styles.floatingSearchFallback}
+        tintColor="rgba(255,255,255,0.26)"
+      />
       <IconSymbol name="search" size={24} color={megrumColors.ink} />
     </Pressable>
   );
@@ -3119,7 +3088,6 @@ const styles = StyleSheet.create({
   },
   floatingSearchButton: {
     alignItems: "center",
-    backgroundColor: "rgba(255,255,255,0.90)",
     borderColor: "rgba(255,255,255,0.86)",
     borderRadius: 999,
     borderWidth: 1,
@@ -3134,6 +3102,10 @@ const styles = StyleSheet.create({
     shadowRadius: 22,
     width: 54,
     zIndex: 20,
+    overflow: "hidden",
+  },
+  floatingSearchFallback: {
+    backgroundColor: "rgba(255,255,255,0.9)",
   },
   homeActionButton: {
     alignItems: "center",
