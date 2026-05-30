@@ -156,6 +156,7 @@ type SearchMemberOption = {
 type SearchMasterFilterData = {
   genres: SearchGenreOption[];
   goodsTypes: string[];
+  groupTags: Record<string, string[]>;
   groups: SearchGroupOption[];
   members: SearchMemberOption[];
   tags: string[];
@@ -187,6 +188,7 @@ const DEFAULT_GOODS_TYPES = [
 const EMPTY_MASTER_FILTERS: SearchMasterFilterData = {
   genres: [],
   goodsTypes: DEFAULT_GOODS_TYPES,
+  groupTags: {},
   groups: [],
   members: [],
   tags: [],
@@ -292,6 +294,11 @@ const PREVIEW_MASTER_FILTERS: SearchMasterFilterData = {
     { groupId: "preview-group-svt", groupName: "SEVENTEEN", id: "preview-member-mingyu", name: "ミンギュ" },
   ],
   goodsTypes: DEFAULT_GOODS_TYPES,
+  groupTags: {
+    LUMENA: ["春ver.", "同種優先"],
+    aespa: ["制服", "現地OK"],
+    SEVENTEEN: ["会場限定"],
+  },
   tags: ["春ver.", "会場限定", "同種優先", "制服", "現地OK"],
 };
 
@@ -791,91 +798,103 @@ function SearchFilterSheet({
 }) {
   const [groupPickerOpen, setGroupPickerOpen] = useState(false);
   return (
-    <>
-      <Modal animationType="slide" transparent visible={open} onRequestClose={onClose}>
-        <View style={styles.filterSheetRoot}>
-          <Pressable style={styles.filterSheetBackdrop} onPress={onClose} />
-          <View style={styles.filterSheet}>
-            <View style={styles.filterSheetHeader}>
-              <Text style={styles.filterSheetTitle}>検索フィルター</Text>
-              <Pressable accessibilityRole="button" onPress={onReset} style={styles.filterReset}>
-                <Text style={styles.filterResetText}>リセット</Text>
+    <Modal animationType="slide" transparent visible={open} onRequestClose={onClose}>
+      <View style={styles.filterSheetRoot}>
+        <Pressable style={styles.filterSheetBackdrop} onPress={onClose} />
+        <View
+          style={[
+            styles.filterSheet,
+            groupPickerOpen ? styles.filterSheetPickerMode : null,
+          ]}
+        >
+          {groupPickerOpen ? (
+            <GroupFilterPickerPanel
+              active={filters.groups}
+              genres={genres}
+              groups={groupOptions}
+              loading={loadingMasters}
+              onClose={() => setGroupPickerOpen(false)}
+              onSetGroups={onSetGroups}
+            />
+          ) : (
+            <>
+              <View style={styles.filterSheetHeader}>
+                <Text style={styles.filterSheetTitle}>検索フィルター</Text>
+                <Pressable accessibilityRole="button" onPress={onReset} style={styles.filterReset}>
+                  <Text style={styles.filterResetText}>リセット</Text>
+                </Pressable>
+              </View>
+              <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.filterSheetContent}>
+                <FilterGroupSelector
+                  active={filters.groups}
+                  loading={loadingMasters}
+                  onOpen={() => setGroupPickerOpen(true)}
+                  onRemove={(value) => onToggle("groups", value)}
+                  title="グループ"
+                />
+                {filters.groups.length > 0 ? (
+                  <FilterChipGroup
+                    active={filters.members}
+                    empty="選んだグループに紐づくメンバーがありません"
+                    filterKey="members"
+                    options={options.members}
+                    title="メンバー"
+                    onToggle={onToggle}
+                  />
+                ) : null}
+                <FilterChipGroup
+                  active={filters.goodsTypes}
+                  filterKey="goodsTypes"
+                  options={options.goodsTypes}
+                  title="グッズ種別"
+                  onToggle={onToggle}
+                />
+                <FilterDateDisclosure
+                  active={filters.meetupDates}
+                  title="現地交換日付"
+                  dates={buildMeetupDateOptions()}
+                  onToggle={(value) => onToggle("meetupDates", value)}
+                />
+                <FilterOptionDisclosure
+                  active={filters.meetupPlaces}
+                  filterKey="meetupPlaces"
+                  options={options.meetupPlaces}
+                  title="現地交換場所"
+                  onToggle={onToggle}
+                />
+                <FilterChipGroup
+                  active={filters.optionTags}
+                  filterKey="optionTags"
+                  options={options.optionTags}
+                  title="交換条件タグ"
+                  onToggle={onToggle}
+                />
+                {filters.groups.length > 0 ? (
+                  <FilterChipGroup
+                    active={filters.tags}
+                    empty="選んだグループでよく使われるタグがありません"
+                    filterKey="tags"
+                    options={options.tags}
+                    title="グッズタグ"
+                    onToggle={onToggle}
+                  />
+                ) : null}
+                <FilterChipGroup
+                  active={filters.exchangeMethods}
+                  filterKey="exchangeMethods"
+                  options={options.exchangeMethods}
+                  title="交換手段"
+                  onToggle={onToggle}
+                />
+              </ScrollView>
+              <Pressable accessibilityRole="button" onPress={onClose} style={styles.filterApply}>
+                <Text style={styles.filterApplyText}>結果を見る</Text>
               </Pressable>
-            </View>
-            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.filterSheetContent}>
-              <FilterGroupSelector
-                active={filters.groups}
-                loading={loadingMasters}
-                onOpen={() => setGroupPickerOpen(true)}
-                onRemove={(value) => onToggle("groups", value)}
-                title="グループ"
-              />
-              <FilterChipGroup
-                active={filters.members}
-                empty={filters.groups.length > 0 ? "選んだグループに紐づくメンバーがありません" : undefined}
-                filterKey="members"
-                options={options.members}
-                title="メンバー"
-                onToggle={onToggle}
-              />
-              <FilterChipGroup
-                active={filters.goodsTypes}
-                filterKey="goodsTypes"
-                options={options.goodsTypes}
-                title="グッズ種別"
-                onToggle={onToggle}
-              />
-              <FilterDateCalendar
-                active={filters.meetupDates}
-                title="現地交換日付"
-                dates={buildMeetupDateOptions()}
-                onToggle={(value) => onToggle("meetupDates", value)}
-              />
-              <FilterChipGroup
-                active={filters.meetupPlaces}
-                filterKey="meetupPlaces"
-                options={options.meetupPlaces}
-                title="現地交換場所"
-                onToggle={onToggle}
-              />
-              <FilterChipGroup
-                active={filters.optionTags}
-                filterKey="optionTags"
-                options={options.optionTags}
-                title="交換条件タグ"
-                onToggle={onToggle}
-              />
-              <FilterChipGroup
-                active={filters.tags}
-                filterKey="tags"
-                options={options.tags}
-                title="グッズタグ"
-                onToggle={onToggle}
-              />
-              <FilterChipGroup
-                active={filters.exchangeMethods}
-                filterKey="exchangeMethods"
-                options={options.exchangeMethods}
-                title="交換手段"
-                onToggle={onToggle}
-              />
-            </ScrollView>
-            <Pressable accessibilityRole="button" onPress={onClose} style={styles.filterApply}>
-              <Text style={styles.filterApplyText}>結果を見る</Text>
-            </Pressable>
-          </View>
+            </>
+          )}
         </View>
-      </Modal>
-      <GroupFilterPickerModal
-        active={filters.groups}
-        genres={genres}
-        groups={groupOptions}
-        loading={loadingMasters}
-        onClose={() => setGroupPickerOpen(false)}
-        onSetGroups={onSetGroups}
-        open={groupPickerOpen}
-      />
-    </>
+      </View>
+    </Modal>
   );
 }
 
@@ -924,14 +943,13 @@ function FilterGroupSelector({
   );
 }
 
-function GroupFilterPickerModal({
+function GroupFilterPickerPanel({
   active,
   genres,
   groups,
   loading,
   onClose,
   onSetGroups,
-  open,
 }: {
   active: string[];
   genres: SearchGenreOption[];
@@ -939,7 +957,6 @@ function GroupFilterPickerModal({
   loading: boolean;
   onClose: () => void;
   onSetGroups: (groups: string[]) => void;
-  open: boolean;
 }) {
   const [activeGenre, setActiveGenre] = useState("all");
   const [query, setQuery] = useState("");
@@ -966,87 +983,76 @@ function GroupFilterPickerModal({
   }
 
   return (
-    <Modal
-      animationType={Platform.OS === "ios" ? "slide" : "fade"}
-      presentationStyle={Platform.OS === "ios" ? "pageSheet" : "overFullScreen"}
-      transparent={Platform.OS !== "ios"}
-      visible={open}
-      onRequestClose={onClose}
-    >
-      <View style={[styles.groupPickerRoot, Platform.OS === "ios" ? styles.groupPickerNativeRoot : null]}>
-        {Platform.OS !== "ios" ? <Pressable style={styles.groupPickerBackdrop} onPress={onClose} /> : null}
-        <View style={[styles.groupPickerPanel, Platform.OS === "ios" ? styles.groupPickerNativePanel : null]}>
-          <View style={styles.groupPickerHeader}>
-            <View>
-              <Text style={styles.groupPickerTitle}>グループを選ぶ</Text>
-              <Text style={styles.groupPickerSub}>推し登録と同じ候補から選択します</Text>
-            </View>
-            <Pressable accessibilityRole="button" onPress={onClose} style={styles.groupPickerClose}>
-              <Text style={styles.groupPickerCloseText}>完了</Text>
-            </Pressable>
-          </View>
-          <TextInput
-            autoCapitalize="none"
-            placeholder="推しを検索"
-            placeholderTextColor="rgba(58,50,74,0.36)"
-            returnKeyType="search"
-            style={styles.groupPickerSearch}
-            value={query}
-            onChangeText={setQuery}
-          />
-          <ScrollView
-            horizontal
-            keyboardShouldPersistTaps="handled"
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.groupPickerGenres}
-          >
-            <FilterSmallChip
-              active={activeGenre === "all"}
-              label="すべて"
-              onPress={() => setActiveGenre("all")}
-            />
-            {genres.map((genre) => (
-              <FilterSmallChip
-                active={activeGenre === genre.id}
-                key={genre.id}
-                label={genre.name}
-                onPress={() => setActiveGenre(genre.id)}
-              />
-            ))}
-          </ScrollView>
-          {loading ? <ActivityIndicator color={megrumColors.lavender} /> : null}
-          <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.groupPickerList}>
-            {filtered.map((group) => {
-              const selected = activeSet.has(group.name);
-              return (
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityState={{ selected }}
-                  key={group.id}
-                  onPress={() => toggleGroup(group.name)}
-                  style={[styles.groupPickerCard, selected ? styles.groupPickerCardActive : null]}
-                >
-                  <View style={styles.groupPickerCardCopy}>
-                    <Text numberOfLines={1} style={styles.groupPickerCardTitle}>
-                      {group.name}
-                    </Text>
-                    <Text numberOfLines={1} style={styles.groupPickerCardMeta}>
-                      {group.mine ? "自分の推し" : group.genreName ?? "マスタ登録済み"}
-                    </Text>
-                  </View>
-                  <Text style={[styles.groupPickerCheck, selected ? styles.groupPickerCheckActive : null]}>
-                    {selected ? "✓" : "+"}
-                  </Text>
-                </Pressable>
-              );
-            })}
-            {!loading && filtered.length === 0 ? (
-              <Text style={styles.filterGroupEmpty}>該当するグループがありません</Text>
-            ) : null}
-          </ScrollView>
+    <View style={styles.groupPickerInline}>
+      <View style={styles.groupPickerHeader}>
+        <View>
+          <Text style={styles.groupPickerTitle}>グループを選ぶ</Text>
+          <Text style={styles.groupPickerSub}>推し登録と同じ候補から選択します</Text>
         </View>
+        <Pressable accessibilityRole="button" onPress={onClose} style={styles.groupPickerClose}>
+          <Text style={styles.groupPickerCloseText}>完了</Text>
+        </Pressable>
       </View>
-    </Modal>
+      <TextInput
+        autoCapitalize="none"
+        placeholder="推しを検索"
+        placeholderTextColor="rgba(58,50,74,0.36)"
+        returnKeyType="search"
+        style={styles.groupPickerSearch}
+        value={query}
+        onChangeText={setQuery}
+      />
+      <ScrollView
+        horizontal
+        keyboardShouldPersistTaps="handled"
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.groupPickerGenres}
+      >
+        <FilterSmallChip
+          active={activeGenre === "all"}
+          label="すべて"
+          onPress={() => setActiveGenre("all")}
+        />
+        {genres.map((genre) => (
+          <FilterSmallChip
+            active={activeGenre === genre.id}
+            key={genre.id}
+            label={genre.name}
+            onPress={() => setActiveGenre(genre.id)}
+          />
+        ))}
+      </ScrollView>
+      {loading ? <ActivityIndicator color={megrumColors.lavender} /> : null}
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.groupPickerList}>
+        {filtered.map((group) => {
+          const selected = activeSet.has(group.name);
+          return (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityState={{ selected }}
+              key={group.id}
+              onPress={() => toggleGroup(group.name)}
+              style={[styles.groupPickerCard, selected ? styles.groupPickerCardActive : null]}
+            >
+              <View style={styles.groupPickerCardCopy}>
+                <Text numberOfLines={1} style={styles.groupPickerCardTitle}>
+                  {group.name}
+                </Text>
+                <Text numberOfLines={1} style={styles.groupPickerCardMeta}>
+                  {group.mine ? "自分の推し" : group.genreName ?? "マスタ登録済み"}
+                </Text>
+              </View>
+              <Text style={[styles.groupPickerCheck, selected ? styles.groupPickerCheckActive : null]}>
+                {selected ? "✓" : "+"}
+              </Text>
+            </Pressable>
+          );
+        })}
+        {!loading && filtered.length === 0 ? (
+          <Text style={styles.filterGroupEmpty}>該当するグループがありません</Text>
+        ) : null}
+      </ScrollView>
+    </View>
   );
 }
 
@@ -1073,7 +1079,7 @@ function FilterSmallChip({
   );
 }
 
-function FilterDateCalendar({
+function FilterDateDisclosure({
   active,
   dates,
   onToggle,
@@ -1084,52 +1090,147 @@ function FilterDateCalendar({
   onToggle: (value: string) => void;
   title: string;
 }) {
+  const [open, setOpen] = useState(false);
   return (
     <View style={styles.filterGroup}>
-      <Text style={styles.filterGroupTitle}>{title}</Text>
-      <View style={styles.filterCalendarGrid}>
-        {dates.map((date) => {
-          const selected = active.includes(date.value);
-          return (
-            <Pressable
-              accessibilityRole="button"
-              accessibilityState={{ selected }}
-              key={date.value}
-              onPress={() => onToggle(date.value)}
-              style={[
-                styles.filterDateCell,
-                selected ? styles.filterDateCellActive : null,
-              ]}
-            >
-              <Text
-                style={[
-                  styles.filterDateMonth,
-                  selected ? styles.filterDateTextActive : null,
-                ]}
-              >
-                {date.month}
-              </Text>
-              <Text
-                style={[
-                  styles.filterDateDay,
-                  selected ? styles.filterDateTextActive : null,
-                ]}
-              >
-                {date.day}
-              </Text>
-              <Text
-                style={[
-                  styles.filterDateWeekday,
-                  selected ? styles.filterDateTextActive : null,
-                ]}
-              >
-                {date.weekday}
-              </Text>
-            </Pressable>
-          );
-        })}
-      </View>
+      <FilterDisclosureHeader
+        count={active.length}
+        open={open}
+        title={title}
+        onPress={() => setOpen((current) => !current)}
+      />
+      {open ? (
+        <View style={styles.filterFloatingPanel}>
+          <View style={styles.filterCalendarGrid}>
+            {dates.map((date) => {
+              const selected = active.includes(date.value);
+              return (
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityState={{ selected }}
+                  key={date.value}
+                  onPress={() => onToggle(date.value)}
+                  style={[
+                    styles.filterDateCell,
+                    selected ? styles.filterDateCellActive : null,
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.filterDateMonth,
+                      selected ? styles.filterDateTextActive : null,
+                    ]}
+                  >
+                    {date.month}
+                  </Text>
+                  <Text
+                    style={[
+                      styles.filterDateDay,
+                      selected ? styles.filterDateTextActive : null,
+                    ]}
+                  >
+                    {date.day}
+                  </Text>
+                  <Text
+                    style={[
+                      styles.filterDateWeekday,
+                      selected ? styles.filterDateTextActive : null,
+                    ]}
+                  >
+                    {date.weekday}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        </View>
+      ) : null}
     </View>
+  );
+}
+
+function FilterOptionDisclosure({
+  active,
+  filterKey,
+  onToggle,
+  options,
+  title,
+}: {
+  active: string[];
+  filterKey: keyof SearchFilterState;
+  onToggle: (key: keyof SearchFilterState, value: string) => void;
+  options: string[];
+  title: string;
+}) {
+  const [open, setOpen] = useState(false);
+  return (
+    <View style={styles.filterGroup}>
+      <FilterDisclosureHeader
+        count={active.length}
+        open={open}
+        title={title}
+        onPress={() => setOpen((current) => !current)}
+      />
+      {open ? (
+        <View style={styles.filterFloatingPanel}>
+          <View style={styles.filterGroupChips}>
+            {options.map((value) => {
+              const selected = active.includes(value);
+              return (
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityState={{ selected }}
+                  key={value}
+                  onPress={() => onToggle(filterKey, value)}
+                  style={[styles.filterChipOption, selected ? styles.filterChipOptionActive : null]}
+                >
+                  <Text
+                    style={[
+                      styles.filterChipOptionText,
+                      selected ? styles.filterChipOptionTextActive : null,
+                    ]}
+                  >
+                    {value}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        </View>
+      ) : null}
+    </View>
+  );
+}
+
+function FilterDisclosureHeader({
+  count,
+  onPress,
+  open,
+  title,
+}: {
+  count: number;
+  onPress: () => void;
+  open: boolean;
+  title: string;
+}) {
+  return (
+    <Pressable
+      accessibilityLabel={`${title}を${open ? "閉じる" : "選択する"}`}
+      accessibilityRole="button"
+      onPress={onPress}
+      style={({ pressed }) => [
+        styles.filterDisclosureRow,
+        pressed ? styles.pressed : null,
+      ]}
+    >
+      <Text style={styles.filterDisclosureTitle}>{title}</Text>
+      <View style={styles.filterDisclosureRight}>
+        <Text style={[styles.filterDisclosureValue, count > 0 ? styles.filterDisclosureValueActive : null]}>
+          {count > 0 ? `（${count}件）` : "（選択）"}
+        </Text>
+        <Text style={styles.filterDisclosureChevron}>{open ? "⌃" : "⌄"}</Text>
+      </View>
+    </Pressable>
   );
 }
 
@@ -1184,7 +1285,7 @@ function FilterChipGroup({
 
 async function fetchSearchMasterFilters(userId: string): Promise<SearchMasterFilterData> {
   if (!supabase) return EMPTY_MASTER_FILTERS;
-  const [genreRes, groupRes, oshiRes, memberRes, goodsTypeRes, tagRes] = await Promise.all([
+  const [genreRes, groupRes, oshiRes, memberRes, goodsTypeRes] = await Promise.all([
     supabase
       .from("genres_master")
       .select("id, name, display_order")
@@ -1208,10 +1309,6 @@ async function fetchSearchMasterFilters(userId: string): Promise<SearchMasterFil
       .from("goods_types_master")
       .select("id, name, display_order")
       .order("display_order", { ascending: true }),
-    supabase.rpc("search_tags", {
-      p_q: "",
-      p_limit: 24,
-    }),
   ]);
 
   const myGroupIds = new Set(
@@ -1268,18 +1365,71 @@ async function fetchSearchMasterFilters(userId: string): Promise<SearchMasterFil
       .map((row) => row.name?.trim() ?? "")
       .filter(Boolean);
 
-  const tags =
-    ((tagRes.data as TagSearchRow[] | null) ?? [])
-      .map((row) => row.label?.trim() ?? "")
-      .filter(Boolean);
+  const groupTags = await fetchSearchGroupTags(groups);
+  const tags = uniqueSearchOptions(Object.values(groupTags).flat());
 
   return {
     genres,
     groups,
     members,
     goodsTypes: uniqueSearchOptions([...goodsTypes, ...DEFAULT_GOODS_TYPES]),
+    groupTags,
     tags,
   };
+}
+
+async function fetchSearchGroupTags(groups: SearchGroupOption[]) {
+  const result: Record<string, string[]> = {};
+  if (!supabase || groups.length === 0) return result;
+  const groupById = new Map(groups.map((group) => [group.id, group]));
+  const { data: inventoryRows, error: inventoryError } = await supabase
+    .from("goods_inventory")
+    .select("id, group_id")
+    .in("group_id", Array.from(groupById.keys()))
+    .in("status", ["active", "reserved", "keep"])
+    .limit(1600);
+  if (inventoryError) return result;
+
+  const inventoryToGroup = new Map<string, string>();
+  for (const row of (inventoryRows as { id?: string | null; group_id?: string | null }[] | null) ?? []) {
+    if (!row.id || !row.group_id) continue;
+    inventoryToGroup.set(row.id, row.group_id);
+  }
+  if (inventoryToGroup.size === 0) return result;
+
+  const { data: tagRows, error: tagError } = await supabase
+    .from("goods_inventory_tags")
+    .select("inventory_id, tag:tags_master(label)")
+    .in("inventory_id", Array.from(inventoryToGroup.keys()))
+    .limit(3200);
+  if (tagError) return result;
+
+  const countsByGroup = new Map<string, Map<string, number>>();
+  for (const row of (tagRows as { inventory_id?: string | null; tag?: unknown }[] | null) ?? []) {
+    if (!row.inventory_id) continue;
+    const groupId = inventoryToGroup.get(row.inventory_id);
+    if (!groupId) continue;
+    const rawTag = Array.isArray(row.tag) ? row.tag[0] : row.tag;
+    const label =
+      rawTag && typeof rawTag === "object" && "label" in rawTag
+        ? String(rawTag.label ?? "").trim()
+        : "";
+    if (!label) continue;
+    const groupCounts = countsByGroup.get(groupId) ?? new Map<string, number>();
+    groupCounts.set(label, (groupCounts.get(label) ?? 0) + 1);
+    countsByGroup.set(groupId, groupCounts);
+  }
+
+  for (const [groupId, tagCounts] of countsByGroup.entries()) {
+    const group = groupById.get(groupId);
+    if (!group) continue;
+    result[group.name] = Array.from(tagCounts.entries())
+      .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], "ja"))
+      .slice(0, 20)
+      .map(([label]) => label);
+  }
+
+  return result;
 }
 
 async function fetchSearchHits(userId: string, q: string): Promise<SearchHit[]> {
@@ -1660,10 +1810,14 @@ function mergeSearchFilterOptions(
   const selectedGroups = new Set(activeFilters.groups);
   const linkedMembers = masterOptions.members
     .filter((member) => {
-      if (selectedGroups.size === 0) return true;
+      if (selectedGroups.size === 0) return false;
       return !!member.groupName && selectedGroups.has(member.groupName);
     })
     .map((member) => member.name);
+  const linkedTags =
+    selectedGroups.size === 0
+      ? []
+      : Array.from(selectedGroups).flatMap((group) => masterOptions.groupTags[group] ?? []);
 
   return {
     groups: uniqueSearchOptions([
@@ -1674,7 +1828,6 @@ function mergeSearchFilterOptions(
     members: uniqueSearchOptions([
       ...activeFilters.members,
       ...linkedMembers,
-      ...hitOptions.members,
     ]),
     goodsTypes: uniqueSearchOptions([
       ...activeFilters.goodsTypes,
@@ -1687,9 +1840,8 @@ function mergeSearchFilterOptions(
     optionTags: DEFAULT_OPTION_TAGS,
     tags: uniqueSearchOptions([
       ...activeFilters.tags,
-      ...masterOptions.tags,
-      ...hitOptions.tags,
-    ]),
+      ...linkedTags,
+    ]).slice(0, 20),
     exchangeMethods: EXCHANGE_FILTERS,
   };
 }
@@ -1860,16 +2012,20 @@ function normalizeSearchFilters(
   filters: SearchFilterState,
   masterOptions: SearchMasterFilterData,
 ): SearchFilterState {
-  if (filters.groups.length === 0) return filters;
+  if (filters.groups.length === 0) return { ...filters, members: [], tags: [] };
   const selectedGroups = new Set(filters.groups);
   const allowedMembers = new Set(
     masterOptions.members
       .filter((member) => !!member.groupName && selectedGroups.has(member.groupName))
       .map((member) => member.name),
   );
+  const allowedTags = new Set(
+    Array.from(selectedGroups).flatMap((group) => masterOptions.groupTags[group] ?? []),
+  );
   return {
     ...filters,
     members: filters.members.filter((member) => allowedMembers.has(member)),
+    tags: filters.tags.filter((tag) => allowedTags.has(tag)),
   };
 }
 
@@ -2132,6 +2288,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 18,
     paddingTop: 16,
   },
+  filterSheetPickerMode: {
+    maxHeight: "90%",
+  },
   filterSheetHeader: {
     alignItems: "center",
     flexDirection: "row",
@@ -2146,20 +2305,20 @@ const styles = StyleSheet.create({
   filterReset: {
     backgroundColor: "rgba(58,50,74,0.06)",
     borderRadius: megrumRadii.pill,
-    paddingHorizontal: 11,
-    paddingVertical: 7,
+    paddingHorizontal: 13,
+    paddingVertical: 8,
   },
   filterResetText: {
     color: megrumColors.mutedInk,
-    fontSize: 11,
+    fontSize: 12.5,
     fontWeight: "900",
   },
   filterSheetContent: {
-    gap: 15,
+    gap: 17,
     paddingBottom: 16,
   },
   filterGroup: {
-    gap: 8,
+    gap: 9,
   },
   filterGroupHeader: {
     alignItems: "center",
@@ -2168,19 +2327,19 @@ const styles = StyleSheet.create({
   },
   filterGroupTitle: {
     color: megrumColors.ink,
-    fontSize: 13,
+    fontSize: 14.5,
     fontWeight: "900",
   },
   filterGroupEmpty: {
     color: megrumColors.mutedInk,
-    fontSize: 11,
+    fontSize: 12.5,
     fontWeight: "800",
-    lineHeight: 16,
+    lineHeight: 18,
   },
   filterGroupChips: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 7,
+    gap: 8,
   },
   filterPickerButton: {
     alignItems: "center",
@@ -2190,13 +2349,13 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     flexDirection: "row",
     justifyContent: "space-between",
-    minHeight: 48,
-    paddingHorizontal: 14,
-    paddingVertical: 11,
+    minHeight: 54,
+    paddingHorizontal: 15,
+    paddingVertical: 13,
   },
   filterPickerButtonText: {
     color: megrumColors.ink,
-    fontSize: 12.5,
+    fontSize: 14,
     fontWeight: "900",
   },
   filterPickerChevron: {
@@ -2208,18 +2367,18 @@ const styles = StyleSheet.create({
   filterCalendarGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 7,
+    gap: 8,
   },
   filterDateCell: {
     alignItems: "center",
     backgroundColor: megrumColors.surface,
     borderColor: "rgba(58,50,74,0.08)",
-    borderRadius: 14,
+    borderRadius: 15,
     borderWidth: 1,
-    minHeight: 58,
-    paddingHorizontal: 7,
-    paddingVertical: 7,
-    width: 58,
+    minHeight: 64,
+    paddingHorizontal: 8,
+    paddingVertical: 8,
+    width: 62,
   },
   filterDateCellActive: {
     backgroundColor: "rgba(166,149,216,0.16)",
@@ -2227,19 +2386,19 @@ const styles = StyleSheet.create({
   },
   filterDateMonth: {
     color: megrumColors.mutedInk,
-    fontSize: 8.5,
+    fontSize: 9.5,
     fontWeight: "800",
   },
   filterDateDay: {
     color: megrumColors.ink,
-    fontSize: 15,
+    fontSize: 17,
     fontWeight: "900",
-    lineHeight: 18,
+    lineHeight: 20,
     marginTop: 1,
   },
   filterDateWeekday: {
     color: megrumColors.mutedInk,
-    fontSize: 9,
+    fontSize: 10,
     fontWeight: "900",
   },
   filterDateTextActive: {
@@ -2250,8 +2409,9 @@ const styles = StyleSheet.create({
     borderColor: "rgba(58,50,74,0.08)",
     borderRadius: megrumRadii.pill,
     borderWidth: 1,
-    paddingHorizontal: 11,
-    paddingVertical: 7,
+    minHeight: 38,
+    paddingHorizontal: 13,
+    paddingVertical: 9,
   },
   filterChipOptionActive: {
     backgroundColor: "rgba(166,149,216,0.16)",
@@ -2259,7 +2419,7 @@ const styles = StyleSheet.create({
   },
   filterChipOptionText: {
     color: megrumColors.ink,
-    fontSize: 11,
+    fontSize: 12.5,
     fontWeight: "900",
   },
   filterChipOptionTextActive: {
@@ -2273,8 +2433,56 @@ const styles = StyleSheet.create({
   },
   filterApplyText: {
     color: megrumColors.surface,
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: "900",
+  },
+  filterDisclosureRow: {
+    alignItems: "center",
+    backgroundColor: megrumColors.surface,
+    borderColor: "rgba(58,50,74,0.10)",
+    borderRadius: 17,
+    borderWidth: 1,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    minHeight: 56,
+    paddingHorizontal: 15,
+    paddingVertical: 13,
+  },
+  filterDisclosureTitle: {
+    color: megrumColors.ink,
+    flex: 1,
+    fontSize: 14.5,
+    fontWeight: "900",
+  },
+  filterDisclosureRight: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 8,
+  },
+  filterDisclosureValue: {
+    color: megrumColors.mutedInk,
+    fontSize: 12.5,
+    fontWeight: "900",
+  },
+  filterDisclosureValueActive: {
+    color: megrumColors.lavender,
+  },
+  filterDisclosureChevron: {
+    color: megrumColors.mutedInk,
+    fontSize: 17,
+    fontWeight: "900",
+    lineHeight: 18,
+  },
+  filterFloatingPanel: {
+    backgroundColor: "rgba(255,255,255,0.94)",
+    borderColor: "rgba(255,255,255,0.86)",
+    borderRadius: 22,
+    borderWidth: 1,
+    padding: 12,
+    shadowColor: megrumColors.ink,
+    shadowOffset: { width: 0, height: 14 },
+    shadowOpacity: 0.12,
+    shadowRadius: 22,
   },
   groupPickerRoot: {
     backgroundColor: "rgba(20,16,29,0.34)",
@@ -2307,6 +2515,9 @@ const styles = StyleSheet.create({
     maxHeight: "100%",
     paddingTop: 18,
   },
+  groupPickerInline: {
+    minHeight: 520,
+  },
   groupPickerHeader: {
     alignItems: "center",
     flexDirection: "row",
@@ -2320,7 +2531,7 @@ const styles = StyleSheet.create({
   },
   groupPickerSub: {
     color: megrumColors.mutedInk,
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: "800",
     marginTop: 3,
   },
@@ -2332,7 +2543,7 @@ const styles = StyleSheet.create({
   },
   groupPickerCloseText: {
     color: megrumColors.lavender,
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: "900",
   },
   groupPickerSearch: {
@@ -2341,17 +2552,17 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     borderWidth: 1,
     color: megrumColors.ink,
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: "800",
-    minHeight: 48,
-    paddingHorizontal: 14,
+    minHeight: 52,
+    paddingHorizontal: 15,
   },
   groupPickerGenres: {
-    gap: 7,
+    gap: 8,
     paddingVertical: 12,
   },
   groupPickerList: {
-    gap: 9,
+    gap: 10,
     paddingBottom: 28,
   },
   groupPickerCard: {
@@ -2362,7 +2573,8 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     flexDirection: "row",
     gap: 11,
-    padding: 12,
+    minHeight: 58,
+    padding: 13,
   },
   groupPickerCardActive: {
     backgroundColor: "rgba(166,149,216,0.09)",
@@ -2373,12 +2585,12 @@ const styles = StyleSheet.create({
   },
   groupPickerCardTitle: {
     color: megrumColors.ink,
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: "900",
   },
   groupPickerCardMeta: {
     color: megrumColors.mutedInk,
-    fontSize: 10.5,
+    fontSize: 11.5,
     fontWeight: "800",
     marginTop: 3,
   },
@@ -2396,8 +2608,9 @@ const styles = StyleSheet.create({
     borderColor: "rgba(58,50,74,0.10)",
     borderRadius: megrumRadii.pill,
     borderWidth: 1,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
+    minHeight: 38,
+    paddingHorizontal: 14,
+    paddingVertical: 9,
   },
   filterSmallChipActive: {
     backgroundColor: "rgba(166,149,216,0.14)",
@@ -2405,7 +2618,7 @@ const styles = StyleSheet.create({
   },
   filterSmallChipText: {
     color: megrumColors.ink,
-    fontSize: 11.5,
+    fontSize: 12.5,
     fontWeight: "900",
   },
   filterSmallChipTextActive: {
