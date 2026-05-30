@@ -580,8 +580,6 @@ export default function EncountersScreen() {
   const { previewMode, profile, user } = useAuth();
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const [settingsOpen, setSettingsOpen] = useState(false);
-  const [meguriEnabled, setMeguriEnabled] = useState(true);
   const [groomPosts, setGroomPosts] = useState<GroomPost[]>(() => (previewMode ? GROOM_POSTS : []));
   const [groomLoading, setGroomLoading] = useState(!previewMode);
   const [selectedGroomId, setSelectedGroomId] = useState<string | null>(null);
@@ -607,7 +605,7 @@ export default function EncountersScreen() {
   );
   const groomToastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const selectedGroomPost = groomPosts.find((post) => post.id === selectedGroomId) ?? null;
-  const headerTop = Math.max(insets.top, 18) + 8;
+  const contentTopPadding = Math.max(insets.top, 18) + 8;
   const bottomPadding = Math.max(insets.bottom, 12) + 96;
 
   async function refreshGroomPosts() {
@@ -1049,7 +1047,7 @@ export default function EncountersScreen() {
         automaticallyAdjustsScrollIndicatorInsets
         contentContainerStyle={[
           styles.screen,
-          { paddingBottom: bottomPadding, paddingTop: headerTop + 48 },
+          { paddingBottom: bottomPadding, paddingTop: contentTopPadding },
         ]}
         contentInsetAdjustmentBehavior="automatic"
         refreshControl={
@@ -1097,33 +1095,6 @@ export default function EncountersScreen() {
         <IconSymbol name="add" color="#fff" size={17} />
         <Text style={styles.threadFabText}>スレッドを立てる</Text>
       </Pressable>
-
-      <View pointerEvents="box-none" style={[styles.fixedHeader, { top: headerTop }]}>
-        <Pressable
-          accessibilityLabel="めぐり設定"
-          accessibilityRole="button"
-          onPress={() => setSettingsOpen(true)}
-          style={styles.settingsButton}
-        >
-          <GroomGlassFill fallbackStyle={styles.settingsButtonFallback} tintColor="rgba(255,255,255,0.28)" />
-          <IconSymbol name="settings-outline" color={megrumColors.ink} size={20} />
-        </Pressable>
-      </View>
-
-      <MeguriSettingsModal
-        enabled={meguriEnabled}
-        onAvatarEdit={() => {
-          setSettingsOpen(false);
-          router.push("/profile-edit");
-        }}
-        onClose={() => setSettingsOpen(false)}
-        onProfileEdit={() => {
-          setSettingsOpen(false);
-          router.push("/meguri-profile-edit");
-        }}
-        onToggle={() => setMeguriEnabled((current) => !current)}
-        open={settingsOpen}
-      />
 
       {selectedGroomPost ? (
         <GroomViewerModal
@@ -4330,27 +4301,6 @@ const styles = StyleSheet.create({
     justifyContent: "flex-end",
     minHeight: 42,
     paddingHorizontal: 6,
-  },
-  fixedHeader: {
-    alignItems: "flex-end",
-    left: 16,
-    position: "absolute",
-    right: 16,
-    zIndex: 20,
-  },
-  settingsButton: {
-    alignItems: "center",
-    borderColor: "rgba(58,50,74,0.08)",
-    borderRadius: megrumRadii.pill,
-    borderWidth: 1,
-    height: 40,
-    justifyContent: "center",
-    overflow: "hidden",
-    width: 40,
-    ...megrumShadow,
-  },
-  settingsButtonFallback: {
-    backgroundColor: "rgba(255,255,255,0.86)",
   },
   groomRail: {
     gap: 11,

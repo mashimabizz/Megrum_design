@@ -4,6 +4,44 @@
 
 ---
 
+## イテレーション292：めぐりホーム上部を詰める
+
+### 背景・問題意識
+
+オーナーから、めぐりホーム右上の設定アイコンは不要で、そのぶん画面上部の空白を詰め、「グルーム」という見出しが最上部に来るようにしたいという指摘があった。従来は右上の設定ボタン用に固定ヘッダー領域を確保しており、`グルーム` の開始位置が下がっていた。
+
+### 変更内容
+
+#### `mobile/app/(tabs)/encounters.tsx`
+- めぐりホーム右上の設定アイコン表示を削除した。
+- 設定アイコンに紐づく固定ヘッダー領域と `MeguriSettingsModal` 呼び出しを削除した。
+- `ScrollView` の上部余白を `headerTop + 48` から安全領域＋最小余白に詰め、`グルーム` 見出しが画面上部に来るようにした。
+
+### 影響範囲
+
+- iOS版 めぐりホーム
+- グルーム一覧の上部レイアウト
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- `EAS_UPDATE_PROJECT_SLUG=ihub EXPO_NO_GIT_STATUS=1 npm --prefix mobile run update:ios:preview -- --message "[iter292] めぐりホーム上部を詰める" --non-interactive`
+- Preview OTA: Update group ID `2047972d-95ca-432f-83c3-69e8d56c93e0` / iOS update ID `019e79c7-2292-72e3-850c-a04248d471dc`
+- EAS Dashboard: `https://expo.dev/accounts/mashima.bizz/projects/ihub/updates/2047972d-95ca-432f-83c3-69e8d56c93e0`
+
+### 関連ファイル
+
+- `mobile/app/(tabs)/encounters.tsx`
+- `notes/08_design_iterations.md`
+
+### セルフレビュー結果
+
+- ✅ めぐりホーム右上の設定アイコンを表示しないようにした。
+- ✅ 固定ヘッダー用に空いていた上部余白を削り、`グルーム` 見出しの開始位置を上げた。
+- ✅ iOS Preview channel へOTA配信済み。
+- ✅ 状態遷移・用語・DBスキーマ変更はないため、`notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要。
+
 ## イテレーション291：左ドロワー項目の遷移を確実化
 
 ### 背景・問題意識
