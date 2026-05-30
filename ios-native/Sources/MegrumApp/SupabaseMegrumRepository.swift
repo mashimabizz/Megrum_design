@@ -5,11 +5,13 @@ import MegrumData
 public struct SupabaseMegrumRepository: MegrumRepository {
     private let client: SupabaseRESTClient
     private let oshiClient: SupabaseOshiClient
+    private let mailingAddressClient: SupabaseMailingAddressClient
     private let viewerID: UUID
 
     public init(client: SupabaseRESTClient, viewerID: UUID) {
         self.client = client
         self.oshiClient = SupabaseOshiClient(client: client)
+        self.mailingAddressClient = SupabaseMailingAddressClient(client: client)
         self.viewerID = viewerID
     }
 
@@ -53,6 +55,14 @@ public struct SupabaseMegrumRepository: MegrumRepository {
 
     public func loadOshiCharacters(groupID: UUID, limit: Int) async throws -> [OshiCharacter] {
         try await oshiClient.loadCharacters(groupID: groupID, limit: limit)
+    }
+
+    public func loadMailingAddress() async throws -> MailingAddress? {
+        try await mailingAddressClient.loadAddress(userID: viewerID)
+    }
+
+    public func saveMailingAddress(_ address: MailingAddress) async throws -> MailingAddress {
+        try await mailingAddressClient.upsertAddress(address)
     }
 
     public func completeAccountSetup(_ input: AccountSetupInput) async throws -> UserProfile {

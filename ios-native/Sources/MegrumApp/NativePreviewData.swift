@@ -39,6 +39,17 @@ enum NativePreviewData {
         OshiCharacter(id: secondMemberID, groupID: secondGroupID, name: "SAKURA", aliases: ["サクラ"], displayOrder: 1)
     ]
 
+    static let mailingAddress = MailingAddress(
+        userID: viewerID,
+        recipientName: "みちりおん",
+        postalCode: "1000001",
+        prefecture: "東京都",
+        city: "千代田区",
+        line1: "千代田1-1",
+        line2: "Megrumビル",
+        phoneNumber: "0312345678"
+    )
+
     static let inventory: [GoodsItem] = [
         GoodsItem(
             id: UUID(uuidString: "00000000-0000-0000-0000-000000000201")!,

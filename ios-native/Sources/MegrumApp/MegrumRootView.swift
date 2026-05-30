@@ -48,6 +48,7 @@ public struct MegrumRootView: View {
     @StateObject private var authState: MegrumAuthState
     @State private var selectedTab: MegrumTab = .home
     @State private var showsSearch = false
+    @State private var showsSettings = false
 
     public init(
         appState: MegrumAppState = MegrumAppState(),
@@ -98,6 +99,11 @@ public struct MegrumRootView: View {
                 SearchScreen(items: appState.inventory)
             }
         }
+        .sheet(isPresented: $showsSettings) {
+            NavigationStack {
+                SettingsScreen(appState: appState)
+            }
+        }
     }
 
     private var authenticatedTabs: some View {
@@ -109,7 +115,10 @@ public struct MegrumRootView: View {
                     possibleItems: Array(appState.inventory.reversed()),
                     isLoading: appState.isLoading,
                     showsSearch: $showsSearch,
-                    onRefresh: appState.refresh
+                    onRefresh: appState.refresh,
+                    onOpenSettings: {
+                        showsSettings = true
+                    }
                 )
             }
             .tag(MegrumTab.home)

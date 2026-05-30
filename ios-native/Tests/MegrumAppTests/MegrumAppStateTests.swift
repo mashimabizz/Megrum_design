@@ -81,6 +81,46 @@ final class MegrumAppStateTests: XCTestCase {
         XCTAssertEqual(state.oshiCharacters.first?.name, "SANA")
     }
 
+    func testAppStateLoadsAndSavesPreviewMailingAddress() async {
+        let state = MegrumAppState(repository: PreviewMegrumRepository())
+
+        await state.loadMailingAddress()
+
+        XCTAssertEqual(state.mailingAddress?.postalCode, "1000001")
+
+        let saved = await state.saveMailingAddress(
+            MailingAddress(
+                userID: NativePreviewIDs.viewerID,
+                recipientName: "みちりおん",
+                postalCode: "1500001",
+                prefecture: "東京都",
+                city: "渋谷区",
+                line1: "神宮前1-1"
+            )
+        )
+
+        XCTAssertTrue(saved)
+        XCTAssertEqual(state.mailingAddress?.postalCode, "1500001")
+    }
+
+    func testAppStateValidatesMailingAddressBeforeSaving() async {
+        let state = MegrumAppState(repository: PreviewMegrumRepository())
+
+        let saved = await state.saveMailingAddress(
+            MailingAddress(
+                userID: NativePreviewIDs.viewerID,
+                recipientName: "",
+                postalCode: "1500001",
+                prefecture: "東京都",
+                city: "渋谷区",
+                line1: "神宮前1-1"
+            )
+        )
+
+        XCTAssertFalse(saved)
+        XCTAssertEqual(state.errorMessage, "宛名・郵便番号・都道府県・市区町村・番地を入力してください")
+    }
+
     func testAuthStateSignsInThroughRepository() async {
         let state = MegrumAuthState(repository: StubAuthRepository())
 
@@ -152,4 +192,8 @@ private struct SingleSnapshotRepository: MegrumRepository {
             threads: []
         )
     }
+}
+
+private enum NativePreviewIDs {
+    static let viewerID = UUID(uuidString: "00000000-0000-0000-0000-000000000001")!
 }

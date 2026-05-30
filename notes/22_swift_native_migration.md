@@ -1,7 +1,7 @@
 # 22. Swift Native Migration
 
 最終更新: 2026-05-31
-ステータス: Active draft（iter310）
+ステータス: Active draft（iter311）
 
 ## 目的
 
@@ -109,7 +109,8 @@ tar -xzf /Users/michitaka/Desktop/Megrum_backups/pre-swift-migration-20260531-03
 - iter308で、`users.account_status` を `AccountStatus` としてSwift型化し、`registered / verified / onboarding` のユーザーを初回プロフィール設定画面へ分岐できるようにした。
 - iter309で、`OshiKind` / `OshiGroup` / `OshiCharacter` / `UserOshiSelection` と `SupabaseOshiClient` を追加し、`groups_master` と `characters_master` をSwift側から読める境界を作った。
 - iter310で、初回プロフィール設定画面に推しグループ/メンバー選択を追加し、`user_oshi` を差し替え保存してから `users.account_status='active'` へ進めるようにした。
-- 現時点のAuthはOAuth・メールリンク復帰・住所設定を含むフルオンボーディングまでは未完了。次のPhase 2作業で認証リンク処理、Apple/Google、住所設定へ広げる。
+- iter311で、設定一覧と住所設定フォームを追加し、`user_mailing_addresses` をSwift側から取得/upsertできる境界を作った。
+- 現時点のAuthはOAuth・メールリンク復帰・住所自動補完を含むフルオンボーディングまでは未完了。次のPhase 2作業で認証リンク処理、Apple/Google、住所補完へ広げる。
 
 ### Phase 3: Exchange core
 

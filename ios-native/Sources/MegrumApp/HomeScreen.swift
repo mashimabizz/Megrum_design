@@ -9,12 +9,13 @@ struct HomeScreen: View {
     var isLoading: Bool
     @Binding var showsSearch: Bool
     var onRefresh: () async -> Void
+    var onOpenSettings: () -> Void = {}
 
     var body: some View {
         ZStack(alignment: .bottomLeading) {
             ScrollView {
                 VStack(alignment: .leading, spacing: 28) {
-                    HomeHeader(viewer: viewer)
+                    HomeHeader(viewer: viewer, onOpenSettings: onOpenSettings)
 
                     MatchSection(
                         title: "マッチしてるよ！",
@@ -51,24 +52,28 @@ struct HomeScreen: View {
 
 private struct HomeHeader: View {
     var viewer: UserProfile?
+    var onOpenSettings: () -> Void
 
     var body: some View {
         HStack {
-            Circle()
-                .fill(
-                    LinearGradient(
-                        colors: [MegrumTheme.lavender, MegrumTheme.pink],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
+            Button(action: onOpenSettings) {
+                Circle()
+                    .fill(
+                        LinearGradient(
+                            colors: [MegrumTheme.lavender, MegrumTheme.pink],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
                     )
-                )
-                .frame(width: 44, height: 44)
-                .overlay(
-                    Text(initial)
-                        .font(.system(size: 20, weight: .heavy, design: .rounded))
-                        .foregroundStyle(.white)
-                )
-                .accessibilityLabel("自分のアイコン")
+                    .frame(width: 44, height: 44)
+                    .overlay(
+                        Text(initial)
+                            .font(.system(size: 20, weight: .heavy, design: .rounded))
+                            .foregroundStyle(.white)
+                    )
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("設定を開く")
 
             Spacer()
 

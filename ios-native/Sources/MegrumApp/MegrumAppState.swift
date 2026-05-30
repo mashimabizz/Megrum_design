@@ -61,6 +61,8 @@ public protocol MegrumRepository: Sendable {
     func loadInitialSnapshot() async throws -> MegrumAppSnapshot
     func loadOshiGroups(searchText: String?, limit: Int) async throws -> [OshiGroup]
     func loadOshiCharacters(groupID: UUID, limit: Int) async throws -> [OshiCharacter]
+    func loadMailingAddress() async throws -> MailingAddress?
+    func saveMailingAddress(_ address: MailingAddress) async throws -> MailingAddress
     func completeAccountSetup(_ input: AccountSetupInput) async throws -> UserProfile
 }
 
@@ -71,6 +73,14 @@ public extension MegrumRepository {
 
     func loadOshiCharacters(groupID: UUID, limit: Int) async throws -> [OshiCharacter] {
         []
+    }
+
+    func loadMailingAddress() async throws -> MailingAddress? {
+        nil
+    }
+
+    func saveMailingAddress(_ address: MailingAddress) async throws -> MailingAddress {
+        throw MegrumRepositoryError.unsupportedMutation
     }
 
     func completeAccountSetup(_ input: AccountSetupInput) async throws -> UserProfile {
@@ -114,6 +124,14 @@ public struct PreviewMegrumRepository: MegrumRepository {
     public func loadOshiCharacters(groupID: UUID, limit: Int) async throws -> [OshiCharacter] {
         Array(NativePreviewData.oshiCharacters.filter { $0.groupID == groupID }.prefix(limit))
     }
+
+    public func loadMailingAddress() async throws -> MailingAddress? {
+        NativePreviewData.mailingAddress
+    }
+
+    public func saveMailingAddress(_ address: MailingAddress) async throws -> MailingAddress {
+        address
+    }
 }
 
 @MainActor
@@ -126,9 +144,12 @@ public final class MegrumAppState: ObservableObject {
     @Published public private(set) var threads: [BoardThread] = []
     @Published public private(set) var oshiGroups: [OshiGroup] = []
     @Published public private(set) var oshiCharacters: [OshiCharacter] = []
+    @Published public private(set) var mailingAddress: MailingAddress?
     @Published public private(set) var isLoading = false
     @Published public private(set) var isLoadingOshiGroups = false
     @Published public private(set) var isLoadingOshiCharacters = false
+    @Published public private(set) var isLoadingMailingAddress = false
+    @Published public private(set) var isSavingMailingAddress = false
     @Published public private(set) var isSavingAccountSetup = false
     @Published public private(set) var errorMessage: String?
 
@@ -196,6 +217,43 @@ public final class MegrumAppState: ObservableObject {
             errorMessage = "推しメンバーを読み込めませんでした"
         }
         isLoadingOshiCharacters = false
+    }
+
+    public func loadMailingAddress() async {
+        guard !isLoadingMailingAddress else {
+            return
+        }
+
+        isLoadingMailingAddress = true
+        errorMessage = nil
+        do {
+            mailingAddress = try await repository.loadMailingAddress()
+        } catch {
+            errorMessage = "住所を読み込めませんでした"
+        }
+        isLoadingMailingAddress = false
+    }
+
+    public func saveMailingAddress(_ address: MailingAddress) async -> Bool {
+        guard !isSavingMailingAddress else {
+            return false
+        }
+        guard address.isReady else {
+            errorMessage = "宛名・郵便番号・都道府県・市区町村・番地を入力してください"
+            return false
+        }
+
+        isSavingMailingAddress = true
+        errorMessage = nil
+        do {
+            mailingAddress = try await repository.saveMailingAddress(address)
+            isSavingMailingAddress = false
+            return true
+        } catch {
+            errorMessage = "住所を保存できませんでした"
+            isSavingMailingAddress = false
+            return false
+        }
     }
 
     public func completeAccountSetup(

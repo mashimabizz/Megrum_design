@@ -4,6 +4,88 @@
 
 ---
 
+## イテレーション311：Swift住所設定を追加
+
+### 背景・問題意識
+
+Swift Native版は初回推し設定まで進んだが、ユーザー設定から住所を確認・保存できる画面とSupabase境界がまだなかった。取引条件の確認や今後の交換手段拡張で住所登録状況を扱うため、既存DBの `user_mailing_addresses` をSwift側から読み書きできるようにし、ホームのユーザーアイコンから設定一覧へ入れる最初の導線を追加した。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumCore/MegrumModels.swift`
+- `MailingAddress` を追加し、宛名、郵便番号、都道府県、市区町村、番地、補足住所、電話番号をSwift domain modelとして扱えるようにした。
+- 必須入力判定、郵便番号表示、一覧用summaryをmodel側に寄せた。
+
+#### `ios-native/Sources/MegrumData/SupabaseMailingAddressClient.swift`
+- `user_mailing_addresses` の1件取得とupsertを行う `SupabaseMailingAddressClient` を追加した。
+- request生成メソッドをテスト可能にし、`on_conflict=user_id` で同一ユーザーの住所を差し替え保存する形にした。
+
+#### `ios-native/Sources/MegrumApp/SettingsScreen.swift`
+- SwiftUIの設定一覧画面を追加し、「住所設定」から住所フォームへ遷移できるようにした。
+- 住所フォームではキーボード表示中も入力欄を追えるよう、`Form` / focus / `scrollDismissesKeyboard` を使ったiOS標準寄りの入力体験にした。
+- 郵便番号は数字7桁に正規化し、保存前に必須項目を検証するようにした。
+
+#### `ios-native/Sources/MegrumApp/MegrumAppState.swift`
+- `loadMailingAddress()` / `saveMailingAddress(_:)` を追加し、画面からrepository経由で住所を扱えるようにした。
+- 保存中・読込中状態とvalidation errorを追加した。
+
+#### `ios-native/Sources/MegrumApp/SupabaseMegrumRepository.swift`
+- live Supabase repositoryに `SupabaseMailingAddressClient` を接続した。
+
+#### `ios-native/Sources/MegrumApp/HomeScreen.swift`
+- ホームヘッダーの自分アイコンから設定シートを開けるようにした。
+
+#### `ios-native/Sources/MegrumApp/MegrumRootView.swift`
+- `SettingsScreen` をシートとして表示する導線を追加した。
+
+#### `ios-native/Sources/MegrumApp/NativePreviewData.swift`
+- Preview用の住所データを追加した。
+
+#### `ios-native/Tests/`
+- `SupabaseMailingAddressClient` の取得/upsert requestを検証した。
+- `MegrumAppState` の住所読込・保存・validationを検証した。
+
+### 影響範囲
+
+- Swift Native版の設定一覧
+- Swift Native版の住所設定フォーム
+- `user_mailing_addresses` 読み書き境界
+- 今後の取引条件確認、住所登録済み判定
+
+### 確認方法
+
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-build --enable-xctest --disable-swift-testing -j 1`
+- `xcodebuild -quiet -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -destination 'generic/platform=iOS Simulator' -derivedDataPath /tmp/megrum-native-xcodebuild CODE_SIGNING_ALLOWED=NO build`
+- `git diff --check -- ios-native/Sources/MegrumCore/MegrumModels.swift ios-native/Sources/MegrumData/SupabaseMailingAddressClient.swift ios-native/Tests/MegrumDataTests/SupabaseMailingAddressClientTests.swift ios-native/Sources/MegrumApp/MegrumAppState.swift ios-native/Sources/MegrumApp/NativePreviewData.swift ios-native/Sources/MegrumApp/SupabaseMegrumRepository.swift ios-native/Sources/MegrumApp/HomeScreen.swift ios-native/Sources/MegrumApp/MegrumRootView.swift ios-native/Sources/MegrumApp/SettingsScreen.swift ios-native/Tests/MegrumAppTests/MegrumAppStateTests.swift ios-native/README.md notes/22_swift_native_migration.md notes/08_design_iterations.md`
+
+### 関連ファイル
+
+- `ios-native/Sources/MegrumCore/MegrumModels.swift`
+- `ios-native/Sources/MegrumData/SupabaseMailingAddressClient.swift`
+- `ios-native/Tests/MegrumDataTests/SupabaseMailingAddressClientTests.swift`
+- `ios-native/Sources/MegrumApp/SettingsScreen.swift`
+- `ios-native/Sources/MegrumApp/MegrumAppState.swift`
+- `ios-native/Sources/MegrumApp/SupabaseMegrumRepository.swift`
+- `ios-native/Sources/MegrumApp/HomeScreen.swift`
+- `ios-native/Sources/MegrumApp/MegrumRootView.swift`
+- `ios-native/Sources/MegrumApp/NativePreviewData.swift`
+- `ios-native/Tests/MegrumAppTests/MegrumAppStateTests.swift`
+- `ios-native/README.md`
+- `notes/22_swift_native_migration.md`
+- `notes/08_design_iterations.md`
+
+### セルフレビュー結果
+
+- ✅ `user_mailing_addresses` は既存DBスキーマを使い、migrationは追加していない。
+- ✅ 画面からSupabaseへ直接触らず、`MegrumRepository` / `MegrumAppState` 境界を保った。
+- ✅ Swift Package testsが29件成功した。
+- ✅ Xcode project buildが成功した。
+- ✅ 状態遷移・新用語・DBスキーマ変更はないため、`notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要。
+- ⚠️ 郵便番号から住所を自動補完する外部API連携は未実装。次工程以降で追加する。
+- ✅ TestFlight配布はまだ行っていないため、Preview OTA / TestFlight配信は不要。
+
+---
+
 ## イテレーション310：Swift初回推し設定保存を追加
 
 ### 背景・問題意識
