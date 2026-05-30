@@ -138,7 +138,8 @@ public struct MegrumRootView: View {
                 GoodsCollectionScreen(
                     title: "在庫",
                     subtitle: "交換に出せるグッズ",
-                    items: appState.inventory
+                    items: appState.inventory,
+                    showsAddButton: true
                 )
             }
             .tag(MegrumTab.inventory)

@@ -4,6 +4,61 @@
 
 ---
 
+## イテレーション317：Swift在庫Wish一覧操作を追加
+
+### 背景・問題意識
+
+RN版では在庫/Wish一覧で列数の切り替えや追加導線が求められていた。Swift Native版でも一覧表示だけでは移行後の操作感が不足するため、在庫/Wish共通のcollection screenに、列数切り替えと追加ボタンのNative土台を追加した。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/CollectionScreens.swift`
+- `GoodsCollectionScreen` に `columns` 状態を追加し、3/4/5列を循環できるようにした。
+- `CollectionHeader` を追加し、タイトル/サブタイトルの右側に列数切り替えアイコンを表示するようにした。
+- `ColumnToggleButton` を追加し、現在の列数に応じて四角いカラムアイコンの数が変わるようにした。
+- `AddGoodsButton` を追加し、在庫/Wishの左下に追加ボタンを表示できるようにした。
+- 既存の `ScreenTitle` はやりとり/めぐり画面が使っているため、共通title componentとして維持した。
+
+#### `ios-native/Sources/MegrumApp/MegrumRootView.swift`
+- 在庫タブで左下追加ボタンを表示するようにした。
+
+#### `ios-native/README.md`
+- 在庫/Wishの列数切り替えと追加ボタン土台を追記した。
+
+#### `notes/22_swift_native_migration.md`
+- Phase 3のExchange coreに、iter317の一覧操作土台を追記した。
+
+### 影響範囲
+
+- Swift Native版の在庫一覧
+- Swift Native版のWish一覧
+- 今後の在庫/Wish追加・編集フォーム接続
+
+### 確認方法
+
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-build --enable-xctest --disable-swift-testing -j 1`
+- `xcodebuild -quiet -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -destination 'generic/platform=iOS Simulator' -derivedDataPath /tmp/megrum-native-xcodebuild CODE_SIGNING_ALLOWED=NO build`
+
+### 関連ファイル
+
+- `ios-native/Sources/MegrumApp/CollectionScreens.swift`
+- `ios-native/Sources/MegrumApp/MegrumRootView.swift`
+- `ios-native/README.md`
+- `notes/22_swift_native_migration.md`
+- `notes/08_design_iterations.md`
+
+### セルフレビュー結果
+
+- ✅ 列数切り替えはSwiftUI Buttonとシンプルな図形で構成し、現在列数をaccessibility valueに入れた。
+- ✅ 追加ボタンは左下固定で、在庫/Wishともに次の追加フォーム接続へつながる受け口にした。
+- ✅ 既存の `ScreenTitle` を残し、やりとり/めぐり画面を壊さない構成にした。
+- ✅ Swift Package testsが44件成功した。
+- ✅ Xcode project buildが成功した。
+- ✅ 状態遷移・新用語・DBスキーマ変更はないため、`notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要。
+- ✅ TestFlight配布はまだ行っていないため、Preview OTA / TestFlight配信は不要。
+
+---
+
 ## イテレーション316：Swiftグッズ長押しメニューを追加
 
 ### 背景・問題意識
