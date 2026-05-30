@@ -2752,6 +2752,7 @@ function ChatBubble({
 }) {
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [expandedPhotoUrl, setExpandedPhotoUrl] = useState<string | null>(null);
   const system = message.type === "system" || message.type === "arrival_status";
   const text = messageText(message);
   const openApprove = message.meta?.action === "open_approve";
@@ -2849,7 +2850,17 @@ function ChatBubble({
         {mine ? <ChatMessageMeta createdAt={message.createdAt} read={read} /> : null}
         <ChatGradientBubble mine={mine} style={[styles.chatBubble, mine ? styles.chatBubbleMine : null]}>
           {message.photoUrl ? (
-            <Image source={{ uri: message.photoUrl }} style={styles.chatPhoto} />
+            <Pressable
+              accessibilityRole="imagebutton"
+              accessibilityLabel="共有された写真を拡大表示"
+              onPress={() => setExpandedPhotoUrl(message.photoUrl)}
+              style={({ pressed }) => [
+                styles.chatPhotoButton,
+                pressed ? styles.chatPhotoButtonPressed : null,
+              ]}
+            >
+              <Image source={{ uri: message.photoUrl }} style={styles.chatPhoto} />
+            </Pressable>
           ) : null}
           <Text style={[styles.chatBubbleText, mine ? styles.chatBubbleTextMine : null]}>
             {text}
@@ -2857,7 +2868,52 @@ function ChatBubble({
         </ChatGradientBubble>
         {!mine ? <ChatMessageMeta createdAt={message.createdAt} /> : null}
       </View>
+      <FullscreenPhotoModal
+        photoUrl={expandedPhotoUrl}
+        onClose={() => setExpandedPhotoUrl(null)}
+      />
     </View>
+  );
+}
+
+function FullscreenPhotoModal({
+  onClose,
+  photoUrl,
+}: {
+  onClose: () => void;
+  photoUrl: string | null;
+}) {
+  return (
+    <Modal
+      animationType="fade"
+      transparent
+      visible={!!photoUrl}
+      onRequestClose={onClose}
+    >
+      <View style={styles.photoViewerRoot}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="写真ビューアを閉じる"
+          onPress={onClose}
+          style={styles.photoViewerBackdrop}
+        />
+        {photoUrl ? (
+          <Image
+            resizeMode="contain"
+            source={{ uri: photoUrl }}
+            style={styles.photoViewerImage}
+          />
+        ) : null}
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="閉じる"
+          onPress={onClose}
+          style={styles.photoViewerClose}
+        >
+          <Text style={styles.photoViewerCloseText}>×</Text>
+        </Pressable>
+      </View>
+    </Modal>
   );
 }
 
@@ -5398,11 +5454,53 @@ const styles = StyleSheet.create({
   chatBubbleTextMine: {
     color: megrumColors.surface,
   },
+  chatPhotoButton: {
+    borderRadius: 12,
+    marginBottom: 7,
+    overflow: "hidden",
+  },
+  chatPhotoButtonPressed: {
+    opacity: 0.86,
+    transform: [{ scale: 0.99 }],
+  },
   chatPhoto: {
     borderRadius: 12,
     height: 150,
-    marginBottom: 7,
     width: 190,
+  },
+  photoViewerRoot: {
+    alignItems: "center",
+    backgroundColor: "rgba(8,7,12,0.94)",
+    flex: 1,
+    justifyContent: "center",
+  },
+  photoViewerBackdrop: {
+    bottom: 0,
+    left: 0,
+    position: "absolute",
+    right: 0,
+    top: 0,
+  },
+  photoViewerImage: {
+    height: "86%",
+    width: "100%",
+  },
+  photoViewerClose: {
+    alignItems: "center",
+    backgroundColor: "rgba(255,255,255,0.16)",
+    borderRadius: 999,
+    height: 42,
+    justifyContent: "center",
+    position: "absolute",
+    right: 18,
+    top: 58,
+    width: 42,
+  },
+  photoViewerCloseText: {
+    color: megrumColors.surface,
+    fontSize: 28,
+    fontWeight: "500",
+    lineHeight: 32,
   },
   chatMessageMeta: {
     alignItems: "flex-start",

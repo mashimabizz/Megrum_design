@@ -4,6 +4,46 @@
 
 ---
 
+## イテレーション285：取引チャット写真を全画面表示に対応
+
+### 背景・問題意識
+
+オーナーから、取引チャットで共有された写真をタップした時に、画面いっぱいに拡大表示したいという要望があった。現状はチャットバブル内のサムネイル表示だけで、交換物や服装写真の細部を確認しにくい。
+
+### 変更内容
+
+#### `mobile/app/transaction-detail.tsx`
+- 写真付きメッセージの画像をタップ可能にし、タップ時に全画面の写真ビューアを開くようにした。
+- 写真ビューアは黒背景の `Modal` とし、画像は `contain` で画面内に最大表示するようにした。
+- 背景タップまたは右上の閉じるボタンでチャットへ戻れるようにした。
+
+### 影響範囲
+
+- iOS版 取引チャット
+- 写真メッセージ
+- 服装写真メッセージ
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- `EAS_UPDATE_PROJECT_SLUG=ihub EXPO_NO_GIT_STATUS=1 npm --prefix mobile run update:ios:preview -- --message "[iter285] 取引チャット写真を全画面表示" --non-interactive`
+- Preview OTA: Update group ID `3d48e16c-3865-466f-8fa0-a1efaa7b1f98` / iOS update ID `019e787b-8d8e-7e30-9f46-91d7d2131972`
+- EAS Dashboard: `https://expo.dev/accounts/mashima.bizz/projects/ihub/updates/3d48e16c-3865-466f-8fa0-a1efaa7b1f98`
+
+### 関連ファイル
+
+- `mobile/app/transaction-detail.tsx`
+- `notes/08_design_iterations.md`
+
+### セルフレビュー結果
+
+- ✅ 写真付きチャットをタップすると全画面ビューアが開く。
+- ✅ 画像は画面からはみ出さず `contain` 表示になる。
+- ✅ 背景タップと閉じるボタンで戻れる。
+- ✅ iOS Preview channel へOTA配信済み。
+- ✅ 状態遷移・用語・DBスキーマ変更はないため、`notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要。
+
 ## イテレーション284：検索フィルター用語と成立後CTAを整理
 
 ### 背景・問題意識
