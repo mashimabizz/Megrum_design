@@ -44,15 +44,25 @@ public enum MegrumTab: String, CaseIterable, Identifiable, Sendable {
 
 @MainActor
 public struct MegrumRootView: View {
+    @StateObject private var appState: MegrumAppState
     @State private var selectedTab: MegrumTab = .home
     @State private var showsSearch = false
 
-    public init() {}
+    public init(appState: MegrumAppState = MegrumAppState()) {
+        _appState = StateObject(wrappedValue: appState)
+    }
 
     public var body: some View {
         TabView(selection: $selectedTab) {
             NavigationStack {
-                HomeScreen(showsSearch: $showsSearch)
+                HomeScreen(
+                    viewer: appState.viewer,
+                    matchedItems: appState.inventory,
+                    possibleItems: Array(appState.inventory.reversed()),
+                    isLoading: appState.isLoading,
+                    showsSearch: $showsSearch,
+                    onRefresh: appState.refresh
+                )
             }
             .tag(MegrumTab.home)
             .tabItem {
@@ -63,7 +73,7 @@ public struct MegrumRootView: View {
                 GoodsCollectionScreen(
                     title: "在庫",
                     subtitle: "交換に出せるグッズ",
-                    items: NativePreviewData.inventory
+                    items: appState.inventory
                 )
             }
             .tag(MegrumTab.inventory)
@@ -72,7 +82,7 @@ public struct MegrumRootView: View {
             }
 
             NavigationStack {
-                WishCollectionScreen(items: NativePreviewData.wishes)
+                WishCollectionScreen(items: appState.wishes)
             }
             .tag(MegrumTab.wish)
             .tabItem {
@@ -80,7 +90,7 @@ public struct MegrumRootView: View {
             }
 
             NavigationStack {
-                TradesScreen(proposals: NativePreviewData.proposals)
+                TradesScreen(proposals: appState.proposals)
             }
             .tag(MegrumTab.trades)
             .tabItem {
@@ -88,7 +98,7 @@ public struct MegrumRootView: View {
             }
 
             NavigationStack {
-                MeguriScreen(grooms: NativePreviewData.grooms, threads: NativePreviewData.threads)
+                MeguriScreen(grooms: appState.grooms, threads: appState.threads)
             }
             .tag(MegrumTab.meguri)
             .tabItem {
@@ -96,9 +106,12 @@ public struct MegrumRootView: View {
             }
         }
         .tint(MegrumTheme.lavender)
+        .task {
+            await appState.loadInitialData()
+        }
         .sheet(isPresented: $showsSearch) {
             NavigationStack {
-                SearchScreen(items: NativePreviewData.inventory)
+                SearchScreen(items: appState.inventory)
             }
         }
     }

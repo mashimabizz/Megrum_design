@@ -7,6 +7,20 @@ enum NativePreviewData {
     static let groupID = UUID(uuidString: "00000000-0000-0000-0000-000000000011")!
     static let memberID = UUID(uuidString: "00000000-0000-0000-0000-000000000012")!
 
+    static let viewer = UserProfile(
+        id: viewerID,
+        handle: "michilion",
+        displayName: "みちりおん",
+        prefecture: "東京都"
+    )
+
+    static let partner = UserProfile(
+        id: partnerID,
+        handle: "michi1",
+        displayName: "michi",
+        prefecture: "東京都"
+    )
+
     static let tags = [
         GoodsTag(id: UUID(uuidString: "00000000-0000-0000-0000-000000000101")!, name: "東京2026"),
         GoodsTag(id: UUID(uuidString: "00000000-0000-0000-0000-000000000102")!, name: "会場限定"),

@@ -12,7 +12,8 @@ The existing Expo / React Native app under `mobile/` remains the rollback source
 - `Sources/MegrumCore` contains portable domain models that mirror the current Supabase-backed product concepts.
 - `Sources/MegrumDesign` contains native SwiftUI design primitives, starting with a Liquid Glass-style search button.
 - `Sources/MegrumApp` contains the SwiftUI app shell and first native screens for Home, Search, Inventory, Wish, Trades, and Meguri.
-- `Tests/MegrumCoreTests` verifies state names and display labels that must stay aligned with `notes/09_state_machines.md` and `notes/10_glossary.md`.
+- `Sources/MegrumApp/MegrumAppState.swift` contains the first app state and repository boundary for later Supabase integration.
+- `Tests/MegrumCoreTests` and `Tests/MegrumAppTests` verify state names, display labels, and the preview repository load path.
 
 ## Build Loop
 

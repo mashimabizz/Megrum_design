@@ -1,7 +1,7 @@
 # 22. Swift Native Migration
 
 最終更新: 2026-05-31
-ステータス: Active draft（iter301）
+ステータス: Active draft（iter302）
 
 ## 目的
 
@@ -61,6 +61,7 @@ tar -xzf /Users/michitaka/Desktop/Megrum_backups/pre-swift-migration-20260531-03
 - UIはSwiftUIを主軸にし、カメラ・写真・地図・通知・共有・購入・権限などは必要に応じてUIKit / Apple frameworkを直接使う。
 - アーキテクチャはMV firstを基本にする。不要なMVVMや巨大ViewModelを増やさない。
 - 共有状態は `@Observable` / `@State` / `@Environment` を優先し、非同期処理はSwift Concurrencyで整理する。
+- 画面が直接fixtureを読む構造にしない。`MegrumAppState` と `MegrumRepository` を通し、Supabase接続へ差し替えられる境界を保つ。
 
 ### 3. MegrumでSwift化の恩恵が大きい領域
 
@@ -92,6 +93,7 @@ tar -xzf /Users/michitaka/Desktop/Megrum_backups/pre-swift-migration-20260531-03
 
 - `ios-native/MegrumNative.xcodeproj` と `App/MegrumNativeApp.swift` でSwiftUI App hostを追加済み。
 - Swift Package側では `MegrumApp` にRootView、TabView、主要タブ画面の骨格を置く。
+- `MegrumAppState` と `MegrumRepository` で初期データロード境界を追加済み。
 - Bundle IDは最初は比較用Previewを分け、最終的に本番IDへ寄せる。
 - TabView / NavigationStack / deep link / auth restore / app lifecycleを組む。
 

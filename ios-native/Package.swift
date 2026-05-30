@@ -17,6 +17,7 @@ let package = Package(
         .target(name: "MegrumCore"),
         .target(name: "MegrumDesign", dependencies: ["MegrumCore"]),
         .target(name: "MegrumApp", dependencies: ["MegrumCore", "MegrumDesign"]),
-        .testTarget(name: "MegrumCoreTests", dependencies: ["MegrumCore"])
+        .testTarget(name: "MegrumCoreTests", dependencies: ["MegrumCore"]),
+        .testTarget(name: "MegrumAppTests", dependencies: ["MegrumApp"])
     ]
 )

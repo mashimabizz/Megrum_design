@@ -4,6 +4,72 @@
 
 ---
 
+## イテレーション302：Swift AppStateを追加
+
+### 背景・問題意識
+
+Swift版の画面骨格はできたが、各画面が直接固定データを読んでいる状態では、Supabase接続・認証復帰・pull to refresh・画面間共有状態へ進めにくい。完全移行を継続するため、まずSwift側にアプリ状態とRepository境界を作り、後続の実データ接続を差し替えやすくする必要があった。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/MegrumAppState.swift`
+- `MegrumAppSnapshot` を追加し、viewer / inventory / wishes / proposals / grooms / threads をまとめてロードできる形にした。
+- `MegrumRepository` protocolを追加し、将来のSupabase接続を画面から分離した。
+- `PreviewMegrumRepository` を追加し、現時点では固定データをRepository経由で返す構成にした。
+- `MegrumAppState` を追加し、初期ロード、refresh、loading/error状態をSwiftUIから監視できるようにした。
+
+#### `ios-native/Sources/MegrumApp/MegrumRootView.swift`
+- `@StateObject` で `MegrumAppState` を保持し、主要タブへ状態からデータを渡すよう変更した。
+- 起動時に `loadInitialData()` を走らせるようにした。
+
+#### `ios-native/Sources/MegrumApp/HomeScreen.swift`
+- Homeがviewer / match data / loading state / refresh actionを受け取る構成に変更した。
+- 初期ロード中にグッズグリッド形状のplaceholderを表示できるようにした。
+- `refreshable` で上方向pull更新の入口をSwift側にも用意した。
+
+#### `ios-native/Tests/MegrumAppTests/`
+- `MegrumAppStateTests` を追加し、Preview repositoryから初期データがロードされることを検証した。
+
+#### `ios-native/README.md`
+- AppState / Repository境界とMegrumAppTestsの役割を追記した。
+
+#### `notes/22_swift_native_migration.md`
+- Swift版の共有状態・データ接続方針として、画面が直接fixtureを読まないことを追記した。
+
+### 影響範囲
+
+- Swift Native iOS版のアプリ状態管理
+- ホーム、検索、在庫、Wish、やりとり、めぐりのデータ受け渡し
+- 今後のSupabase / 認証 / refresh接続の差し替え点
+
+### 確認方法
+
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-build --enable-xctest --disable-swift-testing -j 1`
+- `xcodebuild -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -destination 'generic/platform=iOS Simulator' -derivedDataPath /tmp/megrum-native-xcodebuild CODE_SIGNING_ALLOWED=NO build`
+- `git diff --check -- ios-native/Package.swift ios-native/Sources/MegrumApp ios-native/Tests/MegrumAppTests ios-native/README.md notes/22_swift_native_migration.md notes/08_design_iterations.md`
+
+### 関連ファイル
+
+- `ios-native/Package.swift`
+- `ios-native/Sources/MegrumApp/MegrumAppState.swift`
+- `ios-native/Sources/MegrumApp/HomeScreen.swift`
+- `ios-native/Sources/MegrumApp/MegrumRootView.swift`
+- `ios-native/Sources/MegrumApp/NativePreviewData.swift`
+- `ios-native/Tests/MegrumAppTests/MegrumAppStateTests.swift`
+- `ios-native/README.md`
+- `notes/22_swift_native_migration.md`
+- `notes/08_design_iterations.md`
+
+### セルフレビュー結果
+
+- ✅ 画面が直接固定データを読む構造から、AppState / Repository経由の構造へ進めた。
+- ✅ Swift Package testsが3件成功し、AppStateの初期ロードを検証した。
+- ✅ Xcode App HostのSimulator buildが引き続き成功することを確認した。
+- ✅ 状態遷移・用語・DBスキーマ変更はないため、`notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要。
+- ✅ TestFlight配布はまだ行っていないため、Preview OTA / TestFlight配信は不要。
+
+---
+
 ## イテレーション301：Xcode App Hostを追加
 
 ### 背景・問題意識
