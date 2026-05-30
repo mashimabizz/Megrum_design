@@ -357,6 +357,7 @@ export default function UserProfileScreen() {
               <MiniStat
                 label="評価"
                 value={profile.ratingAvg == null ? "★—" : `★${profile.ratingAvg.toFixed(1)}`}
+                accessibilityLabel="評価一覧を見る"
                 onPress={() =>
                   router.push({
                     pathname: "/user-evaluations",
@@ -519,10 +520,12 @@ function ProfileHero({ profile }: { profile: UserProfile }) {
 }
 
 function MiniStat({
+  accessibilityLabel,
   label,
   value,
   onPress,
 }: {
+  accessibilityLabel?: string;
   label: string;
   value: string;
   onPress?: () => void;
@@ -537,6 +540,7 @@ function MiniStat({
   return (
     <Pressable
       accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel ?? label}
       onPress={onPress}
       style={({ pressed }) => [
         styles.miniStat,

@@ -4,6 +4,58 @@
 
 ---
 
+## イテレーション277：相手プロフィール評価導線を接続
+
+### 背景・問題意識
+
+オーナーから、相手プロフィールの評価エリアをタップした時に評価一覧へ遷移し、一覧では評価者のアイコン、ユーザーネーム、評価日付、評価の星、コメントを見られるようにしたいという要望があった。既存の評価一覧画面はあったが、表示がコメント付き評価に偏っており、評価者アイコンも不足していた。
+
+### 変更内容
+
+#### `mobile/app/user-profile.tsx`
+- 相手プロフィール上部の評価 stat にアクセシビリティラベルを追加し、評価一覧へのタップ導線を明示した。
+
+#### `mobile/app/user-evaluations.tsx`
+- 評価一覧をコメント付きだけではなく全評価のリストに変更した。
+- 評価者のアイコン、ユーザーネーム、表示名、評価日付、星、コメントを表示するカードに整理した。
+- 評価者プロフィール取得で `avatar_url` / `display_name` を読み込むようにした。
+
+#### `supabase/migrations/20260531001000_allow_profile_evaluation_read.sql`
+- 相手プロフィールの評価一覧で評価詳細を取得できるよう、ログイン済みユーザー向けの読み取りポリシーを追加した。
+- `ratee_id, created_at` のインデックスを追加した。
+
+#### `notes/05_data_model.md`
+- プロフィール評価一覧の表示項目とRLS方針を追記した。
+
+### 影響範囲
+
+- iOS版 相手プロフィール
+- iOS版 評価一覧
+- Supabase `user_evaluations` の読み取りポリシー
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- `EAS_UPDATE_PROJECT_SLUG=ihub EXPO_NO_GIT_STATUS=1 npm --prefix mobile run update:ios:preview -- --message "[iter277] 相手プロフィール評価導線を接続" --non-interactive`
+- Preview OTA: Update group ID `8707c0e1-651d-4a8f-bd2b-7a97664fc9a4` / iOS update ID `019e76e3-da99-7499-94af-5a64c69ab4c2`
+- DB反映: `npx supabase db push --linked --yes` で `20260531001000_allow_profile_evaluation_read.sql` を適用済み
+
+### 関連ファイル
+
+- `mobile/app/user-profile.tsx`
+- `mobile/app/user-evaluations.tsx`
+- `supabase/migrations/20260531001000_allow_profile_evaluation_read.sql`
+- `notes/05_data_model.md`
+- `notes/08_design_iterations.md`
+
+### セルフレビュー結果
+
+- ✅ 相手プロフィールの評価タップ導線は既存の評価一覧ルートへ接続済み。
+- ✅ 評価一覧は全評価を対象にし、評価者アイコン・ユーザーネーム・日付・星・コメントを表示する。
+- ✅ 新しいDBテーブルは追加せず、既存 `user_evaluations` の読み取りポリシーのみ補強した。
+- ✅ 状態名・新規用語の追加はなし。`notes/09_state_machines.md` / `notes/10_glossary.md` の更新は不要。
+
 ## イテレーション276：モバイル通知と通知ドロワー導線を実装
 
 ### 背景・問題意識

@@ -1,6 +1,6 @@
 import { router, useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Image, StyleSheet, Text, View } from "react-native";
 import { useAuth } from "../src/auth/AuthProvider";
 import { PrimaryButton } from "../src/components/PrimaryButton";
 import { RouteHeader } from "../src/components/RouteHeader";
@@ -9,17 +9,24 @@ import { supabase } from "../src/lib/supabase";
 import { megrumColors, megrumRadii, megrumShadow } from "../src/theme/tokens";
 
 type EvaluationRow = {
+  id: string;
   stars: number;
   comment: string | null;
   created_at: string;
   rater_id: string;
 };
 
+type EvaluationWithRater = EvaluationRow & {
+  raterAvatarUrl: string | null;
+  raterDisplayName: string;
+  raterHandle: string;
+};
+
 type EvaluationData = {
   userId: string;
   handle: string;
   displayName: string;
-  evaluations: (EvaluationRow & { raterHandle: string })[];
+  evaluations: EvaluationWithRater[];
 };
 
 export default function UserEvaluationsScreen() {
@@ -48,9 +55,6 @@ export default function UserEvaluationsScreen() {
   }, [reload]);
 
   const stats = useMemo(() => buildStats(data?.evaluations ?? []), [data?.evaluations]);
-  const comments = (data?.evaluations ?? []).filter(
-    (evaluation) => evaluation.comment && evaluation.comment.trim().length > 0,
-  );
 
   if (previewMode || !user) {
     return (
@@ -115,27 +119,45 @@ export default function UserEvaluationsScreen() {
             </View>
 
             <View style={styles.comments}>
-              {comments.length > 0 ? (
-                comments.map((evaluation, index) => (
-                  <View key={`${evaluation.created_at}-${index}`} style={styles.commentCard}>
-                    <View style={styles.commentTop}>
-                      <Text style={styles.rater}>@{evaluation.raterHandle}</Text>
-                      <Text style={styles.commentStars}>
-                        {"★".repeat(evaluation.stars)}
-                        <Text style={styles.commentStarsMuted}>
-                          {"★".repeat(5 - evaluation.stars)}
+              {data.evaluations.map((evaluation) => (
+                <View key={evaluation.id} style={styles.commentCard}>
+                  <View style={styles.commentTop}>
+                    <View style={styles.raterAvatar}>
+                      {evaluation.raterAvatarUrl ? (
+                        <Image
+                          source={{ uri: evaluation.raterAvatarUrl }}
+                          resizeMode="cover"
+                          style={styles.raterAvatarImage}
+                        />
+                      ) : (
+                        <Text style={styles.raterAvatarText}>
+                          {raterInitial(evaluation)}
                         </Text>
-                      </Text>
-                      <Text style={styles.date}>{formatDate(evaluation.created_at)}</Text>
+                      )}
                     </View>
-                    <Text style={styles.comment}>{evaluation.comment}</Text>
+                    <View style={styles.raterInfo}>
+                      <Text numberOfLines={1} style={styles.rater}>
+                        @{evaluation.raterHandle}
+                      </Text>
+                      <Text numberOfLines={1} style={styles.raterName}>
+                        {evaluation.raterDisplayName}
+                      </Text>
+                    </View>
+                    <Text style={styles.date}>{formatDate(evaluation.created_at)}</Text>
                   </View>
-                ))
-              ) : (
-                <View style={styles.emptyCard}>
-                  <Text style={styles.muted}>コメント付きの評価はまだありません</Text>
+                  <View style={styles.evaluationMeta}>
+                    <Text style={styles.commentStars}>
+                      {"★".repeat(evaluation.stars)}
+                      <Text style={styles.commentStarsMuted}>
+                        {"★".repeat(5 - evaluation.stars)}
+                      </Text>
+                    </Text>
+                  </View>
+                  <Text style={styles.comment}>
+                    {evaluation.comment?.trim() || "コメントはありません"}
+                  </Text>
                 </View>
-              )}
+              ))}
             </View>
           </>
         )
@@ -164,19 +186,33 @@ async function fetchEvaluationData(userId: string): Promise<EvaluationData> {
 
   const { data: rows } = await supabase
     .from("user_evaluations")
-    .select("stars, comment, created_at, rater_id")
+    .select("id, stars, comment, created_at, rater_id")
     .eq("ratee_id", userId)
     .order("created_at", { ascending: false });
   const evaluations = ((rows as EvaluationRow[] | null) ?? []);
   const raterIds = Array.from(new Set(evaluations.map((evaluation) => evaluation.rater_id)));
-  const handleMap = new Map<string, string>();
+  const raterMap = new Map<
+    string,
+    { avatarUrl: string | null; displayName: string; handle: string }
+  >();
   if (raterIds.length > 0) {
     const { data: raters } = await supabase
       .from("users")
-      .select("id, handle")
+      .select("id, handle, display_name, avatar_url")
       .in("id", raterIds);
-    for (const rater of (raters as { id: string; handle: string | null }[] | null) ?? []) {
-      handleMap.set(rater.id, rater.handle ?? "?");
+    for (const rater of (
+      raters as {
+        id: string;
+        handle: string | null;
+        display_name: string | null;
+        avatar_url: string | null;
+      }[] | null
+    ) ?? []) {
+      raterMap.set(rater.id, {
+        avatarUrl: rater.avatar_url ?? null,
+        displayName: rater.display_name ?? rater.handle ?? "ユーザー",
+        handle: rater.handle ?? "?",
+      });
     }
   }
   return {
@@ -185,7 +221,9 @@ async function fetchEvaluationData(userId: string): Promise<EvaluationData> {
     displayName: targetUser.display_name ?? "?",
     evaluations: evaluations.map((evaluation) => ({
       ...evaluation,
-      raterHandle: handleMap.get(evaluation.rater_id) ?? "?",
+      raterAvatarUrl: raterMap.get(evaluation.rater_id)?.avatarUrl ?? null,
+      raterDisplayName: raterMap.get(evaluation.rater_id)?.displayName ?? "ユーザー",
+      raterHandle: raterMap.get(evaluation.rater_id)?.handle ?? "?",
     })),
   };
 }
@@ -206,6 +244,10 @@ function buildStats(evaluations: EvaluationRow[]) {
 function formatDate(value: string) {
   const date = new Date(value);
   return `${date.getFullYear()}/${String(date.getMonth() + 1).padStart(2, "0")}/${String(date.getDate()).padStart(2, "0")}`;
+}
+
+function raterInitial(evaluation: EvaluationWithRater) {
+  return (evaluation.raterDisplayName || evaluation.raterHandle || "?").slice(0, 1);
 }
 
 const styles = StyleSheet.create({
@@ -318,22 +360,54 @@ const styles = StyleSheet.create({
     borderColor: "rgba(58,50,74,0.08)",
     borderRadius: megrumRadii.lg,
     borderWidth: 1,
+    gap: 10,
     padding: 14,
   },
   commentTop: {
     alignItems: "center",
     flexDirection: "row",
     gap: 8,
-    marginBottom: 7,
+  },
+  raterAvatar: {
+    alignItems: "center",
+    backgroundColor: "rgba(166,149,216,0.12)",
+    borderColor: "rgba(166,149,216,0.24)",
+    borderRadius: 18,
+    borderWidth: 1,
+    height: 36,
+    justifyContent: "center",
+    overflow: "hidden",
+    width: 36,
+  },
+  raterAvatarImage: {
+    height: "100%",
+    width: "100%",
+  },
+  raterAvatarText: {
+    color: megrumColors.lavender,
+    fontSize: 13,
+    fontWeight: "900",
+  },
+  raterInfo: {
+    flex: 1,
+    gap: 2,
   },
   rater: {
     color: megrumColors.ink,
     fontSize: 11.5,
     fontWeight: "900",
   },
+  raterName: {
+    color: megrumColors.mutedInk,
+    fontSize: 10.5,
+    fontWeight: "800",
+  },
+  evaluationMeta: {
+    alignItems: "center",
+    flexDirection: "row",
+  },
   commentStars: {
     color: megrumColors.lavender,
-    flex: 1,
     fontSize: 10.5,
     fontWeight: "900",
   },
