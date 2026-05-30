@@ -4,6 +4,50 @@
 
 ---
 
+## イテレーション287：検索フィルター候補と下部配置を修正
+
+### 背景・問題意識
+
+オーナーから、ホームの検索アイコンから検索画面へ入った時に、下部の検索バーとフィルターフッターが重なっているという指摘があった。また、検索語が結果にヒットしない場合、フィルター候補が検索結果依存のまま空になり、グループ・メンバー・グッズ種別などで絞り込めない状態になっていた。
+
+### 変更内容
+
+#### `mobile/app/search.tsx`
+- 下部のフィルターフッター位置を、iOS下部検索バーより上へ逃がすように調整した。
+- フィルター候補を検索結果だけではなく、`groups_master` / `characters_master` / `goods_types_master` / `search_tags` からも読み込むようにした。
+- グループは推し登録画面に近い別モーダルで選択できるようにし、ジャンルチップ・検索欄・カード選択UIを追加した。
+- メンバー候補は選択中のグループに紐づくものだけを表示するようにした。
+- グッズ種別は検索結果が0件でもデフォルト候補をボタン表示するようにした。
+- 現地交換日付、現地交換場所、交換条件タグ、交換手段は検索結果に依存せず候補を表示する方針を維持した。
+
+### 影響範囲
+
+- iOS版 検索画面
+- 検索フィルター
+- ホーム画面からの検索導線
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- `EAS_UPDATE_PROJECT_SLUG=ihub EXPO_NO_GIT_STATUS=1 npm --prefix mobile run update:ios:preview -- --message "[iter287] 検索フィルター候補と下部配置を修正" --non-interactive`
+- Preview OTA: Update group ID `b6cf1041-5ae0-43fe-a5c7-fa5caf3ede3b` / iOS update ID `019e788b-496a-7e7b-81bf-ae592c2e8924`
+- EAS Dashboard: `https://expo.dev/accounts/mashima.bizz/projects/ihub/updates/b6cf1041-5ae0-43fe-a5c7-fa5caf3ede3b`
+
+### 関連ファイル
+
+- `mobile/app/search.tsx`
+- `notes/08_design_iterations.md`
+
+### セルフレビュー結果
+
+- ✅ 下部検索バーとフィルターフッターが同じ高さに重ならないようにした。
+- ✅ グループ・メンバー・グッズ種別の候補を検索結果0件時にも表示できるようにした。
+- ✅ グループ選択は推し登録画面の候補選択に近いカードUIへ寄せた。
+- ✅ メンバー候補は選択済みグループに連動して絞り込まれる。
+- ✅ iOS Preview channel へOTA配信済み。
+- ✅ 状態遷移・用語・DBスキーマ変更はないため、`notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要。
+
 ## イテレーション286：ホーム検索をリキッドグラス化
 
 ### 背景・問題意識

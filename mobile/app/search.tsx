@@ -3,6 +3,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { router, Stack, useLocalSearchParams } from "expo-router";
 import {
   ActionSheetIOS,
+  ActivityIndicator,
   Alert,
   Keyboard,
   Modal,
@@ -11,6 +12,7 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -27,6 +29,11 @@ import { supabase } from "../src/lib/supabase";
 import { megrumColors, megrumRadii } from "../src/theme/tokens";
 
 type MasterName = { name: string | null } | { name: string | null }[] | null;
+type MasterRelation =
+  | { id?: string | null; name?: string | null }
+  | { id?: string | null; name?: string | null }[]
+  | null
+  | undefined;
 
 type InventoryHitRow = {
   id: string;
@@ -128,6 +135,31 @@ type SearchMetadata = {
 };
 
 type SearchSortKey = "recentLogin" | "newest";
+type SearchGenreOption = {
+  id: string;
+  name: string;
+};
+type SearchGroupOption = {
+  aliases: string[];
+  genreId: string | null;
+  genreName: string | null;
+  id: string;
+  mine: boolean;
+  name: string;
+};
+type SearchMemberOption = {
+  groupId: string | null;
+  groupName: string | null;
+  id: string;
+  name: string;
+};
+type SearchMasterFilterData = {
+  genres: SearchGenreOption[];
+  goodsTypes: string[];
+  groups: SearchGroupOption[];
+  members: SearchMemberOption[];
+  tags: string[];
+};
 
 const RECENT_KEY = "megrum-search-recent-v1";
 const EMPTY_FILTERS: SearchFilterState = {
@@ -142,6 +174,23 @@ const EMPTY_FILTERS: SearchFilterState = {
 };
 const EXCHANGE_FILTERS = ["現地交換", "郵送", "どちらもOK"];
 const DEFAULT_OPTION_TAGS = ["即日発送", "同日発送", "開演前OK", "終演後OK", "グッズ販売中OK"];
+const DEFAULT_GOODS_TYPES = [
+  "トレカ",
+  "生写真",
+  "缶バッジ",
+  "アクスタ",
+  "アクキー",
+  "ステッカー",
+  "うちわ",
+  "ポストカード",
+];
+const EMPTY_MASTER_FILTERS: SearchMasterFilterData = {
+  genres: [],
+  goodsTypes: DEFAULT_GOODS_TYPES,
+  groups: [],
+  members: [],
+  tags: [],
+};
 const PREFECTURE_FILTERS = JAPAN_PREFECTURES.map((prefecture) =>
   displayPrefectureName(prefecture.name),
 );
@@ -206,6 +255,45 @@ const PREVIEW_HITS: SearchHit[] = [
     matchBucket: "none",
   },
 ];
+const PREVIEW_MASTER_FILTERS: SearchMasterFilterData = {
+  genres: [
+    { id: "preview-kpop", name: "K-POP" },
+    { id: "preview-anime", name: "アニメ" },
+  ],
+  groups: [
+    {
+      aliases: ["ルメナ"],
+      genreId: "preview-kpop",
+      genreName: "K-POP",
+      id: "preview-group-lumena",
+      mine: true,
+      name: "LUMENA",
+    },
+    {
+      aliases: [],
+      genreId: "preview-kpop",
+      genreName: "K-POP",
+      id: "preview-group-aespa",
+      mine: true,
+      name: "aespa",
+    },
+    {
+      aliases: ["セブチ"],
+      genreId: "preview-kpop",
+      genreName: "K-POP",
+      id: "preview-group-svt",
+      mine: false,
+      name: "SEVENTEEN",
+    },
+  ],
+  members: [
+    { groupId: "preview-group-lumena", groupName: "LUMENA", id: "preview-member-sua", name: "スア" },
+    { groupId: "preview-group-aespa", groupName: "aespa", id: "preview-member-ning", name: "ニンニン" },
+    { groupId: "preview-group-svt", groupName: "SEVENTEEN", id: "preview-member-mingyu", name: "ミンギュ" },
+  ],
+  goodsTypes: DEFAULT_GOODS_TYPES,
+  tags: ["春ver.", "会場限定", "同種優先", "制服", "現地OK"],
+};
 
 const RESULT_SECTIONS: {
   id: SearchMatchBucket;
@@ -245,6 +333,10 @@ export default function SearchScreen() {
   const [hits, setHits] = useState<SearchHit[]>([]);
   const [filters, setFilters] = useState<SearchFilterState>(EMPTY_FILTERS);
   const [filterOpen, setFilterOpen] = useState(false);
+  const [masterFilters, setMasterFilters] = useState<SearchMasterFilterData>(
+    previewMode ? PREVIEW_MASTER_FILTERS : EMPTY_MASTER_FILTERS,
+  );
+  const [masterFiltersLoading, setMasterFiltersLoading] = useState(false);
   const [sortKey, setSortKey] = useState<SearchSortKey>("recentLogin");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -281,6 +373,34 @@ export default function SearchScreen() {
   useEffect(() => {
     loadPopularSearches();
   }, [loadPopularSearches]);
+
+  useEffect(() => {
+    if (!supabase || previewMode) {
+      setMasterFilters(PREVIEW_MASTER_FILTERS);
+      setMasterFiltersLoading(false);
+      return;
+    }
+    if (!user) {
+      setMasterFilters(EMPTY_MASTER_FILTERS);
+      setMasterFiltersLoading(false);
+      return;
+    }
+    let active = true;
+    setMasterFiltersLoading(true);
+    fetchSearchMasterFilters(user.id)
+      .then((next) => {
+        if (active) setMasterFilters(next);
+      })
+      .catch(() => {
+        if (active) setMasterFilters(EMPTY_MASTER_FILTERS);
+      })
+      .finally(() => {
+        if (active) setMasterFiltersLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [previewMode, user]);
 
   useEffect(() => {
     const q = query.trim();
@@ -341,7 +461,10 @@ export default function SearchScreen() {
     () => sortSearchHits(filteredHits, sortKey),
     [filteredHits, sortKey],
   );
-  const filterOptions = useMemo(() => buildSearchFilterOptions(hits), [hits]);
+  const filterOptions = useMemo(
+    () => mergeSearchFilterOptions(buildSearchFilterOptions(hits), masterFilters, filters),
+    [filters, hits, masterFilters],
+  );
   const activeFilterCount = countActiveSearchFilters(filters);
 
   const sections = useMemo(
@@ -356,11 +479,32 @@ export default function SearchScreen() {
   );
 
   const totalCount = sortedHits.length;
-  const filterFooterBottom = Math.max(insets.bottom, 12) + 16;
-  const footerBottomPadding = filterFooterBottom + 86;
+  const filterFooterBottom = Math.max(insets.bottom, 12) + 86;
+  const footerBottomPadding = filterFooterBottom + 104;
   const dismissKeyboard = useCallback(() => {
     Keyboard.dismiss();
   }, []);
+
+  const updateFilters = useCallback(
+    (key: keyof SearchFilterState, value: string) => {
+      setFilters((current) =>
+        normalizeSearchFilters(
+          toggleSearchFilterValue(current, key, value),
+          masterFilters,
+        ),
+      );
+    },
+    [masterFilters],
+  );
+
+  const updateFilterGroups = useCallback(
+    (groups: string[]) => {
+      setFilters((current) =>
+        normalizeSearchFilters({ ...current, groups }, masterFilters),
+      );
+    },
+    [masterFilters],
+  );
 
   function submit(nextQuery = draft) {
     const q = nextQuery.trim();
@@ -534,13 +678,15 @@ export default function SearchScreen() {
       </View>
       <SearchFilterSheet
         filters={filters}
+        groupOptions={masterFilters.groups}
+        genres={masterFilters.genres}
+        loadingMasters={masterFiltersLoading}
         open={filterOpen}
         options={filterOptions}
         onClose={() => setFilterOpen(false)}
         onReset={() => setFilters(EMPTY_FILTERS)}
-        onToggle={(key, value) =>
-          setFilters((current) => toggleSearchFilterValue(current, key, value))
-        }
+        onSetGroups={updateFilterGroups}
+        onToggle={updateFilters}
       />
     </Screen>
   );
@@ -622,93 +768,308 @@ function SuggestionGroup({
 
 function SearchFilterSheet({
   filters,
+  genres,
+  groupOptions,
+  loadingMasters,
   onClose,
   onReset,
+  onSetGroups,
   onToggle,
   open,
   options,
 }: {
   filters: SearchFilterState;
+  genres: SearchGenreOption[];
+  groupOptions: SearchGroupOption[];
+  loadingMasters: boolean;
   onClose: () => void;
   onReset: () => void;
+  onSetGroups: (groups: string[]) => void;
   onToggle: (key: keyof SearchFilterState, value: string) => void;
   open: boolean;
   options: SearchFilterState;
 }) {
+  const [groupPickerOpen, setGroupPickerOpen] = useState(false);
   return (
-    <Modal animationType="slide" transparent visible={open} onRequestClose={onClose}>
-      <View style={styles.filterSheetRoot}>
-        <Pressable style={styles.filterSheetBackdrop} onPress={onClose} />
-        <View style={styles.filterSheet}>
-          <View style={styles.filterSheetHeader}>
-            <Text style={styles.filterSheetTitle}>検索フィルター</Text>
-            <Pressable accessibilityRole="button" onPress={onReset} style={styles.filterReset}>
-              <Text style={styles.filterResetText}>リセット</Text>
+    <>
+      <Modal animationType="slide" transparent visible={open} onRequestClose={onClose}>
+        <View style={styles.filterSheetRoot}>
+          <Pressable style={styles.filterSheetBackdrop} onPress={onClose} />
+          <View style={styles.filterSheet}>
+            <View style={styles.filterSheetHeader}>
+              <Text style={styles.filterSheetTitle}>検索フィルター</Text>
+              <Pressable accessibilityRole="button" onPress={onReset} style={styles.filterReset}>
+                <Text style={styles.filterResetText}>リセット</Text>
+              </Pressable>
+            </View>
+            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.filterSheetContent}>
+              <FilterGroupSelector
+                active={filters.groups}
+                loading={loadingMasters}
+                onOpen={() => setGroupPickerOpen(true)}
+                onRemove={(value) => onToggle("groups", value)}
+                title="グループ"
+              />
+              <FilterChipGroup
+                active={filters.members}
+                empty={filters.groups.length > 0 ? "選んだグループに紐づくメンバーがありません" : undefined}
+                filterKey="members"
+                options={options.members}
+                title="メンバー"
+                onToggle={onToggle}
+              />
+              <FilterChipGroup
+                active={filters.goodsTypes}
+                filterKey="goodsTypes"
+                options={options.goodsTypes}
+                title="グッズ種別"
+                onToggle={onToggle}
+              />
+              <FilterDateCalendar
+                active={filters.meetupDates}
+                title="現地交換日付"
+                dates={buildMeetupDateOptions()}
+                onToggle={(value) => onToggle("meetupDates", value)}
+              />
+              <FilterChipGroup
+                active={filters.meetupPlaces}
+                filterKey="meetupPlaces"
+                options={options.meetupPlaces}
+                title="現地交換場所"
+                onToggle={onToggle}
+              />
+              <FilterChipGroup
+                active={filters.optionTags}
+                filterKey="optionTags"
+                options={options.optionTags}
+                title="交換条件タグ"
+                onToggle={onToggle}
+              />
+              <FilterChipGroup
+                active={filters.tags}
+                filterKey="tags"
+                options={options.tags}
+                title="グッズタグ"
+                onToggle={onToggle}
+              />
+              <FilterChipGroup
+                active={filters.exchangeMethods}
+                filterKey="exchangeMethods"
+                options={options.exchangeMethods}
+                title="交換手段"
+                onToggle={onToggle}
+              />
+            </ScrollView>
+            <Pressable accessibilityRole="button" onPress={onClose} style={styles.filterApply}>
+              <Text style={styles.filterApplyText}>結果を見る</Text>
             </Pressable>
           </View>
-          <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.filterSheetContent}>
-            <FilterChipGroup
-              active={filters.groups}
-              filterKey="groups"
-              options={options.groups}
-              title="グループ"
-              onToggle={onToggle}
+        </View>
+      </Modal>
+      <GroupFilterPickerModal
+        active={filters.groups}
+        genres={genres}
+        groups={groupOptions}
+        loading={loadingMasters}
+        onClose={() => setGroupPickerOpen(false)}
+        onSetGroups={onSetGroups}
+        open={groupPickerOpen}
+      />
+    </>
+  );
+}
+
+function FilterGroupSelector({
+  active,
+  loading,
+  onOpen,
+  onRemove,
+  title,
+}: {
+  active: string[];
+  loading: boolean;
+  onOpen: () => void;
+  onRemove: (value: string) => void;
+  title: string;
+}) {
+  return (
+    <View style={styles.filterGroup}>
+      <View style={styles.filterGroupHeader}>
+        <Text style={styles.filterGroupTitle}>{title}</Text>
+        {loading ? <ActivityIndicator color={megrumColors.lavender} size="small" /> : null}
+      </View>
+      <Pressable accessibilityRole="button" onPress={onOpen} style={styles.filterPickerButton}>
+        <Text style={styles.filterPickerButtonText}>
+          {active.length > 0 ? "グループを変更" : "グループを選ぶ"}
+        </Text>
+        <Text style={styles.filterPickerChevron}>›</Text>
+      </Pressable>
+      {active.length > 0 ? (
+        <View style={styles.filterGroupChips}>
+          {active.map((value) => (
+            <Pressable
+              accessibilityRole="button"
+              key={value}
+              onPress={() => onRemove(value)}
+              style={[styles.filterChipOption, styles.filterChipOptionActive]}
+            >
+              <Text style={styles.filterChipOptionTextActive}>{value} ×</Text>
+            </Pressable>
+          ))}
+        </View>
+      ) : (
+        <Text style={styles.filterGroupEmpty}>推し選択と同じ形でグループを選べます</Text>
+      )}
+    </View>
+  );
+}
+
+function GroupFilterPickerModal({
+  active,
+  genres,
+  groups,
+  loading,
+  onClose,
+  onSetGroups,
+  open,
+}: {
+  active: string[];
+  genres: SearchGenreOption[];
+  groups: SearchGroupOption[];
+  loading: boolean;
+  onClose: () => void;
+  onSetGroups: (groups: string[]) => void;
+  open: boolean;
+}) {
+  const [activeGenre, setActiveGenre] = useState("all");
+  const [query, setQuery] = useState("");
+  const activeSet = useMemo(() => new Set(active), [active]);
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return groups
+      .filter((group) => {
+        if (activeGenre !== "all" && group.genreId !== activeGenre) return false;
+        if (!q) return true;
+        return (
+          group.name.toLowerCase().includes(q) ||
+          group.aliases.some((alias) => alias.toLowerCase().includes(q))
+        );
+      })
+      .sort((a, b) => Number(b.mine) - Number(a.mine) || a.name.localeCompare(b.name, "ja"));
+  }, [activeGenre, groups, query]);
+
+  function toggleGroup(name: string) {
+    const next = activeSet.has(name)
+      ? active.filter((value) => value !== name)
+      : [...active, name];
+    onSetGroups(next);
+  }
+
+  return (
+    <Modal
+      animationType={Platform.OS === "ios" ? "slide" : "fade"}
+      presentationStyle={Platform.OS === "ios" ? "pageSheet" : "overFullScreen"}
+      transparent={Platform.OS !== "ios"}
+      visible={open}
+      onRequestClose={onClose}
+    >
+      <View style={[styles.groupPickerRoot, Platform.OS === "ios" ? styles.groupPickerNativeRoot : null]}>
+        {Platform.OS !== "ios" ? <Pressable style={styles.groupPickerBackdrop} onPress={onClose} /> : null}
+        <View style={[styles.groupPickerPanel, Platform.OS === "ios" ? styles.groupPickerNativePanel : null]}>
+          <View style={styles.groupPickerHeader}>
+            <View>
+              <Text style={styles.groupPickerTitle}>グループを選ぶ</Text>
+              <Text style={styles.groupPickerSub}>推し登録と同じ候補から選択します</Text>
+            </View>
+            <Pressable accessibilityRole="button" onPress={onClose} style={styles.groupPickerClose}>
+              <Text style={styles.groupPickerCloseText}>完了</Text>
+            </Pressable>
+          </View>
+          <TextInput
+            autoCapitalize="none"
+            placeholder="推しを検索"
+            placeholderTextColor="rgba(58,50,74,0.36)"
+            returnKeyType="search"
+            style={styles.groupPickerSearch}
+            value={query}
+            onChangeText={setQuery}
+          />
+          <ScrollView
+            horizontal
+            keyboardShouldPersistTaps="handled"
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.groupPickerGenres}
+          >
+            <FilterSmallChip
+              active={activeGenre === "all"}
+              label="すべて"
+              onPress={() => setActiveGenre("all")}
             />
-            <FilterChipGroup
-              active={filters.members}
-              filterKey="members"
-              options={options.members}
-              title="メンバー"
-              onToggle={onToggle}
-            />
-            <FilterChipGroup
-              active={filters.goodsTypes}
-              filterKey="goodsTypes"
-              options={options.goodsTypes}
-              title="グッズ種別"
-              onToggle={onToggle}
-            />
-            <FilterDateCalendar
-              active={filters.meetupDates}
-              title="現地交換日付"
-              dates={buildMeetupDateOptions()}
-              onToggle={(value) => onToggle("meetupDates", value)}
-            />
-            <FilterChipGroup
-              active={filters.meetupPlaces}
-              filterKey="meetupPlaces"
-              options={options.meetupPlaces}
-              title="現地交換場所"
-              onToggle={onToggle}
-            />
-            <FilterChipGroup
-              active={filters.optionTags}
-              filterKey="optionTags"
-              options={options.optionTags}
-              title="交換条件タグ"
-              onToggle={onToggle}
-            />
-            <FilterChipGroup
-              active={filters.tags}
-              filterKey="tags"
-              options={options.tags}
-              title="グッズタグ"
-              onToggle={onToggle}
-            />
-            <FilterChipGroup
-              active={filters.exchangeMethods}
-              filterKey="exchangeMethods"
-              options={options.exchangeMethods}
-              title="交換手段"
-              onToggle={onToggle}
-            />
+            {genres.map((genre) => (
+              <FilterSmallChip
+                active={activeGenre === genre.id}
+                key={genre.id}
+                label={genre.name}
+                onPress={() => setActiveGenre(genre.id)}
+              />
+            ))}
           </ScrollView>
-          <Pressable accessibilityRole="button" onPress={onClose} style={styles.filterApply}>
-            <Text style={styles.filterApplyText}>結果を見る</Text>
-          </Pressable>
+          {loading ? <ActivityIndicator color={megrumColors.lavender} /> : null}
+          <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.groupPickerList}>
+            {filtered.map((group) => {
+              const selected = activeSet.has(group.name);
+              return (
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityState={{ selected }}
+                  key={group.id}
+                  onPress={() => toggleGroup(group.name)}
+                  style={[styles.groupPickerCard, selected ? styles.groupPickerCardActive : null]}
+                >
+                  <View style={styles.groupPickerCardCopy}>
+                    <Text numberOfLines={1} style={styles.groupPickerCardTitle}>
+                      {group.name}
+                    </Text>
+                    <Text numberOfLines={1} style={styles.groupPickerCardMeta}>
+                      {group.mine ? "自分の推し" : group.genreName ?? "マスタ登録済み"}
+                    </Text>
+                  </View>
+                  <Text style={[styles.groupPickerCheck, selected ? styles.groupPickerCheckActive : null]}>
+                    {selected ? "✓" : "+"}
+                  </Text>
+                </Pressable>
+              );
+            })}
+            {!loading && filtered.length === 0 ? (
+              <Text style={styles.filterGroupEmpty}>該当するグループがありません</Text>
+            ) : null}
+          </ScrollView>
         </View>
       </View>
     </Modal>
+  );
+}
+
+function FilterSmallChip({
+  active,
+  label,
+  onPress,
+}: {
+  active: boolean;
+  label: string;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityState={{ selected: active }}
+      onPress={onPress}
+      style={[styles.filterSmallChip, active ? styles.filterSmallChipActive : null]}
+    >
+      <Text style={[styles.filterSmallChipText, active ? styles.filterSmallChipTextActive : null]}>
+        {label}
+      </Text>
+    </Pressable>
   );
 }
 
@@ -819,6 +1180,106 @@ function FilterChipGroup({
       )}
     </View>
   );
+}
+
+async function fetchSearchMasterFilters(userId: string): Promise<SearchMasterFilterData> {
+  if (!supabase) return EMPTY_MASTER_FILTERS;
+  const [genreRes, groupRes, oshiRes, memberRes, goodsTypeRes, tagRes] = await Promise.all([
+    supabase
+      .from("genres_master")
+      .select("id, name, display_order")
+      .order("display_order", { ascending: true }),
+    supabase
+      .from("groups_master")
+      .select("id, name, aliases, genre_id, display_order, genre:genres_master(id, name)")
+      .order("display_order", { ascending: true })
+      .limit(160),
+    supabase
+      .from("user_oshi")
+      .select("group_id")
+      .eq("user_id", userId)
+      .not("group_id", "is", null),
+    supabase
+      .from("characters_master")
+      .select("id, name, group_id, display_order, group:groups_master(id, name)")
+      .order("display_order", { ascending: true })
+      .limit(420),
+    supabase
+      .from("goods_types_master")
+      .select("id, name, display_order")
+      .order("display_order", { ascending: true }),
+    supabase.rpc("search_tags", {
+      p_q: "",
+      p_limit: 24,
+    }),
+  ]);
+
+  const myGroupIds = new Set(
+    ((oshiRes.data as { group_id: string | null }[] | null) ?? [])
+      .map((row) => row.group_id)
+      .filter((id): id is string => !!id),
+  );
+
+  const genres =
+    ((genreRes.data as { id: string; name: string | null }[] | null) ?? [])
+      .map((genre) => ({
+        id: genre.id,
+        name: genre.name?.trim() ?? "",
+      }))
+      .filter((genre) => genre.name.length > 0);
+
+  const groups =
+    ((groupRes.data as Record<string, unknown>[] | null) ?? [])
+      .map((group) => {
+        const genre = pickMasterRelation(group.genre as MasterRelation);
+        const name = typeof group.name === "string" ? group.name.trim() : "";
+        return {
+          aliases: Array.isArray(group.aliases)
+            ? group.aliases.filter((alias): alias is string => typeof alias === "string")
+            : [],
+          genreId:
+            typeof group.genre_id === "string" ? group.genre_id : genre?.id ?? null,
+          genreName: genre?.name ?? null,
+          id: String(group.id),
+          mine: myGroupIds.has(String(group.id)),
+          name,
+        };
+      })
+      .filter((group) => group.name.length > 0)
+      .sort((a, b) => Number(b.mine) - Number(a.mine) || a.name.localeCompare(b.name, "ja"));
+
+  const members =
+    ((memberRes.data as Record<string, unknown>[] | null) ?? [])
+      .map((member) => {
+        const group = pickMasterRelation(member.group as MasterRelation);
+        const name = typeof member.name === "string" ? member.name.trim() : "";
+        return {
+          groupId:
+            typeof member.group_id === "string" ? member.group_id : group?.id ?? null,
+          groupName: group?.name ?? null,
+          id: String(member.id),
+          name,
+        };
+      })
+      .filter((member) => member.name.length > 0);
+
+  const goodsTypes =
+    ((goodsTypeRes.data as { name: string | null }[] | null) ?? [])
+      .map((row) => row.name?.trim() ?? "")
+      .filter(Boolean);
+
+  const tags =
+    ((tagRes.data as TagSearchRow[] | null) ?? [])
+      .map((row) => row.label?.trim() ?? "")
+      .filter(Boolean);
+
+  return {
+    genres,
+    groups,
+    members,
+    goodsTypes: uniqueSearchOptions([...goodsTypes, ...DEFAULT_GOODS_TYPES]),
+    tags,
+  };
 }
 
 async function fetchSearchHits(userId: string, q: string): Promise<SearchHit[]> {
@@ -1191,6 +1652,48 @@ function buildSearchFilterOptions(hits: SearchHit[]): SearchFilterState {
   };
 }
 
+function mergeSearchFilterOptions(
+  hitOptions: SearchFilterState,
+  masterOptions: SearchMasterFilterData,
+  activeFilters: SearchFilterState,
+): SearchFilterState {
+  const selectedGroups = new Set(activeFilters.groups);
+  const linkedMembers = masterOptions.members
+    .filter((member) => {
+      if (selectedGroups.size === 0) return true;
+      return !!member.groupName && selectedGroups.has(member.groupName);
+    })
+    .map((member) => member.name);
+
+  return {
+    groups: uniqueSearchOptions([
+      ...activeFilters.groups,
+      ...masterOptions.groups.map((group) => group.name),
+      ...hitOptions.groups,
+    ]),
+    members: uniqueSearchOptions([
+      ...activeFilters.members,
+      ...linkedMembers,
+      ...hitOptions.members,
+    ]),
+    goodsTypes: uniqueSearchOptions([
+      ...activeFilters.goodsTypes,
+      ...masterOptions.goodsTypes,
+      ...hitOptions.goodsTypes,
+      ...DEFAULT_GOODS_TYPES,
+    ]),
+    meetupDates: buildMeetupDateOptions().map((date) => date.value),
+    meetupPlaces: PREFECTURE_FILTERS,
+    optionTags: DEFAULT_OPTION_TAGS,
+    tags: uniqueSearchOptions([
+      ...activeFilters.tags,
+      ...masterOptions.tags,
+      ...hitOptions.tags,
+    ]),
+    exchangeMethods: EXCHANGE_FILTERS,
+  };
+}
+
 function searchHitPassesFilters(hit: SearchHit, filters: SearchFilterState) {
   if (filters.groups.length > 0 && (!hit.groupName || !filters.groups.includes(hit.groupName))) {
     return false;
@@ -1353,6 +1856,29 @@ function toggleSearchFilterValue(
   return { ...current, [key]: nextValues };
 }
 
+function normalizeSearchFilters(
+  filters: SearchFilterState,
+  masterOptions: SearchMasterFilterData,
+): SearchFilterState {
+  if (filters.groups.length === 0) return filters;
+  const selectedGroups = new Set(filters.groups);
+  const allowedMembers = new Set(
+    masterOptions.members
+      .filter((member) => !!member.groupName && selectedGroups.has(member.groupName))
+      .map((member) => member.name),
+  );
+  return {
+    ...filters,
+    members: filters.members.filter((member) => allowedMembers.has(member)),
+  };
+}
+
+function uniqueSearchOptions(values: string[]) {
+  return Array.from(new Set(values.map((value) => value.trim()).filter(Boolean))).sort((a, b) =>
+    a.localeCompare(b, "ja"),
+  );
+}
+
 function countActiveSearchFilters(filters: SearchFilterState) {
   return Object.values(filters).reduce((sum, values) => sum + values.length, 0);
 }
@@ -1360,6 +1886,15 @@ function countActiveSearchFilters(filters: SearchFilterState) {
 function pickName(value: MasterName): string | null {
   if (!value) return null;
   return Array.isArray(value) ? value[0]?.name ?? null : value.name;
+}
+
+function pickMasterRelation(value: MasterRelation) {
+  const relation = Array.isArray(value) ? value[0] ?? null : value ?? null;
+  if (!relation) return null;
+  return {
+    id: typeof relation.id === "string" ? relation.id : null,
+    name: typeof relation.name === "string" ? relation.name : null,
+  };
 }
 
 function normalizeHue(value: number | string | null | undefined, seed: string) {
@@ -1626,6 +2161,11 @@ const styles = StyleSheet.create({
   filterGroup: {
     gap: 8,
   },
+  filterGroupHeader: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 8,
+  },
   filterGroupTitle: {
     color: megrumColors.ink,
     fontSize: 13,
@@ -1641,6 +2181,29 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     flexWrap: "wrap",
     gap: 7,
+  },
+  filterPickerButton: {
+    alignItems: "center",
+    backgroundColor: megrumColors.surface,
+    borderColor: "rgba(58,50,74,0.10)",
+    borderRadius: 16,
+    borderWidth: 1,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    minHeight: 48,
+    paddingHorizontal: 14,
+    paddingVertical: 11,
+  },
+  filterPickerButtonText: {
+    color: megrumColors.ink,
+    fontSize: 12.5,
+    fontWeight: "900",
+  },
+  filterPickerChevron: {
+    color: megrumColors.mutedInk,
+    fontSize: 24,
+    fontWeight: "700",
+    lineHeight: 26,
   },
   filterCalendarGrid: {
     flexDirection: "row",
@@ -1712,6 +2275,141 @@ const styles = StyleSheet.create({
     color: megrumColors.surface,
     fontSize: 14,
     fontWeight: "900",
+  },
+  groupPickerRoot: {
+    backgroundColor: "rgba(20,16,29,0.34)",
+    flex: 1,
+    justifyContent: "flex-end",
+  },
+  groupPickerNativeRoot: {
+    backgroundColor: megrumColors.background,
+    justifyContent: "flex-start",
+  },
+  groupPickerBackdrop: {
+    bottom: 0,
+    left: 0,
+    position: "absolute",
+    right: 0,
+    top: 0,
+  },
+  groupPickerPanel: {
+    backgroundColor: megrumColors.background,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    maxHeight: "90%",
+    paddingHorizontal: 18,
+    paddingTop: 16,
+  },
+  groupPickerNativePanel: {
+    borderTopLeftRadius: 0,
+    borderTopRightRadius: 0,
+    flex: 1,
+    maxHeight: "100%",
+    paddingTop: 18,
+  },
+  groupPickerHeader: {
+    alignItems: "center",
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginBottom: 13,
+  },
+  groupPickerTitle: {
+    color: megrumColors.ink,
+    fontSize: 18,
+    fontWeight: "900",
+  },
+  groupPickerSub: {
+    color: megrumColors.mutedInk,
+    fontSize: 11,
+    fontWeight: "800",
+    marginTop: 3,
+  },
+  groupPickerClose: {
+    backgroundColor: "rgba(166,149,216,0.14)",
+    borderRadius: megrumRadii.pill,
+    paddingHorizontal: 13,
+    paddingVertical: 8,
+  },
+  groupPickerCloseText: {
+    color: megrumColors.lavender,
+    fontSize: 12,
+    fontWeight: "900",
+  },
+  groupPickerSearch: {
+    backgroundColor: megrumColors.surface,
+    borderColor: "rgba(58,50,74,0.10)",
+    borderRadius: 16,
+    borderWidth: 1,
+    color: megrumColors.ink,
+    fontSize: 14,
+    fontWeight: "800",
+    minHeight: 48,
+    paddingHorizontal: 14,
+  },
+  groupPickerGenres: {
+    gap: 7,
+    paddingVertical: 12,
+  },
+  groupPickerList: {
+    gap: 9,
+    paddingBottom: 28,
+  },
+  groupPickerCard: {
+    alignItems: "center",
+    backgroundColor: megrumColors.surface,
+    borderColor: "rgba(58,50,74,0.08)",
+    borderRadius: 18,
+    borderWidth: 1.5,
+    flexDirection: "row",
+    gap: 11,
+    padding: 12,
+  },
+  groupPickerCardActive: {
+    backgroundColor: "rgba(166,149,216,0.09)",
+    borderColor: megrumColors.lavender,
+  },
+  groupPickerCardCopy: {
+    flex: 1,
+  },
+  groupPickerCardTitle: {
+    color: megrumColors.ink,
+    fontSize: 14,
+    fontWeight: "900",
+  },
+  groupPickerCardMeta: {
+    color: megrumColors.mutedInk,
+    fontSize: 10.5,
+    fontWeight: "800",
+    marginTop: 3,
+  },
+  groupPickerCheck: {
+    color: megrumColors.mutedInk,
+    fontSize: 20,
+    fontWeight: "900",
+    width: 24,
+  },
+  groupPickerCheckActive: {
+    color: megrumColors.lavender,
+  },
+  filterSmallChip: {
+    backgroundColor: megrumColors.surface,
+    borderColor: "rgba(58,50,74,0.10)",
+    borderRadius: megrumRadii.pill,
+    borderWidth: 1,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  filterSmallChipActive: {
+    backgroundColor: "rgba(166,149,216,0.14)",
+    borderColor: megrumColors.lavender,
+  },
+  filterSmallChipText: {
+    color: megrumColors.ink,
+    fontSize: 11.5,
+    fontWeight: "900",
+  },
+  filterSmallChipTextActive: {
+    color: megrumColors.lavender,
   },
   pressed: {
     opacity: 0.86,
