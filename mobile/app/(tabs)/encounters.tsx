@@ -1046,12 +1046,12 @@ export default function EncountersScreen() {
       topInset={false}
     >
       <ScrollView
-        automaticallyAdjustsScrollIndicatorInsets={false}
+        automaticallyAdjustsScrollIndicatorInsets
         contentContainerStyle={[
           styles.screen,
           { paddingBottom: bottomPadding, paddingTop: headerTop + 48 },
         ]}
-        contentInsetAdjustmentBehavior="never"
+        contentInsetAdjustmentBehavior="automatic"
         refreshControl={
           <RefreshControl
             refreshing={meguriRefreshing}
@@ -1059,7 +1059,9 @@ export default function EncountersScreen() {
             tintColor={megrumColors.lavender}
           />
         }
+        scrollEventThrottle={16}
         showsVerticalScrollIndicator={false}
+        style={styles.meguriScroll}
       >
         <GroomRail
           loading={groomLoading}
@@ -4298,6 +4300,9 @@ const styles = StyleSheet.create({
     paddingBottom: 0,
     paddingHorizontal: 0,
     paddingTop: 0,
+  },
+  meguriScroll: {
+    flex: 1,
   },
   screen: {
     gap: 16,

@@ -4,6 +4,45 @@
 
 ---
 
+## イテレーション288：めぐりホームの更新表示を統一
+
+### 背景・問題意識
+
+オーナーから、上にスクロールした時のローディングについて、めぐりホームだけホーム画面ややり取り画面と挙動・デザインが違うという指摘があった。めぐりホームは `ScrollView` の inset 調整を独自に止めていたため、Pull-to-refresh の表示位置や出方が他タブと揃いにくい状態だった。
+
+### 変更内容
+
+#### `mobile/app/(tabs)/encounters.tsx`
+- めぐりホームの `ScrollView` を、ホーム画面・やり取り画面と同じく `automaticallyAdjustsScrollIndicatorInsets` と `contentInsetAdjustmentBehavior="automatic"` に統一した。
+- `scrollEventThrottle={16}` と `flex: 1` のスクロール style を追加し、他タブと同じネイティブスクロール更新挙動に寄せた。
+- 更新処理自体は既存の `handleMeguriRefresh` を維持し、グルームと掲示板を同時に再取得する挙動は変えない。
+
+### 影響範囲
+
+- iOS版 めぐりホーム
+- めぐりホームのPull-to-refresh表示
+- グルーム／掲示板一覧の更新導線
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- `EAS_UPDATE_PROJECT_SLUG=ihub EXPO_NO_GIT_STATUS=1 npm --prefix mobile run update:ios:preview -- --message "[iter288] めぐりホームの更新表示を統一" --non-interactive`
+- Preview OTA: Update group ID `2132150e-5efe-4d36-9a81-9fcff11d0d2b` / iOS update ID `019e7890-a5e5-71eb-b918-7c297516c73d`
+- EAS Dashboard: `https://expo.dev/accounts/mashima.bizz/projects/ihub/updates/2132150e-5efe-4d36-9a81-9fcff11d0d2b`
+
+### 関連ファイル
+
+- `mobile/app/(tabs)/encounters.tsx`
+- `notes/08_design_iterations.md`
+
+### セルフレビュー結果
+
+- ✅ めぐりホームのPull-to-refresh設定をホーム画面・やり取り画面と同じネイティブ寄りの設定へ揃えた。
+- ✅ 更新時に読み直すデータ範囲は既存通り、グルームと掲示板に限定した。
+- ✅ iOS Preview channel へOTA配信済み。
+- ✅ 状態遷移・用語・DBスキーマ変更はないため、`notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要。
+
 ## イテレーション287：検索フィルター候補と下部配置を修正
 
 ### 背景・問題意識
