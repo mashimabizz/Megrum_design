@@ -4,6 +4,54 @@
 
 ---
 
+## イテレーション244：掲示板返信の正確な投稿日時を確認できるようにする
+
+### 背景・問題意識
+
+スポット掲示板では、列形成や落とし物、現地アナウンスなど、情報の鮮度が重要になる。返信欄には相対時刻だけを表示していたが、具体的な日時を確認したい場面があるため、返信時刻をタップして詳細日時を確認できるようにした。
+
+### 変更内容
+
+#### `mobile/app/meguri-board-thread.tsx`
+- 返信の相対時刻表示をタップ可能にした。
+- タップ時に `返信の日時` アラートを表示し、投稿日時を年・月・日・曜日・時刻つきで確認できるようにした。
+- 編集済み返信の場合は編集日時も同じアラート内に表示するようにした。
+- `formatFullDateTime` を追加し、詳細日時表示専用のフォーマットを分離した。
+
+#### `notes/09_state_machines.md`
+- Meguri Board Lifecycle に返信日時詳細表示のルールを追記した。
+
+#### `notes/10_glossary.md`
+- 掲示板返信日時詳細を追加した。
+
+### 影響範囲
+
+- iOS版 スポット掲示板詳細
+- 返信時刻表示
+- 現地情報の鮮度確認
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- `EAS_UPDATE_PROJECT_SLUG=ihub EXPO_NO_GIT_STATUS=1 npm --prefix mobile run update:ios:preview -- --message "[iter244] show board reply timestamp" --non-interactive`
+- Preview OTA: Update group ID `a32c1174-e103-4e2d-a602-662f36f9cf88` / iOS update ID `019e7631-89c1-70ef-b271-9688b0bde81d`
+
+### 関連ファイル
+
+- `mobile/app/meguri-board-thread.tsx`
+- `notes/08_design_iterations.md`
+- `notes/09_state_machines.md`
+- `notes/10_glossary.md`
+
+### セルフレビュー結果
+
+- ✅ 相対時刻表示は維持しつつ、必要な時だけ詳細日時を確認できる軽い導線にした。
+- ✅ 編集済み返信では投稿日時と編集日時の両方を出し、情報の更新タイミングを追えるようにした。
+- ✅ DB変更なし、ネイティブ依存追加なしでPreview OTA対象内に収めた。
+
+---
+
 ## イテレーション243：掲示板返信の保存ボタンを常に見えるようにする
 
 ### 背景・問題意識

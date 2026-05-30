@@ -1382,6 +1382,14 @@ export default function MeguriBoardThreadScreen() {
     });
   }
 
+  function showReplyTimestamp(reply: MeguriBoardReply) {
+    const rows = [`投稿: ${formatFullDateTime(reply.createdAt)}`];
+    if (reply.updatedAt && reply.updatedAt > reply.createdAt + 60000) {
+      rows.push(`編集: ${formatFullDateTime(reply.updatedAt)}`);
+    }
+    Alert.alert("返信の日時", rows.join("\n"));
+  }
+
   function openBoardUserProfile(userId: string) {
     if (!userId) return;
     if (userId === actor.userId) {
@@ -2092,10 +2100,17 @@ export default function MeguriBoardThreadScreen() {
                               />
                             ) : null}
                           </ChatGradientBubble>
-                          <Text style={[styles.replyTime, reply.mine ? styles.replyTimeMine : null]}>
-                            {formatRelativeTime(reply.createdAt)}
-                            {reply.updatedAt && reply.updatedAt > reply.createdAt + 60000 ? " · 編集済み" : ""}
-                          </Text>
+                          <Pressable
+                            accessibilityRole="button"
+                            hitSlop={8}
+                            onPress={() => showReplyTimestamp(reply)}
+                            style={reply.mine ? styles.replyTimeButtonMine : styles.replyTimeButton}
+                          >
+                            <Text style={[styles.replyTime, reply.mine ? styles.replyTimeMine : null]}>
+                              {formatRelativeTime(reply.createdAt)}
+                              {reply.updatedAt && reply.updatedAt > reply.createdAt + 60000 ? " · 編集済み" : ""}
+                            </Text>
+                          </Pressable>
                           <View style={[styles.replyActionRow, reply.mine ? styles.replyActionRowMine : null]}>
                             <Pressable
                               accessibilityRole="button"
@@ -3033,6 +3048,17 @@ function formatAbsoluteDateTime(value: number) {
   }).format(new Date(value));
 }
 
+function formatFullDateTime(value: number) {
+  return new Intl.DateTimeFormat("ja-JP", {
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    month: "long",
+    weekday: "short",
+    year: "numeric",
+  }).format(new Date(value));
+}
+
 function normalizeReplySearch(value: string | null | undefined) {
   return (value ?? "").replace(/\s+/g, " ").trim().toLowerCase();
 }
@@ -3913,6 +3939,12 @@ const styles = StyleSheet.create({
     fontSize: 10.5,
     fontWeight: "700",
     paddingHorizontal: 4,
+  },
+  replyTimeButton: {
+    alignSelf: "flex-start",
+  },
+  replyTimeButtonMine: {
+    alignSelf: "flex-end",
   },
   replyTimeMine: {
     textAlign: "right",
