@@ -594,6 +594,12 @@ export default function MeguriBoardScreen() {
     }
   }
 
+  async function markThreadRead(thread: MeguriBoardThread) {
+    const nextReadAt = Math.max(Date.now(), thread.latestActivityAt);
+    updateThreadLocally({ ...thread, readAt: nextReadAt });
+    await markMeguriBoardThreadRead(thread.id);
+  }
+
   async function toggleThreadBookmark(thread: MeguriBoardThread) {
     const bookmarked = !thread.bookmarked;
     updateThreadLocally({
@@ -692,6 +698,9 @@ export default function MeguriBoardScreen() {
   function openThreadActions(thread: MeguriBoardThread) {
     const actions: Array<{ destructive?: boolean; disabled?: boolean; label: string; run?: () => void }> = [
       { label: "共有する", run: () => void shareThread(thread) },
+      ...(isThreadUnread(thread)
+        ? [{ label: "既読にする", run: () => void markThreadRead(thread) }]
+        : []),
       {
         label: thread.mine ? "自分のプロフィール" : "投稿者プロフィール",
         run: () => openBoardUserProfile(thread.authorId),

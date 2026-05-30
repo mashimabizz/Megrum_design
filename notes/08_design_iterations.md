@@ -4,6 +4,53 @@
 
 ---
 
+## イテレーション255：掲示板一覧に個別既読操作を追加する
+
+### 背景・問題意識
+
+一般的なスレッド一覧では、未読スレッドを開かずに既読へ整理する操作があると、あとで読むものと流してよいものを分けやすい。スポット掲示板には未読表示中の一括既読はあったが、一覧カード単位で1件だけ既読にする導線がなかったため、スレッドアクションに個別既読操作を追加した。
+
+### 変更内容
+
+#### `mobile/app/meguri-board.tsx`
+- 未読スレッドのアクションシートに `既読にする` を表示するようにした。
+- 押下時はローカル表示を即時更新し、既存の `markMeguriBoardThreadRead` で永続化するようにした。
+- 既読済みスレッドには同操作を出さず、アクション数を増やしすぎないようにした。
+
+#### `notes/09_state_machines.md`
+- Meguri Board Lifecycle に個別既読操作のルールを追記した。
+
+#### `notes/10_glossary.md`
+- 掲示板個別既読を追加した。
+
+### 影響範囲
+
+- iOS版 スポット掲示板一覧
+- スレッドカードの長押し/メニュー操作
+- 未読スレッドの整理
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- `EAS_UPDATE_PROJECT_SLUG=ihub EXPO_NO_GIT_STATUS=1 npm --prefix mobile run update:ios:preview -- --message "[iter255] add single board mark read" --non-interactive`
+- Preview OTA: Update group ID `4f5ea420-68c2-4e8a-a672-7d84942eec10` / iOS update ID `019e765d-4ffc-7e88-9eeb-dc53454507b4`
+
+### 関連ファイル
+
+- `mobile/app/meguri-board.tsx`
+- `notes/08_design_iterations.md`
+- `notes/09_state_machines.md`
+- `notes/10_glossary.md`
+
+### セルフレビュー結果
+
+- ✅ 既存の既読保存関数を利用し、未読状態の定義を増やしていない。
+- ✅ 未読スレッドにだけ操作を出すため、通常のアクションシートを不要に長くしていない。
+- ✅ DB変更なし、ネイティブ依存追加なしでPreview OTA対象内に収めた。
+
+---
+
 ## イテレーション254：掲示板一覧カードに保存済み・通知ONラベルを追加する
 
 ### 背景・問題意識
