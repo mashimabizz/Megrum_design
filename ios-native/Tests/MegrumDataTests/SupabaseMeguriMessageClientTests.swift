@@ -43,6 +43,26 @@ final class SupabaseMeguriMessageClientTests: XCTestCase {
         XCTAssertEqual(payload["body"] as? String, "こんにちは")
     }
 
+    func testBuildsMeguriMessageMarkReadRequest() throws {
+        let client = SupabaseMeguriMessageClient(configuration: configuration)
+        let viewerID = UUID(uuidString: "00000000-0000-0000-0000-000000000001")!
+        let peerID = UUID(uuidString: "00000000-0000-0000-0000-000000000002")!
+        let readAt = Date(timeIntervalSince1970: 1_800_000_000)
+
+        let request = try client.makeMarkConversationReadRequest(
+            viewerID: viewerID,
+            peerID: peerID,
+            readAt: readAt
+        )
+        let body = try XCTUnwrap(request.httpBody)
+        let payload = try XCTUnwrap(JSONSerialization.jsonObject(with: body) as? [String: Any])
+
+        XCTAssertEqual(request.httpMethod, "PATCH")
+        XCTAssertEqual(request.url?.absoluteString, "https://example.supabase.co/rest/v1/meguri_messages?select=id,sender_id,recipient_id,source_groom_reply_id,message_type,body,image_url,image_path,read_at,created_at&recipient_id=eq.00000000-0000-0000-0000-000000000001&sender_id=eq.00000000-0000-0000-0000-000000000002&read_at=is.null")
+        XCTAssertEqual(request.value(forHTTPHeaderField: "Prefer"), "return=representation")
+        XCTAssertEqual(payload["read_at"] as? String, "2027-01-15T08:00:00.000Z")
+    }
+
     private var configuration: SupabaseConfiguration {
         SupabaseConfiguration(
             projectURL: URL(string: "https://example.supabase.co")!,

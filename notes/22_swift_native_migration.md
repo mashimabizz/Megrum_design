@@ -1,7 +1,7 @@
 # 22. Swift Native Migration
 
 最終更新: 2026-05-31
-ステータス: Active draft（iter335）
+ステータス: Active draft（iter336）
 
 ## 目的
 
@@ -145,6 +145,7 @@ tar -xzf /Users/michitaka/Desktop/Megrum_backups/pre-swift-migration-20260531-03
 - iter333で、`groom_replies` 作成と `notifications.kind='groom_reply'` のSwift Native境界を追加し、グルーム全画面ビューアから返信を送れるようにした。
 - iter334で、`list_meguri_messages_for_viewer` RPCと `meguri_messages` text insert境界をSwift Nativeに追加し、めぐりメッセージをAppStateで読み書きできるようにした。
 - iter335で、Swift Native通知一覧から `groom_reply` / `meguri_message` のリンクを解釈し、相手別のめぐりメッセージ画面へpushして送信できる最小導線を追加した。
+- iter336で、めぐりメッセージ会話を開いた時に受信メッセージの `read_at` を更新するSwift Native既読化境界を追加した。
 
 ### Phase 5: Cutover
 

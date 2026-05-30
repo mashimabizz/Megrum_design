@@ -74,6 +74,7 @@ public protocol MegrumRepository: Sendable {
     func sendGroomReply(_ input: GroomReplyCreateInput) async throws -> GroomReply
     func loadMeguriMessages() async throws -> [MeguriMessage]
     func sendMeguriMessage(_ input: MeguriMessageCreateInput) async throws -> MeguriMessage
+    func markMeguriMessagesRead(peerID: UUID, readAt: Date) async throws -> [MeguriMessage]
     func loadBoardThreads(latitude: Double?, longitude: Double?, prefecture: String?, scope: BoardThread.Audience) async throws -> [BoardThread]
     func loadBoardReplies(threadID: UUID, latitude: Double?, longitude: Double?, prefecture: String?, scope: BoardThread.Audience) async throws -> [BoardReply]
     func sendBoardReply(_ input: BoardReplyCreateInput) async throws -> BoardReply
@@ -144,6 +145,10 @@ public extension MegrumRepository {
 
     func sendMeguriMessage(_ input: MeguriMessageCreateInput) async throws -> MeguriMessage {
         throw MegrumRepositoryError.unsupportedMutation
+    }
+
+    func markMeguriMessagesRead(peerID: UUID, readAt: Date) async throws -> [MeguriMessage] {
+        []
     }
 
     func loadBoardThreads(latitude: Double?, longitude: Double?, prefecture: String?, scope: BoardThread.Audience) async throws -> [BoardThread] {
@@ -334,6 +339,17 @@ public struct PreviewMegrumRepository: MegrumRepository {
             sourceGroomReplyID: input.sourceGroomReplyID,
             body: input.body
         )
+    }
+
+    public func markMeguriMessagesRead(peerID: UUID, readAt: Date) async throws -> [MeguriMessage] {
+        NativePreviewData.meguriMessages.compactMap { message in
+            guard message.senderID == peerID, message.recipientID == NativePreviewData.viewerID, message.readAt == nil else {
+                return nil
+            }
+            var next = message
+            next.readAt = readAt
+            return next
+        }
     }
 
     public func loadBoardThreads(latitude: Double?, longitude: Double?, prefecture: String?, scope: BoardThread.Audience) async throws -> [BoardThread] {
@@ -724,6 +740,40 @@ public final class MegrumAppState: ObservableObject {
             errorMessage = "めぐりメッセージを送信できませんでした"
             sendingMeguriMessageRecipientID = nil
             return false
+        }
+    }
+
+    public func markMeguriMessagesRead(peerID: UUID) async {
+        guard let viewer else {
+            return
+        }
+
+        let targetIndexes = meguriMessages.indices.filter { index in
+            let message = meguriMessages[index]
+            return message.senderID == peerID
+                && message.recipientID == viewer.id
+                && message.readAt == nil
+        }
+        guard !targetIndexes.isEmpty else {
+            return
+        }
+
+        let readAt = Date()
+        let previous = meguriMessages
+        for index in targetIndexes {
+            meguriMessages[index].readAt = readAt
+        }
+
+        do {
+            let updated = try await repository.markMeguriMessagesRead(peerID: peerID, readAt: readAt)
+            guard !updated.isEmpty else {
+                return
+            }
+            let updatedByID = Dictionary(uniqueKeysWithValues: updated.map { ($0.id, $0) })
+            meguriMessages = meguriMessages.map { updatedByID[$0.id] ?? $0 }
+        } catch {
+            meguriMessages = previous
+            errorMessage = "めぐりメッセージを既読にできませんでした"
         }
     }
 

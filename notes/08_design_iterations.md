@@ -4,6 +4,66 @@
 
 ---
 
+## イテレーション336：Swiftめぐり会話既読化を追加
+
+### 背景・問題意識
+
+Swift Native版のめぐりメッセージ画面は表示と送信までできるようになったが、会話を開いても受信メッセージの `read_at` を更新する境界がまだなかった。通知一覧や未読管理の整合を保つため、既存DBの `meguri_messages.read_at` を会話単位で更新し、AppStateにも即時反映する。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumData/SupabaseMeguriMessageClient.swift`
+- `meguri_messages` の受信未読行を `recipient_id` / `sender_id` / `read_at is null` でPATCHする `markConversationRead` を追加した。
+- 既読化request builderを追加し、payloadとqueryをテスト可能にした。
+
+#### `ios-native/Sources/MegrumApp/MegrumAppState.swift` / `ios-native/Sources/MegrumApp/SupabaseMegrumRepository.swift`
+- repository境界に `markMeguriMessagesRead` を追加した。
+- AppStateで会話相手から受信した未読メッセージだけを楽観的に既読化し、失敗時はロールバックするようにした。
+
+#### `ios-native/Sources/MegrumApp/SettingsScreen.swift`
+- めぐりメッセージ画面を開いた時に、読み込み後すぐ相手別の受信メッセージを既読化するようにした。
+
+#### `ios-native/Tests/MegrumDataTests/SupabaseMeguriMessageClientTests.swift`
+- `meguri_messages` 既読化PATCH requestのURL、method、Prefer header、payloadを検証した。
+
+#### `ios-native/Tests/MegrumAppTests/MegrumAppStateTests.swift`
+- Preview repositoryでめぐりメッセージの `read_at` がAppStateへ反映されることを検証した。
+
+#### `ios-native/README.md` / `notes/22_swift_native_migration.md`
+- Swift NativeめぐりPhaseの進捗として、会話既読化境界を追記した。
+
+### 影響範囲
+
+- Swift Native版のめぐりメッセージ画面
+- Swift Native版の `meguri_messages.read_at` 更新境界
+- Swift Native版の通知・未読管理の土台
+
+### 確認方法
+
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-build --enable-xctest --disable-swift-testing -j 1`
+- `xcodebuild -quiet -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -destination 'generic/platform=iOS Simulator' -derivedDataPath /tmp/megrum-native-xcodebuild CODE_SIGNING_ALLOWED=NO build`
+
+### 関連ファイル
+
+- `ios-native/Sources/MegrumData/SupabaseMeguriMessageClient.swift`
+- `ios-native/Sources/MegrumApp/MegrumAppState.swift`
+- `ios-native/Sources/MegrumApp/SupabaseMegrumRepository.swift`
+- `ios-native/Sources/MegrumApp/SettingsScreen.swift`
+- `ios-native/Tests/MegrumDataTests/SupabaseMeguriMessageClientTests.swift`
+- `ios-native/Tests/MegrumAppTests/MegrumAppStateTests.swift`
+- `ios-native/README.md`
+- `notes/22_swift_native_migration.md`
+- `notes/08_design_iterations.md`
+
+### セルフレビュー結果
+
+- ✅ Swift Package testsが82件成功した。
+- ✅ Xcode project buildが成功した。
+- ✅ 既存の `meguri_messages.read_at` を使うため、新規migrationは追加していない。
+- ✅ `notes/09_state_machines.md` には既に「受信者が会話を開いた時に `meguri_messages.read_at` を更新する」ルールがあるため、状態遷移の更新は不要。
+- ✅ 新規用語・廃止用語は追加していないため、`notes/10_glossary.md` の更新は不要。
+- ✅ DBスキーマ自体は変更していないため、`notes/05_data_model.md` の更新は不要。
+
 ## イテレーション335：Swift通知からめぐり会話へ遷移
 
 ### 背景・問題意識

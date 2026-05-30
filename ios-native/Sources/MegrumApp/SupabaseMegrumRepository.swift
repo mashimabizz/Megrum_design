@@ -138,6 +138,10 @@ public struct SupabaseMegrumRepository: MegrumRepository {
         try await meguriMessageClient.sendTextMessage(input)
     }
 
+    public func markMeguriMessagesRead(peerID: UUID, readAt: Date) async throws -> [MeguriMessage] {
+        try await meguriMessageClient.markConversationRead(viewerID: viewerID, peerID: peerID, readAt: readAt)
+    }
+
     public func loadBoardThreads(
         latitude: Double?,
         longitude: Double?,

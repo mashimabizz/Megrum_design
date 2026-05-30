@@ -175,6 +175,21 @@ final class MegrumAppStateTests: XCTestCase {
         XCTAssertNil(state.errorMessage)
     }
 
+    func testAppStateMarksPreviewMeguriMessagesRead() async {
+        let state = MegrumAppState(repository: PreviewMegrumRepository())
+        let peerID = UUID(uuidString: "00000000-0000-0000-0000-000000000002")!
+
+        await state.loadInitialData()
+        await state.loadMeguriMessages()
+
+        XCTAssertNil(state.meguriMessages(with: peerID).first?.readAt)
+
+        await state.markMeguriMessagesRead(peerID: peerID)
+
+        XCTAssertNotNil(state.meguriMessages(with: peerID).first?.readAt)
+        XCTAssertNil(state.errorMessage)
+    }
+
     func testAppStateCreatesPreviewBoardThreadWithPrefectureOverride() async {
         let state = MegrumAppState(repository: PreviewMegrumRepository())
         await state.loadInitialData()

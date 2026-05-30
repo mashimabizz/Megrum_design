@@ -306,6 +306,7 @@ private struct MeguriMessagesScreen: View {
         .megrumInlineNavigationTitle()
         .task {
             await appState.loadMeguriMessages()
+            await appState.markMeguriMessagesRead(peerID: peerID)
         }
     }
 

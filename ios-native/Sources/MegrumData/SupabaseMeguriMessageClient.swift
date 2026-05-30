@@ -3,13 +3,16 @@ import MegrumCore
 
 public final class SupabaseMeguriMessageClient: @unchecked Sendable {
     private let client: SupabaseRESTClient
+    private let encoder: JSONEncoder
 
     public init(configuration: SupabaseConfiguration, session: URLSession = .shared) {
         self.client = SupabaseRESTClient(configuration: configuration, session: session)
+        self.encoder = Self.makeEncoder()
     }
 
     public init(client: SupabaseRESTClient) {
         self.client = client
+        self.encoder = Self.makeEncoder()
     }
 
     public func loadMessages() async throws -> [MeguriMessage] {
@@ -35,6 +38,21 @@ public final class SupabaseMeguriMessageClient: @unchecked Sendable {
         )
     }
 
+    @discardableResult
+    public func markConversationRead(
+        viewerID: UUID,
+        peerID: UUID,
+        readAt: Date = .now
+    ) async throws -> [MeguriMessage] {
+        let rows: [MeguriMessageRow] = try await client.updateRows(
+            in: "meguri_messages",
+            values: MeguriMessageReadPayload(readAt: isoTimestamp(readAt)),
+            select: MeguriMessageRow.insertSelect,
+            queryItems: markConversationReadQueryItems(viewerID: viewerID, peerID: peerID)
+        )
+        return rows.compactMap(\.message)
+    }
+
     public func makeLoadMessagesRequest() throws -> URLRequest {
         try client.makeRPCRequest(
             function: "list_meguri_messages_for_viewer",
@@ -48,6 +66,36 @@ public final class SupabaseMeguriMessageClient: @unchecked Sendable {
             values: [MeguriMessageCreatePayload(input: input)],
             select: MeguriMessageRow.insertSelect
         )
+    }
+
+    public func makeMarkConversationReadRequest(
+        viewerID: UUID,
+        peerID: UUID,
+        readAt: Date
+    ) throws -> URLRequest {
+        try client.makeMutationRequest(
+            path: "/rest/v1/meguri_messages",
+            queryItems: [
+                URLQueryItem(name: "select", value: MeguriMessageRow.insertSelect)
+            ] + markConversationReadQueryItems(viewerID: viewerID, peerID: peerID),
+            method: "PATCH",
+            body: encoder.encode(MeguriMessageReadPayload(readAt: isoTimestamp(readAt))),
+            prefer: "return=representation"
+        )
+    }
+
+    private func markConversationReadQueryItems(viewerID: UUID, peerID: UUID) -> [URLQueryItem] {
+        [
+            URLQueryItem(name: "recipient_id", value: "eq.\(viewerID.uuidString.lowercased())"),
+            URLQueryItem(name: "sender_id", value: "eq.\(peerID.uuidString.lowercased())"),
+            URLQueryItem(name: "read_at", value: "is.null")
+        ]
+    }
+
+    private static func makeEncoder() -> JSONEncoder {
+        let encoder = JSONEncoder()
+        encoder.keyEncodingStrategy = .convertToSnakeCase
+        return encoder
     }
 }
 
@@ -136,4 +184,14 @@ private struct MeguriMessageCreatePayload: Encodable, Sendable {
         self.senderId = input.senderID
         self.sourceGroomReplyId = input.sourceGroomReplyID
     }
+}
+
+private struct MeguriMessageReadPayload: Encodable, Sendable {
+    var readAt: String
+}
+
+private func isoTimestamp(_ date: Date) -> String {
+    let formatter = ISO8601DateFormatter()
+    formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+    return formatter.string(from: date)
 }
