@@ -11,6 +11,14 @@ public struct SupabaseConfiguration: Equatable, Sendable {
         self.accessToken = accessToken
     }
 
+    public func withAccessToken(_ accessToken: String?) -> SupabaseConfiguration {
+        SupabaseConfiguration(
+            projectURL: projectURL,
+            publishableKey: publishableKey,
+            accessToken: accessToken
+        )
+    }
+
     public static func fromEnvironment(_ environment: [String: String] = ProcessInfo.processInfo.environment) -> SupabaseConfiguration? {
         make(
             urlString: environment["MEGRUM_SUPABASE_URL"]

@@ -1,4 +1,5 @@
 import Foundation
+import MegrumCore
 import MegrumData
 
 public enum MegrumAppStateFactory {
@@ -12,21 +13,39 @@ public enum MegrumAppStateFactory {
         environment: [String: String],
         infoDictionary: [String: Any]? = nil
     ) -> MegrumAppState {
+        MegrumAppState(repository: repository(environment: environment, infoDictionary: infoDictionary))
+    }
+
+    public static func repository(
+        authSession: AuthSession? = nil,
+        environment: [String: String] = ProcessInfo.processInfo.environment,
+        infoDictionary: [String: Any]? = Bundle.main.infoDictionary
+    ) -> any MegrumRepository {
+        if let authSession {
+            if let configuration = SupabaseConfiguration.fromEnvironment(environment) {
+                return liveRepository(configuration: configuration.withAccessToken(authSession.accessToken), viewerID: authSession.user.id)
+            }
+
+            if let configuration = SupabaseConfiguration.fromInfoDictionary(infoDictionary) {
+                return liveRepository(configuration: configuration.withAccessToken(authSession.accessToken), viewerID: authSession.user.id)
+            }
+        }
+
         if
             let configuration = SupabaseConfiguration.fromEnvironment(environment),
             let viewerID = viewerID(from: environment)
         {
-            return liveState(configuration: configuration, viewerID: viewerID)
+            return liveRepository(configuration: configuration, viewerID: viewerID)
         }
 
         if
             let configuration = SupabaseConfiguration.fromInfoDictionary(infoDictionary),
             let viewerID = viewerID(from: infoDictionary)
         {
-            return liveState(configuration: configuration, viewerID: viewerID)
+            return liveRepository(configuration: configuration, viewerID: viewerID)
         }
 
-        return MegrumAppState(repository: PreviewMegrumRepository())
+        return PreviewMegrumRepository()
     }
 
     private static func viewerID(from environment: [String: String]) -> UUID? {
@@ -37,13 +56,10 @@ public enum MegrumAppStateFactory {
         (infoDictionary?["MegrumSupabaseViewerID"] as? String).flatMap(UUID.init(uuidString:))
     }
 
-    @MainActor
-    private static func liveState(configuration: SupabaseConfiguration, viewerID: UUID) -> MegrumAppState {
-        MegrumAppState(
-            repository: SupabaseMegrumRepository(
-                client: SupabaseRESTClient(configuration: configuration),
-                viewerID: viewerID
-            )
+    private static func liveRepository(configuration: SupabaseConfiguration, viewerID: UUID) -> any MegrumRepository {
+        SupabaseMegrumRepository(
+            client: SupabaseRESTClient(configuration: configuration),
+            viewerID: viewerID
         )
     }
 }

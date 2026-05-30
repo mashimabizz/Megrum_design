@@ -4,6 +4,78 @@
 
 ---
 
+## イテレーション306：Swift Auth sessionをAppStateへ接続
+
+### 背景・問題意識
+
+iter305でSwift Native版はSupabase Auth sessionをKeychainへ保存・復元できるようになったが、AppState側の実データrepositoryはまだsessionを見ていなかった。このままだとログイン済みユーザーで起動しても、Supabase REST requestにaccess tokenとviewer idが反映されず、preview dataまたは固定viewerのままになる。Phase 2の次工程として、ログインsessionをAppStateのrepository差し替えに接続した。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumData/SupabaseConfiguration.swift`
+- `withAccessToken(_:)` を追加し、既存のSupabase公開設定を保ったままsession access tokenだけ差し替えられるようにした。
+
+#### `ios-native/Sources/MegrumApp/MegrumAppState.swift`
+- `repository` を差し替え可能にした。
+- `replaceRepository(_:)` を追加し、Auth session変更時にrepositoryを入れ替えて初期データを再ロードできるようにした。
+
+#### `ios-native/Sources/MegrumApp/MegrumAppStateFactory.swift`
+- `repository(authSession:environment:infoDictionary:)` を追加した。
+- Auth sessionがある場合、sessionのaccess tokenとuser idを優先して `SupabaseMegrumRepository` を作るようにした。
+- Auth sessionがない場合は、従来通り環境変数/Info.plistのviewer id、またはpreview repositoryへfallbackする。
+
+#### `ios-native/Sources/MegrumApp/MegrumRootView.swift`
+- 起動時とAuth session変更時に `syncRepositoryWithAuthSession()` を呼び、AppStateをログイン中ユーザーのrepositoryへ同期するようにした。
+
+#### `ios-native/Tests/MegrumDataTests/SupabaseConfigurationTests.swift`
+- access token差し替え後もproject URLとpublishable keyが維持されることを検証した。
+
+#### `ios-native/Tests/MegrumAppTests/MegrumAppStateTests.swift`
+- AppStateがrepository差し替え後に新しいviewer snapshotを読み込めることを検証した。
+
+#### `ios-native/README.md`
+- 保存済みsessionがlive repositoryへ渡る構成を追記した。
+
+#### `notes/22_swift_native_migration.md`
+- Phase 2の進捗をiter306へ更新し、次に残っているAuth/Account作業を明確化した。
+
+### 影響範囲
+
+- Swift Native iOS版のログイン後データ取得
+- Supabase REST requestのAuthorization header
+- App起動時のpreview/live repository切り替え
+- 今後のプロフィール作成、オンボーディング判定、住所設定、通知導線
+
+### 確認方法
+
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-build --enable-xctest --disable-swift-testing -j 1`
+- `xcodebuild -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -destination 'generic/platform=iOS Simulator' -derivedDataPath /tmp/megrum-native-xcodebuild CODE_SIGNING_ALLOWED=NO build`
+- `git diff --check -- ios-native/Sources/MegrumData/SupabaseConfiguration.swift ios-native/Sources/MegrumApp/MegrumAppState.swift ios-native/Sources/MegrumApp/MegrumAppStateFactory.swift ios-native/Sources/MegrumApp/MegrumRootView.swift ios-native/Tests/MegrumDataTests/SupabaseConfigurationTests.swift ios-native/Tests/MegrumAppTests/MegrumAppStateTests.swift ios-native/README.md notes/22_swift_native_migration.md notes/08_design_iterations.md`
+
+### 関連ファイル
+
+- `ios-native/Sources/MegrumData/SupabaseConfiguration.swift`
+- `ios-native/Sources/MegrumApp/MegrumAppState.swift`
+- `ios-native/Sources/MegrumApp/MegrumAppStateFactory.swift`
+- `ios-native/Sources/MegrumApp/MegrumRootView.swift`
+- `ios-native/Tests/MegrumDataTests/SupabaseConfigurationTests.swift`
+- `ios-native/Tests/MegrumAppTests/MegrumAppStateTests.swift`
+- `ios-native/README.md`
+- `notes/22_swift_native_migration.md`
+- `notes/08_design_iterations.md`
+
+### セルフレビュー結果
+
+- ✅ Auth sessionのaccess tokenをSupabase REST clientへ渡す境界を追加した。
+- ✅ viewer idは固定環境値よりログイン中ユーザーを優先するため、実ユーザー単位のデータ取得に進める構成になった。
+- ✅ Swift Package testsが15件成功し、設定差し替えとrepository差し替えを検証した。
+- ✅ Xcode App HostのiOS Simulator buildが成功した。
+- ✅ 状態遷移・用語・DBスキーマ変更はないため、`notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要。
+- ⚠️ メールリンク復帰、Apple/Google、プロフィール自動作成、オンボーディング判定は次のPhase 2作業で実装する。
+- ✅ TestFlight配布はまだ行っていないため、Preview OTA / TestFlight配信は不要。
+
+---
+
 ## イテレーション305：Swift Auth session保存を追加
 
 ### 背景・問題意識

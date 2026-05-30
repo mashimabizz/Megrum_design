@@ -41,6 +41,8 @@ Auth currently supports the first native email/password path. If Supabase config
 
 Live sessions are encoded as `AuthSession` and persisted through `KeychainAuthSessionStore`. The Swift app can restore a saved session on launch, while still keeping the storage abstraction replaceable in tests.
 
+When an auth session is available, `MegrumAppStateFactory.repository(authSession:)` rebuilds the live Supabase repository with that session's access token and user id. This keeps the app shell preview-friendly while allowing signed-in users to drive authenticated data loading.
+
 For the Xcode app host, use CLI-first verification:
 
 ```bash

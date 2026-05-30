@@ -31,4 +31,18 @@ final class SupabaseConfigurationTests: XCTestCase {
         XCTAssertEqual(request.value(forHTTPHeaderField: "Authorization"), "Bearer session_token")
         XCTAssertEqual(request.value(forHTTPHeaderField: "Accept"), "application/json")
     }
+
+    func testAccessTokenCanBeReplacedForAuthenticatedRequests() {
+        let config = SupabaseConfiguration(
+            projectURL: URL(string: "https://example.supabase.co")!,
+            publishableKey: "sb_publishable_test",
+            accessToken: nil
+        )
+
+        let authenticatedConfig = config.withAccessToken("session_token")
+
+        XCTAssertEqual(authenticatedConfig.projectURL, config.projectURL)
+        XCTAssertEqual(authenticatedConfig.publishableKey, config.publishableKey)
+        XCTAssertEqual(authenticatedConfig.accessToken, "session_token")
+    }
 }

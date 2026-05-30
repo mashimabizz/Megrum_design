@@ -29,6 +29,20 @@ final class MegrumAppStateTests: XCTestCase {
         XCTAssertFalse(state.inventory.isEmpty)
     }
 
+    func testAppStateCanReplaceRepositoryAfterAuthChanges() async {
+        let state = MegrumAppState(repository: PreviewMegrumRepository())
+        let nextViewer = UserProfile(
+            id: UUID(uuidString: "44444444-4444-4444-4444-444444444444")!,
+            handle: "signed_in",
+            displayName: "Signed In"
+        )
+
+        await state.replaceRepository(SingleSnapshotRepository(viewer: nextViewer))
+
+        XCTAssertEqual(state.viewer?.handle, "signed_in")
+        XCTAssertTrue(state.inventory.isEmpty)
+    }
+
     func testAuthStateSignsInThroughRepository() async {
         let state = MegrumAuthState(repository: StubAuthRepository())
 
@@ -85,4 +99,19 @@ private struct StubAuthRepository: MegrumAuthRepository {
     }
 
     func signOut(session: AuthSession) async throws {}
+}
+
+private struct SingleSnapshotRepository: MegrumRepository {
+    var viewer: UserProfile
+
+    func loadInitialSnapshot() async throws -> MegrumAppSnapshot {
+        MegrumAppSnapshot(
+            viewer: viewer,
+            inventory: [],
+            wishes: [],
+            proposals: [],
+            grooms: [],
+            threads: []
+        )
+    }
 }

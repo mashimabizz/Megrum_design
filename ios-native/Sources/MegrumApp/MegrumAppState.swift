@@ -57,7 +57,7 @@ public final class MegrumAppState: ObservableObject {
     @Published public private(set) var isLoading = false
     @Published public private(set) var errorMessage: String?
 
-    private let repository: any MegrumRepository
+    private var repository: any MegrumRepository
 
     public init(repository: any MegrumRepository = PreviewMegrumRepository()) {
         self.repository = repository
@@ -81,6 +81,11 @@ public final class MegrumAppState: ObservableObject {
     }
 
     public func refresh() async {
+        await loadInitialData()
+    }
+
+    public func replaceRepository(_ repository: any MegrumRepository) async {
+        self.repository = repository
         await loadInitialData()
     }
 

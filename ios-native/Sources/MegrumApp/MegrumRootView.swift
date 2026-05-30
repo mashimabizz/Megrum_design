@@ -125,14 +125,14 @@ public struct MegrumRootView: View {
         }
         .tint(MegrumTheme.lavender)
         .task {
-            await appState.loadInitialData()
+            await syncRepositoryWithAuthSession()
         }
         .onChange(of: authState.session?.user.id) { _, userID in
             guard userID != nil else {
                 return
             }
             Task {
-                await appState.loadInitialData()
+                await syncRepositoryWithAuthSession()
             }
         }
         .sheet(isPresented: $showsSearch) {
@@ -140,5 +140,11 @@ public struct MegrumRootView: View {
                 SearchScreen(items: appState.inventory)
             }
         }
+    }
+
+    private func syncRepositoryWithAuthSession() async {
+        await appState.replaceRepository(
+            MegrumAppStateFactory.repository(authSession: authState.session)
+        )
     }
 }
