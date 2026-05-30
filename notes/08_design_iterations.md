@@ -4,6 +4,45 @@
 
 ---
 
+## イテレーション279：通知ドロワー導線を修正
+
+### 背景・問題意識
+
+オーナーから、左ドロワーの「通知」をタップしてもドロワーが閉じるだけで通知一覧に遷移しない、通知一覧がなければ作成し、既存ならそこへ移るようにしたいという指摘があった。既に通知一覧画面は `mobile/app/(tabs)/notifications.tsx` と `mobile/app/notifications.tsx` に存在していたため、ドロワー側の遷移順序を修正した。
+
+### 変更内容
+
+#### `mobile/app/(tabs)/_layout.tsx`
+- 左ドロワーの共通 `go(...)` を、画面遷移してからドロワーを閉じる順序から、ドロワーを閉じ切った後に `router.push(...)` する順序へ変更した。
+- 通知項目だけでなく、プロフィール、プロフィール編集、推し設定、スケジュール、完了した取引などのドロワー遷移も同じ安定した動きになる。
+- 通知一覧画面は既存の `mobile/app/(tabs)/notifications.tsx` をそのまま利用し、未読/既読/取引フィルタと通知タップ時の対象画面遷移を維持した。
+
+### 影響範囲
+
+- iOS版 左ドロワー
+- iOS版 通知一覧への導線
+- ドロワー内の各メニュー遷移
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- `EAS_UPDATE_PROJECT_SLUG=ihub EXPO_NO_GIT_STATUS=1 npm --prefix mobile run update:ios:preview -- --message "[iter279] 通知ドロワー導線を修正" --non-interactive`
+- Preview OTA: Update group ID `57186268-0558-451f-b2b1-bf24ed0b7951` / iOS update ID `019e7836-ae04-723d-b887-1d0fbd97c3f3`
+- EAS Dashboard: `https://expo.dev/accounts/mashima.bizz/projects/ihub/updates/57186268-0558-451f-b2b1-bf24ed0b7951`
+
+### 関連ファイル
+
+- `mobile/app/(tabs)/_layout.tsx`
+- `notes/08_design_iterations.md`
+
+### セルフレビュー結果
+
+- ✅ 通知一覧画面は既存実装を確認済み。
+- ✅ 左ドロワーの「通知」は、閉じるアニメーション完了後に通知一覧へ遷移する。
+- ✅ 新しいDBテーブル・状態・用語は追加していないため、`notes/05_data_model.md` / `notes/09_state_machines.md` / `notes/10_glossary.md` の更新は不要。
+- ✅ iOS Preview channel へOTA配信済み。
+
 ## イテレーション278：セキュリティ監査とRLS強化
 
 ### 背景・問題意識

@@ -417,8 +417,9 @@ function ProfileDrawerContent({
   }, [previewMode, user?.id]);
 
   function go(path: Parameters<typeof router.push>[0]) {
-    router.push(path);
-    onNavigate();
+    onNavigate(() => {
+      router.push(path);
+    });
   }
 
   async function handleSignOut() {
