@@ -4,6 +4,52 @@
 
 ---
 
+## イテレーション251：掲示板一覧カードに参加中ラベルを表示する
+
+### 背景・問題意識
+
+一般的なスレッド一覧では、自分が書き込んだスレッドを見分けられることが重要になる。スポット掲示板には `参加中` 表示モードがあるが、通常の一覧上では参加済みスレッドがカード単位で分かりにくかったため、カードのバッジ列に参加中ラベルを追加した。
+
+### 変更内容
+
+#### `mobile/app/meguri-board.tsx`
+- スレッドカードのバッジ列に、`thread.participated` が true の場合 `参加中` ラベルを表示するようにした。
+- 既存の `StatusBadge` を使い回し、固定/締め切り/下書き/未読ラベルと同じ情報階層で表示した。
+
+#### `notes/09_state_machines.md`
+- Meguri Board Lifecycle に一覧参加中ラベルの表示ルールを追記した。
+
+#### `notes/10_glossary.md`
+- 掲示板一覧参加中ラベルを追加した。
+
+### 影響範囲
+
+- iOS版 スポット掲示板一覧
+- スレッドカードのバッジ列
+- 参加中スレッドへの戻りやすさ
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- `EAS_UPDATE_PROJECT_SLUG=ihub EXPO_NO_GIT_STATUS=1 npm --prefix mobile run update:ios:preview -- --message "[iter251] show participated board label" --non-interactive`
+- Preview OTA: Update group ID `247bd9a3-788d-4177-8500-72f41c538938` / iOS update ID `019e764b-f4a9-74af-ba83-12a2785ee3e3`
+
+### 関連ファイル
+
+- `mobile/app/meguri-board.tsx`
+- `notes/08_design_iterations.md`
+- `notes/09_state_machines.md`
+- `notes/10_glossary.md`
+
+### セルフレビュー結果
+
+- ✅ 既存の参加中判定を利用し、DBや状態管理を増やさず一覧の視認性だけを改善した。
+- ✅ 既存 `StatusBadge` を使い回し、カード内の他ステータス表示と見た目を揃えた。
+- ✅ DB変更なし、ネイティブ依存追加なしでPreview OTA対象内に収めた。
+
+---
+
 ## イテレーション250：掲示板一覧の並び替えチップを横スクロール化する
 
 ### 背景・問題意識

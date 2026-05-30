@@ -1017,6 +1017,7 @@ export default function MeguriBoardScreen() {
                           <ScopeBadge scope={thread.audienceScope} />
                           {thread.isPinned ? <StatusBadge label="固定" /> : null}
                           {thread.status === "locked" ? <StatusBadge label="締め切り" /> : null}
+                          {thread.participated ? <StatusBadge label="参加中" /> : null}
                           {replyDraftThreadIds.has(thread.id) ? <StatusBadge label="下書きあり" /> : null}
                           {isThreadUnread(thread) ? (
                             <View style={styles.unreadBadge}>
