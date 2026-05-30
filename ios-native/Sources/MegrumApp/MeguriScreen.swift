@@ -5,6 +5,7 @@ import SwiftUI
 
 struct MeguriScreen: View {
     @ObservedObject var appState: MegrumAppState
+    @StateObject private var locationState = MegrumLocationState()
     @State private var selectedThread: BoardThread?
     @State private var activeMap: MeguriMapKind?
 
@@ -48,14 +49,25 @@ struct MeguriScreen: View {
         .background(MegrumTheme.canvas.ignoresSafeArea())
         .megrumHiddenNavigationBar()
         .refreshable {
-            await appState.loadMeguriFeed()
+            await appState.loadMeguriFeed(
+                latitude: locationState.coordinate?.latitude,
+                longitude: locationState.coordinate?.longitude
+            )
+        }
+        .task {
+            locationState.requestCurrentLocation()
+        }
+        .onReceive(locationState.$coordinate.compactMap { $0 }) { coordinate in
+            Task {
+                await appState.loadMeguriFeed(latitude: coordinate.latitude, longitude: coordinate.longitude)
+            }
         }
         .sheet(item: $selectedThread) { thread in
             NavigationStack {
                 BoardThreadDetailScreen(appState: appState, thread: thread)
             }
         }
-        .modifier(MeguriMapPresentationModifier(activeMap: $activeMap, appState: appState))
+        .modifier(MeguriMapPresentationModifier(activeMap: $activeMap, appState: appState, locationState: locationState))
         .safeAreaInset(edge: .bottom, alignment: .trailing) {
             Button {
             } label: {
@@ -77,18 +89,19 @@ struct MeguriScreen: View {
 private struct MeguriMapPresentationModifier: ViewModifier {
     @Binding var activeMap: MeguriMapKind?
     @ObservedObject var appState: MegrumAppState
+    @ObservedObject var locationState: MegrumLocationState
 
     func body(content: Content) -> some View {
         #if os(iOS)
         content.fullScreenCover(item: $activeMap) { kind in
             NavigationStack {
-                MeguriMapScreen(kind: kind, appState: appState)
+                MeguriMapScreen(kind: kind, appState: appState, locationState: locationState)
             }
         }
         #else
         content.sheet(item: $activeMap) { kind in
             NavigationStack {
-                MeguriMapScreen(kind: kind, appState: appState)
+                MeguriMapScreen(kind: kind, appState: appState, locationState: locationState)
             }
         }
         #endif
@@ -132,15 +145,17 @@ private enum MeguriMapKind: String, Identifiable {
 private struct MeguriMapScreen: View {
     var kind: MeguriMapKind
     @ObservedObject var appState: MegrumAppState
+    @ObservedObject var locationState: MegrumLocationState
     @Environment(\.dismiss) private var dismiss
     @State private var cameraPosition: MapCameraPosition
     @State private var selectedGroom: GroomPost?
     @State private var selectedThread: BoardThread?
 
-    init(kind: MeguriMapKind, appState: MegrumAppState) {
+    init(kind: MeguriMapKind, appState: MegrumAppState, locationState: MegrumLocationState) {
         self.kind = kind
         self.appState = appState
-        _cameraPosition = State(initialValue: .region(MKCoordinateRegion(center: kind.initialCenter(grooms: appState.grooms, threads: appState.threads), span: kind.regionSpan)))
+        self.locationState = locationState
+        _cameraPosition = State(initialValue: .region(MKCoordinateRegion(center: kind.initialCenter(userCoordinate: locationState.coordinate, grooms: appState.grooms, threads: appState.threads), span: kind.regionSpan)))
     }
 
     var body: some View {
@@ -189,9 +204,21 @@ private struct MeguriMapScreen: View {
             .padding(.top, 14)
         }
         .task {
-            await appState.loadMeguriFeed()
+            locationState.requestCurrentLocation()
+            await appState.loadMeguriFeed(
+                latitude: locationState.coordinate?.latitude,
+                longitude: locationState.coordinate?.longitude
+            )
             withAnimation(.smooth(duration: 0.28)) {
-                cameraPosition = .region(MKCoordinateRegion(center: kind.initialCenter(grooms: appState.grooms, threads: appState.threads), span: kind.regionSpan))
+                cameraPosition = .region(MKCoordinateRegion(center: centerCoordinate, span: kind.regionSpan))
+            }
+        }
+        .onReceive(locationState.$coordinate.compactMap { $0 }) { coordinate in
+            Task {
+                await appState.loadMeguriFeed(latitude: coordinate.latitude, longitude: coordinate.longitude)
+            }
+            withAnimation(.smooth(duration: 0.28)) {
+                cameraPosition = .region(MKCoordinateRegion(center: coordinate.clLocationCoordinate, span: kind.regionSpan))
             }
         }
         .sheet(item: $selectedGroom) { groom in
@@ -207,7 +234,7 @@ private struct MeguriMapScreen: View {
     }
 
     private var centerCoordinate: CLLocationCoordinate2D {
-        kind.initialCenter(grooms: appState.grooms, threads: appState.threads)
+        kind.initialCenter(userCoordinate: locationState.coordinate, grooms: appState.grooms, threads: appState.threads)
     }
 }
 
@@ -603,7 +630,11 @@ private extension GroomPost {
 }
 
 private extension MeguriMapKind {
-    func initialCenter(grooms: [GroomPost], threads: [BoardThread]) -> CLLocationCoordinate2D {
+    func initialCenter(userCoordinate: MegrumLocationCoordinate?, grooms: [GroomPost], threads: [BoardThread]) -> CLLocationCoordinate2D {
+        if let userCoordinate {
+            return userCoordinate.clLocationCoordinate
+        }
+
         switch self {
         case .grooms:
             return grooms.first?.coordinate ?? Self.fallbackCenter

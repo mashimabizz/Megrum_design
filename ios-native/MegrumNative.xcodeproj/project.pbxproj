@@ -139,6 +139,7 @@
 				INFOPLIST_KEY_MegrumSupabasePublishableKey = "";
 				INFOPLIST_KEY_MegrumSupabaseURL = "";
 				INFOPLIST_KEY_MegrumSupabaseViewerID = "";
+				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "現在地を使って近くのグルームと掲示板を表示します。";
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UIStatusBarStyle = UIStatusBarStyleDefault;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
@@ -169,6 +170,7 @@
 				INFOPLIST_KEY_MegrumSupabasePublishableKey = "";
 				INFOPLIST_KEY_MegrumSupabaseURL = "";
 				INFOPLIST_KEY_MegrumSupabaseViewerID = "";
+				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "現在地を使って近くのグルームと掲示板を表示します。";
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UIStatusBarStyle = UIStatusBarStyleDefault;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;

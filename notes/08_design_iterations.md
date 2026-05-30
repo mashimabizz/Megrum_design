@@ -4,6 +4,66 @@
 
 ---
 
+## イテレーション327：Swiftめぐり現在地境界を追加
+
+### 背景・問題意識
+
+Swift Native版のめぐりマップはMapKitで開けるようになったが、初期中心と範囲円はまだ投稿やfallback座標に依存していた。ユーザー要望では、位置情報許可中は自分の位置を中心に地図を初期表示し、1km/3km範囲をわかるようにする必要がある。そこでCoreLocation境界を先に分離し、めぐりfeed再読込とMapKit中心座標へ安全に渡せるようにした。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/MegrumLocationState.swift`
+- CoreLocationを扱う `MegrumLocationState` を追加した。
+- 現在地座標、権限状態、取得中状態、エラー表示用メッセージをSwiftUIから観測できるようにした。
+- iOSではwhen-in-use権限を要求し、macOSのSwiftPM検証環境ではcompile可能な分岐にした。
+- Swift 6の並行性チェックに合わせ、delegateからMainActorへ渡す値を事前に切り出すようにした。
+
+#### `ios-native/Sources/MegrumApp/MeguriScreen.swift`
+- めぐりホームに `MegrumLocationState` を持たせ、画面表示時に現在地取得を開始するようにした。
+- 現在地が取れた時に `loadMeguriFeed(latitude:longitude:)` を呼び、既存RPCへ現在地を渡せるようにした。
+- グルーム/掲示板マップの初期中心と範囲円の中心を現在地優先にした。
+- 現在地が未取得の場合は、既存の投稿座標/fallback座標へ戻すようにした。
+
+#### `ios-native/MegrumNative.xcodeproj/project.pbxproj`
+- 生成Info.plistへ `NSLocationWhenInUseUsageDescription` を追加した。
+
+#### `ios-native/README.md`
+- `MegrumLocationState` とめぐり現在地連動を追記した。
+
+#### `notes/22_swift_native_migration.md`
+- Swift Native移行のステータスをiter327へ更新し、Phase 4の進捗にCoreLocation境界を追記した。
+
+### 影響範囲
+
+- Swift Native版のめぐりホーム
+- Swift Native版のグルームマップ/掲示板マップ
+- Swift Native版の位置情報権限文言
+
+### 確認方法
+
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-build --enable-xctest --disable-swift-testing -j 1`
+- `xcodebuild -quiet -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -destination 'generic/platform=iOS Simulator' -derivedDataPath /tmp/megrum-native-xcodebuild CODE_SIGNING_ALLOWED=NO build`
+
+### 関連ファイル
+
+- `ios-native/Sources/MegrumApp/MegrumLocationState.swift`
+- `ios-native/Sources/MegrumApp/MeguriScreen.swift`
+- `ios-native/MegrumNative.xcodeproj/project.pbxproj`
+- `ios-native/README.md`
+- `notes/22_swift_native_migration.md`
+- `notes/08_design_iterations.md`
+
+### セルフレビュー結果
+
+- ✅ Swift Package testsが64件成功した。
+- ✅ Xcode project buildが成功した。
+- ✅ CoreLocationをSwiftUI画面から直接散らさず、`MegrumLocationState` に閉じ込めた。
+- ✅ 新規DBスキーマや状態名は追加していないため、`notes/05_data_model.md` / `notes/09_state_machines.md` の更新は不要。
+- ✅ 新しいユーザー向け用語は追加していないため、`notes/10_glossary.md` の更新は不要。
+- ✅ TestFlight配布はまだ行っていないため、Preview OTA / TestFlight配信は不要。
+
+---
+
 ## イテレーション326：SwiftめぐりMapKit導線を追加
 
 ### 背景・問題意識
