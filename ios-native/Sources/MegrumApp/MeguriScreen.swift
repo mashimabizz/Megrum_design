@@ -7,6 +7,7 @@ struct MeguriScreen: View {
     @ObservedObject var appState: MegrumAppState
     @StateObject private var locationState = MegrumLocationState()
     @State private var selectedThread: BoardThread?
+    @State private var selectedGroom: GroomPost?
     @State private var activeMap: MeguriMapKind?
 
     var body: some View {
@@ -18,7 +19,9 @@ struct MeguriScreen: View {
                     SectionHeader(title: "グルーム", actionTitle: "地図で見る") {
                         activeMap = .grooms
                     }
-                    GroomStrip(grooms: appState.grooms)
+                    GroomStrip(grooms: appState.grooms) { groom in
+                        selectedGroom = groom
+                    }
                 }
 
                 VStack(alignment: .leading, spacing: 14) {
@@ -67,6 +70,7 @@ struct MeguriScreen: View {
                 BoardThreadDetailScreen(appState: appState, thread: thread)
             }
         }
+        .modifier(GroomViewerPresentationModifier(selectedGroom: $selectedGroom, grooms: appState.grooms))
         .modifier(MeguriMapPresentationModifier(activeMap: $activeMap, appState: appState, locationState: locationState))
         .safeAreaInset(edge: .bottom, alignment: .trailing) {
             Button {
@@ -83,6 +87,23 @@ struct MeguriScreen: View {
             .padding(.trailing, 20)
             .padding(.bottom, 10)
         }
+    }
+}
+
+private struct GroomViewerPresentationModifier: ViewModifier {
+    @Binding var selectedGroom: GroomPost?
+    var grooms: [GroomPost]
+
+    func body(content: Content) -> some View {
+        #if os(iOS)
+        content.fullScreenCover(item: $selectedGroom) { groom in
+            GroomViewerScreen(grooms: grooms, initialGroom: groom)
+        }
+        #else
+        content.sheet(item: $selectedGroom) { groom in
+            GroomViewerScreen(grooms: grooms, initialGroom: groom)
+        }
+        #endif
     }
 }
 
@@ -105,6 +126,128 @@ private struct MeguriMapPresentationModifier: ViewModifier {
             }
         }
         #endif
+    }
+}
+
+private struct GroomViewerScreen: View {
+    var grooms: [GroomPost]
+    var initialGroom: GroomPost
+    @Environment(\.dismiss) private var dismiss
+    @State private var currentIndex: Int
+    @State private var dragOffset: CGSize = .zero
+
+    init(grooms: [GroomPost], initialGroom: GroomPost) {
+        let fallbackGrooms = grooms.isEmpty ? [initialGroom] : grooms
+        self.grooms = fallbackGrooms
+        self.initialGroom = initialGroom
+        _currentIndex = State(initialValue: fallbackGrooms.firstIndex(where: { $0.id == initialGroom.id }) ?? 0)
+    }
+
+    private var currentGroom: GroomPost {
+        grooms[max(0, min(currentIndex, grooms.count - 1))]
+    }
+
+    var body: some View {
+        ZStack {
+            Color.black.ignoresSafeArea()
+
+            AsyncImage(url: currentGroom.imageURL) { phase in
+                switch phase {
+                case .success(let image):
+                    image
+                        .resizable()
+                        .scaledToFit()
+                        .id(currentGroom.id)
+                        .transition(.opacity.combined(with: .scale(scale: 0.98)))
+                case .failure:
+                    Image(systemName: "photo")
+                        .font(.system(size: 42, weight: .bold))
+                        .foregroundStyle(.white.opacity(0.7))
+                default:
+                    ProgressView()
+                        .tint(.white)
+                        .controlSize(.large)
+                }
+            }
+            .padding(.horizontal, 8)
+            .offset(y: dragOffset.height * 0.28)
+            .scaleEffect(max(0.92, 1 - abs(dragOffset.height) / 900))
+
+            HStack(spacing: 0) {
+                Color.clear
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        move(by: -1)
+                    }
+
+                Color.clear
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        move(by: 1)
+                    }
+            }
+
+            VStack(spacing: 0) {
+                HStack(spacing: 6) {
+                    ForEach(grooms.indices, id: \.self) { index in
+                        Capsule()
+                            .fill(index <= currentIndex ? .white : .white.opacity(0.28))
+                            .frame(height: 3)
+                    }
+                }
+                .padding(.horizontal, 14)
+                .padding(.top, 14)
+
+                HStack {
+                    Spacer()
+                    Button {
+                        dismiss()
+                    } label: {
+                        Image(systemName: "xmark")
+                            .font(.system(size: 16, weight: .heavy))
+                            .foregroundStyle(.white)
+                            .frame(width: 44, height: 44)
+                            .background(.black.opacity(0.28), in: Circle())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("閉じる")
+                }
+                .padding(.horizontal, 14)
+                .padding(.top, 10)
+
+                Spacer()
+            }
+        }
+        .gesture(
+            DragGesture(minimumDistance: 12)
+                .onChanged { value in
+                    if value.translation.height > 0 {
+                        dragOffset = value.translation
+                    }
+                }
+                .onEnded { value in
+                    if value.translation.height > 100 {
+                        dismiss()
+                    } else {
+                        withAnimation(.spring(response: 0.28, dampingFraction: 0.86)) {
+                            dragOffset = .zero
+                        }
+                    }
+                }
+        )
+    }
+
+    private func move(by delta: Int) {
+        let nextIndex = currentIndex + delta
+        guard grooms.indices.contains(nextIndex) else {
+            if delta > 0 {
+                dismiss()
+            }
+            return
+        }
+        withAnimation(.smooth(duration: 0.18)) {
+            currentIndex = nextIndex
+        }
     }
 }
 
@@ -520,12 +663,16 @@ private struct SectionHeader: View {
 
 private struct GroomStrip: View {
     var grooms: [GroomPost]
+    var onSelect: (GroomPost) -> Void
 
     var body: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 14) {
                 ForEach(grooms) { groom in
-                    VStack(spacing: 8) {
+                    Button {
+                        onSelect(groom)
+                    } label: {
+                        VStack(spacing: 8) {
                         Circle()
                             .fill(
                                 LinearGradient(
@@ -544,7 +691,9 @@ private struct GroomStrip: View {
                         Text("1km圏内")
                             .font(.system(size: 11, weight: .heavy, design: .rounded))
                             .foregroundStyle(MegrumTheme.muted)
+                        }
                     }
+                    .buttonStyle(.plain)
                     .id(groom.id)
                 }
             }

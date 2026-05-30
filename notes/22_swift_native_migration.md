@@ -1,7 +1,7 @@
 # 22. Swift Native Migration
 
 最終更新: 2026-05-31
-ステータス: Active draft（iter327）
+ステータス: Active draft（iter328）
 
 ## 目的
 
@@ -137,6 +137,7 @@ tar -xzf /Users/michitaka/Desktop/Megrum_backups/pre-swift-migration-20260531-03
 - iter325で、掲示板スレッド詳細、返信一覧、返信送信のSwift Native RPC境界を追加し、めぐりホームからチャット形式の掲示板詳細へ進めるようにした。
 - iter326で、めぐりホームの「地図で見る」からグルーム/掲示板のMapKit画面を開き、ピンと範囲円を表示できるようにした。
 - iter327で、CoreLocation境界と位置情報利用文言を追加し、めぐりのfeed再読込とMapKit初期中心を現在地に寄せられるようにした。
+- iter328で、グルーム横並びから全画面ビューアを開き、画像読み込み中はローディングだけを表示するNative閲覧導線を追加した。
 
 ### Phase 5: Cutover
 

@@ -4,6 +4,57 @@
 
 ---
 
+## イテレーション328：Swiftグルーム閲覧導線を追加
+
+### 背景・問題意識
+
+Swift Native版のめぐりホームはグルーム一覧と地図表示まで進んだが、グルームをタップして全画面で見る体験がまだなかった。グルームはInstagramストーリーに近い閲覧感が必要なため、まず横並びの投稿から全画面ビューアを開き、画像読み込み中はテキストを出さずローディングだけを表示する基本導線を作る。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/MeguriScreen.swift`
+- `GroomStrip` の各グルームをタップ可能にした。
+- `GroomViewerPresentationModifier` を追加し、iOSではfull-screen cover、SwiftPMのmacOS検証環境ではsheetへfallbackするようにした。
+- `GroomViewerScreen` を追加し、全画面黒背景でグルーム画像を表示するようにした。
+- `AsyncImage` の読み込み中は `ProgressView` だけを表示し、本文や補助テキストを出さないようにした。
+- 画面左右タップで前後のグルームへ移動し、最後の右タップで閉じるようにした。
+- 下方向dragで閉じられるようにし、閉じなかった場合はspringで元の位置へ戻すようにした。
+- 上部に閲覧進捗バーと閉じるボタンを追加した。
+
+#### `ios-native/README.md`
+- グルーム全画面ビューアと読み込み中表示を追記した。
+
+#### `notes/22_swift_native_migration.md`
+- Swift Native移行のステータスをiter328へ更新し、Phase 4の進捗にグルーム閲覧導線を追記した。
+
+### 影響範囲
+
+- Swift Native版のめぐりホーム
+- Swift Native版のグルーム閲覧
+
+### 確認方法
+
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-build --enable-xctest --disable-swift-testing -j 1`
+- `xcodebuild -quiet -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -destination 'generic/platform=iOS Simulator' -derivedDataPath /tmp/megrum-native-xcodebuild CODE_SIGNING_ALLOWED=NO build`
+
+### 関連ファイル
+
+- `ios-native/Sources/MegrumApp/MeguriScreen.swift`
+- `ios-native/README.md`
+- `notes/22_swift_native_migration.md`
+- `notes/08_design_iterations.md`
+
+### セルフレビュー結果
+
+- ✅ Swift Package testsが64件成功した。
+- ✅ Xcode project buildが成功した。
+- ✅ 画像読み込み中に補助テキストを出さず、ローディングだけを表示する仕様にした。
+- ✅ 新規DBスキーマや状態名は追加していないため、`notes/05_data_model.md` / `notes/09_state_machines.md` の更新は不要。
+- ✅ 新しいユーザー向け用語は追加していないため、`notes/10_glossary.md` の更新は不要。
+- ✅ TestFlight配布はまだ行っていないため、Preview OTA / TestFlight配信は不要。
+
+---
+
 ## イテレーション327：Swiftめぐり現在地境界を追加
 
 ### 背景・問題意識
