@@ -523,6 +523,45 @@ public struct WishItem: Identifiable, Codable, Hashable, Sendable {
     }
 }
 
+public enum ProposalMatchType: String, Codable, Sendable, CaseIterable, Identifiable {
+    case perfect
+    case forward
+    case backward
+
+    public var id: String { rawValue }
+}
+
+public struct ProposalCreateInput: Equatable, Sendable {
+    public var receiverID: UUID
+    public var senderGoodsIDs: [UUID]
+    public var receiverGoodsIDs: [UUID]
+    public var exchangeMethod: ExchangeMethod
+    public var conditionTags: [String]
+    public var message: String?
+    public var matchType: ProposalMatchType
+    public var status: ProposalStatus
+
+    public init(
+        receiverID: UUID,
+        senderGoodsIDs: [UUID],
+        receiverGoodsIDs: [UUID],
+        exchangeMethod: ExchangeMethod = .mail,
+        conditionTags: [String] = [],
+        message: String? = nil,
+        matchType: ProposalMatchType = .forward,
+        status: ProposalStatus = .sent
+    ) {
+        self.receiverID = receiverID
+        self.senderGoodsIDs = senderGoodsIDs
+        self.receiverGoodsIDs = receiverGoodsIDs
+        self.exchangeMethod = exchangeMethod
+        self.conditionTags = conditionTags
+        self.message = message
+        self.matchType = matchType
+        self.status = status
+    }
+}
+
 public struct TradeProposal: Identifiable, Codable, Hashable, Sendable {
     public var id: UUID
     public var senderID: UUID

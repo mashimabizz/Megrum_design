@@ -5,6 +5,7 @@ import SwiftUI
 struct GoodsGrid: View {
     var items: [GoodsItem]
     var columns: Int = 3
+    var onAddToExchangeList: ((GoodsItem) -> Void)?
     @State private var detailItem: GoodsItem?
     @State private var actionMessage: String?
 
@@ -48,7 +49,11 @@ struct GoodsGrid: View {
         case .detail:
             detailItem = item
         case .addToExchangeList:
-            actionMessage = "「\(item.title)」を交換リストに追加する処理は、打診フローのSwift化で接続します。"
+            if let onAddToExchangeList {
+                onAddToExchangeList(item)
+            } else {
+                actionMessage = "「\(item.title)」を交換リストに追加する処理は、打診フローのSwift化で接続します。"
+            }
         case .hide:
             actionMessage = "「\(item.title)」を非表示にする処理は、在庫編集のSwift化で接続します。"
         case .report:

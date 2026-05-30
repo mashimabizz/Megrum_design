@@ -64,6 +64,7 @@ public protocol MegrumRepository: Sendable {
     func loadGoodsTypes(limit: Int) async throws -> [GoodsType]
     func createGoodsEntry(_ input: GoodsEntryInput) async throws -> GoodsItem
     func searchGoods(_ input: GoodsSearchInput) async throws -> [GoodsItem]
+    func createProposal(_ input: ProposalCreateInput) async throws -> TradeProposal
     func loadMailingAddress() async throws -> MailingAddress?
     func saveMailingAddress(_ address: MailingAddress) async throws -> MailingAddress
     func lookupAddress(postalCode: String) async throws -> PostalCodeAddress?
@@ -94,6 +95,10 @@ public extension MegrumRepository {
 
     func searchGoods(_ input: GoodsSearchInput) async throws -> [GoodsItem] {
         []
+    }
+
+    func createProposal(_ input: ProposalCreateInput) async throws -> TradeProposal {
+        throw MegrumRepositoryError.unsupportedMutation
     }
 
     func loadMailingAddress() async throws -> MailingAddress? {
@@ -200,6 +205,19 @@ public struct PreviewMegrumRepository: MegrumRepository {
         .map { $0 }
     }
 
+    public func createProposal(_ input: ProposalCreateInput) async throws -> TradeProposal {
+        TradeProposal(
+            id: UUID(),
+            senderID: NativePreviewData.viewerID,
+            receiverID: input.receiverID,
+            status: input.status,
+            exchangeMethod: input.exchangeMethod,
+            senderGoodsIDs: input.senderGoodsIDs,
+            receiverGoodsIDs: input.receiverGoodsIDs,
+            conditionTags: input.conditionTags
+        )
+    }
+
     public func loadMailingAddress() async throws -> MailingAddress? {
         NativePreviewData.mailingAddress
     }
@@ -273,6 +291,7 @@ public final class MegrumAppState: ObservableObject {
     @Published public private(set) var isLookingUpPostalCode = false
     @Published public private(set) var isSavingMailingAddress = false
     @Published public private(set) var isCreatingGoodsEntry = false
+    @Published public private(set) var isCreatingProposal = false
     @Published public private(set) var unblockingUserID: UUID?
     @Published public private(set) var isMarkingNotificationsRead = false
     @Published public private(set) var isSavingAccountSetup = false
@@ -444,6 +463,29 @@ public final class MegrumAppState: ObservableObject {
         if activeSearchRequestID == requestID {
             activeSearchRequestID = nil
             isSearchingGoods = false
+        }
+    }
+
+    public func createProposal(_ input: ProposalCreateInput) async -> Bool {
+        guard !isCreatingProposal else {
+            return false
+        }
+        guard !input.senderGoodsIDs.isEmpty, !input.receiverGoodsIDs.isEmpty else {
+            errorMessage = "提示物を選択してください"
+            return false
+        }
+
+        isCreatingProposal = true
+        errorMessage = nil
+        do {
+            let proposal = try await repository.createProposal(input)
+            proposals.insert(proposal, at: 0)
+            isCreatingProposal = false
+            return true
+        } catch {
+            errorMessage = "打診を作成できませんでした"
+            isCreatingProposal = false
+            return false
         }
     }
 

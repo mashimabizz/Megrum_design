@@ -141,6 +141,32 @@ final class MegrumAppStateTests: XCTestCase {
         XCTAssertNil(state.errorMessage)
     }
 
+    func testAppStateCreatesPreviewProposal() async {
+        let state = MegrumAppState(repository: PreviewMegrumRepository())
+        await state.loadInitialData()
+
+        let senderGoodsID = try! XCTUnwrap(state.inventory.first?.id)
+        let receiverGoodsID = UUID(uuidString: "99999999-9999-9999-9999-999999999999")!
+        let receiverID = UUID(uuidString: "22222222-2222-2222-2222-222222222222")!
+
+        let created = await state.createProposal(
+            ProposalCreateInput(
+                receiverID: receiverID,
+                senderGoodsIDs: [senderGoodsID],
+                receiverGoodsIDs: [receiverGoodsID],
+                exchangeMethod: .mail,
+                conditionTags: ["即日発送"],
+                message: "よろしくお願いします"
+            )
+        )
+
+        XCTAssertTrue(created)
+        XCTAssertEqual(state.proposals.first?.receiverID, receiverID)
+        XCTAssertEqual(state.proposals.first?.receiverGoodsIDs, [receiverGoodsID])
+        XCTAssertEqual(state.proposals.first?.conditionTags, ["即日発送"])
+        XCTAssertFalse(state.isCreatingProposal)
+    }
+
     func testAppStateValidatesGoodsEntryTitle() async {
         let state = MegrumAppState(repository: PreviewMegrumRepository())
         let created = await state.createGoodsEntry(

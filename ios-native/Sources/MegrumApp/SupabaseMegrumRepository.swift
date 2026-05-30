@@ -10,6 +10,7 @@ public struct SupabaseMegrumRepository: MegrumRepository {
     private let postalCodeAddressClient: PostalCodeAddressClient
     private let blockClient: SupabaseBlockClient
     private let notificationClient: SupabaseNotificationClient
+    private let proposalClient: SupabaseProposalClient
     private let viewerID: UUID
 
     public init(client: SupabaseRESTClient, viewerID: UUID) {
@@ -20,6 +21,7 @@ public struct SupabaseMegrumRepository: MegrumRepository {
         self.postalCodeAddressClient = PostalCodeAddressClient()
         self.blockClient = SupabaseBlockClient(client: client)
         self.notificationClient = SupabaseNotificationClient(client: client)
+        self.proposalClient = SupabaseProposalClient(client: client)
         self.viewerID = viewerID
     }
 
@@ -75,6 +77,10 @@ public struct SupabaseMegrumRepository: MegrumRepository {
 
     public func searchGoods(_ input: GoodsSearchInput) async throws -> [GoodsItem] {
         try await goodsInventoryClient.searchGoods(viewerID: viewerID, input: input)
+    }
+
+    public func createProposal(_ input: ProposalCreateInput) async throws -> TradeProposal {
+        try await proposalClient.createProposal(senderID: viewerID, input: input)
     }
 
     public func loadMailingAddress() async throws -> MailingAddress? {
@@ -173,16 +179,7 @@ public struct SupabaseMegrumRepository: MegrumRepository {
     }
 
     private func loadProposals() async throws -> [TradeProposal] {
-        let viewer = viewerID.uuidString.lowercased()
-        let rows: [ProposalRow] = try await client.fetchRows(
-            from: "proposals",
-            select: "id,sender_id,receiver_id,status,exchange_method,sender_have_ids,receiver_have_ids,condition_tags,created_at",
-            queryItems: [
-                URLQueryItem(name: "or", value: "(sender_id.eq.\(viewer),receiver_id.eq.\(viewer))"),
-                URLQueryItem(name: "order", value: "created_at.desc")
-            ]
-        )
-        return rows.compactMap(\.proposal)
+        try await proposalClient.loadProposals(viewerID: viewerID)
     }
 }
 
@@ -245,35 +242,6 @@ private struct GoodsInventoryRow: Decodable, Sendable {
             goodsTypeID: goodsTypeId,
             title: title,
             tags: []
-        )
-    }
-}
-
-private struct ProposalRow: Decodable, Sendable {
-    var id: UUID
-    var senderId: UUID
-    var receiverId: UUID
-    var status: String
-    var exchangeMethod: String?
-    var senderHaveIds: [UUID]?
-    var receiverHaveIds: [UUID]?
-    var conditionTags: [String]?
-    var createdAt: Date?
-
-    var proposal: TradeProposal? {
-        guard let proposalStatus = ProposalStatus(rawValue: status) else {
-            return nil
-        }
-        return TradeProposal(
-            id: id,
-            senderID: senderId,
-            receiverID: receiverId,
-            status: proposalStatus,
-            exchangeMethod: ExchangeMethod(rawValue: exchangeMethod ?? "hand") ?? .hand,
-            senderGoodsIDs: senderHaveIds ?? [],
-            receiverGoodsIDs: receiverHaveIds ?? [],
-            conditionTags: conditionTags ?? [],
-            createdAt: createdAt ?? .now
         )
     }
 }

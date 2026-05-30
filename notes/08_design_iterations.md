@@ -4,6 +4,86 @@
 
 ---
 
+## イテレーション321：Swift打診作成境界を追加
+
+### 背景・問題意識
+
+Swift Native版で検索結果を表示できても、そこから交換の打診へ進む入口がなければ交換コアの移行が止まる。まずは `proposals` をNativeから読み書きできる境界と、検索結果から最小打診を作成するUIを追加し、今後の提示物選択・スケジュール・取引チャットへつながる足場を作る。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumCore/MegrumModels.swift`
+- `ProposalMatchType` と `ProposalCreateInput` を追加し、打診作成に必要な受信者・提示物・受け取り候補・交換手段・交換条件タグ・メッセージをSwift型で扱えるようにした。
+
+#### `ios-native/Sources/MegrumData/SupabaseProposalClient.swift`
+- `proposals` の一覧読み込みrequest境界を追加した。
+- `proposals` の作成request境界を追加し、`sender_have_ids` / `receiver_have_ids` / `exchange_method` / `option_tags` を保存できるようにした。
+- 既存の `option_tags` を `TradeProposal.conditionTags` へマッピングし、旧 `condition_tags` 参照を避けるようにした。
+
+#### `ios-native/Sources/MegrumApp/SupabaseMegrumRepository.swift`
+- `SupabaseProposalClient` をrepositoryへ接続し、既存のproposal読み込みも同client経由に切り替えた。
+- `createProposal(_:)` を実装した。
+
+#### `ios-native/Sources/MegrumApp/MegrumAppState.swift`
+- `isCreatingProposal` と `createProposal(_:)` を追加し、作成成功時にやりとり一覧へ即時反映するようにした。
+- Preview repositoryでも最小打診を作成できるようにした。
+
+#### `ios-native/Sources/MegrumApp/GoodsGrid.swift`
+- 長押しメニューの「交換リストに追加」を、呼び出し側から任意のハンドラへつなげられるようにした。
+
+#### `ios-native/Sources/MegrumApp/SearchScreen.swift`
+- 検索結果の「交換リストに追加」から `ProposalCreateSheet` を開くようにした。
+- `ProposalCreateSheet` で受け取るグッズ、私が出す在庫、交換手段、交換条件タグ、メッセージを指定して打診を作成できるようにした。
+
+#### `ios-native/Tests/MegrumDataTests/SupabaseProposalClientTests.swift`
+- `proposals` 読み込みと作成requestのURL/JSON payloadを検証した。
+
+#### `ios-native/Tests/MegrumAppTests/MegrumAppStateTests.swift`
+- Preview repositoryで打診作成がやりとり一覧へ反映されることを検証した。
+
+#### `ios-native/README.md`
+- `SupabaseProposalClient` と検索結果からのproposal作成sheetを追記した。
+
+#### `notes/22_swift_native_migration.md`
+- Swift Native移行のステータスをiter321へ更新し、Phase 3の進捗にproposal作成境界を追記した。
+
+### 影響範囲
+
+- Swift Native版の検索結果
+- Swift Native版の打診作成入口
+- Swift Native版のやりとり一覧データ
+- Swift Native版の `proposals` 読み書き境界
+
+### 確認方法
+
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-build --enable-xctest --disable-swift-testing -j 1`
+- `xcodebuild -quiet -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -destination 'generic/platform=iOS Simulator' -derivedDataPath /tmp/megrum-native-xcodebuild CODE_SIGNING_ALLOWED=NO build`
+
+### 関連ファイル
+
+- `ios-native/Sources/MegrumCore/MegrumModels.swift`
+- `ios-native/Sources/MegrumData/SupabaseProposalClient.swift`
+- `ios-native/Sources/MegrumApp/SupabaseMegrumRepository.swift`
+- `ios-native/Sources/MegrumApp/MegrumAppState.swift`
+- `ios-native/Sources/MegrumApp/GoodsGrid.swift`
+- `ios-native/Sources/MegrumApp/SearchScreen.swift`
+- `ios-native/Tests/MegrumDataTests/SupabaseProposalClientTests.swift`
+- `ios-native/Tests/MegrumAppTests/MegrumAppStateTests.swift`
+- `ios-native/README.md`
+- `notes/22_swift_native_migration.md`
+- `notes/08_design_iterations.md`
+
+### セルフレビュー結果
+
+- ✅ Swift Package testsが55件成功した。
+- ✅ Xcode project buildが成功した。
+- ✅ 既存DBスキーマの `proposals.option_tags` を使うため、新規migrationは不要。
+- ✅ Proposal状態名は既存の `draft` / `sent` を使うため、`notes/09_state_machines.md` の更新は不要。
+- ✅ 「交換条件タグ」は `notes/05_data_model.md` の `option_tags` で既に定義済みのため、`notes/10_glossary.md` の更新は不要。
+- ✅ TestFlight配布はまだ行っていないため、Preview OTA / TestFlight配信は不要。
+
+---
+
 ## イテレーション320：Swift検索結果境界を追加
 
 ### 背景・問題意識
