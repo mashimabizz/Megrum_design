@@ -4,6 +4,45 @@
 
 ---
 
+## イテレーション289：左ドロワー内スワイプで閉じる
+
+### 背景・問題意識
+
+オーナーから、左ドロワーを閉じる時に元々の画面側から左へフリックする必要があり、ドロワー内の領域を左へフリックしても閉じられないという指摘があった。ドロワーは画面右側の前景に閉じるジェスチャーを持っていたが、左側のドロワー本体には同じジェスチャーが付いていなかった。
+
+### 変更内容
+
+#### `mobile/app/(tabs)/_layout.tsx`
+- ドロワー本体の `Animated.View` に左スワイプ専用の `PanResponder` を追加した。
+- 通常のメニュータップはそのまま通し、左方向に一定以上動いた時だけドロワー側のResponderが反応するようにした。
+- ドロワー内スワイプ中は既存の項目タップ無効化ルールと同じく、ドロワー項目の操作を止めるようにした。
+- 閉じる閾値に届かない場合は再度開いた状態へ戻し、誤操作で閉じにくいようにした。
+
+### 影響範囲
+
+- iOS版 左ドロワー
+- ホーム左上アイコンから開くプロフィールドロワー
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- `EAS_UPDATE_PROJECT_SLUG=ihub EXPO_NO_GIT_STATUS=1 npm --prefix mobile run update:ios:preview -- --message "[iter289] 左ドロワー内スワイプで閉じる" --non-interactive`
+- Preview OTA: Update group ID `4da42eff-02ec-40b6-9460-20dd1df8e838` / iOS update ID `019e7894-52af-7ce8-a637-410fa6edeed5`
+- EAS Dashboard: `https://expo.dev/accounts/mashima.bizz/projects/ihub/updates/4da42eff-02ec-40b6-9460-20dd1df8e838`
+
+### 関連ファイル
+
+- `mobile/app/(tabs)/_layout.tsx`
+- `notes/08_design_iterations.md`
+
+### セルフレビュー結果
+
+- ✅ ドロワー内のメニュータップを邪魔しないよう、左方向の明確なスワイプだけを検知対象にした。
+- ✅ 閉じている途中にドロワー項目が反応しない既存ルールと整合するよう、スワイプ開始時にドロワー操作を一時無効化した。
+- ✅ iOS Preview channel へOTA配信済み。
+- ✅ 状態遷移・用語・DBスキーマ変更はないため、`notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要。
+
 ## イテレーション288：めぐりホームの更新表示を統一
 
 ### 背景・問題意識

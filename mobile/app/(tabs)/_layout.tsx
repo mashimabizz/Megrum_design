@@ -270,6 +270,45 @@ function ProfileDrawerShell({ children }: { children: ReactNode }) {
     [openX, screenX],
   );
 
+  const drawerPanResponder = useMemo(
+    () =>
+      PanResponder.create({
+        onMoveShouldSetPanResponderCapture: (_event, gesture) =>
+          visibleRef.current &&
+          !closingRef.current &&
+          drawerInteractiveRef.current &&
+          gesture.dx < -6 &&
+          Math.abs(gesture.dx) > Math.abs(gesture.dy) * 1.15,
+        onMoveShouldSetPanResponder: (_event, gesture) =>
+          visibleRef.current &&
+          !closingRef.current &&
+          drawerInteractiveRef.current &&
+          gesture.dx < -6 &&
+          Math.abs(gesture.dx) > Math.abs(gesture.dy) * 1.15,
+        onPanResponderGrant: () => {
+          closingRef.current = false;
+          setDrawerInteractionEnabled(false);
+          setClosing(false);
+          screenX.stopAnimation();
+        },
+        onPanResponderMove: (_event, gesture) => {
+          const next = Math.min(openX, Math.max(0, openX + gesture.dx));
+          screenX.setValue(next);
+        },
+        onPanResponderRelease: (_event, gesture) => {
+          if (gesture.dx < -openX * 0.18 || gesture.vx < -0.28) {
+            closeDrawer();
+            return;
+          }
+          openDrawer();
+        },
+        onPanResponderTerminate: () => {
+          openDrawer();
+        },
+      }),
+    [openX, screenX],
+  );
+
   const drawerOpacity = screenX.interpolate({
     inputRange: [0, openX * 0.3, openX],
     outputRange: [0, 1, 1],
@@ -309,6 +348,7 @@ function ProfileDrawerShell({ children }: { children: ReactNode }) {
               transform: [{ translateX: drawerParallax }],
             },
           ]}
+          {...drawerPanResponder.panHandlers}
         >
           <ProfileDrawerContent onNavigate={closeDrawer} />
         </Animated.View>
