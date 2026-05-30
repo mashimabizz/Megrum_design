@@ -4,6 +4,44 @@
 
 ---
 
+## イテレーション281：左ドロワー通知導線を確実化
+
+### 背景・問題意識
+
+オーナーから、左ドロワー内の「通知」をタップしてもドロワーが閉じるだけで通知一覧へ遷移しない、という再指摘があった。前回はドロワー共通の遷移順序を修正したが、通知行は NativeTabs の隠しタブに対応する画面であり、閉じアニメ完了後の `/notifications` 遷移では安定しない可能性があった。
+
+### 変更内容
+
+#### `mobile/app/(tabs)/_layout.tsx`
+- 左ドロワーの通知行だけ、`router.push("/(tabs)/notifications")` を先に実行してからドロワーを閉じる専用ハンドラ `openNotifications()` に変更した。
+- 通知一覧は既存の `mobile/app/(tabs)/notifications.tsx` を利用し、ドロワーの背面が即座に通知一覧へ切り替わるようにした。
+- 他のドロワー項目は、既存の閉じアニメ完了後に遷移する挙動を維持した。
+
+### 影響範囲
+
+- iOS版 左ドロワー
+- iOS版 通知一覧への導線
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- `EAS_UPDATE_PROJECT_SLUG=ihub EXPO_NO_GIT_STATUS=1 npm --prefix mobile run update:ios:preview -- --message "[iter281] 左ドロワー通知導線を確実化" --non-interactive`
+- Preview OTA: Update group ID `c7fa122f-fc87-4035-9546-654127155d23` / iOS update ID `019e785c-4fd0-769f-8285-aefa6f440ef1`
+- EAS Dashboard: `https://expo.dev/accounts/mashima.bizz/projects/ihub/updates/c7fa122f-fc87-4035-9546-654127155d23`
+
+### 関連ファイル
+
+- `mobile/app/(tabs)/_layout.tsx`
+- `notes/08_design_iterations.md`
+
+### セルフレビュー結果
+
+- ✅ スクショで指摘された左ドロワー内の「通知」行を直接修正した。
+- ✅ 通知一覧画面は既存の `mobile/app/(tabs)/notifications.tsx` を利用している。
+- ✅ 新しいDBテーブル・状態・用語は追加していないため、`notes/05_data_model.md` / `notes/09_state_machines.md` / `notes/10_glossary.md` の更新は不要。
+- ✅ iOS Preview channel へOTA配信済み。
+
 ## イテレーション280：グルーム遷移とマップ初期表示を調整
 
 ### 背景・問題意識

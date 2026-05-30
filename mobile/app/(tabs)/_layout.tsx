@@ -422,6 +422,11 @@ function ProfileDrawerContent({
     });
   }
 
+  function openNotifications() {
+    router.push("/(tabs)/notifications");
+    onNavigate();
+  }
+
   async function handleSignOut() {
     onNavigate();
     if (previewMode) {
@@ -476,7 +481,7 @@ function ProfileDrawerContent({
           accessory={<DrawerNotificationBadge count={unreadNotificationCount} />}
           icon="notifications-outline"
           label="通知"
-          onPress={() => go("/notifications")}
+          onPress={openNotifications}
         />
         <DrawerItem icon="create-outline" label="プロフィール編集" onPress={() => go("/profile-edit")} />
         <DrawerItem icon="sparkles-outline" label="推し設定" onPress={() => go("/oshi-settings")} />
