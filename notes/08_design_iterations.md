@@ -4,6 +4,54 @@
 
 ---
 
+## イテレーション339：Swift APNs登録をAppホストへ接続
+
+### 背景・問題意識
+
+iter338でAPNs device tokenをDBへ保存する境界はできたが、Xcodeアプリホスト側でiOS標準の通知許可、APNs登録、device token受け取りを行う処理がまだなかった。Swift Native版が実機で端末通知の準備を始められるように、アプリ起動側のbridgeを追加する。
+
+### 変更内容
+
+#### `ios-native/App/MegrumNativeApp.swift`
+- `MegrumAppState` と `MegrumAuthState` をAppホストで `@StateObject` 管理するようにした。
+- iOSのみ `UIApplicationDelegateAdaptor` で `NativePushAppDelegate` を接続した。
+- Supabase設定済みかつサインイン済みの場合に、iOS標準の `UNUserNotificationCenter` で通知許可を確認し、許可済みならAPNs登録へ進むようにした。
+- APNsから受け取ったdevice tokenを16進文字列化し、NotificationCenter経由でSwiftUI側へ渡すようにした。
+- pending tokenはviewer読み込み後にも再登録を試み、repository差し替え直後の取りこぼしを避けるようにした。
+- アプリ前面表示中の通知は `.banner` / `.sound` / `.badge` で表示可能にした。
+
+#### `ios-native/README.md` / `notes/22_swift_native_migration.md`
+- Swift Native通知Phaseの進捗として、Appホストの通知許可/APNs登録bridgeを追記した。
+
+### 影響範囲
+
+- Swift Native Xcodeアプリホスト
+- iOS標準通知許可ダイアログ
+- APNs device token登録フロー
+- 後続の通知タップ遷移、APNs配送ワーカー、Push Notifications capability設定
+
+### 確認方法
+
+- `xcodebuild -quiet -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -destination 'generic/platform=iOS Simulator' -derivedDataPath /tmp/megrum-native-xcodebuild CODE_SIGNING_ALLOWED=NO build`
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-build --enable-xctest --disable-swift-testing -j 1`
+
+### 関連ファイル
+
+- `ios-native/App/MegrumNativeApp.swift`
+- `ios-native/README.md`
+- `notes/22_swift_native_migration.md`
+- `notes/08_design_iterations.md`
+
+### セルフレビュー結果
+
+- ✅ Xcode project buildが成功した。
+- ✅ Swift Package testsが88件成功した。
+- ✅ 既存のSwift Package APIには影響しないAppホスト側の接続に閉じた。
+- ✅ 通知許可はSupabase設定済みかつサインイン済みの時だけ要求するようにした。
+- ✅ データモデルはiter338のAPNs列を使うだけのため、`notes/05_data_model.md` の追加更新は不要。
+- ✅ 状態遷移は変えていないため、`notes/09_state_machines.md` の更新は不要。
+- ✅ 新用語は追加していないため、`notes/10_glossary.md` の追加更新は不要。
+
 ## イテレーション338：Swift APNs端末登録境界を追加
 
 ### 背景・問題意識
