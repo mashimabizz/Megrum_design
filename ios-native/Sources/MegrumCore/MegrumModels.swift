@@ -258,6 +258,29 @@ public struct MailingAddress: Identifiable, Codable, Hashable, Sendable {
     }
 }
 
+public struct PostalCodeAddress: Codable, Hashable, Sendable {
+    public var postalCode: String
+    public var prefecture: String
+    public var city: String
+    public var town: String
+
+    public init(
+        postalCode: String,
+        prefecture: String,
+        city: String,
+        town: String
+    ) {
+        self.postalCode = postalCode
+        self.prefecture = prefecture
+        self.city = city
+        self.town = town
+    }
+
+    public var line1Suggestion: String {
+        town
+    }
+}
+
 public struct GoodsTag: Identifiable, Codable, Hashable, Sendable {
     public var id: UUID
     public var name: String

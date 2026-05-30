@@ -4,6 +4,75 @@
 
 ---
 
+## イテレーション312：Swift住所の郵便番号補完を追加
+
+### 背景・問題意識
+
+iter311でSwift Native版の住所設定フォームを追加したが、郵便番号を入力しても都道府県・市区町村・町域が手入力のままだった。オーナー要望では郵便番号入力後に住所が自動で入ることが必須なので、zipcloud公式APIの `zipcode` 検索を使う薄いclientを追加し、SwiftUIフォームへ接続した。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumCore/MegrumModels.swift`
+- `PostalCodeAddress` を追加し、郵便番号検索結果の都道府県・市区町村・町域をdomain modelとして扱えるようにした。
+
+#### `ios-native/Sources/MegrumData/PostalCodeAddressClient.swift`
+- zipcloudの郵便番号検索APIへ `zipcode` と `limit=1` を付けて問い合わせるclientを追加した。
+- 郵便番号正規化、request生成、HTTP status、API statusのerror handlingを追加した。
+
+#### `ios-native/Sources/MegrumApp/MegrumAppState.swift`
+- `lookupPostalCode(_:)` を追加し、フォームからrepository経由で住所候補を取得できるようにした。
+- 読込状態 `isLookingUpPostalCode` と住所未検出/取得失敗時のerror messageを追加した。
+- Preview repositoryでも `1000001` の住所補完を返せるようにした。
+
+#### `ios-native/Sources/MegrumApp/SupabaseMegrumRepository.swift`
+- live repositoryに `PostalCodeAddressClient` を接続した。
+
+#### `ios-native/Sources/MegrumApp/SettingsScreen.swift`
+- 郵便番号が7桁になったら250ms待って住所候補を取得し、都道府県・市区町村・番地欄へ反映するようにした。
+- 取得中は郵便番号欄の右端に小さな `ProgressView` を表示するようにした。
+- 画面離脱時に補完タスクをcancelするようにした。
+
+#### `ios-native/Tests/`
+- `PostalCodeAddressClient` のrequest URL、未完成郵便番号のvalidation、正規化を検証した。
+- `MegrumAppState` のPreview住所補完を検証した。
+
+### 影響範囲
+
+- Swift Native版の住所設定フォーム
+- 外部郵便番号API境界
+- 住所登録時の手入力負荷
+
+### 確認方法
+
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-build --enable-xctest --disable-swift-testing -j 1`
+- `xcodebuild -quiet -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -destination 'generic/platform=iOS Simulator' -derivedDataPath /tmp/megrum-native-xcodebuild CODE_SIGNING_ALLOWED=NO build`
+- `git diff --check -- ios-native/Sources/MegrumCore/MegrumModels.swift ios-native/Sources/MegrumData/PostalCodeAddressClient.swift ios-native/Tests/MegrumDataTests/PostalCodeAddressClientTests.swift ios-native/Sources/MegrumApp/MegrumAppState.swift ios-native/Sources/MegrumApp/SupabaseMegrumRepository.swift ios-native/Sources/MegrumApp/SettingsScreen.swift ios-native/Tests/MegrumAppTests/MegrumAppStateTests.swift ios-native/README.md notes/22_swift_native_migration.md notes/08_design_iterations.md`
+
+### 関連ファイル
+
+- `ios-native/Sources/MegrumCore/MegrumModels.swift`
+- `ios-native/Sources/MegrumData/PostalCodeAddressClient.swift`
+- `ios-native/Tests/MegrumDataTests/PostalCodeAddressClientTests.swift`
+- `ios-native/Sources/MegrumApp/MegrumAppState.swift`
+- `ios-native/Sources/MegrumApp/SupabaseMegrumRepository.swift`
+- `ios-native/Sources/MegrumApp/SettingsScreen.swift`
+- `ios-native/Tests/MegrumAppTests/MegrumAppStateTests.swift`
+- `ios-native/README.md`
+- `notes/22_swift_native_migration.md`
+- `notes/08_design_iterations.md`
+
+### セルフレビュー結果
+
+- ✅ 住所補完は画面から直接APIを呼ばず、`MegrumRepository` / `MegrumAppState` 境界を通した。
+- ✅ DBスキーマ変更はないため、migrationは追加していない。
+- ✅ Swift Package testsが33件成功した。
+- ✅ Xcode project buildが成功した。
+- ✅ 状態遷移・新用語・DBスキーマ変更はないため、`notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要。
+- ⚠️ zipcloudの利用条件確認と障害時fallbackは、リリース前チェックリストに残す。
+- ✅ TestFlight配布はまだ行っていないため、Preview OTA / TestFlight配信は不要。
+
+---
+
 ## イテレーション311：Swift住所設定を追加
 
 ### 背景・問題意識

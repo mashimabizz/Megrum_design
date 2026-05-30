@@ -6,12 +6,14 @@ public struct SupabaseMegrumRepository: MegrumRepository {
     private let client: SupabaseRESTClient
     private let oshiClient: SupabaseOshiClient
     private let mailingAddressClient: SupabaseMailingAddressClient
+    private let postalCodeAddressClient: PostalCodeAddressClient
     private let viewerID: UUID
 
     public init(client: SupabaseRESTClient, viewerID: UUID) {
         self.client = client
         self.oshiClient = SupabaseOshiClient(client: client)
         self.mailingAddressClient = SupabaseMailingAddressClient(client: client)
+        self.postalCodeAddressClient = PostalCodeAddressClient()
         self.viewerID = viewerID
     }
 
@@ -63,6 +65,10 @@ public struct SupabaseMegrumRepository: MegrumRepository {
 
     public func saveMailingAddress(_ address: MailingAddress) async throws -> MailingAddress {
         try await mailingAddressClient.upsertAddress(address)
+    }
+
+    public func lookupAddress(postalCode: String) async throws -> PostalCodeAddress? {
+        try await postalCodeAddressClient.lookup(postalCode: postalCode)
     }
 
     public func completeAccountSetup(_ input: AccountSetupInput) async throws -> UserProfile {

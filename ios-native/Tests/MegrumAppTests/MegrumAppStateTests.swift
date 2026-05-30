@@ -121,6 +121,18 @@ final class MegrumAppStateTests: XCTestCase {
         XCTAssertEqual(state.errorMessage, "宛名・郵便番号・都道府県・市区町村・番地を入力してください")
     }
 
+    func testAppStateLooksUpPostalCodeInPreviewRepository() async {
+        let state = MegrumAppState(repository: PreviewMegrumRepository())
+
+        let address = await state.lookupPostalCode("100-0001")
+
+        XCTAssertEqual(address?.prefecture, "東京都")
+        XCTAssertEqual(address?.city, "千代田区")
+        XCTAssertEqual(address?.line1Suggestion, "千代田")
+        XCTAssertFalse(state.isLookingUpPostalCode)
+        XCTAssertNil(state.errorMessage)
+    }
+
     func testAuthStateSignsInThroughRepository() async {
         let state = MegrumAuthState(repository: StubAuthRepository())
 

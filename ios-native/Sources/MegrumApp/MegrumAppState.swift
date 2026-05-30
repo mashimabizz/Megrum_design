@@ -63,6 +63,7 @@ public protocol MegrumRepository: Sendable {
     func loadOshiCharacters(groupID: UUID, limit: Int) async throws -> [OshiCharacter]
     func loadMailingAddress() async throws -> MailingAddress?
     func saveMailingAddress(_ address: MailingAddress) async throws -> MailingAddress
+    func lookupAddress(postalCode: String) async throws -> PostalCodeAddress?
     func completeAccountSetup(_ input: AccountSetupInput) async throws -> UserProfile
 }
 
@@ -81,6 +82,10 @@ public extension MegrumRepository {
 
     func saveMailingAddress(_ address: MailingAddress) async throws -> MailingAddress {
         throw MegrumRepositoryError.unsupportedMutation
+    }
+
+    func lookupAddress(postalCode: String) async throws -> PostalCodeAddress? {
+        nil
     }
 
     func completeAccountSetup(_ input: AccountSetupInput) async throws -> UserProfile {
@@ -132,6 +137,18 @@ public struct PreviewMegrumRepository: MegrumRepository {
     public func saveMailingAddress(_ address: MailingAddress) async throws -> MailingAddress {
         address
     }
+
+    public func lookupAddress(postalCode: String) async throws -> PostalCodeAddress? {
+        guard normalizedPostalCode(postalCode) == "1000001" else {
+            return nil
+        }
+        return PostalCodeAddress(
+            postalCode: "1000001",
+            prefecture: "東京都",
+            city: "千代田区",
+            town: "千代田"
+        )
+    }
 }
 
 @MainActor
@@ -149,6 +166,7 @@ public final class MegrumAppState: ObservableObject {
     @Published public private(set) var isLoadingOshiGroups = false
     @Published public private(set) var isLoadingOshiCharacters = false
     @Published public private(set) var isLoadingMailingAddress = false
+    @Published public private(set) var isLookingUpPostalCode = false
     @Published public private(set) var isSavingMailingAddress = false
     @Published public private(set) var isSavingAccountSetup = false
     @Published public private(set) var errorMessage: String?
@@ -256,6 +274,33 @@ public final class MegrumAppState: ObservableObject {
         }
     }
 
+    public func lookupPostalCode(_ postalCode: String) async -> PostalCodeAddress? {
+        let normalizedPostalCode = normalizedPostalCode(postalCode)
+        guard normalizedPostalCode.count == 7 else {
+            return nil
+        }
+        guard !isLookingUpPostalCode else {
+            return nil
+        }
+
+        isLookingUpPostalCode = true
+        errorMessage = nil
+        defer {
+            isLookingUpPostalCode = false
+        }
+
+        do {
+            let address = try await repository.lookupAddress(postalCode: normalizedPostalCode)
+            if address == nil {
+                errorMessage = "郵便番号に一致する住所が見つかりませんでした"
+            }
+            return address
+        } catch {
+            errorMessage = "郵便番号から住所を取得できませんでした"
+            return nil
+        }
+    }
+
     public func completeAccountSetup(
         displayName: String,
         prefecture: String?,
@@ -308,4 +353,8 @@ private extension String {
     var nilIfBlank: String? {
         isEmpty ? nil : self
     }
+}
+
+private func normalizedPostalCode(_ value: String) -> String {
+    String(value.filter(\.isNumber).prefix(7))
 }

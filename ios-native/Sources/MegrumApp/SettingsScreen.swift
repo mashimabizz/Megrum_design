@@ -65,6 +65,8 @@ struct AddressSettingsScreen: View {
     @State private var line1 = ""
     @State private var line2 = ""
     @State private var phoneNumber = ""
+    @State private var postalCodeLookupTask: Task<Void, Never>?
+    @State private var lastAppliedPostalCode = ""
 
     var body: some View {
         ScrollView {
@@ -84,6 +86,9 @@ struct AddressSettingsScreen: View {
         .task {
             await appState.loadMailingAddress()
             apply(address: appState.mailingAddress)
+        }
+        .onDisappear {
+            postalCodeLookupTask?.cancel()
         }
         .onChange(of: appState.mailingAddress) { _, address in
             apply(address: address)
@@ -110,15 +115,26 @@ struct AddressSettingsScreen: View {
                 .onSubmit { focusedField = .postalCode }
                 .megrumTextFieldStyle()
 
-            TextField("郵便番号（ハイフンなし）", text: $postalCode)
-                .focused($focusedField, equals: .postalCode)
-                .textContentType(.postalCode)
-                #if os(iOS)
-                .keyboardType(.numberPad)
-                #endif
-                .onChange(of: postalCode) { _, value in
-                    postalCode = normalizedPostalCode(value)
+            HStack(spacing: 10) {
+                TextField("郵便番号（ハイフンなし）", text: $postalCode)
+                    .focused($focusedField, equals: .postalCode)
+                    .textContentType(.postalCode)
+                    #if os(iOS)
+                    .keyboardType(.numberPad)
+                    #endif
+                    .onChange(of: postalCode) { _, value in
+                        let normalized = normalizedPostalCode(value)
+                        if normalized != value {
+                            postalCode = normalized
+                        }
+                        schedulePostalCodeLookup(normalized)
+                    }
+
+                if appState.isLookingUpPostalCode {
+                    ProgressView()
+                        .controlSize(.small)
                 }
+            }
                 .megrumTextFieldStyle()
 
             TextField("都道府県", text: $prefecture)
@@ -220,10 +236,35 @@ struct AddressSettingsScreen: View {
         line1 = address.line1
         line2 = address.line2 ?? ""
         phoneNumber = address.phoneNumber ?? ""
+        lastAppliedPostalCode = address.postalCode
     }
 
     private func normalizedPostalCode(_ value: String) -> String {
         String(value.filter(\.isNumber).prefix(7))
+    }
+
+    private func schedulePostalCodeLookup(_ value: String) {
+        postalCodeLookupTask?.cancel()
+        guard value.count == 7, value != lastAppliedPostalCode else {
+            return
+        }
+
+        postalCodeLookupTask = Task { [value] in
+            try? await Task.sleep(nanoseconds: 250_000_000)
+            guard !Task.isCancelled else {
+                return
+            }
+            guard let address = await appState.lookupPostalCode(value) else {
+                return
+            }
+            guard !Task.isCancelled else {
+                return
+            }
+            prefecture = address.prefecture
+            city = address.city
+            line1 = address.line1Suggestion
+            lastAppliedPostalCode = address.postalCode
+        }
     }
 
     private enum Field {

@@ -1,7 +1,7 @@
 # 22. Swift Native Migration
 
 最終更新: 2026-05-31
-ステータス: Active draft（iter311）
+ステータス: Active draft（iter312）
 
 ## 目的
 
@@ -110,7 +110,8 @@ tar -xzf /Users/michitaka/Desktop/Megrum_backups/pre-swift-migration-20260531-03
 - iter309で、`OshiKind` / `OshiGroup` / `OshiCharacter` / `UserOshiSelection` と `SupabaseOshiClient` を追加し、`groups_master` と `characters_master` をSwift側から読める境界を作った。
 - iter310で、初回プロフィール設定画面に推しグループ/メンバー選択を追加し、`user_oshi` を差し替え保存してから `users.account_status='active'` へ進めるようにした。
 - iter311で、設定一覧と住所設定フォームを追加し、`user_mailing_addresses` をSwift側から取得/upsertできる境界を作った。
-- 現時点のAuthはOAuth・メールリンク復帰・住所自動補完を含むフルオンボーディングまでは未完了。次のPhase 2作業で認証リンク処理、Apple/Google、住所補完へ広げる。
+- iter312で、郵便番号7桁入力からzipcloud公式APIで住所候補を取得し、住所設定フォームへ反映する境界を追加した。
+- 現時点のAuthはOAuth・メールリンク復帰を含むフルオンボーディングまでは未完了。次のPhase 2作業で認証リンク処理、Apple/Googleへ広げる。
 
 ### Phase 3: Exchange core
 
