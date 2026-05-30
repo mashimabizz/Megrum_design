@@ -4,6 +4,65 @@
 
 ---
 
+## イテレーション280：グルーム遷移とマップ初期表示を調整
+
+### 背景・問題意識
+
+オーナーから、グルーム閲覧で横フリック時だけユーザー切替が立方体回転になり、右タップで次ユーザーへ移る時にも同じ回転演出にしたいという指摘があった。また、下フリックで閉じる際に元画面が自然に見えるようにし、最後に元のグルームが一瞬再表示される挙動をなくしたいという要望があった。加えて、グルームマップと掲示板マップの初期表示を位置情報許可時は現在地中心にし、グルームの閲覧可能範囲を地図上で1km円として表示する必要があった。
+
+### 変更内容
+
+#### `mobile/app/(tabs)/encounters.tsx`
+- めぐり側グルームビューアで、右/左タップが別ユーザーへ進む場合も `finishSwipe(...)` を通して立方体回転演出を走らせるようにした。
+- 同一ユーザー内の次/前グルームは従来どおり即時切替のまま維持した。
+- 下フリック終了時に `dismissY` / `swipeX` を閉じる直前にリセットしないようにし、最後の再表示を防止した。
+- 下フリック中のグルーム本体 opacity を最後まで 0 に落とし、背面の元画面が段階的に見えるようにした。
+
+#### `mobile/app/(tabs)/index.tsx`
+- ホーム側グルームビューアでも、下フリック終了時のアニメ値リセットをやめ、閉じ際の一瞬の再表示を防止した。
+- 下フリック中のグルーム本体 opacity を最後まで 0 に落とすようにした。
+
+#### `mobile/app/groom-map.tsx`
+- 位置情報取得後に `MapView.animateToRegion(...)` で現在地中心へ追従するようにした。
+- iOS標準の現在地ボタンを表示するようにした。
+- 現在地を中心に、グルームを閲覧できる1km圏を円で表示するようにした。
+
+#### `mobile/app/meguri-board-map.tsx`
+- 位置情報取得後に `MapView.animateToRegion(...)` で現在地中心へ追従するようにした。
+- iOS標準の現在地ボタンを表示するようにした。
+
+### 影響範囲
+
+- iOS版 めぐりホームのグルーム閲覧
+- iOS版 ホーム起点のグルーム閲覧
+- iOS版 グルームマップ
+- iOS版 掲示板マップ
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- `EAS_UPDATE_PROJECT_SLUG=ihub EXPO_NO_GIT_STATUS=1 npm --prefix mobile run update:ios:preview -- --message "[iter280] グルーム遷移とマップ初期表示を調整" --non-interactive`
+- Preview OTA: Update group ID `f604426b-678a-41e3-8cb4-990623d73f33` / iOS update ID `019e7843-eeee-7001-b2c1-efd62b56550d`
+- EAS Dashboard: `https://expo.dev/accounts/mashima.bizz/projects/ihub/updates/f604426b-678a-41e3-8cb4-990623d73f33`
+
+### 関連ファイル
+
+- `mobile/app/(tabs)/encounters.tsx`
+- `mobile/app/(tabs)/index.tsx`
+- `mobile/app/groom-map.tsx`
+- `mobile/app/meguri-board-map.tsx`
+- `notes/08_design_iterations.md`
+
+### セルフレビュー結果
+
+- ✅ 右/左タップで別ユーザーへ移る場合だけ立方体回転演出を使い、同一ユーザー内のグルーム切替は従来の挙動を維持した。
+- ✅ 下フリック完了時のアニメ値リセットをなくし、閉じ際に元グルームが再表示されないようにした。
+- ✅ グルームマップと掲示板マップは、位置情報取得後に現在地中心へ移動する。
+- ✅ グルームマップに現在地中心の1km円を表示する。
+- ✅ 新しいDBテーブル・状態・用語は追加していないため、`notes/05_data_model.md` / `notes/09_state_machines.md` / `notes/10_glossary.md` の更新は不要。
+- ✅ iOS Preview channel へOTA配信済み。
+
 ## イテレーション279：通知ドロワー導線を修正
 
 ### 背景・問題意識

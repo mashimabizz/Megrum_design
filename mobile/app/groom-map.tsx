@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -10,7 +10,7 @@ import {
   View,
 } from "react-native";
 import { router, useFocusEffect } from "expo-router";
-import MapView, { Marker, type Region } from "react-native-maps";
+import MapView, { Circle, Marker, type Region } from "react-native-maps";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAuth } from "../src/auth/AuthProvider";
 import { IconSymbol } from "../src/components/IconSymbol";
@@ -34,6 +34,7 @@ const FALLBACK_CENTER: MegrumCoordinate = {
 export default function GroomMapScreen() {
   const insets = useSafeAreaInsets();
   const { previewMode, user } = useAuth();
+  const mapRef = useRef<MapView | null>(null);
   const [viewerCoordinate, setViewerCoordinate] = useState<MegrumCoordinate | null>(null);
   const [posts, setPosts] = useState<GroomRemotePost[]>([]);
   const [loading, setLoading] = useState(true);
@@ -78,6 +79,11 @@ export default function GroomMapScreen() {
     }, [loadPosts]),
   );
 
+  useEffect(() => {
+    if (!viewerCoordinate) return;
+    mapRef.current?.animateToRegion(region, 360);
+  }, [region, viewerCoordinate]);
+
   function openPost(post: GroomRemotePost) {
     if (!canOpenGroom(post)) {
       Alert.alert("1km圏外のグルームは見れません");
@@ -92,12 +98,26 @@ export default function GroomMapScreen() {
   return (
     <View style={styles.root}>
       <MapView
+        ref={mapRef}
         initialRegion={region}
         mapType="standard"
         showsCompass
         showsUserLocation
+        showsMyLocationButton
         style={StyleSheet.absoluteFillObject}
       >
+        {viewerCoordinate ? (
+          <Circle
+            center={{
+              latitude: viewerCoordinate.latitude,
+              longitude: viewerCoordinate.longitude,
+            }}
+            fillColor="rgba(166,149,216,0.12)"
+            radius={GROOM_ACCESS_RADIUS_M}
+            strokeColor="rgba(166,149,216,0.92)"
+            strokeWidth={2}
+          />
+        ) : null}
         {posts.map((post) =>
           post.originLat !== null && post.originLng !== null ? (
             <Marker

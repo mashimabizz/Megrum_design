@@ -1641,8 +1641,6 @@ function HomeGroomViewerModal({
       useNativeDriver: false,
     }).start(({ finished }) => {
       if (!finished) return;
-      dismissY.setValue(0);
-      swipeX.setValue(0);
       onClose();
     });
   }
@@ -1799,7 +1797,7 @@ function HomeGroomViewerModal({
   });
   const dismissOpacity = dismissY.interpolate({
     inputRange: [0, height * 0.55],
-    outputRange: [1, 0.18],
+    outputRange: [1, 0],
     extrapolate: "clamp",
   });
   const backdropOpacity = dismissY.interpolate({

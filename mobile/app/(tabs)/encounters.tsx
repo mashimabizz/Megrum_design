@@ -1470,20 +1470,23 @@ function GroomViewerModal({
     }
   }
 
-	  function selectRelativePost(offset: -1 | 1) {
-	    if (!currentGroup || currentPostIndex < 0) return;
-	    const nextPostIndex = currentPostIndex + offset;
-	    if (nextPostIndex >= 0 && nextPostIndex < currentGroupPosts.length) {
-	      onSelectPost(currentGroupPosts[nextPostIndex].id);
-	      return;
-	    }
-	    const hasRelativeAccount =
-	      offset > 0
-	        ? currentAccountIndex < accountGroups.length - 1
-	        : currentAccountIndex > 0;
-	    if (!hasRelativeAccount && offset < 0) return;
-	    selectRelativeAccount(offset);
-	  }
+  function selectRelativePost(offset: -1 | 1) {
+    if (!currentGroup || currentPostIndex < 0) return;
+    const nextPostIndex = currentPostIndex + offset;
+    if (nextPostIndex >= 0 && nextPostIndex < currentGroupPosts.length) {
+      onSelectPost(currentGroupPosts[nextPostIndex].id);
+      return;
+    }
+    const hasRelativeAccount =
+      offset > 0
+        ? currentAccountIndex < accountGroups.length - 1
+        : currentAccountIndex > 0;
+    if (!hasRelativeAccount) {
+      if (offset > 0) onClose();
+      return;
+    }
+    finishSwipe(offset);
+  }
 
   function selectRelativeAccount(offset: -1 | 1) {
     if (currentAccountIndex < 0) return;
@@ -1531,8 +1534,6 @@ function GroomViewerModal({
       useNativeDriver: false,
     }).start(({ finished }) => {
       if (!finished) return;
-      dismissY.setValue(0);
-      swipeX.setValue(0);
       onClose();
     });
   }
@@ -1740,7 +1741,7 @@ function GroomViewerModal({
   });
   const dismissOpacity = dismissY.interpolate({
     inputRange: [0, height * 0.55],
-    outputRange: [1, 0.18],
+    outputRange: [1, 0],
     extrapolate: "clamp",
   });
   const dismissBackdropOpacity = dismissY.interpolate({

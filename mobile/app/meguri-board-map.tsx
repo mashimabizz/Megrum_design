@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -38,6 +38,7 @@ const FALLBACK_CENTER: MegrumCoordinate = {
 export default function MeguriBoardMapScreen() {
   const insets = useSafeAreaInsets();
   const { previewMode, profile, user } = useAuth();
+  const mapRef = useRef<MapView | null>(null);
   const [viewerContext, setViewerContext] = useState<MeguriBoardViewerContext>(() =>
     buildViewerContext({
       fallbackArea: profile?.primaryArea || DEFAULT_MEGURI_PROFILE.baseArea,
@@ -94,6 +95,11 @@ export default function MeguriBoardMapScreen() {
     }, [loadThreads]),
   );
 
+  useEffect(() => {
+    if (!viewerContext.coordinate) return;
+    mapRef.current?.animateToRegion(region, 360);
+  }, [region, viewerContext.coordinate]);
+
   function openThread(thread: MeguriBoardThread) {
     if (!canOpenThread(thread)) {
       Alert.alert("3km圏外の掲示板は見れません");
@@ -117,10 +123,12 @@ export default function MeguriBoardMapScreen() {
   return (
     <View style={styles.root}>
       <MapView
+        ref={mapRef}
         initialRegion={region}
         mapType="standard"
         showsCompass
         showsUserLocation
+        showsMyLocationButton
         style={StyleSheet.absoluteFillObject}
       >
         {threads.map((thread) =>
