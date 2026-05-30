@@ -15,6 +15,7 @@
 4. **`notes/08_design_iterations.md` の最新 iter を 1〜2件読む**（直近のコンテキスト）
 5. **オーナーがタスク的な指示をした場合は `notes/USER_PLAYBOOK.md` を確認**（Phase 2 タスク・指示テンプレ・チェックポイントが集約されている）
 6. **法的文書（規約・プライバシー・特商法）に関わる作業は `notes/17_legal_alignment.md` を確認**（弁護士納品の規約原典との整合性管理）
+7. **`mobile/` の作業では本ファイルの「Codex iOS開発運用規約」を必ず確認**（小さな検証ループ、証拠つきデバッグ、Liquid Glass方針）
 
 これらを読まずに作業を始めない。
 
@@ -152,6 +153,58 @@ bg-megrum-lavender / text-megrum-sky / border-megrum-pink / megrum-warn / megrum
 - WebとiOSの見た目・導線を完全同期する必要はない。共通化が必要なものは `packages/core/` / `packages/supabase/` に寄せ、画面体験はiOSを正とする。
 - mobile のユーザー向け変更は、完了前に Preview channel / EAS build 反映要否を必ず確認する。web 管理画面だけの変更では iOS Preview 更新は不要。
 
+## 🧭 Codex iOS開発運用規約（iter298）
+
+> 参考：npaka「Codex のiOSアプリ開発のためのプロンプトまとめ」と OpenAI Developers「Native development」の方針を、Megrum の Expo / React Native + iOS Preview 運用に合わせて落とし込んだもの。
+
+### 1. CLI優先・小さな検証ループ
+
+- 変更ごとに、まず**最小限で意味のある検証コマンド**を選ぶ。いきなり全ビルドに飛ばない。
+- `mobile/` の JS/TS 変更は原則として次を基本ループにする：
+  - `npm --prefix mobile run typecheck`
+  - ユーザー向け変更なら `npm --prefix mobile run export:ios:preview`
+  - OTA可能なら `EAS_UPDATE_PROJECT_SLUG=ihub EXPO_NO_GIT_STATUS=1 npm --prefix mobile run update:ios:preview -- --message "[iter◯◯] ..." --non-interactive`
+- iOSネイティブ層、Expo local module、Info.plist、権限、依存追加、Pod、Xcode設定を触った場合はOTAでは足りない。Preview用のEAS buildまたはXcode Archiveが必要であることを明示する。
+- Xcodeで確認する場合は、原則 `mobile/ios/MegrumPreview.xcworkspace` / `MegrumPreview` scheme を前提にし、使ったworkspace、scheme、デバイス、OS、確認コマンドを最終報告に書く。
+
+### 2. バグ修正は「再現 → 証拠 → 最小修正 → 再検証」
+
+- 1回の作業で扱う障害モードを絞る。隣接する改善を勝手に広げない。
+- 可能なら修正前に再現手順を確定し、スクリーンショット、ログ、型エラー、スタック、該当DB行など、判断材料を残す。
+- UI操作の検証では、生座標よりアクセシビリティラベル、ルート、テストID、安定した文言を優先する。
+- 認証情報や特別なテストデータが必要で発見できない時だけ、足りない入力を最小限で質問する。
+- 最終報告では「何を確認したか」「何を確認できなかったか」を具体的に書く。
+
+### 3. 大きな画面のリファクタリング
+
+- リファクタリングは**挙動・レイアウト・ナビゲーション・ビジネスロジックを維持する作業**として扱う。仕様変更は別作業として分ける。
+- まず意味のあるセクションを小さなコンポーネントへ抽出する。巨大な画面を、巨大な computed view / helper の束へ置き換えない。
+- 子コンポーネントへ親モデル全体を渡さない。必要最小限の値、状態、コールバックを渡す。
+- 複雑なボタン処理・副作用・保存処理は render / JSX 直下から出し、サービス・hooks・小さな関数へ分ける。
+- ルートの画面ツリーは安定させる。画面全体の `if/else` 入れ替えより、局所的な条件表示を優先する。
+- 変更しなかった重要項目（永続化、状態遷移、分析、通知、ナビゲーション、ユーザー表示文言など）もセルフレビューに明記する。
+
+### 4. Liquid Glass / iOS標準UIの扱い
+
+- Liquid Glassは「全部をガラス化する」方針ではない。コンテンツの上にある操作レイヤー、検索、シート、ツールバー、主要CTAなど、効果がある場所から限定的に導入する。
+- まず対象フローを監査し、ガラス化すべき面、プレーンなまま残すべき面、削除すべき過剰なカスタムblur/装飾を分けてから実装する。
+- iOS標準・ネイティブ素材で実現できる場合は、独自Viewより標準コンポーネントや既存の `LiquidGlassSurface` / system material fallback を優先する。
+- 透明表現を使う場合でも、可読性、コントラスト、Reduce Transparency / Reduce Motion を必ず守る。
+- iOS 26専用APIを使う場合は、それ以前のruntime向けフォールバックを明示する。Expo/React Native上でネイティブAPIが使えない場合は、近似表現と限界を報告する。
+
+### 5. App Intents / システム連携は小さく始める
+
+- App Intents、Shortcuts、Spotlight、ウィジェット等のシステム連携は、リリース直前のP0修正より優先しない。
+- 着手する場合は、画面全体を外部公開するのではなく、ユーザー価値が高い動詞（開く、作成する、検索する、続ける等）と最小のEntityだけに絞る。
+- インテントからアプリを開く場合は、既存のExpo Router / deep link設計と衝突しないよう、遷移先と状態復元を先に設計する。
+
+### 6. 完了報告の必須要素
+
+- 変更ファイル、変更した挙動、保持した挙動を短く書く。
+- 実行した検証コマンド、OTA / build の有無、Update group ID / build番号を明記する。
+- 未実行の検証がある場合は、理由を隠さず書く。
+- 関連のない未コミット変更がある場合は、触っていないことを明記する。
+
 ---
 
 ## 🤖 環境ごとの動作差分（重要）
@@ -275,20 +328,21 @@ Phase 0a 完了後、Supabase CLI で初期化予定。
 
 ```
 □ 1. 変更内容を実装（JSX編集等）
-□ 2. notes/08_design_iterations.md に新しい iteration エントリを追加
-□ 3. 状態遷移に影響あるか？ → あれば notes/09_state_machines.md を更新
-□ 4. 新用語・廃止用語があるか？ → あれば notes/10_glossary.md を更新
-□ 5. データモデルに影響あるか？ → あれば notes/05_data_model.md にメモ追加
-□ 6. commit メッセージは [iter◯◯] [タイトル] 形式で
-□ 7. push
-□ 8. **iOS版 / mobile のユーザー向け変更は、完了前に必ず Preview channel にも反映**
+□ 2. 最小限で意味のある検証を実行（例：`npm --prefix mobile run typecheck`、該当画面の再現確認、差分チェック）
+□ 3. notes/08_design_iterations.md に新しい iteration エントリを追加
+□ 4. 状態遷移に影響あるか？ → あれば notes/09_state_machines.md を更新
+□ 5. 新用語・廃止用語があるか？ → あれば notes/10_glossary.md を更新
+□ 6. データモデルに影響あるか？ → あれば notes/05_data_model.md にメモ追加
+□ 7. commit メッセージは [iter◯◯] [タイトル] 形式で
+□ 8. push
+□ 9. **iOS版 / mobile のユーザー向け変更は、完了前に必ず Preview channel にも反映**
    - JS/TSだけの変更：`npm --prefix mobile run export:ios:preview` → `EXPO_NO_GIT_STATUS=1 npm --prefix mobile run update:ios:preview -- --message "[iter◯◯] ..." --non-interactive`
    - Swift / Expo local module / native config / 依存追加を含む変更：EAS Updateだけでは反映されないため、Preview用のEAS buildが必要。必要ならオーナーにビルド手順を渡す
    - Preview更新した場合は、EAS Update ID / Update group を `notes/08_design_iterations.md` の確認方法へ記録
-□ 9. **ユーザー向け変更は原則 `mobile/` のみ更新**。`web/` は管理者画面・運用画面として必要な時だけ更新する
+□ 10. **ユーザー向け変更は原則 `mobile/` のみ更新**。`web/` は管理者画面・運用画面として必要な時だけ更新する
 ```
 
-**省略禁止**：チェックリストの 2-5 を飛ばすと、別環境の Codex が同じ判断を再現できなくなる。
+**省略禁止**：チェックリストの 2-6 を飛ばすと、別環境の Codex が同じ判断を再現できなくなる。
 
 ### B. iteration エントリの形式
 

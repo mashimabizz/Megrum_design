@@ -4,6 +4,55 @@
 
 ---
 
+## イテレーション298：Codex iOS開発運用規約を反映
+
+### 背景・問題意識
+
+オーナーから、npaka氏の記事「Codex のiOSアプリ開発のためのプロンプトまとめ」に書かれている開発姿勢を、Megrumの開発環境に反映したいという指示があった。記事と元になっているOpenAI DevelopersのNative developmentページを確認し、MegrumのExpo / React Native / iOS Preview運用に合う形で、未来のCodexセッションが必ず読むルールへ落とし込む必要があった。
+
+### 変更内容
+
+#### `AGENTS.md`
+- 起動時チェックに、`mobile/` 作業では「Codex iOS開発運用規約」を確認するルールを追加した。
+- CLI優先の小さな検証ループ、Preview OTA / EAS build の判断、Xcode workspace / scheme の報告ルールを明文化した。
+- バグ修正は「再現 → 証拠 → 最小修正 → 再検証」で進めるルールを追加した。
+- 大きな画面のリファクタリングでは、挙動・レイアウト・ナビゲーションを維持し、小さなコンポーネントへ分割する方針を追加した。
+- Liquid Glassは全画面に無差別適用せず、監査してから操作レイヤー中心に限定導入し、フォールバックとアクセシビリティを確認する方針を追加した。
+- App Intents / システム連携は、初回リリースP0より優先せず、小さな動詞と最小Entityから始める方針を追加した。
+- 設計・実装変更チェックリストへ「最小限で意味のある検証」を追加した。
+
+#### `notes/USER_PLAYBOOK.md`
+- オーナーがCodexへ依頼する時の基本形を追加した。
+- iOS UI / Liquid Glass、画面整理、バグ調査を依頼する時のテンプレートと注意点を追加した。
+- Codexに再現・証拠・最小修正・再検証まで求める運用を明文化した。
+
+### 影響範囲
+
+- 今後のCodexセッションの作業規約
+- iOS / `mobile/` 作業の検証・報告ループ
+- Liquid Glassや大規模リファクタリングの進め方
+- オーナーがCodexに依頼する時のテンプレート
+
+### 確認方法
+
+- `git diff --check -- AGENTS.md notes/USER_PLAYBOOK.md notes/08_design_iterations.md`
+- 参考確認: `https://note.com/npaka/n/n51962b239b68`
+- 参考確認: `https://developers.openai.com/codex/use-cases/collections/native-development`
+
+### 関連ファイル
+
+- `AGENTS.md`
+- `notes/USER_PLAYBOOK.md`
+- `notes/08_design_iterations.md`
+
+### セルフレビュー結果
+
+- ✅ 外部記事の内容をそのまま転載せず、MegrumのExpo / React Native / Preview OTA運用に合わせて要点を規約化した。
+- ✅ 未来のCodexセッションが必ず読む `AGENTS.md` に反映した。
+- ✅ オーナーが依頼を出す時に使う `notes/USER_PLAYBOOK.md` に、実用テンプレートとして反映した。
+- ✅ 実装コード・DBスキーマ・状態遷移・用語定義は変更していないため、`notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要。
+- ✅ iOSユーザー向けコード変更ではないため、Preview OTA配信は不要。
+
 ## イテレーション297：検索フィルターの選択UIを整理
 
 ### 背景・問題意識
