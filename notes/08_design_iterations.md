@@ -4,6 +4,53 @@
 
 ---
 
+## イテレーション248：掲示板一覧カードから投稿者プロフィールへ移動できるようにする
+
+### 背景・問題意識
+
+スレッド一覧では、タイトルや本文を開く前に投稿者を確認したいことがある。詳細画面では投稿者名からプロフィールへ直接移動できるようになったため、一覧カードでも同じ操作感に揃え、投稿者の確認をスレッドを開く前にできるようにした。
+
+### 変更内容
+
+#### `mobile/app/meguri-board.tsx`
+- スレッドカードのメタ表示を `threadMetaRow` に分割し、投稿者名だけをタップ可能にした。
+- 投稿者名タップで `openBoardUserProfile(thread.authorId)` を呼び出し、投稿者プロフィールへ遷移するようにした。
+- カード全体のスレッド遷移と競合しないよう、投稿者名タップ時はイベント伝播を止めるようにした。
+
+#### `notes/09_state_machines.md`
+- Meguri Board Lifecycle に一覧カード投稿者プロフィール導線のルールを追記した。
+
+#### `notes/10_glossary.md`
+- 掲示板一覧投稿者プロフィール導線を追加した。
+
+### 影響範囲
+
+- iOS版 スポット掲示板一覧
+- スレッドカード
+- 投稿者プロフィールへの導線
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- `EAS_UPDATE_PROJECT_SLUG=ihub EXPO_NO_GIT_STATUS=1 npm --prefix mobile run update:ios:preview -- --message "[iter248] open board list author profile" --non-interactive`
+- Preview OTA: Update group ID `66d70e87-1403-4d48-9d44-9d52cfc76a1a` / iOS update ID `019e7641-ce59-7bb4-b6a4-ed550c43605d`
+
+### 関連ファイル
+
+- `mobile/app/meguri-board.tsx`
+- `notes/08_design_iterations.md`
+- `notes/09_state_machines.md`
+- `notes/10_glossary.md`
+
+### セルフレビュー結果
+
+- ✅ 詳細画面と同じく投稿者名だけをリンク的に強調し、カード本文やタイトルの視認性は変えなかった。
+- ✅ 投稿者名タップ時にスレッド詳細へ同時遷移しないようにした。
+- ✅ DB変更なし、ネイティブ依存追加なしでPreview OTA対象内に収めた。
+
+---
+
 ## イテレーション247：掲示板スレッド投稿者へ本文から直接移動できるようにする
 
 ### 背景・問題意識

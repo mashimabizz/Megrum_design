@@ -1045,9 +1045,24 @@ export default function MeguriBoardScreen() {
                         {thread.body}
                       </Text>
                       <AttachmentGrid imageUris={thread.imageUris} compact />
-                      <Text numberOfLines={1} style={styles.threadMeta}>
-                        {meguriBoardAudienceMeta(thread)} · {thread.authorName}
-                      </Text>
+                      <View style={styles.threadMetaRow}>
+                        <Text numberOfLines={1} style={styles.threadMeta}>
+                          {meguriBoardAudienceMeta(thread)} ·{" "}
+                        </Text>
+                        <Pressable
+                          accessibilityRole="button"
+                          hitSlop={8}
+                          onPress={(event) => {
+                            event.stopPropagation();
+                            openBoardUserProfile(thread.authorId);
+                          }}
+                          style={styles.threadAuthorButton}
+                        >
+                          <Text numberOfLines={1} style={styles.threadAuthorText}>
+                            {thread.authorName}
+                          </Text>
+                        </Pressable>
+                      </View>
                       <View style={styles.threadFooter}>
                         <Text
                           numberOfLines={1}
@@ -2040,8 +2055,22 @@ const styles = StyleSheet.create({
   },
   threadMeta: {
     color: megrumColors.mutedInk,
+    flexShrink: 0,
     fontSize: 11.5,
     fontWeight: "800",
+  },
+  threadMetaRow: {
+    alignItems: "center",
+    flexDirection: "row",
+    minWidth: 0,
+  },
+  threadAuthorButton: {
+    flexShrink: 1,
+  },
+  threadAuthorText: {
+    color: megrumColors.lavender,
+    fontSize: 11.5,
+    fontWeight: "900",
   },
   threadFooter: {
     alignItems: "center",
