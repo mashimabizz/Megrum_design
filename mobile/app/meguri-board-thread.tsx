@@ -1485,6 +1485,12 @@ export default function MeguriBoardThreadScreen() {
         run: () => toggleReplyBodyExpanded(reply.id),
       });
     }
+    if (reply.parentReplyId) {
+      actions.push({
+        label: "引用元を見る",
+        run: () => jumpToQuotedReply(reply.parentReplyId, reply.id),
+      });
+    }
     if (replySearchText.trim() || replySortMode !== "oldest") {
       actions.push({
         label: "元の流れで見る",

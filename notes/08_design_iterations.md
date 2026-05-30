@@ -4,6 +4,52 @@
 
 ---
 
+## イテレーション246：掲示板返信メニューから引用元を見られるようにする
+
+### 背景・問題意識
+
+引用返信が増えると、会話の途中から読んだユーザーは元の発言を探しにくい。返信本文内の引用プレビューから移動できる導線はあるが、長い返信や画像付き返信ではプレビューを見落とすことがあるため、返信メニューから引用元へ戻れる操作を追加した。
+
+### 変更内容
+
+#### `mobile/app/meguri-board-thread.tsx`
+- 親返信を持つ返信のアクションシートに `引用元を見る` を追加した。
+- `引用元を見る` から既存の `jumpToQuotedReply` を呼び出し、引用元へスクロールしつつ戻り導線も維持するようにした。
+
+#### `notes/09_state_machines.md`
+- Meguri Board Lifecycle に返信メニューからの引用元表示ルールを追記した。
+
+#### `notes/10_glossary.md`
+- 掲示板引用元メニュー導線を追加した。
+
+### 影響範囲
+
+- iOS版 スポット掲示板詳細
+- 引用返信の読み返し
+- 返信アクションシート
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- `EAS_UPDATE_PROJECT_SLUG=ihub EXPO_NO_GIT_STATUS=1 npm --prefix mobile run update:ios:preview -- --message "[iter246] open quoted reply from menu" --non-interactive`
+- Preview OTA: Update group ID `31a1a1ed-6256-4305-ba09-0206957e2268` / iOS update ID `019e7639-af1d-7580-882b-9407708b8137`
+
+### 関連ファイル
+
+- `mobile/app/meguri-board-thread.tsx`
+- `notes/08_design_iterations.md`
+- `notes/09_state_machines.md`
+- `notes/10_glossary.md`
+
+### セルフレビュー結果
+
+- ✅ 既存の引用プレビュータップ導線を壊さず、アクションシートにも同じ移動手段を追加した。
+- ✅ 親返信を持つ返信だけに表示し、通常返信のメニューを増やしすぎないようにした。
+- ✅ DB変更なし、ネイティブ依存追加なしでPreview OTA対象内に収めた。
+
+---
+
 ## イテレーション245：掲示板返信者プロフィール導線を直接開けるようにする
 
 ### 背景・問題意識
