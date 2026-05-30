@@ -4,6 +4,52 @@
 
 ---
 
+## イテレーション263：掲示板本文カードにブロックボタンを追加する
+
+### 背景・問題意識
+
+一般的なスレッド型掲示板では、通報だけでなく、自分の閲覧体験から特定ユーザーを避けるブロック導線が必要になる。スポット掲示板ではメニュー内から投稿者をブロックできたが、通報ボタンを本文カードへ出したことで、安全操作の入口が分散しないようブロックも同じアクション列に追加した。
+
+### 変更内容
+
+#### `mobile/app/meguri-board-thread.tsx`
+- 他人のスレッド本文カードアクション列に `ブロック` ボタンを追加した。
+- 押下時は既存の `confirmBlockThreadAuthor` を使い、確認アラートを挟んで投稿者ブロックへ進むようにした。
+- 自分のスレッドではブロックボタンを表示しないようにした。
+
+#### `notes/09_state_machines.md`
+- Meguri Board Lifecycle に本文カードブロックボタンの表示/操作ルールを追記した。
+
+#### `notes/10_glossary.md`
+- 掲示板本文カードブロックボタンを追加した。
+
+### 影響範囲
+
+- iOS版 スポット掲示板スレッド詳細
+- スレッド本文カードの安全導線
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- `EAS_UPDATE_PROJECT_SLUG=ihub EXPO_NO_GIT_STATUS=1 npm --prefix mobile run update:ios:preview -- --message "[iter263] add thread detail block button" --non-interactive`
+- Preview OTA: Update group ID `2fb9f0ea-e891-41f2-b9da-10017bbe95ee` / iOS update ID `019e767a-6c9a-709e-aa83-8d230946780d`
+
+### 関連ファイル
+
+- `mobile/app/meguri-board-thread.tsx`
+- `notes/08_design_iterations.md`
+- `notes/09_state_machines.md`
+- `notes/10_glossary.md`
+
+### セルフレビュー結果
+
+- ✅ 既存の確認アラートとブロック処理を使い回し、誤タップで即ブロックされない。
+- ✅ 自分のスレッドには表示しないため、無意味な操作を出さない。
+- ✅ ネイティブ依存追加なしでPreview OTA対象内に収めた。
+
+---
+
 ## イテレーション262：掲示板本文カードに通報ボタンを追加する
 
 ### 背景・問題意識

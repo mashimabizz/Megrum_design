@@ -1796,6 +1796,16 @@ export default function MeguriBoardThreadScreen() {
                       </Text>
                     </Pressable>
                   ) : null}
+                  {!thread.mine ? (
+                    <Pressable
+                      accessibilityRole="button"
+                      onPress={confirmBlockThreadAuthor}
+                      style={styles.threadActionPill}
+                    >
+                      <IconSymbol name="ban-outline" color={megrumColors.mutedInk} size={15} />
+                      <Text style={styles.threadActionText}>ブロック</Text>
+                    </Pressable>
+                  ) : null}
                   <Pressable
                     accessibilityRole="button"
                     onPress={openParticipants}
