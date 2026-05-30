@@ -4,6 +4,52 @@
 
 ---
 
+## イテレーション261：掲示板本文の日時詳細を見られるようにする
+
+### 背景・問題意識
+
+一般的なスレッド型掲示板では、相対時刻だけでなく正確な投稿日時や更新日時を確認できる必要がある。スポット掲示板では返信の日時詳細は見られたが、スレッド本文カードの作成時刻は相対表示だけだったため、本文上部の時刻をタップして詳細日時を確認できるようにした。
+
+### 変更内容
+
+#### `mobile/app/meguri-board-thread.tsx`
+- スレッド本文カード右上の相対時刻をタップ可能にした。
+- `showThreadTimestamp` を追加し、作成日時と、1分以上後に更新されている場合の更新日時をアラートで表示するようにした。
+- 返信日時詳細と同じ `formatFullDateTime` を使い、表示形式を揃えた。
+
+#### `notes/09_state_machines.md`
+- Meguri Board Lifecycle に本文日時詳細の表示ルールを追記した。
+
+#### `notes/10_glossary.md`
+- 掲示板本文日時詳細を追加した。
+
+### 影響範囲
+
+- iOS版 スポット掲示板スレッド詳細
+- スレッド本文カードの時刻表示
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- `EAS_UPDATE_PROJECT_SLUG=ihub EXPO_NO_GIT_STATUS=1 npm --prefix mobile run update:ios:preview -- --message "[iter261] show thread timestamp detail" --non-interactive`
+- Preview OTA: Update group ID `0e026c82-5b23-42cd-8fe0-0c10d1218dca` / iOS update ID `019e7674-da2e-7885-a586-1b668f494a30`
+
+### 関連ファイル
+
+- `mobile/app/meguri-board-thread.tsx`
+- `notes/08_design_iterations.md`
+- `notes/09_state_machines.md`
+- `notes/10_glossary.md`
+
+### セルフレビュー結果
+
+- ✅ 返信日時詳細と同じ形式・操作に揃え、スレッド本文だけ別仕様にならないようにした。
+- ✅ 表示操作だけなので、スレッド/返信の状態やDBスキーマは変更していない。
+- ✅ ネイティブ依存追加なしでPreview OTA対象内に収めた。
+
+---
+
 ## イテレーション260：掲示板本文カードに共有ボタンを追加する
 
 ### 背景・問題意識

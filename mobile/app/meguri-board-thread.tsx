@@ -1404,6 +1404,15 @@ export default function MeguriBoardThreadScreen() {
     Alert.alert("返信の日時", rows.join("\n"));
   }
 
+  function showThreadTimestamp() {
+    if (!thread) return;
+    const rows = [`作成: ${formatFullDateTime(thread.createdAt)}`];
+    if (thread.updatedAt && thread.updatedAt > thread.createdAt + 60000) {
+      rows.push(`更新: ${formatFullDateTime(thread.updatedAt)}`);
+    }
+    Alert.alert("スレッドの日時", rows.join("\n"));
+  }
+
   function openBoardUserProfile(userId: string) {
     if (!userId) return;
     if (userId === actor.userId) {
@@ -1666,7 +1675,13 @@ export default function MeguriBoardThreadScreen() {
                     {thread.status === "locked" ? <StatusBadge label="締め切り" /> : null}
                     {thread.reported ? <StatusBadge label="通報済み" /> : null}
                   </View>
-                  <Text style={styles.heroTime}>{formatRelativeTime(thread.createdAt)}</Text>
+                  <Pressable
+                    accessibilityRole="button"
+                    hitSlop={8}
+                    onPress={showThreadTimestamp}
+                  >
+                    <Text style={styles.heroTime}>{formatRelativeTime(thread.createdAt)}</Text>
+                  </Pressable>
                 </View>
                 <Text style={styles.heroTitle}>{thread.title}</Text>
                 <HighlightedText
