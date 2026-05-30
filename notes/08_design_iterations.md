@@ -4,6 +4,66 @@
 
 ---
 
+## イテレーション344：Swift APNs配送Functionを追加
+
+### 背景・問題意識
+
+Swift Native iOS版はAPNs token登録、通知許可、entitlement、ログアウト時の端末解除までつながったが、`notifications` の行を実際にAPNsへ送る信頼済みサーバー側の入口が未整備だった。APNs秘密鍵はクライアントやDB migrationに置けないため、まずSupabase Edge Functionに配送処理を閉じ込める。
+
+### 変更内容
+
+#### `supabase/functions/send-apns-notification/index.ts`
+- `notification_id` を受け取り、`notifications` の対象行を取得するEdge Functionを追加した。
+- `notification_devices.push_provider='apns'` の有効端末だけを読み込み、APNsへalert payloadを送るようにした。
+- APNs provider tokenを `MEGRUM_APNS_TEAM_ID` / `MEGRUM_APNS_KEY_ID` / `MEGRUM_APNS_PRIVATE_KEY` からES256署名で生成するようにした。
+- APNsが `BadDeviceToken` / `Unregistered` / 410を返した端末は `notification_devices.revoked_at` で無効化するようにした。
+- `Authorization: Bearer <service role>` または `x-megrum-dispatch-secret` のサーバー側認証を必須にした。
+
+#### `supabase/functions/send-apns-notification/README.md`
+- 必要なEdge Function secrets、入力payload、認証方式、ローカル構文チェック方法を記載した。
+
+#### `supabase/config.toml`
+- `send-apns-notification` はFunction内で独自にサーバー側認証するため、Edge gatewayのJWT検証を無効化した。
+
+#### `ios-native/README.md` / `notes/22_swift_native_migration.md`
+- Swift Native通知Phaseの進捗として、APNs配送Functionを追記した。
+
+#### `notes/05_data_model.md` / `notes/10_glossary.md`
+- `notifications` / `notification_devices` のAPNs配送説明を更新した。
+- `APNs配送Function` の用語定義を追加した。
+
+### 影響範囲
+
+- Swift Native版の端末通知配送基盤
+- Supabase Edge Functions
+- `notification_devices.revoked_at` による無効端末管理
+
+### 確認方法
+
+- `web/node_modules/.bin/tsc --noEmit --target es2022 --lib es2022,dom --module nodenext --moduleResolution nodenext --skipLibCheck supabase/functions/send-apns-notification/index.ts`
+
+### 関連ファイル
+
+- `supabase/functions/send-apns-notification/index.ts`
+- `supabase/functions/send-apns-notification/README.md`
+- `supabase/config.toml`
+- `ios-native/README.md`
+- `notes/22_swift_native_migration.md`
+- `notes/05_data_model.md`
+- `notes/10_glossary.md`
+- `notes/08_design_iterations.md`
+
+### セルフレビュー結果
+
+- ✅ TypeScript構文チェックが成功した。
+- ✅ APNs秘密鍵はEdge Function secretsから読む設計にし、migrationやクライアントに置かない。
+- ✅ Functionはservice roleまたはdispatch secretがない呼び出しを拒否する。
+- ✅ 無効APNs端末を `revoked_at` で止めるため、ログアウト解除と同じライフサイクルに揃えた。
+- ✅ DBスキーマは変えていないが、`notifications` / `notification_devices` の説明が変わるため `notes/05_data_model.md` を更新した。
+- ✅ 状態遷移は変えていないため、`notes/09_state_machines.md` の更新は不要。
+- ✅ 新用語として `APNs配送Function` を `notes/10_glossary.md` に追加した。
+- ⚠️ DBトリガーからの自動呼び出しは、秘密情報の置き場を確定してから次iterで接続する。
+
 ## イテレーション343：Swift Appleログインを追加
 
 ### 背景・問題意識

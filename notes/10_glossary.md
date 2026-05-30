@@ -4,7 +4,7 @@
 > 新環境（別Claudeセッション・別エンジニア）でも、これだけ読めばコンテキストがつかめる。
 
 最終更新: 2026-05-31
-ステータス: Draft v3.77（iter343 Swift Native Appleログインを反映）
+ステータス: Draft v3.78（iter344 Swift Native APNs配送Functionを反映）
 
 ---
 
@@ -51,6 +51,7 @@
 | **Appleログイン** | Sign in with Apple | Swift Native iOS版でApple標準の `SignInWithAppleButton` から認証し、Apple identity tokenとraw nonceをSupabase Authへ渡してMegrum sessionを作る認証経路 | iter343 |
 | **モバイル通知** | push notification, 端末通知 | iOS/Android端末に届くMegrumの通知。Expo版はExpo Push Token、Swift Native iOS版はAPNs device tokenを `notification_devices` に登録し、`notifications` の新規行を端末へ配送する | iter276, iter338 |
 | **APNs device token** | native device token, APNsトークン | Swift Native iOS版がApple Push Notification serviceから受け取る端末トークン。`notification_devices.push_provider='apns'` / `native_device_token` に保存する | iter338 |
+| **APNs配送Function** | `send-apns-notification` | 信頼済みサーバー側から `notification_id` を受け取り、対象ユーザーの有効APNs端末へ通知を配送するSupabase Edge Function。無効端末は `revoked_at` で止める | iter344 |
 | **通知一覧** | notification center | アプリ内で受信通知を確認する一覧。未読/既読を `notifications.read_at` で管理し、通知タップで対象画面へ遷移する | iter92, iter276 |
 | **通知バッジ** | unread badge | 未読通知数を示す小さな件数表示。左ドロワーの「通知」項目やアプリアイコンバッジで使う | iter276 |
 | **共通ロジック** | shared core | Web/iOSで挙動を揃えるため `packages/core/` に切り出す状態判定・マッチング優先度・市場残数などの処理 | iter154.75 |
