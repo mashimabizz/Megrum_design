@@ -9,7 +9,6 @@ import {
 } from "react";
 import { router } from "expo-router";
 import type { SFSymbol, SymbolViewProps } from "expo-symbols";
-import { LinearGradient } from "expo-linear-gradient";
 import {
   ActionSheetIOS,
   Alert,
@@ -267,7 +266,7 @@ type SymbolModule = {
 };
 
 let cachedSymbolView: ComponentType<SymbolViewProps> | null | undefined;
-const ENABLE_NATIVE_HOME_EFFECTS = false;
+const ENABLE_NATIVE_HOME_EFFECTS = Platform.OS === "ios";
 
 function getIOSSFSymbolView() {
   if (!ENABLE_NATIVE_HOME_EFFECTS) {
@@ -1439,46 +1438,35 @@ function FloatingSearchButton() {
     <Pressable
       accessibilityLabel="検索"
       accessibilityRole="button"
+      hitSlop={10}
       onPress={() => router.push("/search")}
       style={({ pressed }) => [
         styles.floatingSearchButton,
         pressed ? styles.floatingSearchButtonPressed : null,
       ]}
     >
-      <View pointerEvents="none" style={styles.floatingSearchGlassClip}>
-        <LiquidGlassSurface
-          blurIntensity={70}
-          glassEffectStyle={{
-            style: "clear",
-            animate: true,
-            animationDuration: 0.22,
-          }}
-          isInteractive
-          pointerEvents="none"
-          style={StyleSheet.absoluteFillObject}
-          fallbackStyle={styles.floatingSearchFallback}
-          tintColor="rgba(255,255,255,0.2)"
-        />
-        <View pointerEvents="none" style={styles.floatingSearchOverlay} />
-        <LinearGradient
-          colors={[
-            "rgba(255,255,255,0.92)",
-            "rgba(255,255,255,0.34)",
-            "rgba(255,255,255,0.04)",
-          ]}
-          end={{ x: 0.94, y: 0.96 }}
-          pointerEvents="none"
-          start={{ x: 0.12, y: 0.06 }}
-          style={styles.floatingSearchSpecular}
-        />
-        <View pointerEvents="none" style={styles.floatingSearchInnerGlow} />
+      <LiquidGlassSurface
+        blurIntensity={58}
+        blurTint="systemThinMaterialLight"
+        glassEffectStyle={{
+          style: "regular",
+          animate: true,
+          animationDuration: 0.2,
+        }}
+        isInteractive
+        pointerEvents="none"
+        style={styles.floatingSearchGlassSurface}
+        fallbackStyle={styles.floatingSearchFallback}
+        tintColor="rgba(255,255,255,0.12)"
+      >
         <View style={styles.floatingSearchIconLayer}>
-          <View style={styles.searchGlyph}>
-            <View style={styles.searchGlyphRing} />
-            <View style={styles.searchGlyphHandle} />
-          </View>
+          <NativeHomeActionSymbol
+            color="rgba(28,25,38,0.86)"
+            fallbackName="search"
+            name="magnifyingglass"
+          />
         </View>
-      </View>
+      </LiquidGlassSurface>
     </Pressable>
   );
 }
@@ -3212,86 +3200,35 @@ const styles = StyleSheet.create({
     left: 16,
     position: "absolute",
     shadowColor: megrumColors.ink,
-    shadowOffset: { width: 0, height: 16 },
-    shadowOpacity: 0.18,
-    shadowRadius: 28,
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.14,
+    shadowRadius: 24,
     width: 62,
     zIndex: 20,
   },
   floatingSearchButtonPressed: {
-    opacity: 0.9,
-    transform: [{ scale: 0.94 }],
+    opacity: 0.92,
+    transform: [{ scale: 0.97 }],
   },
   floatingSearchFallback: {
-    backgroundColor: "rgba(255,255,255,0.42)",
+    backgroundColor: "rgba(255,255,255,0.36)",
   },
-  floatingSearchGlassClip: {
-    ...StyleSheet.absoluteFillObject,
+  floatingSearchGlassSurface: {
     alignItems: "center",
-    backgroundColor: "rgba(255,255,255,0.2)",
-    borderColor: "rgba(255,255,255,0.92)",
+    borderColor: "rgba(255,255,255,0.56)",
     borderRadius: 999,
     borderWidth: StyleSheet.hairlineWidth,
+    height: "100%",
     justifyContent: "center",
     overflow: "hidden",
-  },
-  floatingSearchOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: "rgba(255,255,255,0.24)",
-  },
-  floatingSearchSpecular: {
-    borderRadius: 999,
-    bottom: 0,
-    left: 0,
-    opacity: 0.86,
-    position: "absolute",
-    right: 0,
-    top: 0,
-  },
-  floatingSearchInnerGlow: {
-    ...StyleSheet.absoluteFillObject,
-    borderColor: "rgba(255,255,255,0.84)",
-    borderRadius: 999,
-    borderWidth: 1,
-    shadowColor: "#ffffff",
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.7,
-    shadowRadius: 8,
+    width: "100%",
   },
   floatingSearchIconLayer: {
     alignItems: "center",
-    backgroundColor: "rgba(255,255,255,0.2)",
-    borderColor: "rgba(255,255,255,0.36)",
     borderRadius: 999,
-    borderWidth: StyleSheet.hairlineWidth,
-    height: 42,
+    height: 44,
     justifyContent: "center",
-    width: 42,
-  },
-  searchGlyph: {
-    height: 30,
-    position: "relative",
-    width: 30,
-  },
-  searchGlyphRing: {
-    borderColor: megrumColors.ink,
-    borderRadius: 999,
-    borderWidth: 3,
-    height: 18,
-    left: 3,
-    position: "absolute",
-    top: 3,
-    width: 18,
-  },
-  searchGlyphHandle: {
-    backgroundColor: megrumColors.ink,
-    borderRadius: 999,
-    bottom: 5,
-    height: 3,
-    position: "absolute",
-    right: 2,
-    transform: [{ rotate: "45deg" }],
-    width: 12,
+    width: 44,
   },
   homeActionButton: {
     alignItems: "center",

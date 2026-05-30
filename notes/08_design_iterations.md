@@ -4,6 +4,48 @@
 
 ---
 
+## イテレーション293：ホーム検索を標準Liquid Glassへ再設計
+
+### 背景・問題意識
+
+オーナーから、ホーム画面左下の検索アイコンが iOS 標準の Liquid Glass ではなく擬似的なデザインに見えるため、Apple の標準仕様を精査して反映してほしいという指摘があった。Apple Human Interface Guidelines の Materials では、Liquid Glass は操作部品やナビゲーションをコンテンツ層の上に浮かせ、下の内容を隠しすぎずに階層を作る素材として説明されているため、独自の斜めグラデーションや発光を重ねる表現は避ける方針にした。
+
+### 変更内容
+
+#### `mobile/app/(tabs)/index.tsx`
+- ホーム左下の検索ボタンから、白いオーバーレイ、斜めハイライト、内側発光、自作虫眼鏡パーツを削除した。
+- 検索ボタンの面を `LiquidGlassSurface` のネイティブ `GlassView` / iOS material fallback のみで描画する構造に変更した。
+- iOS では `expo-symbols` の SF Symbols `magnifyingglass` を使うようにし、非対応時だけ既存 `IconSymbol` にフォールバックするようにした。
+- 押下時の縮小を控えめにし、標準コントロールに近い反応へ調整した。
+
+### 影響範囲
+
+- iOS版 ホーム画面
+- ホーム左下の検索導線
+- ホーム画面内の SF Symbols 表示
+
+### 確認方法
+
+- Apple Human Interface Guidelines / Materials を確認
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- `EAS_UPDATE_PROJECT_SLUG=ihub EXPO_NO_GIT_STATUS=1 npm --prefix mobile run update:ios:preview -- --message "[iter293] ホーム検索を標準Liquid Glassへ再設計" --non-interactive`
+- Preview OTA: Update group ID `0b4f6ddf-ec25-4a7d-88a7-86fbc04453bd` / iOS update ID `019e79ce-50fc-71b6-a5f6-9532733ffe70`
+- EAS Dashboard: `https://expo.dev/accounts/mashima.bizz/projects/ihub/updates/0b4f6ddf-ec25-4a7d-88a7-86fbc04453bd`
+
+### 関連ファイル
+
+- `mobile/app/(tabs)/index.tsx`
+- `notes/08_design_iterations.md`
+
+### セルフレビュー結果
+
+- ✅ 検索ボタンの遷移先は `/search` のまま維持した。
+- ✅ Liquid Glass の表現は `LiquidGlassSurface` に集約し、擬似的な光沢レイヤーを削除した。
+- ✅ iOS では標準の SF Symbols を優先し、非対応環境では既存フォールバックを使う。
+- ✅ iOS Preview channel へOTA配信済み。
+- ✅ 状態遷移・用語・DBスキーマ変更はないため、`notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要。
+
 ## イテレーション292：めぐりホーム上部を詰める
 
 ### 背景・問題意識
