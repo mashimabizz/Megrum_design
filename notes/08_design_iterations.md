@@ -4,6 +4,71 @@
 
 ---
 
+## イテレーション305：Swift Auth session保存を追加
+
+### 背景・問題意識
+
+iter304でSwift Native版のログイン/新規登録入口はできたが、取得したsessionを保存できないと、アプリ再起動のたびにログイン画面へ戻ってしまう。iOS版として自然なログイン維持に進むため、Supabase Auth sessionをKeychainへ保存・復元できる境界を追加した。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumData/AuthSessionStore.swift`
+- `AuthSessionStore` protocolを追加し、session永続化をAuthStateから差し替え可能にした。
+- `KeychainAuthSessionStore` を追加し、live authではKeychainに `AuthSession` を保存・復元・削除できるようにした。
+- `InMemoryAuthSessionStore` を追加し、preview modeとテストでKeychainに依存しない検証ができるようにした。
+
+#### `ios-native/Sources/MegrumApp/MegrumAuthState.swift`
+- `sessionStore` を注入できるようにした。
+- 初期化時に保存済みsessionを復元するようにした。
+- ログイン/新規登録成功時にsessionを保存し、ログアウト時に保存済みsessionを削除するようにした。
+- live auth factoryでは `KeychainAuthSessionStore` を使い、previewでは `InMemoryAuthSessionStore` を使う構成にした。
+
+#### `ios-native/Tests/MegrumDataTests/AuthSessionStoreTests.swift`
+- in-memory storeの保存・読み込み・削除を検証した。
+
+#### `ios-native/Tests/MegrumAppTests/MegrumAppStateTests.swift`
+- `MegrumAuthState` がstoreからsessionを復元できることを検証した。
+
+#### `ios-native/README.md`
+- Auth session保存の構成とKeychain利用を追記した。
+
+#### `notes/22_swift_native_migration.md`
+- Phase 2の進捗として、Keychain保存境界の追加を追記した。
+
+### 影響範囲
+
+- Swift Native iOS版のログイン維持
+- 認証状態の復元
+- 今後のAppState実データ接続、Deep Link復帰、通知導線
+
+### 確認方法
+
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-build --enable-xctest --disable-swift-testing -j 1`
+- `xcodebuild -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -destination 'generic/platform=iOS Simulator' -derivedDataPath /tmp/megrum-native-xcodebuild CODE_SIGNING_ALLOWED=NO build`
+- `git diff --check -- ios-native/Sources/MegrumData/AuthSessionStore.swift ios-native/Sources/MegrumApp/MegrumAuthState.swift ios-native/Tests/MegrumDataTests/AuthSessionStoreTests.swift ios-native/Tests/MegrumAppTests/MegrumAppStateTests.swift ios-native/README.md notes/22_swift_native_migration.md notes/08_design_iterations.md`
+
+### 関連ファイル
+
+- `ios-native/Sources/MegrumData/AuthSessionStore.swift`
+- `ios-native/Sources/MegrumApp/MegrumAuthState.swift`
+- `ios-native/Tests/MegrumDataTests/AuthSessionStoreTests.swift`
+- `ios-native/Tests/MegrumAppTests/MegrumAppStateTests.swift`
+- `ios-native/README.md`
+- `notes/22_swift_native_migration.md`
+- `notes/08_design_iterations.md`
+
+### セルフレビュー結果
+
+- ✅ session保存はKeychainに分離し、AuthStateから直接Keychain APIを呼ばない構成にした。
+- ✅ テストでは `InMemoryAuthSessionStore` を使い、Keychainの外部状態に依存しないようにした。
+- ✅ Swift Package testsが13件成功し、session storeとAuthState復元を検証した。
+- ✅ Xcode App HostのiOS Simulator buildが成功した。
+- ✅ 状態遷移・用語・DBスキーマ変更はないため、`notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要。
+- ⚠️ 保存済みsessionを使ったSupabase REST repositoryへのaccess token注入は次の作業で実装する。
+- ✅ TestFlight配布はまだ行っていないため、Preview OTA / TestFlight配信は不要。
+
+---
+
 ## イテレーション304：Swift Auth基盤を追加
 
 ### 背景・問題意識

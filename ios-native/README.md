@@ -16,6 +16,7 @@ The existing Expo / React Native app under `mobile/` remains the rollback source
 - `Sources/MegrumApp/MegrumAppState.swift` contains the first app state and repository boundary for Supabase integration.
 - `Sources/MegrumApp/MegrumAuthState.swift` and `AuthScreen.swift` contain the first native auth state, Supabase auth repository bridge, and SwiftUI login/signup screen.
 - `Sources/MegrumData/SupabaseAuthClient.swift` contains the first Supabase Auth request layer for email/password login, signup, and logout.
+- `Sources/MegrumData/AuthSessionStore.swift` contains the session persistence boundary. Live auth uses Keychain; tests and preview mode use an in-memory store.
 - `Tests/MegrumCoreTests`, `Tests/MegrumDataTests`, and `Tests/MegrumAppTests` verify state names, display labels, Supabase request construction, and the preview repository load path.
 
 ## Build Loop
@@ -37,6 +38,8 @@ To run the native app against Supabase from Xcode or CLI, provide only public/cl
 If these values are absent, the Swift app intentionally falls back to preview data.
 
 Auth currently supports the first native email/password path. If Supabase config is present and no session is available, `MegrumRootView` shows `AuthScreen`; without config, it starts signed into preview mode so the app shell remains immediately inspectable.
+
+Live sessions are encoded as `AuthSession` and persisted through `KeychainAuthSessionStore`. The Swift app can restore a saved session on launch, while still keeping the storage abstraction replaceable in tests.
 
 For the Xcode app host, use CLI-first verification:
 

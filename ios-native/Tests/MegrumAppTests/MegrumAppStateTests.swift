@@ -1,5 +1,6 @@
 import MegrumApp
 import MegrumCore
+import MegrumData
 import XCTest
 
 @MainActor
@@ -37,6 +38,17 @@ final class MegrumAppStateTests: XCTestCase {
         XCTAssertTrue(state.isAuthenticated)
         XCTAssertFalse(state.isLoading)
         XCTAssertNil(state.errorMessage)
+    }
+
+    func testAuthStateRestoresSessionFromStore() async {
+        let store = InMemoryAuthSessionStore()
+        let firstState = MegrumAuthState(repository: StubAuthRepository(), sessionStore: store)
+
+        await firstState.signIn(email: "michi@example.com", password: "password123")
+        let restoredState = MegrumAuthState(repository: StubAuthRepository(), sessionStore: store)
+
+        XCTAssertEqual(restoredState.session?.user.email, "michi@example.com")
+        XCTAssertTrue(restoredState.isAuthenticated)
     }
 
     func testAuthStateValidatesSignUpPasswordLength() async {

@@ -92,11 +92,17 @@ public final class MegrumAuthState: ObservableObject {
 
     public let isConfigured: Bool
     private let repository: any MegrumAuthRepository
+    private let sessionStore: any AuthSessionStore
 
-    public init(repository: any MegrumAuthRepository, initialSession: AuthSession? = nil) {
+    public init(
+        repository: any MegrumAuthRepository,
+        sessionStore: any AuthSessionStore = InMemoryAuthSessionStore(),
+        initialSession: AuthSession? = nil
+    ) {
         self.repository = repository
+        self.sessionStore = sessionStore
         self.isConfigured = repository.isConfigured
-        self.session = initialSession
+        self.session = initialSession ?? (try? sessionStore.load())
     }
 
     public var isAuthenticated: Bool {
@@ -153,6 +159,7 @@ public final class MegrumAuthState: ObservableObject {
 
         do {
             try await repository.signOut(session: session)
+            try sessionStore.clear()
             self.session = isConfigured ? nil : PreviewMegrumAuthRepository.previewSession()
         } catch {
             errorMessage = normalizedMessage(from: error)
@@ -166,7 +173,9 @@ public final class MegrumAuthState: ObservableObject {
         errorMessage = nil
 
         do {
-            session = try await action()
+            let nextSession = try await action()
+            try sessionStore.save(nextSession)
+            session = nextSession
         } catch {
             errorMessage = normalizedMessage(from: error)
         }
@@ -215,6 +224,7 @@ public enum MegrumAuthStateFactory {
 
         return MegrumAuthState(
             repository: PreviewMegrumAuthRepository(),
+            sessionStore: InMemoryAuthSessionStore(),
             initialSession: PreviewMegrumAuthRepository.previewSession()
         )
     }
@@ -225,7 +235,8 @@ public enum MegrumAuthStateFactory {
             repository: SupabaseMegrumAuthRepository(
                 client: SupabaseAuthClient(configuration: configuration),
                 emailRedirectTo: emailRedirectTo
-            )
+            ),
+            sessionStore: KeychainAuthSessionStore()
         )
     }
 

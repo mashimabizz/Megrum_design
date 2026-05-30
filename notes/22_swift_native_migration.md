@@ -1,7 +1,7 @@
 # 22. Swift Native Migration
 
 最終更新: 2026-05-31
-ステータス: Active draft（iter304）
+ステータス: Active draft（iter305）
 
 ## 目的
 
@@ -103,7 +103,8 @@ tar -xzf /Users/michitaka/Desktop/Megrum_backups/pre-swift-migration-20260531-03
 - 新規登録、ログイン、メールリンク復帰、プロフィール、推し設定、住所設定をSwift化する。
 - キーボード回避、フォームvalidation、権限説明をiOS標準で作る。
 - iter304で、Swift側に `AuthUser` / `AuthSession`、Supabase Auth client、`MegrumAuthState`、メール/パスワードのログイン・登録画面を追加した。
-- 現時点のAuthはセッション永続化・OAuth・メールリンク復帰・プロフィール自動作成までは未完了。次のPhase 2作業でKeychain保存、認証リンク処理、Apple/Google、オンボーディング判定へ広げる。
+- iter305で、`AuthSessionStore`、`KeychainAuthSessionStore`、`InMemoryAuthSessionStore` を追加し、Swift版がログインsessionを保存・復元できる境界を持った。
+- 現時点のAuthはOAuth・メールリンク復帰・プロフィール自動作成までは未完了。次のPhase 2作業で認証リンク処理、Apple/Google、オンボーディング判定へ広げる。
 
 ### Phase 3: Exchange core
 
