@@ -13,6 +13,7 @@ import {
   type NativeScrollEvent,
   type NativeSyntheticEvent,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Screen } from "../../src/components/Screen";
 import { TransactionListSkeleton } from "../../src/components/SkeletonScreen";
 import { useAuth } from "../../src/auth/AuthProvider";
@@ -192,10 +193,12 @@ export default function TransactionsScreen() {
   const [animatedTabs, setAnimatedTabs] = useState<Set<TopTab>>(
     () => new Set(),
   );
+  const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
   const pagerRef = useRef<ScrollView>(null);
   const pagerPosition = useRef(new Animated.Value(0)).current;
   const pageWidth = Math.max(1, width - 36);
+  const footerTabsBottomPadding = Math.max(insets.bottom, 12) + 68;
 
   useEffect(() => {
     if (!supabase || previewMode) {
@@ -376,7 +379,7 @@ export default function TransactionsScreen() {
           </View>
         ))}
       </ScrollView>
-      <View style={styles.footerTabsWrap}>
+      <View style={[styles.footerTabsWrap, { paddingBottom: footerTabsBottomPadding }]}>
         <SegmentedControl
           values={topTabs.map((item) => `${item.label} ${item.count}`)}
           selectedIndex={Math.max(0, TOP_TABS.findIndex((item) => item.id === tab))}

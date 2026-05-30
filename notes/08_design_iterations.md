@@ -4,6 +4,44 @@
 
 ---
 
+## イテレーション264：やりとり下部タブをフッター上へ逃がす
+
+### 背景・問題意識
+
+オーナーから、やりとり画面の `打診中` / `進行中` 切り替えボタンが従来の下部フッターと重なり、押せないという指摘があった。iOS標準の `NativeTabs` は画面下部に重なるため、画面内に置いた下部セグメント側でsafe areaとタブバー相当の余白を確保する必要がある。
+
+### 変更内容
+
+#### `mobile/app/(tabs)/transactions.tsx`
+- `useSafeAreaInsets` を読み込み、やりとり下部セグメントの下余白を端末のsafe area込みで動的に計算するようにした。
+- `footerTabsWrap` の下余白を `Math.max(insets.bottom, 12) + 68` にし、`打診中` / `進行中` ボタンがネイティブタブバーの上に表示されるようにした。
+
+### 影響範囲
+
+- iOS版 やりとり画面
+- `打診中` / `進行中` 下部セグメント
+- NativeTabs 下部フッターとの重なり
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `npm --prefix mobile run export:ios:preview`
+- `EAS_UPDATE_PROJECT_SLUG=ihub EXPO_NO_GIT_STATUS=1 npm --prefix mobile run update:ios:preview -- --message "[iter264] lift transaction footer tabs" --non-interactive`
+- Preview OTA: Update group ID `70f114f5-4508-456b-8278-fa859ed81e9c` / iOS update ID `019e767e-1a92-7d8d-bfae-eef21b978ad7`
+
+### 関連ファイル
+
+- `mobile/app/(tabs)/transactions.tsx`
+- `notes/08_design_iterations.md`
+
+### セルフレビュー結果
+
+- ✅ iOS標準 `NativeTabs` は維持し、独自フッター化していない。
+- ✅ safe area込みで下部セグメントを上に逃がし、既存フッターとタップ領域が重ならないようにした。
+- ✅ 状態遷移・用語・DBスキーマに影響しないため、`notes/09_state_machines.md` と `notes/10_glossary.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション263：掲示板本文カードにブロックボタンを追加する
 
 ### 背景・問題意識
