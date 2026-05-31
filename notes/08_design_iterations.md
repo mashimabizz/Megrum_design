@@ -4,6 +4,101 @@
 
 ---
 
+## イテレーション371：RN差分P0から自分プロフィール・打診作成・取引当日アクションを移植
+
+### 背景・問題意識
+
+Swift Native版を実機確認したところ、iOS標準感は良い一方でReact Native版と比べると画面上の不足がまだ多い、というオーナー指摘があった。そこで、RN parity backlogのP0をもとに、画面で不足が目立ちやすい「自分プロフィール/推し設定」「打診作成」「取引チャット当日アクション」を先に埋めた。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/AccountSetupScreen.swift`
+- 初回設定と設定後の編集の両方で使えるようにし、複数グループ/複数メンバーの推し選択を扱えるようにした。
+- グループ全体選択とメンバー選択が競合しないよう、同じグループ内では選択状態を整理するhelperを追加した。
+
+#### `ios-native/Sources/MegrumApp/OnboardingOshiSelection.swift`
+- 推し選択の状態更新ロジックを小さな型へ分離し、複数選択のテストを書けるようにした。
+
+#### `ios-native/Sources/MegrumApp/SettingsScreen.swift`
+- 設定一覧から「自分のプロフィール」と「推し設定」へ進める導線を追加した。
+
+#### `ios-native/Sources/MegrumApp/OwnProfileScreen.swift`
+- RN版にある自分プロフィール確認に相当するNative画面を追加し、プロフィール概要、在庫/Wish/進行中取引数、編集導線を表示するようにした。
+
+#### `ios-native/Sources/MegrumApp/ProposalCreateFlow.swift`
+- 検索結果/相手プロフィール起点の打診作成を専用フロー化し、「私が出す」「受け取る」「待ち合わせ」「確認」のステップで作成できるようにした。
+- 現地/郵送/どちらもOKの交換手段、複数提示物、現地系の待ち合わせ候補validation、確認サマリーを入れた。
+
+#### `ios-native/Sources/MegrumApp/SearchScreen.swift`
+- 検索結果から従来のcompact sheetではなく、専用の `ProposalCreateFlow` を開くようにした。
+
+#### `ios-native/Sources/MegrumApp/PublicUserProfileScreen.swift`
+- 相手プロフィールからの打診作成も `ProposalCreateFlow` に統一し、相手所有グッズを受け取り候補として渡すようにした。
+
+#### `ios-native/Sources/MegrumCore/MegrumModels.swift`
+- 取引チャットの到着ステータスを `TradeArrivalStatus` として型化し、位置情報messageの緯度/経度/ラベル/metaを保持できるようにした。
+
+#### `ios-native/Sources/MegrumData/SupabaseMessageClient.swift`
+- 現在地共有messageと到着ステータスmessageをSupabase schemaの `message_type`, `location_lat`, `location_lng`, `location_label`, `meta.status` へ送れるrequest境界にした。
+
+#### `ios-native/Sources/MegrumApp/MegrumAppState.swift`
+- `sendLocationMessage` と `sendArrivalStatusMessage` をAppState/repository境界へ追加し、Preview repositoryでも同じ型のmessageが返るようにした。
+
+#### `ios-native/Sources/MegrumApp/SupabaseMegrumRepository.swift`
+- Swift Nativeの取引チャットからSupabaseのtyped message送信を呼び出せるようにした。
+
+#### `ios-native/Sources/MegrumApp/TradesScreen.swift`
+- 取引チャットの「向かっています/到着しました/離れました」をtyped arrival messageとして送るようにした。
+- 現在地共有ボタンをCoreLocationへ接続し、許可済みなら緯度/経度付きmessage、失敗時は権限案内sheetを表示するようにした。
+- 現在地messageが空表示にならないよう、ラベルまたは座標を吹き出しに表示するようにした。
+
+#### `ios-native/Tests/`
+- 推し選択状態、自分プロフィール集計、打診作成フローvalidation、message requestの到着ステータス明示をテストした。
+
+### 影響範囲
+
+- Swift Native初回設定/設定後の推し設定
+- Swift Native自分プロフィール
+- Swift Native検索/相手プロフィールからの打診作成
+- Swift Native取引チャットの当日アクション
+- Supabase `messages` の位置情報/到着ステータスpayload
+
+### 確認方法
+
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-p0-build`
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-p0-test --enable-xctest --disable-swift-testing -j 1`
+- `xcodebuild -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -destination 'generic/platform=iOS Simulator' -derivedDataPath /tmp/megrum-native-xcodebuild-iter371 CODE_SIGNING_ALLOWED=NO build`
+- `xcodebuild -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -destination 'generic/platform=iOS' -derivedDataPath /tmp/megrum-native-device-iter371 -allowProvisioningUpdates build`
+- `xcrun devicectl device install app --device 00008120-000C49C43669A01E /tmp/megrum-native-device-iter371/Build/Products/Debug-iphoneos/MegrumNative.app`
+
+### 関連ファイル
+
+- `ios-native/Sources/MegrumApp/AccountSetupScreen.swift`
+- `ios-native/Sources/MegrumApp/OnboardingOshiSelection.swift`
+- `ios-native/Sources/MegrumApp/OwnProfileScreen.swift`
+- `ios-native/Sources/MegrumApp/ProposalCreateFlow.swift`
+- `ios-native/Sources/MegrumApp/SearchScreen.swift`
+- `ios-native/Sources/MegrumApp/PublicUserProfileScreen.swift`
+- `ios-native/Sources/MegrumApp/TradesScreen.swift`
+- `ios-native/Sources/MegrumApp/MegrumAppState.swift`
+- `ios-native/Sources/MegrumApp/SupabaseMegrumRepository.swift`
+- `ios-native/Sources/MegrumCore/MegrumModels.swift`
+- `ios-native/Sources/MegrumData/SupabaseMessageClient.swift`
+- `ios-native/Tests/`
+- `notes/22_swift_native_migration.md`
+
+### セルフレビュー結果
+
+- ✅ Swift NativeのiOS標準感は維持し、RN版の見た目をそのままコピーする方向には寄せていない
+- ✅ RN parity P0のうち、自分プロフィール/推し設定、打診作成、取引チャット当日アクションの不足を前進させた
+- ✅ `swift build` が成功した
+- ✅ `swift test` は202件すべて成功した
+- ✅ `xcodebuild` Simulator build と署名付きiPhone向けDebug build が成功した
+- ✅ `MTO’s phone` はUSB上に見えているがCoreDevice上で `unavailable` のため、この時点の自動installは端末接続復帰待ち
+- ✅ 既存の `mobile/` / `web/` の未コミット差分には触れていない
+- ✅ 状態遷移そのものの新規状態は追加していないため、`notes/09` 更新は不要と判断した
+- ⚠️ P0のHome/AW、在庫/Wish編集、異議/遅刻/キャンセル詳細は引き続きRN parity backlogに残る
+
 ## イテレーション370：Swift差分バッチでグルームマップと認証・取引導線を補強
 
 ### 背景・問題意識

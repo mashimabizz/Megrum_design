@@ -243,7 +243,7 @@ struct SearchScreen: View {
         }
         .sheet(item: $proposalTargetItem) { item in
             NavigationStack {
-                ProposalCreateSheet(appState: appState, targetItem: item)
+                ProposalCreateFlow(appState: appState, targetItem: item)
             }
         }
         .sheet(item: $profileRoute) { route in

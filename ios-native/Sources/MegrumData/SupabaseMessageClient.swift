@@ -23,6 +23,19 @@ public enum SupabaseMessageArrivalStatus: String, CaseIterable, Sendable {
     }
 }
 
+private extension SupabaseMessageArrivalStatus {
+    init(_ status: TradeArrivalStatus) {
+        switch status {
+        case .enroute:
+            self = .enroute
+        case .arrived:
+            self = .arrived
+        case .left:
+            self = .left
+        }
+    }
+}
+
 public final class SupabaseMessageClient: @unchecked Sendable {
     private let client: SupabaseRESTClient
     private let encoder: JSONEncoder
@@ -107,7 +120,7 @@ public final class SupabaseMessageClient: @unchecked Sendable {
     }
 
     public func sendArrivalStatusMessage(senderID: UUID, proposalID: UUID, body: String) async throws -> TradeMessage {
-        try await sendArrivalStatusMessage(senderID: senderID, proposalID: proposalID, status: .arrived, body: body)
+        try await sendArrivalStatusMessage(senderID: senderID, proposalID: proposalID, status: SupabaseMessageArrivalStatus.arrived, body: body)
     }
 
     public func sendArrivalStatusMessage(
@@ -122,6 +135,20 @@ public final class SupabaseMessageClient: @unchecked Sendable {
             messageType: .arrivalStatus,
             body: body?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty ?? status.defaultBody,
             meta: ["status": status.rawValue]
+        )
+    }
+
+    public func sendArrivalStatusMessage(
+        senderID: UUID,
+        proposalID: UUID,
+        status: TradeArrivalStatus,
+        body: String? = nil
+    ) async throws -> TradeMessage {
+        try await sendArrivalStatusMessage(
+            senderID: senderID,
+            proposalID: proposalID,
+            status: SupabaseMessageArrivalStatus(status),
+            body: body
         )
     }
 
@@ -240,7 +267,7 @@ public final class SupabaseMessageClient: @unchecked Sendable {
     }
 
     public func makeSendArrivalStatusMessageRequest(senderID: UUID, proposalID: UUID, body: String) throws -> URLRequest {
-        try makeSendArrivalStatusMessageRequest(senderID: senderID, proposalID: proposalID, status: .arrived, body: body)
+        try makeSendArrivalStatusMessageRequest(senderID: senderID, proposalID: proposalID, status: SupabaseMessageArrivalStatus.arrived, body: body)
     }
 
     public func makeSendArrivalStatusMessageRequest(
@@ -255,6 +282,20 @@ public final class SupabaseMessageClient: @unchecked Sendable {
             messageType: .arrivalStatus,
             body: body?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty ?? status.defaultBody,
             meta: ["status": status.rawValue]
+        )
+    }
+
+    public func makeSendArrivalStatusMessageRequest(
+        senderID: UUID,
+        proposalID: UUID,
+        status: TradeArrivalStatus,
+        body: String? = nil
+    ) throws -> URLRequest {
+        try makeSendArrivalStatusMessageRequest(
+            senderID: senderID,
+            proposalID: proposalID,
+            status: SupabaseMessageArrivalStatus(status),
+            body: body
         )
     }
 
@@ -346,6 +387,10 @@ private struct MessageRow: Decodable, Sendable {
             messageType: type,
             body: resolvedBody,
             photoURL: photoUrl,
+            locationLatitude: locationLat,
+            locationLongitude: locationLng,
+            locationLabel: locationLabel,
+            meta: meta ?? [:],
             createdAt: createdAt ?? .now
         )
     }

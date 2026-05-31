@@ -2,18 +2,61 @@ import MegrumCore
 import MegrumDesign
 import SwiftUI
 
+public enum AccountSetupMode: Sendable {
+    case onboarding
+    case edit
+
+    var headerTitle: String {
+        switch self {
+        case .onboarding:
+            "Megrumへようこそ"
+        case .edit:
+            "プロフィールを整える"
+        }
+    }
+
+    var headerSubtitle: String {
+        switch self {
+        case .onboarding:
+            "まずはアプリ内で表示する名前、活動エリア、推しを設定します"
+        case .edit:
+            "表示名、活動エリア、推し設定をまとめて更新できます"
+        }
+    }
+
+    var navigationTitle: String {
+        switch self {
+        case .onboarding:
+            "プロフィール設定"
+        case .edit:
+            "プロフィール編集"
+        }
+    }
+
+    var saveTitle: String {
+        switch self {
+        case .onboarding:
+            "設定を完了する"
+        case .edit:
+            "プロフィールを更新する"
+        }
+    }
+}
+
 @MainActor
 public struct AccountSetupScreen: View {
     @ObservedObject private var appState: MegrumAppState
+    private let mode: AccountSetupMode
     @State private var displayName: String
     @State private var prefecture: String
     @State private var groupSearchText = ""
-    @State private var selectedGroup: OshiGroup?
-    @State private var selectedCharacter: OshiCharacter?
+    @State private var activeGroup: OshiGroup?
+    @State private var selectedOshiDrafts: [OnboardingOshiDraft] = []
     @FocusState private var focusedField: Field?
 
-    public init(appState: MegrumAppState) {
+    public init(appState: MegrumAppState, mode: AccountSetupMode = .onboarding) {
         self.appState = appState
+        self.mode = mode
         _displayName = State(initialValue: appState.viewer?.displayName ?? "")
         _prefecture = State(initialValue: appState.viewer?.prefecture ?? "")
     }
@@ -32,7 +75,7 @@ public struct AccountSetupScreen: View {
         }
         .background(MegrumTheme.canvas.ignoresSafeArea())
         .scrollDismissesKeyboard(.interactively)
-        .navigationTitle("プロフィール設定")
+        .navigationTitle(mode.navigationTitle)
         .megrumInlineNavigationTitle()
         .task {
             if appState.oshiGroups.isEmpty {
@@ -43,11 +86,11 @@ public struct AccountSetupScreen: View {
 
     private var header: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("Megrumへようこそ")
+            Text(mode.headerTitle)
                 .font(.system(size: 32, weight: .black, design: .rounded))
                 .foregroundStyle(MegrumTheme.ink)
 
-            Text("まずはアプリ内で表示する名前と都道府県を設定します")
+            Text(mode.headerSubtitle)
                 .font(.system(size: 15, weight: .bold, design: .rounded))
                 .foregroundStyle(MegrumTheme.muted)
         }
@@ -90,7 +133,7 @@ public struct AccountSetupScreen: View {
                     Text("推しを選ぶ")
                         .font(.system(size: 20, weight: .black, design: .rounded))
                         .foregroundStyle(MegrumTheme.ink)
-                    Text("グループを選び、必要ならメンバーも選択します")
+                    Text("グループやメンバーを複数選べます")
                         .font(.system(size: 13, weight: .bold, design: .rounded))
                         .foregroundStyle(MegrumTheme.muted)
                 }
@@ -111,19 +154,22 @@ public struct AccountSetupScreen: View {
 
             oshiGroupScroller
 
-            if let selectedGroup {
+            if let activeGroup {
                 VStack(alignment: .leading, spacing: 10) {
-                    Text("\(selectedGroup.name) のメンバー")
+                    Text("\(activeGroup.name) のメンバー")
                         .font(.system(size: 14, weight: .black, design: .rounded))
                         .foregroundStyle(MegrumTheme.ink)
 
                     Button {
-                        selectedCharacter = nil
+                        selectedOshiDrafts = OnboardingOshiSelectionLogic.toggleWholeGroup(
+                            activeGroup,
+                            in: selectedOshiDrafts
+                        )
                     } label: {
                         HStack {
                             Text("グループ全体")
                             Spacer()
-                            if selectedCharacter == nil {
+                            if isWholeGroupSelected(activeGroup) {
                                 Image(systemName: "checkmark.circle.fill")
                             }
                         }
@@ -131,12 +177,14 @@ public struct AccountSetupScreen: View {
                     .buttonStyle(.plain)
                     .padding(.horizontal, 14)
                     .frame(height: 48)
-                    .background(selectedCharacter == nil ? MegrumTheme.lavender.opacity(0.16) : Color.white.opacity(0.82), in: RoundedRectangle(cornerRadius: 16))
-                    .foregroundStyle(selectedCharacter == nil ? MegrumTheme.lavender : MegrumTheme.ink)
+                    .background(isWholeGroupSelected(activeGroup) ? MegrumTheme.lavender.opacity(0.16) : Color.white.opacity(0.82), in: RoundedRectangle(cornerRadius: 16))
+                    .foregroundStyle(isWholeGroupSelected(activeGroup) ? MegrumTheme.lavender : MegrumTheme.ink)
 
                     oshiCharacterScroller
                 }
             }
+
+            selectedOshiSummary
         }
         .padding(18)
         .background(Color.white.opacity(0.76), in: RoundedRectangle(cornerRadius: 24))
@@ -150,13 +198,13 @@ public struct AccountSetupScreen: View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 10) {
                 ForEach(appState.oshiGroups) { group in
+                    let hasSelection = OnboardingOshiSelectionLogic.groupHasSelection(group, in: selectedOshiDrafts)
                     oshiChip(
                         title: group.name,
-                        systemImage: selectedGroup?.id == group.id ? "checkmark.circle.fill" : "sparkle",
-                        isSelected: selectedGroup?.id == group.id
+                        systemImage: hasSelection ? "checkmark.circle.fill" : "sparkle",
+                        isSelected: activeGroup?.id == group.id || hasSelection
                     ) {
-                        selectedGroup = group
-                        selectedCharacter = nil
+                        activeGroup = group
                         Task { await appState.loadOshiCharacters(group: group) }
                     }
                 }
@@ -169,12 +217,20 @@ public struct AccountSetupScreen: View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 10) {
                 ForEach(appState.oshiCharacters) { character in
+                    let isSelected = OnboardingOshiSelectionLogic.isCharacterSelected(character, in: selectedOshiDrafts)
                     oshiChip(
                         title: character.name,
-                        systemImage: selectedCharacter?.id == character.id ? "checkmark.circle.fill" : "person.crop.circle",
-                        isSelected: selectedCharacter?.id == character.id
+                        systemImage: isSelected ? "checkmark.circle.fill" : "person.crop.circle",
+                        isSelected: isSelected
                     ) {
-                        selectedCharacter = character
+                        guard let activeGroup else {
+                            return
+                        }
+                        selectedOshiDrafts = OnboardingOshiSelectionLogic.toggleCharacter(
+                            character,
+                            group: activeGroup,
+                            in: selectedOshiDrafts
+                        )
                     }
                 }
             }
@@ -205,6 +261,43 @@ public struct AccountSetupScreen: View {
         .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 
+    private var selectedOshiSummary: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("選択中")
+                .font(.system(size: 14, weight: .black, design: .rounded))
+                .foregroundStyle(MegrumTheme.ink)
+
+            if selectedOshiDrafts.isEmpty {
+                Text("まだ選択されていません")
+                    .font(.system(size: 13, weight: .bold, design: .rounded))
+                    .foregroundStyle(MegrumTheme.muted)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(14)
+                    .background(Color.white.opacity(0.72), in: RoundedRectangle(cornerRadius: 16))
+            } else {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 8) {
+                        ForEach(selectedOshiDrafts) { draft in
+                            Button {
+                                selectedOshiDrafts.removeAll { $0.id == draft.id }
+                            } label: {
+                                Label(draft.displayName, systemImage: "xmark.circle.fill")
+                                    .font(.system(size: 13, weight: .black, design: .rounded))
+                                    .lineLimit(1)
+                                    .padding(.horizontal, 12)
+                                    .frame(height: 34)
+                                    .background(MegrumTheme.lavender.opacity(0.14), in: Capsule())
+                                    .foregroundStyle(MegrumTheme.lavender)
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                    .padding(.vertical, 2)
+                }
+            }
+        }
+    }
+
     private var saveButton: some View {
         Button {
             Task { await save() }
@@ -214,7 +307,7 @@ public struct AccountSetupScreen: View {
                     ProgressView()
                         .controlSize(.small)
                 }
-                Text("設定を完了する")
+                Text(mode.saveTitle)
                     .font(.system(size: 16, weight: .black, design: .rounded))
             }
             .frame(maxWidth: .infinity)
@@ -223,7 +316,7 @@ public struct AccountSetupScreen: View {
         .buttonStyle(.borderedProminent)
         .buttonBorderShape(.roundedRectangle(radius: 18))
         .tint(MegrumTheme.lavender)
-        .disabled(appState.isSavingAccountSetup || displayName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || selectedGroup == nil)
+        .disabled(appState.isSavingAccountSetup || displayName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || selectedOshiDrafts.isEmpty)
     }
 
     private func save() async {
@@ -236,17 +329,11 @@ public struct AccountSetupScreen: View {
     }
 
     private var selectedOshiInputs: [AccountSetupOshiInput] {
-        guard let selectedGroup else {
-            return []
-        }
-        return [
-            AccountSetupOshiInput(
-                groupID: selectedGroup.id,
-                characterID: selectedCharacter?.id,
-                kind: selectedCharacter == nil ? .box : .specific,
-                priority: 1
-            )
-        ]
+        OnboardingOshiSelectionLogic.accountSetupInputs(from: selectedOshiDrafts)
+    }
+
+    private func isWholeGroupSelected(_ group: OshiGroup) -> Bool {
+        OnboardingOshiSelectionLogic.isWholeGroupSelected(group, in: selectedOshiDrafts)
     }
 
     private enum Field {

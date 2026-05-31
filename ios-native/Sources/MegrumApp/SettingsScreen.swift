@@ -13,6 +13,23 @@ struct SettingsScreen: View {
         List {
             Section {
                 NavigationLink {
+                    OwnProfileScreen(appState: appState)
+                } label: {
+                    Label {
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text("自分のプロフィール")
+                                .font(.body.weight(.semibold))
+                            Text(profileStatusText)
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(MegrumTheme.muted)
+                        }
+                    } icon: {
+                        Image(systemName: "person.crop.circle")
+                            .foregroundStyle(MegrumTheme.lavender)
+                    }
+                }
+
+                NavigationLink {
                     NotificationsScreen(appState: appState) { tab in
                         dismiss()
                         onOpenNotificationDestination(tab)
@@ -159,6 +176,16 @@ struct SettingsScreen: View {
 
     private var pushNotificationStatusText: String {
         appState.pushNotificationsEnabled ? "端末に通知を届ける" : "端末通知はOFF"
+    }
+
+    private var profileStatusText: String {
+        guard let viewer = appState.viewer else {
+            return "未読み込み"
+        }
+        if let prefecture = viewer.prefecture, !prefecture.isEmpty {
+            return "\(viewer.displayName) / \(prefecture)"
+        }
+        return viewer.displayName
     }
 
     private var addressStatusText: String {

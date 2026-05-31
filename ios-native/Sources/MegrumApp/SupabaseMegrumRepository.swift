@@ -182,6 +182,36 @@ public struct SupabaseMegrumRepository: MegrumRepository {
         try await messageClient.sendTextMessage(senderID: viewerID, input: input)
     }
 
+    public func sendLocationMessage(
+        proposalID: UUID,
+        latitude: Double,
+        longitude: Double,
+        label: String,
+        body: String?
+    ) async throws -> TradeMessage {
+        try await messageClient.sendLocationMessage(
+            senderID: viewerID,
+            proposalID: proposalID,
+            latitude: latitude,
+            longitude: longitude,
+            label: label,
+            body: body
+        )
+    }
+
+    public func sendArrivalStatusMessage(
+        proposalID: UUID,
+        status: TradeArrivalStatus,
+        body: String?
+    ) async throws -> TradeMessage {
+        try await messageClient.sendArrivalStatusMessage(
+            senderID: viewerID,
+            proposalID: proposalID,
+            status: status,
+            body: body
+        )
+    }
+
     public func loadSchedules(for proposal: TradeProposal, startAt: Date, endAt: Date) async throws -> [PersonalSchedule] {
         guard proposal.isParticipant(viewerID) else {
             return []

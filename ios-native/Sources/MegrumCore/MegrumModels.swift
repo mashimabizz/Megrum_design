@@ -1244,6 +1244,25 @@ public enum TradeMessageType: String, Codable, Sendable, CaseIterable, Identifia
     public var id: String { rawValue }
 }
 
+public enum TradeArrivalStatus: String, Codable, Sendable, CaseIterable, Identifiable {
+    case enroute
+    case arrived
+    case left
+
+    public var id: String { rawValue }
+
+    public var defaultBody: String {
+        switch self {
+        case .enroute:
+            "向かっています"
+        case .arrived:
+            "到着しました"
+        case .left:
+            "離れました"
+        }
+    }
+}
+
 public struct TradeMessage: Identifiable, Codable, Hashable, Sendable {
     public var id: UUID
     public var proposalID: UUID
@@ -1251,6 +1270,10 @@ public struct TradeMessage: Identifiable, Codable, Hashable, Sendable {
     public var messageType: TradeMessageType
     public var body: String?
     public var photoURL: URL?
+    public var locationLatitude: Double?
+    public var locationLongitude: Double?
+    public var locationLabel: String?
+    public var meta: [String: String]
     public var createdAt: Date
 
     public init(
@@ -1260,6 +1283,10 @@ public struct TradeMessage: Identifiable, Codable, Hashable, Sendable {
         messageType: TradeMessageType,
         body: String? = nil,
         photoURL: URL? = nil,
+        locationLatitude: Double? = nil,
+        locationLongitude: Double? = nil,
+        locationLabel: String? = nil,
+        meta: [String: String] = [:],
         createdAt: Date = .now
     ) {
         self.id = id
@@ -1268,6 +1295,10 @@ public struct TradeMessage: Identifiable, Codable, Hashable, Sendable {
         self.messageType = messageType
         self.body = body
         self.photoURL = photoURL
+        self.locationLatitude = locationLatitude
+        self.locationLongitude = locationLongitude
+        self.locationLabel = locationLabel
+        self.meta = meta
         self.createdAt = createdAt
     }
 }

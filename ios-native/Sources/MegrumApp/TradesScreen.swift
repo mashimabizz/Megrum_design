@@ -209,6 +209,17 @@ enum TradeArrivalQuickAction: String, CaseIterable, Identifiable {
         title
     }
 
+    var tradeStatus: TradeArrivalStatus {
+        switch self {
+        case .enroute:
+            .enroute
+        case .arrived:
+            .arrived
+        case .left:
+            .left
+        }
+    }
+
     var systemImage: String {
         switch self {
         case .enroute:
@@ -248,7 +259,7 @@ private enum TradeUnavailableChatAction: String, Identifiable {
     var description: String {
         switch self {
         case .location:
-            "ピン付きの現在地共有はまだ接続中です。今はメッセージ本文で待ち合わせ場所を伝えてください。"
+            "現在地を取得できませんでした。端末の位置情報許可を確認してください。"
         case .outfitPhoto:
             "服装写真の送信はまだ接続中です。交換後の証跡写真は取引証跡から追加できます。"
         }
@@ -321,6 +332,8 @@ private struct TradeDetailScreen: View {
     @State private var isShowingScheduleSheet = false
     @State private var unavailableChatAction: TradeUnavailableChatAction?
     @State private var selectedRemoteImage: RemoteImageSelection?
+    @State private var isWaitingToShareLocation = false
+    @StateObject private var locationState = MegrumLocationState()
 
     private var messages: [TradeMessage] {
         appState.messages(for: proposal.id)
@@ -433,7 +446,7 @@ private struct TradeDetailScreen: View {
                         sendArrivalQuickAction(action)
                     },
                     onOpenLocationPlaceholder: {
-                        unavailableChatAction = .location
+                        shareCurrentLocation()
                     },
                     onOpenOutfitPhotoPlaceholder: {
                         unavailableChatAction = .outfitPhoto
@@ -530,6 +543,20 @@ private struct TradeDetailScreen: View {
             .presentationDetents([.medium])
             .presentationDragIndicator(.visible)
         }
+        .onChange(of: locationState.coordinate) { _, coordinate in
+            guard isWaitingToShareLocation, let coordinate else {
+                return
+            }
+            isWaitingToShareLocation = false
+            sendLocationMessage(coordinate)
+        }
+        .onChange(of: locationState.locationErrorMessage) { _, errorMessage in
+            guard isWaitingToShareLocation, errorMessage != nil else {
+                return
+            }
+            isWaitingToShareLocation = false
+            unavailableChatAction = .location
+        }
         .confirmationDialog(
             "この打診を断りますか？",
             isPresented: $isShowingRejectConfirmation,
@@ -600,7 +627,33 @@ private struct TradeDetailScreen: View {
 
     private func sendArrivalQuickAction(_ action: TradeArrivalQuickAction) {
         Task {
-            _ = await appState.sendMessage(proposalID: currentProposal.id, body: action.messageBody)
+            _ = await appState.sendArrivalStatusMessage(
+                proposalID: currentProposal.id,
+                status: action.tradeStatus,
+                body: action.messageBody
+            )
+        }
+    }
+
+    private func shareCurrentLocation() {
+        if let coordinate = locationState.coordinate {
+            sendLocationMessage(coordinate)
+            return
+        }
+
+        isWaitingToShareLocation = true
+        locationState.requestCurrentLocation()
+    }
+
+    private func sendLocationMessage(_ coordinate: MegrumLocationCoordinate) {
+        Task {
+            _ = await appState.sendLocationMessage(
+                proposalID: currentProposal.id,
+                latitude: coordinate.latitude,
+                longitude: coordinate.longitude,
+                label: "現在地",
+                body: nil
+            )
         }
     }
 
@@ -1271,9 +1324,7 @@ private struct TradeMessageBubble: View {
 
             switch message.messageType {
             case .location:
-                if let bodyText {
-                    richTextBubble(title: "現在地共有", systemImage: "location.fill", body: bodyText)
-                }
+                richTextBubble(title: message.locationLabel ?? "現在地共有", systemImage: "location.fill", body: locationBubbleBody)
             case .arrivalStatus:
                 if let bodyText {
                     richTextBubble(title: "到着ステータス", systemImage: "checkmark.circle.fill", body: bodyText)
@@ -1291,6 +1342,19 @@ private struct TradeMessageBubble: View {
                 .foregroundStyle(MegrumTheme.muted)
         }
         .frame(maxWidth: .infinity, alignment: isMine ? .trailing : .leading)
+    }
+
+    private var locationBubbleBody: String {
+        if let bodyText {
+            return bodyText
+        }
+        if let latitude = message.locationLatitude, let longitude = message.locationLongitude {
+            return [
+                latitude.formatted(.number.precision(.fractionLength(5))),
+                longitude.formatted(.number.precision(.fractionLength(5)))
+            ].joined(separator: ", ")
+        }
+        return "現在地を共有しました"
     }
 
     private var systemMessage: some View {

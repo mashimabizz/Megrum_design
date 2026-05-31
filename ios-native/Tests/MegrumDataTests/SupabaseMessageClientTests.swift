@@ -131,7 +131,7 @@ final class SupabaseMessageClientTests: XCTestCase {
         let request = try client.makeSendArrivalStatusMessageRequest(
             senderID: senderID,
             proposalID: proposalID,
-            status: .arrived,
+            status: SupabaseMessageArrivalStatus.arrived,
             body: " 北口に着きました "
         )
         let body = try XCTUnwrap(request.httpBody)

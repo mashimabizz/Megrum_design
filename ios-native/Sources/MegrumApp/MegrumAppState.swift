@@ -85,6 +85,8 @@ public protocol MegrumRepository: Sendable {
     func fileTradeDispute(_ input: TradeDisputeCreateInput) async throws -> TradeDisputeTicket
     func loadMessages(proposalID: UUID, limit: Int) async throws -> [TradeMessage]
     func sendMessage(_ input: TradeMessageCreateInput) async throws -> TradeMessage
+    func sendLocationMessage(proposalID: UUID, latitude: Double, longitude: Double, label: String, body: String?) async throws -> TradeMessage
+    func sendArrivalStatusMessage(proposalID: UUID, status: TradeArrivalStatus, body: String?) async throws -> TradeMessage
     func loadSchedules(for proposal: TradeProposal, startAt: Date, endAt: Date) async throws -> [PersonalSchedule]
     func createSchedule(_ input: PersonalScheduleCreateInput) async throws -> PersonalSchedule
     func loadGrooms(latitude: Double?, longitude: Double?, radiusMeters: Int) async throws -> [GroomPost]
@@ -205,6 +207,14 @@ public extension MegrumRepository {
     }
 
     func sendMessage(_ input: TradeMessageCreateInput) async throws -> TradeMessage {
+        throw MegrumRepositoryError.unsupportedMutation
+    }
+
+    func sendLocationMessage(proposalID: UUID, latitude: Double, longitude: Double, label: String, body: String?) async throws -> TradeMessage {
+        throw MegrumRepositoryError.unsupportedMutation
+    }
+
+    func sendArrivalStatusMessage(proposalID: UUID, status: TradeArrivalStatus, body: String?) async throws -> TradeMessage {
         throw MegrumRepositoryError.unsupportedMutation
     }
 
@@ -636,6 +646,30 @@ public struct PreviewMegrumRepository: MegrumRepository {
             senderID: NativePreviewData.viewerID,
             messageType: .text,
             body: input.body
+        )
+    }
+
+    public func sendLocationMessage(proposalID: UUID, latitude: Double, longitude: Double, label: String, body: String?) async throws -> TradeMessage {
+        TradeMessage(
+            id: UUID(),
+            proposalID: proposalID,
+            senderID: NativePreviewData.viewerID,
+            messageType: .location,
+            body: body?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfBlank ?? label,
+            locationLatitude: latitude,
+            locationLongitude: longitude,
+            locationLabel: label
+        )
+    }
+
+    public func sendArrivalStatusMessage(proposalID: UUID, status: TradeArrivalStatus, body: String?) async throws -> TradeMessage {
+        TradeMessage(
+            id: UUID(),
+            proposalID: proposalID,
+            senderID: NativePreviewData.viewerID,
+            messageType: .arrivalStatus,
+            body: body?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfBlank ?? status.defaultBody,
+            meta: ["status": status.rawValue]
         )
     }
 
@@ -1891,6 +1925,65 @@ public final class MegrumAppState: ObservableObject {
             return true
         } catch {
             errorMessage = "メッセージを送信できませんでした"
+            sendingMessageProposalID = nil
+            return false
+        }
+    }
+
+    public func sendLocationMessage(
+        proposalID: UUID,
+        latitude: Double,
+        longitude: Double,
+        label: String,
+        body: String? = nil
+    ) async -> Bool {
+        let normalizedLabel = label.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !normalizedLabel.isEmpty, sendingMessageProposalID != proposalID else {
+            return false
+        }
+
+        sendingMessageProposalID = proposalID
+        errorMessage = nil
+        do {
+            let message = try await repository.sendLocationMessage(
+                proposalID: proposalID,
+                latitude: latitude,
+                longitude: longitude,
+                label: normalizedLabel,
+                body: body
+            )
+            messagesByProposalID[proposalID, default: []].append(message)
+            sendingMessageProposalID = nil
+            return true
+        } catch {
+            errorMessage = "現在地を共有できませんでした"
+            sendingMessageProposalID = nil
+            return false
+        }
+    }
+
+    public func sendArrivalStatusMessage(
+        proposalID: UUID,
+        status: TradeArrivalStatus,
+        body: String? = nil
+    ) async -> Bool {
+        guard sendingMessageProposalID != proposalID else {
+            return false
+        }
+
+        sendingMessageProposalID = proposalID
+        errorMessage = nil
+        do {
+            let message = try await repository.sendArrivalStatusMessage(
+                proposalID: proposalID,
+                status: status,
+                body: body
+            )
+            messagesByProposalID[proposalID, default: []].append(message)
+            sendingMessageProposalID = nil
+            return true
+        } catch {
+            errorMessage = "到着ステータスを送信できませんでした"
             sendingMessageProposalID = nil
             return false
         }

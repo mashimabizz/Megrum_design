@@ -1,7 +1,7 @@
 # 22. Swift Native Migration
 
 最終更新: 2026-05-31
-ステータス: Active draft（iter370）
+ステータス: Active draft（iter371）
 
 ## 目的
 
@@ -134,6 +134,7 @@ tar -xzf /Users/michitaka/Desktop/Megrum_backups/pre-swift-migration-20260531-03
 - iter367で、Google OAuth authorize URL / request builderを追加し、UI接続前にrequest生成をテストできるようにした。
 - iter369で、Googleログインボタンを `ASWebAuthenticationSession` へ接続し、Supabase OAuth callbackを既存redirect復元境界へ渡せるようにした。
 - iter370で、OAuth callback schemeを `MEGRUM_URL_SCHEME` build settingから導出するようにし、Apple / Googleなどの外部ID Provider error stateを汎用名へ整理した。
+- iter371で、初回設定と設定後の推し設定を共通化し、複数グループ/複数メンバーの推し選択、自分プロフィール概要、設定一覧からのプロフィール/推し設定導線を追加した。
 - 現時点のAuthはメール/パスワード、Appleログイン、Googleログインの最小導線まで追加済み。Google側のProvider設定と実機callback許可はSupabase/Apple側の設定確認が残る。
 
 ### Phase 3: Exchange core
@@ -176,6 +177,8 @@ tar -xzf /Users/michitaka/Desktop/Megrum_backups/pre-swift-migration-20260531-03
 - iter369で、在庫/Wishグリッドの列数・spacing・スケルトン数を共有する `GoodsGridLayout` にまとめ、3/4/5列切り替え、空状態、長押しメニュー、数量バッジ、アクセシビリティを補強した。
 - iter369で、取引チャット系request境界を補強し、位置情報message、到着状態meta、写真message type validation、申告memo validation、証跡承認/評価送信validationを追加した。
 - iter370で、取引チャット入力欄上に到着ステータス、現在地共有、服装写真共有のNative affordanceを追加した。到着ステータスは既存text message境界で送信し、typed location / arrival messageのAppState接続は後続で実装する。
+- iter371で、検索結果/相手プロフィールからの打診作成を専用 `ProposalCreateFlow` に置き換え、「私が出す」「受け取る」「待ち合わせ」「確認」の段階で複数提示物と現地/郵送/どちらもOKを扱えるようにした。
+- iter371で、取引チャットの現在地共有と到着ステータスをAppState/repositoryへ接続し、`messages.location_lat/location_lng/location_label` と `meta.status` を使うtyped messageとして送れるようにした。
 
 ### Phase 4: Meguri core
 
@@ -216,6 +219,8 @@ tar -xzf /Users/michitaka/Desktop/Megrum_backups/pre-swift-migration-20260531-03
 - iter368で、前回更新と今回更新を含めた署名付きDebugビルドを `MTO’s phone` へ再インストールし、`tokyo.megrum.native.preview` の起動まで確認した。
 - iter369で、並列実装バッチの更新を含む署名付きDebugビルドを `MTO’s phone` へ再インストールし、`tokyo.megrum.native.preview` の起動まで確認した。
 - iter370で、署名付きiPhone向けDebugビルドまでは成功した。`MTO’s phone` はUSB上に見えているがCoreDevice/Xcode上で `available=false` のため、自動installは端末ロック解除・接続復帰待ち。
+- iter371で、RN parity backlogのP0から自分プロフィール/推し設定、打診作成、取引チャット当日アクションを先に実装した。Home/AW、在庫/Wish編集、異議/遅刻/キャンセル詳細は引き続きP0として残る。
+- iter371で、`swift build` / `swift test` 202件 / `xcodebuild` Simulator build / 署名付きiPhone向けDebug build は成功した。`MTO’s phone` はCoreDeviceで `unavailable` のため、自動installは端末接続復帰待ち。
 
 ## RN parity backlog（iter370監査）
 
@@ -230,16 +235,19 @@ tar -xzf /Users/michitaka/Desktop/Megrum_backups/pre-swift-migration-20260531-03
    - Swiftの追加sheetは最小構成。RN版の写真、カメラ/ライブラリ、タグ、メンバー、編集、status、複数カード切り抜きが不足している。
    - 主な対象: `ios-native/Sources/MegrumApp/CollectionScreens.swift`, 新規 `GoodsEditorScreen.swift`
 3. Proposal Creation / Confirm
-   - Swiftはcompact sheet中心。RN版の譲る/受け取る/待ち合わせの複数タブ、複数選択、スケジュール背景、場所選択、確認画面、完了画面が不足している。
-   - 主な対象: `ios-native/Sources/MegrumApp/SearchScreen.swift`, `ios-native/Sources/MegrumApp/PublicUserProfileScreen.swift`, 新規 `ProposalSelectScreen.swift`, 新規 `ProposalConfirmScreen.swift`
+   - iter371で専用 `ProposalCreateFlow` を追加し、譲る/受け取る/待ち合わせ/確認、複数提示物、現地/郵送/どちらもOKの入口は実装済み。
+   - 残: スケジュール背景、地図による場所選択、完了画面、よりRN版に近い候補選択の密度調整。
+   - 主な対象: `ios-native/Sources/MegrumApp/ProposalCreateFlow.swift`, `ios-native/Sources/MegrumApp/SearchScreen.swift`, `ios-native/Sources/MegrumApp/PublicUserProfileScreen.swift`
 4. Trade Chat Day-Of Actions
-   - Swiftは入口を追加済みだが、現在地共有と服装写真共有は未接続。到着状態もrich messageではなくtext fallback。
+   - iter371で現在地共有と到着ステータスはtyped messageとして接続済み。
+   - 残: 服装写真共有、キャンセル/遅刻申請、当日banner/入力欄上メニューの最終整理。
    - 主な対象: `ios-native/Sources/MegrumApp/TradesScreen.swift`, `ios-native/Sources/MegrumData/SupabaseMessageClient.swift`
 5. Dispute / Cancel / Late Flow
    - Swiftは基本通報のみ。RN版の異議詳細、返信、タイムライン、キャンセル/遅刻申請、取引詳細へのbanner反映が不足している。
    - 主な対象: `ios-native/Sources/MegrumApp/TradesScreen.swift`, 新規 `DisputeDetailScreen.swift`
 6. Onboarding / Own Profile
-   - Swiftは初回設定が1画面に圧縮されている。RN版の性別、複数推し/メンバー、自分プロフィール、プロフィール編集、推し設定、完了体験が不足している。
+   - iter371で複数推し/メンバー、自分プロフィール、設定からのプロフィール/推し設定導線は追加済み。
+   - 残: 性別、プロフィール編集の項目拡張、完了体験、RN版のオンボーディング分割設計。
    - 主な対象: `ios-native/Sources/MegrumApp/AuthScreen.swift`, `ios-native/Sources/MegrumApp/AccountSetupScreen.swift`, `ios-native/Sources/MegrumApp/SettingsScreen.swift`
 
 ### P1

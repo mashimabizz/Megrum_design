@@ -88,12 +88,12 @@ struct PublicUserProfileScreen: View {
         }
         .sheet(item: $proposalTargetItem) { item in
             NavigationStack {
-                ProposalCreateSheet(appState: appState, targetItem: item)
+                ProposalCreateFlow(appState: appState, targetItem: item)
             }
         }
         .sheet(item: $listingProposalTarget) { target in
             NavigationStack {
-                ProposalCreateSheet(
+                ProposalCreateFlow(
                     appState: appState,
                     targetItem: target.targetItem,
                     listingID: target.listing.id,
