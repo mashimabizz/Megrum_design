@@ -1,7 +1,7 @@
 # 22. Swift Native Migration
 
 最終更新: 2026-05-31
-ステータス: Active draft（iter353）
+ステータス: Active draft（iter354）
 
 ## 目的
 
@@ -59,6 +59,8 @@ tar -xzf /Users/michitaka/Desktop/Megrum_backups/pre-swift-migration-20260531-03
 - iOS 26以上ではLiquid GlassのネイティブAPIを優先する。
 - iOS 17/18/旧実行環境では `Material` / UIKit standard material / 独自最小fallbackで可読性を維持する。
 - UIはSwiftUIを主軸にし、カメラ・写真・地図・通知・共有・購入・権限などは必要に応じてUIKit / Apple frameworkを直接使う。
+- Swift Native版のデザインは、legacy Expo版の見た目を完全再現することを目的にしない。オーナーの実機レビューでは、Swift版のiOS標準感を維持する方針で確定した。
+- Megrumらしい色・余白・情報設計は継承するが、操作部品、シート、ナビゲーション、カメラ、地図、通知、設定画面はApple標準の自然な挙動と質感を優先する。
 - アーキテクチャはMV firstを基本にする。不要なMVVMや巨大ViewModelを増やさない。
 - 共有状態は `@Observable` / `@State` / `@Environment` を優先し、非同期処理はSwift Concurrencyで整理する。
 - 画面が直接fixtureを読む構造にしない。`MegrumAppState` と `MegrumRepository` を通し、Supabase接続へ差し替えられる境界を保つ。

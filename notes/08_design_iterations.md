@@ -4,6 +4,41 @@
 
 ---
 
+## イテレーション354：Swift版はiOS標準感を正とする
+
+### 背景・問題意識
+
+オーナーがSwift Native版を実機確認し、「元々のアプリと比べて、iOSの標準デザイン感があり、かなりいい」「最終的にデザインまで元々のアプリに寄せようとしているなら不要」と判断した。以後のSwift移行では、legacy Expo版の見た目を完全再現するのではなく、SwiftUI / UIKit / Apple標準フレームワークの自然な質感を維持する。
+
+### 変更内容
+
+#### `notes/22_swift_native_migration.md`
+- Swift Native版のデザイン原則として、旧アプリへの見た目の完全再現を目的にしないことを明記した。
+- 既存のMegrumらしい色・余白・情報設計は継承しつつ、操作部品、シート、ナビゲーション、カメラ、地図、通知などはiOS標準感を優先する方針にした。
+
+### 影響範囲
+
+- Swift Native版の全画面UI方針
+- 今後のLiquid Glass / Material / SwiftUI標準部品の採用判断
+- legacy `mobile/` からの移植時のデザイン判断
+
+### 確認方法
+
+- `notes/22_swift_native_migration.md` の「2. Swift版の技術方針」を確認する。
+
+### 関連ファイル
+
+- `notes/22_swift_native_migration.md`
+- `notes/08_design_iterations.md`
+
+### セルフレビュー結果
+
+- ✅ オーナーの実機レビュー結果を移行方針に反映した
+- ✅ 状態名・DBスキーマ・用語の変更はなく、`notes/09` / `notes/05` / `notes/10` は更新不要と判断した
+- ✅ 今後のSwift実装で、legacy UIへの過剰な寄せ直しを避ける判断基準を残した
+
+---
+
 ## イテレーション353：Swiftグッズ通報を追加
 
 ### 背景・問題意識
