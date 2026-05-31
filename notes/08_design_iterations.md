@@ -4,6 +4,64 @@
 
 ---
 
+## イテレーション382：App StoreローカライズQAを追加
+
+### 背景・問題意識
+
+App Store Connectの主言語は日本語想定だが、Review Notesは英語で審査員向けに説明する必要がある。日本語メタデータ、English (U.S.)追加候補、Review Notes、スクリーンショット、公開URL説明がズレると、審査員が実機で辿れない画面を説明してしまうリスクがあるため、ローカライズ/メタデータQA表を追加した。
+
+### 変更内容
+
+#### `notes/60_app_store_localization_metadata_qa.md`
+- Primary Language、English (U.S.)追加候補、Review Notes、スクリーンショット、公開URLの日英整合チェックを追加した。
+- 初回最小スコープ用のEnglish Description候補を追加した。
+- byte/文字数チェック、監査結果フォーマット、No-Goを整理した。
+
+#### `notes/31_app_store_connect_metadata_worksheet.md`, `notes/40_app_store_connect_copy_paste_sheet.md`
+- 日本語/English (U.S.)/Review Notesの整合確認は `notes/60` を使う導線を追加した。
+
+#### `notes/39_release_command_center.md`, `notes/30_owner_release_action_sheet.md`
+- ローカライズ・メタデータQAへの導線を追加した。
+
+#### `notes/22_release_triage_tracker.csv`
+- RL-058としてApp Storeローカライズ・メタデータQAを追加した。
+
+### 影響範囲
+
+- App Store Connect入力
+- Review Notes
+- スクリーンショット説明
+- 公開URL説明
+- English (U.S.)追加判断
+- コード、ローカライズファイル、App Store Connect設定、公開URLは変更していない。
+
+### 確認方法
+
+- `rg -n "RL-058|ローカライズ|English \\(U\\.S\\.\\)|Review Notes|Primary Language" notes/60_app_store_localization_metadata_qa.md notes/31_app_store_connect_metadata_worksheet.md notes/40_app_store_connect_copy_paste_sheet.md notes/22_release_triage_tracker.csv`
+- `python3 - <<'PY' ...` による `notes/22_release_triage_tracker.csv` のCSV parse確認
+- 旧規約用語・旧主体表現チェック（旧提案/旧メッセージ/旧投稿関連、サービス主体表現）
+- `git diff --check -- notes`
+
+### セルフレビュー結果
+
+- ✅ コード、ローカライズファイル、App Store Connect設定、公開URLは変更していない。
+- ✅ 日本語メタデータと英語Review Notesのズレを提出前に確認できる表にした。
+- ✅ 初回で出さない有料機能/外部AI/未完成3Dを英語説明から削る条件を入れた。
+- ✅ 状態名の追加/改名はなく、`notes/09_state_machines.md` 更新は不要。
+- ✅ 新用語は追加していないため、`notes/10_glossary.md` 更新は不要。
+- ✅ DBスキーマ変更はなく、`notes/05_data_model.md` 更新は不要。
+
+### 関連ファイル
+
+- `notes/60_app_store_localization_metadata_qa.md`
+- `notes/31_app_store_connect_metadata_worksheet.md`
+- `notes/40_app_store_connect_copy_paste_sheet.md`
+- `notes/39_release_command_center.md`
+- `notes/30_owner_release_action_sheet.md`
+- `notes/22_release_triage_tracker.csv`
+
+---
+
 ## イテレーション381：初回提出スコープ露出監査表を追加
 
 ### 背景・問題意識

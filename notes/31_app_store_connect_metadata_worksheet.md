@@ -11,6 +11,7 @@ App Store Connectの各入力欄へ何を入れるか、制限、下書き、未
 この文書はメタデータ準備用であり、コード、ビルド設定、公開ページは変更しない。
 
 提出直前にコピーする最終文面は `notes/40_app_store_connect_copy_paste_sheet.md` を使う。
+日本語/English (U.S.)/Review Notesの整合確認は `notes/60_app_store_localization_metadata_qa.md` を使う。
 
 ## 1. 先に決めること
 
