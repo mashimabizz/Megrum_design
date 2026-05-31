@@ -10,6 +10,7 @@ App Store提出前に必要な `megrum.jp` の公開URL、`support@megrum.jp` �
 
 この文書は運用ランブックであり、DNS、ホスティング、メールサービス、公開ページそのものは変更しない。
 ドメイン、DNS、メール、サポート担当の権限棚卸しは `notes/61_release_access_owner_registry.md` を使う。
+`support@megrum.jp` の受信後の分類、受付番号、優先度、エスカレーションは `notes/67_support_inbox_triage_runbook.md` を使う。
 
 ## 1. 公開前に決めること
 

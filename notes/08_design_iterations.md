@@ -4,6 +4,68 @@
 
 ---
 
+## イテレーション389：サポート受信トリアージRunbookを追加
+
+### 背景・問題意識
+
+App Store提出前後は、`support@megrum.jp` に通常問い合わせだけでなく、Apple審査員からの連絡、通報、安全相談、アカウント削除、個人情報請求、個人情報・セキュリティ事故疑いが入る可能性がある。返信テンプレートは用意済みだが、受信時の分類、受付番号、優先度、エスカレーションが曖昧だとP0を通常問い合わせとして放置するリスクがあるため、サポート受信トリアージRunbookを追加した。
+
+### 変更内容
+
+#### `notes/67_support_inbox_triage_runbook.md`
+- `support@megrum.jp` の受信箱ルール、初回トリアージ分類、受付番号ルール、受信時チェックリスト、エスカレーション表、P0初動、日次確認、提出前チェックを追加した。
+- App Review、通報/安全、個人情報・セキュリティ事故疑い、アカウント削除、個人情報請求、購入/IAP、ログイン、取引相談、不具合を優先度別に整理した。
+- パスワード、認証コード、secret、不要な本人確認書類を受け取らない方針を明記した。
+- Apple App Review Guidelines、Apple account deletion、Apple App Privacy Details、個人情報保護委員会の漏えい等対応情報への公式参照を追加した。
+
+#### `notes/34_support_response_templates.md`, `notes/47_domain_email_publication_runbook.md`
+- 返信テンプレートとメール運用から、受信箱トリアージRunbookへの導線を追加した。
+
+#### `notes/39_release_command_center.md`, `notes/30_owner_release_action_sheet.md`, `notes/50_release_go_no_go_decision_matrix.md`, `notes/57_legal_release_branch_integration_plan.md`
+- サポート受信トリアージへの導線とGo / No-Go Gateを追加し、法務docsのstage禁止範囲を `notes/67` まで広げた。
+
+#### `notes/22_release_triage_tracker.csv`
+- RL-065としてサポート受信トリアージを追加した。
+
+### 影響範囲
+
+- App Review連絡
+- `support@megrum.jp` の問い合わせ運用
+- 通報、安全相談、アカウント削除、個人情報請求
+- 個人情報・セキュリティ事故疑い
+- Go / No-Go判定
+- コード、メール設定、サポートツール設定、公開URL、DB、App Store Connect設定は変更していない。
+
+### 確認方法
+
+- `rg -n "RL-065|サポート受信|support@megrum.jp|受付番号|App Review|INC-|notes/67" notes/67_support_inbox_triage_runbook.md notes/39_release_command_center.md notes/50_release_go_no_go_decision_matrix.md notes/22_release_triage_tracker.csv`
+- `python3 - <<'PY' ...` による `notes/22_release_triage_tracker.csv` のCSV parse確認
+- 旧規約用語・旧主体表現チェック（旧提案/旧メッセージ/旧投稿関連、サービス主体表現）
+- `git diff --check -- notes`
+
+### セルフレビュー結果
+
+- ✅ コード、メール設定、サポートツール設定、公開URL、DB、App Store Connect設定は変更していない。
+- ✅ App Review連絡、削除、個人情報請求、通報、事故疑いを通常問い合わせと分ける形にした。
+- ✅ パスワード、認証コード、secret、不要な本人確認書類を受け取らない方針を維持した。
+- ✅ 公式参照はAppleと個人情報保護委員会に限定した。
+- ✅ 状態名の追加/改名はなく、`notes/09_state_machines.md` 更新は不要。
+- ✅ 新用語は追加していないため、`notes/10_glossary.md` 更新は不要。
+- ✅ DBスキーマ変更はなく、`notes/05_data_model.md` 更新は不要。
+
+### 関連ファイル
+
+- `notes/67_support_inbox_triage_runbook.md`
+- `notes/34_support_response_templates.md`
+- `notes/47_domain_email_publication_runbook.md`
+- `notes/39_release_command_center.md`
+- `notes/30_owner_release_action_sheet.md`
+- `notes/50_release_go_no_go_decision_matrix.md`
+- `notes/57_legal_release_branch_integration_plan.md`
+- `notes/22_release_triage_tracker.csv`
+
+---
+
 ## イテレーション388：法務レビュー後公開文面最終化Runbookを追加
 
 ### 背景・問題意識

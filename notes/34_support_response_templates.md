@@ -3,6 +3,7 @@
 > 目的：初回リリース前に、問い合わせ、通報、アカウント削除、個人情報、購入、AI機能に対する一次返信を用意する。
 > コード変更なし。公開サポートページと運用SOPの実務テンプレートとして使う。
 > 公開FAQの下書きは `notes/55_public_help_faq_draft.md` を使う。
+> 受信箱での分類、受付番号、優先度、エスカレーションは `notes/67_support_inbox_triage_runbook.md` を使う。
 
 最終更新: 2026-05-31
 ステータス: Draft v0.1（運用前・文面レビュー前）
@@ -525,3 +526,4 @@ AIの結果に誤りがある場合は、ユーザーご自身で内容を確認
 - App Privacy照合: `notes/27_app_privacy_data_inventory.md`
 - IAP商品設定: `notes/33_iap_product_setup_worksheet.md`
 - 法務レビュー依頼: `notes/29_legal_review_brief.md`
+- サポート受信トリアージ: `notes/67_support_inbox_triage_runbook.md`

@@ -72,6 +72,7 @@
 | リリース証跡フォルダ索引 | `notes/64_release_evidence_folder_index.md` |
 | Release Candidateハンドオフ | `notes/65_release_candidate_handoff.md` |
 | 法務レビュー後公開文面最終化 | `notes/66_legal_review_publication_runbook.md` |
+| サポート受信トリアージ | `notes/67_support_inbox_triage_runbook.md` |
 | オーナー作業表 | `notes/30_owner_release_action_sheet.md` |
 | App Store Connect入力 | `notes/31_app_store_connect_metadata_worksheet.md` |
 | TestFlight / Submit手順 | `notes/32_testflight_review_submission_runbook.md` |
@@ -181,6 +182,7 @@
 | リリース証跡フォルダ索引 | RL-062 | `notes/64` |
 | Release Candidateハンドオフ | RL-063 | `notes/65` |
 | 法務レビュー後公開文面最終化 | RL-064 | `notes/66` |
+| サポート受信トリアージ | RL-065 | `notes/67` |
 
 ---
 
@@ -221,6 +223,7 @@
 | リリース証跡フォルダ索引 | `notes/64_release_evidence_folder_index.md` |
 | Release Candidateハンドオフチェックリスト | `notes/65_release_candidate_handoff.md` |
 | 法務レビュー後公開文面最終化Runbook | `notes/66_legal_review_publication_runbook.md` |
+| サポート受信トリアージRunbook | `notes/67_support_inbox_triage_runbook.md` |
 | App Store提出素材 | `notes/24_app_store_submission_pack.md` |
 | App Store Connect入力表 | `notes/31_app_store_connect_metadata_worksheet.md` |
 | TestFlight / Submit手順 | `notes/32_testflight_review_submission_runbook.md` |
