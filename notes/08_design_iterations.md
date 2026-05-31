@@ -4,6 +4,51 @@
 
 ---
 
+## イテレーション350：Swift取引写真拡大を追加
+
+### 背景・問題意識
+
+取引チャットで共有された写真や証跡写真は、カード内の小さな表示だけでは内容確認がしづらい。ユーザー要望に合わせ、写真をタップしたら画面いっぱいに確認できるNativeビューアへ接続する。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/TradesScreen.swift`
+- `TradeMessageBubble` で `photoURL` を持つメッセージを画像バブルとして表示するようにした。
+- 取引チャットの写真バブルと証跡写真をタップすると、黒背景の全画面画像ビューアを開くようにした。
+- 画像読み込み中はProgressView、失敗時は読み込み失敗表示を出すようにした。
+- テキストのない写真メッセージで空バブルが出ないようにした。
+
+#### `ios-native/README.md` / `notes/22_swift_native_migration.md` / `notes/10_glossary.md`
+- 取引写真拡大のNative対応を記録した。
+
+### 影響範囲
+
+- Swift Native版取引詳細sheet
+- 取引チャットの写真メッセージ表示
+- 証跡写真表示
+
+### 確認方法
+
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-build --enable-xctest --disable-swift-testing -j 1`
+- `xcodebuild -quiet -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -destination 'generic/platform=iOS Simulator' -derivedDataPath /tmp/megrum-native-xcodebuild CODE_SIGNING_ALLOWED=NO build`
+- `git diff --check -- ios-native/Sources/MegrumApp/TradesScreen.swift ios-native/README.md notes/22_swift_native_migration.md notes/10_glossary.md notes/08_design_iterations.md`
+
+### 関連ファイル
+
+- `ios-native/Sources/MegrumApp/TradesScreen.swift`
+- `ios-native/README.md`
+- `notes/22_swift_native_migration.md`
+- `notes/10_glossary.md`
+- `notes/08_design_iterations.md`
+
+### セルフレビュー結果
+
+- ✅ `TradeMessage.photoURL` を使い、既存データモデルの範囲で写真表示を追加した
+- ✅ 証跡写真とチャット写真で同じ全画面ビューアを使うようにした
+- ✅ データモデル・状態遷移の変更はなく、`notes/05` / `notes/09` は更新不要と判断した
+
+---
+
 ## イテレーション349：Swiftグルームカメラ投稿を追加
 
 ### 背景・問題意識

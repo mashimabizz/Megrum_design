@@ -4,7 +4,7 @@
 > 新環境（別Claudeセッション・別エンジニア）でも、これだけ読めばコンテキストがつかめる。
 
 最終更新: 2026-05-31
-ステータス: Draft v3.83（iter349 Swift Nativeグルームカメラ投稿を反映）
+ステータス: Draft v3.84（iter350 Swift Native取引写真拡大を反映）
 
 ---
 
@@ -209,6 +209,7 @@
 | **取引** | deal、trade | 合意成立から完了まで | C-2, C-3 |
 | **住所** | mailing address | 郵送交換で使う住所情報。合意成立までは相手に見せず、合意後に当事者同士だけへ開示する | iter168.71 |
 | **証跡撮影** | evidence | 物理交換後に交換したグッズを撮影し、取引完了判断の材料にする操作。Swift Native版ではiOSカメラまたは写真選択から `chat-photos` へ画像を保存し、`proposal_evidence_photos` と `proposals.evidence_photo_url` に反映する | C-3, iter347, iter348 |
+| **取引写真拡大** | trade photo preview | 取引チャットに共有された写真や証跡写真をタップし、黒背景の全画面ビューアで確認する操作 | iter350 |
 | **両者承認** | dual approve | 証跡撮影後に送信者・受信者が内容を確認する操作。Swift Native版では `proposals.approved_by_sender` / `approved_by_receiver` を更新し、両方trueになった時点で `completed` にする | C-3, iter347 |
 | **評価** | rating | 完了した取引に対する1-5 stars＋コメント。Swift Native版では取引完了後に `user_evaluations` へ投稿する | C-3, iter347 |
 | **dispute** | 異議、申告、通報、D-flow | 取引異常時の申し立てフロー。取引チャットの `通報` ボタンはこの申告フローに接続する | D-flow / iter168.87 |

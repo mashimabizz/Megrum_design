@@ -241,6 +241,7 @@ private struct TradeDetailScreen: View {
     @State private var selectedEvidencePhotoItem: PhotosPickerItem?
     @State private var isShowingEvidenceCamera = false
     @State private var isShowingEvaluationSheet = false
+    @State private var selectedRemoteImage: RemoteImageSelection?
 
     private var messages: [TradeMessage] {
         appState.messages(for: proposal.id)
@@ -277,6 +278,9 @@ private struct TradeDetailScreen: View {
                             onOpenCamera: {
                                 isShowingEvidenceCamera = true
                             },
+                            onOpenImage: { url in
+                                selectedRemoteImage = RemoteImageSelection(url: url)
+                            },
                             onApprove: {
                                 Task {
                                     await appState.approveTradeEvidence(proposalID: currentProposal.id)
@@ -302,7 +306,10 @@ private struct TradeDetailScreen: View {
                         ForEach(messages) { message in
                             TradeMessageBubble(
                                 message: message,
-                                isMine: message.senderID == appState.viewer?.id
+                                isMine: message.senderID == appState.viewer?.id,
+                                onOpenImage: { url in
+                                    selectedRemoteImage = RemoteImageSelection(url: url)
+                                }
                             )
                         }
                     }
@@ -359,6 +366,15 @@ private struct TradeDetailScreen: View {
             .presentationDetents([.medium])
             .presentationDragIndicator(.visible)
         }
+#if os(iOS)
+        .fullScreenCover(item: $selectedRemoteImage) { selection in
+            FullScreenRemoteImageView(url: selection.url)
+        }
+#else
+        .sheet(item: $selectedRemoteImage) { selection in
+            FullScreenRemoteImageView(url: selection.url)
+        }
+#endif
 #if os(iOS)
         .sheet(isPresented: $isShowingEvidenceCamera) {
             NativeCameraCaptureView { imageData in
@@ -448,6 +464,7 @@ private struct TradeEvidencePanel: View {
     var isApproving: Bool
     var canUseCamera: Bool
     var onOpenCamera: () -> Void
+    var onOpenImage: (URL) -> Void
     var onApprove: () -> Void
     var onRate: () -> Void
 
@@ -485,28 +502,34 @@ private struct TradeEvidencePanel: View {
             }
 
             if let evidencePhotoURL = proposal.evidencePhotoURL {
-                AsyncImage(url: evidencePhotoURL) { phase in
-                    switch phase {
-                    case .success(let image):
-                        image
-                            .resizable()
-                            .scaledToFill()
-                    case .failure:
-                        MegrumTheme.sky.opacity(0.18)
-                            .overlay {
-                                Image(systemName: "photo")
-                                    .font(.system(size: 28, weight: .bold))
-                                    .foregroundStyle(MegrumTheme.muted)
-                            }
-                    case .empty:
-                        MegrumTheme.sky.opacity(0.12)
-                            .overlay {
-                                ProgressView()
-                            }
-                    @unknown default:
-                        Color.clear
+                Button {
+                    onOpenImage(evidencePhotoURL)
+                } label: {
+                    AsyncImage(url: evidencePhotoURL) { phase in
+                        switch phase {
+                        case .success(let image):
+                            image
+                                .resizable()
+                                .scaledToFill()
+                        case .failure:
+                            MegrumTheme.sky.opacity(0.18)
+                                .overlay {
+                                    Image(systemName: "photo")
+                                        .font(.system(size: 28, weight: .bold))
+                                        .foregroundStyle(MegrumTheme.muted)
+                                }
+                        case .empty:
+                            MegrumTheme.sky.opacity(0.12)
+                                .overlay {
+                                    ProgressView()
+                                }
+                        @unknown default:
+                            Color.clear
+                        }
                     }
                 }
+                .buttonStyle(.plain)
+                .accessibilityLabel("証跡写真を拡大表示")
                 .frame(height: 172)
                 .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
                 .overlay {
@@ -674,15 +697,55 @@ private struct TradeEvaluationSheet: View {
 private struct TradeMessageBubble: View {
     var message: TradeMessage
     var isMine: Bool
+    var onOpenImage: (URL) -> Void
+
+    private var bodyText: String? {
+        message.body?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
+    }
 
     var body: some View {
         VStack(alignment: isMine ? .trailing : .leading, spacing: 4) {
-            Text(message.body ?? "")
-                .font(.system(size: 15, weight: .bold, design: .rounded))
-                .foregroundStyle(isMine ? .white : MegrumTheme.ink)
-                .padding(.horizontal, 14)
-                .padding(.vertical, 10)
-                .background(isMine ? AnyShapeStyle(MegrumTheme.lavender) : AnyShapeStyle(.white.opacity(0.9)), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+            if let photoURL = message.photoURL {
+                Button {
+                    onOpenImage(photoURL)
+                } label: {
+                    AsyncImage(url: photoURL) { phase in
+                        switch phase {
+                        case .success(let image):
+                            image
+                                .resizable()
+                                .scaledToFill()
+                        case .failure:
+                            MegrumTheme.sky.opacity(0.18)
+                                .overlay {
+                                    Image(systemName: "photo")
+                                        .font(.system(size: 24, weight: .bold))
+                                        .foregroundStyle(MegrumTheme.muted)
+                                }
+                        case .empty:
+                            MegrumTheme.sky.opacity(0.12)
+                                .overlay {
+                                    ProgressView()
+                                }
+                        @unknown default:
+                            Color.clear
+                        }
+                    }
+                    .frame(width: 210, height: 250)
+                    .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("取引チャットの写真を拡大表示")
+            }
+
+            if let bodyText {
+                Text(bodyText)
+                    .font(.system(size: 15, weight: .bold, design: .rounded))
+                    .foregroundStyle(isMine ? .white : MegrumTheme.ink)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 10)
+                    .background(isMine ? AnyShapeStyle(MegrumTheme.lavender) : AnyShapeStyle(.white.opacity(0.9)), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+            }
 
             Text(message.createdAt.formatted(date: .omitted, time: .shortened))
                 .font(.system(size: 11, weight: .bold, design: .rounded))
@@ -723,6 +786,60 @@ private struct TradeMessageInput: View {
             .buttonStyle(.plain)
             .disabled(text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isSending)
             .opacity(text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? 0.45 : 1)
+        }
+    }
+}
+
+private struct RemoteImageSelection: Identifiable, Equatable {
+    var url: URL
+    var id: String { url.absoluteString }
+}
+
+private struct FullScreenRemoteImageView: View {
+    var url: URL
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        ZStack(alignment: .topTrailing) {
+            Color.black.ignoresSafeArea()
+
+            AsyncImage(url: url) { phase in
+                switch phase {
+                case .success(let image):
+                    image
+                        .resizable()
+                        .scaledToFit()
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                case .failure:
+                    VStack(spacing: 12) {
+                        Image(systemName: "photo")
+                            .font(.system(size: 34, weight: .bold))
+                        Text("画像を読み込めませんでした")
+                            .font(.system(size: 15, weight: .bold, design: .rounded))
+                    }
+                    .foregroundStyle(.white.opacity(0.86))
+                case .empty:
+                    ProgressView()
+                        .tint(.white)
+                @unknown default:
+                    EmptyView()
+                }
+            }
+            .padding(.horizontal, 16)
+
+            Button {
+                dismiss()
+            } label: {
+                Image(systemName: "xmark")
+                    .font(.system(size: 15, weight: .heavy))
+                    .foregroundStyle(.white)
+                    .frame(width: 42, height: 42)
+                    .background(.white.opacity(0.18), in: Circle())
+            }
+            .buttonStyle(.plain)
+            .padding(.top, 18)
+            .padding(.trailing, 18)
+            .accessibilityLabel("閉じる")
         }
     }
 }
