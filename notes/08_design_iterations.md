@@ -4,6 +4,79 @@
 
 ---
 
+## イテレーション394：承認後の手動公開制御を追加
+
+### 背景・問題意識
+
+App Store初回提出の準備がSubmit直前まで細かく分解されてきた一方で、承認後の `Pending Developer Release` から `Release This Version` を押す直前までの読み合わせ、Release option確認、公開初日監視、公開後に止める判断は `notes/51` の大枠に留まっていた。承認後に意図しない自動公開や公開タイミング誤りを起こさないため、手動公開制御を独立Runbookとして追加した。
+
+### 変更内容
+
+#### `notes/72_app_store_approval_release_control_runbook.md`
+- App Review承認後の `Pending Developer Release`、Release option、`Release This Version`、公開URL、サポート受信、事故疑いなしを読み合わせるRunbookを追加した。
+- Release option QA、PDR gate、手動公開操作、T+0〜T+24h監視、将来アップデート時の段階的リリース、公開後に止める判断を整理した。
+- Apple公式ヘルプのApp Store version release option、App status、phased releaseへの参照を追加した。
+
+#### `notes/51_post_submission_release_day_runbook.md`, `notes/62_app_review_manual_submission_checklist.md`, `notes/71_app_store_connect_final_input_reconciliation.md`
+- 提出後ランブック、手動提出チェック、最終入力差分QAから `notes/72` への導線を追加した。
+- 承認後は `notes/72` のPDR gateで読み合わせる流れへ更新した。
+
+#### `notes/39_release_command_center.md`, `notes/30_owner_release_action_sheet.md`, `notes/50_release_go_no_go_decision_matrix.md`
+- コントロールボード、オーナー作業表、Go / No-Go判定表へ `notes/72` を追加した。
+- Phase Dとして承認後・公開前の実行順を追加し、G22 Release Controlとして公開制御未整備をNo-Go化した。
+
+#### `notes/36_submission_evidence_checklist.md`, `notes/64_release_evidence_folder_index.md`
+- 承認後のRelease option、PDR gate、`Release This Version`、公開初日監視の証跡項目を追加した。
+- 証跡フォルダ索引の `10_submission/` と `12_release_day/` に公開制御用の保存項目を追加した。
+
+#### `notes/24_app_store_submission_pack.md`, `notes/57_legal_release_branch_integration_plan.md`, `notes/22_release_triage_tracker.csv`
+- 提出パック、法務branch統合手順、リリーストリアージから `notes/72` への導線を追加した。
+- RL-070としてApp Store承認後・手動公開制御を追加した。
+
+### 影響範囲
+
+- App Review承認後の公開操作
+- `Pending Developer Release`、Release option、`Release This Version`
+- 公開URL、サポート受信、App Privacy、配信地域、DSA、IAP Availability
+- 公開初日監視、公開後に止める判断
+- コード、App Store Connect設定、Apple Developer設定、公開URL、証跡ファイルは変更していない。
+
+### 確認方法
+
+- `rg -n "RL-070|notes/72|Release Control|Pending Developer Release|Release This Version|PDR gate|承認後・手動公開制御" notes/72_app_store_approval_release_control_runbook.md notes/39_release_command_center.md notes/50_release_go_no_go_decision_matrix.md notes/22_release_triage_tracker.csv notes/51_post_submission_release_day_runbook.md notes/64_release_evidence_folder_index.md`
+- `python3 - <<'PY' ...` による `notes/22_release_triage_tracker.csv` のCSV parse確認
+- 旧規約用語・旧主体表現チェック（旧提案/旧メッセージ/旧投稿関連、サービス主体表現）
+- `git diff --check -- notes`
+
+### セルフレビュー結果
+
+- ✅ コード、App Store Connect設定、Apple Developer設定、公開URL、証跡ファイルは変更していない。
+- ✅ Submit前のQAではなく、承認後・公開前の公開制御に目的を絞った。
+- ✅ 手動公開を初回推奨とし、Automatic / Date releaseを選ぶ場合はオーナー明示承認を必要にした。
+- ✅ PDR gateに `notes/50`, `notes/70`, `notes/71`, 公開URL、サポート受信、事故疑いなし、配信地域/DSA/IAPを接続した。
+- ✅ 実パスワード、secret、token、実代表者情報を記録しない方針を維持した。
+- ✅ Apple公式ヘルプの手動公開、App status、段階的リリースを参照した。
+- ✅ 状態名の追加/改名はApp Store Connect運用状態の参照のみで、Megrumの状態遷移変更ではないため `notes/09_state_machines.md` 更新は不要。
+- ✅ 新用語はApp Store提出準備用語の範囲内のため、`notes/10_glossary.md` 更新は不要。
+- ✅ DBスキーマ変更はなく、`notes/05_data_model.md` 更新は不要。
+
+### 関連ファイル
+
+- `notes/72_app_store_approval_release_control_runbook.md`
+- `notes/51_post_submission_release_day_runbook.md`
+- `notes/62_app_review_manual_submission_checklist.md`
+- `notes/71_app_store_connect_final_input_reconciliation.md`
+- `notes/39_release_command_center.md`
+- `notes/30_owner_release_action_sheet.md`
+- `notes/50_release_go_no_go_decision_matrix.md`
+- `notes/36_submission_evidence_checklist.md`
+- `notes/64_release_evidence_folder_index.md`
+- `notes/24_app_store_submission_pack.md`
+- `notes/57_legal_release_branch_integration_plan.md`
+- `notes/22_release_triage_tracker.csv`
+
+---
+
 ## イテレーション393：App Store Connect最終入力差分QAを追加
 
 ### 背景・問題意識

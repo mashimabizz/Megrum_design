@@ -178,6 +178,7 @@ Evidence folder:
 - 提出証跡チェックリスト: `notes/36_submission_evidence_checklist.md`
 - リリース証跡フォルダ索引: `notes/64_release_evidence_folder_index.md`
 - Go / No-Go判定表: `notes/50_release_go_no_go_decision_matrix.md`
+- 承認後・手動公開制御Runbook: `notes/72_app_store_approval_release_control_runbook.md`
 - Release Candidateハンドオフ: `notes/65_release_candidate_handoff.md`
 - 配信地域・EU DSA・IAP Availability: `notes/68_app_store_territory_dsa_iap_availability.md`
 

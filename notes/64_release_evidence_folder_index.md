@@ -234,6 +234,7 @@ secret実値や管理画面の認証情報は保存しない。
 | SUB-004 | Submission status | png又はmd |
 | SUB-005 | 提出日時、提出者、Version/Build | md |
 | SUB-006 | App Store Connect最終入力差分QA結果 | md |
+| SUB-007 | Release option控え | md又はpng |
 
 ### 5.11 `11_review_response/`
 
@@ -255,6 +256,8 @@ secret実値や管理画面の認証情報は保存しない。
 | REL-003 | App Store公開確認 | png又はmd |
 | REL-004 | T+1h/T+3h/T+6h/T+12h/T+24h監視結果 | md |
 | REL-005 | 初日問い合わせ/重大通報/障害の有無 | md |
+| REL-006 | `notes/72` のPDR gateと公開直前読み合わせ | md |
+| REL-007 | Release This Version実施者、時刻、直後status | md又はpng |
 
 ## 6. 証跡の扱いで迷う時
 
@@ -276,14 +279,16 @@ secret実値や管理画面の認証情報は保存しない。
 - [ ] secret、API key、tokenを保存していない
 - [ ] 実ユーザー又は実取引の個人情報を保存していない
 - [ ] スクショに内部ID、debug表示、未完成機能がない
-- [ ] `notes/36_submission_evidence_checklist.md` のEV-001〜EV-012と対応している
+- [ ] `notes/36_submission_evidence_checklist.md` のEV-001〜EV-013と対応している
 - [ ] `notes/62_app_review_manual_submission_checklist.md` の提出直前チェックと対応している
+- [ ] `notes/72_app_store_approval_release_control_runbook.md` のPDR gateと公開初日監視に対応している
 
 ## 8. 関連文書
 
 - 提出証跡チェックリスト: `notes/36_submission_evidence_checklist.md`
 - App Review手動提出チェック: `notes/62_app_review_manual_submission_checklist.md`
 - App Store Connect最終入力差分QA: `notes/71_app_store_connect_final_input_reconciliation.md`
+- 承認後・手動公開制御Runbook: `notes/72_app_store_approval_release_control_runbook.md`
 - 公開ページレダクションQA: `notes/63_public_page_redaction_qa.md`
 - TestFlight / App Review提出ランブック: `notes/32_testflight_review_submission_runbook.md`
 - P0スモークテスト台本: `notes/42_p0_smoke_test_script.md`

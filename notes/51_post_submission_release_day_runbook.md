@@ -10,6 +10,8 @@ App StoreへSubmit for Reviewした後、審査待ち、審査中、承認、手
 
 この文書は運用手順であり、コード、DB、ビルド設定、App Store Connect設定は変更しない。
 
+承認後の `Pending Developer Release`、`Release This Version`、公開直前読み合わせ、公開初日の証跡保存は `notes/72_app_store_approval_release_control_runbook.md` を使う。
+
 ## 1. 初回提出の推奨リリース方式
 
 初回提出では、承認後すぐ自動公開ではなく、**手動公開**を推奨する。
@@ -93,7 +95,9 @@ Submit後にやること:
 
 `Pending Developer Release` になったら、公開前に次を確認する。
 
-- [ ] `notes/50` のG0〜G11がGo又はConditional Go
+詳細な公開制御gateは `notes/72_app_store_approval_release_control_runbook.md` のPDR gateで読み合わせる。
+
+- [ ] `notes/50` のG0〜G22がGo又はConditional Go
 - [ ] Support URL、Privacy Policy URL、Terms URL、Commerce URLが開く
 - [ ] `support@megrum.jp` が受信できる
 - [ ] App Store ConnectのApp Privacy回答が最終ビルドと一致している
@@ -107,6 +111,8 @@ No-GoならRelease This Versionを押さず、原因を解消する。
 ## 7. 手動公開手順
 
 実際のApp Store Connect画面で担当者が実施する。
+
+操作直前の読み合わせ、ダイアログ確認、実施後の証跡保存は `notes/72_app_store_approval_release_control_runbook.md` の手順に沿う。
 
 1. AppsでMegrumを開く。
 2. 該当するiOSバージョンを開く。
@@ -154,7 +160,15 @@ Apple公式情報では、段階的リリースは7日間で自動アップデ�
 - 一時停止は合計30日まで可能。
 - 初回公開より、既存ユーザーがいるアップデートで使う想定。
 
-## 11. 公式参照
+## 11. 関連文書
+
+- 承認後・手動公開制御Runbook: `notes/72_app_store_approval_release_control_runbook.md`
+- Go / No-Go判定表: `notes/50_release_go_no_go_decision_matrix.md`
+- App Store Connect最終入力差分QA: `notes/71_app_store_connect_final_input_reconciliation.md`
+- リリース証跡フォルダ索引: `notes/64_release_evidence_folder_index.md`
+- サポート受信トリアージ: `notes/67_support_inbox_triage_runbook.md`
+
+## 12. 公式参照
 
 - Apple Submit an app: https://developer.apple.com/help/app-store-connect/manage-submissions-to-app-review/submit-an-app/
 - Apple App and submission statuses: https://developer.apple.com/help/app-store-connect/reference/app-information/app-and-submission-statuses

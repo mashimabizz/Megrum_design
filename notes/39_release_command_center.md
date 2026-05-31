@@ -77,6 +77,7 @@
 | App Reviewリジェクト/追加情報要求 | `notes/69_app_review_rejection_triage_runbook.md` |
 | App Store商品ページ素材QA | `notes/70_app_store_product_page_asset_qa.md` |
 | App Store Connect最終入力差分QA | `notes/71_app_store_connect_final_input_reconciliation.md` |
+| 承認後・手動公開制御 | `notes/72_app_store_approval_release_control_runbook.md` |
 | オーナー作業表 | `notes/30_owner_release_action_sheet.md` |
 | App Store Connect入力 | `notes/31_app_store_connect_metadata_worksheet.md` |
 | TestFlight / Submit手順 | `notes/32_testflight_review_submission_runbook.md` |
@@ -130,6 +131,13 @@
 4. `notes/41` で返信案を作る。
 5. 修正後の証跡を追加する。
 6. Review Notesへ変更点を書いて再提出する。
+
+### Phase D: 承認後・公開前
+
+1. `Pending Developer Release` を確認し、承認後スナップショットを保存する。
+2. `notes/72` でRelease option、PDR gate、公開URL、サポート受信、事故疑いなしを読み合わせる。
+3. `Release This Version` 直前にVersion / Build / status / Release optionを再確認する。
+4. 公開操作後、T+0 / T+1h / T+3h / T+6h / T+12h / T+24hの監視を開始する。
 
 ---
 
@@ -191,6 +199,7 @@
 | App Reviewリジェクト/追加情報要求 | RL-067 | `notes/69` |
 | App Store商品ページ素材QA | RL-068 | `notes/70` |
 | App Store Connect最終入力差分QA | RL-069 | `notes/71` |
+| 承認後・手動公開制御 | RL-070 | `notes/72` |
 
 ---
 
@@ -211,6 +220,7 @@
 - App icon、スクショ、App Preview、poster frame、Product Page PreviewのQAが未完了。
 - App Store Connect実入力値が、提出docs、完成build、公開URL、App Privacy、Review Notesと未照合。
 - スクショに実住所、実在IP、内部ID、デバッグ表示がある。
+- 承認後のRelease option、`Pending Developer Release` gate、`Release This Version` 操作手順、公開初日監視が未整備。
 
 ---
 
@@ -238,6 +248,7 @@
 | App Reviewリジェクト/追加情報要求Runbook | `notes/69_app_review_rejection_triage_runbook.md` |
 | App Store商品ページ素材QA | `notes/70_app_store_product_page_asset_qa.md` |
 | App Store Connect最終入力差分QA | `notes/71_app_store_connect_final_input_reconciliation.md` |
+| App Store承認後・手動公開制御Runbook | `notes/72_app_store_approval_release_control_runbook.md` |
 | App Store提出素材 | `notes/24_app_store_submission_pack.md` |
 | App Store Connect入力表 | `notes/31_app_store_connect_metadata_worksheet.md` |
 | TestFlight / Submit手順 | `notes/32_testflight_review_submission_runbook.md` |
@@ -281,7 +292,7 @@
 | スクショ撮影 | 完成ビルドで |
 | Submit for Review | 全P0確認後 |
 | App Review指摘対応 | 指摘受領後 |
-| 承認後の手動公開・公開初日監視 | 承認後 |
+| 承認後の手動公開・公開初日監視 | 承認後。`notes/72` を使う |
 
 ---
 
@@ -297,4 +308,4 @@
 7. `notes/40` からApp Store Connectへ転記する。
 8. `notes/50` でGo / No-Goを判定する。
 9. 証跡を残して提出する。
-10. 承認後は `notes/51` に沿って手動公開と公開初日監視を行う。
+10. 承認後は `notes/51` と `notes/72` に沿って手動公開と公開初日監視を行う。

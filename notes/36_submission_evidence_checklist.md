@@ -55,6 +55,7 @@
 | EV-010.5 | ASC Final Input | App Store Connect実入力値と提出docs/buildの最終差分QA | `notes/71` |
 | EV-011 | Copy Sheet | App Store Connectへ入力した最終文面 | `notes/40` |
 | EV-012 | Security Audit | RLS、Storage、secret、APNs、公開URL、管理者権限の監査結果 | `notes/54` |
+| EV-013 | Release Control | 承認後のRelease option、PDR gate、Release This Version、公開初日監視の記録 | `notes/72` |
 
 ---
 
@@ -182,6 +183,7 @@ Evidence folder:
 - App Review Guideline適合マトリクス: `notes/53_app_review_guideline_compliance_matrix.md`
 - App Store Connect入力表: `notes/31_app_store_connect_metadata_worksheet.md`
 - App Store Connect最終入力差分QA: `notes/71_app_store_connect_final_input_reconciliation.md`
+- 承認後・手動公開制御Runbook: `notes/72_app_store_approval_release_control_runbook.md`
 - TestFlight/App Review提出ランブック: `notes/32_testflight_review_submission_runbook.md`
 - デモアカウント計画: `notes/35_demo_account_review_data_plan.md`
 - 提出コントロールボード: `notes/39_release_command_center.md`

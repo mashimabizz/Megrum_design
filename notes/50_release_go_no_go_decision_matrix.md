@@ -50,6 +50,7 @@
 | G19 | Review Response | App Review指摘時の本文保存、分類、返信、再提出、取り下げ、appeal判断の担当と手順がある | リジェクト時に新build要否や返信方針を判断できない | `notes/69` |
 | G20 | Product Page Assets | App icon、スクショ、App Preview、poster frame、Product Page Previewが完成build、メタデータ、初回スコープと一致 | 商品ページ素材に古いUI、実データ、権利物、未完成機能、poster frame未確認が残る | `notes/70` |
 | G21 | ASC Final Input | App Store Connect実入力値が提出docs、完成build、公開URL、App Privacy、Review Notes、同時提出itemと一致 | 実入力値に未露出機能、誤build、URL不一致、Privacy回答漏れ、IAP同時提出漏れが残る | `notes/71` |
+| G22 | Release Control | 承認後のRelease option、PDR gate、`Release This Version` 操作、公開初日監視が整理済み | 手動公開設定や公開直前gateが未確認で、意図しない自動公開又は公開タイミング誤りが起きうる | `notes/72` |
 
 ## 3. P0トラッカー対応
 
@@ -61,6 +62,7 @@
 | 打診/ネゴ/取引 | RL-008, RL-009, RL-010, RL-011, RL-012 | `notes/42` | 2アカウントで主要フローがPass |
 | 法務/URL | RL-013, RL-036, RL-045, RL-056 | `notes/25`, `notes/37`, `notes/47`, `notes/58` | 公開URL、サポートメール、法務回答反映が確認済み |
 | App Store提出 | RL-014, RL-015, RL-027, RL-034, RL-038, RL-040 | `notes/31`, `notes/32`, `notes/35`, `notes/40`, `notes/42` | ビルド、デモアカウント、転記文面、P0台本が揃う |
+| 公開制御 | RL-049, RL-070 | `notes/51`, `notes/72` | 承認後の手動公開、PDR gate、公開初日監視が整理済み |
 | スコープ | RL-019, RL-020, RL-021, RL-057 | `notes/39`, `notes/42`, `notes/59` | 現地交換MVP、露出範囲、App Privacy回答が一致 |
 | 3D/めぐり | RL-017 | `notes/22_release_triage_tracker.csv` | 未完成3Dが露出しない |
 | UGC安全 | RL-030 | `notes/26`, `notes/42` | 通報/ブロック/問い合わせが説明できる |
@@ -113,6 +115,7 @@ Conditional Goにする場合は、`notes/36` に「隠した証跡」と「説�
 | G19 Review Response | TODO | TODO | TODO |
 | G20 Product Page Assets | TODO | TODO | TODO |
 | G21 ASC Final Input | TODO | TODO | TODO |
+| G22 Release Control | TODO | TODO | TODO |
 
 最終判定:
 
@@ -140,6 +143,7 @@ Evidence folder:
 - App Review指摘時の本文保存、Guideline分類、new build要否、返信/再提出/取り下げ/appeal判断の手順が未整備。
 - App icon、スクショ、App Preview、poster frame、Product Page Previewが未確認、又は完成build/初回スコープ/メタデータと矛盾している。
 - App Store Connect実入力値が、提出docs、完成build、公開URL、App Privacy、Review Notes、同時提出itemと未照合又は矛盾している。
+- 承認後のRelease option、`Pending Developer Release` gate、`Release This Version` 操作、公開初日監視が未整備。
 - 隠すはずの機能が画面、FAQ、App Store文面、スクショ、Review Notesに残っている。
 - Privacy Policy URL又はSupport URLが404。
 - アカウント削除入口がない。
@@ -172,4 +176,5 @@ Evidence folder:
 - App Store商品ページ素材QA: `notes/70_app_store_product_page_asset_qa.md`
 - App Store Connect最終入力差分QA: `notes/71_app_store_connect_final_input_reconciliation.md`
 - 提出後・公開初日ランブック: `notes/51_post_submission_release_day_runbook.md`
+- 承認後・手動公開制御Runbook: `notes/72_app_store_approval_release_control_runbook.md`
 - データ保持・削除マトリクス: `notes/52_data_retention_deletion_matrix.md`

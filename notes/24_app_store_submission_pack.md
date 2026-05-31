@@ -11,6 +11,7 @@
 実装完了後は、実アプリの画面・SDK・通信内容と照合してから提出する。
 
 提出全体の実行順と文書マップは `notes/39_release_command_center.md` を使う。
+承認後の手動公開、`Pending Developer Release`、`Release This Version`、公開初日監視は `notes/72_app_store_approval_release_control_runbook.md` を使う。
 
 ## 前提
 
@@ -25,6 +26,7 @@
 提出画面へ入力する前の詳細ワークシートは `notes/31_app_store_connect_metadata_worksheet.md` を使う。
 提出直前にコピーする文面は `notes/40_app_store_connect_copy_paste_sheet.md` を使う。
 App Store Connectへ実際に入力した値の最終差分照合は `notes/71_app_store_connect_final_input_reconciliation.md` を使う。
+承認後に公開へ進めるかの最終読み合わせは `notes/72_app_store_approval_release_control_runbook.md` を使う。
 
 有料機能を初回提出に含める場合は、IAP商品設定を `notes/33_iap_product_setup_worksheet.md` で先に固定する。
 デモアカウントと審査用データは `notes/35_demo_account_review_data_plan.md` を使う。

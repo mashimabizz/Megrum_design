@@ -240,7 +240,7 @@ No-Go:
 | SR-002 | 同時提出アイテムの有無が最終判断と一致 | TODO |
 | SR-003 | Submit for Review後のステータス記録欄を用意した | TODO |
 | SR-004 | リジェクト時の対応先が決まっている | TODO |
-| SR-005 | 承認後の公開方法が手動/自動のどちらか決まっている | TODO |
+| SR-005 | 承認後の公開方法が手動/自動のどちらか決まり、手動公開なら `notes/72` を使う | TODO |
 
 操作:
 1. Draft Submissionを開く。
@@ -272,7 +272,8 @@ No-Go:
 提出直後に行うこと:
 1. `notes/36_submission_evidence_checklist.md` に証跡を追記する。
 2. `notes/51_post_submission_release_day_runbook.md` の提出後監視へ移る。
-3. リジェクトが来た場合は `notes/41_app_review_response_templates.md` へ指摘文を転記する。
+3. 承認後に `Pending Developer Release` になった場合は `notes/72_app_store_approval_release_control_runbook.md` へ移る。
+4. リジェクトが来た場合は `notes/41_app_review_response_templates.md` へ指摘文を転記する。
 
 ## 15. 関連文書
 
@@ -289,6 +290,7 @@ No-Go:
 - 初回提出スコープ露出監査: `notes/59_initial_release_scope_exposure_audit.md`
 - リリース権限・運用アカウント: `notes/61_release_access_owner_registry.md`
 - 提出後・公開初日運用: `notes/51_post_submission_release_day_runbook.md`
+- 承認後・手動公開制御: `notes/72_app_store_approval_release_control_runbook.md`
 
 ## 16. 公式参照
 
