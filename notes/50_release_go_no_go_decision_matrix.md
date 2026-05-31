@@ -48,6 +48,7 @@
 | G17 | Support Inbox | support@の受信、App Review連絡、P0分類、削除/個人情報請求、事故疑いの担当が決まっている | 審査員連絡、削除請求、通報、事故疑いを受けられない | `notes/67` |
 | G18 | Territory / DSA | 配信地域、EU DSA trader status、IAP Availabilityが確定 | 配信地域や公開連絡先、IAP提供地域が未確認 | `notes/68` |
 | G19 | Review Response | App Review指摘時の本文保存、分類、返信、再提出、取り下げ、appeal判断の担当と手順がある | リジェクト時に新build要否や返信方針を判断できない | `notes/69` |
+| G20 | Product Page Assets | App icon、スクショ、App Preview、poster frame、Product Page Previewが完成build、メタデータ、初回スコープと一致 | 商品ページ素材に古いUI、実データ、権利物、未完成機能、poster frame未確認が残る | `notes/70` |
 
 ## 3. P0トラッカー対応
 
@@ -109,6 +110,7 @@ Conditional Goにする場合は、`notes/36` に「隠した証跡」と「説�
 | G17 Support Inbox | TODO | TODO | TODO |
 | G18 Territory / DSA | TODO | TODO | TODO |
 | G19 Review Response | TODO | TODO | TODO |
+| G20 Product Page Assets | TODO | TODO | TODO |
 
 最終判定:
 
@@ -134,6 +136,7 @@ Evidence folder:
 - `support@megrum.jp` の受信、App Review連絡確認、P0問い合わせ分類、削除/個人情報請求の担当が未決。
 - 配信地域、EU DSA trader status、IAP Availability、App Store商品ページに表示される連絡先情報が未確認。
 - App Review指摘時の本文保存、Guideline分類、new build要否、返信/再提出/取り下げ/appeal判断の手順が未整備。
+- App icon、スクショ、App Preview、poster frame、Product Page Previewが未確認、又は完成build/初回スコープ/メタデータと矛盾している。
 - 隠すはずの機能が画面、FAQ、App Store文面、スクショ、Review Notesに残っている。
 - Privacy Policy URL又はSupport URLが404。
 - アカウント削除入口がない。
@@ -163,5 +166,6 @@ Evidence folder:
 - サポート受信トリアージRunbook: `notes/67_support_inbox_triage_runbook.md`
 - App Store配信地域・EU DSA・IAP Availability: `notes/68_app_store_territory_dsa_iap_availability.md`
 - App Reviewリジェクト/追加情報要求Runbook: `notes/69_app_review_rejection_triage_runbook.md`
+- App Store商品ページ素材QA: `notes/70_app_store_product_page_asset_qa.md`
 - 提出後・公開初日ランブック: `notes/51_post_submission_release_day_runbook.md`
 - データ保持・削除マトリクス: `notes/52_data_retention_deletion_matrix.md`

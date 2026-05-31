@@ -17,10 +17,10 @@ Swift Native開発セッションと、法務・App Store提出準備セッシ�
 | Swift Native開発 | `/Users/michitaka/Desktop/Megrum` | `codex/rl-003-006-inventory-wish-listing` | 開発側が継続利用 |
 | 法務・リリース準備 | `/Users/michitaka/Desktop/Megrum_release_prep` | `codex/legal-release-prep` | commit/push済み |
 
-法務・リリース準備branchの最新commit:
+法務・リリース準備branchの最新commitは、作業継続中のため次で確認する:
 
 ```text
-3951916 [iter378] 法務リリース準備を分離
+git log --oneline -1
 ```
 
 リモート:
@@ -45,7 +45,7 @@ https://github.com/mashimabizz/Megrum_design/pull/2
 - 開発セッションが意図して更新した既存notes
 
 開発側branchでstageしないもの:
-- `notes/24_app_store_submission_pack.md` 〜 `notes/69_app_review_rejection_triage_runbook.md`
+- `notes/24_app_store_submission_pack.md` 〜 `notes/70_app_store_product_page_asset_qa.md`
 - `notes/legal/`
 - 法務・App Store提出準備だけを目的にした新規docs
 
@@ -110,6 +110,7 @@ PR本文案:
 - サポート受信トリアージ手順
 - 配信地域・EU DSA・IAP Availability判断
 - App Reviewリジェクト/追加情報要求トリアージ手順
+- App Store商品ページ素材QA
 
 ## 変更していないもの
 
@@ -211,6 +212,7 @@ PY
 - サポート受信トリアージ: `notes/67_support_inbox_triage_runbook.md`
 - 配信地域・EU DSA・IAP Availability: `notes/68_app_store_territory_dsa_iap_availability.md`
 - App Reviewリジェクト/追加情報要求: `notes/69_app_review_rejection_triage_runbook.md`
+- App Store商品ページ素材QA: `notes/70_app_store_product_page_asset_qa.md`
 - 公開FAQ下書き: `notes/55_public_help_faq_draft.md`
 - アプリ内法務・安全コピー: `notes/56_in_app_legal_safety_copy_deck.md`
 - リリーストリアージ: `notes/22_release_triage_tracker.csv`

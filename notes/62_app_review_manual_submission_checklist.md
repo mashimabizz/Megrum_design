@@ -18,6 +18,7 @@ App Store ConnectでMegrumの完成ビルドを審査提出する直前に、提
 - `notes/42_p0_smoke_test_script.md` のP0確認結果が記録されている。
 - `notes/36_submission_evidence_checklist.md` に提出証跡を残す準備ができている。
 - `notes/64_release_evidence_folder_index.md` に従って証跡保存先とmanifest方針が決まっている。
+- `notes/70_app_store_product_page_asset_qa.md` でApp icon、スクショ、App Preview、poster frame、Product Page Previewを確認している。
 - 公開URL、App Privacy、Review Notes、デモアカウント、スクショが提出候補になっている。
 
 使わないタイミング:
@@ -125,6 +126,7 @@ No-Go:
 | SS-004 | 未完成機能が写っていない | TODO | TODO |
 | SS-005 | スクショの文言がメタデータと矛盾しない | TODO | TODO |
 | SS-006 | 通報/ブロック/削除/サポート導線を説明できる | TODO | TODO |
+| SS-007 | App icon、App Preview、poster frame、Product Page Previewが `notes/70` と一致 | TODO | TODO |
 
 No-Go:
 - スクショが古いUI。
@@ -277,6 +279,7 @@ No-Go:
 - App Store Connect入力: `notes/31_app_store_connect_metadata_worksheet.md`
 - 転記用シート: `notes/40_app_store_connect_copy_paste_sheet.md`
 - ローカライズ・メタデータQA: `notes/60_app_store_localization_metadata_qa.md`
+- 商品ページ素材QA: `notes/70_app_store_product_page_asset_qa.md`
 - 提出証跡: `notes/36_submission_evidence_checklist.md`
 - リリース証跡フォルダ索引: `notes/64_release_evidence_folder_index.md`
 - Go / No-Go判定: `notes/50_release_go_no_go_decision_matrix.md`

@@ -9,6 +9,7 @@
 App Store Connectへ入力する日本語メタデータ、English (U.S.) 追加候補、Review Notes、スクリーンショット、公開URLの説明が、完成ビルドと矛盾しないかを確認する。
 
 この文書はQA台帳であり、コード、ローカライズファイル、App Store Connect設定、公開URLは変更しない。
+App icon、App Preview、poster frame、Product Page Previewを含む商品ページ素材の最終QAは `notes/70_app_store_product_page_asset_qa.md` を使う。
 
 ## 1. 初回提出の方針
 
@@ -152,6 +153,7 @@ No-Go:
 - App Store Connect入力ワークシート: `notes/31_app_store_connect_metadata_worksheet.md`
 - App Store Connect転記用シート: `notes/40_app_store_connect_copy_paste_sheet.md`
 - スクリーンショット台本: `notes/28_app_store_screenshot_storyboard.md`
+- 商品ページ素材QA: `notes/70_app_store_product_page_asset_qa.md`
 - 公開URL公開チェックリスト: `notes/37_public_url_publication_checklist.md`
 - 初回提出スコープ露出監査: `notes/59_initial_release_scope_exposure_audit.md`
 - App Review指摘対応テンプレート: `notes/41_app_review_response_templates.md`

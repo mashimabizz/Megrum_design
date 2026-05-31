@@ -9,6 +9,7 @@
 App Store Connectに提出するスクリーンショットの順番、画面、コピー、避けるべき表示を事前に決める。
 
 この文書は撮影台本であり、アプリコードやデザインを変更しない。
+App icon、App Preview、poster frame、Product Page Previewを含む最終QAは `notes/70_app_store_product_page_asset_qa.md` を使う。
 
 ## 1. 基本方針
 
@@ -122,6 +123,7 @@ App Store Connectに提出するスクリーンショットの順番、画面、
 - [ ] 3D機能が未完成なら写っていない
 - [ ] 通報・ブロック・削除が未実装なら、安全画面に過度な表現をしない
 - [ ] スクショとApp Review Notesの説明が一致している
+- [ ] App icon、App Preview、poster frameの扱いが `notes/70` と矛盾しない
 
 ## 8. 撮影後チェック
 
@@ -150,3 +152,7 @@ App Store Connectに提出するスクリーンショットの順番、画面、
 - Apple Product Page: https://developer.apple.com/app-store/product-page/
 - Apple Screenshot Specifications: https://developer.apple.com/help/app-store-connect/reference/app-information/screenshot-specifications
 - Upload App Previews and Screenshots: https://developer.apple.com/help/app-store-connect/manage-app-information/upload-app-previews-and-screenshots/
+
+## 11. 関連文書
+
+- 商品ページ素材QA: `notes/70_app_store_product_page_asset_qa.md`

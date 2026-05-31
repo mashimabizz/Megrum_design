@@ -4,6 +4,79 @@
 
 ---
 
+## イテレーション392：商品ページ素材QAを追加
+
+### 背景・問題意識
+
+App Store初回提出では、App Store説明文やReview Notesだけでなく、App icon、スクリーンショット、App Preview、poster frame、ローカライズ別素材が商品ページに表示される。素材が古いUI、未完成機能、実データ、権利未確認画像、初回スコープ外の機能を含むと、審査遅延や公開後の誤認につながるため、商品ページ素材専用のQAチェックリストを追加した。
+
+### 変更内容
+
+#### `notes/70_app_store_product_page_asset_qa.md`
+- App icon、スクリーンショット、App Preview、poster frame、ローカライズ別素材、Product Page PreviewのQA表を追加した。
+- 初回はApp Previewなし候補、スクショ6〜8枚候補、先頭3枚重視、App iconは完成build由来のみという推奨を整理した。
+- 実データ、権利物、debug表示、未完成機能、初回で隠す機能の露出をNo-Goとして明記した。
+- Apple公式ヘルプのApp icon、Product Page、App Preview/Screenshot、Screenshot specificationsへの参照を追加した。
+
+#### `notes/28_app_store_screenshot_storyboard.md`, `notes/60_app_store_localization_metadata_qa.md`, `notes/62_app_review_manual_submission_checklist.md`
+- スクショ台本、ローカライズQA、手動提出チェックから `notes/70` への導線を追加した。
+- App Review提出直前に、App icon、App Preview、poster frame、Product Page Previewを同じ素材QAで確認する流れにした。
+
+#### `notes/36_submission_evidence_checklist.md`, `notes/64_release_evidence_folder_index.md`
+- 提出証跡と証跡フォルダ索引に、商品ページ素材QAとProduct Page Preview確認を保存する項目を追加した。
+
+#### `notes/39_release_command_center.md`, `notes/30_owner_release_action_sheet.md`, `notes/50_release_go_no_go_decision_matrix.md`, `notes/57_legal_release_branch_integration_plan.md`
+- コントロールボード、オーナー作業表、Go / No-Go Gate、法務branch統合手順へ `notes/70` を追加した。
+- G20 Product Page Assetsとして、商品ページ素材の未確認又は矛盾をNo-Go化した。
+- 法務docsのstage禁止範囲を `notes/70` まで広げた。
+
+#### `notes/22_release_triage_tracker.csv`
+- RL-068としてApp Store商品ページ素材QAを追加した。
+
+### 影響範囲
+
+- App Store商品ページ
+- App icon、スクリーンショット、App Preview、poster frame
+- Product Page Preview
+- App Store Connect入力
+- ローカライズ素材
+- 提出証跡、Go / No-Go判定
+- コード、Xcode asset catalog、App Store Connect設定、画像/動画ファイル、公開URLは変更していない。
+
+### 確認方法
+
+- `rg -n "RL-068|notes/70|Product Page|App Preview|poster frame|App icon|商品ページ素材" notes/70_app_store_product_page_asset_qa.md notes/39_release_command_center.md notes/50_release_go_no_go_decision_matrix.md notes/22_release_triage_tracker.csv notes/28_app_store_screenshot_storyboard.md notes/60_app_store_localization_metadata_qa.md notes/62_app_review_manual_submission_checklist.md`
+- `python3 - <<'PY' ...` による `notes/22_release_triage_tracker.csv` のCSV parse確認
+- 旧規約用語・旧主体表現チェック（旧提案/旧メッセージ/旧投稿関連、サービス主体表現）
+- `git diff --check -- notes`
+
+### セルフレビュー結果
+
+- ✅ コード、Xcode asset catalog、App Store Connect設定、画像/動画ファイル、公開URLは変更していない。
+- ✅ App Store商品ページ素材のQAを、スクショ台本やローカライズQAではなく専用文書へ分離した。
+- ✅ App Previewは初回なし候補とし、出す場合だけposter frameと処理待ちを確認する形にした。
+- ✅ 実データ、権利物、debug表示、未完成機能、初回で隠す機能の露出をNo-Go化した。
+- ✅ Apple公式ヘルプとProduct Page情報を参照した。
+- ✅ 状態名の追加/改名はなく、`notes/09_state_machines.md` 更新は不要。
+- ✅ 新用語は既存のApp Store提出準備用語の範囲内のため、`notes/10_glossary.md` 更新は不要。
+- ✅ DBスキーマ変更はなく、`notes/05_data_model.md` 更新は不要。
+
+### 関連ファイル
+
+- `notes/70_app_store_product_page_asset_qa.md`
+- `notes/28_app_store_screenshot_storyboard.md`
+- `notes/60_app_store_localization_metadata_qa.md`
+- `notes/62_app_review_manual_submission_checklist.md`
+- `notes/36_submission_evidence_checklist.md`
+- `notes/64_release_evidence_folder_index.md`
+- `notes/39_release_command_center.md`
+- `notes/30_owner_release_action_sheet.md`
+- `notes/50_release_go_no_go_decision_matrix.md`
+- `notes/57_legal_release_branch_integration_plan.md`
+- `notes/22_release_triage_tracker.csv`
+
+---
+
 ## イテレーション391：App Review指摘トリアージを追加
 
 ### 背景・問題意識

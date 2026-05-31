@@ -76,6 +76,7 @@ Swift Nativeの `Info.plist` では `public.app-category.social-networking` が�
 | 提出前セキュリティ監査 | `notes/54` | RLS、Storage、secret、APNs、管理者権限のNo-Go確認 |
 | 個人情報・セキュリティ事故初動 | `notes/49` | 受付番号、初動担当、本人通知/PPC報告判断 |
 | スクショ | `notes/28` | 完成ビルドで撮影 |
+| 商品ページ素材QA | `notes/70` | App icon、スクショ、App Preview、poster frame、Product Page Previewを確認 |
 | IAP商品 | `notes/33` | 初回提出で有料機能を出す場合だけ |
 | サポート返信 | `notes/34` | 通報、削除、購入、AI、特商法請求 |
 | 削除/個人情報請求 | `notes/45` | アプリ内削除、保持対象、Sign in with Apple連携 |
@@ -103,6 +104,7 @@ Swift Nativeの `Info.plist` では `public.app-category.social-networking` が�
 | サポート受信トリアージ | `notes/67` | App Review連絡、通報、削除、個人情報請求、事故疑いの分類と担当を決める |
 | 配信地域・EU DSA・IAP Availability | `notes/68` | 初回配信地域、EU DSA trader status、IAP提供地域を決める |
 | App Review指摘トリアージ | `notes/69` | リジェクト/追加情報要求時の返信、再提出、取り下げ、appeal判断を決める |
+| App Store商品ページ素材QA | `notes/70` | App icon、スクショ、App Preview、poster frame、Product Page Previewを提出前に確認する |
 
 ## 4. デモアカウント準備
 
@@ -225,3 +227,4 @@ Appleのリジェクト文を貼るので、ガイドライン番号ごとに対
 - `notes/67_support_inbox_triage_runbook.md`
 - `notes/68_app_store_territory_dsa_iap_availability.md`
 - `notes/69_app_review_rejection_triage_runbook.md`
+- `notes/70_app_store_product_page_asset_qa.md`

@@ -189,7 +189,8 @@ YYYY-MM-DD_hhmm_appstore_vX.Y_buildN_area_short-description.ext
 | SCR-001 | App Store提出スクショ一式 | png |
 | SCR-002 | スクショ台本との対応表 | md |
 | SCR-003 | 実住所、実在IP、内部ID、debug表示なし確認 | md |
-| SCR-004 | 初回で隠す機能が写っていない確認 | md |
+| SCR-004 | App icon、App Preview、poster frame、Product Page PreviewのQA結果 | md |
+| SCR-005 | 初回で隠す機能が写っていない確認 | md |
 
 ### 5.7 `07_review_notes_metadata/`
 
@@ -199,6 +200,7 @@ YYYY-MM-DD_hhmm_appstore_vX.Y_buildN_area_short-description.ext
 | MET-002 | Review Notes最終版 | md |
 | MET-003 | Keywords、Subtitle、Descriptionの文字数/byte確認 | md |
 | MET-004 | English (U.S.)を入れる場合の日英整合QA | md |
+| MET-005 | 商品ページ素材QAとメタデータ整合の確認 | md |
 
 ### 5.8 `08_safety_account_deletion/`
 
