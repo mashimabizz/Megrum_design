@@ -15,6 +15,7 @@ public struct SupabaseMegrumRepository: MegrumRepository {
     private let proposalClient: SupabaseProposalClient
     private let disputeClient: SupabaseDisputeClient
     private let messageClient: SupabaseMessageClient
+    private let scheduleClient: SupabaseScheduleClient
     private let groomClient: SupabaseGroomClient
     private let meguriMessageClient: SupabaseMeguriMessageClient
     private let boardClient: SupabaseBoardClient
@@ -34,6 +35,7 @@ public struct SupabaseMegrumRepository: MegrumRepository {
         self.proposalClient = SupabaseProposalClient(client: client)
         self.disputeClient = SupabaseDisputeClient(client: client)
         self.messageClient = SupabaseMessageClient(client: client)
+        self.scheduleClient = SupabaseScheduleClient(client: client)
         self.groomClient = SupabaseGroomClient(client: client)
         self.meguriMessageClient = SupabaseMeguriMessageClient(client: client)
         self.boardClient = SupabaseBoardClient(client: client)
@@ -178,6 +180,21 @@ public struct SupabaseMegrumRepository: MegrumRepository {
 
     public func sendMessage(_ input: TradeMessageCreateInput) async throws -> TradeMessage {
         try await messageClient.sendTextMessage(senderID: viewerID, input: input)
+    }
+
+    public func loadSchedules(for proposal: TradeProposal, startAt: Date, endAt: Date) async throws -> [PersonalSchedule] {
+        guard proposal.isParticipant(viewerID) else {
+            return []
+        }
+        var userIDs = [viewerID]
+        if let partnerID = proposal.partnerID(for: viewerID) {
+            userIDs.append(partnerID)
+        }
+        return try await scheduleClient.loadSchedules(
+            userIDs: userIDs,
+            startAt: startAt,
+            endAt: endAt
+        )
     }
 
     public func loadGrooms(latitude: Double?, longitude: Double?, radiusMeters: Int) async throws -> [GroomPost] {

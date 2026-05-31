@@ -1,7 +1,7 @@
 # 22. Swift Native Migration
 
 最終更新: 2026-05-31
-ステータス: Active draft（iter362）
+ステータス: Active draft（iter363）
 
 ## 目的
 
@@ -155,6 +155,7 @@ tar -xzf /Users/michitaka/Desktop/Megrum_backups/pre-swift-migration-20260531-03
 - iter360で、`exchange_method='both'` の打診を承諾する時に、Native segmented pickerで `hand` または `mail` を選ばせ、その選択値を `proposals.exchange_method` へPATCHしてから合意へ進めるようにした。
 - iter361で、取引詳細の返答パネルから「条件を変えて再打診」を開けるようにした。元 Proposal を直接変更せず、参加者視点で提示物を反転コピーし、Native sheetで交換手段・交換条件タグ・メッセージを調整した `status='negotiating'` の新しい打診を作成する。再打診作成者は自分の条件に合意済みとして `agreed_by_sender=true` にする。
 - iter362で、取引チャットのメッセージ入力欄の上からも同じ再打診sheetを開けるようにした。再打診は `sent` / `negotiating` / `agreement_one_side` のProposalに限定し、Swift版のiOS標準デザイン感を最終方針として維持する。
+- iter363で、取引チャットのメッセージ入力欄上に「スケジュール」ボタンを追加し、Native sheetで自分と相手の予定を週（5日）/月で確認できるようにした。`schedules` テーブルの `place_name` を含む読み込み境界も追加し、旧Expo版の見た目ではなくSwiftUI標準のsheet / segmented picker / materialで表示する。
 
 ### Phase 4: Meguri core
 

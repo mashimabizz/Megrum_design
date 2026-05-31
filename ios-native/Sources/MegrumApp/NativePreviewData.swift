@@ -11,6 +11,13 @@ enum NativePreviewData {
     static let cardGoodsTypeID = UUID(uuidString: "00000000-0000-0000-0000-000000000021")!
     static let photoGoodsTypeID = UUID(uuidString: "00000000-0000-0000-0000-000000000022")!
 
+    private static func previewDate(dayOffset: Int = 0, hour: Int, minute: Int = 0) -> Date {
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: .now)
+        let day = calendar.date(byAdding: .day, value: dayOffset, to: today) ?? today
+        return calendar.date(bySettingHour: hour, minute: minute, second: 0, of: day) ?? day
+    }
+
     static let viewer = UserProfile(
         id: viewerID,
         handle: "michilion",
@@ -307,6 +314,43 @@ enum NativePreviewData {
             )
         ]
     ]
+
+    static var schedules: [PersonalSchedule] {
+        [
+            PersonalSchedule(
+                id: UUID(uuidString: "00000000-0000-0000-0000-000000000471")!,
+                userID: viewerID,
+                title: "物販列",
+                placeName: "横浜アリーナ 北口",
+                startAt: previewDate(hour: 10),
+                endAt: previewDate(hour: 12)
+            ),
+            PersonalSchedule(
+                id: UUID(uuidString: "00000000-0000-0000-0000-000000000472")!,
+                userID: viewerID,
+                title: "友人と合流",
+                placeName: "駅前広場",
+                startAt: previewDate(hour: 14),
+                endAt: previewDate(hour: 15, minute: 30)
+            ),
+            PersonalSchedule(
+                id: UUID(uuidString: "00000000-0000-0000-0000-000000000473")!,
+                userID: partnerID,
+                title: "開演前準備",
+                placeName: "会場ロビー",
+                startAt: previewDate(hour: 11, minute: 30),
+                endAt: previewDate(hour: 12, minute: 30)
+            ),
+            PersonalSchedule(
+                id: UUID(uuidString: "00000000-0000-0000-0000-000000000474")!,
+                userID: partnerID,
+                title: "交換待ち合わせ",
+                placeName: "東ゲート付近",
+                startAt: previewDate(dayOffset: 1, hour: 13),
+                endAt: previewDate(dayOffset: 1, hour: 13, minute: 45)
+            )
+        ]
+    }
 
     static let meguriMessages: [MeguriMessage] = [
         MeguriMessage(

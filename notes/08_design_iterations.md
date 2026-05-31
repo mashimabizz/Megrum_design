@@ -4,6 +4,83 @@
 
 ---
 
+## イテレーション363：Swift取引スケジュールsheetを追加
+
+### 背景・問題意識
+
+オーナーの実機レビューで、Swift移行版は旧Expo版の見た目へ寄せ戻さず、iOS標準デザイン感を維持する方針が確認された。取引チャットでは、メッセージ入力欄上の「スケジュール」から、自分と相手の予定を重ねて確認できる必要がある。今回はその入口をSwift Native版に追加し、既存Supabaseの `schedules` テーブルを読む境界も用意する。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumCore/MegrumModels.swift`
+- `PersonalSchedule` を追加し、`schedules` テーブルの `title` / `place_name` / `start_at` / `end_at` / `all_day` をSwift側で扱えるようにした。
+- 表示範囲内の予定を判定する `overlaps(start:end:)` を追加した。
+
+#### `ios-native/Sources/MegrumData/SupabaseScheduleClient.swift`
+- `schedules` を `user_id in (...)` と期間overlapで読み込むPostgREST clientを追加した。
+- 自分と取引相手の予定を同じ境界で取得できるようにした。
+
+#### `ios-native/Sources/MegrumApp/MegrumAppState.swift` / `ios-native/Sources/MegrumApp/SupabaseMegrumRepository.swift`
+- `loadSchedules(for:startAt:endAt:)` をRepository / AppStateへ追加した。
+- 取引参加者以外の予定読み込みを避け、Preview repositoryでも自分・相手の予定を返せるようにした。
+
+#### `ios-native/Sources/MegrumApp/TradesScreen.swift`
+- 取引チャット入力欄の上に、iOS標準寄りの「スケジュール」ボタンを追加した。
+- ボタン押下でNative sheetを開き、週（5日）/月の切り替え、前後移動、自分と相手の予定の色分け、予定名・場所表示を追加した。
+- UIは旧Expo版の再現ではなく、SwiftUIのNavigationStack / sheet / segmented picker / materialを使う方向で整理した。
+
+#### `ios-native/Tests/`
+- `PersonalSchedule` のoverlap判定、Supabase schedule request、Preview AppStateの予定読み込みをテストした。
+
+#### `notes/22_swift_native_migration.md`
+- Swift Native版の取引チャットにスケジュールsheetを追加したことをPhase 3へ追記した。
+- Swift版のiOS標準デザイン感を維持する方針を継続記録した。
+
+#### `ios-native/README.md`
+- Swift Native workspaceの現在内容に `SupabaseScheduleClient` を追記した。
+- 取引詳細の説明に、5日週表示/月表示のスケジュールsheetを追加したことを追記した。
+
+### 影響範囲
+
+- Swift Native版の取引詳細
+- 取引チャット入力欄上の補助アクション
+- 自分/相手のスケジュール読み込み境界
+- Supabase `schedules` テーブル読み込み
+
+### 確認方法
+
+- `swift test --package-path ios-native`
+  - テスト本体は 133件すべて成功。ただし初回はSwiftPM build databaseの一時的なdisk I/O errorで終了コードが1になったため、scratch path指定で再確認する。
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-build --enable-xctest --disable-swift-testing -j 1`
+- `xcodebuild -quiet -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -destination 'generic/platform=iOS Simulator' -derivedDataPath /tmp/megrum-native-xcodebuild CODE_SIGNING_ALLOWED=NO build`
+- `xcodebuild -quiet -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -destination 'id=7F6C74EF-5786-5316-920A-F7F1CC3FE2A4' -derivedDataPath /tmp/megrum-native-device DEVELOPMENT_TEAM=3N67L2WV4F build`
+- `xcrun devicectl device install app --device 7F6C74EF-5786-5316-920A-F7F1CC3FE2A4 /tmp/megrum-native-device/Build/Products/Debug-iphoneos/MegrumNative.app`
+- `xcrun devicectl device process launch --device 7F6C74EF-5786-5316-920A-F7F1CC3FE2A4 tokyo.megrum.native.preview`
+
+### 関連ファイル
+
+- `ios-native/Sources/MegrumCore/MegrumModels.swift`
+- `ios-native/Sources/MegrumData/SupabaseScheduleClient.swift`
+- `ios-native/Sources/MegrumApp/MegrumAppState.swift`
+- `ios-native/Sources/MegrumApp/SupabaseMegrumRepository.swift`
+- `ios-native/Sources/MegrumApp/NativePreviewData.swift`
+- `ios-native/Sources/MegrumApp/TradesScreen.swift`
+- `ios-native/Tests/MegrumCoreTests/MegrumCoreTests.swift`
+- `ios-native/Tests/MegrumDataTests/SupabaseScheduleClientTests.swift`
+- `ios-native/Tests/MegrumAppTests/MegrumAppStateTests.swift`
+- `ios-native/README.md`
+- `notes/22_swift_native_migration.md`
+- `notes/08_design_iterations.md`
+
+### セルフレビュー結果
+
+- ✅ Swift版のiOS標準デザイン感を維持し、旧Expo版の見た目へ寄せる実装は避けた
+- ✅ `スケジュール` は既存用語として `notes/10` に定義済みのため、用語追加は不要と判断した
+- ✅ `schedules.place_name` は既に `notes/05` とmigrationに存在するため、DBスキーマ更新は不要と判断した
+- ✅ 状態名の追加・変更はなく、`notes/09` 更新は不要と判断した
+
+---
+
 ## イテレーション362：Swift取引チャットから再打診を開く
 
 ### 背景・問題意識

@@ -501,6 +501,23 @@ final class MegrumAppStateTests: XCTestCase {
         XCTAssertFalse(state.isCreatingProposal)
     }
 
+    func testAppStateLoadsPreviewTradeSchedules() async {
+        let state = MegrumAppState(repository: PreviewMegrumRepository())
+        let proposalID = UUID(uuidString: "00000000-0000-0000-0000-000000000402")!
+
+        await state.loadInitialData()
+        let proposal = try! XCTUnwrap(state.proposals.first { $0.id == proposalID })
+        let start = Calendar.current.startOfDay(for: .now)
+        let end = Calendar.current.date(byAdding: .day, value: 5, to: start)!
+
+        await state.loadSchedules(for: proposal, startAt: start, endAt: end)
+
+        XCTAssertFalse(state.schedules(for: proposalID).isEmpty)
+        XCTAssertTrue(state.schedules(for: proposalID).contains { $0.placeName != nil })
+        XCTAssertNil(state.loadingSchedulesProposalID)
+        XCTAssertNil(state.errorMessage)
+    }
+
     func testAppStateAgreesPreviewIncomingProposal() async {
         let state = MegrumAppState(repository: PreviewMegrumRepository())
         let incomingProposalID = UUID(uuidString: "00000000-0000-0000-0000-000000000403")!

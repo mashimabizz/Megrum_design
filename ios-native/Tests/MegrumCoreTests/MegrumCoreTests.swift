@@ -120,4 +120,29 @@ final class MegrumCoreTests: XCTestCase {
             )
         )
     }
+
+    func testPersonalScheduleOverlapBoundary() {
+        let schedule = PersonalSchedule(
+            id: UUID(),
+            userID: UUID(),
+            title: "物販列",
+            placeName: "北口",
+            startAt: Date(timeIntervalSince1970: 1_000),
+            endAt: Date(timeIntervalSince1970: 2_000)
+        )
+
+        XCTAssertTrue(
+            schedule.overlaps(
+                start: Date(timeIntervalSince1970: 1_500),
+                end: Date(timeIntervalSince1970: 2_500)
+            )
+        )
+        XCTAssertFalse(
+            schedule.overlaps(
+                start: Date(timeIntervalSince1970: 2_000),
+                end: Date(timeIntervalSince1970: 3_000)
+            )
+        )
+        XCTAssertEqual(schedule.durationInterval.duration, 1_000)
+    }
 }

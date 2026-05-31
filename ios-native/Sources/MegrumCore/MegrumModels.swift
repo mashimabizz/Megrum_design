@@ -1013,6 +1013,48 @@ public struct TradeProposal: Identifiable, Codable, Hashable, Sendable {
     }
 }
 
+public struct PersonalSchedule: Identifiable, Codable, Hashable, Sendable {
+    public var id: UUID
+    public var userID: UUID
+    public var title: String
+    public var placeName: String?
+    public var startAt: Date
+    public var endAt: Date
+    public var allDay: Bool
+    public var note: String?
+
+    public init(
+        id: UUID,
+        userID: UUID,
+        title: String,
+        placeName: String? = nil,
+        startAt: Date,
+        endAt: Date,
+        allDay: Bool = false,
+        note: String? = nil
+    ) {
+        self.id = id
+        self.userID = userID
+        self.title = title
+        self.placeName = placeName
+        self.startAt = startAt
+        self.endAt = endAt
+        self.allDay = allDay
+        self.note = note
+    }
+
+    public var durationInterval: DateInterval {
+        if endAt > startAt {
+            return DateInterval(start: startAt, end: endAt)
+        }
+        return DateInterval(start: startAt, duration: 60)
+    }
+
+    public func overlaps(start: Date, end: Date) -> Bool {
+        startAt < end && endAt > start
+    }
+}
+
 public struct TradeEvidenceCreateInput: Equatable, Sendable {
     public var proposalID: UUID
     public var imageData: Data

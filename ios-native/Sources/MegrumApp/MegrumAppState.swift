@@ -85,6 +85,7 @@ public protocol MegrumRepository: Sendable {
     func fileTradeDispute(_ input: TradeDisputeCreateInput) async throws -> TradeDisputeTicket
     func loadMessages(proposalID: UUID, limit: Int) async throws -> [TradeMessage]
     func sendMessage(_ input: TradeMessageCreateInput) async throws -> TradeMessage
+    func loadSchedules(for proposal: TradeProposal, startAt: Date, endAt: Date) async throws -> [PersonalSchedule]
     func loadGrooms(latitude: Double?, longitude: Double?, radiusMeters: Int) async throws -> [GroomPost]
     func createGroomPost(_ input: GroomPostCreateInput) async throws -> GroomPost
     func markGroomViewed(postID: UUID) async throws
@@ -203,6 +204,10 @@ public extension MegrumRepository {
 
     func sendMessage(_ input: TradeMessageCreateInput) async throws -> TradeMessage {
         throw MegrumRepositoryError.unsupportedMutation
+    }
+
+    func loadSchedules(for proposal: TradeProposal, startAt: Date, endAt: Date) async throws -> [PersonalSchedule] {
+        []
     }
 
     func loadGrooms(latitude: Double?, longitude: Double?, radiusMeters: Int) async throws -> [GroomPost] {
@@ -623,6 +628,16 @@ public struct PreviewMegrumRepository: MegrumRepository {
         )
     }
 
+    public func loadSchedules(for proposal: TradeProposal, startAt: Date, endAt: Date) async throws -> [PersonalSchedule] {
+        guard proposal.isParticipant(NativePreviewData.viewerID) else {
+            return []
+        }
+        let participantIDs = Set([proposal.senderID, proposal.receiverID])
+        return NativePreviewData.schedules
+            .filter { participantIDs.contains($0.userID) && $0.overlaps(start: startAt, end: endAt) }
+            .sorted { $0.startAt < $1.startAt }
+    }
+
     public func loadGrooms(latitude: Double?, longitude: Double?, radiusMeters: Int) async throws -> [GroomPost] {
         NativePreviewData.grooms
     }
@@ -801,6 +816,7 @@ public final class MegrumAppState: ObservableObject {
     @Published public private(set) var listings: [IndividualListing] = []
     @Published public private(set) var proposals: [TradeProposal] = []
     @Published public private(set) var messagesByProposalID: [UUID: [TradeMessage]] = [:]
+    @Published public private(set) var schedulesByProposalID: [UUID: [PersonalSchedule]] = [:]
     @Published public private(set) var boardRepliesByThreadID: [UUID: [BoardReply]] = [:]
     @Published public private(set) var groomRepliesByPostID: [UUID: [GroomReply]] = [:]
     @Published public private(set) var meguriMessages: [MeguriMessage] = []
@@ -851,6 +867,7 @@ public final class MegrumAppState: ObservableObject {
     @Published public private(set) var isCreatingGroomPost = false
     @Published public private(set) var isCreatingBoardThread = false
     @Published public private(set) var loadingMessagesProposalID: UUID?
+    @Published public private(set) var loadingSchedulesProposalID: UUID?
     @Published public private(set) var sendingMessageProposalID: UUID?
     @Published public private(set) var sendingGroomReplyPostID: UUID?
     @Published public private(set) var sendingMeguriMessageRecipientID: UUID?
@@ -876,6 +893,10 @@ public final class MegrumAppState: ObservableObject {
 
     public func messages(for proposalID: UUID) -> [TradeMessage] {
         messagesByProposalID[proposalID] ?? []
+    }
+
+    public func schedules(for proposalID: UUID) -> [PersonalSchedule] {
+        schedulesByProposalID[proposalID] ?? []
     }
 
     public func boardReplies(for threadID: UUID) -> [BoardReply] {
@@ -1808,6 +1829,29 @@ public final class MegrumAppState: ObservableObject {
             sendingMessageProposalID = nil
             return false
         }
+    }
+
+    public func loadSchedules(for proposal: TradeProposal, startAt: Date, endAt: Date) async {
+        guard loadingSchedulesProposalID != proposal.id else {
+            return
+        }
+        guard startAt < endAt else {
+            schedulesByProposalID[proposal.id] = []
+            return
+        }
+
+        loadingSchedulesProposalID = proposal.id
+        errorMessage = nil
+        do {
+            schedulesByProposalID[proposal.id] = try await repository.loadSchedules(
+                for: proposal,
+                startAt: startAt,
+                endAt: endAt
+            )
+        } catch {
+            errorMessage = "スケジュールを読み込めませんでした"
+        }
+        loadingSchedulesProposalID = nil
     }
 
     private func replaceProposal(_ proposal: TradeProposal) {
