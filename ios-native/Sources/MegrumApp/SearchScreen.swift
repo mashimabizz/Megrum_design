@@ -70,16 +70,22 @@ struct SearchScreen: View {
                             proposalTargetItem = item
                         } onOpenOwnerProfile: { userID in
                             profileRoute = PublicProfileRoute(userID: userID)
+                        } onReportItem: { item, reason, note in
+                            reportItem(item, reason: reason, note: note)
                         }
                         SearchResultSection(results: results(in: .possible), bucket: .possible, viewerID: appState.viewer?.id) { item in
                             proposalTargetItem = item
                         } onOpenOwnerProfile: { userID in
                             profileRoute = PublicProfileRoute(userID: userID)
+                        } onReportItem: { item, reason, note in
+                            reportItem(item, reason: reason, note: note)
                         }
                         SearchResultSection(results: results(in: .none), bucket: .none, viewerID: appState.viewer?.id) { item in
                             proposalTargetItem = item
                         } onOpenOwnerProfile: { userID in
                             profileRoute = PublicProfileRoute(userID: userID)
+                        } onReportItem: { item, reason, note in
+                            reportItem(item, reason: reason, note: note)
                         }
                     }
                 }
@@ -131,6 +137,17 @@ struct SearchScreen: View {
             await appState.loadGoodsTypes()
         }
         await appState.searchGoods(query: query, groupID: selectedGroupID, goodsTypeID: selectedGoodsTypeID)
+    }
+
+    private func reportItem(_ item: GoodsItem, reason: GoodsReportReason, note: String) {
+        Task {
+            _ = await appState.reportGoods(
+                itemID: item.id,
+                reportedUserID: item.ownerID,
+                reason: reason,
+                note: note
+            )
+        }
     }
 
     private func scheduleSearch(delayNanoseconds: UInt64 = 260_000_000) {
@@ -262,6 +279,7 @@ private struct SearchResultSection: View {
     var viewerID: UUID?
     var onStartProposal: (GoodsItem) -> Void
     var onOpenOwnerProfile: (UUID) -> Void
+    var onReportItem: (GoodsItem, GoodsReportReason, String) -> Void
 
     var body: some View {
         if !results.isEmpty {
@@ -280,7 +298,8 @@ private struct SearchResultSection: View {
                     items: results.map(\.item),
                     viewerID: viewerID,
                     onOpenOwnerProfile: onOpenOwnerProfile,
-                    onAddToExchangeList: onStartProposal
+                    onAddToExchangeList: onStartProposal,
+                    onReportItem: onReportItem
                 )
             }
         }

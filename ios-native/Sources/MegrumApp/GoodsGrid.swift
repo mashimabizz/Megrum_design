@@ -10,9 +10,11 @@ struct GoodsGrid: View {
     var onAddToExchangeList: ((GoodsItem) -> Void)?
     var onHideItem: ((GoodsItem) -> Void)?
     var onDeleteItem: ((GoodsItem) -> Void)?
+    var onReportItem: ((GoodsItem, GoodsReportReason, String) -> Void)?
     @State private var detailItem: GoodsItem?
     @State private var actionMessage: String?
     @State private var pendingDeleteItem: GoodsItem?
+    @State private var reportItem: GoodsItem?
 
     private var gridItems: [GridItem] {
         Array(repeating: GridItem(.flexible(), spacing: 14), count: columns)
@@ -40,6 +42,14 @@ struct GoodsGrid: View {
         .sheet(item: $detailItem) { item in
             NavigationStack {
                 GoodsDetailSheet(item: item)
+            }
+        }
+        .sheet(item: $reportItem) { item in
+            NavigationStack {
+                GoodsReportSheet(item: item) { reason, note in
+                    onReportItem?(item, reason, note)
+                    reportItem = nil
+                }
             }
         }
         .alert("まだ接続していません", isPresented: Binding(
@@ -89,7 +99,11 @@ struct GoodsGrid: View {
                 actionMessage = "「\(item.title)」を非表示にする処理は、自分の在庫/Wishでのみ使えます。"
             }
         case .report:
-            actionMessage = "「\(item.title)」の通報導線は、通報フローのSwift化で接続します。"
+            if item.ownerID != viewerID, onReportItem != nil {
+                reportItem = item
+            } else {
+                actionMessage = "「\(item.title)」の通報導線は、他のユーザーのグッズでのみ使えます。"
+            }
         case .delete:
             if item.ownerID == viewerID, onDeleteItem != nil {
                 pendingDeleteItem = item
@@ -320,6 +334,52 @@ private struct GoodsDetailSheet: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
+private struct GoodsReportSheet: View {
+    var item: GoodsItem
+    var onSubmit: (GoodsReportReason, String) -> Void
+
+    @Environment(\.dismiss) private var dismiss
+    @State private var reason: GoodsReportReason = .fakeItem
+    @State private var note = ""
+
+    var body: some View {
+        Form {
+            Section("対象") {
+                Text(item.title)
+                    .font(.system(size: 15, weight: .bold, design: .rounded))
+            }
+
+            Section("理由") {
+                Picker("理由", selection: $reason) {
+                    ForEach(GoodsReportReason.allCases) { reason in
+                        Text(reason.displayName).tag(reason)
+                    }
+                }
+            }
+
+            Section("補足") {
+                TextEditor(text: $note)
+                    .frame(minHeight: 120)
+            }
+        }
+        .navigationTitle("通報")
+        .megrumInlineNavigationTitle()
+        .toolbar {
+            ToolbarItem(placement: .cancellationAction) {
+                Button("キャンセル") {
+                    dismiss()
+                }
+            }
+            ToolbarItem(placement: .confirmationAction) {
+                Button("送信") {
+                    onSubmit(reason, note)
+                    dismiss()
+                }
+            }
+        }
     }
 }
 

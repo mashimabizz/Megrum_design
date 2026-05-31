@@ -66,6 +66,7 @@ public protocol MegrumRepository: Sendable {
     func searchGoods(_ input: GoodsSearchInput) async throws -> [GoodsItem]
     func archiveGoodsItem(itemID: UUID) async throws
     func deleteGoodsItem(itemID: UUID) async throws
+    func reportGoods(_ input: GoodsReportCreateInput) async throws -> GoodsReportTicket
     func loadPublicUserProfile(userID: UUID) async throws -> PublicUserProfile?
     func loadUserEvaluations(userID: UUID, limit: Int) async throws -> [UserEvaluation]
     func createProposal(_ input: ProposalCreateInput) async throws -> TradeProposal
@@ -128,6 +129,10 @@ public extension MegrumRepository {
     }
 
     func deleteGoodsItem(itemID: UUID) async throws {
+        throw MegrumRepositoryError.unsupportedMutation
+    }
+
+    func reportGoods(_ input: GoodsReportCreateInput) async throws -> GoodsReportTicket {
         throw MegrumRepositoryError.unsupportedMutation
     }
 
@@ -330,6 +335,14 @@ public struct PreviewMegrumRepository: MegrumRepository {
     public func archiveGoodsItem(itemID: UUID) async throws {}
 
     public func deleteGoodsItem(itemID: UUID) async throws {}
+
+    public func reportGoods(_ input: GoodsReportCreateInput) async throws -> GoodsReportTicket {
+        GoodsReportTicket(
+            id: UUID(),
+            goodsItemID: input.goodsItemID,
+            status: "open"
+        )
+    }
 
     public func loadPublicUserProfile(userID: UUID) async throws -> PublicUserProfile? {
         let profile: UserProfile
@@ -660,6 +673,7 @@ public final class MegrumAppState: ObservableObject {
     @Published public private(set) var isSavingMailingAddress = false
     @Published public private(set) var isCreatingGoodsEntry = false
     @Published public private(set) var mutatingGoodsItemID: UUID?
+    @Published public private(set) var reportingGoodsItemID: UUID?
     @Published public private(set) var isCreatingProposal = false
     @Published public private(set) var addingEvidenceProposalID: UUID?
     @Published public private(set) var approvingEvidenceProposalID: UUID?
@@ -1280,6 +1294,41 @@ public final class MegrumAppState: ObservableObject {
         } catch {
             errorMessage = "グッズを削除できませんでした"
             mutatingGoodsItemID = nil
+            return false
+        }
+    }
+
+    public func reportGoods(
+        itemID: UUID,
+        reportedUserID: UUID,
+        reason: GoodsReportReason,
+        note: String
+    ) async -> Bool {
+        guard reportingGoodsItemID != itemID else {
+            return false
+        }
+        guard viewer?.id != reportedUserID else {
+            errorMessage = "自分のグッズは通報できません"
+            return false
+        }
+
+        let trimmedNote = note.trimmingCharacters(in: .whitespacesAndNewlines)
+        reportingGoodsItemID = itemID
+        errorMessage = nil
+        do {
+            _ = try await repository.reportGoods(
+                GoodsReportCreateInput(
+                    goodsItemID: itemID,
+                    reportedUserID: reportedUserID,
+                    reason: reason,
+                    note: trimmedNote.nilIfBlank
+                )
+            )
+            reportingGoodsItemID = nil
+            return true
+        } catch {
+            errorMessage = "通報を送信できませんでした"
+            reportingGoodsItemID = nil
             return false
         }
     }

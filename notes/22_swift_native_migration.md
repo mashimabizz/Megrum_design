@@ -1,7 +1,7 @@
 # 22. Swift Native Migration
 
 最終更新: 2026-05-31
-ステータス: Active draft（iter352）
+ステータス: Active draft（iter353）
 
 ## 目的
 
@@ -144,6 +144,7 @@ tar -xzf /Users/michitaka/Desktop/Megrum_backups/pre-swift-migration-20260531-03
 - iter350で、取引チャットの写真メッセージと証跡写真をタップで全画面表示できるNative画像ビューアへ接続した。
 - iter351で、取引詳細sheetの右上からSwift Nativeの通報sheetを開き、既存 `disputes` テーブルへ `submitted` の申告を作成できる境界を追加した。受付後は取引チャットにsystem messageを残す。
 - iter352で、在庫/Wishグリッドの長押しメニューから本人所有グッズを `status='archived'` にする非表示処理と、本人所有行の削除処理を `goods_inventory` へ接続した。
+- iter353で、他ユーザー所有グッズの長押しメニューからSwift Nativeの通報sheetを開き、新規 `goods_reports` テーブルへグッズ単位の通報を保存できる境界を追加した。
 
 ### Phase 4: Meguri core
 

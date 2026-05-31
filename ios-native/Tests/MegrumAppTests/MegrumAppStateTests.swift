@@ -353,6 +353,41 @@ final class MegrumAppStateTests: XCTestCase {
         XCTAssertNil(state.errorMessage)
     }
 
+    func testAppStateReportsPreviewGoods() async {
+        let state = MegrumAppState(repository: PreviewMegrumRepository())
+        await state.loadInitialData()
+        await state.searchGoods(query: "ランダム")
+        let item = try! XCTUnwrap(state.searchResults.first?.item)
+
+        let reported = await state.reportGoods(
+            itemID: item.id,
+            reportedUserID: item.ownerID,
+            reason: .fakeItem,
+            note: " 説明と違います "
+        )
+
+        XCTAssertTrue(reported)
+        XCTAssertNil(state.reportingGoodsItemID)
+        XCTAssertNil(state.errorMessage)
+    }
+
+    func testAppStateRejectsReportingOwnGoods() async {
+        let state = MegrumAppState(repository: PreviewMegrumRepository())
+        await state.loadInitialData()
+        let item = try! XCTUnwrap(state.inventory.first)
+
+        let reported = await state.reportGoods(
+            itemID: item.id,
+            reportedUserID: item.ownerID,
+            reason: .other,
+            note: ""
+        )
+
+        XCTAssertFalse(reported)
+        XCTAssertNil(state.reportingGoodsItemID)
+        XCTAssertEqual(state.errorMessage, "自分のグッズは通報できません")
+    }
+
     func testAppStateCreatesPreviewProposal() async {
         let state = MegrumAppState(repository: PreviewMegrumRepository())
         await state.loadInitialData()

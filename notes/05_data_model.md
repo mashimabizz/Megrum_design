@@ -4,7 +4,7 @@
 > 実装の正解集。`09_state_machines.md` と完全に整合させ、`10_glossary.md` の用語を使う。
 
 最終更新: 2026-05-31
-ステータス: Draft v2.32（iter352 Swift Native在庫/Wish非表示・削除接続を反映）
+ステータス: Draft v2.33（iter353 Swift Nativeグッズ通報を反映）
 
 ## 最新化履歴
 
@@ -44,6 +44,7 @@
 | **v2.30** | **2026-05-31** | **iter346 反映（相手プロフィールと評価一覧をSwift Nativeから読むため、公開プロフィール/評価一覧RPCを追加）** |
 | **v2.31** | **2026-05-31** | **iter347 反映（Swift Native取引詳細から `chat-photos` / `proposal_evidence_photos` / `proposals.approved_by_*` / `user_evaluations` を使う最小完了フローを追加）** |
 | **v2.32** | **2026-05-31** | **iter352 反映（Swift Native在庫/Wish長押しメニューから `goods_inventory.status='archived'` の非表示と本人所有行DELETEへ接続）** |
+| **v2.33** | **2026-05-31** | **iter353 反映（他ユーザー所有グッズの長押し通報を `goods_reports` へ保存するSwift Native境界とRLSを追加）** |
 | **v2.20** | **2026-05-29** | **iter168.90 反映（`search_query_logs` と人気検索RPCを追加。検索結果はマッチ分類つきグッズパネルで表示）** |
 | **v2.21** | **2026-05-30** | **iter168.97 反映（`schedules.place_name` 追加。合意時に `both` を単一手段へ固定し、現地交換の複数候補は1件へ固定する運用を追記）** |
 
@@ -969,6 +970,28 @@ iter34 で到着ステータス・サブステート追加。
 | `status` | text | 'open', 'reviewing', 'resolved', 'dismissed' |
 | `resolved_at` | timestamptz nullable | |
 | `created_at` | timestamptz | |
+
+### `goods_reports`（グッズ通報 / iter353）
+
+取引成立前でも、不適切なグッズ表示を運営確認へ回すためのグッズ単位の通報。取引異常時の `disputes` とは分ける。
+
+| カラム | 型 | 説明 |
+|---|---|---|
+| `id` | uuid | PK |
+| `reporter_id` | uuid | → users。通報者 |
+| `goods_inventory_id` | uuid | → goods_inventory。対象グッズ |
+| `reported_user_id` | uuid | → users。対象グッズの所有者 |
+| `reason` | text | `spam` / `harassment` / `fake_item` / `privacy` / `unsafe` / `other` |
+| `note` | text nullable | 補足。500文字以内 |
+| `status` | text | `open` / `reviewing` / `resolved` / `dismissed` |
+| `created_at` | timestamptz | |
+| `updated_at` | timestamptz | |
+
+RLS:
+- ログインユーザーは自分の `reporter_id` の行だけinsert/selectできる。
+- `reporter_id <> reported_user_id` を必須にし、自分のグッズ通報を禁止する。
+- 対象 `goods_inventory` は `reported_user_id` 所有かつ `status in ('active','reserved')` の行に限定する。
+- `unique (reporter_id, goods_inventory_id)` により同じグッズへの重複通報を防ぐ。
 
 ---
 

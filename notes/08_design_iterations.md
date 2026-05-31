@@ -4,6 +4,81 @@
 
 ---
 
+## イテレーション353：Swiftグッズ通報を追加
+
+### 背景・問題意識
+
+Swift Native版の在庫/Wish/検索グリッドは長押しメニューから「通報する」を出せる状態になったが、実際の通報保存先と送信導線が未接続だった。取引成立前でも不適切なグッズ表示を運営確認へ回せるよう、取引通報とは別にグッズ単位の通報境界を追加する。
+
+### 変更内容
+
+#### `supabase/migrations/20260531012000_add_goods_reports.sql`
+- `goods_reports` テーブルを追加した。
+- 通報者、対象 `goods_inventory`、対象ユーザー、理由、補足、ステータスを保存する。
+- 自分自身のグッズ通報を禁止し、表示可能な `active` / `reserved` のグッズだけ通報できるRLSを追加した。
+
+#### `ios-native/Sources/MegrumCore/MegrumModels.swift`
+- `GoodsReportReason` / `GoodsReportCreateInput` / `GoodsReportTicket` を追加した。
+- 理由は `spam` / `harassment` / `fake_item` / `privacy` / `unsafe` / `other` に揃えた。
+
+#### `ios-native/Sources/MegrumData/SupabaseGoodsReportClient.swift`
+- `goods_reports` へinsertするPostgREST境界とrequest builderを追加した。
+
+#### `ios-native/Sources/MegrumApp/MegrumAppState.swift` / `SupabaseMegrumRepository.swift`
+- `MegrumRepository.reportGoods` と `MegrumAppState.reportGoods` を追加した。
+- 自分のグッズを通報しようとした場合は送信せず、エラーメッセージを出すようにした。
+
+#### `ios-native/Sources/MegrumApp/GoodsGrid.swift` / `SearchScreen.swift`
+- 他ユーザー所有グッズの長押しメニューから、iOS標準sheet/Formの通報画面を開けるようにした。
+- 検索結果の「マッチしてるよ！」「交換できるかも？」「マッチなし」すべてから同じ通報導線を使うようにした。
+
+#### `ios-native/Tests/`
+- `SupabaseGoodsReportClientTests` でinsert requestのpayloadを検証した。
+- `MegrumAppStateTests` でPreview通報成功と自分のグッズ通報拒否を検証した。
+
+#### `ios-native/README.md` / `notes/22_swift_native_migration.md` / `notes/05_data_model.md` / `notes/10_glossary.md`
+- Swift Native版のグッズ通報接続と `goods_reports` スキーマを記録した。
+
+### 影響範囲
+
+- Swift Native版のHome/Search/Inventory/Wish共通グッズグリッド
+- Swift Native版検索結果
+- `goods_inventory` に紐づく安全導線
+- 新規 `goods_reports` テーブルとRLS
+
+### 確認方法
+
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-build --enable-xctest --disable-swift-testing -j 1`
+- `xcodebuild -quiet -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -destination 'generic/platform=iOS Simulator' -derivedDataPath /tmp/megrum-native-xcodebuild CODE_SIGNING_ALLOWED=NO build`
+- `xcodebuild -quiet -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -configuration Debug -destination 'id=00008120-000C49C43669A01E' -derivedDataPath /tmp/megrum-native-device-build -allowProvisioningUpdates DEVELOPMENT_TEAM=3N67L2WV4F build`
+- `xcrun devicectl device install app --device 7F6C74EF-5786-5316-920A-F7F1CC3FE2A4 /tmp/megrum-native-device-build/Build/Products/Debug-iphoneos/MegrumNative.app`
+
+### 関連ファイル
+
+- `supabase/migrations/20260531012000_add_goods_reports.sql`
+- `ios-native/Sources/MegrumCore/MegrumModels.swift`
+- `ios-native/Sources/MegrumData/SupabaseGoodsReportClient.swift`
+- `ios-native/Sources/MegrumApp/MegrumAppState.swift`
+- `ios-native/Sources/MegrumApp/SupabaseMegrumRepository.swift`
+- `ios-native/Sources/MegrumApp/GoodsGrid.swift`
+- `ios-native/Sources/MegrumApp/SearchScreen.swift`
+- `ios-native/Tests/MegrumDataTests/SupabaseGoodsReportClientTests.swift`
+- `ios-native/Tests/MegrumAppTests/MegrumAppStateTests.swift`
+- `ios-native/README.md`
+- `notes/22_swift_native_migration.md`
+- `notes/05_data_model.md`
+- `notes/10_glossary.md`
+- `notes/08_design_iterations.md`
+
+### セルフレビュー結果
+
+- ✅ 取引通報の `disputes` と混ぜず、グッズ単位の通報として `goods_reports` を分離した
+- ✅ 自分のグッズ通報はSwift側とDB checkの両方で防いだ
+- ✅ SwiftUI標準のsheet/Formを使い、独自の重い通報UIを増やさない方針にした
+- ✅ Proposal / Deal の状態名追加はなく、`notes/09` は更新不要と判断した
+
+---
+
 ## イテレーション352：Swift在庫/Wishの非表示と削除を接続
 
 ### 背景・問題意識

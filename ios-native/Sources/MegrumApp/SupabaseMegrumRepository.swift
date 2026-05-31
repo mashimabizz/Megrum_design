@@ -6,6 +6,7 @@ public struct SupabaseMegrumRepository: MegrumRepository {
     private let client: SupabaseRESTClient
     private let oshiClient: SupabaseOshiClient
     private let goodsInventoryClient: SupabaseGoodsInventoryClient
+    private let goodsReportClient: SupabaseGoodsReportClient
     private let mailingAddressClient: SupabaseMailingAddressClient
     private let postalCodeAddressClient: PostalCodeAddressClient
     private let blockClient: SupabaseBlockClient
@@ -23,6 +24,7 @@ public struct SupabaseMegrumRepository: MegrumRepository {
         self.client = client
         self.oshiClient = SupabaseOshiClient(client: client)
         self.goodsInventoryClient = SupabaseGoodsInventoryClient(client: client)
+        self.goodsReportClient = SupabaseGoodsReportClient(client: client)
         self.mailingAddressClient = SupabaseMailingAddressClient(client: client)
         self.postalCodeAddressClient = PostalCodeAddressClient()
         self.blockClient = SupabaseBlockClient(client: client)
@@ -104,6 +106,10 @@ public struct SupabaseMegrumRepository: MegrumRepository {
 
     public func deleteGoodsItem(itemID: UUID) async throws {
         try await goodsInventoryClient.deleteGoodsItem(userID: viewerID, itemID: itemID)
+    }
+
+    public func reportGoods(_ input: GoodsReportCreateInput) async throws -> GoodsReportTicket {
+        try await goodsReportClient.createReport(reporterID: viewerID, input: input)
     }
 
     public func loadPublicUserProfile(userID: UUID) async throws -> PublicUserProfile? {
