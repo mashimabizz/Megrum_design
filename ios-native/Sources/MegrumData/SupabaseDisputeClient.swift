@@ -79,6 +79,9 @@ public final class SupabaseDisputeClient: @unchecked Sendable {
         guard let respondentID = proposal.partnerID(for: userID) else {
             throw SupabaseDisputeClientError.missingRespondent
         }
+        guard !input.factMemo.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            throw SupabaseDisputeClientError.emptyFactMemo
+        }
         return try client.makeInsertRequest(
             into: "disputes",
             values: [

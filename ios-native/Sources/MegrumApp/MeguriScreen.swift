@@ -775,6 +775,7 @@ private struct MeguriMapScreen: View {
     @State private var selectedGroom: GroomPost?
     @State private var selectedThread: BoardThread?
     @State private var mapNotice: String?
+    @State private var hasCenteredMapOnLocation = false
 
     init(
         kind: MeguriMapKind,
@@ -807,7 +808,7 @@ private struct MeguriMapScreen: View {
                             Button {
                                 openGroomIfInRange(groom)
                             } label: {
-                                GroomMapPin(groom: groom)
+                                GroomMapPin(groom: groom, isOutOfRange: isGroomOutOfRange(groom))
                             }
                             .buttonStyle(.plain)
                         }
@@ -860,8 +861,8 @@ private struct MeguriMapScreen: View {
                 prefecture: selectedPrefecture,
                 scope: mapBoardScope
             )
-            withAnimation(.smooth(duration: 0.28)) {
-                cameraPosition = .region(MKCoordinateRegion(center: centerCoordinate, span: kind.regionSpan))
+            await MainActor.run {
+                alignCameraToVisibleContent(userCoordinate: locationState.coordinate, animated: false)
             }
         }
         .onReceive(locationState.$coordinate.compactMap { $0 }) { coordinate in
@@ -872,9 +873,10 @@ private struct MeguriMapScreen: View {
                     prefecture: selectedPrefecture,
                     scope: mapBoardScope
                 )
-            }
-            withAnimation(.smooth(duration: 0.28)) {
-                cameraPosition = .region(MKCoordinateRegion(center: coordinate.clLocationCoordinate, span: kind.regionSpan))
+                await MainActor.run {
+                    mapNotice = nil
+                    alignCameraToVisibleContent(userCoordinate: coordinate, animated: true, force: true)
+                }
             }
         }
         .sheet(item: $selectedGroom) { groom in
@@ -894,8 +896,34 @@ private struct MeguriMapScreen: View {
         }
     }
 
-    private var centerCoordinate: CLLocationCoordinate2D {
-        kind.initialCenter(userCoordinate: locationState.coordinate, grooms: appState.grooms, threads: appState.threads)
+    private func alignCameraToVisibleContent(
+        userCoordinate: MegrumLocationCoordinate?,
+        animated: Bool,
+        force: Bool = false
+    ) {
+        if !force, userCoordinate != nil, hasCenteredMapOnLocation {
+            return
+        }
+
+        let region = kind.visibleRegion(
+            userCoordinate: userCoordinate,
+            grooms: appState.grooms,
+            threads: appState.threads,
+            boardScope: boardScope
+        )
+        let update = {
+            cameraPosition = .region(region)
+        }
+        if animated {
+            withAnimation(.smooth(duration: 0.28)) {
+                update()
+            }
+        } else {
+            update()
+        }
+        if userCoordinate != nil {
+            hasCenteredMapOnLocation = true
+        }
     }
 
     private var rangeCircle: (center: CLLocationCoordinate2D, radius: CLLocationDistance)? {
@@ -941,9 +969,16 @@ private struct MeguriMapScreen: View {
             selectedGroom = groom
             return
         }
+        guard locationState.coordinate != nil else {
+            withAnimation(.smooth(duration: 0.2)) {
+                mapNotice = "現在地取得後にグルームを開けます"
+            }
+            locationState.requestCurrentLocation()
+            return
+        }
         guard canOpen(groom: groom) else {
             withAnimation(.smooth(duration: 0.2)) {
-                mapNotice = "1km圏外のグルームは見れません"
+                mapNotice = groomRangeNotice(groom)
             }
             return
         }
@@ -951,13 +986,34 @@ private struct MeguriMapScreen: View {
         selectedGroom = groom
     }
 
+    private func isGroomOutOfRange(_ groom: GroomPost) -> Bool {
+        guard let distance = distanceFromCurrentLocation(to: groom) else {
+            return false
+        }
+        return distance > MeguriMapKind.grooms.radiusMeters
+    }
+
     private func canOpen(groom: GroomPost) -> Bool {
+        guard let distance = distanceFromCurrentLocation(to: groom) else {
+            return false
+        }
+        return distance <= MeguriMapKind.grooms.radiusMeters
+    }
+
+    private func distanceFromCurrentLocation(to groom: GroomPost) -> CLLocationDistance? {
         guard let coordinate = locationState.coordinate else {
-            return true
+            return nil
         }
         let currentLocation = CLLocation(latitude: coordinate.latitude, longitude: coordinate.longitude)
         let groomLocation = CLLocation(latitude: groom.latitude, longitude: groom.longitude)
-        return currentLocation.distance(from: groomLocation) <= MeguriMapKind.grooms.radiusMeters
+        return currentLocation.distance(from: groomLocation)
+    }
+
+    private func groomRangeNotice(_ groom: GroomPost) -> String {
+        guard let distance = distanceFromCurrentLocation(to: groom) else {
+            return "現在地取得後にグルームを開けます"
+        }
+        return "現在地から\(distance.meguriDistanceText)。1km圏外のグルームは見れません"
     }
 }
 
@@ -1023,19 +1079,32 @@ private struct MapStatusBadge: View {
 
 private struct GroomMapPin: View {
     var groom: GroomPost
+    var isOutOfRange: Bool
 
     var body: some View {
         VStack(spacing: 0) {
             GroomThumbnailCircle(url: groom.imageURL, size: 58)
                 .overlay(Circle().stroke(.white, lineWidth: 3))
+                .overlay(alignment: .bottomTrailing) {
+                    if isOutOfRange {
+                        Image(systemName: "lock.fill")
+                            .font(.system(size: 10, weight: .heavy))
+                            .foregroundStyle(MegrumTheme.ink)
+                            .frame(width: 21, height: 21)
+                            .background(.regularMaterial, in: Circle())
+                            .offset(x: 3, y: 3)
+                    }
+                }
                 .shadow(color: MegrumTheme.ink.opacity(0.22), radius: 12, y: 8)
+                .saturation(isOutOfRange ? 0.25 : 1)
+                .opacity(isOutOfRange ? 0.68 : 1)
 
             Triangle()
                 .fill(.white)
                 .frame(width: 14, height: 8)
                 .offset(y: -1)
         }
-        .accessibilityLabel("グルーム")
+        .accessibilityLabel(isOutOfRange ? "1km圏外のグルーム" : "グルーム")
     }
 }
 
@@ -1170,9 +1239,9 @@ private struct BoardThreadDetailScreen: View {
     }
 
     var body: some View {
-        VStack(spacing: 0) {
+        ScrollViewReader { proxy in
             ScrollView {
-                VStack(alignment: .leading, spacing: 12) {
+                LazyVStack(alignment: .leading, spacing: 12) {
                     BoardThreadStarterBubble(
                         thread: thread,
                         isMine: thread.authorID == appState.viewer?.id
@@ -1202,54 +1271,95 @@ private struct BoardThreadDetailScreen: View {
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 20)
                     }
+
+                    Color.clear
+                        .frame(height: 1)
+                        .id(BoardThreadScrollAnchor.bottom)
                 }
                 .padding(.horizontal, 20)
                 .padding(.top, 20)
-                .padding(.bottom, 22)
+                .padding(.bottom, 88)
             }
-
-            BoardReplyInput(
-                text: $draftReply,
-                isSending: appState.sendingBoardReplyThreadID == thread.id
-            ) {
-                Task {
-                    let sent = await appState.sendBoardReply(
-                        threadID: thread.id,
-                        body: draftReply,
-                        latitude: coordinate?.latitude,
-                        longitude: coordinate?.longitude,
-                        prefecture: selectedPrefecture,
-                        scope: thread.audience
-                    )
-                    if sent {
-                        draftReply = ""
+            .scrollDismissesKeyboard(.interactively)
+            .onChange(of: replies.count) { _, _ in
+                scrollToLatest(proxy)
+            }
+            .safeAreaInset(edge: .bottom) {
+                BoardReplyInput(
+                    text: $draftReply,
+                    isSending: appState.sendingBoardReplyThreadID == thread.id
+                ) {
+                    sendReply(proxy: proxy)
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 10)
+                .background(.regularMaterial)
+            }
+            .background(MegrumTheme.canvas.ignoresSafeArea())
+            .navigationTitle(thread.title)
+            .megrumInlineNavigationTitle()
+            .task {
+                await appState.loadBoardReplies(
+                    threadID: thread.id,
+                    latitude: coordinate?.latitude,
+                    longitude: coordinate?.longitude,
+                    prefecture: selectedPrefecture,
+                    scope: thread.audience
+                )
+                await MainActor.run {
+                    scrollToLatest(proxy, animated: false)
+                }
+            }
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("閉じる") {
+                        dismiss()
                     }
                 }
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 10)
-            .background(.regularMaterial)
         }
-        .background(MegrumTheme.canvas.ignoresSafeArea())
-        .navigationTitle(thread.title)
-        .megrumInlineNavigationTitle()
-        .task {
-            await appState.loadBoardReplies(
+    }
+
+    private func sendReply(proxy: ScrollViewProxy) {
+        let trimmedReply = draftReply.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedReply.isEmpty, appState.sendingBoardReplyThreadID != thread.id else {
+            return
+        }
+
+        Task {
+            let sent = await appState.sendBoardReply(
                 threadID: thread.id,
+                body: trimmedReply,
                 latitude: coordinate?.latitude,
                 longitude: coordinate?.longitude,
                 prefecture: selectedPrefecture,
                 scope: thread.audience
             )
-        }
-        .toolbar {
-            ToolbarItem(placement: .cancellationAction) {
-                Button("閉じる") {
-                    dismiss()
+            if sent {
+                await MainActor.run {
+                    draftReply = ""
+                    scrollToLatest(proxy)
                 }
             }
         }
     }
+
+    private func scrollToLatest(_ proxy: ScrollViewProxy, animated: Bool = true) {
+        let scroll = {
+            proxy.scrollTo(BoardThreadScrollAnchor.bottom, anchor: .bottom)
+        }
+        if animated {
+            withAnimation(.smooth(duration: 0.22)) {
+                scroll()
+            }
+        } else {
+            scroll()
+        }
+    }
+}
+
+private enum BoardThreadScrollAnchor: Hashable {
+    case bottom
 }
 
 private struct BoardThreadStarterBubble: View {
@@ -1324,20 +1434,35 @@ private struct BoardReplyInput: View {
     var isSending: Bool
     var onSend: () -> Void
 
+    private var canSend: Bool {
+        !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && !isSending
+    }
+
     var body: some View {
         HStack(spacing: 10) {
             TextField("返信を入力", text: $text, axis: .vertical)
                 .font(.system(size: 16, weight: .bold, design: .rounded))
                 .lineLimit(1...4)
+                .submitLabel(.send)
                 .padding(.horizontal, 14)
                 .padding(.vertical, 11)
                 .background(.white.opacity(0.82), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                .overlay {
+                    RoundedRectangle(cornerRadius: 18, style: .continuous)
+                        .stroke(MegrumTheme.lavender.opacity(0.14), lineWidth: 1)
+                }
+                .onSubmit {
+                    if canSend {
+                        onSend()
+                    }
+                }
 
             Button(action: onSend) {
                 Group {
                     if isSending {
                         ProgressView()
                             .controlSize(.small)
+                            .tint(.white)
                     } else {
                         Image(systemName: "arrow.up")
                             .font(.system(size: 17, weight: .heavy))
@@ -1348,8 +1473,8 @@ private struct BoardReplyInput: View {
                 .background(MegrumTheme.lavender, in: Circle())
             }
             .buttonStyle(.plain)
-            .disabled(text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isSending)
-            .opacity(text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? 0.45 : 1)
+            .disabled(!canSend)
+            .opacity(canSend ? 1 : 0.45)
         }
     }
 }
@@ -1671,8 +1796,130 @@ private extension MeguriMapKind {
         }
     }
 
+    func visibleRegion(
+        userCoordinate: MegrumLocationCoordinate?,
+        grooms: [GroomPost],
+        threads: [BoardThread],
+        boardScope: BoardThread.Audience
+    ) -> MKCoordinateRegion {
+        let userLocation = userCoordinate?.clLocationCoordinate
+        var rect = MKMapRect.null
+
+        if let userLocation, shouldCenterRangeCircle(boardScope: boardScope) {
+            rect = rect.union(.meguriRect(centeredAt: userLocation, radiusMeters: radiusMeters))
+        } else if let userLocation, annotationCoordinates(grooms: grooms, threads: threads).isEmpty {
+            rect = rect.union(.meguriRect(centeredAt: userLocation, radiusMeters: 220))
+        }
+
+        for coordinate in annotationCoordinates(grooms: grooms, threads: threads) where coordinate.isMeguriValid {
+            rect = rect.union(.meguriRect(centeredAt: coordinate, radiusMeters: 150))
+        }
+
+        guard !rect.isNull else {
+            return MKCoordinateRegion(
+                center: initialCenter(userCoordinate: userCoordinate, grooms: grooms, threads: threads),
+                span: regionSpan
+            )
+        }
+
+        return MKCoordinateRegion(rect.meguriPadded())
+            .meguriClamped(minimum: minimumRegionSpan, maximum: maximumRegionSpan)
+    }
+
+    private func annotationCoordinates(grooms: [GroomPost], threads: [BoardThread]) -> [CLLocationCoordinate2D] {
+        switch self {
+        case .grooms:
+            return grooms.map(\.coordinate)
+        case .boards:
+            return threads.compactMap { thread in
+                guard let latitude = thread.latitude, let longitude = thread.longitude else {
+                    return nil
+                }
+                return CLLocationCoordinate2D(latitude: latitude, longitude: longitude)
+            }
+        }
+    }
+
+    private func shouldCenterRangeCircle(boardScope: BoardThread.Audience) -> Bool {
+        switch self {
+        case .grooms:
+            return true
+        case .boards:
+            return boardScope == .nearby3km
+        }
+    }
+
+    private var minimumRegionSpan: MKCoordinateSpan {
+        switch self {
+        case .grooms:
+            MKCoordinateSpan(latitudeDelta: 0.018, longitudeDelta: 0.018)
+        case .boards:
+            MKCoordinateSpan(latitudeDelta: 0.04, longitudeDelta: 0.04)
+        }
+    }
+
+    private var maximumRegionSpan: MKCoordinateSpan {
+        switch self {
+        case .grooms:
+            MKCoordinateSpan(latitudeDelta: 0.12, longitudeDelta: 0.12)
+        case .boards:
+            MKCoordinateSpan(latitudeDelta: 0.16, longitudeDelta: 0.16)
+        }
+    }
+
     static var fallbackCenter: CLLocationCoordinate2D {
         CLLocationCoordinate2D(latitude: 35.681236, longitude: 139.767125)
+    }
+}
+
+private extension MKMapRect {
+    static func meguriRect(centeredAt coordinate: CLLocationCoordinate2D, radiusMeters: CLLocationDistance) -> MKMapRect {
+        let point = MKMapPoint(coordinate)
+        let metersPerMapPoint = max(MKMetersPerMapPointAtLatitude(coordinate.latitude), 0.000_001)
+        let radiusMapPoints = max(radiusMeters / metersPerMapPoint, 1)
+        return MKMapRect(
+            x: point.x - radiusMapPoints,
+            y: point.y - radiusMapPoints,
+            width: radiusMapPoints * 2,
+            height: radiusMapPoints * 2
+        )
+    }
+
+    func meguriPadded(fraction: Double = 0.24) -> MKMapRect {
+        insetBy(dx: -size.width * fraction, dy: -size.height * fraction)
+    }
+}
+
+private extension MKCoordinateRegion {
+    func meguriClamped(minimum: MKCoordinateSpan, maximum: MKCoordinateSpan) -> MKCoordinateRegion {
+        MKCoordinateRegion(
+            center: center,
+            span: MKCoordinateSpan(
+                latitudeDelta: span.latitudeDelta.meguriClamped(minimum.latitudeDelta, maximum.latitudeDelta),
+                longitudeDelta: span.longitudeDelta.meguriClamped(minimum.longitudeDelta, maximum.longitudeDelta)
+            )
+        )
+    }
+}
+
+private extension CLLocationCoordinate2D {
+    var isMeguriValid: Bool {
+        CLLocationCoordinate2DIsValid(self)
+    }
+}
+
+private extension Double {
+    func meguriClamped(_ lowerBound: Double, _ upperBound: Double) -> Double {
+        min(max(self, lowerBound), upperBound)
+    }
+}
+
+private extension CLLocationDistance {
+    var meguriDistanceText: String {
+        if self < 1_000 {
+            return "\(Int(rounded()))m"
+        }
+        return String(format: "%.1fkm", self / 1_000)
     }
 }
 

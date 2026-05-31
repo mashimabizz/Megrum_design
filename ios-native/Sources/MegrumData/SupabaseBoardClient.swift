@@ -142,9 +142,15 @@ private struct BoardThreadListPayload: Encodable, Sendable {
     var pScope: String
 
     init(latitude: Double?, longitude: Double?, prefecture: String?, scope: BoardThread.Audience) {
-        self.pViewerLat = latitude
-        self.pViewerLng = longitude
-        self.pPrefecture = prefecture?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
+        let context = BoardScopeQueryContext(
+            latitude: latitude,
+            longitude: longitude,
+            prefecture: prefecture,
+            scope: scope
+        )
+        self.pViewerLat = context.latitude
+        self.pViewerLng = context.longitude
+        self.pPrefecture = context.prefecture
         self.pScope = scope.rawValue
     }
 
@@ -287,10 +293,16 @@ private struct BoardReplyListPayload: Encodable, Sendable {
         prefecture: String?,
         scope: BoardThread.Audience
     ) {
+        let context = BoardScopeQueryContext(
+            latitude: latitude,
+            longitude: longitude,
+            prefecture: prefecture,
+            scope: scope
+        )
         self.pThreadId = threadID
-        self.pViewerLat = latitude
-        self.pViewerLng = longitude
-        self.pPrefecture = prefecture?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
+        self.pViewerLat = context.latitude
+        self.pViewerLng = context.longitude
+        self.pPrefecture = context.prefecture
         self.pScope = scope.rawValue
     }
 
@@ -337,11 +349,17 @@ private struct BoardReplyAppendPayload: Encodable, Sendable {
     var pImagePaths: [String]
 
     init(input: BoardReplyCreateInput) {
+        let context = BoardScopeQueryContext(
+            latitude: input.latitude,
+            longitude: input.longitude,
+            prefecture: input.prefecture,
+            scope: input.scope
+        )
         self.pThreadId = input.threadID
         self.pBody = input.body.trimmingCharacters(in: .whitespacesAndNewlines)
-        self.pViewerLat = input.latitude
-        self.pViewerLng = input.longitude
-        self.pPrefecture = input.prefecture?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
+        self.pViewerLat = context.latitude
+        self.pViewerLng = context.longitude
+        self.pPrefecture = context.prefecture
         self.pScope = input.scope.rawValue
         self.pParentReplyId = nil
         self.pQuoteAuthorName = nil
@@ -407,6 +425,30 @@ private struct BoardReplyRow: Decodable, Sendable {
             status: status,
             createdAt: createdAt ?? .now
         )
+    }
+}
+
+private struct BoardScopeQueryContext: Sendable {
+    var latitude: Double?
+    var longitude: Double?
+    var prefecture: String?
+
+    init(latitude: Double?, longitude: Double?, prefecture: String?, scope: BoardThread.Audience) {
+        let trimmedPrefecture = prefecture?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
+        switch scope {
+        case .nearby3km:
+            self.latitude = latitude
+            self.longitude = longitude
+            self.prefecture = nil
+        case .samePrefecture:
+            self.latitude = nil
+            self.longitude = nil
+            self.prefecture = trimmedPrefecture
+        case .sameSpot, .global:
+            self.latitude = latitude
+            self.longitude = longitude
+            self.prefecture = trimmedPrefecture
+        }
     }
 }
 

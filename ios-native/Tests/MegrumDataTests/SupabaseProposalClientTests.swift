@@ -189,6 +189,27 @@ final class SupabaseProposalClientTests: XCTestCase {
         XCTAssertEqual(json["p_proposal_id"] as? String, "33333333-3333-3333-3333-333333333333")
     }
 
+    func testRejectsApproveEvidenceRequestWithoutEvidencePhoto() throws {
+        let client = SupabaseProposalClient(configuration: configuration)
+        let senderID = UUID(uuidString: "11111111-1111-1111-1111-111111111111")!
+        let receiverID = UUID(uuidString: "22222222-2222-2222-2222-222222222222")!
+        let proposal = TradeProposal(
+            id: UUID(uuidString: "33333333-3333-3333-3333-333333333333")!,
+            senderID: senderID,
+            receiverID: receiverID,
+            status: .agreed,
+            exchangeMethod: .hand,
+            senderGoodsIDs: [],
+            receiverGoodsIDs: []
+        )
+
+        XCTAssertThrowsError(
+            try client.makeApproveEvidenceRequest(userID: receiverID, proposal: proposal)
+        ) { error in
+            XCTAssertEqual(error as? SupabaseProposalClientError, .missingEvidence)
+        }
+    }
+
     func testBuildsSubmitEvaluationRequest() throws {
         let client = SupabaseProposalClient(configuration: configuration)
         let senderID = UUID(uuidString: "11111111-1111-1111-1111-111111111111")!
@@ -219,6 +240,58 @@ final class SupabaseProposalClientTests: XCTestCase {
         XCTAssertEqual(json.first?["ratee_id"] as? String, "22222222-2222-2222-2222-222222222222")
         XCTAssertEqual(json.first?["stars"] as? Int, 5)
         XCTAssertEqual(json.first?["comment"] as? String, "ありがとうございました")
+    }
+
+    func testRejectsSubmitEvaluationRequestBeforeCompletion() throws {
+        let client = SupabaseProposalClient(configuration: configuration)
+        let senderID = UUID(uuidString: "11111111-1111-1111-1111-111111111111")!
+        let receiverID = UUID(uuidString: "22222222-2222-2222-2222-222222222222")!
+        let proposalID = UUID(uuidString: "33333333-3333-3333-3333-333333333333")!
+        let proposal = TradeProposal(
+            id: proposalID,
+            senderID: senderID,
+            receiverID: receiverID,
+            status: .agreed,
+            exchangeMethod: .hand,
+            senderGoodsIDs: [],
+            receiverGoodsIDs: []
+        )
+
+        XCTAssertThrowsError(
+            try client.makeSubmitEvaluationRequest(
+                userID: senderID,
+                proposal: proposal,
+                input: TradeEvaluationCreateInput(proposalID: proposalID, stars: 5, comment: nil)
+            )
+        ) { error in
+            XCTAssertEqual(error as? SupabaseProposalClientError, .invalidStatus)
+        }
+    }
+
+    func testRejectsSubmitEvaluationRequestWithInvalidStars() throws {
+        let client = SupabaseProposalClient(configuration: configuration)
+        let senderID = UUID(uuidString: "11111111-1111-1111-1111-111111111111")!
+        let receiverID = UUID(uuidString: "22222222-2222-2222-2222-222222222222")!
+        let proposalID = UUID(uuidString: "33333333-3333-3333-3333-333333333333")!
+        let proposal = TradeProposal(
+            id: proposalID,
+            senderID: senderID,
+            receiverID: receiverID,
+            status: .completed,
+            exchangeMethod: .hand,
+            senderGoodsIDs: [],
+            receiverGoodsIDs: []
+        )
+
+        XCTAssertThrowsError(
+            try client.makeSubmitEvaluationRequest(
+                userID: senderID,
+                proposal: proposal,
+                input: TradeEvaluationCreateInput(proposalID: proposalID, stars: 6, comment: nil)
+            )
+        ) { error in
+            XCTAssertEqual(error as? SupabaseProposalClientError, .invalidRating)
+        }
     }
 
     private var configuration: SupabaseConfiguration {

@@ -70,6 +70,32 @@ final class SupabaseDisputeClientTests: XCTestCase {
         }
     }
 
+    func testRejectsDisputeRequestWithBlankFactMemo() throws {
+        let client = SupabaseDisputeClient(configuration: configuration)
+        let reporterID = UUID(uuidString: "11111111-1111-1111-1111-111111111111")!
+        let respondentID = UUID(uuidString: "22222222-2222-2222-2222-222222222222")!
+        let proposal = TradeProposal(
+            id: UUID(uuidString: "33333333-3333-3333-3333-333333333333")!,
+            senderID: reporterID,
+            receiverID: respondentID,
+            status: .agreed,
+            exchangeMethod: .hand,
+            senderGoodsIDs: [],
+            receiverGoodsIDs: []
+        )
+
+        XCTAssertThrowsError(
+            try client.makeCreateDisputeRequest(
+                userID: reporterID,
+                proposal: proposal,
+                input: TradeDisputeCreateInput(proposalID: proposal.id, category: .other, factMemo: "   "),
+                ticketNo: "DPT-260531-ABCD"
+            )
+        ) { error in
+            XCTAssertEqual(error as? SupabaseDisputeClientError, .emptyFactMemo)
+        }
+    }
+
     private var configuration: SupabaseConfiguration {
         SupabaseConfiguration(
             projectURL: URL(string: "https://example.supabase.co")!,

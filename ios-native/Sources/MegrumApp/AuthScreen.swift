@@ -2,6 +2,9 @@
 import AuthenticationServices
 import CryptoKit
 #endif
+#if canImport(UIKit)
+import UIKit
+#endif
 import MegrumDesign
 import SwiftUI
 
@@ -33,6 +36,9 @@ public struct AuthScreen: View {
     @State private var hasSubmittedPasswordReset = false
     @State private var appleSignInNonce: String?
     @State private var appleSignInError: String?
+    #if canImport(AuthenticationServices) && canImport(UIKit)
+    @State private var googleOAuthSession: ASWebAuthenticationSession?
+    #endif
     @FocusState private var focusedField: Field?
 
     public init(authState: MegrumAuthState) {
@@ -275,7 +281,39 @@ public struct AuthScreen: View {
             .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
             .disabled(authState.isLoading || !authState.isConfigured)
             .accessibilityLabel("Appleで続ける")
+
+            googleSignInButton
         }
+        #endif
+    }
+
+    @ViewBuilder
+    private var googleSignInButton: some View {
+        #if canImport(AuthenticationServices) && canImport(UIKit)
+        Button {
+            startGoogleSignIn()
+        } label: {
+            HStack(spacing: 10) {
+                Text("G")
+                    .font(.system(size: 17, weight: .black, design: .rounded))
+                    .frame(width: 24, height: 24)
+                    .foregroundStyle(MegrumTheme.ink)
+                    .background(Color.white, in: Circle())
+                    .overlay(
+                        Circle()
+                            .stroke(MegrumTheme.muted.opacity(0.22), lineWidth: 1)
+                    )
+                Text("Googleで続ける")
+                    .font(.system(size: 16, weight: .black, design: .rounded))
+            }
+            .frame(maxWidth: .infinity)
+            .frame(height: 54)
+        }
+        .buttonStyle(.bordered)
+        .buttonBorderShape(.roundedRectangle(radius: 18))
+        .tint(MegrumTheme.ink)
+        .disabled(authState.isLoading || !authState.isConfigured)
+        .accessibilityLabel("Googleで続ける")
         #endif
     }
 
@@ -318,6 +356,51 @@ public struct AuthScreen: View {
             await authState.signUp(email: email, password: password, handle: handle)
         }
     }
+
+    #if canImport(AuthenticationServices) && canImport(UIKit)
+    private func startGoogleSignIn() {
+        focusedField = nil
+        appleSignInError = nil
+
+        guard let callbackScheme = authState.oauthCallbackScheme else {
+            appleSignInError = "Googleログインを開始できませんでした。もう一度お試しください"
+            return
+        }
+
+        do {
+            let authorizeURL = try authState.googleOAuthAuthorizeURL()
+            let session = ASWebAuthenticationSession(
+                url: authorizeURL,
+                callbackURLScheme: callbackScheme
+            ) { callbackURL, error in
+                Task { @MainActor in
+                    googleOAuthSession = nil
+                    if let sessionError = error as? ASWebAuthenticationSessionError,
+                       sessionError.code == .canceledLogin {
+                        return
+                    }
+                    guard let callbackURL else {
+                        appleSignInError = "Googleでのログインに失敗しました。もう一度お試しください"
+                        return
+                    }
+                    let handled = await authState.handleOpenURL(callbackURL)
+                    if !handled, authState.errorMessage == nil {
+                        appleSignInError = "Googleログイン情報を取得できませんでした。もう一度お試しください"
+                    }
+                }
+            }
+            session.presentationContextProvider = OAuthPresentationContextProvider.shared
+            session.prefersEphemeralWebBrowserSession = false
+            googleOAuthSession = session
+            if !session.start() {
+                googleOAuthSession = nil
+                appleSignInError = "Googleログインを開始できませんでした。もう一度お試しください"
+            }
+        } catch {
+            appleSignInError = "Googleログインを開始できませんでした。もう一度お試しください"
+        }
+    }
+    #endif
 
     private enum Field {
         case email
@@ -469,4 +552,17 @@ private enum AppleSignInNonce {
         return value.isEmpty ? nil : value
     }
 }
+
+#if canImport(UIKit)
+private final class OAuthPresentationContextProvider: NSObject, ASWebAuthenticationPresentationContextProviding {
+    static let shared = OAuthPresentationContextProvider()
+
+    func presentationAnchor(for session: ASWebAuthenticationSession) -> ASPresentationAnchor {
+        UIApplication.shared.connectedScenes
+            .compactMap { $0 as? UIWindowScene }
+            .flatMap(\.windows)
+            .first { $0.isKeyWindow } ?? ASPresentationAnchor()
+    }
+}
+#endif
 #endif

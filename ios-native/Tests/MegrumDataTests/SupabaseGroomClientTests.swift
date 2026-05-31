@@ -22,6 +22,22 @@ final class SupabaseGroomClientTests: XCTestCase {
         XCTAssertEqual(json["p_radius_m"] as? Int, 1_000)
     }
 
+    func testBuildsNearbyGroomRPCRequestWithNullLocationAndMinimumRadius() throws {
+        let client = SupabaseGroomClient(configuration: configuration)
+
+        let request = try client.makeLoadNearbyGroomsRequest(
+            latitude: nil,
+            longitude: nil,
+            radiusMeters: 20
+        )
+        let body = try XCTUnwrap(request.httpBody)
+        let json = try XCTUnwrap(JSONSerialization.jsonObject(with: body) as? [String: Any])
+
+        XCTAssertTrue(json["p_viewer_lat"] is NSNull)
+        XCTAssertTrue(json["p_viewer_lng"] is NSNull)
+        XCTAssertEqual(json["p_radius_m"] as? Int, 100)
+    }
+
     func testLoadNearbyGroomsKeepsPathOnlyRowWhenSignedURLFails() throws {
         let imagePath = "00000000-0000-0000-0000-000000000001/path-only.jpg"
         let configuration = URLSessionConfiguration.ephemeral

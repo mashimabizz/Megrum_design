@@ -8,8 +8,8 @@ final class SupabaseBoardClientTests: XCTestCase {
         let client = SupabaseBoardClient(configuration: configuration)
 
         let request = try client.makeLoadThreadsRequest(
-            latitude: nil,
-            longitude: nil,
+            latitude: 35.681236,
+            longitude: 139.767125,
             prefecture: " 東京都 ",
             scope: .samePrefecture
         )
@@ -22,6 +22,24 @@ final class SupabaseBoardClientTests: XCTestCase {
         XCTAssertTrue(json["p_viewer_lng"] is NSNull)
         XCTAssertEqual(json["p_prefecture"] as? String, "東京都")
         XCTAssertEqual(json["p_scope"] as? String, "same_prefecture")
+    }
+
+    func testNearbyBoardThreadRequestUsesLocationScopeOnly() throws {
+        let client = SupabaseBoardClient(configuration: configuration)
+
+        let request = try client.makeLoadThreadsRequest(
+            latitude: 35.681236,
+            longitude: 139.767125,
+            prefecture: " 東京都 ",
+            scope: .nearby3km
+        )
+        let body = try XCTUnwrap(request.httpBody)
+        let json = try XCTUnwrap(JSONSerialization.jsonObject(with: body) as? [String: Any])
+
+        XCTAssertEqual(json["p_viewer_lat"] as? Double, 35.681236)
+        XCTAssertEqual(json["p_viewer_lng"] as? Double, 139.767125)
+        XCTAssertTrue(json["p_prefecture"] is NSNull)
+        XCTAssertEqual(json["p_scope"] as? String, "nearby_3km")
     }
 
     func testBuildsBoardReplyRPCRequests() throws {
@@ -42,7 +60,7 @@ final class SupabaseBoardClientTests: XCTestCase {
         XCTAssertEqual(loadJSON["p_thread_id"] as? String, threadID.uuidString.uppercased())
         XCTAssertEqual(loadJSON["p_viewer_lat"] as? Double, 35.0)
         XCTAssertEqual(loadJSON["p_viewer_lng"] as? Double, 139.0)
-        XCTAssertEqual(loadJSON["p_prefecture"] as? String, "東京都")
+        XCTAssertTrue(loadJSON["p_prefecture"] is NSNull)
         XCTAssertEqual(loadJSON["p_scope"] as? String, "nearby_3km")
 
         let appendRequest = try client.makeAppendReplyRequest(
@@ -62,8 +80,49 @@ final class SupabaseBoardClientTests: XCTestCase {
         XCTAssertEqual(appendJSON["p_body"] as? String, "了解です")
         XCTAssertEqual(appendJSON["p_viewer_lat"] as? Double, 35.681236)
         XCTAssertEqual(appendJSON["p_viewer_lng"] as? Double, 139.767125)
+        XCTAssertTrue(appendJSON["p_prefecture"] is NSNull)
+        XCTAssertEqual(appendJSON["p_scope"] as? String, "nearby_3km")
         XCTAssertTrue(appendJSON["p_parent_reply_id"] is NSNull)
         XCTAssertEqual((appendJSON["p_image_paths"] as? [String]) ?? ["unexpected"], [])
+    }
+
+    func testSamePrefectureBoardReplyRequestsUsePrefectureScopeOnly() throws {
+        let client = SupabaseBoardClient(configuration: configuration)
+        let threadID = UUID(uuidString: "11111111-1111-1111-1111-111111111111")!
+
+        let loadRequest = try client.makeLoadRepliesRequest(
+            threadID: threadID,
+            latitude: 35.0,
+            longitude: 139.0,
+            prefecture: " 東京都 ",
+            scope: .samePrefecture
+        )
+        let loadBody = try XCTUnwrap(loadRequest.httpBody)
+        let loadJSON = try XCTUnwrap(JSONSerialization.jsonObject(with: loadBody) as? [String: Any])
+
+        XCTAssertTrue(loadJSON["p_viewer_lat"] is NSNull)
+        XCTAssertTrue(loadJSON["p_viewer_lng"] is NSNull)
+        XCTAssertEqual(loadJSON["p_prefecture"] as? String, "東京都")
+        XCTAssertEqual(loadJSON["p_scope"] as? String, "same_prefecture")
+
+        let appendRequest = try client.makeAppendReplyRequest(
+            BoardReplyCreateInput(
+                threadID: threadID,
+                body: " 都内なら行けます ",
+                latitude: 35.681236,
+                longitude: 139.767125,
+                prefecture: " 東京都 ",
+                scope: .samePrefecture
+            )
+        )
+        let appendBody = try XCTUnwrap(appendRequest.httpBody)
+        let appendJSON = try XCTUnwrap(JSONSerialization.jsonObject(with: appendBody) as? [String: Any])
+
+        XCTAssertEqual(appendJSON["p_body"] as? String, "都内なら行けます")
+        XCTAssertTrue(appendJSON["p_viewer_lat"] is NSNull)
+        XCTAssertTrue(appendJSON["p_viewer_lng"] is NSNull)
+        XCTAssertEqual(appendJSON["p_prefecture"] as? String, "東京都")
+        XCTAssertEqual(appendJSON["p_scope"] as? String, "same_prefecture")
     }
 
     func testBuildsBoardThreadCreateRequest() throws {

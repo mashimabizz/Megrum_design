@@ -2,6 +2,33 @@ import MegrumCore
 import MegrumDesign
 import SwiftUI
 
+struct GoodsGridLayout: Equatable {
+    static let minimumColumns = 3
+    static let maximumColumns = 5
+    static let columnSpacing: CGFloat = 14
+    static let rowSpacing: CGFloat = 16
+    static let tileAspectRatio: CGFloat = 0.78
+    static let tileCornerRadius: CGFloat = 18
+
+    var requestedColumns: Int
+
+    init(columns: Int = Self.minimumColumns) {
+        self.requestedColumns = columns
+    }
+
+    var columns: Int {
+        min(Self.maximumColumns, max(Self.minimumColumns, requestedColumns))
+    }
+
+    var nextColumns: Int {
+        columns >= Self.maximumColumns ? Self.minimumColumns : columns + 1
+    }
+
+    var skeletonTileCount: Int {
+        columns * 2
+    }
+}
+
 struct GoodsGrid: View {
     var items: [GoodsItem]
     var columns: Int = 3
@@ -19,15 +46,15 @@ struct GoodsGrid: View {
     @State private var reportItem: GoodsItem?
 
     private var gridItems: [GridItem] {
-        Array(repeating: GridItem(.flexible(), spacing: 14), count: normalizedColumns)
+        Array(repeating: GridItem(.flexible(), spacing: GoodsGridLayout.columnSpacing), count: layout.columns)
     }
 
-    private var normalizedColumns: Int {
-        min(5, max(3, columns))
+    private var layout: GoodsGridLayout {
+        GoodsGridLayout(columns: columns)
     }
 
     var body: some View {
-        LazyVGrid(columns: gridItems, spacing: 16) {
+        LazyVGrid(columns: gridItems, spacing: GoodsGridLayout.rowSpacing) {
             ForEach(items) { item in
                 GoodsTile(
                     item: item,
@@ -164,9 +191,9 @@ struct GoodsTile: View {
     var body: some View {
         Button(action: onOpenDetail) {
             VStack(alignment: .leading, spacing: 8) {
-                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                RoundedRectangle(cornerRadius: GoodsGridLayout.tileCornerRadius, style: .continuous)
                     .fill(tileGradient)
-                    .aspectRatio(0.78, contentMode: .fit)
+                    .aspectRatio(GoodsGridLayout.tileAspectRatio, contentMode: .fit)
                     .overlay {
                         if let imageURL = item.imageURL {
                             AsyncImage(url: imageURL) { image in
@@ -178,7 +205,7 @@ struct GoodsTile: View {
                                     .controlSize(.small)
                                     .tint(.white)
                             }
-                            .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+                            .clipShape(RoundedRectangle(cornerRadius: GoodsGridLayout.tileCornerRadius, style: .continuous))
                         } else {
                             Image(systemName: "photo")
                                 .font(.system(size: 28, weight: .semibold))
@@ -191,9 +218,15 @@ struct GoodsTile: View {
                                 .padding(8)
                         }
                     }
+                    .overlay(alignment: .bottomTrailing) {
+                        if item.quantity > 1 {
+                            GoodsQuantityBadge(quantity: item.quantity)
+                                .padding(8)
+                        }
+                    }
                     .overlay {
                         if isBusy {
-                            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                            RoundedRectangle(cornerRadius: GoodsGridLayout.tileCornerRadius, style: .continuous)
                                 .fill(.black.opacity(0.18))
                             ProgressView()
                                 .tint(.white)
@@ -210,15 +243,57 @@ struct GoodsTile: View {
         .buttonStyle(.plain)
         .disabled(isBusy)
         .contextMenu {
-            ForEach(actions) { action in
+            ForEach(primaryActions) { action in
                 Button(role: action.role) {
                     onAction(action)
                 } label: {
                     Label(action.title, systemImage: action.symbolName)
                 }
             }
+            if !destructiveActions.isEmpty {
+                Divider()
+                ForEach(destructiveActions) { action in
+                    Button(role: action.role) {
+                        onAction(action)
+                    } label: {
+                        Label(action.title, systemImage: action.symbolName)
+                    }
+                }
+            }
         }
-        .accessibilityElement(children: .combine)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(item.title)
+        .accessibilityValue(Text(accessibilityValue))
+        .accessibilityHint(Text(accessibilityHint))
+    }
+
+    private var primaryActions: [GoodsTileAction] {
+        actions.filter { !$0.isDestructive }
+    }
+
+    private var destructiveActions: [GoodsTileAction] {
+        actions.filter(\.isDestructive)
+    }
+
+    private var accessibilityValue: String {
+        var values = ["\(item.quantity)点"]
+        if let tag = item.tags.first {
+            values.append("#\(tag.name)")
+        }
+        if isBusy {
+            values.append("処理中")
+        }
+        return values.joined(separator: "、")
+    }
+
+    private var accessibilityHint: String {
+        if isBusy {
+            return "処理が終わるまで操作できません。"
+        }
+        if actions.count > 1 {
+            return "ダブルタップで詳細を開きます。長押しで操作メニューを開けます。"
+        }
+        return "ダブルタップで詳細を開きます。"
     }
 
     private var tileGradient: LinearGradient {
@@ -289,6 +364,10 @@ enum GoodsTileAction: CaseIterable, Identifiable {
         case .detail, .addToExchangeList, .createIndividualListing, .hide, .report:
             nil
         }
+    }
+
+    var isDestructive: Bool {
+        role == .destructive
     }
 }
 
@@ -436,6 +515,22 @@ private struct GoodsTagPill: View {
             .padding(.horizontal, horizontalPadding)
             .padding(.vertical, 7)
             .background(.white.opacity(0.86), in: Capsule())
+    }
+}
+
+private struct GoodsQuantityBadge: View {
+    var quantity: Int
+
+    var body: some View {
+        Text("×\(quantity)")
+            .font(.system(size: 11, weight: .heavy, design: .rounded))
+            .monospacedDigit()
+            .foregroundStyle(.white)
+            .padding(.horizontal, 7)
+            .padding(.vertical, 4)
+            .background(MegrumTheme.lavender, in: Capsule())
+            .shadow(color: MegrumTheme.ink.opacity(0.16), radius: 5, y: 2)
+            .accessibilityHidden(true)
     }
 }
 

@@ -4,7 +4,7 @@
 > 新環境（別Claudeセッション・別エンジニア）でも、これだけ読めばコンテキストがつかめる。
 
 最終更新: 2026-05-31
-ステータス: Draft v3.84（iter350 Swift Native取引写真拡大を反映）
+ステータス: Draft v3.85（iter369 Swift Native Googleログインを反映）
 
 ---
 
@@ -49,6 +49,7 @@
 | **Swift Native iOS版** | iOSネイティブ版、Swift版 | `ios-native/` で実装する Swift / SwiftUI / UIKit 版 Megrum。iter299以降のユーザー向けiOS体験の主対象で、Apple標準の遷移・通知・地図・カメラ・Liquid Glass表現を担う | iter299 |
 | **legacy Expo版** | 旧iOSアプリ版、React Native版、Expo版 | `mobile/` で実装されている移行元アプリ。Swift Native版が機能同等になるまで、バックアップ・仕様参照・緊急修正の対象として残す | iter168.63, iter299 |
 | **Appleログイン** | Sign in with Apple | Swift Native iOS版でApple標準の `SignInWithAppleButton` から認証し、Apple identity tokenとraw nonceをSupabase Authへ渡してMegrum sessionを作る認証経路 | iter343 |
+| **Googleログイン** | Google OAuth | Swift Native iOS版でiOS標準の `ASWebAuthenticationSession` からSupabase OAuth authorize URLを開き、callback URLのsessionを既存のredirect復元へ渡してMegrum sessionを作る認証経路 | iter369 |
 | **モバイル通知** | push notification, 端末通知 | iOS/Android端末に届くMegrumの通知。Expo版はExpo Push Token、Swift Native iOS版はAPNs device tokenを `notification_devices` に登録し、`notifications` の新規行を端末へ配送する | iter276, iter338 |
 | **APNs device token** | native device token, APNsトークン | Swift Native iOS版がApple Push Notification serviceから受け取る端末トークン。`notification_devices.push_provider='apns'` / `native_device_token` に保存する | iter338 |
 | **APNs配送Function** | `send-apns-notification` | 信頼済みサーバー側から `notification_id` を受け取り、対象ユーザーの有効APNs端末へ通知を配送するSupabase Edge Function。DB設定値が揃っていれば `notifications` 作成triggerから呼ばれ、無効端末は `revoked_at` で止める | iter344, iter345 |

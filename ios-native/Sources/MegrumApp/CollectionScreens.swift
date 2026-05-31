@@ -9,7 +9,7 @@ struct GoodsCollectionScreen: View {
     var showsAddButton: Bool = false
     var appState: MegrumAppState?
     var entryKind: GoodsEntryKind = .inventory
-    @State private var columns = 3
+    @State private var columns = GoodsGridLayout.minimumColumns
     @State private var isShowingAddForm = false
     @State private var isShowingUnavailableAlert = false
     @State private var listingSeedWish: GoodsItem?
@@ -51,9 +51,54 @@ struct GoodsCollectionScreen: View {
         entryKind == .inventory ? "在庫に追加" : "Wishに追加"
     }
 
+    private var addButtonHint: String {
+        entryKind == .inventory ? "新しい在庫の登録シートを開きます" : "新しいWishの登録シートを開きます"
+    }
+
+    private var emptyMessageSystemImage: String {
+        if hasActiveFilters {
+            return "line.3.horizontal.decrease.circle"
+        }
+        if title == "個別募集" {
+            return "rectangle.stack.badge.plus"
+        }
+        switch entryKind {
+        case .inventory:
+            return "shippingbox"
+        case .wish:
+            return "heart"
+        }
+    }
+
+    private var emptyMessageDetail: String {
+        if hasActiveFilters {
+            return "フィルターを変えると表示されることがあります。"
+        }
+        if title == "個別募集" {
+            return "条件を指定した募集は、Wishから作成できます。"
+        }
+        switch entryKind {
+        case .inventory:
+            return "譲る候補を登録すると、検索や打診に使えるようになります。"
+        case .wish:
+            return "探したいグッズを登録すると、候補探しに使えるようになります。"
+        }
+    }
+
+    private var emptyMessageActionTitle: String? {
+        showsAddButton && !hasActiveFilters ? addButtonLabel : nil
+    }
+
+    private var emptyMessageAction: (() -> Void)? {
+        guard emptyMessageActionTitle != nil else {
+            return nil
+        }
+        return { openAddForm() }
+    }
+
     var body: some View {
         ZStack(alignment: .bottomLeading) {
-            ScrollView {
+            ScrollView(.vertical) {
                 VStack(alignment: .leading, spacing: 20) {
                     CollectionHeader(title: title, subtitle: subtitle, columns: $columns)
                     if let appState {
@@ -66,7 +111,13 @@ struct GoodsCollectionScreen: View {
                     if isShowingLoadingState {
                         CollectionGridSkeleton(columns: columns)
                     } else if filteredItems.isEmpty {
-                        EmptyCollectionMessage(title: emptyMessageTitle)
+                        EmptyCollectionMessage(
+                            title: emptyMessageTitle,
+                            systemImage: emptyMessageSystemImage,
+                            message: emptyMessageDetail,
+                            actionTitle: emptyMessageActionTitle,
+                            action: emptyMessageAction
+                        )
                     } else {
                         GoodsGrid(
                             items: filteredItems,
@@ -87,13 +138,7 @@ struct GoodsCollectionScreen: View {
             .megrumHiddenNavigationBar()
 
             if showsAddButton {
-                AddGoodsButton(accessibilityLabel: addButtonLabel) {
-                    if appState == nil {
-                        isShowingUnavailableAlert = true
-                    } else {
-                        isShowingAddForm = true
-                    }
-                }
+                AddGoodsButton(accessibilityLabel: addButtonLabel, accessibilityHint: addButtonHint, action: openAddForm)
                 .padding(.leading, 24)
                 .padding(.bottom, 22)
             }
@@ -161,6 +206,14 @@ struct GoodsCollectionScreen: View {
 
     private var canCreateListingFromItems: Bool {
         appState != nil && entryKind == .wish
+    }
+
+    private func openAddForm() {
+        if appState == nil {
+            isShowingUnavailableAlert = true
+        } else {
+            isShowingAddForm = true
+        }
     }
 }
 
@@ -262,18 +315,23 @@ private struct CollectionHeader: View {
 private struct ColumnToggleButton: View {
     @Binding var columns: Int
 
+    private var layout: GoodsGridLayout {
+        GoodsGridLayout(columns: columns)
+    }
+
     var body: some View {
         Button {
-            columns = columns >= 5 ? 3 : columns + 1
+            columns = layout.nextColumns
         } label: {
-            HStack(spacing: 3) {
-                ForEach(0..<columns, id: \.self) { _ in
-                    RoundedRectangle(cornerRadius: 3, style: .continuous)
-                        .strokeBorder(MegrumTheme.ink, lineWidth: 2)
-                        .frame(width: 9, height: 14)
-                }
+            HStack(spacing: 8) {
+                GridColumnGlyph(columns: layout.columns)
+
+                Text("\(layout.columns)")
+                    .font(.system(size: 13, weight: .heavy, design: .rounded))
+                    .monospacedDigit()
+                    .foregroundStyle(MegrumTheme.ink)
             }
-            .frame(width: 54, height: 44)
+            .frame(width: 64, height: 44)
             .background(.regularMaterial, in: Capsule())
             .overlay {
                 Capsule()
@@ -282,12 +340,33 @@ private struct ColumnToggleButton: View {
         }
         .buttonStyle(.plain)
         .accessibilityLabel("表示列数を変更")
-        .accessibilityValue("\(columns)列")
+        .accessibilityValue("\(layout.columns)列")
+        .accessibilityHint("タップすると\(layout.nextColumns)列に切り替えます")
+    }
+}
+
+private struct GridColumnGlyph: View {
+    var columns: Int
+
+    private var layout: GoodsGridLayout {
+        GoodsGridLayout(columns: columns)
+    }
+
+    var body: some View {
+        HStack(alignment: .center, spacing: 2) {
+            ForEach(0..<GoodsGridLayout.maximumColumns, id: \.self) { index in
+                Capsule(style: .continuous)
+                    .fill(index < layout.columns ? MegrumTheme.ink : MegrumTheme.ink.opacity(0.18))
+                    .frame(width: 4, height: index < layout.columns ? 18 : 12)
+            }
+        }
+        .accessibilityHidden(true)
     }
 }
 
 private struct AddGoodsButton: View {
     var accessibilityLabel: String
+    var accessibilityHint: String
     var action: () -> Void
 
     var body: some View {
@@ -312,6 +391,7 @@ private struct AddGoodsButton: View {
         }
         .buttonStyle(.plain)
         .accessibilityLabel(accessibilityLabel)
+        .accessibilityHint(accessibilityHint)
     }
 }
 
@@ -383,39 +463,56 @@ private struct FilterChoiceRow<Content: View>: View {
 
 private struct EmptyCollectionMessage: View {
     var title: String
+    var systemImage: String
+    var message: String
+    var actionTitle: String?
+    var action: (() -> Void)?
 
     var body: some View {
-        Text(title)
-            .font(.system(size: 15, weight: .heavy, design: .rounded))
-            .foregroundStyle(MegrumTheme.muted)
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 34)
-            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
-            .overlay {
-                RoundedRectangle(cornerRadius: 24, style: .continuous)
-                    .strokeBorder(.white.opacity(0.55), lineWidth: 1)
+        ContentUnavailableView {
+            Label(title, systemImage: systemImage)
+                .font(.system(size: 17, weight: .heavy, design: .rounded))
+        } description: {
+            Text(message)
+                .font(.system(size: 13, weight: .bold, design: .rounded))
+        } actions: {
+            if let actionTitle, let action {
+                Button(action: action) {
+                    Label(actionTitle, systemImage: "plus")
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(MegrumTheme.lavender)
             }
+        }
+        .foregroundStyle(MegrumTheme.muted)
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 14)
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 24, style: .continuous)
+                .strokeBorder(.white.opacity(0.55), lineWidth: 1)
+        }
     }
 }
 
 private struct CollectionGridSkeleton: View {
     var columns: Int
 
-    private var normalizedColumns: Int {
-        min(5, max(3, columns))
+    private var layout: GoodsGridLayout {
+        GoodsGridLayout(columns: columns)
     }
 
     private var gridItems: [GridItem] {
-        Array(repeating: GridItem(.flexible(), spacing: 14), count: normalizedColumns)
+        Array(repeating: GridItem(.flexible(), spacing: GoodsGridLayout.columnSpacing), count: layout.columns)
     }
 
     var body: some View {
-        LazyVGrid(columns: gridItems, spacing: 16) {
-            ForEach(0..<normalizedColumns * 2, id: \.self) { _ in
+        LazyVGrid(columns: gridItems, spacing: GoodsGridLayout.rowSpacing) {
+            ForEach(0..<layout.skeletonTileCount, id: \.self) { _ in
                 VStack(alignment: .leading, spacing: 8) {
-                    RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    RoundedRectangle(cornerRadius: GoodsGridLayout.tileCornerRadius, style: .continuous)
                         .fill(MegrumTheme.lavender.opacity(0.12))
-                        .aspectRatio(0.78, contentMode: .fit)
+                        .aspectRatio(GoodsGridLayout.tileAspectRatio, contentMode: .fit)
                     RoundedRectangle(cornerRadius: 5, style: .continuous)
                         .fill(MegrumTheme.lavender.opacity(0.12))
                         .frame(height: 13)

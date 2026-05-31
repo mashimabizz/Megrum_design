@@ -866,6 +866,15 @@ final class MegrumAppStateTests: XCTestCase {
         XCTAssertNil(state.errorMessage)
     }
 
+    func testAuthStateBuildsGoogleOAuthAuthorizeURLThroughRepository() throws {
+        let state = MegrumAuthState(repository: GoogleOAuthAuthRepository())
+
+        let url = try state.googleOAuthAuthorizeURL()
+
+        XCTAssertEqual(url.absoluteString, "https://example.supabase.co/auth/v1/authorize?provider=google&redirect_to=megrum-preview://auth/callback&scopes=email%20profile")
+        XCTAssertEqual(state.oauthCallbackScheme, "megrum-preview")
+    }
+
     func testAuthStateSendsPasswordResetThroughRepository() async {
         let repository = PasswordResetAuthRepository()
         let state = MegrumAuthState(repository: repository)
@@ -1087,6 +1096,25 @@ private struct AppleAuthRepository: MegrumAuthRepository {
                 email: "apple@example.com"
             )
         )
+    }
+
+    func signUp(_ input: AuthSignUpInput) async throws -> AuthSession {
+        throw MegrumRepositoryError.unsupportedMutation
+    }
+
+    func signOut(session: AuthSession) async throws {}
+}
+
+private struct GoogleOAuthAuthRepository: MegrumAuthRepository {
+    var isConfigured: Bool { true }
+    var oauthCallbackScheme: String? { "megrum-preview" }
+
+    func signIn(email: String, password: String) async throws -> AuthSession {
+        throw MegrumRepositoryError.unsupportedMutation
+    }
+
+    func googleOAuthAuthorizeURL() throws -> URL {
+        URL(string: "https://example.supabase.co/auth/v1/authorize?provider=google&redirect_to=megrum-preview://auth/callback&scopes=email%20profile")!
     }
 
     func signUp(_ input: AuthSignUpInput) async throws -> AuthSession {

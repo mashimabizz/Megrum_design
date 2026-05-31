@@ -61,9 +61,11 @@ public enum MegrumAuthInputValidator {
 
 public protocol MegrumAuthRepository: Sendable {
     var isConfigured: Bool { get }
+    var oauthCallbackScheme: String? { get }
 
     func signIn(email: String, password: String) async throws -> AuthSession
     func signInWithApple(idToken: String, nonce: String, fullName: String?) async throws -> AuthSession
+    func googleOAuthAuthorizeURL() throws -> URL
     func signUp(_ input: AuthSignUpInput) async throws -> AuthSession
     func sendPasswordReset(email: String) async throws
     func signOut(session: AuthSession) async throws
@@ -71,7 +73,13 @@ public protocol MegrumAuthRepository: Sendable {
 }
 
 public extension MegrumAuthRepository {
+    var oauthCallbackScheme: String? { nil }
+
     func signInWithApple(idToken: String, nonce: String, fullName: String?) async throws -> AuthSession {
+        throw MegrumRepositoryError.unsupportedMutation
+    }
+
+    func googleOAuthAuthorizeURL() throws -> URL {
         throw MegrumRepositoryError.unsupportedMutation
     }
 
@@ -86,6 +94,7 @@ public extension MegrumAuthRepository {
 
 public struct PreviewMegrumAuthRepository: MegrumAuthRepository {
     public var isConfigured: Bool { false }
+    public var oauthCallbackScheme: String? { "megrum-preview" }
 
     public init() {}
 
@@ -120,10 +129,12 @@ public struct PreviewMegrumAuthRepository: MegrumAuthRepository {
 
 public struct SupabaseMegrumAuthRepository: MegrumAuthRepository {
     public var isConfigured: Bool { true }
+    public var oauthCallbackScheme: String? { oauthCallbackSchemeValue }
 
     private let client: SupabaseAuthClient
     private let accountClient: SupabaseAccountClient?
     private let emailRedirectTo: URL?
+    private let oauthCallbackSchemeValue: String?
 
     public init(
         client: SupabaseAuthClient,
@@ -133,6 +144,7 @@ public struct SupabaseMegrumAuthRepository: MegrumAuthRepository {
         self.client = client
         self.accountClient = accountClient
         self.emailRedirectTo = emailRedirectTo
+        self.oauthCallbackSchemeValue = Self.callbackScheme(from: emailRedirectTo) ?? "megrum-preview"
     }
 
     public func signIn(email: String, password: String) async throws -> AuthSession {
@@ -144,6 +156,14 @@ public struct SupabaseMegrumAuthRepository: MegrumAuthRepository {
             provider: .apple,
             idToken: idToken,
             nonce: nonce
+        )
+    }
+
+    public func googleOAuthAuthorizeURL() throws -> URL {
+        try client.makeOAuthAuthorizeURL(
+            provider: .google,
+            redirectTo: emailRedirectTo,
+            scopes: ["email", "profile"]
         )
     }
 
@@ -176,6 +196,18 @@ public struct SupabaseMegrumAuthRepository: MegrumAuthRepository {
     public func restoreSession(fromRedirectURL url: URL) async throws -> AuthSession? {
         try await client.session(fromRedirectURL: url)
     }
+
+    private static func callbackScheme(from redirectURL: URL?) -> String? {
+        guard
+            let redirectURL,
+            let components = URLComponents(url: redirectURL, resolvingAgainstBaseURL: false),
+            let scheme = components.queryItems?.first(where: { $0.name == "scheme" })?.value?.trimmingCharacters(in: .whitespacesAndNewlines),
+            !scheme.isEmpty
+        else {
+            return nil
+        }
+        return scheme
+    }
 }
 
 @MainActor
@@ -202,6 +234,10 @@ public final class MegrumAuthState: ObservableObject {
 
     public var isAuthenticated: Bool {
         session != nil
+    }
+
+    public var oauthCallbackScheme: String? {
+        repository.oauthCallbackScheme
     }
 
     public func signIn(email: String, password: String) async {
@@ -240,6 +276,13 @@ public final class MegrumAuthState: ObservableObject {
                 fullName: fullName?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfBlank
             )
         }
+    }
+
+    public func googleOAuthAuthorizeURL() throws -> URL {
+        guard isConfigured else {
+            throw MegrumRepositoryError.unsupportedMutation
+        }
+        return try repository.googleOAuthAuthorizeURL()
     }
 
     public func signUp(email: String, password: String, handle: String?) async {

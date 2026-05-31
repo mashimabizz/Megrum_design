@@ -272,7 +272,15 @@ public final class SupabaseProposalClient: @unchecked Sendable {
     }
 
     public func makeApproveEvidenceRequest(userID: UUID, proposal: TradeProposal) throws -> URLRequest {
-        _ = userID
+        guard proposal.isParticipant(userID) else {
+            throw SupabaseProposalClientError.notParticipant
+        }
+        guard proposal.status == .agreed || proposal.status == .completed else {
+            throw SupabaseProposalClientError.invalidStatus
+        }
+        guard proposal.evidencePhotoURL != nil else {
+            throw SupabaseProposalClientError.missingEvidence
+        }
         return try client.makeRPCRequest(
             function: "approve_trade_evidence_for_viewer",
             payload: ProposalApprovalRPCPayload(proposalID: proposal.id)
@@ -280,7 +288,15 @@ public final class SupabaseProposalClient: @unchecked Sendable {
     }
 
     public func makeSubmitEvaluationRequest(userID: UUID, proposal: TradeProposal, input: TradeEvaluationCreateInput) throws -> URLRequest {
-        let rateeID = proposal.partnerID(for: userID) ?? proposal.receiverID
+        guard (1...5).contains(input.stars) else {
+            throw SupabaseProposalClientError.invalidRating
+        }
+        guard proposal.isParticipant(userID), let rateeID = proposal.partnerID(for: userID) else {
+            throw SupabaseProposalClientError.notParticipant
+        }
+        guard proposal.status == .completed else {
+            throw SupabaseProposalClientError.invalidStatus
+        }
         return try client.makeInsertRequest(
             into: "user_evaluations",
             values: [

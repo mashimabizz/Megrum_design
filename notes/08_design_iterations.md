@@ -4,6 +4,96 @@
 
 ---
 
+## イテレーション369：Swift並列移行バッチで認証・グリッド・めぐり・取引境界を補強
+
+### 背景・問題意識
+
+Swift Native版を継続してiPhoneで確認できるようにしたいという要望があり、前回更新に続く並列実装バッチを統合した。今回は、認証のGoogle OAuth UI接続、在庫/WishグリッドのiOS標準寄りの安定化、めぐりマップ/掲示板詳細、取引チャット系request境界の堅牢化を、競合しない担当範囲へ分けて進めた。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/AuthScreen.swift`
+- Googleログインボタンを追加し、iOS標準の `ASWebAuthenticationSession` でSupabase OAuth authorize URLを開くようにした。
+- callback URLを既存の `MegrumAuthState.handleOpenURL` へ渡し、メール認証redirectと同じsession復元境界で処理できるようにした。
+
+#### `ios-native/Sources/MegrumApp/MegrumAuthState.swift`
+- Auth repositoryにGoogle OAuth authorize URLとcallback schemeの境界を追加した。
+- Supabase live repositoryでは設定済みredirect URLからcallback schemeを導出し、Preview repositoryでは `megrum-preview` を使うようにした。
+
+#### `ios-native/Sources/MegrumApp/CollectionScreens.swift`
+- 在庫/Wishの空状態をiOS標準の `ContentUnavailableView` 風に整理した。
+- 3/4/5列切り替え、読み込み中のスケルトン、長押しメニューのアクセシビリティを補強した。
+
+#### `ios-native/Sources/MegrumApp/GoodsGrid.swift`
+- 3/4/5列の列数、spacing、tile比率、スケルトン数を共有する `GoodsGridLayout` を追加した。
+- 数量が2以上のグッズに数量バッジを表示し、長押しメニューの破壊的操作を視覚的に分離した。
+
+#### `ios-native/Sources/MegrumApp/MeguriScreen.swift`
+- グルーム/掲示板マップの初期cameraを、現在地の範囲円と表示対象pinが収まるように調整した。
+- グルームmap上の範囲外pinはロック表示に寄せ、タップ時に距離制限のalertを表示するようにした。
+- 掲示板詳細をチャット寄りに整理し、Lazy stack、最新返信へのscroll、interactive keyboard dismissal、safe-area composerを追加した。
+
+#### `ios-native/Sources/MegrumData/SupabaseBoardClient.swift`
+- 掲示板RPC requestで、3km圏内scopeは緯度経度、都道府県scopeはprefectureのみを送るようにした。
+
+#### `ios-native/Sources/MegrumData/SupabaseMessageClient.swift`
+- 位置情報messageに `location_lat` / `location_lng` / `location_label` を保存するrequest境界を追加した。
+- 到着状態messageに `meta.status` を保存し、読み込み時もlocation/meta列をselectするようにした。
+- 写真message requestで、写真以外のmessage typeを弾くvalidationを追加した。
+
+#### `ios-native/Sources/MegrumData/SupabaseDisputeClient.swift`
+- 空白だけの申告memoをrequest builder側でも拒否するようにした。
+
+#### `ios-native/Sources/MegrumData/SupabaseProposalClient.swift`
+- 証跡承認と評価送信requestで、参加者・状態・証跡写真・星数のvalidationを追加した。
+
+#### `ios-native/Tests/`
+- Google OAuth authorize URL、グリッドlayout、掲示板scope payload、グルーム周辺RPC、位置情報/到着状態message、申告memo、証跡承認、評価送信のrequest検証を追加した。
+
+### 影響範囲
+
+- Swift Native認証画面
+- Swift Native在庫/Wishグリッド
+- Swift Nativeめぐりホーム、グルーム/掲示板マップ、掲示板詳細
+- Swift Native取引チャット/証跡/評価/通報のrequest境界
+- 実機確認用のインストール済み `tokyo.megrum.native.preview`
+
+### 確認方法
+
+- `git diff --check -- ios-native`
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-iter369-build`
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-iter369-test --enable-xctest --disable-swift-testing -j 1`
+- `xcodebuild -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -destination 'generic/platform=iOS Simulator' -derivedDataPath /tmp/megrum-native-xcodebuild-iter369 CODE_SIGNING_ALLOWED=NO build`
+- `xcodebuild -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -destination 'platform=iOS,id=00008120-000C49C43669A01E' -derivedDataPath /tmp/megrum-native-device-build-iter369 build`
+- `xcrun devicectl device install app --device 00008120-000C49C43669A01E /tmp/megrum-native-device-build-iter369/Build/Products/Debug-iphoneos/MegrumNative.app`
+- `xcrun devicectl device process launch --device 00008120-000C49C43669A01E tokyo.megrum.native.preview`
+
+### 関連ファイル
+
+- `ios-native/Sources/MegrumApp/AuthScreen.swift`
+- `ios-native/Sources/MegrumApp/CollectionScreens.swift`
+- `ios-native/Sources/MegrumApp/GoodsGrid.swift`
+- `ios-native/Sources/MegrumApp/MegrumAuthState.swift`
+- `ios-native/Sources/MegrumApp/MeguriScreen.swift`
+- `ios-native/Sources/MegrumData/SupabaseBoardClient.swift`
+- `ios-native/Sources/MegrumData/SupabaseDisputeClient.swift`
+- `ios-native/Sources/MegrumData/SupabaseMessageClient.swift`
+- `ios-native/Sources/MegrumData/SupabaseProposalClient.swift`
+- `ios-native/Tests/`
+- `notes/10_glossary.md`
+- `notes/22_swift_native_migration.md`
+
+### セルフレビュー結果
+
+- ✅ サブエージェント3本を実装workerとして使い、編集範囲を分けて競合を避けた
+- ✅ `MegrumModels.swift` / `MegrumAppState.swift` / `SupabaseMegrumRepository.swift` はこのバッチでは変更していない
+- ✅ iOS標準の `ASWebAuthenticationSession`、MapKit camera、SwiftUI standard surfaceを優先した
+- ✅ `swift build` / `swift test` 186件 / `xcodebuild` Simulator build / 実機build / 実機install / 実機launch が成功した
+- ✅ 既存の `mobile/` / `web/` の未コミット差分には触れていない
+- ✅ 新規用語としてGoogleログインを `notes/10` に追加した
+- ✅ 状態名やDBスキーマ追加はないため、`notes/09` / `notes/05` 更新は不要と判断した
+- ⚠️ liveで1km外グルームpinまで広域表示するには、distance/canView付きRPCまたは専用feed拡張がまだ必要
+
 ## イテレーション368：Swift検索フィルターとめぐり範囲制御を補強
 
 ### 背景・問題意識

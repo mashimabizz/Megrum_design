@@ -1,7 +1,7 @@
 # 22. Swift Native Migration
 
 最終更新: 2026-05-31
-ステータス: Active draft（iter368）
+ステータス: Active draft（iter369）
 
 ## 目的
 
@@ -132,7 +132,8 @@ tar -xzf /Users/michitaka/Desktop/Megrum_backups/pre-swift-migration-20260531-03
 - iter366で、APNs device token upsertのconflict targetをDB側の通常unique indexと一致させ、Preview Supabase DBへ未適用migrationを反映した。
 - iter367で、認証フォームのdisabled状態、入力正規化、ハンドル名validation、Supabase error表示を補強した。live設定がない場合はAppleログインボタンを無効化し、preview fallback時の誤操作を減らした。
 - iter367で、Google OAuth authorize URL / request builderを追加し、UI接続前にrequest生成をテストできるようにした。
-- 現時点のAuthはAppleログインまで追加済み。Google OAuthはrequest境界まで追加済みで、UI接続は後続のPhase 2作業で広げる。
+- iter369で、Googleログインボタンを `ASWebAuthenticationSession` へ接続し、Supabase OAuth callbackを既存redirect復元境界へ渡せるようにした。
+- 現時点のAuthはメール/パスワード、Appleログイン、Googleログインの最小導線まで追加済み。Google側のProvider設定と実機callback許可はSupabase/Apple側の設定確認が残る。
 
 ### Phase 3: Exchange core
 
@@ -171,6 +172,8 @@ tar -xzf /Users/michitaka/Desktop/Megrum_backups/pre-swift-migration-20260531-03
 - iter367で、取引チャットの共有写真ビューアをピンチズーム、ズーム中ドラッグ、ダブルタップリセットに対応させた。
 - iter368で、検索の `GoodsSearchInput` に `memberID` を追加し、`goods_inventory.character_id` をlive requestへ渡せるようにした。Preview repositoryとテストも同じ条件に揃えた。
 - iter368で、検索フィルターのグッズ種別とグッズタグを分離し、グループ未選択時はメンバーとグッズタグ候補を非表示にした。グッズタグ候補は最大20件まで表示する。
+- iter369で、在庫/Wishグリッドの列数・spacing・スケルトン数を共有する `GoodsGridLayout` にまとめ、3/4/5列切り替え、空状態、長押しメニュー、数量バッジ、アクセシビリティを補強した。
+- iter369で、取引チャット系request境界を補強し、位置情報message、到着状態meta、写真message type validation、申告memo validation、証跡承認/評価送信validationを追加した。
 
 ### Phase 4: Meguri core
 
@@ -195,6 +198,8 @@ tar -xzf /Users/michitaka/Desktop/Megrum_backups/pre-swift-migration-20260531-03
 - iter367で、グルームマップのstatus表示を現在地から1km範囲の確認用途に寄せた。範囲外ピンの完全な閲覧制御は、distance/canViewを返すRPC拡張と合わせて後続で詰める。
 - iter368で、Previewの掲示板scopeを分離し、都道府県表示に3km圏内スレッドが混ざらないようにした。
 - iter368で、グルームマップ上の1km圏外グルームをタップした時は詳細を開かず、範囲外で見られない旨を表示するようにした。liveで1km外ピンを含めて表示するには、feed RPC側が全件または周辺広域とcanViewを返す拡張が必要。
+- iter369で、グルーム/掲示板mapの初期cameraを現在地の範囲円とpinが収まるように調整し、範囲外グルームpinのロック表示を追加した。
+- iter369で、掲示板詳細をチャット寄りに整理し、Lazy stack、最新返信へのscroll、interactive keyboard dismissal、safe-area composerを追加した。掲示板RPC requestもscopeに応じて緯度経度または都道府県だけを送るようにした。
 
 ### Phase 5: Cutover
 
@@ -205,6 +210,7 @@ tar -xzf /Users/michitaka/Desktop/Megrum_backups/pre-swift-migration-20260531-03
 - iter367で、Swift Native PreviewのBuildを `2` に更新し、`ITSAppUsesNonExemptEncryption=false` をInfo.plistへ追加した。
 - iter367で、`MTO’s phone` 向けに署名付きDebugビルドを作成し、`tokyo.megrum.native.preview` を直接インストールできることを確認した。端末ロック中のため自動launchはOSに拒否されたが、インストール自体は成功済み。
 - iter368で、前回更新と今回更新を含めた署名付きDebugビルドを `MTO’s phone` へ再インストールし、`tokyo.megrum.native.preview` の起動まで確認した。
+- iter369で、並列実装バッチの更新を含む署名付きDebugビルドを `MTO’s phone` へ再インストールし、`tokyo.megrum.native.preview` の起動まで確認した。
 
 ## 完了条件
 
