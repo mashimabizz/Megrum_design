@@ -2,17 +2,22 @@ import { Text, type TextStyle, type StyleProp } from "react-native";
 
 export type IconSymbolName =
   | "add"
+  | "add-circle-outline"
+  | "arrow-clockwise"
   | "arrow-forward"
   | "ban-outline"
   | "calendar-outline"
   | "camera-outline"
   | "checkmark-circle-outline"
+  | "chevron-back"
   | "chevron-down"
   | "chevron-forward"
   | "close"
   | "close-circle-outline"
   | "create-outline"
   | "document-text-outline"
+  | "heart"
+  | "heart-outline"
   | "lock-closed-outline"
   | "mail-outline"
   | "mail-unread-outline"
@@ -20,6 +25,10 @@ export type IconSymbolName =
   | "receipt-outline"
   | "scale-outline"
   | "search"
+  | "search-outline"
+  | "send-outline"
+  | "ellipsis-horizontal"
+  | "settings-outline"
   | "shield-checkmark-outline"
   | "sparkles-outline"
   | "star-outline"
@@ -28,17 +37,22 @@ export type IconSymbolName =
 
 const GLYPHS: Record<IconSymbolName, string> = {
   add: "+",
+  "add-circle-outline": "+",
+  "arrow-clockwise": "↻",
   "arrow-forward": "→",
   "ban-outline": "⊘",
   "calendar-outline": "□",
   "camera-outline": "▣",
   "checkmark-circle-outline": "✓",
+  "chevron-back": "‹",
   "chevron-down": "⌄",
   "chevron-forward": "›",
   close: "×",
   "close-circle-outline": "×",
   "create-outline": "✎",
   "document-text-outline": "▤",
+  heart: "♥",
+  "heart-outline": "♡",
   "lock-closed-outline": "⌂",
   "mail-outline": "✉",
   "mail-unread-outline": "✉",
@@ -46,6 +60,10 @@ const GLYPHS: Record<IconSymbolName, string> = {
   "receipt-outline": "▧",
   "scale-outline": "⚖",
   search: "⌕",
+  "search-outline": "⌕",
+  "send-outline": "➤",
+  "ellipsis-horizontal": "…",
+  "settings-outline": "⚙",
   "shield-checkmark-outline": "✓",
   "sparkles-outline": "✦",
   "star-outline": "★",

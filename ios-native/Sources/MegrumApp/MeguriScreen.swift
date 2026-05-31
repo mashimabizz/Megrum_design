@@ -38,10 +38,10 @@ struct MeguriScreen: View {
             VStack(alignment: .leading, spacing: 26) {
                 ScreenTitle(title: "グルーム", subtitle: "近くの投稿と掲示板")
 
-                if let noticeMessage {
+                if let notice {
                     MeguriNoticeBanner(
-                        message: noticeMessage,
-                        actionTitle: locationNoticeActionTitle
+                        message: notice.message,
+                        actionTitle: notice.actionTitle
                     ) {
                         handleLocationNoticeAction()
                     }
@@ -64,7 +64,7 @@ struct MeguriScreen: View {
                             }
                         }
                     ) { groom in
-                        selectedGroom = groom
+                        openGroomFromStrip(groom)
                     }
                 }
 
@@ -90,13 +90,21 @@ struct MeguriScreen: View {
                         }
                     )
 
-                    ForEach(appState.threads) { thread in
-                        Button {
-                            selectedThread = thread
-                        } label: {
-                            BoardThreadCard(thread: thread)
+                    if appState.threads.isEmpty {
+                        MeguriInlineEmptyState(
+                            systemImage: "bubble.left.and.bubble.right",
+                            title: selectedBoardScope == .nearby3km ? "3km圏内のスレッドはまだありません" : "この都道府県のスレッドはまだありません",
+                            message: selectedBoardScope == .nearby3km ? "現在地の近くにいる人へ聞きたいことを投稿できます。" : "都道府県表示に切り替えた人へ届く掲示板です。"
+                        )
+                    } else {
+                        ForEach(appState.threads) { thread in
+                            Button {
+                                selectedThread = thread
+                            } label: {
+                                BoardThreadCard(thread: thread)
+                            }
+                            .buttonStyle(.plain)
                         }
-                        .buttonStyle(.plain)
                     }
                 }
             }
@@ -167,11 +175,16 @@ struct MeguriScreen: View {
         }
 #if os(iOS)
         .sheet(isPresented: $isShowingGroomCamera) {
-            NativeCameraCaptureView { imageData in
-                Task {
-                    await publishGroomPhoto(data: imageData, imageContentType: "image/jpeg")
+            NativeCameraCaptureView(
+                onCapture: { imageData in
+                    Task {
+                        await publishGroomPhoto(data: imageData, imageContentType: "image/jpeg")
+                    }
+                },
+                onFailure: { message in
+                    localNoticeMessage = message
                 }
-            }
+            )
             .ignoresSafeArea()
         }
 #endif
@@ -211,17 +224,28 @@ struct MeguriScreen: View {
 
     private func updateBoardScope(_ scope: BoardThread.Audience) {
         storedBoardScopeRaw = scope.rawValue
+        if scope == .nearby3km, locationState.coordinate == nil {
+            locationState.requestCurrentLocation()
+            return
+        }
         Task {
             await reloadMeguriFeed(scope: scope)
         }
     }
 
     private func reloadMeguriFeed(scope: BoardThread.Audience? = nil) async {
+        let targetScope = scope ?? selectedBoardScope
+        if targetScope == .nearby3km, locationState.coordinate == nil {
+            await MainActor.run {
+                locationState.requestCurrentLocation()
+            }
+            return
+        }
         await appState.loadMeguriFeed(
             latitude: locationState.coordinate?.latitude,
             longitude: locationState.coordinate?.longitude,
             prefecture: selectedBoardPrefecture,
-            scope: scope ?? selectedBoardScope
+            scope: targetScope
         )
     }
 
@@ -250,25 +274,44 @@ struct MeguriScreen: View {
         }
     }
 
-    private var noticeMessage: String? {
-        localNoticeMessage ?? locationState.locationErrorMessage ?? appState.errorMessage
+    private func openGroomFromStrip(_ groom: GroomPost) {
+        guard MeguriAccessPolicy.canOpenGroom(
+            groom,
+            currentCoordinate: locationState.coordinate,
+            viewerID: appState.viewer?.id
+        ) else {
+            if locationState.coordinate == nil {
+                locationState.requestCurrentLocation()
+            }
+            localNoticeMessage = MeguriAccessPolicy.groomAccessMessage(
+                groom,
+                currentCoordinate: locationState.coordinate,
+                viewerID: appState.viewer?.id
+            )
+            return
+        }
+        localNoticeMessage = nil
+        selectedGroom = groom
     }
 
-    private var locationNoticeActionTitle: String? {
-        guard localNoticeMessage == nil, locationState.locationErrorMessage != nil else {
-            return nil
+    private var notice: MegrumLocationNotice? {
+        if let localNoticeMessage {
+            return MegrumLocationNotice(message: localNoticeMessage, actionTitle: nil)
         }
-        if locationState.authorizationStatus == .denied || locationState.authorizationStatus == .restricted {
-            return "設定"
+        if let locationNotice = locationState.meguriNotice {
+            return locationNotice
         }
-        return "再試行"
+        if let errorMessage = appState.errorMessage {
+            return MegrumLocationNotice(message: errorMessage, actionTitle: nil)
+        }
+        return nil
     }
 
     private func handleLocationNoticeAction() {
-        guard locationState.locationErrorMessage != nil else {
+        guard localNoticeMessage == nil, locationState.meguriNotice?.actionTitle != nil else {
             return
         }
-        if locationState.authorizationStatus == .denied || locationState.authorizationStatus == .restricted {
+        if locationState.permissionPhase == .denied || locationState.permissionPhase == .servicesDisabled {
             openAppSettings()
         } else {
             locationState.requestCurrentLocation()
@@ -340,12 +383,38 @@ private struct BoardThreadComposerSheet: View {
     private var canSubmit: Bool {
         !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
             && !bodyText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-            && hasRequiredLocation
+            && missingContextMessage == nil
             && !appState.isCreatingBoardThread
     }
 
-    private var hasRequiredLocation: Bool {
-        scope != .nearby3km || coordinate != nil
+    private var missingContextMessage: String? {
+        switch scope {
+        case .nearby3km:
+            if coordinate == nil {
+                return "3km圏内のスレッドには現在地が必要です"
+            }
+            if selectedPrefecture?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfBlank == nil,
+               appState.viewer?.prefecture?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfBlank == nil {
+                return "3km圏内のスレッドには都道府県設定が必要です"
+            }
+            return nil
+        case .samePrefecture:
+            if selectedPrefecture?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfBlank == nil,
+               appState.viewer?.prefecture?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfBlank == nil {
+                return "都道府県を選択してください"
+            }
+            return nil
+        case .sameSpot, .global:
+            return "この公開範囲はまだ作成できません"
+        }
+    }
+
+    private var submitLatitude: Double? {
+        scope == .nearby3km ? coordinate?.latitude : nil
+    }
+
+    private var submitLongitude: Double? {
+        scope == .nearby3km ? coordinate?.longitude : nil
     }
 
     var body: some View {
@@ -367,8 +436,8 @@ private struct BoardThreadComposerSheet: View {
                 }
                 .pickerStyle(.segmented)
 
-                if !hasRequiredLocation {
-                    MeguriNoticeBanner(message: "3km圏内のスレッドには現在地が必要です")
+                if let missingContextMessage {
+                    MeguriNoticeBanner(message: missingContextMessage)
                 }
 
                 VStack(alignment: .leading, spacing: 8) {
@@ -422,8 +491,8 @@ private struct BoardThreadComposerSheet: View {
                         title: title,
                         body: bodyText,
                         scope: scope,
-                        latitude: coordinate?.latitude,
-                        longitude: coordinate?.longitude,
+                        latitude: submitLatitude,
+                        longitude: submitLongitude,
                         prefecture: selectedPrefecture
                     )
                     if created {
@@ -945,6 +1014,12 @@ private struct MeguriMapScreen: View {
                 radiusMeters: 3_000
             )
         case .boards:
+            if boardScope == .nearby3km, (latitude == nil || longitude == nil) {
+                await MainActor.run {
+                    locationState.requestCurrentLocation()
+                }
+                return
+            }
             await appState.loadMeguriFeed(
                 latitude: latitude,
                 longitude: longitude,
@@ -997,51 +1072,53 @@ private struct MeguriMapScreen: View {
             selectedGroom = groom
             return
         }
+        if canOpen(groom: groom) {
+            mapNotice = nil
+            selectedGroom = groom
+            return
+        }
         guard locationState.coordinate != nil else {
             withAnimation(.smooth(duration: 0.2)) {
-                mapNotice = "現在地取得後にグルームを開けます"
+                mapNotice = MeguriAccessPolicy.groomAccessMessage(
+                    groom,
+                    currentCoordinate: locationState.coordinate,
+                    viewerID: appState.viewer?.id
+                )
             }
             locationState.requestCurrentLocation()
             return
         }
-        guard canOpen(groom: groom) else {
-            withAnimation(.smooth(duration: 0.2)) {
-                mapNotice = groomRangeNotice(groom)
-            }
-            return
+        withAnimation(.smooth(duration: 0.2)) {
+            mapNotice = groomRangeNotice(groom)
         }
-        mapNotice = nil
-        selectedGroom = groom
     }
 
     private func isGroomOutOfRange(_ groom: GroomPost) -> Bool {
-        guard let distance = distanceFromCurrentLocation(to: groom) else {
-            return false
-        }
-        return distance > MeguriMapKind.grooms.radiusMeters
+        !MeguriAccessPolicy.canOpenGroom(
+            groom,
+            currentCoordinate: locationState.coordinate,
+            viewerID: appState.viewer?.id
+        )
     }
 
     private func canOpen(groom: GroomPost) -> Bool {
-        guard let distance = distanceFromCurrentLocation(to: groom) else {
-            return false
-        }
-        return distance <= MeguriMapKind.grooms.radiusMeters
+        MeguriAccessPolicy.canOpenGroom(
+            groom,
+            currentCoordinate: locationState.coordinate,
+            viewerID: appState.viewer?.id
+        )
     }
 
     private func distanceFromCurrentLocation(to groom: GroomPost) -> CLLocationDistance? {
-        guard let coordinate = locationState.coordinate else {
-            return nil
-        }
-        let currentLocation = CLLocation(latitude: coordinate.latitude, longitude: coordinate.longitude)
-        let groomLocation = CLLocation(latitude: groom.latitude, longitude: groom.longitude)
-        return currentLocation.distance(from: groomLocation)
+        MeguriAccessPolicy.distanceMeters(from: locationState.coordinate, to: groom)
     }
 
     private func groomRangeNotice(_ groom: GroomPost) -> String {
-        guard let distance = distanceFromCurrentLocation(to: groom) else {
-            return "現在地取得後にグルームを開けます"
-        }
-        return "現在地から\(distance.meguriDistanceText)。1km圏外のグルームは見れません"
+        MeguriAccessPolicy.groomAccessMessage(
+            groom,
+            currentCoordinate: locationState.coordinate,
+            viewerID: appState.viewer?.id
+        )
     }
 }
 
@@ -1266,6 +1343,24 @@ private struct BoardThreadDetailScreen: View {
         appState.boardReplies(for: thread.id)
     }
 
+    private var replyContextScope: BoardThread.Audience {
+        thread.audience == .sameSpot ? .nearby3km : thread.audience
+    }
+
+    private var missingReplyContextMessage: String? {
+        switch replyContextScope {
+        case .nearby3km:
+            coordinate == nil ? "このスレッドへの返信には現在地が必要です" : nil
+        case .samePrefecture:
+            selectedPrefecture?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfBlank == nil
+                && appState.viewer?.prefecture?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfBlank == nil
+                ? "このスレッドへの返信には都道府県設定が必要です"
+                : nil
+        case .sameSpot, .global:
+            nil
+        }
+    }
+
     var body: some View {
         ScrollViewReader { proxy in
             ScrollView {
@@ -1274,6 +1369,10 @@ private struct BoardThreadDetailScreen: View {
                         thread: thread,
                         isMine: thread.authorID == appState.viewer?.id
                     )
+
+                    if let missingReplyContextMessage {
+                        MeguriNoticeBanner(message: missingReplyContextMessage)
+                    }
 
                     ForEach(replies) { reply in
                         BoardReplyBubble(
@@ -1315,7 +1414,8 @@ private struct BoardThreadDetailScreen: View {
             .safeAreaInset(edge: .bottom) {
                 BoardReplyInput(
                     text: $draftReply,
-                    isSending: appState.sendingBoardReplyThreadID == thread.id
+                    isSending: appState.sendingBoardReplyThreadID == thread.id,
+                    isDisabled: missingReplyContextMessage != nil
                 ) {
                     sendReply(proxy: proxy)
                 }
@@ -1332,7 +1432,7 @@ private struct BoardThreadDetailScreen: View {
                     latitude: coordinate?.latitude,
                     longitude: coordinate?.longitude,
                     prefecture: selectedPrefecture,
-                    scope: thread.audience
+                    scope: replyContextScope
                 )
                 await MainActor.run {
                     scrollToLatest(proxy, animated: false)
@@ -1361,7 +1461,7 @@ private struct BoardThreadDetailScreen: View {
                 latitude: coordinate?.latitude,
                 longitude: coordinate?.longitude,
                 prefecture: selectedPrefecture,
-                scope: thread.audience
+                scope: replyContextScope
             )
             if sent {
                 await MainActor.run {
@@ -1460,10 +1560,11 @@ private struct BoardReplyBubble: View {
 private struct BoardReplyInput: View {
     @Binding var text: String
     var isSending: Bool
+    var isDisabled = false
     var onSend: () -> Void
 
     private var canSend: Bool {
-        !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && !isSending
+        !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && !isSending && !isDisabled
     }
 
     var body: some View {
@@ -1484,6 +1585,7 @@ private struct BoardReplyInput: View {
                         onSend()
                     }
                 }
+                .disabled(isDisabled)
 
             Button(action: onSend) {
                 Group {
@@ -1504,6 +1606,7 @@ private struct BoardReplyInput: View {
             .disabled(!canSend)
             .opacity(canSend ? 1 : 0.45)
         }
+        .opacity(isDisabled ? 0.62 : 1)
     }
 }
 
@@ -1652,6 +1755,36 @@ private struct MeguriNoticeBanner: View {
     }
 }
 
+private struct MeguriInlineEmptyState: View {
+    var systemImage: String
+    var title: String
+    var message: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Image(systemName: systemImage)
+                .font(.system(size: 22, weight: .bold))
+                .foregroundStyle(MegrumTheme.lavender)
+
+            Text(title)
+                .font(.system(size: 16, weight: .heavy, design: .rounded))
+                .foregroundStyle(MegrumTheme.ink)
+
+            Text(message)
+                .font(.system(size: 13, weight: .bold, design: .rounded))
+                .foregroundStyle(MegrumTheme.muted)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(.white.opacity(0.82), in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .stroke(MegrumTheme.lavender.opacity(0.12), lineWidth: 1)
+        }
+    }
+}
+
 private struct GroomStrip: View {
     var grooms: [GroomPost]
     @Binding var selectedPhotoItem: PhotosPickerItem?
@@ -1675,6 +1808,15 @@ private struct GroomStrip: View {
                 }
                 .buttonStyle(.plain)
                 .disabled(isCreating)
+
+                if grooms.isEmpty {
+                    MeguriInlineEmptyState(
+                        systemImage: "sparkles",
+                        title: "近くのグルームはまだありません",
+                        message: "撮影すると、いま近くにいる人へだけ届きます。"
+                    )
+                    .frame(width: 230)
+                }
 
                 ForEach(grooms) { groom in
                     Button {
@@ -1796,6 +1938,57 @@ private struct Triangle: Shape {
         path.addLine(to: CGPoint(x: rect.maxX, y: rect.minY))
         path.closeSubpath()
         return path
+    }
+}
+
+enum MeguriAccessPolicy {
+    static let groomOpenRadiusMeters: CLLocationDistance = 1_000
+    static let boardNearbyRadiusMeters: CLLocationDistance = 3_000
+
+    static func distanceMeters(
+        from currentCoordinate: MegrumLocationCoordinate?,
+        to groom: GroomPost
+    ) -> CLLocationDistance? {
+        guard let currentCoordinate else {
+            return nil
+        }
+        let currentLocation = CLLocation(
+            latitude: currentCoordinate.latitude,
+            longitude: currentCoordinate.longitude
+        )
+        let groomLocation = CLLocation(
+            latitude: groom.latitude,
+            longitude: groom.longitude
+        )
+        return currentLocation.distance(from: groomLocation)
+    }
+
+    static func canOpenGroom(
+        _ groom: GroomPost,
+        currentCoordinate: MegrumLocationCoordinate?,
+        viewerID: UUID?
+    ) -> Bool {
+        if groom.authorID == viewerID {
+            return true
+        }
+        guard let distance = distanceMeters(from: currentCoordinate, to: groom) else {
+            return false
+        }
+        return distance <= groomOpenRadiusMeters
+    }
+
+    static func groomAccessMessage(
+        _ groom: GroomPost,
+        currentCoordinate: MegrumLocationCoordinate?,
+        viewerID: UUID?
+    ) -> String {
+        if groom.authorID == viewerID {
+            return ""
+        }
+        guard let distance = distanceMeters(from: currentCoordinate, to: groom) else {
+            return "現在地取得後にグルームを開けます"
+        }
+        return "現在地から\(distance.meguriDistanceText)。1km圏外のグルームは見れません"
     }
 }
 

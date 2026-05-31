@@ -29,10 +29,138 @@ struct GoodsGridLayout: Equatable {
     }
 }
 
+enum GoodsGridContext: Equatable {
+    case inventory
+    case wish
+    case tradeCandidate
+
+    init(entryKind: GoodsEntryKind) {
+        switch entryKind {
+        case .inventory:
+            self = .inventory
+        case .wish:
+            self = .wish
+        }
+    }
+
+    var statusLabel: String {
+        switch self {
+        case .inventory:
+            "譲る候補"
+        case .wish:
+            "探し中"
+        case .tradeCandidate:
+            "交換候補"
+        }
+    }
+
+    var quantityLabel: String {
+        switch self {
+        case .inventory:
+            "在庫数"
+        case .wish:
+            "希望数"
+        case .tradeCandidate:
+            "枚数"
+        }
+    }
+}
+
+struct GoodsTilePresentation: Equatable {
+    var item: GoodsItem
+    var context: GoodsGridContext
+    var isBusy: Bool
+
+    var statusLabel: String {
+        if context == .inventory {
+            return item.status?.inventoryTabTitle ?? GoodsEntryStatus.active.inventoryTabTitle
+        }
+        return context.statusLabel
+    }
+
+    var quantityText: String {
+        "\(max(1, item.quantity))点"
+    }
+
+    var tagSummary: String? {
+        guard !item.tags.isEmpty else {
+            return nil
+        }
+        if item.tags.count == 1 {
+            return "#\(item.tags[0].name)"
+        }
+        return "#\(item.tags[0].name) +\(item.tags.count - 1)"
+    }
+
+    var tileMetadataText: String {
+        var parts = [statusLabel, quantityText]
+        if let tagSummary {
+            parts.append(tagSummary)
+        }
+        return parts.joined(separator: " ・ ")
+    }
+
+    var accessibilityValue: String {
+        var values = [statusLabel, quantityText]
+        if let tagSummary {
+            values.append(tagSummary)
+        }
+        if isBusy {
+            values.append("処理中")
+        }
+        return values.joined(separator: "、")
+    }
+}
+
+struct GoodsTileActionPolicy: Equatable {
+    var viewerID: UUID?
+    var itemOwnerID: UUID
+    var canAddToExchangeList: Bool
+    var canCreateIndividualListing: Bool
+    var canEdit: Bool
+    var canHide: Bool
+    var canDelete: Bool
+    var canReport: Bool
+
+    var actions: [GoodsTileAction] {
+        guard let viewerID else {
+            return [.detail]
+        }
+
+        if itemOwnerID == viewerID {
+            var ownerActions: [GoodsTileAction] = [.detail]
+            if canEdit {
+                ownerActions.append(.edit)
+            }
+            if canCreateIndividualListing {
+                ownerActions.append(.createIndividualListing)
+            }
+            if canHide {
+                ownerActions.append(.hide)
+            }
+            if canDelete {
+                ownerActions.append(.delete)
+            }
+            return ownerActions
+        }
+
+        var remoteActions: [GoodsTileAction] = [.detail]
+        if canAddToExchangeList {
+            remoteActions.append(.addToExchangeList)
+        }
+        if canReport {
+            remoteActions.append(.report)
+        }
+        return remoteActions
+    }
+}
+
 struct GoodsGrid: View {
     var items: [GoodsItem]
     var columns: Int = 3
+    var context: GoodsGridContext = .tradeCandidate
     var viewerID: UUID?
+    var onOpenItem: ((GoodsItem) -> Void)?
     var onOpenOwnerProfile: ((UUID) -> Void)?
     var onAddToExchangeList: ((GoodsItem) -> Void)?
     var onCreateIndividualListing: ((GoodsItem) -> Void)?
@@ -59,9 +187,12 @@ struct GoodsGrid: View {
             ForEach(items) { item in
                 GoodsTile(
                     item: item,
+                    context: context,
                     actions: actions(for: item),
                     onOpenDetail: {
-                        if let onOpenOwnerProfile, item.ownerID != viewerID {
+                        if let onOpenItem {
+                            onOpenItem(item)
+                        } else if let onOpenOwnerProfile, item.ownerID != viewerID {
                             onOpenOwnerProfile(item.ownerID)
                         } else {
                             detailItem = item
@@ -76,7 +207,7 @@ struct GoodsGrid: View {
         }
         .sheet(item: $detailItem) { item in
             NavigationStack {
-                GoodsDetailSheet(item: item)
+                GoodsDetailSheet(item: item, context: context)
             }
         }
         .sheet(item: $reportItem) { item in
@@ -161,42 +292,31 @@ struct GoodsGrid: View {
     }
 
     private func actions(for item: GoodsItem) -> [GoodsTileAction] {
-        guard let viewerID else {
-            return [.detail]
-        }
-        if item.ownerID == viewerID {
-            var actions: [GoodsTileAction] = [.detail]
-            if onEditItem != nil {
-                actions.append(.edit)
-            }
-            if onCreateIndividualListing != nil {
-                actions.append(.createIndividualListing)
-            }
-            if onHideItem != nil {
-                actions.append(.hide)
-            }
-            if onDeleteItem != nil {
-                actions.append(.delete)
-            }
-            return actions
-        }
-        var actions: [GoodsTileAction] = [.detail]
-        if onAddToExchangeList != nil {
-            actions.append(.addToExchangeList)
-        }
-        if onReportItem != nil {
-            actions.append(.report)
-        }
-        return actions
+        GoodsTileActionPolicy(
+            viewerID: viewerID,
+            itemOwnerID: item.ownerID,
+            canAddToExchangeList: onAddToExchangeList != nil,
+            canCreateIndividualListing: onCreateIndividualListing != nil,
+            canEdit: onEditItem != nil,
+            canHide: onHideItem != nil,
+            canDelete: onDeleteItem != nil,
+            canReport: onReportItem != nil
+        )
+        .actions
     }
 }
 
 struct GoodsTile: View {
     var item: GoodsItem
+    var context: GoodsGridContext = .tradeCandidate
     var actions: [GoodsTileAction] = GoodsTileAction.visibleActions
     var onOpenDetail: () -> Void
     var onAction: (GoodsTileAction) -> Void
     var isBusy = false
+
+    private var presentation: GoodsTilePresentation {
+        GoodsTilePresentation(item: item, context: context, isBusy: isBusy)
+    }
 
     var body: some View {
         Button(action: onOpenDetail) {
@@ -206,16 +326,11 @@ struct GoodsTile: View {
                     .aspectRatio(GoodsGridLayout.tileAspectRatio, contentMode: .fit)
                     .overlay {
                         if let imageURL = item.imageURL {
-                            AsyncImage(url: imageURL) { image in
-                                image
-                                    .resizable()
-                                    .scaledToFill()
-                            } placeholder: {
-                                ProgressView()
-                                    .controlSize(.small)
-                                    .tint(.white)
-                            }
-                            .clipShape(RoundedRectangle(cornerRadius: GoodsGridLayout.tileCornerRadius, style: .continuous))
+                            GoodsRemoteImage(
+                                url: imageURL,
+                                cornerRadius: GoodsGridLayout.tileCornerRadius,
+                                placeholderIconSize: 28
+                            )
                         } else {
                             Image(systemName: "photo")
                                 .font(.system(size: 28, weight: .semibold))
@@ -244,10 +359,18 @@ struct GoodsTile: View {
                     }
                     .shadow(color: MegrumTheme.ink.opacity(0.08), radius: 10, y: 5)
 
-                Text(item.title)
-                    .font(.system(size: 13, weight: .bold, design: .rounded))
-                    .foregroundStyle(MegrumTheme.ink)
-                    .lineLimit(1)
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(item.title)
+                        .font(.system(size: 13, weight: .bold, design: .rounded))
+                        .foregroundStyle(MegrumTheme.ink)
+                        .lineLimit(1)
+
+                    Text(presentation.tileMetadataText)
+                        .font(.system(size: 10.5, weight: .heavy, design: .rounded))
+                        .foregroundStyle(MegrumTheme.muted)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.82)
+                }
             }
         }
         .buttonStyle(.plain)
@@ -273,7 +396,7 @@ struct GoodsTile: View {
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(item.title)
-        .accessibilityValue(Text(accessibilityValue))
+        .accessibilityValue(Text(presentation.accessibilityValue))
         .accessibilityHint(Text(accessibilityHint))
     }
 
@@ -283,17 +406,6 @@ struct GoodsTile: View {
 
     private var destructiveActions: [GoodsTileAction] {
         actions.filter(\.isDestructive)
-    }
-
-    private var accessibilityValue: String {
-        var values = ["\(item.quantity)点"]
-        if let tag = item.tags.first {
-            values.append("#\(tag.name)")
-        }
-        if isBusy {
-            values.append("処理中")
-        }
-        return values.joined(separator: "、")
     }
 
     private var accessibilityHint: String {
@@ -319,7 +431,7 @@ struct GoodsTile: View {
     }
 }
 
-enum GoodsTileAction: CaseIterable, Identifiable {
+enum GoodsTileAction: CaseIterable, Identifiable, Equatable {
     case detail
     case addToExchangeList
     case createIndividualListing
@@ -388,6 +500,7 @@ enum GoodsTileAction: CaseIterable, Identifiable {
 
 private struct GoodsDetailSheet: View {
     var item: GoodsItem
+    var context: GoodsGridContext
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
@@ -428,15 +541,11 @@ private struct GoodsDetailSheet: View {
             .aspectRatio(0.78, contentMode: .fit)
             .overlay {
                 if let imageURL = item.imageURL {
-                    AsyncImage(url: imageURL) { image in
-                        image
-                            .resizable()
-                            .scaledToFill()
-                    } placeholder: {
-                        ProgressView()
-                            .tint(.white)
-                    }
-                    .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
+                    GoodsRemoteImage(
+                        url: imageURL,
+                        cornerRadius: 28,
+                        placeholderIconSize: 44
+                    )
                 } else {
                     Image(systemName: "photo")
                         .font(.system(size: 44, weight: .semibold))
@@ -448,6 +557,10 @@ private struct GoodsDetailSheet: View {
                     GoodsTagPill(name: tag.name, fontSize: 13, horizontalPadding: 12)
                         .padding(14)
                 }
+            }
+            .overlay(alignment: .topLeading) {
+                GoodsStatusPill(text: context.statusLabel)
+                    .padding(14)
             }
             .shadow(color: MegrumTheme.ink.opacity(0.12), radius: 22, y: 12)
     }
@@ -463,8 +576,8 @@ private struct GoodsDetailSheet: View {
             }
 
             HStack(spacing: 12) {
-                DetailMetric(label: "数量", value: "\(item.quantity)")
-                DetailMetric(label: "状態", value: "交換候補")
+                DetailMetric(label: context.quantityLabel, value: "\(max(1, item.quantity))")
+                DetailMetric(label: "状態", value: context.statusLabel)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -517,6 +630,54 @@ private struct GoodsReportSheet: View {
     }
 }
 
+private struct GoodsRemoteImage: View {
+    var url: URL
+    var cornerRadius: CGFloat
+    var placeholderIconSize: CGFloat
+
+    var body: some View {
+        AsyncImage(url: url, transaction: Transaction(animation: .easeInOut(duration: 0.18))) { phase in
+            switch phase {
+            case .empty:
+                ProgressView()
+                    .controlSize(.small)
+                    .tint(.white)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            case let .success(image):
+                GeometryReader { proxy in
+                    image
+                        .resizable()
+                        .scaledToFill()
+                        .frame(width: proxy.size.width, height: proxy.size.height)
+                        .clipped()
+                }
+            case .failure:
+                GoodsImageFallback(iconSize: placeholderIconSize)
+            @unknown default:
+                GoodsImageFallback(iconSize: placeholderIconSize)
+            }
+        }
+        .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
+        .accessibilityHidden(true)
+    }
+}
+
+private struct GoodsImageFallback: View {
+    var iconSize: CGFloat
+
+    var body: some View {
+        VStack(spacing: 8) {
+            Image(systemName: "photo.badge.exclamationmark")
+                .font(.system(size: iconSize, weight: .semibold))
+            Text("表示できません")
+                .font(.system(size: 11, weight: .heavy, design: .rounded))
+                .lineLimit(1)
+        }
+        .foregroundStyle(.white.opacity(0.82))
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+}
+
 private struct GoodsTagPill: View {
     var name: String
     var fontSize: CGFloat
@@ -530,6 +691,21 @@ private struct GoodsTagPill: View {
             .padding(.horizontal, horizontalPadding)
             .padding(.vertical, 7)
             .background(.white.opacity(0.86), in: Capsule())
+    }
+}
+
+private struct GoodsStatusPill: View {
+    var text: String
+
+    var body: some View {
+        Text(text)
+            .font(.system(size: 10.5, weight: .heavy, design: .rounded))
+            .lineLimit(1)
+            .foregroundStyle(.white)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 5)
+            .background(MegrumTheme.ink.opacity(0.52), in: Capsule())
+            .accessibilityHidden(true)
     }
 }
 

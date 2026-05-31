@@ -2,6 +2,7 @@ import MegrumCore
 import MegrumDesign
 import SwiftUI
 
+@MainActor
 struct HomeScreen: View {
     var viewer: UserProfile?
     var matchedItems: [GoodsItem]
@@ -9,16 +10,24 @@ struct HomeScreen: View {
     var isLoading: Bool
     @Binding var showsSearch: Bool
     var onRefresh: () async -> Void
+    var appState: MegrumAppState? = nil
     var onOpenSettings: () -> Void = {}
     var onOpenOwnerProfile: (UUID) -> Void = { _ in }
+    var onOpenMeguri: (() -> Void)? = nil
+    var onOpenTrades: (() -> Void)? = nil
 
+    @AppStorage("megrum.home.localMode.activityWindowID") private var localModeActivityWindowID = ""
     @AppStorage("megrum.home.localMode.enabled") private var localModeEnabled = false
     @AppStorage("megrum.home.localMode.venue") private var localModeVenue = ""
+    @AppStorage("megrum.home.localMode.latitude") private var localModeLatitude = ""
+    @AppStorage("megrum.home.localMode.longitude") private var localModeLongitude = ""
     @AppStorage("megrum.home.localMode.startedAt") private var localModeStartedAt = 0.0
     @AppStorage("megrum.home.localMode.durationMinutes") private var localModeDurationMinutes = HomeLocalActivitySettings.defaultDurationMinutes
     @AppStorage("megrum.home.localMode.radiusMeters") private var localModeRadiusMeters = HomeLocalActivitySettings.defaultRadiusMeters
     @AppStorage("megrum.home.localMode.selectedCarryingIDs") private var localModeSelectedCarryingIDs = ""
+    @State private var loadedLocalActivitySettings: HomeLocalActivitySettings?
     @State private var showsLocalModeSettings = false
+    @State private var relationTargetItem: GoodsItem?
 
     var body: some View {
         ZStack(alignment: .bottomLeading) {
@@ -30,10 +39,19 @@ struct HomeScreen: View {
                         viewer: viewer,
                         settings: localActivitySettings,
                         carryingCandidates: localCarryingCandidates,
+                        isLoadingSettings: localModeState?.isLoadingHomeLocalModeSettings ?? false,
+                        isSavingSettings: localModeState?.isSavingHomeLocalModeSettings ?? false,
                         onEdit: {
                             showsLocalModeSettings = true
                         }
                     )
+
+                    if let homeGroomEntrySummary {
+                        HomeGroomEntrySurface(
+                            summary: homeGroomEntrySummary,
+                            onOpen: onOpenMeguri
+                        )
+                    }
 
                     MatchSection(
                         title: "マッチしてるよ！",
@@ -41,6 +59,9 @@ struct HomeScreen: View {
                         items: matchedItems,
                         isLoading: isLoading,
                         viewerID: viewer?.id,
+                        onOpenItem: { item in
+                            relationTargetItem = item
+                        },
                         onOpenOwnerProfile: onOpenOwnerProfile
                     )
 
@@ -59,6 +80,7 @@ struct HomeScreen: View {
             }
             .refreshable {
                 await onRefresh()
+                await loadLocalActivitySettings()
             }
             .background(MegrumTheme.canvas.ignoresSafeArea())
             .megrumHiddenNavigationBar()
@@ -67,7 +89,7 @@ struct HomeScreen: View {
                 showsSearch = true
             }
             .padding(.leading, 24)
-            .padding(.bottom, 22)
+            .padding(.bottom, 92)
         }
         .sheet(isPresented: $showsLocalModeSettings) {
             HomeLocalModeSettingsSheet(
@@ -77,12 +99,41 @@ struct HomeScreen: View {
                 onSave: saveLocalActivitySettings
             )
         }
+        .sheet(item: $relationTargetItem) { item in
+            if let relationState = localModeState {
+                NavigationStack {
+                    MatchRelationScreen(
+                        appState: relationState,
+                        targetItem: item,
+                        matchType: .perfect,
+                        onCompletionAction: { action in
+                            relationTargetItem = nil
+                            if action == .openTrades {
+                                onOpenTrades?()
+                            }
+                        }
+                    )
+                }
+            }
+        }
+        .task(id: viewer?.id) {
+            await loadLocalActivitySettings()
+        }
     }
 
     private var localActivitySettings: HomeLocalActivitySettings {
+        localModeState?.homeLocalModeSettings ?? loadedLocalActivitySettings ?? localStorageActivitySettings
+    }
+
+    private var localStorageActivitySettings: HomeLocalActivitySettings {
         HomeLocalActivitySettings(
+            activityWindowID: UUID(uuidString: localModeActivityWindowID),
             isEnabled: localModeEnabled,
             venue: localModeVenue,
+            coordinate: HomeLocalCoordinateStorageCodec.decode(
+                latitudeText: localModeLatitude,
+                longitudeText: localModeLongitude
+            ) ?? HomeLocalLocationLabel.coordinate(in: localModeVenue),
             startedAt: localModeStartedAt > 0 ? Date(timeIntervalSince1970: localModeStartedAt) : nil,
             durationMinutes: normalizedDurationMinutes,
             radiusMeters: normalizedRadiusMeters,
@@ -90,35 +141,94 @@ struct HomeScreen: View {
         )
     }
 
+    private var localModeState: MegrumAppState? {
+        appState ?? MegrumAppState.activeInstance
+    }
+
     private var localCarryingCandidates: [HomeLocalCarryingCandidate] {
-        HomeLocalCarryingCandidate.candidates(
-            from: matchedItems + possibleItems,
+        let sourceItems = HomeLocalCarryingCandidate.sourceItems(
+            inventory: localModeState?.inventory ?? [],
+            matchedItems: matchedItems,
+            possibleItems: possibleItems
+        )
+        return HomeLocalCarryingCandidate.candidates(
+            from: sourceItems,
             viewerID: viewer?.id
         )
     }
 
     private var normalizedDurationMinutes: Int {
-        HomeLocalActivitySettings.durationOptions.contains(localModeDurationMinutes)
-            ? localModeDurationMinutes
-            : HomeLocalActivitySettings.defaultDurationMinutes
+        HomeLocalActivitySettings.normalizedDurationMinutes(localModeDurationMinutes)
     }
 
     private var normalizedRadiusMeters: Int {
-        HomeLocalActivitySettings.radiusOptions.contains(localModeRadiusMeters)
-            ? localModeRadiusMeters
-            : HomeLocalActivitySettings.defaultRadiusMeters
+        HomeLocalActivitySettings.normalizedRadiusMeters(localModeRadiusMeters)
+    }
+
+    private var homeGroomEntrySummary: HomeGroomEntrySummary? {
+        guard let localModeState else {
+            return nil
+        }
+        return HomeGroomEntrySummary(
+            groomCount: localModeState.grooms.count,
+            localStatus: localActivitySettings.status(),
+            venue: localActivitySettings.displayVenue(fallbackPrefecture: viewer?.prefecture)
+        )
     }
 
     private func saveLocalActivitySettings(_ settings: HomeLocalActivitySettings) {
         let availableIDs = Set(localCarryingCandidates.map(\.id))
+        let sanitized = settings
+            .normalizedForPersistence(fallbackActivityWindowID: localActivitySettings.activityWindowID)
+            .replacingSelectedCarryingIDs(settings.selectedCarryingIDs.intersection(availableIDs))
+
+        loadedLocalActivitySettings = sanitized
+        persistLocalActivitySettings(sanitized)
+
+        guard let localModeState else {
+            return
+        }
+
+        Task { @MainActor in
+            guard let saved = await localModeState.saveHomeLocalModeSettings(sanitized) else {
+                return
+            }
+            let persisted = saved
+                .replacingSelectedCarryingIDs(saved.selectedCarryingIDs.intersection(availableIDs))
+                .mergingMissingLocalCoordinate(from: sanitized)
+            loadedLocalActivitySettings = persisted
+            persistLocalActivitySettings(persisted)
+        }
+    }
+
+    private func loadLocalActivitySettings() async {
+        guard let localModeState else {
+            return
+        }
+        guard let settings = await localModeState.loadHomeLocalModeSettings(fallback: localStorageActivitySettings) else {
+            return
+        }
+        let loaded = settings.mergingMissingLocalCoordinate(from: localStorageActivitySettings)
+        loadedLocalActivitySettings = loaded
+        persistLocalActivitySettings(loaded)
+    }
+
+    private func persistLocalActivitySettings(_ settings: HomeLocalActivitySettings) {
+        localModeActivityWindowID = settings.activityWindowID?.uuidString.lowercased() ?? ""
         localModeEnabled = settings.isEnabled
         localModeVenue = settings.venue
+        localModeLatitude = HomeLocalCoordinateStorageCodec.latitudeText(settings.coordinate)
+        localModeLongitude = HomeLocalCoordinateStorageCodec.longitudeText(settings.coordinate)
         localModeStartedAt = settings.startedAt?.timeIntervalSince1970 ?? localModeStartedAt
         localModeDurationMinutes = settings.durationMinutes
         localModeRadiusMeters = settings.radiusMeters
-        localModeSelectedCarryingIDs = HomeLocalCarryingSelectionCodec.encode(
-            settings.selectedCarryingIDs.intersection(availableIDs)
-        )
+        localModeSelectedCarryingIDs = HomeLocalCarryingSelectionCodec.encode(settings.selectedCarryingIDs)
+    }
+}
+
+private extension HomeLocalActivitySettings {
+    func mergingMissingLocalCoordinate(from fallback: HomeLocalActivitySettings) -> HomeLocalActivitySettings {
+        coordinate == nil ? replacingCoordinate(fallback.coordinate) : self
     }
 }
 
@@ -175,6 +285,7 @@ private struct MatchSection<Items: RandomAccessCollection>: View where Items.Ele
     var items: Items
     var isLoading: Bool
     var viewerID: UUID?
+    var onOpenItem: ((GoodsItem) -> Void)? = nil
     var onOpenOwnerProfile: (UUID) -> Void
 
     var body: some View {
@@ -194,7 +305,12 @@ private struct MatchSection<Items: RandomAccessCollection>: View where Items.Ele
             if isLoading && items.isEmpty {
                 GoodsGridSkeleton()
             } else {
-                GoodsGrid(items: Array(items), viewerID: viewerID, onOpenOwnerProfile: onOpenOwnerProfile)
+                GoodsGrid(
+                    items: Array(items),
+                    viewerID: viewerID,
+                    onOpenItem: onOpenItem,
+                    onOpenOwnerProfile: onOpenOwnerProfile
+                )
             }
         }
     }

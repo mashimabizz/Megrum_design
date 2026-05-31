@@ -15,7 +15,7 @@ final class ProposalCreateSheetTests: XCTestCase {
             isListingSource: false
         )
 
-        XCTAssertEqual(configuration.conditionTagOptions, ["即日発送", "同日発送"])
+        XCTAssertEqual(configuration.conditionTagOptions, ["即日発送", "同日発送", "開演前OK", "終演後OK", "グッズ販売中OK", "短時間OK", "同種優先"])
         XCTAssertEqual(configuration.targetStatus, .sent)
         XCTAssertTrue(configuration.canSubmit)
         XCTAssertNil(configuration.methodNotice)
@@ -34,7 +34,7 @@ final class ProposalCreateSheetTests: XCTestCase {
             isListingSource: false
         )
 
-        XCTAssertEqual(configuration.conditionTagOptions, ["終演後OK", "グッズ販売中OK"])
+        XCTAssertEqual(configuration.conditionTagOptions, ["開演前OK", "終演後OK", "グッズ販売中OK", "短時間OK", "同種優先"])
         XCTAssertNil(configuration.targetStatus)
         XCTAssertFalse(configuration.canSubmit)
         XCTAssertNotNil(configuration.methodNotice)
@@ -53,7 +53,7 @@ final class ProposalCreateSheetTests: XCTestCase {
             isListingSource: false
         )
 
-        XCTAssertEqual(configuration.conditionTagOptions, ["終演後OK", "グッズ販売中OK"])
+        XCTAssertEqual(configuration.conditionTagOptions, ["開演前OK", "終演後OK", "グッズ販売中OK", "短時間OK", "同種優先"])
         XCTAssertEqual(configuration.targetStatus, .sent)
         XCTAssertTrue(configuration.canSubmit)
         XCTAssertNil(configuration.methodNotice)
@@ -90,7 +90,7 @@ final class ProposalCreateSheetTests: XCTestCase {
             isListingSource: false
         )
 
-        XCTAssertEqual(configuration.conditionTagOptions, ["終演後OK", "グッズ販売中OK", "即日発送", "同日発送"])
+        XCTAssertEqual(configuration.conditionTagOptions, ["即日発送", "同日発送", "開演前OK", "終演後OK", "グッズ販売中OK", "短時間OK", "同種優先"])
         XCTAssertEqual(configuration.targetStatus, .sent)
         XCTAssertTrue(configuration.canSubmit)
         XCTAssertNil(configuration.methodNotice)

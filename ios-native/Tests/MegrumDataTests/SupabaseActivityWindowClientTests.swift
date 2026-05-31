@@ -152,6 +152,7 @@ final class SupabaseActivityWindowClientTests: XCTestCase {
         let activityWindowID = uuid("22222222-2222-2222-2222-222222222222")
         let carryingID = uuid("33333333-3333-3333-3333-333333333333")
         let wishID = uuid("44444444-4444-4444-4444-444444444444")
+        let secondWishID = uuid("55555555-5555-5555-5555-555555555555")
 
         let request = try client.makeUpsertLocalModeSettingsRequest(
             userID: userID,
@@ -159,8 +160,8 @@ final class SupabaseActivityWindowClientTests: XCTestCase {
                 enabled: true,
                 activityWindowID: activityWindowID,
                 radiusMeters: 1_000,
-                selectedCarryingIDs: [carryingID],
-                selectedWishIDs: [wishID],
+                selectedCarryingIDs: [carryingID, carryingID],
+                selectedWishIDs: [wishID, secondWishID, wishID],
                 lastLocation: SupabaseActivityWindowCoordinate(latitude: 35.70564, longitude: 139.75189)
             )
         )
@@ -177,7 +178,13 @@ final class SupabaseActivityWindowClientTests: XCTestCase {
         XCTAssertEqual(payload["aw_id"] as? String, "22222222-2222-2222-2222-222222222222")
         XCTAssertEqual(payload["radius_m"] as? Int, 1_000)
         XCTAssertEqual(payload["selected_carrying_ids"] as? [String], ["33333333-3333-3333-3333-333333333333"])
-        XCTAssertEqual(payload["selected_wish_ids"] as? [String], ["44444444-4444-4444-4444-444444444444"])
+        XCTAssertEqual(
+            payload["selected_wish_ids"] as? [String],
+            [
+                "44444444-4444-4444-4444-444444444444",
+                "55555555-5555-5555-5555-555555555555"
+            ]
+        )
         XCTAssertEqual(try XCTUnwrap(payload["last_lat"] as? Double), 35.70564, accuracy: 0.000001)
         XCTAssertEqual(try XCTUnwrap(payload["last_lng"] as? Double), 139.75189, accuracy: 0.000001)
     }
@@ -200,6 +207,27 @@ final class SupabaseActivityWindowClientTests: XCTestCase {
         XCTAssertNil(payload["selected_wish_ids"])
         XCTAssertNil(payload["last_lat"])
         XCTAssertNil(payload["last_lng"])
+    }
+
+    func testBuildsLocalModeClearLocationRequest() throws {
+        let client = SupabaseActivityWindowClient(configuration: configuration)
+        let userID = uuid("11111111-1111-1111-1111-111111111111")
+
+        let request = try client.makeUpsertLocalModeSettingsRequest(
+            userID: userID,
+            input: SupabaseLocalModeSettingsUpsertInput(
+                enabled: false,
+                clearsActivityWindowID: true,
+                clearsLastLocation: true
+            )
+        )
+        let rows = try payloadRows(from: request)
+        let payload = try XCTUnwrap(rows.first)
+
+        XCTAssertEqual(payload["enabled"] as? Bool, false)
+        XCTAssertTrue(payload["aw_id"] is NSNull)
+        XCTAssertTrue(payload["last_lat"] is NSNull)
+        XCTAssertTrue(payload["last_lng"] is NSNull)
     }
 
     func testRejectsInvalidCreateActivityWindowInputs() {
@@ -245,6 +273,23 @@ final class SupabaseActivityWindowClientTests: XCTestCase {
             )
         ) { error in
             XCTAssertEqual(error as? SupabaseActivityWindowClientError, .emptyUpdate)
+        }
+    }
+
+    func testRejectsInvalidLocalModeLocation() {
+        let client = SupabaseActivityWindowClient(configuration: configuration)
+
+        XCTAssertThrowsError(
+            try client.makeUpsertLocalModeSettingsRequest(
+                userID: uuid("11111111-1111-1111-1111-111111111111"),
+                input: SupabaseLocalModeSettingsUpsertInput(
+                    enabled: true,
+                    activityWindowID: uuid("22222222-2222-2222-2222-222222222222"),
+                    lastLocation: SupabaseActivityWindowCoordinate(latitude: 91, longitude: 139.75189)
+                )
+            )
+        ) { error in
+            XCTAssertEqual(error as? SupabaseActivityWindowClientError, .invalidCoordinate)
         }
     }
 

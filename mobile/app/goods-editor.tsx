@@ -461,9 +461,12 @@ export default function GoodsEditorScreen() {
           character_request_id: payload.character_request_id,
           goods_type_id: payload.goods_type_id,
           title: payload.title,
+          series: payload.series,
           description: payload.description,
+          condition: payload.condition,
           quantity: payload.quantity,
           photo_urls: payload.photo_urls,
+          carrying: payload.carrying,
         })
         .eq("id", id)
         .eq("user_id", input.userId)
@@ -531,7 +534,7 @@ export default function GoodsEditorScreen() {
     if (itemIsReadOnly || isWish || !id || !user || !supabase) return;
     Alert.alert(
       "この在庫を削除しますか？",
-      "削除すると復元できません。",
+      "一覧と個別募集から外します。取引済み履歴は削除できません。",
       [
         { text: "閉じる", style: "cancel" },
         {
@@ -558,10 +561,11 @@ export default function GoodsEditorScreen() {
       await removeUnavailableHavesFromListings(user.id, [id]);
       const { error: deleteError } = await supabase
         .from("goods_inventory")
-        .delete()
+        .update({ status: "archived" })
         .eq("id", id)
         .eq("user_id", user.id)
-        .eq("kind", "for_trade");
+        .eq("kind", "for_trade")
+        .neq("status", "traded");
       if (deleteError) throw deleteError;
       navigateBackToList();
     } catch (deleteErr) {
@@ -2140,11 +2144,12 @@ async function loadCurrentStatus(id: string, userId: string) {
 async function removeUnavailableHavesFromListings(userId: string, inventoryIds: string[]) {
   if (!supabase || inventoryIds.length === 0) return;
   const removeSet = new Set(inventoryIds);
-  const { data: listings } = await supabase
+  const { data: listings, error } = await supabase
     .from("listings")
     .select("id, have_ids, have_qtys, status")
     .eq("user_id", userId)
     .in("status", ["active", "paused"]);
+  if (error) throw error;
 
   for (const listing of
     (listings as {
@@ -2165,19 +2170,21 @@ async function removeUnavailableHavesFromListings(userId: string, inventoryIds: 
     }
 
     if (nextIds.length === 0) {
-      await supabase
+      const { error: closeError } = await supabase
         .from("listings")
         .update({ status: "closed" })
         .eq("id", listing.id)
         .eq("user_id", userId);
+      if (closeError) throw closeError;
       continue;
     }
 
-    await supabase
+    const { error: updateError } = await supabase
       .from("listings")
       .update({ have_ids: nextIds, have_qtys: nextQtys })
       .eq("id", listing.id)
       .eq("user_id", userId);
+    if (updateError) throw updateError;
   }
 }
 

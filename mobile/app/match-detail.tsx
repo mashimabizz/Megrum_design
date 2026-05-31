@@ -161,6 +161,7 @@ export default function MatchDetailScreen() {
     partnerId?: string | string[];
     partnerHandle?: string | string[];
     partnerDisplayName?: string | string[];
+    avatarUrl?: string | string[];
     photoUrl?: string | string[];
     gives?: string | string[];
     receives?: string | string[];
@@ -182,8 +183,13 @@ export default function MatchDetailScreen() {
   const priority = activeCandidate?.priority || parsePriority(one(params.priority));
   const tag = activeCandidate?.tag ?? one(params.tag);
   const routePartnerId = one(params.partnerId);
+  const partnerId = routePartnerId || activeCandidate?.partnerId || "";
   const partnerHandle =
     one(params.partnerHandle) || activeCandidate?.partnerHandle || PARTNER_HANDLE;
+  const partnerDisplayName =
+    one(params.partnerDisplayName) ||
+    activeCandidate?.partnerDisplayName ||
+    partnerHandle;
   const routeGiveIds = parseRouteIds(one(params.gives));
   const routeReceiveIds = parseRouteIds(one(params.receives));
   const routeItemIdsKey = [...routeGiveIds, ...routeReceiveIds].join(",");
@@ -485,7 +491,7 @@ export default function MatchDetailScreen() {
   const proposalParams = {
     tab: "meetup",
     candidateId: highlightedItem.id,
-    ...(routePartnerId ? { partnerId: routePartnerId } : {}),
+    ...(partnerId ? { partnerId } : {}),
     partnerHandle,
     matchType: routeMatchType,
     gives: proposalGiveIds.join(","),
@@ -495,7 +501,7 @@ export default function MatchDetailScreen() {
   const simpleProposalParams = {
     tab: "meetup",
     candidateId: highlightedItem.id,
-    ...(routePartnerId ? { partnerId: routePartnerId } : {}),
+    ...(partnerId ? { partnerId } : {}),
     partnerHandle,
     matchType: routeMatchType,
     gives: (routeGiveIds.length > 0
@@ -556,6 +562,21 @@ export default function MatchDetailScreen() {
             <View style={styles.headerCopy}>
               <Text style={styles.headerTitle}>関係図</Text>
             </View>
+            {partnerId ? (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={`${partnerDisplayName}のプロフィールを見る`}
+                onPress={() =>
+                  router.push({
+                    pathname: "/user-profile",
+                    params: { id: partnerId },
+                  })
+                }
+                style={styles.profileButton}
+              >
+                <Text style={styles.profileButtonText}>プロフィール</Text>
+              </Pressable>
+            ) : null}
           </View>
 
           <ScrollView
@@ -2300,10 +2321,18 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: "900",
   },
-  headerSubtitle: {
-    color: megrumColors.mutedInk,
+  profileButton: {
+    backgroundColor: "rgba(166,149,216,0.14)",
+    borderColor: "rgba(166,149,216,0.24)",
+    borderRadius: megrumRadii.pill,
+    borderWidth: 1,
+    paddingHorizontal: 11,
+    paddingVertical: 8,
+  },
+  profileButtonText: {
+    color: megrumColors.lavender,
     fontSize: 11,
-    marginTop: 2,
+    fontWeight: "900",
   },
   content: {
     paddingHorizontal: 18,

@@ -105,6 +105,24 @@ final class SupabaseMessageClientTests: XCTestCase {
         XCTAssertEqual(payload["body"] as? String, "服装写真を共有しました")
     }
 
+    func testBuildsTypedOutfitPhotoMessageRequest() throws {
+        let client = SupabaseMessageClient(configuration: configuration)
+        let senderID = UUID(uuidString: "11111111-1111-1111-1111-111111111111")!
+        let proposalID = UUID(uuidString: "22222222-2222-2222-2222-222222222222")!
+        let photoURL = URL(string: "https://example.com/chat/outfit.jpg")!
+
+        let request = try client.makeSendOutfitPhotoMessageRequest(
+            senderID: senderID,
+            proposalID: proposalID,
+            photoURL: photoURL
+        )
+        let payload = try messagePayload(from: request)
+
+        XCTAssertEqual(payload["message_type"] as? String, "outfit_photo")
+        XCTAssertEqual(payload["photo_url"] as? String, "https://example.com/chat/outfit.jpg")
+        XCTAssertEqual(payload["body"] as? String, "服装写真を共有しました")
+    }
+
     func testRejectsNonPhotoTypeForPhotoMessageRequest() throws {
         let client = SupabaseMessageClient(configuration: configuration)
         let senderID = UUID(uuidString: "11111111-1111-1111-1111-111111111111")!
@@ -172,6 +190,26 @@ final class SupabaseMessageClientTests: XCTestCase {
         XCTAssertEqual(locationJSON.first?["location_lng"] as? Double, 139.638031)
         XCTAssertEqual(locationJSON.first?["location_label"] as? String, "横浜アリーナ 北口")
         XCTAssertNil(locationJSON.first?["photo_url"])
+    }
+
+    func testBuildsCurrentLocationMessageRequestWithDefaultLabel() throws {
+        let client = SupabaseMessageClient(configuration: configuration)
+        let senderID = UUID(uuidString: "11111111-1111-1111-1111-111111111111")!
+        let proposalID = UUID(uuidString: "22222222-2222-2222-2222-222222222222")!
+
+        let request = try client.makeSendCurrentLocationMessageRequest(
+            senderID: senderID,
+            proposalID: proposalID,
+            latitude: 35.443707,
+            longitude: 139.638031
+        )
+        let payload = try messagePayload(from: request)
+
+        XCTAssertEqual(payload["message_type"] as? String, "location")
+        XCTAssertEqual(payload["body"] as? String, "現在地")
+        XCTAssertEqual(payload["location_lat"] as? Double, 35.443707)
+        XCTAssertEqual(payload["location_lng"] as? Double, 139.638031)
+        XCTAssertEqual(payload["location_label"] as? String, "現在地")
     }
 
     func testRejectsLocationMessageRequestWithoutUsableCoordinates() throws {
@@ -314,6 +352,43 @@ final class SupabaseMessageClientTests: XCTestCase {
         XCTAssertEqual(meta["note"] as? String, "北口へ向かっています")
     }
 
+    func testBuildsLateNoticeSystemMessageRequestFromTypedMinutesValue() throws {
+        let client = SupabaseMessageClient(configuration: configuration)
+        let senderID = UUID(uuidString: "11111111-1111-1111-1111-111111111111")!
+        let proposalID = UUID(uuidString: "22222222-2222-2222-2222-222222222222")!
+
+        let request = try client.makeSendLateNoticeMessageRequest(
+            senderID: senderID,
+            proposalID: proposalID,
+            lateMinutes: 30,
+            reason: " 入場列待ち "
+        )
+        let payload = try messagePayload(from: request)
+        let meta = try XCTUnwrap(payload["meta"] as? [String: Any])
+
+        XCTAssertEqual(payload["body"] as? String, "30分遅れる旨が通知されました\n理由：入場列待ち")
+        XCTAssertEqual(meta["action"] as? String, "late_notice")
+        XCTAssertEqual(meta["late_minutes"] as? Int, 30)
+        XCTAssertEqual(meta["reason"] as? String, "入場列待ち")
+    }
+
+    func testRejectsUnsupportedLateMinutesValue() throws {
+        let client = SupabaseMessageClient(configuration: configuration)
+        let senderID = UUID(uuidString: "11111111-1111-1111-1111-111111111111")!
+        let proposalID = UUID(uuidString: "22222222-2222-2222-2222-222222222222")!
+
+        XCTAssertThrowsError(
+            try client.makeSendLateNoticeMessageRequest(
+                senderID: senderID,
+                proposalID: proposalID,
+                lateMinutes: 15,
+                reason: "電車遅延"
+            )
+        ) { error in
+            XCTAssertEqual(error as? SupabaseMessageClientError, .invalidMetadata)
+        }
+    }
+
     func testBuildsCancelRequestSystemMessageRequestWithRNCompatibleMetadata() throws {
         let client = SupabaseMessageClient(configuration: configuration)
         let senderID = UUID(uuidString: "11111111-1111-1111-1111-111111111111")!
@@ -351,6 +426,11 @@ final class SupabaseMessageClientTests: XCTestCase {
         XCTAssertEqual(payload["message_type"] as? String, "system")
         XCTAssertEqual(payload["body"] as? String, "取引キャンセルが合意されました（評価への影響なし）")
         XCTAssertEqual(meta["action"] as? String, "cancel_approved")
+        XCTAssertEqual(meta["approved_by"] as? String, "11111111-1111-1111-1111-111111111111")
+        XCTAssertNil(payload["photo_url"])
+        XCTAssertNil(payload["location_lat"])
+        XCTAssertNil(payload["location_lng"])
+        XCTAssertNil(payload["location_label"])
     }
 
     func testRejectsOperationalSystemMessagesWithoutReason() throws {

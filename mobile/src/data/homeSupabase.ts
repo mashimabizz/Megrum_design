@@ -107,6 +107,8 @@ type Match = {
   listingMatchKind: "both" | "mine_only" | "partner_only" | "none";
   myListingIds: string[];
   partnerListingIds: string[];
+  myListingIdsByTheirGiveId: Record<string, string[]>;
+  partnerListingIdsByTheirGiveId: Record<string, string[]>;
   local: boolean;
 };
 
@@ -124,6 +126,22 @@ type AWRow = {
 type LocalModeRow = {
   enabled: boolean | null;
   aw_id: string | null;
+};
+
+type TagPairRow = {
+  inventory_id: string;
+  tag_id: string;
+  tag: { label: string | null } | { label: string | null }[] | null;
+};
+
+type TagMaps = {
+  tagsByInvId: Record<string, string[]>;
+  tagLabelsByInvId: Record<string, string[]>;
+};
+
+type CandidateSource = {
+  item: Inv;
+  side: "mine" | "partner";
 };
 
 export type HomeSupabaseResult = {
@@ -281,6 +299,12 @@ export async function fetchHomeSupabaseSections(
     currentAW,
     partnerAWs: (otherAWsRaw as AWRow[] | null) ?? [],
   });
+  const { tagsByInvId, tagLabelsByInvId } = await fetchInventoryTags([
+    ...myInventory,
+    ...myWishes,
+    ...otherInventory,
+    ...otherWishes,
+  ]).catch(() => emptyTagMaps());
   const matches = computeMatches({
     myInventory,
     myWishes,
@@ -290,11 +314,42 @@ export async function fetchHomeSupabaseSections(
   });
 
   return {
-    sections: buildSections(matches),
+    sections: buildSections(matches, myWishes, tagsByInvId, tagLabelsByInvId),
     localModeEnabled: !!localMode?.enabled,
     placeLabel: currentAW?.venue ?? null,
     unreadNotificationCount: unreadNotificationCount ?? 0,
   };
+}
+
+async function fetchInventoryTags(items: Inv[]): Promise<TagMaps> {
+  const tagsByInvId: Record<string, string[]> = {};
+  const tagLabelsByInvId: Record<string, string[]> = {};
+  const ids = Array.from(new Set(items.map((item) => item.id)));
+  if (!supabase || ids.length === 0) return { tagsByInvId, tagLabelsByInvId };
+
+  const { data } = await supabase
+    .from("goods_inventory_tags")
+    .select("inventory_id, tag_id, tag:tags_master(label)")
+    .in("inventory_id", ids);
+
+  for (const row of (data as TagPairRow[] | null) ?? []) {
+    const tags = tagsByInvId[row.inventory_id] ?? [];
+    tags.push(row.tag_id);
+    tagsByInvId[row.inventory_id] = tags;
+
+    const tag = Array.isArray(row.tag) ? row.tag[0] : row.tag;
+    if (tag?.label) {
+      const labels = tagLabelsByInvId[row.inventory_id] ?? [];
+      labels.push(tag.label);
+      tagLabelsByInvId[row.inventory_id] = labels;
+    }
+  }
+
+  return { tagsByInvId, tagLabelsByInvId };
+}
+
+function emptyTagMaps(): TagMaps {
+  return { tagsByInvId: {}, tagLabelsByInvId: {} };
 }
 
 async function fetchListingOptions(listingIds: string[]) {
@@ -355,20 +410,28 @@ function computePartnerMatch(input: {
   const theirGives = new Map<string, Inv>();
   const myListingIds: string[] = [];
   const partnerListingIds: string[] = [];
+  const myListingIdsByTheirGiveId = new Map<string, string[]>();
+  const partnerListingIdsByTheirGiveId = new Map<string, string[]>();
 
   for (const listing of input.myListings) {
     const hit = evaluateListing(listing, input.myInvById, input.myWishById, input.partner.inventory);
     if (!hit) continue;
     myListingIds.push(listing.id);
     for (const id of hit.haveIds) addInv(myGives, input.myInvById.get(id));
-    for (const id of hit.matchedIds) addInv(theirGives, partnerInvById.get(id));
+    for (const id of hit.matchedIds) {
+      addInv(theirGives, partnerInvById.get(id));
+      addMapValue(myListingIdsByTheirGiveId, id, listing.id);
+    }
   }
 
   for (const listing of input.partner.listings) {
     const hit = evaluateListing(listing, partnerInvById, partnerWishById, input.myInventory);
     if (!hit) continue;
     partnerListingIds.push(listing.id);
-    for (const id of hit.haveIds) addInv(theirGives, partnerInvById.get(id));
+    for (const id of hit.haveIds) {
+      addInv(theirGives, partnerInvById.get(id));
+      addMapValue(partnerListingIdsByTheirGiveId, id, listing.id);
+    }
     for (const id of hit.matchedIds) addInv(myGives, input.myInvById.get(id));
   }
 
@@ -416,6 +479,8 @@ function computePartnerMatch(input: {
     listingMatchKind,
     myListingIds,
     partnerListingIds,
+    myListingIdsByTheirGiveId: mapToRecord(myListingIdsByTheirGiveId),
+    partnerListingIdsByTheirGiveId: mapToRecord(partnerListingIdsByTheirGiveId),
     local: input.local,
   };
 }
@@ -454,19 +519,34 @@ function evaluateListing(
   return { haveIds, matchedIds: Array.from(matchedIds) };
 }
 
-function buildSections(matches: Match[]): ShelfSection[] {
+function buildSections(
+  matches: Match[],
+  myWishes: Inv[],
+  tagsByInvId: Record<string, string[]>,
+  tagLabelsByInvId: Record<string, string[]>,
+): ShelfSection[] {
   const listingRows = new Map<string, Candidate[]>();
   const possibleRows = new Map<string, Candidate[]>();
   const seen = new Set<string>();
 
   for (const match of matches) {
-    const baseItems = match.theirGives.length > 0 ? match.theirGives : match.myGives;
-    for (const item of baseItems) {
+    for (const { item, side } of displayItemsForMatch(match)) {
       const key = `${match.partner.id}:${item.id}`;
       if (seen.has(key)) continue;
       seen.add(key);
 
-      const priority = priorityFor(match.listingMatchKind);
+      const itemMyListingIds =
+        side === "partner" ? match.myListingIdsByTheirGiveId[item.id] ?? [] : [];
+      const itemPartnerListingIds =
+        side === "partner"
+          ? match.partnerListingIdsByTheirGiveId[item.id] ?? []
+          : [];
+      const priority = priorityForListingIds(
+        itemMyListingIds,
+        itemPartnerListingIds,
+      );
+      const tagScore = bestTagScoreForItem(item, myWishes, tagsByInvId);
+      const tagLabels = tagLabelsByInvId[item.id] ?? [];
       const candidate: Candidate = {
         id: item.id,
         label: item.title,
@@ -474,20 +554,22 @@ function buildSections(matches: Match[]): ShelfSection[] {
         type: item.goodsTypeName ?? "グッズ",
         hue: item.hue,
         photoUrl: item.photoUrl,
-        tag: labelFor(match),
+        tag: tagLabels[0] ?? undefined,
+        tagLabels,
         local: match.local,
         priority,
+        tagScore,
         partnerId: match.partner.id,
         partnerHandle: match.partner.handle,
         partnerDisplayName: match.partner.displayName,
         avatarUrl: match.partner.avatarUrl,
         giveIds: match.myGives.map((give) => give.id),
         receiveIds: match.theirGives.map((receive) => receive.id),
-        listingIds: [...match.myListingIds, ...match.partnerListingIds],
+        listingIds: [...itemMyListingIds, ...itemPartnerListingIds],
         matchType: match.matchType,
       };
       const rowKey = `${item.characterName ?? item.groupName ?? "その他"}__${item.goodsTypeName ?? "グッズ"}`;
-      const target = match.listingMatchKind === "none" ? possibleRows : listingRows;
+      const target = priority === "wish" ? possibleRows : listingRows;
       const current = target.get(rowKey) ?? [];
       current.push(candidate);
       target.set(rowKey, current);
@@ -508,19 +590,38 @@ function buildSections(matches: Match[]): ShelfSection[] {
   ].filter((section) => section.rows.length > 0);
 }
 
+function displayItemsForMatch(match: Match): CandidateSource[] {
+  if (match.theirGives.length > 0) {
+    return match.theirGives.map((item) => ({ item, side: "partner" }));
+  }
+  return match.myGives.map((item) => ({ item, side: "mine" }));
+}
+
 function mapRows(rows: Map<string, Candidate[]>) {
-  return Array.from(rows.entries()).map(([key, candidates]) => {
-    const [character, goodsType] = key.split("__");
-    return {
-      id: key,
-      character,
-      goodsType,
-      candidates: candidates.sort((a, b) => {
-        if (a.local !== b.local) return a.local ? -1 : 1;
-        return priorityRank(a.priority) - priorityRank(b.priority);
-      }),
-    };
-  });
+  return Array.from(rows.entries())
+    .map(([key, candidates]) => {
+      const [character, goodsType] = key.split("__");
+      return {
+        id: key,
+        character,
+        goodsType,
+        candidates: candidates.sort(compareCandidates),
+      };
+    })
+    .sort((a, b) => {
+      const priority = bestPriorityRank(a.candidates) - bestPriorityRank(b.candidates);
+      if (priority !== 0) return priority;
+      const tagScore = bestTagScore(b.candidates) - bestTagScore(a.candidates);
+      if (tagScore !== 0) return tagScore;
+      const localCount =
+        b.candidates.filter((candidate) => candidate.local).length -
+        a.candidates.filter((candidate) => candidate.local).length;
+      if (localCount !== 0) return localCount;
+      if (a.candidates.length !== b.candidates.length) {
+        return b.candidates.length - a.candidates.length;
+      }
+      return a.character.localeCompare(b.character, "ja");
+    });
 }
 
 function toInv(row: GoodsRow): Inv | null {
@@ -625,9 +726,26 @@ function addInv(target: Map<string, Inv>, item?: Inv) {
   if (item) target.set(item.id, item);
 }
 
-function priorityFor(kind: Match["listingMatchKind"]): CandidatePriority {
-  if (kind === "both") return "both";
-  if (kind === "mine_only" || kind === "partner_only") return "oneSide";
+function addMapValue(map: Map<string, string[]>, key: string, value: string) {
+  const values = map.get(key) ?? [];
+  if (!values.includes(value)) values.push(value);
+  map.set(key, values);
+}
+
+function mapToRecord(map: Map<string, string[]>) {
+  const record: Record<string, string[]> = {};
+  for (const [key, value] of map.entries()) record[key] = value;
+  return record;
+}
+
+function priorityForListingIds(
+  myListingIds: string[],
+  partnerListingIds: string[],
+): CandidatePriority {
+  if (myListingIds.length > 0 && partnerListingIds.length > 0) return "both";
+  if (myListingIds.length > 0 || partnerListingIds.length > 0) {
+    return "oneSide";
+  }
   return "wish";
 }
 
@@ -637,12 +755,54 @@ function priorityRank(priority: CandidatePriority) {
   return 2;
 }
 
-function labelFor(match: Match) {
-  if (match.local) return "現地OK";
-  if (match.listingMatchKind === "both") return "双方条件";
-  if (match.listingMatchKind === "mine_only") return "自分条件";
-  if (match.listingMatchKind === "partner_only") return "相手条件";
-  return "wish一致";
+function compareCandidates(a: Candidate, b: Candidate) {
+  const priority = priorityRank(a.priority) - priorityRank(b.priority);
+  if (priority !== 0) return priority;
+  const tagScore = (b.tagScore ?? 0) - (a.tagScore ?? 0);
+  if (tagScore !== 0) return tagScore;
+  if (a.local !== b.local) return a.local ? -1 : 1;
+  return a.label.localeCompare(b.label, "ja");
+}
+
+function bestPriorityRank(candidates: Candidate[]) {
+  return candidates.reduce(
+    (best, candidate) => Math.min(best, priorityRank(candidate.priority)),
+    2,
+  );
+}
+
+function bestTagScore(candidates: Candidate[]) {
+  return candidates.reduce(
+    (best, candidate) => Math.max(best, candidate.tagScore ?? 0),
+    0,
+  );
+}
+
+function bestTagScoreForItem(
+  item: Inv,
+  myWishes: Inv[],
+  tagsByInvId: Record<string, string[]>,
+) {
+  const itemTags = tagsByInvId[item.id] ?? [];
+  if (itemTags.length === 0) return 0;
+  let best = 0;
+  for (const wish of myWishes) {
+    if (!isMatching(item, wish)) continue;
+    best = Math.max(best, jaccardScore(tagsByInvId[wish.id] ?? [], itemTags));
+  }
+  return best;
+}
+
+function jaccardScore(a: string[], b: string[]) {
+  if (a.length === 0 || b.length === 0) return 0;
+  const setA = new Set(a);
+  const setB = new Set(b);
+  let intersect = 0;
+  for (const value of setA) {
+    if (setB.has(value)) intersect += 1;
+  }
+  const union = setA.size + setB.size - intersect;
+  return union > 0 ? intersect / union : 0;
 }
 
 function pickName(value: RelationName) {

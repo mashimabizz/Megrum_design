@@ -34,8 +34,10 @@ public struct AuthScreen: View {
     @State private var isShowingPasswordResetSheet = false
     @State private var passwordResetEmail = ""
     @State private var hasSubmittedPasswordReset = false
+    @State private var passwordResetInputErrorMessage: String?
     @State private var appleSignInNonce: String?
     @State private var identityProviderError: String?
+    @State private var inputErrorMessage: String?
     #if canImport(AuthenticationServices) && canImport(UIKit)
     @State private var googleOAuthSession: ASWebAuthenticationSession?
     #endif
@@ -60,12 +62,48 @@ public struct AuthScreen: View {
             }
             .background(MegrumTheme.canvas.ignoresSafeArea())
             .scrollDismissesKeyboard(.interactively)
+            .background(
+                MegrumTheme.canvas
+                    .ignoresSafeArea()
+                    .onTapGesture {
+                        focusedField = nil
+                    }
+            )
+            #if os(iOS)
+            .toolbar {
+                ToolbarItemGroup(placement: .keyboard) {
+                    Spacer()
+                    Button("閉じる") {
+                        focusedField = nil
+                    }
+                }
+            }
+            #endif
+        }
+        .onChange(of: mode) { _, _ in
+            clearFeedback()
+            focusedField = nil
+        }
+        .onChange(of: email) { _, _ in
+            clearFeedback()
+        }
+        .onChange(of: password) { _, _ in
+            clearFeedback()
+        }
+        .onChange(of: handle) { _, _ in
+            clearFeedback()
         }
         .sheet(isPresented: $isShowingPasswordResetSheet) {
             PasswordResetSheet(
                 email: $passwordResetEmail,
                 isSending: authState.isLoading,
-                errorMessage: hasSubmittedPasswordReset ? authState.errorMessage : nil
+                errorMessage: hasSubmittedPasswordReset ? (passwordResetInputErrorMessage ?? authState.errorMessage) : nil,
+                successMessage: hasSubmittedPasswordReset ? authState.passwordResetMessage : nil,
+                onEmailChanged: {
+                    hasSubmittedPasswordReset = false
+                    passwordResetInputErrorMessage = nil
+                    authState.clearFeedback()
+                }
             ) {
                 await sendPasswordReset()
             }
@@ -103,6 +141,8 @@ public struct AuthScreen: View {
                 handleField
             }
         }
+        .disabled(authState.isLoading)
+        .animation(.easeInOut(duration: 0.12), value: authState.isLoading)
     }
 
     @ViewBuilder
@@ -183,10 +223,18 @@ public struct AuthScreen: View {
 
     private var actionArea: some View {
         VStack(spacing: 14) {
-            if let errorMessage = authState.errorMessage {
+            if !authState.isConfigured {
+                infoLabel("ログイン機能を使うにはSupabase設定が必要です。画面確認だけならプレビューで入れます")
+            }
+
+            if let inputErrorMessage {
+                errorLabel(inputErrorMessage)
+            } else if let errorMessage = authState.errorMessage {
                 errorLabel(errorMessage)
             } else if let identityProviderError {
                 errorLabel(identityProviderError)
+            } else if let successMessage = authState.successMessage {
+                successLabel(successMessage)
             } else if let passwordResetMessage = authState.passwordResetMessage {
                 successLabel(passwordResetMessage)
             }
@@ -208,7 +256,7 @@ public struct AuthScreen: View {
             .buttonStyle(.borderedProminent)
             .buttonBorderShape(.roundedRectangle(radius: 18))
             .tint(MegrumTheme.lavender)
-            .disabled(authState.isLoading || !canSubmit)
+            .disabled(authState.isLoading)
 
             if mode == .signIn {
                 Button("パスワードを忘れた場合") {
@@ -229,6 +277,7 @@ public struct AuthScreen: View {
                 .buttonStyle(.bordered)
                 .buttonBorderShape(.roundedRectangle(radius: 18))
                 .frame(maxWidth: .infinity)
+                .disabled(authState.isLoading)
             }
         }
     }
@@ -249,6 +298,15 @@ public struct AuthScreen: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(14)
             .background(MegrumTheme.ok.opacity(0.12), in: RoundedRectangle(cornerRadius: 16))
+    }
+
+    private func infoLabel(_ message: String) -> some View {
+        Text(message)
+            .font(.system(size: 13, weight: .semibold, design: .rounded))
+            .foregroundStyle(MegrumTheme.muted)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(14)
+            .background(MegrumTheme.sky.opacity(0.12), in: RoundedRectangle(cornerRadius: 16))
     }
 
     @ViewBuilder
@@ -317,38 +375,49 @@ public struct AuthScreen: View {
         #endif
     }
 
-    private var canSubmit: Bool {
-        let hasEmail = MegrumAuthInputValidator.isValidEmail(email)
-        if mode == .signIn {
-            return hasEmail && MegrumAuthInputValidator.isValidSignInPassword(password)
-        }
-        return hasEmail
-            && MegrumAuthInputValidator.isValidSignUpPassword(password)
-            && MegrumAuthInputValidator.isValidHandle(handle)
-    }
-
     private func openPasswordResetSheet() {
         passwordResetEmail = MegrumAuthInputValidator.normalizedEmail(email)
         hasSubmittedPasswordReset = false
+        passwordResetInputErrorMessage = nil
+        inputErrorMessage = nil
         identityProviderError = nil
+        authState.clearFeedback()
         focusedField = nil
         isShowingPasswordResetSheet = true
     }
 
     private func sendPasswordReset() async {
         hasSubmittedPasswordReset = true
+        let normalizedEmail = MegrumAuthInputValidator.normalizedEmail(passwordResetEmail)
         identityProviderError = nil
-        let sent = await authState.sendPasswordReset(email: passwordResetEmail)
-        guard sent else {
+        inputErrorMessage = nil
+        passwordResetInputErrorMessage = nil
+        if let validationMessage = MegrumAuthInputValidator.passwordResetValidationMessage(email: normalizedEmail) {
+            authState.clearFeedback()
+            passwordResetInputErrorMessage = validationMessage
             return
         }
-        email = passwordResetEmail.trimmingCharacters(in: .whitespacesAndNewlines)
-        isShowingPasswordResetSheet = false
+
+        email = normalizedEmail
+        let sent = await authState.sendPasswordReset(email: normalizedEmail)
+        if sent {
+            focusedField = nil
+        }
     }
 
     private func submit() async {
         focusedField = nil
         identityProviderError = nil
+        email = MegrumAuthInputValidator.normalizedEmail(email)
+        if mode == .signUp {
+            handle = MegrumAuthInputValidator.normalizedHandle(handle) ?? ""
+        }
+        inputErrorMessage = validationMessage
+        guard inputErrorMessage == nil else {
+            authState.clearFeedback()
+            return
+        }
+
         switch mode {
         case .signIn:
             await authState.signIn(email: email, password: password)
@@ -357,10 +426,25 @@ public struct AuthScreen: View {
         }
     }
 
+    private var validationMessage: String? {
+        switch mode {
+        case .signIn:
+            MegrumAuthInputValidator.signInValidationMessage(email: email, password: password)
+        case .signUp:
+            MegrumAuthInputValidator.signUpValidationMessage(email: email, password: password, handle: handle)
+        }
+    }
+
+    private func clearFeedback() {
+        inputErrorMessage = nil
+        identityProviderError = nil
+        authState.clearFeedback()
+    }
+
     #if canImport(AuthenticationServices) && canImport(UIKit)
     private func startGoogleSignIn() {
         focusedField = nil
-        identityProviderError = nil
+        clearFeedback()
 
         guard let callbackScheme = authState.oauthCallbackScheme else {
             identityProviderError = "Googleログインを開始できませんでした。もう一度お試しください"
@@ -413,6 +497,8 @@ private struct PasswordResetSheet: View {
     @Binding var email: String
     var isSending: Bool
     var errorMessage: String?
+    var successMessage: String?
+    var onEmailChanged: () -> Void
     var onSend: () async -> Void
 
     @Environment(\.dismiss) private var dismiss
@@ -432,35 +518,57 @@ private struct PasswordResetSheet: View {
                             .foregroundStyle(Color(red: 0.851, green: 0.51, blue: 0.42))
                     }
                 }
+
+                if let successMessage {
+                    Section {
+                        Text(successMessage)
+                            .font(.system(size: 13, weight: .bold, design: .rounded))
+                            .foregroundStyle(MegrumTheme.ok)
+                    }
+                }
             }
             .navigationTitle("パスワード再設定")
             .megrumInlineNavigationTitle()
+            .scrollDismissesKeyboard(.interactively)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("キャンセル") {
+                    Button(successMessage == nil ? "キャンセル" : "閉じる") {
                         dismiss()
                     }
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button {
-                        Task {
-                            await onSend()
+                    if successMessage == nil {
+                        Button {
+                            Task {
+                                await onSend()
+                            }
+                        } label: {
+                            if isSending {
+                                ProgressView()
+                                    .controlSize(.small)
+                            } else {
+                                Text("送信")
+                            }
                         }
-                    } label: {
-                        if isSending {
-                            ProgressView()
-                                .controlSize(.small)
-                        } else {
-                            Text("送信")
-                        }
+                        .disabled(isSending)
                     }
-                    .disabled(isSending || !canSend)
                 }
+                #if os(iOS)
+                ToolbarItemGroup(placement: .keyboard) {
+                    Spacer()
+                    Button("閉じる") {
+                        isEmailFocused = false
+                    }
+                }
+                #endif
             }
             .onAppear {
                 if email.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                     isEmailFocused = true
                 }
+            }
+            .onChange(of: email) { _, _ in
+                onEmailChanged()
             }
         }
     }
@@ -475,9 +583,6 @@ private struct PasswordResetSheet: View {
             .focused($isEmailFocused)
             .submitLabel(.send)
             .onSubmit {
-                guard canSend else {
-                    return
-                }
                 Task {
                     await onSend()
                 }
@@ -486,18 +591,11 @@ private struct PasswordResetSheet: View {
         TextField("メールアドレス", text: $email)
             .focused($isEmailFocused)
             .onSubmit {
-                guard canSend else {
-                    return
-                }
                 Task {
                     await onSend()
                 }
             }
         #endif
-    }
-
-    private var canSend: Bool {
-        MegrumAuthInputValidator.isValidEmail(email)
     }
 }
 

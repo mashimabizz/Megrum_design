@@ -33,6 +33,13 @@ public enum SupabaseMessageLateMinutes: Int, CaseIterable, Sendable {
     case sixty = 60
     case ninety = 90
 
+    public init(minutes: Int) throws {
+        guard let value = Self(rawValue: minutes) else {
+            throw SupabaseMessageClientError.invalidMetadata
+        }
+        self = value
+    }
+
     var label: String {
         switch self {
         case .sixty:
@@ -118,6 +125,21 @@ public final class SupabaseMessageClient: @unchecked Sendable {
         )
     }
 
+    public func sendOutfitPhotoMessage(
+        senderID: UUID,
+        proposalID: UUID,
+        photoURL: URL,
+        body: String? = nil
+    ) async throws -> TradeMessage {
+        try await sendPhotoMessage(
+            senderID: senderID,
+            proposalID: proposalID,
+            photoURL: photoURL,
+            body: body,
+            messageType: .outfitPhoto
+        )
+    }
+
     @available(*, deprecated, message: "Use the latitude/longitude overload so location messages satisfy the DB schema.")
     public func sendLocationMessage(senderID: UUID, proposalID: UUID, body: String) async throws -> TradeMessage {
         throw SupabaseMessageClientError.invalidLocation
@@ -144,6 +166,24 @@ public final class SupabaseMessageClient: @unchecked Sendable {
         )
     }
 
+    public func sendCurrentLocationMessage(
+        senderID: UUID,
+        proposalID: UUID,
+        latitude: Double,
+        longitude: Double,
+        label: String = "現在地",
+        body: String? = nil
+    ) async throws -> TradeMessage {
+        try await sendLocationMessage(
+            senderID: senderID,
+            proposalID: proposalID,
+            latitude: latitude,
+            longitude: longitude,
+            label: label,
+            body: body
+        )
+    }
+
     public func sendSystemMessage(senderID: UUID, proposalID: UUID, body: String) async throws -> TradeMessage {
         try await sendMessage(senderID: senderID, proposalID: proposalID, messageType: .system, body: body)
     }
@@ -163,6 +203,22 @@ public final class SupabaseMessageClient: @unchecked Sendable {
             note: note
         )
         return try await sendMessagePayload(payload)
+    }
+
+    public func sendLateNoticeMessage(
+        senderID: UUID,
+        proposalID: UUID,
+        lateMinutes: Int,
+        reason: String,
+        note: String? = nil
+    ) async throws -> TradeMessage {
+        try await sendLateNoticeMessage(
+            senderID: senderID,
+            proposalID: proposalID,
+            lateMinutes: SupabaseMessageLateMinutes(minutes: lateMinutes),
+            reason: reason,
+            note: note
+        )
     }
 
     public func sendCancelRequestMessage(
@@ -302,6 +358,21 @@ public final class SupabaseMessageClient: @unchecked Sendable {
         )
     }
 
+    public func makeSendOutfitPhotoMessageRequest(
+        senderID: UUID,
+        proposalID: UUID,
+        photoURL: URL,
+        body: String? = nil
+    ) throws -> URLRequest {
+        try makeSendPhotoMessageRequest(
+            senderID: senderID,
+            proposalID: proposalID,
+            photoURL: photoURL,
+            body: body,
+            messageType: .outfitPhoto
+        )
+    }
+
     @available(*, deprecated, message: "Use the latitude/longitude overload so location messages satisfy the DB schema.")
     public func makeSendLocationMessageRequest(senderID: UUID, proposalID: UUID, body: String) throws -> URLRequest {
         throw SupabaseMessageClientError.invalidLocation
@@ -328,6 +399,24 @@ public final class SupabaseMessageClient: @unchecked Sendable {
         )
     }
 
+    public func makeSendCurrentLocationMessageRequest(
+        senderID: UUID,
+        proposalID: UUID,
+        latitude: Double,
+        longitude: Double,
+        label: String = "現在地",
+        body: String? = nil
+    ) throws -> URLRequest {
+        try makeSendLocationMessageRequest(
+            senderID: senderID,
+            proposalID: proposalID,
+            latitude: latitude,
+            longitude: longitude,
+            label: label,
+            body: body
+        )
+    }
+
     public func makeSendSystemMessageRequest(senderID: UUID, proposalID: UUID, body: String) throws -> URLRequest {
         try makeSendMessageRequest(senderID: senderID, proposalID: proposalID, messageType: .system, body: body)
     }
@@ -347,6 +436,22 @@ public final class SupabaseMessageClient: @unchecked Sendable {
             note: note
         )
         return try makeMessageMutationRequest(payload)
+    }
+
+    public func makeSendLateNoticeMessageRequest(
+        senderID: UUID,
+        proposalID: UUID,
+        lateMinutes: Int,
+        reason: String,
+        note: String? = nil
+    ) throws -> URLRequest {
+        try makeSendLateNoticeMessageRequest(
+            senderID: senderID,
+            proposalID: proposalID,
+            lateMinutes: SupabaseMessageLateMinutes(minutes: lateMinutes),
+            reason: reason,
+            note: note
+        )
     }
 
     public func makeSendCancelRequestMessageRequest(
@@ -527,7 +632,8 @@ public final class SupabaseMessageClient: @unchecked Sendable {
             messageType: .system,
             body: "取引キャンセルが合意されました（評価への影響なし）",
             meta: [
-                "action": .string(SupabaseMessageSystemAction.cancelApproved.rawValue)
+                "action": .string(SupabaseMessageSystemAction.cancelApproved.rawValue),
+                "approved_by": .string(senderID.uuidString.lowercased())
             ]
         )
     }

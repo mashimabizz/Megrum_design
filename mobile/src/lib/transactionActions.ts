@@ -28,6 +28,13 @@ type ProposalCompletionRow = {
   listing_id: string | null;
 };
 
+type ProposalEvidencePhotoSummary = {
+  id: string;
+  photo_url: string;
+  taken_at: string | null;
+  taken_by: string | null;
+};
+
 type InventorySourceRow = {
   id: string;
   group_id: string | null;
@@ -188,16 +195,25 @@ export async function approveCompletion(input: {
   if (proposal.sender_id !== input.userId && proposal.receiver_id !== input.userId) {
     return { error: "参加者ではありません" };
   }
+  if (proposal.status === "completed") return { redirectTo: "/transaction-rate" };
   if (proposal.status !== "agreed") return { error: "合意済の取引のみ承認できます" };
-  if (!proposal.evidence_photo_url) return { error: "先に取引証跡を撮影してください" };
+
+  const evidence = await findPrimaryEvidencePhoto(proposal);
+  if (!evidence) return { error: "先に取引証跡を撮影してください" };
 
   const isMeSender = proposal.sender_id === input.userId;
   const alreadyApproved = isMeSender
     ? !!proposal.approved_by_sender
     : !!proposal.approved_by_receiver;
 
+  let sideEffectError: string | null = null;
   if (!alreadyApproved) {
-    await applyInventoryCompletionSideEffects(proposal, input.userId, isMeSender);
+    try {
+      await applyInventoryCompletionSideEffects(proposal, input.userId, isMeSender);
+    } catch (error) {
+      sideEffectError = toActionErrorMessage(error);
+      console.warn("transaction completion side effects failed", sideEffectError);
+    }
   }
 
   const approvedBySender = isMeSender ? true : !!proposal.approved_by_sender;
@@ -282,10 +298,48 @@ export async function submitEvaluation(input: {
     comment: input.comment?.trim() || null,
   });
   if (error) {
-    if (error.code === "23505") return { error: "既に評価済みです" };
+    if (error.code === "23505") return { redirectTo: "/transactions" };
     return { error: error.message };
   }
   return { redirectTo: "/transactions" };
+}
+
+async function findPrimaryEvidencePhoto(
+  proposal: ProposalCompletionRow,
+): Promise<ProposalEvidencePhotoSummary | null> {
+  if (!supabase) return null;
+  if (proposal.evidence_photo_url) {
+    return {
+      id: "legacy-evidence",
+      photo_url: proposal.evidence_photo_url,
+      taken_at: null,
+      taken_by: null,
+    };
+  }
+
+  const { data, error } = await supabase
+    .from("proposal_evidence_photos")
+    .select("id, photo_url, taken_at, taken_by")
+    .eq("proposal_id", proposal.id)
+    .order("position", { ascending: true })
+    .limit(1);
+  if (error) {
+    console.warn("proposal evidence photo lookup failed", error.message);
+    return null;
+  }
+
+  const first = ((data as ProposalEvidencePhotoSummary[] | null) ?? [])[0] ?? null;
+  if (!first) return null;
+
+  await supabase
+    .from("proposals")
+    .update({
+      evidence_photo_url: first.photo_url,
+      evidence_taken_at: first.taken_at,
+      evidence_taken_by: first.taken_by,
+    })
+    .eq("id", proposal.id);
+  return first;
 }
 
 export async function requestTradeCancel(input: {
@@ -636,4 +690,17 @@ function extensionFrom(nameOrUri: string, mimeType?: string | null) {
 
 function formatDate(date: Date) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+}
+
+function toActionErrorMessage(error: unknown) {
+  if (error instanceof Error) return error.message;
+  if (
+    typeof error === "object" &&
+    error &&
+    "message" in error &&
+    typeof error.message === "string"
+  ) {
+    return error.message;
+  }
+  return "unknown error";
 }

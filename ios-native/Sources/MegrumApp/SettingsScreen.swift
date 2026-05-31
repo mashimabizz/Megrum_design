@@ -6,8 +6,25 @@ import SwiftUI
 struct SettingsScreen: View {
     @ObservedObject var appState: MegrumAppState
     var onOpenNotificationDestination: (MegrumTab) -> Void = { _ in }
+    var onOpenNotificationRouteIntent: (NotificationRouteIntent) -> Bool = { _ in false }
     var onSignOut: () async -> Void = {}
     @Environment(\.dismiss) private var dismiss
+    @StateObject private var securityAuthState: MegrumAuthState
+    @State private var isSigningOut = false
+
+    init(
+        appState: MegrumAppState,
+        onOpenNotificationDestination: @escaping (MegrumTab) -> Void = { _ in },
+        onOpenNotificationRouteIntent: @escaping (NotificationRouteIntent) -> Bool = { _ in false },
+        securityAuthState: MegrumAuthState? = nil,
+        onSignOut: @escaping () async -> Void = {}
+    ) {
+        self.appState = appState
+        self.onOpenNotificationDestination = onOpenNotificationDestination
+        self.onOpenNotificationRouteIntent = onOpenNotificationRouteIntent
+        self.onSignOut = onSignOut
+        _securityAuthState = StateObject(wrappedValue: securityAuthState ?? MegrumAuthStateFactory.makeDefault())
+    }
 
     var body: some View {
         List {
@@ -30,9 +47,15 @@ struct SettingsScreen: View {
                 }
 
                 NavigationLink {
-                    NotificationsScreen(appState: appState) { tab in
+                    NotificationCenterScreen(appState: appState) { tab in
                         dismiss()
                         onOpenNotificationDestination(tab)
+                    } onOpenRouteIntent: { intent in
+                        if onOpenNotificationRouteIntent(intent) {
+                            dismiss()
+                            return true
+                        }
+                        return false
                     }
                 } label: {
                     Label {
@@ -134,14 +157,151 @@ struct SettingsScreen: View {
             }
 
             Section {
+                NavigationLink {
+                    SettingsHelpScreen()
+                } label: {
+                    Label {
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text("ヘルプ")
+                                .font(.body.weight(.semibold))
+                            Text("問い合わせと困った時の確認")
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(MegrumTheme.muted)
+                        }
+                    } icon: {
+                        Image(systemName: "questionmark.circle")
+                            .foregroundStyle(MegrumTheme.lavender)
+                    }
+                }
+
+                NavigationLink {
+                    PrivacySettingsScreen(appState: appState)
+                } label: {
+                    Label {
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text("プライバシーと安全")
+                                .font(.body.weight(.semibold))
+                            Text("ブロック・公開範囲・ポリシー")
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(MegrumTheme.muted)
+                        }
+                    } icon: {
+                        Image(systemName: "lock.shield")
+                            .foregroundStyle(MegrumTheme.lavender)
+                    }
+                }
+
+                NavigationLink {
+                    LoginSecuritySettingsScreen(
+                        authState: securityAuthState,
+                        isSigningOut: isSigningOut,
+                        accountSummary: accountSummary,
+                        onSignOut: {
+                            await performSignOut(dismissSettings: true)
+                        }
+                    )
+                } label: {
+                    Label {
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text("ログインとセキュリティ")
+                                .font(.body.weight(.semibold))
+                            Text(loginSecuritySummary.shortStatusText)
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(MegrumTheme.muted)
+                        }
+                    } icon: {
+                        Image(systemName: "person.badge.key")
+                            .foregroundStyle(MegrumTheme.lavender)
+                    }
+                }
+
+                NavigationLink {
+                    LegalDocumentScreen(kind: .terms)
+                } label: {
+                    Label {
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text("利用規約")
+                                .font(.body.weight(.semibold))
+                            Text("公開前確認用の要約")
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(MegrumTheme.muted)
+                        }
+                    } icon: {
+                        Image(systemName: "doc.text")
+                            .foregroundStyle(MegrumTheme.lavender)
+                    }
+                }
+
+                NavigationLink {
+                    LegalDocumentScreen(kind: .privacy)
+                } label: {
+                    Label {
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text("プライバシーポリシー")
+                                .font(.body.weight(.semibold))
+                            Text("取り扱う情報の要点")
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(MegrumTheme.muted)
+                        }
+                    } icon: {
+                        Image(systemName: "hand.raised")
+                            .foregroundStyle(MegrumTheme.lavender)
+                    }
+                }
+
+                NavigationLink {
+                    LegalDocumentScreen(kind: .commerce)
+                } label: {
+                    Label {
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text("特定商取引法に基づく表記")
+                                .font(.body.weight(.semibold))
+                            Text("有料機能と事業者表示の入口")
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(MegrumTheme.muted)
+                        }
+                    } icon: {
+                        Image(systemName: "building.columns")
+                            .foregroundStyle(MegrumTheme.lavender)
+                    }
+                }
+
+                NavigationLink {
+                    AccountOverviewScreen(appState: appState)
+                } label: {
+                    Label {
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text("アカウント")
+                                .font(.body.weight(.semibold))
+                            Text(accountSummary.shortStatusText)
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(MegrumTheme.muted)
+                        }
+                    } icon: {
+                        Image(systemName: "person.text.rectangle")
+                            .foregroundStyle(MegrumTheme.lavender)
+                    }
+                }
+            } header: {
+                Text("サポートとアカウント")
+            }
+
+            Section {
                 Button(role: .destructive) {
                     Task {
-                        await onSignOut()
-                        dismiss()
+                        await performSignOut(dismissSettings: true)
                     }
                 } label: {
-                    Label("ログアウト", systemImage: "rectangle.portrait.and.arrow.right")
+                    HStack {
+                        Label("ログアウト", systemImage: "rectangle.portrait.and.arrow.right")
+                        if isSigningOut {
+                            Spacer()
+                            ProgressView()
+                                .controlSize(.small)
+                        }
+                    }
                 }
+                .disabled(isSigningOut)
             }
         }
         .navigationTitle("設定")
@@ -193,6 +353,756 @@ struct SettingsScreen: View {
             return "未登録"
         }
         return address.summary
+    }
+
+    private var accountSummary: SettingsAccountSummary {
+        SettingsAccountSummary(
+            viewer: appState.viewer,
+            pushNotificationsEnabled: appState.pushNotificationsEnabled,
+            mailingAddress: appState.mailingAddress
+        )
+    }
+
+    private var loginSecuritySummary: LoginSecuritySummary {
+        LoginSecuritySummary(
+            authSession: securityAuthState.session,
+            isAuthenticated: securityAuthState.isAuthenticated,
+            isAuthConfigured: securityAuthState.isConfigured,
+            accountSummary: accountSummary
+        )
+    }
+
+    private func performSignOut(dismissSettings: Bool) async {
+        guard !isSigningOut else {
+            return
+        }
+
+        isSigningOut = true
+        await onSignOut()
+        isSigningOut = false
+
+        if dismissSettings {
+            dismiss()
+        }
+    }
+}
+
+struct SettingsAccountSummary: Equatable {
+    var userIDText: String
+    var handleText: String
+    var displayNameText: String
+    var activityAreaText: String
+    var accountStatusText: String
+    var pushNotificationText: String
+    var addressStatusText: String
+
+    init(
+        viewer: UserProfile?,
+        pushNotificationsEnabled: Bool,
+        mailingAddress: MailingAddress?
+    ) {
+        userIDText = viewer?.id.uuidString.lowercased() ?? "未読み込み"
+        handleText = Self.trimmed(viewer?.handle, fallback: "未設定")
+        displayNameText = Self.trimmed(viewer?.displayName, fallback: "未設定")
+        activityAreaText = Self.trimmed(viewer?.prefecture, fallback: "未設定")
+        accountStatusText = viewer?.accountStatus.settingsDisplayName ?? "未読み込み"
+        pushNotificationText = pushNotificationsEnabled ? "ON" : "OFF"
+
+        if let mailingAddress, mailingAddress.isReady {
+            addressStatusText = "登録済み"
+        } else {
+            addressStatusText = "未登録"
+        }
+    }
+
+    var shortStatusText: String {
+        "\(displayNameText) / 通知\(pushNotificationText)"
+    }
+
+    private static func trimmed(_ value: String?, fallback: String) -> String {
+        let trimmedValue = value?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        return trimmedValue.isEmpty ? fallback : trimmedValue
+    }
+}
+
+struct LoginSecuritySummary: Equatable {
+    var authStatusText: String
+    var emailText: String
+    var authUserIDText: String
+    var profileUserIDText: String
+    var authConfigurationText: String
+    var accountStatusText: String
+
+    init(
+        authSession: AuthSession?,
+        isAuthenticated: Bool,
+        isAuthConfigured: Bool,
+        accountSummary: SettingsAccountSummary
+    ) {
+        authStatusText = isAuthenticated ? "ログイン中" : "再ログインが必要"
+        emailText = Self.trimmed(authSession?.user.email, fallback: "メール未取得")
+        authUserIDText = authSession?.user.id.uuidString.lowercased() ?? "セッション未確認"
+        profileUserIDText = accountSummary.userIDText
+        authConfigurationText = isAuthConfigured ? "Supabase接続" : "プレビュー接続"
+        accountStatusText = accountSummary.accountStatusText
+    }
+
+    var shortStatusText: String {
+        "\(authStatusText) / \(authConfigurationText)"
+    }
+
+    var resetEmailPrefill: String {
+        emailText == "メール未取得" ? "" : emailText
+    }
+
+    private static func trimmed(_ value: String?, fallback: String) -> String {
+        let trimmedValue = value?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        return trimmedValue.isEmpty ? fallback : trimmedValue
+    }
+}
+
+enum MailingAddressDraftValidator {
+    static let missingRequiredMessage = "宛名・郵便番号・都道府県・市区町村・番地を入力してください"
+    static let invalidPostalCodeMessage = "郵便番号は7桁で入力してください"
+
+    static func validationMessage(for address: MailingAddress) -> String? {
+        let requiredValues = [
+            address.recipientName,
+            address.postalCode,
+            address.prefecture,
+            address.city,
+            address.line1
+        ]
+        if requiredValues.contains(where: { $0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }) {
+            return missingRequiredMessage
+        }
+        if address.postalCode.count != 7 {
+            return invalidPostalCodeMessage
+        }
+        return nil
+    }
+}
+
+private extension AccountStatus {
+    var settingsDisplayName: String {
+        switch self {
+        case .registered:
+            "仮登録"
+        case .verified:
+            "認証済"
+        case .onboarding:
+            "オンボ中"
+        case .active:
+            "アクティブ"
+        case .suspended:
+            "停止中"
+        case .deletionRequested:
+            "削除申請中"
+        case .deleted:
+            "削除済"
+        }
+    }
+}
+
+enum SettingsEssentialRoute: String, CaseIterable, Identifiable {
+    case notifications
+    case mobilePush
+    case address
+    case blockedUsers
+    case privacy
+    case loginSecurity
+    case help
+    case terms
+    case privacyPolicy
+    case commerceDisclosure
+    case account
+    case logout
+
+    var id: String { rawValue }
+
+    static let p0Routes: [SettingsEssentialRoute] = [
+        .notifications,
+        .mobilePush,
+        .address,
+        .blockedUsers,
+        .privacy,
+        .loginSecurity,
+        .help,
+        .terms,
+        .privacyPolicy,
+        .commerceDisclosure,
+        .account,
+        .logout
+    ]
+}
+
+@MainActor
+private struct LoginSecuritySettingsScreen: View {
+    @ObservedObject var authState: MegrumAuthState
+    var isSigningOut: Bool
+    var accountSummary: SettingsAccountSummary
+    var onSignOut: () async -> Void
+
+    @FocusState private var focusedField: Field?
+    @State private var resetEmail = ""
+    @State private var resetInputErrorMessage: String?
+
+    private var summary: LoginSecuritySummary {
+        LoginSecuritySummary(
+            authSession: authState.session,
+            isAuthenticated: authState.isAuthenticated,
+            isAuthConfigured: authState.isConfigured,
+            accountSummary: accountSummary
+        )
+    }
+
+    var body: some View {
+        List {
+            Section {
+                SettingsValueRow(title: "認証状態", value: summary.authStatusText)
+                SettingsValueRow(title: "ログインメール", value: summary.emailText)
+                SettingsValueRow(title: "認証ユーザーID", value: summary.authUserIDText, isMonospaced: true)
+                SettingsValueRow(title: "プロフィールID", value: summary.profileUserIDText, isMonospaced: true)
+                SettingsValueRow(title: "接続状態", value: summary.authConfigurationText)
+                SettingsValueRow(title: "アカウント状態", value: summary.accountStatusText)
+            } header: {
+                Text("現在の状態")
+            }
+
+            Section {
+                resetEmailField
+
+                Button {
+                    Task { await sendPasswordReset() }
+                } label: {
+                    HStack(spacing: 8) {
+                        if authState.isLoading {
+                            ProgressView()
+                                .controlSize(.small)
+                        }
+                        Text("再設定メールを送る")
+                    }
+                }
+                .disabled(authState.isLoading)
+
+                if let resetInputErrorMessage {
+                    SecurityFeedbackRow(message: resetInputErrorMessage, style: .error)
+                } else if let errorMessage = authState.errorMessage {
+                    SecurityFeedbackRow(message: errorMessage, style: .error)
+                } else if let successMessage = authState.passwordResetMessage ?? authState.successMessage {
+                    SecurityFeedbackRow(message: successMessage, style: .success)
+                }
+            } header: {
+                Text("パスワード再設定")
+            } footer: {
+                Text("メール/パスワードでログインしている場合は、登録メールへ再設定リンクを送れます。")
+            }
+
+            Section {
+                Button(role: .destructive) {
+                    Task {
+                        focusedField = nil
+                        await onSignOut()
+                    }
+                } label: {
+                    HStack {
+                        Label("ログアウト", systemImage: "rectangle.portrait.and.arrow.right")
+                        if isSigningOut {
+                            Spacer()
+                            ProgressView()
+                                .controlSize(.small)
+                        }
+                    }
+                }
+                .disabled(isSigningOut)
+            } footer: {
+                Text("ログアウトすると、この端末のセッションを外してログイン/新規登録画面に戻ります。")
+            }
+        }
+        .navigationTitle("ログインとセキュリティ")
+        .megrumInlineNavigationTitle()
+        .scrollDismissesKeyboard(.interactively)
+        .toolbar {
+            #if os(iOS)
+            ToolbarItemGroup(placement: .keyboard) {
+                Spacer()
+                Button("閉じる") {
+                    focusedField = nil
+                }
+            }
+            #endif
+        }
+        .onAppear {
+            prefillResetEmailIfNeeded()
+        }
+        .onChange(of: authState.session?.user.email) { _, _ in
+            prefillResetEmailIfNeeded()
+        }
+        .onChange(of: resetEmail) { _, _ in
+            resetInputErrorMessage = nil
+            authState.clearFeedback()
+        }
+    }
+
+    @ViewBuilder
+    private var resetEmailField: some View {
+        #if os(iOS)
+        TextField("ログインメール", text: $resetEmail)
+            .focused($focusedField, equals: .resetEmail)
+            .textInputAutocapitalization(.never)
+            .autocorrectionDisabled()
+            .keyboardType(.emailAddress)
+            .textContentType(.emailAddress)
+            .submitLabel(.send)
+            .onSubmit {
+                Task { await sendPasswordReset() }
+            }
+        #else
+        TextField("ログインメール", text: $resetEmail)
+            .focused($focusedField, equals: .resetEmail)
+            .textContentType(.emailAddress)
+            .onSubmit {
+                Task { await sendPasswordReset() }
+            }
+        #endif
+    }
+
+    private func sendPasswordReset() async {
+        focusedField = nil
+        resetInputErrorMessage = nil
+        let normalizedEmail = MegrumAuthInputValidator.normalizedEmail(resetEmail)
+        if let validationMessage = MegrumAuthInputValidator.passwordResetValidationMessage(email: normalizedEmail) {
+            authState.clearFeedback()
+            resetInputErrorMessage = validationMessage
+            return
+        }
+
+        _ = await authState.sendPasswordReset(email: normalizedEmail)
+    }
+
+    private func prefillResetEmailIfNeeded() {
+        guard resetEmail.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            return
+        }
+        resetEmail = summary.resetEmailPrefill
+    }
+
+    private enum Field {
+        case resetEmail
+    }
+}
+
+private struct SecurityFeedbackRow: View {
+    enum Style {
+        case error
+        case success
+    }
+
+    var message: String
+    var style: Style
+
+    var body: some View {
+        Text(message)
+            .font(.subheadline.weight(.semibold))
+            .foregroundStyle(foregroundColor)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.vertical, 4)
+            .accessibilityLabel(message)
+    }
+
+    private var foregroundColor: Color {
+        switch style {
+        case .error:
+            Color(red: 0.851, green: 0.51, blue: 0.42)
+        case .success:
+            MegrumTheme.ok
+        }
+    }
+}
+
+@MainActor
+private struct PrivacySettingsScreen: View {
+    @ObservedObject var appState: MegrumAppState
+
+    var body: some View {
+        List {
+            Section {
+                NavigationLink {
+                    BlockedUsersScreen(appState: appState)
+                } label: {
+                    HelpRouteRow(
+                        iconName: "person.crop.circle.badge.xmark",
+                        title: "ブロックした人",
+                        message: "ブロック中の相手を確認し、必要に応じて解除できます。"
+                    )
+                }
+
+                NavigationLink {
+                    LegalDocumentScreen(kind: .privacy)
+                } label: {
+                    HelpRouteRow(
+                        iconName: "hand.raised",
+                        title: "プライバシーポリシー",
+                        message: "Megrumが扱う情報と利用目的を確認できます。"
+                    )
+                }
+            } header: {
+                Text("安全管理")
+            }
+
+            Section {
+                HelpRouteRow(
+                    iconName: "location.circle",
+                    title: "位置情報",
+                    message: "グルームと掲示板は位置情報の許可状態に応じて表示範囲が変わります。端末の設定アプリから変更できます。"
+                )
+                HelpRouteRow(
+                    iconName: "bell.badge",
+                    title: "通知の表示",
+                    message: "通知のON/OFFは設定一覧のモバイル通知から変更できます。"
+                )
+                HelpRouteRow(
+                    iconName: "shippingbox",
+                    title: "住所情報",
+                    message: "住所は取引に必要な場面だけで扱います。住所設定から内容を確認できます。"
+                )
+            } header: {
+                Text("共有される情報")
+            }
+        }
+        .navigationTitle("プライバシーと安全")
+        .megrumInlineNavigationTitle()
+    }
+}
+
+private struct SettingsHelpScreen: View {
+    private let supportEmail = "support@megrum.jp"
+
+    var body: some View {
+        List {
+            Section {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("困った時は、状況が分かる内容を添えてお問い合わせください。")
+                        .font(.body)
+                        .foregroundStyle(MegrumTheme.ink)
+
+                    Text(supportEmail)
+                        .font(.body.weight(.semibold))
+                        .foregroundStyle(MegrumTheme.lavender)
+                        .textSelection(.enabled)
+                }
+                .padding(.vertical, 4)
+            } header: {
+                Text("問い合わせ")
+            }
+
+            Section {
+                HelpRouteRow(
+                    iconName: "bell",
+                    title: "通知",
+                    message: "打診、取引チャット、評価、掲示板の更新を確認できます。届かない時はモバイル通知のON/OFFも見直してください。"
+                )
+                HelpRouteRow(
+                    iconName: "shippingbox",
+                    title: "住所設定",
+                    message: "住所情報を登録・更新できます。取引で必要になる場面に備えて、内容が古くないか確認してください。"
+                )
+                HelpRouteRow(
+                    iconName: "person.crop.circle.badge.xmark",
+                    title: "ブロックした人",
+                    message: "ブロック中の相手を確認し、必要に応じて解除できます。"
+                )
+                HelpRouteRow(
+                    iconName: "rectangle.portrait.and.arrow.right",
+                    title: "ログアウト",
+                    message: "共有端末や機種変更前など、今の端末からMegrumのセッションを外したい時に使います。"
+                )
+            } header: {
+                Text("よく使う設定")
+            }
+
+            Section {
+                NavigationLink {
+                    LegalDocumentScreen(kind: .terms)
+                } label: {
+                    HelpRouteRow(
+                        iconName: "doc.text",
+                        title: "利用規約",
+                        message: "公開前レビュー後の正式本文へ差し替えるための入口です。"
+                    )
+                }
+                NavigationLink {
+                    LegalDocumentScreen(kind: .privacy)
+                } label: {
+                    HelpRouteRow(
+                        iconName: "hand.raised",
+                        title: "プライバシーポリシー",
+                        message: "扱う情報と問い合わせ先を確認できます。"
+                    )
+                }
+                NavigationLink {
+                    LegalDocumentScreen(kind: .commerce)
+                } label: {
+                    HelpRouteRow(
+                        iconName: "building.columns",
+                        title: "特定商取引法に基づく表記",
+                        message: "有料機能と事業者表示の確認入口です。"
+                    )
+                }
+            } header: {
+                Text("法的文書")
+            }
+
+            Section {
+                Text("取引中の相手と連絡が取れない、待ち合わせに不安がある、相手の行動に問題を感じる場合は、取引チャットの内容や状況を整理してサポートへ連絡してください。")
+                    .font(.body)
+                    .foregroundStyle(MegrumTheme.ink)
+                    .padding(.vertical, 4)
+            } header: {
+                Text("取引で困った時")
+            }
+        }
+        .navigationTitle("ヘルプ")
+        .megrumInlineNavigationTitle()
+    }
+}
+
+private struct HelpRouteRow: View {
+    var iconName: String
+    var title: String
+    var message: String
+
+    var body: some View {
+        Label {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(title)
+                    .font(.body.weight(.semibold))
+                    .foregroundStyle(MegrumTheme.ink)
+                Text(message)
+                    .font(.subheadline)
+                    .foregroundStyle(MegrumTheme.muted)
+            }
+            .padding(.vertical, 3)
+        } icon: {
+            Image(systemName: iconName)
+                .foregroundStyle(MegrumTheme.lavender)
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(title)
+        .accessibilityHint(message)
+    }
+}
+
+private struct LegalDocumentScreen: View {
+    var kind: LegalDocumentKind
+
+    var body: some View {
+        List {
+            Section {
+                Text(kind.statusMessage)
+                    .font(.body)
+                    .foregroundStyle(MegrumTheme.ink)
+                    .padding(.vertical, 4)
+            } header: {
+                Text("ステータス")
+            }
+
+            Section {
+                ForEach(kind.summaryItems) { item in
+                    LegalSummaryRow(item: item)
+                }
+            } header: {
+                Text("主要項目")
+            }
+
+            Section {
+                Text("support@megrum.jp")
+                    .font(.body.weight(.semibold))
+                    .foregroundStyle(MegrumTheme.lavender)
+                    .textSelection(.enabled)
+            } header: {
+                Text("問い合わせ先")
+            }
+        }
+        .navigationTitle(kind.title)
+        .megrumInlineNavigationTitle()
+    }
+}
+
+enum LegalDocumentKind {
+    case terms
+    case privacy
+    case commerce
+
+    var title: String {
+        switch self {
+        case .terms:
+            "利用規約"
+        case .privacy:
+            "プライバシーポリシー"
+        case .commerce:
+            "特定商取引法に基づく表記"
+        }
+    }
+
+    var statusMessage: String {
+        "この画面は正式な法的本文ではありません。公開前レビュー後の原文へ差し替えるための入口として、確認に必要な要点だけを表示しています。"
+    }
+
+    var summaryItems: [LegalSummaryItem] {
+        switch self {
+        case .terms:
+            [
+                LegalSummaryItem(
+                    title: "Megrumの目的",
+                    body: "推し活グッズの取引を、打診、取引チャット、待ち合わせ、評価まで一連の流れで支援します。"
+                ),
+                LegalSummaryItem(
+                    title: "ユーザーの責任",
+                    body: "登録内容、在庫情報、wish、取引相手とのやりとりは、正確で相手に誤解を与えない内容にしてください。"
+                ),
+                LegalSummaryItem(
+                    title: "禁止事項",
+                    body: "チケット転売、盗品や権利侵害品の取引、相手への迷惑行為、アプリ外での不適切な誘導は禁止です。"
+                ),
+                LegalSummaryItem(
+                    title: "取引と安全",
+                    body: "合意した内容を守り、待ち合わせや取引チャットの情報は当該取引の目的にだけ使います。"
+                ),
+                LegalSummaryItem(
+                    title: "運営の対応",
+                    body: "通報や異議申し立てを確認し、必要に応じて表示制限、アカウント制限、証跡確認を行います。"
+                )
+            ]
+        case .privacy:
+            [
+                LegalSummaryItem(
+                    title: "取得する情報",
+                    body: "アカウント、プロフィール、推し、在庫情報、wish、打診、取引チャット、住所情報、位置情報、通知設定などを扱います。"
+                ),
+                LegalSummaryItem(
+                    title: "利用目的",
+                    body: "アカウント管理、取引の成立と安全な進行、通知、問い合わせ対応、不正利用の防止、サービス改善に利用します。"
+                ),
+                LegalSummaryItem(
+                    title: "相手への表示",
+                    body: "取引に必要なプロフィール、在庫情報、wish、待ち合わせ情報、任意共有した服装写真や現在地を、必要な範囲で表示します。"
+                ),
+                LegalSummaryItem(
+                    title: "保存と削除",
+                    body: "取引の安全確認、異議申し立て、法令対応に必要な範囲で保存し、不要になった情報は削除または非表示化します。"
+                ),
+                LegalSummaryItem(
+                    title: "外部サービス",
+                    body: "認証、通知、決済、分析、問い合わせ対応などで外部サービスを使う場合があります。"
+                )
+            ]
+        case .commerce:
+            [
+                LegalSummaryItem(
+                    title: "表示方針",
+                    body: "代表者名・住所・電話番号は、請求があれば遅滞なく開示する方針です。"
+                ),
+                LegalSummaryItem(
+                    title: "有料機能",
+                    body: "Premium、めぐりPlus、ブーストなどの価格と提供条件は、公開前レビュー済みの本文に合わせて表示します。"
+                ),
+                LegalSummaryItem(
+                    title: "問い合わせ先",
+                    body: "問い合わせは support@megrum.jp で受け付けます。"
+                )
+            ]
+        }
+    }
+}
+
+struct LegalSummaryItem: Identifiable, Equatable {
+    var title: String
+    var body: String
+
+    var id: String { title }
+}
+
+private struct LegalSummaryRow: View {
+    var item: LegalSummaryItem
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 5) {
+            Text(item.title)
+                .font(.body.weight(.semibold))
+                .foregroundStyle(MegrumTheme.ink)
+            Text(item.body)
+                .font(.subheadline)
+                .foregroundStyle(MegrumTheme.muted)
+        }
+        .padding(.vertical, 4)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(item.title)
+        .accessibilityHint(item.body)
+    }
+}
+
+@MainActor
+private struct AccountOverviewScreen: View {
+    @ObservedObject var appState: MegrumAppState
+
+    private var summary: SettingsAccountSummary {
+        SettingsAccountSummary(
+            viewer: appState.viewer,
+            pushNotificationsEnabled: appState.pushNotificationsEnabled,
+            mailingAddress: appState.mailingAddress
+        )
+    }
+
+    var body: some View {
+        List {
+            Section {
+                SettingsValueRow(title: "アカウントID", value: summary.userIDText, isMonospaced: true)
+                SettingsValueRow(title: "ユーザーID", value: summary.handleText)
+                SettingsValueRow(title: "表示名", value: summary.displayNameText)
+                SettingsValueRow(title: "活動エリア", value: summary.activityAreaText)
+                SettingsValueRow(title: "アカウント状態", value: summary.accountStatusText)
+            } header: {
+                Text("基本情報")
+            }
+
+            Section {
+                SettingsValueRow(title: "モバイル通知", value: summary.pushNotificationText)
+                SettingsValueRow(title: "住所登録", value: summary.addressStatusText)
+            } header: {
+                Text("設定状態")
+            }
+        }
+        .navigationTitle("アカウント")
+        .megrumInlineNavigationTitle()
+        .task {
+            if appState.mailingAddress == nil {
+                await appState.loadMailingAddress()
+            }
+            await appState.loadPushNotificationSetting()
+        }
+    }
+}
+
+private struct SettingsValueRow: View {
+    var title: String
+    var value: String
+    var isMonospaced = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(title)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(MegrumTheme.muted)
+            Text(value)
+                .font(isMonospaced ? .body.monospaced() : .body)
+                .foregroundStyle(MegrumTheme.ink)
+                .textSelection(.enabled)
+                .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .padding(.vertical, 3)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(title)、\(value)")
     }
 }
 
@@ -835,6 +1745,7 @@ struct AddressSettingsScreen: View {
     @State private var phoneNumber = ""
     @State private var postalCodeLookupTask: Task<Void, Never>?
     @State private var lastAppliedPostalCode = ""
+    @State private var inputErrorMessage: String?
 
     var body: some View {
         ScrollView {
@@ -851,6 +1762,17 @@ struct AddressSettingsScreen: View {
         .scrollDismissesKeyboard(.interactively)
         .navigationTitle("住所設定")
         .megrumInlineNavigationTitle()
+        .toolbar {
+            #if os(iOS)
+            ToolbarItemGroup(placement: .keyboard) {
+                Spacer()
+                Button("完了") {
+                    focusedField = nil
+                }
+                .font(.body.weight(.semibold))
+            }
+            #endif
+        }
         .task {
             await appState.loadMailingAddress()
             apply(address: appState.mailingAddress)
@@ -860,6 +1782,9 @@ struct AddressSettingsScreen: View {
         }
         .onChange(of: appState.mailingAddress) { _, address in
             apply(address: address)
+        }
+        .onChange(of: draftAddress) { _, _ in
+            inputErrorMessage = nil
         }
     }
 
@@ -941,7 +1866,15 @@ struct AddressSettingsScreen: View {
                 #endif
                 .megrumTextFieldStyle()
 
-            if let errorMessage = appState.errorMessage {
+            if let inputErrorMessage {
+                Text(inputErrorMessage)
+                    .font(.system(size: 13, weight: .bold, design: .rounded))
+                    .foregroundStyle(Color(red: 0.851, green: 0.51, blue: 0.42))
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(14)
+                    .background(Color(red: 0.851, green: 0.51, blue: 0.42).opacity(0.1), in: RoundedRectangle(cornerRadius: 16))
+                    .accessibilityLabel(inputErrorMessage)
+            } else if let errorMessage = appState.errorMessage {
                 Text(errorMessage)
                     .font(.system(size: 13, weight: .bold, design: .rounded))
                     .foregroundStyle(Color(red: 0.851, green: 0.51, blue: 0.42))
@@ -970,7 +1903,8 @@ struct AddressSettingsScreen: View {
         .buttonStyle(.borderedProminent)
         .buttonBorderShape(.roundedRectangle(radius: 18))
         .tint(MegrumTheme.lavender)
-        .disabled(appState.isSavingMailingAddress || !draftAddress.isReady)
+        .disabled(appState.isSavingMailingAddress)
+        .accessibilityHint("入力した住所を保存します")
     }
 
     private var draftAddress: MailingAddress {
@@ -988,7 +1922,13 @@ struct AddressSettingsScreen: View {
 
     private func save() async {
         focusedField = nil
+        inputErrorMessage = MailingAddressDraftValidator.validationMessage(for: draftAddress)
+        guard inputErrorMessage == nil else {
+            return
+        }
+
         if await appState.saveMailingAddress(draftAddress) {
+            inputErrorMessage = nil
             dismiss()
         }
     }

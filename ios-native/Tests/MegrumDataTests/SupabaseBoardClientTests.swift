@@ -125,6 +125,83 @@ final class SupabaseBoardClientTests: XCTestCase {
         XCTAssertEqual(appendJSON["p_scope"] as? String, "same_prefecture")
     }
 
+    func testSameSpotBoardReplyRequestsUseNearbyContext() throws {
+        let client = SupabaseBoardClient(configuration: configuration)
+        let threadID = UUID(uuidString: "11111111-1111-1111-1111-111111111111")!
+
+        let request = try client.makeLoadRepliesRequest(
+            threadID: threadID,
+            latitude: 35.681236,
+            longitude: 139.767125,
+            prefecture: "東京都",
+            scope: .sameSpot
+        )
+        let body = try XCTUnwrap(request.httpBody)
+        let json = try XCTUnwrap(JSONSerialization.jsonObject(with: body) as? [String: Any])
+
+        XCTAssertEqual(json["p_viewer_lat"] as? Double, 35.681236)
+        XCTAssertEqual(json["p_viewer_lng"] as? Double, 139.767125)
+        XCTAssertEqual(json["p_prefecture"] as? String, "東京都")
+        XCTAssertEqual(json["p_scope"] as? String, "nearby_3km")
+    }
+
+    func testLoadThreadsFiltersUnexpectedFarNearbyRowsClientSide() throws {
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [BoardMockURLProtocol.self]
+        let session = URLSession(configuration: configuration)
+        let client = SupabaseBoardClient(configuration: self.configuration, session: session)
+
+        BoardMockURLProtocol.requestHandler = { request in
+            guard let url = request.url else {
+                throw BoardMockError.missingURL
+            }
+            XCTAssertEqual(url.path, "/rest/v1/rpc/list_meguri_board_threads_for_viewer")
+            let data = Data("""
+            [
+              {
+                "id": "00000000-0000-0000-0000-000000000601",
+                "author_id": "00000000-0000-0000-0000-000000000001",
+                "title": "近いスレッド",
+                "body": "近くです",
+                "audience_scope": "nearby_3km",
+                "origin_lat": 35.681236,
+                "origin_lng": 139.767125,
+                "prefecture": "東京都",
+                "latest_activity_at": "2026-05-31T00:00:00Z",
+                "created_at": "2026-05-31T00:00:00Z"
+              },
+              {
+                "id": "00000000-0000-0000-0000-000000000602",
+                "author_id": "00000000-0000-0000-0000-000000000002",
+                "title": "遠いスレッド",
+                "body": "遠くです",
+                "audience_scope": "nearby_3km",
+                "origin_lat": 35.751236,
+                "origin_lng": 139.767125,
+                "prefecture": "東京都",
+                "latest_activity_at": "2026-05-31T00:00:00Z",
+                "created_at": "2026-05-31T00:00:00Z"
+              }
+            ]
+            """.utf8)
+            return (BoardMockURLProtocol.response(for: url, statusCode: 200), data)
+        }
+        defer {
+            BoardMockURLProtocol.requestHandler = nil
+        }
+
+        let threads = try waitForBoardAsyncResult {
+            try await client.loadThreads(
+                latitude: 35.681236,
+                longitude: 139.767125,
+                prefecture: "東京都",
+                scope: .nearby3km
+            )
+        }
+
+        XCTAssertEqual(threads.map(\.title), ["近いスレッド"])
+    }
+
     func testBuildsBoardThreadCreateRequest() throws {
         let client = SupabaseBoardClient(configuration: configuration)
         let authorID = UUID(uuidString: "22222222-2222-2222-2222-222222222222")!
@@ -165,5 +242,86 @@ final class SupabaseBoardClientTests: XCTestCase {
             projectURL: URL(string: "https://example.supabase.co")!,
             publishableKey: "sb_publishable_test"
         )
+    }
+}
+
+private func waitForBoardAsyncResult<Value: Sendable>(
+    _ operation: @escaping @Sendable () async throws -> Value,
+    timeout: TimeInterval = 3
+) throws -> Value {
+    let semaphore = DispatchSemaphore(value: 0)
+    let resultBox = BoardAsyncResultBox<Value>()
+
+    Task {
+        do {
+            resultBox.store(.success(try await operation()))
+        } catch {
+            resultBox.store(.failure(error))
+        }
+        semaphore.signal()
+    }
+
+    XCTAssertEqual(semaphore.wait(timeout: .now() + timeout), .success)
+    return try XCTUnwrap(resultBox.result).get()
+}
+
+private final class BoardAsyncResultBox<Value: Sendable>: @unchecked Sendable {
+    private let lock = NSLock()
+    private var storedResult: Result<Value, Error>?
+
+    var result: Result<Value, Error>? {
+        lock.lock()
+        defer { lock.unlock() }
+        return storedResult
+    }
+
+    func store(_ result: Result<Value, Error>) {
+        lock.lock()
+        storedResult = result
+        lock.unlock()
+    }
+}
+
+private enum BoardMockError: Error {
+    case missingHandler
+    case missingURL
+}
+
+private final class BoardMockURLProtocol: URLProtocol {
+    nonisolated(unsafe) static var requestHandler: ((URLRequest) throws -> (HTTPURLResponse, Data))?
+
+    override class func canInit(with request: URLRequest) -> Bool {
+        true
+    }
+
+    override class func canonicalRequest(for request: URLRequest) -> URLRequest {
+        request
+    }
+
+    override func startLoading() {
+        guard let requestHandler = Self.requestHandler else {
+            client?.urlProtocol(self, didFailWithError: BoardMockError.missingHandler)
+            return
+        }
+
+        do {
+            let (response, data) = try requestHandler(request)
+            client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
+            client?.urlProtocol(self, didLoad: data)
+            client?.urlProtocolDidFinishLoading(self)
+        } catch {
+            client?.urlProtocol(self, didFailWithError: error)
+        }
+    }
+
+    override func stopLoading() {}
+
+    static func response(for url: URL, statusCode: Int) -> HTTPURLResponse {
+        HTTPURLResponse(
+            url: url,
+            statusCode: statusCode,
+            httpVersion: nil,
+            headerFields: ["Content-Type": "application/json"]
+        )!
     }
 }

@@ -1175,16 +1175,16 @@ struct ProposalCreateConfiguration: Equatable {
     var isListingSource: Bool
 
     private static let mailConditionTags = ["即日発送", "同日発送"]
-    private static let handConditionTags = ["終演後OK", "グッズ販売中OK"]
+    private static let baseConditionTags = ["開演前OK", "終演後OK", "グッズ販売中OK", "短時間OK", "同種優先"]
 
     var conditionTagOptions: [String] {
         switch exchangeMethod {
         case .hand:
-            Self.handConditionTags
+            Self.baseConditionTags
         case .mail:
-            Self.mailConditionTags
+            Self.mailConditionTags + Self.baseConditionTags
         case .both:
-            Self.handConditionTags + Self.mailConditionTags
+            Self.mailConditionTags + Self.baseConditionTags
         }
     }
 
@@ -1197,7 +1197,11 @@ struct ProposalCreateConfiguration: Equatable {
     }
 
     var canSubmit: Bool {
-        hasSelectedSenderGoods && !isCreatingProposal && !isLoadingMailingAddress && targetStatus != nil
+        hasSelectedSenderGoods
+            && receiverGoodsCount > 0
+            && !isCreatingProposal
+            && !isLoadingMailingAddress
+            && targetStatus != nil
     }
 
     var targetStatus: ProposalStatus? {
@@ -1211,6 +1215,9 @@ struct ProposalCreateConfiguration: Equatable {
     }
 
     var submitTitle: String {
+        if receiverGoodsCount <= 0 {
+            return "受け取るものを選択"
+        }
         if requiresMailingAddressBeforeSubmit && !hasReadyMailingAddress {
             return "住所登録が必要"
         }

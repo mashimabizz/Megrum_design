@@ -17,6 +17,11 @@ public struct AuthSignUpInput: Equatable, Sendable {
 }
 
 public enum MegrumAuthInputValidator {
+    public static let invalidEmailMessage = "メールアドレスの形式を確認してください"
+    public static let missingPasswordMessage = "パスワードを入力してください"
+    public static let shortPasswordMessage = "パスワードは8文字以上で入力してください"
+    public static let invalidHandleMessage = "ユーザーIDは3〜24文字の英数字と_で入力してください"
+
     public static func normalizedEmail(_ email: String) -> String {
         email.trimmingCharacters(in: .whitespacesAndNewlines)
     }
@@ -33,7 +38,8 @@ public enum MegrumAuthInputValidator {
         }
 
         let domain = parts[1]
-        return domain.contains(".") && !domain.hasPrefix(".") && !domain.hasSuffix(".")
+        let labels = domain.split(separator: ".", omittingEmptySubsequences: false)
+        return labels.count >= 2 && labels.allSatisfy { !$0.isEmpty }
     }
 
     public static func isValidSignInPassword(_ password: String) -> Bool {
@@ -57,6 +63,37 @@ public enum MegrumAuthInputValidator {
         }
         return handle.range(of: #"^[A-Za-z0-9_]+$"#, options: .regularExpression) != nil
     }
+
+    public static func signInValidationMessage(email: String, password: String) -> String? {
+        guard isValidEmail(email) else {
+            return invalidEmailMessage
+        }
+        guard isValidSignInPassword(password) else {
+            return missingPasswordMessage
+        }
+        return nil
+    }
+
+    public static func signUpValidationMessage(email: String, password: String, handle: String?) -> String? {
+        guard isValidEmail(email) else {
+            return invalidEmailMessage
+        }
+        guard isValidSignUpPassword(password) else {
+            return shortPasswordMessage
+        }
+        guard isValidHandle(handle) else {
+            return invalidHandleMessage
+        }
+        return nil
+    }
+
+    public static func passwordResetValidationMessage(email: String) -> String? {
+        isValidEmail(email) ? nil : invalidEmailMessage
+    }
+}
+
+private enum MegrumAuthStateError: Error {
+    case timedOut
 }
 
 public protocol MegrumAuthRepository: Sendable {
@@ -215,21 +252,37 @@ public final class MegrumAuthState: ObservableObject {
     @Published public private(set) var session: AuthSession?
     @Published public private(set) var isLoading = false
     @Published public private(set) var errorMessage: String?
+    @Published public private(set) var successMessage: String?
     @Published public private(set) var passwordResetMessage: String?
 
     public let isConfigured: Bool
     private let repository: any MegrumAuthRepository
     private let sessionStore: any AuthSessionStore
+    private let authActionTimeoutNanoseconds: UInt64
+    private let signOutTimeoutNanoseconds: UInt64
 
     public init(
         repository: any MegrumAuthRepository,
         sessionStore: any AuthSessionStore = InMemoryAuthSessionStore(),
-        initialSession: AuthSession? = nil
+        initialSession: AuthSession? = nil,
+        authActionTimeoutNanoseconds: UInt64 = 20_000_000_000,
+        signOutTimeoutNanoseconds: UInt64 = 8_000_000_000
     ) {
         self.repository = repository
         self.sessionStore = sessionStore
         self.isConfigured = repository.isConfigured
-        self.session = initialSession ?? (try? sessionStore.load())
+        self.authActionTimeoutNanoseconds = authActionTimeoutNanoseconds
+        self.signOutTimeoutNanoseconds = signOutTimeoutNanoseconds
+        if let initialSession {
+            self.session = initialSession
+        } else {
+            do {
+                self.session = try sessionStore.load()
+            } catch {
+                self.session = nil
+                self.errorMessage = "保存済みのログイン情報を読み込めませんでした。もう一度ログインしてください"
+            }
+        }
     }
 
     public var isAuthenticated: Bool {
@@ -240,18 +293,28 @@ public final class MegrumAuthState: ObservableObject {
         repository.oauthCallbackScheme
     }
 
+    public func clearFeedback() {
+        errorMessage = nil
+        successMessage = nil
+        passwordResetMessage = nil
+    }
+
     public func signIn(email: String, password: String) async {
         guard !isLoading else {
             return
         }
         let trimmedEmail = MegrumAuthInputValidator.normalizedEmail(email)
-        guard MegrumAuthInputValidator.isValidEmail(trimmedEmail),
-              MegrumAuthInputValidator.isValidSignInPassword(password) else {
-            errorMessage = "有効なメールアドレスとパスワードを入力してください"
+        if let validationMessage = MegrumAuthInputValidator.signInValidationMessage(
+            email: trimmedEmail,
+            password: password
+        ) {
+            errorMessage = validationMessage
+            successMessage = nil
             passwordResetMessage = nil
             return
         }
 
+        let repository = repository
         await runAuthAction {
             try await repository.signIn(email: trimmedEmail, password: password)
         }
@@ -265,10 +328,12 @@ public final class MegrumAuthState: ObservableObject {
         let trimmedNonce = nonce.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmedIDToken.isEmpty, !trimmedNonce.isEmpty else {
             errorMessage = "Appleログイン情報を取得できませんでした。もう一度お試しください"
+            successMessage = nil
             passwordResetMessage = nil
             return
         }
 
+        let repository = repository
         await runAuthAction {
             try await repository.signInWithApple(
                 idToken: trimmedIDToken,
@@ -292,29 +357,49 @@ public final class MegrumAuthState: ObservableObject {
         let trimmedEmail = MegrumAuthInputValidator.normalizedEmail(email)
         guard MegrumAuthInputValidator.isValidEmail(trimmedEmail) else {
             errorMessage = "有効なメールアドレスを入力してください"
+            successMessage = nil
             passwordResetMessage = nil
             return
         }
         guard MegrumAuthInputValidator.isValidSignUpPassword(password) else {
             errorMessage = "パスワードは8文字以上で入力してください"
+            successMessage = nil
             passwordResetMessage = nil
             return
         }
         guard MegrumAuthInputValidator.isValidHandle(handle) else {
             errorMessage = "ユーザーIDは3〜24文字の英数字と_で入力してください"
+            successMessage = nil
             passwordResetMessage = nil
             return
         }
         let trimmedHandle = MegrumAuthInputValidator.normalizedHandle(handle)
 
-        await runAuthAction {
-            try await repository.signUp(
-                AuthSignUpInput(
-                    email: trimmedEmail,
-                    password: password,
-                    handle: trimmedHandle
+        isLoading = true
+        clearFeedback()
+        defer {
+            isLoading = false
+        }
+
+        let repository = repository
+        do {
+            let nextSession = try await withAuthTimeout(nanoseconds: authActionTimeoutNanoseconds) {
+                try await repository.signUp(
+                    AuthSignUpInput(
+                        email: trimmedEmail,
+                        password: password,
+                        handle: trimmedHandle
+                    )
                 )
-            )
+            }
+            try sessionStore.save(nextSession)
+            session = nextSession
+        } catch {
+            if isLikelyEmailConfirmationRequiredAfterSignUp(error) {
+                successMessage = "確認メールを送信しました。メール内のリンクで認証を完了してからログインしてください"
+                return
+            }
+            errorMessage = normalizedMessage(from: error)
         }
     }
 
@@ -326,20 +411,24 @@ public final class MegrumAuthState: ObservableObject {
         let trimmedEmail = MegrumAuthInputValidator.normalizedEmail(email)
         guard MegrumAuthInputValidator.isValidEmail(trimmedEmail) else {
             errorMessage = "有効なメールアドレスを入力してください"
+            successMessage = nil
             passwordResetMessage = nil
             return false
         }
 
         isLoading = true
-        errorMessage = nil
-        passwordResetMessage = nil
+        clearFeedback()
         defer {
             isLoading = false
         }
 
+        let repository = repository
         do {
-            try await repository.sendPasswordReset(email: trimmedEmail)
+            try await withAuthTimeout(nanoseconds: authActionTimeoutNanoseconds) {
+                try await repository.sendPasswordReset(email: trimmedEmail)
+            }
             passwordResetMessage = "再設定メールを送信しました。受信メールを確認してください"
+            successMessage = passwordResetMessage
             return true
         } catch {
             errorMessage = normalizedMessage(from: error)
@@ -349,8 +438,7 @@ public final class MegrumAuthState: ObservableObject {
 
     public func enterPreview() {
         session = PreviewMegrumAuthRepository.previewSession()
-        errorMessage = nil
-        passwordResetMessage = nil
+        clearFeedback()
     }
 
     @discardableResult
@@ -360,14 +448,16 @@ public final class MegrumAuthState: ObservableObject {
         }
 
         isLoading = true
-        errorMessage = nil
-        passwordResetMessage = nil
+        clearFeedback()
         defer {
             isLoading = false
         }
 
+        let repository = repository
         do {
-            guard let nextSession = try await repository.restoreSession(fromRedirectURL: url) else {
+            guard let nextSession = try await withAuthTimeout(nanoseconds: authActionTimeoutNanoseconds, operation: {
+                try await repository.restoreSession(fromRedirectURL: url)
+            }) else {
                 return false
             }
             try sessionStore.save(nextSession)
@@ -380,40 +470,83 @@ public final class MegrumAuthState: ObservableObject {
     }
 
     public func signOut() async {
-        guard let session else {
-            return
-        }
+        let currentSession = session
         isLoading = true
-        errorMessage = nil
-        passwordResetMessage = nil
-        defer {
-            isLoading = false
-        }
+        clearFeedback()
+        session = nil
 
         do {
-            try await repository.signOut(session: session)
             try sessionStore.clear()
-            self.session = isConfigured ? nil : PreviewMegrumAuthRepository.previewSession()
+            successMessage = "ログアウトしました"
         } catch {
-            errorMessage = normalizedMessage(from: error)
+            errorMessage = "端末からログアウトしましたが、保存情報の削除に失敗しました。アプリを再起動してからもう一度お試しください"
+        }
+        isLoading = false
+
+        guard let currentSession else {
+            return
+        }
+
+        let repository = repository
+        do {
+            try await withAuthTimeout(nanoseconds: signOutTimeoutNanoseconds) {
+                try await repository.signOut(session: currentSession)
+            }
+        } catch {
+            // Remote sign-out must not trap the user in the authenticated shell.
         }
     }
 
-    private func runAuthAction(_ action: () async throws -> AuthSession) async {
+    private func runAuthAction(_ action: @escaping @Sendable () async throws -> AuthSession) async {
         isLoading = true
-        errorMessage = nil
-        passwordResetMessage = nil
+        clearFeedback()
         defer {
             isLoading = false
         }
 
         do {
-            let nextSession = try await action()
+            let nextSession = try await withAuthTimeout(
+                nanoseconds: authActionTimeoutNanoseconds,
+                operation: action
+            )
             try sessionStore.save(nextSession)
             session = nextSession
         } catch {
             errorMessage = normalizedMessage(from: error)
         }
+    }
+
+    private func withAuthTimeout<T: Sendable>(
+        nanoseconds: UInt64,
+        operation: @escaping @Sendable () async throws -> T
+    ) async throws -> T {
+        try await withThrowingTaskGroup(of: T.self) { group in
+            group.addTask {
+                try await operation()
+            }
+            group.addTask {
+                try await Task.sleep(nanoseconds: nanoseconds)
+                throw MegrumAuthStateError.timedOut
+            }
+
+            guard let result = try await group.next() else {
+                throw MegrumAuthStateError.timedOut
+            }
+            group.cancelAll()
+            return result
+        }
+    }
+
+    private func isLikelyEmailConfirmationRequiredAfterSignUp(_ error: Error) -> Bool {
+        if case let DecodingError.keyNotFound(key, _) = error, key.stringValue == "access_token" {
+            return true
+        }
+        if case let SupabaseAuthError.unexpectedStatus(_, message) = error,
+           let message,
+           message.localizedCaseInsensitiveContains("confirm") {
+            return true
+        }
+        return false
     }
 
     private func normalizedMessage(from error: Error) -> String {
@@ -443,6 +576,9 @@ public final class MegrumAuthState: ObservableObject {
         }
         if case MegrumRepositoryError.unsupportedMutation = error {
             return "このログイン方法はまだ利用できません"
+        }
+        if case MegrumAuthStateError.timedOut = error {
+            return "通信に時間がかかっています。接続を確認してもう一度お試しください"
         }
         return "認証に失敗しました。時間をおいてもう一度お試しください"
     }
@@ -481,8 +617,7 @@ public enum MegrumAuthStateFactory {
 
         return MegrumAuthState(
             repository: PreviewMegrumAuthRepository(),
-            sessionStore: InMemoryAuthSessionStore(),
-            initialSession: PreviewMegrumAuthRepository.previewSession()
+            sessionStore: InMemoryAuthSessionStore()
         )
     }
 

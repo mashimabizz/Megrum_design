@@ -41,10 +41,10 @@ public final class SupabaseProposalClient: @unchecked Sendable {
         return rows.compactMap(\.proposal)
     }
 
-    public func createProposal(senderID: UUID, input: ProposalCreateInput) async throws -> TradeProposal {
+    public func createProposal(senderID: UUID, input: ProposalCreateInput, now: Date = .now) async throws -> TradeProposal {
         let rows: [ProposalRow] = try await client.upsertRows(
             into: "proposals",
-            values: [try ProposalCreatePayload(senderID: senderID, input: input)],
+            values: [try ProposalCreatePayload(senderID: senderID, input: input, now: now)],
             select: ProposalRow.select
         )
         return rows.first?.proposal ?? TradeProposal(
@@ -58,7 +58,8 @@ public final class SupabaseProposalClient: @unchecked Sendable {
             receiverGoodsIDs: input.receiverGoodsIDs,
             conditionTags: input.conditionTags,
             agreedBySender: [.sent, .negotiating, .agreementOneSide, .agreed].contains(input.status),
-            agreedByReceiver: input.status == .agreed
+            agreedByReceiver: input.status == .agreed,
+            createdAt: now
         )
     }
 
@@ -183,6 +184,27 @@ public final class SupabaseProposalClient: @unchecked Sendable {
         return updated
     }
 
+    public func approveCancel(userID: UUID, proposalID: UUID, now: Date = .now) async throws -> TradeProposal {
+        let proposal = try await loadProposal(proposalID: proposalID)
+        guard proposal.isParticipant(userID) else {
+            throw SupabaseProposalClientError.notParticipant
+        }
+        guard proposal.status == .agreed else {
+            throw SupabaseProposalClientError.invalidStatus
+        }
+
+        let rows: [ProposalRow] = try await client.updateRows(
+            in: "proposals",
+            values: ProposalCancelApprovalUpdatePayload(now: now),
+            select: ProposalRow.select,
+            queryItems: cancelApprovalQueryItems(proposalID: proposalID, userID: userID)
+        )
+        guard let updated = rows.first?.proposal else {
+            throw SupabaseProposalClientError.invalidStatus
+        }
+        return updated
+    }
+
     public func submitEvaluation(userID: UUID, input: TradeEvaluationCreateInput) async throws -> UserEvaluation {
         guard (1...5).contains(input.stars) else {
             throw SupabaseProposalClientError.invalidRating
@@ -231,14 +253,14 @@ public final class SupabaseProposalClient: @unchecked Sendable {
         )
     }
 
-    public func makeCreateProposalRequest(senderID: UUID, input: ProposalCreateInput) throws -> URLRequest {
+    public func makeCreateProposalRequest(senderID: UUID, input: ProposalCreateInput, now: Date = .now) throws -> URLRequest {
         try client.makeMutationRequest(
             path: "/rest/v1/proposals",
             queryItems: [
                 URLQueryItem(name: "select", value: ProposalRow.select)
             ],
             method: "POST",
-            body: encoder.encode([try ProposalCreatePayload(senderID: senderID, input: input)]),
+            body: encoder.encode([try ProposalCreatePayload(senderID: senderID, input: input, now: now)]),
             prefer: "resolution=merge-duplicates,return=representation"
         )
     }
@@ -284,6 +306,24 @@ public final class SupabaseProposalClient: @unchecked Sendable {
         return try client.makeRPCRequest(
             function: "approve_trade_evidence_for_viewer",
             payload: ProposalApprovalRPCPayload(proposalID: proposal.id)
+        )
+    }
+
+    public func makeApproveCancelRequest(userID: UUID, proposal: TradeProposal, now: Date = .now) throws -> URLRequest {
+        guard proposal.isParticipant(userID) else {
+            throw SupabaseProposalClientError.notParticipant
+        }
+        guard proposal.status == .agreed else {
+            throw SupabaseProposalClientError.invalidStatus
+        }
+        return try client.makeMutationRequest(
+            path: "/rest/v1/proposals",
+            queryItems: [
+                URLQueryItem(name: "select", value: ProposalRow.select)
+            ] + cancelApprovalQueryItems(proposalID: proposal.id, userID: userID),
+            method: "PATCH",
+            body: encoder.encode(ProposalCancelApprovalUpdatePayload(now: now)),
+            prefer: "return=representation"
         )
     }
 
@@ -348,6 +388,16 @@ public final class SupabaseProposalClient: @unchecked Sendable {
     private func proposalQueryItems(proposalID: UUID) -> [URLQueryItem] {
         [
             URLQueryItem(name: "id", value: "eq.\(proposalID.uuidString.lowercased())"),
+            URLQueryItem(name: "limit", value: "1")
+        ]
+    }
+
+    private func cancelApprovalQueryItems(proposalID: UUID, userID: UUID) -> [URLQueryItem] {
+        let viewer = userID.uuidString.lowercased()
+        return [
+            URLQueryItem(name: "id", value: "eq.\(proposalID.uuidString.lowercased())"),
+            URLQueryItem(name: "status", value: "eq.\(ProposalStatus.agreed.rawValue)"),
+            URLQueryItem(name: "or", value: "(sender_id.eq.\(viewer),receiver_id.eq.\(viewer))"),
             URLQueryItem(name: "limit", value: "1")
         ]
     }
@@ -441,11 +491,16 @@ private struct ProposalCreatePayload: Encodable, Sendable {
     var receiverHaveIds: [UUID]
     var receiverHaveQtys: [Int]
     var message: String?
+    var messageTone: String
     var status: String
+    var lastActionAt: String
+    var expiresAt: String?
     var exchangeMethod: String
     var optionTags: [String]
     var exposeCalendar: Bool
     var listingId: UUID?
+    var cashOffer: Bool
+    var cashAmount: Int?
     var meetupStartAt: String?
     var meetupEndAt: String?
     var meetupPlaceName: String?
@@ -454,13 +509,15 @@ private struct ProposalCreatePayload: Encodable, Sendable {
     var meetupCandidates: [ProposalMeetupCandidatePayload]
     var agreedBySender: Bool
 
-    init(senderID: UUID, input: ProposalCreateInput) throws {
+    init(senderID: UUID, input: ProposalCreateInput, now: Date) throws {
+        let meetupCandidates = Self.normalizedMeetupCandidates(for: input)
+        let meetup = meetupCandidates.first
         if input.requiresMeetupBeforeSending {
-            guard input.meetup?.isValid == true else {
+            guard meetup?.isValid == true else {
                 throw SupabaseProposalClientError.missingMeetup
             }
         }
-        let meetup = input.meetup
+        let expiresAt = Calendar(identifier: .gregorian).date(byAdding: .day, value: 7, to: now)
         self.senderId = senderID
         self.receiverId = input.receiverID
         self.matchType = input.matchType.rawValue
@@ -469,18 +526,32 @@ private struct ProposalCreatePayload: Encodable, Sendable {
         self.receiverHaveIds = input.receiverGoodsIDs
         self.receiverHaveQtys = input.receiverGoodsIDs.map { _ in 1 }
         self.message = input.message?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
+        self.messageTone = "standard"
         self.status = input.status.rawValue
+        self.lastActionAt = isoTimestamp(now)
+        self.expiresAt = input.status == .draft ? nil : expiresAt.map(isoTimestamp)
         self.exchangeMethod = input.exchangeMethod.rawValue
         self.optionTags = input.conditionTags
-        self.exposeCalendar = false
+        self.exposeCalendar = input.requiresMeetupBeforeSending && input.exposeCalendar
         self.listingId = input.listingID
+        self.cashOffer = false
+        self.cashAmount = nil
         self.meetupStartAt = meetup.map { isoTimestamp($0.startAt) }
         self.meetupEndAt = meetup.map { isoTimestamp($0.endAt) }
         self.meetupPlaceName = meetup?.normalizedPlaceName.nilIfEmpty
         self.meetupLat = meetup?.latitude
         self.meetupLng = meetup?.longitude
-        self.meetupCandidates = meetup.map { [ProposalMeetupCandidatePayload(meetup: $0)] } ?? []
+        self.meetupCandidates = meetupCandidates.map(ProposalMeetupCandidatePayload.init)
         self.agreedBySender = [.sent, .negotiating, .agreementOneSide, .agreed].contains(input.status)
+    }
+
+    private static func normalizedMeetupCandidates(for input: ProposalCreateInput) -> [ProposalMeetupInput] {
+        var candidates = input.meetupCandidates.filter(\.isValid)
+        if let meetup = input.meetup, meetup.isValid {
+            candidates.removeAll { $0.isSameMeetup(as: meetup) }
+            candidates.insert(meetup, at: 0)
+        }
+        return Array(candidates.prefix(3))
     }
 }
 
@@ -490,6 +561,7 @@ private struct ProposalMeetupCandidatePayload: Encodable, Sendable {
     var placeName: String
     var lat: Double
     var lng: Double
+    var mode: String
 
     init(meetup: ProposalMeetupInput) {
         self.startAt = isoTimestamp(meetup.startAt)
@@ -497,6 +569,44 @@ private struct ProposalMeetupCandidatePayload: Encodable, Sendable {
         self.placeName = meetup.normalizedPlaceName
         self.lat = meetup.latitude
         self.lng = meetup.longitude
+        self.mode = "scheduled"
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        try container.encode([
+            "startAt": ProposalMeetupCandidateValue.string(startAt),
+            "endAt": .string(endAt),
+            "placeName": .string(placeName),
+            "lat": .double(lat),
+            "lng": .double(lng),
+            "mode": .string(mode)
+        ])
+    }
+}
+
+private enum ProposalMeetupCandidateValue: Encodable, Sendable {
+    case string(String)
+    case double(Double)
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        switch self {
+        case .string(let value):
+            try container.encode(value)
+        case .double(let value):
+            try container.encode(value)
+        }
+    }
+}
+
+private extension ProposalMeetupInput {
+    func isSameMeetup(as other: ProposalMeetupInput) -> Bool {
+        startAt == other.startAt
+            && endAt == other.endAt
+            && normalizedPlaceName == other.normalizedPlaceName
+            && latitude == other.latitude
+            && longitude == other.longitude
     }
 }
 
@@ -542,6 +652,15 @@ private struct ProposalApprovalUpdatePayload: Encodable, Sendable {
     var approvedByReceiver: Bool
     var status: String?
     var completedAt: String?
+}
+
+private struct ProposalCancelApprovalUpdatePayload: Encodable, Sendable {
+    var status = ProposalStatus.cancelled.rawValue
+    var lastActionAt: String
+
+    init(now: Date) {
+        self.lastActionAt = isoTimestamp(now)
+    }
 }
 
 private struct EvidencePhotoInsertPayload: Encodable, Sendable {

@@ -70,4 +70,48 @@ final class OnboardingOshiSelectionTests: XCTestCase {
         XCTAssertEqual(inputs.first?.groupID, twice.id)
         XCTAssertEqual(inputs.last?.groupID, ive.id)
     }
+
+    func testDraftsFromSavedSelectionsKeepSavedPriorityOrder() {
+        let twice = OshiGroup(id: UUID(uuidString: "10000000-0000-0000-0000-000000000031")!, name: "TWICE")
+        let ive = OshiGroup(id: UUID(uuidString: "10000000-0000-0000-0000-000000000032")!, name: "IVE")
+        let sana = OshiCharacter(
+            id: UUID(uuidString: "10000000-0000-0000-0000-000000000033")!,
+            groupID: twice.id,
+            name: "SANA"
+        )
+        let selections = [
+            UserOshiSelection(
+                id: UUID(uuidString: "10000000-0000-0000-0000-000000000034")!,
+                userID: UUID(uuidString: "10000000-0000-0000-0000-000000000035")!,
+                groupID: ive.id,
+                characterID: nil,
+                kind: .box,
+                priority: 2
+            ),
+            UserOshiSelection(
+                id: UUID(uuidString: "10000000-0000-0000-0000-000000000036")!,
+                userID: UUID(uuidString: "10000000-0000-0000-0000-000000000035")!,
+                groupID: twice.id,
+                characterID: sana.id,
+                kind: .specific,
+                priority: 1
+            )
+        ]
+
+        let drafts = OnboardingOshiSelectionLogic.drafts(
+            from: selections,
+            groups: [twice, ive],
+            characters: [sana]
+        )
+
+        XCTAssertEqual(drafts.map(\.displayName), ["TWICE / SANA", "IVE 全体"])
+        XCTAssertEqual(drafts.map(\.kind), [.specific, .box])
+    }
+
+    func testAccountSetupModeProvidesCompletionGuidance() {
+        XCTAssertEqual(AccountSetupMode.onboarding.completionTitle, "初回設定が完了しました")
+        XCTAssertTrue(AccountSetupMode.onboarding.completionFootnote.contains("ホームへ進みます"))
+        XCTAssertEqual(AccountSetupMode.edit.completionTitle, "プロフィールを更新しました")
+        XCTAssertTrue(AccountSetupMode.edit.completionMessage.contains("推し設定"))
+    }
 }

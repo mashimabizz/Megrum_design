@@ -1,7 +1,7 @@
 # 22. Swift Native Migration
 
 最終更新: 2026-05-31
-ステータス: Active draft（iter375）
+ステータス: Active draft（iter413）
 
 ## 目的
 
@@ -118,6 +118,25 @@ tar -xzf /Users/michitaka/Desktop/Megrum_backups/pre-swift-migration-20260531-03
 - iter314で、設定一覧に「ブロックした人」を追加し、`groom_user_blocks` の一覧取得と解除をSwift版へ移植した。
 - iter315で、設定一覧に通知入口と未読バッジを追加し、`notifications` の一覧取得・既読化・大分類遷移をSwift版へ移植した。
 - iter337で、設定一覧にモバイル通知の標準Toggleを追加し、`user_notification_settings.push_enabled` の読み込み/upsert境界をSwift版へ移植した。
+- iter376で、ホーム左上の自分アイコンから開く左ドロワーをNative overlayへ戻し、プロフィール、通知、住所設定、ブロックした人、設定とプライバシー、ログアウトへ遷移できる導線を優先実装した。
+- iter376で、Preview用local xcconfigにSupabase URL / publishable key / auth redirect URLを注入し、実機Debug installでも未ログイン時に新規登録・ログイン画面へ入れる状態へ寄せた。
+- iter376で、ログアウト時はAPNs device token revokeを試みてからSupabase Auth sessionを破棄する流れへ接続した。
+- iter377で、設定一覧にヘルプ、利用規約、プライバシーポリシー、アカウント概要の下層導線を追加し、左ドロワー配下の設定項目を触れる範囲を広げた。
+- iter377で、メール/パスワード認証の入力validation、password reset、メール確認待ちsign-up成功表示、古いfeedbackのclear、keyboard dismissを補強した。
+- iter377で、プロフィール編集時に既存 `user_oshi` を読み込み、推し設定の編集画面が空状態から始まらないようにした。
+- iter378で、ホーム画面へ `MegrumAppState` を直接渡し、左ドロワーから触る現地交換モードや持参候補が共通状態を確実に参照するようにした。
+- iter379で、ログアウト時にremote sign outが失敗してもlocal sessionとsession storeを破棄し、Previewでも自動再ログインせず認証画面へ戻れるようにした。保存済みsession復元失敗時も再ログイン導線へ寄せた。
+- iter379で、左ドロワーの主要遷移先をプロフィール、通知、住所設定、ブロックした人、設定とプライバシーへ整理し、項目タップ後に対象画面へ遷移するようにした。
+- iter379で、設定一覧にセキュリティ/プライバシー、ヘルプ、法的文書、アカウント概要、住所、通知、ブロック、ログアウトの入口を整理し、住所入力のkeyboard toolbarも補強した。
+- iter379で、自分プロフィール編集を `users` PATCHへ接続し、表示名、ハンドル、アイコンURL、性別、都道府県を保存できるようにした。
+- iter380で、初回プロフィール設定/プロフィール編集の保存完了alert、推し選択UIのアクセシビリティlabel/hint、設定/ヘルプ配下の利用規約・プライバシーポリシー・特定商取引法に基づく表記入口、アカウント概要のID/status表示を追加した。
+- iter381で、左ドロワーに「推し設定」を追加し、初回設定と同じNative選択画面を編集モードで開けるようにした。ドロワー項目は閉じるアニメーション後に遷移するようにし、閉じている途中の誤反応を減らした。
+- iter402で、推し設定画面をReact Native版に近い編集体験へ拡張した。グループごとの推しメンバーchip、`+ 追加` からのメンバー候補表示、左下固定の「推しを追加」、ジャンル別L1マスタ分類、推し追加リクエストをSwift Nativeへ接続した。
+- iter402で、`swift build` / 推し関連テスト / 実機向け `xcodebuild` は成功した。iPhoneへのinstallはCoreDevice上で端末が `unavailable` のため、端末復帰待ち。
+- iter409で、推し設定画面からメンバー追加リクエスト導線を削除し、各グループ内の `+ 追加` からマスタ上の追加可能メンバーだけを選ぶ仕様へ寄せた。メンバーchipと追加候補chipはRN版の密度に近づくよう小型化した。
+- iter381で、通知一覧を共有 `NotificationCenterScreen` に統一し、`linkPath` からホーム、在庫、Wish、やりとり、めぐり、相手プロフィール、評価一覧へ進む `NotificationRouteIntent` を追加した。
+- iter382で、左端スワイプから左ドロワーを開けるNative gesture layerを追加し、ドロワー項目選択後の遷移を次run loopへ逃がして「閉じるだけで遷移しない」不安定さを減らした。
+- iter382で、設定のログイン/セキュリティ画面へ現在の `MegrumAuthState` を渡し、メール、Auth user ID、profile ID、設定状態、account status、パスワード再設定、ログアウトが実セッションを見るようにした。
 - iter338で、Swift Native iOS版のAPNs device tokenを `notification_devices.push_provider='apns'` / `native_device_token` へupsertする境界を追加した。APNs実配送は後続で接続する。
 - iter339で、XcodeアプリホストにiOS標準の通知許可リクエスト、APNs登録、device tokenをAppStateへ渡すdelegate bridgeを追加した。
 - iter340で、端末通知タップ時の `linkPath` を既存通知一覧と同じ規則でNativeタブへ変換し、該当カテゴリへ移れるbridgeを追加した。
@@ -192,6 +211,39 @@ tar -xzf /Users/michitaka/Desktop/Megrum_backups/pre-swift-migration-20260531-03
 - iter375で、異議詳細画面をload/reply/withdrawの非同期storeへ拡張し、live repositoryへ接続できる画面状態へ進めた。取引詳細からのrouting接続は後続対象。
 - iter375で、`activity_windows` と `user_local_mode_settings` のSwift Data境界を追加した。Home現地交換モード/AW UIからの本接続は後続対象。
 - iter375で、遅刻、キャンセル申請、キャンセル承認などの取引チャットsystem messageをRN互換metadataで作るrequest境界を追加した。入力欄上メニューからのtyped接続と表示デザイン調整は後続対象。
+- iter376で、在庫/Wish作成・編集時のローカル写真を `goods-photos` storageへアップロードし、返却URLを `goods_inventory.photo_urls` へ保存する流れへ接続した。HEICなどは可能な範囲でJPEGへ変換し、対応済み画像形式はcontent typeを維持する。
+- iter376で、`attach_inventory_tag` / `detach_inventory_tag` RPCと `goods_inventory_tags` 読み込みをSwift Data境界へ追加し、作成・検索・公開在庫読み込み・更新でタグを保持できるようにした。
+- iter377で、個別募集編集をNative Formから `listings` PATCH と `listing_wish_options` PATCH/insertへ接続し、画面内だけでなくSupabaseへ保存される境界まで進めた。
+- iter377で、ホーム現地交換モードの持参候補が相手グッズではなく自分の在庫を優先するように修正した。
+- iter378で、在庫/Wish保存失敗時に入力・タグ・選択写真を保持し、再試行または写真を外して保存できる復帰UIを追加した。
+- iter378で、取引チャットの遅刻連絡とキャンセル申請を `messages.meta.action` 付きのtyped system messageとしてAppState / repository / Supabase message clientへ接続した。
+- iter378で、異議詳細の役割別アクション、証跡表示、反論時の `disputes` 更新をlive Data境界へ追加した。
+- iter379で、在庫/Wish編集画面に既存写真/選択済み写真のpreview、画像読み込み中/失敗時fallback、10MB超過の保存前validationを追加し、失敗後も入力内容・タグ・選択写真を保持したまま再試行できるようにした。
+- iter379で、`goods-photos` uploadのContent-Type正規化、空/未対応/過大ファイルのrequest validation、グリッド/詳細の画像fallbackを補強した。
+- iter379で、ホーム現地交換モード、打診作成カレンダー/マップ、取引詳細の当日/異議系表示、送信後導線の統合分を取り込んだ。
+- iter380で、ホーム現地交換モードON時にiOS位置情報を取得し、座標を `activity_windows.center_lat/lng` と `user_local_mode_settings.last_location_lat/lng` へ保存/復元する境界まで接続した。
+- iter380で、打診作成の待ち合わせ候補を最大3件まで追加/選択/削除できるdraftへ拡張し、MapKit上で選んだ座標を候補へ反映できるようにした。
+- iter380で、取引チャットの服装写真共有を `NativeCameraCaptureView` に接続し、カメラ直撮りから `messages.message_type='outfit_photo'` の写真送信へ進める入口を追加した。到着状態/現在地共有/system messageのpresentationも整理した。
+- iter381で、グッズ編集/追加画面でもiOSカメラ直撮りをローカル写真アップロードdraftへ追加できるようにした。写真ライブラリ選択、validation、保存復帰の既存経路は維持する。
+- iter381で、取引チャット内の相手からのキャンセル申請に対し、「キャンセルに同意する」CTAを表示し、`proposals.status='cancelled'` と承認system message作成まで接続した。自分が出した申請や承認済みの申請ではCTAを出さない。
+- iter381で、Swift Nativeホーム用の `SupabaseHomeClient` を追加し、RN版のmatch/possible候補に近いlive data request境界を用意した。AppState/Home UIへの本接続は次の優先対象として残す。
+- iter382で、自分プロフィール編集のプロフィール画像を写真ライブラリ/カメラ/削除から扱えるようにし、`profile-photos` Storage upload と `users.avatar_url` 更新をlive repositoryへ接続した。Supabase側のbucket/RLS確認は残る。
+- iter382で、`SupabaseHomeClient` をAppState/Home UIへ本接続し、`HomeCandidateComposer` で相手在庫、viewer wish、相手wish/個別募集候補から「マッチしてるよ！」「交換できるかも？」をcomposeするようにした。live data失敗時は既存fallbackを維持する。
+- iter382で、在庫/Wish一覧に集計chip、読み込み状態、context別空表示、remote image fallbackを追加し、3/4/5列切替や長押し操作は維持した。
+- iter382で、やりとり一覧を「打診中」「進行中」「完了済み」の3分類に拡張し、完了済み取引を進行中から分離した。
+- iter392で、Wish取得に `photo_urls` / `quantity` を通し、Wish一覧でも登録画像を表示するようにした。
+- iter392で、在庫取得に `kind,status` を通し、「譲る候補」「自分用キープ」「過去に譲った」の3タブへ分類した。
+- iter392で、グッズ画像を明示frame + clipで描画し、ホーム/在庫/Wishの縦横比違い画像が枠外へはみ出さないようにした。
+- iter392で、やりとり一覧の受け取る/私が出す欄に実グッズ画像サムネイルを表示するようにした。
+- iter392で、左ドロワーの推し設定を専用Native画面へ分け、登録済み推し、グループ検索、メンバー選択、箱推し、保存導線をReact Native版の情報設計に近づけた。
+- iter392で、ホーム現地交換モードのユーザー向け表示から旧AW表記を外し、現在地取得後の逆ジオコーディングで建物名または住所を表示できるようにした。
+- iter395で、保存済みの旧座標テキストもユーザー向けには表示せず、保存済み座標から住所/施設名の再解決を試みるようにした。
+- iter409で、ホームの「マッチしてるよ！」パネルから関係図sheetを開き、対象グッズ、相手個別募集、自分個別募集、「私が出す」「受け取る」候補を選んで打診作成へ進めるSwift Native導線を追加した。関係図で選んだ自分の提示物は `ProposalCreateFlow` の初期選択へ引き継ぐ。
+- iter409で、関係図の候補抽出・個別募集条件からの提示物推定・fallbackを `MatchRelationScreenTests` で検証し、`swift build` とSimulator向け `xcodebuild` を通した。
+- iter410で、Swift Native打診作成の複数待ち合わせ候補を `ProposalCreateInput.meetupCandidates` から `proposals.meetup_candidates` へ保存するpayloadへ拡張した。主候補は既存 `meetup_*` 5列へミラーし、JSON側はRN版互換の `startAt/endAt/placeName/lat/lng/mode` 形を保つ。
+- iter411で、関係図をRN版 `match-detail` と同じ「個別募集の中で候補を選ぶ」構造へ修正した。自分/相手の個別募集を一つ選ぶUIを廃止し、wish候補・譲る候補の選択を集計して打診へ進む。
+- iter412で、RN版 `proposal-select` / `proposal-confirm` をサブエージェント監査から日本語仕様整理し、Swift Nativeの提示物選択/送信内容確認へ反映した。相手から受け取る候補を相手の公開在庫から選択できるようにし、私が出す/受け取る双方のフィルター、交換手段による待ち合わせタブ出し分け、確認画面の交換条件タグ/住所確認、関係図起点の初期ステップを整理した。
+- iter413で、ホーム/関係図起点の `match_type` 引き継ぎ、確認画面の `expose_calendar`、住所未登録時の住所設定導線、送信完了後の `打診一覧に飛ぶ` / `まだ他に探す` 導線、受け取る候補未選択時の送信ブロックを追加した。
 
 ### Phase 4: Meguri core
 
@@ -240,45 +292,86 @@ tar -xzf /Users/michitaka/Desktop/Megrum_backups/pre-swift-migration-20260531-03
 - iter373で、`swift build` / `swift test` 236件 / `xcodebuild` Simulator build / 署名付きiPhone向けDebug build は成功した。`MTO’s phone` はCoreDeviceで `unavailable` のため、自動installは未完了。
 - iter375で、RN parity backlogのP0から在庫/Wish編集画面の保存接続、在庫/Wish作成payloadのメンバー/status保持、異議詳細画面のlive-ready化、AW Data境界、取引チャット運用系system message境界を追加した。
 - iter375で、`swift build` / `swift test` 262件 / `xcodebuild` Simulator build / 署名付きiPhone向けDebug build は成功した。`MTO’s phone` はCoreDeviceで `unavailable` のため、自動installは端末接続復帰待ち。
+- iter376で、左ドロワー/設定/ログアウト/Auth実環境接続、在庫/Wish写真アップロード、タグ保存境界を優先補強した。
+- iter376で、`swift build` / `swift test` 276件 / 署名付きiPhone向けDebug build は成功した。`MTO’s phone` へのinstallも成功した。自動launchのみ端末ロック中のためOSに拒否された。
+- iter377で、左ドロワー配下設定、認証入力、プロフィール編集、個別募集編集、現地交換モード持参候補を優先補強した。
+- iter377で、`swift build` / `swift test` 299件 / 署名付きiPhone向けDebug build は成功した。`MTO’s phone` への上書きinstallと自動launchまで成功した。
+- iter378で、優先P0としてホーム状態注入、在庫/Wish保存失敗復帰、遅刻/キャンセルtyped message、異議詳細live actionを補強した。
+- iter378で、`swift build` / `swift test` 316件 / 署名付きiPhone向けDebug build は成功した。`MTO’s phone` への上書きinstallは成功し、自動launchのみ端末ロック中のためOSに拒否された。
+- iter379で、左ドロワー/設定、ログアウト/Auth復帰、自分プロフィール保存、在庫/Wish写真編集/アップロード復帰、ホーム/打診/取引の統合分を優先補強した。
+- iter379で、`swift build` / `swift test` 344件 / 署名付きiPhone向けDebug build は成功した。`MTO’s phone` への上書きinstallも成功した。
+- iter380で、現地交換モードの位置保存、打診待ち合わせ候補/地図選択、取引チャットのカメラ直撮り入口、初回設定/設定/法的文書入口を優先補強した。
+- iter380で、`swift build` / `swift test` 355件 / 署名付きiPhone向けDebug build は成功した。`MTO’s phone` はCoreDeviceで `unavailable` のため、自動installは端末接続復帰待ち。
+- iter381で、左ドロワー/設定/通知/推し設定、グッズ編集カメラdraft、キャンセル申請承認、ホーム用request境界を優先補強した。
+- iter381で、`swift build` / `swift test` 372件 / 署名付きiPhone向けDebug build は成功した。`MTO’s phone` はCoreDeviceで `unavailable` のため、自動installは端末接続復帰待ち。
+- iter382で、左ドロワーedge swipe、設定ログイン/セキュリティ、自分プロフィール画像upload、ホーム候補live data接続、在庫/Wish表示、やりとり完了済み分類を優先補強した。
+- iter382で、`swift build` / `swift test` 386件 / 署名付きiPhone向けDebug build は成功した。`MTO’s phone` はUSB interfaceとして検出されるがCoreDeviceで `available=false` / `tunnelState=unavailable` のため、自動installは端末接続復帰待ち。
+- iter392で、Wish画像、やりとり一覧画像、在庫3分類、推し設定専用画面、現地交換モードの現在地表示、iPhone実機インストールまでを優先補強した。
+- iter392で、`swift build` / 対象 `swift test` 90件 / 署名付きiPhone向けDebug build が成功した。`MTO’s phone` への上書きinstallと自動launchまで成功した。
+- iter395で、現地交換モードの保存済み旧座標テキストを数字表示しないようにし、`MTO’s phone` への上書きinstallと自動launchまで成功した。
+- iter412で、RN仕様へ寄せた提示物選択/送信内容確認の更新を含む署名付きDebugビルドを `MTO’s phone` へ上書きinstallした。自動launchのみ端末ロック中のためOSに拒否された。
 
-## RN parity backlog（iter370監査 / iter375更新）
+## RN parity backlog（iter370監査 / iter380更新）
 
 画面上の不足が多く見えるというオーナー指摘を受け、React Native版とSwift Native版のread-only差分監査を実施した。Swift版はiOS標準感を維持しつつ、以下の順に不足機能を埋める。
 
 ### P0
 
-1. Home / Local Mode / AW
+1. Home / Local Mode / Current Location
    - iter372で、ホームに現地交換モード、会場/現在地、半径、時間枠、持参グッズ概要、LIVE/OFF/終了表示のNative入口を追加した。
    - iter375で、`activity_windows` と `user_local_mode_settings` のData境界を追加した。
-   - 残: Home UI/AppStateからのAW live接続、相手から見える現地交換モード、AW作成/更新のUI接続、ホーム上のグルーム導線整理。
+   - iter377で、現地交換モードの持参候補は自分の在庫を優先して表示するようにした。
+   - iter380で、現地交換モードON時の現在地座標を取得し、内部のActivity Window centerとlocal mode last locationへ保存/復元するUI/AppState/repository境界を接続した。
+   - iter382で、ホーム実データのマッチ候補compositionを `SupabaseHomeClient` / `HomeCandidateComposer` / AppStateへ接続した。
+   - iter392で、ユーザー向け表示を現地交換モード/現在地の更新に寄せ、現在地座標は建物名または住所へ解決して表示するようにした。
+   - iter395で、旧保存値の `現在地 34...` 形式も非表示化し、住所解決中/未解決時は数字ではない文言で表示するようにした。
+   - 残: 相手から見える現地交換モードの表示確認、ホーム上のグルーム導線整理。
    - 主な対象: `ios-native/Sources/MegrumApp/HomeScreen.swift`, `ios-native/Sources/MegrumApp/MegrumAppState.swift`
 2. Inventory / Wish Creation and Editing
    - iter372で、在庫/WishのNative編集画面を追加し、写真選択入口、タグ、メンバー、status、数量などの入力UIを先に載せた。
    - iter373で、`goods_inventory` の本人所有PATCH境界とrequest testsを追加した。
    - iter375で、編集画面からPATCH境界を呼ぶ接続と、作成時のメンバー/status保持を追加した。
-   - 残: 写真Upload、タグjoin table保存、複数カード切り抜き。
+   - iter376で、写真Uploadとタグjoin table保存をlive repositoryへ接続した。
+   - iter378で、保存失敗時に入力・タグ・写真を保持し、再試行または写真を外して保存できるUIを追加した。
+   - iter379で、既存/選択写真preview、画像fallback、10MB超過validation、Content-Type正規化を追加した。
+   - 残: 複数カード切り抜き、Storage/RLS実機データでの権限確認。
    - 主な対象: `ios-native/Sources/MegrumApp/CollectionScreens.swift`, 新規 `GoodsEditorScreen.swift`
 3. Proposal Creation / Confirm
    - iter371で専用 `ProposalCreateFlow` を追加し、譲る/受け取る/待ち合わせ/確認、複数提示物、現地/郵送/どちらもOKの入口は実装済み。
    - iter372で送信完了画面を追加し、送信後に入力ステップへ戻りにくい構造へ寄せた。
-   - 残: スケジュール背景、地図による場所選択、よりRN版に近い候補選択の密度調整。
+   - iter377で、個別募集の編集保存を `listings` / `listing_wish_options` のlive repositoryへ接続した。
+   - iter379で、打診作成カレンダー/マップの統合分と、viewer/partner両方の予定を含むテストを取り込んだ。
+   - iter380で、待ち合わせ候補を最大3件まで持てるdraft、候補追加/選択/削除、MapKit座標選択、スケジュール場所候補の重複排除を追加した。
+   - iter410で、複数待ち合わせ候補をDBへそのまま保存するpayload拡張を追加した。
+   - iter411で、関係図からの打診起点をRN版同様に候補選択型へ修正し、複数個別募集を単一 `listingID` へ無理に丸めない集計へ寄せた。
+   - iter412で、`proposal-select` / `proposal-confirm` をRN版から仕様整理し、相手在庫からの受け取り候補選択、私が出す/受け取るのフィルター、交換手段別タブ、確認画面の交換条件タグ/住所確認、関係図起点の初期ステップを補強した。
+   - iter413で、`match_type` / `expose_calendar` / 送信完了後導線 / 住所未登録導線 / 受け取る候補必須validationを補強した。
+   - 残: liveスケジュール背景の密度調整、複数個別募集を完全に保持するDB/API拡張、相手条件の送信直前再検証。
    - 主な対象: `ios-native/Sources/MegrumApp/ProposalCreateFlow.swift`, `ios-native/Sources/MegrumApp/SearchScreen.swift`, `ios-native/Sources/MegrumApp/PublicUserProfileScreen.swift`
 4. Trade Chat Day-Of Actions
    - iter371で現在地共有と到着ステータスはtyped messageとして接続済み。
    - iter372で遅刻/キャンセル相談を取引チャット内のsystem messageとして送る導線を追加した。
    - iter373で服装写真共有を `PhotosPicker` から取引チャット写真メッセージ送信まで接続した。
    - iter375で、遅刻/キャンセル申請/キャンセル承認のRN互換metadata request境界を追加した。
-   - 残: 当日banner/入力欄上メニューからのtyped接続、system messageの表示デザイン調整、カメラ直撮り入口。
+   - iter378で、入力欄上メニューからの遅刻連絡/キャンセル申請をtyped system messageへ接続した。
+   - iter379で、取引詳細の当日/異議系表示の統合分を取り込んだ。
+   - iter380で、服装写真共有のカメラ直撮り入口と、到着状態/現在地共有/system messageのpresentation調整を追加した。
+   - 残: キャンセル申請を相手が承認して取引をキャンセルへ進める導線。
    - 主な対象: `ios-native/Sources/MegrumApp/TradesScreen.swift`, `ios-native/Sources/MegrumData/SupabaseMessageClient.swift`
 5. Dispute / Cancel / Late Flow
    - iter372で異議詳細、返信、タイムライン、取り下げ、キャンセル/遅刻draftのNative scaffoldを追加した。
    - iter373で `disputes` のload、`dispute_messages` の返信作成、取り下げPATCHのlive境界とrequest testsを追加した。
    - iter375で、異議詳細画面をload/reply/withdraw非同期storeへ拡張した。
-   - 残: live repository注入、取引詳細からのrouting、取引詳細へのbanner反映。
+   - iter378で、viewer role別アクション、証跡表示、反論時の `disputes.status/respondent_response/respondent_responded_at` 更新を追加した。
+   - 残: 取引詳細からのrouting、取引詳細へのbanner反映。
    - 主な対象: `ios-native/Sources/MegrumApp/TradesScreen.swift`, 新規 `DisputeDetailScreen.swift`
 6. Onboarding / Own Profile
    - iter371で複数推し/メンバー、自分プロフィール、設定からのプロフィール/推し設定導線は追加済み。
-   - 残: 性別、プロフィール編集の項目拡張、完了体験、RN版のオンボーディング分割設計。
+   - iter376で、左ドロワーからプロフィール、通知、住所設定、ブロック、設定とプライバシー、ログアウトへ入る基本導線を実機反映した。
+   - iter377で、設定内のヘルプ/法的文書/アカウント概要の下層画面と、プロフィール編集時の推し設定復元を追加した。
+   - iter379で、ログアウト/Auth復帰、左ドロワー項目遷移、設定一覧、自分プロフィール保存、性別保存を補強した。
+   - iter380で、初回設定/プロフィール編集の完了alert、推し選択のアクセシビリティ、法的文書入口、アカウント概要のID/status表示を追加した。
+   - 残: RN版のオンボーディング分割設計、法的文書/ヘルプ本文の最終整合。
    - 主な対象: `ios-native/Sources/MegrumApp/AuthScreen.swift`, `ios-native/Sources/MegrumApp/AccountSetupScreen.swift`, `ios-native/Sources/MegrumApp/SettingsScreen.swift`
 
 ### P1
@@ -288,7 +381,8 @@ tar -xzf /Users/michitaka/Desktop/Megrum_backups/pre-swift-migration-20260531-03
 2. Board Detail Moderation and Rich Replies
    - Swiftの掲示板詳細はチャット風に寄せたが、非表示/通報/ブロック/共有、画像返信、編集/削除、reaction、draftが不足している。
 3. Settings / Legal / Help
-   - Swift設定は通知、住所、ブロック、ログアウト中心。ヘルプ、法的文書、アカウント周辺が不足している。
+   - Swift設定は通知、住所、ブロック、ログアウト、ヘルプ、法的文書、アカウント概要まで入口ができた。
+   - 残: App Store提出前の正式URL、法的文書本文、サポート文面の最終整合。
 4. Notification Deep Links
    - Swift通知は主にタブ遷移。RN版の取引、異議、掲示板、評価、証跡、プロフィールなどの詳細画面直行が不足している。
 

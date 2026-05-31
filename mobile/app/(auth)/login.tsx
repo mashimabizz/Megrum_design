@@ -10,6 +10,7 @@ import {
 } from "react-native";
 import { MegrumLogo } from "../../src/components/MegrumLogo";
 import { AppleAuthButton } from "../../src/components/AppleAuthButton";
+import { GoogleAuthButton } from "../../src/components/GoogleAuthButton";
 import { PrimaryButton } from "../../src/components/PrimaryButton";
 import { Screen } from "../../src/components/Screen";
 import { TextField } from "../../src/components/TextField";
@@ -99,6 +100,7 @@ export default function LoginScreen() {
               <View style={styles.dividerLine} />
             </View>
             <AppleAuthButton mode="signIn" onError={setMessage} />
+            <GoogleAuthButton mode="signIn" onError={setMessage} />
 
             <View style={styles.signupRow}>
               <Text style={styles.signupText}>アカウントをお持ちでない方は </Text>

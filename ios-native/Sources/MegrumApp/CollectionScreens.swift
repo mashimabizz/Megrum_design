@@ -2,6 +2,69 @@ import MegrumCore
 import MegrumDesign
 import SwiftUI
 
+struct GoodsCollectionMetrics: Equatable {
+    var items: [GoodsItem]
+
+    var itemCount: Int {
+        items.count
+    }
+
+    var totalQuantity: Int {
+        items.reduce(0) { partialResult, item in
+            partialResult + max(1, item.quantity)
+        }
+    }
+
+    var taggedItemCount: Int {
+        items.filter { !$0.tags.isEmpty }.count
+    }
+
+    var visibleSummary: String {
+        "\(itemCount)件 / \(totalQuantity)点"
+    }
+
+    func filterSummary(totalCount: Int) -> String? {
+        guard totalCount != itemCount else {
+            return nil
+        }
+        return "全\(totalCount)件中"
+    }
+}
+
+struct GoodsCollectionFilter: Equatable {
+    var groupID: UUID?
+    var goodsTypeID: UUID?
+    var tagNames: Set<String> = []
+
+    var isActive: Bool {
+        groupID != nil || goodsTypeID != nil || !tagNames.isEmpty
+    }
+
+    var activeCount: Int {
+        var count = 0
+        if groupID != nil { count += 1 }
+        if goodsTypeID != nil { count += 1 }
+        count += tagNames.count
+        return count
+    }
+
+    func matches(_ item: GoodsItem) -> Bool {
+        if let groupID, item.groupID != groupID {
+            return false
+        }
+        if let goodsTypeID, item.goodsTypeID != goodsTypeID {
+            return false
+        }
+        if !tagNames.isEmpty {
+            let itemTagNames = Set(item.tags.map(\.name))
+            if !tagNames.isSubset(of: itemTagNames) {
+                return false
+            }
+        }
+        return true
+    }
+}
+
 struct GoodsCollectionScreen: View {
     var title: String
     var subtitle: String
@@ -15,21 +78,83 @@ struct GoodsCollectionScreen: View {
     @State private var listingSeedWish: GoodsItem?
     @State private var selectedGroupID: UUID?
     @State private var selectedGoodsTypeID: UUID?
+    @State private var selectedTagNames: Set<String> = []
+    @State private var selectedInventoryStatus: GoodsEntryStatus = .active
 
-    private var filteredItems: [GoodsItem] {
-        items.filter { item in
-            let matchesGroup = selectedGroupID == nil || item.groupID == selectedGroupID
-            let matchesGoodsType = selectedGoodsTypeID == nil || item.goodsTypeID == selectedGoodsTypeID
-            return matchesGroup && matchesGoodsType
+    private static let inventoryStatuses: [GoodsEntryStatus] = [.active, .keep, .traded]
+
+    private var activeFilter: GoodsCollectionFilter {
+        GoodsCollectionFilter(groupID: selectedGroupID, goodsTypeID: selectedGoodsTypeID, tagNames: selectedTagNames)
+    }
+
+    private var statusFilteredItems: [GoodsItem] {
+        guard entryKind == .inventory else {
+            return items
+        }
+        return items.filter { item in
+            switch selectedInventoryStatus {
+            case .active:
+                return item.status == nil || item.status == .active || item.status == .reserved
+            case .keep:
+                return item.status == .keep
+            case .traded:
+                return item.status == .traded
+            case .reserved:
+                return item.status == .reserved
+            case .archived:
+                return item.status == .archived
+            }
         }
     }
 
+    private var filteredItems: [GoodsItem] {
+        statusFilteredItems.filter(activeFilter.matches)
+    }
+
     private var hasActiveFilters: Bool {
-        selectedGroupID != nil || selectedGoodsTypeID != nil
+        activeFilter.isActive
+    }
+
+    private var filteredMetrics: GoodsCollectionMetrics {
+        GoodsCollectionMetrics(items: filteredItems)
+    }
+
+    private var availableTagNames: [String] {
+        let structuralFilter = GoodsCollectionFilter(groupID: selectedGroupID, goodsTypeID: selectedGoodsTypeID)
+        return Array(Set(statusFilteredItems.filter(structuralFilter.matches).flatMap { $0.tags.map(\.name) }))
+            .sorted { $0.localizedStandardCompare($1) == .orderedAscending }
+            .prefix(20)
+            .map { $0 }
+    }
+
+    private var inventoryStatusCounts: [GoodsEntryStatus: Int] {
+        Dictionary(uniqueKeysWithValues: Self.inventoryStatuses.map { status in
+            let count = items.filter { item in
+                switch status {
+                case .active:
+                    return item.status == nil || item.status == .active || item.status == .reserved
+                case .keep:
+                    return item.status == .keep
+                case .traded:
+                    return item.status == .traded
+                case .reserved, .archived:
+                    return false
+                }
+            }.count
+            return (status, count)
+        })
+    }
+
+    private var selectedInventoryStatusTitle: String {
+        selectedInventoryStatus.inventoryTabTitle
     }
 
     private var isShowingLoadingState: Bool {
         appState?.isLoading == true && items.isEmpty
+    }
+
+    private var showsCollectionSummary: Bool {
+        title != "個別募集"
     }
 
     private var emptyMessageTitle: String {
@@ -41,32 +166,18 @@ struct GoodsCollectionScreen: View {
         }
         switch entryKind {
         case .inventory:
-            return "在庫はまだありません"
+            switch selectedInventoryStatus {
+            case .active, .reserved:
+                return "譲る候補はまだありません"
+            case .keep:
+                return "自分用キープはまだありません"
+            case .traded:
+                return "過去に譲ったグッズはまだありません"
+            case .archived:
+                return "非表示のグッズはありません"
+            }
         case .wish:
             return "Wishはまだありません"
-        }
-    }
-
-    private var addButtonLabel: String {
-        entryKind == .inventory ? "在庫に追加" : "Wishに追加"
-    }
-
-    private var addButtonHint: String {
-        entryKind == .inventory ? "新しい在庫の登録シートを開きます" : "新しいWishの登録シートを開きます"
-    }
-
-    private var emptyMessageSystemImage: String {
-        if hasActiveFilters {
-            return "line.3.horizontal.decrease.circle"
-        }
-        if title == "個別募集" {
-            return "rectangle.stack.badge.plus"
-        }
-        switch entryKind {
-        case .inventory:
-            return "shippingbox"
-        case .wish:
-            return "heart"
         }
     }
 
@@ -79,19 +190,58 @@ struct GoodsCollectionScreen: View {
         }
         switch entryKind {
         case .inventory:
-            return "譲る候補を登録すると、検索や打診に使えるようになります。"
+            switch selectedInventoryStatus {
+            case .active, .reserved:
+                return "譲る候補を登録すると、検索や打診に使えるようになります。"
+            case .keep:
+                return "交換に出さない手元用グッズはここで管理できます。"
+            case .traded:
+                return "譲渡済みのグッズはここにまとまります。"
+            case .archived:
+                return "非表示にしたグッズは通常の一覧から外れます。"
+            }
         case .wish:
             return "探したいグッズを登録すると、候補探しに使えるようになります。"
         }
     }
 
+    private var emptyMessageSystemImage: String {
+        if hasActiveFilters {
+            return "line.3.horizontal.decrease.circle"
+        }
+        if title == "個別募集" {
+            return "rectangle.stack.badge.plus"
+        }
+        switch entryKind {
+        case .inventory:
+            switch selectedInventoryStatus {
+            case .active, .reserved:
+                return "shippingbox"
+            case .keep:
+                return "archivebox"
+            case .traded:
+                return "checkmark.seal"
+            case .archived:
+                return "eye.slash"
+            }
+        case .wish:
+            return "heart"
+        }
+    }
+
     private var emptyMessageActionTitle: String? {
-        showsAddButton && !hasActiveFilters ? addButtonLabel : nil
+        if hasActiveFilters {
+            return "フィルターをクリア"
+        }
+        return showsAddButton ? addButtonLabel : nil
     }
 
     private var emptyMessageAction: (() -> Void)? {
         guard emptyMessageActionTitle != nil else {
             return nil
+        }
+        if hasActiveFilters {
+            return { resetFilters() }
         }
         return { openAddForm() }
     }
@@ -101,14 +251,32 @@ struct GoodsCollectionScreen: View {
             ScrollView(.vertical) {
                 VStack(alignment: .leading, spacing: 20) {
                     CollectionHeader(title: title, subtitle: subtitle, columns: $columns)
+                    if entryKind == .inventory {
+                        InventoryStatusTabs(
+                            selectedStatus: $selectedInventoryStatus,
+                            counts: inventoryStatusCounts
+                        )
+                    }
                     if let appState {
                         CollectionFilterBar(
                             appState: appState,
                             selectedGroupID: $selectedGroupID,
-                            selectedGoodsTypeID: $selectedGoodsTypeID
+                            selectedGoodsTypeID: $selectedGoodsTypeID,
+                            selectedTagNames: $selectedTagNames,
+                            availableTagNames: availableTagNames
+                        )
+                    }
+                    if showsCollectionSummary {
+                        CollectionSummaryBar(
+                            metrics: filteredMetrics,
+                            totalCount: statusFilteredItems.count,
+                            context: GoodsGridContext(entryKind: entryKind),
+                            statusTitle: entryKind == .inventory ? selectedInventoryStatusTitle : nil,
+                            hasActiveFilters: hasActiveFilters
                         )
                     }
                     if isShowingLoadingState {
+                        CollectionLoadingNotice()
                         CollectionGridSkeleton(columns: columns)
                     } else if filteredItems.isEmpty {
                         EmptyCollectionMessage(
@@ -122,6 +290,7 @@ struct GoodsCollectionScreen: View {
                         GoodsGrid(
                             items: filteredItems,
                             columns: columns,
+                            context: GoodsGridContext(entryKind: entryKind),
                             viewerID: appState?.viewer?.id,
                             onCreateIndividualListing: canCreateListingFromItems ? { listingSeedWish = $0 } : nil,
                             onEditItem: appState == nil ? nil : { editorRoute = .edit($0, entryKind) },
@@ -133,15 +302,15 @@ struct GoodsCollectionScreen: View {
                 }
                 .padding(.horizontal, 20)
                 .padding(.top, 18)
-                .padding(.bottom, showsAddButton ? 118 : 92)
+                .padding(.bottom, showsAddButton ? 156 : 104)
             }
             .background(MegrumTheme.canvas.ignoresSafeArea())
             .megrumHiddenNavigationBar()
 
             if showsAddButton {
                 AddGoodsButton(accessibilityLabel: addButtonLabel, accessibilityHint: addButtonHint, action: openAddForm)
-                .padding(.leading, 24)
-                .padding(.bottom, 22)
+                    .padding(.leading, 24)
+                    .padding(.bottom, 92)
             }
         }
         .sheet(item: $editorRoute) { route in
@@ -172,6 +341,20 @@ struct GoodsCollectionScreen: View {
         .task {
             await loadFilterChoicesIfNeeded()
         }
+        .onChange(of: selectedGroupID) { _, _ in
+            reconcileSelectedTags()
+        }
+        .onChange(of: selectedGoodsTypeID) { _, _ in
+            reconcileSelectedTags()
+        }
+    }
+
+    private var addButtonLabel: String {
+        entryKind == .inventory ? "在庫に追加" : "Wishに追加"
+    }
+
+    private var addButtonHint: String {
+        entryKind == .inventory ? "新しい在庫の登録シートを開きます" : "新しいWishの登録シートを開きます"
     }
 
     private func loadFilterChoicesIfNeeded() async {
@@ -204,6 +387,17 @@ struct GoodsCollectionScreen: View {
         }
     }
 
+    private func resetFilters() {
+        selectedGroupID = nil
+        selectedGoodsTypeID = nil
+        selectedTagNames = []
+    }
+
+    private func reconcileSelectedTags() {
+        let available = Set(availableTagNames)
+        selectedTagNames = selectedTagNames.intersection(available)
+    }
+
     private var canCreateListingFromItems: Bool {
         appState != nil && entryKind == .wish
     }
@@ -234,11 +428,15 @@ struct WishCollectionScreen: View {
             GoodsItem(
                 id: $0.id,
                 ownerID: $0.ownerID,
+                kind: .wish,
+                status: .active,
                 groupID: $0.groupID,
                 memberID: $0.memberID,
                 goodsTypeID: $0.goodsTypeID,
                 title: $0.title,
-                tags: $0.tags
+                imageURL: $0.imageURL,
+                tags: $0.tags,
+                quantity: $0.quantity
             )
         }
     }
@@ -395,10 +593,125 @@ private struct AddGoodsButton: View {
     }
 }
 
+private struct InventoryStatusTabs: View {
+    @Binding var selectedStatus: GoodsEntryStatus
+    var counts: [GoodsEntryStatus: Int]
+
+    private let statuses: [GoodsEntryStatus] = [.active, .keep, .traded]
+
+    var body: some View {
+        Picker("在庫の表示", selection: $selectedStatus) {
+            ForEach(statuses) { status in
+                Text("\(status.inventoryTabTitle) \(counts[status, default: 0])")
+                    .tag(status)
+            }
+        }
+        .pickerStyle(.segmented)
+        .accessibilityLabel("在庫の表示切り替え")
+    }
+}
+
+private struct CollectionSummaryBar: View {
+    var metrics: GoodsCollectionMetrics
+    var totalCount: Int
+    var context: GoodsGridContext
+    var statusTitle: String?
+    var hasActiveFilters: Bool
+
+    private var leadingText: String {
+        if let filterSummary = metrics.filterSummary(totalCount: totalCount) {
+            return "\(filterSummary) \(metrics.visibleSummary)"
+        }
+        return metrics.visibleSummary
+    }
+
+    private var tagText: String {
+        metrics.taggedItemCount > 0 ? "タグ付き \(metrics.taggedItemCount)件" : "タグなし"
+    }
+
+    var body: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 10) {
+                SummaryChip(
+                    title: statusTitle ?? context.statusLabel,
+                    value: leadingText,
+                    systemImage: context == .wish ? "heart.fill" : "square.grid.2x2.fill"
+                )
+                SummaryChip(
+                    title: "タグ",
+                    value: tagText,
+                    systemImage: "tag.fill"
+                )
+                if hasActiveFilters {
+                    SummaryChip(
+                        title: "表示",
+                        value: "絞り込み中",
+                        systemImage: "line.3.horizontal.decrease.circle.fill"
+                    )
+                }
+            }
+            .padding(.vertical, 2)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("一覧サマリー")
+        .accessibilityValue("\(statusTitle ?? context.statusLabel)、\(leadingText)、\(tagText)")
+    }
+}
+
+private struct SummaryChip: View {
+    var title: String
+    var value: String
+    var systemImage: String
+
+    var body: some View {
+        Label {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(.system(size: 10.5, weight: .heavy, design: .rounded))
+                    .foregroundStyle(MegrumTheme.muted)
+                    .lineLimit(1)
+                Text(value)
+                    .font(.system(size: 12.5, weight: .heavy, design: .rounded))
+                    .foregroundStyle(MegrumTheme.ink)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.78)
+            }
+        } icon: {
+            Image(systemName: systemImage)
+                .font(.system(size: 13, weight: .heavy))
+                .foregroundStyle(MegrumTheme.lavender)
+        }
+        .labelStyle(.titleAndIcon)
+        .padding(.horizontal, 11)
+        .padding(.vertical, 9)
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .strokeBorder(.white.opacity(0.52), lineWidth: 1)
+        }
+    }
+}
+
+private struct CollectionLoadingNotice: View {
+    var body: some View {
+        Label("グッズを読み込み中", systemImage: "arrow.clockwise")
+            .font(.system(size: 13, weight: .heavy, design: .rounded))
+            .foregroundStyle(MegrumTheme.muted)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 11)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(MegrumTheme.lavender.opacity(0.10), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+            .accessibilityLabel("グッズを読み込み中")
+    }
+}
+
 private struct CollectionFilterBar: View {
     @ObservedObject var appState: MegrumAppState
     @Binding var selectedGroupID: UUID?
     @Binding var selectedGoodsTypeID: UUID?
+    @Binding var selectedTagNames: Set<String>
+    var availableTagNames: [String]
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -420,6 +733,23 @@ private struct CollectionFilterBar: View {
                 ForEach(appState.goodsTypes) { goodsType in
                     ChoiceChip(title: goodsType.name, isSelected: selectedGoodsTypeID == goodsType.id) {
                         selectedGoodsTypeID = goodsType.id
+                    }
+                }
+            }
+
+            if !availableTagNames.isEmpty || !selectedTagNames.isEmpty {
+                FilterChoiceRow(title: "タグ", isLoading: false) {
+                    ChoiceChip(title: "すべて", isSelected: selectedTagNames.isEmpty) {
+                        selectedTagNames = []
+                    }
+                    ForEach(availableTagNames, id: \.self) { tagName in
+                        ChoiceChip(title: "#\(tagName)", isSelected: selectedTagNames.contains(tagName)) {
+                            if selectedTagNames.contains(tagName) {
+                                selectedTagNames.remove(tagName)
+                            } else {
+                                selectedTagNames.insert(tagName)
+                            }
+                        }
                     }
                 }
             }

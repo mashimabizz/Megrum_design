@@ -64,7 +64,7 @@ function buildMobileAuthRedirect(searchParams: URLSearchParams) {
   const scheme = getMobileScheme(searchParams.get("scheme"));
   const params = new URLSearchParams();
 
-  for (const key of ["code", "error", "error_code", "error_description"]) {
+  for (const key of ["code", "error", "error_code", "error_description", "provider"]) {
     const value = searchParams.get(key);
     if (value) params.set(key, value);
   }

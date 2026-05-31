@@ -811,8 +811,8 @@ private struct LocalModeSettingsUpsertPayload: Encodable, Sendable {
             }
             self.radiusM = radiusMeters
         }
-        self.selectedCarryingIds = input.selectedCarryingIDs
-        self.selectedWishIds = input.selectedWishIDs
+        self.selectedCarryingIds = Self.deduplicated(input.selectedCarryingIDs)
+        self.selectedWishIds = Self.deduplicated(input.selectedWishIDs)
         if let lastLocation = input.lastLocation {
             guard (-90...90).contains(lastLocation.latitude),
                   (-180...180).contains(lastLocation.longitude)
@@ -836,6 +836,14 @@ private struct LocalModeSettingsUpsertPayload: Encodable, Sendable {
         case selectedWishIds
         case lastLat
         case lastLng
+    }
+
+    private static func deduplicated(_ ids: [UUID]?) -> [UUID]? {
+        guard let ids else {
+            return nil
+        }
+        var seen = Set<UUID>()
+        return ids.filter { seen.insert($0).inserted }
     }
 
     func encode(to encoder: Encoder) throws {

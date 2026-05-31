@@ -7,6 +7,7 @@ public enum SupabaseDisputeClientError: Error, Equatable, Sendable {
     case missingRespondent
     case emptyFactMemo
     case emptyReplyBody
+    case replyBodyTooLong(maxLength: Int)
     case malformedResponse
 }
 
@@ -171,7 +172,25 @@ public final class SupabaseDisputeClient: @unchecked Sendable {
         guard let message = rows.first?.message else {
             throw SupabaseDisputeClientError.malformedResponse
         }
+        if input.senderRole == .respondent {
+            _ = try await markRespondentReplyReceived(input, respondedAt: message.createdAt)
+        }
         return message
+    }
+
+    @discardableResult
+    public func markRespondentReplyReceived(
+        _ input: SupabaseDisputeReplyCreateInput,
+        respondedAt: Date = .now
+    ) async throws -> SupabaseDisputeDetail? {
+        try validateReply(input)
+        let rows: [DisputeDetailRow] = try await client.updateRows(
+            in: "disputes",
+            values: DisputeRespondentReplyPayload(input: input, respondedAt: isoTimestamp(respondedAt)),
+            select: DisputeDetailRow.select,
+            queryItems: respondentReplyQueryItems(ticketID: input.disputeID, respondentID: input.senderID)
+        )
+        return rows.first?.detail
     }
 
     @discardableResult
@@ -248,6 +267,22 @@ public final class SupabaseDisputeClient: @unchecked Sendable {
         )
     }
 
+    public func makeMarkRespondentReplyReceivedRequest(
+        _ input: SupabaseDisputeReplyCreateInput,
+        respondedAt: Date
+    ) throws -> URLRequest {
+        try validateReply(input)
+        return try client.makeMutationRequest(
+            path: "/rest/v1/disputes",
+            queryItems: [
+                URLQueryItem(name: "select", value: DisputeDetailRow.select)
+            ] + respondentReplyQueryItems(ticketID: input.disputeID, respondentID: input.senderID),
+            method: "PATCH",
+            body: encoder.encode(DisputeRespondentReplyPayload(input: input, respondedAt: isoTimestamp(respondedAt))),
+            prefer: "return=representation"
+        )
+    }
+
     public func makeWithdrawDisputeRequest(
         ticketID: UUID,
         reporterID: UUID,
@@ -287,9 +322,21 @@ public final class SupabaseDisputeClient: @unchecked Sendable {
         ]
     }
 
+    private func respondentReplyQueryItems(ticketID: UUID, respondentID: UUID) -> [URLQueryItem] {
+        [
+            URLQueryItem(name: "id", value: "eq.\(ticketID.uuidString.lowercased())"),
+            URLQueryItem(name: "respondent_id", value: "eq.\(respondentID.uuidString.lowercased())"),
+            URLQueryItem(name: "status", value: "in.(submitted,response_pending)")
+        ]
+    }
+
     private func validateReply(_ input: SupabaseDisputeReplyCreateInput) throws {
-        guard !input.body.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+        let body = input.body.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !body.isEmpty else {
             throw SupabaseDisputeClientError.emptyReplyBody
+        }
+        guard body.count <= 4_000 else {
+            throw SupabaseDisputeClientError.replyBodyTooLong(maxLength: 4_000)
         }
     }
 
@@ -455,6 +502,22 @@ private struct DisputeReplyInsertPayload: Encodable, Sendable {
         self.photoUrls = input.photoURLs
             .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
             .filter { !$0.isEmpty }
+    }
+}
+
+private struct DisputeRespondentReplyPayload: Encodable, Sendable {
+    var respondentResponse = "disputed"
+    var respondentResponseText: String
+    var respondentEvidenceUrls: [String]
+    var respondentRespondedAt: String
+    var status = "arbitrating"
+
+    init(input: SupabaseDisputeReplyCreateInput, respondedAt: String) {
+        self.respondentResponseText = input.body.trimmingCharacters(in: .whitespacesAndNewlines)
+        self.respondentEvidenceUrls = input.photoURLs
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+        self.respondentRespondedAt = respondedAt
     }
 }
 

@@ -9,7 +9,7 @@ final class SupabaseOshiClientTests: XCTestCase {
 
         let request = try client.makeGroupsRequest(searchText: "TWICE", limit: 20)
 
-        XCTAssertEqual(request.url?.absoluteString, "https://example.supabase.co/rest/v1/groups_master?select=id,name,aliases,display_order&order=display_order.asc,name.asc&limit=20&name=ilike.*TWICE*")
+        XCTAssertEqual(request.url?.absoluteString, "https://example.supabase.co/rest/v1/groups_master?select=id,name,aliases,kind,genre_id,display_order,genre:genres_master(id,name,kind,display_order)&order=display_order.asc,name.asc&limit=20&name=ilike.*TWICE*")
         XCTAssertEqual(request.httpMethod, "GET")
         XCTAssertEqual(request.value(forHTTPHeaderField: "apikey"), "sb_publishable_test")
     }
@@ -35,6 +35,16 @@ final class SupabaseOshiClientTests: XCTestCase {
         XCTAssertEqual(request.value(forHTTPHeaderField: "Prefer"), "return=minimal")
     }
 
+    func testBuildsLoadUserSelectionsRequest() throws {
+        let client = SupabaseOshiClient(configuration: configuration)
+        let userID = UUID(uuidString: "11111111-1111-1111-1111-111111111111")!
+
+        let request = try client.makeLoadUserSelectionsRequest(userID: userID)
+
+        XCTAssertEqual(request.url?.absoluteString, "https://example.supabase.co/rest/v1/user_oshi?select=id,user_id,group_id,character_id,oshi_request_id,character_request_id,kind,priority,group:groups_master(id,name),character:characters_master(id,name),oshi_request:oshi_requests(id,requested_name,status),character_request:character_requests(id,requested_name,status)&user_id=eq.11111111-1111-1111-1111-111111111111&order=priority.asc")
+        XCTAssertEqual(request.httpMethod, "GET")
+    }
+
     func testBuildsUpsertUserSelectionsRequest() throws {
         let client = SupabaseOshiClient(configuration: configuration)
         let selection = UserOshiSelection(
@@ -50,7 +60,7 @@ final class SupabaseOshiClientTests: XCTestCase {
         let body = try XCTUnwrap(request.httpBody)
         let json = try XCTUnwrap(JSONSerialization.jsonObject(with: body) as? [[String: Any]])
 
-        XCTAssertEqual(request.url?.absoluteString, "https://example.supabase.co/rest/v1/user_oshi?select=id,user_id,group_id,character_id,kind,priority")
+        XCTAssertEqual(request.url?.absoluteString, "https://example.supabase.co/rest/v1/user_oshi?select=id,user_id,group_id,character_id,oshi_request_id,character_request_id,kind,priority,group:groups_master(id,name),character:characters_master(id,name),oshi_request:oshi_requests(id,requested_name,status),character_request:character_requests(id,requested_name,status)")
         XCTAssertEqual(request.httpMethod, "POST")
         XCTAssertEqual(request.value(forHTTPHeaderField: "Prefer"), "resolution=merge-duplicates,return=representation")
         XCTAssertEqual(json.first?["id"] as? String, "22222222-2222-2222-2222-222222222222")

@@ -9,11 +9,14 @@ import { megrumColors, megrumShadow } from "../../src/theme/tokens";
 
 export default function EmailConfirmedScreen() {
   const { onboardingPath, refreshProfile, user } = useAuth();
-  const { code, error_description } = useLocalSearchParams<{
+  const { code, error_description, provider } = useLocalSearchParams<{
     code?: string | string[];
     error_description?: string | string[];
+    provider?: string | string[];
   }>();
   const authCode = Array.isArray(code) ? code[0] : code;
+  const providerParam = Array.isArray(provider) ? provider[0] : provider;
+  const isGoogleAuth = providerParam === "google";
   const linkError = Array.isArray(error_description)
     ? error_description[0]
     : error_description;
@@ -51,8 +54,10 @@ export default function EmailConfirmedScreen() {
         </View>
         <Text style={styles.title}>認証完了！</Text>
         <Text style={styles.copy}>
-          メールアドレスの認証が完了しました。{"\n"}
-          続けてプロフィールを設定しましょう。
+          {isGoogleAuth
+            ? "Googleアカウントで認証できました。"
+            : "メールアドレスの認証が完了しました。"}
+          {"\n"}続けてプロフィールを設定しましょう。
         </Text>
         {linkError || exchangeError ? (
           <Text style={styles.errorText}>{linkError ?? exchangeError}</Text>

@@ -4,6 +4,14 @@ import MegrumDesign
 import PhotosUI
 #endif
 import SwiftUI
+#if canImport(UIKit)
+import UIKit
+#endif
+#if canImport(AppKit)
+import AppKit
+#endif
+
+let goodsEditorMaxPhotoUploadBytes = 10 * 1_024 * 1_024
 
 enum GoodsEditorMode: String, CaseIterable, Identifiable {
     case create
@@ -66,6 +74,7 @@ enum GoodsEditorRoute: Identifiable {
 enum GoodsEditorStatus: String, CaseIterable, Identifiable, Equatable {
     case forTrade = "for_trade"
     case keep
+    case traded
     case wishActive = "active"
     case wishAchieved = "achieved"
 
@@ -78,7 +87,7 @@ enum GoodsEditorStatus: String, CaseIterable, Identifiable, Equatable {
     static func options(for kind: GoodsEntryKind) -> [GoodsEditorStatus] {
         switch kind {
         case .inventory:
-            [.forTrade, .keep]
+            [.forTrade, .keep, .traded]
         case .wish:
             [.wishActive, .wishAchieved]
         }
@@ -94,6 +103,8 @@ enum GoodsEditorStatus: String, CaseIterable, Identifiable, Equatable {
             "譲る候補"
         case .keep:
             "自分用キープ"
+        case .traded:
+            "過去に譲った"
         case .wishActive:
             "探し中"
         case .wishAchieved:
@@ -107,6 +118,8 @@ enum GoodsEditorStatus: String, CaseIterable, Identifiable, Equatable {
             "arrow.left.arrow.right.circle"
         case .keep:
             "archivebox"
+        case .traded:
+            "checkmark.seal"
         case .wishActive:
             "heart"
         case .wishAchieved:
@@ -120,8 +133,31 @@ enum GoodsEditorStatus: String, CaseIterable, Identifiable, Equatable {
             .active
         case .keep:
             .keep
+        case .traded:
+            .traded
         case .wishAchieved:
             .archived
+        }
+    }
+
+    init(entryKind: GoodsEntryKind, persistedStatus: GoodsEntryStatus?) {
+        switch entryKind {
+        case .inventory:
+            switch persistedStatus {
+            case .keep:
+                self = .keep
+            case .traded:
+                self = .traded
+            case .active, .reserved, .archived, nil:
+                self = .forTrade
+            }
+        case .wish:
+            switch persistedStatus {
+            case .archived, .traded:
+                self = .wishAchieved
+            case .active, .keep, .reserved, nil:
+                self = .wishActive
+            }
         }
     }
 }
@@ -158,6 +194,42 @@ enum GoodsEditorSaveBlocker: Equatable, Identifiable {
     }
 }
 
+struct GoodsEditorSaveFailure: Equatable, Identifiable {
+    var appMessage: String
+    var includesPhotoUpload: Bool
+    var includesTagChanges: Bool
+
+    var id: String {
+        [appMessage, includesPhotoUpload.description, includesTagChanges.description].joined(separator: "-")
+    }
+
+    var title: String {
+        "保存できませんでした"
+    }
+
+    var message: String {
+        var lines = [appMessage]
+        if includesPhotoUpload {
+            lines.append("写真アップロードで失敗した可能性があります。写真を外して保存するか、通信状況を確認して再試行できます。")
+        }
+        if includesTagChanges {
+            lines.append("タグ保存で失敗した可能性があります。タグは画面に残っているので、必要なら削除してもう一度試せます。")
+        }
+        lines.append("入力内容はこの画面に残しています。")
+        return lines.joined(separator: "\n\n")
+    }
+
+    static func make(draft: GoodsEditorDraft, appMessage: String?) -> GoodsEditorSaveFailure {
+        let trimmedMessage = appMessage?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let fallbackMessage = "通信状況を確認してからもう一度お試しください。"
+        return GoodsEditorSaveFailure(
+            appMessage: trimmedMessage?.isEmpty == false ? (trimmedMessage ?? fallbackMessage) : fallbackMessage,
+            includesPhotoUpload: draft.hasUnsavedLocalPhoto,
+            includesTagChanges: draft.hasTagChanges
+        )
+    }
+}
+
 struct GoodsEditorDraft: Equatable {
     var mode: GoodsEditorMode
     var entryKind: GoodsEntryKind
@@ -170,6 +242,8 @@ struct GoodsEditorDraft: Equatable {
     var tagNames: [String]
     var originalTagNames: [String]
     var hasLocalPhoto: Bool
+    var localPhotoData: Data?
+    var localPhotoContentType: String?
     var existingImageURL: URL?
     var existingItemID: UUID?
 
@@ -182,10 +256,13 @@ struct GoodsEditorDraft: Equatable {
         self.memberID = item?.memberID
         self.goodsTypeID = item?.goodsTypeID
         self.quantity = max(1, min(item?.quantity ?? 1, 999))
-        self.status = Self.defaultStatus(mode: mode, entryKind: entryKind)
+        self.status = item.map { GoodsEditorStatus(entryKind: entryKind, persistedStatus: $0.status) }
+            ?? Self.defaultStatus(mode: mode, entryKind: entryKind)
         self.tagNames = normalizedItemTags
         self.originalTagNames = normalizedItemTags
         self.hasLocalPhoto = false
+        self.localPhotoData = nil
+        self.localPhotoContentType = nil
         self.existingImageURL = item?.imageURL
         self.existingItemID = item?.id
     }
@@ -200,6 +277,24 @@ struct GoodsEditorDraft: Equatable {
 
     var hasDisplayPhoto: Bool {
         hasLocalPhoto || existingImageURL != nil
+    }
+
+    var hasUnsavedLocalPhoto: Bool {
+        hasLocalPhoto || localPhotoData != nil
+    }
+
+    var hasTagChanges: Bool {
+        tagNames != originalTagNames
+    }
+
+    var photoStatusText: String {
+        if hasUnsavedLocalPhoto {
+            return existingImageURL == nil ? "選択済み（保存前）" : "選び直し済み（保存前）"
+        }
+        if existingImageURL != nil {
+            return "保存済み写真あり"
+        }
+        return "未選択"
     }
 
     mutating func setEntryKind(_ kind: GoodsEntryKind) {
@@ -221,6 +316,18 @@ struct GoodsEditorDraft: Equatable {
 
     mutating func removeTag(_ tag: String) {
         tagNames.removeAll { $0 == tag }
+    }
+
+    mutating func clearLocalPhotoSelection() {
+        hasLocalPhoto = false
+        localPhotoData = nil
+        localPhotoContentType = nil
+    }
+
+    mutating func setLocalPhotoUpload(_ upload: GoodsPhotoUpload) {
+        hasLocalPhoto = true
+        localPhotoData = upload.data
+        localPhotoContentType = upload.contentType
     }
 
     func resolvedTitle(groupName: String?, memberName: String?, goodsTypeName: String?) -> String {
@@ -255,7 +362,9 @@ struct GoodsEditorDraft: Equatable {
             memberID: memberID,
             goodsTypeID: goodsTypeID,
             quantity: normalizedQuantity,
-            status: status.persistedStatus
+            status: status.persistedStatus,
+            tagNames: tagNames,
+            photoUpload: photoUpload
         )
     }
 
@@ -279,19 +388,21 @@ struct GoodsEditorDraft: Equatable {
             goodsTypeID: goodsTypeID,
             quantity: normalizedQuantity,
             status: status.persistedStatus,
-            photoURLs: existingImageURL.map { [$0.absoluteString] }
+            photoURLs: existingImageURL.map { [$0.absoluteString] },
+            tagNames: tagNames,
+            photoUpload: photoUpload
         )
     }
 
     var blockingReasons: [GoodsEditorSaveBlocker] {
-        var reasons: [GoodsEditorSaveBlocker] = []
-        if tagNames != originalTagNames {
-            reasons.append(.tagPersistence)
+        []
+    }
+
+    private var photoUpload: GoodsPhotoUpload? {
+        guard let localPhotoData else {
+            return nil
         }
-        if hasLocalPhoto {
-            reasons.append(.photoPersistence)
-        }
-        return reasons
+        return GoodsPhotoUpload(data: localPhotoData, contentType: localPhotoContentType ?? "image/jpeg")
     }
 
     static func defaultStatus(mode: GoodsEditorMode, entryKind: GoodsEntryKind) -> GoodsEditorStatus {
@@ -328,6 +439,10 @@ struct GoodsEditorSheet: View {
     @Environment(\.dismiss) private var dismiss
     @State private var draft: GoodsEditorDraft
     @State private var tagDraft = ""
+    @State private var photoError: String?
+    @State private var lastSaveFailure: GoodsEditorSaveFailure?
+    @State private var isShowingPhotoRemovalDialog = false
+    @State private var isShowingCameraCapture = false
     @State private var didAssignDefaults = false
     @FocusState private var focusedField: Field?
     #if canImport(PhotosUI)
@@ -359,6 +474,7 @@ struct GoodsEditorSheet: View {
                 statusSection
                 tagsSection
                 unsupportedSection
+                saveFailureSection
                 saveButton
             }
             .padding(.horizontal, 20)
@@ -390,6 +506,51 @@ struct GoodsEditorSheet: View {
                 await loadMembers(for: newValue)
             }
         }
+        .onChange(of: draft) { _, _ in
+            lastSaveFailure = nil
+        }
+        .alert(
+            lastSaveFailure?.title ?? "保存できませんでした",
+            isPresented: Binding(
+                get: { lastSaveFailure != nil },
+                set: { if !$0 { lastSaveFailure = nil } }
+            ),
+            presenting: lastSaveFailure
+        ) { failure in
+            Button("再試行") {
+                Task {
+                    await save()
+                }
+            }
+            if failure.includesPhotoUpload {
+                Button("写真を外す", role: .destructive) {
+                    clearLocalPhotoSelection()
+                }
+            }
+            Button("閉じる", role: .cancel) {}
+        } message: { failure in
+            Text(failure.message)
+        }
+        .confirmationDialog(
+            "写真の操作",
+            isPresented: $isShowingPhotoRemovalDialog,
+            titleVisibility: .visible
+        ) {
+            Button("選択した写真を外す", role: .destructive) {
+                clearLocalPhotoSelection()
+            }
+            Button("キャンセル", role: .cancel) {}
+        } message: {
+            Text("保存前に選んだ写真だけを外します。ほかの入力内容は残ります。")
+        }
+#if os(iOS)
+        .sheet(isPresented: $isShowingCameraCapture) {
+            NativeCameraCaptureView { imageData in
+                loadCapturedCameraPhoto(imageData)
+            }
+            .ignoresSafeArea()
+        }
+#endif
     }
 
     private var navigationTitle: String {
@@ -492,31 +653,29 @@ struct GoodsEditorSheet: View {
     private var photoSection: some View {
         editorSection(title: "写真", systemImage: "camera") {
             VStack(alignment: .leading, spacing: 12) {
+                let photoPickerTitle = draft.hasUnsavedLocalPhoto ? "選び直す" : "写真を選ぶ"
+
                 RoundedRectangle(cornerRadius: 24, style: .continuous)
                     .fill(photoGradient)
                     .aspectRatio(draft.entryKind == .inventory ? 0.78 : 1.45, contentMode: .fit)
                     .overlay {
-                        VStack(spacing: 10) {
-                            Image(systemName: draft.hasDisplayPhoto ? "photo.fill.on.rectangle.fill" : "photo")
-                                .font(.system(size: 36, weight: .semibold))
-                                .foregroundStyle(.white.opacity(0.82))
-                            Text(draft.hasDisplayPhoto ? "写真あり" : "未選択")
-                                .font(.system(size: 13, weight: .heavy, design: .rounded))
-                                .foregroundStyle(.white)
-                        }
+                        photoPreview
                     }
+                    .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
                     .shadow(color: MegrumTheme.ink.opacity(0.10), radius: 16, y: 8)
 
                 HStack(spacing: 10) {
                     #if canImport(PhotosUI)
                     PhotosPicker(selection: $selectedPhotoItem, matching: .images) {
-                        Label("写真を選ぶ", systemImage: "photo.on.rectangle")
+                        Label(photoPickerTitle, systemImage: "photo.on.rectangle")
                     }
                     .buttonStyle(.bordered)
                     .tint(MegrumTheme.lavender)
                     .disabled(draft.mode == .readonly)
                     .onChange(of: selectedPhotoItem) { _, newValue in
-                        draft.hasLocalPhoto = newValue != nil
+                        Task {
+                            await loadSelectedPhoto(newValue)
+                        }
                     }
                     #else
                     Button {
@@ -529,17 +688,51 @@ struct GoodsEditorSheet: View {
                     .disabled(draft.mode == .readonly)
                     #endif
 
+                    if draft.hasUnsavedLocalPhoto {
+                        Button(role: .destructive) {
+                            isShowingPhotoRemovalDialog = true
+                        } label: {
+                            Label("外す", systemImage: "trash")
+                        }
+                        .buttonStyle(.bordered)
+                        .disabled(draft.mode == .readonly)
+                    }
+
+                    #if os(iOS)
+                    Button {
+                        isShowingCameraCapture = true
+                    } label: {
+                        Label("カメラ", systemImage: "camera")
+                    }
+                    .buttonStyle(.bordered)
+                    .tint(MegrumTheme.lavender)
+                    .disabled(draft.mode == .readonly)
+                    .accessibilityLabel("カメラで撮る")
+                    #else
                     Button {
                     } label: {
                         Label("カメラ", systemImage: "camera")
                     }
                     .buttonStyle(.bordered)
                     .disabled(true)
+                    #endif
                 }
 
-                Text("新しい写真を選んだ場合は、Storage保存接続後に登録できます。")
+                Text("選んだ写真や撮影した写真は保存時にアップロードされます。")
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(MegrumTheme.muted)
+
+                if draft.hasUnsavedLocalPhoto {
+                    Label("保存に失敗しても、選択した写真はこの画面に残ります。", systemImage: "arrow.clockwise")
+                        .font(.caption.weight(.bold))
+                        .foregroundStyle(MegrumTheme.lavender)
+                }
+
+                if let photoError {
+                    Text(photoError)
+                        .font(.caption.weight(.bold))
+                        .foregroundStyle(.red)
+                }
             }
         }
     }
@@ -564,6 +757,85 @@ struct GoodsEditorSheet: View {
                     .foregroundStyle(MegrumTheme.muted)
             }
         }
+    }
+
+    @ViewBuilder
+    private var photoPreview: some View {
+        if let localPhotoData = draft.localPhotoData {
+            localPhotoPreview(data: localPhotoData)
+        } else if let existingImageURL = draft.existingImageURL {
+            AsyncImage(url: existingImageURL, transaction: Transaction(animation: .easeInOut(duration: 0.18))) { phase in
+                switch phase {
+                case .empty:
+                    photoPlaceholder(status: "写真を読み込み中", showsProgress: true)
+                case let .success(image):
+                    image
+                        .resizable()
+                        .scaledToFill()
+                        .overlay(alignment: .bottomLeading) {
+                            PhotoStatusBadge(text: draft.photoStatusText)
+                                .padding(12)
+                        }
+                case .failure:
+                    photoPlaceholder(status: "保存済み写真を表示できません")
+                @unknown default:
+                    photoPlaceholder(status: draft.photoStatusText)
+                }
+            }
+        } else {
+            photoPlaceholder(status: draft.photoStatusText)
+        }
+    }
+
+    @ViewBuilder
+    private func localPhotoPreview(data: Data) -> some View {
+        #if canImport(UIKit)
+        if let image = UIImage(data: data) {
+            Image(uiImage: image)
+                .resizable()
+                .scaledToFill()
+                .overlay(alignment: .bottomLeading) {
+                    PhotoStatusBadge(text: draft.photoStatusText)
+                        .padding(12)
+                }
+        } else {
+            photoPlaceholder(status: draft.photoStatusText)
+        }
+        #elseif canImport(AppKit)
+        if let image = NSImage(data: data) {
+            Image(nsImage: image)
+                .resizable()
+                .scaledToFill()
+                .overlay(alignment: .bottomLeading) {
+                    PhotoStatusBadge(text: draft.photoStatusText)
+                        .padding(12)
+                }
+        } else {
+            photoPlaceholder(status: draft.photoStatusText)
+        }
+        #else
+        photoPlaceholder(status: draft.photoStatusText)
+        #endif
+    }
+
+    private func photoPlaceholder(status: String, showsProgress: Bool = false) -> some View {
+        VStack(spacing: 10) {
+            if showsProgress {
+                ProgressView()
+                    .controlSize(.regular)
+                    .tint(.white)
+            } else {
+                Image(systemName: draft.hasDisplayPhoto ? "photo.fill.on.rectangle.fill" : "photo")
+                    .font(.system(size: 36, weight: .semibold))
+                    .foregroundStyle(.white.opacity(0.82))
+            }
+            Text(status)
+                .font(.system(size: 13, weight: .heavy, design: .rounded))
+                .foregroundStyle(.white)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 14)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     private var groupSection: some View {
@@ -724,7 +996,7 @@ struct GoodsEditorSheet: View {
                         .disabled(tagDraft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || draft.tagNames.count >= 5)
                 }
 
-                Text("タグは5件まで入力できます。タグの追加・削除は次の保存接続で反映します。")
+                Text("タグは5件まで入力できます。保存時にグッズへ反映されます。")
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(MegrumTheme.muted)
             }
@@ -749,6 +1021,49 @@ struct GoodsEditorSheet: View {
                             .foregroundStyle(MegrumTheme.muted)
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
+                }
+            }
+            .padding(16)
+            .background(MegrumTheme.pink.opacity(0.14), in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: 22, style: .continuous)
+                    .strokeBorder(MegrumTheme.pink.opacity(0.32), lineWidth: 1)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var saveFailureSection: some View {
+        if let lastSaveFailure {
+            VStack(alignment: .leading, spacing: 12) {
+                Label(lastSaveFailure.title, systemImage: "exclamationmark.triangle.fill")
+                    .font(.headline.weight(.black))
+                    .foregroundStyle(MegrumTheme.ink)
+
+                Text(lastSaveFailure.message)
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(MegrumTheme.muted)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                HStack(spacing: 10) {
+                    Button {
+                        Task {
+                            await save()
+                        }
+                    } label: {
+                        Label("再試行", systemImage: "arrow.clockwise")
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(MegrumTheme.lavender)
+
+                    if lastSaveFailure.includesPhotoUpload {
+                        Button(role: .destructive) {
+                            isShowingPhotoRemovalDialog = true
+                        } label: {
+                            Label("写真を外す", systemImage: "trash")
+                        }
+                        .buttonStyle(.bordered)
+                    }
                 }
             }
             .padding(16)
@@ -859,7 +1174,65 @@ struct GoodsEditorSheet: View {
         tagDraft = ""
     }
 
+    private func clearLocalPhotoSelection() {
+        draft.clearLocalPhotoSelection()
+        photoError = nil
+        #if canImport(PhotosUI)
+        selectedPhotoItem = nil
+        #endif
+    }
+
+    private func loadCapturedCameraPhoto(_ data: Data) {
+        let upload = GoodsPhotoUpload(data: data, contentType: "image/jpeg")
+        if let uploadError = goodsEditorPhotoUploadError(for: upload) {
+            draft.clearLocalPhotoSelection()
+            photoError = uploadError
+            return
+        }
+        draft.setLocalPhotoUpload(upload)
+        photoError = nil
+        #if canImport(PhotosUI)
+        selectedPhotoItem = nil
+        #endif
+    }
+
+    #if canImport(PhotosUI)
+    private func loadSelectedPhoto(_ item: PhotosPickerItem?) async {
+        guard let item else {
+            draft.hasLocalPhoto = false
+            draft.localPhotoData = nil
+            draft.localPhotoContentType = nil
+            return
+        }
+
+        do {
+            guard let data = try await item.loadTransferable(type: Data.self) else {
+                draft.hasLocalPhoto = false
+                draft.localPhotoData = nil
+                draft.localPhotoContentType = nil
+                return
+            }
+            let upload = normalizedPhotoUpload(from: data)
+            if let uploadError = goodsEditorPhotoUploadError(for: upload) {
+                draft.hasLocalPhoto = false
+                draft.localPhotoData = nil
+                draft.localPhotoContentType = nil
+                photoError = uploadError
+                return
+            }
+            draft.setLocalPhotoUpload(upload)
+            photoError = nil
+        } catch {
+            draft.hasLocalPhoto = false
+            draft.localPhotoData = nil
+            draft.localPhotoContentType = nil
+            photoError = "写真を読み込めませんでした"
+        }
+    }
+    #endif
+
     private func save() async {
+        lastSaveFailure = nil
         let saved: Bool
         switch draft.mode {
         case .create:
@@ -887,6 +1260,8 @@ struct GoodsEditorSheet: View {
         }
         if saved {
             dismiss()
+        } else {
+            lastSaveFailure = GoodsEditorSaveFailure.make(draft: draft, appMessage: appState.errorMessage)
         }
     }
 
@@ -908,6 +1283,68 @@ struct GoodsEditorSheet: View {
             startPoint: .topLeading,
             endPoint: .bottomTrailing
         )
+    }
+}
+
+struct PhotoStatusBadge: View {
+    var text: String
+
+    var body: some View {
+        Text(text)
+            .font(.system(size: 12, weight: .heavy, design: .rounded))
+            .foregroundStyle(.white)
+            .padding(.horizontal, 11)
+            .padding(.vertical, 7)
+            .background(.black.opacity(0.34), in: Capsule())
+            .overlay {
+                Capsule()
+                    .strokeBorder(.white.opacity(0.22), lineWidth: 1)
+            }
+    }
+}
+
+func normalizedPhotoUpload(from data: Data) -> GoodsPhotoUpload {
+    if let contentType = detectedSupportedImageContentType(data),
+       data.count <= goodsEditorMaxPhotoUploadBytes {
+        return GoodsPhotoUpload(data: data, contentType: contentType)
+    }
+
+    #if canImport(UIKit)
+    if let image = UIImage(data: data),
+       let jpegData = image.jpegData(compressionQuality: 0.88) {
+        return GoodsPhotoUpload(data: jpegData, contentType: "image/jpeg")
+    }
+    #endif
+
+    return GoodsPhotoUpload(data: data, contentType: "image/jpeg")
+}
+
+func goodsEditorPhotoUploadError(for upload: GoodsPhotoUpload) -> String? {
+    upload.data.count > goodsEditorMaxPhotoUploadBytes ? "写真は10MB以下にしてください" : nil
+}
+
+func detectedSupportedImageContentType(_ data: Data) -> String? {
+    if data.starts(withBytes: [0xFF, 0xD8, 0xFF]) {
+        return "image/jpeg"
+    }
+    if data.starts(withBytes: [0x89, 0x50, 0x4E, 0x47]) {
+        return "image/png"
+    }
+    if data.starts(withBytes: [0x47, 0x49, 0x46]) {
+        return "image/gif"
+    }
+    if data.count >= 12 {
+        let signature = String(data: Data(data[8..<12]), encoding: .ascii)
+        if signature == "WEBP" {
+            return "image/webp"
+        }
+    }
+    return nil
+}
+
+private extension Data {
+    func starts(withBytes bytes: [UInt8]) -> Bool {
+        count >= bytes.count && Array(prefix(bytes.count)) == bytes
     }
 }
 

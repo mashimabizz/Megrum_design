@@ -49,6 +49,32 @@ final class MegrumAppStateTests: XCTestCase {
         XCTAssertFalse(state.isCreatingIndividualListing)
     }
 
+    func testAppStateUpdatesPreviewIndividualListing() async {
+        let state = MegrumAppState(repository: PreviewMegrumRepository())
+
+        await state.loadInitialData()
+        let listing = try! XCTUnwrap(state.listings.first)
+        let updated = await state.updateIndividualListing(
+            listingID: listing.id,
+            primaryOptionID: listing.options.first?.id,
+            input: IndividualListingCreateInput(
+                haveItems: [
+                    ListingItemQuantity(itemID: state.inventory[0].id, quantity: 2)
+                ],
+                wishItems: [
+                    ListingItemQuantity(itemID: state.wishes[0].id, quantity: 1)
+                ],
+                note: " 更新しました "
+            ),
+            status: .paused
+        )
+
+        XCTAssertEqual(updated?.status, .paused)
+        XCTAssertEqual(state.listings.first?.note, "更新しました")
+        XCTAssertEqual(state.listings.first?.haves.first?.quantity, 2)
+        XCTAssertNil(state.updatingIndividualListingID)
+    }
+
     func testAppStateCreatesPreviewScheduleForProposal() async {
         let state = MegrumAppState(repository: PreviewMegrumRepository())
 
@@ -73,6 +99,97 @@ final class MegrumAppStateTests: XCTestCase {
         XCTAssertEqual(state.schedules(for: proposal.id).last?.placeName, "北口")
         XCTAssertEqual(state.schedules(for: proposal.id).last?.userID, state.viewer?.id)
         XCTAssertFalse(state.isCreatingSchedule)
+    }
+
+    func testAppStateSendsPreviewLateNoticeWithMetadata() async {
+        let state = MegrumAppState(repository: PreviewMegrumRepository())
+
+        await state.loadInitialData()
+        let proposal = try! XCTUnwrap(state.proposals.first)
+        let initialCount = state.messages(for: proposal.id).count
+
+        let sent = await state.sendLateNoticeMessage(
+            proposalID: proposal.id,
+            lateMinutes: 20,
+            reason: " 電車遅延 ",
+            note: " 北口へ向かっています "
+        )
+
+        let message = try! XCTUnwrap(state.messages(for: proposal.id).last)
+        XCTAssertTrue(sent)
+        XCTAssertEqual(state.messages(for: proposal.id).count, initialCount + 1)
+        XCTAssertEqual(message.messageType, .system)
+        XCTAssertEqual(message.body, "20分遅れる旨が通知されました\n理由：電車遅延\n北口へ向かっています")
+        XCTAssertEqual(message.meta["action"], "late_notice")
+        XCTAssertEqual(message.meta["late_minutes"], "20")
+        XCTAssertEqual(message.meta["reason"], "電車遅延")
+        XCTAssertNil(state.sendingMessageProposalID)
+        XCTAssertNil(state.errorMessage)
+    }
+
+    func testAppStateSendsPreviewCancelRequestWithMetadata() async {
+        let state = MegrumAppState(repository: PreviewMegrumRepository())
+
+        await state.loadInitialData()
+        let proposal = try! XCTUnwrap(state.proposals.first)
+        let initialCount = state.messages(for: proposal.id).count
+
+        let sent = await state.sendCancelRequestMessage(
+            proposalID: proposal.id,
+            reason: " 体調不良 ",
+            note: nil
+        )
+
+        let message = try! XCTUnwrap(state.messages(for: proposal.id).last)
+        XCTAssertTrue(sent)
+        XCTAssertEqual(state.messages(for: proposal.id).count, initialCount + 1)
+        XCTAssertEqual(message.messageType, .system)
+        XCTAssertEqual(message.body, "取引キャンセルが申請されました\n理由：体調不良")
+        XCTAssertEqual(message.meta["action"], "cancel_requested")
+        XCTAssertEqual(message.meta["reason"], "体調不良")
+        XCTAssertNil(state.sendingMessageProposalID)
+        XCTAssertNil(state.errorMessage)
+    }
+
+    func testAppStateUpdatesPreviewOwnProfile() async {
+        let state = MegrumAppState(repository: PreviewMegrumRepository())
+
+        await state.loadInitialData()
+        let saved = await state.updateOwnProfile(
+            OwnProfileUpdateInput(
+                handle: " @Michi_New ",
+                displayName: " みちりおん改 ",
+                gender: .noAnswer,
+                prefecture: " 東京都 ",
+                avatarURL: URL(string: "https://preview.megrum.jp/avatar.jpg")
+            )
+        )
+
+        XCTAssertTrue(saved)
+        XCTAssertEqual(state.viewer?.handle, "michi_new")
+        XCTAssertEqual(state.viewer?.displayName, "みちりおん改")
+        XCTAssertEqual(state.viewer?.gender, .noAnswer)
+        XCTAssertEqual(state.viewer?.prefecture, "東京都")
+        XCTAssertEqual(state.viewer?.avatarURL?.absoluteString, "https://preview.megrum.jp/avatar.jpg")
+        XCTAssertFalse(state.isSavingOwnProfile)
+        XCTAssertNil(state.errorMessage)
+    }
+
+    func testAppStateRejectsInvalidOwnProfileHandle() async {
+        let state = MegrumAppState(repository: PreviewMegrumRepository())
+
+        await state.loadInitialData()
+        let saved = await state.updateOwnProfile(
+            OwnProfileUpdateInput(
+                handle: "みち",
+                displayName: "みちりおん",
+                prefecture: "山形県"
+            )
+        )
+
+        XCTAssertFalse(saved)
+        XCTAssertEqual(state.viewer?.handle, "michilion")
+        XCTAssertEqual(state.errorMessage, "ユーザーIDは半角英数字・_ の3〜20文字で入力してください")
     }
 
     func testAppStateLoadsPreviewPublicExchangeContent() async {
@@ -376,6 +493,8 @@ final class MegrumAppStateTests: XCTestCase {
         XCTAssertEqual(state.viewer?.displayName, "みちりおん")
         XCTAssertEqual(state.viewer?.prefecture, "山形県")
         XCTAssertEqual(state.viewer?.accountStatus, .active)
+        XCTAssertEqual(state.userOshiSelections.first?.groupID, groupID)
+        XCTAssertEqual(state.userOshiSelections.first?.kind, .box)
         XCTAssertFalse(state.isSavingAccountSetup)
     }
 
@@ -396,6 +515,15 @@ final class MegrumAppStateTests: XCTestCase {
 
         XCTAssertEqual(state.oshiGroups.first?.name, "TWICE")
         XCTAssertEqual(state.oshiCharacters.first?.name, "SANA")
+    }
+
+    func testAppStateLoadsPreviewUserOshiSelections() async {
+        let state = MegrumAppState(repository: PreviewMegrumRepository())
+
+        await state.loadUserOshiSelections()
+
+        XCTAssertEqual(state.userOshiSelections.first?.kind, .specific)
+        XCTAssertFalse(state.isLoadingUserOshiSelections)
     }
 
     func testAppStateLoadsPreviewGoodsTypes() async {
@@ -951,7 +1079,7 @@ final class MegrumAppStateTests: XCTestCase {
 
         XCTAssertNil(state.session)
         XCTAssertFalse(state.isAuthenticated)
-        XCTAssertEqual(state.errorMessage, "有効なメールアドレスとパスワードを入力してください")
+        XCTAssertEqual(state.errorMessage, MegrumAuthInputValidator.invalidEmailMessage)
     }
 
     func testAuthStateSignsInWithAppleThroughRepository() async {

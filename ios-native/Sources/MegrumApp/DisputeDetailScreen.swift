@@ -1,4 +1,5 @@
 import MegrumCore
+import MegrumData
 import MegrumDesign
 import SwiftUI
 
@@ -14,7 +15,31 @@ enum DisputeDetailStatus: String, CaseIterable, Identifiable, Equatable, Sendabl
     var id: String { rawValue }
 
     init(rawStatus: String) {
-        self = DisputeDetailStatus(rawValue: rawStatus) ?? .submitted
+        switch rawStatus.normalizedDisputeStatus {
+        case "response_pending":
+            self = .replyWindow
+        case "responded":
+            self = .replyReceived
+        case "arbitrating":
+            self = .arbitration
+        case "closed":
+            self = .resolved
+        default:
+            self = DisputeDetailStatus(rawValue: rawStatus.normalizedDisputeStatus) ?? .submitted
+        }
+    }
+
+    init(supabaseStatus: String, outcome: String?, operatorComment: String?, closedAt: Date?, respondentRespondedAt: Date?) {
+        let normalized = supabaseStatus.normalizedDisputeStatus
+        if normalized == "closed" {
+            self = outcome.nilIfBlank == nil && operatorComment.nilIfBlank == nil ? .withdrawn : .resolved
+            return
+        }
+        if normalized == "response_pending", respondentRespondedAt != nil {
+            self = .replyReceived
+            return
+        }
+        self.init(rawStatus: normalized)
     }
 
     var displayName: String {
@@ -88,6 +113,27 @@ enum DisputeTimelineEventState: Equatable, Sendable {
     case pending
 }
 
+enum DisputeDetailMessageSenderRole: String, Equatable, Sendable {
+    case reporter
+    case respondent
+    case `operator`
+    case unknown
+}
+
+enum DisputeDetailViewerRole: Equatable, Sendable {
+    case reporter
+    case respondent
+
+    var participantRole: SupabaseDisputeParticipantRole {
+        switch self {
+        case .reporter:
+            .reporter
+        case .respondent:
+            .respondent
+        }
+    }
+}
+
 struct DisputeTimelineEvent: Identifiable, Equatable, Sendable {
     var id: String
     var status: DisputeDetailStatus
@@ -113,6 +159,8 @@ struct DisputeTimelineEvent: Identifiable, Equatable, Sendable {
 
 struct DisputeDetailMessageModel: Identifiable, Equatable, Sendable {
     var id: UUID
+    var senderID: UUID?
+    var senderRole: DisputeDetailMessageSenderRole
     var senderName: String
     var body: String
     var createdAt: Date
@@ -120,12 +168,16 @@ struct DisputeDetailMessageModel: Identifiable, Equatable, Sendable {
 
     init(
         id: UUID = UUID(),
+        senderID: UUID? = nil,
+        senderRole: DisputeDetailMessageSenderRole = .unknown,
         senderName: String,
         body: String,
         createdAt: Date,
         photoURLs: [String] = []
     ) {
         self.id = id
+        self.senderID = senderID
+        self.senderRole = senderRole
         self.senderName = senderName
         self.body = body
         self.createdAt = createdAt
@@ -182,6 +234,8 @@ enum DisputeDetailTimelineBuilder {
             submittedAt
         case .resolved:
             resolvedAt
+        case .withdrawn:
+            resolvedAt
         default:
             nil
         }
@@ -213,14 +267,21 @@ enum DisputeDetailTimelineBuilder {
 struct DisputeDetailModel: Identifiable, Equatable, Sendable {
     var id: UUID
     var proposalID: UUID
+    var reporterID: UUID?
+    var respondentID: UUID?
+    var viewerRole: DisputeDetailViewerRole?
     var ticketNo: String
     var status: DisputeDetailStatus
     var category: TradeDisputeCategory?
     var reporterName: String
     var respondentName: String
     var factMemo: String?
+    var evidencePhotoURLs: [String]
+    var respondentEvidencePhotoURLs: [String]
+    var createdAt: Date?
     var submittedAt: Date
     var replyDeadlineAt: Date?
+    var operatorDeadlineAt: Date?
     var resolvedAt: Date?
     var resolutionSummary: String?
     var timeline: [DisputeTimelineEvent]
@@ -229,14 +290,21 @@ struct DisputeDetailModel: Identifiable, Equatable, Sendable {
     init(
         id: UUID,
         proposalID: UUID,
+        reporterID: UUID? = nil,
+        respondentID: UUID? = nil,
+        viewerRole: DisputeDetailViewerRole? = nil,
         ticketNo: String,
         status: DisputeDetailStatus,
         category: TradeDisputeCategory? = nil,
         reporterName: String = "あなた",
         respondentName: String = "相手",
         factMemo: String? = nil,
+        evidencePhotoURLs: [String] = [],
+        respondentEvidencePhotoURLs: [String] = [],
+        createdAt: Date? = nil,
         submittedAt: Date,
         replyDeadlineAt: Date? = nil,
+        operatorDeadlineAt: Date? = nil,
         resolvedAt: Date? = nil,
         resolutionSummary: String? = nil,
         timeline: [DisputeTimelineEvent]? = nil,
@@ -244,14 +312,21 @@ struct DisputeDetailModel: Identifiable, Equatable, Sendable {
     ) {
         self.id = id
         self.proposalID = proposalID
+        self.reporterID = reporterID
+        self.respondentID = respondentID
+        self.viewerRole = viewerRole
         self.ticketNo = ticketNo
         self.status = status
         self.category = category
         self.reporterName = reporterName
         self.respondentName = respondentName
         self.factMemo = factMemo
+        self.evidencePhotoURLs = evidencePhotoURLs
+        self.respondentEvidencePhotoURLs = respondentEvidencePhotoURLs
+        self.createdAt = createdAt
         self.submittedAt = submittedAt
         self.replyDeadlineAt = replyDeadlineAt
+        self.operatorDeadlineAt = operatorDeadlineAt
         self.resolvedAt = resolvedAt
         self.resolutionSummary = resolutionSummary
         self.timeline = timeline ?? DisputeDetailTimelineBuilder.build(
@@ -279,11 +354,78 @@ struct DisputeDetailModel: Identifiable, Equatable, Sendable {
     }
 
     var canSubmitReply: Bool {
-        status.allowsReply
+        status.allowsReply && viewerRole != .reporter
     }
 
     var canWithdraw: Bool {
-        status.allowsWithdrawal
+        status.allowsWithdrawal && viewerRole != .respondent
+    }
+
+    var statusDescription: String {
+        switch status {
+        case .filed:
+            return "申告内容を確認中です。送信前なら内容を整えられます。"
+        case .submitted:
+            return "申告を受け付けました。相手へ反論機会を通知します。"
+        case .replyWindow:
+            return "相手の反論を待っています。期限後は運営確認へ進みます。"
+        case .replyReceived:
+            return "相手の反論を受け付けました。運営確認へ進みます。"
+        case .arbitration:
+            return "運営が申告内容、取引チャット、証跡を確認しています。"
+        case .resolved:
+            return "仲裁結果が確定しました。結果と運営コメントを確認してください。"
+        case .withdrawn:
+            return "この申告は取り下げ済みです。追加の反論や仲裁確認は行われません。"
+        }
+    }
+
+    var nextActionText: String {
+        if canSubmitReply {
+            return "反論内容を入力し、必要な証跡があれば本文に補足してください。"
+        }
+        if canWithdraw {
+            return "状況が解決した場合は、申告を取り下げられます。"
+        }
+
+        switch status {
+        case .replyReceived, .arbitration:
+            return "追加確認が必要な場合は運営から連絡があります。"
+        case .resolved:
+            return "結果を確認し、必要なら取引チャットへ戻ってください。"
+        case .withdrawn:
+            return "取引チャットから必要な連絡を続けてください。"
+        default:
+            return "現在この申告で行える操作はありません。"
+        }
+    }
+
+    var withdrawalUnavailableText: String? {
+        guard !canWithdraw else {
+            return nil
+        }
+        if viewerRole == .respondent {
+            return "取り下げは申告者だけが行えます。"
+        }
+        switch status {
+        case .replyReceived:
+            return "相手の反論後は運営確認に進むため、画面からは取り下げできません。"
+        case .arbitration:
+            return "仲裁中のため、取り下げは運営確認が必要です。"
+        case .resolved:
+            return "仲裁結果が確定済みです。"
+        case .withdrawn:
+            return "申告は取り下げ済みです。"
+        case .filed, .submitted, .replyWindow:
+            return nil
+        }
+    }
+
+    var evidenceGroups: [DisputeEvidenceGroup] {
+        [
+            DisputeEvidenceGroup(title: "申告者の証跡", ownerName: reporterName, photoURLs: evidencePhotoURLs),
+            DisputeEvidenceGroup(title: "相手の証跡", ownerName: respondentName, photoURLs: respondentEvidencePhotoURLs)
+        ].filter { !$0.photoURLs.isEmpty }
     }
 
     func replacing(
@@ -298,14 +440,21 @@ struct DisputeDetailModel: Identifiable, Equatable, Sendable {
         return DisputeDetailModel(
             id: id,
             proposalID: proposalID,
+            reporterID: reporterID,
+            respondentID: respondentID,
+            viewerRole: viewerRole,
             ticketNo: ticketNo,
             status: nextStatus,
             category: category,
             reporterName: reporterName,
             respondentName: respondentName,
             factMemo: factMemo,
+            evidencePhotoURLs: evidencePhotoURLs,
+            respondentEvidencePhotoURLs: respondentEvidencePhotoURLs,
+            createdAt: createdAt,
             submittedAt: submittedAt,
             replyDeadlineAt: replyDeadlineAt,
+            operatorDeadlineAt: operatorDeadlineAt,
             resolvedAt: nextResolvedAt,
             resolutionSummary: resolutionSummary ?? self.resolutionSummary,
             timeline: nextTimeline,
@@ -328,9 +477,253 @@ struct DisputeDetailModel: Identifiable, Equatable, Sendable {
         let minutes = max(1, remainingSeconds / 60)
         return "反論期限まで残り\(minutes)分"
     }
+
+    func counterpartyID(for viewerID: UUID) -> UUID? {
+        if reporterID == viewerID {
+            return respondentID
+        }
+        if respondentID == viewerID {
+            return reporterID
+        }
+        return nil
+    }
+}
+
+struct DisputeEvidenceGroup: Identifiable, Equatable, Sendable {
+    var id: String { title }
+    var title: String
+    var ownerName: String
+    var photoURLs: [String]
+}
+
+struct DisputeDetailSupabaseMapper: Equatable, Sendable {
+    var viewerID: UUID?
+    var reporterName: String?
+    var respondentName: String?
+
+    init(viewerID: UUID? = nil, reporterName: String? = nil, respondentName: String? = nil) {
+        self.viewerID = viewerID
+        self.reporterName = reporterName
+        self.respondentName = respondentName
+    }
+
+    func model(from detail: SupabaseDisputeDetail) -> DisputeDetailModel {
+        DisputeDetailModel(supabaseDetail: detail, mapper: self)
+    }
+
+    func message(from message: SupabaseDisputeMessage, in detail: SupabaseDisputeDetail) -> DisputeDetailMessageModel {
+        DisputeDetailMessageModel(supabaseMessage: message, detail: detail, mapper: self)
+    }
+
+    func senderRole(for viewerID: UUID, in detail: SupabaseDisputeDetail) -> SupabaseDisputeParticipantRole? {
+        viewerRole(for: viewerID, in: detail)?.participantRole
+    }
+
+    func viewerRole(for viewerID: UUID, in detail: SupabaseDisputeDetail) -> DisputeDetailViewerRole? {
+        if viewerID == detail.reporterID {
+            return .reporter
+        }
+        if viewerID == detail.respondentID {
+            return .respondent
+        }
+        return nil
+    }
+
+    func displayReporterName(for detail: SupabaseDisputeDetail) -> String {
+        if let reporterName = reporterName?.nilIfBlank {
+            return reporterName
+        }
+        if viewerID == detail.reporterID {
+            return "あなた"
+        }
+        if viewerID == detail.respondentID {
+            return "相手"
+        }
+        return "申告者"
+    }
+
+    func displayRespondentName(for detail: SupabaseDisputeDetail) -> String {
+        if let respondentName = respondentName?.nilIfBlank {
+            return respondentName
+        }
+        if viewerID == detail.respondentID {
+            return "あなた"
+        }
+        return "相手"
+    }
+
+    func displayName(for role: DisputeDetailMessageSenderRole, senderID: UUID?, in detail: SupabaseDisputeDetail) -> String {
+        if let viewerID, senderID == viewerID {
+            return "あなた"
+        }
+
+        switch role {
+        case .reporter:
+            return displayReporterName(for: detail)
+        case .respondent:
+            return displayRespondentName(for: detail)
+        case .operator:
+            return "運営"
+        case .unknown:
+            if senderID == detail.reporterID {
+                return displayReporterName(for: detail)
+            }
+            if senderID == detail.respondentID {
+                return displayRespondentName(for: detail)
+            }
+            return senderID == nil ? "運営" : "参加者"
+        }
+    }
+}
+
+extension DisputeDetailModel {
+    init(supabaseDetail detail: SupabaseDisputeDetail, mapper: DisputeDetailSupabaseMapper = DisputeDetailSupabaseMapper()) {
+        let status = DisputeDetailStatus(
+            supabaseStatus: detail.status,
+            outcome: detail.outcome,
+            operatorComment: detail.operatorComment,
+            closedAt: detail.closedAt,
+            respondentRespondedAt: detail.respondentRespondedAt
+        )
+        let messages = Self.mappedMessages(from: detail, mapper: mapper)
+        self.init(
+            id: detail.id,
+            proposalID: detail.proposalID,
+            reporterID: detail.reporterID,
+            respondentID: detail.respondentID,
+            viewerRole: mapper.viewerID.flatMap { mapper.viewerRole(for: $0, in: detail) },
+            ticketNo: detail.ticketNo,
+            status: status,
+            category: detail.category,
+            reporterName: mapper.displayReporterName(for: detail),
+            respondentName: mapper.displayRespondentName(for: detail),
+            factMemo: detail.factMemo,
+            evidencePhotoURLs: detail.evidencePhotoURLs.cleanedPhotoURLs,
+            respondentEvidencePhotoURLs: detail.respondentEvidenceURLs.cleanedPhotoURLs,
+            createdAt: detail.createdAt,
+            submittedAt: detail.submittedAt,
+            replyDeadlineAt: detail.respondentDeadlineAt,
+            operatorDeadlineAt: detail.operatorDeadlineAt,
+            resolvedAt: detail.closedAt,
+            resolutionSummary: Self.resolutionSummary(from: detail, status: status),
+            messages: messages
+        )
+    }
+
+    private static func mappedMessages(
+        from detail: SupabaseDisputeDetail,
+        mapper: DisputeDetailSupabaseMapper
+    ) -> [DisputeDetailMessageModel] {
+        var messages = detail.messages.map { mapper.message(from: $0, in: detail) }
+
+        let respondentBody = detail.respondentResponseText.nilIfBlank ?? detail.respondentResponse.nilIfBlank
+        let respondentPhotoURLs = detail.respondentEvidenceURLs.cleanedPhotoURLs
+        let hasPersistedRespondentMessage = messages.contains { message in
+            message.senderRole == .respondent && (respondentBody == nil || message.body == respondentBody)
+        }
+        if !hasPersistedRespondentMessage, respondentBody != nil || !respondentPhotoURLs.isEmpty {
+            messages.append(
+                DisputeDetailMessageModel(
+                    id: detail.id,
+                    senderID: detail.respondentID,
+                    senderRole: .respondent,
+                    senderName: mapper.displayRespondentName(for: detail),
+                    body: respondentBody ?? "証跡写真が追加されました。",
+                    createdAt: detail.respondentRespondedAt ?? detail.updatedAt ?? detail.submittedAt,
+                    photoURLs: respondentPhotoURLs
+                )
+            )
+        }
+
+        return messages.sorted { lhs, rhs in
+            if lhs.createdAt == rhs.createdAt {
+                return lhs.id.uuidString < rhs.id.uuidString
+            }
+            return lhs.createdAt < rhs.createdAt
+        }
+    }
+
+    private static func resolutionSummary(from detail: SupabaseDisputeDetail, status: DisputeDetailStatus) -> String? {
+        if status == .withdrawn {
+            return "申告は取り下げられました。"
+        }
+
+        let outcome = detail.outcome.nilIfBlank
+        let operatorComment = detail.operatorComment.nilIfBlank
+        switch (outcome, operatorComment) {
+        case let (.some(outcome), .some(operatorComment)):
+            return "\(outcome)\n\(operatorComment)"
+        case let (.some(outcome), .none):
+            return outcome
+        case let (.none, .some(operatorComment)):
+            return operatorComment
+        case (.none, .none):
+            return nil
+        }
+    }
+}
+
+extension DisputeDetailMessageModel {
+    init(
+        supabaseMessage message: SupabaseDisputeMessage,
+        detail: SupabaseDisputeDetail,
+        mapper: DisputeDetailSupabaseMapper = DisputeDetailSupabaseMapper()
+    ) {
+        let role = DisputeDetailMessageSenderRole(supabaseRole: message.senderRole, senderID: message.senderID)
+        self.init(
+            id: message.id,
+            senderID: message.senderID,
+            senderRole: role,
+            senderName: mapper.displayName(for: role, senderID: message.senderID, in: detail),
+            body: message.body,
+            createdAt: message.createdAt,
+            photoURLs: message.photoURLs.cleanedPhotoURLs
+        )
+    }
+}
+
+private extension DisputeDetailMessageSenderRole {
+    init(supabaseRole: SupabaseDisputeParticipantRole?, senderID: UUID?) {
+        switch supabaseRole {
+        case .reporter:
+            self = .reporter
+        case .respondent:
+            self = .respondent
+        case .none:
+            self = senderID == nil ? .operator : .unknown
+        }
+    }
+}
+
+private extension Array where Element == String {
+    var cleanedPhotoURLs: [String] {
+        map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+    }
+}
+
+private extension String {
+    var normalizedDisputeStatus: String {
+        trimmingCharacters(in: .whitespacesAndNewlines)
+            .lowercased()
+            .replacingOccurrences(of: "-", with: "_")
+    }
+
+    var nilIfBlank: String? {
+        let trimmed = trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? nil : trimmed
+    }
+}
+
+private extension Optional where Wrapped == String {
+    var nilIfBlank: String? {
+        flatMap(\.nilIfBlank)
+    }
 }
 
 struct DisputeReplyDraft: Equatable, Sendable {
+    static let maxBodyLength = 4_000
+
     var body: String = ""
     var includesEvidenceNote = true
 
@@ -339,7 +732,17 @@ struct DisputeReplyDraft: Equatable, Sendable {
     }
 
     var isSubmittable: Bool {
-        !normalizedBody.isEmpty
+        validationMessage == nil
+    }
+
+    var validationMessage: String? {
+        if normalizedBody.isEmpty {
+            return "本文を入力してください"
+        }
+        if normalizedBody.count > Self.maxBodyLength {
+            return "本文は\(Self.maxBodyLength)文字以内で入力してください"
+        }
+        return nil
     }
 }
 
@@ -448,11 +851,14 @@ enum DisputeDetailLoadState: Equatable, Sendable {
 
 enum DisputeDetailActionError: LocalizedError, Equatable {
     case notCompleted
+    case notParticipant
 
     var errorDescription: String? {
         switch self {
         case .notCompleted:
             "操作を完了できませんでした。"
+        case .notParticipant:
+            "この申告を操作できません。"
         }
     }
 }
@@ -462,6 +868,57 @@ final class DisputeDetailStore: ObservableObject {
     typealias DetailAction = () async throws -> DisputeDetailModel?
     typealias ReplyAction = (DisputeReplyDraft) async throws -> DisputeDetailModel?
     typealias WithdrawAction = () async throws -> DisputeDetailModel?
+
+    struct Actions {
+        var detail: DetailAction
+        var reply: ReplyAction
+        var withdraw: WithdrawAction
+
+        init(
+            detail: @escaping DetailAction,
+            reply: @escaping ReplyAction,
+            withdraw: @escaping WithdrawAction
+        ) {
+            self.detail = detail
+            self.reply = reply
+            self.withdraw = withdraw
+        }
+
+        static func supabase(
+            ticketID: UUID,
+            viewerID: UUID,
+            client: SupabaseDisputeClient,
+            mapper: DisputeDetailSupabaseMapper? = nil
+        ) -> Actions {
+            let mapper = mapper ?? DisputeDetailSupabaseMapper(viewerID: viewerID)
+            return Actions(
+                detail: {
+                    try await client.loadDispute(ticketID: ticketID).map(mapper.model(from:))
+                },
+                reply: { draft in
+                    guard let detail = try await client.loadDispute(ticketID: ticketID) else {
+                        return nil
+                    }
+                    guard let senderRole = mapper.senderRole(for: viewerID, in: detail) else {
+                        throw DisputeDetailActionError.notParticipant
+                    }
+                    _ = try await client.createDisputeReply(
+                        SupabaseDisputeReplyCreateInput(
+                            disputeID: ticketID,
+                            senderID: viewerID,
+                            senderRole: senderRole,
+                            body: draft.normalizedBody
+                        )
+                    )
+                    return try await client.loadDispute(ticketID: ticketID).map(mapper.model(from:))
+                },
+                withdraw: {
+                    try await client.withdrawDispute(ticketID: ticketID, reporterID: viewerID)
+                        .map(mapper.model(from:))
+                }
+            )
+        }
+    }
 
     @Published private(set) var state: DisputeDetailLoadState
     @Published var replyDraft: DisputeReplyDraft
@@ -475,18 +932,30 @@ final class DisputeDetailStore: ObservableObject {
     private let withdraw: WithdrawAction
     private var hasLoaded = false
 
-    init(
+    convenience init(
         initialState: DisputeDetailLoadState = .loading,
         initialReplyDraft: DisputeReplyDraft = DisputeReplyDraft(),
         detail: @escaping DetailAction,
         reply: @escaping ReplyAction,
         withdraw: @escaping WithdrawAction
     ) {
+        self.init(
+            initialState: initialState,
+            initialReplyDraft: initialReplyDraft,
+            actions: Actions(detail: detail, reply: reply, withdraw: withdraw)
+        )
+    }
+
+    init(
+        initialState: DisputeDetailLoadState = .loading,
+        initialReplyDraft: DisputeReplyDraft = DisputeReplyDraft(),
+        actions: Actions
+    ) {
         self.state = initialState
         self.replyDraft = initialReplyDraft
-        self.detail = detail
-        self.reply = reply
-        self.withdraw = withdraw
+        self.detail = actions.detail
+        self.reply = actions.reply
+        self.withdraw = actions.withdraw
         self.hasLoaded = initialState.model != nil
     }
 
@@ -514,6 +983,10 @@ final class DisputeDetailStore: ObservableObject {
     func submitReply() async {
         let draft = replyDraft
         guard draft.isSubmittable, !isSubmittingReply else {
+            return
+        }
+        guard state.model?.canSubmitReply == true else {
+            actionErrorMessage = "この状態では反論を送信できません。"
             return
         }
 
@@ -625,6 +1098,40 @@ struct DisputeDetailScreen: View {
             )
         )
         self.onSubmitTradeRequest = onSubmitTradeRequest
+    }
+
+    init(
+        initialReplyDraft: DisputeReplyDraft = DisputeReplyDraft(),
+        actions: DisputeDetailStore.Actions,
+        onSubmitTradeRequest: @escaping (TradeRequestDraft) async -> Bool = { _ in false }
+    ) {
+        self._store = StateObject(
+            wrappedValue: DisputeDetailStore(
+                initialReplyDraft: initialReplyDraft,
+                actions: actions
+            )
+        )
+        self.onSubmitTradeRequest = onSubmitTradeRequest
+    }
+
+    init(
+        ticketID: UUID,
+        viewerID: UUID,
+        disputeClient: SupabaseDisputeClient,
+        mapper: DisputeDetailSupabaseMapper? = nil,
+        initialReplyDraft: DisputeReplyDraft = DisputeReplyDraft(),
+        onSubmitTradeRequest: @escaping (TradeRequestDraft) async -> Bool = { _ in false }
+    ) {
+        self.init(
+            initialReplyDraft: initialReplyDraft,
+            actions: .supabase(
+                ticketID: ticketID,
+                viewerID: viewerID,
+                client: disputeClient,
+                mapper: mapper
+            ),
+            onSubmitTradeRequest: onSubmitTradeRequest
+        )
     }
 
     init(
@@ -813,6 +1320,22 @@ struct DisputeDetailScreen: View {
                 }
             }
 
+            Section("証跡") {
+                if model.evidenceGroups.isEmpty {
+                    ContentUnavailableView(
+                        "添付された証跡はありません",
+                        systemImage: "photo.on.rectangle.angled",
+                        description: Text("取引チャットや交換証跡の内容も運営確認の対象です。")
+                    )
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 8)
+                } else {
+                    ForEach(model.evidenceGroups) { group in
+                        DisputeEvidenceGroupView(group: group)
+                    }
+                }
+            }
+
             if let resolutionSummary = model.resolutionSummary {
                 Section("仲裁結果") {
                     Text(resolutionSummary)
@@ -820,8 +1343,12 @@ struct DisputeDetailScreen: View {
                 }
             }
 
-            if !model.messages.isEmpty {
-                Section("返信履歴") {
+            Section("返信履歴") {
+                if model.messages.isEmpty {
+                    Text("まだ返信はありません。")
+                        .font(.callout)
+                        .foregroundStyle(MegrumTheme.muted)
+                } else {
                     ForEach(model.messages) { message in
                         DisputeMessageRow(message: message)
                     }
@@ -850,6 +1377,19 @@ struct DisputeDetailScreen: View {
             }
 
             Section {
+                if model.canWithdraw {
+                    Button(role: .destructive) {
+                        isShowingWithdrawConfirmation = true
+                    } label: {
+                        Label("申告を取り下げる", systemImage: "arrow.uturn.backward")
+                    }
+                    .disabled(store.isWithdrawing)
+                } else if let message = model.withdrawalUnavailableText {
+                    Label(message, systemImage: "lock.fill")
+                        .font(.callout)
+                        .foregroundStyle(MegrumTheme.muted)
+                }
+
                 Button {
                     presentedRequestKind = .late
                 } label: {
@@ -862,7 +1402,7 @@ struct DisputeDetailScreen: View {
                     Label(TradeRequestKind.cancellation.title, systemImage: TradeRequestKind.cancellation.systemImage)
                 }
             } header: {
-                Text("当日リクエスト")
+                Text("操作")
             } footer: {
                 Text("遅刻やキャンセルは取引チャット側へ反映するための独立した申請として扱います。")
             }
@@ -912,7 +1452,20 @@ private struct DisputeStatusHeader: View {
                 statusChip(title: "受付", value: model.submittedAt.formatted(date: .abbreviated, time: .shortened))
                 if model.canSubmitReply {
                     statusChip(title: "反論", value: model.replyCountdownText())
+                } else if let operatorDeadlineAt = model.operatorDeadlineAt, model.status == .arbitration {
+                    statusChip(title: "運営", value: operatorDeadlineAt.formatted(date: .abbreviated, time: .shortened))
+                } else if let resolvedAt = model.resolvedAt, model.status == .resolved || model.status == .withdrawn {
+                    statusChip(title: "完了", value: resolvedAt.formatted(date: .abbreviated, time: .shortened))
                 }
+            }
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text(model.statusDescription)
+                    .font(.callout.weight(.semibold))
+                    .foregroundStyle(MegrumTheme.ink)
+                Text(model.nextActionText)
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(MegrumTheme.muted)
             }
         }
         .padding(18)
@@ -1049,6 +1602,43 @@ private struct DisputeMessageRow: View {
     }
 }
 
+private struct DisputeEvidenceGroupView: View {
+    var group: DisputeEvidenceGroup
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Label(group.title, systemImage: "photo.stack.fill")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(MegrumTheme.ink)
+                Spacer()
+                Text(group.ownerName)
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(MegrumTheme.muted)
+            }
+
+            ForEach(Array(group.photoURLs.enumerated()), id: \.offset) { index, url in
+                if let link = URL(string: url), link.scheme != nil {
+                    Link(destination: link) {
+                        HStack {
+                            Label("証跡写真 \(index + 1)", systemImage: "photo")
+                            Spacer()
+                            Image(systemName: "arrow.up.right")
+                                .font(.caption.weight(.bold))
+                                .foregroundStyle(MegrumTheme.muted)
+                        }
+                    }
+                } else {
+                    Label("証跡写真 \(index + 1)", systemImage: "photo")
+                        .foregroundStyle(MegrumTheme.muted)
+                }
+            }
+            .font(.callout.weight(.semibold))
+        }
+        .padding(.vertical, 4)
+    }
+}
+
 private struct DisputeReplyComposer: View {
     @Binding var draft: DisputeReplyDraft
     var isSubmitting: Bool
@@ -1070,6 +1660,12 @@ private struct DisputeReplyComposer: View {
                 }
 
             Toggle("証跡やチャット内容も確認してほしい", isOn: $draft.includesEvidenceNote)
+
+            if let validationMessage = draft.validationMessage, !draft.normalizedBody.isEmpty {
+                Text(validationMessage)
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.orange)
+            }
 
             Button(action: onSubmit) {
                 Group {

@@ -91,4 +91,36 @@ enum OnboardingOshiSelectionLogic {
             draft.accountSetupInput(priority: offset + 1)
         }
     }
+
+    static func drafts(
+        from selections: [UserOshiSelection],
+        groups: [OshiGroup],
+        characters: [OshiCharacter]
+    ) -> [OnboardingOshiDraft] {
+        let groupsByID = Dictionary(uniqueKeysWithValues: groups.map { ($0.id, $0) })
+        let charactersByID = Dictionary(uniqueKeysWithValues: characters.map { ($0.id, $0) })
+
+        return selections.sorted { lhs, rhs in
+            lhs.priority < rhs.priority
+        }.compactMap { selection in
+            guard let groupID = selection.groupID else {
+                return nil
+            }
+
+            let groupName = groupsByID[groupID]?.name ?? "選択済みグループ"
+            let characterName: String?
+            if let characterID = selection.characterID {
+                characterName = charactersByID[characterID]?.name ?? "選択済みメンバー"
+            } else {
+                characterName = nil
+            }
+
+            return OnboardingOshiDraft(
+                groupID: groupID,
+                groupName: groupName,
+                characterID: selection.characterID,
+                characterName: characterName
+            )
+        }
+    }
 }

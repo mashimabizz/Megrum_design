@@ -44,6 +44,22 @@ final class ProposalCreateFlowTests: XCTestCase {
         XCTAssertFalse(configuration.canAdvance(from: .confirm))
     }
 
+    func testProposalFlowCannotSubmitWithoutReceiverGoods() {
+        let configuration = ProposalCreateConfiguration(
+            exchangeMethod: .mail,
+            hasSelectedSenderGoods: true,
+            isCreatingProposal: false,
+            hasReadyMailingAddress: true,
+            isLoadingMailingAddress: false,
+            hasValidMeetup: false,
+            receiverGoodsCount: 0,
+            isListingSource: false
+        )
+
+        XCTAssertFalse(configuration.canSubmit)
+        XCTAssertEqual(configuration.submitTitle, "受け取るものを選択")
+    }
+
     func testProposalFlowCanReachConfirmWhenSelectionsAndMeetupAreReady() {
         let configuration = ProposalCreateConfiguration(
             exchangeMethod: .hand,

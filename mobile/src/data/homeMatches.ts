@@ -8,8 +8,10 @@ export type Candidate = {
   hue: string;
   photoUrl?: string | null;
   tag?: string;
+  tagLabels?: string[];
   local: boolean;
   priority: CandidatePriority;
+  tagScore?: number;
   partnerId?: string;
   partnerHandle?: string;
   partnerDisplayName?: string;
@@ -56,6 +58,7 @@ export const MATCH_SECTIONS: ShelfSection[] = [
             type: "トレカ",
             hue: "#cbbcf4",
             tag: "双方条件",
+            tagLabels: ["春ver.", "同種優先"],
             local: true,
             priority: "both",
           },
@@ -66,6 +69,7 @@ export const MATCH_SECTIONS: ShelfSection[] = [
             type: "トレカ",
             hue: "#a8d4e6",
             tag: "タグ一致",
+            tagLabels: ["ラキドロ"],
             local: false,
             priority: "both",
           },
@@ -76,6 +80,7 @@ export const MATCH_SECTIONS: ShelfSection[] = [
             type: "トレカ",
             hue: "#f3c5d4",
             tag: "相手条件",
+            tagLabels: ["会場限定"],
             local: true,
             priority: "oneSide",
           },
@@ -86,6 +91,7 @@ export const MATCH_SECTIONS: ShelfSection[] = [
             type: "トレカ",
             hue: "#d9eef5",
             tag: "候補",
+            tagLabels: ["通常盤"],
             local: false,
             priority: "oneSide",
           },
@@ -103,6 +109,7 @@ export const MATCH_SECTIONS: ShelfSection[] = [
             type: "アクスタ",
             hue: "#bcd8fa",
             tag: "自分条件",
+            tagLabels: ["アクスタ"],
             local: false,
             priority: "oneSide",
           },
@@ -113,6 +120,7 @@ export const MATCH_SECTIONS: ShelfSection[] = [
             type: "アクスタ",
             hue: "#f7d5df",
             tag: "現地OK",
+            tagLabels: ["制服", "現地OK"],
             local: true,
             priority: "oneSide",
           },
@@ -123,6 +131,7 @@ export const MATCH_SECTIONS: ShelfSection[] = [
             type: "アクスタ",
             hue: "#d5cff4",
             tag: "タグ一致",
+            tagLabels: ["ライブ"],
             local: false,
             priority: "oneSide",
           },
@@ -146,6 +155,7 @@ export const MATCH_SECTIONS: ShelfSection[] = [
             type: "トレカ",
             hue: "#c8e8f2",
             tag: "wish一致",
+            tagLabels: ["トレカ"],
             local: false,
             priority: "wish",
           },
@@ -156,6 +166,7 @@ export const MATCH_SECTIONS: ShelfSection[] = [
             type: "トレカ",
             hue: "#f2c6d7",
             tag: "現地OK",
+            tagLabels: ["初回盤", "現地OK"],
             local: true,
             priority: "wish",
           },
@@ -166,6 +177,7 @@ export const MATCH_SECTIONS: ShelfSection[] = [
             type: "トレカ",
             hue: "#cabcf1",
             tag: "衣装",
+            tagLabels: ["店舗特典", "衣装"],
             local: false,
             priority: "wish",
           },
@@ -176,6 +188,7 @@ export const MATCH_SECTIONS: ShelfSection[] = [
             type: "トレカ",
             hue: "#b7dceb",
             tag: "候補",
+            tagLabels: ["ラントレ"],
             local: false,
             priority: "wish",
           },
@@ -193,6 +206,7 @@ export const MATCH_SECTIONS: ShelfSection[] = [
             type: "缶バッジ",
             hue: "#d8cef6",
             tag: "wish一致",
+            tagLabels: ["缶バッジ"],
             local: false,
             priority: "wish",
           },
@@ -203,6 +217,7 @@ export const MATCH_SECTIONS: ShelfSection[] = [
             type: "缶バッジ",
             hue: "#acd8e7",
             tag: "近い",
+            tagLabels: ["会場"],
             local: true,
             priority: "wish",
           },
@@ -213,6 +228,7 @@ export const MATCH_SECTIONS: ShelfSection[] = [
             type: "缶バッジ",
             hue: "#f3c9d6",
             tag: "候補",
+            tagLabels: ["通常"],
             local: false,
             priority: "wish",
           },

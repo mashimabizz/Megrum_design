@@ -1,15 +1,70 @@
 import Foundation
 import MegrumCore
 
+public enum SupabaseListingClientError: Error, Equatable, Sendable {
+    case emptyUpdate
+    case emptyItems
+}
+
+public struct SupabaseListingUpdateInput: Equatable, Sendable {
+    public var haveItems: [ListingItemQuantity]?
+    public var haveLogic: ListingLogic?
+    public var status: IndividualListingStatus?
+    public var note: String?
+    public var clearsNote: Bool
+
+    public init(
+        haveItems: [ListingItemQuantity]? = nil,
+        haveLogic: ListingLogic? = nil,
+        status: IndividualListingStatus? = nil,
+        note: String? = nil,
+        clearsNote: Bool = false
+    ) {
+        self.haveItems = haveItems
+        self.haveLogic = haveLogic
+        self.status = status
+        self.note = note
+        self.clearsNote = clearsNote
+    }
+}
+
+public struct SupabaseListingWishOptionUpdateInput: Equatable, Sendable {
+    public var wishItems: [ListingItemQuantity]?
+    public var logic: ListingLogic?
+    public var exchangeType: IndividualListingExchangeType?
+    public var isCashOffer: Bool?
+    public var cashAmount: Int?
+    public var clearsCashAmount: Bool
+
+    public init(
+        wishItems: [ListingItemQuantity]? = nil,
+        logic: ListingLogic? = nil,
+        exchangeType: IndividualListingExchangeType? = nil,
+        isCashOffer: Bool? = nil,
+        cashAmount: Int? = nil,
+        clearsCashAmount: Bool = false
+    ) {
+        self.wishItems = wishItems
+        self.logic = logic
+        self.exchangeType = exchangeType
+        self.isCashOffer = isCashOffer
+        self.cashAmount = cashAmount
+        self.clearsCashAmount = clearsCashAmount
+    }
+}
+
 public final class SupabaseListingClient: @unchecked Sendable {
     private let client: SupabaseRESTClient
+    private let encoder: JSONEncoder
 
     public init(configuration: SupabaseConfiguration, session: URLSession = .shared) {
         self.client = SupabaseRESTClient(configuration: configuration, session: session)
+        self.encoder = Self.makeEncoder()
     }
 
     public init(client: SupabaseRESTClient) {
         self.client = client
+        self.encoder = Self.makeEncoder()
     }
 
     public func loadListings(userID: UUID) async throws -> [IndividualListing] {
@@ -55,6 +110,59 @@ public final class SupabaseListingClient: @unchecked Sendable {
             values: [ListingWishOptionPayload(listingID: listingRow.id, position: 1, input: input)],
             select: ListingWishOptionRow.select
         )
+        return listingRow.listing(options: optionRows.map(\.option))
+    }
+
+    public func updateListing(
+        userID: UUID,
+        listingID: UUID,
+        primaryOptionID: UUID?,
+        input: IndividualListingCreateInput,
+        status: IndividualListingStatus
+    ) async throws -> IndividualListing {
+        let listingRows: [ListingRow] = try await client.updateRows(
+            in: "listings",
+            values: try ListingUpdatePayload(
+                input: SupabaseListingUpdateInput(
+                    haveItems: input.haveItems,
+                    haveLogic: input.haveLogic,
+                    status: status,
+                    note: input.note,
+                    clearsNote: input.note == nil
+                )
+            ),
+            select: ListingRow.select,
+            queryItems: ownedListingQueryItems(userID: userID, listingID: listingID)
+        )
+        guard let listingRow = listingRows.first else {
+            throw SupabaseRESTError.unexpectedStatus(-1)
+        }
+
+        let optionInput = SupabaseListingWishOptionUpdateInput(
+            wishItems: input.wishItems,
+            logic: input.wishLogic,
+            exchangeType: input.exchangeType,
+            isCashOffer: false,
+            cashAmount: nil,
+            clearsCashAmount: true
+        )
+
+        let optionRows: [ListingWishOptionRow]
+        if let primaryOptionID {
+            optionRows = try await client.updateRows(
+                in: "listing_wish_options",
+                values: try ListingWishOptionUpdatePayload(input: optionInput),
+                select: ListingWishOptionRow.select,
+                queryItems: listingWishOptionQueryItems(listingID: listingID, optionID: primaryOptionID)
+            )
+        } else {
+            optionRows = try await client.insertRows(
+                into: "listing_wish_options",
+                values: [ListingWishOptionPayload(listingID: listingID, position: 1, input: input)],
+                select: ListingWishOptionRow.select
+            )
+        }
+
         return listingRow.listing(options: optionRows.map(\.option))
     }
 
@@ -105,6 +213,57 @@ public final class SupabaseListingClient: @unchecked Sendable {
         )
     }
 
+    public func makeUpdateListingRequest(
+        userID: UUID,
+        listingID: UUID,
+        input: SupabaseListingUpdateInput
+    ) throws -> URLRequest {
+        try client.makeMutationRequest(
+            path: "/rest/v1/listings",
+            queryItems: [
+                URLQueryItem(name: "select", value: ListingRow.select)
+            ] + ownedListingQueryItems(userID: userID, listingID: listingID),
+            method: "PATCH",
+            body: encoder.encode(ListingUpdatePayload(input: input)),
+            prefer: "return=representation"
+        )
+    }
+
+    public func makeUpdateListingWishOptionRequest(
+        listingID: UUID,
+        optionID: UUID,
+        input: SupabaseListingWishOptionUpdateInput
+    ) throws -> URLRequest {
+        try client.makeMutationRequest(
+            path: "/rest/v1/listing_wish_options",
+            queryItems: [
+                URLQueryItem(name: "select", value: ListingWishOptionRow.select)
+            ] + listingWishOptionQueryItems(listingID: listingID, optionID: optionID),
+            method: "PATCH",
+            body: encoder.encode(ListingWishOptionUpdatePayload(input: input)),
+            prefer: "return=representation"
+        )
+    }
+
+    public func makeArchiveListingRequest(userID: UUID, listingID: UUID) throws -> URLRequest {
+        try client.makeMutationRequest(
+            path: "/rest/v1/listings",
+            queryItems: [
+                URLQueryItem(name: "select", value: ListingRow.select)
+            ] + ownedListingQueryItems(userID: userID, listingID: listingID),
+            method: "PATCH",
+            body: encoder.encode(ListingStatusPayload(status: IndividualListingStatus.closed.rawValue)),
+            prefer: "return=representation"
+        )
+    }
+
+    public func makeDeleteListingRequest(userID: UUID, listingID: UUID) throws -> URLRequest {
+        try client.makeDeleteRequest(
+            from: "listings",
+            queryItems: ownedListingQueryItems(userID: userID, listingID: listingID)
+        )
+    }
+
     private func listingQueryItems(userID: UUID, publicOnly: Bool) -> [URLQueryItem] {
         [
             URLQueryItem(name: "user_id", value: "eq.\(userID.uuidString.lowercased())"),
@@ -123,6 +282,25 @@ public final class SupabaseListingClient: @unchecked Sendable {
         ]
     }
 
+    private func ownedListingQueryItems(userID: UUID, listingID: UUID) -> [URLQueryItem] {
+        [
+            URLQueryItem(name: "id", value: "eq.\(listingID.uuidString.lowercased())"),
+            URLQueryItem(name: "user_id", value: "eq.\(userID.uuidString.lowercased())")
+        ]
+    }
+
+    private func listingWishOptionQueryItems(listingID: UUID, optionID: UUID) -> [URLQueryItem] {
+        [
+            URLQueryItem(name: "id", value: "eq.\(optionID.uuidString.lowercased())"),
+            URLQueryItem(name: "listing_id", value: "eq.\(listingID.uuidString.lowercased())")
+        ]
+    }
+
+    private static func makeEncoder() -> JSONEncoder {
+        let encoder = JSONEncoder()
+        encoder.keyEncodingStrategy = .convertToSnakeCase
+        return encoder
+    }
 }
 
 private struct ListingRow: Decodable, Sendable {
@@ -210,6 +388,64 @@ private struct ListingPayload: Encodable, Sendable {
     }
 }
 
+private struct ListingStatusPayload: Encodable, Sendable {
+    var status: String
+}
+
+private struct ListingUpdatePayload: Encodable, Sendable {
+    private var haveIds: [UUID]?
+    private var haveQtys: [Int]?
+    private var haveLogic: String?
+    private var status: String?
+    private var note: String??
+
+    init(input: SupabaseListingUpdateInput) throws {
+        if let haveItems = input.haveItems {
+            guard !haveItems.isEmpty else {
+                throw SupabaseListingClientError.emptyItems
+            }
+            self.haveIds = haveItems.map(\.itemID)
+            self.haveQtys = haveItems.map { boundedListingQuantity($0.quantity) }
+        }
+        self.haveLogic = input.haveLogic?.rawValue
+        self.status = input.status?.rawValue
+        if let note = input.note {
+            let trimmed = note.trimmingCharacters(in: .whitespacesAndNewlines)
+            self.note = .some(trimmed.isEmpty ? nil : trimmed)
+        } else if input.clearsNote {
+            self.note = .some(nil)
+        }
+
+        guard haveIds != nil || haveLogic != nil || status != nil || note != nil else {
+            throw SupabaseListingClientError.emptyUpdate
+        }
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case haveIds
+        case haveQtys
+        case haveLogic
+        case status
+        case note
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encodeIfPresent(haveIds, forKey: .haveIds)
+        try container.encodeIfPresent(haveQtys, forKey: .haveQtys)
+        try container.encodeIfPresent(haveLogic, forKey: .haveLogic)
+        try container.encodeIfPresent(status, forKey: .status)
+        if let note {
+            switch note {
+            case let .some(value):
+                try container.encode(value, forKey: .note)
+            case .none:
+                try container.encodeNil(forKey: .note)
+            }
+        }
+    }
+}
+
 private struct ListingWishOptionPayload: Encodable, Sendable {
     var listingId: UUID
     var position: Int
@@ -232,8 +468,69 @@ private struct ListingWishOptionPayload: Encodable, Sendable {
     }
 }
 
+private struct ListingWishOptionUpdatePayload: Encodable, Sendable {
+    private var wishIds: [UUID]?
+    private var wishQtys: [Int]?
+    private var logic: String?
+    private var exchangeType: String?
+    private var isCashOffer: Bool?
+    private var cashAmount: Int??
+
+    init(input: SupabaseListingWishOptionUpdateInput) throws {
+        if let wishItems = input.wishItems {
+            guard !wishItems.isEmpty else {
+                throw SupabaseListingClientError.emptyItems
+            }
+            self.wishIds = wishItems.map(\.itemID)
+            self.wishQtys = wishItems.map { boundedListingQuantity($0.quantity) }
+        }
+        self.logic = input.logic?.rawValue
+        self.exchangeType = input.exchangeType?.rawValue
+        self.isCashOffer = input.isCashOffer
+        if let cashAmount = input.cashAmount {
+            self.cashAmount = .some(max(0, cashAmount))
+        } else if input.clearsCashAmount {
+            self.cashAmount = .some(nil)
+        }
+
+        guard wishIds != nil || logic != nil || exchangeType != nil || isCashOffer != nil || cashAmount != nil else {
+            throw SupabaseListingClientError.emptyUpdate
+        }
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case wishIds
+        case wishQtys
+        case logic
+        case exchangeType
+        case isCashOffer
+        case cashAmount
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encodeIfPresent(wishIds, forKey: .wishIds)
+        try container.encodeIfPresent(wishQtys, forKey: .wishQtys)
+        try container.encodeIfPresent(logic, forKey: .logic)
+        try container.encodeIfPresent(exchangeType, forKey: .exchangeType)
+        try container.encodeIfPresent(isCashOffer, forKey: .isCashOffer)
+        if let cashAmount {
+            switch cashAmount {
+            case let .some(value):
+                try container.encode(value, forKey: .cashAmount)
+            case .none:
+                try container.encodeNil(forKey: .cashAmount)
+            }
+        }
+    }
+}
+
 private func itemQuantities(ids: [UUID], quantities: [Int]) -> [ListingItemQuantity] {
     ids.enumerated().map { index, id in
         ListingItemQuantity(itemID: id, quantity: quantities.indices.contains(index) ? quantities[index] : 1)
     }
+}
+
+private func boundedListingQuantity(_ quantity: Int) -> Int {
+    max(1, min(quantity, 99))
 }

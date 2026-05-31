@@ -10,6 +10,8 @@ enum NativePreviewData {
     static let secondMemberID = UUID(uuidString: "00000000-0000-0000-0000-000000000014")!
     static let cardGoodsTypeID = UUID(uuidString: "00000000-0000-0000-0000-000000000021")!
     static let photoGoodsTypeID = UUID(uuidString: "00000000-0000-0000-0000-000000000022")!
+    static let kpopMaleGenreID = UUID(uuidString: "00000000-0000-0000-0000-000000000101")!
+    static let kpopFemaleGenreID = UUID(uuidString: "00000000-0000-0000-0000-000000000102")!
 
     private static func previewDate(dayOffset: Int = 0, hour: Int, minute: Int = 0) -> Date {
         let calendar = Calendar.current
@@ -39,8 +41,32 @@ enum NativePreviewData {
     ]
 
     static let oshiGroups = [
-        OshiGroup(id: groupID, name: "TWICE", aliases: ["トゥワイス"], displayOrder: 1),
-        OshiGroup(id: secondGroupID, name: "LE SSERAFIM", aliases: ["ルセラフィム"], displayOrder: 2)
+        OshiGroup(
+            id: groupID,
+            name: "TWICE",
+            aliases: ["トゥワイス"],
+            kind: .group,
+            genreID: kpopFemaleGenreID,
+            genreName: "K-POP女性",
+            displayOrder: 1
+        ),
+        OshiGroup(
+            id: secondGroupID,
+            name: "LE SSERAFIM",
+            aliases: ["ルセラフィム"],
+            kind: .group,
+            genreID: kpopFemaleGenreID,
+            genreName: "K-POP女性",
+            displayOrder: 2
+        )
+    ]
+
+    static let oshiGenres = [
+        OshiGenre(id: kpopMaleGenreID, name: "K-POP男性", displayOrder: 1),
+        OshiGenre(id: kpopFemaleGenreID, name: "K-POP女性", displayOrder: 2),
+        OshiGenre(id: UUID(uuidString: "00000000-0000-0000-0000-000000000103")!, name: "国内男性", displayOrder: 3),
+        OshiGenre(id: UUID(uuidString: "00000000-0000-0000-0000-000000000104")!, name: "国内女性", displayOrder: 4),
+        OshiGenre(id: UUID(uuidString: "00000000-0000-0000-0000-000000000105")!, name: "アニメ・マンガ", displayOrder: 5)
     ]
 
     static let oshiCharacters = [
@@ -136,26 +162,31 @@ enum NativePreviewData {
             memberID: memberID,
             goodsTypeID: cardGoodsTypeID,
             title: "ランダムトレカ A",
+            imageURL: URL(string: "https://picsum.photos/seed/megrum-card-a/420/560"),
             tags: [tags[0], tags[2]],
             quantity: 2
         ),
         GoodsItem(
             id: UUID(uuidString: "00000000-0000-0000-0000-000000000202")!,
             ownerID: viewerID,
+            status: .keep,
             groupID: groupID,
             memberID: memberID,
             goodsTypeID: photoGoodsTypeID,
             title: "会場限定フォト",
+            imageURL: URL(string: "https://picsum.photos/seed/megrum-photo/420/520"),
             tags: [tags[1]],
             quantity: 1
         ),
         GoodsItem(
             id: UUID(uuidString: "00000000-0000-0000-0000-000000000203")!,
             ownerID: partnerID,
+            status: .traded,
             groupID: groupID,
             memberID: memberID,
             goodsTypeID: cardGoodsTypeID,
             title: "ランダムトレカ B",
+            imageURL: URL(string: "https://picsum.photos/seed/megrum-card-b/420/560"),
             tags: [tags[2]],
             quantity: 1
         )
@@ -169,6 +200,7 @@ enum NativePreviewData {
             memberID: memberID,
             goodsTypeID: photoGoodsTypeID,
             title: "会場限定フォト",
+            imageURL: URL(string: "https://picsum.photos/seed/megrum-wish-photo/420/520"),
             tags: [tags[1]]
         ),
         WishItem(
@@ -178,6 +210,7 @@ enum NativePreviewData {
             memberID: memberID,
             goodsTypeID: cardGoodsTypeID,
             title: "ランダムトレカ B",
+            imageURL: URL(string: "https://picsum.photos/seed/megrum-wish-card/420/560"),
             tags: [tags[2]]
         )
     ]

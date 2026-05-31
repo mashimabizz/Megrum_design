@@ -31,7 +31,7 @@ final class SupabaseGoodsInventoryClientTests: XCTestCase {
         let body = try XCTUnwrap(request.httpBody)
         let json = try XCTUnwrap(JSONSerialization.jsonObject(with: body) as? [[String: Any]])
 
-        XCTAssertEqual(request.url?.absoluteString, "https://example.supabase.co/rest/v1/goods_inventory?select=id,user_id,group_id,character_id,goods_type_id,title,photo_urls,quantity")
+        XCTAssertEqual(request.url?.absoluteString, "https://example.supabase.co/rest/v1/goods_inventory?select=id,user_id,kind,status,group_id,character_id,goods_type_id,title,photo_urls,quantity")
         XCTAssertEqual(request.httpMethod, "POST")
         XCTAssertEqual(request.value(forHTTPHeaderField: "Prefer"), "resolution=merge-duplicates,return=representation")
         XCTAssertEqual(json.first?["user_id"] as? String, "11111111-1111-1111-1111-111111111111")
@@ -114,7 +114,7 @@ final class SupabaseGoodsInventoryClientTests: XCTestCase {
         let url = try XCTUnwrap(request.url?.absoluteString)
 
         XCTAssertEqual(request.httpMethod, "GET")
-        XCTAssertTrue(url.hasPrefix("https://example.supabase.co/rest/v1/goods_inventory?select=id,user_id,group_id,character_id,goods_type_id,title,photo_urls,quantity"))
+        XCTAssertTrue(url.hasPrefix("https://example.supabase.co/rest/v1/goods_inventory?select=id,user_id,kind,status,group_id,character_id,goods_type_id,title,photo_urls,quantity"))
         XCTAssertTrue(url.contains("kind=eq.for_trade"))
         XCTAssertTrue(url.contains("status=in.(active,reserved)"))
         XCTAssertTrue(url.contains("user_id=neq.11111111-1111-1111-1111-111111111111"))
@@ -134,7 +134,7 @@ final class SupabaseGoodsInventoryClientTests: XCTestCase {
         let url = try XCTUnwrap(request.url?.absoluteString)
 
         XCTAssertEqual(request.httpMethod, "GET")
-        XCTAssertTrue(url.hasPrefix("https://example.supabase.co/rest/v1/goods_inventory?select=id,user_id,group_id,character_id,goods_type_id,title,photo_urls,quantity"))
+        XCTAssertTrue(url.hasPrefix("https://example.supabase.co/rest/v1/goods_inventory?select=id,user_id,kind,status,group_id,character_id,goods_type_id,title,photo_urls,quantity"))
         XCTAssertTrue(url.contains("kind=eq.for_trade"))
         XCTAssertTrue(url.contains("status=in.(active,reserved)"))
         XCTAssertTrue(url.contains("user_id=eq.22222222-2222-2222-2222-222222222222"))
@@ -154,7 +154,7 @@ final class SupabaseGoodsInventoryClientTests: XCTestCase {
         XCTAssertEqual(request.httpMethod, "PATCH")
         XCTAssertEqual(
             request.url?.absoluteString,
-            "https://example.supabase.co/rest/v1/goods_inventory?select=id,user_id,group_id,character_id,goods_type_id,title,photo_urls,quantity&id=eq.44444444-4444-4444-4444-444444444444&user_id=eq.11111111-1111-1111-1111-111111111111&status=neq.traded"
+            "https://example.supabase.co/rest/v1/goods_inventory?select=id,user_id,kind,status,group_id,character_id,goods_type_id,title,photo_urls,quantity&id=eq.44444444-4444-4444-4444-444444444444&user_id=eq.11111111-1111-1111-1111-111111111111&status=neq.traded"
         )
         XCTAssertEqual(request.value(forHTTPHeaderField: "Prefer"), "return=representation")
         XCTAssertEqual(json["status"] as? String, "archived")
@@ -185,7 +185,7 @@ final class SupabaseGoodsInventoryClientTests: XCTestCase {
         XCTAssertEqual(request.httpMethod, "PATCH")
         XCTAssertEqual(
             request.url?.absoluteString,
-            "https://example.supabase.co/rest/v1/goods_inventory?select=id,user_id,group_id,character_id,goods_type_id,title,photo_urls,quantity&id=eq.44444444-4444-4444-4444-444444444444&user_id=eq.11111111-1111-1111-1111-111111111111&status=neq.traded"
+            "https://example.supabase.co/rest/v1/goods_inventory?select=id,user_id,kind,status,group_id,character_id,goods_type_id,title,photo_urls,quantity&id=eq.44444444-4444-4444-4444-444444444444&user_id=eq.11111111-1111-1111-1111-111111111111&status=neq.traded"
         )
         XCTAssertEqual(request.value(forHTTPHeaderField: "Prefer"), "return=representation")
         XCTAssertEqual(json["title"] as? String, "ラントレ B")
@@ -203,6 +203,125 @@ final class SupabaseGoodsInventoryClientTests: XCTestCase {
         )
     }
 
+    func testBuildsGoodsPhotoUploadRequest() throws {
+        let client = SupabaseGoodsInventoryClient(configuration: configuration)
+        let userID = UUID(uuidString: "11111111-1111-1111-1111-111111111111")!
+        let path = "\(userID.uuidString.lowercased())/sample.jpg"
+        let data = Data([0xFF, 0xD8, 0xFF])
+
+        let request = try client.makeUploadGoodsPhotoRequest(
+            userID: userID,
+            path: path,
+            data: data,
+            contentType: "image/jpeg"
+        )
+
+        XCTAssertEqual(
+            request.url?.absoluteString,
+            "https://example.supabase.co/storage/v1/object/goods-photos/11111111-1111-1111-1111-111111111111/sample.jpg"
+        )
+        XCTAssertEqual(request.httpMethod, "POST")
+        XCTAssertEqual(request.httpBody, data)
+        XCTAssertEqual(request.value(forHTTPHeaderField: "Content-Type"), "image/jpeg")
+        XCTAssertNil(request.value(forHTTPHeaderField: "x-upsert"))
+    }
+
+    func testGoodsPhotoUploadRequestNormalizesContentTypeWhitespaceAndAlias() throws {
+        let client = SupabaseGoodsInventoryClient(configuration: configuration)
+        let userID = UUID(uuidString: "11111111-1111-1111-1111-111111111111")!
+        let path = "\(userID.uuidString.lowercased())/sample.jpg"
+
+        let request = try client.makeUploadGoodsPhotoRequest(
+            userID: userID,
+            path: path,
+            data: Data([0xFF, 0xD8, 0xFF]),
+            contentType: " image/jpg\n"
+        )
+
+        XCTAssertEqual(request.value(forHTTPHeaderField: "Content-Type"), "image/jpeg")
+    }
+
+    func testGoodsPhotoUploadRequestRejectsUnsupportedContentType() throws {
+        let client = SupabaseGoodsInventoryClient(configuration: configuration)
+        let userID = UUID(uuidString: "11111111-1111-1111-1111-111111111111")!
+
+        XCTAssertThrowsError(
+            try client.makeUploadGoodsPhotoRequest(
+                userID: userID,
+                path: "\(userID.uuidString.lowercased())/sample.heic",
+                data: Data([0x00]),
+                contentType: "image/heic"
+            )
+        ) { error in
+            XCTAssertEqual(error as? SupabaseGoodsInventoryClientError, .unsupportedImageContentType)
+        }
+    }
+
+    func testGoodsPhotoUploadRequestRejectsOversizedImage() throws {
+        let client = SupabaseGoodsInventoryClient(configuration: configuration)
+        let userID = UUID(uuidString: "11111111-1111-1111-1111-111111111111")!
+
+        XCTAssertThrowsError(
+            try client.makeUploadGoodsPhotoRequest(
+                userID: userID,
+                path: "\(userID.uuidString.lowercased())/large.jpg",
+                data: Data(repeating: 0x00, count: SupabaseGoodsInventoryClient.maxGoodsPhotoUploadBytes + 1),
+                contentType: "image/jpeg"
+            )
+        ) { error in
+            XCTAssertEqual(error as? SupabaseGoodsInventoryClientError, .imageTooLarge)
+        }
+    }
+
+    func testBuildsGoodsTagRPCRequests() throws {
+        let client = SupabaseGoodsInventoryClient(configuration: configuration)
+        let itemID = UUID(uuidString: "44444444-4444-4444-4444-444444444444")!
+        let tagID = UUID(uuidString: "55555555-5555-5555-5555-555555555555")!
+
+        let attach = try client.makeAttachGoodsTagRequest(inventoryID: itemID, rawLabel: " #会場限定 ")
+        let attachBody = try XCTUnwrap(attach.httpBody)
+        let attachJSON = try XCTUnwrap(JSONSerialization.jsonObject(with: attachBody) as? [String: Any])
+
+        XCTAssertEqual(attach.url?.absoluteString, "https://example.supabase.co/rest/v1/rpc/attach_inventory_tag")
+        XCTAssertEqual(attach.httpMethod, "POST")
+        XCTAssertEqual(attachJSON["p_inventory_id"] as? String, "44444444-4444-4444-4444-444444444444")
+        XCTAssertEqual(attachJSON["p_raw_label"] as? String, "会場限定")
+
+        let detach = try client.makeDetachGoodsTagRequest(inventoryID: itemID, tagID: tagID)
+        let detachBody = try XCTUnwrap(detach.httpBody)
+        let detachJSON = try XCTUnwrap(JSONSerialization.jsonObject(with: detachBody) as? [String: Any])
+
+        XCTAssertEqual(detach.url?.absoluteString, "https://example.supabase.co/rest/v1/rpc/detach_inventory_tag")
+        XCTAssertEqual(detach.httpMethod, "POST")
+        XCTAssertEqual(detachJSON["p_inventory_id"] as? String, "44444444-4444-4444-4444-444444444444")
+        XCTAssertEqual(detachJSON["p_tag_id"] as? String, "55555555-5555-5555-5555-555555555555")
+    }
+
+    func testAttachGoodsTagRequestRejectsBlankLabel() throws {
+        let client = SupabaseGoodsInventoryClient(configuration: configuration)
+        let itemID = UUID(uuidString: "44444444-4444-4444-4444-444444444444")!
+
+        XCTAssertThrowsError(
+            try client.makeAttachGoodsTagRequest(inventoryID: itemID, rawLabel: " # \n")
+        ) { error in
+            XCTAssertEqual(error as? SupabaseGoodsInventoryClientError, .emptyTag)
+        }
+    }
+
+    func testBuildsLoadGoodsTagsRequest() throws {
+        let client = SupabaseGoodsInventoryClient(configuration: configuration)
+        let request = try client.makeLoadGoodsTagsRequest(inventoryIDs: [
+            UUID(uuidString: "55555555-5555-5555-5555-555555555555")!,
+            UUID(uuidString: "44444444-4444-4444-4444-444444444444")!
+        ])
+        let url = try XCTUnwrap(request.url?.absoluteString)
+
+        XCTAssertEqual(request.httpMethod, "GET")
+        XCTAssertTrue(url.hasPrefix("https://example.supabase.co/rest/v1/goods_inventory_tags?select=inventory_id,tag:tags_master(id,label)"))
+        XCTAssertTrue(url.contains("inventory_id=in.(44444444-4444-4444-4444-444444444444,55555555-5555-5555-5555-555555555555)"))
+        XCTAssertTrue(url.contains("order=created_at.asc"))
+    }
+
     func testUpdateGoodsItemRequestCanClearCharacterID() throws {
         let client = SupabaseGoodsInventoryClient(configuration: configuration)
         let userID = UUID(uuidString: "11111111-1111-1111-1111-111111111111")!
@@ -214,6 +333,18 @@ final class SupabaseGoodsInventoryClientTests: XCTestCase {
         let json = try XCTUnwrap(JSONSerialization.jsonObject(with: body) as? [String: Any])
 
         XCTAssertTrue(json["character_id"] is NSNull)
+    }
+
+    func testUpdateGoodsItemRequestRejectsEmptyUpdate() throws {
+        let client = SupabaseGoodsInventoryClient(configuration: configuration)
+        let userID = UUID(uuidString: "11111111-1111-1111-1111-111111111111")!
+        let itemID = UUID(uuidString: "44444444-4444-4444-4444-444444444444")!
+
+        XCTAssertThrowsError(
+            try client.makeUpdateGoodsItemRequest(userID: userID, itemID: itemID, input: GoodsInventoryUpdateInput())
+        ) { error in
+            XCTAssertEqual(error as? SupabaseGoodsInventoryClientError, .emptyUpdate)
+        }
     }
 
     func testBuildsDeleteGoodsItemRequest() throws {

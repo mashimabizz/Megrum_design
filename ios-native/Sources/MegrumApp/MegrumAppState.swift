@@ -45,14 +45,53 @@ public struct AccountSetupInput: Equatable, Sendable {
 public struct AccountSetupOshiInput: Equatable, Sendable {
     public var groupID: UUID?
     public var characterID: UUID?
+    public var oshiRequestID: UUID?
+    public var characterRequestID: UUID?
     public var kind: OshiKind
     public var priority: Int
 
-    public init(groupID: UUID?, characterID: UUID?, kind: OshiKind, priority: Int = 1) {
+    public init(
+        groupID: UUID?,
+        characterID: UUID?,
+        kind: OshiKind,
+        priority: Int = 1,
+        oshiRequestID: UUID? = nil,
+        characterRequestID: UUID? = nil
+    ) {
         self.groupID = groupID
         self.characterID = characterID
+        self.oshiRequestID = oshiRequestID
+        self.characterRequestID = characterRequestID
         self.kind = kind
         self.priority = priority
+    }
+}
+
+public struct OwnProfileUpdateInput: Equatable, Sendable {
+    public var handle: String
+    public var displayName: String
+    public var gender: UserGender?
+    public var prefecture: String?
+    public var avatarURL: URL?
+    public var avatarUpload: GoodsPhotoUpload?
+    public var clearsAvatar: Bool
+
+    public init(
+        handle: String,
+        displayName: String,
+        gender: UserGender? = nil,
+        prefecture: String? = nil,
+        avatarURL: URL? = nil,
+        avatarUpload: GoodsPhotoUpload? = nil,
+        clearsAvatar: Bool = false
+    ) {
+        self.handle = handle
+        self.displayName = displayName
+        self.gender = gender
+        self.prefecture = prefecture
+        self.avatarURL = avatarURL
+        self.avatarUpload = avatarUpload
+        self.clearsAvatar = clearsAvatar
     }
 }
 
@@ -62,8 +101,14 @@ public enum MegrumRepositoryError: Error, Equatable, Sendable {
 
 public protocol MegrumRepository: Sendable {
     func loadInitialSnapshot() async throws -> MegrumAppSnapshot
+    func loadHomeCandidateSections() async throws -> HomeCandidateSections
+    func loadOshiGenres(limit: Int) async throws -> [OshiGenre]
     func loadOshiGroups(searchText: String?, limit: Int) async throws -> [OshiGroup]
     func loadOshiCharacters(groupID: UUID, limit: Int) async throws -> [OshiCharacter]
+    func loadUserOshiSelections() async throws -> [UserOshiSelection]
+    func saveUserOshiSelections(_ selections: [AccountSetupOshiInput]) async throws -> [UserOshiSelection]
+    func createOshiRequest(_ input: OshiRequestCreateInput) async throws -> UUID
+    func createCharacterRequest(_ input: CharacterRequestCreateInput) async throws -> UUID
     func loadGoodsTypes(limit: Int) async throws -> [GoodsType]
     func createGoodsEntry(_ input: GoodsEntryInput) async throws -> GoodsItem
     func updateGoodsEntry(itemID: UUID, kind: GoodsEntryKind, input: GoodsEntryUpdateInput) async throws -> GoodsItem
@@ -73,6 +118,12 @@ public protocol MegrumRepository: Sendable {
     func reportGoods(_ input: GoodsReportCreateInput) async throws -> GoodsReportTicket
     func loadIndividualListings() async throws -> [IndividualListing]
     func createIndividualListing(_ input: IndividualListingCreateInput) async throws -> IndividualListing
+    func updateIndividualListing(
+        listingID: UUID,
+        primaryOptionID: UUID?,
+        input: IndividualListingCreateInput,
+        status: IndividualListingStatus
+    ) async throws -> IndividualListing
     func loadPublicTradeGoods(userID: UUID, limit: Int) async throws -> [GoodsItem]
     func loadPublicIndividualListings(userID: UUID) async throws -> [IndividualListing]
     func loadPublicUserProfile(userID: UUID) async throws -> PublicUserProfile?
@@ -80,6 +131,7 @@ public protocol MegrumRepository: Sendable {
     func createProposal(_ input: ProposalCreateInput) async throws -> TradeProposal
     func agreeProposal(proposalID: UUID, acceptedExchangeMethod: ExchangeMethod?) async throws -> TradeProposal
     func rejectProposal(proposalID: UUID) async throws -> TradeProposal
+    func approveTradeCancel(proposalID: UUID) async throws -> (proposal: TradeProposal, message: TradeMessage)
     func addTradeEvidence(_ input: TradeEvidenceCreateInput) async throws -> TradeProposal
     func approveTradeEvidence(proposalID: UUID) async throws -> TradeProposal
     func submitTradeEvaluation(_ input: TradeEvaluationCreateInput) async throws -> UserEvaluation
@@ -88,10 +140,14 @@ public protocol MegrumRepository: Sendable {
     func sendMessage(_ input: TradeMessageCreateInput) async throws -> TradeMessage
     func sendPhotoMessage(_ input: TradePhotoMessageCreateInput) async throws -> TradeMessage
     func sendSystemMessage(proposalID: UUID, body: String) async throws -> TradeMessage
+    func sendLateNoticeMessage(proposalID: UUID, lateMinutes: Int, reason: String, note: String?) async throws -> TradeMessage
+    func sendCancelRequestMessage(proposalID: UUID, reason: String, note: String?) async throws -> TradeMessage
     func sendLocationMessage(proposalID: UUID, latitude: Double, longitude: Double, label: String, body: String?) async throws -> TradeMessage
     func sendArrivalStatusMessage(proposalID: UUID, status: TradeArrivalStatus, body: String?) async throws -> TradeMessage
     func loadSchedules(for proposal: TradeProposal, startAt: Date, endAt: Date) async throws -> [PersonalSchedule]
     func createSchedule(_ input: PersonalScheduleCreateInput) async throws -> PersonalSchedule
+    func loadHomeLocalModeSettings(now: Date) async throws -> HomeLocalActivitySettings?
+    func saveHomeLocalModeSettings(_ settings: HomeLocalActivitySettings, now: Date) async throws -> HomeLocalActivitySettings
     func loadGrooms(latitude: Double?, longitude: Double?, radiusMeters: Int) async throws -> [GroomPost]
     func loadGroomMapPosts(latitude: Double?, longitude: Double?, radiusMeters: Int) async throws -> [GroomPost]
     func createGroomPost(_ input: GroomPostCreateInput) async throws -> GroomPost
@@ -117,16 +173,41 @@ public protocol MegrumRepository: Sendable {
     func setPushNotificationsEnabled(_ enabled: Bool) async throws -> Bool
     func registerNativePushDeviceToken(_ token: String, appVersion: String?) async throws
     func revokeNativePushDeviceToken(_ token: String, revokedAt: Date) async throws
+    func updateOwnProfile(_ input: OwnProfileUpdateInput) async throws -> UserProfile
     func completeAccountSetup(_ input: AccountSetupInput) async throws -> UserProfile
 }
 
 public extension MegrumRepository {
+    func loadHomeCandidateSections() async throws -> HomeCandidateSections {
+        throw MegrumRepositoryError.unsupportedMutation
+    }
+
+    func loadOshiGenres(limit: Int) async throws -> [OshiGenre] {
+        []
+    }
+
     func loadOshiGroups(searchText: String?, limit: Int) async throws -> [OshiGroup] {
         []
     }
 
     func loadOshiCharacters(groupID: UUID, limit: Int) async throws -> [OshiCharacter] {
         []
+    }
+
+    func loadUserOshiSelections() async throws -> [UserOshiSelection] {
+        []
+    }
+
+    func saveUserOshiSelections(_ selections: [AccountSetupOshiInput]) async throws -> [UserOshiSelection] {
+        []
+    }
+
+    func createOshiRequest(_ input: OshiRequestCreateInput) async throws -> UUID {
+        throw MegrumRepositoryError.unsupportedMutation
+    }
+
+    func createCharacterRequest(_ input: CharacterRequestCreateInput) async throws -> UUID {
+        throw MegrumRepositoryError.unsupportedMutation
     }
 
     func loadGoodsTypes(limit: Int) async throws -> [GoodsType] {
@@ -165,6 +246,15 @@ public extension MegrumRepository {
         throw MegrumRepositoryError.unsupportedMutation
     }
 
+    func updateIndividualListing(
+        listingID: UUID,
+        primaryOptionID: UUID?,
+        input: IndividualListingCreateInput,
+        status: IndividualListingStatus
+    ) async throws -> IndividualListing {
+        throw MegrumRepositoryError.unsupportedMutation
+    }
+
     func loadPublicTradeGoods(userID: UUID, limit: Int) async throws -> [GoodsItem] {
         []
     }
@@ -190,6 +280,10 @@ public extension MegrumRepository {
     }
 
     func rejectProposal(proposalID: UUID) async throws -> TradeProposal {
+        throw MegrumRepositoryError.unsupportedMutation
+    }
+
+    func approveTradeCancel(proposalID: UUID) async throws -> (proposal: TradeProposal, message: TradeMessage) {
         throw MegrumRepositoryError.unsupportedMutation
     }
 
@@ -225,6 +319,14 @@ public extension MegrumRepository {
         throw MegrumRepositoryError.unsupportedMutation
     }
 
+    func sendLateNoticeMessage(proposalID: UUID, lateMinutes: Int, reason: String, note: String?) async throws -> TradeMessage {
+        throw MegrumRepositoryError.unsupportedMutation
+    }
+
+    func sendCancelRequestMessage(proposalID: UUID, reason: String, note: String?) async throws -> TradeMessage {
+        throw MegrumRepositoryError.unsupportedMutation
+    }
+
     func sendLocationMessage(proposalID: UUID, latitude: Double, longitude: Double, label: String, body: String?) async throws -> TradeMessage {
         throw MegrumRepositoryError.unsupportedMutation
     }
@@ -238,6 +340,14 @@ public extension MegrumRepository {
     }
 
     func createSchedule(_ input: PersonalScheduleCreateInput) async throws -> PersonalSchedule {
+        throw MegrumRepositoryError.unsupportedMutation
+    }
+
+    func loadHomeLocalModeSettings(now: Date) async throws -> HomeLocalActivitySettings? {
+        nil
+    }
+
+    func saveHomeLocalModeSettings(_ settings: HomeLocalActivitySettings, now: Date) async throws -> HomeLocalActivitySettings {
         throw MegrumRepositoryError.unsupportedMutation
     }
 
@@ -331,6 +441,10 @@ public extension MegrumRepository {
 
     func revokeNativePushDeviceToken(_ token: String, revokedAt: Date) async throws {}
 
+    func updateOwnProfile(_ input: OwnProfileUpdateInput) async throws -> UserProfile {
+        throw MegrumRepositoryError.unsupportedMutation
+    }
+
     func completeAccountSetup(_ input: AccountSetupInput) async throws -> UserProfile {
         throw MegrumRepositoryError.unsupportedMutation
     }
@@ -351,6 +465,13 @@ public struct PreviewMegrumRepository: MegrumRepository {
         )
     }
 
+    public func loadHomeCandidateSections() async throws -> HomeCandidateSections {
+        HomeCandidateSections(
+            matchedItems: NativePreviewData.inventory,
+            possibleItems: Array(NativePreviewData.inventory.reversed())
+        )
+    }
+
     public func completeAccountSetup(_ input: AccountSetupInput) async throws -> UserProfile {
         UserProfile(
             id: NativePreviewData.viewer.id,
@@ -362,6 +483,35 @@ public struct PreviewMegrumRepository: MegrumRepository {
         )
     }
 
+    public func updateOwnProfile(_ input: OwnProfileUpdateInput) async throws -> UserProfile {
+        let avatarURL: URL?
+        if input.avatarUpload != nil {
+            avatarURL = URL(string: "https://preview.megrum.jp/profile-photo.jpg")
+        } else if input.clearsAvatar {
+            avatarURL = nil
+        } else {
+            avatarURL = input.avatarURL ?? NativePreviewData.viewer.avatarURL
+        }
+
+        return UserProfile(
+            id: NativePreviewData.viewer.id,
+            handle: normalizedHandle(input.handle),
+            displayName: input.displayName,
+            avatarURL: avatarURL,
+            gender: input.gender,
+            prefecture: input.prefecture,
+            accountStatus: .active
+        )
+    }
+
+    private func normalizedHandle(_ handle: String) -> String {
+        var normalized = handle.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        while normalized.first == "@" {
+            normalized.removeFirst()
+        }
+        return normalized
+    }
+
     public func loadOshiGroups(searchText: String?, limit: Int) async throws -> [OshiGroup] {
         let groups = NativePreviewData.oshiGroups
         guard let searchText = searchText?.trimmingCharacters(in: .whitespacesAndNewlines), !searchText.isEmpty else {
@@ -370,8 +520,48 @@ public struct PreviewMegrumRepository: MegrumRepository {
         return Array(groups.filter { $0.name.localizedCaseInsensitiveContains(searchText) }.prefix(limit))
     }
 
+    public func loadOshiGenres(limit: Int) async throws -> [OshiGenre] {
+        Array(NativePreviewData.oshiGenres.prefix(limit))
+    }
+
     public func loadOshiCharacters(groupID: UUID, limit: Int) async throws -> [OshiCharacter] {
         Array(NativePreviewData.oshiCharacters.filter { $0.groupID == groupID }.prefix(limit))
+    }
+
+    public func loadUserOshiSelections() async throws -> [UserOshiSelection] {
+        [
+            UserOshiSelection(
+                id: UUID(uuidString: "00000000-0000-0000-0000-0000000000a1")!,
+                userID: NativePreviewData.viewerID,
+                groupID: NativePreviewData.groupID,
+                characterID: NativePreviewData.memberID,
+                kind: .specific,
+                priority: 1
+            )
+        ]
+    }
+
+    public func saveUserOshiSelections(_ selections: [AccountSetupOshiInput]) async throws -> [UserOshiSelection] {
+        selections.enumerated().map { offset, selection in
+            UserOshiSelection(
+                id: UUID(),
+                userID: NativePreviewData.viewerID,
+                groupID: selection.groupID,
+                characterID: selection.characterID,
+                kind: selection.kind,
+                priority: offset + 1,
+                oshiRequestID: selection.oshiRequestID,
+                characterRequestID: selection.characterRequestID
+            )
+        }
+    }
+
+    public func createOshiRequest(_ input: OshiRequestCreateInput) async throws -> UUID {
+        UUID()
+    }
+
+    public func createCharacterRequest(_ input: CharacterRequestCreateInput) async throws -> UUID {
+        UUID()
     }
 
     public func loadGoodsTypes(limit: Int) async throws -> [GoodsType] {
@@ -386,6 +576,10 @@ public struct PreviewMegrumRepository: MegrumRepository {
             memberID: input.memberID,
             goodsTypeID: input.goodsTypeID,
             title: input.title,
+            imageURL: input.photoUpload == nil ? nil : URL(string: "https://preview.megrum.jp/goods-photo.jpg"),
+            tags: input.tagNames.enumerated().map { index, name in
+                GoodsTag(id: UUID(uuidString: "00000000-0000-0000-0000-\(String(format: "%012d", index + 1))") ?? UUID(), name: name)
+            },
             quantity: input.quantity
         )
     }
@@ -398,6 +592,10 @@ public struct PreviewMegrumRepository: MegrumRepository {
             memberID: input.memberID,
             goodsTypeID: input.goodsTypeID,
             title: input.title,
+            imageURL: input.photoUpload == nil ? input.photoURLs?.compactMap(URL.init(string:)).first : URL(string: "https://preview.megrum.jp/goods-photo.jpg"),
+            tags: input.tagNames?.enumerated().map { index, name in
+                GoodsTag(id: UUID(uuidString: "00000000-0000-0000-0000-\(String(format: "%012d", index + 1))") ?? UUID(), name: name)
+            } ?? [],
             quantity: input.quantity
         )
     }
@@ -454,6 +652,33 @@ public struct PreviewMegrumRepository: MegrumRepository {
             status: .active,
             note: input.note,
             options: [option]
+        )
+    }
+
+    public func updateIndividualListing(
+        listingID: UUID,
+        primaryOptionID: UUID?,
+        input: IndividualListingCreateInput,
+        status: IndividualListingStatus
+    ) async throws -> IndividualListing {
+        let option = IndividualListingWishOption(
+            id: primaryOptionID ?? UUID(),
+            listingID: listingID,
+            position: 1,
+            wishes: input.wishItems,
+            logic: input.wishLogic,
+            exchangeType: input.exchangeType,
+            updatedAt: Date()
+        )
+        return IndividualListing(
+            id: listingID,
+            ownerID: NativePreviewData.viewerID,
+            haves: input.haveItems,
+            haveLogic: input.haveLogic,
+            status: status,
+            note: input.note,
+            options: [option],
+            updatedAt: Date()
         )
     }
 
@@ -573,6 +798,50 @@ public struct PreviewMegrumRepository: MegrumRepository {
             completedAt: proposal.completedAt,
             createdAt: proposal.createdAt
         )
+    }
+
+    public func approveTradeCancel(proposalID: UUID) async throws -> (proposal: TradeProposal, message: TradeMessage) {
+        let proposal = NativePreviewData.proposals.first { $0.id == proposalID }
+            ?? TradeProposal(
+                id: proposalID,
+                senderID: NativePreviewData.partnerID,
+                receiverID: NativePreviewData.viewerID,
+                status: .agreed,
+                exchangeMethod: .hand,
+                senderGoodsIDs: [],
+                receiverGoodsIDs: []
+            )
+        let cancelled = TradeProposal(
+            id: proposal.id,
+            senderID: proposal.senderID,
+            receiverID: proposal.receiverID,
+            status: .cancelled,
+            exchangeMethod: proposal.exchangeMethod,
+            senderGoodsIDs: proposal.senderGoodsIDs,
+            receiverGoodsIDs: proposal.receiverGoodsIDs,
+            conditionTags: proposal.conditionTags,
+            agreedBySender: proposal.agreedBySender,
+            agreedByReceiver: proposal.agreedByReceiver,
+            evidencePhotoURL: proposal.evidencePhotoURL,
+            evidenceTakenAt: proposal.evidenceTakenAt,
+            evidenceTakenBy: proposal.evidenceTakenBy,
+            approvedBySender: proposal.approvedBySender,
+            approvedByReceiver: proposal.approvedByReceiver,
+            completedAt: proposal.completedAt,
+            createdAt: proposal.createdAt
+        )
+        let message = TradeMessage(
+            id: UUID(),
+            proposalID: proposalID,
+            senderID: NativePreviewData.viewerID,
+            messageType: .system,
+            body: "キャンセル申請に同意しました",
+            meta: [
+                "action": "cancel_approved",
+                "approved_by": NativePreviewData.viewerID.uuidString.lowercased()
+            ]
+        )
+        return (cancelled, message)
     }
 
     public func addTradeEvidence(_ input: TradeEvidenceCreateInput) async throws -> TradeProposal {
@@ -698,6 +967,66 @@ public struct PreviewMegrumRepository: MegrumRepository {
         )
     }
 
+    public func sendLateNoticeMessage(
+        proposalID: UUID,
+        lateMinutes: Int,
+        reason: String,
+        note: String?
+    ) async throws -> TradeMessage {
+        let normalizedReason = reason.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !normalizedReason.isEmpty else {
+            throw MegrumRepositoryError.unsupportedMutation
+        }
+        let normalizedNote = note?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfBlank
+        let body = "\(Self.lateMinutesLabel(lateMinutes))遅れる旨が通知されました\n理由：\(normalizedReason)\(normalizedNote.map { "\n\($0)" } ?? "")"
+        var meta = [
+            "action": "late_notice",
+            "notified_by": NativePreviewData.viewerID.uuidString.lowercased(),
+            "late_minutes": "\(lateMinutes)",
+            "reason": normalizedReason
+        ]
+        if let normalizedNote {
+            meta["note"] = normalizedNote
+        }
+        return TradeMessage(
+            id: UUID(),
+            proposalID: proposalID,
+            senderID: NativePreviewData.viewerID,
+            messageType: .system,
+            body: body,
+            meta: meta
+        )
+    }
+
+    public func sendCancelRequestMessage(
+        proposalID: UUID,
+        reason: String,
+        note: String?
+    ) async throws -> TradeMessage {
+        let normalizedReason = reason.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !normalizedReason.isEmpty else {
+            throw MegrumRepositoryError.unsupportedMutation
+        }
+        let normalizedNote = note?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfBlank
+        let body = "取引キャンセルが申請されました\n理由：\(normalizedReason)\(normalizedNote.map { "\n\($0)" } ?? "")"
+        var meta = [
+            "action": "cancel_requested",
+            "requested_by": NativePreviewData.viewerID.uuidString.lowercased(),
+            "reason": normalizedReason
+        ]
+        if let normalizedNote {
+            meta["note"] = normalizedNote
+        }
+        return TradeMessage(
+            id: UUID(),
+            proposalID: proposalID,
+            senderID: NativePreviewData.viewerID,
+            messageType: .system,
+            body: body,
+            meta: meta
+        )
+    }
+
     public func sendLocationMessage(proposalID: UUID, latitude: Double, longitude: Double, label: String, body: String?) async throws -> TradeMessage {
         TradeMessage(
             id: UUID(),
@@ -720,6 +1049,17 @@ public struct PreviewMegrumRepository: MegrumRepository {
             body: body?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfBlank ?? status.defaultBody,
             meta: ["status": status.rawValue]
         )
+    }
+
+    private static func lateMinutesLabel(_ minutes: Int) -> String {
+        switch minutes {
+        case 60:
+            "1時間"
+        case 90:
+            "1時間以上"
+        default:
+            "\(minutes)分"
+        }
     }
 
     public func loadSchedules(for proposal: TradeProposal, startAt: Date, endAt: Date) async throws -> [PersonalSchedule] {
@@ -746,6 +1086,21 @@ public struct PreviewMegrumRepository: MegrumRepository {
             allDay: input.allDay,
             note: input.normalizedNote
         )
+    }
+
+    public func loadHomeLocalModeSettings(now: Date) async throws -> HomeLocalActivitySettings? {
+        nil
+    }
+
+    public func saveHomeLocalModeSettings(
+        _ settings: HomeLocalActivitySettings,
+        now: Date
+    ) async throws -> HomeLocalActivitySettings {
+        var normalized = settings.normalizedForPersistence(now: now)
+        if normalized.isEnabled, normalized.activityWindowID == nil {
+            normalized.activityWindowID = UUID()
+        }
+        return normalized
     }
 
     public func loadGrooms(latitude: Double?, longitude: Double?, radiusMeters: Int) async throws -> [GroomPost] {
@@ -923,6 +1278,8 @@ public final class MegrumAppState: ObservableObject {
     @Published public private(set) var viewer: UserProfile?
     @Published public private(set) var inventory: [GoodsItem] = []
     @Published public private(set) var wishes: [WishItem] = []
+    @Published public private(set) var homeMatchedItems: [GoodsItem] = []
+    @Published public private(set) var homePossibleItems: [GoodsItem] = []
     @Published public private(set) var listings: [IndividualListing] = []
     @Published public private(set) var proposals: [TradeProposal] = []
     @Published public private(set) var messagesByProposalID: [UUID: [TradeMessage]] = [:]
@@ -934,8 +1291,10 @@ public final class MegrumAppState: ObservableObject {
     @Published public private(set) var groomMapPosts: [GroomPost] = []
     @Published public private(set) var likedGroomIDs: Set<UUID> = []
     @Published public private(set) var threads: [BoardThread] = []
+    @Published public private(set) var oshiGenres: [OshiGenre] = []
     @Published public private(set) var oshiGroups: [OshiGroup] = []
     @Published public private(set) var oshiCharacters: [OshiCharacter] = []
+    @Published public private(set) var userOshiSelections: [UserOshiSelection] = []
     @Published public private(set) var goodsTypes: [GoodsType] = []
     @Published public private(set) var searchResults: [SearchResultItem] = []
     @Published public private(set) var publicProfilesByUserID: [UUID: PublicUserProfile] = [:]
@@ -949,6 +1308,7 @@ public final class MegrumAppState: ObservableObject {
     @Published public private(set) var isLoading = false
     @Published public private(set) var isLoadingOshiGroups = false
     @Published public private(set) var isLoadingOshiCharacters = false
+    @Published public private(set) var isLoadingUserOshiSelections = false
     @Published public private(set) var isLoadingGoodsTypes = false
     @Published public private(set) var isSearchingGoods = false
     @Published public private(set) var loadingPublicProfileUserID: UUID?
@@ -968,6 +1328,7 @@ public final class MegrumAppState: ObservableObject {
     @Published public private(set) var isCreatingGoodsEntry = false
     @Published public private(set) var isLoadingIndividualListings = false
     @Published public private(set) var isCreatingIndividualListing = false
+    @Published public private(set) var updatingIndividualListingID: UUID?
     @Published public private(set) var mutatingGoodsItemID: UUID?
     @Published public private(set) var reportingGoodsItemID: UUID?
     @Published public private(set) var isCreatingProposal = false
@@ -990,14 +1351,24 @@ public final class MegrumAppState: ObservableObject {
     @Published public private(set) var isMarkingNotificationsRead = false
     @Published public private(set) var isSavingPushNotificationSetting = false
     @Published public private(set) var isSavingAccountSetup = false
+    @Published public private(set) var isSavingOwnProfile = false
+    @Published public private(set) var homeLocalModeSettings: HomeLocalActivitySettings?
+    @Published public private(set) var isLoadingHomeLocalModeSettings = false
+    @Published public private(set) var isSavingHomeLocalModeSettings = false
     @Published public private(set) var errorMessage: String?
 
     private var repository: any MegrumRepository
     private var activeSearchRequestID: UUID?
     private var registeredNativePushDeviceToken: String?
+    private static weak var activeInstanceStorage: MegrumAppState?
+
+    static var activeInstance: MegrumAppState? {
+        activeInstanceStorage
+    }
 
     public init(repository: any MegrumRepository = PreviewMegrumRepository()) {
         self.repository = repository
+        Self.activeInstanceStorage = self
     }
 
     public var unreadNotificationCount: Int {
@@ -1039,7 +1410,9 @@ public final class MegrumAppState: ObservableObject {
         errorMessage = nil
 
         do {
-            apply(try await repository.loadInitialSnapshot())
+            let snapshot = try await repository.loadInitialSnapshot()
+            apply(snapshot)
+            await loadHomeCandidates(fallbackInventory: snapshot.inventory)
         } catch {
             errorMessage = "データを読み込めませんでした"
         }
@@ -1049,6 +1422,21 @@ public final class MegrumAppState: ObservableObject {
 
     public func refresh() async {
         await loadInitialData()
+    }
+
+    private func loadHomeCandidates(fallbackInventory: [GoodsItem]) async {
+        do {
+            let sections = try await repository.loadHomeCandidateSections()
+            applyHomeCandidateSections(sections, fallbackInventory: fallbackInventory)
+        } catch {
+            applyHomeCandidateSections(
+                HomeCandidateSections(
+                    matchedItems: fallbackInventory,
+                    possibleItems: Array(fallbackInventory.reversed())
+                ),
+                fallbackInventory: fallbackInventory
+            )
+        }
     }
 
     public func loadMeguriFeed(
@@ -1455,6 +1843,25 @@ public final class MegrumAppState: ObservableObject {
         value?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfBlank
     }
 
+    private func normalizedTagNames(_ tagNames: [String]) -> [String] {
+        tagNames.reduce(into: []) { result, raw in
+            guard result.count < 5 else {
+                return
+            }
+            let normalized = raw
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+                .trimmingCharacters(in: CharacterSet(charactersIn: "#＃"))
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !normalized.isEmpty else {
+                return
+            }
+            let clipped = String(normalized.prefix(50))
+            if !result.contains(where: { $0.caseInsensitiveCompare(clipped) == .orderedSame }) {
+                result.append(clipped)
+            }
+        }
+    }
+
     public func replaceRepository(_ repository: any MegrumRepository) async {
         self.repository = repository
         await loadInitialData()
@@ -1468,7 +1875,10 @@ public final class MegrumAppState: ObservableObject {
         isLoadingOshiGroups = true
         errorMessage = nil
         do {
-            oshiGroups = try await repository.loadOshiGroups(searchText: searchText, limit: 30)
+            async let groups = repository.loadOshiGroups(searchText: searchText, limit: 500)
+            async let genres = repository.loadOshiGenres(limit: 100)
+            oshiGroups = try await groups
+            oshiGenres = try await genres
         } catch {
             errorMessage = "推しグループを読み込めませんでした"
         }
@@ -1487,11 +1897,57 @@ public final class MegrumAppState: ObservableObject {
         isLoadingOshiCharacters = true
         errorMessage = nil
         do {
-            oshiCharacters = try await repository.loadOshiCharacters(groupID: group.id, limit: 80)
+            oshiCharacters = try await repository.loadOshiCharacters(groupID: group.id, limit: 1_000)
         } catch {
             errorMessage = "推しメンバーを読み込めませんでした"
         }
         isLoadingOshiCharacters = false
+    }
+
+    public func loadUserOshiSelections() async {
+        guard !isLoadingUserOshiSelections else {
+            return
+        }
+
+        isLoadingUserOshiSelections = true
+        errorMessage = nil
+        do {
+            userOshiSelections = try await repository.loadUserOshiSelections()
+        } catch {
+            errorMessage = "推し設定を読み込めませんでした"
+        }
+        isLoadingUserOshiSelections = false
+    }
+
+    public func saveOshiSelections(_ oshiSelections: [AccountSetupOshiInput]) async -> Bool {
+        do {
+            userOshiSelections = try await repository.saveUserOshiSelections(oshiSelections)
+            errorMessage = nil
+            return true
+        } catch {
+            errorMessage = "推し設定を保存できませんでした"
+            return false
+        }
+    }
+
+    public func createOshiRequest(_ input: OshiRequestCreateInput) async -> UUID? {
+        do {
+            errorMessage = nil
+            return try await repository.createOshiRequest(input)
+        } catch {
+            errorMessage = "推し追加リクエストを送信できませんでした"
+            return nil
+        }
+    }
+
+    public func createCharacterRequest(_ input: CharacterRequestCreateInput) async -> UUID? {
+        do {
+            errorMessage = nil
+            return try await repository.createCharacterRequest(input)
+        } catch {
+            errorMessage = "メンバー追加リクエストを送信できませんでした"
+            return nil
+        }
     }
 
     public func loadGoodsTypes() async {
@@ -1526,7 +1982,9 @@ public final class MegrumAppState: ObservableObject {
             memberID: input.memberID,
             goodsTypeID: input.goodsTypeID,
             quantity: max(1, min(input.quantity, 999)),
-            status: input.status
+            status: input.status,
+            tagNames: normalizedTagNames(input.tagNames),
+            photoUpload: input.photoUpload
         )
 
         isCreatingGoodsEntry = true
@@ -1562,7 +2020,9 @@ public final class MegrumAppState: ObservableObject {
             goodsTypeID: input.goodsTypeID,
             quantity: max(1, min(input.quantity, 999)),
             status: input.status,
-            photoURLs: input.photoURLs
+            photoURLs: input.photoURLs,
+            tagNames: input.tagNames.map(normalizedTagNames),
+            photoUpload: input.photoUpload
         )
 
         mutatingGoodsItemID = itemID
@@ -1741,6 +2201,49 @@ public final class MegrumAppState: ObservableObject {
         }
     }
 
+    public func updateIndividualListing(
+        listingID: UUID,
+        primaryOptionID: UUID?,
+        input: IndividualListingCreateInput,
+        status: IndividualListingStatus
+    ) async -> IndividualListing? {
+        guard updatingIndividualListingID == nil else {
+            return nil
+        }
+        guard !input.haveItems.isEmpty, !input.wishItems.isEmpty else {
+            errorMessage = "譲るものと求めるものを選択してください"
+            return nil
+        }
+
+        let normalizedInput = IndividualListingCreateInput(
+            haveItems: input.haveItems.map { ListingItemQuantity(itemID: $0.itemID, quantity: max(1, min($0.quantity, 99))) },
+            haveLogic: input.haveLogic,
+            wishItems: input.wishItems.map { ListingItemQuantity(itemID: $0.itemID, quantity: max(1, min($0.quantity, 99))) },
+            wishLogic: input.wishLogic,
+            exchangeType: input.exchangeType,
+            note: input.note?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfBlank
+        )
+
+        updatingIndividualListingID = listingID
+        errorMessage = nil
+        do {
+            let updated = try await repository.updateIndividualListing(
+                listingID: listingID,
+                primaryOptionID: primaryOptionID,
+                input: normalizedInput,
+                status: status
+            )
+            listings.removeAll { $0.id == updated.id }
+            listings.insert(updated, at: 0)
+            updatingIndividualListingID = nil
+            return updated
+        } catch {
+            errorMessage = "個別募集を更新できませんでした"
+            updatingIndividualListingID = nil
+            return nil
+        }
+    }
+
     public func loadPublicUserProfile(userID: UUID) async {
         guard loadingPublicProfileUserID != userID else {
             return
@@ -1849,6 +2352,26 @@ public final class MegrumAppState: ObservableObject {
             return true
         } catch {
             errorMessage = "打診を断れませんでした"
+            respondingProposalID = nil
+            return false
+        }
+    }
+
+    public func approveTradeCancel(proposalID: UUID) async -> Bool {
+        guard respondingProposalID != proposalID else {
+            return false
+        }
+
+        respondingProposalID = proposalID
+        errorMessage = nil
+        do {
+            let result = try await repository.approveTradeCancel(proposalID: proposalID)
+            replaceProposal(result.proposal)
+            messagesByProposalID[proposalID, default: []].append(result.message)
+            respondingProposalID = nil
+            return true
+        } catch {
+            errorMessage = "キャンセル申請に同意できませんでした"
             respondingProposalID = nil
             return false
         }
@@ -2060,6 +2583,64 @@ public final class MegrumAppState: ObservableObject {
         }
     }
 
+    public func sendLateNoticeMessage(
+        proposalID: UUID,
+        lateMinutes: Int,
+        reason: String,
+        note: String? = nil
+    ) async -> Bool {
+        let normalizedReason = reason.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !normalizedReason.isEmpty, sendingMessageProposalID != proposalID else {
+            return false
+        }
+
+        sendingMessageProposalID = proposalID
+        errorMessage = nil
+        do {
+            let message = try await repository.sendLateNoticeMessage(
+                proposalID: proposalID,
+                lateMinutes: lateMinutes,
+                reason: normalizedReason,
+                note: note
+            )
+            messagesByProposalID[proposalID, default: []].append(message)
+            sendingMessageProposalID = nil
+            return true
+        } catch {
+            errorMessage = "遅刻連絡を送信できませんでした"
+            sendingMessageProposalID = nil
+            return false
+        }
+    }
+
+    public func sendCancelRequestMessage(
+        proposalID: UUID,
+        reason: String,
+        note: String? = nil
+    ) async -> Bool {
+        let normalizedReason = reason.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !normalizedReason.isEmpty, sendingMessageProposalID != proposalID else {
+            return false
+        }
+
+        sendingMessageProposalID = proposalID
+        errorMessage = nil
+        do {
+            let message = try await repository.sendCancelRequestMessage(
+                proposalID: proposalID,
+                reason: normalizedReason,
+                note: note
+            )
+            messagesByProposalID[proposalID, default: []].append(message)
+            sendingMessageProposalID = nil
+            return true
+        } catch {
+            errorMessage = "キャンセル申請を送信できませんでした"
+            sendingMessageProposalID = nil
+            return false
+        }
+    }
+
     public func sendLocationMessage(
         proposalID: UUID,
         latitude: Double,
@@ -2165,6 +2746,76 @@ public final class MegrumAppState: ObservableObject {
             errorMessage = "スケジュールを保存できませんでした"
             isCreatingSchedule = false
             return false
+        }
+    }
+
+    @discardableResult
+    public func loadHomeLocalModeSettings(
+        fallback: HomeLocalActivitySettings? = nil,
+        now: Date = .now
+    ) async -> HomeLocalActivitySettings? {
+        guard !isLoadingHomeLocalModeSettings else {
+            return homeLocalModeSettings ?? fallback
+        }
+
+        isLoadingHomeLocalModeSettings = true
+        errorMessage = nil
+        defer {
+            isLoadingHomeLocalModeSettings = false
+        }
+
+        do {
+            if let loaded = try await repository.loadHomeLocalModeSettings(now: now) {
+                let normalized = loaded.normalizedForPersistence(now: now)
+                homeLocalModeSettings = normalized
+                return normalized
+            }
+            if homeLocalModeSettings == nil {
+                homeLocalModeSettings = fallback?.normalizedForPersistence(now: now)
+            }
+            return homeLocalModeSettings ?? fallback
+        } catch {
+            if homeLocalModeSettings == nil {
+                homeLocalModeSettings = fallback?.normalizedForPersistence(now: now)
+            }
+            errorMessage = "現地交換モードを読み込めませんでした"
+            return homeLocalModeSettings ?? fallback
+        }
+    }
+
+    @discardableResult
+    public func saveHomeLocalModeSettings(
+        _ settings: HomeLocalActivitySettings,
+        now: Date = .now
+    ) async -> HomeLocalActivitySettings? {
+        guard !isSavingHomeLocalModeSettings else {
+            return nil
+        }
+
+        let previous = homeLocalModeSettings
+        let prepared = settings.normalizedForPersistence(
+            now: now,
+            fallbackActivityWindowID: previous?.activityWindowID
+        )
+        guard !prepared.isEnabled || !prepared.normalizedVenue.isEmpty else {
+            errorMessage = "場所を入力してください"
+            return nil
+        }
+
+        homeLocalModeSettings = prepared
+        isSavingHomeLocalModeSettings = true
+        errorMessage = nil
+        do {
+            let saved = try await repository.saveHomeLocalModeSettings(prepared, now: now)
+            let normalized = saved.normalizedForPersistence(now: now, fallbackActivityWindowID: prepared.activityWindowID)
+            homeLocalModeSettings = normalized
+            isSavingHomeLocalModeSettings = false
+            return normalized
+        } catch {
+            homeLocalModeSettings = previous
+            errorMessage = "現地交換モードを保存できませんでした"
+            isSavingHomeLocalModeSettings = false
+            return nil
         }
     }
 
@@ -2448,18 +3099,76 @@ public final class MegrumAppState: ObservableObject {
         errorMessage = nil
 
         do {
-            viewer = try await repository.completeAccountSetup(
+            let savedViewer = try await repository.completeAccountSetup(
                 AccountSetupInput(
                     displayName: trimmedDisplayName,
                     prefecture: prefecture?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfBlank,
                     oshiSelections: oshiSelections
                 )
             )
+            viewer = savedViewer
+            userOshiSelections = oshiSelections.map { selection in
+                UserOshiSelection(
+                    id: UUID(),
+                    userID: savedViewer.id,
+                    groupID: selection.groupID,
+                    characterID: selection.characterID,
+                    kind: selection.kind,
+                    priority: selection.priority,
+                    oshiRequestID: selection.oshiRequestID,
+                    characterRequestID: selection.characterRequestID
+                )
+            }
             isSavingAccountSetup = false
             return true
         } catch {
             errorMessage = "プロフィールを保存できませんでした"
             isSavingAccountSetup = false
+            return false
+        }
+    }
+
+    public func updateOwnProfile(_ input: OwnProfileUpdateInput) async -> Bool {
+        guard !isSavingOwnProfile else {
+            return false
+        }
+
+        let normalizedHandle = normalizedProfileHandle(input.handle)
+        let trimmedDisplayName = input.displayName.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let normalizedHandle else {
+            errorMessage = "ユーザーIDを入力してください"
+            return false
+        }
+        guard normalizedHandle.range(of: #"^[a-z0-9_]{3,20}$"#, options: .regularExpression) != nil else {
+            errorMessage = "ユーザーIDは半角英数字・_ の3〜20文字で入力してください"
+            return false
+        }
+        guard !trimmedDisplayName.isEmpty else {
+            errorMessage = "表示名を入力してください"
+            return false
+        }
+
+        isSavingOwnProfile = true
+        errorMessage = nil
+
+        do {
+            let savedViewer = try await repository.updateOwnProfile(
+                OwnProfileUpdateInput(
+                    handle: normalizedHandle,
+                    displayName: trimmedDisplayName,
+                    gender: input.gender,
+                    prefecture: input.prefecture?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfBlank,
+                    avatarURL: input.avatarURL,
+                    avatarUpload: input.avatarUpload,
+                    clearsAvatar: input.clearsAvatar
+                )
+            )
+            viewer = savedViewer
+            isSavingOwnProfile = false
+            return true
+        } catch {
+            errorMessage = "プロフィールを保存できませんでした"
+            isSavingOwnProfile = false
             return false
         }
     }
@@ -2476,9 +3185,21 @@ public final class MegrumAppState: ObservableObject {
         threads = snapshot.threads
     }
 
+    private func applyHomeCandidateSections(_ sections: HomeCandidateSections, fallbackInventory: [GoodsItem]) {
+        if sections.isEmpty {
+            homeMatchedItems = fallbackInventory
+            homePossibleItems = Array(fallbackInventory.reversed())
+        } else {
+            homeMatchedItems = sections.matchedItems
+            homePossibleItems = sections.possibleItems
+        }
+    }
+
     private func removeGoodsItemLocally(_ itemID: UUID) {
         inventory.removeAll { $0.id == itemID }
         wishes.removeAll { $0.id == itemID }
+        homeMatchedItems.removeAll { $0.id == itemID }
+        homePossibleItems.removeAll { $0.id == itemID }
         searchResults.removeAll { $0.item.id == itemID }
         listings = listings.compactMap { listing in
             var next = listing
@@ -2513,6 +3234,7 @@ public final class MegrumAppState: ObservableObject {
                 at: 0
             )
         }
+        upsertHomeCandidateIfPresent(item)
 
         searchResults = searchResults.map { result in
             guard result.item.id == item.id else {
@@ -2526,6 +3248,15 @@ public final class MegrumAppState: ObservableObject {
         }
     }
 
+    private func upsertHomeCandidateIfPresent(_ item: GoodsItem) {
+        if let index = homeMatchedItems.firstIndex(where: { $0.id == item.id }) {
+            homeMatchedItems[index] = item
+        }
+        if let index = homePossibleItems.firstIndex(where: { $0.id == item.id }) {
+            homePossibleItems[index] = item
+        }
+    }
+
     private func searchBucket(for item: GoodsItem) -> SearchMatchBucket {
         let matchesWish = wishes.contains { wish in
             let groupMatches = wish.groupID == nil || item.groupID == wish.groupID
@@ -2534,6 +3265,14 @@ public final class MegrumAppState: ObservableObject {
         }
         return matchesWish ? .possible : .none
     }
+}
+
+private func normalizedProfileHandle(_ handle: String) -> String? {
+    var normalized = handle.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+    while normalized.first == "@" {
+        normalized.removeFirst()
+    }
+    return normalized.nilIfBlank
 }
 
 private extension String {

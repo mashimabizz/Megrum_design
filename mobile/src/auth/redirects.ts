@@ -5,10 +5,21 @@ const MOBILE_AUTH_CALLBACK_URL =
   "https://megrum.jp/auth/callback";
 
 export function getMobileAuthEmailRedirectTo() {
+  return buildMobileAuthRedirectTo();
+}
+
+export function getMobileAuthOAuthRedirectTo(provider: "google") {
+  return buildMobileAuthRedirectTo({ provider });
+}
+
+function buildMobileAuthRedirectTo(extraParams?: Record<string, string>) {
   const separator = MOBILE_AUTH_CALLBACK_URL.includes("?") ? "&" : "?";
-  return `${MOBILE_AUTH_CALLBACK_URL}${separator}next=mobile&scheme=${encodeURIComponent(
-    getAppScheme(),
-  )}`;
+  const params = new URLSearchParams({
+    next: "mobile",
+    scheme: getAppScheme(),
+    ...extraParams,
+  });
+  return `${MOBILE_AUTH_CALLBACK_URL}${separator}${params.toString()}`;
 }
 
 function getAppScheme() {

@@ -1,5 +1,6 @@
 import MegrumCore
 import MegrumDesign
+import Foundation
 import PhotosUI
 import SwiftUI
 #if os(iOS)
@@ -20,16 +21,44 @@ struct TradesScreen: View {
         proposals.filter { selectedStage.contains($0.status) }
     }
 
+    private var goodsByID: [UUID: GoodsItem] {
+        var lookup: [UUID: GoodsItem] = [:]
+        let localWishGoods = appState.wishes.map {
+            GoodsItem(
+                id: $0.id,
+                ownerID: $0.ownerID,
+                kind: .wish,
+                status: .active,
+                groupID: $0.groupID,
+                memberID: $0.memberID,
+                goodsTypeID: $0.goodsTypeID,
+                title: $0.title,
+                imageURL: $0.imageURL,
+                tags: $0.tags,
+                quantity: $0.quantity
+            )
+        }
+        let allKnownGoods = appState.inventory
+            + appState.homeMatchedItems
+            + appState.homePossibleItems
+            + localWishGoods
+            + appState.publicTradeGoodsByUserID.values.flatMap { $0 }
+        for item in allKnownGoods {
+            lookup[item.id] = item
+        }
+        return lookup
+    }
+
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
-                ScreenTitle(title: "やりとり", subtitle: selectedStage.subtitle)
+                ScreenTitle(title: "やりとり", subtitle: selectedStageSubtitle)
 
                 if visibleProposals.isEmpty {
                     EmptyTradeStage(stage: selectedStage)
                 } else {
                     ForEach(visibleProposals) { proposal in
-                        TradeCard(proposal: proposal) {
+                        TradeCard(proposal: proposal, goodsByID: goodsByID) {
                             selectedProposal = proposal
                         }
                     }
@@ -45,7 +74,8 @@ struct TradesScreen: View {
             TradeStageBar(
                 selectedStage: $selectedStage,
                 pendingCount: proposals.filter { TradeStage.pending.contains($0.status) }.count,
-                inProgressCount: proposals.filter { TradeStage.inProgress.contains($0.status) }.count
+                inProgressCount: proposals.filter { TradeStage.inProgress.contains($0.status) }.count,
+                completedCount: proposals.filter { TradeStage.completed.contains($0.status) }.count
             )
             .padding(.horizontal, 20)
             .padding(.bottom, 10)
@@ -54,9 +84,9 @@ struct TradesScreen: View {
             DragGesture(minimumDistance: 32)
                 .onEnded { value in
                     if value.translation.width < -44 {
-                        selectedStage = .inProgress
+                        selectedStage = selectedStage.next
                     } else if value.translation.width > 44 {
-                        selectedStage = .pending
+                        selectedStage = selectedStage.previous
                     }
                 }
         )
@@ -66,10 +96,15 @@ struct TradesScreen: View {
             }
         }
     }
+
+    private var selectedStageSubtitle: String {
+        "\(selectedStage.subtitle) ・ \(visibleProposals.count)件"
+    }
 }
 
 private struct TradeCard: View {
     var proposal: TradeProposal
+    var goodsByID: [UUID: GoodsItem] = [:]
     var onOpen: () -> Void
 
     var body: some View {
@@ -91,13 +126,21 @@ private struct TradeCard: View {
                 }
 
                 HStack {
-                    TradePreviewColumn(title: "受け取る", symbol: "arrow.down.left")
+                    TradePreviewColumn(
+                        title: "受け取る",
+                        symbol: "arrow.down.left",
+                        items: previewItems(for: proposal.receiverGoodsIDs)
+                    )
                     Spacer()
                     Image(systemName: "arrow.left.arrow.right")
                         .font(.system(size: 26, weight: .bold))
                         .foregroundStyle(MegrumTheme.lavender)
                     Spacer()
-                    TradePreviewColumn(title: "私が出す", symbol: "arrow.up.right")
+                    TradePreviewColumn(
+                        title: "私が出す",
+                        symbol: "arrow.up.right",
+                        items: previewItems(for: proposal.senderGoodsIDs)
+                    )
                 }
 
                 if !proposal.conditionTags.isEmpty {
@@ -121,6 +164,9 @@ private struct TradeCard: View {
             .shadow(color: MegrumTheme.ink.opacity(0.06), radius: 16, y: 8)
         }
         .buttonStyle(.plain)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(accessibilityLabel)
+        .accessibilityHint("取引詳細を開きます")
     }
 
     private var statusText: String {
@@ -145,11 +191,30 @@ private struct TradeCard: View {
             "完了"
         }
     }
+
+    private func previewItems(for ids: [UUID]) -> [GoodsItem] {
+        ids.compactMap { goodsByID[$0] }
+    }
+
+    private var accessibilityLabel: String {
+        var parts = [
+            "取引",
+            statusText,
+            proposal.exchangeMethod.displayName,
+            "受け取る \(proposal.receiverGoodsIDs.count)件",
+            "私が出す \(proposal.senderGoodsIDs.count)件"
+        ]
+        if !proposal.conditionTags.isEmpty {
+            parts.append("条件 \(proposal.conditionTags.joined(separator: "、"))")
+        }
+        return parts.joined(separator: "、")
+    }
 }
 
-private enum TradeStage: String, CaseIterable, Identifiable {
+enum TradeStage: String, CaseIterable, Identifiable {
     case pending
     case inProgress
+    case completed
 
     var id: String { rawValue }
 
@@ -159,6 +224,8 @@ private enum TradeStage: String, CaseIterable, Identifiable {
             "打診中"
         case .inProgress:
             "進行中"
+        case .completed:
+            "完了済み"
         }
     }
 
@@ -168,6 +235,8 @@ private enum TradeStage: String, CaseIterable, Identifiable {
             "送信済み・調整中の打診"
         case .inProgress:
             "成立後の取引"
+        case .completed:
+            "完了・キャンセル・終了した取引"
         }
     }
 
@@ -176,7 +245,53 @@ private enum TradeStage: String, CaseIterable, Identifiable {
         case .pending:
             [.draft, .sent, .negotiating, .agreementOneSide].contains(status)
         case .inProgress:
-            [.agreed, .completed].contains(status)
+            status == .agreed
+        case .completed:
+            [.completed, .cancelled, .rejected, .expired].contains(status)
+        }
+    }
+
+    var next: TradeStage {
+        switch self {
+        case .pending:
+            .inProgress
+        case .inProgress:
+            .completed
+        case .completed:
+            .completed
+        }
+    }
+
+    var previous: TradeStage {
+        switch self {
+        case .pending:
+            .pending
+        case .inProgress:
+            .pending
+        case .completed:
+            .inProgress
+        }
+    }
+
+    var emptyTitle: String {
+        switch self {
+        case .pending:
+            "打診中の取引はありません"
+        case .inProgress:
+            "進行中の取引はありません"
+        case .completed:
+            "完了済みの取引はありません"
+        }
+    }
+
+    var emptyMessage: String {
+        switch self {
+        case .pending:
+            "送信済み・調整中の打診が届くとここに表示されます。"
+        case .inProgress:
+            "成立した取引はここから取引チャットを開けます。"
+        case .completed:
+            "完了後の証跡・評価や終了した打診をここから確認できます。"
         }
     }
 }
@@ -266,7 +381,7 @@ private enum TradeUnavailableChatAction: String, Identifiable {
     }
 }
 
-enum TradeAssistanceRequestKind: String, CaseIterable, Identifiable {
+enum TradeAssistanceRequestKind: String, CaseIterable, Identifiable, Sendable {
     case late
     case cancel
 
@@ -299,18 +414,547 @@ enum TradeAssistanceRequestKind: String, CaseIterable, Identifiable {
         }
     }
 
-    var placeholder: String {
+    var reasonPlaceholder: String {
         switch self {
         case .late:
-            "到着見込み時刻や理由を入力してください"
+            "遅れる理由"
         case .cancel:
-            "キャンセルしたい理由を入力してください"
+            "キャンセルが必要な理由"
+        }
+    }
+
+    var notePlaceholder: String {
+        switch self {
+        case .late:
+            "待ち合わせ場所への向かい方や到着見込みなど（任意）"
+        case .cancel:
+            "相手への補足や代替案など（任意）"
+        }
+    }
+
+    var acknowledgementText: String {
+        switch self {
+        case .late:
+            "遅刻連絡が相手の判断材料になることを確認しました。"
+        case .cancel:
+            "キャンセル申請後も相手の確認が必要なことを確認しました。"
+        }
+    }
+
+    var placeholder: String {
+        reasonPlaceholder
+    }
+
+    var menuAccessibilityLabel: String {
+        switch self {
+        case .late:
+            "遅刻申請を開く"
+        case .cancel:
+            "キャンセル申請を開く"
+        }
+    }
+
+    var reasonAccessibilityLabel: String {
+        switch self {
+        case .late:
+            "遅刻理由"
+        case .cancel:
+            "キャンセル理由"
+        }
+    }
+
+    var noteAccessibilityLabel: String {
+        switch self {
+        case .late:
+            "遅刻申請の補足"
+        case .cancel:
+            "キャンセル申請の補足"
+        }
+    }
+
+    var acknowledgementAccessibilityLabel: String {
+        switch self {
+        case .late:
+            "遅刻申請の確認事項"
+        case .cancel:
+            "キャンセル申請の確認事項"
         }
     }
 
     func systemMessageBody(from memo: String) -> String {
-        let trimmed = memo.trimmingCharacters(in: .whitespacesAndNewlines)
-        return trimmed.isEmpty ? messagePrefix : "\(messagePrefix)：\(trimmed)"
+        let draft = TradeAssistanceRequestDraft(
+            kind: self,
+            reason: memo,
+            acknowledgesImpact: true
+        )
+        return draft.systemIntent?.messageBody ?? messagePrefix
+    }
+}
+
+enum TradeLateDelayBucket: Int, CaseIterable, Identifiable, Equatable, Sendable {
+    case ten = 10
+    case twenty = 20
+    case thirty = 30
+    case sixty = 60
+    case ninety = 90
+
+    var id: Int { rawValue }
+
+    var title: String {
+        switch self {
+        case .ten, .twenty, .thirty:
+            "\(rawValue)分"
+        case .sixty:
+            "1時間"
+        case .ninety:
+            "1時間以上"
+        }
+    }
+
+    var accessibilityLabel: String {
+        "遅れる見込み \(title)"
+    }
+}
+
+struct TradeAssistanceSystemIntent: Equatable, Sendable {
+    enum Action: String, Equatable, Sendable {
+        case lateNotice = "late_notice"
+        case cancelRequested = "cancel_requested"
+    }
+
+    var kind: TradeAssistanceRequestKind
+    var action: Action
+    var delayBucket: TradeLateDelayBucket?
+    var reason: String
+    var note: String?
+    var acknowledgedImpact: Bool
+
+    var lateMinutes: Int? {
+        delayBucket?.rawValue
+    }
+
+    var metadata: [String: String] {
+        var values = [
+            "action": action.rawValue,
+            "reason": reason
+        ]
+        if let lateMinutes {
+            values["late_minutes"] = "\(lateMinutes)"
+        }
+        if let note {
+            values["note"] = note
+        }
+        return values
+    }
+
+    var messageBody: String {
+        let noteSuffix = note.map { "\n\($0)" } ?? ""
+        switch kind {
+        case .late:
+            let delay = delayBucket?.title ?? TradeLateDelayBucket.ten.title
+            return "\(delay)遅れる旨が通知されました\n理由：\(reason)\(noteSuffix)"
+        case .cancel:
+            return "取引キャンセルが申請されました\n理由：\(reason)\(noteSuffix)"
+        }
+    }
+}
+
+struct TradeArrivalStatusSendIntent: Equatable, Sendable {
+    var action: TradeArrivalQuickAction
+
+    var messageType: TradeMessageType {
+        .arrivalStatus
+    }
+
+    var status: TradeArrivalStatus {
+        action.tradeStatus
+    }
+
+    var body: String {
+        action.messageBody
+    }
+
+    var metadata: [String: String] {
+        ["status": status.rawValue]
+    }
+}
+
+struct TradeLocationShareIntent: Equatable, Sendable {
+    var coordinate: MegrumLocationCoordinate
+    var label: String = "現在地"
+    var body: String?
+
+    var messageType: TradeMessageType {
+        .location
+    }
+
+    var normalizedLabel: String {
+        label.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    var isSubmittable: Bool {
+        !normalizedLabel.isEmpty
+            && coordinate.latitude.isFinite
+            && coordinate.longitude.isFinite
+            && (-90...90).contains(coordinate.latitude)
+            && (-180...180).contains(coordinate.longitude)
+    }
+}
+
+struct TradeOutfitPhotoSendIntent: Equatable, Sendable {
+    var imageContentType: String
+    var body: String = "服装写真を共有しました"
+
+    var messageType: TradeMessageType {
+        .outfitPhoto
+    }
+}
+
+struct TradeChatInputAvailability: Equatable, Sendable {
+    var canSendMessages: Bool
+
+    init(status: ProposalStatus) {
+        self.canSendMessages = [.sent, .negotiating, .agreementOneSide, .agreed].contains(status)
+    }
+
+    init(proposal: TradeProposal) {
+        self.init(status: proposal.status)
+    }
+}
+
+struct TradeEvaluationPromptState: Equatable, Sendable {
+    var hasSubmittedEvaluation: Bool
+
+    init(
+        proposal: TradeProposal,
+        viewerID: UUID?,
+        messages: [TradeMessage],
+        localSubmission: Bool = false
+    ) {
+        guard proposal.status == .completed, let viewerID else {
+            self.hasSubmittedEvaluation = false
+            return
+        }
+        self.hasSubmittedEvaluation = localSubmission || messages.contains { message in
+            Self.isViewerEvaluationMessage(message, viewerID: viewerID)
+        }
+    }
+
+    private static func isViewerEvaluationMessage(_ message: TradeMessage, viewerID: UUID) -> Bool {
+        guard message.senderID == viewerID, message.messageType == .system else {
+            return false
+        }
+        if message.meta["action"] == "evaluation_submitted" || message.meta["event_type"] == "evaluation_submitted" {
+            return true
+        }
+        return message.body?.contains("取引評価を送信しました") == true
+    }
+}
+
+struct TradeAssistanceRequestDraft: Equatable, Sendable {
+    var kind: TradeAssistanceRequestKind
+    var delayBucket: TradeLateDelayBucket = .ten
+    var reason: String = ""
+    var note: String = ""
+    var acknowledgesImpact = false
+
+    var normalizedReason: String {
+        reason.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    var normalizedNote: String? {
+        note.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
+    }
+
+    var isSubmittable: Bool {
+        !normalizedReason.isEmpty && acknowledgesImpact
+    }
+
+    var systemIntent: TradeAssistanceSystemIntent? {
+        guard isSubmittable else {
+            return nil
+        }
+
+        switch kind {
+        case .late:
+            return TradeAssistanceSystemIntent(
+                kind: kind,
+                action: .lateNotice,
+                delayBucket: delayBucket,
+                reason: normalizedReason,
+                note: normalizedNote,
+                acknowledgedImpact: acknowledgesImpact
+            )
+        case .cancel:
+            return TradeAssistanceSystemIntent(
+                kind: kind,
+                action: .cancelRequested,
+                delayBucket: nil,
+                reason: normalizedReason,
+                note: normalizedNote,
+                acknowledgedImpact: acknowledgesImpact
+            )
+        }
+    }
+}
+
+struct TradeDisputeSummary: Identifiable, Equatable, Sendable {
+    var id: UUID
+    var sourceMessageID: UUID
+    var proposalID: UUID
+    var reporterID: UUID
+    var ticketNo: String
+    var status: DisputeDetailStatus
+    var category: TradeDisputeCategory?
+    var factMemo: String?
+    var body: String
+    var submittedAt: Date
+
+    init?(message: TradeMessage) {
+        guard message.messageType == .system else {
+            return nil
+        }
+
+        let body = message.body?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
+        let ticketNo = message.meta.firstNonBlank([
+            "ticket_no",
+            "ticketNo",
+            "dispute_ticket_no",
+            "disputeTicketNo"
+        ]) ?? body?.firstDisputeTicketNumber
+        let action = message.meta.firstNonBlank(["action", "event"])
+        let hasDisputeAction = action.map(Self.isDisputeAction) ?? false
+        let hasDisputeBody = body?.contains("申告") == true
+
+        guard ticketNo != nil || hasDisputeAction || hasDisputeBody else {
+            return nil
+        }
+
+        self.id = message.meta.uuidValue(for: ["dispute_id", "disputeID", "ticket_id", "ticketID"]) ?? message.id
+        self.sourceMessageID = message.id
+        self.proposalID = message.proposalID
+        self.reporterID = message.senderID
+        self.ticketNo = ticketNo ?? "受付済み"
+        self.status = Self.status(from: message.meta, action: action)
+        self.category = message.meta.firstNonBlank(["category", "dispute_category"]).flatMap(TradeDisputeCategory.init(rawValue:))
+        self.factMemo = message.meta.firstNonBlank(["fact_memo", "factMemo", "memo"])
+        self.body = body ?? "取引の申告を受け付けました。"
+        self.submittedAt = message.createdAt
+    }
+
+    var bannerTitle: String {
+        switch status {
+        case .resolved:
+            "申告の結果が届いています"
+        case .withdrawn:
+            "申告は取り下げ済みです"
+        case .replyReceived, .arbitration:
+            "申告を運営が確認中です"
+        default:
+            "申告を受け付けました"
+        }
+    }
+
+    var bannerBody: String {
+        if ticketNo == "受付済み" {
+            return status.displayName
+        }
+        return "\(ticketNo) · \(status.displayName)"
+    }
+
+    func detailModel(proposal: TradeProposal, viewerID: UUID?) -> DisputeDetailModel {
+        let respondentID = proposal.partnerID(for: reporterID)
+            ?? viewerID.flatMap { proposal.partnerID(for: $0) }
+            ?? proposal.receiverID
+        let viewerRole: DisputeDetailViewerRole?
+        if viewerID == reporterID {
+            viewerRole = .reporter
+        } else if viewerID == respondentID {
+            viewerRole = .respondent
+        } else {
+            viewerRole = nil
+        }
+
+        let reporterName = viewerRole == .reporter ? "あなた" : "相手"
+        let respondentName = viewerRole == .respondent ? "あなた" : "相手"
+        let safeStatus = status.interactionSafeFallback
+
+        return DisputeDetailModel(
+            id: id,
+            proposalID: proposalID,
+            reporterID: reporterID,
+            respondentID: respondentID,
+            viewerRole: viewerRole,
+            ticketNo: ticketNo,
+            status: safeStatus,
+            category: category,
+            reporterName: reporterName,
+            respondentName: respondentName,
+            factMemo: factMemo,
+            submittedAt: submittedAt,
+            messages: [
+                DisputeDetailMessageModel(
+                    id: sourceMessageID,
+                    senderID: nil,
+                    senderRole: .operator,
+                    senderName: "運営",
+                    body: body,
+                    createdAt: submittedAt
+                )
+            ]
+        )
+    }
+
+    private static func isDisputeAction(_ action: String) -> Bool {
+        action.hasPrefix("dispute_") || action == "dispute"
+    }
+
+    private static func status(from meta: [String: String], action: String?) -> DisputeDetailStatus {
+        if let rawStatus = meta.firstNonBlank(["dispute_status", "status"]) {
+            return DisputeDetailStatus(rawStatus: rawStatus)
+        }
+
+        switch action {
+        case "dispute_closed":
+            return .resolved
+        case "dispute_responded":
+            return .replyReceived
+        case "dispute_withdrawn":
+            return .withdrawn
+        case "dispute_received", "dispute_created", "dispute":
+            return .submitted
+        default:
+            return .submitted
+        }
+    }
+}
+
+struct TradeDayOfBannerPresentation: Equatable, Sendable {
+    var myArrivalText: String
+    var partnerArrivalText: String
+    var myOutfitText: String
+    var partnerOutfitText: String
+    var promptText: String
+
+    init?(proposal: TradeProposal, messages: [TradeMessage], viewerID: UUID?) {
+        guard [.agreed, .completed].contains(proposal.status) else {
+            return nil
+        }
+
+        let myArrival = viewerID.flatMap { Self.latestArrivalStatus(in: messages, senderID: $0) }
+        let partnerArrival = Self.latestPartnerArrivalStatus(in: messages, viewerID: viewerID)
+        let hasMyOutfit = viewerID.map { Self.hasOutfitPhoto(in: messages, senderID: $0) } ?? false
+        let hasPartnerOutfit = Self.hasPartnerOutfitPhoto(in: messages, viewerID: viewerID)
+
+        self.myArrivalText = Self.arrivalText(myArrival, fallback: "未共有")
+        self.partnerArrivalText = Self.arrivalText(partnerArrival, fallback: "未共有")
+        self.myOutfitText = hasMyOutfit ? "共有済み" : "未共有"
+        self.partnerOutfitText = hasPartnerOutfit ? "共有済み" : "未共有"
+        if myArrival == .arrived {
+            self.promptText = "必要に応じて現在地や服装写真を更新できます。"
+        } else if hasMyOutfit {
+            self.promptText = "到着したらステータスを共有すると合流しやすくなります。"
+        } else {
+            self.promptText = "現在地、到着、服装写真を当日の判断材料として残せます。"
+        }
+    }
+
+    private static func latestArrivalStatus(in messages: [TradeMessage], senderID: UUID) -> TradeArrivalStatus? {
+        messages
+            .filter { $0.senderID == senderID && $0.messageType == .arrivalStatus }
+            .sorted { $0.createdAt < $1.createdAt }
+            .last
+            .flatMap { $0.meta["status"].flatMap(TradeArrivalStatus.init(rawValue:)) }
+    }
+
+    private static func latestPartnerArrivalStatus(in messages: [TradeMessage], viewerID: UUID?) -> TradeArrivalStatus? {
+        messages
+            .filter { message in
+                message.messageType == .arrivalStatus && viewerID.map { message.senderID != $0 } != false
+            }
+            .sorted { $0.createdAt < $1.createdAt }
+            .last
+            .flatMap { $0.meta["status"].flatMap(TradeArrivalStatus.init(rawValue:)) }
+    }
+
+    private static func hasOutfitPhoto(in messages: [TradeMessage], senderID: UUID) -> Bool {
+        messages.contains { $0.senderID == senderID && $0.messageType == .outfitPhoto }
+    }
+
+    private static func hasPartnerOutfitPhoto(in messages: [TradeMessage], viewerID: UUID?) -> Bool {
+        messages.contains { message in
+            message.messageType == .outfitPhoto && viewerID.map { message.senderID != $0 } != false
+        }
+    }
+
+    private static func arrivalText(_ status: TradeArrivalStatus?, fallback: String) -> String {
+        switch status {
+        case .enroute:
+            "移動中"
+        case .arrived:
+            "到着済み"
+        case .left:
+            "離れました"
+        case .none:
+            fallback
+        }
+    }
+}
+
+private struct TradeDisputeDetailRoute: Identifiable, Equatable, Hashable {
+    var summary: TradeDisputeSummary
+    var model: DisputeDetailModel
+
+    var id: UUID { summary.id }
+
+    static func == (lhs: TradeDisputeDetailRoute, rhs: TradeDisputeDetailRoute) -> Bool {
+        lhs.id == rhs.id
+    }
+
+    func hash(into hasher: inout Hasher) {
+        hasher.combine(id)
+    }
+}
+
+private extension DisputeDetailStatus {
+    var interactionSafeFallback: DisputeDetailStatus {
+        switch self {
+        case .filed, .submitted, .replyWindow:
+            .arbitration
+        default:
+            self
+        }
+    }
+}
+
+private extension Dictionary where Key == String, Value == String {
+    func firstNonBlank(_ keys: [String]) -> String? {
+        for key in keys {
+            if let value = self[key]?.trimmingCharacters(in: .whitespacesAndNewlines), !value.isEmpty {
+                return value
+            }
+        }
+        return nil
+    }
+
+    func uuidValue(for keys: [String]) -> UUID? {
+        firstNonBlank(keys).flatMap(UUID.init(uuidString:))
+    }
+}
+
+private extension String {
+    var firstDisputeTicketNumber: String? {
+        let pattern = #"#?(DPT-[A-Z0-9-]+)"#
+        guard let regex = try? NSRegularExpression(pattern: pattern) else {
+            return nil
+        }
+        let range = NSRange(startIndex..<endIndex, in: self)
+        guard let match = regex.firstMatch(in: self, range: range),
+              let ticketRange = Range(match.range(at: 1), in: self)
+        else {
+            return nil
+        }
+        return String(self[ticketRange])
     }
 }
 
@@ -318,11 +962,13 @@ private struct TradeStageBar: View {
     @Binding var selectedStage: TradeStage
     var pendingCount: Int
     var inProgressCount: Int
+    var completedCount: Int
 
     var body: some View {
         HStack(spacing: 8) {
             stageButton(.pending, count: pendingCount)
             stageButton(.inProgress, count: inProgressCount)
+            stageButton(.completed, count: completedCount)
         }
         .padding(7)
         .background(.regularMaterial, in: Capsule())
@@ -346,6 +992,8 @@ private struct TradeStageBar: View {
             .background(selectedStage == stage ? AnyShapeStyle(.white.opacity(0.9)) : AnyShapeStyle(.clear), in: Capsule())
         }
         .buttonStyle(.plain)
+        .accessibilityLabel("\(stage.title) \(count)件")
+        .accessibilityHint("やりとり一覧を\(stage.title)に切り替えます")
     }
 }
 
@@ -353,16 +1001,30 @@ private struct EmptyTradeStage: View {
     var stage: TradeStage
 
     var body: some View {
-        Text(stage == .pending ? "打診中の取引はありません" : "進行中の取引はありません")
-            .font(.system(size: 15, weight: .heavy, design: .rounded))
-            .foregroundStyle(MegrumTheme.muted)
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 34)
-            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
-            .overlay {
-                RoundedRectangle(cornerRadius: 24, style: .continuous)
-                    .strokeBorder(.white.opacity(0.62), lineWidth: 1)
-            }
+        VStack(spacing: 8) {
+            Image(systemName: "tray")
+                .font(.system(size: 24, weight: .bold))
+                .foregroundStyle(MegrumTheme.lavender)
+
+            Text(stage.emptyTitle)
+                .font(.system(size: 15, weight: .heavy, design: .rounded))
+                .foregroundStyle(MegrumTheme.ink)
+
+            Text(stage.emptyMessage)
+                .font(.system(size: 13, weight: .bold, design: .rounded))
+                .foregroundStyle(MegrumTheme.muted)
+                .multilineTextAlignment(.center)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.horizontal, 18)
+        .padding(.vertical, 30)
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 24, style: .continuous)
+                .strokeBorder(.white.opacity(0.62), lineWidth: 1)
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(stage.emptyTitle)。\(stage.emptyMessage)")
     }
 }
 
@@ -374,6 +1036,7 @@ private struct TradeDetailScreen: View {
     @State private var selectedEvidencePhotoItem: PhotosPickerItem?
     @State private var selectedOutfitPhotoItem: PhotosPickerItem?
     @State private var isShowingEvidenceCamera = false
+    @State private var isShowingOutfitCamera = false
     @State private var isShowingEvaluationSheet = false
     @State private var isShowingDisputeSheet = false
     @State private var isShowingRejectConfirmation = false
@@ -383,6 +1046,8 @@ private struct TradeDetailScreen: View {
     @State private var assistanceRequestKind: TradeAssistanceRequestKind?
     @State private var selectedRemoteImage: RemoteImageSelection?
     @State private var isWaitingToShareLocation = false
+    @State private var disputeDetailRoute: TradeDisputeDetailRoute?
+    @State private var didSubmitEvaluation = false
     @StateObject private var locationState = MegrumLocationState()
 
     private var messages: [TradeMessage] {
@@ -393,98 +1058,132 @@ private struct TradeDetailScreen: View {
         appState.proposals.first { $0.id == proposal.id } ?? proposal
     }
 
+    private var goodsByID: [UUID: GoodsItem] {
+        var lookup: [UUID: GoodsItem] = [:]
+        let localWishGoods = appState.wishes.map {
+            GoodsItem(
+                id: $0.id,
+                ownerID: $0.ownerID,
+                kind: .wish,
+                status: .active,
+                groupID: $0.groupID,
+                memberID: $0.memberID,
+                goodsTypeID: $0.goodsTypeID,
+                title: $0.title,
+                imageURL: $0.imageURL,
+                tags: $0.tags,
+                quantity: $0.quantity
+            )
+        }
+        let allKnownGoods = appState.inventory
+            + appState.homeMatchedItems
+            + appState.homePossibleItems
+            + localWishGoods
+            + appState.publicTradeGoodsByUserID.values.flatMap { $0 }
+        for item in allKnownGoods {
+            lookup[item.id] = item
+        }
+        return lookup
+    }
+
+    private var latestDisputeSummary: TradeDisputeSummary? {
+        messages
+            .compactMap(TradeDisputeSummary.init(message:))
+            .max { $0.submittedAt < $1.submittedAt }
+    }
+
+    private var chatInputAvailability: TradeChatInputAvailability {
+        TradeChatInputAvailability(proposal: currentProposal)
+    }
+
+    private var evaluationPromptState: TradeEvaluationPromptState {
+        TradeEvaluationPromptState(
+            proposal: currentProposal,
+            viewerID: appState.viewer?.id,
+            messages: messages,
+            localSubmission: didSubmitEvaluation
+        )
+    }
+
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 18) {
-                ScreenTitle(title: "取引詳細", subtitle: currentProposal.exchangeMethod.displayName)
-                TradeCard(proposal: currentProposal) {}
-
-                VStack(alignment: .leading, spacing: 12) {
-                    detailRow(title: "ステータス", value: statusText)
-                    detailRow(title: "交換条件タグ", value: currentProposal.conditionTags.isEmpty ? "未設定" : currentProposal.conditionTags.joined(separator: " / "))
-                    detailRow(title: "私が出す", value: "\(currentProposal.senderGoodsIDs.count)件")
-                    detailRow(title: "受け取る", value: "\(currentProposal.receiverGoodsIDs.count)件")
-                }
-                .padding(18)
-                .background(.white.opacity(0.84), in: RoundedRectangle(cornerRadius: 24, style: .continuous))
-
-                if currentProposal.isProposalResponsePending {
-                    TradeProposalResponsePanel(
-                        proposal: currentProposal,
-                        viewerID: appState.viewer?.id,
-                        isResponding: appState.respondingProposalID == currentProposal.id,
-                        onAgree: { acceptedExchangeMethod in
-                            Task {
-                                await appState.agreeProposal(
-                                    proposalID: currentProposal.id,
-                                    acceptedExchangeMethod: acceptedExchangeMethod
-                                )
-                            }
-                        },
-                        onReject: {
-                            isShowingRejectConfirmation = true
-                        },
-                        onCounterProposal: {
-                            isShowingCounterProposalSheet = true
-                        }
-                    )
-                }
-
-                if currentProposal.status == .agreed || currentProposal.status == .completed {
-                    TradeEvidencePanel(
-                        proposal: currentProposal,
-                        viewerID: appState.viewer?.id,
-                        selectedPhotoItem: $selectedEvidencePhotoItem,
-                        isAddingEvidence: appState.addingEvidenceProposalID == currentProposal.id,
-                        isApproving: appState.approvingEvidenceProposalID == currentProposal.id,
-                        canUseCamera: canUseCamera,
-                        onOpenCamera: {
-                            isShowingEvidenceCamera = true
-                        },
-                        onOpenImage: { url in
-                            selectedRemoteImage = RemoteImageSelection(url: url)
-                        },
-                        onApprove: {
-                            Task {
-                                await appState.approveTradeEvidence(proposalID: currentProposal.id)
-                            }
-                        },
-                        onRate: {
-                            isShowingEvaluationSheet = true
-                        }
-                    )
-                }
-
-                VStack(alignment: .leading, spacing: 12) {
-                    HStack {
-                        Text("メッセージ")
-                            .font(.system(size: 20, weight: .heavy, design: .rounded))
-                            .foregroundStyle(MegrumTheme.ink)
-                        if appState.loadingMessagesProposalID == proposal.id {
-                            ProgressView()
-                                .controlSize(.small)
-                        }
-                    }
-
-                    ForEach(messages) { message in
-                        TradeMessageBubble(
-                            message: message,
-                            isMine: message.senderID == appState.viewer?.id,
-                            onOpenImage: { url in
-                                selectedRemoteImage = RemoteImageSelection(url: url)
-                            }
-                        )
-                    }
+        bodyBeforeDialogs
+        .confirmationDialog(
+            "この打診を断りますか？",
+            isPresented: $isShowingRejectConfirmation,
+            titleVisibility: .visible
+        ) {
+            Button("断る", role: .destructive) {
+                Task {
+                    await appState.rejectProposal(proposalID: currentProposal.id)
                 }
             }
-            .padding(.horizontal, 20)
-            .padding(.top, 18)
-            .padding(.bottom, 26)
+            Button("キャンセル", role: .cancel) {}
+        } message: {
+            Text("断った後は、この打診では取引を進められません。")
         }
+#if os(iOS)
+        .fullScreenCover(item: $selectedRemoteImage) { selection in
+            FullScreenRemoteImageView(url: selection.url)
+        }
+#else
+        .sheet(item: $selectedRemoteImage) { selection in
+            FullScreenRemoteImageView(url: selection.url)
+        }
+#endif
+#if os(iOS)
+        .sheet(isPresented: $isShowingEvidenceCamera) {
+            NativeCameraCaptureView { imageData in
+                Task {
+                    await addEvidence(data: imageData, imageContentType: "image/jpeg")
+                }
+            }
+            .ignoresSafeArea()
+        }
+        .sheet(isPresented: $isShowingOutfitCamera) {
+            NativeCameraCaptureView { imageData in
+                Task {
+                    await addChatPhoto(
+                        data: imageData,
+                        messageType: .outfitPhoto,
+                        imageContentType: "image/jpeg"
+                    )
+                }
+            }
+            .ignoresSafeArea()
+        }
+#endif
+        .toolbar {
+            ToolbarItem(placement: .cancellationAction) {
+                Button("閉じる") {
+                    dismiss()
+                }
+            }
+            ToolbarItem(placement: .primaryAction) {
+                if let latestDisputeSummary {
+                    Button {
+                        openDisputeDetail(latestDisputeSummary)
+                    } label: {
+                        Label("申告詳細", systemImage: "exclamationmark.bubble")
+                    }
+                } else {
+                    Button {
+                        isShowingDisputeSheet = true
+                    } label: {
+                        Label("通報", systemImage: "exclamationmark.bubble")
+                    }
+                    .disabled(appState.filingDisputeProposalID == currentProposal.id)
+                }
+            }
+        }
+    }
+
+    private var bodyBeforeDialogs: some View {
+        AnyView(scrollContent)
         .scrollDismissesKeyboard(.interactively)
         .background(MegrumTheme.canvas.ignoresSafeArea())
         .safeAreaInset(edge: .bottom) {
-            if appState.viewer.map({ currentProposal.isParticipant($0.id) }) == true {
+            if appState.viewer.map({ currentProposal.isParticipant($0.id) }) == true,
+               chatInputAvailability.canSendMessages {
                 TradeMessageInput(
                     text: $draftMessage,
                     selectedOutfitPhotoItem: $selectedOutfitPhotoItem,
@@ -498,6 +1197,10 @@ private struct TradeDetailScreen: View {
                     },
                     onOpenLocationPlaceholder: {
                         shareCurrentLocation()
+                    },
+                    canUseCamera: canUseCamera,
+                    onOpenOutfitCamera: {
+                        isShowingOutfitCamera = true
                     },
                     onCounterProposal: {
                         isShowingCounterProposalSheet = true
@@ -556,6 +1259,8 @@ private struct TradeDetailScreen: View {
                         comment: comment
                     )
                     if sent {
+                        didSubmitEvaluation = true
+                        await appState.loadMessages(proposalID: currentProposal.id)
                         isShowingEvaluationSheet = false
                     }
                 }
@@ -610,11 +1315,23 @@ private struct TradeDetailScreen: View {
                 TradeAssistanceRequestSheet(
                     kind: kind,
                     isSubmitting: appState.sendingMessageProposalID == currentProposal.id
-                ) { memo in
-                    let sent = await appState.sendSystemMessage(
-                        proposalID: currentProposal.id,
-                        body: kind.systemMessageBody(from: memo)
-                    )
+                ) { intent in
+                    let sent: Bool
+                    switch intent.action {
+                    case .lateNotice:
+                        sent = await appState.sendLateNoticeMessage(
+                            proposalID: currentProposal.id,
+                            lateMinutes: intent.lateMinutes ?? TradeLateDelayBucket.ten.rawValue,
+                            reason: intent.reason,
+                            note: intent.note
+                        )
+                    case .cancelRequested:
+                        sent = await appState.sendCancelRequestMessage(
+                            proposalID: currentProposal.id,
+                            reason: intent.reason,
+                            note: intent.note
+                        )
+                    }
                     if sent {
                         assistanceRequestKind = nil
                     }
@@ -622,6 +1339,9 @@ private struct TradeDetailScreen: View {
             }
             .presentationDetents([.medium])
             .presentationDragIndicator(.visible)
+        }
+        .navigationDestination(item: $disputeDetailRoute) { route in
+            DisputeDetailScreen(model: route.model)
         }
         .onChange(of: locationState.coordinate) { _, coordinate in
             guard isWaitingToShareLocation, let coordinate else {
@@ -637,54 +1357,169 @@ private struct TradeDetailScreen: View {
             isWaitingToShareLocation = false
             unavailableChatAction = .location
         }
-        .confirmationDialog(
-            "この打診を断りますか？",
-            isPresented: $isShowingRejectConfirmation,
-            titleVisibility: .visible
+    }
+
+    private var scrollContent: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 18) {
+                ScreenTitle(title: "取引詳細", subtitle: currentProposal.exchangeMethod.displayName)
+                TradeCard(proposal: currentProposal, goodsByID: goodsByID) {}
+                detailSummarySection
+                disputeBannerSection
+                proposalResponseSection
+                evidenceSection
+                dayOfBannerSection
+                messagesSection
+            }
+            .padding(.horizontal, 20)
+            .padding(.top, 18)
+            .padding(.bottom, 112)
+        }
+    }
+
+    private var detailSummarySection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            detailRow(title: "ステータス", value: statusText)
+            detailRow(title: "交換条件タグ", value: currentProposal.conditionTags.isEmpty ? "未設定" : currentProposal.conditionTags.joined(separator: " / "))
+            detailRow(title: "私が出す", value: "\(currentProposal.senderGoodsIDs.count)件")
+            detailRow(title: "受け取る", value: "\(currentProposal.receiverGoodsIDs.count)件")
+        }
+        .padding(18)
+        .background(.white.opacity(0.84), in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+    }
+
+    @ViewBuilder
+    private var disputeBannerSection: some View {
+        if let latestDisputeSummary {
+            TradeDisputeBanner(summary: latestDisputeSummary) {
+                openDisputeDetail(latestDisputeSummary)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var proposalResponseSection: some View {
+        if currentProposal.isProposalResponsePending {
+            TradeProposalResponsePanel(
+                proposal: currentProposal,
+                viewerID: appState.viewer?.id,
+                isResponding: appState.respondingProposalID == currentProposal.id,
+                onAgree: { acceptedExchangeMethod in
+                    Task {
+                        await appState.agreeProposal(
+                            proposalID: currentProposal.id,
+                            acceptedExchangeMethod: acceptedExchangeMethod
+                        )
+                    }
+                },
+                onReject: {
+                    isShowingRejectConfirmation = true
+                },
+                onCounterProposal: {
+                    isShowingCounterProposalSheet = true
+                }
+            )
+        }
+    }
+
+    @ViewBuilder
+    private var evidenceSection: some View {
+        if currentProposal.status == .agreed || currentProposal.status == .completed {
+            TradeEvidencePanel(
+                proposal: currentProposal,
+                viewerID: appState.viewer?.id,
+                selectedPhotoItem: $selectedEvidencePhotoItem,
+                evaluationState: evaluationPromptState,
+                isAddingEvidence: appState.addingEvidenceProposalID == currentProposal.id,
+                isApproving: appState.approvingEvidenceProposalID == currentProposal.id,
+                canUseCamera: canUseCamera,
+                onOpenCamera: {
+                    isShowingEvidenceCamera = true
+                },
+                onOpenImage: { url in
+                    selectedRemoteImage = RemoteImageSelection(url: url)
+                },
+                onApprove: {
+                    Task {
+                        await appState.approveTradeEvidence(proposalID: currentProposal.id)
+                    }
+                },
+                onRate: {
+                    isShowingEvaluationSheet = true
+                }
+            )
+        }
+    }
+
+    @ViewBuilder
+    private var dayOfBannerSection: some View {
+        if let dayOfPresentation = TradeDayOfBannerPresentation(
+            proposal: currentProposal,
+            messages: messages,
+            viewerID: appState.viewer?.id
         ) {
-            Button("断る", role: .destructive) {
-                Task {
-                    await appState.rejectProposal(proposalID: currentProposal.id)
+            TradeDayOfBanner(
+                presentation: dayOfPresentation,
+                selectedOutfitPhotoItem: $selectedOutfitPhotoItem,
+                isSending: appState.sendingMessageProposalID == proposal.id,
+                canUseCamera: canUseCamera,
+                onOpenOutfitCamera: {
+                    isShowingOutfitCamera = true
+                },
+                onMarkArrived: {
+                    sendArrivalQuickAction(.arrived)
+                },
+                onShareLocation: {
+                    shareCurrentLocation()
+                }
+            )
+        }
+    }
+
+    private var messagesSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Text("メッセージ")
+                    .font(.system(size: 20, weight: .heavy, design: .rounded))
+                    .foregroundStyle(MegrumTheme.ink)
+                if appState.loadingMessagesProposalID == proposal.id {
+                    ProgressView()
+                        .controlSize(.small)
                 }
             }
-            Button("キャンセル", role: .cancel) {}
-        } message: {
-            Text("断った後は、この打診では取引を進められません。")
-        }
-#if os(iOS)
-        .fullScreenCover(item: $selectedRemoteImage) { selection in
-            FullScreenRemoteImageView(url: selection.url)
-        }
-#else
-        .sheet(item: $selectedRemoteImage) { selection in
-            FullScreenRemoteImageView(url: selection.url)
-        }
-#endif
-#if os(iOS)
-        .sheet(isPresented: $isShowingEvidenceCamera) {
-            NativeCameraCaptureView { imageData in
-                Task {
-                    await addEvidence(data: imageData, imageContentType: "image/jpeg")
-                }
-            }
-            .ignoresSafeArea()
-        }
-#endif
-        .toolbar {
-            ToolbarItem(placement: .cancellationAction) {
-                Button("閉じる") {
-                    dismiss()
-                }
-            }
-            ToolbarItem(placement: .primaryAction) {
-                Button {
-                    isShowingDisputeSheet = true
-                } label: {
-                    Label("通報", systemImage: "exclamationmark.bubble")
-                }
-                .disabled(appState.filingDisputeProposalID == currentProposal.id)
+
+            ForEach(messages) { message in
+                TradeMessageBubble(
+                    message: message,
+                    isMine: message.senderID == appState.viewer?.id,
+                    cancelApprovalPrompt: TradeCancelApprovalPrompt(
+                        message: message,
+                        proposal: currentProposal,
+                        viewerID: appState.viewer?.id,
+                        messages: messages
+                    ),
+                    isApprovingCancel: appState.respondingProposalID == currentProposal.id,
+                    onOpenImage: { url in
+                        selectedRemoteImage = RemoteImageSelection(url: url)
+                    },
+                    onOpenDispute: { summary in
+                        openDisputeDetail(summary)
+                    },
+                    onApproveCancel: {
+                        Task {
+                            await appState.approveTradeCancel(proposalID: currentProposal.id)
+                        }
+                    }
+                )
             }
         }
+    }
+
+    private func openDisputeDetail(_ summary: TradeDisputeSummary) {
+        disputeDetailRoute = TradeDisputeDetailRoute(
+            summary: summary,
+            model: summary.detailModel(proposal: currentProposal, viewerID: appState.viewer?.id)
+        )
     }
 
     private func addEvidence(from item: PhotosPickerItem) async {
@@ -713,11 +1548,23 @@ private struct TradeDetailScreen: View {
             unavailableChatAction = .outfitPhoto
             return
         }
+        await addChatPhoto(
+            data: data,
+            messageType: messageType,
+            imageContentType: inferredEvidenceImageContentType(from: data)
+        )
+    }
+
+    private func addChatPhoto(data: Data, messageType: TradeMessageType, imageContentType: String) async {
+        let intent = TradeOutfitPhotoSendIntent(
+            imageContentType: imageContentType
+        )
         let sent = await appState.sendPhotoMessage(
             proposalID: currentProposal.id,
             imageData: data,
-            imageContentType: inferredEvidenceImageContentType(from: data),
-            messageType: messageType
+            imageContentType: intent.imageContentType,
+            messageType: messageType == .outfitPhoto ? intent.messageType : messageType,
+            body: messageType == .outfitPhoto ? intent.body : nil
         )
         if !sent {
             unavailableChatAction = .outfitPhoto
@@ -725,11 +1572,12 @@ private struct TradeDetailScreen: View {
     }
 
     private func sendArrivalQuickAction(_ action: TradeArrivalQuickAction) {
+        let intent = TradeArrivalStatusSendIntent(action: action)
         Task {
             _ = await appState.sendArrivalStatusMessage(
                 proposalID: currentProposal.id,
-                status: action.tradeStatus,
-                body: action.messageBody
+                status: intent.status,
+                body: intent.body
             )
         }
     }
@@ -745,13 +1593,18 @@ private struct TradeDetailScreen: View {
     }
 
     private func sendLocationMessage(_ coordinate: MegrumLocationCoordinate) {
+        let intent = TradeLocationShareIntent(coordinate: coordinate)
+        guard intent.isSubmittable else {
+            unavailableChatAction = .location
+            return
+        }
         Task {
             _ = await appState.sendLocationMessage(
                 proposalID: currentProposal.id,
-                latitude: coordinate.latitude,
-                longitude: coordinate.longitude,
-                label: "現在地",
-                body: nil
+                latitude: intent.coordinate.latitude,
+                longitude: intent.coordinate.longitude,
+                label: intent.normalizedLabel,
+                body: intent.body
             )
         }
     }
@@ -795,7 +1648,7 @@ private struct TradeDetailScreen: View {
         case .cancelled:
             "キャンセル済"
         case .completed:
-            "完了"
+            evaluationPromptState.hasSubmittedEvaluation ? "評価済み" : "完了"
         }
     }
 }
@@ -903,6 +1756,135 @@ private struct TradeProposalResponsePanel: View {
             RoundedRectangle(cornerRadius: 26, style: .continuous)
                 .strokeBorder(.white.opacity(0.72), lineWidth: 1)
         }
+    }
+}
+
+private struct TradeDisputeBanner: View {
+    var summary: TradeDisputeSummary
+    var onOpen: () -> Void
+
+    var body: some View {
+        Button(action: onOpen) {
+            HStack(alignment: .top, spacing: 12) {
+                Image(systemName: "exclamationmark.bubble.fill")
+                    .font(.system(size: 18, weight: .bold))
+                    .foregroundStyle(.white)
+                    .frame(width: 38, height: 38)
+                    .background(MegrumTheme.pink, in: RoundedRectangle(cornerRadius: 13, style: .continuous))
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(summary.bannerTitle)
+                        .font(.system(size: 15, weight: .heavy, design: .rounded))
+                        .foregroundStyle(MegrumTheme.ink)
+                    Text(summary.bannerBody)
+                        .font(.system(size: 12, weight: .semibold, design: .rounded))
+                        .foregroundStyle(MegrumTheme.muted)
+                }
+
+                Spacer(minLength: 8)
+
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 13, weight: .heavy))
+                    .foregroundStyle(MegrumTheme.muted)
+                    .padding(.top, 10)
+            }
+            .padding(15)
+            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: 22, style: .continuous)
+                    .strokeBorder(MegrumTheme.pink.opacity(0.42), lineWidth: 1)
+            }
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("\(summary.bannerTitle)。\(summary.bannerBody)。詳細を見る")
+    }
+}
+
+private struct TradeDayOfBanner: View {
+    var presentation: TradeDayOfBannerPresentation
+    @Binding var selectedOutfitPhotoItem: PhotosPickerItem?
+    var isSending: Bool
+    var canUseCamera: Bool
+    var onOpenOutfitCamera: () -> Void
+    var onMarkArrived: () -> Void
+    var onShareLocation: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Label("当日の合流サポート", systemImage: "figure.wave")
+                .font(.system(size: 16, weight: .heavy, design: .rounded))
+                .foregroundStyle(MegrumTheme.ink)
+
+            Text(presentation.promptText)
+                .font(.system(size: 12, weight: .semibold, design: .rounded))
+                .foregroundStyle(MegrumTheme.muted)
+
+            HStack(spacing: 8) {
+                statusChip(title: "あなた", value: presentation.myArrivalText)
+                statusChip(title: "相手", value: presentation.partnerArrivalText)
+            }
+
+            HStack(spacing: 8) {
+                statusChip(title: "服装写真", value: presentation.myOutfitText)
+                statusChip(title: "相手の服装", value: presentation.partnerOutfitText)
+            }
+
+            HStack(spacing: 8) {
+                Button(action: onMarkArrived) {
+                    Label("到着", systemImage: "checkmark.circle")
+                }
+                .disabled(isSending)
+
+                Button(action: onShareLocation) {
+                    Label("現在地", systemImage: "location")
+                }
+                .disabled(isSending)
+
+                Menu {
+#if os(iOS)
+                    Button(action: onOpenOutfitCamera) {
+                        Label("カメラで撮る", systemImage: "camera.fill")
+                    }
+                    .disabled(!canUseCamera || isSending)
+#endif
+
+                    PhotosPicker(selection: $selectedOutfitPhotoItem, matching: .images) {
+                        Label("写真から選ぶ", systemImage: "photo.on.rectangle")
+                    }
+                    .disabled(isSending)
+                } label: {
+                    Label("服装", systemImage: "person.crop.rectangle")
+                }
+                .disabled(isSending)
+            }
+            .font(.system(size: 13, weight: .heavy, design: .rounded))
+            .buttonStyle(.bordered)
+            .controlSize(.small)
+        }
+        .padding(16)
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 24, style: .continuous)
+                .strokeBorder(.white.opacity(0.7), lineWidth: 1)
+        }
+        .accessibilityElement(children: .combine)
+    }
+
+    private func statusChip(title: String, value: String) -> some View {
+        VStack(alignment: .leading, spacing: 3) {
+            Text(title)
+                .font(.system(size: 11, weight: .heavy, design: .rounded))
+                .foregroundStyle(MegrumTheme.muted)
+            Text(value)
+                .font(.system(size: 13, weight: .heavy, design: .rounded))
+                .foregroundStyle(MegrumTheme.ink)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 11)
+        .padding(.vertical, 9)
+        .background(.white.opacity(0.72), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
     }
 }
 
@@ -1097,6 +2079,7 @@ private struct TradeEvidencePanel: View {
     var proposal: TradeProposal
     var viewerID: UUID?
     @Binding var selectedPhotoItem: PhotosPickerItem?
+    var evaluationState: TradeEvaluationPromptState
     var isAddingEvidence: Bool
     var isApproving: Bool
     var canUseCamera: Bool
@@ -1181,15 +2164,25 @@ private struct TradeEvidencePanel: View {
             }
 
             if proposal.status == .completed {
-                Button(action: onRate) {
-                    Label("評価を送信", systemImage: "star.fill")
-                        .font(.system(size: 16, weight: .heavy, design: .rounded))
+                if evaluationState.hasSubmittedEvaluation {
+                    Label("評価送信済み", systemImage: "star.fill")
+                        .font(.system(size: 15, weight: .heavy, design: .rounded))
+                        .foregroundStyle(MegrumTheme.ok)
                         .frame(maxWidth: .infinity)
-                        .frame(height: 52)
-                        .background(MegrumTheme.lavender, in: Capsule())
-                        .foregroundStyle(.white)
+                        .frame(height: 50)
+                        .background(.white.opacity(0.72), in: Capsule())
+                        .accessibilityLabel("評価送信済み")
+                } else {
+                    Button(action: onRate) {
+                        Label("評価を送信", systemImage: "star.fill")
+                            .font(.system(size: 16, weight: .heavy, design: .rounded))
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 52)
+                            .background(MegrumTheme.lavender, in: Capsule())
+                            .foregroundStyle(.white)
+                    }
+                    .buttonStyle(.plain)
                 }
-                .buttonStyle(.plain)
             } else if proposal.evidencePhotoURL == nil {
                 Button(action: onOpenCamera) {
                     Label(isAddingEvidence ? "追加中" : "交換後にグッズを撮影", systemImage: "camera.fill")
@@ -1398,10 +2391,149 @@ private struct TradeEvaluationSheet: View {
     }
 }
 
+struct TradeSystemMessagePresentation: Equatable, Sendable {
+    var title: String
+    var systemImage: String
+    var body: String
+    var detail: String?
+    var accessibilityLabel: String {
+        [title, body, detail].compactMap(\.self).joined(separator: "。")
+    }
+
+    init(message: TradeMessage) {
+        let fallbackBody = message.body?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty ?? "取引が更新されました"
+        if let disputeSummary = TradeDisputeSummary(message: message) {
+            title = "申告受付"
+            systemImage = "exclamationmark.bubble"
+            body = disputeSummary.body
+            detail = disputeSummary.bannerBody
+            return
+        }
+
+        switch message.meta["action"] {
+        case .some(TradeAssistanceSystemIntent.Action.lateNotice.rawValue):
+            title = "遅刻連絡"
+            systemImage = "clock.badge.exclamationmark"
+            body = Self.operationalBody(message: message, fallbackBody: fallbackBody)
+            detail = message.meta["late_minutes"].map { "見込み：\($0)分" }
+        case .some(TradeAssistanceSystemIntent.Action.cancelRequested.rawValue):
+            title = "キャンセル申請"
+            systemImage = "xmark.circle"
+            body = Self.operationalBody(message: message, fallbackBody: fallbackBody)
+            detail = nil
+        case .some("cancel_approved"):
+            title = "キャンセル合意"
+            systemImage = "checkmark.circle"
+            body = Self.operationalBody(message: message, fallbackBody: fallbackBody)
+            detail = nil
+        default:
+            title = "取引更新"
+            systemImage = "info.circle.fill"
+            body = fallbackBody
+            detail = nil
+        }
+    }
+
+    private static func operationalBody(message: TradeMessage, fallbackBody: String) -> String {
+        var lines: [String] = []
+        if let reason = message.meta["reason"]?.trimmingCharacters(in: .whitespacesAndNewlines), !reason.isEmpty {
+            lines.append("理由：\(reason)")
+        }
+        if let note = message.meta["note"]?.trimmingCharacters(in: .whitespacesAndNewlines), !note.isEmpty {
+            lines.append("補足：\(note)")
+        }
+        return lines.isEmpty ? fallbackBody : lines.joined(separator: "\n")
+    }
+}
+
+struct TradeCancelApprovalPrompt: Equatable, Sendable {
+    var canApprove: Bool
+
+    init(
+        message: TradeMessage,
+        proposal: TradeProposal,
+        viewerID: UUID?,
+        messages: [TradeMessage]
+    ) {
+        guard
+            let viewerID,
+            proposal.status == .agreed,
+            proposal.isParticipant(viewerID),
+            message.messageType == .system,
+            message.meta["action"] == TradeAssistanceSystemIntent.Action.cancelRequested.rawValue
+        else {
+            canApprove = false
+            return
+        }
+
+        let viewerKey = viewerID.uuidString.lowercased()
+        let requesterKey = message.meta["requested_by"]?.lowercased()
+            ?? message.senderID.uuidString.lowercased()
+        let alreadyApproved = messages.contains { $0.meta["action"] == "cancel_approved" }
+        canApprove = requesterKey != viewerKey && !alreadyApproved
+    }
+}
+
+struct TradeOperationalMessagePresentation: Equatable, Sendable {
+    var title: String
+    var systemImage: String
+    var body: String
+    var detail: String?
+
+    init(message: TradeMessage) {
+        switch message.messageType {
+        case .location:
+            title = message.locationLabel?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty ?? "現在地共有"
+            systemImage = "location.fill"
+            body = Self.locationBody(message: message)
+            detail = "位置情報"
+        case .arrivalStatus:
+            title = "到着ステータス"
+            systemImage = "checkmark.circle.fill"
+            body = message.body?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty ?? "到着状況を共有しました"
+            detail = message.meta["status"].flatMap(Self.arrivalDetail(for:))
+        default:
+            title = "取引メッセージ"
+            systemImage = "info.circle.fill"
+            body = message.body?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty ?? "取引が更新されました"
+            detail = nil
+        }
+    }
+
+    private static func locationBody(message: TradeMessage) -> String {
+        if let body = message.body?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty {
+            return body
+        }
+        if let latitude = message.locationLatitude, let longitude = message.locationLongitude {
+            let latText = latitude.formatted(.number.precision(.fractionLength(5)))
+            let lngText = longitude.formatted(.number.precision(.fractionLength(5)))
+            return "緯度 \(latText) / 経度 \(lngText)"
+        }
+        return "現在地を共有しました"
+    }
+
+    private static func arrivalDetail(for rawStatus: String) -> String? {
+        switch TradeArrivalStatus(rawValue: rawStatus) {
+        case .enroute:
+            "移動中"
+        case .arrived:
+            "到着済み"
+        case .left:
+            "離れました"
+        case .none:
+            nil
+        }
+    }
+}
+
 private struct TradeMessageBubble: View {
     var message: TradeMessage
     var isMine: Bool
+    var cancelApprovalPrompt: TradeCancelApprovalPrompt?
+    var isApprovingCancel: Bool = false
     var onOpenImage: (URL) -> Void
+    var onOpenDispute: (TradeDisputeSummary) -> Void = { _ in }
+    var onApproveCancel: () -> Void = {}
 
     private var bodyText: String? {
         message.body?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
@@ -1423,11 +2555,21 @@ private struct TradeMessageBubble: View {
 
             switch message.messageType {
             case .location:
-                richTextBubble(title: message.locationLabel ?? "現在地共有", systemImage: "location.fill", body: locationBubbleBody)
+                let presentation = TradeOperationalMessagePresentation(message: message)
+                richTextBubble(
+                    title: presentation.title,
+                    systemImage: presentation.systemImage,
+                    body: presentation.body,
+                    detail: presentation.detail
+                )
             case .arrivalStatus:
-                if let bodyText {
-                    richTextBubble(title: "到着ステータス", systemImage: "checkmark.circle.fill", body: bodyText)
-                }
+                let presentation = TradeOperationalMessagePresentation(message: message)
+                richTextBubble(
+                    title: presentation.title,
+                    systemImage: presentation.systemImage,
+                    body: presentation.body,
+                    detail: presentation.detail
+                )
             case .text, .photo, .outfitPhoto:
                 if let bodyText {
                     textBubble(bodyText)
@@ -1443,31 +2585,76 @@ private struct TradeMessageBubble: View {
         .frame(maxWidth: .infinity, alignment: isMine ? .trailing : .leading)
     }
 
-    private var locationBubbleBody: String {
-        if let bodyText {
-            return bodyText
+    @ViewBuilder
+    private var systemMessage: some View {
+        let presentation = TradeSystemMessagePresentation(message: message)
+        if let disputeSummary = TradeDisputeSummary(message: message) {
+            Button {
+                onOpenDispute(disputeSummary)
+            } label: {
+                systemMessageContent(presentation: presentation, showsDisclosure: true)
+            }
+            .buttonStyle(.plain)
+        } else {
+            VStack(spacing: 8) {
+                systemMessageContent(presentation: presentation, showsDisclosure: false)
+                if cancelApprovalPrompt?.canApprove == true {
+                    Button(action: onApproveCancel) {
+                        HStack(spacing: 8) {
+                            if isApprovingCancel {
+                                ProgressView()
+                                    .controlSize(.small)
+                            } else {
+                                Image(systemName: "checkmark.circle.fill")
+                                    .font(.system(size: 14, weight: .bold))
+                            }
+                            Text("キャンセルに同意する")
+                                .font(.system(size: 13, weight: .heavy, design: .rounded))
+                        }
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 9)
+                        .background(MegrumTheme.lavender, in: Capsule())
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(isApprovingCancel)
+                    .accessibilityLabel("キャンセル申請に同意する")
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .center)
         }
-        if let latitude = message.locationLatitude, let longitude = message.locationLongitude {
-            return [
-                latitude.formatted(.number.precision(.fractionLength(5))),
-                longitude.formatted(.number.precision(.fractionLength(5)))
-            ].joined(separator: ", ")
-        }
-        return "現在地を共有しました"
     }
 
-    private var systemMessage: some View {
-        HStack(spacing: 7) {
-            Image(systemName: "info.circle.fill")
-            Text(bodyText ?? "取引が更新されました")
+    private func systemMessageContent(presentation: TradeSystemMessagePresentation, showsDisclosure: Bool) -> some View {
+        HStack(alignment: .top, spacing: 8) {
+            Image(systemName: presentation.systemImage)
+                .font(.system(size: 13, weight: .bold))
+                .padding(.top, 1)
+            VStack(alignment: .leading, spacing: 3) {
+                Text(presentation.title)
+                    .font(.system(size: 12, weight: .heavy, design: .rounded))
+                Text(presentation.body)
+                    .font(.system(size: 12, weight: .semibold, design: .rounded))
+                    .fixedSize(horizontal: false, vertical: true)
+                if let detail = presentation.detail {
+                    Text(detail)
+                        .font(.system(size: 11, weight: .heavy, design: .rounded))
+                        .foregroundStyle(MegrumTheme.lavender)
+                }
+            }
+            if showsDisclosure {
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 10, weight: .heavy))
+                    .padding(.top, 2)
+            }
         }
-        .font(.system(size: 12, weight: .heavy, design: .rounded))
         .foregroundStyle(MegrumTheme.muted)
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
-        .background(.white.opacity(0.72), in: Capsule())
+        .padding(.horizontal, 13)
+        .padding(.vertical, 9)
+        .frame(maxWidth: 320, alignment: .leading)
+        .background(.white.opacity(0.76), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
         .frame(maxWidth: .infinity, alignment: .center)
-        .accessibilityLabel(bodyText ?? "取引が更新されました")
+        .accessibilityLabel(presentation.accessibilityLabel)
     }
 
     private func photoMessage(_ photoURL: URL) -> some View {
@@ -1518,6 +2705,8 @@ private struct TradeMessageBubble: View {
         Text(text)
             .font(.system(size: 15, weight: .bold, design: .rounded))
             .foregroundStyle(isMine ? .white : MegrumTheme.ink)
+            .fixedSize(horizontal: false, vertical: true)
+            .frame(maxWidth: 300, alignment: isMine ? .trailing : .leading)
             .padding(.horizontal, 14)
             .padding(.vertical, 10)
             .background(
@@ -1526,15 +2715,22 @@ private struct TradeMessageBubble: View {
             )
     }
 
-    private func richTextBubble(title: String, systemImage: String, body: String) -> some View {
+    private func richTextBubble(title: String, systemImage: String, body: String, detail: String? = nil) -> some View {
         VStack(alignment: .leading, spacing: 5) {
             Label(title, systemImage: systemImage)
                 .font(.system(size: 12, weight: .heavy, design: .rounded))
                 .foregroundStyle(isMine ? .white.opacity(0.86) : MegrumTheme.lavender)
             Text(body)
                 .font(.system(size: 15, weight: .heavy, design: .rounded))
+                .fixedSize(horizontal: false, vertical: true)
+            if let detail {
+                Text(detail)
+                    .font(.system(size: 11, weight: .heavy, design: .rounded))
+                    .foregroundStyle(isMine ? .white.opacity(0.78) : MegrumTheme.muted)
+            }
         }
         .foregroundStyle(isMine ? .white : MegrumTheme.ink)
+        .frame(maxWidth: 300, alignment: .leading)
         .padding(.horizontal, 14)
         .padding(.vertical, 11)
         .background(
@@ -1586,33 +2782,95 @@ private struct TradeUnavailableChatActionSheet: View {
 private struct TradeAssistanceRequestSheet: View {
     var kind: TradeAssistanceRequestKind
     var isSubmitting: Bool
-    var onSubmit: (String) async -> Void
+    var onSubmit: (TradeAssistanceSystemIntent) async -> Void
 
     @Environment(\.dismiss) private var dismiss
-    @State private var memo = ""
+    @State private var draft: TradeAssistanceRequestDraft
+
+    init(
+        kind: TradeAssistanceRequestKind,
+        isSubmitting: Bool,
+        onSubmit: @escaping (TradeAssistanceSystemIntent) async -> Void
+    ) {
+        self.kind = kind
+        self.isSubmitting = isSubmitting
+        self.onSubmit = onSubmit
+        self._draft = State(initialValue: TradeAssistanceRequestDraft(kind: kind))
+    }
 
     var body: some View {
         Form {
             Section {
-                TextEditor(text: $memo)
+                Label(kind.title, systemImage: kind.systemImage)
+                    .font(.headline)
+                    .foregroundStyle(MegrumTheme.ink)
+
+                if kind == .late {
+                    Picker("遅れる見込み", selection: $draft.delayBucket) {
+                        ForEach(TradeLateDelayBucket.allCases) { bucket in
+                            Text(bucket.title)
+                                .tag(bucket)
+                                .accessibilityLabel(bucket.accessibilityLabel)
+                        }
+                    }
+                    .pickerStyle(.menu)
+                    .accessibilityLabel("遅れる見込み")
+                }
+            } footer: {
+                Text(kind.acknowledgementText)
+            }
+
+            Section("理由") {
+                TextEditor(text: $draft.reason)
                     .frame(minHeight: 132)
                     .overlay(alignment: .topLeading) {
-                        if memo.isEmpty {
-                            Text(kind.placeholder)
+                        if draft.reason.isEmpty {
+                            Text(kind.reasonPlaceholder)
                                 .foregroundStyle(MegrumTheme.muted)
                                 .padding(.top, 8)
                                 .padding(.leading, 5)
                                 .allowsHitTesting(false)
                         }
                     }
+                    .accessibilityLabel(kind.reasonAccessibilityLabel)
+            }
+
+            Section {
+                TextEditor(text: $draft.note)
+                    .frame(minHeight: 96)
+                    .overlay(alignment: .topLeading) {
+                        if draft.note.isEmpty {
+                            Text(kind.notePlaceholder)
+                                .foregroundStyle(MegrumTheme.muted)
+                                .padding(.top, 8)
+                                .padding(.leading, 5)
+                                .allowsHitTesting(false)
+                        }
+                    }
+                    .accessibilityLabel(kind.noteAccessibilityLabel)
             } header: {
-                Label(kind.title, systemImage: kind.systemImage)
+                Text("補足")
             } footer: {
-                Text("取引チャットに申請内容を残します。相手と条件を確認してください。")
+                Text("補足は任意です。送信後は取引チャットにシステムメッセージとして残ります。")
+            }
+
+            Section {
+                Toggle(kind.acknowledgementText, isOn: $draft.acknowledgesImpact)
+                    .accessibilityLabel(kind.acknowledgementAccessibilityLabel)
+            }
+
+            if let intent = draft.systemIntent {
+                Section("取引チャットへの反映文") {
+                    Text(intent.messageBody)
+                        .font(.callout.weight(.semibold))
+                        .foregroundStyle(MegrumTheme.ink)
+                        .accessibilityLabel("\(kind.title)の送信内容")
+                }
             }
         }
         .navigationTitle(kind.title)
         .megrumInlineNavigationTitle()
+        .scrollDismissesKeyboard(.interactively)
         .toolbar {
             ToolbarItem(placement: .cancellationAction) {
                 Button("閉じる") {
@@ -1622,7 +2880,10 @@ private struct TradeAssistanceRequestSheet: View {
             ToolbarItem(placement: .confirmationAction) {
                 Button {
                     Task {
-                        await onSubmit(memo)
+                        guard let intent = draft.systemIntent else {
+                            return
+                        }
+                        await onSubmit(intent)
                     }
                 } label: {
                     if isSubmitting {
@@ -1631,7 +2892,7 @@ private struct TradeAssistanceRequestSheet: View {
                         Text("送信")
                     }
                 }
-                .disabled(isSubmitting)
+                .disabled(!draft.isSubmittable || isSubmitting)
             }
         }
     }
@@ -1645,6 +2906,8 @@ private struct TradeMessageInput: View {
     var onOpenSchedule: () -> Void
     var onSendArrivalStatus: (TradeArrivalQuickAction) -> Void
     var onOpenLocationPlaceholder: () -> Void
+    var canUseCamera: Bool
+    var onOpenOutfitCamera: () -> Void
     var onCounterProposal: () -> Void
     var onRequestLate: () -> Void
     var onRequestCancel: () -> Void
@@ -1675,8 +2938,15 @@ private struct TradeMessageInput: View {
                     Label("現在地を共有", systemImage: "location.fill")
                 }
 
+#if os(iOS)
+                Button(action: onOpenOutfitCamera) {
+                    Label("服装写真を撮る", systemImage: "camera.fill")
+                }
+                .disabled(!canUseCamera || isSending)
+#endif
+
                 PhotosPicker(selection: $selectedOutfitPhotoItem, matching: .images) {
-                    Label("服装写真を共有", systemImage: "person.crop.rectangle")
+                    Label("服装写真を選ぶ", systemImage: "photo.on.rectangle")
                 }
                 .disabled(isSending)
 
@@ -1687,12 +2957,14 @@ private struct TradeMessageInput: View {
                 }
 
                 Button(action: onRequestLate) {
-                    Label("遅刻を申請", systemImage: "clock.badge.exclamationmark")
+                    Label(TradeAssistanceRequestKind.late.title, systemImage: TradeAssistanceRequestKind.late.systemImage)
                 }
+                .accessibilityLabel(TradeAssistanceRequestKind.late.menuAccessibilityLabel)
 
                 Button(action: onRequestCancel) {
-                    Label("キャンセル申請", systemImage: "xmark.circle")
+                    Label(TradeAssistanceRequestKind.cancel.title, systemImage: TradeAssistanceRequestKind.cancel.systemImage)
                 }
+                .accessibilityLabel(TradeAssistanceRequestKind.cancel.menuAccessibilityLabel)
 
                 Button(role: .destructive, action: onReport) {
                     Label("通報", systemImage: "exclamationmark.bubble")
@@ -2370,6 +3642,7 @@ private struct FullScreenRemoteImageView: View {
 private struct TradePreviewColumn: View {
     var title: String
     var symbol: String
+    var items: [GoodsItem] = []
 
     var body: some View {
         VStack(spacing: 8) {
@@ -2377,15 +3650,87 @@ private struct TradePreviewColumn: View {
                 .font(.system(size: 13, weight: .heavy, design: .rounded))
                 .foregroundStyle(MegrumTheme.muted)
 
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .fill(MegrumTheme.sky.opacity(0.18))
-                .frame(width: 74, height: 74)
-                .overlay {
-                    Image(systemName: symbol)
-                        .font(.system(size: 22, weight: .bold))
-                        .foregroundStyle(MegrumTheme.lavender)
+            if items.isEmpty {
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .fill(MegrumTheme.sky.opacity(0.18))
+                    .frame(width: 74, height: 74)
+                    .overlay {
+                        Image(systemName: symbol)
+                            .font(.system(size: 22, weight: .bold))
+                            .foregroundStyle(MegrumTheme.lavender)
+                    }
+            } else {
+                ZStack(alignment: .topTrailing) {
+                    ForEach(previewItems.indices, id: \.self) { index in
+                        TradePreviewThumbnail(item: previewItems[index])
+                            .offset(x: CGFloat(index) * -16, y: CGFloat(index) * 8)
+                    }
+                    if items.count > 2 {
+                        Text("+\(items.count - 2)")
+                            .font(.system(size: 11, weight: .heavy, design: .rounded))
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 7)
+                            .padding(.vertical, 4)
+                            .background(MegrumTheme.ink.opacity(0.76), in: Capsule())
+                            .offset(x: 4, y: -5)
+                    }
                 }
+                .frame(width: 86, height: 78)
+            }
         }
+    }
+
+    private var previewItems: [GoodsItem] {
+        Array(items.prefix(2))
+    }
+}
+
+private struct TradePreviewThumbnail: View {
+    var item: GoodsItem
+
+    var body: some View {
+        RoundedRectangle(cornerRadius: 16, style: .continuous)
+            .fill(MegrumTheme.sky.opacity(0.18))
+            .frame(width: 68, height: 68)
+            .overlay {
+                if let imageURL = item.imageURL {
+                    AsyncImage(url: imageURL, transaction: Transaction(animation: .easeInOut(duration: 0.18))) { phase in
+                        switch phase {
+                        case .empty:
+                            ProgressView()
+                                .controlSize(.small)
+                                .tint(MegrumTheme.lavender)
+                        case let .success(image):
+                            GeometryReader { proxy in
+                                image
+                                    .resizable()
+                                    .scaledToFill()
+                                    .frame(width: proxy.size.width, height: proxy.size.height)
+                                    .clipped()
+                            }
+                        case .failure:
+                            fallbackIcon
+                        @unknown default:
+                            fallbackIcon
+                        }
+                    }
+                } else {
+                    fallbackIcon
+                }
+            }
+            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .strokeBorder(.white.opacity(0.78), lineWidth: 1)
+            }
+            .shadow(color: MegrumTheme.ink.opacity(0.08), radius: 8, y: 4)
+            .accessibilityLabel(item.title)
+    }
+
+    private var fallbackIcon: some View {
+        Image(systemName: "photo")
+            .font(.system(size: 20, weight: .bold))
+            .foregroundStyle(MegrumTheme.lavender)
     }
 }
 

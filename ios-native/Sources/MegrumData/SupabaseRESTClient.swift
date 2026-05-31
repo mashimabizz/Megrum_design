@@ -117,6 +117,35 @@ public final class SupabaseRESTClient: @unchecked Sendable {
         return try decoder.decode([Row].self, from: data)
     }
 
+    public func rpcValue<Payload: Encodable & Sendable, Value: Decodable & Sendable>(
+        function name: String,
+        payload: Payload
+    ) async throws -> Value {
+        let request = try makeRPCRequest(function: name, payload: payload)
+        let (data, response) = try await session.data(for: request)
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw SupabaseRESTError.unexpectedStatus(-1)
+        }
+        guard (200..<300).contains(httpResponse.statusCode) else {
+            throw SupabaseRESTError.unexpectedStatus(httpResponse.statusCode)
+        }
+        return try decoder.decode(Value.self, from: data)
+    }
+
+    public func rpcVoid<Payload: Encodable & Sendable>(
+        function name: String,
+        payload: Payload
+    ) async throws {
+        let request = try makeRPCRequest(function: name, payload: payload)
+        let (_, response) = try await session.data(for: request)
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw SupabaseRESTError.unexpectedStatus(-1)
+        }
+        guard (200..<300).contains(httpResponse.statusCode) else {
+            throw SupabaseRESTError.unexpectedStatus(httpResponse.statusCode)
+        }
+    }
+
     public func deleteRows(
         from table: String,
         queryItems: [URLQueryItem]
@@ -282,6 +311,17 @@ public final class SupabaseRESTClient: @unchecked Sendable {
             method: "POST",
             body: body
         )
+    }
+
+    public func publicStorageObjectURL(bucket: String, path: String) throws -> URL {
+        guard var components = URLComponents(url: configuration.projectURL, resolvingAgainstBaseURL: false) else {
+            throw SupabaseRESTError.invalidURL
+        }
+        components.path = normalizedPath("/storage/v1/object/public/\(bucket)/\(path)")
+        guard let url = components.url else {
+            throw SupabaseRESTError.invalidURL
+        }
+        return url
     }
 
     public func makeMutationRequest(

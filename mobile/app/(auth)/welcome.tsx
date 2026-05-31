@@ -2,6 +2,7 @@ import { useState } from "react";
 import { router } from "expo-router";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { AppleAuthButton } from "../../src/components/AppleAuthButton";
+import { GoogleAuthButton } from "../../src/components/GoogleAuthButton";
 import { MegrumLogo } from "../../src/components/MegrumLogo";
 import { PrimaryButton } from "../../src/components/PrimaryButton";
 import { Screen } from "../../src/components/Screen";
@@ -83,9 +84,11 @@ export default function WelcomeScreen() {
           mode="signUp"
           onError={(message) => setTermsError(message)}
         />
-        <PrimaryButton variant="secondary" disabled>
-          Googleで新規登録
-        </PrimaryButton>
+        <GoogleAuthButton
+          disabled={!termsAccepted}
+          mode="signUp"
+          onError={(message) => setTermsError(message)}
+        />
         {!configured ? (
           <Pressable
             accessibilityRole="button"

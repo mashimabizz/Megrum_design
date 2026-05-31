@@ -4,7 +4,8 @@ import SwiftUI
 
 struct IndividualListingsScreen: View {
     @ObservedObject var appState: MegrumAppState
-    @State private var isShowingEditor = false
+    @State private var editorRoute: IndividualListingEditorRoute?
+    @State private var locallyEditedListings: [UUID: IndividualListing] = [:]
 
     var body: some View {
         ZStack(alignment: .bottomLeading) {
@@ -14,16 +15,19 @@ struct IndividualListingsScreen: View {
 
                     if appState.isLoadingIndividualListings {
                         listingSkeletons
-                    } else if appState.listings.isEmpty {
+                    } else if displayedListings.isEmpty {
                         EmptyListingView()
                     } else {
                         VStack(spacing: 12) {
-                            ForEach(appState.listings) { listing in
+                            ForEach(displayedListings) { listing in
                                 IndividualListingCard(
                                     listing: listing,
                                     inventoryByID: inventoryByID,
-                                    wishByID: wishByID
-                                )
+                                    wishByID: wishByID,
+                                    canEdit: listing.ownerID == appState.viewer?.id
+                                ) {
+                                    editorRoute = .edit(listing)
+                                }
                             }
                         }
                     }
@@ -33,13 +37,14 @@ struct IndividualListingsScreen: View {
                 .padding(.bottom, 118)
             }
             .refreshable {
+                locallyEditedListings.removeAll()
                 await appState.loadIndividualListings()
             }
             .background(MegrumTheme.canvas.ignoresSafeArea())
             .megrumHiddenNavigationBar()
 
             AddIndividualListingButton {
-                isShowingEditor = true
+                editorRoute = .create
             }
             .padding(.leading, 24)
             .padding(.bottom, 22)
@@ -50,10 +55,23 @@ struct IndividualListingsScreen: View {
             }
             await loadChoicesIfNeeded()
         }
-        .sheet(isPresented: $isShowingEditor) {
+        .sheet(item: $editorRoute) { route in
             NavigationStack {
-                IndividualListingEditorSheet(appState: appState)
+                switch route {
+                case .create:
+                    IndividualListingEditorSheet(appState: appState)
+                case .edit(let listing):
+                    IndividualListingEditorSheet(appState: appState, editing: listing) { updated in
+                        locallyEditedListings[updated.id] = updated
+                    }
+                }
             }
+        }
+    }
+
+    private var displayedListings: [IndividualListing] {
+        appState.listings.map { listing in
+            locallyEditedListings[listing.id] ?? listing
         }
     }
 
@@ -86,10 +104,26 @@ struct IndividualListingsScreen: View {
     }
 }
 
+private enum IndividualListingEditorRoute: Identifiable {
+    case create
+    case edit(IndividualListing)
+
+    var id: String {
+        switch self {
+        case .create:
+            "create"
+        case .edit(let listing):
+            "edit-\(listing.id.uuidString)"
+        }
+    }
+}
+
 private struct IndividualListingCard: View {
     var listing: IndividualListing
     var inventoryByID: [UUID: GoodsItem]
     var wishByID: [UUID: WishItem]
+    var canEdit: Bool = false
+    var onEdit: () -> Void = {}
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -102,6 +136,20 @@ private struct IndividualListingCard: View {
                     .background(statusColor, in: Capsule())
 
                 Spacer()
+
+                if canEdit {
+                    Menu {
+                        Button(action: onEdit) {
+                            Label("編集", systemImage: "pencil")
+                        }
+                    } label: {
+                        Image(systemName: "ellipsis.circle")
+                            .font(.system(size: 20, weight: .semibold, design: .rounded))
+                            .foregroundStyle(MegrumTheme.muted)
+                            .frame(width: 34, height: 34)
+                    }
+                    .accessibilityLabel("個別募集を編集")
+                }
 
                 Text(listing.haveLogic == .all ? "譲るもの全部" : "どれか譲る")
                     .font(.system(size: 13, weight: .heavy, design: .rounded))
@@ -126,7 +174,7 @@ private struct IndividualListingCard: View {
 
                 ListingItemGroup(
                     title: "求める",
-                    items: primaryOptionItems
+                    items: optionItems
                 )
             }
 
@@ -146,18 +194,22 @@ private struct IndividualListingCard: View {
         .shadow(color: MegrumTheme.ink.opacity(0.08), radius: 18, y: 10)
     }
 
-    private var primaryOptionItems: [ListedItemLabel] {
-        guard let option = listing.options.sorted(by: { $0.position < $1.position }).first else {
+    private var optionItems: [ListedItemLabel] {
+        let options = listing.options.sorted(by: { $0.position < $1.position })
+        guard !options.isEmpty else {
             return [ListedItemLabel(title: "未設定", quantity: 1)]
         }
-        if option.isCashOffer, let amount = option.cashAmount {
-            return [ListedItemLabel(title: "定価 \(amount)円", quantity: 1)]
-        }
-        return option.wishes.map { quantity in
-            ListedItemLabel(
-                title: wishByID[quantity.itemID]?.title ?? "Wish",
-                quantity: quantity.quantity
-            )
+        return options.enumerated().flatMap { index, option -> [ListedItemLabel] in
+            let prefix = options.count > 1 ? "選択肢\(index + 1) " : ""
+            if option.isCashOffer, let amount = option.cashAmount {
+                return [ListedItemLabel(title: "\(prefix)定価 \(amount)円", quantity: 1)]
+            }
+            return option.wishes.map { quantity in
+                ListedItemLabel(
+                    title: "\(prefix)\(wishByID[quantity.itemID]?.title ?? "Wish")",
+                    quantity: quantity.quantity
+                )
+            }
         }
     }
 
@@ -264,18 +316,244 @@ private struct AddIndividualListingButton: View {
     }
 }
 
+enum IndividualListingEditorMode: Equatable {
+    case create(preselectedWishID: UUID?)
+    case edit(IndividualListing)
+
+    var isEditing: Bool {
+        if case .edit = self {
+            return true
+        }
+        return false
+    }
+}
+
+struct IndividualListingDraft: Equatable {
+    var mode: IndividualListingEditorMode
+    var selectedHaveIDs: Set<UUID>
+    var haveQuantities: [UUID: Int]
+    var selectedWishIDs: Set<UUID>
+    var wishQuantities: [UUID: Int]
+    var haveLogic: ListingLogic
+    var wishLogic: ListingLogic
+    var exchangeType: IndividualListingExchangeType
+    var status: IndividualListingStatus
+    var note: String
+
+    init(mode: IndividualListingEditorMode) {
+        self.mode = mode
+        switch mode {
+        case .create(let preselectedWishID):
+            self.selectedHaveIDs = []
+            self.haveQuantities = [:]
+            self.selectedWishIDs = preselectedWishID.map { Set([$0]) } ?? []
+            self.wishQuantities = preselectedWishID.map { [$0: 1] } ?? [:]
+            self.haveLogic = .all
+            self.wishLogic = .one
+            self.exchangeType = .any
+            self.status = .active
+            self.note = ""
+        case .edit(let listing):
+            let primaryOption = listing.options.sorted { $0.position < $1.position }.first
+            self.selectedHaveIDs = Set(listing.haves.map(\.itemID))
+            self.haveQuantities = Dictionary(uniqueKeysWithValues: listing.haves.map { ($0.itemID, boundedQuantity($0.quantity)) })
+            self.selectedWishIDs = Set(primaryOption?.wishes.map(\.itemID) ?? [])
+            self.wishQuantities = Dictionary(uniqueKeysWithValues: (primaryOption?.wishes ?? []).map { ($0.itemID, boundedQuantity($0.quantity)) })
+            self.haveLogic = listing.haveLogic
+            self.wishLogic = primaryOption?.logic ?? .one
+            self.exchangeType = primaryOption?.exchangeType ?? .any
+            self.status = listing.status
+            self.note = listing.note ?? ""
+        }
+    }
+
+    var navigationTitle: String {
+        mode.isEditing ? "個別募集を編集" : "個別募集を作成"
+    }
+
+    var confirmationTitle: String {
+        mode.isEditing ? "反映" : "保存"
+    }
+
+    mutating func toggleHave(_ id: UUID, maxQuantity: Int = 99) {
+        if selectedHaveIDs.contains(id) {
+            selectedHaveIDs.remove(id)
+            haveQuantities.removeValue(forKey: id)
+        } else {
+            selectedHaveIDs.insert(id)
+            haveQuantities[id] = boundedQuantity(haveQuantities[id] ?? 1, maxQuantity: maxQuantity)
+        }
+    }
+
+    mutating func toggleWish(_ id: UUID) {
+        if selectedWishIDs.contains(id) {
+            selectedWishIDs.remove(id)
+            wishQuantities.removeValue(forKey: id)
+        } else {
+            selectedWishIDs.insert(id)
+            wishQuantities[id] = boundedQuantity(wishQuantities[id] ?? 1)
+        }
+    }
+
+    mutating func setHaveQuantity(_ id: UUID, quantity: Int, maxQuantity: Int = 99) {
+        guard selectedHaveIDs.contains(id) else {
+            return
+        }
+        haveQuantities[id] = boundedQuantity(quantity, maxQuantity: maxQuantity)
+    }
+
+    mutating func setWishQuantity(_ id: UUID, quantity: Int) {
+        guard selectedWishIDs.contains(id) else {
+            return
+        }
+        wishQuantities[id] = boundedQuantity(quantity)
+    }
+
+    func haveQuantity(for id: UUID) -> Int {
+        boundedQuantity(haveQuantities[id] ?? 1)
+    }
+
+    func wishQuantity(for id: UUID) -> Int {
+        boundedQuantity(wishQuantities[id] ?? 1)
+    }
+
+    func validationMessage(inventory: [GoodsItem], wishes: [WishItem]) -> String? {
+        if selectedHaveIDs.isEmpty {
+            return "譲るものを選択してください"
+        }
+        if selectedWishIDs.isEmpty {
+            return "求めるものを選択してください"
+        }
+        let selectedHaveItems = selectedInventoryItems(from: inventory)
+        let selectedWishItems = selectedWishItems(from: wishes)
+        if selectedHaveItems.count != selectedHaveIDs.count {
+            return "選択した在庫を読み込めませんでした"
+        }
+        if selectedWishItems.count != selectedWishIDs.count {
+            return "選択したWishを読み込めませんでした"
+        }
+        if !hasSameGroupAndType(selectedHaveItems) {
+            return "譲るものは同じグループ・同じ種別で選んでください"
+        }
+        if !hasSameGroupAndType(selectedWishItems) {
+            return "求めるものは同じグループ・同じ種別で選んでください"
+        }
+        if haveLogic == .one, wishLogic == .one, selectedHaveIDs.count > 1, selectedWishIDs.count > 1 {
+            return "両方を「どれか1つだけ」にする場合は、片方を1件にしてください"
+        }
+        return nil
+    }
+
+    func createInput(inventory: [GoodsItem], wishes: [WishItem]) -> IndividualListingCreateInput? {
+        guard validationMessage(inventory: inventory, wishes: wishes) == nil else {
+            return nil
+        }
+        return IndividualListingCreateInput(
+            haveItems: selectedInventoryItems(from: inventory).map { item in
+                ListingItemQuantity(itemID: item.id, quantity: haveQuantity(for: item.id))
+            },
+            haveLogic: haveLogic,
+            wishItems: selectedWishItems(from: wishes).map { item in
+                ListingItemQuantity(itemID: item.id, quantity: wishQuantity(for: item.id))
+            },
+            wishLogic: wishLogic,
+            exchangeType: exchangeType,
+            note: trimmedNote
+        )
+    }
+
+    func updatedListing(from original: IndividualListing, inventory: [GoodsItem], wishes: [WishItem]) -> IndividualListing? {
+        guard let input = createInput(inventory: inventory, wishes: wishes) else {
+            return nil
+        }
+        let selectedHaveItems = selectedInventoryItems(from: inventory)
+        let selectedWishItems = selectedWishItems(from: wishes)
+        var options = original.options.sorted { $0.position < $1.position }
+        let existingOption = options.first
+        let updatedOption = IndividualListingWishOption(
+            id: existingOption?.id ?? UUID(),
+            listingID: original.id,
+            position: existingOption?.position ?? 1,
+            wishes: input.wishItems,
+            logic: input.wishLogic,
+            exchangeType: input.exchangeType,
+            isCashOffer: false,
+            cashAmount: nil,
+            wishGroupID: selectedWishItems.first?.groupID,
+            wishGoodsTypeID: selectedWishItems.first?.goodsTypeID,
+            createdAt: existingOption?.createdAt,
+            updatedAt: Date()
+        )
+        if options.isEmpty {
+            options = [updatedOption]
+        } else {
+            options[0] = updatedOption
+        }
+        return IndividualListing(
+            id: original.id,
+            ownerID: original.ownerID,
+            haves: input.haveItems,
+            haveLogic: input.haveLogic,
+            haveGroupID: selectedHaveItems.first?.groupID,
+            haveGoodsTypeID: selectedHaveItems.first?.goodsTypeID,
+            status: status,
+            note: input.note,
+            options: options,
+            createdAt: original.createdAt,
+            updatedAt: Date()
+        )
+    }
+
+    private var trimmedNote: String? {
+        let trimmed = note.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? nil : trimmed
+    }
+
+    private func selectedInventoryItems(from inventory: [GoodsItem]) -> [GoodsItem] {
+        inventory.filter { selectedHaveIDs.contains($0.id) }
+    }
+
+    private func selectedWishItems(from wishes: [WishItem]) -> [WishItem] {
+        wishes.filter { selectedWishIDs.contains($0.id) }
+    }
+
+    private func hasSameGroupAndType(_ items: [GoodsItem]) -> Bool {
+        guard let first = items.first else {
+            return true
+        }
+        return items.allSatisfy { $0.groupID == first.groupID && $0.goodsTypeID == first.goodsTypeID }
+    }
+
+    private func hasSameGroupAndType(_ items: [WishItem]) -> Bool {
+        guard let first = items.first else {
+            return true
+        }
+        return items.allSatisfy { $0.groupID == first.groupID && $0.goodsTypeID == first.goodsTypeID }
+    }
+}
+
+private func boundedQuantity(_ quantity: Int, maxQuantity: Int = 99) -> Int {
+    max(1, min(quantity, max(1, maxQuantity), 99))
+}
+
 struct IndividualListingEditorSheet: View {
     @ObservedObject var appState: MegrumAppState
-    var preselectedWishID: UUID?
+    var onLocalEditSaved: ((IndividualListing) -> Void)?
 
     @Environment(\.dismiss) private var dismiss
-    @State private var selectedHaveIDs: Set<UUID> = []
-    @State private var selectedWishIDs: Set<UUID> = []
-    @State private var haveLogic: ListingLogic = .all
-    @State private var wishLogic: ListingLogic = .one
-    @State private var exchangeType: IndividualListingExchangeType = .any
-    @State private var note = ""
-    @State private var didApplyPreset = false
+    @State private var draft: IndividualListingDraft
+
+    init(appState: MegrumAppState, preselectedWishID: UUID? = nil) {
+        self.appState = appState
+        self.onLocalEditSaved = nil
+        self._draft = State(initialValue: IndividualListingDraft(mode: .create(preselectedWishID: preselectedWishID)))
+    }
+
+    init(appState: MegrumAppState, editing listing: IndividualListing, onLocalEditSaved: @escaping (IndividualListing) -> Void) {
+        self.appState = appState
+        self.onLocalEditSaved = onLocalEditSaved
+        self._draft = State(initialValue: IndividualListingDraft(mode: .edit(listing)))
+    }
 
     var body: some View {
         Form {
@@ -288,12 +566,19 @@ struct IndividualListingEditorSheet: View {
                         SelectionRow(
                             title: item.title,
                             subtitle: item.quantity > 1 ? "\(item.quantity)個あります" : nil,
-                            isSelected: selectedHaveIDs.contains(item.id)
+                            isSelected: draft.selectedHaveIDs.contains(item.id)
                         ) {
-                            toggleHave(item.id)
+                            draft.toggleHave(item.id, maxQuantity: item.quantity)
+                        }
+                        if draft.selectedHaveIDs.contains(item.id) {
+                            Stepper(
+                                "数量 \(draft.haveQuantity(for: item.id))",
+                                value: haveQuantityBinding(for: item),
+                                in: 1...max(1, item.quantity)
+                            )
                         }
                     }
-                    Picker("譲る条件", selection: $haveLogic) {
+                    Picker("譲る条件", selection: $draft.haveLogic) {
                         ForEach(ListingLogic.allCases) { logic in
                             Text(logic == .all ? "全部出す" : "どれか1つ出す").tag(logic)
                         }
@@ -310,12 +595,19 @@ struct IndividualListingEditorSheet: View {
                         SelectionRow(
                             title: item.title,
                             subtitle: nil,
-                            isSelected: selectedWishIDs.contains(item.id)
+                            isSelected: draft.selectedWishIDs.contains(item.id)
                         ) {
-                            toggleWish(item.id)
+                            draft.toggleWish(item.id)
+                        }
+                        if draft.selectedWishIDs.contains(item.id) {
+                            Stepper(
+                                "数量 \(draft.wishQuantity(for: item.id))",
+                                value: wishQuantityBinding(for: item),
+                                in: 1...99
+                            )
                         }
                     }
-                    Picker("求める条件", selection: $wishLogic) {
+                    Picker("求める条件", selection: $draft.wishLogic) {
                         ForEach(ListingLogic.allCases) { logic in
                             Text(logic.displayName).tag(logic)
                         }
@@ -324,13 +616,26 @@ struct IndividualListingEditorSheet: View {
             }
 
             Section("交換タイプ") {
-                Picker("同種・異種", selection: $exchangeType) {
+                Picker("同種・異種", selection: $draft.exchangeType) {
                     ForEach(IndividualListingExchangeType.allCases) { type in
                         Text(type.displayName).tag(type)
                     }
                 }
-                TextField("メモ（任意）", text: $note, axis: .vertical)
+                TextField("メモ（任意）", text: $draft.note, axis: .vertical)
                     .lineLimit(2...4)
+            }
+
+            if draft.mode.isEditing {
+                Section("公開状態") {
+                    Picker("状態", selection: $draft.status) {
+                        ForEach([IndividualListingStatus.active, .paused, .closed]) { status in
+                            Text(status.displayName).tag(status)
+                        }
+                    }
+                    Text("保存すると個別募集の公開状態にも反映されます。")
+                        .font(.footnote.weight(.semibold))
+                        .foregroundStyle(MegrumTheme.muted)
+                }
             }
 
             if let validationMessage {
@@ -342,7 +647,7 @@ struct IndividualListingEditorSheet: View {
             }
         }
         .scrollDismissesKeyboard(.interactively)
-        .navigationTitle("個別募集を作成")
+        .navigationTitle(draft.navigationTitle)
         .megrumInlineNavigationTitle()
         .toolbar {
             ToolbarItem(placement: .cancellationAction) {
@@ -359,101 +664,64 @@ struct IndividualListingEditorSheet: View {
                     if appState.isCreatingIndividualListing {
                         ProgressView()
                     } else {
-                        Text("保存")
+                        Text(draft.confirmationTitle)
                     }
                 }
-                .disabled(validationMessage != nil || appState.isCreatingIndividualListing)
+                .disabled(validationMessage != nil || isSaving)
             }
         }
-        .onAppear {
-            applyPresetIfNeeded()
-        }
-    }
-
-    private var selectedHaveItems: [GoodsItem] {
-        appState.inventory.filter { selectedHaveIDs.contains($0.id) }
-    }
-
-    private var selectedWishItems: [WishItem] {
-        appState.wishes.filter { selectedWishIDs.contains($0.id) }
     }
 
     private var validationMessage: String? {
-        if selectedHaveIDs.isEmpty {
-            return "譲るものを選択してください"
-        }
-        if selectedWishIDs.isEmpty {
-            return "求めるものを選択してください"
-        }
-        if !hasSameGroupAndType(selectedHaveItems) {
-            return "譲るものは同じグループ・同じ種別で選んでください"
-        }
-        if !hasSameGroupAndType(selectedWishItems) {
-            return "求めるものは同じグループ・同じ種別で選んでください"
-        }
-        if haveLogic == .one, wishLogic == .one, selectedHaveIDs.count > 1, selectedWishIDs.count > 1 {
-            return "両方を「どれか1つだけ」にする場合は、片方を1件にしてください"
-        }
-        return nil
+        draft.validationMessage(inventory: appState.inventory, wishes: appState.wishes)
     }
 
-    private func toggleHave(_ id: UUID) {
-        if selectedHaveIDs.contains(id) {
-            selectedHaveIDs.remove(id)
-        } else {
-            selectedHaveIDs.insert(id)
+    private var isSaving: Bool {
+        switch draft.mode {
+        case .create:
+            return appState.isCreatingIndividualListing
+        case .edit(let listing):
+            return appState.updatingIndividualListingID == listing.id
         }
-    }
-
-    private func toggleWish(_ id: UUID) {
-        if selectedWishIDs.contains(id) {
-            selectedWishIDs.remove(id)
-        } else {
-            selectedWishIDs.insert(id)
-        }
-    }
-
-    private func hasSameGroupAndType(_ items: [GoodsItem]) -> Bool {
-        guard let first = items.first else {
-            return true
-        }
-        return items.allSatisfy { $0.groupID == first.groupID && $0.goodsTypeID == first.goodsTypeID }
-    }
-
-    private func hasSameGroupAndType(_ items: [WishItem]) -> Bool {
-        guard let first = items.first else {
-            return true
-        }
-        return items.allSatisfy { $0.groupID == first.groupID && $0.goodsTypeID == first.goodsTypeID }
     }
 
     private func save() async {
-        guard validationMessage == nil else {
+        guard let input = draft.createInput(inventory: appState.inventory, wishes: appState.wishes) else {
+            return
+        }
+        if case .edit(let listing) = draft.mode {
+            let primaryOptionID = listing.options.sorted { $0.position < $1.position }.first?.id
+            if let updated = await appState.updateIndividualListing(
+                listingID: listing.id,
+                primaryOptionID: primaryOptionID,
+                input: input,
+                status: draft.status
+            ) {
+                onLocalEditSaved?(updated)
+                dismiss()
+            }
             return
         }
         let saved = await appState.createIndividualListing(
-            IndividualListingCreateInput(
-                haveItems: selectedHaveItems.map { ListingItemQuantity(itemID: $0.id, quantity: 1) },
-                haveLogic: haveLogic,
-                wishItems: selectedWishItems.map { ListingItemQuantity(itemID: $0.id, quantity: 1) },
-                wishLogic: wishLogic,
-                exchangeType: exchangeType,
-                note: note
-            )
+            input
         )
         if saved {
             dismiss()
         }
     }
 
-    private func applyPresetIfNeeded() {
-        guard !didApplyPreset else {
-            return
-        }
-        didApplyPreset = true
-        if let preselectedWishID {
-            selectedWishIDs.insert(preselectedWishID)
-        }
+    private func haveQuantityBinding(for item: GoodsItem) -> Binding<Int> {
+        Binding(
+            get: { draft.haveQuantity(for: item.id) },
+            set: { draft.setHaveQuantity(item.id, quantity: $0, maxQuantity: item.quantity) }
+        )
+    }
+
+    private func wishQuantityBinding(for item: WishItem) -> Binding<Int> {
+        Binding(
+            get: { draft.wishQuantity(for: item.id) },
+            set: { draft.setWishQuantity(item.id, quantity: $0) }
+        )
     }
 }
 

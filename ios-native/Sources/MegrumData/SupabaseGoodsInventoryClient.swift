@@ -5,6 +5,9 @@ public enum SupabaseGoodsInventoryClientError: Error, Equatable, Sendable {
     case emptyTitle
     case invalidQuantity
     case emptyUpdate
+    case emptyTag
+    case imageTooLarge
+    case unsupportedImageContentType
 }
 
 public enum GoodsInventoryStatus: String, Codable, Sendable, CaseIterable, Identifiable {
@@ -26,6 +29,7 @@ public struct GoodsInventoryUpdateInput: Equatable, Sendable {
     public var quantity: Int?
     public var status: GoodsInventoryStatus?
     public var photoURLs: [String]?
+    public var tagNames: [String]?
 
     public init(
         title: String? = nil,
@@ -35,7 +39,8 @@ public struct GoodsInventoryUpdateInput: Equatable, Sendable {
         goodsTypeID: UUID? = nil,
         quantity: Int? = nil,
         status: GoodsInventoryStatus? = nil,
-        photoURLs: [String]? = nil
+        photoURLs: [String]? = nil,
+        tagNames: [String]? = nil
     ) {
         self.title = title
         self.groupID = groupID
@@ -45,10 +50,14 @@ public struct GoodsInventoryUpdateInput: Equatable, Sendable {
         self.quantity = quantity
         self.status = status
         self.photoURLs = photoURLs
+        self.tagNames = tagNames
     }
 }
 
 public final class SupabaseGoodsInventoryClient: @unchecked Sendable {
+    public static let goodsPhotoBucket = "goods-photos"
+    public static let maxGoodsPhotoUploadBytes = 10 * 1_024 * 1_024
+
     private let client: SupabaseRESTClient
     private let encoder: JSONEncoder
 
@@ -79,9 +88,11 @@ public final class SupabaseGoodsInventoryClient: @unchecked Sendable {
             values: [GoodsEntryPayload(userID: userID, input: input, photoURLs: normalizedPhotoURLs)],
             select: GoodsInventoryRow.select
         )
-        return rows.first?.goodsItem ?? GoodsItem(
+        var item = rows.first?.goodsItem ?? GoodsItem(
             id: UUID(),
             ownerID: userID,
+            kind: input.kind,
+            status: input.status ?? .active,
             groupID: input.groupID,
             memberID: input.memberID,
             goodsTypeID: input.goodsTypeID,
@@ -89,6 +100,9 @@ public final class SupabaseGoodsInventoryClient: @unchecked Sendable {
             imageURL: normalizedPhotoURLs.compactMap(URL.init(string:)).first,
             quantity: max(1, min(input.quantity, 999))
         )
+        let tags = try await syncGoodsTagsIfNeeded(inventoryID: item.id, tagNames: input.tagNames)
+        item.tags = tags
+        return item
     }
 
     public func searchGoods(viewerID: UUID, input: GoodsSearchInput) async throws -> [GoodsItem] {
@@ -97,7 +111,7 @@ public final class SupabaseGoodsInventoryClient: @unchecked Sendable {
             select: GoodsInventoryRow.select,
             queryItems: searchQueryItems(viewerID: viewerID, input: input)
         )
-        return rows.map(\.goodsItem)
+        return try await goodsItemsWithTags(from: rows)
     }
 
     public func loadPublicTradeGoods(userID: UUID, limit: Int = 60) async throws -> [GoodsItem] {
@@ -106,7 +120,7 @@ public final class SupabaseGoodsInventoryClient: @unchecked Sendable {
             select: GoodsInventoryRow.select,
             queryItems: publicTradeGoodsQueryItems(userID: userID, limit: limit)
         )
-        return rows.map(\.goodsItem)
+        return try await goodsItemsWithTags(from: rows)
     }
 
     public func archiveGoodsItem(userID: UUID, itemID: UUID) async throws -> GoodsItem? {
@@ -116,7 +130,10 @@ public final class SupabaseGoodsInventoryClient: @unchecked Sendable {
             select: GoodsInventoryRow.select,
             queryItems: ownedItemQueryItems(userID: userID, itemID: itemID)
         )
-        return rows.first?.goodsItem
+        guard let row = rows.first else {
+            return nil
+        }
+        return try await goodsItemsWithTags(from: [row]).first
     }
 
     public func updateGoodsItem(userID: UUID, itemID: UUID, input: GoodsInventoryUpdateInput) async throws -> GoodsItem? {
@@ -127,13 +144,124 @@ public final class SupabaseGoodsInventoryClient: @unchecked Sendable {
             select: GoodsInventoryRow.select,
             queryItems: ownedItemQueryItems(userID: userID, itemID: itemID)
         )
-        return rows.first?.goodsItem
+        guard var item = rows.first?.goodsItem else {
+            return nil
+        }
+        if let tagNames = input.tagNames {
+            item.tags = try await syncGoodsTagsIfNeeded(inventoryID: item.id, tagNames: tagNames)
+        } else {
+            item.tags = try await loadGoodsTags(inventoryIDs: [item.id])[item.id] ?? []
+        }
+        return item
     }
 
     public func deleteGoodsItem(userID: UUID, itemID: UUID) async throws {
         try await client.deleteRows(
             from: "goods_inventory",
             queryItems: ownedItemQueryItems(userID: userID, itemID: itemID)
+        )
+    }
+
+    public func uploadGoodsPhoto(userID: UUID, imageData: Data, contentType: String) async throws -> String {
+        guard imageData.count <= Self.maxGoodsPhotoUploadBytes else {
+            throw SupabaseGoodsInventoryClientError.imageTooLarge
+        }
+        let normalizedContentType = try normalizedImageContentType(contentType)
+        let path = goodsPhotoPath(userID: userID, contentType: normalizedContentType)
+        try await client.uploadObject(
+            bucket: Self.goodsPhotoBucket,
+            path: path,
+            data: imageData,
+            contentType: normalizedContentType,
+            upsert: false
+        )
+        return try client.publicStorageObjectURL(bucket: Self.goodsPhotoBucket, path: path).absoluteString
+    }
+
+    public func loadGoodsTags(inventoryIDs: [UUID]) async throws -> [UUID: [GoodsTag]] {
+        let ids = Array(Set(inventoryIDs))
+        guard !ids.isEmpty else {
+            return [:]
+        }
+        let rows: [GoodsInventoryTagRow] = try await client.fetchRows(
+            from: "goods_inventory_tags",
+            select: GoodsInventoryTagRow.select,
+            queryItems: [
+                URLQueryItem(
+                    name: "inventory_id",
+                    value: "in.(\(ids.map { $0.uuidString.lowercased() }.sorted().joined(separator: ",")))"
+                ),
+                URLQueryItem(name: "order", value: "created_at.asc")
+            ]
+        )
+        return rows.reduce(into: [:]) { result, row in
+            guard let tag = row.tag?.goodsTag else {
+                return
+            }
+            result[row.inventoryId, default: []].append(tag)
+        }
+    }
+
+    @discardableResult
+    public func attachGoodsTag(inventoryID: UUID, rawLabel: String) async throws -> GoodsTag {
+        guard let normalizedLabel = normalizedTagName(rawLabel) else {
+            throw SupabaseGoodsInventoryClientError.emptyTag
+        }
+        let tagID: UUID = try await client.rpcValue(
+            function: "attach_inventory_tag",
+            payload: AttachInventoryTagPayload(inventoryID: inventoryID, rawLabel: normalizedLabel)
+        )
+        return GoodsTag(id: tagID, name: normalizedLabel)
+    }
+
+    public func detachGoodsTag(inventoryID: UUID, tagID: UUID) async throws {
+        try await client.rpcVoid(
+            function: "detach_inventory_tag",
+            payload: DetachInventoryTagPayload(inventoryID: inventoryID, tagID: tagID)
+        )
+    }
+
+    public func makeUploadGoodsPhotoRequest(userID: UUID, path: String, data: Data, contentType: String) throws -> URLRequest {
+        guard data.count <= Self.maxGoodsPhotoUploadBytes else {
+            throw SupabaseGoodsInventoryClientError.imageTooLarge
+        }
+        return try client.makeStorageObjectUploadRequest(
+            bucket: Self.goodsPhotoBucket,
+            path: path,
+            data: data,
+            contentType: normalizedImageContentType(contentType),
+            upsert: false
+        )
+    }
+
+    public func makeAttachGoodsTagRequest(inventoryID: UUID, rawLabel: String) throws -> URLRequest {
+        guard let normalizedLabel = normalizedTagName(rawLabel) else {
+            throw SupabaseGoodsInventoryClientError.emptyTag
+        }
+        return try client.makeRPCRequest(
+            function: "attach_inventory_tag",
+            payload: AttachInventoryTagPayload(inventoryID: inventoryID, rawLabel: normalizedLabel)
+        )
+    }
+
+    public func makeDetachGoodsTagRequest(inventoryID: UUID, tagID: UUID) throws -> URLRequest {
+        try client.makeRPCRequest(
+            function: "detach_inventory_tag",
+            payload: DetachInventoryTagPayload(inventoryID: inventoryID, tagID: tagID)
+        )
+    }
+
+    public func makeLoadGoodsTagsRequest(inventoryIDs: [UUID]) throws -> URLRequest {
+        try client.makeRequest(
+            path: "/rest/v1/goods_inventory_tags",
+            queryItems: [
+                URLQueryItem(name: "select", value: GoodsInventoryTagRow.select),
+                URLQueryItem(
+                    name: "inventory_id",
+                    value: "in.(\(inventoryIDs.map { $0.uuidString.lowercased() }.sorted().joined(separator: ",")))"
+                ),
+                URLQueryItem(name: "order", value: "created_at.asc")
+            ]
         )
     }
 
@@ -276,6 +404,96 @@ public final class SupabaseGoodsInventoryClient: @unchecked Sendable {
         }
     }
 
+    private func goodsItemsWithTags(from rows: [GoodsInventoryRow]) async throws -> [GoodsItem] {
+        let tagMap = try await loadGoodsTags(inventoryIDs: rows.map(\.id))
+        return rows.map { row in
+            var item = row.goodsItem
+            item.tags = tagMap[row.id] ?? []
+            return item
+        }
+    }
+
+    private func syncGoodsTagsIfNeeded(inventoryID: UUID, tagNames: [String]) async throws -> [GoodsTag] {
+        let desiredNames = normalizedTagNames(tagNames)
+        let existingTags = try await loadGoodsTags(inventoryIDs: [inventoryID])[inventoryID] ?? []
+        let existingByName = existingTags.reduce(into: [String: GoodsTag]()) { result, tag in
+            let key = tag.name.lowercased()
+            if result[key] == nil {
+                result[key] = tag
+            }
+        }
+        let desiredKeys = Set(desiredNames.map { $0.lowercased() })
+
+        for tag in existingTags where !desiredKeys.contains(tag.name.lowercased()) {
+            try await detachGoodsTag(inventoryID: inventoryID, tagID: tag.id)
+        }
+
+        var synced: [GoodsTag] = []
+        for name in desiredNames {
+            if let existing = existingByName[name.lowercased()] {
+                synced.append(existing)
+            } else {
+                synced.append(try await attachGoodsTag(inventoryID: inventoryID, rawLabel: name))
+            }
+        }
+        return synced
+    }
+
+    private func normalizedTagNames(_ tagNames: [String]) -> [String] {
+        tagNames.reduce(into: []) { result, raw in
+            guard result.count < 5, let normalized = normalizedTagName(raw) else {
+                return
+            }
+            if !result.contains(where: { $0.caseInsensitiveCompare(normalized) == .orderedSame }) {
+                result.append(normalized)
+            }
+        }
+    }
+
+    private func normalizedTagName(_ raw: String) -> String? {
+        let normalized = raw
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .trimmingCharacters(in: CharacterSet(charactersIn: "#＃"))
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        return normalized.isEmpty ? nil : String(normalized.prefix(50))
+    }
+
+    private func normalizedImageContentType(_ contentType: String) throws -> String {
+        switch contentType.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() {
+        case "image/jpeg", "image/jpg":
+            "image/jpeg"
+        case "image/png":
+            "image/png"
+        case "image/webp":
+            "image/webp"
+        case "image/gif":
+            "image/gif"
+        default:
+            throw SupabaseGoodsInventoryClientError.unsupportedImageContentType
+        }
+    }
+
+    private func goodsPhotoPath(userID: UUID, contentType: String) -> String {
+        let milliseconds = Int(Date().timeIntervalSince1970 * 1_000)
+        return [
+            userID.uuidString.lowercased(),
+            "\(milliseconds)_\(UUID().uuidString.lowercased()).\(fileExtension(for: contentType))"
+        ].joined(separator: "/")
+    }
+
+    private func fileExtension(for contentType: String) -> String {
+        switch contentType {
+        case "image/png":
+            "png"
+        case "image/webp":
+            "webp"
+        case "image/gif":
+            "gif"
+        default:
+            "jpg"
+        }
+    }
+
     private static func makeEncoder() -> JSONEncoder {
         let encoder = JSONEncoder()
         encoder.keyEncodingStrategy = .convertToSnakeCase
@@ -302,10 +520,12 @@ private struct GoodsTypeRow: Decodable, Sendable {
 }
 
 private struct GoodsInventoryRow: Decodable, Sendable {
-    static let select = "id,user_id,group_id,character_id,goods_type_id,title,photo_urls,quantity"
+    static let select = "id,user_id,kind,status,group_id,character_id,goods_type_id,title,photo_urls,quantity"
 
     var id: UUID
     var userId: UUID
+    var kind: String?
+    var status: String?
     var groupId: UUID?
     var characterId: UUID?
     var goodsTypeId: UUID?
@@ -317,6 +537,8 @@ private struct GoodsInventoryRow: Decodable, Sendable {
         GoodsItem(
             id: id,
             ownerID: userId,
+            kind: GoodsEntryKind(inventoryKind: kind),
+            status: status.flatMap(GoodsEntryStatus.init(rawValue:)),
             groupID: groupId,
             memberID: characterId,
             goodsTypeID: goodsTypeId,
@@ -325,6 +547,22 @@ private struct GoodsInventoryRow: Decodable, Sendable {
             tags: [],
             quantity: max(1, quantity ?? 1)
         )
+    }
+}
+
+private struct GoodsInventoryTagRow: Decodable, Sendable {
+    static let select = "inventory_id,tag:tags_master(id,label)"
+
+    var inventoryId: UUID
+    var tag: GoodsTagRow?
+}
+
+private struct GoodsTagRow: Decodable, Sendable {
+    var id: UUID
+    var label: String
+
+    var goodsTag: GoodsTag {
+        GoodsTag(id: id, name: label)
     }
 }
 
@@ -357,6 +595,36 @@ private struct GoodsEntryPayload: Encodable, Sendable {
         self.quantity = max(1, min(input.quantity, 999))
         self.status = input.status?.rawValue
         self.photoUrls = photoURLs
+    }
+}
+
+private struct AttachInventoryTagPayload: Encodable, Sendable {
+    var inventoryID: UUID
+    var rawLabel: String
+
+    init(inventoryID: UUID, rawLabel: String) {
+        self.inventoryID = inventoryID
+        self.rawLabel = rawLabel
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case inventoryID = "p_inventory_id"
+        case rawLabel = "p_raw_label"
+    }
+}
+
+private struct DetachInventoryTagPayload: Encodable, Sendable {
+    var inventoryID: UUID
+    var tagID: UUID
+
+    init(inventoryID: UUID, tagID: UUID) {
+        self.inventoryID = inventoryID
+        self.tagID = tagID
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case inventoryID = "p_inventory_id"
+        case tagID = "p_tag_id"
     }
 }
 

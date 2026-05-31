@@ -122,6 +122,57 @@ final class SupabaseGroomClientTests: XCTestCase {
         XCTAssertEqual(posts.first?.longitude, 139.767125)
     }
 
+    func testLoadNearbyGroomsFiltersUnexpectedFarRowsClientSide() throws {
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [GroomMockURLProtocol.self]
+        let session = URLSession(configuration: configuration)
+        let client = SupabaseGroomClient(configuration: self.configuration, session: session)
+
+        GroomMockURLProtocol.requestHandler = { request in
+            guard let url = request.url else {
+                throw GroomMockError.missingURL
+            }
+
+            guard url.path == "/rest/v1/rpc/list_groom_feed_nearby" else {
+                throw GroomMockError.unexpectedRequest(url.absoluteString)
+            }
+            let data = Data("""
+            [
+              {
+                "id": "00000000-0000-0000-0000-000000000501",
+                "user_id": "00000000-0000-0000-0000-000000000001",
+                "image_url": "https://example.com/near.jpg",
+                "image_path": null,
+                "published_at": "2026-05-31T00:00:00Z",
+                "created_at": "2026-05-31T00:00:00Z",
+                "origin_lat": 35.681236,
+                "origin_lng": 139.767125
+              },
+              {
+                "id": "00000000-0000-0000-0000-000000000502",
+                "user_id": "00000000-0000-0000-0000-000000000002",
+                "image_url": "https://example.com/far.jpg",
+                "image_path": null,
+                "published_at": "2026-05-31T00:00:00Z",
+                "created_at": "2026-05-31T00:00:00Z",
+                "origin_lat": 35.701236,
+                "origin_lng": 139.767125
+              }
+            ]
+            """.utf8)
+            return (GroomMockURLProtocol.response(for: url, statusCode: 200), data)
+        }
+        defer {
+            GroomMockURLProtocol.requestHandler = nil
+        }
+
+        let posts = try waitForAsyncResult {
+            try await client.loadNearbyGrooms(latitude: 35.681236, longitude: 139.767125)
+        }
+
+        XCTAssertEqual(posts.map(\.imageURL.absoluteString), ["https://example.com/near.jpg"])
+    }
+
     func testBuildsGroomPostCreateRequest() throws {
         let client = SupabaseGroomClient(configuration: configuration)
         let authorID = UUID(uuidString: "00000000-0000-0000-0000-000000000001")!

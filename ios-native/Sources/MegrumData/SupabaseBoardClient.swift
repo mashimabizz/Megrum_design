@@ -3,6 +3,7 @@ import MegrumCore
 
 public final class SupabaseBoardClient: @unchecked Sendable {
     private static let threadSelect = "id,author_id,title,body,audience_scope,origin_lat,origin_lng,prefecture,latest_activity_at,created_at"
+    private static let nearbyRadiusMeters = 3_000.0
 
     private let client: SupabaseRESTClient
 
@@ -29,7 +30,18 @@ public final class SupabaseBoardClient: @unchecked Sendable {
                 scope: scope
             )
         )
-        return rows.compactMap(\.thread)
+        return rows.compactMap { row in
+            guard row.isVisibleInRequestedScope(
+                latitude: latitude,
+                longitude: longitude,
+                prefecture: prefecture,
+                scope: scope,
+                radiusMeters: Self.nearbyRadiusMeters
+            ) else {
+                return nil
+            }
+            return row.thread
+        }
     }
 
     public func loadReplies(
@@ -151,7 +163,7 @@ private struct BoardThreadListPayload: Encodable, Sendable {
         self.pViewerLat = context.latitude
         self.pViewerLng = context.longitude
         self.pPrefecture = context.prefecture
-        self.pScope = scope.rawValue
+        self.pScope = context.rpcScope.rawValue
     }
 
     enum CodingKeys: String, CodingKey {
@@ -207,6 +219,43 @@ private struct BoardThreadRow: Decodable, Sendable {
             prefecture: prefecture,
             createdAt: latestActivityAt ?? createdAt ?? .now
         )
+    }
+
+    func isVisibleInRequestedScope(
+        latitude: Double?,
+        longitude: Double?,
+        prefecture: String?,
+        scope: BoardThread.Audience,
+        radiusMeters: Double
+    ) -> Bool {
+        switch scope {
+        case .nearby3km, .sameSpot:
+            guard
+                let latitude,
+                let longitude,
+                let originLat,
+                let originLng
+            else {
+                return true
+            }
+            return haversineMeters(
+                fromLatitude: latitude,
+                fromLongitude: longitude,
+                toLatitude: originLat,
+                toLongitude: originLng
+            ) <= radiusMeters
+        case .samePrefecture:
+            guard
+                let requestedPrefecture = prefecture?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty,
+                let threadPrefecture = self.prefecture?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
+            else {
+                return true
+            }
+            return threadPrefecture.replacingOccurrences(of: " ", with: "")
+                == requestedPrefecture.replacingOccurrences(of: " ", with: "")
+        case .global:
+            return true
+        }
     }
 }
 
@@ -303,7 +352,7 @@ private struct BoardReplyListPayload: Encodable, Sendable {
         self.pViewerLat = context.latitude
         self.pViewerLng = context.longitude
         self.pPrefecture = context.prefecture
-        self.pScope = scope.rawValue
+        self.pScope = context.rpcScope.rawValue
     }
 
     enum CodingKeys: String, CodingKey {
@@ -360,7 +409,7 @@ private struct BoardReplyAppendPayload: Encodable, Sendable {
         self.pViewerLat = context.latitude
         self.pViewerLng = context.longitude
         self.pPrefecture = context.prefecture
-        self.pScope = input.scope.rawValue
+        self.pScope = context.rpcScope.rawValue
         self.pParentReplyId = nil
         self.pQuoteAuthorName = nil
         self.pQuoteBody = nil
@@ -432,6 +481,7 @@ private struct BoardScopeQueryContext: Sendable {
     var latitude: Double?
     var longitude: Double?
     var prefecture: String?
+    var rpcScope: BoardThread.Audience
 
     init(latitude: Double?, longitude: Double?, prefecture: String?, scope: BoardThread.Audience) {
         let trimmedPrefecture = prefecture?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
@@ -440,14 +490,17 @@ private struct BoardScopeQueryContext: Sendable {
             self.latitude = latitude
             self.longitude = longitude
             self.prefecture = nil
+            self.rpcScope = .nearby3km
         case .samePrefecture:
             self.latitude = nil
             self.longitude = nil
             self.prefecture = trimmedPrefecture
+            self.rpcScope = .samePrefecture
         case .sameSpot, .global:
             self.latitude = latitude
             self.longitude = longitude
             self.prefecture = trimmedPrefecture
+            self.rpcScope = scope == .sameSpot ? .nearby3km : .global
         }
     }
 }
@@ -456,4 +509,20 @@ private extension String {
     var nilIfEmpty: String? {
         isEmpty ? nil : self
     }
+}
+
+private func haversineMeters(
+    fromLatitude: Double,
+    fromLongitude: Double,
+    toLatitude: Double,
+    toLongitude: Double
+) -> Double {
+    let earthRadius = 6_371_000.0
+    let fromLat = fromLatitude * .pi / 180
+    let toLat = toLatitude * .pi / 180
+    let deltaLat = (toLatitude - fromLatitude) * .pi / 180
+    let deltaLng = (toLongitude - fromLongitude) * .pi / 180
+    let a = sin(deltaLat / 2) * sin(deltaLat / 2)
+        + cos(fromLat) * cos(toLat) * sin(deltaLng / 2) * sin(deltaLng / 2)
+    return earthRadius * 2 * atan2(sqrt(a), sqrt(1 - a))
 }

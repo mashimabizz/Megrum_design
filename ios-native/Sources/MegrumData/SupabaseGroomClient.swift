@@ -37,8 +37,15 @@ public final class SupabaseGroomClient: @unchecked Sendable {
                 minRadiusMeters: Self.minRadiusMeters
             )
         )
-        let signedURLs = await signedURLMap(for: rows)
-        return rows.compactMap { $0.post(signedURLs: signedURLs) }
+        let scopedRows = rows.filter {
+            $0.isWithinRadius(
+                latitude: latitude,
+                longitude: longitude,
+                radiusMeters: Double(Self.maxFeedRadiusMeters)
+            )
+        }
+        let signedURLs = await signedURLMap(for: scopedRows)
+        return scopedRows.compactMap { $0.post(signedURLs: signedURLs) }
     }
 
     public func loadGroomMapPosts(
@@ -333,6 +340,23 @@ private struct GroomFeedRow: Decodable, Sendable {
         return nil
     }
 
+    func isWithinRadius(latitude: Double?, longitude: Double?, radiusMeters: Double) -> Bool {
+        guard
+            let latitude,
+            let longitude,
+            let originLat,
+            let originLng
+        else {
+            return true
+        }
+        return haversineMeters(
+            fromLatitude: latitude,
+            fromLongitude: longitude,
+            toLatitude: originLat,
+            toLongitude: originLng
+        ) <= radiusMeters
+    }
+
     private var normalizedImageURL: String? {
         guard let imageUrl = imageUrl?.trimmingCharacters(in: .whitespacesAndNewlines), !imageUrl.isEmpty else {
             return nil
@@ -510,4 +534,20 @@ private func fileExtension(for contentType: String) -> String {
     default:
         "jpg"
     }
+}
+
+private func haversineMeters(
+    fromLatitude: Double,
+    fromLongitude: Double,
+    toLatitude: Double,
+    toLongitude: Double
+) -> Double {
+    let earthRadius = 6_371_000.0
+    let fromLat = fromLatitude * .pi / 180
+    let toLat = toLatitude * .pi / 180
+    let deltaLat = (toLatitude - fromLatitude) * .pi / 180
+    let deltaLng = (toLongitude - fromLongitude) * .pi / 180
+    let a = sin(deltaLat / 2) * sin(deltaLat / 2)
+        + cos(fromLat) * cos(toLat) * sin(deltaLng / 2) * sin(deltaLng / 2)
+    return earthRadius * 2 * atan2(sqrt(a), sqrt(1 - a))
 }

@@ -97,7 +97,7 @@ struct PublicUserProfileScreen: View {
                     appState: appState,
                     targetItem: target.targetItem,
                     listingID: target.listing.id,
-                    receiverGoodsIDs: target.listing.haves.map(\.itemID)
+                    receiverGoodsIDs: target.receiverGoodsIDs
                 )
             }
         }
@@ -122,11 +122,24 @@ private enum PublicProfileExchangeTab: String, CaseIterable, Identifiable {
     var id: String { rawValue }
 }
 
-private struct ListingProposalTarget: Identifiable {
+struct ListingProposalTarget: Identifiable, Equatable {
     var listing: IndividualListing
     var targetItem: GoodsItem
+    var receiverGoodsIDs: [UUID]
 
     var id: UUID { listing.id }
+
+    init?(listing: IndividualListing, goodsByID: [UUID: GoodsItem]) {
+        let receiverGoodsIDs = listing.haves.map(\.itemID).deduplicated()
+        guard
+            let targetItem = receiverGoodsIDs.compactMap({ goodsByID[$0] }).first
+        else {
+            return nil
+        }
+        self.listing = listing
+        self.targetItem = targetItem
+        self.receiverGoodsIDs = receiverGoodsIDs
+    }
 }
 
 private struct ProfileHero: View {
@@ -267,6 +280,10 @@ private struct PublicProfileListingCard: View {
         listing.haves.compactMap { goodsByID[$0.itemID] }
     }
 
+    private var proposalTarget: ListingProposalTarget? {
+        ListingProposalTarget(listing: listing, goodsByID: goodsByID)
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             HStack(alignment: .firstTextBaseline) {
@@ -312,10 +329,10 @@ private struct PublicProfileListingCard: View {
             }
 
             Button {
-                guard let targetItem = targetItems.first else {
+                guard let proposalTarget else {
                     return
                 }
-                onStartProposal(ListingProposalTarget(listing: listing, targetItem: targetItem))
+                onStartProposal(proposalTarget)
             } label: {
                 Text("この募集に打診する")
                     .font(.system(size: 16, weight: .heavy, design: .rounded))
@@ -325,8 +342,8 @@ private struct PublicProfileListingCard: View {
                     .background(MegrumTheme.lavender, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
             }
             .buttonStyle(.plain)
-            .disabled(targetItems.isEmpty)
-            .opacity(targetItems.isEmpty ? 0.48 : 1)
+            .disabled(proposalTarget == nil)
+            .opacity(proposalTarget == nil ? 0.48 : 1)
         }
         .padding(16)
         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
@@ -365,6 +382,13 @@ private struct PublicProfileEmptyExchangeMessage: View {
                 RoundedRectangle(cornerRadius: 24, style: .continuous)
                     .strokeBorder(.white.opacity(0.55), lineWidth: 1)
             }
+    }
+}
+
+private extension Array where Element == UUID {
+    func deduplicated() -> [UUID] {
+        var seen: Set<UUID> = []
+        return filter { seen.insert($0).inserted }
     }
 }
 

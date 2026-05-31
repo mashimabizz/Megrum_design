@@ -62,11 +62,34 @@ public enum AccountStatus: String, Codable, Sendable, CaseIterable, Identifiable
     }
 }
 
+public enum UserGender: String, Codable, Sendable, CaseIterable, Identifiable {
+    case female
+    case male
+    case other
+    case noAnswer = "no_answer"
+
+    public var id: String { rawValue }
+
+    public var displayName: String {
+        switch self {
+        case .female:
+            "女性"
+        case .male:
+            "男性"
+        case .other:
+            "その他"
+        case .noAnswer:
+            "回答しない"
+        }
+    }
+}
+
 public struct UserProfile: Identifiable, Codable, Hashable, Sendable {
     public var id: UUID
     public var handle: String
     public var displayName: String
     public var avatarURL: URL?
+    public var gender: UserGender?
     public var prefecture: String?
     public var accountStatus: AccountStatus
 
@@ -75,6 +98,7 @@ public struct UserProfile: Identifiable, Codable, Hashable, Sendable {
         handle: String,
         displayName: String,
         avatarURL: URL? = nil,
+        gender: UserGender? = nil,
         prefecture: String? = nil,
         accountStatus: AccountStatus = .active
     ) {
@@ -82,6 +106,7 @@ public struct UserProfile: Identifiable, Codable, Hashable, Sendable {
         self.handle = handle
         self.displayName = displayName
         self.avatarURL = avatarURL
+        self.gender = gender
         self.prefecture = prefecture
         self.accountStatus = accountStatus
     }
@@ -194,16 +219,96 @@ public enum OshiKind: String, Codable, Sendable, CaseIterable, Identifiable {
     public var id: String { rawValue }
 }
 
+public enum OshiRequestKind: String, Codable, Sendable, CaseIterable, Identifiable {
+    case group
+    case work
+    case solo
+
+    public var id: String { rawValue }
+
+    public var displayName: String {
+        switch self {
+        case .group:
+            "グループ"
+        case .work:
+            "作品"
+        case .solo:
+            "ソロ"
+        }
+    }
+}
+
+public struct OshiGenre: Identifiable, Codable, Hashable, Sendable {
+    public var id: UUID
+    public var name: String
+    public var kind: String?
+    public var displayOrder: Int
+
+    public init(id: UUID, name: String, kind: String? = nil, displayOrder: Int = 0) {
+        self.id = id
+        self.name = name
+        self.kind = kind
+        self.displayOrder = displayOrder
+    }
+}
+
+public struct OshiRequestCreateInput: Equatable, Sendable {
+    public var requestedName: String
+    public var requestedKind: OshiRequestKind
+    public var requestedGenreID: UUID?
+    public var note: String?
+
+    public init(
+        requestedName: String,
+        requestedKind: OshiRequestKind,
+        requestedGenreID: UUID? = nil,
+        note: String? = nil
+    ) {
+        self.requestedName = requestedName
+        self.requestedKind = requestedKind
+        self.requestedGenreID = requestedGenreID
+        self.note = note
+    }
+}
+
+public struct CharacterRequestCreateInput: Equatable, Sendable {
+    public var groupID: UUID?
+    public var oshiRequestID: UUID?
+    public var requestedName: String
+    public var note: String?
+
+    public init(groupID: UUID?, oshiRequestID: UUID? = nil, requestedName: String, note: String? = nil) {
+        self.groupID = groupID
+        self.oshiRequestID = oshiRequestID
+        self.requestedName = requestedName
+        self.note = note
+    }
+}
+
 public struct OshiGroup: Identifiable, Codable, Hashable, Sendable {
     public var id: UUID
     public var name: String
     public var aliases: [String]
+    public var kind: OshiRequestKind
+    public var genreID: UUID?
+    public var genreName: String?
     public var displayOrder: Int
 
-    public init(id: UUID, name: String, aliases: [String] = [], displayOrder: Int = 0) {
+    public init(
+        id: UUID,
+        name: String,
+        aliases: [String] = [],
+        kind: OshiRequestKind = .group,
+        genreID: UUID? = nil,
+        genreName: String? = nil,
+        displayOrder: Int = 0
+    ) {
         self.id = id
         self.name = name
         self.aliases = aliases
+        self.kind = kind
+        self.genreID = genreID
+        self.genreName = genreName
         self.displayOrder = displayOrder
     }
 }
@@ -249,6 +354,12 @@ public struct UserOshiSelection: Identifiable, Codable, Hashable, Sendable {
     public var userID: UUID
     public var groupID: UUID?
     public var characterID: UUID?
+    public var oshiRequestID: UUID?
+    public var characterRequestID: UUID?
+    public var groupName: String?
+    public var characterName: String?
+    public var oshiRequestName: String?
+    public var characterRequestName: String?
     public var kind: OshiKind
     public var priority: Int
 
@@ -258,12 +369,24 @@ public struct UserOshiSelection: Identifiable, Codable, Hashable, Sendable {
         groupID: UUID?,
         characterID: UUID?,
         kind: OshiKind,
-        priority: Int
+        priority: Int,
+        oshiRequestID: UUID? = nil,
+        characterRequestID: UUID? = nil,
+        groupName: String? = nil,
+        characterName: String? = nil,
+        oshiRequestName: String? = nil,
+        characterRequestName: String? = nil
     ) {
         self.id = id
         self.userID = userID
         self.groupID = groupID
         self.characterID = characterID
+        self.oshiRequestID = oshiRequestID
+        self.characterRequestID = characterRequestID
+        self.groupName = groupName
+        self.characterName = characterName
+        self.oshiRequestName = oshiRequestName
+        self.characterRequestName = characterRequestName
         self.kind = kind
         self.priority = priority
     }
@@ -445,6 +568,8 @@ public struct GoodsTag: Identifiable, Codable, Hashable, Sendable {
 public struct GoodsItem: Identifiable, Codable, Hashable, Sendable {
     public var id: UUID
     public var ownerID: UUID
+    public var kind: GoodsEntryKind?
+    public var status: GoodsEntryStatus?
     public var groupID: UUID?
     public var memberID: UUID?
     public var goodsTypeID: UUID?
@@ -456,6 +581,8 @@ public struct GoodsItem: Identifiable, Codable, Hashable, Sendable {
     public init(
         id: UUID,
         ownerID: UUID,
+        kind: GoodsEntryKind? = nil,
+        status: GoodsEntryStatus? = nil,
         groupID: UUID? = nil,
         memberID: UUID? = nil,
         goodsTypeID: UUID? = nil,
@@ -466,6 +593,8 @@ public struct GoodsItem: Identifiable, Codable, Hashable, Sendable {
     ) {
         self.id = id
         self.ownerID = ownerID
+        self.kind = kind
+        self.status = status
         self.groupID = groupID
         self.memberID = memberID
         self.goodsTypeID = goodsTypeID
@@ -473,6 +602,16 @@ public struct GoodsItem: Identifiable, Codable, Hashable, Sendable {
         self.imageURL = imageURL
         self.tags = tags
         self.quantity = quantity
+    }
+}
+
+public struct GoodsPhotoUpload: Equatable, Sendable {
+    public var data: Data
+    public var contentType: String
+
+    public init(data: Data, contentType: String = "image/jpeg") {
+        self.data = data
+        self.contentType = contentType
     }
 }
 
@@ -490,6 +629,17 @@ public enum GoodsEntryKind: String, Codable, Sendable, CaseIterable, Identifiabl
             "wanted"
         }
     }
+
+    public init?(inventoryKind: String?) {
+        switch inventoryKind {
+        case "for_trade":
+            self = .inventory
+        case "wanted":
+            self = .wish
+        default:
+            return nil
+        }
+    }
 }
 
 public enum GoodsEntryStatus: String, Codable, Sendable, CaseIterable, Identifiable {
@@ -500,6 +650,19 @@ public enum GoodsEntryStatus: String, Codable, Sendable, CaseIterable, Identifia
     case archived
 
     public var id: String { rawValue }
+
+    public var inventoryTabTitle: String {
+        switch self {
+        case .active, .reserved:
+            "譲る候補"
+        case .keep:
+            "自分用キープ"
+        case .traded:
+            "過去に譲った"
+        case .archived:
+            "非表示"
+        }
+    }
 }
 
 public struct GoodsEntryInput: Equatable, Sendable {
@@ -510,6 +673,8 @@ public struct GoodsEntryInput: Equatable, Sendable {
     public var goodsTypeID: UUID
     public var quantity: Int
     public var status: GoodsEntryStatus?
+    public var tagNames: [String]
+    public var photoUpload: GoodsPhotoUpload?
 
     public init(
         kind: GoodsEntryKind,
@@ -518,7 +683,9 @@ public struct GoodsEntryInput: Equatable, Sendable {
         memberID: UUID? = nil,
         goodsTypeID: UUID,
         quantity: Int = 1,
-        status: GoodsEntryStatus? = nil
+        status: GoodsEntryStatus? = nil,
+        tagNames: [String] = [],
+        photoUpload: GoodsPhotoUpload? = nil
     ) {
         self.kind = kind
         self.title = title
@@ -527,6 +694,8 @@ public struct GoodsEntryInput: Equatable, Sendable {
         self.goodsTypeID = goodsTypeID
         self.quantity = quantity
         self.status = status
+        self.tagNames = tagNames
+        self.photoUpload = photoUpload
     }
 }
 
@@ -539,6 +708,8 @@ public struct GoodsEntryUpdateInput: Equatable, Sendable {
     public var quantity: Int
     public var status: GoodsEntryStatus
     public var photoURLs: [String]?
+    public var tagNames: [String]?
+    public var photoUpload: GoodsPhotoUpload?
 
     public init(
         title: String,
@@ -548,7 +719,9 @@ public struct GoodsEntryUpdateInput: Equatable, Sendable {
         goodsTypeID: UUID,
         quantity: Int = 1,
         status: GoodsEntryStatus = .active,
-        photoURLs: [String]? = nil
+        photoURLs: [String]? = nil,
+        tagNames: [String]? = nil,
+        photoUpload: GoodsPhotoUpload? = nil
     ) {
         self.title = title
         self.groupID = groupID
@@ -558,6 +731,8 @@ public struct GoodsEntryUpdateInput: Equatable, Sendable {
         self.quantity = quantity
         self.status = status
         self.photoURLs = photoURLs
+        self.tagNames = tagNames
+        self.photoUpload = photoUpload
     }
 }
 
@@ -673,7 +848,9 @@ public struct WishItem: Identifiable, Codable, Hashable, Sendable {
     public var memberID: UUID?
     public var goodsTypeID: UUID?
     public var title: String
+    public var imageURL: URL?
     public var tags: [GoodsTag]
+    public var quantity: Int
 
     public init(
         id: UUID,
@@ -682,7 +859,9 @@ public struct WishItem: Identifiable, Codable, Hashable, Sendable {
         memberID: UUID? = nil,
         goodsTypeID: UUID? = nil,
         title: String,
-        tags: [GoodsTag] = []
+        imageURL: URL? = nil,
+        tags: [GoodsTag] = [],
+        quantity: Int = 1
     ) {
         self.id = id
         self.ownerID = ownerID
@@ -690,7 +869,9 @@ public struct WishItem: Identifiable, Codable, Hashable, Sendable {
         self.memberID = memberID
         self.goodsTypeID = goodsTypeID
         self.title = title
+        self.imageURL = imageURL
         self.tags = tags
+        self.quantity = quantity
     }
 }
 
@@ -923,6 +1104,8 @@ public struct ProposalCreateInput: Equatable, Sendable {
     public var matchType: ProposalMatchType
     public var status: ProposalStatus
     public var meetup: ProposalMeetupInput?
+    public var meetupCandidates: [ProposalMeetupInput]
+    public var exposeCalendar: Bool
     public var listingID: UUID?
 
     public init(
@@ -935,6 +1118,8 @@ public struct ProposalCreateInput: Equatable, Sendable {
         matchType: ProposalMatchType = .forward,
         status: ProposalStatus = .sent,
         meetup: ProposalMeetupInput? = nil,
+        meetupCandidates: [ProposalMeetupInput] = [],
+        exposeCalendar: Bool = false,
         listingID: UUID? = nil
     ) {
         self.receiverID = receiverID
@@ -946,6 +1131,8 @@ public struct ProposalCreateInput: Equatable, Sendable {
         self.matchType = matchType
         self.status = status
         self.meetup = meetup
+        self.meetupCandidates = meetupCandidates
+        self.exposeCalendar = exposeCalendar
         self.listingID = listingID
     }
 

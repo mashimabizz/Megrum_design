@@ -100,6 +100,39 @@ final class SupabaseDisputeClientTests: XCTestCase {
         XCTAssertEqual(json.first?["photo_urls"] as? [String], ["https://example.com/a.jpg"])
     }
 
+    func testBuildsMarkRespondentReplyReceivedRequest() throws {
+        let client = SupabaseDisputeClient(configuration: configuration)
+        let disputeID = UUID(uuidString: "44444444-4444-4444-4444-444444444444")!
+        let respondentID = UUID(uuidString: "22222222-2222-2222-2222-222222222222")!
+        let respondedAt = Date(timeIntervalSince1970: 1_800_000_000)
+
+        let request = try client.makeMarkRespondentReplyReceivedRequest(
+            SupabaseDisputeReplyCreateInput(
+                disputeID: disputeID,
+                senderID: respondentID,
+                senderRole: .respondent,
+                body: "  受け渡し時の状況に相違があります  ",
+                photoURLs: [" https://example.com/respondent-proof.jpg ", ""]
+            ),
+            respondedAt: respondedAt
+        )
+        let body = try XCTUnwrap(request.httpBody)
+        let json = try XCTUnwrap(JSONSerialization.jsonObject(with: body) as? [String: Any])
+        let url = try XCTUnwrap(request.url?.absoluteString)
+
+        XCTAssertEqual(request.httpMethod, "PATCH")
+        XCTAssertEqual(request.value(forHTTPHeaderField: "Prefer"), "return=representation")
+        XCTAssertTrue(url.hasPrefix("https://example.supabase.co/rest/v1/disputes?select=id,proposal_id,reporter_id,respondent_id"))
+        XCTAssertTrue(url.contains("id=eq.44444444-4444-4444-4444-444444444444"))
+        XCTAssertTrue(url.contains("respondent_id=eq.22222222-2222-2222-2222-222222222222"))
+        XCTAssertTrue(url.contains("status=in.(submitted,response_pending)") || url.contains("status=in.%28submitted,response_pending%29"))
+        XCTAssertEqual(json["respondent_response"] as? String, "disputed")
+        XCTAssertEqual(json["respondent_response_text"] as? String, "受け渡し時の状況に相違があります")
+        XCTAssertEqual(json["respondent_evidence_urls"] as? [String], ["https://example.com/respondent-proof.jpg"])
+        XCTAssertEqual(json["respondent_responded_at"] as? String, "2027-01-15T08:00:00.000Z")
+        XCTAssertEqual(json["status"] as? String, "arbitrating")
+    }
+
     func testBuildsWithdrawDisputeRequest() throws {
         let client = SupabaseDisputeClient(configuration: configuration)
         let ticketID = UUID(uuidString: "44444444-4444-4444-4444-444444444444")!
@@ -190,6 +223,23 @@ final class SupabaseDisputeClientTests: XCTestCase {
             )
         ) { error in
             XCTAssertEqual(error as? SupabaseDisputeClientError, .emptyReplyBody)
+        }
+    }
+
+    func testRejectsCreateDisputeReplyRequestWithTooLongBody() throws {
+        let client = SupabaseDisputeClient(configuration: configuration)
+
+        XCTAssertThrowsError(
+            try client.makeCreateDisputeReplyRequest(
+                SupabaseDisputeReplyCreateInput(
+                    disputeID: UUID(uuidString: "44444444-4444-4444-4444-444444444444")!,
+                    senderID: UUID(uuidString: "22222222-2222-2222-2222-222222222222")!,
+                    senderRole: .respondent,
+                    body: String(repeating: "あ", count: 4_001)
+                )
+            )
+        ) { error in
+            XCTAssertEqual(error as? SupabaseDisputeClientError, .replyBodyTooLong(maxLength: 4_000))
         }
     }
 
