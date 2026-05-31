@@ -125,8 +125,8 @@ final class MegrumAppStateTests: XCTestCase {
 
         await state.loadMeguriFeed(scope: .samePrefecture)
 
-        XCTAssertTrue(state.threads.contains { $0.audience == .samePrefecture })
-        XCTAssertTrue(state.threads.contains { $0.audience == .nearby3km })
+        XCTAssertFalse(state.threads.isEmpty)
+        XCTAssertTrue(state.threads.allSatisfy { $0.audience == .samePrefecture })
     }
 
     func testAppStateRefreshesPreviewMeguriFeedWithPrefectureOverride() async {
@@ -412,6 +412,23 @@ final class MegrumAppStateTests: XCTestCase {
 
         XCTAssertEqual(state.searchResults.first?.item.title, "ランダムトレカ B")
         XCTAssertEqual(state.searchResults.first?.bucket, .possible)
+        XCTAssertFalse(state.isSearchingGoods)
+        XCTAssertNil(state.errorMessage)
+    }
+
+    func testAppStateSearchesPreviewGoodsByMember() async {
+        let state = MegrumAppState(repository: PreviewMegrumRepository())
+        await state.loadInitialData()
+        await state.searchGoods(query: "")
+        guard let memberID = state.searchResults.compactMap({ $0.item.memberID }).first else {
+            XCTFail("Preview search data should include at least one member-backed goods item.")
+            return
+        }
+
+        await state.searchGoods(query: "", memberID: memberID)
+
+        XCTAssertFalse(state.searchResults.isEmpty)
+        XCTAssertTrue(state.searchResults.allSatisfy { $0.item.memberID == memberID })
         XCTAssertFalse(state.isSearchingGoods)
         XCTAssertNil(state.errorMessage)
     }

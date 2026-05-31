@@ -511,12 +511,14 @@ public struct GoodsEntryInput: Equatable, Sendable {
 public struct GoodsSearchInput: Equatable, Sendable {
     public var query: String
     public var groupID: UUID?
+    public var memberID: UUID?
     public var goodsTypeID: UUID?
     public var limit: Int
 
-    public init(query: String, groupID: UUID? = nil, goodsTypeID: UUID? = nil, limit: Int = 60) {
+    public init(query: String, groupID: UUID? = nil, memberID: UUID? = nil, goodsTypeID: UUID? = nil, limit: Int = 60) {
         self.query = query
         self.groupID = groupID
+        self.memberID = memberID
         self.goodsTypeID = goodsTypeID
         self.limit = limit
     }

@@ -91,7 +91,10 @@ struct SearchScreen: View {
                 selectedGroupID == nil || result.item.groupID == selectedGroupID
             }
             .flatMap { $0.item.tags.map(\.name) }
-        return Array(Set(tags)).sorted { $0.localizedStandardCompare($1) == .orderedAscending }
+        return Array(Set(tags))
+            .sorted { $0.localizedStandardCompare($1) == .orderedAscending }
+            .prefix(20)
+            .map { $0 }
     }
 
     private var activeFilterCount: Int {
@@ -232,6 +235,9 @@ struct SearchScreen: View {
         .onChange(of: selectedGoodsTypeID) { _, _ in
             scheduleSearch(delayNanoseconds: 0)
         }
+        .onChange(of: selectedMemberID) { _, _ in
+            scheduleSearch(delayNanoseconds: 0)
+        }
         .onDisappear {
             searchTask?.cancel()
         }
@@ -273,7 +279,12 @@ struct SearchScreen: View {
         if appState.goodsTypes.isEmpty {
             await appState.loadGoodsTypes()
         }
-        await appState.searchGoods(query: query, groupID: selectedGroupID, goodsTypeID: selectedGoodsTypeID)
+        await appState.searchGoods(
+            query: query,
+            groupID: selectedGroupID,
+            memberID: selectedMemberID,
+            goodsTypeID: selectedGoodsTypeID
+        )
     }
 
     private func reportItem(_ item: GoodsItem, reason: GoodsReportReason, note: String) {
@@ -294,7 +305,12 @@ struct SearchScreen: View {
             guard !Task.isCancelled else {
                 return
             }
-            await appState.searchGoods(query: query, groupID: selectedGroupID, goodsTypeID: selectedGoodsTypeID)
+            await appState.searchGoods(
+                query: query,
+                groupID: selectedGroupID,
+                memberID: selectedMemberID,
+                goodsTypeID: selectedGoodsTypeID
+            )
         }
     }
 
@@ -449,6 +465,8 @@ private struct SearchFilterSheet: View {
     var onReset: () -> Void
 
     @Environment(\.dismiss) private var dismiss
+    @State private var isMeetupDatePickerExpanded = false
+    @State private var isMeetupPrefecturePickerExpanded = false
 
     private var hasSelectedGroup: Bool {
         selectedGroupID != nil
@@ -464,6 +482,9 @@ private struct SearchFilterSheet: View {
                     }
                 }
                 .font(.system(size: 17, weight: .bold, design: .rounded))
+                #if os(iOS)
+                .pickerStyle(.navigationLink)
+                #endif
 
                 if appState.isLoadingOshiGroups {
                     ProgressView("グループを読み込み中")
@@ -481,6 +502,9 @@ private struct SearchFilterSheet: View {
                         }
                     }
                     .font(.system(size: 17, weight: .bold, design: .rounded))
+                    #if os(iOS)
+                    .pickerStyle(.navigationLink)
+                    #endif
 
                     if appState.isLoadingOshiCharacters {
                         ProgressView("メンバーを読み込み中")
@@ -488,22 +512,31 @@ private struct SearchFilterSheet: View {
                 } header: {
                     Text("メンバー")
                 }
+            }
 
+            Section {
+                Picker("グッズ種別", selection: $selectedGoodsTypeID) {
+                    Text("すべて").tag(Optional<UUID>.none)
+                    ForEach(appState.goodsTypes) { goodsType in
+                        Text(goodsType.name).tag(Optional(goodsType.id))
+                    }
+                }
+                .font(.system(size: 17, weight: .bold, design: .rounded))
+                #if os(iOS)
+                .pickerStyle(.navigationLink)
+                #endif
+
+                if appState.isLoadingGoodsTypes {
+                    ProgressView("グッズ種別を読み込み中")
+                }
+            } header: {
+                Text("グッズ種別")
+            }
+
+            if hasSelectedGroup {
                 Section {
-                    Picker("グッズタグ", selection: $selectedGoodsTypeID) {
-                        Text("すべて").tag(Optional<UUID>.none)
-                        ForEach(appState.goodsTypes) { goodsType in
-                            Text(goodsType.name).tag(Optional(goodsType.id))
-                        }
-                    }
-                    .font(.system(size: 17, weight: .bold, design: .rounded))
-
-                    if appState.isLoadingGoodsTypes {
-                        ProgressView("グッズタグを読み込み中")
-                    }
-
                     if availableGoodsTagNames.isEmpty {
-                        Text("検索結果にタグ候補があると、ここで複数選択できます。")
+                        Text("このグループに紐づくタグ候補はまだありません。")
                             .font(.system(size: 15, weight: .bold, design: .rounded))
                             .foregroundStyle(MegrumTheme.muted)
                     } else {
@@ -516,18 +549,29 @@ private struct SearchFilterSheet: View {
                 } header: {
                     Text("グッズタグ")
                 } footer: {
-                    Text("グループを選んだあとに表示します。")
+                    Text("最大20件まで表示します。")
                 }
             }
 
             Section {
-                HStack {
+                DisclosureGroup(isExpanded: $isMeetupDatePickerExpanded) {
                     DatePicker("日付を追加", selection: $meetupDateDraft, displayedComponents: .date)
-                        .font(.system(size: 17, weight: .bold, design: .rounded))
-                    Button("追加") {
+                        .datePickerStyle(.graphical)
+                    Button {
                         addMeetupDate(meetupDateDraft)
+                    } label: {
+                        Label("この日付を追加", systemImage: "calendar.badge.plus")
                     }
                     .font(.system(size: 16, weight: .heavy, design: .rounded))
+                } label: {
+                    HStack {
+                        Text("現地交換日付")
+                            .font(.system(size: 17, weight: .heavy, design: .rounded))
+                        Spacer()
+                        Text(selectedMeetupDates.isEmpty ? "選択" : "\(selectedMeetupDates.count)件")
+                            .font(.system(size: 16, weight: .heavy, design: .rounded))
+                            .foregroundStyle(MegrumTheme.lavender)
+                    }
                 }
 
                 if selectedMeetupDates.isEmpty {
@@ -551,21 +595,33 @@ private struct SearchFilterSheet: View {
                     }
                 }
             } header: {
-                Text("待ち合わせ日")
-            } footer: {
-                Text("現時点では端末内の選択です。日程条件の検索連携は後続のAPI接続で行います。")
+                Text("現地交換日付")
             }
 
             Section {
-                Picker("都道府県", selection: $selectedMeetupPrefecture) {
-                    Text("指定なし").tag("")
-                    ForEach(searchFilterJapanesePrefectures, id: \.self) { prefecture in
-                        Text(prefecture).tag(prefecture)
+                DisclosureGroup(isExpanded: $isMeetupPrefecturePickerExpanded) {
+                    Picker("都道府県", selection: $selectedMeetupPrefecture) {
+                        Text("指定なし").tag("")
+                        ForEach(searchFilterJapanesePrefectures, id: \.self) { prefecture in
+                            Text(prefecture).tag(prefecture)
+                        }
+                    }
+                    .font(.system(size: 17, weight: .bold, design: .rounded))
+                    #if os(iOS)
+                    .pickerStyle(.navigationLink)
+                    #endif
+                } label: {
+                    HStack {
+                        Text("現地交換場所")
+                            .font(.system(size: 17, weight: .heavy, design: .rounded))
+                        Spacer()
+                        Text(selectedMeetupPrefecture.isEmpty ? "選択" : selectedMeetupPrefecture)
+                            .font(.system(size: 16, weight: .heavy, design: .rounded))
+                            .foregroundStyle(MegrumTheme.lavender)
                     }
                 }
-                .font(.system(size: 17, weight: .bold, design: .rounded))
             } header: {
-                Text("待ち合わせ場所")
+                Text("現地交換場所")
             }
 
             Section {

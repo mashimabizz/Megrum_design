@@ -369,8 +369,9 @@ public struct PreviewMegrumRepository: MegrumRepository {
                 || item.title.localizedCaseInsensitiveContains(query)
                 || item.tags.contains { $0.name.localizedCaseInsensitiveContains(query) }
             let matchesGroup = input.groupID == nil || item.groupID == input.groupID
+            let matchesMember = input.memberID == nil || item.memberID == input.memberID
             let matchesGoodsType = input.goodsTypeID == nil || item.goodsTypeID == input.goodsTypeID
-            return matchesQuery && matchesGroup && matchesGoodsType
+            return matchesQuery && matchesGroup && matchesMember && matchesGoodsType
         }
         .prefix(max(0, input.limit))
         .map { $0 }
@@ -719,7 +720,7 @@ public struct PreviewMegrumRepository: MegrumRepository {
             case .nearby3km:
                 return thread.audience == .nearby3km
             case .samePrefecture:
-                return thread.prefecture == prefecture || prefecture == nil
+                return thread.audience == .samePrefecture && (thread.prefecture == prefecture || prefecture == nil)
             case .sameSpot, .global:
                 return thread.audience == scope
             }
@@ -1441,7 +1442,12 @@ public final class MegrumAppState: ObservableObject {
         }
     }
 
-    public func searchGoods(query: String, groupID: UUID? = nil, goodsTypeID: UUID? = nil) async {
+    public func searchGoods(
+        query: String,
+        groupID: UUID? = nil,
+        memberID: UUID? = nil,
+        goodsTypeID: UUID? = nil
+    ) async {
         let requestID = UUID()
         activeSearchRequestID = requestID
         isSearchingGoods = true
@@ -1451,6 +1457,7 @@ public final class MegrumAppState: ObservableObject {
                 GoodsSearchInput(
                     query: query,
                     groupID: groupID,
+                    memberID: memberID,
                     goodsTypeID: goodsTypeID
                 )
             )

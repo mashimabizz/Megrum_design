@@ -69,6 +69,7 @@ final class SupabaseGoodsInventoryClientTests: XCTestCase {
         let input = GoodsSearchInput(
             query: "トレカ",
             groupID: UUID(uuidString: "22222222-2222-2222-2222-222222222222")!,
+            memberID: UUID(uuidString: "44444444-4444-4444-4444-444444444444")!,
             goodsTypeID: UUID(uuidString: "33333333-3333-3333-3333-333333333333")!,
             limit: 25
         )
@@ -85,6 +86,7 @@ final class SupabaseGoodsInventoryClientTests: XCTestCase {
         XCTAssertTrue(url.contains("limit=25"))
         XCTAssertTrue(url.contains("title=ilike.*%E3%83%88%E3%83%AC%E3%82%AB*"))
         XCTAssertTrue(url.contains("group_id=eq.22222222-2222-2222-2222-222222222222"))
+        XCTAssertTrue(url.contains("character_id=eq.44444444-4444-4444-4444-444444444444"))
         XCTAssertTrue(url.contains("goods_type_id=eq.33333333-3333-3333-3333-333333333333"))
     }
 

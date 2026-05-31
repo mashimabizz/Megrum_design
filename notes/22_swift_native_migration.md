@@ -1,7 +1,7 @@
 # 22. Swift Native Migration
 
 最終更新: 2026-05-31
-ステータス: Active draft（iter367）
+ステータス: Active draft（iter368）
 
 ## 目的
 
@@ -169,6 +169,8 @@ tar -xzf /Users/michitaka/Desktop/Megrum_backups/pre-swift-migration-20260531-03
 - iter367で、検索画面の下部フィルター導線を検索前から使えるようにし、グループ選択後だけメンバーとグッズタグ候補を表示するNative sheetへ整理した。現地交換日付は複数日、現地交換場所は都道府県として選択できる。
 - iter367で、取引チャットの入力欄を `safeAreaInset` に寄せ、スケジュール、再打診、通報などを入力欄上のメニューへ整理した。写真、位置情報、system、到着状態のメッセージrequest builderも追加した。
 - iter367で、取引チャットの共有写真ビューアをピンチズーム、ズーム中ドラッグ、ダブルタップリセットに対応させた。
+- iter368で、検索の `GoodsSearchInput` に `memberID` を追加し、`goods_inventory.character_id` をlive requestへ渡せるようにした。Preview repositoryとテストも同じ条件に揃えた。
+- iter368で、検索フィルターのグッズ種別とグッズタグを分離し、グループ未選択時はメンバーとグッズタグ候補を非表示にした。グッズタグ候補は最大20件まで表示する。
 
 ### Phase 4: Meguri core
 
@@ -191,6 +193,8 @@ tar -xzf /Users/michitaka/Desktop/Megrum_backups/pre-swift-migration-20260531-03
 - iter366で、グルーム画像のsigned URL作成に失敗してもpath-only rowをfeedから落とさず、UIが回復可能に扱える相対URLとして保持するようにした。
 - iter367で、めぐり掲示板詳細の余分なヘッダー/操作群を減らし、スレッド本文を開始メッセージ、返信をチャット風の吹き出しとして表示する方向へ整理した。
 - iter367で、グルームマップのstatus表示を現在地から1km範囲の確認用途に寄せた。範囲外ピンの完全な閲覧制御は、distance/canViewを返すRPC拡張と合わせて後続で詰める。
+- iter368で、Previewの掲示板scopeを分離し、都道府県表示に3km圏内スレッドが混ざらないようにした。
+- iter368で、グルームマップ上の1km圏外グルームをタップした時は詳細を開かず、範囲外で見られない旨を表示するようにした。liveで1km外ピンを含めて表示するには、feed RPC側が全件または周辺広域とcanViewを返す拡張が必要。
 
 ### Phase 5: Cutover
 
@@ -200,6 +204,7 @@ tar -xzf /Users/michitaka/Desktop/Megrum_backups/pre-swift-migration-20260531-03
 - iter365で、RN parity / QAのread-only監査を実施し、Swift版に残るP0/P1差分を「TestFlightで見るべき通しシナリオ」として統合役が保持する運用にした。
 - iter367で、Swift Native PreviewのBuildを `2` に更新し、`ITSAppUsesNonExemptEncryption=false` をInfo.plistへ追加した。
 - iter367で、`MTO’s phone` 向けに署名付きDebugビルドを作成し、`tokyo.megrum.native.preview` を直接インストールできることを確認した。端末ロック中のため自動launchはOSに拒否されたが、インストール自体は成功済み。
+- iter368で、前回更新と今回更新を含めた署名付きDebugビルドを `MTO’s phone` へ再インストールし、`tokyo.megrum.native.preview` の起動まで確認した。
 
 ## 完了条件
 

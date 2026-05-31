@@ -774,6 +774,7 @@ private struct MeguriMapScreen: View {
     @State private var cameraPosition: MapCameraPosition
     @State private var selectedGroom: GroomPost?
     @State private var selectedThread: BoardThread?
+    @State private var mapNotice: String?
 
     init(
         kind: MeguriMapKind,
@@ -804,7 +805,7 @@ private struct MeguriMapScreen: View {
                     ForEach(appState.grooms) { groom in
                         Annotation("グルーム", coordinate: groom.coordinate) {
                             Button {
-                                selectedGroom = groom
+                                openGroomIfInRange(groom)
                             } label: {
                                 GroomMapPin(groom: groom)
                             }
@@ -836,7 +837,12 @@ private struct MeguriMapScreen: View {
                     dismiss()
                 }
 
-                if let mapStatusMessage {
+                if let mapNotice {
+                    MapStatusBadge(
+                        message: mapNotice,
+                        isLoading: false
+                    )
+                } else if let mapStatusMessage {
                     MapStatusBadge(
                         message: mapStatusMessage,
                         isLoading: appState.isLoadingMeguri || locationState.isRequestingLocation
@@ -928,6 +934,30 @@ private struct MeguriMapScreen: View {
         case .boards:
             boardScope
         }
+    }
+
+    private func openGroomIfInRange(_ groom: GroomPost) {
+        guard kind == .grooms else {
+            selectedGroom = groom
+            return
+        }
+        guard canOpen(groom: groom) else {
+            withAnimation(.smooth(duration: 0.2)) {
+                mapNotice = "1km圏外のグルームは見れません"
+            }
+            return
+        }
+        mapNotice = nil
+        selectedGroom = groom
+    }
+
+    private func canOpen(groom: GroomPost) -> Bool {
+        guard let coordinate = locationState.coordinate else {
+            return true
+        }
+        let currentLocation = CLLocation(latitude: coordinate.latitude, longitude: coordinate.longitude)
+        let groomLocation = CLLocation(latitude: groom.latitude, longitude: groom.longitude)
+        return currentLocation.distance(from: groomLocation) <= MeguriMapKind.grooms.radiusMeters
     }
 }
 

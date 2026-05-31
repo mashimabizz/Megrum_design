@@ -4,6 +4,77 @@
 
 ---
 
+## イテレーション368：Swift検索フィルターとめぐり範囲制御を補強
+
+### 背景・問題意識
+
+Swift Native版を継続してiPhoneで確認したいという要望があり、前回までの更新を含めて実機へ再反映する必要があった。加えて、検索フィルターはメンバー条件が端末内絞り込み中心で、グッズ種別とグッズタグの見出しも混ざっていた。めぐりマップは範囲円を表示している一方で、範囲外グルームをタップした時の明示的な制御が足りなかった。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumCore/MegrumModels.swift`
+- `GoodsSearchInput` に `memberID` を追加し、検索条件としてメンバーを表現できるようにした。
+
+#### `ios-native/Sources/MegrumData/SupabaseGoodsInventoryClient.swift`
+- 検索requestに `character_id=eq.<memberID>` を追加し、メンバー検索をサーバー側条件として送れるようにした。
+
+#### `ios-native/Sources/MegrumApp/SearchScreen.swift`
+- メンバー選択時も検索を再実行するようにした。
+- グループ未選択時はメンバーとグッズタグ候補を非表示にし、グッズタグ候補は最大20件に制限した。
+- グッズ種別を独立したフィルター項目へ分離し、「グッズタグ」と混ざらないようにした。
+- グループ、メンバー、グッズ種別、都道府県のPickerをiOS標準のNavigationLink pickerへ寄せ、sheet内で選びやすくした。
+- 現地交換日付と現地交換場所を、最初は1行で見えるDisclosureGroup型の選択UIへ整理した。
+
+#### `ios-native/Sources/MegrumApp/MegrumAppState.swift`
+- Preview repositoryの検索でも `memberID` を反映するようにし、live / previewの挙動を揃えた。
+- Previewの掲示板scopeで、都道府県表示に3km圏内スレッドが混ざらないようにした。
+
+#### `ios-native/Sources/MegrumApp/MeguriScreen.swift`
+- グルームマップで現在地から1km外のグルームをタップした時は詳細を開かず、「1km圏外のグルームは見れません」と表示するようにした。
+
+#### `ios-native/Tests/`
+- `SupabaseGoodsInventoryClientTests` に `character_id` 検索requestの検証を追加した。
+- `MegrumAppStateTests` にPreviewのメンバー検索と掲示板scope分離の検証を追加・更新した。
+
+### 影響範囲
+
+- Swift Native検索画面と検索フィルター
+- Swift Nativeの `goods_inventory` 検索request
+- Swift Nativeめぐり掲示板のPreview scope
+- Swift Nativeグルームマップの範囲外タップ時挙動
+- 実機確認用のインストール済み `tokyo.megrum.native.preview`
+
+### 確認方法
+
+- `git diff --check -- ios-native`
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-iter368-build`
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-iter368-test --enable-xctest --disable-swift-testing -j 1`
+- `xcodebuild -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -destination 'generic/platform=iOS Simulator' -derivedDataPath /tmp/megrum-native-xcodebuild-iter368 CODE_SIGNING_ALLOWED=NO build`
+- `xcodebuild -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -destination 'platform=iOS,id=00008120-000C49C43669A01E' -derivedDataPath /tmp/megrum-native-device-build-iter368 build`
+- `xcrun devicectl device install app --device 00008120-000C49C43669A01E /tmp/megrum-native-device-build-iter368/Build/Products/Debug-iphoneos/MegrumNative.app`
+- `xcrun devicectl device process launch --device 00008120-000C49C43669A01E tokyo.megrum.native.preview`
+
+### 関連ファイル
+
+- `ios-native/Sources/MegrumApp/MegrumAppState.swift`
+- `ios-native/Sources/MegrumApp/MeguriScreen.swift`
+- `ios-native/Sources/MegrumApp/SearchScreen.swift`
+- `ios-native/Sources/MegrumCore/MegrumModels.swift`
+- `ios-native/Sources/MegrumData/SupabaseGoodsInventoryClient.swift`
+- `ios-native/Tests/MegrumAppTests/MegrumAppStateTests.swift`
+- `ios-native/Tests/MegrumDataTests/SupabaseGoodsInventoryClientTests.swift`
+- `notes/22_swift_native_migration.md`
+
+### セルフレビュー結果
+
+- ✅ サブエージェント4本はread-only監査として使い、実装は統合役側で競合しない範囲に閉じた
+- ✅ 検索フィルターの「グッズ種別」と「グッズタグ」を分離した
+- ✅ メンバー条件はlive request / preview repository / testsで同じ条件として扱えるようにした
+- ✅ `swift build` / `swift test` / `xcodebuild` Simulator build / 実機build / 実機install / 実機launch が成功した
+- ✅ 既存の `mobile/` / `web/` の未コミット差分には触れていない
+- ✅ 状態名やDBスキーマの追加はないため、`notes/09` / `notes/05` 更新は不要と判断した
+- ⚠️ グルームの「1km外ピンも全件表示」はlive RPCが近隣feedのみ返すため、完全対応にはdistance/canView付きRPC拡張が必要
+
 ## イテレーション367：Swift実機レビュー版を並列強化
 
 ### 背景・問題意識

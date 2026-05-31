@@ -160,6 +160,9 @@ public final class SupabaseGoodsInventoryClient: @unchecked Sendable {
         if let groupID = input.groupID {
             queryItems.append(URLQueryItem(name: "group_id", value: "eq.\(groupID.uuidString.lowercased())"))
         }
+        if let memberID = input.memberID {
+            queryItems.append(URLQueryItem(name: "character_id", value: "eq.\(memberID.uuidString.lowercased())"))
+        }
         if let goodsTypeID = input.goodsTypeID {
             queryItems.append(URLQueryItem(name: "goods_type_id", value: "eq.\(goodsTypeID.uuidString.lowercased())"))
         }
