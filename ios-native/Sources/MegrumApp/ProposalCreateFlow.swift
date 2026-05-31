@@ -51,6 +51,22 @@ enum ProposalCreateStep: String, CaseIterable, Identifiable, Equatable {
     }
 }
 
+struct ProposalSubmittedSummary: Equatable {
+    var senderCount: Int
+    var receiverCount: Int
+    var methodTitle: String
+    var meetupSummary: String
+    var conditionTags: [String]
+
+    var detailText: String {
+        let goodsText = "\(senderCount)件を提示 / \(receiverCount)件を受け取り候補"
+        if conditionTags.isEmpty {
+            return "\(goodsText)で送信しました。"
+        }
+        return "\(goodsText)・\(conditionTags.joined(separator: " / "))"
+    }
+}
+
 extension ProposalCreateConfiguration {
     func canAdvance(from step: ProposalCreateStep) -> Bool {
         switch step {
@@ -94,6 +110,7 @@ struct ProposalCreateFlow: View {
     @State private var meetupPlaceName = ""
     @State private var meetupLatitudeText = ""
     @State private var meetupLongitudeText = ""
+    @State private var submittedSummary: ProposalSubmittedSummary?
     @StateObject private var locationState = MegrumLocationState()
 
     private var orderedSenderGoodsIDs: [UUID] {
@@ -159,55 +176,65 @@ struct ProposalCreateFlow: View {
     }
 
     var body: some View {
-        VStack(spacing: 0) {
-            ProposalStepHeader(
-                selectedStep: $selectedStep,
-                configuration: configuration,
-                senderCount: orderedSenderGoodsIDs.count,
-                receiverCount: resolvedReceiverGoodsIDs.count
-            )
-            .padding(.horizontal, 18)
-            .padding(.top, 12)
-            .padding(.bottom, 10)
+        Group {
+            if let submittedSummary {
+                ProposalCreateCompletionView(summary: submittedSummary) {
+                    dismiss()
+                }
+            } else {
+                VStack(spacing: 0) {
+                    ProposalStepHeader(
+                        selectedStep: $selectedStep,
+                        configuration: configuration,
+                        senderCount: orderedSenderGoodsIDs.count,
+                        receiverCount: resolvedReceiverGoodsIDs.count
+                    )
+                    .padding(.horizontal, 18)
+                    .padding(.top, 12)
+                    .padding(.bottom, 10)
 
-            Divider()
-                .overlay(MegrumTheme.lavender.opacity(0.12))
+                    Divider()
+                        .overlay(MegrumTheme.lavender.opacity(0.12))
 
-            ScrollView {
-                VStack(alignment: .leading, spacing: 18) {
-                    ProposalScreenTitle(step: selectedStep, targetItem: targetItem)
+                    ScrollView {
+                        VStack(alignment: .leading, spacing: 18) {
+                            ProposalScreenTitle(step: selectedStep, targetItem: targetItem)
 
-                    switch selectedStep {
-                    case .give:
-                        giveStep
-                    case .receive:
-                        receiveStep
-                    case .meetup:
-                        meetupStep
-                    case .confirm:
-                        confirmStep
+                            switch selectedStep {
+                            case .give:
+                                giveStep
+                            case .receive:
+                                receiveStep
+                            case .meetup:
+                                meetupStep
+                            case .confirm:
+                                confirmStep
+                            }
+                        }
+                        .padding(.horizontal, 20)
+                        .padding(.top, 22)
+                        .padding(.bottom, 104)
                     }
                 }
-                .padding(.horizontal, 20)
-                .padding(.top, 22)
-                .padding(.bottom, 104)
             }
         }
         .safeAreaInset(edge: .bottom) {
-            ProposalFlowBottomBar(
-                selectedStep: selectedStep,
-                configuration: configuration,
-                isCreating: appState.isCreatingProposal,
-                onBack: previousStep,
-                onPrimary: primaryAction
-            )
+            if submittedSummary == nil {
+                ProposalFlowBottomBar(
+                    selectedStep: selectedStep,
+                    configuration: configuration,
+                    isCreating: appState.isCreatingProposal,
+                    onBack: previousStep,
+                    onPrimary: primaryAction
+                )
+            }
         }
         .background(MegrumTheme.canvas.ignoresSafeArea())
-        .navigationTitle("打診作成")
+        .navigationTitle(submittedSummary == nil ? "打診作成" : "送信完了")
         .megrumInlineNavigationTitle()
         .toolbar {
             ToolbarItem(placement: .cancellationAction) {
-                Button("閉じる") {
+                Button(submittedSummary == nil ? "閉じる" : "完了") {
                     dismiss()
                 }
             }
@@ -465,7 +492,16 @@ struct ProposalCreateFlow: View {
             )
         )
         if created {
-            dismiss()
+            let summary = ProposalSubmittedSummary(
+                senderCount: orderedSenderGoodsIDs.count,
+                receiverCount: resolvedReceiverGoodsIDs.count,
+                methodTitle: Self.methodTitle(exchangeMethod),
+                meetupSummary: meetupSummary,
+                conditionTags: orderedConditionTags
+            )
+            withAnimation(.snappy) {
+                submittedSummary = summary
+            }
         }
     }
 
@@ -504,6 +540,61 @@ struct ProposalCreateFlow: View {
                 .hour()
                 .minute()
         )
+    }
+}
+
+private struct ProposalCreateCompletionView: View {
+    var summary: ProposalSubmittedSummary
+    var onClose: () -> Void
+
+    var body: some View {
+        VStack(spacing: 26) {
+            Spacer(minLength: 42)
+
+            Image(systemName: "paperplane.circle.fill")
+                .font(.system(size: 82, weight: .bold))
+                .foregroundStyle(MegrumTheme.lavender)
+                .symbolRenderingMode(.hierarchical)
+
+            VStack(spacing: 10) {
+                Text("打診を送信しました")
+                    .font(.system(size: 30, weight: .heavy, design: .rounded))
+                    .foregroundStyle(MegrumTheme.ink)
+                    .multilineTextAlignment(.center)
+
+                Text(summary.detailText)
+                    .font(.system(size: 16, weight: .bold, design: .rounded))
+                    .foregroundStyle(MegrumTheme.muted)
+                    .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            VStack(spacing: 10) {
+                ProposalSummaryRow(title: "交換方法", value: summary.methodTitle)
+                ProposalSummaryRow(title: "待ち合わせ", value: summary.meetupSummary)
+            }
+            .padding(16)
+            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: 24, style: .continuous)
+                    .stroke(.white.opacity(0.62), lineWidth: 1)
+            }
+
+            Spacer()
+
+            Button(action: onClose) {
+                Text("やりとりで確認する")
+                    .font(.system(size: 17, weight: .heavy, design: .rounded))
+                    .foregroundStyle(.white)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 56)
+                    .background(MegrumTheme.lavender, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                    .shadow(color: MegrumTheme.lavender.opacity(0.28), radius: 14, y: 8)
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(.horizontal, 22)
+        .padding(.bottom, 18)
     }
 }
 

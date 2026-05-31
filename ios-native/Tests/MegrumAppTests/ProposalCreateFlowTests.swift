@@ -60,4 +60,28 @@ final class ProposalCreateFlowTests: XCTestCase {
         XCTAssertEqual(configuration.targetStatus, .sent)
         XCTAssertEqual(configuration.targetSupplement, "ほか1件も受け取る条件です")
     }
+
+    func testProposalSubmittedSummaryOmitsTagsWhenEmpty() {
+        let summary = ProposalSubmittedSummary(
+            senderCount: 2,
+            receiverCount: 1,
+            methodTitle: "現地交換",
+            meetupSummary: "6月1日 12:00 / 横浜アリーナ",
+            conditionTags: []
+        )
+
+        XCTAssertEqual(summary.detailText, "2件を提示 / 1件を受け取り候補で送信しました。")
+    }
+
+    func testProposalSubmittedSummaryIncludesConditionTags() {
+        let summary = ProposalSubmittedSummary(
+            senderCount: 1,
+            receiverCount: 3,
+            methodTitle: "現地 / 郵送",
+            meetupSummary: "6月1日 12:00 / 横浜アリーナ",
+            conditionTags: ["終演後OK", "同日発送"]
+        )
+
+        XCTAssertEqual(summary.detailText, "1件を提示 / 3件を受け取り候補・終演後OK / 同日発送")
+    }
 }

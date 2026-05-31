@@ -15,4 +15,17 @@ final class TradeChatAffordanceTests: XCTestCase {
             XCTAssertFalse(action.systemImage.isEmpty)
         }
     }
+
+    func testAssistanceRequestKindsHaveChatMenuLabels() {
+        for kind in TradeAssistanceRequestKind.allCases {
+            XCTAssertFalse(kind.title.isEmpty)
+            XCTAssertFalse(kind.systemImage.isEmpty)
+            XCTAssertFalse(kind.placeholder.isEmpty)
+        }
+    }
+
+    func testAssistanceRequestSystemMessageKeepsKindPrefix() {
+        XCTAssertEqual(TradeAssistanceRequestKind.late.systemMessageBody(from: "10分遅れます"), "遅刻申請：10分遅れます")
+        XCTAssertEqual(TradeAssistanceRequestKind.cancel.systemMessageBody(from: "   "), "キャンセル申請")
+    }
 }

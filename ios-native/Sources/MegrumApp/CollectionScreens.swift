@@ -10,7 +10,7 @@ struct GoodsCollectionScreen: View {
     var appState: MegrumAppState?
     var entryKind: GoodsEntryKind = .inventory
     @State private var columns = GoodsGridLayout.minimumColumns
-    @State private var isShowingAddForm = false
+    @State private var editorRoute: GoodsEditorRoute?
     @State private var isShowingUnavailableAlert = false
     @State private var listingSeedWish: GoodsItem?
     @State private var selectedGroupID: UUID?
@@ -124,6 +124,7 @@ struct GoodsCollectionScreen: View {
                             columns: columns,
                             viewerID: appState?.viewer?.id,
                             onCreateIndividualListing: canCreateListingFromItems ? { listingSeedWish = $0 } : nil,
+                            onEditItem: appState == nil ? nil : { editorRoute = .edit($0, entryKind) },
                             onHideItem: appState == nil ? nil : { hideItem($0) },
                             onDeleteItem: appState == nil ? nil : { deleteItem($0) },
                             busyItemID: appState?.mutatingGoodsItemID
@@ -143,13 +144,12 @@ struct GoodsCollectionScreen: View {
                 .padding(.bottom, 22)
             }
         }
-        .sheet(isPresented: $isShowingAddForm) {
+        .sheet(item: $editorRoute) { route in
             if let appState {
                 NavigationStack {
-                    GoodsEntryEditorSheet(
+                    GoodsEditorSheet(
                         appState: appState,
-                        kind: entryKind,
-                        title: title
+                        route: route
                     )
                 }
             }
@@ -212,7 +212,7 @@ struct GoodsCollectionScreen: View {
         if appState == nil {
             isShowingUnavailableAlert = true
         } else {
-            isShowingAddForm = true
+            editorRoute = .create(entryKind)
         }
     }
 }

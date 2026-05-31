@@ -1,7 +1,7 @@
 # 22. Swift Native Migration
 
 最終更新: 2026-05-31
-ステータス: Active draft（iter371）
+ステータス: Active draft（iter372）
 
 ## 目的
 
@@ -179,6 +179,11 @@ tar -xzf /Users/michitaka/Desktop/Megrum_backups/pre-swift-migration-20260531-03
 - iter370で、取引チャット入力欄上に到着ステータス、現在地共有、服装写真共有のNative affordanceを追加した。到着ステータスは既存text message境界で送信し、typed location / arrival messageのAppState接続は後続で実装する。
 - iter371で、検索結果/相手プロフィールからの打診作成を専用 `ProposalCreateFlow` に置き換え、「私が出す」「受け取る」「待ち合わせ」「確認」の段階で複数提示物と現地/郵送/どちらもOKを扱えるようにした。
 - iter371で、取引チャットの現在地共有と到着ステータスをAppState/repositoryへ接続し、`messages.location_lat/location_lng/location_label` と `meta.status` を使うtyped messageとして送れるようにした。
+- iter372で、ホームに現地交換モードカードと編集sheetを追加し、会場/現在地、時間枠、半径、持参グッズ概要を表示できるようにした。現時点では端末内保存で、Supabase AW接続は後続対象。
+- iter372で、在庫/WishのNative編集画面を追加し、タイトル、種別、グループ、メンバー、グッズ種別、数量、ステータス、タグ、写真選択入口をまとめた。保存境界未接続の項目は保存前に明示して、黙って欠落させない。
+- iter372で、打診送信後に完了画面を表示し、送信後に入力ステップへ戻りにくい構造へ寄せた。
+- iter372で、遅刻/キャンセルの連絡を異議申告ではなく取引チャットのsystem messageとして送る境界へ整理した。
+- iter372で、異議詳細、タイムライン、返信、取り下げ、遅刻/キャンセルdraftのNative scaffoldを追加した。取引詳細からの本接続と実データ接続は後続対象。
 
 ### Phase 4: Meguri core
 
@@ -221,29 +226,36 @@ tar -xzf /Users/michitaka/Desktop/Megrum_backups/pre-swift-migration-20260531-03
 - iter370で、署名付きiPhone向けDebugビルドまでは成功した。`MTO’s phone` はUSB上に見えているがCoreDevice/Xcode上で `available=false` のため、自動installは端末ロック解除・接続復帰待ち。
 - iter371で、RN parity backlogのP0から自分プロフィール/推し設定、打診作成、取引チャット当日アクションを先に実装した。Home/AW、在庫/Wish編集、異議/遅刻/キャンセル詳細は引き続きP0として残る。
 - iter371で、`swift build` / `swift test` 202件 / `xcodebuild` Simulator build / 署名付きiPhone向けDebug build は成功した。`MTO’s phone` はCoreDeviceで `unavailable` のため、自動installは端末接続復帰待ち。
+- iter372で、RN parity backlogのP0からHome現地交換モード、在庫/Wish編集画面、打診送信後完了画面、取引チャットの遅刻/キャンセル連絡、異議詳細scaffoldを追加した。
+- iter372で、`swift build` / `swift test` 222件 / `xcodebuild` Simulator build / 署名付きiPhone向けDebug build は成功した。`MTO’s phone` はCoreDeviceで `unavailable` のため、自動installは未完了。
 
-## RN parity backlog（iter370監査）
+## RN parity backlog（iter370監査 / iter372更新）
 
 画面上の不足が多く見えるというオーナー指摘を受け、React Native版とSwift Native版のread-only差分監査を実施した。Swift版はiOS標準感を維持しつつ、以下の順に不足機能を埋める。
 
 ### P0
 
 1. Home / Local Mode / AW
-   - Swiftのホームは検索とマッチグリッド中心で、RN版にある現地交換モード、会場/半径/時間、持参グッズ、AW作成、LIVE表示、ホーム上のグルーム導線が不足している。
+   - iter372で、ホームに現地交換モード、会場/現在地、半径、時間枠、持参グッズ概要、LIVE/OFF/終了表示のNative入口を追加した。
+   - 残: Supabase AW接続、相手から見える現地交換モード、AW作成/更新のlive境界、ホーム上のグルーム導線整理。
    - 主な対象: `ios-native/Sources/MegrumApp/HomeScreen.swift`, `ios-native/Sources/MegrumApp/MegrumAppState.swift`
 2. Inventory / Wish Creation and Editing
-   - Swiftの追加sheetは最小構成。RN版の写真、カメラ/ライブラリ、タグ、メンバー、編集、status、複数カード切り抜きが不足している。
+   - iter372で、在庫/WishのNative編集画面を追加し、写真選択入口、タグ、メンバー、status、数量などの入力UIを先に載せた。
+   - 残: 写真/タグ/メンバー/status/editのlive保存境界、複数カード切り抜き、既存アイテム編集のDB PATCH。
    - 主な対象: `ios-native/Sources/MegrumApp/CollectionScreens.swift`, 新規 `GoodsEditorScreen.swift`
 3. Proposal Creation / Confirm
    - iter371で専用 `ProposalCreateFlow` を追加し、譲る/受け取る/待ち合わせ/確認、複数提示物、現地/郵送/どちらもOKの入口は実装済み。
-   - 残: スケジュール背景、地図による場所選択、完了画面、よりRN版に近い候補選択の密度調整。
+   - iter372で送信完了画面を追加し、送信後に入力ステップへ戻りにくい構造へ寄せた。
+   - 残: スケジュール背景、地図による場所選択、よりRN版に近い候補選択の密度調整。
    - 主な対象: `ios-native/Sources/MegrumApp/ProposalCreateFlow.swift`, `ios-native/Sources/MegrumApp/SearchScreen.swift`, `ios-native/Sources/MegrumApp/PublicUserProfileScreen.swift`
 4. Trade Chat Day-Of Actions
    - iter371で現在地共有と到着ステータスはtyped messageとして接続済み。
-   - 残: 服装写真共有、キャンセル/遅刻申請、当日banner/入力欄上メニューの最終整理。
+   - iter372で遅刻/キャンセル相談を取引チャット内のsystem messageとして送る導線を追加した。
+   - 残: 服装写真共有、当日banner/入力欄上メニューの最終整理、system messageの表示デザイン調整。
    - 主な対象: `ios-native/Sources/MegrumApp/TradesScreen.swift`, `ios-native/Sources/MegrumData/SupabaseMessageClient.swift`
 5. Dispute / Cancel / Late Flow
-   - Swiftは基本通報のみ。RN版の異議詳細、返信、タイムライン、キャンセル/遅刻申請、取引詳細へのbanner反映が不足している。
+   - iter372で異議詳細、返信、タイムライン、取り下げ、キャンセル/遅刻draftのNative scaffoldを追加した。
+   - 残: `disputes` のload/reply/withdraw live境界、取引詳細からのrouting、取引詳細へのbanner反映。
    - 主な対象: `ios-native/Sources/MegrumApp/TradesScreen.swift`, 新規 `DisputeDetailScreen.swift`
 6. Onboarding / Own Profile
    - iter371で複数推し/メンバー、自分プロフィール、設定からのプロフィール/推し設定導線は追加済み。

@@ -12,11 +12,28 @@ struct HomeScreen: View {
     var onOpenSettings: () -> Void = {}
     var onOpenOwnerProfile: (UUID) -> Void = { _ in }
 
+    @AppStorage("megrum.home.localMode.enabled") private var localModeEnabled = false
+    @AppStorage("megrum.home.localMode.venue") private var localModeVenue = ""
+    @AppStorage("megrum.home.localMode.startedAt") private var localModeStartedAt = 0.0
+    @AppStorage("megrum.home.localMode.durationMinutes") private var localModeDurationMinutes = HomeLocalActivitySettings.defaultDurationMinutes
+    @AppStorage("megrum.home.localMode.radiusMeters") private var localModeRadiusMeters = HomeLocalActivitySettings.defaultRadiusMeters
+    @AppStorage("megrum.home.localMode.selectedCarryingIDs") private var localModeSelectedCarryingIDs = ""
+    @State private var showsLocalModeSettings = false
+
     var body: some View {
         ZStack(alignment: .bottomLeading) {
             ScrollView {
                 VStack(alignment: .leading, spacing: 28) {
                     HomeHeader(viewer: viewer, onOpenSettings: onOpenSettings)
+
+                    HomeLocalModeSurface(
+                        viewer: viewer,
+                        settings: localActivitySettings,
+                        carryingCandidates: localCarryingCandidates,
+                        onEdit: {
+                            showsLocalModeSettings = true
+                        }
+                    )
 
                     MatchSection(
                         title: "マッチしてるよ！",
@@ -52,6 +69,56 @@ struct HomeScreen: View {
             .padding(.leading, 24)
             .padding(.bottom, 22)
         }
+        .sheet(isPresented: $showsLocalModeSettings) {
+            HomeLocalModeSettingsSheet(
+                viewer: viewer,
+                settings: localActivitySettings,
+                carryingCandidates: localCarryingCandidates,
+                onSave: saveLocalActivitySettings
+            )
+        }
+    }
+
+    private var localActivitySettings: HomeLocalActivitySettings {
+        HomeLocalActivitySettings(
+            isEnabled: localModeEnabled,
+            venue: localModeVenue,
+            startedAt: localModeStartedAt > 0 ? Date(timeIntervalSince1970: localModeStartedAt) : nil,
+            durationMinutes: normalizedDurationMinutes,
+            radiusMeters: normalizedRadiusMeters,
+            selectedCarryingIDs: HomeLocalCarryingSelectionCodec.decode(localModeSelectedCarryingIDs)
+        )
+    }
+
+    private var localCarryingCandidates: [HomeLocalCarryingCandidate] {
+        HomeLocalCarryingCandidate.candidates(
+            from: matchedItems + possibleItems,
+            viewerID: viewer?.id
+        )
+    }
+
+    private var normalizedDurationMinutes: Int {
+        HomeLocalActivitySettings.durationOptions.contains(localModeDurationMinutes)
+            ? localModeDurationMinutes
+            : HomeLocalActivitySettings.defaultDurationMinutes
+    }
+
+    private var normalizedRadiusMeters: Int {
+        HomeLocalActivitySettings.radiusOptions.contains(localModeRadiusMeters)
+            ? localModeRadiusMeters
+            : HomeLocalActivitySettings.defaultRadiusMeters
+    }
+
+    private func saveLocalActivitySettings(_ settings: HomeLocalActivitySettings) {
+        let availableIDs = Set(localCarryingCandidates.map(\.id))
+        localModeEnabled = settings.isEnabled
+        localModeVenue = settings.venue
+        localModeStartedAt = settings.startedAt?.timeIntervalSince1970 ?? localModeStartedAt
+        localModeDurationMinutes = settings.durationMinutes
+        localModeRadiusMeters = settings.radiusMeters
+        localModeSelectedCarryingIDs = HomeLocalCarryingSelectionCodec.encode(
+            settings.selectedCarryingIDs.intersection(availableIDs)
+        )
     }
 }
 

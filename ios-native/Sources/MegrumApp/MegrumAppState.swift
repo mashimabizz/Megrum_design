@@ -85,6 +85,7 @@ public protocol MegrumRepository: Sendable {
     func fileTradeDispute(_ input: TradeDisputeCreateInput) async throws -> TradeDisputeTicket
     func loadMessages(proposalID: UUID, limit: Int) async throws -> [TradeMessage]
     func sendMessage(_ input: TradeMessageCreateInput) async throws -> TradeMessage
+    func sendSystemMessage(proposalID: UUID, body: String) async throws -> TradeMessage
     func sendLocationMessage(proposalID: UUID, latitude: Double, longitude: Double, label: String, body: String?) async throws -> TradeMessage
     func sendArrivalStatusMessage(proposalID: UUID, status: TradeArrivalStatus, body: String?) async throws -> TradeMessage
     func loadSchedules(for proposal: TradeProposal, startAt: Date, endAt: Date) async throws -> [PersonalSchedule]
@@ -207,6 +208,10 @@ public extension MegrumRepository {
     }
 
     func sendMessage(_ input: TradeMessageCreateInput) async throws -> TradeMessage {
+        throw MegrumRepositoryError.unsupportedMutation
+    }
+
+    func sendSystemMessage(proposalID: UUID, body: String) async throws -> TradeMessage {
         throw MegrumRepositoryError.unsupportedMutation
     }
 
@@ -646,6 +651,16 @@ public struct PreviewMegrumRepository: MegrumRepository {
             senderID: NativePreviewData.viewerID,
             messageType: .text,
             body: input.body
+        )
+    }
+
+    public func sendSystemMessage(proposalID: UUID, body: String) async throws -> TradeMessage {
+        TradeMessage(
+            id: UUID(),
+            proposalID: proposalID,
+            senderID: NativePreviewData.viewerID,
+            messageType: .system,
+            body: body
         )
     }
 
@@ -1925,6 +1940,29 @@ public final class MegrumAppState: ObservableObject {
             return true
         } catch {
             errorMessage = "メッセージを送信できませんでした"
+            sendingMessageProposalID = nil
+            return false
+        }
+    }
+
+    public func sendSystemMessage(proposalID: UUID, body: String) async -> Bool {
+        let trimmed = body.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else {
+            return false
+        }
+        guard sendingMessageProposalID != proposalID else {
+            return false
+        }
+
+        sendingMessageProposalID = proposalID
+        errorMessage = nil
+        do {
+            let message = try await repository.sendSystemMessage(proposalID: proposalID, body: trimmed)
+            messagesByProposalID[proposalID, default: []].append(message)
+            sendingMessageProposalID = nil
+            return true
+        } catch {
+            errorMessage = "取引チャットへ送信できませんでした"
             sendingMessageProposalID = nil
             return false
         }

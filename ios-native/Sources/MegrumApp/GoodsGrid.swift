@@ -36,6 +36,7 @@ struct GoodsGrid: View {
     var onOpenOwnerProfile: ((UUID) -> Void)?
     var onAddToExchangeList: ((GoodsItem) -> Void)?
     var onCreateIndividualListing: ((GoodsItem) -> Void)?
+    var onEditItem: ((GoodsItem) -> Void)?
     var onHideItem: ((GoodsItem) -> Void)?
     var onDeleteItem: ((GoodsItem) -> Void)?
     var onReportItem: ((GoodsItem, GoodsReportReason, String) -> Void)?
@@ -132,6 +133,12 @@ struct GoodsGrid: View {
             } else {
                 actionMessage = "「\(item.title)」から個別募集を作成する処理は、Wish画面で使えます。"
             }
+        case .edit:
+            if item.ownerID == viewerID, let onEditItem {
+                onEditItem(item)
+            } else {
+                actionMessage = "「\(item.title)」の編集は、自分の在庫/Wishでのみ使えます。"
+            }
         case .hide:
             if item.ownerID == viewerID, let onHideItem {
                 onHideItem(item)
@@ -159,6 +166,9 @@ struct GoodsGrid: View {
         }
         if item.ownerID == viewerID {
             var actions: [GoodsTileAction] = [.detail]
+            if onEditItem != nil {
+                actions.append(.edit)
+            }
             if onCreateIndividualListing != nil {
                 actions.append(.createIndividualListing)
             }
@@ -313,12 +323,13 @@ enum GoodsTileAction: CaseIterable, Identifiable {
     case detail
     case addToExchangeList
     case createIndividualListing
+    case edit
     case hide
     case report
     case delete
 
     static var visibleActions: [GoodsTileAction] {
-        [.detail, .addToExchangeList, .hide, .report, .delete]
+        [.detail, .addToExchangeList, .edit, .hide, .report, .delete]
     }
 
     var id: String { title }
@@ -331,6 +342,8 @@ enum GoodsTileAction: CaseIterable, Identifiable {
             "交換リストに追加"
         case .createIndividualListing:
             "これで個別募集する"
+        case .edit:
+            "編集"
         case .hide:
             "非表示にする"
         case .report:
@@ -348,6 +361,8 @@ enum GoodsTileAction: CaseIterable, Identifiable {
             "plus.circle"
         case .createIndividualListing:
             "rectangle.stack.badge.plus"
+        case .edit:
+            "square.and.pencil"
         case .hide:
             "eye.slash"
         case .report:
@@ -361,7 +376,7 @@ enum GoodsTileAction: CaseIterable, Identifiable {
         switch self {
         case .delete:
             .destructive
-        case .detail, .addToExchangeList, .createIndividualListing, .hide, .report:
+        case .detail, .addToExchangeList, .createIndividualListing, .edit, .hide, .report:
             nil
         }
     }

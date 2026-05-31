@@ -266,6 +266,54 @@ private enum TradeUnavailableChatAction: String, Identifiable {
     }
 }
 
+enum TradeAssistanceRequestKind: String, CaseIterable, Identifiable {
+    case late
+    case cancel
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .late:
+            "遅刻を申請"
+        case .cancel:
+            "キャンセル申請"
+        }
+    }
+
+    var systemImage: String {
+        switch self {
+        case .late:
+            "clock.badge.exclamationmark"
+        case .cancel:
+            "xmark.circle"
+        }
+    }
+
+    var messagePrefix: String {
+        switch self {
+        case .late:
+            "遅刻申請"
+        case .cancel:
+            "キャンセル申請"
+        }
+    }
+
+    var placeholder: String {
+        switch self {
+        case .late:
+            "到着見込み時刻や理由を入力してください"
+        case .cancel:
+            "キャンセルしたい理由を入力してください"
+        }
+    }
+
+    func systemMessageBody(from memo: String) -> String {
+        let trimmed = memo.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? messagePrefix : "\(messagePrefix)：\(trimmed)"
+    }
+}
+
 private struct TradeStageBar: View {
     @Binding var selectedStage: TradeStage
     var pendingCount: Int
@@ -331,6 +379,7 @@ private struct TradeDetailScreen: View {
     @State private var isShowingCounterProposalSheet = false
     @State private var isShowingScheduleSheet = false
     @State private var unavailableChatAction: TradeUnavailableChatAction?
+    @State private var assistanceRequestKind: TradeAssistanceRequestKind?
     @State private var selectedRemoteImage: RemoteImageSelection?
     @State private var isWaitingToShareLocation = false
     @StateObject private var locationState = MegrumLocationState()
@@ -454,6 +503,12 @@ private struct TradeDetailScreen: View {
                     onCounterProposal: {
                         isShowingCounterProposalSheet = true
                     },
+                    onRequestLate: {
+                        assistanceRequestKind = .late
+                    },
+                    onRequestCancel: {
+                        assistanceRequestKind = .cancel
+                    },
                     onReport: {
                         isShowingDisputeSheet = true
                     }
@@ -539,6 +594,24 @@ private struct TradeDetailScreen: View {
         .sheet(item: $unavailableChatAction) { action in
             NavigationStack {
                 TradeUnavailableChatActionSheet(action: action)
+            }
+            .presentationDetents([.medium])
+            .presentationDragIndicator(.visible)
+        }
+        .sheet(item: $assistanceRequestKind) { kind in
+            NavigationStack {
+                TradeAssistanceRequestSheet(
+                    kind: kind,
+                    isSubmitting: appState.sendingMessageProposalID == currentProposal.id
+                ) { memo in
+                    let sent = await appState.sendSystemMessage(
+                        proposalID: currentProposal.id,
+                        body: kind.systemMessageBody(from: memo)
+                    )
+                    if sent {
+                        assistanceRequestKind = nil
+                    }
+                }
             }
             .presentationDetents([.medium])
             .presentationDragIndicator(.visible)
@@ -1484,6 +1557,60 @@ private struct TradeUnavailableChatActionSheet: View {
     }
 }
 
+private struct TradeAssistanceRequestSheet: View {
+    var kind: TradeAssistanceRequestKind
+    var isSubmitting: Bool
+    var onSubmit: (String) async -> Void
+
+    @Environment(\.dismiss) private var dismiss
+    @State private var memo = ""
+
+    var body: some View {
+        Form {
+            Section {
+                TextEditor(text: $memo)
+                    .frame(minHeight: 132)
+                    .overlay(alignment: .topLeading) {
+                        if memo.isEmpty {
+                            Text(kind.placeholder)
+                                .foregroundStyle(MegrumTheme.muted)
+                                .padding(.top, 8)
+                                .padding(.leading, 5)
+                                .allowsHitTesting(false)
+                        }
+                    }
+            } header: {
+                Label(kind.title, systemImage: kind.systemImage)
+            } footer: {
+                Text("取引チャットに申請内容を残します。相手と条件を確認してください。")
+            }
+        }
+        .navigationTitle(kind.title)
+        .megrumInlineNavigationTitle()
+        .toolbar {
+            ToolbarItem(placement: .cancellationAction) {
+                Button("閉じる") {
+                    dismiss()
+                }
+            }
+            ToolbarItem(placement: .confirmationAction) {
+                Button {
+                    Task {
+                        await onSubmit(memo)
+                    }
+                } label: {
+                    if isSubmitting {
+                        ProgressView()
+                    } else {
+                        Text("送信")
+                    }
+                }
+                .disabled(isSubmitting)
+            }
+        }
+    }
+}
+
 private struct TradeMessageInput: View {
     @Binding var text: String
     var isSending: Bool
@@ -1493,6 +1620,8 @@ private struct TradeMessageInput: View {
     var onOpenLocationPlaceholder: () -> Void
     var onOpenOutfitPhotoPlaceholder: () -> Void
     var onCounterProposal: () -> Void
+    var onRequestLate: () -> Void
+    var onRequestCancel: () -> Void
     var onReport: () -> Void
     var onSend: () -> Void
 
@@ -1528,6 +1657,14 @@ private struct TradeMessageInput: View {
                     Button(action: onCounterProposal) {
                         Label("再打診", systemImage: "arrow.triangle.2.circlepath")
                     }
+                }
+
+                Button(action: onRequestLate) {
+                    Label("遅刻を申請", systemImage: "clock.badge.exclamationmark")
+                }
+
+                Button(action: onRequestCancel) {
+                    Label("キャンセル申請", systemImage: "xmark.circle")
                 }
 
                 Button(role: .destructive, action: onReport) {

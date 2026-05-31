@@ -182,6 +182,10 @@ public struct SupabaseMegrumRepository: MegrumRepository {
         try await messageClient.sendTextMessage(senderID: viewerID, input: input)
     }
 
+    public func sendSystemMessage(proposalID: UUID, body: String) async throws -> TradeMessage {
+        try await messageClient.sendSystemMessage(senderID: viewerID, proposalID: proposalID, body: body)
+    }
+
     public func sendLocationMessage(
         proposalID: UUID,
         latitude: Double,

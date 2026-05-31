@@ -4,6 +4,100 @@
 
 ---
 
+## イテレーション372：RN差分P0をSwift版へ追加補完
+
+### 背景・問題意識
+
+Swift Native版はiOS標準感を維持する方針で良い一方、React Native版と比べて画面上の不足がまだ多いというオーナー指摘があった。iter371で大きなP0導線を入れたが、引き続きRN parity backlogを基準に、ホーム現地交換モード、在庫/Wish編集、打診送信後の戻り制御、取引チャットの運用アクションを優先して追加した。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/HomeScreen.swift`
+- ホームに現地交換モードの状態カードを追加し、会場/現在地、時間枠、半径、持参グッズ概要を表示できるようにした。
+- 編集sheetからモードON/OFF、会場名、時間枠、半径、持参グッズを設定できるNative導線を追加した。
+
+#### `ios-native/Sources/MegrumApp/HomeLocalModeSurface.swift`
+- 現地交換モードのdraft、表示サマリー、端末内保存codec、持参グッズ候補抽出を小さな型へ分離した。
+
+#### `ios-native/Sources/MegrumApp/CollectionScreens.swift`
+- 在庫/Wishの追加ボタンを、最小追加sheetから新しいNative編集画面へ接続した。
+
+#### `ios-native/Sources/MegrumApp/GoodsEditorScreen.swift`
+- 在庫/WishのNative編集画面を追加し、タイトル、種別、グループ、メンバー、グッズ種別、数量、ステータス、タグ、写真選択の入口をまとめた。
+- まだ保存境界が未接続の項目は、黙って落とさず保存前に不足理由を表示するようにした。
+
+#### `ios-native/Sources/MegrumApp/GoodsGrid.swift`
+- グリッド側から編集画面へ渡す導線に合わせ、追加/長押し周辺の表示を調整した。
+
+#### `ios-native/Sources/MegrumApp/ProposalCreateFlow.swift`
+- 打診送信後にすぐ閉じず、「打診を送信しました」の完了画面を表示するようにした。
+- 完了後は「やりとりで確認する」から閉じるため、左端スワイプなどで打診入力ステップへ戻りにくい構造へ寄せた。
+
+#### `ios-native/Sources/MegrumApp/MegrumAppState.swift`
+- 取引チャットへsystem messageを送るRepository/AppState境界を追加した。
+
+#### `ios-native/Sources/MegrumApp/SupabaseMegrumRepository.swift`
+- `SupabaseMessageClient.sendSystemMessage` をSwift NativeのRepository境界から呼べるようにした。
+
+#### `ios-native/Sources/MegrumApp/TradesScreen.swift`
+- 取引チャットの入力欄上メニューに「遅刻を連絡」「キャンセル相談」を追加した。
+- これらは異議申告ではなく、取引チャット内のsystem messageとして残す形に整理した。
+
+#### `ios-native/Sources/MegrumApp/DisputeDetailScreen.swift`
+- 異議詳細、タイムライン、返信、取り下げ入口、遅刻/キャンセル申請draftのNative scaffoldを追加した。
+- 取引チャットへの本接続は次の統合対象として残した。
+
+#### `ios-native/Tests/MegrumAppTests/`
+- `HomeLocalModeTests`, `GoodsEditorDraftTests`, `ProposalCreateFlowTests`, `TradeChatAffordanceTests`, `DisputeDetailScreenTests`, `TradeRequestDraftTests` を追加/更新し、今回のRN差分補完をテストした。
+
+### 影響範囲
+
+- Swift Nativeホーム
+- Swift Native在庫/Wish追加・編集入口
+- Swift Native打診作成完了後の遷移
+- Swift Native取引チャット入力欄上メニュー
+- Swift Native異議詳細scaffold
+- Supabase `messages` system message送信境界
+
+### 確認方法
+
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-rn-parity-build`
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-rn-parity-test --enable-xctest --disable-swift-testing -j 1`
+- `xcodebuild -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -destination 'generic/platform=iOS Simulator' -derivedDataPath /tmp/megrum-native-xcodebuild-iter372 CODE_SIGNING_ALLOWED=NO build`
+- `xcodebuild -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -destination 'generic/platform=iOS' -derivedDataPath /tmp/megrum-native-device-iter372 -allowProvisioningUpdates build`
+- `xcrun devicectl device install app --device 7F6C74EF-5786-5316-920A-F7F1CC3FE2A4 /tmp/megrum-native-device-iter372/Build/Products/Debug-iphoneos/MegrumNative.app`
+  - 署名付きDebug buildは成功。
+  - `MTO’s phone` はCoreDeviceで `unavailable` のため、自動installは未完了。
+
+### セルフレビュー結果
+
+- ✅ React Native版との差分監査を起点にP0不足へ絞って追加した。
+- ✅ iOS標準のsheet/Form/List/segmented control中心にし、Swift版の標準デザイン感を維持した。
+- ✅ 状態名の追加/改名はなく、`notes/09_state_machines.md` 更新は不要。
+- ✅ 新しい用語定義は既存のRN差分バックログ内の範囲で、`notes/10_glossary.md` 更新は不要。
+- ⚠️ 在庫/Wish編集の写真/タグ/メンバー保存、Home現地交換モードのSupabase AW接続、異議詳細の実データ接続は次のP0として残る。
+
+### 関連ファイル
+
+- `ios-native/Sources/MegrumApp/HomeScreen.swift`
+- `ios-native/Sources/MegrumApp/HomeLocalModeSurface.swift`
+- `ios-native/Sources/MegrumApp/CollectionScreens.swift`
+- `ios-native/Sources/MegrumApp/GoodsEditorScreen.swift`
+- `ios-native/Sources/MegrumApp/GoodsGrid.swift`
+- `ios-native/Sources/MegrumApp/ProposalCreateFlow.swift`
+- `ios-native/Sources/MegrumApp/MegrumAppState.swift`
+- `ios-native/Sources/MegrumApp/SupabaseMegrumRepository.swift`
+- `ios-native/Sources/MegrumApp/TradesScreen.swift`
+- `ios-native/Sources/MegrumApp/DisputeDetailScreen.swift`
+- `ios-native/Tests/MegrumAppTests/HomeLocalModeTests.swift`
+- `ios-native/Tests/MegrumAppTests/GoodsEditorDraftTests.swift`
+- `ios-native/Tests/MegrumAppTests/ProposalCreateFlowTests.swift`
+- `ios-native/Tests/MegrumAppTests/TradeChatAffordanceTests.swift`
+- `ios-native/Tests/MegrumAppTests/DisputeDetailScreenTests.swift`
+- `ios-native/Tests/MegrumAppTests/TradeRequestDraftTests.swift`
+
+---
+
 ## イテレーション371：RN差分P0から自分プロフィール・打診作成・取引当日アクションを移植
 
 ### 背景・問題意識
