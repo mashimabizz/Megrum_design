@@ -4,6 +4,57 @@
 
 ---
 
+## イテレーション357：Swift Wishから個別募集作成へ接続
+
+### 背景・問題意識
+
+Swift Native版の個別募集は一覧と作成sheetの土台まで通ったが、実際のユーザー導線としては「このWishを起点に個別募集を作る」流れが必要だった。オーナーの実機レビューで、Swift版のiOS標準感を維持する方針も確認されたため、旧アプリの装飾へ寄せず、標準の長押しメニューとsheetで接続する。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/GoodsGrid.swift`
+- 自分のWishアイテムの長押しメニューに「これで個別募集する」を追加した。
+- 既存の詳細/非表示/削除アクションと同じNative context menuの中に置き、Inventoryや他ユーザーアイテムには不要に出ないようにした。
+
+#### `ios-native/Sources/MegrumApp/CollectionScreens.swift`
+- Wish一覧から選んだアイテムを起点に、個別募集作成sheetを開けるようにした。
+- `entryKind == .wish` の場合だけ作成導線を渡し、在庫一覧側には混ぜないようにした。
+
+#### `ios-native/Sources/MegrumApp/IndividualListingsScreen.swift`
+- 個別募集作成sheetに `preselectedWishID` を受け取れる入口を追加した。
+- Wish起点で開いた場合、対象Wishが最初から「受け取る」側に選択された状態になるようにした。
+
+#### `ios-native/README.md` / `notes/22_swift_native_migration.md`
+- Swift Native移行ステータスへ、Wish起点の個別募集作成導線を追記した。
+
+### 影響範囲
+
+- Swift Native版のWish一覧
+- Wishアイテム長押しメニュー
+- 個別募集作成sheetの初期選択
+
+### 確認方法
+
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-build --enable-xctest --disable-swift-testing -j 1`
+- `xcodebuild -quiet -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -destination 'generic/platform=iOS Simulator' -derivedDataPath /tmp/megrum-native-xcodebuild CODE_SIGNING_ALLOWED=NO build`
+
+### 関連ファイル
+
+- `ios-native/Sources/MegrumApp/GoodsGrid.swift`
+- `ios-native/Sources/MegrumApp/CollectionScreens.swift`
+- `ios-native/Sources/MegrumApp/IndividualListingsScreen.swift`
+- `ios-native/README.md`
+- `notes/22_swift_native_migration.md`
+- `notes/08_design_iterations.md`
+
+### セルフレビュー結果
+
+- ✅ Swift版のiOS標準感を維持し、既存のNative context menu / sheet構造で導線を追加した
+- ✅ DBスキーマ追加はなく、既存の個別募集作成境界を使うため `notes/05` は更新不要と判断した
+- ✅ 状態遷移・用語の追加はなく、`notes/09` / `notes/10` は更新不要と判断した
+
+---
+
 ## イテレーション356：Swift個別募集の土台を追加
 
 ### 背景・問題意識

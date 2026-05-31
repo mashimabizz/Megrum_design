@@ -1,7 +1,7 @@
 # 22. Swift Native Migration
 
 最終更新: 2026-05-31
-ステータス: Active draft（iter355）
+ステータス: Active draft（iter357）
 
 ## 目的
 
@@ -149,6 +149,7 @@ tar -xzf /Users/michitaka/Desktop/Megrum_backups/pre-swift-migration-20260531-03
 - iter352で、在庫/Wishグリッドの長押しメニューから本人所有グッズを `status='archived'` にする非表示処理と、本人所有行の削除処理を `goods_inventory` へ接続した。
 - iter353で、他ユーザー所有グッズの長押しメニューからSwift Nativeの通報sheetを開き、新規 `goods_reports` テーブルへグッズ単位の通報を保存できる境界を追加した。
 - iter356で、Swift Native版の個別募集モデル、`listings` / `listing_wish_options` の読み書き境界、AppState状態、Wishタブ内の「Wish / 個別募集」切り替えと作成sheetを追加した。
+- iter357で、Wish一覧の自分のアイテムを長押しして「これで個別募集する」から作成sheetへ進める導線を追加した。対象Wishは作成sheetの「受け取る」側へ最初から選択される。
 
 ### Phase 4: Meguri core
 

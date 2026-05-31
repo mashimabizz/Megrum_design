@@ -12,6 +12,7 @@ struct GoodsCollectionScreen: View {
     @State private var columns = 3
     @State private var isShowingAddForm = false
     @State private var isShowingUnavailableAlert = false
+    @State private var listingSeedWish: GoodsItem?
     @State private var selectedGroupID: UUID?
     @State private var selectedGoodsTypeID: UUID?
 
@@ -42,6 +43,7 @@ struct GoodsCollectionScreen: View {
                             items: filteredItems,
                             columns: columns,
                             viewerID: appState?.viewer?.id,
+                            onCreateIndividualListing: canCreateListingFromItems ? { listingSeedWish = $0 } : nil,
                             onHideItem: appState == nil ? nil : { hideItem($0) },
                             onDeleteItem: appState == nil ? nil : { deleteItem($0) }
                         )
@@ -73,6 +75,16 @@ struct GoodsCollectionScreen: View {
                         appState: appState,
                         kind: entryKind,
                         title: title
+                    )
+                }
+            }
+        }
+        .sheet(item: $listingSeedWish) { item in
+            if let appState {
+                NavigationStack {
+                    IndividualListingEditorSheet(
+                        appState: appState,
+                        preselectedWishID: item.id
                     )
                 }
             }
@@ -115,6 +127,10 @@ struct GoodsCollectionScreen: View {
         Task {
             _ = await appState.deleteGoodsItem(item.id)
         }
+    }
+
+    private var canCreateListingFromItems: Bool {
+        appState != nil && entryKind == .wish
     }
 }
 

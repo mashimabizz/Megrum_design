@@ -264,8 +264,9 @@ private struct AddIndividualListingButton: View {
     }
 }
 
-private struct IndividualListingEditorSheet: View {
+struct IndividualListingEditorSheet: View {
     @ObservedObject var appState: MegrumAppState
+    var preselectedWishID: UUID?
 
     @Environment(\.dismiss) private var dismiss
     @State private var selectedHaveIDs: Set<UUID> = []
@@ -274,6 +275,7 @@ private struct IndividualListingEditorSheet: View {
     @State private var wishLogic: ListingLogic = .one
     @State private var exchangeType: IndividualListingExchangeType = .any
     @State private var note = ""
+    @State private var didApplyPreset = false
 
     var body: some View {
         Form {
@@ -363,6 +365,9 @@ private struct IndividualListingEditorSheet: View {
                 .disabled(validationMessage != nil || appState.isCreatingIndividualListing)
             }
         }
+        .onAppear {
+            applyPresetIfNeeded()
+        }
     }
 
     private var selectedHaveItems: [GoodsItem] {
@@ -438,6 +443,16 @@ private struct IndividualListingEditorSheet: View {
         )
         if saved {
             dismiss()
+        }
+    }
+
+    private func applyPresetIfNeeded() {
+        guard !didApplyPreset else {
+            return
+        }
+        didApplyPreset = true
+        if let preselectedWishID {
+            selectedWishIDs.insert(preselectedWishID)
         }
     }
 }
