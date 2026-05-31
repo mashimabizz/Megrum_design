@@ -4,6 +4,68 @@
 
 ---
 
+## イテレーション360：Swift承諾時に交換手段を確定
+
+### 背景・問題意識
+
+Swift Native版の取引詳細から打診を承諾できるようになったが、`どちらもOK` の打診を受ける場合、ユーザーが現地交換か郵送交換かを選ばないまま成立できてしまう余地があった。以前の仕様要望では、相手からの打診に複数の交換手段が含まれる場合、応じる前にどれで進めるかを選ばせる必要がある。Swift版のiOS標準デザイン感を維持しながら、Native segmented pickerでこの選択を入れる。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumData/SupabaseProposalClient.swift`
+- `agreeProposal` と `makeAgreeProposalRequest` に `acceptedExchangeMethod` を追加した。
+- 打診の `exchange_method` が `both` の場合、承諾時に `hand` または `mail` の選択を必須にした。
+- 選択された交換手段を `exchange_method` としてPATCHし、成立後の取引条件が単一手段として残るようにした。
+- 既に `hand` / `mail` の打診では、余計な `exchange_method` 更新を送らないようにした。
+
+#### `ios-native/Sources/MegrumApp/MegrumAppState.swift` / `SupabaseMegrumRepository.swift`
+- Repository境界とAppStateの承諾APIに `acceptedExchangeMethod` を通した。
+- Preview repositoryでも `both` 承諾時は選択手段へ確定し、未選択なら失敗するようにした。
+
+#### `ios-native/Sources/MegrumApp/TradesScreen.swift`
+- 届いた打診が `どちらもOK` の場合だけ、承諾パネル内にiOS標準のsegmented pickerを表示するようにした。
+- `現地交換` / `郵送交換` のどちらかを選んでから「この内容で承諾」を押す流れにした。
+- `現地交換` または `郵送交換` のみの打診では、従来通り余計な選択UIを出さない。
+
+#### `ios-native/Sources/MegrumApp/NativePreviewData.swift`
+- Previewの受信打診を `どちらもOK` にし、実機上で交換手段選択UIを確認できるようにした。
+
+#### `ios-native/Tests/`
+- `both` の打診を承諾する時に、選択した交換手段がPATCH payloadへ入ることを検証した。
+- Preview AppStateの承諾後に、交換手段が選択値へ確定することを検証した。
+
+### 影響範囲
+
+- Swift Native版の取引詳細
+- 受信打診の承諾フロー
+- `proposals.exchange_method` の承諾時更新
+
+### 確認方法
+
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-build --enable-xctest --disable-swift-testing -j 1`
+- `xcodebuild -quiet -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -destination 'generic/platform=iOS Simulator' -derivedDataPath /tmp/megrum-native-xcodebuild CODE_SIGNING_ALLOWED=NO build`
+
+### 関連ファイル
+
+- `ios-native/Sources/MegrumData/SupabaseProposalClient.swift`
+- `ios-native/Sources/MegrumApp/MegrumAppState.swift`
+- `ios-native/Sources/MegrumApp/SupabaseMegrumRepository.swift`
+- `ios-native/Sources/MegrumApp/NativePreviewData.swift`
+- `ios-native/Sources/MegrumApp/TradesScreen.swift`
+- `ios-native/Tests/MegrumDataTests/SupabaseProposalClientTests.swift`
+- `ios-native/Tests/MegrumAppTests/MegrumAppStateTests.swift`
+- `notes/22_swift_native_migration.md`
+- `notes/08_design_iterations.md`
+
+### セルフレビュー結果
+
+- ✅ Swift版のiOS標準感を維持し、独自の装飾ではなく標準segmented pickerで交換手段選択を実装した
+- ✅ 状態名は追加せず、既存 `sent` / `agreement_one_side` / `agreed` を維持したため `notes/09` 更新は不要と判断した
+- ✅ 既存 `exchange_method` の値を承諾時に確定させるだけで、DBスキーマ追加はないため `notes/05` 更新は不要と判断した
+- ✅ 新しい用語は追加していないため、`notes/10` は更新不要と判断した
+
+---
+
 ## イテレーション359：Swift打診の承諾拒否を接続
 
 ### 背景・問題意識

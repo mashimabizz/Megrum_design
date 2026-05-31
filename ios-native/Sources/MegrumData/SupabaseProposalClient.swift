@@ -60,7 +60,7 @@ public final class SupabaseProposalClient: @unchecked Sendable {
         )
     }
 
-    public func agreeProposal(userID: UUID, proposalID: UUID) async throws -> TradeProposal {
+    public func agreeProposal(userID: UUID, proposalID: UUID, acceptedExchangeMethod: ExchangeMethod?) async throws -> TradeProposal {
         let proposal = try await loadProposal(proposalID: proposalID)
         guard proposal.isParticipant(userID) else {
             throw SupabaseProposalClientError.notParticipant
@@ -69,6 +69,7 @@ public final class SupabaseProposalClient: @unchecked Sendable {
             throw SupabaseProposalClientError.invalidStatus
         }
 
+        let resolvedExchangeMethod = try proposal.resolvedExchangeMethod(forAcceptance: acceptedExchangeMethod)
         let nextAgreement = proposal.nextAgreementApproved(by: userID)
         let status: ProposalStatus = nextAgreement.agreedBySender && nextAgreement.agreedByReceiver
             ? .agreed
@@ -78,7 +79,8 @@ public final class SupabaseProposalClient: @unchecked Sendable {
             values: ProposalAgreementUpdatePayload(
                 agreedBySender: nextAgreement.agreedBySender,
                 agreedByReceiver: nextAgreement.agreedByReceiver,
-                status: status.rawValue
+                status: status.rawValue,
+                exchangeMethod: resolvedExchangeMethod == proposal.exchangeMethod ? nil : resolvedExchangeMethod.rawValue
             ),
             select: ProposalRow.select,
             queryItems: proposalQueryItems(proposalID: proposalID)
@@ -285,7 +287,12 @@ public final class SupabaseProposalClient: @unchecked Sendable {
         )
     }
 
-    public func makeAgreeProposalRequest(userID: UUID, proposal: TradeProposal) throws -> URLRequest {
+    public func makeAgreeProposalRequest(
+        userID: UUID,
+        proposal: TradeProposal,
+        acceptedExchangeMethod: ExchangeMethod? = nil
+    ) throws -> URLRequest {
+        let resolvedExchangeMethod = try proposal.resolvedExchangeMethod(forAcceptance: acceptedExchangeMethod)
         let nextAgreement = proposal.nextAgreementApproved(by: userID)
         let status: ProposalStatus = nextAgreement.agreedBySender && nextAgreement.agreedByReceiver
             ? .agreed
@@ -302,7 +309,8 @@ public final class SupabaseProposalClient: @unchecked Sendable {
                 ProposalAgreementUpdatePayload(
                     agreedBySender: nextAgreement.agreedBySender,
                     agreedByReceiver: nextAgreement.agreedByReceiver,
-                    status: status.rawValue
+                    status: status.rawValue,
+                    exchangeMethod: resolvedExchangeMethod == proposal.exchangeMethod ? nil : resolvedExchangeMethod.rawValue
                 )
             ),
             prefer: "return=representation"
@@ -519,6 +527,7 @@ private struct ProposalAgreementUpdatePayload: Encodable, Sendable {
     var agreedBySender: Bool
     var agreedByReceiver: Bool
     var status: String
+    var exchangeMethod: String?
 }
 
 private struct ProposalStatusUpdatePayload: Encodable, Sendable {
@@ -630,6 +639,21 @@ private func fileExtension(for contentType: String) -> String {
 private extension TradeProposal {
     var canRespondToProposal: Bool {
         [.sent, .negotiating, .agreementOneSide].contains(status)
+    }
+
+    func resolvedExchangeMethod(forAcceptance selectedMethod: ExchangeMethod?) throws -> ExchangeMethod {
+        switch exchangeMethod {
+        case .both:
+            guard let selectedMethod, selectedMethod != .both else {
+                throw SupabaseProposalClientError.invalidStatus
+            }
+            return selectedMethod
+        case .hand, .mail:
+            if let selectedMethod, selectedMethod != exchangeMethod {
+                throw SupabaseProposalClientError.invalidStatus
+            }
+            return exchangeMethod
+        }
     }
 
     func nextAgreementApproved(by userID: UUID) -> (agreedBySender: Bool, agreedByReceiver: Bool) {

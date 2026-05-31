@@ -1,7 +1,7 @@
 # 22. Swift Native Migration
 
 最終更新: 2026-05-31
-ステータス: Active draft（iter359）
+ステータス: Active draft（iter360）
 
 ## 目的
 
@@ -152,6 +152,7 @@ tar -xzf /Users/michitaka/Desktop/Megrum_backups/pre-swift-migration-20260531-03
 - iter357で、Wish一覧の自分のアイテムを長押しして「これで個別募集する」から作成sheetへ進める導線を追加した。対象Wishは作成sheetの「受け取る」側へ最初から選択される。
 - iter358で、相手プロフィールに「譲る候補 / 個別募集」のNative segmented controlを追加し、相手の公開グッズや個別募集から打診作成sheetへ進める導線を接続した。個別募集起点の打診では既存 `proposals.listing_id` を保持する。
 - iter359で、Swift Native版の取引詳細から届いた打診を「この内容で承諾」または「断る」導線へ接続した。`proposals.agreed_by_sender` / `agreed_by_receiver` を読み書きし、両者合意で `agreed`、片側合意で `agreement_one_side`、断る場合は `rejected` へ進める。
+- iter360で、`exchange_method='both'` の打診を承諾する時に、Native segmented pickerで `hand` または `mail` を選ばせ、その選択値を `proposals.exchange_method` へPATCHしてから合意へ進めるようにした。
 
 ### Phase 4: Meguri core
 

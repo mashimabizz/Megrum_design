@@ -272,7 +272,7 @@ enum NativePreviewData {
             senderID: partnerID,
             receiverID: viewerID,
             status: .sent,
-            exchangeMethod: .mail,
+            exchangeMethod: .both,
             senderGoodsIDs: [inventory[2].id],
             receiverGoodsIDs: [inventory[0].id],
             conditionTags: ["即日発送"],

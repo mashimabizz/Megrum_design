@@ -478,11 +478,15 @@ final class MegrumAppStateTests: XCTestCase {
 
         await state.loadInitialData()
 
-        let accepted = await state.agreeProposal(proposalID: incomingProposalID)
+        let accepted = await state.agreeProposal(
+            proposalID: incomingProposalID,
+            acceptedExchangeMethod: .mail
+        )
         let updated = state.proposals.first(where: { $0.id == incomingProposalID })
 
         XCTAssertTrue(accepted)
         XCTAssertEqual(updated?.status, .agreed)
+        XCTAssertEqual(updated?.exchangeMethod, .mail)
         XCTAssertEqual(updated?.agreedBySender, true)
         XCTAssertEqual(updated?.agreedByReceiver, true)
         XCTAssertNil(state.respondingProposalID)

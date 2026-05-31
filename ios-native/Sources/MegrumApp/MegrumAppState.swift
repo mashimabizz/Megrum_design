@@ -77,7 +77,7 @@ public protocol MegrumRepository: Sendable {
     func loadPublicUserProfile(userID: UUID) async throws -> PublicUserProfile?
     func loadUserEvaluations(userID: UUID, limit: Int) async throws -> [UserEvaluation]
     func createProposal(_ input: ProposalCreateInput) async throws -> TradeProposal
-    func agreeProposal(proposalID: UUID) async throws -> TradeProposal
+    func agreeProposal(proposalID: UUID, acceptedExchangeMethod: ExchangeMethod?) async throws -> TradeProposal
     func rejectProposal(proposalID: UUID) async throws -> TradeProposal
     func addTradeEvidence(_ input: TradeEvidenceCreateInput) async throws -> TradeProposal
     func approveTradeEvidence(proposalID: UUID) async throws -> TradeProposal
@@ -173,7 +173,7 @@ public extension MegrumRepository {
         throw MegrumRepositoryError.unsupportedMutation
     }
 
-    func agreeProposal(proposalID: UUID) async throws -> TradeProposal {
+    func agreeProposal(proposalID: UUID, acceptedExchangeMethod: ExchangeMethod?) async throws -> TradeProposal {
         throw MegrumRepositoryError.unsupportedMutation
     }
 
@@ -453,7 +453,7 @@ public struct PreviewMegrumRepository: MegrumRepository {
         )
     }
 
-    public func agreeProposal(proposalID: UUID) async throws -> TradeProposal {
+    public func agreeProposal(proposalID: UUID, acceptedExchangeMethod: ExchangeMethod?) async throws -> TradeProposal {
         let proposal = NativePreviewData.proposals.first { $0.id == proposalID }
             ?? TradeProposal(
                 id: proposalID,
@@ -464,6 +464,7 @@ public struct PreviewMegrumRepository: MegrumRepository {
                 senderGoodsIDs: [],
                 receiverGoodsIDs: []
             )
+        let resolvedExchangeMethod = try resolvedAcceptanceExchangeMethod(for: proposal, selectedMethod: acceptedExchangeMethod)
         let agreedBySender = proposal.isSender(NativePreviewData.viewerID) ? true : (proposal.agreedBySender || proposal.status == .sent)
         let agreedByReceiver = proposal.isSender(NativePreviewData.viewerID) ? proposal.agreedByReceiver : true
         return TradeProposal(
@@ -471,7 +472,7 @@ public struct PreviewMegrumRepository: MegrumRepository {
             senderID: proposal.senderID,
             receiverID: proposal.receiverID,
             status: agreedBySender && agreedByReceiver ? .agreed : .agreementOneSide,
-            exchangeMethod: proposal.exchangeMethod,
+            exchangeMethod: resolvedExchangeMethod,
             senderGoodsIDs: proposal.senderGoodsIDs,
             receiverGoodsIDs: proposal.receiverGoodsIDs,
             conditionTags: proposal.conditionTags,
@@ -771,6 +772,24 @@ public struct PreviewMegrumRepository: MegrumRepository {
     public func registerNativePushDeviceToken(_ token: String, appVersion: String?) async throws {}
 
     public func revokeNativePushDeviceToken(_ token: String, revokedAt: Date) async throws {}
+}
+
+private func resolvedAcceptanceExchangeMethod(
+    for proposal: TradeProposal,
+    selectedMethod: ExchangeMethod?
+) throws -> ExchangeMethod {
+    switch proposal.exchangeMethod {
+    case .both:
+        guard let selectedMethod, selectedMethod != .both else {
+            throw MegrumRepositoryError.unsupportedMutation
+        }
+        return selectedMethod
+    case .hand, .mail:
+        if let selectedMethod, selectedMethod != proposal.exchangeMethod {
+            throw MegrumRepositoryError.unsupportedMutation
+        }
+        return proposal.exchangeMethod
+    }
 }
 
 @MainActor
@@ -1600,7 +1619,7 @@ public final class MegrumAppState: ObservableObject {
         }
     }
 
-    public func agreeProposal(proposalID: UUID) async -> Bool {
+    public func agreeProposal(proposalID: UUID, acceptedExchangeMethod: ExchangeMethod? = nil) async -> Bool {
         guard respondingProposalID != proposalID else {
             return false
         }
@@ -1608,7 +1627,10 @@ public final class MegrumAppState: ObservableObject {
         respondingProposalID = proposalID
         errorMessage = nil
         do {
-            let proposal = try await repository.agreeProposal(proposalID: proposalID)
+            let proposal = try await repository.agreeProposal(
+                proposalID: proposalID,
+                acceptedExchangeMethod: acceptedExchangeMethod
+            )
             replaceProposal(proposal)
             respondingProposalID = nil
             await loadMessages(proposalID: proposalID)

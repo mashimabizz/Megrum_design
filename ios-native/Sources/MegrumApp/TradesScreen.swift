@@ -280,9 +280,12 @@ private struct TradeDetailScreen: View {
                             proposal: currentProposal,
                             viewerID: appState.viewer?.id,
                             isResponding: appState.respondingProposalID == currentProposal.id,
-                            onAgree: {
+                            onAgree: { acceptedExchangeMethod in
                                 Task {
-                                    await appState.agreeProposal(proposalID: currentProposal.id)
+                                    await appState.agreeProposal(
+                                        proposalID: currentProposal.id,
+                                        acceptedExchangeMethod: acceptedExchangeMethod
+                                    )
                                 }
                             },
                             onReject: {
@@ -524,8 +527,9 @@ private struct TradeProposalResponsePanel: View {
     var proposal: TradeProposal
     var viewerID: UUID?
     var isResponding: Bool
-    var onAgree: () -> Void
+    var onAgree: (ExchangeMethod?) -> Void
     var onReject: () -> Void
+    @State private var selectedExchangeMethod: ExchangeMethod = .hand
 
     private var canAgree: Bool {
         guard let viewerID, proposal.isParticipant(viewerID) else {
@@ -541,6 +545,10 @@ private struct TradeProposalResponsePanel: View {
         return proposal.agreementBy(viewerID) && !proposal.partnerAgreement(for: viewerID)
     }
 
+    private var needsExchangeMethodChoice: Bool {
+        proposal.exchangeMethod == .both
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             Text("打診への返答")
@@ -548,7 +556,22 @@ private struct TradeProposalResponsePanel: View {
                 .foregroundStyle(MegrumTheme.ink)
 
             if canAgree {
-                Button(action: onAgree) {
+                if needsExchangeMethodChoice {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("交換手段を選ぶ")
+                            .font(.system(size: 13, weight: .heavy, design: .rounded))
+                            .foregroundStyle(MegrumTheme.muted)
+                        Picker("交換手段", selection: $selectedExchangeMethod) {
+                            Text(ExchangeMethod.hand.displayName).tag(ExchangeMethod.hand)
+                            Text(ExchangeMethod.mail.displayName).tag(ExchangeMethod.mail)
+                        }
+                        .pickerStyle(.segmented)
+                    }
+                }
+
+                Button {
+                    onAgree(needsExchangeMethodChoice ? selectedExchangeMethod : nil)
+                } label: {
                     Group {
                         if isResponding {
                             ProgressView()

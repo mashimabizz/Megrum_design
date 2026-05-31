@@ -88,6 +88,38 @@ final class SupabaseProposalClientTests: XCTestCase {
         XCTAssertEqual(json["agreed_by_sender"] as? Bool, true)
         XCTAssertEqual(json["agreed_by_receiver"] as? Bool, true)
         XCTAssertEqual(json["status"] as? String, "agreed")
+        XCTAssertNil(json["exchange_method"])
+    }
+
+    func testBuildsAgreeProposalRequestWithSelectedExchangeMethod() throws {
+        let client = SupabaseProposalClient(configuration: configuration)
+        let senderID = UUID(uuidString: "11111111-1111-1111-1111-111111111111")!
+        let receiverID = UUID(uuidString: "22222222-2222-2222-2222-222222222222")!
+        let proposalID = UUID(uuidString: "33333333-3333-3333-3333-333333333333")!
+        let proposal = TradeProposal(
+            id: proposalID,
+            senderID: senderID,
+            receiverID: receiverID,
+            status: .sent,
+            exchangeMethod: .both,
+            senderGoodsIDs: [],
+            receiverGoodsIDs: [],
+            agreedBySender: true,
+            agreedByReceiver: false
+        )
+
+        let request = try client.makeAgreeProposalRequest(
+            userID: receiverID,
+            proposal: proposal,
+            acceptedExchangeMethod: .mail
+        )
+        let body = try XCTUnwrap(request.httpBody)
+        let json = try XCTUnwrap(JSONSerialization.jsonObject(with: body) as? [String: Any])
+
+        XCTAssertEqual(json["agreed_by_sender"] as? Bool, true)
+        XCTAssertEqual(json["agreed_by_receiver"] as? Bool, true)
+        XCTAssertEqual(json["status"] as? String, "agreed")
+        XCTAssertEqual(json["exchange_method"] as? String, "mail")
     }
 
     func testBuildsRejectProposalRequest() throws {

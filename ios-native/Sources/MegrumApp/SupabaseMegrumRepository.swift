@@ -144,8 +144,12 @@ public struct SupabaseMegrumRepository: MegrumRepository {
         try await proposalClient.createProposal(senderID: viewerID, input: input)
     }
 
-    public func agreeProposal(proposalID: UUID) async throws -> TradeProposal {
-        try await proposalClient.agreeProposal(userID: viewerID, proposalID: proposalID)
+    public func agreeProposal(proposalID: UUID, acceptedExchangeMethod: ExchangeMethod?) async throws -> TradeProposal {
+        try await proposalClient.agreeProposal(
+            userID: viewerID,
+            proposalID: proposalID,
+            acceptedExchangeMethod: acceptedExchangeMethod
+        )
     }
 
     public func rejectProposal(proposalID: UUID) async throws -> TradeProposal {
