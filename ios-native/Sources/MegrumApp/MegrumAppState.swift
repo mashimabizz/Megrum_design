@@ -66,6 +66,7 @@ public protocol MegrumRepository: Sendable {
     func loadOshiCharacters(groupID: UUID, limit: Int) async throws -> [OshiCharacter]
     func loadGoodsTypes(limit: Int) async throws -> [GoodsType]
     func createGoodsEntry(_ input: GoodsEntryInput) async throws -> GoodsItem
+    func updateGoodsEntry(itemID: UUID, kind: GoodsEntryKind, input: GoodsEntryUpdateInput) async throws -> GoodsItem
     func searchGoods(_ input: GoodsSearchInput) async throws -> [GoodsItem]
     func archiveGoodsItem(itemID: UUID) async throws
     func deleteGoodsItem(itemID: UUID) async throws
@@ -133,6 +134,10 @@ public extension MegrumRepository {
     }
 
     func createGoodsEntry(_ input: GoodsEntryInput) async throws -> GoodsItem {
+        throw MegrumRepositoryError.unsupportedMutation
+    }
+
+    func updateGoodsEntry(itemID: UUID, kind: GoodsEntryKind, input: GoodsEntryUpdateInput) async throws -> GoodsItem {
         throw MegrumRepositoryError.unsupportedMutation
     }
 
@@ -378,6 +383,19 @@ public struct PreviewMegrumRepository: MegrumRepository {
             id: UUID(),
             ownerID: NativePreviewData.viewerID,
             groupID: input.groupID,
+            memberID: input.memberID,
+            goodsTypeID: input.goodsTypeID,
+            title: input.title,
+            quantity: input.quantity
+        )
+    }
+
+    public func updateGoodsEntry(itemID: UUID, kind: GoodsEntryKind, input: GoodsEntryUpdateInput) async throws -> GoodsItem {
+        GoodsItem(
+            id: itemID,
+            ownerID: NativePreviewData.viewerID,
+            groupID: input.groupID,
+            memberID: input.memberID,
             goodsTypeID: input.goodsTypeID,
             title: input.title,
             quantity: input.quantity
@@ -1505,36 +1523,58 @@ public final class MegrumAppState: ObservableObject {
             kind: input.kind,
             title: trimmedTitle,
             groupID: input.groupID,
+            memberID: input.memberID,
             goodsTypeID: input.goodsTypeID,
-            quantity: max(1, min(input.quantity, 999))
+            quantity: max(1, min(input.quantity, 999)),
+            status: input.status
         )
 
         isCreatingGoodsEntry = true
         errorMessage = nil
         do {
             let created = try await repository.createGoodsEntry(normalizedInput)
-            switch normalizedInput.kind {
-            case .inventory:
-                inventory.insert(created, at: 0)
-            case .wish:
-                wishes.insert(
-                    WishItem(
-                        id: created.id,
-                        ownerID: created.ownerID,
-                        groupID: created.groupID,
-                        memberID: created.memberID,
-                        goodsTypeID: created.goodsTypeID,
-                        title: created.title,
-                        tags: created.tags
-                    ),
-                    at: 0
-                )
-            }
+            upsertGoodsItemLocally(created, kind: normalizedInput.kind)
             isCreatingGoodsEntry = false
             return true
         } catch {
             errorMessage = "グッズを保存できませんでした"
             isCreatingGoodsEntry = false
+            return false
+        }
+    }
+
+    public func updateGoodsEntry(itemID: UUID, kind: GoodsEntryKind, input: GoodsEntryUpdateInput) async -> Bool {
+        guard mutatingGoodsItemID != itemID else {
+            return false
+        }
+
+        let trimmedTitle = input.title.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedTitle.isEmpty else {
+            errorMessage = "グッズ名を入力してください"
+            return false
+        }
+
+        let normalizedInput = GoodsEntryUpdateInput(
+            title: trimmedTitle,
+            groupID: input.groupID,
+            memberID: input.memberID,
+            clearsMemberID: input.clearsMemberID,
+            goodsTypeID: input.goodsTypeID,
+            quantity: max(1, min(input.quantity, 999)),
+            status: input.status,
+            photoURLs: input.photoURLs
+        )
+
+        mutatingGoodsItemID = itemID
+        errorMessage = nil
+        do {
+            let updated = try await repository.updateGoodsEntry(itemID: itemID, kind: kind, input: normalizedInput)
+            upsertGoodsItemLocally(updated, kind: kind)
+            mutatingGoodsItemID = nil
+            return true
+        } catch {
+            errorMessage = "グッズを更新できませんでした"
+            mutatingGoodsItemID = nil
             return false
         }
     }
@@ -2449,6 +2489,40 @@ public final class MegrumAppState: ObservableObject {
                 return nextOption.wishes.isEmpty && !nextOption.isCashOffer ? nil : nextOption
             }
             return next.haves.isEmpty || next.options.isEmpty ? nil : next
+        }
+    }
+
+    private func upsertGoodsItemLocally(_ item: GoodsItem, kind: GoodsEntryKind) {
+        inventory.removeAll { $0.id == item.id }
+        wishes.removeAll { $0.id == item.id }
+
+        switch kind {
+        case .inventory:
+            inventory.insert(item, at: 0)
+        case .wish:
+            wishes.insert(
+                WishItem(
+                    id: item.id,
+                    ownerID: item.ownerID,
+                    groupID: item.groupID,
+                    memberID: item.memberID,
+                    goodsTypeID: item.goodsTypeID,
+                    title: item.title,
+                    tags: item.tags
+                ),
+                at: 0
+            )
+        }
+
+        searchResults = searchResults.map { result in
+            guard result.item.id == item.id else {
+                return result
+            }
+            return SearchResultItem(
+                item: item,
+                ownerUserID: item.ownerID,
+                bucket: searchBucket(for: item)
+            )
         }
     }
 

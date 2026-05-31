@@ -1,7 +1,7 @@
 # 22. Swift Native Migration
 
 最終更新: 2026-05-31
-ステータス: Active draft（iter373）
+ステータス: Active draft（iter375）
 
 ## 目的
 
@@ -187,6 +187,11 @@ tar -xzf /Users/michitaka/Desktop/Megrum_backups/pre-swift-migration-20260531-03
 - iter373で、取引チャットの服装写真共有を `PhotosPicker` から `chat-photos` Storage upload、署名URL作成、`messages.message_type='outfit_photo'` 作成まで接続した。
 - iter373で、在庫/Wish編集向けに `goods_inventory` の本人所有PATCH境界とrequest testsを追加した。編集画面からの呼び出し接続は後続対象。
 - iter373で、異議詳細のload、異議返信、取り下げPATCHのlive境界とrequest testsを追加した。scaffold画面からの呼び出し接続は後続対象。
+- iter375で、在庫/Wish編集画面から `updateGoodsEntry` を呼び、本人所有 `goods_inventory` PATCH境界へ接続した。既存画像・既存タグは保存blockerにせず、変更されたタグと新規ローカル写真だけを後続対象として明示する。
+- iter375で、在庫/Wish作成payloadに `character_id` と `status` を含め、新規登録時にもメンバー/状態を落とさないようにした。
+- iter375で、異議詳細画面をload/reply/withdrawの非同期storeへ拡張し、live repositoryへ接続できる画面状態へ進めた。取引詳細からのrouting接続は後続対象。
+- iter375で、`activity_windows` と `user_local_mode_settings` のSwift Data境界を追加した。Home現地交換モード/AW UIからの本接続は後続対象。
+- iter375で、遅刻、キャンセル申請、キャンセル承認などの取引チャットsystem messageをRN互換metadataで作るrequest境界を追加した。入力欄上メニューからのtyped接続と表示デザイン調整は後続対象。
 
 ### Phase 4: Meguri core
 
@@ -233,8 +238,10 @@ tar -xzf /Users/michitaka/Desktop/Megrum_backups/pre-swift-migration-20260531-03
 - iter372で、`swift build` / `swift test` 222件 / `xcodebuild` Simulator build / 署名付きiPhone向けDebug build は成功した。`MTO’s phone` はCoreDeviceで `unavailable` のため、自動installは未完了。
 - iter373で、RN parity backlogのP0から取引チャット服装写真共有、在庫/Wish編集PATCH境界、異議詳細live境界を追加した。
 - iter373で、`swift build` / `swift test` 236件 / `xcodebuild` Simulator build / 署名付きiPhone向けDebug build は成功した。`MTO’s phone` はCoreDeviceで `unavailable` のため、自動installは未完了。
+- iter375で、RN parity backlogのP0から在庫/Wish編集画面の保存接続、在庫/Wish作成payloadのメンバー/status保持、異議詳細画面のlive-ready化、AW Data境界、取引チャット運用系system message境界を追加した。
+- iter375で、`swift build` / `swift test` 262件 / `xcodebuild` Simulator build / 署名付きiPhone向けDebug build は成功した。`MTO’s phone` はCoreDeviceで `unavailable` のため、自動installは端末接続復帰待ち。
 
-## RN parity backlog（iter370監査 / iter373更新）
+## RN parity backlog（iter370監査 / iter375更新）
 
 画面上の不足が多く見えるというオーナー指摘を受け、React Native版とSwift Native版のread-only差分監査を実施した。Swift版はiOS標準感を維持しつつ、以下の順に不足機能を埋める。
 
@@ -242,12 +249,14 @@ tar -xzf /Users/michitaka/Desktop/Megrum_backups/pre-swift-migration-20260531-03
 
 1. Home / Local Mode / AW
    - iter372で、ホームに現地交換モード、会場/現在地、半径、時間枠、持参グッズ概要、LIVE/OFF/終了表示のNative入口を追加した。
-   - 残: Supabase AW接続、相手から見える現地交換モード、AW作成/更新のlive境界、ホーム上のグルーム導線整理。
+   - iter375で、`activity_windows` と `user_local_mode_settings` のData境界を追加した。
+   - 残: Home UI/AppStateからのAW live接続、相手から見える現地交換モード、AW作成/更新のUI接続、ホーム上のグルーム導線整理。
    - 主な対象: `ios-native/Sources/MegrumApp/HomeScreen.swift`, `ios-native/Sources/MegrumApp/MegrumAppState.swift`
 2. Inventory / Wish Creation and Editing
    - iter372で、在庫/WishのNative編集画面を追加し、写真選択入口、タグ、メンバー、status、数量などの入力UIを先に載せた。
    - iter373で、`goods_inventory` の本人所有PATCH境界とrequest testsを追加した。
-   - 残: 編集画面からPATCH境界を呼ぶ接続、写真Upload、タグjoin table保存、複数カード切り抜き。
+   - iter375で、編集画面からPATCH境界を呼ぶ接続と、作成時のメンバー/status保持を追加した。
+   - 残: 写真Upload、タグjoin table保存、複数カード切り抜き。
    - 主な対象: `ios-native/Sources/MegrumApp/CollectionScreens.swift`, 新規 `GoodsEditorScreen.swift`
 3. Proposal Creation / Confirm
    - iter371で専用 `ProposalCreateFlow` を追加し、譲る/受け取る/待ち合わせ/確認、複数提示物、現地/郵送/どちらもOKの入口は実装済み。
@@ -258,12 +267,14 @@ tar -xzf /Users/michitaka/Desktop/Megrum_backups/pre-swift-migration-20260531-03
    - iter371で現在地共有と到着ステータスはtyped messageとして接続済み。
    - iter372で遅刻/キャンセル相談を取引チャット内のsystem messageとして送る導線を追加した。
    - iter373で服装写真共有を `PhotosPicker` から取引チャット写真メッセージ送信まで接続した。
-   - 残: 当日banner/入力欄上メニューの最終整理、system messageの表示デザイン調整、カメラ直撮り入口。
+   - iter375で、遅刻/キャンセル申請/キャンセル承認のRN互換metadata request境界を追加した。
+   - 残: 当日banner/入力欄上メニューからのtyped接続、system messageの表示デザイン調整、カメラ直撮り入口。
    - 主な対象: `ios-native/Sources/MegrumApp/TradesScreen.swift`, `ios-native/Sources/MegrumData/SupabaseMessageClient.swift`
 5. Dispute / Cancel / Late Flow
    - iter372で異議詳細、返信、タイムライン、取り下げ、キャンセル/遅刻draftのNative scaffoldを追加した。
    - iter373で `disputes` のload、`dispute_messages` の返信作成、取り下げPATCHのlive境界とrequest testsを追加した。
-   - 残: 異議詳細scaffoldからlive境界を呼ぶ接続、取引詳細からのrouting、取引詳細へのbanner反映。
+   - iter375で、異議詳細画面をload/reply/withdraw非同期storeへ拡張した。
+   - 残: live repository注入、取引詳細からのrouting、取引詳細へのbanner反映。
    - 主な対象: `ios-native/Sources/MegrumApp/TradesScreen.swift`, 新規 `DisputeDetailScreen.swift`
 6. Onboarding / Own Profile
    - iter371で複数推し/メンバー、自分プロフィール、設定からのプロフィール/推し設定導線は追加済み。

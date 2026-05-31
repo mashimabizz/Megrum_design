@@ -21,8 +21,10 @@ final class SupabaseGoodsInventoryClientTests: XCTestCase {
             kind: .inventory,
             title: "ランダムトレカ A",
             groupID: UUID(uuidString: "22222222-2222-2222-2222-222222222222")!,
+            memberID: UUID(uuidString: "44444444-4444-4444-4444-444444444444")!,
             goodsTypeID: UUID(uuidString: "33333333-3333-3333-3333-333333333333")!,
-            quantity: 2
+            quantity: 2,
+            status: .keep
         )
 
         let request = try client.makeCreateGoodsEntryRequest(userID: userID, input: input)
@@ -35,11 +37,13 @@ final class SupabaseGoodsInventoryClientTests: XCTestCase {
         XCTAssertEqual(json.first?["user_id"] as? String, "11111111-1111-1111-1111-111111111111")
         XCTAssertEqual(json.first?["kind"] as? String, "for_trade")
         XCTAssertEqual(json.first?["group_id"] as? String, "22222222-2222-2222-2222-222222222222")
+        XCTAssertEqual(json.first?["character_id"] as? String, "44444444-4444-4444-4444-444444444444")
         XCTAssertEqual(json.first?["goods_type_id"] as? String, "33333333-3333-3333-3333-333333333333")
         XCTAssertEqual(json.first?["title"] as? String, "ランダムトレカ A")
         XCTAssertEqual(json.first?["condition"] as? String, "good")
         XCTAssertEqual(json.first?["exchange_type"] as? String, "any")
         XCTAssertEqual(json.first?["quantity"] as? Int, 2)
+        XCTAssertEqual(json.first?["status"] as? String, "keep")
         XCTAssertEqual(json.first?["photo_urls"] as? [String], [])
     }
 

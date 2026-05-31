@@ -18,8 +18,10 @@ final class GoodsEditorDraftTests: XCTestCase {
         XCTAssertEqual(input.kind, .inventory)
         XCTAssertEqual(input.title, "TWICE トレカ")
         XCTAssertEqual(input.groupID, groupID)
+        XCTAssertNil(input.memberID)
         XCTAssertEqual(input.goodsTypeID, goodsTypeID)
         XCTAssertEqual(input.quantity, 999)
+        XCTAssertEqual(input.status, .active)
     }
 
     func testSwitchingEntryKindResetsInvalidStatus() {
@@ -45,25 +47,38 @@ final class GoodsEditorDraftTests: XCTestCase {
 
         XCTAssertEqual(
             draft.blockingReasons,
-            [.memberPersistence, .tagPersistence, .photoPersistence]
+            [.tagPersistence, .photoPersistence]
         )
         XCTAssertNil(draft.createInput(groupName: "TWICE", memberName: "SANA", goodsTypeName: "トレカ"))
     }
 
-    func testEditModeIsBlockedUntilUpdateBoundaryExists() {
+    func testEditModeBuildsUpdateInput() throws {
+        let groupID = UUID()
+        let memberID = UUID()
+        let goodsTypeID = UUID()
         let item = GoodsItem(
             id: UUID(),
             ownerID: UUID(),
-            groupID: UUID(),
-            goodsTypeID: UUID(),
+            groupID: groupID,
+            memberID: memberID,
+            goodsTypeID: goodsTypeID,
             title: "既存グッズ",
             quantity: 2
         )
 
-        let draft = GoodsEditorDraft(mode: .edit, entryKind: .inventory, item: item)
+        var draft = GoodsEditorDraft(mode: .edit, entryKind: .inventory, item: item)
+        draft.title = "  変更後  "
+        draft.quantity = 4
+        draft.status = .keep
 
-        XCTAssertTrue(draft.blockingReasons.contains(.editPersistence))
+        let input = try XCTUnwrap(draft.updateInput(groupName: "TWICE", memberName: "SANA", goodsTypeName: "トレカ"))
         XCTAssertNil(draft.createInput(groupName: "TWICE", memberName: nil, goodsTypeName: "トレカ"))
+        XCTAssertEqual(input.title, "変更後")
+        XCTAssertEqual(input.groupID, groupID)
+        XCTAssertEqual(input.memberID, memberID)
+        XCTAssertEqual(input.goodsTypeID, goodsTypeID)
+        XCTAssertEqual(input.quantity, 4)
+        XCTAssertEqual(input.status, .keep)
     }
 
     func testTagsAreNormalizedDeduplicatedAndLimited() {

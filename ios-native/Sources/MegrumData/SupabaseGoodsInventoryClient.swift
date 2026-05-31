@@ -83,6 +83,7 @@ public final class SupabaseGoodsInventoryClient: @unchecked Sendable {
             id: UUID(),
             ownerID: userID,
             groupID: input.groupID,
+            memberID: input.memberID,
             goodsTypeID: input.goodsTypeID,
             title: input.title.trimmingCharacters(in: .whitespacesAndNewlines),
             imageURL: normalizedPhotoURLs.compactMap(URL.init(string:)).first,
@@ -331,6 +332,7 @@ private struct GoodsEntryPayload: Encodable, Sendable {
     var userId: UUID
     var kind: String
     var groupId: UUID
+    var characterId: UUID?
     var goodsTypeId: UUID
     var title: String
     var condition: String?
@@ -338,12 +340,14 @@ private struct GoodsEntryPayload: Encodable, Sendable {
     var flexLevel: String?
     var exchangeType: String
     var quantity: Int
+    var status: String?
     var photoUrls: [String]
 
     init(userID: UUID, input: GoodsEntryInput, photoURLs: [String] = []) {
         self.userId = userID
         self.kind = input.kind.inventoryKind
         self.groupId = input.groupID
+        self.characterId = input.memberID
         self.goodsTypeId = input.goodsTypeID
         self.title = input.title.trimmingCharacters(in: .whitespacesAndNewlines)
         self.condition = input.kind == .inventory ? "good" : nil
@@ -351,6 +355,7 @@ private struct GoodsEntryPayload: Encodable, Sendable {
         self.flexLevel = input.kind == .wish ? "normal" : nil
         self.exchangeType = "any"
         self.quantity = max(1, min(input.quantity, 999))
+        self.status = input.status?.rawValue
         self.photoUrls = photoURLs
     }
 }

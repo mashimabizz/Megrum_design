@@ -446,6 +446,40 @@ final class MegrumAppStateTests: XCTestCase {
         XCTAssertFalse(state.isCreatingGoodsEntry)
     }
 
+    func testAppStateUpdatesPreviewGoodsEntryLocally() async {
+        let state = MegrumAppState(repository: PreviewMegrumRepository())
+        await state.loadInitialData()
+        await state.loadOshiGroups()
+        await state.loadGoodsTypes()
+        await state.loadOshiCharacters(group: state.oshiGroups.first)
+
+        let item = try! XCTUnwrap(state.inventory.first)
+        let groupID = try! XCTUnwrap(state.oshiGroups.first?.id)
+        let memberID = try! XCTUnwrap(state.oshiCharacters.first?.id)
+        let goodsTypeID = try! XCTUnwrap(state.goodsTypes.first?.id)
+
+        let updated = await state.updateGoodsEntry(
+            itemID: item.id,
+            kind: .inventory,
+            input: GoodsEntryUpdateInput(
+                title: "  更新トレカ  ",
+                groupID: groupID,
+                memberID: memberID,
+                goodsTypeID: goodsTypeID,
+                quantity: 3,
+                status: .keep
+            )
+        )
+
+        XCTAssertTrue(updated)
+        XCTAssertEqual(state.inventory.first?.id, item.id)
+        XCTAssertEqual(state.inventory.first?.title, "更新トレカ")
+        XCTAssertEqual(state.inventory.first?.memberID, memberID)
+        XCTAssertEqual(state.inventory.first?.quantity, 3)
+        XCTAssertNil(state.mutatingGoodsItemID)
+        XCTAssertNil(state.errorMessage)
+    }
+
     func testAppStateSearchesPreviewGoods() async {
         let state = MegrumAppState(repository: PreviewMegrumRepository())
         await state.loadInitialData()

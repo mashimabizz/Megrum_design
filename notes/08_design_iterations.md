@@ -4,6 +4,98 @@
 
 ---
 
+## イテレーション375：Swift保存接続とData境界補完
+
+### 背景・問題意識
+
+オーナーから「React Native版との差分を確認して、まだ不足している機能を追加する形で進めているか」「画面上、不足しているところが多い」と指摘があった。Swift Native版は旧Expo版の見た目をコピーするのではなく、iOS標準感を維持しながらRN版にあったP0機能差分を埋める方針で進める必要がある。今回は並列エージェントと統合役で、在庫/Wish保存接続、異議詳細、Activity Window、取引チャットのsystem message境界を補完した。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumCore/MegrumModels.swift`
+- `GoodsEntryStatus` と `GoodsEntryUpdateInput` を追加し、在庫/Wish編集時にstatus、メンバー、数量、写真URLなどを明示的に更新できる型へ整理した。
+- `GoodsEntryInput` に `memberID` と `status` を追加し、新規登録時もRN版で使っていた紐づけ情報を落とさないようにした。
+
+#### `ios-native/Sources/MegrumApp/GoodsEditorScreen.swift`
+- 編集モードで既存画像・既存タグを理由に保存不可にならないようにし、未接続の差分だけを保存前blockerとして扱うようにした。
+- 新規登録と編集保存を分岐し、編集時は `updateGoodsEntry` を呼ぶようにした。
+- ステータス選択を保存payloadへ反映し、保存ボタン文言も登録/更新で切り替えるようにした。
+
+#### `ios-native/Sources/MegrumApp/MegrumAppState.swift`
+- `MegrumRepository` に `updateGoodsEntry` 境界を追加した。
+- Preview repositoryでも在庫/Wish更新をローカル状態へ反映し、検索結果にも同じ更新を同期するようにした。
+
+#### `ios-native/Sources/MegrumApp/SupabaseMegrumRepository.swift`
+- Swift App層の更新inputを `SupabaseGoodsInventoryClient.GoodsInventoryUpdateInput` へ変換し、live Supabase PATCHへ接続した。
+
+#### `ios-native/Sources/MegrumData/SupabaseGoodsInventoryClient.swift`
+- 新規作成payloadに `character_id` と `status` を含め、create時にもメンバー/状態が欠落しないようにした。
+
+#### `ios-native/Sources/MegrumApp/DisputeDetailScreen.swift`
+- 異議詳細画面を固定fixture寄りの表示から、load/reply/withdrawの非同期境界を持つlive接続可能なstore構造へ拡張した。
+- 読み込み、空、エラー、返信送信中、取り下げ中の状態を画面内で扱えるようにした。
+
+#### `ios-native/Sources/MegrumData/SupabaseActivityWindowClient.swift`
+- `activity_windows` と `user_local_mode_settings` のrequest境界を追加した。
+- 現地交換モード/AWをSupabaseへ接続するための読み書きテストを追加した。UI/AppStateへの本接続は後続対象。
+
+#### `ios-native/Sources/MegrumData/SupabaseMessageClient.swift`
+- 遅刻、キャンセル申請、キャンセル承認などの取引チャットsystem messageをRN互換のmetadataで生成する型とrequest builderを追加した。
+- 写真/位置情報/到着状態/運用系system messageのvalidationを補強した。
+
+#### `ios-native/Tests/`
+- 在庫/Wish編集、Supabase goods request、AppStateローカル更新、異議詳細store、Activity Window request、取引チャットsystem message requestのテストを追加・更新した。
+
+### 走らせたAgent
+
+- `Ampere`: 異議詳細画面のlive-ready storeと画面状態を担当。
+- `Feynman`: Activity Window / 現地交換モードのSupabase request境界を担当。
+- `Bohr`: 取引チャットの運用系system messageとmetadata validationを担当。
+- 統合役: 共通モデル、AppState、Repository、在庫/Wish編集画面、notes更新、build/test、実機反映を担当。
+
+### 影響範囲
+
+- Swift Native在庫/Wish登録・編集
+- Swift Native検索結果/ローカル状態更新
+- Supabase `goods_inventory` create/update
+- 異議詳細画面
+- Activity Window / 現地交換モードのData境界
+- 取引チャットsystem message request境界
+
+### 確認方法
+
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-iter375-build`
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-iter375-test --enable-xctest --disable-swift-testing -j 1`
+- `xcodebuild -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -destination 'generic/platform=iOS Simulator' -derivedDataPath /tmp/megrum-native-xcodebuild-iter375 CODE_SIGNING_ALLOWED=NO build`
+- `xcodebuild -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -destination 'generic/platform=iOS' -derivedDataPath /tmp/megrum-native-device-iter375 -allowProvisioningUpdates build`
+- `xcrun devicectl device install app --device 7F6C74EF-5786-5316-920A-F7F1CC3FE2A4 /tmp/megrum-native-device-iter375/Build/Products/Debug-iphoneos/MegrumNative.app`
+
+### セルフレビュー結果
+
+- ✅ React Native版との差分は、見た目の完全再現ではなくSwift NativeのiOS標準感を保ったP0機能移植として扱っている。
+- ✅ `swift build` は成功した。
+- ✅ `swift test` は262件すべて成功した。
+- ✅ Simulator向け `xcodebuild` は成功した。
+- ✅ 署名付きiPhone向けDebug buildは成功した。
+- ⚠️ USB接続iPhoneはCoreDevice上で `unavailable` のため、今回更新分の自動installは端末接続復帰待ち。
+- ✅ 状態名の追加/改名はなく、`notes/09_state_machines.md` 更新は不要。
+- ✅ 新用語・廃止用語はなく、`notes/10_glossary.md` 更新は不要。
+- ✅ DBスキーマの新規変更はなく、`notes/05_data_model.md` 更新は不要。`activity_windows` / `user_local_mode_settings` / `goods_inventory` / `messages` の既存境界をSwift側へ接続した。
+
+### 関連ファイル
+
+- `ios-native/Sources/MegrumCore/MegrumModels.swift`
+- `ios-native/Sources/MegrumApp/GoodsEditorScreen.swift`
+- `ios-native/Sources/MegrumApp/MegrumAppState.swift`
+- `ios-native/Sources/MegrumApp/SupabaseMegrumRepository.swift`
+- `ios-native/Sources/MegrumApp/DisputeDetailScreen.swift`
+- `ios-native/Sources/MegrumData/SupabaseGoodsInventoryClient.swift`
+- `ios-native/Sources/MegrumData/SupabaseActivityWindowClient.swift`
+- `ios-native/Sources/MegrumData/SupabaseMessageClient.swift`
+- `ios-native/Tests/`
+
+---
+
 ## イテレーション373：Swift RN差分P0を並列補完
 
 ### 背景・問題意識

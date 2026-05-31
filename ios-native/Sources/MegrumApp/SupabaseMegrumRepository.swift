@@ -104,6 +104,28 @@ public struct SupabaseMegrumRepository: MegrumRepository {
         try await goodsInventoryClient.createGoodsEntry(userID: viewerID, input: input)
     }
 
+    public func updateGoodsEntry(itemID: UUID, kind: GoodsEntryKind, input: GoodsEntryUpdateInput) async throws -> GoodsItem {
+        let status = GoodsInventoryStatus(rawValue: input.status.rawValue) ?? .active
+        let updated = try await goodsInventoryClient.updateGoodsItem(
+            userID: viewerID,
+            itemID: itemID,
+            input: GoodsInventoryUpdateInput(
+                title: input.title,
+                groupID: input.groupID,
+                characterID: input.memberID,
+                clearsCharacterID: input.clearsMemberID,
+                goodsTypeID: input.goodsTypeID,
+                quantity: input.quantity,
+                status: status,
+                photoURLs: input.photoURLs
+            )
+        )
+        if let updated {
+            return updated
+        }
+        throw MegrumRepositoryError.unsupportedMutation
+    }
+
     public func searchGoods(_ input: GoodsSearchInput) async throws -> [GoodsItem] {
         try await goodsInventoryClient.searchGoods(viewerID: viewerID, input: input)
     }

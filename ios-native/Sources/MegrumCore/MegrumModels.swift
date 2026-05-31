@@ -492,19 +492,72 @@ public enum GoodsEntryKind: String, Codable, Sendable, CaseIterable, Identifiabl
     }
 }
 
+public enum GoodsEntryStatus: String, Codable, Sendable, CaseIterable, Identifiable {
+    case active
+    case keep
+    case reserved
+    case traded
+    case archived
+
+    public var id: String { rawValue }
+}
+
 public struct GoodsEntryInput: Equatable, Sendable {
     public var kind: GoodsEntryKind
     public var title: String
     public var groupID: UUID
+    public var memberID: UUID?
     public var goodsTypeID: UUID
     public var quantity: Int
+    public var status: GoodsEntryStatus?
 
-    public init(kind: GoodsEntryKind, title: String, groupID: UUID, goodsTypeID: UUID, quantity: Int = 1) {
+    public init(
+        kind: GoodsEntryKind,
+        title: String,
+        groupID: UUID,
+        memberID: UUID? = nil,
+        goodsTypeID: UUID,
+        quantity: Int = 1,
+        status: GoodsEntryStatus? = nil
+    ) {
         self.kind = kind
         self.title = title
         self.groupID = groupID
+        self.memberID = memberID
         self.goodsTypeID = goodsTypeID
         self.quantity = quantity
+        self.status = status
+    }
+}
+
+public struct GoodsEntryUpdateInput: Equatable, Sendable {
+    public var title: String
+    public var groupID: UUID
+    public var memberID: UUID?
+    public var clearsMemberID: Bool
+    public var goodsTypeID: UUID
+    public var quantity: Int
+    public var status: GoodsEntryStatus
+    public var photoURLs: [String]?
+
+    public init(
+        title: String,
+        groupID: UUID,
+        memberID: UUID? = nil,
+        clearsMemberID: Bool = false,
+        goodsTypeID: UUID,
+        quantity: Int = 1,
+        status: GoodsEntryStatus = .active,
+        photoURLs: [String]? = nil
+    ) {
+        self.title = title
+        self.groupID = groupID
+        self.memberID = memberID
+        self.clearsMemberID = clearsMemberID
+        self.goodsTypeID = goodsTypeID
+        self.quantity = quantity
+        self.status = status
+        self.photoURLs = photoURLs
     }
 }
 

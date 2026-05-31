@@ -111,6 +111,28 @@ struct DisputeTimelineEvent: Identifiable, Equatable, Sendable {
     }
 }
 
+struct DisputeDetailMessageModel: Identifiable, Equatable, Sendable {
+    var id: UUID
+    var senderName: String
+    var body: String
+    var createdAt: Date
+    var photoURLs: [String]
+
+    init(
+        id: UUID = UUID(),
+        senderName: String,
+        body: String,
+        createdAt: Date,
+        photoURLs: [String] = []
+    ) {
+        self.id = id
+        self.senderName = senderName
+        self.body = body
+        self.createdAt = createdAt
+        self.photoURLs = photoURLs
+    }
+}
+
 enum DisputeDetailTimelineBuilder {
     static func build(
         status: DisputeDetailStatus,
@@ -202,6 +224,7 @@ struct DisputeDetailModel: Identifiable, Equatable, Sendable {
     var resolvedAt: Date?
     var resolutionSummary: String?
     var timeline: [DisputeTimelineEvent]
+    var messages: [DisputeDetailMessageModel]
 
     init(
         id: UUID,
@@ -216,7 +239,8 @@ struct DisputeDetailModel: Identifiable, Equatable, Sendable {
         replyDeadlineAt: Date? = nil,
         resolvedAt: Date? = nil,
         resolutionSummary: String? = nil,
-        timeline: [DisputeTimelineEvent]? = nil
+        timeline: [DisputeTimelineEvent]? = nil,
+        messages: [DisputeDetailMessageModel] = []
     ) {
         self.id = id
         self.proposalID = proposalID
@@ -236,6 +260,7 @@ struct DisputeDetailModel: Identifiable, Equatable, Sendable {
             replyDeadlineAt: replyDeadlineAt,
             resolvedAt: resolvedAt
         )
+        self.messages = messages
     }
 
     init(ticket: TradeDisputeTicket, category: TradeDisputeCategory? = nil, reporterName: String = "あなた", respondentName: String = "相手", factMemo: String? = nil, replyDeadlineAt: Date? = nil) {
@@ -259,6 +284,33 @@ struct DisputeDetailModel: Identifiable, Equatable, Sendable {
 
     var canWithdraw: Bool {
         status.allowsWithdrawal
+    }
+
+    func replacing(
+        status: DisputeDetailStatus? = nil,
+        resolvedAt: Date? = nil,
+        resolutionSummary: String? = nil,
+        messages: [DisputeDetailMessageModel]? = nil
+    ) -> DisputeDetailModel {
+        let nextStatus = status ?? self.status
+        let nextResolvedAt = resolvedAt ?? self.resolvedAt
+        let nextTimeline = status == nil && resolvedAt == nil ? timeline : nil
+        return DisputeDetailModel(
+            id: id,
+            proposalID: proposalID,
+            ticketNo: ticketNo,
+            status: nextStatus,
+            category: category,
+            reporterName: reporterName,
+            respondentName: respondentName,
+            factMemo: factMemo,
+            submittedAt: submittedAt,
+            replyDeadlineAt: replyDeadlineAt,
+            resolvedAt: nextResolvedAt,
+            resolutionSummary: resolutionSummary ?? self.resolutionSummary,
+            timeline: nextTimeline,
+            messages: messages ?? self.messages
+        )
     }
 
     func replyCountdownText(now: Date = .now) -> String {
@@ -380,15 +432,147 @@ struct TradeRequestDraft: Equatable, Sendable {
     }
 }
 
+enum DisputeDetailLoadState: Equatable, Sendable {
+    case loading
+    case loaded(DisputeDetailModel)
+    case empty
+    case failed(String)
+
+    var model: DisputeDetailModel? {
+        if case .loaded(let model) = self {
+            return model
+        }
+        return nil
+    }
+}
+
+enum DisputeDetailActionError: LocalizedError, Equatable {
+    case notCompleted
+
+    var errorDescription: String? {
+        switch self {
+        case .notCompleted:
+            "操作を完了できませんでした。"
+        }
+    }
+}
+
+@MainActor
+final class DisputeDetailStore: ObservableObject {
+    typealias DetailAction = () async throws -> DisputeDetailModel?
+    typealias ReplyAction = (DisputeReplyDraft) async throws -> DisputeDetailModel?
+    typealias WithdrawAction = () async throws -> DisputeDetailModel?
+
+    @Published private(set) var state: DisputeDetailLoadState
+    @Published var replyDraft: DisputeReplyDraft
+    @Published private(set) var isLoading = false
+    @Published private(set) var isSubmittingReply = false
+    @Published private(set) var isWithdrawing = false
+    @Published private(set) var actionErrorMessage: String?
+
+    private let detail: DetailAction
+    private let reply: ReplyAction
+    private let withdraw: WithdrawAction
+    private var hasLoaded = false
+
+    init(
+        initialState: DisputeDetailLoadState = .loading,
+        initialReplyDraft: DisputeReplyDraft = DisputeReplyDraft(),
+        detail: @escaping DetailAction,
+        reply: @escaping ReplyAction,
+        withdraw: @escaping WithdrawAction
+    ) {
+        self.state = initialState
+        self.replyDraft = initialReplyDraft
+        self.detail = detail
+        self.reply = reply
+        self.withdraw = withdraw
+        self.hasLoaded = initialState.model != nil
+    }
+
+    func loadIfNeeded() async {
+        guard !hasLoaded else {
+            return
+        }
+        await load()
+    }
+
+    func load() async {
+        hasLoaded = true
+        isLoading = true
+        if state.model == nil {
+            state = .loading
+        }
+        do {
+            state = try await resolvedState(from: detail())
+        } catch {
+            state = .failed(Self.message(for: error))
+        }
+        isLoading = false
+    }
+
+    func submitReply() async {
+        let draft = replyDraft
+        guard draft.isSubmittable, !isSubmittingReply else {
+            return
+        }
+
+        isSubmittingReply = true
+        actionErrorMessage = nil
+        do {
+            let updated = try await reply(draft)
+            replyDraft = DisputeReplyDraft()
+            if let updated {
+                state = .loaded(updated)
+            } else {
+                state = try await resolvedState(from: detail())
+            }
+        } catch {
+            actionErrorMessage = Self.message(for: error)
+        }
+        isSubmittingReply = false
+    }
+
+    func withdrawDispute() async {
+        guard state.model?.canWithdraw == true, !isWithdrawing else {
+            return
+        }
+
+        isWithdrawing = true
+        actionErrorMessage = nil
+        do {
+            state = try await resolvedState(from: withdraw())
+        } catch {
+            actionErrorMessage = Self.message(for: error)
+        }
+        isWithdrawing = false
+    }
+
+    func clearActionError() {
+        actionErrorMessage = nil
+    }
+
+    private func resolvedState(from model: DisputeDetailModel?) -> DisputeDetailLoadState {
+        if let model {
+            return .loaded(model)
+        }
+        return .empty
+    }
+
+    private static func message(for error: Error) -> String {
+        let localized = error.localizedDescription.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !localized.isEmpty {
+            return localized
+        }
+        return "時間をおいてもう一度お試しください。"
+    }
+}
+
 struct DisputeDetailScreen: View {
-    var model: DisputeDetailModel
-    var onSubmitReply: (DisputeReplyDraft) async -> Bool
+    @StateObject private var store: DisputeDetailStore
     var onSubmitTradeRequest: (TradeRequestDraft) async -> Bool
-    var onWithdraw: () async -> Bool
 
     @Environment(\.dismiss) private var dismiss
-    @State private var replyDraft: DisputeReplyDraft
-    @State private var isSubmittingReply = false
     @State private var presentedRequestKind: TradeRequestKind?
     @State private var isShowingWithdrawConfirmation = false
 
@@ -399,14 +583,210 @@ struct DisputeDetailScreen: View {
         onSubmitTradeRequest: @escaping (TradeRequestDraft) async -> Bool = { _ in false },
         onWithdraw: @escaping () async -> Bool = { false }
     ) {
-        self.model = model
-        self.onSubmitReply = onSubmitReply
+        self._store = StateObject(
+            wrappedValue: DisputeDetailStore(
+                initialState: .loaded(model),
+                initialReplyDraft: initialReplyDraft,
+                detail: { model },
+                reply: { draft in
+                    if await onSubmitReply(draft) {
+                        return nil
+                    }
+                    throw DisputeDetailActionError.notCompleted
+                },
+                withdraw: {
+                    if await onWithdraw() {
+                        return model.replacing(
+                            status: .withdrawn,
+                            resolvedAt: Date(),
+                            resolutionSummary: "申告は取り下げられました。"
+                        )
+                    }
+                    throw DisputeDetailActionError.notCompleted
+                }
+            )
+        )
         self.onSubmitTradeRequest = onSubmitTradeRequest
-        self.onWithdraw = onWithdraw
-        self._replyDraft = State(initialValue: initialReplyDraft)
+    }
+
+    init(
+        initialReplyDraft: DisputeReplyDraft = DisputeReplyDraft(),
+        detail: @escaping DisputeDetailStore.DetailAction,
+        reply: @escaping DisputeDetailStore.ReplyAction,
+        withdraw: @escaping DisputeDetailStore.WithdrawAction,
+        onSubmitTradeRequest: @escaping (TradeRequestDraft) async -> Bool = { _ in false }
+    ) {
+        self._store = StateObject(
+            wrappedValue: DisputeDetailStore(
+                initialReplyDraft: initialReplyDraft,
+                detail: detail,
+                reply: reply,
+                withdraw: withdraw
+            )
+        )
+        self.onSubmitTradeRequest = onSubmitTradeRequest
+    }
+
+    init(
+        store: DisputeDetailStore,
+        onSubmitTradeRequest: @escaping (TradeRequestDraft) async -> Bool = { _ in false }
+    ) {
+        self._store = StateObject(wrappedValue: store)
+        self.onSubmitTradeRequest = onSubmitTradeRequest
     }
 
     var body: some View {
+        Group {
+            switch store.state {
+            case .loading:
+                loadingView
+            case .loaded(let model):
+                loadedList(model: model)
+            case .empty:
+                emptyView
+            case .failed(let message):
+                errorView(message: message)
+            }
+        }
+        .task {
+            await store.loadIfNeeded()
+        }
+        .navigationTitle("異議詳細")
+        .megrumInlineNavigationTitle()
+        .toolbar {
+            ToolbarItem(placement: .cancellationAction) {
+                Button("閉じる") {
+                    dismiss()
+                }
+            }
+
+            if store.state.model?.canWithdraw == true {
+                ToolbarItem(placement: .primaryAction) {
+                    Button(role: .destructive) {
+                        isShowingWithdrawConfirmation = true
+                    } label: {
+                        if store.isWithdrawing {
+                            ProgressView()
+                        } else {
+                            Label("取り下げ", systemImage: "arrow.uturn.backward")
+                        }
+                    }
+                }
+            }
+        }
+        .sheet(item: $presentedRequestKind) { kind in
+            NavigationStack {
+                TradeRequestSheet(kind: kind, onSubmit: onSubmitTradeRequest)
+            }
+            .presentationDetents([.medium, .large])
+            .presentationDragIndicator(.visible)
+        }
+        .confirmationDialog(
+            "申告を取り下げますか？",
+            isPresented: $isShowingWithdrawConfirmation,
+            titleVisibility: .visible
+        ) {
+            Button("取り下げる", role: .destructive) {
+                Task {
+                    await store.withdrawDispute()
+                }
+            }
+            Button("キャンセル", role: .cancel) {}
+        } message: {
+            Text("取り下げ後は、この申告への反論や仲裁確認を進められません。")
+        }
+        .alert(
+            "操作を完了できませんでした",
+            isPresented: Binding(
+                get: { store.actionErrorMessage != nil },
+                set: { isPresented in
+                    if !isPresented {
+                        store.clearActionError()
+                    }
+                }
+            )
+        ) {
+            Button("OK", role: .cancel) {
+                store.clearActionError()
+            }
+        } message: {
+            Text(store.actionErrorMessage ?? "")
+        }
+    }
+
+    private var loadingView: some View {
+        List {
+            Section {
+                HStack {
+                    Spacer()
+                    ProgressView("読み込み中")
+                    Spacer()
+                }
+                .padding(.vertical, 32)
+            }
+        }
+        .scrollContentBackground(.hidden)
+        .background(MegrumTheme.canvas.ignoresSafeArea())
+        .disputeDetailListStyle()
+    }
+
+    private var emptyView: some View {
+        List {
+            Section {
+                VStack(spacing: 12) {
+                    Image(systemName: "exclamationmark.bubble")
+                        .font(.system(size: 36, weight: .semibold))
+                        .foregroundStyle(MegrumTheme.muted)
+                    Text("申告が見つかりません")
+                        .font(.headline)
+                        .foregroundStyle(MegrumTheme.ink)
+                    Text("取引チャットや通知から、もう一度開いてください。")
+                        .font(.subheadline)
+                        .multilineTextAlignment(.center)
+                        .foregroundStyle(MegrumTheme.muted)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 32)
+            }
+        }
+        .scrollContentBackground(.hidden)
+        .background(MegrumTheme.canvas.ignoresSafeArea())
+        .disputeDetailListStyle()
+    }
+
+    private func errorView(message: String) -> some View {
+        List {
+            Section {
+                VStack(spacing: 12) {
+                    Image(systemName: "wifi.exclamationmark")
+                        .font(.system(size: 36, weight: .semibold))
+                        .foregroundStyle(MegrumTheme.muted)
+                    Text("読み込めませんでした")
+                        .font(.headline)
+                        .foregroundStyle(MegrumTheme.ink)
+                    Text(message)
+                        .font(.subheadline)
+                        .multilineTextAlignment(.center)
+                        .foregroundStyle(MegrumTheme.muted)
+                    Button {
+                        Task {
+                            await store.load()
+                        }
+                    } label: {
+                        Label("再読み込み", systemImage: "arrow.clockwise")
+                    }
+                    .buttonStyle(.borderedProminent)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 32)
+            }
+        }
+        .scrollContentBackground(.hidden)
+        .background(MegrumTheme.canvas.ignoresSafeArea())
+        .disputeDetailListStyle()
+    }
+
+    private func loadedList(model: DisputeDetailModel) -> some View {
         List {
             Section {
                 DisputeStatusHeader(model: model)
@@ -440,12 +820,27 @@ struct DisputeDetailScreen: View {
                 }
             }
 
+            if !model.messages.isEmpty {
+                Section("返信履歴") {
+                    ForEach(model.messages) { message in
+                        DisputeMessageRow(message: message)
+                    }
+                }
+            }
+
             if model.canSubmitReply {
                 Section {
                     DisputeReplyComposer(
-                        draft: $replyDraft,
-                        isSubmitting: isSubmittingReply,
-                        onSubmit: submitReply
+                        draft: Binding(
+                            get: { store.replyDraft },
+                            set: { store.replyDraft = $0 }
+                        ),
+                        isSubmitting: store.isSubmittingReply,
+                        onSubmit: {
+                            Task {
+                                await store.submitReply()
+                            }
+                        }
                     )
                 } header: {
                     Text("反論")
@@ -475,63 +870,6 @@ struct DisputeDetailScreen: View {
         .scrollContentBackground(.hidden)
         .background(MegrumTheme.canvas.ignoresSafeArea())
         .disputeDetailListStyle()
-        .navigationTitle("異議詳細")
-        .megrumInlineNavigationTitle()
-        .toolbar {
-            ToolbarItem(placement: .cancellationAction) {
-                Button("閉じる") {
-                    dismiss()
-                }
-            }
-
-            if model.canWithdraw {
-                ToolbarItem(placement: .primaryAction) {
-                    Button(role: .destructive) {
-                        isShowingWithdrawConfirmation = true
-                    } label: {
-                        Label("取り下げ", systemImage: "arrow.uturn.backward")
-                    }
-                }
-            }
-        }
-        .sheet(item: $presentedRequestKind) { kind in
-            NavigationStack {
-                TradeRequestSheet(kind: kind, onSubmit: onSubmitTradeRequest)
-            }
-            .presentationDetents([.medium, .large])
-            .presentationDragIndicator(.visible)
-        }
-        .confirmationDialog(
-            "申告を取り下げますか？",
-            isPresented: $isShowingWithdrawConfirmation,
-            titleVisibility: .visible
-        ) {
-            Button("取り下げる", role: .destructive) {
-                Task {
-                    if await onWithdraw() {
-                        dismiss()
-                    }
-                }
-            }
-            Button("キャンセル", role: .cancel) {}
-        } message: {
-            Text("取り下げ後は、この申告への反論や仲裁確認を進められません。")
-        }
-    }
-
-    private func submitReply() {
-        guard replyDraft.isSubmittable, !isSubmittingReply else {
-            return
-        }
-
-        Task {
-            isSubmittingReply = true
-            let sent = await onSubmitReply(replyDraft)
-            isSubmittingReply = false
-            if sent {
-                replyDraft = DisputeReplyDraft()
-            }
-        }
     }
 }
 
@@ -682,6 +1020,35 @@ private struct DisputeTimelineView: View {
     }
 }
 
+private struct DisputeMessageRow: View {
+    var message: DisputeDetailMessageModel
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack {
+                Text(message.senderName)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(MegrumTheme.ink)
+                Spacer()
+                Text(message.createdAt.formatted(date: .abbreviated, time: .shortened))
+                    .font(.caption.weight(.medium))
+                    .foregroundStyle(MegrumTheme.muted)
+            }
+
+            Text(message.body)
+                .font(.body)
+                .foregroundStyle(MegrumTheme.ink)
+
+            if !message.photoURLs.isEmpty {
+                Label("\(message.photoURLs.count)件の写真", systemImage: "photo.on.rectangle")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(MegrumTheme.muted)
+            }
+        }
+        .padding(.vertical, 4)
+    }
+}
+
 private struct DisputeReplyComposer: View {
     @Binding var draft: DisputeReplyDraft
     var isSubmitting: Bool
@@ -824,3 +1191,102 @@ private struct TradeRequestSheet: View {
         }
     }
 }
+
+#if DEBUG
+@MainActor
+private enum DisputeDetailPreviewData {
+    enum PreviewError: LocalizedError {
+        case failed
+
+        var errorDescription: String? {
+            "通信状況を確認して、もう一度お試しください。"
+        }
+    }
+
+    static let submittedAt = Date(timeIntervalSince1970: 1_800)
+
+    static var model: DisputeDetailModel {
+        DisputeDetailModel(
+            id: UUID(uuidString: "30000000-0000-0000-0000-000000000001")!,
+            proposalID: UUID(uuidString: "30000000-0000-0000-0000-000000000101")!,
+            ticketNo: "DPT-260531-ABCDEF12",
+            status: .replyWindow,
+            category: .noshow,
+            reporterName: "あなた",
+            respondentName: "相手",
+            factMemo: "待ち合わせ時刻を過ぎても到着連絡がありませんでした。",
+            submittedAt: submittedAt,
+            replyDeadlineAt: submittedAt.addingTimeInterval(86_400),
+            messages: [
+                DisputeDetailMessageModel(
+                    id: UUID(uuidString: "30000000-0000-0000-0000-000000000201")!,
+                    senderName: "相手",
+                    body: "到着予定は取引チャットで共有済みです。",
+                    createdAt: submittedAt.addingTimeInterval(1_200)
+                )
+            ]
+        )
+    }
+
+    static func store(state: DisputeDetailLoadState) -> DisputeDetailStore {
+        DisputeDetailStore(
+            initialState: state,
+            detail: {
+                switch state {
+                case .loading:
+                    try await Task.sleep(nanoseconds: 30_000_000_000)
+                    return model
+                case .failed:
+                    throw PreviewError.failed
+                case .empty:
+                    return nil
+                default:
+                    return model
+                }
+            },
+            reply: { draft in
+                let message = DisputeDetailMessageModel(
+                    senderName: "あなた",
+                    body: draft.normalizedBody,
+                    createdAt: submittedAt.addingTimeInterval(1_800)
+                )
+                return model.replacing(messages: model.messages + [message])
+            },
+            withdraw: {
+                model.replacing(
+                    status: .withdrawn,
+                    resolvedAt: submittedAt.addingTimeInterval(2_400),
+                    resolutionSummary: "申告は取り下げられました。"
+                )
+            }
+        )
+    }
+}
+
+struct DisputeDetailScreen_Previews: PreviewProvider {
+    @MainActor
+    static var previews: some View {
+        Group {
+            NavigationStack {
+                DisputeDetailScreen(store: DisputeDetailPreviewData.store(state: .loading))
+            }
+            .previewDisplayName("Loading")
+
+            NavigationStack {
+                DisputeDetailScreen(store: DisputeDetailPreviewData.store(state: .loaded(DisputeDetailPreviewData.model)))
+            }
+            .previewDisplayName("Reply / Withdraw")
+
+            NavigationStack {
+                DisputeDetailScreen(store: DisputeDetailPreviewData.store(state: .empty))
+            }
+            .previewDisplayName("Empty")
+
+            NavigationStack {
+                DisputeDetailScreen(store: DisputeDetailPreviewData.store(state: .failed("通信状況を確認して、もう一度お試しください。")))
+            }
+            .previewDisplayName("Error")
+        }
+    }
+}
+#endif

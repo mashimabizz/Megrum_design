@@ -2,8 +2,11 @@ import Foundation
 import MegrumCore
 
 public enum SupabaseMessageClientError: Error, Equatable, Sendable {
+    case invalidBody
     case invalidPhotoMessageType
+    case invalidPhotoURL
     case invalidLocation
+    case invalidMetadata
 }
 
 public enum SupabaseMessageArrivalStatus: String, CaseIterable, Sendable {
@@ -21,6 +24,31 @@ public enum SupabaseMessageArrivalStatus: String, CaseIterable, Sendable {
             "離れました"
         }
     }
+}
+
+public enum SupabaseMessageLateMinutes: Int, CaseIterable, Sendable {
+    case ten = 10
+    case twenty = 20
+    case thirty = 30
+    case sixty = 60
+    case ninety = 90
+
+    var label: String {
+        switch self {
+        case .sixty:
+            "1時間"
+        case .ninety:
+            "1時間以上"
+        case .ten, .twenty, .thirty:
+            "\(rawValue)分"
+        }
+    }
+}
+
+public enum SupabaseMessageSystemAction: String, Sendable {
+    case cancelRequested = "cancel_requested"
+    case cancelApproved = "cancel_approved"
+    case lateNotice = "late_notice"
 }
 
 private extension SupabaseMessageArrivalStatus {
@@ -80,11 +108,12 @@ public final class SupabaseMessageClient: @unchecked Sendable {
         messageType: TradeMessageType = .photo
     ) async throws -> TradeMessage {
         try validatePhotoMessageType(messageType)
+        try validatePhotoURL(photoURL)
         return try await sendMessage(
             senderID: senderID,
             proposalID: proposalID,
             messageType: messageType,
-            body: body,
+            body: body ?? defaultPhotoBody(for: messageType),
             photoURL: photoURL
         )
     }
@@ -117,6 +146,43 @@ public final class SupabaseMessageClient: @unchecked Sendable {
 
     public func sendSystemMessage(senderID: UUID, proposalID: UUID, body: String) async throws -> TradeMessage {
         try await sendMessage(senderID: senderID, proposalID: proposalID, messageType: .system, body: body)
+    }
+
+    public func sendLateNoticeMessage(
+        senderID: UUID,
+        proposalID: UUID,
+        lateMinutes: SupabaseMessageLateMinutes,
+        reason: String,
+        note: String? = nil
+    ) async throws -> TradeMessage {
+        let payload = try makeLateNoticePayload(
+            senderID: senderID,
+            proposalID: proposalID,
+            lateMinutes: lateMinutes,
+            reason: reason,
+            note: note
+        )
+        return try await sendMessagePayload(payload)
+    }
+
+    public func sendCancelRequestMessage(
+        senderID: UUID,
+        proposalID: UUID,
+        reason: String,
+        note: String? = nil
+    ) async throws -> TradeMessage {
+        let payload = try makeCancelRequestPayload(
+            senderID: senderID,
+            proposalID: proposalID,
+            reason: reason,
+            note: note
+        )
+        return try await sendMessagePayload(payload)
+    }
+
+    public func sendCancelApprovedMessage(senderID: UUID, proposalID: UUID) async throws -> TradeMessage {
+        let payload = try makeCancelApprovedPayload(senderID: senderID, proposalID: proposalID)
+        return try await sendMessagePayload(payload)
     }
 
     public func sendArrivalStatusMessage(senderID: UUID, proposalID: UUID, body: String) async throws -> TradeMessage {
@@ -163,16 +229,7 @@ public final class SupabaseMessageClient: @unchecked Sendable {
         locationLabel: String? = nil,
         meta: [String: String]? = nil
     ) async throws -> TradeMessage {
-        if messageType == .location {
-            guard let locationLatitude, let locationLongitude else {
-                throw SupabaseMessageClientError.invalidLocation
-            }
-            try validateLocation(latitude: locationLatitude, longitude: locationLongitude)
-        }
-        if messageType == .photo || messageType == .outfitPhoto {
-            try validatePhotoMessageType(messageType)
-        }
-        let payload = MessageCreatePayload(
+        let payload = try makeMessageCreatePayload(
             proposalID: proposalID,
             senderID: senderID,
             messageType: messageType,
@@ -183,6 +240,10 @@ public final class SupabaseMessageClient: @unchecked Sendable {
             locationLabel: locationLabel,
             meta: meta
         )
+        return try await sendMessagePayload(payload)
+    }
+
+    private func sendMessagePayload(_ payload: MessageCreatePayload) async throws -> TradeMessage {
         let rows: [MessageRow] = try await client.upsertRows(
             into: "messages",
             values: [payload],
@@ -190,11 +251,15 @@ public final class SupabaseMessageClient: @unchecked Sendable {
         )
         return rows.first?.message ?? TradeMessage(
             id: UUID(),
-            proposalID: proposalID,
-            senderID: senderID,
-            messageType: messageType,
+            proposalID: payload.proposalId,
+            senderID: payload.senderId,
+            messageType: payload.tradeMessageType,
             body: payload.body,
-            photoURL: photoURL
+            photoURL: payload.photoURLValue,
+            locationLatitude: payload.locationLat,
+            locationLongitude: payload.locationLng,
+            locationLabel: payload.locationLabel,
+            meta: payload.tradeMeta
         )
     }
 
@@ -227,11 +292,12 @@ public final class SupabaseMessageClient: @unchecked Sendable {
         messageType: TradeMessageType = .photo
     ) throws -> URLRequest {
         try validatePhotoMessageType(messageType)
+        try validatePhotoURL(photoURL)
         return try makeSendMessageRequest(
             senderID: senderID,
             proposalID: proposalID,
             messageType: messageType,
-            body: body,
+            body: body ?? defaultPhotoBody(for: messageType),
             photoURL: photoURL
         )
     }
@@ -264,6 +330,43 @@ public final class SupabaseMessageClient: @unchecked Sendable {
 
     public func makeSendSystemMessageRequest(senderID: UUID, proposalID: UUID, body: String) throws -> URLRequest {
         try makeSendMessageRequest(senderID: senderID, proposalID: proposalID, messageType: .system, body: body)
+    }
+
+    public func makeSendLateNoticeMessageRequest(
+        senderID: UUID,
+        proposalID: UUID,
+        lateMinutes: SupabaseMessageLateMinutes,
+        reason: String,
+        note: String? = nil
+    ) throws -> URLRequest {
+        let payload = try makeLateNoticePayload(
+            senderID: senderID,
+            proposalID: proposalID,
+            lateMinutes: lateMinutes,
+            reason: reason,
+            note: note
+        )
+        return try makeMessageMutationRequest(payload)
+    }
+
+    public func makeSendCancelRequestMessageRequest(
+        senderID: UUID,
+        proposalID: UUID,
+        reason: String,
+        note: String? = nil
+    ) throws -> URLRequest {
+        let payload = try makeCancelRequestPayload(
+            senderID: senderID,
+            proposalID: proposalID,
+            reason: reason,
+            note: note
+        )
+        return try makeMessageMutationRequest(payload)
+    }
+
+    public func makeSendCancelApprovedMessageRequest(senderID: UUID, proposalID: UUID) throws -> URLRequest {
+        let payload = try makeCancelApprovedPayload(senderID: senderID, proposalID: proposalID)
+        return try makeMessageMutationRequest(payload)
     }
 
     public func makeSendArrivalStatusMessageRequest(senderID: UUID, proposalID: UUID, body: String) throws -> URLRequest {
@@ -310,16 +413,7 @@ public final class SupabaseMessageClient: @unchecked Sendable {
         locationLabel: String? = nil,
         meta: [String: String]? = nil
     ) throws -> URLRequest {
-        if messageType == .location {
-            guard let locationLatitude, let locationLongitude else {
-                throw SupabaseMessageClientError.invalidLocation
-            }
-            try validateLocation(latitude: locationLatitude, longitude: locationLongitude)
-        }
-        if messageType == .photo || messageType == .outfitPhoto {
-            try validatePhotoMessageType(messageType)
-        }
-        let payload = MessageCreatePayload(
+        let payload = try makeMessageCreatePayload(
             proposalID: proposalID,
             senderID: senderID,
             messageType: messageType,
@@ -330,6 +424,10 @@ public final class SupabaseMessageClient: @unchecked Sendable {
             locationLabel: locationLabel,
             meta: meta
         )
+        return try makeMessageMutationRequest(payload)
+    }
+
+    private func makeMessageMutationRequest(_ payload: MessageCreatePayload) throws -> URLRequest {
         return try client.makeMutationRequest(
             path: "/rest/v1/messages",
             queryItems: [
@@ -338,6 +436,99 @@ public final class SupabaseMessageClient: @unchecked Sendable {
             method: "POST",
             body: encoder.encode([payload]),
             prefer: "resolution=merge-duplicates,return=representation"
+        )
+    }
+
+    private func makeMessageCreatePayload(
+        proposalID: UUID,
+        senderID: UUID,
+        messageType: TradeMessageType,
+        body: String? = nil,
+        photoURL: URL? = nil,
+        locationLatitude: Double? = nil,
+        locationLongitude: Double? = nil,
+        locationLabel: String? = nil,
+        meta: [String: String]? = nil
+    ) throws -> MessageCreatePayload {
+        try validateMessagePayload(
+            messageType: messageType,
+            body: body,
+            photoURL: photoURL,
+            locationLatitude: locationLatitude,
+            locationLongitude: locationLongitude,
+            locationLabel: locationLabel,
+            meta: meta
+        )
+        return MessageCreatePayload(
+            proposalID: proposalID,
+            senderID: senderID,
+            messageType: messageType,
+            body: body,
+            photoURL: photoURL,
+            locationLatitude: locationLatitude,
+            locationLongitude: locationLongitude,
+            locationLabel: locationLabel,
+            meta: meta?.mapValues(MessageMetadataValue.string)
+        )
+    }
+
+    private func makeLateNoticePayload(
+        senderID: UUID,
+        proposalID: UUID,
+        lateMinutes: SupabaseMessageLateMinutes,
+        reason: String,
+        note: String?
+    ) throws -> MessageCreatePayload {
+        let normalizedReason = try requiredText(reason)
+        let normalizedNote = note?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
+        let body = "\(lateMinutes.label)遅れる旨が通知されました\n理由：\(normalizedReason)\(normalizedNote.map { "\n\($0)" } ?? "")"
+        return MessageCreatePayload(
+            proposalID: proposalID,
+            senderID: senderID,
+            messageType: .system,
+            body: body,
+            meta: [
+                "action": .string(SupabaseMessageSystemAction.lateNotice.rawValue),
+                "notified_by": .string(senderID.uuidString.lowercased()),
+                "late_minutes": .int(lateMinutes.rawValue),
+                "reason": .string(normalizedReason),
+                "note": normalizedNote.map(MessageMetadataValue.string) ?? .null
+            ]
+        )
+    }
+
+    private func makeCancelRequestPayload(
+        senderID: UUID,
+        proposalID: UUID,
+        reason: String,
+        note: String?
+    ) throws -> MessageCreatePayload {
+        let normalizedReason = try requiredText(reason)
+        let normalizedNote = note?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
+        let body = "取引キャンセルが申請されました\n理由：\(normalizedReason)\(normalizedNote.map { "\n\($0)" } ?? "")"
+        return MessageCreatePayload(
+            proposalID: proposalID,
+            senderID: senderID,
+            messageType: .system,
+            body: body,
+            meta: [
+                "action": .string(SupabaseMessageSystemAction.cancelRequested.rawValue),
+                "requested_by": .string(senderID.uuidString.lowercased()),
+                "reason": .string(normalizedReason),
+                "note": normalizedNote.map(MessageMetadataValue.string) ?? .null
+            ]
+        )
+    }
+
+    private func makeCancelApprovedPayload(senderID: UUID, proposalID: UUID) throws -> MessageCreatePayload {
+        MessageCreatePayload(
+            proposalID: proposalID,
+            senderID: senderID,
+            messageType: .system,
+            body: "取引キャンセルが合意されました（評価への影響なし）",
+            meta: [
+                "action": .string(SupabaseMessageSystemAction.cancelApproved.rawValue)
+            ]
         )
     }
 
@@ -353,10 +544,95 @@ public final class SupabaseMessageClient: @unchecked Sendable {
         }
     }
 
+    private func validatePhotoURL(_ photoURL: URL?) throws {
+        guard
+            let photoURL,
+            let scheme = photoURL.scheme?.lowercased(),
+            ["http", "https"].contains(scheme),
+            photoURL.host?.isEmpty == false
+        else {
+            throw SupabaseMessageClientError.invalidPhotoURL
+        }
+    }
+
     private func validateLocation(latitude: Double, longitude: Double) throws {
         guard latitude.isFinite, longitude.isFinite, (-90...90).contains(latitude), (-180...180).contains(longitude) else {
             throw SupabaseMessageClientError.invalidLocation
         }
+    }
+
+    private func validateMessagePayload(
+        messageType: TradeMessageType,
+        body: String?,
+        photoURL: URL?,
+        locationLatitude: Double?,
+        locationLongitude: Double?,
+        locationLabel: String?,
+        meta: [String: String]?
+    ) throws {
+        switch messageType {
+        case .text:
+            _ = try requiredText(body)
+            try rejectAttachmentFields(photoURL: photoURL, locationLatitude: locationLatitude, locationLongitude: locationLongitude, locationLabel: locationLabel)
+        case .system:
+            _ = try requiredText(body)
+            try rejectAttachmentFields(photoURL: photoURL, locationLatitude: locationLatitude, locationLongitude: locationLongitude, locationLabel: locationLabel)
+        case .photo, .outfitPhoto:
+            try validatePhotoMessageType(messageType)
+            try validatePhotoURL(photoURL)
+            if let locationLatitude, let locationLongitude {
+                try validateLocation(latitude: locationLatitude, longitude: locationLongitude)
+                throw SupabaseMessageClientError.invalidLocation
+            }
+            if locationLatitude != nil || locationLongitude != nil || locationLabel?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty != nil {
+                throw SupabaseMessageClientError.invalidLocation
+            }
+        case .location:
+            guard let locationLatitude, let locationLongitude else {
+                throw SupabaseMessageClientError.invalidLocation
+            }
+            try validateLocation(latitude: locationLatitude, longitude: locationLongitude)
+            guard locationLabel?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty != nil else {
+                throw SupabaseMessageClientError.invalidLocation
+            }
+            if photoURL != nil {
+                throw SupabaseMessageClientError.invalidPhotoURL
+            }
+        case .arrivalStatus:
+            _ = try requiredText(body)
+            try rejectAttachmentFields(photoURL: photoURL, locationLatitude: locationLatitude, locationLongitude: locationLongitude, locationLabel: locationLabel)
+            guard
+                let status = meta?["status"],
+                SupabaseMessageArrivalStatus(rawValue: status) != nil
+            else {
+                throw SupabaseMessageClientError.invalidMetadata
+            }
+        }
+    }
+
+    private func rejectAttachmentFields(
+        photoURL: URL?,
+        locationLatitude: Double?,
+        locationLongitude: Double?,
+        locationLabel: String?
+    ) throws {
+        if photoURL != nil {
+            throw SupabaseMessageClientError.invalidPhotoURL
+        }
+        if locationLatitude != nil || locationLongitude != nil || locationLabel?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty != nil {
+            throw SupabaseMessageClientError.invalidLocation
+        }
+    }
+
+    private func requiredText(_ text: String?) throws -> String {
+        guard let normalized = text?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty else {
+            throw SupabaseMessageClientError.invalidBody
+        }
+        return normalized
+    }
+
+    private func defaultPhotoBody(for messageType: TradeMessageType) -> String? {
+        messageType == .outfitPhoto ? "服装写真を共有しました" : nil
     }
 }
 
@@ -372,7 +648,7 @@ private struct MessageRow: Decodable, Sendable {
     var locationLat: Double?
     var locationLng: Double?
     var locationLabel: String?
-    var meta: [String: String]?
+    var meta: [String: MessageMetadataValue]?
     var createdAt: Date?
 
     var message: TradeMessage? {
@@ -390,7 +666,7 @@ private struct MessageRow: Decodable, Sendable {
             locationLatitude: locationLat,
             locationLongitude: locationLng,
             locationLabel: locationLabel,
-            meta: meta ?? [:],
+            meta: meta?.compactMapValues(\.stringValue) ?? [:],
             createdAt: createdAt ?? .now
         )
     }
@@ -400,8 +676,66 @@ private struct MessageRow: Decodable, Sendable {
         case .location:
             locationLabel
         case .arrivalStatus:
-            meta?["body"] ?? meta?["label"] ?? meta?["status"].flatMap(SupabaseMessageArrivalStatus.init(rawValue:))?.defaultBody
+            meta?["body"]?.stringValue
+                ?? meta?["label"]?.stringValue
+                ?? meta?["status"]?.stringValue.flatMap(SupabaseMessageArrivalStatus.init(rawValue:))?.defaultBody
         case .text, .photo, .outfitPhoto, .system:
+            nil
+        }
+    }
+}
+
+private enum MessageMetadataValue: Codable, Equatable, Sendable {
+    case string(String)
+    case int(Int)
+    case double(Double)
+    case bool(Bool)
+    case null
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        if container.decodeNil() {
+            self = .null
+        } else if let string = try? container.decode(String.self) {
+            self = .string(string)
+        } else if let int = try? container.decode(Int.self) {
+            self = .int(int)
+        } else if let double = try? container.decode(Double.self) {
+            self = .double(double)
+        } else if let bool = try? container.decode(Bool.self) {
+            self = .bool(bool)
+        } else {
+            self = .null
+        }
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        switch self {
+        case let .string(value):
+            try container.encode(value)
+        case let .int(value):
+            try container.encode(value)
+        case let .double(value):
+            try container.encode(value)
+        case let .bool(value):
+            try container.encode(value)
+        case .null:
+            try container.encodeNil()
+        }
+    }
+
+    var stringValue: String? {
+        switch self {
+        case let .string(value):
+            value
+        case let .int(value):
+            "\(value)"
+        case let .double(value):
+            "\(value)"
+        case let .bool(value):
+            value ? "true" : "false"
+        case .null:
             nil
         }
     }
@@ -416,7 +750,7 @@ private struct MessageCreatePayload: Encodable, Sendable {
     var locationLat: Double?
     var locationLng: Double?
     var locationLabel: String?
-    var meta: [String: String]?
+    var meta: [String: MessageMetadataValue]?
 
     init(senderID: UUID, input: TradeMessageCreateInput) {
         self.init(
@@ -436,7 +770,7 @@ private struct MessageCreatePayload: Encodable, Sendable {
         locationLatitude: Double? = nil,
         locationLongitude: Double? = nil,
         locationLabel: String? = nil,
-        meta: [String: String]? = nil
+        meta: [String: MessageMetadataValue]? = nil
     ) {
         self.proposalId = proposalID
         self.senderId = senderID
@@ -447,6 +781,18 @@ private struct MessageCreatePayload: Encodable, Sendable {
         self.locationLng = locationLongitude
         self.locationLabel = locationLabel?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
         self.meta = meta?.isEmpty == true ? nil : meta
+    }
+
+    var tradeMessageType: TradeMessageType {
+        TradeMessageType(rawValue: messageType) ?? .system
+    }
+
+    var photoURLValue: URL? {
+        photoUrl.flatMap(URL.init(string:))
+    }
+
+    var tradeMeta: [String: String] {
+        meta?.compactMapValues(\.stringValue) ?? [:]
     }
 }
 

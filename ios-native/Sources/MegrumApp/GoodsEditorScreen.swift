@@ -113,57 +113,47 @@ enum GoodsEditorStatus: String, CaseIterable, Identifiable, Equatable {
             "checkmark.seal"
         }
     }
+
+    var persistedStatus: GoodsEntryStatus {
+        switch self {
+        case .forTrade, .wishActive:
+            .active
+        case .keep:
+            .keep
+        case .wishAchieved:
+            .archived
+        }
+    }
 }
 
 enum GoodsEditorSaveBlocker: Equatable, Identifiable {
-    case editPersistence
-    case memberPersistence
     case tagPersistence
     case photoPersistence
-    case statusPersistence(GoodsEditorStatus)
 
     var id: String {
         switch self {
-        case .editPersistence:
-            "edit"
-        case .memberPersistence:
-            "member"
         case .tagPersistence:
             "tags"
         case .photoPersistence:
             "photo"
-        case let .statusPersistence(status):
-            "status-\(status.rawValue)"
         }
     }
 
     var title: String {
         switch self {
-        case .editPersistence:
-            "既存グッズの更新APIが未接続"
-        case .memberPersistence:
-            "メンバー保存が未接続"
         case .tagPersistence:
             "グッズタグ保存が未接続"
         case .photoPersistence:
             "写真アップロード保存が未接続"
-        case let .statusPersistence(status):
-            "「\(status.title)」保存が未接続"
         }
     }
 
     var message: String {
         switch self {
-        case .editPersistence:
-            "現在の共通境界には create / archive / delete のみがあり、更新用の状態・repository API がありません。"
-        case .memberPersistence:
-            "`GoodsEntryInput` に memberID / characterID がないため、選択を保存できません。"
         case .tagPersistence:
             "`goods_inventory_tags` の読み書き境界がSwift Native側に未追加です。"
         case .photoPersistence:
             "`photo_urls` とStorage uploadを保存する境界が未追加です。"
-        case .statusPersistence:
-            "`GoodsEntryInput` は在庫を `for_trade`、Wishを `wanted` として作成する最小境界のままです。"
         }
     }
 }
@@ -178,10 +168,13 @@ struct GoodsEditorDraft: Equatable {
     var quantity: Int
     var status: GoodsEditorStatus
     var tagNames: [String]
+    var originalTagNames: [String]
     var hasLocalPhoto: Bool
+    var existingImageURL: URL?
     var existingItemID: UUID?
 
     init(mode: GoodsEditorMode = .create, entryKind: GoodsEntryKind = .inventory, item: GoodsItem? = nil) {
+        let normalizedItemTags = Self.normalizedTags(item?.tags.map(\.name) ?? [])
         self.mode = mode
         self.entryKind = entryKind
         self.title = item?.title ?? ""
@@ -190,8 +183,10 @@ struct GoodsEditorDraft: Equatable {
         self.goodsTypeID = item?.goodsTypeID
         self.quantity = max(1, min(item?.quantity ?? 1, 999))
         self.status = Self.defaultStatus(mode: mode, entryKind: entryKind)
-        self.tagNames = Self.normalizedTags(item?.tags.map(\.name) ?? [])
-        self.hasLocalPhoto = item?.imageURL != nil
+        self.tagNames = normalizedItemTags
+        self.originalTagNames = normalizedItemTags
+        self.hasLocalPhoto = false
+        self.existingImageURL = item?.imageURL
         self.existingItemID = item?.id
     }
 
@@ -201,6 +196,10 @@ struct GoodsEditorDraft: Equatable {
 
     var normalizedQuantity: Int {
         max(1, min(quantity, 999))
+    }
+
+    var hasDisplayPhoto: Bool {
+        hasLocalPhoto || existingImageURL != nil
     }
 
     mutating func setEntryKind(_ kind: GoodsEntryKind) {
@@ -253,27 +252,44 @@ struct GoodsEditorDraft: Equatable {
             kind: entryKind,
             title: resolved,
             groupID: groupID,
+            memberID: memberID,
             goodsTypeID: goodsTypeID,
-            quantity: normalizedQuantity
+            quantity: normalizedQuantity,
+            status: status.persistedStatus
+        )
+    }
+
+    func updateInput(groupName: String? = nil, memberName: String? = nil, goodsTypeName: String? = nil) -> GoodsEntryUpdateInput? {
+        guard mode == .edit,
+              blockingReasons.isEmpty,
+              let groupID,
+              let goodsTypeID
+        else {
+            return nil
+        }
+        let resolved = resolvedTitle(groupName: groupName, memberName: memberName, goodsTypeName: goodsTypeName)
+        guard !resolved.isEmpty else {
+            return nil
+        }
+        return GoodsEntryUpdateInput(
+            title: resolved,
+            groupID: groupID,
+            memberID: memberID,
+            clearsMemberID: memberID == nil,
+            goodsTypeID: goodsTypeID,
+            quantity: normalizedQuantity,
+            status: status.persistedStatus,
+            photoURLs: existingImageURL.map { [$0.absoluteString] }
         )
     }
 
     var blockingReasons: [GoodsEditorSaveBlocker] {
         var reasons: [GoodsEditorSaveBlocker] = []
-        if isEditingExistingItem {
-            reasons.append(.editPersistence)
-        }
-        if memberID != nil {
-            reasons.append(.memberPersistence)
-        }
-        if !tagNames.isEmpty {
+        if tagNames != originalTagNames {
             reasons.append(.tagPersistence)
         }
         if hasLocalPhoto {
             reasons.append(.photoPersistence)
-        }
-        if status != Self.defaultStatus(mode: mode, entryKind: entryKind) {
-            reasons.append(.statusPersistence(status))
         }
         return reasons
     }
@@ -413,11 +429,24 @@ struct GoodsEditorSheet: View {
     }
 
     private var canSave: Bool {
-        draft.createInput(
-            groupName: selectedGroup?.name,
-            memberName: selectedMember?.name,
-            goodsTypeName: selectedGoodsType?.name
-        ) != nil && !appState.isCreatingGoodsEntry
+        switch draft.mode {
+        case .create:
+            return draft.createInput(
+                groupName: selectedGroup?.name,
+                memberName: selectedMember?.name,
+                goodsTypeName: selectedGoodsType?.name
+            ) != nil && !appState.isCreatingGoodsEntry
+        case .edit:
+            return draft.existingItemID != nil
+                && draft.updateInput(
+                    groupName: selectedGroup?.name,
+                    memberName: selectedMember?.name,
+                    goodsTypeName: selectedGoodsType?.name
+                ) != nil
+                && appState.mutatingGoodsItemID != draft.existingItemID
+        case .readonly:
+            return false
+        }
     }
 
     private var header: some View {
@@ -439,7 +468,7 @@ struct GoodsEditorSheet: View {
                 }
             }
 
-            Text("RN版の写真・タグ・メンバー・状態をSwift UIへ寄せた入力面です。未接続の項目は保存前に理由を表示します。")
+            Text("写真、グループ、メンバー、種別、数量、状態をまとめて管理できます。")
                 .font(.system(size: 13, weight: .bold, design: .rounded))
                 .foregroundStyle(MegrumTheme.muted)
         }
@@ -468,10 +497,10 @@ struct GoodsEditorSheet: View {
                     .aspectRatio(draft.entryKind == .inventory ? 0.78 : 1.45, contentMode: .fit)
                     .overlay {
                         VStack(spacing: 10) {
-                            Image(systemName: draft.hasLocalPhoto ? "photo.fill.on.rectangle.fill" : "photo")
+                            Image(systemName: draft.hasDisplayPhoto ? "photo.fill.on.rectangle.fill" : "photo")
                                 .font(.system(size: 36, weight: .semibold))
                                 .foregroundStyle(.white.opacity(0.82))
-                            Text(draft.hasLocalPhoto ? "写真を選択済み" : "未選択")
+                            Text(draft.hasDisplayPhoto ? "写真あり" : "未選択")
                                 .font(.system(size: 13, weight: .heavy, design: .rounded))
                                 .foregroundStyle(.white)
                         }
@@ -508,7 +537,7 @@ struct GoodsEditorSheet: View {
                     .disabled(true)
                 }
 
-                Text("PhotosPickerはローカル選択までです。Storage upload と photo_urls 保存が入るまでは、写真選択中の保存を止めます。")
+                Text("新しい写真を選んだ場合は、Storage保存接続後に登録できます。")
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(MegrumTheme.muted)
             }
@@ -575,7 +604,7 @@ struct GoodsEditorSheet: View {
                 .tint(MegrumTheme.lavender)
                 .disabled(draft.groupID == nil)
 
-                Text("現行の作成境界には character_id がないため、選択すると保存は保留になります。")
+                Text("指定なしでも保存できます。")
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(MegrumTheme.muted)
             }
@@ -695,7 +724,7 @@ struct GoodsEditorSheet: View {
                         .disabled(tagDraft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || draft.tagNames.count >= 5)
                 }
 
-                Text("タグは5件まで入力できます。保存には `goods_inventory_tags` 境界の追加が必要です。")
+                Text("タグは5件まで入力できます。タグの追加・削除は次の保存接続で反映します。")
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(MegrumTheme.muted)
             }
@@ -706,7 +735,7 @@ struct GoodsEditorSheet: View {
     private var unsupportedSection: some View {
         if !draft.blockingReasons.isEmpty {
             VStack(alignment: .leading, spacing: 12) {
-                Label("保存前に接続が必要です", systemImage: "exclamationmark.triangle.fill")
+                Label("まだ保存できない変更があります", systemImage: "exclamationmark.triangle.fill")
                     .font(.headline.weight(.black))
                     .foregroundStyle(MegrumTheme.ink)
 
@@ -755,7 +784,10 @@ struct GoodsEditorSheet: View {
 
     private var saveButtonTitle: String {
         if draft.mode == .edit {
-            return "更新APIが未接続です"
+            if appState.mutatingGoodsItemID == draft.existingItemID {
+                return "更新しています"
+            }
+            return "変更を保存"
         }
         if appState.isCreatingGoodsEntry {
             return "保存しています"
@@ -828,14 +860,31 @@ struct GoodsEditorSheet: View {
     }
 
     private func save() async {
-        guard let input = draft.createInput(
-            groupName: selectedGroup?.name,
-            memberName: selectedMember?.name,
-            goodsTypeName: selectedGoodsType?.name
-        ) else {
+        let saved: Bool
+        switch draft.mode {
+        case .create:
+            guard let input = draft.createInput(
+                groupName: selectedGroup?.name,
+                memberName: selectedMember?.name,
+                goodsTypeName: selectedGoodsType?.name
+            ) else {
+                return
+            }
+            saved = await appState.createGoodsEntry(input)
+        case .edit:
+            guard let itemID = draft.existingItemID,
+                  let input = draft.updateInput(
+                    groupName: selectedGroup?.name,
+                    memberName: selectedMember?.name,
+                    goodsTypeName: selectedGoodsType?.name
+                  )
+            else {
+                return
+            }
+            saved = await appState.updateGoodsEntry(itemID: itemID, kind: draft.entryKind, input: input)
+        case .readonly:
             return
         }
-        let saved = await appState.createGoodsEntry(input)
         if saved {
             dismiss()
         }
