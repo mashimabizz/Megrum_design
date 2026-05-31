@@ -4,6 +4,60 @@
 
 ---
 
+## イテレーション349：Swiftグルームカメラ投稿を追加
+
+### 背景・問題意識
+
+グルームは写真中心の一過性スナップなので、写真ライブラリから選ぶだけでは投稿体験が重い。Swift Native移行ではiOS標準カメラを使い、現場で撮ってすぐ投稿できる導線を優先する。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/NativeCameraCaptureView.swift`
+- iOS標準の `UIImagePickerController` カメラをSwiftUIから開く共通Viewを追加した。
+- 撮影画像をJPEGデータとして呼び出し元へ返すようにした。
+
+#### `ios-native/Sources/MegrumApp/TradesScreen.swift`
+- 証跡撮影で追加したカメラViewを共通Viewへ差し替えた。
+
+#### `ios-native/Sources/MegrumApp/MeguriScreen.swift`
+- グルーム追加導線を「撮影」と「写真」に分けた。
+- 「撮影」はiOSカメラを起動し、撮影画像を既存の `createGroomPost` 経路へ渡すようにした。
+- 「写真」はPhotosPickerを使うfallback導線として残した。
+
+#### `ios-native/README.md` / `notes/22_swift_native_migration.md` / `notes/10_glossary.md`
+- グルーム投稿がiOSカメラ撮影に対応したことを記録した。
+
+### 影響範囲
+
+- Swift Native版めぐりホームのグルーム追加導線
+- Swift Native版取引詳細の証跡撮影共通部品
+- iOSカメラ利用箇所
+
+### 確認方法
+
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-build --enable-xctest --disable-swift-testing -j 1`
+- `xcodebuild -quiet -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -destination 'generic/platform=iOS Simulator' -derivedDataPath /tmp/megrum-native-xcodebuild CODE_SIGNING_ALLOWED=NO build`
+- `git diff --check -- ios-native/Sources/MegrumApp/NativeCameraCaptureView.swift ios-native/Sources/MegrumApp/TradesScreen.swift ios-native/Sources/MegrumApp/MeguriScreen.swift ios-native/README.md notes/22_swift_native_migration.md notes/10_glossary.md notes/08_design_iterations.md`
+
+### 関連ファイル
+
+- `ios-native/Sources/MegrumApp/NativeCameraCaptureView.swift`
+- `ios-native/Sources/MegrumApp/TradesScreen.swift`
+- `ios-native/Sources/MegrumApp/MeguriScreen.swift`
+- `ios-native/README.md`
+- `notes/22_swift_native_migration.md`
+- `notes/10_glossary.md`
+- `notes/08_design_iterations.md`
+
+### セルフレビュー結果
+
+- ✅ カメラ実装を共通化し、証跡撮影とグルーム投稿で重複を増やさないようにした
+- ✅ iOS標準カメラUIを使い、独自カメラ画面の作り込みは避けた
+- ✅ 写真ライブラリ導線は残し、Simulatorでもグルーム投稿を確認できるようにした
+- ✅ 状態遷移・データモデルの変更はなく、`notes/09` / `notes/05` は更新不要と判断した
+
+---
+
 ## イテレーション348：Swift証跡カメラ撮影を追加
 
 ### 背景・問題意識

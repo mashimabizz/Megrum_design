@@ -3,6 +3,9 @@ import MegrumDesign
 import MapKit
 import PhotosUI
 import SwiftUI
+#if os(iOS)
+import UIKit
+#endif
 
 struct MeguriScreen: View {
     @ObservedObject var appState: MegrumAppState
@@ -12,6 +15,7 @@ struct MeguriScreen: View {
     @State private var selectedThread: BoardThread?
     @State private var selectedGroom: GroomPost?
     @State private var selectedGroomPhotoItem: PhotosPickerItem?
+    @State private var isShowingGroomCamera = false
     @State private var activeMap: MeguriMapKind?
     @State private var isShowingThreadComposer = false
     @State private var isShowingPrefecturePicker = false
@@ -40,7 +44,11 @@ struct MeguriScreen: View {
                     GroomStrip(
                         grooms: appState.grooms,
                         selectedPhotoItem: $selectedGroomPhotoItem,
-                        isCreating: appState.isCreatingGroomPost
+                        isCreating: appState.isCreatingGroomPost,
+                        canUseCamera: canUseCamera,
+                        onOpenCamera: {
+                            isShowingGroomCamera = true
+                        }
                     ) { groom in
                         selectedGroom = groom
                     }
@@ -142,6 +150,16 @@ struct MeguriScreen: View {
             .presentationDetents([.medium, .large])
             .presentationDragIndicator(.visible)
         }
+#if os(iOS)
+        .sheet(isPresented: $isShowingGroomCamera) {
+            NativeCameraCaptureView { imageData in
+                Task {
+                    await publishGroomPhoto(data: imageData, imageContentType: "image/jpeg")
+                }
+            }
+            .ignoresSafeArea()
+        }
+#endif
         .modifier(
             GroomViewerPresentationModifier(
                 selectedGroom: $selectedGroom,
@@ -200,15 +218,27 @@ struct MeguriScreen: View {
         guard let data = try? await item.loadTransferable(type: Data.self) else {
             return
         }
+        await publishGroomPhoto(data: data, imageContentType: inferredImageContentType(from: data))
+    }
+
+    private func publishGroomPhoto(data: Data, imageContentType: String) async {
         let created = await appState.createGroomPost(
             imageData: data,
-            imageContentType: inferredImageContentType(from: data),
+            imageContentType: imageContentType,
             latitude: locationState.coordinate?.latitude,
             longitude: locationState.coordinate?.longitude
         )
         if created {
             await reloadMeguriFeed()
         }
+    }
+
+    private var canUseCamera: Bool {
+#if os(iOS)
+        UIImagePickerController.isSourceTypeAvailable(.camera)
+#else
+        false
+#endif
     }
 
     private func inferredImageContentType(from data: Data) -> String {
@@ -1187,35 +1217,22 @@ private struct GroomStrip: View {
     var grooms: [GroomPost]
     @Binding var selectedPhotoItem: PhotosPickerItem?
     var isCreating: Bool
+    var canUseCamera: Bool
+    var onOpenCamera: () -> Void
     var onSelect: (GroomPost) -> Void
 
     var body: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 14) {
-                PhotosPicker(selection: $selectedPhotoItem, matching: .images) {
-                    VStack(spacing: 8) {
-                        Circle()
-                            .fill(.white.opacity(0.9))
-                            .frame(width: 72, height: 72)
-                            .overlay {
-                                if isCreating {
-                                    ProgressView()
-                                        .tint(MegrumTheme.lavender)
-                                } else {
-                                    Image(systemName: "plus")
-                                        .font(.system(size: 26, weight: .heavy))
-                                        .foregroundStyle(MegrumTheme.lavender)
-                                }
-                            }
-                            .overlay {
-                                Circle()
-                                    .stroke(MegrumTheme.lavender.opacity(0.18), lineWidth: 1)
-                            }
+                Button(action: onOpenCamera) {
+                    GroomAddTile(title: "撮影", systemImage: "camera.fill", isLoading: isCreating)
+                }
+                .buttonStyle(.plain)
+                .disabled(isCreating || !canUseCamera)
+                .opacity(canUseCamera ? 1 : 0.48)
 
-                        Text("追加")
-                            .font(.system(size: 11, weight: .heavy, design: .rounded))
-                            .foregroundStyle(MegrumTheme.muted)
-                    }
+                PhotosPicker(selection: $selectedPhotoItem, matching: .images) {
+                    GroomAddTile(title: "写真", systemImage: "photo.on.rectangle", isLoading: isCreating)
                 }
                 .buttonStyle(.plain)
                 .disabled(isCreating)
@@ -1250,6 +1267,38 @@ private struct GroomStrip: View {
                 }
             }
             .padding(.vertical, 2)
+        }
+    }
+}
+
+private struct GroomAddTile: View {
+    var title: String
+    var systemImage: String
+    var isLoading: Bool
+
+    var body: some View {
+        VStack(spacing: 8) {
+            Circle()
+                .fill(.white.opacity(0.9))
+                .frame(width: 72, height: 72)
+                .overlay {
+                    if isLoading {
+                        ProgressView()
+                            .tint(MegrumTheme.lavender)
+                    } else {
+                        Image(systemName: systemImage)
+                            .font(.system(size: 23, weight: .heavy))
+                            .foregroundStyle(MegrumTheme.lavender)
+                    }
+                }
+                .overlay {
+                    Circle()
+                        .stroke(MegrumTheme.lavender.opacity(0.18), lineWidth: 1)
+                }
+
+            Text(title)
+                .font(.system(size: 11, weight: .heavy, design: .rounded))
+                .foregroundStyle(MegrumTheme.muted)
         }
     }
 }
