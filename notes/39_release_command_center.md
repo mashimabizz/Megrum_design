@@ -79,6 +79,7 @@
 | App Store Connect最終入力差分QA | `notes/71_app_store_connect_final_input_reconciliation.md` |
 | 承認後・手動公開制御 | `notes/72_app_store_approval_release_control_runbook.md` |
 | 公開停止・Availability変更 | `notes/73_app_store_availability_emergency_stop_runbook.md` |
+| App Store評価・レビュー返信 | `notes/74_app_store_ratings_reviews_response_runbook.md` |
 | オーナー作業表 | `notes/30_owner_release_action_sheet.md` |
 | App Store Connect入力 | `notes/31_app_store_connect_metadata_worksheet.md` |
 | TestFlight / Submit手順 | `notes/32_testflight_review_submission_runbook.md` |
@@ -140,6 +141,7 @@
 3. `Release This Version` 直前にVersion / Build / status / Release optionを再確認する。
 4. 公開操作後、T+0 / T+1h / T+3h / T+6h / T+12h / T+24hの監視を開始する。
 5. 公開継続が危険な場合は `notes/73` でTerritory deselect、Remove App From Sale、new buildを判断する。
+6. 公開初週の評価・レビュー、公開返信、concern report候補は `notes/74` で確認する。
 
 ---
 
@@ -203,6 +205,7 @@
 | App Store Connect最終入力差分QA | RL-069 | `notes/71` |
 | 承認後・手動公開制御 | RL-070 | `notes/72` |
 | 公開停止・Availability変更 | RL-071 | `notes/73` |
+| App Store評価・レビュー返信 | RL-072 | `notes/74` |
 
 ---
 
@@ -254,6 +257,7 @@
 | App Store Connect最終入力差分QA | `notes/71_app_store_connect_final_input_reconciliation.md` |
 | App Store承認後・手動公開制御Runbook | `notes/72_app_store_approval_release_control_runbook.md` |
 | App Store公開停止・Availability変更Runbook | `notes/73_app_store_availability_emergency_stop_runbook.md` |
+| App Store評価・レビュー返信Runbook | `notes/74_app_store_ratings_reviews_response_runbook.md` |
 | App Store提出素材 | `notes/24_app_store_submission_pack.md` |
 | App Store Connect入力表 | `notes/31_app_store_connect_metadata_worksheet.md` |
 | TestFlight / Submit手順 | `notes/32_testflight_review_submission_runbook.md` |
@@ -299,6 +303,7 @@
 | App Review指摘対応 | 指摘受領後 |
 | 承認後の手動公開・公開初日監視 | 承認後。`notes/72` を使う |
 | 公開後の停止・Availability変更 | P0事故疑い又は公開継続が危険な時。`notes/73` を使う |
+| 公開後の評価・レビュー確認 | 公開後。`notes/74` を使う |
 
 ---
 
@@ -315,3 +320,4 @@
 8. `notes/50` でGo / No-Goを判定する。
 9. 証跡を残して提出する。
 10. 承認後は `notes/51` と `notes/72` に沿って手動公開と公開初日監視を行う。
+11. 公開後は `notes/74` で評価・レビュー返信を日次確認する。

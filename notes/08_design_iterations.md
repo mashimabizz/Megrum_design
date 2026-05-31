@@ -4,6 +4,74 @@
 
 ---
 
+## イテレーション396：App Storeレビュー返信運用を追加
+
+### 背景・問題意識
+
+公開後のサポート受信、App Review指摘対応、公開停止手順は整理済みだが、App Store product pageに表示される星評価・ユーザーレビューへの公開返信は別のリスクがある。公開返信は全ユーザーに見えるため、個人情報、未確認事実、補償、内部情報、相手方処分を不用意に書かないためのRunbookを追加した。
+
+### 変更内容
+
+#### `notes/74_app_store_ratings_reviews_response_runbook.md`
+- App Store公開後の星評価、ユーザーレビュー、公開返信、concern report、overview rating resetのRunbookを追加した。
+- Apple公式ヘルプに基づき、レビュー返信は公開表示され、表示まで最大24時間かかる場合があり、1レビューにつき表示される返信は1つであることを明記した。
+- レビュー分類、返信前チェック、公開返信テンプレート、concern report判断、overview rating reset判断、記録フォーマットを整理した。
+
+#### `notes/39_release_command_center.md`, `notes/30_owner_release_action_sheet.md`, `notes/50_release_go_no_go_decision_matrix.md`
+- コントロールボード、オーナー作業表、Go / No-Go判定表へ `notes/74` を追加した。
+- G24 Ratings / Reviewsとして、公開後のレビュー返信方針未整備をリスクとして明文化した。
+
+#### `notes/51_post_submission_release_day_runbook.md`, `notes/67_support_inbox_triage_runbook.md`, `notes/34_support_response_templates.md`
+- 公開初日のT+24h確認にApp Store評価・レビュー確認を追加した。
+- サポート受信トリアージから、公開レビューは個別メール返信と分けて `notes/74` を使う導線を追加した。
+- メール返信テンプレート側にも、公開レビュー返信は全ユーザーに見えるため `notes/74` を使う注意を追加した。
+
+#### `notes/64_release_evidence_folder_index.md`, `notes/57_legal_release_branch_integration_plan.md`, `notes/22_release_triage_tracker.csv`
+- 証跡フォルダ索引に `14_app_store_reviews/` を追加した。
+- 法務branch統合手順のstage禁止範囲を `notes/74` まで広げた。
+- RL-072としてApp Store評価・レビュー返信運用を追加した。
+
+### 影響範囲
+
+- App Store公開後のRatings and Reviews確認
+- 公開レビュー返信、concern report、overview rating reset
+- サポート受信、個人情報・セキュリティ事故初動、公開初日監視、証跡保存
+- コード、App Store Connect設定、公開URL、サポートツール、証跡ファイルは変更していない。
+
+### 確認方法
+
+- `rg -n "RL-072|notes/74|Ratings / Reviews|評価・レビュー返信|14_app_store_reviews|REVW-" notes/74_app_store_ratings_reviews_response_runbook.md notes/39_release_command_center.md notes/50_release_go_no_go_decision_matrix.md notes/22_release_triage_tracker.csv notes/64_release_evidence_folder_index.md`
+- `python3 - <<'PY' ...` による `notes/22_release_triage_tracker.csv` のCSV parse確認
+- 旧規約用語・旧主体表現チェック（旧提案/旧メッセージ/旧投稿関連、サービス主体表現）
+- `git diff --check -- notes`
+
+### セルフレビュー結果
+
+- ✅ コード、App Store Connect設定、公開URL、サポートツール、証跡ファイルは変更していない。
+- ✅ 公開レビュー返信を個別メール返信と分け、公開表示される前提のNG表現チェックを追加した。
+- ✅ 安全、個人情報、IAP、ログイン、アカウント削除、事故疑いのレビューを既存Runbookへ接続した。
+- ✅ concern reportとoverview rating resetを「低評価を隠す」目的ではなく、公式機能として慎重に扱う形にした。
+- ✅ 実レビュー本文全文、ユーザー名、個人情報、認証情報を公開リポジトリに残さない方針を維持した。
+- ✅ Apple公式ヘルプのRatings and reviews、Respond to reviews、Reset an app overview ratingを参照した。
+- ✅ 状態名の追加/改名はなく、Megrumの状態遷移変更ではないため `notes/09_state_machines.md` 更新は不要。
+- ✅ 新用語はApp Store運用語の範囲内のため、`notes/10_glossary.md` 更新は不要。
+- ✅ DBスキーマ変更はなく、`notes/05_data_model.md` 更新は不要。
+
+### 関連ファイル
+
+- `notes/74_app_store_ratings_reviews_response_runbook.md`
+- `notes/39_release_command_center.md`
+- `notes/30_owner_release_action_sheet.md`
+- `notes/50_release_go_no_go_decision_matrix.md`
+- `notes/51_post_submission_release_day_runbook.md`
+- `notes/67_support_inbox_triage_runbook.md`
+- `notes/34_support_response_templates.md`
+- `notes/64_release_evidence_folder_index.md`
+- `notes/57_legal_release_branch_integration_plan.md`
+- `notes/22_release_triage_tracker.csv`
+
+---
+
 ## イテレーション395：公開停止とAvailability変更を追加
 
 ### 背景・問題意識

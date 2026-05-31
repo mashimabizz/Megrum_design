@@ -50,6 +50,7 @@ release_evidence/
     11_review_response/
     12_release_day/
     13_availability_stop/
+    14_app_store_reviews/
 ```
 
 Drive等へ保存する場合も、同じ番号と名前にすると探しやすい。
@@ -270,6 +271,20 @@ secret実値や管理画面の認証情報は保存しない。
 | STOP-004 | サポート告知/FAQ更新判断 | md |
 | STOP-005 | 復帰判定と再公開/Availability復帰記録 | md |
 
+### 5.14 `14_app_store_reviews/`
+
+| ID | 証跡 | 形式 |
+|---|---|---|
+| REVW-001 | Ratings and Reviews日次確認 | md |
+| REVW-002 | 公開返信案、承認、送信控え | md |
+| REVW-003 | App Store product page上の返信反映確認 | md又はpng |
+| REVW-004 | concern report判断と送信控え | md |
+| REVW-005 | overview rating reset判断 | md |
+
+注意:
+- レビュー本文全文、ユーザー名、個人情報、認証情報は公開リポジトリに残さない。
+- 公開返信は `notes/74` の返信前チェックを通したものだけ保存する。
+
 ## 6. 証跡の扱いで迷う時
 
 | 状況 | 判断 |
@@ -294,6 +309,7 @@ secret実値や管理画面の認証情報は保存しない。
 - [ ] `notes/62_app_review_manual_submission_checklist.md` の提出直前チェックと対応している
 - [ ] `notes/72_app_store_approval_release_control_runbook.md` のPDR gateと公開初日監視に対応している
 - [ ] `notes/73_app_store_availability_emergency_stop_runbook.md` の停止/復帰判断に対応している
+- [ ] `notes/74_app_store_ratings_reviews_response_runbook.md` の評価・レビュー返信記録に対応している
 
 ## 8. 関連文書
 
@@ -302,6 +318,7 @@ secret実値や管理画面の認証情報は保存しない。
 - App Store Connect最終入力差分QA: `notes/71_app_store_connect_final_input_reconciliation.md`
 - 承認後・手動公開制御Runbook: `notes/72_app_store_approval_release_control_runbook.md`
 - 公開停止・Availability変更Runbook: `notes/73_app_store_availability_emergency_stop_runbook.md`
+- App Store評価・レビュー返信Runbook: `notes/74_app_store_ratings_reviews_response_runbook.md`
 - 公開ページレダクションQA: `notes/63_public_page_redaction_qa.md`
 - TestFlight / App Review提出ランブック: `notes/32_testflight_review_submission_runbook.md`
 - P0スモークテスト台本: `notes/42_p0_smoke_test_script.md`

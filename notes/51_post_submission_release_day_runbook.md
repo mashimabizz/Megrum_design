@@ -131,9 +131,11 @@ No-GoならRelease This Versionを押さず、原因を解消する。
 | T+3h | 実端末でApp Storeから入手できるか確認 |
 | T+6h | 新規登録、ログイン、在庫、wish、打診、取引チャットを軽く確認 |
 | T+12h | サポートメール、App Store Connectメッセージ、TestFlightフィードバックを確認 |
-| T+24h | 初日まとめ、未対応問い合わせ、次ビルド候補を記録 |
+| T+24h | 初日まとめ、未対応問い合わせ、App Store評価・レビュー、次ビルド候補を記録 |
 
 公開初日は、機能追加ではなく、ログイン不能、URL不通、削除導線、App Privacy不一致、重大通報の監視を優先する。
+
+公開後の星評価、ユーザーレビュー、公開返信、concern report、overview rating reset判断は `notes/74_app_store_ratings_reviews_response_runbook.md` を使う。
 
 ## 9. 公開後に止める判断
 
@@ -166,6 +168,7 @@ Apple公式情報では、段階的リリースは7日間で自動アップデ�
 
 - 承認後・手動公開制御Runbook: `notes/72_app_store_approval_release_control_runbook.md`
 - App Store公開停止・Availability変更Runbook: `notes/73_app_store_availability_emergency_stop_runbook.md`
+- App Store評価・レビュー返信Runbook: `notes/74_app_store_ratings_reviews_response_runbook.md`
 - Go / No-Go判定表: `notes/50_release_go_no_go_decision_matrix.md`
 - App Store Connect最終入力差分QA: `notes/71_app_store_connect_final_input_reconciliation.md`
 - リリース証跡フォルダ索引: `notes/64_release_evidence_folder_index.md`

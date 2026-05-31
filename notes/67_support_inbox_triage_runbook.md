@@ -10,6 +10,8 @@
 
 この文書はサポート受信運用の手順であり、コード、メール設定、サポートツール設定、公開URL、DB、App Store Connect設定は変更しない。
 
+App Store product page上の公開レビュー返信は、個別メールとは別に `notes/74_app_store_ratings_reviews_response_runbook.md` を使う。
+
 ## 1. 使うタイミング
 
 使うタイミング:
@@ -52,6 +54,7 @@ AppleのApp Review Guidelinesでは、Support URLを含むメタデータやURL�
 | 分類 | 例 | 優先度 | 初動 | 参照 |
 |---|---|---|---|---|
 | App Review | Apple審査員からの問い合わせ、デモアカウント不備、URL不備 | P0 | 即確認、証跡保存、必要ならReview Notes更新 | `notes/41`, `notes/62` |
+| App Storeレビュー | 1〜2 stars、安全、個人情報、IAP、ログイン、削除、URL不備を含む公開レビュー | P0/P1/P2 | `notes/74` で分類し、個別対応はサポートへ誘導 | `notes/74`, `notes/34` |
 | 安全・危険 | 脅迫、つきまとい、危険な合流誘導、個人情報晒し | P0 | 通報受付、危険時案内、必要に応じて一時制限 | `notes/26`, `notes/34` |
 | 個人情報・セキュリティ事故疑い | 他人データ表示、誤送信、RLS/Storage/secret疑い | P0 | `INC-YYYYMMDD-0001` を発行しIncidentへ | `notes/49` |
 | アカウント削除 | 削除できない、削除申請、削除完了確認 | P0/P1 | アプリ内削除案内、例外時は本人確認 | `notes/45` |
@@ -185,6 +188,7 @@ P0に該当したら、通常返信より先に次を行う。
 |---|---|---|
 | `support@megrum.jp` 未返信P0 | 1日2回以上 | P0未返信 |
 | App Review / Apple連絡 | 1日2回以上 | 審査連絡の見落とし |
+| App Store評価・レビュー | 公開初週は1日1回以上 | 公開レビュー内のP0/個人情報/返信漏れ |
 | アカウント削除 | 1日1回以上 | 削除できない問い合わせ放置 |
 | 個人情報請求 | 1日1回以上 | 受付番号なし |
 | 通報・安全 | 1日1回以上 | 危険相談放置 |
@@ -222,6 +226,7 @@ No-Go:
 - Trust & Safety SOP: `notes/26_trust_safety_release_sop.md`
 - ドメイン・メール・公開URL運用: `notes/47_domain_email_publication_runbook.md`
 - App Review指摘対応: `notes/41_app_review_response_templates.md`
+- App Store評価・レビュー返信: `notes/74_app_store_ratings_reviews_response_runbook.md`
 - リリース証跡フォルダ索引: `notes/64_release_evidence_folder_index.md`
 - Go / No-Go判定: `notes/50_release_go_no_go_decision_matrix.md`
 

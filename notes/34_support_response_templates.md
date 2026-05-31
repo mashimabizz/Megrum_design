@@ -4,6 +4,7 @@
 > コード変更なし。公開サポートページと運用SOPの実務テンプレートとして使う。
 > 公開FAQの下書きは `notes/55_public_help_faq_draft.md` を使う。
 > 受信箱での分類、受付番号、優先度、エスカレーションは `notes/67_support_inbox_triage_runbook.md` を使う。
+> App Storeの公開レビュー返信は、個別メールと違って全ユーザーに見えるため `notes/74_app_store_ratings_reviews_response_runbook.md` を使う。
 
 最終更新: 2026-05-31
 ステータス: Draft v0.1（運用前・文面レビュー前）
@@ -527,3 +528,4 @@ AIの結果に誤りがある場合は、ユーザーご自身で内容を確認
 - IAP商品設定: `notes/33_iap_product_setup_worksheet.md`
 - 法務レビュー依頼: `notes/29_legal_review_brief.md`
 - サポート受信トリアージ: `notes/67_support_inbox_triage_runbook.md`
+- App Store評価・レビュー返信: `notes/74_app_store_ratings_reviews_response_runbook.md`

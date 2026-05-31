@@ -91,6 +91,7 @@ Swift Nativeの `Info.plist` では `public.app-category.social-networking` が�
 | 提出後・公開初日運用 | `notes/51` | 手動公開、公開初日監視、指摘対応 |
 | 承認後・手動公開制御 | `notes/72` | Pending Developer Release、Release This Version、公開直前gate、公開初日監視 |
 | 公開停止・Availability変更 | `notes/73` | P0事故疑い時のTerritory deselect、Remove App From Sale、new build、復帰判断 |
+| App Store評価・レビュー返信 | `notes/74` | 公開後のレビュー分類、公開返信、concern report、rating reset判断 |
 | Guideline適合 | `notes/53` | Apple審査Guideline別の証跡確認 |
 | アプリ内法務・安全コピー | `notes/56` | 同意、権限説明、安全注意、AI/IAP文言を実装前に確認 |
 | 法務branch統合手順 | `notes/57` | 開発branchと混ぜずにPR化/mergeする |
@@ -215,6 +216,7 @@ Appleのリジェクト文を貼るので、ガイドライン番号ごとに対
 - `notes/51_post_submission_release_day_runbook.md`
 - `notes/72_app_store_approval_release_control_runbook.md`
 - `notes/73_app_store_availability_emergency_stop_runbook.md`
+- `notes/74_app_store_ratings_reviews_response_runbook.md`
 - `notes/52_data_retention_deletion_matrix.md`
 - `notes/53_app_review_guideline_compliance_matrix.md`
 - `notes/54_prelaunch_security_audit_checklist.md`
