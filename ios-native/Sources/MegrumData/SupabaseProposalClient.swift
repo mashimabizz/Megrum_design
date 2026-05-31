@@ -55,7 +55,7 @@ public final class SupabaseProposalClient: @unchecked Sendable {
             senderGoodsIDs: input.senderGoodsIDs,
             receiverGoodsIDs: input.receiverGoodsIDs,
             conditionTags: input.conditionTags,
-            agreedBySender: input.status == .sent || input.status == .agreementOneSide || input.status == .agreed,
+            agreedBySender: [.sent, .negotiating, .agreementOneSide, .agreed].contains(input.status),
             agreedByReceiver: input.status == .agreed
         )
     }
@@ -519,7 +519,7 @@ private struct ProposalCreatePayload: Encodable, Sendable {
         self.optionTags = input.conditionTags
         self.exposeCalendar = false
         self.listingId = input.listingID
-        self.agreedBySender = input.status == .sent || input.status == .agreed || input.status == .agreementOneSide
+        self.agreedBySender = [.sent, .negotiating, .agreementOneSide, .agreed].contains(input.status)
     }
 }
 

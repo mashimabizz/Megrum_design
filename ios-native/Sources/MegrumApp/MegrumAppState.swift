@@ -449,7 +449,8 @@ public struct PreviewMegrumRepository: MegrumRepository {
             senderGoodsIDs: input.senderGoodsIDs,
             receiverGoodsIDs: input.receiverGoodsIDs,
             conditionTags: input.conditionTags,
-            agreedBySender: input.status == .sent
+            agreedBySender: [.sent, .negotiating, .agreementOneSide, .agreed].contains(input.status),
+            agreedByReceiver: input.status == .agreed
         )
     }
 

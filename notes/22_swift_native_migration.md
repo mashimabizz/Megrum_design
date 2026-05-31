@@ -1,7 +1,7 @@
 # 22. Swift Native Migration
 
 最終更新: 2026-05-31
-ステータス: Active draft（iter360）
+ステータス: Active draft（iter361）
 
 ## 目的
 
@@ -59,7 +59,7 @@ tar -xzf /Users/michitaka/Desktop/Megrum_backups/pre-swift-migration-20260531-03
 - iOS 26以上ではLiquid GlassのネイティブAPIを優先する。
 - iOS 17/18/旧実行環境では `Material` / UIKit standard material / 独自最小fallbackで可読性を維持する。
 - UIはSwiftUIを主軸にし、カメラ・写真・地図・通知・共有・購入・権限などは必要に応じてUIKit / Apple frameworkを直接使う。
-- Swift Native版のデザインは、legacy Expo版の見た目を完全再現することを目的にしない。オーナーの実機レビューでは、Swift版のiOS標準感を維持する方針で確定した。
+- Swift Native版のデザインは、legacy Expo版の見た目を完全再現することを目的にしない。オーナーの実機レビューでは、Swift版のiOS標準感を維持し、最終デザインも無理に旧アプリへ寄せ戻さない方針で確定した。
 - Megrumらしい色・余白・情報設計は継承するが、操作部品、シート、ナビゲーション、カメラ、地図、通知、設定画面はApple標準の自然な挙動と質感を優先する。
 - アーキテクチャはMV firstを基本にする。不要なMVVMや巨大ViewModelを増やさない。
 - 共有状態は `@Observable` / `@State` / `@Environment` を優先し、非同期処理はSwift Concurrencyで整理する。
@@ -153,6 +153,7 @@ tar -xzf /Users/michitaka/Desktop/Megrum_backups/pre-swift-migration-20260531-03
 - iter358で、相手プロフィールに「譲る候補 / 個別募集」のNative segmented controlを追加し、相手の公開グッズや個別募集から打診作成sheetへ進める導線を接続した。個別募集起点の打診では既存 `proposals.listing_id` を保持する。
 - iter359で、Swift Native版の取引詳細から届いた打診を「この内容で承諾」または「断る」導線へ接続した。`proposals.agreed_by_sender` / `agreed_by_receiver` を読み書きし、両者合意で `agreed`、片側合意で `agreement_one_side`、断る場合は `rejected` へ進める。
 - iter360で、`exchange_method='both'` の打診を承諾する時に、Native segmented pickerで `hand` または `mail` を選ばせ、その選択値を `proposals.exchange_method` へPATCHしてから合意へ進めるようにした。
+- iter361で、取引詳細の返答パネルから「条件を変えて再打診」を開けるようにした。元 Proposal を直接変更せず、参加者視点で提示物を反転コピーし、Native sheetで交換手段・交換条件タグ・メッセージを調整した `status='negotiating'` の新しい打診を作成する。再打診作成者は自分の条件に合意済みとして `agreed_by_sender=true` にする。
 
 ### Phase 4: Meguri core
 

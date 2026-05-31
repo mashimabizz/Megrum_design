@@ -60,6 +60,30 @@ final class SupabaseProposalClientTests: XCTestCase {
         XCTAssertEqual(json.first?["agreed_by_sender"] as? Bool, true)
     }
 
+    func testBuildsCounterProposalRequestWithSenderAgreement() throws {
+        let client = SupabaseProposalClient(configuration: configuration)
+        let senderID = UUID(uuidString: "11111111-1111-1111-1111-111111111111")!
+        let receiverID = UUID(uuidString: "22222222-2222-2222-2222-222222222222")!
+        let senderGoodsID = UUID(uuidString: "33333333-3333-3333-3333-333333333333")!
+        let receiverGoodsID = UUID(uuidString: "44444444-4444-4444-4444-444444444444")!
+        let input = ProposalCreateInput(
+            receiverID: receiverID,
+            senderGoodsIDs: [senderGoodsID],
+            receiverGoodsIDs: [receiverGoodsID],
+            exchangeMethod: .mail,
+            conditionTags: ["同日発送"],
+            message: "条件を変えます",
+            status: .negotiating
+        )
+
+        let request = try client.makeCreateProposalRequest(senderID: senderID, input: input)
+        let body = try XCTUnwrap(request.httpBody)
+        let json = try XCTUnwrap(JSONSerialization.jsonObject(with: body) as? [[String: Any]])
+
+        XCTAssertEqual(json.first?["status"] as? String, "negotiating")
+        XCTAssertEqual(json.first?["agreed_by_sender"] as? Bool, true)
+    }
+
     func testBuildsAgreeProposalRequestForIncomingSentProposal() throws {
         let client = SupabaseProposalClient(configuration: configuration)
         let senderID = UUID(uuidString: "11111111-1111-1111-1111-111111111111")!

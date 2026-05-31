@@ -472,6 +472,35 @@ final class MegrumAppStateTests: XCTestCase {
         XCTAssertFalse(state.isCreatingProposal)
     }
 
+    func testAppStateCreatesPreviewCounterProposal() async {
+        let state = MegrumAppState(repository: PreviewMegrumRepository())
+        let incomingProposalID = UUID(uuidString: "00000000-0000-0000-0000-000000000403")!
+
+        await state.loadInitialData()
+        let incoming = try! XCTUnwrap(state.proposals.first(where: { $0.id == incomingProposalID }))
+        let viewerID = try! XCTUnwrap(state.viewer?.id)
+        let input = try! XCTUnwrap(
+            incoming.counterProposalInput(
+                from: viewerID,
+                exchangeMethod: .mail,
+                conditionTags: ["同日発送"],
+                message: "郵送なら進められます"
+            )
+        )
+
+        let created = await state.createProposal(input)
+
+        XCTAssertTrue(created)
+        XCTAssertEqual(state.proposals.first?.receiverID, incoming.senderID)
+        XCTAssertEqual(state.proposals.first?.senderGoodsIDs, incoming.receiverGoodsIDs)
+        XCTAssertEqual(state.proposals.first?.receiverGoodsIDs, incoming.senderGoodsIDs)
+        XCTAssertEqual(state.proposals.first?.exchangeMethod, .mail)
+        XCTAssertEqual(state.proposals.first?.conditionTags, ["同日発送"])
+        XCTAssertEqual(state.proposals.first?.status, .negotiating)
+        XCTAssertEqual(state.proposals.first?.agreedBySender, true)
+        XCTAssertFalse(state.isCreatingProposal)
+    }
+
     func testAppStateAgreesPreviewIncomingProposal() async {
         let state = MegrumAppState(repository: PreviewMegrumRepository())
         let incomingProposalID = UUID(uuidString: "00000000-0000-0000-0000-000000000403")!

@@ -947,6 +947,51 @@ public struct TradeProposal: Identifiable, Codable, Hashable, Sendable {
         }
         return nil
     }
+
+    public func goodsOffered(by userID: UUID) -> [UUID]? {
+        if senderID == userID {
+            return senderGoodsIDs
+        }
+        if receiverID == userID {
+            return receiverGoodsIDs
+        }
+        return nil
+    }
+
+    public func goodsRequested(by userID: UUID) -> [UUID]? {
+        if senderID == userID {
+            return receiverGoodsIDs
+        }
+        if receiverID == userID {
+            return senderGoodsIDs
+        }
+        return nil
+    }
+
+    public func counterProposalInput(
+        from userID: UUID,
+        exchangeMethod: ExchangeMethod,
+        conditionTags: [String],
+        message: String?
+    ) -> ProposalCreateInput? {
+        guard
+            let receiverID = partnerID(for: userID),
+            let senderGoodsIDs = goodsOffered(by: userID),
+            let receiverGoodsIDs = goodsRequested(by: userID)
+        else {
+            return nil
+        }
+
+        return ProposalCreateInput(
+            receiverID: receiverID,
+            senderGoodsIDs: senderGoodsIDs,
+            receiverGoodsIDs: receiverGoodsIDs,
+            exchangeMethod: exchangeMethod,
+            conditionTags: conditionTags,
+            message: message,
+            status: .negotiating
+        )
+    }
 }
 
 public struct TradeEvidenceCreateInput: Equatable, Sendable {

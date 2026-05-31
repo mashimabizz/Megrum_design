@@ -4,6 +4,71 @@
 
 ---
 
+## イテレーション361：Swift再打診をNative sheetで追加
+
+### 背景・問題意識
+
+Swift Native版の実機レビューで、legacy Expo版よりiOS標準デザイン感があり、この方向を維持する方針が確認された。取引詳細では承諾・拒否・`both` 承諾時の交換手段選択まで接続済みだが、以前の仕様要望にある「条件を少し変えて逆に打診する」導線が未実装だった。元 Proposal を直接変更せず、既存状態遷移の `sent → negotiating` に沿って、新しい打診を作る。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumCore/MegrumModels.swift`
+- `TradeProposal` に、参加者視点で「自分が出すもの」「受け取るもの」を返す `goodsOffered(by:)` / `goodsRequested(by:)` を追加した。
+- `counterProposalInput(from:exchangeMethod:conditionTags:message:)` を追加し、元 Proposal の提示物を参加者視点で反転して `status=.negotiating` の新しい `ProposalCreateInput` を作れるようにした。
+- 非参加者からの再打診inputは `nil` にし、画面側から誤って作成できないようにした。
+
+#### `ios-native/Sources/MegrumApp/TradesScreen.swift`
+- 打診への返答パネルに「条件を変えて再打診」ボタンを追加した。
+- Native `sheet` / `Form` / `Picker(.segmented)` で、元の提示物件数を確認し、交換手段・交換条件タグ・メッセージを調整して再打診できる画面を追加した。
+- 旧Expo版の見た目へ寄せず、Swift版のiOS標準デザイン感を維持した。
+
+#### `ios-native/Sources/MegrumApp/MegrumAppState.swift` / `ios-native/Sources/MegrumData/SupabaseProposalClient.swift`
+- `status=.negotiating` で作る再打診は、作成者側の `agreed_by_sender` を true として保存するようにした。
+- これにより、相手が再打診を承諾した時に余計な二度目の承諾が不要になる。
+
+#### `ios-native/Tests/`
+- 受信者視点の再打診inputが、相手を宛先にし、自分のグッズと相手のグッズを正しく反転し、`negotiating` で作成されることを検証した。
+- 非参加者から再打診inputを作れないことを検証した。
+- Preview AppStateで、既存受信打診から再打診を作成できることを検証した。
+- `negotiating` 作成payloadで `agreed_by_sender=true` になることを検証した。
+
+#### `ios-native/README.md` / `notes/22_swift_native_migration.md`
+- Swift Native版の取引詳細に、再打診導線を追加したことを追記した。
+- Swift版のiOS標準デザイン感を正とし、旧アプリの見た目へ無理に戻さない方針を継続記録した。
+
+### 影響範囲
+
+- Swift Native版の取引詳細
+- `sent` / `negotiating` の打診レスポンス導線
+- `ProposalCreateInput` 作成前のドメイン判定
+
+### 確認方法
+
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-build --enable-xctest --disable-swift-testing -j 1`
+- `xcodebuild -quiet -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -destination 'generic/platform=iOS Simulator' -derivedDataPath /tmp/megrum-native-xcodebuild CODE_SIGNING_ALLOWED=NO build`
+
+### 関連ファイル
+
+- `ios-native/Sources/MegrumCore/MegrumModels.swift`
+- `ios-native/Sources/MegrumApp/TradesScreen.swift`
+- `ios-native/Sources/MegrumApp/MegrumAppState.swift`
+- `ios-native/Sources/MegrumData/SupabaseProposalClient.swift`
+- `ios-native/Tests/MegrumCoreTests/MegrumCoreTests.swift`
+- `ios-native/Tests/MegrumAppTests/MegrumAppStateTests.swift`
+- `ios-native/Tests/MegrumDataTests/SupabaseProposalClientTests.swift`
+- `ios-native/README.md`
+- `notes/22_swift_native_migration.md`
+- `notes/08_design_iterations.md`
+
+### セルフレビュー結果
+
+- ✅ Swift版のiOS標準デザイン感を維持し、独自の旧Expo寄せではなくNative sheet / Form / segmented pickerで実装した
+- ✅ 状態名は既存 `negotiating` を使い、`notes/09` の逆打診 / 再打診ルールと一致しているため状態遷移更新は不要と判断した
+- ✅ DBスキーマ追加はなく、既存 `proposals` 作成境界を使うため `notes/05` 更新は不要と判断した
+- ✅ 用語は既存 `逆打診 / 再打診` を使い、新規用語追加はないため `notes/10` 更新は不要と判断した
+
+---
+
 ## イテレーション360：Swift承諾時に交換手段を確定
 
 ### 背景・問題意識
