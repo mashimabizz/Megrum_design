@@ -1,0 +1,10 @@
+// Checked-in defaults for the native iOS app.
+// Copy MegrumNative.local.xcconfig.example to MegrumNative.local.xcconfig
+// when you want a local live-data build. The local file is gitignored.
+
+MEGRUM_SUPABASE_URL =
+MEGRUM_SUPABASE_PUBLISHABLE_KEY =
+MEGRUM_SUPABASE_VIEWER_ID =
+MEGRUM_AUTH_EMAIL_REDIRECT_URL = https:/$()/megrum.jp/auth/callback?next=mobile&scheme=megrum-preview
+
+#include? "MegrumNative.local.xcconfig"

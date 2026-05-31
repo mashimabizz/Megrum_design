@@ -1,0 +1,8 @@
+// Copy this file to MegrumNative.local.xcconfig and fill the values.
+// The local file is gitignored, so do not commit real keys.
+// Use https:/$()/... instead of https://... because // starts an xcconfig comment.
+
+MEGRUM_SUPABASE_URL = https:/$()/YOUR-PROJECT.supabase.co
+MEGRUM_SUPABASE_PUBLISHABLE_KEY = YOUR_SUPABASE_PUBLISHABLE_KEY
+MEGRUM_SUPABASE_VIEWER_ID = 00000000-0000-0000-0000-000000000000
+MEGRUM_AUTH_EMAIL_REDIRECT_URL = https:/$()/megrum.jp/auth/callback?next=mobile&scheme=megrum-preview

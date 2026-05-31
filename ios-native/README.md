@@ -54,6 +54,14 @@ To run the native app against Supabase from Xcode or CLI, provide only public/cl
 - `MegrumSupabaseViewerID` / `MEGRUM_SUPABASE_VIEWER_ID`
 - `MegrumAuthEmailRedirectURL` / `MEGRUM_AUTH_EMAIL_REDIRECT_URL`
 
+The Xcode host reads checked-in defaults from `Config/MegrumNative.xcconfig`. For a local live-data build, create an ignored local config:
+
+```bash
+cp ios-native/Config/MegrumNative.local.xcconfig.example ios-native/Config/MegrumNative.local.xcconfig
+```
+
+Then fill `MEGRUM_SUPABASE_URL`, `MEGRUM_SUPABASE_PUBLISHABLE_KEY`, and `MEGRUM_SUPABASE_VIEWER_ID` in the local file. The local config is ignored by git. You can also override these values from the CLI with `xcodebuild ... MEGRUM_SUPABASE_URL='https://...' MEGRUM_SUPABASE_PUBLISHABLE_KEY='...' MEGRUM_SUPABASE_VIEWER_ID='...'`.
+
 If these values are absent, the Swift app intentionally falls back to preview data.
 
 Auth currently supports the native email/password path and Sign in with Apple. If Supabase config is present and no session is available, `MegrumRootView` shows `AuthScreen`; without config, it starts signed into preview mode so the app shell remains immediately inspectable.

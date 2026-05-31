@@ -4,6 +4,75 @@
 
 ---
 
+## イテレーション355：Swift実データ設定を安全に注入する
+
+### 背景・問題意識
+
+Swift Native版を実機で確認できる状態になったが、現時点のXcode hostはSupabase設定値が空で、常にPreview dataへfallbackする。実データレビューへ進むには、秘密情報をGitに入れずにXcode/CLIからSupabase URL、publishable key、viewer idを差し込める導線が必要だった。
+
+### 変更内容
+
+#### `ios-native/Config/MegrumNative.xcconfig`
+- Swift Native app hostのchecked-in build setting defaultを追加した。
+- `MegrumNative.local.xcconfig` をoptional includeし、ローカルだけで実データ設定を注入できるようにした。
+
+#### `ios-native/Config/MegrumNative.local.xcconfig.example`
+- ローカル設定ファイルの雛形を追加した。
+- `.xcconfig` のURL記法で `//` がコメント化されないよう、`https:/$()/...` の注意を残した。
+
+#### `ios-native/MegrumNative.xcodeproj/project.pbxproj`
+- Native targetのDebug/Releaseへ `MegrumNative.xcconfig` を接続した。
+- `MegrumSupabaseURL` / `MegrumSupabasePublishableKey` / `MegrumSupabaseViewerID` / `MegrumAuthEmailRedirectURL` をbuild setting経由でInfo.plistへ渡すようにした。
+
+#### `ios-native/Sources/MegrumData/SupabaseConfiguration.swift`
+- 空文字や未解決placeholderだけでなく、scheme/hostのないSupabase URLも設定として採用しないようにした。
+
+#### `ios-native/Sources/MegrumApp/MegrumAuthState.swift`
+- メール認証redirect URLも空文字・未解決placeholderを無視し、既定URLへfallbackするようにした。
+
+#### `ios-native/Tests/`
+- Info dictionaryからSupabase設定を読むテストを追加した。
+- 未解決build setting placeholderや相対URLを拒否するテストを追加した。
+- app factoryが未解決placeholder時にPreview dataへfallbackすることを検証した。
+
+#### `ios-native/README.md` / `notes/22_swift_native_migration.md`
+- ローカル実データbuildの設定手順とSwift移行ステータスを更新した。
+
+### 影響範囲
+
+- Swift Native版のXcode build設定
+- Swift Native版のSupabase実データ接続準備
+- 実機レビュー時のPreview data / live data切り替え
+
+### 確認方法
+
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-build --enable-xctest --disable-swift-testing -j 1`
+- `xcodebuild -quiet -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -destination 'generic/platform=iOS Simulator' -derivedDataPath /tmp/megrum-native-xcodebuild CODE_SIGNING_ALLOWED=NO build`
+- `xcodebuild -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -showBuildSettings | rg "MEGRUM_SUPABASE|MegrumSupabase|INFOPLIST_KEY_Megrum"`
+
+### 関連ファイル
+
+- `ios-native/.gitignore`
+- `ios-native/Config/MegrumNative.xcconfig`
+- `ios-native/Config/MegrumNative.local.xcconfig.example`
+- `ios-native/MegrumNative.xcodeproj/project.pbxproj`
+- `ios-native/Sources/MegrumData/SupabaseConfiguration.swift`
+- `ios-native/Sources/MegrumApp/MegrumAuthState.swift`
+- `ios-native/Tests/MegrumDataTests/SupabaseConfigurationTests.swift`
+- `ios-native/Tests/MegrumAppTests/MegrumAppStateTests.swift`
+- `ios-native/README.md`
+- `notes/22_swift_native_migration.md`
+- `notes/08_design_iterations.md`
+
+### セルフレビュー結果
+
+- ✅ Supabaseの実値はgitignoreされたlocal xcconfigへ置く設計にし、秘密情報をcommit対象にしない
+- ✅ 未解決placeholderをlive configとして誤採用せず、Preview dataへfallbackする
+- ✅ DBスキーマ・状態名・用語の変更はなく、`notes/05` / `notes/09` / `notes/10` は更新不要と判断した
+- ✅ Swift NativeのiOS標準感を維持する方針とは衝突しない、build設定だけの変更に留めた
+
+---
+
 ## イテレーション354：Swift版はiOS標準感を正とする
 
 ### 背景・問題意識

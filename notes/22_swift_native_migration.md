@@ -1,7 +1,7 @@
 # 22. Swift Native Migration
 
 最終更新: 2026-05-31
-ステータス: Active draft（iter354）
+ステータス: Active draft（iter355）
 
 ## 目的
 
@@ -97,6 +97,7 @@ tar -xzf /Users/michitaka/Desktop/Megrum_backups/pre-swift-migration-20260531-03
 - Swift Package側では `MegrumApp` にRootView、TabView、主要タブ画面の骨格を置く。
 - `MegrumAppState` と `MegrumRepository` で初期データロード境界を追加済み。
 - `MegrumData` にSupabase設定とPostgRESTリクエスト境界を追加済み。環境/Info.plistに公開設定とviewer idがあればlive repository、なければpreview repositoryにfallbackする。
+- iter355で、Xcode targetが `Config/MegrumNative.xcconfig` を読み込むようにし、gitignoreされた `MegrumNative.local.xcconfig` からSupabase URL、publishable key、viewer id、メール認証redirect URLを安全に注入できるようにした。未設定または未解決のbuild setting placeholderはPreview dataへfallbackする。
 - Bundle IDは最初は比較用Previewを分け、最終的に本番IDへ寄せる。
 - TabView / NavigationStack / deep link / auth restore / app lifecycleを組む。
 

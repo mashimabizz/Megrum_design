@@ -49,7 +49,11 @@ public struct SupabaseConfiguration: Equatable, Sendable {
             let key = publishableKey?.trimmingCharacters(in: .whitespacesAndNewlines),
             !rawURL.isEmpty,
             !key.isEmpty,
-            let url = URL(string: rawURL)
+            !rawURL.contains("$("),
+            !key.contains("$("),
+            let url = URL(string: rawURL),
+            url.scheme != nil,
+            url.host != nil
         else {
             return nil
         }

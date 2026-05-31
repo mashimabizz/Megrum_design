@@ -333,17 +333,25 @@ public enum MegrumAuthStateFactory {
     }
 
     private static func authRedirectURL(from environment: [String: String]) -> URL? {
-        if let value = environment["MEGRUM_AUTH_EMAIL_REDIRECT_URL"], let url = URL(string: value) {
-            return url
-        }
-        return defaultAuthRedirectURL
+        authRedirectURL(from: environment["MEGRUM_AUTH_EMAIL_REDIRECT_URL"]) ?? defaultAuthRedirectURL
     }
 
     private static func authRedirectURL(from infoDictionary: [String: Any]?) -> URL? {
-        if let value = infoDictionary?["MegrumAuthEmailRedirectURL"] as? String, let url = URL(string: value) {
-            return url
+        authRedirectURL(from: infoDictionary?["MegrumAuthEmailRedirectURL"] as? String) ?? defaultAuthRedirectURL
+    }
+
+    private static func authRedirectURL(from rawValue: String?) -> URL? {
+        guard
+            let rawValue = rawValue?.trimmingCharacters(in: .whitespacesAndNewlines),
+            !rawValue.isEmpty,
+            !rawValue.contains("$("),
+            let url = URL(string: rawValue),
+            url.scheme != nil
+        else {
+            return nil
         }
-        return defaultAuthRedirectURL
+
+        return url
     }
 
     private static var defaultAuthRedirectURL: URL? {

@@ -2,6 +2,35 @@ import MegrumData
 import XCTest
 
 final class SupabaseConfigurationTests: XCTestCase {
+    func testReadsInfoDictionaryKeys() {
+        let config = SupabaseConfiguration.fromInfoDictionary([
+            "MegrumSupabaseURL": "https://example.supabase.co",
+            "MegrumSupabasePublishableKey": "sb_publishable_test"
+        ])
+
+        XCTAssertEqual(config?.projectURL.absoluteString, "https://example.supabase.co")
+        XCTAssertEqual(config?.publishableKey, "sb_publishable_test")
+        XCTAssertNil(config?.accessToken)
+    }
+
+    func testIgnoresUnresolvedBuildSettingPlaceholders() {
+        let config = SupabaseConfiguration.fromInfoDictionary([
+            "MegrumSupabaseURL": "$(MEGRUM_SUPABASE_URL)",
+            "MegrumSupabasePublishableKey": "$(MEGRUM_SUPABASE_PUBLISHABLE_KEY)"
+        ])
+
+        XCTAssertNil(config)
+    }
+
+    func testRejectsRelativeSupabaseURL() {
+        let config = SupabaseConfiguration.fromInfoDictionary([
+            "MegrumSupabaseURL": "example.supabase.co",
+            "MegrumSupabasePublishableKey": "sb_publishable_test"
+        ])
+
+        XCTAssertNil(config)
+    }
+
     func testReadsExpoCompatibleEnvironmentKeys() {
         let config = SupabaseConfiguration.fromEnvironment([
             "EXPO_PUBLIC_SUPABASE_URL": "https://example.supabase.co",

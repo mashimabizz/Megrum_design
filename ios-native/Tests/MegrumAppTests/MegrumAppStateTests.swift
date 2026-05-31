@@ -29,6 +29,22 @@ final class MegrumAppStateTests: XCTestCase {
         XCTAssertFalse(state.inventory.isEmpty)
     }
 
+    func testFactoryFallsBackToPreviewWithUnresolvedSupabasePlaceholders() async {
+        let state = MegrumAppStateFactory.make(
+            environment: [:],
+            infoDictionary: [
+                "MegrumSupabaseURL": "$(MEGRUM_SUPABASE_URL)",
+                "MegrumSupabasePublishableKey": "$(MEGRUM_SUPABASE_PUBLISHABLE_KEY)",
+                "MegrumSupabaseViewerID": "$(MEGRUM_SUPABASE_VIEWER_ID)"
+            ]
+        )
+
+        await state.loadInitialData()
+
+        XCTAssertEqual(state.viewer?.handle, "michilion")
+        XCTAssertFalse(state.inventory.isEmpty)
+    }
+
     func testAppStateRefreshesPreviewMeguriFeed() async {
         let state = MegrumAppState(repository: PreviewMegrumRepository())
 
