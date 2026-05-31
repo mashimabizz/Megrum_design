@@ -9,6 +9,9 @@ public enum SupabaseGroomClientError: Error, Equatable, Sendable {
 public final class SupabaseGroomClient: @unchecked Sendable {
     private static let groomBucket = "groom-posts"
     private static let maxUploadBytes = Int(9.5 * 1_024 * 1_024)
+    private static let maxFeedRadiusMeters = 1_000
+    private static let maxMapRadiusMeters = 3_000
+    private static let minRadiusMeters = 100
     private let client: SupabaseRESTClient
 
     public init(configuration: SupabaseConfiguration, session: URLSession = .shared) {
@@ -29,7 +32,28 @@ public final class SupabaseGroomClient: @unchecked Sendable {
             payload: GroomFeedPayload(
                 latitude: latitude,
                 longitude: longitude,
-                radiusMeters: radiusMeters
+                radiusMeters: radiusMeters,
+                maxRadiusMeters: Self.maxFeedRadiusMeters,
+                minRadiusMeters: Self.minRadiusMeters
+            )
+        )
+        let signedURLs = await signedURLMap(for: rows)
+        return rows.compactMap { $0.post(signedURLs: signedURLs) }
+    }
+
+    public func loadGroomMapPosts(
+        latitude: Double?,
+        longitude: Double?,
+        radiusMeters: Int = 3_000
+    ) async throws -> [GroomPost] {
+        let rows: [GroomFeedRow] = try await client.rpcRows(
+            function: "list_groom_feed_nearby",
+            payload: GroomFeedPayload(
+                latitude: latitude,
+                longitude: longitude,
+                radiusMeters: radiusMeters,
+                maxRadiusMeters: Self.maxMapRadiusMeters,
+                minRadiusMeters: Self.minRadiusMeters
             )
         )
         let signedURLs = await signedURLMap(for: rows)
@@ -73,7 +97,26 @@ public final class SupabaseGroomClient: @unchecked Sendable {
             payload: GroomFeedPayload(
                 latitude: latitude,
                 longitude: longitude,
-                radiusMeters: radiusMeters
+                radiusMeters: radiusMeters,
+                maxRadiusMeters: Self.maxFeedRadiusMeters,
+                minRadiusMeters: Self.minRadiusMeters
+            )
+        )
+    }
+
+    public func makeLoadGroomMapPostsRequest(
+        latitude: Double?,
+        longitude: Double?,
+        radiusMeters: Int = 3_000
+    ) throws -> URLRequest {
+        try client.makeRPCRequest(
+            function: "list_groom_feed_nearby",
+            payload: GroomFeedPayload(
+                latitude: latitude,
+                longitude: longitude,
+                radiusMeters: radiusMeters,
+                maxRadiusMeters: Self.maxMapRadiusMeters,
+                minRadiusMeters: Self.minRadiusMeters
             )
         )
     }
@@ -196,10 +239,10 @@ private struct GroomFeedPayload: Encodable, Sendable {
     var pViewerLng: Double?
     var pRadiusM: Int
 
-    init(latitude: Double?, longitude: Double?, radiusMeters: Int) {
+    init(latitude: Double?, longitude: Double?, radiusMeters: Int, maxRadiusMeters: Int, minRadiusMeters: Int) {
         self.pViewerLat = latitude
         self.pViewerLng = longitude
-        self.pRadiusM = min(max(radiusMeters, 100), 1_000)
+        self.pRadiusM = min(max(radiusMeters, minRadiusMeters), maxRadiusMeters)
     }
 
     enum CodingKeys: String, CodingKey {

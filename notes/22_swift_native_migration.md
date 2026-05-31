@@ -1,7 +1,7 @@
 # 22. Swift Native Migration
 
 最終更新: 2026-05-31
-ステータス: Active draft（iter369）
+ステータス: Active draft（iter370）
 
 ## 目的
 
@@ -133,6 +133,7 @@ tar -xzf /Users/michitaka/Desktop/Megrum_backups/pre-swift-migration-20260531-03
 - iter367で、認証フォームのdisabled状態、入力正規化、ハンドル名validation、Supabase error表示を補強した。live設定がない場合はAppleログインボタンを無効化し、preview fallback時の誤操作を減らした。
 - iter367で、Google OAuth authorize URL / request builderを追加し、UI接続前にrequest生成をテストできるようにした。
 - iter369で、Googleログインボタンを `ASWebAuthenticationSession` へ接続し、Supabase OAuth callbackを既存redirect復元境界へ渡せるようにした。
+- iter370で、OAuth callback schemeを `MEGRUM_URL_SCHEME` build settingから導出するようにし、Apple / Googleなどの外部ID Provider error stateを汎用名へ整理した。
 - 現時点のAuthはメール/パスワード、Appleログイン、Googleログインの最小導線まで追加済み。Google側のProvider設定と実機callback許可はSupabase/Apple側の設定確認が残る。
 
 ### Phase 3: Exchange core
@@ -174,6 +175,7 @@ tar -xzf /Users/michitaka/Desktop/Megrum_backups/pre-swift-migration-20260531-03
 - iter368で、検索フィルターのグッズ種別とグッズタグを分離し、グループ未選択時はメンバーとグッズタグ候補を非表示にした。グッズタグ候補は最大20件まで表示する。
 - iter369で、在庫/Wishグリッドの列数・spacing・スケルトン数を共有する `GoodsGridLayout` にまとめ、3/4/5列切り替え、空状態、長押しメニュー、数量バッジ、アクセシビリティを補強した。
 - iter369で、取引チャット系request境界を補強し、位置情報message、到着状態meta、写真message type validation、申告memo validation、証跡承認/評価送信validationを追加した。
+- iter370で、取引チャット入力欄上に到着ステータス、現在地共有、服装写真共有のNative affordanceを追加した。到着ステータスは既存text message境界で送信し、typed location / arrival messageのAppState接続は後続で実装する。
 
 ### Phase 4: Meguri core
 
@@ -200,6 +202,8 @@ tar -xzf /Users/michitaka/Desktop/Megrum_backups/pre-swift-migration-20260531-03
 - iter368で、グルームマップ上の1km圏外グルームをタップした時は詳細を開かず、範囲外で見られない旨を表示するようにした。liveで1km外ピンを含めて表示するには、feed RPC側が全件または周辺広域とcanViewを返す拡張が必要。
 - iter369で、グルーム/掲示板mapの初期cameraを現在地の範囲円とpinが収まるように調整し、範囲外グルームpinのロック表示を追加した。
 - iter369で、掲示板詳細をチャット寄りに整理し、Lazy stack、最新返信へのscroll、interactive keyboard dismissal、safe-area composerを追加した。掲示板RPC requestもscopeに応じて緯度経度または都道府県だけを送るようにした。
+- iter370で、ホーム用グルームfeedとマップ用グルームfeedを分離し、Swift Nativeのグルームマップは3km圏内のpinを取得できる `loadGroomMapPosts` を使うようにした。通常feedは1km上限のまま維持する。
+- iter370で、Preview Supabaseの `list_groom_feed_nearby` server-side clampを3kmへ広げるmigrationを適用し、liveでもマップ用広域pinを取得できる条件を整えた。
 
 ### Phase 5: Cutover
 
@@ -211,6 +215,43 @@ tar -xzf /Users/michitaka/Desktop/Megrum_backups/pre-swift-migration-20260531-03
 - iter367で、`MTO’s phone` 向けに署名付きDebugビルドを作成し、`tokyo.megrum.native.preview` を直接インストールできることを確認した。端末ロック中のため自動launchはOSに拒否されたが、インストール自体は成功済み。
 - iter368で、前回更新と今回更新を含めた署名付きDebugビルドを `MTO’s phone` へ再インストールし、`tokyo.megrum.native.preview` の起動まで確認した。
 - iter369で、並列実装バッチの更新を含む署名付きDebugビルドを `MTO’s phone` へ再インストールし、`tokyo.megrum.native.preview` の起動まで確認した。
+- iter370で、署名付きiPhone向けDebugビルドまでは成功した。`MTO’s phone` はUSB上に見えているがCoreDevice/Xcode上で `available=false` のため、自動installは端末ロック解除・接続復帰待ち。
+
+## RN parity backlog（iter370監査）
+
+画面上の不足が多く見えるというオーナー指摘を受け、React Native版とSwift Native版のread-only差分監査を実施した。Swift版はiOS標準感を維持しつつ、以下の順に不足機能を埋める。
+
+### P0
+
+1. Home / Local Mode / AW
+   - Swiftのホームは検索とマッチグリッド中心で、RN版にある現地交換モード、会場/半径/時間、持参グッズ、AW作成、LIVE表示、ホーム上のグルーム導線が不足している。
+   - 主な対象: `ios-native/Sources/MegrumApp/HomeScreen.swift`, `ios-native/Sources/MegrumApp/MegrumAppState.swift`
+2. Inventory / Wish Creation and Editing
+   - Swiftの追加sheetは最小構成。RN版の写真、カメラ/ライブラリ、タグ、メンバー、編集、status、複数カード切り抜きが不足している。
+   - 主な対象: `ios-native/Sources/MegrumApp/CollectionScreens.swift`, 新規 `GoodsEditorScreen.swift`
+3. Proposal Creation / Confirm
+   - Swiftはcompact sheet中心。RN版の譲る/受け取る/待ち合わせの複数タブ、複数選択、スケジュール背景、場所選択、確認画面、完了画面が不足している。
+   - 主な対象: `ios-native/Sources/MegrumApp/SearchScreen.swift`, `ios-native/Sources/MegrumApp/PublicUserProfileScreen.swift`, 新規 `ProposalSelectScreen.swift`, 新規 `ProposalConfirmScreen.swift`
+4. Trade Chat Day-Of Actions
+   - Swiftは入口を追加済みだが、現在地共有と服装写真共有は未接続。到着状態もrich messageではなくtext fallback。
+   - 主な対象: `ios-native/Sources/MegrumApp/TradesScreen.swift`, `ios-native/Sources/MegrumData/SupabaseMessageClient.swift`
+5. Dispute / Cancel / Late Flow
+   - Swiftは基本通報のみ。RN版の異議詳細、返信、タイムライン、キャンセル/遅刻申請、取引詳細へのbanner反映が不足している。
+   - 主な対象: `ios-native/Sources/MegrumApp/TradesScreen.swift`, 新規 `DisputeDetailScreen.swift`
+6. Onboarding / Own Profile
+   - Swiftは初回設定が1画面に圧縮されている。RN版の性別、複数推し/メンバー、自分プロフィール、プロフィール編集、推し設定、完了体験が不足している。
+   - 主な対象: `ios-native/Sources/MegrumApp/AuthScreen.swift`, `ios-native/Sources/MegrumApp/AccountSetupScreen.swift`, `ios-native/Sources/MegrumApp/SettingsScreen.swift`
+
+### P1
+
+1. Meguri Messages / Plus / Profile Adjacent Screens
+   - Swiftはグルーム、掲示板、マップ、通知経由の最小メッセージはあるが、見えるめぐりメッセージ入口、Plus、プロフィール編集、実績、共有が不足している。
+2. Board Detail Moderation and Rich Replies
+   - Swiftの掲示板詳細はチャット風に寄せたが、非表示/通報/ブロック/共有、画像返信、編集/削除、reaction、draftが不足している。
+3. Settings / Legal / Help
+   - Swift設定は通知、住所、ブロック、ログアウト中心。ヘルプ、法的文書、アカウント周辺が不足している。
+4. Notification Deep Links
+   - Swift通知は主にタブ遷移。RN版の取引、異議、掲示板、評価、証跡、プロフィールなどの詳細画面直行が不足している。
 
 ## 完了条件
 

@@ -88,6 +88,7 @@ public protocol MegrumRepository: Sendable {
     func loadSchedules(for proposal: TradeProposal, startAt: Date, endAt: Date) async throws -> [PersonalSchedule]
     func createSchedule(_ input: PersonalScheduleCreateInput) async throws -> PersonalSchedule
     func loadGrooms(latitude: Double?, longitude: Double?, radiusMeters: Int) async throws -> [GroomPost]
+    func loadGroomMapPosts(latitude: Double?, longitude: Double?, radiusMeters: Int) async throws -> [GroomPost]
     func createGroomPost(_ input: GroomPostCreateInput) async throws -> GroomPost
     func markGroomViewed(postID: UUID) async throws
     func setGroomLiked(postID: UUID, isLiked: Bool) async throws
@@ -217,6 +218,10 @@ public extension MegrumRepository {
 
     func loadGrooms(latitude: Double?, longitude: Double?, radiusMeters: Int) async throws -> [GroomPost] {
         []
+    }
+
+    func loadGroomMapPosts(latitude: Double?, longitude: Double?, radiusMeters: Int) async throws -> [GroomPost] {
+        try await loadGrooms(latitude: latitude, longitude: longitude, radiusMeters: radiusMeters)
     }
 
     func createGroomPost(_ input: GroomPostCreateInput) async throws -> GroomPost {
@@ -843,6 +848,7 @@ public final class MegrumAppState: ObservableObject {
     @Published public private(set) var groomRepliesByPostID: [UUID: [GroomReply]] = [:]
     @Published public private(set) var meguriMessages: [MeguriMessage] = []
     @Published public private(set) var grooms: [GroomPost] = []
+    @Published public private(set) var groomMapPosts: [GroomPost] = []
     @Published public private(set) var likedGroomIDs: Set<UUID> = []
     @Published public private(set) var threads: [BoardThread] = []
     @Published public private(set) var oshiGroups: [OshiGroup] = []
@@ -872,6 +878,7 @@ public final class MegrumAppState: ObservableObject {
     @Published public private(set) var isRegisteringNativePushDevice = false
     @Published public private(set) var isRevokingNativePushDevice = false
     @Published public private(set) var isLoadingMeguri = false
+    @Published public private(set) var isLoadingGroomMap = false
     @Published public private(set) var isLoadingMeguriMessages = false
     @Published public private(set) var isLookingUpPostalCode = false
     @Published public private(set) var isSavingMailingAddress = false
@@ -994,6 +1001,29 @@ public final class MegrumAppState: ObservableObject {
         isLoadingMeguri = false
     }
 
+    public func loadGroomMapPosts(
+        latitude: Double? = nil,
+        longitude: Double? = nil,
+        radiusMeters: Int = 3_000
+    ) async {
+        guard !isLoadingGroomMap else {
+            return
+        }
+
+        isLoadingGroomMap = true
+        errorMessage = nil
+        do {
+            groomMapPosts = try await repository.loadGroomMapPosts(
+                latitude: latitude,
+                longitude: longitude,
+                radiusMeters: radiusMeters
+            )
+        } catch {
+            errorMessage = "グルームマップを読み込めませんでした"
+        }
+        isLoadingGroomMap = false
+    }
+
     public func createGroomPost(
         imageData: Data,
         imageContentType: String,
@@ -1032,6 +1062,8 @@ public final class MegrumAppState: ObservableObject {
             )
             grooms.removeAll { $0.id == post.id }
             grooms.insert(post, at: 0)
+            groomMapPosts.removeAll { $0.id == post.id }
+            groomMapPosts.insert(post, at: 0)
             isCreatingGroomPost = false
             return true
         } catch {
@@ -2216,6 +2248,7 @@ public final class MegrumAppState: ObservableObject {
         listings = snapshot.listings
         proposals = snapshot.proposals
         grooms = snapshot.grooms
+        groomMapPosts = snapshot.grooms
         likedGroomIDs = Set(snapshot.grooms.filter(\.liked).map(\.id))
         threads = snapshot.threads
     }

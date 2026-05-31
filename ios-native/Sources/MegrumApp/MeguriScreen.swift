@@ -789,7 +789,8 @@ private struct MeguriMapScreen: View {
         self.locationState = locationState
         self.selectedPrefecture = selectedPrefecture
         self.boardScope = boardScope
-        _cameraPosition = State(initialValue: .region(MKCoordinateRegion(center: kind.initialCenter(userCoordinate: locationState.coordinate, grooms: appState.grooms, threads: appState.threads), span: kind.regionSpan)))
+        let initialGrooms = appState.groomMapPosts.isEmpty ? appState.grooms : appState.groomMapPosts
+        _cameraPosition = State(initialValue: .region(MKCoordinateRegion(center: kind.initialCenter(userCoordinate: locationState.coordinate, grooms: initialGrooms, threads: appState.threads), span: kind.regionSpan)))
     }
 
     var body: some View {
@@ -803,7 +804,7 @@ private struct MeguriMapScreen: View {
 
                 switch kind {
                 case .grooms:
-                    ForEach(appState.grooms) { groom in
+                    ForEach(mapGrooms) { groom in
                         Annotation("グルーム", coordinate: groom.coordinate) {
                             Button {
                                 openGroomIfInRange(groom)
@@ -846,7 +847,7 @@ private struct MeguriMapScreen: View {
                 } else if let mapStatusMessage {
                     MapStatusBadge(
                         message: mapStatusMessage,
-                        isLoading: appState.isLoadingMeguri || locationState.isRequestingLocation
+                        isLoading: isLoadingMapContent || locationState.isRequestingLocation
                     )
                 }
             }
@@ -855,11 +856,9 @@ private struct MeguriMapScreen: View {
         }
         .task {
             locationState.requestCurrentLocation()
-            await appState.loadMeguriFeed(
+            await reloadMapContent(
                 latitude: locationState.coordinate?.latitude,
-                longitude: locationState.coordinate?.longitude,
-                prefecture: selectedPrefecture,
-                scope: mapBoardScope
+                longitude: locationState.coordinate?.longitude
             )
             await MainActor.run {
                 alignCameraToVisibleContent(userCoordinate: locationState.coordinate, animated: false)
@@ -867,11 +866,9 @@ private struct MeguriMapScreen: View {
         }
         .onReceive(locationState.$coordinate.compactMap { $0 }) { coordinate in
             Task {
-                await appState.loadMeguriFeed(
+                await reloadMapContent(
                     latitude: coordinate.latitude,
-                    longitude: coordinate.longitude,
-                    prefecture: selectedPrefecture,
-                    scope: mapBoardScope
+                    longitude: coordinate.longitude
                 )
                 await MainActor.run {
                     mapNotice = nil
@@ -907,7 +904,7 @@ private struct MeguriMapScreen: View {
 
         let region = kind.visibleRegion(
             userCoordinate: userCoordinate,
-            grooms: appState.grooms,
+            grooms: mapGrooms,
             threads: appState.threads,
             boardScope: boardScope
         )
@@ -926,6 +923,37 @@ private struct MeguriMapScreen: View {
         }
     }
 
+    private var mapGrooms: [GroomPost] {
+        appState.groomMapPosts.isEmpty ? appState.grooms : appState.groomMapPosts
+    }
+
+    private var isLoadingMapContent: Bool {
+        switch kind {
+        case .grooms:
+            appState.isLoadingGroomMap
+        case .boards:
+            appState.isLoadingMeguri
+        }
+    }
+
+    private func reloadMapContent(latitude: Double?, longitude: Double?) async {
+        switch kind {
+        case .grooms:
+            await appState.loadGroomMapPosts(
+                latitude: latitude,
+                longitude: longitude,
+                radiusMeters: 3_000
+            )
+        case .boards:
+            await appState.loadMeguriFeed(
+                latitude: latitude,
+                longitude: longitude,
+                prefecture: selectedPrefecture,
+                scope: mapBoardScope
+            )
+        }
+    }
+
     private var rangeCircle: (center: CLLocationCoordinate2D, radius: CLLocationDistance)? {
         guard let coordinate = locationState.coordinate else {
             return nil
@@ -937,7 +965,7 @@ private struct MeguriMapScreen: View {
     }
 
     private var mapStatusMessage: String? {
-        if appState.isLoadingMeguri || locationState.isRequestingLocation {
+        if isLoadingMapContent || locationState.isRequestingLocation {
             return "現在地と投稿を読み込み中"
         }
         if let locationErrorMessage = locationState.locationErrorMessage, kind == .grooms || boardScope == .nearby3km {
@@ -947,7 +975,7 @@ private struct MeguriMapScreen: View {
             return "都道府県内の位置つきスレッドを表示中"
         }
         if kind == .grooms, rangeCircle != nil {
-            return "現在地1km圏内のグルームを表示中"
+            return "現在地周辺のグルームを表示中。1km外は閲覧できません"
         }
         if rangeCircle == nil {
             return "範囲円は現在地取得後に表示されます"

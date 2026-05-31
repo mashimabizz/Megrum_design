@@ -209,6 +209,14 @@ public struct SupabaseMegrumRepository: MegrumRepository {
         )
     }
 
+    public func loadGroomMapPosts(latitude: Double?, longitude: Double?, radiusMeters: Int) async throws -> [GroomPost] {
+        try await groomClient.loadGroomMapPosts(
+            latitude: latitude,
+            longitude: longitude,
+            radiusMeters: radiusMeters
+        )
+    }
+
     public func createGroomPost(_ input: GroomPostCreateInput) async throws -> GroomPost {
         try await groomClient.createPost(input)
     }

@@ -113,6 +113,48 @@ final class MegrumAppStateTests: XCTestCase {
         XCTAssertFalse(state.inventory.isEmpty)
     }
 
+    func testNativeInfoPlistDeclaresConfigurableURLScheme() throws {
+        let plist = try Self.nativeInfoPlist()
+        let urlTypes = try XCTUnwrap(plist["CFBundleURLTypes"] as? [[String: Any]])
+        let schemes = urlTypes.flatMap { urlType in
+            urlType["CFBundleURLSchemes"] as? [String] ?? []
+        }
+
+        XCTAssertEqual(schemes, ["$(MEGRUM_URL_SCHEME)"])
+        XCTAssertEqual(plist["MegrumAuthEmailRedirectURL"] as? String, "$(MEGRUM_AUTH_EMAIL_REDIRECT_URL)")
+    }
+
+    func testNativeAuthXcconfigKeepsURLSchemeAndRedirectInSync() throws {
+        for configPath in [
+            "Config/MegrumNative.xcconfig",
+            "Config/MegrumNative.local.xcconfig.example"
+        ] {
+            let entries = try Self.xcconfigEntries(relativePath: configPath)
+
+            XCTAssertEqual(entries["MEGRUM_URL_SCHEME"], "megrum-preview", configPath)
+            XCTAssertEqual(
+                entries["MEGRUM_AUTH_EMAIL_REDIRECT_URL"],
+                "https:/$()/megrum.jp/auth/callback?next=mobile&scheme=$(MEGRUM_URL_SCHEME)",
+                configPath
+            )
+        }
+    }
+
+    func testAuthStateFactoryUsesConfiguredRedirectSchemeForOAuthCallback() {
+        let state = MegrumAuthStateFactory.make(
+            environment: [:],
+            infoDictionary: [
+                "MegrumSupabaseURL": "https://example.supabase.co",
+                "MegrumSupabasePublishableKey": "sb_publishable_test",
+                "MegrumSupabaseViewerID": "00000000-0000-0000-0000-000000000000",
+                "MegrumAuthEmailRedirectURL": "https://megrum.jp/auth/callback?next=mobile&scheme=megrum-dev"
+            ]
+        )
+
+        XCTAssertTrue(state.isConfigured)
+        XCTAssertEqual(state.oauthCallbackScheme, "megrum-dev")
+    }
+
     func testAppStateRefreshesPreviewMeguriFeed() async {
         let state = MegrumAppState(repository: PreviewMegrumRepository())
 
@@ -967,6 +1009,36 @@ final class MegrumAppStateTests: XCTestCase {
         XCTAssertEqual(state.publicProfilesByUserID[partnerID]?.profile.handle, "michi1")
         XCTAssertEqual(state.publicProfilesByUserID[partnerID]?.evaluationCount, 2)
         XCTAssertEqual(state.userEvaluationsByUserID[partnerID]?.first?.stars, 5)
+    }
+
+    private static func nativeInfoPlist() throws -> [String: Any] {
+        let data = try Data(contentsOf: iosNativeRoot.appendingPathComponent("App/Info.plist"))
+        let plist = try PropertyListSerialization.propertyList(from: data, options: [], format: nil)
+        return try XCTUnwrap(plist as? [String: Any])
+    }
+
+    private static func xcconfigEntries(relativePath: String) throws -> [String: String] {
+        let contents = try String(contentsOf: iosNativeRoot.appendingPathComponent(relativePath), encoding: .utf8)
+        return contents.split(whereSeparator: \.isNewline).reduce(into: [:]) { entries, line in
+            let trimmedLine = line.trimmingCharacters(in: .whitespaces)
+            guard !trimmedLine.isEmpty, !trimmedLine.hasPrefix("//"), !trimmedLine.hasPrefix("#") else {
+                return
+            }
+            let parts = trimmedLine.split(separator: "=", maxSplits: 1).map {
+                $0.trimmingCharacters(in: .whitespaces)
+            }
+            guard parts.count == 2 else {
+                return
+            }
+            entries[parts[0]] = parts[1]
+        }
+    }
+
+    private static var iosNativeRoot: URL {
+        URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
     }
 }
 

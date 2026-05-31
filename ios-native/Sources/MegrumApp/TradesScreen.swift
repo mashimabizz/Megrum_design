@@ -187,6 +187,74 @@ private extension TradeProposal {
     }
 }
 
+enum TradeArrivalQuickAction: String, CaseIterable, Identifiable {
+    case enroute
+    case arrived
+    case left
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .enroute:
+            "向かっています"
+        case .arrived:
+            "到着しました"
+        case .left:
+            "離れました"
+        }
+    }
+
+    var messageBody: String {
+        title
+    }
+
+    var systemImage: String {
+        switch self {
+        case .enroute:
+            "figure.walk"
+        case .arrived:
+            "checkmark.circle.fill"
+        case .left:
+            "arrow.turn.up.left"
+        }
+    }
+}
+
+private enum TradeUnavailableChatAction: String, Identifiable {
+    case location
+    case outfitPhoto
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .location:
+            "現在地を共有"
+        case .outfitPhoto:
+            "服装写真を共有"
+        }
+    }
+
+    var systemImage: String {
+        switch self {
+        case .location:
+            "location.fill"
+        case .outfitPhoto:
+            "person.crop.rectangle"
+        }
+    }
+
+    var description: String {
+        switch self {
+        case .location:
+            "ピン付きの現在地共有はまだ接続中です。今はメッセージ本文で待ち合わせ場所を伝えてください。"
+        case .outfitPhoto:
+            "服装写真の送信はまだ接続中です。交換後の証跡写真は取引証跡から追加できます。"
+        }
+    }
+}
+
 private struct TradeStageBar: View {
     @Binding var selectedStage: TradeStage
     var pendingCount: Int
@@ -251,6 +319,7 @@ private struct TradeDetailScreen: View {
     @State private var isShowingRejectConfirmation = false
     @State private var isShowingCounterProposalSheet = false
     @State private var isShowingScheduleSheet = false
+    @State private var unavailableChatAction: TradeUnavailableChatAction?
     @State private var selectedRemoteImage: RemoteImageSelection?
 
     private var messages: [TradeMessage] {
@@ -360,6 +429,15 @@ private struct TradeDetailScreen: View {
                     onOpenSchedule: {
                         isShowingScheduleSheet = true
                     },
+                    onSendArrivalStatus: { action in
+                        sendArrivalQuickAction(action)
+                    },
+                    onOpenLocationPlaceholder: {
+                        unavailableChatAction = .location
+                    },
+                    onOpenOutfitPhotoPlaceholder: {
+                        unavailableChatAction = .outfitPhoto
+                    },
                     onCounterProposal: {
                         isShowingCounterProposalSheet = true
                     },
@@ -445,6 +523,13 @@ private struct TradeDetailScreen: View {
             .presentationDetents([.large])
             .presentationDragIndicator(.visible)
         }
+        .sheet(item: $unavailableChatAction) { action in
+            NavigationStack {
+                TradeUnavailableChatActionSheet(action: action)
+            }
+            .presentationDetents([.medium])
+            .presentationDragIndicator(.visible)
+        }
         .confirmationDialog(
             "この打診を断りますか？",
             isPresented: $isShowingRejectConfirmation,
@@ -511,6 +596,12 @@ private struct TradeDetailScreen: View {
             imageData: data,
             imageContentType: imageContentType
         )
+    }
+
+    private func sendArrivalQuickAction(_ action: TradeArrivalQuickAction) {
+        Task {
+            _ = await appState.sendMessage(proposalID: currentProposal.id, body: action.messageBody)
+        }
     }
 
     private var canUseCamera: Bool {
@@ -1301,11 +1392,42 @@ private struct TradeMessageBubble: View {
     }
 }
 
+private struct TradeUnavailableChatActionSheet: View {
+    var action: TradeUnavailableChatAction
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        ContentUnavailableView {
+            Label(action.title, systemImage: action.systemImage)
+        } description: {
+            Text(action.description)
+        } actions: {
+            Button("閉じる") {
+                dismiss()
+            }
+            .buttonStyle(.borderedProminent)
+            .tint(MegrumTheme.lavender)
+        }
+        .navigationTitle(action.title)
+        .megrumInlineNavigationTitle()
+        .toolbar {
+            ToolbarItem(placement: .cancellationAction) {
+                Button("閉じる") {
+                    dismiss()
+                }
+            }
+        }
+    }
+}
+
 private struct TradeMessageInput: View {
     @Binding var text: String
     var isSending: Bool
     var showsCounterProposal: Bool
     var onOpenSchedule: () -> Void
+    var onSendArrivalStatus: (TradeArrivalQuickAction) -> Void
+    var onOpenLocationPlaceholder: () -> Void
+    var onOpenOutfitPhotoPlaceholder: () -> Void
     var onCounterProposal: () -> Void
     var onReport: () -> Void
     var onSend: () -> Void
@@ -1315,6 +1437,27 @@ private struct TradeMessageInput: View {
             Menu {
                 Button(action: onOpenSchedule) {
                     Label("スケジュール", systemImage: "calendar")
+                }
+
+                Menu {
+                    ForEach(TradeArrivalQuickAction.allCases) { action in
+                        Button {
+                            onSendArrivalStatus(action)
+                        } label: {
+                            Label(action.title, systemImage: action.systemImage)
+                        }
+                        .disabled(isSending)
+                    }
+                } label: {
+                    Label("到着ステータス", systemImage: "checkmark.circle")
+                }
+
+                Button(action: onOpenLocationPlaceholder) {
+                    Label("現在地を共有", systemImage: "location.fill")
+                }
+
+                Button(action: onOpenOutfitPhotoPlaceholder) {
+                    Label("服装写真を共有", systemImage: "person.crop.rectangle")
                 }
 
                 if showsCounterProposal {

@@ -4,6 +4,87 @@
 
 ---
 
+## イテレーション370：Swift差分バッチでグルームマップと認証・取引導線を補強
+
+### 背景・問題意識
+
+Swift Native版をiPhoneで継続確認できるようにしつつ、前回残った「liveで1km外グルームpinを地図に出せない」問題、OAuth callback schemeの固定化、取引チャットの当日行動導線を補強した。あわせて、React Native版との差分がまだ画面上に残っているというオーナー指摘を受け、次の作業をRN parity監査から再開する方針に切り替えた。
+
+### 変更内容
+
+#### `ios-native/Config/MegrumNative.xcconfig`
+- `MEGRUM_URL_SCHEME` を明示し、Supabase redirect URLの `scheme` queryをbuild settingから導出するようにした。
+
+#### `ios-native/Sources/MegrumApp/AuthScreen.swift`
+- Apple / Googleなどの外部ID Provider共通のエラー表示として扱えるよう、provider error stateの命名を汎用化した。
+
+#### `ios-native/Sources/MegrumData/SupabaseGroomClient.swift`
+- 通常のめぐりホームfeedは1km上限のまま維持した。
+- グルームマップ専用に `loadGroomMapPosts` を追加し、最大3kmまで周辺グルームpinを取得できるrequest境界を追加した。
+
+#### `ios-native/Sources/MegrumApp/MegrumAppState.swift`
+- `groomMapPosts` と `isLoadingGroomMap` を追加し、ホームfeedとマップ表示用データを分離した。
+- グルーム投稿作成後は、ホームfeedとマップfeedの両方に反映するようにした。
+
+#### `ios-native/Sources/MegrumApp/SupabaseMegrumRepository.swift`
+- Swift Native repositoryからグルームマップ専用feedを呼び出せるようにした。
+
+#### `ios-native/Sources/MegrumApp/MeguriScreen.swift`
+- グルームマップは `groomMapPosts` を優先して表示し、ホームfeedが1kmに制限されても3km圏のpinを地図へ出せる構成にした。
+- マップ画面の読み込み状態を、グルームマップと掲示板マップで分けて扱うようにした。
+
+#### `ios-native/Sources/MegrumApp/TradesScreen.swift`
+- 取引チャット入力欄上の当日行動メニューとして、到着ステータス、現在地共有、服装写真共有のNative affordanceを追加した。
+- 到着ステータスは現時点では既存のtext message境界で送信し、typed message化は後続のAppState/repository拡張に回した。
+
+#### `supabase/migrations/20260531023000_widen_groom_map_feed_radius.sql`
+- `public.list_groom_feed_nearby` のserver-side radius clampを3kmへ広げ、live DBでもマップ用広域pinを取得できるようにした。
+- migrationはPreview Supabaseへ直接適用し、function bodyに3km clampが入ったことを確認した。
+
+#### `ios-native/Tests/`
+- URL scheme / redirect URL、グルーム通常feedとマップfeedのradius clamp、取引チャット当日行動ラベルのテストを追加した。
+
+### 影響範囲
+
+- Swift Native認証画面とOAuth callback設定
+- Swift Nativeめぐりホーム、グルームマップ
+- Swift Native取引チャットの入力欄上メニュー
+- Supabase `list_groom_feed_nearby` RPC
+
+### 確認方法
+
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-integrated-build`
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-integrated-test --enable-xctest --disable-swift-testing -j 1`
+- `xcodebuild -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -destination 'generic/platform=iOS Simulator' -derivedDataPath /tmp/megrum-native-xcodebuild-iter370 CODE_SIGNING_ALLOWED=NO build`
+- `supabase db query --linked --file supabase/migrations/20260531023000_widen_groom_map_feed_radius.sql --output json`
+- `supabase db query --linked "select position('), 3000)' in pg_get_functiondef('public.list_groom_feed_nearby(double precision,double precision,integer)'::regprocedure)) as has_3000_clamp;" --output json`
+- `xcodebuild -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -destination 'generic/platform=iOS' -derivedDataPath /tmp/megrum-native-device-iter370 -allowProvisioningUpdates build`
+
+### 関連ファイル
+
+- `ios-native/Config/MegrumNative.xcconfig`
+- `ios-native/Config/MegrumNative.local.xcconfig.example`
+- `ios-native/Sources/MegrumApp/AuthScreen.swift`
+- `ios-native/Sources/MegrumApp/MegrumAppState.swift`
+- `ios-native/Sources/MegrumApp/MeguriScreen.swift`
+- `ios-native/Sources/MegrumApp/SupabaseMegrumRepository.swift`
+- `ios-native/Sources/MegrumApp/TradesScreen.swift`
+- `ios-native/Sources/MegrumData/SupabaseGroomClient.swift`
+- `ios-native/Tests/`
+- `supabase/migrations/20260531023000_widen_groom_map_feed_radius.sql`
+- `notes/22_swift_native_migration.md`
+
+### セルフレビュー結果
+
+- ✅ グルームの通常feedは1km制限のまま維持し、マップ表示だけ3km取得に分離した
+- ✅ Supabase側のRPC clampも3kmへ広げ、liveで1km外pinが出ない問題のserver-side条件を解消した
+- ✅ iOS標準のSwiftUI / MapKit / build setting境界を優先し、legacy Expo側の見た目へ寄せ戻していない
+- ✅ `swift build` / `swift test` 193件 / `xcodebuild` Simulator build / 署名付きiPhone向けbuild が成功した
+- ✅ `MTO’s phone` はUSB上に見えているがXcode/CoreDevice上で `available=false` のため、この時点の自動installは端末接続待ち
+- ✅ 既存の `mobile/` / `web/` の未コミット差分には触れていない
+- ✅ 状態名・用語追加はないため、`notes/09` / `notes/10` 更新は不要と判断した
+- ⚠️ RN版との差分はまだ画面単位で残っているため、次バッチはRN parity監査のP0/P1リストを元に不足機能を埋める
+
 ## イテレーション369：Swift並列移行バッチで認証・グリッド・めぐり・取引境界を補強
 
 ### 背景・問題意識

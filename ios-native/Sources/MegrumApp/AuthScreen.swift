@@ -35,7 +35,7 @@ public struct AuthScreen: View {
     @State private var passwordResetEmail = ""
     @State private var hasSubmittedPasswordReset = false
     @State private var appleSignInNonce: String?
-    @State private var appleSignInError: String?
+    @State private var identityProviderError: String?
     #if canImport(AuthenticationServices) && canImport(UIKit)
     @State private var googleOAuthSession: ASWebAuthenticationSession?
     #endif
@@ -185,8 +185,8 @@ public struct AuthScreen: View {
         VStack(spacing: 14) {
             if let errorMessage = authState.errorMessage {
                 errorLabel(errorMessage)
-            } else if let appleSignInError {
-                errorLabel(appleSignInError)
+            } else if let identityProviderError {
+                errorLabel(identityProviderError)
             } else if let passwordResetMessage = authState.passwordResetMessage {
                 successLabel(passwordResetMessage)
             }
@@ -270,7 +270,7 @@ public struct AuthScreen: View {
             SignInWithAppleButton(.continue) { request in
                 let nonce = AppleSignInNonce.make()
                 appleSignInNonce = nonce
-                appleSignInError = nil
+                identityProviderError = nil
                 request.requestedScopes = [.fullName, .email]
                 request.nonce = AppleSignInNonce.sha256(nonce)
             } onCompletion: { result in
@@ -330,14 +330,14 @@ public struct AuthScreen: View {
     private func openPasswordResetSheet() {
         passwordResetEmail = MegrumAuthInputValidator.normalizedEmail(email)
         hasSubmittedPasswordReset = false
-        appleSignInError = nil
+        identityProviderError = nil
         focusedField = nil
         isShowingPasswordResetSheet = true
     }
 
     private func sendPasswordReset() async {
         hasSubmittedPasswordReset = true
-        appleSignInError = nil
+        identityProviderError = nil
         let sent = await authState.sendPasswordReset(email: passwordResetEmail)
         guard sent else {
             return
@@ -348,7 +348,7 @@ public struct AuthScreen: View {
 
     private func submit() async {
         focusedField = nil
-        appleSignInError = nil
+        identityProviderError = nil
         switch mode {
         case .signIn:
             await authState.signIn(email: email, password: password)
@@ -360,10 +360,10 @@ public struct AuthScreen: View {
     #if canImport(AuthenticationServices) && canImport(UIKit)
     private func startGoogleSignIn() {
         focusedField = nil
-        appleSignInError = nil
+        identityProviderError = nil
 
         guard let callbackScheme = authState.oauthCallbackScheme else {
-            appleSignInError = "Googleログインを開始できませんでした。もう一度お試しください"
+            identityProviderError = "Googleログインを開始できませんでした。もう一度お試しください"
             return
         }
 
@@ -380,12 +380,12 @@ public struct AuthScreen: View {
                         return
                     }
                     guard let callbackURL else {
-                        appleSignInError = "Googleでのログインに失敗しました。もう一度お試しください"
+                        identityProviderError = "Googleでのログインに失敗しました。もう一度お試しください"
                         return
                     }
                     let handled = await authState.handleOpenURL(callbackURL)
                     if !handled, authState.errorMessage == nil {
-                        appleSignInError = "Googleログイン情報を取得できませんでした。もう一度お試しください"
+                        identityProviderError = "Googleログイン情報を取得できませんでした。もう一度お試しください"
                     }
                 }
             }
@@ -394,10 +394,10 @@ public struct AuthScreen: View {
             googleOAuthSession = session
             if !session.start() {
                 googleOAuthSession = nil
-                appleSignInError = "Googleログインを開始できませんでした。もう一度お試しください"
+                identityProviderError = "Googleログインを開始できませんでした。もう一度お試しください"
             }
         } catch {
-            appleSignInError = "Googleログインを開始できませんでした。もう一度お試しください"
+            identityProviderError = "Googleログインを開始できませんでした。もう一度お試しください"
         }
     }
     #endif
@@ -512,7 +512,7 @@ private extension AuthScreen {
                 let tokenData = credential.identityToken,
                 let idToken = String(data: tokenData, encoding: .utf8)
             else {
-                appleSignInError = "Appleログイン情報を取得できませんでした。もう一度お試しください"
+                identityProviderError = "Appleログイン情報を取得できませんでした。もう一度お試しください"
                 appleSignInNonce = nil
                 return
             }
@@ -527,7 +527,7 @@ private extension AuthScreen {
             if let authorizationError = error as? ASAuthorizationError, authorizationError.code == .canceled {
                 return
             }
-            appleSignInError = "Appleでのログインに失敗しました。もう一度お試しください"
+            identityProviderError = "Appleでのログインに失敗しました。もう一度お試しください"
         }
     }
 }

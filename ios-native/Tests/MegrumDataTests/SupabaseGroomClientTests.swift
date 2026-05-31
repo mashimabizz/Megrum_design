@@ -38,6 +38,38 @@ final class SupabaseGroomClientTests: XCTestCase {
         XCTAssertEqual(json["p_radius_m"] as? Int, 100)
     }
 
+    func testBuildsGroomMapRPCRequestWithWiderRadius() throws {
+        let client = SupabaseGroomClient(configuration: configuration)
+
+        let request = try client.makeLoadGroomMapPostsRequest(
+            latitude: 35.681236,
+            longitude: 139.767125,
+            radiusMeters: 2_500
+        )
+        let body = try XCTUnwrap(request.httpBody)
+        let json = try XCTUnwrap(JSONSerialization.jsonObject(with: body) as? [String: Any])
+
+        XCTAssertEqual(request.httpMethod, "POST")
+        XCTAssertEqual(request.url?.absoluteString, "https://example.supabase.co/rest/v1/rpc/list_groom_feed_nearby")
+        XCTAssertEqual(json["p_viewer_lat"] as? Double, 35.681236)
+        XCTAssertEqual(json["p_viewer_lng"] as? Double, 139.767125)
+        XCTAssertEqual(json["p_radius_m"] as? Int, 2_500)
+    }
+
+    func testBuildsGroomMapRPCRequestWithMapMaximumRadius() throws {
+        let client = SupabaseGroomClient(configuration: configuration)
+
+        let request = try client.makeLoadGroomMapPostsRequest(
+            latitude: 35.681236,
+            longitude: 139.767125,
+            radiusMeters: 12_000
+        )
+        let body = try XCTUnwrap(request.httpBody)
+        let json = try XCTUnwrap(JSONSerialization.jsonObject(with: body) as? [String: Any])
+
+        XCTAssertEqual(json["p_radius_m"] as? Int, 3_000)
+    }
+
     func testLoadNearbyGroomsKeepsPathOnlyRowWhenSignedURLFails() throws {
         let imagePath = "00000000-0000-0000-0000-000000000001/path-only.jpg"
         let configuration = URLSessionConfiguration.ephemeral
