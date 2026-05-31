@@ -16,6 +16,7 @@
 - 初回リリースの勝ち条件は、App Store審査への初回提出完了。
 - コード修正、ビルド作成、署名、アップロードは別セッションの開発作業。
 - このランブックでは、完成ビルドがApp Store Connectにアップロードされた後の確認と提出準備を扱う。
+- 開発セッションから完成候補ビルドを受け取る時は `notes/65_release_candidate_handoff.md` の項目でVersion、Build、commit SHA、スコープ、検証結果を確認する。
 - Apple公式情報では、ビルドはXcode、Swift Playground、altool、Transporter等でアップロードでき、App Store Connect側の処理完了後に選択できる。
 
 ## 2. 役割
@@ -42,6 +43,7 @@
 | Internal Only | Internal Only buildではないか。App Store提出するなら注意 |
 | Warnings | Privacy、Missing compliance、Icon、Export等の警告がないか |
 | TestFlight | 内部グループへ追加できるか |
+| RC Handoff | `notes/65` の必須項目が埋まっているか |
 
 ## 4. TestFlight内部配布
 

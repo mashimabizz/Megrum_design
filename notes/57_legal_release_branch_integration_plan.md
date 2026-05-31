@@ -45,7 +45,7 @@ https://github.com/mashimabizz/Megrum_design/pull/2
 - 開発セッションが意図して更新した既存notes
 
 開発側branchでstageしないもの:
-- `notes/24_app_store_submission_pack.md` 〜 `notes/64_release_evidence_folder_index.md`
+- `notes/24_app_store_submission_pack.md` 〜 `notes/65_release_candidate_handoff.md`
 - `notes/legal/`
 - 法務・App Store提出準備だけを目的にした新規docs
 
@@ -105,6 +105,7 @@ PR本文案:
 - Trust & Safety、アカウント削除、個人情報請求、事故初動
 - 外部サービス台帳、Privacy Manifest/SDK監査、提出前セキュリティ監査
 - 公開FAQ、アプリ内法務・安全コピー
+- Release Candidateハンドオフ、提出証跡、公開ページレダクションQA
 
 ## 変更していないもの
 
@@ -190,16 +191,18 @@ PY
 ## 8. 推奨順序
 
 1. 開発側が現在の実装差分を必要な単位でcommitする。
-2. 法務branchでPRを作る。
-3. PR上でコード差分がないことを確認する。
-4. 共有docsの競合だけ手動で解く。
-5. 完成ビルドに合わせて、FAQ、アプリ内コピー、App Privacy、Review Notesから未露出機能を削る。
-6. 法務レビュー後、公開ページへ流し込む。
+2. 開発側がRelease Candidate情報を `notes/65_release_candidate_handoff.md` の項目で渡す。
+3. 法務branchでPRを作る。
+4. PR上でコード差分がないことを確認する。
+5. 共有docsの競合だけ手動で解く。
+6. 完成ビルドに合わせて、FAQ、アプリ内コピー、App Privacy、Review Notesから未露出機能を削る。
+7. 法務レビュー後、公開ページへ流し込む。
 
 ## 9. 関連文書
 
 - リリースコントロールボード: `notes/39_release_command_center.md`
 - オーナー向けアクションシート: `notes/30_owner_release_action_sheet.md`
+- Release Candidateハンドオフ: `notes/65_release_candidate_handoff.md`
 - 公開FAQ下書き: `notes/55_public_help_faq_draft.md`
 - アプリ内法務・安全コピー: `notes/56_in_app_legal_safety_copy_deck.md`
 - リリーストリアージ: `notes/22_release_triage_tracker.csv`

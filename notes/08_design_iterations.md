@@ -4,6 +4,63 @@
 
 ---
 
+## イテレーション387：Release Candidateハンドオフを追加
+
+### 背景・問題意識
+
+開発セッションと法務・提出準備セッションを別ツリーに分けたことで、コード差分は混ざりにくくなった。一方で、完成候補ビルドを受け取る時にVersion、Build、commit SHA、検証結果、出す/隠す機能が曖昧だと、違うBuildを提出したり、未完成機能をApp Store文面で説明してしまうリスクがあるため、Release Candidateハンドオフ表を追加した。
+
+### 変更内容
+
+#### `notes/65_release_candidate_handoff.md`
+- 開発セッションから受け取るRelease Candidate情報、機能スコープ、検証結果、法務・提出側の受領後作業、差し戻し条件、完了テンプレートを追加した。
+- 元ツリーの開発差分は開発セッションがcommitし、法務docsは `codex/legal-release-prep` を正本とする原則を明記した。
+
+#### `notes/32_testflight_review_submission_runbook.md`, `notes/50_release_go_no_go_decision_matrix.md`
+- 完成候補ビルド受領時に `notes/65` を使う導線と、Go / No-Go Gateを追加した。
+
+#### `notes/39_release_command_center.md`, `notes/30_owner_release_action_sheet.md`, `notes/57_legal_release_branch_integration_plan.md`
+- Release Candidateハンドオフへの導線を追加し、法務docsのstage禁止範囲を `notes/65` まで広げた。
+
+#### `notes/22_release_triage_tracker.csv`
+- RL-063としてRelease Candidateハンドオフを追加した。
+
+### 影響範囲
+
+- 開発セッションからの完成候補ビルド受領
+- TestFlight / App Review提出準備
+- Go / No-Go判定
+- 法務branch統合手順
+- コード、ビルド、App Store Connect設定、公開URL、DB、外部サービス設定は変更していない。
+
+### 確認方法
+
+- `rg -n "RL-063|Release Candidate|commit SHA|RC Handoff|差し戻し|notes/65" notes/65_release_candidate_handoff.md notes/39_release_command_center.md notes/50_release_go_no_go_decision_matrix.md notes/22_release_triage_tracker.csv`
+- `python3 - <<'PY' ...` による `notes/22_release_triage_tracker.csv` のCSV parse確認
+- 旧規約用語・旧主体表現チェック（旧提案/旧メッセージ/旧投稿関連、サービス主体表現）
+- `git diff --check -- notes`
+
+### セルフレビュー結果
+
+- ✅ コード、ビルド、App Store Connect設定、公開URL、DB、外部サービス設定は変更していない。
+- ✅ 開発側のVersion、Build、commit SHA、検証結果、出す/隠す機能を受け取る形にした。
+- ✅ ハンドオフ後にP0コード修正が入った場合は新Buildで再確認する原則を明記した。
+- ✅ 状態名の追加/改名はなく、`notes/09_state_machines.md` 更新は不要。
+- ✅ 新用語は追加していないため、`notes/10_glossary.md` 更新は不要。
+- ✅ DBスキーマ変更はなく、`notes/05_data_model.md` 更新は不要。
+
+### 関連ファイル
+
+- `notes/65_release_candidate_handoff.md`
+- `notes/32_testflight_review_submission_runbook.md`
+- `notes/50_release_go_no_go_decision_matrix.md`
+- `notes/39_release_command_center.md`
+- `notes/30_owner_release_action_sheet.md`
+- `notes/57_legal_release_branch_integration_plan.md`
+- `notes/22_release_triage_tracker.csv`
+
+---
+
 ## イテレーション386：リリース証跡フォルダ索引を追加
 
 ### 背景・問題意識
