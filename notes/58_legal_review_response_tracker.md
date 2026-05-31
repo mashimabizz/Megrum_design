@@ -18,6 +18,8 @@
 4. 反映後、対象文書、差分、公開URL、App Store Connect入力欄を確認する。
 5. 未反映又は判断保留がある場合、Go / No-Go判定ではConditional Go以上にしない。
 
+公開URLへ流し込む前の最終化手順は `notes/66_legal_review_publication_runbook.md` を使う。
+
 ## 2. 受領時に保存するもの
 
 | 項目 | 保存方針 |
@@ -112,6 +114,7 @@ git diff --check -- notes
 ## 9. 関連文書
 
 - 法務レビュー依頼メモ: `notes/29_legal_review_brief.md`
+- 法務レビュー後公開文面最終化Runbook: `notes/66_legal_review_publication_runbook.md`
 - 法的文書整合性管理: `notes/17_legal_alignment.md`
 - 利用規約ドラフト: `notes/legal/01_terms_of_service_draft.md`
 - プライバシーポリシードラフト: `notes/legal/02_privacy_policy_draft.md`

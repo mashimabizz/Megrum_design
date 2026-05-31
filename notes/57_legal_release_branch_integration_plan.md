@@ -45,7 +45,7 @@ https://github.com/mashimabizz/Megrum_design/pull/2
 - 開発セッションが意図して更新した既存notes
 
 開発側branchでstageしないもの:
-- `notes/24_app_store_submission_pack.md` 〜 `notes/65_release_candidate_handoff.md`
+- `notes/24_app_store_submission_pack.md` 〜 `notes/66_legal_review_publication_runbook.md`
 - `notes/legal/`
 - 法務・App Store提出準備だけを目的にした新規docs
 
@@ -106,6 +106,7 @@ PR本文案:
 - 外部サービス台帳、Privacy Manifest/SDK監査、提出前セキュリティ監査
 - 公開FAQ、アプリ内法務・安全コピー
 - Release Candidateハンドオフ、提出証跡、公開ページレダクションQA
+- 法務レビュー後の公開文面最終化手順
 
 ## 変更していないもの
 
@@ -203,6 +204,7 @@ PY
 - リリースコントロールボード: `notes/39_release_command_center.md`
 - オーナー向けアクションシート: `notes/30_owner_release_action_sheet.md`
 - Release Candidateハンドオフ: `notes/65_release_candidate_handoff.md`
+- 法務レビュー後公開文面最終化: `notes/66_legal_review_publication_runbook.md`
 - 公開FAQ下書き: `notes/55_public_help_faq_draft.md`
 - アプリ内法務・安全コピー: `notes/56_in_app_legal_safety_copy_deck.md`
 - リリーストリアージ: `notes/22_release_triage_tracker.csv`

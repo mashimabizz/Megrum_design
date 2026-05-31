@@ -99,6 +99,7 @@ Swift Nativeの `Info.plist` では `public.app-category.social-networking` が�
 | 公開ページレダクションQA | `notes/63` | 公開前に内部情報、secret、未確定機能、未確定価格、実データが混ざっていないか確認する |
 | リリース証跡フォルダ索引 | `notes/64` | スクショ、URL控え、Review Notes、App Privacy回答をどこにどう保存するか決める |
 | Release Candidateハンドオフ | `notes/65` | 開発セッションからVersion、Build、commit SHA、検証結果、出す/隠す機能を受け取る |
+| 法務レビュー後公開文面最終化 | `notes/66` | 弁護士回答をTerms、Privacy、Support、FAQ、App Store文面、App Privacyへ反映する |
 
 ## 4. デモアカウント準備
 
@@ -217,3 +218,4 @@ Appleのリジェクト文を貼るので、ガイドライン番号ごとに対
 - `notes/63_public_page_redaction_qa.md`
 - `notes/64_release_evidence_folder_index.md`
 - `notes/65_release_candidate_handoff.md`
+- `notes/66_legal_review_publication_runbook.md`

@@ -44,6 +44,7 @@
 | G13 | Legal Review | 法務レビュー回答が反映済み、又は未反映論点が初回提出に影響しない | 弁護士回答の未反映/要再確認が残っている | `notes/58` |
 | G14 | Scope Exposure | 出す/隠す機能が画面、文面、FAQ、App Privacy、スクショで一致 | 隠すはずの機能が画面やメタデータに残る | `notes/59` |
 | G15 | RC Handoff | Version、Build、commit SHA、検証結果、出す/隠す機能が開発側から共有済み | 提出候補ビルドの由来やスコープが追えない | `notes/65` |
+| G16 | Legal Publication | 弁護士回答が公開文面とApp Store文面へ横断反映済み | Terms、Privacy、Support、FAQ、Review Notes、App Privacyのどこかに古い前提が残る | `notes/66` |
 
 ## 3. P0トラッカー対応
 
@@ -101,6 +102,7 @@ Conditional Goにする場合は、`notes/36` に「隠した証跡」と「説�
 | G13 Legal Review | TODO | TODO | TODO |
 | G14 Scope Exposure | TODO | TODO | TODO |
 | G15 RC Handoff | TODO | TODO | TODO |
+| G16 Legal Publication | TODO | TODO | TODO |
 
 最終判定:
 
@@ -122,6 +124,7 @@ Evidence folder:
 - RLS、Storage公開範囲、secret、APNs通知の監査でNo-Goが残っている。
 - 法務レビュー回答の未反映又は要再確認が残っている。
 - 提出候補ビルドのVersion、Build、commit SHA、検証結果、出す/隠す機能が不明。
+- 弁護士回答を受けたのに、公開文面又はApp Store文面への反映漏れが残っている。
 - 隠すはずの機能が画面、FAQ、App Store文面、スクショ、Review Notesに残っている。
 - Privacy Policy URL又はSupport URLが404。
 - アカウント削除入口がない。
@@ -147,5 +150,6 @@ Evidence folder:
 - 法務レビュー回答反映台帳: `notes/58_legal_review_response_tracker.md`
 - 初回提出スコープ露出監査表: `notes/59_initial_release_scope_exposure_audit.md`
 - Release Candidateハンドオフ: `notes/65_release_candidate_handoff.md`
+- 法務レビュー後公開文面最終化Runbook: `notes/66_legal_review_publication_runbook.md`
 - 提出後・公開初日ランブック: `notes/51_post_submission_release_day_runbook.md`
 - データ保持・削除マトリクス: `notes/52_data_retention_deletion_matrix.md`

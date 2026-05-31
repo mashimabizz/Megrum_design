@@ -4,6 +4,70 @@
 
 ---
 
+## イテレーション388：法務レビュー後公開文面最終化Runbookを追加
+
+### 背景・問題意識
+
+弁護士レビュー回答を受け取った後、利用規約やプライバシーポリシーだけを更新して、Support、FAQ、App Store説明文、Review Notes、App Privacy回答のどこかに古い前提が残ると、公開前の法務・審査リスクになる。回答を横断反映するためのRunbookを追加した。
+
+### 変更内容
+
+#### `notes/66_legal_review_publication_runbook.md`
+- 弁護士回答受領後の反映フロー、論点別反映マップ、公開文面更新チェック、公開URL反映前QA、確認コマンド、反映完了記録テンプレートを追加した。
+- Apple App Review Guidelines、Apple Account Deletion、Apple App Privacy Details、消費者庁 特定商取引法ガイド、個人情報保護委員会ガイドライン/Q&Aへの公式参照を追加した。
+- 回答全文や実パスワード、secret、実ユーザー情報、実代表者情報を公開リポジトリに書かない方針を明記した。
+
+#### `notes/58_legal_review_response_tracker.md`, `notes/37_public_url_publication_checklist.md`
+- 法務レビュー回答後の公開文面最終化Runbookへの導線を追加した。
+
+#### `notes/39_release_command_center.md`, `notes/30_owner_release_action_sheet.md`, `notes/57_legal_release_branch_integration_plan.md`
+- 法務レビュー後公開文面最終化への導線を追加し、法務docsのstage禁止範囲を `notes/66` まで広げた。
+
+#### `notes/50_release_go_no_go_decision_matrix.md`
+- G16 Legal Publicationとして、弁護士回答の公開文面/App Store文面への横断反映Gateを追加した。
+
+#### `notes/22_release_triage_tracker.csv`
+- RL-064として法務レビュー後公開文面最終化を追加した。
+
+### 影響範囲
+
+- 弁護士レビュー回答の反映管理
+- 利用規約、プライバシーポリシー、特商法表示
+- 公開サポート、FAQ、アカウント削除、通報、安全、AI説明
+- App Store説明文、Review Notes、App Privacy回答
+- Go / No-Go判定
+- コード、公開URL、App Store Connect設定、法務原典docx、実アカウント情報は変更していない。
+
+### 確認方法
+
+- `rg -n "RL-064|法務レビュー後|Legal Publication|消費者庁|個人情報保護委員会|notes/66" notes/66_legal_review_publication_runbook.md notes/39_release_command_center.md notes/50_release_go_no_go_decision_matrix.md notes/22_release_triage_tracker.csv`
+- `python3 - <<'PY' ...` による `notes/22_release_triage_tracker.csv` のCSV parse確認
+- 旧規約用語・旧主体表現チェック（旧提案/旧メッセージ/旧投稿関連、サービス主体表現）
+- `git diff --check -- notes`
+
+### セルフレビュー結果
+
+- ✅ コード、公開URL、App Store Connect設定、法務原典docx、実アカウント情報は変更していない。
+- ✅ 弁護士回答をTerms、Privacy、Support、FAQ、Review Notes、App Privacyへ横断反映する流れにした。
+- ✅ 回答全文、実パスワード、secret、実ユーザー情報、実代表者情報を書かない方針を維持した。
+- ✅ 公式参照はApple、消費者庁、個人情報保護委員会に限定した。
+- ✅ 状態名の追加/改名はなく、`notes/09_state_machines.md` 更新は不要。
+- ✅ 新用語は追加していないため、`notes/10_glossary.md` 更新は不要。
+- ✅ DBスキーマ変更はなく、`notes/05_data_model.md` 更新は不要。
+
+### 関連ファイル
+
+- `notes/66_legal_review_publication_runbook.md`
+- `notes/58_legal_review_response_tracker.md`
+- `notes/37_public_url_publication_checklist.md`
+- `notes/39_release_command_center.md`
+- `notes/30_owner_release_action_sheet.md`
+- `notes/57_legal_release_branch_integration_plan.md`
+- `notes/50_release_go_no_go_decision_matrix.md`
+- `notes/22_release_triage_tracker.csv`
+
+---
+
 ## イテレーション387：Release Candidateハンドオフを追加
 
 ### 背景・問題意識
