@@ -95,6 +95,7 @@ Swift Nativeの `Info.plist` では `public.app-category.social-networking` が�
 | 初回提出スコープ露出監査 | `notes/59` | 出す/隠す機能が画面・文面・FAQ・App Privacyで一致しているか確認 |
 | ローカライズ・メタデータQA | `notes/60` | 日本語、English (U.S.)候補、Review Notes、スクショ説明の整合を確認 |
 | リリース権限・運用アカウント | `notes/61` | App Store Connect、DNS、メール、Supabase、法務の担当と権限を棚卸し |
+| App Review手動提出チェック | `notes/62` | Add for Review、Draft Submission、Submit for Review直前の画面確認に使う |
 
 ## 4. デモアカウント準備
 
@@ -209,3 +210,4 @@ Appleのリジェクト文を貼るので、ガイドライン番号ごとに対
 - `notes/59_initial_release_scope_exposure_audit.md`
 - `notes/60_app_store_localization_metadata_qa.md`
 - `notes/61_release_access_owner_registry.md`
+- `notes/62_app_review_manual_submission_checklist.md`

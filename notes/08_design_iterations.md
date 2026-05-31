@@ -4,6 +4,61 @@
 
 ---
 
+## イテレーション384：App Review手動提出チェックを追加
+
+### 背景・問題意識
+
+App Store初回提出では、TestFlight確認や提出素材が揃っていても、App Store Connectの提出画面でBuild、App Privacy、Review Notes、IAP同時提出、公開URLを取り違えると審査遅延やリジェクトにつながる。Add for Review、Draft Submission、Submit for Reviewの直前に提出者が画面を見ながら確認できる手動チェックリストを追加した。
+
+### 変更内容
+
+#### `notes/62_app_review_manual_submission_checklist.md`
+- App Store Connectの提出直前に使う手動チェックリストを追加した。
+- App Information、Version Metadata、Screenshots、Build、App Privacy、App Review Information、IAP、Add for Review、Submit for Review、提出直後記録の確認項目を整理した。
+- デモアカウントの実パスワードをリポジトリに書かない方針と、提出権限/2FA/証跡保存のNo-Goを明記した。
+- Apple公式ヘルプのSubmit an App、Overview、App Information、Manage App Privacy、App privacy detailsへの参照を追加した。
+
+#### `notes/39_release_command_center.md`, `notes/30_owner_release_action_sheet.md`
+- App Review手動提出チェックリストへの導線を追加した。
+
+#### `notes/22_release_triage_tracker.csv`
+- RL-060としてApp Review手動提出チェックリストを追加した。
+
+### 影響範囲
+
+- App Store Connect提出操作
+- Review Notes
+- App Privacy最終確認
+- デモアカウント
+- IAP同時提出判断
+- 提出証跡
+- コード、App Store Connect設定、Apple Developer設定、DNS、公開URLは変更していない。
+
+### 確認方法
+
+- `rg -n "RL-060|Add for Review|Submit for Review|Draft Submission|App Privacy|Review Notes" notes/62_app_review_manual_submission_checklist.md notes/39_release_command_center.md notes/22_release_triage_tracker.csv`
+- `python3 - <<'PY' ...` による `notes/22_release_triage_tracker.csv` のCSV parse確認
+- 旧規約用語・旧主体表現チェック（旧提案/旧メッセージ/旧投稿関連、サービス主体表現）
+- `git diff --check -- notes`
+
+### セルフレビュー結果
+
+- ✅ コード、App Store Connect設定、Apple Developer設定、DNS、公開URLは変更していない。
+- ✅ 提出画面で取り違えやすいBuild、Privacy、Review Notes、IAP同時提出、証跡保存を確認できる形にした。
+- ✅ デモアカウントの実パスワードやsecret実値を書かない方針を維持した。
+- ✅ 状態名の追加/改名はなく、`notes/09_state_machines.md` 更新は不要。
+- ✅ 新用語は追加していないため、`notes/10_glossary.md` 更新は不要。
+- ✅ DBスキーマ変更はなく、`notes/05_data_model.md` 更新は不要。
+
+### 関連ファイル
+
+- `notes/62_app_review_manual_submission_checklist.md`
+- `notes/39_release_command_center.md`
+- `notes/30_owner_release_action_sheet.md`
+- `notes/22_release_triage_tracker.csv`
+
+---
+
 ## イテレーション383：リリース権限台帳を追加
 
 ### 背景・問題意識
