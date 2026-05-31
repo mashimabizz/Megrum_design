@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>RN Actual Screen Lookup</title>
+    <style>
+      :root {
+        --bg: #f7f6fb;
+        --panel: rgba(255, 255, 255, 0.92);
+        --ink: #342d45;
+        --muted: #7d7890;
+        --lavender: #a695d8;
+        --sky: #a8d4e6;
+        --pink: #f3c5d4;
+        --line: rgba(82, 65, 123, 0.12);
+        --shadow: 0 18px 44px rgba(91, 76, 128, 0.12);
+        --radius: 24px;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Noto Sans JP", sans-serif;
+        color: var(--ink);
+        background:
+          radial-gradient(circle at top right, rgba(166, 149, 216, 0.18), transparent 32%),
+          radial-gradient(circle at left 18%, rgba(168, 212, 230, 0.18), transparent 26%),
+          linear-gradient(180deg, #fcfbff 0%, var(--bg) 100%);
+      }
+
+      a {
+        color: inherit;
+      }
+
+      .page {
+        max-width: 1100px;
+        margin: 0 auto;
+        padding: 24px 16px 64px;
+      }
+
+      .hero {
+        background: linear-gradient(135deg, rgba(255,255,255,0.96), rgba(255,255,255,0.86));
+        border: 1px solid var(--line);
+        border-radius: 32px;
+        box-shadow: var(--shadow);
+        padding: 24px 20px;
+      }
+
+      .eyebrow {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 12px;
+        border-radius: 999px;
+        font-size: 12px;
+        font-weight: 700;
+        background: rgba(166, 149, 216, 0.14);
+        color: #5f5680;
+      }
+
+      h1 {
+        margin: 14px 0 10px;
+        font-size: 30px;
+        line-height: 1.15;
+      }
+
+      .lead {
+        margin: 0;
+        font-size: 14px;
+        line-height: 1.8;
+        color: var(--muted);
+      }
+
+      .linkbox {
+        margin-top: 16px;
+        padding: 14px 16px;
+        border-radius: 18px;
+        background: rgba(168, 212, 230, 0.16);
+        border: 1px solid rgba(168, 212, 230, 0.35);
+        font-size: 13px;
+        line-height: 1.8;
+      }
+
+      .cards {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+        gap: 18px;
+        margin-top: 22px;
+      }
+
+      .card {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        box-shadow: var(--shadow);
+        overflow: hidden;
+      }
+
+      .shot {
+        display: block;
+        width: 100%;
+        aspect-ratio: 603 / 1311;
+        object-fit: cover;
+        background: #efeaf7;
+      }
+
+      .body {
+        padding: 16px;
+      }
+
+      .title-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+      }
+
+      h2 {
+        margin: 0;
+        font-size: 19px;
+      }
+
+      .tag {
+        flex-shrink: 0;
+        font-size: 11px;
+        font-weight: 800;
+        color: #6e638f;
+        background: rgba(243, 197, 212, 0.32);
+        padding: 7px 10px;
+        border-radius: 999px;
+      }
+
+      .point {
+        margin: 10px 0 14px;
+        font-size: 13px;
+        line-height: 1.75;
+        color: var(--muted);
+      }
+
+      .label {
+        margin: 0 0 6px;
+        font-size: 11px;
+        font-weight: 800;
+        letter-spacing: 0.04em;
+        color: #7b7195;
+        text-transform: uppercase;
+      }
+
+      code {
+        display: block;
+        padding: 11px 12px;
+        border-radius: 14px;
+        background: rgba(52, 45, 69, 0.05);
+        border: 1px solid rgba(52, 45, 69, 0.08);
+        font-size: 12px;
+        line-height: 1.6;
+        overflow-wrap: anywhere;
+        white-space: pre-wrap;
+      }
+
+      .stack + .stack {
+        margin-top: 12px;
+      }
+
+      .footer {
+        margin-top: 26px;
+        font-size: 12px;
+        line-height: 1.8;
+        color: var(--muted);
+      }
+
+      @media (max-width: 640px) {
+        .page {
+          padding: 16px 12px 40px;
+        }
+
+        .hero {
+          padding: 18px 16px;
+          border-radius: 24px;
+        }
+
+        h1 {
+          font-size: 24px;
+        }
+
+        .cards {
+          grid-template-columns: 1fr;
+          gap: 14px;
+        }
+
+        .body {
+          padding: 14px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="page">
+      <section class="hero">
+        <div class="eyebrow">RN実画面スクショ対応表</div>
+        <h1>スマホから見て、<br />そのまま RN 元ファイルを特定するページ</h1>
+        <p class="lead">
+          これは mock HTML ではなく、`mobile/` の Preview 実画面をシミュレータで撮った一覧です。
+          画面の見た目から `RN元` と `Swift先` をすぐ引けるようにしてあります。
+        </p>
+        <div class="linkbox">
+          GitHub Pages で開くURL:
+          <br />
+          <a href="https://mashimabizz.github.io/Megrum_design/rn-actual-screen-lookup.html">
+            https://mashimabizz.github.io/Megrum_design/rn-actual-screen-lookup.html
+          </a>
+        </div>
+      </section>
+
+      <section class="cards">
+        <article class="card">
+          <img class="shot" src="notes/assets/rn-screen-lookup/rn-home.png" alt="RN Home" />
+          <div class="body">
+            <div class="title-row">
+              <h2>ホーム</h2>
+              <div class="tag">Home</div>
+            </div>
+            <p class="point">上にグルーム、中央に「マッチしてるよ！」と「交換できるかも？」のカード群が並ぶ画面。</p>
+            <div class="stack">
+              <p class="label">RN元</p>
+              <code>mobile/app/(tabs)/index.tsx</code>
+            </div>
+            <div class="stack">
+              <p class="label">Swift先</p>
+              <code>ios-native/Sources/MegrumApp/HomeScreen.swift</code>
+            </div>
+          </div>
+        </article>
+
+        <article class="card">
+          <img class="shot" src="notes/assets/rn-screen-lookup/rn-search.png" alt="RN Search" />
+          <div class="body">
+            <div class="title-row">
+              <h2>検索</h2>
+              <div class="tag">Search</div>
+            </div>
+            <p class="point">左上に戻る、下に検索バー、中央に件数とフィルター導線がある検索画面。</p>
+            <div class="stack">
+              <p class="label">RN元</p>
+              <code>mobile/app/search.tsx</code>
+            </div>
+            <div class="stack">
+              <p class="label">Swift先</p>
+              <code>ios-native/Sources/MegrumApp/SearchScreen.swift</code>
+            </div>
+          </div>
+        </article>
+
+        <article class="card">
+          <img class="shot" src="notes/assets/rn-screen-lookup/rn-match-detail.png" alt="RN Match Detail" />
+          <div class="body">
+            <div class="title-row">
+              <h2>関係図</h2>
+              <div class="tag">Match</div>
+            </div>
+            <p class="point">タイトルが「関係図」。左右の候補パネルと、下部の「打診に進む」が目印。</p>
+            <div class="stack">
+              <p class="label">RN元</p>
+              <code>mobile/app/match-detail.tsx</code>
+            </div>
+            <div class="stack">
+              <p class="label">Swift先</p>
+              <code>ios-native/Sources/MegrumApp/MatchRelationScreen.swift</code>
+            </div>
+          </div>
+        </article>
+
+        <article class="card">
+          <img class="shot" src="notes/assets/rn-screen-lookup/rn-proposal-select.png" alt="RN Proposal Select" />
+          <div class="body">
+            <div class="title-row">
+              <h2>打診作成 STEP1</h2>
+              <div class="tag">Proposal</div>
+            </div>
+            <p class="point">`PROPOSAL / STEP 1/2`、交換手段タブ、`私が出す / 受け取る / 待ち合わせ` の切替がある。</p>
+            <div class="stack">
+              <p class="label">RN元</p>
+              <code>mobile/app/proposal-select.tsx</code>
+            </div>
+            <div class="stack">
+              <p class="label">Swift先</p>
+              <code>ios-native/Sources/MegrumApp/ProposalCreateFlow.swift</code>
+            </div>
+          </div>
+        </article>
+
+        <article class="card">
+          <img class="shot" src="notes/assets/rn-screen-lookup/rn-inventory.png" alt="RN Inventory" />
+          <div class="body">
+            <div class="title-row">
+              <h2>在庫</h2>
+              <div class="tag">Inventory</div>
+            </div>
+            <p class="point">タイトル「マイ在庫」。`譲る候補 / 自分用キープ / 過去に譲った` の切替とグッズグリッド。</p>
+            <div class="stack">
+              <p class="label">RN元</p>
+              <code>mobile/app/(tabs)/inventory.tsx</code>
+            </div>
+            <div class="stack">
+              <p class="label">Swift先</p>
+              <code>ios-native/Sources/MegrumApp/CollectionScreens.swift</code>
+            </div>
+          </div>
+        </article>
+
+        <article class="card">
+          <img class="shot" src="notes/assets/rn-screen-lookup/rn-wishes.png" alt="RN Wishes" />
+          <div class="body">
+            <div class="title-row">
+              <h2>ウィッシュ</h2>
+              <div class="tag">Wish</div>
+            </div>
+            <p class="point">タイトル「ウィッシュ」。`Wish / 個別募集` 切替と、募集デッキが見える画面。</p>
+            <div class="stack">
+              <p class="label">RN元</p>
+              <code>mobile/app/(tabs)/wishes.tsx</code>
+            </div>
+            <div class="stack">
+              <p class="label">Swift先</p>
+              <code>ios-native/Sources/MegrumApp/CollectionScreens.swift</code>
+            </div>
+          </div>
+        </article>
+
+        <article class="card">
+          <img class="shot" src="notes/assets/rn-screen-lookup/rn-transactions.png" alt="RN Transactions" />
+          <div class="body">
+            <div class="title-row">
+              <h2>やりとり</h2>
+              <div class="tag">Trades</div>
+            </div>
+            <p class="point">相手ごとのカードが縦に並び、下で `打診中 / 進行中` を切り替える一覧画面。</p>
+            <div class="stack">
+              <p class="label">RN元</p>
+              <code>mobile/app/(tabs)/transactions.tsx</code>
+            </div>
+            <div class="stack">
+              <p class="label">Swift先</p>
+              <code>ios-native/Sources/MegrumApp/TradesScreen.swift</code>
+            </div>
+          </div>
+        </article>
+
+        <article class="card">
+          <img class="shot" src="notes/assets/rn-screen-lookup/rn-encounters.png" alt="RN Encounters" />
+          <div class="body">
+            <div class="title-row">
+              <h2>めぐり</h2>
+              <div class="tag">Meguri</div>
+            </div>
+            <p class="point">`グルーム` と `掲示板` の2セクションがあり、それぞれに `地図で見る` が付く入口画面。</p>
+            <div class="stack">
+              <p class="label">RN元</p>
+              <code>mobile/app/(tabs)/encounters.tsx</code>
+            </div>
+            <div class="stack">
+              <p class="label">Swift先</p>
+              <code>ios-native/Sources/MegrumApp/MeguriScreen.swift</code>
+            </div>
+          </div>
+        </article>
+      </section>
+
+      <p class="footer">
+        補足: `proposal-confirm.tsx`、`transaction-detail.tsx`、`user-profile.tsx` などは、このページを土台に後から追加できます。
+        まずは移行でよく使う主要8画面を先に載せています。
+      </p>
+    </main>
+  </body>
+</html>
