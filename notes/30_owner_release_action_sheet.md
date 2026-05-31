@@ -17,6 +17,7 @@
 | P0 | `support@megrum.jp` の受信確認 | 実際にメールを送って受信できる | App StoreサポートURL、法務窓口、`notes/34` |
 | P0 | `megrum.jp` の公開URL枠を決める | `/support` `/legal/terms` `/legal/privacy` `/legal/commerce` をどこで公開するか決定 | `notes/25`, `notes/37` |
 | P0 | 弁護士レビューに回すか決める | 回す場合、`notes/29` の短文を使って依頼 | `notes/29_legal_review_brief.md` |
+| P0 | 弁護士回答の反映台帳を使う | 回答後、要点と反映先を `notes/58` に記録する | `notes/58_legal_review_response_tracker.md` |
 | P0 | App Store Connect のデモアカウント方針を決める | メール/パスワード、テストデータ、削除可否を決める | `notes/35_demo_account_review_data_plan.md` |
 | P0 | 外部AIを初回提出に含めるか決める | 含める/含めないを決定 | 含めない方が審査・法務は軽い |
 | P0 | 有料機能を初回提出に含めるか決める | Premium/めぐりPlus/ブーストの露出有無を決定 | 含めるなら `notes/33` のIAP表と特商法がP0 |
@@ -90,6 +91,7 @@ Swift Nativeの `Info.plist` では `public.app-category.social-networking` が�
 | Guideline適合 | `notes/53` | Apple審査Guideline別の証跡確認 |
 | アプリ内法務・安全コピー | `notes/56` | 同意、権限説明、安全注意、AI/IAP文言を実装前に確認 |
 | 法務branch統合手順 | `notes/57` | 開発branchと混ぜずにPR化/mergeする |
+| 法務レビュー回答反映 | `notes/58` | 回答、判断、反映先、未決論点を管理 |
 
 ## 4. デモアカウント準備
 
@@ -200,3 +202,4 @@ Appleのリジェクト文を貼るので、ガイドライン番号ごとに対
 - `notes/55_public_help_faq_draft.md`
 - `notes/56_in_app_legal_safety_copy_deck.md`
 - `notes/57_legal_release_branch_integration_plan.md`
+- `notes/58_legal_review_response_tracker.md`

@@ -4,6 +4,62 @@
 
 ---
 
+## イテレーション380：法務レビュー回答反映台帳を追加
+
+### 背景・問題意識
+
+弁護士レビュー依頼メモは整備済みだが、回答を受け取った後に、どの回答をどの文書へ反映したか、未決論点が残っていないかを追う台帳が不足していた。公開前のTerms、Privacy、特商法、Support、App Privacy、Review Notesの反映漏れを防ぐため、法務レビュー回答反映台帳を追加した。
+
+### 変更内容
+
+#### `notes/58_legal_review_response_tracker.md`
+- 弁護士回答の受領物、レビュー回答一覧、影響文書マップ、反映ステータス定義、反映時チェック、No-Goを追加した。
+- 現地交換安全、位置情報/服装写真、未成年、AI、UGC、有料機能、特商法、削除/保存期間、外国事業者、古物/権利物の初期行を用意した。
+- 回答原文は公開リポジトリに貼らず、要点だけ記録する方針を明記した。
+
+#### `notes/29_legal_review_brief.md`
+- 弁護士回答後は `notes/58` に要点、反映先、未決論点を記録する導線を追加した。
+
+#### `notes/39_release_command_center.md`, `notes/30_owner_release_action_sheet.md`, `notes/50_release_go_no_go_decision_matrix.md`
+- 法務レビュー回答反映を文書マップ、オーナー作業表、Go / No-Goに接続した。
+
+#### `notes/22_release_triage_tracker.csv`
+- RL-056として法務レビュー回答反映台帳を追加した。
+
+### 影響範囲
+
+- 弁護士レビュー後の文書反映
+- Terms / Privacy / 特商法 / Support / App Privacy / Review Notes
+- Go / No-Go判定
+- コード、公開URL、App Store Connect設定は変更していない。
+
+### 確認方法
+
+- `rg -n "LR-001|RL-056|法務レビュー回答|G13 Legal Review|未反映" notes/58_legal_review_response_tracker.md notes/29_legal_review_brief.md notes/50_release_go_no_go_decision_matrix.md notes/22_release_triage_tracker.csv`
+- `python3 - <<'PY' ...` による `notes/22_release_triage_tracker.csv` のCSV parse確認
+- 旧規約用語・旧主体表現チェック（旧提案/旧メッセージ/旧投稿関連、サービス主体表現）
+- `git diff --check -- notes`
+
+### セルフレビュー結果
+
+- ✅ コード、公開URL、App Store Connect設定は変更していない。
+- ✅ 弁護士回答原文を公開リポジトリに貼らず、要点と反映先だけ管理する方針にした。
+- ✅ Go / No-GoへG13 Legal Reviewを追加し、未反映/要再確認が残る場合は提出を止める条件にした。
+- ✅ 状態名の追加/改名はなく、`notes/09_state_machines.md` 更新は不要。
+- ✅ 新用語は追加していないため、`notes/10_glossary.md` 更新は不要。
+- ✅ DBスキーマ変更はなく、`notes/05_data_model.md` 更新は不要。
+
+### 関連ファイル
+
+- `notes/58_legal_review_response_tracker.md`
+- `notes/29_legal_review_brief.md`
+- `notes/39_release_command_center.md`
+- `notes/30_owner_release_action_sheet.md`
+- `notes/50_release_go_no_go_decision_matrix.md`
+- `notes/22_release_triage_tracker.csv`
+
+---
+
 ## イテレーション379：法務branch統合手順を追加
 
 ### 背景・問題意識

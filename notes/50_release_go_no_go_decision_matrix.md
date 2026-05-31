@@ -41,6 +41,7 @@
 | G10 | Evidence | Build、URL、App Privacy、スクショ、Review Notesの控えがある | 何を確認したか追えない | `notes/36` |
 | G11 | Incident | 事故疑いがない。ある場合は初動記録と法務確認済み | 事故疑いが未処理 | `notes/49` |
 | G12 | Security | RLS、Storage、secret、APNs、管理者権限の提出前監査がPass | 他人データ表示、公開bucket、secret露出、任意通知送信の疑い | `notes/54` |
+| G13 | Legal Review | 法務レビュー回答が反映済み、又は未反映論点が初回提出に影響しない | 弁護士回答の未反映/要再確認が残っている | `notes/58` |
 
 ## 3. P0トラッカー対応
 
@@ -50,7 +51,7 @@
 | 在庫/wish | RL-003, RL-004, RL-005, RL-022 | `notes/42` | 作成、編集、削除、推し追加復帰がPass |
 | 個別条件/マッチ | RL-006, RL-007 | `notes/42` | 表示、保存、候補遷移がPass |
 | 打診/ネゴ/取引 | RL-008, RL-009, RL-010, RL-011, RL-012 | `notes/42` | 2アカウントで主要フローがPass |
-| 法務/URL | RL-013, RL-036, RL-045 | `notes/25`, `notes/37`, `notes/47` | 公開URLとサポートメールが確認済み |
+| 法務/URL | RL-013, RL-036, RL-045, RL-056 | `notes/25`, `notes/37`, `notes/47`, `notes/58` | 公開URL、サポートメール、法務回答反映が確認済み |
 | App Store提出 | RL-014, RL-015, RL-027, RL-034, RL-038, RL-040 | `notes/31`, `notes/32`, `notes/35`, `notes/40`, `notes/42` | ビルド、デモアカウント、転記文面、P0台本が揃う |
 | スコープ | RL-019, RL-020, RL-021 | `notes/39`, `notes/42` | 現地交換MVPとApp Privacy回答が一致 |
 | 3D/めぐり | RL-017 | `notes/22_release_triage_tracker.csv` | 未完成3Dが露出しない |
@@ -95,6 +96,7 @@ Conditional Goにする場合は、`notes/36` に「隠した証跡」と「説�
 | G10 Evidence | TODO | TODO | TODO |
 | G11 Incident | TODO | TODO | TODO |
 | G12 Security | TODO | TODO | TODO |
+| G13 Legal Review | TODO | TODO | TODO |
 
 最終判定:
 
@@ -114,6 +116,7 @@ Evidence folder:
 - コア交換フローが途中で止まる。
 - App Privacyと実ビルドが矛盾している。
 - RLS、Storage公開範囲、secret、APNs通知の監査でNo-Goが残っている。
+- 法務レビュー回答の未反映又は要再確認が残っている。
 - Privacy Policy URL又はSupport URLが404。
 - アカウント削除入口がない。
 - UGCが見えるのに通報/ブロック/問い合わせがない。
@@ -135,5 +138,6 @@ Evidence folder:
 - Privacy Manifest/SDK監査台帳: `notes/44_privacy_manifest_sdk_audit.md`
 - 外部サービス・委託先データ台帳: `notes/48_external_service_vendor_register.md`
 - 個人情報・セキュリティ事故初動ランブック: `notes/49_privacy_security_incident_response_runbook.md`
+- 法務レビュー回答反映台帳: `notes/58_legal_review_response_tracker.md`
 - 提出後・公開初日ランブック: `notes/51_post_submission_release_day_runbook.md`
 - データ保持・削除マトリクス: `notes/52_data_retention_deletion_matrix.md`

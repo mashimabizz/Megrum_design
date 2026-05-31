@@ -7,6 +7,7 @@
 
 現行仕様ベースで作成した利用規約・プライバシーポリシー・特商法表記・サポート文面について、公開前に弁護士へ確認してもらう論点を整理する。
 この文書はレビュー依頼メモであり、コードや公開ページは変更しない。
+弁護士回答の受領後は `notes/58_legal_review_response_tracker.md` に要点、反映先、未決論点を記録する。
 
 ## 1. 確認してほしい文書
 
@@ -20,6 +21,7 @@
 | `notes/48_external_service_vendor_register.md` | 外部サービス、委託先、SDK、APIの確認台帳 |
 | `notes/52_data_retention_deletion_matrix.md` | 保存期間、削除、匿名化、例外保持の確認台帳 |
 | `notes/17_legal_alignment.md` | 弁護士納品原典との整合管理 |
+| `notes/58_legal_review_response_tracker.md` | レビュー回答後の反映管理 |
 
 既存の弁護士納品原典:
 
@@ -138,3 +140,10 @@ Megrumの初回App Store提出に向け、現行仕様に合わせた利用規�
 - Apple App Privacy Details: https://developer.apple.com/app-store/app-privacy-details/
 - 消費者庁 特定商取引法ガイド 通信販売広告Q&A: https://www.no-trouble.caa.go.jp/qa/advertising.html
 - 個人情報保護委員会 通則ガイドライン: https://www.ppc.go.jp/personalinfo/legal/guidelines_tsusoku/
+
+## 8. 回答受領後の運用
+
+- 回答原文はオーナー管理の安全な場所に保存する。
+- 公開リポジトリには、回答の要点、判断、反映先だけを `notes/58_legal_review_response_tracker.md` へ記録する。
+- Terms、Privacy、特商法、App Privacy、Review Notes、公開FAQ、アプリ内コピーに影響する回答は、反映漏れがないか台帳で確認する。
+- 未反映又は要再確認の論点が残る場合、公開URL反映とApp Store提出を進めない。
