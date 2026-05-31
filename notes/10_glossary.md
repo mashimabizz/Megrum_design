@@ -212,7 +212,7 @@
 | **取引写真拡大** | trade photo preview | 取引チャットに共有された写真や証跡写真をタップし、黒背景の全画面ビューアで確認する操作 | iter350 |
 | **両者承認** | dual approve | 証跡撮影後に送信者・受信者が内容を確認する操作。Swift Native版では `proposals.approved_by_sender` / `approved_by_receiver` を更新し、両方trueになった時点で `completed` にする | C-3, iter347 |
 | **評価** | rating | 完了した取引に対する1-5 stars＋コメント。Swift Native版では取引完了後に `user_evaluations` へ投稿する | C-3, iter347 |
-| **dispute** | 異議、申告、通報、D-flow | 取引異常時の申し立てフロー。取引チャットの `通報` ボタンはこの申告フローに接続する | D-flow / iter168.87 |
+| **dispute** | 異議、申告、通報、D-flow | 取引異常時の申し立てフロー。Swift Native版では取引詳細sheet右上の `通報` から理由と内容を入力し、`disputes` に `submitted` として作成する | D-flow / iter168.87 / iter351 |
 | **反論** | reply | dispute 申告に対する弁明 | D-flow |
 | **仲裁** | arbitration | 運営による決定 | D-flow |
 | **凍結** | freeze | dispute 中に新規打診を停止 | iter14 |

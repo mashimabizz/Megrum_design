@@ -11,6 +11,7 @@ public struct SupabaseMegrumRepository: MegrumRepository {
     private let blockClient: SupabaseBlockClient
     private let notificationClient: SupabaseNotificationClient
     private let proposalClient: SupabaseProposalClient
+    private let disputeClient: SupabaseDisputeClient
     private let messageClient: SupabaseMessageClient
     private let groomClient: SupabaseGroomClient
     private let meguriMessageClient: SupabaseMeguriMessageClient
@@ -27,6 +28,7 @@ public struct SupabaseMegrumRepository: MegrumRepository {
         self.blockClient = SupabaseBlockClient(client: client)
         self.notificationClient = SupabaseNotificationClient(client: client)
         self.proposalClient = SupabaseProposalClient(client: client)
+        self.disputeClient = SupabaseDisputeClient(client: client)
         self.messageClient = SupabaseMessageClient(client: client)
         self.groomClient = SupabaseGroomClient(client: client)
         self.meguriMessageClient = SupabaseMeguriMessageClient(client: client)
@@ -118,6 +120,10 @@ public struct SupabaseMegrumRepository: MegrumRepository {
 
     public func submitTradeEvaluation(_ input: TradeEvaluationCreateInput) async throws -> UserEvaluation {
         try await proposalClient.submitEvaluation(userID: viewerID, input: input)
+    }
+
+    public func fileTradeDispute(_ input: TradeDisputeCreateInput) async throws -> TradeDisputeTicket {
+        try await disputeClient.createDispute(userID: viewerID, input: input)
     }
 
     public func loadMessages(proposalID: UUID, limit: Int) async throws -> [TradeMessage] {

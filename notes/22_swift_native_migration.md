@@ -1,7 +1,7 @@
 # 22. Swift Native Migration
 
 最終更新: 2026-05-31
-ステータス: Active draft（iter350）
+ステータス: Active draft（iter351）
 
 ## 目的
 
@@ -142,6 +142,7 @@ tar -xzf /Users/michitaka/Desktop/Megrum_backups/pre-swift-migration-20260531-03
 - iter348で、証跡写真追加をPhotosPickerだけでなくiOSカメラ起動に接続し、Native app targetへ `NSCameraUsageDescription` を追加した。
 - iter349で、グルーム追加も共通のiOSカメラ起動に接続し、写真ライブラリ選択をfallback導線として残した。
 - iter350で、取引チャットの写真メッセージと証跡写真をタップで全画面表示できるNative画像ビューアへ接続した。
+- iter351で、取引詳細sheetの右上からSwift Nativeの通報sheetを開き、既存 `disputes` テーブルへ `submitted` の申告を作成できる境界を追加した。受付後は取引チャットにsystem messageを残す。
 
 ### Phase 4: Meguri core
 

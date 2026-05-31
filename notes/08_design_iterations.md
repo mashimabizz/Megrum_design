@@ -4,6 +4,70 @@
 
 ---
 
+## イテレーション351：Swift取引通報導線を追加
+
+### 背景・問題意識
+
+Swift Native版の取引詳細はチャット、写真拡大、証跡撮影、評価まで進んだが、問題が起きた時に運営へ申告する入口がまだ未接続だった。リリースに必要な安全導線として、既存 `disputes` テーブルへ申告を作成できる最小Nativeフローを追加する。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumCore/MegrumModels.swift`
+- `TradeDisputeCategory`、`TradeDisputeCreateInput`、`TradeDisputeTicket` を追加した。
+- DB既存カテゴリ `short` / `wrong` / `noshow` / `cancel` / `other` とSwift enumを一致させた。
+
+#### `ios-native/Sources/MegrumData/SupabaseDisputeClient.swift`
+- `proposals` から参加者を確認し、申告者の相手を `respondent_id` として `disputes` にinsertするPostgREST境界を追加した。
+- `ticket_no` をNative側で生成し、申告受付後に取引チャットへsystem messageを残すようにした。
+
+#### `ios-native/Sources/MegrumApp/MegrumAppState.swift` / `SupabaseMegrumRepository.swift`
+- `fileTradeDispute` をrepository境界とAppStateへ追加し、送信中状態と入力validationを持たせた。
+
+#### `ios-native/Sources/MegrumApp/TradesScreen.swift`
+- 取引詳細sheetの右上に「通報」ボタンを追加した。
+- iOS標準のsheet/Formで理由選択と内容入力を行い、送信後に `disputes` へ申告できるようにした。
+
+#### `ios-native/Tests/`
+- `SupabaseDisputeClientTests` で `disputes` insert requestのpayloadを検証した。
+- `MegrumAppStateTests` でPreview repositoryの申告送信と空入力validationを検証した。
+
+#### `ios-native/README.md` / `notes/22_swift_native_migration.md` / `notes/10_glossary.md` / `notes/05_data_model.md`
+- Swift Nativeの取引申告接続を記録した。
+
+### 影響範囲
+
+- Swift Native版取引詳細sheet
+- 取引チャットの安全導線
+- `disputes` / `messages` へのPostgREST書き込み境界
+
+### 確認方法
+
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-build --enable-xctest --disable-swift-testing -j 1`
+
+### 関連ファイル
+
+- `ios-native/Sources/MegrumCore/MegrumModels.swift`
+- `ios-native/Sources/MegrumData/SupabaseDisputeClient.swift`
+- `ios-native/Sources/MegrumApp/MegrumAppState.swift`
+- `ios-native/Sources/MegrumApp/SupabaseMegrumRepository.swift`
+- `ios-native/Sources/MegrumApp/TradesScreen.swift`
+- `ios-native/Tests/MegrumDataTests/SupabaseDisputeClientTests.swift`
+- `ios-native/Tests/MegrumAppTests/MegrumAppStateTests.swift`
+- `ios-native/README.md`
+- `notes/22_swift_native_migration.md`
+- `notes/10_glossary.md`
+- `notes/05_data_model.md`
+- `notes/08_design_iterations.md`
+
+### セルフレビュー結果
+
+- ✅ 新規DB migrationは追加せず、既存 `disputes` スキーマへ接続した
+- ✅ 申告者がProposal参加者であることをSwift側でも確認してからinsertする
+- ✅ SwiftUI標準のsheet/Formを使い、独自の重い申告UIを増やさない方針にした
+- ✅ Proposal / Dispute の状態名追加はなく、`notes/09` は更新不要と判断した
+
+---
+
 ## イテレーション350：Swift取引写真拡大を追加
 
 ### 背景・問題意識

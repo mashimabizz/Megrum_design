@@ -241,6 +241,7 @@ private struct TradeDetailScreen: View {
     @State private var selectedEvidencePhotoItem: PhotosPickerItem?
     @State private var isShowingEvidenceCamera = false
     @State private var isShowingEvaluationSheet = false
+    @State private var isShowingDisputeSheet = false
     @State private var selectedRemoteImage: RemoteImageSelection?
 
     private var messages: [TradeMessage] {
@@ -366,6 +367,24 @@ private struct TradeDetailScreen: View {
             .presentationDetents([.medium])
             .presentationDragIndicator(.visible)
         }
+        .sheet(isPresented: $isShowingDisputeSheet) {
+            NavigationStack {
+                TradeDisputeSheet(
+                    isSubmitting: appState.filingDisputeProposalID == currentProposal.id
+                ) { category, factMemo in
+                    let sent = await appState.fileTradeDispute(
+                        proposalID: currentProposal.id,
+                        category: category,
+                        factMemo: factMemo
+                    )
+                    if sent {
+                        isShowingDisputeSheet = false
+                    }
+                }
+            }
+            .presentationDetents([.medium, .large])
+            .presentationDragIndicator(.visible)
+        }
 #if os(iOS)
         .fullScreenCover(item: $selectedRemoteImage) { selection in
             FullScreenRemoteImageView(url: selection.url)
@@ -390,6 +409,14 @@ private struct TradeDetailScreen: View {
                 Button("閉じる") {
                     dismiss()
                 }
+            }
+            ToolbarItem(placement: .primaryAction) {
+                Button {
+                    isShowingDisputeSheet = true
+                } label: {
+                    Label("通報", systemImage: "exclamationmark.bubble")
+                }
+                .disabled(appState.filingDisputeProposalID == currentProposal.id)
             }
         }
     }
@@ -620,6 +647,73 @@ private struct TradeEvidencePanel: View {
         .padding(.horizontal, 10)
         .padding(.vertical, 7)
         .background(.white.opacity(0.72), in: Capsule())
+    }
+}
+
+private struct TradeDisputeSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    @State private var category: TradeDisputeCategory = .wrong
+    @State private var factMemo = ""
+    var isSubmitting: Bool
+    var onSubmit: (TradeDisputeCategory, String) async -> Void
+
+    private var trimmedFactMemo: String {
+        factMemo.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    var body: some View {
+        Form {
+            Section {
+                Picker("理由", selection: $category) {
+                    ForEach(TradeDisputeCategory.allCases) { category in
+                        Text(category.displayName).tag(category)
+                    }
+                }
+            } header: {
+                Text("申告理由")
+            }
+
+            Section {
+                TextEditor(text: $factMemo)
+                    .frame(minHeight: 140)
+                    .overlay(alignment: .topLeading) {
+                        if factMemo.isEmpty {
+                            Text("何が起きたかを具体的に入力してください")
+                                .foregroundStyle(MegrumTheme.muted)
+                                .padding(.top, 8)
+                                .padding(.leading, 5)
+                                .allowsHitTesting(false)
+                        }
+                    }
+            } header: {
+                Text("内容")
+            } footer: {
+                Text("写真や証跡は取引チャット上の共有内容と合わせて運営が確認します。")
+            }
+        }
+        .navigationTitle("通報")
+        .megrumInlineNavigationTitle()
+        .toolbar {
+            ToolbarItem(placement: .cancellationAction) {
+                Button("閉じる") {
+                    dismiss()
+                }
+            }
+            ToolbarItem(placement: .confirmationAction) {
+                Button {
+                    Task {
+                        await onSubmit(category, trimmedFactMemo)
+                    }
+                } label: {
+                    if isSubmitting {
+                        ProgressView()
+                    } else {
+                        Text("送信")
+                    }
+                }
+                .disabled(isSubmitting || trimmedFactMemo.isEmpty)
+            }
+        }
     }
 }
 

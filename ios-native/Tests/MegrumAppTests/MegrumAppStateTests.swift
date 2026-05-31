@@ -407,6 +407,38 @@ final class MegrumAppStateTests: XCTestCase {
         XCTAssertNil(state.errorMessage)
     }
 
+    func testAppStateFilesPreviewTradeDispute() async {
+        let state = MegrumAppState(repository: PreviewMegrumRepository())
+        await state.loadInitialData()
+        let proposalID = try! XCTUnwrap(state.proposals.first?.id)
+
+        let filed = await state.fileTradeDispute(
+            proposalID: proposalID,
+            category: .wrong,
+            factMemo: "  状態が説明と違いました  "
+        )
+
+        XCTAssertTrue(filed)
+        XCTAssertNil(state.filingDisputeProposalID)
+        XCTAssertNil(state.errorMessage)
+    }
+
+    func testAppStateValidatesTradeDisputeMemo() async {
+        let state = MegrumAppState(repository: PreviewMegrumRepository())
+        await state.loadInitialData()
+        let proposalID = try! XCTUnwrap(state.proposals.first?.id)
+
+        let filed = await state.fileTradeDispute(
+            proposalID: proposalID,
+            category: .other,
+            factMemo: " "
+        )
+
+        XCTAssertFalse(filed)
+        XCTAssertEqual(state.errorMessage, "申告内容を入力してください")
+        XCTAssertNil(state.filingDisputeProposalID)
+    }
+
     func testAppStateValidatesGoodsEntryTitle() async {
         let state = MegrumAppState(repository: PreviewMegrumRepository())
         let created = await state.createGoodsEntry(

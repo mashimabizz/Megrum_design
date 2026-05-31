@@ -1018,6 +1018,11 @@ iter12-18 の D-flow に対応するスキーマ（旧版未定義だったの�
 >
 > 当事者へのペナルティ通知は別途 `reports`/`disputes` のステータス変化と連動。
 
+実装メモ（iter351）：
+- Swift Native版は既存migration `20260503270000_add_disputes.sql` の `disputes` テーブルへ直接接続する。
+- Native送信時は `proposal_id` / `reporter_id` / `respondent_id` / `category` / `fact_memo` / `evidence_photo_urls` / `ticket_no` をinsertし、DB既定の `status='submitted'` を使う。
+- 申告作成後は取引チャットの `messages` にsystem messageを残す。
+
 ⚠️ 要確認：
 - 反論機会期限が 24h or 4h はカテゴリで変わるか（09 未確定項目#3）
 - 仲裁SLA超過時のエスカレーションフロー

@@ -70,6 +70,7 @@ public protocol MegrumRepository: Sendable {
     func addTradeEvidence(_ input: TradeEvidenceCreateInput) async throws -> TradeProposal
     func approveTradeEvidence(proposalID: UUID) async throws -> TradeProposal
     func submitTradeEvaluation(_ input: TradeEvaluationCreateInput) async throws -> UserEvaluation
+    func fileTradeDispute(_ input: TradeDisputeCreateInput) async throws -> TradeDisputeTicket
     func loadMessages(proposalID: UUID, limit: Int) async throws -> [TradeMessage]
     func sendMessage(_ input: TradeMessageCreateInput) async throws -> TradeMessage
     func loadGrooms(latitude: Double?, longitude: Double?, radiusMeters: Int) async throws -> [GroomPost]
@@ -141,6 +142,10 @@ public extension MegrumRepository {
     }
 
     func submitTradeEvaluation(_ input: TradeEvaluationCreateInput) async throws -> UserEvaluation {
+        throw MegrumRepositoryError.unsupportedMutation
+    }
+
+    func fileTradeDispute(_ input: TradeDisputeCreateInput) async throws -> TradeDisputeTicket {
         throw MegrumRepositoryError.unsupportedMutation
     }
 
@@ -424,6 +429,15 @@ public struct PreviewMegrumRepository: MegrumRepository {
         )
     }
 
+    public func fileTradeDispute(_ input: TradeDisputeCreateInput) async throws -> TradeDisputeTicket {
+        TradeDisputeTicket(
+            id: UUID(),
+            proposalID: input.proposalID,
+            ticketNo: "DPT-260531-0001",
+            status: "submitted"
+        )
+    }
+
     public func loadMessages(proposalID: UUID, limit: Int) async throws -> [TradeMessage] {
         NativePreviewData.messages[proposalID] ?? []
     }
@@ -635,6 +649,7 @@ public final class MegrumAppState: ObservableObject {
     @Published public private(set) var addingEvidenceProposalID: UUID?
     @Published public private(set) var approvingEvidenceProposalID: UUID?
     @Published public private(set) var submittingEvaluationProposalID: UUID?
+    @Published public private(set) var filingDisputeProposalID: UUID?
     @Published public private(set) var isCreatingGroomPost = false
     @Published public private(set) var isCreatingBoardThread = false
     @Published public private(set) var loadingMessagesProposalID: UUID?
@@ -1339,6 +1354,40 @@ public final class MegrumAppState: ObservableObject {
         } catch {
             errorMessage = "評価を送信できませんでした"
             submittingEvaluationProposalID = nil
+            return false
+        }
+    }
+
+    public func fileTradeDispute(
+        proposalID: UUID,
+        category: TradeDisputeCategory,
+        factMemo: String
+    ) async -> Bool {
+        let trimmed = factMemo.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else {
+            errorMessage = "申告内容を入力してください"
+            return false
+        }
+        guard filingDisputeProposalID != proposalID else {
+            return false
+        }
+
+        filingDisputeProposalID = proposalID
+        errorMessage = nil
+        do {
+            _ = try await repository.fileTradeDispute(
+                TradeDisputeCreateInput(
+                    proposalID: proposalID,
+                    category: category,
+                    factMemo: trimmed
+                )
+            )
+            filingDisputeProposalID = nil
+            await loadMessages(proposalID: proposalID)
+            return true
+        } catch {
+            errorMessage = "申告を送信できませんでした"
+            filingDisputeProposalID = nil
             return false
         }
     }
