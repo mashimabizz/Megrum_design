@@ -29,6 +29,12 @@ Swift Native開発セッションと、法務・App Store提出準備セッシ�
 origin/codex/legal-release-prep
 ```
 
+Draft PR:
+
+```text
+https://github.com/mashimabizz/Megrum_design/pull/2
+```
+
 ## 2. 絶対に混ぜないもの
 
 開発側branchでstageしてよいもの:
@@ -73,6 +79,9 @@ git add -A
 PRを作るタイミング:
 - 開発側のP0実装commitが一段落した後
 - 又は、公開URL/法務レビュー作業に着手する前
+
+現在のPR:
+- Draft: https://github.com/mashimabizz/Megrum_design/pull/2
 
 PRタイトル案:
 

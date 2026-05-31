@@ -12,6 +12,8 @@
 
 今回の勝ち条件は、一般公開完了ではなく、App Store審査への初回提出完了。
 
+法務・リリース準備docsは Draft PR `https://github.com/mashimabizz/Megrum_design/pull/2` で開発branchから分離して管理する。
+
 提出してよい状態:
 - 完成候補ビルドがApp Store Connectへアップロード済み。
 - デモアカウントで主要機能を確認できる。

@@ -73,6 +73,7 @@
 - 開発側でstageしてよい範囲、stageしない範囲、`git add -A` を避ける理由を明記した。
 - 法務branchのPRタイトル/本文案、merge前チェック、共有docs競合時の判断を追加した。
 - 元ツリーの掃除方針と、まだ触らない共有docsを明記した。
+- Draft PR `https://github.com/mashimabizz/Megrum_design/pull/2` を記録した。
 
 #### `notes/39_release_command_center.md`, `notes/30_owner_release_action_sheet.md`
 - 法務branch統合手順への導線を追加した。
