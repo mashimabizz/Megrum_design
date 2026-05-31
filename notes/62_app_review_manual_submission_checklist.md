@@ -19,6 +19,7 @@ App Store ConnectでMegrumの完成ビルドを審査提出する直前に、提
 - `notes/36_submission_evidence_checklist.md` に提出証跡を残す準備ができている。
 - `notes/64_release_evidence_folder_index.md` に従って証跡保存先とmanifest方針が決まっている。
 - `notes/70_app_store_product_page_asset_qa.md` でApp icon、スクショ、App Preview、poster frame、Product Page Previewを確認している。
+- `notes/71_app_store_connect_final_input_reconciliation.md` でApp Store Connectの実入力値と提出docs/buildを照合している。
 - 公開URL、App Privacy、Review Notes、デモアカウント、スクショが提出候補になっている。
 
 使わないタイミング:
@@ -69,6 +70,7 @@ No-Go:
 | FR-005 | 公開URLが200応答、ログイン不要、HTTPS | TODO | `notes/37` |
 | FR-006 | サポートメール又は問い合わせ導線が受信確認済み | TODO | `notes/47` |
 | FR-007 | 権限・運用アカウント台帳のP0が埋まっている | TODO | `notes/61` |
+| FR-008 | App Store Connect最終入力差分QAがPass又は提出判断済み | TODO | `notes/71` |
 
 No-Go:
 - 提出候補ビルドとテスト済みビルドが違う。
@@ -280,6 +282,7 @@ No-Go:
 - 転記用シート: `notes/40_app_store_connect_copy_paste_sheet.md`
 - ローカライズ・メタデータQA: `notes/60_app_store_localization_metadata_qa.md`
 - 商品ページ素材QA: `notes/70_app_store_product_page_asset_qa.md`
+- App Store Connect最終入力差分QA: `notes/71_app_store_connect_final_input_reconciliation.md`
 - 提出証跡: `notes/36_submission_evidence_checklist.md`
 - リリース証跡フォルダ索引: `notes/64_release_evidence_folder_index.md`
 - Go / No-Go判定: `notes/50_release_go_no_go_decision_matrix.md`

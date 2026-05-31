@@ -3,6 +3,7 @@
 > 目的：App Store Connectへ入力する文面を、提出直前にコピーしやすい形へ集約する。
 > コード変更なし。実ビルドの機能範囲に合わせて、不要な段落を削ってから入力する。
 > 日本語/English (U.S.)/Review Notesの整合確認は `notes/60_app_store_localization_metadata_qa.md` を使う。
+> App Store Connectへ入力した後の実値との照合は `notes/71_app_store_connect_final_input_reconciliation.md` を使う。
 
 最終更新: 2026-05-31
 ステータス: Draft v0.1（転記前）
@@ -247,6 +248,7 @@ Trackingは、広告識別子や他社データと結合した追跡をしない
 
 - App Store Connect入力表: `notes/31_app_store_connect_metadata_worksheet.md`
 - App Storeローカライズ・メタデータQA: `notes/60_app_store_localization_metadata_qa.md`
+- App Store Connect最終入力差分QA: `notes/71_app_store_connect_final_input_reconciliation.md`
 - 提出パック: `notes/24_app_store_submission_pack.md`
 - デモアカウント計画: `notes/35_demo_account_review_data_plan.md`
 - 公開URLチェック: `notes/37_public_url_publication_checklist.md`

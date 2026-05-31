@@ -45,7 +45,7 @@ https://github.com/mashimabizz/Megrum_design/pull/2
 - 開発セッションが意図して更新した既存notes
 
 開発側branchでstageしないもの:
-- `notes/24_app_store_submission_pack.md` 〜 `notes/70_app_store_product_page_asset_qa.md`
+- `notes/24_app_store_submission_pack.md` 〜 `notes/71_app_store_connect_final_input_reconciliation.md`
 - `notes/legal/`
 - 法務・App Store提出準備だけを目的にした新規docs
 
@@ -111,6 +111,7 @@ PR本文案:
 - 配信地域・EU DSA・IAP Availability判断
 - App Reviewリジェクト/追加情報要求トリアージ手順
 - App Store商品ページ素材QA
+- App Store Connect最終入力差分QA
 
 ## 変更していないもの
 
@@ -213,6 +214,7 @@ PY
 - 配信地域・EU DSA・IAP Availability: `notes/68_app_store_territory_dsa_iap_availability.md`
 - App Reviewリジェクト/追加情報要求: `notes/69_app_review_rejection_triage_runbook.md`
 - App Store商品ページ素材QA: `notes/70_app_store_product_page_asset_qa.md`
+- App Store Connect最終入力差分QA: `notes/71_app_store_connect_final_input_reconciliation.md`
 - 公開FAQ下書き: `notes/55_public_help_faq_draft.md`
 - アプリ内法務・安全コピー: `notes/56_in_app_legal_safety_copy_deck.md`
 - リリーストリアージ: `notes/22_release_triage_tracker.csv`

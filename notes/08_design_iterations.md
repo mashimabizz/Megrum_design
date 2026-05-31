@@ -4,6 +4,79 @@
 
 ---
 
+## イテレーション393：App Store Connect最終入力差分QAを追加
+
+### 背景・問題意識
+
+App Store Connectへmetadata、Review Notes、App Privacy、build、IAP等を実入力した後は、下書きdocsと実入力値がズレる可能性がある。Submit for Review直前に誤build、URL不一致、Privacy回答漏れ、未完成機能の訴求、IAP同時提出漏れを見落とすと審査遅延につながるため、実入力値と提出docs/buildを照合する最終差分QAを追加した。
+
+### 変更内容
+
+#### `notes/71_app_store_connect_final_input_reconciliation.md`
+- App Store Connect実入力値を、完成候補build、`notes/31`、`notes/40`、公開URL、App Privacy、Review Notes、商品ページ素材QA、同時提出itemと照合する台帳を追加した。
+- App Information、Version Metadata、App Review Information、App Privacy/質問票/IAP、Draft Submissionの差分QAを分けた。
+- 誤字、未露出機能残り、Privacy回答漏れ、Build/Version取り違え、コード修正が必要な差分、法務レビュー回答との矛盾、secret入り証跡の対応判断を整理した。
+- Apple公式ヘルプのRequired/localizable/editable properties、App information、Platform version information、Submit an appへの参照を追加した。
+
+#### `notes/24_app_store_submission_pack.md`, `notes/31_app_store_connect_metadata_worksheet.md`, `notes/40_app_store_connect_copy_paste_sheet.md`, `notes/60_app_store_localization_metadata_qa.md`, `notes/62_app_review_manual_submission_checklist.md`
+- 入力前のワークシート、転記用シート、ローカライズQA、手動提出チェックから `notes/71` への導線を追加した。
+- Add for Review前に最終入力差分QAを確認するチェックを追加した。
+
+#### `notes/36_submission_evidence_checklist.md`, `notes/64_release_evidence_folder_index.md`
+- 提出証跡と証跡フォルダ索引に、App Store Connect実入力値と提出docs/buildの最終差分QAを保存する項目を追加した。
+
+#### `notes/39_release_command_center.md`, `notes/30_owner_release_action_sheet.md`, `notes/50_release_go_no_go_decision_matrix.md`, `notes/57_legal_release_branch_integration_plan.md`
+- コントロールボード、オーナー作業表、Go / No-Go Gate、法務branch統合手順へ `notes/71` を追加した。
+- G21 ASC Final Inputとして、実入力値が提出docs、完成build、公開URL、App Privacy、Review Notes、同時提出itemと未照合又は矛盾する状態をNo-Go化した。
+- 法務docsのstage禁止範囲を `notes/71` まで広げた。
+
+#### `notes/22_release_triage_tracker.csv`
+- RL-069としてApp Store Connect最終入力差分QAを追加した。
+
+### 影響範囲
+
+- App Store Connect実入力
+- App Information、Version Metadata、Review Notes、App Privacy、質問票、IAP、Draft Submission
+- 公開URL、商品ページ素材、ローカライズ
+- 提出証跡、Go / No-Go判定
+- コード、App Store Connect設定、Apple Developer設定、公開URL、証跡ファイルは変更していない。
+
+### 確認方法
+
+- `rg -n "RL-069|notes/71|ASC Final Input|最終入力差分|Draft Submission|Submit for Review" notes/71_app_store_connect_final_input_reconciliation.md notes/39_release_command_center.md notes/50_release_go_no_go_decision_matrix.md notes/22_release_triage_tracker.csv notes/31_app_store_connect_metadata_worksheet.md notes/40_app_store_connect_copy_paste_sheet.md notes/62_app_review_manual_submission_checklist.md`
+- `python3 - <<'PY' ...` による `notes/22_release_triage_tracker.csv` のCSV parse確認
+- 旧規約用語・旧主体表現チェック（旧提案/旧メッセージ/旧投稿関連、サービス主体表現）
+- `git diff --check -- notes`
+
+### セルフレビュー結果
+
+- ✅ コード、App Store Connect設定、Apple Developer設定、公開URL、証跡ファイルは変更していない。
+- ✅ 入力前の下書きdocsではなく、実入力後・Submit前の差分照合に目的を絞った。
+- ✅ 実パスワード、secret、token、実代表者情報を記録しない方針を維持した。
+- ✅ 誤build、URL不一致、Privacy回答漏れ、未完成機能訴求、IAP同時提出漏れをNo-Go対象として整理した。
+- ✅ Apple公式ヘルプのmetadata必須項目と提出操作を参照した。
+- ✅ 状態名の追加/改名はなく、`notes/09_state_machines.md` 更新は不要。
+- ✅ 新用語はApp Store提出準備用語の範囲内のため、`notes/10_glossary.md` 更新は不要。
+- ✅ DBスキーマ変更はなく、`notes/05_data_model.md` 更新は不要。
+
+### 関連ファイル
+
+- `notes/71_app_store_connect_final_input_reconciliation.md`
+- `notes/24_app_store_submission_pack.md`
+- `notes/31_app_store_connect_metadata_worksheet.md`
+- `notes/40_app_store_connect_copy_paste_sheet.md`
+- `notes/60_app_store_localization_metadata_qa.md`
+- `notes/62_app_review_manual_submission_checklist.md`
+- `notes/36_submission_evidence_checklist.md`
+- `notes/64_release_evidence_folder_index.md`
+- `notes/39_release_command_center.md`
+- `notes/30_owner_release_action_sheet.md`
+- `notes/50_release_go_no_go_decision_matrix.md`
+- `notes/57_legal_release_branch_integration_plan.md`
+- `notes/22_release_triage_tracker.csv`
+
+---
+
 ## イテレーション392：商品ページ素材QAを追加
 
 ### 背景・問題意識

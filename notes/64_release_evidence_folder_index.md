@@ -201,6 +201,7 @@ YYYY-MM-DD_hhmm_appstore_vX.Y_buildN_area_short-description.ext
 | MET-003 | Keywords、Subtitle、Descriptionの文字数/byte確認 | md |
 | MET-004 | English (U.S.)を入れる場合の日英整合QA | md |
 | MET-005 | 商品ページ素材QAとメタデータ整合の確認 | md |
+| MET-006 | App Store Connect実入力値と提出docs/buildの最終差分QA | md |
 
 ### 5.8 `08_safety_account_deletion/`
 
@@ -232,6 +233,7 @@ secret実値や管理画面の認証情報は保存しない。
 | SUB-003 | Submit for Review実施 | png又はmd |
 | SUB-004 | Submission status | png又はmd |
 | SUB-005 | 提出日時、提出者、Version/Build | md |
+| SUB-006 | App Store Connect最終入力差分QA結果 | md |
 
 ### 5.11 `11_review_response/`
 
@@ -281,6 +283,7 @@ secret実値や管理画面の認証情報は保存しない。
 
 - 提出証跡チェックリスト: `notes/36_submission_evidence_checklist.md`
 - App Review手動提出チェック: `notes/62_app_review_manual_submission_checklist.md`
+- App Store Connect最終入力差分QA: `notes/71_app_store_connect_final_input_reconciliation.md`
 - 公開ページレダクションQA: `notes/63_public_page_redaction_qa.md`
 - TestFlight / App Review提出ランブック: `notes/32_testflight_review_submission_runbook.md`
 - P0スモークテスト台本: `notes/42_p0_smoke_test_script.md`

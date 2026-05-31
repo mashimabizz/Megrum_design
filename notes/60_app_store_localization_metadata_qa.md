@@ -154,6 +154,7 @@ No-Go:
 - App Store Connect転記用シート: `notes/40_app_store_connect_copy_paste_sheet.md`
 - スクリーンショット台本: `notes/28_app_store_screenshot_storyboard.md`
 - 商品ページ素材QA: `notes/70_app_store_product_page_asset_qa.md`
+- App Store Connect最終入力差分QA: `notes/71_app_store_connect_final_input_reconciliation.md`
 - 公開URL公開チェックリスト: `notes/37_public_url_publication_checklist.md`
 - 初回提出スコープ露出監査: `notes/59_initial_release_scope_exposure_audit.md`
 - App Review指摘対応テンプレート: `notes/41_app_review_response_templates.md`

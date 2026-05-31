@@ -52,6 +52,7 @@
 | EV-009 | Screenshot | App Store用スクショ一式 | `notes/28` |
 | EV-009.5 | Product Page Assets | App icon、App Preview、poster frame、Product Page PreviewのQA結果 | `notes/70` |
 | EV-010 | Review Notes | App Review Notes最終本文 | `notes/31` |
+| EV-010.5 | ASC Final Input | App Store Connect実入力値と提出docs/buildの最終差分QA | `notes/71` |
 | EV-011 | Copy Sheet | App Store Connectへ入力した最終文面 | `notes/40` |
 | EV-012 | Security Audit | RLS、Storage、secret、APNs、公開URL、管理者権限の監査結果 | `notes/54` |
 
@@ -180,6 +181,7 @@ Evidence folder:
 - 商品ページ素材QA: `notes/70_app_store_product_page_asset_qa.md`
 - App Review Guideline適合マトリクス: `notes/53_app_review_guideline_compliance_matrix.md`
 - App Store Connect入力表: `notes/31_app_store_connect_metadata_worksheet.md`
+- App Store Connect最終入力差分QA: `notes/71_app_store_connect_final_input_reconciliation.md`
 - TestFlight/App Review提出ランブック: `notes/32_testflight_review_submission_runbook.md`
 - デモアカウント計画: `notes/35_demo_account_review_data_plan.md`
 - 提出コントロールボード: `notes/39_release_command_center.md`

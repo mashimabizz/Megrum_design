@@ -76,6 +76,7 @@
 | 配信地域・EU DSA・IAP Availability | `notes/68_app_store_territory_dsa_iap_availability.md` |
 | App Reviewリジェクト/追加情報要求 | `notes/69_app_review_rejection_triage_runbook.md` |
 | App Store商品ページ素材QA | `notes/70_app_store_product_page_asset_qa.md` |
+| App Store Connect最終入力差分QA | `notes/71_app_store_connect_final_input_reconciliation.md` |
 | オーナー作業表 | `notes/30_owner_release_action_sheet.md` |
 | App Store Connect入力 | `notes/31_app_store_connect_metadata_worksheet.md` |
 | TestFlight / Submit手順 | `notes/32_testflight_review_submission_runbook.md` |
@@ -117,7 +118,7 @@
 7. スクショを撮影し、App icon、App Preview、poster frame、Product Page Previewを `notes/70` で確認する。
 8. App Store Connectへメタデータを入力する。
 9. Review Notesへデモアカウントとレビュー経路を入れる。
-10. `notes/40` の転記内容とApp Store Connect入力値を一致させる。
+10. `notes/71` でApp Store Connect実入力値と提出docs/buildの差分を確認する。
 11. `notes/36` の証跡を埋める。
 12. Add for Review、Submit for Reviewへ進む。
 
@@ -189,6 +190,7 @@
 | 配信地域・EU DSA・IAP Availability | RL-066 | `notes/68` |
 | App Reviewリジェクト/追加情報要求 | RL-067 | `notes/69` |
 | App Store商品ページ素材QA | RL-068 | `notes/70` |
+| App Store Connect最終入力差分QA | RL-069 | `notes/71` |
 
 ---
 
@@ -207,6 +209,7 @@
 - 住所登録又は住所表示の未完成導線が見える。
 - 未完成3Dが見える。
 - App icon、スクショ、App Preview、poster frame、Product Page PreviewのQAが未完了。
+- App Store Connect実入力値が、提出docs、完成build、公開URL、App Privacy、Review Notesと未照合。
 - スクショに実住所、実在IP、内部ID、デバッグ表示がある。
 
 ---
@@ -234,6 +237,7 @@
 | App Store配信地域・EU DSA・IAP Availability | `notes/68_app_store_territory_dsa_iap_availability.md` |
 | App Reviewリジェクト/追加情報要求Runbook | `notes/69_app_review_rejection_triage_runbook.md` |
 | App Store商品ページ素材QA | `notes/70_app_store_product_page_asset_qa.md` |
+| App Store Connect最終入力差分QA | `notes/71_app_store_connect_final_input_reconciliation.md` |
 | App Store提出素材 | `notes/24_app_store_submission_pack.md` |
 | App Store Connect入力表 | `notes/31_app_store_connect_metadata_worksheet.md` |
 | TestFlight / Submit手順 | `notes/32_testflight_review_submission_runbook.md` |

@@ -12,6 +12,7 @@ App Store Connectの各入力欄へ何を入れるか、制限、下書き、未
 
 提出直前にコピーする最終文面は `notes/40_app_store_connect_copy_paste_sheet.md` を使う。
 日本語/English (U.S.)/Review Notesの整合確認は `notes/60_app_store_localization_metadata_qa.md` を使う。
+App Store Connectへ実際に入力した後の最終差分照合は `notes/71_app_store_connect_final_input_reconciliation.md` を使う。
 
 ## 1. 先に決めること
 
@@ -259,3 +260,7 @@ Megrumはユーザーがグッズ写真や投稿をアップロードするた�
 - Apple Age Rating: https://developer.apple.com/help/app-store-connect/manage-app-information/set-an-app-age-rating
 - Apple Age Rating Values: https://developer.apple.com/help/app-store-connect/reference/app-information/age-ratings-values-and-definitions/
 - Apple In-App Purchase Information: https://developer.apple.com/help/app-store-connect/reference/in-app-purchase-information
+
+## 13. 関連文書
+
+- App Store Connect最終入力差分QA: `notes/71_app_store_connect_final_input_reconciliation.md`
