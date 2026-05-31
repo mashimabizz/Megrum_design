@@ -4,6 +4,59 @@
 
 ---
 
+## イテレーション362：Swift取引チャットから再打診を開く
+
+### 背景・問題意識
+
+オーナーの実機レビューで、Swift Native版のiOS標準デザイン感を最終デザイン方針として維持し、旧Expo版へ無理に見た目を寄せ戻さないことが確認された。前回は打診への返答パネルから再打診sheetを開けるようにしたが、仕様では取引チャットの「条件を変えて再打診」導線も同じ挙動にする必要がある。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumCore/MegrumModels.swift`
+- `TradeProposal` に `allowsCounterProposal` と `canCreateCounterProposal(from:)` を追加した。
+- `sent` / `negotiating` / `agreement_one_side` 以外では再打診inputを作れないようにし、合意済み・完了済み・拒否済みなどの終端に近い取引から誤って新しい打診を作らないようにした。
+
+#### `ios-native/Sources/MegrumApp/TradesScreen.swift`
+- 取引詳細のメッセージ入力欄の上に、iOS標準寄りの `bordered` capsule buttonとして「条件を変えて再打診」を追加した。
+- 既存の `CounterProposalSheet` を再利用し、取引チャット側から開いても元 Proposal の提示物を参加者視点で反転コピーできるようにした。
+- 旧Expo版の見た目へ寄せず、Swift版のNative sheet / material / system buttonの方向性を維持した。
+
+#### `ios-native/Tests/MegrumCoreTests/MegrumCoreTests.swift`
+- 再打診可能な状態と、合意済み状態で再打診inputを作れないことを検証した。
+
+#### `ios-native/README.md` / `notes/22_swift_native_migration.md`
+- Swift Native版の取引チャット下部アクションから再打診を開けることを追記した。
+- Swift版のiOS標準デザイン感を正とする方針を継続記録した。
+
+### 影響範囲
+
+- Swift Native版の取引詳細
+- 取引チャット下部アクション
+- 再打診input生成前のドメイン判定
+
+### 確認方法
+
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-build --enable-xctest --disable-swift-testing -j 1`
+- `xcodebuild -quiet -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -destination 'generic/platform=iOS Simulator' -derivedDataPath /tmp/megrum-native-xcodebuild CODE_SIGNING_ALLOWED=NO build`
+
+### 関連ファイル
+
+- `ios-native/Sources/MegrumCore/MegrumModels.swift`
+- `ios-native/Sources/MegrumApp/TradesScreen.swift`
+- `ios-native/Tests/MegrumCoreTests/MegrumCoreTests.swift`
+- `ios-native/README.md`
+- `notes/22_swift_native_migration.md`
+- `notes/08_design_iterations.md`
+
+### セルフレビュー結果
+
+- ✅ Swift版のiOS標準デザイン感を維持し、独自装飾ではなくSwiftUI標準寄りのbutton / sheetを再利用した
+- ✅ 状態名は追加せず、既存 `sent` / `negotiating` / `agreement_one_side` の範囲判定だけを追加したため `notes/09` 更新は不要と判断した
+- ✅ DBスキーマ追加はなく、既存 `proposals` 作成境界を使うため `notes/05` 更新は不要と判断した
+- ✅ 新規用語は追加せず、既存 `再打診` を使うため `notes/10` 更新は不要と判断した
+
+---
+
 ## イテレーション361：Swift再打診をNative sheetで追加
 
 ### 背景・問題意識

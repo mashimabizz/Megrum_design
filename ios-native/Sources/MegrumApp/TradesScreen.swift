@@ -350,14 +350,22 @@ private struct TradeDetailScreen: View {
                 .padding(.bottom, 22)
             }
 
-            TradeMessageInput(
-                text: $draftMessage,
-                isSending: appState.sendingMessageProposalID == proposal.id
-            ) {
-                Task {
-                    let sent = await appState.sendMessage(proposalID: proposal.id, body: draftMessage)
-                    if sent {
-                        draftMessage = ""
+            VStack(spacing: 8) {
+                if currentProposal.canCreateCounterProposal(from: appState.viewer?.id) {
+                    TradeChatActionBar {
+                        isShowingCounterProposalSheet = true
+                    }
+                }
+
+                TradeMessageInput(
+                    text: $draftMessage,
+                    isSending: appState.sendingMessageProposalID == proposal.id
+                ) {
+                    Task {
+                        let sent = await appState.sendMessage(proposalID: proposal.id, body: draftMessage)
+                        if sent {
+                            draftMessage = ""
+                        }
                     }
                 }
             }
@@ -1228,6 +1236,23 @@ private struct TradeMessageInput: View {
             .disabled(text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isSending)
             .opacity(text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? 0.45 : 1)
         }
+    }
+}
+
+private struct TradeChatActionBar: View {
+    var onCounterProposal: () -> Void
+
+    var body: some View {
+        Button(action: onCounterProposal) {
+            Label("条件を変えて再打診", systemImage: "arrow.triangle.2.circlepath")
+                .font(.system(size: 15, weight: .heavy, design: .rounded))
+                .frame(maxWidth: .infinity)
+                .frame(height: 42)
+        }
+        .buttonStyle(.bordered)
+        .buttonBorderShape(.capsule)
+        .tint(MegrumTheme.lavender)
+        .accessibilityLabel("条件を変えて再打診")
     }
 }
 

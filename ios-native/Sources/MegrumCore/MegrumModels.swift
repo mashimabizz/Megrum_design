@@ -968,6 +968,24 @@ public struct TradeProposal: Identifiable, Codable, Hashable, Sendable {
         return nil
     }
 
+    public var allowsCounterProposal: Bool {
+        [.sent, .negotiating, .agreementOneSide].contains(status)
+    }
+
+    public func canCreateCounterProposal(from userID: UUID?) -> Bool {
+        guard
+            let userID,
+            isParticipant(userID),
+            allowsCounterProposal,
+            let senderGoodsIDs = goodsOffered(by: userID),
+            let receiverGoodsIDs = goodsRequested(by: userID)
+        else {
+            return false
+        }
+
+        return !senderGoodsIDs.isEmpty && !receiverGoodsIDs.isEmpty
+    }
+
     public func counterProposalInput(
         from userID: UUID,
         exchangeMethod: ExchangeMethod,
@@ -975,6 +993,7 @@ public struct TradeProposal: Identifiable, Codable, Hashable, Sendable {
         message: String?
     ) -> ProposalCreateInput? {
         guard
+            canCreateCounterProposal(from: userID),
             let receiverID = partnerID(for: userID),
             let senderGoodsIDs = goodsOffered(by: userID),
             let receiverGoodsIDs = goodsRequested(by: userID)

@@ -61,6 +61,42 @@ final class MegrumCoreTests: XCTestCase {
         XCTAssertEqual(input?.status, .negotiating)
     }
 
+    func testTradeProposalCounterProposalAvailabilityMatchesOpenStatuses() {
+        let senderID = UUID(uuidString: "00000000-0000-0000-0000-000000000001")!
+        let receiverID = UUID(uuidString: "00000000-0000-0000-0000-000000000002")!
+        let senderGoodsID = UUID(uuidString: "00000000-0000-0000-0000-000000000101")!
+        let receiverGoodsID = UUID(uuidString: "00000000-0000-0000-0000-000000000201")!
+        let openProposal = TradeProposal(
+            id: UUID(),
+            senderID: senderID,
+            receiverID: receiverID,
+            status: .negotiating,
+            exchangeMethod: .both,
+            senderGoodsIDs: [senderGoodsID],
+            receiverGoodsIDs: [receiverGoodsID]
+        )
+        let agreedProposal = TradeProposal(
+            id: UUID(),
+            senderID: senderID,
+            receiverID: receiverID,
+            status: .agreed,
+            exchangeMethod: .both,
+            senderGoodsIDs: [senderGoodsID],
+            receiverGoodsIDs: [receiverGoodsID]
+        )
+
+        XCTAssertTrue(openProposal.canCreateCounterProposal(from: receiverID))
+        XCTAssertFalse(agreedProposal.canCreateCounterProposal(from: receiverID))
+        XCTAssertNil(
+            agreedProposal.counterProposalInput(
+                from: receiverID,
+                exchangeMethod: .mail,
+                conditionTags: [],
+                message: nil
+            )
+        )
+    }
+
     func testTradeProposalCounterProposalInputRejectsNonParticipant() {
         let senderID = UUID(uuidString: "00000000-0000-0000-0000-000000000001")!
         let receiverID = UUID(uuidString: "00000000-0000-0000-0000-000000000002")!
