@@ -9,6 +9,7 @@
 App Store初回提出前に、MegrumのDB、Storage、Edge Function、秘密鍵、通知、公開URL、管理者権限まわりを横断して確認するための監査チェックリスト。
 
 この文書は確認台帳であり、コード、DB、Supabase設定、Apple Developer設定、App Store Connect設定は変更しない。
+担当者、権限、secret管理場所の棚卸しは `notes/61_release_access_owner_registry.md` を使う。
 
 ## 1. 公式ドキュメントからの前提
 
@@ -173,6 +174,7 @@ plutil -p ios-native/App/PrivacyInfo.xcprivacy
 | `notes/49_privacy_security_incident_response_runbook.md` | 漏えい疑い時の初動判断 |
 | `notes/50_release_go_no_go_decision_matrix.md` | セキュリティGateの最終判定 |
 | `notes/53_app_review_guideline_compliance_matrix.md` | Guideline 1.6 Data Security、5.1 Privacyの証跡 |
+| `notes/61_release_access_owner_registry.md` | 担当者、権限、secret管理場所の棚卸し |
 
 ## 11. 参照
 

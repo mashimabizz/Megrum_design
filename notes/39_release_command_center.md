@@ -66,6 +66,7 @@
 | 法務レビュー回答反映 | `notes/58_legal_review_response_tracker.md` |
 | 初回提出スコープ露出監査 | `notes/59_initial_release_scope_exposure_audit.md` |
 | ローカライズ・メタデータQA | `notes/60_app_store_localization_metadata_qa.md` |
+| リリース権限・運用アカウント | `notes/61_release_access_owner_registry.md` |
 | オーナー作業表 | `notes/30_owner_release_action_sheet.md` |
 | App Store Connect入力 | `notes/31_app_store_connect_metadata_worksheet.md` |
 | TestFlight / Submit手順 | `notes/32_testflight_review_submission_runbook.md` |
@@ -169,6 +170,7 @@
 | 法務レビュー回答反映 | RL-056 | `notes/58` |
 | 初回提出スコープ露出監査 | RL-057 | `notes/59` |
 | ローカライズ・メタデータQA | RL-058 | `notes/60` |
+| リリース権限・運用アカウント | RL-059 | `notes/61` |
 
 ---
 
@@ -203,6 +205,7 @@
 | 法務レビュー回答反映台帳 | `notes/58_legal_review_response_tracker.md` |
 | 初回提出スコープ露出監査表 | `notes/59_initial_release_scope_exposure_audit.md` |
 | App Storeローカライズ・メタデータQA | `notes/60_app_store_localization_metadata_qa.md` |
+| リリース権限・運用アカウント台帳 | `notes/61_release_access_owner_registry.md` |
 | App Store提出素材 | `notes/24_app_store_submission_pack.md` |
 | App Store Connect入力表 | `notes/31_app_store_connect_metadata_worksheet.md` |
 | TestFlight / Submit手順 | `notes/32_testflight_review_submission_runbook.md` |

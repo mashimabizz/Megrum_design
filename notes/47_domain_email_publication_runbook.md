@@ -9,6 +9,7 @@
 App Store提出前に必要な `megrum.jp` の公開URL、`support@megrum.jp` の受信/送信、DNS、HTTPS、公開証跡を、コード変更なしで確認できる手順へ落とす。
 
 この文書は運用ランブックであり、DNS、ホスティング、メールサービス、公開ページそのものは変更しない。
+ドメイン、DNS、メール、サポート担当の権限棚卸しは `notes/61_release_access_owner_registry.md` を使う。
 
 ## 1. 公開前に決めること
 
@@ -165,3 +166,4 @@ curl -I https://megrum.jp/support/ai
 - 提出証跡: `notes/36_submission_evidence_checklist.md`
 - アカウント削除・個人情報請求: `notes/45_account_deletion_privacy_request_runbook.md`
 - App Store提出司令塔: `notes/39_release_command_center.md`
+- リリース権限・運用アカウント台帳: `notes/61_release_access_owner_registry.md`

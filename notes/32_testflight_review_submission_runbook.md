@@ -9,6 +9,7 @@
 完成ビルドができた後、TestFlight配布、内部確認、App Store審査提出までを迷わず進めるための手順書。
 
 この文書は運用手順であり、コード、ビルド設定、App Store Connect設定は変更しない。
+提出作業に必要な権限、担当、2FA、運用アカウントの棚卸しは `notes/61_release_access_owner_registry.md` を使う。
 
 ## 1. 前提
 

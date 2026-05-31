@@ -4,6 +4,63 @@
 
 ---
 
+## イテレーション383：リリース権限台帳を追加
+
+### 背景・問題意識
+
+App Store初回提出では、文書やメタデータだけでなく、App Store Connect、Apple Developer、DNS、メール、Supabase、法務、事故初動の権限と担当者が揃っている必要がある。提出当日に2FAや権限不足で止まらないよう、実値を書かない権限・運用アカウント台帳を追加した。
+
+### 変更内容
+
+#### `notes/61_release_access_owner_registry.md`
+- Apple Developer / App Store Connect、提出作業、ドメイン/DNS、メール/サポート、Supabase、OAuth/APNs、IAP、法務/Privacyの権限台帳を追加した。
+- パスワード、secret、復旧コード、private keyを書かない方針と、書いてよい情報/書かない情報を整理した。
+- アクセス棚卸しフォーマットとNo-Goを追加した。
+
+#### `notes/39_release_command_center.md`, `notes/32_testflight_review_submission_runbook.md`, `notes/47_domain_email_publication_runbook.md`, `notes/54_prelaunch_security_audit_checklist.md`, `notes/30_owner_release_action_sheet.md`
+- 権限・運用アカウント台帳への導線を追加した。
+
+#### `notes/22_release_triage_tracker.csv`
+- RL-059としてリリース権限・運用アカウント台帳を追加した。
+
+### 影響範囲
+
+- App Store Connect提出作業
+- Apple Developer権限
+- DNS/公開URL/メール運用
+- Supabase/Storage/Edge Function/secret管理
+- APNs/OAuth/IAP
+- 法務レビュー/事故初動担当
+- コード、App Store Connect設定、Apple Developer設定、DNS、メール、Supabase設定は変更していない。
+
+### 確認方法
+
+- `rg -n "RL-059|Account Holder|App Store Connect|Supabase|secret実値|リリース権限" notes/61_release_access_owner_registry.md notes/39_release_command_center.md notes/22_release_triage_tracker.csv`
+- `python3 - <<'PY' ...` による `notes/22_release_triage_tracker.csv` のCSV parse確認
+- 旧規約用語・旧主体表現チェック（旧提案/旧メッセージ/旧投稿関連、サービス主体表現）
+- `git diff --check -- notes`
+
+### セルフレビュー結果
+
+- ✅ コード、App Store Connect設定、Apple Developer設定、DNS、メール、Supabase設定は変更していない。
+- ✅ パスワード、2FA復旧コード、secret実値、private keyを書かない方針を明記した。
+- ✅ App Store提出、DNS/メール、Supabase、APNs/OAuth、IAP、法務/事故初動の担当と権限を棚卸しできる形にした。
+- ✅ 状態名の追加/改名はなく、`notes/09_state_machines.md` 更新は不要。
+- ✅ 新用語は追加していないため、`notes/10_glossary.md` 更新は不要。
+- ✅ DBスキーマ変更はなく、`notes/05_data_model.md` 更新は不要。
+
+### 関連ファイル
+
+- `notes/61_release_access_owner_registry.md`
+- `notes/39_release_command_center.md`
+- `notes/32_testflight_review_submission_runbook.md`
+- `notes/47_domain_email_publication_runbook.md`
+- `notes/54_prelaunch_security_audit_checklist.md`
+- `notes/30_owner_release_action_sheet.md`
+- `notes/22_release_triage_tracker.csv`
+
+---
+
 ## イテレーション382：App StoreローカライズQAを追加
 
 ### 背景・問題意識
