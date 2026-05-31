@@ -97,6 +97,7 @@ Swift Nativeの `Info.plist` では `public.app-category.social-networking` が�
 | リリース権限・運用アカウント | `notes/61` | App Store Connect、DNS、メール、Supabase、法務の担当と権限を棚卸し |
 | App Review手動提出チェック | `notes/62` | Add for Review、Draft Submission、Submit for Review直前の画面確認に使う |
 | 公開ページレダクションQA | `notes/63` | 公開前に内部情報、secret、未確定機能、未確定価格、実データが混ざっていないか確認する |
+| リリース証跡フォルダ索引 | `notes/64` | スクショ、URL控え、Review Notes、App Privacy回答をどこにどう保存するか決める |
 
 ## 4. デモアカウント準備
 
@@ -213,3 +214,4 @@ Appleのリジェクト文を貼るので、ガイドライン番号ごとに対
 - `notes/61_release_access_owner_registry.md`
 - `notes/62_app_review_manual_submission_checklist.md`
 - `notes/63_public_page_redaction_qa.md`
+- `notes/64_release_evidence_folder_index.md`

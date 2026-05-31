@@ -4,6 +4,69 @@
 
 ---
 
+## イテレーション386：リリース証跡フォルダ索引を追加
+
+### 背景・問題意識
+
+App Store初回提出では、Build、TestFlight、公開URL、App Privacy、Review Notes、スクショ、Submit for Review、承認後公開の証跡が複数箇所に分散しやすい。後日の審査対応や公開初日監視で「どこに何を保存したか」を追えるように、証跡フォルダ構成、命名、manifest、保存してよい情報/保存しない情報を整理した。
+
+### 変更内容
+
+#### `notes/64_release_evidence_folder_index.md`
+- リリース証跡の保存先方針、フォルダ構成案、命名規則、`00_manifest.md` テンプレートを追加した。
+- Build、TestFlight、公開URL、App Privacy、Privacy Manifest/SDK、スクショ、Review Notes、Safety、Security、Submission、Review Response、Release Dayのエリア別証跡を整理した。
+- 実パスワード、認証コード、secret、実ユーザー情報、管理画面情報を保存しないルールを明記した。
+
+#### `notes/36_submission_evidence_checklist.md`, `notes/62_app_review_manual_submission_checklist.md`
+- 証跡フォルダ索引への導線を追加した。
+
+#### `notes/39_release_command_center.md`, `notes/30_owner_release_action_sheet.md`
+- 証跡フォルダ索引への導線を追加した。
+
+#### `notes/57_legal_release_branch_integration_plan.md`
+- 法務・リリース準備docsのstage禁止範囲を `notes/64` まで広げた。
+
+#### `notes/22_release_triage_tracker.csv`
+- RL-062としてリリース証跡フォルダ索引を追加した。
+
+### 影響範囲
+
+- App Store提出証跡
+- TestFlight内部確認
+- 公開URL確認
+- App Privacy / Privacy Manifest / SDK監査
+- Review Notes / メタデータ控え
+- Submit for Review / 審査中対応 / 承認後公開
+- コード、ビルド、App Store Connect設定、公開URL、実証跡ファイルは変更していない。
+
+### 確認方法
+
+- `rg -n "RL-062|release_evidence|00_manifest|実パスワード|Submit for Review|リリース証跡" notes/64_release_evidence_folder_index.md notes/39_release_command_center.md notes/22_release_triage_tracker.csv`
+- `python3 - <<'PY' ...` による `notes/22_release_triage_tracker.csv` のCSV parse確認
+- 旧規約用語・旧主体表現チェック（旧提案/旧メッセージ/旧投稿関連、サービス主体表現）
+- `git diff --check -- notes`
+
+### セルフレビュー結果
+
+- ✅ コード、ビルド、App Store Connect設定、公開URL、実証跡ファイルは変更していない。
+- ✅ 提出証跡の保存先、命名、manifest、保存禁止情報を明確にした。
+- ✅ 実パスワード、secret、実ユーザー情報を保存しない方針を維持した。
+- ✅ 状態名の追加/改名はなく、`notes/09_state_machines.md` 更新は不要。
+- ✅ 新用語は追加していないため、`notes/10_glossary.md` 更新は不要。
+- ✅ DBスキーマ変更はなく、`notes/05_data_model.md` 更新は不要。
+
+### 関連ファイル
+
+- `notes/64_release_evidence_folder_index.md`
+- `notes/36_submission_evidence_checklist.md`
+- `notes/62_app_review_manual_submission_checklist.md`
+- `notes/39_release_command_center.md`
+- `notes/30_owner_release_action_sheet.md`
+- `notes/57_legal_release_branch_integration_plan.md`
+- `notes/22_release_triage_tracker.csv`
+
+---
+
 ## イテレーション385：公開ページレダクションQAを追加
 
 ### 背景・問題意識

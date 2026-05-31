@@ -19,6 +19,7 @@
 | 命名 | `YYYY-MM-DD_appstore_vX.Y_buildN_項目` |
 
 この文書はチェックリストであり、証跡ファイル自体はまだ作成しない。
+証跡フォルダの構成、命名、manifest、保存してよい情報/保存しない情報は `notes/64_release_evidence_folder_index.md` を使う。
 
 ---
 
@@ -182,3 +183,4 @@ Evidence folder:
 - App Store Connect転記用シート: `notes/40_app_store_connect_copy_paste_sheet.md`
 - App Review指摘対応テンプレート: `notes/41_app_review_response_templates.md`
 - P0スモークテスト台本: `notes/42_p0_smoke_test_script.md`
+- リリース証跡フォルダ索引: `notes/64_release_evidence_folder_index.md`

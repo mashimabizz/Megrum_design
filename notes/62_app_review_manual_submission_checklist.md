@@ -17,6 +17,7 @@ App Store ConnectでMegrumの完成ビルドを審査提出する直前に、提
 - TestFlight内部確認が終わっている。
 - `notes/42_p0_smoke_test_script.md` のP0確認結果が記録されている。
 - `notes/36_submission_evidence_checklist.md` に提出証跡を残す準備ができている。
+- `notes/64_release_evidence_folder_index.md` に従って証跡保存先とmanifest方針が決まっている。
 - 公開URL、App Privacy、Review Notes、デモアカウント、スクショが提出候補になっている。
 
 使わないタイミング:
@@ -277,6 +278,7 @@ No-Go:
 - 転記用シート: `notes/40_app_store_connect_copy_paste_sheet.md`
 - ローカライズ・メタデータQA: `notes/60_app_store_localization_metadata_qa.md`
 - 提出証跡: `notes/36_submission_evidence_checklist.md`
+- リリース証跡フォルダ索引: `notes/64_release_evidence_folder_index.md`
 - Go / No-Go判定: `notes/50_release_go_no_go_decision_matrix.md`
 - 初回提出スコープ露出監査: `notes/59_initial_release_scope_exposure_audit.md`
 - リリース権限・運用アカウント: `notes/61_release_access_owner_registry.md`

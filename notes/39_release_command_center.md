@@ -69,6 +69,7 @@
 | リリース権限・運用アカウント | `notes/61_release_access_owner_registry.md` |
 | App Review手動提出チェック | `notes/62_app_review_manual_submission_checklist.md` |
 | 公開ページレダクションQA | `notes/63_public_page_redaction_qa.md` |
+| リリース証跡フォルダ索引 | `notes/64_release_evidence_folder_index.md` |
 | オーナー作業表 | `notes/30_owner_release_action_sheet.md` |
 | App Store Connect入力 | `notes/31_app_store_connect_metadata_worksheet.md` |
 | TestFlight / Submit手順 | `notes/32_testflight_review_submission_runbook.md` |
@@ -175,6 +176,7 @@
 | リリース権限・運用アカウント | RL-059 | `notes/61` |
 | App Review手動提出チェック | RL-060 | `notes/62` |
 | 公開ページレダクションQA | RL-061 | `notes/63` |
+| リリース証跡フォルダ索引 | RL-062 | `notes/64` |
 
 ---
 
@@ -212,6 +214,7 @@
 | リリース権限・運用アカウント台帳 | `notes/61_release_access_owner_registry.md` |
 | App Review手動提出チェックリスト | `notes/62_app_review_manual_submission_checklist.md` |
 | 公開ページレダクションQA | `notes/63_public_page_redaction_qa.md` |
+| リリース証跡フォルダ索引 | `notes/64_release_evidence_folder_index.md` |
 | App Store提出素材 | `notes/24_app_store_submission_pack.md` |
 | App Store Connect入力表 | `notes/31_app_store_connect_metadata_worksheet.md` |
 | TestFlight / Submit手順 | `notes/32_testflight_review_submission_runbook.md` |
