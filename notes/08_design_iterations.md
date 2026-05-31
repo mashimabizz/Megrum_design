@@ -1191,1686 +1191,1381 @@ App Store審査では、アカウント作成があるアプリに対してア�
 
 ---
 
-## イテレーション397：App Privacy回答シートとSDK監査台帳を追加
+## イテレーション397：署名とCapabilities事前確認を追加
 
 ### 背景・問題意識
 
-App Privacyは、単なるプライバシーポリシー要約ではなく、App Store Connect上でData Type、ユーザーへの紐づき、Tracking、Purposeを個別に回答する必要がある。既存の `notes/27` は照合表として有用だったが、実際の回答欄へ転記する粒度と、Privacy Manifest/SDK監査の台帳が不足していたため、コード変更なしで追加した。
+App Store提出準備は、メタデータ、App Privacy、公開URL、公開後運用まで整理できてきた。一方で、完成候補ビルドを実際にupload / submitする直前には、Apple Developer側のBundle ID、App ID、Capabilities、entitlements、provisioning profile、certificate、App Store Connect app recordが一致しないと、Build upload失敗、Invalid Binary、APNs不達、Apple login不具合につながる。既存docsには断片的な確認項目があったが、署名・Capabilities専用の事前確認Runbookを追加した。
 
 ### 変更内容
 
-#### `notes/43_app_privacy_connect_answer_sheet.md`
-- Privacy Policy URL、User Privacy Choices URL、Data Collection、Trackingのトップ回答を整理した。
-- Contact Info、User Content、Location、Identifiers、Purchases、Search History、Usage Data、Diagnostics、Other Dataの選択候補を整理した。
-- Apple公式説明に合わせ、取引チャットやめぐりメッセージ等のアプリ内非SMSメッセージを `Emails or Text Messages` として回答する方針を追加した。
-- Data Type別に、Collected、Linked to user、Tracking、Purposes、Examplesを回答表にした。
-- 選ばない候補、入力順、No-Goを追加した。
+#### `notes/75_apple_developer_signing_capabilities_preflight.md`
+- Apple Developer署名・Capabilities事前確認Runbookを追加した。
+- Bundle ID、App ID、Team ID、Version/Build、Capabilities、provisioning profile、certificate、APNs、Sign in with Apple、Associated Domainsの確認表を整理した。
+- Apple公式ヘルプに基づき、App IDのCapabilitiesはallow listであり、Xcode target側のCapabilities/entitlementsとも一致が必要であること、Capabilities変更後はprovisioning profile更新確認が必要であることを明記した。
+- private key、`.p12`、2FA code、recovery code、実電話番号を記録しない方針を追加した。
 
-#### `notes/44_privacy_manifest_sdk_audit.md`
-- Swift Native側の静的確認結果として、Tracking false、UserDefaults `CA92.1`、カメラ/位置情報、外部Swift Package依存なし等を整理した。
-- Privacy Manifest、SDK/Framework、通信先の監査表を追加した。
-- `plutil`、`rg`、実機App Privacy Reportでの確認コマンド案とNo-Goを追加した。
+#### `notes/39_release_command_center.md`, `notes/30_owner_release_action_sheet.md`, `notes/50_release_go_no_go_decision_matrix.md`
+- コントロールボード、オーナー作業表、Go / No-Go判定表へ `notes/75` を追加した。
+- G25 Signing / Capabilitiesとして、Bundle ID / App ID / Capabilities / profile / certificate未照合をNo-Go化した。
 
-#### `notes/27_app_privacy_data_inventory.md`
-- App Store Connect回答は `notes/43`、Privacy Manifest/SDK監査は `notes/44` を使う導線を追加した。
-- 既存Markdownの改行用空白を整理した。
+#### `notes/32_testflight_review_submission_runbook.md`, `notes/62_app_review_manual_submission_checklist.md`, `notes/65_release_candidate_handoff.md`, `notes/71_app_store_connect_final_input_reconciliation.md`
+- 完成候補ビルド受領、提出前チェック、手動提出チェック、App Store Connect最終入力差分QAから `notes/75` への導線を追加した。
+- 開発側ハンドオフ項目にApp ID / Team ID、Signing mode、Capabilities / entitlementsを追加した。
 
-#### `notes/24_app_store_submission_pack.md`
-- App Privacy関連の参照に `notes/43` と `notes/44` を追加した。
+#### `notes/36_submission_evidence_checklist.md`, `notes/64_release_evidence_folder_index.md`, `notes/61_release_access_owner_registry.md`
+- 提出証跡にEV-014 Signing / Capabilitiesを追加した。
+- 証跡フォルダ索引に `15_signing_capabilities/` を追加した。
+- 権限台帳にSigning / Capabilities確認担当を追加した。
 
-#### `notes/36_submission_evidence_checklist.md`
-- App Privacy回答シートとPrivacy Manifest/SDK監査台帳を関連文書に追加した。
-
-#### `notes/39_release_command_center.md`
-- 文書マップと完了済み準備に `notes/43` と `notes/44` を追加した。
-
-#### `notes/40_app_store_connect_copy_paste_sheet.md`
-- App Privacy転記前メモの正として `notes/43` と `notes/44` を追加した。
-
-#### `notes/42_p0_smoke_test_script.md`
-- 関連文書にApp Privacy回答シートとPrivacy Manifest/SDK監査台帳を追加した。
-
-#### `notes/22_release_triage_tracker.csv`
-- RL-029の参照を `notes/43` / `notes/44` まで拡張した。
-- RL-041としてApp Privacy回答の最終転記を追加した。
-- RL-042としてPrivacy Manifest / SDK監査を追加した。
+#### `notes/24_app_store_submission_pack.md`, `notes/44_privacy_manifest_sdk_audit.md`, `notes/54_prelaunch_security_audit_checklist.md`, `notes/57_legal_release_branch_integration_plan.md`, `notes/69_app_review_rejection_triage_runbook.md`, `notes/22_release_triage_tracker.csv`
+- 提出前ブロッカー、Privacy Manifest / SDK監査、セキュリティ監査、法務branch統合手順、Invalid Binary分類へ `notes/75` を接続した。
+- 法務branch統合手順のstage禁止範囲を `notes/75` まで広げた。
+- RL-073としてApple Developer署名・Capabilities事前確認を追加した。
 
 ### 影響範囲
 
-- App Store Connect App Privacy回答
-- PrivacyInfo.xcprivacy監査
-- SDK/通信先監査
-- Privacy Policyとの整合
-- コード変更なし。別セッションのSwift Native実装には触れていない。
+- 完成候補ビルドのArchive / upload / Submit for Review前確認
+- Apple Developer Identifiers、Capabilities、provisioning profile、certificate、APNs、Sign in with Apple
+- App Store Connect app record、Release Candidateハンドオフ、Invalid Binary対応、提出証跡
+- コード、Xcode project、Apple Developer設定、App Store Connect設定、secret、証跡ファイルは変更していない。
 
 ### 確認方法
 
-- `plutil -p ios-native/App/PrivacyInfo.xcprivacy`
-- `plutil -p ios-native/App/Info.plist`
-- `sed -n '1,160p' ios-native/Package.swift`
-- `rg -n "Emails or Text Messages|Tracking|Physical Address|Precise Location|No-Go|User Privacy Choices" notes/43_app_privacy_connect_answer_sheet.md`
-- `rg -n "PrivacyInfo|CA92.1|Required Reason|SDK|通信先|No-Go" notes/44_privacy_manifest_sdk_audit.md`
-- 旧規約用語・旧主体表現チェック（旧提案/旧メッセージ/旧投稿関連、サービス主体表現）
+- `rg -n "RL-073|notes/75|Signing / Capabilities|署名・Capabilities|15_signing_capabilities|SIGN-|SIWA-|APNS-" notes/75_apple_developer_signing_capabilities_preflight.md notes/39_release_command_center.md notes/50_release_go_no_go_decision_matrix.md notes/22_release_triage_tracker.csv notes/64_release_evidence_folder_index.md`
 - `python3 - <<'PY' ...` による `notes/22_release_triage_tracker.csv` のCSV parse確認
-- `git diff --check -- notes/43_app_privacy_connect_answer_sheet.md notes/44_privacy_manifest_sdk_audit.md notes/27_app_privacy_data_inventory.md notes/24_app_store_submission_pack.md notes/36_submission_evidence_checklist.md notes/39_release_command_center.md notes/40_app_store_connect_copy_paste_sheet.md notes/42_p0_smoke_test_script.md notes/22_release_triage_tracker.csv notes/08_design_iterations.md`
+- 旧規約用語・旧主体表現チェック（旧提案/旧メッセージ/旧投稿関連、サービス主体表現）
+- `git diff --check -- notes`
 
 ### セルフレビュー結果
 
-- ✅ コード、Supabase、ビルド設定、アプリ画面は変更していない。
-- ✅ App PrivacyはApple公式のData Type/Linked/Tracking/Purpose構造に合わせた。
-- ✅ 取引チャット等の非SMSメッセージを `Emails or Text Messages` として扱う注意を入れた。
-- ✅ Swift Nativeの現状確認は読み取りのみで、Privacy ManifestやInfo.plistは変更していない。
-- ✅ 状態名の追加/改名はなく、`notes/09_state_machines.md` 更新は不要。
-- ✅ 新用語・廃止用語はなく、`notes/10_glossary.md` 更新は不要。
+- ✅ コード、Xcode project、Apple Developer設定、App Store Connect設定、secret、証跡ファイルは変更していない。
+- ✅ 署名・Capabilities確認を、RCハンドオフ、手動提出、最終入力差分QA、証跡保存、Go / No-Goへ接続した。
+- ✅ Push Notifications、Sign in with Apple、IAP、Associated Domainsを、初回で見える機能に応じて確認する形にした。
+- ✅ Capabilities変更後のprovisioning profile更新確認、development / production APNs環境の取り違え、Preview用Bundle ID混入をNo-Go化した。
+- ✅ private key、`.p12`、2FA code、recovery code、実電話番号を記録しない方針を明記した。
+- ✅ Apple公式ヘルプのApp ID登録、Capabilities、有効化、App Store provisioning profile、profile更新、Sign in with Appleを参照した。
+- ✅ 状態名の追加/改名はApple提出運用の確認項目のみで、Megrumの状態遷移変更ではないため `notes/09_state_machines.md` 更新は不要。
+- ✅ 新用語はApple Developer運用語の範囲内のため、`notes/10_glossary.md` 更新は不要。
 - ✅ DBスキーマ変更はなく、`notes/05_data_model.md` 更新は不要。
-- ⚠️ 実App Store Connect回答、実機App Privacy Report確認、最終ビルドのSDK/通信先監査は未実行。
 
 ### 関連ファイル
 
-- `notes/43_app_privacy_connect_answer_sheet.md`
-- `notes/44_privacy_manifest_sdk_audit.md`
-- `notes/27_app_privacy_data_inventory.md`
-- `notes/24_app_store_submission_pack.md`
-- `notes/36_submission_evidence_checklist.md`
+- `notes/75_apple_developer_signing_capabilities_preflight.md`
 - `notes/39_release_command_center.md`
-- `notes/40_app_store_connect_copy_paste_sheet.md`
-- `notes/42_p0_smoke_test_script.md`
-- `notes/22_release_triage_tracker.csv`
-
----
-
-## イテレーション395：現地交換モードの座標表示を非表示化
-
-### 背景・問題意識
-
-ホーム画面の現地交換導線で、旧AW由来の表示や `34.7332,135.5555` のような生の緯度経度が見えると、ユーザーには意味が伝わらない。現時点の場所を更新する機能として扱い、表示は建物名または住所、解決できない場合も数字ではない安全な文言にする必要があった。
-
-### 変更内容
-
-#### `ios-native/Sources/MegrumApp/HomeLocalModeSurface.swift`
-- 現地交換モードの保存済み場所が旧形式の座標文字列だった場合、ユーザー向けには表示しないようにした。
-- 座標がある場合は、逆ジオコーディング解決前は `住所を確認中` / `現在地を取得済み` を表示し、緯度経度の数字を直接表示しないようにした。
-- 現地交換sheet表示時に、保存済み座標から住所/施設名の再解決を試みるようにした。
-
-#### `ios-native/Sources/MegrumApp/MegrumLocationState.swift`
-- 既に保存されている座標を後から逆ジオコーディングできる `resolveKnownCoordinate` を追加した。
-- iOSのplacemarkから、建物名/施設名、住所の順で表示ラベルを作れる既存方針を、保存済み座標にも適用できるようにした。
-
-#### `ios-native/Tests/MegrumAppTests/HomeLocalModeTests.swift`
-- 古い `現在地 34.7332, 135.5555` 形式が画面表示では `現在地を取得済み` になることをテストした。
-
-#### `ios-native/Tests/MegrumAppTests/MegrumAppStateTests.swift`
-- 現在の認証validation実装に合わせ、メール形式エラー文言の期待値を更新した。
-
-### 影響範囲
-
-- Swift Native版ホームの現地交換モード
-- 現地交換モード編集sheet
-- 端末内に残っている旧座標テキストの表示
-- iOS位置情報の逆ジオコーディング表示
-
-### 確認方法
-
-- `swift build --package-path ios-native --scratch-path /tmp/megrum-current-swift-build`
-- `swift test --package-path ios-native --scratch-path /tmp/megrum-current-tests --enable-xctest --disable-swift-testing -j 1 --filter 'HomeLocalModeTests|MegrumAppStateTests'`
-- `xcodebuild -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -destination 'generic/platform=iOS' -derivedDataPath /tmp/megrum-native-current -allowProvisioningUpdates build`
-- `xcrun devicectl device install app --device 7F6C74EF-5786-5316-920A-F7F1CC3FE2A4 /tmp/megrum-native-current/Build/Products/Debug-iphoneos/MegrumNative.app`
-- `xcrun devicectl device process launch --device 7F6C74EF-5786-5316-920A-F7F1CC3FE2A4 tokyo.megrum.native.preview`
-
-### セルフレビュー結果
-
-- ✅ SwiftPM build、対象テスト88件、Xcode実機向けbuildが成功。
-- ✅ 接続中の iPhone 15 に `tokyo.megrum.native.preview` を上書きインストールし、起動まで確認した。
-- ✅ ユーザー向けに旧AW文字列は追加していない。
-- ✅ `現在地 34...` 形式の古い保存値も数字で表示しない。
-- ✅ 状態名の追加/変更はなく、`notes/09_state_machines.md` 更新は不要。
-- ✅ 用語の扱いを補足するため、`notes/10_glossary.md` を更新する。
-- ⚠️ 施設名が取れるかはiOSの逆ジオコーディング結果に依存するため、取得できない場所では `現在地を取得済み` 表示になる。
-
-### 関連ファイル
-
-- `ios-native/Sources/MegrumApp/HomeLocalModeSurface.swift`
-- `ios-native/Sources/MegrumApp/MegrumLocationState.swift`
-- `ios-native/Tests/MegrumAppTests/HomeLocalModeTests.swift`
-- `ios-native/Tests/MegrumAppTests/MegrumAppStateTests.swift`
-
----
-
-## イテレーション396：P0実機スモークテスト台本を追加
-
-### 背景・問題意識
-
-完成候補ビルドが来た後に、P0項目をどの順番で2アカウント確認するかが `notes/32` では概要レベルだった。App Store提出判断を実機証跡に寄せるため、Auth、在庫、wish、打診、ネゴ、取引、郵送、安全、削除、公開URL、App Privacyまでを具体手順に落とした。
-
-### 変更内容
-
-#### `notes/42_p0_smoke_test_script.md`
-- 実施条件、P0合否、No-Go、結果記録表、Fail時の判断を追加した。
-- SM-001〜SM-019として、新規登録、ログイン、在庫、wish、個別条件、ホーム、打診、受信、ネゴ、取引チャット、郵送交換、未完成機能露出、通報/ブロック、アカウント削除、公開URL、App Privacyの台本を追加した。
-- 各テストに対応するRL番号、手順、合格条件、証跡を明記した。
-
-#### `notes/32_testflight_review_submission_runbook.md`
-- 内部スモークテストの詳細台本として `notes/42` を参照するようにした。
-
-#### `notes/36_submission_evidence_checklist.md`
-- 関連文書にP0スモークテスト台本を追加した。
-
-#### `notes/39_release_command_center.md`
-- 文書マップ、完成ビルド後の実行順、実作業リストに `notes/42` を追加した。
-
-#### `notes/22_release_triage_tracker.csv`
-- RL-040としてP0スモークテスト台本を追加した。
-
-### 影響範囲
-
-- TestFlight内部確認
-- App Store提出前の実機P0判断
-- 提出証跡
-- コード変更なし。別セッションのSwift Native実装には触れていない。
-
-### 確認方法
-
-- `rg -n "SM-001|SM-019|No-Go|Fail時|RL-001|RL-040" notes/42_p0_smoke_test_script.md notes/22_release_triage_tracker.csv`
-- 旧規約用語・旧主体表現チェック（旧提案/旧メッセージ/旧投稿関連、サービス主体表現）
-- `python3 - <<'PY' ...` による `notes/22_release_triage_tracker.csv` のCSV parse確認
-- `git diff --check -- notes/42_p0_smoke_test_script.md notes/32_testflight_review_submission_runbook.md notes/36_submission_evidence_checklist.md notes/39_release_command_center.md notes/22_release_triage_tracker.csv notes/08_design_iterations.md`
-
-### セルフレビュー結果
-
-- ✅ コード、Supabase、ビルド設定、アプリ画面は変更していない。
-- ✅ P0を実機で確認するための手順と合格条件を具体化した。
-- ✅ Fail時の提出停止/非表示/修正判断を分けた。
-- ✅ 状態名の追加/改名はなく、`notes/09_state_machines.md` 更新は不要。
-- ✅ 新用語・廃止用語はなく、`notes/10_glossary.md` 更新は不要。
-- ✅ DBスキーマ変更はなく、`notes/05_data_model.md` 更新は不要。
-- ⚠️ 実機テスト、TestFlight配布、証跡保存は未実行。
-
-### 関連ファイル
-
-- `notes/42_p0_smoke_test_script.md`
+- `notes/30_owner_release_action_sheet.md`
+- `notes/50_release_go_no_go_decision_matrix.md`
 - `notes/32_testflight_review_submission_runbook.md`
+- `notes/62_app_review_manual_submission_checklist.md`
+- `notes/65_release_candidate_handoff.md`
+- `notes/71_app_store_connect_final_input_reconciliation.md`
 - `notes/36_submission_evidence_checklist.md`
-- `notes/39_release_command_center.md`
+- `notes/64_release_evidence_folder_index.md`
+- `notes/61_release_access_owner_registry.md`
+- `notes/24_app_store_submission_pack.md`
+- `notes/44_privacy_manifest_sdk_audit.md`
+- `notes/54_prelaunch_security_audit_checklist.md`
+- `notes/57_legal_release_branch_integration_plan.md`
+- `notes/69_app_review_rejection_triage_runbook.md`
 - `notes/22_release_triage_tracker.csv`
 
 ---
 
-## イテレーション395：App Store転記シートと審査指摘返信を追加
+## イテレーション396：App Storeレビュー返信運用を追加
 
 ### 背景・問題意識
 
-提出準備文書は揃ってきたが、App Store Connectへ最終的にどの文面をコピーするか、App Reviewで指摘が来たときにどう分類して返信するかがまだ散らばっていた。完成ビルド後の転記ミスと、リジェクト時の初動遅れを減らすため、コード変更なしで転記用シートと指摘対応テンプレートを追加した。
+公開後のサポート受信、App Review指摘対応、公開停止手順は整理済みだが、App Store product pageに表示される星評価・ユーザーレビューへの公開返信は別のリスクがある。公開返信は全ユーザーに見えるため、個人情報、未確認事実、補償、内部情報、相手方処分を不用意に書かないためのRunbookを追加した。
 
 ### 変更内容
 
-#### `notes/40_app_store_connect_copy_paste_sheet.md`
-- App Information、Promotional Text、Description、Keywords、App Review Information、Review Notesを転記しやすい形で追加した。
-- 初回安全寄せとして、有料機能、外部AI、未完成3Dを非表示にする前提を明記した。
-- 郵送交換あり/なし、最小スコープ、有料機能あり、外部AIありの差し替え文を追加した。
-- Age Rating、Content Rights、Export Compliance、App Privacyの提出前メモを追加した。
+#### `notes/74_app_store_ratings_reviews_response_runbook.md`
+- App Store公開後の星評価、ユーザーレビュー、公開返信、concern report、overview rating resetのRunbookを追加した。
+- Apple公式ヘルプに基づき、レビュー返信は公開表示され、表示まで最大24時間かかる場合があり、1レビューにつき表示される返信は1つであることを明記した。
+- レビュー分類、返信前チェック、公開返信テンプレート、concern report判断、overview rating reset判断、記録フォーマットを整理した。
 
-#### `notes/41_app_review_response_templates.md`
-- App Review指摘受領時の記録項目、共通返信フォーマット、再提出チェックを追加した。
-- Guideline 2.1、UGC、Privacy/Account Deletion、IAP、物理商品/デジタル機能整理、Metadata/Screenshots、AI、Public URLsの返信テンプレートを追加した。
-- Apple公式のSubmit、Unresolved Issues、IAP提出、App Review Guidelinesへの参照を追加した。
+#### `notes/39_release_command_center.md`, `notes/30_owner_release_action_sheet.md`, `notes/50_release_go_no_go_decision_matrix.md`
+- コントロールボード、オーナー作業表、Go / No-Go判定表へ `notes/74` を追加した。
+- G24 Ratings / Reviewsとして、公開後のレビュー返信方針未整備をリスクとして明文化した。
 
-#### `notes/24_app_store_submission_pack.md`
-- 転記用シートと指摘対応テンプレートへの参照を追加した。
+#### `notes/51_post_submission_release_day_runbook.md`, `notes/67_support_inbox_triage_runbook.md`, `notes/34_support_response_templates.md`
+- 公開初日のT+24h確認にApp Store評価・レビュー確認を追加した。
+- サポート受信トリアージから、公開レビューは個別メール返信と分けて `notes/74` を使う導線を追加した。
+- メール返信テンプレート側にも、公開レビュー返信は全ユーザーに見えるため `notes/74` を使う注意を追加した。
 
-#### `notes/31_app_store_connect_metadata_worksheet.md`
-- 提出直前の最終文面として `notes/40` を参照するようにした。
+#### `notes/64_release_evidence_folder_index.md`, `notes/57_legal_release_branch_integration_plan.md`, `notes/22_release_triage_tracker.csv`
+- 証跡フォルダ索引に `14_app_store_reviews/` を追加した。
+- 法務branch統合手順のstage禁止範囲を `notes/74` まで広げた。
+- RL-072としてApp Store評価・レビュー返信運用を追加した。
 
-#### `notes/32_testflight_review_submission_runbook.md`
-- 提出記録へ転記シート最終版と、リジェクト時の `notes/41` 分類結果を追加した。
+### 影響範囲
 
-#### `notes/36_submission_evidence_checklist.md`
-- App Store Connectへ入力した最終文面を証跡に追加した。
-- 関連文書に `notes/40` と `notes/41` を追加した。
+- App Store公開後のRatings and Reviews確認
+- 公開レビュー返信、concern report、overview rating reset
+- サポート受信、個人情報・セキュリティ事故初動、公開初日監視、証跡保存
+- コード、App Store Connect設定、公開URL、サポートツール、証跡ファイルは変更していない。
 
-#### `notes/39_release_command_center.md`
-- 文書マップ、実行順、リジェクト時手順、最短ルートへ `notes/40` と `notes/41` を追加した。
+### 確認方法
+
+- `rg -n "RL-072|notes/74|Ratings / Reviews|評価・レビュー返信|14_app_store_reviews|REVW-" notes/74_app_store_ratings_reviews_response_runbook.md notes/39_release_command_center.md notes/50_release_go_no_go_decision_matrix.md notes/22_release_triage_tracker.csv notes/64_release_evidence_folder_index.md`
+- `python3 - <<'PY' ...` による `notes/22_release_triage_tracker.csv` のCSV parse確認
+- 旧規約用語・旧主体表現チェック（旧提案/旧メッセージ/旧投稿関連、サービス主体表現）
+- `git diff --check -- notes`
+
+### セルフレビュー結果
+
+- ✅ コード、App Store Connect設定、公開URL、サポートツール、証跡ファイルは変更していない。
+- ✅ 公開レビュー返信を個別メール返信と分け、公開表示される前提のNG表現チェックを追加した。
+- ✅ 安全、個人情報、IAP、ログイン、アカウント削除、事故疑いのレビューを既存Runbookへ接続した。
+- ✅ concern reportとoverview rating resetを「低評価を隠す」目的ではなく、公式機能として慎重に扱う形にした。
+- ✅ 実レビュー本文全文、ユーザー名、個人情報、認証情報を公開リポジトリに残さない方針を維持した。
+- ✅ Apple公式ヘルプのRatings and reviews、Respond to reviews、Reset an app overview ratingを参照した。
+- ✅ 状態名の追加/改名はなく、Megrumの状態遷移変更ではないため `notes/09_state_machines.md` 更新は不要。
+- ✅ 新用語はApp Store運用語の範囲内のため、`notes/10_glossary.md` 更新は不要。
+- ✅ DBスキーマ変更はなく、`notes/05_data_model.md` 更新は不要。
+
+### 関連ファイル
+
+- `notes/74_app_store_ratings_reviews_response_runbook.md`
+- `notes/39_release_command_center.md`
+- `notes/30_owner_release_action_sheet.md`
+- `notes/50_release_go_no_go_decision_matrix.md`
+- `notes/51_post_submission_release_day_runbook.md`
+- `notes/67_support_inbox_triage_runbook.md`
+- `notes/34_support_response_templates.md`
+- `notes/64_release_evidence_folder_index.md`
+- `notes/57_legal_release_branch_integration_plan.md`
+- `notes/22_release_triage_tracker.csv`
+
+---
+
+## イテレーション395：公開停止とAvailability変更を追加
+
+### 背景・問題意識
+
+承認後の手動公開制御を `notes/72` で整理したが、公開後に他人データ表示、Privacy URL障害、App Privacy不一致、IAP重大不具合などが起きた場合に、App Store上で地域Availabilityを外す、`Remove App From Sale` を使う、旧versionを unavailable にする、new buildを出す、復帰条件を判断する専用手順がまだ不足していた。公開停止は「押せば全部止まる」操作ではなく、既存入手ユーザーやサポート対応が残るため、公開停止・復帰のRunbookを追加した。
+
+### 変更内容
+
+#### `notes/73_app_store_availability_emergency_stop_runbook.md`
+- 公開後のP0事故疑い時に、Territory deselect、`Remove App From Sale`、旧version unavailable、new build、サポート告知、復帰判断を行うRunbookを追加した。
+- Apple公式ヘルプに基づき、Availability変更は最大24時間の反映があり、既存入手ユーザーへの影響が残る場合があることを明記した。
+- 停止判断スナップショット、即時停止候補、地域Availability変更手順、`Remove App From Sale` 手順、旧version/new build判断、復帰判定を整理した。
+
+#### `notes/72_app_store_approval_release_control_runbook.md`, `notes/51_post_submission_release_day_runbook.md`, `notes/49_privacy_security_incident_response_runbook.md`, `notes/68_app_store_territory_dsa_iap_availability.md`
+- 公開後に止める判断、事故初動、配信地域判断から `notes/73` への導線を追加した。
+- App Store上の停止操作だけで事故対応が完了しないことを明確化した。
+
+#### `notes/39_release_command_center.md`, `notes/30_owner_release_action_sheet.md`, `notes/50_release_go_no_go_decision_matrix.md`
+- コントロールボード、オーナー作業表、Go / No-Go判定表へ `notes/73` を追加した。
+- G23 Availability Stopとして、公開後のP0事故疑いに対する停止/復帰判断未整備をNo-Go化した。
+
+#### `notes/64_release_evidence_folder_index.md`, `notes/57_legal_release_branch_integration_plan.md`, `notes/22_release_triage_tracker.csv`
+- 証跡フォルダ索引に `13_availability_stop/` を追加した。
+- 法務branch統合手順のstage禁止範囲を `notes/73` まで広げた。
+- RL-071としてApp Store公開停止・Availability変更を追加した。
+
+### 影響範囲
+
+- 公開後の重大障害、個人情報又はセキュリティ事故疑い、App Privacy不一致、公開URL障害、IAP重大不具合
+- App Store Availability、Territory deselect、Remove App From Sale、旧version unavailable、new build
+- サポート告知、FAQ、復帰判定、証跡保存
+- コード、App Store Connect設定、Apple Developer設定、公開URL、証跡ファイルは変更していない。
+
+### 確認方法
+
+- `rg -n "RL-071|notes/73|Availability Stop|Remove App From Sale|Territory deselect|公開停止・Availability変更|旧version" notes/73_app_store_availability_emergency_stop_runbook.md notes/39_release_command_center.md notes/50_release_go_no_go_decision_matrix.md notes/22_release_triage_tracker.csv notes/72_app_store_approval_release_control_runbook.md notes/64_release_evidence_folder_index.md`
+- `python3 - <<'PY' ...` による `notes/22_release_triage_tracker.csv` のCSV parse確認
+- 旧規約用語・旧主体表現チェック（旧提案/旧メッセージ/旧投稿関連、サービス主体表現）
+- `git diff --check -- notes`
+
+### セルフレビュー結果
+
+- ✅ コード、App Store Connect設定、Apple Developer設定、公開URL、証跡ファイルは変更していない。
+- ✅ 公開停止を「事故初動」「サポート受信」「手動公開制御」「配信地域判断」と接続した。
+- ✅ Territory deselect、Remove App From Sale、旧version unavailable、new buildを使い分ける形にした。
+- ✅ 既存入手ユーザーへの影響が残る可能性、反映に最大24時間かかる可能性、サポート/削除/個人情報請求は継続する点を明記した。
+- ✅ 実パスワード、secret、token、影響ユーザーの不要な個人情報を記録しない方針を維持した。
+- ✅ Apple公式ヘルプのAvailability管理、Remove App From Sale、version unavailableを参照した。
+- ✅ 状態名の追加/改名はApp Store運用状態の参照のみで、Megrumの状態遷移変更ではないため `notes/09_state_machines.md` 更新は不要。
+- ✅ 新用語はApp Store提出準備用語の範囲内のため、`notes/10_glossary.md` 更新は不要。
+- ✅ DBスキーマ変更はなく、`notes/05_data_model.md` 更新は不要。
+
+### 関連ファイル
+
+- `notes/73_app_store_availability_emergency_stop_runbook.md`
+- `notes/72_app_store_approval_release_control_runbook.md`
+- `notes/51_post_submission_release_day_runbook.md`
+- `notes/49_privacy_security_incident_response_runbook.md`
+- `notes/68_app_store_territory_dsa_iap_availability.md`
+- `notes/39_release_command_center.md`
+- `notes/30_owner_release_action_sheet.md`
+- `notes/50_release_go_no_go_decision_matrix.md`
+- `notes/64_release_evidence_folder_index.md`
+- `notes/57_legal_release_branch_integration_plan.md`
+- `notes/22_release_triage_tracker.csv`
+
+---
+
+## イテレーション394：承認後の手動公開制御を追加
+
+### 背景・問題意識
+
+App Store初回提出の準備がSubmit直前まで細かく分解されてきた一方で、承認後の `Pending Developer Release` から `Release This Version` を押す直前までの読み合わせ、Release option確認、公開初日監視、公開後に止める判断は `notes/51` の大枠に留まっていた。承認後に意図しない自動公開や公開タイミング誤りを起こさないため、手動公開制御を独立Runbookとして追加した。
+
+### 変更内容
+
+#### `notes/72_app_store_approval_release_control_runbook.md`
+- App Review承認後の `Pending Developer Release`、Release option、`Release This Version`、公開URL、サポート受信、事故疑いなしを読み合わせるRunbookを追加した。
+- Release option QA、PDR gate、手動公開操作、T+0〜T+24h監視、将来アップデート時の段階的リリース、公開後に止める判断を整理した。
+- Apple公式ヘルプのApp Store version release option、App status、phased releaseへの参照を追加した。
+
+#### `notes/51_post_submission_release_day_runbook.md`, `notes/62_app_review_manual_submission_checklist.md`, `notes/71_app_store_connect_final_input_reconciliation.md`
+- 提出後ランブック、手動提出チェック、最終入力差分QAから `notes/72` への導線を追加した。
+- 承認後は `notes/72` のPDR gateで読み合わせる流れへ更新した。
+
+#### `notes/39_release_command_center.md`, `notes/30_owner_release_action_sheet.md`, `notes/50_release_go_no_go_decision_matrix.md`
+- コントロールボード、オーナー作業表、Go / No-Go判定表へ `notes/72` を追加した。
+- Phase Dとして承認後・公開前の実行順を追加し、G22 Release Controlとして公開制御未整備をNo-Go化した。
+
+#### `notes/36_submission_evidence_checklist.md`, `notes/64_release_evidence_folder_index.md`
+- 承認後のRelease option、PDR gate、`Release This Version`、公開初日監視の証跡項目を追加した。
+- 証跡フォルダ索引の `10_submission/` と `12_release_day/` に公開制御用の保存項目を追加した。
+
+#### `notes/24_app_store_submission_pack.md`, `notes/57_legal_release_branch_integration_plan.md`, `notes/22_release_triage_tracker.csv`
+- 提出パック、法務branch統合手順、リリーストリアージから `notes/72` への導線を追加した。
+- RL-070としてApp Store承認後・手動公開制御を追加した。
+
+### 影響範囲
+
+- App Review承認後の公開操作
+- `Pending Developer Release`、Release option、`Release This Version`
+- 公開URL、サポート受信、App Privacy、配信地域、DSA、IAP Availability
+- 公開初日監視、公開後に止める判断
+- コード、App Store Connect設定、Apple Developer設定、公開URL、証跡ファイルは変更していない。
+
+### 確認方法
+
+- `rg -n "RL-070|notes/72|Release Control|Pending Developer Release|Release This Version|PDR gate|承認後・手動公開制御" notes/72_app_store_approval_release_control_runbook.md notes/39_release_command_center.md notes/50_release_go_no_go_decision_matrix.md notes/22_release_triage_tracker.csv notes/51_post_submission_release_day_runbook.md notes/64_release_evidence_folder_index.md`
+- `python3 - <<'PY' ...` による `notes/22_release_triage_tracker.csv` のCSV parse確認
+- 旧規約用語・旧主体表現チェック（旧提案/旧メッセージ/旧投稿関連、サービス主体表現）
+- `git diff --check -- notes`
+
+### セルフレビュー結果
+
+- ✅ コード、App Store Connect設定、Apple Developer設定、公開URL、証跡ファイルは変更していない。
+- ✅ Submit前のQAではなく、承認後・公開前の公開制御に目的を絞った。
+- ✅ 手動公開を初回推奨とし、Automatic / Date releaseを選ぶ場合はオーナー明示承認を必要にした。
+- ✅ PDR gateに `notes/50`, `notes/70`, `notes/71`, 公開URL、サポート受信、事故疑いなし、配信地域/DSA/IAPを接続した。
+- ✅ 実パスワード、secret、token、実代表者情報を記録しない方針を維持した。
+- ✅ Apple公式ヘルプの手動公開、App status、段階的リリースを参照した。
+- ✅ 状態名の追加/改名はApp Store Connect運用状態の参照のみで、Megrumの状態遷移変更ではないため `notes/09_state_machines.md` 更新は不要。
+- ✅ 新用語はApp Store提出準備用語の範囲内のため、`notes/10_glossary.md` 更新は不要。
+- ✅ DBスキーマ変更はなく、`notes/05_data_model.md` 更新は不要。
+
+### 関連ファイル
+
+- `notes/72_app_store_approval_release_control_runbook.md`
+- `notes/51_post_submission_release_day_runbook.md`
+- `notes/62_app_review_manual_submission_checklist.md`
+- `notes/71_app_store_connect_final_input_reconciliation.md`
+- `notes/39_release_command_center.md`
+- `notes/30_owner_release_action_sheet.md`
+- `notes/50_release_go_no_go_decision_matrix.md`
+- `notes/36_submission_evidence_checklist.md`
+- `notes/64_release_evidence_folder_index.md`
+- `notes/24_app_store_submission_pack.md`
+- `notes/57_legal_release_branch_integration_plan.md`
+- `notes/22_release_triage_tracker.csv`
+
+---
+
+## イテレーション393：App Store Connect最終入力差分QAを追加
+
+### 背景・問題意識
+
+App Store Connectへmetadata、Review Notes、App Privacy、build、IAP等を実入力した後は、下書きdocsと実入力値がズレる可能性がある。Submit for Review直前に誤build、URL不一致、Privacy回答漏れ、未完成機能の訴求、IAP同時提出漏れを見落とすと審査遅延につながるため、実入力値と提出docs/buildを照合する最終差分QAを追加した。
+
+### 変更内容
+
+#### `notes/71_app_store_connect_final_input_reconciliation.md`
+- App Store Connect実入力値を、完成候補build、`notes/31`、`notes/40`、公開URL、App Privacy、Review Notes、商品ページ素材QA、同時提出itemと照合する台帳を追加した。
+- App Information、Version Metadata、App Review Information、App Privacy/質問票/IAP、Draft Submissionの差分QAを分けた。
+- 誤字、未露出機能残り、Privacy回答漏れ、Build/Version取り違え、コード修正が必要な差分、法務レビュー回答との矛盾、secret入り証跡の対応判断を整理した。
+- Apple公式ヘルプのRequired/localizable/editable properties、App information、Platform version information、Submit an appへの参照を追加した。
+
+#### `notes/24_app_store_submission_pack.md`, `notes/31_app_store_connect_metadata_worksheet.md`, `notes/40_app_store_connect_copy_paste_sheet.md`, `notes/60_app_store_localization_metadata_qa.md`, `notes/62_app_review_manual_submission_checklist.md`
+- 入力前のワークシート、転記用シート、ローカライズQA、手動提出チェックから `notes/71` への導線を追加した。
+- Add for Review前に最終入力差分QAを確認するチェックを追加した。
+
+#### `notes/36_submission_evidence_checklist.md`, `notes/64_release_evidence_folder_index.md`
+- 提出証跡と証跡フォルダ索引に、App Store Connect実入力値と提出docs/buildの最終差分QAを保存する項目を追加した。
+
+#### `notes/39_release_command_center.md`, `notes/30_owner_release_action_sheet.md`, `notes/50_release_go_no_go_decision_matrix.md`, `notes/57_legal_release_branch_integration_plan.md`
+- コントロールボード、オーナー作業表、Go / No-Go Gate、法務branch統合手順へ `notes/71` を追加した。
+- G21 ASC Final Inputとして、実入力値が提出docs、完成build、公開URL、App Privacy、Review Notes、同時提出itemと未照合又は矛盾する状態をNo-Go化した。
+- 法務docsのstage禁止範囲を `notes/71` まで広げた。
 
 #### `notes/22_release_triage_tracker.csv`
-- RL-038としてApp Store Connect転記用最終文面を追加した。
-- RL-039としてApp Review指摘対応テンプレートを追加した。
+- RL-069としてApp Store Connect最終入力差分QAを追加した。
+
+### 影響範囲
+
+- App Store Connect実入力
+- App Information、Version Metadata、Review Notes、App Privacy、質問票、IAP、Draft Submission
+- 公開URL、商品ページ素材、ローカライズ
+- 提出証跡、Go / No-Go判定
+- コード、App Store Connect設定、Apple Developer設定、公開URL、証跡ファイルは変更していない。
+
+### 確認方法
+
+- `rg -n "RL-069|notes/71|ASC Final Input|最終入力差分|Draft Submission|Submit for Review" notes/71_app_store_connect_final_input_reconciliation.md notes/39_release_command_center.md notes/50_release_go_no_go_decision_matrix.md notes/22_release_triage_tracker.csv notes/31_app_store_connect_metadata_worksheet.md notes/40_app_store_connect_copy_paste_sheet.md notes/62_app_review_manual_submission_checklist.md`
+- `python3 - <<'PY' ...` による `notes/22_release_triage_tracker.csv` のCSV parse確認
+- 旧規約用語・旧主体表現チェック（旧提案/旧メッセージ/旧投稿関連、サービス主体表現）
+- `git diff --check -- notes`
+
+### セルフレビュー結果
+
+- ✅ コード、App Store Connect設定、Apple Developer設定、公開URL、証跡ファイルは変更していない。
+- ✅ 入力前の下書きdocsではなく、実入力後・Submit前の差分照合に目的を絞った。
+- ✅ 実パスワード、secret、token、実代表者情報を記録しない方針を維持した。
+- ✅ 誤build、URL不一致、Privacy回答漏れ、未完成機能訴求、IAP同時提出漏れをNo-Go対象として整理した。
+- ✅ Apple公式ヘルプのmetadata必須項目と提出操作を参照した。
+- ✅ 状態名の追加/改名はなく、`notes/09_state_machines.md` 更新は不要。
+- ✅ 新用語はApp Store提出準備用語の範囲内のため、`notes/10_glossary.md` 更新は不要。
+- ✅ DBスキーマ変更はなく、`notes/05_data_model.md` 更新は不要。
+
+### 関連ファイル
+
+- `notes/71_app_store_connect_final_input_reconciliation.md`
+- `notes/24_app_store_submission_pack.md`
+- `notes/31_app_store_connect_metadata_worksheet.md`
+- `notes/40_app_store_connect_copy_paste_sheet.md`
+- `notes/60_app_store_localization_metadata_qa.md`
+- `notes/62_app_review_manual_submission_checklist.md`
+- `notes/36_submission_evidence_checklist.md`
+- `notes/64_release_evidence_folder_index.md`
+- `notes/39_release_command_center.md`
+- `notes/30_owner_release_action_sheet.md`
+- `notes/50_release_go_no_go_decision_matrix.md`
+- `notes/57_legal_release_branch_integration_plan.md`
+- `notes/22_release_triage_tracker.csv`
+
+---
+
+## イテレーション392：商品ページ素材QAを追加
+
+### 背景・問題意識
+
+App Store初回提出では、App Store説明文やReview Notesだけでなく、App icon、スクリーンショット、App Preview、poster frame、ローカライズ別素材が商品ページに表示される。素材が古いUI、未完成機能、実データ、権利未確認画像、初回スコープ外の機能を含むと、審査遅延や公開後の誤認につながるため、商品ページ素材専用のQAチェックリストを追加した。
+
+### 変更内容
+
+#### `notes/70_app_store_product_page_asset_qa.md`
+- App icon、スクリーンショット、App Preview、poster frame、ローカライズ別素材、Product Page PreviewのQA表を追加した。
+- 初回はApp Previewなし候補、スクショ6〜8枚候補、先頭3枚重視、App iconは完成build由来のみという推奨を整理した。
+- 実データ、権利物、debug表示、未完成機能、初回で隠す機能の露出をNo-Goとして明記した。
+- Apple公式ヘルプのApp icon、Product Page、App Preview/Screenshot、Screenshot specificationsへの参照を追加した。
+
+#### `notes/28_app_store_screenshot_storyboard.md`, `notes/60_app_store_localization_metadata_qa.md`, `notes/62_app_review_manual_submission_checklist.md`
+- スクショ台本、ローカライズQA、手動提出チェックから `notes/70` への導線を追加した。
+- App Review提出直前に、App icon、App Preview、poster frame、Product Page Previewを同じ素材QAで確認する流れにした。
+
+#### `notes/36_submission_evidence_checklist.md`, `notes/64_release_evidence_folder_index.md`
+- 提出証跡と証跡フォルダ索引に、商品ページ素材QAとProduct Page Preview確認を保存する項目を追加した。
+
+#### `notes/39_release_command_center.md`, `notes/30_owner_release_action_sheet.md`, `notes/50_release_go_no_go_decision_matrix.md`, `notes/57_legal_release_branch_integration_plan.md`
+- コントロールボード、オーナー作業表、Go / No-Go Gate、法務branch統合手順へ `notes/70` を追加した。
+- G20 Product Page Assetsとして、商品ページ素材の未確認又は矛盾をNo-Go化した。
+- 法務docsのstage禁止範囲を `notes/70` まで広げた。
+
+#### `notes/22_release_triage_tracker.csv`
+- RL-068としてApp Store商品ページ素材QAを追加した。
+
+### 影響範囲
+
+- App Store商品ページ
+- App icon、スクリーンショット、App Preview、poster frame
+- Product Page Preview
+- App Store Connect入力
+- ローカライズ素材
+- 提出証跡、Go / No-Go判定
+- コード、Xcode asset catalog、App Store Connect設定、画像/動画ファイル、公開URLは変更していない。
+
+### 確認方法
+
+- `rg -n "RL-068|notes/70|Product Page|App Preview|poster frame|App icon|商品ページ素材" notes/70_app_store_product_page_asset_qa.md notes/39_release_command_center.md notes/50_release_go_no_go_decision_matrix.md notes/22_release_triage_tracker.csv notes/28_app_store_screenshot_storyboard.md notes/60_app_store_localization_metadata_qa.md notes/62_app_review_manual_submission_checklist.md`
+- `python3 - <<'PY' ...` による `notes/22_release_triage_tracker.csv` のCSV parse確認
+- 旧規約用語・旧主体表現チェック（旧提案/旧メッセージ/旧投稿関連、サービス主体表現）
+- `git diff --check -- notes`
+
+### セルフレビュー結果
+
+- ✅ コード、Xcode asset catalog、App Store Connect設定、画像/動画ファイル、公開URLは変更していない。
+- ✅ App Store商品ページ素材のQAを、スクショ台本やローカライズQAではなく専用文書へ分離した。
+- ✅ App Previewは初回なし候補とし、出す場合だけposter frameと処理待ちを確認する形にした。
+- ✅ 実データ、権利物、debug表示、未完成機能、初回で隠す機能の露出をNo-Go化した。
+- ✅ Apple公式ヘルプとProduct Page情報を参照した。
+- ✅ 状態名の追加/改名はなく、`notes/09_state_machines.md` 更新は不要。
+- ✅ 新用語は既存のApp Store提出準備用語の範囲内のため、`notes/10_glossary.md` 更新は不要。
+- ✅ DBスキーマ変更はなく、`notes/05_data_model.md` 更新は不要。
+
+### 関連ファイル
+
+- `notes/70_app_store_product_page_asset_qa.md`
+- `notes/28_app_store_screenshot_storyboard.md`
+- `notes/60_app_store_localization_metadata_qa.md`
+- `notes/62_app_review_manual_submission_checklist.md`
+- `notes/36_submission_evidence_checklist.md`
+- `notes/64_release_evidence_folder_index.md`
+- `notes/39_release_command_center.md`
+- `notes/30_owner_release_action_sheet.md`
+- `notes/50_release_go_no_go_decision_matrix.md`
+- `notes/57_legal_release_branch_integration_plan.md`
+- `notes/22_release_triage_tracker.csv`
+
+---
+
+## イテレーション391：App Review指摘トリアージを追加
+
+### 背景・問題意識
+
+App Review提出後にリジェクト、Metadata Rejected、Unresolved Issues、追加情報要求が来た場合、返信テンプレートだけでは、同じbuildで直せるのか、新buildが必要なのか、却下itemを削除するのか、appealすべきなのかの判断がぶれやすい。誤って不正確な返信や不要なコード変更を行うと、審査遅延や開発セッションとの混線につながるため、指摘受領後の初動Runbookを追加した。
+
+### 変更内容
+
+#### `notes/69_app_review_rejection_triage_runbook.md`
+- App Reviewリジェクト、Metadata Rejected、Unresolved Issues、追加情報要求、TestFlight App Review指摘を受けた時の初動15分、分類表、判断ツリー、返信前チェック、appeal判断を追加した。
+- 同じbuildで直せる可能性が高いものと、新buildが必要になりやすいものを分けた。
+- Apple本文の全文保存、Guideline分類、item削除、Remove submission、appeal候補、証跡保存の扱いを整理した。
+- Apple公式ヘルプのReply to App Review messages、Manage a submission with unresolved issues、Remove a submission from review、Submit an app、App Review Guidelinesへの参照を追加した。
+
+#### `notes/41_app_review_response_templates.md`, `notes/51_post_submission_release_day_runbook.md`
+- 返信文テンプレートを使う前に `notes/69` で分類と判断を行う導線を追加した。
+
+#### `notes/39_release_command_center.md`, `notes/30_owner_release_action_sheet.md`, `notes/50_release_go_no_go_decision_matrix.md`, `notes/57_legal_release_branch_integration_plan.md`
+- App Review指摘トリアージへの導線、Go / No-Go Gate、法務docsのstage禁止範囲を追加した。
+
+#### `notes/36_submission_evidence_checklist.md`, `notes/64_release_evidence_folder_index.md`
+- リジェクト時証跡に、同じbuild/new build/却下item削除/appeal判断を残す項目を追加した。
+
+#### `notes/22_release_triage_tracker.csv`
+- RL-067としてApp Reviewリジェクト・追加情報要求トリアージを追加した。
+
+### 影響範囲
+
+- App Review / TestFlight App Review指摘対応
+- Resolution Center返信
+- Metadata Rejected / Rejected / Unresolved Issues
+- 再提出、取り下げ、appeal判断
+- 開発セッションへのnew build依頼
+- 提出証跡、リリース証跡
+- コード、App Store Connect設定、公開URL、法務原典docxは変更していない。
+
+### 確認方法
+
+- `rg -n "RL-067|notes/69|Unresolved Issues|appeal|new build|App Reviewリジェクト" notes/69_app_review_rejection_triage_runbook.md notes/39_release_command_center.md notes/50_release_go_no_go_decision_matrix.md notes/22_release_triage_tracker.csv`
+- `python3 - <<'PY' ...` による `notes/22_release_triage_tracker.csv` のCSV parse確認
+- 旧規約用語・旧主体表現チェック（旧提案/旧メッセージ/旧投稿関連、サービス主体表現）
+- `git diff --check -- notes`
+
+### セルフレビュー結果
+
+- ✅ コード、App Store Connect設定、公開URL、法務原典docxは変更していない。
+- ✅ 返信文そのものは `notes/41` に残し、`notes/69` は初動判断と証跡保存に絞った。
+- ✅ new buildが必要なものは開発セッションへ切り出し、`notes/65` で新しいRelease Candidateを受け取る流れにした。
+- ✅ Apple公式ヘルプとApp Review Guidelinesを参照した。
+- ✅ 状態名の追加/改名はなく、`notes/09_state_machines.md` 更新は不要。
+- ✅ 新用語は追加していないため、`notes/10_glossary.md` 更新は不要。
+- ✅ DBスキーマ変更はなく、`notes/05_data_model.md` 更新は不要。
+
+### 関連ファイル
+
+- `notes/69_app_review_rejection_triage_runbook.md`
+- `notes/41_app_review_response_templates.md`
+- `notes/51_post_submission_release_day_runbook.md`
+- `notes/39_release_command_center.md`
+- `notes/30_owner_release_action_sheet.md`
+- `notes/50_release_go_no_go_decision_matrix.md`
+- `notes/57_legal_release_branch_integration_plan.md`
+- `notes/36_submission_evidence_checklist.md`
+- `notes/64_release_evidence_folder_index.md`
+- `notes/22_release_triage_tracker.csv`
+
+---
+
+## イテレーション390：配信地域・EU DSA・IAP Availabilityを追加
+
+### 背景・問題意識
+
+App Store初回提出では、メタデータやPrivacyだけでなく、アプリ本体の配信地域、EU Digital Services Actのtrader status、App Store商品ページに表示される連絡先情報、IAPの提供地域を決める必要がある。初回MVPでAll CountriesやEU配信を安易に選ぶと、法務、サポート、ローカライズ、公開連絡先、IAP地域整合の確認範囲が広がるため、判断表を追加した。
+
+### 変更内容
+
+#### `notes/68_app_store_territory_dsa_iap_availability.md`
+- App Availability、EU DSA trader status、連絡先情報、IAP Availabilityの判断表を追加した。
+- 初回はJapanのみ候補、EU配信はDSA情報確認後、IAPは有料機能を隠すなら後回しという推奨を整理した。
+- 代表者情報非公表方針とDSA表示の関係、IAP Availabilityと特商法/App Privacy/Review Notesの整合チェックを追加した。
+- Apple公式ヘルプのApp Availability、IAP Availability、EU DSA trader requirements、IAP pricing and availabilityへの参照を追加した。
+
+#### `notes/31_app_store_connect_metadata_worksheet.md`, `notes/33_iap_product_setup_worksheet.md`, `notes/46_app_store_questionnaire_answer_sheet.md`
+- 配信地域、EU DSA、IAP Availability判断への導線を追加した。
+
+#### `notes/39_release_command_center.md`, `notes/30_owner_release_action_sheet.md`, `notes/50_release_go_no_go_decision_matrix.md`, `notes/57_legal_release_branch_integration_plan.md`
+- 配信地域・EU DSA・IAP Availabilityへの導線とGo / No-Go Gateを追加し、法務docsのstage禁止範囲を `notes/68` まで広げた。
+
+#### `notes/22_release_triage_tracker.csv`
+- RL-066として配信地域・EU DSA・IAP Availabilityを追加した。
+
+### 影響範囲
+
+- App Store Connect Pricing and Availability
+- EU DSA trader status
+- App Store商品ページに表示される連絡先
+- IAP Availability
+- 特商法表示、Support URL、Privacy URL
+- Go / No-Go判定
+- コード、App Store Connect設定、IAP商品、公開URL、法務原典docxは変更していない。
+
+### 確認方法
+
+- `rg -n "RL-066|DSA|trader|Availability|IAP Availability|Japanのみ|notes/68" notes/68_app_store_territory_dsa_iap_availability.md notes/39_release_command_center.md notes/50_release_go_no_go_decision_matrix.md notes/22_release_triage_tracker.csv`
+- `python3 - <<'PY' ...` による `notes/22_release_triage_tracker.csv` のCSV parse確認
+- 旧規約用語・旧主体表現チェック（旧提案/旧メッセージ/旧投稿関連、サービス主体表現）
+- `git diff --check -- notes`
+
+### セルフレビュー結果
+
+- ✅ コード、App Store Connect設定、IAP商品、公開URL、法務原典docxは変更していない。
+- ✅ 初回配信地域をJapanのみ候補として、EU DSAと公開連絡先の確認を分離した。
+- ✅ IAPを隠す場合/出す場合のAvailability、特商法、App Privacy、Review Notes整合を整理した。
+- ✅ 実連絡先、代表者情報、個人住所、個人電話番号をリポジトリに書かない方針を維持した。
+- ✅ 状態名の追加/改名はなく、`notes/09_state_machines.md` 更新は不要。
+- ✅ 新用語は追加していないため、`notes/10_glossary.md` 更新は不要。
+- ✅ DBスキーマ変更はなく、`notes/05_data_model.md` 更新は不要。
+
+### 関連ファイル
+
+- `notes/68_app_store_territory_dsa_iap_availability.md`
+- `notes/31_app_store_connect_metadata_worksheet.md`
+- `notes/33_iap_product_setup_worksheet.md`
+- `notes/46_app_store_questionnaire_answer_sheet.md`
+- `notes/39_release_command_center.md`
+- `notes/30_owner_release_action_sheet.md`
+- `notes/50_release_go_no_go_decision_matrix.md`
+- `notes/57_legal_release_branch_integration_plan.md`
+- `notes/22_release_triage_tracker.csv`
+
+---
+
+## イテレーション389：サポート受信トリアージRunbookを追加
+
+### 背景・問題意識
+
+App Store提出前後は、`support@megrum.jp` に通常問い合わせだけでなく、Apple審査員からの連絡、通報、安全相談、アカウント削除、個人情報請求、個人情報・セキュリティ事故疑いが入る可能性がある。返信テンプレートは用意済みだが、受信時の分類、受付番号、優先度、エスカレーションが曖昧だとP0を通常問い合わせとして放置するリスクがあるため、サポート受信トリアージRunbookを追加した。
+
+### 変更内容
+
+#### `notes/67_support_inbox_triage_runbook.md`
+- `support@megrum.jp` の受信箱ルール、初回トリアージ分類、受付番号ルール、受信時チェックリスト、エスカレーション表、P0初動、日次確認、提出前チェックを追加した。
+- App Review、通報/安全、個人情報・セキュリティ事故疑い、アカウント削除、個人情報請求、購入/IAP、ログイン、取引相談、不具合を優先度別に整理した。
+- パスワード、認証コード、secret、不要な本人確認書類を受け取らない方針を明記した。
+- Apple App Review Guidelines、Apple account deletion、Apple App Privacy Details、個人情報保護委員会の漏えい等対応情報への公式参照を追加した。
+
+#### `notes/34_support_response_templates.md`, `notes/47_domain_email_publication_runbook.md`
+- 返信テンプレートとメール運用から、受信箱トリアージRunbookへの導線を追加した。
+
+#### `notes/39_release_command_center.md`, `notes/30_owner_release_action_sheet.md`, `notes/50_release_go_no_go_decision_matrix.md`, `notes/57_legal_release_branch_integration_plan.md`
+- サポート受信トリアージへの導線とGo / No-Go Gateを追加し、法務docsのstage禁止範囲を `notes/67` まで広げた。
+
+#### `notes/22_release_triage_tracker.csv`
+- RL-065としてサポート受信トリアージを追加した。
+
+### 影響範囲
+
+- App Review連絡
+- `support@megrum.jp` の問い合わせ運用
+- 通報、安全相談、アカウント削除、個人情報請求
+- 個人情報・セキュリティ事故疑い
+- Go / No-Go判定
+- コード、メール設定、サポートツール設定、公開URL、DB、App Store Connect設定は変更していない。
+
+### 確認方法
+
+- `rg -n "RL-065|サポート受信|support@megrum.jp|受付番号|App Review|INC-|notes/67" notes/67_support_inbox_triage_runbook.md notes/39_release_command_center.md notes/50_release_go_no_go_decision_matrix.md notes/22_release_triage_tracker.csv`
+- `python3 - <<'PY' ...` による `notes/22_release_triage_tracker.csv` のCSV parse確認
+- 旧規約用語・旧主体表現チェック（旧提案/旧メッセージ/旧投稿関連、サービス主体表現）
+- `git diff --check -- notes`
+
+### セルフレビュー結果
+
+- ✅ コード、メール設定、サポートツール設定、公開URL、DB、App Store Connect設定は変更していない。
+- ✅ App Review連絡、削除、個人情報請求、通報、事故疑いを通常問い合わせと分ける形にした。
+- ✅ パスワード、認証コード、secret、不要な本人確認書類を受け取らない方針を維持した。
+- ✅ 公式参照はAppleと個人情報保護委員会に限定した。
+- ✅ 状態名の追加/改名はなく、`notes/09_state_machines.md` 更新は不要。
+- ✅ 新用語は追加していないため、`notes/10_glossary.md` 更新は不要。
+- ✅ DBスキーマ変更はなく、`notes/05_data_model.md` 更新は不要。
+
+### 関連ファイル
+
+- `notes/67_support_inbox_triage_runbook.md`
+- `notes/34_support_response_templates.md`
+- `notes/47_domain_email_publication_runbook.md`
+- `notes/39_release_command_center.md`
+- `notes/30_owner_release_action_sheet.md`
+- `notes/50_release_go_no_go_decision_matrix.md`
+- `notes/57_legal_release_branch_integration_plan.md`
+- `notes/22_release_triage_tracker.csv`
+
+---
+
+## イテレーション388：法務レビュー後公開文面最終化Runbookを追加
+
+### 背景・問題意識
+
+弁護士レビュー回答を受け取った後、利用規約やプライバシーポリシーだけを更新して、Support、FAQ、App Store説明文、Review Notes、App Privacy回答のどこかに古い前提が残ると、公開前の法務・審査リスクになる。回答を横断反映するためのRunbookを追加した。
+
+### 変更内容
+
+#### `notes/66_legal_review_publication_runbook.md`
+- 弁護士回答受領後の反映フロー、論点別反映マップ、公開文面更新チェック、公開URL反映前QA、確認コマンド、反映完了記録テンプレートを追加した。
+- Apple App Review Guidelines、Apple Account Deletion、Apple App Privacy Details、消費者庁 特定商取引法ガイド、個人情報保護委員会ガイドライン/Q&Aへの公式参照を追加した。
+- 回答全文や実パスワード、secret、実ユーザー情報、実代表者情報を公開リポジトリに書かない方針を明記した。
+
+#### `notes/58_legal_review_response_tracker.md`, `notes/37_public_url_publication_checklist.md`
+- 法務レビュー回答後の公開文面最終化Runbookへの導線を追加した。
+
+#### `notes/39_release_command_center.md`, `notes/30_owner_release_action_sheet.md`, `notes/57_legal_release_branch_integration_plan.md`
+- 法務レビュー後公開文面最終化への導線を追加し、法務docsのstage禁止範囲を `notes/66` まで広げた。
+
+#### `notes/50_release_go_no_go_decision_matrix.md`
+- G16 Legal Publicationとして、弁護士回答の公開文面/App Store文面への横断反映Gateを追加した。
+
+#### `notes/22_release_triage_tracker.csv`
+- RL-064として法務レビュー後公開文面最終化を追加した。
+
+### 影響範囲
+
+- 弁護士レビュー回答の反映管理
+- 利用規約、プライバシーポリシー、特商法表示
+- 公開サポート、FAQ、アカウント削除、通報、安全、AI説明
+- App Store説明文、Review Notes、App Privacy回答
+- Go / No-Go判定
+- コード、公開URL、App Store Connect設定、法務原典docx、実アカウント情報は変更していない。
+
+### 確認方法
+
+- `rg -n "RL-064|法務レビュー後|Legal Publication|消費者庁|個人情報保護委員会|notes/66" notes/66_legal_review_publication_runbook.md notes/39_release_command_center.md notes/50_release_go_no_go_decision_matrix.md notes/22_release_triage_tracker.csv`
+- `python3 - <<'PY' ...` による `notes/22_release_triage_tracker.csv` のCSV parse確認
+- 旧規約用語・旧主体表現チェック（旧提案/旧メッセージ/旧投稿関連、サービス主体表現）
+- `git diff --check -- notes`
+
+### セルフレビュー結果
+
+- ✅ コード、公開URL、App Store Connect設定、法務原典docx、実アカウント情報は変更していない。
+- ✅ 弁護士回答をTerms、Privacy、Support、FAQ、Review Notes、App Privacyへ横断反映する流れにした。
+- ✅ 回答全文、実パスワード、secret、実ユーザー情報、実代表者情報を書かない方針を維持した。
+- ✅ 公式参照はApple、消費者庁、個人情報保護委員会に限定した。
+- ✅ 状態名の追加/改名はなく、`notes/09_state_machines.md` 更新は不要。
+- ✅ 新用語は追加していないため、`notes/10_glossary.md` 更新は不要。
+- ✅ DBスキーマ変更はなく、`notes/05_data_model.md` 更新は不要。
+
+### 関連ファイル
+
+- `notes/66_legal_review_publication_runbook.md`
+- `notes/58_legal_review_response_tracker.md`
+- `notes/37_public_url_publication_checklist.md`
+- `notes/39_release_command_center.md`
+- `notes/30_owner_release_action_sheet.md`
+- `notes/57_legal_release_branch_integration_plan.md`
+- `notes/50_release_go_no_go_decision_matrix.md`
+- `notes/22_release_triage_tracker.csv`
+
+---
+
+## イテレーション387：Release Candidateハンドオフを追加
+
+### 背景・問題意識
+
+開発セッションと法務・提出準備セッションを別ツリーに分けたことで、コード差分は混ざりにくくなった。一方で、完成候補ビルドを受け取る時にVersion、Build、commit SHA、検証結果、出す/隠す機能が曖昧だと、違うBuildを提出したり、未完成機能をApp Store文面で説明してしまうリスクがあるため、Release Candidateハンドオフ表を追加した。
+
+### 変更内容
+
+#### `notes/65_release_candidate_handoff.md`
+- 開発セッションから受け取るRelease Candidate情報、機能スコープ、検証結果、法務・提出側の受領後作業、差し戻し条件、完了テンプレートを追加した。
+- 元ツリーの開発差分は開発セッションがcommitし、法務docsは `codex/legal-release-prep` を正本とする原則を明記した。
+
+#### `notes/32_testflight_review_submission_runbook.md`, `notes/50_release_go_no_go_decision_matrix.md`
+- 完成候補ビルド受領時に `notes/65` を使う導線と、Go / No-Go Gateを追加した。
+
+#### `notes/39_release_command_center.md`, `notes/30_owner_release_action_sheet.md`, `notes/57_legal_release_branch_integration_plan.md`
+- Release Candidateハンドオフへの導線を追加し、法務docsのstage禁止範囲を `notes/65` まで広げた。
+
+#### `notes/22_release_triage_tracker.csv`
+- RL-063としてRelease Candidateハンドオフを追加した。
+
+### 影響範囲
+
+- 開発セッションからの完成候補ビルド受領
+- TestFlight / App Review提出準備
+- Go / No-Go判定
+- 法務branch統合手順
+- コード、ビルド、App Store Connect設定、公開URL、DB、外部サービス設定は変更していない。
+
+### 確認方法
+
+- `rg -n "RL-063|Release Candidate|commit SHA|RC Handoff|差し戻し|notes/65" notes/65_release_candidate_handoff.md notes/39_release_command_center.md notes/50_release_go_no_go_decision_matrix.md notes/22_release_triage_tracker.csv`
+- `python3 - <<'PY' ...` による `notes/22_release_triage_tracker.csv` のCSV parse確認
+- 旧規約用語・旧主体表現チェック（旧提案/旧メッセージ/旧投稿関連、サービス主体表現）
+- `git diff --check -- notes`
+
+### セルフレビュー結果
+
+- ✅ コード、ビルド、App Store Connect設定、公開URL、DB、外部サービス設定は変更していない。
+- ✅ 開発側のVersion、Build、commit SHA、検証結果、出す/隠す機能を受け取る形にした。
+- ✅ ハンドオフ後にP0コード修正が入った場合は新Buildで再確認する原則を明記した。
+- ✅ 状態名の追加/改名はなく、`notes/09_state_machines.md` 更新は不要。
+- ✅ 新用語は追加していないため、`notes/10_glossary.md` 更新は不要。
+- ✅ DBスキーマ変更はなく、`notes/05_data_model.md` 更新は不要。
+
+### 関連ファイル
+
+- `notes/65_release_candidate_handoff.md`
+- `notes/32_testflight_review_submission_runbook.md`
+- `notes/50_release_go_no_go_decision_matrix.md`
+- `notes/39_release_command_center.md`
+- `notes/30_owner_release_action_sheet.md`
+- `notes/57_legal_release_branch_integration_plan.md`
+- `notes/22_release_triage_tracker.csv`
+
+---
+
+## イテレーション386：リリース証跡フォルダ索引を追加
+
+### 背景・問題意識
+
+App Store初回提出では、Build、TestFlight、公開URL、App Privacy、Review Notes、スクショ、Submit for Review、承認後公開の証跡が複数箇所に分散しやすい。後日の審査対応や公開初日監視で「どこに何を保存したか」を追えるように、証跡フォルダ構成、命名、manifest、保存してよい情報/保存しない情報を整理した。
+
+### 変更内容
+
+#### `notes/64_release_evidence_folder_index.md`
+- リリース証跡の保存先方針、フォルダ構成案、命名規則、`00_manifest.md` テンプレートを追加した。
+- Build、TestFlight、公開URL、App Privacy、Privacy Manifest/SDK、スクショ、Review Notes、Safety、Security、Submission、Review Response、Release Dayのエリア別証跡を整理した。
+- 実パスワード、認証コード、secret、実ユーザー情報、管理画面情報を保存しないルールを明記した。
+
+#### `notes/36_submission_evidence_checklist.md`, `notes/62_app_review_manual_submission_checklist.md`
+- 証跡フォルダ索引への導線を追加した。
+
+#### `notes/39_release_command_center.md`, `notes/30_owner_release_action_sheet.md`
+- 証跡フォルダ索引への導線を追加した。
+
+#### `notes/57_legal_release_branch_integration_plan.md`
+- 法務・リリース準備docsのstage禁止範囲を `notes/64` まで広げた。
+
+#### `notes/22_release_triage_tracker.csv`
+- RL-062としてリリース証跡フォルダ索引を追加した。
+
+### 影響範囲
+
+- App Store提出証跡
+- TestFlight内部確認
+- 公開URL確認
+- App Privacy / Privacy Manifest / SDK監査
+- Review Notes / メタデータ控え
+- Submit for Review / 審査中対応 / 承認後公開
+- コード、ビルド、App Store Connect設定、公開URL、実証跡ファイルは変更していない。
+
+### 確認方法
+
+- `rg -n "RL-062|release_evidence|00_manifest|実パスワード|Submit for Review|リリース証跡" notes/64_release_evidence_folder_index.md notes/39_release_command_center.md notes/22_release_triage_tracker.csv`
+- `python3 - <<'PY' ...` による `notes/22_release_triage_tracker.csv` のCSV parse確認
+- 旧規約用語・旧主体表現チェック（旧提案/旧メッセージ/旧投稿関連、サービス主体表現）
+- `git diff --check -- notes`
+
+### セルフレビュー結果
+
+- ✅ コード、ビルド、App Store Connect設定、公開URL、実証跡ファイルは変更していない。
+- ✅ 提出証跡の保存先、命名、manifest、保存禁止情報を明確にした。
+- ✅ 実パスワード、secret、実ユーザー情報を保存しない方針を維持した。
+- ✅ 状態名の追加/改名はなく、`notes/09_state_machines.md` 更新は不要。
+- ✅ 新用語は追加していないため、`notes/10_glossary.md` 更新は不要。
+- ✅ DBスキーマ変更はなく、`notes/05_data_model.md` 更新は不要。
+
+### 関連ファイル
+
+- `notes/64_release_evidence_folder_index.md`
+- `notes/36_submission_evidence_checklist.md`
+- `notes/62_app_review_manual_submission_checklist.md`
+- `notes/39_release_command_center.md`
+- `notes/30_owner_release_action_sheet.md`
+- `notes/57_legal_release_branch_integration_plan.md`
+- `notes/22_release_triage_tracker.csv`
+
+---
+
+## イテレーション385：公開ページレダクションQAを追加
+
+### 背景・問題意識
+
+App Store審査前に公開するサポート、規約、プライバシーポリシー、FAQ、削除、通報、安全、AI説明ページは、審査員とユーザーが直接見る。ここにsecret、内部ID、実データ、未確定価格、初回で隠す機能の断定説明が残ると、審査・法務・安全上のリスクになるため、公開前に人間が確認するレダクションQAを追加した。
+
+### 変更内容
+
+#### `notes/63_public_page_redaction_qa.md`
+- 公開対象URL、公開してよい情報/公開しない情報、全ページ共通QAを追加した。
+- Support、利用規約、プライバシーポリシー、特商法表示のページ別QAを整理した。
+- 公開前検索パターン、公開ページQA記録フォーマット、関連文書を追加した。
+
+#### `notes/39_release_command_center.md`, `notes/30_owner_release_action_sheet.md`, `notes/37_public_url_publication_checklist.md`
+- 公開ページレダクションQAへの導線を追加した。
+
+#### `notes/57_legal_release_branch_integration_plan.md`
+- 法務・リリース準備docsのstage禁止範囲を `notes/63` まで広げた。
+
+#### `notes/22_release_triage_tracker.csv`
+- RL-061として公開ページレダクションQAを追加した。
+
+### 影響範囲
+
+- 公開サポートページ
+- 利用規約、プライバシーポリシー、特商法表示
+- FAQ、アカウント削除、個人情報請求、通報、安全、AI説明ページ
+- App Store ConnectのSupport URL / Privacy Policy URL
+- コード、公開URL、App Store Connect設定、DNS、メール設定は変更していない。
+
+### 確認方法
+
+- `rg -n "RL-061|レダクション|secret|未確定価格|公開ページ|Support URL" notes/63_public_page_redaction_qa.md notes/39_release_command_center.md notes/22_release_triage_tracker.csv`
+- `python3 - <<'PY' ...` による `notes/22_release_triage_tracker.csv` のCSV parse確認
+- 旧規約用語・旧主体表現チェック（旧提案/旧メッセージ/旧投稿関連、サービス主体表現）
+- `git diff --check -- notes`
+
+### セルフレビュー結果
+
+- ✅ コード、公開URL、App Store Connect設定、DNS、メール設定は変更していない。
+- ✅ secret、実パスワード、内部ID、実データ、未確定価格、隠す機能を公開前に検出できるQAにした。
+- ✅ 公開URL確認の `notes/37` と、権限/secret実値を書かない `notes/61` へ接続した。
+- ✅ 状態名の追加/改名はなく、`notes/09_state_machines.md` 更新は不要。
+- ✅ 新用語は追加していないため、`notes/10_glossary.md` 更新は不要。
+- ✅ DBスキーマ変更はなく、`notes/05_data_model.md` 更新は不要。
+
+### 関連ファイル
+
+- `notes/63_public_page_redaction_qa.md`
+- `notes/39_release_command_center.md`
+- `notes/30_owner_release_action_sheet.md`
+- `notes/37_public_url_publication_checklist.md`
+- `notes/57_legal_release_branch_integration_plan.md`
+- `notes/22_release_triage_tracker.csv`
+
+---
+
+## イテレーション384：App Review手動提出チェックを追加
+
+### 背景・問題意識
+
+App Store初回提出では、TestFlight確認や提出素材が揃っていても、App Store Connectの提出画面でBuild、App Privacy、Review Notes、IAP同時提出、公開URLを取り違えると審査遅延やリジェクトにつながる。Add for Review、Draft Submission、Submit for Reviewの直前に提出者が画面を見ながら確認できる手動チェックリストを追加した。
+
+### 変更内容
+
+#### `notes/62_app_review_manual_submission_checklist.md`
+- App Store Connectの提出直前に使う手動チェックリストを追加した。
+- App Information、Version Metadata、Screenshots、Build、App Privacy、App Review Information、IAP、Add for Review、Submit for Review、提出直後記録の確認項目を整理した。
+- デモアカウントの実パスワードをリポジトリに書かない方針と、提出権限/2FA/証跡保存のNo-Goを明記した。
+- Apple公式ヘルプのSubmit an App、Overview、App Information、Manage App Privacy、App privacy detailsへの参照を追加した。
+
+#### `notes/39_release_command_center.md`, `notes/30_owner_release_action_sheet.md`
+- App Review手動提出チェックリストへの導線を追加した。
+
+#### `notes/22_release_triage_tracker.csv`
+- RL-060としてApp Review手動提出チェックリストを追加した。
+
+### 影響範囲
+
+- App Store Connect提出操作
+- Review Notes
+- App Privacy最終確認
+- デモアカウント
+- IAP同時提出判断
+- 提出証跡
+- コード、App Store Connect設定、Apple Developer設定、DNS、公開URLは変更していない。
+
+### 確認方法
+
+- `rg -n "RL-060|Add for Review|Submit for Review|Draft Submission|App Privacy|Review Notes" notes/62_app_review_manual_submission_checklist.md notes/39_release_command_center.md notes/22_release_triage_tracker.csv`
+- `python3 - <<'PY' ...` による `notes/22_release_triage_tracker.csv` のCSV parse確認
+- 旧規約用語・旧主体表現チェック（旧提案/旧メッセージ/旧投稿関連、サービス主体表現）
+- `git diff --check -- notes`
+
+### セルフレビュー結果
+
+- ✅ コード、App Store Connect設定、Apple Developer設定、DNS、公開URLは変更していない。
+- ✅ 提出画面で取り違えやすいBuild、Privacy、Review Notes、IAP同時提出、証跡保存を確認できる形にした。
+- ✅ デモアカウントの実パスワードやsecret実値を書かない方針を維持した。
+- ✅ 状態名の追加/改名はなく、`notes/09_state_machines.md` 更新は不要。
+- ✅ 新用語は追加していないため、`notes/10_glossary.md` 更新は不要。
+- ✅ DBスキーマ変更はなく、`notes/05_data_model.md` 更新は不要。
+
+### 関連ファイル
+
+- `notes/62_app_review_manual_submission_checklist.md`
+- `notes/39_release_command_center.md`
+- `notes/30_owner_release_action_sheet.md`
+- `notes/22_release_triage_tracker.csv`
+
+---
+
+## イテレーション383：リリース権限台帳を追加
+
+### 背景・問題意識
+
+App Store初回提出では、文書やメタデータだけでなく、App Store Connect、Apple Developer、DNS、メール、Supabase、法務、事故初動の権限と担当者が揃っている必要がある。提出当日に2FAや権限不足で止まらないよう、実値を書かない権限・運用アカウント台帳を追加した。
+
+### 変更内容
+
+#### `notes/61_release_access_owner_registry.md`
+- Apple Developer / App Store Connect、提出作業、ドメイン/DNS、メール/サポート、Supabase、OAuth/APNs、IAP、法務/Privacyの権限台帳を追加した。
+- パスワード、secret、復旧コード、private keyを書かない方針と、書いてよい情報/書かない情報を整理した。
+- アクセス棚卸しフォーマットとNo-Goを追加した。
+
+#### `notes/39_release_command_center.md`, `notes/32_testflight_review_submission_runbook.md`, `notes/47_domain_email_publication_runbook.md`, `notes/54_prelaunch_security_audit_checklist.md`, `notes/30_owner_release_action_sheet.md`
+- 権限・運用アカウント台帳への導線を追加した。
+
+#### `notes/22_release_triage_tracker.csv`
+- RL-059としてリリース権限・運用アカウント台帳を追加した。
+
+### 影響範囲
+
+- App Store Connect提出作業
+- Apple Developer権限
+- DNS/公開URL/メール運用
+- Supabase/Storage/Edge Function/secret管理
+- APNs/OAuth/IAP
+- 法務レビュー/事故初動担当
+- コード、App Store Connect設定、Apple Developer設定、DNS、メール、Supabase設定は変更していない。
+
+### 確認方法
+
+- `rg -n "RL-059|Account Holder|App Store Connect|Supabase|secret実値|リリース権限" notes/61_release_access_owner_registry.md notes/39_release_command_center.md notes/22_release_triage_tracker.csv`
+- `python3 - <<'PY' ...` による `notes/22_release_triage_tracker.csv` のCSV parse確認
+- 旧規約用語・旧主体表現チェック（旧提案/旧メッセージ/旧投稿関連、サービス主体表現）
+- `git diff --check -- notes`
+
+### セルフレビュー結果
+
+- ✅ コード、App Store Connect設定、Apple Developer設定、DNS、メール、Supabase設定は変更していない。
+- ✅ パスワード、2FA復旧コード、secret実値、private keyを書かない方針を明記した。
+- ✅ App Store提出、DNS/メール、Supabase、APNs/OAuth、IAP、法務/事故初動の担当と権限を棚卸しできる形にした。
+- ✅ 状態名の追加/改名はなく、`notes/09_state_machines.md` 更新は不要。
+- ✅ 新用語は追加していないため、`notes/10_glossary.md` 更新は不要。
+- ✅ DBスキーマ変更はなく、`notes/05_data_model.md` 更新は不要。
+
+### 関連ファイル
+
+- `notes/61_release_access_owner_registry.md`
+- `notes/39_release_command_center.md`
+- `notes/32_testflight_review_submission_runbook.md`
+- `notes/47_domain_email_publication_runbook.md`
+- `notes/54_prelaunch_security_audit_checklist.md`
+- `notes/30_owner_release_action_sheet.md`
+- `notes/22_release_triage_tracker.csv`
+
+---
+
+## イテレーション382：App StoreローカライズQAを追加
+
+### 背景・問題意識
+
+App Store Connectの主言語は日本語想定だが、Review Notesは英語で審査員向けに説明する必要がある。日本語メタデータ、English (U.S.)追加候補、Review Notes、スクリーンショット、公開URL説明がズレると、審査員が実機で辿れない画面を説明してしまうリスクがあるため、ローカライズ/メタデータQA表を追加した。
+
+### 変更内容
+
+#### `notes/60_app_store_localization_metadata_qa.md`
+- Primary Language、English (U.S.)追加候補、Review Notes、スクリーンショット、公開URLの日英整合チェックを追加した。
+- 初回最小スコープ用のEnglish Description候補を追加した。
+- byte/文字数チェック、監査結果フォーマット、No-Goを整理した。
+
+#### `notes/31_app_store_connect_metadata_worksheet.md`, `notes/40_app_store_connect_copy_paste_sheet.md`
+- 日本語/English (U.S.)/Review Notesの整合確認は `notes/60` を使う導線を追加した。
+
+#### `notes/39_release_command_center.md`, `notes/30_owner_release_action_sheet.md`
+- ローカライズ・メタデータQAへの導線を追加した。
+
+#### `notes/22_release_triage_tracker.csv`
+- RL-058としてApp Storeローカライズ・メタデータQAを追加した。
 
 ### 影響範囲
 
 - App Store Connect入力
-- App Review Notes
-- App Review指摘対応
-- リジェクト時の証跡管理
-- コード変更なし。別セッションのSwift Native実装には触れていない。
+- Review Notes
+- スクリーンショット説明
+- 公開URL説明
+- English (U.S.)追加判断
+- コード、ローカライズファイル、App Store Connect設定、公開URLは変更していない。
 
 ### 確認方法
 
-- `rg -n "Promotional Text|Review Notes|Age Rating|提出前削除リスト|Paid features are not enabled" notes/40_app_store_connect_copy_paste_sheet.md`
-- `rg -n "Guideline 2.1|Guideline 1.2|In-App Purchase|Privacy|Public URLs|Resubmit" notes/41_app_review_response_templates.md`
-- 旧規約用語・旧主体表現チェック（旧提案/旧メッセージ/旧投稿関連、サービス主体表現）
+- `rg -n "RL-058|ローカライズ|English \\(U\\.S\\.\\)|Review Notes|Primary Language" notes/60_app_store_localization_metadata_qa.md notes/31_app_store_connect_metadata_worksheet.md notes/40_app_store_connect_copy_paste_sheet.md notes/22_release_triage_tracker.csv`
 - `python3 - <<'PY' ...` による `notes/22_release_triage_tracker.csv` のCSV parse確認
-- `git diff --check -- notes/40_app_store_connect_copy_paste_sheet.md notes/41_app_review_response_templates.md notes/24_app_store_submission_pack.md notes/31_app_store_connect_metadata_worksheet.md notes/32_testflight_review_submission_runbook.md notes/36_submission_evidence_checklist.md notes/39_release_command_center.md notes/22_release_triage_tracker.csv notes/08_design_iterations.md`
+- 旧規約用語・旧主体表現チェック（旧提案/旧メッセージ/旧投稿関連、サービス主体表現）
+- `git diff --check -- notes`
 
 ### セルフレビュー結果
 
-- ✅ コード、Supabase、ビルド設定、アプリ画面は変更していない。
-- ✅ 転記用文面は、実ビルドで出す/隠す機能ごとに削除・差し替えできる形にした。
-- ✅ App Review指摘対応は、修正、確認手順、証跡、再提出を分けて書ける形にした。
+- ✅ コード、ローカライズファイル、App Store Connect設定、公開URLは変更していない。
+- ✅ 日本語メタデータと英語Review Notesのズレを提出前に確認できる表にした。
+- ✅ 初回で出さない有料機能/外部AI/未完成3Dを英語説明から削る条件を入れた。
 - ✅ 状態名の追加/改名はなく、`notes/09_state_machines.md` 更新は不要。
-- ✅ 新用語・廃止用語はなく、`notes/10_glossary.md` 更新は不要。
+- ✅ 新用語は追加していないため、`notes/10_glossary.md` 更新は不要。
 - ✅ DBスキーマ変更はなく、`notes/05_data_model.md` 更新は不要。
-- ⚠️ 実App Store Connect入力、実Review Notes入力、実指摘対応は未実行。
 
 ### 関連ファイル
 
+- `notes/60_app_store_localization_metadata_qa.md`
+- `notes/31_app_store_connect_metadata_worksheet.md`
 - `notes/40_app_store_connect_copy_paste_sheet.md`
-- `notes/41_app_review_response_templates.md`
-- `notes/24_app_store_submission_pack.md`
-- `notes/31_app_store_connect_metadata_worksheet.md`
-- `notes/32_testflight_review_submission_runbook.md`
-- `notes/36_submission_evidence_checklist.md`
 - `notes/39_release_command_center.md`
+- `notes/30_owner_release_action_sheet.md`
 - `notes/22_release_triage_tracker.csv`
 
 ---
 
-## イテレーション392：Swift版の画像表示と在庫タブをRN寄せ
+## イテレーション381：初回提出スコープ露出監査表を追加
 
 ### 背景・問題意識
 
-Swift Native版の実機確認で、Wish一覧とやりとり一覧に画像が出ない、ホーム/在庫の画像が枠からはみ出す、フッター上の覆いで操作部が見えない、在庫タブと推し設定がlegacy Expo版の主要導線に届いていない、という指摘があった。リリース前の実機レビューで確認しやすいよう、画像表示・在庫分類・推し設定・現地交換モードの用語をまとめて整えた。
+初回提出では、有料機能、外部AI、未完成3D、未完成掲示板、住所/電話番号入力などを「出すか隠すか」で審査・法務リスクが大きく変わる。既存文書に個別の注意はあるが、完成ビルド、App Store文面、スクショ、FAQ、App Privacyを横断して確認する表が不足していたため、露出監査表を追加した。
 
 ### 変更内容
 
-#### `ios-native/Sources/MegrumCore/MegrumModels.swift`
-- `GoodsItem` に `kind` / `status` を保持し、Swift側でも在庫・Wish・ステータスを判定できるようにした。
-- `WishItem` に `imageURL` と `quantity` を追加し、Wish一覧でも登録画像を表示できるようにした。
-- 在庫ステータスの表示名を「譲る候補」「自分用キープ」「過去に譲った」に揃えた。
+#### `notes/59_initial_release_scope_exposure_audit.md`
+- 初回提出の原則と、機能露出マトリクスを追加した。
+- 画面監査、メタデータ監査、公開文書監査、証跡フォーマット、No-Goを整理した。
+- 初回で隠すべき候補として、有料機能、外部AI、未完成3D、未完成掲示板、住所/電話番号入力、debug/internal表示を明示した。
 
-#### `ios-native/Sources/MegrumData/SupabaseGoodsInventoryClient.swift`
-- goods一覧取得のselectへ `kind,status` を追加し、Swift版の在庫タブ分類に必要な値を取得するようにした。
-
-#### `ios-native/Sources/MegrumApp/SupabaseMegrumRepository.swift`
-- 在庫は `archived` 以外を取得し、`keep` / `traded` もSwift版に読み込めるようにした。
-- Wish取得で `photo_urls` / `quantity` / `kind` / `status` を読み込み、Wish画像表示に反映した。
-
-#### `ios-native/Sources/MegrumApp/GoodsGrid.swift`
-- グッズ画像を `scaledToFill` + 明示frame + `clipped()` で描画し、縦横比が違う画像でもパネル外へはみ出さないようにした。
-- ステータス表示を在庫タブ名に合わせた。
-
-#### `ios-native/Sources/MegrumApp/CollectionScreens.swift`
-- 在庫画面を「譲る候補」「自分用キープ」「過去に譲った」の3タブに分けた。
-- タブごとにフィルタ、件数、空状態、タグ候補を切り替えるようにした。
-- フッターに画像/追加ボタン/スクロール末尾が隠れないよう、下部余白を調整した。
-
-#### `ios-native/Sources/MegrumApp/TradesScreen.swift`
-- やりとり一覧の受け取る/私が出す欄に、実際のグッズ画像サムネイルを表示するようにした。
-- 在庫、ホーム候補、Wish、相手公開グッズをlookupして、取引カード内で画像を引けるようにした。
-
-#### `ios-native/Sources/MegrumApp/OshiSettingsScreen.swift`
-- 左ドロワーの「推し設定」用に専用Swift画面を追加した。
-- 登録済み推し、グループ検索、グループチップ、メンバーチップ、箱推し、保存導線をlegacy Expo版に近い情報量へ寄せた。
-
-#### `ios-native/Sources/MegrumApp/MegrumRootView.swift`
-- 左ドロワーの「推し設定」から専用画面を開くようにした。
-- ログアウト時は先に認証状態を解除し、APNs端末解除は後続Taskへ逃がして復帰遅延を避けた。
-
-#### `ios-native/Sources/MegrumApp/MegrumLocationState.swift`
-- 現在地取得後に逆ジオコーディングし、施設名または住所を表示できる状態を追加した。
-
-#### `ios-native/Sources/MegrumApp/HomeLocalModeSurface.swift`
-- ユーザー向けの旧AW表記をやめ、現地交換モードと現在地の更新として表示するようにした。
-- 座標の数字だけでなく、取得できる場合は建物名/住所を表示するようにした。
-
-#### `ios-native/Sources/MegrumApp/HomeScreen.swift`
-- ホームの検索ボタンがTabViewフッターに重ならないよう、下部配置を調整した。
-
-#### `ios-native/Sources/MegrumApp/MegrumAppState.swift` / `ios-native/Sources/MegrumData/SupabaseOshiClient.swift`
-- 推しL1マスタ取得件数を100件へ増やし、React Native版のマスタ量に近づけた。
-
-#### `ios-native/Tests/MegrumDataTests/SupabaseGoodsInventoryClientTests.swift`
-- goods取得selectの `kind,status` 追加に合わせてrequestテストを更新した。
-
-### 影響範囲
-
-- Swift Native版のWish一覧
-- Swift Native版の在庫一覧
-- Swift Native版のやりとり一覧
-- Swift Native版のホーム検索ボタン位置
-- Swift Native版の左ドロワー推し設定
-- Swift Native版の現地交換モード表示
-- Supabase goods取得selectとSwiftモデル
-
-### 確認方法
-
-- `git diff --check -- ios-native/Sources/MegrumCore/MegrumModels.swift ios-native/Sources/MegrumApp/CollectionScreens.swift ios-native/Sources/MegrumApp/GoodsGrid.swift ios-native/Sources/MegrumApp/GoodsEditorScreen.swift ios-native/Sources/MegrumApp/TradesScreen.swift ios-native/Sources/MegrumApp/OshiSettingsScreen.swift ios-native/Sources/MegrumApp/MegrumRootView.swift ios-native/Sources/MegrumApp/MegrumLocationState.swift ios-native/Sources/MegrumApp/HomeLocalModeSurface.swift ios-native/Sources/MegrumApp/HomeScreen.swift ios-native/Sources/MegrumApp/MegrumAppState.swift ios-native/Sources/MegrumApp/NativePreviewData.swift ios-native/Sources/MegrumApp/SupabaseMegrumRepository.swift ios-native/Sources/MegrumData/SupabaseGoodsInventoryClient.swift ios-native/Sources/MegrumData/SupabaseOshiClient.swift ios-native/Tests/MegrumDataTests/SupabaseGoodsInventoryClientTests.swift`
-- `swift build --package-path ios-native --scratch-path /tmp/megrum-current-swift-build`
-- `swift test --package-path ios-native --scratch-path /tmp/megrum-current-tests --enable-xctest --disable-swift-testing -j 1 --filter 'GoodsGridLayoutTests|GoodsEditorDraftTests|SupabaseGoodsInventoryClientTests|TradeChatAffordanceTests|HomeLocalModeTests|AccountSetupScreenTests|SettingsScreenTests'`
-- `xcodebuild -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -destination 'generic/platform=iOS' -derivedDataPath /tmp/megrum-native-current -allowProvisioningUpdates build`
-- `xcrun devicectl device install app --device 7F6C74EF-5786-5316-920A-F7F1CC3FE2A4 /tmp/megrum-native-current/Build/Products/Debug-iphoneos/MegrumNative.app`
-- `xcrun devicectl device process launch --terminate-existing --device 7F6C74EF-5786-5316-920A-F7F1CC3FE2A4 tokyo.megrum.native.preview`
-
-### セルフレビュー結果
-
-- ✅ SwiftPM build、対象テスト90件、Xcode実機向けbuildが成功。
-- ✅ 接続中の iPhone 15 に `tokyo.megrum.native.preview` をインストールし、起動まで確認した。
-- ✅ Wish / 在庫 / やりとりの画像表示経路をSwiftモデルとRepositoryへ通した。
-- ✅ 画像はパネル外にはみ出さないようクリップする描画にした。
-- ✅ 在庫の3タブ名はReact Native版の主要分類に合わせた。
-- ✅ 推し設定は専用画面化し、グループ/メンバーの選択量を増やした。
-- ✅ 状態名の追加/改名はなく、`notes/09_state_machines.md` 更新は不要。
-- ✅ 旧AWのユーザー向け扱いを変えたため、`notes/10_glossary.md` を更新する。
-- ✅ `GoodsItem.kind/status` と `WishItem.imageURL/quantity` を追加したため、Swift Native migration memoへ反映する。
-- ⚠️ 推しマスタの完全なRN同等化は、DB側にある全L1/L2の正規化状態に依存する。
-
-### 関連ファイル
-
-- `ios-native/Sources/MegrumCore/MegrumModels.swift`
-- `ios-native/Sources/MegrumApp/CollectionScreens.swift`
-- `ios-native/Sources/MegrumApp/GoodsGrid.swift`
-- `ios-native/Sources/MegrumApp/TradesScreen.swift`
-- `ios-native/Sources/MegrumApp/OshiSettingsScreen.swift`
-- `ios-native/Sources/MegrumApp/HomeLocalModeSurface.swift`
-- `ios-native/Sources/MegrumApp/MegrumLocationState.swift`
-- `ios-native/Sources/MegrumApp/SupabaseMegrumRepository.swift`
-- `ios-native/Sources/MegrumData/SupabaseGoodsInventoryClient.swift`
-- `ios-native/Sources/MegrumData/SupabaseOshiClient.swift`
-
----
-
-## イテレーション394：初回提出コントロールボードを追加
-
-### 背景・問題意識
-
-リリース準備文書が `notes/24` 以降に増えたため、提出当日にどの順番で何を見るか、どのP0が実機確認なのか、どれが運用準備なのかを一目で追える司令塔が必要になった。コード変更なしで、初回提出までの勝ち条件、実行順、No-Goを1枚に統合した。
-
-### 変更内容
-
-#### `notes/39_release_command_center.md`
-- 初回提出の勝ち条件を明記した。
-- オーナー判断、文書マップ、Phase A/B/Cの実行順を整理した。
-- P0ブロッカーを実機確認が必要なものと運用・提出準備に分けた。
-- 提出直前No-Go、コード非変更で完了済みの準備、まだ実作業が必要な項目、最短ルートを追加した。
-
-#### `notes/24_app_store_submission_pack.md`
-- 提出全体の実行順と文書マップとして `notes/39` を参照するようにした。
-
-#### `notes/30_owner_release_action_sheet.md`
-- オーナー向け入力表と関連文書リストに `notes/39` を追加した。
-
-#### `notes/36_submission_evidence_checklist.md`
-- 関連文書に `notes/39` を追加した。
+#### `notes/39_release_command_center.md`, `notes/30_owner_release_action_sheet.md`, `notes/24_app_store_submission_pack.md`, `notes/50_release_go_no_go_decision_matrix.md`
+- 初回提出スコープ露出監査表への導線を追加した。
+- Go / No-GoにG14 Scope Exposureを追加した。
 
 #### `notes/22_release_triage_tracker.csv`
-- RL-027のメモに、提出全体の実行順として `notes/39` を追加した。
+- RL-057として初回提出スコープ露出監査表を追加した。
 
 ### 影響範囲
 
-- App Store初回提出の実行順
-- P0ブロッカー管理
-- オーナー判断
-- 提出当日の参照文書
-- コード変更なし。別セッションのSwift Native実装には触れていない。
+- 完成ビルド確認
+- App Store説明文 / スクリーンショット / Review Notes
+- 公開FAQ / 利用規約 / プライバシーポリシー
+- App Privacy回答
+- Go / No-Go判定
+- コード、画面、App Store Connect設定、公開URLは変更していない。
 
 ### 確認方法
 
-- `rg -n "勝ち条件|Phase A|Phase B|P0ブロッカー|No-Go|最短ルート" notes/39_release_command_center.md`
-- 旧規約用語・旧主体表現チェック（旧提案/旧メッセージ/旧投稿関連、サービス主体表現）
+- `rg -n "RL-057|G14 Scope Exposure|初回提出スコープ露出|有料機能|外部AI|未完成3D" notes/59_initial_release_scope_exposure_audit.md notes/50_release_go_no_go_decision_matrix.md notes/22_release_triage_tracker.csv`
 - `python3 - <<'PY' ...` による `notes/22_release_triage_tracker.csv` のCSV parse確認
-- `git diff --check -- notes/39_release_command_center.md notes/24_app_store_submission_pack.md notes/30_owner_release_action_sheet.md notes/36_submission_evidence_checklist.md notes/22_release_triage_tracker.csv notes/08_design_iterations.md`
+- 旧規約用語・旧主体表現チェック（旧提案/旧メッセージ/旧投稿関連、サービス主体表現）
+- `git diff --check -- notes`
 
 ### セルフレビュー結果
 
-- ✅ コード、Supabase、ビルド設定、アプリ画面は変更していない。
-- ✅ 準備済み文書を当日の実行順でつなぎ直した。
-- ✅ P0を実機確認と運用準備に分け、次に何を見るか分かる形にした。
+- ✅ コード、画面、App Store Connect設定、公開URLは変更していない。
+- ✅ 初回で出す/隠す機能を、画面、メタデータ、公開文書、App Privacyまで横断して確認できる表にした。
+- ✅ Go / No-GoへG14 Scope Exposureを追加し、隠すはずの機能が残る場合は提出停止にした。
 - ✅ 状態名の追加/改名はなく、`notes/09_state_machines.md` 更新は不要。
-- ✅ 新用語・廃止用語はなく、`notes/10_glossary.md` 更新は不要。
+- ✅ 新用語は追加していないため、`notes/10_glossary.md` 更新は不要。
 - ✅ DBスキーマ変更はなく、`notes/05_data_model.md` 更新は不要。
-- ⚠️ 実ビルド確認、公開URL確認、App Store Connect入力、Submit for Reviewは未実行。
 
 ### 関連ファイル
 
+- `notes/59_initial_release_scope_exposure_audit.md`
 - `notes/39_release_command_center.md`
-- `notes/24_app_store_submission_pack.md`
 - `notes/30_owner_release_action_sheet.md`
-- `notes/36_submission_evidence_checklist.md`
+- `notes/24_app_store_submission_pack.md`
+- `notes/50_release_go_no_go_decision_matrix.md`
 - `notes/22_release_triage_tracker.csv`
 
 ---
 
-## イテレーション393：公開URLチェックとTestFlight案内を追加
+## イテレーション380：法務レビュー回答反映台帳を追加
 
 ### 背景・問題意識
 
-App Store提出では、サポートURLとプライバシーポリシーURLがログインなしで開けること、TestFlight協力者が実住所や実在IPを入れずに確認できることが重要になる。公開ページ原稿はあったが、公開時の受け入れ基準、確認コマンド、協力者向け案内文が不足していたため、コード変更なしで準備した。
+弁護士レビュー依頼メモは整備済みだが、回答を受け取った後に、どの回答をどの文書へ反映したか、未決論点が残っていないかを追う台帳が不足していた。公開前のTerms、Privacy、特商法、Support、App Privacy、Review Notesの反映漏れを防ぐため、法務レビュー回答反映台帳を追加した。
 
 ### 変更内容
 
-#### `notes/37_public_url_publication_checklist.md`
-- サポート、プライバシー、利用規約、特商法、アカウント削除、個人情報請求、通報、安全、AI説明ページの公開要件を追加した。
-- ログイン不要、HTTPS、200応答、モバイル表示、連絡先、最終更新日、実ビルドとの一致を共通受け入れ基準にした。
-- ページ別No-Go、公開作業チェック、`curl -I` による確認コマンド案、App Review Notes補足文を追加した。
-
-#### `notes/38_testflight_tester_comms.md`
-- 内部テスター、外部テスター向けの招待文を追加した。
-- What to Test文面、入力禁止事項、フィードバックフォーム項目、緊急度定義、返信テンプレート、集計フォーマットを追加した。
-
-#### `notes/25_public_legal_support_pages.md`
-- 公開時の受け入れ基準として `notes/37` を参照するようにした。
-- 既存のMarkdown上の改行用空白を整理した。
-
-#### `notes/24_app_store_submission_pack.md`
-- 公開URLチェックリストとTestFlight協力者向け案内への参照を追加した。
-
-#### `notes/30_owner_release_action_sheet.md`
-- オーナー向け入力表に公開URLとTestFlight案内の参照を追加した。
-
-#### `notes/32_testflight_review_submission_runbook.md`
-- TestFlight協力者向け案内として `notes/38` を参照するようにした。
-- Legal URLsの関連文書に `notes/37` を追加した。
-
-#### `notes/36_submission_evidence_checklist.md`
-- 公開URLチェックリストとTestFlight協力者向け案内を関連文書に追加した。
-
-#### `notes/22_release_triage_tracker.csv`
-- RL-036として公開URLの公開確認を追加した。
-- RL-037としてTestFlight協力者向け案内とフィードバック導線を追加した。
-
-### 影響範囲
-
-- App Store ConnectのSupport URL / Privacy Policy URL
-- 公開法務・サポートページ
-- TestFlight内部/外部協力者への案内
-- フィードバック収集
-- 提出証跡
-- コード変更なし。別セッションのSwift Native実装には触れていない。
-
-### 確認方法
-
-- `rg -n "https://megrum.jp/support|curl -I|ログイン不要|No-Go|App Review Notes" notes/37_public_url_publication_checklist.md`
-- `rg -n "TestFlight|What to Test|フィードバック|P0|実住所|公式画像" notes/38_testflight_tester_comms.md`
-- 旧規約用語・旧主体表現チェック（旧提案/旧メッセージ/旧投稿関連、サービス主体表現）
-- `python3 - <<'PY' ...` による `notes/22_release_triage_tracker.csv` のCSV parse確認
-- `git diff --check -- notes/24_app_store_submission_pack.md notes/25_public_legal_support_pages.md notes/30_owner_release_action_sheet.md notes/32_testflight_review_submission_runbook.md notes/36_submission_evidence_checklist.md notes/22_release_triage_tracker.csv notes/08_design_iterations.md`
-
-### セルフレビュー結果
-
-- ✅ コード、Supabase、ビルド設定、アプリ画面は変更していない。
-- ✅ 公開URLをログイン不要、HTTPS、200応答、実ビルド一致の観点で整理した。
-- ✅ TestFlight協力者へ、実住所、電話番号、実在IP、公式画像を入れない注意を明記した。
-- ✅ 状態名の追加/改名はなく、`notes/09_state_machines.md` 更新は不要。
-- ✅ 新用語・廃止用語はなく、`notes/10_glossary.md` 更新は不要。
-- ✅ DBスキーマ変更はなく、`notes/05_data_model.md` 更新は不要。
-- ⚠️ 実URL公開、`curl`確認、TestFlight配布、フィードバックフォーム作成は未実行。
-
-### 関連ファイル
-
-- `notes/37_public_url_publication_checklist.md`
-- `notes/38_testflight_tester_comms.md`
-- `notes/25_public_legal_support_pages.md`
-- `notes/24_app_store_submission_pack.md`
-- `notes/30_owner_release_action_sheet.md`
-- `notes/32_testflight_review_submission_runbook.md`
-- `notes/36_submission_evidence_checklist.md`
-- `notes/22_release_triage_tracker.csv`
-
----
-
-## イテレーション392：デモアカウントと提出証跡の準備表を追加
-
-### 背景・問題意識
-
-App Reviewでは、審査員がデモアカウントで主要機能を確認できること、提出後に何を確認したか追跡できることが重要になる。既存のスクショ台本や提出ランブックにはデモアカウントの必要性はあったが、具体的なアカウント役割、架空データ、証跡管理までは不足していたため、コード変更なしで準備した。
-
-### 変更内容
-
-#### `notes/35_demo_account_review_data_plan.md`
-- 審査員ログイン用、交換相手役、安全確認用のアカウント構成を追加した。
-- 実パスワードをリポジトリに書かない運用方針を明記した。
-- メインユーザー、交換相手、在庫、wish、AW、打診、取引チャット、郵送交換、UGC、安全導線、IAP、AIの審査用データ案を追加した。
-- App Review Notesへ差し込むデモアカウント説明文を追加した。
-
-#### `notes/36_submission_evidence_checklist.md`
-- Build、Auth、Legal URL、App Privacy、Privacy Manifest、アカウント削除、UGC安全、Core Flow、スクショ、Review Notesの必須証跡を整理した。
-- 有料機能、外部AI、郵送交換、グルーム/掲示板、Push通知の条件付き証跡を追加した。
-- 内部スモークテスト記録、App Review提出記録、リジェクト時記録のフォーマットを追加した。
-
-#### `notes/24_app_store_submission_pack.md`
-- デモアカウント計画と提出証跡チェックリストへの参照を追加した。
-
-#### `notes/28_app_store_screenshot_storyboard.md`
-- スクショ用架空データの具体化先として `notes/35` を参照するようにした。
-
-#### `notes/30_owner_release_action_sheet.md`
-- オーナー向け入力表にデモアカウント、提出証跡の参照を追加した。
-
-#### `notes/31_app_store_connect_metadata_worksheet.md`
-- Demo Account欄で `notes/35` を参照し、実パスワードをリポジトリに書かない注意を追加した。
-
-#### `notes/32_testflight_review_submission_runbook.md`
-- 内部スモークテストとSubmit for Review記録で、デモアカウント計画と証跡チェックリストを参照するようにした。
-
-#### `notes/22_release_triage_tracker.csv`
-- RL-034としてデモアカウントと審査用データ準備を追加した。
-- RL-035としてApp Store提出証跡管理を追加した。
-
-### 影響範囲
-
-- App Review用デモアカウント
-- スクリーンショット撮影データ
-- TestFlight内部確認
-- Submit for Review時の証跡管理
-- リジェクト時の再提出対応
-- コード変更なし。別セッションのSwift Native実装には触れていない。
-
-### 確認方法
-
-- `rg -n "Demo account|reviewer\\+primary|実パスワード|App Review Notes|IAP|外部AI" notes/35_demo_account_review_data_plan.md`
-- `rg -n "EV-001|証跡|No-Go|App Privacy|Review Notes|Submit" notes/36_submission_evidence_checklist.md`
-- 旧規約用語・旧主体表現チェック（旧提案/旧メッセージ/旧投稿関連、サービス主体表現）
-- `python3 - <<'PY' ...` による `notes/22_release_triage_tracker.csv` のCSV parse確認
-- `git diff --check -- notes/24_app_store_submission_pack.md notes/28_app_store_screenshot_storyboard.md notes/30_owner_release_action_sheet.md notes/31_app_store_connect_metadata_worksheet.md notes/32_testflight_review_submission_runbook.md notes/22_release_triage_tracker.csv notes/08_design_iterations.md`
-
-### セルフレビュー結果
-
-- ✅ コード、Supabase、ビルド設定、アプリ画面は変更していない。
-- ✅ 実パスワードをリポジトリに書かない方針を明記した。
-- ✅ スクショ、App Review Notes、審査用データが同じ架空データ方針でつながった。
-- ✅ 提出時に残す証跡を、必須と条件付きに分けた。
-- ✅ 状態名の追加/改名はなく、`notes/09_state_machines.md` 更新は不要。
-- ✅ 新用語・廃止用語はなく、`notes/10_glossary.md` 更新は不要。
-- ✅ DBスキーマ変更はなく、`notes/05_data_model.md` 更新は不要。
-- ⚠️ 実デモアカウント作成、実データ投入、スクショ撮影、提出証跡保存は未実行。
-
-### 関連ファイル
-
-- `notes/35_demo_account_review_data_plan.md`
-- `notes/36_submission_evidence_checklist.md`
-- `notes/24_app_store_submission_pack.md`
-- `notes/28_app_store_screenshot_storyboard.md`
-- `notes/30_owner_release_action_sheet.md`
-- `notes/31_app_store_connect_metadata_worksheet.md`
-- `notes/32_testflight_review_submission_runbook.md`
-- `notes/22_release_triage_tracker.csv`
-
----
-
-## イテレーション391：IAP商品表とサポート返信テンプレを追加
-
-### 背景・問題意識
-
-初回App Store提出に向けて、Premium、めぐりPlus、ブーストを出すか隠すかの判断材料と、公開後に問い合わせへ即応するための一次返信テンプレートが不足していた。コード変更を避けつつ、AppleのIAP設定、特商法、App Privacy、問い合わせ運用がつながる形で準備した。
-
-### 変更内容
-
-#### `notes/33_iap_product_setup_worksheet.md`
-- 初回提出ではIAP実装が固まるまで有料導線を隠す推奨方針を追加した。
-- Premium月額、Premium年額、めぐりPlus月額、ブースト1/5/10個の商品ID候補、表示名、説明、価格、権限対応を整理した。
-- サブスクリプショングループ、StoreKit実装前チェック、App Store Connect入力欄、Go / No-Goを追加した。
-- Apple公式のIAP、サブスクリプション、価格、審査情報への参照を追加した。
-
-#### `notes/34_support_response_templates.md`
-- 問い合わせ受付、ログイン、アカウント削除、通報、ブロック、取引トラブル、郵送交換、個人情報、購入/返金/解約、AI、特商法請求、不具合報告の返信テンプレートを追加した。
-- 返信で言わないこと、本人確認、優先度、収集する情報を運用メモとして整理した。
-
-#### `notes/24_app_store_submission_pack.md`
-- 有料機能を出す場合は `notes/33` のIAP表を使う導線を追加した。
-- 問い合わせ一次返信は `notes/34` を使う導線を追加した。
-
-#### `notes/30_owner_release_action_sheet.md`
-- オーナー判断表にIAP商品表とサポート返信テンプレートの参照を追加した。
-- 有料機能が見えている場合の提出停止条件を `notes/33` と接続した。
-
-#### `notes/22_release_triage_tracker.csv`
-- RL-032としてIAP商品設定と有料機能露出判断を追加した。
-- RL-033としてサポート一次返信テンプレート整備を追加した。
-
-### 影響範囲
-
-- App Store ConnectのIAP商品設定
-- 有料機能を初回提出に含めるかのGo / No-Go判断
-- 購入、返金、解約、購入復元の審査・サポート準備
-- 公開後の問い合わせ一次返信
-- コード変更なし。別セッションのSwift Native実装には触れていない。
-
-### 確認方法
-
-- `rg -n "IAP|Product ID|Premium|めぐりPlus|ブースト|StoreKit|Go / No-Go" notes/33_iap_product_setup_worksheet.md`
-- `rg -n "アカウント削除|通報|返金|個人情報|AI|特定商取引法|support@megrum.jp" notes/34_support_response_templates.md`
-- 旧規約用語・旧主体表現チェック（旧提案/旧メッセージ/旧投稿関連、サービス主体表現）
-- `python3 - <<'PY' ...` による `notes/22_release_triage_tracker.csv` のCSV parse確認
-- `git diff --check -- notes/33_iap_product_setup_worksheet.md notes/34_support_response_templates.md notes/24_app_store_submission_pack.md notes/30_owner_release_action_sheet.md notes/22_release_triage_tracker.csv notes/08_design_iterations.md`
-
-### セルフレビュー結果
-
-- ✅ コード、Supabase、ビルド設定、アプリ画面は変更していない。
-- ✅ Product IDは作成後に変更できない前提で、事前凍結用の表にした。
-- ✅ 有料導線を出す場合と隠す場合の判断を分けた。
-- ✅ サポート返信は、相手方処分や個人情報を開示しない形にした。
-- ✅ 状態名の追加/改名はなく、`notes/09_state_machines.md` 更新は不要。
-- ✅ 新用語・廃止用語はなく、`notes/10_glossary.md` 更新は不要。
-- ✅ DBスキーマ変更はなく、`notes/05_data_model.md` 更新は不要。
-- ⚠️ 実IAP作成、StoreKit実装、Sandbox購入、メール送受信、メール認証設定の確認は未実行。
-
-### 関連ファイル
-
-- `notes/33_iap_product_setup_worksheet.md`
-- `notes/34_support_response_templates.md`
-- `notes/24_app_store_submission_pack.md`
-- `notes/30_owner_release_action_sheet.md`
-- `notes/22_release_triage_tracker.csv`
-
----
-
-## イテレーション390：App Store Connect入力表と提出ランブックを追加
-
-### 背景・問題意識
-
-App Store提出準備をさらに進めるには、説明文やスクショ案だけでなく、実際のApp Store Connect入力欄、年齢制限、Content Rights、Export Compliance、TestFlight配布、Submit for Review手順まで、提出画面で迷わない単位に落とす必要があった。コード変更を避けつつ、完成ビルド後にすぐ使える運用文書として整備した。
-
-### 変更内容
-
-#### `notes/31_app_store_connect_metadata_worksheet.md`
-- App Information、Version Information、Review Information、Age Rating、Content Rights、Export Complianceの入力ワークシートを追加した。
-- 日本語メタデータ候補とEnglish (U.S.) 追加時の候補を整理した。
-- Apple公式の文字数/byte制限、Age Rating、IAP情報への参照を追加した。
-
-#### `notes/32_testflight_review_submission_runbook.md`
-- ビルド受領時チェック、TestFlight内部配布、What to Test下書き、内部スモークテスト、外部TestFlight判断、Submit for Review手順、リジェクト対応テンプレを追加した。
-- Apple公式のTestFlight、ビルドアップロード、App Review提出手順への参照を追加した。
-
-#### `notes/24_app_store_submission_pack.md`
-- App Store Connect入力ワークシートとTestFlight/App Review提出ランブックへの参照を追加した。
-
-#### `notes/22_release_triage_tracker.csv`
-- RL-014に入力ワークシートの所在を追記した。
-- RL-015を進行中にし、TestFlight配布/提出ランブックの所在を追記した。
-- RL-027を進行中にし、Submit for Review手順の所在を追記した。
-
-### 影響範囲
-
-- App Store Connectメタデータ入力
-- TestFlight内部配布
-- App Review提出手順
-- リジェクト時の初動
-- コード変更なし。別セッションのSwift Native実装には触れていない。
-
-### 確認方法
-
-- `rg -n "App Store Connect|Age Rating|Keywords|Promotional Text|Submit for Review|TestFlight|What to Test|Build Number" notes/31_app_store_connect_metadata_worksheet.md notes/32_testflight_review_submission_runbook.md notes/24_app_store_submission_pack.md`
-- 旧規約用語・旧主体表現チェック（旧提案/旧メッセージ/旧投稿関連、サービス主体表現）
-- `git diff --check -- notes/31_app_store_connect_metadata_worksheet.md notes/32_testflight_review_submission_runbook.md notes/24_app_store_submission_pack.md notes/22_release_triage_tracker.csv notes/08_design_iterations.md`
-
-### セルフレビュー結果
-
-- ✅ コード、Supabase、ビルド設定、アプリ画面は変更していない。
-- ✅ App Store Connectの入力欄ごとに、制限、下書き、未確定事項を分けた。
-- ✅ TestFlight配布とApp Review提出は、完成ビルド後に実行する運用手順として整理した。
-- ✅ 状態名の追加/改名はなく、`notes/09_state_machines.md` 更新は不要。
-- ✅ 新用語・廃止用語はなく、`notes/10_glossary.md` 更新は不要。
-- ✅ DBスキーマ変更はなく、`notes/05_data_model.md` 更新は不要。
-- ⚠️ 実ビルドUpload、TestFlight配布、App Review提出は未実行。
-
-### 関連ファイル
-
-- `notes/31_app_store_connect_metadata_worksheet.md`
-- `notes/32_testflight_review_submission_runbook.md`
-- `notes/24_app_store_submission_pack.md`
-- `notes/22_release_triage_tracker.csv`
-
----
-
-## イテレーション389：オーナー向け提出準備アクションシートを追加
-
-### 背景・問題意識
-
-リリース準備文書が増えてきたため、開発者向けの詳細メモとは別に、オーナーが今すぐ判断・準備できる項目だけを切り出す必要があった。App Store提出前に止まるP0を、サポートURL、デモアカウント、弁護士レビュー、外部AI、有料機能、郵送交換、スクショ素材の観点で整理した。
-
-### 変更内容
-
-#### `notes/30_owner_release_action_sheet.md`
-- 今日できる作業、オーナー判断が必要なP0、Apple提出前の入力項目、デモアカウント準備を整理した。
-- 弁護士へ送る添付セット、提出直前の判断ライン、Codexへ投げると速い依頼文を追加した。
-- コードを触らず、リリース準備だけを進める前提を明記した。
-
-### 影響範囲
-
-- オーナー側のApp Store提出準備
-- 弁護士レビュー依頼
-- デモアカウント、スクショ、公開URLの準備
-- コード変更なし。別セッションのSwift Native実装には触れていない。
-
-### 確認方法
-
-- `rg -n "今日できること|デモアカウント|弁護士|App Store|提出を止める|コードは触らない" notes/30_owner_release_action_sheet.md`
-- 旧規約用語・旧主体表現チェック（旧提案/旧メッセージ/旧投稿関連、サービス主体表現）
-- `git diff --check -- notes/30_owner_release_action_sheet.md notes/08_design_iterations.md`
-
-### セルフレビュー結果
-
-- ✅ コード、Supabase、ビルド設定、アプリ画面は変更していない。
-- ✅ 技術者向け詳細ではなく、オーナーが判断・準備する項目に絞った。
-- ✅ 状態名の追加/改名はなく、`notes/09_state_machines.md` 更新は不要。
-- ✅ 新用語・廃止用語はなく、`notes/10_glossary.md` 更新は不要。
-- ✅ DBスキーマ変更はなく、`notes/05_data_model.md` 更新は不要。
-- ⚠️ 実際の提出可否は、完成ビルドでの実機確認と公開URL確認後に判断する。
-
-### 関連ファイル
-
-- `notes/30_owner_release_action_sheet.md`
-- `notes/24_app_store_submission_pack.md`
-- `notes/25_public_legal_support_pages.md`
-- `notes/29_legal_review_brief.md`
-
----
-
-## イテレーション388：法務レビュー依頼メモを追加
-
-### 背景・問題意識
-
-利用規約・プライバシーポリシー・特商法・サポート文面のドラフトは整ってきたが、郵送交換、本人確認なし、AI機能、UGC、有料機能、代表者情報非公表、外国第三者提供は、公開前に弁護士レビューで明示的に潰すべき論点である。App Store提出前に、人間レビューへ渡せる質問票として整理した。
-
-### 変更内容
+#### `notes/58_legal_review_response_tracker.md`
+- 弁護士回答の受領物、レビュー回答一覧、影響文書マップ、反映ステータス定義、反映時チェック、No-Goを追加した。
+- 現地交換安全、位置情報/服装写真、未成年、AI、UGC、有料機能、特商法、削除/保存期間、外国事業者、古物/権利物の初期行を用意した。
+- 回答原文は公開リポジトリに貼らず、要点だけ記録する方針を明記した。
 
 #### `notes/29_legal_review_brief.md`
-- 弁護士へ確認してほしい文書一覧と、既存の弁護士納品原典の所在を整理した。
-- 現行仕様の要約と、原典からの主な変更点を表にした。
-- 郵送交換、現地交換と安全、AI機能、UGC、特商法、有料機能、アカウント削除、外国第三者提供、古物営業法/チケット/権利物の重点レビュー質問を追加した。
-- 弁護士へそのまま送れる短文を追加した。
+- 弁護士回答後は `notes/58` に要点、反映先、未決論点を記録する導線を追加した。
+
+#### `notes/39_release_command_center.md`, `notes/30_owner_release_action_sheet.md`, `notes/50_release_go_no_go_decision_matrix.md`
+- 法務レビュー回答反映を文書マップ、オーナー作業表、Go / No-Goに接続した。
 
 #### `notes/22_release_triage_tracker.csv`
-- RL-013に、弁護士確認メモの所在を追記した。
+- RL-056として法務レビュー回答反映台帳を追加した。
 
 ### 影響範囲
 
-- 公開前法務レビュー
-- 利用規約・プライバシーポリシー・特商法表記
-- App Store審査向けの法務説明
-- コード変更なし。別セッションのSwift Native実装には触れていない。
+- 弁護士レビュー後の文書反映
+- Terms / Privacy / 特商法 / Support / App Privacy / Review Notes
+- Go / No-Go判定
+- コード、公開URL、App Store Connect設定は変更していない。
 
 ### 確認方法
 
-- `rg -n "郵送交換|AI機能|UGC|特定商取引法|アカウント削除|外国|古物|チケット" notes/29_legal_review_brief.md`
+- `rg -n "LR-001|RL-056|法務レビュー回答|G13 Legal Review|未反映" notes/58_legal_review_response_tracker.md notes/29_legal_review_brief.md notes/50_release_go_no_go_decision_matrix.md notes/22_release_triage_tracker.csv`
+- `python3 - <<'PY' ...` による `notes/22_release_triage_tracker.csv` のCSV parse確認
 - 旧規約用語・旧主体表現チェック（旧提案/旧メッセージ/旧投稿関連、サービス主体表現）
-- `git diff --check -- notes/29_legal_review_brief.md notes/22_release_triage_tracker.csv notes/08_design_iterations.md`
+- `git diff --check -- notes`
 
 ### セルフレビュー結果
 
-- ✅ コード、Supabase、ビルド設定、アプリ画面は変更していない。
-- ✅ 弁護士に確認してほしい論点を、仕様と条項ごとに切り分けた。
-- ✅ 代表者情報は既存方針どおり非公表前提だが、特商法上の可否はレビュー質問として残した。
+- ✅ コード、公開URL、App Store Connect設定は変更していない。
+- ✅ 弁護士回答原文を公開リポジトリに貼らず、要点と反映先だけ管理する方針にした。
+- ✅ Go / No-GoへG13 Legal Reviewを追加し、未反映/要再確認が残る場合は提出を止める条件にした。
 - ✅ 状態名の追加/改名はなく、`notes/09_state_machines.md` 更新は不要。
-- ✅ 新用語・廃止用語はなく、`notes/10_glossary.md` 更新は不要。
+- ✅ 新用語は追加していないため、`notes/10_glossary.md` 更新は不要。
 - ✅ DBスキーマ変更はなく、`notes/05_data_model.md` 更新は不要。
-- ⚠️ 本メモは法務レビュー依頼の台本であり、弁護士回答後に公開文面へ反映が必要。
 
 ### 関連ファイル
 
+- `notes/58_legal_review_response_tracker.md`
 - `notes/29_legal_review_brief.md`
-- `notes/legal/01_terms_of_service_draft.md`
-- `notes/legal/02_privacy_policy_draft.md`
-- `notes/25_public_legal_support_pages.md`
-- `notes/26_trust_safety_release_sop.md`
-- `notes/27_app_privacy_data_inventory.md`
-
----
-
-## イテレーション387：App Privacy照合表とスクショ台本を追加
-
-### 背景・問題意識
-
-App Store審査提出の準備として、App Privacy回答とスクリーンショット素材は、実装完了後に急いで作ると漏れが出やすい。オーナーの継続指示に従い、コード変更なしで、提出直前に実ビルドと照合できるデータインベントリと撮影台本を先に作成した。
-
-### 変更内容
-
-#### `notes/27_app_privacy_data_inventory.md`
-- Swift Nativeの `PrivacyInfo.xcprivacy`、`Info.plist`、`Package.swift` から現時点で読めるプライバシー関連事実を整理した。
-- App Privacyカテゴリごとの収集有無、ユーザー紐づき、目的、トラッキング有無の回答候補を作成した。
-- Supabase、APNs、Apple/Googleログイン、IAP、Stripe、位置情報、Camera/Photos、Analytics/Crash、外部AIごとの提出前確認表を追加した。
-- Swift Nativeとlegacy ExpoのPrivacy Manifest差分を記録し、初回提出バイナリに応じて回答を変える注意を明記した。
-
-#### `notes/28_app_store_screenshot_storyboard.md`
-- App Storeスクリーンショットの撮影順、画面、伝えること、コピー候補、避けるべき表示を整理した。
-- 実在IP/個人情報を避けるための架空デモデータ候補を追加した。
-- 撮影前/撮影後チェック、App Review Notesとの対応表を追加した。
-
-#### `notes/24_app_store_submission_pack.md`
-- App Privacy詳細照合表とスクリーンショット台本への参照を追記した。
-
-#### `notes/22_release_triage_tracker.csv`
-- RL-014にスクショ台本の所在を追記した。
-- RL-029を進行中にし、App Privacy詳細照合表の所在を追記した。
-
-### 影響範囲
-
-- App Store Connect App Privacy回答
-- Privacy Manifest照合
-- App Storeスクリーンショット制作
-- App Review Notesとの整合確認
-- コード変更なし。別セッションのSwift Native実装には触れていない。
-
-### 確認方法
-
-- `rg -n "App Privacy|PrivacyInfo|NSPrivacy|トラッキング|スクリーンショット|App Review|support@megrum.jp" notes/27_app_privacy_data_inventory.md notes/28_app_store_screenshot_storyboard.md notes/24_app_store_submission_pack.md`
-- 旧規約用語・旧主体表現チェック（旧提案/旧メッセージ/旧投稿関連、サービス主体表現）
-- `git diff --check -- notes/27_app_privacy_data_inventory.md notes/28_app_store_screenshot_storyboard.md notes/24_app_store_submission_pack.md notes/22_release_triage_tracker.csv notes/08_design_iterations.md`
-
-### セルフレビュー結果
-
-- ✅ コード、Supabase、ビルド設定、アプリ画面は変更していない。
-- ✅ App Privacy回答は断定ではなく、実ビルド・SDK・通信ログで最終確認する前提の作業表にした。
-- ✅ スクショ台本では、実在IP、実住所、実ユーザー情報を写さない方針を明記した。
-- ✅ 状態名の追加/改名はなく、`notes/09_state_machines.md` 更新は不要。
-- ✅ 新用語・廃止用語はなく、`notes/10_glossary.md` 更新は不要。
-- ✅ DBスキーマ変更はなく、`notes/05_data_model.md` 更新は不要。
-- ⚠️ App Privacy回答、スクショ、デモデータは完成ビルドで最終確定が必要。
-
-### 関連ファイル
-
-- `notes/27_app_privacy_data_inventory.md`
-- `notes/28_app_store_screenshot_storyboard.md`
-- `notes/24_app_store_submission_pack.md`
+- `notes/39_release_command_center.md`
+- `notes/30_owner_release_action_sheet.md`
+- `notes/50_release_go_no_go_decision_matrix.md`
 - `notes/22_release_triage_tracker.csv`
 
 ---
 
-## イテレーション386：公開サポートと安全運用SOPを追加
+## イテレーション379：法務branch統合手順を追加
 
 ### 背景・問題意識
 
-オーナーから「私が止めるまでその辺りの準備を進めてください」と継続指示があった。別セッションでコード開発が進んでいるため、コードを変更せず、App Store審査前に公開・説明が必要なサポートページ文面、アカウント削除、通報/ブロック、個人情報請求、AI説明、Trust & Safety運用を先に整える必要があった。
+法務・リリース準備docsを別worktree/別branchへ分離してpushしたが、開発側セッションが並行して進むため、どのbranchで何をstageするか、いつPR化するか、共有docsの競合をどう扱うかを明文化する必要があった。元ツリーの未追跡法務docsも、正本が法務branchへcommit済みであることを確認して除外した。
 
 ### 変更内容
+
+#### `notes/57_legal_release_branch_integration_plan.md`
+- Swift Native開発worktreeと法務リリース準備worktreeの役割を整理した。
+- 開発側でstageしてよい範囲、stageしない範囲、`git add -A` を避ける理由を明記した。
+- 法務branchのPRタイトル/本文案、merge前チェック、共有docs競合時の判断を追加した。
+- 元ツリーの掃除方針と、まだ触らない共有docsを明記した。
+- Draft PR `https://github.com/mashimabizz/Megrum_design/pull/2` を記録した。
+
+#### `notes/39_release_command_center.md`, `notes/30_owner_release_action_sheet.md`
+- 法務branch統合手順への導線を追加した。
+
+#### `notes/22_release_triage_tracker.csv`
+- RL-055として法務branch統合手順を追加した。
+
+### 影響範囲
+
+- 開発branchと法務branchの並行運用
+- PR作成/merge時の競合判断
+- `notes/08`, `notes/17`, `notes/22` の共有docs管理
+- コード、DB、ビルド設定、App Store Connect設定は変更していない。
+
+### 確認方法
+
+- `rg -n "RL-055|codex/legal-release-prep|git add -A|法務branch統合" notes/57_legal_release_branch_integration_plan.md notes/39_release_command_center.md notes/22_release_triage_tracker.csv`
+- `python3 - <<'PY' ...` による `notes/22_release_triage_tracker.csv` のCSV parse確認
+- `git diff --check -- notes`
+
+### セルフレビュー結果
+
+- ✅ コード、DB、ビルド設定、App Store Connect設定は変更していない。
+- ✅ 法務branch `codex/legal-release-prep` のcommit/push済み状態と、開発側でstageしない範囲を明記した。
+- ✅ 元ツリーの未追跡法務docsは正本commit後に除外し、共有docsは触らず残した。
+- ✅ 状態名の追加/改名はなく、`notes/09_state_machines.md` 更新は不要。
+- ✅ 新用語は追加していないため、`notes/10_glossary.md` 更新は不要。
+- ✅ DBスキーマ変更はなく、`notes/05_data_model.md` 更新は不要。
+
+### 関連ファイル
+
+- `notes/57_legal_release_branch_integration_plan.md`
+- `notes/39_release_command_center.md`
+- `notes/30_owner_release_action_sheet.md`
+- `notes/22_release_triage_tracker.csv`
+
+---
+
+## イテレーション378：アプリ内法務安全コピーを追加
+
+### 背景・問題意識
+
+公開FAQと法務文書は整ってきたが、実装セッションが画面に入れる同意文言、権限説明、安全注意、AI/IAP文言を都度作ると、規約、Privacy、App Privacy、Review Notesとズレる可能性がある。そこで、コードを触らずにアプリ内で使う短文コピーを先に用意した。
+
+### 変更内容
+
+#### `notes/56_in_app_legal_safety_copy_deck.md`
+- Terms / Privacy同意、アカウント作成前説明、位置情報、カメラ/写真、通知、現地交換安全、打診、取引チャット、通報/ブロック、アカウント削除、個人情報請求、AI、有料機能の文言を追加した。
+- 各領域にNo-Goを入れ、画面文言が過剰保証、Privacy不一致、未実装機能の断定にならないようにした。
+- App Review Notes用短文と実装時チェックを追加した。
+
+#### `notes/39_release_command_center.md`, `notes/30_owner_release_action_sheet.md`, `notes/24_app_store_submission_pack.md`, `notes/55_public_help_faq_draft.md`
+- アプリ内法務・安全コピー集への導線を追加した。
+
+#### `notes/22_release_triage_tracker.csv`
+- RL-054としてアプリ内法務・安全コピー集を追加した。
+
+### 影響範囲
+
+- Swift Native実装時の画面文言
+- App ReviewのPermission / Safety / Privacy説明
+- 利用規約、プライバシーポリシー、App Privacyとの文言整合
+- コード、画面、公開URL、App Store Connect設定は変更していない。
+
+### 確認方法
+
+- `rg -n "RL-054|アプリ内法務|Terms / Privacy|現地交換の安全|AI補助" notes/56_in_app_legal_safety_copy_deck.md notes/39_release_command_center.md notes/22_release_triage_tracker.csv`
+- `python3 - <<'PY' ...` による `notes/22_release_triage_tracker.csv` のCSV parse確認
+- 旧規約用語・旧主体表現チェック（旧提案/旧メッセージ/旧投稿関連、サービス主体表現）
+- `git diff --check -- notes`
+
+### セルフレビュー結果
+
+- ✅ コード、画面、公開URL、App Store Connect設定は変更していない。
+- ✅ 同意、権限、現地交換安全、通報、削除、AI、IAPの画面文言を、公開FAQ/Privacy/App Reviewと揃う形で用意した。
+- ✅ 初回で出さない外部AI/有料機能は画面から外す注意を入れた。
+- ✅ 状態名の追加/改名はなく、`notes/09_state_machines.md` 更新は不要。
+- ✅ 新用語は追加していないため、`notes/10_glossary.md` 更新は不要。
+- ✅ DBスキーマ変更はなく、`notes/05_data_model.md` 更新は不要。
+
+### 関連ファイル
+
+- `notes/56_in_app_legal_safety_copy_deck.md`
+- `notes/39_release_command_center.md`
+- `notes/30_owner_release_action_sheet.md`
+- `notes/24_app_store_submission_pack.md`
+- `notes/55_public_help_faq_draft.md`
+- `notes/22_release_triage_tracker.csv`
+
+---
+
+## イテレーション377：公開ヘルプFAQ下書きを追加
+
+### 背景・問題意識
+
+Support URL、通報・削除・個人情報請求ページの原稿はあるが、審査員やユーザーが問い合わせ前に自己解決できるFAQページの下書きが不足していた。公開サポートページを連絡先だけにしないため、アカウント、現地交換、安全、削除、Privacy、通知、有料機能、AI、不具合のFAQを一枚にまとめた。
+
+### 変更内容
+
+#### `notes/55_public_help_faq_draft.md`
+- 公開候補URL `https://megrum.jp/support/faq` を定義した。
+- アカウント、グッズ登録/wish、打診、取引チャット、現地交換と安全、通報・ブロック、個人情報、通知、有料機能、AI、不具合のFAQを追加した。
+- 初回提出で出さない機能は公開時に削る/準備中扱いにする注意を入れた。
 
 #### `notes/25_public_legal_support_pages.md`
-- `megrum.jp` で公開するサポートURL、法務URL、アカウント削除、個人情報請求、通報・ブロック、AI機能説明の文面下書きを追加した。
-- App StoreサポートURLに使うトップページ文面、問い合わせカテゴリ、記載してほしい情報、受付時間を整理した。
-- 特定商取引法に基づく表記の下書きを、代表者情報非公表方針と課金価格候補を前提に作成した。
+- 公開URL一覧とSupportトップのリンクにFAQを追加した。
 
-#### `notes/26_trust_safety_release_sop.md`
-- UGC、通報、ブロック、モデレーション、アカウント削除、個人情報請求、AI機能、郵送交換トラブルの運用SOPを追加した。
-- App Store審査で説明しやすいよう、UGC審査前チェック、証跡パック、審査週の運用ルーチンを整理した。
+#### `notes/37_public_url_publication_checklist.md`
+- 公開必須URL、curl確認、関連文書にFAQを追加した。
 
-#### `notes/24_app_store_submission_pack.md`
-- 公開URLチェックへアカウント削除、個人情報請求、通報ページを追加した。
-- スクリーンショット仕様と撮影前チェックを追加した。
-- Apple公式のProduct Page / Screenshot Specifications参照を追加した。
+#### `notes/39_release_command_center.md`, `notes/30_owner_release_action_sheet.md`, `notes/34_support_response_templates.md`
+- FAQ文書への導線を追加した。
 
 #### `notes/22_release_triage_tracker.csv`
-- RL-013、RL-030、RL-031を進行中にし、公開文面/SOP下書きの所在と、実URL公開・実機確認が未完了であることを記録した。
+- RL-053として公開ヘルプFAQ下書きを追加した。
 
 ### 影響範囲
 
-- App Store審査提出準備
-- 公開サポートページ原稿
-- Trust & Safety運用
-- アカウント削除、個人情報請求、AI機能説明、通報/ブロック説明
-- コード変更なし。別セッションのSwift Native実装には触れていない。
+- Support URL公開準備
+- App ReviewのDeveloper Information / Support URL説明
+- ユーザー問い合わせ削減
+- 通報、削除、Privacy、AI、IAPの公開説明
+- コード、公開URL、App Store Connect設定は変更していない。
 
 ### 確認方法
 
-- `rg -n "アカウント削除|通報|ブロック|AI機能|App Store|Privacy|特定商取引法|support@megrum.jp" notes/25_public_legal_support_pages.md notes/26_trust_safety_release_sop.md notes/24_app_store_submission_pack.md`
+- `rg -n "support/faq|RL-053|公開ヘルプFAQ|よくある質問" notes/55_public_help_faq_draft.md notes/25_public_legal_support_pages.md notes/37_public_url_publication_checklist.md notes/39_release_command_center.md notes/22_release_triage_tracker.csv`
+- `python3 - <<'PY' ...` による `notes/22_release_triage_tracker.csv` のCSV parse確認
 - 旧規約用語・旧主体表現チェック（旧提案/旧メッセージ/旧投稿関連、サービス主体表現）
-- `git diff --check -- notes/25_public_legal_support_pages.md notes/26_trust_safety_release_sop.md notes/24_app_store_submission_pack.md notes/22_release_triage_tracker.csv notes/08_design_iterations.md`
+- `git diff --check -- notes`
 
 ### セルフレビュー結果
 
-- ✅ コード、Supabase、ビルド設定、アプリ画面は変更していない。
-- ✅ AppleのUGC、アカウント削除、App Privacy、スクリーンショット提出観点を、公開文面と運用SOPへ分けて整理した。
-- ✅ 代表者情報は、既存方針どおり「請求があれば遅滞なく開示」の下書きに留めた。
+- ✅ コード、公開URL、App Store Connect設定は変更していない。
+- ✅ Supportトップ、公開URLチェック、コントロールボード、オーナー作業表、返信テンプレートからFAQへ辿れるようにした。
+- ✅ 初回提出で出さない有料機能/外部AIは公開時に削る注意を入れた。
 - ✅ 状態名の追加/改名はなく、`notes/09_state_machines.md` 更新は不要。
-- ✅ 新用語・廃止用語はなく、`notes/10_glossary.md` 更新は不要。
+- ✅ 新用語は追加していないため、`notes/10_glossary.md` 更新は不要。
 - ✅ DBスキーマ変更はなく、`notes/05_data_model.md` 更新は不要。
-- ⚠️ 実URL公開、アプリ内導線、通報/ブロック/削除の実機確認は別途必要。
 
 ### 関連ファイル
 
+- `notes/55_public_help_faq_draft.md`
 - `notes/25_public_legal_support_pages.md`
-- `notes/26_trust_safety_release_sop.md`
-- `notes/24_app_store_submission_pack.md`
+- `notes/37_public_url_publication_checklist.md`
+- `notes/39_release_command_center.md`
+- `notes/30_owner_release_action_sheet.md`
+- `notes/34_support_response_templates.md`
 - `notes/22_release_triage_tracker.csv`
 
 ---
 
-## イテレーション385：App Store提出素材パックを追加
+## イテレーション376：法務リリース準備を別worktreeへ分離
 
 ### 背景・問題意識
 
-オーナーから「いまできることを準備させてほしい」「別セッションで開発を進めているので、コードの方を更新するのはやめてほしい」と指示があった。開発作業と衝突しない範囲で、App Store審査に必要なメタ情報、審査メモ、プライバシー回答、AI/UGC/アカウント削除の提出前確認を先に整備する必要があった。
+並行セッションでSwift Native実装が進んでおり、同じworktreeに法務・App Store提出準備の未コミット文書が増えると差分の見通しが悪くなる。オーナーから「別のツリーで作業した方がいいのかな」と相談があったため、コード変更を含まない法務・リリース準備だけを `codex/legal-release-prep` の別worktreeへ分離した。
 
 ### 変更内容
 
-#### `notes/24_app_store_submission_pack.md`
-- App Store Connect のアプリ名、サブタイトル、説明文、キーワード、URL、著作権表記の下書きを追加した。
-- App Review Notes に貼れる審査メモ下書きと、デモアカウント・レビュー経路のTODOを整理した。
-- App Privacy 回答の想定カテゴリ、`PrivacyInfo.xcprivacy` 照合観点、外部AIサービス利用時の同意・説明観点を整理した。
-- UGCの通報/ブロック/モデレーション、アプリ内アカウント削除、公開URL、権限説明文、スクリーンショット構成、提出前ブロッカーを1枚に集約した。
+#### `notes/legal/`
+- 利用規約ドラフトとプライバシーポリシードラフトを、現地交換MVPとAI利用開示を前提に整理した。
 
-#### `notes/22_release_triage_tracker.csv`
-- RL-014 を進行中にし、App Store Connect入力素材の下書きが `notes/24_app_store_submission_pack.md` にあることを追記した。
-- RL-029 に App Privacy 回答下書きの所在と、提出直前にSDK/通信ログで最終照合する注意を追記した。
-
-### 影響範囲
-
-- App Store Connect 提出準備
-- 法務・プライバシー・AI・UGC・アカウント削除のリリース前確認
-- コード変更なし。別セッションのSwift Native実装には触れていない。
-
-### 確認方法
-
-- `rg -n "AI|App Privacy|PrivacyInfo|UGC|アカウント削除|App Review|support@megrum.jp" notes/24_app_store_submission_pack.md`
-- 旧規約用語・旧主体表現チェック（旧提案/旧メッセージ/旧投稿関連、サービス主体表現）
-- `git diff --check -- notes/24_app_store_submission_pack.md notes/08_design_iterations.md notes/22_release_triage_tracker.csv`
-
-### セルフレビュー結果
-
-- ✅ コード、Supabase、ビルド設定、アプリ画面は変更していない。
-- ✅ App Store提出前に入力が必要な素材を、開発と独立して準備できる形にした。
-- ✅ AI機能は、オンデバイス処理と外部AIサービス利用時の同意・説明を分けて記載した。
-- ✅ 状態名の追加/改名はなく、`notes/09_state_machines.md` 更新は不要。
-- ✅ 新用語・廃止用語はなく、`notes/10_glossary.md` 更新は不要。
-- ✅ DBスキーマ変更はなく、`notes/05_data_model.md` 更新は不要。
-- ⚠️ App Privacy 回答は実装・SDK・通信内容との最終照合が必要。
-
-### 関連ファイル
-
-- `notes/24_app_store_submission_pack.md`
-- `notes/22_release_triage_tracker.csv`
-- `notes/legal/01_terms_of_service_draft.md`
-- `notes/legal/02_privacy_policy_draft.md`
-
----
-
-## イテレーション384：AI機能の法務条項を補強
-
-### 背景・問題意識
-
-オーナーから「AIを使っていくみたいなことはちゃんと利用規約に記載してる？」と確認があった。法務ドラフトにはトレカAI一括登録の取得情報は入っていたが、利用規約としてのAI機能、出力の非保証、外部AIサービス利用時の明示・同意、汎用モデル学習利用の扱いが不足していた。App Store Review Guidelinesでも、個人データを第三者AIへ共有する場合は明示と許可が必要になるため、公開前ドラフトを補強した。
-
-### 変更内容
-
-#### `notes/legal/01_terms_of_service_draft.md`
-- 定義へ `AI機能` を追加した。
-- 本アプリの内容条項へ、AI機能の利用、AI出力の誤り・偏り・不完全性、専門的判断を代替しないこと、外部AIサービス利用時の明示・同意、AI機能の禁止利用を追記した。
-
-#### `notes/legal/02_privacy_policy_draft.md`
-- 取得情報へ `AI機能及び自動処理に関する情報` を追加した。
-- 利用目的へAI機能の提供、品質改善、安全確保を追加した。
-- 独立章として `AI機能及び自動処理` を追加し、オンデバイス処理、外部AIサービスへの送信、同意取得、汎用モデル学習利用の有無、ログ確認を整理した。
-- 委託先・外国第三者提供にもAIサービスを追加した。
-
-#### `notes/10_glossary.md`
-- `AI機能` と `外部AIサービス` を用語集へ追加した。
+#### `notes/24_app_store_submission_pack.md` 〜 `notes/54_prelaunch_security_audit_checklist.md`
+- App Store提出素材、公開ページ原稿、Trust & Safety、App Privacy、スクショ、弁護士レビュー、オーナー作業表、TestFlight、IAP、サポート返信、デモアカウント、提出証跡、公開URL、Tester案内、提出コントロールボード、App Review対応、P0スモーク、App Privacy回答、Privacy Manifest/SDK監査、アカウント削除、質問票、外部サービス、事故初動、Go / No-Go、提出後運用、データ保持、Guideline適合、提出前セキュリティ監査を追加した。
+- `notes/54` ではRLS、Storage、secret、APNs、Auth/OAuth、公開URL、管理者権限の提出前監査Gateを整理した。
 
 #### `notes/17_legal_alignment.md`
-- AI機能の利用規約・プライバシーポリシー反映内容を法務整合メモへ追記した。
+- 初回リリース範囲を現地交換MVPとして扱う前提に合わせ、規約原典との整合論点を整理した。
 
 #### `notes/22_release_triage_tracker.csv`
-- リリース前の追加確認項目として、AI機能の開示/外部AI同意UI、App Store Privacy Details / `PrivacyInfo.xcprivacy` 照合、UGC通報/ブロック/モデレーション、アプリ内アカウント削除とApple/Google連携解除を追加した。
+- RL-028以降の法務・リリース準備タスクを追加し、RL-052として提出前セキュリティ監査を追加した。
 
 ### 影響範囲
 
-- 法的文書ドラフト
-- 将来のAI機能・外部AIサービス導入時の同意設計
-- App Store審査時のプライバシー説明
-- リリース前P0チェックリスト
+- 法務レビュー準備
+- App Store Connect入力
+- TestFlight/App Review提出運用
+- App Privacy / Privacy Manifest / 外部サービス確認
+- Trust & Safety / アカウント削除 / 個人情報請求 / 事故初動
+- Go / No-Go判定
+- コード、DB、Supabase設定、Apple Developer設定、App Store Connect設定は変更していない。
 
 ### 確認方法
 
-- `rg -n "AI機能|外部AI|汎用モデル|生成AI|人工知能" notes/legal notes/10_glossary.md notes/17_legal_alignment.md`
+- `git status --short` で `ios-native/`, `mobile/`, `web/`, `supabase/` の差分が出ていないことを確認する。
+- `rg -n "SEC-001|SEC-016|RL-052|G12 Security|提出前セキュリティ監査|No-Go" notes/54_prelaunch_security_audit_checklist.md notes/39_release_command_center.md notes/50_release_go_no_go_decision_matrix.md notes/22_release_triage_tracker.csv`
+- `python3 - <<'PY' ...` による `notes/22_release_triage_tracker.csv` のCSV parse確認
 - 旧規約用語・旧主体表現チェック（旧提案/旧メッセージ/旧投稿関連、サービス主体表現）
-- `git diff --check -- notes/legal/01_terms_of_service_draft.md notes/legal/02_privacy_policy_draft.md notes/10_glossary.md notes/17_legal_alignment.md notes/08_design_iterations.md`
+- `git diff --check -- notes`
 
 ### セルフレビュー結果
 
-- ✅ AI利用の一般条項だけでなく、外部AIへ個人情報を送る場合の明示・同意、学習利用の有無までプライバシーポリシーに入れた。
-- ✅ トレカAI一括登録のような端末内処理と、外部AIサービス利用時の扱いを分けて書いた。
-- ✅ 新用語 `AI機能` / `外部AIサービス` を `notes/10_glossary.md` に追加した。
+- ✅ 別worktree `/Users/michitaka/Desktop/Megrum_release_prep`、branch `codex/legal-release-prep` で作業するように分離した。
+- ✅ 分離先ではコード、DB、ビルド設定、Supabase設定、Apple Developer設定、App Store Connect設定を変更していない。
+- ✅ 初回提出スコープは現地交換MVPとして文書群を接続した。
+- ✅ AI利用開示、IAP判断、App Privacy、Privacy Manifest、Guideline、セキュリティ監査まで提出前に確認できる導線を作った。
 - ✅ 状態名の追加/改名はなく、`notes/09_state_machines.md` 更新は不要。
-- ✅ データモデル変更はなく、`notes/05_data_model.md` 更新は不要。
-- ⚠️ どの外部AIサービスを使うか、ユーザー入力を学習利用させない契約にするか、個別同意UIをどこに出すかは実装前に確定が必要。
+- ✅ 新用語は追加していないため、`notes/10_glossary.md` 更新は不要。
+- ✅ DBスキーマ変更はなく、`notes/05_data_model.md` 更新は不要。
+- ⚠️ 実ビルド、公開URL、Supabase Dashboard、Apple Developer、App Store Connectでの実作業は未実行。
 
 ### 関連ファイル
 
 - `notes/legal/01_terms_of_service_draft.md`
 - `notes/legal/02_privacy_policy_draft.md`
-- `notes/10_glossary.md`
 - `notes/17_legal_alignment.md`
 - `notes/22_release_triage_tracker.csv`
-
----
-
-## イテレーション383：Swift初期ロードの部分失敗耐性を追加
-
-### 背景・問題意識
-
-USB経由でSwift Native版を実機へ再インストールして起動したところ、オーナーのiPhoneで「Megrumを読み込んでいます」のまま進まない状態が発生した。`MegrumRootView` は `viewer == nil` の間ローディングを出す設計だが、初期snapshot内の在庫/Wish/個別募集/打診/グルーム/掲示板のいずれかが失敗するとsnapshot全体が失敗し、viewerが反映されないため、実機上では原因が見えないまま停止していた。
-
-### 変更内容
-
-#### `ios-native/Sources/MegrumApp/SupabaseMegrumRepository.swift`
-- `loadInitialSnapshot()` でviewer取得だけを起動必須条件にし、在庫/Wish/個別募集/打診/グルーム/掲示板はsection単位のbest-effort読み込みへ変更した。
-- いずれかのsectionがSupabase/RLS/通信/API差分で失敗しても、そのsectionだけ空配列にfallbackし、ホーム表示まで進めるようにした。
-- Debug buildでは失敗したsectionのerrorをconsoleへ出し、次の調査で原因を追いやすくした。
-
-#### `ios-native/Sources/MegrumApp/MegrumRootView.swift`
-- viewer取得自体が失敗した場合は、無限ローディングではなく「Megrumを読み込めませんでした」画面を表示するようにした。
-- 失敗画面から「再読み込み」と「ログアウトしてやり直す」を実行できるようにした。
-
-### 影響範囲
-
-- Swift Native起動直後の初期ロード
-- Supabase live repositoryでのsection取得失敗時の挙動
-- 実機Debug buildでの起動ブロッカー切り分け
-
-### 確認方法
-
-- `swift build --package-path ios-native --scratch-path /tmp/megrum-loading-fix-build`
-- `swift test --package-path ios-native --scratch-path /tmp/megrum-loading-fix-tests --enable-xctest --disable-swift-testing -j 1 --filter MegrumAppStateTests`
-- `xcodebuild -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -destination 'generic/platform=iOS' -derivedDataPath /tmp/megrum-native-loading-fix -allowProvisioningUpdates build`
-- `xcrun devicectl device install app --device 7F6C74EF-5786-5316-920A-F7F1CC3FE2A4 /tmp/megrum-native-loading-fix/Build/Products/Debug-iphoneos/MegrumNative.app`
-- `xcrun devicectl device process launch --terminate-existing --device 7F6C74EF-5786-5316-920A-F7F1CC3FE2A4 tokyo.megrum.native.preview`
-
-### セルフレビュー結果
-
-- ✅ `swift build` は成功した。
-- ✅ `MegrumAppStateTests` は70件すべて成功した。
-- ✅ 署名付きiPhone向けDebug `xcodebuild` は成功した。
-- ✅ `MTO’s phone` へのinstallは成功し、bundle id `tokyo.megrum.native.preview` を起動し直した。
-- ⚠️ 実機画面でローディングを抜けたかは、オーナー端末上の目視確認待ち。
-- ✅ 状態名の追加/改名はなく、`notes/09_state_machines.md` 更新は不要。
-- ✅ 新用語・廃止用語はなく、`notes/10_glossary.md` 更新は不要。
-- ✅ DBスキーマ変更はなく、`notes/05_data_model.md` 更新は不要。
-
-### 関連ファイル
-
-- `ios-native/Sources/MegrumApp/SupabaseMegrumRepository.swift`
-- `ios-native/Sources/MegrumApp/MegrumRootView.swift`
-
----
-
-## イテレーション382：Swift優先導線を実データへ接続
-
-### 背景・問題意識
-
-オーナーから、Swift移行では「左ドロワーを出せるようにすること」「そこから各種設定もできるようにすること」「ログアウト、新規登録、ログイン」「各種データの表示・編集・アップロード」を最優先するよう指示があった。iter381までで入口は増えたが、設定の認証状態表示、プロフィール画像アップロード、ホーム候補のlive data接続、在庫/Wishの表示密度、取引完了一覧がまだ弱かったため、競合しない領域に分けて並列実装し、親側で共通状態を統合した。
-
-### 変更内容
-
-#### `ios-native/Sources/MegrumApp/MegrumRootView.swift`
-- 左端スワイプで左ドロワーを開ける薄いNative gesture layerを追加した。
-- ドロワー項目選択時は一度閉じてから次run loopで遷移先を開き、ドロワーが閉じるだけで遷移しない不安定さを減らした。
-- 設定画面へ現在の `MegrumAuthState` を渡し、ログイン/ログアウト状態の表示と操作が実セッションを見るようにした。
-
-#### `ios-native/Sources/MegrumApp/SettingsScreen.swift`
-- 設定一覧にログイン/セキュリティ画面を追加し、メール、Auth user ID、profile ID、設定状態、account status、パスワード再設定、ログアウトを確認できるようにした。
-- ログアウト導線は既存のpush token revokeとSupabase sign outへ接続した。
-
-#### `ios-native/Sources/MegrumApp/OwnProfileScreen.swift`
-#### `ios-native/Sources/MegrumApp/MegrumAppState.swift`
-#### `ios-native/Sources/MegrumApp/SupabaseMegrumRepository.swift`
-- 自分プロフィール編集で写真ライブラリ、カメラ直撮り、画像削除を扱えるようにした。
-- `profile-photos` Storageへアップロードし、`users.avatar_url` を更新するlive repository境界を追加した。
-- Preview repositoryにもavatar URL更新を反映し、実機レビュー時に画面状態が変わるようにした。
-
-#### `ios-native/Sources/MegrumApp/HomeCandidateComposer.swift`
-#### `ios-native/Sources/MegrumData/SupabaseHomeClient.swift`
-#### `ios-native/Sources/MegrumApp/SupabaseMegrumRepository.swift`
-#### `ios-native/Sources/MegrumApp/MegrumAppState.swift`
-- `SupabaseHomeClient` のrequest境界をAppState/Home UIへ本接続した。
-- `HomeCandidateComposer` を追加し、相手在庫、viewer wish、相手wish/個別募集候補から「マッチしてるよ！」「交換できるかも？」の候補をcomposeするようにした。
-- live dataが未対応または失敗した場合は、既存のpreview fallbackへ戻して画面を空にしないようにした。
-
-#### `ios-native/Sources/MegrumApp/CollectionScreens.swift`
-#### `ios-native/Sources/MegrumApp/GoodsGrid.swift`
-- 在庫/Wish一覧に集計chip、読み込み状態、context別の空表示、remote image fallbackを追加した。
-- グリッドのtag/status/quantity表示を共通presentationへ寄せ、3/4/5列切替や長押し操作の既存挙動は維持した。
-
-#### `ios-native/Sources/MegrumApp/TradesScreen.swift`
-- やりとり一覧のstageを「打診中」「進行中」「完了済み」の3分類に拡張し、完了済み取引を進行中から分離した。
-- 横スワイプ切り替えとempty copyも3分類に合わせた。
-
-#### `ios-native/Tests/`
-- Settings/auth、プロフィール画像、ホーム候補compose、GoodsGrid layout、取引stageのテストを追加・更新した。
-
-### 影響範囲
-
-- Swift Native左ドロワー、設定、ログイン/セキュリティ、ログアウト
-- Swift Native自分プロフィール編集とプロフィール画像アップロード
-- Swift Nativeホーム候補表示のSupabase接続
-- Swift Native在庫/Wishグリッドの表示品質
-- Swift Nativeやりとり一覧の完了済み分類
-- USB接続iPhoneへのDebug install
-
-### 確認方法
-
-- `git diff --check -- ios-native/Sources/MegrumApp ios-native/Sources/MegrumData ios-native/Tests/MegrumAppTests`
-- `swift test --package-path ios-native --scratch-path /tmp/megrum-home-candidate-tests --enable-xctest --disable-swift-testing -j 1 --filter HomeCandidateComposerTests`
-- `swift test --package-path ios-native --scratch-path /tmp/megrum-priority-targeted --enable-xctest --disable-swift-testing -j 1 --filter 'SettingsScreenTests|AuthScreenInputTests|OwnProfileScreenTests|OwnProfileSummaryTests|GoodsGridLayoutTests|TradeChatAffordanceTests|HomeCandidateComposerTests'`
-- `swift test --package-path ios-native --scratch-path /tmp/megrum-priority-full --enable-xctest --disable-swift-testing -j 1`
-- `swift build --package-path ios-native --scratch-path /tmp/megrum-priority-swift-build`
-- `xcodebuild -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -destination 'generic/platform=iOS' -derivedDataPath /tmp/megrum-native-priority -allowProvisioningUpdates build`
-- `xcrun devicectl device install app --device 7F6C74EF-5786-5316-920A-F7F1CC3FE2A4 /tmp/megrum-native-priority/Build/Products/Debug-iphoneos/MegrumNative.app`
-
-### セルフレビュー結果
-
-- ✅ `git diff --check` は成功した。
-- ✅ `HomeCandidateComposerTests` は2件すべて成功した。
-- ✅ targeted priority testは55件すべて成功した。
-- ✅ full `swift test` は386件すべて成功した。
-- ✅ `swift build` は成功した。
-- ✅ 署名付きiPhone向けDebug `xcodebuild` は成功した。
-- ⚠️ `MTO’s phone` はUSB interfaceとして検出され、pairing済みかつDeveloper Mode enabledだが、CoreDevice上で `available=false` / `tunnelState=unavailable` のため、自動installは未完了。署名済みappは `/tmp/megrum-native-priority/Build/Products/Debug-iphoneos/MegrumNative.app` に作成済み。
-- ⚠️ `profile-photos` Storage bucketとRLS policyはSupabase側の設定確認が必要。
-- ✅ 状態名の追加/改名はなく、`notes/09_state_machines.md` 更新は不要。
-- ✅ 新用語・廃止用語はなく、`notes/10_glossary.md` 更新は不要。
-- ✅ DBスキーマの新規変更はなく、`notes/05_data_model.md` 更新は不要。既存 `users.avatar_url`、`goods_inventory`、`wish`、`listings`、`proposals` 境界のSwift接続を補強した。
-
-### 関連ファイル
-
-- `ios-native/Sources/MegrumApp/MegrumRootView.swift`
-- `ios-native/Sources/MegrumApp/SettingsScreen.swift`
-- `ios-native/Sources/MegrumApp/OwnProfileScreen.swift`
-- `ios-native/Sources/MegrumApp/MegrumAppState.swift`
-- `ios-native/Sources/MegrumApp/SupabaseMegrumRepository.swift`
-- `ios-native/Sources/MegrumApp/HomeCandidateComposer.swift`
-- `ios-native/Sources/MegrumData/SupabaseHomeClient.swift`
-- `ios-native/Sources/MegrumApp/CollectionScreens.swift`
-- `ios-native/Sources/MegrumApp/GoodsGrid.swift`
-- `ios-native/Sources/MegrumApp/TradesScreen.swift`
-- `ios-native/Tests/MegrumAppTests/`
-
----
-
-## イテレーション381：Swift P0導線の統合補強
-
-### 背景・問題意識
-
-オーナーから、Swift移行では「左ドロワーを出せること」「そこから各種設定ができること」「ログアウト、新規登録、ログインができること」「各種データの表示・編集・アップロードができること」を最優先するよう再確認があった。iter380までで基礎導線は入ったが、通知から対象画面へ直接飛ぶ導線、推し設定への直行、キャンセル申請への同意、グッズ編集時のカメラ直撮り、ホーム表示用のlive data境界がまだ弱かったため、並列実装分を親側で統合した。
-
-### 変更内容
-
-#### `ios-native/Sources/MegrumApp/AppChrome.swift`
-#### `ios-native/Sources/MegrumApp/MegrumRootView.swift`
-#### `ios-native/Sources/MegrumApp/SettingsScreen.swift`
-- 左ドロワーに「推し設定」を追加し、初回設定と同じNative選択画面を編集モードで開けるようにした。
-- ドロワー項目は閉じるアニメーション後に遷移するようにし、閉じている途中の誤反応を減らした。
-- 通知一覧を設定内の旧簡易画面ではなく、共有 `NotificationCenterScreen` に統一した。
-- 通知の `linkPath` を解釈し、タブ遷移または相手プロフィール/評価一覧へ進める共通導線をRootへ追加した。
-
-#### `ios-native/Sources/MegrumApp/NotificationsScreen.swift`
-- `NotificationRouteIntent` を追加し、通知の `linkPath` からホーム、在庫、Wish、やりとり、めぐり、相手プロフィール、評価一覧の遷移意図を取り出せるようにした。
-
-#### `ios-native/Sources/MegrumApp/GoodsEditorScreen.swift`
-- グッズ編集/追加画面で、写真ライブラリだけでなくiOSカメラ直撮りからローカル写真アップロードdraftへ追加できるようにした。
-- 既存の写真validationとアップロード上限を維持したまま、撮影写真も同じ保存経路に乗るようにした。
-
-#### `ios-native/Sources/MegrumApp/TradesScreen.swift`
-#### `ios-native/Sources/MegrumApp/MegrumAppState.swift`
-#### `ios-native/Sources/MegrumApp/SupabaseMegrumRepository.swift`
-#### `ios-native/Sources/MegrumData/SupabaseProposalClient.swift`
-#### `ios-native/Sources/MegrumData/SupabaseMessageClient.swift`
-- 取引チャット内の相手からのキャンセル申請に対し、「キャンセルに同意する」を表示し、`proposals.status='cancelled'` と承認system message作成まで接続した。
-- Preview repositoryにも同じ挙動を追加し、実機レビュー時にlive/previewどちらでも画面上の挙動を確認できるようにした。
-- 既に承認済み、または自分が出したキャンセル申請では同意CTAを出さないようにした。
-
-#### `ios-native/Sources/MegrumData/SupabaseHomeClient.swift`
-- Swift Nativeホーム用のSupabase request境界を追加し、近い将来Home UIがRN版と同等のmatch/possible候補をlive dataから読めるようにした。
-- 今回はAppState/Home UIへの接続前の薄いData境界に留め、共通状態の大きな差し替えは後続iterで扱う。
-
-#### `ios-native/Tests/`
-- 通知linkPath解釈、グッズ編集カメラdraft、キャンセル承認CTA、Supabase proposal/message request、ホーム用request builderのテストを追加・更新した。
-
-### 影響範囲
-
-- Swift Native左ドロワーと設定/推し設定/通知導線
-- Swift Native通知一覧からの対象画面遷移
-- Swift Nativeグッズ編集/追加時の写真アップロード入口
-- Swift Native取引チャットのキャンセル申請承認
-- Swift Nativeホーム表示用live data境界
-- USB接続iPhoneへのDebug install
-
-### 確認方法
-
-- `git diff --check -- ios-native/Sources/MegrumApp ios-native/Sources/MegrumData ios-native/Tests`
-- `swift test --package-path ios-native --scratch-path /tmp/megrum-iter381-targeted --enable-xctest --disable-swift-testing -j 1 --filter 'TradeChatAffordanceTests|NotificationRouteTests|GoodsEditorDraftTests|SupabaseProposalClientTests|SupabaseMessageClientTests|SupabaseHomeClientTests'`
-- `swift test --package-path ios-native --scratch-path /tmp/megrum-iter381-targeted2 --enable-xctest --disable-swift-testing -j 1 --filter 'SettingsScreenTests|TradeChatAffordanceTests|NotificationRouteTests|GoodsEditorDraftTests|SupabaseProposalClientTests|SupabaseMessageClientTests|SupabaseHomeClientTests'`
-- `swift build --package-path ios-native --scratch-path /tmp/megrum-iter381-build`
-- `swift test --package-path ios-native --scratch-path /tmp/megrum-iter381-full --enable-xctest --disable-swift-testing -j 1`
-- `xcodebuild -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -destination 'generic/platform=iOS' -derivedDataPath /tmp/megrum-native-iter381 -allowProvisioningUpdates build`
-- `xcrun devicectl device install app --device 7F6C74EF-5786-5316-920A-F7F1CC3FE2A4 /tmp/megrum-native-iter381/Build/Products/Debug-iphoneos/MegrumNative.app`
-
-### セルフレビュー結果
-
-- ✅ targeted smoke test 1 は75件すべて成功した。
-- ✅ targeted smoke test 2 は81件すべて成功した。
-- ✅ `swift build` は成功した。
-- ✅ `swift test` は372件すべて成功した。
-- ✅ `xcodebuild` のiPhone向けDebug buildは成功した。
-- ⚠️ `MTO’s phone` はCoreDevice / xcdeviceでUSB interfaceとして見えているが `unavailable` / `available=false` のため、自動installは未完了。署名済みappは `/tmp/megrum-native-iter381/Build/Products/Debug-iphoneos/MegrumNative.app` に作成済み。
-- ✅ 状態名の追加/改名はなく、`notes/09_state_machines.md` 更新は不要。
-- ✅ 新用語・廃止用語はなく、`notes/10_glossary.md` 更新は不要。
-- ✅ DBスキーマの新規変更はなく、`notes/05_data_model.md` 更新は不要。既存 `notifications` / `proposals` / `messages` / `goods_inventory` 境界をSwift側で接続・補強した。
-
-### 関連ファイル
-
-- `ios-native/Sources/MegrumApp/AppChrome.swift`
-- `ios-native/Sources/MegrumApp/MegrumRootView.swift`
-- `ios-native/Sources/MegrumApp/SettingsScreen.swift`
-- `ios-native/Sources/MegrumApp/NotificationsScreen.swift`
-- `ios-native/Sources/MegrumApp/GoodsEditorScreen.swift`
-- `ios-native/Sources/MegrumApp/TradesScreen.swift`
-- `ios-native/Sources/MegrumApp/MegrumAppState.swift`
-- `ios-native/Sources/MegrumApp/SupabaseMegrumRepository.swift`
-- `ios-native/Sources/MegrumData/SupabaseProposalClient.swift`
-- `ios-native/Sources/MegrumData/SupabaseMessageClient.swift`
-- `ios-native/Sources/MegrumData/SupabaseHomeClient.swift`
-- `ios-native/Tests/`
-
----
-
-## イテレーション380：Swift P0導線の追加補強
-
-### 背景・問題意識
-
-オーナーから、Swift移行では引き続き「左ドロワーを出せること」「そこから各種設定ができること」「ログアウト、新規登録、ログインができること」「各種データの表示・編集・アップロードができること」を優先するよう再確認があった。iter379の統合後、RN版との差分監査で残ったP0から、ホーム現地交換モード、打診作成、取引チャット、初回設定/設定導線を競合しない範囲へ分割し、親側で共通repository境界を統合した。
-
-### 変更内容
-
-#### `ios-native/Sources/MegrumApp/HomeScreen.swift`
-#### `ios-native/Sources/MegrumApp/HomeLocalModeSurface.swift`
-#### `ios-native/Sources/MegrumData/SupabaseActivityWindowClient.swift`
-- 現地交換モードON時にiOS位置情報を取得し、現在地座標をdraftへ保持できるようにした。
-- 現地交換モード設定のローカル保存codecに緯度/経度を追加し、既存 `activityWindowID` と一緒に復元できるようにした。
-- `user_local_mode_settings` upsert payloadで持参/希望IDを重複排除し、last locationの保存/clear payloadを扱えるようにした。
-
-#### `ios-native/Sources/MegrumApp/ProposalCreateFlow.swift`
-- 打診作成の待ち合わせ候補を最大3件まで追加/選択/削除できるdraftへ拡張した。
-- MapKit上で選んだ座標を待ち合わせ候補に反映し、場所名が空の場合は「地図で選択した場所」を補完するようにした。
-- 自分/相手のスケジュール背景から、場所候補を重複排除して拾えるようにした。
-
-#### `ios-native/Sources/MegrumApp/TradesScreen.swift`
-- 取引チャットの服装写真共有に、既存の `NativeCameraCaptureView` を使うカメラ直撮り入口を追加した。
-- 到着状態、現在地共有、遅刻/キャンセル系のsystem message表示を、取引チャット内で読みやすいpresentationへ整理した。
-- system messageの幅、折り返し、下部余白を調整し、入力欄まわりで詰まりにくくした。
-
-#### `ios-native/Sources/MegrumApp/AccountSetupScreen.swift`
-#### `ios-native/Sources/MegrumApp/SettingsScreen.swift`
-- 初回プロフィール設定/プロフィール編集の保存後に完了alertを出し、次に何をすればよいか分かるようにした。
-- 入力欄、推しchip、削除chipのアクセシビリティlabel/hintを補強した。
-- 設定とヘルプ配下に、利用規約、プライバシーポリシー、特定商取引法に基づく表記の入口を揃えた。法的文書本文は原典を書き換えず、入口と最小表示に留めた。
-- アカウント概要にaccount ID、user ID、account statusを確認できる表示を追加した。
-
-#### `ios-native/Sources/MegrumApp/SupabaseMegrumRepository.swift`
-- 現地交換モード設定で取得した座標を、`activity_windows.center_lat/lng` と `user_local_mode_settings.last_location_lat/lng` へ落とさず保存/復元するようにした。
-- 現地交換モードOFF時も、既存設定に合わせてlast locationを保持またはclearできるようにした。
-
-#### `ios-native/Tests/`
-- Home現地交換モード座標、AW request builder、打診待ち合わせ候補/地図座標、取引チャット操作表示、初回設定、設定一覧のテストを追加・更新した。
-
-### 影響範囲
-
-- Swift Nativeホーム現地交換モードとAW保存境界
-- Swift Native打診作成の待ち合わせ候補/マップ操作
-- Swift Native取引チャットの当日操作と服装写真カメラ入口
-- Swift Native初回設定、設定/ヘルプ/法的文書入口、アカウント概要
-- USB接続iPhoneへのDebug install
-
-### 確認方法
-
-- `git diff --check -- ios-native/Sources/MegrumApp ios-native/Sources/MegrumData ios-native/Tests`
-- `swift test --package-path ios-native --scratch-path /tmp/megrum-iter380-targeted --enable-xctest --disable-swift-testing -j 1 --filter 'HomeLocalModeTests|SupabaseActivityWindowClientTests|TradeChatAffordanceTests|TradeRequestDraftProposalCreateFlowTests|OnboardingOshiSelectionTests|SettingsScreenTests'`
-- `swift build --package-path ios-native --scratch-path /tmp/megrum-iter380-build`
-- `swift test --package-path ios-native --scratch-path /tmp/megrum-iter380-full --enable-xctest --disable-swift-testing -j 1`
-- `xcodebuild -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -destination generic/platform=iOS -derivedDataPath /tmp/megrum-native-iter380 -allowProvisioningUpdates build`
-- `xcrun devicectl device install app --device 7F6C74EF-5786-5316-920A-F7F1CC3FE2A4 /tmp/megrum-native-iter380/Build/Products/Debug-iphoneos/MegrumNative.app`
-
-### セルフレビュー結果
-
-- ✅ targeted smoke test は61件すべて成功した。
-- ✅ `swift build` は成功した。
-- ✅ `swift test` は355件すべて成功した。
-- ✅ `xcodebuild` のiPhone向けDebug buildは成功した。
-- ⚠️ `MTO’s phone` はCoreDevice上で `unavailable` のため、今回の自動installは未完了。署名済みappは `/tmp/megrum-native-iter380/Build/Products/Debug-iphoneos/MegrumNative.app` に作成済み。
-- ✅ 状態名の追加/改名はなく、`notes/09_state_machines.md` 更新は不要。
-- ✅ 新用語・廃止用語はなく、`notes/10_glossary.md` 更新は不要。
-- ✅ DBスキーマの新規変更はなく、`notes/05_data_model.md` 更新は不要。既存 `activity_windows` / `user_local_mode_settings` / `messages` / `users` 境界をSwift側で接続・補強した。
-- ✅ 法的文書本文は原典を書き換えず、入口と最小表示の追加に留めた。
-
-### 関連ファイル
-
-- `ios-native/Sources/MegrumApp/HomeScreen.swift`
-- `ios-native/Sources/MegrumApp/HomeLocalModeSurface.swift`
-- `ios-native/Sources/MegrumApp/ProposalCreateFlow.swift`
-- `ios-native/Sources/MegrumApp/TradesScreen.swift`
-- `ios-native/Sources/MegrumApp/AccountSetupScreen.swift`
-- `ios-native/Sources/MegrumApp/SettingsScreen.swift`
-- `ios-native/Sources/MegrumApp/SupabaseMegrumRepository.swift`
-- `ios-native/Sources/MegrumData/SupabaseActivityWindowClient.swift`
-- `ios-native/Tests/`
-
----
-
-## イテレーション379：Swift優先導線の追加統合
-
-### 背景・問題意識
-
-オーナーから、Swift移行では引き続き「左ドロワーを出せること」「左ドロワーから各種設定ができること」「ログアウト、新規登録、ログインができること」「各種データの表示・編集・アップロードができること」を最優先にするよう再指示があった。iter378の実機反映後、サブエージェントを認証/ログアウト、ドロワー/設定、データ編集/アップロードへ分け、親側で共通状態とSupabase境界を統合した。
-
-### 変更内容
-
-#### `ios-native/Sources/MegrumApp/AuthScreen.swift`
-#### `ios-native/Sources/MegrumApp/MegrumAuthState.swift`
-- ログアウト時にremote sign outが失敗しても、ローカルsessionとsession storeを必ず破棄し、認証画面へ戻るようにした。
-- Preview repositoryでもログアウト直後に自動再ログインしないようにし、実機レビュー時にログイン/新規登録画面へ戻れる状態にした。
-- 保存済みsessionの復元に失敗した場合は、再ログインが必要な状態として扱うようにした。
-- 読み込み中の入力disabled状態と認証画面の説明を整理した。
-
-#### `ios-native/Sources/MegrumApp/AppChrome.swift`
-#### `ios-native/Sources/MegrumApp/SettingsScreen.swift`
-- 左ドロワーの主要遷移先を、プロフィール、通知、住所設定、ブロックした人、設定とプライバシーへ整理した。
-- ドロワー項目をタップした時に、閉じるだけで終わらず、閉じた後に対象画面へ遷移するようにした。
-- 設定一覧にセキュリティ/プライバシー、ヘルプ、利用規約、プライバシーポリシー、アカウント概要、住所、通知、ブロック、ログアウトの入口を整理した。
-- 住所入力中にキーボードtoolbarのDoneで閉じられるようにした。
-
-#### `ios-native/Sources/MegrumApp/OwnProfileScreen.swift`
-#### `ios-native/Sources/MegrumApp/MegrumAppState.swift`
-#### `ios-native/Sources/MegrumApp/SupabaseMegrumRepository.swift`
-#### `ios-native/Sources/MegrumCore/MegrumModels.swift`
-- 自分プロフィール編集を共通状態とSupabase `users` PATCHへ接続した。
-- `UserGender` と `OwnProfileUpdateInput` を追加し、表示名、ハンドル、アイコンURL、性別、都道府県を保存できるようにした。
-- ハンドル名validationを共通化し、保存中状態を画面に反映するようにした。
-
-#### `ios-native/Sources/MegrumApp/GoodsEditorScreen.swift`
-#### `ios-native/Sources/MegrumApp/GoodsGrid.swift`
-#### `ios-native/Sources/MegrumData/SupabaseGoodsInventoryClient.swift`
-- 在庫/Wish編集画面で、既存写真や選択済み写真をプレビュー表示し、読み込み中/失敗時のfallbackを追加した。
-- 10MBを超える写真を保存前に弾き、失敗後も入力内容・タグ・選択写真を保持したまま再試行できるようにした。
-- グリッド/詳細の画像読み込み失敗時にも、空白ではなくfallback表示を出すようにした。
-- Storage uploadのContent-Type正規化と空/未対応/過大ファイルのrequest validationを補強した。
-
-#### `ios-native/Sources/MegrumApp/HomeScreen.swift`
-#### `ios-native/Sources/MegrumApp/HomeLocalModeSurface.swift`
-#### `ios-native/Sources/MegrumApp/ProposalCreateFlow.swift`
-#### `ios-native/Sources/MegrumApp/TradesScreen.swift`
-- ホームの現地交換モード、打診作成カレンダー/マップ、取引詳細の当日/異議系表示、送信後導線の統合分を取り込んだ。
-- 打診作成のスケジュール背景表示テストを、viewerとpartner両方の予定を含む期待値へ更新した。
-
-#### `ios-native/Tests/`
-- Auth入力、設定一覧、プロフィール保存、グッズ編集/アップロード、ホーム現地交換、打診作成、取引チャット、Supabase request builderのテストを追加・更新した。
-
-### 影響範囲
-
-- Swift Native左ドロワーと設定配下の主要導線
-- Swift Nativeログアウト、session復元、新規登録/ログイン入口
-- Swift Native自分プロフィール編集
-- Swift Native在庫/Wish表示・編集・写真アップロード
-- Swift Nativeホーム現地交換モード、打診作成、取引チャット補助導線
-- USB接続iPhoneへのDebug install
-
-### 確認方法
-
-- `git diff --check -- ios-native/Sources/MegrumApp ios-native/Sources/MegrumCore ios-native/Sources/MegrumData ios-native/Tests`
-- `swift test --package-path ios-native --scratch-path /tmp/megrum-current-build --enable-xctest --disable-swift-testing -j 1 --filter 'AuthScreenInputTests|SettingsScreenTests|OwnProfile|HomeLocalMode|TradeChatAffordance|TradeRequestDraft'`
-- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-build`
-- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-full --enable-xctest --disable-swift-testing -j 1`
-- `xcodebuild -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -destination 'generic/platform=iOS' -derivedDataPath /tmp/megrum-native-xcodebuild -allowProvisioningUpdates build`
-- `xcrun devicectl device install app --device 7F6C74EF-5786-5316-920A-F7F1CC3FE2A4 /tmp/megrum-native-xcodebuild/Build/Products/Debug-iphoneos/MegrumNative.app`
-
-### セルフレビュー結果
-
-- ✅ targeted smoke test は58件すべて成功した。
-- ✅ `swift build` は成功した。
-- ✅ `swift test` は344件すべて成功した。
-- ✅ `xcodebuild` のiPhone向けDebug buildは成功した。
-- ✅ `MTO’s phone` へのinstallは成功した。
-- ✅ 状態名の追加/改名はなく、`notes/09_state_machines.md` 更新は不要。
-- ✅ 新用語・廃止用語はなく、`notes/10_glossary.md` 更新は不要。
-- ✅ DBスキーマの新規変更はなく、`notes/05_data_model.md` 更新は不要。既存 `users` / `goods_inventory` / storage / messages / disputes 境界をSwift側で接続・補強した。
-
-### 関連ファイル
-
-- `ios-native/Sources/MegrumApp/AuthScreen.swift`
-- `ios-native/Sources/MegrumApp/MegrumAuthState.swift`
-- `ios-native/Sources/MegrumApp/AppChrome.swift`
-- `ios-native/Sources/MegrumApp/SettingsScreen.swift`
-- `ios-native/Sources/MegrumApp/OwnProfileScreen.swift`
-- `ios-native/Sources/MegrumApp/MegrumAppState.swift`
-- `ios-native/Sources/MegrumApp/SupabaseMegrumRepository.swift`
-- `ios-native/Sources/MegrumApp/GoodsEditorScreen.swift`
-- `ios-native/Sources/MegrumApp/GoodsGrid.swift`
-- `ios-native/Sources/MegrumData/SupabaseGoodsInventoryClient.swift`
-- `ios-native/Tests/`
-
----
-
-## イテレーション378：Swift優先P0の実機更新
-
-### 背景・問題意識
-
-オーナーから、Swift移行では「左ドロワーを出せること」「そこから各種設定ができること」「ログアウト、新規登録、ログインができること」「各種データの表示・編集・アップロードができること」を最優先にするよう再指示があった。iter377の基礎導線に対して、データ更新失敗時の復帰、取引チャットの型付き操作、異議詳細のlive境界、ホームの現地交換モード接続を追加で補強した。
-
-### 変更内容
-
-#### `ios-native/Sources/MegrumApp/GoodsEditorScreen.swift`
-- 在庫/Wish保存に失敗した場合も、入力内容、タグ、選択済み写真を保持する失敗カードを表示するようにした。
-- 失敗後に「再試行」「写真を外す」を選べるようにし、アップロード失敗から画面を閉じずに復帰できるようにした。
-
-#### `ios-native/Sources/MegrumApp/TradesScreen.swift`
-#### `ios-native/Sources/MegrumApp/MegrumAppState.swift`
-#### `ios-native/Sources/MegrumApp/SupabaseMegrumRepository.swift`
-#### `ios-native/Sources/MegrumData/SupabaseMessageClient.swift`
-- 取引チャットの遅刻連絡とキャンセル申請を、単なるsystem本文ではなく `meta.action` 付きの型付きメッセージとして送れるようにした。
-- UI側のdraft/intent、AppState、repository、Supabase message clientまで接続し、一覧表示側でも遅刻/キャンセル系のsystem messageを読みやすく扱えるようにした。
-
-#### `ios-native/Sources/MegrumApp/DisputeDetailScreen.swift`
-#### `ios-native/Sources/MegrumData/SupabaseDisputeClient.swift`
-- 異議詳細で申告者/相手の役割を判定し、取り下げ可否と反論可否を整理した。
-- 相手の反論時に `dispute_messages` 追加後、`disputes` 側も `respondent_response=disputed` / `status=arbitrating` へ更新するlive境界を追加した。
-- 証跡写真、期限、次アクションがNative List上で確認できるようにした。
-
-#### `ios-native/Sources/MegrumApp/MegrumRootView.swift`
-- ホーム画面へ `appState` を直接渡し、現地交換モードの持参候補や保存処理がSwift Nativeの共通状態を確実に参照するようにした。
-
-#### `ios-native/Tests/`
-- グッズ編集失敗復帰、取引チャットtyped intent、Supabase message metadata、異議詳細、AppState typed message送信をテストで補強した。
-
-### 影響範囲
-
-- Swift Native在庫/Wish追加・編集と写真アップロード復帰
-- Swift Native取引チャットの遅刻連絡・キャンセル申請
-- Swift Native異議詳細
-- Swift Nativeホームの現地交換モード
-- USB接続iPhoneへのDebug install
-
-### 確認方法
-
-- `git diff --check -- ios-native/Sources/MegrumApp/MegrumAppState.swift ios-native/Sources/MegrumApp/SupabaseMegrumRepository.swift ios-native/Sources/MegrumApp/TradesScreen.swift ios-native/Tests/MegrumAppTests/MegrumAppStateTests.swift`
-- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-priority-build`
-- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-priority-full-test --enable-xctest --disable-swift-testing -j 1`
-- `xcodebuild -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -destination 'generic/platform=iOS' -derivedDataPath /tmp/megrum-native-device-priority -allowProvisioningUpdates build`
-- `xcrun devicectl device install app --device 7F6C74EF-5786-5316-920A-F7F1CC3FE2A4 /tmp/megrum-native-device-priority/Build/Products/Debug-iphoneos/MegrumNative.app`
-
-### セルフレビュー結果
-
-- ✅ `swift build` は成功した。
-- ✅ `swift test` は316件すべて成功した。
-- ✅ `xcodebuild` の実機向けDebug buildは成功した。
-- ✅ `MTO’s phone` へのinstallは成功した。
-- ⚠️ `devicectl process launch` はiPhoneがロック中だったためOSに拒否された。アプリのinstall自体は完了済み。
-- ✅ 状態名の追加/改名はなく、`notes/09_state_machines.md` 更新は不要。
-- ✅ 新用語・廃止用語はなく、`notes/10_glossary.md` 更新は不要。
-- ✅ DBスキーマの新規変更はなく、`notes/05_data_model.md` 更新は不要。既存 `messages.meta` / `disputes` / `goods_inventory.photo_urls` / storage境界をSwift側で接続した。
-
-### 関連ファイル
-
-- `ios-native/Sources/MegrumApp/GoodsEditorScreen.swift`
-- `ios-native/Sources/MegrumApp/TradesScreen.swift`
-- `ios-native/Sources/MegrumApp/DisputeDetailScreen.swift`
-- `ios-native/Sources/MegrumApp/MegrumRootView.swift`
-- `ios-native/Sources/MegrumApp/MegrumAppState.swift`
-- `ios-native/Sources/MegrumApp/SupabaseMegrumRepository.swift`
-- `ios-native/Sources/MegrumData/SupabaseMessageClient.swift`
-- `ios-native/Sources/MegrumData/SupabaseDisputeClient.swift`
-- `ios-native/Tests/`
-
----
-
-## イテレーション377：Swift P0導線を並列補強
-
-### 背景・問題意識
-
-オーナーから、Swift移行では「左ドロワーと設定導線」「ログアウト・新規登録・ログイン」「各種データの表示・編集・アップロード」を優先するよう明示された。iter376で実機反映した土台に対して、サブエージェントを設定・認証・個別募集へ分割し、親側で共通状態と永続保存境界を統合した。
-
-### 変更内容
-
-#### `ios-native/Sources/MegrumApp/SettingsScreen.swift`
-- 設定一覧からヘルプ、利用規約、プライバシーポリシー、アカウント概要へ進めるNative List導線を追加した。
-- 住所設定・ブロック・通知だけでなく、設定下層の最低限の確認画面もSwift側で触れるようにした。
-
-#### `ios-native/Sources/MegrumApp/AuthScreen.swift`
-#### `ios-native/Sources/MegrumApp/MegrumAuthState.swift`
-- 認証入力validationをpure helper化し、メール形式、パスワード、ハンドル、password resetのエラーを分けて表示できるようにした。
-- Supabase新規登録でメール確認待ちとなりsessionが返らないケースを成功扱いにし、確認メール送信済みの案内を出すようにした。
-- mode変更、入力変更、OAuth開始、password reset開始時に古いerror/successをclearするようにした。
-- キーボードsubmit、iOS keyboard toolbar、背景タップでのdismissを追加した。
-
-#### `ios-native/Sources/MegrumApp/AccountSetupScreen.swift`
-#### `ios-native/Sources/MegrumApp/OnboardingOshiSelection.swift`
-- プロフィール編集時に `user_oshi` の既存推し設定を読み込み、現在の選択状態として復元するようにした。
-- 保存後はAppState上の `userOshiSelections` も同期し、再編集時に空状態へ戻らないようにした。
-
-#### `ios-native/Sources/MegrumApp/IndividualListingsScreen.swift`
-#### `ios-native/Sources/MegrumData/SupabaseListingClient.swift`
-- 個別募集カードに編集メニューを追加し、既存の譲るもの、求めるもの、数量、条件、交換タイプ、メモ、公開状態をNative Formで編集できるようにした。
-- `listings` PATCH、`listing_wish_options` PATCH、close/delete request builderを追加した。
-- 親側で `MegrumRepository.updateIndividualListing` とAppState更新を追加し、編集内容が画面内だけでなくSupabaseへ保存される境界まで接続した。
-
-#### `ios-native/Sources/MegrumApp/HomeScreen.swift`
-#### `ios-native/Sources/MegrumApp/HomeLocalModeSurface.swift`
-- 現地交換モードの持参候補がホームの相手グッズではなく、自分の在庫を優先して出すように修正した。
-
-#### `ios-native/Tests/`
-- Auth入力validation、設定下層、推し設定復元、個別募集編集、Supabase request builder、AppState更新をテストで補強した。
-
-### 影響範囲
-
-- Swift Native左ドロワー配下の設定画面
-- Swift Native新規登録、ログイン、password reset、session復元前後のエラー表示
-- プロフィール編集と推し設定復元
-- 個別募集の表示・編集・Supabase永続化
-- ホーム現地交換モードの持参グッズ候補
-- 実機Debug install
-
-### 確認方法
-
-- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-iter377-build2`
-- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-iter377-test2 --enable-xctest --disable-swift-testing -j 1`
-- `xcodebuild -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -destination 'generic/platform=iOS' -derivedDataPath /tmp/megrum-native-device-iter377 -allowProvisioningUpdates build`
-- `xcrun devicectl device install app --device 7F6C74EF-5786-5316-920A-F7F1CC3FE2A4 /tmp/megrum-native-device-iter377/Build/Products/Debug-iphoneos/MegrumNative.app`
-- `xcrun devicectl device process launch --device 7F6C74EF-5786-5316-920A-F7F1CC3FE2A4 tokyo.megrum.native.preview`
-
-### セルフレビュー結果
-
-- ✅ `swift build` は成功した。
-- ✅ `swift test` は299件すべて成功した。
-- ✅ `git diff --check` は対象Swift差分で成功した。
-- ✅ 署名付きiPhone向けDebug buildは成功した。
-- ✅ `MTO’s phone` への上書きinstallと起動は成功した。
-- ✅ 状態名の追加/改名はなく、`notes/09_state_machines.md` 更新は不要。
-- ✅ 新用語・廃止用語はなく、`notes/10_glossary.md` 更新は不要。
-- ✅ DBスキーマの新規変更はなく、`notes/05_data_model.md` 更新は不要。既存 `user_oshi` / `listings` / `listing_wish_options` / storage/RPC境界をSwift側へ接続した。
-
-### 関連ファイル
-
-- `ios-native/Sources/MegrumApp/SettingsScreen.swift`
-- `ios-native/Sources/MegrumApp/AuthScreen.swift`
-- `ios-native/Sources/MegrumApp/MegrumAuthState.swift`
-- `ios-native/Sources/MegrumApp/AccountSetupScreen.swift`
-- `ios-native/Sources/MegrumApp/OnboardingOshiSelection.swift`
-- `ios-native/Sources/MegrumApp/IndividualListingsScreen.swift`
-- `ios-native/Sources/MegrumApp/HomeScreen.swift`
-- `ios-native/Sources/MegrumApp/HomeLocalModeSurface.swift`
-- `ios-native/Sources/MegrumApp/MegrumAppState.swift`
-- `ios-native/Sources/MegrumApp/SupabaseMegrumRepository.swift`
-- `ios-native/Sources/MegrumData/SupabaseListingClient.swift`
-- `ios-native/Sources/MegrumData/SupabaseOshiClient.swift`
-- `ios-native/Tests/`
-
----
-
-## イテレーション376：Swift優先導線を実機反映
-
-### 背景・問題意識
-
-オーナーから、Swift移行では「左ドロワーを出せること」「ドロワーから各種設定ができること」「ログアウト、新規登録、ログインができること」「各種データの表示・編集・アップロードができること」を優先してほしいと指示があった。見た目の細部よりも、Swift Native版で日常的に触る基本導線を実機で確認できる状態にする必要がある。
-
-### 変更内容
-
-#### `ios-native/Sources/MegrumApp/AppChrome.swift`
-- 左ドロワーをSwift Nativeのオーバーレイとして実装し、プロフィール、通知、住所設定、ブロックした人、設定とプライバシー、ログアウトへ遷移できる項目を整理した。
-- ドロワーの閉じ中に項目が誤反応しないよう、閉じアニメーション中のタップを無効化した。
-
-#### `ios-native/Sources/MegrumApp/MegrumRootView.swift`
-- ホーム左上の自分アイコンから左ドロワーを開き、ドロワー項目から各設定画面をsheetで開けるようにした。
-- ログアウト時にpush token revokeを通してからSupabase Auth sessionを破棄する導線へ接続した。
-
-#### `ios-native/Sources/MegrumApp/GoodsEditorScreen.swift`
-- 在庫/Wish編集画面で写真選択データを保存時にアップロード対象として扱うようにした。
-- HEICなどの画像は可能な範囲でJPEGへ変換し、JPEG/PNG/GIF/WebPはcontent typeを保ったまま保存inputへ渡すようにした。
-- タグ入力を保存payloadへ含め、保存前blockerではなく実際に反映される項目として扱うようにした。
-
-#### `ios-native/Sources/MegrumData/SupabaseGoodsInventoryClient.swift`
-- `goods-photos` storageへの画像アップロードrequestを追加した。
-- `attach_inventory_tag` / `detach_inventory_tag` RPCと `goods_inventory_tags` 読み込みを追加し、作成・検索・公開在庫読み込み・更新時にタグを保持できるようにした。
-
-#### `ios-native/Sources/MegrumApp/MegrumAppState.swift`
-- Preview repositoryでも写真選択・タグ更新を反映し、実データ接続前後で画面挙動が大きく変わらないようにした。
-
-#### `ios-native/Sources/MegrumApp/SupabaseMegrumRepository.swift`
-- グッズ作成・更新時に写真アップロードを先に実行し、返ってきた公開URLを `goods_inventory.photo_urls` へ反映する流れへ接続した。
-
-#### `ios-native/Tests/`
-- グッズ写真アップロードrequest、タグRPC request、タグ読み込みrequest、編集draftの写真/タグpayloadをテストで補強した。
-- 既存の異議詳細/取引チャット/ホーム現地交換モード系の並列実装分も含め、Swift Native側の回帰テストを更新した。
-
-### 影響範囲
-
-- Swift Native左ドロワー
-- Swift Native設定導線、通知、住所設定、ブロック解除、ログアウト
-- Swift Native新規登録/ログイン/session復元の実環境接続
-- 在庫/Wishの作成・編集・写真アップロード・タグ保存
-- 実機Debug install
-
-### 確認方法
-
-- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-priority-build`
-- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-priority-test --enable-xctest --disable-swift-testing -j 1`
-- `xcodebuild -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -destination 'generic/platform=iOS' -derivedDataPath /tmp/megrum-native-device-priority -allowProvisioningUpdates build`
-- `xcrun devicectl device install app --device 7F6C74EF-5786-5316-920A-F7F1CC3FE2A4 /tmp/megrum-native-device-priority/Build/Products/Debug-iphoneos/MegrumNative.app`
-
-### セルフレビュー結果
-
-- ✅ `swift build` は成功した。
-- ✅ `swift test` は276件すべて成功した。
-- ✅ 署名付きiPhone向けDebug buildは成功した。
-- ✅ `MTO’s phone` への上書きinstallは成功した。
-- ⚠️ 自動launchは端末ロック中のためOSに拒否された。ロック解除後はホーム画面から起動可能。
-- ✅ 状態名の追加/改名はなく、`notes/09_state_machines.md` 更新は不要。
-- ✅ 新用語・廃止用語はなく、`notes/10_glossary.md` 更新は不要。
-- ✅ DBスキーマの新規変更はなく、`notes/05_data_model.md` 更新は不要。既存Storage/RPC/join table境界をSwift側へ接続した。
-
-### 関連ファイル
-
-- `ios-native/Sources/MegrumApp/AppChrome.swift`
-- `ios-native/Sources/MegrumApp/MegrumRootView.swift`
-- `ios-native/Sources/MegrumApp/GoodsEditorScreen.swift`
-- `ios-native/Sources/MegrumApp/MegrumAppState.swift`
-- `ios-native/Sources/MegrumApp/SupabaseMegrumRepository.swift`
-- `ios-native/Sources/MegrumData/SupabaseGoodsInventoryClient.swift`
-- `ios-native/Sources/MegrumData/SupabaseRESTClient.swift`
-- `ios-native/Sources/MegrumCore/MegrumModels.swift`
-- `ios-native/Tests/`
+- `notes/24_app_store_submission_pack.md` 〜 `notes/54_prelaunch_security_audit_checklist.md`
 
 ---
 
@@ -2963,63 +2658,6 @@ USB経由でSwift Native版を実機へ再インストールして起動した�
 - `ios-native/Sources/MegrumData/SupabaseActivityWindowClient.swift`
 - `ios-native/Sources/MegrumData/SupabaseMessageClient.swift`
 - `ios-native/Tests/`
-
----
-
-## イテレーション374：現行仕様の法務ドラフト追加
-
-### 背景・問題意識
-
-オーナーから「今の仕様をベースにして、利用規約とプライバシーポリシーを作成してください」と依頼があった。既存の `利用規約など/` 配下の弁護士納品 docx は法務原典として保持されているが、現行仕様では郵送交換の再追加、Swift Native iOS主線、めぐり/グルーム/スポット掲示板、APNs通知、Premium/めぐりPlus/ブーストなどが増えているため、公開前レビューに回せる現行仕様ベースの本文ドラフトを作る必要があった。
-
-### 変更内容
-
-#### `notes/legal/01_terms_of_service_draft.md`
-- 現行仕様ベースの利用規約ドラフトを新規作成した。
-- 旧規約用語ではなく、「打診」「取引チャット」「在庫情報」「wish」「現地交換」「郵送交換」「めぐり」「グルーム」「スポット掲示板」へ統一した。
-- 郵送交換は、取引成立後に当事者へ住所情報を表示し、初回リリースでは身分証明書による本人確認を行わない可能性があることを明記した。
-- 現地交換の待ち合わせ、服装写真、現在地共有、到着状況、証跡、評価、異議申し立て、通報、ブロックを条文化した。
-- Premium会員、めぐりPlus、ブースト、広告、スポンサー表示、有料サービスの決済・返金境界を整理した。
-
-#### `notes/legal/02_privacy_policy_draft.md`
-- 現行仕様ベースのプライバシーポリシードラフトを新規作成した。
-- アカウント/認証、プロフィール、推し、在庫/wish、打診/取引、住所情報、位置情報、服装写真、グルーム、スポット掲示板、通知トークン、決済、広告/分析、問い合わせ情報の取得項目と利用目的を整理した。
-- 現在地共有・服装写真は取引相手限定表示、原則取引終了後30日を目安に削除又は非表示化する方針を明記した。
-- 外部サービス、外国にある第三者への提供、決済情報、Cookie/広告/分析、安全管理措置、開示等請求、問い合わせ窓口を整備した。
-
-#### `notes/17_legal_alignment.md`
-- 新ドラフトの所在と、既存docx原典との関係を2026-05-31追記として明記した。
-- 郵送交換、本人確認なし運用、住所情報、位置情報/服装写真、代表者情報非公表、`support@megrum.jp` 統一を法務整合メモへ残した。
-
-### 影響範囲
-
-- 法的文書の公開前ドラフト
-- 利用規約・プライバシーポリシーの本番反映前レビュー
-- Web/mobile/iOSの法的画面に後続反映する本文ソース
-
-### 確認方法
-
-- `textutil -convert txt -stdout "利用規約など/01_Megrum利用規約【納品】.docx"`
-- `textutil -convert txt -stdout "利用規約など/02_Megrumプライバシーポリシー【納品】.docx"`
-- 旧規約用語・旧主体表現チェック（旧提案/旧メッセージ/旧投稿関連、サービス主体表現）
-- `rg -n "打診|取引チャット|郵送交換|住所情報|めぐりPlus|グルーム|スポット掲示板|support@megrum.jp" notes/legal`
-
-### セルフレビュー結果
-
-- ✅ 弁護士納品 docx と `notes/17_legal_alignment.md` を確認したうえで、現行仕様の差分を本文へ反映した。
-- ✅ 旧提案/旧メッセージ/旧投稿系の規約用語は新規ドラフトに含めていない。
-- ✅ 主体表現は「運営者」、対象サービス表現は「本アプリ」に統一した。
-- ✅ 住所情報、現在地共有、服装写真、通知トークン、決済、広告/分析、外部サービス、外国第三者提供、安全管理措置をプライバシーポリシーへ含めた。
-- ✅ 状態名の追加/改名はなく、`notes/09_state_machines.md` 更新は不要。
-- ✅ 新しい用語追加はなく、既存用語の法務文書化に留まるため `notes/10_glossary.md` 更新は不要。
-- ✅ データモデル変更はなく、`notes/05_data_model.md` 更新は不要。
-- ⚠️ 公開前に、年齢制限、保存期間、郵送交換の本人確認なし運用、外部サービス一覧、課金開始時期は法務レビューで最終確定する。
-
-### 関連ファイル
-
-- `notes/legal/01_terms_of_service_draft.md`
-- `notes/legal/02_privacy_policy_draft.md`
-- `notes/17_legal_alignment.md`
 
 ---
 
