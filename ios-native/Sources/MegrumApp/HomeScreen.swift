@@ -10,6 +10,7 @@ struct HomeScreen: View {
     @Binding var showsSearch: Bool
     var onRefresh: () async -> Void
     var onOpenSettings: () -> Void = {}
+    var onOpenOwnerProfile: (UUID) -> Void = { _ in }
 
     var body: some View {
         ZStack(alignment: .bottomLeading) {
@@ -21,14 +22,18 @@ struct HomeScreen: View {
                         title: "マッチしてるよ！",
                         count: matchedItems.count,
                         items: matchedItems,
-                        isLoading: isLoading
+                        isLoading: isLoading,
+                        viewerID: viewer?.id,
+                        onOpenOwnerProfile: onOpenOwnerProfile
                     )
 
                     MatchSection(
                         title: "交換できるかも？",
                         count: possibleItems.count,
                         items: possibleItems,
-                        isLoading: isLoading
+                        isLoading: isLoading,
+                        viewerID: viewer?.id,
+                        onOpenOwnerProfile: onOpenOwnerProfile
                     )
                 }
                 .padding(.horizontal, 20)
@@ -102,6 +107,8 @@ private struct MatchSection<Items: RandomAccessCollection>: View where Items.Ele
     var count: Int
     var items: Items
     var isLoading: Bool
+    var viewerID: UUID?
+    var onOpenOwnerProfile: (UUID) -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -120,7 +127,7 @@ private struct MatchSection<Items: RandomAccessCollection>: View where Items.Ele
             if isLoading && items.isEmpty {
                 GoodsGridSkeleton()
             } else {
-                GoodsGrid(items: Array(items))
+                GoodsGrid(items: Array(items), viewerID: viewerID, onOpenOwnerProfile: onOpenOwnerProfile)
             }
         }
     }

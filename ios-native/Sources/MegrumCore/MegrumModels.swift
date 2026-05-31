@@ -85,6 +85,64 @@ public struct UserProfile: Identifiable, Codable, Hashable, Sendable {
     }
 }
 
+public struct PublicUserProfile: Identifiable, Codable, Hashable, Sendable {
+    public var id: UUID { profile.id }
+    public var profile: UserProfile
+    public var averageStars: Double?
+    public var evaluationCount: Int
+    public var completedTradeCount: Int
+
+    public init(
+        profile: UserProfile,
+        averageStars: Double? = nil,
+        evaluationCount: Int = 0,
+        completedTradeCount: Int = 0
+    ) {
+        self.profile = profile
+        self.averageStars = averageStars
+        self.evaluationCount = evaluationCount
+        self.completedTradeCount = completedTradeCount
+    }
+
+    public var ratingSummary: String {
+        guard let averageStars else {
+            return "評価なし"
+        }
+        return String(format: "★ %.1f", averageStars)
+    }
+}
+
+public struct UserEvaluation: Identifiable, Codable, Hashable, Sendable {
+    public var id: UUID
+    public var raterID: UUID
+    public var raterHandle: String
+    public var raterDisplayName: String
+    public var raterAvatarURL: URL?
+    public var stars: Int
+    public var comment: String?
+    public var createdAt: Date
+
+    public init(
+        id: UUID,
+        raterID: UUID,
+        raterHandle: String,
+        raterDisplayName: String,
+        raterAvatarURL: URL? = nil,
+        stars: Int,
+        comment: String? = nil,
+        createdAt: Date = .now
+    ) {
+        self.id = id
+        self.raterID = raterID
+        self.raterHandle = raterHandle
+        self.raterDisplayName = raterDisplayName
+        self.raterAvatarURL = raterAvatarURL
+        self.stars = stars
+        self.comment = comment
+        self.createdAt = createdAt
+    }
+}
+
 public struct AuthUser: Identifiable, Codable, Hashable, Sendable {
     public var id: UUID
     public var email: String?

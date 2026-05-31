@@ -11,6 +11,7 @@ struct SearchScreen: View {
     @State private var selectedGoodsTypeID: UUID?
     @State private var searchTask: Task<Void, Never>?
     @State private var proposalTargetItem: GoodsItem?
+    @State private var profileRoute: PublicProfileRoute?
 
     private var resultCount: Int {
         appState.searchResults.count
@@ -65,14 +66,20 @@ struct SearchScreen: View {
                     } else if appState.searchResults.isEmpty {
                         SearchEmptyMessage()
                     } else {
-                        SearchResultSection(results: results(in: .matched), bucket: .matched) { item in
+                        SearchResultSection(results: results(in: .matched), bucket: .matched, viewerID: appState.viewer?.id) { item in
                             proposalTargetItem = item
+                        } onOpenOwnerProfile: { userID in
+                            profileRoute = PublicProfileRoute(userID: userID)
                         }
-                        SearchResultSection(results: results(in: .possible), bucket: .possible) { item in
+                        SearchResultSection(results: results(in: .possible), bucket: .possible, viewerID: appState.viewer?.id) { item in
                             proposalTargetItem = item
+                        } onOpenOwnerProfile: { userID in
+                            profileRoute = PublicProfileRoute(userID: userID)
                         }
-                        SearchResultSection(results: results(in: .none), bucket: .none) { item in
+                        SearchResultSection(results: results(in: .none), bucket: .none, viewerID: appState.viewer?.id) { item in
                             proposalTargetItem = item
+                        } onOpenOwnerProfile: { userID in
+                            profileRoute = PublicProfileRoute(userID: userID)
                         }
                     }
                 }
@@ -107,6 +114,11 @@ struct SearchScreen: View {
         .sheet(item: $proposalTargetItem) { item in
             NavigationStack {
                 ProposalCreateSheet(appState: appState, targetItem: item)
+            }
+        }
+        .sheet(item: $profileRoute) { route in
+            NavigationStack {
+                PublicUserProfileScreen(appState: appState, userID: route.userID)
             }
         }
     }
@@ -247,7 +259,9 @@ private struct SearchFilterChip: View {
 private struct SearchResultSection: View {
     var results: [SearchResultItem]
     var bucket: SearchMatchBucket
+    var viewerID: UUID?
     var onStartProposal: (GoodsItem) -> Void
+    var onOpenOwnerProfile: (UUID) -> Void
 
     var body: some View {
         if !results.isEmpty {
@@ -262,7 +276,12 @@ private struct SearchResultSection: View {
                         .foregroundStyle(MegrumTheme.muted)
                 }
 
-                GoodsGrid(items: results.map(\.item), onAddToExchangeList: onStartProposal)
+                GoodsGrid(
+                    items: results.map(\.item),
+                    viewerID: viewerID,
+                    onOpenOwnerProfile: onOpenOwnerProfile,
+                    onAddToExchangeList: onStartProposal
+                )
             }
         }
     }

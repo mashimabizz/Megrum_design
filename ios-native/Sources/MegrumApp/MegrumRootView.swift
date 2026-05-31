@@ -49,6 +49,7 @@ public struct MegrumRootView: View {
     @State private var selectedTab: MegrumTab = .home
     @State private var showsSearch = false
     @State private var showsSettings = false
+    @State private var publicProfileRoute: PublicProfileRoute?
     @Binding private var notificationDestinationTab: MegrumTab?
 
     public init(
@@ -130,6 +131,11 @@ public struct MegrumRootView: View {
                 )
             }
         }
+        .sheet(item: $publicProfileRoute) { route in
+            NavigationStack {
+                PublicUserProfileScreen(appState: appState, userID: route.userID)
+            }
+        }
     }
 
     private var authenticatedTabs: some View {
@@ -144,6 +150,9 @@ public struct MegrumRootView: View {
                     onRefresh: appState.refresh,
                     onOpenSettings: {
                         showsSettings = true
+                    },
+                    onOpenOwnerProfile: { userID in
+                        publicProfileRoute = PublicProfileRoute(userID: userID)
                     }
                 )
             }

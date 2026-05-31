@@ -4,7 +4,7 @@
 > 新環境（別Claudeセッション・別エンジニア）でも、これだけ読めばコンテキストがつかめる。
 
 最終更新: 2026-05-31
-ステータス: Draft v3.79（iter345 Swift Native APNs DB trigger接続を反映）
+ステータス: Draft v3.80（iter346 Swift Native相手プロフィール評価導線を反映）
 
 ---
 
@@ -54,6 +54,8 @@
 | **APNs配送Function** | `send-apns-notification` | 信頼済みサーバー側から `notification_id` を受け取り、対象ユーザーの有効APNs端末へ通知を配送するSupabase Edge Function。DB設定値が揃っていれば `notifications` 作成triggerから呼ばれ、無効端末は `revoked_at` で止める | iter344, iter345 |
 | **通知一覧** | notification center | アプリ内で受信通知を確認する一覧。未読/既読を `notifications.read_at` で管理し、通知タップで対象画面へ遷移する | iter92, iter276 |
 | **通知バッジ** | unread badge | 未読通知数を示す小さな件数表示。左ドロワーの「通知」項目やアプリアイコンバッジで使う | iter276 |
+| **相手プロフィール** | public user profile | 他ユーザーの公開プロフィール。Swift Native版ではグッズパネルの相手所有物タップから開き、上半分にアイコン・表示名・handle・都道府県・評価サマリ・完了取引数を表示する | iter346 |
+| **評価一覧** | user evaluations | 相手プロフィールの評価サマリから開く一覧。評価者アイコン、ユーザーネーム、評価日、星、コメントを表示する。Swift Native版では公開RPC経由で読み込む | iter277, iter346 |
 | **共通ロジック** | shared core | Web/iOSで挙動を揃えるため `packages/core/` に切り出す状態判定・マッチング優先度・市場残数などの処理 | iter154.75 |
 | **OTA配信** | EAS Update, over-the-air update | App Store / TestFlightへ新しいバイナリをUploadせず、既存ビルドの同一runtimeへJS/アセット更新を配信する仕組み。ネイティブモジュール追加・Info.plist変更・Bundle ID変更は対象外 | iter168.88 |
 | **現地交換** | 現地、対面 | 直接会って交換する取引形態。会場・物販・駅周辺などでその場で受け渡す | C-flow |

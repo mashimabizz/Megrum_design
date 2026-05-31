@@ -576,6 +576,18 @@ final class MegrumAppStateTests: XCTestCase {
         XCTAssertNil(state.session)
         XCTAssertEqual(state.errorMessage, "メールアドレスと8文字以上のパスワードを入力してください")
     }
+
+    func testAppStateLoadsPreviewPublicProfileAndEvaluations() async {
+        let state = MegrumAppState(repository: PreviewMegrumRepository())
+        let partnerID = UUID(uuidString: "00000000-0000-0000-0000-000000000002")!
+
+        await state.loadPublicUserProfile(userID: partnerID)
+        await state.loadUserEvaluations(userID: partnerID)
+
+        XCTAssertEqual(state.publicProfilesByUserID[partnerID]?.profile.handle, "michi1")
+        XCTAssertEqual(state.publicProfilesByUserID[partnerID]?.evaluationCount, 2)
+        XCTAssertEqual(state.userEvaluationsByUserID[partnerID]?.first?.stars, 5)
+    }
 }
 
 private struct StubAuthRepository: MegrumAuthRepository {

@@ -4,6 +4,88 @@
 
 ---
 
+## イテレーション346：Swift相手プロフィール評価を追加
+
+### 背景・問題意識
+
+Swift Native版はホーム/検索/在庫/Wish/打診/取引チャットの骨格が進んだが、他人のグッズから相手プロフィールへ入り、評価サマリと評価一覧を確認する導線が不足していた。評価は信頼形成の核なので、直接テーブル公開を広げず、公開してよい最小情報だけをRPCで返す形にする。
+
+### 変更内容
+
+#### `supabase/migrations/20260531011000_public_user_profile_evaluations.sql`
+- `get_public_user_profile_for_viewer(p_user_id)` を追加し、公開プロフィール、評価平均、評価件数、完了取引数だけを返すようにした。
+- `list_user_evaluations_for_profile(p_user_id, p_limit)` を追加し、評価者の公開情報、星、コメント、評価日だけを返すようにした。
+- 停止/削除系の評価対象・評価者は公開プロフィール/評価一覧から除外した。
+- `user_evaluations` の直接RLSは広げず、プロフィール表示用の最小RPCを追加した。
+
+#### `ios-native/Sources/MegrumCore/MegrumModels.swift`
+- `PublicUserProfile` と `UserEvaluation` を追加した。
+
+#### `ios-native/Sources/MegrumData/SupabaseUserProfileClient.swift`
+- 公開プロフィールRPCと評価一覧RPCを呼ぶSwift clientを追加した。
+- request生成テスト用の `makeLoadProfileRequest` / `makeLoadEvaluationsRequest` を追加した。
+
+#### `ios-native/Sources/MegrumApp/PublicUserProfileScreen.swift`
+- 相手プロフィール上半分のNative sheetを追加した。
+- 評価サマリをタップすると、評価者アイコン、ユーザーネーム、評価日、星、コメントの一覧へ進めるようにした。
+
+#### `ios-native/Sources/MegrumApp/GoodsGrid.swift` / `HomeScreen.swift` / `SearchScreen.swift` / `MegrumRootView.swift`
+- 他ユーザー所有のグッズパネルをタップした場合だけ相手プロフィールを開くようにした。
+- 自分のグッズは従来通りグッズ詳細sheetを開く。
+
+#### `ios-native/Sources/MegrumApp/MegrumAppState.swift` / `SupabaseMegrumRepository.swift` / `NativePreviewData.swift`
+- 公開プロフィール・評価一覧の状態、読み込み処理、Preview dataを追加した。
+
+#### `ios-native/Tests/MegrumDataTests/SupabaseUserProfileClientTests.swift` / `ios-native/Tests/MegrumAppTests/MegrumAppStateTests.swift`
+- 公開プロフィール/評価一覧RPC requestの組み立てと、Preview repository経由の読み込みをテストした。
+
+#### `ios-native/README.md` / `notes/22_swift_native_migration.md` / `notes/05_data_model.md` / `notes/10_glossary.md`
+- Swift Native移行進捗、公開プロフィール/評価一覧RPC、用語定義を更新した。
+
+### 影響範囲
+
+- Swift Native版ホーム/検索のグッズパネルタップ挙動
+- 相手プロフィール表示
+- 評価一覧表示
+- `user_evaluations` の公開読み取り境界
+- Supabase RPC migration
+
+### 確認方法
+
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-build --enable-xctest --disable-swift-testing -j 1`
+- `xcodebuild -quiet -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -destination 'generic/platform=iOS Simulator' -derivedDataPath /tmp/megrum-native-xcodebuild CODE_SIGNING_ALLOWED=NO build`
+- `git diff --check -- ios-native/Sources/MegrumCore/MegrumModels.swift ios-native/Sources/MegrumData/SupabaseUserProfileClient.swift ios-native/Sources/MegrumApp/PublicUserProfileScreen.swift ios-native/Sources/MegrumApp/GoodsGrid.swift ios-native/Sources/MegrumApp/HomeScreen.swift ios-native/Sources/MegrumApp/SearchScreen.swift ios-native/Sources/MegrumApp/MegrumRootView.swift ios-native/Sources/MegrumApp/MegrumAppState.swift ios-native/Sources/MegrumApp/SupabaseMegrumRepository.swift ios-native/Sources/MegrumApp/NativePreviewData.swift ios-native/Tests/MegrumDataTests/SupabaseUserProfileClientTests.swift ios-native/Tests/MegrumAppTests/MegrumAppStateTests.swift supabase/migrations/20260531011000_public_user_profile_evaluations.sql ios-native/README.md notes/22_swift_native_migration.md notes/05_data_model.md notes/10_glossary.md notes/08_design_iterations.md`
+
+### 関連ファイル
+
+- `supabase/migrations/20260531011000_public_user_profile_evaluations.sql`
+- `ios-native/Sources/MegrumCore/MegrumModels.swift`
+- `ios-native/Sources/MegrumData/SupabaseUserProfileClient.swift`
+- `ios-native/Sources/MegrumApp/PublicUserProfileScreen.swift`
+- `ios-native/Sources/MegrumApp/GoodsGrid.swift`
+- `ios-native/Sources/MegrumApp/HomeScreen.swift`
+- `ios-native/Sources/MegrumApp/SearchScreen.swift`
+- `ios-native/Sources/MegrumApp/MegrumRootView.swift`
+- `ios-native/Sources/MegrumApp/MegrumAppState.swift`
+- `ios-native/Sources/MegrumApp/SupabaseMegrumRepository.swift`
+- `ios-native/Sources/MegrumApp/NativePreviewData.swift`
+- `ios-native/Tests/MegrumDataTests/SupabaseUserProfileClientTests.swift`
+- `ios-native/Tests/MegrumAppTests/MegrumAppStateTests.swift`
+- `ios-native/README.md`
+- `notes/22_swift_native_migration.md`
+- `notes/05_data_model.md`
+- `notes/10_glossary.md`
+- `notes/08_design_iterations.md`
+
+### セルフレビュー結果
+
+- ✅ 他ユーザー所有グッズだけプロフィールsheetへ進み、自分のグッズは詳細sheetを維持した。
+- ✅ 評価一覧は直接 `user_evaluations` のRLSを緩めず、公開情報だけを返すRPCに閉じた。
+- ✅ 評価対象/評価者が停止・削除系の場合は公開結果から除外した。
+- ✅ SwiftPMテストで95件成功した。
+- ✅ 状態遷移は変えていないため、`notes/09_state_machines.md` の更新は不要。
+- ✅ 新用語として「相手プロフィール」「評価一覧」を `notes/10_glossary.md` に追加した。
+
 ## イテレーション345：Swift APNs配送をDB triggerに接続
 
 ### 背景・問題意識

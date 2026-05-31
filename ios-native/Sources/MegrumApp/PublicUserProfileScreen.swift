@@ -1,0 +1,313 @@
+import MegrumCore
+import MegrumDesign
+import SwiftUI
+
+struct PublicProfileRoute: Identifiable, Equatable {
+    var userID: UUID
+    var id: UUID { userID }
+}
+
+struct PublicUserProfileScreen: View {
+    @ObservedObject var appState: MegrumAppState
+    var userID: UUID
+
+    @Environment(\.dismiss) private var dismiss
+
+    private var publicProfile: PublicUserProfile? {
+        appState.publicProfilesByUserID[userID]
+    }
+
+    private var evaluations: [UserEvaluation] {
+        appState.userEvaluationsByUserID[userID] ?? []
+    }
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 20) {
+                if let publicProfile {
+                    ProfileHero(publicProfile: publicProfile)
+                    ProfileStats(publicProfile: publicProfile, evaluations: evaluations)
+                } else {
+                    ProfileSkeleton()
+                }
+            }
+            .padding(.horizontal, 22)
+            .padding(.top, 18)
+            .padding(.bottom, 42)
+        }
+        .background(MegrumTheme.canvas.ignoresSafeArea())
+        .navigationTitle("プロフィール")
+        .megrumInlineNavigationTitle()
+        .toolbar {
+            ToolbarItem(placement: .cancellationAction) {
+                Button("閉じる") {
+                    dismiss()
+                }
+            }
+        }
+        .task(id: userID) {
+            await appState.loadPublicUserProfile(userID: userID)
+            await appState.loadUserEvaluations(userID: userID)
+        }
+    }
+}
+
+private struct ProfileHero: View {
+    var publicProfile: PublicUserProfile
+
+    private var profile: UserProfile {
+        publicProfile.profile
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 18) {
+            ProfileAvatar(profile: profile, size: 92)
+
+            VStack(alignment: .leading, spacing: 7) {
+                Text(profile.displayName)
+                    .font(.system(size: 34, weight: .heavy, design: .rounded))
+                    .foregroundStyle(MegrumTheme.ink)
+                    .lineLimit(1)
+
+                Text("@\(profile.handle)")
+                    .font(.system(size: 19, weight: .heavy, design: .rounded))
+                    .foregroundStyle(MegrumTheme.muted)
+
+                if let prefecture = profile.prefecture, !prefecture.isEmpty {
+                    Text(prefecture)
+                        .font(.system(size: 15, weight: .heavy, design: .rounded))
+                        .foregroundStyle(MegrumTheme.ink.opacity(0.72))
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(22)
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 30, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 30, style: .continuous)
+                .strokeBorder(.white.opacity(0.64), lineWidth: 1)
+        }
+        .shadow(color: MegrumTheme.ink.opacity(0.08), radius: 18, y: 10)
+    }
+}
+
+private struct ProfileStats: View {
+    var publicProfile: PublicUserProfile
+    var evaluations: [UserEvaluation]
+
+    var body: some View {
+        HStack(spacing: 12) {
+            NavigationLink {
+                EvaluationListScreen(
+                    profile: publicProfile.profile,
+                    evaluations: evaluations,
+                    isLoading: false
+                )
+            } label: {
+                ProfileStatCard(
+                    title: "評価",
+                    value: publicProfile.ratingSummary,
+                    caption: "\(publicProfile.evaluationCount)件",
+                    symbolName: "star.fill"
+                )
+            }
+            .buttonStyle(.plain)
+
+            ProfileStatCard(
+                title: "取引",
+                value: "\(publicProfile.completedTradeCount)",
+                caption: "完了",
+                symbolName: "checkmark.seal.fill"
+            )
+        }
+    }
+}
+
+private struct ProfileStatCard: View {
+    var title: String
+    var value: String
+    var caption: String
+    var symbolName: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Image(systemName: symbolName)
+                .font(.system(size: 17, weight: .bold))
+                .foregroundStyle(MegrumTheme.lavender)
+
+            Text(value)
+                .font(.system(size: 24, weight: .heavy, design: .rounded))
+                .foregroundStyle(MegrumTheme.ink)
+
+            HStack(spacing: 5) {
+                Text(title)
+                Text(caption)
+            }
+            .font(.system(size: 13, weight: .heavy, design: .rounded))
+            .foregroundStyle(MegrumTheme.muted)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(16)
+        .background(.white.opacity(0.82), in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 22, style: .continuous)
+                .strokeBorder(.white.opacity(0.7), lineWidth: 1)
+        }
+    }
+}
+
+private struct EvaluationListScreen: View {
+    var profile: UserProfile
+    var evaluations: [UserEvaluation]
+    var isLoading: Bool
+
+    var body: some View {
+        List {
+            if evaluations.isEmpty && !isLoading {
+                Text("まだ評価はありません")
+                    .font(.system(size: 15, weight: .bold, design: .rounded))
+                    .foregroundStyle(MegrumTheme.muted)
+                    .listRowBackground(Color.clear)
+            } else {
+                ForEach(evaluations) { evaluation in
+                    EvaluationRow(evaluation: evaluation)
+                        .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
+                        .listRowBackground(Color.clear)
+                }
+            }
+        }
+        .scrollContentBackground(.hidden)
+        .background(MegrumTheme.canvas.ignoresSafeArea())
+        .navigationTitle("\(profile.displayName)の評価")
+        .megrumInlineNavigationTitle()
+    }
+}
+
+private struct EvaluationRow: View {
+    var evaluation: UserEvaluation
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 12) {
+                ProfileAvatar(
+                    profile: UserProfile(
+                        id: evaluation.raterID,
+                        handle: evaluation.raterHandle,
+                        displayName: evaluation.raterDisplayName,
+                        avatarURL: evaluation.raterAvatarURL
+                    ),
+                    size: 44
+                )
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(evaluation.raterDisplayName)
+                        .font(.system(size: 16, weight: .heavy, design: .rounded))
+                        .foregroundStyle(MegrumTheme.ink)
+                    Text("@\(evaluation.raterHandle) ・ \(Self.dateFormatter.string(from: evaluation.createdAt))")
+                        .font(.system(size: 12, weight: .bold, design: .rounded))
+                        .foregroundStyle(MegrumTheme.muted)
+                }
+
+                Spacer()
+
+                StarRating(stars: evaluation.stars)
+            }
+
+            if let comment = evaluation.comment?.trimmingCharacters(in: .whitespacesAndNewlines), !comment.isEmpty {
+                Text(comment)
+                    .font(.system(size: 15, weight: .semibold, design: .rounded))
+                    .foregroundStyle(MegrumTheme.ink.opacity(0.82))
+                    .lineSpacing(3)
+            }
+        }
+        .padding(16)
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 22, style: .continuous)
+                .strokeBorder(.white.opacity(0.56), lineWidth: 1)
+        }
+    }
+
+    private static let dateFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "ja_JP")
+        formatter.dateFormat = "yyyy/M/d"
+        return formatter
+    }()
+}
+
+private struct StarRating: View {
+    var stars: Int
+
+    var body: some View {
+        HStack(spacing: 1) {
+            ForEach(1...5, id: \.self) { index in
+                Image(systemName: index <= stars ? "star.fill" : "star")
+                    .font(.system(size: 11, weight: .bold))
+                    .foregroundStyle(index <= stars ? MegrumTheme.lavender : MegrumTheme.muted.opacity(0.42))
+            }
+        }
+        .accessibilityLabel("星\(stars)")
+    }
+}
+
+private struct ProfileAvatar: View {
+    var profile: UserProfile
+    var size: CGFloat
+
+    var body: some View {
+        Circle()
+            .fill(
+                LinearGradient(
+                    colors: [MegrumTheme.lavender, MegrumTheme.pink],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+            )
+            .frame(width: size, height: size)
+            .overlay {
+                if let avatarURL = profile.avatarURL {
+                    AsyncImage(url: avatarURL) { image in
+                        image
+                            .resizable()
+                            .scaledToFill()
+                    } placeholder: {
+                        ProgressView()
+                            .tint(.white)
+                    }
+                    .clipShape(Circle())
+                } else {
+                    Text(initial)
+                        .font(.system(size: max(17, size * 0.42), weight: .heavy, design: .rounded))
+                        .foregroundStyle(.white)
+                }
+            }
+            .overlay {
+                Circle().stroke(.white.opacity(0.72), lineWidth: 1)
+            }
+    }
+
+    private var initial: String {
+        profile.displayName.first.map(String.init) ?? "M"
+    }
+}
+
+private struct ProfileSkeleton: View {
+    var body: some View {
+        VStack(alignment: .leading, spacing: 18) {
+            Circle()
+                .fill(.white.opacity(0.74))
+                .frame(width: 92, height: 92)
+            RoundedRectangle(cornerRadius: 12)
+                .fill(.white.opacity(0.74))
+                .frame(width: 190, height: 34)
+            RoundedRectangle(cornerRadius: 10)
+                .fill(.white.opacity(0.64))
+                .frame(width: 124, height: 20)
+        }
+        .padding(22)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 30, style: .continuous))
+        .redacted(reason: .placeholder)
+    }
+}

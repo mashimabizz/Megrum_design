@@ -100,6 +100,27 @@ enum NativePreviewData {
         )
     ]
 
+    static let userEvaluations = [
+        UserEvaluation(
+            id: UUID(uuidString: "00000000-0000-0000-0000-000000000091")!,
+            raterID: UUID(uuidString: "00000000-0000-0000-0000-000000000092")!,
+            raterHandle: "trade_mina",
+            raterDisplayName: "mina",
+            stars: 5,
+            comment: "返信が早く、交換物も丁寧に保管されていました。",
+            createdAt: Date(timeIntervalSinceNow: -86_400 * 2)
+        ),
+        UserEvaluation(
+            id: UUID(uuidString: "00000000-0000-0000-0000-000000000093")!,
+            raterID: UUID(uuidString: "00000000-0000-0000-0000-000000000094")!,
+            raterHandle: "sana_goods",
+            raterDisplayName: "sana",
+            stars: 4,
+            comment: "現地での受け渡しがスムーズでした。",
+            createdAt: Date(timeIntervalSinceNow: -86_400 * 14)
+        )
+    ]
+
     static let inventory: [GoodsItem] = [
         GoodsItem(
             id: UUID(uuidString: "00000000-0000-0000-0000-000000000201")!,

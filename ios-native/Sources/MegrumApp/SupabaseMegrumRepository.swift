@@ -15,6 +15,7 @@ public struct SupabaseMegrumRepository: MegrumRepository {
     private let groomClient: SupabaseGroomClient
     private let meguriMessageClient: SupabaseMeguriMessageClient
     private let boardClient: SupabaseBoardClient
+    private let userProfileClient: SupabaseUserProfileClient
     private let viewerID: UUID
 
     public init(client: SupabaseRESTClient, viewerID: UUID) {
@@ -30,6 +31,7 @@ public struct SupabaseMegrumRepository: MegrumRepository {
         self.groomClient = SupabaseGroomClient(client: client)
         self.meguriMessageClient = SupabaseMeguriMessageClient(client: client)
         self.boardClient = SupabaseBoardClient(client: client)
+        self.userProfileClient = SupabaseUserProfileClient(client: client)
         self.viewerID = viewerID
     }
 
@@ -92,6 +94,14 @@ public struct SupabaseMegrumRepository: MegrumRepository {
 
     public func searchGoods(_ input: GoodsSearchInput) async throws -> [GoodsItem] {
         try await goodsInventoryClient.searchGoods(viewerID: viewerID, input: input)
+    }
+
+    public func loadPublicUserProfile(userID: UUID) async throws -> PublicUserProfile? {
+        try await userProfileClient.loadProfile(userID: userID)
+    }
+
+    public func loadUserEvaluations(userID: UUID, limit: Int) async throws -> [UserEvaluation] {
+        try await userProfileClient.loadEvaluations(userID: userID, limit: limit)
     }
 
     public func createProposal(_ input: ProposalCreateInput) async throws -> TradeProposal {

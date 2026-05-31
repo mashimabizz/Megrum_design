@@ -5,6 +5,8 @@ import SwiftUI
 struct GoodsGrid: View {
     var items: [GoodsItem]
     var columns: Int = 3
+    var viewerID: UUID?
+    var onOpenOwnerProfile: ((UUID) -> Void)?
     var onAddToExchangeList: ((GoodsItem) -> Void)?
     @State private var detailItem: GoodsItem?
     @State private var actionMessage: String?
@@ -19,7 +21,11 @@ struct GoodsGrid: View {
                 GoodsTile(
                     item: item,
                     onOpenDetail: {
-                        detailItem = item
+                        if let onOpenOwnerProfile, item.ownerID != viewerID {
+                            onOpenOwnerProfile(item.ownerID)
+                        } else {
+                            detailItem = item
+                        }
                     },
                     onAction: { action in
                         handle(action, item: item)

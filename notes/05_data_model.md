@@ -4,7 +4,7 @@
 > 実装の正解集。`09_state_machines.md` と完全に整合させ、`10_glossary.md` の用語を使う。
 
 最終更新: 2026-05-31
-ステータス: Draft v2.29（iter338 APNs端末登録境界を追加）
+ステータス: Draft v2.30（iter346 相手プロフィール評価RPCを追加）
 
 ## 最新化履歴
 
@@ -41,6 +41,7 @@
 | **v2.27** | **2026-05-30** | **iter276 反映（`notification_devices` と `user_notification_settings.push_enabled` を追加し、`notifications` INSERTからExpo Pushへ配送する）** |
 | **v2.28** | **2026-05-30** | **iter278 反映（公開プロフィール列制限、削除済み/停止中ユーザー非公開、AW匿名読み取り停止、所有者更新系RLSの `WITH CHECK` 追加）** |
 | **v2.29** | **2026-05-31** | **iter338 反映（Swift Native iOS版のAPNs device token保存用に `notification_devices.push_provider` / `native_device_token` を追加）** |
+| **v2.30** | **2026-05-31** | **iter346 反映（相手プロフィールと評価一覧をSwift Nativeから読むため、公開プロフィール/評価一覧RPCを追加）** |
 | **v2.20** | **2026-05-29** | **iter168.90 反映（`search_query_logs` と人気検索RPCを追加。検索結果はマッチ分類つきグッズパネルで表示）** |
 | **v2.21** | **2026-05-30** | **iter168.97 反映（`schedules.place_name` 追加。合意時に `both` を単一手段へ固定し、現地交換の複数候補は1件へ固定する運用を追記）** |
 
@@ -908,10 +909,10 @@ iter34 で到着ステータス・サブステート追加。
 | カラム | 型 | 説明 |
 |---|---|---|
 | `id` | uuid | PK |
-| `deal_id` | uuid | → deals（旧 `exchange_id`） |
-| `evaluator_id` | uuid | → users |
-| `evaluated_id` | uuid | → users |
-| `rating` | int | 1-5 |
+| `proposal_id` | uuid | → proposals |
+| `rater_id` | uuid | 評価者 |
+| `ratee_id` | uuid | 評価対象 |
+| `stars` | int | 1-5 |
 | `comment` | text nullable | |
 | `punctuality_rating` | int nullable | 1-5（時間厳守度、⚠️要確認） |
 | `item_condition_rating` | int nullable | 1-5（実物状態の一致度、⚠️要確認） |
@@ -923,6 +924,11 @@ iter34 で到着ステータス・サブステート追加。
 実装メモ（iter277）：
 - 相手プロフィールの評価一覧では、評価者アイコン、ユーザーネーム、評価日、★、コメントを表示する。
 - `user_evaluations` は、削除・停止されていない ratee の評価に限り、ログイン済みユーザーがプロフィール評価一覧として閲覧できる。
+
+実装メモ（iter346）：
+- 直接の `user_evaluations` SELECT は取引参加者向けRLSを維持する。
+- 相手プロフィールの表示には `get_public_user_profile_for_viewer(p_user_id)` と `list_user_evaluations_for_profile(p_user_id, p_limit)` を使い、公開してよいプロフィールサマリ・評価者公開情報・星・コメントだけを返す。
+- `account_status in ('suspended', 'deletion_requested', 'deleted')` の評価対象/評価者はプロフィール評価一覧から除外する。
 
 ⚠️ 要確認：
 - 細分化評価（punctuality/item_condition/communication）を MVPで採用するか後フェーズか

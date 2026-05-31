@@ -1,7 +1,7 @@
 # 22. Swift Native Migration
 
 最終更新: 2026-05-31
-ステータス: Active draft（iter342）
+ステータス: Active draft（iter346）
 
 ## 目的
 
@@ -137,6 +137,7 @@ tar -xzf /Users/michitaka/Desktop/Megrum_backups/pre-swift-migration-20260531-03
 - iter321で、`proposals` の読み込み/作成境界をSwift Nativeへ追加し、検索結果から打診作成sheetを開いて最小proposalを作れるようにした。
 - iter322で、やりとり画面を「打診中」「進行中」に分け、フッター上のNative切り替えバーと横スワイプ切り替え、取引詳細sheetを追加した。
 - iter323で、`messages` の読み込み/送信境界をSwift Nativeへ追加し、取引詳細sheetでNativeの取引チャットを表示・送信できるようにした。
+- iter346で、検索結果やホームの相手所有グッズから相手プロフィールを開き、評価サマリから評価一覧へ進めるSwift Native導線と公開RPC境界を追加した。
 
 ### Phase 4: Meguri core
 

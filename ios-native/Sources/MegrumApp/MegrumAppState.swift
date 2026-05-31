@@ -64,6 +64,8 @@ public protocol MegrumRepository: Sendable {
     func loadGoodsTypes(limit: Int) async throws -> [GoodsType]
     func createGoodsEntry(_ input: GoodsEntryInput) async throws -> GoodsItem
     func searchGoods(_ input: GoodsSearchInput) async throws -> [GoodsItem]
+    func loadPublicUserProfile(userID: UUID) async throws -> PublicUserProfile?
+    func loadUserEvaluations(userID: UUID, limit: Int) async throws -> [UserEvaluation]
     func createProposal(_ input: ProposalCreateInput) async throws -> TradeProposal
     func loadMessages(proposalID: UUID, limit: Int) async throws -> [TradeMessage]
     func sendMessage(_ input: TradeMessageCreateInput) async throws -> TradeMessage
@@ -112,6 +114,14 @@ public extension MegrumRepository {
     }
 
     func searchGoods(_ input: GoodsSearchInput) async throws -> [GoodsItem] {
+        []
+    }
+
+    func loadPublicUserProfile(userID: UUID) async throws -> PublicUserProfile? {
+        nil
+    }
+
+    func loadUserEvaluations(userID: UUID, limit: Int) async throws -> [UserEvaluation] {
         []
     }
 
@@ -285,6 +295,30 @@ public struct PreviewMegrumRepository: MegrumRepository {
         }
         .prefix(max(0, input.limit))
         .map { $0 }
+    }
+
+    public func loadPublicUserProfile(userID: UUID) async throws -> PublicUserProfile? {
+        let profile: UserProfile
+        if userID == NativePreviewData.viewerID {
+            profile = NativePreviewData.viewer
+        } else {
+            profile = NativePreviewData.partner
+        }
+
+        let evaluations = try await loadUserEvaluations(userID: userID, limit: 100)
+        let average = evaluations.isEmpty
+            ? nil
+            : Double(evaluations.map(\.stars).reduce(0, +)) / Double(evaluations.count)
+        return PublicUserProfile(
+            profile: profile,
+            averageStars: average,
+            evaluationCount: evaluations.count,
+            completedTradeCount: 12
+        )
+    }
+
+    public func loadUserEvaluations(userID: UUID, limit: Int) async throws -> [UserEvaluation] {
+        Array(NativePreviewData.userEvaluations.prefix(max(0, limit)))
     }
 
     public func createProposal(_ input: ProposalCreateInput) async throws -> TradeProposal {
@@ -483,6 +517,8 @@ public final class MegrumAppState: ObservableObject {
     @Published public private(set) var oshiCharacters: [OshiCharacter] = []
     @Published public private(set) var goodsTypes: [GoodsType] = []
     @Published public private(set) var searchResults: [SearchResultItem] = []
+    @Published public private(set) var publicProfilesByUserID: [UUID: PublicUserProfile] = [:]
+    @Published public private(set) var userEvaluationsByUserID: [UUID: [UserEvaluation]] = [:]
     @Published public private(set) var mailingAddress: MailingAddress?
     @Published public private(set) var blockedUsers: [BlockedUser] = []
     @Published public private(set) var notifications: [MegrumNotification] = []
@@ -492,6 +528,8 @@ public final class MegrumAppState: ObservableObject {
     @Published public private(set) var isLoadingOshiCharacters = false
     @Published public private(set) var isLoadingGoodsTypes = false
     @Published public private(set) var isSearchingGoods = false
+    @Published public private(set) var loadingPublicProfileUserID: UUID?
+    @Published public private(set) var loadingEvaluationsUserID: UUID?
     @Published public private(set) var isLoadingMailingAddress = false
     @Published public private(set) var isLoadingBlockedUsers = false
     @Published public private(set) var isLoadingNotifications = false
@@ -1083,6 +1121,36 @@ public final class MegrumAppState: ObservableObject {
             activeSearchRequestID = nil
             isSearchingGoods = false
         }
+    }
+
+    public func loadPublicUserProfile(userID: UUID) async {
+        guard loadingPublicProfileUserID != userID else {
+            return
+        }
+        loadingPublicProfileUserID = userID
+        errorMessage = nil
+        do {
+            if let profile = try await repository.loadPublicUserProfile(userID: userID) {
+                publicProfilesByUserID[userID] = profile
+            }
+        } catch {
+            errorMessage = "プロフィールを読み込めませんでした"
+        }
+        loadingPublicProfileUserID = nil
+    }
+
+    public func loadUserEvaluations(userID: UUID, limit: Int = 50) async {
+        guard loadingEvaluationsUserID != userID else {
+            return
+        }
+        loadingEvaluationsUserID = userID
+        errorMessage = nil
+        do {
+            userEvaluationsByUserID[userID] = try await repository.loadUserEvaluations(userID: userID, limit: limit)
+        } catch {
+            errorMessage = "評価を読み込めませんでした"
+        }
+        loadingEvaluationsUserID = nil
     }
 
     public func createProposal(_ input: ProposalCreateInput) async -> Bool {
