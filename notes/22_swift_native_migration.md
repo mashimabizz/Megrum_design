@@ -1,7 +1,7 @@
 # 22. Swift Native Migration
 
 最終更新: 2026-05-31
-ステータス: Active draft（iter363）
+ステータス: Active draft（iter365）
 
 ## 目的
 
@@ -126,6 +126,7 @@ tar -xzf /Users/michitaka/Desktop/Megrum_backups/pre-swift-migration-20260531-03
 - iter343で、SwiftUI標準の `SignInWithAppleButton`、nonce生成、Supabase Authの `grant_type=id_token` 境界、Sign in with Apple entitlementを追加した。
 - iter344で、`send-apns-notification` Supabase Edge Functionを追加し、信頼済みサーバー側呼び出しからAPNsへ通知を配送できる入口を作った。DBトリガー直結は秘密情報の置き場を確定してから接続する。
 - iter345で、`notifications` insert後のDB triggerから、DB設定値が揃っている場合だけ `send-apns-notification` Edge Functionを呼ぶようにした。dispatch secretはmigrationに書かず、プロジェクト設定で注入する。
+- iter365で、TestFlight前提のSwift Native App設定を並列実装バッチで見直し、明示的なInfo.plist、URL scheme、権限文言、Privacy Manifest、Team ID、Release/Debug設定を整理した。
 - 現時点のAuthはAppleログインまで追加済み。Google OAuthは後続のPhase 2作業で広げる。
 
 ### Phase 3: Exchange core
@@ -156,6 +157,8 @@ tar -xzf /Users/michitaka/Desktop/Megrum_backups/pre-swift-migration-20260531-03
 - iter361で、取引詳細の返答パネルから「条件を変えて再打診」を開けるようにした。元 Proposal を直接変更せず、参加者視点で提示物を反転コピーし、Native sheetで交換手段・交換条件タグ・メッセージを調整した `status='negotiating'` の新しい打診を作成する。再打診作成者は自分の条件に合意済みとして `agreed_by_sender=true` にする。
 - iter362で、取引チャットのメッセージ入力欄の上からも同じ再打診sheetを開けるようにした。再打診は `sent` / `negotiating` / `agreement_one_side` のProposalに限定し、Swift版のiOS標準デザイン感を最終方針として維持する。
 - iter363で、取引チャットのメッセージ入力欄上に「スケジュール」ボタンを追加し、Native sheetで自分と相手の予定を週（5日）/月で確認できるようにした。`schedules` テーブルの `place_name` を含む読み込み境界も追加し、旧Expo版の見た目ではなくSwiftUI標準のsheet / segmented picker / materialで表示する。
+- iter365で、並列実装バッチとして、打診作成sheetの `listing_id` 保持、`ProposalMeetupInput` による現地系打診validation、在庫/Wishグリッドのローディング/空状態/長押し操作、検索/相手プロフィール/個別募集起点の打診導線、取引返答・拒否・証跡承認のRPC化をまとめて補強した。
+- iter365で、Supabase migration `20260531013000_harden_proposal_response_rpc.sql` を追加し、`respond_to_proposal_for_viewer` と `approve_trade_evidence_for_viewer` で行ロックしながら合意・拒否・完了・在庫/個別募集更新を行う方針へ寄せた。
 
 ### Phase 4: Meguri core
 
@@ -174,12 +177,14 @@ tar -xzf /Users/michitaka/Desktop/Megrum_backups/pre-swift-migration-20260531-03
 - iter334で、`list_meguri_messages_for_viewer` RPCと `meguri_messages` text insert境界をSwift Nativeに追加し、めぐりメッセージをAppStateで読み書きできるようにした。
 - iter335で、Swift Native通知一覧から `groom_reply` / `meguri_message` のリンクを解釈し、相手別のめぐりメッセージ画面へpushして送信できる最小導線を追加した。
 - iter336で、めぐりメッセージ会話を開いた時に受信メッセージの `read_at` を更新するSwift Native既読化境界を追加した。
+- iter365で、位置情報拒否/未許可/許可後の表示、MapKit初期中心と範囲円、カメラ不可端末、グルーム画像読み込み失敗、掲示板返信送信時の座標引き継ぎを補強した。
 
 ### Phase 5: Cutover
 
 - Swift版PreviewをTestFlight配布する。
 - 既存RN版との画面・機能差分をチェックリスト化する。
 - App Store提出前に、Bundle ID、Associated Domains、通知、権限文言、Privacy Manifest、規約リンクを最終確認する。
+- iter365で、RN parity / QAのread-only監査を実施し、Swift版に残るP0/P1差分を「TestFlightで見るべき通しシナリオ」として統合役が保持する運用にした。
 
 ## 完了条件
 

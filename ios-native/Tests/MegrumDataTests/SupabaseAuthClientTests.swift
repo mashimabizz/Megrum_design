@@ -64,6 +64,29 @@ final class SupabaseAuthClientTests: XCTestCase {
         XCTAssertNil(body["access_token"])
     }
 
+    func testBuildsPasswordResetRequestWithRedirect() throws {
+        let client = SupabaseAuthClient(configuration: configuration)
+        let redirectURL = URL(string: "https://megrum.jp/auth/callback?next=mobile&scheme=megrum-preview")!
+
+        let request = try client.makePasswordResetRequest(
+            email: "michi@example.com",
+            emailRedirectTo: redirectURL
+        )
+
+        XCTAssertEqual(request.httpMethod, "POST")
+        XCTAssertEqual(request.value(forHTTPHeaderField: "apikey"), "sb_publishable_test")
+        XCTAssertEqual(request.value(forHTTPHeaderField: "Authorization"), "Bearer sb_publishable_test")
+
+        let components = try XCTUnwrap(URLComponents(url: try XCTUnwrap(request.url), resolvingAgainstBaseURL: false))
+        XCTAssertEqual(components.scheme, "https")
+        XCTAssertEqual(components.host, "example.supabase.co")
+        XCTAssertEqual(components.path, "/auth/v1/recover")
+        XCTAssertEqual(components.queryItems?.first(where: { $0.name == "redirect_to" })?.value, redirectURL.absoluteString)
+
+        let body = try XCTUnwrap(request.jsonBody)
+        XCTAssertEqual(body["email"] as? String, "michi@example.com")
+    }
+
     func testBuildsSignOutRequestWithSessionBearer() throws {
         let client = SupabaseAuthClient(configuration: configuration)
 

@@ -318,10 +318,33 @@ struct ProposalCreateSheet: View {
     @State private var selectedConditionTags: Set<String> = []
     @State private var message = ""
 
-    private let conditionTagOptions = ["即日発送", "同日発送", "終演後OK", "グッズ販売中OK"]
-
     private var selectedSenderID: UUID? {
         selectedSenderGoodsID ?? appState.inventory.first?.id
+    }
+
+    private var resolvedReceiverGoodsIDs: [UUID] {
+        var uniqueIDs: [UUID] = []
+        let candidateIDs = receiverGoodsIDs ?? [targetItem.id]
+        for id in candidateIDs where !uniqueIDs.contains(id) {
+            uniqueIDs.append(id)
+        }
+        return uniqueIDs.isEmpty ? [targetItem.id] : uniqueIDs
+    }
+
+    private var configuration: ProposalCreateConfiguration {
+        ProposalCreateConfiguration(
+            exchangeMethod: exchangeMethod,
+            hasSelectedSenderGoods: selectedSenderID != nil,
+            isCreatingProposal: appState.isCreatingProposal,
+            hasReadyMailingAddress: appState.mailingAddress?.isReady == true,
+            isLoadingMailingAddress: appState.isLoadingMailingAddress,
+            receiverGoodsCount: resolvedReceiverGoodsIDs.count,
+            isListingSource: listingID != nil
+        )
+    }
+
+    private var conditionTagOptions: [String] {
+        configuration.conditionTagOptions
     }
 
     private var orderedConditionTags: [String] {
@@ -377,6 +400,13 @@ struct ProposalCreateSheet: View {
                         }
                     }
                     .pickerStyle(.segmented)
+
+                    if let methodNotice = configuration.methodNotice {
+                        Text(methodNotice)
+                            .font(.system(size: 13, weight: .bold, design: .rounded))
+                            .foregroundStyle(MegrumTheme.muted)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
                 }
 
                 VStack(alignment: .leading, spacing: 12) {
@@ -433,7 +463,7 @@ struct ProposalCreateSheet: View {
                             ProgressView()
                                 .tint(.white)
                         }
-                        Text("この内容で打診を作成")
+                        Text(configuration.submitTitle)
                     }
                     .font(.system(size: 18, weight: .heavy, design: .rounded))
                     .foregroundStyle(.white)
@@ -442,8 +472,8 @@ struct ProposalCreateSheet: View {
                     .background(MegrumTheme.lavender, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
                 }
                 .buttonStyle(.plain)
-                .disabled(selectedSenderID == nil || appState.isCreatingProposal)
-                .opacity(selectedSenderID == nil ? 0.48 : 1)
+                .disabled(!configuration.canSubmit)
+                .opacity(configuration.canSubmit ? 1 : 0.48)
             }
             .padding(.horizontal, 22)
             .padding(.top, 24)
@@ -461,6 +491,14 @@ struct ProposalCreateSheet: View {
         }
         .onAppear {
             selectedSenderGoodsID = selectedSenderID
+        }
+        .task {
+            if appState.mailingAddress == nil {
+                await appState.loadMailingAddress()
+            }
+        }
+        .onChange(of: exchangeMethod) { _, _ in
+            selectedConditionTags = selectedConditionTags.intersection(Set(conditionTagOptions))
         }
     }
 
@@ -485,9 +523,15 @@ struct ProposalCreateSheet: View {
                         .font(.system(size: 17, weight: .heavy, design: .rounded))
                         .foregroundStyle(MegrumTheme.ink)
                         .lineLimit(2)
-                    Text("相手の在庫から選択")
+                    Text(configuration.targetSubtitle)
                         .font(.system(size: 13, weight: .bold, design: .rounded))
                         .foregroundStyle(MegrumTheme.muted)
+                    if let targetSupplement = configuration.targetSupplement {
+                        Text(targetSupplement)
+                            .font(.system(size: 12, weight: .bold, design: .rounded))
+                            .foregroundStyle(MegrumTheme.lavender)
+                            .lineLimit(1)
+                    }
                 }
                 Spacer()
             }
@@ -522,15 +566,14 @@ struct ProposalCreateSheet: View {
     }
 
     private func createProposal() async {
-        guard let selectedSenderID else {
+        guard let selectedSenderID, let targetStatus = configuration.targetStatus else {
             return
         }
-        let targetStatus: ProposalStatus = exchangeMethod == .mail ? .sent : .draft
         let created = await appState.createProposal(
             ProposalCreateInput(
                 receiverID: targetItem.ownerID,
                 senderGoodsIDs: [selectedSenderID],
-                receiverGoodsIDs: receiverGoodsIDs ?? [targetItem.id],
+                receiverGoodsIDs: resolvedReceiverGoodsIDs,
                 exchangeMethod: exchangeMethod,
                 conditionTags: orderedConditionTags,
                 message: message,
@@ -541,6 +584,86 @@ struct ProposalCreateSheet: View {
         if created {
             dismiss()
         }
+    }
+}
+
+struct ProposalCreateConfiguration: Equatable {
+    var exchangeMethod: ExchangeMethod
+    var hasSelectedSenderGoods: Bool
+    var isCreatingProposal: Bool
+    var hasReadyMailingAddress: Bool
+    var isLoadingMailingAddress: Bool
+    var receiverGoodsCount: Int
+    var isListingSource: Bool
+
+    private static let mailConditionTags = ["即日発送", "同日発送"]
+    private static let handConditionTags = ["終演後OK", "グッズ販売中OK"]
+
+    var conditionTagOptions: [String] {
+        switch exchangeMethod {
+        case .hand:
+            Self.handConditionTags
+        case .mail:
+            Self.mailConditionTags
+        case .both:
+            Self.handConditionTags + Self.mailConditionTags
+        }
+    }
+
+    var requiresMeetupBeforeSubmit: Bool {
+        exchangeMethod == .hand || exchangeMethod == .both
+    }
+
+    var requiresMailingAddressBeforeSubmit: Bool {
+        exchangeMethod == .mail || exchangeMethod == .both
+    }
+
+    var canSubmit: Bool {
+        hasSelectedSenderGoods && !isCreatingProposal && !isLoadingMailingAddress && targetStatus != nil
+    }
+
+    var targetStatus: ProposalStatus? {
+        if requiresMeetupBeforeSubmit {
+            return nil
+        }
+        if requiresMailingAddressBeforeSubmit && !hasReadyMailingAddress {
+            return nil
+        }
+        return .sent
+    }
+
+    var submitTitle: String {
+        if requiresMeetupBeforeSubmit {
+            return "待ち合わせ入力が必要"
+        }
+        if requiresMailingAddressBeforeSubmit && !hasReadyMailingAddress {
+            return "住所登録が必要"
+        }
+        return "この内容で打診を送る"
+    }
+
+    var methodNotice: String? {
+        if requiresMeetupBeforeSubmit {
+            return "現地交換は待ち合わせ入力が必要です。いまは郵送交換のみ、この画面から送信できます。"
+        }
+        if requiresMailingAddressBeforeSubmit && isLoadingMailingAddress {
+            return "住所登録を確認しています。"
+        }
+        if requiresMailingAddressBeforeSubmit && !hasReadyMailingAddress {
+            return "郵送交換は住所登録が必要です。設定から住所を登録してください。"
+        }
+        return nil
+    }
+
+    var targetSubtitle: String {
+        isListingSource ? "個別募集から選択" : "相手の在庫から選択"
+    }
+
+    var targetSupplement: String? {
+        guard isListingSource, receiverGoodsCount > 1 else {
+            return nil
+        }
+        return "ほか\(receiverGoodsCount - 1)件も受け取る条件です"
     }
 }
 

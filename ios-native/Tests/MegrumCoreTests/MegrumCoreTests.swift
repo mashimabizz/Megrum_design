@@ -34,10 +34,12 @@ final class MegrumCoreTests: XCTestCase {
         let receiverID = UUID(uuidString: "00000000-0000-0000-0000-000000000002")!
         let senderGoodsID = UUID(uuidString: "00000000-0000-0000-0000-000000000101")!
         let receiverGoodsID = UUID(uuidString: "00000000-0000-0000-0000-000000000201")!
+        let listingID = UUID(uuidString: "00000000-0000-0000-0000-000000000301")!
         let proposal = TradeProposal(
             id: UUID(),
             senderID: senderID,
             receiverID: receiverID,
+            listingID: listingID,
             status: .sent,
             exchangeMethod: .both,
             senderGoodsIDs: [senderGoodsID],
@@ -59,6 +61,36 @@ final class MegrumCoreTests: XCTestCase {
         XCTAssertEqual(input?.conditionTags, ["即日発送"])
         XCTAssertEqual(input?.message, "郵送でお願いします")
         XCTAssertEqual(input?.status, .negotiating)
+        XCTAssertEqual(input?.listingID, listingID)
+    }
+
+    func testProposalMeetupInputValidatesRequiredLocalExchangeFields() {
+        let valid = ProposalMeetupInput(
+            startAt: Date(timeIntervalSince1970: 1_000),
+            endAt: Date(timeIntervalSince1970: 2_800),
+            placeName: " 横浜アリーナ 北口 ",
+            latitude: 35.5122,
+            longitude: 139.6171
+        )
+        let invalidPlace = ProposalMeetupInput(
+            startAt: valid.startAt,
+            endAt: valid.endAt,
+            placeName: " ",
+            latitude: valid.latitude,
+            longitude: valid.longitude
+        )
+        let invalidRange = ProposalMeetupInput(
+            startAt: valid.endAt,
+            endAt: valid.startAt,
+            placeName: valid.placeName,
+            latitude: valid.latitude,
+            longitude: valid.longitude
+        )
+
+        XCTAssertTrue(valid.isValid)
+        XCTAssertEqual(valid.normalizedPlaceName, "横浜アリーナ 北口")
+        XCTAssertFalse(invalidPlace.isValid)
+        XCTAssertFalse(invalidRange.isValid)
     }
 
     func testTradeProposalCounterProposalAvailabilityMatchesOpenStatuses() {
@@ -144,5 +176,26 @@ final class MegrumCoreTests: XCTestCase {
             )
         )
         XCTAssertEqual(schedule.durationInterval.duration, 1_000)
+    }
+
+    func testPersonalScheduleCreateInputNormalizesAndValidates() {
+        let start = Date(timeIntervalSince1970: 1_000)
+        let end = Date(timeIntervalSince1970: 2_000)
+        let input = PersonalScheduleCreateInput(
+            title: " 物販列 ",
+            placeName: " 北口 ",
+            startAt: start,
+            endAt: end,
+            note: " 友達と合流 "
+        )
+
+        XCTAssertTrue(input.isValid)
+        XCTAssertEqual(input.normalizedTitle, "物販列")
+        XCTAssertEqual(input.normalizedPlaceName, "北口")
+        XCTAssertEqual(input.normalizedNote, "友達と合流")
+
+        let invalid = PersonalScheduleCreateInput(title: " ", startAt: end, endAt: start)
+        XCTAssertFalse(invalid.isValid)
+        XCTAssertTrue(invalid.normalizedTitle.isEmpty)
     }
 }

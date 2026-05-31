@@ -24,6 +24,33 @@ struct GoodsCollectionScreen: View {
         }
     }
 
+    private var hasActiveFilters: Bool {
+        selectedGroupID != nil || selectedGoodsTypeID != nil
+    }
+
+    private var isShowingLoadingState: Bool {
+        appState?.isLoading == true && items.isEmpty
+    }
+
+    private var emptyMessageTitle: String {
+        if hasActiveFilters {
+            return "条件に合うグッズがありません"
+        }
+        if title == "個別募集" {
+            return "個別募集はまだありません"
+        }
+        switch entryKind {
+        case .inventory:
+            return "在庫はまだありません"
+        case .wish:
+            return "Wishはまだありません"
+        }
+    }
+
+    private var addButtonLabel: String {
+        entryKind == .inventory ? "在庫に追加" : "Wishに追加"
+    }
+
     var body: some View {
         ZStack(alignment: .bottomLeading) {
             ScrollView {
@@ -36,8 +63,10 @@ struct GoodsCollectionScreen: View {
                             selectedGoodsTypeID: $selectedGoodsTypeID
                         )
                     }
-                    if filteredItems.isEmpty {
-                        EmptyCollectionMessage(title: "条件に合うグッズがありません")
+                    if isShowingLoadingState {
+                        CollectionGridSkeleton(columns: columns)
+                    } else if filteredItems.isEmpty {
+                        EmptyCollectionMessage(title: emptyMessageTitle)
                     } else {
                         GoodsGrid(
                             items: filteredItems,
@@ -45,7 +74,8 @@ struct GoodsCollectionScreen: View {
                             viewerID: appState?.viewer?.id,
                             onCreateIndividualListing: canCreateListingFromItems ? { listingSeedWish = $0 } : nil,
                             onHideItem: appState == nil ? nil : { hideItem($0) },
-                            onDeleteItem: appState == nil ? nil : { deleteItem($0) }
+                            onDeleteItem: appState == nil ? nil : { deleteItem($0) },
+                            busyItemID: appState?.mutatingGoodsItemID
                         )
                     }
                 }
@@ -57,7 +87,7 @@ struct GoodsCollectionScreen: View {
             .megrumHiddenNavigationBar()
 
             if showsAddButton {
-                AddGoodsButton {
+                AddGoodsButton(accessibilityLabel: addButtonLabel) {
                     if appState == nil {
                         isShowingUnavailableAlert = true
                     } else {
@@ -257,6 +287,7 @@ private struct ColumnToggleButton: View {
 }
 
 private struct AddGoodsButton: View {
+    var accessibilityLabel: String
     var action: () -> Void
 
     var body: some View {
@@ -280,7 +311,7 @@ private struct AddGoodsButton: View {
                 .shadow(color: MegrumTheme.ink.opacity(0.16), radius: 18, y: 10)
         }
         .buttonStyle(.plain)
-        .accessibilityLabel("追加")
+        .accessibilityLabel(accessibilityLabel)
     }
 }
 
@@ -364,6 +395,35 @@ private struct EmptyCollectionMessage: View {
                 RoundedRectangle(cornerRadius: 24, style: .continuous)
                     .strokeBorder(.white.opacity(0.55), lineWidth: 1)
             }
+    }
+}
+
+private struct CollectionGridSkeleton: View {
+    var columns: Int
+
+    private var normalizedColumns: Int {
+        min(5, max(3, columns))
+    }
+
+    private var gridItems: [GridItem] {
+        Array(repeating: GridItem(.flexible(), spacing: 14), count: normalizedColumns)
+    }
+
+    var body: some View {
+        LazyVGrid(columns: gridItems, spacing: 16) {
+            ForEach(0..<normalizedColumns * 2, id: \.self) { _ in
+                VStack(alignment: .leading, spacing: 8) {
+                    RoundedRectangle(cornerRadius: 18, style: .continuous)
+                        .fill(MegrumTheme.lavender.opacity(0.12))
+                        .aspectRatio(0.78, contentMode: .fit)
+                    RoundedRectangle(cornerRadius: 5, style: .continuous)
+                        .fill(MegrumTheme.lavender.opacity(0.12))
+                        .frame(height: 13)
+                }
+                .redacted(reason: .placeholder)
+            }
+        }
+        .accessibilityLabel("グッズを読み込み中")
     }
 }
 

@@ -323,8 +323,8 @@ struct IndividualListingEditorSheet: View {
                 }
             }
 
-            Section("交換条件") {
-                Picker("種類", selection: $exchangeType) {
+            Section("交換タイプ") {
+                Picker("同種・異種", selection: $exchangeType) {
                     ForEach(IndividualListingExchangeType.allCases) { type in
                         Text(type.displayName).tag(type)
                     }

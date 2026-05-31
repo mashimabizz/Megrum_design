@@ -12,13 +12,18 @@ struct GoodsGrid: View {
     var onHideItem: ((GoodsItem) -> Void)?
     var onDeleteItem: ((GoodsItem) -> Void)?
     var onReportItem: ((GoodsItem, GoodsReportReason, String) -> Void)?
+    var busyItemID: UUID?
     @State private var detailItem: GoodsItem?
     @State private var actionMessage: String?
     @State private var pendingDeleteItem: GoodsItem?
     @State private var reportItem: GoodsItem?
 
     private var gridItems: [GridItem] {
-        Array(repeating: GridItem(.flexible(), spacing: 14), count: columns)
+        Array(repeating: GridItem(.flexible(), spacing: 14), count: normalizedColumns)
+    }
+
+    private var normalizedColumns: Int {
+        min(5, max(3, columns))
     }
 
     var body: some View {
@@ -36,7 +41,8 @@ struct GoodsGrid: View {
                     },
                     onAction: { action in
                         handle(action, item: item)
-                    }
+                    },
+                    isBusy: busyItemID == item.id
                 )
             }
         }
@@ -122,21 +128,28 @@ struct GoodsGrid: View {
 
     private func actions(for item: GoodsItem) -> [GoodsTileAction] {
         guard let viewerID else {
-            return GoodsTileAction.visibleActions
+            return [.detail]
         }
         if item.ownerID == viewerID {
             var actions: [GoodsTileAction] = [.detail]
             if onCreateIndividualListing != nil {
                 actions.append(.createIndividualListing)
             }
-            actions.append(contentsOf: [.hide, .delete])
+            if onHideItem != nil {
+                actions.append(.hide)
+            }
+            if onDeleteItem != nil {
+                actions.append(.delete)
+            }
             return actions
         }
         var actions: [GoodsTileAction] = [.detail]
         if onAddToExchangeList != nil {
             actions.append(.addToExchangeList)
         }
-        actions.append(.report)
+        if onReportItem != nil {
+            actions.append(.report)
+        }
         return actions
     }
 }
@@ -146,6 +159,7 @@ struct GoodsTile: View {
     var actions: [GoodsTileAction] = GoodsTileAction.visibleActions
     var onOpenDetail: () -> Void
     var onAction: (GoodsTileAction) -> Void
+    var isBusy = false
 
     var body: some View {
         Button(action: onOpenDetail) {
@@ -177,6 +191,14 @@ struct GoodsTile: View {
                                 .padding(8)
                         }
                     }
+                    .overlay {
+                        if isBusy {
+                            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                                .fill(.black.opacity(0.18))
+                            ProgressView()
+                                .tint(.white)
+                        }
+                    }
                     .shadow(color: MegrumTheme.ink.opacity(0.08), radius: 10, y: 5)
 
                 Text(item.title)
@@ -186,6 +208,7 @@ struct GoodsTile: View {
             }
         }
         .buttonStyle(.plain)
+        .disabled(isBusy)
         .contextMenu {
             ForEach(actions) { action in
                 Button(role: action.role) {

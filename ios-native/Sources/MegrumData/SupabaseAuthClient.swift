@@ -72,6 +72,18 @@ public final class SupabaseAuthClient: @unchecked Sendable {
         return try await performAuthRequest(request)
     }
 
+    public func sendPasswordReset(email: String, emailRedirectTo: URL? = nil) async throws {
+        let request = try makePasswordResetRequest(email: email, emailRedirectTo: emailRedirectTo)
+        let (data, response) = try await session.data(for: request)
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw SupabaseAuthError.unexpectedStatus(-1, nil)
+        }
+        guard (200..<300).contains(httpResponse.statusCode) else {
+            let message = try? decoder.decode(AuthErrorResponse.self, from: data).message
+            throw SupabaseAuthError.unexpectedStatus(httpResponse.statusCode, message)
+        }
+    }
+
     public func signOut(accessToken: String) async throws {
         let request = try makeSignOutRequest(accessToken: accessToken)
         let (_, response) = try await session.data(for: request)
@@ -166,6 +178,20 @@ public final class SupabaseAuthClient: @unchecked Sendable {
         )
     }
 
+    public func makePasswordResetRequest(email: String, emailRedirectTo: URL? = nil) throws -> URLRequest {
+        let payload = PasswordResetPayload(email: email)
+        let queryItems = emailRedirectTo.map {
+            [URLQueryItem(name: "redirect_to", value: $0.absoluteString)]
+        } ?? []
+        return try makeAuthRequest(
+            path: "/auth/v1/recover",
+            queryItems: queryItems,
+            method: "POST",
+            body: encoder.encode(payload),
+            bearerToken: configuration.publishableKey
+        )
+    }
+
     public func makeSignOutRequest(accessToken: String) throws -> URLRequest {
         try makeAuthRequest(
             path: "/auth/v1/logout",
@@ -227,6 +253,10 @@ public final class SupabaseAuthClient: @unchecked Sendable {
 private struct PasswordPayload: Encodable {
     var email: String
     var password: String
+}
+
+private struct PasswordResetPayload: Encodable {
+    var email: String
 }
 
 private struct SignUpPayload: Encodable {

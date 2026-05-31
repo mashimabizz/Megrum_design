@@ -823,6 +823,41 @@ public enum ProposalMatchType: String, Codable, Sendable, CaseIterable, Identifi
     public var id: String { rawValue }
 }
 
+public struct ProposalMeetupInput: Equatable, Sendable {
+    public var startAt: Date
+    public var endAt: Date
+    public var placeName: String
+    public var latitude: Double
+    public var longitude: Double
+
+    public init(
+        startAt: Date,
+        endAt: Date,
+        placeName: String,
+        latitude: Double,
+        longitude: Double
+    ) {
+        self.startAt = startAt
+        self.endAt = endAt
+        self.placeName = placeName
+        self.latitude = latitude
+        self.longitude = longitude
+    }
+
+    public var normalizedPlaceName: String {
+        placeName.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    public var isValid: Bool {
+        startAt < endAt
+            && !normalizedPlaceName.isEmpty
+            && latitude.isFinite
+            && longitude.isFinite
+            && (-90...90).contains(latitude)
+            && (-180...180).contains(longitude)
+    }
+}
+
 public struct ProposalCreateInput: Equatable, Sendable {
     public var receiverID: UUID
     public var senderGoodsIDs: [UUID]
@@ -832,6 +867,7 @@ public struct ProposalCreateInput: Equatable, Sendable {
     public var message: String?
     public var matchType: ProposalMatchType
     public var status: ProposalStatus
+    public var meetup: ProposalMeetupInput?
     public var listingID: UUID?
 
     public init(
@@ -843,6 +879,7 @@ public struct ProposalCreateInput: Equatable, Sendable {
         message: String? = nil,
         matchType: ProposalMatchType = .forward,
         status: ProposalStatus = .sent,
+        meetup: ProposalMeetupInput? = nil,
         listingID: UUID? = nil
     ) {
         self.receiverID = receiverID
@@ -853,7 +890,12 @@ public struct ProposalCreateInput: Equatable, Sendable {
         self.message = message
         self.matchType = matchType
         self.status = status
+        self.meetup = meetup
         self.listingID = listingID
+    }
+
+    public var requiresMeetupBeforeSending: Bool {
+        status != .draft && (exchangeMethod == .hand || exchangeMethod == .both)
     }
 }
 
@@ -861,6 +903,7 @@ public struct TradeProposal: Identifiable, Codable, Hashable, Sendable {
     public var id: UUID
     public var senderID: UUID
     public var receiverID: UUID
+    public var listingID: UUID?
     public var status: ProposalStatus
     public var exchangeMethod: ExchangeMethod
     public var senderGoodsIDs: [UUID]
@@ -880,6 +923,7 @@ public struct TradeProposal: Identifiable, Codable, Hashable, Sendable {
         id: UUID,
         senderID: UUID,
         receiverID: UUID,
+        listingID: UUID? = nil,
         status: ProposalStatus,
         exchangeMethod: ExchangeMethod,
         senderGoodsIDs: [UUID],
@@ -898,6 +942,7 @@ public struct TradeProposal: Identifiable, Codable, Hashable, Sendable {
         self.id = id
         self.senderID = senderID
         self.receiverID = receiverID
+        self.listingID = listingID
         self.status = status
         self.exchangeMethod = exchangeMethod
         self.senderGoodsIDs = senderGoodsIDs
@@ -1008,7 +1053,8 @@ public struct TradeProposal: Identifiable, Codable, Hashable, Sendable {
             exchangeMethod: exchangeMethod,
             conditionTags: conditionTags,
             message: message,
-            status: .negotiating
+            status: .negotiating,
+            listingID: listingID
         )
     }
 }
@@ -1052,6 +1098,53 @@ public struct PersonalSchedule: Identifiable, Codable, Hashable, Sendable {
 
     public func overlaps(start: Date, end: Date) -> Bool {
         startAt < end && endAt > start
+    }
+}
+
+public struct PersonalScheduleCreateInput: Equatable, Sendable {
+    public var title: String
+    public var placeName: String?
+    public var startAt: Date
+    public var endAt: Date
+    public var allDay: Bool
+    public var note: String?
+
+    public init(
+        title: String,
+        placeName: String? = nil,
+        startAt: Date,
+        endAt: Date,
+        allDay: Bool = false,
+        note: String? = nil
+    ) {
+        self.title = title
+        self.placeName = placeName
+        self.startAt = startAt
+        self.endAt = endAt
+        self.allDay = allDay
+        self.note = note
+    }
+
+    public var normalizedTitle: String {
+        title.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    public var normalizedPlaceName: String? {
+        placeName?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfBlank
+    }
+
+    public var normalizedNote: String? {
+        note?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfBlank
+    }
+
+    public var isValid: Bool {
+        !normalizedTitle.isEmpty && startAt < endAt
+    }
+}
+
+private extension String {
+    var nilIfBlank: String? {
+        isEmpty ? nil : self
     }
 }
 

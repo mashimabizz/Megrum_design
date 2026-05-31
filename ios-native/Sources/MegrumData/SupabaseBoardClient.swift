@@ -393,17 +393,18 @@ private struct BoardReplyRow: Decodable, Sendable {
     var id: UUID
     var threadId: UUID
     var authorId: UUID
-    var body: String
+    var body: String?
     var status: String?
     var createdAt: Date?
 
     var reply: BoardReply? {
-        BoardReply(
+        let status = BoardReply.Status(rawValue: status ?? "visible") ?? .visible
+        return BoardReply(
             id: id,
             threadID: threadId,
             authorID: authorId,
-            body: body,
-            status: BoardReply.Status(rawValue: status ?? "visible") ?? .visible,
+            body: body ?? "",
+            status: status,
             createdAt: createdAt ?? .now
         )
     }

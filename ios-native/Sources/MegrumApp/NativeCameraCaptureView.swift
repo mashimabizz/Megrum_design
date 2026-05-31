@@ -7,7 +7,13 @@ struct NativeCameraCaptureView: UIViewControllerRepresentable {
     var onCapture: (Data) -> Void
     @Environment(\.dismiss) private var dismiss
 
-    func makeUIViewController(context: Context) -> UIImagePickerController {
+    func makeUIViewController(context: Context) -> UIViewController {
+        guard UIImagePickerController.isSourceTypeAvailable(.camera) else {
+            return UIHostingController(rootView: NativeCameraUnavailableView {
+                dismiss()
+            })
+        }
+
         let picker = UIImagePickerController()
         picker.sourceType = .camera
         picker.cameraCaptureMode = .photo
@@ -16,7 +22,7 @@ struct NativeCameraCaptureView: UIViewControllerRepresentable {
         return picker
     }
 
-    func updateUIViewController(_ uiViewController: UIImagePickerController, context: Context) {}
+    func updateUIViewController(_ uiViewController: UIViewController, context: Context) {}
 
     func makeCoordinator() -> Coordinator {
         Coordinator(onCapture: onCapture, dismiss: dismiss)
@@ -47,6 +53,36 @@ struct NativeCameraCaptureView: UIViewControllerRepresentable {
 
         func imagePickerControllerDidCancel(_ picker: UIImagePickerController) {
             dismiss()
+        }
+    }
+}
+
+private struct NativeCameraUnavailableView: View {
+    var onClose: () -> Void
+
+    var body: some View {
+        NavigationStack {
+            VStack(spacing: 16) {
+                Image(systemName: "camera.slash")
+                    .font(.system(size: 44, weight: .semibold))
+                    .foregroundStyle(.secondary)
+
+                Text("カメラを利用できません")
+                    .font(.headline)
+
+                Text("この端末ではカメラを起動できません。写真から選択してください。")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 28)
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background(.background)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("閉じる", action: onClose)
+                }
+            }
         }
     }
 }

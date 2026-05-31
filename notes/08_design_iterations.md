@@ -4,6 +4,150 @@
 
 ---
 
+## イテレーション365：Swift並列実装バッチを統合
+
+### 背景・問題意識
+
+iOS一本で勝つ方針のもと、Swift移行を最大並列で進めたいという要望があった。今回は統合役が共通ファイルを持ち、各Agentに編集範囲を分けて、TestFlight準備、認証、打診作成、在庫/Wish、取引、めぐり、Supabase request監査、RN parity監査を同時並行で進めた。
+
+### 変更内容
+
+#### `ios-native/App/` / `ios-native/Config/` / `ios-native/MegrumNative.xcodeproj/project.pbxproj`
+- Swift Native PreviewのInfo.plistを明示し、URL scheme、権限文言、Privacy Manifest、Team ID、Bundle設定をTestFlight前提で整理した。
+
+#### `ios-native/Sources/MegrumApp/AuthScreen.swift` / `MegrumAuthState.swift` / `AppChrome.swift`
+- 認証・アカウント周辺のエラー表示、session復元、キーボード dismissal、左ドロワー操作、通知入口の挙動を補強した。
+
+#### `ios-native/Sources/MegrumApp/SearchScreen.swift` / `PublicUserProfileScreen.swift` / `IndividualListingsScreen.swift`
+- 打診作成sheetへ個別募集起点の `listing_id` を渡し、交換手段と条件不足のvalidationを整理した。
+- `hand` / `both` の本送信には待ち合わせ入力を必須にし、`mail` は住所未準備時にブロックするようにした。
+
+#### `ios-native/Sources/MegrumApp/CollectionScreens.swift` / `GoodsGrid.swift`
+- 在庫/Wishのローディング、空状態、列数切り替え、長押し操作、非表示・削除・通報中の表示崩れを補強した。
+
+#### `ios-native/Sources/MegrumApp/TradesScreen.swift`
+- 取引チャット、写真拡大、証跡、評価、通報、スケジュール更新、再打診まわりのSwift Native導線を維持しつつ、提案返答・証跡承認をRPC経由の安全な更新へ寄せた。
+
+#### `ios-native/Sources/MegrumApp/MeguriScreen.swift` / `MegrumLocationState.swift` / `NativeCameraCaptureView.swift`
+- めぐりの位置情報許可、MapKit初期中心、範囲円、カメラ不可端末、画像読み込み失敗、掲示板返信の現在地連携を補強した。
+
+#### `ios-native/Sources/MegrumCore/MegrumModels.swift`
+- `ProposalMeetupInput` を追加し、現地系打診の待ち合わせ候補を型で検証できるようにした。
+- `TradeProposal.listingID` を追加し、個別募集起点の取引を保持できるようにした。
+
+#### `ios-native/Sources/MegrumData/`
+- Supabase request payloadのtrim、limit、null fallback、RPC payload、`listing_id` select、待ち合わせ列、Privacy/TestFlight関連の境界を補強した。
+
+#### `supabase/migrations/20260531013000_harden_proposal_response_rpc.sql`
+- `respond_to_proposal_for_viewer` と `approve_trade_evidence_for_viewer` を追加し、返答・拒否・証跡承認・完了時の在庫/個別募集更新をDB側でロックしながら行えるようにした。
+
+#### `ios-native/Tests/`
+- 打診作成sheet、公開プロフィール、在庫/Wish request、Supabase proposal/auth/schedule/board request、proposal状態・`exchange_method`・`listing_id`・通知linkPathの不一致検出テストを追加・更新した。
+
+### 影響範囲
+
+- Swift Native Preview全体
+- TestFlight提出前設定
+- 認証/初回設定/通知入口
+- 検索/相手プロフィール/個別募集/打診作成
+- 在庫/Wishのグリッド操作
+- 取引チャット/証跡/完了/評価
+- めぐりホーム/グルーム/掲示板/MapKit
+- Supabase proposal response RPC
+
+### 確認方法
+
+- `swift build --package-path ios-native`
+  - ローカル `.build/build.db` のdisk I/O errorで終了コード1。scratch pathで再確認。
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-swift-build`
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-build --enable-xctest --disable-swift-testing -j 1`
+- `xcodebuild -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -destination 'generic/platform=iOS Simulator' -derivedDataPath /tmp/megrum-native-xcodebuild CODE_SIGNING_ALLOWED=NO build`
+
+### 関連ファイル
+
+- `ios-native/App/Info.plist`
+- `ios-native/App/PrivacyInfo.xcprivacy`
+- `ios-native/Config/MegrumNative.xcconfig`
+- `ios-native/MegrumNative.xcodeproj/project.pbxproj`
+- `ios-native/Sources/MegrumApp/`
+- `ios-native/Sources/MegrumCore/MegrumModels.swift`
+- `ios-native/Sources/MegrumData/`
+- `ios-native/Tests/`
+- `supabase/migrations/20260531013000_harden_proposal_response_rpc.sql`
+- `notes/22_swift_native_migration.md`
+- `notes/08_design_iterations.md`
+
+### セルフレビュー結果
+
+- ✅ 共通ファイルは統合役だけが編集し、サブエージェント間で同一ファイルを同時編集しない運用を維持した
+- ✅ 状態名の追加・改名はなく、`notes/09` の状態定義更新は不要と判断した
+- ✅ 新しいユーザー向け用語は追加していないため、`notes/10` 更新は不要と判断した
+- ✅ Swift Native版のiOS標準デザイン感を維持し、旧Expo版への見た目寄せ戻しはしていない
+- ⚠️ 新規RPC migrationはSQLファイル追加まで。Supabase本番/Preview DBへの適用は別途必要
+
+---
+
+## イテレーション364：Swiftスケジュール更新を追加
+
+### 背景・問題意識
+
+Swift移行版の実機レビューで、旧Expo版へ見た目を寄せ戻さず、iOS標準デザイン感を維持する方針が再確認された。取引チャットのスケジュールsheetは前回「見る」入口まで追加したが、ユーザーがその場で自分の予定を更新できないと、待ち合わせ調整の流れが途切れる。今回はSwiftUI標準のForm / DatePicker / sheetを使い、取引スケジュールから予定を追加できるようにする。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumCore/MegrumModels.swift`
+- `PersonalScheduleCreateInput` を追加し、予定名、場所、開始/終了、終日、メモを正規化・検証できるようにした。
+
+#### `ios-native/Sources/MegrumData/SupabaseScheduleClient.swift`
+- `schedules` へinsertする `createSchedule(userID:input:)` とテスト用request builderを追加した。
+- 日時はISO8601文字列でpayload化し、Supabase PostgRESTのsnake_case payloadへ揃えた。
+
+#### `ios-native/Sources/MegrumApp/MegrumAppState.swift` / `ios-native/Sources/MegrumApp/SupabaseMegrumRepository.swift`
+- `createSchedule(_:)` をRepository / AppStateへ追加した。
+- 保存後は表示中の取引スケジュール一覧へ即時反映し、開始時刻順で並び替えるようにした。
+
+#### `ios-native/Sources/MegrumApp/TradesScreen.swift`
+- 取引スケジュールsheetのtoolbarに「更新」ボタンを追加した。
+- ボタン押下でNative sheetを開き、SwiftUI標準Formで予定名、場所、開始/終了、終日、メモを入力できるようにした。
+- 開始日時を変更した時は終了日時が逆転しないよう補正し、保存中は標準ProgressViewで明示する。
+
+#### `ios-native/Tests/`
+- `PersonalScheduleCreateInput` の正規化・validationを追加した。
+- Supabase schedule insert requestのpayloadを検証した。
+- Preview AppStateで予定追加後に取引スケジュールへ反映されることを検証した。
+
+### 影響範囲
+
+- Swift Native版の取引詳細
+- 取引チャットのスケジュールsheet
+- Supabase `schedules` insert境界
+
+### 確認方法
+
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-build --enable-xctest --disable-swift-testing -j 1`
+
+### 関連ファイル
+
+- `ios-native/Sources/MegrumCore/MegrumModels.swift`
+- `ios-native/Sources/MegrumData/SupabaseScheduleClient.swift`
+- `ios-native/Sources/MegrumApp/MegrumAppState.swift`
+- `ios-native/Sources/MegrumApp/SupabaseMegrumRepository.swift`
+- `ios-native/Sources/MegrumApp/TradesScreen.swift`
+- `ios-native/Tests/MegrumCoreTests/MegrumCoreTests.swift`
+- `ios-native/Tests/MegrumDataTests/SupabaseScheduleClientTests.swift`
+- `ios-native/Tests/MegrumAppTests/MegrumAppStateTests.swift`
+- `notes/22_swift_native_migration.md`
+- `notes/08_design_iterations.md`
+
+### セルフレビュー結果
+
+- ✅ 旧Expo版の見た目へ寄せず、SwiftUI標準のForm / DatePicker / toolbar / sheetで実装した
+- ✅ `schedules` テーブルは既存schemaに存在するため、DB migration追加は不要と判断した
+- ✅ 状態名の追加・変更はなく、`notes/09` 更新は不要と判断した
+- ✅ 用語追加はなく、`notes/10` 更新は不要と判断した
+
+---
+
 ## イテレーション363：Swift取引スケジュールsheetを追加
 
 ### 背景・問題意識

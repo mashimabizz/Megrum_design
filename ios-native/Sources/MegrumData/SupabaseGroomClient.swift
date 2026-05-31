@@ -32,7 +32,7 @@ public final class SupabaseGroomClient: @unchecked Sendable {
                 radiusMeters: radiusMeters
             )
         )
-        let signedURLs = try await signedURLMap(for: rows)
+        let signedURLs = await signedURLMap(for: rows)
         return rows.compactMap { $0.post(signedURLs: signedURLs) }
     }
 
@@ -56,7 +56,7 @@ public final class SupabaseGroomClient: @unchecked Sendable {
             values: [GroomPostInsertPayload(input: input, imagePath: imagePath)],
             select: GroomFeedRow.select
         )
-        let signedURLs = try await signedURLMap(for: rows)
+        let signedURLs = await signedURLMap(for: rows)
         guard let post = rows.first?.post(signedURLs: signedURLs) else {
             throw SupabaseGroomClientError.malformedResponse
         }
@@ -168,10 +168,11 @@ public final class SupabaseGroomClient: @unchecked Sendable {
         )
     }
 
-    private func signedURLMap(for rows: [GroomFeedRow]) async throws -> [String: URL] {
+    private func signedURLMap(for rows: [GroomFeedRow]) async -> [String: URL] {
         var signedURLs: [String: URL] = [:]
-        for path in rows.compactMap(\.imagePath) {
-            signedURLs[path] = try await client.createSignedURL(bucket: Self.groomBucket, path: path)
+        let paths = Set(rows.compactMap(\.storageImagePath))
+        for path in paths {
+            signedURLs[path] = try? await client.createSignedURL(bucket: Self.groomBucket, path: path)
         }
         return signedURLs
     }
@@ -264,13 +265,26 @@ private struct GroomFeedRow: Decodable, Sendable {
     }
 
     private func resolvedImageURL(signedURLs: [String: URL]) -> URL? {
-        if let imagePath, let signedURL = signedURLs[imagePath] {
+        if let storageImagePath, let signedURL = signedURLs[storageImagePath] {
             return signedURL
         }
         guard let imageUrl, let url = URL(string: imageUrl), url.scheme != nil else {
             return nil
         }
         return url
+    }
+
+    var storageImagePath: String? {
+        if let imagePath = imagePath?.trimmingCharacters(in: .whitespacesAndNewlines), !imagePath.isEmpty {
+            return imagePath
+        }
+        guard let imageUrl = imageUrl?.trimmingCharacters(in: .whitespacesAndNewlines), !imageUrl.isEmpty else {
+            return nil
+        }
+        if URL(string: imageUrl)?.scheme == nil {
+            return imageUrl
+        }
+        return nil
     }
 }
 

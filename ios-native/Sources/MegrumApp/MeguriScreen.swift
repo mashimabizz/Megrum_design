@@ -19,6 +19,7 @@ struct MeguriScreen: View {
     @State private var activeMap: MeguriMapKind?
     @State private var isShowingThreadComposer = false
     @State private var isShowingPrefecturePicker = false
+    @State private var localNoticeMessage: String?
 
     private var selectedBoardScope: BoardThread.Audience {
         BoardThread.Audience(rawValue: storedBoardScopeRaw) ?? .nearby3km
@@ -37,6 +38,15 @@ struct MeguriScreen: View {
             VStack(alignment: .leading, spacing: 26) {
                 ScreenTitle(title: "グルーム", subtitle: "近くの投稿と掲示板")
 
+                if let noticeMessage {
+                    MeguriNoticeBanner(
+                        message: noticeMessage,
+                        actionTitle: locationNoticeActionTitle
+                    ) {
+                        handleLocationNoticeAction()
+                    }
+                }
+
                 VStack(alignment: .leading, spacing: 14) {
                     SectionHeader(title: "グルーム", actionTitle: "地図で見る") {
                         activeMap = .grooms
@@ -47,7 +57,11 @@ struct MeguriScreen: View {
                         isCreating: appState.isCreatingGroomPost,
                         canUseCamera: canUseCamera,
                         onOpenCamera: {
-                            isShowingGroomCamera = true
+                            if canUseCamera {
+                                isShowingGroomCamera = true
+                            } else {
+                                localNoticeMessage = "この端末ではカメラを利用できません。写真から選択してください。"
+                            }
                         }
                     ) { groom in
                         selectedGroom = groom
@@ -121,7 +135,8 @@ struct MeguriScreen: View {
                 BoardThreadDetailScreen(
                     appState: appState,
                     thread: thread,
-                    selectedPrefecture: selectedBoardPrefecture
+                    selectedPrefecture: selectedBoardPrefecture,
+                    coordinate: locationState.coordinate
                 )
             }
         }
@@ -216,6 +231,7 @@ struct MeguriScreen: View {
         }
 
         guard let data = try? await item.loadTransferable(type: Data.self) else {
+            localNoticeMessage = "写真を読み込めませんでした"
             return
         }
         await publishGroomPhoto(data: data, imageContentType: inferredImageContentType(from: data))
@@ -229,8 +245,43 @@ struct MeguriScreen: View {
             longitude: locationState.coordinate?.longitude
         )
         if created {
+            localNoticeMessage = nil
             await reloadMeguriFeed()
         }
+    }
+
+    private var noticeMessage: String? {
+        localNoticeMessage ?? locationState.locationErrorMessage ?? appState.errorMessage
+    }
+
+    private var locationNoticeActionTitle: String? {
+        guard localNoticeMessage == nil, locationState.locationErrorMessage != nil else {
+            return nil
+        }
+        if locationState.authorizationStatus == .denied || locationState.authorizationStatus == .restricted {
+            return "設定"
+        }
+        return "再試行"
+    }
+
+    private func handleLocationNoticeAction() {
+        guard locationState.locationErrorMessage != nil else {
+            return
+        }
+        if locationState.authorizationStatus == .denied || locationState.authorizationStatus == .restricted {
+            openAppSettings()
+        } else {
+            locationState.requestCurrentLocation()
+        }
+    }
+
+    private func openAppSettings() {
+        #if os(iOS)
+        guard let url = URL(string: UIApplication.openSettingsURLString) else {
+            return
+        }
+        UIApplication.shared.open(url)
+        #endif
     }
 
     private var canUseCamera: Bool {
@@ -289,7 +340,12 @@ private struct BoardThreadComposerSheet: View {
     private var canSubmit: Bool {
         !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
             && !bodyText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            && hasRequiredLocation
             && !appState.isCreatingBoardThread
+    }
+
+    private var hasRequiredLocation: Bool {
+        scope != .nearby3km || coordinate != nil
     }
 
     var body: some View {
@@ -310,6 +366,10 @@ private struct BoardThreadComposerSheet: View {
                     Text(selectedPrefecture ?? appState.viewer?.prefecture ?? "都道府県").tag(BoardThread.Audience.samePrefecture)
                 }
                 .pickerStyle(.segmented)
+
+                if !hasRequiredLocation {
+                    MeguriNoticeBanner(message: "3km圏内のスレッドには現在地が必要です")
+                }
 
                 VStack(alignment: .leading, spacing: 8) {
                     Text("タイトル")
@@ -504,9 +564,7 @@ private struct GroomViewerScreen: View {
                         .id(currentGroom.id)
                         .transition(.opacity.combined(with: .scale(scale: 0.98)))
                 case .failure:
-                    Image(systemName: "photo")
-                        .font(.system(size: 42, weight: .bold))
-                        .foregroundStyle(.white.opacity(0.7))
+                    GroomImageFailureView(message: "画像を読み込めませんでした", foregroundColor: .white)
                 default:
                     ProgressView()
                         .tint(.white)
@@ -735,9 +793,11 @@ private struct MeguriMapScreen: View {
     var body: some View {
         ZStack(alignment: .top) {
             Map(position: $cameraPosition, interactionModes: [.pan, .zoom, .rotate]) {
-                MapCircle(center: centerCoordinate, radius: kind.radiusMeters)
-                    .foregroundStyle(MegrumTheme.lavender.opacity(0.08))
-                    .stroke(MegrumTheme.lavender.opacity(0.42), lineWidth: 1.5)
+                if let rangeCircle {
+                    MapCircle(center: rangeCircle.center, radius: rangeCircle.radius)
+                        .foregroundStyle(MegrumTheme.lavender.opacity(0.08))
+                        .stroke(MegrumTheme.lavender.opacity(0.42), lineWidth: 1.5)
+                }
 
                 switch kind {
                 case .grooms:
@@ -771,8 +831,17 @@ private struct MeguriMapScreen: View {
             }
             .ignoresSafeArea()
 
-            MapGlassHeader(title: kind.title) {
-                dismiss()
+            VStack(spacing: 10) {
+                MapGlassHeader(title: kind.title) {
+                    dismiss()
+                }
+
+                if let mapStatusMessage {
+                    MapStatusBadge(
+                        message: mapStatusMessage,
+                        isLoading: appState.isLoadingMeguri || locationState.isRequestingLocation
+                    )
+                }
             }
             .padding(.horizontal, 18)
             .padding(.top, 14)
@@ -812,7 +881,8 @@ private struct MeguriMapScreen: View {
                 BoardThreadDetailScreen(
                     appState: appState,
                     thread: thread,
-                    selectedPrefecture: selectedPrefecture
+                    selectedPrefecture: selectedPrefecture,
+                    coordinate: locationState.coordinate
                 )
             }
         }
@@ -820,6 +890,32 @@ private struct MeguriMapScreen: View {
 
     private var centerCoordinate: CLLocationCoordinate2D {
         kind.initialCenter(userCoordinate: locationState.coordinate, grooms: appState.grooms, threads: appState.threads)
+    }
+
+    private var rangeCircle: (center: CLLocationCoordinate2D, radius: CLLocationDistance)? {
+        guard let coordinate = locationState.coordinate else {
+            return nil
+        }
+        if kind == .boards, boardScope != .nearby3km {
+            return nil
+        }
+        return (coordinate.clLocationCoordinate, kind.radiusMeters)
+    }
+
+    private var mapStatusMessage: String? {
+        if appState.isLoadingMeguri || locationState.isRequestingLocation {
+            return "現在地と投稿を読み込み中"
+        }
+        if let locationErrorMessage = locationState.locationErrorMessage, kind == .grooms || boardScope == .nearby3km {
+            return locationErrorMessage
+        }
+        if kind == .boards, boardScope == .samePrefecture {
+            return "都道府県内の位置つきスレッドを表示中"
+        }
+        if rangeCircle == nil {
+            return "範囲円は現在地取得後に表示されます"
+        }
+        return nil
     }
 
     private var mapBoardScope: BoardThread.Audience {
@@ -864,34 +960,42 @@ private struct MapGlassHeader: View {
     }
 }
 
+private struct MapStatusBadge: View {
+    var message: String
+    var isLoading: Bool
+
+    var body: some View {
+        HStack(spacing: 8) {
+            if isLoading {
+                ProgressView()
+                    .controlSize(.small)
+                    .tint(MegrumTheme.lavender)
+            } else {
+                Image(systemName: "location")
+                    .font(.system(size: 13, weight: .heavy))
+                    .foregroundStyle(MegrumTheme.lavender)
+            }
+
+            Text(message)
+                .font(.system(size: 13, weight: .heavy, design: .rounded))
+                .foregroundStyle(MegrumTheme.ink)
+                .lineLimit(2)
+                .multilineTextAlignment(.center)
+        }
+        .padding(.horizontal, 14)
+        .frame(minHeight: 38)
+        .background(.regularMaterial, in: Capsule())
+    }
+}
+
 private struct GroomMapPin: View {
     var groom: GroomPost
 
     var body: some View {
         VStack(spacing: 0) {
-            AsyncImage(url: groom.imageURL) { phase in
-                switch phase {
-                case .success(let image):
-                    image
-                        .resizable()
-                        .scaledToFill()
-                default:
-                    LinearGradient(
-                        colors: [MegrumTheme.sky, MegrumTheme.pink],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                    .overlay {
-                        Image(systemName: "photo")
-                            .font(.system(size: 18, weight: .bold))
-                            .foregroundStyle(.white)
-                    }
-                }
-            }
-            .frame(width: 58, height: 58)
-            .clipShape(Circle())
-            .overlay(Circle().stroke(.white, lineWidth: 3))
-            .shadow(color: MegrumTheme.ink.opacity(0.22), radius: 12, y: 8)
+            GroomThumbnailCircle(url: groom.imageURL, size: 58)
+                .overlay(Circle().stroke(.white, lineWidth: 3))
+                .shadow(color: MegrumTheme.ink.opacity(0.22), radius: 12, y: 8)
 
             Triangle()
                 .fill(.white)
@@ -939,6 +1043,12 @@ private struct GroomMapDetailSheet: View {
                     image
                         .resizable()
                         .scaledToFill()
+                case .failure:
+                    RoundedRectangle(cornerRadius: 24, style: .continuous)
+                        .fill(.white.opacity(0.86))
+                        .overlay {
+                            GroomImageFailureView(message: "画像を読み込めませんでした", foregroundColor: MegrumTheme.ink)
+                        }
                 default:
                     RoundedRectangle(cornerRadius: 24, style: .continuous)
                         .fill(
@@ -963,10 +1073,62 @@ private struct GroomMapDetailSheet: View {
     }
 }
 
+private struct GroomThumbnailCircle: View {
+    var url: URL
+    var size: CGFloat
+
+    var body: some View {
+        AsyncImage(url: url) { phase in
+            switch phase {
+            case .success(let image):
+                image
+                    .resizable()
+                    .scaledToFill()
+            case .failure:
+                GroomImageFailureView(message: nil, foregroundColor: .white)
+            default:
+                ProgressView()
+                    .tint(.white)
+            }
+        }
+        .frame(width: size, height: size)
+        .background(
+            LinearGradient(
+                colors: [MegrumTheme.sky, MegrumTheme.pink],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+        )
+        .clipShape(Circle())
+        .contentShape(Circle())
+    }
+}
+
+private struct GroomImageFailureView: View {
+    var message: String?
+    var foregroundColor: Color
+
+    var body: some View {
+        VStack(spacing: 6) {
+            Image(systemName: "photo")
+                .font(.system(size: message == nil ? 20 : 30, weight: .bold))
+
+            if let message {
+                Text(message)
+                    .font(.system(size: 13, weight: .bold, design: .rounded))
+                    .multilineTextAlignment(.center)
+            }
+        }
+        .foregroundStyle(foregroundColor.opacity(0.78))
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+}
+
 private struct BoardThreadDetailScreen: View {
     @ObservedObject var appState: MegrumAppState
     var thread: BoardThread
     var selectedPrefecture: String?
+    var coordinate: MegrumLocationCoordinate?
     @Environment(\.dismiss) private var dismiss
     @State private var draftReply = ""
 
@@ -1011,6 +1173,8 @@ private struct BoardThreadDetailScreen: View {
                     let sent = await appState.sendBoardReply(
                         threadID: thread.id,
                         body: draftReply,
+                        latitude: coordinate?.latitude,
+                        longitude: coordinate?.longitude,
                         prefecture: selectedPrefecture,
                         scope: thread.audience
                     )
@@ -1029,6 +1193,8 @@ private struct BoardThreadDetailScreen: View {
         .task {
             await appState.loadBoardReplies(
                 threadID: thread.id,
+                latitude: coordinate?.latitude,
+                longitude: coordinate?.longitude,
                 prefecture: selectedPrefecture,
                 scope: thread.audience
             )
@@ -1213,6 +1379,40 @@ private struct SectionHeader: View {
     }
 }
 
+private struct MeguriNoticeBanner: View {
+    var message: String
+    var actionTitle: String?
+    var action: (() -> Void)?
+
+    var body: some View {
+        HStack(spacing: 10) {
+            Image(systemName: "location.slash")
+                .font(.system(size: 16, weight: .bold))
+                .foregroundStyle(MegrumTheme.lavender)
+
+            Text(message)
+                .font(.system(size: 13, weight: .bold, design: .rounded))
+                .foregroundStyle(MegrumTheme.ink)
+                .fixedSize(horizontal: false, vertical: true)
+
+            Spacer(minLength: 6)
+
+            if let actionTitle, let action {
+                Button(actionTitle, action: action)
+                    .font(.system(size: 13, weight: .heavy, design: .rounded))
+                    .foregroundStyle(MegrumTheme.lavender)
+            }
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 12)
+        .background(.white.opacity(0.88), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .stroke(MegrumTheme.lavender.opacity(0.14), lineWidth: 1)
+        }
+    }
+}
+
 private struct GroomStrip: View {
     var grooms: [GroomPost]
     @Binding var selectedPhotoItem: PhotosPickerItem?
@@ -1228,8 +1428,8 @@ private struct GroomStrip: View {
                     GroomAddTile(title: "撮影", systemImage: "camera.fill", isLoading: isCreating)
                 }
                 .buttonStyle(.plain)
-                .disabled(isCreating || !canUseCamera)
-                .opacity(canUseCamera ? 1 : 0.48)
+                .disabled(isCreating)
+                .opacity(canUseCamera ? 1 : 0.58)
 
                 PhotosPicker(selection: $selectedPhotoItem, matching: .images) {
                     GroomAddTile(title: "写真", systemImage: "photo.on.rectangle", isLoading: isCreating)
@@ -1242,24 +1442,11 @@ private struct GroomStrip: View {
                         onSelect(groom)
                     } label: {
                         VStack(spacing: 8) {
-                        Circle()
-                            .fill(
-                                LinearGradient(
-                                    colors: [MegrumTheme.sky, MegrumTheme.pink],
-                                    startPoint: .topLeading,
-                                    endPoint: .bottomTrailing
-                                )
-                            )
-                            .frame(width: 72, height: 72)
-                            .overlay {
-                                Image(systemName: "photo")
-                                    .font(.system(size: 24, weight: .bold))
-                                    .foregroundStyle(.white)
-                            }
+                            GroomThumbnailCircle(url: groom.imageURL, size: 72)
 
-                        Text("1km圏内")
-                            .font(.system(size: 11, weight: .heavy, design: .rounded))
-                            .foregroundStyle(MegrumTheme.muted)
+                            Text("1km圏内")
+                                .font(.system(size: 11, weight: .heavy, design: .rounded))
+                                .foregroundStyle(MegrumTheme.muted)
                         }
                     }
                     .buttonStyle(.plain)

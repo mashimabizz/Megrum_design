@@ -197,6 +197,10 @@ public struct SupabaseMegrumRepository: MegrumRepository {
         )
     }
 
+    public func createSchedule(_ input: PersonalScheduleCreateInput) async throws -> PersonalSchedule {
+        try await scheduleClient.createSchedule(userID: viewerID, input: input)
+    }
+
     public func loadGrooms(latitude: Double?, longitude: Double?, radiusMeters: Int) async throws -> [GroomPost] {
         try await groomClient.loadNearbyGrooms(
             latitude: latitude,

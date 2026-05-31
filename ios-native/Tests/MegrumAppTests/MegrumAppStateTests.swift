@@ -49,6 +49,32 @@ final class MegrumAppStateTests: XCTestCase {
         XCTAssertFalse(state.isCreatingIndividualListing)
     }
 
+    func testAppStateCreatesPreviewScheduleForProposal() async {
+        let state = MegrumAppState(repository: PreviewMegrumRepository())
+
+        await state.loadInitialData()
+        let proposal = try! XCTUnwrap(state.proposals.first)
+        let initialCount = state.schedules(for: proposal.id).count
+        let start = Date(timeIntervalSince1970: 1_780_160_000)
+
+        let created = await state.createSchedule(
+            PersonalScheduleCreateInput(
+                title: " 物販列 ",
+                placeName: " 北口 ",
+                startAt: start,
+                endAt: start.addingTimeInterval(3_600)
+            ),
+            for: proposal
+        )
+
+        XCTAssertTrue(created)
+        XCTAssertEqual(state.schedules(for: proposal.id).count, initialCount + 1)
+        XCTAssertEqual(state.schedules(for: proposal.id).last?.title, "物販列")
+        XCTAssertEqual(state.schedules(for: proposal.id).last?.placeName, "北口")
+        XCTAssertEqual(state.schedules(for: proposal.id).last?.userID, state.viewer?.id)
+        XCTAssertFalse(state.isCreatingSchedule)
+    }
+
     func testAppStateLoadsPreviewPublicExchangeContent() async {
         let state = MegrumAppState(repository: PreviewMegrumRepository())
         let partnerID = UUID(uuidString: "00000000-0000-0000-0000-000000000002")!
@@ -735,6 +761,14 @@ final class MegrumAppStateTests: XCTestCase {
         XCTAssertFalse(state.isMarkingNotificationsRead)
     }
 
+    func testNotificationLinkPathsRouteToNativeTabs() {
+        XCTAssertEqual(MegrumTab(notificationLinkPath: "/proposals/preview"), .trades)
+        XCTAssertEqual(MegrumTab(notificationLinkPath: "/trades/preview"), .trades)
+        XCTAssertEqual(MegrumTab(notificationLinkPath: "/meguri-board-thread?id=thread-1"), .meguri)
+        XCTAssertEqual(MegrumTab(notificationLinkPath: "/goods/preview"), .inventory)
+        XCTAssertEqual(MegrumTab(notificationLinkPath: "/wish/preview"), .wish)
+    }
+
     func testAppStateLoadsAndTogglesPreviewPushNotificationSetting() async {
         let state = MegrumAppState(repository: PreviewMegrumRepository())
 
@@ -805,6 +839,22 @@ final class MegrumAppStateTests: XCTestCase {
         XCTAssertNil(state.errorMessage)
     }
 
+    func testAuthStateSendsPasswordResetThroughRepository() async {
+        let repository = PasswordResetAuthRepository()
+        let state = MegrumAuthState(repository: repository)
+
+        let sent = await state.sendPasswordReset(email: " michi@example.com ")
+
+        XCTAssertTrue(sent)
+        XCTAssertNil(state.session)
+        XCTAssertEqual(state.passwordResetMessage, "再設定メールを送信しました。受信メールを確認してください")
+        XCTAssertFalse(state.isLoading)
+        XCTAssertNil(state.errorMessage)
+
+        let emails = await repository.emailsSnapshot()
+        XCTAssertEqual(emails, ["michi@example.com"])
+    }
+
     func testAuthStateRestoresSessionFromStore() async {
         let store = InMemoryAuthSessionStore()
         let firstState = MegrumAuthState(repository: StubAuthRepository(), sessionStore: store)
@@ -835,6 +885,17 @@ final class MegrumAppStateTests: XCTestCase {
 
         XCTAssertNil(state.session)
         XCTAssertEqual(state.errorMessage, "メールアドレスと8文字以上のパスワードを入力してください")
+    }
+
+    func testAuthStateValidatesPasswordResetEmail() async {
+        let state = MegrumAuthState(repository: StubAuthRepository())
+
+        let sent = await state.sendPasswordReset(email: " ")
+
+        XCTAssertFalse(sent)
+        XCTAssertNil(state.session)
+        XCTAssertEqual(state.errorMessage, "有効なメールアドレスを入力してください")
+        XCTAssertNil(state.passwordResetMessage)
     }
 
     func testAppStateLoadsPreviewPublicProfileAndEvaluations() async {
@@ -874,6 +935,30 @@ private struct StubAuthRepository: MegrumAuthRepository {
     }
 
     func signOut(session: AuthSession) async throws {}
+}
+
+private actor PasswordResetAuthRepository: MegrumAuthRepository {
+    private var emails: [String] = []
+
+    nonisolated var isConfigured: Bool { true }
+
+    func signIn(email: String, password: String) async throws -> AuthSession {
+        throw MegrumRepositoryError.unsupportedMutation
+    }
+
+    func signUp(_ input: AuthSignUpInput) async throws -> AuthSession {
+        throw MegrumRepositoryError.unsupportedMutation
+    }
+
+    func sendPasswordReset(email: String) async throws {
+        emails.append(email)
+    }
+
+    func signOut(session: AuthSession) async throws {}
+
+    func emailsSnapshot() -> [String] {
+        emails
+    }
 }
 
 private struct RedirectAuthRepository: MegrumAuthRepository {

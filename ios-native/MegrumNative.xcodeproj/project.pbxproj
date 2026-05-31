@@ -9,12 +9,15 @@
 /* Begin PBXBuildFile section */
 		13CA94AC73314C2BBD87BB5D /* MegrumNativeApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = EB317683D09049DF88A9DF5A /* MegrumNativeApp.swift */; };
 		455A5FD2CC3F4C6FAF0B9FE2 /* MegrumApp in Frameworks */ = {isa = PBXBuildFile; productRef = 2CAA32C3F51848648465951E /* MegrumApp */; };
+		7C35B443C9C34E51AF45D3F2 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = C8F50324503B4596A4E03357 /* PrivacyInfo.xcprivacy */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
 		1F56D75641C44F4985D89C9D /* MegrumNative.local.xcconfig.example */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = MegrumNative.local.xcconfig.example; sourceTree = "<group>"; };
 		3DF98E9464FC46B3A1D22EAA /* MegrumNative.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = MegrumNative.entitlements; sourceTree = "<group>"; };
 		9722E6114D194F97A9D926F9 /* MegrumNative.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = MegrumNative.xcconfig; sourceTree = "<group>"; };
+		B4E0DBCB8D354F1E939B5F20 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		C8F50324503B4596A4E03357 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		D3FBF9C8C95D427FAF75EE97 /* MegrumNative.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = MegrumNative.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		EB317683D09049DF88A9DF5A /* MegrumNativeApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MegrumNativeApp.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -42,8 +45,10 @@
 		62E971A7479443AEBA8CB754 /* App */ = {
 			isa = PBXGroup;
 			children = (
+				B4E0DBCB8D354F1E939B5F20 /* Info.plist */,
 				3DF98E9464FC46B3A1D22EAA /* MegrumNative.entitlements */,
 				EB317683D09049DF88A9DF5A /* MegrumNativeApp.swift */,
+				C8F50324503B4596A4E03357 /* PrivacyInfo.xcprivacy */,
 			);
 			path = App;
 			sourceTree = "<group>";
@@ -75,6 +80,7 @@
 			buildPhases = (
 				DE325F16ECD44250BBDED68C /* Sources */,
 				46E4935CB0B24781AF5F498C /* Frameworks */,
+				F3562C66D3F940EA874F1A7C /* Resources */,
 			);
 			buildRules = (
 			);
@@ -126,6 +132,17 @@
 		};
 /* End PBXProject section */
 
+/* Begin PBXResourcesBuildPhase section */
+		F3562C66D3F940EA874F1A7C /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				7C35B443C9C34E51AF45D3F2 /* PrivacyInfo.xcprivacy in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
 /* Begin PBXSourcesBuildPhase section */
 		DE325F16ECD44250BBDED68C /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
@@ -148,19 +165,10 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_ASSET_PATHS = "";
-				DEVELOPMENT_TEAM = "";
+				DEVELOPMENT_TEAM = 3N67L2WV4F;
 				ENABLE_PREVIEWS = YES;
-				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_CFBundleDisplayName = Megrum;
-				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.social-networking";
-				INFOPLIST_KEY_MegrumAuthEmailRedirectURL = "$(MEGRUM_AUTH_EMAIL_REDIRECT_URL)";
-				INFOPLIST_KEY_MegrumSupabasePublishableKey = "$(MEGRUM_SUPABASE_PUBLISHABLE_KEY)";
-				INFOPLIST_KEY_MegrumSupabaseURL = "$(MEGRUM_SUPABASE_URL)";
-				INFOPLIST_KEY_MegrumSupabaseViewerID = "$(MEGRUM_SUPABASE_VIEWER_ID)";
-				INFOPLIST_KEY_NSCameraUsageDescription = "交換完了時の証跡写真を撮影するためにカメラを使用します。";
-				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "現在地を使って近くのグルームと掲示板を表示します。";
-				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
-				INFOPLIST_KEY_UIStatusBarStyle = UIStatusBarStyleDefault;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = App/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				MARKETING_VERSION = 0.1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = tokyo.megrum.native.preview;
@@ -184,19 +192,10 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_ASSET_PATHS = "";
-				DEVELOPMENT_TEAM = "";
+				DEVELOPMENT_TEAM = 3N67L2WV4F;
 				ENABLE_PREVIEWS = YES;
-				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_CFBundleDisplayName = Megrum;
-				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.social-networking";
-				INFOPLIST_KEY_MegrumAuthEmailRedirectURL = "$(MEGRUM_AUTH_EMAIL_REDIRECT_URL)";
-				INFOPLIST_KEY_MegrumSupabasePublishableKey = "$(MEGRUM_SUPABASE_PUBLISHABLE_KEY)";
-				INFOPLIST_KEY_MegrumSupabaseURL = "$(MEGRUM_SUPABASE_URL)";
-				INFOPLIST_KEY_MegrumSupabaseViewerID = "$(MEGRUM_SUPABASE_VIEWER_ID)";
-				INFOPLIST_KEY_NSCameraUsageDescription = "交換完了時の証跡写真を撮影するためにカメラを使用します。";
-				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "現在地を使って近くのグルームと掲示板を表示します。";
-				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
-				INFOPLIST_KEY_UIStatusBarStyle = UIStatusBarStyleDefault;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = App/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				MARKETING_VERSION = 0.1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = tokyo.megrum.native.preview;

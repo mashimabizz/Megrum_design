@@ -32,8 +32,15 @@ final class MegrumLocationState: NSObject, ObservableObject {
         locationErrorMessage = nil
         authorizationStatus = manager.authorizationStatus
 
+        guard CLLocationManager.locationServicesEnabled() else {
+            isRequestingLocation = false
+            locationErrorMessage = "位置情報サービスがオフです"
+            return
+        }
+
         switch authorizationStatus {
         case .notDetermined:
+            isRequestingLocation = true
             #if os(iOS)
             manager.requestWhenInUseAuthorization()
             #else
@@ -48,8 +55,10 @@ final class MegrumLocationState: NSObject, ObservableObject {
             manager.requestLocation()
         #endif
         case .denied, .restricted:
-            locationErrorMessage = "位置情報が許可されていません"
+            isRequestingLocation = false
+            locationErrorMessage = Self.message(for: authorizationStatus)
         @unknown default:
+            isRequestingLocation = false
             locationErrorMessage = "位置情報を取得できません"
         }
     }
@@ -62,6 +71,9 @@ extension MegrumLocationState: CLLocationManagerDelegate {
             authorizationStatus = status
             if isAuthorized {
                 requestCurrentLocation()
+            } else if status != .notDetermined {
+                isRequestingLocation = false
+                locationErrorMessage = Self.message(for: status)
             }
         }
     }
@@ -84,7 +96,12 @@ extension MegrumLocationState: CLLocationManagerDelegate {
     nonisolated func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
         Task { @MainActor in
             isRequestingLocation = false
-            locationErrorMessage = "位置情報を取得できません"
+            if let error = error as? CLError, error.code == .denied {
+                authorizationStatus = .denied
+                locationErrorMessage = Self.message(for: .denied)
+            } else {
+                locationErrorMessage = "位置情報を取得できません"
+            }
         }
     }
 }
@@ -96,5 +113,16 @@ private extension MegrumLocationState {
         #else
         authorizationStatus == .authorizedAlways
         #endif
+    }
+
+    static func message(for status: CLAuthorizationStatus) -> String {
+        switch status {
+        case .denied:
+            "位置情報が許可されていません"
+        case .restricted:
+            "この端末では位置情報を利用できません"
+        default:
+            "位置情報を取得できません"
+        }
     }
 }

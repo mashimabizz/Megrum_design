@@ -1,6 +1,11 @@
 import Foundation
 import MegrumCore
 
+public enum SupabaseScheduleClientError: Error, Equatable, Sendable {
+    case invalidInput
+    case malformedResponse
+}
+
 public final class SupabaseScheduleClient: @unchecked Sendable {
     private let client: SupabaseRESTClient
     private let dateFormatter: ISO8601DateFormatter
@@ -32,6 +37,21 @@ public final class SupabaseScheduleClient: @unchecked Sendable {
         return rows.compactMap(\.schedule)
     }
 
+    public func createSchedule(userID: UUID, input: PersonalScheduleCreateInput) async throws -> PersonalSchedule {
+        guard input.isValid else {
+            throw SupabaseScheduleClientError.invalidInput
+        }
+        let rows: [ScheduleRow] = try await client.insertRows(
+            into: "schedules",
+            values: [ScheduleCreatePayload(userID: userID, input: input, dateFormatter: dateFormatter)],
+            select: ScheduleRow.select
+        )
+        guard let schedule = rows.first?.schedule else {
+            throw SupabaseScheduleClientError.malformedResponse
+        }
+        return schedule
+    }
+
     public func makeLoadSchedulesRequest(
         userIDs: [UUID],
         startAt: Date,
@@ -42,6 +62,17 @@ public final class SupabaseScheduleClient: @unchecked Sendable {
             path: "/rest/v1/schedules",
             queryItems: [URLQueryItem(name: "select", value: ScheduleRow.select)]
                 + loadScheduleQueryItems(userIDs: userIDs, startAt: startAt, endAt: endAt, limit: limit)
+        )
+    }
+
+    public func makeCreateScheduleRequest(userID: UUID, input: PersonalScheduleCreateInput) throws -> URLRequest {
+        guard input.isValid else {
+            throw SupabaseScheduleClientError.invalidInput
+        }
+        return try client.makeInsertRequest(
+            into: "schedules",
+            values: [ScheduleCreatePayload(userID: userID, input: input, dateFormatter: dateFormatter)],
+            select: ScheduleRow.select
         )
     }
 
@@ -65,6 +96,26 @@ public final class SupabaseScheduleClient: @unchecked Sendable {
         let formatter = ISO8601DateFormatter()
         formatter.formatOptions = [.withInternetDateTime]
         return formatter
+    }
+}
+
+private struct ScheduleCreatePayload: Encodable, Sendable {
+    var userId: UUID
+    var title: String
+    var placeName: String?
+    var startAt: String
+    var endAt: String
+    var allDay: Bool
+    var note: String?
+
+    init(userID: UUID, input: PersonalScheduleCreateInput, dateFormatter: ISO8601DateFormatter) {
+        self.userId = userID
+        self.title = input.normalizedTitle
+        self.placeName = input.normalizedPlaceName
+        self.startAt = dateFormatter.string(from: input.startAt)
+        self.endAt = dateFormatter.string(from: input.endAt)
+        self.allDay = input.allDay
+        self.note = input.normalizedNote
     }
 }
 

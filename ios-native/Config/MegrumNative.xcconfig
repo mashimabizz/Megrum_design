@@ -5,6 +5,7 @@
 MEGRUM_SUPABASE_URL =
 MEGRUM_SUPABASE_PUBLISHABLE_KEY =
 MEGRUM_SUPABASE_VIEWER_ID =
+MEGRUM_URL_SCHEME = megrum-preview
 MEGRUM_AUTH_EMAIL_REDIRECT_URL = https:/$()/megrum.jp/auth/callback?next=mobile&scheme=megrum-preview
 
 #include? "MegrumNative.local.xcconfig"

@@ -117,7 +117,7 @@ public struct MegrumRootView: View {
         }
         .sheet(isPresented: $showsSettings) {
             NavigationStack {
-                SettingsScreen(
+                AppDrawerScreen(
                     appState: appState,
                     onOpenNotificationDestination: { tab in
                         selectedTab = tab

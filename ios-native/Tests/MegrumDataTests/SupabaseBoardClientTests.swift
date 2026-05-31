@@ -49,6 +49,8 @@ final class SupabaseBoardClientTests: XCTestCase {
             BoardReplyCreateInput(
                 threadID: threadID,
                 body: " 了解です ",
+                latitude: 35.681236,
+                longitude: 139.767125,
                 prefecture: "東京都",
                 scope: .nearby3km
             )
@@ -58,6 +60,8 @@ final class SupabaseBoardClientTests: XCTestCase {
 
         XCTAssertEqual(appendRequest.url?.absoluteString, "https://example.supabase.co/rest/v1/rpc/append_meguri_board_reply_for_viewer")
         XCTAssertEqual(appendJSON["p_body"] as? String, "了解です")
+        XCTAssertEqual(appendJSON["p_viewer_lat"] as? Double, 35.681236)
+        XCTAssertEqual(appendJSON["p_viewer_lng"] as? Double, 139.767125)
         XCTAssertTrue(appendJSON["p_parent_reply_id"] is NSNull)
         XCTAssertEqual((appendJSON["p_image_paths"] as? [String]) ?? ["unexpected"], [])
     }

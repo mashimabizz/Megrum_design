@@ -45,7 +45,7 @@ struct PublicUserProfileScreen: View {
             VStack(alignment: .leading, spacing: 20) {
                 if let publicProfile {
                     ProfileHero(publicProfile: publicProfile)
-                    ProfileStats(publicProfile: publicProfile, evaluations: evaluations)
+                    ProfileStats(appState: appState, userID: userID, publicProfile: publicProfile)
                     PublicProfileExchangeSection(
                         selectedTab: $selectedExchangeTab,
                         tradeGoods: tradeGoods,
@@ -169,16 +169,17 @@ private struct ProfileHero: View {
 }
 
 private struct ProfileStats: View {
+    @ObservedObject var appState: MegrumAppState
+    var userID: UUID
     var publicProfile: PublicUserProfile
-    var evaluations: [UserEvaluation]
 
     var body: some View {
         HStack(spacing: 12) {
             NavigationLink {
                 EvaluationListScreen(
-                    profile: publicProfile.profile,
-                    evaluations: evaluations,
-                    isLoading: false
+                    appState: appState,
+                    userID: userID,
+                    profile: publicProfile.profile
                 )
             } label: {
                 ProfileStatCard(
@@ -189,6 +190,8 @@ private struct ProfileStats: View {
                 )
             }
             .buttonStyle(.plain)
+            .accessibilityLabel("評価一覧を開く")
+            .accessibilityValue("\(publicProfile.evaluationCount)件")
 
             ProfileStatCard(
                 title: "取引",
@@ -398,30 +401,78 @@ private struct ProfileStatCard: View {
     }
 }
 
-private struct EvaluationListScreen: View {
-    var profile: UserProfile
-    var evaluations: [UserEvaluation]
+struct PublicProfileEvaluationListState: Equatable {
+    var evaluationCount: Int
     var isLoading: Bool
+
+    init(evaluations: [UserEvaluation], isLoading: Bool) {
+        self.evaluationCount = evaluations.count
+        self.isLoading = isLoading
+    }
+
+    var showsLoading: Bool {
+        isLoading && evaluationCount == 0
+    }
+
+    var showsEmpty: Bool {
+        !isLoading && evaluationCount == 0
+    }
+}
+
+private struct EvaluationListScreen: View {
+    @ObservedObject var appState: MegrumAppState
+    var userID: UUID
+    var profile: UserProfile
+
+    private var evaluations: [UserEvaluation] {
+        appState.userEvaluationsByUserID[userID] ?? []
+    }
+
+    private var listState: PublicProfileEvaluationListState {
+        PublicProfileEvaluationListState(
+            evaluations: evaluations,
+            isLoading: appState.loadingEvaluationsUserID == userID
+        )
+    }
 
     var body: some View {
         List {
-            if evaluations.isEmpty && !isLoading {
-                Text("まだ評価はありません")
-                    .font(.system(size: 15, weight: .bold, design: .rounded))
-                    .foregroundStyle(MegrumTheme.muted)
-                    .listRowBackground(Color.clear)
+            if listState.showsLoading {
+                HStack(spacing: 10) {
+                    ProgressView()
+                    Text("評価を読み込んでいます")
+                        .font(.system(size: 15, weight: .bold, design: .rounded))
+                        .foregroundStyle(MegrumTheme.muted)
+                }
+                .frame(maxWidth: .infinity, alignment: .center)
+                .padding(.vertical, 28)
+                .listRowBackground(Color.clear)
+            } else if listState.showsEmpty {
+                ContentUnavailableView(
+                    "まだ評価はありません",
+                    systemImage: "star",
+                    description: Text("取引完了後の評価がここに表示されます")
+                )
+                .listRowBackground(Color.clear)
             } else {
                 ForEach(evaluations) { evaluation in
                     EvaluationRow(evaluation: evaluation)
-                        .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
-                        .listRowBackground(Color.clear)
                 }
             }
         }
+        .listStyle(.plain)
         .scrollContentBackground(.hidden)
         .background(MegrumTheme.canvas.ignoresSafeArea())
         .navigationTitle("\(profile.displayName)の評価")
         .megrumInlineNavigationTitle()
+        .task(id: userID) {
+            if evaluations.isEmpty {
+                await appState.loadUserEvaluations(userID: userID)
+            }
+        }
+        .refreshable {
+            await appState.loadUserEvaluations(userID: userID)
+        }
     }
 }
 
@@ -462,12 +513,7 @@ private struct EvaluationRow: View {
                     .lineSpacing(3)
             }
         }
-        .padding(16)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: 22, style: .continuous)
-                .strokeBorder(.white.opacity(0.56), lineWidth: 1)
-        }
+        .padding(.vertical, 8)
     }
 
     private static let dateFormatter: DateFormatter = {

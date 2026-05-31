@@ -28,6 +28,9 @@ public struct AuthScreen: View {
     @State private var email = ""
     @State private var password = ""
     @State private var handle = ""
+    @State private var isShowingPasswordResetSheet = false
+    @State private var passwordResetEmail = ""
+    @State private var hasSubmittedPasswordReset = false
     @State private var appleSignInNonce: String?
     @State private var appleSignInError: String?
     @FocusState private var focusedField: Field?
@@ -51,6 +54,15 @@ public struct AuthScreen: View {
             }
             .background(MegrumTheme.canvas.ignoresSafeArea())
             .scrollDismissesKeyboard(.interactively)
+        }
+        .sheet(isPresented: $isShowingPasswordResetSheet) {
+            PasswordResetSheet(
+                email: $passwordResetEmail,
+                isSending: authState.isLoading,
+                errorMessage: hasSubmittedPasswordReset ? authState.errorMessage : nil
+            ) {
+                await sendPasswordReset()
+            }
         }
     }
 
@@ -167,6 +179,8 @@ public struct AuthScreen: View {
                 errorLabel(errorMessage)
             } else if let appleSignInError {
                 errorLabel(appleSignInError)
+            } else if let passwordResetMessage = authState.passwordResetMessage {
+                successLabel(passwordResetMessage)
             }
 
             Button {
@@ -188,6 +202,16 @@ public struct AuthScreen: View {
             .tint(MegrumTheme.lavender)
             .disabled(authState.isLoading || !canSubmit)
 
+            if mode == .signIn {
+                Button("パスワードを忘れた場合") {
+                    openPasswordResetSheet()
+                }
+                .buttonStyle(.borderless)
+                .font(.system(size: 14, weight: .bold, design: .rounded))
+                .foregroundStyle(MegrumTheme.lavender)
+                .disabled(authState.isLoading)
+            }
+
             appleSignInButton
 
             if !authState.isConfigured {
@@ -208,6 +232,15 @@ public struct AuthScreen: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(14)
             .background(Color(red: 0.851, green: 0.51, blue: 0.42).opacity(0.1), in: RoundedRectangle(cornerRadius: 16))
+    }
+
+    private func successLabel(_ message: String) -> some View {
+        Text(message)
+            .font(.system(size: 13, weight: .bold, design: .rounded))
+            .foregroundStyle(MegrumTheme.ok)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(14)
+            .background(MegrumTheme.ok.opacity(0.12), in: RoundedRectangle(cornerRadius: 16))
     }
 
     @ViewBuilder
@@ -252,6 +285,25 @@ public struct AuthScreen: View {
         return hasEmail && password.count >= 8
     }
 
+    private func openPasswordResetSheet() {
+        passwordResetEmail = email
+        hasSubmittedPasswordReset = false
+        appleSignInError = nil
+        focusedField = nil
+        isShowingPasswordResetSheet = true
+    }
+
+    private func sendPasswordReset() async {
+        hasSubmittedPasswordReset = true
+        appleSignInError = nil
+        let sent = await authState.sendPasswordReset(email: passwordResetEmail)
+        guard sent else {
+            return
+        }
+        email = passwordResetEmail.trimmingCharacters(in: .whitespacesAndNewlines)
+        isShowingPasswordResetSheet = false
+    }
+
     private func submit() async {
         focusedField = nil
         appleSignInError = nil
@@ -267,6 +319,98 @@ public struct AuthScreen: View {
         case email
         case password
         case handle
+    }
+}
+
+private struct PasswordResetSheet: View {
+    @Binding var email: String
+    var isSending: Bool
+    var errorMessage: String?
+    var onSend: () async -> Void
+
+    @Environment(\.dismiss) private var dismiss
+    @FocusState private var isEmailFocused: Bool
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section {
+                    emailField
+                }
+
+                if let errorMessage {
+                    Section {
+                        Text(errorMessage)
+                            .font(.system(size: 13, weight: .bold, design: .rounded))
+                            .foregroundStyle(Color(red: 0.851, green: 0.51, blue: 0.42))
+                    }
+                }
+            }
+            .navigationTitle("パスワード再設定")
+            .megrumInlineNavigationTitle()
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("キャンセル") {
+                        dismiss()
+                    }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button {
+                        Task {
+                            await onSend()
+                        }
+                    } label: {
+                        if isSending {
+                            ProgressView()
+                                .controlSize(.small)
+                        } else {
+                            Text("送信")
+                        }
+                    }
+                    .disabled(isSending || !canSend)
+                }
+            }
+            .onAppear {
+                if email.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    isEmailFocused = true
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var emailField: some View {
+        #if os(iOS)
+        TextField("メールアドレス", text: $email)
+            .textInputAutocapitalization(.never)
+            .keyboardType(.emailAddress)
+            .textContentType(.emailAddress)
+            .focused($isEmailFocused)
+            .submitLabel(.send)
+            .onSubmit {
+                guard canSend else {
+                    return
+                }
+                Task {
+                    await onSend()
+                }
+            }
+        #else
+        TextField("メールアドレス", text: $email)
+            .focused($isEmailFocused)
+            .onSubmit {
+                guard canSend else {
+                    return
+                }
+                Task {
+                    await onSend()
+                }
+            }
+        #endif
+    }
+
+    private var canSend: Bool {
+        email.trimmingCharacters(in: .whitespacesAndNewlines).contains("@")
     }
 }
 

@@ -36,7 +36,7 @@ public final class SupabaseGoodsInventoryClient: @unchecked Sendable {
             groupID: input.groupID,
             goodsTypeID: input.goodsTypeID,
             title: input.title,
-            quantity: input.quantity
+            quantity: max(1, input.quantity)
         )
     }
 
@@ -136,8 +136,12 @@ public final class SupabaseGoodsInventoryClient: @unchecked Sendable {
     private func goodsTypeQueryItems(limit: Int) -> [URLQueryItem] {
         [
             URLQueryItem(name: "order", value: "display_order.asc,name.asc"),
-            URLQueryItem(name: "limit", value: "\(limit)")
+            URLQueryItem(name: "limit", value: "\(boundedLimit(limit))")
         ]
+    }
+
+    private func boundedLimit(_ limit: Int, upperBound: Int = 100) -> Int {
+        max(1, min(limit, upperBound))
     }
 
     private func searchQueryItems(viewerID: UUID, input: GoodsSearchInput) -> [URLQueryItem] {
@@ -227,7 +231,7 @@ private struct GoodsInventoryRow: Decodable, Sendable {
             title: title,
             imageURL: photoUrls?.compactMap(URL.init(string:)).first,
             tags: [],
-            quantity: quantity ?? 1
+            quantity: max(1, quantity ?? 1)
         )
     }
 }
@@ -250,12 +254,12 @@ private struct GoodsEntryPayload: Encodable, Sendable {
         self.kind = input.kind.inventoryKind
         self.groupId = input.groupID
         self.goodsTypeId = input.goodsTypeID
-        self.title = input.title
+        self.title = input.title.trimmingCharacters(in: .whitespacesAndNewlines)
         self.condition = input.kind == .inventory ? "good" : nil
         self.priority = input.kind == .wish ? "second" : nil
         self.flexLevel = input.kind == .wish ? "normal" : nil
         self.exchangeType = "any"
-        self.quantity = input.quantity
+        self.quantity = max(1, min(input.quantity, 999))
         self.photoUrls = []
     }
 }

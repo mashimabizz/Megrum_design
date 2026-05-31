@@ -86,6 +86,7 @@ public protocol MegrumRepository: Sendable {
     func loadMessages(proposalID: UUID, limit: Int) async throws -> [TradeMessage]
     func sendMessage(_ input: TradeMessageCreateInput) async throws -> TradeMessage
     func loadSchedules(for proposal: TradeProposal, startAt: Date, endAt: Date) async throws -> [PersonalSchedule]
+    func createSchedule(_ input: PersonalScheduleCreateInput) async throws -> PersonalSchedule
     func loadGrooms(latitude: Double?, longitude: Double?, radiusMeters: Int) async throws -> [GroomPost]
     func createGroomPost(_ input: GroomPostCreateInput) async throws -> GroomPost
     func markGroomViewed(postID: UUID) async throws
@@ -208,6 +209,10 @@ public extension MegrumRepository {
 
     func loadSchedules(for proposal: TradeProposal, startAt: Date, endAt: Date) async throws -> [PersonalSchedule] {
         []
+    }
+
+    func createSchedule(_ input: PersonalScheduleCreateInput) async throws -> PersonalSchedule {
+        throw MegrumRepositoryError.unsupportedMutation
     }
 
     func loadGrooms(latitude: Double?, longitude: Double?, radiusMeters: Int) async throws -> [GroomPost] {
@@ -638,6 +643,22 @@ public struct PreviewMegrumRepository: MegrumRepository {
             .sorted { $0.startAt < $1.startAt }
     }
 
+    public func createSchedule(_ input: PersonalScheduleCreateInput) async throws -> PersonalSchedule {
+        guard input.isValid else {
+            throw MegrumRepositoryError.unsupportedMutation
+        }
+        return PersonalSchedule(
+            id: UUID(),
+            userID: NativePreviewData.viewerID,
+            title: input.normalizedTitle,
+            placeName: input.normalizedPlaceName,
+            startAt: input.startAt,
+            endAt: input.endAt,
+            allDay: input.allDay,
+            note: input.normalizedNote
+        )
+    }
+
     public func loadGrooms(latitude: Double?, longitude: Double?, radiusMeters: Int) async throws -> [GroomPost] {
         NativePreviewData.grooms
     }
@@ -868,6 +889,7 @@ public final class MegrumAppState: ObservableObject {
     @Published public private(set) var isCreatingBoardThread = false
     @Published public private(set) var loadingMessagesProposalID: UUID?
     @Published public private(set) var loadingSchedulesProposalID: UUID?
+    @Published public private(set) var isCreatingSchedule = false
     @Published public private(set) var sendingMessageProposalID: UUID?
     @Published public private(set) var sendingGroomReplyPostID: UUID?
     @Published public private(set) var sendingMeguriMessageRecipientID: UUID?
@@ -1207,6 +1229,8 @@ public final class MegrumAppState: ObservableObject {
     public func sendBoardReply(
         threadID: UUID,
         body: String,
+        latitude: Double? = nil,
+        longitude: Double? = nil,
         prefecture: String? = nil,
         scope: BoardThread.Audience = .nearby3km
     ) async -> Bool {
@@ -1226,6 +1250,8 @@ public final class MegrumAppState: ObservableObject {
                 BoardReplyCreateInput(
                     threadID: threadID,
                     body: trimmed,
+                    latitude: latitude,
+                    longitude: longitude,
                     prefecture: selectedPrefecture,
                     scope: scope
                 )
@@ -1852,6 +1878,32 @@ public final class MegrumAppState: ObservableObject {
             errorMessage = "スケジュールを読み込めませんでした"
         }
         loadingSchedulesProposalID = nil
+    }
+
+    public func createSchedule(_ input: PersonalScheduleCreateInput, for proposal: TradeProposal? = nil) async -> Bool {
+        guard input.isValid else {
+            errorMessage = "予定名と時間を確認してください"
+            return false
+        }
+        guard !isCreatingSchedule else {
+            return false
+        }
+
+        isCreatingSchedule = true
+        errorMessage = nil
+        do {
+            let schedule = try await repository.createSchedule(input)
+            if let proposal {
+                schedulesByProposalID[proposal.id, default: []].append(schedule)
+                schedulesByProposalID[proposal.id]?.sort { $0.startAt < $1.startAt }
+            }
+            isCreatingSchedule = false
+            return true
+        } catch {
+            errorMessage = "スケジュールを保存できませんでした"
+            isCreatingSchedule = false
+            return false
+        }
     }
 
     private func replaceProposal(_ proposal: TradeProposal) {

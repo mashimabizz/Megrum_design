@@ -22,12 +22,17 @@ public protocol MegrumAuthRepository: Sendable {
     func signIn(email: String, password: String) async throws -> AuthSession
     func signInWithApple(idToken: String, nonce: String, fullName: String?) async throws -> AuthSession
     func signUp(_ input: AuthSignUpInput) async throws -> AuthSession
+    func sendPasswordReset(email: String) async throws
     func signOut(session: AuthSession) async throws
     func restoreSession(fromRedirectURL url: URL) async throws -> AuthSession?
 }
 
 public extension MegrumAuthRepository {
     func signInWithApple(idToken: String, nonce: String, fullName: String?) async throws -> AuthSession {
+        throw MegrumRepositoryError.unsupportedMutation
+    }
+
+    func sendPasswordReset(email: String) async throws {
         throw MegrumRepositoryError.unsupportedMutation
     }
 
@@ -52,6 +57,8 @@ public struct PreviewMegrumAuthRepository: MegrumAuthRepository {
     public func signUp(_ input: AuthSignUpInput) async throws -> AuthSession {
         Self.previewSession(email: input.email)
     }
+
+    public func sendPasswordReset(email: String) async throws {}
 
     public func signOut(session: AuthSession) async throws {}
 
@@ -115,6 +122,10 @@ public struct SupabaseMegrumAuthRepository: MegrumAuthRepository {
         return session
     }
 
+    public func sendPasswordReset(email: String) async throws {
+        try await client.sendPasswordReset(email: email, emailRedirectTo: emailRedirectTo)
+    }
+
     public func signOut(session: AuthSession) async throws {
         try await client.signOut(accessToken: session.accessToken)
     }
@@ -129,6 +140,7 @@ public final class MegrumAuthState: ObservableObject {
     @Published public private(set) var session: AuthSession?
     @Published public private(set) var isLoading = false
     @Published public private(set) var errorMessage: String?
+    @Published public private(set) var passwordResetMessage: String?
 
     public let isConfigured: Bool
     private let repository: any MegrumAuthRepository
@@ -156,6 +168,7 @@ public final class MegrumAuthState: ObservableObject {
         let trimmedEmail = email.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmedEmail.isEmpty, !password.isEmpty else {
             errorMessage = "メールアドレスとパスワードを入力してください"
+            passwordResetMessage = nil
             return
         }
 
@@ -172,6 +185,7 @@ public final class MegrumAuthState: ObservableObject {
         let trimmedNonce = nonce.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmedIDToken.isEmpty, !trimmedNonce.isEmpty else {
             errorMessage = "Appleログイン情報を取得できませんでした。もう一度お試しください"
+            passwordResetMessage = nil
             return
         }
 
@@ -191,6 +205,7 @@ public final class MegrumAuthState: ObservableObject {
         let trimmedEmail = email.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmedEmail.isEmpty, password.count >= 8 else {
             errorMessage = "メールアドレスと8文字以上のパスワードを入力してください"
+            passwordResetMessage = nil
             return
         }
 
@@ -205,9 +220,38 @@ public final class MegrumAuthState: ObservableObject {
         }
     }
 
+    @discardableResult
+    public func sendPasswordReset(email: String) async -> Bool {
+        guard !isLoading else {
+            return false
+        }
+        let trimmedEmail = email.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard trimmedEmail.contains("@") else {
+            errorMessage = "有効なメールアドレスを入力してください"
+            passwordResetMessage = nil
+            return false
+        }
+
+        isLoading = true
+        errorMessage = nil
+        passwordResetMessage = nil
+
+        do {
+            try await repository.sendPasswordReset(email: trimmedEmail)
+            passwordResetMessage = "再設定メールを送信しました。受信メールを確認してください"
+            isLoading = false
+            return true
+        } catch {
+            errorMessage = normalizedMessage(from: error)
+            isLoading = false
+            return false
+        }
+    }
+
     public func enterPreview() {
         session = PreviewMegrumAuthRepository.previewSession()
         errorMessage = nil
+        passwordResetMessage = nil
     }
 
     @discardableResult
@@ -218,6 +262,7 @@ public final class MegrumAuthState: ObservableObject {
 
         isLoading = true
         errorMessage = nil
+        passwordResetMessage = nil
         defer {
             isLoading = false
         }
@@ -241,6 +286,7 @@ public final class MegrumAuthState: ObservableObject {
         }
         isLoading = true
         errorMessage = nil
+        passwordResetMessage = nil
 
         do {
             try await repository.signOut(session: session)
@@ -256,6 +302,7 @@ public final class MegrumAuthState: ObservableObject {
     private func runAuthAction(_ action: () async throws -> AuthSession) async {
         isLoading = true
         errorMessage = nil
+        passwordResetMessage = nil
 
         do {
             let nextSession = try await action()
@@ -275,6 +322,10 @@ public final class MegrumAuthState: ObservableObject {
             }
             if message.contains("Email not confirmed") {
                 return "メール認証が完了していません。受信メールを確認してください"
+            }
+            if message.localizedCaseInsensitiveContains("rate limit")
+                || message.localizedCaseInsensitiveContains("security purposes") {
+                return "送信間隔が短すぎます。しばらく待ってから再度お試しください"
             }
             return message
         }
