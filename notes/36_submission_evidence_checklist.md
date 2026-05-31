@@ -133,6 +133,7 @@ Evidence folder:
 | 該当画面 | スクショ又は画面名 |
 | Appleへの返信 | 送信前の下書きと送信後の本文 |
 | 修正内容 | コード変更、文言変更、メタデータ変更を分ける |
+| 対応判断 | 同じbuildで直す/new build/却下item削除/appeal候補を分ける |
 | 再提出日時 | App Store Connectの状態と一緒に保存 |
 
 ---
@@ -182,5 +183,6 @@ Evidence folder:
 - 提出コントロールボード: `notes/39_release_command_center.md`
 - App Store Connect転記用シート: `notes/40_app_store_connect_copy_paste_sheet.md`
 - App Review指摘対応テンプレート: `notes/41_app_review_response_templates.md`
+- App Reviewリジェクト/追加情報要求Runbook: `notes/69_app_review_rejection_triage_runbook.md`
 - P0スモークテスト台本: `notes/42_p0_smoke_test_script.md`
 - リリース証跡フォルダ索引: `notes/64_release_evidence_folder_index.md`

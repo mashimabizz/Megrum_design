@@ -4,6 +4,74 @@
 
 ---
 
+## イテレーション391：App Review指摘トリアージを追加
+
+### 背景・問題意識
+
+App Review提出後にリジェクト、Metadata Rejected、Unresolved Issues、追加情報要求が来た場合、返信テンプレートだけでは、同じbuildで直せるのか、新buildが必要なのか、却下itemを削除するのか、appealすべきなのかの判断がぶれやすい。誤って不正確な返信や不要なコード変更を行うと、審査遅延や開発セッションとの混線につながるため、指摘受領後の初動Runbookを追加した。
+
+### 変更内容
+
+#### `notes/69_app_review_rejection_triage_runbook.md`
+- App Reviewリジェクト、Metadata Rejected、Unresolved Issues、追加情報要求、TestFlight App Review指摘を受けた時の初動15分、分類表、判断ツリー、返信前チェック、appeal判断を追加した。
+- 同じbuildで直せる可能性が高いものと、新buildが必要になりやすいものを分けた。
+- Apple本文の全文保存、Guideline分類、item削除、Remove submission、appeal候補、証跡保存の扱いを整理した。
+- Apple公式ヘルプのReply to App Review messages、Manage a submission with unresolved issues、Remove a submission from review、Submit an app、App Review Guidelinesへの参照を追加した。
+
+#### `notes/41_app_review_response_templates.md`, `notes/51_post_submission_release_day_runbook.md`
+- 返信文テンプレートを使う前に `notes/69` で分類と判断を行う導線を追加した。
+
+#### `notes/39_release_command_center.md`, `notes/30_owner_release_action_sheet.md`, `notes/50_release_go_no_go_decision_matrix.md`, `notes/57_legal_release_branch_integration_plan.md`
+- App Review指摘トリアージへの導線、Go / No-Go Gate、法務docsのstage禁止範囲を追加した。
+
+#### `notes/36_submission_evidence_checklist.md`, `notes/64_release_evidence_folder_index.md`
+- リジェクト時証跡に、同じbuild/new build/却下item削除/appeal判断を残す項目を追加した。
+
+#### `notes/22_release_triage_tracker.csv`
+- RL-067としてApp Reviewリジェクト・追加情報要求トリアージを追加した。
+
+### 影響範囲
+
+- App Review / TestFlight App Review指摘対応
+- Resolution Center返信
+- Metadata Rejected / Rejected / Unresolved Issues
+- 再提出、取り下げ、appeal判断
+- 開発セッションへのnew build依頼
+- 提出証跡、リリース証跡
+- コード、App Store Connect設定、公開URL、法務原典docxは変更していない。
+
+### 確認方法
+
+- `rg -n "RL-067|notes/69|Unresolved Issues|appeal|new build|App Reviewリジェクト" notes/69_app_review_rejection_triage_runbook.md notes/39_release_command_center.md notes/50_release_go_no_go_decision_matrix.md notes/22_release_triage_tracker.csv`
+- `python3 - <<'PY' ...` による `notes/22_release_triage_tracker.csv` のCSV parse確認
+- 旧規約用語・旧主体表現チェック（旧提案/旧メッセージ/旧投稿関連、サービス主体表現）
+- `git diff --check -- notes`
+
+### セルフレビュー結果
+
+- ✅ コード、App Store Connect設定、公開URL、法務原典docxは変更していない。
+- ✅ 返信文そのものは `notes/41` に残し、`notes/69` は初動判断と証跡保存に絞った。
+- ✅ new buildが必要なものは開発セッションへ切り出し、`notes/65` で新しいRelease Candidateを受け取る流れにした。
+- ✅ Apple公式ヘルプとApp Review Guidelinesを参照した。
+- ✅ 状態名の追加/改名はなく、`notes/09_state_machines.md` 更新は不要。
+- ✅ 新用語は追加していないため、`notes/10_glossary.md` 更新は不要。
+- ✅ DBスキーマ変更はなく、`notes/05_data_model.md` 更新は不要。
+
+### 関連ファイル
+
+- `notes/69_app_review_rejection_triage_runbook.md`
+- `notes/41_app_review_response_templates.md`
+- `notes/51_post_submission_release_day_runbook.md`
+- `notes/39_release_command_center.md`
+- `notes/30_owner_release_action_sheet.md`
+- `notes/50_release_go_no_go_decision_matrix.md`
+- `notes/57_legal_release_branch_integration_plan.md`
+- `notes/36_submission_evidence_checklist.md`
+- `notes/64_release_evidence_folder_index.md`
+- `notes/22_release_triage_tracker.csv`
+
+---
+
 ## イテレーション390：配信地域・EU DSA・IAP Availabilityを追加
 
 ### 背景・問題意識

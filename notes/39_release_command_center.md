@@ -74,6 +74,7 @@
 | 法務レビュー後公開文面最終化 | `notes/66_legal_review_publication_runbook.md` |
 | サポート受信トリアージ | `notes/67_support_inbox_triage_runbook.md` |
 | 配信地域・EU DSA・IAP Availability | `notes/68_app_store_territory_dsa_iap_availability.md` |
+| App Reviewリジェクト/追加情報要求 | `notes/69_app_review_rejection_triage_runbook.md` |
 | オーナー作業表 | `notes/30_owner_release_action_sheet.md` |
 | App Store Connect入力 | `notes/31_app_store_connect_metadata_worksheet.md` |
 | TestFlight / Submit手順 | `notes/32_testflight_review_submission_runbook.md` |
@@ -122,7 +123,7 @@
 ### Phase C: リジェクト時
 
 1. Resolution Center本文を保存する。
-2. 指摘Guidelineを分類する。
+2. `notes/69` で指摘Guideline、対象item、同じbuildで直す/new buildにする/却下itemを削除する/appealする判断を分類する。
 3. メタデータ修正で済むか、コード修正が必要か分ける。
 4. `notes/41` で返信案を作る。
 5. 修正後の証跡を追加する。
@@ -185,6 +186,7 @@
 | 法務レビュー後公開文面最終化 | RL-064 | `notes/66` |
 | サポート受信トリアージ | RL-065 | `notes/67` |
 | 配信地域・EU DSA・IAP Availability | RL-066 | `notes/68` |
+| App Reviewリジェクト/追加情報要求 | RL-067 | `notes/69` |
 
 ---
 
@@ -227,6 +229,7 @@
 | 法務レビュー後公開文面最終化Runbook | `notes/66_legal_review_publication_runbook.md` |
 | サポート受信トリアージRunbook | `notes/67_support_inbox_triage_runbook.md` |
 | App Store配信地域・EU DSA・IAP Availability | `notes/68_app_store_territory_dsa_iap_availability.md` |
+| App Reviewリジェクト/追加情報要求Runbook | `notes/69_app_review_rejection_triage_runbook.md` |
 | App Store提出素材 | `notes/24_app_store_submission_pack.md` |
 | App Store Connect入力表 | `notes/31_app_store_connect_metadata_worksheet.md` |
 | TestFlight / Submit手順 | `notes/32_testflight_review_submission_runbook.md` |
@@ -238,6 +241,7 @@
 | TestFlight協力者案内 | `notes/38_testflight_tester_comms.md` |
 | App Store Connect転記用シート | `notes/40_app_store_connect_copy_paste_sheet.md` |
 | App Review指摘対応テンプレート | `notes/41_app_review_response_templates.md` |
+| App Reviewリジェクト/追加情報要求Runbook | `notes/69_app_review_rejection_triage_runbook.md` |
 | P0スモークテスト台本 | `notes/42_p0_smoke_test_script.md` |
 | App Review Guideline適合マトリクス | `notes/53_app_review_guideline_compliance_matrix.md` |
 | 提出前セキュリティ監査チェックリスト | `notes/54_prelaunch_security_audit_checklist.md` |

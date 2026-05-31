@@ -2,6 +2,7 @@
 
 > 目的：App Reviewで指摘が来たときに、慌てず分類・修正・返信・再提出できるようにする。
 > コード変更なし。Resolution Center返信の下書きとして使う。
+> 初動、同じbuildで直す/new buildにする/appealする判断は `notes/69_app_review_rejection_triage_runbook.md` を先に使う。
 
 最終更新: 2026-05-31
 ステータス: Draft v0.1（未提出）

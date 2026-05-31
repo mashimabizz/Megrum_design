@@ -240,6 +240,7 @@ secret実値や管理画面の認証情報は保存しない。
 | REV-003 | Appleへの返信下書き | md |
 | REV-004 | 送信後の返信控え | md |
 | REV-005 | 再提出時の変更点 | md |
+| REV-006 | 同じbuild/new build/却下item削除/appeal判断 | md |
 
 ### 5.12 `12_release_day/`
 
@@ -282,5 +283,6 @@ secret実値や管理画面の認証情報は保存しない。
 - TestFlight / App Review提出ランブック: `notes/32_testflight_review_submission_runbook.md`
 - P0スモークテスト台本: `notes/42_p0_smoke_test_script.md`
 - App Store提出後・公開初日ランブック: `notes/51_post_submission_release_day_runbook.md`
+- App Reviewリジェクト/追加情報要求Runbook: `notes/69_app_review_rejection_triage_runbook.md`
 - 提出前セキュリティ監査: `notes/54_prelaunch_security_audit_checklist.md`
 - リリース権限・運用アカウント: `notes/61_release_access_owner_registry.md`
