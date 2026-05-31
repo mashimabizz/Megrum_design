@@ -6,7 +6,7 @@ final class SupabaseAuthClientTests: XCTestCase {
         let client = SupabaseAuthClient(configuration: configuration)
 
         let request = try client.makePasswordSignInRequest(
-            email: "michi@example.com",
+            email: " michi@example.com ",
             password: "password123"
         )
 
@@ -85,6 +85,28 @@ final class SupabaseAuthClientTests: XCTestCase {
 
         let body = try XCTUnwrap(request.jsonBody)
         XCTAssertEqual(body["email"] as? String, "michi@example.com")
+    }
+
+    func testBuildsGoogleOAuthAuthorizeRequest() throws {
+        let client = SupabaseAuthClient(configuration: configuration)
+        let redirectURL = URL(string: "https://megrum.jp/auth/callback?next=mobile&scheme=megrum-preview")!
+
+        let request = try client.makeOAuthAuthorizeRequest(
+            provider: .google,
+            redirectTo: redirectURL,
+            scopes: [" email ", "profile", ""]
+        )
+
+        XCTAssertEqual(request.httpMethod, "GET")
+        XCTAssertEqual(request.value(forHTTPHeaderField: "Accept"), "text/html,application/xhtml+xml,application/json")
+
+        let components = try XCTUnwrap(URLComponents(url: try XCTUnwrap(request.url), resolvingAgainstBaseURL: false))
+        XCTAssertEqual(components.scheme, "https")
+        XCTAssertEqual(components.host, "example.supabase.co")
+        XCTAssertEqual(components.path, "/auth/v1/authorize")
+        XCTAssertEqual(components.queryItems?.first(where: { $0.name == "provider" })?.value, "google")
+        XCTAssertEqual(components.queryItems?.first(where: { $0.name == "redirect_to" })?.value, redirectURL.absoluteString)
+        XCTAssertEqual(components.queryItems?.first(where: { $0.name == "scopes" })?.value, "email profile")
     }
 
     func testBuildsSignOutRequestWithSessionBearer() throws {

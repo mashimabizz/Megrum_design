@@ -828,6 +828,16 @@ final class MegrumAppStateTests: XCTestCase {
         XCTAssertNil(state.errorMessage)
     }
 
+    func testAuthStateValidatesSignInEmail() async {
+        let state = MegrumAuthState(repository: StubAuthRepository())
+
+        await state.signIn(email: "michi", password: "password123")
+
+        XCTAssertNil(state.session)
+        XCTAssertFalse(state.isAuthenticated)
+        XCTAssertEqual(state.errorMessage, "有効なメールアドレスとパスワードを入力してください")
+    }
+
     func testAuthStateSignsInWithAppleThroughRepository() async {
         let state = MegrumAuthState(repository: AppleAuthRepository())
 
@@ -878,13 +888,36 @@ final class MegrumAppStateTests: XCTestCase {
         XCTAssertTrue(state.isAuthenticated)
     }
 
+    func testAuthStateTrimsSignUpInputThroughRepository() async {
+        let repository = SignUpRecordingAuthRepository()
+        let state = MegrumAuthState(repository: repository)
+
+        await state.signUp(email: " michi@example.com ", password: "password123", handle: " michi_1 ")
+
+        XCTAssertEqual(state.session?.user.email, "michi@example.com")
+        XCTAssertNil(state.errorMessage)
+
+        let inputs = await repository.inputsSnapshot()
+        XCTAssertEqual(inputs.first?.email, "michi@example.com")
+        XCTAssertEqual(inputs.first?.handle, "michi_1")
+    }
+
     func testAuthStateValidatesSignUpPasswordLength() async {
         let state = MegrumAuthState(repository: StubAuthRepository())
 
         await state.signUp(email: "michi@example.com", password: "short", handle: "michi1")
 
         XCTAssertNil(state.session)
-        XCTAssertEqual(state.errorMessage, "メールアドレスと8文字以上のパスワードを入力してください")
+        XCTAssertEqual(state.errorMessage, "パスワードは8文字以上で入力してください")
+    }
+
+    func testAuthStateValidatesSignUpHandle() async {
+        let state = MegrumAuthState(repository: StubAuthRepository())
+
+        await state.signUp(email: "michi@example.com", password: "password123", handle: "みち")
+
+        XCTAssertNil(state.session)
+        XCTAssertEqual(state.errorMessage, "ユーザーIDは3〜24文字の英数字と_で入力してください")
     }
 
     func testAuthStateValidatesPasswordResetEmail() async {
@@ -935,6 +968,33 @@ private struct StubAuthRepository: MegrumAuthRepository {
     }
 
     func signOut(session: AuthSession) async throws {}
+}
+
+private actor SignUpRecordingAuthRepository: MegrumAuthRepository {
+    private var inputs: [AuthSignUpInput] = []
+
+    nonisolated var isConfigured: Bool { true }
+
+    func signIn(email: String, password: String) async throws -> AuthSession {
+        throw MegrumRepositoryError.unsupportedMutation
+    }
+
+    func signUp(_ input: AuthSignUpInput) async throws -> AuthSession {
+        inputs.append(input)
+        return AuthSession(
+            accessToken: "signup_access_token",
+            user: AuthUser(
+                id: UUID(uuidString: "55555555-5555-5555-5555-555555555555")!,
+                email: input.email
+            )
+        )
+    }
+
+    func signOut(session: AuthSession) async throws {}
+
+    func inputsSnapshot() -> [AuthSignUpInput] {
+        inputs
+    }
 }
 
 private actor PasswordResetAuthRepository: MegrumAuthRepository {

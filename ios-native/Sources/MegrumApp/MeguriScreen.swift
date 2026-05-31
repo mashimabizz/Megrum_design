@@ -912,6 +912,9 @@ private struct MeguriMapScreen: View {
         if kind == .boards, boardScope == .samePrefecture {
             return "都道府県内の位置つきスレッドを表示中"
         }
+        if kind == .grooms, rangeCircle != nil {
+            return "現在地1km圏内のグルームを表示中"
+        }
         if rangeCircle == nil {
             return "範囲円は現在地取得後に表示されます"
         }
@@ -1139,19 +1142,11 @@ private struct BoardThreadDetailScreen: View {
     var body: some View {
         VStack(spacing: 0) {
             ScrollView {
-                VStack(alignment: .leading, spacing: 16) {
-                    BoardThreadCard(thread: thread)
-
-                    HStack {
-                        Text("返信")
-                            .font(.system(size: 20, weight: .heavy, design: .rounded))
-                            .foregroundStyle(MegrumTheme.ink)
-
-                        if appState.loadingBoardRepliesThreadID == thread.id {
-                            ProgressView()
-                                .controlSize(.small)
-                        }
-                    }
+                VStack(alignment: .leading, spacing: 12) {
+                    BoardThreadStarterBubble(
+                        thread: thread,
+                        isMine: thread.authorID == appState.viewer?.id
+                    )
 
                     ForEach(replies) { reply in
                         BoardReplyBubble(
@@ -1159,9 +1154,27 @@ private struct BoardThreadDetailScreen: View {
                             isMine: reply.authorID == appState.viewer?.id
                         )
                     }
+
+                    if appState.loadingBoardRepliesThreadID == thread.id {
+                        HStack(spacing: 8) {
+                            ProgressView()
+                                .controlSize(.small)
+                            Text("返信を読み込み中")
+                                .font(.system(size: 12, weight: .heavy, design: .rounded))
+                                .foregroundStyle(MegrumTheme.muted)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.top, 4)
+                    } else if replies.isEmpty {
+                        Text("まだ返信はありません")
+                            .font(.system(size: 13, weight: .heavy, design: .rounded))
+                            .foregroundStyle(MegrumTheme.muted)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 20)
+                    }
                 }
                 .padding(.horizontal, 20)
-                .padding(.top, 18)
+                .padding(.top, 20)
                 .padding(.bottom, 22)
             }
 
@@ -1188,7 +1201,7 @@ private struct BoardThreadDetailScreen: View {
             .background(.regularMaterial)
         }
         .background(MegrumTheme.canvas.ignoresSafeArea())
-        .navigationTitle("掲示板")
+        .navigationTitle(thread.title)
         .megrumInlineNavigationTitle()
         .task {
             await appState.loadBoardReplies(
@@ -1209,17 +1222,58 @@ private struct BoardThreadDetailScreen: View {
     }
 }
 
+private struct BoardThreadStarterBubble: View {
+    var thread: BoardThread
+    var isMine: Bool
+
+    var body: some View {
+        VStack(alignment: isMine ? .trailing : .leading, spacing: 5) {
+            VStack(alignment: .leading, spacing: 8) {
+                Text(thread.title)
+                    .font(.system(size: 18, weight: .heavy, design: .rounded))
+                    .foregroundStyle(isMine ? .white : MegrumTheme.ink)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                Text(thread.body)
+                    .font(.system(size: 15, weight: .bold, design: .rounded))
+                    .foregroundStyle(isMine ? .white.opacity(0.94) : MegrumTheme.ink.opacity(0.88))
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .padding(.horizontal, 15)
+            .padding(.vertical, 12)
+            .frame(maxWidth: 292, alignment: .leading)
+            .background(
+                isMine ? AnyShapeStyle(MegrumTheme.lavender) : AnyShapeStyle(.white.opacity(0.92)),
+                in: RoundedRectangle(cornerRadius: 20, style: .continuous)
+            )
+            .shadow(color: MegrumTheme.ink.opacity(isMine ? 0.08 : 0.05), radius: 12, y: 6)
+
+            Text(thread.createdAt.formatted(date: .omitted, time: .shortened))
+                .font(.system(size: 11, weight: .bold, design: .rounded))
+                .foregroundStyle(MegrumTheme.muted)
+                .padding(.horizontal, 4)
+        }
+        .frame(maxWidth: .infinity, alignment: isMine ? .trailing : .leading)
+        .accessibilityElement(children: .combine)
+    }
+}
+
 private struct BoardReplyBubble: View {
     var reply: BoardReply
     var isMine: Bool
 
+    private var bodyText: String {
+        reply.status == .deleted ? "削除済みです" : reply.body
+    }
+
     var body: some View {
-        VStack(alignment: isMine ? .trailing : .leading, spacing: 4) {
-            Text(reply.status == .deleted ? "削除済みです" : reply.body)
+        VStack(alignment: isMine ? .trailing : .leading, spacing: 5) {
+            Text(bodyText)
                 .font(.system(size: 15, weight: .bold, design: .rounded))
                 .foregroundStyle(isMine ? .white : MegrumTheme.ink)
                 .padding(.horizontal, 14)
                 .padding(.vertical, 10)
+                .frame(maxWidth: 292, alignment: .leading)
                 .background(
                     isMine ? AnyShapeStyle(MegrumTheme.lavender) : AnyShapeStyle(.white.opacity(0.9)),
                     in: RoundedRectangle(cornerRadius: 18, style: .continuous)
@@ -1228,8 +1282,10 @@ private struct BoardReplyBubble: View {
             Text(reply.createdAt.formatted(date: .omitted, time: .shortened))
                 .font(.system(size: 11, weight: .bold, design: .rounded))
                 .foregroundStyle(MegrumTheme.muted)
+                .padding(.horizontal, 4)
         }
         .frame(maxWidth: .infinity, alignment: isMine ? .trailing : .leading)
+        .accessibilityElement(children: .combine)
     }
 }
 

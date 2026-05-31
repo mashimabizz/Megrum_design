@@ -29,17 +29,68 @@ public final class SupabaseMessageClient: @unchecked Sendable {
     }
 
     public func sendTextMessage(senderID: UUID, input: TradeMessageCreateInput) async throws -> TradeMessage {
+        try await sendMessage(
+            senderID: senderID,
+            proposalID: input.proposalID,
+            messageType: .text,
+            body: input.body
+        )
+    }
+
+    public func sendPhotoMessage(
+        senderID: UUID,
+        proposalID: UUID,
+        photoURL: URL,
+        body: String? = nil,
+        messageType: TradeMessageType = .photo
+    ) async throws -> TradeMessage {
+        try await sendMessage(
+            senderID: senderID,
+            proposalID: proposalID,
+            messageType: messageType,
+            body: body,
+            photoURL: photoURL
+        )
+    }
+
+    public func sendLocationMessage(senderID: UUID, proposalID: UUID, body: String) async throws -> TradeMessage {
+        try await sendMessage(senderID: senderID, proposalID: proposalID, messageType: .location, body: body)
+    }
+
+    public func sendSystemMessage(senderID: UUID, proposalID: UUID, body: String) async throws -> TradeMessage {
+        try await sendMessage(senderID: senderID, proposalID: proposalID, messageType: .system, body: body)
+    }
+
+    public func sendArrivalStatusMessage(senderID: UUID, proposalID: UUID, body: String) async throws -> TradeMessage {
+        try await sendMessage(senderID: senderID, proposalID: proposalID, messageType: .arrivalStatus, body: body)
+    }
+
+    public func sendMessage(
+        senderID: UUID,
+        proposalID: UUID,
+        messageType: TradeMessageType,
+        body: String? = nil,
+        photoURL: URL? = nil
+    ) async throws -> TradeMessage {
+        let payload = MessageCreatePayload(
+            proposalID: proposalID,
+            senderID: senderID,
+            messageType: messageType,
+            body: body,
+            photoURL: photoURL
+        )
         let rows: [MessageRow] = try await client.upsertRows(
             into: "messages",
-            values: [MessageCreatePayload(senderID: senderID, input: input)],
+            values: [payload],
             select: MessageRow.select
         )
         return rows.first?.message ?? TradeMessage(
             id: UUID(),
-            proposalID: input.proposalID,
+            proposalID: proposalID,
             senderID: senderID,
-            messageType: .text,
-            body: input.body
+            messageType: messageType,
+            body: payload.body,
+            photoURL: photoURL
         )
     }
 
@@ -56,13 +107,63 @@ public final class SupabaseMessageClient: @unchecked Sendable {
     }
 
     public func makeSendTextMessageRequest(senderID: UUID, input: TradeMessageCreateInput) throws -> URLRequest {
-        try client.makeMutationRequest(
+        try makeSendMessageRequest(
+            senderID: senderID,
+            proposalID: input.proposalID,
+            messageType: .text,
+            body: input.body
+        )
+    }
+
+    public func makeSendPhotoMessageRequest(
+        senderID: UUID,
+        proposalID: UUID,
+        photoURL: URL,
+        body: String? = nil,
+        messageType: TradeMessageType = .photo
+    ) throws -> URLRequest {
+        try makeSendMessageRequest(
+            senderID: senderID,
+            proposalID: proposalID,
+            messageType: messageType,
+            body: body,
+            photoURL: photoURL
+        )
+    }
+
+    public func makeSendLocationMessageRequest(senderID: UUID, proposalID: UUID, body: String) throws -> URLRequest {
+        try makeSendMessageRequest(senderID: senderID, proposalID: proposalID, messageType: .location, body: body)
+    }
+
+    public func makeSendSystemMessageRequest(senderID: UUID, proposalID: UUID, body: String) throws -> URLRequest {
+        try makeSendMessageRequest(senderID: senderID, proposalID: proposalID, messageType: .system, body: body)
+    }
+
+    public func makeSendArrivalStatusMessageRequest(senderID: UUID, proposalID: UUID, body: String) throws -> URLRequest {
+        try makeSendMessageRequest(senderID: senderID, proposalID: proposalID, messageType: .arrivalStatus, body: body)
+    }
+
+    public func makeSendMessageRequest(
+        senderID: UUID,
+        proposalID: UUID,
+        messageType: TradeMessageType,
+        body: String? = nil,
+        photoURL: URL? = nil
+    ) throws -> URLRequest {
+        let payload = MessageCreatePayload(
+            proposalID: proposalID,
+            senderID: senderID,
+            messageType: messageType,
+            body: body,
+            photoURL: photoURL
+        )
+        return try client.makeMutationRequest(
             path: "/rest/v1/messages",
             queryItems: [
                 URLQueryItem(name: "select", value: MessageRow.select)
             ],
             method: "POST",
-            body: encoder.encode([MessageCreatePayload(senderID: senderID, input: input)]),
+            body: encoder.encode([payload]),
             prefer: "resolution=merge-duplicates,return=representation"
         )
     }
@@ -105,12 +206,29 @@ private struct MessageCreatePayload: Encodable, Sendable {
     var proposalId: UUID
     var senderId: UUID
     var messageType: String
-    var body: String
+    var body: String?
+    var photoUrl: String?
 
     init(senderID: UUID, input: TradeMessageCreateInput) {
-        self.proposalId = input.proposalID
+        self.init(
+            proposalID: input.proposalID,
+            senderID: senderID,
+            messageType: .text,
+            body: input.body
+        )
+    }
+
+    init(
+        proposalID: UUID,
+        senderID: UUID,
+        messageType: TradeMessageType,
+        body: String? = nil,
+        photoURL: URL? = nil
+    ) {
+        self.proposalId = proposalID
         self.senderId = senderID
-        self.messageType = TradeMessageType.text.rawValue
-        self.body = input.body.trimmingCharacters(in: .whitespacesAndNewlines)
+        self.messageType = messageType.rawValue
+        self.body = body?.trimmingCharacters(in: .whitespacesAndNewlines)
+        self.photoUrl = photoURL?.absoluteString
     }
 }

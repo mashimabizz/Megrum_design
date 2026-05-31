@@ -16,6 +16,49 @@ public struct AuthSignUpInput: Equatable, Sendable {
     }
 }
 
+public enum MegrumAuthInputValidator {
+    public static func normalizedEmail(_ email: String) -> String {
+        email.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    public static func isValidEmail(_ email: String) -> Bool {
+        let value = normalizedEmail(email)
+        guard !value.isEmpty, value.rangeOfCharacter(from: .whitespacesAndNewlines) == nil else {
+            return false
+        }
+
+        let parts = value.split(separator: "@", omittingEmptySubsequences: false)
+        guard parts.count == 2, !parts[0].isEmpty, !parts[1].isEmpty else {
+            return false
+        }
+
+        let domain = parts[1]
+        return domain.contains(".") && !domain.hasPrefix(".") && !domain.hasSuffix(".")
+    }
+
+    public static func isValidSignInPassword(_ password: String) -> Bool {
+        !password.isEmpty
+    }
+
+    public static func isValidSignUpPassword(_ password: String) -> Bool {
+        password.count >= 8 && !password.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    public static func normalizedHandle(_ handle: String?) -> String? {
+        handle?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfBlank
+    }
+
+    public static func isValidHandle(_ handle: String?) -> Bool {
+        guard let handle = normalizedHandle(handle) else {
+            return true
+        }
+        guard (3...24).contains(handle.count) else {
+            return false
+        }
+        return handle.range(of: #"^[A-Za-z0-9_]+$"#, options: .regularExpression) != nil
+    }
+}
+
 public protocol MegrumAuthRepository: Sendable {
     var isConfigured: Bool { get }
 
@@ -165,9 +208,10 @@ public final class MegrumAuthState: ObservableObject {
         guard !isLoading else {
             return
         }
-        let trimmedEmail = email.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmedEmail.isEmpty, !password.isEmpty else {
-            errorMessage = "メールアドレスとパスワードを入力してください"
+        let trimmedEmail = MegrumAuthInputValidator.normalizedEmail(email)
+        guard MegrumAuthInputValidator.isValidEmail(trimmedEmail),
+              MegrumAuthInputValidator.isValidSignInPassword(password) else {
+            errorMessage = "有効なメールアドレスとパスワードを入力してください"
             passwordResetMessage = nil
             return
         }
@@ -202,19 +246,30 @@ public final class MegrumAuthState: ObservableObject {
         guard !isLoading else {
             return
         }
-        let trimmedEmail = email.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmedEmail.isEmpty, password.count >= 8 else {
-            errorMessage = "メールアドレスと8文字以上のパスワードを入力してください"
+        let trimmedEmail = MegrumAuthInputValidator.normalizedEmail(email)
+        guard MegrumAuthInputValidator.isValidEmail(trimmedEmail) else {
+            errorMessage = "有効なメールアドレスを入力してください"
             passwordResetMessage = nil
             return
         }
+        guard MegrumAuthInputValidator.isValidSignUpPassword(password) else {
+            errorMessage = "パスワードは8文字以上で入力してください"
+            passwordResetMessage = nil
+            return
+        }
+        guard MegrumAuthInputValidator.isValidHandle(handle) else {
+            errorMessage = "ユーザーIDは3〜24文字の英数字と_で入力してください"
+            passwordResetMessage = nil
+            return
+        }
+        let trimmedHandle = MegrumAuthInputValidator.normalizedHandle(handle)
 
         await runAuthAction {
             try await repository.signUp(
                 AuthSignUpInput(
                     email: trimmedEmail,
                     password: password,
-                    handle: handle?.trimmingCharacters(in: .whitespacesAndNewlines)
+                    handle: trimmedHandle
                 )
             )
         }
@@ -225,8 +280,8 @@ public final class MegrumAuthState: ObservableObject {
         guard !isLoading else {
             return false
         }
-        let trimmedEmail = email.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard trimmedEmail.contains("@") else {
+        let trimmedEmail = MegrumAuthInputValidator.normalizedEmail(email)
+        guard MegrumAuthInputValidator.isValidEmail(trimmedEmail) else {
             errorMessage = "有効なメールアドレスを入力してください"
             passwordResetMessage = nil
             return false
@@ -235,15 +290,16 @@ public final class MegrumAuthState: ObservableObject {
         isLoading = true
         errorMessage = nil
         passwordResetMessage = nil
+        defer {
+            isLoading = false
+        }
 
         do {
             try await repository.sendPasswordReset(email: trimmedEmail)
             passwordResetMessage = "再設定メールを送信しました。受信メールを確認してください"
-            isLoading = false
             return true
         } catch {
             errorMessage = normalizedMessage(from: error)
-            isLoading = false
             return false
         }
     }
@@ -287,6 +343,9 @@ public final class MegrumAuthState: ObservableObject {
         isLoading = true
         errorMessage = nil
         passwordResetMessage = nil
+        defer {
+            isLoading = false
+        }
 
         do {
             try await repository.signOut(session: session)
@@ -295,14 +354,15 @@ public final class MegrumAuthState: ObservableObject {
         } catch {
             errorMessage = normalizedMessage(from: error)
         }
-
-        isLoading = false
     }
 
     private func runAuthAction(_ action: () async throws -> AuthSession) async {
         isLoading = true
         errorMessage = nil
         passwordResetMessage = nil
+        defer {
+            isLoading = false
+        }
 
         do {
             let nextSession = try await action()
@@ -311,8 +371,6 @@ public final class MegrumAuthState: ObservableObject {
         } catch {
             errorMessage = normalizedMessage(from: error)
         }
-
-        isLoading = false
     }
 
     private func normalizedMessage(from error: Error) -> String {
@@ -323,11 +381,25 @@ public final class MegrumAuthState: ObservableObject {
             if message.contains("Email not confirmed") {
                 return "メール認証が完了していません。受信メールを確認してください"
             }
+            if message.localizedCaseInsensitiveContains("already registered") {
+                return "このメールアドレスはすでに登録されています"
+            }
+            if message.localizedCaseInsensitiveContains("invalid email")
+                || message.localizedCaseInsensitiveContains("validate email") {
+                return "有効なメールアドレスを入力してください"
+            }
+            if message.localizedCaseInsensitiveContains("password")
+                && message.localizedCaseInsensitiveContains("at least") {
+                return "パスワードは8文字以上で入力してください"
+            }
             if message.localizedCaseInsensitiveContains("rate limit")
                 || message.localizedCaseInsensitiveContains("security purposes") {
                 return "送信間隔が短すぎます。しばらく待ってから再度お試しください"
             }
             return message
+        }
+        if case MegrumRepositoryError.unsupportedMutation = error {
+            return "このログイン方法はまだ利用できません"
         }
         return "認証に失敗しました。時間をおいてもう一度お試しください"
     }

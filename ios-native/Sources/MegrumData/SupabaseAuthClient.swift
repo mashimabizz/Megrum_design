@@ -22,6 +22,10 @@ public enum SupabaseIDTokenProvider: String, Equatable, Sendable {
     case facebook
 }
 
+public enum SupabaseOAuthProvider: String, Equatable, Sendable {
+    case google
+}
+
 public final class SupabaseAuthClient: @unchecked Sendable {
     private let configuration: SupabaseConfiguration
     private let session: URLSession
@@ -124,7 +128,7 @@ public final class SupabaseAuthClient: @unchecked Sendable {
     }
 
     public func makePasswordSignInRequest(email: String, password: String) throws -> URLRequest {
-        let payload = PasswordPayload(email: email, password: password)
+        let payload = PasswordPayload(email: email.authTrimmed, password: password)
         return try makeAuthRequest(
             path: "/auth/v1/token",
             queryItems: [URLQueryItem(name: "grant_type", value: "password")],
@@ -140,12 +144,14 @@ public final class SupabaseAuthClient: @unchecked Sendable {
         metadata: SupabaseAuthProfileMetadata = SupabaseAuthProfileMetadata(),
         emailRedirectTo: URL? = nil
     ) throws -> URLRequest {
+        let normalizedHandle = metadata.handle.authNilIfBlank
+        let normalizedDisplayName = metadata.displayName.authNilIfBlank
         let payload = SignUpPayload(
-            email: email,
+            email: email.authTrimmed,
             password: password,
             data: SignUpMetadata(
-                handle: metadata.handle,
-                displayName: metadata.displayName ?? metadata.handle
+                handle: normalizedHandle,
+                displayName: normalizedDisplayName ?? normalizedHandle
             ),
             emailRedirectTo: emailRedirectTo?.absoluteString
         )
@@ -165,9 +171,9 @@ public final class SupabaseAuthClient: @unchecked Sendable {
     ) throws -> URLRequest {
         let payload = IDTokenPayload(
             provider: provider.rawValue,
-            idToken: idToken,
-            accessToken: accessToken,
-            nonce: nonce
+            idToken: idToken.authTrimmed,
+            accessToken: accessToken.authNilIfBlank,
+            nonce: nonce.authNilIfBlank
         )
         return try makeAuthRequest(
             path: "/auth/v1/token",
@@ -178,8 +184,50 @@ public final class SupabaseAuthClient: @unchecked Sendable {
         )
     }
 
+    public func makeOAuthAuthorizeURL(
+        provider: SupabaseOAuthProvider,
+        redirectTo: URL? = nil,
+        scopes: [String] = []
+    ) throws -> URL {
+        guard var components = URLComponents(url: configuration.projectURL, resolvingAgainstBaseURL: false) else {
+            throw SupabaseAuthError.invalidURL
+        }
+
+        var queryItems = [
+            URLQueryItem(name: "provider", value: provider.rawValue)
+        ]
+        if let redirectTo {
+            queryItems.append(URLQueryItem(name: "redirect_to", value: redirectTo.absoluteString))
+        }
+        let normalizedScopes = scopes.map(\.authTrimmed).filter { !$0.isEmpty }
+        if !normalizedScopes.isEmpty {
+            queryItems.append(URLQueryItem(name: "scopes", value: normalizedScopes.joined(separator: " ")))
+        }
+
+        components.path = "/auth/v1/authorize"
+        components.queryItems = queryItems
+
+        guard let url = components.url else {
+            throw SupabaseAuthError.invalidURL
+        }
+        return url
+    }
+
+    public func makeOAuthAuthorizeRequest(
+        provider: SupabaseOAuthProvider,
+        redirectTo: URL? = nil,
+        scopes: [String] = []
+    ) throws -> URLRequest {
+        var request = URLRequest(
+            url: try makeOAuthAuthorizeURL(provider: provider, redirectTo: redirectTo, scopes: scopes)
+        )
+        request.httpMethod = "GET"
+        request.setValue("text/html,application/xhtml+xml,application/json", forHTTPHeaderField: "Accept")
+        return request
+    }
+
     public func makePasswordResetRequest(email: String, emailRedirectTo: URL? = nil) throws -> URLRequest {
-        let payload = PasswordResetPayload(email: email)
+        let payload = PasswordResetPayload(email: email.authTrimmed)
         let queryItems = emailRedirectTo.map {
             [URLQueryItem(name: "redirect_to", value: $0.absoluteString)]
         } ?? []
@@ -331,5 +379,20 @@ private struct AuthErrorResponse: Decodable {
     var msg: String?
     var message: String? {
         msg
+    }
+}
+
+private extension String {
+    var authTrimmed: String {
+        trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+}
+
+private extension Optional where Wrapped == String {
+    var authNilIfBlank: String? {
+        guard let value = self?.authTrimmed, !value.isEmpty else {
+            return nil
+        }
+        return value
     }
 }

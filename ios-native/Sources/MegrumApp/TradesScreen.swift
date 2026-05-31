@@ -262,101 +262,35 @@ private struct TradeDetailScreen: View {
     }
 
     var body: some View {
-        VStack(spacing: 0) {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 18) {
-                    ScreenTitle(title: "取引詳細", subtitle: currentProposal.exchangeMethod.displayName)
-                    TradeCard(proposal: currentProposal) {}
+        ScrollView {
+            VStack(alignment: .leading, spacing: 18) {
+                ScreenTitle(title: "取引詳細", subtitle: currentProposal.exchangeMethod.displayName)
+                TradeCard(proposal: currentProposal) {}
 
-                    VStack(alignment: .leading, spacing: 12) {
-                        detailRow(title: "ステータス", value: statusText)
-                        detailRow(title: "交換条件タグ", value: currentProposal.conditionTags.isEmpty ? "未設定" : currentProposal.conditionTags.joined(separator: " / "))
-                        detailRow(title: "私が出す", value: "\(currentProposal.senderGoodsIDs.count)件")
-                        detailRow(title: "受け取る", value: "\(currentProposal.receiverGoodsIDs.count)件")
-                    }
-                    .padding(18)
-                    .background(.white.opacity(0.84), in: RoundedRectangle(cornerRadius: 24, style: .continuous))
-
-                    if currentProposal.isProposalResponsePending {
-                        TradeProposalResponsePanel(
-                            proposal: currentProposal,
-                            viewerID: appState.viewer?.id,
-                            isResponding: appState.respondingProposalID == currentProposal.id,
-                            onAgree: { acceptedExchangeMethod in
-                                Task {
-                                    await appState.agreeProposal(
-                                        proposalID: currentProposal.id,
-                                        acceptedExchangeMethod: acceptedExchangeMethod
-                                    )
-                                }
-                            },
-                            onReject: {
-                                isShowingRejectConfirmation = true
-                            },
-                            onCounterProposal: {
-                                isShowingCounterProposalSheet = true
-                            }
-                        )
-                    }
-
-                    if currentProposal.status == .agreed || currentProposal.status == .completed {
-                        TradeEvidencePanel(
-                            proposal: currentProposal,
-                            viewerID: appState.viewer?.id,
-                            selectedPhotoItem: $selectedEvidencePhotoItem,
-                            isAddingEvidence: appState.addingEvidenceProposalID == currentProposal.id,
-                            isApproving: appState.approvingEvidenceProposalID == currentProposal.id,
-                            canUseCamera: canUseCamera,
-                            onOpenCamera: {
-                                isShowingEvidenceCamera = true
-                            },
-                            onOpenImage: { url in
-                                selectedRemoteImage = RemoteImageSelection(url: url)
-                            },
-                            onApprove: {
-                                Task {
-                                    await appState.approveTradeEvidence(proposalID: currentProposal.id)
-                                }
-                            },
-                            onRate: {
-                                isShowingEvaluationSheet = true
-                            }
-                        )
-                    }
-
-                    VStack(alignment: .leading, spacing: 12) {
-                        HStack {
-                            Text("メッセージ")
-                                .font(.system(size: 20, weight: .heavy, design: .rounded))
-                                .foregroundStyle(MegrumTheme.ink)
-                            if appState.loadingMessagesProposalID == proposal.id {
-                                ProgressView()
-                                    .controlSize(.small)
-                            }
-                        }
-
-                        ForEach(messages) { message in
-                            TradeMessageBubble(
-                                message: message,
-                                isMine: message.senderID == appState.viewer?.id,
-                                onOpenImage: { url in
-                                    selectedRemoteImage = RemoteImageSelection(url: url)
-                                }
-                            )
-                        }
-                    }
+                VStack(alignment: .leading, spacing: 12) {
+                    detailRow(title: "ステータス", value: statusText)
+                    detailRow(title: "交換条件タグ", value: currentProposal.conditionTags.isEmpty ? "未設定" : currentProposal.conditionTags.joined(separator: " / "))
+                    detailRow(title: "私が出す", value: "\(currentProposal.senderGoodsIDs.count)件")
+                    detailRow(title: "受け取る", value: "\(currentProposal.receiverGoodsIDs.count)件")
                 }
-                .padding(.horizontal, 20)
-                .padding(.top, 18)
-                .padding(.bottom, 22)
-            }
+                .padding(18)
+                .background(.white.opacity(0.84), in: RoundedRectangle(cornerRadius: 24, style: .continuous))
 
-            VStack(spacing: 8) {
-                if appState.viewer.map({ currentProposal.isParticipant($0.id) }) == true {
-                    TradeChatActionBar(
-                        showsCounterProposal: currentProposal.canCreateCounterProposal(from: appState.viewer?.id),
-                        onOpenSchedule: {
-                            isShowingScheduleSheet = true
+                if currentProposal.isProposalResponsePending {
+                    TradeProposalResponsePanel(
+                        proposal: currentProposal,
+                        viewerID: appState.viewer?.id,
+                        isResponding: appState.respondingProposalID == currentProposal.id,
+                        onAgree: { acceptedExchangeMethod in
+                            Task {
+                                await appState.agreeProposal(
+                                    proposalID: currentProposal.id,
+                                    acceptedExchangeMethod: acceptedExchangeMethod
+                                )
+                            }
+                        },
+                        onReject: {
+                            isShowingRejectConfirmation = true
                         },
                         onCounterProposal: {
                             isShowingCounterProposalSheet = true
@@ -364,9 +298,74 @@ private struct TradeDetailScreen: View {
                     )
                 }
 
+                if currentProposal.status == .agreed || currentProposal.status == .completed {
+                    TradeEvidencePanel(
+                        proposal: currentProposal,
+                        viewerID: appState.viewer?.id,
+                        selectedPhotoItem: $selectedEvidencePhotoItem,
+                        isAddingEvidence: appState.addingEvidenceProposalID == currentProposal.id,
+                        isApproving: appState.approvingEvidenceProposalID == currentProposal.id,
+                        canUseCamera: canUseCamera,
+                        onOpenCamera: {
+                            isShowingEvidenceCamera = true
+                        },
+                        onOpenImage: { url in
+                            selectedRemoteImage = RemoteImageSelection(url: url)
+                        },
+                        onApprove: {
+                            Task {
+                                await appState.approveTradeEvidence(proposalID: currentProposal.id)
+                            }
+                        },
+                        onRate: {
+                            isShowingEvaluationSheet = true
+                        }
+                    )
+                }
+
+                VStack(alignment: .leading, spacing: 12) {
+                    HStack {
+                        Text("メッセージ")
+                            .font(.system(size: 20, weight: .heavy, design: .rounded))
+                            .foregroundStyle(MegrumTheme.ink)
+                        if appState.loadingMessagesProposalID == proposal.id {
+                            ProgressView()
+                                .controlSize(.small)
+                        }
+                    }
+
+                    ForEach(messages) { message in
+                        TradeMessageBubble(
+                            message: message,
+                            isMine: message.senderID == appState.viewer?.id,
+                            onOpenImage: { url in
+                                selectedRemoteImage = RemoteImageSelection(url: url)
+                            }
+                        )
+                    }
+                }
+            }
+            .padding(.horizontal, 20)
+            .padding(.top, 18)
+            .padding(.bottom, 26)
+        }
+        .scrollDismissesKeyboard(.interactively)
+        .background(MegrumTheme.canvas.ignoresSafeArea())
+        .safeAreaInset(edge: .bottom) {
+            if appState.viewer.map({ currentProposal.isParticipant($0.id) }) == true {
                 TradeMessageInput(
                     text: $draftMessage,
-                    isSending: appState.sendingMessageProposalID == proposal.id
+                    isSending: appState.sendingMessageProposalID == proposal.id,
+                    showsCounterProposal: currentProposal.canCreateCounterProposal(from: appState.viewer?.id),
+                    onOpenSchedule: {
+                        isShowingScheduleSheet = true
+                    },
+                    onCounterProposal: {
+                        isShowingCounterProposalSheet = true
+                    },
+                    onReport: {
+                        isShowingDisputeSheet = true
+                    }
                 ) {
                     Task {
                         let sent = await appState.sendMessage(proposalID: proposal.id, body: draftMessage)
@@ -375,12 +374,11 @@ private struct TradeDetailScreen: View {
                         }
                     }
                 }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 10)
+                .background(.regularMaterial)
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 10)
-            .background(.regularMaterial)
         }
-        .background(MegrumTheme.canvas.ignoresSafeArea())
         .navigationTitle("取引詳細")
         .megrumInlineNavigationTitle()
         .task {
@@ -1167,47 +1165,34 @@ private struct TradeMessageBubble: View {
     }
 
     var body: some View {
+        if message.messageType == .system {
+            systemMessage
+        } else {
+            userMessage
+        }
+    }
+
+    private var userMessage: some View {
         VStack(alignment: isMine ? .trailing : .leading, spacing: 4) {
             if let photoURL = message.photoURL {
-                Button {
-                    onOpenImage(photoURL)
-                } label: {
-                    AsyncImage(url: photoURL) { phase in
-                        switch phase {
-                        case .success(let image):
-                            image
-                                .resizable()
-                                .scaledToFill()
-                        case .failure:
-                            MegrumTheme.sky.opacity(0.18)
-                                .overlay {
-                                    Image(systemName: "photo")
-                                        .font(.system(size: 24, weight: .bold))
-                                        .foregroundStyle(MegrumTheme.muted)
-                                }
-                        case .empty:
-                            MegrumTheme.sky.opacity(0.12)
-                                .overlay {
-                                    ProgressView()
-                                }
-                        @unknown default:
-                            Color.clear
-                        }
-                    }
-                    .frame(width: 210, height: 250)
-                    .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("取引チャットの写真を拡大表示")
+                photoMessage(photoURL)
             }
 
-            if let bodyText {
-                Text(bodyText)
-                    .font(.system(size: 15, weight: .bold, design: .rounded))
-                    .foregroundStyle(isMine ? .white : MegrumTheme.ink)
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 10)
-                    .background(isMine ? AnyShapeStyle(MegrumTheme.lavender) : AnyShapeStyle(.white.opacity(0.9)), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+            switch message.messageType {
+            case .location:
+                if let bodyText {
+                    richTextBubble(title: "現在地共有", systemImage: "location.fill", body: bodyText)
+                }
+            case .arrivalStatus:
+                if let bodyText {
+                    richTextBubble(title: "到着ステータス", systemImage: "checkmark.circle.fill", body: bodyText)
+                }
+            case .text, .photo, .outfitPhoto:
+                if let bodyText {
+                    textBubble(bodyText)
+                }
+            case .system:
+                EmptyView()
             }
 
             Text(message.createdAt.formatted(date: .omitted, time: .shortened))
@@ -1216,15 +1201,140 @@ private struct TradeMessageBubble: View {
         }
         .frame(maxWidth: .infinity, alignment: isMine ? .trailing : .leading)
     }
+
+    private var systemMessage: some View {
+        HStack(spacing: 7) {
+            Image(systemName: "info.circle.fill")
+            Text(bodyText ?? "取引が更新されました")
+        }
+        .font(.system(size: 12, weight: .heavy, design: .rounded))
+        .foregroundStyle(MegrumTheme.muted)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .background(.white.opacity(0.72), in: Capsule())
+        .frame(maxWidth: .infinity, alignment: .center)
+        .accessibilityLabel(bodyText ?? "取引が更新されました")
+    }
+
+    private func photoMessage(_ photoURL: URL) -> some View {
+        Button {
+            onOpenImage(photoURL)
+        } label: {
+            AsyncImage(url: photoURL) { phase in
+                switch phase {
+                case .success(let image):
+                    image
+                        .resizable()
+                        .scaledToFill()
+                case .failure:
+                    MegrumTheme.sky.opacity(0.18)
+                        .overlay {
+                            Image(systemName: "photo")
+                                .font(.system(size: 24, weight: .bold))
+                                .foregroundStyle(MegrumTheme.muted)
+                        }
+                case .empty:
+                    MegrumTheme.sky.opacity(0.12)
+                        .overlay {
+                            ProgressView()
+                        }
+                @unknown default:
+                    Color.clear
+                }
+            }
+            .frame(width: 210, height: message.messageType == .outfitPhoto ? 280 : 250)
+            .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+            .overlay(alignment: .topLeading) {
+                if let label = photoLabel {
+                    Label(label, systemImage: "photo.fill")
+                        .font(.system(size: 11, weight: .heavy, design: .rounded))
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 9)
+                        .padding(.vertical, 6)
+                        .background(.black.opacity(0.46), in: Capsule())
+                        .padding(9)
+                }
+            }
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("\(photoLabel ?? "取引チャットの写真")を拡大表示")
+    }
+
+    private func textBubble(_ text: String) -> some View {
+        Text(text)
+            .font(.system(size: 15, weight: .bold, design: .rounded))
+            .foregroundStyle(isMine ? .white : MegrumTheme.ink)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 10)
+            .background(
+                isMine ? AnyShapeStyle(MegrumTheme.lavender) : AnyShapeStyle(.white.opacity(0.9)),
+                in: RoundedRectangle(cornerRadius: 18, style: .continuous)
+            )
+    }
+
+    private func richTextBubble(title: String, systemImage: String, body: String) -> some View {
+        VStack(alignment: .leading, spacing: 5) {
+            Label(title, systemImage: systemImage)
+                .font(.system(size: 12, weight: .heavy, design: .rounded))
+                .foregroundStyle(isMine ? .white.opacity(0.86) : MegrumTheme.lavender)
+            Text(body)
+                .font(.system(size: 15, weight: .heavy, design: .rounded))
+        }
+        .foregroundStyle(isMine ? .white : MegrumTheme.ink)
+        .padding(.horizontal, 14)
+        .padding(.vertical, 11)
+        .background(
+            isMine ? AnyShapeStyle(MegrumTheme.lavender) : AnyShapeStyle(.white.opacity(0.9)),
+            in: RoundedRectangle(cornerRadius: 18, style: .continuous)
+        )
+    }
+
+    private var photoLabel: String? {
+        switch message.messageType {
+        case .photo:
+            "写真"
+        case .outfitPhoto:
+            "服装写真"
+        default:
+            nil
+        }
+    }
 }
 
 private struct TradeMessageInput: View {
     @Binding var text: String
     var isSending: Bool
+    var showsCounterProposal: Bool
+    var onOpenSchedule: () -> Void
+    var onCounterProposal: () -> Void
+    var onReport: () -> Void
     var onSend: () -> Void
 
     var body: some View {
         HStack(spacing: 10) {
+            Menu {
+                Button(action: onOpenSchedule) {
+                    Label("スケジュール", systemImage: "calendar")
+                }
+
+                if showsCounterProposal {
+                    Button(action: onCounterProposal) {
+                        Label("再打診", systemImage: "arrow.triangle.2.circlepath")
+                    }
+                }
+
+                Button(role: .destructive, action: onReport) {
+                    Label("通報", systemImage: "exclamationmark.bubble")
+                }
+            } label: {
+                Image(systemName: "plus")
+                    .font(.system(size: 17, weight: .heavy))
+                    .foregroundStyle(MegrumTheme.lavender)
+                    .frame(width: 42, height: 42)
+                    .background(.white.opacity(0.82), in: Circle())
+            }
+            .accessibilityLabel("メッセージ操作")
+
             TextField("メッセージ", text: $text, axis: .vertical)
                 .font(.system(size: 16, weight: .bold, design: .rounded))
                 .lineLimit(1...4)
@@ -1249,40 +1359,6 @@ private struct TradeMessageInput: View {
             .buttonStyle(.plain)
             .disabled(text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isSending)
             .opacity(text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? 0.45 : 1)
-        }
-    }
-}
-
-private struct TradeChatActionBar: View {
-    var showsCounterProposal: Bool
-    var onOpenSchedule: () -> Void
-    var onCounterProposal: () -> Void
-
-    var body: some View {
-        HStack(spacing: 8) {
-            Button(action: onOpenSchedule) {
-                Label("スケジュール", systemImage: "calendar")
-                    .font(.system(size: 15, weight: .heavy, design: .rounded))
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 42)
-            }
-            .buttonStyle(.bordered)
-            .buttonBorderShape(.capsule)
-            .tint(MegrumTheme.sky)
-            .accessibilityLabel("スケジュールを表示")
-
-            if showsCounterProposal {
-                Button(action: onCounterProposal) {
-                    Label("再打診", systemImage: "arrow.triangle.2.circlepath")
-                        .font(.system(size: 15, weight: .heavy, design: .rounded))
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 42)
-                }
-                .buttonStyle(.bordered)
-                .buttonBorderShape(.capsule)
-                .tint(MegrumTheme.lavender)
-                .accessibilityLabel("条件を変えて再打診")
-            }
         }
     }
 }
@@ -1828,6 +1904,10 @@ private struct RemoteImageSelection: Identifiable, Equatable {
 private struct FullScreenRemoteImageView: View {
     var url: URL
     @Environment(\.dismiss) private var dismiss
+    @State private var scale: CGFloat = 1
+    @State private var lastScale: CGFloat = 1
+    @State private var offset: CGSize = .zero
+    @State private var lastOffset: CGSize = .zero
 
     var body: some View {
         ZStack(alignment: .topTrailing) {
@@ -1840,6 +1920,12 @@ private struct FullScreenRemoteImageView: View {
                         .resizable()
                         .scaledToFit()
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .scaleEffect(scale)
+                        .offset(offset)
+                        .gesture(zoomGesture.simultaneously(with: dragGesture))
+                        .onTapGesture(count: 2) {
+                            resetZoom()
+                        }
                 case .failure:
                     VStack(spacing: 12) {
                         Image(systemName: "photo")
@@ -1871,6 +1957,42 @@ private struct FullScreenRemoteImageView: View {
             .padding(.trailing, 18)
             .accessibilityLabel("閉じる")
         }
+    }
+
+    private var zoomGesture: some Gesture {
+        MagnificationGesture()
+            .onChanged { value in
+                scale = min(max(lastScale * value, 1), 4)
+            }
+            .onEnded { _ in
+                lastScale = scale
+                if scale <= 1.02 {
+                    resetZoom()
+                }
+            }
+    }
+
+    private var dragGesture: some Gesture {
+        DragGesture()
+            .onChanged { value in
+                guard scale > 1 else {
+                    return
+                }
+                offset = CGSize(
+                    width: lastOffset.width + value.translation.width,
+                    height: lastOffset.height + value.translation.height
+                )
+            }
+            .onEnded { _ in
+                lastOffset = offset
+            }
+    }
+
+    private func resetZoom() {
+        scale = 1
+        lastScale = 1
+        offset = .zero
+        lastOffset = .zero
     }
 }
 

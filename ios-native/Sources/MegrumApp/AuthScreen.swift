@@ -104,6 +104,7 @@ public struct AuthScreen: View {
         #if os(iOS)
         TextField("メールアドレス", text: $email)
             .textInputAutocapitalization(.never)
+            .autocorrectionDisabled()
             .keyboardType(.emailAddress)
             .textContentType(.emailAddress)
             .focused($focusedField, equals: .email)
@@ -156,6 +157,7 @@ public struct AuthScreen: View {
         #if os(iOS)
         TextField("ユーザーID（任意）", text: $handle)
             .textInputAutocapitalization(.never)
+            .autocorrectionDisabled()
             .textContentType(.username)
             .focused($focusedField, equals: .handle)
             .submitLabel(.go)
@@ -271,22 +273,24 @@ public struct AuthScreen: View {
             .signInWithAppleButtonStyle(.black)
             .frame(height: 54)
             .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
-            .disabled(authState.isLoading)
+            .disabled(authState.isLoading || !authState.isConfigured)
             .accessibilityLabel("Appleで続ける")
         }
         #endif
     }
 
     private var canSubmit: Bool {
-        let hasEmail = !email.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        let hasEmail = MegrumAuthInputValidator.isValidEmail(email)
         if mode == .signIn {
-            return hasEmail && !password.isEmpty
+            return hasEmail && MegrumAuthInputValidator.isValidSignInPassword(password)
         }
-        return hasEmail && password.count >= 8
+        return hasEmail
+            && MegrumAuthInputValidator.isValidSignUpPassword(password)
+            && MegrumAuthInputValidator.isValidHandle(handle)
     }
 
     private func openPasswordResetSheet() {
-        passwordResetEmail = email
+        passwordResetEmail = MegrumAuthInputValidator.normalizedEmail(email)
         hasSubmittedPasswordReset = false
         appleSignInError = nil
         focusedField = nil
@@ -410,7 +414,7 @@ private struct PasswordResetSheet: View {
     }
 
     private var canSend: Bool {
-        email.trimmingCharacters(in: .whitespacesAndNewlines).contains("@")
+        MegrumAuthInputValidator.isValidEmail(email)
     }
 }
 

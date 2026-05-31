@@ -1,7 +1,7 @@
 # 22. Swift Native Migration
 
 最終更新: 2026-05-31
-ステータス: Active draft（iter366）
+ステータス: Active draft（iter367）
 
 ## 目的
 
@@ -130,7 +130,9 @@ tar -xzf /Users/michitaka/Desktop/Megrum_backups/pre-swift-migration-20260531-03
 - iter366で、AppIcon asset catalogを追加してXcode targetへ接続し、TestFlight upload validation前のAppIcon不足を解消した。
 - iter366で、カメラ利用文言を証跡撮影とグルーム投稿の両方に合わせて更新した。
 - iter366で、APNs device token upsertのconflict targetをDB側の通常unique indexと一致させ、Preview Supabase DBへ未適用migrationを反映した。
-- 現時点のAuthはAppleログインまで追加済み。Google OAuthは後続のPhase 2作業で広げる。
+- iter367で、認証フォームのdisabled状態、入力正規化、ハンドル名validation、Supabase error表示を補強した。live設定がない場合はAppleログインボタンを無効化し、preview fallback時の誤操作を減らした。
+- iter367で、Google OAuth authorize URL / request builderを追加し、UI接続前にrequest生成をテストできるようにした。
+- 現時点のAuthはAppleログインまで追加済み。Google OAuthはrequest境界まで追加済みで、UI接続は後続のPhase 2作業で広げる。
 
 ### Phase 3: Exchange core
 
@@ -164,6 +166,9 @@ tar -xzf /Users/michitaka/Desktop/Megrum_backups/pre-swift-migration-20260531-03
 - iter365で、Supabase migration `20260531013000_harden_proposal_response_rpc.sql` を追加し、`respond_to_proposal_for_viewer` と `approve_trade_evidence_for_viewer` で行ロックしながら合意・拒否・完了・在庫/個別募集更新を行う方針へ寄せた。
 - iter366で、Swift Nativeの打診作成sheetから `hand` / `both` を送れるように待ち合わせ候補入力を追加し、有効な `ProposalMeetupInput` を送信payloadへ含めるようにした。
 - iter366で、完了RPCを再定義し、双方承認時に数量減算、受け取り側keep作成、譲渡履歴作成、個別募集closed化を同一トランザクションで行うようにした。
+- iter367で、検索画面の下部フィルター導線を検索前から使えるようにし、グループ選択後だけメンバーとグッズタグ候補を表示するNative sheetへ整理した。現地交換日付は複数日、現地交換場所は都道府県として選択できる。
+- iter367で、取引チャットの入力欄を `safeAreaInset` に寄せ、スケジュール、再打診、通報などを入力欄上のメニューへ整理した。写真、位置情報、system、到着状態のメッセージrequest builderも追加した。
+- iter367で、取引チャットの共有写真ビューアをピンチズーム、ズーム中ドラッグ、ダブルタップリセットに対応させた。
 
 ### Phase 4: Meguri core
 
@@ -184,6 +189,8 @@ tar -xzf /Users/michitaka/Desktop/Megrum_backups/pre-swift-migration-20260531-03
 - iter336で、めぐりメッセージ会話を開いた時に受信メッセージの `read_at` を更新するSwift Native既読化境界を追加した。
 - iter365で、位置情報拒否/未許可/許可後の表示、MapKit初期中心と範囲円、カメラ不可端末、グルーム画像読み込み失敗、掲示板返信送信時の座標引き継ぎを補強した。
 - iter366で、グルーム画像のsigned URL作成に失敗してもpath-only rowをfeedから落とさず、UIが回復可能に扱える相対URLとして保持するようにした。
+- iter367で、めぐり掲示板詳細の余分なヘッダー/操作群を減らし、スレッド本文を開始メッセージ、返信をチャット風の吹き出しとして表示する方向へ整理した。
+- iter367で、グルームマップのstatus表示を現在地から1km範囲の確認用途に寄せた。範囲外ピンの完全な閲覧制御は、distance/canViewを返すRPC拡張と合わせて後続で詰める。
 
 ### Phase 5: Cutover
 
@@ -191,6 +198,8 @@ tar -xzf /Users/michitaka/Desktop/Megrum_backups/pre-swift-migration-20260531-03
 - 既存RN版との画面・機能差分をチェックリスト化する。
 - App Store提出前に、Bundle ID、Associated Domains、通知、権限文言、Privacy Manifest、規約リンクを最終確認する。
 - iter365で、RN parity / QAのread-only監査を実施し、Swift版に残るP0/P1差分を「TestFlightで見るべき通しシナリオ」として統合役が保持する運用にした。
+- iter367で、Swift Native PreviewのBuildを `2` に更新し、`ITSAppUsesNonExemptEncryption=false` をInfo.plistへ追加した。
+- iter367で、`MTO’s phone` 向けに署名付きDebugビルドを作成し、`tokyo.megrum.native.preview` を直接インストールできることを確認した。端末ロック中のため自動launchはOSに拒否されたが、インストール自体は成功済み。
 
 ## 完了条件
 

@@ -3,23 +3,127 @@ import MegrumCore
 import MegrumDesign
 import SwiftUI
 
+private func searchFilterDateText(_ date: Date) -> String {
+    date.formatted(
+        .dateTime
+            .locale(Locale(identifier: "ja_JP"))
+            .month()
+            .day()
+            .weekday(.abbreviated)
+    )
+}
+
+private let searchFilterJapanesePrefectures = [
+    "北海道", "青森県", "岩手県", "宮城県", "秋田県", "山形県", "福島県",
+    "茨城県", "栃木県", "群馬県", "埼玉県", "千葉県", "東京都", "神奈川県",
+    "新潟県", "富山県", "石川県", "福井県", "山梨県", "長野県",
+    "岐阜県", "静岡県", "愛知県", "三重県",
+    "滋賀県", "京都府", "大阪府", "兵庫県", "奈良県", "和歌山県",
+    "鳥取県", "島根県", "岡山県", "広島県", "山口県",
+    "徳島県", "香川県", "愛媛県", "高知県",
+    "福岡県", "佐賀県", "長崎県", "熊本県", "大分県", "宮崎県", "鹿児島県", "沖縄県"
+]
+
 struct SearchScreen: View {
     @ObservedObject var appState: MegrumAppState
 
     @Environment(\.dismiss) private var dismiss
     @State private var query = ""
     @State private var selectedGroupID: UUID?
+    @State private var selectedMemberID: UUID?
     @State private var selectedGoodsTypeID: UUID?
+    @State private var selectedGoodsTagNames: Set<String> = []
+    @State private var selectedMeetupDates: [Date] = []
+    @State private var meetupDateDraft = Date()
+    @State private var selectedMeetupPrefecture = ""
     @State private var searchTask: Task<Void, Never>?
     @State private var proposalTargetItem: GoodsItem?
     @State private var profileRoute: PublicProfileRoute?
+    @State private var isShowingFilters = false
 
     private var resultCount: Int {
-        appState.searchResults.count
+        filteredSearchResults.count
     }
 
     private func results(in bucket: SearchMatchBucket) -> [SearchResultItem] {
-        appState.searchResults.filter { $0.bucket == bucket }
+        filteredSearchResults.filter { $0.bucket == bucket }
+    }
+
+    private var filteredSearchResults: [SearchResultItem] {
+        appState.searchResults.filter { result in
+            if let selectedMemberID, result.item.memberID != selectedMemberID {
+                return false
+            }
+            if !selectedGoodsTagNames.isEmpty {
+                let itemTagNames = Set(result.item.tags.map(\.name))
+                if !selectedGoodsTagNames.isSubset(of: itemTagNames) {
+                    return false
+                }
+            }
+            return true
+        }
+    }
+
+    private var selectedGroup: OshiGroup? {
+        guard let selectedGroupID else {
+            return nil
+        }
+        return appState.oshiGroups.first { $0.id == selectedGroupID }
+    }
+
+    private var selectedMember: OshiCharacter? {
+        guard let selectedMemberID else {
+            return nil
+        }
+        return appState.oshiCharacters.first { $0.id == selectedMemberID }
+    }
+
+    private var selectedGoodsType: GoodsType? {
+        guard let selectedGoodsTypeID else {
+            return nil
+        }
+        return appState.goodsTypes.first { $0.id == selectedGoodsTypeID }
+    }
+
+    private var availableGoodsTagNames: [String] {
+        let tags = appState.searchResults
+            .filter { result in
+                selectedGroupID == nil || result.item.groupID == selectedGroupID
+            }
+            .flatMap { $0.item.tags.map(\.name) }
+        return Array(Set(tags)).sorted { $0.localizedStandardCompare($1) == .orderedAscending }
+    }
+
+    private var activeFilterCount: Int {
+        var count = 0
+        if selectedGroupID != nil { count += 1 }
+        if selectedMemberID != nil { count += 1 }
+        if selectedGoodsTypeID != nil { count += 1 }
+        count += selectedGoodsTagNames.count
+        if !selectedMeetupDates.isEmpty { count += 1 }
+        if !selectedMeetupPrefecture.isEmpty { count += 1 }
+        return count
+    }
+
+    private var filterSummaryTitles: [String] {
+        var titles: [String] = []
+        if let selectedGroup {
+            titles.append(selectedGroup.name)
+        }
+        if let selectedMember {
+            titles.append(selectedMember.name)
+        }
+        if let selectedGoodsType {
+            titles.append(selectedGoodsType.name)
+        }
+        titles.append(contentsOf: selectedGoodsTagNames.sorted())
+        if !selectedMeetupDates.isEmpty {
+            titles.append("日付\(selectedMeetupDates.count)件")
+        }
+        if !selectedMeetupPrefecture.isEmpty {
+            titles.append(selectedMeetupPrefecture)
+        }
+        return titles
     }
 
     var body: some View {
@@ -46,11 +150,12 @@ struct SearchScreen: View {
                         .font(.system(size: 58, weight: .heavy, design: .rounded))
                         .foregroundStyle(MegrumTheme.lavender)
 
-                    SearchFilterBar(
-                        appState: appState,
-                        selectedGroupID: $selectedGroupID,
-                        selectedGoodsTypeID: $selectedGoodsTypeID
-                    )
+                    SearchFilterSummaryBar(
+                        activeFilterCount: activeFilterCount,
+                        summaryTitles: filterSummaryTitles
+                    ) {
+                        isShowingFilters = true
+                    }
 
                     HStack(alignment: .firstTextBaseline, spacing: 8) {
                         Text("\(resultCount)件")
@@ -64,7 +169,7 @@ struct SearchScreen: View {
 
                     if appState.isSearchingGoods && appState.searchResults.isEmpty {
                         SearchResultSkeleton()
-                    } else if appState.searchResults.isEmpty {
+                    } else if filteredSearchResults.isEmpty {
                         SearchEmptyMessage()
                     } else {
                         SearchResultSection(results: results(in: .matched), bucket: .matched, viewerID: appState.viewer?.id) { item in
@@ -95,7 +200,13 @@ struct SearchScreen: View {
                 .padding(.bottom, 132)
             }
 
-            SearchInputBar(query: $query) {
+            SearchFooterBar(
+                query: $query,
+                activeFilterCount: activeFilterCount,
+                onFilterTap: {
+                    isShowingFilters = true
+                }
+            ) {
                 scheduleSearch(delayNanoseconds: 0)
             }
                 .padding(.horizontal, 22)
@@ -110,6 +221,12 @@ struct SearchScreen: View {
             scheduleSearch()
         }
         .onChange(of: selectedGroupID) { _, _ in
+            selectedMemberID = nil
+            selectedGoodsTypeID = nil
+            selectedGoodsTagNames = []
+            Task {
+                await appState.loadOshiCharacters(group: selectedGroup)
+            }
             scheduleSearch(delayNanoseconds: 0)
         }
         .onChange(of: selectedGoodsTypeID) { _, _ in
@@ -127,6 +244,25 @@ struct SearchScreen: View {
             NavigationStack {
                 PublicUserProfileScreen(appState: appState, userID: route.userID)
             }
+        }
+        .sheet(isPresented: $isShowingFilters) {
+            NavigationStack {
+                SearchFilterSheet(
+                    appState: appState,
+                    selectedGroupID: $selectedGroupID,
+                    selectedMemberID: $selectedMemberID,
+                    selectedGoodsTypeID: $selectedGoodsTypeID,
+                    selectedGoodsTagNames: $selectedGoodsTagNames,
+                    selectedMeetupDates: $selectedMeetupDates,
+                    meetupDateDraft: $meetupDateDraft,
+                    selectedMeetupPrefecture: $selectedMeetupPrefecture,
+                    availableGoodsTagNames: availableGoodsTagNames,
+                    onReset: resetFilters
+                )
+            }
+            #if os(iOS)
+            .presentationDetents([.medium, .large])
+            #endif
         }
     }
 
@@ -161,6 +297,19 @@ struct SearchScreen: View {
             await appState.searchGoods(query: query, groupID: selectedGroupID, goodsTypeID: selectedGoodsTypeID)
         }
     }
+
+    private func resetFilters() {
+        selectedGroupID = nil
+        selectedMemberID = nil
+        selectedGoodsTypeID = nil
+        selectedGoodsTagNames = []
+        selectedMeetupDates = []
+        selectedMeetupPrefecture = ""
+        Task {
+            await appState.loadOshiCharacters(group: nil)
+        }
+        scheduleSearch(delayNanoseconds: 0)
+    }
 }
 
 private struct SearchInputBar: View {
@@ -179,6 +328,7 @@ private struct SearchInputBar: View {
                 .onSubmit(onSubmit)
         }
         .padding(.horizontal, 20)
+        .frame(maxWidth: .infinity)
         .frame(height: 62)
         .background(.regularMaterial, in: Capsule())
         .overlay(Capsule().stroke(.white.opacity(0.72), lineWidth: 1))
@@ -186,66 +336,287 @@ private struct SearchInputBar: View {
     }
 }
 
-private struct SearchFilterBar: View {
-    @ObservedObject var appState: MegrumAppState
-    @Binding var selectedGroupID: UUID?
-    @Binding var selectedGoodsTypeID: UUID?
+private struct SearchFooterBar: View {
+    @Binding var query: String
+    var activeFilterCount: Int
+    var onFilterTap: () -> Void
+    var onSubmit: () -> Void
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            SearchFilterRow(title: "グループ", isLoading: appState.isLoadingOshiGroups) {
-                SearchFilterChip(title: "すべて", isSelected: selectedGroupID == nil) {
-                    selectedGroupID = nil
-                }
-                ForEach(appState.oshiGroups) { group in
-                    SearchFilterChip(title: group.name, isSelected: selectedGroupID == group.id) {
-                        selectedGroupID = group.id
-                    }
-                }
-            }
+        HStack(spacing: 12) {
+            Button(action: onFilterTap) {
+                ZStack(alignment: .topTrailing) {
+                    Image(systemName: "line.3.horizontal.decrease.circle.fill")
+                        .font(.system(size: 29, weight: .bold))
+                        .foregroundStyle(MegrumTheme.lavender)
+                        .frame(width: 62, height: 62)
+                        .background(.regularMaterial, in: Circle())
+                        .overlay(Circle().stroke(.white.opacity(0.72), lineWidth: 1))
 
-            SearchFilterRow(title: "グッズ種別", isLoading: appState.isLoadingGoodsTypes) {
-                SearchFilterChip(title: "すべて", isSelected: selectedGoodsTypeID == nil) {
-                    selectedGoodsTypeID = nil
-                }
-                ForEach(appState.goodsTypes) { goodsType in
-                    SearchFilterChip(title: goodsType.name, isSelected: selectedGoodsTypeID == goodsType.id) {
-                        selectedGoodsTypeID = goodsType.id
+                    if activeFilterCount > 0 {
+                        Text("\(activeFilterCount)")
+                            .font(.system(size: 12, weight: .black, design: .rounded))
+                            .foregroundStyle(.white)
+                            .frame(width: 22, height: 22)
+                            .background(MegrumTheme.lavender, in: Circle())
+                            .offset(x: 2, y: -2)
                     }
                 }
             }
+            .buttonStyle(.plain)
+            .accessibilityLabel("検索フィルター")
+
+            SearchInputBar(query: $query, onSubmit: onSubmit)
         }
     }
 }
 
-private struct SearchFilterRow<Content: View>: View {
-    var title: String
-    var isLoading: Bool
-    var content: Content
+private struct SearchFilterSummaryBar: View {
+    var activeFilterCount: Int
+    var summaryTitles: [String]
+    var onTap: () -> Void
 
-    init(title: String, isLoading: Bool, @ViewBuilder content: () -> Content) {
-        self.title = title
-        self.isLoading = isLoading
-        self.content = content()
+    var body: some View {
+        Button(action: onTap) {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack(spacing: 10) {
+                    Image(systemName: "slider.horizontal.3")
+                        .font(.system(size: 18, weight: .heavy))
+                        .foregroundStyle(MegrumTheme.lavender)
+
+                    Text("絞り込み")
+                        .font(.system(size: 18, weight: .black, design: .rounded))
+                        .foregroundStyle(MegrumTheme.ink)
+
+                    Spacer()
+
+                    if activeFilterCount > 0 {
+                        Text("\(activeFilterCount)件")
+                            .font(.system(size: 14, weight: .black, design: .rounded))
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 12)
+                            .frame(height: 30)
+                            .background(MegrumTheme.lavender, in: Capsule())
+                    }
+
+                    Image(systemName: "chevron.up.chevron.down")
+                        .font(.system(size: 14, weight: .heavy))
+                        .foregroundStyle(MegrumTheme.muted)
+                }
+
+                if summaryTitles.isEmpty {
+                    Text("グループを選ぶと、メンバーとグッズタグを選択できます")
+                        .font(.system(size: 15, weight: .bold, design: .rounded))
+                        .foregroundStyle(MegrumTheme.muted)
+                        .fixedSize(horizontal: false, vertical: true)
+                } else {
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 8) {
+                            ForEach(summaryTitles, id: \.self) { title in
+                                Text(title)
+                                    .font(.system(size: 14, weight: .heavy, design: .rounded))
+                                    .foregroundStyle(MegrumTheme.ink)
+                                    .lineLimit(1)
+                                    .padding(.horizontal, 12)
+                                    .frame(height: 34)
+                                    .background(.white.opacity(0.76), in: Capsule())
+                            }
+                        }
+                    }
+                }
+            }
+            .padding(16)
+            .background(.white.opacity(0.82), in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: 22, style: .continuous)
+                    .stroke(.white.opacity(0.72), lineWidth: 1)
+            }
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+private struct SearchFilterSheet: View {
+    @ObservedObject var appState: MegrumAppState
+    @Binding var selectedGroupID: UUID?
+    @Binding var selectedMemberID: UUID?
+    @Binding var selectedGoodsTypeID: UUID?
+    @Binding var selectedGoodsTagNames: Set<String>
+    @Binding var selectedMeetupDates: [Date]
+    @Binding var meetupDateDraft: Date
+    @Binding var selectedMeetupPrefecture: String
+    var availableGoodsTagNames: [String]
+    var onReset: () -> Void
+
+    @Environment(\.dismiss) private var dismiss
+
+    private var hasSelectedGroup: Bool {
+        selectedGroupID != nil
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 8) {
-                Text(title)
-                    .font(.system(size: 13, weight: .heavy, design: .rounded))
-                    .foregroundStyle(MegrumTheme.muted)
-                if isLoading {
-                    ProgressView()
-                        .controlSize(.small)
+        Form {
+            Section {
+                Picker("グループ", selection: $selectedGroupID) {
+                    Text("すべて").tag(Optional<UUID>.none)
+                    ForEach(appState.oshiGroups) { group in
+                        Text(group.name).tag(Optional(group.id))
+                    }
+                }
+                .font(.system(size: 17, weight: .bold, design: .rounded))
+
+                if appState.isLoadingOshiGroups {
+                    ProgressView("グループを読み込み中")
+                }
+            } header: {
+                Text("グループ")
+            }
+
+            if hasSelectedGroup {
+                Section {
+                    Picker("メンバー", selection: $selectedMemberID) {
+                        Text("グループ全体").tag(Optional<UUID>.none)
+                        ForEach(appState.oshiCharacters) { character in
+                            Text(character.name).tag(Optional(character.id))
+                        }
+                    }
+                    .font(.system(size: 17, weight: .bold, design: .rounded))
+
+                    if appState.isLoadingOshiCharacters {
+                        ProgressView("メンバーを読み込み中")
+                    }
+                } header: {
+                    Text("メンバー")
+                }
+
+                Section {
+                    Picker("グッズタグ", selection: $selectedGoodsTypeID) {
+                        Text("すべて").tag(Optional<UUID>.none)
+                        ForEach(appState.goodsTypes) { goodsType in
+                            Text(goodsType.name).tag(Optional(goodsType.id))
+                        }
+                    }
+                    .font(.system(size: 17, weight: .bold, design: .rounded))
+
+                    if appState.isLoadingGoodsTypes {
+                        ProgressView("グッズタグを読み込み中")
+                    }
+
+                    if availableGoodsTagNames.isEmpty {
+                        Text("検索結果にタグ候補があると、ここで複数選択できます。")
+                            .font(.system(size: 15, weight: .bold, design: .rounded))
+                            .foregroundStyle(MegrumTheme.muted)
+                    } else {
+                        SearchWrappingTagPicker(
+                            tags: availableGoodsTagNames,
+                            selectedTags: $selectedGoodsTagNames
+                        )
+                        .padding(.vertical, 4)
+                    }
+                } header: {
+                    Text("グッズタグ")
+                } footer: {
+                    Text("グループを選んだあとに表示します。")
                 }
             }
 
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 10) {
-                    content
+            Section {
+                HStack {
+                    DatePicker("日付を追加", selection: $meetupDateDraft, displayedComponents: .date)
+                        .font(.system(size: 17, weight: .bold, design: .rounded))
+                    Button("追加") {
+                        addMeetupDate(meetupDateDraft)
+                    }
+                    .font(.system(size: 16, weight: .heavy, design: .rounded))
                 }
-                .padding(.vertical, 2)
+
+                if selectedMeetupDates.isEmpty {
+                    Text("指定なし")
+                        .font(.system(size: 15, weight: .bold, design: .rounded))
+                        .foregroundStyle(MegrumTheme.muted)
+                } else {
+                    ForEach(selectedMeetupDates, id: \.self) { date in
+                        HStack {
+                            Text(searchFilterDateText(date))
+                                .font(.system(size: 16, weight: .bold, design: .rounded))
+                            Spacer()
+                            Button {
+                                removeMeetupDate(date)
+                            } label: {
+                                Image(systemName: "xmark.circle.fill")
+                                    .foregroundStyle(MegrumTheme.muted)
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                }
+            } header: {
+                Text("待ち合わせ日")
+            } footer: {
+                Text("現時点では端末内の選択です。日程条件の検索連携は後続のAPI接続で行います。")
+            }
+
+            Section {
+                Picker("都道府県", selection: $selectedMeetupPrefecture) {
+                    Text("指定なし").tag("")
+                    ForEach(searchFilterJapanesePrefectures, id: \.self) { prefecture in
+                        Text(prefecture).tag(prefecture)
+                    }
+                }
+                .font(.system(size: 17, weight: .bold, design: .rounded))
+            } header: {
+                Text("待ち合わせ場所")
+            }
+
+            Section {
+                Button("すべてリセット", role: .destructive) {
+                    onReset()
+                }
+                .font(.system(size: 17, weight: .heavy, design: .rounded))
+            }
+        }
+        .navigationTitle("検索フィルター")
+        .megrumInlineNavigationTitle()
+        .toolbar {
+            ToolbarItem(placement: .confirmationAction) {
+                Button("完了") {
+                    dismiss()
+                }
+            }
+        }
+    }
+
+    private func addMeetupDate(_ date: Date) {
+        let normalizedDate = Calendar.current.startOfDay(for: date)
+        guard !selectedMeetupDates.contains(normalizedDate) else {
+            return
+        }
+        selectedMeetupDates.append(normalizedDate)
+        selectedMeetupDates.sort()
+    }
+
+    private func removeMeetupDate(_ date: Date) {
+        let normalizedDate = Calendar.current.startOfDay(for: date)
+        selectedMeetupDates.removeAll { Calendar.current.isDate($0, inSameDayAs: normalizedDate) }
+    }
+}
+
+private struct SearchWrappingTagPicker: View {
+    var tags: [String]
+    @Binding var selectedTags: Set<String>
+
+    private let columns = [GridItem(.adaptive(minimum: 118), spacing: 10)]
+
+    var body: some View {
+        LazyVGrid(columns: columns, alignment: .leading, spacing: 10) {
+            ForEach(tags, id: \.self) { tag in
+                SearchFilterChip(title: tag, isSelected: selectedTags.contains(tag)) {
+                    if selectedTags.contains(tag) {
+                        selectedTags.remove(tag)
+                    } else {
+                        selectedTags.insert(tag)
+                    }
+                }
             }
         }
     }
@@ -262,8 +633,8 @@ private struct SearchFilterChip: View {
                 .font(.system(size: 15, weight: .heavy, design: .rounded))
                 .lineLimit(1)
                 .foregroundStyle(isSelected ? .white : MegrumTheme.ink)
-                .padding(.horizontal, 16)
-                .frame(height: 42)
+                .padding(.horizontal, 18)
+                .frame(minHeight: 46)
                 .background(isSelected ? AnyShapeStyle(MegrumTheme.lavender) : AnyShapeStyle(.regularMaterial), in: Capsule())
                 .overlay {
                     Capsule()

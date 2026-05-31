@@ -37,6 +37,8 @@
 	<string>public.app-category.social-networking</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 	<key>MegrumAuthEmailRedirectURL</key>
 	<string>$(MEGRUM_AUTH_EMAIL_REDIRECT_URL)</string>
 	<key>MegrumSupabasePublishableKey</key>

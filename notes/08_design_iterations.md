@@ -4,6 +4,92 @@
 
 ---
 
+## イテレーション367：Swift実機レビュー版を並列強化
+
+### 背景・問題意識
+
+Swift Native版を最大並列で進めたいという要望を受け、検索、取引チャット、めぐり掲示板、認証、TestFlight readinessを競合しない範囲に分けて同時に実装した。加えて、更新後すぐiPhoneで確認したいという要望があったため、統合後にXcode実機ビルドと直接インストールまで実施した。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/SearchScreen.swift`
+- 検索前から使える下部フィルター導線を追加し、SwiftUI標準のsheet / Formで検索条件を編集できるようにした。
+- グループ未選択時はメンバーとグッズタグを非表示にし、グループ選択後だけ紐づく候補を表示するようにした。
+- 現地交換日付は複数日選択、現地交換場所は都道府県選択として扱い、UI部品の文字とタップ領域を大きめにした。
+
+#### `ios-native/Sources/MegrumApp/TradesScreen.swift`
+- 取引チャットの入力欄を `safeAreaInset` に寄せ、下部ナビと重なりにくい構造へ変更した。
+- スケジュール、再打診、通報などの操作を入力欄上のメニューへ整理した。
+- `system` / `location` / `arrival_status` / `photo` / `outfit_photo` のメッセージ表示を型に応じて出し分けた。
+- 共有写真の全画面表示でピンチズーム、ズーム中ドラッグ、ダブルタップリセットに対応した。
+
+#### `ios-native/Sources/MegrumData/SupabaseMessageClient.swift`
+- 写真、位置情報、system、到着状態のメッセージrequest builderを追加し、既存text送信のトリム挙動は維持した。
+
+#### `ios-native/Sources/MegrumApp/MeguriScreen.swift`
+- 掲示板詳細の上部カードや余分な操作群を減らし、取引チャット寄りの吹き出し表示へ整理した。
+- スレッド本文は開始メッセージとして表示し、返信は本文と時刻が読みやすいチャット風レイアウトにした。
+- グルームマップは現在地から1km範囲を見せる意図が伝わるstatus表示へ寄せた。
+
+#### `ios-native/Sources/MegrumApp/AuthScreen.swift` / `MegrumAuthState.swift`
+- 認証フォームのdisabled状態、入力正規化、ハンドル名validation、Supabase error表示を補強した。
+- live設定がない場合はAppleログインボタンを無効にし、preview fallback時の誤操作を減らした。
+
+#### `ios-native/Sources/MegrumData/SupabaseAuthClient.swift`
+- Google OAuth authorize URL / request builderを追加し、UI接続前にrequest生成をテスト可能にした。
+
+#### `ios-native/App/Info.plist` / `ios-native/MegrumNative.xcodeproj/project.pbxproj`
+- Swift Native PreviewのBuildを `2` に更新した。
+- `ITSAppUsesNonExemptEncryption=false` を追加し、App Store Connectの暗号化確認で不要な詰まりを減らした。
+
+#### `ios-native/Tests/`
+- Auth validation、Google OAuth request、rich message requestのテストを追加・更新した。
+
+### 影響範囲
+
+- Swift Native検索画面と検索フィルター
+- Swift Native取引チャット
+- Swift Nativeめぐり掲示板詳細
+- Swift Native認証フォーム
+- Swift Native message/auth request builder
+- TestFlight / 実機確認用のBuild番号とInfo.plist
+
+### 確認方法
+
+- `git diff --check -- ios-native`
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-integrated-build-2`
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-integrated-test-2 --enable-xctest --disable-swift-testing -j 1`
+- `xcodebuild -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -destination 'generic/platform=iOS Simulator' -derivedDataPath /tmp/megrum-native-xcodebuild CODE_SIGNING_ALLOWED=NO build`
+- `xcodebuild -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -destination 'platform=iOS,id=00008120-000C49C43669A01E' -derivedDataPath /tmp/megrum-native-device-build build`
+- `xcrun devicectl device install app --device 00008120-000C49C43669A01E /tmp/megrum-native-device-build/Build/Products/Debug-iphoneos/MegrumNative.app`
+
+### 関連ファイル
+
+- `ios-native/App/Info.plist`
+- `ios-native/MegrumNative.xcodeproj/project.pbxproj`
+- `ios-native/Sources/MegrumApp/AuthScreen.swift`
+- `ios-native/Sources/MegrumApp/MegrumAuthState.swift`
+- `ios-native/Sources/MegrumApp/MeguriScreen.swift`
+- `ios-native/Sources/MegrumApp/SearchScreen.swift`
+- `ios-native/Sources/MegrumApp/TradesScreen.swift`
+- `ios-native/Sources/MegrumData/SupabaseAuthClient.swift`
+- `ios-native/Sources/MegrumData/SupabaseMessageClient.swift`
+- `ios-native/Tests/MegrumAppTests/MegrumAppStateTests.swift`
+- `ios-native/Tests/MegrumDataTests/SupabaseAuthClientTests.swift`
+- `ios-native/Tests/MegrumDataTests/SupabaseMessageClientTests.swift`
+- `notes/22_swift_native_migration.md`
+
+### セルフレビュー結果
+
+- ✅ サブエージェントごとに編集ファイルを分け、共通docsとXcode統合は統合役側で扱った
+- ✅ `swift build` / `swift test` / `xcodebuild` Simulator build / 実機build が成功した
+- ✅ `MTO’s phone` へ `tokyo.megrum.native.preview` を直接インストールできた
+- ✅ 状態名やDBスキーマの追加はないため、`notes/09` / `notes/05` 更新は不要と判断した
+- ⚠️ 実機launchは端末ロック中のためOSに拒否された。インストール自体は成功済み
+- ⚠️ 検索フィルターのメンバー、グッズタグ、日付、都道府県は現時点では端末内フィルタ中心。サーバー側の完全絞り込みは後続のRPC/API拡張が必要
+
+---
+
 ## イテレーション366：Swift P0実機ブロッカーを並列解消
 
 ### 背景・問題意識
