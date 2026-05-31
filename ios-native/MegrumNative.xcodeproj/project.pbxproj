@@ -143,6 +143,7 @@
 				INFOPLIST_KEY_MegrumSupabasePublishableKey = "";
 				INFOPLIST_KEY_MegrumSupabaseURL = "";
 				INFOPLIST_KEY_MegrumSupabaseViewerID = "";
+				INFOPLIST_KEY_NSCameraUsageDescription = "交換完了時の証跡写真を撮影するためにカメラを使用します。";
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "現在地を使って近くのグルームと掲示板を表示します。";
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UIStatusBarStyle = UIStatusBarStyleDefault;
@@ -176,6 +177,7 @@
 				INFOPLIST_KEY_MegrumSupabasePublishableKey = "";
 				INFOPLIST_KEY_MegrumSupabaseURL = "";
 				INFOPLIST_KEY_MegrumSupabaseViewerID = "";
+				INFOPLIST_KEY_NSCameraUsageDescription = "交換完了時の証跡写真を撮影するためにカメラを使用します。";
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "現在地を使って近くのグルームと掲示板を表示します。";
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UIStatusBarStyle = UIStatusBarStyleDefault;

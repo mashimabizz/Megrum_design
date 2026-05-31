@@ -2,6 +2,9 @@ import MegrumCore
 import MegrumDesign
 import PhotosUI
 import SwiftUI
+#if os(iOS)
+import UIKit
+#endif
 
 struct TradesScreen: View {
     @ObservedObject var appState: MegrumAppState
@@ -236,6 +239,7 @@ private struct TradeDetailScreen: View {
     @Environment(\.dismiss) private var dismiss
     @State private var draftMessage = ""
     @State private var selectedEvidencePhotoItem: PhotosPickerItem?
+    @State private var isShowingEvidenceCamera = false
     @State private var isShowingEvaluationSheet = false
 
     private var messages: [TradeMessage] {
@@ -269,6 +273,10 @@ private struct TradeDetailScreen: View {
                             selectedPhotoItem: $selectedEvidencePhotoItem,
                             isAddingEvidence: appState.addingEvidenceProposalID == currentProposal.id,
                             isApproving: appState.approvingEvidenceProposalID == currentProposal.id,
+                            canUseCamera: canUseCamera,
+                            onOpenCamera: {
+                                isShowingEvidenceCamera = true
+                            },
                             onApprove: {
                                 Task {
                                     await appState.approveTradeEvidence(proposalID: currentProposal.id)
@@ -351,6 +359,16 @@ private struct TradeDetailScreen: View {
             .presentationDetents([.medium])
             .presentationDragIndicator(.visible)
         }
+#if os(iOS)
+        .sheet(isPresented: $isShowingEvidenceCamera) {
+            EvidenceCameraCaptureView { imageData in
+                Task {
+                    await addEvidence(data: imageData, imageContentType: "image/jpeg")
+                }
+            }
+            .ignoresSafeArea()
+        }
+#endif
         .toolbar {
             ToolbarItem(placement: .cancellationAction) {
                 Button("閉じる") {
@@ -367,11 +385,23 @@ private struct TradeDetailScreen: View {
         guard let data = try? await item.loadTransferable(type: Data.self) else {
             return
         }
+        await addEvidence(data: data, imageContentType: inferredEvidenceImageContentType(from: data))
+    }
+
+    private func addEvidence(data: Data, imageContentType: String) async {
         _ = await appState.addTradeEvidence(
             proposalID: currentProposal.id,
             imageData: data,
-            imageContentType: inferredEvidenceImageContentType(from: data)
+            imageContentType: imageContentType
         )
+    }
+
+    private var canUseCamera: Bool {
+#if os(iOS)
+        UIImagePickerController.isSourceTypeAvailable(.camera)
+#else
+        false
+#endif
     }
 
     private func detailRow(title: String, value: String) -> some View {
@@ -416,6 +446,8 @@ private struct TradeEvidencePanel: View {
     @Binding var selectedPhotoItem: PhotosPickerItem?
     var isAddingEvidence: Bool
     var isApproving: Bool
+    var canUseCamera: Bool
+    var onOpenCamera: () -> Void
     var onApprove: () -> Void
     var onRate: () -> Void
 
@@ -499,13 +531,24 @@ private struct TradeEvidencePanel: View {
                 }
                 .buttonStyle(.plain)
             } else if proposal.evidencePhotoURL == nil {
-                PhotosPicker(selection: $selectedPhotoItem, matching: .images) {
+                Button(action: onOpenCamera) {
                     Label(isAddingEvidence ? "追加中" : "交換後にグッズを撮影", systemImage: "camera.fill")
                         .font(.system(size: 16, weight: .heavy, design: .rounded))
                         .frame(maxWidth: .infinity)
                         .frame(height: 54)
                         .background(MegrumTheme.lavender, in: Capsule())
                         .foregroundStyle(.white)
+                }
+                .buttonStyle(.plain)
+                .disabled(isAddingEvidence || !canUseCamera)
+
+                PhotosPicker(selection: $selectedPhotoItem, matching: .images) {
+                    Label("写真から選ぶ", systemImage: "photo.on.rectangle")
+                        .font(.system(size: 15, weight: .heavy, design: .rounded))
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 48)
+                        .background(.white.opacity(0.76), in: Capsule())
+                        .foregroundStyle(MegrumTheme.ink)
                 }
                 .buttonStyle(.plain)
                 .disabled(isAddingEvidence)
@@ -705,6 +748,56 @@ private struct TradePreviewColumn: View {
         }
     }
 }
+
+#if os(iOS)
+private struct EvidenceCameraCaptureView: UIViewControllerRepresentable {
+    var onCapture: (Data) -> Void
+    @Environment(\.dismiss) private var dismiss
+
+    func makeUIViewController(context: Context) -> UIImagePickerController {
+        let picker = UIImagePickerController()
+        picker.sourceType = .camera
+        picker.cameraCaptureMode = .photo
+        picker.allowsEditing = false
+        picker.delegate = context.coordinator
+        return picker
+    }
+
+    func updateUIViewController(_ uiViewController: UIImagePickerController, context: Context) {}
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(onCapture: onCapture, dismiss: dismiss)
+    }
+
+    final class Coordinator: NSObject, UINavigationControllerDelegate, UIImagePickerControllerDelegate {
+        private let onCapture: (Data) -> Void
+        private let dismiss: DismissAction
+
+        init(onCapture: @escaping (Data) -> Void, dismiss: DismissAction) {
+            self.onCapture = onCapture
+            self.dismiss = dismiss
+        }
+
+        func imagePickerController(
+            _ picker: UIImagePickerController,
+            didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey: Any]
+        ) {
+            defer {
+                dismiss()
+            }
+            guard let image = info[.originalImage] as? UIImage,
+                  let data = image.jpegData(compressionQuality: 0.88) else {
+                return
+            }
+            onCapture(data)
+        }
+
+        func imagePickerControllerDidCancel(_ picker: UIImagePickerController) {
+            dismiss()
+        }
+    }
+}
+#endif
 
 private extension String {
     var nilIfEmpty: String? {

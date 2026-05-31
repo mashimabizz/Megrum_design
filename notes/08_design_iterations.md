@@ -4,6 +4,55 @@
 
 ---
 
+## イテレーション348：Swift証跡カメラ撮影を追加
+
+### 背景・問題意識
+
+iter347で取引完了フローはつながったが、証跡写真の追加はPhotosPickerのみで、ユーザーが求めていた「交換後にグッズを撮影する」体験としては弱かった。iOS一本化方針に合わせ、標準カメラ画面を使ってその場で撮影できる導線へ寄せる。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/TradesScreen.swift`
+- 取引詳細sheetの証跡パネルで、主ボタン「交換後にグッズを撮影」からiOSカメラを開くようにした。
+- カメラが使える端末では `UIImagePickerController` の `.camera` を使い、撮影画像をJPEGとして既存の `addTradeEvidence` へ渡すようにした。
+- 写真ライブラリから選ぶ導線は副ボタンとして残し、カメラ非対応環境でも確認できるようにした。
+
+#### `ios-native/MegrumNative.xcodeproj/project.pbxproj`
+- 生成Info.plist設定に `NSCameraUsageDescription` を追加した。
+
+#### `ios-native/README.md` / `notes/22_swift_native_migration.md` / `notes/10_glossary.md`
+- Swift Nativeの証跡撮影がiOSカメラとPhotosPickerの両方に対応したことを記録した。
+
+### 影響範囲
+
+- Swift Native版の取引詳細sheet
+- 証跡写真追加フロー
+- iOSカメラ権限文言
+
+### 確認方法
+
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-build --enable-xctest --disable-swift-testing -j 1`
+- `xcodebuild -quiet -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -destination 'generic/platform=iOS Simulator' -derivedDataPath /tmp/megrum-native-xcodebuild CODE_SIGNING_ALLOWED=NO build`
+- `git diff --check -- ios-native/Sources/MegrumApp/TradesScreen.swift ios-native/MegrumNative.xcodeproj/project.pbxproj ios-native/README.md notes/22_swift_native_migration.md notes/10_glossary.md notes/08_design_iterations.md`
+
+### 関連ファイル
+
+- `ios-native/Sources/MegrumApp/TradesScreen.swift`
+- `ios-native/MegrumNative.xcodeproj/project.pbxproj`
+- `ios-native/README.md`
+- `notes/22_swift_native_migration.md`
+- `notes/10_glossary.md`
+- `notes/08_design_iterations.md`
+
+### セルフレビュー結果
+
+- ✅ iOS標準のカメラUIを使い、独自カメラを作り込まない方針にした
+- ✅ 写真選択導線も残し、Simulatorやカメラ非対応環境でも操作不能にならないようにした
+- ✅ Native app targetにカメラ利用目的文言を追加した
+- ✅ 状態遷移・データモデルの変更はなく、`notes/09` / `notes/05` は更新不要と判断した
+
+---
+
 ## イテレーション347：Swift取引完了フローを追加
 
 ### 背景・問題意識
