@@ -4,6 +4,79 @@
 
 ---
 
+## イテレーション359：Swift打診の承諾拒否を接続
+
+### 背景・問題意識
+
+Swift Native版は相手プロフィールから打診を作れるようになったが、届いた打診に対して取引詳細から「この内容で承諾」「断る」を実行する導線が未接続だった。オーナーの実機レビューでは、Swift版のiOS標準デザイン感を維持する方針が確認されたため、旧Expo版へ見た目を寄せ戻さず、Native sheet / confirmation dialog / material cardの質感で交換フローを前進させる。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumCore/MegrumModels.swift`
+- `TradeProposal` に `agreedBySender` / `agreedByReceiver` を追加し、`proposals.agreed_by_*` をSwift型で保持できるようにした。
+- 自分側・相手側の合意状態を判定する `agreementBy` / `partnerAgreement` を追加した。
+
+#### `ios-native/Sources/MegrumData/SupabaseProposalClient.swift`
+- 打診の承諾 `agreeProposal` と、断る `rejectProposal` を追加した。
+- 承諾時は `agreed_by_sender` / `agreed_by_receiver` と `status` をPATCHし、両者合意なら `agreed`、片側合意なら `agreement_one_side` へ進めるようにした。
+- 断る時は `status='rejected'` に更新し、取引チャットへsystem messageを残すようにした。
+- `ProposalRow.select` と作成payloadに合意フラグを含め、読み込み直後から状態が欠落しないようにした。
+
+#### `ios-native/Sources/MegrumApp/MegrumAppState.swift` / `SupabaseMegrumRepository.swift`
+- Repository境界に `agreeProposal` / `rejectProposal` を追加し、Preview / Supabaseの両方で同じAppState APIを使えるようにした。
+- `respondingProposalID` を追加し、承諾・拒否中の重複操作を抑えられる状態を持たせた。
+- 更新後のproposalを一覧へ差し替え、取引チャットの再読込も走るようにした。
+
+#### `ios-native/Sources/MegrumApp/TradesScreen.swift`
+- 届いた打診の詳細に、Native material cardの承諾パネルを追加した。
+- 自分がまだ合意していない場合だけ「この内容で承諾」と「断る」を表示し、拒否はiOS標準のconfirmation dialogで確認するようにした。
+- 自分が合意済みの場合は、相手待ちの状態だけを静かに表示するようにした。
+
+#### `ios-native/Sources/MegrumApp/NativePreviewData.swift`
+- Preview dataに受信側として承諾・拒否を試せる打診を追加した。
+- 既存Preview proposalにも合意フラグを明示し、状態表示が実データに近くなるようにした。
+
+#### `ios-native/Tests/`
+- Supabaseの承諾・拒否PATCH request、合意フラグ付き作成payload、Preview AppStateの承諾・拒否更新をテストで検証した。
+
+#### `ios-native/README.md` / `notes/22_swift_native_migration.md`
+- Swift Native移行ステータスへ、打診レスポンス導線を追記した。
+- Swift版のiOS標準デザイン感を維持する方針を継続することを明記した。
+
+### 影響範囲
+
+- Swift Native版のやりとり一覧・取引詳細
+- 打診の `sent` / `agreement_one_side` / `agreed` / `rejected` 遷移
+- `proposals.agreed_by_sender` / `proposals.agreed_by_receiver` のSwift読み書き
+
+### 確認方法
+
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-build --enable-xctest --disable-swift-testing -j 1`
+- `xcodebuild -quiet -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -destination 'generic/platform=iOS Simulator' -derivedDataPath /tmp/megrum-native-xcodebuild CODE_SIGNING_ALLOWED=NO build`
+
+### 関連ファイル
+
+- `ios-native/Sources/MegrumCore/MegrumModels.swift`
+- `ios-native/Sources/MegrumData/SupabaseProposalClient.swift`
+- `ios-native/Sources/MegrumApp/MegrumAppState.swift`
+- `ios-native/Sources/MegrumApp/SupabaseMegrumRepository.swift`
+- `ios-native/Sources/MegrumApp/NativePreviewData.swift`
+- `ios-native/Sources/MegrumApp/TradesScreen.swift`
+- `ios-native/Tests/MegrumDataTests/SupabaseProposalClientTests.swift`
+- `ios-native/Tests/MegrumAppTests/MegrumAppStateTests.swift`
+- `ios-native/README.md`
+- `notes/22_swift_native_migration.md`
+- `notes/08_design_iterations.md`
+
+### セルフレビュー結果
+
+- ✅ 旧Expo版の見た目へ寄せ戻さず、SwiftUI標準のsheet、confirmation dialog、material cardで実装した
+- ✅ 状態名は既存 `ProposalStatus` と `notes/09` の `sent` / `agreement_one_side` / `agreed` / `rejected` を使い、新しい状態名は追加していない
+- ✅ 既存 `proposals.agreed_by_*` をSwift側へ接続しただけのため、DB migrationや `notes/05` 更新は不要と判断した
+- ✅ 新しい用語は追加していないため、`notes/10` は更新不要と判断した
+
+---
+
 ## イテレーション358：Swift相手プロフィールの交換導線を追加
 
 ### 背景・問題意識

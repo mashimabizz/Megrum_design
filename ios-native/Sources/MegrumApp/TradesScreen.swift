@@ -181,6 +181,12 @@ private enum TradeStage: String, CaseIterable, Identifiable {
     }
 }
 
+private extension TradeProposal {
+    var isProposalResponsePending: Bool {
+        [.sent, .negotiating, .agreementOneSide].contains(status)
+    }
+}
+
 private struct TradeStageBar: View {
     @Binding var selectedStage: TradeStage
     var pendingCount: Int
@@ -242,6 +248,7 @@ private struct TradeDetailScreen: View {
     @State private var isShowingEvidenceCamera = false
     @State private var isShowingEvaluationSheet = false
     @State private var isShowingDisputeSheet = false
+    @State private var isShowingRejectConfirmation = false
     @State private var selectedRemoteImage: RemoteImageSelection?
 
     private var messages: [TradeMessage] {
@@ -267,6 +274,22 @@ private struct TradeDetailScreen: View {
                     }
                     .padding(18)
                     .background(.white.opacity(0.84), in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+
+                    if currentProposal.isProposalResponsePending {
+                        TradeProposalResponsePanel(
+                            proposal: currentProposal,
+                            viewerID: appState.viewer?.id,
+                            isResponding: appState.respondingProposalID == currentProposal.id,
+                            onAgree: {
+                                Task {
+                                    await appState.agreeProposal(proposalID: currentProposal.id)
+                                }
+                            },
+                            onReject: {
+                                isShowingRejectConfirmation = true
+                            }
+                        )
+                    }
 
                     if currentProposal.status == .agreed || currentProposal.status == .completed {
                         TradeEvidencePanel(
@@ -385,6 +408,20 @@ private struct TradeDetailScreen: View {
             .presentationDetents([.medium, .large])
             .presentationDragIndicator(.visible)
         }
+        .confirmationDialog(
+            "この打診を断りますか？",
+            isPresented: $isShowingRejectConfirmation,
+            titleVisibility: .visible
+        ) {
+            Button("断る", role: .destructive) {
+                Task {
+                    await appState.rejectProposal(proposalID: currentProposal.id)
+                }
+            }
+            Button("キャンセル", role: .cancel) {}
+        } message: {
+            Text("断った後は、この打診では取引を進められません。")
+        }
 #if os(iOS)
         .fullScreenCover(item: $selectedRemoteImage) { selection in
             FullScreenRemoteImageView(url: selection.url)
@@ -479,6 +516,81 @@ private struct TradeDetailScreen: View {
             "キャンセル済"
         case .completed:
             "完了"
+        }
+    }
+}
+
+private struct TradeProposalResponsePanel: View {
+    var proposal: TradeProposal
+    var viewerID: UUID?
+    var isResponding: Bool
+    var onAgree: () -> Void
+    var onReject: () -> Void
+
+    private var canAgree: Bool {
+        guard let viewerID, proposal.isParticipant(viewerID) else {
+            return false
+        }
+        return !proposal.agreementBy(viewerID)
+    }
+
+    private var isWaitingForPartner: Bool {
+        guard let viewerID, proposal.isParticipant(viewerID) else {
+            return true
+        }
+        return proposal.agreementBy(viewerID) && !proposal.partnerAgreement(for: viewerID)
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Text("打診への返答")
+                .font(.system(size: 20, weight: .heavy, design: .rounded))
+                .foregroundStyle(MegrumTheme.ink)
+
+            if canAgree {
+                Button(action: onAgree) {
+                    Group {
+                        if isResponding {
+                            ProgressView()
+                                .tint(.white)
+                        } else {
+                            Label("この内容で承諾", systemImage: "checkmark.circle.fill")
+                        }
+                    }
+                    .font(.system(size: 16, weight: .heavy, design: .rounded))
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 54)
+                    .background(MegrumTheme.lavender, in: Capsule())
+                    .foregroundStyle(.white)
+                }
+                .buttonStyle(.plain)
+                .disabled(isResponding)
+
+                Button(role: .destructive, action: onReject) {
+                    Label("断る", systemImage: "xmark.circle")
+                        .font(.system(size: 15, weight: .heavy, design: .rounded))
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 48)
+                }
+                .buttonStyle(.bordered)
+                .disabled(isResponding)
+            } else {
+                HStack(spacing: 10) {
+                    Image(systemName: isWaitingForPartner ? "clock" : "checkmark.circle.fill")
+                    Text(isWaitingForPartner ? "相手の合意を待っています" : "返答済みです")
+                }
+                .font(.system(size: 15, weight: .heavy, design: .rounded))
+                .foregroundStyle(MegrumTheme.muted)
+                .frame(maxWidth: .infinity)
+                .frame(height: 50)
+                .background(.white.opacity(0.72), in: Capsule())
+            }
+        }
+        .padding(18)
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 26, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 26, style: .continuous)
+                .strokeBorder(.white.opacity(0.72), lineWidth: 1)
         }
     }
 }

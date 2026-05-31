@@ -472,6 +472,38 @@ final class MegrumAppStateTests: XCTestCase {
         XCTAssertFalse(state.isCreatingProposal)
     }
 
+    func testAppStateAgreesPreviewIncomingProposal() async {
+        let state = MegrumAppState(repository: PreviewMegrumRepository())
+        let incomingProposalID = UUID(uuidString: "00000000-0000-0000-0000-000000000403")!
+
+        await state.loadInitialData()
+
+        let accepted = await state.agreeProposal(proposalID: incomingProposalID)
+        let updated = state.proposals.first(where: { $0.id == incomingProposalID })
+
+        XCTAssertTrue(accepted)
+        XCTAssertEqual(updated?.status, .agreed)
+        XCTAssertEqual(updated?.agreedBySender, true)
+        XCTAssertEqual(updated?.agreedByReceiver, true)
+        XCTAssertNil(state.respondingProposalID)
+        XCTAssertNil(state.errorMessage)
+    }
+
+    func testAppStateRejectsPreviewIncomingProposal() async {
+        let state = MegrumAppState(repository: PreviewMegrumRepository())
+        let incomingProposalID = UUID(uuidString: "00000000-0000-0000-0000-000000000403")!
+
+        await state.loadInitialData()
+
+        let rejected = await state.rejectProposal(proposalID: incomingProposalID)
+        let updated = state.proposals.first(where: { $0.id == incomingProposalID })
+
+        XCTAssertTrue(rejected)
+        XCTAssertEqual(updated?.status, .rejected)
+        XCTAssertNil(state.respondingProposalID)
+        XCTAssertNil(state.errorMessage)
+    }
+
     func testAppStateLoadsAndSendsPreviewMessages() async {
         let state = MegrumAppState(repository: PreviewMegrumRepository())
         await state.loadInitialData()

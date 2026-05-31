@@ -77,6 +77,8 @@ public protocol MegrumRepository: Sendable {
     func loadPublicUserProfile(userID: UUID) async throws -> PublicUserProfile?
     func loadUserEvaluations(userID: UUID, limit: Int) async throws -> [UserEvaluation]
     func createProposal(_ input: ProposalCreateInput) async throws -> TradeProposal
+    func agreeProposal(proposalID: UUID) async throws -> TradeProposal
+    func rejectProposal(proposalID: UUID) async throws -> TradeProposal
     func addTradeEvidence(_ input: TradeEvidenceCreateInput) async throws -> TradeProposal
     func approveTradeEvidence(proposalID: UUID) async throws -> TradeProposal
     func submitTradeEvaluation(_ input: TradeEvaluationCreateInput) async throws -> UserEvaluation
@@ -168,6 +170,14 @@ public extension MegrumRepository {
     }
 
     func createProposal(_ input: ProposalCreateInput) async throws -> TradeProposal {
+        throw MegrumRepositoryError.unsupportedMutation
+    }
+
+    func agreeProposal(proposalID: UUID) async throws -> TradeProposal {
+        throw MegrumRepositoryError.unsupportedMutation
+    }
+
+    func rejectProposal(proposalID: UUID) async throws -> TradeProposal {
         throw MegrumRepositoryError.unsupportedMutation
     }
 
@@ -438,7 +448,74 @@ public struct PreviewMegrumRepository: MegrumRepository {
             exchangeMethod: input.exchangeMethod,
             senderGoodsIDs: input.senderGoodsIDs,
             receiverGoodsIDs: input.receiverGoodsIDs,
-            conditionTags: input.conditionTags
+            conditionTags: input.conditionTags,
+            agreedBySender: input.status == .sent
+        )
+    }
+
+    public func agreeProposal(proposalID: UUID) async throws -> TradeProposal {
+        let proposal = NativePreviewData.proposals.first { $0.id == proposalID }
+            ?? TradeProposal(
+                id: proposalID,
+                senderID: NativePreviewData.partnerID,
+                receiverID: NativePreviewData.viewerID,
+                status: .sent,
+                exchangeMethod: .hand,
+                senderGoodsIDs: [],
+                receiverGoodsIDs: []
+            )
+        let agreedBySender = proposal.isSender(NativePreviewData.viewerID) ? true : (proposal.agreedBySender || proposal.status == .sent)
+        let agreedByReceiver = proposal.isSender(NativePreviewData.viewerID) ? proposal.agreedByReceiver : true
+        return TradeProposal(
+            id: proposal.id,
+            senderID: proposal.senderID,
+            receiverID: proposal.receiverID,
+            status: agreedBySender && agreedByReceiver ? .agreed : .agreementOneSide,
+            exchangeMethod: proposal.exchangeMethod,
+            senderGoodsIDs: proposal.senderGoodsIDs,
+            receiverGoodsIDs: proposal.receiverGoodsIDs,
+            conditionTags: proposal.conditionTags,
+            agreedBySender: agreedBySender,
+            agreedByReceiver: agreedByReceiver,
+            evidencePhotoURL: proposal.evidencePhotoURL,
+            evidenceTakenAt: proposal.evidenceTakenAt,
+            evidenceTakenBy: proposal.evidenceTakenBy,
+            approvedBySender: proposal.approvedBySender,
+            approvedByReceiver: proposal.approvedByReceiver,
+            completedAt: proposal.completedAt,
+            createdAt: proposal.createdAt
+        )
+    }
+
+    public func rejectProposal(proposalID: UUID) async throws -> TradeProposal {
+        let proposal = NativePreviewData.proposals.first { $0.id == proposalID }
+            ?? TradeProposal(
+                id: proposalID,
+                senderID: NativePreviewData.partnerID,
+                receiverID: NativePreviewData.viewerID,
+                status: .sent,
+                exchangeMethod: .hand,
+                senderGoodsIDs: [],
+                receiverGoodsIDs: []
+            )
+        return TradeProposal(
+            id: proposal.id,
+            senderID: proposal.senderID,
+            receiverID: proposal.receiverID,
+            status: .rejected,
+            exchangeMethod: proposal.exchangeMethod,
+            senderGoodsIDs: proposal.senderGoodsIDs,
+            receiverGoodsIDs: proposal.receiverGoodsIDs,
+            conditionTags: proposal.conditionTags,
+            agreedBySender: proposal.agreedBySender,
+            agreedByReceiver: proposal.agreedByReceiver,
+            evidencePhotoURL: proposal.evidencePhotoURL,
+            evidenceTakenAt: proposal.evidenceTakenAt,
+            evidenceTakenBy: proposal.evidenceTakenBy,
+            approvedBySender: proposal.approvedBySender,
+            approvedByReceiver: proposal.approvedByReceiver,
+            completedAt: proposal.completedAt,
+            createdAt: proposal.createdAt
         )
     }
 
@@ -463,6 +540,8 @@ public struct PreviewMegrumRepository: MegrumRepository {
             senderGoodsIDs: proposal.senderGoodsIDs,
             receiverGoodsIDs: proposal.receiverGoodsIDs,
             conditionTags: proposal.conditionTags,
+            agreedBySender: proposal.agreedBySender,
+            agreedByReceiver: proposal.agreedByReceiver,
             evidencePhotoURL: URL(string: "https://example.com/evidence.jpg")!,
             evidenceTakenAt: .now,
             evidenceTakenBy: NativePreviewData.viewerID,
@@ -496,6 +575,8 @@ public struct PreviewMegrumRepository: MegrumRepository {
             senderGoodsIDs: proposal.senderGoodsIDs,
             receiverGoodsIDs: proposal.receiverGoodsIDs,
             conditionTags: proposal.conditionTags,
+            agreedBySender: proposal.agreedBySender,
+            agreedByReceiver: proposal.agreedByReceiver,
             evidencePhotoURL: proposal.evidencePhotoURL ?? URL(string: "https://example.com/evidence.jpg")!,
             evidenceTakenAt: proposal.evidenceTakenAt ?? .now,
             evidenceTakenBy: proposal.evidenceTakenBy ?? NativePreviewData.viewerID,
@@ -744,6 +825,7 @@ public final class MegrumAppState: ObservableObject {
     @Published public private(set) var isCreatingProposal = false
     @Published public private(set) var addingEvidenceProposalID: UUID?
     @Published public private(set) var approvingEvidenceProposalID: UUID?
+    @Published public private(set) var respondingProposalID: UUID?
     @Published public private(set) var submittingEvaluationProposalID: UUID?
     @Published public private(set) var filingDisputeProposalID: UUID?
     @Published public private(set) var isCreatingGroomPost = false
@@ -1514,6 +1596,46 @@ public final class MegrumAppState: ObservableObject {
         } catch {
             errorMessage = "打診を作成できませんでした"
             isCreatingProposal = false
+            return false
+        }
+    }
+
+    public func agreeProposal(proposalID: UUID) async -> Bool {
+        guard respondingProposalID != proposalID else {
+            return false
+        }
+
+        respondingProposalID = proposalID
+        errorMessage = nil
+        do {
+            let proposal = try await repository.agreeProposal(proposalID: proposalID)
+            replaceProposal(proposal)
+            respondingProposalID = nil
+            await loadMessages(proposalID: proposalID)
+            return true
+        } catch {
+            errorMessage = "打診を承諾できませんでした"
+            respondingProposalID = nil
+            return false
+        }
+    }
+
+    public func rejectProposal(proposalID: UUID) async -> Bool {
+        guard respondingProposalID != proposalID else {
+            return false
+        }
+
+        respondingProposalID = proposalID
+        errorMessage = nil
+        do {
+            let proposal = try await repository.rejectProposal(proposalID: proposalID)
+            replaceProposal(proposal)
+            respondingProposalID = nil
+            await loadMessages(proposalID: proposalID)
+            return true
+        } catch {
+            errorMessage = "打診を断れませんでした"
+            respondingProposalID = nil
             return false
         }
     }

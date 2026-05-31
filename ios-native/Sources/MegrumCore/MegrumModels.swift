@@ -866,6 +866,8 @@ public struct TradeProposal: Identifiable, Codable, Hashable, Sendable {
     public var senderGoodsIDs: [UUID]
     public var receiverGoodsIDs: [UUID]
     public var conditionTags: [String]
+    public var agreedBySender: Bool
+    public var agreedByReceiver: Bool
     public var evidencePhotoURL: URL?
     public var evidenceTakenAt: Date?
     public var evidenceTakenBy: UUID?
@@ -883,6 +885,8 @@ public struct TradeProposal: Identifiable, Codable, Hashable, Sendable {
         senderGoodsIDs: [UUID],
         receiverGoodsIDs: [UUID],
         conditionTags: [String] = [],
+        agreedBySender: Bool = false,
+        agreedByReceiver: Bool = false,
         evidencePhotoURL: URL? = nil,
         evidenceTakenAt: Date? = nil,
         evidenceTakenBy: UUID? = nil,
@@ -899,6 +903,8 @@ public struct TradeProposal: Identifiable, Codable, Hashable, Sendable {
         self.senderGoodsIDs = senderGoodsIDs
         self.receiverGoodsIDs = receiverGoodsIDs
         self.conditionTags = conditionTags
+        self.agreedBySender = agreedBySender
+        self.agreedByReceiver = agreedByReceiver
         self.evidencePhotoURL = evidencePhotoURL
         self.evidenceTakenAt = evidenceTakenAt
         self.evidenceTakenBy = evidenceTakenBy
@@ -914,6 +920,14 @@ public struct TradeProposal: Identifiable, Codable, Hashable, Sendable {
 
     public func isSender(_ userID: UUID) -> Bool {
         senderID == userID
+    }
+
+    public func agreementBy(_ userID: UUID) -> Bool {
+        isSender(userID) ? agreedBySender : agreedByReceiver
+    }
+
+    public func partnerAgreement(for userID: UUID) -> Bool {
+        isSender(userID) ? agreedByReceiver : agreedBySender
     }
 
     public func approvedBy(_ userID: UUID) -> Bool {

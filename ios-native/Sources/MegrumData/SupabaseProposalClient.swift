@@ -54,8 +54,70 @@ public final class SupabaseProposalClient: @unchecked Sendable {
             exchangeMethod: input.exchangeMethod,
             senderGoodsIDs: input.senderGoodsIDs,
             receiverGoodsIDs: input.receiverGoodsIDs,
-            conditionTags: input.conditionTags
+            conditionTags: input.conditionTags,
+            agreedBySender: input.status == .sent || input.status == .agreementOneSide || input.status == .agreed,
+            agreedByReceiver: input.status == .agreed
         )
+    }
+
+    public func agreeProposal(userID: UUID, proposalID: UUID) async throws -> TradeProposal {
+        let proposal = try await loadProposal(proposalID: proposalID)
+        guard proposal.isParticipant(userID) else {
+            throw SupabaseProposalClientError.notParticipant
+        }
+        guard proposal.canRespondToProposal else {
+            throw SupabaseProposalClientError.invalidStatus
+        }
+
+        let nextAgreement = proposal.nextAgreementApproved(by: userID)
+        let status: ProposalStatus = nextAgreement.agreedBySender && nextAgreement.agreedByReceiver
+            ? .agreed
+            : .agreementOneSide
+        let rows: [ProposalRow] = try await client.updateRows(
+            in: "proposals",
+            values: ProposalAgreementUpdatePayload(
+                agreedBySender: nextAgreement.agreedBySender,
+                agreedByReceiver: nextAgreement.agreedByReceiver,
+                status: status.rawValue
+            ),
+            select: ProposalRow.select,
+            queryItems: proposalQueryItems(proposalID: proposalID)
+        )
+        guard let updated = rows.first?.proposal else {
+            throw SupabaseProposalClientError.malformedResponse
+        }
+        try? await createSystemMessage(
+            proposalID: proposalID,
+            senderID: userID,
+            body: status == .agreed ? "打診が成立しました" : "打診に合意しました"
+        )
+        return updated
+    }
+
+    public func rejectProposal(userID: UUID, proposalID: UUID) async throws -> TradeProposal {
+        let proposal = try await loadProposal(proposalID: proposalID)
+        guard proposal.isParticipant(userID) else {
+            throw SupabaseProposalClientError.notParticipant
+        }
+        guard proposal.canRespondToProposal else {
+            throw SupabaseProposalClientError.invalidStatus
+        }
+
+        let rows: [ProposalRow] = try await client.updateRows(
+            in: "proposals",
+            values: ProposalStatusUpdatePayload(status: ProposalStatus.rejected.rawValue),
+            select: ProposalRow.select,
+            queryItems: proposalQueryItems(proposalID: proposalID)
+        )
+        guard let updated = rows.first?.proposal else {
+            throw SupabaseProposalClientError.malformedResponse
+        }
+        try? await createSystemMessage(
+            proposalID: proposalID,
+            senderID: userID,
+            body: "打診を断りました"
+        )
+        return updated
     }
 
     public func addEvidencePhoto(userID: UUID, input: TradeEvidenceCreateInput) async throws -> TradeProposal {
@@ -223,6 +285,44 @@ public final class SupabaseProposalClient: @unchecked Sendable {
         )
     }
 
+    public func makeAgreeProposalRequest(userID: UUID, proposal: TradeProposal) throws -> URLRequest {
+        let nextAgreement = proposal.nextAgreementApproved(by: userID)
+        let status: ProposalStatus = nextAgreement.agreedBySender && nextAgreement.agreedByReceiver
+            ? .agreed
+            : .agreementOneSide
+        return try client.makeMutationRequest(
+            path: "/rest/v1/proposals",
+            queryItems: [
+                URLQueryItem(name: "select", value: ProposalRow.select),
+                URLQueryItem(name: "id", value: "eq.\(proposal.id.uuidString.lowercased())"),
+                URLQueryItem(name: "limit", value: "1")
+            ],
+            method: "PATCH",
+            body: encoder.encode(
+                ProposalAgreementUpdatePayload(
+                    agreedBySender: nextAgreement.agreedBySender,
+                    agreedByReceiver: nextAgreement.agreedByReceiver,
+                    status: status.rawValue
+                )
+            ),
+            prefer: "return=representation"
+        )
+    }
+
+    public func makeRejectProposalRequest(proposalID: UUID) throws -> URLRequest {
+        try client.makeMutationRequest(
+            path: "/rest/v1/proposals",
+            queryItems: [
+                URLQueryItem(name: "select", value: ProposalRow.select),
+                URLQueryItem(name: "id", value: "eq.\(proposalID.uuidString.lowercased())"),
+                URLQueryItem(name: "limit", value: "1")
+            ],
+            method: "PATCH",
+            body: encoder.encode(ProposalStatusUpdatePayload(status: ProposalStatus.rejected.rawValue)),
+            prefer: "return=representation"
+        )
+    }
+
     public func makeApproveEvidenceRequest(userID: UUID, proposal: TradeProposal) throws -> URLRequest {
         let approvedBySender = proposal.isSender(userID) ? true : proposal.approvedBySender
         let approvedByReceiver = proposal.isSender(userID) ? proposal.approvedByReceiver : true
@@ -326,6 +426,8 @@ private struct ProposalRow: Decodable, Sendable {
         "sender_have_ids",
         "receiver_have_ids",
         "option_tags",
+        "agreed_by_sender",
+        "agreed_by_receiver",
         "evidence_photo_url",
         "evidence_taken_at",
         "evidence_taken_by",
@@ -343,6 +445,8 @@ private struct ProposalRow: Decodable, Sendable {
     var senderHaveIds: [UUID]?
     var receiverHaveIds: [UUID]?
     var optionTags: [String]?
+    var agreedBySender: Bool?
+    var agreedByReceiver: Bool?
     var evidencePhotoUrl: String?
     var evidenceTakenAt: Date?
     var evidenceTakenBy: UUID?
@@ -364,6 +468,8 @@ private struct ProposalRow: Decodable, Sendable {
             senderGoodsIDs: senderHaveIds ?? [],
             receiverGoodsIDs: receiverHaveIds ?? [],
             conditionTags: optionTags ?? [],
+            agreedBySender: agreedBySender ?? false,
+            agreedByReceiver: agreedByReceiver ?? false,
             evidencePhotoURL: evidencePhotoUrl.flatMap(URL.init(string:)),
             evidenceTakenAt: evidenceTakenAt,
             evidenceTakenBy: evidenceTakenBy,
@@ -389,6 +495,7 @@ private struct ProposalCreatePayload: Encodable, Sendable {
     var optionTags: [String]
     var exposeCalendar: Bool
     var listingId: UUID?
+    var agreedBySender: Bool
 
     init(senderID: UUID, input: ProposalCreateInput) {
         self.senderId = senderID
@@ -404,7 +511,18 @@ private struct ProposalCreatePayload: Encodable, Sendable {
         self.optionTags = input.conditionTags
         self.exposeCalendar = false
         self.listingId = input.listingID
+        self.agreedBySender = input.status == .sent || input.status == .agreed || input.status == .agreementOneSide
     }
+}
+
+private struct ProposalAgreementUpdatePayload: Encodable, Sendable {
+    var agreedBySender: Bool
+    var agreedByReceiver: Bool
+    var status: String
+}
+
+private struct ProposalStatusUpdatePayload: Encodable, Sendable {
+    var status: String
 }
 
 private struct ProposalEvidenceUpdatePayload: Encodable, Sendable {
@@ -506,5 +624,18 @@ private func fileExtension(for contentType: String) -> String {
         "webp"
     default:
         "jpg"
+    }
+}
+
+private extension TradeProposal {
+    var canRespondToProposal: Bool {
+        [.sent, .negotiating, .agreementOneSide].contains(status)
+    }
+
+    func nextAgreementApproved(by userID: UUID) -> (agreedBySender: Bool, agreedByReceiver: Bool) {
+        let senderIsImplicitlyAgreed = status == .sent
+        let nextSender = isSender(userID) ? true : (agreedBySender || senderIsImplicitlyAgreed)
+        let nextReceiver = isSender(userID) ? agreedByReceiver : true
+        return (nextSender, nextReceiver)
     }
 }

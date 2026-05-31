@@ -13,6 +13,8 @@ final class SupabaseProposalClientTests: XCTestCase {
 
         XCTAssertEqual(request.httpMethod, "GET")
         XCTAssertTrue(url.hasPrefix("https://example.supabase.co/rest/v1/proposals?select=id,sender_id,receiver_id,status,exchange_method,sender_have_ids,receiver_have_ids,option_tags"))
+        XCTAssertTrue(url.contains("agreed_by_sender"))
+        XCTAssertTrue(url.contains("agreed_by_receiver"))
         XCTAssertTrue(url.contains("evidence_photo_url"))
         XCTAssertTrue(url.contains("approved_by_sender"))
         XCTAssertTrue(url.contains("completed_at"))
@@ -55,6 +57,52 @@ final class SupabaseProposalClientTests: XCTestCase {
         XCTAssertEqual(json.first?["option_tags"] as? [String], ["即日発送"])
         XCTAssertEqual(json.first?["message"] as? String, "よろしくお願いします")
         XCTAssertEqual(json.first?["listing_id"] as? String, "55555555-5555-5555-5555-555555555555")
+        XCTAssertEqual(json.first?["agreed_by_sender"] as? Bool, true)
+    }
+
+    func testBuildsAgreeProposalRequestForIncomingSentProposal() throws {
+        let client = SupabaseProposalClient(configuration: configuration)
+        let senderID = UUID(uuidString: "11111111-1111-1111-1111-111111111111")!
+        let receiverID = UUID(uuidString: "22222222-2222-2222-2222-222222222222")!
+        let proposalID = UUID(uuidString: "33333333-3333-3333-3333-333333333333")!
+        let proposal = TradeProposal(
+            id: proposalID,
+            senderID: senderID,
+            receiverID: receiverID,
+            status: .sent,
+            exchangeMethod: .hand,
+            senderGoodsIDs: [],
+            receiverGoodsIDs: [],
+            agreedBySender: true,
+            agreedByReceiver: false
+        )
+
+        let request = try client.makeAgreeProposalRequest(userID: receiverID, proposal: proposal)
+        let url = try XCTUnwrap(request.url?.absoluteString)
+        let body = try XCTUnwrap(request.httpBody)
+        let json = try XCTUnwrap(JSONSerialization.jsonObject(with: body) as? [String: Any])
+
+        XCTAssertEqual(request.httpMethod, "PATCH")
+        XCTAssertEqual(request.value(forHTTPHeaderField: "Prefer"), "return=representation")
+        XCTAssertTrue(url.contains("id=eq.33333333-3333-3333-3333-333333333333"))
+        XCTAssertEqual(json["agreed_by_sender"] as? Bool, true)
+        XCTAssertEqual(json["agreed_by_receiver"] as? Bool, true)
+        XCTAssertEqual(json["status"] as? String, "agreed")
+    }
+
+    func testBuildsRejectProposalRequest() throws {
+        let client = SupabaseProposalClient(configuration: configuration)
+        let proposalID = UUID(uuidString: "33333333-3333-3333-3333-333333333333")!
+
+        let request = try client.makeRejectProposalRequest(proposalID: proposalID)
+        let url = try XCTUnwrap(request.url?.absoluteString)
+        let body = try XCTUnwrap(request.httpBody)
+        let json = try XCTUnwrap(JSONSerialization.jsonObject(with: body) as? [String: Any])
+
+        XCTAssertEqual(request.httpMethod, "PATCH")
+        XCTAssertEqual(request.value(forHTTPHeaderField: "Prefer"), "return=representation")
+        XCTAssertTrue(url.contains("id=eq.33333333-3333-3333-3333-333333333333"))
+        XCTAssertEqual(json["status"] as? String, "rejected")
     }
 
     func testBuildsApproveEvidenceRequest() throws {

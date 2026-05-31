@@ -252,7 +252,8 @@ enum NativePreviewData {
             exchangeMethod: .both,
             senderGoodsIDs: [inventory[0].id],
             receiverGoodsIDs: [inventory[2].id],
-            conditionTags: ["同日発送", "終演後OK"]
+            conditionTags: ["同日発送", "終演後OK"],
+            agreedBySender: true
         ),
         TradeProposal(
             id: UUID(uuidString: "00000000-0000-0000-0000-000000000402")!,
@@ -262,7 +263,20 @@ enum NativePreviewData {
             exchangeMethod: .hand,
             senderGoodsIDs: [inventory[2].id],
             receiverGoodsIDs: [inventory[1].id],
-            conditionTags: ["会場付近"]
+            conditionTags: ["会場付近"],
+            agreedBySender: true,
+            agreedByReceiver: true
+        ),
+        TradeProposal(
+            id: UUID(uuidString: "00000000-0000-0000-0000-000000000403")!,
+            senderID: partnerID,
+            receiverID: viewerID,
+            status: .sent,
+            exchangeMethod: .mail,
+            senderGoodsIDs: [inventory[2].id],
+            receiverGoodsIDs: [inventory[0].id],
+            conditionTags: ["即日発送"],
+            agreedBySender: true
         )
     ]
 
