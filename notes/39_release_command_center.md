@@ -78,6 +78,7 @@
 | App Store商品ページ素材QA | `notes/70_app_store_product_page_asset_qa.md` |
 | App Store Connect最終入力差分QA | `notes/71_app_store_connect_final_input_reconciliation.md` |
 | 承認後・手動公開制御 | `notes/72_app_store_approval_release_control_runbook.md` |
+| 公開停止・Availability変更 | `notes/73_app_store_availability_emergency_stop_runbook.md` |
 | オーナー作業表 | `notes/30_owner_release_action_sheet.md` |
 | App Store Connect入力 | `notes/31_app_store_connect_metadata_worksheet.md` |
 | TestFlight / Submit手順 | `notes/32_testflight_review_submission_runbook.md` |
@@ -138,6 +139,7 @@
 2. `notes/72` でRelease option、PDR gate、公開URL、サポート受信、事故疑いなしを読み合わせる。
 3. `Release This Version` 直前にVersion / Build / status / Release optionを再確認する。
 4. 公開操作後、T+0 / T+1h / T+3h / T+6h / T+12h / T+24hの監視を開始する。
+5. 公開継続が危険な場合は `notes/73` でTerritory deselect、Remove App From Sale、new buildを判断する。
 
 ---
 
@@ -200,6 +202,7 @@
 | App Store商品ページ素材QA | RL-068 | `notes/70` |
 | App Store Connect最終入力差分QA | RL-069 | `notes/71` |
 | 承認後・手動公開制御 | RL-070 | `notes/72` |
+| 公開停止・Availability変更 | RL-071 | `notes/73` |
 
 ---
 
@@ -221,6 +224,7 @@
 - App Store Connect実入力値が、提出docs、完成build、公開URL、App Privacy、Review Notesと未照合。
 - スクショに実住所、実在IP、内部ID、デバッグ表示がある。
 - 承認後のRelease option、`Pending Developer Release` gate、`Release This Version` 操作手順、公開初日監視が未整備。
+- 公開後のP0事故疑いに対して、App Store Availability変更、Remove App From Sale、new build判断の手順が未整備。
 
 ---
 
@@ -249,6 +253,7 @@
 | App Store商品ページ素材QA | `notes/70_app_store_product_page_asset_qa.md` |
 | App Store Connect最終入力差分QA | `notes/71_app_store_connect_final_input_reconciliation.md` |
 | App Store承認後・手動公開制御Runbook | `notes/72_app_store_approval_release_control_runbook.md` |
+| App Store公開停止・Availability変更Runbook | `notes/73_app_store_availability_emergency_stop_runbook.md` |
 | App Store提出素材 | `notes/24_app_store_submission_pack.md` |
 | App Store Connect入力表 | `notes/31_app_store_connect_metadata_worksheet.md` |
 | TestFlight / Submit手順 | `notes/32_testflight_review_submission_runbook.md` |
@@ -293,6 +298,7 @@
 | Submit for Review | 全P0確認後 |
 | App Review指摘対応 | 指摘受領後 |
 | 承認後の手動公開・公開初日監視 | 承認後。`notes/72` を使う |
+| 公開後の停止・Availability変更 | P0事故疑い又は公開継続が危険な時。`notes/73` を使う |
 
 ---
 

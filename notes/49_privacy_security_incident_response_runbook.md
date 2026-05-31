@@ -200,10 +200,12 @@ Megrumサポートです。
 | プライバシーポリシー | 外部サービス、利用目的、保持期間、委託先、本人通知方法が変わった |
 | サポートページ | 事故に関する問い合わせ導線を追加する |
 | Review Notes | 審査中に安全/プライバシー措置を説明する必要がある |
+| App Store Availability | 公開継続が危険で、地域Availability変更、Remove App From Sale、new build判断が必要 |
 | `notes/27` | データインベントリを更新する必要がある |
 | `notes/48` | 外部サービス/委託先の扱いが変わった |
 
 AppleのApp Privacy回答は、実際のデータ取扱いと最新状態を一致させる。
+公開停止又はAvailability変更が必要な場合は `notes/73_app_store_availability_emergency_stop_runbook.md` を使う。
 
 ## 11. No-Go
 
@@ -225,6 +227,7 @@ AppleのApp Privacy回答は、実際のデータ取扱いと最新状態を一�
 - アカウント削除・個人情報請求: `notes/45_account_deletion_privacy_request_runbook.md`
 - 外部サービス・委託先データ台帳: `notes/48_external_service_vendor_register.md`
 - データ保持・削除マトリクス: `notes/52_data_retention_deletion_matrix.md`
+- App Store公開停止・Availability変更: `notes/73_app_store_availability_emergency_stop_runbook.md`
 
 ## 13. 公式参照
 

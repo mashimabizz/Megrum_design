@@ -155,7 +155,7 @@ Pause候補:
 
 ## 9. 公開後に止める判断
 
-公開後に次が起きたら、配信停止、地域availability変更、段階的リリースpause、新build、サポート告知、事故初動の要否を判断する。
+公開後に次が起きたら、`notes/73_app_store_availability_emergency_stop_runbook.md` と合わせて、配信停止、地域availability変更、段階的リリースpause、新build、サポート告知、事故初動の要否を判断する。
 
 | 事象 | 初動 | 参照 |
 |---|---|---|
@@ -165,6 +165,7 @@ Pause候補:
 | アカウント削除が動かない | 削除請求の代替受付を用意 | `notes/45`, `notes/67` |
 | IAP購入又は復元が壊れる | IAP露出停止又はnew build判断 | `notes/33`, `notes/68` |
 | App Review又は公開メタデータの問題 | 指摘本文保存、返信案、同じbuild可否を判断 | `notes/69`, `notes/41` |
+| 公開継続が危険 | Territory deselect、Remove App From Sale、new buildを判断 | `notes/73` |
 
 ## 10. 最終サインオフ
 
@@ -206,6 +207,7 @@ Next action:
 - ドメイン・メール・公開URL運用: `notes/47_domain_email_publication_runbook.md`
 - App Reviewリジェクト/追加情報要求: `notes/69_app_review_rejection_triage_runbook.md`
 - App Review指摘対応テンプレート: `notes/41_app_review_response_templates.md`
+- App Store公開停止・Availability変更: `notes/73_app_store_availability_emergency_stop_runbook.md`
 
 ## 12. 公式参照
 

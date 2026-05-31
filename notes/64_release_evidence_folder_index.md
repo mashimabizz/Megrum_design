@@ -49,6 +49,7 @@ release_evidence/
     10_submission/
     11_review_response/
     12_release_day/
+    13_availability_stop/
 ```
 
 Drive等へ保存する場合も、同じ番号と名前にすると探しやすい。
@@ -259,6 +260,16 @@ secret実値や管理画面の認証情報は保存しない。
 | REL-006 | `notes/72` のPDR gateと公開直前読み合わせ | md |
 | REL-007 | Release This Version実施者、時刻、直後status | md又はpng |
 
+### 5.13 `13_availability_stop/`
+
+| ID | 証跡 | 形式 |
+|---|---|---|
+| STOP-001 | 停止判断スナップショット | md |
+| STOP-002 | Territory deselect又はRemove App From Sale実施記録 | md又はpng |
+| STOP-003 | 旧version unavailable又はnew build判断 | md |
+| STOP-004 | サポート告知/FAQ更新判断 | md |
+| STOP-005 | 復帰判定と再公開/Availability復帰記録 | md |
+
 ## 6. 証跡の扱いで迷う時
 
 | 状況 | 判断 |
@@ -282,6 +293,7 @@ secret実値や管理画面の認証情報は保存しない。
 - [ ] `notes/36_submission_evidence_checklist.md` のEV-001〜EV-013と対応している
 - [ ] `notes/62_app_review_manual_submission_checklist.md` の提出直前チェックと対応している
 - [ ] `notes/72_app_store_approval_release_control_runbook.md` のPDR gateと公開初日監視に対応している
+- [ ] `notes/73_app_store_availability_emergency_stop_runbook.md` の停止/復帰判断に対応している
 
 ## 8. 関連文書
 
@@ -289,6 +301,7 @@ secret実値や管理画面の認証情報は保存しない。
 - App Review手動提出チェック: `notes/62_app_review_manual_submission_checklist.md`
 - App Store Connect最終入力差分QA: `notes/71_app_store_connect_final_input_reconciliation.md`
 - 承認後・手動公開制御Runbook: `notes/72_app_store_approval_release_control_runbook.md`
+- 公開停止・Availability変更Runbook: `notes/73_app_store_availability_emergency_stop_runbook.md`
 - 公開ページレダクションQA: `notes/63_public_page_redaction_qa.md`
 - TestFlight / App Review提出ランブック: `notes/32_testflight_review_submission_runbook.md`
 - P0スモークテスト台本: `notes/42_p0_smoke_test_script.md`

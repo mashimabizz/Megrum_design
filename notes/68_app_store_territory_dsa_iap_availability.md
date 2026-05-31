@@ -10,6 +10,8 @@ App Store初回提出で、配信地域、EU Digital Services Act（DSA）のtra
 
 この文書はApp Store Connect入力前の判断表であり、コード、App Store Connect設定、IAP商品、公開URL、法務原典docxは変更しない。
 
+公開後に地域Availabilityを変更する、又は全地域から外す判断は `notes/73_app_store_availability_emergency_stop_runbook.md` を使う。
+
 ## 1. 公式前提の要点
 
 Apple公式ヘルプ上、App Store Connectでは提出前にアプリのAvailabilityを設定し、All Countries or Regions、Specific Countries or Regions、Pre-Order等から選ぶ。
@@ -153,6 +155,7 @@ No-Go:
 - App Review手動提出チェック: `notes/62_app_review_manual_submission_checklist.md`
 - リリース証跡フォルダ索引: `notes/64_release_evidence_folder_index.md`
 - Go / No-Go判定: `notes/50_release_go_no_go_decision_matrix.md`
+- App Store公開停止・Availability変更: `notes/73_app_store_availability_emergency_stop_runbook.md`
 
 ## 10. 公式参照
 

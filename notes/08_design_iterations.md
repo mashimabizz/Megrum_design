@@ -4,6 +4,74 @@
 
 ---
 
+## イテレーション395：公開停止とAvailability変更を追加
+
+### 背景・問題意識
+
+承認後の手動公開制御を `notes/72` で整理したが、公開後に他人データ表示、Privacy URL障害、App Privacy不一致、IAP重大不具合などが起きた場合に、App Store上で地域Availabilityを外す、`Remove App From Sale` を使う、旧versionを unavailable にする、new buildを出す、復帰条件を判断する専用手順がまだ不足していた。公開停止は「押せば全部止まる」操作ではなく、既存入手ユーザーやサポート対応が残るため、公開停止・復帰のRunbookを追加した。
+
+### 変更内容
+
+#### `notes/73_app_store_availability_emergency_stop_runbook.md`
+- 公開後のP0事故疑い時に、Territory deselect、`Remove App From Sale`、旧version unavailable、new build、サポート告知、復帰判断を行うRunbookを追加した。
+- Apple公式ヘルプに基づき、Availability変更は最大24時間の反映があり、既存入手ユーザーへの影響が残る場合があることを明記した。
+- 停止判断スナップショット、即時停止候補、地域Availability変更手順、`Remove App From Sale` 手順、旧version/new build判断、復帰判定を整理した。
+
+#### `notes/72_app_store_approval_release_control_runbook.md`, `notes/51_post_submission_release_day_runbook.md`, `notes/49_privacy_security_incident_response_runbook.md`, `notes/68_app_store_territory_dsa_iap_availability.md`
+- 公開後に止める判断、事故初動、配信地域判断から `notes/73` への導線を追加した。
+- App Store上の停止操作だけで事故対応が完了しないことを明確化した。
+
+#### `notes/39_release_command_center.md`, `notes/30_owner_release_action_sheet.md`, `notes/50_release_go_no_go_decision_matrix.md`
+- コントロールボード、オーナー作業表、Go / No-Go判定表へ `notes/73` を追加した。
+- G23 Availability Stopとして、公開後のP0事故疑いに対する停止/復帰判断未整備をNo-Go化した。
+
+#### `notes/64_release_evidence_folder_index.md`, `notes/57_legal_release_branch_integration_plan.md`, `notes/22_release_triage_tracker.csv`
+- 証跡フォルダ索引に `13_availability_stop/` を追加した。
+- 法務branch統合手順のstage禁止範囲を `notes/73` まで広げた。
+- RL-071としてApp Store公開停止・Availability変更を追加した。
+
+### 影響範囲
+
+- 公開後の重大障害、個人情報又はセキュリティ事故疑い、App Privacy不一致、公開URL障害、IAP重大不具合
+- App Store Availability、Territory deselect、Remove App From Sale、旧version unavailable、new build
+- サポート告知、FAQ、復帰判定、証跡保存
+- コード、App Store Connect設定、Apple Developer設定、公開URL、証跡ファイルは変更していない。
+
+### 確認方法
+
+- `rg -n "RL-071|notes/73|Availability Stop|Remove App From Sale|Territory deselect|公開停止・Availability変更|旧version" notes/73_app_store_availability_emergency_stop_runbook.md notes/39_release_command_center.md notes/50_release_go_no_go_decision_matrix.md notes/22_release_triage_tracker.csv notes/72_app_store_approval_release_control_runbook.md notes/64_release_evidence_folder_index.md`
+- `python3 - <<'PY' ...` による `notes/22_release_triage_tracker.csv` のCSV parse確認
+- 旧規約用語・旧主体表現チェック（旧提案/旧メッセージ/旧投稿関連、サービス主体表現）
+- `git diff --check -- notes`
+
+### セルフレビュー結果
+
+- ✅ コード、App Store Connect設定、Apple Developer設定、公開URL、証跡ファイルは変更していない。
+- ✅ 公開停止を「事故初動」「サポート受信」「手動公開制御」「配信地域判断」と接続した。
+- ✅ Territory deselect、Remove App From Sale、旧version unavailable、new buildを使い分ける形にした。
+- ✅ 既存入手ユーザーへの影響が残る可能性、反映に最大24時間かかる可能性、サポート/削除/個人情報請求は継続する点を明記した。
+- ✅ 実パスワード、secret、token、影響ユーザーの不要な個人情報を記録しない方針を維持した。
+- ✅ Apple公式ヘルプのAvailability管理、Remove App From Sale、version unavailableを参照した。
+- ✅ 状態名の追加/改名はApp Store運用状態の参照のみで、Megrumの状態遷移変更ではないため `notes/09_state_machines.md` 更新は不要。
+- ✅ 新用語はApp Store提出準備用語の範囲内のため、`notes/10_glossary.md` 更新は不要。
+- ✅ DBスキーマ変更はなく、`notes/05_data_model.md` 更新は不要。
+
+### 関連ファイル
+
+- `notes/73_app_store_availability_emergency_stop_runbook.md`
+- `notes/72_app_store_approval_release_control_runbook.md`
+- `notes/51_post_submission_release_day_runbook.md`
+- `notes/49_privacy_security_incident_response_runbook.md`
+- `notes/68_app_store_territory_dsa_iap_availability.md`
+- `notes/39_release_command_center.md`
+- `notes/30_owner_release_action_sheet.md`
+- `notes/50_release_go_no_go_decision_matrix.md`
+- `notes/64_release_evidence_folder_index.md`
+- `notes/57_legal_release_branch_integration_plan.md`
+- `notes/22_release_triage_tracker.csv`
+
+---
+
 ## イテレーション394：承認後の手動公開制御を追加
 
 ### 背景・問題意識

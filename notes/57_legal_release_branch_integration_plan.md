@@ -45,7 +45,7 @@ https://github.com/mashimabizz/Megrum_design/pull/2
 - 開発セッションが意図して更新した既存notes
 
 開発側branchでstageしないもの:
-- `notes/24_app_store_submission_pack.md` 〜 `notes/72_app_store_approval_release_control_runbook.md`
+- `notes/24_app_store_submission_pack.md` 〜 `notes/73_app_store_availability_emergency_stop_runbook.md`
 - `notes/legal/`
 - 法務・App Store提出準備だけを目的にした新規docs
 
@@ -113,6 +113,7 @@ PR本文案:
 - App Store商品ページ素材QA
 - App Store Connect最終入力差分QA
 - 承認後の手動公開制御手順
+- 公開停止・Availability変更手順
 
 ## 変更していないもの
 
@@ -217,6 +218,7 @@ PY
 - App Store商品ページ素材QA: `notes/70_app_store_product_page_asset_qa.md`
 - App Store Connect最終入力差分QA: `notes/71_app_store_connect_final_input_reconciliation.md`
 - 承認後・手動公開制御: `notes/72_app_store_approval_release_control_runbook.md`
+- 公開停止・Availability変更: `notes/73_app_store_availability_emergency_stop_runbook.md`
 - 公開FAQ下書き: `notes/55_public_help_faq_draft.md`
 - アプリ内法務・安全コピー: `notes/56_in_app_legal_safety_copy_deck.md`
 - リリーストリアージ: `notes/22_release_triage_tracker.csv`

@@ -139,6 +139,8 @@ No-GoならRelease This Versionを押さず、原因を解消する。
 
 次が起きたら、機能停止、公開停止、新ビルド、サポート告知の要否を判断する。
 
+App Store上の地域Availability変更、`Remove App From Sale`、旧version unavailable、new build判断は `notes/73_app_store_availability_emergency_stop_runbook.md` を使う。
+
 - ログイン不能が複数発生する。
 - 他人のデータが見える。
 - 位置情報又は取引チャットが意図しない相手に見える。
@@ -163,6 +165,7 @@ Apple公式情報では、段階的リリースは7日間で自動アップデ�
 ## 11. 関連文書
 
 - 承認後・手動公開制御Runbook: `notes/72_app_store_approval_release_control_runbook.md`
+- App Store公開停止・Availability変更Runbook: `notes/73_app_store_availability_emergency_stop_runbook.md`
 - Go / No-Go判定表: `notes/50_release_go_no_go_decision_matrix.md`
 - App Store Connect最終入力差分QA: `notes/71_app_store_connect_final_input_reconciliation.md`
 - リリース証跡フォルダ索引: `notes/64_release_evidence_folder_index.md`
