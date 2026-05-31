@@ -40,6 +40,8 @@
 | 内容一致 | 実ビルドで出す機能と矛盾しない |
 | 不要情報 | 実パスワード、内部ID、実住所、秘密鍵を含まない |
 
+公開前に、内部情報、secret、未確定機能、未確定価格、実データが混ざっていないかは `notes/63_public_page_redaction_qa.md` でも確認する。
+
 ---
 
 ## 3. ページ別受け入れ基準
@@ -213,6 +215,7 @@ Commerce disclosure for paid features is available at https://megrum.jp/legal/co
 
 - 公開ページ文面: `notes/25_public_legal_support_pages.md`
 - 公開ヘルプFAQ下書き: `notes/55_public_help_faq_draft.md`
+- 公開ページレダクションQA: `notes/63_public_page_redaction_qa.md`
 - サポート返信テンプレート: `notes/34_support_response_templates.md`
 - 提出証跡: `notes/36_submission_evidence_checklist.md`
 - App Store提出パック: `notes/24_app_store_submission_pack.md`

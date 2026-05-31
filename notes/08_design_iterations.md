@@ -4,6 +4,63 @@
 
 ---
 
+## イテレーション385：公開ページレダクションQAを追加
+
+### 背景・問題意識
+
+App Store審査前に公開するサポート、規約、プライバシーポリシー、FAQ、削除、通報、安全、AI説明ページは、審査員とユーザーが直接見る。ここにsecret、内部ID、実データ、未確定価格、初回で隠す機能の断定説明が残ると、審査・法務・安全上のリスクになるため、公開前に人間が確認するレダクションQAを追加した。
+
+### 変更内容
+
+#### `notes/63_public_page_redaction_qa.md`
+- 公開対象URL、公開してよい情報/公開しない情報、全ページ共通QAを追加した。
+- Support、利用規約、プライバシーポリシー、特商法表示のページ別QAを整理した。
+- 公開前検索パターン、公開ページQA記録フォーマット、関連文書を追加した。
+
+#### `notes/39_release_command_center.md`, `notes/30_owner_release_action_sheet.md`, `notes/37_public_url_publication_checklist.md`
+- 公開ページレダクションQAへの導線を追加した。
+
+#### `notes/57_legal_release_branch_integration_plan.md`
+- 法務・リリース準備docsのstage禁止範囲を `notes/63` まで広げた。
+
+#### `notes/22_release_triage_tracker.csv`
+- RL-061として公開ページレダクションQAを追加した。
+
+### 影響範囲
+
+- 公開サポートページ
+- 利用規約、プライバシーポリシー、特商法表示
+- FAQ、アカウント削除、個人情報請求、通報、安全、AI説明ページ
+- App Store ConnectのSupport URL / Privacy Policy URL
+- コード、公開URL、App Store Connect設定、DNS、メール設定は変更していない。
+
+### 確認方法
+
+- `rg -n "RL-061|レダクション|secret|未確定価格|公開ページ|Support URL" notes/63_public_page_redaction_qa.md notes/39_release_command_center.md notes/22_release_triage_tracker.csv`
+- `python3 - <<'PY' ...` による `notes/22_release_triage_tracker.csv` のCSV parse確認
+- 旧規約用語・旧主体表現チェック（旧提案/旧メッセージ/旧投稿関連、サービス主体表現）
+- `git diff --check -- notes`
+
+### セルフレビュー結果
+
+- ✅ コード、公開URL、App Store Connect設定、DNS、メール設定は変更していない。
+- ✅ secret、実パスワード、内部ID、実データ、未確定価格、隠す機能を公開前に検出できるQAにした。
+- ✅ 公開URL確認の `notes/37` と、権限/secret実値を書かない `notes/61` へ接続した。
+- ✅ 状態名の追加/改名はなく、`notes/09_state_machines.md` 更新は不要。
+- ✅ 新用語は追加していないため、`notes/10_glossary.md` 更新は不要。
+- ✅ DBスキーマ変更はなく、`notes/05_data_model.md` 更新は不要。
+
+### 関連ファイル
+
+- `notes/63_public_page_redaction_qa.md`
+- `notes/39_release_command_center.md`
+- `notes/30_owner_release_action_sheet.md`
+- `notes/37_public_url_publication_checklist.md`
+- `notes/57_legal_release_branch_integration_plan.md`
+- `notes/22_release_triage_tracker.csv`
+
+---
+
 ## イテレーション384：App Review手動提出チェックを追加
 
 ### 背景・問題意識

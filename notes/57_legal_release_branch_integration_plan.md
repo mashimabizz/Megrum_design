@@ -45,7 +45,7 @@ https://github.com/mashimabizz/Megrum_design/pull/2
 - 開発セッションが意図して更新した既存notes
 
 開発側branchでstageしないもの:
-- `notes/24_app_store_submission_pack.md` 〜 `notes/57_legal_release_branch_integration_plan.md`
+- `notes/24_app_store_submission_pack.md` 〜 `notes/63_public_page_redaction_qa.md`
 - `notes/legal/`
 - 法務・App Store提出準備だけを目的にした新規docs
 
