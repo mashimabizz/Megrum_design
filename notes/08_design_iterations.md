@@ -4,6 +4,180 @@
 
 ---
 
+## イテレーション378：アプリ内法務安全コピーを追加
+
+### 背景・問題意識
+
+公開FAQと法務文書は整ってきたが、実装セッションが画面に入れる同意文言、権限説明、安全注意、AI/IAP文言を都度作ると、規約、Privacy、App Privacy、Review Notesとズレる可能性がある。そこで、コードを触らずにアプリ内で使う短文コピーを先に用意した。
+
+### 変更内容
+
+#### `notes/56_in_app_legal_safety_copy_deck.md`
+- Terms / Privacy同意、アカウント作成前説明、位置情報、カメラ/写真、通知、現地交換安全、打診、取引チャット、通報/ブロック、アカウント削除、個人情報請求、AI、有料機能の文言を追加した。
+- 各領域にNo-Goを入れ、画面文言が過剰保証、Privacy不一致、未実装機能の断定にならないようにした。
+- App Review Notes用短文と実装時チェックを追加した。
+
+#### `notes/39_release_command_center.md`, `notes/30_owner_release_action_sheet.md`, `notes/24_app_store_submission_pack.md`, `notes/55_public_help_faq_draft.md`
+- アプリ内法務・安全コピー集への導線を追加した。
+
+#### `notes/22_release_triage_tracker.csv`
+- RL-054としてアプリ内法務・安全コピー集を追加した。
+
+### 影響範囲
+
+- Swift Native実装時の画面文言
+- App ReviewのPermission / Safety / Privacy説明
+- 利用規約、プライバシーポリシー、App Privacyとの文言整合
+- コード、画面、公開URL、App Store Connect設定は変更していない。
+
+### 確認方法
+
+- `rg -n "RL-054|アプリ内法務|Terms / Privacy|現地交換の安全|AI補助" notes/56_in_app_legal_safety_copy_deck.md notes/39_release_command_center.md notes/22_release_triage_tracker.csv`
+- `python3 - <<'PY' ...` による `notes/22_release_triage_tracker.csv` のCSV parse確認
+- 旧規約用語・旧主体表現チェック（旧提案/旧メッセージ/旧投稿関連、サービス主体表現）
+- `git diff --check -- notes`
+
+### セルフレビュー結果
+
+- ✅ コード、画面、公開URL、App Store Connect設定は変更していない。
+- ✅ 同意、権限、現地交換安全、通報、削除、AI、IAPの画面文言を、公開FAQ/Privacy/App Reviewと揃う形で用意した。
+- ✅ 初回で出さない外部AI/有料機能は画面から外す注意を入れた。
+- ✅ 状態名の追加/改名はなく、`notes/09_state_machines.md` 更新は不要。
+- ✅ 新用語は追加していないため、`notes/10_glossary.md` 更新は不要。
+- ✅ DBスキーマ変更はなく、`notes/05_data_model.md` 更新は不要。
+
+### 関連ファイル
+
+- `notes/56_in_app_legal_safety_copy_deck.md`
+- `notes/39_release_command_center.md`
+- `notes/30_owner_release_action_sheet.md`
+- `notes/24_app_store_submission_pack.md`
+- `notes/55_public_help_faq_draft.md`
+- `notes/22_release_triage_tracker.csv`
+
+---
+
+## イテレーション377：公開ヘルプFAQ下書きを追加
+
+### 背景・問題意識
+
+Support URL、通報・削除・個人情報請求ページの原稿はあるが、審査員やユーザーが問い合わせ前に自己解決できるFAQページの下書きが不足していた。公開サポートページを連絡先だけにしないため、アカウント、現地交換、安全、削除、Privacy、通知、有料機能、AI、不具合のFAQを一枚にまとめた。
+
+### 変更内容
+
+#### `notes/55_public_help_faq_draft.md`
+- 公開候補URL `https://megrum.jp/support/faq` を定義した。
+- アカウント、グッズ登録/wish、打診、取引チャット、現地交換と安全、通報・ブロック、個人情報、通知、有料機能、AI、不具合のFAQを追加した。
+- 初回提出で出さない機能は公開時に削る/準備中扱いにする注意を入れた。
+
+#### `notes/25_public_legal_support_pages.md`
+- 公開URL一覧とSupportトップのリンクにFAQを追加した。
+
+#### `notes/37_public_url_publication_checklist.md`
+- 公開必須URL、curl確認、関連文書にFAQを追加した。
+
+#### `notes/39_release_command_center.md`, `notes/30_owner_release_action_sheet.md`, `notes/34_support_response_templates.md`
+- FAQ文書への導線を追加した。
+
+#### `notes/22_release_triage_tracker.csv`
+- RL-053として公開ヘルプFAQ下書きを追加した。
+
+### 影響範囲
+
+- Support URL公開準備
+- App ReviewのDeveloper Information / Support URL説明
+- ユーザー問い合わせ削減
+- 通報、削除、Privacy、AI、IAPの公開説明
+- コード、公開URL、App Store Connect設定は変更していない。
+
+### 確認方法
+
+- `rg -n "support/faq|RL-053|公開ヘルプFAQ|よくある質問" notes/55_public_help_faq_draft.md notes/25_public_legal_support_pages.md notes/37_public_url_publication_checklist.md notes/39_release_command_center.md notes/22_release_triage_tracker.csv`
+- `python3 - <<'PY' ...` による `notes/22_release_triage_tracker.csv` のCSV parse確認
+- 旧規約用語・旧主体表現チェック（旧提案/旧メッセージ/旧投稿関連、サービス主体表現）
+- `git diff --check -- notes`
+
+### セルフレビュー結果
+
+- ✅ コード、公開URL、App Store Connect設定は変更していない。
+- ✅ Supportトップ、公開URLチェック、コントロールボード、オーナー作業表、返信テンプレートからFAQへ辿れるようにした。
+- ✅ 初回提出で出さない有料機能/外部AIは公開時に削る注意を入れた。
+- ✅ 状態名の追加/改名はなく、`notes/09_state_machines.md` 更新は不要。
+- ✅ 新用語は追加していないため、`notes/10_glossary.md` 更新は不要。
+- ✅ DBスキーマ変更はなく、`notes/05_data_model.md` 更新は不要。
+
+### 関連ファイル
+
+- `notes/55_public_help_faq_draft.md`
+- `notes/25_public_legal_support_pages.md`
+- `notes/37_public_url_publication_checklist.md`
+- `notes/39_release_command_center.md`
+- `notes/30_owner_release_action_sheet.md`
+- `notes/34_support_response_templates.md`
+- `notes/22_release_triage_tracker.csv`
+
+---
+
+## イテレーション376：法務リリース準備を別worktreeへ分離
+
+### 背景・問題意識
+
+並行セッションでSwift Native実装が進んでおり、同じworktreeに法務・App Store提出準備の未コミット文書が増えると差分の見通しが悪くなる。オーナーから「別のツリーで作業した方がいいのかな」と相談があったため、コード変更を含まない法務・リリース準備だけを `codex/legal-release-prep` の別worktreeへ分離した。
+
+### 変更内容
+
+#### `notes/legal/`
+- 利用規約ドラフトとプライバシーポリシードラフトを、現地交換MVPとAI利用開示を前提に整理した。
+
+#### `notes/24_app_store_submission_pack.md` 〜 `notes/54_prelaunch_security_audit_checklist.md`
+- App Store提出素材、公開ページ原稿、Trust & Safety、App Privacy、スクショ、弁護士レビュー、オーナー作業表、TestFlight、IAP、サポート返信、デモアカウント、提出証跡、公開URL、Tester案内、提出コントロールボード、App Review対応、P0スモーク、App Privacy回答、Privacy Manifest/SDK監査、アカウント削除、質問票、外部サービス、事故初動、Go / No-Go、提出後運用、データ保持、Guideline適合、提出前セキュリティ監査を追加した。
+- `notes/54` ではRLS、Storage、secret、APNs、Auth/OAuth、公開URL、管理者権限の提出前監査Gateを整理した。
+
+#### `notes/17_legal_alignment.md`
+- 初回リリース範囲を現地交換MVPとして扱う前提に合わせ、規約原典との整合論点を整理した。
+
+#### `notes/22_release_triage_tracker.csv`
+- RL-028以降の法務・リリース準備タスクを追加し、RL-052として提出前セキュリティ監査を追加した。
+
+### 影響範囲
+
+- 法務レビュー準備
+- App Store Connect入力
+- TestFlight/App Review提出運用
+- App Privacy / Privacy Manifest / 外部サービス確認
+- Trust & Safety / アカウント削除 / 個人情報請求 / 事故初動
+- Go / No-Go判定
+- コード、DB、Supabase設定、Apple Developer設定、App Store Connect設定は変更していない。
+
+### 確認方法
+
+- `git status --short` で `ios-native/`, `mobile/`, `web/`, `supabase/` の差分が出ていないことを確認する。
+- `rg -n "SEC-001|SEC-016|RL-052|G12 Security|提出前セキュリティ監査|No-Go" notes/54_prelaunch_security_audit_checklist.md notes/39_release_command_center.md notes/50_release_go_no_go_decision_matrix.md notes/22_release_triage_tracker.csv`
+- `python3 - <<'PY' ...` による `notes/22_release_triage_tracker.csv` のCSV parse確認
+- 旧規約用語・旧主体表現チェック（旧提案/旧メッセージ/旧投稿関連、サービス主体表現）
+- `git diff --check -- notes`
+
+### セルフレビュー結果
+
+- ✅ 別worktree `/Users/michitaka/Desktop/Megrum_release_prep`、branch `codex/legal-release-prep` で作業するように分離した。
+- ✅ 分離先ではコード、DB、ビルド設定、Supabase設定、Apple Developer設定、App Store Connect設定を変更していない。
+- ✅ 初回提出スコープは現地交換MVPとして文書群を接続した。
+- ✅ AI利用開示、IAP判断、App Privacy、Privacy Manifest、Guideline、セキュリティ監査まで提出前に確認できる導線を作った。
+- ✅ 状態名の追加/改名はなく、`notes/09_state_machines.md` 更新は不要。
+- ✅ 新用語は追加していないため、`notes/10_glossary.md` 更新は不要。
+- ✅ DBスキーマ変更はなく、`notes/05_data_model.md` 更新は不要。
+- ⚠️ 実ビルド、公開URL、Supabase Dashboard、Apple Developer、App Store Connectでの実作業は未実行。
+
+### 関連ファイル
+
+- `notes/legal/01_terms_of_service_draft.md`
+- `notes/legal/02_privacy_policy_draft.md`
+- `notes/17_legal_alignment.md`
+- `notes/22_release_triage_tracker.csv`
+- `notes/24_app_store_submission_pack.md` 〜 `notes/54_prelaunch_security_audit_checklist.md`
+
+---
+
 ## イテレーション375：Swift保存接続とData境界補完
 
 ### 背景・問題意識
