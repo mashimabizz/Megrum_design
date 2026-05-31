@@ -89,6 +89,7 @@ Swift Nativeの `Info.plist` では `public.app-category.social-networking` が�
 | 提出後・公開初日運用 | `notes/51` | 手動公開、公開初日監視、指摘対応 |
 | Guideline適合 | `notes/53` | Apple審査Guideline別の証跡確認 |
 | アプリ内法務・安全コピー | `notes/56` | 同意、権限説明、安全注意、AI/IAP文言を実装前に確認 |
+| 法務branch統合手順 | `notes/57` | 開発branchと混ぜずにPR化/mergeする |
 
 ## 4. デモアカウント準備
 
@@ -198,3 +199,4 @@ Appleのリジェクト文を貼るので、ガイドライン番号ごとに対
 - `notes/54_prelaunch_security_audit_checklist.md`
 - `notes/55_public_help_faq_draft.md`
 - `notes/56_in_app_legal_safety_copy_deck.md`
+- `notes/57_legal_release_branch_integration_plan.md`

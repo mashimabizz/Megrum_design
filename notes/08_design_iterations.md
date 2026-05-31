@@ -4,6 +4,57 @@
 
 ---
 
+## イテレーション379：法務branch統合手順を追加
+
+### 背景・問題意識
+
+法務・リリース準備docsを別worktree/別branchへ分離してpushしたが、開発側セッションが並行して進むため、どのbranchで何をstageするか、いつPR化するか、共有docsの競合をどう扱うかを明文化する必要があった。元ツリーの未追跡法務docsも、正本が法務branchへcommit済みであることを確認して除外した。
+
+### 変更内容
+
+#### `notes/57_legal_release_branch_integration_plan.md`
+- Swift Native開発worktreeと法務リリース準備worktreeの役割を整理した。
+- 開発側でstageしてよい範囲、stageしない範囲、`git add -A` を避ける理由を明記した。
+- 法務branchのPRタイトル/本文案、merge前チェック、共有docs競合時の判断を追加した。
+- 元ツリーの掃除方針と、まだ触らない共有docsを明記した。
+
+#### `notes/39_release_command_center.md`, `notes/30_owner_release_action_sheet.md`
+- 法務branch統合手順への導線を追加した。
+
+#### `notes/22_release_triage_tracker.csv`
+- RL-055として法務branch統合手順を追加した。
+
+### 影響範囲
+
+- 開発branchと法務branchの並行運用
+- PR作成/merge時の競合判断
+- `notes/08`, `notes/17`, `notes/22` の共有docs管理
+- コード、DB、ビルド設定、App Store Connect設定は変更していない。
+
+### 確認方法
+
+- `rg -n "RL-055|codex/legal-release-prep|git add -A|法務branch統合" notes/57_legal_release_branch_integration_plan.md notes/39_release_command_center.md notes/22_release_triage_tracker.csv`
+- `python3 - <<'PY' ...` による `notes/22_release_triage_tracker.csv` のCSV parse確認
+- `git diff --check -- notes`
+
+### セルフレビュー結果
+
+- ✅ コード、DB、ビルド設定、App Store Connect設定は変更していない。
+- ✅ 法務branch `codex/legal-release-prep` のcommit/push済み状態と、開発側でstageしない範囲を明記した。
+- ✅ 元ツリーの未追跡法務docsは正本commit後に除外し、共有docsは触らず残した。
+- ✅ 状態名の追加/改名はなく、`notes/09_state_machines.md` 更新は不要。
+- ✅ 新用語は追加していないため、`notes/10_glossary.md` 更新は不要。
+- ✅ DBスキーマ変更はなく、`notes/05_data_model.md` 更新は不要。
+
+### 関連ファイル
+
+- `notes/57_legal_release_branch_integration_plan.md`
+- `notes/39_release_command_center.md`
+- `notes/30_owner_release_action_sheet.md`
+- `notes/22_release_triage_tracker.csv`
+
+---
+
 ## イテレーション378：アプリ内法務安全コピーを追加
 
 ### 背景・問題意識

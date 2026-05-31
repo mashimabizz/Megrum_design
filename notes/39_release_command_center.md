@@ -45,6 +45,7 @@
 | 公開ページ原稿 | `notes/25_public_legal_support_pages.md` |
 | 公開FAQ原稿 | `notes/55_public_help_faq_draft.md` |
 | アプリ内法務・安全コピー | `notes/56_in_app_legal_safety_copy_deck.md` |
+| 法務branch統合手順 | `notes/57_legal_release_branch_integration_plan.md` |
 | ドメイン・メール・公開URL運用 | `notes/47_domain_email_publication_runbook.md` |
 | Trust & Safety運用 | `notes/26_trust_safety_release_sop.md` |
 | App Privacy / Privacy Manifest | `notes/27_app_privacy_data_inventory.md` |
@@ -159,6 +160,7 @@
 | 提出前セキュリティ監査 | RL-052 | `notes/54` |
 | 公開ヘルプFAQ | RL-053 | `notes/55` |
 | アプリ内法務・安全コピー | RL-054 | `notes/56` |
+| 法務branch統合手順 | RL-055 | `notes/57` |
 
 ---
 
@@ -188,6 +190,7 @@
 | プライバシーポリシードラフト | `notes/legal/02_privacy_policy_draft.md` |
 | 公開ヘルプFAQ下書き | `notes/55_public_help_faq_draft.md` |
 | アプリ内法務・安全コピー集 | `notes/56_in_app_legal_safety_copy_deck.md` |
+| 法務branch統合手順 | `notes/57_legal_release_branch_integration_plan.md` |
 | 法務レビュー依頼メモ | `notes/29_legal_review_brief.md` |
 | App Store提出素材 | `notes/24_app_store_submission_pack.md` |
 | App Store Connect入力表 | `notes/31_app_store_connect_metadata_worksheet.md` |
