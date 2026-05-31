@@ -4,6 +4,88 @@
 
 ---
 
+## イテレーション347：Swift取引完了フローを追加
+
+### 背景・問題意識
+
+Swift Native版の取引詳細はチャット閲覧まで進んでいたが、取引完了に必要な証跡写真、両者承認、評価投稿がまだつながっていなかった。リリース前の主軸であるグッズ交換では、取引が完了し評価が残るところまでをNative側で完結させる必要がある。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumCore/MegrumModels.swift`
+- `TradeProposal` に証跡写真URL、撮影日時、撮影者、送信者/受信者承認、完了日時を追加した。
+- `ProposalStatus` に `cancelled` / `completed` を追加した。
+- 証跡作成用の `TradeEvidenceCreateInput` と評価投稿用の `TradeEvaluationCreateInput` を追加した。
+
+#### `ios-native/Sources/MegrumData/SupabaseProposalClient.swift`
+- `proposals` の証跡/承認/完了列を読み込むようにした。
+- `chat-photos` への証跡画像upload、`proposal_evidence_photos` 作成、`proposals.evidence_photo_url` 更新を追加した。
+- 証跡承認時に `approved_by_sender` / `approved_by_receiver` を更新し、両者承認で `status=completed` へ進めるようにした。
+- 完了後の `user_evaluations` 投稿を追加した。
+- 承認/評価requestの組み立てテスト用helperを追加した。
+
+#### `ios-native/Sources/MegrumApp/TradesScreen.swift`
+- 取引詳細sheetに証跡写真の表示、写真選択、承認ボタン、評価sheetを追加した。
+- `agreed` と `completed` を進行中タブに含め、完了後も評価導線へ進めるようにした。
+
+#### `ios-native/Sources/MegrumApp/MegrumAppState.swift` / `SupabaseMegrumRepository.swift`
+- 証跡追加、証跡承認、評価投稿の状態管理とrepository接続を追加した。
+- Preview repositoryでも証跡追加・承認・評価投稿の流れを確認できるようにした。
+
+#### `ios-native/Tests/MegrumCoreTests/MegrumCoreTests.swift`
+- `cancelled` / `completed` の状態値を確認するテストを追加した。
+
+#### `ios-native/Tests/MegrumDataTests/SupabaseProposalClientTests.swift`
+- `ProposalRow` の証跡/承認/完了列selectを確認するようにした。
+- 証跡承認と評価投稿のrequest生成テストを追加した。
+
+#### `ios-native/Tests/MegrumAppTests/MegrumAppStateTests.swift`
+- Preview stateで証跡追加、承認、評価投稿まで進めるテストを追加した。
+
+#### `ios-native/README.md` / `notes/22_swift_native_migration.md` / `notes/05_data_model.md` / `notes/09_state_machines.md` / `notes/10_glossary.md`
+- Swift Native移行進捗、取引完了フロー、証跡/承認/評価のデータモデル・状態・用語を更新した。
+
+### 影響範囲
+
+- Swift Native版の取引一覧/取引詳細
+- `proposals` のステータス/証跡/承認/完了扱い
+- `proposal_evidence_photos`
+- `chat-photos` storage bucket
+- `user_evaluations`
+
+### 確認方法
+
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-build --enable-xctest --disable-swift-testing -j 1`
+- `xcodebuild -quiet -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -destination 'generic/platform=iOS Simulator' -derivedDataPath /tmp/megrum-native-xcodebuild CODE_SIGNING_ALLOWED=NO build`
+- `git diff --check -- ios-native/Sources/MegrumCore/MegrumModels.swift ios-native/Sources/MegrumData/SupabaseProposalClient.swift ios-native/Sources/MegrumApp/MegrumAppState.swift ios-native/Sources/MegrumApp/SupabaseMegrumRepository.swift ios-native/Sources/MegrumApp/TradesScreen.swift ios-native/Sources/MegrumDesign/MegrumTheme.swift ios-native/Tests/MegrumCoreTests/MegrumCoreTests.swift ios-native/Tests/MegrumDataTests/SupabaseProposalClientTests.swift ios-native/Tests/MegrumAppTests/MegrumAppStateTests.swift ios-native/README.md notes/22_swift_native_migration.md notes/05_data_model.md notes/09_state_machines.md notes/10_glossary.md notes/08_design_iterations.md`
+
+### 関連ファイル
+
+- `ios-native/Sources/MegrumCore/MegrumModels.swift`
+- `ios-native/Sources/MegrumData/SupabaseProposalClient.swift`
+- `ios-native/Sources/MegrumApp/MegrumAppState.swift`
+- `ios-native/Sources/MegrumApp/SupabaseMegrumRepository.swift`
+- `ios-native/Sources/MegrumApp/TradesScreen.swift`
+- `ios-native/Sources/MegrumDesign/MegrumTheme.swift`
+- `ios-native/Tests/MegrumCoreTests/MegrumCoreTests.swift`
+- `ios-native/Tests/MegrumDataTests/SupabaseProposalClientTests.swift`
+- `ios-native/Tests/MegrumAppTests/MegrumAppStateTests.swift`
+- `ios-native/README.md`
+- `notes/22_swift_native_migration.md`
+- `notes/05_data_model.md`
+- `notes/09_state_machines.md`
+- `notes/10_glossary.md`
+- `notes/08_design_iterations.md`
+
+### セルフレビュー結果
+
+- ✅ Swift Native側だけを対象にし、legacy Expo/Web側の既存差分は触っていない
+- ✅ 証跡/承認/評価はSupabase client、AppState、UI、テストの一連で接続した
+- ✅ `notes/05` / `notes/09` / `notes/10` にデータモデル・状態・用語の差分を反映した
+- ✅ Swift Package testとXcode buildで確認する
+
+---
+
 ## イテレーション346：Swift相手プロフィール評価を追加
 
 ### 背景・問題意識

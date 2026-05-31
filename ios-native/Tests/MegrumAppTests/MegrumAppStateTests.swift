@@ -375,6 +375,38 @@ final class MegrumAppStateTests: XCTestCase {
         XCTAssertNil(state.sendingMessageProposalID)
     }
 
+    func testAppStateAddsEvidenceApprovesAndSubmitsPreviewEvaluation() async {
+        let state = MegrumAppState(repository: PreviewMegrumRepository())
+        await state.loadInitialData()
+        let proposalID = try! XCTUnwrap(state.proposals.first(where: { $0.status == .agreed })?.id)
+
+        let added = await state.addTradeEvidence(
+            proposalID: proposalID,
+            imageData: Data([0xff, 0xd8, 0xff]),
+            imageContentType: "image/jpeg"
+        )
+
+        XCTAssertTrue(added)
+        XCTAssertNotNil(state.proposals.first(where: { $0.id == proposalID })?.evidencePhotoURL)
+        XCTAssertNil(state.addingEvidenceProposalID)
+
+        let approved = await state.approveTradeEvidence(proposalID: proposalID)
+
+        XCTAssertTrue(approved)
+        XCTAssertTrue(state.proposals.first(where: { $0.id == proposalID })?.approvedByReceiver ?? false)
+        XCTAssertNil(state.approvingEvidenceProposalID)
+
+        let submitted = await state.submitTradeEvaluation(
+            proposalID: proposalID,
+            stars: 5,
+            comment: "ありがとうございました"
+        )
+
+        XCTAssertTrue(submitted)
+        XCTAssertNil(state.submittingEvaluationProposalID)
+        XCTAssertNil(state.errorMessage)
+    }
+
     func testAppStateValidatesGoodsEntryTitle() async {
         let state = MegrumAppState(repository: PreviewMegrumRepository())
         let created = await state.createGoodsEntry(

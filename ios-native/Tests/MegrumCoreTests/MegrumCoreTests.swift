@@ -10,6 +10,8 @@ final class MegrumCoreTests: XCTestCase {
 
     func testProposalStatusRawValueMatchesExistingStateMachine() {
         XCTAssertEqual(ProposalStatus.agreementOneSide.rawValue, "agreement_one_side")
+        XCTAssertEqual(ProposalStatus.cancelled.rawValue, "cancelled")
+        XCTAssertEqual(ProposalStatus.completed.rawValue, "completed")
     }
 
     func testAccountStatusSetupBoundary() {

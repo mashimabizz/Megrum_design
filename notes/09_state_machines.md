@@ -3,8 +3,8 @@
 > **目的**：Megrum の主要エンティティのライフサイクルと状態遷移ルールを定義。
 > 実装が状態遷移でブレないための一次資料。デザイン・実装・QA の共通言語。
 
-最終更新: 2026-05-30
-ステータス: Draft v1.93（iter263 本文カードブロックボタンを追記）
+最終更新: 2026-05-31
+ステータス: Draft v1.94（iter347 Swift Native取引完了状態を反映）
 
 ---
 
@@ -134,8 +134,9 @@ stateDiagram-v2
 ## 2. Deal Lifecycle
 
 合意成立した取引の、当日〜完了まで。
-入口は Proposal Lifecycle の `agreed`、出口は `rated`（完了）または `cancelled`、または `disputed`（→ Dispute Lifecycle）。
+入口は Proposal Lifecycle の `agreed`、出口は `completed`（Swift Native現行の完了状態）/ `rated`（評価済みの概念状態）または `cancelled`、または `disputed`（→ Dispute Lifecycle）。
 現行の図は **現地交換フローを主軸** にしており、郵送交換は当面ビジネスルールで扱う。発送済み / 受取済み の専用状態を切るかは未確定。
+Swift Native版では `approved` を `proposals.approved_by_sender` / `approved_by_receiver` のboolで表現し、両方trueになった時点で `proposals.status='completed'` にする。評価済みかどうかは `user_evaluations` の投稿有無で判定する。
 
 ### 状態図
 
@@ -184,7 +185,8 @@ stateDiagram-v2
 | `arrived_both` | 両者到着 | 合流可能 |
 | `evidence_captured` | 証跡撮影済 | 両者の品物を1枚に撮影 |
 | `approved` | 両者承認済 | 内容OK |
-| `rated` | 評価済 | terminal（完了） |
+| `completed` | 完了 | Swift Native現行のterminal状態 |
+| `rated` | 評価済 | 完了後に評価投稿済みであることを示す概念状態 |
 | `disputed` | dispute中 | → Dispute Lifecycle |
 | `cancelled` | キャンセル済 | terminal |
 

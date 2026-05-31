@@ -4,7 +4,7 @@
 > 新環境（別Claudeセッション・別エンジニア）でも、これだけ読めばコンテキストがつかめる。
 
 最終更新: 2026-05-31
-ステータス: Draft v3.80（iter346 Swift Native相手プロフィール評価導線を反映）
+ステータス: Draft v3.81（iter347 Swift Native取引完了フローを反映）
 
 ---
 
@@ -208,9 +208,9 @@
 | **合意** | agreement | 双方合意で取引成立 | C-1.5 |
 | **取引** | deal、trade | 合意成立から完了まで | C-2, C-3 |
 | **住所** | mailing address | 郵送交換で使う住所情報。合意成立までは相手に見せず、合意後に当事者同士だけへ開示する | iter168.71 |
-| **証跡撮影** | evidence | 物理交換時の両者品物を1枚撮影。「左=相手 / 右=自分」固定 | C-3 |
-| **両者承認** | dual approve | 取引内容の相互確認 | C-3 |
-| **評価** | rating | 1-5 stars＋コメント | C-3 |
+| **証跡撮影** | evidence | 物理交換後に交換したグッズを撮影し、取引完了判断の材料にする操作。Swift Native版では `chat-photos` へ画像を保存し、`proposal_evidence_photos` と `proposals.evidence_photo_url` に反映する | C-3, iter347 |
+| **両者承認** | dual approve | 証跡撮影後に送信者・受信者が内容を確認する操作。Swift Native版では `proposals.approved_by_sender` / `approved_by_receiver` を更新し、両方trueになった時点で `completed` にする | C-3, iter347 |
+| **評価** | rating | 完了した取引に対する1-5 stars＋コメント。Swift Native版では取引完了後に `user_evaluations` へ投稿する | C-3, iter347 |
 | **dispute** | 異議、申告、通報、D-flow | 取引異常時の申し立てフロー。取引チャットの `通報` ボタンはこの申告フローに接続する | D-flow / iter168.87 |
 | **反論** | reply | dispute 申告に対する弁明 | D-flow |
 | **仲裁** | arbitration | 運営による決定 | D-flow |
@@ -319,7 +319,8 @@
 | `expired` | 期限切れ | Proposal |
 | `on_the_way` | 移動中 | Deal |
 | `arrived_both` | 両者到着 | Deal |
-| `completed` / `rated` | 完了 | Deal |
+| `completed` | 完了 | Proposal |
+| `rated` | 評価済み | 取引完了後の派生状態 |
 | `disputed` | dispute中 | Deal |
 | `active` | アクティブ | AW, Account, Wish |
 | `paused` | 一時無効 | AW |

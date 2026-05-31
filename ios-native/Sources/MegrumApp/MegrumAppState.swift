@@ -67,6 +67,9 @@ public protocol MegrumRepository: Sendable {
     func loadPublicUserProfile(userID: UUID) async throws -> PublicUserProfile?
     func loadUserEvaluations(userID: UUID, limit: Int) async throws -> [UserEvaluation]
     func createProposal(_ input: ProposalCreateInput) async throws -> TradeProposal
+    func addTradeEvidence(_ input: TradeEvidenceCreateInput) async throws -> TradeProposal
+    func approveTradeEvidence(proposalID: UUID) async throws -> TradeProposal
+    func submitTradeEvaluation(_ input: TradeEvaluationCreateInput) async throws -> UserEvaluation
     func loadMessages(proposalID: UUID, limit: Int) async throws -> [TradeMessage]
     func sendMessage(_ input: TradeMessageCreateInput) async throws -> TradeMessage
     func loadGrooms(latitude: Double?, longitude: Double?, radiusMeters: Int) async throws -> [GroomPost]
@@ -126,6 +129,18 @@ public extension MegrumRepository {
     }
 
     func createProposal(_ input: ProposalCreateInput) async throws -> TradeProposal {
+        throw MegrumRepositoryError.unsupportedMutation
+    }
+
+    func addTradeEvidence(_ input: TradeEvidenceCreateInput) async throws -> TradeProposal {
+        throw MegrumRepositoryError.unsupportedMutation
+    }
+
+    func approveTradeEvidence(proposalID: UUID) async throws -> TradeProposal {
+        throw MegrumRepositoryError.unsupportedMutation
+    }
+
+    func submitTradeEvaluation(_ input: TradeEvaluationCreateInput) async throws -> UserEvaluation {
         throw MegrumRepositoryError.unsupportedMutation
     }
 
@@ -331,6 +346,81 @@ public struct PreviewMegrumRepository: MegrumRepository {
             senderGoodsIDs: input.senderGoodsIDs,
             receiverGoodsIDs: input.receiverGoodsIDs,
             conditionTags: input.conditionTags
+        )
+    }
+
+    public func addTradeEvidence(_ input: TradeEvidenceCreateInput) async throws -> TradeProposal {
+        let proposal = NativePreviewData.proposals.first { $0.id == input.proposalID }
+            ?? NativePreviewData.proposals.first
+            ?? TradeProposal(
+                id: input.proposalID,
+                senderID: NativePreviewData.viewerID,
+                receiverID: NativePreviewData.partnerID,
+                status: .agreed,
+                exchangeMethod: .hand,
+                senderGoodsIDs: [],
+                receiverGoodsIDs: []
+            )
+        return TradeProposal(
+            id: proposal.id,
+            senderID: proposal.senderID,
+            receiverID: proposal.receiverID,
+            status: .agreed,
+            exchangeMethod: proposal.exchangeMethod,
+            senderGoodsIDs: proposal.senderGoodsIDs,
+            receiverGoodsIDs: proposal.receiverGoodsIDs,
+            conditionTags: proposal.conditionTags,
+            evidencePhotoURL: URL(string: "https://example.com/evidence.jpg")!,
+            evidenceTakenAt: .now,
+            evidenceTakenBy: NativePreviewData.viewerID,
+            approvedBySender: proposal.approvedBySender,
+            approvedByReceiver: proposal.approvedByReceiver,
+            completedAt: proposal.completedAt,
+            createdAt: proposal.createdAt
+        )
+    }
+
+    public func approveTradeEvidence(proposalID: UUID) async throws -> TradeProposal {
+        let proposal = NativePreviewData.proposals.first { $0.id == proposalID }
+            ?? TradeProposal(
+                id: proposalID,
+                senderID: NativePreviewData.viewerID,
+                receiverID: NativePreviewData.partnerID,
+                status: .agreed,
+                exchangeMethod: .hand,
+                senderGoodsIDs: [],
+                receiverGoodsIDs: [],
+                evidencePhotoURL: URL(string: "https://example.com/evidence.jpg")!
+            )
+        let approvedBySender = proposal.isSender(NativePreviewData.viewerID) ? true : proposal.approvedBySender
+        let approvedByReceiver = proposal.isSender(NativePreviewData.viewerID) ? proposal.approvedByReceiver : true
+        return TradeProposal(
+            id: proposal.id,
+            senderID: proposal.senderID,
+            receiverID: proposal.receiverID,
+            status: approvedBySender && approvedByReceiver ? .completed : .agreed,
+            exchangeMethod: proposal.exchangeMethod,
+            senderGoodsIDs: proposal.senderGoodsIDs,
+            receiverGoodsIDs: proposal.receiverGoodsIDs,
+            conditionTags: proposal.conditionTags,
+            evidencePhotoURL: proposal.evidencePhotoURL ?? URL(string: "https://example.com/evidence.jpg")!,
+            evidenceTakenAt: proposal.evidenceTakenAt ?? .now,
+            evidenceTakenBy: proposal.evidenceTakenBy ?? NativePreviewData.viewerID,
+            approvedBySender: approvedBySender,
+            approvedByReceiver: approvedByReceiver,
+            completedAt: approvedBySender && approvedByReceiver ? .now : proposal.completedAt,
+            createdAt: proposal.createdAt
+        )
+    }
+
+    public func submitTradeEvaluation(_ input: TradeEvaluationCreateInput) async throws -> UserEvaluation {
+        UserEvaluation(
+            id: UUID(),
+            raterID: NativePreviewData.viewerID,
+            raterHandle: NativePreviewData.viewer.handle,
+            raterDisplayName: NativePreviewData.viewer.displayName,
+            stars: input.stars,
+            comment: input.comment
         )
     }
 
@@ -542,6 +632,9 @@ public final class MegrumAppState: ObservableObject {
     @Published public private(set) var isSavingMailingAddress = false
     @Published public private(set) var isCreatingGoodsEntry = false
     @Published public private(set) var isCreatingProposal = false
+    @Published public private(set) var addingEvidenceProposalID: UUID?
+    @Published public private(set) var approvingEvidenceProposalID: UUID?
+    @Published public private(set) var submittingEvaluationProposalID: UUID?
     @Published public private(set) var isCreatingGroomPost = false
     @Published public private(set) var isCreatingBoardThread = false
     @Published public private(set) var loadingMessagesProposalID: UUID?
@@ -1176,6 +1269,80 @@ public final class MegrumAppState: ObservableObject {
         }
     }
 
+    public func addTradeEvidence(proposalID: UUID, imageData: Data, imageContentType: String) async -> Bool {
+        guard addingEvidenceProposalID != proposalID else {
+            return false
+        }
+        guard !imageData.isEmpty else {
+            errorMessage = "証跡に使う写真を選択してください"
+            return false
+        }
+
+        addingEvidenceProposalID = proposalID
+        errorMessage = nil
+        do {
+            let proposal = try await repository.addTradeEvidence(
+                TradeEvidenceCreateInput(
+                    proposalID: proposalID,
+                    imageData: imageData,
+                    imageContentType: imageContentType
+                )
+            )
+            replaceProposal(proposal)
+            addingEvidenceProposalID = nil
+            await loadMessages(proposalID: proposalID)
+            return true
+        } catch {
+            errorMessage = "証跡写真を追加できませんでした"
+            addingEvidenceProposalID = nil
+            return false
+        }
+    }
+
+    public func approveTradeEvidence(proposalID: UUID) async -> Bool {
+        guard approvingEvidenceProposalID != proposalID else {
+            return false
+        }
+
+        approvingEvidenceProposalID = proposalID
+        errorMessage = nil
+        do {
+            let proposal = try await repository.approveTradeEvidence(proposalID: proposalID)
+            replaceProposal(proposal)
+            approvingEvidenceProposalID = nil
+            await loadMessages(proposalID: proposalID)
+            return true
+        } catch {
+            errorMessage = "証跡を承認できませんでした"
+            approvingEvidenceProposalID = nil
+            return false
+        }
+    }
+
+    public func submitTradeEvaluation(proposalID: UUID, stars: Int, comment: String?) async -> Bool {
+        guard submittingEvaluationProposalID != proposalID else {
+            return false
+        }
+
+        submittingEvaluationProposalID = proposalID
+        errorMessage = nil
+        do {
+            _ = try await repository.submitTradeEvaluation(
+                TradeEvaluationCreateInput(
+                    proposalID: proposalID,
+                    stars: stars,
+                    comment: comment
+                )
+            )
+            submittingEvaluationProposalID = nil
+            return true
+        } catch {
+            errorMessage = "評価を送信できませんでした"
+            submittingEvaluationProposalID = nil
+            return false
+        }
+    }
+
     public func loadMessages(proposalID: UUID, limit: Int = 80) async {
         guard loadingMessagesProposalID != proposalID else {
             return
@@ -1212,6 +1379,14 @@ public final class MegrumAppState: ObservableObject {
             errorMessage = "メッセージを送信できませんでした"
             sendingMessageProposalID = nil
             return false
+        }
+    }
+
+    private func replaceProposal(_ proposal: TradeProposal) {
+        if let index = proposals.firstIndex(where: { $0.id == proposal.id }) {
+            proposals[index] = proposal
+        } else {
+            proposals.insert(proposal, at: 0)
         }
     }
 

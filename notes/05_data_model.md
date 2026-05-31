@@ -4,7 +4,7 @@
 > 実装の正解集。`09_state_machines.md` と完全に整合させ、`10_glossary.md` の用語を使う。
 
 最終更新: 2026-05-31
-ステータス: Draft v2.30（iter346 相手プロフィール評価RPCを追加）
+ステータス: Draft v2.31（iter347 Swift Native取引完了フローを反映）
 
 ## 最新化履歴
 
@@ -42,6 +42,7 @@
 | **v2.28** | **2026-05-30** | **iter278 反映（公開プロフィール列制限、削除済み/停止中ユーザー非公開、AW匿名読み取り停止、所有者更新系RLSの `WITH CHECK` 追加）** |
 | **v2.29** | **2026-05-31** | **iter338 反映（Swift Native iOS版のAPNs device token保存用に `notification_devices.push_provider` / `native_device_token` を追加）** |
 | **v2.30** | **2026-05-31** | **iter346 反映（相手プロフィールと評価一覧をSwift Nativeから読むため、公開プロフィール/評価一覧RPCを追加）** |
+| **v2.31** | **2026-05-31** | **iter347 反映（Swift Native取引詳細から `chat-photos` / `proposal_evidence_photos` / `proposals.approved_by_*` / `user_evaluations` を使う最小完了フローを追加）** |
 | **v2.20** | **2026-05-29** | **iter168.90 反映（`search_query_logs` と人気検索RPCを追加。検索結果はマッチ分類つきグッズパネルで表示）** |
 | **v2.21** | **2026-05-30** | **iter168.97 反映（`schedules.place_name` 追加。合意時に `both` を単一手段へ固定し、現地交換の複数候補は1件へ固定する運用を追記）** |
 
@@ -831,6 +832,11 @@ iter34 で `message_type` 拡張。
 ---
 
 ## 6. 取引（Deal）・到着・服装・位置共有
+
+現行実装メモ（iter347）：
+- 取引完了のSwift Native最小フローは、専用 `deals` 実テーブルではなく既存 `proposals` の `evidence_photo_url` / `evidence_taken_at` / `evidence_taken_by` / `approved_by_sender` / `approved_by_receiver` / `completed_at` / `status='completed'` と、複数枚対応の `proposal_evidence_photos`、評価の `user_evaluations` を使う。
+- 証跡画像は Storage `chat-photos` に保存し、`proposal_evidence_photos.photo_url` と `proposals.evidence_photo_url`（最初の1枚の互換ミラー）に保持する。
+- Swift Nativeの `SupabaseProposalClient` は、証跡追加、承認、評価投稿をこの境界に接続する。
 
 ### `deals`（旧 `exchanges` をリネーム、用語集と一致）
 

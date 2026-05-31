@@ -27,6 +27,8 @@ public enum ProposalStatus: String, Codable, Sendable, CaseIterable, Identifiabl
     case agreed
     case rejected
     case expired
+    case cancelled
+    case completed
 
     public var id: String { rawValue }
 }
@@ -629,6 +631,12 @@ public struct TradeProposal: Identifiable, Codable, Hashable, Sendable {
     public var senderGoodsIDs: [UUID]
     public var receiverGoodsIDs: [UUID]
     public var conditionTags: [String]
+    public var evidencePhotoURL: URL?
+    public var evidenceTakenAt: Date?
+    public var evidenceTakenBy: UUID?
+    public var approvedBySender: Bool
+    public var approvedByReceiver: Bool
+    public var completedAt: Date?
     public var createdAt: Date
 
     public init(
@@ -640,6 +648,12 @@ public struct TradeProposal: Identifiable, Codable, Hashable, Sendable {
         senderGoodsIDs: [UUID],
         receiverGoodsIDs: [UUID],
         conditionTags: [String] = [],
+        evidencePhotoURL: URL? = nil,
+        evidenceTakenAt: Date? = nil,
+        evidenceTakenBy: UUID? = nil,
+        approvedBySender: Bool = false,
+        approvedByReceiver: Bool = false,
+        completedAt: Date? = nil,
         createdAt: Date = .now
     ) {
         self.id = id
@@ -650,7 +664,63 @@ public struct TradeProposal: Identifiable, Codable, Hashable, Sendable {
         self.senderGoodsIDs = senderGoodsIDs
         self.receiverGoodsIDs = receiverGoodsIDs
         self.conditionTags = conditionTags
+        self.evidencePhotoURL = evidencePhotoURL
+        self.evidenceTakenAt = evidenceTakenAt
+        self.evidenceTakenBy = evidenceTakenBy
+        self.approvedBySender = approvedBySender
+        self.approvedByReceiver = approvedByReceiver
+        self.completedAt = completedAt
         self.createdAt = createdAt
+    }
+
+    public func isParticipant(_ userID: UUID) -> Bool {
+        senderID == userID || receiverID == userID
+    }
+
+    public func isSender(_ userID: UUID) -> Bool {
+        senderID == userID
+    }
+
+    public func approvedBy(_ userID: UUID) -> Bool {
+        isSender(userID) ? approvedBySender : approvedByReceiver
+    }
+
+    public func partnerApproved(for userID: UUID) -> Bool {
+        isSender(userID) ? approvedByReceiver : approvedBySender
+    }
+
+    public func partnerID(for userID: UUID) -> UUID? {
+        if senderID == userID {
+            return receiverID
+        }
+        if receiverID == userID {
+            return senderID
+        }
+        return nil
+    }
+}
+
+public struct TradeEvidenceCreateInput: Equatable, Sendable {
+    public var proposalID: UUID
+    public var imageData: Data
+    public var imageContentType: String
+
+    public init(proposalID: UUID, imageData: Data, imageContentType: String) {
+        self.proposalID = proposalID
+        self.imageData = imageData
+        self.imageContentType = imageContentType
+    }
+}
+
+public struct TradeEvaluationCreateInput: Equatable, Sendable {
+    public var proposalID: UUID
+    public var stars: Int
+    public var comment: String?
+
+    public init(proposalID: UUID, stars: Int, comment: String? = nil) {
+        self.proposalID = proposalID
+        self.stars = stars
+        self.comment = comment
     }
 }
 

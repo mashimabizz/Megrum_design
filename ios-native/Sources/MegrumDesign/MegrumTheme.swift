@@ -6,6 +6,7 @@ public enum MegrumTheme {
     public static let pink = Color(red: 0.953, green: 0.773, blue: 0.831)
     public static let ink = Color(red: 0.212, green: 0.188, blue: 0.286)
     public static let muted = Color(red: 0.584, green: 0.557, blue: 0.643)
+    public static let ok = Color(red: 0.286, green: 0.690, blue: 0.443)
     public static let canvas = Color(red: 0.984, green: 0.976, blue: 0.988)
 }
 

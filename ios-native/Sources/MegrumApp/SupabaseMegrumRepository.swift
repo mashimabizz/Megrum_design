@@ -108,6 +108,18 @@ public struct SupabaseMegrumRepository: MegrumRepository {
         try await proposalClient.createProposal(senderID: viewerID, input: input)
     }
 
+    public func addTradeEvidence(_ input: TradeEvidenceCreateInput) async throws -> TradeProposal {
+        try await proposalClient.addEvidencePhoto(userID: viewerID, input: input)
+    }
+
+    public func approveTradeEvidence(proposalID: UUID) async throws -> TradeProposal {
+        try await proposalClient.approveEvidence(userID: viewerID, proposalID: proposalID)
+    }
+
+    public func submitTradeEvaluation(_ input: TradeEvaluationCreateInput) async throws -> UserEvaluation {
+        try await proposalClient.submitEvaluation(userID: viewerID, input: input)
+    }
+
     public func loadMessages(proposalID: UUID, limit: Int) async throws -> [TradeMessage] {
         try await messageClient.loadMessages(proposalID: proposalID, limit: limit)
     }

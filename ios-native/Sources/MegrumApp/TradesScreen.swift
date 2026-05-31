@@ -1,5 +1,6 @@
 import MegrumCore
 import MegrumDesign
+import PhotosUI
 import SwiftUI
 
 struct TradesScreen: View {
@@ -135,6 +136,10 @@ private struct TradeCard: View {
             "拒否済"
         case .expired:
             "期限切れ"
+        case .cancelled:
+            "キャンセル済"
+        case .completed:
+            "完了"
         }
     }
 }
@@ -168,7 +173,7 @@ private enum TradeStage: String, CaseIterable, Identifiable {
         case .pending:
             [.draft, .sent, .negotiating, .agreementOneSide].contains(status)
         case .inProgress:
-            status == .agreed
+            [.agreed, .completed].contains(status)
         }
     }
 }
@@ -230,26 +235,50 @@ private struct TradeDetailScreen: View {
     var proposal: TradeProposal
     @Environment(\.dismiss) private var dismiss
     @State private var draftMessage = ""
+    @State private var selectedEvidencePhotoItem: PhotosPickerItem?
+    @State private var isShowingEvaluationSheet = false
 
     private var messages: [TradeMessage] {
         appState.messages(for: proposal.id)
+    }
+
+    private var currentProposal: TradeProposal {
+        appState.proposals.first { $0.id == proposal.id } ?? proposal
     }
 
     var body: some View {
         VStack(spacing: 0) {
             ScrollView {
                 VStack(alignment: .leading, spacing: 18) {
-                    ScreenTitle(title: "取引詳細", subtitle: proposal.exchangeMethod.displayName)
-                    TradeCard(proposal: proposal) {}
+                    ScreenTitle(title: "取引詳細", subtitle: currentProposal.exchangeMethod.displayName)
+                    TradeCard(proposal: currentProposal) {}
 
                     VStack(alignment: .leading, spacing: 12) {
                         detailRow(title: "ステータス", value: statusText)
-                        detailRow(title: "交換条件タグ", value: proposal.conditionTags.isEmpty ? "未設定" : proposal.conditionTags.joined(separator: " / "))
-                        detailRow(title: "私が出す", value: "\(proposal.senderGoodsIDs.count)件")
-                        detailRow(title: "受け取る", value: "\(proposal.receiverGoodsIDs.count)件")
+                        detailRow(title: "交換条件タグ", value: currentProposal.conditionTags.isEmpty ? "未設定" : currentProposal.conditionTags.joined(separator: " / "))
+                        detailRow(title: "私が出す", value: "\(currentProposal.senderGoodsIDs.count)件")
+                        detailRow(title: "受け取る", value: "\(currentProposal.receiverGoodsIDs.count)件")
                     }
                     .padding(18)
                     .background(.white.opacity(0.84), in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+
+                    if currentProposal.status == .agreed || currentProposal.status == .completed {
+                        TradeEvidencePanel(
+                            proposal: currentProposal,
+                            viewerID: appState.viewer?.id,
+                            selectedPhotoItem: $selectedEvidencePhotoItem,
+                            isAddingEvidence: appState.addingEvidenceProposalID == currentProposal.id,
+                            isApproving: appState.approvingEvidenceProposalID == currentProposal.id,
+                            onApprove: {
+                                Task {
+                                    await appState.approveTradeEvidence(proposalID: currentProposal.id)
+                                }
+                            },
+                            onRate: {
+                                isShowingEvaluationSheet = true
+                            }
+                        )
+                    }
 
                     VStack(alignment: .leading, spacing: 12) {
                         HStack {
@@ -296,6 +325,32 @@ private struct TradeDetailScreen: View {
         .task {
             await appState.loadMessages(proposalID: proposal.id)
         }
+        .onChange(of: selectedEvidencePhotoItem) { _, item in
+            guard let item else {
+                return
+            }
+            Task {
+                await addEvidence(from: item)
+            }
+        }
+        .sheet(isPresented: $isShowingEvaluationSheet) {
+            NavigationStack {
+                TradeEvaluationSheet(
+                    isSubmitting: appState.submittingEvaluationProposalID == currentProposal.id
+                ) { stars, comment in
+                    let sent = await appState.submitTradeEvaluation(
+                        proposalID: currentProposal.id,
+                        stars: stars,
+                        comment: comment
+                    )
+                    if sent {
+                        isShowingEvaluationSheet = false
+                    }
+                }
+            }
+            .presentationDetents([.medium])
+            .presentationDragIndicator(.visible)
+        }
         .toolbar {
             ToolbarItem(placement: .cancellationAction) {
                 Button("閉じる") {
@@ -303,6 +358,20 @@ private struct TradeDetailScreen: View {
                 }
             }
         }
+    }
+
+    private func addEvidence(from item: PhotosPickerItem) async {
+        defer {
+            selectedEvidencePhotoItem = nil
+        }
+        guard let data = try? await item.loadTransferable(type: Data.self) else {
+            return
+        }
+        _ = await appState.addTradeEvidence(
+            proposalID: currentProposal.id,
+            imageData: data,
+            imageContentType: inferredEvidenceImageContentType(from: data)
+        )
     }
 
     private func detailRow(title: String, value: String) -> some View {
@@ -318,7 +387,7 @@ private struct TradeDetailScreen: View {
     }
 
     private var statusText: String {
-        switch proposal.status {
+        switch currentProposal.status {
         case .draft:
             "下書き"
         case .sent:
@@ -333,7 +402,229 @@ private struct TradeDetailScreen: View {
             "拒否済"
         case .expired:
             "期限切れ"
+        case .cancelled:
+            "キャンセル済"
+        case .completed:
+            "完了"
         }
+    }
+}
+
+private struct TradeEvidencePanel: View {
+    var proposal: TradeProposal
+    var viewerID: UUID?
+    @Binding var selectedPhotoItem: PhotosPickerItem?
+    var isAddingEvidence: Bool
+    var isApproving: Bool
+    var onApprove: () -> Void
+    var onRate: () -> Void
+
+    private var myApproved: Bool {
+        guard let viewerID else {
+            return false
+        }
+        return proposal.approvedBy(viewerID)
+    }
+
+    private var partnerApproved: Bool {
+        guard let viewerID else {
+            return false
+        }
+        return proposal.partnerApproved(for: viewerID)
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack {
+                Text("取引証跡")
+                    .font(.system(size: 20, weight: .heavy, design: .rounded))
+                    .foregroundStyle(MegrumTheme.ink)
+
+                Spacer()
+
+                if proposal.status == .completed {
+                    Text("完了")
+                        .font(.system(size: 13, weight: .heavy, design: .rounded))
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 11)
+                        .padding(.vertical, 6)
+                        .background(MegrumTheme.ok, in: Capsule())
+                }
+            }
+
+            if let evidencePhotoURL = proposal.evidencePhotoURL {
+                AsyncImage(url: evidencePhotoURL) { phase in
+                    switch phase {
+                    case .success(let image):
+                        image
+                            .resizable()
+                            .scaledToFill()
+                    case .failure:
+                        MegrumTheme.sky.opacity(0.18)
+                            .overlay {
+                                Image(systemName: "photo")
+                                    .font(.system(size: 28, weight: .bold))
+                                    .foregroundStyle(MegrumTheme.muted)
+                            }
+                    case .empty:
+                        MegrumTheme.sky.opacity(0.12)
+                            .overlay {
+                                ProgressView()
+                            }
+                    @unknown default:
+                        Color.clear
+                    }
+                }
+                .frame(height: 172)
+                .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+                .overlay {
+                    RoundedRectangle(cornerRadius: 22, style: .continuous)
+                        .strokeBorder(.white.opacity(0.7), lineWidth: 1)
+                }
+            }
+
+            HStack(spacing: 8) {
+                approvalChip(title: "あなた", isApproved: myApproved)
+                approvalChip(title: "相手", isApproved: partnerApproved)
+            }
+
+            if proposal.status == .completed {
+                Button(action: onRate) {
+                    Label("評価を送信", systemImage: "star.fill")
+                        .font(.system(size: 16, weight: .heavy, design: .rounded))
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 52)
+                        .background(MegrumTheme.lavender, in: Capsule())
+                        .foregroundStyle(.white)
+                }
+                .buttonStyle(.plain)
+            } else if proposal.evidencePhotoURL == nil {
+                PhotosPicker(selection: $selectedPhotoItem, matching: .images) {
+                    Label(isAddingEvidence ? "追加中" : "交換後にグッズを撮影", systemImage: "camera.fill")
+                        .font(.system(size: 16, weight: .heavy, design: .rounded))
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 54)
+                        .background(MegrumTheme.lavender, in: Capsule())
+                        .foregroundStyle(.white)
+                }
+                .buttonStyle(.plain)
+                .disabled(isAddingEvidence)
+            } else if !myApproved {
+                Button(action: onApprove) {
+                    Group {
+                        if isApproving {
+                            ProgressView()
+                                .tint(.white)
+                        } else {
+                            Label("証跡を承認", systemImage: "checkmark.seal.fill")
+                        }
+                    }
+                    .font(.system(size: 16, weight: .heavy, design: .rounded))
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 54)
+                    .background(MegrumTheme.lavender, in: Capsule())
+                    .foregroundStyle(.white)
+                }
+                .buttonStyle(.plain)
+                .disabled(isApproving)
+            } else {
+                Text("相手の承認を待っています")
+                    .font(.system(size: 14, weight: .heavy, design: .rounded))
+                    .foregroundStyle(MegrumTheme.muted)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 50)
+                    .background(.white.opacity(0.68), in: Capsule())
+            }
+        }
+        .padding(18)
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 26, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 26, style: .continuous)
+                .strokeBorder(.white.opacity(0.72), lineWidth: 1)
+        }
+    }
+
+    private func approvalChip(title: String, isApproved: Bool) -> some View {
+        HStack(spacing: 6) {
+            Image(systemName: isApproved ? "checkmark.circle.fill" : "clock")
+            Text(isApproved ? "\(title) 承認済み" : "\(title) 未承認")
+        }
+        .font(.system(size: 12, weight: .heavy, design: .rounded))
+        .foregroundStyle(isApproved ? MegrumTheme.ok : MegrumTheme.muted)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 7)
+        .background(.white.opacity(0.72), in: Capsule())
+    }
+}
+
+private struct TradeEvaluationSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    @State private var stars = 5
+    @State private var comment = ""
+    var isSubmitting: Bool
+    var onSubmit: (Int, String?) async -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 18) {
+            HStack {
+                Text("評価を送信")
+                    .font(.system(size: 24, weight: .heavy, design: .rounded))
+                    .foregroundStyle(MegrumTheme.ink)
+
+                Spacer()
+
+                Button("閉じる") {
+                    dismiss()
+                }
+                .font(.system(size: 14, weight: .heavy, design: .rounded))
+            }
+
+            HStack(spacing: 10) {
+                ForEach(1...5, id: \.self) { value in
+                    Button {
+                        stars = value
+                    } label: {
+                        Image(systemName: value <= stars ? "star.fill" : "star")
+                            .font(.system(size: 30, weight: .bold))
+                            .foregroundStyle(MegrumTheme.lavender)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .frame(maxWidth: .infinity)
+
+            TextField("コメント（任意）", text: $comment, axis: .vertical)
+                .font(.system(size: 16, weight: .bold, design: .rounded))
+                .lineLimit(3...5)
+                .padding(14)
+                .background(.white.opacity(0.78), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+
+            Button {
+                Task {
+                    await onSubmit(stars, comment.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty)
+                }
+            } label: {
+                Group {
+                    if isSubmitting {
+                        ProgressView()
+                            .tint(.white)
+                    } else {
+                        Text("送信")
+                    }
+                }
+                .font(.system(size: 17, weight: .heavy, design: .rounded))
+                .frame(maxWidth: .infinity)
+                .frame(height: 54)
+                .background(MegrumTheme.lavender, in: Capsule())
+                .foregroundStyle(.white)
+            }
+            .buttonStyle(.plain)
+            .disabled(isSubmitting)
+
+            Spacer(minLength: 0)
+        }
+        .padding(22)
+        .background(MegrumTheme.canvas.ignoresSafeArea())
     }
 }
 
@@ -413,4 +704,33 @@ private struct TradePreviewColumn: View {
                 }
         }
     }
+}
+
+private extension String {
+    var nilIfEmpty: String? {
+        isEmpty ? nil : self
+    }
+}
+
+private func inferredEvidenceImageContentType(from data: Data) -> String {
+    let bytes = [UInt8](data.prefix(12))
+    if bytes.count >= 8,
+       bytes[0] == 0x89,
+       bytes[1] == 0x50,
+       bytes[2] == 0x4E,
+       bytes[3] == 0x47 {
+        return "image/png"
+    }
+    if bytes.count >= 12,
+       bytes[0] == 0x52,
+       bytes[1] == 0x49,
+       bytes[2] == 0x46,
+       bytes[3] == 0x46,
+       bytes[8] == 0x57,
+       bytes[9] == 0x45,
+       bytes[10] == 0x42,
+       bytes[11] == 0x50 {
+        return "image/webp"
+    }
+    return "image/jpeg"
 }
