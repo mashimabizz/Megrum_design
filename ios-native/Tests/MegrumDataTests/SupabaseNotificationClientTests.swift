@@ -82,7 +82,7 @@ final class SupabaseNotificationClientTests: XCTestCase {
         let rows = try XCTUnwrap(JSONSerialization.jsonObject(with: body) as? [[String: Any]])
         let payload = try XCTUnwrap(rows.first)
 
-        XCTAssertEqual(request.url?.absoluteString, "https://example.supabase.co/rest/v1/notification_devices?select=id&on_conflict=user_id,native_device_token")
+        XCTAssertEqual(request.url?.absoluteString, "https://example.supabase.co/rest/v1/notification_devices?select=id&on_conflict=user_id,push_provider,native_device_token")
         XCTAssertEqual(request.httpMethod, "POST")
         XCTAssertEqual(request.value(forHTTPHeaderField: "Prefer"), "resolution=merge-duplicates,return=representation")
         XCTAssertEqual(payload["user_id"] as? String, userID.uuidString.lowercased())

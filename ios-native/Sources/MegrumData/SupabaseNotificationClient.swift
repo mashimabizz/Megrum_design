@@ -2,6 +2,8 @@ import Foundation
 import MegrumCore
 
 public final class SupabaseNotificationClient: @unchecked Sendable {
+    private static let nativePushDeviceConflictTarget = "user_id,push_provider,native_device_token"
+
     private let client: SupabaseRESTClient
     private let encoder: JSONEncoder
 
@@ -88,7 +90,7 @@ public final class SupabaseNotificationClient: @unchecked Sendable {
                 )
             ],
             select: NotificationDeviceRow.select,
-            onConflict: "user_id,native_device_token"
+            onConflict: Self.nativePushDeviceConflictTarget
         )
         return rows.first?.id
     }
@@ -184,7 +186,7 @@ public final class SupabaseNotificationClient: @unchecked Sendable {
                 )
             ],
             select: NotificationDeviceRow.select,
-            onConflict: "user_id,native_device_token"
+            onConflict: Self.nativePushDeviceConflictTarget
         )
     }
 

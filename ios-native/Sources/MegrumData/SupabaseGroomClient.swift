@@ -268,10 +268,13 @@ private struct GroomFeedRow: Decodable, Sendable {
         if let storageImagePath, let signedURL = signedURLs[storageImagePath] {
             return signedURL
         }
-        guard let imageUrl, let url = URL(string: imageUrl), url.scheme != nil else {
-            return nil
+        if let imageUrl = normalizedImageURL, let url = URL(string: imageUrl) {
+            return url
         }
-        return url
+        if let storageImagePath {
+            return URL(string: storageImagePath)
+        }
+        return nil
     }
 
     var storageImagePath: String? {
@@ -285,6 +288,13 @@ private struct GroomFeedRow: Decodable, Sendable {
             return imageUrl
         }
         return nil
+    }
+
+    private var normalizedImageURL: String? {
+        guard let imageUrl = imageUrl?.trimmingCharacters(in: .whitespacesAndNewlines), !imageUrl.isEmpty else {
+            return nil
+        }
+        return imageUrl
     }
 }
 

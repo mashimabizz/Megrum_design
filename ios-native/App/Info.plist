@@ -46,7 +46,7 @@
 	<key>MegrumSupabaseViewerID</key>
 	<string>$(MEGRUM_SUPABASE_VIEWER_ID)</string>
 	<key>NSCameraUsageDescription</key>
-	<string>交換完了時の証跡写真を撮影するためにカメラを使用します。</string>
+	<string>交換完了時の証跡写真の撮影やグルーム投稿の写真撮影のためにカメラを使用します。</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>現在地を使って近くのグルームと掲示板を表示します。</string>
 	<key>UIApplicationSupportsIndirectInputEvents</key>

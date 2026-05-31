@@ -10,6 +10,7 @@ final class ProposalCreateSheetTests: XCTestCase {
             isCreatingProposal: false,
             hasReadyMailingAddress: true,
             isLoadingMailingAddress: false,
+            hasValidMeetup: false,
             receiverGoodsCount: 1,
             isListingSource: false
         )
@@ -28,6 +29,7 @@ final class ProposalCreateSheetTests: XCTestCase {
             isCreatingProposal: false,
             hasReadyMailingAddress: true,
             isLoadingMailingAddress: false,
+            hasValidMeetup: false,
             receiverGoodsCount: 1,
             isListingSource: false
         )
@@ -39,6 +41,25 @@ final class ProposalCreateSheetTests: XCTestCase {
         XCTAssertEqual(configuration.submitTitle, "待ち合わせ入力が必要")
     }
 
+    func testHandProposalCanSubmitWithValidMeetup() {
+        let configuration = ProposalCreateConfiguration(
+            exchangeMethod: .hand,
+            hasSelectedSenderGoods: true,
+            isCreatingProposal: false,
+            hasReadyMailingAddress: false,
+            isLoadingMailingAddress: false,
+            hasValidMeetup: true,
+            receiverGoodsCount: 1,
+            isListingSource: false
+        )
+
+        XCTAssertEqual(configuration.conditionTagOptions, ["終演後OK", "グッズ販売中OK"])
+        XCTAssertEqual(configuration.targetStatus, .sent)
+        XCTAssertTrue(configuration.canSubmit)
+        XCTAssertNil(configuration.methodNotice)
+        XCTAssertEqual(configuration.submitTitle, "この内容で打診を送る")
+    }
+
     func testMailProposalRequiresReadyMailingAddress() {
         let configuration = ProposalCreateConfiguration(
             exchangeMethod: .mail,
@@ -46,6 +67,44 @@ final class ProposalCreateSheetTests: XCTestCase {
             isCreatingProposal: false,
             hasReadyMailingAddress: false,
             isLoadingMailingAddress: false,
+            hasValidMeetup: false,
+            receiverGoodsCount: 1,
+            isListingSource: false
+        )
+
+        XCTAssertNil(configuration.targetStatus)
+        XCTAssertFalse(configuration.canSubmit)
+        XCTAssertEqual(configuration.submitTitle, "住所登録が必要")
+        XCTAssertEqual(configuration.methodNotice, "郵送交換は住所登録が必要です。設定から住所を登録してください。")
+    }
+
+    func testBothProposalCanSubmitWithReadyAddressAndValidMeetup() {
+        let configuration = ProposalCreateConfiguration(
+            exchangeMethod: .both,
+            hasSelectedSenderGoods: true,
+            isCreatingProposal: false,
+            hasReadyMailingAddress: true,
+            isLoadingMailingAddress: false,
+            hasValidMeetup: true,
+            receiverGoodsCount: 1,
+            isListingSource: false
+        )
+
+        XCTAssertEqual(configuration.conditionTagOptions, ["終演後OK", "グッズ販売中OK", "即日発送", "同日発送"])
+        XCTAssertEqual(configuration.targetStatus, .sent)
+        XCTAssertTrue(configuration.canSubmit)
+        XCTAssertNil(configuration.methodNotice)
+        XCTAssertEqual(configuration.submitTitle, "この内容で打診を送る")
+    }
+
+    func testBothProposalRequiresReadyMailingAddressEvenWithValidMeetup() {
+        let configuration = ProposalCreateConfiguration(
+            exchangeMethod: .both,
+            hasSelectedSenderGoods: true,
+            isCreatingProposal: false,
+            hasReadyMailingAddress: false,
+            isLoadingMailingAddress: false,
+            hasValidMeetup: true,
             receiverGoodsCount: 1,
             isListingSource: false
         )
@@ -63,6 +122,7 @@ final class ProposalCreateSheetTests: XCTestCase {
             isCreatingProposal: false,
             hasReadyMailingAddress: true,
             isLoadingMailingAddress: false,
+            hasValidMeetup: false,
             receiverGoodsCount: 3,
             isListingSource: true
         )

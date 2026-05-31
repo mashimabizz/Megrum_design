@@ -1,3 +1,4 @@
+import Foundation
 import MegrumCore
 import MegrumDesign
 import SwiftUI
@@ -317,6 +318,12 @@ struct ProposalCreateSheet: View {
     @State private var exchangeMethod: ExchangeMethod = .mail
     @State private var selectedConditionTags: Set<String> = []
     @State private var message = ""
+    @State private var meetupStartAt = Date()
+    @State private var meetupEndAt = Date().addingTimeInterval(30 * 60)
+    @State private var meetupPlaceName = ""
+    @State private var meetupLatitudeText = ""
+    @State private var meetupLongitudeText = ""
+    @StateObject private var locationState = MegrumLocationState()
 
     private var selectedSenderID: UUID? {
         selectedSenderGoodsID ?? appState.inventory.first?.id
@@ -338,6 +345,7 @@ struct ProposalCreateSheet: View {
             isCreatingProposal: appState.isCreatingProposal,
             hasReadyMailingAddress: appState.mailingAddress?.isReady == true,
             isLoadingMailingAddress: appState.isLoadingMailingAddress,
+            hasValidMeetup: meetupInput?.isValid == true,
             receiverGoodsCount: resolvedReceiverGoodsIDs.count,
             isListingSource: listingID != nil
         )
@@ -349,6 +357,23 @@ struct ProposalCreateSheet: View {
 
     private var orderedConditionTags: [String] {
         conditionTagOptions.filter { selectedConditionTags.contains($0) }
+    }
+
+    private var meetupInput: ProposalMeetupInput? {
+        guard
+            let latitude = Self.coordinateValue(from: meetupLatitudeText),
+            let longitude = Self.coordinateValue(from: meetupLongitudeText)
+        else {
+            return nil
+        }
+        let input = ProposalMeetupInput(
+            startAt: meetupStartAt,
+            endAt: meetupEndAt,
+            placeName: meetupPlaceName,
+            latitude: latitude,
+            longitude: longitude
+        )
+        return input.isValid ? input : nil
     }
 
     var body: some View {
@@ -407,6 +432,18 @@ struct ProposalCreateSheet: View {
                             .foregroundStyle(MegrumTheme.muted)
                             .fixedSize(horizontal: false, vertical: true)
                     }
+                }
+
+                if configuration.requiresMeetupBeforeSubmit {
+                    ProposalMeetupForm(
+                        startAt: $meetupStartAt,
+                        endAt: $meetupEndAt,
+                        placeName: $meetupPlaceName,
+                        latitudeText: $meetupLatitudeText,
+                        longitudeText: $meetupLongitudeText,
+                        isRequestingLocation: locationState.isRequestingLocation,
+                        locationErrorMessage: locationState.locationErrorMessage
+                    )
                 }
 
                 VStack(alignment: .leading, spacing: 12) {
@@ -491,6 +528,10 @@ struct ProposalCreateSheet: View {
         }
         .onAppear {
             selectedSenderGoodsID = selectedSenderID
+            if meetupEndAt <= meetupStartAt {
+                meetupEndAt = meetupStartAt.addingTimeInterval(30 * 60)
+            }
+            requestLocationIfNeeded()
         }
         .task {
             if appState.mailingAddress == nil {
@@ -499,6 +540,26 @@ struct ProposalCreateSheet: View {
         }
         .onChange(of: exchangeMethod) { _, _ in
             selectedConditionTags = selectedConditionTags.intersection(Set(conditionTagOptions))
+            requestLocationIfNeeded()
+        }
+        .onChange(of: meetupStartAt) { _, newValue in
+            if meetupEndAt <= newValue {
+                meetupEndAt = newValue.addingTimeInterval(30 * 60)
+            }
+        }
+        .onChange(of: locationState.coordinate) { _, coordinate in
+            guard let coordinate, configuration.requiresMeetupBeforeSubmit else {
+                return
+            }
+            if meetupPlaceName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                meetupPlaceName = "現在地"
+            }
+            if meetupLatitudeText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                meetupLatitudeText = Self.coordinateText(coordinate.latitude)
+            }
+            if meetupLongitudeText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                meetupLongitudeText = Self.coordinateText(coordinate.longitude)
+            }
         }
     }
 
@@ -569,6 +630,10 @@ struct ProposalCreateSheet: View {
         guard let selectedSenderID, let targetStatus = configuration.targetStatus else {
             return
         }
+        let meetup = configuration.requiresMeetupBeforeSubmit ? meetupInput : nil
+        guard !configuration.requiresMeetupBeforeSubmit || meetup != nil else {
+            return
+        }
         let created = await appState.createProposal(
             ProposalCreateInput(
                 receiverID: targetItem.ownerID,
@@ -578,12 +643,97 @@ struct ProposalCreateSheet: View {
                 conditionTags: orderedConditionTags,
                 message: message,
                 status: targetStatus,
+                meetup: meetup,
                 listingID: listingID
             )
         )
         if created {
             dismiss()
         }
+    }
+
+    private static func coordinateValue(from text: String) -> Double? {
+        Double(text.trimmingCharacters(in: .whitespacesAndNewlines))
+    }
+
+    private static func coordinateText(_ value: Double) -> String {
+        String(format: "%.6f", value)
+    }
+
+    private func requestLocationIfNeeded() {
+        guard configuration.requiresMeetupBeforeSubmit else {
+            return
+        }
+        locationState.requestCurrentLocation()
+    }
+}
+
+private struct ProposalMeetupForm: View {
+    @Binding var startAt: Date
+    @Binding var endAt: Date
+    @Binding var placeName: String
+    @Binding var latitudeText: String
+    @Binding var longitudeText: String
+    var isRequestingLocation: Bool
+    var locationErrorMessage: String?
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(spacing: 8) {
+                Text("待ち合わせ候補")
+                    .font(.system(size: 18, weight: .heavy, design: .rounded))
+                    .foregroundStyle(MegrumTheme.ink)
+                if isRequestingLocation {
+                    ProgressView()
+                        .controlSize(.small)
+                }
+            }
+
+            VStack(spacing: 0) {
+                DatePicker("開始日時", selection: $startAt, displayedComponents: [.date, .hourAndMinute])
+                    .proposalMeetupRow()
+                Divider()
+                DatePicker("終了日時", selection: $endAt, displayedComponents: [.date, .hourAndMinute])
+                    .proposalMeetupRow()
+                Divider()
+                TextField("場所名", text: $placeName)
+                    .proposalMeetupRow()
+                Divider()
+                HStack(spacing: 12) {
+                    TextField("緯度", text: $latitudeText)
+                        #if os(iOS)
+                        .keyboardType(.decimalPad)
+                        #endif
+                    TextField("経度", text: $longitudeText)
+                        #if os(iOS)
+                        .keyboardType(.decimalPad)
+                        #endif
+                }
+                .proposalMeetupRow()
+            }
+            .font(.system(size: 16, weight: .bold, design: .rounded))
+            .foregroundStyle(MegrumTheme.ink)
+            .padding(.horizontal, 14)
+            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: 22, style: .continuous)
+                    .stroke(.white.opacity(0.68), lineWidth: 1)
+            }
+
+            if let locationErrorMessage {
+                Text(locationErrorMessage)
+                    .font(.system(size: 13, weight: .bold, design: .rounded))
+                    .foregroundStyle(MegrumTheme.muted)
+            }
+        }
+    }
+}
+
+private extension View {
+    func proposalMeetupRow() -> some View {
+        self
+            .frame(minHeight: 48)
+            .padding(.vertical, 6)
     }
 }
 
@@ -593,6 +743,7 @@ struct ProposalCreateConfiguration: Equatable {
     var isCreatingProposal: Bool
     var hasReadyMailingAddress: Bool
     var isLoadingMailingAddress: Bool
+    var hasValidMeetup: Bool = false
     var receiverGoodsCount: Int
     var isListingSource: Bool
 
@@ -623,34 +774,34 @@ struct ProposalCreateConfiguration: Equatable {
     }
 
     var targetStatus: ProposalStatus? {
-        if requiresMeetupBeforeSubmit {
+        if requiresMailingAddressBeforeSubmit && !hasReadyMailingAddress {
             return nil
         }
-        if requiresMailingAddressBeforeSubmit && !hasReadyMailingAddress {
+        if requiresMeetupBeforeSubmit && !hasValidMeetup {
             return nil
         }
         return .sent
     }
 
     var submitTitle: String {
-        if requiresMeetupBeforeSubmit {
-            return "待ち合わせ入力が必要"
-        }
         if requiresMailingAddressBeforeSubmit && !hasReadyMailingAddress {
             return "住所登録が必要"
+        }
+        if requiresMeetupBeforeSubmit && !hasValidMeetup {
+            return "待ち合わせ入力が必要"
         }
         return "この内容で打診を送る"
     }
 
     var methodNotice: String? {
-        if requiresMeetupBeforeSubmit {
-            return "現地交換は待ち合わせ入力が必要です。いまは郵送交換のみ、この画面から送信できます。"
-        }
         if requiresMailingAddressBeforeSubmit && isLoadingMailingAddress {
             return "住所登録を確認しています。"
         }
         if requiresMailingAddressBeforeSubmit && !hasReadyMailingAddress {
             return "郵送交換は住所登録が必要です。設定から住所を登録してください。"
+        }
+        if requiresMeetupBeforeSubmit && !hasValidMeetup {
+            return "現地交換は待ち合わせ候補を入力すると送信できます。"
         }
         return nil
     }

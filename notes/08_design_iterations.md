@@ -4,6 +4,88 @@
 
 ---
 
+## イテレーション366：Swift P0実機ブロッカーを並列解消
+
+### 背景・問題意識
+
+Swift Native版を最大並列で前進させるため、まず4本のread-only監査でTestFlight readiness、Exchange/Trades、Meguri/通知、Inventory/Wish/SearchのP0/P1を洗い出した。重複して検出されたP0は、現地系打診がSwift UIから送信できないこと、APNs device登録のDB conflict target不一致、AppIcon不足、グルーム画像署名失敗時に投稿行が消えること、完了RPCの在庫移動不足だった。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/SearchScreen.swift`
+- `ProposalCreateSheet` にSwiftUI標準の `DatePicker` / `TextField` ベースの待ち合わせ候補入力を追加した。
+- `hand` / `both` の場合、有効な開始/終了日時、場所名、緯度、経度が揃うと `ProposalMeetupInput` を `ProposalCreateInput(meetup:)` へ渡して送信できるようにした。
+- 位置情報が取れる場合は、現地系打診の入力開始時に現在地の緯度経度と「現在地」を初期補助として入れるようにした。
+
+#### `ios-native/Sources/MegrumData/SupabaseNotificationClient.swift`
+- APNs device token upsertの `on_conflict` を `user_id,push_provider,native_device_token` に変更し、DB側の通常unique indexと一致させた。
+
+#### `ios-native/Sources/MegrumData/SupabaseGroomClient.swift`
+- グルーム画像のsigned URL作成に失敗しても、path-only rowをfeedから落とさず、相対URLとして返してUI側で回復可能に扱えるようにした。
+
+#### `ios-native/App/` / `ios-native/MegrumNative.xcodeproj/project.pbxproj`
+- `Assets.xcassets/AppIcon.appiconset` を追加し、Xcode targetのResourcesと `ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon` を設定した。
+- `NSCameraUsageDescription` を証跡撮影とグルーム投稿の両方を説明する文言へ更新した。
+
+#### `supabase/migrations/20260531020000_fix_apns_device_conflict_target.sql`
+- `notification_devices` のAPNs重複行を整理し、`(user_id, push_provider, native_device_token)` の通常unique indexを追加した。
+
+#### `supabase/migrations/20260531022000_finalize_trade_inventory_transfer.sql`
+- `approve_trade_evidence_for_viewer` を上書きし、双方承認時に数量減算、受け取り側keep作成、譲渡履歴作成、個別募集closed化を同一トランザクションで確定するようにした。
+
+#### `ios-native/Tests/`
+- 打診作成sheetで `hand` / `both` の待ち合わせ候補必須、住所必須、送信可否を検証した。
+- APNs device登録requestの `on_conflict` を検証した。
+- グルームsigned URL失敗時でもfeed行が保持されることを検証した。
+
+### 影響範囲
+
+- Swift Nativeの打診作成sheet
+- APNs device registration
+- TestFlight upload validationのAppIcon
+- グルームfeedの画像失敗時挙動
+- 取引完了時の在庫移動RPC
+- Preview Supabase DB migration history
+
+### 確認方法
+
+- `swift build --package-path ios-native`
+  - 既知のローカル `.build/build.db` disk I/O errorで終了コード1。scratch pathで再確認。
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-swift-build`
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-build --enable-xctest --disable-swift-testing -j 1`
+- `xcodebuild -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -destination 'generic/platform=iOS Simulator' -derivedDataPath /tmp/megrum-native-xcodebuild CODE_SIGNING_ALLOWED=NO build`
+- `supabase db push --dry-run`
+- `supabase db push`
+- `supabase migration list`
+- `supabase db push --dry-run`
+
+### 関連ファイル
+
+- `ios-native/App/Info.plist`
+- `ios-native/App/Assets.xcassets/`
+- `ios-native/MegrumNative.xcodeproj/project.pbxproj`
+- `ios-native/Sources/MegrumApp/SearchScreen.swift`
+- `ios-native/Sources/MegrumData/SupabaseNotificationClient.swift`
+- `ios-native/Sources/MegrumData/SupabaseGroomClient.swift`
+- `ios-native/Tests/MegrumAppTests/ProposalCreateSheetTests.swift`
+- `ios-native/Tests/MegrumDataTests/SupabaseNotificationClientTests.swift`
+- `ios-native/Tests/MegrumDataTests/SupabaseGroomClientTests.swift`
+- `supabase/migrations/20260531020000_fix_apns_device_conflict_target.sql`
+- `supabase/migrations/20260531022000_finalize_trade_inventory_transfer.sql`
+- `notes/22_swift_native_migration.md`
+
+### セルフレビュー結果
+
+- ✅ サブエージェントの編集範囲を排他的に分け、共通docsと在庫完了RPC migrationは統合役だけが編集した
+- ✅ `swift test` は164件すべて成功した
+- ✅ `xcodebuild` でAsset Catalogがリンクされ、Simulator向けアプリビルドが成功した
+- ✅ Preview Supabase DBへ未適用migrationを反映し、再dry-runでup to dateを確認した
+- ✅ 状態名の追加・改名はなく、`notes/09` 更新は不要と判断した
+- ✅ 新しいユーザー向け用語は追加していないため、`notes/10` 更新は不要と判断した
+- ⚠️ 実機でのAppIcon表示、APNs実配送、グルーム署名失敗時のプレースホルダ目視は未確認
+
+---
+
 ## イテレーション365：Swift並列実装バッチを統合
 
 ### 背景・問題意識

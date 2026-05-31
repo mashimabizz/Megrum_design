@@ -10,11 +10,13 @@
 		13CA94AC73314C2BBD87BB5D /* MegrumNativeApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = EB317683D09049DF88A9DF5A /* MegrumNativeApp.swift */; };
 		455A5FD2CC3F4C6FAF0B9FE2 /* MegrumApp in Frameworks */ = {isa = PBXBuildFile; productRef = 2CAA32C3F51848648465951E /* MegrumApp */; };
 		7C35B443C9C34E51AF45D3F2 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = C8F50324503B4596A4E03357 /* PrivacyInfo.xcprivacy */; };
+		A2F716C91609477A83F4F4C1 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 5FE3FB4473824B50B23B9D87 /* Assets.xcassets */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
 		1F56D75641C44F4985D89C9D /* MegrumNative.local.xcconfig.example */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = MegrumNative.local.xcconfig.example; sourceTree = "<group>"; };
 		3DF98E9464FC46B3A1D22EAA /* MegrumNative.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = MegrumNative.entitlements; sourceTree = "<group>"; };
+		5FE3FB4473824B50B23B9D87 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		9722E6114D194F97A9D926F9 /* MegrumNative.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = MegrumNative.xcconfig; sourceTree = "<group>"; };
 		B4E0DBCB8D354F1E939B5F20 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		C8F50324503B4596A4E03357 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
@@ -46,6 +48,7 @@
 			isa = PBXGroup;
 			children = (
 				B4E0DBCB8D354F1E939B5F20 /* Info.plist */,
+				5FE3FB4473824B50B23B9D87 /* Assets.xcassets */,
 				3DF98E9464FC46B3A1D22EAA /* MegrumNative.entitlements */,
 				EB317683D09049DF88A9DF5A /* MegrumNativeApp.swift */,
 				C8F50324503B4596A4E03357 /* PrivacyInfo.xcprivacy */,
@@ -137,6 +140,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A2F716C91609477A83F4F4C1 /* Assets.xcassets in Resources */,
 				7C35B443C9C34E51AF45D3F2 /* PrivacyInfo.xcprivacy in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -160,6 +164,7 @@
 			baseConfigurationReference = 9722E6114D194F97A9D926F9 /* MegrumNative.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				APS_ENVIRONMENT = development;
 				CODE_SIGN_ENTITLEMENTS = App/MegrumNative.entitlements;
 				CODE_SIGN_STYLE = Automatic;
@@ -187,6 +192,7 @@
 			baseConfigurationReference = 9722E6114D194F97A9D926F9 /* MegrumNative.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				APS_ENVIRONMENT = production;
 				CODE_SIGN_ENTITLEMENTS = App/MegrumNative.entitlements;
 				CODE_SIGN_STYLE = Automatic;

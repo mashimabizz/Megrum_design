@@ -22,6 +22,58 @@ final class SupabaseGroomClientTests: XCTestCase {
         XCTAssertEqual(json["p_radius_m"] as? Int, 1_000)
     }
 
+    func testLoadNearbyGroomsKeepsPathOnlyRowWhenSignedURLFails() throws {
+        let imagePath = "00000000-0000-0000-0000-000000000001/path-only.jpg"
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [GroomMockURLProtocol.self]
+        let session = URLSession(configuration: configuration)
+        let client = SupabaseGroomClient(configuration: self.configuration, session: session)
+
+        GroomMockURLProtocol.requestHandler = { request in
+            guard let url = request.url else {
+                throw GroomMockError.missingURL
+            }
+
+            switch url.path {
+            case "/rest/v1/rpc/list_groom_feed_nearby":
+                let data = Data("""
+                [
+                  {
+                    "id": "00000000-0000-0000-0000-000000000501",
+                    "user_id": "00000000-0000-0000-0000-000000000001",
+                    "image_url": "\(imagePath)",
+                    "image_path": "\(imagePath)",
+                    "published_at": "2026-05-31T00:00:00Z",
+                    "created_at": "2026-05-31T00:00:00Z",
+                    "origin_lat": 35.681236,
+                    "origin_lng": 139.767125
+                  }
+                ]
+                """.utf8)
+                return (GroomMockURLProtocol.response(for: url, statusCode: 200), data)
+
+            case "/storage/v1/object/sign/groom-posts/\(imagePath)":
+                return (GroomMockURLProtocol.response(for: url, statusCode: 500), Data(#"{"message":"sign failed"}"#.utf8))
+
+            default:
+                throw GroomMockError.unexpectedRequest(url.absoluteString)
+            }
+        }
+        defer {
+            GroomMockURLProtocol.requestHandler = nil
+        }
+
+        let posts = try waitForAsyncResult {
+            try await client.loadNearbyGrooms(latitude: 35.681236, longitude: 139.767125)
+        }
+
+        XCTAssertEqual(posts.count, 1)
+        XCTAssertEqual(posts.first?.imageURL.scheme, nil)
+        XCTAssertEqual(posts.first?.imageURL.relativeString, imagePath)
+        XCTAssertEqual(posts.first?.latitude, 35.681236)
+        XCTAssertEqual(posts.first?.longitude, 139.767125)
+    }
+
     func testBuildsGroomPostCreateRequest() throws {
         let client = SupabaseGroomClient(configuration: configuration)
         let authorID = UUID(uuidString: "00000000-0000-0000-0000-000000000001")!
@@ -137,5 +189,87 @@ final class SupabaseGroomClientTests: XCTestCase {
             projectURL: URL(string: "https://example.supabase.co")!,
             publishableKey: "sb_publishable_test"
         )
+    }
+}
+
+private func waitForAsyncResult<Value: Sendable>(
+    _ operation: @escaping @Sendable () async throws -> Value,
+    timeout: TimeInterval = 3
+) throws -> Value {
+    let semaphore = DispatchSemaphore(value: 0)
+    let resultBox = GroomAsyncResultBox<Value>()
+
+    Task {
+        do {
+            resultBox.store(.success(try await operation()))
+        } catch {
+            resultBox.store(.failure(error))
+        }
+        semaphore.signal()
+    }
+
+    XCTAssertEqual(semaphore.wait(timeout: .now() + timeout), .success)
+    return try XCTUnwrap(resultBox.result).get()
+}
+
+private final class GroomAsyncResultBox<Value: Sendable>: @unchecked Sendable {
+    private let lock = NSLock()
+    private var storedResult: Result<Value, Error>?
+
+    var result: Result<Value, Error>? {
+        lock.lock()
+        defer { lock.unlock() }
+        return storedResult
+    }
+
+    func store(_ result: Result<Value, Error>) {
+        lock.lock()
+        storedResult = result
+        lock.unlock()
+    }
+}
+
+private enum GroomMockError: Error {
+    case missingHandler
+    case missingURL
+    case unexpectedRequest(String)
+}
+
+private final class GroomMockURLProtocol: URLProtocol {
+    nonisolated(unsafe) static var requestHandler: ((URLRequest) throws -> (HTTPURLResponse, Data))?
+
+    override class func canInit(with request: URLRequest) -> Bool {
+        true
+    }
+
+    override class func canonicalRequest(for request: URLRequest) -> URLRequest {
+        request
+    }
+
+    override func startLoading() {
+        guard let requestHandler = Self.requestHandler else {
+            client?.urlProtocol(self, didFailWithError: GroomMockError.missingHandler)
+            return
+        }
+
+        do {
+            let (response, data) = try requestHandler(request)
+            client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
+            client?.urlProtocol(self, didLoad: data)
+            client?.urlProtocolDidFinishLoading(self)
+        } catch {
+            client?.urlProtocol(self, didFailWithError: error)
+        }
+    }
+
+    override func stopLoading() {}
+
+    static func response(for url: URL, statusCode: Int) -> HTTPURLResponse {
+        HTTPURLResponse(
+            url: url,
+            statusCode: statusCode,
+            httpVersion: nil,
+            headerFields: ["Content-Type": "application/json"]
+        )!
     }
 }
