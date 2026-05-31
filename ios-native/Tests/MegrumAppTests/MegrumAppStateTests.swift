@@ -13,11 +13,40 @@ final class MegrumAppStateTests: XCTestCase {
         XCTAssertEqual(state.viewer?.handle, "michilion")
         XCTAssertFalse(state.inventory.isEmpty)
         XCTAssertFalse(state.wishes.isEmpty)
+        XCTAssertFalse(state.listings.isEmpty)
         XCTAssertFalse(state.proposals.isEmpty)
         XCTAssertFalse(state.grooms.isEmpty)
         XCTAssertFalse(state.threads.isEmpty)
         XCTAssertFalse(state.isLoading)
         XCTAssertNil(state.errorMessage)
+    }
+
+    func testAppStateCreatesPreviewIndividualListing() async {
+        let state = MegrumAppState(repository: PreviewMegrumRepository())
+
+        await state.loadInitialData()
+        let initialCount = state.listings.count
+        let created = await state.createIndividualListing(
+            IndividualListingCreateInput(
+                haveItems: [
+                    ListingItemQuantity(itemID: state.inventory[0].id, quantity: 1)
+                ],
+                haveLogic: .all,
+                wishItems: [
+                    ListingItemQuantity(itemID: state.wishes[0].id, quantity: 1)
+                ],
+                wishLogic: .one,
+                exchangeType: .any,
+                note: " 交換条件メモ "
+            )
+        )
+
+        XCTAssertTrue(created)
+        XCTAssertEqual(state.listings.count, initialCount + 1)
+        XCTAssertEqual(state.listings.first?.haves.first?.itemID, state.inventory[0].id)
+        XCTAssertEqual(state.listings.first?.options.first?.wishes.first?.itemID, state.wishes[0].id)
+        XCTAssertEqual(state.listings.first?.note, "交換条件メモ")
+        XCTAssertFalse(state.isCreatingIndividualListing)
     }
 
     func testFactoryFallsBackToPreviewWithoutSupabaseConfig() async {

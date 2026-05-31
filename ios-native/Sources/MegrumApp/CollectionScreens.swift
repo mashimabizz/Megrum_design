@@ -121,6 +121,14 @@ struct GoodsCollectionScreen: View {
 struct WishCollectionScreen: View {
     var items: [WishItem]
     var appState: MegrumAppState?
+    @State private var selectedSection: WishSection = .wishes
+
+    private enum WishSection: String, CaseIterable, Identifiable {
+        case wishes = "Wish"
+        case listings = "個別募集"
+
+        var id: String { rawValue }
+    }
 
     private var goodsLikeItems: [GoodsItem] {
         items.map {
@@ -137,14 +145,45 @@ struct WishCollectionScreen: View {
     }
 
     var body: some View {
-        GoodsCollectionScreen(
-            title: "Wish",
-            subtitle: "ほしいグッズ",
-            items: goodsLikeItems,
-            showsAddButton: true,
-            appState: appState,
-            entryKind: .wish
-        )
+        VStack(spacing: 0) {
+            Picker("表示", selection: $selectedSection) {
+                ForEach(WishSection.allCases) { section in
+                    Text(section.rawValue).tag(section)
+                }
+            }
+            .pickerStyle(.segmented)
+            .padding(.horizontal, 20)
+            .padding(.top, 12)
+            .padding(.bottom, 6)
+            .background(MegrumTheme.canvas)
+
+            Group {
+                switch selectedSection {
+                case .wishes:
+                    GoodsCollectionScreen(
+                        title: "Wish",
+                        subtitle: "ほしいグッズ",
+                        items: goodsLikeItems,
+                        showsAddButton: true,
+                        appState: appState,
+                        entryKind: .wish
+                    )
+                case .listings:
+                    if let appState {
+                        IndividualListingsScreen(appState: appState)
+                    } else {
+                        GoodsCollectionScreen(
+                            title: "個別募集",
+                            subtitle: "条件を指定した募集",
+                            items: [],
+                            showsAddButton: false
+                        )
+                    }
+                }
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        }
+        .background(MegrumTheme.canvas.ignoresSafeArea())
     }
 }
 

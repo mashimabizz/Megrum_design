@@ -6,6 +6,7 @@ public struct MegrumAppSnapshot: Sendable {
     public var viewer: UserProfile
     public var inventory: [GoodsItem]
     public var wishes: [WishItem]
+    public var listings: [IndividualListing]
     public var proposals: [TradeProposal]
     public var grooms: [GroomPost]
     public var threads: [BoardThread]
@@ -14,6 +15,7 @@ public struct MegrumAppSnapshot: Sendable {
         viewer: UserProfile,
         inventory: [GoodsItem],
         wishes: [WishItem],
+        listings: [IndividualListing] = [],
         proposals: [TradeProposal],
         grooms: [GroomPost],
         threads: [BoardThread]
@@ -21,6 +23,7 @@ public struct MegrumAppSnapshot: Sendable {
         self.viewer = viewer
         self.inventory = inventory
         self.wishes = wishes
+        self.listings = listings
         self.proposals = proposals
         self.grooms = grooms
         self.threads = threads
@@ -67,6 +70,8 @@ public protocol MegrumRepository: Sendable {
     func archiveGoodsItem(itemID: UUID) async throws
     func deleteGoodsItem(itemID: UUID) async throws
     func reportGoods(_ input: GoodsReportCreateInput) async throws -> GoodsReportTicket
+    func loadIndividualListings() async throws -> [IndividualListing]
+    func createIndividualListing(_ input: IndividualListingCreateInput) async throws -> IndividualListing
     func loadPublicUserProfile(userID: UUID) async throws -> PublicUserProfile?
     func loadUserEvaluations(userID: UUID, limit: Int) async throws -> [UserEvaluation]
     func createProposal(_ input: ProposalCreateInput) async throws -> TradeProposal
@@ -133,6 +138,14 @@ public extension MegrumRepository {
     }
 
     func reportGoods(_ input: GoodsReportCreateInput) async throws -> GoodsReportTicket {
+        throw MegrumRepositoryError.unsupportedMutation
+    }
+
+    func loadIndividualListings() async throws -> [IndividualListing] {
+        []
+    }
+
+    func createIndividualListing(_ input: IndividualListingCreateInput) async throws -> IndividualListing {
         throw MegrumRepositoryError.unsupportedMutation
     }
 
@@ -271,6 +284,7 @@ public struct PreviewMegrumRepository: MegrumRepository {
             viewer: NativePreviewData.viewer,
             inventory: NativePreviewData.inventory,
             wishes: NativePreviewData.wishes,
+            listings: NativePreviewData.listings,
             proposals: NativePreviewData.proposals,
             grooms: NativePreviewData.grooms,
             threads: NativePreviewData.threads
@@ -341,6 +355,31 @@ public struct PreviewMegrumRepository: MegrumRepository {
             id: UUID(),
             goodsItemID: input.goodsItemID,
             status: "open"
+        )
+    }
+
+    public func loadIndividualListings() async throws -> [IndividualListing] {
+        NativePreviewData.listings
+    }
+
+    public func createIndividualListing(_ input: IndividualListingCreateInput) async throws -> IndividualListing {
+        let listingID = UUID()
+        let option = IndividualListingWishOption(
+            id: UUID(),
+            listingID: listingID,
+            position: 1,
+            wishes: input.wishItems,
+            logic: input.wishLogic,
+            exchangeType: input.exchangeType
+        )
+        return IndividualListing(
+            id: listingID,
+            ownerID: NativePreviewData.viewerID,
+            haves: input.haveItems,
+            haveLogic: input.haveLogic,
+            status: .active,
+            note: input.note,
+            options: [option]
         )
     }
 
@@ -636,6 +675,7 @@ public final class MegrumAppState: ObservableObject {
     @Published public private(set) var viewer: UserProfile?
     @Published public private(set) var inventory: [GoodsItem] = []
     @Published public private(set) var wishes: [WishItem] = []
+    @Published public private(set) var listings: [IndividualListing] = []
     @Published public private(set) var proposals: [TradeProposal] = []
     @Published public private(set) var messagesByProposalID: [UUID: [TradeMessage]] = [:]
     @Published public private(set) var boardRepliesByThreadID: [UUID: [BoardReply]] = [:]
@@ -672,6 +712,8 @@ public final class MegrumAppState: ObservableObject {
     @Published public private(set) var isLookingUpPostalCode = false
     @Published public private(set) var isSavingMailingAddress = false
     @Published public private(set) var isCreatingGoodsEntry = false
+    @Published public private(set) var isLoadingIndividualListings = false
+    @Published public private(set) var isCreatingIndividualListing = false
     @Published public private(set) var mutatingGoodsItemID: UUID?
     @Published public private(set) var reportingGoodsItemID: UUID?
     @Published public private(set) var isCreatingProposal = false
@@ -1333,6 +1375,54 @@ public final class MegrumAppState: ObservableObject {
         }
     }
 
+    public func loadIndividualListings() async {
+        guard !isLoadingIndividualListings else {
+            return
+        }
+
+        isLoadingIndividualListings = true
+        errorMessage = nil
+        do {
+            listings = try await repository.loadIndividualListings()
+        } catch {
+            errorMessage = "個別募集を読み込めませんでした"
+        }
+        isLoadingIndividualListings = false
+    }
+
+    public func createIndividualListing(_ input: IndividualListingCreateInput) async -> Bool {
+        guard !isCreatingIndividualListing else {
+            return false
+        }
+        guard !input.haveItems.isEmpty, !input.wishItems.isEmpty else {
+            errorMessage = "譲るものと求めるものを選択してください"
+            return false
+        }
+
+        let normalizedInput = IndividualListingCreateInput(
+            haveItems: input.haveItems.map { ListingItemQuantity(itemID: $0.itemID, quantity: max(1, min($0.quantity, 99))) },
+            haveLogic: input.haveLogic,
+            wishItems: input.wishItems.map { ListingItemQuantity(itemID: $0.itemID, quantity: max(1, min($0.quantity, 99))) },
+            wishLogic: input.wishLogic,
+            exchangeType: input.exchangeType,
+            note: input.note?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfBlank
+        )
+
+        isCreatingIndividualListing = true
+        errorMessage = nil
+        do {
+            let created = try await repository.createIndividualListing(normalizedInput)
+            listings.removeAll { $0.id == created.id }
+            listings.insert(created, at: 0)
+            isCreatingIndividualListing = false
+            return true
+        } catch {
+            errorMessage = "個別募集を作成できませんでした"
+            isCreatingIndividualListing = false
+            return false
+        }
+    }
+
     public func loadPublicUserProfile(userID: UUID) async {
         guard loadingPublicProfileUserID != userID else {
             return
@@ -1833,6 +1923,7 @@ public final class MegrumAppState: ObservableObject {
         viewer = snapshot.viewer
         inventory = snapshot.inventory
         wishes = snapshot.wishes
+        listings = snapshot.listings
         proposals = snapshot.proposals
         grooms = snapshot.grooms
         likedGroomIDs = Set(snapshot.grooms.filter(\.liked).map(\.id))
@@ -1843,6 +1934,16 @@ public final class MegrumAppState: ObservableObject {
         inventory.removeAll { $0.id == itemID }
         wishes.removeAll { $0.id == itemID }
         searchResults.removeAll { $0.item.id == itemID }
+        listings = listings.compactMap { listing in
+            var next = listing
+            next.haves.removeAll { $0.itemID == itemID }
+            next.options = next.options.compactMap { option in
+                var nextOption = option
+                nextOption.wishes.removeAll { $0.itemID == itemID }
+                return nextOption.wishes.isEmpty && !nextOption.isCashOffer ? nil : nextOption
+            }
+            return next.haves.isEmpty || next.options.isEmpty ? nil : next
+        }
     }
 
     private func searchBucket(for item: GoodsItem) -> SearchMatchBucket {

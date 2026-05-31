@@ -7,6 +7,7 @@ public struct SupabaseMegrumRepository: MegrumRepository {
     private let oshiClient: SupabaseOshiClient
     private let goodsInventoryClient: SupabaseGoodsInventoryClient
     private let goodsReportClient: SupabaseGoodsReportClient
+    private let listingClient: SupabaseListingClient
     private let mailingAddressClient: SupabaseMailingAddressClient
     private let postalCodeAddressClient: PostalCodeAddressClient
     private let blockClient: SupabaseBlockClient
@@ -25,6 +26,7 @@ public struct SupabaseMegrumRepository: MegrumRepository {
         self.oshiClient = SupabaseOshiClient(client: client)
         self.goodsInventoryClient = SupabaseGoodsInventoryClient(client: client)
         self.goodsReportClient = SupabaseGoodsReportClient(client: client)
+        self.listingClient = SupabaseListingClient(client: client)
         self.mailingAddressClient = SupabaseMailingAddressClient(client: client)
         self.postalCodeAddressClient = PostalCodeAddressClient()
         self.blockClient = SupabaseBlockClient(client: client)
@@ -43,6 +45,7 @@ public struct SupabaseMegrumRepository: MegrumRepository {
         let viewer = try await loadViewer()
         async let inventory = loadGoods(kind: "for_trade")
         async let wishes = loadWishes()
+        async let listings = loadIndividualListings()
         async let proposals = loadProposals()
         async let grooms = loadGrooms(latitude: nil, longitude: nil, radiusMeters: 1_000)
         async let threads = loadBoardThreads(
@@ -56,6 +59,7 @@ public struct SupabaseMegrumRepository: MegrumRepository {
             viewer: viewer,
             inventory: try await inventory,
             wishes: try await wishes,
+            listings: try await listings,
             proposals: try await proposals,
             grooms: try await grooms,
             threads: try await threads
@@ -110,6 +114,14 @@ public struct SupabaseMegrumRepository: MegrumRepository {
 
     public func reportGoods(_ input: GoodsReportCreateInput) async throws -> GoodsReportTicket {
         try await goodsReportClient.createReport(reporterID: viewerID, input: input)
+    }
+
+    public func loadIndividualListings() async throws -> [IndividualListing] {
+        try await listingClient.loadListings(userID: viewerID)
+    }
+
+    public func createIndividualListing(_ input: IndividualListingCreateInput) async throws -> IndividualListing {
+        try await listingClient.createListing(userID: viewerID, input: input)
     }
 
     public func loadPublicUserProfile(userID: UUID) async throws -> PublicUserProfile? {

@@ -148,6 +148,7 @@ tar -xzf /Users/michitaka/Desktop/Megrum_backups/pre-swift-migration-20260531-03
 - iter351で、取引詳細sheetの右上からSwift Nativeの通報sheetを開き、既存 `disputes` テーブルへ `submitted` の申告を作成できる境界を追加した。受付後は取引チャットにsystem messageを残す。
 - iter352で、在庫/Wishグリッドの長押しメニューから本人所有グッズを `status='archived'` にする非表示処理と、本人所有行の削除処理を `goods_inventory` へ接続した。
 - iter353で、他ユーザー所有グッズの長押しメニューからSwift Nativeの通報sheetを開き、新規 `goods_reports` テーブルへグッズ単位の通報を保存できる境界を追加した。
+- iter356で、Swift Native版の個別募集モデル、`listings` / `listing_wish_options` の読み書き境界、AppState状態、Wishタブ内の「Wish / 個別募集」切り替えと作成sheetを追加した。
 
 ### Phase 4: Meguri core
 

@@ -4,6 +4,75 @@
 
 ---
 
+## イテレーション356：Swift個別募集の土台を追加
+
+### 背景・問題意識
+
+Swift Native版の実機レビューで、旧アプリへ見た目を寄せ戻さず、iOS標準感を維持する方針が確認された。次の移行対象として、在庫/Wishと打診の間にある「個別募集」がSwift側に未接続だったため、ネイティブ画面・AppState・Supabase境界を先に通す。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumCore/MegrumModels.swift`
+- `ListingItemQuantity` / `ListingLogic` / `IndividualListingStatus` / `IndividualListingExchangeType` を追加した。
+- `IndividualListing` / `IndividualListingWishOption` / `IndividualListingCreateInput` を追加し、`listings` と `listing_wish_options` の現行スキーマをSwift型にした。
+
+#### `ios-native/Sources/MegrumData/SupabaseListingClient.swift`
+- `listings` の読み込みと作成、`listing_wish_options` の読み込みと作成を行うPostgREST境界を追加した。
+- request builderを公開し、URL・payloadをテストで検証できるようにした。
+
+#### `ios-native/Sources/MegrumApp/MegrumAppState.swift` / `SupabaseMegrumRepository.swift`
+- `MegrumAppSnapshot` と `MegrumAppState` に `listings` を追加した。
+- `loadIndividualListings` / `createIndividualListing` をRepository境界に追加し、Preview repositoryとSupabase repositoryの両方に接続した。
+- 在庫/Wish削除時に、関連する個別募集の端末内表示も整合するようにした。
+
+#### `ios-native/Sources/MegrumApp/CollectionScreens.swift` / `IndividualListingsScreen.swift`
+- WishタブにSwiftUI標準のsegmented controlで「Wish / 個別募集」を追加した。
+- 個別募集一覧カード、ローディングスケルトン、空状態、左下の作成ボタンを追加した。
+- 作成sheetでは、在庫とWishを選び、`すべてほしい` / `どれか1つだけ`、同種/異種/同異種OK、メモを指定して保存できるようにした。
+
+#### `ios-native/Tests/`
+- `SupabaseListingClientTests` を追加し、個別募集の読み込み・作成requestを検証した。
+- `MegrumAppStateTests` にPreview個別募集の初期ロードと作成検証を追加した。
+
+#### `ios-native/README.md` / `notes/22_swift_native_migration.md`
+- Swift Native移行ステータスへ個別募集の接続状況を追記した。
+
+### 影響範囲
+
+- Swift Native版のWishタブ
+- 個別募集一覧・作成導線
+- `listings` / `listing_wish_options` のSwift PostgREST境界
+- 在庫/Wish削除後の個別募集表示
+
+### 確認方法
+
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-build --enable-xctest --disable-swift-testing -j 1`
+- `xcodebuild -quiet -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -destination 'generic/platform=iOS Simulator' -derivedDataPath /tmp/megrum-native-xcodebuild CODE_SIGNING_ALLOWED=NO build`
+
+### 関連ファイル
+
+- `ios-native/Sources/MegrumCore/MegrumModels.swift`
+- `ios-native/Sources/MegrumData/SupabaseListingClient.swift`
+- `ios-native/Sources/MegrumApp/MegrumAppState.swift`
+- `ios-native/Sources/MegrumApp/SupabaseMegrumRepository.swift`
+- `ios-native/Sources/MegrumApp/NativePreviewData.swift`
+- `ios-native/Sources/MegrumApp/CollectionScreens.swift`
+- `ios-native/Sources/MegrumApp/IndividualListingsScreen.swift`
+- `ios-native/Tests/MegrumDataTests/SupabaseListingClientTests.swift`
+- `ios-native/Tests/MegrumAppTests/MegrumAppStateTests.swift`
+- `ios-native/README.md`
+- `notes/22_swift_native_migration.md`
+- `notes/08_design_iterations.md`
+
+### セルフレビュー結果
+
+- ✅ Swift版のiOS標準感を維持し、旧Expo版の装飾へ寄せ戻さない画面設計にした
+- ✅ DBスキーマ追加はなく、既存 `listings` / `listing_wish_options` へ接続したため `notes/05` は更新不要と判断した
+- ✅ 新しい状態名は追加していないため `notes/09` は更新不要と判断した
+- ✅ 「個別募集」は既存用語のため `notes/10` は更新不要と判断した
+
+---
+
 ## イテレーション355：Swift実データ設定を安全に注入する
 
 ### 背景・問題意識
