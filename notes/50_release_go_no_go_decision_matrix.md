@@ -46,6 +46,7 @@
 | G15 | RC Handoff | Version、Build、commit SHA、検証結果、出す/隠す機能が開発側から共有済み | 提出候補ビルドの由来やスコープが追えない | `notes/65` |
 | G16 | Legal Publication | 弁護士回答が公開文面とApp Store文面へ横断反映済み | Terms、Privacy、Support、FAQ、Review Notes、App Privacyのどこかに古い前提が残る | `notes/66` |
 | G17 | Support Inbox | support@の受信、App Review連絡、P0分類、削除/個人情報請求、事故疑いの担当が決まっている | 審査員連絡、削除請求、通報、事故疑いを受けられない | `notes/67` |
+| G18 | Territory / DSA | 配信地域、EU DSA trader status、IAP Availabilityが確定 | 配信地域や公開連絡先、IAP提供地域が未確認 | `notes/68` |
 
 ## 3. P0トラッカー対応
 
@@ -105,6 +106,7 @@ Conditional Goにする場合は、`notes/36` に「隠した証跡」と「説�
 | G15 RC Handoff | TODO | TODO | TODO |
 | G16 Legal Publication | TODO | TODO | TODO |
 | G17 Support Inbox | TODO | TODO | TODO |
+| G18 Territory / DSA | TODO | TODO | TODO |
 
 最終判定:
 
@@ -128,6 +130,7 @@ Evidence folder:
 - 提出候補ビルドのVersion、Build、commit SHA、検証結果、出す/隠す機能が不明。
 - 弁護士回答を受けたのに、公開文面又はApp Store文面への反映漏れが残っている。
 - `support@megrum.jp` の受信、App Review連絡確認、P0問い合わせ分類、削除/個人情報請求の担当が未決。
+- 配信地域、EU DSA trader status、IAP Availability、App Store商品ページに表示される連絡先情報が未確認。
 - 隠すはずの機能が画面、FAQ、App Store文面、スクショ、Review Notesに残っている。
 - Privacy Policy URL又はSupport URLが404。
 - アカウント削除入口がない。
@@ -155,5 +158,6 @@ Evidence folder:
 - Release Candidateハンドオフ: `notes/65_release_candidate_handoff.md`
 - 法務レビュー後公開文面最終化Runbook: `notes/66_legal_review_publication_runbook.md`
 - サポート受信トリアージRunbook: `notes/67_support_inbox_triage_runbook.md`
+- App Store配信地域・EU DSA・IAP Availability: `notes/68_app_store_territory_dsa_iap_availability.md`
 - 提出後・公開初日ランブック: `notes/51_post_submission_release_day_runbook.md`
 - データ保持・削除マトリクス: `notes/52_data_retention_deletion_matrix.md`

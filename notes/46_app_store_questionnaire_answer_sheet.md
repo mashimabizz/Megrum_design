@@ -114,6 +114,8 @@ No-Go:
 - Primary CategoryはLifestyle又はSocial Networking候補で、Gamesにはしない。
 - 韓国向けに追加のRating Classification Numberが必要になる特徴がないか、App Store Connectの実質問に沿って確認する。
 
+配信地域、EU DSA trader status、IAP Availabilityの判断は `notes/68_app_store_territory_dsa_iap_availability.md` を使う。
+
 ## 7. 転記前チェックリスト
 
 | 項目 | 状態 |
@@ -144,3 +146,4 @@ No-Go:
 - Apple App Information reference: https://developer.apple.com/help/app-store-connect/reference/app-information
 - Apple Overview of export compliance: https://developer.apple.com/help/app-store-connect/manage-app-information/overview-of-export-compliance
 - Apple Export compliance documentation for encryption: https://developer.apple.com/help/app-store-connect/reference/app-information/export-compliance-documentation-for-encryption/
+- App Store配信地域・EU DSA・IAP Availability: `notes/68_app_store_territory_dsa_iap_availability.md`

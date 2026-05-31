@@ -25,6 +25,7 @@ App Store Connectの各入力欄へ何を入れるか、制限、下書き、未
 | 外部AI | 初回は出さない又はオンデバイス限定推奨 | 外部AI送信は説明/同意/Privacy回答が重くなる |
 | 有料機能 | IAPが固まるまで隠す選択もあり | 出すならIAP、特商法、スクショ、審査メモがP0 |
 | 現地外の交換手段 | 初回は隠す | 現地交換に集中するため |
+| 配信地域 / EU DSA | 初回はJapanのみ候補。EU配信はDSA trader情報確認後 | `notes/68_app_store_territory_dsa_iap_availability.md` で判断 |
 
 ## 2. App Information
 

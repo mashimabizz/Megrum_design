@@ -101,6 +101,7 @@ Swift Nativeの `Info.plist` では `public.app-category.social-networking` が�
 | Release Candidateハンドオフ | `notes/65` | 開発セッションからVersion、Build、commit SHA、検証結果、出す/隠す機能を受け取る |
 | 法務レビュー後公開文面最終化 | `notes/66` | 弁護士回答をTerms、Privacy、Support、FAQ、App Store文面、App Privacyへ反映する |
 | サポート受信トリアージ | `notes/67` | App Review連絡、通報、削除、個人情報請求、事故疑いの分類と担当を決める |
+| 配信地域・EU DSA・IAP Availability | `notes/68` | 初回配信地域、EU DSA trader status、IAP提供地域を決める |
 
 ## 4. デモアカウント準備
 
@@ -221,3 +222,4 @@ Appleのリジェクト文を貼るので、ガイドライン番号ごとに対
 - `notes/65_release_candidate_handoff.md`
 - `notes/66_legal_review_publication_runbook.md`
 - `notes/67_support_inbox_triage_runbook.md`
+- `notes/68_app_store_territory_dsa_iap_availability.md`

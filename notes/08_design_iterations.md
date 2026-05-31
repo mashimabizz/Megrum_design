@@ -4,6 +4,70 @@
 
 ---
 
+## イテレーション390：配信地域・EU DSA・IAP Availabilityを追加
+
+### 背景・問題意識
+
+App Store初回提出では、メタデータやPrivacyだけでなく、アプリ本体の配信地域、EU Digital Services Actのtrader status、App Store商品ページに表示される連絡先情報、IAPの提供地域を決める必要がある。初回MVPでAll CountriesやEU配信を安易に選ぶと、法務、サポート、ローカライズ、公開連絡先、IAP地域整合の確認範囲が広がるため、判断表を追加した。
+
+### 変更内容
+
+#### `notes/68_app_store_territory_dsa_iap_availability.md`
+- App Availability、EU DSA trader status、連絡先情報、IAP Availabilityの判断表を追加した。
+- 初回はJapanのみ候補、EU配信はDSA情報確認後、IAPは有料機能を隠すなら後回しという推奨を整理した。
+- 代表者情報非公表方針とDSA表示の関係、IAP Availabilityと特商法/App Privacy/Review Notesの整合チェックを追加した。
+- Apple公式ヘルプのApp Availability、IAP Availability、EU DSA trader requirements、IAP pricing and availabilityへの参照を追加した。
+
+#### `notes/31_app_store_connect_metadata_worksheet.md`, `notes/33_iap_product_setup_worksheet.md`, `notes/46_app_store_questionnaire_answer_sheet.md`
+- 配信地域、EU DSA、IAP Availability判断への導線を追加した。
+
+#### `notes/39_release_command_center.md`, `notes/30_owner_release_action_sheet.md`, `notes/50_release_go_no_go_decision_matrix.md`, `notes/57_legal_release_branch_integration_plan.md`
+- 配信地域・EU DSA・IAP Availabilityへの導線とGo / No-Go Gateを追加し、法務docsのstage禁止範囲を `notes/68` まで広げた。
+
+#### `notes/22_release_triage_tracker.csv`
+- RL-066として配信地域・EU DSA・IAP Availabilityを追加した。
+
+### 影響範囲
+
+- App Store Connect Pricing and Availability
+- EU DSA trader status
+- App Store商品ページに表示される連絡先
+- IAP Availability
+- 特商法表示、Support URL、Privacy URL
+- Go / No-Go判定
+- コード、App Store Connect設定、IAP商品、公開URL、法務原典docxは変更していない。
+
+### 確認方法
+
+- `rg -n "RL-066|DSA|trader|Availability|IAP Availability|Japanのみ|notes/68" notes/68_app_store_territory_dsa_iap_availability.md notes/39_release_command_center.md notes/50_release_go_no_go_decision_matrix.md notes/22_release_triage_tracker.csv`
+- `python3 - <<'PY' ...` による `notes/22_release_triage_tracker.csv` のCSV parse確認
+- 旧規約用語・旧主体表現チェック（旧提案/旧メッセージ/旧投稿関連、サービス主体表現）
+- `git diff --check -- notes`
+
+### セルフレビュー結果
+
+- ✅ コード、App Store Connect設定、IAP商品、公開URL、法務原典docxは変更していない。
+- ✅ 初回配信地域をJapanのみ候補として、EU DSAと公開連絡先の確認を分離した。
+- ✅ IAPを隠す場合/出す場合のAvailability、特商法、App Privacy、Review Notes整合を整理した。
+- ✅ 実連絡先、代表者情報、個人住所、個人電話番号をリポジトリに書かない方針を維持した。
+- ✅ 状態名の追加/改名はなく、`notes/09_state_machines.md` 更新は不要。
+- ✅ 新用語は追加していないため、`notes/10_glossary.md` 更新は不要。
+- ✅ DBスキーマ変更はなく、`notes/05_data_model.md` 更新は不要。
+
+### 関連ファイル
+
+- `notes/68_app_store_territory_dsa_iap_availability.md`
+- `notes/31_app_store_connect_metadata_worksheet.md`
+- `notes/33_iap_product_setup_worksheet.md`
+- `notes/46_app_store_questionnaire_answer_sheet.md`
+- `notes/39_release_command_center.md`
+- `notes/30_owner_release_action_sheet.md`
+- `notes/50_release_go_no_go_decision_matrix.md`
+- `notes/57_legal_release_branch_integration_plan.md`
+- `notes/22_release_triage_tracker.csv`
+
+---
+
 ## イテレーション389：サポート受信トリアージRunbookを追加
 
 ### 背景・問題意識

@@ -37,6 +37,7 @@ Appleの審査では、アプリ内で消費・利用するデジタル機能は
 | Stripe等の外部決済をiOSアプリ内に置く | 非推奨 | デジタル機能の課金はApple審査上のリスクが高い |
 
 初回版で無料にする場合、App Store ConnectのIn-App Purchasesは未作成でもよい。ただし、アプリ内の有料機能ボタン、価格表示、課金画面、購入モーダル、特典説明が表示されないことを実機で確認する。
+アプリ本体の配信地域、EU DSA、IAP Availabilityの横断確認は `notes/68_app_store_territory_dsa_iap_availability.md` を使う。
 
 ---
 
@@ -210,6 +211,7 @@ Apple由来の取引ID、Original Transaction ID、期限、返金、取消、�
 - Apple In-App Purchase information: https://developer.apple.com/help/app-store-connect/reference/in-app-purchase-information/
 - Apple Auto-renewable subscription information: https://developer.apple.com/help/app-store-connect/reference/auto-renewable-subscription-information/
 - Apple IAP pricing and availability: https://developer.apple.com/help/app-store-connect/reference/in-app-purchase-and-subscriptions-pricing-and-availability/
+- App Store配信地域・EU DSA・IAP Availability: `notes/68_app_store_territory_dsa_iap_availability.md`
 - Megrum マネタイズ戦略: `notes/16_monetization.md`
 - Megrum データモデル: `notes/05_data_model.md`
 - Megrum API仕様: `notes/13_api_spec.md`
