@@ -85,6 +85,7 @@ public protocol MegrumRepository: Sendable {
     func fileTradeDispute(_ input: TradeDisputeCreateInput) async throws -> TradeDisputeTicket
     func loadMessages(proposalID: UUID, limit: Int) async throws -> [TradeMessage]
     func sendMessage(_ input: TradeMessageCreateInput) async throws -> TradeMessage
+    func sendPhotoMessage(_ input: TradePhotoMessageCreateInput) async throws -> TradeMessage
     func sendSystemMessage(proposalID: UUID, body: String) async throws -> TradeMessage
     func sendLocationMessage(proposalID: UUID, latitude: Double, longitude: Double, label: String, body: String?) async throws -> TradeMessage
     func sendArrivalStatusMessage(proposalID: UUID, status: TradeArrivalStatus, body: String?) async throws -> TradeMessage
@@ -208,6 +209,10 @@ public extension MegrumRepository {
     }
 
     func sendMessage(_ input: TradeMessageCreateInput) async throws -> TradeMessage {
+        throw MegrumRepositoryError.unsupportedMutation
+    }
+
+    func sendPhotoMessage(_ input: TradePhotoMessageCreateInput) async throws -> TradeMessage {
         throw MegrumRepositoryError.unsupportedMutation
     }
 
@@ -651,6 +656,17 @@ public struct PreviewMegrumRepository: MegrumRepository {
             senderID: NativePreviewData.viewerID,
             messageType: .text,
             body: input.body
+        )
+    }
+
+    public func sendPhotoMessage(_ input: TradePhotoMessageCreateInput) async throws -> TradeMessage {
+        TradeMessage(
+            id: UUID(),
+            proposalID: input.proposalID,
+            senderID: NativePreviewData.viewerID,
+            messageType: input.messageType,
+            body: input.body?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfBlank,
+            photoURL: URL(string: "https://preview.megrum.local/chat/\(UUID().uuidString.lowercased()).jpg")
         )
     }
 
@@ -1940,6 +1956,42 @@ public final class MegrumAppState: ObservableObject {
             return true
         } catch {
             errorMessage = "メッセージを送信できませんでした"
+            sendingMessageProposalID = nil
+            return false
+        }
+    }
+
+    public func sendPhotoMessage(
+        proposalID: UUID,
+        imageData: Data,
+        imageContentType: String,
+        messageType: TradeMessageType = .photo,
+        body: String? = nil
+    ) async -> Bool {
+        guard [.photo, .outfitPhoto].contains(messageType), !imageData.isEmpty else {
+            return false
+        }
+        guard sendingMessageProposalID != proposalID else {
+            return false
+        }
+
+        sendingMessageProposalID = proposalID
+        errorMessage = nil
+        do {
+            let message = try await repository.sendPhotoMessage(
+                TradePhotoMessageCreateInput(
+                    proposalID: proposalID,
+                    imageData: imageData,
+                    imageContentType: imageContentType,
+                    messageType: messageType,
+                    body: body
+                )
+            )
+            messagesByProposalID[proposalID, default: []].append(message)
+            sendingMessageProposalID = nil
+            return true
+        } catch {
+            errorMessage = "写真を取引チャットへ送信できませんでした"
             sendingMessageProposalID = nil
             return false
         }

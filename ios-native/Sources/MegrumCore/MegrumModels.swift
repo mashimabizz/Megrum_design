@@ -1313,6 +1313,28 @@ public struct TradeMessageCreateInput: Equatable, Sendable {
     }
 }
 
+public struct TradePhotoMessageCreateInput: Equatable, Sendable {
+    public var proposalID: UUID
+    public var imageData: Data
+    public var imageContentType: String
+    public var messageType: TradeMessageType
+    public var body: String?
+
+    public init(
+        proposalID: UUID,
+        imageData: Data,
+        imageContentType: String,
+        messageType: TradeMessageType = .photo,
+        body: String? = nil
+    ) {
+        self.proposalID = proposalID
+        self.imageData = imageData
+        self.imageContentType = imageContentType
+        self.messageType = messageType
+        self.body = body
+    }
+}
+
 public struct GroomPost: Identifiable, Codable, Hashable, Sendable {
     public var id: UUID
     public var authorID: UUID

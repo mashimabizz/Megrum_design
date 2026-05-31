@@ -4,6 +4,95 @@
 
 ---
 
+## イテレーション373：Swift RN差分P0を並列補完
+
+### 背景・問題意識
+
+Swift Native版は実機レビューでiOS標準感が良いと確認できた一方、React Native版と比べて画面上・フロー上の不足がまだ多い。今回は並列エージェントでRN差分P0のうち、取引チャットの服装写真共有、在庫/Wish編集のDB PATCH境界、異議詳細のlive境界を補完した。旧Expo版の見た目へ戻すのではなく、Swift版のNative設計を保ったまま不足機能を追加する。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumCore/MegrumModels.swift`
+- 取引チャットへ写真メッセージを送るための `TradePhotoMessageCreateInput` を追加した。
+
+#### `ios-native/Sources/MegrumApp/MegrumAppState.swift`
+- `MegrumRepository` / `PreviewMegrumRepository` / `MegrumAppState` に写真メッセージ送信境界を追加した。
+- `.photo` / `.outfitPhoto` 以外や空データは送らないようにし、送信中状態とエラー表示を既存メッセージ送信と同じ流れに揃えた。
+
+#### `ios-native/Sources/MegrumApp/SupabaseMegrumRepository.swift`
+- `chat-photos` Storage bucketへ画像をアップロードし、署名URLを作って `messages` の写真メッセージとして保存する処理を追加した。
+- 服装写真と通常写真でpath prefixを分け、content typeと最大サイズを最小限検証するようにした。
+
+#### `ios-native/Sources/MegrumApp/TradesScreen.swift`
+- 取引チャット入力欄上の「服装写真を共有」を未接続placeholderから `PhotosPicker` に変更した。
+- 選択した写真を `message_type='outfit_photo'` の取引チャット写真メッセージとして送れるようにした。
+
+#### `ios-native/Sources/MegrumData/SupabaseGoodsInventoryClient.swift`
+- 在庫/Wish編集向けに `GoodsInventoryUpdateInput` と `updateGoodsItem` / `makeUpdateGoodsItemRequest` を追加した。
+- 更新は `id` と `user_id` で本人所有に絞り、取引済み行を避けるqueryへ寄せた。
+- タイトル、グループ、メンバー、グッズ種別、数量、ステータス、写真URLのPATCHを扱えるようにした。
+
+#### `ios-native/Sources/MegrumData/SupabaseDisputeClient.swift`
+- 異議詳細、異議返信、取り下げのlive境界を追加した。
+- `disputes` と `dispute_messages` を読み書きできる型とrequest builderを増やし、scaffold止まりだった異議詳細を次にUI接続できる状態へ進めた。
+
+#### `ios-native/Tests/MegrumAppTests/MegrumAppStateTests.swift`
+- Preview repositoryでも服装写真メッセージを送れることをテストした。
+
+#### `ios-native/Tests/MegrumDataTests/`
+- 在庫/Wish更新、写真URL付き作成、空PATCH/不正数量/空タイトルvalidationを追加した。
+- 異議一覧取得、単体取得、返信作成、返信空文字validation、取り下げPATCHのrequestテストを追加した。
+
+### 走らせたAgent
+
+- `Sagan`: `SupabaseGoodsInventoryClient` と在庫/Wish request testsを担当。
+- `Lovelace`: `SupabaseDisputeClient` と異議 request testsを担当。
+- 統合役: 共通モデル、AppState、Repository、取引チャットUI、notes更新、build/testを担当。
+
+### 影響範囲
+
+- Swift Native取引チャット
+- Swift Native服装写真共有
+- Supabase `chat-photos` Storage upload
+- Supabase `messages` 写真メッセージ作成
+- Supabase `goods_inventory` 更新境界
+- Supabase `disputes` / `dispute_messages` live境界
+
+### 確認方法
+
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-iter373-build`
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-iter373-test --enable-xctest --disable-swift-testing -j 1`
+  - 236 tests passed
+- `xcodebuild -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -destination 'generic/platform=iOS Simulator' -derivedDataPath /tmp/megrum-native-xcodebuild-iter373 CODE_SIGNING_ALLOWED=NO build`
+- `xcodebuild -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -destination 'generic/platform=iOS' -derivedDataPath /tmp/megrum-native-device-iter373 -allowProvisioningUpdates build`
+- `xcrun devicectl device install app --device 7F6C74EF-5786-5316-920A-F7F1CC3FE2A4 /tmp/megrum-native-device-iter373/Build/Products/Debug-iphoneos/MegrumNative.app`
+  - 署名付きDebug buildは成功。
+  - `MTO’s phone` はCoreDeviceで `unavailable` のため、自動installは未完了。
+
+### セルフレビュー結果
+
+- ✅ React Native版との差分を確認し、画面上の不足として見えやすい取引チャット写真共有を実操作まで接続した。
+- ✅ iOS標準の `PhotosPicker` / sheet / SwiftUI状態管理を使い、Swift版の標準デザイン感を維持した。
+- ✅ 在庫/Wish編集と異議詳細は、画面接続前にData境界とrequest testsを先に固めた。
+- ✅ 状態名の追加/改名はなく、`notes/09_state_machines.md` 更新は不要。
+- ✅ 新しいユーザー向け用語は追加しておらず、`notes/10_glossary.md` 更新は不要。
+- ⚠️ 在庫/Wish編集画面から `updateGoodsItem` を呼ぶ接続、異議詳細scaffoldからlive detail/reply/withdrawを呼ぶ接続は次のP0として残る。
+
+### 関連ファイル
+
+- `ios-native/Sources/MegrumCore/MegrumModels.swift`
+- `ios-native/Sources/MegrumApp/MegrumAppState.swift`
+- `ios-native/Sources/MegrumApp/SupabaseMegrumRepository.swift`
+- `ios-native/Sources/MegrumApp/TradesScreen.swift`
+- `ios-native/Sources/MegrumData/SupabaseGoodsInventoryClient.swift`
+- `ios-native/Sources/MegrumData/SupabaseDisputeClient.swift`
+- `ios-native/Tests/MegrumAppTests/MegrumAppStateTests.swift`
+- `ios-native/Tests/MegrumDataTests/SupabaseGoodsInventoryClientTests.swift`
+- `ios-native/Tests/MegrumDataTests/InventoryWishRequestHardeningTests.swift`
+- `ios-native/Tests/MegrumDataTests/SupabaseDisputeClientTests.swift`
+
+---
+
 ## イテレーション372：RN差分P0をSwift版へ追加補完
 
 ### 背景・問題意識

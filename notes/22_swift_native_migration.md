@@ -1,7 +1,7 @@
 # 22. Swift Native Migration
 
 最終更新: 2026-05-31
-ステータス: Active draft（iter372）
+ステータス: Active draft（iter373）
 
 ## 目的
 
@@ -184,6 +184,9 @@ tar -xzf /Users/michitaka/Desktop/Megrum_backups/pre-swift-migration-20260531-03
 - iter372で、打診送信後に完了画面を表示し、送信後に入力ステップへ戻りにくい構造へ寄せた。
 - iter372で、遅刻/キャンセルの連絡を異議申告ではなく取引チャットのsystem messageとして送る境界へ整理した。
 - iter372で、異議詳細、タイムライン、返信、取り下げ、遅刻/キャンセルdraftのNative scaffoldを追加した。取引詳細からの本接続と実データ接続は後続対象。
+- iter373で、取引チャットの服装写真共有を `PhotosPicker` から `chat-photos` Storage upload、署名URL作成、`messages.message_type='outfit_photo'` 作成まで接続した。
+- iter373で、在庫/Wish編集向けに `goods_inventory` の本人所有PATCH境界とrequest testsを追加した。編集画面からの呼び出し接続は後続対象。
+- iter373で、異議詳細のload、異議返信、取り下げPATCHのlive境界とrequest testsを追加した。scaffold画面からの呼び出し接続は後続対象。
 
 ### Phase 4: Meguri core
 
@@ -228,8 +231,10 @@ tar -xzf /Users/michitaka/Desktop/Megrum_backups/pre-swift-migration-20260531-03
 - iter371で、`swift build` / `swift test` 202件 / `xcodebuild` Simulator build / 署名付きiPhone向けDebug build は成功した。`MTO’s phone` はCoreDeviceで `unavailable` のため、自動installは端末接続復帰待ち。
 - iter372で、RN parity backlogのP0からHome現地交換モード、在庫/Wish編集画面、打診送信後完了画面、取引チャットの遅刻/キャンセル連絡、異議詳細scaffoldを追加した。
 - iter372で、`swift build` / `swift test` 222件 / `xcodebuild` Simulator build / 署名付きiPhone向けDebug build は成功した。`MTO’s phone` はCoreDeviceで `unavailable` のため、自動installは未完了。
+- iter373で、RN parity backlogのP0から取引チャット服装写真共有、在庫/Wish編集PATCH境界、異議詳細live境界を追加した。
+- iter373で、`swift build` / `swift test` 236件 / `xcodebuild` Simulator build / 署名付きiPhone向けDebug build は成功した。`MTO’s phone` はCoreDeviceで `unavailable` のため、自動installは未完了。
 
-## RN parity backlog（iter370監査 / iter372更新）
+## RN parity backlog（iter370監査 / iter373更新）
 
 画面上の不足が多く見えるというオーナー指摘を受け、React Native版とSwift Native版のread-only差分監査を実施した。Swift版はiOS標準感を維持しつつ、以下の順に不足機能を埋める。
 
@@ -241,7 +246,8 @@ tar -xzf /Users/michitaka/Desktop/Megrum_backups/pre-swift-migration-20260531-03
    - 主な対象: `ios-native/Sources/MegrumApp/HomeScreen.swift`, `ios-native/Sources/MegrumApp/MegrumAppState.swift`
 2. Inventory / Wish Creation and Editing
    - iter372で、在庫/WishのNative編集画面を追加し、写真選択入口、タグ、メンバー、status、数量などの入力UIを先に載せた。
-   - 残: 写真/タグ/メンバー/status/editのlive保存境界、複数カード切り抜き、既存アイテム編集のDB PATCH。
+   - iter373で、`goods_inventory` の本人所有PATCH境界とrequest testsを追加した。
+   - 残: 編集画面からPATCH境界を呼ぶ接続、写真Upload、タグjoin table保存、複数カード切り抜き。
    - 主な対象: `ios-native/Sources/MegrumApp/CollectionScreens.swift`, 新規 `GoodsEditorScreen.swift`
 3. Proposal Creation / Confirm
    - iter371で専用 `ProposalCreateFlow` を追加し、譲る/受け取る/待ち合わせ/確認、複数提示物、現地/郵送/どちらもOKの入口は実装済み。
@@ -251,11 +257,13 @@ tar -xzf /Users/michitaka/Desktop/Megrum_backups/pre-swift-migration-20260531-03
 4. Trade Chat Day-Of Actions
    - iter371で現在地共有と到着ステータスはtyped messageとして接続済み。
    - iter372で遅刻/キャンセル相談を取引チャット内のsystem messageとして送る導線を追加した。
-   - 残: 服装写真共有、当日banner/入力欄上メニューの最終整理、system messageの表示デザイン調整。
+   - iter373で服装写真共有を `PhotosPicker` から取引チャット写真メッセージ送信まで接続した。
+   - 残: 当日banner/入力欄上メニューの最終整理、system messageの表示デザイン調整、カメラ直撮り入口。
    - 主な対象: `ios-native/Sources/MegrumApp/TradesScreen.swift`, `ios-native/Sources/MegrumData/SupabaseMessageClient.swift`
 5. Dispute / Cancel / Late Flow
    - iter372で異議詳細、返信、タイムライン、取り下げ、キャンセル/遅刻draftのNative scaffoldを追加した。
-   - 残: `disputes` のload/reply/withdraw live境界、取引詳細からのrouting、取引詳細へのbanner反映。
+   - iter373で `disputes` のload、`dispute_messages` の返信作成、取り下げPATCHのlive境界とrequest testsを追加した。
+   - 残: 異議詳細scaffoldからlive境界を呼ぶ接続、取引詳細からのrouting、取引詳細へのbanner反映。
    - 主な対象: `ios-native/Sources/MegrumApp/TradesScreen.swift`, 新規 `DisputeDetailScreen.swift`
 6. Onboarding / Own Profile
    - iter371で複数推し/メンバー、自分プロフィール、設定からのプロフィール/推し設定導線は追加済み。

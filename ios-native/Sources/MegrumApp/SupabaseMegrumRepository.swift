@@ -3,6 +3,8 @@ import MegrumCore
 import MegrumData
 
 public struct SupabaseMegrumRepository: MegrumRepository {
+    private static let chatPhotoBucket = "chat-photos"
+    private static let maxChatPhotoUploadBytes = Int(9.5 * 1_024 * 1_024)
     private let client: SupabaseRESTClient
     private let oshiClient: SupabaseOshiClient
     private let goodsInventoryClient: SupabaseGoodsInventoryClient
@@ -180,6 +182,41 @@ public struct SupabaseMegrumRepository: MegrumRepository {
 
     public func sendMessage(_ input: TradeMessageCreateInput) async throws -> TradeMessage {
         try await messageClient.sendTextMessage(senderID: viewerID, input: input)
+    }
+
+    public func sendPhotoMessage(_ input: TradePhotoMessageCreateInput) async throws -> TradeMessage {
+        guard [.photo, .outfitPhoto].contains(input.messageType) else {
+            throw SupabaseMessageClientError.invalidPhotoMessageType
+        }
+        guard input.imageData.count <= Self.maxChatPhotoUploadBytes else {
+            throw SupabaseProposalClientError.imageTooLarge
+        }
+
+        let contentType = normalizedChatImageContentType(input.imageContentType)
+        let path = chatPhotoPath(
+            proposalID: input.proposalID,
+            messageType: input.messageType,
+            contentType: contentType
+        )
+        try await client.uploadObject(
+            bucket: Self.chatPhotoBucket,
+            path: path,
+            data: input.imageData,
+            contentType: contentType,
+            upsert: false
+        )
+        let signedURL = try await client.createSignedURL(
+            bucket: Self.chatPhotoBucket,
+            path: path,
+            expiresIn: 60 * 60 * 24 * 365
+        )
+        return try await messageClient.sendPhotoMessage(
+            senderID: viewerID,
+            proposalID: input.proposalID,
+            photoURL: signedURL,
+            body: input.body,
+            messageType: input.messageType
+        )
     }
 
     public func sendSystemMessage(proposalID: UUID, body: String) async throws -> TradeMessage {
@@ -502,4 +539,32 @@ private struct GoodsInventoryRow: Decodable, Sendable {
             tags: []
         )
     }
+}
+
+private func normalizedChatImageContentType(_ value: String) -> String {
+    switch value.lowercased() {
+    case "image/png":
+        "image/png"
+    case "image/webp":
+        "image/webp"
+    default:
+        "image/jpeg"
+    }
+}
+
+private func chatImageFileExtension(for contentType: String) -> String {
+    switch normalizedChatImageContentType(contentType) {
+    case "image/png":
+        "png"
+    case "image/webp":
+        "webp"
+    default:
+        "jpg"
+    }
+}
+
+private func chatPhotoPath(proposalID: UUID, messageType: TradeMessageType, contentType: String) -> String {
+    let milliseconds = Int(Date().timeIntervalSince1970 * 1_000)
+    let prefix = messageType == .outfitPhoto ? "outfit" : "photo"
+    return "\(proposalID.uuidString.lowercased())/\(prefix)-\(milliseconds)-\(UUID().uuidString.lowercased()).\(chatImageFileExtension(for: contentType))"
 }

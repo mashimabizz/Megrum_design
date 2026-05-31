@@ -656,6 +656,29 @@ final class MegrumAppStateTests: XCTestCase {
         XCTAssertNil(state.sendingMessageProposalID)
     }
 
+    func testAppStateSendsPreviewOutfitPhotoMessage() async {
+        let state = MegrumAppState(repository: PreviewMegrumRepository())
+        await state.loadInitialData()
+        let proposalID = try! XCTUnwrap(state.proposals.first?.id)
+
+        await state.loadMessages(proposalID: proposalID)
+        let initialCount = state.messages(for: proposalID).count
+
+        let sent = await state.sendPhotoMessage(
+            proposalID: proposalID,
+            imageData: Data([0xff, 0xd8, 0xff]),
+            imageContentType: "image/jpeg",
+            messageType: .outfitPhoto
+        )
+
+        XCTAssertTrue(sent)
+        XCTAssertEqual(state.messages(for: proposalID).count, initialCount + 1)
+        XCTAssertEqual(state.messages(for: proposalID).last?.messageType, .outfitPhoto)
+        XCTAssertNotNil(state.messages(for: proposalID).last?.photoURL)
+        XCTAssertNil(state.sendingMessageProposalID)
+        XCTAssertNil(state.errorMessage)
+    }
+
     func testAppStateAddsEvidenceApprovesAndSubmitsPreviewEvaluation() async {
         let state = MegrumAppState(repository: PreviewMegrumRepository())
         await state.loadInitialData()

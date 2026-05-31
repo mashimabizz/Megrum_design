@@ -261,7 +261,7 @@ private enum TradeUnavailableChatAction: String, Identifiable {
         case .location:
             "現在地を取得できませんでした。端末の位置情報許可を確認してください。"
         case .outfitPhoto:
-            "服装写真の送信はまだ接続中です。交換後の証跡写真は取引証跡から追加できます。"
+            "服装写真を送信できませんでした。写真の選択権限と通信状態を確認してください。"
         }
     }
 }
@@ -372,6 +372,7 @@ private struct TradeDetailScreen: View {
     @Environment(\.dismiss) private var dismiss
     @State private var draftMessage = ""
     @State private var selectedEvidencePhotoItem: PhotosPickerItem?
+    @State private var selectedOutfitPhotoItem: PhotosPickerItem?
     @State private var isShowingEvidenceCamera = false
     @State private var isShowingEvaluationSheet = false
     @State private var isShowingDisputeSheet = false
@@ -486,6 +487,7 @@ private struct TradeDetailScreen: View {
             if appState.viewer.map({ currentProposal.isParticipant($0.id) }) == true {
                 TradeMessageInput(
                     text: $draftMessage,
+                    selectedOutfitPhotoItem: $selectedOutfitPhotoItem,
                     isSending: appState.sendingMessageProposalID == proposal.id,
                     showsCounterProposal: currentProposal.canCreateCounterProposal(from: appState.viewer?.id),
                     onOpenSchedule: {
@@ -496,9 +498,6 @@ private struct TradeDetailScreen: View {
                     },
                     onOpenLocationPlaceholder: {
                         shareCurrentLocation()
-                    },
-                    onOpenOutfitPhotoPlaceholder: {
-                        unavailableChatAction = .outfitPhoto
                     },
                     onCounterProposal: {
                         isShowingCounterProposalSheet = true
@@ -536,6 +535,14 @@ private struct TradeDetailScreen: View {
             }
             Task {
                 await addEvidence(from: item)
+            }
+        }
+        .onChange(of: selectedOutfitPhotoItem) { _, item in
+            guard let item else {
+                return
+            }
+            Task {
+                await addChatPhoto(from: item, messageType: .outfitPhoto)
             }
         }
         .sheet(isPresented: $isShowingEvaluationSheet) {
@@ -696,6 +703,25 @@ private struct TradeDetailScreen: View {
             imageData: data,
             imageContentType: imageContentType
         )
+    }
+
+    private func addChatPhoto(from item: PhotosPickerItem, messageType: TradeMessageType) async {
+        defer {
+            selectedOutfitPhotoItem = nil
+        }
+        guard let data = try? await item.loadTransferable(type: Data.self) else {
+            unavailableChatAction = .outfitPhoto
+            return
+        }
+        let sent = await appState.sendPhotoMessage(
+            proposalID: currentProposal.id,
+            imageData: data,
+            imageContentType: inferredEvidenceImageContentType(from: data),
+            messageType: messageType
+        )
+        if !sent {
+            unavailableChatAction = .outfitPhoto
+        }
     }
 
     private func sendArrivalQuickAction(_ action: TradeArrivalQuickAction) {
@@ -1613,12 +1639,12 @@ private struct TradeAssistanceRequestSheet: View {
 
 private struct TradeMessageInput: View {
     @Binding var text: String
+    @Binding var selectedOutfitPhotoItem: PhotosPickerItem?
     var isSending: Bool
     var showsCounterProposal: Bool
     var onOpenSchedule: () -> Void
     var onSendArrivalStatus: (TradeArrivalQuickAction) -> Void
     var onOpenLocationPlaceholder: () -> Void
-    var onOpenOutfitPhotoPlaceholder: () -> Void
     var onCounterProposal: () -> Void
     var onRequestLate: () -> Void
     var onRequestCancel: () -> Void
@@ -1649,9 +1675,10 @@ private struct TradeMessageInput: View {
                     Label("現在地を共有", systemImage: "location.fill")
                 }
 
-                Button(action: onOpenOutfitPhotoPlaceholder) {
+                PhotosPicker(selection: $selectedOutfitPhotoItem, matching: .images) {
                     Label("服装写真を共有", systemImage: "person.crop.rectangle")
                 }
+                .disabled(isSending)
 
                 if showsCounterProposal {
                     Button(action: onCounterProposal) {

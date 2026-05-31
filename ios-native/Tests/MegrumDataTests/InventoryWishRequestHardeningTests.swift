@@ -35,6 +35,89 @@ final class InventoryWishRequestHardeningTests: XCTestCase {
         XCTAssertEqual(payload["quantity"] as? Int, 1)
     }
 
+    func testCreateGoodsEntryRequestRejectsBlankTitle() {
+        let client = SupabaseGoodsInventoryClient(configuration: configuration)
+        let userID = UUID(uuidString: "11111111-1111-1111-1111-111111111111")!
+        let input = GoodsEntryInput(
+            kind: .inventory,
+            title: "  \n",
+            groupID: UUID(uuidString: "22222222-2222-2222-2222-222222222222")!,
+            goodsTypeID: UUID(uuidString: "33333333-3333-3333-3333-333333333333")!
+        )
+
+        XCTAssertThrowsError(try client.makeCreateGoodsEntryRequest(userID: userID, input: input)) { error in
+            XCTAssertEqual(error as? SupabaseGoodsInventoryClientError, .emptyTitle)
+        }
+    }
+
+    func testUpdateGoodsItemRequestRejectsBlankTitle() {
+        let client = SupabaseGoodsInventoryClient(configuration: configuration)
+        let userID = UUID(uuidString: "11111111-1111-1111-1111-111111111111")!
+        let itemID = UUID(uuidString: "44444444-4444-4444-4444-444444444444")!
+
+        XCTAssertThrowsError(
+            try client.makeUpdateGoodsItemRequest(
+                userID: userID,
+                itemID: itemID,
+                input: GoodsInventoryUpdateInput(title: "  \n")
+            )
+        ) { error in
+            XCTAssertEqual(error as? SupabaseGoodsInventoryClientError, .emptyTitle)
+        }
+    }
+
+    func testUpdateGoodsItemRequestRejectsInvalidQuantity() {
+        let client = SupabaseGoodsInventoryClient(configuration: configuration)
+        let userID = UUID(uuidString: "11111111-1111-1111-1111-111111111111")!
+        let itemID = UUID(uuidString: "44444444-4444-4444-4444-444444444444")!
+
+        for quantity in [0, 1_000] {
+            XCTAssertThrowsError(
+                try client.makeUpdateGoodsItemRequest(
+                    userID: userID,
+                    itemID: itemID,
+                    input: GoodsInventoryUpdateInput(quantity: quantity)
+                )
+            ) { error in
+                XCTAssertEqual(error as? SupabaseGoodsInventoryClientError, .invalidQuantity)
+            }
+        }
+    }
+
+    func testUpdateGoodsItemRequestRejectsEmptyPatch() {
+        let client = SupabaseGoodsInventoryClient(configuration: configuration)
+        let userID = UUID(uuidString: "11111111-1111-1111-1111-111111111111")!
+        let itemID = UUID(uuidString: "44444444-4444-4444-4444-444444444444")!
+
+        XCTAssertThrowsError(
+            try client.makeUpdateGoodsItemRequest(
+                userID: userID,
+                itemID: itemID,
+                input: GoodsInventoryUpdateInput()
+            )
+        ) { error in
+            XCTAssertEqual(error as? SupabaseGoodsInventoryClientError, .emptyUpdate)
+        }
+    }
+
+    func testUpdateGoodsItemRequestDoesNotWriteTagsBecauseTagsUseJoinTable() throws {
+        let client = SupabaseGoodsInventoryClient(configuration: configuration)
+        let userID = UUID(uuidString: "11111111-1111-1111-1111-111111111111")!
+        let itemID = UUID(uuidString: "44444444-4444-4444-4444-444444444444")!
+
+        let request = try client.makeUpdateGoodsItemRequest(
+            userID: userID,
+            itemID: itemID,
+            input: GoodsInventoryUpdateInput(title: "ランダムトレカ")
+        )
+        let body = try XCTUnwrap(request.httpBody)
+        let payload = try XCTUnwrap(JSONSerialization.jsonObject(with: body) as? [String: Any])
+
+        XCTAssertNil(payload["tags"])
+        XCTAssertNil(payload["tag_names"])
+        XCTAssertNil(payload["goods_inventory_tags"])
+    }
+
     func testBlankGoodsReportNoteIsOmitted() throws {
         let client = SupabaseGoodsReportClient(configuration: configuration)
         let input = GoodsReportCreateInput(
