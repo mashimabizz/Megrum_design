@@ -64,6 +64,7 @@
 | スクショ台本 | `notes/28_app_store_screenshot_storyboard.md` |
 | 弁護士レビュー依頼 | `notes/29_legal_review_brief.md` |
 | 法務レビュー回答反映 | `notes/58_legal_review_response_tracker.md` |
+| 初回提出スコープ露出監査 | `notes/59_initial_release_scope_exposure_audit.md` |
 | オーナー作業表 | `notes/30_owner_release_action_sheet.md` |
 | App Store Connect入力 | `notes/31_app_store_connect_metadata_worksheet.md` |
 | TestFlight / Submit手順 | `notes/32_testflight_review_submission_runbook.md` |
@@ -165,6 +166,7 @@
 | アプリ内法務・安全コピー | RL-054 | `notes/56` |
 | 法務branch統合手順 | RL-055 | `notes/57` |
 | 法務レビュー回答反映 | RL-056 | `notes/58` |
+| 初回提出スコープ露出監査 | RL-057 | `notes/59` |
 
 ---
 
@@ -197,6 +199,7 @@
 | 法務branch統合手順 | `notes/57_legal_release_branch_integration_plan.md` |
 | 法務レビュー依頼メモ | `notes/29_legal_review_brief.md` |
 | 法務レビュー回答反映台帳 | `notes/58_legal_review_response_tracker.md` |
+| 初回提出スコープ露出監査表 | `notes/59_initial_release_scope_exposure_audit.md` |
 | App Store提出素材 | `notes/24_app_store_submission_pack.md` |
 | App Store Connect入力表 | `notes/31_app_store_connect_metadata_worksheet.md` |
 | TestFlight / Submit手順 | `notes/32_testflight_review_submission_runbook.md` |

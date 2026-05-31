@@ -92,6 +92,7 @@ Swift Nativeの `Info.plist` では `public.app-category.social-networking` が�
 | アプリ内法務・安全コピー | `notes/56` | 同意、権限説明、安全注意、AI/IAP文言を実装前に確認 |
 | 法務branch統合手順 | `notes/57` | 開発branchと混ぜずにPR化/mergeする |
 | 法務レビュー回答反映 | `notes/58` | 回答、判断、反映先、未決論点を管理 |
+| 初回提出スコープ露出監査 | `notes/59` | 出す/隠す機能が画面・文面・FAQ・App Privacyで一致しているか確認 |
 
 ## 4. デモアカウント準備
 
@@ -203,3 +204,4 @@ Appleのリジェクト文を貼るので、ガイドライン番号ごとに対
 - `notes/56_in_app_legal_safety_copy_deck.md`
 - `notes/57_legal_release_branch_integration_plan.md`
 - `notes/58_legal_review_response_tracker.md`
+- `notes/59_initial_release_scope_exposure_audit.md`

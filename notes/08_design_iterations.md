@@ -4,6 +4,62 @@
 
 ---
 
+## イテレーション381：初回提出スコープ露出監査表を追加
+
+### 背景・問題意識
+
+初回提出では、有料機能、外部AI、未完成3D、未完成掲示板、住所/電話番号入力などを「出すか隠すか」で審査・法務リスクが大きく変わる。既存文書に個別の注意はあるが、完成ビルド、App Store文面、スクショ、FAQ、App Privacyを横断して確認する表が不足していたため、露出監査表を追加した。
+
+### 変更内容
+
+#### `notes/59_initial_release_scope_exposure_audit.md`
+- 初回提出の原則と、機能露出マトリクスを追加した。
+- 画面監査、メタデータ監査、公開文書監査、証跡フォーマット、No-Goを整理した。
+- 初回で隠すべき候補として、有料機能、外部AI、未完成3D、未完成掲示板、住所/電話番号入力、debug/internal表示を明示した。
+
+#### `notes/39_release_command_center.md`, `notes/30_owner_release_action_sheet.md`, `notes/24_app_store_submission_pack.md`, `notes/50_release_go_no_go_decision_matrix.md`
+- 初回提出スコープ露出監査表への導線を追加した。
+- Go / No-GoにG14 Scope Exposureを追加した。
+
+#### `notes/22_release_triage_tracker.csv`
+- RL-057として初回提出スコープ露出監査表を追加した。
+
+### 影響範囲
+
+- 完成ビルド確認
+- App Store説明文 / スクリーンショット / Review Notes
+- 公開FAQ / 利用規約 / プライバシーポリシー
+- App Privacy回答
+- Go / No-Go判定
+- コード、画面、App Store Connect設定、公開URLは変更していない。
+
+### 確認方法
+
+- `rg -n "RL-057|G14 Scope Exposure|初回提出スコープ露出|有料機能|外部AI|未完成3D" notes/59_initial_release_scope_exposure_audit.md notes/50_release_go_no_go_decision_matrix.md notes/22_release_triage_tracker.csv`
+- `python3 - <<'PY' ...` による `notes/22_release_triage_tracker.csv` のCSV parse確認
+- 旧規約用語・旧主体表現チェック（旧提案/旧メッセージ/旧投稿関連、サービス主体表現）
+- `git diff --check -- notes`
+
+### セルフレビュー結果
+
+- ✅ コード、画面、App Store Connect設定、公開URLは変更していない。
+- ✅ 初回で出す/隠す機能を、画面、メタデータ、公開文書、App Privacyまで横断して確認できる表にした。
+- ✅ Go / No-GoへG14 Scope Exposureを追加し、隠すはずの機能が残る場合は提出停止にした。
+- ✅ 状態名の追加/改名はなく、`notes/09_state_machines.md` 更新は不要。
+- ✅ 新用語は追加していないため、`notes/10_glossary.md` 更新は不要。
+- ✅ DBスキーマ変更はなく、`notes/05_data_model.md` 更新は不要。
+
+### 関連ファイル
+
+- `notes/59_initial_release_scope_exposure_audit.md`
+- `notes/39_release_command_center.md`
+- `notes/30_owner_release_action_sheet.md`
+- `notes/24_app_store_submission_pack.md`
+- `notes/50_release_go_no_go_decision_matrix.md`
+- `notes/22_release_triage_tracker.csv`
+
+---
+
 ## イテレーション380：法務レビュー回答反映台帳を追加
 
 ### 背景・問題意識

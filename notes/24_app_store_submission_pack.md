@@ -259,6 +259,7 @@ Age Rating、Content Rights、Export Complianceの質問票は `notes/46_app_sto
 Apple Guideline別の提出前適合確認は `notes/53_app_review_guideline_compliance_matrix.md` を使う。
 RLS、Storage、secret、APNs、管理者権限の提出前監査は `notes/54_prelaunch_security_audit_checklist.md` を使う。
 アプリ内の同意、権限説明、安全注意、AI/IAP文言は `notes/56_in_app_legal_safety_copy_deck.md` を使う。
+初回提出で出す/隠す機能の露出監査は `notes/59_initial_release_scope_exposure_audit.md` を使う。
 
 ## 12. 公式参照
 

@@ -42,6 +42,7 @@
 | G11 | Incident | 事故疑いがない。ある場合は初動記録と法務確認済み | 事故疑いが未処理 | `notes/49` |
 | G12 | Security | RLS、Storage、secret、APNs、管理者権限の提出前監査がPass | 他人データ表示、公開bucket、secret露出、任意通知送信の疑い | `notes/54` |
 | G13 | Legal Review | 法務レビュー回答が反映済み、又は未反映論点が初回提出に影響しない | 弁護士回答の未反映/要再確認が残っている | `notes/58` |
+| G14 | Scope Exposure | 出す/隠す機能が画面、文面、FAQ、App Privacy、スクショで一致 | 隠すはずの機能が画面やメタデータに残る | `notes/59` |
 
 ## 3. P0トラッカー対応
 
@@ -53,7 +54,7 @@
 | 打診/ネゴ/取引 | RL-008, RL-009, RL-010, RL-011, RL-012 | `notes/42` | 2アカウントで主要フローがPass |
 | 法務/URL | RL-013, RL-036, RL-045, RL-056 | `notes/25`, `notes/37`, `notes/47`, `notes/58` | 公開URL、サポートメール、法務回答反映が確認済み |
 | App Store提出 | RL-014, RL-015, RL-027, RL-034, RL-038, RL-040 | `notes/31`, `notes/32`, `notes/35`, `notes/40`, `notes/42` | ビルド、デモアカウント、転記文面、P0台本が揃う |
-| スコープ | RL-019, RL-020, RL-021 | `notes/39`, `notes/42` | 現地交換MVPとApp Privacy回答が一致 |
+| スコープ | RL-019, RL-020, RL-021, RL-057 | `notes/39`, `notes/42`, `notes/59` | 現地交換MVP、露出範囲、App Privacy回答が一致 |
 | 3D/めぐり | RL-017 | `notes/22_release_triage_tracker.csv` | 未完成3Dが露出しない |
 | UGC安全 | RL-030 | `notes/26`, `notes/42` | 通報/ブロック/問い合わせが説明できる |
 | アカウント | RL-031, RL-043 | `notes/45` | 削除入口、保持対象、請求導線が説明できる |
@@ -97,6 +98,7 @@ Conditional Goにする場合は、`notes/36` に「隠した証跡」と「説�
 | G11 Incident | TODO | TODO | TODO |
 | G12 Security | TODO | TODO | TODO |
 | G13 Legal Review | TODO | TODO | TODO |
+| G14 Scope Exposure | TODO | TODO | TODO |
 
 最終判定:
 
@@ -117,6 +119,7 @@ Evidence folder:
 - App Privacyと実ビルドが矛盾している。
 - RLS、Storage公開範囲、secret、APNs通知の監査でNo-Goが残っている。
 - 法務レビュー回答の未反映又は要再確認が残っている。
+- 隠すはずの機能が画面、FAQ、App Store文面、スクショ、Review Notesに残っている。
 - Privacy Policy URL又はSupport URLが404。
 - アカウント削除入口がない。
 - UGCが見えるのに通報/ブロック/問い合わせがない。
@@ -139,5 +142,6 @@ Evidence folder:
 - 外部サービス・委託先データ台帳: `notes/48_external_service_vendor_register.md`
 - 個人情報・セキュリティ事故初動ランブック: `notes/49_privacy_security_incident_response_runbook.md`
 - 法務レビュー回答反映台帳: `notes/58_legal_review_response_tracker.md`
+- 初回提出スコープ露出監査表: `notes/59_initial_release_scope_exposure_audit.md`
 - 提出後・公開初日ランブック: `notes/51_post_submission_release_day_runbook.md`
 - データ保持・削除マトリクス: `notes/52_data_retention_deletion_matrix.md`
