@@ -51,6 +51,7 @@ release_evidence/
     12_release_day/
     13_availability_stop/
     14_app_store_reviews/
+    15_signing_capabilities/
 ```
 
 Drive等へ保存する場合も、同じ番号と名前にすると探しやすい。
@@ -285,6 +286,22 @@ secret実値や管理画面の認証情報は保存しない。
 - レビュー本文全文、ユーザー名、個人情報、認証情報は公開リポジトリに残さない。
 - 公開返信は `notes/74` の返信前チェックを通したものだけ保存する。
 
+### 5.15 `15_signing_capabilities/`
+
+| ID | 証跡 | 形式 |
+|---|---|---|
+| SIGN-001 | Bundle ID / App ID / Team ID照合 | md |
+| SIGN-002 | App IDのCapabilities一覧 | md又はpng |
+| SIGN-003 | Xcode Signing & Capabilities / entitlements確認 | md又はpng |
+| SIGN-004 | App Store distribution profile / certificate確認 | md |
+| SIGN-005 | APNs key / environment / Bundle ID照合 | md |
+| SIGN-006 | Sign in with Apple設定確認 | md |
+| SIGN-007 | IAP / Associated Domains要否判断 | md |
+
+注意:
+- `.p12`、certificate private key、APNs private key、2FA code、recovery code、実電話番号は保存しない。
+- Profile名やKey IDは必要最小限の記録に留める。
+
 ## 6. 証跡の扱いで迷う時
 
 | 状況 | 判断 |
@@ -310,6 +327,7 @@ secret実値や管理画面の認証情報は保存しない。
 - [ ] `notes/72_app_store_approval_release_control_runbook.md` のPDR gateと公開初日監視に対応している
 - [ ] `notes/73_app_store_availability_emergency_stop_runbook.md` の停止/復帰判断に対応している
 - [ ] `notes/74_app_store_ratings_reviews_response_runbook.md` の評価・レビュー返信記録に対応している
+- [ ] `notes/75_apple_developer_signing_capabilities_preflight.md` の署名・Capabilities確認に対応している
 
 ## 8. 関連文書
 
@@ -319,6 +337,7 @@ secret実値や管理画面の認証情報は保存しない。
 - 承認後・手動公開制御Runbook: `notes/72_app_store_approval_release_control_runbook.md`
 - 公開停止・Availability変更Runbook: `notes/73_app_store_availability_emergency_stop_runbook.md`
 - App Store評価・レビュー返信Runbook: `notes/74_app_store_ratings_reviews_response_runbook.md`
+- Apple Developer署名・Capabilities事前確認Runbook: `notes/75_apple_developer_signing_capabilities_preflight.md`
 - 公開ページレダクションQA: `notes/63_public_page_redaction_qa.md`
 - TestFlight / App Review提出ランブック: `notes/32_testflight_review_submission_runbook.md`
 - P0スモークテスト台本: `notes/42_p0_smoke_test_script.md`

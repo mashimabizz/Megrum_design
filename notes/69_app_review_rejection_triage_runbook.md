@@ -63,7 +63,7 @@ Apple App Review Guidelinesでは、疑問や追加説明がある場合はApp S
 | Age / Content Rights / Export | 質問票、権利物、暗号化回答 | `notes/46`, `notes/28`, `notes/31` | 回答とスクショ/SDKを照合 |
 | AI | 外部AI送信、説明、Privacy不一致 | `notes/legal`, `notes/27`, `notes/48` | 隠すか説明/同意/回答を揃える |
 | Unresolved Issues | submission内itemの一部却下 | `notes/33`, `notes/62`, 本文 | itemを編集/削除して再提出 |
-| Invalid Binary | binary要件、署名、entitlement、privacy manifest | 開発セッション, `notes/44` | 開発側へ切り出し、新build前提 |
+| Invalid Binary | binary要件、署名、entitlement、privacy manifest | 開発セッション, `notes/75`, `notes/44` | 開発側へ切り出し、新build前提 |
 | 追加情報要求 | Guideline違反ではなく説明不足 | `notes/41`, `notes/53` | 事実と確認経路を短く返信 |
 | Appeal候補 | Appleの事実認定と実装事実が明確に違う | `notes/36`, `notes/53`, 法務判断 | 先に通常返信で説明し、必要時のみappeal |
 

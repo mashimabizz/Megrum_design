@@ -31,6 +31,7 @@ App Store初回提出、TestFlight配布、公開URL運用、サポート対応�
 | Customer Support | ユーザー返信、レビュー返信候補 | TODO | App Store Connect | TODO |
 | Finance / Sales | IAP売上、支払い、契約確認 | TODO | App Store Connect | 有料機能を出す場合 |
 | Access to Certificates/Profiles | 証明書、Profiles、Identifiers | TODO | Apple Developer | TODO |
+| Signing / Capabilities確認 | Bundle ID、App ID、Capabilities、profile/certificate照合 | TODO | `notes/75` | Archive/upload前 |
 | App Review contact | 審査連絡先 | TODO | App Store Connect Review Information | TODO |
 
 提出前No-Go:
@@ -48,6 +49,7 @@ App Store初回提出、TestFlight配布、公開URL運用、サポート対応�
 | Privacy Policy URL入力 | App Manager以上 | TODO |
 | App Privacy回答 | App Manager以上 | TODO |
 | Age Rating / Content Rights / Export Compliance回答 | App Manager以上 | TODO |
+| Bundle ID / Capabilities / 署名確認 | Developer + App Manager | `notes/75` |
 | TestFlight内部配布 | App Manager / Admin / Account Holder等 | TODO |
 | IAP商品作成 | Account Holder / Admin / App Manager等、契約状況も確認 | 有料機能を出す場合 |
 | Add for Review / Submit for Review | App Manager以上 | TODO |
@@ -120,6 +122,8 @@ No-Go:
 - OAuth redirect URLが古い。
 - Sign in with Apple削除連携の方針が説明できない。
 
+署名、Capabilities、provisioning profile、certificate、Bundle ID照合の詳細は `notes/75_apple_developer_signing_capabilities_preflight.md` を使う。
+
 ## 8. IAP / 課金
 
 有料機能を初回で隠す場合も、誰がIAPを作成できるかだけ確認する。
@@ -172,6 +176,7 @@ No-Go:
 ## 11. 関連文書
 
 - TestFlight / App Review提出ランブック: `notes/32_testflight_review_submission_runbook.md`
+- Apple Developer署名・Capabilities事前確認: `notes/75_apple_developer_signing_capabilities_preflight.md`
 - ドメイン・メール・公開URL運用: `notes/47_domain_email_publication_runbook.md`
 - 提出前セキュリティ監査: `notes/54_prelaunch_security_audit_checklist.md`
 - 個人情報・セキュリティ事故初動: `notes/49_privacy_security_incident_response_runbook.md`

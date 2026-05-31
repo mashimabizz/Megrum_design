@@ -175,6 +175,7 @@ plutil -p ios-native/App/PrivacyInfo.xcprivacy
 | `notes/50_release_go_no_go_decision_matrix.md` | セキュリティGateの最終判定 |
 | `notes/53_app_review_guideline_compliance_matrix.md` | Guideline 1.6 Data Security、5.1 Privacyの証跡 |
 | `notes/61_release_access_owner_registry.md` | 担当者、権限、secret管理場所の棚卸し |
+| `notes/75_apple_developer_signing_capabilities_preflight.md` | Bundle ID、Capabilities、APNs、Sign in with Apple、署名の照合 |
 
 ## 11. 参照
 

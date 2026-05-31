@@ -17,6 +17,7 @@
 - コード修正、ビルド作成、署名、アップロードは別セッションの開発作業。
 - このランブックでは、完成ビルドがApp Store Connectにアップロードされた後の確認と提出準備を扱う。
 - 開発セッションから完成候補ビルドを受け取る時は `notes/65_release_candidate_handoff.md` の項目でVersion、Build、commit SHA、スコープ、検証結果を確認する。
+- Bundle ID、App ID、Capabilities、entitlements、provisioning profile、certificateの照合は `notes/75_apple_developer_signing_capabilities_preflight.md` を使う。
 - Apple公式情報では、ビルドはXcode、Swift Playground、altool、Transporter等でアップロードでき、App Store Connect側の処理完了後に選択できる。
 
 ## 2. 役割
@@ -37,6 +38,7 @@
 |---|---|
 | App | Megrumの正しいApp Recordか |
 | Bundle ID | 提出対象のBundle IDか |
+| Signing / Capabilities | `notes/75` のP0確認にNo-Goがないか |
 | Version | App Store ConnectのVersionと一致するか |
 | Build Number | 前回より大きいか |
 | Processing | App Store Connectで処理完了しているか |
@@ -131,6 +133,7 @@ Apple公式上、外部テスターは最大10,000人まで招待できるが、
 | Version Metadata | Description、Keywords、Support URL、Copyright、Screenshotsが入力済み | `notes/31`, `notes/28` |
 | App Privacy | 実SDK/通信/ポリシーと一致 | `notes/27` |
 | Build | 正しいVersion/Buildを選択 | 本文書 |
+| Signing / Capabilities | Bundle ID、App ID、Capabilities、profile/certificateが一致 | `notes/75` |
 | App Review Information | 連絡先、デモアカウント、Notesが入力済み | `notes/31` |
 | Legal URLs | terms/privacy/commerce/supportが公開済み | `notes/25`, `notes/37` |
 | UGC | 通報、ブロック、連絡先、モデレーション説明あり | `notes/26` |

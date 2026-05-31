@@ -53,6 +53,7 @@
 | G22 | Release Control | 承認後のRelease option、PDR gate、`Release This Version` 操作、公開初日監視が整理済み | 手動公開設定や公開直前gateが未確認で、意図しない自動公開又は公開タイミング誤りが起きうる | `notes/72` |
 | G23 | Availability Stop | 公開後のP0事故疑いに対するAvailability変更、Remove App From Sale、new build判断が整理済み | 公開継続が危険な時に停止/復帰/サポート告知の判断ができない | `notes/73` |
 | G24 | Ratings / Reviews | 公開後の評価・レビュー確認、公開返信、concern report、overview rating reset判断が整理済み | 公開返信で個人情報、未確認事実、補償、内部情報を書いてしまう | `notes/74` |
+| G25 | Signing / Capabilities | Bundle ID、App ID、Capabilities、entitlements、provisioning profile、certificate、App Store Connect app recordが一致 | Build upload失敗、Invalid Binary、APNs不達、Apple login不具合が起きうる | `notes/75` |
 
 ## 3. P0トラッカー対応
 
@@ -67,6 +68,7 @@
 | 公開制御 | RL-049, RL-070 | `notes/51`, `notes/72` | 承認後の手動公開、PDR gate、公開初日監視が整理済み |
 | 公開停止 | RL-071 | `notes/73` | 公開後のAvailability変更、Remove App From Sale、new build判断が整理済み |
 | 評価・レビュー | RL-072 | `notes/74` | 公開後のレビュー分類、公開返信、concern report、rating reset判断が整理済み |
+| 署名・Capabilities | RL-073 | `notes/75` | Bundle ID、App ID、Capabilities、entitlements、profile/certificate、app recordが一致 |
 | スコープ | RL-019, RL-020, RL-021, RL-057 | `notes/39`, `notes/42`, `notes/59` | 現地交換MVP、露出範囲、App Privacy回答が一致 |
 | 3D/めぐり | RL-017 | `notes/22_release_triage_tracker.csv` | 未完成3Dが露出しない |
 | UGC安全 | RL-030 | `notes/26`, `notes/42` | 通報/ブロック/問い合わせが説明できる |
@@ -122,6 +124,7 @@ Conditional Goにする場合は、`notes/36` に「隠した証跡」と「説�
 | G22 Release Control | TODO | TODO | TODO |
 | G23 Availability Stop | TODO | TODO | TODO |
 | G24 Ratings / Reviews | TODO | TODO | TODO |
+| G25 Signing / Capabilities | TODO | TODO | TODO |
 
 最終判定:
 
@@ -149,6 +152,7 @@ Evidence folder:
 - App Review指摘時の本文保存、Guideline分類、new build要否、返信/再提出/取り下げ/appeal判断の手順が未整備。
 - App icon、スクショ、App Preview、poster frame、Product Page Previewが未確認、又は完成build/初回スコープ/メタデータと矛盾している。
 - App Store Connect実入力値が、提出docs、完成build、公開URL、App Privacy、Review Notes、同時提出itemと未照合又は矛盾している。
+- Bundle ID、App ID、Capabilities、entitlements、provisioning profile、certificate、App Store Connect app recordが未照合又は矛盾している。
 - 承認後のRelease option、`Pending Developer Release` gate、`Release This Version` 操作、公開初日監視が未整備。
 - 公開後のP0事故疑いに対するAvailability変更、Remove App From Sale、new build、復帰判断が未整備。
 - 公開後の評価・レビュー返信方針が未整備で、公開返信に個人情報や未確認事実を書くおそれがある。
@@ -187,4 +191,5 @@ Evidence folder:
 - 承認後・手動公開制御Runbook: `notes/72_app_store_approval_release_control_runbook.md`
 - 公開停止・Availability変更Runbook: `notes/73_app_store_availability_emergency_stop_runbook.md`
 - App Store評価・レビュー返信Runbook: `notes/74_app_store_ratings_reviews_response_runbook.md`
+- Apple Developer署名・Capabilities事前確認Runbook: `notes/75_apple_developer_signing_capabilities_preflight.md`
 - データ保持・削除マトリクス: `notes/52_data_retention_deletion_matrix.md`

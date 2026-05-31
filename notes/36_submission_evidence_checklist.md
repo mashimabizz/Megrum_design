@@ -56,6 +56,7 @@
 | EV-011 | Copy Sheet | App Store Connectへ入力した最終文面 | `notes/40` |
 | EV-012 | Security Audit | RLS、Storage、secret、APNs、公開URL、管理者権限の監査結果 | `notes/54` |
 | EV-013 | Release Control | 承認後のRelease option、PDR gate、Release This Version、公開初日監視の記録 | `notes/72` |
+| EV-014 | Signing / Capabilities | Bundle ID、App ID、Capabilities、profile/certificate照合 | `notes/75` |
 
 ---
 
@@ -150,6 +151,7 @@ Evidence folder:
 - デモアカウントでログインできない。
 - 利用規約、プライバシーポリシー、サポートURLが404。
 - App Privacyと実ビルドのSDK/通信が矛盾している。
+- Bundle ID、App ID、Capabilities、entitlements、provisioning profile、certificate、App Store Connect app recordが矛盾している。
 - RLS、Storage公開範囲、secret、APNs通知の監査でNo-Goが残っている。
 - アカウント作成があるのにアプリ内削除入口がない。
 - UGCがあるのに通報/ブロック/問い合わせ導線が説明できない。
@@ -184,6 +186,7 @@ Evidence folder:
 - App Store Connect入力表: `notes/31_app_store_connect_metadata_worksheet.md`
 - App Store Connect最終入力差分QA: `notes/71_app_store_connect_final_input_reconciliation.md`
 - 承認後・手動公開制御Runbook: `notes/72_app_store_approval_release_control_runbook.md`
+- Apple Developer署名・Capabilities事前確認Runbook: `notes/75_apple_developer_signing_capabilities_preflight.md`
 - TestFlight/App Review提出ランブック: `notes/32_testflight_review_submission_runbook.md`
 - デモアカウント計画: `notes/35_demo_account_review_data_plan.md`
 - 提出コントロールボード: `notes/39_release_command_center.md`

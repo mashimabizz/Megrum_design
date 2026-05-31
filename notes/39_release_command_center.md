@@ -80,6 +80,7 @@
 | 承認後・手動公開制御 | `notes/72_app_store_approval_release_control_runbook.md` |
 | 公開停止・Availability変更 | `notes/73_app_store_availability_emergency_stop_runbook.md` |
 | App Store評価・レビュー返信 | `notes/74_app_store_ratings_reviews_response_runbook.md` |
+| Apple Developer署名・Capabilities | `notes/75_apple_developer_signing_capabilities_preflight.md` |
 | オーナー作業表 | `notes/30_owner_release_action_sheet.md` |
 | App Store Connect入力 | `notes/31_app_store_connect_metadata_worksheet.md` |
 | TestFlight / Submit手順 | `notes/32_testflight_review_submission_runbook.md` |
@@ -122,8 +123,9 @@
 8. App Store Connectへメタデータを入力する。
 9. Review Notesへデモアカウントとレビュー経路を入れる。
 10. `notes/71` でApp Store Connect実入力値と提出docs/buildの差分を確認する。
-11. `notes/36` の証跡を埋める。
-12. Add for Review、Submit for Reviewへ進む。
+11. `notes/75` でBundle ID、App ID、Capabilities、署名、provisioning profileを確認する。
+12. `notes/36` の証跡を埋める。
+13. Add for Review、Submit for Reviewへ進む。
 
 ### Phase C: リジェクト時
 
@@ -206,6 +208,7 @@
 | 承認後・手動公開制御 | RL-070 | `notes/72` |
 | 公開停止・Availability変更 | RL-071 | `notes/73` |
 | App Store評価・レビュー返信 | RL-072 | `notes/74` |
+| Apple Developer署名・Capabilities | RL-073 | `notes/75` |
 
 ---
 
@@ -225,6 +228,7 @@
 - 未完成3Dが見える。
 - App icon、スクショ、App Preview、poster frame、Product Page PreviewのQAが未完了。
 - App Store Connect実入力値が、提出docs、完成build、公開URL、App Privacy、Review Notesと未照合。
+- Bundle ID、App ID、Capabilities、entitlements、provisioning profile、certificate、App Store Connect app recordが未照合。
 - スクショに実住所、実在IP、内部ID、デバッグ表示がある。
 - 承認後のRelease option、`Pending Developer Release` gate、`Release This Version` 操作手順、公開初日監視が未整備。
 - 公開後のP0事故疑いに対して、App Store Availability変更、Remove App From Sale、new build判断の手順が未整備。
@@ -258,6 +262,7 @@
 | App Store承認後・手動公開制御Runbook | `notes/72_app_store_approval_release_control_runbook.md` |
 | App Store公開停止・Availability変更Runbook | `notes/73_app_store_availability_emergency_stop_runbook.md` |
 | App Store評価・レビュー返信Runbook | `notes/74_app_store_ratings_reviews_response_runbook.md` |
+| Apple Developer署名・Capabilities事前確認Runbook | `notes/75_apple_developer_signing_capabilities_preflight.md` |
 | App Store提出素材 | `notes/24_app_store_submission_pack.md` |
 | App Store Connect入力表 | `notes/31_app_store_connect_metadata_worksheet.md` |
 | TestFlight / Submit手順 | `notes/32_testflight_review_submission_runbook.md` |
@@ -304,6 +309,7 @@
 | 承認後の手動公開・公開初日監視 | 承認後。`notes/72` を使う |
 | 公開後の停止・Availability変更 | P0事故疑い又は公開継続が危険な時。`notes/73` を使う |
 | 公開後の評価・レビュー確認 | 公開後。`notes/74` を使う |
+| Apple Developer署名・Capabilities確認 | 完成ビルドArchive/upload前。`notes/75` を使う |
 
 ---
 
@@ -317,7 +323,8 @@
 5. 完成ビルドでP0だけ実機確認する。
 6. スクショ、App Privacy、Review Notesを実ビルドに合わせて最終化する。
 7. `notes/40` からApp Store Connectへ転記する。
-8. `notes/50` でGo / No-Goを判定する。
-9. 証跡を残して提出する。
-10. 承認後は `notes/51` と `notes/72` に沿って手動公開と公開初日監視を行う。
-11. 公開後は `notes/74` で評価・レビュー返信を日次確認する。
+8. `notes/75` で署名・Capabilitiesを確認する。
+9. `notes/50` でGo / No-Goを判定する。
+10. 証跡を残して提出する。
+11. 承認後は `notes/51` と `notes/72` に沿って手動公開と公開初日監視を行う。
+12. 公開後は `notes/74` で評価・レビュー返信を日次確認する。

@@ -40,6 +40,9 @@
 | App Version | Yes | TODO |
 | Build Number | Yes | TODO |
 | Bundle ID | Yes | TODO |
+| App ID / Team ID | Yes | TODO |
+| Signing mode | Yes | Automatic / Manual |
+| Capabilities / entitlements | Yes | TODO |
 | Build作成方法 | Yes | Xcode / EAS / Other |
 | Upload方法 | Yes | Xcode / Transporter / Other |
 | App Store Connect処理状態 | Yes | Processing / Ready / Warning |
@@ -56,6 +59,7 @@
 No-Go:
 - commit SHAが不明。
 - TestFlightで確認したBuild Numberと提出予定Build Numberが違う。
+- Bundle ID、App ID、Team ID、Capabilities、entitlementsが `notes/75` で照合できない。
 - P0不具合が残っているのに提出候補として渡されている。
 - 隠す機能が画面に残っている可能性がある。
 
@@ -119,8 +123,9 @@ xcodebuild -scheme MegrumNative -destination 'platform=iOS Simulator,name=iPhone
 | 5 | 公開ページのレダクションQAを行う | `notes/63` |
 | 6 | App Privacy / Privacy Manifest / SDK監査を最終照合 | `notes/27`, `notes/43`, `notes/44`, `notes/48` |
 | 7 | App Store Connect転記文面を最終化 | `notes/40`, `notes/60` |
-| 8 | Go / No-Goを判定 | `notes/50` |
-| 9 | 手動提出チェックへ進む | `notes/62` |
+| 8 | Apple Developer署名・Capabilities事前確認を行う | `notes/75` |
+| 9 | Go / No-Goを判定 | `notes/50` |
+| 10 | 手動提出チェックへ進む | `notes/62` |
 
 ## 7. 差し戻し条件
 
@@ -133,6 +138,7 @@ xcodebuild -scheme MegrumNative -destination 'platform=iOS Simulator,name=iPhone
 - 住所/電話番号入力が初回提出スコープに残っている。
 - 実ユーザー情報、内部ID、debug表示が画面やスクショに出る。
 - App Privacyと実ビルドの収集/送信データが矛盾する。
+- Bundle ID、App ID、Capabilities、entitlements、provisioning profile、certificate、App Store Connect app recordが矛盾する。
 - RLS、Storage、secret、APNs、管理者権限の監査でNo-Goが残る。
 
 差し戻し時に渡す情報:
@@ -160,6 +166,9 @@ Commit SHA:
 App Version:
 Build Number:
 Bundle ID:
+App ID / Team ID:
+Signing mode:
+Capabilities / entitlements:
 Uploaded to App Store Connect: Yes / No
 TestFlight internal ready: Yes / No
 
@@ -190,6 +199,7 @@ Handoff decision:
 
 - 法務branch統合手順: `notes/57_legal_release_branch_integration_plan.md`
 - TestFlight / App Review提出ランブック: `notes/32_testflight_review_submission_runbook.md`
+- Apple Developer署名・Capabilities事前確認: `notes/75_apple_developer_signing_capabilities_preflight.md`
 - P0スモークテスト台本: `notes/42_p0_smoke_test_script.md`
 - 初回提出スコープ露出監査: `notes/59_initial_release_scope_exposure_audit.md`
 - App Review手動提出チェック: `notes/62_app_review_manual_submission_checklist.md`

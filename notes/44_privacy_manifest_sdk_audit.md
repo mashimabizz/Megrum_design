@@ -132,6 +132,7 @@ rg -n "Firebase|Analytics|Crash|StoreKit|Supabase|URLSession|PhotosUI|CoreLocati
 - App Privacy回答シート: `notes/43_app_privacy_connect_answer_sheet.md`
 - App Privacyインベントリ: `notes/27_app_privacy_data_inventory.md`
 - 提出前セキュリティ監査: `notes/54_prelaunch_security_audit_checklist.md`
+- Apple Developer署名・Capabilities事前確認: `notes/75_apple_developer_signing_capabilities_preflight.md`
 - P0スモークテスト台本: `notes/42_p0_smoke_test_script.md`
 - Apple Privacy Manifest Files: https://developer.apple.com/documentation/bundleresources/privacy-manifest-files
 - Apple Adding a Privacy Manifest: https://developer.apple.com/documentation/bundleresources/adding-a-privacy-manifest-to-your-app-or-third-party-sdk

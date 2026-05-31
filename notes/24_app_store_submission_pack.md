@@ -246,6 +246,7 @@ Appleの仕様上、スクリーンショットは1〜10枚、形式は `.jpeg` 
 - [ ] 在庫、Wish、打診、合意、取引完了が実機で通る
 - [ ] 利用規約、プライバシーポリシー、問い合わせ導線が切れていない
 - [ ] App Privacy、Privacy Manifest、プライバシーポリシーが矛盾していない
+- [ ] Bundle ID、App ID、Capabilities、署名、profile/certificateが矛盾していない
 - [ ] UGCの通報、ブロック、モデレーションが説明できる
 - [ ] アプリ内アカウント削除がある
 - [ ] 未完成の3D、未完成の有料機能、未完成の外部AI機能が露出していない
@@ -261,6 +262,7 @@ Age Rating、Content Rights、Export Complianceの質問票は `notes/46_app_sto
 個人情報・セキュリティ事故時の初動は `notes/49_privacy_security_incident_response_runbook.md` を使う。
 Apple Guideline別の提出前適合確認は `notes/53_app_review_guideline_compliance_matrix.md` を使う。
 RLS、Storage、secret、APNs、管理者権限の提出前監査は `notes/54_prelaunch_security_audit_checklist.md` を使う。
+Apple Developer側のBundle ID、App ID、Capabilities、署名、profile/certificate確認は `notes/75_apple_developer_signing_capabilities_preflight.md` を使う。
 アプリ内の同意、権限説明、安全注意、AI/IAP文言は `notes/56_in_app_legal_safety_copy_deck.md` を使う。
 初回提出で出す/隠す機能の露出監査は `notes/59_initial_release_scope_exposure_audit.md` を使う。
 

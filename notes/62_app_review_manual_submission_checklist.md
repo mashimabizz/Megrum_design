@@ -20,6 +20,7 @@ App Store ConnectでMegrumの完成ビルドを審査提出する直前に、提
 - `notes/64_release_evidence_folder_index.md` に従って証跡保存先とmanifest方針が決まっている。
 - `notes/70_app_store_product_page_asset_qa.md` でApp icon、スクショ、App Preview、poster frame、Product Page Previewを確認している。
 - `notes/71_app_store_connect_final_input_reconciliation.md` でApp Store Connectの実入力値と提出docs/buildを照合している。
+- `notes/75_apple_developer_signing_capabilities_preflight.md` でBundle ID、App ID、Capabilities、署名、profile/certificateを照合している。
 - 公開URL、App Privacy、Review Notes、デモアカウント、スクショが提出候補になっている。
 
 使わないタイミング:
@@ -71,6 +72,7 @@ No-Go:
 | FR-006 | サポートメール又は問い合わせ導線が受信確認済み | TODO | `notes/47` |
 | FR-007 | 権限・運用アカウント台帳のP0が埋まっている | TODO | `notes/61` |
 | FR-008 | App Store Connect最終入力差分QAがPass又は提出判断済み | TODO | `notes/71` |
+| FR-009 | Apple Developer署名・Capabilities事前確認がPass又は提出判断済み | TODO | `notes/75` |
 
 No-Go:
 - 提出候補ビルドとテスト済みビルドが違う。
@@ -147,11 +149,13 @@ Version画面のBuildセクションで確認する。
 | BD-004 | TestFlightで確認したBuildと一致 | TODO | TODO |
 | BD-005 | Export Compliance回答が `notes/46` と一致 | TODO | TODO |
 | BD-006 | Privacy Manifest / SDK監査メモと矛盾しない | TODO | `notes/44` |
+| BD-007 | Bundle ID、App ID、Capabilities、entitlements、profile/certificateが一致 | TODO | `notes/75` |
 
 No-Go:
 - TestFlightで確認していないBuildを選択している。
 - Compliance警告を理解しないまま進める。
 - Privacy ManifestやSDKの確認が未完了。
+- Signing / CapabilitiesのNo-Goが残っている。
 
 ## 9. App Privacy確認
 
@@ -284,6 +288,7 @@ No-Go:
 - ローカライズ・メタデータQA: `notes/60_app_store_localization_metadata_qa.md`
 - 商品ページ素材QA: `notes/70_app_store_product_page_asset_qa.md`
 - App Store Connect最終入力差分QA: `notes/71_app_store_connect_final_input_reconciliation.md`
+- Apple Developer署名・Capabilities事前確認: `notes/75_apple_developer_signing_capabilities_preflight.md`
 - 提出証跡: `notes/36_submission_evidence_checklist.md`
 - リリース証跡フォルダ索引: `notes/64_release_evidence_folder_index.md`
 - Go / No-Go判定: `notes/50_release_go_no_go_decision_matrix.md`

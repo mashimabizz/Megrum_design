@@ -4,6 +4,86 @@
 
 ---
 
+## イテレーション397：署名とCapabilities事前確認を追加
+
+### 背景・問題意識
+
+App Store提出準備は、メタデータ、App Privacy、公開URL、公開後運用まで整理できてきた。一方で、完成候補ビルドを実際にupload / submitする直前には、Apple Developer側のBundle ID、App ID、Capabilities、entitlements、provisioning profile、certificate、App Store Connect app recordが一致しないと、Build upload失敗、Invalid Binary、APNs不達、Apple login不具合につながる。既存docsには断片的な確認項目があったが、署名・Capabilities専用の事前確認Runbookを追加した。
+
+### 変更内容
+
+#### `notes/75_apple_developer_signing_capabilities_preflight.md`
+- Apple Developer署名・Capabilities事前確認Runbookを追加した。
+- Bundle ID、App ID、Team ID、Version/Build、Capabilities、provisioning profile、certificate、APNs、Sign in with Apple、Associated Domainsの確認表を整理した。
+- Apple公式ヘルプに基づき、App IDのCapabilitiesはallow listであり、Xcode target側のCapabilities/entitlementsとも一致が必要であること、Capabilities変更後はprovisioning profile更新確認が必要であることを明記した。
+- private key、`.p12`、2FA code、recovery code、実電話番号を記録しない方針を追加した。
+
+#### `notes/39_release_command_center.md`, `notes/30_owner_release_action_sheet.md`, `notes/50_release_go_no_go_decision_matrix.md`
+- コントロールボード、オーナー作業表、Go / No-Go判定表へ `notes/75` を追加した。
+- G25 Signing / Capabilitiesとして、Bundle ID / App ID / Capabilities / profile / certificate未照合をNo-Go化した。
+
+#### `notes/32_testflight_review_submission_runbook.md`, `notes/62_app_review_manual_submission_checklist.md`, `notes/65_release_candidate_handoff.md`, `notes/71_app_store_connect_final_input_reconciliation.md`
+- 完成候補ビルド受領、提出前チェック、手動提出チェック、App Store Connect最終入力差分QAから `notes/75` への導線を追加した。
+- 開発側ハンドオフ項目にApp ID / Team ID、Signing mode、Capabilities / entitlementsを追加した。
+
+#### `notes/36_submission_evidence_checklist.md`, `notes/64_release_evidence_folder_index.md`, `notes/61_release_access_owner_registry.md`
+- 提出証跡にEV-014 Signing / Capabilitiesを追加した。
+- 証跡フォルダ索引に `15_signing_capabilities/` を追加した。
+- 権限台帳にSigning / Capabilities確認担当を追加した。
+
+#### `notes/24_app_store_submission_pack.md`, `notes/44_privacy_manifest_sdk_audit.md`, `notes/54_prelaunch_security_audit_checklist.md`, `notes/57_legal_release_branch_integration_plan.md`, `notes/69_app_review_rejection_triage_runbook.md`, `notes/22_release_triage_tracker.csv`
+- 提出前ブロッカー、Privacy Manifest / SDK監査、セキュリティ監査、法務branch統合手順、Invalid Binary分類へ `notes/75` を接続した。
+- 法務branch統合手順のstage禁止範囲を `notes/75` まで広げた。
+- RL-073としてApple Developer署名・Capabilities事前確認を追加した。
+
+### 影響範囲
+
+- 完成候補ビルドのArchive / upload / Submit for Review前確認
+- Apple Developer Identifiers、Capabilities、provisioning profile、certificate、APNs、Sign in with Apple
+- App Store Connect app record、Release Candidateハンドオフ、Invalid Binary対応、提出証跡
+- コード、Xcode project、Apple Developer設定、App Store Connect設定、secret、証跡ファイルは変更していない。
+
+### 確認方法
+
+- `rg -n "RL-073|notes/75|Signing / Capabilities|署名・Capabilities|15_signing_capabilities|SIGN-|SIWA-|APNS-" notes/75_apple_developer_signing_capabilities_preflight.md notes/39_release_command_center.md notes/50_release_go_no_go_decision_matrix.md notes/22_release_triage_tracker.csv notes/64_release_evidence_folder_index.md`
+- `python3 - <<'PY' ...` による `notes/22_release_triage_tracker.csv` のCSV parse確認
+- 旧規約用語・旧主体表現チェック（旧提案/旧メッセージ/旧投稿関連、サービス主体表現）
+- `git diff --check -- notes`
+
+### セルフレビュー結果
+
+- ✅ コード、Xcode project、Apple Developer設定、App Store Connect設定、secret、証跡ファイルは変更していない。
+- ✅ 署名・Capabilities確認を、RCハンドオフ、手動提出、最終入力差分QA、証跡保存、Go / No-Goへ接続した。
+- ✅ Push Notifications、Sign in with Apple、IAP、Associated Domainsを、初回で見える機能に応じて確認する形にした。
+- ✅ Capabilities変更後のprovisioning profile更新確認、development / production APNs環境の取り違え、Preview用Bundle ID混入をNo-Go化した。
+- ✅ private key、`.p12`、2FA code、recovery code、実電話番号を記録しない方針を明記した。
+- ✅ Apple公式ヘルプのApp ID登録、Capabilities、有効化、App Store provisioning profile、profile更新、Sign in with Appleを参照した。
+- ✅ 状態名の追加/改名はApple提出運用の確認項目のみで、Megrumの状態遷移変更ではないため `notes/09_state_machines.md` 更新は不要。
+- ✅ 新用語はApple Developer運用語の範囲内のため、`notes/10_glossary.md` 更新は不要。
+- ✅ DBスキーマ変更はなく、`notes/05_data_model.md` 更新は不要。
+
+### 関連ファイル
+
+- `notes/75_apple_developer_signing_capabilities_preflight.md`
+- `notes/39_release_command_center.md`
+- `notes/30_owner_release_action_sheet.md`
+- `notes/50_release_go_no_go_decision_matrix.md`
+- `notes/32_testflight_review_submission_runbook.md`
+- `notes/62_app_review_manual_submission_checklist.md`
+- `notes/65_release_candidate_handoff.md`
+- `notes/71_app_store_connect_final_input_reconciliation.md`
+- `notes/36_submission_evidence_checklist.md`
+- `notes/64_release_evidence_folder_index.md`
+- `notes/61_release_access_owner_registry.md`
+- `notes/24_app_store_submission_pack.md`
+- `notes/44_privacy_manifest_sdk_audit.md`
+- `notes/54_prelaunch_security_audit_checklist.md`
+- `notes/57_legal_release_branch_integration_plan.md`
+- `notes/69_app_review_rejection_triage_runbook.md`
+- `notes/22_release_triage_tracker.csv`
+
+---
+
 ## イテレーション396：App Storeレビュー返信運用を追加
 
 ### 背景・問題意識

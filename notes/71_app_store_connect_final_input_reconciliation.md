@@ -10,6 +10,8 @@ App Store Connectへ実際に入力した値を、完成候補build、`notes/31`
 
 この文書は最終照合台帳であり、コード、App Store Connect設定、Apple Developer設定、公開URL、証跡ファイル自体は変更しない。
 
+Bundle ID、Apple Developer側App ID、Capabilities、entitlements、provisioning profile、certificateの事前確認は `notes/75_apple_developer_signing_capabilities_preflight.md` を使う。
+
 ## 1. 公式前提の要点
 
 Apple公式ヘルプ上、App Store提出には必要なmetadataと対象versionのbuild選択が必要になる。提出操作は、対象app versionで正しいbuildを確認し、Add for ReviewでDraft Submissionへ入れ、最後にSubmit for Reviewを押す流れになる。
@@ -61,6 +63,7 @@ Platform version informationには、Screenshots、App Preview、Promotional Tex
 | ASC-FI-001 | Name | `Megrum`。`notes/31` / `notes/40` と一致 | TODO | TODO |
 | ASC-FI-002 | Subtitle | 初回スコープと一致、30文字以内、過剰保証なし | TODO | TODO |
 | ASC-FI-003 | Bundle ID | 完成候補build、開発側ハンドオフ、Xcode設定と一致 | TODO | `notes/65` |
+| ASC-FI-003a | Apple Developer App ID / Capabilities | `notes/75` の署名・Capabilities確認と一致 | TODO | `notes/75` |
 | ASC-FI-004 | SKU | 内部管理値として妥当。変更不可であることを理解 | TODO | TODO |
 | ASC-FI-005 | Primary Language | Japanese方針と一致 | TODO | `notes/31` |
 | ASC-FI-006 | Primary/Secondary Category | `notes/31` / `notes/46` の判断と一致 | TODO | TODO |
