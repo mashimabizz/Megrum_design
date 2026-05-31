@@ -4,6 +4,80 @@
 
 ---
 
+## イテレーション358：Swift相手プロフィールの交換導線を追加
+
+### 背景・問題意識
+
+Swift Native版の実機レビューで、旧Expo版の見た目へ寄せ戻さず、iOS標準のデザイン感を維持する方針が確認された。相手プロフィールは評価一覧まで開けるようになっていたが、交換ユーザーに必要な「相手が出せるもの」と「相手の個別募集」を見て、その場で打診する導線が未接続だった。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumData/SupabaseGoodsInventoryClient.swift`
+- 他ユーザーの公開譲る候補を `goods_inventory` から取得する `loadPublicTradeGoods` / request builderを追加した。
+- `kind=for_trade`、`status in active/reserved`、対象 `user_id`、更新順、limit付きで取得するようにした。
+
+#### `ios-native/Sources/MegrumData/SupabaseListingClient.swift`
+- 相手プロフィール用の公開個別募集取得 `loadPublicListings` / request builderを追加した。
+- 自分用一覧は従来通り `active/paused/matched`、公開表示は `active` のみに分けた。
+
+#### `ios-native/Sources/MegrumData/SupabaseProposalClient.swift` / `ios-native/Sources/MegrumCore/MegrumModels.swift`
+- `ProposalCreateInput` と作成payloadに `listingID` を追加し、個別募集起点の打診が `proposals.listing_id` を保持できるようにした。
+
+#### `ios-native/Sources/MegrumApp/MegrumAppState.swift` / `ios-native/Sources/MegrumApp/SupabaseMegrumRepository.swift`
+- 公開プロフィール用の譲る候補・個別募集をユーザーIDごとに保持する状態を追加した。
+- Preview repositoryとSupabase repositoryの両方に公開交換情報の読み込み境界を接続した。
+
+#### `ios-native/Sources/MegrumApp/PublicUserProfileScreen.swift`
+- 相手プロフィールの下部にiOS標準のsegmented controlで「譲る候補 / 個別募集」を追加した。
+- 譲る候補は既存 `GoodsGrid` を使い、個別募集はNative cardで表示するようにした。
+- 相手のグッズや個別募集から、既存の打診作成sheetへ進めるようにした。
+
+#### `ios-native/Sources/MegrumApp/SearchScreen.swift`
+- 打診作成sheetを公開プロフィールから再利用できるようにし、個別募集IDと相手側グッズIDを渡せるようにした。
+
+#### `ios-native/Tests/`
+- 公開譲る候補、公開個別募集、個別募集ID付き打診payload、Preview公開プロフィール読み込みをテストで検証した。
+
+#### `ios-native/README.md` / `notes/22_swift_native_migration.md`
+- Swift Native移行ステータスへ、相手プロフィールの交換導線を追記した。
+- Swift版のiOS標準デザイン感を維持する方針を継続することを明記した。
+
+### 影響範囲
+
+- Swift Native版の相手プロフィール
+- 相手の譲る候補・個別募集表示
+- 個別募集起点の打診作成
+- `proposals.listing_id` のSwift payload接続
+
+### 確認方法
+
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-build --enable-xctest --disable-swift-testing -j 1`
+- `xcodebuild -quiet -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -destination 'generic/platform=iOS Simulator' -derivedDataPath /tmp/megrum-native-xcodebuild CODE_SIGNING_ALLOWED=NO build`
+
+### 関連ファイル
+
+- `ios-native/Sources/MegrumCore/MegrumModels.swift`
+- `ios-native/Sources/MegrumData/SupabaseGoodsInventoryClient.swift`
+- `ios-native/Sources/MegrumData/SupabaseListingClient.swift`
+- `ios-native/Sources/MegrumData/SupabaseProposalClient.swift`
+- `ios-native/Sources/MegrumApp/MegrumAppState.swift`
+- `ios-native/Sources/MegrumApp/SupabaseMegrumRepository.swift`
+- `ios-native/Sources/MegrumApp/NativePreviewData.swift`
+- `ios-native/Sources/MegrumApp/PublicUserProfileScreen.swift`
+- `ios-native/Sources/MegrumApp/SearchScreen.swift`
+- `ios-native/Tests/`
+- `ios-native/README.md`
+- `notes/22_swift_native_migration.md`
+- `notes/08_design_iterations.md`
+
+### セルフレビュー結果
+
+- ✅ 旧Expo版の装飾へ寄せず、SwiftUI標準のsegmented control、sheet、NavigationStackの流れを維持した
+- ✅ DBスキーマ追加はなく、既存 `proposals.listing_id` をSwift payloadへ接続するだけのため `notes/05` は更新不要と判断した
+- ✅ 新しい状態名や用語は追加していないため、`notes/09` / `notes/10` は更新不要と判断した
+
+---
+
 ## イテレーション357：Swift Wishから個別募集作成へ接続
 
 ### 背景・問題意識

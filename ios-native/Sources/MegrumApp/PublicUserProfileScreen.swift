@@ -12,6 +12,9 @@ struct PublicUserProfileScreen: View {
     var userID: UUID
 
     @Environment(\.dismiss) private var dismiss
+    @State private var selectedExchangeTab: PublicProfileExchangeTab = .goods
+    @State private var proposalTargetItem: GoodsItem?
+    @State private var listingProposalTarget: ListingProposalTarget?
 
     private var publicProfile: PublicUserProfile? {
         appState.publicProfilesByUserID[userID]
@@ -21,12 +24,45 @@ struct PublicUserProfileScreen: View {
         appState.userEvaluationsByUserID[userID] ?? []
     }
 
+    private var tradeGoods: [GoodsItem] {
+        appState.publicTradeGoodsByUserID[userID] ?? []
+    }
+
+    private var listings: [IndividualListing] {
+        appState.publicListingsByUserID[userID] ?? []
+    }
+
+    private var goodsByID: [UUID: GoodsItem] {
+        Dictionary(uniqueKeysWithValues: tradeGoods.map { ($0.id, $0) })
+    }
+
+    private var isLoadingExchangeContent: Bool {
+        appState.loadingPublicExchangeUserID == userID
+    }
+
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
                 if let publicProfile {
                     ProfileHero(publicProfile: publicProfile)
                     ProfileStats(publicProfile: publicProfile, evaluations: evaluations)
+                    PublicProfileExchangeSection(
+                        selectedTab: $selectedExchangeTab,
+                        tradeGoods: tradeGoods,
+                        listings: listings,
+                        goodsByID: goodsByID,
+                        isLoading: isLoadingExchangeContent,
+                        viewerID: appState.viewer?.id,
+                        onStartGoodsProposal: { item in
+                            proposalTargetItem = item
+                        },
+                        onStartListingProposal: { target in
+                            listingProposalTarget = target
+                        },
+                        onReportItem: { item, reason, note in
+                            reportItem(item, reason: reason, note: note)
+                        }
+                    )
                 } else {
                     ProfileSkeleton()
                 }
@@ -47,9 +83,50 @@ struct PublicUserProfileScreen: View {
         }
         .task(id: userID) {
             await appState.loadPublicUserProfile(userID: userID)
+            await appState.loadPublicExchangeContent(userID: userID)
             await appState.loadUserEvaluations(userID: userID)
         }
+        .sheet(item: $proposalTargetItem) { item in
+            NavigationStack {
+                ProposalCreateSheet(appState: appState, targetItem: item)
+            }
+        }
+        .sheet(item: $listingProposalTarget) { target in
+            NavigationStack {
+                ProposalCreateSheet(
+                    appState: appState,
+                    targetItem: target.targetItem,
+                    listingID: target.listing.id,
+                    receiverGoodsIDs: target.listing.haves.map(\.itemID)
+                )
+            }
+        }
     }
+
+    private func reportItem(_ item: GoodsItem, reason: GoodsReportReason, note: String) {
+        Task {
+            _ = await appState.reportGoods(
+                itemID: item.id,
+                reportedUserID: item.ownerID,
+                reason: reason,
+                note: note
+            )
+        }
+    }
+}
+
+private enum PublicProfileExchangeTab: String, CaseIterable, Identifiable {
+    case goods = "譲る候補"
+    case listings = "個別募集"
+
+    var id: String { rawValue }
+}
+
+private struct ListingProposalTarget: Identifiable {
+    var listing: IndividualListing
+    var targetItem: GoodsItem
+
+    var id: UUID { listing.id }
 }
 
 private struct ProfileHero: View {
@@ -120,6 +197,171 @@ private struct ProfileStats: View {
                 symbolName: "checkmark.seal.fill"
             )
         }
+    }
+}
+
+private struct PublicProfileExchangeSection: View {
+    @Binding var selectedTab: PublicProfileExchangeTab
+    var tradeGoods: [GoodsItem]
+    var listings: [IndividualListing]
+    var goodsByID: [UUID: GoodsItem]
+    var isLoading: Bool
+    var viewerID: UUID?
+    var onStartGoodsProposal: (GoodsItem) -> Void
+    var onStartListingProposal: (ListingProposalTarget) -> Void
+    var onReportItem: (GoodsItem, GoodsReportReason, String) -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Picker("表示", selection: $selectedTab) {
+                ForEach(PublicProfileExchangeTab.allCases) { tab in
+                    Text(tab.rawValue).tag(tab)
+                }
+            }
+            .pickerStyle(.segmented)
+
+            if isLoading && tradeGoods.isEmpty && listings.isEmpty {
+                PublicProfileExchangeSkeleton()
+            } else {
+                switch selectedTab {
+                case .goods:
+                    if tradeGoods.isEmpty {
+                        PublicProfileEmptyExchangeMessage(text: "譲る候補はまだありません")
+                    } else {
+                        GoodsGrid(
+                            items: tradeGoods,
+                            viewerID: viewerID,
+                            onAddToExchangeList: onStartGoodsProposal,
+                            onReportItem: onReportItem
+                        )
+                    }
+                case .listings:
+                    if listings.isEmpty {
+                        PublicProfileEmptyExchangeMessage(text: "個別募集はまだありません")
+                    } else {
+                        VStack(spacing: 12) {
+                            ForEach(listings) { listing in
+                                PublicProfileListingCard(
+                                    listing: listing,
+                                    goodsByID: goodsByID,
+                                    onStartProposal: onStartListingProposal
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+private struct PublicProfileListingCard: View {
+    var listing: IndividualListing
+    var goodsByID: [UUID: GoodsItem]
+    var onStartProposal: (ListingProposalTarget) -> Void
+
+    private var targetItems: [GoodsItem] {
+        listing.haves.compactMap { goodsByID[$0.itemID] }
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(alignment: .firstTextBaseline) {
+                Text(listing.status.displayName)
+                    .font(.system(size: 13, weight: .heavy, design: .rounded))
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 10)
+                    .frame(height: 28)
+                    .background(MegrumTheme.lavender, in: Capsule())
+
+                Spacer()
+
+                Text(listing.haveLogic == .all ? "全部セット" : "どれか1つ")
+                    .font(.system(size: 13, weight: .heavy, design: .rounded))
+                    .foregroundStyle(MegrumTheme.muted)
+            }
+
+            VStack(alignment: .leading, spacing: 8) {
+                Text("相手が出す")
+                    .font(.system(size: 12, weight: .heavy, design: .rounded))
+                    .foregroundStyle(MegrumTheme.muted)
+
+                ForEach(listing.haves) { quantity in
+                    HStack(spacing: 8) {
+                        Text(goodsByID[quantity.itemID]?.title ?? "グッズ")
+                            .font(.system(size: 16, weight: .heavy, design: .rounded))
+                            .foregroundStyle(MegrumTheme.ink)
+                            .lineLimit(1)
+                        if quantity.quantity > 1 {
+                            Text("×\(quantity.quantity)")
+                                .font(.system(size: 13, weight: .heavy, design: .rounded))
+                                .foregroundStyle(MegrumTheme.lavender)
+                        }
+                    }
+                }
+            }
+
+            if let note = listing.note?.trimmingCharacters(in: .whitespacesAndNewlines), !note.isEmpty {
+                Text(note)
+                    .font(.system(size: 13, weight: .bold, design: .rounded))
+                    .foregroundStyle(MegrumTheme.muted)
+                    .lineLimit(2)
+            }
+
+            Button {
+                guard let targetItem = targetItems.first else {
+                    return
+                }
+                onStartProposal(ListingProposalTarget(listing: listing, targetItem: targetItem))
+            } label: {
+                Text("この募集に打診する")
+                    .font(.system(size: 16, weight: .heavy, design: .rounded))
+                    .foregroundStyle(.white)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 48)
+                    .background(MegrumTheme.lavender, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+            }
+            .buttonStyle(.plain)
+            .disabled(targetItems.isEmpty)
+            .opacity(targetItems.isEmpty ? 0.48 : 1)
+        }
+        .padding(16)
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 24, style: .continuous)
+                .strokeBorder(.white.opacity(0.58), lineWidth: 1)
+        }
+        .shadow(color: MegrumTheme.ink.opacity(0.08), radius: 18, y: 10)
+    }
+}
+
+private struct PublicProfileExchangeSkeleton: View {
+    var body: some View {
+        VStack(spacing: 12) {
+            ForEach(0..<2, id: \.self) { _ in
+                RoundedRectangle(cornerRadius: 24, style: .continuous)
+                    .fill(.white.opacity(0.72))
+                    .frame(height: 136)
+                    .redacted(reason: .placeholder)
+            }
+        }
+    }
+}
+
+private struct PublicProfileEmptyExchangeMessage: View {
+    var text: String
+
+    var body: some View {
+        Text(text)
+            .font(.system(size: 15, weight: .heavy, design: .rounded))
+            .foregroundStyle(MegrumTheme.muted)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 28)
+            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: 24, style: .continuous)
+                    .strokeBorder(.white.opacity(0.55), lineWidth: 1)
+            }
     }
 }
 

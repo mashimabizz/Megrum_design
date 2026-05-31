@@ -388,6 +388,7 @@ private struct ProposalCreatePayload: Encodable, Sendable {
     var exchangeMethod: String
     var optionTags: [String]
     var exposeCalendar: Bool
+    var listingId: UUID?
 
     init(senderID: UUID, input: ProposalCreateInput) {
         self.senderId = senderID
@@ -402,6 +403,7 @@ private struct ProposalCreatePayload: Encodable, Sendable {
         self.exchangeMethod = input.exchangeMethod.rawValue
         self.optionTags = input.conditionTags
         self.exposeCalendar = false
+        self.listingId = input.listingID
     }
 }
 

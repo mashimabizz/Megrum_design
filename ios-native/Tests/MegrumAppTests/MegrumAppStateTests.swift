@@ -49,6 +49,19 @@ final class MegrumAppStateTests: XCTestCase {
         XCTAssertFalse(state.isCreatingIndividualListing)
     }
 
+    func testAppStateLoadsPreviewPublicExchangeContent() async {
+        let state = MegrumAppState(repository: PreviewMegrumRepository())
+        let partnerID = UUID(uuidString: "00000000-0000-0000-0000-000000000002")!
+
+        await state.loadInitialData()
+        await state.loadPublicExchangeContent(userID: partnerID)
+
+        XCTAssertEqual(state.publicTradeGoodsByUserID[partnerID]?.first?.ownerID, partnerID)
+        XCTAssertEqual(state.publicListingsByUserID[partnerID]?.first?.ownerID, partnerID)
+        XCTAssertNil(state.loadingPublicExchangeUserID)
+        XCTAssertNil(state.errorMessage)
+    }
+
     func testFactoryFallsBackToPreviewWithoutSupabaseConfig() async {
         let state = MegrumAppStateFactory.make(environment: [:], infoDictionary: [:])
 

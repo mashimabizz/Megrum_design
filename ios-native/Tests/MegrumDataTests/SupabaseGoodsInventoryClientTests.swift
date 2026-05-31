@@ -88,6 +88,22 @@ final class SupabaseGoodsInventoryClientTests: XCTestCase {
         XCTAssertTrue(url.contains("goods_type_id=eq.33333333-3333-3333-3333-333333333333"))
     }
 
+    func testBuildsLoadPublicTradeGoodsRequest() throws {
+        let client = SupabaseGoodsInventoryClient(configuration: configuration)
+        let userID = UUID(uuidString: "22222222-2222-2222-2222-222222222222")!
+
+        let request = try client.makeLoadPublicTradeGoodsRequest(userID: userID, limit: 24)
+        let url = try XCTUnwrap(request.url?.absoluteString)
+
+        XCTAssertEqual(request.httpMethod, "GET")
+        XCTAssertTrue(url.hasPrefix("https://example.supabase.co/rest/v1/goods_inventory?select=id,user_id,group_id,character_id,goods_type_id,title,photo_urls,quantity"))
+        XCTAssertTrue(url.contains("kind=eq.for_trade"))
+        XCTAssertTrue(url.contains("status=in.(active,reserved)"))
+        XCTAssertTrue(url.contains("user_id=eq.22222222-2222-2222-2222-222222222222"))
+        XCTAssertTrue(url.contains("order=updated_at.desc"))
+        XCTAssertTrue(url.contains("limit=24"))
+    }
+
     func testBuildsArchiveGoodsItemRequest() throws {
         let client = SupabaseGoodsInventoryClient(configuration: configuration)
         let userID = UUID(uuidString: "11111111-1111-1111-1111-111111111111")!

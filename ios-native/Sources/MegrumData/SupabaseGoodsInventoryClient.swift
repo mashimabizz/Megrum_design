@@ -49,6 +49,15 @@ public final class SupabaseGoodsInventoryClient: @unchecked Sendable {
         return rows.map(\.goodsItem)
     }
 
+    public func loadPublicTradeGoods(userID: UUID, limit: Int = 60) async throws -> [GoodsItem] {
+        let rows: [GoodsInventoryRow] = try await client.fetchRows(
+            from: "goods_inventory",
+            select: GoodsInventoryRow.select,
+            queryItems: publicTradeGoodsQueryItems(userID: userID, limit: limit)
+        )
+        return rows.map(\.goodsItem)
+    }
+
     public func archiveGoodsItem(userID: UUID, itemID: UUID) async throws -> GoodsItem? {
         let rows: [GoodsInventoryRow] = try await client.updateRows(
             in: "goods_inventory",
@@ -93,6 +102,15 @@ public final class SupabaseGoodsInventoryClient: @unchecked Sendable {
             queryItems: [
                 URLQueryItem(name: "select", value: GoodsInventoryRow.select)
             ] + searchQueryItems(viewerID: viewerID, input: input)
+        )
+    }
+
+    public func makeLoadPublicTradeGoodsRequest(userID: UUID, limit: Int = 60) throws -> URLRequest {
+        try client.makeRequest(
+            path: "/rest/v1/goods_inventory",
+            queryItems: [
+                URLQueryItem(name: "select", value: GoodsInventoryRow.select)
+            ] + publicTradeGoodsQueryItems(userID: userID, limit: limit)
         )
     }
 
@@ -142,6 +160,16 @@ public final class SupabaseGoodsInventoryClient: @unchecked Sendable {
             queryItems.append(URLQueryItem(name: "goods_type_id", value: "eq.\(goodsTypeID.uuidString.lowercased())"))
         }
         return queryItems
+    }
+
+    private func publicTradeGoodsQueryItems(userID: UUID, limit: Int) -> [URLQueryItem] {
+        [
+            URLQueryItem(name: "kind", value: "eq.for_trade"),
+            URLQueryItem(name: "status", value: "in.(active,reserved)"),
+            URLQueryItem(name: "user_id", value: "eq.\(userID.uuidString.lowercased())"),
+            URLQueryItem(name: "order", value: "updated_at.desc"),
+            URLQueryItem(name: "limit", value: "\(max(1, min(limit, 100)))")
+        ]
     }
 
     private func ownedItemQueryItems(userID: UUID, itemID: UUID) -> [URLQueryItem] {

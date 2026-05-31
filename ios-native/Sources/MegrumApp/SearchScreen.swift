@@ -306,9 +306,11 @@ private struct SearchResultSection: View {
     }
 }
 
-private struct ProposalCreateSheet: View {
+struct ProposalCreateSheet: View {
     @ObservedObject var appState: MegrumAppState
     var targetItem: GoodsItem
+    var listingID: UUID?
+    var receiverGoodsIDs: [UUID]?
 
     @Environment(\.dismiss) private var dismiss
     @State private var selectedSenderGoodsID: UUID?
@@ -528,11 +530,12 @@ private struct ProposalCreateSheet: View {
             ProposalCreateInput(
                 receiverID: targetItem.ownerID,
                 senderGoodsIDs: [selectedSenderID],
-                receiverGoodsIDs: [targetItem.id],
+                receiverGoodsIDs: receiverGoodsIDs ?? [targetItem.id],
                 exchangeMethod: exchangeMethod,
                 conditionTags: orderedConditionTags,
                 message: message,
-                status: targetStatus
+                status: targetStatus,
+                listingID: listingID
             )
         )
         if created {

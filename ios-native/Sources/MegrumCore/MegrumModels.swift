@@ -832,6 +832,7 @@ public struct ProposalCreateInput: Equatable, Sendable {
     public var message: String?
     public var matchType: ProposalMatchType
     public var status: ProposalStatus
+    public var listingID: UUID?
 
     public init(
         receiverID: UUID,
@@ -841,7 +842,8 @@ public struct ProposalCreateInput: Equatable, Sendable {
         conditionTags: [String] = [],
         message: String? = nil,
         matchType: ProposalMatchType = .forward,
-        status: ProposalStatus = .sent
+        status: ProposalStatus = .sent,
+        listingID: UUID? = nil
     ) {
         self.receiverID = receiverID
         self.senderGoodsIDs = senderGoodsIDs
@@ -851,6 +853,7 @@ public struct ProposalCreateInput: Equatable, Sendable {
         self.message = message
         self.matchType = matchType
         self.status = status
+        self.listingID = listingID
     }
 }
 

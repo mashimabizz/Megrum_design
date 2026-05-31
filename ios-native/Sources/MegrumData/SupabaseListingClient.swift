@@ -13,10 +13,18 @@ public final class SupabaseListingClient: @unchecked Sendable {
     }
 
     public func loadListings(userID: UUID) async throws -> [IndividualListing] {
+        try await loadListings(userID: userID, publicOnly: false)
+    }
+
+    public func loadPublicListings(userID: UUID) async throws -> [IndividualListing] {
+        try await loadListings(userID: userID, publicOnly: true)
+    }
+
+    private func loadListings(userID: UUID, publicOnly: Bool) async throws -> [IndividualListing] {
         let rows: [ListingRow] = try await client.fetchRows(
             from: "listings",
             select: ListingRow.select,
-            queryItems: listingQueryItems(userID: userID)
+            queryItems: listingQueryItems(userID: userID, publicOnly: publicOnly)
         )
         let listingIDs = rows.map(\.id)
         let optionRows: [ListingWishOptionRow] = listingIDs.isEmpty
@@ -55,7 +63,16 @@ public final class SupabaseListingClient: @unchecked Sendable {
             path: "/rest/v1/listings",
             queryItems: [
                 URLQueryItem(name: "select", value: ListingRow.select)
-            ] + listingQueryItems(userID: userID)
+            ] + listingQueryItems(userID: userID, publicOnly: false)
+        )
+    }
+
+    public func makeLoadPublicListingsRequest(userID: UUID) throws -> URLRequest {
+        try client.makeRequest(
+            path: "/rest/v1/listings",
+            queryItems: [
+                URLQueryItem(name: "select", value: ListingRow.select)
+            ] + listingQueryItems(userID: userID, publicOnly: true)
         )
     }
 
@@ -88,10 +105,10 @@ public final class SupabaseListingClient: @unchecked Sendable {
         )
     }
 
-    private func listingQueryItems(userID: UUID) -> [URLQueryItem] {
+    private func listingQueryItems(userID: UUID, publicOnly: Bool) -> [URLQueryItem] {
         [
             URLQueryItem(name: "user_id", value: "eq.\(userID.uuidString.lowercased())"),
-            URLQueryItem(name: "status", value: "in.(active,paused,matched)"),
+            URLQueryItem(name: "status", value: publicOnly ? "eq.active" : "in.(active,paused,matched)"),
             URLQueryItem(name: "order", value: "updated_at.desc")
         ]
     }

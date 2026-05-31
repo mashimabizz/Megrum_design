@@ -26,13 +26,15 @@ final class SupabaseProposalClientTests: XCTestCase {
         let receiverID = UUID(uuidString: "22222222-2222-2222-2222-222222222222")!
         let senderGoodsID = UUID(uuidString: "33333333-3333-3333-3333-333333333333")!
         let receiverGoodsID = UUID(uuidString: "44444444-4444-4444-4444-444444444444")!
+        let listingID = UUID(uuidString: "55555555-5555-5555-5555-555555555555")!
         let input = ProposalCreateInput(
             receiverID: receiverID,
             senderGoodsIDs: [senderGoodsID],
             receiverGoodsIDs: [receiverGoodsID],
             exchangeMethod: .mail,
             conditionTags: ["即日発送"],
-            message: "よろしくお願いします"
+            message: "よろしくお願いします",
+            listingID: listingID
         )
 
         let request = try client.makeCreateProposalRequest(senderID: senderID, input: input)
@@ -52,6 +54,7 @@ final class SupabaseProposalClientTests: XCTestCase {
         XCTAssertEqual(json.first?["exchange_method"] as? String, "mail")
         XCTAssertEqual(json.first?["option_tags"] as? [String], ["即日発送"])
         XCTAssertEqual(json.first?["message"] as? String, "よろしくお願いします")
+        XCTAssertEqual(json.first?["listing_id"] as? String, "55555555-5555-5555-5555-555555555555")
     }
 
     func testBuildsApproveEvidenceRequest() throws {

@@ -72,6 +72,8 @@ public protocol MegrumRepository: Sendable {
     func reportGoods(_ input: GoodsReportCreateInput) async throws -> GoodsReportTicket
     func loadIndividualListings() async throws -> [IndividualListing]
     func createIndividualListing(_ input: IndividualListingCreateInput) async throws -> IndividualListing
+    func loadPublicTradeGoods(userID: UUID, limit: Int) async throws -> [GoodsItem]
+    func loadPublicIndividualListings(userID: UUID) async throws -> [IndividualListing]
     func loadPublicUserProfile(userID: UUID) async throws -> PublicUserProfile?
     func loadUserEvaluations(userID: UUID, limit: Int) async throws -> [UserEvaluation]
     func createProposal(_ input: ProposalCreateInput) async throws -> TradeProposal
@@ -147,6 +149,14 @@ public extension MegrumRepository {
 
     func createIndividualListing(_ input: IndividualListingCreateInput) async throws -> IndividualListing {
         throw MegrumRepositoryError.unsupportedMutation
+    }
+
+    func loadPublicTradeGoods(userID: UUID, limit: Int) async throws -> [GoodsItem] {
+        []
+    }
+
+    func loadPublicIndividualListings(userID: UUID) async throws -> [IndividualListing] {
+        []
     }
 
     func loadPublicUserProfile(userID: UUID) async throws -> PublicUserProfile? {
@@ -381,6 +391,18 @@ public struct PreviewMegrumRepository: MegrumRepository {
             note: input.note,
             options: [option]
         )
+    }
+
+    public func loadPublicTradeGoods(userID: UUID, limit: Int) async throws -> [GoodsItem] {
+        Array(NativePreviewData.inventory.filter { item in
+            item.ownerID == userID
+        }.prefix(max(0, limit)))
+    }
+
+    public func loadPublicIndividualListings(userID: UUID) async throws -> [IndividualListing] {
+        NativePreviewData.publicListings.filter { listing in
+            listing.ownerID == userID && listing.status == .active
+        }
     }
 
     public func loadPublicUserProfile(userID: UUID) async throws -> PublicUserProfile? {
@@ -689,6 +711,8 @@ public final class MegrumAppState: ObservableObject {
     @Published public private(set) var goodsTypes: [GoodsType] = []
     @Published public private(set) var searchResults: [SearchResultItem] = []
     @Published public private(set) var publicProfilesByUserID: [UUID: PublicUserProfile] = [:]
+    @Published public private(set) var publicTradeGoodsByUserID: [UUID: [GoodsItem]] = [:]
+    @Published public private(set) var publicListingsByUserID: [UUID: [IndividualListing]] = [:]
     @Published public private(set) var userEvaluationsByUserID: [UUID: [UserEvaluation]] = [:]
     @Published public private(set) var mailingAddress: MailingAddress?
     @Published public private(set) var blockedUsers: [BlockedUser] = []
@@ -700,6 +724,7 @@ public final class MegrumAppState: ObservableObject {
     @Published public private(set) var isLoadingGoodsTypes = false
     @Published public private(set) var isSearchingGoods = false
     @Published public private(set) var loadingPublicProfileUserID: UUID?
+    @Published public private(set) var loadingPublicExchangeUserID: UUID?
     @Published public private(set) var loadingEvaluationsUserID: UUID?
     @Published public private(set) var isLoadingMailingAddress = false
     @Published public private(set) var isLoadingBlockedUsers = false
@@ -1437,6 +1462,23 @@ public final class MegrumAppState: ObservableObject {
             errorMessage = "プロフィールを読み込めませんでした"
         }
         loadingPublicProfileUserID = nil
+    }
+
+    public func loadPublicExchangeContent(userID: UUID) async {
+        guard loadingPublicExchangeUserID != userID else {
+            return
+        }
+        loadingPublicExchangeUserID = userID
+        errorMessage = nil
+        do {
+            async let tradeGoods = repository.loadPublicTradeGoods(userID: userID, limit: 60)
+            async let listings = repository.loadPublicIndividualListings(userID: userID)
+            publicTradeGoodsByUserID[userID] = try await tradeGoods
+            publicListingsByUserID[userID] = try await listings
+        } catch {
+            errorMessage = "プロフィールの交換情報を読み込めませんでした"
+        }
+        loadingPublicExchangeUserID = nil
     }
 
     public func loadUserEvaluations(userID: UUID, limit: Int = 50) async {

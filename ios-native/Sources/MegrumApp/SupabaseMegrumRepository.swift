@@ -124,6 +124,14 @@ public struct SupabaseMegrumRepository: MegrumRepository {
         try await listingClient.createListing(userID: viewerID, input: input)
     }
 
+    public func loadPublicTradeGoods(userID: UUID, limit: Int) async throws -> [GoodsItem] {
+        try await goodsInventoryClient.loadPublicTradeGoods(userID: userID, limit: limit)
+    }
+
+    public func loadPublicIndividualListings(userID: UUID) async throws -> [IndividualListing] {
+        try await listingClient.loadPublicListings(userID: userID)
+    }
+
     public func loadPublicUserProfile(userID: UUID) async throws -> PublicUserProfile? {
         try await userProfileClient.loadProfile(userID: userID)
     }

@@ -209,6 +209,40 @@ enum NativePreviewData {
         ]
     }()
 
+    static let publicListings: [IndividualListing] = {
+        let listingID = UUID(uuidString: "00000000-0000-0000-0000-000000000361")!
+        return [
+            IndividualListing(
+                id: listingID,
+                ownerID: partnerID,
+                haves: [
+                    ListingItemQuantity(itemID: inventory[2].id, quantity: 1)
+                ],
+                haveLogic: .all,
+                haveGroupID: groupID,
+                haveGoodsTypeID: cardGoodsTypeID,
+                status: .active,
+                note: "ランダムトレカAを探しています。",
+                options: [
+                    IndividualListingWishOption(
+                        id: UUID(uuidString: "00000000-0000-0000-0000-000000000362")!,
+                        listingID: listingID,
+                        position: 1,
+                        wishes: [
+                            ListingItemQuantity(itemID: inventory[0].id, quantity: 1)
+                        ],
+                        logic: .one,
+                        exchangeType: .any,
+                        wishGroupID: groupID,
+                        wishGoodsTypeID: cardGoodsTypeID
+                    )
+                ],
+                createdAt: Date(timeIntervalSinceNow: -2_400),
+                updatedAt: Date(timeIntervalSinceNow: -1_200)
+            )
+        ]
+    }()
+
     static let proposals: [TradeProposal] = [
         TradeProposal(
             id: UUID(uuidString: "00000000-0000-0000-0000-000000000401")!,

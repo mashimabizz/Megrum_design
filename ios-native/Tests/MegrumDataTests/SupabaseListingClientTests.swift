@@ -18,6 +18,20 @@ final class SupabaseListingClientTests: XCTestCase {
         XCTAssertTrue(url.contains("order=updated_at.desc"))
     }
 
+    func testBuildsLoadPublicListingsRequest() throws {
+        let client = SupabaseListingClient(configuration: configuration)
+        let userID = UUID(uuidString: "11111111-1111-1111-1111-111111111111")!
+
+        let request = try client.makeLoadPublicListingsRequest(userID: userID)
+        let url = try XCTUnwrap(request.url?.absoluteString)
+
+        XCTAssertEqual(request.httpMethod, "GET")
+        XCTAssertTrue(url.hasPrefix("https://example.supabase.co/rest/v1/listings?select=id,user_id,have_ids,have_qtys,have_logic,have_group_id,have_goods_type_id,status,note,created_at,updated_at"))
+        XCTAssertTrue(url.contains("user_id=eq.11111111-1111-1111-1111-111111111111"))
+        XCTAssertTrue(url.contains("status=eq.active"))
+        XCTAssertTrue(url.contains("order=updated_at.desc"))
+    }
+
     func testBuildsLoadListingWishOptionsRequest() throws {
         let client = SupabaseListingClient(configuration: configuration)
         let firstID = UUID(uuidString: "22222222-2222-2222-2222-222222222222")!
