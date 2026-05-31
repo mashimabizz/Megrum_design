@@ -4,6 +4,68 @@
 
 ---
 
+## イテレーション352：Swift在庫/Wishの非表示と削除を接続
+
+### 背景・問題意識
+
+Swift Native版の在庫/Wishグリッドは長押しメニューの見た目までは移植済みだったが、「非表示にする」「削除する」がプレースホルダのままだった。リリースに向け、本人所有のグッズ操作を既存 `goods_inventory` のRLS境界へ接続する。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumData/SupabaseGoodsInventoryClient.swift`
+- `goods_inventory.status='archived'` に更新する `archiveGoodsItem` を追加した。
+- 本人所有行を `id + user_id` で絞って削除する `deleteGoodsItem` を追加した。
+- それぞれのPostgREST request builderをテスト可能にした。
+
+#### `ios-native/Sources/MegrumApp/MegrumAppState.swift` / `SupabaseMegrumRepository.swift`
+- `MegrumRepository` に在庫/Wishの非表示・削除境界を追加した。
+- 成功後に `inventory` / `wishes` / `searchResults` から同じIDを外し、画面へ即時反映するようにした。
+
+#### `ios-native/Sources/MegrumApp/GoodsGrid.swift` / `CollectionScreens.swift`
+- 自分の在庫/Wishでは長押しメニューから「非表示」「削除」を実行できるようにした。
+- 削除はiOS標準の確認dialogを挟んでから実行するようにした。
+- 他ユーザー所有のグッズでは削除系アクションを出さず、詳細・交換リスト追加・通報だけに絞るようにした。
+
+#### `ios-native/Tests/`
+- `SupabaseGoodsInventoryClientTests` でarchive/delete requestを検証した。
+- `MegrumAppStateTests` でPreview状態から在庫/Wishがローカル除去されることを検証した。
+
+#### `ios-native/README.md` / `notes/22_swift_native_migration.md` / `notes/05_data_model.md`
+- Swift Native版の在庫/Wish非表示・削除接続を記録した。
+
+### 影響範囲
+
+- Swift Native版の在庫一覧
+- Swift Native版のWish一覧
+- `goods_inventory` の本人所有更新・削除RLS境界
+
+### 確認方法
+
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-build --enable-xctest --disable-swift-testing -j 1`
+
+### 関連ファイル
+
+- `ios-native/Sources/MegrumData/SupabaseGoodsInventoryClient.swift`
+- `ios-native/Sources/MegrumApp/MegrumAppState.swift`
+- `ios-native/Sources/MegrumApp/SupabaseMegrumRepository.swift`
+- `ios-native/Sources/MegrumApp/GoodsGrid.swift`
+- `ios-native/Sources/MegrumApp/CollectionScreens.swift`
+- `ios-native/Tests/MegrumDataTests/SupabaseGoodsInventoryClientTests.swift`
+- `ios-native/Tests/MegrumAppTests/MegrumAppStateTests.swift`
+- `ios-native/README.md`
+- `notes/22_swift_native_migration.md`
+- `notes/05_data_model.md`
+- `notes/08_design_iterations.md`
+
+### セルフレビュー結果
+
+- ✅ 新規DB migrationは追加せず、既存 `goods_inventory.status='archived'` とDELETE policyへ接続した
+- ✅ 削除は即実行ではなく、標準確認dialogを挟むようにした
+- ✅ 他ユーザー所有グッズでは本人用の非表示/削除アクションを出さないようにした
+- ✅ 状態名の追加はなく、`notes/09` / `notes/10` は更新不要と判断した
+
+---
+
 ## イテレーション351：Swift取引通報導線を追加
 
 ### 背景・問題意識

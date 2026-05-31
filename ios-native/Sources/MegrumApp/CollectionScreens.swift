@@ -38,7 +38,13 @@ struct GoodsCollectionScreen: View {
                     if filteredItems.isEmpty {
                         EmptyCollectionMessage(title: "条件に合うグッズがありません")
                     } else {
-                        GoodsGrid(items: filteredItems, columns: columns)
+                        GoodsGrid(
+                            items: filteredItems,
+                            columns: columns,
+                            viewerID: appState?.viewer?.id,
+                            onHideItem: appState == nil ? nil : { hideItem($0) },
+                            onDeleteItem: appState == nil ? nil : { deleteItem($0) }
+                        )
                     }
                 }
                 .padding(.horizontal, 20)
@@ -90,6 +96,24 @@ struct GoodsCollectionScreen: View {
         }
         if appState.goodsTypes.isEmpty {
             await appState.loadGoodsTypes()
+        }
+    }
+
+    private func hideItem(_ item: GoodsItem) {
+        guard let appState else {
+            return
+        }
+        Task {
+            _ = await appState.archiveGoodsItem(item.id)
+        }
+    }
+
+    private func deleteItem(_ item: GoodsItem) {
+        guard let appState else {
+            return
+        }
+        Task {
+            _ = await appState.deleteGoodsItem(item.id)
         }
     }
 }

@@ -4,7 +4,7 @@
 > 実装の正解集。`09_state_machines.md` と完全に整合させ、`10_glossary.md` の用語を使う。
 
 最終更新: 2026-05-31
-ステータス: Draft v2.31（iter347 Swift Native取引完了フローを反映）
+ステータス: Draft v2.32（iter352 Swift Native在庫/Wish非表示・削除接続を反映）
 
 ## 最新化履歴
 
@@ -43,6 +43,7 @@
 | **v2.29** | **2026-05-31** | **iter338 反映（Swift Native iOS版のAPNs device token保存用に `notification_devices.push_provider` / `native_device_token` を追加）** |
 | **v2.30** | **2026-05-31** | **iter346 反映（相手プロフィールと評価一覧をSwift Nativeから読むため、公開プロフィール/評価一覧RPCを追加）** |
 | **v2.31** | **2026-05-31** | **iter347 反映（Swift Native取引詳細から `chat-photos` / `proposal_evidence_photos` / `proposals.approved_by_*` / `user_evaluations` を使う最小完了フローを追加）** |
+| **v2.32** | **2026-05-31** | **iter352 反映（Swift Native在庫/Wish長押しメニューから `goods_inventory.status='archived'` の非表示と本人所有行DELETEへ接続）** |
 | **v2.20** | **2026-05-29** | **iter168.90 反映（`search_query_logs` と人気検索RPCを追加。検索結果はマッチ分類つきグッズパネルで表示）** |
 | **v2.21** | **2026-05-30** | **iter168.97 反映（`schedules.place_name` 追加。合意時に `both` を単一手段へ固定し、現地交換の複数候補は1件へ固定する運用を追記）** |
 
@@ -515,6 +516,8 @@ iter29 で 1行=1個 の方針確定。UI で集約表示し、選択時は N �
 > **iter153 市場残数**：マイ在庫に表示する実在庫 `quantity` は、打診が `agreed` になった時点では減らさない。マッチング市場・打診作成・個別募集作成では、派生値 `market_available_qty = quantity - sum(agreed proposal の未完了承認分 qty)` を使う。取引完了承認時に初めて実在庫 `quantity` を減算する。
 >
 > **iter154.18 譲り済み履歴の不変性**：`status='traded'` の在庫は取引履歴の証跡として扱い、ユーザー操作による更新・削除を不可にする。画面上は詳細確認のみ、サーバーアクションでも update/delete を拒否する。
+>
+> **iter352 Swift Native操作**：在庫/Wishの「非表示」は `goods_inventory.status='archived'` に更新し、本人所有行だけを対象にする。「削除」は本人所有行を `id + user_id` で絞ってDELETEする。取引履歴に入った `traded` 行の削除禁止は別途サーバー側制約として維持する。
 
 | `is_carrying` | boolean | 「今日持参する」フラグ（F2 携帯モード） |
 | `carry_event_id` | uuid nullable | → events |

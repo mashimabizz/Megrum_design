@@ -8,8 +8,11 @@ struct GoodsGrid: View {
     var viewerID: UUID?
     var onOpenOwnerProfile: ((UUID) -> Void)?
     var onAddToExchangeList: ((GoodsItem) -> Void)?
+    var onHideItem: ((GoodsItem) -> Void)?
+    var onDeleteItem: ((GoodsItem) -> Void)?
     @State private var detailItem: GoodsItem?
     @State private var actionMessage: String?
+    @State private var pendingDeleteItem: GoodsItem?
 
     private var gridItems: [GridItem] {
         Array(repeating: GridItem(.flexible(), spacing: 14), count: columns)
@@ -20,6 +23,7 @@ struct GoodsGrid: View {
             ForEach(items) { item in
                 GoodsTile(
                     item: item,
+                    actions: actions(for: item),
                     onOpenDetail: {
                         if let onOpenOwnerProfile, item.ownerID != viewerID {
                             onOpenOwnerProfile(item.ownerID)
@@ -48,6 +52,24 @@ struct GoodsGrid: View {
                 Text(actionMessage)
             }
         }
+        .confirmationDialog("削除しますか？", isPresented: Binding(
+            get: { pendingDeleteItem != nil },
+            set: { if !$0 { pendingDeleteItem = nil } }
+        ), titleVisibility: .visible) {
+            Button("削除する", role: .destructive) {
+                if let pendingDeleteItem {
+                    onDeleteItem?(pendingDeleteItem)
+                }
+                pendingDeleteItem = nil
+            }
+            Button("キャンセル", role: .cancel) {
+                pendingDeleteItem = nil
+            }
+        } message: {
+            if let pendingDeleteItem {
+                Text("「\(pendingDeleteItem.title)」を削除します。")
+            }
+        }
     }
 
     private func handle(_ action: GoodsTileAction, item: GoodsItem) {
@@ -61,17 +83,41 @@ struct GoodsGrid: View {
                 actionMessage = "「\(item.title)」を交換リストに追加する処理は、打診フローのSwift化で接続します。"
             }
         case .hide:
-            actionMessage = "「\(item.title)」を非表示にする処理は、在庫編集のSwift化で接続します。"
+            if item.ownerID == viewerID, let onHideItem {
+                onHideItem(item)
+            } else {
+                actionMessage = "「\(item.title)」を非表示にする処理は、自分の在庫/Wishでのみ使えます。"
+            }
         case .report:
             actionMessage = "「\(item.title)」の通報導線は、通報フローのSwift化で接続します。"
         case .delete:
-            actionMessage = "「\(item.title)」を削除する処理は、在庫削除APIのSwift化で接続します。"
+            if item.ownerID == viewerID, onDeleteItem != nil {
+                pendingDeleteItem = item
+            } else {
+                actionMessage = "「\(item.title)」を削除する処理は、自分の在庫/Wishでのみ使えます。"
+            }
         }
+    }
+
+    private func actions(for item: GoodsItem) -> [GoodsTileAction] {
+        guard let viewerID else {
+            return GoodsTileAction.visibleActions
+        }
+        if item.ownerID == viewerID {
+            return [.detail, .hide, .delete]
+        }
+        var actions: [GoodsTileAction] = [.detail]
+        if onAddToExchangeList != nil {
+            actions.append(.addToExchangeList)
+        }
+        actions.append(.report)
+        return actions
     }
 }
 
 struct GoodsTile: View {
     var item: GoodsItem
+    var actions: [GoodsTileAction] = GoodsTileAction.visibleActions
     var onOpenDetail: () -> Void
     var onAction: (GoodsTileAction) -> Void
 
@@ -115,7 +161,7 @@ struct GoodsTile: View {
         }
         .buttonStyle(.plain)
         .contextMenu {
-            ForEach(GoodsTileAction.visibleActions) { action in
+            ForEach(actions) { action in
                 Button(role: action.role) {
                     onAction(action)
                 } label: {

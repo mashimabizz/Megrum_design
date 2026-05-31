@@ -88,6 +88,39 @@ final class SupabaseGoodsInventoryClientTests: XCTestCase {
         XCTAssertTrue(url.contains("goods_type_id=eq.33333333-3333-3333-3333-333333333333"))
     }
 
+    func testBuildsArchiveGoodsItemRequest() throws {
+        let client = SupabaseGoodsInventoryClient(configuration: configuration)
+        let userID = UUID(uuidString: "11111111-1111-1111-1111-111111111111")!
+        let itemID = UUID(uuidString: "44444444-4444-4444-4444-444444444444")!
+
+        let request = try client.makeArchiveGoodsItemRequest(userID: userID, itemID: itemID)
+        let body = try XCTUnwrap(request.httpBody)
+        let json = try XCTUnwrap(JSONSerialization.jsonObject(with: body) as? [String: Any])
+
+        XCTAssertEqual(request.httpMethod, "PATCH")
+        XCTAssertEqual(
+            request.url?.absoluteString,
+            "https://example.supabase.co/rest/v1/goods_inventory?select=id,user_id,group_id,character_id,goods_type_id,title,photo_urls,quantity&id=eq.44444444-4444-4444-4444-444444444444&user_id=eq.11111111-1111-1111-1111-111111111111&status=neq.traded"
+        )
+        XCTAssertEqual(request.value(forHTTPHeaderField: "Prefer"), "return=representation")
+        XCTAssertEqual(json["status"] as? String, "archived")
+    }
+
+    func testBuildsDeleteGoodsItemRequest() throws {
+        let client = SupabaseGoodsInventoryClient(configuration: configuration)
+        let userID = UUID(uuidString: "11111111-1111-1111-1111-111111111111")!
+        let itemID = UUID(uuidString: "44444444-4444-4444-4444-444444444444")!
+
+        let request = try client.makeDeleteGoodsItemRequest(userID: userID, itemID: itemID)
+
+        XCTAssertEqual(request.httpMethod, "DELETE")
+        XCTAssertEqual(
+            request.url?.absoluteString,
+            "https://example.supabase.co/rest/v1/goods_inventory?id=eq.44444444-4444-4444-4444-444444444444&user_id=eq.11111111-1111-1111-1111-111111111111&status=neq.traded"
+        )
+        XCTAssertEqual(request.value(forHTTPHeaderField: "Prefer"), "return=minimal")
+    }
+
     private var configuration: SupabaseConfiguration {
         SupabaseConfiguration(
             projectURL: URL(string: "https://example.supabase.co")!,

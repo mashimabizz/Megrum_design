@@ -49,6 +49,23 @@ public final class SupabaseGoodsInventoryClient: @unchecked Sendable {
         return rows.map(\.goodsItem)
     }
 
+    public func archiveGoodsItem(userID: UUID, itemID: UUID) async throws -> GoodsItem? {
+        let rows: [GoodsInventoryRow] = try await client.updateRows(
+            in: "goods_inventory",
+            values: GoodsInventoryStatusPayload(status: "archived"),
+            select: GoodsInventoryRow.select,
+            queryItems: ownedItemQueryItems(userID: userID, itemID: itemID)
+        )
+        return rows.first?.goodsItem
+    }
+
+    public func deleteGoodsItem(userID: UUID, itemID: UUID) async throws {
+        try await client.deleteRows(
+            from: "goods_inventory",
+            queryItems: ownedItemQueryItems(userID: userID, itemID: itemID)
+        )
+    }
+
     public func makeLoadGoodsTypesRequest(limit: Int = 40) throws -> URLRequest {
         try client.makeRequest(
             path: "/rest/v1/goods_types_master",
@@ -79,6 +96,25 @@ public final class SupabaseGoodsInventoryClient: @unchecked Sendable {
         )
     }
 
+    public func makeArchiveGoodsItemRequest(userID: UUID, itemID: UUID) throws -> URLRequest {
+        try client.makeMutationRequest(
+            path: "/rest/v1/goods_inventory",
+            queryItems: [
+                URLQueryItem(name: "select", value: GoodsInventoryRow.select)
+            ] + ownedItemQueryItems(userID: userID, itemID: itemID),
+            method: "PATCH",
+            body: encoder.encode(GoodsInventoryStatusPayload(status: "archived")),
+            prefer: "return=representation"
+        )
+    }
+
+    public func makeDeleteGoodsItemRequest(userID: UUID, itemID: UUID) throws -> URLRequest {
+        try client.makeDeleteRequest(
+            from: "goods_inventory",
+            queryItems: ownedItemQueryItems(userID: userID, itemID: itemID)
+        )
+    }
+
     private func goodsTypeQueryItems(limit: Int) -> [URLQueryItem] {
         [
             URLQueryItem(name: "order", value: "display_order.asc,name.asc"),
@@ -106,6 +142,14 @@ public final class SupabaseGoodsInventoryClient: @unchecked Sendable {
             queryItems.append(URLQueryItem(name: "goods_type_id", value: "eq.\(goodsTypeID.uuidString.lowercased())"))
         }
         return queryItems
+    }
+
+    private func ownedItemQueryItems(userID: UUID, itemID: UUID) -> [URLQueryItem] {
+        [
+            URLQueryItem(name: "id", value: "eq.\(itemID.uuidString.lowercased())"),
+            URLQueryItem(name: "user_id", value: "eq.\(userID.uuidString.lowercased())"),
+            URLQueryItem(name: "status", value: "neq.traded")
+        ]
     }
 
     private static func makeEncoder() -> JSONEncoder {
@@ -186,4 +230,8 @@ private struct GoodsEntryPayload: Encodable, Sendable {
         self.quantity = input.quantity
         self.photoUrls = []
     }
+}
+
+private struct GoodsInventoryStatusPayload: Encodable, Sendable {
+    var status: String
 }

@@ -64,6 +64,8 @@ public protocol MegrumRepository: Sendable {
     func loadGoodsTypes(limit: Int) async throws -> [GoodsType]
     func createGoodsEntry(_ input: GoodsEntryInput) async throws -> GoodsItem
     func searchGoods(_ input: GoodsSearchInput) async throws -> [GoodsItem]
+    func archiveGoodsItem(itemID: UUID) async throws
+    func deleteGoodsItem(itemID: UUID) async throws
     func loadPublicUserProfile(userID: UUID) async throws -> PublicUserProfile?
     func loadUserEvaluations(userID: UUID, limit: Int) async throws -> [UserEvaluation]
     func createProposal(_ input: ProposalCreateInput) async throws -> TradeProposal
@@ -119,6 +121,14 @@ public extension MegrumRepository {
 
     func searchGoods(_ input: GoodsSearchInput) async throws -> [GoodsItem] {
         []
+    }
+
+    func archiveGoodsItem(itemID: UUID) async throws {
+        throw MegrumRepositoryError.unsupportedMutation
+    }
+
+    func deleteGoodsItem(itemID: UUID) async throws {
+        throw MegrumRepositoryError.unsupportedMutation
     }
 
     func loadPublicUserProfile(userID: UUID) async throws -> PublicUserProfile? {
@@ -316,6 +326,10 @@ public struct PreviewMegrumRepository: MegrumRepository {
         .prefix(max(0, input.limit))
         .map { $0 }
     }
+
+    public func archiveGoodsItem(itemID: UUID) async throws {}
+
+    public func deleteGoodsItem(itemID: UUID) async throws {}
 
     public func loadPublicUserProfile(userID: UUID) async throws -> PublicUserProfile? {
         let profile: UserProfile
@@ -645,6 +659,7 @@ public final class MegrumAppState: ObservableObject {
     @Published public private(set) var isLookingUpPostalCode = false
     @Published public private(set) var isSavingMailingAddress = false
     @Published public private(set) var isCreatingGoodsEntry = false
+    @Published public private(set) var mutatingGoodsItemID: UUID?
     @Published public private(set) var isCreatingProposal = false
     @Published public private(set) var addingEvidenceProposalID: UUID?
     @Published public private(set) var approvingEvidenceProposalID: UUID?
@@ -1231,6 +1246,44 @@ public final class MegrumAppState: ObservableObject {
         }
     }
 
+    public func archiveGoodsItem(_ itemID: UUID) async -> Bool {
+        guard mutatingGoodsItemID != itemID else {
+            return false
+        }
+
+        mutatingGoodsItemID = itemID
+        errorMessage = nil
+        do {
+            try await repository.archiveGoodsItem(itemID: itemID)
+            removeGoodsItemLocally(itemID)
+            mutatingGoodsItemID = nil
+            return true
+        } catch {
+            errorMessage = "グッズを非表示にできませんでした"
+            mutatingGoodsItemID = nil
+            return false
+        }
+    }
+
+    public func deleteGoodsItem(_ itemID: UUID) async -> Bool {
+        guard mutatingGoodsItemID != itemID else {
+            return false
+        }
+
+        mutatingGoodsItemID = itemID
+        errorMessage = nil
+        do {
+            try await repository.deleteGoodsItem(itemID: itemID)
+            removeGoodsItemLocally(itemID)
+            mutatingGoodsItemID = nil
+            return true
+        } catch {
+            errorMessage = "グッズを削除できませんでした"
+            mutatingGoodsItemID = nil
+            return false
+        }
+    }
+
     public func loadPublicUserProfile(userID: UUID) async {
         guard loadingPublicProfileUserID != userID else {
             return
@@ -1735,6 +1788,12 @@ public final class MegrumAppState: ObservableObject {
         grooms = snapshot.grooms
         likedGroomIDs = Set(snapshot.grooms.filter(\.liked).map(\.id))
         threads = snapshot.threads
+    }
+
+    private func removeGoodsItemLocally(_ itemID: UUID) {
+        inventory.removeAll { $0.id == itemID }
+        wishes.removeAll { $0.id == itemID }
+        searchResults.removeAll { $0.item.id == itemID }
     }
 
     private func searchBucket(for item: GoodsItem) -> SearchMatchBucket {

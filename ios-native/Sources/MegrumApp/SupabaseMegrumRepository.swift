@@ -98,6 +98,14 @@ public struct SupabaseMegrumRepository: MegrumRepository {
         try await goodsInventoryClient.searchGoods(viewerID: viewerID, input: input)
     }
 
+    public func archiveGoodsItem(itemID: UUID) async throws {
+        _ = try await goodsInventoryClient.archiveGoodsItem(userID: viewerID, itemID: itemID)
+    }
+
+    public func deleteGoodsItem(itemID: UUID) async throws {
+        try await goodsInventoryClient.deleteGoodsItem(userID: viewerID, itemID: itemID)
+    }
+
     public func loadPublicUserProfile(userID: UUID) async throws -> PublicUserProfile? {
         try await userProfileClient.loadProfile(userID: userID)
     }

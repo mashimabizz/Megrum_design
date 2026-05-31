@@ -332,6 +332,27 @@ final class MegrumAppStateTests: XCTestCase {
         XCTAssertNil(state.errorMessage)
     }
 
+    func testAppStateArchivesAndDeletesPreviewGoodsLocally() async {
+        let state = MegrumAppState(repository: PreviewMegrumRepository())
+        await state.loadInitialData()
+        let inventoryID = try! XCTUnwrap(state.inventory.first?.id)
+        let wishID = try! XCTUnwrap(state.wishes.first?.id)
+        let inventoryCount = state.inventory.count
+        let wishCount = state.wishes.count
+
+        let archived = await state.archiveGoodsItem(inventoryID)
+        let deleted = await state.deleteGoodsItem(wishID)
+
+        XCTAssertTrue(archived)
+        XCTAssertTrue(deleted)
+        XCTAssertEqual(state.inventory.count, inventoryCount - 1)
+        XCTAssertFalse(state.inventory.contains { $0.id == inventoryID })
+        XCTAssertEqual(state.wishes.count, wishCount - 1)
+        XCTAssertFalse(state.wishes.contains { $0.id == wishID })
+        XCTAssertNil(state.mutatingGoodsItemID)
+        XCTAssertNil(state.errorMessage)
+    }
+
     func testAppStateCreatesPreviewProposal() async {
         let state = MegrumAppState(repository: PreviewMegrumRepository())
         await state.loadInitialData()
