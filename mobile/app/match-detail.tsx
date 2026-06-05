@@ -167,6 +167,7 @@ export default function MatchDetailScreen() {
     receives?: string | string[];
     listings?: string | string[];
     matchType?: string | string[];
+    visualExpanded?: string | string[];
   }>();
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
@@ -196,6 +197,7 @@ export default function MatchDetailScreen() {
   const routeListingIds = parseRouteIds(one(params.listings));
   const routeListingIdsKey = routeListingIds.join(",");
   const routeMatchType = normalizeMatchType(one(params.matchType));
+  const visualExpanded = one(params.visualExpanded);
   const shouldResolveCatalog =
     !!supabase && !previewMode && routeItemIdsKey.length > 0;
   const listingResolutionKey = [
@@ -292,6 +294,16 @@ export default function MatchDetailScreen() {
     setHaveSelection(initialHaveSelection(listings, highlightedItem.id));
     setPopupTarget(null);
   }, [data, highlightedItem.id]);
+
+  useEffect(() => {
+    if (visualExpanded !== "candidates" || routeDataLoading) return;
+    const target = firstVisualCandidatePopupTarget({
+      myListings: data.myListings,
+      partnerListings: data.partnerListings,
+      highlightedItemId: highlightedItem.id,
+    });
+    if (target) setPopupTarget(target);
+  }, [data, highlightedItem.id, routeDataLoading, visualExpanded]);
 
   useEffect(() => {
     if (!supabase || previewMode || routeItemIdsKey.length === 0) {
@@ -2121,6 +2133,54 @@ function initialHaveSelection(listings: ListingInfo[], highlightedItemId: string
     if (first) selection[listing.listingId] = [first.item.id];
   }
   return selection;
+}
+
+function firstVisualCandidatePopupTarget({
+  myListings,
+  partnerListings,
+  highlightedItemId,
+}: {
+  myListings: ListingInfo[];
+  partnerListings: ListingInfo[];
+  highlightedItemId: string;
+}): PopupTarget | null {
+  const groups: { listings: ListingInfo[]; viewpoint: "mine" | "partner" }[] = [
+    { listings: myListings, viewpoint: "mine" },
+    { listings: partnerListings, viewpoint: "partner" },
+  ];
+
+  for (const group of groups) {
+    for (const listing of group.listings) {
+      const fallbackHave =
+        listing.haves.find((have) => have.item.id === highlightedItemId) ??
+        listing.haves.find((have) => have.matched) ??
+        listing.haves[0];
+      if (!fallbackHave) continue;
+
+      const options = listing.options
+        .filter((option) => !option.isCashOffer)
+        .sort((a, b) => {
+          if (a.matched !== b.matched) return Number(b.matched) - Number(a.matched);
+          return a.position - b.position;
+        });
+
+      for (const option of options) {
+        const wish = option.wishes.find((candidateWish) => candidateWish.candidates.length > 0);
+        if (!wish) continue;
+        return {
+          listingId: listing.listingId,
+          viewpoint: group.viewpoint,
+          wishItem: wish.item,
+          wishQty: wish.qty,
+          candidates: wish.candidates,
+          exchangeType: option.exchangeType,
+          fallbackHave: fallbackHave.item,
+        };
+      }
+    }
+  }
+
+  return null;
 }
 
 function aggregateSelection({

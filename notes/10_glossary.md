@@ -45,7 +45,7 @@
 | 用語 | 別名/英 | 定義 | 関連 |
 |---|---|---|---|
 | **Megrum** | メグルム、正式サービス名 | 推し活グッズ交換・推しすれ違いプラットフォーム名 | iter158 |
-| **Web管理画面** | Web版、運用画面 | `web/` で実装する Next.js 版 Megrum。通常ユーザー向けWeb版ではなく、管理者・運用・サポート確認用途を主対象にする | iter168.63 |
+| **Web管理画面** | Web版、運用画面 | `web/` で実装する Next.js 版 Megrum。通常ユーザー向けWeb版ではなく、`/admin` 配下の管理者コンソール、認証、運用Webhookだけを残す | iter168.63, iter416 |
 | **Swift Native iOS版** | iOSネイティブ版、Swift版 | `ios-native/` で実装する Swift / SwiftUI / UIKit 版 Megrum。iter299以降のユーザー向けiOS体験の主対象で、Apple標準の遷移・通知・地図・カメラ・Liquid Glass表現を担う | iter299 |
 | **legacy Expo版** | 旧iOSアプリ版、React Native版、Expo版 | `mobile/` で実装されている移行元アプリ。Swift Native版が機能同等になるまで、バックアップ・仕様参照・緊急修正の対象として残す | iter168.63, iter299 |
 | **Appleログイン** | Sign in with Apple | Swift Native iOS版でApple標準の `SignInWithAppleButton` から認証し、Apple identity tokenとraw nonceをSupabase Authへ渡してMegrum sessionを作る認証経路 | iter343 |

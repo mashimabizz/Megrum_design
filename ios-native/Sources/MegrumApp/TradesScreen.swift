@@ -9,6 +9,7 @@ import UIKit
 
 struct TradesScreen: View {
     @ObservedObject var appState: MegrumAppState
+    @Binding var requestedStage: TradeStage?
 
     @State private var selectedStage: TradeStage = .pending
     @State private var selectedProposal: TradeProposal?
@@ -18,7 +19,9 @@ struct TradesScreen: View {
     }
 
     private var visibleProposals: [TradeProposal] {
-        proposals.filter { selectedStage.contains($0.status) }
+        proposals
+            .filter { selectedStage.contains($0.status) }
+            .sorted(by: compareForRnPendingList)
     }
 
     private var goodsByID: [UUID: GoodsItem] {
@@ -52,20 +55,23 @@ struct TradesScreen: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
-                ScreenTitle(title: "やりとり", subtitle: selectedStageSubtitle)
-
                 if visibleProposals.isEmpty {
                     EmptyTradeStage(stage: selectedStage)
                 } else {
                     ForEach(visibleProposals) { proposal in
-                        TradeCard(proposal: proposal, goodsByID: goodsByID) {
+                        TradeCard(
+                            proposal: proposal,
+                            viewerID: appState.viewer?.id,
+                            profilesByUserID: appState.publicProfilesByUserID,
+                            goodsByID: goodsByID
+                        ) {
                             selectedProposal = proposal
                         }
                     }
                 }
             }
             .padding(.horizontal, 20)
-            .padding(.top, 18)
+            .padding(.top, 14)
             .padding(.bottom, 132)
         }
         .background(MegrumTheme.canvas.ignoresSafeArea())
@@ -95,73 +101,327 @@ struct TradesScreen: View {
                 TradeDetailScreen(appState: appState, proposal: proposal)
             }
         }
+        .onAppear {
+            consumeRequestedStage()
+        }
+        .onChange(of: requestedStage) { _, _ in
+            consumeRequestedStage()
+        }
+        .task(id: partnerProfileTaskKey) {
+            for userID in visiblePartnerIDs where appState.publicProfilesByUserID[userID] == nil {
+                await appState.loadPublicUserProfile(userID: userID)
+            }
+        }
     }
 
     private var selectedStageSubtitle: String {
         "\(selectedStage.subtitle) ・ \(visibleProposals.count)件"
     }
+
+    private var partnerProfileTaskKey: String {
+        visiblePartnerIDs
+            .map(\.uuidString)
+            .sorted()
+            .joined(separator: ",")
+    }
+
+    private var visiblePartnerIDs: [UUID] {
+        guard let viewerID = appState.viewer?.id else {
+            return []
+        }
+        var seen: Set<UUID> = []
+        return visibleProposals.compactMap { proposal in
+            guard let partnerID = proposal.partnerID(for: viewerID), !seen.contains(partnerID) else {
+                return nil
+            }
+            seen.insert(partnerID)
+            return partnerID
+        }
+    }
+
+    private func compareForRnPendingList(_ lhs: TradeProposal, _ rhs: TradeProposal) -> Bool {
+        let lhsPriority = rnPendingPriority(for: lhs)
+        let rhsPriority = rnPendingPriority(for: rhs)
+        if lhsPriority != rhsPriority {
+            return lhsPriority < rhsPriority
+        }
+        return lhs.createdAt > rhs.createdAt
+    }
+
+    private func rnPendingPriority(for proposal: TradeProposal) -> Int {
+        switch proposal.status {
+        case .negotiating:
+            return 0
+        case .agreementOneSide:
+            return 1
+        case .sent:
+            return proposal.senderID == appState.viewer?.id ? 2 : 3
+        case .agreed:
+            return 4
+        case .completed:
+            return 5
+        case .cancelled, .rejected, .expired:
+            return 6
+        case .draft:
+            return 7
+        }
+    }
+
+    private func consumeRequestedStage() {
+        guard let requestedStage else {
+            return
+        }
+        selectedStage = TradeStageRouteRequestResolver.resolve(
+            current: selectedStage,
+            requested: requestedStage
+        )
+        self.requestedStage = nil
+    }
+}
+
+enum TradeStageRouteRequestResolver {
+    static func resolve(current: TradeStage, requested: TradeStage?) -> TradeStage {
+        requested ?? current
+    }
+}
+
+struct TradeCardPresentation: Equatable {
+    var partnerHandle: String
+    var partnerInitial: String
+    var updatedText: String
+    var directionText: String
+    var isReceived: Bool
+    var statusText: String
+    var responseText: String?
+    var needsAction: Bool
+    var tone: Tone
+    var meetupTimeText: String
+    var meetupPlaceText: String
+
+    enum Tone: Equatable {
+        case action
+        case live
+        case idle
+    }
+
+    init(
+        proposal: TradeProposal,
+        viewerID: UUID?,
+        profilesByUserID: [UUID: PublicUserProfile],
+        now: Date = .now
+    ) {
+        let partnerID = viewerID.flatMap { proposal.partnerID(for: $0) }
+            ?? proposal.receiverID
+        let handle = profilesByUserID[partnerID]?.profile.handle
+            ?? Self.fallbackHandle(for: partnerID)
+        self.partnerHandle = handle
+        self.partnerInitial = String(handle.prefix(1)).uppercased()
+        self.updatedText = Self.relativeTimeText(from: proposal.createdAt, now: now)
+        self.isReceived = viewerID.map { proposal.receiverID == $0 } ?? false
+        self.directionText = isReceived ? "届いた" : "送った"
+        self.needsAction = Self.needsAction(proposal: proposal, viewerID: viewerID)
+        self.statusText = Self.statusText(for: proposal.status, needsAction: needsAction)
+        self.responseText = Self.responseText(for: proposal.status, needsAction: needsAction)
+        self.tone = needsAction ? .action : (proposal.status == .agreed ? .live : .idle)
+        self.meetupTimeText = Self.meetupTimeText(for: proposal)
+        self.meetupPlaceText = Self.meetupPlaceText(for: proposal)
+    }
+
+    private static func fallbackHandle(for userID: UUID) -> String {
+        "user_\(userID.uuidString.prefix(4).lowercased())"
+    }
+
+    private static func needsAction(proposal: TradeProposal, viewerID: UUID?) -> Bool {
+        guard let viewerID else {
+            return false
+        }
+        switch proposal.status {
+        case .sent:
+            return proposal.receiverID == viewerID
+        case .negotiating:
+            return proposal.receiverID == viewerID
+        case .agreementOneSide:
+            return !proposal.agreementBy(viewerID)
+        case .agreed:
+            return false
+        case .draft, .completed, .cancelled, .rejected, .expired:
+            return false
+        }
+    }
+
+    static func statusText(for status: ProposalStatus, needsAction: Bool) -> String {
+        switch status {
+        case .draft:
+            return "下書き"
+        case .sent:
+            return needsAction ? "新着打診" : "送信済み"
+        case .negotiating:
+            return needsAction ? "返信が届いています" : "ネゴ中"
+        case .agreementOneSide:
+            return needsAction ? "合意待ち" : "相手の合意待ち"
+        case .agreed:
+            return needsAction ? "要確認" : "取引予定"
+        case .completed:
+            return "完了"
+        case .cancelled:
+            return "キャンセル"
+        case .rejected:
+            return "見送り"
+        case .expired:
+            return "期限切れ"
+        }
+    }
+
+    static func responseText(for status: ProposalStatus, needsAction: Bool) -> String? {
+        switch status {
+        case .sent, .negotiating, .agreementOneSide:
+            return needsAction ? "要対応" : "相手待ち"
+        default:
+            return nil
+        }
+    }
+
+    private static func relativeTimeText(from date: Date, now: Date) -> String {
+        let seconds = max(0, Int(now.timeIntervalSince(date)))
+        if seconds < 60 {
+            return "たった今"
+        }
+        let minutes = seconds / 60
+        if minutes < 60 {
+            return "\(minutes)分前"
+        }
+        let hours = minutes / 60
+        if hours < 24 {
+            return "\(hours)時間前"
+        }
+        return "\(hours / 24)日前"
+    }
+
+    private static func meetupTimeText(for proposal: TradeProposal) -> String {
+        proposal.status == .agreed ? "今日 18:15 - 18:45" : "候補確認中"
+    }
+
+    private static func meetupPlaceText(for proposal: TradeProposal) -> String {
+        switch proposal.exchangeMethod {
+        case .hand:
+            return proposal.status == .agreed ? "横浜アリーナ 北口" : "横浜アリーナ"
+        case .mail:
+            return "住所確認中"
+        case .both:
+            return "どちらもOK"
+        }
+    }
 }
 
 private struct TradeCard: View {
+    private static let actionColor = Color(red: 0.84, green: 0.46, blue: 0.36)
+    private static let calmColor = Color(red: 0.23, green: 0.49, blue: 0.58)
+
     var proposal: TradeProposal
+    var viewerID: UUID?
+    var profilesByUserID: [UUID: PublicUserProfile] = [:]
     var goodsByID: [UUID: GoodsItem] = [:]
     var onOpen: () -> Void
 
+    private var presentation: TradeCardPresentation {
+        TradeCardPresentation(
+            proposal: proposal,
+            viewerID: viewerID,
+            profilesByUserID: profilesByUserID
+        )
+    }
+
     var body: some View {
         Button(action: onOpen) {
-            VStack(alignment: .leading, spacing: 14) {
-                HStack {
-                    Text(statusText)
-                        .font(.system(size: 14, weight: .heavy, design: .rounded))
-                        .foregroundStyle(MegrumTheme.ink)
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 7)
-                        .background(MegrumTheme.sky.opacity(0.28), in: Capsule())
-
-                    Spacer()
-
-                    Text(proposal.exchangeMethod.displayName)
-                        .font(.system(size: 13, weight: .heavy, design: .rounded))
-                        .foregroundStyle(MegrumTheme.lavender)
-                }
-
-                HStack {
-                    TradePreviewColumn(
-                        title: "受け取る",
-                        symbol: "arrow.down.left",
-                        items: previewItems(for: proposal.receiverGoodsIDs)
-                    )
-                    Spacer()
-                    Image(systemName: "arrow.left.arrow.right")
-                        .font(.system(size: 26, weight: .bold))
-                        .foregroundStyle(MegrumTheme.lavender)
-                    Spacer()
-                    TradePreviewColumn(
-                        title: "私が出す",
-                        symbol: "arrow.up.right",
-                        items: previewItems(for: proposal.senderGoodsIDs)
-                    )
-                }
-
-                if !proposal.conditionTags.isEmpty {
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        HStack(spacing: 8) {
-                            ForEach(proposal.conditionTags, id: \.self) { tag in
-                                Text(tag)
-                                    .font(.system(size: 12, weight: .bold, design: .rounded))
-                                    .foregroundStyle(MegrumTheme.ink)
-                                    .padding(.horizontal, 10)
-                                    .padding(.vertical, 6)
-                                    .background(.white.opacity(0.72), in: Capsule())
-                            }
+            VStack(alignment: .leading, spacing: 0) {
+                HStack(spacing: 7) {
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .fill(MegrumTheme.lavender.opacity(0.16))
+                        .frame(width: 28, height: 28)
+                        .overlay {
+                            Text(presentation.partnerInitial)
+                                .font(.system(size: 12, weight: .black, design: .rounded))
+                                .foregroundStyle(MegrumTheme.lavender)
                         }
+
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text("@\(presentation.partnerHandle)")
+                            .font(.system(size: 11.5, weight: .black, design: .rounded))
+                            .foregroundStyle(MegrumTheme.ink)
+                            .lineLimit(1)
+                        Text(presentation.updatedText)
+                            .font(.system(size: 9, weight: .bold, design: .rounded))
+                            .foregroundStyle(MegrumTheme.muted)
                     }
+
+                    Spacer(minLength: 8)
+
+                    Text(presentation.directionText)
+                        .font(.system(size: 9.5, weight: .black, design: .rounded))
+                        .foregroundStyle(directionForegroundColor)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(directionBackgroundColor, in: Capsule())
+                }
+
+                HStack(spacing: 8) {
+                    Text(presentation.statusText)
+                        .font(.system(size: 10.5, weight: .black, design: .rounded))
+                        .foregroundStyle(statusColor)
+                        .padding(.horizontal, 9)
+                        .padding(.vertical, 4)
+                        .background(statusColor.opacity(0.12), in: Capsule())
+
+                    if let responseText = presentation.responseText {
+                        Text(responseText)
+                            .font(.system(size: 10, weight: .black, design: .rounded))
+                            .foregroundStyle(responseColor)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 4)
+                            .background(responseColor.opacity(0.10), in: Capsule())
+                    }
+
+                    Spacer(minLength: 0)
+                }
+                .padding(.top, 9)
+
+                TradePairPreview(
+                    receiverItems: previewItems(for: proposal.receiverGoodsIDs),
+                    senderItems: previewItems(for: proposal.senderGoodsIDs)
+                )
+                .padding(9)
+                .background(MegrumTheme.sky.opacity(0.10), in: RoundedRectangle(cornerRadius: 15, style: .continuous))
+                .padding(.top, 9)
+
+                HStack(spacing: 8) {
+                    Text(presentation.meetupTimeText)
+                        .font(.system(size: 10.5, weight: .black, design: .rounded))
+                        .foregroundStyle(MegrumTheme.ink)
+                        .lineLimit(1)
+                    Spacer(minLength: 8)
+                    Text(presentation.meetupPlaceText)
+                        .font(.system(size: 10.5, weight: .bold, design: .rounded))
+                        .foregroundStyle(MegrumTheme.muted)
+                        .lineLimit(1)
+                }
+                .padding(.top, 9)
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 10)
+            .background(Color.white.opacity(0.9), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+            .overlay(alignment: .leading) {
+                if presentation.needsAction {
+                    RoundedRectangle(cornerRadius: 3, style: .continuous)
+                        .fill(Self.actionColor)
+                        .frame(width: 3)
+                        .padding(.vertical, 12)
                 }
             }
-            .padding(18)
-            .background(.white.opacity(0.86), in: RoundedRectangle(cornerRadius: 24, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: 24).stroke(.black.opacity(0.05), lineWidth: 1))
-            .shadow(color: MegrumTheme.ink.opacity(0.06), radius: 16, y: 8)
+            .overlay {
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    .stroke(cardBorderColor, lineWidth: presentation.needsAction ? 1.4 : 1)
+            }
+            .shadow(color: MegrumTheme.ink.opacity(0.04), radius: 14, y: 8)
         }
         .buttonStyle(.plain)
         .accessibilityElement(children: .combine)
@@ -169,27 +429,34 @@ private struct TradeCard: View {
         .accessibilityHint("取引詳細を開きます")
     }
 
-    private var statusText: String {
-        switch proposal.status {
-        case .draft:
-            "下書き"
-        case .sent:
-            "打診中"
-        case .negotiating:
-            "調整中"
-        case .agreementOneSide:
-            "合意待ち"
-        case .agreed:
-            "進行中"
-        case .rejected:
-            "拒否済"
-        case .expired:
-            "期限切れ"
-        case .cancelled:
-            "キャンセル済"
-        case .completed:
-            "完了"
+    private var statusColor: Color {
+        switch presentation.tone {
+        case .action:
+            Self.actionColor
+        case .live:
+            Self.calmColor
+        case .idle:
+            MegrumTheme.ink
         }
+    }
+
+    private var cardBorderColor: Color {
+        presentation.needsAction ? Self.actionColor.opacity(0.24) : MegrumTheme.ink.opacity(0.08)
+    }
+
+    private var directionForegroundColor: Color {
+        presentation.isReceived ? MegrumTheme.lavender : Self.calmColor
+    }
+
+    private var directionBackgroundColor: Color {
+        if presentation.isReceived {
+            return MegrumTheme.lavender.opacity(0.14)
+        }
+        return MegrumTheme.sky.opacity(0.22)
+    }
+
+    private var responseColor: Color {
+        presentation.needsAction ? Self.actionColor : Self.calmColor
     }
 
     private func previewItems(for ids: [UUID]) -> [GoodsItem] {
@@ -199,7 +466,7 @@ private struct TradeCard: View {
     private var accessibilityLabel: String {
         var parts = [
             "取引",
-            statusText,
+            presentation.statusText,
             proposal.exchangeMethod.displayName,
             "受け取る \(proposal.receiverGoodsIDs.count)件",
             "私が出す \(proposal.senderGoodsIDs.count)件"
@@ -3643,45 +3910,73 @@ private struct TradePreviewColumn: View {
     var title: String
     var symbol: String
     var items: [GoodsItem] = []
+    var right = false
 
     var body: some View {
-        VStack(spacing: 8) {
+        VStack(alignment: right ? .trailing : .leading, spacing: 6) {
             Text(title)
-                .font(.system(size: 13, weight: .heavy, design: .rounded))
+                .font(.system(size: 9.5, weight: .black, design: .rounded))
                 .foregroundStyle(MegrumTheme.muted)
 
             if items.isEmpty {
                 RoundedRectangle(cornerRadius: 14, style: .continuous)
                     .fill(MegrumTheme.sky.opacity(0.18))
-                    .frame(width: 74, height: 74)
+                    .frame(width: 32, height: 42)
                     .overlay {
                         Image(systemName: symbol)
-                            .font(.system(size: 22, weight: .bold))
+                            .font(.system(size: 13, weight: .bold))
                             .foregroundStyle(MegrumTheme.lavender)
                     }
             } else {
-                ZStack(alignment: .topTrailing) {
-                    ForEach(previewItems.indices, id: \.self) { index in
-                        TradePreviewThumbnail(item: previewItems[index])
-                            .offset(x: CGFloat(index) * -16, y: CGFloat(index) * 8)
-                    }
-                    if items.count > 2 {
-                        Text("+\(items.count - 2)")
-                            .font(.system(size: 11, weight: .heavy, design: .rounded))
-                            .foregroundStyle(.white)
-                            .padding(.horizontal, 7)
-                            .padding(.vertical, 4)
-                            .background(MegrumTheme.ink.opacity(0.76), in: Capsule())
-                            .offset(x: 4, y: -5)
+                HStack(spacing: 5) {
+                    ForEach(previewItems) { item in
+                        TradePreviewThumbnail(item: item)
                     }
                 }
-                .frame(width: 86, height: 78)
+                .frame(maxWidth: .infinity, alignment: right ? .trailing : .leading)
             }
         }
+        .frame(maxWidth: .infinity, alignment: right ? .trailing : .leading)
     }
 
     private var previewItems: [GoodsItem] {
-        Array(items.prefix(2))
+        Array(items.prefix(3))
+    }
+}
+
+private struct TradePairPreview: View {
+    var receiverItems: [GoodsItem]
+    var senderItems: [GoodsItem]
+
+    var body: some View {
+        HStack(spacing: 8) {
+            TradePreviewColumn(
+                title: "受け取る",
+                symbol: "arrow.down.left",
+                items: receiverItems
+            )
+            TradeArrowStack()
+            TradePreviewColumn(
+                title: "私が出す",
+                symbol: "arrow.up.right",
+                items: senderItems,
+                right: true
+            )
+        }
+    }
+}
+
+private struct TradeArrowStack: View {
+    var body: some View {
+        VStack(spacing: -3) {
+            Text("→")
+                .font(.system(size: 16, weight: .black, design: .rounded))
+                .foregroundStyle(MegrumTheme.lavender)
+            Text("←")
+                .font(.system(size: 16, weight: .black, design: .rounded))
+                .foregroundStyle(MegrumTheme.sky)
+        }
+        .frame(width: 22)
     }
 }
 
@@ -3689,9 +3984,9 @@ private struct TradePreviewThumbnail: View {
     var item: GoodsItem
 
     var body: some View {
-        RoundedRectangle(cornerRadius: 16, style: .continuous)
-            .fill(MegrumTheme.sky.opacity(0.18))
-            .frame(width: 68, height: 68)
+        RoundedRectangle(cornerRadius: 8, style: .continuous)
+            .fill(TradePreviewThumbnailStyle.hue(for: item))
+            .frame(width: 32, height: 42)
             .overlay {
                 if let imageURL = item.imageURL {
                     AsyncImage(url: imageURL, transaction: Transaction(animation: .easeInOut(duration: 0.18))) { phase in
@@ -3718,19 +4013,48 @@ private struct TradePreviewThumbnail: View {
                     fallbackIcon
                 }
             }
-            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
             .overlay {
-                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
                     .strokeBorder(.white.opacity(0.78), lineWidth: 1)
             }
-            .shadow(color: MegrumTheme.ink.opacity(0.08), radius: 8, y: 4)
             .accessibilityLabel(item.title)
     }
 
     private var fallbackIcon: some View {
-        Image(systemName: "photo")
-            .font(.system(size: 20, weight: .bold))
-            .foregroundStyle(MegrumTheme.lavender)
+        Text(TradePreviewThumbnailStyle.glyph(for: item))
+            .font(.system(size: 16, weight: .black, design: .rounded))
+            .foregroundStyle(.white)
+    }
+}
+
+enum TradePreviewThumbnailStyle {
+    static func glyph(for item: GoodsItem) -> String {
+        if item.title.contains("スア") {
+            return "S"
+        }
+        if item.title.contains("ニンニン") {
+            return "N"
+        }
+        if item.title.contains("ジョンウ") {
+            return "J"
+        }
+        if item.title.contains("カリナ") {
+            return "K"
+        }
+        let title = item.title.trimmingCharacters(in: .whitespacesAndNewlines)
+        return title.first.map { String($0).uppercased() } ?? "?"
+    }
+
+    static func hue(for item: GoodsItem) -> Color {
+        switch abs(item.id.hashValue) % 3 {
+        case 0:
+            return MegrumTheme.lavender.opacity(0.62)
+        case 1:
+            return MegrumTheme.sky.opacity(0.72)
+        default:
+            return MegrumTheme.pink.opacity(0.62)
+        }
     }
 }
 

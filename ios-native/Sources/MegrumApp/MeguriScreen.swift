@@ -118,6 +118,9 @@ struct MeguriScreen: View {
             await reloadMeguriFeed()
         }
         .task {
+            guard !VisualQAPreviewMode.isEnabled(environment: ProcessInfo.processInfo.environment) else {
+                return
+            }
             locationState.requestCurrentLocation()
         }
         .onReceive(locationState.$coordinate.compactMap { $0 }) { coordinate in
@@ -897,7 +900,9 @@ private struct MeguriMapScreen: View {
                 }
             }
             .mapControls {
-                MapUserLocationButton()
+                if !VisualQAPreviewMode.isEnabled(environment: ProcessInfo.processInfo.environment) {
+                    MapUserLocationButton()
+                }
                 MapCompass()
                 MapScaleView()
             }
@@ -924,7 +929,9 @@ private struct MeguriMapScreen: View {
             .padding(.top, 14)
         }
         .task {
-            locationState.requestCurrentLocation()
+            if !VisualQAPreviewMode.isEnabled(environment: ProcessInfo.processInfo.environment) {
+                locationState.requestCurrentLocation()
+            }
             await reloadMapContent(
                 latitude: locationState.coordinate?.latitude,
                 longitude: locationState.coordinate?.longitude

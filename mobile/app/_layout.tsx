@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef } from "react";
 import { Stack, router } from "expo-router";
 import * as Notifications from "expo-notifications";
 import { StatusBar } from "expo-status-bar";
-import { ActivityIndicator, View } from "react-native";
+import { ActivityIndicator, Platform, View } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { AuthProvider, useAuth } from "../src/auth/AuthProvider";
 import { KeyboardDismissView } from "../src/components/KeyboardDismissView";
@@ -35,6 +35,7 @@ export default function RootLayout() {
 function NotificationBootstrap() {
   const { previewMode, user } = useAuth();
   const handledResponses = useRef<Set<string>>(new Set());
+  const notificationsAvailable = Platform.OS !== "web";
 
   const syncBadge = useCallback(async () => {
     if (!user?.id || previewMode) {
@@ -73,6 +74,7 @@ function NotificationBootstrap() {
   );
 
   useEffect(() => {
+    if (!notificationsAvailable) return;
     const subscription = Notifications.addNotificationResponseReceivedListener(
       handleNotificationResponse,
     );
@@ -84,9 +86,10 @@ function NotificationBootstrap() {
     return () => {
       subscription.remove();
     };
-  }, [handleNotificationResponse]);
+  }, [handleNotificationResponse, notificationsAvailable]);
 
   useEffect(() => {
+    if (!notificationsAvailable) return;
     if (!user?.id || previewMode) {
       void setMobileNotificationBadgeCount(0);
       return;
@@ -108,9 +111,10 @@ function NotificationBootstrap() {
         void revokeExpoPushTokenForUser(user.id, registeredToken);
       }
     };
-  }, [previewMode, user?.id]);
+  }, [notificationsAvailable, previewMode, user?.id]);
 
   useEffect(() => {
+    if (!notificationsAvailable) return;
     const client = supabase;
     if (!client || !user?.id || previewMode) {
       void setMobileNotificationBadgeCount(0);
@@ -137,7 +141,7 @@ function NotificationBootstrap() {
     return () => {
       void client.removeChannel(channel);
     };
-  }, [previewMode, syncBadge, user?.id]);
+  }, [notificationsAvailable, previewMode, syncBadge, user?.id]);
 
   return null;
 }

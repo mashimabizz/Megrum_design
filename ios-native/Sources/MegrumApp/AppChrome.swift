@@ -4,20 +4,27 @@ import SwiftUI
 enum AppDrawerDestination: String, Identifiable {
     case profile
     case notifications
+    case profileEdit
     case oshiSettings
-    case address
-    case blockedUsers
+    case schedules
+    case completedTrades
     case settings
+    case help
 
     var id: String { rawValue }
 
     static let primaryItems: [AppDrawerDestination] = [
         .profile,
         .notifications,
+        .profileEdit,
         .oshiSettings,
-        .address,
-        .blockedUsers,
-        .settings
+        .schedules,
+        .completedTrades
+    ]
+
+    static let compactItems: [AppDrawerDestination] = [
+        .settings,
+        .help
     ]
 
     var title: String {
@@ -26,106 +33,95 @@ enum AppDrawerDestination: String, Identifiable {
             "プロフィール"
         case .notifications:
             "通知"
+        case .profileEdit:
+            "プロフィール編集"
         case .oshiSettings:
             "推し設定"
-        case .address:
-            "住所設定"
-        case .blockedUsers:
-            "ブロックした人"
+        case .schedules:
+            "スケジュール"
+        case .completedTrades:
+            "完了した取引"
         case .settings:
             "設定とプライバシー"
+        case .help:
+            "ヘルプ"
         }
     }
 
     var systemImage: String {
         switch self {
         case .profile:
-            "person.crop.circle"
+            "star"
         case .notifications:
             "bell"
+        case .profileEdit:
+            "square.and.pencil"
         case .oshiSettings:
             "sparkles"
-        case .address:
-            "shippingbox"
-        case .blockedUsers:
-            "person.crop.circle.badge.xmark"
+        case .schedules:
+            "calendar"
+        case .completedTrades:
+            "checkmark.circle"
         case .settings:
-            "gearshape"
+            "checkmark.shield"
+        case .help:
+            "doc.text"
         }
     }
+}
 
-    func subtitle(notificationStatus: String, addressStatus: String) -> String {
-        switch self {
-        case .profile:
-            "自分の表示を確認"
-        case .notifications:
-            notificationStatus
-        case .oshiSettings:
-            "グループ・メンバー"
-        case .address:
-            addressStatus
-        case .blockedUsers:
-            "一覧と解除"
-        case .settings:
-            "通知・アカウント"
-        }
+enum AppDrawerVisualMetrics {
+    static let minimumDrawerWidth: CGFloat = 320
+    static let maximumDrawerWidth: CGFloat = 380
+    static let drawerWidthRatio: CGFloat = 0.9
+    static let foregroundOpenRatio: CGFloat = 0.68
+    static let foregroundOpenInset: CGFloat = 34
+    static let foregroundCornerRadius: CGFloat = 18
+    static let whiteoutOpacity: CGFloat = 0.18
+    static let foregroundShadowOpacity: CGFloat = 0.16
+    static let foregroundShadowRadius: CGFloat = 18
+    static let drawerParallax: CGFloat = -12
+
+    static func drawerWidth(screenWidth: CGFloat) -> CGFloat {
+        min(maximumDrawerWidth, max(minimumDrawerWidth, screenWidth * drawerWidthRatio))
+    }
+
+    static func openOffset(screenWidth: CGFloat) -> CGFloat {
+        let width = drawerWidth(screenWidth: screenWidth)
+        return min(width - foregroundOpenInset, screenWidth * foregroundOpenRatio)
     }
 }
 
 @MainActor
 struct AppDrawerOverlay: View {
     @Binding var isPresented: Bool
+    var presentationProgress: CGFloat
+    var drawerWidth: CGFloat
     @ObservedObject var appState: MegrumAppState
     var onSelectDestination: (AppDrawerDestination) -> Void
     var onSignOut: () async -> Void
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @State private var dragTranslation: CGFloat = 0
     @State private var isClosing = false
 
-    private let drawerWidth: CGFloat = 318
-
     var body: some View {
-        GeometryReader { proxy in
-            ZStack(alignment: .leading) {
-                Color.black
-                    .opacity(backdropOpacity)
-                    .ignoresSafeArea()
-                    .contentShape(Rectangle())
-                    .onTapGesture {
-                        close()
-                    }
-
-                panel
-                    .frame(width: min(drawerWidth, proxy.size.width * 0.84))
-                    .frame(maxHeight: .infinity)
-                    .background(.regularMaterial)
-                    .clipShape(
-                        UnevenRoundedRectangle(
-                            topLeadingRadius: 0,
-                            bottomLeadingRadius: 0,
-                            bottomTrailingRadius: 34,
-                            topTrailingRadius: 34,
-                            style: .continuous
-                        )
-                    )
-                    .shadow(color: Color.black.opacity(0.20), radius: 30, x: 10, y: 0)
-                    .offset(x: drawerOffset)
-                    .gesture(closeDragGesture)
+        panel
+            .frame(width: drawerWidth)
+            .frame(maxHeight: .infinity)
+            .background(Color.white)
+            .opacity(drawerOpacity)
+            .offset(x: drawerParallaxOffset)
+        .allowsHitTesting(presentationProgress > 0.001)
+        .animation(drawerAnimation, value: isPresented)
+        .animation(drawerAnimation, value: isClosing)
+        .onChange(of: isPresented) { _, newValue in
+            if newValue {
+                isClosing = false
             }
-            .allowsHitTesting(isPresented)
-            .animation(drawerAnimation, value: isPresented)
-            .animation(drawerAnimation, value: dragTranslation)
-            .onChange(of: isPresented) { _, newValue in
-                if newValue {
-                    isClosing = false
-                    dragTranslation = 0
-                }
-            }
-            .task {
-                if appState.notifications.isEmpty {
-                    await appState.loadNotifications()
-                }
+        }
+        .task {
+            if appState.notifications.isEmpty {
+                await appState.loadNotifications()
             }
         }
     }
@@ -138,10 +134,6 @@ struct AppDrawerOverlay: View {
                 ForEach(AppDrawerDestination.primaryItems) { destination in
                     drawerButton(
                         title: destination.title,
-                        subtitle: destination.subtitle(
-                            notificationStatus: notificationStatusText,
-                            addressStatus: addressStatusText
-                        ),
                         systemImage: destination.systemImage,
                         destination: destination,
                         badge: destination == .notifications ? appState.unreadNotificationCount : 0
@@ -154,6 +146,20 @@ struct AppDrawerOverlay: View {
 
             Divider()
                 .padding(.horizontal, 22)
+                .padding(.bottom, 10)
+
+            VStack(spacing: 4) {
+                ForEach(AppDrawerDestination.compactItems) { destination in
+                    drawerButton(
+                        title: destination.title,
+                        systemImage: destination.systemImage,
+                        destination: destination,
+                        isCompact: true
+                    )
+                }
+            }
+            .padding(.horizontal, 18)
+            .padding(.bottom, 8)
 
             Button(role: .destructive) {
                 guard !isClosing else {
@@ -166,87 +172,71 @@ struct AppDrawerOverlay: View {
                 }
             } label: {
                 Label("ログアウト", systemImage: "rectangle.portrait.and.arrow.right")
-                    .font(.system(size: 17, weight: .bold, design: .rounded))
+                    .font(.system(size: 16.5, weight: .bold, design: .rounded))
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.horizontal, 22)
-                    .padding(.vertical, 16)
+                    .padding(.vertical, 10)
             }
             .disabled(isClosing)
             .padding(.bottom, 22)
         }
-        .padding(.top, 54)
+        .padding(.top, 28)
     }
 
     private var profileHeader: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: 5) {
             Circle()
-                .fill(
-                    LinearGradient(
-                        colors: [MegrumTheme.lavender, MegrumTheme.pink],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                )
-                .frame(width: 74, height: 74)
+                .fill(MegrumTheme.lavender.opacity(0.16))
+                .frame(width: 64, height: 64)
                 .overlay {
                     Text(profileInitial)
-                        .font(.system(size: 30, weight: .heavy, design: .rounded))
-                        .foregroundStyle(.white)
+                        .font(.system(size: 24, weight: .heavy, design: .rounded))
+                        .foregroundStyle(MegrumTheme.ink)
                 }
+                .padding(.bottom, 9)
 
-            VStack(alignment: .leading, spacing: 4) {
-                Text(appState.viewer?.displayName ?? "Megrum")
-                    .font(.system(size: 28, weight: .heavy, design: .rounded))
-                    .foregroundStyle(MegrumTheme.ink)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.72)
+            Text(appState.viewer?.displayName ?? "Megrum")
+                .font(.system(size: 26, weight: .heavy, design: .rounded))
+                .foregroundStyle(MegrumTheme.ink)
+                .lineLimit(1)
+                .minimumScaleFactor(0.72)
 
-                Text("@\(appState.viewer?.handle ?? "megrum")")
-                    .font(.system(size: 18, weight: .bold, design: .rounded))
-                    .foregroundStyle(MegrumTheme.muted)
-                    .lineLimit(1)
-            }
+            Text("@\(appState.viewer?.handle ?? "preview_hana")")
+                .font(.system(size: 18, weight: .bold, design: .rounded))
+                .foregroundStyle(MegrumTheme.muted)
+                .lineLimit(1)
 
-            if let prefecture = appState.viewer?.prefecture, !prefecture.isEmpty {
-                Text(prefecture)
-                    .font(.system(size: 14, weight: .black, design: .rounded))
-                    .foregroundStyle(MegrumTheme.ink)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 6)
-                    .background(.white.opacity(0.72), in: Capsule())
-            }
+            Text(profileAreaText)
+                .font(.system(size: 14, weight: .bold, design: .rounded))
+                .foregroundStyle(MegrumTheme.ink)
+                .lineLimit(1)
+                .padding(.top, 6)
         }
         .padding(.horizontal, 24)
-        .padding(.bottom, 24)
+        .padding(.bottom, 22)
     }
 
     private func drawerButton(
         title: String,
-        subtitle: String,
         systemImage: String,
         destination: AppDrawerDestination,
-        badge: Int = 0
+        badge: Int = 0,
+        isCompact: Bool = false
     ) -> some View {
         Button {
             select(destination)
         } label: {
-            HStack(spacing: 16) {
+            HStack(spacing: isCompact ? 16 : 18) {
                 Image(systemName: systemImage)
-                    .font(.system(size: 23, weight: .semibold))
+                    .font(.system(size: isCompact ? 21 : 25, weight: .semibold))
                     .foregroundStyle(MegrumTheme.ink)
-                    .frame(width: 32)
+                    .frame(width: 25)
 
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(title)
-                        .font(.system(size: 18, weight: .heavy, design: .rounded))
-                        .foregroundStyle(MegrumTheme.ink)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.78)
-                    Text(subtitle)
-                        .font(.system(size: 12.5, weight: .bold, design: .rounded))
-                        .foregroundStyle(MegrumTheme.muted)
-                        .lineLimit(1)
-                }
+                Text(title)
+                    .font(.system(size: isCompact ? 16.5 : 20, weight: isCompact ? .bold : .heavy, design: .rounded))
+                    .foregroundStyle(MegrumTheme.ink)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.78)
 
                 Spacer(minLength: 8)
 
@@ -260,41 +250,21 @@ struct AppDrawerOverlay: View {
                 }
             }
             .contentShape(Rectangle())
-            .padding(.horizontal, 8)
-            .padding(.vertical, 11)
+            .padding(.horizontal, 3)
+            .frame(minHeight: isCompact ? 40 : 46)
         }
         .buttonStyle(.plain)
         .disabled(isClosing)
         .accessibilityLabel(title)
     }
 
-    private var closeDragGesture: some Gesture {
-        DragGesture(minimumDistance: 12)
-            .onChanged { value in
-                guard !isClosing else {
-                    return
-                }
-                dragTranslation = min(0, value.translation.width)
-            }
-            .onEnded { value in
-                guard !isClosing else {
-                    return
-                }
-                if value.translation.width < -70 || value.predictedEndTranslation.width < -120 {
-                    close()
-                } else {
-                    dragTranslation = 0
-                }
-            }
+    private var drawerOpacity: Double {
+        let raw = presentationProgress / 0.3
+        return Double(min(1, max(0, raw)))
     }
 
-    private var drawerOffset: CGFloat {
-        (isPresented ? 0 : -drawerWidth) + dragTranslation
-    }
-
-    private var backdropOpacity: Double {
-        let progress = max(0, min(1, 1 + Double(drawerOffset / drawerWidth)))
-        return 0.18 * progress
+    private var drawerParallaxOffset: CGFloat {
+        AppDrawerVisualMetrics.drawerParallax * (1 - presentationProgress)
     }
 
     private var drawerAnimation: Animation {
@@ -308,21 +278,11 @@ struct AppDrawerOverlay: View {
         return String(first)
     }
 
-    private var notificationStatusText: String {
-        guard !appState.notifications.isEmpty else {
-            return "未読なし"
+    private var profileAreaText: String {
+        guard let prefecture = appState.viewer?.prefecture, !prefecture.isEmpty else {
+            return "エリア未設定"
         }
-        if appState.unreadNotificationCount > 0 {
-            return "未読 \(appState.unreadNotificationCount)件"
-        }
-        return "すべて既読"
-    }
-
-    private var addressStatusText: String {
-        guard let address = appState.mailingAddress, address.isReady else {
-            return "未登録"
-        }
-        return address.summary
+        return prefecture
     }
 
     private func select(_ destination: AppDrawerDestination) {
@@ -336,7 +296,6 @@ struct AppDrawerOverlay: View {
 
     private func close(completion: (() -> Void)? = nil) {
         isClosing = true
-        dragTranslation = 0
         isPresented = false
         let delay = reduceMotion ? 0.08 : 0.18
         DispatchQueue.main.asyncAfter(deadline: .now() + delay) {

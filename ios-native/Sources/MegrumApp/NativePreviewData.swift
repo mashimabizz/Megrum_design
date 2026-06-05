@@ -8,8 +8,11 @@ enum NativePreviewData {
     static let memberID = UUID(uuidString: "00000000-0000-0000-0000-000000000012")!
     static let secondGroupID = UUID(uuidString: "00000000-0000-0000-0000-000000000013")!
     static let secondMemberID = UUID(uuidString: "00000000-0000-0000-0000-000000000014")!
+    static let thirdGroupID = UUID(uuidString: "00000000-0000-0000-0000-000000000015")!
+    static let thirdMemberID = UUID(uuidString: "00000000-0000-0000-0000-000000000016")!
     static let cardGoodsTypeID = UUID(uuidString: "00000000-0000-0000-0000-000000000021")!
     static let photoGoodsTypeID = UUID(uuidString: "00000000-0000-0000-0000-000000000022")!
+    static let acrylicStandGoodsTypeID = UUID(uuidString: "00000000-0000-0000-0000-000000000023")!
     static let kpopMaleGenreID = UUID(uuidString: "00000000-0000-0000-0000-000000000101")!
     static let kpopFemaleGenreID = UUID(uuidString: "00000000-0000-0000-0000-000000000102")!
 
@@ -35,7 +38,7 @@ enum NativePreviewData {
     )
 
     static let tags = [
-        GoodsTag(id: UUID(uuidString: "00000000-0000-0000-0000-000000000101")!, name: "東京2026"),
+        GoodsTag(id: UUID(uuidString: "00000000-0000-0000-0000-000000000101")!, name: "aespa"),
         GoodsTag(id: UUID(uuidString: "00000000-0000-0000-0000-000000000102")!, name: "会場限定"),
         GoodsTag(id: UUID(uuidString: "00000000-0000-0000-0000-000000000103")!, name: "トレカ")
     ]
@@ -43,8 +46,8 @@ enum NativePreviewData {
     static let oshiGroups = [
         OshiGroup(
             id: groupID,
-            name: "TWICE",
-            aliases: ["トゥワイス"],
+            name: "aespa",
+            aliases: ["エスパ"],
             kind: .group,
             genreID: kpopFemaleGenreID,
             genreName: "K-POP女性",
@@ -52,12 +55,21 @@ enum NativePreviewData {
         ),
         OshiGroup(
             id: secondGroupID,
-            name: "LE SSERAFIM",
-            aliases: ["ルセラフィム"],
+            name: "LUMENA",
+            aliases: [],
             kind: .group,
             genreID: kpopFemaleGenreID,
             genreName: "K-POP女性",
             displayOrder: 2
+        ),
+        OshiGroup(
+            id: thirdGroupID,
+            name: "NCT",
+            aliases: [],
+            kind: .group,
+            genreID: kpopMaleGenreID,
+            genreName: "K-POP男性",
+            displayOrder: 3
         )
     ]
 
@@ -70,15 +82,16 @@ enum NativePreviewData {
     ]
 
     static let oshiCharacters = [
-        OshiCharacter(id: memberID, groupID: groupID, name: "SANA", aliases: ["サナ"], displayOrder: 1),
-        OshiCharacter(id: secondMemberID, groupID: secondGroupID, name: "SAKURA", aliases: ["サクラ"], displayOrder: 1)
+        OshiCharacter(id: memberID, groupID: groupID, name: "カリナ", aliases: ["KARINA"], displayOrder: 1),
+        OshiCharacter(id: secondMemberID, groupID: secondGroupID, name: "スア", aliases: ["SUA"], displayOrder: 1),
+        OshiCharacter(id: thirdMemberID, groupID: thirdGroupID, name: "ジョンウ", aliases: ["JUNGWOO"], displayOrder: 1)
     ]
 
     static let goodsTypes = [
         GoodsType(id: cardGoodsTypeID, name: "トレカ", category: "card", displayOrder: 1),
         GoodsType(id: photoGoodsTypeID, name: "生写真", category: "photo", displayOrder: 2),
         GoodsType(
-            id: UUID(uuidString: "00000000-0000-0000-0000-000000000023")!,
+            id: acrylicStandGoodsTypeID,
             name: "アクスタ",
             category: "figure",
             displayOrder: 3
@@ -161,33 +174,53 @@ enum NativePreviewData {
             groupID: groupID,
             memberID: memberID,
             goodsTypeID: cardGoodsTypeID,
-            title: "ランダムトレカ A",
-            imageURL: URL(string: "https://picsum.photos/seed/megrum-card-a/420/560"),
+            title: "カリナ 春ver.",
+            imageURL: nil,
             tags: [tags[0], tags[2]],
-            quantity: 2
+            quantity: 1
         ),
         GoodsItem(
             id: UUID(uuidString: "00000000-0000-0000-0000-000000000202")!,
             ownerID: viewerID,
-            status: .keep,
-            groupID: groupID,
-            memberID: memberID,
-            goodsTypeID: photoGoodsTypeID,
-            title: "会場限定フォト",
-            imageURL: URL(string: "https://picsum.photos/seed/megrum-photo/420/520"),
-            tags: [tags[1]],
+            groupID: thirdGroupID,
+            memberID: thirdMemberID,
+            goodsTypeID: cardGoodsTypeID,
+            title: "ジョンウ ラキドロ",
+            imageURL: nil,
+            tags: [tags[2]],
             quantity: 1
         ),
         GoodsItem(
             id: UUID(uuidString: "00000000-0000-0000-0000-000000000203")!,
             ownerID: partnerID,
             status: .traded,
-            groupID: groupID,
-            memberID: memberID,
+            groupID: secondGroupID,
+            memberID: secondMemberID,
             goodsTypeID: cardGoodsTypeID,
-            title: "ランダムトレカ B",
-            imageURL: URL(string: "https://picsum.photos/seed/megrum-card-b/420/560"),
+            title: "スア 春ver.",
+            imageURL: nil,
             tags: [tags[2]],
+            quantity: 1
+        ),
+        GoodsItem(
+            id: UUID(uuidString: "00000000-0000-0000-0000-000000000204")!,
+            ownerID: partnerID,
+            groupID: groupID,
+            goodsTypeID: acrylicStandGoodsTypeID,
+            title: "ニンニン 制服",
+            imageURL: nil,
+            tags: [],
+            quantity: 1
+        ),
+        GoodsItem(
+            id: UUID(uuidString: "00000000-0000-0000-0000-000000000205")!,
+            ownerID: partnerID,
+            groupID: secondGroupID,
+            memberID: secondMemberID,
+            goodsTypeID: cardGoodsTypeID,
+            title: "スア 会場限定",
+            imageURL: nil,
+            tags: [tags[1], tags[2]],
             quantity: 1
         )
     ]
@@ -196,24 +229,44 @@ enum NativePreviewData {
         WishItem(
             id: UUID(uuidString: "00000000-0000-0000-0000-000000000301")!,
             ownerID: viewerID,
-            groupID: groupID,
-            memberID: memberID,
-            goodsTypeID: photoGoodsTypeID,
-            title: "会場限定フォト",
-            imageURL: URL(string: "https://picsum.photos/seed/megrum-wish-photo/420/520"),
-            tags: [tags[1]]
+            groupID: secondGroupID,
+            memberID: secondMemberID,
+            goodsTypeID: cardGoodsTypeID,
+            title: "スア ラキドロ",
+            imageURL: nil,
+            tags: [tags[2]]
         ),
         WishItem(
             id: UUID(uuidString: "00000000-0000-0000-0000-000000000302")!,
             ownerID: viewerID,
             groupID: groupID,
-            memberID: memberID,
-            goodsTypeID: cardGoodsTypeID,
-            title: "ランダムトレカ B",
-            imageURL: URL(string: "https://picsum.photos/seed/megrum-wish-card/420/560"),
-            tags: [tags[2]]
+            goodsTypeID: acrylicStandGoodsTypeID,
+            title: "ニンニン 制服",
+            imageURL: nil,
+            tags: []
         )
     ]
+
+    static var homeMatchedItems: [GoodsItem] {
+        partnerGoods + viewerGoods
+    }
+
+    static var homePossibleItems: [GoodsItem] {
+        [
+            inventory[3],
+            inventory[2],
+            inventory[1],
+            inventory[0]
+        ]
+    }
+
+    private static var partnerGoods: [GoodsItem] {
+        inventory.filter { $0.ownerID == partnerID }
+    }
+
+    private static var viewerGoods: [GoodsItem] {
+        inventory.filter { $0.ownerID == viewerID }
+    }
 
     static let listings: [IndividualListing] = {
         let listingID = UUID(uuidString: "00000000-0000-0000-0000-000000000351")!
@@ -222,9 +275,10 @@ enum NativePreviewData {
                 id: listingID,
                 ownerID: viewerID,
                 haves: [
-                    ListingItemQuantity(itemID: inventory[0].id, quantity: 1)
+                    ListingItemQuantity(itemID: inventory[0].id, quantity: 1),
+                    ListingItemQuantity(itemID: inventory[1].id, quantity: 1)
                 ],
-                haveLogic: .all,
+                haveLogic: .one,
                 haveGroupID: groupID,
                 haveGoodsTypeID: cardGoodsTypeID,
                 status: .active,
@@ -235,11 +289,12 @@ enum NativePreviewData {
                         listingID: listingID,
                         position: 1,
                         wishes: [
+                            ListingItemQuantity(itemID: inventory[2].id, quantity: 1),
                             ListingItemQuantity(itemID: wishes[1].id, quantity: 1)
                         ],
                         logic: .one,
                         exchangeType: .any,
-                        wishGroupID: groupID,
+                        wishGroupID: secondGroupID,
                         wishGoodsTypeID: cardGoodsTypeID
                     )
                 ],
@@ -256,20 +311,22 @@ enum NativePreviewData {
                 id: listingID,
                 ownerID: partnerID,
                 haves: [
-                    ListingItemQuantity(itemID: inventory[2].id, quantity: 1)
+                    ListingItemQuantity(itemID: inventory[2].id, quantity: 1),
+                    ListingItemQuantity(itemID: inventory[3].id, quantity: 1)
                 ],
-                haveLogic: .all,
-                haveGroupID: groupID,
+                haveLogic: .one,
+                haveGroupID: secondGroupID,
                 haveGoodsTypeID: cardGoodsTypeID,
                 status: .active,
-                note: "ランダムトレカAを探しています。",
+                note: "カリナ春ver.を探しています。",
                 options: [
                     IndividualListingWishOption(
                         id: UUID(uuidString: "00000000-0000-0000-0000-000000000362")!,
                         listingID: listingID,
                         position: 1,
                         wishes: [
-                            ListingItemQuantity(itemID: inventory[0].id, quantity: 1)
+                            ListingItemQuantity(itemID: inventory[0].id, quantity: 1),
+                            ListingItemQuantity(itemID: inventory[1].id, quantity: 1)
                         ],
                         logic: .one,
                         exchangeType: .any,
@@ -293,7 +350,8 @@ enum NativePreviewData {
             senderGoodsIDs: [inventory[0].id],
             receiverGoodsIDs: [inventory[2].id],
             conditionTags: ["同日発送", "終演後OK"],
-            agreedBySender: true
+            agreedBySender: true,
+            createdAt: Date(timeIntervalSinceNow: -3_600)
         ),
         TradeProposal(
             id: UUID(uuidString: "00000000-0000-0000-0000-000000000402")!,
@@ -305,7 +363,8 @@ enum NativePreviewData {
             receiverGoodsIDs: [inventory[1].id],
             conditionTags: ["会場付近"],
             agreedBySender: true,
-            agreedByReceiver: true
+            agreedByReceiver: true,
+            createdAt: Date(timeIntervalSinceNow: -5_400)
         ),
         TradeProposal(
             id: UUID(uuidString: "00000000-0000-0000-0000-000000000403")!,
@@ -316,7 +375,32 @@ enum NativePreviewData {
             senderGoodsIDs: [inventory[2].id],
             receiverGoodsIDs: [inventory[0].id],
             conditionTags: ["即日発送"],
-            agreedBySender: true
+            agreedBySender: true,
+            createdAt: Date(timeIntervalSinceNow: -7_200)
+        ),
+        TradeProposal(
+            id: UUID(uuidString: "00000000-0000-0000-0000-000000000404")!,
+            senderID: partnerID,
+            receiverID: viewerID,
+            status: .negotiating,
+            exchangeMethod: .hand,
+            senderGoodsIDs: [inventory[2].id],
+            receiverGoodsIDs: [inventory[1].id],
+            conditionTags: ["返信確認中", "要対応"],
+            agreedBySender: true,
+            createdAt: Date(timeIntervalSinceNow: -180)
+        ),
+        TradeProposal(
+            id: UUID(uuidString: "00000000-0000-0000-0000-000000000405")!,
+            senderID: partnerID,
+            receiverID: viewerID,
+            status: .agreementOneSide,
+            exchangeMethod: .hand,
+            senderGoodsIDs: [inventory[2].id],
+            receiverGoodsIDs: [inventory[0].id],
+            conditionTags: ["合意待ち", "要対応"],
+            agreedBySender: true,
+            createdAt: Date(timeIntervalSinceNow: -720)
         )
     ]
 

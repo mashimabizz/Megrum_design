@@ -26,7 +26,7 @@ export default async function AdminLayout({
       <header className="border-b border-slate-200 bg-white">
         <div className="mx-auto flex w-full max-w-6xl flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <Link href="/" className="text-[11px] font-bold text-slate-500">
+            <Link href="/admin" className="text-[11px] font-bold text-slate-500">
               Megrum
             </Link>
             <h1 className="mt-1 text-[22px] font-black tracking-normal">

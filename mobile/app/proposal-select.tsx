@@ -233,6 +233,7 @@ export default function ProposalSelectScreen() {
     proposalId?: string | string[];
     revise?: string | string[];
     exchangeMethod?: string | string[];
+    visualCalendarMode?: MeetupCalendarMode | MeetupCalendarMode[];
   }>();
   const initialTab = parseTab(one(params.tab));
   const givesParam = one(params.gives);
@@ -245,6 +246,9 @@ export default function ProposalSelectScreen() {
   const proposalIdParam = one(params.proposalId);
   const reviseParam = one(params.revise);
   const exchangeMethodParam = one(params.exchangeMethod);
+  const visualCalendarModeParam = parseMeetupCalendarMode(
+    one(params.visualCalendarMode),
+  );
   const isRevisionMode = reviseParam === "1" && !!proposalIdParam;
   const [exchangeMethod, setExchangeMethod] = useState<ExchangeMethod>(() =>
     normalizeExchangeMethod(exchangeMethodParam),
@@ -930,6 +934,7 @@ export default function ProposalSelectScreen() {
           <MeetupPane
             candidates={meetupCandidates}
             scheduleOverlays={scheduleOverlays}
+            initialCalendarMode={visualCalendarModeParam ?? "week"}
             activeCandidateId={activeMeetupId}
             placeSheetId={placeSheetId}
             onSelectCandidate={setActiveMeetupId}
@@ -1365,6 +1370,7 @@ function ChoiceFilterChip({
 function MeetupPane({
   candidates,
   scheduleOverlays,
+  initialCalendarMode = "week",
   activeCandidateId,
   placeSheetId,
   onSelectCandidate,
@@ -1376,6 +1382,7 @@ function MeetupPane({
 }: {
   candidates: MeetupCandidate[];
   scheduleOverlays: ProposalScheduleOverlayItem[];
+  initialCalendarMode?: MeetupCalendarMode;
   activeCandidateId: string | null;
   placeSheetId: string | null;
   onSelectCandidate: (id: string | null) => void;
@@ -1392,7 +1399,8 @@ function MeetupPane({
 }) {
   const { width } = useWindowDimensions();
   const scrollRef = useRef<ScrollView>(null);
-  const [calendarMode, setCalendarMode] = useState<MeetupCalendarMode>("week");
+  const [calendarMode, setCalendarMode] =
+    useState<MeetupCalendarMode>(initialCalendarMode);
   const [weekOffset, setWeekOffset] = useState(0);
   const days = useMemo(() => buildMeetupDays(weekOffset), [weekOffset]);
   const monthDays = useMemo(() => buildMeetupMonthDays(weekOffset), [weekOffset]);
@@ -2861,6 +2869,13 @@ function parseTab(value?: string): ProposalTab {
     return value;
   }
   return "give";
+}
+
+function parseMeetupCalendarMode(value?: string): MeetupCalendarMode | null {
+  if (value === "month" || value === "week") {
+    return value;
+  }
+  return null;
 }
 
 function exchangeMethodToIndex(method: ExchangeMethod) {

@@ -200,6 +200,8 @@ final class MegrumAppStateTests: XCTestCase {
         await state.loadPublicExchangeContent(userID: partnerID)
 
         XCTAssertEqual(state.publicTradeGoodsByUserID[partnerID]?.first?.ownerID, partnerID)
+        XCTAssertEqual(state.publicTradeGoodsByUserID[partnerID]?.count, 3)
+        XCTAssertEqual(state.inventory.filter { $0.ownerID == partnerID }.count, 1)
         XCTAssertEqual(state.publicListingsByUserID[partnerID]?.first?.ownerID, partnerID)
         XCTAssertNil(state.loadingPublicExchangeUserID)
         XCTAssertNil(state.errorMessage)
@@ -222,6 +224,23 @@ final class MegrumAppStateTests: XCTestCase {
                 "MegrumSupabasePublishableKey": "$(MEGRUM_SUPABASE_PUBLISHABLE_KEY)",
                 "MegrumSupabaseViewerID": "$(MEGRUM_SUPABASE_VIEWER_ID)"
             ]
+        )
+
+        await state.loadInitialData()
+
+        XCTAssertEqual(state.viewer?.handle, "michilion")
+        XCTAssertFalse(state.inventory.isEmpty)
+    }
+
+    func testFactoryCanForceVisualQAPreviewRepositoryDespiteSupabaseConfig() async {
+        let state = MegrumAppStateFactory.make(
+            environment: [
+                "MEGRUM_VISUAL_QA_PREVIEW_AUTH": "true",
+                "MEGRUM_SUPABASE_URL": "https://example.supabase.co",
+                "MEGRUM_SUPABASE_PUBLISHABLE_KEY": "sb_publishable_test",
+                "MEGRUM_SUPABASE_VIEWER_ID": "00000000-0000-0000-0000-000000000000"
+            ],
+            infoDictionary: [:]
         )
 
         await state.loadInitialData()

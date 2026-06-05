@@ -21,6 +21,10 @@ public enum MegrumAppStateFactory {
         environment: [String: String] = ProcessInfo.processInfo.environment,
         infoDictionary: [String: Any]? = Bundle.main.infoDictionary
     ) -> any MegrumRepository {
+        if VisualQAPreviewMode.isEnabled(environment: environment) {
+            return PreviewMegrumRepository()
+        }
+
         if let authSession {
             if let configuration = SupabaseConfiguration.fromEnvironment(environment) {
                 return liveRepository(configuration: configuration.withAccessToken(authSession.accessToken), viewerID: authSession.user.id)

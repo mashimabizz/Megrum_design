@@ -3,30 +3,24 @@ import MegrumCore
 import XCTest
 
 final class SettingsScreenTests: XCTestCase {
-    func testDrawerPrimaryItemsCoverP0Destinations() {
+    func testDrawerItemsMatchRnProfileDrawerDestinations() {
         XCTAssertEqual(
             AppDrawerDestination.primaryItems,
-            [.profile, .notifications, .oshiSettings, .address, .blockedUsers, .settings]
+            [.profile, .notifications, .profileEdit, .oshiSettings, .schedules, .completedTrades]
+        )
+        XCTAssertEqual(
+            AppDrawerDestination.compactItems,
+            [.settings, .help]
         )
 
         XCTAssertEqual(AppDrawerDestination.notifications.title, "通知")
+        XCTAssertEqual(AppDrawerDestination.profileEdit.title, "プロフィール編集")
         XCTAssertEqual(AppDrawerDestination.oshiSettings.title, "推し設定")
+        XCTAssertEqual(AppDrawerDestination.schedules.title, "スケジュール")
+        XCTAssertEqual(AppDrawerDestination.completedTrades.title, "完了した取引")
+        XCTAssertEqual(AppDrawerDestination.help.title, "ヘルプ")
         XCTAssertEqual(AppDrawerDestination.oshiSettings.systemImage, "sparkles")
-        XCTAssertEqual(
-            AppDrawerDestination.notifications.subtitle(
-                notificationStatus: "未読 3件",
-                addressStatus: "登録済み"
-            ),
-            "未読 3件"
-        )
-        XCTAssertEqual(
-            AppDrawerDestination.address.subtitle(
-                notificationStatus: "未読なし",
-                addressStatus: "未登録"
-            ),
-            "未登録"
-        )
-        XCTAssertEqual(AppDrawerDestination.settings.systemImage, "gearshape")
+        XCTAssertEqual(AppDrawerDestination.settings.systemImage, "checkmark.shield")
     }
 
     func testSettingsEssentialRoutesCoverP0Settings() {

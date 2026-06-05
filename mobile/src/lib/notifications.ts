@@ -13,16 +13,21 @@ export type NotificationResponseData = {
   notificationId: string | null;
 };
 
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldPlaySound: true,
-    shouldSetBadge: true,
-    shouldShowBanner: true,
-    shouldShowList: true,
-  }),
-});
+const notificationsAvailable = Platform.OS !== "web";
+
+if (notificationsAvailable) {
+  Notifications.setNotificationHandler({
+    handleNotification: async () => ({
+      shouldPlaySound: true,
+      shouldSetBadge: true,
+      shouldShowBanner: true,
+      shouldShowList: true,
+    }),
+  });
+}
 
 export async function requestExpoPushToken(): Promise<string | null> {
+  if (!notificationsAvailable) return null;
   try {
     const { status: existingStatus } =
       await Notifications.getPermissionsAsync();
@@ -152,6 +157,7 @@ export async function markNotificationRead(userId: string, notificationId: strin
 }
 
 export async function setMobileNotificationBadgeCount(count: number) {
+  if (!notificationsAvailable) return;
   try {
     await Notifications.setBadgeCountAsync(Math.max(0, count));
   } catch (error) {

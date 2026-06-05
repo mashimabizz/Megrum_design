@@ -1455,21 +1455,25 @@ function FloatingSearchButton() {
 
   useEffect(() => {
     let mounted = true;
-    void AccessibilityInfo.isReduceMotionEnabled().then((enabled) => {
-      if (mounted) setReduceMotion(enabled);
-    });
-    void AccessibilityInfo.isReduceTransparencyEnabled().then((enabled) => {
-      if (mounted) setReduceTransparency(enabled);
-    });
-    const motionSubscription = AccessibilityInfo.addEventListener("reduceMotionChanged", setReduceMotion);
-    const transparencySubscription = AccessibilityInfo.addEventListener(
+    if (typeof AccessibilityInfo.isReduceMotionEnabled === "function") {
+      void AccessibilityInfo.isReduceMotionEnabled().then((enabled) => {
+        if (mounted) setReduceMotion(enabled);
+      });
+    }
+    if (typeof AccessibilityInfo.isReduceTransparencyEnabled === "function") {
+      void AccessibilityInfo.isReduceTransparencyEnabled().then((enabled) => {
+        if (mounted) setReduceTransparency(enabled);
+      });
+    }
+    const motionSubscription = AccessibilityInfo.addEventListener?.("reduceMotionChanged", setReduceMotion);
+    const transparencySubscription = AccessibilityInfo.addEventListener?.(
       "reduceTransparencyChanged",
       setReduceTransparency,
     );
     return () => {
       mounted = false;
-      motionSubscription.remove();
-      transparencySubscription.remove();
+      motionSubscription?.remove();
+      transparencySubscription?.remove();
       if (holdTimerRef.current) {
         clearTimeout(holdTimerRef.current);
       }

@@ -8,7 +8,7 @@ export default function AuthErrorPage() {
   return (
     <main className="flex flex-1 flex-col items-center justify-center bg-gradient-to-b from-purple-50 via-white to-pink-50 px-6 py-12">
       <div className="w-full max-w-md text-center">
-        <Link href="/" className="inline-block">
+        <Link href="/admin" className="inline-block">
           <span className="inline-block rounded-full bg-purple-100 px-4 py-1 text-xs font-bold tracking-widest text-purple-700">
             ★ Megrum
           </span>
@@ -47,12 +47,6 @@ export default function AuthErrorPage() {
             className="rounded-lg bg-gradient-to-r from-purple-500 to-pink-500 px-4 py-3 text-base font-bold text-white shadow-md transition-all hover:from-purple-600 hover:to-pink-600"
           >
             ログイン画面へ
-          </Link>
-          <Link
-            href="/signup"
-            className="rounded-lg border border-purple-300 bg-white px-4 py-3 text-base font-bold text-purple-700 transition-all hover:bg-purple-50"
-          >
-            新規登録に戻る
           </Link>
         </div>
       </div>
