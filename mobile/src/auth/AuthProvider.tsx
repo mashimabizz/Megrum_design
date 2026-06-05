@@ -61,7 +61,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
   const [loading, setLoading] = useState(hasSupabaseConfig);
   const [profile, setProfile] = useState<AuthProfile | null>(null);
   const [profileLoading, setProfileLoading] = useState(hasSupabaseConfig);
-  const [previewMode, setPreviewMode] = useState(false);
+  const [previewMode, setPreviewMode] = useState(shouldStartVisualPreviewMode);
 
   useEffect(() => {
     if (!supabase) {
@@ -366,6 +366,13 @@ function buildFallbackHandle(user: User) {
 
   return buildIdHandle(user.id);
 }
+
+function shouldStartVisualPreviewMode() {
+  const location = globalThis.location;
+  if (!location?.search) return false;
+  return new URLSearchParams(location.search).get("visualPreview") === "1";
+}
+
 
 function buildIdHandle(userId: string) {
   return `user_${userId.replace(/-/g, "").slice(0, 8)}`;

@@ -4,6 +4,4315 @@
 
 ---
 
+## イテレーション418.72：左ドロワー右スワイプ判定をRN PanResponder値へ戻す
+
+### 背景・問題意識
+
+左ドロワーについて、オーナーから「左画面の端だけじゃなくて、どこでも右にスワイプしたら指の動きに従って、左ドロワーが出るように」「Xのモバイルアプリ版と同様のUIに」と指摘があった。Swift側は全画面 `highPriorityGesture` でどこでも右スワイプを拾う構造にはなっていたが、開始判定がRN版の `PanResponder` よりやや厳しく、実機上で「出し方が変わっていない」と感じられる余地があった。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/MegrumRootView.swift`
+- `AppDrawerGestureResolver` にRN版 `mobile/app/(tabs)/_layout.tsx` の `PanResponder` 相当値を定数化した。
+- 閉じている時の開始判定を `dx > 5` かつ横成分が縦成分より強い場合へ戻した。
+- 開いている時の開始判定を `abs(dx) > 6` かつ横成分優勢へ合わせた。
+- 開く確定閾値をRN版と同じ `openX * 0.24` 相当へ合わせ、予測移動量による勢い判定も定数化した。
+- 画面全体で右スワイプを拾い、縦スクロール優先、閾値未満で戻る、開いた後は左スワイプで閉じる操作仕様は維持した。
+
+#### `ios-native/Tests/MegrumAppTests/AppDrawerGestureTests.swift`
+- RN由来のドロワー閾値が戻らないよう `testDrawerGestureThresholdsMatchRnPanResponderModel` を追加した。
+- 閉じた状態で `dx=6` の右スワイプから追従開始すること、端起点を要求しないこと、縦スワイプを無視すること、閾値未満は戻ることを確認した。
+
+### 影響範囲
+
+- Swift Native iOSの左ドロワー開閉ジェスチャ
+- ホーム、関係図、打診作成、待ち合わせカレンダー、送信payload、DB schemaには影響しない
+
+### 確認方法
+
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-drawer-rn-gesture --enable-xctest --disable-swift-testing --filter AppDrawerGestureTests -j 1`
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-home-proposal-routes --enable-xctest --disable-swift-testing --filter HomeScreenFlowTests --filter MatchRelationScreenTests --filter ProposalCreateFlowTests -j 1`
+- RN/Swiftスクショ比較は `drawer-open` / `home` 取得途中でオーナー指示により停止したため、今回分は完走していない。
+
+### セルフレビュー結果
+
+- ✅ `AppDrawerGestureTests` は 10 tests / 0 failures を確認した。
+- ✅ ホーム起点フロー関連の `HomeScreenFlowTests`、`MatchRelationScreenTests`、`ProposalCreateFlowTests`、関連待ち合わせテストは合計 71 tests / 0 failures を確認した。
+- ✅ 左ドロワーは画面端ではなく画面全体の右スワイプで追従する実装を維持した。
+- ⚠️ 実機インストールとRN/Swift比較スクショの完走は、停止指示により未実施。
+- ✅ 新しい状態名・用語・DB schema変更はないため、`notes/09_state_machines.md`、`notes/10_glossary.md`、`notes/05_data_model.md` の更新は不要と判断した。
+
+### 関連ファイル
+
+- `ios-native/Sources/MegrumApp/MegrumRootView.swift`
+- `ios-native/Tests/MegrumAppTests/AppDrawerGestureTests.swift`
+
+---
+
+## イテレーション418.71：STEP1候補paneのgapをRN choicePaneへ合わせる
+
+### 背景・問題意識
+
+ホームのグッズパネル押下後フローについて、STEP1 `私が出す` / `受け取る` のRN/Swift比較を継続した。候補行そのものはRN `choiceCard` 数値へ寄ってきたが、Swift側ではフィルタと候補リストの間隔がRN `choicePane.gap: 10` より広く、候補リストの開始位置が下がって見えていた。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/ProposalCreateFlow.swift`
+- `ProposalCandidateListMetrics.paneSpacing` を追加し、RN `choicePane.gap` と同じ 10 を定義した。
+- `giveStep` / `receiveStep` のフィルタと候補リスト間の `VStack` spacing を 14 から 10 へ変更した。
+- 候補行内のpadding、サムネイル、check circle、横スワイプSTEP切替、下部CTA、送信payloadは維持した。
+
+#### `ios-native/Tests/MegrumAppTests/ProposalCreateFlowTests.swift`
+- `testProposalCandidateListUsesRnLikePaneAndRowSpacing` を追加し、候補pane gapと候補行間gapがRN値から戻らないようにした。
+
+### 影響範囲
+
+- 打診作成STEP1 `私が出す` / `受け取る` のフィルタ直下から候補リスト開始までの縦間隔
+- 候補選択状態、集計、STEP遷移、待ち合わせカレンダー、送信確認、送信payloadには影響しない
+
+### 確認方法
+
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-step1-pane-spacing --enable-xctest --disable-swift-testing --filter ProposalCreateFlowTests -j 1`
+- `scripts/capture_home_proposal_visual_qa.sh --include-rn --screens proposal-give,proposal-receive --rn-screens proposal-give,proposal-receive`
+- RN/Swift比較画像:
+  - `notes/assets/swift-visual-qa/compare-proposal-give-rn-swift.png`
+  - `notes/assets/swift-visual-qa/compare-proposal-receive-rn-swift.png`
+
+### セルフレビュー結果
+
+- ✅ `ProposalCreateFlowTests` 関連実行は 44 tests / 0 failures を確認した。
+- ✅ RN/Swiftスクショ比較をSTEP1 `proposal-give` / `proposal-receive` で再取得した。
+- ✅ `proposal-give` の `normalizedMeanAbsDiff` は `17.90` 相当から `17.66` へ改善した。
+- ⚠️ `proposal-receive` の `normalizedMeanAbsDiff` は `19.33` 相当から `19.61` へ小幅悪化した。ただしRNソースの `choicePane.gap: 10` と候補リスト開始位置の目視一致を優先し、変更は採用した。
+- ✅ 新しい状態名・用語・DB schema変更はないため、`notes/09_state_machines.md`、`notes/10_glossary.md`、`notes/05_data_model.md` の更新は不要と判断した。
+
+### 関連ファイル
+
+- `ios-native/Sources/MegrumApp/ProposalCreateFlow.swift`
+- `ios-native/Tests/MegrumAppTests/ProposalCreateFlowTests.swift`
+- `notes/assets/swift-visual-qa/compare-proposal-give-rn-swift.png`
+- `notes/assets/swift-visual-qa/compare-proposal-receive-rn-swift.png`
+
+---
+
+## イテレーション418.70：STEP1下部CTAをRN footer構造へ寄せる
+
+### 背景・問題意識
+
+ホームのグッズパネル押下後フローについて、RN/Swiftスクリーンショット比較でSTEP1 `私が出す` / `受け取る` の差分を確認した。候補行自体はRN `choiceCard` 数値に寄ってきた一方、画面下部の固定CTAではSwift側の背景が白寄りで、RN `proposal-select.tsx` の `footer` が使う `megrumColors.background` と異なっていた。また、RNの `paddingBottom: Math.max(insets.bottom, 12)` をSwiftの `safeAreaInset` にそのまま足すと安全領域が二重加算され、ボタンが上がりすぎることも比較で確認した。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/ProposalCreateFlow.swift`
+- `ProposalFlowBottomBarMetrics` を追加し、固定footerの左右padding、top padding、bottom padding、button minHeight、corner radiusを定数化した。
+- 固定下部CTAの背景を白からMegrum canvasへ変更し、RN footerの背景色に合わせた。
+- `safeAreaInset(edge: .bottom, spacing: 0)` を指定し、Swift側の下部余白が余計に追加されないようにした。
+- Swiftの `safeAreaInset` が安全領域を扱うため、通常bottom paddingは見た目のRN相当値として 6 を維持した。
+- 確認画面のinline CTAは既存のinline配置を維持した。
+
+#### `ios-native/Tests/MegrumAppTests/ProposalCreateFlowTests.swift`
+- `testProposalBottomBarUsesRnLikeFixedFooterMetrics` を追加し、STEP1/待ち合わせの固定footerメトリクスが戻らないようにした。
+
+### 影響範囲
+
+- 打診作成STEP1 `私が出す` / `受け取る` の下部固定CTA
+- 待ち合わせSTEPの下部固定CTA
+- 送信確認画面のinline CTA、送信payload、関係図、待ち合わせカレンダー操作、DB schemaには影響しない
+
+### 確認方法
+
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-step1-footer --enable-xctest --disable-swift-testing --filter ProposalCreateFlowTests -j 1`
+- `scripts/capture_home_proposal_visual_qa.sh --include-rn --screens proposal-give,proposal-receive --rn-screens proposal-give,proposal-receive`
+- RN/Swift比較画像:
+  - `notes/assets/swift-visual-qa/compare-proposal-give-rn-swift.png`
+  - `notes/assets/swift-visual-qa/compare-proposal-receive-rn-swift.png`
+
+### セルフレビュー結果
+
+- ✅ `ProposalCreateFlowTests` 関連実行は 43 tests / 0 failures を確認した。
+- ✅ RN/Swiftスクショ比較をSTEP1 `proposal-give` / `proposal-receive` で再取得した。
+- ✅ `proposal-give` の `normalizedMeanAbsDiff` は `18.02` 相当から `17.90` へ小幅改善した。
+- ✅ `proposal-receive` の `normalizedMeanAbsDiff` は `19.45` 相当から `19.33` へ小幅改善した。
+- ✅ RN footer値をそのまま移植して悪化した案は採用せず、Swiftのsafe area仕様を踏まえた見た目同等のbottom paddingに戻した。
+- ✅ 新しい状態名・用語・DB schema変更はないため、`notes/09_state_machines.md`、`notes/10_glossary.md`、`notes/05_data_model.md` の更新は不要と判断した。
+
+### 関連ファイル
+
+- `ios-native/Sources/MegrumApp/ProposalCreateFlow.swift`
+- `ios-native/Tests/MegrumAppTests/ProposalCreateFlowTests.swift`
+- `notes/assets/swift-visual-qa/compare-proposal-give-rn-swift.png`
+- `notes/assets/swift-visual-qa/compare-proposal-receive-rn-swift.png`
+
+---
+
+## イテレーション418.69：左ドロワーとSTEP1候補行をRN比較で再調整
+
+### 背景・問題意識
+
+左ドロワーについて、画面左端だけでなく画面内どこでも右スワイプしたら指の動きに追従して開く操作仕様は維持しつつ、前回のSwift側はメイン画面の白飛びと大きな角丸が強く、Xモバイルアプリのサイドメニューより演出過多に見えやすかった。あわせて、ホームのグッズパネル押下後フローのSTEP1候補行について、RN実スクショとSwiftスクショを並べるとSwift側の候補行がやや半透明/濃い選択表現になっていたため、RN `proposal-select.tsx` の `choiceCard` 数値へ戻した。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/AppChrome.swift`
+- 左ドロワーの全画面右スワイプ追従、閾値未満で戻る、開いた状態で左スワイプすると閉じる操作仕様は維持した。
+- Xモバイルのように素直にサイドメニューが出る見え方へ寄せるため、前景画面の角丸を 68 から 18、白い覆いを 0.82 から 0.18、影opacityを 0.24 から 0.16、drawer parallaxを -22 から -12 へ弱めた。
+
+#### `ios-native/Sources/MegrumApp/ProposalCreateFlow.swift`
+- STEP1の候補行メトリクスをRN `choiceCard` と同じ意味で定数化した。
+- 候補行の未選択背景をRN `surface` 相当の白へ戻し、選択背景opacityを 0.08、選択枠opacityを 0.48、通常枠opacityを 0.08 に合わせた。
+- サムネイル内の白グロー、文字グリフ、check circle寸法もRN数値としてテスト可能にした。
+
+#### `ios-native/Tests/MegrumAppTests/AppDrawerGestureTests.swift`
+- ドロワーの「どこでも右スワイプ」「縦スワイプ無視」「閾値未満で戻る」「左スワイプで閉じる」仕様を維持したまま、X寄せの視覚メトリクスへ期待値を更新した。
+
+#### `ios-native/Tests/MegrumAppTests/ProposalCreateFlowTests.swift`
+- STEP1候補行のpadding、gap、角丸、背景/枠opacity、サムネイル装飾、check circleがRN数値から後退しないように期待値を追加した。
+
+### 影響範囲
+
+- 左ドロワーの開閉見え方と右スワイプ追従
+- ホーム起点のグッズパネル押下後フロー内、STEP1 `私が出す` / `受け取る` の候補行
+- 関係図の候補展開、待ち合わせカレンダー操作、送信payload、状態名、DB schemaには影響しない
+
+### 確認方法
+
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-drawer-step1 --enable-xctest --disable-swift-testing --filter AppDrawerGestureTests -j 1`
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-step1-row --enable-xctest --disable-swift-testing --filter ProposalCreateFlowTests -j 1`
+- `scripts/capture_home_proposal_visual_qa.sh --include-rn --screens drawer-open,home,match-relation-candidates,proposal-give,proposal-receive --rn-screens drawer-open,home,match-relation-candidates,proposal-give,proposal-receive`
+- RN/Swift比較画像:
+  - `notes/assets/swift-visual-qa/compare-drawer-open-rn-swift.png`
+  - `notes/assets/swift-visual-qa/compare-home-rn-swift.png`
+  - `notes/assets/swift-visual-qa/compare-relation-candidates-expanded-rn-swift.png`
+  - `notes/assets/swift-visual-qa/compare-proposal-give-rn-swift.png`
+  - `notes/assets/swift-visual-qa/compare-proposal-receive-rn-swift.png`
+
+### セルフレビュー結果
+
+- ✅ `AppDrawerGestureTests` は 9 tests / 0 failures を確認した。
+- ✅ `ProposalCreateFlowTests` 関連実行は 42 tests / 0 failures を確認した。
+- ✅ RN/Swiftスクショ比較をドロワー、ホーム、関係図候補展開、STEP1 `give/receive` で再取得した。
+- ✅ 左ドロワーは画面内どこでも右スワイプで指追従する仕様を維持し、見た目の白飛びと過剰な丸みを抑えた。
+- ✅ STEP1候補行はRN `choiceCard` の背景/枠/サムネイル/チェック寸法へ戻した。
+- ⚠️ `proposal-give` の `normalizedMeanAbsDiff` は `18.02` のまま、`proposal-receive` は `19.51` 相当から `19.45` へ小幅改善。残差はiOSセーフエリア、下部CTA配置、RN web previewとのChrome差が大きいため、次はCTA/セーフエリア単位で比較する。
+- ✅ 新しい状態名・用語・DB schema変更はないため、`notes/09_state_machines.md`、`notes/10_glossary.md`、`notes/05_data_model.md` の更新は不要と判断した。
+
+### 関連ファイル
+
+- `ios-native/Sources/MegrumApp/AppChrome.swift`
+- `ios-native/Sources/MegrumApp/ProposalCreateFlow.swift`
+- `ios-native/Tests/MegrumAppTests/AppDrawerGestureTests.swift`
+- `ios-native/Tests/MegrumAppTests/ProposalCreateFlowTests.swift`
+- `notes/assets/swift-visual-qa/compare-drawer-open-rn-swift.png`
+- `notes/assets/swift-visual-qa/compare-proposal-receive-rn-swift.png`
+
+---
+
+## イテレーション418.68：ホーム候補カード内のグローと文字をRN数値へ調整
+
+### 背景・問題意識
+
+ホームのグッズパネル押下後フローについて、入口であるホーム候補カードのRN/Swift比較を継続した。ホーム全体の `normalizedMeanAbsDiff` は、RN版の黒い上部タブバーとSwift版のiOS標準下部タブバーというアプリChrome差に強く引っ張られている。一方で、ホームのグッズパネルそのものでは、Swift側の白いグロー円がRNより大きく、メンバー文字グリフがRNより小さいため、候補カード内の見え方がずれていた。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/HomeScreen.swift`
+- `HomeCandidateGridMetrics` にRNの `fakeImageGlow` / `fakeImageLetter` 相当の数値を追加した。
+- 白いグロー円をRNと同じ 58pt 相当へ縮小し、右上へのはみ出し位置を `right: -17, top: -12` 相当へ変更した。
+- メンバー文字グリフをRNと同じ 32pt、影radius 5、ink opacity 0.16へ変更した。
+- 3列カードサイズ、タグ、LIVEバッジ、優先度フレーム、グッズパネル押下から関係図へ入る導線は維持した。
+
+#### `ios-native/Tests/MegrumAppTests/HomeScreenFlowTests.swift`
+- `testHomeCandidateGridUsesRnLikeThreeColumnWrapMetrics` に、グロー円サイズ、offset、文字サイズ、影radiusのRN準拠値を追加した。
+
+### 影響範囲
+
+- ホーム画面の `マッチしてるよ！` / `交換できるかも？` グッズ候補カード
+- ホームのグッズパネル押下前の見た目
+- 関係図、打診作成、送信確認、送信payloadには影響しない
+
+### 確認方法
+
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-home-card-inner-parity --enable-xctest --disable-swift-testing --filter HomeScreenFlowTests -j 1`
+- `scripts/capture_home_proposal_visual_qa.sh --include-rn --screens home --rn-screens home`
+- RN/Swift比較画像: `notes/assets/swift-visual-qa/compare-home-rn-swift.png`
+
+### セルフレビュー結果
+
+- ✅ ホーム候補カード内の白グローと文字グリフをRNの実装数値に寄せた。
+- ✅ `HomeScreenFlowTests` は 13 tests / 0 failures を確認した。
+- ✅ RN/Swiftホーム比較を再撮影し、カード内装飾は目視でRNへ近づいたことを確認した。
+- ⚠️ `home` の `normalizedMeanAbsDiff` は `21.72` で、タブChrome差とRN撮影時の輝度差に引っ張られて単純改善しなかった。ホーム全体のChrome差はiOS標準タブ優先ルールとの兼ね合いがあるため、引き続きホーム内カード・表示制御単位で比較する。
+- ✅ 新しい状態名・用語・DB schema変更はないため、`notes/09_state_machines.md`、`notes/10_glossary.md`、`notes/05_data_model.md` の更新は不要と判断した。
+
+### 関連ファイル
+
+- `ios-native/Sources/MegrumApp/HomeScreen.swift`
+- `ios-native/Tests/MegrumAppTests/HomeScreenFlowTests.swift`
+- `notes/assets/swift-visual-qa/compare-home-rn-swift.png`
+
+---
+
+## イテレーション418.67：送信確認の横余白とgapをRN実スクショ基準へ再調整
+
+### 背景・問題意識
+
+ホームのグッズパネル押下後フローについて、RN/Swiftのスクリーンショット比較を継続した。送信確認画面ではRNソース上に `StatusPill` がある一方、実際に撮影したRNスクリーンショットでは右上に表示されていなかった。比較QAでは実スクショを正として扱う方針のため、Swift側へSTEPピルを追加する案は不採用とした。そのうえで、RN実画面の `Screen` 横padding 18 と確認Scroll内gap 13に対し、Swift確認画面だけ横padding 20 / gap 12になっていた差分を修正した。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/ProposalCreateFlow.swift`
+- `ProposalFlowContentMetrics` を追加し、通常STEPと確認STEPの横padding / content spacingを定数化した。
+- 確認STEPの横paddingをRN `Screen` と同じ 18 に変更し、確認Scroll内のcontent spacingをRN `styles.content.gap` と同じ 13 に変更した。
+- RN実スクショでは表示されていないSTEPピル追加案は戻し、ヘッダーの表示要素数は実スクショ基準で維持した。
+
+#### `ios-native/Tests/MegrumAppTests/ProposalCreateFlowTests.swift`
+- `testProposalConfirmContentUsesRnLikeScreenPaddingAndSpacing` を追加し、確認画面の横paddingとgapがRN基準から戻らないようにした。
+
+### 影響範囲
+
+- ホーム起点フローの `送信確認` 画面
+- 送信確認内の注意カード、交換内容カード、受け渡し方法カード、交換条件タグ、待ち合わせ候補カードの横幅と縦密度
+- 送信payload、状態遷移、待ち合わせ候補、完了後の `打診一覧に飛ぶ` 導線には影響しない
+
+### 確認方法
+
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-proposal-header-pill --enable-xctest --disable-swift-testing --filter ProposalCreateFlowTests -j 1`
+- `scripts/capture_home_proposal_visual_qa.sh --include-rn --screens proposal-confirm --rn-screens proposal-confirm`
+- RN/Swift比較画像: `notes/assets/swift-visual-qa/compare-proposal-confirm-rn-swift.png`
+
+### セルフレビュー結果
+
+- ✅ RN実スクショに出ていないSTEPピル追加は戻し、実画面比較を正にした。
+- ✅ 確認画面の横padding 18 / content gap 13 をSwift側に反映し、`proposal-confirm` の `normalizedMeanAbsDiff` は `18.75` から `18.18` へ改善した。
+- ✅ `ProposalCreateFlowTests` は 42 tests / 0 failures を確認した。
+- ✅ 送信payload、状態名、用語、DB schemaは変更していないため、`notes/09_state_machines.md`、`notes/10_glossary.md`、`notes/05_data_model.md` の更新は不要と判断した。
+- ⚠️ iOSステータスバーぶんの縦位置差、地図カードの見せ方差、ホーム画面全体のタブ構造差はまだ残っているため、継続してRN/Swiftスクショ比較で詰める。
+
+### 関連ファイル
+
+- `ios-native/Sources/MegrumApp/ProposalCreateFlow.swift`
+- `ios-native/Tests/MegrumAppTests/ProposalCreateFlowTests.swift`
+- `notes/assets/swift-visual-qa/compare-proposal-confirm-rn-swift.png`
+
+---
+
+## イテレーション418.66：送信確認のスケジュール共有カードをRN寸法へ調整
+
+### 背景・問題意識
+
+ホームのグッズパネル押下後フローについて、RN/Swiftのスクリーンショット比較を継続した。送信確認画面は情報順自体は `交換内容 -> 受け渡し方法 -> 交換条件タグ -> 交換できる候補 -> メッセージ -> スケジュール共有` で固定済みだが、下部のスケジュール共有カードだけSwift側の余白、角丸、文字サイズが大きく、RN版のコンパクトな確認カードと密度がずれていた。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/ProposalCreateFlow.swift`
+- `ProposalScheduleShareMetrics` を追加し、RN版の `scheduleCard` / `scheduleTitle` / `scheduleSub` に合わせたカード寸法を固定した。
+- スケジュール共有カードの gap、padding、cornerRadius、title/status fontSize、status top spacing、active/inactive border opacity をRN数値へ寄せた。
+- `exposeCalendar` の意味、送信payload、確認画面の情報順、送信CTAの配置は維持した。
+
+#### `ios-native/Tests/MegrumAppTests/ProposalCreateFlowTests.swift`
+- `testProposalScheduleShareCardUsesRnLikeMetrics` を追加し、スケジュール共有カードのRN準拠メトリクスを固定した。
+
+### 影響範囲
+
+- ホーム起点フローの `送信確認` 画面
+- `スケジュール共有` 表示カードの見た目とON/OFF表示
+- 送信payload、状態遷移、待ち合わせ候補作成・選択ロジックには影響しない
+
+### 確認方法
+
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-proposal-confirm-parity --enable-xctest --disable-swift-testing --filter ProposalCreateFlowTests -j 1`
+- `scripts/capture_home_proposal_visual_qa.sh --include-rn --screens proposal-confirm --rn-screens proposal-confirm`
+- RN/Swift比較画像: `notes/assets/swift-visual-qa/compare-proposal-confirm-rn-swift.png`
+
+### セルフレビュー結果
+
+- ✅ RN版のスケジュール共有カード寸法をSwift側で定数化し、今後の回帰をテストで検出できるようにした。
+- ✅ 送信確認の情報順、`exposeCalendar`、`meetupCandidates`、送信payloadは変更していない。
+- ✅ `ProposalCreateFlowTests` は 41 tests / 0 failures を確認した。
+- ⚠️ Visual QA の `proposal-confirm` は `normalizedMeanAbsDiff: 18.75` で直前の `18.57` よりわずかに悪化したが、比較画像では主にヘッダー高さ・画面密度差が支配的で、対象カードはRN寸法へ近づいたためこの修正は保持する。
+- ✅ 新しい状態名・用語・DB schema変更はないため、`notes/09_state_machines.md`、`notes/10_glossary.md`、`notes/05_data_model.md` の更新は不要と判断した。
+
+### 関連ファイル
+
+- `ios-native/Sources/MegrumApp/ProposalCreateFlow.swift`
+- `ios-native/Tests/MegrumAppTests/ProposalCreateFlowTests.swift`
+- `notes/assets/swift-visual-qa/compare-proposal-confirm-rn-swift.png`
+
+---
+
+## イテレーション418.65：ホーム候補パネルのRN優先度フレームをSwiftへ反映
+
+### 背景・問題意識
+
+ホームのグッズパネル押下後フローについて、RN/Swiftのスクリーンショット比較を継続した。関係図以降の画面に加えて、入口であるホーム候補パネル自体もRN版では `candidate.priority` に応じた枠・影があり、ユーザーに「強い候補」「片側候補」の違いが伝わる。Swift版は3カラム、タグ、LIVEバッジ、タップ導線は再現済みだったが、この優先度フレームが弱く、ホーム起点の候補パネルとしての意味が薄く見えていたため、RNの `getPriorityFrameStyle` 数値に寄せた。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/HomeScreen.swift`
+- `HomeCandidateTile` に `shelfKind` を渡し、matched棚をRNの `both`、possible棚を `oneSide` 相当のフレームとして扱うようにした。
+- `HomeCandidatePriorityFrameStyle` / `HomeCandidatePriorityFrameMetrics` を追加し、RNの `both` / `oneSide` 枠線幅、opacity、影radius、影Yを固定した。
+- ホームのグッズパネル押下時の関係図遷移、候補カードサイズ、タグ、LIVEバッジ、local auraは維持した。
+
+#### `ios-native/Tests/MegrumAppTests/HomeScreenFlowTests.swift`
+- RN準拠の候補優先度フレーム数値を固定する `testHomeCandidatePriorityFrameUsesRnLikeBothAndOneSideMetrics` を追加した。
+
+#### `scripts/capture_home_proposal_visual_qa.sh`
+- Swift画面起動後の待機時間を `MEGRUM_SWIFT_SCREEN_SETTLE_SECONDS` で調整可能にし、デフォルトを6秒にした。
+- ホーム画面が初期ロード中のまま撮影される不安定さを減らし、RN/Swift比較画像を証拠として使いやすくした。
+
+#### `notes/assets/swift-visual-qa/`
+- RN/Swiftの `home` を再撮影し、比較画像と `visual-qa-report.json` を更新した。
+
+### 影響範囲
+
+- ホームの `マッチしてるよ！` / `交換できるかも？` 候補グッズパネル
+- RN/Swiftスクショ比較スクリプトのSwift画面撮影待機
+- 関係図、打診作成、待ち合わせカレンダー、proposal payload、DB schema、状態名には影響なし
+
+### 確認方法
+
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-home-frame-parity --enable-xctest --disable-swift-testing --filter HomeScreenFlowTests -j 1`
+- `scripts/capture_home_proposal_visual_qa.sh --include-rn --screens home --rn-screens home`
+- `scripts/capture_home_proposal_visual_qa.sh --skip-build --screens home`
+
+### セルフレビュー結果
+
+- ✅ `HomeScreenFlowTests` 13件が0 failuresで通った。
+- ✅ RNの `both` / `oneSide` フレーム数値をSwiftの `HomeCandidatePriorityFrameMetrics` に固定した。
+- ✅ SwiftホームのVisual QAがローディング画面で撮れる不安定さを確認し、待機6秒の再撮影でホーム本体が撮れることを確認した。
+- ✅ `home` の normalizedMeanAbsDiff は有効なホーム本体撮影で `21.25`。過去の `22.62` からは微改善した。
+- ✅ `MTO’s phone`（USB接続実機）へのDebugインストールが `INSTALL SUCCEEDED` で完了した。
+- ⚠️ RN Web比較は上部タブ、SwiftはiOS標準タブバーのため、ホーム全体の完全一致にはまだ構造差が残る。今回はホーム起点フローの入口である候補グッズパネルの優先度フレームと押下対象の意味一致を優先した。
+- ✅ 状態名、用語、DB schema、proposal payloadは変更していないため、`notes/09_state_machines.md`、`notes/10_glossary.md`、`notes/05_data_model.md` の更新は不要と判断した。
+
+### 関連ファイル
+
+- `ios-native/Sources/MegrumApp/HomeScreen.swift`
+- `ios-native/Tests/MegrumAppTests/HomeScreenFlowTests.swift`
+- `scripts/capture_home_proposal_visual_qa.sh`
+- `notes/assets/rn-screen-lookup/rn-home.png`
+- `notes/assets/swift-visual-qa/swift-home-preview.png`
+- `notes/assets/swift-visual-qa/compare-home-rn-swift.png`
+- `notes/assets/swift-visual-qa/visual-qa-report.json`
+
+---
+
+## イテレーション418.64：打診STEPタブをRNの全幅セグメントへ再調整
+
+### 背景・問題意識
+
+ホームのグッズパネル押下後フローについて、RN版とSwift版のスクリーンショットを都度比較する方針で確認を継続した。関係図の候補展開シートはRN構造へ寄ったが、打診STEP1の `私が出す / 受け取る / 待ち合わせ` タブがSwift側では横スクロールの大きなピル列になっており、RN版 `SectionTabs` の「全幅セグメント内で選択thumbが動く」構造と違って見えていた。候補カードや送信payloadを触らず、タブ構造と画面左右余白だけを小さく再調整した。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/ProposalCreateFlow.swift`
+- `ProposalStepHeader` を横スクロール型から、RN `SectionTabs` に合わせた全幅セグメント型へ変更した。
+- `ProposalSectionTabsMetrics` を追加し、RNの `sectionTabs` / `sectionTab` 数値に合わせて container padding 4、tab gap 4、tab padding horizontal 5 / vertical 8、minHeight 36、label 11.5、count 10 を固定した。
+- `give/receive/meetup` 画面の左右余白をRNのフィルタ/リスト基準に合わせて20から18へ調整した。
+- 候補カード寸法、候補選択状態、STEP横スワイプ、待ち合わせカレンダー、送信payloadは変更していない。
+
+#### `ios-native/Tests/MegrumAppTests/ProposalCreateFlowTests.swift`
+- RN準拠のセグメントタブ寸法を固定する `testProposalSectionTabsUseRnLikeSegmentMetrics` を追加した。
+
+#### `notes/assets/swift-visual-qa/`
+- RN/Swiftの `proposal-give` / `proposal-receive` を再撮影し、比較画像と `visual-qa-report.json` を更新した。
+
+### 影響範囲
+
+- ホームのグッズパネル押下後、関係図から `打診に進む` で入る打診STEP1のタブ表示
+- RN/Swiftスクショ比較用の `proposal-give` / `proposal-receive`
+- 左ドロワー、関係図候補展開、待ち合わせカレンダー、完了後の `打診一覧に飛ぶ`、DB schema、状態名には影響なし
+
+### 確認方法
+
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-proposal-step1-parity --enable-xctest --disable-swift-testing --filter ProposalCreateFlowTests -j 1`
+- `scripts/capture_home_proposal_visual_qa.sh --include-rn --screens proposal-give,proposal-receive --rn-screens proposal-give,proposal-receive`
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-drawer-home-flow --enable-xctest --disable-swift-testing --filter AppDrawerGestureTests --filter HomeScreenFlowTests --filter MatchRelationScreenTests --filter ProposalCreateFlowTests -j 1`
+
+### セルフレビュー結果
+
+- ✅ `ProposalCreateFlowTests` 24件、関連して走った `TradeRequestDraftProposalCreateFlowTests` 16件、合計40件が0 failuresで通った。
+- ✅ ドロワー/ホーム起点/関係図/打診STEP/待ち合わせの対象テストは75件が0 failuresで通った。
+- ✅ 左ドロワーは `AppDrawerGestureTests` で、画面端に限定しない右スワイプ開始、縦スクロール優先、閾値未満で戻る、左スワイプで閉じる挙動を確認した。
+- ✅ ホーム起点は `HomeScreenFlowTests` で、matched / possible のグッズパネルから関係図へ入る導線と、完了後のpending一覧着地ルートを確認した。
+- ✅ RN/Swiftスクショ比較を再生成し、`proposal-give` は normalizedMeanAbsDiff `18.42` から `18.02` へ微改善した。
+- ⚠️ `proposal-receive` は `18.57` から `19.51` へ悪化したが、目視ではタブ構造はRNへ近づき、差分の主因はSwift側のiOSステータスバー/上余白、候補カードの表示枚数、ネイティブレンダリング差と判断した。候補カード寸法は既にRN数値でテスト固定しているため、今回は追加のカード改変を避けた。
+- ✅ `MTO’s phone`（USB接続実機）へのDebugインストールが `INSTALL SUCCEEDED` で完了した。
+- ✅ 状態名、用語、DB schema、proposal payloadは変更していないため、`notes/09_state_machines.md`、`notes/10_glossary.md`、`notes/05_data_model.md` の更新は不要と判断した。
+
+### 関連ファイル
+
+- `ios-native/Sources/MegrumApp/ProposalCreateFlow.swift`
+- `ios-native/Tests/MegrumAppTests/ProposalCreateFlowTests.swift`
+- `notes/assets/rn-screen-lookup/rn-proposal-give.png`
+- `notes/assets/rn-screen-lookup/rn-proposal-receive.png`
+- `notes/assets/swift-visual-qa/swift-proposal-give.png`
+- `notes/assets/swift-visual-qa/swift-proposal-receive.png`
+- `notes/assets/swift-visual-qa/compare-proposal-give-rn-swift.png`
+- `notes/assets/swift-visual-qa/compare-proposal-receive-rn-swift.png`
+- `notes/assets/swift-visual-qa/visual-qa-report.json`
+
+---
+
+## イテレーション418.63：関係図の候補展開シートをRN構造へ再調整
+
+### 背景・問題意識
+
+ホームのグッズパネル押下後フローについて、RN版とSwift版のスクリーンショットを都度比較する方針で再確認した。左ドロワーとホーム候補パネルは改善済みだったが、関係図で「選択肢のグッズを選ぶと候補グッズが展開され、そこでタップ選択する」シートがまだSwift側だけ2カラムカード風に見えていた。RN版 `mobile/app/match-detail.tsx` の `WishPopup` は、ヘッダーにwish名、左にwishカード、右に候補グッズのグリッド、下部に戻るボタンを持つため、Swift側もこの構造へ寄せた。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/MatchRelationScreen.swift`
+- 候補展開シートをRNの `WishPopup` 構造に寄せ、ヘッダー、wish側カード、候補オーナー行、候補グリッド、戻るボタンの配置を再調整した。
+- `wish ×N・M 件の候補`、`↑ あなたの譲：...`、`@相手 が譲るもの` の文言生成を `MatchRelationPopupCopy` に切り出し、RN準拠の表示をテスト可能にした。
+- 候補カードはRN同様に、選択中はlavender枠/チェック、選択元はpink枠/バッジで表示するようにした。
+- Visual QA時だけ、公開グッズ読み込みがスクショタイミングに間に合わない場合でもPreviewDataから同一オーナー候補を補完し、通常の非同期読み込み挙動は維持した。
+
+#### `ios-native/Sources/MegrumApp/MegrumRootView.swift`
+- `match-relation` / `match-relation-candidates` のVisual QAルートをHomeScreenの自動遷移に依存せず、直接root表示するようにした。
+- RN/Swiftスクショ比較でホーム画面のまま撮れてしまう不安定さを解消した。
+
+#### `ios-native/Sources/MegrumApp/NativePreviewData.swift`
+- 関係図Visual QA用の相手候補をRNシナリオに合わせ、`スア 春ver.` と `スア 会場限定` の2候補へ調整した。
+- 個別募集のwish参照を候補GoodsItemへ向け、シートタイトルと候補数がRNと同じ意味になるようにした。
+
+#### `ios-native/Tests/MegrumAppTests/MatchRelationScreenTests.swift`
+- RN準拠の候補展開シート文言を固定するテストを追加した。
+- NativePreviewDataから `スア 春ver.` の2候補シートが作れることをテストした。
+
+#### `ios-native/Tests/MegrumAppTests/HomeScreenFlowTests.swift`
+- 関係図Visual QAルートが直接root表示されることをテストした。
+
+#### `notes/assets/swift-visual-qa/`
+- RN/Swiftの `match-relation-candidates` を再撮影し、比較画像と `visual-qa-report.json` を更新した。
+
+### 影響範囲
+
+- ホームのグッズパネル押下後に入る関係図の候補展開シート
+- RN/Swiftスクショ比較用のVisual QAルート
+- Swiftプレビューデータ上の関係図サンプル候補
+- proposal payload、待ち合わせカレンダー、左ドロワー本体、DB schema、状態名には影響なし
+
+### 確認方法
+
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-relation-sheet-parity --enable-xctest --disable-swift-testing --filter MatchRelationScreenTests --filter HomeScreenFlowTests -j 1`
+- `scripts/capture_home_proposal_visual_qa.sh --include-rn --screens match-relation-candidates --rn-screens match-relation-candidates`
+- `xcodebuild -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -destination 'id=00008120-000C49C43669A01E' -configuration Debug -allowProvisioningUpdates install`
+
+### セルフレビュー結果
+
+- ✅ `HomeScreenFlowTests` 12件、`MatchRelationScreenTests` 14件、合計26件が0 failuresで通った。
+- ✅ RN/Swiftスクショ比較で `relation-candidates-expanded` を再生成した。
+- ✅ Visual QAの撮影不安定状態ではSwift側がホームのまま撮れ、差分が `95.48` まで悪化することを確認し、直接root表示で解消した。
+- ✅ 修正後の `relation-candidates-expanded` normalizedMeanAbsDiff は `12.89` で、タイトル、候補数、候補グリッド、戻るボタンの主要構造を目視確認した。
+- ✅ `MTO’s phone`（iOS 26.5）へのDebug実機インストールが `INSTALL SUCCEEDED` で完了した。
+- ✅ 状態名、用語、DB schema、proposal payloadは変更していないため、`notes/09_state_machines.md`、`notes/10_glossary.md`、`notes/05_data_model.md` の更新は不要と判断した。
+- ⚠️ RN比較画像はExpo Web、Swift比較画像はiOS nativeのため、フォントレンダリング、ステータスバー、カードの微細な余白差は残る。今回は画面構成・表示制御・入力制御・候補展開の意味一致を優先した。
+
+### 関連ファイル
+
+- `ios-native/Sources/MegrumApp/MatchRelationScreen.swift`
+- `ios-native/Sources/MegrumApp/MegrumRootView.swift`
+- `ios-native/Sources/MegrumApp/NativePreviewData.swift`
+- `ios-native/Tests/MegrumAppTests/MatchRelationScreenTests.swift`
+- `ios-native/Tests/MegrumAppTests/HomeScreenFlowTests.swift`
+- `notes/assets/rn-screen-lookup/rn-match-detail-candidates-expanded.png`
+- `notes/assets/swift-visual-qa/swift-match-relation-candidates-expanded.png`
+- `notes/assets/swift-visual-qa/compare-relation-candidates-expanded-rn-swift.png`
+- `notes/assets/swift-visual-qa/visual-qa-report.json`
+
+---
+
+## イテレーション418.62：左ドロワーをRNのX風押し出し表示へ寄せる
+
+### 背景・問題意識
+
+左ドロワーは「画面端だけでなく、どこでも右スワイプしたら指の動きに従って出る」挙動を先に実装していたが、RN/Swift比較スクリーンショットでは開いた状態の見た目がまだ通常ドロワー寄りだった。RN版 `mobile/app/(tabs)/_layout.tsx` はXモバイルアプリ風に、drawerを下層に置き、前景画面を `screenX` で右へ押し出し、白い幕 `0.82` と左角丸 `68` を乗せる構造になっているため、Swift側もこの操作モデルへ寄せた。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/AppChrome.swift`
+- `AppDrawerVisualMetrics` を追加し、RN由来の `drawerWidth min 320 / max 380 / ratio 0.9`、`openOffset ratio 0.68 / inset 34`、`whiteoutOpacity 0.82`、`cornerRadius 68`、`drawerParallax -22` をSwift側で固定した。
+- `AppDrawerOverlay` から黒いバックドロップ型の表示を外し、RN同様にdrawer本体を下層パネルとして表示する構造へ寄せた。
+- drawer本体のopacityとparallaxをRNの `drawerOpacity` / `drawerParallax` 相当に調整した。
+
+#### `ios-native/Sources/MegrumApp/MegrumRootView.swift`
+- 前景タブ画面の押し出し量をRNの `openX` 相当に変更し、指の移動量と前景移動量が一致するようにした。
+- 前景タブ画面にRN同様の左角丸、影、白い幕を追加した。
+- 白い幕をタップするとドロワーを閉じる挙動を維持した。
+
+#### `ios-native/Tests/MegrumAppTests/AppDrawerGestureTests.swift`
+- RN由来のドロワー表示メトリクスをテストで固定した。
+- 既存の「閉じた状態で任意位置から右スワイプ」「縦スワイプ優先」「閾値未満は戻る」「開いた状態で左スワイプ閉じる」テストは維持した。
+
+#### `notes/assets/swift-visual-qa/`
+- `drawer-open` を再撮影し、RN/Swift比較画像と `visual-qa-report.json` を更新した。
+
+### 影響範囲
+
+- 左ドロワーの開閉表示、前景押し出し、白幕、角丸、タップ閉じ
+- ホームを含むタブRoot全体の横スワイプ体験
+- ホーム候補カード、関係図、打診作成、待ち合わせカレンダー、proposal payload、状態名、用語、DB schemaには影響なし
+
+### 確認方法
+
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-drawer-xstyle --enable-xctest --disable-swift-testing --filter AppDrawerGestureTests -j 1`
+- `scripts/capture_home_proposal_visual_qa.sh --screens drawer-open`
+- `xcodebuild -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -destination 'id=00008120-000C49C43669A01E' -configuration Debug -allowProvisioningUpdates install`
+
+### セルフレビュー結果
+
+- ✅ `AppDrawerGestureTests` 9件が0 failuresで通った。
+- ✅ Visual QAで `drawer-open` のRN/Swift比較画像を再生成した。
+- ✅ `drawer-open` の normalizedMeanAbsDiff は 18.64 から 12.10 へ改善した。
+- ✅ 目視でも前景画面の右押し出し、白幕、角丸がRN/X風の構造に近づいたことを確認した。
+- ✅ `MTO’s phone`（iOS 26.5）へのDebug実機インストールが `INSTALL SUCCEEDED` で完了した。
+- ✅ 状態名、用語、DB schema、proposal payloadは変更していないため、`notes/09_state_machines.md`、`notes/10_glossary.md`、`notes/05_data_model.md` の更新は不要と判断した。
+- ⚠️ RN比較画像とSwift比較画像ではステータスバーの扱いが違うため、上端の時刻/Dynamic Island由来の差分は今回の修正対象外とした。
+
+### 関連ファイル
+
+- `ios-native/Sources/MegrumApp/AppChrome.swift`
+- `ios-native/Sources/MegrumApp/MegrumRootView.swift`
+- `ios-native/Tests/MegrumAppTests/AppDrawerGestureTests.swift`
+- `notes/assets/swift-visual-qa/swift-drawer-open.png`
+- `notes/assets/swift-visual-qa/compare-drawer-open-rn-swift.png`
+- `notes/assets/swift-visual-qa/visual-qa-report.json`
+
+---
+
+## イテレーション418.61：ホーム候補パネルをRNの3列グリッドへ寄せる
+
+### 背景・問題意識
+
+ホーム起点のグッズパネル押下後フローをRN/Swift比較スクリーンショットで見比べたところ、Swift側の候補パネルは横スクロールの大きな棚になっていた。一方、RN版 `mobile/app/(tabs)/index.tsx` は `ShelfSectionRows` 内で `homeCandidateGrid` を `flexDirection: row` / `flexWrap: wrap` / `gap: 10` とし、端末幅から3列の `tileWidth` を計算して候補カードを折り返している。グッズパネル押下の入口体験に直結するため、Swift側もRNの3列グリッド構造へ寄せた。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/HomeScreen.swift`
+- ホーム候補表示を横スクロール `HStack` から `LazyVGrid` 3列構成へ変更した。
+- `HomeLayoutMetrics` / `HomeCandidateGridMetrics` を追加し、RN由来の `horizontalPadding 18`、`columnCount 3`、`gap 10`、`cardHeightRatio 1.34` をSwift側で固定した。
+- RNの `LocalAura` に合わせ、現地候補カードに淡いlavenderの外枠、影、外側余白を追加した。
+- RNのタグ/`LIVE` バッジに合わせ、フォントサイズ、padding、`LIVE` のtop offsetを調整した。
+- グッズパネルタップ時の関係図遷移は維持した。
+
+#### `ios-native/Tests/MegrumAppTests/HomeScreenFlowTests.swift`
+- ホーム候補グリッドがRN由来の3列折り返しメトリクスを使うことをテストで固定した。
+- 既存の「マッチしてるよ！」押下で関係図へ入るルート、候補選択対象のpartner-owned優先は維持した。
+
+#### `notes/assets/swift-visual-qa/`
+- `home` を再撮影し、RN/Swift比較画像と `visual-qa-report.json` を更新した。
+
+### 影響範囲
+
+- ホーム画面の `マッチしてるよ！` / `交換できるかも？` 候補カード表示
+- ホームのグッズパネル押下から関係図へ入る入口体験
+- 関係図、打診作成、待ち合わせカレンダー、左ドロワー、proposal payload、状態名、用語、DB schemaには影響なし
+
+### 確認方法
+
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-home-grid-parity --enable-xctest --disable-swift-testing --filter 'HomeScreenFlowTests|MatchRelationScreenTests|ProposalCreateFlowTests|AppDrawerGestureTests' -j 1`
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-home-grid-aura --enable-xctest --disable-swift-testing --filter HomeScreenFlowTests -j 1`
+- `scripts/capture_home_proposal_visual_qa.sh --screens home`
+- `xcodebuild -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -destination 'id=00008120-000C49C43669A01E' -configuration Debug -allowProvisioningUpdates install`
+
+### セルフレビュー結果
+
+- ✅ 対象70件のSwiftテストが0 failuresで通った。
+- ✅ オーラ追加後の `HomeScreenFlowTests` 11件が0 failuresで通った。
+- ✅ Visual QAで `home` のRN/Swift比較画像を再生成した。
+- ✅ `home` の normalizedMeanAbsDiff は 24.52 から 22.62 へ改善した。
+- ✅ 候補カードの画面構成がRN同様の3列折り返しになったことを目視確認した。
+- ✅ `MTO’s phone`（iOS 26.5）へのDebug実機インストールが `INSTALL SUCCEEDED` で完了した。
+- ✅ 状態名、用語、DB schema、proposal payloadは変更していないため、`notes/09_state_machines.md`、`notes/10_glossary.md`、`notes/05_data_model.md` の更新は不要と判断した。
+- ⚠️ RN比較画像はExpo Web上のNativeTabsフォールバック表示を含むため、上部タブとSwiftのiOS標準下部タブの差は今回の修正対象外とした。iOS標準タブを捨てる変更はAGENTS.mdのiOS標準優先ルールに反するため、ユーザー確認なしでは行わない。
+
+### 関連ファイル
+
+- `ios-native/Sources/MegrumApp/HomeScreen.swift`
+- `ios-native/Tests/MegrumAppTests/HomeScreenFlowTests.swift`
+- `notes/assets/swift-visual-qa/swift-home-preview.png`
+- `notes/assets/swift-visual-qa/compare-home-rn-swift.png`
+- `notes/assets/swift-visual-qa/visual-qa-report.json`
+
+---
+
+## イテレーション418.60：打診作成フィルタ行をRNの横並び構造へ修正
+
+### 背景・問題意識
+
+ホーム起点のグッズパネル押下後フローをRN/Swift比較スクリーンショットで見比べたところ、打診作成STEPの `私が出す` / `受け取る` にあるグッズフィルタがSwift側では「ラベルの下にチップを積む」縦構造になっていた。一方、RN版 `mobile/app/proposal-select.tsx` では `choiceFilterRow` が横並びで、左に固定幅ラベル、右にスクロール可能なチップ列を置く設計だったため、Swift側も画面構成優先でRN構造へ戻した。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/ProposalCreateFlow.swift`
+- `ProposalGoodsFilterMetrics` を追加し、RN版の `label width 30`、`label fontSize 9.5`、`tracking 0.4`、`chip gap 6`、`chip padding 10 / 5`、`chip fontSize 11` をSwift側で固定した。
+- `ProposalFilterRow` を縦積み `VStack` から横並び `HStack` に変更し、RN同様に「分類ラベル → チップ列」の1行UIへ揃えた。
+- `ProposalFilterChip` の文字サイズと余白をRNメトリクスへ寄せ、受け取る候補のフィルタ行が画面上で候補カード群と同じ関係で見えるようにした。
+
+#### `ios-native/Tests/MegrumAppTests/ProposalCreateFlowTests.swift`
+- 打診作成フィルタ行がRN由来の横並びメトリクスを使うことをテストで固定した。
+
+#### `notes/assets/swift-visual-qa/`
+- `proposal-give` / `proposal-receive` を再撮影し、RN/Swift比較画像と `visual-qa-report.json` を更新した。
+
+### 影響範囲
+
+- 打診作成STEPの `私が出す` / `受け取る` グッズ選択フィルタ
+- ホーム起点の関係図から打診作成へ進むフロー
+- 左ドロワー、関係図の候補展開、待ち合わせカレンダー、proposal payload、状態名、用語、DB schemaには影響なし
+
+### 確認方法
+
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-proposal-filter-parity --enable-xctest --disable-swift-testing --filter 'ProposalCreateFlowTests|HomeScreenFlowTests|TradeRequestDraftProposalCreateFlowTests|AppDrawerGestureTests' -j 1`
+- `scripts/capture_home_proposal_visual_qa.sh --screens proposal-give,proposal-receive`
+- `xcodebuild -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -destination 'id=00008120-000C49C43669A01E' -configuration Debug -allowProvisioningUpdates install`
+
+### セルフレビュー結果
+
+- ✅ 対象58件のSwiftテストが0 failuresで通った。
+- ✅ Visual QAで `proposal-give` / `proposal-receive` のRN/Swift比較画像を再生成した。
+- ✅ `proposal-receive` の normalizedMeanAbsDiff は 19.28 から 18.57 へ改善した。
+- ✅ `proposal-give` の normalizedMeanAbsDiff は 13.99 から 18.42 へ悪化したが、RNコード上の横並びフィルタ構造へ戻した結果であり、画面構成・表示制御の再現を優先した。
+- ✅ `MTO’s phone`（iOS 26.5）へのDebug実機インストールが `INSTALL SUCCEEDED` で完了した。
+- ✅ 状態名、用語、DB schema、proposal payloadは変更していないため、`notes/09_state_machines.md`、`notes/10_glossary.md`、`notes/05_data_model.md` の更新は不要と判断した。
+- ⚠️ 比較画像の数値差だけではRN準拠を判定しきれないため、今後もRNコード・RNスクショ・Swiftスクショの3点を見比べて判断する。
+
+### 関連ファイル
+
+- `ios-native/Sources/MegrumApp/ProposalCreateFlow.swift`
+- `ios-native/Tests/MegrumAppTests/ProposalCreateFlowTests.swift`
+- `notes/assets/swift-visual-qa/swift-proposal-give.png`
+- `notes/assets/swift-visual-qa/swift-proposal-receive.png`
+- `notes/assets/swift-visual-qa/compare-proposal-give-rn-swift.png`
+- `notes/assets/swift-visual-qa/compare-proposal-receive-rn-swift.png`
+- `notes/assets/swift-visual-qa/visual-qa-report.json`
+
+---
+
+## イテレーション418.59：打診作成ヘッダーをRNメトリクスへ合わせ込み
+
+### 背景・問題意識
+
+ホーム起点のグッズパネル押下後フローをRN/Swift比較スクリーンショットで見比べたところ、Swift側の打診作成ヘッダーはRN版より戻るボタンとタイトルが小さく、`PROPOSAL` kicker もRNの紫ではなくmuted表示になっていた。ステータスバー有無による上下位置差は比較画像側の条件差なので無理に詰めず、RNコードで明確に定義されているヘッダー部品の寸法・色を優先して揃えた。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/ProposalCreateFlow.swift`
+- `ProposalFlowHeaderMetrics` を追加し、RN版 `proposal-select.tsx` の `backButton 42pt`、`kicker 10pt / tracking 0.7`、`title 23pt`、header gap `12pt` をSwift側でも固定した。
+- `ProposalFlowScreenHeader` の戻るボタンを `38pt` から `42pt`、chevronを `15pt` から `18pt` へ調整した。
+- `PROPOSAL` kicker の色をRN同様のlavenderに戻し、タイトルサイズを `21pt` から `23pt` へ調整した。
+
+#### `ios-native/Tests/MegrumAppTests/ProposalCreateFlowTests.swift`
+- 打診作成ヘッダーのRN準拠メトリクスをテストで固定した。
+
+#### `notes/assets/swift-visual-qa/`
+- `proposal-give` / `proposal-receive` / `proposal-meetup-week` を再撮影し、RN/Swift比較画像と `visual-qa-report.json` を更新した。
+
+### 影響範囲
+
+- 打診作成フロー全STEPのヘッダー表示
+- ホーム起点のグッズパネル押下後、関係図から打診作成へ進む画面群
+- 入力制御、スワイプ制御、proposal payload、状態名、用語、DB schemaには影響なし
+
+### 確認方法
+
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-proposal-header-parity --enable-xctest --disable-swift-testing --filter 'ProposalCreateFlowTests|HomeScreenFlowTests|TradeRequestDraftProposalCreateFlowTests|AppDrawerGestureTests' -j 1`
+- `scripts/capture_home_proposal_visual_qa.sh --screens proposal-give,proposal-receive,proposal-meetup`
+- `xcodebuild -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -destination 'id=00008120-000C49C43669A01E' -configuration Debug -allowProvisioningUpdates install`
+
+### セルフレビュー結果
+
+- ✅ 対象57件のSwiftテストが0 failuresで通った。
+- ✅ Visual QAで `proposal-give` / `proposal-receive` / `proposal-meetup-week` のRN/Swift比較画像を再生成した。
+- ✅ `proposal-give` の normalizedMeanAbsDiff は 17.06 から 13.99 へ改善した。
+- ✅ `proposal-receive` の normalizedMeanAbsDiff は 19.82 から 19.28 へ改善した。
+- ✅ `proposal-meetup-week` の normalizedMeanAbsDiff は 19.44 から 16.32 へ改善した。
+- ✅ `MTO’s phone`（iOS 26.5）へのDebug実機インストールが `INSTALL SUCCEEDED` で完了した。
+- ✅ 状態名、用語、DB schema、proposal payloadは変更していないため、`notes/09_state_machines.md`、`notes/10_glossary.md`、`notes/05_data_model.md` の更新は不要と判断した。
+- ⚠️ RN比較画像側にはステータスバーがなくSwift比較画像にはiOSステータスバーがあるため、ヘッダーの絶対Y座標差は次回以降も「比較条件差」として扱い、実機UIを壊す方向には詰めない。
+
+### 関連ファイル
+
+- `ios-native/Sources/MegrumApp/ProposalCreateFlow.swift`
+- `ios-native/Tests/MegrumAppTests/ProposalCreateFlowTests.swift`
+- `notes/assets/swift-visual-qa/swift-proposal-give.png`
+- `notes/assets/swift-visual-qa/swift-proposal-receive.png`
+- `notes/assets/swift-visual-qa/swift-proposal-meetup-week.png`
+- `notes/assets/swift-visual-qa/compare-proposal-give-rn-swift.png`
+- `notes/assets/swift-visual-qa/compare-proposal-receive-rn-swift.png`
+- `notes/assets/swift-visual-qa/compare-proposal-meetup-week-rn-swift.png`
+- `notes/assets/swift-visual-qa/visual-qa-report.json`
+
+---
+
+## イテレーション418.58：待ち合わせカレンダーをRNメトリクスへ再調整
+
+### 背景・問題意識
+
+ホーム起点のグッズパネル押下後フローについて、RN版とSwift版のスクリーンショットを都度撮影して見比べながら移行精度を上げる方針に切り替えた。待ち合わせカレンダーの比較では、Swift側の週ヘッダーと時間グリッドがSwift独自の圧縮寸法になっており、RN版の `SLOT_HEIGHT=16`、`TIME_LABEL_WIDTH=52`、曜日→日付の表示順とズレていた。また月表示はSwift側が7列をきれいに収めすぎており、RNの `13.72% + gap` による少し横へ溢れるグリッド感と違って見えていた。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/ProposalMeetupCalendarEditor.swift`
+- 週カレンダーの `slotHeight` をRN版の `16`、`timeLabelWidth` を `52`、日カラム間隔を `0` に合わせた。
+- 週ヘッダーをRN同様に「曜日ラベル → 大きい日付番号」の順で表示し、ロケール依存の `6月5日` / `金曜日` 表示をやめた。
+- 月カレンダーにRNの `monthDayCell width: 13.72%` 相当の固定セル幅計算を追加し、7列がわずかにviewport外へ溢れる表示へ寄せた。
+- 月セル高をRN版の `minHeight: 74` に合わせ、日付ラベルも数値のみで固定した。
+
+#### `ios-native/Tests/MegrumAppTests/TradeRequestDraftProposalCreateFlowTests.swift`
+- 週カレンダーがRN定数（slot高、時間ラベル幅、曜日/日付ラベル）を使うことをテストで固定した。
+- 月カレンダーがRN由来のパーセントセル幅で軽くviewport overflowすることをテストで固定した。
+
+#### `notes/assets/swift-visual-qa/`
+- `proposal-meetup-week` / `proposal-meetup-month` を再撮影し、RN/Swift比較画像と `visual-qa-report.json` を更新した。
+
+### 影響範囲
+
+- 打診作成STEP1の `待ち合わせ` カレンダー表示
+- 週送りスワイプ、長押し作成、ドラッグ移動/リサイズ、候補タップ導線の操作モデル
+- proposal payload、`meetupCandidates`、状態名、用語、DB schemaには影響なし
+
+### 確認方法
+
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-meetup-calendar-parity-2 --enable-xctest --disable-swift-testing --filter 'TradeRequestDraftProposalCreateFlowTests|ProposalCreateFlowTests|HomeScreenFlowTests|AppDrawerGestureTests' -j 1`
+- `scripts/capture_home_proposal_visual_qa.sh --screens proposal-meetup,proposal-meetup-month`
+- `xcodebuild -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -destination 'id=00008120-000C49C43669A01E' -configuration Debug -allowProvisioningUpdates install`
+
+### セルフレビュー結果
+
+- ✅ 対象56件のSwiftテストが0 failuresで通った。
+- ✅ Visual QAで `proposal-meetup-week` / `proposal-meetup-month` のRN/Swift比較画像を再生成した。
+- ✅ `proposal-meetup-week` の normalizedMeanAbsDiff は 19.44、`proposal-meetup-month` は 16.69 として記録された。
+- ✅ `MTO’s phone`（iOS 26.5）へのDebug実機インストールが `INSTALL SUCCEEDED` で完了した。
+- ✅ 状態名、用語、DB schema、proposal payloadは変更していないため、`notes/09_state_machines.md`、`notes/10_glossary.md`、`notes/05_data_model.md` の更新は不要と判断した。
+- ⚠️ カレンダーの大枠余白、safe area由来のヘッダー位置、STEPタブの横幅・切れ方は引き続きVisual QAで調整対象。
+
+### 関連ファイル
+
+- `ios-native/Sources/MegrumApp/ProposalMeetupCalendarEditor.swift`
+- `ios-native/Tests/MegrumAppTests/TradeRequestDraftProposalCreateFlowTests.swift`
+- `notes/assets/swift-visual-qa/swift-proposal-meetup-week.png`
+- `notes/assets/swift-visual-qa/swift-proposal-meetup-month.png`
+- `notes/assets/swift-visual-qa/compare-proposal-meetup-week-rn-swift.png`
+- `notes/assets/swift-visual-qa/compare-proposal-meetup-month-rn-swift.png`
+- `notes/assets/swift-visual-qa/visual-qa-report.json`
+
+---
+
+## イテレーション418.57：STEP1候補行の選択表示をRN準拠化
+
+### 背景・問題意識
+
+ホーム起点フローの `proposal-give` / `proposal-receive` をRN/Swift横並びで見比べたところ、Swift側の候補行にはRN版の `choiceCard` にある右端のチェック丸がなく、選択済み/未選択の表示制御がRNと一致していなかった。STEP1は「私が出す / 受け取る」の入力制御そのものなので、選択状態が同じ見え方で伝わることを優先して修正した。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/ProposalCreateFlow.swift`
+- `ProposalSelectableGoodsRowMetrics` を追加し、候補行サムネイルをRNの `66x82`、角丸 `15`、チェック丸 `26` に合わせた。
+- `ProposalSelectableGoodsCheckmark` を追加し、選択済みなら紫丸に `✓`、未選択なら薄い枠線の丸を右端に表示するようにした。
+- 写真なしサムネイルにRNの `choiceShine` と同じ白い光沢円を追加し、グッズパネルの見え方を近づけた。
+
+#### `ios-native/Tests/MegrumAppTests/ProposalCreateFlowTests.swift`
+- 候補行サムネイル寸法、角丸、チェック丸サイズがRN準拠であることをテストで固定した。
+
+#### `notes/assets/swift-visual-qa/`
+- `proposal-give` / `proposal-receive` を再撮影し、`compare-proposal-give-rn-swift.png`、`compare-proposal-receive-rn-swift.png`、`visual-qa-report.json` を更新した。
+
+### 影響範囲
+
+- 打診作成STEP1の `私が出す` / `受け取る` 候補行
+- 候補行の選択済み/未選択表示
+- 候補行のタップ対象と入力制御の見え方
+- proposal payload、状態名、用語、DB schemaには影響なし
+
+### 確認方法
+
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-choice-row-parity --enable-xctest --disable-swift-testing --filter 'ProposalCreateFlowTests|HomeScreenFlowTests|TradeRequestDraftProposalCreateFlowTests|AppDrawerGestureTests' -j 1`
+- `scripts/capture_home_proposal_visual_qa.sh --screens proposal-give,proposal-receive`
+- `xcodebuild -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -destination 'id=00008120-000C49C43669A01E' -configuration Debug -allowProvisioningUpdates install`
+
+### セルフレビュー結果
+
+- ✅ 対象55件のSwiftテストが0 failuresで通った。
+- ✅ `proposal-give` の normalizedMeanAbsDiff は 19.67 から 17.06 まで改善した。
+- ✅ `proposal-receive` の normalizedMeanAbsDiff は 20.00 から 19.82 へ小幅改善した。
+- ✅ RNコード上の `choiceCard` / `choiceImage` / `checkCircle` と同じ意味の表示要素をSwift側にも持たせた。
+- ✅ `MTO’s phone`（iOS 26.5）へのDebug実機インストールが `INSTALL SUCCEEDED` で完了した。
+- ✅ 状態名、用語、DB schema、proposal payloadは変更していないため、`notes/09_state_machines.md`、`notes/10_glossary.md`、`notes/05_data_model.md` の更新は不要と判断した。
+- ⚠️ safe area由来のヘッダー位置、STEPタブの横幅・切れ方、候補行カード幅は引き続きVisual QAで調整対象。
+
+### 関連ファイル
+
+- `ios-native/Sources/MegrumApp/ProposalCreateFlow.swift`
+- `ios-native/Tests/MegrumAppTests/ProposalCreateFlowTests.swift`
+- `notes/assets/swift-visual-qa/swift-proposal-give.png`
+- `notes/assets/swift-visual-qa/swift-proposal-receive.png`
+- `notes/assets/swift-visual-qa/compare-proposal-give-rn-swift.png`
+- `notes/assets/swift-visual-qa/compare-proposal-receive-rn-swift.png`
+- `notes/assets/swift-visual-qa/visual-qa-report.json`
+
+---
+
+## イテレーション418.56：送信確認CTAをRN同様のスクロール末尾配置へ調整
+
+### 背景・問題意識
+
+ホーム起点フローの `proposal-confirm` をRN/Swift横並びで見比べると、Swift側だけ下部CTAが固定オーバーレイとして常時表示され、待ち合わせ候補カードに重なっていた。RN版の `proposal-confirm.tsx` は共通 `Screen` のスクロール内容末尾に `PrimaryButton` を置く構成で、同じスクロール位置では候補カードが見え、送信ボタンは下へスクロールした先に出る。オーナー要件の「ボタンの数、位置、表示制御」を揃えるため、確認画面だけCTA配置をRNへ寄せた。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/ProposalCreateFlow.swift`
+- `ProposalFlowBottomBarPlacement.usesInlineScrollButton(for:)` を追加し、`.confirm` だけ送信CTAをスクロール内容末尾に表示するようにした。
+- `give` / `receive` / `meetup` は従来どおり下部固定CTAを維持し、選択中ステップの操作性は変えないようにした。
+- `ProposalFlowBottomBar` に `isInline` を追加し、確認画面では白背景の固定バーではなく、RNの `PrimaryButton` に近いインラインボタンとして描画するようにした。
+- 交換内容カードのサムネイル表示を、RNの `thumbRow` に合わせて `44pt` サムネイル + `6pt` gap の折り返しグリッドに変更した。
+
+#### `ios-native/Tests/MegrumAppTests/ProposalCreateFlowTests.swift`
+- 確認画面だけCTAがinline配置になることをテストで固定した。
+- 交換カードのサムネイル寸法とgapがRN準拠であることをテストで固定した。
+
+#### `notes/assets/swift-visual-qa/`
+- `proposal-confirm` を再撮影し、`compare-proposal-confirm-rn-swift.png` と `visual-qa-report.json` を更新した。
+
+### 影響範囲
+
+- 打診作成フローの送信確認画面
+- 送信確認画面の送信ボタン表示位置
+- 送信確認画面の交換内容カード内サムネイル表示
+- `give` / `receive` / `meetup` の下部CTA、proposal payload、状態名、用語、DB schemaには影響なし
+
+### 確認方法
+
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-confirm-inline-button --enable-xctest --disable-swift-testing --filter 'ProposalCreateFlowTests|HomeScreenFlowTests|TradeRequestDraftProposalCreateFlowTests|AppDrawerGestureTests' -j 1`
+- `scripts/capture_home_proposal_visual_qa.sh --screens proposal-confirm`
+- `xcodebuild -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -destination 'id=00008120-000C49C43669A01E' -configuration Debug -allowProvisioningUpdates install`
+
+### セルフレビュー結果
+
+- ✅ 対象54件のSwiftテストが0 failuresで通った。
+- ✅ `proposal-confirm` のRN/Swift比較で、Swift側の固定CTAが候補カードへ被らなくなった。
+- ✅ `proposal-confirm` の normalizedMeanAbsDiff は 20.88 から 18.57 まで改善した。
+- ✅ `MTO’s phone`（iOS 26.5）へのDebug実機インストールが `INSTALL SUCCEEDED` で完了した。
+- ✅ 状態名、用語、DB schema、proposal payloadは変更していないため、`notes/09_state_machines.md`、`notes/10_glossary.md`、`notes/05_data_model.md` の更新は不要と判断した。
+- ⚠️ 交換内容カードの右側パネル幅、MapKitの実地図表示、safe area由来のヘッダー位置差分は引き続きVisual QAで調整対象。
+
+### 関連ファイル
+
+- `ios-native/Sources/MegrumApp/ProposalCreateFlow.swift`
+- `ios-native/Tests/MegrumAppTests/ProposalCreateFlowTests.swift`
+- `notes/assets/swift-visual-qa/swift-proposal-confirm-final.png`
+- `notes/assets/swift-visual-qa/compare-proposal-confirm-rn-swift.png`
+- `notes/assets/swift-visual-qa/visual-qa-report.json`
+
+---
+
+## イテレーション418.55：確認画面の交換カードグリフをRN準拠化
+
+### 背景・問題意識
+
+ホーム起点フローの `proposal-confirm` をRN/Swift横並びで見比べたところ、Swift側の交換内容カードでグッズ名の先頭日本語文字が出る余地があり、RN版のグッズカード表記である `S` / `K` / `J` / `N` と意味が揃いきっていなかった。確認画面は「この内容で打診を送る」直前の画面なので、相手の譲・あなたの譲のカード表記もRNと同じ読み方に固定した。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/ProposalCreateFlow.swift`
+- `ProposalPreviewGlyphResolver.glyph(for:)` をRN風のメンバー頭文字解決へ寄せ、`スア -> S`、`カリナ -> K`、`ジョンウ -> J`、`ニンニン -> N` を返すようにした。
+- 未知タイトルや空タイトルのfallbackは維持し、プレビュー表示が壊れないようにした。
+
+#### `ios-native/Tests/MegrumAppTests/ProposalCreateFlowTests.swift`
+- 確認画面の交換カードグリフがRN風の `S/K/J/N` になることをテストで固定した。
+
+#### `notes/assets/swift-visual-qa/`
+- `proposal-confirm` を再撮影し、`compare-proposal-confirm-rn-swift.png` と `visual-qa-report.json` を更新した。
+
+### 影響範囲
+
+- 打診作成フローの送信確認画面に表示される交換内容カード
+- RN/Swift Visual QAの `proposal-confirm`
+- 通常のproposal payload、状態名、用語、DB schemaには影響なし
+
+### 確認方法
+
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-confirm-glyph-parity --enable-xctest --disable-swift-testing --filter 'ProposalCreateFlowTests|HomeScreenFlowTests|TradeRequestDraftProposalCreateFlowTests|AppDrawerGestureTests' -j 1`
+- `scripts/capture_home_proposal_visual_qa.sh --screens proposal-confirm`
+- `xcodebuild -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -destination 'id=00008120-000C49C43669A01E' -configuration Debug -allowProvisioningUpdates install`
+
+### セルフレビュー結果
+
+- ✅ 対象52件のSwiftテストが0 failuresで通った。
+- ✅ `compare-proposal-confirm-rn-swift.png` で、交換内容カードのSwift側がRNと同じ `S` / `K` 表記になったことを確認した。
+- ✅ RN/Swift比較QAは22枚の画像過不足なし、11ペアすべて寸法差0を維持した。
+- ✅ `MTO’s phone`（iOS 26.5）へのDebug実機インストールが `INSTALL SUCCEEDED` で完了した。
+- ⚠️ `proposal-confirm` の normalizedMeanAbsDiff は 20.88。カード表記の意味差は潰したが、Swift Nativeのsafe area、カード幅、下部CTA固定表示、MapKit表示位置の差分は継続して目視比較対象。
+- ✅ 状態名、用語、DB schema、proposal payloadは変更していないため、`notes/09_state_machines.md`、`notes/10_glossary.md`、`notes/05_data_model.md` の更新は不要と判断した。
+
+### 関連ファイル
+
+- `ios-native/Sources/MegrumApp/ProposalCreateFlow.swift`
+- `ios-native/Tests/MegrumAppTests/ProposalCreateFlowTests.swift`
+- `notes/assets/swift-visual-qa/swift-proposal-confirm-final.png`
+- `notes/assets/swift-visual-qa/compare-proposal-confirm-rn-swift.png`
+- `notes/assets/swift-visual-qa/visual-qa-report.json`
+
+---
+
+## イテレーション418.54：proposal系Visual QAを直接root描画へ安定化
+
+### 背景・問題意識
+
+ホーム起点フローの `proposal-confirm` をRN/Swift横並びで再撮影したところ、Swift側の比較画像にホームのグルーム領域が残ったまま確認画面が下から出る状態が写っていた。これは実際の画面構成差ではなく、Visual QA用にrootから打診作成フローをモーダル表示していたため、スクショタイミングが遷移中の状態を拾っていたもの。ボタン数・位置・表示制御の比較を続けるには、proposal系スクショを安定したフルスクリーン状態で撮る必要があった。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/MegrumRootView.swift`
+- `VisualQAProposalRouteResolver.shouldRenderDirectRoot(for:)` を追加し、`proposal-give` / `proposal-receive` / `proposal-meetup` / `proposal-meetup-month` / `proposal-confirm` / `proposal-complete` をVisual QA時だけroot直下で描画するようにした。
+- 通常アプリのホーム→関係図→打診作成導線は維持し、Visual QA専用の直接表示だけを切り分けた。
+- 直接root描画時も `onCompletionAction` は `applyProposalCompletionRoute` に通し、完了後の `打診一覧に飛ぶ` 意味は維持した。
+
+#### `ios-native/Tests/MegrumAppTests/HomeScreenFlowTests.swift`
+- proposal系Visual QAがroot直下で描画され、ホーム・関係図・pending一覧は直接描画対象外であることをテストで固定した。
+
+#### `notes/assets/swift-visual-qa/`
+- proposal系6画面を再撮影し、`compare-proposal-*-rn-swift.png` と `visual-qa-report.json` を更新した。
+
+### 影響範囲
+
+- RN/Swiftスクショ比較QAの proposal系画面
+- Visual QA専用の打診作成画面起動方法
+- 通常のホーム起点ユーザーフロー、状態名、DB schema、proposal payloadには影響なし
+
+### 確認方法
+
+- `scripts/capture_home_proposal_visual_qa.sh --screens proposal-give,proposal-receive,proposal-meetup,proposal-meetup-month,proposal-confirm,proposal-complete`
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-confirm-direct-root --enable-xctest --disable-swift-testing --filter 'HomeScreenFlowTests|ProposalCreateFlowTests|TradeRequestDraftProposalCreateFlowTests|AppDrawerGestureTests' -j 1`
+
+### セルフレビュー結果
+
+- ✅ `proposal-confirm` のSwift比較画像から、ホーム背景が混ざる遷移中スクショを除去できた。
+- ✅ proposal系Visual QAはroot直下の安定したフルスクリーン状態で撮れるようになった。
+- ✅ 対象52件のSwiftテストが0 failuresで通った。
+- ✅ RN/Swift比較QAは22枚の画像過不足なし、11ペアすべて寸法差0を維持した。
+- ⚠️ `proposal-confirm` の normalizedMeanAbsDiff は 20.96。遷移中スクショを排除して画面状態は正しくなったが、Swift Nativeの標準safe area、カード幅、地図表示位置の差分が数値上は残る。
+- ✅ 状態名、用語、DB schema、proposal payloadは変更していないため、`notes/09_state_machines.md`、`notes/10_glossary.md`、`notes/05_data_model.md` の更新は不要と判断した。
+
+### 関連ファイル
+
+- `ios-native/Sources/MegrumApp/MegrumRootView.swift`
+- `ios-native/Tests/MegrumAppTests/HomeScreenFlowTests.swift`
+- `notes/assets/swift-visual-qa/swift-proposal-confirm-final.png`
+- `notes/assets/swift-visual-qa/compare-proposal-confirm-rn-swift.png`
+- `notes/assets/swift-visual-qa/visual-qa-report.json`
+
+---
+
+## イテレーション418.53：ホームのグッズパネル入口をRN横レールへ再調整
+
+### 背景・問題意識
+
+ホーム起点のRN/Swift横並び比較で、Swift版の `マッチしてるよ！` は3列グリッド表示になっており、RN版の「横に流れる大きめグッズパネル」と見え方が違っていた。オーナー要件の「ホーム画面のグッズパネルを押下した時から」の入口として、押すべきパネルの形・横スクロール感・相手グッズから始まることは重要なため、ホーム候補表示をRNの横レールへ戻した。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/HomeScreen.swift`
+- `HomeCandidateGrid` を3列 `LazyVGrid` から横スクロール `HStack` へ変更した。
+- カード幅を `148pt`、間隔を `10pt` に固定し、RN版同様に「2枚強 + 次カードの覗き」が見える構成へ寄せた。
+- 読み込み中スケルトンも横レール表示へ揃えた。
+- カード色は `S/K/J/N` の表示文字を基準にし、ホームQAで文字と色の意味が揺れにくいようにした。
+- グッズパネルタップ時に関係図へ入るルート、`matched -> perfect` / `possible -> forward` の振り分けは維持した。
+
+#### `ios-native/Sources/MegrumApp/NativePreviewData.swift`
+- Visual QA用のホーム候補を `homeMatchedItems` / `homePossibleItems` として明示した。
+- `homeMatchedItems` は相手所有グッズを先頭にし、ホームの最初のタップ対象が「相手のグッズパネル」になるようにした。
+
+#### `ios-native/Sources/MegrumApp/MegrumAppState.swift`
+- `PreviewMegrumRepository.loadHomeCandidateSections()` が、全在庫そのままではなく、ホームQA用に並べた候補セクションを返すようにした。
+
+#### `ios-native/Tests/MegrumAppTests/HomeScreenFlowTests.swift`
+- ホーム候補レールがRN版の2枚強表示になる幅・間隔をテストで固定した。
+- Visual QA用ホーム候補の先頭が相手所有の `S` グッズであることを検証した。
+
+#### `notes/assets/swift-visual-qa/`
+- `swift-home-preview.png`、`compare-home-rn-swift.png`、`visual-qa-report.json` を再撮影・更新した。
+
+### 影響範囲
+
+- ホーム画面の `マッチしてるよ！` / `交換できるかも？` のグッズパネル表示
+- ホームのグッズパネルタップから関係図へ入る視覚的入口
+- Visual QA用プレビュー候補の並び
+- DB schema、状態名、用語、proposal payloadには影響なし
+
+### 確認方法
+
+- `scripts/capture_home_proposal_visual_qa.sh --screens home`
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-home-rail-parity-2 --enable-xctest --disable-swift-testing --filter 'HomeScreenFlowTests|AppDrawerGestureTests|ProposalCreateFlowTests|TradeRequestDraftProposalCreateFlowTests' -j 1`
+
+### セルフレビュー結果
+
+- ✅ Swiftホームの `マッチしてるよ！` がRN同様の横スクロールレールになった。
+- ✅ ホームQAの先頭候補が相手所有の `S` グッズになり、最初に押すグッズパネルの意味がRN起点フローへ近づいた。
+- ✅ 対象51件のSwiftテストが0 failuresで通った。
+- ✅ RN/Swift比較QAは22枚の画像過不足なし、11ペアすべて寸法差0を維持した。
+- ⚠️ `home` の normalizedMeanAbsDiff は 23.42 から 24.52。カード構成と候補意味はRNへ近づいたが、Swift Nativeの標準ステータス領域・下部タブバーとRNの黒い上タブ差が数値上の残差として残る。
+- ✅ 状態名、用語、DB schema、proposal payloadは変更していないため、`notes/09_state_machines.md`、`notes/10_glossary.md`、`notes/05_data_model.md` の更新は不要と判断した。
+
+### 関連ファイル
+
+- `ios-native/Sources/MegrumApp/HomeScreen.swift`
+- `ios-native/Sources/MegrumApp/NativePreviewData.swift`
+- `ios-native/Sources/MegrumApp/MegrumAppState.swift`
+- `ios-native/Tests/MegrumAppTests/HomeScreenFlowTests.swift`
+- `notes/assets/swift-visual-qa/swift-home-preview.png`
+- `notes/assets/swift-visual-qa/compare-home-rn-swift.png`
+- `notes/assets/swift-visual-qa/visual-qa-report.json`
+
+---
+
+## イテレーション418.52：STEP1下部CTAの縦位置をRN比較で再調整
+
+### 背景・問題意識
+
+ホーム起点の打診作成STEP1をRN/Swift横並びで再確認したところ、Swift版の下部CTAは右矢印削除後も、RN版より下部バーの素材感と縦余白が強く出ていた。iOS標準のsafe areaは維持する必要があるが、RN版と見比べたときに「ボタンの位置・表示制御」がずれて見える要因を減らすため、CTA周辺だけを小さく再調整した。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/ProposalCreateFlow.swift`
+- `ProposalFlowBottomBar` の背景を `.regularMaterial` から白ベースの不透明寄り背景へ変更し、RN版の白い下部固定CTAに近づけた。
+- 下部CTAまわりの上下余白を `top 12 / bottom 10` から `top 10 / bottom 6` に抑え、iOS safe areaを残しながらRN版との縦位置差を縮めた。
+- CTAの文言、有効化条件、STEP遷移、送信payload生成は変更していない。
+
+#### `scripts/capture_home_proposal_visual_qa.sh`
+- 既存の全11ペア横並び比較生成を使い、`proposal-give` と `proposal-receive` を再撮影して比較レポートを更新した。
+
+#### `notes/assets/swift-visual-qa/`
+- `swift-proposal-give.png` と `swift-proposal-receive.png` を再撮影した。
+- `compare-proposal-give-rn-swift.png` と `compare-proposal-receive-rn-swift.png` を含む横並び比較PNG、および `visual-qa-report.json` を最新化した。
+
+### 影響範囲
+
+- ホーム起点の `打診に進む` 後、STEP1の下部CTA表示
+- RN/Swiftスクショ比較QAの `proposal-give` / `proposal-receive`
+- DB schema、状態名、用語、proposal payloadには影響なし
+
+### 確認方法
+
+- `scripts/capture_home_proposal_visual_qa.sh --screens proposal-give,proposal-receive`
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-drawer-proposal-parity --enable-xctest --disable-swift-testing --filter 'ProposalCreateFlowTests|HomeScreenFlowTests|TradeRequestDraftProposalCreateFlowTests|AppDrawerGestureTests' -j 1`
+
+### セルフレビュー結果
+
+- ✅ RN/Swift比較QAは22枚の画像過不足なし、11ペアすべて寸法差0を維持した。
+- ✅ `proposal-give` の normalizedMeanAbsDiff は 20.17 から 19.61 に改善した。
+- ✅ `proposal-receive` の normalizedMeanAbsDiff は 20.49 から 19.86 に改善した。
+- ✅ `AppDrawerGestureTests|HomeScreenFlowTests|ProposalCreateFlowTests|TradeRequestDraftProposalCreateFlowTests` の対象49件が0 failuresで通った。
+- ✅ iOS標準のsafe areaを潰す修正は避け、下部CTAだけRN版へ近づける最小調整に留めた。
+- ✅ 状態名、用語、DB schema、proposal payloadは変更していないため、`notes/09_state_machines.md`、`notes/10_glossary.md`、`notes/05_data_model.md` の更新は不要と判断した。
+
+### 関連ファイル
+
+- `ios-native/Sources/MegrumApp/ProposalCreateFlow.swift`
+- `scripts/capture_home_proposal_visual_qa.sh`
+- `notes/assets/swift-visual-qa/swift-proposal-give.png`
+- `notes/assets/swift-visual-qa/swift-proposal-receive.png`
+- `notes/assets/swift-visual-qa/compare-proposal-give-rn-swift.png`
+- `notes/assets/swift-visual-qa/compare-proposal-receive-rn-swift.png`
+- `notes/assets/swift-visual-qa/visual-qa-report.json`
+
+---
+
+## イテレーション418.51：STEP1種別チップ順と全ペア横並び比較をRN準拠化
+
+### 背景・問題意識
+
+ホーム起点の打診作成STEP1をRN/Swift横並びで確認したところ、`proposal-receive` の種別チップがRN版では `アクスタ -> トレカ`、Swift版では `トレカ -> アクスタ` になっていた。候補カード自体は同じ2件でも、フィルタUIの表示順が違うと「同じ選択画面を移行できている」と言いにくいため、RN版の表示制御に合わせて種別チップ順を修正した。また、横並び比較PNGは重点3画面だけでなく、ホーム起点フロー全体の11ペアを自動生成できるように広げた。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/ProposalCreateFlow.swift`
+- `ProposalGoodsFilterCatalog.goodsTypeChoices` の並びを `displayOrder` ではなく種別名の表示順に変更した。
+- `proposal-receive` で `アクスタ -> トレカ` の順に表示され、RN版の種別チップ順と揃うようにした。
+- グループチップ順、候補カード、STEP遷移、CTA、payload生成は変更していない。
+
+#### `ios-native/Tests/MegrumAppTests/ProposalCreateFlowTests.swift`
+- 候補の入力順が `トレカ -> アクスタ` でも、種別チップは `アクスタ -> トレカ` で返るテストを追加した。
+
+#### `scripts/capture_home_proposal_visual_qa.sh`
+- 横並び比較PNGの自動生成対象を、重点3画面からホーム起点フロー全11ペアへ拡張した。
+- 追加対象は `home`、`relation-entry`、`relation-candidates-expanded`、`proposal-meetup-week`、`proposal-meetup-month`、`proposal-confirm`、`proposal-complete`、`proposal-pending`。
+
+#### `notes/assets/swift-visual-qa/`
+- `swift-proposal-receive.png` を再撮影した。
+- `compare-relation-entry-rn-swift.png`、`compare-relation-candidates-expanded-rn-swift.png`、`compare-proposal-meetup-week-rn-swift.png`、`compare-proposal-meetup-month-rn-swift.png`、`compare-proposal-complete-rn-swift.png` など、全ペアの横並び比較PNGをスクリプト生成物として更新した。
+- `visual-qa-report.json` を最新の比較結果へ更新した。
+
+### 影響範囲
+
+- ホーム起点の `打診に進む` 後、STEP1の種別フィルタ表示順
+- RN/Swiftスクショ比較QAの成果物範囲
+- DB schema、状態名、用語、proposal payloadには影響なし
+
+### 確認方法
+
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-drawer-proposal-parity --enable-xctest --disable-swift-testing --filter 'ProposalCreateFlowTests|HomeScreenFlowTests|TradeRequestDraftProposalCreateFlowTests|AppDrawerGestureTests' -j 1`
+- `scripts/capture_home_proposal_visual_qa.sh --screens proposal-receive`
+
+### セルフレビュー結果
+
+- ✅ `AppDrawerGestureTests|HomeScreenFlowTests|ProposalCreateFlowTests|TradeRequestDraftProposalCreateFlowTests` の対象49件が0 failuresで通った。
+- ✅ RN/Swift比較QAは22枚の画像過不足なし、11ペアすべて寸法差0を維持した。
+- ✅ `proposal-receive` のSwift種別チップが、RN版と同じ `アクスタ -> トレカ` 順になったことを横並び画像で確認した。
+- ✅ 横並び比較PNGはホーム起点フロー全11ペアで自動生成されるようになった。
+- ⚠️ `proposal-receive` の normalizedMeanAbsDiff は 20.49。チップ順の意味差分は解消したが、Dynamic Island、標準safe area、CTA位置、カード縦位置の残差は引き続き残る。
+- ✅ 状態名、用語、DB schema、proposal payloadは変更していないため、`notes/09_state_machines.md`、`notes/10_glossary.md`、`notes/05_data_model.md` の更新は不要と判断した。
+
+### 関連ファイル
+
+- `ios-native/Sources/MegrumApp/ProposalCreateFlow.swift`
+- `ios-native/Tests/MegrumAppTests/ProposalCreateFlowTests.swift`
+- `scripts/capture_home_proposal_visual_qa.sh`
+- `notes/assets/swift-visual-qa/swift-proposal-receive.png`
+- `notes/assets/swift-visual-qa/compare-relation-entry-rn-swift.png`
+- `notes/assets/swift-visual-qa/compare-relation-candidates-expanded-rn-swift.png`
+- `notes/assets/swift-visual-qa/compare-proposal-meetup-week-rn-swift.png`
+- `notes/assets/swift-visual-qa/compare-proposal-meetup-month-rn-swift.png`
+- `notes/assets/swift-visual-qa/compare-proposal-complete-rn-swift.png`
+- `notes/assets/swift-visual-qa/visual-qa-report.json`
+
+---
+
+## イテレーション418.50：STEP1 CTAとRN/Swift横並び比較生成を整理
+
+### 背景・問題意識
+
+ホーム起点の打診作成STEP1をRN/Swiftスクショで見比べたところ、Swift版の下部CTAにはRN版にない右矢印アイコンが含まれていた。ボタン数は同じでも、ボタン内の表示要素が増えているため、オーナー要件の「ボタンの数、位置、テキストの表示、入力制御、表示制御」を再現する観点では、RN版同様にテキスト中心のCTAへ揃える必要があった。また、前回の横並び比較PNGは手動生成だったため、「都度RN版とSwift版のスクショを見比べる」運用を続けるには、比較画像生成をQAスクリプトに組み込む必要があった。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/ProposalCreateFlow.swift`
+- `ProposalFlowBottomBar` の主CTAから `chevron.right` アイコンを削除した。
+- `待ち合わせへ進む` / `次へ：送信確認` / 送信系CTAは、RN版同様にボタン内テキストを主表示にした。
+- CTAの有効化条件、STEP遷移、送信payload生成は変更していない。
+
+#### `scripts/capture_home_proposal_visual_qa.sh`
+- `write_compare_images` を追加し、RN/Swiftの横並びPNGを同じQAコマンド内で自動生成するようにした。
+- 自動生成対象は、今回の重点確認に使う `drawer-open`、`proposal-give`、`proposal-receive`。
+- `--verify-only` でも横並びPNGを生成し、既存スクショからすぐ比較画像を作り直せるようにした。
+- RN/Swift 11ペアの寸法・平均輝度・簡易ピクセル差分を `visual-qa-report.json` として保存し、ログに流れた数値だけに依存しない確認にした。
+
+#### `notes/assets/swift-visual-qa/`
+- `swift-proposal-give.png` と `swift-proposal-receive.png` を再撮影した。
+- `compare-drawer-open-rn-swift.png`、`compare-proposal-give-rn-swift.png`、`compare-proposal-receive-rn-swift.png` をスクリプト生成物として更新した。
+- `visual-qa-report.json` を追加し、最新のRN/Swift比較数値を成果物として残した。
+
+### 影響範囲
+
+- ホーム起点の `打診に進む` 後、STEP1下部CTAの表示要素
+- RN/Swiftスクショ比較QAの再現性
+- 左ドロワー、関係図、待ち合わせカレンダー、確認・完了・打診一覧の既存挙動には影響なし
+- proposal payload、DB schema、状態名、用語には影響なし
+
+### 確認方法
+
+- `scripts/capture_home_proposal_visual_qa.sh --screens proposal-give,proposal-receive`
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-drawer-proposal-parity --enable-xctest --disable-swift-testing --filter 'AppDrawerGestureTests|HomeScreenFlowTests|ProposalCreateFlowTests|TradeRequestDraftProposalCreateFlowTests' -j 1`
+
+### セルフレビュー結果
+
+- ✅ `ProposalFlowBottomBar` のCTAはRN版と同じくテキスト中心になり、ボタン内の余計な右矢印表示を削除した。
+- ✅ `AppDrawerGestureTests|HomeScreenFlowTests|ProposalCreateFlowTests|TradeRequestDraftProposalCreateFlowTests` の対象49件が0 failuresで通った。
+- ✅ RN/Swift比較QAは22枚の画像過不足なし、11ペアすべて寸法差0を維持した。
+- ✅ `capture_home_proposal_visual_qa.sh` 実行後に横並び比較PNGが自動生成されるようになった。
+- ✅ `--verify-only` でも `visual-qa-report.json` と横並び比較PNGが再生成されることを確認した。
+- ⚠️ `proposal-give` の normalizedMeanAbsDiff は 20.17、`proposal-receive` は 20.48。右矢印削除は表示意味としてRNへ近づいたが、簡易ピクセル差分はごくわずかに悪化したため、次の調整ではCTA位置・safe area・カード縦位置のどれを優先するかを見直す。
+- ✅ 状態名、用語、DB schema、proposal payloadは変更していないため、`notes/09_state_machines.md`、`notes/10_glossary.md`、`notes/05_data_model.md` の更新は不要と判断した。
+
+### 関連ファイル
+
+- `ios-native/Sources/MegrumApp/ProposalCreateFlow.swift`
+- `scripts/capture_home_proposal_visual_qa.sh`
+- `notes/assets/swift-visual-qa/swift-proposal-give.png`
+- `notes/assets/swift-visual-qa/swift-proposal-receive.png`
+- `notes/assets/swift-visual-qa/compare-drawer-open-rn-swift.png`
+- `notes/assets/swift-visual-qa/compare-proposal-give-rn-swift.png`
+- `notes/assets/swift-visual-qa/compare-proposal-receive-rn-swift.png`
+- `notes/assets/swift-visual-qa/visual-qa-report.json`
+
+---
+
+## イテレーション418.49：左ドロワーとホーム起点STEP1をRN/Swift比較で再調整
+
+### 背景・問題意識
+
+オーナーから、左ドロワーの出し方とホームのグッズパネルタップ後フローについて「そちらの方針で再修正」し、RN版とSwift版のスクショを都度見比べるテスト方針が良さそうだと指示があった。左ドロワーは前回の全域右スワイプ追従を維持しつつ、ホーム起点の打診作成STEP1では、Swift側にRNにはない `STEP 1/2` ピルが表示され、`私が出す` の候補にも相手所有グッズが混ざり得る差分が残っていた。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/ProposalCreateFlow.swift`
+- `私が出す` の候補を viewer 所有の在庫に限定し、RN版の「自分が提示するグッズだけを選ぶ」意味に揃えた。
+- 提示物選択ヘッダーから `STEP 1/2` / `STEP 2/2` ピルを取り除き、RN版と同じ `PROPOSAL` ラベル + `提示物の選択` タイトルを主表示にした。
+- 未使用になった `stepLabel` の受け渡しと `ProposalFlowStatusPill` を削除し、STEP表示が復活しにくい構成へ整理した。
+- 候補行はRNの縦1列カードに近い、文字サムネ・選択ハイライト・補助チップの構成を維持した。
+
+#### `ios-native/Tests/MegrumAppTests/ProposalCreateFlowTests.swift`
+- RNヘッダー期待値テストからSTEPピル前提を外し、`PROPOSAL` + 画面タイトルを主に見る方針へ合わせた。
+- 候補行の文字グリフがRN同様に `K` / `J` / `S` / `N` へ解決されるテストを維持した。
+
+#### `notes/assets/swift-visual-qa/`
+- RN/Swift比較用に `drawer-open`、`proposal-give`、`proposal-receive` を再撮影した。
+- 横並び確認用に `compare-drawer-open-rn-swift.png`、`compare-proposal-give-rn-swift.png`、`compare-proposal-receive-rn-swift.png` を作成し直した。
+
+### 影響範囲
+
+- ホームのグッズパネルから関係図を経由して `打診に進む` 後のSTEP1表示
+- `私が出す` で選べる候補グッズの所有者境界
+- 左ドロワーのスクショ比較QA
+- proposal payload、DB schema、状態名、用語には影響なし
+
+### 確認方法
+
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-drawer-proposal-parity --enable-xctest --disable-swift-testing --filter 'AppDrawerGestureTests|HomeScreenFlowTests|ProposalCreateFlowTests|TradeRequestDraftProposalCreateFlowTests' -j 1`
+- `scripts/capture_home_proposal_visual_qa.sh --screens drawer-open,proposal-give,proposal-receive`
+
+### セルフレビュー結果
+
+- ✅ `AppDrawerGestureTests|HomeScreenFlowTests|ProposalCreateFlowTests|TradeRequestDraftProposalCreateFlowTests` の対象49件が0 failuresで通った。
+- ✅ RN/Swift比較QAは22枚の画像過不足なし、11ペアすべて寸法差0を維持した。
+- ✅ `drawer-open` の normalizedMeanAbsDiff は 18.64 で、全域右スワイプ追従後のドロワー表示を再撮影した。
+- ✅ `proposal-give` の normalizedMeanAbsDiff は 20.16。Swift側でもSTEPピルが消え、自分所有の `カリナ 春ver.` / `ジョンウ ラキドロ` だけが提示候補として並ぶ。
+- ⚠️ `proposal-receive` の normalizedMeanAbsDiff は 20.43 で、iter418.45時点の19.73より数値上は少し悪化した。目視ではRN同様の2候補・縦1列・文字サムネへ寄っているが、Swift NativeのDynamic Island、標準safe area、下部CTA余白が残るため、次の微調整対象として継続する。
+- ✅ 左ドロワーは `AppDrawerGestureTests` で、左端不要、全域右スワイプ開始、縦スワイプ優先、閾値未満復帰、開状態からの左スワイプ閉じを再確認した。
+- ✅ 状態名、用語、DB schema、proposal payloadは変更していないため、`notes/09_state_machines.md`、`notes/10_glossary.md`、`notes/05_data_model.md` の更新は不要と判断した。
+
+### 関連ファイル
+
+- `ios-native/Sources/MegrumApp/ProposalCreateFlow.swift`
+- `ios-native/Tests/MegrumAppTests/ProposalCreateFlowTests.swift`
+- `notes/assets/swift-visual-qa/swift-drawer-open.png`
+- `notes/assets/swift-visual-qa/swift-proposal-give.png`
+- `notes/assets/swift-visual-qa/swift-proposal-receive.png`
+- `notes/assets/swift-visual-qa/compare-drawer-open-rn-swift.png`
+- `notes/assets/swift-visual-qa/compare-proposal-give-rn-swift.png`
+- `notes/assets/swift-visual-qa/compare-proposal-receive-rn-swift.png`
+
+---
+
+## イテレーション418.48：打診一覧着地をRN pendingカード構成へ寄せる
+
+### 背景・問題意識
+
+ホームのグッズパネル押下から打診完了し、`打診一覧に飛ぶ` で着地する画面をRN/Swiftスクショで見比べたところ、Swift版は大見出し `やりとり` が先頭を占有し、カードの順序・ステータス文言・相手プロフィール表示もRN版の `proposal-pending` と大きくずれていた。ユーザーから「変わっているのか、何を見たら変わっていると言えるのか」と確認されたため、RN/Swiftのスクショを都度比較する形で、着地点の画面構成と表示制御を再調整した。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/TradesScreen.swift`
+- pending一覧の大見出しを外し、RN版同様にカードが画面上部から始まる構成へ寄せた。
+- `TradeCardPresentation` を追加し、RN版の pending カードと同じ意味の表示文言を一元化した。
+  - `返信が届いています` / `合意待ち` / `送信済み` / `新着打診`
+  - `要対応` / `相手待ち`
+  - `届いた` / `送った`
+- pending一覧の表示順をRN版の見え方に寄せ、`negotiating`、`agreement_one_side`、送信済み、受信済みの順で並ぶようにした。
+- 表示中proposalの相手プロフィールを自動ロードし、未ロード時に `@user_0000` のようなfallbackだけがスクショに出る状態を減らした。
+- カード中央の交換プレビューをRN版の小さな縦長グッズサムネ＋双方向矢印構成へ寄せた。
+- iOS標準タブバーは残し、RNとの完全pixel一致よりもAGENTS.mdの「iOSネイティブ標準コンポーネント優先」を守った。
+
+#### `ios-native/Sources/MegrumApp/NativePreviewData.swift`
+- RN/Swift比較用fixtureのpending proposalを、RN版の `proposal-pending` に近い順序・向き・時刻へ調整した。
+- 先頭カードが `返信が届いています`、2件目が `合意待ち`、3件目が `送信済み`、4件目が `新着打診` になるよう、`senderID` / `receiverID` / `createdAt` を整理した。
+
+#### `ios-native/Tests/MegrumAppTests/TradeChatAffordanceTests.swift`
+- pending一覧の件数、完了画面からpendingへの着地、RN準拠のステータス文言、グッズサムネの文字グリフを確認するテストを追加した。
+
+#### `notes/assets/swift-visual-qa/`
+- `swift-proposal-pending.png` を再撮影した。
+- RN/Swift目視比較用に `compare-proposal-pending-rn-swift.png` を作成した。
+
+### 影響範囲
+
+- 打診完了後の `打診一覧に飛ぶ` 着地点
+- `TradesScreen` のpending一覧カード表示
+- Visual QA用のpreview fixture
+- proposal payload、DB schema、状態名、用語には影響なし
+
+### 確認方法
+
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-pending-parity --enable-xctest --disable-swift-testing --filter 'TradeChatAffordanceTests|HomeScreenFlowTests|ProposalCreateFlowTests' -j 1`
+- `scripts/capture_home_proposal_visual_qa.sh --screens proposal-pending`
+
+### セルフレビュー結果
+
+- ✅ `TradeChatAffordanceTests|HomeScreenFlowTests|ProposalCreateFlowTests` と関連対象の68件が0 failuresで通った。
+- ✅ RN/Swift比較QAは22枚の画像過不足なし、11ペアすべて寸法差0を維持した。
+- ✅ `proposal-pending` の normalizedMeanAbsDiff は 17.01 -> 15.51 に改善した。
+- ✅ 先頭カードが `返信が届いています` / `要対応` になり、RN版pending一覧の先頭状態と揃った。
+- ✅ `打診一覧に飛ぶ` は `TradesScreen` の pending stage へ着地する導線を維持した。
+- ✅ 状態名、用語、DB schema、proposal payloadは変更していないため、`notes/09_state_machines.md`、`notes/10_glossary.md`、`notes/05_data_model.md` の更新は不要と判断した。
+- ⚠️ Swift NativeはiOS標準タブバーとステータスバーを維持するため、RN版より下部UIと上部余白が残る。これはAGENTS.mdのiOS標準優先ルールに沿った意図的な差分。
+
+### 関連ファイル
+
+- `ios-native/Sources/MegrumApp/TradesScreen.swift`
+- `ios-native/Sources/MegrumApp/NativePreviewData.swift`
+- `ios-native/Tests/MegrumAppTests/TradeChatAffordanceTests.swift`
+- `notes/assets/swift-visual-qa/swift-proposal-pending.png`
+- `notes/assets/swift-visual-qa/compare-proposal-pending-rn-swift.png`
+
+---
+
+## イテレーション418.47：ホーム入口をRNのグルーム＋グッズパネル構成へ寄せる
+
+### 背景・問題意識
+
+ホームのRN/Swiftスクショ比較で `home` の normalizedMeanAbsDiff が 36.96 と大きく、RN版は `グルーム` レールと `マッチしてるよ！` のグッズパネルが画面上部の主役になっている一方、Swift版は現地交換カードが大きく先頭に出て、グッズパネル押下フローの入口が下へ押し下げられていた。ユーザー要件は「ホーム画面のグッズパネルを押下した時から打診完了まで」をまず完璧に移行することなので、ホーム入口でもRN同様にグッズパネルを即座に見つけて押せる構成へ再調整した。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/HomeScreen.swift`
+- ホーム上部の順序をRN版に寄せ、`HomeHeader` の直下に `HomeGroomRail`、続いて `マッチしてるよ！` / `交換できるかも？` のグッズパネルを表示する構成へ変更した。
+- `HomeLocalModeSurface` は削除せず、グッズパネルの後ろへ移動した。現地交換モード機能は保持しつつ、ホーム起点の打診フローをRN同様に優先表示する。
+- RNの `HomeGroomRail` に合わせ、`追加` と丸いグルーム投稿タイルを横並び表示する `HomeGroomRail` を追加した。
+- RNの `CandidateTile` に合わせ、ホーム専用の `HomeCandidateGrid` / `HomeCandidateTile` を追加した。
+  - 3列グリッド
+  - 大きな角丸グッズパネル
+  - 写真なし時の文字バッジ
+  - 右上のハッシュタグピル
+  - `LIVE` バッジ
+- グッズパネルの押下先は既存の `HomeGoodsPanelRouteResolver` を使い、`matched` は関係図 `.perfect`、`possible` は関係図 `.forward` へ入る挙動を維持した。
+
+#### `ios-native/Tests/MegrumAppTests/HomeScreenFlowTests.swift`
+- ホームタイルがRN同様のメンバー文字とタグ行を作ることを確認するテストを追加した。
+
+#### `notes/assets/swift-visual-qa/`
+- `swift-home-preview.png` を再撮影した。
+
+### 影響範囲
+
+- ホーム画面の上部構成
+- ホームのグッズパネル表示
+- ホームのグッズパネル押下から関係図へ入る導線
+- 現地交換モードの保存・設定・DB schema・proposal payload・状態名・用語には影響なし
+
+### 確認方法
+
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-home-parity --enable-xctest --disable-swift-testing --filter 'HomeScreenFlowTests|AppDrawerGestureTests|MatchRelationScreenTests' -j 1`
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-home-parity --enable-xctest --disable-swift-testing --filter 'HomeScreenFlowTests' -j 1`
+- `scripts/capture_home_proposal_visual_qa.sh --screens home`
+
+### セルフレビュー結果
+
+- ✅ `HomeScreenFlowTests|AppDrawerGestureTests|MatchRelationScreenTests` の対象28件が0 failuresで通った。
+- ✅ 追加の `HomeScreenFlowTests` 8件が0 failuresで通った。
+- ✅ RN/Swift比較QAは22枚の画像過不足なし、11ペアすべて寸法差0を維持した。
+- ✅ `home` の normalizedMeanAbsDiff は 36.96 -> 23.42 に改善した。
+- ✅ Swiftホームでも、画面上部で `グルーム` レールと `マッチしてるよ！` のグッズパネルが見えるようになった。
+- ✅ グッズパネル押下で関係図へ入る導線は維持し、`matched` / `possible` の matchType 分岐も変更していない。
+- ✅ 状態名、用語、DB schema、proposal payloadは変更していないため、`notes/09_state_machines.md`、`notes/10_glossary.md`、`notes/05_data_model.md` の更新は不要と判断した。
+- ⚠️ RN Web撮影には黒い上部タブが写っている一方、Swift NativeはiOS標準タブバーを維持しているため、完全pixel一致ではなく「画面構成・入力導線・押下先」の一致を優先した。
+
+### 関連ファイル
+
+- `ios-native/Sources/MegrumApp/HomeScreen.swift`
+- `ios-native/Tests/MegrumAppTests/HomeScreenFlowTests.swift`
+- `notes/assets/swift-visual-qa/swift-home-preview.png`
+
+---
+
+## イテレーション418.46：送信確認のグッズサムネをRN文字グリフへ再調整
+
+### 背景・問題意識
+
+ホームのグッズパネル押下後フローをRN/Swiftスクショで見比べたところ、送信確認画面の `交換内容` でRN版は写真なしグッズをタイトル先頭文字のグリフバッジ（例：`ス`、`カ`）として表示している一方、Swift版はSF Symbolsの写真アイコンを表示していた。候補fixtureをRN側へ寄せた後も、この差が「同じグッズ候補を確認している」感覚を弱めていたため、Swift側のフォールバック表示をRN準拠へ寄せた。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/ProposalCreateFlow.swift`
+- `ProposalPreviewThumb` の画像なしフォールバックを `photo` アイコンから、グッズタイトル先頭文字の白いグリフ表示へ変更した。
+- `ProposalPreviewGlyphResolver` を追加し、前後空白を除いた最初の文字を使い、空文字の場合は `?` にフォールバックするようにした。
+- `交換内容` の情報順、payload、候補選択状態、送信導線は変更していない。
+
+#### `ios-native/Tests/MegrumAppTests/ProposalCreateFlowTests.swift`
+- タイトル先頭文字フォールバックの単体テストを追加した。
+
+#### `notes/assets/swift-visual-qa/`
+- `swift-proposal-confirm-final.png` を再撮影した。
+
+### 影響範囲
+
+- ホーム起点の関係図から打診作成へ進んだ後の送信確認画面
+- 写真URLがないグッズサムネイルの表示
+- DB schema、proposal payload、状態名、用語には影響なし
+
+### 確認方法
+
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-confirm-glyph --enable-xctest --disable-swift-testing --filter 'ProposalCreateFlowTests|HomeScreenFlowTests' -j 1`
+- `scripts/capture_home_proposal_visual_qa.sh --screens proposal-confirm`
+
+### セルフレビュー結果
+
+- ✅ 対象Swiftテスト39件が0 failuresで通った。
+- ✅ RN/Swift比較QAは22枚の画像過不足なし、11ペアすべて寸法差0を維持した。
+- ✅ Swift送信確認画面の `交換内容` が写真アイコンではなく `ス` / `カ` の文字グリフ表示になり、RNの写真なしサムネ表現へ寄った。
+- ✅ `proposal-confirm` の normalizedMeanAbsDiff は 20.19。局所的なグリフ差分修正のため全体平均は大きく改善していないが、目視上の意味差分は解消した。
+- ✅ payload、状態名、用語、DB schemaは変更していないため、`notes/09_state_machines.md`、`notes/10_glossary.md`、`notes/05_data_model.md` の更新は不要と判断した。
+
+### 関連ファイル
+
+- `ios-native/Sources/MegrumApp/ProposalCreateFlow.swift`
+- `ios-native/Tests/MegrumAppTests/ProposalCreateFlowTests.swift`
+- `notes/assets/swift-visual-qa/swift-proposal-confirm-final.png`
+
+---
+
+## イテレーション418.45：ホーム起点フロー比較QAのSwift fixtureをRN側へ寄せる
+
+### 背景・問題意識
+
+RN/Swiftスクショ比較で `proposal-receive` の normalizedMeanAbsDiff が 26.36 と大きく、目視するとSwift側だけ `TWICE / ランダムトレカ` 系の古いプレビューfixtureと写真URLが混ざり、RN側の `aespa / LUMENA / NCT` fixtureと候補数・タイトル・画像表現が異なっていた。これでは画面構成や入力制御の差ではなく、比較データの差がノイズになってしまうため、Swift NativeのVisual QA用データをRNの `proposalItems` / home preview fixture に寄せた。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/NativePreviewData.swift`
+- Visual QA用の推しグループを `aespa`、`LUMENA`、`NCT` に寄せた。
+- グッズ名をRNの提示物選択fixtureに合わせた。
+  - `カリナ 春ver.`
+  - `ジョンウ ラキドロ`
+  - `スア ラキドロ`
+  - `ニンニン 制服`
+- Swift側だけ写真URLが出ていた候補を、RN同様のプレースホルダー表示になるよう `imageURL: nil` へ寄せた。
+- 自分の譲る候補、相手が譲る候補、wish/listing の組み合わせをRN比較で使う候補構成へ合わせた。
+
+#### `ios-native/Sources/MegrumApp/MegrumAppState.swift`
+- Preview repository の `loadPublicTradeGoods` で古い追加fixture（`会場限定フォト`、`ランダムトレカ C`）を足していた処理を削除した。
+- 本番Supabase repositoryではなくPreview repositoryのみの変更とし、通常のDB由来候補数やpayloadには影響しないようにした。
+
+#### `notes/assets/swift-visual-qa/`
+- `swift-match-relation-rn-visual-header.png`
+- `swift-match-relation-candidates-expanded.png`
+- `swift-proposal-give.png`
+- `swift-proposal-receive.png`
+
+### 影響範囲
+
+- RN/Swift比較QA用のSwiftプレビュー表示
+- ホームのグッズパネル押下後に入る関係図、提示物選択STEP1の比較精度
+- 本番データ読み込み、DB schema、proposal payload、状態名、用語には影響なし
+
+### 確認方法
+
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-visual-fixture --enable-xctest --disable-swift-testing --filter 'HomeScreenFlowTests|MatchRelationScreenTests|ProposalCreateFlowTests|TradeRequestDraftProposalCreateFlowTests' -j 1`
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-visual-fixture --enable-xctest --disable-swift-testing --filter 'HomeScreenFlowTests|ProposalCreateFlowTests|TradeRequestDraftProposalCreateFlowTests' -j 1`
+- `scripts/capture_home_proposal_visual_qa.sh --screens match-relation,match-relation-candidates,proposal-give,proposal-receive`
+- `scripts/capture_home_proposal_visual_qa.sh --screens proposal-receive`
+- `scripts/capture_home_proposal_visual_qa.sh --verify-only`
+
+### セルフレビュー結果
+
+- ✅ 対象Swiftテスト50件、追加確認38件が0 failuresで通った。
+- ✅ RN/Swift比較QAは22枚の画像過不足なし、11ペアすべて寸法差0を維持した。
+- ✅ `relation-entry` の normalizedMeanAbsDiff は 15.09 -> 12.5 に改善した。
+- ✅ `proposal-receive` の normalizedMeanAbsDiff は 26.36 -> 19.73 に改善した。
+- ✅ `proposal-receive` はSwift側でもRN同様に2候補表示になり、古い3件目の `ランダムトレカ C` が出なくなった。
+- ✅ 本番Supabase repository、送信payload、状態名は変更していないため、`notes/09_state_machines.md`、`notes/10_glossary.md`、`notes/05_data_model.md` の更新は不要と判断した。
+- ⚠️ Swift実機/Simulator側はステータスバーと `STEP 1/2` チップが写るため、RN Web撮影との完全pixel一致はまだ目的にしていない。次はホーム画面全体またはSTEP1上部余白/ヘッダー差分をRN準拠で詰める。
+
+### 関連ファイル
+
+- `ios-native/Sources/MegrumApp/NativePreviewData.swift`
+- `ios-native/Sources/MegrumApp/MegrumAppState.swift`
+- `notes/assets/swift-visual-qa/swift-match-relation-rn-visual-header.png`
+- `notes/assets/swift-visual-qa/swift-match-relation-candidates-expanded.png`
+- `notes/assets/swift-visual-qa/swift-proposal-give.png`
+- `notes/assets/swift-visual-qa/swift-proposal-receive.png`
+
+---
+
+## イテレーション418.44：左ドロワーをRN/X式の全域スワイプUIへ再調整
+
+### 背景・問題意識
+
+実機確認で左ドロワーが「めちゃくちゃなUI」に見えるという指摘があり、Swift版を確認すると、RN版のXモバイルアプリ風ドロワーとは違い、角丸・Material・強い影の独立パネルとして表示されていた。ユーザー要件は「左画面端だけでなく、どこでも右にスワイプしたら指の動きに従って左ドロワーが出る」であり、Swift側の全域スワイプ制御は入っていたが、表示面がRNの `ProfileDrawerShell` と異なっていたため、RN/Swiftスクショ比較を基準に再調整した。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/AppChrome.swift`
+- ドロワー項目をRN版と同じ順序へ寄せた。
+  - `プロフィール`
+  - `通知`
+  - `プロフィール編集`
+  - `推し設定`
+  - `スケジュール`
+  - `完了した取引`
+  - `設定とプライバシー`
+  - `ヘルプ`
+  - `ログアウト`
+- 住所設定・ブロックした人はRN版の左ドロワー表層には出さず、設定画面側の導線として維持した。
+- 角丸Materialパネル、強い影、サブタイトル付き行をやめ、RN/X式の白い下地メニューとして見える構成にした。
+- プロフィールヘッダー、アバター、メニュー行のサイズと余白をRN版の `drawerContent` / `DrawerItem` に寄せた。
+
+#### `ios-native/Sources/MegrumApp/MegrumRootView.swift`
+- ドロワー項目の選択先をRN版の意味へ合わせた。
+- `プロフィール編集` は既存の `AccountSetupScreen(mode: .edit)` へ接続した。
+- `完了した取引` は `TradesScreen` の `.completed` へ着地するようにした。
+- `スケジュール` はSwift側にRN同等の独立スケジュール画面がまだないため、既存の取引/スケジュール導線を持つ `TradesScreen` 側へ寄せた。
+
+#### `ios-native/Tests/MegrumAppTests/AppDrawerGestureTests.swift`
+- ドロワーが画面端起点ではなく、全域の水平右スワイプで追従開始することを既存テストで維持した。
+- RN版のドロワー項目順を固定するテストを追加した。
+
+#### `ios-native/Tests/MegrumAppTests/SettingsScreenTests.swift`
+- 旧Swiftドロワー前提の住所/ブロック表示テストを、RN版のドロワー項目構成へ更新した。
+
+#### `notes/assets/swift-visual-qa/`
+- `swift-drawer-open.png` をビルド込みで再撮影した。
+
+### 影響範囲
+
+- 左ドロワーの表示、メニュー項目、タップ遷移
+- 画面全域からの右スワイプによるドロワー表示
+- ホーム起点フローのスクショ比較QA
+- DB schema、proposal payload、状態名、用語には影響なし
+
+### 確認方法
+
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-drawer-parity --enable-xctest --disable-swift-testing --filter 'AppDrawerGestureTests|SettingsScreenTests|HomeScreenFlowTests' -j 1`
+- `scripts/capture_home_proposal_visual_qa.sh --screens drawer-open`
+- `scripts/capture_home_proposal_visual_qa.sh --verify-only`
+- RN/Swiftスクショを目視比較：
+  - `notes/assets/rn-screen-lookup/rn-drawer-open.png`
+  - `notes/assets/swift-visual-qa/swift-drawer-open.png`
+
+### セルフレビュー結果
+
+- ✅ 左ドロワーは角丸Materialカードではなく、RN/X式の白い下地メニューとして表示されるようになった。
+- ✅ Swiftの全域右スワイプテストは維持し、画面端だけに限定されていないことを確認した。
+- ✅ RN版のメニュー項目順をSwiftテストで固定した。
+- ✅ 対象Swiftテスト26件が0 failuresで通った。
+- ✅ RN/Swift比較QAは22枚の画像過不足なし、11ペアすべて寸法差0を維持した。`drawer-open` の normalizedMeanAbsDiff は 19.93。
+- ⚠️ Swift実機/Simulator側はステータスバーが写るため、RN Web撮影のdrawer visual snapshotとは完全なpixel一致ではなく、構成・入力制御・スワイプ意味の一致を優先した。
+- ⚠️ Swift側の独立スケジュール画面は未整備のため、ドロワー上の `スケジュール` は既存の取引/スケジュール導線へ暫定接続している。RN同等の単独スケジュール画面は別iterで整える。
+
+### 関連ファイル
+
+- `ios-native/Sources/MegrumApp/AppChrome.swift`
+- `ios-native/Sources/MegrumApp/MegrumRootView.swift`
+- `ios-native/Tests/MegrumAppTests/AppDrawerGestureTests.swift`
+- `ios-native/Tests/MegrumAppTests/SettingsScreenTests.swift`
+- `notes/assets/swift-visual-qa/swift-drawer-open.png`
+
+---
+
+## イテレーション418.43：待ち合わせカレンダー週送りをRN式の指追従へ寄せる
+
+### 背景・問題意識
+
+ホーム起点の `提示物の選択 -> 待ち合わせ` では、RN版の週カレンダーが横スワイプ中に `weekDragX` で日付ヘッダーとグリッドを指の動きへ追従させ、閾値未満なら戻り、閾値以上なら週送りする挙動になっている。Swift版は週送り自体と長押し候補作成は実装済みだったが、横スワイプ中の盤面追従が弱く、ユーザー要件の「スワイプしたときの挙動」の再現度が足りなかった。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/ProposalMeetupCalendarEditor.swift`
+- 週カレンダーに `weekDragOffset` を追加し、横スワイプ中に日付ヘッダーと時間グリッドが指の動きへ追従するようにした。
+- RNと同じ意味で、横移動優先時だけ週スワイプとして扱い、縦方向優先の操作はスクロール/候補作成側を維持した。
+- 閾値未満は元の位置へ戻し、閾値以上は `onShiftWeek` で前後週へ送ってからオフセットを戻す構成にした。
+- ドラッグ量はRNのcarry表現に近づけ、過剰に画面外へ流れないよう `edgeCarryRatio` で抵抗を入れた。
+
+#### `ios-native/Tests/MegrumAppTests/TradeRequestDraftProposalCreateFlowTests.swift`
+- `testProposalMeetupWeekSwipeFollowsFingerAndUsesRnThreshold` を追加し、ドラッグ中オフセットのクランプ、閾値未満の未切替、閾値以上の週送り、縦優先時の未切替を検証した。
+
+#### `notes/assets/swift-visual-qa/`
+- `swift-proposal-meetup-week.png` と `swift-proposal-meetup-month.png` をビルド込みで再撮影した。
+
+### 影響範囲
+
+- ホーム起点フローの `待ち合わせ` STEP
+- 待ち合わせカレンダーの週送り横スワイプ
+- 長押し候補作成、候補移動/終了時刻調整、候補順、送信payloadには影響なし
+
+### 確認方法
+
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-meetup-swipe --enable-xctest --disable-swift-testing --filter 'TradeRequestDraftProposalCreateFlowTests|ProposalCreateFlowTests|HomeScreenFlowTests' -j 1`
+- `scripts/capture_home_proposal_visual_qa.sh --screens proposal-meetup,proposal-meetup-month`
+- `scripts/capture_home_proposal_visual_qa.sh --verify-only`
+
+### セルフレビュー結果
+
+- ✅ 週カレンダーは横スワイプ中に日付ヘッダーと時間グリッドが指へ追従するようになった。
+- ✅ 閾値未満は戻る、閾値以上は週送り、縦優先は週送りしない、というRN版の操作意味をテストで固定した。
+- ✅ 対象Swiftテスト38件が0 failuresで通った。
+- ✅ RN/Swift比較QAは22枚の画像過不足なし、11ペアすべて寸法差0を維持した。
+- ✅ payload、DB schema、状態名、用語は変更していないため、`notes/09_state_machines.md`、`notes/10_glossary.md`、`notes/05_data_model.md` の更新は不要と判断した。
+- ⚠️ 静止スクショでは指追従中の途中状態そのものは見えないため、最終的な体感確認は実機/Simulator操作で継続する。
+
+### 関連ファイル
+
+- `ios-native/Sources/MegrumApp/ProposalMeetupCalendarEditor.swift`
+- `ios-native/Tests/MegrumAppTests/TradeRequestDraftProposalCreateFlowTests.swift`
+- `notes/assets/swift-visual-qa/swift-proposal-meetup-week.png`
+- `notes/assets/swift-visual-qa/swift-proposal-meetup-month.png`
+
+---
+
+## イテレーション418.42：Swift提示物選択STEP1のセグメントとタブをRN寄せ
+
+### 背景・問題意識
+
+RN比較QAをiPhone実寸viewportで撮り直した結果、Swiftの `提示物の選択` STEP1 は候補カードの構成自体は近い一方で、交換手段セグメントとSTEPタブの表示がRNと逆方向にズレていた。RN版は交換手段の選択中セグメントが紫で、`私が出す 1 / 受け取る 1 / 待ち合わせ !` は白い横長ピル上のインライン表示である。一方Swift版は、交換手段がiOS標準Segmented Picker由来の白選択、STEPタブが紫ピル＋緑バッジになっており、画面上部の表示制御の意味がRN版と違って見えていた。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/ProposalCreateFlow.swift`
+- `ProposalExchangeMethodSelector` をRN版の `SegmentedControl` 表現に近づけ、選択中セグメントを紫、未選択を薄いグレー背景上の muted 表示にした。
+- `ProposalStepHeader` を、紫ピル＋緑バッジから、白い横長ピル上に `私が出す 1` のようなタブ名＋件数をインライン表示する構成へ変更した。
+- タブのジャンプ可否、件数表示、`give/receive` の横スワイプ切替、`meetup` ではスワイプ無効という既存の入力制御は維持した。
+
+#### `notes/assets/swift-visual-qa/`
+- `swift-proposal-give.png`、`swift-proposal-receive.png`、`swift-proposal-meetup-week.png` をビルド込みで再撮影した。
+
+### 影響範囲
+
+- ホーム起点フロー内の `提示物の選択` STEP1
+- `私が出す`、`受け取る`、`待ち合わせ` のRN/Swift比較QA
+- 送信payload、DB schema、状態名、候補選択ロジックには影響なし
+
+### 確認方法
+
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-proposal-step-ui --enable-xctest --disable-swift-testing --filter 'ProposalCreateFlowTests|TradeRequestDraftProposalCreateFlowTests|HomeScreenFlowTests' -j 1`
+- `scripts/capture_home_proposal_visual_qa.sh --screens proposal-give,proposal-receive,proposal-meetup`
+- `scripts/capture_home_proposal_visual_qa.sh --verify-only`
+- RN/Swiftスクショを目視比較：
+  - `notes/assets/rn-screen-lookup/rn-proposal-give.png`
+  - `notes/assets/swift-visual-qa/swift-proposal-give.png`
+
+### セルフレビュー結果
+
+- ✅ 交換手段はRN同様に選択中が紫で見えるようになり、STEP1上部の表示意味が揃った。
+- ✅ STEPタブは緑バッジをやめ、RNの `私が出す 1` / `受け取る 1` に近いインライン件数表示へ変更した。
+- ✅ 対象Swiftテスト37件が0 failuresで通った。
+- ✅ RN/Swift比較QAは22枚の画像過不足なし、11ペアすべて寸法差0を維持した。
+- ✅ 入力制御、横スワイプ制御、payload、DB schema、状態名は変更していないため、`notes/09_state_machines.md`、`notes/10_glossary.md`、`notes/05_data_model.md` の更新は不要と判断した。
+- ⚠️ RNはWeb撮影上タブ/セグメントが一部横にはみ出して見えるため、厳密なpixel差ではなく、画面構成・選択状態・入力制御の一致を主に確認した。
+
+### 関連ファイル
+
+- `ios-native/Sources/MegrumApp/ProposalCreateFlow.swift`
+- `notes/assets/swift-visual-qa/swift-proposal-give.png`
+- `notes/assets/swift-visual-qa/swift-proposal-receive.png`
+- `notes/assets/swift-visual-qa/swift-proposal-meetup-week.png`
+
+---
+
+## イテレーション418.41：RN比較QAをiPhone実寸viewportで再撮影
+
+### 背景・問題意識
+
+ホーム起点のRN/Swift比較QAで、RN側の `proposal-*` スクショが横1206pxのWeb画面として描画され、SwiftのiPhone Simulator画像と同じピクセル数でも実際のレイアウト幅が違っていた。これにより、RN側だけコンテンツが小さく見え、関係図・提示物選択・待ち合わせカレンダーの差分判断が歪んでいた。また、HTMLは `rn-home.png` を比較対象にしていたが、再撮影スクリプトのRN対象にはhomeが入っておらず、ホーム起点の比較が手動依存になっていた。
+
+### 変更内容
+
+#### `scripts/capture_home_proposal_visual_qa.sh`
+- RN web撮影を `1206x2622` のCSS viewportではなく、`402x874` viewport + device scale factor `3` に変更した。
+- 出力画像は引き続きSwift Simulatorと同じ `1206x2622` に揃え、比較レポートの寸法差0を維持した。
+- RN撮影対象に `home:/?visualPreview=1` を追加し、ホーム画面も自動再撮影できるようにした。
+- 環境変数を `MEGRUM_RN_VIEWPORT_WIDTH`、`MEGRUM_RN_VIEWPORT_HEIGHT`、`MEGRUM_RN_DEVICE_SCALE_FACTOR` として明示した。
+
+#### `mobile/app/(tabs)/index.tsx`
+- Web撮影時に存在しない `AccessibilityInfo.isReduceTransparencyEnabled` でホームが赤いエラー画面になる問題を、`typeof` ガードで回避した。
+- iOS実機/RNネイティブでAPIが存在する場合は従来どおりReduce Motion / Reduce Transparencyを読む。
+
+#### `notes/assets/rn-screen-lookup/`
+- RNのhome、drawer、関係図候補展開、提示物選択、待ち合わせ、確認、完了、pending一覧をiPhone実寸viewport条件で再撮影した。
+
+### 影響範囲
+
+- RN/Swift比較QAの撮影基準
+- ホーム起点フローのスクショ比較精度
+- RN web撮影時のホーム表示安定性
+- Swift Native実装、送信payload、DB schema、状態名には影響なし
+
+### 確認方法
+
+- `bash -n scripts/capture_home_proposal_visual_qa.sh`
+- `npm --prefix mobile run typecheck`
+- `scripts/capture_home_proposal_visual_qa.sh --rn-only`
+- `scripts/capture_home_proposal_visual_qa.sh --rn-only --rn-screens home`
+- `scripts/capture_home_proposal_visual_qa.sh --verify-only`
+- `notes/assets/rn-screen-lookup/rn-home.png` を目視し、赤いエラー画面ではなくホーム実画面になっていることを確認した。
+
+### セルフレビュー結果
+
+- ✅ RN/Swift比較QAは22枚の画像過不足なし、11ペアすべて寸法差0を維持した。
+- ✅ RN側の関係図候補展開は撮影条件修正後、Swift側と同程度の暗幕・下部パネル比較として見られるようになった。
+- ✅ ホームRNスクショも自動撮影対象になり、ホーム起点フローの入口が手動依存ではなくなった。
+- ✅ `AccessibilityInfo` のWebガードはWeb撮影だけの安全化で、ネイティブiOS側のReduce Transparency対応は維持している。
+- ✅ 新しい状態名・用語・DB schema・送信payloadの変更はないため、`notes/09_state_machines.md`、`notes/10_glossary.md`、`notes/05_data_model.md` の更新は不要と判断した。
+- ⚠️ このiterは比較QA基盤の修正であり、Swift側の残り見た目差分は次iter以降で、正しいRNスクショを基準に詰める。
+
+### 関連ファイル
+
+- `scripts/capture_home_proposal_visual_qa.sh`
+- `mobile/app/(tabs)/index.tsx`
+- `notes/assets/rn-screen-lookup/rn-home.png`
+- `notes/assets/rn-screen-lookup/rn-drawer-open.png`
+- `notes/assets/rn-screen-lookup/rn-match-detail-candidates-expanded.png`
+- `notes/assets/rn-screen-lookup/rn-proposal-give.png`
+- `notes/assets/rn-screen-lookup/rn-proposal-receive.png`
+- `notes/assets/rn-screen-lookup/rn-proposal-meetup-week.png`
+- `notes/assets/rn-screen-lookup/rn-proposal-meetup-month.png`
+- `notes/assets/rn-screen-lookup/rn-proposal-confirm.png`
+- `notes/assets/rn-screen-lookup/rn-proposal-complete.png`
+- `notes/assets/rn-screen-lookup/rn-proposal-pending.png`
+
+---
+
+## イテレーション418.40：pending一覧Preview件数をRN比較へ揃える
+
+### 背景・問題意識
+
+ホーム起点の打診完了後に `打診一覧に飛ぶ` で着地する pending 一覧をRN/Swiftで並べたところ、RN側は `打診中 4`、Swift側は `打診中 2` になっており、終点比較の見分けポイントが件数差に引っ張られていた。通常データ境界ではなくVisual QA用Previewデータの差なので、Swift側のPreview proposalをRN比較用に揃える必要があった。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/NativePreviewData.swift`
+- Visual QA / Preview用の pending 対象 proposal を2件追加し、RN側と同じく `打診中 4` として表示されるようにした。
+- 追加分には `negotiating` と `agreement_one_side` 相当の状態を含め、pending一覧が `sent` だけに偏らないようにした。
+
+#### `ios-native/Tests/MegrumAppTests/TradeChatAffordanceTests.swift`
+- Swift Previewのpending対象が4件で、`sent` 2件、`negotiating`、`agreement_one_side` を含むことを検証した。
+
+#### `notes/assets/swift-visual-qa/`
+- `swift-proposal-pending.png` を再撮影し、上部件数とステージセグメントが `打診中 4` になっていることを目視確認した。
+
+### 影響範囲
+
+- RN/Swift比較QAの `proposal-pending` ペア
+- Swift Native Preview / Visual QA 用のサンプル打診一覧
+- 通常の送信payload、DB schema、状態名、実データ取得には影響なし
+
+### 確認方法
+
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-pending-preview --enable-xctest --disable-swift-testing --filter 'TradeChatAffordanceTests|HomeScreenFlowTests' -j 1`
+- `scripts/capture_home_proposal_visual_qa.sh --screens proposal-pending`
+- `scripts/capture_home_proposal_visual_qa.sh --verify-only`
+- RN/Swiftスクショを目視比較：
+  - `notes/assets/rn-screen-lookup/rn-proposal-pending.png`
+  - `notes/assets/swift-visual-qa/swift-proposal-pending.png`
+
+### セルフレビュー結果
+
+- ✅ Swiftのpending一覧も `送信済み・調整中の打診・4件` / `打診中 4` と表示され、RN側の4件表示と意味が揃った。
+- ✅ `--verify-only` で22枚の画像過不足なし、RN/Swift 11ペアすべて寸法差0を確認した。
+- ✅ Previewデータとテストだけの変更で、送信payload・DB schema・状態名・用語は変更していないため、`notes/09_state_machines.md`、`notes/10_glossary.md`、`notes/05_data_model.md` の更新は不要と判断した。
+- ⚠️ カードの細かなタイポグラフィや余白差は残るため、次の目視QAで優先度を見て詰める。
+
+### 関連ファイル
+
+- `ios-native/Sources/MegrumApp/NativePreviewData.swift`
+- `ios-native/Tests/MegrumAppTests/TradeChatAffordanceTests.swift`
+- `notes/assets/swift-visual-qa/swift-proposal-pending.png`
+
+---
+
+## イテレーション418.39：打診完了後のpending一覧着地を比較QAへ追加
+
+### 背景・問題意識
+
+ホーム起点のグッズパネル押下から打診完了までの移行では、完了画面そのものだけでなく、完了CTA `打診一覧に飛ぶ` を押した後に `やりとり` の pending / 打診中 一覧へ着地することまでがスコープである。Swift側は `ProposalCompletionRouteResolver` と `TradeStageRouteRequestResolver` のテストで pending 着地を固定していたが、RN/Swiftスクショ比較QAでは完了画面までしか並べておらず、終点の一覧画面が証拠化されていなかった。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/VisualQAPreviewMode.swift`
+- Visual QA初期画面に `proposal-pending` を追加した。
+
+#### `ios-native/Sources/MegrumApp/MegrumRootView.swift`
+- `VisualQATabRouteResolver` を追加し、`proposal-pending` では初期タブを `やりとり`、要求ステージを `.pending` にするようにした。
+- 通常の完了CTA導線は既存の `ProposalCompletionRouteResolver` を維持し、Visual QAの直接起動だけを追加した。
+
+#### `ios-native/Tests/MegrumAppTests/HomeScreenFlowTests.swift`
+- `proposal-pending` のparse、直接打診フローを開かないこと、初期タブ/要求ステージが pending 一覧になることを追加検証した。
+
+#### `mobile/src/auth/AuthProvider.tsx`
+- `visualPreview=1` の時だけRN webのPreviewデータを初期状態で使えるようにした。
+- 通常URLや実機アプリではこれまでどおり手動Preview/認証状態を使う。
+
+#### `mobile/app/transactions-visual.tsx`
+- RN版の取引一覧をVisual QAで直接撮るため、`TransactionsScreen` を描画する専用routeを追加した。
+
+#### `scripts/capture_home_proposal_visual_qa.sh`
+- RN撮影対象に `proposal-pending:/transactions-visual?visualPreview=1` を追加した。
+- Swift撮影対象に `proposal-pending` を追加した。
+- 比較対象画像を22枚、RN/Swiftペアレポートを11ペアへ拡張した。
+
+#### `RN Swift Home Proposal Visual QA.html`
+- `打診一覧 pending着地` セクションを追加し、RN/Swiftの pending一覧スクショを横並びにした。
+- `--verify-only` の説明をRN/Swift 11ペアへ更新した。
+
+#### `notes/assets/`
+- `notes/assets/rn-screen-lookup/rn-proposal-pending.png` を追加した。
+- `notes/assets/swift-visual-qa/swift-proposal-pending.png` を追加した。
+
+### 影響範囲
+
+- ホーム起点フローの終点 `打診一覧に飛ぶ` 後の比較QA
+- Visual QA専用のRN/Swift pending一覧起動
+- 通常の送信payload、DB schema、状態名、完了CTAルートには影響なし
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-pending-qa --enable-xctest --disable-swift-testing --filter 'HomeScreenFlowTests|TradeChatAffordanceTests' -j 1`
+- `scripts/capture_home_proposal_visual_qa.sh --rn-only --rn-screens proposal-pending`
+- `scripts/capture_home_proposal_visual_qa.sh --screens proposal-pending`
+- RN/Swiftスクショを目視比較：
+  - `notes/assets/rn-screen-lookup/rn-proposal-pending.png`
+  - `notes/assets/swift-visual-qa/swift-proposal-pending.png`
+
+### セルフレビュー結果
+
+- ✅ `打診一覧に飛ぶ` の後に見るべき pending / 打診中 一覧を、RN/Swift比較QAへ追加した。
+- ✅ 22枚の画像過不足なし、RN/Swift 11ペアすべて寸法差0を確認した。
+- ✅ Swiftの完了後ルート・pendingステージ・Visual QA初期起動関連テスト32件が0 failuresで通った。
+- ✅ RN側は `TransactionsScreen` のPreviewデータを使う専用routeで撮影し、`npm --prefix mobile run typecheck` も通した。
+- ✅ 新しい状態名・用語・DB schema・送信payloadの変更はないため、`notes/09_state_machines.md`、`notes/10_glossary.md`、`notes/05_data_model.md` の更新は不要と判断した。
+- ⚠️ RNとSwiftのpending一覧は画面構成・件数・初期タブの意味は揃ったが、カード余白やタイポグラフィの見た目差は次の目視QAでさらに詰める余地がある。
+
+### 関連ファイル
+
+- `ios-native/Sources/MegrumApp/VisualQAPreviewMode.swift`
+- `ios-native/Sources/MegrumApp/MegrumRootView.swift`
+- `ios-native/Tests/MegrumAppTests/HomeScreenFlowTests.swift`
+- `mobile/src/auth/AuthProvider.tsx`
+- `mobile/app/transactions-visual.tsx`
+- `scripts/capture_home_proposal_visual_qa.sh`
+- `RN Swift Home Proposal Visual QA.html`
+- `notes/assets/rn-screen-lookup/rn-proposal-pending.png`
+- `notes/assets/swift-visual-qa/swift-proposal-pending.png`
+
+---
+
+## イテレーション418.38：左ドロワーもRN/Swift比較QAの対象へ追加
+
+### 背景・問題意識
+
+ホーム起点のグッズパネル押下から打診完了までの移行では、関係図・打診作成だけでなく、オーナーから追加指定された左ドロワーの出し方も体験上の重要差分になっている。Swift側はどこでも右スワイプで開く挙動をテスト済みだったが、RN/Swiftスクショ比較QAではSwiftドロワー画像だけがあり、RN側のドロワー展開状態と横並びで確認できていなかった。そのため、見た目比較とジェスチャ検証の証拠が分断されていた。
+
+### 変更内容
+
+#### `mobile/app/(tabs)/_layout.tsx`
+- RN版ドロワーの実コンテンツと同じ `ProfileDrawerContent` を使う `ProfileDrawerVisualSnapshot` を追加した。
+- NativeTabs配下をheadless Chromeで直接撮ると白画面になりやすいため、Visual QA専用に安定したドロワー展開スナップショットを切り出した。
+- 通常のRNタブ操作、ドロワー開閉操作、認証previewモードには影響しない構成にした。
+
+#### `mobile/app/drawer-visual.tsx`
+- RNドロワー展開状態だけを撮影するVisual QA専用routeを追加した。
+
+#### `scripts/capture_home_proposal_visual_qa.sh`
+- RN撮影対象に `drawer-open:/drawer-visual` を追加した。
+- 比較対象画像を20枚、RN/Swiftペアレポートを10ペアへ拡張した。
+
+#### `RN Swift Home Proposal Visual QA.html`
+- 左ドロワーセクションのRN側をプレースホルダーから実スクショに差し替えた。
+- `--verify-only` の説明をRN/Swift 10ペアへ更新した。
+
+#### `notes/assets/rn-screen-lookup/`
+- `rn-drawer-open.png` を追加し、RN版ドロワー展開状態を保存した。
+
+### 影響範囲
+
+- RN/Swiftスクショ比較QAの左ドロワーセクション
+- Visual QA専用のRNドロワースナップショットroute
+- Swiftの左ドロワー挙動、ホーム起点打診フロー、送信payload、DB schemaには影響なし
+
+### 確認方法
+
+- `npm --prefix mobile run typecheck`
+- `scripts/capture_home_proposal_visual_qa.sh --rn-only --rn-screens drawer-open`
+- `scripts/capture_home_proposal_visual_qa.sh --verify-only`
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-drawer-qa --enable-xctest --disable-swift-testing --filter 'AppDrawerGestureTests|HomeScreenFlowTests|MatchRelationScreenTests' -j 1`
+- RN/Swiftスクショを目視比較：
+  - `notes/assets/rn-screen-lookup/rn-drawer-open.png`
+  - `notes/assets/swift-visual-qa/swift-drawer-open.png`
+
+### セルフレビュー結果
+
+- ✅ RN/Swift比較QAに左ドロワーの展開状態を追加し、20枚の画像過不足なし、RN/Swift 10ペアすべて寸法差0を確認した。
+- ✅ Swift側の「左端限定ではなく任意位置から右スワイプで開く」挙動は `AppDrawerGestureTests` で継続検証できている。
+- ✅ RN側の専用routeはスクショ安定化のためだけに追加し、通常のドロワー操作や認証導線は変更していない。
+- ✅ 状態名・用語・DB schema・送信payloadの変更はないため、`notes/09_state_machines.md`、`notes/10_glossary.md`、`notes/05_data_model.md` の更新は不要と判断した。
+- ⚠️ 実機上での指追従の体感は、Simulator/自動テストだけでは完全には証明できないため、次の実機インストール後にオーナー操作で最終確認する。
+
+### 関連ファイル
+
+- `mobile/app/(tabs)/_layout.tsx`
+- `mobile/app/drawer-visual.tsx`
+- `scripts/capture_home_proposal_visual_qa.sh`
+- `RN Swift Home Proposal Visual QA.html`
+- `notes/assets/rn-screen-lookup/rn-drawer-open.png`
+
+---
+
+## イテレーション418.37：Swift関係図の候補展開をRN式下部パネルへ再修正
+
+### 背景・問題意識
+
+ホーム起点のグッズパネル押下後フローをRN版とSwift版のスクショで見比べたところ、RN版の関係図は「選択肢のグッズをタップすると暗いオーバーレイが出て、画面下部の候補パネルからグッズを選ぶ」設計だった。一方、Swift版は候補をカード内にインライン展開しており、画面構成がRN版とズレていた。オーナーからも「めちゃくちゃなUIになっている」と指摘があり、見た目の完全一致ではなくても、入力制御と表示制御の意味をRN版へ戻す必要があった。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/MatchRelationScreen.swift`
+- 関係図の候補展開を、カード内インライン表示から `popupTarget` 駆動の下部候補パネルへ変更した。
+- 選択肢グッズの行をタップすると、背景を暗く落とした上で下部パネルを表示し、候補グッズを横並びでタップ選択できるようにした。
+- 候補タップ時の sender / receiver 集計、`打診に進む` の活性条件、初期候補選択は既存stateを維持し、表示方法だけをRNの操作モデルへ寄せた。
+- Visual QA の `match-relation-candidates` 初期状態でも同じ下部候補パネルを開くようにし、RNスクショと同じ状態で比較できるようにした。
+- 旧インライン展開stateと、不要になった古い全画面シート実装を削除した。
+
+#### `notes/assets/swift-visual-qa/`
+- `swift-match-relation-candidates-expanded.png` を再撮影し、Swift側も暗い背景＋下部候補パネルの状態へ更新した。
+
+### 影響範囲
+
+- ホームのグッズパネルから関係図へ入った後の候補展開UI
+- RN/Swiftスクショ比較QAの `relation-candidates-expanded` ペア
+- 候補選択、集計サマリー、打診作成payload、DB schemaには影響なし
+
+### 確認方法
+
+- `scripts/capture_home_proposal_visual_qa.sh --screens match-relation-candidates`
+- `scripts/capture_home_proposal_visual_qa.sh --verify-only`
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-relation-cleanup --enable-xctest --disable-swift-testing --filter 'MatchRelationScreenTests|HomeScreenFlowTests' -j 1`
+- RN/Swiftスクショを目視比較：
+  - `notes/assets/rn-screen-lookup/rn-match-detail-candidates-expanded.png`
+  - `notes/assets/swift-visual-qa/swift-match-relation-candidates-expanded.png`
+
+### セルフレビュー結果
+
+- ✅ 関係図の候補展開は、RN版と同じ「選択肢タップ -> 暗い背景 -> 下部候補パネル -> 候補タップ選択」の操作モデルに戻した。
+- ✅ `--verify-only` で19枚の画像過不足なし、RN/Swift 9ペアすべて寸法差0を確認した。
+- ✅ 関係図・ホーム導線の重点テスト18件が0 failuresで通った。
+- ✅ 状態名・用語・DB schema・送信payloadの変更はないため、`notes/09_state_machines.md`、`notes/10_glossary.md`、`notes/05_data_model.md` の更新は不要と判断した。
+- ⚠️ 実機での右スワイプドロワー体感と、関係図下部パネルの細かな高さ・余白は、オーナーの手元操作で追加微調整の余地がある。
+
+### 関連ファイル
+
+- `ios-native/Sources/MegrumApp/MatchRelationScreen.swift`
+- `notes/assets/swift-visual-qa/swift-match-relation-candidates-expanded.png`
+
+---
+
+## イテレーション418.36：関係図のRN候補展開スクショを比較QAへ追加
+
+### 背景・問題意識
+
+ホーム起点の関係図では、オーナー要件として「選択肢のグッズを選ぶと、候補となっているグッズが展開されてタップして選択する」設計をRN準拠で再現する必要がある。Swift側は候補展開スクショを持っていたが、RN側の比較画像は通常の関係図だけで、候補展開状態を横並びで確認できていなかった。そのため、スクショ比較QA上では最も重要な関係図インタラクションの証拠が片側だけになっていた。
+
+### 変更内容
+
+#### `mobile/app/match-detail.tsx`
+- Visual QA専用の `visualExpanded=candidates` パラメータを追加した。
+- `candidateId=sua-card-01` など個別募集候補文脈で開いた時に、最初の候補選択ポップアップを初期表示するようにした。
+- 通常導線ではこのパラメータが無い限り、既存どおりユーザータップで候補ポップアップを開く動作を維持した。
+
+#### `scripts/capture_home_proposal_visual_qa.sh`
+- RN撮影対象に `match-relation-candidates:/match-detail?candidateId=sua-card-01&visualExpanded=candidates` を追加した。
+- 比較対象画像を19枚、RN/Swiftペアレポートを9ペアへ拡張した。
+
+#### `RN Swift Home Proposal Visual QA.html`
+- 関係図セクションに `React Native / 候補展開` のスクショを追加した。
+- `--verify-only` の説明をRN/Swift 9ペアへ更新した。
+
+#### `notes/assets/rn-screen-lookup/`
+- `rn-match-detail-candidates-expanded.png` を追加し、RN版の候補ポップアップ展開状態を保存した。
+
+### 影響範囲
+
+- RN/Swiftスクショ比較QAの関係図セクション
+- RN版 `match-detail` のVisual QA専用初期状態
+- 通常のRNユーザー操作、SwiftUI実装、送信payload、DB schemaには影響なし
+
+### 確認方法
+
+- `scripts/capture_home_proposal_visual_qa.sh --rn-only --rn-screens match-relation-candidates`
+- `npm --prefix mobile run typecheck`
+- `bash -n scripts/capture_home_proposal_visual_qa.sh`
+- `scripts/capture_home_proposal_visual_qa.sh --verify-only`
+
+### セルフレビュー結果
+
+- ✅ RN展開スクショに候補選択ポップアップが表示され、Swiftの候補展開スクショと横並びで比較できるようになった。
+- ✅ 比較HTMLは19枚の画像過不足なし、RN/Swift 9ペアすべてで寸法差0を確認した。
+- ✅ `visualExpanded=candidates` はVisual QA専用パラメータで、通常の候補タップ操作は変更していない。
+- ✅ 状態名・用語・DB schema・送信payloadの変更はないため、`notes/09_state_machines.md`、`notes/10_glossary.md`、`notes/05_data_model.md` の更新は不要と判断した。
+
+### 関連ファイル
+
+- `mobile/app/match-detail.tsx`
+- `scripts/capture_home_proposal_visual_qa.sh`
+- `RN Swift Home Proposal Visual QA.html`
+- `notes/assets/rn-screen-lookup/rn-match-detail-candidates-expanded.png`
+
+---
+
+## イテレーション418.35：RN/Swift比較QAを同寸ペアレポート化
+
+### 背景・問題意識
+
+ホームのグッズパネル押下から打診完了までの移行では、RN版とSwift版のスクショを都度見比べる運用が必要である。既存の比較QAは画像18枚の存在と過不足は検証できたが、RN直撮りの打診フロー画像が `520x932`、Swift Simulator画像が `1206x2622` とサイズ違いになっており、比較の土台が揃っていなかった。また、`--verify-only` は「画像がある」ことの証拠に留まり、ペアごとの見比べ対象を数値で一覧化できていなかった。
+
+### 変更内容
+
+#### `scripts/capture_home_proposal_visual_qa.sh`
+- RN webスクショの撮影サイズを `MEGRUM_RN_SCREENSHOT_WIDTH` / `MEGRUM_RN_SCREENSHOT_HEIGHT` で変更できるようにし、標準値をSwift Simulator実寸の `1206x2622` にした。
+- `--verify-only` で、画像18枚の過不足に加えてRN/Swift 8ペアの寸法、平均輝度、64x64正規化後の簡易ピクセル差分を `pairReport` としてJSON出力するようにした。
+- ホーム、関係図入口、提示物選択、受け取り選択、待ち合わせ週/月、送信確認、打診完了をペアレポート対象にした。
+
+#### `RN Swift Home Proposal Visual QA.html`
+- `--verify-only` がペア寸法・平均輝度・簡易差分も出すことを追記した。
+- RN直撮りの標準サイズがSwift Simulatorと同じ `1206x2622` であることを明記した。
+
+#### `notes/assets/rn-screen-lookup/`
+- `rn-proposal-give.png`
+- `rn-proposal-receive.png`
+- `rn-proposal-meetup-week.png`
+- `rn-proposal-meetup-month.png`
+- `rn-proposal-confirm.png`
+- `rn-proposal-complete.png`
+
+上記6枚を同寸比較用に `1206x2622` で再取得した。
+
+### 影響範囲
+
+- RN/Swiftスクショ比較の検証精度
+- ホーム起点打診フローの視覚QA運用
+- SwiftUI画面実装、送信payload、DB schemaには影響なし
+
+### 確認方法
+
+- `bash -n scripts/capture_home_proposal_visual_qa.sh`
+- `scripts/capture_home_proposal_visual_qa.sh --rn-only`
+- `scripts/capture_home_proposal_visual_qa.sh --verify-only`
+
+### セルフレビュー結果
+
+- ✅ RN/Swift 8ペアすべてで `dimensionDelta.width = 0`、`dimensionDelta.height = 0` を確認した。
+- ✅ 画像18枚の過不足検証は `missing: []`、`missingExpected: []`、`unexpected: []` で通過した。
+- ✅ 差分値は合否ではなく、次回以降の目視比較で「大きく崩れた画面」を見つけるための補助指標として扱う。
+- ✅ 状態名・用語・DB schema・送信payloadの変更はないため、`notes/09_state_machines.md`、`notes/10_glossary.md`、`notes/05_data_model.md` の更新は不要と判断した。
+
+### 関連ファイル
+
+- `scripts/capture_home_proposal_visual_qa.sh`
+- `RN Swift Home Proposal Visual QA.html`
+- `notes/assets/rn-screen-lookup/rn-proposal-give.png`
+- `notes/assets/rn-screen-lookup/rn-proposal-receive.png`
+- `notes/assets/rn-screen-lookup/rn-proposal-meetup-week.png`
+- `notes/assets/rn-screen-lookup/rn-proposal-meetup-month.png`
+- `notes/assets/rn-screen-lookup/rn-proposal-confirm.png`
+- `notes/assets/rn-screen-lookup/rn-proposal-complete.png`
+
+---
+
+## イテレーション418.34：打診完了の2ボタン構成をRN順で固定
+
+### 背景・問題意識
+
+ホーム起点の打診作成フローは、送信完了後の導線までRN準拠で再現する必要がある。RN版の完了画面は、完了メッセージの下に `まだ他に探す`、`打診一覧に飛ぶ` の2ボタンをこの順で並べ、後者からpendingの打診一覧へ着地する。Swift版でも見た目だけでなく、ボタン数・順序・文言・役割・遷移先を同じ状態モデルから固定して後退を検知できるようにする必要があった。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/ProposalCreateFlow.swift`
+- 完了画面のボタンを `ProposalCompletionButtonSpec` と `ProposalCompletionButtonCopy.buttons` としてモデル化した。
+- `ProposalCreateCompletionView` は固定の2ボタン直書きではなく、RN順のボタンモデルを `ForEach` して描画する構成へ変更した。
+- secondary の `まだ他に探す`、primary の `打診一覧に飛ぶ` を、文言・高さ・文字色・角丸背景・枠線の役割ごとに分岐させた。
+
+#### `ios-native/Tests/MegrumAppTests/ProposalCreateFlowTests.swift`
+- 完了画面のボタンが `まだ他に探す` -> `打診一覧に飛ぶ` のRN順で、secondary/primary roleも一致することをテスト追加した。
+
+#### `notes/assets/swift-visual-qa/`
+- `swift-proposal-complete-fullscreen.png` を再取得し、RN/Swift比較HTMLの完了画面参照を更新した。
+
+### 影響範囲
+
+- 打診送信完了画面のボタン表示
+- `まだ他に探す` と `打診一覧に飛ぶ` の完了後導線
+- 送信payload、DB schema、候補選択状態、待ち合わせ候補順には影響なし
+
+### 確認方法
+
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-completion-rounded --enable-xctest --disable-swift-testing --filter 'ProposalCreateFlowTests|TradeChatAffordanceTests' -j 1`
+- `scripts/capture_home_proposal_visual_qa.sh --screens proposal-complete`
+- `scripts/capture_home_proposal_visual_qa.sh --verify-only`
+
+### セルフレビュー結果
+
+- ✅ 完了画面はRN版と同じ2ボタン構成、同じ順序、同じ文言でモデル固定した。
+- ✅ `打診一覧に飛ぶ` は既存の完了導線テストで pending 一覧へ着地することを確認した。
+- ✅ Swift完了画面スクショを再取得し、比較HTMLの18枚過不足チェックも通過した。
+- ✅ 状態名・用語・DB schema・送信payloadの変更はないため、`notes/09_state_machines.md`、`notes/10_glossary.md`、`notes/05_data_model.md` の更新は不要と判断した。
+
+### 関連ファイル
+
+- `ios-native/Sources/MegrumApp/ProposalCreateFlow.swift`
+- `ios-native/Tests/MegrumAppTests/ProposalCreateFlowTests.swift`
+- `notes/assets/swift-visual-qa/swift-proposal-complete-fullscreen.png`
+
+---
+
+## イテレーション418.33：送信確認のRN情報順をモデル化して固定
+
+### 背景・問題意識
+
+ホーム起点の打診作成フローでは、送信確認画面の情報順もRN準拠の要件に含まれる。Swift版の確認画面は `交換内容 -> 受け渡し方法 -> 交換条件タグ -> 待ち合わせ候補 -> メッセージ -> スケジュール共有` の順で表示していたが、この順序はView内に直接並んでおり、将来の修正でRN順序から後退してもテストで検知しづらかった。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/ProposalCreateFlow.swift`
+- 送信確認の表示セクションを `ProposalConfirmSectionKind` としてモデル化した。
+- `visibleOrder(requiresMeetupBeforeSubmit:)` を追加し、現地交換ではRN順の6セクション、郵送のみでは待ち合わせ候補とスケジュール共有を除いた4セクションを返すようにした。
+- `confirmStep` は固定のView直書きではなく、この順序モデルを `ForEach` して描画する構成へ変更した。
+
+#### `ios-native/Tests/MegrumAppTests/ProposalCreateFlowTests.swift`
+- 現地交換時の確認画面が `交換内容 -> 受け渡し方法 -> 交換条件タグ -> 待ち合わせ候補 -> メッセージ -> スケジュール共有` の順になることをテスト追加した。
+- 郵送のみでは待ち合わせ候補とスケジュール共有が表示順から外れることをテスト追加した。
+
+#### `notes/assets/swift-visual-qa/`
+- `swift-proposal-confirm-final.png` を再取得し、送信確認スクショの参照を更新した。
+
+### 影響範囲
+
+- 打診作成STEP2の送信確認表示順
+- 現地交換/郵送交換ごとの確認画面セクション出し分け
+- 送信payload、DB schema、候補選択状態、完了導線には影響なし
+
+### 確認方法
+
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-confirm-section-order --enable-xctest --disable-swift-testing --filter 'ProposalCreateFlowTests|TradeChatAffordanceTests|SupabaseProposalClientTests|SupabaseRequestParityTests' -j 1`
+- `scripts/capture_home_proposal_visual_qa.sh --screens proposal-confirm`
+- `scripts/capture_home_proposal_visual_qa.sh --verify-only`
+
+### セルフレビュー結果
+
+- ✅ 送信確認画面のRN情報順を、実View描画と同じモデルからテスト固定した。
+- ✅ 現地交換では待ち合わせ候補とスケジュール共有を表示し、郵送のみでは非表示にする制御をテスト固定した。
+- ✅ Proposal作成payloadの `meetup_candidates`、`match_type`、`expose_calendar`、`listing_id` 後退がないことを関連テストで確認した。
+- ✅ Swift送信確認スクショを再取得し、比較HTMLの18枚過不足チェックも通過した。
+- ✅ 状態名・用語・DB schema・送信payloadの変更はないため、`notes/09_state_machines.md`、`notes/10_glossary.md`、`notes/05_data_model.md` の更新は不要と判断した。
+
+### 関連ファイル
+
+- `ios-native/Sources/MegrumApp/ProposalCreateFlow.swift`
+- `ios-native/Tests/MegrumAppTests/ProposalCreateFlowTests.swift`
+- `notes/assets/swift-visual-qa/swift-proposal-confirm-final.png`
+
+---
+
+## イテレーション418.32：RN/Swift比較QAの画像過不足検証を強化
+
+### 背景・問題意識
+
+ホームのグッズパネル押下から打診完了までの移行では、RN版とSwift版のスクショを都度見比べる運用が重要になる。既存の `scripts/capture_home_proposal_visual_qa.sh --verify-only` はHTML内の画像ファイルが存在するかだけを確認していたため、比較ページから必要なRN/Swift画像が抜けても検知できない可能性があった。また、比較HTMLのホーム注記に「possible棚は相手プロフィールへ入る」と古い導線説明が残っており、現在の「possibleも一方向候補として関係図へ入る」方針とズレていた。
+
+### 変更内容
+
+#### `scripts/capture_home_proposal_visual_qa.sh`
+- `--verify-only` の検証を、画像ファイル存在確認だけでなく、ホーム起点フロー比較に必要なRN/Swift画像18枚の過不足確認へ拡張した。
+- `missingExpected` と `unexpected` を出力し、比較HTMLに必要画像が抜けた場合や想定外画像が混ざった場合も失敗するようにした。
+
+#### `RN Swift Home Proposal Visual QA.html`
+- ホームの確認観点を、matched棚だけでなくpossible棚も一方向候補として関係図へ入る現在の導線へ更新した。
+
+### 影響範囲
+
+- RN/Swiftスクショ比較ページの検証精度
+- ホーム起点の導線説明
+- SwiftUI画面実装、送信payload、DB schemaには影響なし
+
+### 確認方法
+
+- `bash -n scripts/capture_home_proposal_visual_qa.sh`
+- `scripts/capture_home_proposal_visual_qa.sh --verify-only`
+
+### セルフレビュー結果
+
+- ✅ 比較HTMLに必要なRN/Swift画像18枚が過不足なく含まれることを `--verify-only` で確認できるようにした。
+- ✅ `--verify-only` は `expectedImageCount: 18`、`imageCount: 18`、`missingExpected: []`、`unexpected: []` で通過した。
+- ✅ ホームのpossible棚説明を、Swift実装とテスト済み導線の `relation(.forward)` に合わせた。
+- ✅ 状態名・用語・DB schema・送信payloadの変更はないため、`notes/09_state_machines.md`、`notes/10_glossary.md`、`notes/05_data_model.md` の更新は不要と判断した。
+
+### 関連ファイル
+
+- `scripts/capture_home_proposal_visual_qa.sh`
+- `RN Swift Home Proposal Visual QA.html`
+
+---
+
+## イテレーション418.31：関係図と左ドロワーのスワイプ境界をテスト固定
+
+### 背景・問題意識
+
+ホーム起点のRN/Swift比較ではスクショ上の画面構成だけでなく、スワイプ時の挙動も再現対象である。左ドロワーは全域右スワイプ、関係図は横スワイプで前後候補へ移動する実装になっていたが、関係図側はしきい値・縦スクロール優先・端での抵抗がView内に直接書かれており、RN準拠の境界条件としてテストで証明しづらかった。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/MatchRelationScreen.swift`
+- 関係図横スワイプの方向判定、表示offset、切り替え判定、しきい値を `MatchRelationSwipeResolver` として分離した。
+- View側の `relationSwipeGesture` はresolverの結果を使うだけにし、既存の縦スクロール優先、閾値未満の復帰、端での抵抗、前後候補がある時だけ切り替える挙動を維持した。
+
+#### `ios-native/Tests/MegrumAppTests/MatchRelationScreenTests.swift`
+- 縦方向が強いドラッグは関係図横スワイプとして扱わないことを追加検証した。
+- 閾値未満では前後候補へ切り替わらず、閾値または勢いが十分な場合だけ切り替えることを追加検証した。
+- 前後候補がない端ではoffsetが `0.22` 倍の抵抗表示になり、どれだけ強くスワイプしてもターゲット切り替えしないことを追加検証した。
+
+#### `ios-native/Tests/MegrumAppTests/AppDrawerGestureTests.swift`
+- 閉じた左ドロワーが左スワイプを無視し、閾値未満の右スワイプでは閉じたままになることを追加検証した。
+- 開いた左ドロワーが右スワイプを無視し、閾値未満の左スワイプでは開いたままになることを追加検証した。
+
+### 影響範囲
+
+- 関係図の横スワイプ判定とテスト可能性
+- 左ドロワーの全域スワイプ入力制御のテスト証拠
+- UIレイアウト、候補展開、打診作成payload、DB schemaには影響なし
+
+### 確認方法
+
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-swipe-boundaries --enable-xctest --disable-swift-testing --filter 'AppDrawerGestureTests|MatchRelationScreenTests' -j 1`
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-home-flow-gesture-regression --enable-xctest --disable-swift-testing --filter 'HomeScreenFlowTests|MatchRelationScreenTests|ProposalCreateFlowTests|TradeRequestDraftProposalCreateFlowTests|TradeChatAffordanceTests|AppDrawerGestureTests' -j 1`
+- `scripts/capture_home_proposal_visual_qa.sh --verify-only`
+
+### セルフレビュー結果
+
+- ✅ 関係図の横スワイプは、縦スクロール優先、閾値未満復帰、端での抵抗、前後候補あり時だけ切り替えをテストで固定した。
+- ✅ 左ドロワーは、画面全域の右スワイプ開始だけでなく、逆方向・閾値未満の入力制御もテストで固定した。
+- ✅ ホーム起点フロー関連の78件のFocused testが0 failuresで通過した。
+- ✅ RN/Swift比較用スクショ18枚のリンク欠けがないことを確認した。
+- ✅ 状態名・用語・DB schema・送信payloadの変更はないため、`notes/09_state_machines.md`、`notes/10_glossary.md`、`notes/05_data_model.md` の更新は不要と判断した。
+
+### 関連ファイル
+
+- `ios-native/Sources/MegrumApp/MatchRelationScreen.swift`
+- `ios-native/Tests/MegrumAppTests/MatchRelationScreenTests.swift`
+- `ios-native/Tests/MegrumAppTests/AppDrawerGestureTests.swift`
+
+---
+
+## イテレーション418.30：関係図Visual QAを相手グッズ起点と候補展開へ補正
+
+### 背景・問題意識
+
+ホームのグッズパネル押下後フローをRN/Swiftスクショで見比べたところ、Swift版の関係図Visual QAが自分のグッズを起点に開く場合があり、RN版の「相手グッズパネルを押した後」という比較前提からズレていた。また、候補展開スクショでは「選択肢のグッズを選ぶと候補グッズが展開され、候補をタップ選択する」状態を確認したいのに、非同期再シードで展開状態が閉じる可能性と、候補が1件だけに見えるPreview境界が残っていた。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/HomeScreen.swift`
+- 関係図Visual QAの自動起動先を `HomeRelationVisualQARouteResolver` に分離した。
+- 比較用の自動起動では、候補の中からviewer以外が所有するグッズを優先し、RN版の「相手グッズパネル押下後」に近い入口へ揃えた。
+- `MatchRelationScreen` に `visualQAInitialScreen` を明示的に渡し、環境変数の読み直しだけに依存しないようにした。
+
+#### `ios-native/Sources/MegrumApp/MatchRelationScreen.swift`
+- `visualQAInitialScreen` をinitializer引数として受け取り、ホーム起点のQA状態を関係図へ確実に伝搬するようにした。
+- `.matchRelationCandidates` のとき、候補展開を一度適用した後の非同期再シードで `expandedWishKey` が閉じないようにした。
+- 通常のターゲット切替時は従来通り展開状態とQA適用済みフラグをリセットし、横スワイプ後の表示制御は維持した。
+
+#### `ios-native/Sources/MegrumApp/MegrumAppState.swift`
+- Previewの相手公開交換グッズに `ランダムトレカ C` を追加し、関係図で `候補 2件` の展開とタップ選択をスクショ確認できるようにした。
+- 追加候補は `loadPublicTradeGoods` の戻り値だけに閉じ込め、自分の在庫やホーム候補へ混ざらないようにした。
+
+#### `ios-native/Tests/MegrumAppTests/`
+- 関係図Visual QAの入口が相手所有グッズを優先することをテスト追加した。
+- 自分の個別募集に対して、相手候補が複数件展開候補として保持されつつ、初期選択はハイライト中の候補だけになることをテスト追加した。
+- Preview公開交換情報では相手公開グッズが3件返り、共通在庫の相手在庫件数は増えないことを更新した。
+
+#### `notes/assets/swift-visual-qa/`
+- `swift-match-relation-rn-visual-header.png` と `swift-match-relation-candidates-expanded.png` を再取得した。
+- 候補展開スクショで `候補 2件`、`ランダムトレカ B` の選択済み、`ランダムトレカ C` の未選択候補が見える状態を確認した。
+
+### 影響範囲
+
+- ホーム起点のRN/Swift比較用Visual QA入口
+- 関係図の候補展開状態の保持
+- Previewデータの相手公開交換グッズ
+- 通常の手動タップ導線、横スワイプ閾値、打診作成payload、DB schemaには影響なし
+
+### 確認方法
+
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-home-relation-visualqa --enable-xctest --disable-swift-testing --filter 'HomeScreenFlowTests|MatchRelationScreenTests|MegrumAppStateTests/testAppStateLoadsPreviewPublicExchangeContent' -j 1`
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-relation-expansion-persist --enable-xctest --disable-swift-testing --filter 'HomeScreenFlowTests|MatchRelationScreenTests' -j 1`
+- `scripts/capture_home_proposal_visual_qa.sh --screens match-relation,match-relation-candidates`
+- `scripts/capture_home_proposal_visual_qa.sh --verify-only`
+- 目視確認:
+  - `notes/assets/rn-screen-lookup/rn-match-detail.png`
+  - `notes/assets/swift-visual-qa/swift-match-relation-rn-visual-header.png`
+  - `notes/assets/swift-visual-qa/swift-match-relation-candidates-expanded.png`
+
+### セルフレビュー結果
+
+- ✅ RN比較用の関係図入口が、viewer所有ではなく相手所有グッズを優先することをテストで固定した。
+- ✅ `選択肢をタップ → 候補2件が展開 → 候補をタップして選択` の状態をSwiftスクショで確認できるようにした。
+- ✅ 非同期ロード後の再シードでVisual QAの候補展開が閉じないことを実スクショ再取得で確認した。
+- ✅ Preview追加候補は公開交換取得に限定し、共通在庫・自分の出す候補へ混ざらないことをテストで固定した。
+- ✅ 状態名・用語・DB schema・送信payloadの変更はないため、`notes/09_state_machines.md`、`notes/10_glossary.md`、`notes/05_data_model.md` の更新は不要と判断した。
+
+### 関連ファイル
+
+- `ios-native/Sources/MegrumApp/HomeScreen.swift`
+- `ios-native/Sources/MegrumApp/MatchRelationScreen.swift`
+- `ios-native/Sources/MegrumApp/MegrumAppState.swift`
+- `ios-native/Tests/MegrumAppTests/HomeScreenFlowTests.swift`
+- `ios-native/Tests/MegrumAppTests/MatchRelationScreenTests.swift`
+- `ios-native/Tests/MegrumAppTests/MegrumAppStateTests.swift`
+- `notes/assets/swift-visual-qa/swift-match-relation-candidates-expanded.png`
+
+---
+
+## イテレーション418.29：ホーム起点STEP1のCTA遷移をRN文言と一致させる
+
+### 背景・問題意識
+
+ホームのグッズパネル押下から関係図、打診作成、打診完了までのRN/Swiftスクショ比較を続けたところ、Swift版のSTEP1「私が出す」はRN版と同じく `待ち合わせへ進む` を表示できる一方で、実際の主CTA遷移は隣の `受け取る` STEPへ進む可能性が残っていた。ホーム起点では関係図で受け取り候補が既に選ばれているため、文言だけでなくタップ後の遷移先もRN準拠で合わせる必要があった。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/ProposalCreateFlow.swift`
+- 主CTAの遷移先を `ProposalCreatePrimaryStepDestination` として分離し、ボタン文言と同じ状態から遷移先を決めるようにした。
+- `私が出す` で受け取り候補が既にある場合は、現地交換なら `待ち合わせ`、郵送交換なら `送信確認` へ直接進むようにした。
+- 受け取り候補が未選択の場合は従来通り `受け取る` STEPへ進め、候補未選択時の入力制御は維持した。
+
+#### `ios-native/Tests/MegrumAppTests/ProposalCreateFlowTests.swift`
+- STEP1主CTAの文言と遷移先が一致することをテスト追加した。
+- ホーム起点の既選択状態、未選択状態、郵送交換、待ち合わせから確認への遷移を固定した。
+
+#### `notes/assets/swift-visual-qa/`
+- ホーム、左ドロワー、関係図、候補展開、STEP1、待ち合わせ、確認、完了のSwiftスクショを再取得した。
+
+### 影響範囲
+
+- ホーム起点の関係図から打診作成STEP1へ入る導線
+- STEP1下部CTAのタップ後遷移
+- 左ドロワー、関係図の候補展開、待ち合わせカレンダー、送信payload、DB schemaには影響なし
+
+### 確認方法
+
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-primary-step-destination --enable-xctest --disable-swift-testing --filter 'ProposalCreateFlowTests|TradeChatAffordanceTests' -j 1`
+- `scripts/capture_home_proposal_visual_qa.sh --screens home,drawer-open,match-relation,match-relation-candidates,proposal-give,proposal-receive,proposal-meetup,proposal-confirm,proposal-complete`
+- 目視確認:
+  - `notes/assets/rn-screen-lookup/rn-proposal-give.png`
+  - `notes/assets/swift-visual-qa/swift-proposal-give.png`
+  - `notes/assets/swift-visual-qa/swift-drawer-open.png`
+  - `notes/assets/swift-visual-qa/swift-match-relation-candidates-expanded.png`
+  - `notes/assets/swift-visual-qa/swift-proposal-complete-fullscreen.png`
+
+### セルフレビュー結果
+
+- ✅ `私が出す` の表示CTA `待ち合わせへ進む` と実遷移先が一致することをテストで固定した。
+- ✅ 受け取り候補未選択時は `受け取る` STEPへ進むため、入力制御の後退はない。
+- ✅ `打診一覧に飛ぶ` は `TradesScreen` の pending 一覧へ向く既存テストが通過した。
+- ✅ RN/Swift比較用スクショ18枚のリンク欠けがないことを確認した。
+- ✅ 状態名・用語・DB schema・送信payloadの変更はないため、`notes/09_state_machines.md`、`notes/10_glossary.md`、`notes/05_data_model.md` の更新は不要と判断した。
+
+### 関連ファイル
+
+- `ios-native/Sources/MegrumApp/ProposalCreateFlow.swift`
+- `ios-native/Tests/MegrumAppTests/ProposalCreateFlowTests.swift`
+- `notes/assets/swift-visual-qa/swift-proposal-give.png`
+- `notes/assets/swift-visual-qa/swift-drawer-open.png`
+- `notes/assets/swift-visual-qa/swift-match-relation-candidates-expanded.png`
+
+---
+
+## イテレーション418.28：待ち合わせ週カレンダーの7列収まりと長押し案内をRN準拠へ補正
+
+### 背景・問題意識
+
+ホーム起点の関係図から打診完了までのRN/Swiftスクショ比較を続けたところ、Swift版の待ち合わせ週カレンダーが初期表示で横にはみ出し、右端の日付列が切れていた。RN版は7日分の週カレンダーが画面内に収まり、その中央に `長押しで時間帯を選択できるよ` の案内が重なるため、Swift版も週送りスワイプは維持しつつ、通常表示では7列を画面内に収める必要があった。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/ProposalMeetupCalendarEditor.swift`
+- 週カレンダーの列幅計算を `ProposalMeetupCalendarModel.dayWidth(containerWidth:)` / `weekGridWidth(dayWidth:)` としてモデル化した。
+- 狭いカード幅では最低列幅を下げ、7日分と時刻列がコンテナ幅を超えないようにした。
+- `長押しで時間帯を選択できるよ` の案内をカレンダー下部から週グリッド上のオーバーレイへ移し、RNと同じ発見性に戻した。
+- 案内はドラッグプレビュー中には非表示にし、時間帯作成操作を邪魔しないようにした。
+
+#### `ios-native/Tests/MegrumAppTests/TradeRequestDraftProposalCreateFlowTests.swift`
+- 狭いカード幅でも週グリッドが7日分収まることをテスト追加した。
+- 案内オーバーレイ位置に使う時間スロット計算をテスト追加した。
+
+#### `notes/assets/swift-visual-qa/`
+- `swift-proposal-meetup-week.png` を再取得し、7日分の列と長押し案内がRN参照に近い位置へ戻ったことを確認した。
+
+### 影響範囲
+
+- 打診作成STEP1の待ち合わせ週カレンダー表示
+- 待ち合わせカレンダーの長押し作成案内
+- 週送りスワイプ、長押し作成、候補移動/リサイズ、月表示、送信payloadには影響なし
+
+### 確認方法
+
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-meetup-week-hint --enable-xctest --disable-swift-testing --filter 'TradeRequestDraftProposalCreateFlowTests' -j 1`
+- `scripts/capture_home_proposal_visual_qa.sh --screens proposal-meetup`
+- 目視確認:
+  - `notes/assets/rn-screen-lookup/rn-proposal-meetup-week.png`
+  - `notes/assets/swift-visual-qa/swift-proposal-meetup-week.png`
+
+### セルフレビュー結果
+
+- ✅ Swift版の週カレンダーで6月5日〜6月11日の7日分が初期表示内に収まることをスクショで確認した。
+- ✅ `長押しで時間帯を選択できるよ` がRN同様にグリッド中央へ表示されることを確認した。
+- ✅ 週送り・長押し作成・月グリッド・候補時刻計算の既存テストが通過した。
+- ✅ 状態名・用語・DB schema・送信payloadの変更はないため、`notes/09_state_machines.md`、`notes/10_glossary.md`、`notes/05_data_model.md` の更新は不要と判断した。
+
+### 関連ファイル
+
+- `ios-native/Sources/MegrumApp/ProposalMeetupCalendarEditor.swift`
+- `ios-native/Tests/MegrumAppTests/TradeRequestDraftProposalCreateFlowTests.swift`
+- `notes/assets/swift-visual-qa/swift-proposal-meetup-week.png`
+
+---
+
+## イテレーション418.27：RN比較でSTEP1 CTAと公開候補Preview境界を補正
+
+### 背景・問題意識
+
+RN/Swiftスクショを並べて確認したところ、Swift版の打診STEP1「私が出す」では、RN版が既に受け取り候補選択済みの前提で `待ち合わせへ進む` を出しているのに対し、Swift版は `受け取るものへ進む` と表示しており、ホームのグッズパネルタップ後に一段余計な操作が必要に見えていた。また、RN比較のために受け取り候補を複数表示しようとした際、相手候補を共通Preview在庫へ足すと「私が出す」側にも他人グッズが混ざる危険があることをスクショ目視で検出した。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/ProposalCreateFlow.swift`
+- STEP1下部CTAをRN準拠に補正し、`私が出す` でも受け取り候補が既にある場合は現地交換なら `待ち合わせへ進む`、郵送なら `次へ：送信確認` を表示するようにした。
+- 受け取り候補が未選択の場合だけ従来通り `受け取るものへ進む` を出すため、未選択時の入力制御は維持した。
+
+#### `ios-native/Sources/MegrumApp/MegrumAppState.swift`
+- Preview用の `loadPublicTradeGoods` で、相手の公開候補だけ2件返るようにした。
+- 追加候補は公開取得の戻り値にだけ閉じ込め、`NativePreviewData.inventory` の自分用在庫・ホーム候補には混ぜない。
+
+#### `ios-native/Tests/MegrumAppTests/ProposalCreateFlowTests.swift`
+- RN比較で確認したSTEP1 CTA文言をテストに反映した。
+- 受け取り候補未選択時は `受け取るものへ進む` のまま残ることも確認した。
+
+#### `ios-native/Tests/MegrumAppTests/MegrumAppStateTests.swift`
+- Previewの公開交換情報では相手候補が2件返りつつ、アプリ内の共通在庫には相手候補を増やさないことをテスト固定した。
+
+#### `notes/assets/swift-visual-qa/`
+- `swift-home-preview.png`、`swift-proposal-give.png`、`swift-proposal-receive.png`、`swift-match-relation-rn-visual-header.png`、`swift-match-relation-candidates-expanded.png` を再取得した。
+
+### 影響範囲
+
+- ホーム起点の相手グッズパネルタップ後の打診STEP1表示
+- RN/Swift Visual QA用のPreview公開候補
+- 左ドロワー、関係図の候補展開、待ち合わせカレンダー、DB schema、送信payloadキーには変更なし
+
+### 確認方法
+
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-home-drawer-rnfix3 --enable-xctest --disable-swift-testing --filter 'HomeScreenFlowTests|AppDrawerGestureTests|ProposalCreateFlowTests|TradeRequestDraftProposalCreateFlowTests|MegrumAppStateTests/testAppStateLoadsPreviewPublicExchangeContent' -j 1`
+- `scripts/capture_home_proposal_visual_qa.sh --screens home,proposal-give,proposal-receive,match-relation,match-relation-candidates`
+- 目視確認:
+  - `notes/assets/rn-screen-lookup/rn-proposal-give.png`
+  - `notes/assets/swift-visual-qa/swift-proposal-give.png`
+  - `notes/assets/rn-screen-lookup/rn-proposal-receive.png`
+  - `notes/assets/swift-visual-qa/swift-proposal-receive.png`
+  - `notes/assets/swift-visual-qa/swift-home-preview.png`
+  - `notes/assets/swift-visual-qa/swift-match-relation-candidates-expanded.png`
+
+### セルフレビュー結果
+
+- ✅ `私が出す` のCTAが、RN参照と同じ `待ち合わせへ進む` になったことをスクショで確認した。
+- ✅ 受け取り候補はSwift側でも複数表示され、RN比較の視認性が改善した。
+- ✅ ホームの `マッチしてるよ！` は3件へ戻り、公開候補追加がホーム在庫へ混ざらないことを確認した。
+- ✅ 関係図は選択肢起点で候補を展開し、タップ選択する状態を維持している。
+- ✅ 左ドロワーの全画面右スワイプ判定は既存テストで維持確認した。
+- ✅ DB schema、状態名、用語変更はないため、`notes/09_state_machines.md`、`notes/10_glossary.md`、`notes/05_data_model.md` の更新は不要と判断した。
+
+### 関連ファイル
+
+- `ios-native/Sources/MegrumApp/ProposalCreateFlow.swift`
+- `ios-native/Sources/MegrumApp/MegrumAppState.swift`
+- `ios-native/Tests/MegrumAppTests/ProposalCreateFlowTests.swift`
+- `ios-native/Tests/MegrumAppTests/MegrumAppStateTests.swift`
+- `notes/assets/swift-visual-qa/swift-home-preview.png`
+- `notes/assets/swift-visual-qa/swift-proposal-give.png`
+- `notes/assets/swift-visual-qa/swift-proposal-receive.png`
+
+---
+
+## イテレーション418.26：送信確認Visual QAの相手グッズ起点を補正
+
+### 背景・問題意識
+
+RN/Swiftスクショ比較で送信確認画面を見直したところ、Swift版のVisual QA直行ルートでは交換内容の左右が同じ画像に見え、ホームの「相手グッズパネルをタップして関係図から打診へ進む」主線の再現として弱かった。原因は、Visual QA用に打診フローへ直行する際、`homeMatchedItems.first` をそのまま対象にしており、Previewデータでは自分の在庫が先頭に来るケースがあるためだった。RN比較では「相手の譲」と「あなたの譲」が明確に分かれる必要があるため、相手所有グッズを優先して対象にするよう補正した。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/MegrumRootView.swift`
+- `VisualQAProposalRouteResolver.targetItem(candidates:viewerID:)` を追加し、Visual QAの直接打診ルートでは相手所有グッズを優先して開くようにした。
+- 相手所有グッズが見つからない場合だけ従来通り先頭候補へフォールバックする。
+- 通常のホームタップ導線や送信payloadには影響しない。
+
+#### `ios-native/Tests/MegrumAppTests/HomeScreenFlowTests.swift`
+- Visual QA直行ルートが自分の在庫より相手所有グッズを優先することをテスト追加した。
+
+#### `notes/assets/swift-visual-qa/`
+- `swift-proposal-confirm-final.png` を再取得し、宛先が `@michilion`、交換内容が左右で別グッズとして見える状態を確認した。
+- `swift-proposal-complete-fullscreen.png` を再取得し、完了画面の宛先表示を確認した。
+
+### 影響範囲
+
+- Visual QA用の `proposal-give / receive / meetup / confirm / complete` 直行ルート
+- RN/Swift比較HTMLに表示される送信確認・完了スクショ
+- 実ユーザーのホームタップ、関係図、打診作成、DB schema、payloadキーには影響しない
+
+### 確認方法
+
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-visual-target --enable-xctest --disable-swift-testing --filter 'HomeScreenFlowTests|ProposalCreateFlowTests' -j 1`
+- `scripts/capture_home_proposal_visual_qa.sh --screens proposal-confirm,proposal-complete`
+- `scripts/capture_home_proposal_visual_qa.sh --verify-only`
+- 目視確認:
+  - `notes/assets/rn-screen-lookup/rn-proposal-confirm.png`
+  - `notes/assets/swift-visual-qa/swift-proposal-confirm-final.png`
+  - `notes/assets/rn-screen-lookup/rn-proposal-complete.png`
+  - `notes/assets/swift-visual-qa/swift-proposal-complete-fullscreen.png`
+
+### セルフレビュー結果
+
+- ✅ Visual QA直行ルートが相手所有グッズを優先することをテストで確認した。
+- ✅ 送信確認の宛先表示は `@michilion` でRN参照と揃っている。
+- ✅ 送信確認の交換内容は左右で別グッズとして見える状態になった。
+- ✅ Visual QA比較HTMLの画像参照18件に欠落がないことを確認した。
+- ✅ 状態名・新用語・DB schema 変更はないため、`notes/09_state_machines.md`、`notes/10_glossary.md`、`notes/05_data_model.md` の更新は不要と判断した。
+
+### 関連ファイル
+
+- `ios-native/Sources/MegrumApp/MegrumRootView.swift`
+- `ios-native/Tests/MegrumAppTests/HomeScreenFlowTests.swift`
+- `notes/assets/swift-visual-qa/swift-proposal-confirm-final.png`
+- `notes/assets/swift-visual-qa/swift-proposal-complete-fullscreen.png`
+
+---
+
+## イテレーション418.25：左ドロワーとホーム起点関係図フローをRN/Swift比較で再修正
+
+### 背景・問題意識
+
+実機確認で左ドロワーの出方とホームのグッズパネル押下後フローが期待とズレて見えた。特にドロワーは、左端だけでなく画面のどこからでも右スワイプで出せること、かつXモバイルアプリのように指の動きへ素直に追従することが重要だった。またホーム起点では、グッズパネル押下後にプロフィールへ寄り道せず、関係図から打診完了まで進む主線を固定する必要があった。RN/Swiftスクショ比較では、待ち合わせ月表示を詰めすぎるとRNにない下部セクションが初期表示へ出ることも分かったため、画面構成優先で調整した。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/MegrumRootView.swift`
+- 左ドロワーを、エッジ専用の開閉から全画面右スワイプ追従へ整理した。
+- ドロワー表示中のメイン画面は縮小・角丸・白ベールをやめ、Xモバイル版に近い「そのまま右へスライドしてドロワーを見せる」挙動へ変更した。
+- 閾値未満では戻る、開いた状態では左スワイプで閉じる、縦スワイプは拾わない判定は維持した。
+
+#### `ios-native/Sources/MegrumApp/HomeScreen.swift`
+- ホームのグッズパネル押下後の導線を関係図へ固定した。
+- `マッチしてるよ！` は `.perfect`、`交換できるかも？` は既存の `ProposalMatchType.forward` として関係図へ入るようにした。
+- 関係図から打診作成、完了後の `打診一覧に飛ぶ` 導線は維持した。
+
+#### `ios-native/Sources/MegrumApp/ProposalMeetupCalendarEditor.swift`
+- 待ち合わせ月表示をRN初期構成に合わせ、カレンダーが主役で下部の別セクションが出過ぎない高さへ戻した。
+- 週送り、長押し候補作成、長押し後ドラッグ、候補タップの場所入力導線、候補移動/終了時刻調整は維持した。
+
+#### `ios-native/Tests/MegrumAppTests/HomeScreenFlowTests.swift`
+- `交換できるかも？` 棚も関係図へ入ることを期待値として更新した。
+
+### 影響範囲
+
+- アプリ全体の左ドロワー開閉ジェスチャ
+- ホーム `マッチしてるよ！` / `交換できるかも？` のグッズパネル押下後導線
+- ホーム起点 `関係図 -> 打診作成 STEP1 -> 待ち合わせ -> 送信確認 -> 完了 -> 打診一覧`
+- 待ち合わせ月表示の初期画面密度
+- DB schema、payloadキー、状態名には影響しない
+
+### 確認方法
+
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-drawer-home-flow --enable-xctest --disable-swift-testing --filter 'AppDrawerGestureTests|HomeScreenFlowTests|ProposalCreateFlowTests|TradeRequestDraftProposalCreateFlowTests' -j 1`
+- `scripts/capture_home_proposal_visual_qa.sh --screens drawer-open,home,match-relation,match-relation-candidates,proposal-meetup,proposal-meetup-month`
+- `scripts/capture_home_proposal_visual_qa.sh --screens proposal-meetup-month`
+- `scripts/capture_home_proposal_visual_qa.sh --verify-only`
+- 目視確認:
+  - `notes/assets/swift-visual-qa/swift-drawer-open.png`
+  - `notes/assets/swift-visual-qa/swift-match-relation-rn-visual-header.png`
+  - `notes/assets/swift-visual-qa/swift-match-relation-candidates-expanded.png`
+  - `notes/assets/rn-screen-lookup/rn-proposal-meetup-month.png`
+  - `notes/assets/swift-visual-qa/swift-proposal-meetup-month.png`
+
+### セルフレビュー結果
+
+- ✅ 左ドロワーは左端限定ではなく、全域右スワイプで追従する状態を `AppDrawerGestureTests` で確認した。
+- ✅ ドロワーのメイン画面縮小・角丸・白ベールを外し、Xモバイル版に近い横スライド型へ戻した。
+- ✅ ホームの `交換できるかも？` 棚もプロフィールではなく関係図へ入るようにし、既存 `matchType.forward` を使ってDB境界を増やさなかった。
+- ✅ 待ち合わせ月表示は、RNにない下部セクションが初期表示へ出過ぎない構成へ戻した。
+- ✅ 関連Swiftテスト34件で0 failures、Visual QA画像参照18件の欠落なしを確認した。
+- ✅ 状態名・新用語・DB schema 変更はないため、`notes/09_state_machines.md`、`notes/10_glossary.md`、`notes/05_data_model.md` の更新は不要と判断した。
+
+### 関連ファイル
+
+- `ios-native/Sources/MegrumApp/MegrumRootView.swift`
+- `ios-native/Sources/MegrumApp/HomeScreen.swift`
+- `ios-native/Sources/MegrumApp/ProposalMeetupCalendarEditor.swift`
+- `ios-native/Tests/MegrumAppTests/HomeScreenFlowTests.swift`
+- `notes/assets/swift-visual-qa/swift-drawer-open.png`
+- `notes/assets/swift-visual-qa/swift-proposal-meetup-month.png`
+
+---
+
+## イテレーション418.24：関係図ヘッダーと待ち合わせカレンダー密度をRN比較で再調整
+
+### 背景・問題意識
+
+ホーム起点フローのRN/Swiftスクショ比較を継続したところ、関係図ではSwift版だけ右上に `プロフィール` ボタンがあり、RN版の `閉じる + 関係図` だけのヘッダー構成から外れていた。また待ち合わせカレンダーでは、Swift版が `待ち合わせカレンダー` 見出しと操作説明文、月表示の年月見出しを追加していたため、RN版よりカレンダー本体の開始位置が大きく下がっていた。画面構成とボタン数をRN版へ寄せるため、余分な導線と説明ブロックを削った。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/MatchRelationScreen.swift`
+- 関係図ヘッダーから `プロフィール` ボタンを削除した。
+- `showsPartnerProfile` state とプロフィールシート導線を削除し、ホーム起点の関係図はRN版同様に閉じるボタンとタイトルだけの構成にした。
+- 関係図の候補展開、選択状態、スワイプ遷移、下部CTAは維持した。
+
+#### `ios-native/Sources/MegrumApp/ProposalMeetupCalendarEditor.swift`
+- `待ち合わせカレンダー` の見出しと長い操作説明文を削除し、週/月トグルとカレンダー本体をRN版に近い位置へ上げた。
+- 週表示では、空き枠長押しのヒントだけをRN版同様に短いピル表示へ寄せた。
+- 月表示では、RN版にない `2026年6月` 見出しを削除し、曜日行と日付グリッドから始まる構成へ変更した。
+- 週送り、月日付タップ、長押し候補作成、候補タップの場所入力導線、長押し移動/終了時刻調整の操作モデルは維持した。
+
+#### `notes/assets/swift-visual-qa/`
+- `swift-match-relation-rn-visual-header.png`
+- `swift-match-relation-candidates-expanded.png`
+- `swift-proposal-meetup-week.png`
+- `swift-proposal-meetup-month.png`
+
+### 影響範囲
+
+- ホーム起点 `関係図 -> 打診作成 STEP1 待ち合わせ`
+- 関係図ヘッダーのボタン数とプロフィール導線
+- 待ち合わせカレンダーの表示密度、週/月表示の初期見え方
+- データ境界、送信payload、状態名には影響しない
+
+### 確認方法
+
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-relation-calendar-density --enable-xctest --disable-swift-testing --filter 'MatchRelationScreenTests|ProposalCreateFlowTests|TradeRequestDraftProposalCreateFlowTests|HomeScreenFlowTests' -j 1`
+- `scripts/capture_home_proposal_visual_qa.sh --screens match-relation,match-relation-candidates,proposal-meetup,proposal-meetup-month`
+- `scripts/capture_home_proposal_visual_qa.sh --verify-only`
+- 目視確認:
+  - `notes/assets/rn-screen-lookup/rn-match-detail.png`
+  - `notes/assets/swift-visual-qa/swift-match-relation-rn-visual-header.png`
+  - `notes/assets/rn-screen-lookup/rn-proposal-meetup-week.png`
+  - `notes/assets/swift-visual-qa/swift-proposal-meetup-week.png`
+  - `notes/assets/rn-screen-lookup/rn-proposal-meetup-month.png`
+  - `notes/assets/swift-visual-qa/swift-proposal-meetup-month.png`
+
+### セルフレビュー結果
+
+- ✅ 関係図ヘッダーの余分な `プロフィール` ボタンを削除し、RN版と同じボタン数に戻した。
+- ✅ 待ち合わせカレンダーからRN版にない説明ブロックと月見出しを削除し、週/月トグルとカレンダー本体中心の構成へ寄せた。
+- ✅ カレンダー操作モデルは既存テストで維持され、関連Swiftテスト38件で0 failuresを確認した。
+- ✅ 比較HTMLの画像参照は18件すべて存在することを確認した。
+- ✅ 状態名・新用語・DB schema 変更はないため、`notes/09_state_machines.md`、`notes/10_glossary.md`、`notes/05_data_model.md` の更新は不要と判断した。
+- ⚠️ Swift版はiOS実機フレームと既存STEPヘッダーがあるため、RN Web Previewよりカレンダー本体の開始位置はまだ下がる。次回はSTEP1全体ヘッダーの高さをRN比較で追加監査する。
+
+### 関連ファイル
+
+- `ios-native/Sources/MegrumApp/MatchRelationScreen.swift`
+- `ios-native/Sources/MegrumApp/ProposalMeetupCalendarEditor.swift`
+- `notes/assets/swift-visual-qa/swift-match-relation-rn-visual-header.png`
+- `notes/assets/swift-visual-qa/swift-proposal-meetup-week.png`
+- `notes/assets/swift-visual-qa/swift-proposal-meetup-month.png`
+
+---
+
+## イテレーション418.23：Swift打診完了をRNの白カード＋2ボタン構成へ戻す
+
+### 背景・問題意識
+
+ホーム起点フローの最後に表示される `打診完了` 画面をRN/Swiftスクショで見比べたところ、RN版は上部の白い完了カード、その直下に `まだ他に探す` と `打診一覧に飛ぶ` の2ボタンが並ぶ構成だった。一方、Swift版は中央寄せのフルスクリーン完了ビューになっており、ボタン数と文言は合っていても、位置と画面構成がRN版から大きく外れていた。フロー完了時の印象とCTAの位置は重要なため、RN版のカード構成へ戻した。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/ProposalCreateFlow.swift`
+- `ProposalCreateCompletionView` を、中央寄せのフルスクリーン完了ビューから、RN版と同じ白い完了カード＋直下2ボタンの構成へ変更した。
+- 完了カード内の装飾円、チェックアイコン、タイトル、説明文をカード内に収め、カード下に `まだ他に探す` と `打診一覧に飛ぶ` を縦並びで配置した。
+- セカンダリボタンは白背景＋薄いラベンダー枠、主ボタンはラベンダー塗りにし、RN版のCTA階層へ寄せた。
+- Visual QA用の `proposal-confirm` / `proposal-complete` では、相手ハンドルをRN比較用に `michilion` として表示し、スクショ比較時に文言差分がノイズにならないようにした。
+
+#### `notes/assets/swift-visual-qa/`
+- `swift-proposal-complete-fullscreen.png` を再撮影し、RN版 `rn-proposal-complete.png` と見比べた。
+
+### 影響範囲
+
+- ホーム起点 `関係図 -> 打診作成 -> 送信確認 -> 送信完了` フローの完了画面
+- 完了画面のCTA配置、Visual QA時の相手ハンドル表示
+- `まだ他に探す` / `打診一覧に飛ぶ` の遷移ロジック自体は変更しない
+
+### 確認方法
+
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-completion-card --enable-xctest --disable-swift-testing --filter 'ProposalCreateFlowTests|TradeRequestDraftProposalCreateFlowTests|MatchRelationScreenTests|TradeChatAffordanceTests' -j 1`
+- `scripts/capture_home_proposal_visual_qa.sh --screens proposal-complete`
+- `scripts/capture_home_proposal_visual_qa.sh --verify-only`
+- 目視確認:
+  - `notes/assets/rn-screen-lookup/rn-proposal-complete.png`
+  - `notes/assets/swift-visual-qa/swift-proposal-complete-fullscreen.png`
+
+### セルフレビュー結果
+
+- ✅ RN版と同じく、完了カード、`まだ他に探す`、`打診一覧に飛ぶ` の順に戻した。
+- ✅ `打診一覧に飛ぶ` のルーティングは既存の `openTrades -> pending` を維持した。
+- ✅ 対象Swiftテスト59件で0 failuresを確認した。
+- ✅ 比較HTMLの画像参照は18件すべて存在することを確認した。
+- ✅ 状態名・新用語・DB schema 変更はないため、`notes/09_state_machines.md`、`notes/10_glossary.md`、`notes/05_data_model.md` の更新は不要と判断した。
+- ⚠️ SwiftスクショはiOS実機フレームとRetina倍率のためRN Web Previewより大きく見えるが、論理構成とCTA順はRNに寄せた。
+
+### 関連ファイル
+
+- `ios-native/Sources/MegrumApp/ProposalCreateFlow.swift`
+- `notes/assets/swift-visual-qa/swift-proposal-complete-fullscreen.png`
+- `notes/assets/rn-screen-lookup/rn-proposal-complete.png`
+
+---
+
+## イテレーション418.22：Swift送信確認をRN情報順と密度へ再調整
+
+### 背景・問題意識
+
+ホーム起点フローのRN/Swift比較で、Swift版 `送信確認` はRN版と情報順は近いものの、通知カード、交換内容カード、受け渡し方法、交換条件タグの余白とカード階層が大きく、画面上部だけで情報が詰まりすぎて見えていた。オーナーからの「都度、RN版とSwift版のスクショをとって、見比べる」方針に合わせ、RN版 `proposal-confirm` とSwift版 `proposal-confirm` を再撮影して、構成と表示密度を確認しながら再調整した。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/ProposalCreateFlow.swift`
+- `送信確認` のセクション表示を、RN版と同じ `交換内容 -> 受け渡し方法 -> 交換条件タグ -> 交換できる候補 -> メッセージ -> スケジュール共有` の見え方に寄せるため、確認用の軽量 `ProposalConfirmSection` を追加した。
+- 送信確認の案内カードを大きな縦カードから、RN版同様のラベル付き横長バーへ変更した。
+- 交換内容カードをコンパクト化し、左右の譲る/受け取るカード、中央矢印、サムネイルの密度をRN版へ寄せた。
+- 受け渡し方法カードと交換条件タグの余白、角丸、チップ幅を詰め、RN版の初期表示と比較しやすい密度へ戻した。
+- Visual QAの `proposal-confirm` / `proposal-complete` 初期状態では、RN比較と同じく条件タグ未選択・メッセージ空欄で起動するようにした。
+
+#### `notes/assets/swift-visual-qa/`
+- `swift-proposal-confirm-final.png` を再撮影し、RN版 `rn-proposal-confirm.png` と見比べた。
+
+### 影響範囲
+
+- ホーム起点 `関係図 -> 打診作成 -> 送信確認 -> 送信完了` フロー
+- `送信確認` の画面構成、初期表示、条件タグとメッセージのVisual QA状態
+- 送信 payload のフィールドや `ProposalCreateInput` には影響しない
+
+### 確認方法
+
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-proposal-confirm-bar --enable-xctest --disable-swift-testing --filter 'ProposalCreateFlowTests|TradeRequestDraftProposalCreateFlowTests|MatchRelationScreenTests' -j 1`
+- `bash -n scripts/capture_home_proposal_visual_qa.sh`
+- `scripts/capture_home_proposal_visual_qa.sh --screens proposal-confirm`
+- `scripts/capture_home_proposal_visual_qa.sh --verify-only`
+- 目視確認:
+  - `notes/assets/rn-screen-lookup/rn-proposal-confirm.png`
+  - `notes/assets/swift-visual-qa/swift-proposal-confirm-final.png`
+
+### セルフレビュー結果
+
+- ✅ RN版とSwift版の送信確認スクショを再撮影し、交換内容、受け渡し方法、交換条件タグ、待ち合わせ候補の順序が揃っていることを確認した。
+- ✅ Swift版はiOS実機フレームと固定CTAぶん縦方向の見え方が異なるが、カード構成と入力制御はRN準拠へ寄せた。
+- ✅ 対象Swiftテスト34件で0 failuresを確認した。
+- ✅ 比較HTMLの画像参照は18件すべて存在することを確認した。
+- ✅ 状態名・新用語・DB schema 変更はないため、`notes/09_state_machines.md`、`notes/10_glossary.md`、`notes/05_data_model.md` の更新は不要と判断した。
+- ⚠️ 実機での体感確認では、固定CTAとSafe AreaによりRN Web Previewより表示開始位置が下がる点を引き続き確認する。
+
+### 関連ファイル
+
+- `ios-native/Sources/MegrumApp/ProposalCreateFlow.swift`
+- `notes/assets/swift-visual-qa/swift-proposal-confirm-final.png`
+- `notes/assets/rn-screen-lookup/rn-proposal-confirm.png`
+
+---
+
+## イテレーション418.21：Swift STEP1候補カードをRN同様の縦リストへ戻す
+
+### 背景・問題意識
+
+ホーム起点フローのRN/Swift比較で、RN版 `打診作成 STEP1` の候補グッズは `FlatList` の縦1列カードとして表示される。一方、Swift版は一時的に2列グリッド表示になっており、ボタン数やフィルタ表示は近づいていても、候補カードの位置・密度・選択UIがRN版と大きく異なって見えていた。オーナーからの「画面の構成」「テキストの表示」「入力制御」をRN準拠で再現する要件に対し、ここは縦リストへ戻す必要があった。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/ProposalCreateFlow.swift`
+- `私が出す` / `受け取る` の候補表示を `LazyVGrid` から `VStack` の縦1列リストへ変更した。
+- `ProposalCandidateGridMetrics` を `ProposalCandidateListMetrics` へ置き換え、STEP1候補は画面幅に関係なく1列固定とした。
+- `ProposalSelectableGoodsRow` をRNカードに寄せ、左画像、タイトル、タグ/種別、ヒントチップ、右端チェックサークルの構成へ変更した。
+- グリッド用の `ProposalSelectableGoodsCompactCard` はSTEP1から不要になったため削除した。
+
+#### `ios-native/Tests/MegrumAppTests/TradeRequestDraftProposalCreateFlowTests.swift`
+- 候補リストがRN `FlatList` と同じく1列固定であることを検証するテストへ更新した。
+
+#### `notes/assets/swift-visual-qa/`
+- `swift-proposal-give.png` と `swift-proposal-receive.png` を再撮影し、Swift版でも候補カードが縦1列になったことを確認した。
+
+### 影響範囲
+
+- ホーム起点 `関係図 -> 打診作成 STEP1`
+- `私が出す` / `受け取る` の候補カード配置、選択UI、スクロール密度
+- RN/Swift横並び比較ページ上のSTEP1スクショ
+
+### 確認方法
+
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-proposal-rn-list --enable-xctest --disable-swift-testing --filter 'ProposalCreateFlowTests|TradeRequestDraftProposalCreateFlowTests|MatchRelationScreenTests' -j 1`
+- `scripts/capture_home_proposal_visual_qa.sh --screens proposal-give,proposal-receive`
+- `scripts/capture_home_proposal_visual_qa.sh --verify-only`
+- 目視確認:
+  - `notes/assets/rn-screen-lookup/rn-proposal-give.png`
+  - `notes/assets/swift-visual-qa/swift-proposal-give.png`
+  - `notes/assets/rn-screen-lookup/rn-proposal-receive.png`
+  - `notes/assets/swift-visual-qa/swift-proposal-receive.png`
+
+### セルフレビュー結果
+
+- ✅ Swift STEP1の候補表示をRN版と同じ縦1列カードリストへ戻した。
+- ✅ 右端チェックサークル、ヒントチップ、左画像、タイトル/サブ情報の構成をRNに寄せた。
+- ✅ 対象Swiftテスト34件で0 failuresを確認した。
+- ✅ 比較HTMLの画像参照は18件すべて存在することを確認した。
+- ✅ 状態名・新用語・DB schema 変更はないため、`notes/09_state_machines.md`、`notes/10_glossary.md`、`notes/05_data_model.md` の更新は不要と判断した。
+- ⚠️ Swift Previewデータの推し名・グッズ名はRN実データとまだ完全一致していない。次の比較ではデータ名または表示密度の差分を継続確認する。
+
+### 関連ファイル
+
+- `ios-native/Sources/MegrumApp/ProposalCreateFlow.swift`
+- `ios-native/Tests/MegrumAppTests/TradeRequestDraftProposalCreateFlowTests.swift`
+- `notes/assets/swift-visual-qa/swift-proposal-give.png`
+- `notes/assets/swift-visual-qa/swift-proposal-receive.png`
+
+---
+
+## イテレーション418.20：Swift STEP1の推し/種別フィルタをRN表示制御へ寄せる
+
+### 背景・問題意識
+
+ホーム起点フローのRN/Swift比較で、RN版 `打診作成 STEP1` には `推し` / `種別` のフィルタチップが表示され、候補グッズを絞り込める。一方、Swift版はフィルタ部品自体は存在していたが、推し・種別マスタを別画面依存で読み込んでおり、比較スクショや初期表示ではチップが出ないことがあった。またRN版は表示中候補からチップ選択肢を抽出するため、Swift側も全マスタではなく候補グッズに存在する値だけを出す必要があった。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/ProposalCreateFlow.swift`
+- `ProposalGoodsFilterCatalog` を追加し、表示候補グッズに存在する `groupID` / `goodsTypeID` だけから `推し` / `種別` チップを作るようにした。
+- `ProposalCreateFlow` 表示時に `oshiGroups` と `goodsTypes` が未読込なら読み込む `.task` を追加した。
+- `私が出す` / `受け取る` のフィルタバーを、全マスタではなく各タブの候補グッズ由来のチップへ差し替えた。
+
+#### `ios-native/Tests/MegrumAppTests/ProposalCreateFlowTests.swift`
+- 候補グッズに存在しない推し・種別マスタが、STEP1フィルタチップに出ないことを検証するテストを追加した。
+
+#### `notes/assets/swift-visual-qa/`
+- `swift-proposal-give.png` と `swift-proposal-receive.png` を再撮影し、Swift版でも `推し` / `種別` チップが表示されることを確認した。
+
+### 影響範囲
+
+- ホーム起点 `関係図 -> 打診作成 STEP1`
+- `私が出す` / `受け取る` の候補絞り込み表示
+- RN/Swift横並び比較ページ上のSTEP1スクショ
+
+### 確認方法
+
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-proposal-filter-chips --enable-xctest --disable-swift-testing --filter 'ProposalCreateFlowTests|TradeRequestDraftProposalCreateFlowTests|MatchRelationScreenTests' -j 1`
+- `scripts/capture_home_proposal_visual_qa.sh --screens proposal-give,proposal-receive`
+- `bash -n scripts/capture_home_proposal_visual_qa.sh`
+- `scripts/capture_home_proposal_visual_qa.sh --verify-only`
+- 目視確認:
+  - `notes/assets/swift-visual-qa/swift-proposal-give.png`
+  - `notes/assets/swift-visual-qa/swift-proposal-receive.png`
+
+### セルフレビュー結果
+
+- ✅ Swift STEP1でもRN版と同じ意味の `推し` / `種別` フィルタチップが表示されるようになった。
+- ✅ チップ候補はRN同様、表示候補グッズに存在する値だけから作られる。
+- ✅ 対象Swiftテスト34件で0 failuresを確認した。
+- ✅ 比較HTMLの画像参照は18件すべて存在することを確認した。
+- ✅ 状態名・新用語・DB schema 変更はないため、`notes/09_state_machines.md`、`notes/10_glossary.md`、`notes/05_data_model.md` の更新は不要と判断した。
+- ⚠️ RN実データの `aespa` / `NCT` とSwift Previewデータの `TWICE` はまだ完全一致していない。今回の修正はフィルタの表示制御・入力制御の一致を優先した。
+
+### 関連ファイル
+
+- `ios-native/Sources/MegrumApp/ProposalCreateFlow.swift`
+- `ios-native/Tests/MegrumAppTests/ProposalCreateFlowTests.swift`
+- `notes/assets/swift-visual-qa/swift-proposal-give.png`
+- `notes/assets/swift-visual-qa/swift-proposal-receive.png`
+
+---
+
+## イテレーション418.19：Swift STEP1比較用の候補数をRN実画面へ合わせる
+
+### 背景・問題意識
+
+RN/Swiftの `打診作成 STEP1` をタブ別スクショで見比べたところ、RN版の `私が出す` / `受け取る` は各2候補が表示されている一方、Swift版の比較用 `私が出す` は候補が1件だけに見えていた。これはSwiftの本番ロジック差分ではなく、比較用プレビュー在庫の2件目が `keep` 扱いで `selectableSenderGoods` から除外されていたため、RNとの画面構成比較がずれる原因になっていた。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/NativePreviewData.swift`
+- 比較用在庫 `会場限定フォト` を `keep` ではなく通常の提示候補として扱い、Swift `私が出す` タブでもRN版と同じく2候補が表示されるようにした。
+- データ境界や選択ロジックは変えず、Preview / Visual QA の入力データだけをRN比較に適した状態へ寄せた。
+
+#### `notes/assets/swift-visual-qa/`
+- `swift-proposal-give.png` と `swift-proposal-receive.png` を再撮影し、Swift STEP1でも2候補表示になっていることを確認した。
+
+### 影響範囲
+
+- RN/Swift横並び比較ページ上の `打診作成 STEP1`
+- Swift Visual QA用プレビュー在庫
+- 本番DB schema、送信payload、選択条件には影響なし
+
+### 確認方法
+
+- `scripts/capture_home_proposal_visual_qa.sh --screens proposal-give,proposal-receive`
+- `scripts/capture_home_proposal_visual_qa.sh --verify-only`
+- `bash -n scripts/capture_home_proposal_visual_qa.sh`
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-proposal-step1-preview --enable-xctest --disable-swift-testing --filter 'ProposalCreateFlowTests|TradeRequestDraftProposalCreateFlowTests|MatchRelationScreenTests' -j 1`
+- 目視確認:
+  - `notes/assets/rn-screen-lookup/rn-proposal-give.png`
+  - `notes/assets/swift-visual-qa/swift-proposal-give.png`
+  - `notes/assets/rn-screen-lookup/rn-proposal-receive.png`
+  - `notes/assets/swift-visual-qa/swift-proposal-receive.png`
+
+### セルフレビュー結果
+
+- ✅ Swift `私が出す` / `受け取る` の比較スクショが、RNと同じく2候補表示で見比べられるようになった。
+- ✅ 比較HTMLの画像参照は18件すべて存在することを確認した。
+- ✅ 対象Swiftテスト33件で0 failuresを確認した。
+- ✅ データモデル・状態名・用語追加はないため、`notes/05_data_model.md`、`notes/09_state_machines.md`、`notes/10_glossary.md` の更新は不要と判断した。
+- ⚠️ RN側の推し/種類フィルタチップはSwift STEP1にまだ未移植。今回の修正は候補数とタブ別比較精度の補正に限定した。
+
+### 関連ファイル
+
+- `ios-native/Sources/MegrumApp/NativePreviewData.swift`
+- `notes/assets/swift-visual-qa/swift-proposal-give.png`
+- `notes/assets/swift-visual-qa/swift-proposal-receive.png`
+
+---
+
+## イテレーション418.18：RN/Swift STEP1比較をタブ別スクショへ分解
+
+### 背景・問題意識
+
+ホーム起点フローの `打診作成 STEP1` は、RN版もSwift版も `私が出す` / `受け取る` / `待ち合わせ` の3タブで表示制御と入力制御が変わる。前iterの比較ページではSwift側は3タブ分のスクショを並べていたが、RN側は1枚だけで、しかも待ち合わせタブ寄りのスクショに更新されていたため、タブごとの画面構成差分を正しく見比べられなかった。
+
+### 変更内容
+
+#### `scripts/capture_home_proposal_visual_qa.sh`
+- RN直撮り対象を `proposal-give`、`proposal-receive`、`proposal-meetup` に分け、各タブを個別ファイルとして保存するようにした。
+- 既存の `proposal-meetup-month`、`proposal-confirm`、`proposal-complete` のRN直撮りは維持した。
+
+#### `RN Swift Home Proposal Visual QA.html`
+- `打診作成 STEP1` セクションを、RN/Swiftの `私が出す`、RN/Swiftの `受け取る`、RN/Swiftの `待ち合わせ` がそれぞれ並ぶ構成へ変更した。
+- RN側もSwift側と同じ粒度で、ボタン位置、テキスト、タブ選択状態、CTA文言を比較できるようにした。
+
+#### `notes/assets/rn-screen-lookup/`
+- `rn-proposal-give.png`、`rn-proposal-receive.png`、`rn-proposal-meetup-week.png` を追加撮影した。
+
+### 影響範囲
+
+- ホーム起点 `関係図 -> 打診作成 STEP1` の視覚QA運用
+- `私が出す` / `受け取る` / `待ち合わせ` のRN/Swiftタブ別比較
+- 実装挙動そのものには変更なし
+
+### 確認方法
+
+- `scripts/capture_home_proposal_visual_qa.sh --rn-only --rn-screens proposal-give,proposal-receive,proposal-meetup`
+- `scripts/capture_home_proposal_visual_qa.sh --verify-only`
+- `npm --prefix mobile run typecheck`
+- 目視確認:
+  - `notes/assets/rn-screen-lookup/rn-proposal-give.png`
+  - `notes/assets/rn-screen-lookup/rn-proposal-receive.png`
+  - `notes/assets/rn-screen-lookup/rn-proposal-meetup-week.png`
+
+### セルフレビュー結果
+
+- ✅ RN側もSTEP1の3タブを別スクショで比較できるようにした。
+- ✅ 比較HTMLの画像参照は18件すべて存在することを確認した。
+- ✅ RN typecheckで0 failuresを確認した。
+- ✅ 新しい状態名・用語・DB schema 変更はないため、`notes/09_state_machines.md`、`notes/10_glossary.md`、`notes/05_data_model.md` の更新は不要と判断した。
+- ⚠️ 旧 `rn-proposal-select.png` は互換用に残るが、STEP1比較では新しいタブ別3枚を正とする。
+
+### 関連ファイル
+
+- `scripts/capture_home_proposal_visual_qa.sh`
+- `RN Swift Home Proposal Visual QA.html`
+- `notes/assets/rn-screen-lookup/rn-proposal-give.png`
+- `notes/assets/rn-screen-lookup/rn-proposal-receive.png`
+- `notes/assets/rn-screen-lookup/rn-proposal-meetup-week.png`
+
+---
+
+## イテレーション418.17：RN直撮りをホーム起点比較QAスクリプトへ統合
+
+### 背景・問題意識
+
+ホーム起点フローのRN/Swift比較では、Swift側スクショを再取得できるようになった一方で、RN側の送信確認・打診完了・待ち合わせ月表示はまだ手作業URLに依存していた。比較のたびにRNスクショだけ古いまま残ると、Swiftの差分判断がずれるため、Expo webとChrome headlessを使ったRN直撮りも同じQAスクリプトへ統合した。
+
+### 変更内容
+
+#### `scripts/capture_home_proposal_visual_qa.sh`
+- `--include-rn` を追加し、Swiftスクショ取得に加えてRN webの直接撮影も実行できるようにした。
+- `--rn-only` を追加し、RN webスクショだけを撮り直して画像参照検査まで実行できるようにした。
+- `--rn-screens` を追加し、`proposal-select`、`proposal-meetup-month`、`proposal-confirm`、`proposal-complete` のうち必要な画面だけ撮れるようにした。
+- Expo webが起動していない場合は `mobile/` で `CI=1 npx expo start --web --port 8082` を一時起動し、撮影後に終了するようにした。
+- RN `proposal-confirm.tsx` の `parseMeetups` 仕様に合わせ、比較用 `meetups` JSONはトップレベルの `latitude` / `longitude` を持たせた。
+
+#### `RN Swift Home Proposal Visual QA.html`
+- ページ上部のQAコマンドに、RN直撮り込みの `scripts/capture_home_proposal_visual_qa.sh --include-rn` を追加した。
+
+#### `notes/assets/rn-screen-lookup/`
+- スクリプト経由で `rn-proposal-select.png`、`rn-proposal-meetup-month.png`、`rn-proposal-confirm.png`、`rn-proposal-complete.png` を再撮影した。
+- `rn-proposal-confirm.png` は待ち合わせ候補1件が表示される状態で撮り直した。
+
+### 影響範囲
+
+- RN/Swift横並び比較QAの再現性
+- 打診作成STEP1、待ち合わせ月表示、送信確認、打診完了のRN比較資産
+- 実装挙動そのものには変更なし
+
+### 確認方法
+
+- `scripts/capture_home_proposal_visual_qa.sh --help`
+- `scripts/capture_home_proposal_visual_qa.sh --verify-only`
+- `scripts/capture_home_proposal_visual_qa.sh --rn-only`
+- `scripts/capture_home_proposal_visual_qa.sh --rn-only --rn-screens proposal-confirm,proposal-complete`
+- 目視確認: `notes/assets/rn-screen-lookup/rn-proposal-confirm.png` に待ち合わせ候補 `1件` が表示される
+
+### セルフレビュー結果
+
+- ✅ RN側の直接撮影をSwift側と同じQAスクリプトへ統合した。
+- ✅ RN送信確認は候補0件ではなく、候補1件入りの比較スクショとして再取得できるようにした。
+- ✅ 比較HTMLの画像参照16件はすべて存在することを確認した。
+- ✅ 新しい状態名・用語・DB schema 変更はないため、`notes/09_state_machines.md`、`notes/10_glossary.md`、`notes/05_data_model.md` の更新は不要と判断した。
+- ⚠️ RNのホーム・関係図はPreview導線依存があるため、今回の自動撮影対象は直URLで安定撮影できる打診作成以降に限定した。
+
+### 関連ファイル
+
+- `scripts/capture_home_proposal_visual_qa.sh`
+- `RN Swift Home Proposal Visual QA.html`
+- `notes/assets/rn-screen-lookup/rn-proposal-select.png`
+- `notes/assets/rn-screen-lookup/rn-proposal-meetup-month.png`
+- `notes/assets/rn-screen-lookup/rn-proposal-confirm.png`
+- `notes/assets/rn-screen-lookup/rn-proposal-complete.png`
+
+---
+
+## イテレーション418.16：ホーム起点フローのSwiftスクショ再取得スクリプトを追加
+
+### 背景・問題意識
+
+ホーム起点のRN/Swift移行では、オーナーから「都度、RN版とSwift版のスクショをとって、見比べるようなテストがいいかもしれない」という方針が出ている。比較HTMLだけでは最新Swift実装を撮り直す手順が属人的になり、関係図や打診STEPの修正後に古いスクショを見てしまう危険があったため、Swift側のQA初期画面をまとめて再撮影できるCLI手順を固定した。
+
+### 変更内容
+
+#### `scripts/capture_home_proposal_visual_qa.sh`
+- Swift Simulator上の `MegrumNative` をbuild/installし、`MEGRUM_VISUAL_QA_INITIAL_SCREEN` を切り替えながらホーム起点フローのSwiftスクショを再取得するスクリプトを追加した。
+- 対象画面は `home`、`drawer-open`、`match-relation`、`match-relation-candidates`、`proposal-give`、`proposal-receive`、`proposal-meetup`、`proposal-meetup-month`、`proposal-confirm`、`proposal-complete`。
+- `--screens` で一部画面だけ再撮影、`--skip-build` で既存DerivedData利用、`--verify-only` で比較HTMLの画像参照検査だけを実行できるようにした。
+
+#### `RN Swift Home Proposal Visual QA.html`
+- ページ上部にSwift側スクショ再取得コマンドと画像参照チェックコマンドを追記した。
+- 比較ページを開いた人が、その場で「このスクショはどう更新するのか」を確認できるようにした。
+
+### 影響範囲
+
+- ホーム起点 `グッズパネル -> 関係図 -> 打診作成 -> 送信確認 -> 打診完了` の視覚QA運用
+- 左ドロワーと関係図候補展開を含むSwiftスクショ再取得手順
+- 実装挙動そのものには変更なし
+
+### 確認方法
+
+- `scripts/capture_home_proposal_visual_qa.sh --help`
+- `scripts/capture_home_proposal_visual_qa.sh --verify-only`
+- `MEGRUM_DERIVED_DATA=/tmp/megrum-native-relation-candidates-inline-build scripts/capture_home_proposal_visual_qa.sh --skip-build --screens match-relation-candidates`
+
+### セルフレビュー結果
+
+- ✅ Swift側スクショ再取得を1コマンド化し、比較HTMLの古い画像を見続けるリスクを下げた。
+- ✅ `match-relation-candidates` の1画面再撮影を実行し、候補展開済みスクショが更新されることを確認した。
+- ✅ 比較HTMLの画像参照は16件すべて存在することを `--verify-only` で確認した。
+- ✅ 新しい状態名・用語・DB schema 変更はないため、`notes/09_state_machines.md`、`notes/10_glossary.md`、`notes/05_data_model.md` の更新は不要と判断した。
+- ⚠️ RN側の全画面自動撮影はまだ未実装。RN直撮りが必要な時はExpo webの対象URLを使い、今後必要に応じて同スクリプトへ追加する。
+
+### 関連ファイル
+
+- `scripts/capture_home_proposal_visual_qa.sh`
+- `RN Swift Home Proposal Visual QA.html`
+- `notes/assets/swift-visual-qa/swift-match-relation-candidates-expanded.png`
+
+---
+
+## イテレーション418.15：関係図候補展開をRN準拠のインライン表示へ修正
+
+### 背景・問題意識
+
+ホームのグッズパネル押下後フローをRN版とSwift版のスクショで見比べたところ、Swift関係図の候補選択が一時的に別シート表示になっていた。RN `match-detail.tsx` の実画面では、選択肢のグッズ行を起点に同じ関係図カード内へ候補が展開され、そこで候補をタップして選択するため、操作モデルをRN準拠へ戻す必要があった。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/MatchRelationScreen.swift`
+- 選択肢のグッズ行タップで `MatchRelationWishExpansionKey` を切り替え、候補グッズを同じカード内にインライン展開するようにした。
+- 展開候補のタップで既存の `selectedCandidateIDsByListingID` を更新し、選択中サマリー、結論カード、下部CTAの有効状態を同じ状態から駆動させた。
+- QA初期画面 `match-relation-candidates` では、候補選択シートではなく候補展開済みの関係図を直接開くようにした。
+
+#### `ios-native/Sources/MegrumApp/HomeScreen.swift`
+- `match-relation-candidates` のQA起動時もホーム先頭マッチ候補から関係図へ入り、候補展開済み状態を撮影できるようにした。
+
+#### `ios-native/Sources/MegrumApp/VisualQAPreviewMode.swift`
+- Swift Simulator / Debug QA専用の初期画面に `match-relation-candidates` を追加した。
+
+#### `ios-native/Tests/MegrumAppTests/HomeScreenFlowTests.swift`
+- `match-relation-candidates` のQA初期画面パースと、打診作成フローへ誤って直行しないことを検証した。
+
+#### `RN Swift Home Proposal Visual QA.html`
+- 関係図セクションにSwiftの候補展開済みスクショ `swift-match-relation-candidates-expanded.png` を追加し、RN実画面と通常Swift関係図と並べて確認できるようにした。
+
+#### `notes/assets/swift-visual-qa/`
+- Swift Simulatorで `MEGRUM_VISUAL_QA_INITIAL_SCREEN=match-relation-candidates` を起動し、候補展開済み関係図スクショを保存した。
+
+### 影響範囲
+
+- ホーム起点 `グッズパネル -> 関係図` の候補選択UI
+- 関係図内の選択肢展開、候補タップ、集計サマリー、下部CTA活性化
+- RN/Swift横並びの視覚QA運用
+
+### 確認方法
+
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-relation-inline-candidates-check --enable-xctest --disable-swift-testing --filter 'HomeScreenFlowTests|MatchRelationScreenTests' -j 1`
+- `xcodebuild -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -destination 'id=C70DDDBB-2602-49E0-8F95-1F043BCCED76' -derivedDataPath /tmp/megrum-native-relation-candidates-inline-build CODE_SIGNING_ALLOWED=NO build`
+- `SIMCTL_CHILD_MEGRUM_VISUAL_QA_PREVIEW_AUTH=1 SIMCTL_CHILD_MEGRUM_VISUAL_QA_INITIAL_SCREEN=match-relation-candidates xcrun simctl launch C70DDDBB-2602-49E0-8F95-1F043BCCED76 tokyo.megrum.native.preview`
+- `xcrun simctl io C70DDDBB-2602-49E0-8F95-1F043BCCED76 screenshot notes/assets/swift-visual-qa/swift-match-relation-candidates-expanded.png`
+- ローカル: `http://localhost:8000/RN%20Swift%20Home%20Proposal%20Visual%20QA.html`
+
+### セルフレビュー結果
+
+- ✅ RN版と同じく、候補選択を別シートではなく関係図カード内のインライン展開へ修正した。
+- ✅ 展開状態、選択状態、集計サマリー、下部CTAは同じ選択状態から駆動している。
+- ✅ 候補展開済みSwiftスクショを撮影し、比較HTMLへ追加した。
+- ✅ 対象テスト13件とSimulator buildで0 failures / build succeededを確認した。
+- ✅ 新しいDB schema、状態遷移、用語追加はないため、`notes/09_state_machines.md`、`notes/10_glossary.md`、`notes/05_data_model.md` の更新は不要と判断した。
+- ⚠️ 見た目はまだRN完全一致ではなく、今回の修正は操作モデルの一致を優先した。ピクセル差分は比較ページで継続確認する。
+
+### 関連ファイル
+
+- `ios-native/Sources/MegrumApp/MatchRelationScreen.swift`
+- `ios-native/Sources/MegrumApp/HomeScreen.swift`
+- `ios-native/Sources/MegrumApp/VisualQAPreviewMode.swift`
+- `ios-native/Tests/MegrumAppTests/HomeScreenFlowTests.swift`
+- `RN Swift Home Proposal Visual QA.html`
+- `notes/assets/swift-visual-qa/swift-match-relation-candidates-expanded.png`
+
+---
+
+## イテレーション418.14：RN/Swiftホーム起点フロー比較ページを追加
+
+### 背景・問題意識
+
+ホームのグッズパネル押下から打診完了までをRN準拠で移行するには、都度スクショを撮って見比べる運用が必要になった。既存のRN実画面スクショ対応表はRN側の主要画面を逆引きできる一方で、Swift側の最新QAスクショと同じページ上で見比べる導線がなかった。また、送信確認/完了などRNスクショが未収録の詳細画面も、Expo web上で直撮りできる状態にして比較資産へ加える必要があった。
+
+### 変更内容
+
+#### `RN Swift Home Proposal Visual QA.html`
+- ホーム、左ドロワー、関係図、打診作成STEP1、待ち合わせカレンダー、送信確認、打診完了をRN/Swift横並びで確認できる静的HTMLを追加した。
+- RN既存スクショがある画面は `notes/assets/rn-screen-lookup/` の画像を表示し、送信確認/完了/月表示もExpo webで撮影したRN実装スクショへ差し替えた。
+- 各セクションに確認観点を付け、画面構成、入力制御、表示制御、スワイプ/ジェスチャ意味を見比べやすくした。
+- 打診作成STEP1はSwift側の `私が出す` / `受け取る` / `待ち合わせ` 3タブをすべて並べ、RNの `proposal-select` と比較できるようにした。
+- RN完了画面は `proposal-confirm?visualState=complete` で直撮りできることを明記した。
+
+#### `mobile/app/proposal-confirm.tsx`
+- RN完了画面スクショを追加撮影しやすくするため、QA用param `visualState=complete` を追加した。
+- 通常の打診送信では `visualState` が無いため、従来どおり送信前の `送信確認` から始まる。
+
+#### `mobile/app/proposal-select.tsx`
+- RN待ち合わせカレンダー月表示を追加撮影しやすくするため、QA用param `visualCalendarMode=month` を追加した。
+- 通常の打診作成では `visualCalendarMode` が無いため、従来どおり週表示から始まる。
+
+#### `notes/assets/rn-screen-lookup/`
+- Expo web上でRN `proposal-confirm` を直接開き、`rn-proposal-confirm.png` と `rn-proposal-complete.png` を追加した。
+- Expo web上でRN `proposal-select?tab=meetup&visualCalendarMode=month` を直接開き、`rn-proposal-meetup-month.png` を追加した。
+
+#### `notes/78_rn_actual_screenshot_lookup.md`
+- 主要画面の一覧に `待ち合わせカレンダー月表示`、`送信確認`、`打診完了` を追加した。
+
+#### `ios-native/Sources/MegrumApp/VisualQAPreviewMode.swift`
+- Swift Simulator / Debug QA専用の初期画面に `proposal-give` / `proposal-receive` を追加した。
+
+#### `ios-native/Sources/MegrumApp/MegrumRootView.swift`
+- `MEGRUM_VISUAL_QA_INITIAL_SCREEN=proposal-give` / `proposal-receive` 指定時、ホームの先頭マッチ候補から打診作成フローの `私が出す` / `受け取る` へ直接入る比較導線を追加した。
+- QA専用の打診フロー直接起動条件と初期STEP決定を `VisualQAProposalRouteResolver` に切り出し、RootView内の条件分岐が肥大化しないようにした。
+
+#### `notes/assets/swift-visual-qa/`
+- Swift Simulatorで撮影済みのホーム、左ドロワー、関係図、待ち合わせ週表示、待ち合わせ月表示、送信確認、打診完了スクショをリポジトリ内の比較用資産として保存した。
+- Swift Simulatorで撮影した `私が出す` / `受け取る` スクショを追加保存した。
+
+#### `ios-native/Tests/MegrumAppTests/HomeScreenFlowTests.swift`
+- `proposal-give` / `proposal-receive` のQA初期画面パースを追加した。
+- `proposal-give` / `proposal-receive` / `proposal-meetup` / `proposal-confirm` / `proposal-complete` が、それぞれ正しい打診作成STEPへ解決されることを追加検証した。
+
+### 影響範囲
+
+- ホーム起点 `グッズパネル -> 関係図 -> 打診作成 -> 送信確認 -> 打診完了` の視覚QA運用
+- RNスクショ未収録だった送信確認/完了/月表示の比較資産化
+- 実装挙動そのものには変更なし
+
+### 確認方法
+
+- ローカル: `python3 -m http.server 8000`
+- ローカル: `http://localhost:8000/RN%20Swift%20Home%20Proposal%20Visual%20QA.html`
+- 比較対象:
+  - `notes/assets/rn-screen-lookup/rn-home.png`
+  - `notes/assets/rn-screen-lookup/rn-match-detail.png`
+  - `notes/assets/rn-screen-lookup/rn-proposal-select.png`
+  - `notes/assets/rn-screen-lookup/rn-proposal-meetup-month.png`
+  - `notes/assets/rn-screen-lookup/rn-proposal-confirm.png`
+  - `notes/assets/rn-screen-lookup/rn-proposal-complete.png`
+  - `notes/assets/swift-visual-qa/swift-home-preview.png`
+  - `notes/assets/swift-visual-qa/swift-drawer-open.png`
+  - `notes/assets/swift-visual-qa/swift-match-relation-rn-visual-header.png`
+  - `notes/assets/swift-visual-qa/swift-proposal-give.png`
+  - `notes/assets/swift-visual-qa/swift-proposal-receive.png`
+  - `notes/assets/swift-visual-qa/swift-proposal-meetup-week.png`
+  - `notes/assets/swift-visual-qa/swift-proposal-meetup-month.png`
+  - `notes/assets/swift-visual-qa/swift-proposal-confirm-final.png`
+  - `notes/assets/swift-visual-qa/swift-proposal-complete-fullscreen.png`
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-step1-visual-qa --enable-xctest --disable-swift-testing --filter 'HomeScreenFlowTests|ProposalCreateFlowTests|ProposalCreateSheetTests' -j 1`
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-visual-qa-route-resolver --enable-xctest --disable-swift-testing --filter 'HomeScreenFlowTests|ProposalCreateFlowTests|ProposalCreateSheetTests|MatchRelationScreenTests|AppDrawerGestureTests' -j 1`
+- `npm --prefix mobile run typecheck`
+- `xcodebuild -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -destination 'id=C70DDDBB-2602-49E0-8F95-1F043BCCED76' -derivedDataPath /tmp/megrum-native-step1-visual-qa-build CODE_SIGNING_ALLOWED=NO build`
+- `SIMCTL_CHILD_MEGRUM_VISUAL_QA_PREVIEW_AUTH=1 SIMCTL_CHILD_MEGRUM_VISUAL_QA_INITIAL_SCREEN=proposal-give xcrun simctl launch C70DDDBB-2602-49E0-8F95-1F043BCCED76 tokyo.megrum.native.preview`
+- `SIMCTL_CHILD_MEGRUM_VISUAL_QA_PREVIEW_AUTH=1 SIMCTL_CHILD_MEGRUM_VISUAL_QA_INITIAL_SCREEN=proposal-receive xcrun simctl launch C70DDDBB-2602-49E0-8F95-1F043BCCED76 tokyo.megrum.native.preview`
+- `CI=1 npx expo start --web --port 8082`（cwd: `mobile/`）
+- RN送信確認撮影URL: `http://localhost:8082/proposal-confirm?gives=give-1&receives=receive-1&exchangeMethod=hand&meetups=[encoded JSON]`
+- RN完了撮影URL: `http://localhost:8082/proposal-confirm?gives=give-1&receives=receive-1&exchangeMethod=hand&meetups=[encoded JSON]&visualState=complete`
+- RN月表示撮影URL: `http://localhost:8082/proposal-select?tab=meetup&exchangeMethod=hand&visualCalendarMode=month`
+
+### セルフレビュー結果
+
+- ✅ RN既存スクショとSwift最新スクショを、ホーム起点フロー順に1ページで見比べられるようにした。
+- ✅ Swift側は `私が出す` / `受け取る` / `待ち合わせ` のSTEP1全タブを直接起動・撮影できるようにした。
+- ✅ `proposal-give` / `proposal-receive` は対象テスト34件とSimulator buildで確認し、さらにQA起動resolverを含む対象テスト49件で再確認した。
+- ✅ RN側も `visualState=complete` で完了画面を直撮りできる状態にし、`npm --prefix mobile run typecheck` で0 failuresを確認した。
+- ✅ RNの送信確認/完了/月表示スクショをExpo webから取得し、比較ページへ反映した。
+- ✅ 比較ページの画像参照は15件すべて存在することをローカル検査で確認した。
+- ✅ 新しい状態名・用語・DB schema 変更はないため、`notes/09_state_machines.md`、`notes/10_glossary.md`、`notes/05_data_model.md` の更新は不要と判断した。
+- ⚠️ 次回以降、取引詳細などホーム起点外の詳細導線を扱う時は、同じ方式でRN実スクショを追加撮影する。
+
+### 関連ファイル
+
+- `RN Swift Home Proposal Visual QA.html`
+- `mobile/app/proposal-confirm.tsx`
+- `mobile/app/proposal-select.tsx`
+- `notes/78_rn_actual_screenshot_lookup.md`
+- `notes/assets/rn-screen-lookup/rn-proposal-confirm.png`
+- `notes/assets/rn-screen-lookup/rn-proposal-complete.png`
+- `notes/assets/rn-screen-lookup/rn-proposal-meetup-month.png`
+- `ios-native/Sources/MegrumApp/VisualQAPreviewMode.swift`
+- `ios-native/Sources/MegrumApp/MegrumRootView.swift`
+- `ios-native/Tests/MegrumAppTests/HomeScreenFlowTests.swift`
+- `notes/assets/swift-visual-qa/swift-home-preview.png`
+- `notes/assets/swift-visual-qa/swift-drawer-open.png`
+- `notes/assets/swift-visual-qa/swift-match-relation-rn-visual-header.png`
+- `notes/assets/swift-visual-qa/swift-proposal-give.png`
+- `notes/assets/swift-visual-qa/swift-proposal-receive.png`
+- `notes/assets/swift-visual-qa/swift-proposal-meetup-week.png`
+- `notes/assets/swift-visual-qa/swift-proposal-meetup-month.png`
+- `notes/assets/swift-visual-qa/swift-proposal-confirm-final.png`
+- `notes/assets/swift-visual-qa/swift-proposal-complete-fullscreen.png`
+
+---
+
+## イテレーション418.13：送信確認と完了画面をRN比較レーンへ追加
+
+### 背景・問題意識
+
+オーナーから、左ドロワーの出し方とホームのグッズパネルタップ後フローについて、RN版とSwift版のスクショを都度撮って見比べながら再修正したい、という指示があった。前iterまでで関係図と待ち合わせSTEPは比較できるようになったが、`送信確認` / `打診完了` 画面はSwift側に直接開けるQA入口がなく、RNの `mobile/app/proposal-confirm.tsx` と画面構成を突き合わせにくかった。また、関係図から打診作成へ進むとSwift標準sheetの背後に元画面が残り、RNの全画面フローと見た目がズレていた。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/VisualQAPreviewMode.swift`
+- Swift Simulator / Debug QA専用の初期画面に `proposal-confirm` / `proposal-complete` を追加した。
+
+#### `ios-native/Sources/MegrumApp/MegrumRootView.swift`
+- `MEGRUM_VISUAL_QA_INITIAL_SCREEN=proposal-confirm` / `proposal-complete` 指定時、ホームの先頭マッチ候補から打診作成フローの確認/完了画面へ直接入る比較導線を追加した。
+- RNの完了画面ボタンに合わせて、`まだ他に探す` はホームタブ、`打診一覧に飛ぶ` は pending の取引タブへ着地するように補正した。
+- ホーム画面内のめぐり入口は完了画面resolverと分離し、従来どおりめぐりタブへ直接遷移するようにした。
+
+#### `ios-native/Sources/MegrumApp/MatchRelationScreen.swift`
+- ホーム起点の関係図から `打診に進む` で開く `ProposalCreateFlow` を、iOSでは `fullScreenCover` に変更した。
+- macOS SwiftPMテストでは従来どおり `sheet` fallback にした。
+
+#### `ios-native/Sources/MegrumApp/ProposalCreateFlow.swift`
+- Visual QA時だけ、確認画面用の待ち合わせ候補、交換条件タグ、メッセージ、完了summaryをseedし、DB送信なしで確認/完了画面を撮影できるようにした。
+- 画面全体を `maxWidth/maxHeight` で埋め、背後のホーム/関係図が見えないようにした。
+- 確認画面で見ている内容から `ProposalCreateInput` と `ProposalSubmittedSummary` を同じ `ProposalCreateSubmissionDraft` で組み立てるようにし、送信payloadと完了表示のズレをテスト可能にした。
+- 確認画面の交換内容ラベルをRNと同じ `相手の譲（n）` / `あなたの譲（n）` に寄せた。
+- 交換条件タグにRN同様の説明文 `打診の条件として相手に伝えたいものを選べます。` を追加した。
+- スケジュール共有をRN同様の単独カードにし、`スケジュールを共有する` / `ON` / `OFF` / 標準Switchの表示へ寄せた。
+- 打診完了画面にRNのヒーローに近い静的なスパークル/ドット装飾を追加した。
+
+#### `ios-native/Sources/MegrumApp/SearchScreen.swift`
+- 共通の送信CTA文言をRNと同じ `この内容で打診を送信` に変更した。
+
+#### `ios-native/Tests/MegrumAppTests/HomeScreenFlowTests.swift`
+- `proposal-confirm` / `proposal-complete` のQA初期画面パースを追加した。
+
+#### `ios-native/Tests/MegrumAppTests/ProposalCreateFlowTests.swift`
+- `ProposalCreateSubmissionDraft` が `meetup` / `meetupCandidates` / `exposeCalendar` / `matchType` / `listingID` / message trim / 完了summary を同じ確認状態から組み立てることを確認した。
+
+#### `ios-native/Tests/MegrumAppTests/TradeChatAffordanceTests.swift`
+- RNの完了画面ボタン仕様として、`まだ他に探す` がホーム、`打診一覧に飛ぶ` が pending の取引タブへ解決されることを確認した。
+
+#### `ios-native/Tests/MegrumAppTests/AppDrawerGestureTests.swift`
+- 左ドロワーが左端起点に依存せず、任意位置の水平右スワイプで開くことを明示するテストを追加した。
+
+#### `ios-native/Tests/MegrumAppTests/ProposalCreateSheetTests.swift`
+- 送信CTAのRN準拠文言に合わせて期待値を更新した。
+
+### 影響範囲
+
+- Swift Native のホーム起点 `関係図 → 打診に進む → 送信確認 → 打診完了` フロー
+- Swift Native の送信確認画面の文言、表示順、スケジュール共有カード、完了画面ヒーロー
+- Swift Native の左ドロワー右スワイプ仕様のテスト表現
+- 検索/プロフィール起点の `ProposalCreateConfiguration.submitTitle` 表示文言も `送信` に揃う
+
+### 確認方法
+
+- RN参照実装: `mobile/app/proposal-confirm.tsx`
+- 既存RN参照スクショ: `notes/assets/rn-screen-lookup/rn-proposal-select.png`
+- Swift撮影結果（修正前・背後が見えていた確認画面）: `/tmp/megrum-visual-qa/swift-proposal-confirm.png`
+- Swift撮影結果（全画面化後）: `/tmp/megrum-visual-qa/swift-proposal-confirm-fullscreen.png`
+- Swift撮影結果（CTA文言最終反映）: `/tmp/megrum-visual-qa/swift-proposal-confirm-final.png`
+- Swift撮影結果（完了画面）: `/tmp/megrum-visual-qa/swift-proposal-complete-fullscreen.png`
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-confirm-copy --enable-xctest --disable-swift-testing --filter 'ProposalCreateFlowTests|ProposalCreateSheetTests|HomeScreenFlowTests|AppDrawerGestureTests|MatchRelationScreenTests' -j 1`
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-submission-draft --enable-xctest --disable-swift-testing --filter 'ProposalCreateFlowTests|ProposalCreateSheetTests|HomeScreenFlowTests|AppDrawerGestureTests|MatchRelationScreenTests|TradeChatAffordanceTests|SupabaseProposalClientTests' -j 1`
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-completion-routes --enable-xctest --disable-swift-testing --filter 'TradeChatAffordanceTests|HomeScreenFlowTests|ProposalCreateFlowTests|ProposalCreateSheetTests|MatchRelationScreenTests|AppDrawerGestureTests' -j 1`
+- `xcodebuild -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -destination 'id=C70DDDBB-2602-49E0-8F95-1F043BCCED76' -derivedDataPath /tmp/megrum-native-confirm-complete-build CODE_SIGNING_ALLOWED=NO build`
+- `SIMCTL_CHILD_MEGRUM_VISUAL_QA_PREVIEW_AUTH=1 SIMCTL_CHILD_MEGRUM_VISUAL_QA_INITIAL_SCREEN=proposal-confirm xcrun simctl launch C70DDDBB-2602-49E0-8F95-1F043BCCED76 tokyo.megrum.native.preview`
+- `SIMCTL_CHILD_MEGRUM_VISUAL_QA_PREVIEW_AUTH=1 SIMCTL_CHILD_MEGRUM_VISUAL_QA_INITIAL_SCREEN=proposal-complete xcrun simctl launch C70DDDBB-2602-49E0-8F95-1F043BCCED76 tokyo.megrum.native.preview`
+
+### セルフレビュー結果
+
+- ✅ RNの送信確認画面とSwiftの送信確認画面を、表示順 `交換内容 → 受け渡し方法 → 交換条件タグ → 待ち合わせ候補 → メッセージ → スケジュール共有` で照合した。
+- ✅ Swiftの確認画面で背後のホームが見えるズレを解消し、ホーム起点の関係図から打診作成へ入る時はiOS実機でフルスクリーンになるようにした。
+- ✅ RNと同じ `相手の譲（n）` / `あなたの譲（n）`、交換条件タグ説明、スケジュール共有ON/OFF、送信CTA文言へ揃えた。
+- ✅ 確認画面で見ている内容が `ProposalCreateInput` の `meetupCandidates`、`exposeCalendar`、`matchType`、`listingID` と完了summaryへ反映されることをテストで確認した。
+- ✅ 完了画面はRNのタイトル/本文/2ボタン導線を維持しつつ、`まだ他に探す = ホーム` / `打診一覧に飛ぶ = pending取引` の着地まで揃え、ヒーロー装飾を追加した。
+- ✅ 左ドロワーは「左端だけでなく、どこでも右スワイプ」を `AppDrawerGestureTests` で明示した。
+- ⚠️ RNの送信確認/完了単体スクショ資産はまだ `notes/assets/rn-screen-lookup/` に無いため、今回はRN実装コードとの照合とSwiftスクショで確認した。次にRN側の同画面スクショを資産化すると比較精度が上がる。
+- ✅ 新しい状態名・用語・DB schema 変更はないため、`notes/09_state_machines.md`、`notes/10_glossary.md`、`notes/05_data_model.md` の更新は不要と判断した。
+
+### 関連ファイル
+
+- `mobile/app/proposal-confirm.tsx`
+- `ios-native/Sources/MegrumApp/VisualQAPreviewMode.swift`
+- `ios-native/Sources/MegrumApp/MegrumRootView.swift`
+- `ios-native/Sources/MegrumApp/MatchRelationScreen.swift`
+- `ios-native/Sources/MegrumApp/ProposalCreateFlow.swift`
+- `ios-native/Sources/MegrumApp/SearchScreen.swift`
+- `ios-native/Tests/MegrumAppTests/HomeScreenFlowTests.swift`
+- `ios-native/Tests/MegrumAppTests/ProposalCreateFlowTests.swift`
+- `ios-native/Tests/MegrumAppTests/AppDrawerGestureTests.swift`
+- `ios-native/Tests/MegrumAppTests/ProposalCreateSheetTests.swift`
+
+## イテレーション418.12：打診待ち合わせSTEPをRNスクショ比較で再調整
+
+### 背景・問題意識
+
+オーナーから、左ドロワーとホームのグッズパネルタップ後フローについて「RN版とSwift版のスクショを都度撮って見比べる」方針で再修正したい、という指示があった。関係図の次に、ホーム起点で `打診に進む` 後の `提示物の選択` / `待ち合わせ` STEP を RN 実画面 `notes/assets/rn-screen-lookup/rn-proposal-select.png` と見比べたところ、Swift側は候補未作成でも待ち合わせがOK扱いになり、初期候補カードが余計に表示され、カレンダーもRNの7日週・10時台フォーカスとズレていた。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/VisualQAPreviewMode.swift`
+- Swift Simulator / Debug QA専用の初期画面に `proposal-meetup` を追加した。
+
+#### `ios-native/Sources/MegrumApp/MegrumRootView.swift`
+- `MEGRUM_VISUAL_QA_INITIAL_SCREEN=proposal-meetup` 指定時、ホームの先頭マッチ候補から `ProposalCreateFlow` の待ち合わせSTEPへ直接入る比較導線を追加した。
+- 打診完了後の `打診一覧に飛ぶ` は `TradesScreen` の pending ステージへ着地する既存導線を維持した。
+
+#### `ios-native/Sources/MegrumApp/ProposalCreateFlow.swift`
+- 待ち合わせ候補の初期値を空にし、RN同様に「長押しで候補作成するまで未設定」の状態にした。
+- 候補未作成時は待ち合わせタブを `!` のままにし、下部CTAを `交換できる時間を設定してください` で無効化するようにした。
+- 候補管理カードは候補が1件以上できた後だけ表示し、初期画面ではカレンダーを主役にした。
+- 待ち合わせSTEP表示時に自動で位置情報許可を求めないようにした。
+
+#### `ios-native/Sources/MegrumApp/ProposalMeetupCalendarEditor.swift`
+- RNの週表示に合わせ、カレンダーを5日表示/5日送りから7日表示/7日送りへ変更した。
+- 24時間操作範囲は維持したまま、初期表示をRN同様に10:00付近へスクロールするようにした。
+- RNの `週/月` 切替に合わせ、待ち合わせカレンダー内に月表示を追加した。
+- 月表示の日付をタップすると、その日を含む週表示へ戻るようにした。
+- 長押し候補作成、候補移動/終了時刻調整、週送り横スワイプの既存操作モデルを維持した。
+
+#### `ios-native/Sources/MegrumApp/MeguriScreen.swift`
+- Visual QA撮影中だけ、裏で生成されるMeguriの現在地取得とMapKit現在地ボタンを抑止し、待ち合わせスクショに位置情報許可ダイアログが被らないようにした。
+- 通常起動時のMeguri現在地取得・現在地ボタンは維持した。
+
+#### `ios-native/Tests/MegrumAppTests/HomeScreenFlowTests.swift`
+- `proposal-meetup` のQA初期画面パースを追加した。
+
+#### `ios-native/Tests/MegrumAppTests/TradeRequestDraftProposalCreateFlowTests.swift`
+- 待ち合わせカレンダーが7日単位で週送りすることを確認した。
+- 長押し完了時だけ候補作成扱いになることを確認した。
+- カレンダー操作で候補日時が書き換わることを確認した。
+
+### 影響範囲
+
+- Swift Native のホーム起点 `関係図 → 打診に進む → 提示物の選択/待ち合わせ` フロー
+- Swift Native の待ち合わせ候補作成前の表示制御、CTA有効化条件、週送り単位
+- Simulator Visual QAの打診待ち合わせスクショ導線
+- 通常のMeguri現在地機能はVisual QA時以外は維持
+
+### 確認方法
+
+- RN参照スクショ: `notes/assets/rn-screen-lookup/rn-proposal-select.png`
+- Swift撮影結果: `/tmp/megrum-visual-qa/swift-proposal-meetup-step-clean.png`
+- Swift撮影結果（週表示）: `/tmp/megrum-visual-qa/swift-proposal-meetup-week.png`
+- Swift撮影結果（月表示）: `/tmp/megrum-visual-qa/swift-proposal-meetup-month.png`
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-proposal-visual-qa --enable-xctest --disable-swift-testing --filter 'HomeScreenFlowTests|ProposalCreateFlowTests|TradeRequestDraftProposalCreateFlowTests|AppDrawerGestureTests|MatchRelationScreenTests' -j 1`
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-proposal-month --enable-xctest --disable-swift-testing --filter 'ProposalCreateFlowTests|TradeRequestDraftProposalCreateFlowTests|HomeScreenFlowTests|AppDrawerGestureTests|MatchRelationScreenTests' -j 1`
+- `xcodebuild -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -destination 'id=C70DDDBB-2602-49E0-8F95-1F043BCCED76' -derivedDataPath /tmp/megrum-native-proposal-visual-qa-build CODE_SIGNING_ALLOWED=NO build`
+- `SIMCTL_CHILD_MEGRUM_VISUAL_QA_PREVIEW_AUTH=1 SIMCTL_CHILD_MEGRUM_VISUAL_QA_INITIAL_SCREEN=proposal-meetup xcrun simctl launch C70DDDBB-2602-49E0-8F95-1F043BCCED76 tokyo.megrum.native.preview`
+- `SIMCTL_CHILD_MEGRUM_VISUAL_QA_PREVIEW_AUTH=1 SIMCTL_CHILD_MEGRUM_VISUAL_QA_INITIAL_SCREEN=proposal-meetup-month xcrun simctl launch C70DDDBB-2602-49E0-8F95-1F043BCCED76 tokyo.megrum.native.preview`
+
+### セルフレビュー結果
+
+- ✅ RN / Swift の待ち合わせSTEPスクショを見比べ、候補未作成でOK/CTA有効になっていたズレを解消した。
+- ✅ 初期状態では候補カードを出さず、カレンダー長押しから候補を作るRNの操作起点に寄せた。
+- ✅ カレンダーをRN同様の7日週表示・7日週送りへ変更した。
+- ✅ 初期表示をRNの10:00付近に寄せ、00:00始まりで見えるズレを解消した。
+- ✅ RNの `週/月` 切替に合わせ、月表示と日付タップで週表示へ戻る導線を追加した。
+- ✅ Visual QA時の位置情報許可ダイアログ被りを抑止し、比較スクショを撮れるようにした。
+- ⚠️ 月表示内の予定サンプルはPreview fixture依存のため、RN版と同じ予定量での比較は次のfixture整備で精度を上げる。
+- ✅ 新しい状態名・用語・DB schema 変更はないため、`notes/09_state_machines.md`、`notes/10_glossary.md`、`notes/05_data_model.md` の更新は不要と判断した。
+
+### 関連ファイル
+
+- `ios-native/Sources/MegrumApp/VisualQAPreviewMode.swift`
+- `ios-native/Sources/MegrumApp/MegrumRootView.swift`
+- `ios-native/Sources/MegrumApp/ProposalCreateFlow.swift`
+- `ios-native/Sources/MegrumApp/ProposalMeetupCalendarEditor.swift`
+- `ios-native/Sources/MegrumApp/MeguriScreen.swift`
+- `ios-native/Tests/MegrumAppTests/HomeScreenFlowTests.swift`
+- `ios-native/Tests/MegrumAppTests/TradeRequestDraftProposalCreateFlowTests.swift`
+- `notes/assets/rn-screen-lookup/rn-proposal-select.png`
+
+## イテレーション418.11：関係図をRN準拠のフルスクリーン表示へ再調整
+
+### 背景・問題意識
+
+オーナーから、左ドロワーの出し方とホームのグッズパネルタップ後フローを「RN版とSwift版のスクショを都度撮って見比べる」方針で再修正したい、という指示があった。直前のSwift関係図は、候補展開や下部CTAの挙動は近づいていた一方、ホームから開いた時にシートの丸み・薄暗い背面・Liquid Glass寄りのカード/下部バー/巨大なナビゲーションピルが残り、RN版のフルスクリーン関係図と見比べると画面構成の印象が大きく違っていた。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/HomeScreen.swift`
+- ホームの `マッチしてるよ！` グッズパネルから関係図へ入る導線を、iOSでは `fullScreenCover` に変更した。
+- Swift Package のmacOSテストでは `fullScreenCover` が使えないため、`homeRelationPresentation` で iOS はフルスクリーン、その他は sheet にフォールバックするようにした。
+- `交換できるかも？` は引き続き相手プロフィールへ入り、ホーム起点の対象フローを `マッチしてるよ！` に固定した。
+
+#### `ios-native/Sources/MegrumApp/MatchRelationScreen.swift`
+- RN版に寄せて、関係図専用の白いカスタムヘッダーを追加した。
+- `閉じる` / `プロフィール` の巨大なSwiftUI toolbarピルをやめ、丸い `×`、画面タイトル `関係図`、小さなプロフィールボタンにした。
+- 関係図の背景、カード、選択肢グループ、wish行、集計サマリー、下部CTAを、RN版の白地・薄罫線・不透明フッター寄りに再調整した。
+- 集計サマリーの表示順と文言をRN版に合わせ、`📋 結論：この交換`、`あなたが受`、`あなたが譲` の表現にした。
+- 下部バーは `.ultraThinMaterial` をやめ、不透明な白背景と上罫線にした。
+
+### 影響範囲
+
+- Swift Native のホーム `マッチしてるよ！` グッズパネル押下後の関係図表示
+- Swift Native の関係図ヘッダー、カード、選択肢、集計、下部CTAの見た目
+- 左ドロワーの右スワイプ挙動は今回変更していないが、既存テストで継続確認した
+
+### 確認方法
+
+- RN参照スクショ: `notes/assets/rn-screen-lookup/rn-match-detail.png`
+- Swift撮影結果: `/tmp/megrum-visual-qa/swift-match-relation-rn-visual-header.png`
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-relation-rn-visual --enable-xctest --disable-swift-testing --filter 'MatchRelationScreenTests|HomeScreenFlowTests|AppDrawerGestureTests|AuthScreenInputTests|MegrumAppStateTests' -j 1`
+- `xcodebuild -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -destination 'id=C70DDDBB-2602-49E0-8F95-1F043BCCED76' -derivedDataPath /tmp/megrum-native-relation-rn-visual-build CODE_SIGNING_ALLOWED=NO build`
+- `SIMCTL_CHILD_MEGRUM_VISUAL_QA_PREVIEW_AUTH=1 SIMCTL_CHILD_MEGRUM_VISUAL_QA_INITIAL_SCREEN=match-relation xcrun simctl launch C70DDDBB-2602-49E0-8F95-1F043BCCED76 tokyo.megrum.native.preview`
+- 実機 install: `xcodebuild -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -destination 'id=00008120-000C49C43669A01E' -configuration Debug -allowProvisioningUpdates install`
+- 実機確認: `xcrun devicectl device info apps --device 7F6C74EF-5786-5316-920A-F7F1CC3FE2A4 --include-all-apps --bundle-id tokyo.megrum.native.preview`
+- 実機起動: `xcrun devicectl device process launch --device 7F6C74EF-5786-5316-920A-F7F1CC3FE2A4 tokyo.megrum.native.preview --activate`
+
+### セルフレビュー結果
+
+- ✅ RN / Swift の関係図スクショを見比べ、シート表示・巨大Material・巨大toolbarピルのズレを解消した。
+- ✅ ホーム `マッチしてるよ！` グッズパネルからiOS実機ではフルスクリーン関係図に入る。
+- ✅ 関係図の選択肢タップから候補グッズを選ぶ既存設計、横スワイプ、下部 `打診に進む（1件）` はテストで維持確認した。
+- ✅ 左ドロワーの「どこでも右スワイプで開く」判定は `AppDrawerGestureTests` で継続確認した。
+- ✅ 実機 `MTO’s phone` へ `tokyo.megrum.native.preview` をインストールし、起動まで確認した。
+- ⚠️ RN版とSwift版はデータ量が違うため、候補数・カード内アイテム数は完全一致していない。次の比較では同じPreview fixtureに寄せるとさらに正確に見比べられる。
+- ✅ 新しい状態名・用語・DB schema 変更はないため、`notes/09_state_machines.md`、`notes/10_glossary.md`、`notes/05_data_model.md` の更新は不要と判断した。
+
+### 関連ファイル
+
+- `ios-native/Sources/MegrumApp/HomeScreen.swift`
+- `ios-native/Sources/MegrumApp/MatchRelationScreen.swift`
+- `notes/assets/rn-screen-lookup/rn-match-detail.png`
+
+## イテレーション418.10：Swiftホーム起点フローのスクショ比較QA入口と関係図重複候補クラッシュ修正
+
+### 背景・問題意識
+
+オーナーから、左ドロワーの出し方とホームのグッズパネルタップ後フローを再修正するにあたり、RN版とSwift版のスクショを都度撮って見比べるテスト方針がよい、という指摘があった。RN 実画面スクショは `notes/assets/rn-screen-lookup/` にある一方、Swift Simulator は通常起動だとSupabase設定によりログイン画面へ戻るため、ホーム・関係図・左ドロワーを同じ条件で撮影しにくかった。また、QA初期ルートで関係図を開くと、プレビュー候補に同一 `GoodsItem.id` が複数経路で混ざるケースで `Dictionary(uniqueKeysWithValues:)` がクラッシュすることが分かった。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/VisualQAPreviewMode.swift`
+- Swift Simulator / Debug QA専用の環境変数入口を追加した。
+- `MEGRUM_VISUAL_QA_PREVIEW_AUTH=1` で、Supabase設定があってもプレビュー認証セッションと `PreviewMegrumRepository` を使う。
+- `MEGRUM_VISUAL_QA_INITIAL_SCREEN=match-relation` / `drawer-open` で、関係図sheetまたは開いた左ドロワーから起動できるようにした。
+
+#### `ios-native/Sources/MegrumApp/MegrumAuthState.swift`
+- QAフラグ時だけ `PreviewMegrumAuthRepository.previewSession()` を初期セッションとして使い、通常のライブ認証設定は維持した。
+
+#### `ios-native/Sources/MegrumApp/MegrumAppStateFactory.swift`
+- QAフラグ時だけ `PreviewMegrumRepository` を強制し、スクショ比較がライブDB/Keychain状態に左右されないようにした。
+
+#### `ios-native/Sources/MegrumApp/MegrumRootView.swift`
+- `drawer-open` 指定時は初期表示で左ドロワーを開くようにした。
+- `HomeScreen` へQA初期画面指定を渡し、ホーム起点の比較対象をSimulatorで再現できるようにした。
+
+#### `ios-native/Sources/MegrumApp/HomeScreen.swift`
+- `match-relation` 指定時、初回だけ `マッチしてるよ！` の先頭グッズから関係図sheetを開くようにした。
+
+#### `ios-native/Sources/MegrumApp/MatchRelationScreen.swift`
+- 関係図の候補合成で `GoodsItem.id` が重複しても落ちないよう、辞書化を安全な `goodsByID` helper に置き換えた。
+
+#### `ios-native/Tests/MegrumAppTests/AuthScreenInputTests.swift`
+- QAフラグ時だけプレビュー認証済み状態になることをテストした。
+
+#### `ios-native/Tests/MegrumAppTests/MegrumAppStateTests.swift`
+- QAフラグ時だけSupabase設定よりプレビューリポジトリが優先されることをテストした。
+
+#### `ios-native/Tests/MegrumAppTests/HomeScreenFlowTests.swift`
+- `MEGRUM_VISUAL_QA_INITIAL_SCREEN` の `match-relation` / `drawer-open` パースをテストした。
+
+#### `ios-native/Tests/MegrumAppTests/MatchRelationScreenTests.swift`
+- 同じ `GoodsItem.id` が sender / partner source に重複しても関係図詳細を合成できるテストを追加した。
+
+### 影響範囲
+
+- Swift Native のSimulatorスクショQA手順
+- ホームの `マッチしてるよ！` 起点で関係図を開く比較導線
+- 左ドロワーが開いた状態の比較導線
+- 関係図の候補合成クラッシュ耐性
+
+### 確認方法
+
+- RN参照スクショ: `notes/assets/rn-screen-lookup/rn-home.png`
+- RN参照スクショ: `notes/assets/rn-screen-lookup/rn-match-detail.png`
+- Swift撮影結果: `/tmp/megrum-visual-qa/swift-home-preview.png`
+- Swift撮影結果: `/tmp/megrum-visual-qa/swift-drawer-open.png`
+- Swift撮影結果: `/tmp/megrum-visual-qa/swift-match-relation-fixed.png`
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-relation-duplicate --enable-xctest --disable-swift-testing --filter 'MatchRelationScreenTests|HomeScreenFlowTests|AppDrawerGestureTests|AuthScreenInputTests|MegrumAppStateTests' -j 1`
+- `xcodebuild -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -destination 'id=C70DDDBB-2602-49E0-8F95-1F043BCCED76' -derivedDataPath /tmp/megrum-native-visual-qa-relation-fix-build CODE_SIGNING_ALLOWED=NO build`
+- `SIMCTL_CHILD_MEGRUM_VISUAL_QA_PREVIEW_AUTH=1 SIMCTL_CHILD_MEGRUM_VISUAL_QA_INITIAL_SCREEN=match-relation xcrun simctl launch C70DDDBB-2602-49E0-8F95-1F043BCCED76 tokyo.megrum.native.preview`
+- `SIMCTL_CHILD_MEGRUM_VISUAL_QA_PREVIEW_AUTH=1 SIMCTL_CHILD_MEGRUM_VISUAL_QA_INITIAL_SCREEN=drawer-open xcrun simctl launch C70DDDBB-2602-49E0-8F95-1F043BCCED76 tokyo.megrum.native.preview`
+
+### セルフレビュー結果
+
+- ✅ RN / Swift のホーム・関係図・左ドロワーをスクショで見比べるためのSimulator QA入口を作った。
+- ✅ 左ドロワーはSwiftスクショ上で開いた状態を確認した。
+- ✅ 関係図はSwiftスクショ上で `あなたの個別募集`、左右候補、`この内容で打診`、下部 `打診に進む（1件）` まで表示できることを確認した。
+- ✅ 関係図の重複候補IDクラッシュをテストで再現し、辞書化の安全化で修正した。
+- ⚠️ RN関係図とSwift関係図は構成・導線は近いが、Swift側はLiquid Glass寄りで余白とカードの質感がまだRNより大きく違う。次の視覚調整対象として残す。
+- ✅ 新しい状態名・用語・DB schema 変更はないため、`notes/09_state_machines.md`、`notes/10_glossary.md`、`notes/05_data_model.md` の更新は不要と判断した。
+
+### 関連ファイル
+
+- `notes/assets/rn-screen-lookup/rn-home.png`
+- `notes/assets/rn-screen-lookup/rn-match-detail.png`
+- `ios-native/Sources/MegrumApp/VisualQAPreviewMode.swift`
+- `ios-native/Sources/MegrumApp/MegrumAuthState.swift`
+- `ios-native/Sources/MegrumApp/MegrumAppStateFactory.swift`
+- `ios-native/Sources/MegrumApp/MegrumRootView.swift`
+- `ios-native/Sources/MegrumApp/HomeScreen.swift`
+- `ios-native/Sources/MegrumApp/MatchRelationScreen.swift`
+- `ios-native/Tests/MegrumAppTests/AuthScreenInputTests.swift`
+- `ios-native/Tests/MegrumAppTests/MegrumAppStateTests.swift`
+- `ios-native/Tests/MegrumAppTests/HomeScreenFlowTests.swift`
+- `ios-native/Tests/MegrumAppTests/MatchRelationScreenTests.swift`
+
+---
+
+## イテレーション418.9：Swift打診完了からpending一覧着地をRN導線として固定
+
+### 背景・問題意識
+
+ホーム起点の `関係図 -> 打診作成 -> 送信確認 -> 打診完了 -> 打診一覧に飛ぶ` までをRN版と同じ意味で完了させるには、完了画面のボタン表示だけでなく、押下後に `やりとり` の pending 一覧へ確実に着地する必要がある。RN 版 `mobile/app/proposal-confirm.tsx` では完了画面の `打診一覧に飛ぶ` が `goToTabRoot("/transactions")` に進む。Swift 版では callback 経由で `TradesScreen` に移る実装は入っていたが、Root 側の意図をテスト可能な単位へ切り出し、`pending` 指定まで退行しないよう固定した。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/MegrumRootView.swift`
+- `ProposalCompletionRouteState` / `ProposalCompletionRouteResolver` を追加し、完了画面の `まだ他に探す` / `打診一覧に飛ぶ` の着地先を明示化した。
+- `.searchMore` は `めぐり` タブ、`.openTrades` は `やりとり` タブかつ `requestedTradesStage = .pending` に解決する。
+- `HomeScreen` から渡される `onOpenMeguri` / `onOpenTrades` callback も resolver 経由に寄せた。
+
+#### `ios-native/Tests/MegrumAppTests/TradeChatAffordanceTests.swift`
+- `ProposalCompletionRouteResolver` の `searchMore -> .meguri`、`openTrades -> .trades + .pending` をテストで固定した。
+
+### 影響範囲
+
+- 打診完了画面の2ボタン押下後の親Root遷移
+- `打診一覧に飛ぶ` 押下後の `やりとり / 打診中` 着地
+- ホーム起点の関係図sheetから完了した場合の callback 経路
+
+### 確認方法
+
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-completion-route --enable-xctest --disable-swift-testing --filter 'TradeChatAffordanceTests|ProposalCreateFlowTests|HomeScreenFlowTests|AppDrawerGestureTests' -j 1`
+- `xcodebuild -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -destination 'generic/platform=iOS Simulator' -derivedDataPath /tmp/megrum-native-completion-route-build CODE_SIGNING_ALLOWED=NO build`
+- `xcodebuild -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -destination 'id=00008120-000C49C43669A01E' -configuration Debug -allowProvisioningUpdates install`
+- `xcrun devicectl device info apps --device 7F6C74EF-5786-5316-920A-F7F1CC3FE2A4 --include-all-apps --bundle-id tokyo.megrum.native.preview`
+- `xcrun devicectl device process launch --device 7F6C74EF-5786-5316-920A-F7F1CC3FE2A4 tokyo.megrum.native.preview --activate`
+
+### セルフレビュー結果
+
+- ✅ RN 完了画面と同じ2ボタンの意味を Swift Root 側で明示し、`打診一覧に飛ぶ` が pending 一覧へ着地することをテストで固定した。
+- ✅ 対象テスト 53 件、Simulator build、USB 実機 install / launch を確認した。
+- ✅ 新しい状態名・用語・DB schema 変更はないため、`notes/09_state_machines.md`、`notes/10_glossary.md`、`notes/05_data_model.md` の更新は不要と判断した。
+- ⚠️ 実スクショ比較は次の見た目QAで継続する。今回の変更は画面遷移・表示制御の退行防止を優先した。
+
+### 関連ファイル
+
+- `mobile/app/proposal-confirm.tsx`
+- `ios-native/Sources/MegrumApp/MegrumRootView.swift`
+- `ios-native/Sources/MegrumApp/ProposalCreateFlow.swift`
+- `ios-native/Sources/MegrumApp/TradesScreen.swift`
+- `ios-native/Tests/MegrumAppTests/TradeChatAffordanceTests.swift`
+
+---
+
+## イテレーション418.8：Swift打診作成のカレンダー作成操作をRN長押し仕様へ戻す
+
+### 背景・問題意識
+
+ホーム起点の `関係図 -> 打診作成 -> 送信確認 -> 打診完了` を RN 版と見比べる継続作業として、`mobile/app/proposal-select.tsx` と `mobile/app/proposal-confirm.tsx` を再確認した。確認画面のセクション順は Swift 側でも概ね揃っていた一方で、待ち合わせカレンダーの空き枠操作に差分が残っていた。RN 版は空き枠を短押ししても候補作成せず、`LONG_PRESS_MS = 280` の長押し後に候補作成 / ドラッグ作成へ入る。Swift 側は pending 終了時に短押しでも候補を作る経路があり、誤タップで候補が増える挙動になっていたため、RN の操作意味へ戻した。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/ProposalMeetupCalendarEditor.swift`
+- `ProposalMeetupCalendarModel.shouldCreateCandidateOnBoardEnd(wasLongPressed:)` を追加し、空き枠候補作成は長押し済みの場合だけ許可する仕様を明示した。
+- board gesture の `.pending` 終了時に候補を作らないようにし、RN と同じく短押しでは候補作成されない挙動へ戻した。
+- `.creating` 終了時だけ、長押し後ドラッグのプレビュー範囲を候補として作成する。
+
+#### `ios-native/Sources/MegrumApp/ProposalCreateFlow.swift`
+- 送信確認の候補セクション名 `交換できる候補` を `ProposalConfirmSectionCopy` に切り出し、RN 実装の文言としてテスト可能にした。
+
+#### `ios-native/Tests/MegrumAppTests/ProposalCreateFlowTests.swift`
+- 確認画面の `交換できる候補` 文言を RN ヘッダー確認テストに追加した。
+
+#### `ios-native/Tests/MegrumAppTests/TradeRequestDraftProposalCreateFlowTests.swift`
+- 待ち合わせカレンダーが短押しでは候補作成せず、長押し後だけ候補作成することをテストで固定した。
+- RN と同じ `0.28` 秒の長押し閾値をテストで固定した。
+
+### 影響範囲
+
+- 打診作成 STEP1 の `待ち合わせ` タブ
+- 待ち合わせカレンダーの空き枠タップ / 長押し / ドラッグ作成
+- 送信確認画面の候補セクション文言
+
+### 確認方法
+
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-proposal-rn-pass --enable-xctest --disable-swift-testing --filter 'ProposalCreateFlowTests|TradeRequestDraftProposalCreateFlowTests|MatchRelationScreenTests|HomeScreenFlowTests|AppDrawerGestureTests' -j 1`
+- `xcodebuild -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -destination 'generic/platform=iOS Simulator' -derivedDataPath /tmp/megrum-native-proposal-rn-pass-build CODE_SIGNING_ALLOWED=NO build`
+- `xcodebuild -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -destination 'id=00008120-000C49C43669A01E' -configuration Debug -allowProvisioningUpdates install`
+- `xcrun devicectl device info apps --device 7F6C74EF-5786-5316-920A-F7F1CC3FE2A4 --include-all-apps --bundle-id tokyo.megrum.native.preview`
+- `xcrun devicectl device process launch --device 7F6C74EF-5786-5316-920A-F7F1CC3FE2A4 tokyo.megrum.native.preview --activate`
+
+### セルフレビュー結果
+
+- ✅ RN の `handleTabSwipe*` は `give/receive` だけ横スワイプを追跡し、`meetup` では無効。Swift 側も `give/receive` のみ `stepSwipeGesture` を適用しており、閾値 `56` と横優勢比率 `1.35` も一致している。
+- ✅ RN の待ち合わせカレンダーは長押し後に候補作成へ入る。Swift 側も短押し作成を止め、長押し後だけ候補作成するよう修正した。
+- ✅ RN 確認画面の候補セクション名 `交換できる候補` を Swift 側でも維持し、テストで固定した。
+- ✅ 対象テスト 36 件、Simulator build、USB 実機 install / launch を確認した。
+- ✅ 新しい状態名・用語・DB schema 変更はないため、`notes/09_state_machines.md`、`notes/10_glossary.md`、`notes/05_data_model.md` の更新は不要と判断した。
+- ⚠️ 実スクショ横並び比較は、次の画面構成レビューで Simulator の `simctl io ... screenshot` を使って進める。今回の修正はジェスチャ意味の差分をコード・テストで先に固定した。
+
+### 関連ファイル
+
+- `mobile/app/proposal-select.tsx`
+- `mobile/app/proposal-confirm.tsx`
+- `ios-native/Sources/MegrumApp/ProposalCreateFlow.swift`
+- `ios-native/Sources/MegrumApp/ProposalMeetupCalendarEditor.swift`
+- `ios-native/Tests/MegrumAppTests/ProposalCreateFlowTests.swift`
+- `ios-native/Tests/MegrumAppTests/TradeRequestDraftProposalCreateFlowTests.swift`
+
+---
+
+## イテレーション418.7：Swift関係図の候補選択をRNポップアップ構成へ戻す
+
+### 背景・問題意識
+
+オーナーから、Swift 版の関係図 UI が崩れて見える可能性があり、ホームのグッズパネル押下後フローと左ドロワーの方針を再修正しつつ、RN 版と Swift 版のスクショを都度見比べるテスト方針で進めたい、という指摘があった。RN 版 `mobile/app/match-detail.tsx` を再確認すると、関係図の候補選択はインラインに候補を常時展開する構成ではなく、`WishRow` をタップして `WishPopup` を開き、ポップアップ内の候補グリッドでタップ選択する設計だった。Swift 側の直近実装は候補表示が行内に入り込みすぎており、RN の画面構成から外れていたため、まず構造を戻す必要があった。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/MatchRelationScreen.swift`
+- 関係図の候補選択を、常時インライン展開ではなく `MatchRelationWishRow -> MatchRelationWishPopup` の RN 準拠構成へ変更した。
+- 選択肢行は、対象 wish、候補数、chevron、選択済み候補の小さなサマリーだけを表示し、候補一覧そのものは sheet 内の候補グリッドに移した。
+- `MatchRelationWishPopupTarget` / `MatchRelationViewpoint` / `MatchRelationPopupCopy` を追加し、`あなたが譲るもの` と `@相手 が譲るもの` の文脈を RN と同じ意味で出し分けるよう整理した。
+- 候補タップ時の選択状態は従来と同じ `selectedCandidateIDsByListingID` から駆動し、集計サマリーと `打診に進む` の有効化条件が同じ状態を参照するまま保った。
+- 横スワイプ候補移動、ホーム起点の relation target、proposal payload 境界は既存実装を維持した。
+
+#### `ios-native/Tests/MegrumAppTests/MatchRelationScreenTests.swift`
+- RN の popup 起点選択に合わせ、デフォルト popup target の算出と fallback have の決定をテストで固定した。
+- popup 選択後に行下へ表示する選択済み候補サマリーの helper をテストで固定した。
+
+### 影響範囲
+
+- ホームの `マッチしてるよ！` 棚から入る関係図画面
+- 関係図内の「選択肢のグッズを選ぶ -> 候補グッズが展開される -> 候補をタップ選択する」操作
+- 打診作成へ渡る sender / receiver 集計
+
+### 確認方法
+
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-relation-popup --enable-xctest --disable-swift-testing --filter 'MatchRelationScreenTests|HomeScreenFlowTests|AppDrawerGestureTests' -j 1`
+- `xcodebuild -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -destination 'generic/platform=iOS Simulator' -derivedDataPath /tmp/megrum-native-relation-popup-build CODE_SIGNING_ALLOWED=NO build`
+- `xcodebuild -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -destination 'id=00008120-000C49C43669A01E' -configuration Debug -allowProvisioningUpdates install`
+- `xcrun devicectl device info apps --device 7F6C74EF-5786-5316-920A-F7F1CC3FE2A4 --include-all-apps --bundle-id tokyo.megrum.native.preview`
+- `xcrun devicectl device process launch --device 7F6C74EF-5786-5316-920A-F7F1CC3FE2A4 tokyo.megrum.native.preview --activate`
+- RN 比較基準は `notes/assets/rn-screen-lookup/rn-home.png` / `notes/assets/rn-screen-lookup/rn-match-detail.png` / `notes/assets/rn-screen-lookup/rn-proposal-select.png` とし、Swift 側は Simulator または実機で同じ画面を撮って並列比較する
+
+### セルフレビュー結果
+
+- ✅ 関係図の候補選択を RN の `WishRow` タップ起点 + popup 候補グリッドへ戻し、インライン候補で画面が膨らむ構成をやめた。
+- ✅ 選択状態、集計サマリー、`打診に進む` の有効化条件は既存 state から駆動するまま維持した。
+- ✅ `MatchRelationScreenTests`、関連ホーム・ドロワーテスト、Simulator build、USB 実機 install / launch を確認した。
+- ✅ 新しい状態名・用語・DB schema 変更はないため、`notes/09_state_machines.md`、`notes/10_glossary.md`、`notes/05_data_model.md` の更新は不要と判断した。
+- ⚠️ RN / Swift の実スクショ横並び比較は継続課題。今回の実機環境では `devicectl` で直接スクショ取得できなかったため、次の proposal flow QA では Simulator の `simctl io ... screenshot` か手元実機スクショで比較する。
+
+### 関連ファイル
+
+- `mobile/app/match-detail.tsx`
+- `ios-native/Sources/MegrumApp/MatchRelationScreen.swift`
+- `ios-native/Tests/MegrumAppTests/MatchRelationScreenTests.swift`
+- `notes/78_rn_actual_screenshot_lookup.md`
+
+---
+
+## イテレーション418.6：Swift左ドロワー全域スワイプとホーム棚導線を明示化
+
+### 背景・問題意識
+
+オーナーから、Swift 版の左ドロワーが `X` モバイルアプリのような「画面のどこからでも右スワイプで追従して開く」感触になっておらず、ホームのグッズパネル押下後の遷移も RN の仕様どおりに固定したい、という指摘があった。RN 版のホーム棚は `match-detail.tsx` に進む棚と `user-profile.tsx` に進む棚が分かれているため、Swift 側も暗黙挙動ではなくコード上で明示する必要があった。また、今後の RN 比較では `notes/78_rn_actual_screenshot_lookup.md` の実画面スクショを基準にし、Swift 側は Simulator / 実機スクショで見比べる確認を前提に進める。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/MegrumRootView.swift`
+- ドロワーの右スワイプ / 左スワイプ判定を `AppDrawerGestureResolver` に切り出し、横優勢ドラッグだけを扱う形へ整理した。
+- 閉じた状態では全画面の右スワイプ、開いた状態では全画面の左スワイプを追従対象にし、閾値と予測終点の判定を見直して X 風の追従感へ寄せた。
+- `authenticatedTabs` のジェスチャ適用を `.simultaneousGesture` から `.highPriorityGesture(..., including: .subviews)` に変更し、スクロール領域上でもドロワー起動が拾われやすいようにした。
+
+#### `ios-native/Sources/MegrumApp/HomeScreen.swift`
+- ホーム棚の押下先を `HomeMatchShelfKind` / `HomeGoodsPanelRouteResolver` で明示化した。
+- `マッチしてるよ！` は `MatchRelationScreen` へ、`交換できるかも？` は相手プロフィールへ進む RN 仕様を、`GoodsGrid` の暗黙 fallback に頼らず固定した。
+- 関係図へ渡す payload を `HomeRelationRoute` へまとめ、`matchType` を含めて sheet 起動時の意図が読める構成にした。
+
+#### `ios-native/Tests/MegrumAppTests/AppDrawerGestureTests.swift`
+- 閉じた状態の右スワイプ追従、縦寄りドラッグの無視、閾値到達での開閉判定をテストで固定した。
+
+#### `ios-native/Tests/MegrumAppTests/HomeScreenFlowTests.swift`
+- `マッチしてるよ！ -> 関係図`、`交換できるかも？ -> 相手プロフィール` の棚ごとの押下先をテストで固定した。
+
+### 影響範囲
+
+- ログイン後ルート全体の左ドロワー開閉ジェスチャ
+- ホーム棚のグッズパネル押下後導線
+- RN 比較時の確認観点
+
+### 確認方法
+
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-drawer-homeflow --enable-xctest --disable-swift-testing --filter 'AppDrawerGestureTests|HomeScreenFlowTests|MatchRelationScreenTests|ProposalCreateFlowTests' -j 1`
+- `xcodebuild -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -destination 'generic/platform=iOS Simulator' -derivedDataPath /tmp/megrum-native-drawer-homeflow-build CODE_SIGNING_ALLOWED=NO build`
+- `xcodebuild -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -destination 'id=00008120-000C49C43669A01E' -configuration Debug -allowProvisioningUpdates install`
+- RN 比較は `notes/78_rn_actual_screenshot_lookup.md` の `RN Home` / `RN Match Detail` を基準にし、Swift 側は Simulator または実機で同じフローのスクショを撮って並べて確認する
+
+### セルフレビュー結果
+
+- ✅ 左ドロワーの開閉判定を helper に寄せ、全画面スワイプ追従の条件をコードとテストで固定した。
+- ✅ ホーム棚の押下先を `matched` / `possible` ごとに明示し、RN と同じ導線を暗黙挙動から切り離した。
+- ✅ 追加したテスト 34 件、Simulator build、実機 install を確認対象に含めた。
+- ✅ 新しい状態名・用語・データモデル変更は発生していないため、`notes/09_state_machines.md`、`notes/10_glossary.md`、`notes/05_data_model.md` の更新は不要と判断した。
+- ⚠️ RN スクショと Swift スクショの並列比較は、次の relation / proposal 再修正でも継続して使う。
+
+### 関連ファイル
+
+- `ios-native/Sources/MegrumApp/MegrumRootView.swift`
+- `ios-native/Sources/MegrumApp/HomeScreen.swift`
+- `ios-native/Tests/MegrumAppTests/AppDrawerGestureTests.swift`
+- `ios-native/Tests/MegrumAppTests/HomeScreenFlowTests.swift`
+- `notes/78_rn_actual_screenshot_lookup.md`
+
+---
+
+## イテレーション418.5：Swift送信確認ヘッダー構成をRNへ再同期
+
+### 背景・問題意識
+
+ホーム起点の `打診作成 -> 送信確認` を RN `proposal-select.tsx` / `proposal-confirm.tsx` と見比べると、Swift 側は下部 CTA 文言や完了画面は揃ってきた一方で、`確認` ステップの上部構成にまだ差が残っていた。RN では `送信確認` は独立した `STEP 2/2` 画面として扱われ、交換方法の segmented control や `私が出す / 受け取る / 待ち合わせ` タブは表示されない。またメッセージ欄も `メッセージ（任意）` タイトルと `N / 400` カウンタが同じセクション見出しに載るため、Swift 側も画面構成と表示制御をさらに寄せる必要があった。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/ProposalCreateFlow.swift`
+- `確認` ステップでは上部の segmented control とステップタブを非表示にし、RN の `STEP 2/2` 画面に近い単独確認レイアウトへ寄せた。
+- Swift 側だけにあった `送信内容の確認` タイトルブロックを削除し、重複見出しが出ない構成に整理した。
+- ステップタブのラベルを `譲 / 受 / 会う / 確認` から `私が出す / 受け取る / 待ち合わせ / 確認` に変更し、RN の文言へ揃えた。
+- `メッセージ` セクション見出しに `（任意）` と `N / 400` カウンタを直接出せるようにし、内部に重ねていた補助見出し行を削除した。
+
+### 影響範囲
+
+- `打診作成` の `確認` ステップの上部表示構成
+- ステップタブの表示文言
+- `メッセージ` 入力欄の見出し表示
+
+### 確認方法
+
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-home-proposal-verify-5 --enable-xctest --disable-swift-testing --filter 'ProposalCreateFlowTests|MatchRelationScreenTests' -j 1`
+- `xcodebuild -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -destination 'generic/platform=iOS Simulator' -derivedDataPath /tmp/megrum-native-home-proposal-build-8 CODE_SIGNING_ALLOWED=NO build`
+- ホームから `関係図 -> 打診に進む -> 確認` を辿り、`確認` ステップでは上部の segmented control とステップタブが出ず、`メッセージ（任意）` 見出し右側に `N / 400` が出ることを確認する
+
+### セルフレビュー結果
+
+- ✅ `確認` ステップだけを RN どおりの独立画面寄り構成へ寄せ、前段ステップの segmented control とタブを持ち込まないようにした。
+- ✅ タブ文言とメッセージ見出しを RN に揃えつつ、既存の送信 payload やステップ遷移ロジックは変更していない。
+- ✅ 追加差分に対する絞り込みテストと Simulator build を再実行し、0 failures / build success を確認した。
+- ✅ 新しい状態名・用語・データモデル変更は発生していないため、`notes/09_state_machines.md`、`notes/10_glossary.md`、`notes/05_data_model.md` の更新は不要と判断した。
+- ⚠️ 実機での最終見え方は、このあと最新ビルド反映版で継続確認する。
+
+### 関連ファイル
+
+- `ios-native/Sources/MegrumApp/ProposalCreateFlow.swift`
+- `ios-native/Tests/MegrumAppTests/ProposalCreateFlowTests.swift`
+- `ios-native/Tests/MegrumAppTests/MatchRelationScreenTests.swift`
+
+---
+
+## イテレーション418.4：Swift打診CTA文言と関係図副ボタンをRN分岐へ再同期
+
+### 背景・問題意識
+
+ホーム起点フローを RN と照合すると、見た目は近づいていても、まだ下部 CTA の文言分岐と副ボタン構成に差が残っていた。`proposal-select.tsx` では `受け取るものへ進む`、`待ち合わせへ進む`、`次へ：送信確認`、`場所未設定の候補があります` などの進行ラベルが段階ごとに切り替わり、`match-detail.tsx` の simple proposal モードでは副ボタンが `閉じる` になる。一方 Swift は proposal flow の主 CTA が汎用 `次へ` 中心で、関係図 simple proposal モードの副ボタンも表示されていなかったため、画面構成と表示制御の再現度をさらに上げる必要があった。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/ProposalCreateFlow.swift`
+- proposal flow 下部 CTA の文言を専用 helper に切り出し、`受け取るものへ進む`、`待ち合わせへ進む`、`次へ：送信確認`、`場所未設定の候補があります`、`交換できる時間を設定してください` を RN と同じ条件で返すようにした。
+- `待ち合わせ` ステップの未完了時は、単なる generic blocked title ではなく、候補時間があるのに場所未設定なのか、候補自体がないのかで文言を分けるようにした。
+- `受け渡し方法` カードへ RN と同じ交換手段説明文を追加した。
+- `メッセージ` 欄に `N / 400` カウンタと 400 文字上限を追加し、RN の入力制御へ揃えた。
+
+#### `ios-native/Sources/MegrumApp/MatchRelationScreen.swift`
+- 関係図下部バーの副ボタンを relation モードでは `リセット`、simple proposal モードでは `閉じる` に切り替えるようにした。
+- simple proposal モードでも RN と同じ 2 ボタン構成を保ちつつ、主 CTA は `この内容で打診へ`、副 CTA は `閉じる` になるようにした。
+
+#### `ios-native/Tests/MegrumAppTests/ProposalCreateFlowTests.swift`
+- proposal flow 下部 CTA の段階別文言分岐を検証するテストを追加した。
+
+#### `ios-native/Tests/MegrumAppTests/MatchRelationScreenTests.swift`
+- 関係図下部バーの副ボタンが `リセット` / `閉じる` に切り替わることを検証する assertions を追加した。
+
+### 影響範囲
+
+- `打診作成` の下部 CTA 文言と進行案内
+- `送信前の確認` における受け渡し方法説明とメッセージ入力制御
+- `関係図` の simple proposal モード時の副ボタン構成
+
+### 確認方法
+
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-home-proposal-verify-4 --enable-xctest --disable-swift-testing --filter 'MatchRelationScreenTests|ProposalCreateFlowTests|TradeRequestDraftProposalCreateFlowTests|TradeChatAffordanceTests' -j 1`
+- `xcodebuild -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -destination 'generic/platform=iOS Simulator' -derivedDataPath /tmp/megrum-native-home-proposal-build-7 CODE_SIGNING_ALLOWED=NO build`
+- ホームから `関係図 -> 打診に進む` を辿り、simple proposal モードでは副ボタンが `閉じる` になること、proposal flow ではステップごとに下部 CTA が RN と同じ文言へ切り替わることを確認する
+
+### セルフレビュー結果
+
+- ✅ proposal flow の主 CTA を generic `次へ` から RN 段階別文言へ寄せた。
+- ✅ 関係図 simple proposal モードでも RN と同じ 2 ボタン構成を復元した。
+- ✅ `受け渡し方法` 説明文と `メッセージ` 400 文字制御を RN と揃えた。
+- ✅ 新しい状態名・用語・データモデル変更は発生していないため、`notes/09_state_machines.md`、`notes/10_glossary.md`、`notes/05_data_model.md` の更新は不要と判断した。
+- ⚠️ 実機での見え方と通し導線は、このあと最新ビルド反映版で継続確認する。
+
+### 関連ファイル
+
+- `ios-native/Sources/MegrumApp/ProposalCreateFlow.swift`
+- `ios-native/Sources/MegrumApp/MatchRelationScreen.swift`
+- `ios-native/Tests/MegrumAppTests/ProposalCreateFlowTests.swift`
+- `ios-native/Tests/MegrumAppTests/MatchRelationScreenTests.swift`
+
+---
+
+## イテレーション418.3：Swift関係図ヘッダーと進行CTA文言をRNへ再同期
+
+### 背景・問題意識
+
+ホーム起点の `関係図` を RN `match-detail.tsx` と突き合わせると、Swift 側は候補展開と横スワイプまでは揃っていた一方で、ヘッダー右上の `プロフィール` 導線と、画面下部 CTA の文言がまだ RN と一致していなかった。RN では相手プロフィールへ戻れる導線があり、関係図モードでは `打診に進む（N件）`、単純打診モードでは `この内容で打診へ` と文言が切り替わるため、画面構成と表示制御の再現度をさらに上げる必要があった。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/MatchRelationScreen.swift`
+- ナビゲーションバー右上に `プロフィール` ボタンを追加し、相手の `PublicUserProfileScreen` を sheet で開けるようにした。
+- 関係図下部 CTA の文言生成を専用 helper に切り出し、関係図モードでは `打診に進む（N件）`、単純打診モードでは `この内容で打診へ`、候補読み込み中は `候補を読み込んでいます` を返すようにした。
+- 既存の候補展開、候補タップ選択、横スワイプ遷移の状態管理はそのまま維持し、今回の変更をヘッダー導線と表示文言に限定した。
+
+#### `ios-native/Tests/MegrumAppTests/MatchRelationScreenTests.swift`
+- 関係図モードと単純打診モードで CTA 文言が RN 準拠に切り替わることを確認するテストを追加した。
+
+### 影響範囲
+
+- ホームのグッズパネルから開く `関係図` 画面のヘッダー構成
+- 下部 `打診に進む` CTA の表示文言と表示制御
+- 相手プロフィールへ戻る導線
+
+### 確認方法
+
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-home-proposal-verify-3 --enable-xctest --disable-swift-testing --filter 'MatchRelationScreenTests|ProposalCreateFlowTests|TradeRequestDraftProposalCreateFlowTests|TradeChatAffordanceTests' -j 1`
+- `xcodebuild -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -destination 'generic/platform=iOS Simulator' -derivedDataPath /tmp/megrum-native-home-proposal-build-6 CODE_SIGNING_ALLOWED=NO build`
+- ホームから `関係図` を開き、右上に `プロフィール` が出ること、候補選択の有無とモードに応じて下部 CTA が `打診に進む（N件）` / `この内容で打診へ` に切り替わることを確認する
+
+### セルフレビュー結果
+
+- ✅ RN と同じ `プロフィール` 導線を Swift 関係図ヘッダーへ追加した。
+- ✅ 関係図モードと単純打診モードで CTA 文言を切り替え、下部バーのコピー差分を解消した。
+- ✅ 既存の候補展開、候補選択、横スワイプ遷移には影響を広げていない。
+- ✅ 新しい状態名・用語・データモデル変更は発生していないため、`notes/09_state_machines.md`、`notes/10_glossary.md`、`notes/05_data_model.md` の更新は不要と判断した。
+- ⚠️ 実機での指馴染みは、この後の最新インストール版で続けて確認する。
+
+### 関連ファイル
+
+- `ios-native/Sources/MegrumApp/MatchRelationScreen.swift`
+- `ios-native/Tests/MegrumAppTests/MatchRelationScreenTests.swift`
+
+---
+
+## イテレーション418.2：Swift打診完了画面をRN構成へ再同期
+
+### 背景・問題意識
+
+ホーム起点の `関係図 -> 打診作成 -> 送信完了` を RN と突き合わせ直したところ、Swift の送信完了画面だけはまだ差分が残っていた。RN では `打診が完了しました` の完了文言、交換方法ごとの案内文、`まだ他に探す -> 打診一覧に飛ぶ` の 2 CTA 構成なのに対し、Swift は汎用サマリー文、追加の詳細カード、`閉じる` 導線付きの 3 CTA 構成になっており、画面構成と表示文言の再現度が不足していた。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/ProposalCreateFlow.swift`
+- `ProposalSubmittedSummary` に相手の `handle` と交換方法を持たせ、RN と同じ完了タイトルと method 別メッセージを返すようにした。
+- 送信完了画面の hero を `打診が完了しました` に変更し、`現地交換 / 郵送交換 / 現地・郵送` ごとに RN 準拠の案内文を表示するようにした。
+- 完了画面から詳細サマリーカードと `閉じる` ボタンを外し、`まだ他に探す` を先頭、`打診一覧に飛ぶ` を主 CTA に置く 2 ボタン構成へ変更した。
+- 完了後はツールバーの閉じるボタンとシートのスワイプ dismiss を無効にし、RN と同じく CTA 経由でのみ抜ける挙動へ寄せた。
+
+#### `ios-native/Tests/MegrumAppTests/ProposalCreateFlowTests.swift`
+- 完了タイトルと現地交換 / 郵送交換 / 現地・郵送のメッセージ文言が RN 準拠であることを確認するテストを追加・更新した。
+
+### 影響範囲
+
+- ホームのグッズパネルから関係図を経由して打診を送ったあとの送信完了画面
+- `まだ他に探す` と `打診一覧に飛ぶ` の CTA 順と表示文言
+- シートの閉じ方と送信完了後の離脱導線
+
+### 確認方法
+
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-home-proposal-verify-2 --enable-xctest --disable-swift-testing --filter 'MatchRelationScreenTests|ProposalCreateFlowTests|TradeRequestDraftProposalCreateFlowTests|TradeChatAffordanceTests' -j 1`
+- `xcodebuild -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -destination 'generic/platform=iOS Simulator' -derivedDataPath /tmp/megrum-native-home-proposal-build-5 CODE_SIGNING_ALLOWED=NO build`
+- ホームのグッズパネルから `関係図 -> 打診に進む -> 送信` まで辿り、完了画面が `打診が完了しました` と 2 CTA 構成で出ることを確認する
+
+### セルフレビュー結果
+
+- ✅ RN と同じ完了タイトル、method 別案内文、CTA 順に揃えた。
+- ✅ Swift 側だけに存在した追加サマリーカードと `閉じる` 導線を外し、完了画面の構成差分を解消した。
+- ✅ 送信完了後の dismiss 手段を CTA に限定し、誤ってスワイプで閉じる差分をなくした。
+- ✅ 新しい状態名・用語・データモデル変更は発生していないため、`notes/09_state_machines.md`、`notes/10_glossary.md`、`notes/05_data_model.md` の更新は不要と判断した。
+- ⚠️ 実機での最終見え方は、この後の Debug インストール反映版で手元確認を継続する。
+
+### 関連ファイル
+
+- `ios-native/Sources/MegrumApp/ProposalCreateFlow.swift`
+- `ios-native/Tests/MegrumAppTests/ProposalCreateFlowTests.swift`
+
+---
+
+## イテレーション418.1：Swift打診完了後のpending一覧着地を固定
+
+### 背景・問題意識
+
+ホームのグッズパネルから関係図を経由して打診を送ったあと、完了画面の `打診一覧に飛ぶ` で `やりとり` タブ自体には遷移できていたが、一覧のステージが前回閲覧していた `進行中` や `完了` のまま残る可能性があった。オーナーから指定されている「ホーム起点の打診完了フローを RN 準拠で完結させる」条件に対して、送信直後は必ず `pending` 一覧へ着地する保証が必要だった。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/MegrumRootView.swift`
+- ホーム起点で `打診一覧に飛ぶ` が呼ばれたとき、単に `やりとり` タブへ切り替えるだけでなく、`pending` ステージ要求を一緒に保持して渡すようにした。
+- 既存の全画面ドロワー追従構成はそのままに、ホームから `TradesScreen` を開いた瞬間だけ `pending` を優先するルーティングに絞って変更した。
+
+#### `ios-native/Sources/MegrumApp/TradesScreen.swift`
+- `requestedStage` を受け取り、画面表示時または要求更新時に一度だけ消費して `selectedStage` へ反映するようにした。
+- 反映後は要求値を `nil` に戻し、通常の `やりとり` 画面内スワイプやステージ切り替えは既存どおり維持する構成にした。
+
+#### `ios-native/Tests/MegrumAppTests/TradeChatAffordanceTests.swift`
+- 明示的なステージ要求がある場合は現在の一覧状態より `pending` を優先し、要求がない場合は現在のステージを保持するテストを追加した。
+
+### 影響範囲
+
+- ホームのグッズパネルから関係図を経由して打診を送り、完了画面の `打診一覧に飛ぶ` を押したときの `やりとり` 一覧着地先
+- `やりとり` タブの初期ステージ決定ロジック
+- 既存の一覧スワイプや詳細シート遷移には影響しない
+
+### 確認方法
+
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-home-proposal-verify --enable-xctest --disable-swift-testing --filter 'MatchRelationScreenTests|ProposalCreateFlowTests|TradeRequestDraftProposalCreateFlowTests|TradeChatAffordanceTests' -j 1`
+- `xcodebuild -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -destination 'generic/platform=iOS Simulator' -derivedDataPath /tmp/megrum-native-home-proposal-build-4 CODE_SIGNING_ALLOWED=NO build`
+- ホームのグッズパネルから `関係図 -> 打診に進む -> 送信 -> 打診一覧に飛ぶ` を辿り、`やりとり` の `pending` 一覧が最初に開くことを確認する
+
+### セルフレビュー結果
+
+- ✅ ホーム起点の完了 CTA から `pending` 一覧へ着地する条件を、タブ切り替えだけでなく明示的なステージ要求として固定した。
+- ✅ `TradesScreen` 内の通常操作は変えず、初期着地時だけを上書きする最小修正に留めた。
+- ✅ 追加テストと既存の関係図・打診フロー・待ち合わせフロー関連テストをまとめて再実行し、0 failures を確認した。
+- ✅ 新しい状態名・用語・データモデル変更は発生していないため、`notes/09_state_machines.md`、`notes/10_glossary.md`、`notes/05_data_model.md` の更新は不要と判断した。
+- ⚠️ 実機での最終動線確認はこの後の Debug インストールで継続する。
+
+### 関連ファイル
+
+- `ios-native/Sources/MegrumApp/MegrumRootView.swift`
+- `ios-native/Sources/MegrumApp/TradesScreen.swift`
+- `ios-native/Tests/MegrumAppTests/TradeChatAffordanceTests.swift`
+
+---
+
+## イテレーション418：Swift左ドロワーを全域スワイプ追従へ変更
+
+### 背景・問題意識
+
+オーナーから、Swift Native の左ドロワーを「画面左端だけでなく、どこからでも右スワイプしたら指の動きに合わせて開き、X のモバイルアプリ版のように追従してほしい」と要望があった。既存の実装は左端の細いエリアにだけ反応する起動用ジェスチャで、ドロワー本体も独自に閉じドラッグを持っていたため、全画面追従の操作感と噛み合っていなかった。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/MegrumRootView.swift`
+- 認証後タブ全体を `GeometryReader` で包み、ドロワー幅と表示進捗を毎フレーム計算する構成へ変えた。
+- 画面全域に `simultaneousGesture` で横ドラッグを載せ、縦スクロール優先を保ちつつ、閉状態では右スワイプ、開状態では左スワイプだけを有効にした。
+- ドロワー進捗に応じてメインコンテンツの `offset`、`scale`、左角丸、オーバーレイ白幕を連動させ、指に追従して開閉する見た目へ寄せた。
+- 左端専用だった `DrawerEdgeSwipeActivator` を削除した。
+
+#### `ios-native/Sources/MegrumApp/AppChrome.swift`
+- `AppDrawerOverlay` を root 側の `presentationProgress` と `drawerWidth` で描画する方式へ変更した。
+- ドロワー本体が独自に持っていた閉じドラッグ state をなくし、背景の暗幕濃度とパネル位置を進捗値から直接決めるようにした。
+- タップ閉じ、メニュー遷移、ログアウト動線は維持したまま、表示責務をドロワー描画に限定した。
+
+### 影響範囲
+
+- ホームを含むログイン後の全タブで使う左ドロワーの開閉ジェスチャ
+- ドロワー表示中のメインコンテンツの縮小・スライド表現
+- 実機での指追従を含むドロワーの体感操作
+
+### 確認方法
+
+- `xcodebuild -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -destination 'id=00008120-000C49C43669A01E' -configuration Debug -allowProvisioningUpdates install`
+- 実機 `MTO’s phone (iPhone 15)` 上で、ホームなど任意のタブの中央付近から右スワイプして左ドロワーが追従しながら開くことを確認する
+- ドロワー展開中に左スワイプで閉じられること、タップでも閉じられることを確認する
+
+### セルフレビュー結果
+
+- ✅ 左端専用の起動エリアを廃止し、画面全域の横スワイプからドロワーを開ける構成へ変えた。
+- ✅ ドロワー本体の位置と暗幕濃度を root の進捗値に統一し、開閉ロジックを二重管理しない形に整理した。
+- ✅ 実機インストールまで通し、署名付き Debug ビルドを `MTO’s phone` に投入できた。
+- ✅ 新しい状態名や用語は追加していないため、`notes/09_state_machines.md` と `notes/10_glossary.md` の更新は不要と判断した。
+- ⚠️ 実機での最終体感は、オーナーの手元操作で X アプリ相当までさらに微調整が必要になる可能性がある。
+
+### 関連ファイル
+
+- `ios-native/Sources/MegrumApp/MegrumRootView.swift`
+- `ios-native/Sources/MegrumApp/AppChrome.swift`
+
+---
+
+## イテレーション417：Swift関係図の展開選択と待ち合わせカレンダーをRN準拠化
+
+### 背景・問題意識
+
+ホーム画面のグッズパネルから入る Swift Native の打診導線について、オーナーから「RN版どおりに、関係図では選択肢のグッズを起点に候補グッズを展開して選べるようにし、待ち合わせカレンダーも操作仕様ごと再現してほしい」という指示があった。既存の Swift 実装は候補が常時表示される構成で、週送りや長押し編集を含む待ち合わせ候補作成の操作も RN との差が残っていたため、ホーム起点の 1 本に絞って挙動を揃える必要があった。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/MatchRelationScreen.swift`
+- 関係図の個別募集カードを、`選択肢をタップ -> 候補グッズを展開 -> 候補グッズをタップして選択` の構成へ変更した。
+- 展開中の wish を `MatchRelationWishExpansionKey` で管理し、初期表示ではハイライト中グッズに紐づく候補を自動展開するようにした。
+- ホームの matched goods の並びを使った左右スワイプ遷移を追加し、縦スクロール優先、閾値未満の復帰、端での抵抗感だけ返す挙動を入れた。
+- 関係図の集計サマリーと `打診に進む` の活性条件を、展開後の候補選択 state から一貫して再計算するようにした。
+
+#### `ios-native/Sources/MegrumApp/ProposalCreateFlow.swift`
+- `私が出す / 受け取る` ステップに RN 準拠の横スワイプ切り替えを追加し、`待ち合わせ` と `確認` では無効のままにした。
+- `待ち合わせ` ステップに週送り・候補編集用のネイティブカレンダーコンポーネントを組み込み、既存の候補フォームや送信 payload と連動させた。
+- カレンダーから新規候補を作成したときや既存候補を編集したときに、選択中候補と anchor 週が即座に同期するようにした。
+- `確認` ステップの情報順を RN と同じ `交換内容 -> 受け渡し方法 -> 交換条件タグ -> 交換できる候補 -> メッセージ -> スケジュール共有` に並べ替え、待ち合わせ候補は地図付きカードで見せるようにした。
+
+#### `ios-native/Sources/MegrumApp/ProposalMeetupCalendarEditor.swift`
+- RN版の待ち合わせカレンダー挙動を SwiftUI で再構成する新規 View を追加した。
+- 週送り横スワイプ、空き枠の長押し開始からの時間帯作成、既存候補ブロックのドラッグ移動、終了側ハンドルのドラッグ調整を実装した。
+- 候補ブロックのタップで既存フォーム側の選択候補を切り替えつつ、場所名入力欄へ続けて入れる導線を追加した。候補順はそのまま送信 payload の `meetupCandidates` 順に反映される構成を維持した。
+- 長押し判定は DragGesture の移動量だけに頼らずタイマー駆動へ寄せ、指を止めたままでも候補作成・候補編集へ入れるようにした。
+
+#### `ios-native/Tests/MegrumAppTests/MatchRelationScreenTests.swift`
+- ホーム由来の matched goods 順で関係図スワイプ対象が決まること、ハイライト中グッズに応じて初期展開 wish が決まることを追加検証した。
+
+#### `ios-native/Tests/MegrumAppTests/ProposalCreateFlowTests.swift`
+- `私が出す / 受け取る / 待ち合わせ / 確認` の可視ステップ列に対して、横スワイプ遷移先が期待どおり決まることを検証した。
+
+#### `ios-native/Tests/MegrumAppTests/TradeRequestDraftProposalCreateFlowTests.swift`
+- 待ち合わせカレンダーの週送り量と、ドラッグ編集時に日付と時刻スロットが正しく更新されることを検証した。
+
+### 影響範囲
+
+- ホーム画面のグッズパネルから始まる `関係図 -> 打診作成 -> 送信完了 -> 打診一覧` フロー
+- 関係図での候補選択 UI と、候補切り替え時の集計サマリー
+- 現地交換の待ち合わせ候補作成・編集・送信 payload 生成
+
+### 確認方法
+
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-home-proposal-impl --enable-xctest --disable-swift-testing --filter 'MatchRelationScreenTests|ProposalCreateFlowTests|TradeRequestDraftProposalCreateFlowTests|SupabaseProposalClientTests' -j 1`
+- `xcodebuild -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -destination 'generic/platform=iOS Simulator' -derivedDataPath /tmp/megrum-native-home-proposal-build-2 CODE_SIGNING_ALLOWED=NO build`
+
+### セルフレビュー結果
+
+- ✅ 関係図は「選択肢起点で候補を展開して選ぶ」操作に寄せ、常時候補を見せない構成へ揃えた。
+- ✅ 待ち合わせカレンダーは週送り、長押し作成、ドラッグ移動、終了時刻調整まで Swift 側へ移した。
+- ✅ `ProposalCreateInput`、`meetupCandidates`、`matchType`、`exposeCalendar` など既存のデータ境界は増減させていない。
+- ✅ 新しい状態名や用語は追加していないため、`notes/09_state_machines.md` と `notes/10_glossary.md` の更新は不要と判断した。
+- ⚠️ 自動検証は通しているが、実機/Simulator 上でのジェスチャの体感確認まではこの iter では未実施。
+
+### 関連ファイル
+
+- `ios-native/Sources/MegrumApp/MatchRelationScreen.swift`
+- `ios-native/Sources/MegrumApp/ProposalCreateFlow.swift`
+- `ios-native/Sources/MegrumApp/ProposalMeetupCalendarEditor.swift`
+- `ios-native/Tests/MegrumAppTests/MatchRelationScreenTests.swift`
+- `ios-native/Tests/MegrumAppTests/ProposalCreateFlowTests.swift`
+- `ios-native/Tests/MegrumAppTests/TradeRequestDraftProposalCreateFlowTests.swift`
+
+---
+
+## イテレーション416：Webを管理者コンソール専用へ縮退
+
+### 背景・問題意識
+
+オーナーから、ユーザー向けWeb実装は今後不要で削除し、管理者機能だけを残したいという指示があった。iter299以降、ユーザー向けアプリの主線はSwift Native iOSであり、`web/` に通常アプリ画面が残っていると今後の実装対象がぶれるため、Web側を運営用に限定する必要があった。
+
+### 変更内容
+
+#### `web/src/app/*`
+- `/admin` 配下の管理者ページ、`/login`、`/password-reset`、`/auth/*`、`/api/stripe/webhook` を残した。
+- 在庫、Wish、検索、プロフィール、打診、取引、スケジュール、通知、オンボーディング、法務/ヘルプ等の通常ユーザー向けWeb画面を削除した。
+- ルート `/` は `/admin` へredirectするだけの入口に変更した。
+- ログイン済みWebユーザーの遷移先を `/admin` に統一し、Webの新規登録導線とメール確認画面を削除した。
+
+#### `web/package.json`
+- ユーザー向け地図画面でだけ使っていたMapTiler / Leaflet系依存を削除した。
+
+#### `web/AGENTS.md` / `web/README.md`
+- `web/` は管理者コンソール専用であり、通常ユーザー向けWebアプリを今後実装しないことを明記した。
+
+#### `notes/10_glossary.md`
+- `Web管理画面` の定義を、管理者コンソール、認証、運用Webhookだけを残す方針へ更新した。
+
+### 影響範囲
+
+- `web/` の通常ユーザー向け画面はアクセス不可になる。
+- App Store審査などで必要な公開URL（規約、プライバシー、サポート）は、Swift Native側または別の公開静的ページで扱う必要がある。
+- 管理者ページ、管理者ログイン、Stripe webhook は維持する。
+
+### 確認方法
+
+- `npm --prefix web install --package-lock-only`
+- `npm --prefix web run lint`
+- `npm --prefix web run build`
+
+### セルフレビュー結果
+
+- ✅ `web/src/app/admin` と運用に必要な認証・Webhookだけを残した。
+- ✅ 削除したユーザー向けコンポーネントへのimport残りを `rg` で確認した。
+- ✅ 用語定義は `notes/10_glossary.md` の `Web管理画面` を更新した。
+- ✅ 状態遷移の追加・変更はないため、`notes/09_state_machines.md` の更新は不要。
+- ⚠️ 公開法務/サポートURLの置き場は、別途Swift Nativeリリース準備側で決める必要がある。
+
+### 関連ファイル
+
+- `web/src/app/page.tsx`
+- `web/src/app/layout.tsx`
+- `web/src/app/admin/layout.tsx`
+- `web/src/app/auth/actions.ts`
+- `web/src/app/auth/callback/route.ts`
+- `web/src/app/login/page.tsx`
+- `web/package.json`
+- `web/README.md`
+- `web/AGENTS.md`
+- `notes/10_glossary.md`
+
+---
+
+## イテレーション414：RN実画面スクショ対応表をGitHub Pages向けに追加
+
+### 背景・問題意識
+
+オーナーから、「RN版のどの実画面がどのファイルか」をスマホからすぐ確認できるようにしたい、という要望があった。既存の `notes/76_rn_to_swift_screen_map.md` と `notes/78_rn_actual_screenshot_lookup.md` はファイル対応の整理としては有効だが、スマホでは markdown よりも 1 ページの視覚一覧の方が使いやすい。mock HTML ではなく、`mobile/` の Preview 実画面スクショを使った一覧が必要だった。
+
+### 変更内容
+
+#### `RN Actual Screen Lookup.html`
+- GitHub Pages でそのまま開ける静的HTMLを新規追加した。
+- `notes/assets/rn-screen-lookup/` の実画面スクショ8枚を使い、各カードに `RN元` / `Swift先` / 見分けポイントを並べた。
+- スマホ幅でも読みやすい1カラムレイアウトへ自動で落ちるレスポンシブ構成にした。
+
+#### `notes/assets/rn-screen-lookup/*.png`
+- RN Preview 実画面スクショを対応表の参照先として利用した。
+
+### 影響範囲
+
+- オーナーがスマホから RN 実画面を逆引きするフロー
+- RN → Swift 移行指示の出し方
+- GitHub Pages 上の運用用ドキュメント
+
+### 確認方法
+
+- ローカル: `http://localhost:8000/RN%20Actual%20Screen%20Lookup.html`
+- GitHub Pages: `https://mashimabizz.github.io/Megrum_design/RN%20Actual%20Screen%20Lookup.html`
+
+### セルフレビュー結果
+
+- ✅ mock ではなく `mobile/` Preview 実画面スクショを使った。
+- ✅ 各画面に `RN元` と `Swift先` を明示し、スマホでもそのままコピペしやすい構成にした。
+- ✅ 状態名や用語の追加はないため、`notes/09_state_machines.md` と `notes/10_glossary.md` の更新は不要。
+- ⚠️ `proposal-confirm`、`transaction-detail`、`user-profile` などの詳細導線スクショはまだ未収録。
+
+### 関連ファイル
+
+- `RN Actual Screen Lookup.html`
+- `notes/78_rn_actual_screenshot_lookup.md`
+- `notes/assets/rn-screen-lookup/rn-home.png`
+- `notes/assets/rn-screen-lookup/rn-search.png`
+- `notes/assets/rn-screen-lookup/rn-match-detail.png`
+- `notes/assets/rn-screen-lookup/rn-proposal-select.png`
+- `notes/assets/rn-screen-lookup/rn-inventory.png`
+- `notes/assets/rn-screen-lookup/rn-wishes.png`
+- `notes/assets/rn-screen-lookup/rn-transactions.png`
+- `notes/assets/rn-screen-lookup/rn-encounters.png`
+
+---
+
+## イテレーション415：RN全画面をスマホ向け一覧へ拡張
+
+### 背景・問題意識
+
+イテレーション414で、主要8画面の実スクショ付きページは用意できたが、オーナーから「その感じで全部のRN画面をまとめて」見たいという要望が出た。主要画面だけでは、細かい設定画面や認証系、通知系、めぐり周辺の派生導線を逆引きできないため、`mobile/app` の全ルートをスマホ1ページ内で辿れる一覧へ広げる必要があった。
+
+### 変更内容
+
+#### `RN Actual Screen Lookup.html`
+- 代表スクショ8枚のセクションを残したまま、下段に `mobile/app` の全68ルートをカテゴリ別に追加した。
+- 認証・オンボーディング、ホーム・検索、在庫、打診、取引、めぐり、プロフィール、通知、システムルートに分け、各項目へ `RN元` / `Swift先` / 見分けポイントを記載した。
+- スクショ未収録の画面も、スマホでファイル名と Swift 対応先を引ける構成にした。
+
+#### `notes/76_rn_to_swift_screen_map.md`
+- `mobile/app/password-reset.tsx` と 3つの `_layout.tsx` を追加し、`mobile/app` の全68ルートがこの対応表で引けるようにした。
+
+### 影響範囲
+
+- オーナーがスマホから RN 画面全体を逆引きするフロー
+- RN → Swift 移行指示の粒度
+- 認証・設定・通知・めぐり派生導線の参照性
+
+### 確認方法
+
+- ローカル: `http://localhost:8000/RN%20Actual%20Screen%20Lookup.html`
+- GitHub Pages: `https://mashimabizz.github.io/Megrum_design/rn-actual-screen-lookup.html`
+
+### セルフレビュー結果
+
+- ✅ `mobile/app` 配下の全68ルートを洗い出し、スマホページ上で辿れるようにした。
+- ✅ 実スクショがない画面も `RN元` と `Swift先` は必ず引ける状態にした。
+- ✅ 用語・状態名の追加はないため、`notes/09_state_machines.md` と `notes/10_glossary.md` の更新は不要。
+- ⚠️ 実スクショは依然として主要8画面のみで、残りの詳細画面は今後必要なものから追加撮影する。
+
+### 関連ファイル
+
+- `RN Actual Screen Lookup.html`
+- `notes/76_rn_to_swift_screen_map.md`
+
+---
+
 ## イテレーション413：Swift打診完了導線と確認payload最終整理
 
 ### 背景・問題意識

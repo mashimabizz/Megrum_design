@@ -185,6 +185,21 @@ final class AuthScreenInputTests: XCTestCase {
         XCTAssertFalse(state.isAuthenticated)
         XCTAssertNil(state.session)
     }
+
+    func testAuthStateFactoryCanForceVisualQAPreviewSession() {
+        let state = MegrumAuthStateFactory.make(
+            environment: [
+                "MEGRUM_VISUAL_QA_PREVIEW_AUTH": "1",
+                "MEGRUM_SUPABASE_URL": "https://example.supabase.co",
+                "MEGRUM_SUPABASE_PUBLISHABLE_KEY": "sb_publishable_test"
+            ],
+            infoDictionary: [:]
+        )
+
+        XCTAssertFalse(state.isConfigured)
+        XCTAssertTrue(state.isAuthenticated)
+        XCTAssertEqual(state.session?.user.email, "preview@megrum.jp")
+    }
 }
 
 private func makeTestSession(email: String) -> AuthSession {

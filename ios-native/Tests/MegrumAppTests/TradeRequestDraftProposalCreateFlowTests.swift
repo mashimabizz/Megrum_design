@@ -65,10 +65,10 @@ final class TradeRequestDraftProposalCreateFlowTests: XCTestCase {
         XCTAssertEqual(configuration.targetSupplement, "ほか1件も受け取る条件です")
     }
 
-    func testProposalCandidateGridUsesTwoColumnsOnPhoneWidth() {
-        XCTAssertEqual(ProposalCandidateGridMetrics.estimatedColumnCount(containerWidth: 155), 1)
-        XCTAssertEqual(ProposalCandidateGridMetrics.estimatedColumnCount(containerWidth: 350), 2)
-        XCTAssertEqual(ProposalCandidateGridMetrics.estimatedColumnCount(containerWidth: 520), 3)
+    func testProposalCandidateListStaysSingleColumnLikeRnFlatList() {
+        XCTAssertEqual(ProposalCandidateListMetrics.estimatedColumnCount(containerWidth: 155), 1)
+        XCTAssertEqual(ProposalCandidateListMetrics.estimatedColumnCount(containerWidth: 350), 1)
+        XCTAssertEqual(ProposalCandidateListMetrics.estimatedColumnCount(containerWidth: 520), 1)
     }
 
     func testProposalMeetupMapDraftParsesAndBoundsCoordinates() throws {
@@ -171,5 +171,134 @@ final class TradeRequestDraftProposalCreateFlowTests: XCTestCase {
             5
         )
         XCTAssertEqual(context.schedules(on: start, calendar: calendar).map(\.id), [duplicatedID, partnerSchedule.id])
+    }
+
+    func testProposalMeetupCalendarModelShiftsWeekBySevenDays() {
+        let calendar = Calendar(identifier: .gregorian)
+        let anchor = Date(timeIntervalSince1970: 86_400 * 3)
+
+        let shifted = ProposalMeetupCalendarModel.shiftedAnchor(anchorDate: anchor, direction: 1, calendar: calendar)
+
+        XCTAssertEqual(
+            Int(shifted.timeIntervalSince(calendar.startOfDay(for: anchor)) / 86_400),
+            7
+        )
+        XCTAssertEqual(ProposalMeetupCalendarModel.visibleDayCount, 7)
+    }
+
+    func testProposalMeetupCalendarMonthGridPadsToSevenColumns() throws {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+        let components = DateComponents(calendar: calendar, timeZone: calendar.timeZone, year: 2026, month: 6, day: 5)
+        let anchor = try XCTUnwrap(components.date)
+
+        let days = ProposalMeetupCalendarModel.monthGridDays(anchorDate: anchor, calendar: calendar)
+        let concreteDays = days.compactMap { $0 }
+
+        XCTAssertEqual(days.count % 7, 0)
+        XCTAssertEqual(concreteDays.count, 30)
+        XCTAssertEqual(calendar.component(.day, from: try XCTUnwrap(concreteDays.first)), 1)
+        XCTAssertEqual(calendar.component(.day, from: try XCTUnwrap(concreteDays.last)), 30)
+        XCTAssertTrue(days.indices.contains(0))
+        XCTAssertNil(days[0])
+    }
+
+    func testProposalMeetupMonthGridUsesRnPercentCellsWithSlightViewportOverflow() {
+        let containerWidth: CGFloat = 353
+        let cellWidth = ProposalMeetupCalendarModel.monthDayCellWidth(containerWidth: containerWidth)
+        let gridWidth = ProposalMeetupCalendarModel.monthGridWidth(containerWidth: containerWidth)
+
+        XCTAssertEqual(cellWidth, 48)
+        XCTAssertEqual(gridWidth, 360)
+        XCTAssertGreaterThan(gridWidth, containerWidth)
+        XCTAssertEqual(ProposalMeetupCalendarModel.monthGridHeight(rowCount: 6), 482)
+    }
+
+    func testProposalMeetupWeekGridUsesRnCalendarMetrics() throws {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+        let date = try XCTUnwrap(DateComponents(calendar: calendar, timeZone: calendar.timeZone, year: 2026, month: 6, day: 5).date)
+        let containerWidth: CGFloat = 353
+        let dayWidth = ProposalMeetupCalendarModel.dayWidth(containerWidth: containerWidth)
+        let gridWidth = ProposalMeetupCalendarModel.weekGridWidth(dayWidth: dayWidth)
+
+        XCTAssertLessThanOrEqual(gridWidth, containerWidth)
+        XCTAssertEqual(dayWidth, 43)
+        XCTAssertEqual(ProposalMeetupCalendarModel.slotHeight, 16)
+        XCTAssertEqual(ProposalMeetupCalendarModel.timeLabelWidth, 52)
+        XCTAssertEqual(ProposalMeetupCalendarModel.daySpacing, 0)
+        XCTAssertEqual(ProposalMeetupCalendarModel.weekdayLabel(for: date, calendar: calendar), "金")
+        XCTAssertEqual(ProposalMeetupCalendarModel.dayNumberLabel(for: date, calendar: calendar), "5")
+    }
+
+    func testProposalMeetupWeekSwipeFollowsFingerAndUsesRnThreshold() {
+        let containerWidth: CGFloat = 353
+
+        XCTAssertEqual(
+            ProposalMeetupCalendarModel.clampedWeekDragOffset(200, containerWidth: containerWidth),
+            containerWidth * ProposalMeetupCalendarModel.edgeCarryRatio,
+            accuracy: 0.001
+        )
+        XCTAssertEqual(
+            ProposalMeetupCalendarModel.clampedWeekDragOffset(-40, containerWidth: containerWidth),
+            -40,
+            accuracy: 0.001
+        )
+        XCTAssertFalse(
+            ProposalMeetupCalendarModel.shouldShiftWeek(
+                translationWidth: 44,
+                translationHeight: 2,
+                containerWidth: containerWidth
+            )
+        )
+        XCTAssertTrue(
+            ProposalMeetupCalendarModel.shouldShiftWeek(
+                translationWidth: -90,
+                translationHeight: 10,
+                containerWidth: containerWidth
+            )
+        )
+        XCTAssertFalse(
+            ProposalMeetupCalendarModel.shouldShiftWeek(
+                translationWidth: 120,
+                translationHeight: 110,
+                containerWidth: containerWidth
+            )
+        )
+    }
+
+    func testProposalMeetupCalendarHourSlotIndexSupportsOverlayPlacement() {
+        XCTAssertEqual(ProposalMeetupCalendarModel.slotIndex(forHour: 12), 48)
+        XCTAssertEqual(ProposalMeetupCalendarModel.slotIndex(forHour: -1), 0)
+        XCTAssertEqual(ProposalMeetupCalendarModel.slotIndex(forHour: 30), ProposalMeetupCalendarModel.slotCount - 1)
+    }
+
+    func testProposalMeetupCalendarCreatesCandidatesOnlyAfterLongPress() {
+        XCTAssertFalse(ProposalMeetupCalendarModel.shouldCreateCandidateOnBoardEnd(wasLongPressed: false))
+        XCTAssertTrue(ProposalMeetupCalendarModel.shouldCreateCandidateOnBoardEnd(wasLongPressed: true))
+        XCTAssertEqual(ProposalMeetupCalendarModel.longPressDuration, 0.28, accuracy: 0.001)
+    }
+
+    func testProposalMeetupCandidateDraftApplyingCalendarRangeRewritesDates() {
+        let calendar = Calendar(identifier: .gregorian)
+        let day = Date(timeIntervalSince1970: 86_400 * 10)
+        let base = ProposalMeetupCandidateDraft(
+            id: UUID(uuidString: "00000000-0000-0000-0000-000000000601")!,
+            startAt: Date(timeIntervalSince1970: 120),
+            endAt: Date(timeIntervalSince1970: 240),
+            placeName: "北口"
+        )
+
+        let updated = base.applyingCalendarRange(
+            day: day,
+            startSlot: 8,
+            endSlot: 12,
+            calendar: calendar
+        )
+
+        XCTAssertEqual(ProposalMeetupCalendarModel.slotIndex(for: updated.startAt, calendar: calendar), 8)
+        XCTAssertEqual(ProposalMeetupCalendarModel.slotIndex(for: updated.endAt, calendar: calendar), 12)
+        XCTAssertEqual(calendar.startOfDay(for: updated.startAt), calendar.startOfDay(for: day))
+        XCTAssertEqual(updated.placeName, "北口")
     }
 }

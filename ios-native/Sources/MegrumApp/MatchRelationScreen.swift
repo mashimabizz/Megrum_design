@@ -65,6 +65,110 @@ struct MatchRelationCandidate: Identifiable, Equatable {
     var id: UUID { item.id }
 }
 
+struct MatchRelationWishPopupTarget: Identifiable, Equatable {
+    var listingID: UUID
+    var viewpoint: MatchRelationViewpoint
+    var wish: MatchRelationWish
+    var exchangeType: IndividualListingExchangeType
+    var fallbackHave: MatchRelationHave
+
+    var id: String {
+        [
+            listingID.uuidString,
+            viewpoint.rawValue,
+            wish.id.uuidString
+        ]
+        .joined(separator: "|")
+    }
+}
+
+enum MatchRelationViewpoint: String, Equatable {
+    case mine
+    case partner
+}
+
+enum MatchRelationPopupCopy {
+    static func candidateOwnerTitle(viewpoint: MatchRelationViewpoint, partnerHandle: String) -> String {
+        switch viewpoint {
+        case .mine:
+            "@\(partnerHandle) が譲るもの"
+        case .partner:
+            "あなたが譲るもの"
+        }
+    }
+
+    static func subtitle(quantity: Int, candidateCount: Int) -> String {
+        "wish ×\(quantity)・\(candidateCount) 件の候補"
+    }
+
+    static func fallbackTitle(_ title: String) -> String {
+        "↑ あなたの譲：\(title)"
+    }
+}
+
+enum MatchRelationSwipeDirection {
+    case previous
+    case next
+
+    var step: Int {
+        switch self {
+        case .previous:
+            -1
+        case .next:
+            1
+        }
+    }
+}
+
+enum MatchRelationSwipeResolver {
+    static let minimumHorizontalDistance: CGFloat = 8
+    static let horizontalPriorityRatio: CGFloat = 1.08
+    static let edgeResistanceRatio: CGFloat = 0.22
+
+    static func direction(for translation: CGSize) -> MatchRelationSwipeDirection? {
+        guard isHorizontalSwipe(translation) else {
+            return nil
+        }
+        return translation.width < 0 ? .next : .previous
+    }
+
+    static func presentationOffset(
+        translation: CGSize,
+        screenWidth: CGFloat,
+        hasAdjacentTarget: Bool
+    ) -> CGFloat? {
+        guard direction(for: translation) != nil else {
+            return nil
+        }
+        let rawOffset = hasAdjacentTarget ? translation.width : translation.width * edgeResistanceRatio
+        return max(-screenWidth, min(screenWidth, rawOffset))
+    }
+
+    static func shouldSwitchTarget(
+        translation: CGSize,
+        predictedEndTranslationWidth: CGFloat,
+        screenWidth: CGFloat,
+        hasAdjacentTarget: Bool
+    ) -> Bool {
+        guard hasAdjacentTarget, direction(for: translation) != nil else {
+            return false
+        }
+        let absX = abs(translation.width)
+        let fastEnough = abs(predictedEndTranslationWidth) >= absX + 32 && absX >= 42
+        return absX >= threshold(screenWidth: screenWidth) || fastEnough
+    }
+
+    static func threshold(screenWidth: CGFloat) -> CGFloat {
+        min(118, max(72, screenWidth * 0.24))
+    }
+
+    private static func isHorizontalSwipe(_ translation: CGSize) -> Bool {
+        let absX = abs(translation.width)
+        let absY = abs(translation.height)
+        return absX > minimumHorizontalDistance && absX > absY * horizontalPriorityRatio
+    }
+}
+
 struct MatchRelationAggregate: Equatable {
     var senderItems: [GoodsItem]
     var receiverItems: [GoodsItem]
@@ -82,6 +186,22 @@ struct MatchRelationAggregate: Equatable {
 
     var isEmpty: Bool {
         senderIDs.isEmpty || receiverIDs.isEmpty || referencedListingIDs.isEmpty
+    }
+}
+
+enum MatchRelationBottomBarCopy {
+    static func primaryTitle(isEnabled: Bool, showsReset: Bool, totalSelectionCount: Int) -> String {
+        guard isEnabled else {
+            return "候補を読み込んでいます"
+        }
+        if showsReset {
+            return "打診に進む（\(totalSelectionCount)件）"
+        }
+        return "この内容で打診へ"
+    }
+
+    static func secondaryTitle(showsReset: Bool) -> String {
+        showsReset ? "リセット" : "閉じる"
     }
 }
 
@@ -164,6 +284,32 @@ enum MatchRelationComposer {
         return ownDetails + partnerDetails
     }
 
+    static func relationSwipeItems(homeMatchedItems: [GoodsItem], currentTarget: GoodsItem) -> [GoodsItem] {
+        let deduplicated = deduplicatedGoods(homeMatchedItems)
+        guard !deduplicated.isEmpty else {
+            return [currentTarget]
+        }
+        if deduplicated.contains(where: { $0.id == currentTarget.id }) {
+            return deduplicated
+        }
+        return deduplicatedGoods([currentTarget] + deduplicated)
+    }
+
+    static func adjacentSwipeTarget(
+        in items: [GoodsItem],
+        currentID: UUID,
+        direction: MatchRelationSwipeDirection
+    ) -> GoodsItem? {
+        guard let currentIndex = items.firstIndex(where: { $0.id == currentID }) else {
+            return nil
+        }
+        let nextIndex = currentIndex + direction.step
+        guard items.indices.contains(nextIndex) else {
+            return nil
+        }
+        return items[nextIndex]
+    }
+
     static func initialCandidateSelection(
         for details: [MatchRelationListingDetail],
         highlightedItemID: UUID
@@ -207,6 +353,85 @@ enum MatchRelationComposer {
         }
 
         return selection
+    }
+
+    static func defaultPopupTarget(
+        for details: [MatchRelationListingDetail],
+        highlightedItemID: UUID
+    ) -> MatchRelationWishPopupTarget? {
+        for detail in details {
+            for option in detail.options where !option.option.isCashOffer {
+                for wish in option.wishes where !wish.candidates.isEmpty {
+                    guard wish.candidates.contains(where: { $0.item.id == highlightedItemID }),
+                          let fallbackHave = defaultFallbackHave(for: detail, highlightedItemID: highlightedItemID) else {
+                        continue
+                    }
+                    return MatchRelationWishPopupTarget(
+                        listingID: detail.id,
+                        viewpoint: detail.isMyListing ? .mine : .partner,
+                        wish: wish,
+                        exchangeType: option.option.exchangeType,
+                        fallbackHave: fallbackHave
+                    )
+                }
+            }
+        }
+
+        for detail in details {
+            for option in detail.options where !option.option.isCashOffer {
+                if let wish = option.wishes.first(where: { !$0.candidates.isEmpty }),
+                   let fallbackHave = defaultFallbackHave(for: detail, highlightedItemID: highlightedItemID) {
+                    return MatchRelationWishPopupTarget(
+                        listingID: detail.id,
+                        viewpoint: detail.isMyListing ? .mine : .partner,
+                        wish: wish,
+                        exchangeType: option.option.exchangeType,
+                        fallbackHave: fallbackHave
+                    )
+                }
+            }
+        }
+
+        return nil
+    }
+
+    static func defaultFallbackHave(
+        for detail: MatchRelationListingDetail,
+        highlightedItemID: UUID
+    ) -> MatchRelationHave? {
+        detail.haves.first { $0.item.id == highlightedItemID }
+            ?? detail.haves.first(where: \.matched)
+            ?? detail.haves.first
+    }
+
+    static func selectedCandidates(
+        for wish: MatchRelationWish,
+        selectedCandidateIDs: Set<UUID>
+    ) -> [MatchRelationCandidate] {
+        wish.candidates.filter { selectedCandidateIDs.contains($0.item.id) }
+    }
+
+    static func hasSelectedCandidate(
+        for wish: MatchRelationWish,
+        selectedCandidateIDs: Set<UUID>
+    ) -> Bool {
+        !selectedCandidates(for: wish, selectedCandidateIDs: selectedCandidateIDs).isEmpty
+    }
+
+    static func popupTarget(
+        listingID: UUID,
+        viewpoint: MatchRelationViewpoint,
+        option: MatchRelationOption,
+        wish: MatchRelationWish,
+        fallbackHave: MatchRelationHave
+    ) -> MatchRelationWishPopupTarget {
+        MatchRelationWishPopupTarget(
+            listingID: listingID,
+            viewpoint: viewpoint,
+            wish: wish,
+            exchangeType: option.option.exchangeType,
+            fallbackHave: fallbackHave
+        )
     }
 
     static func aggregateSelection(
@@ -310,8 +535,8 @@ enum MatchRelationComposer {
         candidateSource: [GoodsItem],
         highlightedItemID: UUID
     ) -> MatchRelationListingDetail? {
-        let havesByID = Dictionary(uniqueKeysWithValues: havesSource.map { ($0.id, $0) })
-        let candidatesByID = Dictionary(uniqueKeysWithValues: candidateSource.map { ($0.id, $0) })
+        let havesByID = goodsByID(havesSource)
+        let candidatesByID = goodsByID(candidateSource)
         let haves = listing.haves.compactMap { quantity -> MatchRelationHave? in
             guard let item = havesByID[quantity.itemID] else {
                 return nil
@@ -339,7 +564,7 @@ enum MatchRelationComposer {
             return nil
         }
 
-        let goodsByID = Dictionary(uniqueKeysWithValues: (havesSource + candidateSource).map { ($0.id, $0) })
+        let goodsByID = goodsByID(havesSource + candidateSource)
         let options = listing.options.map { option -> MatchRelationOption in
             let wishes = option.wishes.compactMap { wishQuantity -> MatchRelationWish? in
                 let wishItem = goodsByID[wishQuantity.itemID] ?? GoodsItem(
@@ -391,6 +616,12 @@ enum MatchRelationComposer {
         )
     }
 
+    private static func goodsByID(_ items: [GoodsItem]) -> [UUID: GoodsItem] {
+        items.reduce(into: [:]) { result, item in
+            result[item.id] = result[item.id] ?? item
+        }
+    }
+
     private static func defaultCandidateIDs(for option: MatchRelationOption) -> [UUID] {
         let visibleWishes = option.wishes.filter { !$0.candidates.isEmpty }
         guard !visibleWishes.isEmpty else {
@@ -420,12 +651,34 @@ struct MatchRelationScreen: View {
     var onCompletionAction: (ProposalCompletionAction) -> Void = { _ in }
 
     @Environment(\.dismiss) private var dismiss
+    @State private var currentTargetItem: GoodsItem
     @State private var selectedCandidateIDsByListingID: [UUID: Set<UUID>] = [:]
     @State private var selectedHaveIDsByListingID: [UUID: Set<UUID>] = [:]
+    @State private var popupTarget: MatchRelationWishPopupTarget?
     @State private var proposalTarget: MatchRelationProposalTarget?
+    @State private var relationSwipeOffset: CGFloat = 0
+    @State private var didApplyVisualQACandidateExpansion = false
+    private let visualQAInitialScreen: VisualQAInitialScreen?
+
+    init(
+        appState: MegrumAppState,
+        targetItem: GoodsItem,
+        matchType: ProposalMatchType = .perfect,
+        visualQAInitialScreen: VisualQAInitialScreen? = nil,
+        onCompletionAction: @escaping (ProposalCompletionAction) -> Void = { _ in }
+    ) {
+        self._appState = ObservedObject(wrappedValue: appState)
+        self.targetItem = targetItem
+        self.matchType = matchType
+        self.onCompletionAction = onCompletionAction
+        self.visualQAInitialScreen = visualQAInitialScreen ?? VisualQAPreviewMode.initialScreen(
+            environment: ProcessInfo.processInfo.environment
+        )
+        _currentTargetItem = State(initialValue: targetItem)
+    }
 
     private var partnerProfile: PublicUserProfile? {
-        appState.publicProfilesByUserID[targetItem.ownerID]
+        appState.publicProfilesByUserID[currentTargetItem.ownerID]
     }
 
     private var partnerHandle: String {
@@ -433,8 +686,16 @@ struct MatchRelationScreen: View {
     }
 
     private var partnerGoods: [GoodsItem] {
-        let loaded = appState.publicTradeGoodsByUserID[targetItem.ownerID] ?? []
-        return MatchRelationComposer.deduplicatedGoods([targetItem] + loaded)
+        let loaded = appState.publicTradeGoodsByUserID[currentTargetItem.ownerID] ?? []
+        let visualQAFallback: [GoodsItem]
+        if visualQAInitialScreen == .matchRelation || visualQAInitialScreen == .matchRelationCandidates {
+            visualQAFallback = NativePreviewData.inventory.filter { item in
+                item.ownerID == currentTargetItem.ownerID
+            }
+        } else {
+            visualQAFallback = []
+        }
+        return MatchRelationComposer.deduplicatedGoods([currentTargetItem] + loaded + visualQAFallback)
     }
 
     private var senderGoods: [GoodsItem] {
@@ -442,7 +703,7 @@ struct MatchRelationScreen: View {
     }
 
     private var partnerListings: [IndividualListing] {
-        (appState.publicListingsByUserID[targetItem.ownerID] ?? [])
+        (appState.publicListingsByUserID[currentTargetItem.ownerID] ?? [])
             .filter { $0.status == .active }
     }
 
@@ -456,7 +717,7 @@ struct MatchRelationScreen: View {
             partnerListings: partnerListings,
             senderGoods: senderGoods,
             partnerGoods: partnerGoods,
-            highlightedItemID: targetItem.id
+            highlightedItemID: currentTargetItem.id
         )
     }
 
@@ -469,16 +730,16 @@ struct MatchRelationScreen: View {
     }
 
     private var simpleReceiverIDs: [UUID] {
-        [targetItem.id]
+        [currentTargetItem.id]
     }
 
     private var simpleSenderIDs: [UUID] {
-        MatchRelationComposer.fallbackSenderIDs(for: targetItem, inventory: senderGoods)
+        MatchRelationComposer.fallbackSenderIDs(for: currentTargetItem, inventory: senderGoods)
     }
 
     private var isLoading: Bool {
-        appState.loadingPublicExchangeUserID == targetItem.ownerID
-            || appState.loadingPublicProfileUserID == targetItem.ownerID
+        appState.loadingPublicExchangeUserID == currentTargetItem.ownerID
+            || appState.loadingPublicProfileUserID == currentTargetItem.ownerID
             || appState.isLoadingIndividualListings
     }
 
@@ -492,7 +753,7 @@ struct MatchRelationScreen: View {
 
     private var relationSeedKey: String {
         [
-            targetItem.id.uuidString,
+            currentTargetItem.id.uuidString,
             senderGoods.map(\.id.uuidString).joined(separator: ","),
             partnerGoods.map(\.id.uuidString).joined(separator: ","),
             relationDetails.map(\.id.uuidString).joined(separator: ",")
@@ -500,50 +761,75 @@ struct MatchRelationScreen: View {
         .joined(separator: "|")
     }
 
+    private var swipeItems: [GoodsItem] {
+        MatchRelationComposer.relationSwipeItems(
+            homeMatchedItems: appState.homeMatchedItems,
+            currentTarget: currentTargetItem
+        )
+    }
+
+    private var previousSwipeTarget: GoodsItem? {
+        MatchRelationComposer.adjacentSwipeTarget(
+            in: swipeItems,
+            currentID: currentTargetItem.id,
+            direction: .previous
+        )
+    }
+
+    private var nextSwipeTarget: GoodsItem? {
+        MatchRelationComposer.adjacentSwipeTarget(
+            in: swipeItems,
+            currentID: currentTargetItem.id,
+            direction: .next
+        )
+    }
+
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 22) {
-                if isLoading {
-                    MatchRelationLoadingPanel()
-                }
+        GeometryReader { geometry in
+            ScrollView {
+                VStack(alignment: .leading, spacing: 22) {
+                    if isLoading {
+                        MatchRelationLoadingPanel()
+                    }
 
-                if !ownDetails.isEmpty {
-                    MatchRelationSectionHeader(title: "あなたの個別募集")
-                    relationCards(ownDetails)
-                }
+                    if !ownDetails.isEmpty {
+                        MatchRelationSectionHeader(title: "あなたの個別募集")
+                        relationCards(ownDetails)
+                    }
 
-                if !partnerDetails.isEmpty {
-                    MatchRelationSectionHeader(title: "@\(partnerHandle) の個別募集")
-                    relationCards(partnerDetails)
-                }
+                    if !partnerDetails.isEmpty {
+                        MatchRelationSectionHeader(title: "@\(partnerHandle) の個別募集")
+                        relationCards(partnerDetails)
+                    }
 
-                if relationDetails.isEmpty, !isLoading {
-                    MatchRelationSimplePanel(
-                        targetItem: targetItem,
-                        senderItems: simpleSenderIDs.compactMap { id in senderGoods.first { $0.id == id } }
-                    )
-                }
+                    if relationDetails.isEmpty, !isLoading {
+                        MatchRelationSimplePanel(
+                            targetItem: currentTargetItem,
+                            senderItems: simpleSenderIDs.compactMap { id in senderGoods.first { $0.id == id } }
+                        )
+                    }
 
-                if canStartRelationProposal {
+                    if canStartRelationProposal {
                     MatchRelationSummaryPanel(
                         senderItems: aggregate.senderItems,
                         receiverItems: aggregate.receiverItems
                     )
+                    }
                 }
+                .padding(.horizontal, 20)
+                .padding(.top, 18)
+                .padding(.bottom, 112)
+                .offset(x: relationSwipeOffset)
             }
-            .padding(.horizontal, 20)
-            .padding(.top, 18)
-            .padding(.bottom, 112)
+            .contentShape(Rectangle())
+            .simultaneousGesture(relationSwipeGesture(screenWidth: geometry.size.width))
         }
-        .background(MegrumTheme.canvas.ignoresSafeArea())
-        .navigationTitle("関係図")
-        .megrumInlineNavigationTitle()
-        .toolbar {
-            ToolbarItem(placement: .cancellationAction) {
-                Button("閉じる") {
-                    dismiss()
-                }
-            }
+        .background(MatchRelationVisual.background.ignoresSafeArea())
+        .megrumHiddenNavigationBar()
+        .safeAreaInset(edge: .top, spacing: 0) {
+            MatchRelationHeader(
+                onClose: { dismiss() }
+            )
         }
         .safeAreaInset(edge: .bottom) {
             MatchRelationBottomBar(
@@ -551,20 +837,50 @@ struct MatchRelationScreen: View {
                 receiverCount: currentReceiverCount,
                 isEnabled: canStartRelationProposal || canStartSimpleProposal,
                 showsReset: canStartRelationProposal,
-                onReset: resetRelationSelection,
+                onSecondary: {
+                    if canStartRelationProposal {
+                        resetRelationSelection()
+                    } else {
+                        dismiss()
+                    }
+                },
                 onStart: startProposal
             )
         }
-        .task(id: targetItem.ownerID) {
-            await appState.loadPublicUserProfile(userID: targetItem.ownerID)
-            await appState.loadPublicExchangeContent(userID: targetItem.ownerID)
+        .task(id: currentTargetItem.ownerID) {
+            await appState.loadPublicUserProfile(userID: currentTargetItem.ownerID)
+            await appState.loadPublicExchangeContent(userID: currentTargetItem.ownerID)
             await appState.loadIndividualListings()
             seedInitialSelection(force: true)
         }
         .task(id: relationSeedKey) {
             seedInitialSelection(force: true)
         }
-        .sheet(item: $proposalTarget) { target in
+        .onChange(of: currentTargetItem.id) { _, _ in
+            proposalTarget = nil
+            popupTarget = nil
+            didApplyVisualQACandidateExpansion = false
+            seedInitialSelection(force: true)
+        }
+        .overlay {
+            if let target = popupTarget {
+                MatchRelationWishBottomSheet(
+                    target: target,
+                    partnerHandle: partnerHandle,
+                    highlightedItemID: currentTargetItem.id,
+                    selectedCandidateIDs: selectedCandidateIDsByListingID[target.listingID] ?? [],
+                    onToggleCandidate: { candidateID in
+                        toggleCandidate(listingID: target.listingID, candidateID: candidateID)
+                    },
+                    onClose: {
+                        popupTarget = nil
+                    }
+                )
+                .transition(.opacity.combined(with: .move(edge: .bottom)))
+                .zIndex(4)
+            }
+        }
+        .relationProposalPresentation(item: $proposalTarget) { target in
             NavigationStack {
                 ProposalCreateFlow(
                     appState: appState,
@@ -608,14 +924,14 @@ struct MatchRelationScreen: View {
                     detail: detail,
                     index: index,
                     partnerHandle: partnerHandle,
-                    highlightedItemID: targetItem.id,
+                    highlightedItemID: currentTargetItem.id,
                     selectedCandidateIDs: selectedCandidateIDsByListingID[detail.id] ?? [],
                     selectedHaveIDs: selectedHaveIDsByListingID[detail.id] ?? [],
-                    onToggleCandidate: { candidateID in
-                        toggleCandidate(listingID: detail.id, candidateID: candidateID)
-                    },
                     onToggleHave: { haveID in
                         toggleHave(listingID: detail.id, haveID: haveID)
+                    },
+                    onOpenPopup: { target in
+                        popupTarget = target
                     }
                 )
             }
@@ -629,16 +945,32 @@ struct MatchRelationScreen: View {
         }
         selectedCandidateIDsByListingID = MatchRelationComposer.initialCandidateSelection(
             for: details,
-            highlightedItemID: targetItem.id
+            highlightedItemID: currentTargetItem.id
         )
         selectedHaveIDsByListingID = MatchRelationComposer.initialHaveSelection(
             for: details,
-            highlightedItemID: targetItem.id
+            highlightedItemID: currentTargetItem.id
         )
+        applyVisualQACandidateExpansionIfNeeded(details: details)
+    }
+
+    private func applyVisualQACandidateExpansionIfNeeded(details: [MatchRelationListingDetail]) {
+        guard visualQAInitialScreen == .matchRelationCandidates,
+              !didApplyVisualQACandidateExpansion,
+              let target = MatchRelationComposer.defaultPopupTarget(
+                for: details,
+                highlightedItemID: currentTargetItem.id
+              )
+        else {
+            return
+        }
+        didApplyVisualQACandidateExpansion = true
+        popupTarget = target
     }
 
     private func resetRelationSelection() {
         selectedCandidateIDsByListingID = [:]
+        popupTarget = nil
     }
 
     private func toggleCandidate(listingID: UUID, candidateID: UUID) {
@@ -668,7 +1000,7 @@ struct MatchRelationScreen: View {
     private func startProposal() {
         if canStartRelationProposal {
             let listingID = aggregate.referencedListingIDs.count == 1 ? aggregate.referencedListingIDs.first : nil
-            let target = aggregate.receiverItems.first ?? targetItem
+            let target = aggregate.receiverItems.first ?? currentTargetItem
             proposalTarget = MatchRelationProposalTarget(
                 targetItem: target,
                 listingID: listingID,
@@ -683,12 +1015,71 @@ struct MatchRelationScreen: View {
             return
         }
         proposalTarget = MatchRelationProposalTarget(
-            targetItem: targetItem,
+            targetItem: currentTargetItem,
             listingID: nil,
             receiverGoodsIDs: simpleReceiverIDs,
             senderGoodsIDs: simpleSenderIDs,
             matchType: matchType
         )
+    }
+
+    private func relationSwipeGesture(screenWidth: CGFloat) -> some Gesture {
+        DragGesture(minimumDistance: 8)
+            .onChanged { value in
+                guard let direction = MatchRelationSwipeResolver.direction(for: value.translation) else {
+                    return
+                }
+                let hasTarget = direction == .next ? nextSwipeTarget != nil : previousSwipeTarget != nil
+                guard let offset = MatchRelationSwipeResolver.presentationOffset(
+                    translation: value.translation,
+                    screenWidth: screenWidth,
+                    hasAdjacentTarget: hasTarget
+                ) else {
+                    return
+                }
+                relationSwipeOffset = offset
+            }
+            .onEnded { value in
+                guard let direction = MatchRelationSwipeResolver.direction(for: value.translation) else {
+                    withAnimation(.snappy) {
+                        relationSwipeOffset = 0
+                    }
+                    return
+                }
+
+                let target = direction == .next ? nextSwipeTarget : previousSwipeTarget
+                let shouldSwitch = MatchRelationSwipeResolver.shouldSwitchTarget(
+                    translation: value.translation,
+                    predictedEndTranslationWidth: value.predictedEndTranslation.width,
+                    screenWidth: screenWidth,
+                    hasAdjacentTarget: target != nil
+                )
+
+                if let target, shouldSwitch {
+                    withAnimation(.snappy) {
+                        currentTargetItem = target
+                        relationSwipeOffset = 0
+                    }
+                } else {
+                    withAnimation(.snappy) {
+                        relationSwipeOffset = 0
+                    }
+                }
+            }
+    }
+}
+
+private extension View {
+    @ViewBuilder
+    func relationProposalPresentation<Content: View>(
+        item: Binding<MatchRelationProposalTarget?>,
+        @ViewBuilder content: @escaping (MatchRelationProposalTarget) -> Content
+    ) -> some View {
+        #if os(iOS)
+        fullScreenCover(item: item, content: content)
+        #else
+        sheet(item: item, content: content)
+        #endif
     }
 }
 
@@ -726,8 +1117,8 @@ private struct MatchRelationTreeCard: View {
     var highlightedItemID: UUID
     var selectedCandidateIDs: Set<UUID>
     var selectedHaveIDs: Set<UUID>
-    var onToggleCandidate: (UUID) -> Void
     var onToggleHave: (UUID) -> Void
+    var onOpenPopup: (MatchRelationWishPopupTarget) -> Void
 
     private var cashOption: IndividualListingWishOption? {
         detail.listing.options.first(where: \.isCashOffer)
@@ -762,9 +1153,11 @@ private struct MatchRelationTreeCard: View {
                     if detail.isMyListing {
                         MatchRelationOptionList(
                             detail: detail,
+                            viewpoint: .mine,
+                            partnerHandle: partnerHandle,
                             highlightedItemID: highlightedItemID,
                             selectedCandidateIDs: selectedCandidateIDs,
-                            onToggleCandidate: onToggleCandidate
+                            onOpenPopup: onOpenPopup
                         )
                     } else {
                         MatchRelationHaveList(
@@ -792,22 +1185,24 @@ private struct MatchRelationTreeCard: View {
                     } else {
                         MatchRelationOptionList(
                             detail: detail,
+                            viewpoint: .partner,
+                            partnerHandle: partnerHandle,
                             highlightedItemID: highlightedItemID,
                             selectedCandidateIDs: selectedCandidateIDs,
-                            onToggleCandidate: onToggleCandidate
+                            onOpenPopup: onOpenPopup
                         )
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .topLeading)
             }
         }
-        .padding(16)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+        .padding(14)
+        .background(.white, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
         .overlay {
             RoundedRectangle(cornerRadius: 24, style: .continuous)
-                .strokeBorder(.white.opacity(0.62), lineWidth: 1)
+                .strokeBorder(MegrumTheme.ink.opacity(0.08), lineWidth: 1)
         }
-        .shadow(color: MegrumTheme.ink.opacity(0.08), radius: 18, y: 10)
+        .shadow(color: MegrumTheme.ink.opacity(0.04), radius: 8, y: 2)
     }
 
     private func cashText(_ option: IndividualListingWishOption) -> String {
@@ -829,9 +1224,11 @@ private struct MatchRelationOwnerLabel: View {
 
 private struct MatchRelationOptionList: View {
     var detail: MatchRelationListingDetail
+    var viewpoint: MatchRelationViewpoint
+    var partnerHandle: String
     var highlightedItemID: UUID
     var selectedCandidateIDs: Set<UUID>
-    var onToggleCandidate: (UUID) -> Void
+    var onOpenPopup: (MatchRelationWishPopupTarget) -> Void
 
     private var visibleOptions: [MatchRelationOption] {
         detail.options
@@ -855,10 +1252,17 @@ private struct MatchRelationOptionList: View {
             } else {
                 ForEach(visibleOptions) { option in
                     MatchRelationOptionGroup(
+                        listingID: detail.id,
+                        viewpoint: viewpoint,
+                        partnerHandle: partnerHandle,
                         option: option,
+                        fallbackHave: MatchRelationComposer.defaultFallbackHave(
+                            for: detail,
+                            highlightedItemID: highlightedItemID
+                        ),
                         highlightedItemID: highlightedItemID,
                         selectedCandidateIDs: selectedCandidateIDs,
-                        onToggleCandidate: onToggleCandidate
+                        onOpenPopup: onOpenPopup
                     )
                 }
             }
@@ -867,10 +1271,14 @@ private struct MatchRelationOptionList: View {
 }
 
 private struct MatchRelationOptionGroup: View {
+    var listingID: UUID
+    var viewpoint: MatchRelationViewpoint
+    var partnerHandle: String
     var option: MatchRelationOption
+    var fallbackHave: MatchRelationHave?
     var highlightedItemID: UUID
     var selectedCandidateIDs: Set<UUID>
-    var onToggleCandidate: (UUID) -> Void
+    var onOpenPopup: (MatchRelationWishPopupTarget) -> Void
 
     private var visibleWishes: [MatchRelationWish] {
         option.wishes.filter { !$0.candidates.isEmpty }
@@ -878,27 +1286,65 @@ private struct MatchRelationOptionGroup: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            if option.option.wishes.count > 1 {
-                Text(option.option.logic == .all ? "すべてほしい" : "どれか1つだけ")
-                    .font(.system(size: 11, weight: .heavy, design: .rounded))
-                    .foregroundStyle(option.option.logic == .all ? MegrumTheme.ok : MegrumTheme.lavender)
-                    .padding(.horizontal, 8)
-                    .frame(height: 24)
-                    .background(.white.opacity(0.72), in: Capsule())
+            HStack(spacing: 5) {
+                Text("#\(option.option.position)")
+                    .font(.system(size: 9, weight: .heavy, design: .rounded))
+                    .foregroundStyle(option.option.logic == .all ? .white : MegrumTheme.lavender)
+                    .padding(.horizontal, 6)
+                    .frame(height: 18)
+                    .background(option.option.logic == .all ? MegrumTheme.lavender : .white, in: Capsule())
+                    .overlay {
+                        if option.option.logic != .all {
+                            Capsule()
+                                .strokeBorder(MegrumTheme.lavender.opacity(0.34), lineWidth: 1)
+                        }
+                    }
+                Text(option.option.logic == .all ? "セット（AND）" : "いずれか（OR）")
+                    .font(.system(size: 9, weight: .heavy, design: .rounded))
+                    .foregroundStyle(MegrumTheme.muted)
+                    .lineLimit(1)
             }
 
-            ForEach(visibleWishes) { wish in
-                MatchRelationWishRow(
-                    wish: wish,
-                    exchangeType: option.option.exchangeType,
-                    highlightedItemID: highlightedItemID,
-                    selectedCandidateIDs: selectedCandidateIDs,
-                    onToggleCandidate: onToggleCandidate
-                )
+            if fallbackHave != nil {
+                ForEach(visibleWishes) { wish in
+                    MatchRelationWishRow(
+                        wish: wish,
+                        exchangeType: option.option.exchangeType,
+                        highlightedItemID: highlightedItemID,
+                        selectedCandidateIDs: selectedCandidateIDs,
+                        candidateOwnerTitle: MatchRelationPopupCopy.candidateOwnerTitle(
+                            viewpoint: viewpoint,
+                            partnerHandle: partnerHandle
+                        ),
+                        onOpen: {
+                            if let fallbackHave {
+                                onOpenPopup(
+                                    MatchRelationComposer.popupTarget(
+                                        listingID: listingID,
+                                        viewpoint: viewpoint,
+                                        option: option,
+                                        wish: wish,
+                                        fallbackHave: fallbackHave
+                                    )
+                                )
+                            }
+                        }
+                    )
+                }
             }
         }
-        .padding(10)
-        .background(.white.opacity(0.54), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .padding(6)
+        .background(
+            (option.option.logic == .all ? MegrumTheme.lavender.opacity(0.03) : MegrumTheme.lavender.opacity(0.02)),
+            in: RoundedRectangle(cornerRadius: 12, style: .continuous)
+        )
+        .overlay {
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .strokeBorder(
+                    option.option.logic == .all ? MegrumTheme.lavender : MegrumTheme.lavender.opacity(0.34),
+                    style: StrokeStyle(lineWidth: option.option.logic == .all ? 2 : 1, dash: option.option.logic == .all ? [] : [5, 4])
+                )
+        }
     }
 }
 
@@ -907,69 +1353,287 @@ private struct MatchRelationWishRow: View {
     var exchangeType: IndividualListingExchangeType
     var highlightedItemID: UUID
     var selectedCandidateIDs: Set<UUID>
-    var onToggleCandidate: (UUID) -> Void
+    var candidateOwnerTitle: String
+    var onOpen: () -> Void
+
+    private var selectedCandidates: [MatchRelationCandidate] {
+        MatchRelationComposer.selectedCandidates(
+            for: wish,
+            selectedCandidateIDs: selectedCandidateIDs
+        )
+    }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 8) {
-                MatchRelationGoodsThumbnail(item: wish.item, size: 38)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(wish.item.title)
-                        .font(.system(size: 13, weight: .heavy, design: .rounded))
-                        .foregroundStyle(MegrumTheme.ink)
-                        .lineLimit(1)
-                    Text("\(exchangeType.displayName) / 候補 \(wish.candidates.count) 件")
+        VStack(alignment: .leading, spacing: 0) {
+            Button(action: onOpen) {
+                HStack(spacing: 9) {
+                    MatchRelationGoodsThumbnail(item: wish.item, size: 38)
+                    VStack(alignment: .leading, spacing: 2) {
+                        HStack(spacing: 3) {
+                            Text("🎯")
+                                .font(.system(size: 10, weight: .heavy, design: .rounded))
+                            Text(wish.item.title)
+                                .font(.system(size: 11.5, weight: .heavy, design: .rounded))
+                                .foregroundStyle(MegrumTheme.ink)
+                                .lineLimit(1)
+                        }
+                        Text("\(exchangeType.displayName) / 候補 \(wish.candidates.count) 件")
+                            .font(.system(size: 10, weight: .bold, design: .rounded))
+                            .foregroundStyle(MegrumTheme.muted)
+                    }
+                    Spacer(minLength: 0)
+                    Text("×\(wish.quantity)")
                         .font(.system(size: 11, weight: .heavy, design: .rounded))
-                        .foregroundStyle(MegrumTheme.muted)
+                        .foregroundStyle(MegrumTheme.lavender)
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 15, weight: .heavy))
+                        .foregroundStyle(MegrumTheme.lavender)
                 }
-                Spacer(minLength: 0)
-                Text("×\(wish.quantity)")
-                    .font(.system(size: 11, weight: .heavy, design: .rounded))
-                    .foregroundStyle(MegrumTheme.lavender)
+                .padding(.horizontal, 9)
+                .padding(.vertical, 8)
+                .contentShape(Rectangle())
             }
+            .buttonStyle(.plain)
 
-            MatchRelationFlowLayout(spacing: 7, rowSpacing: 7) {
-                ForEach(wish.candidates) { candidate in
-                    MatchRelationCandidateButton(
-                        item: candidate.item,
-                        isSelected: selectedCandidateIDs.contains(candidate.item.id),
-                        isHighlighted: candidate.item.id == highlightedItemID
-                    ) {
-                        onToggleCandidate(candidate.item.id)
+            if !selectedCandidates.isEmpty {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("選択中")
+                        .font(.system(size: 9.5, weight: .heavy, design: .rounded))
+                        .foregroundStyle(MegrumTheme.muted)
+                    HStack(spacing: -8) {
+                        ForEach(selectedCandidates) { candidate in
+                            MatchRelationGoodsThumbnail(item: candidate.item, size: 34)
+                                .overlay {
+                                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                        .strokeBorder(
+                                            candidate.item.id == highlightedItemID ? MegrumTheme.pink.opacity(0.9) : .white,
+                                            lineWidth: 1.5
+                                        )
+                                }
+                        }
                     }
                 }
+                .padding(.horizontal, 9)
+                .padding(.vertical, 7)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .overlay(alignment: .top) {
+                    Rectangle()
+                        .fill(MegrumTheme.ink.opacity(0.04))
+                        .frame(height: 1)
+                }
             }
+        }
+        .accessibilityHint("\(candidateOwnerTitle)をシートで開き、候補グッズをタップして選択します")
+        .background(MatchRelationVisual.background, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .strokeBorder(MegrumTheme.ink.opacity(0.04), lineWidth: 1)
         }
     }
 }
 
-private struct MatchRelationCandidateButton: View {
-    var item: GoodsItem
+private struct MatchRelationWishBottomSheet: View {
+    var target: MatchRelationWishPopupTarget
+    var partnerHandle: String
+    var highlightedItemID: UUID
+    var selectedCandidateIDs: Set<UUID>
+    var onToggleCandidate: (UUID) -> Void
+    var onClose: () -> Void
+
+    private var candidateAccent: Color {
+        target.viewpoint == .mine ? MegrumTheme.pink : MegrumTheme.lavender
+    }
+
+    var body: some View {
+        ZStack(alignment: .bottom) {
+            Color.black.opacity(0.56)
+                .ignoresSafeArea()
+                .onTapGesture(perform: onClose)
+
+            VStack(alignment: .leading, spacing: 0) {
+                HStack(alignment: .center, spacing: 8) {
+                    Text("🎯")
+                        .font(.system(size: 12, weight: .heavy, design: .rounded))
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(target.wish.item.title)
+                            .font(.system(size: 12.5, weight: .heavy, design: .rounded))
+                            .foregroundStyle(MegrumTheme.ink)
+                            .lineLimit(1)
+                        Text(MatchRelationPopupCopy.subtitle(
+                            quantity: target.wish.quantity,
+                            candidateCount: target.wish.candidates.count
+                        ))
+                            .font(.system(size: 10, weight: .bold, design: .rounded))
+                            .foregroundStyle(MegrumTheme.muted)
+                    }
+                    Spacer(minLength: 0)
+                    Button(action: onClose) {
+                        Text("×")
+                            .font(.system(size: 17, weight: .heavy, design: .rounded))
+                            .foregroundStyle(MegrumTheme.muted)
+                            .frame(width: 28, height: 28)
+                            .background(MegrumTheme.ink.opacity(0.04), in: Circle())
+                    }
+                    .buttonStyle(.plain)
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 10)
+                .background(MatchRelationVisual.background)
+                .overlay(alignment: .bottom) {
+                    Rectangle()
+                        .fill(MegrumTheme.ink.opacity(0.04))
+                        .frame(height: 1)
+                }
+
+                HStack(alignment: .top, spacing: 14) {
+                    VStack(alignment: .center, spacing: 0) {
+                        MatchRelationGoodsThumbnail(item: target.wish.item, size: 104)
+                        Text(target.exchangeType.displayName)
+                            .font(.system(size: 9.5, weight: .heavy, design: .rounded))
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 3)
+                            .background(MegrumTheme.lavender, in: Capsule())
+                            .padding(.top, 7)
+                        Text(MatchRelationPopupCopy.fallbackTitle(target.fallbackHave.item.title))
+                            .font(.system(size: 9, weight: .bold, design: .rounded))
+                            .foregroundStyle(MegrumTheme.muted)
+                            .multilineTextAlignment(.center)
+                            .lineLimit(1)
+                            .padding(.top, 5)
+                    }
+                    .frame(width: 110, alignment: .top)
+
+                    VStack(alignment: .leading, spacing: 9) {
+                        HStack(alignment: .firstTextBaseline, spacing: 8) {
+                            MatchRelationMiniAvatar(
+                                title: target.viewpoint == .mine ? "@\(partnerHandle)" : "あなた",
+                                color: candidateAccent
+                            )
+                            Text(MatchRelationPopupCopy.candidateOwnerTitle(
+                                viewpoint: target.viewpoint,
+                                partnerHandle: partnerHandle
+                            ))
+                                .font(.system(size: 10, weight: .heavy, design: .rounded))
+                                .foregroundStyle(candidateAccent)
+                                .lineLimit(1)
+                            Text("（タップで選択）")
+                                .font(.system(size: 9.5, weight: .bold, design: .rounded))
+                                .foregroundStyle(MegrumTheme.muted)
+                        }
+
+                        LazyVGrid(
+                            columns: Array(repeating: GridItem(.flexible(), spacing: 6), count: 3),
+                            alignment: .leading,
+                            spacing: 6
+                        ) {
+                            ForEach(target.wish.candidates) { candidate in
+                                MatchRelationPopupCandidateButton(
+                                    candidate: candidate,
+                                    isSelected: selectedCandidateIDs.contains(candidate.item.id),
+                                    isHighlighted: candidate.item.id == highlightedItemID,
+                                    onTap: {
+                                        onToggleCandidate(candidate.item.id)
+                                    }
+                                )
+                            }
+                        }
+                    }
+                    .frame(maxWidth: .infinity, alignment: .topLeading)
+                }
+                .padding(12)
+
+                Button(action: onClose) {
+                    Text("戻る")
+                        .font(.system(size: 12.5, weight: .heavy, design: .rounded))
+                        .foregroundStyle(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 11)
+                        .background(MegrumTheme.lavender, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+                }
+                .buttonStyle(.plain)
+                .padding(.horizontal, 12)
+                .padding(.top, 2)
+                .padding(.bottom, 22)
+            }
+            .frame(maxWidth: .infinity)
+            .background(.white, in: UnevenRoundedRectangle(topLeadingRadius: 20, topTrailingRadius: 20))
+            .clipShape(UnevenRoundedRectangle(topLeadingRadius: 20, topTrailingRadius: 20))
+            .shadow(color: .black.opacity(0.25), radius: 40, y: -10)
+        }
+        .ignoresSafeArea(edges: .bottom)
+    }
+}
+
+private struct MatchRelationMiniAvatar: View {
+    var title: String
+    var color: Color
+
+    var body: some View {
+        Text(title.prefix(1).uppercased())
+            .font(.system(size: 8, weight: .heavy, design: .rounded))
+            .foregroundStyle(.white)
+            .frame(width: 16, height: 16)
+            .background(color, in: Circle())
+    }
+}
+
+private struct MatchRelationPopupCandidateButton: View {
+    var candidate: MatchRelationCandidate
     var isSelected: Bool
     var isHighlighted: Bool
     var onTap: () -> Void
 
     var body: some View {
         Button(action: onTap) {
-            HStack(spacing: 6) {
-                MatchRelationGoodsThumbnail(item: item, size: 28)
-                Text(item.title)
-                    .lineLimit(1)
+            ZStack(alignment: .topLeading) {
+                VStack(alignment: .center, spacing: 0) {
+                    MatchRelationGoodsThumbnail(item: candidate.item, size: 56)
+
+                    Text(candidate.item.title)
+                        .font(.system(size: 9, weight: .heavy, design: .rounded))
+                        .foregroundStyle(MegrumTheme.ink)
+                        .lineLimit(1)
+                        .frame(maxWidth: 64)
+                        .padding(.top, 3)
+                }
+                .frame(maxWidth: .infinity, alignment: .center)
+
+                if isHighlighted {
+                    Text("選択元")
+                        .font(.system(size: 8.5, weight: .heavy, design: .rounded))
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 5)
+                        .padding(.vertical, 1)
+                        .background(MegrumTheme.pink, in: Capsule())
+                        .offset(x: -8, y: -8)
+                }
+
                 if isSelected {
-                    Image(systemName: "checkmark.circle.fill")
+                    Text("✓")
+                        .font(.system(size: 10, weight: .heavy, design: .rounded))
+                        .foregroundStyle(.white)
+                        .frame(width: 16, height: 16)
+                        .background(MegrumTheme.lavender, in: Circle())
+                        .frame(maxWidth: .infinity, alignment: .topTrailing)
+                        .offset(x: 8, y: -8)
                 }
             }
-            .font(.system(size: 11.5, weight: .heavy, design: .rounded))
-            .foregroundStyle(isSelected ? .white : MegrumTheme.ink)
-            .padding(.horizontal, 8)
-            .frame(height: 36)
+            .padding(4)
+            .frame(maxWidth: .infinity)
+            .frame(minHeight: 82, alignment: .top)
             .background(
-                isSelected ? AnyShapeStyle(MegrumTheme.lavender) : AnyShapeStyle(.white.opacity(0.78)),
-                in: Capsule()
+                isHighlighted
+                    ? Color(red: 1, green: 247 / 255, blue: 251 / 255)
+                    : (isSelected ? MegrumTheme.lavender.opacity(0.08) : .white),
+                in: RoundedRectangle(cornerRadius: 10, style: .continuous)
             )
             .overlay {
-                Capsule()
-                    .strokeBorder(isHighlighted ? MegrumTheme.pink.opacity(0.78) : .clear, lineWidth: 1.4)
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .strokeBorder(
+                        isHighlighted ? MegrumTheme.pink : (isSelected ? MegrumTheme.lavender : .clear),
+                        lineWidth: isHighlighted || isSelected ? 2 : 0
+                    )
             }
         }
         .buttonStyle(.plain)
@@ -1095,41 +1759,47 @@ private struct MatchRelationSummaryPanel: View {
     var receiverItems: [GoodsItem]
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("この内容で打診")
-                .font(.system(size: 17, weight: .heavy, design: .rounded))
-                .foregroundStyle(MegrumTheme.ink)
-            HStack(spacing: 12) {
-                MatchRelationSummarySide(title: "私が出す", items: senderItems)
-                Image(systemName: "arrow.left.arrow.right")
-                    .font(.system(size: 18, weight: .heavy))
-                    .foregroundStyle(MegrumTheme.lavender)
-                MatchRelationSummarySide(title: "受け取る", items: receiverItems)
+        VStack(alignment: .leading, spacing: 7) {
+            Text("📋 結論：この交換")
+                .font(.system(size: 10, weight: .heavy, design: .rounded))
+                .tracking(0.4)
+                .foregroundStyle(MegrumTheme.lavender)
+            HStack(spacing: 8) {
+                MatchRelationSummarySide(title: "あなたが受", color: MegrumTheme.pink, items: receiverItems)
+                Text("⇄")
+                    .font(.system(size: 12, weight: .heavy, design: .rounded))
+                    .foregroundStyle(MegrumTheme.muted)
+                MatchRelationSummarySide(title: "あなたが譲", color: MegrumTheme.lavender, items: senderItems)
             }
         }
-        .padding(16)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+        .background(MegrumTheme.lavender.opacity(0.04), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
         .overlay {
-            RoundedRectangle(cornerRadius: 24, style: .continuous)
-                .strokeBorder(.white.opacity(0.62), lineWidth: 1)
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .strokeBorder(MegrumTheme.lavender.opacity(0.34), lineWidth: 1)
         }
     }
 }
 
 private struct MatchRelationSummarySide: View {
     var title: String
+    var color: Color
     var items: [GoodsItem]
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        HStack(spacing: 5) {
             Text(title)
-                .font(.system(size: 12, weight: .heavy, design: .rounded))
-                .foregroundStyle(MegrumTheme.muted)
+                .font(.system(size: 8.5, weight: .heavy, design: .rounded))
+                .foregroundStyle(.white)
+                .padding(.horizontal, 6)
+                .frame(height: 18)
+                .background(color, in: Capsule())
             HStack(spacing: -8) {
                 ForEach(items.prefix(4)) { item in
-                    MatchRelationGoodsThumbnail(item: item, size: 34)
+                    MatchRelationGoodsThumbnail(item: item, size: 28)
                         .overlay {
-                            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                            RoundedRectangle(cornerRadius: 10, style: .continuous)
                                 .strokeBorder(.white, lineWidth: 1.5)
                         }
                 }
@@ -1138,7 +1808,7 @@ private struct MatchRelationSummarySide: View {
                         .font(.system(size: 11, weight: .heavy, design: .rounded))
                         .foregroundStyle(MegrumTheme.muted)
                         .padding(.horizontal, 8)
-                        .frame(height: 28)
+                        .frame(height: 24)
                         .background(.white.opacity(0.82), in: Capsule())
                 }
             }
@@ -1157,18 +1827,18 @@ private struct MatchRelationSimplePanel: View {
                 .font(.system(size: 18, weight: .heavy, design: .rounded))
                 .foregroundStyle(MegrumTheme.ink)
             HStack(spacing: 12) {
-                MatchRelationSummarySide(title: "私が出す", items: senderItems)
-                Image(systemName: "arrow.left.arrow.right")
-                    .font(.system(size: 18, weight: .heavy))
-                    .foregroundStyle(MegrumTheme.lavender)
-                MatchRelationSummarySide(title: "受け取る", items: [targetItem])
+                MatchRelationSummarySide(title: "あなたが譲", color: MegrumTheme.lavender, items: senderItems)
+                Text("⇄")
+                    .font(.system(size: 12, weight: .heavy, design: .rounded))
+                    .foregroundStyle(MegrumTheme.muted)
+                MatchRelationSummarySide(title: "あなたが受", color: MegrumTheme.pink, items: [targetItem])
             }
         }
         .padding(16)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+        .background(.white, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
         .overlay {
-            RoundedRectangle(cornerRadius: 24, style: .continuous)
-                .strokeBorder(.white.opacity(0.62), lineWidth: 1)
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .strokeBorder(MegrumTheme.ink.opacity(0.08), lineWidth: 1)
         }
     }
 }
@@ -1247,25 +1917,34 @@ private struct MatchRelationBottomBar: View {
     var receiverCount: Int
     var isEnabled: Bool
     var showsReset: Bool
-    var onReset: () -> Void
+    var onSecondary: () -> Void
     var onStart: () -> Void
 
     var body: some View {
+        let totalSelectionCount = max(senderCount, receiverCount)
         HStack(spacing: 10) {
-            if showsReset {
-                Button(action: onReset) {
-                    Text("リセット")
-                        .font(.system(size: 15, weight: .heavy, design: .rounded))
-                        .foregroundStyle(MegrumTheme.ink)
-                        .frame(width: 92)
-                        .frame(height: 54)
-                        .background(.white.opacity(0.78), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
-                }
-                .buttonStyle(.plain)
+            Button(action: onSecondary) {
+                Text(MatchRelationBottomBarCopy.secondaryTitle(showsReset: showsReset))
+                    .font(.system(size: 15, weight: .heavy, design: .rounded))
+                    .foregroundStyle(MegrumTheme.ink)
+                    .frame(width: 92)
+                    .frame(height: 54)
+                    .background(.white, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 18, style: .continuous)
+                            .strokeBorder(MegrumTheme.ink.opacity(0.10), lineWidth: 1)
+                    }
             }
+            .buttonStyle(.plain)
 
             Button(action: onStart) {
-                Text(isEnabled ? "打診に進む（\(senderCount) ⇄ \(receiverCount)）" : "候補を読み込んでいます")
+                Text(
+                    MatchRelationBottomBarCopy.primaryTitle(
+                        isEnabled: isEnabled,
+                        showsReset: showsReset,
+                        totalSelectionCount: totalSelectionCount
+                    )
+                )
                     .font(.system(size: 16, weight: .heavy, design: .rounded))
                     .foregroundStyle(.white)
                     .frame(maxWidth: .infinity)
@@ -1279,6 +1958,52 @@ private struct MatchRelationBottomBar: View {
         .padding(.horizontal, 20)
         .padding(.top, 12)
         .padding(.bottom, 12)
-        .background(.ultraThinMaterial)
+        .background(.white)
+        .overlay(alignment: .top) {
+            Rectangle()
+                .fill(MegrumTheme.ink.opacity(0.08))
+                .frame(height: 1)
+        }
+        .shadow(color: MegrumTheme.ink.opacity(0.08), radius: 12, y: -4)
     }
+}
+
+private struct MatchRelationHeader: View {
+    var onClose: () -> Void
+
+    var body: some View {
+        HStack(spacing: 18) {
+            Button(action: onClose) {
+                Image(systemName: "xmark")
+                    .font(.system(size: 22, weight: .heavy))
+                    .foregroundStyle(MegrumTheme.muted)
+                    .frame(width: 56, height: 56)
+                    .background(.white, in: Circle())
+                    .overlay {
+                        Circle()
+                            .strokeBorder(MegrumTheme.ink.opacity(0.08), lineWidth: 1)
+                    }
+            }
+            .buttonStyle(.plain)
+
+            Text("関係図")
+                .font(.system(size: 27, weight: .heavy, design: .rounded))
+                .foregroundStyle(MegrumTheme.ink)
+
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 20)
+        .padding(.top, 10)
+        .padding(.bottom, 14)
+        .background(.white)
+        .overlay(alignment: .bottom) {
+            Rectangle()
+                .fill(MegrumTheme.ink.opacity(0.06))
+                .frame(height: 1)
+        }
+    }
+}
+
+private enum MatchRelationVisual {
+    static let background = Color(red: 0.984, green: 0.976, blue: 0.988)
 }

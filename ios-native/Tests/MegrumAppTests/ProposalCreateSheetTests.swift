@@ -19,7 +19,7 @@ final class ProposalCreateSheetTests: XCTestCase {
         XCTAssertEqual(configuration.targetStatus, .sent)
         XCTAssertTrue(configuration.canSubmit)
         XCTAssertNil(configuration.methodNotice)
-        XCTAssertEqual(configuration.submitTitle, "この内容で打診を送る")
+        XCTAssertEqual(configuration.submitTitle, "この内容で打診を送信")
     }
 
     func testHandProposalRequiresMeetupBeforeSubmit() {
@@ -57,7 +57,7 @@ final class ProposalCreateSheetTests: XCTestCase {
         XCTAssertEqual(configuration.targetStatus, .sent)
         XCTAssertTrue(configuration.canSubmit)
         XCTAssertNil(configuration.methodNotice)
-        XCTAssertEqual(configuration.submitTitle, "この内容で打診を送る")
+        XCTAssertEqual(configuration.submitTitle, "この内容で打診を送信")
     }
 
     func testMailProposalRequiresReadyMailingAddress() {
@@ -94,7 +94,7 @@ final class ProposalCreateSheetTests: XCTestCase {
         XCTAssertEqual(configuration.targetStatus, .sent)
         XCTAssertTrue(configuration.canSubmit)
         XCTAssertNil(configuration.methodNotice)
-        XCTAssertEqual(configuration.submitTitle, "この内容で打診を送る")
+        XCTAssertEqual(configuration.submitTitle, "この内容で打診を送信")
     }
 
     func testBothProposalRequiresReadyMailingAddressEvenWithValidMeetup() {

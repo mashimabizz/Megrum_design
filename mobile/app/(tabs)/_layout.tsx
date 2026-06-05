@@ -75,7 +75,7 @@ export default function TabLayout() {
     );
   }
 
-  if ((!configured && !previewMode) || (configured && !session)) {
+  if (!previewMode && ((!configured) || (configured && !session))) {
     return <Redirect href="/welcome" />;
   }
 
@@ -410,6 +410,65 @@ function ProfileDrawerShell({ children }: { children: ReactNode }) {
         />
       </View>
     </ProfileDrawerProvider>
+  );
+}
+
+export function ProfileDrawerVisualSnapshot() {
+  const { width } = useWindowDimensions();
+  const drawerWidth = Math.min(380, Math.max(320, width * 0.9));
+  const openX = Math.min(drawerWidth - 34, width * 0.68);
+
+  return (
+    <View style={styles.drawerShellRoot}>
+      <View
+        style={[
+          styles.drawerUnderlay,
+          {
+            opacity: 1,
+            width: drawerWidth,
+            transform: [{ translateX: 0 }],
+          },
+        ]}
+      >
+        <ProfileDrawerContent onNavigate={() => {}} />
+      </View>
+
+      <View
+        style={[
+          styles.drawerForeground,
+          {
+            borderBottomLeftRadius: 68,
+            borderTopLeftRadius: 68,
+            shadowOpacity: 0.24,
+            transform: [{ translateX: openX }],
+          },
+        ]}
+      >
+        <View
+          style={[
+            styles.drawerForegroundClip,
+            {
+              borderBottomLeftRadius: 68,
+              borderTopLeftRadius: 68,
+            },
+          ]}
+        >
+          <View style={styles.drawerVisualForeground}>
+            <Text style={styles.drawerVisualKicker}>ON SITE</Text>
+            <Text style={styles.drawerVisualTitle}>現地交換</Text>
+            <Text style={styles.drawerVisualMeta}>東京都内イベント・4:25 PM</Text>
+            <View style={styles.drawerVisualCard}>
+              <View style={styles.drawerVisualThumb} />
+              <View>
+                <Text style={styles.drawerVisualCardTitle}>ランダムトレカ A</Text>
+                <Text style={styles.drawerVisualCardMeta}>交換候補・2点</Text>
+              </View>
+            </View>
+          </View>
+          <View style={[styles.drawerWhiteout, { opacity: 0.82 }]} />
+        </View>
+      </View>
+    </View>
   );
 }
 
@@ -778,5 +837,63 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(58,50,74,0.12)",
     height: StyleSheet.hairlineWidth,
     marginVertical: 20,
+  },
+  drawerVisualForeground: {
+    backgroundColor: megrumColors.background,
+    flex: 1,
+    gap: 18,
+    paddingHorizontal: 42,
+    paddingTop: 132,
+  },
+  drawerVisualKicker: {
+    alignSelf: "flex-start",
+    backgroundColor: "rgba(166,149,216,0.14)",
+    borderRadius: 999,
+    color: megrumColors.lavender,
+    fontSize: 12,
+    fontWeight: "900",
+    letterSpacing: 1.4,
+    paddingHorizontal: 13,
+    paddingVertical: 7,
+  },
+  drawerVisualTitle: {
+    color: megrumColors.ink,
+    fontSize: 36,
+    fontWeight: "900",
+  },
+  drawerVisualMeta: {
+    color: megrumColors.mutedInk,
+    fontSize: 19,
+    fontWeight: "800",
+  },
+  drawerVisualCard: {
+    alignItems: "center",
+    backgroundColor: "#fff",
+    borderRadius: 28,
+    flexDirection: "row",
+    gap: 16,
+    marginTop: 22,
+    padding: 18,
+    shadowColor: megrumColors.ink,
+    shadowOffset: { width: 0, height: 14 },
+    shadowOpacity: 0.12,
+    shadowRadius: 30,
+  },
+  drawerVisualThumb: {
+    backgroundColor: "rgba(168,212,230,0.42)",
+    borderRadius: 22,
+    height: 92,
+    width: 92,
+  },
+  drawerVisualCardTitle: {
+    color: megrumColors.ink,
+    fontSize: 19,
+    fontWeight: "900",
+  },
+  drawerVisualCardMeta: {
+    color: megrumColors.mutedInk,
+    fontSize: 14,
+    fontWeight: "800",
+    marginTop: 5,
   },
 });

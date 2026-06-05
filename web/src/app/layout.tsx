@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import { Noto_Sans_JP, Inter_Tight } from "next/font/google";
-import { BottomNavTransitionBridge } from "@/components/home/BottomNavTransitionBridge";
 import "./globals.css";
 
 const notoSansJP = Noto_Sans_JP({
@@ -17,8 +16,8 @@ const interTight = Inter_Tight({
 });
 
 export const metadata: Metadata = {
-  title: "Megrum — 推し活グッズ交換",
-  description: "K-POP / アニメ等のファンが現地でグッズを交換するプラットフォーム",
+  title: "Megrum Admin",
+  description: "Megrum management console",
 };
 
 export default function RootLayout({
@@ -32,7 +31,6 @@ export default function RootLayout({
       className={`${notoSansJP.variable} ${interTight.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col font-sans">
-        <BottomNavTransitionBridge />
         {children}
       </body>
     </html>

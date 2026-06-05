@@ -26,6 +26,81 @@ final class TradeChatAffordanceTests: XCTestCase {
         XCTAssertTrue(TradeStage.completed.emptyMessage.contains("終了"))
     }
 
+    func testTradeStageRouteRequestPrefersExplicitPendingDestination() {
+        XCTAssertEqual(
+            TradeStageRouteRequestResolver.resolve(current: .completed, requested: .pending),
+            .pending
+        )
+        XCTAssertEqual(
+            TradeStageRouteRequestResolver.resolve(current: .inProgress, requested: nil),
+            .inProgress
+        )
+    }
+
+    func testNativePreviewPendingListMirrorsRnVisualQaCount() {
+        let pending = NativePreviewData.proposals.filter { TradeStage.pending.contains($0.status) }
+        XCTAssertEqual(pending.count, 4)
+        XCTAssertTrue(pending.contains { $0.status == .negotiating })
+        XCTAssertTrue(pending.contains { $0.status == .agreementOneSide })
+        XCTAssertEqual(pending.filter { $0.status == .sent }.count, 2)
+    }
+
+    func testTradeCardPresentationMatchesRnPendingStatusCopy() {
+        let viewerID = UUID(uuidString: "00000000-0000-0000-0000-000000000001")!
+        let partnerID = UUID(uuidString: "00000000-0000-0000-0000-000000000002")!
+        let proposal = TradeProposal(
+            id: UUID(uuidString: "00000000-0000-0000-0000-000000000301")!,
+            senderID: partnerID,
+            receiverID: viewerID,
+            status: .sent,
+            exchangeMethod: .both,
+            senderGoodsIDs: [],
+            receiverGoodsIDs: [],
+            createdAt: Date(timeIntervalSince1970: 1_000)
+        )
+        let partner = PublicUserProfile(
+            profile: UserProfile(id: partnerID, handle: "michilion", displayName: "みち"),
+            averageStars: nil,
+            evaluationCount: 0,
+            completedTradeCount: 0
+        )
+
+        let presentation = TradeCardPresentation(
+            proposal: proposal,
+            viewerID: viewerID,
+            profilesByUserID: [partnerID: partner],
+            now: Date(timeIntervalSince1970: 1_180)
+        )
+
+        XCTAssertEqual(presentation.partnerHandle, "michilion")
+        XCTAssertEqual(presentation.directionText, "届いた")
+        XCTAssertEqual(presentation.updatedText, "3分前")
+        XCTAssertEqual(presentation.statusText, "新着打診")
+        XCTAssertEqual(presentation.responseText, "要対応")
+        XCTAssertEqual(presentation.tone, .action)
+    }
+
+    func testTradePreviewThumbnailStyleUsesRnLikeGlyphs() {
+        let item = GoodsItem(
+            id: UUID(uuidString: "00000000-0000-0000-0000-000000000401")!,
+            ownerID: UUID(uuidString: "00000000-0000-0000-0000-000000000002")!,
+            title: "ニンニン 制服"
+        )
+
+        XCTAssertEqual(TradePreviewThumbnailStyle.glyph(for: item), "N")
+    }
+
+    func testProposalCompletionRoutesMatchRnCompletionButtons() {
+        XCTAssertEqual(
+            ProposalCompletionRouteResolver.resolve(action: .searchMore),
+            ProposalCompletionRouteState(selectedTab: .home, requestedTradesStage: nil)
+        )
+        XCTAssertEqual(
+            ProposalCompletionRouteResolver.resolve(action: .openTrades),
+            ProposalCompletionRouteState(selectedTab: .trades, requestedTradesStage: .pending)
+        )
+    }
+
     func testTradeChatInputAvailabilityAllowsOnlyActiveNegotiationAndDealStates() {
         XCTAssertFalse(TradeChatInputAvailability(status: .draft).canSendMessages)
         XCTAssertTrue(TradeChatInputAvailability(status: .sent).canSendMessages)

@@ -1224,7 +1224,7 @@ struct ProposalCreateConfiguration: Equatable {
         if requiresMeetupBeforeSubmit && !hasValidMeetup {
             return "待ち合わせ入力が必要"
         }
-        return "この内容で打診を送る"
+        return "この内容で打診を送信"
     }
 
     var methodNotice: String? {

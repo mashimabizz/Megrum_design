@@ -1,0 +1,229 @@
+{
+  "expectedImageCount": 22,
+  "imageCount": 22,
+  "missing": [],
+  "missingExpected": [],
+  "unexpected": [],
+  "pairReport": [
+    {
+      "id": "home",
+      "rn": {
+        "path": "notes/assets/rn-screen-lookup/rn-home.png",
+        "width": 1206,
+        "height": 2622,
+        "averageLuminance": 237.68
+      },
+      "swift": {
+        "path": "notes/assets/swift-visual-qa/swift-home-preview.png",
+        "width": 1206,
+        "height": 2622,
+        "averageLuminance": 230.34
+      },
+      "dimensionDelta": {
+        "width": 0,
+        "height": 0
+      },
+      "normalizedMeanAbsDiff": 22.15
+    },
+    {
+      "id": "drawer-open",
+      "rn": {
+        "path": "notes/assets/rn-screen-lookup/rn-drawer-open.png",
+        "width": 1206,
+        "height": 2622,
+        "averageLuminance": 249.67
+      },
+      "swift": {
+        "path": "notes/assets/swift-visual-qa/swift-drawer-open.png",
+        "width": 1206,
+        "height": 2622,
+        "averageLuminance": 245.08
+      },
+      "dimensionDelta": {
+        "width": 0,
+        "height": 0
+      },
+      "normalizedMeanAbsDiff": 13.21
+    },
+    {
+      "id": "relation-entry",
+      "rn": {
+        "path": "notes/assets/rn-screen-lookup/rn-match-detail.png",
+        "width": 1206,
+        "height": 2622,
+        "averageLuminance": 241.77
+      },
+      "swift": {
+        "path": "notes/assets/swift-visual-qa/swift-match-relation-rn-visual-header.png",
+        "width": 1206,
+        "height": 2622,
+        "averageLuminance": 239.45
+      },
+      "dimensionDelta": {
+        "width": 0,
+        "height": 0
+      },
+      "normalizedMeanAbsDiff": 12.5
+    },
+    {
+      "id": "relation-candidates-expanded",
+      "rn": {
+        "path": "notes/assets/rn-screen-lookup/rn-match-detail-candidates-expanded.png",
+        "width": 1206,
+        "height": 2622,
+        "averageLuminance": 148.75
+      },
+      "swift": {
+        "path": "notes/assets/swift-visual-qa/swift-match-relation-candidates-expanded.png",
+        "width": 1206,
+        "height": 2622,
+        "averageLuminance": 144.26
+      },
+      "dimensionDelta": {
+        "width": 0,
+        "height": 0
+      },
+      "normalizedMeanAbsDiff": 12.89
+    },
+    {
+      "id": "proposal-give",
+      "rn": {
+        "path": "notes/assets/rn-screen-lookup/rn-proposal-give.png",
+        "width": 1206,
+        "height": 2622,
+        "averageLuminance": 238.63
+      },
+      "swift": {
+        "path": "notes/assets/swift-visual-qa/swift-proposal-give.png",
+        "width": 1206,
+        "height": 2622,
+        "averageLuminance": 235.62
+      },
+      "dimensionDelta": {
+        "width": 0,
+        "height": 0
+      },
+      "normalizedMeanAbsDiff": 17.66
+    },
+    {
+      "id": "proposal-receive",
+      "rn": {
+        "path": "notes/assets/rn-screen-lookup/rn-proposal-receive.png",
+        "width": 1206,
+        "height": 2622,
+        "averageLuminance": 238.29
+      },
+      "swift": {
+        "path": "notes/assets/swift-visual-qa/swift-proposal-receive.png",
+        "width": 1206,
+        "height": 2622,
+        "averageLuminance": 234.34
+      },
+      "dimensionDelta": {
+        "width": 0,
+        "height": 0
+      },
+      "normalizedMeanAbsDiff": 19.61
+    },
+    {
+      "id": "proposal-meetup-week",
+      "rn": {
+        "path": "notes/assets/rn-screen-lookup/rn-proposal-meetup-week.png",
+        "width": 1206,
+        "height": 2622,
+        "averageLuminance": 244.63
+      },
+      "swift": {
+        "path": "notes/assets/swift-visual-qa/swift-proposal-meetup-week.png",
+        "width": 1206,
+        "height": 2622,
+        "averageLuminance": 242.46
+      },
+      "dimensionDelta": {
+        "width": 0,
+        "height": 0
+      },
+      "normalizedMeanAbsDiff": 16.32
+    },
+    {
+      "id": "proposal-meetup-month",
+      "rn": {
+        "path": "notes/assets/rn-screen-lookup/rn-proposal-meetup-month.png",
+        "width": 1206,
+        "height": 2622,
+        "averageLuminance": 242.86
+      },
+      "swift": {
+        "path": "notes/assets/swift-visual-qa/swift-proposal-meetup-month.png",
+        "width": 1206,
+        "height": 2622,
+        "averageLuminance": 237.31
+      },
+      "dimensionDelta": {
+        "width": 0,
+        "height": 0
+      },
+      "normalizedMeanAbsDiff": 16.69
+    },
+    {
+      "id": "proposal-confirm",
+      "rn": {
+        "path": "notes/assets/rn-screen-lookup/rn-proposal-confirm.png",
+        "width": 1206,
+        "height": 2622,
+        "averageLuminance": 242.19
+      },
+      "swift": {
+        "path": "notes/assets/swift-visual-qa/swift-proposal-confirm-final.png",
+        "width": 1206,
+        "height": 2622,
+        "averageLuminance": 239.1
+      },
+      "dimensionDelta": {
+        "width": 0,
+        "height": 0
+      },
+      "normalizedMeanAbsDiff": 18.18
+    },
+    {
+      "id": "proposal-complete",
+      "rn": {
+        "path": "notes/assets/rn-screen-lookup/rn-proposal-complete.png",
+        "width": 1206,
+        "height": 2622,
+        "averageLuminance": 242.08
+      },
+      "swift": {
+        "path": "notes/assets/swift-visual-qa/swift-proposal-complete-fullscreen.png",
+        "width": 1206,
+        "height": 2622,
+        "averageLuminance": 240.56
+      },
+      "dimensionDelta": {
+        "width": 0,
+        "height": 0
+      },
+      "normalizedMeanAbsDiff": 11.31
+    },
+    {
+      "id": "proposal-pending",
+      "rn": {
+        "path": "notes/assets/rn-screen-lookup/rn-proposal-pending.png",
+        "width": 1206,
+        "height": 2622,
+        "averageLuminance": 245.66
+      },
+      "swift": {
+        "path": "notes/assets/swift-visual-qa/swift-proposal-pending.png",
+        "width": 1206,
+        "height": 2622,
+        "averageLuminance": 241.42
+      },
+      "dimensionDelta": {
+        "width": 0,
+        "height": 0
+      },
+      "normalizedMeanAbsDiff": 15.51
+    }
+  ]
+}

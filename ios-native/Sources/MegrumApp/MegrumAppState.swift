@@ -467,8 +467,8 @@ public struct PreviewMegrumRepository: MegrumRepository {
 
     public func loadHomeCandidateSections() async throws -> HomeCandidateSections {
         HomeCandidateSections(
-            matchedItems: NativePreviewData.inventory,
-            possibleItems: Array(NativePreviewData.inventory.reversed())
+            matchedItems: NativePreviewData.homeMatchedItems,
+            possibleItems: NativePreviewData.homePossibleItems
         )
     }
 
@@ -683,9 +683,10 @@ public struct PreviewMegrumRepository: MegrumRepository {
     }
 
     public func loadPublicTradeGoods(userID: UUID, limit: Int) async throws -> [GoodsItem] {
-        Array(NativePreviewData.inventory.filter { item in
+        let goods = NativePreviewData.inventory.filter { item in
             item.ownerID == userID
-        }.prefix(max(0, limit)))
+        }
+        return Array(goods.prefix(max(0, limit)))
     }
 
     public func loadPublicIndividualListings(userID: UUID) async throws -> [IndividualListing] {

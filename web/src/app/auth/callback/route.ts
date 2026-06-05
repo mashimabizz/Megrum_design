@@ -12,8 +12,8 @@ export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url);
   const code = searchParams.get("code");
   const error = searchParams.get("error");
-  // デフォルト遷移先：認証完了画面（onboarding 完了済なら自動的に / へ）
-  const next = searchParams.get("next") ?? "/auth/email-confirmed";
+  // Webは管理者コンソール専用。認証後はadminへ戻す。
+  const next = searchParams.get("next") ?? "/admin";
 
   if (next === "mobile") {
     return NextResponse.redirect(buildMobileAuthRedirect(searchParams));

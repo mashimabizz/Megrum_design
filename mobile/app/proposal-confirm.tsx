@@ -110,6 +110,7 @@ export default function ProposalConfirmScreen() {
     proposalId?: string | string[];
     revise?: string | string[];
     exchangeMethod?: string | string[];
+    visualState?: string | string[];
   }>();
   const meetupsParam = one(params.meetups);
   const givesParam = one(params.gives);
@@ -122,6 +123,7 @@ export default function ProposalConfirmScreen() {
   const proposalId = one(params.proposalId);
   const isRevisionMode = one(params.revise) === "1" && !!proposalId;
   const exchangeMethod = normalizeExchangeMethod(one(params.exchangeMethod));
+  const visualState = one(params.visualState);
   const usesHandExchange = supportsHandExchange(exchangeMethod);
   const usesMailExchange = supportsMailExchange(exchangeMethod);
   const giveIds = useMemo(() => parseProposalIdList(givesParam), [givesParam]);
@@ -157,7 +159,7 @@ export default function ProposalConfirmScreen() {
   const [message, setMessage] = useState("");
   const [selectedOptionTags, setSelectedOptionTags] = useState<string[]>([]);
   const [shareSchedule, setShareSchedule] = useState(true);
-  const [submitted, setSubmitted] = useState(false);
+  const [submitted, setSubmitted] = useState(visualState === "complete");
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [mailingAddress, setMailingAddress] = useState<MailingAddressRecord | null>(null);

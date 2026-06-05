@@ -10,15 +10,15 @@ export const metadata = {
 /**
  * パスワードリセット画面（モックアップ AOPasswordReset 準拠）
  *
- * - 既ログインなら / へ
- * - メアド入力 → リセットメール送信 → /auth/verify-email へ
+ * - 既ログインなら /admin へ
+ * - メアド入力 → リセットメール送信 → /login?password_reset=sent へ
  */
 export default async function PasswordResetPage() {
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (user) redirect("/");
+  if (user) redirect("/admin");
 
   return (
     <main className="flex flex-1 flex-col bg-[#fbf9fc]">

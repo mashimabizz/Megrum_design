@@ -601,6 +601,13 @@ public enum MegrumAuthStateFactory {
         environment: [String: String],
         infoDictionary: [String: Any]? = nil
     ) -> MegrumAuthState {
+        if VisualQAPreviewMode.isEnabled(environment: environment) {
+            return MegrumAuthState(
+                repository: PreviewMegrumAuthRepository(),
+                initialSession: PreviewMegrumAuthRepository.previewSession()
+            )
+        }
+
         if let configuration = SupabaseConfiguration.fromEnvironment(environment) {
             return liveState(
                 configuration: configuration,

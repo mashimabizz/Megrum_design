@@ -36,6 +36,16 @@ export default function WelcomeScreen() {
           メールアドレスでログイン
         </PrimaryButton>
 
+        <Pressable
+          accessibilityRole="button"
+          onPress={() => {
+            enterPreview();
+          }}
+          style={styles.previewButton}
+        >
+          <Text style={styles.previewText}>画面だけプレビューする</Text>
+        </Pressable>
+
         <View style={styles.divider}>
           <View style={styles.dividerLine} />
           <Text style={styles.dividerText}>はじめての方</Text>
@@ -89,17 +99,6 @@ export default function WelcomeScreen() {
           mode="signUp"
           onError={(message) => setTermsError(message)}
         />
-        {!configured ? (
-          <Pressable
-            accessibilityRole="button"
-            onPress={() => {
-              enterPreview();
-            }}
-            style={styles.previewButton}
-          >
-            <Text style={styles.previewText}>画面だけプレビューする</Text>
-          </Pressable>
-        ) : null}
       </View>
     </Screen>
   );
