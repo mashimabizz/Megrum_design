@@ -4,6 +4,65 @@
 
 ---
 
+## イテレーション581：めぐり実画面をPreviewデザインへ反映
+
+### 背景・問題意識
+
+オーナーから、めぐりホーム通常版、下タブ引き上げ版、話題詳細画面を、直前に作成したSwiftUI Previewの見た目に合わせて実画面へ反映したいという依頼があった。別セッションでもホーム画面を編集しているため、`codex/meguri-real-screen-design-sync` ブランチで分けて、後からマージしやすい単位にする。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/MeguriHomeViews.swift`
+- 実画面のめぐり上部UIを、左上プロフィールアイコン・右上マップボタンなしの中央タイトルだけに寄せた。
+- 「今日の東京ドーム」「人が集まっています」の集まりカードを表示しない構成にした。
+- Map上のグルームサムネイルと掲示板ピンを、Previewの密度に近い見え方へ揃えた。
+
+#### `ios-native/Sources/MegrumApp/MeguriBoardBottomSheetViews.swift`
+- 下部シートの見出し、グルーム/話題ボタン、フィルタチップ、話題行の文字サイズ・余白・画像サイズをPreview基準へ寄せた。
+- 通常状態と引き上げ状態で、話題行の密度が切り替わるように整理した。
+- 話題行にグルーム画像や参加者サムネイルが出せる場合は使い、画像がない場合は既存のfallback表示を維持した。
+
+#### `ios-native/Sources/MegrumApp/BoardThreadDetailScreen.swift`
+- 話題詳細を、上部カード、参加者表示、返信行、自分の返信、下部返信バーの構成へ変更した。
+- 既存の返信読み込み、返信送信、公開プロフィールpreloadの挙動は維持した。
+- iOSでは詳細sheet内のNavigation barを隠し、Previewに近い独自ヘッダーを表示するようにした。
+
+### 影響範囲
+
+- Swift Native iOSのめぐりホーム通常状態、下部シート引き上げ状態、話題詳細画面
+- 掲示板スレッド取得、返信取得、返信送信、グルーム投稿、DB schema、API payload、状態遷移には影響しない
+
+### 確認方法
+
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-meguri-real-sync-build`
+  - 成功
+- `xcodebuild -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -destination 'platform=iOS Simulator,id=C70DDDBB-2602-49E0-8F95-1F043BCCED76' -derivedDataPath /tmp/megrum-native-meguri-real-sync-xcodebuild build`
+  - 成功
+- Simulator launch:
+  - `MEGRUM_VISUAL_QA_PREVIEW_AUTH=1`
+  - `MEGRUM_VISUAL_QA_INITIAL_SCREEN=meguri`
+  - 成功
+- Simulator screenshots:
+  - `/tmp/megrum-real-meguri-home-normal-v2.jpg`
+  - `/tmp/megrum-real-meguri-home-expanded.jpg`
+  - `/tmp/megrum-real-meguri-board-detail.jpg`
+
+### セルフレビュー結果
+
+- ✅ 通常ホームで左上プロフィールアイコン、右上マップボタン、「今日の東京ドーム」カードが表示されないことを確認した。
+- ✅ 下部シート引き上げ状態で、見出し・チップ・話題行がPreview寄りの密度で表示されることを確認した。
+- ✅ 話題詳細で、独自ヘッダー、上部カード、返信一覧、下部返信バーが表示されることを確認した。
+- ✅ 既存の掲示板詳細sheet遷移、返信読み込み、返信入力欄は維持した。
+- ✅ 状態名・新用語・DB schema変更はないため、`notes/09_state_machines.md`、`notes/10_glossary.md`、`notes/05_data_model.md` の更新は不要と判断した。
+
+### 関連ファイル
+
+- `ios-native/Sources/MegrumApp/MeguriHomeViews.swift`
+- `ios-native/Sources/MegrumApp/MeguriBoardBottomSheetViews.swift`
+- `ios-native/Sources/MegrumApp/BoardThreadDetailScreen.swift`
+
+---
+
 ## イテレーション580：Codex作業モード運用追加
 
 ### 背景・問題意識
