@@ -38,6 +38,51 @@ final class MeguriAccessPolicyTests: XCTestCase {
         XCTAssertTrue(MeguriAccessPolicy.groomAccessMessage(far, currentCoordinate: current, viewerID: viewerID).contains("1km圏外"))
     }
 
+    func testGroomFeedOrderingPrioritizesUnreadLatestAndExcludesViewerPost() {
+        let viewerID = UUID(uuidString: "00000000-0000-0000-0000-000000000001")!
+        let otherID = UUID(uuidString: "00000000-0000-0000-0000-000000000002")!
+        let latestUnread = GroomPost(
+            id: UUID(uuidString: "00000000-0000-0000-0000-000000000101")!,
+            authorID: otherID,
+            imageURL: URL(string: "https://example.com/latest.jpg")!,
+            latitude: 35.681236,
+            longitude: 139.767125,
+            createdAt: Date(timeIntervalSince1970: 300)
+        )
+        let olderUnread = GroomPost(
+            id: UUID(uuidString: "00000000-0000-0000-0000-000000000102")!,
+            authorID: otherID,
+            imageURL: URL(string: "https://example.com/older.jpg")!,
+            latitude: 35.681236,
+            longitude: 139.767125,
+            createdAt: Date(timeIntervalSince1970: 200)
+        )
+        let readPost = GroomPost(
+            id: UUID(uuidString: "00000000-0000-0000-0000-000000000103")!,
+            authorID: otherID,
+            imageURL: URL(string: "https://example.com/read.jpg")!,
+            latitude: 35.681236,
+            longitude: 139.767125,
+            createdAt: Date(timeIntervalSince1970: 400)
+        )
+        let viewerPost = GroomPost(
+            id: UUID(uuidString: "00000000-0000-0000-0000-000000000104")!,
+            authorID: viewerID,
+            imageURL: URL(string: "https://example.com/mine.jpg")!,
+            latitude: 35.681236,
+            longitude: 139.767125,
+            createdAt: Date(timeIntervalSince1970: 500)
+        )
+
+        let sorted = GroomFeedOrdering.sorted(
+            [readPost, viewerPost, olderUnread, latestUnread],
+            viewerID: viewerID,
+            viewedIDs: [readPost.id]
+        )
+
+        XCTAssertEqual(sorted.map(\.id), [latestUnread.id, olderUnread.id, readPost.id])
+    }
+
     func testLocationPermissionPhaseAndNoticeCopy() {
         let requesting = MegrumLocationState.permissionPhase(
             authorizationStatus: .notDetermined,

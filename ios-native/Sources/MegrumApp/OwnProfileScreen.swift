@@ -4,12 +4,6 @@ import MegrumDesign
 import PhotosUI
 #endif
 import SwiftUI
-#if canImport(UIKit)
-import UIKit
-#endif
-#if canImport(AppKit)
-import AppKit
-#endif
 
 struct OwnProfileSummary: Equatable, Sendable {
     var displayName: String
@@ -20,6 +14,8 @@ struct OwnProfileSummary: Equatable, Sendable {
     var inventoryCount: Int
     var wishCount: Int
     var activeTradeCount: Int
+    var completedTradeCount: Int
+    var listingCount: Int
 
     var prefectureText: String {
         trimmedNonEmpty(prefecture) ?? "未設定"
@@ -37,10 +33,19 @@ struct OwnProfileSummary: Equatable, Sendable {
         "\(activeTradeCount)件"
     }
 
+    var completedTradeText: String {
+        "\(completedTradeCount)"
+    }
+
+    var listingText: String {
+        "\(listingCount)"
+    }
+
     init?(
         viewer: UserProfile?,
         inventoryCount: Int,
         wishCount: Int,
+        listingCount: Int = 0,
         proposals: [TradeProposal],
         localDraft: OwnProfileEditDraft? = nil
     ) {
@@ -62,7 +67,9 @@ struct OwnProfileSummary: Equatable, Sendable {
         }
         self.inventoryCount = inventoryCount
         self.wishCount = wishCount
+        self.listingCount = listingCount
         self.activeTradeCount = proposals.filter(\.status.isOwnProfileActiveTrade).count
+        self.completedTradeCount = proposals.filter { $0.status == .completed }.count
     }
 }
 
@@ -225,68 +232,39 @@ enum OwnProfileEditValidation {
 @MainActor
 struct OwnProfileScreen: View {
     @ObservedObject var appState: MegrumAppState
+    var onClose: (() -> Void)?
     @State private var localDraft: OwnProfileEditDraft?
     @State private var editDraft = OwnProfileEditDraft.empty
     @State private var isProfileEditorPresented = false
     @State private var showsProfileCompletion = false
+    @State private var selectedProfileTab: ProfileVisualTab = .goods
+    @Environment(\.dismiss) private var dismiss
 
     private var summary: OwnProfileSummary? {
         OwnProfileSummary(
             viewer: appState.viewer,
             inventoryCount: appState.inventory.count,
             wishCount: appState.wishes.count,
+            listingCount: appState.listings.count,
             proposals: appState.proposals,
             localDraft: localDraft
         )
     }
 
     var body: some View {
-        List {
-            if let summary {
-                Section {
-                    OwnProfileHeader(summary: summary)
-                        .listRowInsets(EdgeInsets(top: 18, leading: 18, bottom: 18, trailing: 18))
-                }
-
-                Section("プロフィール") {
-                    OwnProfileInfoRow(title: "ユーザーID", value: summary.handleText, systemImage: "at")
-                    OwnProfileInfoRow(title: "性別", value: summary.genderText, systemImage: "person.2")
-                    OwnProfileInfoRow(title: "活動エリア", value: summary.prefectureText, systemImage: "mappin.and.ellipse")
-                }
-
-                Section("いまの状態") {
-                    OwnProfileMetricRow(title: "譲るもの", value: "\(summary.inventoryCount)件", systemImage: "shippingbox")
-                    OwnProfileMetricRow(title: "Wish", value: "\(summary.wishCount)件", systemImage: "heart")
-                    OwnProfileMetricRow(title: "進行中のやりとり", value: summary.activeTradeText, systemImage: "arrow.left.arrow.right")
-                }
-
-                Section {
-                    Button {
-                        openProfileEditor(summary: summary)
-                    } label: {
-                        Label("基本プロフィールを編集", systemImage: "square.and.pencil")
-                    }
-
-                    NavigationLink {
-                        AccountSetupScreen(appState: appState, mode: .edit)
-                    } label: {
-                        Label("推し設定を編集", systemImage: "sparkles")
-                    }
-                } footer: {
-                    Text("表示名、ユーザーID、性別、活動エリアと、複数の推しを確認できます。")
-                }
-            } else {
-                Section {
-                    ContentUnavailableView(
-                        "プロフィールを読み込めません",
-                        systemImage: "person.crop.circle",
-                        description: Text("ログイン状態を確認してからもう一度開いてください。")
-                    )
-                }
-            }
+        ScrollView {
+            OwnProfileContent(
+                summary: summary,
+                selectedProfileTab: $selectedProfileTab,
+                profileBio: summary.map(profileBio) ?? "",
+                profileChips: profileChips,
+                profileGridItems: profileGridItems(for: selectedProfileTab),
+                onClose: closePage,
+                onEdit: openCurrentProfileEditor
+            )
         }
-        .navigationTitle("自分のプロフィール")
-        .megrumInlineNavigationTitle()
+        .background(MegrumTheme.canvas.ignoresSafeArea())
+        .megrumHiddenNavigationBar()
         .sheet(isPresented: $isProfileEditorPresented) {
             NavigationStack {
                 OwnProfileEditForm(
@@ -304,11 +282,99 @@ struct OwnProfileScreen: View {
         .onChange(of: appState.viewer) {
             localDraft = nil
         }
+        .task {
+            await loadSupplementalProfileDataIfNeeded()
+        }
+    }
+
+    private var profileChips: [String] {
+        let selectionChips = appState.userOshiSelections
+            .sorted { $0.priority < $1.priority }
+            .compactMap { selection -> String? in
+                let groupName = trimmedNonEmpty(selection.groupName) ?? trimmedNonEmpty(selection.oshiRequestName)
+                let memberName = trimmedNonEmpty(selection.characterName) ?? trimmedNonEmpty(selection.characterRequestName)
+                switch (groupName, memberName) {
+                case let (.some(group), .some(member)):
+                    return "\(group) / \(member)"
+                case let (.some(group), .none):
+                    return group
+                case let (.none, .some(member)):
+                    return member
+                case (.none, .none):
+                    return nil
+                }
+            }
+
+        if !selectionChips.isEmpty {
+            return selectionChips
+        }
+        return ["推し未設定"]
+    }
+
+    private func profileBio(_ summary: OwnProfileSummary) -> String {
+        let parts = [
+            summary.prefectureText,
+            summary.genderText
+        ].filter { !$0.isEmpty && $0 != "未設定" }
+        guard !parts.isEmpty else {
+            return "プロフィール情報を編集できます"
+        }
+        return parts.joined(separator: " / ")
+    }
+
+    private func profileGridItems(for tab: ProfileVisualTab) -> [ProfileVisualGridItem] {
+        switch tab {
+        case .goods:
+            return appState.inventory.map { item in
+                ProfileVisualGridItem(id: item.id, title: item.title, imageURL: item.imageURL)
+            }
+        case .listings:
+            return listingGridItems()
+        case .wish:
+            return appState.wishes.map { item in
+                ProfileVisualGridItem(id: item.id, title: item.title, imageURL: item.imageURL)
+            }
+        }
+    }
+
+    private func listingGridItems() -> [ProfileVisualGridItem] {
+        let inventoryByID = Dictionary(uniqueKeysWithValues: appState.inventory.map { ($0.id, $0) })
+        return appState.listings.compactMap { listing in
+            guard let firstHave = listing.haves.first,
+                  let item = inventoryByID[firstHave.itemID] else {
+                return nil
+            }
+            return ProfileVisualGridItem(id: listing.id, title: item.title, imageURL: item.imageURL)
+        }
+    }
+
+    private func closePage() {
+        if let onClose {
+            onClose()
+        } else {
+            dismiss()
+        }
+    }
+
+    private func openCurrentProfileEditor() {
+        guard let summary else {
+            return
+        }
+        openProfileEditor(summary: summary)
     }
 
     private func openProfileEditor(summary: OwnProfileSummary) {
         editDraft = OwnProfileEditDraft(summary: summary)
         isProfileEditorPresented = true
+    }
+
+    private func loadSupplementalProfileDataIfNeeded() async {
+        if appState.userOshiSelections.isEmpty {
+            await appState.loadUserOshiSelections()
+        }
+        if appState.mailingAddress == nil {
+            await appState.loadMailingAddress()
+        }
     }
 
     private func saveProfileDraft(_ savedDraft: OwnProfileEditDraft) async -> Bool {
@@ -338,7 +404,6 @@ private struct OwnProfileEditForm: View {
     var isSaving = false
     var onSave: (OwnProfileEditDraft) async -> Bool
     @Environment(\.dismiss) private var dismiss
-    @FocusState private var focusedField: Field?
     @State private var isSubmitting = false
     @State private var avatarError: String?
 #if canImport(PhotosUI)
@@ -350,23 +415,12 @@ private struct OwnProfileEditForm: View {
 
     var body: some View {
         Form {
-            avatarSection
+            avatarSectionView
 
-            Section("基本情報") {
-                handleField
-                displayNameField
-            }
-
-            Section("公開情報") {
-                Picker("性別", selection: $draft.gender) {
-                    Text("未設定").tag(UserGender?.none)
-                    ForEach(UserGender.allCases) { option in
-                        Text(option.label).tag(Optional(option))
-                    }
-                }
-
-                prefecturePicker
-            }
+            OwnProfileEditProfileFields(
+                draft: $draft,
+                onSubmitSave: submitSave
+            )
 
             if let error = draft.validationError {
                 Section {
@@ -386,9 +440,7 @@ private struct OwnProfileEditForm: View {
 
             ToolbarItem(placement: .confirmationAction) {
                 Button("保存") {
-                    Task {
-                        await save()
-                    }
+                    submitSave()
                 }
                 .disabled(!draft.isValid || isSaving || isSubmitting)
             }
@@ -411,117 +463,35 @@ private struct OwnProfileEditForm: View {
     }
 
     @ViewBuilder
-    private var avatarSection: some View {
-        Section("アイコン画像") {
-            HStack(alignment: .center, spacing: 16) {
-                OwnProfileAvatarImage(
-                    avatarURL: draft.visibleAvatarURL,
-                    localData: draft.localAvatarData,
-                    initial: draft.normalizedDisplayName.first.map(String.init) ?? "M",
-                    size: 72
-                )
-
-                VStack(alignment: .leading, spacing: 10) {
+    private var avatarSectionView: some View {
 #if canImport(PhotosUI)
-                    PhotosPicker(selection: $selectedAvatarItem, matching: .images) {
-                        Label("写真を選ぶ", systemImage: "photo")
-                    }
+        OwnProfileEditAvatarSection(
+            draft: $draft,
+            avatarError: avatarError,
+            selectedAvatarItem: $selectedAvatarItem,
+            onShowCamera: showCameraCapture,
+            onDeleteAvatar: deleteAvatar
+        )
+#else
+        OwnProfileEditAvatarSection(
+            draft: $draft,
+            avatarError: avatarError,
+            onShowCamera: showCameraCapture,
+            onDeleteAvatar: deleteAvatar
+        )
 #endif
+    }
 
+    private func submitSave() {
+        Task {
+            await save()
+        }
+    }
+
+    private func showCameraCapture() {
 #if os(iOS)
-                    Button {
-                        isShowingCameraCapture = true
-                    } label: {
-                        Label("カメラで撮影", systemImage: "camera")
-                    }
+        isShowingCameraCapture = true
 #endif
-
-                    if draft.hasVisibleAvatar || draft.clearsAvatar {
-                        Button(role: .destructive) {
-                            deleteAvatar()
-                        } label: {
-                            Label("アイコンを削除", systemImage: "trash")
-                        }
-                    }
-                }
-                .buttonStyle(.borderless)
-            }
-
-            if draft.hasLocalAvatarUpload {
-                Label("保存すると新しいアイコンに更新されます", systemImage: "checkmark.circle.fill")
-                    .foregroundStyle(MegrumTheme.lavender)
-            } else if draft.clearsAvatar {
-                Label("保存するとアイコンを削除します", systemImage: "trash")
-                    .foregroundStyle(Color(red: 0.851, green: 0.51, blue: 0.42))
-            }
-
-            if let avatarError {
-                Label(avatarError, systemImage: "exclamationmark.triangle.fill")
-                    .foregroundStyle(Color(red: 0.851, green: 0.51, blue: 0.42))
-            }
-        }
-    }
-
-    @ViewBuilder
-    private var prefecturePicker: some View {
-        #if os(iOS)
-        Picker("活動エリア", selection: $draft.prefecture) {
-            Text("指定なし").tag("")
-            ForEach(OwnProfileEditValidation.japanPrefectures, id: \.self) { prefecture in
-                Text(prefecture).tag(prefecture)
-            }
-        }
-        .pickerStyle(.navigationLink)
-        #else
-        Picker("活動エリア", selection: $draft.prefecture) {
-            Text("指定なし").tag("")
-            ForEach(OwnProfileEditValidation.japanPrefectures, id: \.self) { prefecture in
-                Text(prefecture).tag(prefecture)
-            }
-        }
-        #endif
-    }
-
-    @ViewBuilder
-    private var handleField: some View {
-        #if os(iOS)
-        TextField("ユーザーID", text: $draft.handle)
-            .textInputAutocapitalization(.never)
-            .autocorrectionDisabled()
-            .focused($focusedField, equals: .handle)
-            .submitLabel(.next)
-            .onSubmit {
-                focusedField = .displayName
-            }
-        #else
-        TextField("ユーザーID", text: $draft.handle)
-            .focused($focusedField, equals: .handle)
-            .onSubmit {
-                focusedField = .displayName
-            }
-        #endif
-    }
-
-    @ViewBuilder
-    private var displayNameField: some View {
-        #if os(iOS)
-        TextField("表示名", text: $draft.displayName)
-            .focused($focusedField, equals: .displayName)
-            .submitLabel(.done)
-            .onSubmit {
-                Task {
-                    await save()
-                }
-            }
-        #else
-        TextField("表示名", text: $draft.displayName)
-            .focused($focusedField, equals: .displayName)
-            .onSubmit {
-                Task {
-                    await save()
-                }
-            }
-        #endif
     }
 
     private func save() async {
@@ -586,165 +556,6 @@ private struct OwnProfileEditForm: View {
     }
 #endif
 
-    private enum Field {
-        case handle
-        case displayName
-    }
-}
-
-private struct OwnProfileHeader: View {
-    var summary: OwnProfileSummary
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            OwnProfileAvatarImage(
-                avatarURL: summary.avatarURL,
-                localData: nil,
-                initial: initial,
-                size: 78
-            )
-
-            VStack(alignment: .leading, spacing: 5) {
-                Text(summary.displayName)
-                    .font(.system(size: 28, weight: .heavy, design: .rounded))
-                    .foregroundStyle(MegrumTheme.ink)
-                    .lineLimit(1)
-
-                Text(summary.handleText)
-                    .font(.headline.weight(.bold))
-                    .foregroundStyle(MegrumTheme.muted)
-            }
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(4)
-    }
-
-    private var initial: String {
-        summary.displayName.first.map(String.init) ?? "M"
-    }
-}
-
-private struct OwnProfileAvatarImage: View {
-    var avatarURL: URL?
-    var localData: Data?
-    var initial: String
-    var size: CGFloat
-
-    var body: some View {
-        ZStack {
-            avatarContent
-        }
-        .frame(width: size, height: size)
-        .clipShape(Circle())
-        .overlay {
-            Circle()
-                .strokeBorder(.white.opacity(0.85), lineWidth: 2)
-        }
-        .shadow(color: .black.opacity(0.10), radius: 8, x: 0, y: 4)
-        .accessibilityLabel("プロフィール画像")
-    }
-
-    @ViewBuilder
-    private var avatarContent: some View {
-#if canImport(UIKit)
-        if let localData, let image = UIImage(data: localData) {
-            Image(uiImage: image)
-                .resizable()
-                .scaledToFill()
-        } else if let avatarURL {
-            remoteAvatar(url: avatarURL)
-        } else {
-            fallbackAvatar
-        }
-#elseif canImport(AppKit)
-        if let localData, let image = NSImage(data: localData) {
-            Image(nsImage: image)
-                .resizable()
-                .scaledToFill()
-        } else if let avatarURL {
-            remoteAvatar(url: avatarURL)
-        } else {
-            fallbackAvatar
-        }
-#else
-        if let avatarURL {
-            remoteAvatar(url: avatarURL)
-        } else {
-            fallbackAvatar
-        }
-#endif
-    }
-
-    private func remoteAvatar(url: URL) -> some View {
-        AsyncImage(url: url) { phase in
-            switch phase {
-            case let .success(image):
-                image
-                    .resizable()
-                    .scaledToFill()
-            default:
-                fallbackAvatar
-            }
-        }
-    }
-
-    private var fallbackAvatar: some View {
-        ZStack {
-            Circle()
-                .fill(
-                    LinearGradient(
-                        colors: [MegrumTheme.lavender, MegrumTheme.sky],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                )
-            Text(initial)
-                .font(.system(size: size * 0.44, weight: .black, design: .rounded))
-                .foregroundStyle(.white)
-        }
-    }
-}
-
-private struct OwnProfileInfoRow: View {
-    var title: String
-    var value: String
-    var systemImage: String
-
-    var body: some View {
-        Label {
-            HStack {
-                Text(title)
-                Spacer()
-                Text(value)
-                    .foregroundStyle(MegrumTheme.muted)
-                    .multilineTextAlignment(.trailing)
-            }
-        } icon: {
-            Image(systemName: systemImage)
-                .foregroundStyle(MegrumTheme.lavender)
-        }
-    }
-}
-
-private struct OwnProfileMetricRow: View {
-    var title: String
-    var value: String
-    var systemImage: String
-
-    var body: some View {
-        Label {
-            HStack {
-                Text(title)
-                Spacer()
-                Text(value)
-                    .font(.body.weight(.semibold))
-                    .foregroundStyle(MegrumTheme.ink)
-            }
-        } icon: {
-            Image(systemName: systemImage)
-                .foregroundStyle(MegrumTheme.lavender)
-        }
-    }
 }
 
 private extension UserProfile {

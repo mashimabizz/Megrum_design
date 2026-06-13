@@ -8,7 +8,6 @@ final class AppDrawerGestureTests: XCTestCase {
             [
                 "プロフィール",
                 "通知",
-                "プロフィール編集",
                 "推し設定",
                 "スケジュール",
                 "完了した取引"

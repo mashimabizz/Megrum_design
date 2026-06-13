@@ -45,6 +45,12 @@ final class TradeChatAffordanceTests: XCTestCase {
         XCTAssertEqual(pending.filter { $0.status == .sent }.count, 2)
     }
 
+    func testNativePreviewPendingProposalHasSwipeableGoodsOnBothSides() throws {
+        let proposal = try XCTUnwrap(NativePreviewData.proposals.first { $0.status == .negotiating })
+        XCTAssertGreaterThanOrEqual(proposal.goodsOffered(by: NativePreviewData.viewerID)?.count ?? 0, 2)
+        XCTAssertGreaterThanOrEqual(proposal.goodsRequested(by: NativePreviewData.viewerID)?.count ?? 0, 2)
+    }
+
     func testTradeCardPresentationMatchesRnPendingStatusCopy() {
         let viewerID = UUID(uuidString: "00000000-0000-0000-0000-000000000001")!
         let partnerID = UUID(uuidString: "00000000-0000-0000-0000-000000000002")!
@@ -78,6 +84,178 @@ final class TradeChatAffordanceTests: XCTestCase {
         XCTAssertEqual(presentation.statusText, "新着打診")
         XCTAssertEqual(presentation.responseText, "要対応")
         XCTAssertEqual(presentation.tone, .action)
+        XCTAssertEqual(presentation.meetupSummaryText, "横浜アリーナ × 候補確認中")
+    }
+
+    func testTradeMeetupSummaryCopyShowsOnlyFirstCandidateAndRemainingCount() {
+        XCTAssertEqual(
+            TradeMeetupSummaryCopy.displayText(
+                primaryText: "横浜アリーナ × 17:00-18:00",
+                additionalCandidateCount: 2
+            ),
+            "横浜アリーナ × 17:00-18:00 / 他2件の候補"
+        )
+        XCTAssertEqual(
+            TradeMeetupSummaryCopy.displayText(primaryText: "  ", additionalCandidateCount: 1),
+            "候補確認中 / 他1件の候補"
+        )
+    }
+
+    func testTradeCardPresentationUsesFirstMeetupCandidateAndRemainingCount() {
+        let viewerID = UUID(uuidString: "00000000-0000-0000-0000-000000000001")!
+        let partnerID = UUID(uuidString: "00000000-0000-0000-0000-000000000002")!
+        let calendar = Calendar.current
+        let day = calendar.startOfDay(for: Date(timeIntervalSince1970: 1_800_000_000))
+        let firstStart = calendar.date(byAdding: .hour, value: 9, to: day)!
+        let firstEnd = calendar.date(byAdding: .minute, value: 30, to: firstStart)!
+        let secondStart = calendar.date(byAdding: .hour, value: 13, to: day)!
+        let secondEnd = calendar.date(byAdding: .minute, value: 30, to: secondStart)!
+        let proposal = TradeProposal(
+            id: UUID(uuidString: "00000000-0000-0000-0000-000000000302")!,
+            senderID: partnerID,
+            receiverID: viewerID,
+            status: .sent,
+            exchangeMethod: .hand,
+            senderGoodsIDs: [],
+            receiverGoodsIDs: [],
+            meetupCandidates: [
+                ProposalMeetupInput(
+                    startAt: firstStart,
+                    endAt: firstEnd,
+                    placeName: "横浜アリーナ 北口",
+                    latitude: 35.5122,
+                    longitude: 139.6171
+                ),
+                ProposalMeetupInput(
+                    startAt: secondStart,
+                    endAt: secondEnd,
+                    placeName: "新横浜駅",
+                    latitude: 35.5075,
+                    longitude: 139.6175
+                )
+            ]
+        )
+
+        let presentation = TradeCardPresentation(
+            proposal: proposal,
+            viewerID: viewerID,
+            profilesByUserID: [:],
+            now: day
+        )
+
+        XCTAssertEqual(presentation.meetupSummaryText, "横浜アリーナ 北口 × 09:00-09:30 / 他1件の候補")
+    }
+
+    func testTradeGoodsCarouselLayoutKeepsDraggingCardsInsideStage() {
+        let stageWidth: CGFloat = 124
+        let heroWidth: CGFloat = 92
+        let heroHeight: CGFloat = 128
+
+        for position in stride(from: -1.18, through: 1.18, by: 0.24) {
+            let metrics = TradeGoodsCarouselLayout.cardMetrics(
+                for: position,
+                heroWidth: heroWidth,
+                heroHeight: heroHeight,
+                stageWidth: stageWidth
+            )
+            let leftEdge = stageWidth / 2 + metrics.xOffset - metrics.width / 2
+            let rightEdge = stageWidth / 2 + metrics.xOffset + metrics.width / 2
+            XCTAssertGreaterThanOrEqual(leftEdge, 0, "position \(position) should stay inside the left edge")
+            XCTAssertLessThanOrEqual(rightEdge, stageWidth, "position \(position) should stay inside the right edge")
+        }
+    }
+
+    func testTradeDetailHeroDistinguishesIncomingAndOutgoingProposals() {
+        let viewerID = UUID(uuidString: "00000000-0000-0000-0000-000000000001")!
+        let partnerID = UUID(uuidString: "00000000-0000-0000-0000-000000000002")!
+        let partner = PublicUserProfile(
+            profile: UserProfile(id: partnerID, handle: "michi1", displayName: "みち"),
+            averageStars: nil,
+            evaluationCount: 0,
+            completedTradeCount: 0
+        )
+        let incoming = makeProposal(
+            id: UUID(uuidString: "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbb0101")!,
+            senderID: partnerID,
+            receiverID: viewerID,
+            status: .sent
+        )
+        let outgoing = TradeProposal(
+            id: UUID(uuidString: "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbb0102")!,
+            senderID: viewerID,
+            receiverID: partnerID,
+            status: .sent,
+            exchangeMethod: .hand,
+            senderGoodsIDs: [UUID(uuidString: "11111111-1111-1111-1111-111111111111")!],
+            receiverGoodsIDs: [UUID(uuidString: "22222222-2222-2222-2222-222222222222")!],
+            agreedBySender: true
+        )
+
+        let incomingPresentation = TradeDetailHeroPresentation(
+            proposal: incoming,
+            viewerID: viewerID,
+            profilesByUserID: [partnerID: partner]
+        )
+        let outgoingPresentation = TradeDetailHeroPresentation(
+            proposal: outgoing,
+            viewerID: viewerID,
+            profilesByUserID: [partnerID: partner]
+        )
+
+        XCTAssertEqual(incomingPresentation.relationText, "相手から届いた打診")
+        XCTAssertEqual(incomingPresentation.statusLabel, "新着打診")
+        XCTAssertEqual(incomingPresentation.agreementLabel, "未合意")
+        XCTAssertTrue(incomingPresentation.guidanceText.contains("承諾"))
+        XCTAssertEqual(outgoingPresentation.relationText, "あなたから送った打診")
+        XCTAssertEqual(outgoingPresentation.statusLabel, "相手待ち")
+        XCTAssertEqual(outgoingPresentation.agreementLabel, "返信待ち")
+        XCTAssertTrue(outgoingPresentation.guidanceText.contains("相手の返答"))
+    }
+
+    func testTradeDetailHeroReflectsAgreementAndCompletionStates() {
+        let viewerID = UUID(uuidString: "00000000-0000-0000-0000-000000000001")!
+        let partnerID = UUID(uuidString: "00000000-0000-0000-0000-000000000002")!
+        let waitingForViewer = TradeProposal(
+            id: UUID(uuidString: "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbb0103")!,
+            senderID: partnerID,
+            receiverID: viewerID,
+            status: .agreementOneSide,
+            exchangeMethod: .hand,
+            senderGoodsIDs: [UUID(uuidString: "11111111-1111-1111-1111-111111111111")!],
+            receiverGoodsIDs: [UUID(uuidString: "22222222-2222-2222-2222-222222222222")!],
+            agreedBySender: true
+        )
+        let completed = TradeProposal(
+            id: UUID(uuidString: "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbb0104")!,
+            senderID: viewerID,
+            receiverID: partnerID,
+            status: .completed,
+            exchangeMethod: .hand,
+            senderGoodsIDs: [UUID(uuidString: "11111111-1111-1111-1111-111111111111")!],
+            receiverGoodsIDs: [UUID(uuidString: "22222222-2222-2222-2222-222222222222")!],
+            agreedBySender: true,
+            agreedByReceiver: true,
+            approvedBySender: true,
+            approvedByReceiver: true
+        )
+
+        let agreementPresentation = TradeDetailHeroPresentation(
+            proposal: waitingForViewer,
+            viewerID: viewerID,
+            profilesByUserID: [:]
+        )
+        let completedPresentation = TradeDetailHeroPresentation(
+            proposal: completed,
+            viewerID: viewerID,
+            profilesByUserID: [:]
+        )
+
+        XCTAssertEqual(agreementPresentation.statusLabel, "合意待ち")
+        XCTAssertEqual(agreementPresentation.agreementLabel, "あなたの合意待ち")
+        XCTAssertTrue(agreementPresentation.guidanceText.contains("相手は合意済み"))
+        XCTAssertEqual(completedPresentation.statusLabel, "完了")
+        XCTAssertEqual(completedPresentation.agreementLabel, "完了")
+        XCTAssertTrue(completedPresentation.guidanceText.contains("取引完了済み"))
     }
 
     func testTradePreviewThumbnailStyleUsesRnLikeGlyphs() {

@@ -3,237 +3,6 @@ import MegrumCore
 import MegrumDesign
 import SwiftUI
 
-enum ProposalStepSwipeNavigator {
-    static let minimumHorizontalDistance: CGFloat = 56
-    static let horizontalPriorityRatio: CGFloat = 1.35
-
-    static func destination(
-        from currentStep: ProposalCreateStep,
-        translationWidth: CGFloat,
-        translationHeight: CGFloat,
-        visibleSteps: [ProposalCreateStep]
-    ) -> ProposalCreateStep? {
-        let absX = abs(translationWidth)
-        let absY = abs(translationHeight)
-        guard absX >= minimumHorizontalDistance, absX >= absY * horizontalPriorityRatio else {
-            return nil
-        }
-        guard let currentIndex = visibleSteps.firstIndex(of: currentStep) else {
-            return nil
-        }
-        let destinationIndex = translationWidth < 0 ? currentIndex + 1 : currentIndex - 1
-        guard visibleSteps.indices.contains(destinationIndex) else {
-            return nil
-        }
-        return visibleSteps[destinationIndex]
-    }
-}
-
-enum ProposalMeetupCalendarModel {
-    static let visibleDayCount = 7
-    static let slotMinutes = 15
-    static let slotCount = 24 * (60 / slotMinutes)
-    static let slotHeight: CGFloat = 16
-    static let timeLabelWidth: CGFloat = 52
-    static let daySpacing: CGFloat = 0
-    static let minimumDayWidth: CGFloat = 34
-    static let swipeThreshold: CGFloat = 56
-    static let longPressDuration: TimeInterval = 0.28
-    static let touchCancelDistance: CGFloat = 12
-    static let defaultDurationSlots = 2
-    static let edgeCarryRatio: CGFloat = 0.42
-
-    static func visibleDays(anchorDate: Date, calendar: Calendar = .current) -> [Date] {
-        let start = calendar.startOfDay(for: anchorDate)
-        return (0..<visibleDayCount).compactMap { offset in
-            calendar.date(byAdding: .day, value: offset, to: start)
-        }
-    }
-
-    static func shiftedAnchor(anchorDate: Date, direction: Int, calendar: Calendar = .current) -> Date {
-        let start = calendar.startOfDay(for: anchorDate)
-        return calendar.date(byAdding: .day, value: direction * visibleDayCount, to: start) ?? start
-    }
-
-    static func monthGridDays(anchorDate: Date, calendar: Calendar = .current) -> [Date?] {
-        guard let month = calendar.dateInterval(of: .month, for: anchorDate),
-              let dayRange = calendar.range(of: .day, in: .month, for: anchorDate)
-        else {
-            return []
-        }
-        let leadingBlanks = calendar.component(.weekday, from: month.start) - 1
-        var days: [Date?] = Array(repeating: nil, count: max(0, leadingBlanks))
-        days.append(contentsOf: dayRange.compactMap { day in
-            calendar.date(byAdding: .day, value: day - 1, to: month.start)
-        })
-        while days.count % 7 != 0 {
-            days.append(nil)
-        }
-        return days
-    }
-
-    static func slotIndex(for date: Date, calendar: Calendar = .current) -> Int {
-        let hour = calendar.component(.hour, from: date)
-        let minute = calendar.component(.minute, from: date)
-        let slot = hour * (60 / slotMinutes) + Int(Double(minute) / Double(slotMinutes))
-        return max(0, min(slotCount - 1, slot))
-    }
-
-    static func slotIndex(forHour hour: Int) -> Int {
-        max(0, min(slotCount - 1, hour * (60 / slotMinutes)))
-    }
-
-    static func normalizedSlotRange(startSlot: Int, currentSlot: Int) -> ClosedRange<Int> {
-        let lower = max(0, min(startSlot, currentSlot))
-        let upper = min(slotCount, max(startSlot + 1, currentSlot + 1))
-        return lower...upper
-    }
-
-    static func clampedStartSlot(_ value: Int, duration: Int) -> Int {
-        max(0, min(slotCount - max(duration, 1), value))
-    }
-
-    static func date(for day: Date, slot: Int, calendar: Calendar = .current) -> Date {
-        let start = calendar.startOfDay(for: day)
-        return calendar.date(byAdding: .minute, value: slot * slotMinutes, to: start) ?? start
-    }
-
-    static func shouldCreateCandidateOnBoardEnd(wasLongPressed: Bool) -> Bool {
-        wasLongPressed
-    }
-
-    static func dayWidth(containerWidth: CGFloat) -> CGFloat {
-        guard containerWidth > 0 else {
-            return minimumDayWidth
-        }
-        let spacingWidth = daySpacing * CGFloat(visibleDayCount - 1)
-        let available = containerWidth - timeLabelWidth - spacingWidth
-        return max(minimumDayWidth, floor(available / CGFloat(visibleDayCount)))
-    }
-
-    static func weekdayLabel(for date: Date, calendar: Calendar = .current) -> String {
-        let labels = ["日", "月", "火", "水", "木", "金", "土"]
-        return labels[max(0, min(labels.count - 1, calendar.component(.weekday, from: date) - 1))]
-    }
-
-    static func dayNumberLabel(for date: Date, calendar: Calendar = .current) -> String {
-        "\(calendar.component(.day, from: date))"
-    }
-
-    static func monthDayCellWidth(containerWidth: CGFloat) -> CGFloat {
-        max(42, floor(containerWidth * 0.1372))
-    }
-
-    static func monthGridWidth(containerWidth: CGFloat) -> CGFloat {
-        let cellWidth = monthDayCellWidth(containerWidth: containerWidth)
-        return cellWidth * CGFloat(visibleDayCount) + 4 * CGFloat(visibleDayCount - 1)
-    }
-
-    static func monthGridHeight(rowCount: Int) -> CGFloat {
-        let weekdayHeight: CGFloat = 14
-        let rowHeight: CGFloat = 74
-        let rowSpacing: CGFloat = 4
-        let rows = CGFloat(max(1, rowCount))
-        return weekdayHeight + rowSpacing + rows * rowHeight + max(0, rows - 1) * rowSpacing
-    }
-
-    static func weekGridWidth(dayWidth: CGFloat) -> CGFloat {
-        timeLabelWidth
-            + dayWidth * CGFloat(visibleDayCount)
-            + daySpacing * CGFloat(visibleDayCount - 1)
-    }
-
-    static func clampedWeekDragOffset(_ translationWidth: CGFloat, containerWidth: CGFloat) -> CGFloat {
-        let maxDrag = max(1, containerWidth) * edgeCarryRatio
-        return max(-maxDrag, min(maxDrag, translationWidth))
-    }
-
-    static func shouldShiftWeek(translationWidth: CGFloat, translationHeight: CGFloat, containerWidth: CGFloat) -> Bool {
-        let threshold = min(96, max(44, containerWidth * 0.22))
-        return abs(translationWidth) >= threshold
-            && abs(translationWidth) >= abs(translationHeight) * 1.25
-    }
-}
-
-extension ProposalMeetupCandidateDraft {
-    func applyingCalendarRange(
-        day: Date,
-        startSlot: Int,
-        endSlot: Int,
-        calendar: Calendar = .current
-    ) -> ProposalMeetupCandidateDraft {
-        var draft = self
-        draft.startAt = ProposalMeetupCalendarModel.date(for: day, slot: startSlot, calendar: calendar)
-        draft.endAt = ProposalMeetupCalendarModel.date(for: day, slot: endSlot, calendar: calendar)
-        return draft
-    }
-}
-
-private struct ProposalMeetupCalendarPreview: Equatable {
-    var dayIndex: Int
-    var startSlot: Int
-    var currentSlot: Int
-}
-
-private enum ProposalMeetupCalendarCandidateEditAction {
-    case move
-    case resizeEnd
-}
-
-private struct ProposalMeetupCalendarCandidateEdit: Equatable {
-    var index: Int
-    var dayIndex: Int
-    var startSlot: Int
-    var endSlot: Int
-}
-
-private enum ProposalMeetupCalendarBoardTouchMode {
-    case pending
-    case swiping
-    case creating
-}
-
-private struct ProposalMeetupCalendarBoardTouchState {
-    var startTime: Date
-    var startLocation: CGPoint
-    var dayIndex: Int
-    var startSlot: Int
-    var mode: ProposalMeetupCalendarBoardTouchMode
-}
-
-private enum ProposalMeetupCalendarCandidateTouchMode {
-    case pending
-    case editing
-}
-
-enum ProposalMeetupCalendarDisplayMode: String, CaseIterable, Identifiable, Equatable {
-    case week
-    case month
-
-    var id: String { rawValue }
-
-    var title: String {
-        switch self {
-        case .week:
-            "週"
-        case .month:
-            "月"
-        }
-    }
-}
-
-private struct ProposalMeetupCalendarCandidateTouchState {
-    var startTime: Date
-    var startLocation: CGPoint
-    var draftIndex: Int
-    var action: ProposalMeetupCalendarCandidateEditAction
-    var originalDayIndex: Int
-    var originalStartSlot: Int
-    var originalEndSlot: Int
-    var pointerStartOffsetSlots: Int
-    var mode: ProposalMeetupCalendarCandidateTouchMode
-}
-
 struct ProposalMeetupCalendarEditor: View {
     var drafts: [ProposalMeetupCandidateDraft]
     var selectedIndex: Int
@@ -242,9 +11,11 @@ struct ProposalMeetupCalendarEditor: View {
     var onSelectDraft: (Int) -> Void
     var onShiftWeek: (Int) -> Void
     var onSelectMonthDay: (Date) -> Void
+    var onShiftMonth: (Int) -> Void
     var onCreateDraft: (Date, Int, Int) -> Void
     var onUpdateDraft: (Int, Date, Int, Int) -> Void
-    var onOpenPlaceEntry: () -> Void
+    var onRemoveDraft: (Int) -> Void
+    var onOpenPlaceEntry: (Int) -> Void
 
     @State private var displayMode: ProposalMeetupCalendarDisplayMode = Self.initialDisplayMode()
     @State private var boardTouchState: ProposalMeetupCalendarBoardTouchState?
@@ -268,6 +39,12 @@ struct ProposalMeetupCalendarEditor: View {
         ProposalMeetupCalendarCard {
             VStack(alignment: .leading, spacing: 10) {
                 HStack {
+                    if displayMode == .week {
+                        Text(ProposalMeetupCalendarModel.monthTitle(anchorDate: anchorDate, calendar: calendar))
+                            .font(.system(size: 18, weight: .black, design: .rounded))
+                            .foregroundStyle(MegrumTheme.ink)
+                    }
+
                     Spacer(minLength: 0)
                     ProposalMeetupCalendarModeToggle(selection: $displayMode)
                 }
@@ -279,6 +56,7 @@ struct ProposalMeetupCalendarEditor: View {
                     ProposalMeetupMonthCalendar(
                         anchorDate: anchorDate,
                         scheduleContext: scheduleContext,
+                        onShiftMonth: onShiftMonth,
                         onSelectDay: { day in
                             onSelectMonthDay(day)
                             displayMode = .week
@@ -297,22 +75,14 @@ struct ProposalMeetupCalendarEditor: View {
             let days = ProposalMeetupCalendarModel.visibleDays(anchorDate: anchorDate, calendar: calendar)
 
             VStack(spacing: 8) {
-                HStack(spacing: ProposalMeetupCalendarModel.daySpacing) {
-                    Color.clear
-                        .frame(width: ProposalMeetupCalendarModel.timeLabelWidth, height: 1)
-                    ForEach(Array(days.enumerated()), id: \.offset) { index, day in
-                        VStack(spacing: 2) {
-                            Text(ProposalMeetupCalendarModel.weekdayLabel(for: day, calendar: calendar))
-                                .font(.system(size: 11, weight: .black, design: .rounded))
-                                .foregroundStyle(MegrumTheme.muted)
-                            Text(ProposalMeetupCalendarModel.dayNumberLabel(for: day, calendar: calendar))
-                                .font(.system(size: 24, weight: .black, design: .rounded))
-                                .foregroundStyle(selectedDayColor(index: index))
-                        }
-                        .frame(width: dayWidth)
-                    }
-                }
+                ProposalMeetupCalendarWeekHeader(
+                    days: days,
+                    dayWidth: dayWidth,
+                    selectedDayIndex: selectedDayIndex,
+                    calendar: calendar
+                )
                 .frame(width: gridWidth, alignment: .leading)
+                .frame(maxWidth: .infinity, alignment: .center)
                 .offset(x: weekDragOffset)
                 .animation(.snappy(duration: 0.18), value: weekDragOffset)
                 .gesture(weekHeaderSwipeGesture(containerWidth: geometry.size.width))
@@ -320,17 +90,32 @@ struct ProposalMeetupCalendarEditor: View {
                 ScrollViewReader { proxy in
                     ScrollView(.vertical, showsIndicators: false) {
                         ZStack(alignment: .topLeading) {
-                            calendarBackground(days: days, dayWidth: dayWidth)
+                            ProposalMeetupCalendarWeekTimelineBackground(
+                                days: days,
+                                dayWidth: dayWidth,
+                                selectedDayIndex: selectedDayIndex
+                            )
+                                .contentShape(Rectangle())
+                                .gesture(boardGesture(days: days, dayWidth: dayWidth))
+                                .zIndex(0)
                             candidateBlocks(days: days, dayWidth: dayWidth)
-                            previewBlock(dayWidth: dayWidth)
-                            weekLongPressHint(dayWidth: dayWidth)
+                                .zIndex(2)
+                            ProposalMeetupCalendarWeekPreviewBlock(
+                                preview: previewDraft,
+                                dayWidth: dayWidth
+                            )
+                                .zIndex(3)
+                            ProposalMeetupCalendarWeekLongPressHint(
+                                isVisible: drafts.isEmpty && previewDraft == nil,
+                                dayWidth: dayWidth
+                            )
+                                .zIndex(4)
                         }
                         .frame(width: gridWidth, alignment: .topLeading)
                         .coordinateSpace(name: "proposalMeetupCalendar")
-                        .contentShape(Rectangle())
-                        .gesture(boardGesture(days: days, dayWidth: dayWidth))
                         .offset(x: weekDragOffset)
                         .animation(.snappy(duration: 0.18), value: weekDragOffset)
+                        .frame(maxWidth: .infinity, alignment: .center)
                     }
                     .frame(height: 500)
                     .onAppear {
@@ -348,131 +133,71 @@ struct ProposalMeetupCalendarEditor: View {
         .frame(height: 552)
     }
 
-    private func calendarBackground(days: [Date], dayWidth: CGFloat) -> some View {
-        HStack(alignment: .top, spacing: ProposalMeetupCalendarModel.daySpacing) {
-            VStack(spacing: 0) {
-                ForEach(0..<24, id: \.self) { hour in
-                    Text(String(format: "%02d:00", hour))
-                        .font(.system(size: 10, weight: .bold, design: .rounded))
-                        .foregroundStyle(MegrumTheme.muted)
-                        .frame(width: ProposalMeetupCalendarModel.timeLabelWidth, height: ProposalMeetupCalendarModel.slotHeight * 4, alignment: .topTrailing)
-                        .id(hour)
-                }
-            }
-
-            ForEach(Array(days.enumerated()), id: \.offset) { index, _ in
-                VStack(spacing: 0) {
-                    ForEach(0..<ProposalMeetupCalendarModel.slotCount, id: \.self) { slot in
-                        Rectangle()
-                            .fill(slot.isMultiple(of: 4) ? MegrumTheme.sky.opacity(0.08) : Color.white.opacity(0.44))
-                            .frame(width: dayWidth, height: ProposalMeetupCalendarModel.slotHeight)
-                            .overlay(alignment: .topLeading) {
-                                Rectangle()
-                                    .fill(Color.white.opacity(slot.isMultiple(of: 4) ? 0.78 : 0.46))
-                                    .frame(height: 1)
-                            }
-                    }
-                }
-                .overlay {
-                    RoundedRectangle(cornerRadius: 14, style: .continuous)
-                        .stroke(selectedDayColor(index: index).opacity(index == selectedDayIndex ? 0.34 : 0.12), lineWidth: index == selectedDayIndex ? 1.4 : 1)
-                }
-            }
-        }
-        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
-    }
-
     @ViewBuilder
     private func candidateBlocks(days: [Date], dayWidth: CGFloat) -> some View {
-        ForEach(Array(drafts.enumerated()), id: \.element.id) { index, draft in
-            if let layout = candidateLayout(for: draft, index: index, days: days, dayWidth: dayWidth) {
-                ProposalMeetupCalendarCandidateBlock(
-                    draft: draft,
+        ProposalMeetupCalendarWeekCandidateBlocks(
+            blocks: renderedCandidateBlocks(days: days, dayWidth: dayWidth),
+            onTap: { index in
+                onSelectDraft(index)
+                onOpenPlaceEntry(index)
+            },
+            onChange: { value, index, action in
+                handleCandidateChanged(
                     index: index,
-                    isSelected: index == selectedIndex,
-                    height: layout.height,
-                    onMoveChanged: { value in
-                        handleCandidateChanged(
-                            index: index,
-                            action: .move,
-                            value: value,
-                            days: days,
-                            dayWidth: dayWidth
-                        )
-                    },
-                    onMoveEnded: { value in
-                        handleCandidateEnded(
-                            index: index,
-                            action: .move,
-                            value: value,
-                            days: days,
-                            dayWidth: dayWidth
-                        )
-                    },
-                    onResizeChanged: { value in
-                        handleCandidateChanged(
-                            index: index,
-                            action: .resizeEnd,
-                            value: value,
-                            days: days,
-                            dayWidth: dayWidth
-                        )
-                    },
-                    onResizeEnded: { value in
-                        handleCandidateEnded(
-                            index: index,
-                            action: .resizeEnd,
-                            value: value,
-                            days: days,
-                            dayWidth: dayWidth
-                        )
-                    }
+                    action: action,
+                    value: value,
+                    days: days,
+                    dayWidth: dayWidth
                 )
-                .frame(width: layout.width, height: layout.height)
-                .offset(x: layout.x, y: layout.y)
+            },
+            onEnd: { value, index, action in
+                handleCandidateEnded(
+                    index: index,
+                    action: action,
+                    value: value,
+                    days: days,
+                    dayWidth: dayWidth
+                )
+            },
+            onRemove: onRemoveDraft
+        )
+    }
+
+    private func renderedCandidateBlocks(days: [Date], dayWidth: CGFloat) -> [ProposalMeetupCalendarRenderedCandidateBlock] {
+        drafts.enumerated().compactMap { index, draft in
+            let renderedDraft = renderedCandidateDraft(draft, index: index, days: days)
+            guard let layout = candidateLayout(for: renderedDraft, index: index, days: days, dayWidth: dayWidth) else {
+                return nil
             }
-        }
-    }
-
-    @ViewBuilder
-    private func previewBlock(dayWidth: CGFloat) -> some View {
-        if let previewDraft {
-            let range = ProposalMeetupCalendarModel.normalizedSlotRange(
-                startSlot: previewDraft.startSlot,
-                currentSlot: previewDraft.currentSlot
+            return ProposalMeetupCalendarRenderedCandidateBlock(
+                draft: renderedDraft,
+                index: index,
+                isSelected: index == selectedIndex,
+                x: layout.x,
+                y: layout.y,
+                width: layout.width,
+                height: layout.height
             )
-            let height = CGFloat(max(1, range.upperBound - range.lowerBound)) * ProposalMeetupCalendarModel.slotHeight - 4
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .fill(MegrumTheme.lavender.opacity(0.22))
-                .overlay {
-                    RoundedRectangle(cornerRadius: 14, style: .continuous)
-                        .stroke(MegrumTheme.lavender.opacity(0.7), style: StrokeStyle(lineWidth: 1.2, dash: [5, 4]))
-                }
-                .frame(width: dayWidth - 8, height: max(20, height))
-                .offset(
-                    x: ProposalMeetupCalendarModel.timeLabelWidth
-                        + CGFloat(previewDraft.dayIndex) * (dayWidth + ProposalMeetupCalendarModel.daySpacing)
-                        + 4,
-                    y: CGFloat(range.lowerBound) * ProposalMeetupCalendarModel.slotHeight + 2
-                )
         }
     }
 
-    @ViewBuilder
-    private func weekLongPressHint(dayWidth: CGFloat) -> some View {
-        if drafts.allSatisfy({ $0.normalizedPlaceName.isEmpty }), previewDraft == nil {
-            Text("長押しで時間帯を選択できるよ")
-                .font(.system(size: 12, weight: .bold, design: .rounded))
-                .foregroundStyle(.white)
-                .padding(.horizontal, 18)
-                .frame(height: 38)
-                .background(MegrumTheme.ink.opacity(0.36), in: Capsule())
-                .offset(
-                    x: ProposalMeetupCalendarModel.timeLabelWidth
-                        + (dayWidth + ProposalMeetupCalendarModel.daySpacing) * 1.55,
-                    y: CGFloat(ProposalMeetupCalendarModel.slotIndex(forHour: 12)) * ProposalMeetupCalendarModel.slotHeight
-                )
+    private func renderedCandidateDraft(
+        _ draft: ProposalMeetupCandidateDraft,
+        index: Int,
+        days: [Date]
+    ) -> ProposalMeetupCandidateDraft {
+        guard let candidateEdit,
+              candidateEdit.index == index,
+              days.indices.contains(candidateEdit.dayIndex)
+        else {
+            return draft
         }
+        return draft.applyingCalendarRange(
+            day: days[candidateEdit.dayIndex],
+            startSlot: candidateEdit.startSlot,
+            endSlot: candidateEdit.endSlot,
+            calendar: calendar
+        )
     }
 
     private var selectedDayIndex: Int {
@@ -482,10 +207,6 @@ struct ProposalMeetupCalendarEditor: View {
         }
         let selectedDay = calendar.startOfDay(for: drafts[selectedIndex].startAt)
         return days.firstIndex(where: { calendar.isDate($0, inSameDayAs: selectedDay) }) ?? 0
-    }
-
-    private func selectedDayColor(index: Int) -> Color {
-        index == selectedDayIndex ? MegrumTheme.lavender : MegrumTheme.ink
     }
 
     private func candidateLayout(
@@ -509,17 +230,41 @@ struct ProposalMeetupCalendarEditor: View {
         )
     }
 
+    private func candidateIndex(at location: CGPoint, days: [Date], dayWidth: CGFloat) -> Int? {
+        for (index, draft) in drafts.enumerated().reversed() {
+            guard let layout = candidateLayout(for: draft, index: index, days: days, dayWidth: dayWidth) else {
+                continue
+            }
+            let rect = CGRect(x: layout.x, y: layout.y, width: layout.width, height: layout.height)
+                .insetBy(dx: -6, dy: -ProposalMeetupCalendarModel.slotHeight)
+            if rect.contains(location) {
+                return index
+            }
+        }
+        return nil
+    }
+
     private func boardGesture(days: [Date], dayWidth: CGFloat) -> some Gesture {
         DragGesture(minimumDistance: 0, coordinateSpace: .named("proposalMeetupCalendar"))
             .onChanged { value in
                 if boardTouchState == nil {
                     let point = calendarPoint(from: value.startLocation, dayWidth: dayWidth)
+                    let touchedCandidateIndex = candidateIndex(at: value.startLocation, days: days, dayWidth: dayWidth)
+                    let originalEdit = touchedCandidateIndex.map { currentCandidateEdit(index: $0, days: days) }
+                    let pointerOffset = originalEdit.map {
+                        max(0, min($0.endSlot - $0.startSlot - 1, point.slot - $0.startSlot))
+                    }
                     boardTouchState = ProposalMeetupCalendarBoardTouchState(
                         startTime: Date(),
                         startLocation: value.startLocation,
                         dayIndex: point.dayIndex,
                         startSlot: point.slot,
-                        mode: .pending
+                        mode: .pending,
+                        candidateIndex: touchedCandidateIndex,
+                        originalDayIndex: originalEdit?.dayIndex,
+                        originalStartSlot: originalEdit?.startSlot,
+                        originalEndSlot: originalEdit?.endSlot,
+                        pointerStartOffsetSlots: pointerOffset
                     )
                     scheduleBoardLongPress(dayIndex: point.dayIndex, startSlot: point.slot)
                 }
@@ -529,6 +274,7 @@ struct ProposalMeetupCalendarEditor: View {
                 let dx = value.location.x - state.startLocation.x
                 let dy = value.location.y - state.startLocation.y
                 if state.mode == .pending,
+                   state.candidateIndex == nil,
                    abs(dx) > 10,
                    abs(dx) > abs(dy) * 1.08 {
                     cancelBoardLongPress()
@@ -541,12 +287,49 @@ struct ProposalMeetupCalendarEditor: View {
                     weekDragOffset = ProposalMeetupCalendarModel.clampedWeekDragOffset(dx, containerWidth: dayWidth * CGFloat(ProposalMeetupCalendarModel.visibleDayCount))
                     return
                 }
+                if state.mode == .pending,
+                   hypot(dx, dy) > ProposalMeetupCalendarModel.touchCancelDistance {
+                    cancelBoardLongPress()
+                    if state.candidateIndex == nil {
+                        state.mode = .creating
+                        boardTouchState = state
+                        let point = calendarPoint(from: value.location, dayWidth: dayWidth)
+                        previewDraft = ProposalMeetupCalendarPreview(
+                            dayIndex: state.dayIndex,
+                            startSlot: state.startSlot,
+                            currentSlot: point.slot
+                        )
+                        return
+                    } else {
+                        boardTouchState = nil
+                        previewDraftCleanup()
+                        return
+                    }
+                }
                 if state.mode == .creating {
                     let point = calendarPoint(from: value.location, dayWidth: dayWidth)
                     previewDraft = ProposalMeetupCalendarPreview(
-                        dayIndex: point.dayIndex,
+                        dayIndex: state.dayIndex,
                         startSlot: state.startSlot,
                         currentSlot: point.slot
+                    )
+                }
+                if state.mode == .movingCandidate,
+                   let candidateIndex = state.candidateIndex,
+                   let originalStartSlot = state.originalStartSlot,
+                   let originalEndSlot = state.originalEndSlot,
+                   let pointerStartOffsetSlots = state.pointerStartOffsetSlots {
+                    let point = calendarPoint(from: value.location, dayWidth: dayWidth)
+                    let duration = max(1, originalEndSlot - originalStartSlot)
+                    let startSlot = ProposalMeetupCalendarModel.clampedStartSlot(
+                        point.slot - pointerStartOffsetSlots,
+                        duration: duration
+                    )
+                    candidateEdit = ProposalMeetupCalendarCandidateEdit(
+                        index: candidateIndex,
+                        dayIndex: point.dayIndex,
+                        startSlot: startSlot,
+                        endSlot: startSlot + duration
                     )
                 }
             }
@@ -554,6 +337,7 @@ struct ProposalMeetupCalendarEditor: View {
                 defer {
                     cancelBoardLongPress()
                     boardTouchState = nil
+                    candidateEdit = nil
                 }
                 guard let state = boardTouchState else {
                     return
@@ -587,11 +371,43 @@ struct ProposalMeetupCalendarEditor: View {
                     )
                     previewDraftCleanup()
                     onCreateDraft(days[previewDraft.dayIndex], range.lowerBound, range.upperBound)
+                case .movingCandidate:
+                    guard let candidateIndex = state.candidateIndex,
+                          let originalStartSlot = state.originalStartSlot,
+                          let originalEndSlot = state.originalEndSlot,
+                          let pointerStartOffsetSlots = state.pointerStartOffsetSlots
+                    else {
+                        return
+                    }
+                    let point = calendarPoint(from: value.location, dayWidth: dayWidth)
+                    let duration = max(1, originalEndSlot - originalStartSlot)
+                    let startSlot = ProposalMeetupCalendarModel.clampedStartSlot(
+                        point.slot - pointerStartOffsetSlots,
+                        duration: duration
+                    )
+                    candidateEdit = ProposalMeetupCalendarCandidateEdit(
+                        index: candidateIndex,
+                        dayIndex: point.dayIndex,
+                        startSlot: startSlot,
+                        endSlot: startSlot + duration
+                    )
+                    onUpdateDraft(candidateIndex, days[point.dayIndex], startSlot, startSlot + duration)
+                    onSelectDraft(candidateIndex)
                 case .pending:
+                    if let candidateIndex = candidateIndex(at: value.location, days: days, dayWidth: dayWidth) {
+                        onSelectDraft(candidateIndex)
+                        onOpenPlaceEntry(candidateIndex)
+                        return
+                    }
                     guard ProposalMeetupCalendarModel.shouldCreateCandidateOnBoardEnd(wasLongPressed: false) else {
                         resetWeekDragOffset()
                         return
                     }
+                    let endSlot = min(
+                        ProposalMeetupCalendarModel.slotCount,
+                        state.startSlot + ProposalMeetupCalendarModel.defaultDurationSlots
+                    )
+                    onCreateDraft(days[state.dayIndex], state.startSlot, endSlot)
                 }
             }
     }
@@ -707,7 +523,7 @@ struct ProposalMeetupCalendarEditor: View {
         if state.mode == .pending {
             onSelectDraft(index)
             if action == .move {
-                onOpenPlaceEntry()
+                onOpenPlaceEntry(index)
             }
             return
         }
@@ -748,6 +564,7 @@ struct ProposalMeetupCalendarEditor: View {
 
     private func previewDraftCleanup() {
         previewDraft = nil
+        candidateEdit = nil
     }
 
     private func scheduleBoardLongPress(dayIndex: Int, startSlot: Int) {
@@ -761,13 +578,30 @@ struct ProposalMeetupCalendarEditor: View {
                 startLocation: state.startLocation,
                 dayIndex: state.dayIndex,
                 startSlot: state.startSlot,
-                mode: .creating
+                mode: state.candidateIndex == nil ? .creating : .movingCandidate,
+                candidateIndex: state.candidateIndex,
+                originalDayIndex: state.originalDayIndex,
+                originalStartSlot: state.originalStartSlot,
+                originalEndSlot: state.originalEndSlot,
+                pointerStartOffsetSlots: state.pointerStartOffsetSlots
             )
-            previewDraft = ProposalMeetupCalendarPreview(
-                dayIndex: dayIndex,
-                startSlot: startSlot,
-                currentSlot: startSlot + ProposalMeetupCalendarModel.defaultDurationSlots - 1
-            )
+            if let candidateIndex = state.candidateIndex,
+               let originalDayIndex = state.originalDayIndex,
+               let originalStartSlot = state.originalStartSlot,
+               let originalEndSlot = state.originalEndSlot {
+                candidateEdit = ProposalMeetupCalendarCandidateEdit(
+                    index: candidateIndex,
+                    dayIndex: originalDayIndex,
+                    startSlot: originalStartSlot,
+                    endSlot: originalEndSlot
+                )
+            } else {
+                previewDraft = ProposalMeetupCalendarPreview(
+                    dayIndex: dayIndex,
+                    startSlot: startSlot,
+                    currentSlot: startSlot + ProposalMeetupCalendarModel.defaultDurationSlots - 1
+                )
+            }
         }
         boardLongPressTask = task
         DispatchQueue.main.asyncAfter(
@@ -812,217 +646,5 @@ struct ProposalMeetupCalendarEditor: View {
     private func cancelCandidateLongPress() {
         candidateLongPressTask?.cancel()
         candidateLongPressTask = nil
-    }
-}
-
-private struct ProposalMeetupCalendarCandidateBlock: View {
-    var draft: ProposalMeetupCandidateDraft
-    var index: Int
-    var isSelected: Bool
-    var height: CGFloat
-    var onMoveChanged: (DragGesture.Value) -> Void
-    var onMoveEnded: (DragGesture.Value) -> Void
-    var onResizeChanged: (DragGesture.Value) -> Void
-    var onResizeEnded: (DragGesture.Value) -> Void
-
-    var body: some View {
-        VStack(spacing: 0) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text("候補\(index + 1)")
-                    .font(.system(size: 11, weight: .black, design: .rounded))
-                    .foregroundStyle(.white)
-                Text(draft.normalizedPlaceName.isEmpty ? "場所未入力" : draft.normalizedPlaceName)
-                    .font(.system(size: 11, weight: .bold, design: .rounded))
-                    .foregroundStyle(.white.opacity(0.92))
-                    .lineLimit(2)
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-            .padding(.horizontal, 8)
-            .padding(.top, 8)
-            .padding(.bottom, 16)
-
-            Rectangle()
-                .fill(Color.white.opacity(0.7))
-                .frame(height: 8)
-                .overlay {
-                    Capsule()
-                        .fill(MegrumTheme.lavender.opacity(0.84))
-                        .frame(width: 28, height: 4)
-                }
-                .contentShape(Rectangle())
-                .gesture(
-                    DragGesture(minimumDistance: 0, coordinateSpace: .named("proposalMeetupCalendar"))
-                        .onChanged(onResizeChanged)
-                        .onEnded(onResizeEnded)
-                )
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .background(isSelected ? MegrumTheme.lavender : MegrumTheme.sky, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .strokeBorder(.white.opacity(isSelected ? 0.9 : 0.62), lineWidth: isSelected ? 1.5 : 1)
-        }
-        .contentShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-        .gesture(
-            DragGesture(minimumDistance: 0, coordinateSpace: .named("proposalMeetupCalendar"))
-                .onChanged(onMoveChanged)
-                .onEnded(onMoveEnded)
-        )
-    }
-}
-
-private struct ProposalMeetupCalendarModeToggle: View {
-    @Binding var selection: ProposalMeetupCalendarDisplayMode
-
-    var body: some View {
-        HStack(spacing: 0) {
-            ForEach(ProposalMeetupCalendarDisplayMode.allCases) { mode in
-                Button {
-                    withAnimation(.snappy) {
-                        selection = mode
-                    }
-                } label: {
-                    Text(mode.title)
-                        .font(.system(size: 13, weight: .black, design: .rounded))
-                        .foregroundStyle(selection == mode ? .white : MegrumTheme.muted)
-                        .frame(width: 38, height: 30)
-                        .background(selection == mode ? MegrumTheme.lavender : Color.clear, in: Capsule())
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("カレンダー\(mode.title)表示")
-            }
-        }
-        .padding(3)
-        .background(MegrumTheme.ink.opacity(0.07), in: Capsule())
-    }
-}
-
-private struct ProposalMeetupMonthCalendar: View {
-    var anchorDate: Date
-    var scheduleContext: ProposalScheduleContext
-    var onSelectDay: (Date) -> Void
-
-    private let calendar = Calendar.current
-    private let weekdayLabels = ["日", "月", "火", "水", "木", "金", "土"]
-
-    var body: some View {
-        let days = ProposalMeetupCalendarModel.monthGridDays(anchorDate: anchorDate, calendar: calendar)
-        let rowCount = max(1, days.count / ProposalMeetupCalendarModel.visibleDayCount)
-
-        GeometryReader { geometry in
-            let cellWidth = ProposalMeetupCalendarModel.monthDayCellWidth(containerWidth: geometry.size.width)
-            let gridWidth = ProposalMeetupCalendarModel.monthGridWidth(containerWidth: geometry.size.width)
-
-            VStack(alignment: .leading, spacing: 4) {
-                HStack(spacing: 4) {
-                    ForEach(weekdayLabels, id: \.self) { label in
-                        Text(label)
-                            .font(.system(size: 10.5, weight: .black, design: .rounded))
-                            .foregroundStyle(MegrumTheme.muted)
-                            .frame(width: cellWidth)
-                    }
-                }
-
-                LazyVGrid(columns: Array(repeating: GridItem(.fixed(cellWidth), spacing: 4), count: 7), spacing: 4) {
-                    ForEach(Array(days.enumerated()), id: \.offset) { _, day in
-                        if let day {
-                            ProposalMeetupMonthDayCell(
-                                day: day,
-                                schedules: scheduleContext.schedules(on: day, calendar: calendar),
-                                isToday: calendar.isDateInToday(day),
-                                scheduleContext: scheduleContext,
-                                onSelect: {
-                                    onSelectDay(day)
-                                }
-                            )
-                        } else {
-                            Color.clear
-                                .frame(width: cellWidth, height: 74)
-                        }
-                    }
-                }
-            }
-            .frame(width: gridWidth, alignment: .leading)
-        }
-        .padding(.top, 4)
-        .frame(height: ProposalMeetupCalendarModel.monthGridHeight(rowCount: rowCount))
-        .clipped()
-    }
-}
-
-private struct ProposalMeetupMonthDayCell: View {
-    var day: Date
-    var schedules: [PersonalSchedule]
-    var isToday: Bool
-    var scheduleContext: ProposalScheduleContext
-    var onSelect: () -> Void
-
-    var body: some View {
-        Button(action: onSelect) {
-            VStack(alignment: .leading, spacing: 5) {
-                Text(ProposalMeetupCalendarModel.dayNumberLabel(for: day))
-                    .font(.system(size: 11, weight: .black, design: .rounded))
-                    .foregroundStyle(isToday ? MegrumTheme.lavender : MegrumTheme.ink)
-
-                VStack(alignment: .leading, spacing: 3) {
-                    ForEach(schedules.prefix(3)) { schedule in
-                        Text(monthScheduleLabel(for: schedule))
-                            .font(.system(size: 8, weight: .black, design: .rounded))
-                            .foregroundStyle(MegrumTheme.ink)
-                            .lineLimit(1)
-                            .padding(.horizontal, 3)
-                            .padding(.vertical, 2)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .background(
-                                (scheduleContext.isMine(schedule) ? MegrumTheme.lavender : MegrumTheme.sky).opacity(scheduleContext.isMine(schedule) ? 0.22 : 0.34),
-                                in: RoundedRectangle(cornerRadius: 6, style: .continuous)
-                            )
-                    }
-
-                    if schedules.count > 3 {
-                        Text("+\(schedules.count - 3)")
-                            .font(.system(size: 8, weight: .black, design: .rounded))
-                            .foregroundStyle(MegrumTheme.muted)
-                    }
-                }
-
-                Spacer(minLength: 0)
-            }
-            .padding(6)
-            .frame(maxWidth: .infinity, minHeight: 74, alignment: .topLeading)
-            .background(
-                isToday ? MegrumTheme.lavender.opacity(0.12) : MegrumTheme.ink.opacity(0.035),
-                in: RoundedRectangle(cornerRadius: 10, style: .continuous)
-            )
-            .overlay {
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .stroke(isToday ? MegrumTheme.lavender.opacity(0.34) : MegrumTheme.ink.opacity(0.06), lineWidth: 1)
-            }
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel("\(day.formatted(.dateTime.month().day()))を週表示で開く")
-    }
-
-    private func monthScheduleLabel(for schedule: PersonalSchedule) -> String {
-        if schedule.allDay {
-            return schedule.title
-        }
-        return "\(schedule.startAt.formatted(.dateTime.hour().minute())) \(schedule.title)"
-    }
-}
-
-private struct ProposalMeetupCalendarCard<Content: View>: View {
-    @ViewBuilder var content: Content
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            content
-        }
-        .padding(10)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: 22, style: .continuous)
-                .stroke(.white.opacity(0.62), lineWidth: 1)
-        }
     }
 }

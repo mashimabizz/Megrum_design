@@ -16,6 +16,7 @@ final class OwnProfileSummaryTests: XCTestCase {
             viewer: viewer,
             inventoryCount: 12,
             wishCount: 5,
+            listingCount: 3,
             proposals: [
                 proposal(status: .sent),
                 proposal(status: .agreed),
@@ -30,7 +31,11 @@ final class OwnProfileSummaryTests: XCTestCase {
         XCTAssertEqual(summary?.prefectureText, "東京都")
         XCTAssertEqual(summary?.inventoryCount, 12)
         XCTAssertEqual(summary?.wishCount, 5)
+        XCTAssertEqual(summary?.listingCount, 3)
+        XCTAssertEqual(summary?.listingText, "3")
         XCTAssertEqual(summary?.activeTradeText, "2件")
+        XCTAssertEqual(summary?.completedTradeCount, 1)
+        XCTAssertEqual(summary?.completedTradeText, "1")
     }
 
     func testSummaryReturnsNilWithoutViewer() {

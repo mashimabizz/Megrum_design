@@ -17,6 +17,26 @@ final class HomeScreenFlowTests: XCTestCase {
         )
     }
 
+    func testHomeDoesNotShowGroomRail() {
+        XCTAssertFalse(HomeGroomRailPolicy.isVisibleOnHome)
+    }
+
+    func testNativePreviewHomeCandidatesUseBundledGoodsImages() throws {
+        let imageURLs = NativePreviewData.homeMatchedItems.compactMap(\.imageURL)
+        XCTAssertGreaterThanOrEqual(imageURLs.count, 8)
+
+        let firstImageURL = try XCTUnwrap(imageURLs.first)
+        XCTAssertTrue(firstImageURL.isFileURL)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: firstImageURL.path))
+    }
+
+    func testNativePreviewHavesRailStartsFromViewerGoods() {
+        let firstPossible = NativePreviewData.homePossibleItems.first
+
+        XCTAssertEqual(firstPossible?.ownerID, NativePreviewData.viewerID)
+        XCTAssertNotNil(firstPossible?.imageURL)
+    }
+
     func testVisualQAPreviewModeParsesInitialScreens() {
         XCTAssertEqual(
             VisualQAPreviewMode.initialScreen(
@@ -35,6 +55,12 @@ final class HomeScreenFlowTests: XCTestCase {
                 environment: ["MEGRUM_VISUAL_QA_INITIAL_SCREEN": " drawer-open "]
             ),
             .drawerOpen
+        )
+        XCTAssertEqual(
+            VisualQAPreviewMode.initialScreen(
+                environment: ["MEGRUM_VISUAL_QA_INITIAL_SCREEN": "home-haves-lookup"]
+            ),
+            .homeHavesLookup
         )
         XCTAssertEqual(
             VisualQAPreviewMode.initialScreen(
@@ -205,6 +231,11 @@ final class HomeScreenFlowTests: XCTestCase {
 
     func testHomeCandidateGridUsesRnLikeThreeColumnWrapMetrics() {
         XCTAssertEqual(HomeLayoutMetrics.horizontalPadding, 18)
+        XCTAssertEqual(HomeLayoutMetrics.fixedHeaderTopPadding, 12)
+        XCTAssertEqual(HomeLayoutMetrics.fixedHeaderBottomPadding, 12)
+        XCTAssertEqual(HomeLayoutMetrics.fixedHeaderAvatarSize, 44)
+        XCTAssertEqual(HomeLayoutMetrics.fixedHeaderInitialFontSize, 20)
+        XCTAssertEqual(HomeLayoutMetrics.fixedHeaderTitleFontSize, 24)
         XCTAssertEqual(HomeCandidateGridMetrics.columnCount, 3)
         XCTAssertEqual(HomeCandidateGridMetrics.spacing, 10)
         XCTAssertEqual(HomeCandidateGridMetrics.cardHeightRatio, 1.34)
@@ -230,6 +261,16 @@ final class HomeScreenFlowTests: XCTestCase {
             154.54,
             accuracy: 0.01
         )
+    }
+
+    func testFloatingActionsSitJustAboveFooter() {
+        XCTAssertEqual(FloatingActionLayoutMetrics.leadingPadding, 24)
+        XCTAssertEqual(FloatingActionLayoutMetrics.bottomGapAboveFooter, 12)
+        XCTAssertEqual(FloatingActionLayoutMetrics.contentBottomPadding, 104)
+    }
+
+    func testTabBarTitleIsLiftedAboveGlassFooter() {
+        XCTAssertEqual(MegrumTabBarLayoutMetrics.titleVerticalAdjustment, -4)
     }
 
     func testHomeCandidatePriorityFrameUsesRnLikeBothAndOneSideMetrics() {

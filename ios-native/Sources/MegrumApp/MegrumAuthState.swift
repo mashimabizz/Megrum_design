@@ -106,6 +106,7 @@ public protocol MegrumAuthRepository: Sendable {
     func signUp(_ input: AuthSignUpInput) async throws -> AuthSession
     func sendPasswordReset(email: String) async throws
     func signOut(session: AuthSession) async throws
+    func refreshSession(_ session: AuthSession) async throws -> AuthSession
     func restoreSession(fromRedirectURL url: URL) async throws -> AuthSession?
 }
 
@@ -122,6 +123,10 @@ public extension MegrumAuthRepository {
 
     func sendPasswordReset(email: String) async throws {
         throw MegrumRepositoryError.unsupportedMutation
+    }
+
+    func refreshSession(_ session: AuthSession) async throws -> AuthSession {
+        session
     }
 
     func restoreSession(fromRedirectURL url: URL) async throws -> AuthSession? {
@@ -150,6 +155,10 @@ public struct PreviewMegrumAuthRepository: MegrumAuthRepository {
     public func sendPasswordReset(email: String) async throws {}
 
     public func signOut(session: AuthSession) async throws {}
+
+    public func refreshSession(_ session: AuthSession) async throws -> AuthSession {
+        session
+    }
 
     public static func previewSession(email: String = "preview@megrum.jp") -> AuthSession {
         AuthSession(
@@ -230,6 +239,14 @@ public struct SupabaseMegrumAuthRepository: MegrumAuthRepository {
         try await client.signOut(accessToken: session.accessToken)
     }
 
+    public func refreshSession(_ session: AuthSession) async throws -> AuthSession {
+        let refreshToken = session.refreshToken?.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let refreshToken, !refreshToken.isEmpty else {
+            return session
+        }
+        return try await client.refreshSession(refreshToken: refreshToken)
+    }
+
     public func restoreSession(fromRedirectURL url: URL) async throws -> AuthSession? {
         try await client.session(fromRedirectURL: url)
     }
@@ -280,7 +297,7 @@ public final class MegrumAuthState: ObservableObject {
                 self.session = try sessionStore.load()
             } catch {
                 self.session = nil
-                self.errorMessage = "保存済みのログイン情報を読み込めませんでした。もう一度ログインしてください"
+                try? sessionStore.clear()
             }
         }
     }
@@ -392,8 +409,7 @@ public final class MegrumAuthState: ObservableObject {
                     )
                 )
             }
-            try sessionStore.save(nextSession)
-            session = nextSession
+            activateSession(nextSession)
         } catch {
             if isLikelyEmailConfirmationRequiredAfterSignUp(error) {
                 successMessage = "確認メールを送信しました。メール内のリンクで認証を完了してからログインしてください"
@@ -442,6 +458,37 @@ public final class MegrumAuthState: ObservableObject {
     }
 
     @discardableResult
+    public func refreshSessionIfNeeded(now: Date = .now, leeway: TimeInterval = 300) async -> Bool {
+        guard let currentSession = session else {
+            return false
+        }
+        guard currentSession.shouldRefresh(now: now, leeway: leeway) else {
+            return true
+        }
+        guard !isLoading else {
+            return false
+        }
+
+        isLoading = true
+        clearFeedback()
+        defer {
+            isLoading = false
+        }
+
+        let repository = repository
+        do {
+            let refreshedSession = try await withAuthTimeout(nanoseconds: authActionTimeoutNanoseconds) {
+                try await repository.refreshSession(currentSession)
+            }
+            activateSession(refreshedSession)
+            return true
+        } catch {
+            errorMessage = "ログイン情報を更新できませんでした。接続を確認して再読み込みしてください"
+            return false
+        }
+    }
+
+    @discardableResult
     public func handleOpenURL(_ url: URL) async -> Bool {
         guard !isLoading else {
             return false
@@ -460,8 +507,7 @@ public final class MegrumAuthState: ObservableObject {
             }) else {
                 return false
             }
-            try sessionStore.save(nextSession)
-            session = nextSession
+            activateSession(nextSession)
             return true
         } catch {
             errorMessage = normalizedMessage(from: error)
@@ -509,10 +555,18 @@ public final class MegrumAuthState: ObservableObject {
                 nanoseconds: authActionTimeoutNanoseconds,
                 operation: action
             )
-            try sessionStore.save(nextSession)
-            session = nextSession
+            activateSession(nextSession)
         } catch {
             errorMessage = normalizedMessage(from: error)
+        }
+    }
+
+    private func activateSession(_ nextSession: AuthSession) {
+        session = nextSession
+        do {
+            try sessionStore.save(nextSession)
+        } catch {
+            successMessage = "ログインしました。ただし保存に失敗したため、次回起動時は再ログインが必要な場合があります"
         }
     }
 
@@ -602,6 +656,12 @@ public enum MegrumAuthStateFactory {
         infoDictionary: [String: Any]? = nil
     ) -> MegrumAuthState {
         if VisualQAPreviewMode.isEnabled(environment: environment) {
+            if VisualQAPreviewMode.initialScreen(environment: environment)?.isAuthRoute == true {
+                return MegrumAuthState(
+                    repository: PreviewMegrumAuthRepository(),
+                    sessionStore: InMemoryAuthSessionStore()
+                )
+            }
             return MegrumAuthState(
                 repository: PreviewMegrumAuthRepository(),
                 initialSession: PreviewMegrumAuthRepository.previewSession()

@@ -418,8 +418,8 @@ final class MatchRelationScreenTests: XCTestCase {
             )
         )
 
-        XCTAssertEqual(popupTarget.wish.item.title, "スア 春ver.")
-        XCTAssertEqual(popupTarget.wish.candidates.map(\.item.title), ["スア 春ver.", "スア 会場限定"])
+        XCTAssertEqual(popupTarget.wish.item.title, "サナ 2026 LIVE")
+        XCTAssertEqual(popupTarget.wish.candidates.map(\.item.title), ["サナ 2026 LIVE", "モモ ファンミ"])
         XCTAssertEqual(MatchRelationPopupCopy.subtitle(quantity: popupTarget.wish.quantity, candidateCount: popupTarget.wish.candidates.count), "wish ×1・2 件の候補")
     }
 

@@ -95,17 +95,66 @@ final class AuthScreenInputTests: XCTestCase {
     }
 
     func testAuthStateReportsStoredSessionLoadFailure() {
-        let state = MegrumAuthState(
-            repository: PasswordResetSuccessAuthRepository(),
-            sessionStore: FailingLoadAuthSessionStore()
-        )
+        let store = FailingLoadAuthSessionStore()
+        let state = MegrumAuthState(repository: PasswordResetSuccessAuthRepository(), sessionStore: store)
 
         XCTAssertNil(state.session)
         XCTAssertFalse(state.isAuthenticated)
-        XCTAssertEqual(
-            state.errorMessage,
-            "保存済みのログイン情報を読み込めませんでした。もう一度ログインしてください"
+        XCTAssertNil(state.errorMessage)
+        XCTAssertTrue(store.didClear)
+    }
+
+    func testAuthStateSignInActivatesSessionEvenIfSessionSaveFails() async {
+        let session = makeTestSession(email: "michi@example.com")
+        let state = MegrumAuthState(
+            repository: SignInSuccessAuthRepository(session: session),
+            sessionStore: FailingSaveAuthSessionStore()
         )
+
+        await state.signIn(email: "michi@example.com", password: "password123")
+
+        XCTAssertEqual(state.session, session)
+        XCTAssertTrue(state.isAuthenticated)
+        XCTAssertNil(state.errorMessage)
+        XCTAssertEqual(
+            state.successMessage,
+            "ログインしました。ただし保存に失敗したため、次回起動時は再ログインが必要な場合があります"
+        )
+        XCTAssertFalse(state.isLoading)
+    }
+
+    func testAuthStateRefreshesStoredSessionBeforeUse() async throws {
+        let now = Date(timeIntervalSince1970: 1_780_000_000)
+        let storedSession = AuthSession(
+            accessToken: "old_access_token",
+            refreshToken: "old_refresh_token",
+            expiresIn: 3_600,
+            expiresAt: now.addingTimeInterval(60),
+            user: AuthUser(
+                id: UUID(uuidString: "99999999-9999-9999-9999-999999999999")!,
+                email: "michi@example.com"
+            )
+        )
+        let refreshedSession = AuthSession(
+            accessToken: "new_access_token",
+            refreshToken: "new_refresh_token",
+            expiresIn: 3_600,
+            expiresAt: now.addingTimeInterval(3_600),
+            user: storedSession.user
+        )
+        let store = InMemoryAuthSessionStore(initialSession: storedSession)
+        let repository = RefreshingAuthRepository(refreshedSession: refreshedSession)
+        let state = MegrumAuthState(repository: repository, sessionStore: store)
+
+        let didRefresh = await state.refreshSessionIfNeeded(now: now, leeway: 300)
+
+        XCTAssertTrue(didRefresh)
+        XCTAssertEqual(state.session, refreshedSession)
+        XCTAssertEqual(try store.load(), refreshedSession)
+        XCTAssertNil(state.errorMessage)
+        XCTAssertFalse(state.isLoading)
+        let refreshInputs = await repository.refreshInputs()
+        XCTAssertEqual(refreshInputs, [storedSession])
     }
 
     func testAuthStateSignOutClearsStoredSessionAndCallsRepository() async throws {
@@ -247,11 +296,71 @@ private struct PasswordResetSuccessAuthRepository: MegrumAuthRepository {
 }
 
 private final class FailingLoadAuthSessionStore: AuthSessionStore, @unchecked Sendable {
+    private(set) var didClear = false
+
     func load() throws -> AuthSession? {
         throw TestAuthError.unused
     }
 
     func save(_ session: AuthSession) throws {}
+
+    func clear() throws {
+        didClear = true
+    }
+}
+
+private struct SignInSuccessAuthRepository: MegrumAuthRepository {
+    var isConfigured: Bool { true }
+    var session: AuthSession
+
+    func signIn(email: String, password: String) async throws -> AuthSession {
+        session
+    }
+
+    func signUp(_ input: AuthSignUpInput) async throws -> AuthSession {
+        throw TestAuthError.unused
+    }
+
+    func signOut(session: AuthSession) async throws {}
+}
+
+private actor RefreshingAuthRepository: MegrumAuthRepository {
+    nonisolated var isConfigured: Bool { true }
+    private let refreshedSession: AuthSession
+    private var refreshedInputs: [AuthSession] = []
+
+    init(refreshedSession: AuthSession) {
+        self.refreshedSession = refreshedSession
+    }
+
+    func signIn(email: String, password: String) async throws -> AuthSession {
+        throw TestAuthError.unused
+    }
+
+    func signUp(_ input: AuthSignUpInput) async throws -> AuthSession {
+        throw TestAuthError.unused
+    }
+
+    func signOut(session: AuthSession) async throws {}
+
+    func refreshSession(_ session: AuthSession) async throws -> AuthSession {
+        refreshedInputs.append(session)
+        return refreshedSession
+    }
+
+    func refreshInputs() -> [AuthSession] {
+        refreshedInputs
+    }
+}
+
+private final class FailingSaveAuthSessionStore: AuthSessionStore, @unchecked Sendable {
+    func load() throws -> AuthSession? {
+        nil
+    }
+
+    func save(_ session: AuthSession) throws {
+        throw TestAuthError.unused
+    }
 
     func clear() throws {}
 }

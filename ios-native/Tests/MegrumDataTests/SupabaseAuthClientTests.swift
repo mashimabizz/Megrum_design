@@ -22,6 +22,20 @@ final class SupabaseAuthClientTests: XCTestCase {
         XCTAssertEqual(body["password"] as? String, "password123")
     }
 
+    func testBuildsRefreshSessionRequest() throws {
+        let client = SupabaseAuthClient(configuration: configuration)
+
+        let request = try client.makeRefreshSessionRequest(refreshToken: " refresh_token ")
+
+        XCTAssertEqual(request.url?.absoluteString, "https://example.supabase.co/auth/v1/token?grant_type=refresh_token")
+        XCTAssertEqual(request.httpMethod, "POST")
+        XCTAssertEqual(request.value(forHTTPHeaderField: "apikey"), "sb_publishable_test")
+        XCTAssertEqual(request.value(forHTTPHeaderField: "Authorization"), "Bearer sb_publishable_test")
+
+        let body = try XCTUnwrap(request.jsonBody)
+        XCTAssertEqual(body["refresh_token"] as? String, "refresh_token")
+    }
+
     func testBuildsSignUpRequestWithMetadataAndRedirect() throws {
         let client = SupabaseAuthClient(configuration: configuration)
 
@@ -129,6 +143,82 @@ final class SupabaseAuthClientTests: XCTestCase {
         XCTAssertEqual(request.value(forHTTPHeaderField: "Authorization"), "Bearer redirect_access_token")
     }
 
+    func testPasswordSignInReadsSupabaseMessageError() async throws {
+        let client = SupabaseAuthClient(configuration: configuration, session: mockSession())
+        AuthMockURLProtocol.requestHandler = { request in
+            let url = try XCTUnwrap(request.url)
+            let data = Data(#"{"code":"invalid_credentials","message":"Invalid login credentials"}"#.utf8)
+            return (AuthMockURLProtocol.response(for: url, statusCode: 400), data)
+        }
+        defer {
+            AuthMockURLProtocol.requestHandler = nil
+        }
+
+        do {
+            _ = try await client.signIn(email: "michi@example.com", password: "wrong-password")
+            XCTFail("Expected Supabase auth error")
+        } catch let error as SupabaseAuthError {
+            XCTAssertEqual(error, .unexpectedStatus(400, "Invalid login credentials"))
+        }
+    }
+
+    func testPasswordSignInReadsSupabaseErrorDescription() async throws {
+        let client = SupabaseAuthClient(configuration: configuration, session: mockSession())
+        AuthMockURLProtocol.requestHandler = { request in
+            let url = try XCTUnwrap(request.url)
+            let data = Data(#"{"error":"invalid_grant","error_description":"Email not confirmed"}"#.utf8)
+            return (AuthMockURLProtocol.response(for: url, statusCode: 400), data)
+        }
+        defer {
+            AuthMockURLProtocol.requestHandler = nil
+        }
+
+        do {
+            _ = try await client.signIn(email: "michi@example.com", password: "password123")
+            XCTFail("Expected Supabase auth error")
+        } catch let error as SupabaseAuthError {
+            XCTAssertEqual(error, .unexpectedStatus(400, "Email not confirmed"))
+        }
+    }
+
+    func testRefreshSessionDecodesExpiresAtFromExpiresIn() async throws {
+        let client = SupabaseAuthClient(configuration: configuration, session: mockSession())
+        AuthMockURLProtocol.requestHandler = { request in
+            let url = try XCTUnwrap(request.url)
+            let data = Data(
+                #"""
+                {
+                  "access_token": "new_access_token",
+                  "refresh_token": "new_refresh_token",
+                  "expires_in": 3600,
+                  "token_type": "bearer",
+                  "user": {
+                    "id": "33333333-3333-3333-3333-333333333333",
+                    "email": "michi@example.com",
+                    "created_at": "2026-01-01T00:00:00Z"
+                  }
+                }
+                """#.utf8
+            )
+            return (AuthMockURLProtocol.response(for: url, statusCode: 200), data)
+        }
+        defer {
+            AuthMockURLProtocol.requestHandler = nil
+        }
+
+        let before = Date()
+        let session = try await client.refreshSession(refreshToken: "refresh_token")
+        let after = Date()
+
+        XCTAssertEqual(session.accessToken, "new_access_token")
+        XCTAssertEqual(session.refreshToken, "new_refresh_token")
+        XCTAssertEqual(session.expiresIn, 3600)
+        let expiresAt = try XCTUnwrap(session.expiresAt)
+        XCTAssertGreaterThanOrEqual(expiresAt.timeIntervalSince(before), 3_599)
+        XCTAssertLessThanOrEqual(expiresAt.timeIntervalSince(after), 3_601)
+        XCTAssertFalse(session.shouldRefresh(now: before, leeway: 300))
+    }
+
     func testParsesRedirectFragmentTokens() throws {
         let url = try XCTUnwrap(URL(string: "megrum-preview://auth/callback#access_token=redirect_access_token&refresh_token=refresh_token&expires_in=3600&token_type=bearer"))
 
@@ -146,6 +236,12 @@ final class SupabaseAuthClientTests: XCTestCase {
             publishableKey: "sb_publishable_test"
         )
     }
+
+    private func mockSession() -> URLSession {
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [AuthMockURLProtocol.self]
+        return URLSession(configuration: configuration)
+    }
 }
 
 private extension URLRequest {
@@ -154,5 +250,44 @@ private extension URLRequest {
             return nil
         }
         return try? JSONSerialization.jsonObject(with: httpBody) as? [String: Any]
+    }
+}
+
+private final class AuthMockURLProtocol: URLProtocol {
+    nonisolated(unsafe) static var requestHandler: ((URLRequest) throws -> (HTTPURLResponse, Data))?
+
+    override class func canInit(with request: URLRequest) -> Bool {
+        true
+    }
+
+    override class func canonicalRequest(for request: URLRequest) -> URLRequest {
+        request
+    }
+
+    override func startLoading() {
+        guard let handler = Self.requestHandler else {
+            client?.urlProtocol(self, didFailWithError: URLError(.badServerResponse))
+            return
+        }
+
+        do {
+            let (response, data) = try handler(request)
+            client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
+            client?.urlProtocol(self, didLoad: data)
+            client?.urlProtocolDidFinishLoading(self)
+        } catch {
+            client?.urlProtocol(self, didFailWithError: error)
+        }
+    }
+
+    override func stopLoading() {}
+
+    static func response(for url: URL, statusCode: Int) -> HTTPURLResponse {
+        HTTPURLResponse(
+            url: url,
+            statusCode: statusCode,
+            httpVersion: nil,
+            headerFields: ["Content-Type": "application/json"]
+        )!
     }
 }

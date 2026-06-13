@@ -16,7 +16,6 @@ enum AppDrawerDestination: String, Identifiable {
     static let primaryItems: [AppDrawerDestination] = [
         .profile,
         .notifications,
-        .profileEdit,
         .oshiSettings,
         .schedules,
         .completedTrades

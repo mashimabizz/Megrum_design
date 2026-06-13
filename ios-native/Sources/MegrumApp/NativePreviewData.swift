@@ -23,6 +23,31 @@ enum NativePreviewData {
         return calendar.date(bySettingHour: hour, minute: minute, second: 0, of: day) ?? day
     }
 
+    private static func testGoodsImageURL(_ name: String, fileExtension ext: String = "png") -> URL? {
+        Bundle.module.url(
+            forResource: name,
+            withExtension: ext,
+            subdirectory: "TestGoodsImages"
+        ) ?? Bundle.module.url(forResource: name, withExtension: ext)
+    }
+
+    static let previewMeetupCandidates = [
+        ProposalMeetupInput(
+            startAt: previewDate(hour: 17),
+            endAt: previewDate(hour: 18),
+            placeName: "横浜アリーナ",
+            latitude: 35.5122,
+            longitude: 139.6171
+        ),
+        ProposalMeetupInput(
+            startAt: previewDate(hour: 19),
+            endAt: previewDate(hour: 20),
+            placeName: "新横浜駅",
+            latitude: 35.5075,
+            longitude: 139.6175
+        )
+    ]
+
     static let viewer = UserProfile(
         id: viewerID,
         handle: "michilion",
@@ -40,7 +65,12 @@ enum NativePreviewData {
     static let tags = [
         GoodsTag(id: UUID(uuidString: "00000000-0000-0000-0000-000000000101")!, name: "aespa"),
         GoodsTag(id: UUID(uuidString: "00000000-0000-0000-0000-000000000102")!, name: "会場限定"),
-        GoodsTag(id: UUID(uuidString: "00000000-0000-0000-0000-000000000103")!, name: "トレカ")
+        GoodsTag(id: UUID(uuidString: "00000000-0000-0000-0000-000000000103")!, name: "トレカ"),
+        GoodsTag(id: UUID(uuidString: "00000000-0000-0000-0000-000000000104")!, name: "TWICE"),
+        GoodsTag(id: UUID(uuidString: "00000000-0000-0000-0000-000000000105")!, name: "BTS"),
+        GoodsTag(id: UUID(uuidString: "00000000-0000-0000-0000-000000000106")!, name: "SEVENTEEN"),
+        GoodsTag(id: UUID(uuidString: "00000000-0000-0000-0000-000000000107")!, name: "2026 LIVE"),
+        GoodsTag(id: UUID(uuidString: "00000000-0000-0000-0000-000000000108")!, name: "缶バッジ")
     ]
 
     static let oshiGroups = [
@@ -174,10 +204,12 @@ enum NativePreviewData {
             groupID: groupID,
             memberID: memberID,
             goodsTypeID: cardGoodsTypeID,
-            title: "カリナ 春ver.",
-            imageURL: nil,
-            tags: [tags[0], tags[2]],
-            quantity: 1
+            title: "モモ 2026 LIVE",
+            imageURL: testGoodsImageURL("twice_momo_2"),
+            tags: [tags[3], tags[6], tags[2]],
+            quantity: 1,
+            exchangeMethod: .both,
+            ownerPrefecture: "東京都"
         ),
         GoodsItem(
             id: UUID(uuidString: "00000000-0000-0000-0000-000000000202")!,
@@ -185,10 +217,12 @@ enum NativePreviewData {
             groupID: thirdGroupID,
             memberID: thirdMemberID,
             goodsTypeID: cardGoodsTypeID,
-            title: "ジョンウ ラキドロ",
-            imageURL: nil,
-            tags: [tags[2]],
-            quantity: 1
+            title: "ジョングク トレカ",
+            imageURL: testGoodsImageURL("bts_jungkook"),
+            tags: [tags[4], tags[2]],
+            quantity: 1,
+            exchangeMethod: .mail,
+            ownerPrefecture: "東京都"
         ),
         GoodsItem(
             id: UUID(uuidString: "00000000-0000-0000-0000-000000000203")!,
@@ -197,10 +231,12 @@ enum NativePreviewData {
             groupID: secondGroupID,
             memberID: secondMemberID,
             goodsTypeID: cardGoodsTypeID,
-            title: "スア 春ver.",
-            imageURL: nil,
-            tags: [tags[2]],
-            quantity: 1
+            title: "サナ 2026 LIVE",
+            imageURL: testGoodsImageURL("twice_sana_1"),
+            tags: [tags[3], tags[6], tags[2]],
+            quantity: 1,
+            exchangeMethod: .hand,
+            ownerPrefecture: "福岡県"
         ),
         GoodsItem(
             id: UUID(uuidString: "00000000-0000-0000-0000-000000000204")!,
@@ -208,9 +244,11 @@ enum NativePreviewData {
             groupID: groupID,
             goodsTypeID: acrylicStandGoodsTypeID,
             title: "ニンニン 制服",
-            imageURL: nil,
-            tags: [],
-            quantity: 1
+            imageURL: testGoodsImageURL("aespa_ningning"),
+            tags: [tags[0], tags[2]],
+            quantity: 1,
+            exchangeMethod: .both,
+            ownerPrefecture: "東京都"
         ),
         GoodsItem(
             id: UUID(uuidString: "00000000-0000-0000-0000-000000000205")!,
@@ -218,10 +256,110 @@ enum NativePreviewData {
             groupID: secondGroupID,
             memberID: secondMemberID,
             goodsTypeID: cardGoodsTypeID,
-            title: "スア 会場限定",
-            imageURL: nil,
-            tags: [tags[1], tags[2]],
-            quantity: 1
+            title: "モモ ファンミ",
+            imageURL: testGoodsImageURL("twice_momo_1"),
+            tags: [tags[3], tags[1], tags[2]],
+            quantity: 1,
+            exchangeMethod: .hand,
+            ownerPrefecture: "大阪府"
+        ),
+        GoodsItem(
+            id: UUID(uuidString: "00000000-0000-0000-0000-000000000206")!,
+            ownerID: partnerID,
+            groupID: groupID,
+            goodsTypeID: cardGoodsTypeID,
+            title: "ダヒョン 缶バッジ",
+            imageURL: testGoodsImageURL("twice_dahyun_1"),
+            tags: [tags[3], tags[7]],
+            quantity: 1,
+            exchangeMethod: .mail,
+            ownerPrefecture: "東京都"
+        ),
+        GoodsItem(
+            id: UUID(uuidString: "00000000-0000-0000-0000-000000000207")!,
+            ownerID: partnerID,
+            groupID: thirdGroupID,
+            memberID: thirdMemberID,
+            goodsTypeID: cardGoodsTypeID,
+            title: "V トレカ",
+            imageURL: testGoodsImageURL("bts_v"),
+            tags: [tags[4], tags[2]],
+            quantity: 1,
+            exchangeMethod: .both,
+            ownerPrefecture: "兵庫県"
+        ),
+        GoodsItem(
+            id: UUID(uuidString: "00000000-0000-0000-0000-000000000208")!,
+            ownerID: partnerID,
+            groupID: thirdGroupID,
+            goodsTypeID: cardGoodsTypeID,
+            title: "Joshua トレカ",
+            imageURL: testGoodsImageURL("svt_joshua", fileExtension: "jpg"),
+            tags: [tags[5], tags[2]],
+            quantity: 1,
+            exchangeMethod: .hand,
+            ownerPrefecture: "愛知県"
+        ),
+        GoodsItem(
+            id: UUID(uuidString: "00000000-0000-0000-0000-000000000209")!,
+            ownerID: partnerID,
+            groupID: groupID,
+            goodsTypeID: cardGoodsTypeID,
+            title: "S.Coups トレカ",
+            imageURL: testGoodsImageURL("svt_scoups", fileExtension: "jpg"),
+            tags: [tags[5], tags[2]],
+            quantity: 1,
+            exchangeMethod: .mail,
+            ownerPrefecture: "神奈川県"
+        ),
+        GoodsItem(
+            id: UUID(uuidString: "00000000-0000-0000-0000-000000000210")!,
+            ownerID: viewerID,
+            groupID: groupID,
+            goodsTypeID: acrylicStandGoodsTypeID,
+            title: "TWICE ペンライト",
+            imageURL: testGoodsImageURL("twice_penlight"),
+            tags: [tags[3], tags[6]],
+            quantity: 1,
+            exchangeMethod: .both,
+            ownerPrefecture: "東京都"
+        ),
+        GoodsItem(
+            id: UUID(uuidString: "00000000-0000-0000-0000-000000000211")!,
+            ownerID: viewerID,
+            groupID: thirdGroupID,
+            memberID: thirdMemberID,
+            goodsTypeID: cardGoodsTypeID,
+            title: "ジミン トレカ",
+            imageURL: testGoodsImageURL("bts_jimin"),
+            tags: [tags[4], tags[2]],
+            quantity: 1,
+            exchangeMethod: .mail,
+            ownerPrefecture: "東京都"
+        ),
+        GoodsItem(
+            id: UUID(uuidString: "00000000-0000-0000-0000-000000000212")!,
+            ownerID: viewerID,
+            groupID: groupID,
+            goodsTypeID: cardGoodsTypeID,
+            title: "Mingyu トレカ",
+            imageURL: testGoodsImageURL("svt_mingyu", fileExtension: "jpg"),
+            tags: [tags[5], tags[2]],
+            quantity: 1,
+            exchangeMethod: .hand,
+            ownerPrefecture: "東京都"
+        ),
+        GoodsItem(
+            id: UUID(uuidString: "00000000-0000-0000-0000-000000000213")!,
+            ownerID: viewerID,
+            groupID: groupID,
+            goodsTypeID: acrylicStandGoodsTypeID,
+            title: "ニンニン トレカ",
+            imageURL: testGoodsImageURL("aespa_ningning_2"),
+            tags: [tags[0], tags[2]],
+            quantity: 1,
+            exchangeMethod: .both,
+            ownerPrefecture: "東京都"
         )
     ]
 
@@ -233,8 +371,8 @@ enum NativePreviewData {
             memberID: secondMemberID,
             goodsTypeID: cardGoodsTypeID,
             title: "スア ラキドロ",
-            imageURL: nil,
-            tags: [tags[2]]
+            imageURL: testGoodsImageURL("twice_sana_1"),
+            tags: [tags[3], tags[6], tags[2]]
         ),
         WishItem(
             id: UUID(uuidString: "00000000-0000-0000-0000-000000000302")!,
@@ -242,8 +380,8 @@ enum NativePreviewData {
             groupID: groupID,
             goodsTypeID: acrylicStandGoodsTypeID,
             title: "ニンニン 制服",
-            imageURL: nil,
-            tags: []
+            imageURL: testGoodsImageURL("aespa_ningning"),
+            tags: [tags[0], tags[2]]
         )
     ]
 
@@ -252,12 +390,7 @@ enum NativePreviewData {
     }
 
     static var homePossibleItems: [GoodsItem] {
-        [
-            inventory[3],
-            inventory[2],
-            inventory[1],
-            inventory[0]
-        ]
+        viewerGoods + partnerGoods
     }
 
     private static var partnerGoods: [GoodsItem] {
@@ -351,7 +484,8 @@ enum NativePreviewData {
             receiverGoodsIDs: [inventory[2].id],
             conditionTags: ["同日発送", "終演後OK"],
             agreedBySender: true,
-            createdAt: Date(timeIntervalSinceNow: -3_600)
+            createdAt: Date(timeIntervalSinceNow: -3_600),
+            meetupCandidates: previewMeetupCandidates
         ),
         TradeProposal(
             id: UUID(uuidString: "00000000-0000-0000-0000-000000000402")!,
@@ -364,7 +498,8 @@ enum NativePreviewData {
             conditionTags: ["会場付近"],
             agreedBySender: true,
             agreedByReceiver: true,
-            createdAt: Date(timeIntervalSinceNow: -5_400)
+            createdAt: Date(timeIntervalSinceNow: -5_400),
+            meetupCandidates: Array(previewMeetupCandidates.prefix(1))
         ),
         TradeProposal(
             id: UUID(uuidString: "00000000-0000-0000-0000-000000000403")!,
@@ -376,7 +511,8 @@ enum NativePreviewData {
             receiverGoodsIDs: [inventory[0].id],
             conditionTags: ["即日発送"],
             agreedBySender: true,
-            createdAt: Date(timeIntervalSinceNow: -7_200)
+            createdAt: Date(timeIntervalSinceNow: -7_200),
+            meetupCandidates: previewMeetupCandidates
         ),
         TradeProposal(
             id: UUID(uuidString: "00000000-0000-0000-0000-000000000404")!,
@@ -384,11 +520,12 @@ enum NativePreviewData {
             receiverID: viewerID,
             status: .negotiating,
             exchangeMethod: .hand,
-            senderGoodsIDs: [inventory[2].id],
-            receiverGoodsIDs: [inventory[1].id],
+            senderGoodsIDs: [inventory[2].id, inventory[3].id, inventory[4].id],
+            receiverGoodsIDs: [inventory[1].id, inventory[0].id],
             conditionTags: ["返信確認中", "要対応"],
             agreedBySender: true,
-            createdAt: Date(timeIntervalSinceNow: -180)
+            createdAt: Date(timeIntervalSinceNow: -180),
+            meetupCandidates: previewMeetupCandidates
         ),
         TradeProposal(
             id: UUID(uuidString: "00000000-0000-0000-0000-000000000405")!,
@@ -400,7 +537,8 @@ enum NativePreviewData {
             receiverGoodsIDs: [inventory[0].id],
             conditionTags: ["合意待ち", "要対応"],
             agreedBySender: true,
-            createdAt: Date(timeIntervalSinceNow: -720)
+            createdAt: Date(timeIntervalSinceNow: -720),
+            meetupCandidates: previewMeetupCandidates
         )
     ]
 

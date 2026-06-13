@@ -433,6 +433,12 @@ private struct ProposalRow: Decodable, Sendable {
         "approved_by_sender",
         "approved_by_receiver",
         "completed_at",
+        "meetup_start_at",
+        "meetup_end_at",
+        "meetup_place_name",
+        "meetup_lat",
+        "meetup_lng",
+        "meetup_candidates",
         "created_at"
     ].joined(separator: ",")
 
@@ -453,6 +459,12 @@ private struct ProposalRow: Decodable, Sendable {
     var approvedBySender: Bool?
     var approvedByReceiver: Bool?
     var completedAt: Date?
+    var meetupStartAt: Date?
+    var meetupEndAt: Date?
+    var meetupPlaceName: String?
+    var meetupLat: Double?
+    var meetupLng: Double?
+    var meetupCandidates: [ProposalMeetupCandidateRow]?
     var createdAt: Date?
 
     var proposal: TradeProposal? {
@@ -477,7 +489,56 @@ private struct ProposalRow: Decodable, Sendable {
             approvedBySender: approvedBySender ?? false,
             approvedByReceiver: approvedByReceiver ?? false,
             completedAt: completedAt,
-            createdAt: createdAt ?? .now
+            createdAt: createdAt ?? .now,
+            meetupCandidates: normalizedMeetupCandidates
+        )
+    }
+
+    private var mirroredMeetup: ProposalMeetupInput? {
+        guard let meetupStartAt,
+              let meetupEndAt,
+              let placeName = meetupPlaceName?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty,
+              let meetupLat,
+              let meetupLng
+        else {
+            return nil
+        }
+        let meetup = ProposalMeetupInput(
+            startAt: meetupStartAt,
+            endAt: meetupEndAt,
+            placeName: placeName,
+            latitude: meetupLat,
+            longitude: meetupLng
+        )
+        return meetup.isValid ? meetup : nil
+    }
+
+    private var normalizedMeetupCandidates: [ProposalMeetupInput]? {
+        var candidates = meetupCandidates?
+            .map(\.meetupInput)
+            .filter(\.isValid) ?? []
+        if let mirroredMeetup {
+            candidates.removeAll { $0.isSameMeetup(as: mirroredMeetup) }
+            candidates.insert(mirroredMeetup, at: 0)
+        }
+        return candidates.isEmpty ? nil : Array(candidates.prefix(3))
+    }
+}
+
+private struct ProposalMeetupCandidateRow: Decodable, Sendable {
+    var startAt: Date
+    var endAt: Date
+    var placeName: String
+    var lat: Double
+    var lng: Double
+
+    var meetupInput: ProposalMeetupInput {
+        ProposalMeetupInput(
+            startAt: startAt,
+            endAt: endAt,
+            placeName: placeName,
+            latitude: lat,
+            longitude: lng
         )
     }
 }

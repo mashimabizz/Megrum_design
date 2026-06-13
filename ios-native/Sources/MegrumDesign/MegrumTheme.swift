@@ -10,6 +10,98 @@ public enum MegrumTheme {
     public static let canvas = Color(red: 0.984, green: 0.976, blue: 0.988)
 }
 
+public enum MegrumGlassShape: Equatable {
+    case capsule
+    case circle
+    case rounded(cornerRadius: CGFloat)
+}
+
+public extension View {
+    func megrumLiquidGlass(
+        _ shape: MegrumGlassShape,
+        tint: Color = Color.white.opacity(0.08),
+        interactive: Bool = false
+    ) -> some View {
+        modifier(
+            MegrumLiquidGlassModifier(
+                shape: shape,
+                tint: tint,
+                interactive: interactive
+            )
+        )
+    }
+}
+
+public struct MegrumGlassGroup<Content: View>: View {
+    private var spacing: CGFloat
+    private var content: () -> Content
+
+    public init(spacing: CGFloat, @ViewBuilder content: @escaping () -> Content) {
+        self.spacing = spacing
+        self.content = content
+    }
+
+    public var body: some View {
+        if #available(iOS 26.0, macOS 26.0, *) {
+            GlassEffectContainer(spacing: spacing) {
+                content()
+            }
+        } else {
+            content()
+        }
+    }
+}
+
+private struct MegrumLiquidGlassModifier: ViewModifier {
+    var shape: MegrumGlassShape
+    var tint: Color
+    var interactive: Bool
+
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        if reduceTransparency {
+            content
+        } else if #available(iOS 26.0, macOS 26.0, *) {
+            glassContent(content)
+        } else {
+            content
+        }
+    }
+
+    @available(iOS 26.0, macOS 26.0, *)
+    @ViewBuilder
+    private func glassContent(_ content: Content) -> some View {
+        switch shape {
+        case .capsule:
+            if interactive {
+                content.glassEffect(.regular.tint(tint).interactive(), in: Capsule())
+            } else {
+                content.glassEffect(.regular.tint(tint), in: Capsule())
+            }
+        case .circle:
+            if interactive {
+                content.glassEffect(.regular.tint(tint).interactive(), in: Circle())
+            } else {
+                content.glassEffect(.regular.tint(tint), in: Circle())
+            }
+        case .rounded(let cornerRadius):
+            if interactive {
+                content.glassEffect(
+                    .regular.tint(tint).interactive(),
+                    in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                )
+            } else {
+                content.glassEffect(
+                    .regular.tint(tint),
+                    in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                )
+            }
+        }
+    }
+}
+
 public struct LiquidGlassSearchButton: View {
     private let action: () -> Void
 
@@ -59,6 +151,7 @@ public struct LiquidGlassSearchButton: View {
                 .accessibilityHidden(true)
         }
         .frame(width: 72, height: 72)
+        .megrumLiquidGlass(.circle, tint: MegrumTheme.lavender.opacity(0.18), interactive: true)
         .scaleEffect(isPressed ? 0.975 : 1)
         .offset(x: dragOffset.width, y: dragOffset.height)
         .contentShape(Circle())

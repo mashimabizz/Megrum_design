@@ -31,7 +31,7 @@ final class SupabaseGoodsInventoryClientTests: XCTestCase {
         let body = try XCTUnwrap(request.httpBody)
         let json = try XCTUnwrap(JSONSerialization.jsonObject(with: body) as? [[String: Any]])
 
-        XCTAssertEqual(request.url?.absoluteString, "https://example.supabase.co/rest/v1/goods_inventory?select=id,user_id,kind,status,group_id,character_id,goods_type_id,title,photo_urls,quantity")
+        XCTAssertEqual(request.url?.absoluteString, "https://example.supabase.co/rest/v1/goods_inventory?select=id,user_id,kind,status,group_id,character_id,goods_type_id,title,photo_urls,quantity,exchange_type")
         XCTAssertEqual(request.httpMethod, "POST")
         XCTAssertEqual(request.value(forHTTPHeaderField: "Prefer"), "resolution=merge-duplicates,return=representation")
         XCTAssertEqual(json.first?["user_id"] as? String, "11111111-1111-1111-1111-111111111111")
@@ -154,7 +154,7 @@ final class SupabaseGoodsInventoryClientTests: XCTestCase {
         XCTAssertEqual(request.httpMethod, "PATCH")
         XCTAssertEqual(
             request.url?.absoluteString,
-            "https://example.supabase.co/rest/v1/goods_inventory?select=id,user_id,kind,status,group_id,character_id,goods_type_id,title,photo_urls,quantity&id=eq.44444444-4444-4444-4444-444444444444&user_id=eq.11111111-1111-1111-1111-111111111111&status=neq.traded"
+            "https://example.supabase.co/rest/v1/goods_inventory?select=id,user_id,kind,status,group_id,character_id,goods_type_id,title,photo_urls,quantity,exchange_type&id=eq.44444444-4444-4444-4444-444444444444&user_id=eq.11111111-1111-1111-1111-111111111111&status=neq.traded"
         )
         XCTAssertEqual(request.value(forHTTPHeaderField: "Prefer"), "return=representation")
         XCTAssertEqual(json["status"] as? String, "archived")
@@ -185,7 +185,7 @@ final class SupabaseGoodsInventoryClientTests: XCTestCase {
         XCTAssertEqual(request.httpMethod, "PATCH")
         XCTAssertEqual(
             request.url?.absoluteString,
-            "https://example.supabase.co/rest/v1/goods_inventory?select=id,user_id,kind,status,group_id,character_id,goods_type_id,title,photo_urls,quantity&id=eq.44444444-4444-4444-4444-444444444444&user_id=eq.11111111-1111-1111-1111-111111111111&status=neq.traded"
+            "https://example.supabase.co/rest/v1/goods_inventory?select=id,user_id,kind,status,group_id,character_id,goods_type_id,title,photo_urls,quantity,exchange_type&id=eq.44444444-4444-4444-4444-444444444444&user_id=eq.11111111-1111-1111-1111-111111111111&status=neq.traded"
         )
         XCTAssertEqual(request.value(forHTTPHeaderField: "Prefer"), "return=representation")
         XCTAssertEqual(json["title"] as? String, "ラントレ B")

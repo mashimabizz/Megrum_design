@@ -200,8 +200,8 @@ final class MegrumAppStateTests: XCTestCase {
         await state.loadPublicExchangeContent(userID: partnerID)
 
         XCTAssertEqual(state.publicTradeGoodsByUserID[partnerID]?.first?.ownerID, partnerID)
-        XCTAssertEqual(state.publicTradeGoodsByUserID[partnerID]?.count, 3)
-        XCTAssertEqual(state.inventory.filter { $0.ownerID == partnerID }.count, 1)
+        XCTAssertEqual(state.publicTradeGoodsByUserID[partnerID]?.count, 7)
+        XCTAssertEqual(state.inventory.filter { $0.ownerID == partnerID }.count, 7)
         XCTAssertEqual(state.publicListingsByUserID[partnerID]?.first?.ownerID, partnerID)
         XCTAssertNil(state.loadingPublicExchangeUserID)
         XCTAssertNil(state.errorMessage)
@@ -529,11 +529,11 @@ final class MegrumAppStateTests: XCTestCase {
     func testAppStateLoadsPreviewOshiGroupsAndCharacters() async {
         let state = MegrumAppState(repository: PreviewMegrumRepository())
 
-        await state.loadOshiGroups(searchText: "TWICE")
+        await state.loadOshiGroups(searchText: "aespa")
         await state.loadOshiCharacters(group: state.oshiGroups.first)
 
-        XCTAssertEqual(state.oshiGroups.first?.name, "TWICE")
-        XCTAssertEqual(state.oshiCharacters.first?.name, "SANA")
+        XCTAssertEqual(state.oshiGroups.first?.name, "aespa")
+        XCTAssertEqual(state.oshiCharacters.first?.name, "カリナ")
     }
 
     func testAppStateLoadsPreviewUserOshiSelections() async {
@@ -542,6 +542,8 @@ final class MegrumAppStateTests: XCTestCase {
         await state.loadUserOshiSelections()
 
         XCTAssertEqual(state.userOshiSelections.first?.kind, .specific)
+        XCTAssertEqual(state.userOshiSelections.first?.groupName, "aespa")
+        XCTAssertEqual(state.userOshiSelections.first?.characterName, "カリナ")
         XCTAssertFalse(state.isLoadingUserOshiSelections)
     }
 
@@ -631,9 +633,9 @@ final class MegrumAppStateTests: XCTestCase {
         let state = MegrumAppState(repository: PreviewMegrumRepository())
         await state.loadInitialData()
 
-        await state.searchGoods(query: "ランダム")
+        await state.searchGoods(query: "トレカ")
 
-        XCTAssertEqual(state.searchResults.first?.item.title, "ランダムトレカ B")
+        XCTAssertEqual(state.searchResults.first?.item.title, "サナ 2026 LIVE")
         XCTAssertEqual(state.searchResults.first?.bucket, .possible)
         XCTAssertFalse(state.isSearchingGoods)
         XCTAssertNil(state.errorMessage)
@@ -680,7 +682,7 @@ final class MegrumAppStateTests: XCTestCase {
     func testAppStateReportsPreviewGoods() async {
         let state = MegrumAppState(repository: PreviewMegrumRepository())
         await state.loadInitialData()
-        await state.searchGoods(query: "ランダム")
+        await state.searchGoods(query: "トレカ")
         let item = try! XCTUnwrap(state.searchResults.first?.item)
 
         let reported = await state.reportGoods(

@@ -35,6 +35,9 @@ public struct SupabaseListingWishOptionUpdateInput: Equatable, Sendable {
     public var isCashOffer: Bool?
     public var cashAmount: Int?
     public var clearsCashAmount: Bool
+    public var wishGroupID: UUID?
+    public var wishGoodsTypeID: UUID?
+    public var clearsWishConditionIDs: Bool
 
     public init(
         wishItems: [ListingItemQuantity]? = nil,
@@ -42,7 +45,10 @@ public struct SupabaseListingWishOptionUpdateInput: Equatable, Sendable {
         exchangeType: IndividualListingExchangeType? = nil,
         isCashOffer: Bool? = nil,
         cashAmount: Int? = nil,
-        clearsCashAmount: Bool = false
+        clearsCashAmount: Bool = false,
+        wishGroupID: UUID? = nil,
+        wishGoodsTypeID: UUID? = nil,
+        clearsWishConditionIDs: Bool = false
     ) {
         self.wishItems = wishItems
         self.logic = logic
@@ -50,6 +56,9 @@ public struct SupabaseListingWishOptionUpdateInput: Equatable, Sendable {
         self.isCashOffer = isCashOffer
         self.cashAmount = cashAmount
         self.clearsCashAmount = clearsCashAmount
+        self.wishGroupID = wishGroupID
+        self.wishGoodsTypeID = wishGoodsTypeID
+        self.clearsWishConditionIDs = clearsWishConditionIDs
     }
 }
 
@@ -142,9 +151,12 @@ public final class SupabaseListingClient: @unchecked Sendable {
             wishItems: input.wishItems,
             logic: input.wishLogic,
             exchangeType: input.exchangeType,
-            isCashOffer: false,
-            cashAmount: nil,
-            clearsCashAmount: true
+            isCashOffer: input.isCashOffer,
+            cashAmount: input.cashAmount,
+            clearsCashAmount: input.cashAmount == nil,
+            wishGroupID: input.wishGroupID,
+            wishGoodsTypeID: input.wishGoodsTypeID,
+            clearsWishConditionIDs: input.wishGroupID == nil && input.wishGoodsTypeID == nil
         )
 
         let optionRows: [ListingWishOptionRow]
@@ -455,6 +467,8 @@ private struct ListingWishOptionPayload: Encodable, Sendable {
     var exchangeType: String
     var isCashOffer: Bool
     var cashAmount: Int?
+    var wishGroupId: UUID?
+    var wishGoodsTypeId: UUID?
 
     init(listingID: UUID, position: Int, input: IndividualListingCreateInput) {
         self.listingId = listingID
@@ -463,8 +477,10 @@ private struct ListingWishOptionPayload: Encodable, Sendable {
         self.wishQtys = input.wishItems.map { max(1, min($0.quantity, 99)) }
         self.logic = input.wishLogic.rawValue
         self.exchangeType = input.exchangeType.rawValue
-        self.isCashOffer = false
-        self.cashAmount = nil
+        self.isCashOffer = input.isCashOffer
+        self.cashAmount = input.cashAmount
+        self.wishGroupId = input.wishGroupID
+        self.wishGoodsTypeId = input.wishGoodsTypeID
     }
 }
 
@@ -475,12 +491,11 @@ private struct ListingWishOptionUpdatePayload: Encodable, Sendable {
     private var exchangeType: String?
     private var isCashOffer: Bool?
     private var cashAmount: Int??
+    private var wishGroupId: UUID??
+    private var wishGoodsTypeId: UUID??
 
     init(input: SupabaseListingWishOptionUpdateInput) throws {
         if let wishItems = input.wishItems {
-            guard !wishItems.isEmpty else {
-                throw SupabaseListingClientError.emptyItems
-            }
             self.wishIds = wishItems.map(\.itemID)
             self.wishQtys = wishItems.map { boundedListingQuantity($0.quantity) }
         }
@@ -492,8 +507,18 @@ private struct ListingWishOptionUpdatePayload: Encodable, Sendable {
         } else if input.clearsCashAmount {
             self.cashAmount = .some(nil)
         }
+        if let wishGroupID = input.wishGroupID {
+            self.wishGroupId = .some(wishGroupID)
+        } else if input.clearsWishConditionIDs {
+            self.wishGroupId = .some(nil)
+        }
+        if let wishGoodsTypeID = input.wishGoodsTypeID {
+            self.wishGoodsTypeId = .some(wishGoodsTypeID)
+        } else if input.clearsWishConditionIDs {
+            self.wishGoodsTypeId = .some(nil)
+        }
 
-        guard wishIds != nil || logic != nil || exchangeType != nil || isCashOffer != nil || cashAmount != nil else {
+        guard wishIds != nil || logic != nil || exchangeType != nil || isCashOffer != nil || cashAmount != nil || wishGroupId != nil || wishGoodsTypeId != nil else {
             throw SupabaseListingClientError.emptyUpdate
         }
     }
@@ -505,6 +530,8 @@ private struct ListingWishOptionUpdatePayload: Encodable, Sendable {
         case exchangeType
         case isCashOffer
         case cashAmount
+        case wishGroupId
+        case wishGoodsTypeId
     }
 
     func encode(to encoder: Encoder) throws {
@@ -520,6 +547,22 @@ private struct ListingWishOptionUpdatePayload: Encodable, Sendable {
                 try container.encode(value, forKey: .cashAmount)
             case .none:
                 try container.encodeNil(forKey: .cashAmount)
+            }
+        }
+        if let wishGroupId {
+            switch wishGroupId {
+            case let .some(value):
+                try container.encode(value, forKey: .wishGroupId)
+            case .none:
+                try container.encodeNil(forKey: .wishGroupId)
+            }
+        }
+        if let wishGoodsTypeId {
+            switch wishGoodsTypeId {
+            case let .some(value):
+                try container.encode(value, forKey: .wishGoodsTypeId)
+            case .none:
+                try container.encodeNil(forKey: .wishGoodsTypeId)
             }
         }
     }

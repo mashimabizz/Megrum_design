@@ -520,7 +520,7 @@ private struct GoodsTypeRow: Decodable, Sendable {
 }
 
 private struct GoodsInventoryRow: Decodable, Sendable {
-    static let select = "id,user_id,kind,status,group_id,character_id,goods_type_id,title,photo_urls,quantity"
+    static let select = "id,user_id,kind,status,group_id,character_id,goods_type_id,title,photo_urls,quantity,exchange_type"
 
     var id: UUID
     var userId: UUID
@@ -532,6 +532,7 @@ private struct GoodsInventoryRow: Decodable, Sendable {
     var title: String
     var photoUrls: [String]?
     var quantity: Int?
+    var exchangeType: String?
 
     var goodsItem: GoodsItem {
         GoodsItem(
@@ -545,7 +546,8 @@ private struct GoodsInventoryRow: Decodable, Sendable {
             title: title,
             imageURL: photoUrls?.compactMap(URL.init(string:)).first,
             tags: [],
-            quantity: max(1, quantity ?? 1)
+            quantity: max(1, quantity ?? 1),
+            exchangeMethod: ExchangeMethod(exchangeTypeValue: exchangeType)
         )
     }
 }

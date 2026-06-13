@@ -11,448 +11,44 @@ import UIKit
 import AppKit
 #endif
 
-let goodsEditorMaxPhotoUploadBytes = 10 * 1_024 * 1_024
-
-enum GoodsEditorMode: String, CaseIterable, Identifiable {
-    case create
-    case edit
-    case readonly
-
-    var id: String { rawValue }
-
-    var badgeTitle: String {
-        switch self {
-        case .create:
-            "NEW"
-        case .edit:
-            "EDIT"
-        case .readonly:
-            "詳細のみ"
-        }
-    }
-}
-
-enum GoodsEditorRoute: Identifiable {
-    case create(GoodsEntryKind)
-    case edit(GoodsItem, GoodsEntryKind)
-
-    var id: String {
-        switch self {
-        case let .create(kind):
-            "create-\(kind.rawValue)"
-        case let .edit(item, kind):
-            "edit-\(kind.rawValue)-\(item.id.uuidString)"
-        }
-    }
-
-    var mode: GoodsEditorMode {
-        switch self {
-        case .create:
-            .create
-        case .edit:
-            .edit
-        }
-    }
-
-    var kind: GoodsEntryKind {
-        switch self {
-        case let .create(kind), let .edit(_, kind):
-            kind
-        }
-    }
-
-    var item: GoodsItem? {
-        switch self {
-        case .create:
-            nil
-        case let .edit(item, _):
-            item
-        }
-    }
-}
-
-enum GoodsEditorStatus: String, CaseIterable, Identifiable, Equatable {
-    case forTrade = "for_trade"
-    case keep
-    case traded
-    case wishActive = "active"
-    case wishAchieved = "achieved"
-
-    var id: String { rawValue }
-
-    static func defaultStatus(for kind: GoodsEntryKind) -> GoodsEditorStatus {
-        kind == .inventory ? .forTrade : .wishActive
-    }
-
-    static func options(for kind: GoodsEntryKind) -> [GoodsEditorStatus] {
-        switch kind {
-        case .inventory:
-            [.forTrade, .keep, .traded]
-        case .wish:
-            [.wishActive, .wishAchieved]
-        }
-    }
-
-    func isValid(for kind: GoodsEntryKind) -> Bool {
-        Self.options(for: kind).contains(self)
-    }
-
-    var title: String {
-        switch self {
-        case .forTrade:
-            "譲る候補"
-        case .keep:
-            "自分用キープ"
-        case .traded:
-            "過去に譲った"
-        case .wishActive:
-            "探し中"
-        case .wishAchieved:
-            "入手済み"
-        }
-    }
-
-    var systemImage: String {
-        switch self {
-        case .forTrade:
-            "arrow.left.arrow.right.circle"
-        case .keep:
-            "archivebox"
-        case .traded:
-            "checkmark.seal"
-        case .wishActive:
-            "heart"
-        case .wishAchieved:
-            "checkmark.seal"
-        }
-    }
-
-    var persistedStatus: GoodsEntryStatus {
-        switch self {
-        case .forTrade, .wishActive:
-            .active
-        case .keep:
-            .keep
-        case .traded:
-            .traded
-        case .wishAchieved:
-            .archived
-        }
-    }
-
-    init(entryKind: GoodsEntryKind, persistedStatus: GoodsEntryStatus?) {
-        switch entryKind {
-        case .inventory:
-            switch persistedStatus {
-            case .keep:
-                self = .keep
-            case .traded:
-                self = .traded
-            case .active, .reserved, .archived, nil:
-                self = .forTrade
-            }
-        case .wish:
-            switch persistedStatus {
-            case .archived, .traded:
-                self = .wishAchieved
-            case .active, .keep, .reserved, nil:
-                self = .wishActive
-            }
-        }
-    }
-}
-
-enum GoodsEditorSaveBlocker: Equatable, Identifiable {
-    case tagPersistence
-    case photoPersistence
-
-    var id: String {
-        switch self {
-        case .tagPersistence:
-            "tags"
-        case .photoPersistence:
-            "photo"
-        }
-    }
-
-    var title: String {
-        switch self {
-        case .tagPersistence:
-            "グッズタグ保存が未接続"
-        case .photoPersistence:
-            "写真アップロード保存が未接続"
-        }
-    }
-
-    var message: String {
-        switch self {
-        case .tagPersistence:
-            "`goods_inventory_tags` の読み書き境界がSwift Native側に未追加です。"
-        case .photoPersistence:
-            "`photo_urls` とStorage uploadを保存する境界が未追加です。"
-        }
-    }
-}
-
-struct GoodsEditorSaveFailure: Equatable, Identifiable {
-    var appMessage: String
-    var includesPhotoUpload: Bool
-    var includesTagChanges: Bool
-
-    var id: String {
-        [appMessage, includesPhotoUpload.description, includesTagChanges.description].joined(separator: "-")
-    }
-
-    var title: String {
-        "保存できませんでした"
-    }
-
-    var message: String {
-        var lines = [appMessage]
-        if includesPhotoUpload {
-            lines.append("写真アップロードで失敗した可能性があります。写真を外して保存するか、通信状況を確認して再試行できます。")
-        }
-        if includesTagChanges {
-            lines.append("タグ保存で失敗した可能性があります。タグは画面に残っているので、必要なら削除してもう一度試せます。")
-        }
-        lines.append("入力内容はこの画面に残しています。")
-        return lines.joined(separator: "\n\n")
-    }
-
-    static func make(draft: GoodsEditorDraft, appMessage: String?) -> GoodsEditorSaveFailure {
-        let trimmedMessage = appMessage?.trimmingCharacters(in: .whitespacesAndNewlines)
-        let fallbackMessage = "通信状況を確認してからもう一度お試しください。"
-        return GoodsEditorSaveFailure(
-            appMessage: trimmedMessage?.isEmpty == false ? (trimmedMessage ?? fallbackMessage) : fallbackMessage,
-            includesPhotoUpload: draft.hasUnsavedLocalPhoto,
-            includesTagChanges: draft.hasTagChanges
-        )
-    }
-}
-
-struct GoodsEditorDraft: Equatable {
-    var mode: GoodsEditorMode
-    var entryKind: GoodsEntryKind
-    var title: String
-    var groupID: UUID?
-    var memberID: UUID?
-    var goodsTypeID: UUID?
-    var quantity: Int
-    var status: GoodsEditorStatus
-    var tagNames: [String]
-    var originalTagNames: [String]
-    var hasLocalPhoto: Bool
-    var localPhotoData: Data?
-    var localPhotoContentType: String?
-    var existingImageURL: URL?
-    var existingItemID: UUID?
-
-    init(mode: GoodsEditorMode = .create, entryKind: GoodsEntryKind = .inventory, item: GoodsItem? = nil) {
-        let normalizedItemTags = Self.normalizedTags(item?.tags.map(\.name) ?? [])
-        self.mode = mode
-        self.entryKind = entryKind
-        self.title = item?.title ?? ""
-        self.groupID = item?.groupID
-        self.memberID = item?.memberID
-        self.goodsTypeID = item?.goodsTypeID
-        self.quantity = max(1, min(item?.quantity ?? 1, 999))
-        self.status = item.map { GoodsEditorStatus(entryKind: entryKind, persistedStatus: $0.status) }
-            ?? Self.defaultStatus(mode: mode, entryKind: entryKind)
-        self.tagNames = normalizedItemTags
-        self.originalTagNames = normalizedItemTags
-        self.hasLocalPhoto = false
-        self.localPhotoData = nil
-        self.localPhotoContentType = nil
-        self.existingImageURL = item?.imageURL
-        self.existingItemID = item?.id
-    }
-
-    var isEditingExistingItem: Bool {
-        mode != .create || existingItemID != nil
-    }
-
-    var normalizedQuantity: Int {
-        max(1, min(quantity, 999))
-    }
-
-    var hasDisplayPhoto: Bool {
-        hasLocalPhoto || existingImageURL != nil
-    }
-
-    var hasUnsavedLocalPhoto: Bool {
-        hasLocalPhoto || localPhotoData != nil
-    }
-
-    var hasTagChanges: Bool {
-        tagNames != originalTagNames
-    }
-
-    var photoStatusText: String {
-        if hasUnsavedLocalPhoto {
-            return existingImageURL == nil ? "選択済み（保存前）" : "選び直し済み（保存前）"
-        }
-        if existingImageURL != nil {
-            return "保存済み写真あり"
-        }
-        return "未選択"
-    }
-
-    mutating func setEntryKind(_ kind: GoodsEntryKind) {
-        entryKind = kind
-        if !status.isValid(for: kind) {
-            status = Self.defaultStatus(mode: mode, entryKind: kind)
-        }
-    }
-
-    mutating func addTag(_ rawTag: String) {
-        let normalized = Self.normalizedTag(rawTag)
-        guard let normalized, tagNames.count < 5 else {
-            return
-        }
-        if !tagNames.contains(where: { $0.caseInsensitiveCompare(normalized) == .orderedSame }) {
-            tagNames.append(normalized)
-        }
-    }
-
-    mutating func removeTag(_ tag: String) {
-        tagNames.removeAll { $0 == tag }
-    }
-
-    mutating func clearLocalPhotoSelection() {
-        hasLocalPhoto = false
-        localPhotoData = nil
-        localPhotoContentType = nil
-    }
-
-    mutating func setLocalPhotoUpload(_ upload: GoodsPhotoUpload) {
-        hasLocalPhoto = true
-        localPhotoData = upload.data
-        localPhotoContentType = upload.contentType
-    }
-
-    func resolvedTitle(groupName: String?, memberName: String?, goodsTypeName: String?) -> String {
-        let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
-        if !trimmed.isEmpty {
-            return trimmed
-        }
-        return [memberName, groupName, goodsTypeName]
-            .compactMap { value in
-                let trimmedValue = value?.trimmingCharacters(in: .whitespacesAndNewlines)
-                return trimmedValue?.isEmpty == false ? trimmedValue : nil
-            }
-            .joined(separator: " ")
-    }
-
-    func createInput(groupName: String? = nil, memberName: String? = nil, goodsTypeName: String? = nil) -> GoodsEntryInput? {
-        guard mode == .create,
-              blockingReasons.isEmpty,
-              let groupID,
-              let goodsTypeID
-        else {
-            return nil
-        }
-        let resolved = resolvedTitle(groupName: groupName, memberName: memberName, goodsTypeName: goodsTypeName)
-        guard !resolved.isEmpty else {
-            return nil
-        }
-        return GoodsEntryInput(
-            kind: entryKind,
-            title: resolved,
-            groupID: groupID,
-            memberID: memberID,
-            goodsTypeID: goodsTypeID,
-            quantity: normalizedQuantity,
-            status: status.persistedStatus,
-            tagNames: tagNames,
-            photoUpload: photoUpload
-        )
-    }
-
-    func updateInput(groupName: String? = nil, memberName: String? = nil, goodsTypeName: String? = nil) -> GoodsEntryUpdateInput? {
-        guard mode == .edit,
-              blockingReasons.isEmpty,
-              let groupID,
-              let goodsTypeID
-        else {
-            return nil
-        }
-        let resolved = resolvedTitle(groupName: groupName, memberName: memberName, goodsTypeName: goodsTypeName)
-        guard !resolved.isEmpty else {
-            return nil
-        }
-        return GoodsEntryUpdateInput(
-            title: resolved,
-            groupID: groupID,
-            memberID: memberID,
-            clearsMemberID: memberID == nil,
-            goodsTypeID: goodsTypeID,
-            quantity: normalizedQuantity,
-            status: status.persistedStatus,
-            photoURLs: existingImageURL.map { [$0.absoluteString] },
-            tagNames: tagNames,
-            photoUpload: photoUpload
-        )
-    }
-
-    var blockingReasons: [GoodsEditorSaveBlocker] {
-        []
-    }
-
-    private var photoUpload: GoodsPhotoUpload? {
-        guard let localPhotoData else {
-            return nil
-        }
-        return GoodsPhotoUpload(data: localPhotoData, contentType: localPhotoContentType ?? "image/jpeg")
-    }
-
-    static func defaultStatus(mode: GoodsEditorMode, entryKind: GoodsEntryKind) -> GoodsEditorStatus {
-        if mode == .readonly {
-            return entryKind == .inventory ? .forTrade : .wishActive
-        }
-        return GoodsEditorStatus.defaultStatus(for: entryKind)
-    }
-
-    private static func normalizedTags(_ tags: [String]) -> [String] {
-        tags.reduce(into: []) { result, tag in
-            guard result.count < 5, let normalized = normalizedTag(tag) else {
-                return
-            }
-            if !result.contains(where: { $0.caseInsensitiveCompare(normalized) == .orderedSame }) {
-                result.append(normalized)
-            }
-        }
-    }
-
-    private static func normalizedTag(_ tag: String) -> String? {
-        let normalized = tag
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-            .trimmingCharacters(in: CharacterSet(charactersIn: "#＃"))
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-        return normalized.isEmpty ? nil : String(normalized.prefix(40))
-    }
-}
-
 struct GoodsEditorSheet: View {
     @ObservedObject var appState: MegrumAppState
     var route: GoodsEditorRoute
+
+    private enum PhotoCaptureTarget {
+        case draft
+        case inventoryCreate
+        case tradingCardBulk
+    }
 
     @Environment(\.dismiss) private var dismiss
     @State private var draft: GoodsEditorDraft
     @State private var tagDraft = ""
     @State private var photoError: String?
     @State private var lastSaveFailure: GoodsEditorSaveFailure?
+    @State private var createStep: GoodsCreateStep = .common
+    @State private var createPhotos: [GoodsCreatePhotoDraft] = []
+    @State private var createMetas: [GoodsCreateMetaDraft] = [GoodsCreateMetaDraft()]
+    @State private var createError: String?
+    @State private var photoCaptureTarget: PhotoCaptureTarget = .draft
     @State private var isShowingPhotoRemovalDialog = false
+    @State private var isShowingPhotoSourceDialog = false
+    @State private var isShowingPhotoLibraryPicker = false
+    @State private var isShowingCreatePhotoLibraryPicker = false
     @State private var isShowingCameraCapture = false
+    @State private var isConfirmingInventoryDelete = false
+    @State private var isShowingTradingCardBulkSourceDialog = false
+    @State private var isShowingTradingCardBulkPhotoLibraryPicker = false
+    @State private var isProcessingTradingCardBulk = false
+    @State private var tradingCardBulkStatusMessage: String?
+    @State private var deleteErrorMessage: String?
     @State private var didAssignDefaults = false
-    @FocusState private var focusedField: Field?
+    @FocusState private var isTagFieldFocused: Bool
     #if canImport(PhotosUI)
     @State private var selectedPhotoItem: PhotosPickerItem?
+    @State private var selectedCreatePhotoItems: [PhotosPickerItem] = []
+    @State private var selectedTradingCardBulkPhotoItem: PhotosPickerItem?
     #endif
-
-    private enum Field {
-        case title
-        case tag
-    }
 
     init(appState: MegrumAppState, route: GoodsEditorRoute) {
         self.appState = appState
@@ -461,103 +57,130 @@ struct GoodsEditorSheet: View {
     }
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 22) {
-                header
-                modeSection
-                photoSection
-                titleSection
-                groupSection
-                memberSection
-                goodsTypeSection
-                quantitySection
-                statusSection
-                tagsSection
-                unsupportedSection
-                saveFailureSection
-                saveButton
-            }
-            .padding(.horizontal, 20)
-            .padding(.top, 18)
-            .padding(.bottom, 40)
-        }
-        .scrollDismissesKeyboard(.interactively)
-        .background(MegrumTheme.canvas.ignoresSafeArea())
-        .navigationTitle(navigationTitle)
-        .megrumInlineNavigationTitle()
-        .toolbar {
-            ToolbarItem(placement: .cancellationAction) {
-                Button("閉じる") {
-                    dismiss()
-                }
-            }
-        }
-        .task {
-            await loadChoices()
-        }
-        .onChange(of: appState.oshiGroups) { _, _ in
-            assignDefaultsIfNeeded()
-        }
-        .onChange(of: appState.goodsTypes) { _, _ in
-            assignDefaultsIfNeeded()
-        }
-        .onChange(of: draft.groupID) { _, newValue in
-            Task {
-                await loadMembers(for: newValue)
-            }
-        }
-        .onChange(of: draft) { _, _ in
-            lastSaveFailure = nil
-        }
-        .alert(
-            lastSaveFailure?.title ?? "保存できませんでした",
-            isPresented: Binding(
-                get: { lastSaveFailure != nil },
-                set: { if !$0 { lastSaveFailure = nil } }
-            ),
-            presenting: lastSaveFailure
-        ) { failure in
-            Button("再試行") {
-                Task {
-                    await save()
-                }
-            }
-            if failure.includesPhotoUpload {
-                Button("写真を外す", role: .destructive) {
-                    clearLocalPhotoSelection()
-                }
-            }
-            Button("閉じる", role: .cancel) {}
-        } message: { failure in
-            Text(failure.message)
-        }
-        .confirmationDialog(
-            "写真の操作",
-            isPresented: $isShowingPhotoRemovalDialog,
-            titleVisibility: .visible
+        GoodsEditorSheetScrollContent(
+            blockingReasons: draft.blockingReasons,
+            lastSaveFailure: lastSaveFailure,
+            usesInventoryCreateFlow: usesInventoryCreateFlow,
+            entryKind: draft.entryKind,
+            mode: draft.mode,
+            existingItemID: draft.existingItemID,
+            isItemReadOnly: isItemReadOnly,
+            isSavingCurrentItem: isSavingCurrentItem,
+            isMutatingCurrentItem: appState.mutatingGoodsItemID == draft.existingItemID,
+            canSave: canSave,
+            saveButtonTitle: saveButtonTitle,
+            onRetrySave: retrySave,
+            onRequestPhotoRemoval: requestPhotoRemoval,
+            onClose: dismissEditor,
+            onSave: startSave,
+            onConfirmDelete: requestInventoryDeleteConfirmation
         ) {
-            Button("選択した写真を外す", role: .destructive) {
-                clearLocalPhotoSelection()
-            }
-            Button("キャンセル", role: .cancel) {}
-        } message: {
-            Text("保存前に選んだ写真だけを外します。ほかの入力内容は残ります。")
+            formContent
         }
-#if os(iOS)
-        .sheet(isPresented: $isShowingCameraCapture) {
-            NativeCameraCaptureView { imageData in
-                loadCapturedCameraPhoto(imageData)
+            .scrollDismissesKeyboard(.interactively)
+            .background(MegrumTheme.canvas.ignoresSafeArea())
+            .navigationTitle(navigationTitle)
+            .megrumInlineNavigationTitle()
+            .toolbar {
+                editorToolbar
             }
-            .ignoresSafeArea()
-        }
+            .task {
+                await loadChoices()
+            }
+            .onChange(of: appState.oshiGroups) { _, _ in
+                assignDefaultsIfNeeded()
+            }
+            .onChange(of: appState.goodsTypes) { _, _ in
+                assignDefaultsIfNeeded()
+            }
+            .onChange(of: draft.groupID) { _, newValue in
+                handleSelectedGroupChange(newValue)
+            }
+            .onChange(of: draft.entryKind) { _, _ in
+                resetInventoryCreateFlow()
+            }
+            .onChange(of: draft) { _, _ in
+                clearTransientEditorFeedback()
+            }
+            .goodsEditorFailureAlerts(
+                lastSaveFailure: $lastSaveFailure,
+                deleteErrorMessage: $deleteErrorMessage,
+                onRetry: retrySave,
+                onClearPhoto: clearLocalPhotoSelection
+            )
+            .goodsEditorDialogs(
+                isShowingPhotoRemovalDialog: $isShowingPhotoRemovalDialog,
+                isShowingPhotoSourceDialog: $isShowingPhotoSourceDialog,
+                isShowingPhotoLibraryPicker: $isShowingPhotoLibraryPicker,
+                isShowingCameraCapture: $isShowingCameraCapture,
+                isConfirmingInventoryDelete: $isConfirmingInventoryDelete,
+                photoSourceDialogTitle: photoSourceDialogTitle,
+                onClearPhoto: clearLocalPhotoSelection,
+                onDeleteInventory: startDeleteInventoryItem
+            )
+#if canImport(PhotosUI)
+            .photosPicker(isPresented: $isShowingPhotoLibraryPicker, selection: $selectedPhotoItem, matching: .images)
+            .photosPicker(
+                isPresented: $isShowingCreatePhotoLibraryPicker,
+                selection: $selectedCreatePhotoItems,
+                maxSelectionCount: 0,
+                matching: .images
+            )
+            .photosPicker(
+                isPresented: $isShowingTradingCardBulkPhotoLibraryPicker,
+                selection: $selectedTradingCardBulkPhotoItem,
+                matching: .images
+            )
+            .onChange(of: selectedPhotoItem) { _, newValue in
+                handleSelectedPhotoItemChange(newValue)
+            }
+            .onChange(of: selectedCreatePhotoItems) { _, newValue in
+                handleSelectedCreatePhotoItemsChange(newValue)
+            }
+            .onChange(of: selectedTradingCardBulkPhotoItem) { _, newValue in
+                handleSelectedTradingCardBulkPhotoItemChange(newValue)
+            }
 #endif
+#if os(iOS)
+            .sheet(isPresented: $isShowingCameraCapture) {
+                NativeCameraCaptureView { imageData in
+                    loadCapturedCameraPhoto(imageData)
+                } onFailure: { message in
+                    photoError = message
+                    createError = message
+                }
+                .ignoresSafeArea()
+            }
+#endif
+            .goodsEditorTradingCardBulkSourceDialog(
+                isPresented: $isShowingTradingCardBulkSourceDialog,
+                onPickCamera: startTradingCardBulkCamera,
+                onPickPhotoLibrary: showTradingCardBulkPhotoLibrary
+            )
+    }
+
+    @ToolbarContentBuilder
+    private var editorToolbar: some ToolbarContent {
+        ToolbarItem(placement: .cancellationAction) {
+            Button("閉じる", action: dismissEditor)
+        }
+        if draft.mode != .create {
+            ToolbarItem(placement: .confirmationAction) {
+                Text(draft.mode.badgeTitle)
+                    .font(.caption.weight(.black))
+                    .foregroundStyle(MegrumTheme.lavender)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 5)
+                    .background(MegrumTheme.lavender.opacity(0.12), in: Capsule())
+            }
+        }
     }
 
     private var navigationTitle: String {
         if draft.mode == .edit {
-            return draft.entryKind == .inventory ? "在庫を編集" : "Wishを編集"
+            return draft.entryKind == .inventory ? "マイグッズを編集" : "Wishを編集"
         }
-        return draft.entryKind == .inventory ? "在庫に追加" : "Wishに追加"
+        return draft.entryKind == .inventory ? "マイグッズに追加" : "Wishに追加"
     }
 
     private var selectedGroup: OshiGroup? {
@@ -590,6 +213,9 @@ struct GoodsEditorSheet: View {
     }
 
     private var canSave: Bool {
+        guard !isItemReadOnly else {
+            return false
+        }
         switch draft.mode {
         case .create:
             return draft.createInput(
@@ -610,491 +236,115 @@ struct GoodsEditorSheet: View {
         }
     }
 
-    private var header: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(alignment: .center, spacing: 10) {
-                Image(systemName: draft.entryKind == .inventory ? "shippingbox" : "heart")
-                    .font(.system(size: 20, weight: .bold))
-                    .foregroundStyle(.white)
-                    .frame(width: 42, height: 42)
-                    .background(headerGradient, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(navigationTitle)
-                        .font(.system(size: 30, weight: .heavy, design: .rounded))
-                        .foregroundStyle(MegrumTheme.ink)
-                    Text(draft.mode.badgeTitle)
-                        .font(.caption.weight(.black))
-                        .foregroundStyle(MegrumTheme.lavender)
-                }
-            }
-
-            Text("写真、グループ、メンバー、種別、数量、状態をまとめて管理できます。")
-                .font(.system(size: 13, weight: .bold, design: .rounded))
-                .foregroundStyle(MegrumTheme.muted)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
+    private var isItemReadOnly: Bool {
+        draft.mode == .readonly || (draft.entryKind == .inventory && draft.status == .traded)
     }
 
-    private var modeSection: some View {
-        editorSection(title: "登録先", systemImage: "tray.and.arrow.down") {
-            Picker("登録先", selection: Binding(
-                get: { draft.entryKind },
-                set: { draft.setEntryKind($0) }
-            )) {
-                Text("在庫（譲）").tag(GoodsEntryKind.inventory)
-                Text("Wish（求）").tag(GoodsEntryKind.wish)
-            }
-            .pickerStyle(.segmented)
-            .disabled(draft.mode != .create)
+    private var isSavingCurrentItem: Bool {
+        switch draft.mode {
+        case .create:
+            appState.isCreatingGoodsEntry
+        case .edit:
+            appState.mutatingGoodsItemID == draft.existingItemID
+        case .readonly:
+            false
         }
     }
 
-    private var photoSection: some View {
-        editorSection(title: "写真", systemImage: "camera") {
-            VStack(alignment: .leading, spacing: 12) {
-                let photoPickerTitle = draft.hasUnsavedLocalPhoto ? "選び直す" : "写真を選ぶ"
-
-                RoundedRectangle(cornerRadius: 24, style: .continuous)
-                    .fill(photoGradient)
-                    .aspectRatio(draft.entryKind == .inventory ? 0.78 : 1.45, contentMode: .fit)
-                    .overlay {
-                        photoPreview
-                    }
-                    .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
-                    .shadow(color: MegrumTheme.ink.opacity(0.10), radius: 16, y: 8)
-
-                HStack(spacing: 10) {
-                    #if canImport(PhotosUI)
-                    PhotosPicker(selection: $selectedPhotoItem, matching: .images) {
-                        Label(photoPickerTitle, systemImage: "photo.on.rectangle")
-                    }
-                    .buttonStyle(.bordered)
-                    .tint(MegrumTheme.lavender)
-                    .disabled(draft.mode == .readonly)
-                    .onChange(of: selectedPhotoItem) { _, newValue in
-                        Task {
-                            await loadSelectedPhoto(newValue)
-                        }
-                    }
-                    #else
-                    Button {
-                        draft.hasLocalPhoto = true
-                    } label: {
-                        Label("写真を選ぶ", systemImage: "photo.on.rectangle")
-                    }
-                    .buttonStyle(.bordered)
-                    .tint(MegrumTheme.lavender)
-                    .disabled(draft.mode == .readonly)
-                    #endif
-
-                    if draft.hasUnsavedLocalPhoto {
-                        Button(role: .destructive) {
-                            isShowingPhotoRemovalDialog = true
-                        } label: {
-                            Label("外す", systemImage: "trash")
-                        }
-                        .buttonStyle(.bordered)
-                        .disabled(draft.mode == .readonly)
-                    }
-
-                    #if os(iOS)
-                    Button {
-                        isShowingCameraCapture = true
-                    } label: {
-                        Label("カメラ", systemImage: "camera")
-                    }
-                    .buttonStyle(.bordered)
-                    .tint(MegrumTheme.lavender)
-                    .disabled(draft.mode == .readonly)
-                    .accessibilityLabel("カメラで撮る")
-                    #else
-                    Button {
-                    } label: {
-                        Label("カメラ", systemImage: "camera")
-                    }
-                    .buttonStyle(.bordered)
-                    .disabled(true)
-                    #endif
-                }
-
-                Text("選んだ写真や撮影した写真は保存時にアップロードされます。")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(MegrumTheme.muted)
-
-                if draft.hasUnsavedLocalPhoto {
-                    Label("保存に失敗しても、選択した写真はこの画面に残ります。", systemImage: "arrow.clockwise")
-                        .font(.caption.weight(.bold))
-                        .foregroundStyle(MegrumTheme.lavender)
-                }
-
-                if let photoError {
-                    Text(photoError)
-                        .font(.caption.weight(.bold))
-                        .foregroundStyle(.red)
-                }
-            }
-        }
+    private var usesInventoryCreateFlow: Bool {
+        draft.mode == .create && draft.entryKind == .inventory
     }
 
-    private var titleSection: some View {
-        editorSection(title: "名前", systemImage: "text.cursor") {
-            VStack(alignment: .leading, spacing: 10) {
-                #if os(iOS)
-                TextField("例：ランダムトレカ A", text: $draft.title)
-                    .textInputAutocapitalization(.never)
-                    .focused($focusedField, equals: .title)
-                    .submitLabel(.done)
-                    .megrumTextFieldStyle()
-                #else
-                TextField("例：ランダムトレカ A", text: $draft.title)
-                    .focused($focusedField, equals: .title)
-                    .megrumTextFieldStyle()
-                #endif
+    private var canAdvanceFromCreateCommon: Bool {
+        draft.groupID != nil && draft.goodsTypeID != nil
+    }
 
-                Text(resolvedTitlePreview.isEmpty ? "未入力時はグループと種別から名前を作ります。" : "保存名: \(resolvedTitlePreview)")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(MegrumTheme.muted)
-            }
+    private var isTradingCardType: Bool {
+        selectedGoodsType?.name == "トレカ"
+    }
+
+    private var photoSourceDialogTitle: String {
+        draft.hasDisplayPhoto ? "写真を差し替え" : "写真を追加"
+    }
+
+    private var photoActionTitle: String {
+        if draft.entryKind == .wish {
+            return draft.hasDisplayPhoto ? "差し替え" : "+ 画像を選択"
         }
+        return draft.hasDisplayPhoto ? "撮り直す / 差し替え" : "写真を追加"
+    }
+
+    private var wishImageHint: String {
+        draft.hasDisplayPhoto ? "1枚登録済" : "任意"
+    }
+
+    private var isWishPhotoRemovalLocked: Bool {
+        GoodsEditorWishPhotoRemovalPolicy.isRemovalLocked(
+            itemID: draft.existingItemID,
+            entryKind: draft.entryKind,
+            listings: appState.listings
+        )
     }
 
     @ViewBuilder
-    private var photoPreview: some View {
-        if let localPhotoData = draft.localPhotoData {
-            localPhotoPreview(data: localPhotoData)
-        } else if let existingImageURL = draft.existingImageURL {
-            AsyncImage(url: existingImageURL, transaction: Transaction(animation: .easeInOut(duration: 0.18))) { phase in
-                switch phase {
-                case .empty:
-                    photoPlaceholder(status: "写真を読み込み中", showsProgress: true)
-                case let .success(image):
-                    image
-                        .resizable()
-                        .scaledToFill()
-                        .overlay(alignment: .bottomLeading) {
-                            PhotoStatusBadge(text: draft.photoStatusText)
-                                .padding(12)
-                        }
-                case .failure:
-                    photoPlaceholder(status: "保存済み写真を表示できません")
-                @unknown default:
-                    photoPlaceholder(status: draft.photoStatusText)
-                }
-            }
-        } else {
-            photoPlaceholder(status: draft.photoStatusText)
-        }
+    private var formContent: some View {
+        GoodsEditorFormContentView(
+            draft: $draft,
+            tagDraft: $tagDraft,
+            isTagFieldFocused: $isTagFieldFocused,
+            createMetas: $createMetas,
+            navigationTitle: navigationTitle,
+            headerDescription: headerDescription,
+            usesInventoryCreateFlow: usesInventoryCreateFlow,
+            isItemReadOnly: isItemReadOnly,
+            createStep: createStep,
+            createPhotos: createPhotos,
+            groups: appState.oshiGroups,
+            isLoadingOshiGroups: appState.isLoadingOshiGroups,
+            members: appState.oshiCharacters,
+            isLoadingOshiCharacters: appState.isLoadingOshiCharacters,
+            goodsTypes: appState.goodsTypes,
+            isLoadingGoodsTypes: appState.isLoadingGoodsTypes,
+            selectedGroupName: selectedGroup?.name,
+            selectedGoodsTypeName: selectedGoodsType?.name,
+            createError: createError,
+            canAdvanceFromCreateCommon: canAdvanceFromCreateCommon,
+            isTradingCardType: isTradingCardType,
+            isProcessingTradingCardBulk: isProcessingTradingCardBulk,
+            tradingCardBulkStatusMessage: tradingCardBulkStatusMessage,
+            canSaveInventoryCreateMetas: canSaveInventoryCreateMetas,
+            isCreatingGoodsEntry: appState.isCreatingGoodsEntry,
+            photoError: photoError,
+            photoActionTitle: photoActionTitle,
+            titlePreview: resolvedTitlePreview,
+            wishImageHint: wishImageHint,
+            isWishPhotoRemovalLocked: isWishPhotoRemovalLocked,
+            onRemoveTag: removeTag,
+            onAddTag: addCurrentTag,
+            onCommonNext: goToCreateShoot,
+            onPickCamera: startInventoryCreateCamera,
+            onPickPhotos: showInventoryCreatePhotoLibrary,
+            onStartTradingCardBulk: showTradingCardBulkSourceDialog,
+            onRemovePhoto: removeCreatePhoto,
+            onShootBack: returnToCreateCommonStep,
+            onShootNext: goToCreateMetaWithPhotos,
+            onContinueWithoutPhoto: goToCreateMetaWithoutPhoto,
+            onMetaBack: returnFromCreateMetaStep,
+            onSaveMetas: startSaveInventoryCreateFlow,
+            onShowPhotoSource: showDraftPhotoSourceDialog,
+            onClearLocalPhoto: clearLocalPhotoSelection,
+            onRemoveWishPhoto: removeWishPhoto
+        )
     }
 
-    @ViewBuilder
-    private func localPhotoPreview(data: Data) -> some View {
-        #if canImport(UIKit)
-        if let image = UIImage(data: data) {
-            Image(uiImage: image)
-                .resizable()
-                .scaledToFill()
-                .overlay(alignment: .bottomLeading) {
-                    PhotoStatusBadge(text: draft.photoStatusText)
-                        .padding(12)
-                }
-        } else {
-            photoPlaceholder(status: draft.photoStatusText)
+    private var headerDescription: String {
+        if usesInventoryCreateFlow {
+            return "推し・種別、写真、写真ごとの詳細の順に登録できます。"
         }
-        #elseif canImport(AppKit)
-        if let image = NSImage(data: data) {
-            Image(nsImage: image)
-                .resizable()
-                .scaledToFill()
-                .overlay(alignment: .bottomLeading) {
-                    PhotoStatusBadge(text: draft.photoStatusText)
-                        .padding(12)
-                }
-        } else {
-            photoPlaceholder(status: draft.photoStatusText)
+        if draft.entryKind == .inventory {
+            return "写真、推し、数量、タグを編集できます。"
         }
-        #else
-        photoPlaceholder(status: draft.photoStatusText)
-        #endif
-    }
-
-    private func photoPlaceholder(status: String, showsProgress: Bool = false) -> some View {
-        VStack(spacing: 10) {
-            if showsProgress {
-                ProgressView()
-                    .controlSize(.regular)
-                    .tint(.white)
-            } else {
-                Image(systemName: draft.hasDisplayPhoto ? "photo.fill.on.rectangle.fill" : "photo")
-                    .font(.system(size: 36, weight: .semibold))
-                    .foregroundStyle(.white.opacity(0.82))
-            }
-            Text(status)
-                .font(.system(size: 13, weight: .heavy, design: .rounded))
-                .foregroundStyle(.white)
-                .multilineTextAlignment(.center)
-                .padding(.horizontal, 14)
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-    }
-
-    private var groupSection: some View {
-        editorSection(title: "グループ", systemImage: "person.2") {
-            VStack(alignment: .leading, spacing: 10) {
-                if appState.isLoadingOshiGroups {
-                    ProgressView()
-                        .controlSize(.small)
-                }
-
-                Picker("グループ", selection: $draft.groupID) {
-                    Text("選択してください").tag(UUID?.none)
-                    ForEach(appState.oshiGroups) { group in
-                        Text(group.name).tag(Optional(group.id))
-                    }
-                }
-                .pickerStyle(.menu)
-                .tint(MegrumTheme.lavender)
-            }
-        }
-    }
-
-    private var memberSection: some View {
-        editorSection(title: "メンバー / キャラ", systemImage: "person.crop.circle") {
-            VStack(alignment: .leading, spacing: 10) {
-                if appState.isLoadingOshiCharacters {
-                    ProgressView()
-                        .controlSize(.small)
-                }
-
-                Picker("メンバー", selection: $draft.memberID) {
-                    Text("指定なし").tag(UUID?.none)
-                    ForEach(appState.oshiCharacters) { member in
-                        Text(member.name).tag(Optional(member.id))
-                    }
-                }
-                .pickerStyle(.menu)
-                .tint(MegrumTheme.lavender)
-                .disabled(draft.groupID == nil)
-
-                Text("指定なしでも保存できます。")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(MegrumTheme.muted)
-            }
-        }
-    }
-
-    private var goodsTypeSection: some View {
-        editorSection(title: "グッズ種別", systemImage: "square.grid.2x2") {
-            VStack(alignment: .leading, spacing: 10) {
-                if appState.isLoadingGoodsTypes {
-                    ProgressView()
-                        .controlSize(.small)
-                }
-
-                Picker("グッズ種別", selection: $draft.goodsTypeID) {
-                    Text("選択してください").tag(UUID?.none)
-                    ForEach(appState.goodsTypes) { goodsType in
-                        Text(goodsType.name).tag(Optional(goodsType.id))
-                    }
-                }
-                .pickerStyle(.menu)
-                .tint(MegrumTheme.lavender)
-            }
-        }
-    }
-
-    private var quantitySection: some View {
-        editorSection(title: "数量", systemImage: "number") {
-            Stepper(value: $draft.quantity, in: 1...999) {
-                HStack {
-                    Text("個数")
-                        .font(.headline.weight(.black))
-                    Spacer()
-                    Text("\(draft.normalizedQuantity)")
-                        .font(.system(size: 24, weight: .heavy, design: .rounded))
-                        .monospacedDigit()
-                        .foregroundStyle(MegrumTheme.lavender)
-                }
-            }
-        }
-    }
-
-    private var statusSection: some View {
-        editorSection(title: "状態", systemImage: "checkmark.seal") {
-            VStack(alignment: .leading, spacing: 12) {
-                ForEach(GoodsEditorStatus.options(for: draft.entryKind)) { status in
-                    Button {
-                        draft.status = status
-                    } label: {
-                        HStack(spacing: 12) {
-                            Image(systemName: status.systemImage)
-                                .font(.system(size: 17, weight: .bold))
-                                .foregroundStyle(draft.status == status ? .white : MegrumTheme.lavender)
-                                .frame(width: 34, height: 34)
-                                .background(
-                                    draft.status == status ? MegrumTheme.lavender : MegrumTheme.lavender.opacity(0.12),
-                                    in: Circle()
-                                )
-                            Text(status.title)
-                                .font(.headline.weight(.black))
-                                .foregroundStyle(MegrumTheme.ink)
-                            Spacer()
-                            if draft.status == status {
-                                Image(systemName: "checkmark")
-                                    .font(.headline.weight(.black))
-                                    .foregroundStyle(MegrumTheme.lavender)
-                            }
-                        }
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 10)
-                        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
-                    }
-                    .buttonStyle(.plain)
-                }
-            }
-        }
-    }
-
-    private var tagsSection: some View {
-        editorSection(title: "タグ", systemImage: "tag") {
-            VStack(alignment: .leading, spacing: 12) {
-                if draft.tagNames.isEmpty {
-                    Text("タグなし")
-                        .font(.subheadline.weight(.bold))
-                        .foregroundStyle(MegrumTheme.muted)
-                } else {
-                    FlowLayout(spacing: 8) {
-                        ForEach(draft.tagNames, id: \.self) { tag in
-                            Button {
-                                draft.removeTag(tag)
-                            } label: {
-                                HStack(spacing: 5) {
-                                    Text("#\(tag)")
-                                    Image(systemName: "xmark")
-                                        .font(.caption.weight(.black))
-                                }
-                                .font(.caption.weight(.black))
-                                .foregroundStyle(MegrumTheme.ink)
-                                .padding(.horizontal, 10)
-                                .padding(.vertical, 7)
-                                .background(.white.opacity(0.9), in: Capsule())
-                            }
-                            .buttonStyle(.plain)
-                        }
-                    }
-                }
-
-                HStack(spacing: 10) {
-                    TextField("例：会場限定", text: $tagDraft)
-                        .focused($focusedField, equals: .tag)
-                        .submitLabel(.done)
-                        .onSubmit(addCurrentTag)
-                        .megrumTextFieldStyle()
-                    Button("追加", action: addCurrentTag)
-                        .buttonStyle(.bordered)
-                        .tint(MegrumTheme.lavender)
-                        .disabled(tagDraft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || draft.tagNames.count >= 5)
-                }
-
-                Text("タグは5件まで入力できます。保存時にグッズへ反映されます。")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(MegrumTheme.muted)
-            }
-        }
-    }
-
-    @ViewBuilder
-    private var unsupportedSection: some View {
-        if !draft.blockingReasons.isEmpty {
-            VStack(alignment: .leading, spacing: 12) {
-                Label("まだ保存できない変更があります", systemImage: "exclamationmark.triangle.fill")
-                    .font(.headline.weight(.black))
-                    .foregroundStyle(MegrumTheme.ink)
-
-                ForEach(draft.blockingReasons) { reason in
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(reason.title)
-                            .font(.subheadline.weight(.black))
-                            .foregroundStyle(MegrumTheme.ink)
-                        Text(reason.message)
-                            .font(.caption.weight(.semibold))
-                            .foregroundStyle(MegrumTheme.muted)
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                }
-            }
-            .padding(16)
-            .background(MegrumTheme.pink.opacity(0.14), in: RoundedRectangle(cornerRadius: 22, style: .continuous))
-            .overlay {
-                RoundedRectangle(cornerRadius: 22, style: .continuous)
-                    .strokeBorder(MegrumTheme.pink.opacity(0.32), lineWidth: 1)
-            }
-        }
-    }
-
-    @ViewBuilder
-    private var saveFailureSection: some View {
-        if let lastSaveFailure {
-            VStack(alignment: .leading, spacing: 12) {
-                Label(lastSaveFailure.title, systemImage: "exclamationmark.triangle.fill")
-                    .font(.headline.weight(.black))
-                    .foregroundStyle(MegrumTheme.ink)
-
-                Text(lastSaveFailure.message)
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(MegrumTheme.muted)
-                    .fixedSize(horizontal: false, vertical: true)
-
-                HStack(spacing: 10) {
-                    Button {
-                        Task {
-                            await save()
-                        }
-                    } label: {
-                        Label("再試行", systemImage: "arrow.clockwise")
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .tint(MegrumTheme.lavender)
-
-                    if lastSaveFailure.includesPhotoUpload {
-                        Button(role: .destructive) {
-                            isShowingPhotoRemovalDialog = true
-                        } label: {
-                            Label("写真を外す", systemImage: "trash")
-                        }
-                        .buttonStyle(.bordered)
-                    }
-                }
-            }
-            .padding(16)
-            .background(MegrumTheme.pink.opacity(0.14), in: RoundedRectangle(cornerRadius: 22, style: .continuous))
-            .overlay {
-                RoundedRectangle(cornerRadius: 22, style: .continuous)
-                    .strokeBorder(MegrumTheme.pink.opacity(0.32), lineWidth: 1)
-            }
-        }
-    }
-
-    private var saveButton: some View {
-        Button {
-            Task {
-                await save()
-            }
-        } label: {
-            HStack(spacing: 10) {
-                if appState.isCreatingGoodsEntry {
-                    ProgressView()
-                        .tint(.white)
-                }
-                Text(saveButtonTitle)
-                    .font(.headline.weight(.black))
-            }
-            .frame(maxWidth: .infinity)
-            .frame(height: 54)
-        }
-        .buttonStyle(.borderedProminent)
-        .tint(MegrumTheme.lavender)
-        .disabled(!canSave)
+        return "推し、数量、画像、タグを編集できます。"
     }
 
     private var saveButtonTitle: String {
@@ -1102,32 +352,224 @@ struct GoodsEditorSheet: View {
             if appState.mutatingGoodsItemID == draft.existingItemID {
                 return "更新しています"
             }
-            return "変更を保存"
+            return draft.entryKind == .wish ? "ウィッシュを更新" : "変更を保存"
         }
         if appState.isCreatingGoodsEntry {
             return "保存しています"
         }
-        return draft.entryKind == .inventory ? "在庫を登録" : "Wishを登録"
+        return draft.entryKind == .inventory ? "マイグッズを登録" : "Wishを登録"
     }
 
-    private func editorSection<Content: View>(
-        title: String,
-        systemImage: String,
-        @ViewBuilder content: () -> Content
-    ) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Label(title, systemImage: systemImage)
-                .font(.headline.weight(.black))
-                .foregroundStyle(MegrumTheme.ink)
-            content()
+    private func dismissEditor() {
+        dismiss()
+    }
+
+    private func startSave() {
+        Task {
+            await save()
         }
-        .padding(16)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: 24, style: .continuous)
-                .strokeBorder(.white.opacity(0.58), lineWidth: 1)
+    }
+
+    private func retrySave() {
+        startSave()
+    }
+
+    private func requestPhotoRemoval() {
+        isShowingPhotoRemovalDialog = true
+    }
+
+    private func requestInventoryDeleteConfirmation() {
+        isConfirmingInventoryDelete = true
+    }
+
+    private func startDeleteInventoryItem() {
+        Task {
+            await deleteInventoryItem()
         }
+    }
+
+    private func startInventoryCreateCamera() {
+        photoCaptureTarget = .inventoryCreate
+        isShowingCameraCapture = true
+    }
+
+    private func showInventoryCreatePhotoLibrary() {
+        isShowingCreatePhotoLibraryPicker = true
+    }
+
+    private func returnToCreateCommonStep() {
+        createStep = .common
+    }
+
+    private func returnFromCreateMetaStep() {
+        createStep = createPhotos.isEmpty ? .common : .shoot
+    }
+
+    private func startSaveInventoryCreateFlow() {
+        Task {
+            await saveInventoryCreateFlow()
+        }
+    }
+
+    private func handleSelectedGroupChange(_ groupID: UUID?) {
+        resetCreateMetaMembers()
+        Task {
+            await loadMembers(for: groupID)
+        }
+    }
+
+    private func clearTransientEditorFeedback() {
+        lastSaveFailure = nil
+        createError = nil
+    }
+
+    #if canImport(PhotosUI)
+    private func handleSelectedPhotoItemChange(_ item: PhotosPickerItem?) {
+        Task {
+            await loadSelectedPhoto(item)
+        }
+    }
+
+    private func handleSelectedCreatePhotoItemsChange(_ items: [PhotosPickerItem]) {
+        Task {
+            await loadSelectedCreatePhotos(items)
+        }
+    }
+
+    private func handleSelectedTradingCardBulkPhotoItemChange(_ item: PhotosPickerItem?) {
+        Task {
+            await loadSelectedTradingCardBulkPhoto(item)
+        }
+    }
+    #endif
+
+    private var canSaveInventoryCreateMetas: Bool {
+        !inventoryCreateInputs().isEmpty && !appState.isCreatingGoodsEntry
+    }
+
+    private func goToCreateShoot() {
+        guard canAdvanceFromCreateCommon else {
+            createError = "グループとグッズ種別を選択してください"
+            return
+        }
+        createError = nil
+        createStep = .shoot
+    }
+
+    private func goToCreateMetaWithPhotos() {
+        guard !createPhotos.isEmpty else {
+            createError = "登録する写真を選んでください"
+            return
+        }
+        syncCreateMetasWithPhotos()
+        createError = nil
+        createStep = .meta
+    }
+
+    private func goToCreateMetaWithoutPhoto() {
+        createMetas = [GoodsCreateMetaDraft()]
+        createError = nil
+        createStep = .meta
+    }
+
+    private func resetInventoryCreateFlow() {
+        createStep = .common
+        createPhotos = []
+        createMetas = [GoodsCreateMetaDraft()]
+        createError = nil
+        photoError = nil
+        tradingCardBulkStatusMessage = nil
+        isProcessingTradingCardBulk = false
+        #if canImport(PhotosUI)
+        selectedCreatePhotoItems = []
+        selectedTradingCardBulkPhotoItem = nil
+        #endif
+    }
+
+    private func resetCreateMetaMembers() {
+        guard usesInventoryCreateFlow else {
+            return
+        }
+        createMetas = createMetas.map { meta in
+            var next = meta
+            next.memberID = nil
+            return next
+        }
+    }
+
+    private func syncCreateMetasWithPhotos() {
+        guard !createPhotos.isEmpty else {
+            if createMetas.isEmpty {
+                createMetas = [GoodsCreateMetaDraft()]
+            }
+            return
+        }
+        let currentByPhotoID = Dictionary(uniqueKeysWithValues: createMetas.compactMap { meta in
+            meta.photoID.map { ($0, meta) }
+        })
+        createMetas = createPhotos.map { photo in
+            currentByPhotoID[photo.id] ?? GoodsCreateMetaDraft(photoID: photo.id)
+        }
+    }
+
+    private func removeCreatePhoto(_ photoID: UUID) {
+        createPhotos.removeAll { $0.id == photoID }
+        if createStep == .meta {
+            syncCreateMetasWithPhotos()
+        } else {
+            createMetas.removeAll { $0.photoID == photoID }
+        }
+    }
+
+    private func memberName(for memberID: UUID?) -> String? {
+        guard let memberID else {
+            return nil
+        }
+        return appState.oshiCharacters.first { $0.id == memberID }?.name
+    }
+
+    private func photoUpload(for photoID: UUID?) -> GoodsPhotoUpload? {
+        guard let photoID else {
+            return nil
+        }
+        return createPhotos.first { $0.id == photoID }?.upload
+    }
+
+    private func inventoryCreateInputs() -> [GoodsEntryInput] {
+        createMetas.compactMap { meta in
+            meta.createInput(
+                sharedDraft: draft,
+                photoUpload: photoUpload(for: meta.photoID),
+                groupName: selectedGroup?.name,
+                memberName: memberName(for: meta.memberID),
+                goodsTypeName: selectedGoodsType?.name
+            )
+        }
+    }
+
+    private func saveInventoryCreateFlow() async {
+        guard canAdvanceFromCreateCommon else {
+            createError = "グループとグッズ種別を選択してください"
+            return
+        }
+        let inputs = inventoryCreateInputs()
+        guard !inputs.isEmpty else {
+            createError = "登録するアイテムがありません"
+            return
+        }
+
+        createError = nil
+        var savedCount = 0
+        for input in inputs {
+            let saved = await appState.createGoodsEntry(input)
+            if !saved {
+                let base = appState.errorMessage ?? "保存に失敗しました"
+                createError = savedCount > 0 ? "\(savedCount)件は登録済みです。\(base)" : base
+                return
+            }
+            savedCount += 1
+        }
+        dismiss()
     }
 
     private func loadChoices() async {
@@ -1139,7 +581,7 @@ struct GoodsEditorSheet: View {
         }
         assignDefaultsIfNeeded()
         await loadMembers(for: draft.groupID)
-        focusedField = draft.mode == .create ? .title : nil
+        isTagFieldFocused = false
     }
 
     private func assignDefaultsIfNeeded() {
@@ -1170,8 +612,15 @@ struct GoodsEditorSheet: View {
     }
 
     private func addCurrentTag() {
+        guard !isItemReadOnly else {
+            return
+        }
         draft.addTag(tagDraft)
         tagDraft = ""
+    }
+
+    private func removeTag(_ tag: String) {
+        draft.removeTag(tag)
     }
 
     private func clearLocalPhotoSelection() {
@@ -1182,11 +631,63 @@ struct GoodsEditorSheet: View {
         #endif
     }
 
+    private func showDraftPhotoSourceDialog() {
+        photoCaptureTarget = .draft
+        isShowingPhotoSourceDialog = true
+    }
+
+    private func showTradingCardBulkSourceDialog() {
+        isShowingTradingCardBulkSourceDialog = true
+    }
+
+    private func startTradingCardBulkCamera() {
+        photoCaptureTarget = .tradingCardBulk
+        isShowingCameraCapture = true
+    }
+
+    private func showTradingCardBulkPhotoLibrary() {
+        isShowingTradingCardBulkPhotoLibraryPicker = true
+    }
+
+    private func removeWishPhoto() {
+        guard draft.entryKind == .wish, !isItemReadOnly else {
+            return
+        }
+        if isWishPhotoRemovalLocked {
+            photoError = "この WISH は個別募集で使用中のため画像を削除できません（差し替えは可能）"
+            return
+        }
+        draft.removeDisplayPhoto()
+        photoError = nil
+        #if canImport(PhotosUI)
+        selectedPhotoItem = nil
+        #endif
+    }
+
     private func loadCapturedCameraPhoto(_ data: Data) {
+        if photoCaptureTarget == .tradingCardBulk {
+            Task {
+                await processTradingCardBulkImage(data)
+            }
+            return
+        }
+
         let upload = GoodsPhotoUpload(data: data, contentType: "image/jpeg")
         if let uploadError = goodsEditorPhotoUploadError(for: upload) {
-            draft.clearLocalPhotoSelection()
+            if photoCaptureTarget == .draft {
+                draft.clearLocalPhotoSelection()
+            }
             photoError = uploadError
+            createError = uploadError
+            return
+        }
+        if photoCaptureTarget == .inventoryCreate {
+            createPhotos.append(GoodsCreatePhotoDraft(upload: upload))
+            if createStep == .meta {
+                syncCreateMetasWithPhotos()
+            }
+            createError = nil
+            photoError = nil
             return
         }
         draft.setLocalPhotoUpload(upload)
@@ -1229,7 +730,112 @@ struct GoodsEditorSheet: View {
             photoError = "写真を読み込めませんでした"
         }
     }
+
+    private func loadSelectedCreatePhotos(_ items: [PhotosPickerItem]) async {
+        guard !items.isEmpty else {
+            return
+        }
+
+        var nextPhotos: [GoodsCreatePhotoDraft] = []
+        var lastError: String?
+        for item in items {
+            do {
+                guard let data = try await item.loadTransferable(type: Data.self) else {
+                    lastError = "写真を読み込めませんでした"
+                    continue
+                }
+                let upload = normalizedPhotoUpload(from: data)
+                if let uploadError = goodsEditorPhotoUploadError(for: upload) {
+                    lastError = uploadError
+                    continue
+                }
+                nextPhotos.append(GoodsCreatePhotoDraft(upload: upload))
+            } catch {
+                lastError = "写真を読み込めませんでした"
+            }
+        }
+
+        if nextPhotos.isEmpty {
+            createError = lastError ?? "写真を読み込めませんでした"
+        } else {
+            createPhotos.append(contentsOf: nextPhotos)
+            if createStep == .meta {
+                syncCreateMetasWithPhotos()
+            }
+            createError = lastError
+        }
+        selectedCreatePhotoItems = []
+    }
+
+    private func loadSelectedTradingCardBulkPhoto(_ item: PhotosPickerItem?) async {
+        guard let item else {
+            return
+        }
+
+        do {
+            guard let data = try await item.loadTransferable(type: Data.self) else {
+                createError = "写真を読み込めませんでした"
+                selectedTradingCardBulkPhotoItem = nil
+                return
+            }
+            await processTradingCardBulkImage(data)
+        } catch {
+            createError = "写真を読み込めませんでした"
+        }
+        selectedTradingCardBulkPhotoItem = nil
+    }
     #endif
+
+    private func processTradingCardBulkImage(_ data: Data) async {
+        guard isTradingCardType else {
+            createError = "トレカ種別を選択した時だけAI一括登録を使えます"
+            return
+        }
+
+        createError = nil
+        tradingCardBulkStatusMessage = nil
+        isProcessingTradingCardBulk = true
+        defer {
+            isProcessingTradingCardBulk = false
+        }
+
+        do {
+            let results = try await TradingCardBulkRecognizer.recognizeCards(in: data)
+            appendTradingCardBulkResults(results)
+        } catch {
+            createError = error.localizedDescription
+        }
+    }
+
+    private func appendTradingCardBulkResults(_ results: [TradingCardBulkRecognitionResult]) {
+        var nextPhotos: [GoodsCreatePhotoDraft] = []
+        var lastError: String?
+
+        for result in results {
+            let upload = result.upload
+            if let uploadError = goodsEditorPhotoUploadError(for: upload) {
+                lastError = uploadError
+                continue
+            }
+            nextPhotos.append(GoodsCreatePhotoDraft(upload: upload))
+        }
+
+        guard !nextPhotos.isEmpty else {
+            createError = lastError ?? "AIで追加できるカード画像がありませんでした"
+            return
+        }
+
+        createPhotos.append(contentsOf: nextPhotos)
+        if createStep == .meta {
+            syncCreateMetasWithPhotos()
+        }
+
+        let usedFallback = results.contains { $0.source == .fallbackOriginal }
+        tradingCardBulkStatusMessage = usedFallback
+            ? "カード枠を検出できなかったため、元写真を1枚追加しました。必要なら撮り直すか、写真一覧から削除してください。"
+            : "\(nextPhotos.count)枚のカードを切り出して追加しました。続けて追加するか、詳細設定へ進めます。"
+        createError = lastError
+    }
 
     private func save() async {
         lastSaveFailure = nil
@@ -1265,101 +871,20 @@ struct GoodsEditorSheet: View {
         }
     }
 
-    private var headerGradient: LinearGradient {
-        LinearGradient(
-            colors: [MegrumTheme.lavender, MegrumTheme.pink],
-            startPoint: .topLeading,
-            endPoint: .bottomTrailing
-        )
-    }
-
-    private var photoGradient: LinearGradient {
-        LinearGradient(
-            colors: [
-                MegrumTheme.sky.opacity(0.62),
-                MegrumTheme.lavender.opacity(0.72),
-                MegrumTheme.pink.opacity(0.54)
-            ],
-            startPoint: .topLeading,
-            endPoint: .bottomTrailing
-        )
-    }
-}
-
-struct PhotoStatusBadge: View {
-    var text: String
-
-    var body: some View {
-        Text(text)
-            .font(.system(size: 12, weight: .heavy, design: .rounded))
-            .foregroundStyle(.white)
-            .padding(.horizontal, 11)
-            .padding(.vertical, 7)
-            .background(.black.opacity(0.34), in: Capsule())
-            .overlay {
-                Capsule()
-                    .strokeBorder(.white.opacity(0.22), lineWidth: 1)
-            }
-    }
-}
-
-func normalizedPhotoUpload(from data: Data) -> GoodsPhotoUpload {
-    if let contentType = detectedSupportedImageContentType(data),
-       data.count <= goodsEditorMaxPhotoUploadBytes {
-        return GoodsPhotoUpload(data: data, contentType: contentType)
-    }
-
-    #if canImport(UIKit)
-    if let image = UIImage(data: data),
-       let jpegData = image.jpegData(compressionQuality: 0.88) {
-        return GoodsPhotoUpload(data: jpegData, contentType: "image/jpeg")
-    }
-    #endif
-
-    return GoodsPhotoUpload(data: data, contentType: "image/jpeg")
-}
-
-func goodsEditorPhotoUploadError(for upload: GoodsPhotoUpload) -> String? {
-    upload.data.count > goodsEditorMaxPhotoUploadBytes ? "写真は10MB以下にしてください" : nil
-}
-
-func detectedSupportedImageContentType(_ data: Data) -> String? {
-    if data.starts(withBytes: [0xFF, 0xD8, 0xFF]) {
-        return "image/jpeg"
-    }
-    if data.starts(withBytes: [0x89, 0x50, 0x4E, 0x47]) {
-        return "image/png"
-    }
-    if data.starts(withBytes: [0x47, 0x49, 0x46]) {
-        return "image/gif"
-    }
-    if data.count >= 12 {
-        let signature = String(data: Data(data[8..<12]), encoding: .ascii)
-        if signature == "WEBP" {
-            return "image/webp"
+    private func deleteInventoryItem() async {
+        guard draft.entryKind == .inventory,
+              draft.mode == .edit,
+              let itemID = draft.existingItemID,
+              !isItemReadOnly
+        else {
+            return
+        }
+        let deleted = await appState.archiveGoodsItem(itemID)
+        if deleted {
+            dismiss()
+        } else {
+            deleteErrorMessage = appState.errorMessage ?? "通信状況を確認してからもう一度お試しください。"
         }
     }
-    return nil
-}
 
-private extension Data {
-    func starts(withBytes bytes: [UInt8]) -> Bool {
-        count >= bytes.count && Array(prefix(bytes.count)) == bytes
-    }
-}
-
-private struct FlowLayout<Content: View>: View {
-    var spacing: CGFloat = 8
-    var content: Content
-
-    init(spacing: CGFloat = 8, @ViewBuilder content: () -> Content) {
-        self.spacing = spacing
-        self.content = content()
-    }
-
-    var body: some View {
-        LazyVGrid(columns: [GridItem(.adaptive(minimum: 92), spacing: spacing)], alignment: .leading, spacing: spacing) {
-            content
-        }
-    }
 }

@@ -16,7 +16,7 @@ public enum MegrumTab: String, CaseIterable, Identifiable, Sendable {
         case .home:
             "ホーム"
         case .inventory:
-            "在庫"
+            "マイグッズ"
         case .wish:
             "Wish"
         case .trades:
@@ -140,12 +140,7 @@ enum VisualQAProposalRouteResolver {
     }
 
     static func targetItem(candidates: [GoodsItem], viewerID: UUID?) -> GoodsItem? {
-        candidates.first { item in
-            guard let viewerID else {
-                return false
-            }
-            return item.ownerID != viewerID
-        } ?? candidates.first
+        VisualQATargetItemResolver.targetItem(candidates: candidates, viewerID: viewerID)
     }
 }
 
@@ -158,7 +153,9 @@ enum VisualQARelationRouteResolver {
             false
         }
     }
+}
 
+enum VisualQATargetItemResolver {
     static func targetItem(candidates: [GoodsItem], viewerID: UUID?) -> GoodsItem? {
         candidates.first { item in
             guard let viewerID else {
@@ -172,6 +169,8 @@ enum VisualQARelationRouteResolver {
 enum VisualQATabRouteResolver {
     static func initialTab(for screen: VisualQAInitialScreen?) -> MegrumTab {
         switch screen {
+        case .meguri:
+            .meguri
         case .proposalPending:
             .trades
         default:
@@ -198,11 +197,13 @@ public struct MegrumRootView: View {
     @State private var showsDrawer = false
     @State private var requestedTradesStage: TradeStage?
     @State private var drawerDestination: AppDrawerDestination?
+    @State private var drawerPageDestination: AppDrawerDestination?
     @State private var publicProfileRoute: PublicProfileRoute?
     @State private var visualQAProposalRoute: HomeRelationRoute?
     @State private var didOpenVisualQAProposalRoute = false
     private let visualQAInitialScreen: VisualQAInitialScreen?
     @GestureState private var drawerDragTranslation: CGFloat = 0
+    @Environment(\.scenePhase) private var scenePhase
     @Binding private var notificationDestinationTab: MegrumTab?
 
     public init(
@@ -213,6 +214,7 @@ public struct MegrumRootView: View {
         ),
         notificationDestinationTab: Binding<MegrumTab?> = .constant(nil)
     ) {
+        MegrumTabBarAppearance.configure()
         let visualQAInitialScreen = VisualQAPreviewMode.initialScreen(
             environment: ProcessInfo.processInfo.environment
         )
@@ -230,7 +232,7 @@ public struct MegrumRootView: View {
             if authState.isAuthenticated {
                 authenticatedRoot
             } else {
-                AuthScreen(authState: authState)
+                AuthScreen(authState: authState, visualQAInitialScreen: visualQAInitialScreen)
             }
         }
         .onOpenURL { url in
@@ -244,6 +246,14 @@ public struct MegrumRootView: View {
             }
             selectedTab = destination
             notificationDestinationTab = nil
+        }
+        .onChange(of: scenePhase) { _, phase in
+            guard phase == .active, authState.isAuthenticated else {
+                return
+            }
+            Task {
+                await syncRepositoryWithAuthSession()
+            }
         }
     }
 
@@ -291,6 +301,44 @@ public struct MegrumRootView: View {
                         visualQAInitialScreen: visualQAInitialScreen,
                         onCompletionAction: applyProposalCompletionRoute
                     )
+                }
+            } else if visualQAInitialScreen == .individualListings {
+                NavigationStack {
+                    IndividualListingsScreen(appState: appState)
+                }
+            } else if visualQAInitialScreen == .individualListingHaves {
+                NavigationStack {
+                    IndividualListingsScreen(
+                        appState: appState,
+                        initialEditorStep: .haves,
+                        initiallyPresentsEditor: true
+                    )
+                }
+            } else if let optionKind = visualQAIndividualListingOptionKind {
+                NavigationStack {
+                    IndividualListingsScreen(appState: appState, initialEditorOptionKind: optionKind)
+                }
+            } else if visualQAInitialScreen == .individualListingExchange {
+                NavigationStack {
+                    IndividualListingsScreen(
+                        appState: appState,
+                        initialEditorStep: .exchange,
+                        initiallyPresentsEditor: true
+                    )
+                }
+            } else if visualQAInitialScreen == .ownProfile {
+                NavigationStack {
+                    OwnProfileScreen(appState: appState)
+                }
+            } else if visualQAInitialScreen == .publicProfile {
+                NavigationStack {
+                    PublicUserProfileScreen(appState: appState, userID: NativePreviewData.partnerID)
+                }
+            } else if drawerPageDestination == .profile {
+                NavigationStack {
+                    OwnProfileScreen(appState: appState) {
+                        drawerPageDestination = nil
+                    }
                 }
             } else {
                 authenticatedTabs
@@ -340,7 +388,7 @@ public struct MegrumRootView: View {
         guard VisualQAProposalRouteResolver.shouldRenderDirectRoot(for: visualQAInitialScreen) else {
             return nil
         }
-        guard let item = VisualQAProposalRouteResolver.targetItem(
+        guard let item = VisualQATargetItemResolver.targetItem(
             candidates: appState.homeMatchedItems,
             viewerID: appState.viewer?.id
         ) else {
@@ -353,13 +401,26 @@ public struct MegrumRootView: View {
         guard VisualQARelationRouteResolver.shouldRenderDirectRoot(for: visualQAInitialScreen) else {
             return nil
         }
-        guard let item = VisualQARelationRouteResolver.targetItem(
+        guard let item = VisualQATargetItemResolver.targetItem(
             candidates: appState.homeMatchedItems,
             viewerID: appState.viewer?.id
         ) else {
             return nil
         }
         return HomeRelationRoute(item: item, matchType: .perfect)
+    }
+
+    private var visualQAIndividualListingOptionKind: IndividualListingOptionKind? {
+        switch visualQAInitialScreen {
+        case .individualListingWish:
+            .wish
+        case .individualListingCondition:
+            .condition
+        case .individualListingCash:
+            .cash
+        default:
+            nil
+        }
     }
 
     private var authenticatedTabs: some View {
@@ -409,8 +470,8 @@ public struct MegrumRootView: View {
 
                     NavigationStack {
                         GoodsCollectionScreen(
-                            title: "在庫",
-                            subtitle: "交換に出せるグッズ",
+                            title: "マイグッズ",
+                            subtitle: "",
                             items: appState.inventory,
                             showsAddButton: true,
                             appState: appState,
@@ -495,6 +556,7 @@ public struct MegrumRootView: View {
                                 await appState.revokeRegisteredNativePushDeviceToken()
                             }
                             drawerDestination = nil
+                            drawerPageDestination = nil
                             publicProfileRoute = nil
                             showsDrawer = false
                         }
@@ -549,6 +611,7 @@ public struct MegrumRootView: View {
     }
 
     private func syncRepositoryWithAuthSession() async {
+        await authState.refreshSessionIfNeeded()
         await appState.replaceRepository(
             MegrumAppStateFactory.repository(authSession: authState.session)
         )
@@ -567,7 +630,7 @@ public struct MegrumRootView: View {
         else {
             return
         }
-        guard let item = VisualQAProposalRouteResolver.targetItem(
+        guard let item = VisualQATargetItemResolver.targetItem(
             candidates: appState.homeMatchedItems,
             viewerID: appState.viewer?.id
         ) else {
@@ -583,8 +646,13 @@ public struct MegrumRootView: View {
 
     private func openDrawerDestination(_ destination: AppDrawerDestination) {
         drawerDestination = nil
+        drawerPageDestination = nil
 
         switch destination {
+        case .profile:
+            DispatchQueue.main.async {
+                drawerPageDestination = destination
+            }
         case .schedules:
             requestedTradesStage = .inProgress
             selectedTab = .trades
@@ -739,13 +807,7 @@ private struct NativeLoadingFailureScreen: View {
             }
 
             VStack(spacing: 10) {
-                Button {
-                    Task {
-                        isRetrying = true
-                        await onRetry()
-                        isRetrying = false
-                    }
-                } label: {
+                Button(action: retry) {
                     Label(isRetrying ? "再読み込み中" : "再読み込み", systemImage: "arrow.clockwise")
                         .frame(maxWidth: .infinity)
                 }
@@ -753,13 +815,7 @@ private struct NativeLoadingFailureScreen: View {
                 .tint(MegrumTheme.lavender)
                 .disabled(isRetrying || isSigningOut)
 
-                Button(role: .destructive) {
-                    Task {
-                        isSigningOut = true
-                        await onSignOut()
-                        isSigningOut = false
-                    }
-                } label: {
+                Button(role: .destructive, action: signOut) {
                     Label(isSigningOut ? "ログアウト中" : "ログアウトしてやり直す", systemImage: "rectangle.portrait.and.arrow.right")
                         .frame(maxWidth: .infinity)
                 }
@@ -773,5 +829,21 @@ private struct NativeLoadingFailureScreen: View {
         .frame(maxWidth: 420)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(MegrumTheme.canvas.ignoresSafeArea())
+    }
+
+    private func retry() {
+        Task {
+            isRetrying = true
+            await onRetry()
+            isRetrying = false
+        }
+    }
+
+    private func signOut() {
+        Task {
+            isSigningOut = true
+            await onSignOut()
+            isSigningOut = false
+        }
     }
 }

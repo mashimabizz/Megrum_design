@@ -1,0 +1,4 @@
+enabledWorkflows:
+  - simulator
+  - ui-automation
+  - debugging

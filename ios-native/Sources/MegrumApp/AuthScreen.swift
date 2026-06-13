@@ -24,14 +24,45 @@ public enum AuthScreenMode: String, CaseIterable, Identifiable {
     }
 }
 
+enum AuthFlowRoute: Equatable {
+    case signInChoice
+    case signUpChoice
+    case signInEmail
+    case signUpEmail
+    case passwordReset
+
+    init(visualQAInitialScreen: VisualQAInitialScreen?) {
+        switch visualQAInitialScreen {
+        case .authSignUp:
+            self = .signUpChoice
+        case .authEmailSignIn:
+            self = .signInEmail
+        case .authEmailSignUp:
+            self = .signUpEmail
+        case .authPasswordReset:
+            self = .passwordReset
+        default:
+            self = .signInChoice
+        }
+    }
+
+    var mode: AuthScreenMode {
+        switch self {
+        case .signUpChoice, .signUpEmail:
+            .signUp
+        case .signInChoice, .signInEmail, .passwordReset:
+            .signIn
+        }
+    }
+}
+
 @MainActor
 public struct AuthScreen: View {
     @ObservedObject private var authState: MegrumAuthState
-    @State private var mode: AuthScreenMode = .signIn
+    @State private var route: AuthFlowRoute
     @State private var email = ""
     @State private var password = ""
     @State private var handle = ""
-    @State private var isShowingPasswordResetSheet = false
     @State private var passwordResetEmail = ""
     @State private var hasSubmittedPasswordReset = false
     @State private var passwordResetInputErrorMessage: String?
@@ -43,22 +74,124 @@ public struct AuthScreen: View {
     #endif
     @FocusState private var focusedField: Field?
 
+    private var mode: AuthScreenMode { route.mode }
+
+    private var feedbackMessage: AuthVisualFeedback? {
+        if !authState.isConfigured {
+            return nil
+        }
+        if let inputErrorMessage {
+            return AuthVisualFeedback(message: inputErrorMessage, style: .error)
+        }
+        if let errorMessage = authState.errorMessage {
+            return AuthVisualFeedback(message: errorMessage, style: .error)
+        }
+        if let identityProviderError {
+            return AuthVisualFeedback(message: identityProviderError, style: .error)
+        }
+        if let successMessage = authState.successMessage {
+            return AuthVisualFeedback(message: successMessage, style: .success)
+        }
+        if let passwordResetMessage = authState.passwordResetMessage {
+            return AuthVisualFeedback(message: passwordResetMessage, style: .success)
+        }
+        return nil
+    }
+
+    private var passwordResetFeedbackMessage: AuthVisualFeedback? {
+        guard hasSubmittedPasswordReset else {
+            return nil
+        }
+        if let passwordResetInputErrorMessage {
+            return AuthVisualFeedback(message: passwordResetInputErrorMessage, style: .error)
+        }
+        if let errorMessage = authState.errorMessage {
+            return AuthVisualFeedback(message: errorMessage, style: .error)
+        }
+        if let passwordResetMessage = authState.passwordResetMessage {
+            return AuthVisualFeedback(message: passwordResetMessage, style: .success)
+        }
+        return nil
+    }
+
+    private var validationMessage: String? {
+        switch mode {
+        case .signIn:
+            MegrumAuthInputValidator.signInValidationMessage(email: email, password: password)
+        case .signUp:
+            MegrumAuthInputValidator.signUpValidationMessage(email: email, password: password, handle: handle)
+        }
+    }
+
     public init(authState: MegrumAuthState) {
         self.authState = authState
+        let route = AuthFlowRoute.signInChoice
+        self._route = State(initialValue: route)
+    }
+
+    init(authState: MegrumAuthState, visualQAInitialScreen: VisualQAInitialScreen?) {
+        self.authState = authState
+        let route = AuthFlowRoute(visualQAInitialScreen: visualQAInitialScreen)
+        self._route = State(initialValue: route)
     }
 
     public var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(alignment: .leading, spacing: 24) {
-                    header
-                    modePicker
-                    form
-                    actionArea
+                switch route {
+                case .signInChoice:
+                    AuthChoiceScreen(
+                        mode: .signIn,
+                        onAppleRequest: prepareAppleSignIn,
+                        onAppleCompletion: handleAppleSignIn,
+                        onGoogle: startGoogleSignInFromChoice,
+                        onEmail: { setRoute(.signInEmail) },
+                        onSwitch: { setRoute(.signUpChoice) }
+                    )
+                case .signUpChoice:
+                    AuthChoiceScreen(
+                        mode: .signUp,
+                        onAppleRequest: prepareAppleSignIn,
+                        onAppleCompletion: handleAppleSignIn,
+                        onGoogle: startGoogleSignInFromChoice,
+                        onEmail: { setRoute(.signUpEmail) },
+                        onSwitch: { setRoute(.signInChoice) }
+                    )
+                case .signInEmail:
+                    AuthEmailScreen(
+                        mode: .signIn,
+                        email: $email,
+                        password: $password,
+                        isLoading: authState.isLoading,
+                        feedback: feedbackMessage,
+                        onSubmit: submitFromButton,
+                        onPasswordReset: { setRoute(.passwordReset) },
+                        onBackToProvider: { setRoute(.signInChoice) },
+                        onSwitch: { setRoute(.signUpEmail) }
+                    )
+                case .signUpEmail:
+                    AuthEmailScreen(
+                        mode: .signUp,
+                        email: $email,
+                        password: $password,
+                        isLoading: authState.isLoading,
+                        feedback: feedbackMessage,
+                        onSubmit: submitFromButton,
+                        onPasswordReset: { setRoute(.passwordReset) },
+                        onBackToProvider: { setRoute(.signUpChoice) },
+                        onSwitch: { setRoute(.signInEmail) }
+                    )
+                case .passwordReset:
+                    AuthPasswordResetScreen(
+                        email: $passwordResetEmail,
+                        isSending: authState.isLoading,
+                        feedback: passwordResetFeedbackMessage,
+                        onEmailChanged: handlePasswordResetEmailChanged,
+                        onSend: sendPasswordResetFromButton,
+                        onBack: { setRoute(.signInEmail) },
+                        onLogin: { setRoute(.signInEmail) }
+                    )
                 }
-                .padding(.horizontal, 24)
-                .padding(.top, 28)
-                .padding(.bottom, 42)
             }
             .background(MegrumTheme.canvas.ignoresSafeArea())
             .scrollDismissesKeyboard(.interactively)
@@ -80,10 +213,6 @@ public struct AuthScreen: View {
             }
             #endif
         }
-        .onChange(of: mode) { _, _ in
-            clearFeedback()
-            focusedField = nil
-        }
         .onChange(of: email) { _, _ in
             clearFeedback()
         }
@@ -93,297 +222,39 @@ public struct AuthScreen: View {
         .onChange(of: handle) { _, _ in
             clearFeedback()
         }
-        .sheet(isPresented: $isShowingPasswordResetSheet) {
-            PasswordResetSheet(
-                email: $passwordResetEmail,
-                isSending: authState.isLoading,
-                errorMessage: hasSubmittedPasswordReset ? (passwordResetInputErrorMessage ?? authState.errorMessage) : nil,
-                successMessage: hasSubmittedPasswordReset ? authState.passwordResetMessage : nil,
-                onEmailChanged: {
-                    hasSubmittedPasswordReset = false
-                    passwordResetInputErrorMessage = nil
-                    authState.clearFeedback()
-                }
-            ) {
-                await sendPasswordReset()
-            }
+    }
+
+    private func setRoute(_ nextRoute: AuthFlowRoute) {
+        route = nextRoute
+        if nextRoute == .passwordReset {
+            passwordResetEmail = MegrumAuthInputValidator.normalizedEmail(email)
+            hasSubmittedPasswordReset = false
+            passwordResetInputErrorMessage = nil
         }
+        clearFeedback()
+        focusedField = nil
     }
 
-    private var header: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text("Megrum")
-                .font(.system(size: 38, weight: .black, design: .rounded))
-                .foregroundStyle(MegrumTheme.ink)
-
-            Text(mode == .signIn ? "おかえりなさい" : "まずはアカウントを作成します")
-                .font(.system(size: 15, weight: .bold, design: .rounded))
-                .foregroundStyle(MegrumTheme.muted)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
+    private func submitFromButton() {
+        Task { await submit() }
     }
 
-    private var modePicker: some View {
-        Picker("認証方法", selection: $mode) {
-            ForEach(AuthScreenMode.allCases) { mode in
-                Text(mode.title).tag(mode)
-            }
-        }
-        .pickerStyle(.segmented)
+    private func sendPasswordResetFromButton() {
+        Task { await sendPasswordReset() }
     }
 
-    private var form: some View {
-        VStack(spacing: 16) {
-            emailField
-            passwordField
-
-            if mode == .signUp {
-                handleField
-            }
-        }
-        .disabled(authState.isLoading)
-        .animation(.easeInOut(duration: 0.12), value: authState.isLoading)
-    }
-
-    @ViewBuilder
-    private var emailField: some View {
-        #if os(iOS)
-        TextField("メールアドレス", text: $email)
-            .textInputAutocapitalization(.never)
-            .autocorrectionDisabled()
-            .keyboardType(.emailAddress)
-            .textContentType(.emailAddress)
-            .focused($focusedField, equals: .email)
-            .submitLabel(.next)
-            .onSubmit {
-                focusedField = .password
-            }
-            .megrumTextFieldStyle()
-        #else
-        TextField("メールアドレス", text: $email)
-            .focused($focusedField, equals: .email)
-            .onSubmit {
-                focusedField = .password
-            }
-            .megrumTextFieldStyle()
-        #endif
-    }
-
-    @ViewBuilder
-    private var passwordField: some View {
-        #if os(iOS)
-        SecureField("パスワード", text: $password)
-            .textContentType(mode == .signIn ? .password : .newPassword)
-            .focused($focusedField, equals: .password)
-            .submitLabel(mode == .signIn ? .go : .next)
-            .onSubmit {
-                if mode == .signIn {
-                    Task { await submit() }
-                } else {
-                    focusedField = .handle
-                }
-            }
-            .megrumTextFieldStyle()
-        #else
-        SecureField("パスワード", text: $password)
-            .focused($focusedField, equals: .password)
-            .onSubmit {
-                if mode == .signIn {
-                    Task { await submit() }
-                } else {
-                    focusedField = .handle
-                }
-            }
-            .megrumTextFieldStyle()
-        #endif
-    }
-
-    @ViewBuilder
-    private var handleField: some View {
-        #if os(iOS)
-        TextField("ユーザーID（任意）", text: $handle)
-            .textInputAutocapitalization(.never)
-            .autocorrectionDisabled()
-            .textContentType(.username)
-            .focused($focusedField, equals: .handle)
-            .submitLabel(.go)
-            .onSubmit {
-                Task { await submit() }
-            }
-            .megrumTextFieldStyle()
-        #else
-        TextField("ユーザーID（任意）", text: $handle)
-            .focused($focusedField, equals: .handle)
-            .onSubmit {
-                Task { await submit() }
-            }
-            .megrumTextFieldStyle()
-        #endif
-    }
-
-    private var actionArea: some View {
-        VStack(spacing: 14) {
-            if !authState.isConfigured {
-                infoLabel("ログイン機能を使うにはSupabase設定が必要です。画面確認だけならプレビューで入れます")
-            }
-
-            if let inputErrorMessage {
-                errorLabel(inputErrorMessage)
-            } else if let errorMessage = authState.errorMessage {
-                errorLabel(errorMessage)
-            } else if let identityProviderError {
-                errorLabel(identityProviderError)
-            } else if let successMessage = authState.successMessage {
-                successLabel(successMessage)
-            } else if let passwordResetMessage = authState.passwordResetMessage {
-                successLabel(passwordResetMessage)
-            }
-
-            Button {
-                Task { await submit() }
-            } label: {
-                HStack(spacing: 10) {
-                    if authState.isLoading {
-                        ProgressView()
-                            .controlSize(.small)
-                    }
-                    Text(mode == .signIn ? "メールアドレスでログイン" : "メールアドレスで登録")
-                        .font(.system(size: 16, weight: .black, design: .rounded))
-                }
-                .frame(maxWidth: .infinity)
-                .frame(height: 54)
-            }
-            .buttonStyle(.borderedProminent)
-            .buttonBorderShape(.roundedRectangle(radius: 18))
-            .tint(MegrumTheme.lavender)
-            .disabled(authState.isLoading)
-
-            if mode == .signIn {
-                Button("パスワードを忘れた場合") {
-                    openPasswordResetSheet()
-                }
-                .buttonStyle(.borderless)
-                .font(.system(size: 14, weight: .bold, design: .rounded))
-                .foregroundStyle(MegrumTheme.lavender)
-                .disabled(authState.isLoading)
-            }
-
-            appleSignInButton
-
-            if !authState.isConfigured {
-                Button("画面だけプレビューする") {
-                    authState.enterPreview()
-                }
-                .buttonStyle(.bordered)
-                .buttonBorderShape(.roundedRectangle(radius: 18))
-                .frame(maxWidth: .infinity)
-                .disabled(authState.isLoading)
-            }
-        }
-    }
-
-    private func errorLabel(_ message: String) -> some View {
-        Text(message)
-            .font(.system(size: 13, weight: .bold, design: .rounded))
-            .foregroundStyle(Color(red: 0.851, green: 0.51, blue: 0.42))
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(14)
-            .background(Color(red: 0.851, green: 0.51, blue: 0.42).opacity(0.1), in: RoundedRectangle(cornerRadius: 16))
-    }
-
-    private func successLabel(_ message: String) -> some View {
-        Text(message)
-            .font(.system(size: 13, weight: .bold, design: .rounded))
-            .foregroundStyle(MegrumTheme.ok)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(14)
-            .background(MegrumTheme.ok.opacity(0.12), in: RoundedRectangle(cornerRadius: 16))
-    }
-
-    private func infoLabel(_ message: String) -> some View {
-        Text(message)
-            .font(.system(size: 13, weight: .semibold, design: .rounded))
-            .foregroundStyle(MegrumTheme.muted)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(14)
-            .background(MegrumTheme.sky.opacity(0.12), in: RoundedRectangle(cornerRadius: 16))
-    }
-
-    @ViewBuilder
-    private var appleSignInButton: some View {
-        #if canImport(AuthenticationServices)
-        VStack(spacing: 12) {
-            HStack(spacing: 10) {
-                Rectangle()
-                    .fill(MegrumTheme.muted.opacity(0.18))
-                    .frame(height: 1)
-                Text("または")
-                    .font(.system(size: 12, weight: .bold, design: .rounded))
-                    .foregroundStyle(MegrumTheme.muted)
-                Rectangle()
-                    .fill(MegrumTheme.muted.opacity(0.18))
-                    .frame(height: 1)
-            }
-
-            SignInWithAppleButton(.continue) { request in
-                let nonce = AppleSignInNonce.make()
-                appleSignInNonce = nonce
-                identityProviderError = nil
-                request.requestedScopes = [.fullName, .email]
-                request.nonce = AppleSignInNonce.sha256(nonce)
-            } onCompletion: { result in
-                handleAppleSignIn(result)
-            }
-            .signInWithAppleButtonStyle(.black)
-            .frame(height: 54)
-            .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
-            .disabled(authState.isLoading || !authState.isConfigured)
-            .accessibilityLabel("Appleで続ける")
-
-            googleSignInButton
-        }
-        #endif
-    }
-
-    @ViewBuilder
-    private var googleSignInButton: some View {
-        #if canImport(AuthenticationServices) && canImport(UIKit)
-        Button {
-            startGoogleSignIn()
-        } label: {
-            HStack(spacing: 10) {
-                Text("G")
-                    .font(.system(size: 17, weight: .black, design: .rounded))
-                    .frame(width: 24, height: 24)
-                    .foregroundStyle(MegrumTheme.ink)
-                    .background(Color.white, in: Circle())
-                    .overlay(
-                        Circle()
-                            .stroke(MegrumTheme.muted.opacity(0.22), lineWidth: 1)
-                    )
-                Text("Googleで続ける")
-                    .font(.system(size: 16, weight: .black, design: .rounded))
-            }
-            .frame(maxWidth: .infinity)
-            .frame(height: 54)
-        }
-        .buttonStyle(.bordered)
-        .buttonBorderShape(.roundedRectangle(radius: 18))
-        .tint(MegrumTheme.ink)
-        .disabled(authState.isLoading || !authState.isConfigured)
-        .accessibilityLabel("Googleで続ける")
-        #endif
-    }
-
-    private func openPasswordResetSheet() {
-        passwordResetEmail = MegrumAuthInputValidator.normalizedEmail(email)
+    private func handlePasswordResetEmailChanged() {
         hasSubmittedPasswordReset = false
         passwordResetInputErrorMessage = nil
-        inputErrorMessage = nil
-        identityProviderError = nil
         authState.clearFeedback()
-        focusedField = nil
-        isShowingPasswordResetSheet = true
+    }
+
+    private func startGoogleSignInFromChoice() {
+        #if canImport(AuthenticationServices) && canImport(UIKit)
+        startGoogleSignIn()
+        #else
+        identityProviderError = "Googleログインを開始できませんでした。もう一度お試しください"
+        #endif
     }
 
     private func sendPasswordReset() async {
@@ -423,15 +294,6 @@ public struct AuthScreen: View {
             await authState.signIn(email: email, password: password)
         case .signUp:
             await authState.signUp(email: email, password: password, handle: handle)
-        }
-    }
-
-    private var validationMessage: String? {
-        switch mode {
-        case .signIn:
-            MegrumAuthInputValidator.signInValidationMessage(email: email, password: password)
-        case .signUp:
-            MegrumAuthInputValidator.signUpValidationMessage(email: email, password: password, handle: handle)
         }
     }
 
@@ -493,114 +355,16 @@ public struct AuthScreen: View {
     }
 }
 
-private struct PasswordResetSheet: View {
-    @Binding var email: String
-    var isSending: Bool
-    var errorMessage: String?
-    var successMessage: String?
-    var onEmailChanged: () -> Void
-    var onSend: () async -> Void
-
-    @Environment(\.dismiss) private var dismiss
-    @FocusState private var isEmailFocused: Bool
-
-    var body: some View {
-        NavigationStack {
-            Form {
-                Section {
-                    emailField
-                }
-
-                if let errorMessage {
-                    Section {
-                        Text(errorMessage)
-                            .font(.system(size: 13, weight: .bold, design: .rounded))
-                            .foregroundStyle(Color(red: 0.851, green: 0.51, blue: 0.42))
-                    }
-                }
-
-                if let successMessage {
-                    Section {
-                        Text(successMessage)
-                            .font(.system(size: 13, weight: .bold, design: .rounded))
-                            .foregroundStyle(MegrumTheme.ok)
-                    }
-                }
-            }
-            .navigationTitle("パスワード再設定")
-            .megrumInlineNavigationTitle()
-            .scrollDismissesKeyboard(.interactively)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button(successMessage == nil ? "キャンセル" : "閉じる") {
-                        dismiss()
-                    }
-                }
-                ToolbarItem(placement: .confirmationAction) {
-                    if successMessage == nil {
-                        Button {
-                            Task {
-                                await onSend()
-                            }
-                        } label: {
-                            if isSending {
-                                ProgressView()
-                                    .controlSize(.small)
-                            } else {
-                                Text("送信")
-                            }
-                        }
-                        .disabled(isSending)
-                    }
-                }
-                #if os(iOS)
-                ToolbarItemGroup(placement: .keyboard) {
-                    Spacer()
-                    Button("閉じる") {
-                        isEmailFocused = false
-                    }
-                }
-                #endif
-            }
-            .onAppear {
-                if email.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                    isEmailFocused = true
-                }
-            }
-            .onChange(of: email) { _, _ in
-                onEmailChanged()
-            }
-        }
-    }
-
-    @ViewBuilder
-    private var emailField: some View {
-        #if os(iOS)
-        TextField("メールアドレス", text: $email)
-            .textInputAutocapitalization(.never)
-            .keyboardType(.emailAddress)
-            .textContentType(.emailAddress)
-            .focused($isEmailFocused)
-            .submitLabel(.send)
-            .onSubmit {
-                Task {
-                    await onSend()
-                }
-            }
-        #else
-        TextField("メールアドレス", text: $email)
-            .focused($isEmailFocused)
-            .onSubmit {
-                Task {
-                    await onSend()
-                }
-            }
-        #endif
-    }
-}
-
 #if canImport(AuthenticationServices)
 private extension AuthScreen {
+    func prepareAppleSignIn(_ request: ASAuthorizationAppleIDRequest) {
+        let nonce = AppleSignInNonce.make()
+        appleSignInNonce = nonce
+        identityProviderError = nil
+        request.requestedScopes = [.fullName, .email]
+        request.nonce = AppleSignInNonce.sha256(nonce)
+    }
+
     func handleAppleSignIn(_ result: Result<ASAuthorization, Error>) {
         switch result {
         case let .success(authorization):

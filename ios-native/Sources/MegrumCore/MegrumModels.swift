@@ -7,6 +7,19 @@ public enum ExchangeMethod: String, Codable, Sendable, CaseIterable, Identifiabl
 
     public var id: String { rawValue }
 
+    public init?(exchangeTypeValue: String?) {
+        switch exchangeTypeValue?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() {
+        case "hand", "local", "in_person":
+            self = .hand
+        case "mail", "postal", "shipping":
+            self = .mail
+        case "both", "any":
+            self = .both
+        default:
+            return nil
+        }
+    }
+
     public var displayName: String {
         switch self {
         case .hand:
@@ -208,6 +221,16 @@ public struct AuthSession: Codable, Hashable, Sendable {
 
     public var authorizationHeaderValue: String {
         "Bearer \(accessToken)"
+    }
+
+    public func shouldRefresh(now: Date = .now, leeway: TimeInterval = 300) -> Bool {
+        guard refreshToken?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false else {
+            return false
+        }
+        guard let expiresAt else {
+            return true
+        }
+        return expiresAt.timeIntervalSince(now) <= leeway
     }
 }
 
@@ -577,6 +600,8 @@ public struct GoodsItem: Identifiable, Codable, Hashable, Sendable {
     public var imageURL: URL?
     public var tags: [GoodsTag]
     public var quantity: Int
+    public var exchangeMethod: ExchangeMethod?
+    public var ownerPrefecture: String?
 
     public init(
         id: UUID,
@@ -589,7 +614,9 @@ public struct GoodsItem: Identifiable, Codable, Hashable, Sendable {
         title: String,
         imageURL: URL? = nil,
         tags: [GoodsTag] = [],
-        quantity: Int = 1
+        quantity: Int = 1,
+        exchangeMethod: ExchangeMethod? = nil,
+        ownerPrefecture: String? = nil
     ) {
         self.id = id
         self.ownerID = ownerID
@@ -602,6 +629,8 @@ public struct GoodsItem: Identifiable, Codable, Hashable, Sendable {
         self.imageURL = imageURL
         self.tags = tags
         self.quantity = quantity
+        self.exchangeMethod = exchangeMethod
+        self.ownerPrefecture = ownerPrefecture
     }
 }
 
@@ -1032,6 +1061,10 @@ public struct IndividualListingCreateInput: Equatable, Sendable {
     public var wishItems: [ListingItemQuantity]
     public var wishLogic: ListingLogic
     public var exchangeType: IndividualListingExchangeType
+    public var isCashOffer: Bool
+    public var cashAmount: Int?
+    public var wishGroupID: UUID?
+    public var wishGoodsTypeID: UUID?
     public var note: String?
 
     public init(
@@ -1040,6 +1073,10 @@ public struct IndividualListingCreateInput: Equatable, Sendable {
         wishItems: [ListingItemQuantity],
         wishLogic: ListingLogic = .one,
         exchangeType: IndividualListingExchangeType = .any,
+        isCashOffer: Bool = false,
+        cashAmount: Int? = nil,
+        wishGroupID: UUID? = nil,
+        wishGoodsTypeID: UUID? = nil,
         note: String? = nil
     ) {
         self.haveItems = haveItems
@@ -1047,6 +1084,10 @@ public struct IndividualListingCreateInput: Equatable, Sendable {
         self.wishItems = wishItems
         self.wishLogic = wishLogic
         self.exchangeType = exchangeType
+        self.isCashOffer = isCashOffer
+        self.cashAmount = cashAmount.map { max(0, $0) }
+        self.wishGroupID = wishGroupID
+        self.wishGoodsTypeID = wishGoodsTypeID
         self.note = note
     }
 }
@@ -1059,7 +1100,7 @@ public enum ProposalMatchType: String, Codable, Sendable, CaseIterable, Identifi
     public var id: String { rawValue }
 }
 
-public struct ProposalMeetupInput: Equatable, Sendable {
+public struct ProposalMeetupInput: Equatable, Codable, Hashable, Sendable {
     public var startAt: Date
     public var endAt: Date
     public var placeName: String
@@ -1160,6 +1201,7 @@ public struct TradeProposal: Identifiable, Codable, Hashable, Sendable {
     public var approvedByReceiver: Bool
     public var completedAt: Date?
     public var createdAt: Date
+    public var meetupCandidates: [ProposalMeetupInput]?
 
     public init(
         id: UUID,
@@ -1179,7 +1221,8 @@ public struct TradeProposal: Identifiable, Codable, Hashable, Sendable {
         approvedBySender: Bool = false,
         approvedByReceiver: Bool = false,
         completedAt: Date? = nil,
-        createdAt: Date = .now
+        createdAt: Date = .now,
+        meetupCandidates: [ProposalMeetupInput]? = nil
     ) {
         self.id = id
         self.senderID = senderID
@@ -1199,6 +1242,7 @@ public struct TradeProposal: Identifiable, Codable, Hashable, Sendable {
         self.approvedByReceiver = approvedByReceiver
         self.completedAt = completedAt
         self.createdAt = createdAt
+        self.meetupCandidates = meetupCandidates
     }
 
     public func isParticipant(_ userID: UUID) -> Bool {

@@ -104,7 +104,7 @@ final class TradeRequestDraftProposalCreateFlowTests: XCTestCase {
         XCTAssertEqual(meetup.latitude, 35.5122, accuracy: 0.000001)
         XCTAssertEqual(meetup.longitude, 139.6171, accuracy: 0.000001)
         XCTAssertTrue(candidate.summary(index: 1).contains("候補2"))
-        XCTAssertEqual(ProposalMeetupCandidateDraft.maxCandidates, 3)
+        XCTAssertEqual(ProposalMeetupCandidateDraft.maxCandidates, 5)
     }
 
     func testProposalMeetupCandidateDraftAppliesCurrentLocationWithoutOverwritingPlace() {
@@ -173,7 +173,7 @@ final class TradeRequestDraftProposalCreateFlowTests: XCTestCase {
         XCTAssertEqual(context.schedules(on: start, calendar: calendar).map(\.id), [duplicatedID, partnerSchedule.id])
     }
 
-    func testProposalMeetupCalendarModelShiftsWeekBySevenDays() {
+    func testProposalMeetupCalendarModelShiftsWeekByFiveDays() {
         let calendar = Calendar(identifier: .gregorian)
         let anchor = Date(timeIntervalSince1970: 86_400 * 3)
 
@@ -181,9 +181,10 @@ final class TradeRequestDraftProposalCreateFlowTests: XCTestCase {
 
         XCTAssertEqual(
             Int(shifted.timeIntervalSince(calendar.startOfDay(for: anchor)) / 86_400),
-            7
+            5
         )
-        XCTAssertEqual(ProposalMeetupCalendarModel.visibleDayCount, 7)
+        XCTAssertEqual(ProposalMeetupCalendarModel.visibleDayCount, 5)
+        XCTAssertEqual(ProposalMeetupCalendarModel.monthColumnCount, 7)
     }
 
     func testProposalMeetupCalendarMonthGridPadsToSevenColumns() throws {
@@ -203,6 +204,22 @@ final class TradeRequestDraftProposalCreateFlowTests: XCTestCase {
         XCTAssertNil(days[0])
     }
 
+    func testProposalMeetupCalendarMonthNavigationUsesYearMonthTitle() throws {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+        let anchor = try XCTUnwrap(DateComponents(calendar: calendar, timeZone: calendar.timeZone, year: 2026, month: 1, day: 31).date)
+
+        XCTAssertEqual(ProposalMeetupCalendarModel.monthTitle(anchorDate: anchor, calendar: calendar), "2026年1月")
+
+        let nextMonth = ProposalMeetupCalendarModel.shiftedMonthAnchor(anchorDate: anchor, direction: 1, calendar: calendar)
+        XCTAssertEqual(ProposalMeetupCalendarModel.monthTitle(anchorDate: nextMonth, calendar: calendar), "2026年2月")
+        XCTAssertEqual(calendar.component(.day, from: nextMonth), 1)
+
+        let previousMonth = ProposalMeetupCalendarModel.shiftedMonthAnchor(anchorDate: anchor, direction: -1, calendar: calendar)
+        XCTAssertEqual(ProposalMeetupCalendarModel.monthTitle(anchorDate: previousMonth, calendar: calendar), "2025年12月")
+        XCTAssertEqual(calendar.component(.day, from: previousMonth), 1)
+    }
+
     func testProposalMeetupMonthGridUsesRnPercentCellsWithSlightViewportOverflow() {
         let containerWidth: CGFloat = 353
         let cellWidth = ProposalMeetupCalendarModel.monthDayCellWidth(containerWidth: containerWidth)
@@ -211,7 +228,7 @@ final class TradeRequestDraftProposalCreateFlowTests: XCTestCase {
         XCTAssertEqual(cellWidth, 48)
         XCTAssertEqual(gridWidth, 360)
         XCTAssertGreaterThan(gridWidth, containerWidth)
-        XCTAssertEqual(ProposalMeetupCalendarModel.monthGridHeight(rowCount: 6), 482)
+        XCTAssertEqual(ProposalMeetupCalendarModel.monthGridHeight(rowCount: 6), 524)
     }
 
     func testProposalMeetupWeekGridUsesRnCalendarMetrics() throws {
@@ -223,9 +240,11 @@ final class TradeRequestDraftProposalCreateFlowTests: XCTestCase {
         let gridWidth = ProposalMeetupCalendarModel.weekGridWidth(dayWidth: dayWidth)
 
         XCTAssertLessThanOrEqual(gridWidth, containerWidth)
-        XCTAssertEqual(dayWidth, 43)
+        XCTAssertEqual(dayWidth, 62)
+        XCTAssertEqual(gridWidth, 350)
+        XCTAssertEqual(ProposalMeetupCalendarModel.weekDayColumnsWidth(dayWidth: dayWidth), 310)
         XCTAssertEqual(ProposalMeetupCalendarModel.slotHeight, 16)
-        XCTAssertEqual(ProposalMeetupCalendarModel.timeLabelWidth, 52)
+        XCTAssertEqual(ProposalMeetupCalendarModel.timeLabelWidth, 40)
         XCTAssertEqual(ProposalMeetupCalendarModel.daySpacing, 0)
         XCTAssertEqual(ProposalMeetupCalendarModel.weekdayLabel(for: date, calendar: calendar), "金")
         XCTAssertEqual(ProposalMeetupCalendarModel.dayNumberLabel(for: date, calendar: calendar), "5")
@@ -273,10 +292,25 @@ final class TradeRequestDraftProposalCreateFlowTests: XCTestCase {
         XCTAssertEqual(ProposalMeetupCalendarModel.slotIndex(forHour: 30), ProposalMeetupCalendarModel.slotCount - 1)
     }
 
-    func testProposalMeetupCalendarCreatesCandidatesOnlyAfterLongPress() {
-        XCTAssertFalse(ProposalMeetupCalendarModel.shouldCreateCandidateOnBoardEnd(wasLongPressed: false))
+    func testProposalMeetupCalendarCreatesDefaultCandidateOnTapOrLongPress() {
+        XCTAssertTrue(ProposalMeetupCalendarModel.shouldCreateCandidateOnBoardEnd(wasLongPressed: false))
         XCTAssertTrue(ProposalMeetupCalendarModel.shouldCreateCandidateOnBoardEnd(wasLongPressed: true))
         XCTAssertEqual(ProposalMeetupCalendarModel.longPressDuration, 0.28, accuracy: 0.001)
+        XCTAssertEqual(ProposalMeetupCalendarModel.defaultDurationSlots, 4)
+        XCTAssertEqual(
+            ProposalMeetupCalendarModel.defaultDurationSlots * ProposalMeetupCalendarModel.slotMinutes,
+            60
+        )
+    }
+
+    func testProposalMeetupCalendarDragSelectionNormalizesDraggedDuration() {
+        let downwardRange = ProposalMeetupCalendarModel.normalizedSlotRange(startSlot: 40, currentSlot: 46)
+        XCTAssertEqual(downwardRange.lowerBound, 40)
+        XCTAssertEqual(downwardRange.upperBound, 47)
+
+        let upwardRange = ProposalMeetupCalendarModel.normalizedSlotRange(startSlot: 40, currentSlot: 34)
+        XCTAssertEqual(upwardRange.lowerBound, 34)
+        XCTAssertEqual(upwardRange.upperBound, 41)
     }
 
     func testProposalMeetupCandidateDraftApplyingCalendarRangeRewritesDates() {

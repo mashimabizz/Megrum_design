@@ -22,11 +22,44 @@ final class GoodsGridLayoutTests: XCTestCase {
         XCTAssertEqual(GoodsGridLayout(columns: 5).skeletonTileCount, 10)
     }
 
+    func testGoodsGridUsesReactNativeCardSpacingAndRatio() {
+        XCTAssertEqual(GoodsGridLayout.columnSpacing, 10)
+        XCTAssertEqual(GoodsGridLayout.rowSpacing, 10)
+        XCTAssertEqual(GoodsGridLayout.tileCornerRadius, 13)
+        XCTAssertEqual(GoodsGridLayout.tileAspectRatio, 1 / 1.34, accuracy: 0.0001)
+        XCTAssertEqual(GoodsTileCollectionCardMetrics.tagMaxWidthRatio, 0.78)
+        XCTAssertEqual(GoodsTileCollectionCardMetrics.glyphFontSize, 32)
+    }
+
+    func testInventoryQuickActionsMatchOwnerMenuOrder() {
+        XCTAssertEqual(GoodsQuickActionKind.inventoryActions, [.edit, .moveToKeep, .tag, .delete])
+        XCTAssertEqual(GoodsQuickActionKind.edit.title, "編集する")
+        XCTAssertEqual(GoodsQuickActionKind.moveToKeep.title, "自分用キープへ")
+        XCTAssertEqual(GoodsQuickActionKind.tag.title, "タグをつける")
+        XCTAssertEqual(GoodsQuickActionKind.delete.title, "削除する")
+        XCTAssertNil(GoodsQuickActionKind.edit.role)
+        XCTAssertNotNil(GoodsQuickActionKind.delete.role)
+    }
+
+    func testSelectionFooterUsesFixedGlassActionMetrics() {
+        XCTAssertEqual(GoodsSelectionFooterMetrics.bottomPadding, 12)
+        XCTAssertEqual(GoodsSelectionFooterMetrics.horizontalPadding, 18)
+        XCTAssertEqual(GoodsSelectionFooterMetrics.cornerRadius, 28)
+        XCTAssertEqual(GoodsSelectionFooterMetrics.actionHeight, 52)
+        XCTAssertEqual(GoodsSelectionFooterMetrics.actionSpacing, 10)
+    }
+
     func testGridContextLabelsFollowEntryKind() {
         XCTAssertEqual(GoodsGridContext(entryKind: .inventory).statusLabel, "譲る候補")
-        XCTAssertEqual(GoodsGridContext(entryKind: .inventory).quantityLabel, "在庫数")
+        XCTAssertEqual(GoodsGridContext(entryKind: .inventory).quantityLabel, "マイグッズ数")
         XCTAssertEqual(GoodsGridContext(entryKind: .wish).statusLabel, "探し中")
         XCTAssertEqual(GoodsGridContext(entryKind: .wish).quantityLabel, "希望数")
+    }
+
+    func testInventoryAndWishUseImageOnlyCardsLikeReactNative() {
+        XCTAssertTrue(GoodsTileCardPolicy.usesImageOnlyCard(for: .inventory))
+        XCTAssertTrue(GoodsTileCardPolicy.usesImageOnlyCard(for: .wish))
+        XCTAssertFalse(GoodsTileCardPolicy.usesImageOnlyCard(for: .tradeCandidate))
     }
 
     func testTilePresentationSummarizesStatusQuantityAndTags() {
@@ -50,31 +83,22 @@ final class GoodsGridLayoutTests: XCTestCase {
         XCTAssertEqual(presentation.accessibilityValue, "譲る候補、3点、#会場限定 +1、処理中")
     }
 
-    func testCollectionMetricsCountsVisibleItemsQuantityAndTaggedItems() {
-        let items = [
-            GoodsItem(
-                id: UUID(),
-                ownerID: UUID(),
-                title: "トレカ A",
-                tags: [GoodsTag(id: UUID(), name: "未開封")],
-                quantity: 2
-            ),
-            GoodsItem(
-                id: UUID(),
-                ownerID: UUID(),
-                title: "トレカ B",
-                quantity: 0
-            )
-        ]
+    func testCollectionCardStyleUsesStableGlyphAndTagLine() {
+        let item = GoodsItem(
+            id: UUID(),
+            ownerID: UUID(),
+            title: "カリナ 春ver.",
+            tags: [
+                GoodsTag(id: UUID(), name: "aespa"),
+                GoodsTag(id: UUID(), name: "トレカ")
+            ]
+        )
+        let untagged = GoodsItem(id: UUID(), ownerID: UUID(), title: "ジョンウ ラキドロ")
 
-        let metrics = GoodsCollectionMetrics(items: items)
-
-        XCTAssertEqual(metrics.itemCount, 2)
-        XCTAssertEqual(metrics.totalQuantity, 3)
-        XCTAssertEqual(metrics.taggedItemCount, 1)
-        XCTAssertEqual(metrics.visibleSummary, "2件 / 3点")
-        XCTAssertEqual(metrics.filterSummary(totalCount: 5), "全5件中")
-        XCTAssertNil(metrics.filterSummary(totalCount: 2))
+        XCTAssertEqual(GoodsTileCollectionCardStyle.glyph(for: item), "K")
+        XCTAssertEqual(GoodsTileCollectionCardStyle.tagLine(for: item), "# aespa # トレカ")
+        XCTAssertEqual(GoodsTileCollectionCardStyle.glyph(for: untagged), "J")
+        XCTAssertEqual(GoodsTileCollectionCardStyle.tagLine(for: untagged), "タグ未設定")
     }
 
     func testCollectionFilterMatchesGroupGoodsTypeAndTags() {
@@ -118,6 +142,20 @@ final class GoodsGridLayoutTests: XCTestCase {
         XCTAssertFalse(filter.matches(wrongGroup))
         XCTAssertTrue(filter.isActive)
         XCTAssertEqual(filter.activeCount, 4)
+    }
+
+    func testCollectionFilterUsesCompactChipMetrics() {
+        XCTAssertEqual(CollectionScreenLayoutMetrics.mainStackSpacing, 12)
+        XCTAssertEqual(CollectionScreenLayoutMetrics.topPadding, 14)
+        XCTAssertEqual(CollectionScreenLayoutMetrics.headerAccessoryVerticalPadding, 2)
+        XCTAssertEqual(CollectionScreenLayoutMetrics.filterBarSpacing, 6)
+        XCTAssertEqual(CollectionScreenLayoutMetrics.filterRowLabelWidth, 64)
+        XCTAssertEqual(CollectionScreenLayoutMetrics.filterRowChipSpacing, 7)
+        XCTAssertEqual(CollectionScreenLayoutMetrics.filterChipHeight, 32)
+        XCTAssertEqual(CollectionScreenLayoutMetrics.filterChipHorizontalPadding, 12)
+        XCTAssertEqual(CollectionScreenLayoutMetrics.filterChipFontSize, 12.5)
+        XCTAssertEqual(CollectionScreenLayoutMetrics.filterChipGlassSelectedOpacity, 0.22)
+        XCTAssertEqual(CollectionScreenLayoutMetrics.filterChipGlassIdleOpacity, 0.10)
     }
 
     func testTileActionPolicySeparatesOwnerAndRemoteActions() {

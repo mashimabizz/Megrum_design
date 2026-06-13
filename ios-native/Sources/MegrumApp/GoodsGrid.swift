@@ -2,13 +2,146 @@ import MegrumCore
 import MegrumDesign
 import SwiftUI
 
+enum GoodsTileCollectionCardMetrics {
+    static let imageHeightMultiplier: CGFloat = 1.34
+    static let cornerRadius: CGFloat = 13
+    static let gridSpacing: CGFloat = 10
+    static let borderOpacity: CGFloat = 0.08
+    static let shadowOpacity: CGFloat = 0.08
+    static let shadowRadius: CGFloat = 9
+    static let shadowX: CGFloat = 3
+    static let shadowY: CGFloat = 6
+    static let shineSize: CGFloat = 58
+    static let shineCenterXOffset: CGFloat = 12
+    static let shineCenterY: CGFloat = 17
+    static let shineOpacity: CGFloat = 0.26
+    static let glyphFontSize: CGFloat = 32
+    static let tagInset: CGFloat = 6
+    static let tagMaxWidthRatio: CGFloat = 0.78
+    static let tagFontSize: CGFloat = 9
+    static let tagHorizontalPadding: CGFloat = 6
+    static let tagVerticalPadding: CGFloat = 3
+}
+
+enum GoodsTileCardPolicy {
+    static func usesImageOnlyCard(for context: GoodsGridContext) -> Bool {
+        context == .inventory || context == .wish
+    }
+}
+
+enum GoodsSelectionFooterMetrics {
+    static let bottomPadding: CGFloat = 12
+    static let horizontalPadding: CGFloat = 18
+    static let cornerRadius: CGFloat = 28
+    static let actionHeight: CGFloat = 52
+    static let actionSpacing: CGFloat = 10
+}
+
+enum GoodsQuickActionKind: CaseIterable, Identifiable, Equatable {
+    case edit
+    case moveToKeep
+    case tag
+    case delete
+
+    static let inventoryActions: [GoodsQuickActionKind] = [.edit, .moveToKeep, .tag, .delete]
+
+    var id: String { title }
+
+    var title: String {
+        switch self {
+        case .edit:
+            "編集する"
+        case .moveToKeep:
+            "自分用キープへ"
+        case .tag:
+            "タグをつける"
+        case .delete:
+            "削除する"
+        }
+    }
+
+    var systemImage: String {
+        switch self {
+        case .edit:
+            "square.and.pencil"
+        case .moveToKeep:
+            "archivebox"
+        case .tag:
+            "tag"
+        case .delete:
+            "trash"
+        }
+    }
+
+    var role: ButtonRole? {
+        switch self {
+        case .delete:
+            .destructive
+        case .edit, .moveToKeep, .tag:
+            nil
+        }
+    }
+}
+
+enum GoodsTileCollectionCardStyle {
+    static func tagLine(for item: GoodsItem) -> String {
+        guard !item.tags.isEmpty else {
+            return "タグ未設定"
+        }
+
+        let visibleTags = item.tags.prefix(2).map { "# \($0.name)" }.joined(separator: " ")
+        return item.tags.count > 2 ? "\(visibleTags) ..." : visibleTags
+    }
+
+    static func glyph(for item: GoodsItem) -> String {
+        let title = item.title.trimmingCharacters(in: .whitespacesAndNewlines)
+        if title.contains("スア") {
+            return "S"
+        }
+        if title.contains("ジョンウ") {
+            return "J"
+        }
+        if title.contains("ニンニン") {
+            return "N"
+        }
+        if title.contains("カリナ") {
+            return "K"
+        }
+        return title.first.map { String($0).uppercased() } ?? "?"
+    }
+
+    static func hue(for item: GoodsItem) -> Color {
+        switch glyph(for: item) {
+        case "S":
+            Color(red: 0.796, green: 0.737, blue: 0.957)
+        case "J":
+            MegrumTheme.sky
+        case "N":
+            MegrumTheme.pink
+        case "K":
+            Color(red: 0.835, green: 0.812, blue: 0.957)
+        default:
+            switch abs(item.id.hashValue) % 4 {
+            case 0:
+                Color(red: 0.796, green: 0.737, blue: 0.957)
+            case 1:
+                MegrumTheme.sky
+            case 2:
+                MegrumTheme.pink
+            default:
+                Color(red: 0.835, green: 0.812, blue: 0.957)
+            }
+        }
+    }
+}
+
 struct GoodsGridLayout: Equatable {
     static let minimumColumns = 3
     static let maximumColumns = 5
-    static let columnSpacing: CGFloat = 14
-    static let rowSpacing: CGFloat = 16
-    static let tileAspectRatio: CGFloat = 0.78
-    static let tileCornerRadius: CGFloat = 18
+    static let columnSpacing: CGFloat = GoodsTileCollectionCardMetrics.gridSpacing
+    static let rowSpacing: CGFloat = GoodsTileCollectionCardMetrics.gridSpacing
+    static let tileAspectRatio: CGFloat = 1 / GoodsTileCollectionCardMetrics.imageHeightMultiplier
+    static let tileCornerRadius: CGFloat = GoodsTileCollectionCardMetrics.cornerRadius
 
     var requestedColumns: Int
 
@@ -57,7 +190,7 @@ enum GoodsGridContext: Equatable {
     var quantityLabel: String {
         switch self {
         case .inventory:
-            "在庫数"
+            "マイグッズ数"
         case .wish:
             "希望数"
         case .tradeCandidate:
@@ -169,6 +302,10 @@ struct GoodsGrid: View {
     var onDeleteItem: ((GoodsItem) -> Void)?
     var onReportItem: ((GoodsItem, GoodsReportReason, String) -> Void)?
     var busyItemID: UUID?
+    var isSelectionMode = false
+    var selectedItemIDs: Set<UUID> = []
+    var onBeginSelection: ((GoodsItem) -> Void)?
+    var onToggleSelection: ((GoodsItem) -> Void)?
     @State private var detailItem: GoodsItem?
     @State private var actionMessage: String?
     @State private var pendingDeleteItem: GoodsItem?
@@ -190,6 +327,10 @@ struct GoodsGrid: View {
                     context: context,
                     actions: actions(for: item),
                     onOpenDetail: {
+                        if isSelectionMode, let onToggleSelection {
+                            onToggleSelection(item)
+                            return
+                        }
                         if let onOpenItem {
                             onOpenItem(item)
                         } else if let onOpenOwnerProfile, item.ownerID != viewerID {
@@ -201,7 +342,13 @@ struct GoodsGrid: View {
                     onAction: { action in
                         handle(action, item: item)
                     },
-                    isBusy: busyItemID == item.id
+                    isBusy: busyItemID == item.id,
+                    isSelectionMode: isSelectionMode,
+                    isSelected: selectedItemIDs.contains(item.id),
+                    usesSystemContextMenu: onBeginSelection == nil,
+                    onLongPress: onBeginSelection.map { beginSelection in
+                        { beginSelection(item) }
+                    }
                 )
             }
         }
@@ -268,13 +415,13 @@ struct GoodsGrid: View {
             if item.ownerID == viewerID, let onEditItem {
                 onEditItem(item)
             } else {
-                actionMessage = "「\(item.title)」の編集は、自分の在庫/Wishでのみ使えます。"
+                actionMessage = "「\(item.title)」の編集は、自分のマイグッズ/Wishでのみ使えます。"
             }
         case .hide:
             if item.ownerID == viewerID, let onHideItem {
                 onHideItem(item)
             } else {
-                actionMessage = "「\(item.title)」を非表示にする処理は、自分の在庫/Wishでのみ使えます。"
+                actionMessage = "「\(item.title)」を非表示にする処理は、自分のマイグッズ/Wishでのみ使えます。"
             }
         case .report:
             if item.ownerID != viewerID, onReportItem != nil {
@@ -286,7 +433,7 @@ struct GoodsGrid: View {
             if item.ownerID == viewerID, onDeleteItem != nil {
                 pendingDeleteItem = item
             } else {
-                actionMessage = "「\(item.title)」を削除する処理は、自分の在庫/Wishでのみ使えます。"
+                actionMessage = "「\(item.title)」を削除する処理は、自分のマイグッズ/Wishでのみ使えます。"
             }
         }
     }
@@ -303,131 +450,6 @@ struct GoodsGrid: View {
             canReport: onReportItem != nil
         )
         .actions
-    }
-}
-
-struct GoodsTile: View {
-    var item: GoodsItem
-    var context: GoodsGridContext = .tradeCandidate
-    var actions: [GoodsTileAction] = GoodsTileAction.visibleActions
-    var onOpenDetail: () -> Void
-    var onAction: (GoodsTileAction) -> Void
-    var isBusy = false
-
-    private var presentation: GoodsTilePresentation {
-        GoodsTilePresentation(item: item, context: context, isBusy: isBusy)
-    }
-
-    var body: some View {
-        Button(action: onOpenDetail) {
-            VStack(alignment: .leading, spacing: 8) {
-                RoundedRectangle(cornerRadius: GoodsGridLayout.tileCornerRadius, style: .continuous)
-                    .fill(tileGradient)
-                    .aspectRatio(GoodsGridLayout.tileAspectRatio, contentMode: .fit)
-                    .overlay {
-                        if let imageURL = item.imageURL {
-                            GoodsRemoteImage(
-                                url: imageURL,
-                                cornerRadius: GoodsGridLayout.tileCornerRadius,
-                                placeholderIconSize: 28
-                            )
-                        } else {
-                            Image(systemName: "photo")
-                                .font(.system(size: 28, weight: .semibold))
-                                .foregroundStyle(.white.opacity(0.74))
-                        }
-                    }
-                    .overlay(alignment: .topTrailing) {
-                        if let tag = item.tags.first {
-                            GoodsTagPill(name: tag.name, fontSize: 11, horizontalPadding: 9)
-                                .padding(8)
-                        }
-                    }
-                    .overlay(alignment: .bottomTrailing) {
-                        if item.quantity > 1 {
-                            GoodsQuantityBadge(quantity: item.quantity)
-                                .padding(8)
-                        }
-                    }
-                    .overlay {
-                        if isBusy {
-                            RoundedRectangle(cornerRadius: GoodsGridLayout.tileCornerRadius, style: .continuous)
-                                .fill(.black.opacity(0.18))
-                            ProgressView()
-                                .tint(.white)
-                        }
-                    }
-                    .shadow(color: MegrumTheme.ink.opacity(0.08), radius: 10, y: 5)
-
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(item.title)
-                        .font(.system(size: 13, weight: .bold, design: .rounded))
-                        .foregroundStyle(MegrumTheme.ink)
-                        .lineLimit(1)
-
-                    Text(presentation.tileMetadataText)
-                        .font(.system(size: 10.5, weight: .heavy, design: .rounded))
-                        .foregroundStyle(MegrumTheme.muted)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.82)
-                }
-            }
-        }
-        .buttonStyle(.plain)
-        .disabled(isBusy)
-        .contextMenu {
-            ForEach(primaryActions) { action in
-                Button(role: action.role) {
-                    onAction(action)
-                } label: {
-                    Label(action.title, systemImage: action.symbolName)
-                }
-            }
-            if !destructiveActions.isEmpty {
-                Divider()
-                ForEach(destructiveActions) { action in
-                    Button(role: action.role) {
-                        onAction(action)
-                    } label: {
-                        Label(action.title, systemImage: action.symbolName)
-                    }
-                }
-            }
-        }
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel(item.title)
-        .accessibilityValue(Text(presentation.accessibilityValue))
-        .accessibilityHint(Text(accessibilityHint))
-    }
-
-    private var primaryActions: [GoodsTileAction] {
-        actions.filter { !$0.isDestructive }
-    }
-
-    private var destructiveActions: [GoodsTileAction] {
-        actions.filter(\.isDestructive)
-    }
-
-    private var accessibilityHint: String {
-        if isBusy {
-            return "処理が終わるまで操作できません。"
-        }
-        if actions.count > 1 {
-            return "ダブルタップで詳細を開きます。長押しで操作メニューを開けます。"
-        }
-        return "ダブルタップで詳細を開きます。"
-    }
-
-    private var tileGradient: LinearGradient {
-        LinearGradient(
-            colors: [
-                MegrumTheme.sky.opacity(0.62),
-                MegrumTheme.lavender.opacity(0.72),
-                MegrumTheme.pink.opacity(0.54)
-            ],
-            startPoint: .topLeading,
-            endPoint: .bottomTrailing
-        )
     }
 }
 
@@ -495,264 +517,5 @@ enum GoodsTileAction: CaseIterable, Identifiable, Equatable {
 
     var isDestructive: Bool {
         role == .destructive
-    }
-}
-
-private struct GoodsDetailSheet: View {
-    var item: GoodsItem
-    var context: GoodsGridContext
-    @Environment(\.dismiss) private var dismiss
-
-    var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 18) {
-                hero
-                copy
-            }
-            .padding(.horizontal, 20)
-            .padding(.top, 18)
-            .padding(.bottom, 40)
-        }
-        .background(MegrumTheme.canvas.ignoresSafeArea())
-        .navigationTitle("グッズ詳細")
-        .megrumInlineNavigationTitle()
-        .toolbar {
-            ToolbarItem(placement: .cancellationAction) {
-                Button("閉じる") {
-                    dismiss()
-                }
-            }
-        }
-    }
-
-    private var hero: some View {
-        RoundedRectangle(cornerRadius: 28, style: .continuous)
-            .fill(
-                LinearGradient(
-                    colors: [
-                        MegrumTheme.sky.opacity(0.6),
-                        MegrumTheme.lavender.opacity(0.72),
-                        MegrumTheme.pink.opacity(0.58)
-                    ],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
-            )
-            .aspectRatio(0.78, contentMode: .fit)
-            .overlay {
-                if let imageURL = item.imageURL {
-                    GoodsRemoteImage(
-                        url: imageURL,
-                        cornerRadius: 28,
-                        placeholderIconSize: 44
-                    )
-                } else {
-                    Image(systemName: "photo")
-                        .font(.system(size: 44, weight: .semibold))
-                        .foregroundStyle(.white.opacity(0.75))
-                }
-            }
-            .overlay(alignment: .topTrailing) {
-                if let tag = item.tags.first {
-                    GoodsTagPill(name: tag.name, fontSize: 13, horizontalPadding: 12)
-                        .padding(14)
-                }
-            }
-            .overlay(alignment: .topLeading) {
-                GoodsStatusPill(text: context.statusLabel)
-                    .padding(14)
-            }
-            .shadow(color: MegrumTheme.ink.opacity(0.12), radius: 22, y: 12)
-    }
-
-    private var copy: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text(item.title)
-                .font(.system(size: 28, weight: .heavy, design: .rounded))
-                .foregroundStyle(MegrumTheme.ink)
-
-            if !item.tags.isEmpty {
-                FlowTags(tags: item.tags)
-            }
-
-            HStack(spacing: 12) {
-                DetailMetric(label: context.quantityLabel, value: "\(max(1, item.quantity))")
-                DetailMetric(label: "状態", value: context.statusLabel)
-            }
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-    }
-}
-
-private struct GoodsReportSheet: View {
-    var item: GoodsItem
-    var onSubmit: (GoodsReportReason, String) -> Void
-
-    @Environment(\.dismiss) private var dismiss
-    @State private var reason: GoodsReportReason = .fakeItem
-    @State private var note = ""
-
-    var body: some View {
-        Form {
-            Section("対象") {
-                Text(item.title)
-                    .font(.system(size: 15, weight: .bold, design: .rounded))
-            }
-
-            Section("理由") {
-                Picker("理由", selection: $reason) {
-                    ForEach(GoodsReportReason.allCases) { reason in
-                        Text(reason.displayName).tag(reason)
-                    }
-                }
-            }
-
-            Section("補足") {
-                TextEditor(text: $note)
-                    .frame(minHeight: 120)
-            }
-        }
-        .navigationTitle("通報")
-        .megrumInlineNavigationTitle()
-        .toolbar {
-            ToolbarItem(placement: .cancellationAction) {
-                Button("キャンセル") {
-                    dismiss()
-                }
-            }
-            ToolbarItem(placement: .confirmationAction) {
-                Button("送信") {
-                    onSubmit(reason, note)
-                    dismiss()
-                }
-            }
-        }
-    }
-}
-
-private struct GoodsRemoteImage: View {
-    var url: URL
-    var cornerRadius: CGFloat
-    var placeholderIconSize: CGFloat
-
-    var body: some View {
-        AsyncImage(url: url, transaction: Transaction(animation: .easeInOut(duration: 0.18))) { phase in
-            switch phase {
-            case .empty:
-                ProgressView()
-                    .controlSize(.small)
-                    .tint(.white)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-            case let .success(image):
-                GeometryReader { proxy in
-                    image
-                        .resizable()
-                        .scaledToFill()
-                        .frame(width: proxy.size.width, height: proxy.size.height)
-                        .clipped()
-                }
-            case .failure:
-                GoodsImageFallback(iconSize: placeholderIconSize)
-            @unknown default:
-                GoodsImageFallback(iconSize: placeholderIconSize)
-            }
-        }
-        .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
-        .accessibilityHidden(true)
-    }
-}
-
-private struct GoodsImageFallback: View {
-    var iconSize: CGFloat
-
-    var body: some View {
-        VStack(spacing: 8) {
-            Image(systemName: "photo.badge.exclamationmark")
-                .font(.system(size: iconSize, weight: .semibold))
-            Text("表示できません")
-                .font(.system(size: 11, weight: .heavy, design: .rounded))
-                .lineLimit(1)
-        }
-        .foregroundStyle(.white.opacity(0.82))
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-    }
-}
-
-private struct GoodsTagPill: View {
-    var name: String
-    var fontSize: CGFloat
-    var horizontalPadding: CGFloat
-
-    var body: some View {
-        Text("# \(name)")
-            .font(.system(size: fontSize, weight: .heavy, design: .rounded))
-            .lineLimit(1)
-            .foregroundStyle(MegrumTheme.ink)
-            .padding(.horizontal, horizontalPadding)
-            .padding(.vertical, 7)
-            .background(.white.opacity(0.86), in: Capsule())
-    }
-}
-
-private struct GoodsStatusPill: View {
-    var text: String
-
-    var body: some View {
-        Text(text)
-            .font(.system(size: 10.5, weight: .heavy, design: .rounded))
-            .lineLimit(1)
-            .foregroundStyle(.white)
-            .padding(.horizontal, 8)
-            .padding(.vertical, 5)
-            .background(MegrumTheme.ink.opacity(0.52), in: Capsule())
-            .accessibilityHidden(true)
-    }
-}
-
-private struct GoodsQuantityBadge: View {
-    var quantity: Int
-
-    var body: some View {
-        Text("×\(quantity)")
-            .font(.system(size: 11, weight: .heavy, design: .rounded))
-            .monospacedDigit()
-            .foregroundStyle(.white)
-            .padding(.horizontal, 7)
-            .padding(.vertical, 4)
-            .background(MegrumTheme.lavender, in: Capsule())
-            .shadow(color: MegrumTheme.ink.opacity(0.16), radius: 5, y: 2)
-            .accessibilityHidden(true)
-    }
-}
-
-private struct FlowTags: View {
-    var tags: [GoodsTag]
-
-    var body: some View {
-        LazyVGrid(columns: [GridItem(.adaptive(minimum: 92), spacing: 8)], alignment: .leading, spacing: 8) {
-            ForEach(tags) { tag in
-                GoodsTagPill(name: tag.name, fontSize: 12, horizontalPadding: 11)
-            }
-        }
-    }
-}
-
-private struct DetailMetric: View {
-    var label: String
-    var value: String
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(label)
-                .font(.caption.weight(.bold))
-                .foregroundStyle(MegrumTheme.muted)
-            Text(value)
-                .font(.headline.weight(.black))
-                .foregroundStyle(MegrumTheme.ink)
-        }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 12)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
     }
 }

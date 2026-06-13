@@ -6,15 +6,15 @@ final class SettingsScreenTests: XCTestCase {
     func testDrawerItemsMatchRnProfileDrawerDestinations() {
         XCTAssertEqual(
             AppDrawerDestination.primaryItems,
-            [.profile, .notifications, .profileEdit, .oshiSettings, .schedules, .completedTrades]
+            [.profile, .notifications, .oshiSettings, .schedules, .completedTrades]
         )
+        XCTAssertFalse(AppDrawerDestination.primaryItems.contains(.profileEdit))
         XCTAssertEqual(
             AppDrawerDestination.compactItems,
             [.settings, .help]
         )
 
         XCTAssertEqual(AppDrawerDestination.notifications.title, "通知")
-        XCTAssertEqual(AppDrawerDestination.profileEdit.title, "プロフィール編集")
         XCTAssertEqual(AppDrawerDestination.oshiSettings.title, "推し設定")
         XCTAssertEqual(AppDrawerDestination.schedules.title, "スケジュール")
         XCTAssertEqual(AppDrawerDestination.completedTrades.title, "完了した取引")

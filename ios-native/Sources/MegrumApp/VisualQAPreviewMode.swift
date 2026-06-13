@@ -3,6 +3,7 @@ import Foundation
 enum VisualQAInitialScreen: String, Equatable {
     case home
     case drawerOpen = "drawer-open"
+    case homeHavesLookup = "home-haves-lookup"
     case matchRelation = "match-relation"
     case matchRelationCandidates = "match-relation-candidates"
     case proposalGive = "proposal-give"
@@ -12,6 +13,29 @@ enum VisualQAInitialScreen: String, Equatable {
     case proposalConfirm = "proposal-confirm"
     case proposalComplete = "proposal-complete"
     case proposalPending = "proposal-pending"
+    case authSignIn = "auth-sign-in"
+    case authSignUp = "auth-sign-up"
+    case authEmailSignIn = "auth-email-sign-in"
+    case authEmailSignUp = "auth-email-sign-up"
+    case authPasswordReset = "auth-password-reset"
+    case meguri
+    case individualListings = "individual-listings"
+    case individualListingHaves = "individual-listing-haves"
+    case individualListingWish = "individual-listing-wish"
+    case individualListingCondition = "individual-listing-condition"
+    case individualListingCash = "individual-listing-cash"
+    case individualListingExchange = "individual-listing-exchange"
+    case ownProfile = "own-profile"
+    case publicProfile = "public-profile"
+
+    var isAuthRoute: Bool {
+        switch self {
+        case .authSignIn, .authSignUp, .authEmailSignIn, .authEmailSignUp, .authPasswordReset:
+            true
+        default:
+            false
+        }
+    }
 }
 
 enum VisualQAPreviewMode {

@@ -46,6 +46,11 @@ public final class SupabaseAuthClient: @unchecked Sendable {
         return try await performAuthRequest(request)
     }
 
+    public func refreshSession(refreshToken: String) async throws -> AuthSession {
+        let request = try makeRefreshSessionRequest(refreshToken: refreshToken)
+        return try await performAuthRequest(request)
+    }
+
     public func signUp(
         email: String,
         password: String,
@@ -108,7 +113,7 @@ public final class SupabaseAuthClient: @unchecked Sendable {
             accessToken: payload.accessToken,
             refreshToken: payload.refreshToken,
             expiresIn: payload.expiresIn,
-            expiresAt: payload.expiresAt,
+            expiresAt: payload.expiresAt ?? payload.expiresIn.map { Date().addingTimeInterval(TimeInterval($0)) },
             tokenType: payload.tokenType,
             user: user
         )
@@ -132,6 +137,17 @@ public final class SupabaseAuthClient: @unchecked Sendable {
         return try makeAuthRequest(
             path: "/auth/v1/token",
             queryItems: [URLQueryItem(name: "grant_type", value: "password")],
+            method: "POST",
+            body: encoder.encode(payload),
+            bearerToken: configuration.publishableKey
+        )
+    }
+
+    public func makeRefreshSessionRequest(refreshToken: String) throws -> URLRequest {
+        let payload = RefreshTokenPayload(refreshToken: refreshToken.authTrimmed)
+        return try makeAuthRequest(
+            path: "/auth/v1/token",
+            queryItems: [URLQueryItem(name: "grant_type", value: "refresh_token")],
             method: "POST",
             body: encoder.encode(payload),
             bearerToken: configuration.publishableKey
@@ -303,6 +319,14 @@ private struct PasswordPayload: Encodable {
     var password: String
 }
 
+private struct RefreshTokenPayload: Encodable {
+    var refreshToken: String
+
+    enum CodingKeys: String, CodingKey {
+        case refreshToken = "refresh_token"
+    }
+}
+
 private struct PasswordResetPayload: Encodable {
     var email: String
 }
@@ -358,7 +382,8 @@ private struct AuthResponse: Decodable {
             accessToken: accessToken,
             refreshToken: refreshToken,
             expiresIn: expiresIn,
-            expiresAt: expiresAt.map { Date(timeIntervalSince1970: TimeInterval($0)) },
+            expiresAt: expiresAt.map { Date(timeIntervalSince1970: TimeInterval($0)) }
+                ?? expiresIn.map { Date().addingTimeInterval(TimeInterval($0)) },
             tokenType: tokenType ?? "bearer",
             user: user.authUser
         )
@@ -377,8 +402,21 @@ private struct UserResponse: Decodable {
 
 private struct AuthErrorResponse: Decodable {
     var msg: String?
+    var messageText: String?
+    var errorDescription: String?
+    var error: String?
+
     var message: String? {
-        msg
+        [msg, messageText, errorDescription, error]
+            .compactMap { $0?.authTrimmed }
+            .first { !$0.isEmpty }
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case msg
+        case messageText = "message"
+        case errorDescription
+        case error
     }
 }
 
