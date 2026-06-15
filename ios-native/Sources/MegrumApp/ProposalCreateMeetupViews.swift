@@ -176,7 +176,7 @@ struct ProposalFlowMeetupForm: View {
                         Map(position: $cameraPosition, interactionModes: [.pan, .zoom]) {
                             if let selectedCoordinate {
                                 Marker(
-                                    placeName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "待ち合わせ" : placeName,
+                                    placeName.isBlank ? "待ち合わせ" : placeName,
                                     coordinate: selectedCoordinate
                                 )
                                 .tint(MegrumTheme.lavender)

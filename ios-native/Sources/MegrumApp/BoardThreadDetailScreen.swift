@@ -522,7 +522,7 @@ private struct BoardReplyInput: View {
     var onSend: () -> Void
 
     private var canSend: Bool {
-        !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && !isSending && !isDisabled
+        !text.isBlank && !isSending && !isDisabled
     }
 
     var body: some View {

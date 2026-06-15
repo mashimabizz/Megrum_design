@@ -343,8 +343,7 @@ struct AppDrawerOverlay: View {
 
     private var profileAreaText: String {
         var parts: [String] = []
-        if let prefecture = appState.viewer?.prefecture?.trimmingCharacters(in: .whitespacesAndNewlines),
-           !prefecture.isEmpty {
+        if let prefecture = appState.viewer?.prefecture.nilIfBlank {
             parts.append(prefecture)
         }
         if let ageText = appState.viewer?.ageText {
@@ -360,8 +359,9 @@ struct AppDrawerOverlay: View {
         guard !isClosing else {
             return
         }
-        onSelectDestination(destination)
-        close()
+        close {
+            onSelectDestination(destination)
+        }
     }
 
     private func close(completion: (() -> Void)? = nil) {

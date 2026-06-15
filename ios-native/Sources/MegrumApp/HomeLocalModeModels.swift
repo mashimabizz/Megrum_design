@@ -103,7 +103,7 @@ public struct HomeLocalActivitySettings: Equatable, Sendable {
         if coordinate != nil || HomeLocalLocationLabel.coordinate(in: normalizedVenue) != nil {
             return HomeLocalLocationLabel.unresolvedText
         }
-        if let fallbackPrefecture, !fallbackPrefecture.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+        if let fallbackPrefecture, !fallbackPrefecture.isBlank {
             return "\(fallbackPrefecture)周辺"
         }
         return "現在地未設定"

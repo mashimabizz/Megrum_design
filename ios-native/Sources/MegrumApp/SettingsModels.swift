@@ -91,7 +91,7 @@ enum MailingAddressDraftValidator {
             address.city,
             address.line1
         ]
-        if requiredValues.contains(where: { $0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }) {
+        if requiredValues.contains(where: \.isBlank) {
             return missingRequiredMessage
         }
         if address.postalCode.count != 7 {

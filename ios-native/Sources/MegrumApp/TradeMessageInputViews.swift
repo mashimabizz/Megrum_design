@@ -176,7 +176,7 @@ private struct TradeMessageComposerRow: View {
     @FocusState private var isTextFieldFocused: Bool
 
     private var isMessageEmpty: Bool {
-        text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        text.isBlank
     }
 
     var body: some View {

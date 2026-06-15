@@ -183,7 +183,7 @@ struct OshiRequestSheet: View {
     }
 
     private var canSubmit: Bool {
-        name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false
+        !name.isBlank
     }
 
     var body: some View {

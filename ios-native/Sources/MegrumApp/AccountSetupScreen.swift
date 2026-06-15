@@ -78,7 +78,7 @@ public enum AccountSetupDraftValidator {
         displayName: String,
         oshiSelections: [AccountSetupOshiInput]
     ) -> String? {
-        if displayName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+        if displayName.isBlank {
             return missingDisplayNameMessage
         }
         if oshiSelections.isEmpty {

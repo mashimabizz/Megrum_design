@@ -112,15 +112,11 @@ struct GoodsCreateMetaDraft: Identifiable, Equatable {
     }
 
     func resolvedTitle(groupName: String?, memberName: String?, goodsTypeName: String?) -> String {
-        let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
-        if !trimmed.isEmpty {
-            return trimmed
+        if let trimmedTitle = title.nilIfBlank {
+            return trimmedTitle
         }
         return [memberName, groupName, goodsTypeName]
-            .compactMap { value in
-                let trimmedValue = value?.trimmingCharacters(in: .whitespacesAndNewlines)
-                return trimmedValue?.isEmpty == false ? trimmedValue : nil
-            }
+            .compactMap(\.nilIfBlank)
             .joined(separator: " ")
     }
 
@@ -306,10 +302,9 @@ struct GoodsEditorSaveFailure: Equatable, Identifiable {
     }
 
     static func make(draft: GoodsEditorDraft, appMessage: String?) -> GoodsEditorSaveFailure {
-        let trimmedMessage = appMessage?.trimmingCharacters(in: .whitespacesAndNewlines)
         let fallbackMessage = "通信状況を確認してからもう一度お試しください。"
         return GoodsEditorSaveFailure(
-            appMessage: trimmedMessage?.isEmpty == false ? (trimmedMessage ?? fallbackMessage) : fallbackMessage,
+            appMessage: appMessage.nilIfBlank ?? fallbackMessage,
             includesPhotoUpload: draft.hasUnsavedLocalPhoto,
             includesTagChanges: draft.hasTagChanges
         )
@@ -430,15 +425,11 @@ struct GoodsEditorDraft: Equatable {
     }
 
     func resolvedTitle(groupName: String?, memberName: String?, goodsTypeName: String?) -> String {
-        let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
-        if !trimmed.isEmpty {
-            return trimmed
+        if let trimmedTitle = title.nilIfBlank {
+            return trimmedTitle
         }
         return [memberName, groupName, goodsTypeName]
-            .compactMap { value in
-                let trimmedValue = value?.trimmingCharacters(in: .whitespacesAndNewlines)
-                return trimmedValue?.isEmpty == false ? trimmedValue : nil
-            }
+            .compactMap(\.nilIfBlank)
             .joined(separator: " ")
     }
 

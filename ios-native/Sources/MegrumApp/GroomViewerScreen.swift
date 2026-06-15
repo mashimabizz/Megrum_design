@@ -154,8 +154,8 @@ private struct GroomViewerScreen: View {
                             .background(MegrumTheme.lavender, in: Circle())
                         }
                         .buttonStyle(.plain)
-                        .disabled(replyDraft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isSendingReply)
-                        .opacity(replyDraft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? 0.52 : 1)
+                        .disabled(replyDraft.isBlank || isSendingReply)
+                        .opacity(replyDraft.isBlank ? 0.52 : 1)
                     } else {
                         Spacer()
                     }

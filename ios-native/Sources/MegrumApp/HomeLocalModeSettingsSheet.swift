@@ -121,7 +121,7 @@ struct HomeLocalModeSettingsSheet: View {
                 draft.venue = locationState.resolvedLocationLabel ?? "住所を確認中"
             }
             .onChange(of: locationState.resolvedLocationLabel) { _, label in
-                guard let label, !label.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+                guard let label, !label.isBlank else {
                     return
                 }
                 draft.venue = label
@@ -191,7 +191,7 @@ struct HomeLocalActivityDraft: Equatable {
     }
 
     var canSave: Bool {
-        !isEnabled || !venue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        !isEnabled || !venue.isBlank
     }
 
     func settings(savedAt now: Date, original: HomeLocalActivitySettings) -> HomeLocalActivitySettings {

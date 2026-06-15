@@ -4,6 +4,60 @@
 
 ---
 
+## イテレーション695：左ドロワー遷移とblank判定を安定化
+
+### 背景・問題意識
+
+左ドロワーの「プロフィール」「推し設定」などを押しても、ドロワーが閉じるだけで遷移しないことがある。ドロワーを閉じるアニメーションと遷移先のsheet/root切り替えが同時に走ると、SwiftUI側の表示更新が不安定になる余地があった。
+
+また、継続リファクタリングとしてApp層に残る空白判定を共通 `nilIfBlank` / `isBlank` へ寄せ、既存挙動を維持しながら読みやすさを上げる。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/AppChrome.swift`
+- ドロワー項目タップ時に、先にドロワーを閉じ、閉じ終わった後で `onSelectDestination` を呼ぶようにした。
+- プロフィールヘッダーの都道府県表示の空白判定を `nilIfBlank` へ寄せた。
+
+#### `ios-native/Sources/MegrumApp/AppStringExtensions.swift`
+- `String` と `Optional<String>` に `isBlank` を追加した。
+
+#### App層の入力・表示補助
+- `trimmingCharacters(in: .whitespacesAndNewlines).isEmpty` 系の判定を `isBlank` / `nilIfBlank` へ置き換えた。
+- `GoodsEditorModels` のタイトルfallbackと保存失敗メッセージの空白nil化を共通helper経由へ整理した。
+
+### 影響範囲
+
+- 左ドロワーからのプロフィール、通知、推し設定、スケジュール、設定/ヘルプへの遷移タイミング
+- App層の一部入力validation、fallback文言生成、空白判定
+- UI文言、DB schema、API契約、状態遷移、保存payloadの意味は変更なし。
+
+### 確認方法
+
+- `rg -n "trimmingCharacters\\(in: \\.whitespacesAndNewlines\\)\\.isEmpty|!.*trimmingCharacters\\(in: \\.whitespacesAndNewlines\\)\\.isEmpty|isEmpty == false" ios-native/Sources/MegrumApp -g '*.swift' || true`
+- `git diff --check -- [変更したSwiftファイル]`
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-drawer-navigation-build --enable-xctest --disable-swift-testing -j 1 --filter 'AppDrawerGestureTests|AccountSetupScreenTests|GoodsEditorDraftTests|GoodsEditorWishPhotoRemovalPolicyTests|MeguriFeedStateReducerTests|HomeLocalModeTests|AuthScreenInputTests|OshiSettingsDraftTests|ProposalCreateFlowTests|ProposalCreateSheetTests|SearchScreenTests|SettingsScreenTests|TradeChatAffordanceTests|MegrumAppStateTests|NotificationRouteTests'`
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-drawer-navigation-recheck-build --enable-xctest --disable-swift-testing -j 1 --filter 'AppDrawerGestureTests|SettingsScreenTests'`
+- `xcodebuild -quiet -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -configuration Debug -destination 'generic/platform=iOS' -derivedDataPath /tmp/megrum-native-device-drawer-navigation-v2 -allowProvisioningUpdates build`
+- `xcrun devicectl device install app --device 7F6C74EF-5786-5316-920A-F7F1CC3FE2A4 /tmp/megrum-native-device-drawer-navigation-v2/Build/Products/Debug-iphoneos/MegrumNative.app`
+
+### セルフレビュー結果
+
+- ✅ 左ドロワーの遷移発火を閉じアニメーション後に移し、sheet/root切り替えの競合を避けた。
+- ✅ 対象テスト275件と再チェック23件が成功した。
+- ✅ 実機向けDebug buildが成功した。
+- ✅ `MTO’s phone` へのインストールが成功した。
+- ⚠️ 実機起動コマンドは端末ロックにより拒否された。インストール済みのため、端末アンロック後に手動起動できる。
+- ✅ `notes/09_state_machines.md`、`notes/10_glossary.md`、`notes/05_data_model.md` の更新は不要。
+
+### 関連ファイル
+
+- `ios-native/Sources/MegrumApp/AppChrome.swift`
+- `ios-native/Sources/MegrumApp/AppStringExtensions.swift`
+- `ios-native/Sources/MegrumApp/GoodsEditorModels.swift`
+- `ios-native/Sources/MegrumApp/*`
+
+---
+
 ## イテレーション694：郵便番号正規化をData層へ集約
 
 ### 背景・問題意識

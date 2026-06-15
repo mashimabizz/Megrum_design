@@ -47,7 +47,7 @@ public enum MegrumAuthInputValidator {
     }
 
     public static func isValidSignUpPassword(_ password: String) -> Bool {
-        password.count >= 8 && !password.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        password.count >= 8 && !password.isBlank
     }
 
     public static func normalizedHandle(_ handle: String?) -> String? {

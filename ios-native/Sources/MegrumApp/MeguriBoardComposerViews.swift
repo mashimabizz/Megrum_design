@@ -38,8 +38,8 @@ struct BoardThreadComposerSheet: View {
     }
 
     private var canSubmit: Bool {
-        !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-            && !bodyText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        !title.isBlank
+            && !bodyText.isBlank
             && missingContextMessage == nil
             && !appState.isCreatingBoardThread
     }

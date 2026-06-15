@@ -247,13 +247,13 @@ struct ProposalCreateSheet: View {
             guard let coordinate, configuration.requiresMeetupBeforeSubmit else {
                 return
             }
-            if meetupPlaceName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            if meetupPlaceName.isBlank {
                 meetupPlaceName = "現在地"
             }
-            if meetupLatitudeText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            if meetupLatitudeText.isBlank {
                 meetupLatitudeText = Self.coordinateText(coordinate.latitude)
             }
-            if meetupLongitudeText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            if meetupLongitudeText.isBlank {
                 meetupLongitudeText = Self.coordinateText(coordinate.longitude)
             }
         }

@@ -513,10 +513,10 @@ struct ProposalMeetupCandidateDraft: Identifiable, Equatable {
         if draft.normalizedPlaceName.isEmpty {
             draft.placeName = "現在地"
         }
-        if draft.latitudeText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+        if draft.latitudeText.isBlank {
             draft.latitudeText = ProposalMeetupMapDraft.coordinateText(coordinate.latitude)
         }
-        if draft.longitudeText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+        if draft.longitudeText.isBlank {
             draft.longitudeText = ProposalMeetupMapDraft.coordinateText(coordinate.longitude)
         }
         return draft

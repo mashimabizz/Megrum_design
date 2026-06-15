@@ -283,8 +283,8 @@ private struct MeguriMessageInput: View {
                 .background(MegrumTheme.lavender, in: Circle())
             }
             .buttonStyle(.plain)
-            .disabled(text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isSending)
-            .opacity(text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? 0.45 : 1)
+            .disabled(text.isBlank || isSending)
+            .opacity(text.isBlank ? 0.45 : 1)
             .accessibilityLabel("送信")
         }
     }

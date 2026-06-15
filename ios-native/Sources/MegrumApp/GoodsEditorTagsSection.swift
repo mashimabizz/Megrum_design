@@ -14,7 +14,7 @@ struct GoodsEditorTagsSection: View {
 
     private var canAddTag: Bool {
         !isItemReadOnly
-            && !tagDraft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            && !tagDraft.isBlank
             && tagNames.count < 5
     }
 

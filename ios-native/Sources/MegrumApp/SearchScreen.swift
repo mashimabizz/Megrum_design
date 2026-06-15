@@ -10,7 +10,7 @@ enum SearchLayoutMetrics {
 
 enum SearchCriteriaResolver {
     static func hasCriteria(query: String, activeFilterCount: Int) -> Bool {
-        !query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || activeFilterCount > 0
+        !query.isBlank || activeFilterCount > 0
     }
 }
 

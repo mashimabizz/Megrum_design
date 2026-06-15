@@ -141,7 +141,7 @@ struct LoginSecuritySettingsScreen: View {
     }
 
     private func prefillResetEmailIfNeeded() {
-        guard resetEmail.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+        guard resetEmail.isBlank else {
             return
         }
         resetEmail = summary.resetEmailPrefill
