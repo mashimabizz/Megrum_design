@@ -247,11 +247,11 @@ private extension MegrumLocationState {
             return HomeLocalLocationLabel.coordinateText(coordinate)
         }
 
-        if let pointOfInterest = placemark.areasOfInterest?.first?.trimmedNonEmpty {
+        if let pointOfInterest = placemark.areasOfInterest?.first?.nilIfBlank {
             return pointOfInterest
         }
 
-        if let name = placemark.name?.trimmedNonEmpty,
+        if let name = placemark.name?.nilIfBlank,
            !name.contains(","),
            !name.isCoordinateLike {
             return name
@@ -264,7 +264,7 @@ private extension MegrumLocationState {
             placemark.thoroughfare,
             placemark.subThoroughfare
         ]
-        .compactMap { $0?.trimmedNonEmpty }
+        .compactMap { $0?.nilIfBlank }
         .joined()
 
         if !address.isEmpty {
@@ -295,11 +295,6 @@ private extension MegrumLocationState {
 }
 
 private extension String {
-    var trimmedNonEmpty: String? {
-        let trimmed = trimmingCharacters(in: .whitespacesAndNewlines)
-        return trimmed.isEmpty ? nil : trimmed
-    }
-
     var isCoordinateLike: Bool {
         let parts = split(separator: ",")
         guard parts.count == 2 else {

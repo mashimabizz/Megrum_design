@@ -20,7 +20,7 @@ struct OwnProfileSummary: Equatable, Sendable {
     var listingCount: Int
 
     var prefectureText: String {
-        trimmedNonEmpty(prefecture) ?? "未設定"
+        prefecture.nilIfBlank ?? "未設定"
     }
 
     var handleText: String {
@@ -61,7 +61,7 @@ struct OwnProfileSummary: Equatable, Sendable {
         self.displayName = localDraft?.normalizedDisplayName ?? viewer.displayName
         self.handle = localDraft?.normalizedHandle ?? viewer.handle
         if let localDraft {
-            self.prefecture = trimmedNonEmpty(localDraft.normalizedPrefecture)
+            self.prefecture = localDraft.normalizedPrefecture.nilIfBlank
         } else {
             self.prefecture = viewer.prefectureForDisplay
         }
@@ -326,8 +326,8 @@ struct OwnProfileScreen: View {
         let selectionChips = appState.userOshiSelections
             .sorted { $0.priority < $1.priority }
             .compactMap { selection -> String? in
-                let groupName = trimmedNonEmpty(selection.groupName) ?? trimmedNonEmpty(selection.oshiRequestName)
-                let memberName = trimmedNonEmpty(selection.characterName) ?? trimmedNonEmpty(selection.characterRequestName)
+                let groupName = selection.groupName.nilIfBlank ?? selection.oshiRequestName.nilIfBlank
+                let memberName = selection.characterName.nilIfBlank ?? selection.characterRequestName.nilIfBlank
                 switch (groupName, memberName) {
                 case let (.some(group), .some(member)):
                     return "\(group) / \(member)"
@@ -420,7 +420,7 @@ struct OwnProfileScreen: View {
                 handle: normalized.handle,
                 displayName: normalized.displayName,
                 gender: normalized.gender,
-                prefecture: trimmedNonEmpty(normalized.prefecture),
+                prefecture: normalized.prefecture.nilIfBlank,
                 paymentMethods: normalized.paymentMethods,
                 avatarURL: normalized.visibleAvatarURL,
                 avatarUpload: normalized.avatarUpload,
@@ -597,13 +597,8 @@ private struct OwnProfileEditForm: View {
 
 private extension UserProfile {
     var prefectureForDisplay: String? {
-        trimmedNonEmpty(prefecture)
+        prefecture.nilIfBlank
     }
-}
-
-private func trimmedNonEmpty(_ value: String?) -> String? {
-    let trimmed = value?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-    return trimmed.isEmpty ? nil : trimmed
 }
 
 func ownProfileAvatarUploadError(for upload: GoodsPhotoUpload) -> String? {

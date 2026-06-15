@@ -4,6 +4,50 @@
 
 ---
 
+## イテレーション691：trimmedNonEmptyをnilIfBlankへ統一
+
+### 背景・問題意識
+
+継続リファクタリングとして、OwnProfileと位置ラベル生成に残っていた `trimmedNonEmpty` を、iter690で共通化した `nilIfBlank` へ寄せる。空白除去後に空ならnilという意味を一箇所に統一し、プロフィール表示・現在地表示の既存挙動は維持する。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/OwnProfileScreen.swift`
+- プロフィール都道府県、推しチップ、プロフィール編集保存時の空白nil化を `nilIfBlank` へ差し替えた。
+- ファイルローカルの `trimmedNonEmpty(_:)` を削除した。
+
+#### `ios-native/Sources/MegrumApp/MegrumLocationState.swift`
+- 逆ジオコード結果のPOI/name/address部品の空白nil化を `nilIfBlank` へ差し替えた。
+- ファイルローカルの `String.trimmedNonEmpty` を削除した。
+
+### 影響範囲
+
+- 自分のプロフィール概要/編集保存時の表示用文字列正規化
+- めぐり/現地モードで使う現在地ラベル生成
+- 表示文言、位置情報権限状態、保存payload、DB schema、状態遷移の意味は変更なし。
+
+### 確認方法
+
+- `rg -n "trimmedNonEmpty" ios-native/Sources/MegrumApp ios-native/Tests/MegrumAppTests || true`
+- `git diff --check -- ios-native/Sources/MegrumApp/OwnProfileScreen.swift ios-native/Sources/MegrumApp/MegrumLocationState.swift`
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-trimmed-non-empty-build --enable-xctest --disable-swift-testing -j 1 --filter 'OwnProfileScreenTests|OwnProfileSummaryTests|MeguriAccessPolicyTests|HomeLocalModeTests'`
+- `xcodebuild -quiet -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -configuration Debug -destination 'generic/platform=iOS Simulator' -derivedDataPath /tmp/megrum-native-xcodebuild-trimmed-non-empty CODE_SIGNING_ALLOWED=NO build`
+
+### セルフレビュー結果
+
+- ✅ `trimmedNonEmpty` が残っていないことを確認した。
+- ✅ 対象テスト35件が成功した。
+- ✅ Xcode Debug build が成功した。
+- ✅ 位置ラベルの座標判定やプロフィール保存payloadの意味は変更していない。
+- ✅ `notes/09_state_machines.md`、`notes/10_glossary.md`、`notes/05_data_model.md` の更新は不要。
+
+### 関連ファイル
+
+- `ios-native/Sources/MegrumApp/OwnProfileScreen.swift`
+- `ios-native/Sources/MegrumApp/MegrumLocationState.swift`
+
+---
+
 ## イテレーション690：nilIfBlankをApp共通拡張へ集約
 
 ### 背景・問題意識
