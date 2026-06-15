@@ -4,6 +4,41 @@
 
 ---
 
+## イテレーション684：ListingClientの更新note正規化を共通化
+
+### 背景・問題意識
+
+継続リファクタリングとして、`SupabaseListingClient` の個別募集更新payloadに残っていたnoteのtrim/空文字nil化を `SupabaseTextNormalizer` 経由へ寄せる。作成payloadのnoteは既存仕様どおり入力値をそのまま扱うため、今回の変更対象から外した。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumData/SupabaseListingClient.swift`
+- `ListingUpdatePayload` のnote更新処理を `SupabaseTextNormalizer.optional(_:)` に差し替えた。
+
+### 影響範囲
+
+- 個別募集更新リクエストのnote payload生成
+- 個別募集作成payload、選択肢payload、ステータス更新、URL/HTTP method、DB schema、UI文言、状態遷移の意味は変更なし。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumData/SupabaseListingClient.swift ios-native/Tests/MegrumDataTests/SupabaseListingClientTests.swift ios-native/Tests/MegrumDataTests/SupabaseTextNormalizerTests.swift`
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-listing-normalizer-build --enable-xctest --disable-swift-testing -j 1 --filter 'SupabaseTextNormalizerTests|SupabaseListingClientTests'`
+- `xcodebuild -quiet -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -configuration Debug -destination 'generic/platform=iOS Simulator' -derivedDataPath /tmp/megrum-native-xcodebuild-listing-normalizer CODE_SIGNING_ALLOWED=NO build`
+
+### セルフレビュー結果
+
+- ✅ 対象テスト15件が成功した。
+- ✅ Xcode Debug build が成功した。
+- ✅ 個別募集作成時のnote扱いは変更しなかった。
+- ✅ `notes/09_state_machines.md`、`notes/10_glossary.md`、`notes/05_data_model.md` の更新は不要。
+
+### 関連ファイル
+
+- `ios-native/Sources/MegrumData/SupabaseListingClient.swift`
+
+---
+
 ## イテレーション683：ActivityWindowClientの入力文字列正規化を共通化
 
 ### 背景・問題意識

@@ -434,8 +434,7 @@ private struct ListingUpdatePayload: Encodable, Sendable {
         self.haveLogic = input.haveLogic?.rawValue
         self.status = input.status?.rawValue
         if let note = input.note {
-            let trimmed = note.trimmingCharacters(in: .whitespacesAndNewlines)
-            self.note = .some(trimmed.isEmpty ? nil : trimmed)
+            self.note = .some(SupabaseTextNormalizer.optional(note))
         } else if input.clearsNote {
             self.note = .some(nil)
         }
