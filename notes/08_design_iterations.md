@@ -4,6 +4,42 @@
 
 ---
 
+## イテレーション680：SupabaseConfigurationの環境値正規化を共通化
+
+### 背景・問題意識
+
+継続リファクタリングとして、Supabase接続設定の環境変数/Info.plist値に残っていたtrimと空文字nil化を `SupabaseTextNormalizer` 経由へ寄せる。未解決build setting placeholderの拒否、URL妥当性確認、access token省略の既存挙動は維持した。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumData/SupabaseConfiguration.swift`
+- URL文字列、publishable key、access tokenのtrim/空文字nil化を `SupabaseTextNormalizer.optional(_:)` に差し替えた。
+- `make(urlString:publishableKey:accessToken:)` 内の手作業の空文字判定を削除した。
+
+### 影響範囲
+
+- Supabase接続設定の環境変数/Info.plist読み込み
+- placeholder拒否、相対URL拒否、Authorization header生成、Storage request生成、DB schema、UI文言、状態遷移の意味は変更なし。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumData/SupabaseConfiguration.swift ios-native/Tests/MegrumDataTests/SupabaseConfigurationTests.swift ios-native/Tests/MegrumDataTests/SupabaseTextNormalizerTests.swift`
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-configuration-normalizer-build --enable-xctest --disable-swift-testing -j 1 --filter 'SupabaseTextNormalizerTests|SupabaseConfigurationTests'`
+- `xcodebuild -quiet -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -configuration Debug -destination 'generic/platform=iOS Simulator' -derivedDataPath /tmp/megrum-native-xcodebuild-configuration-normalizer CODE_SIGNING_ALLOWED=NO build`
+
+### セルフレビュー結果
+
+- ✅ 対象テスト12件が成功した。
+- ✅ Xcode Debug build が成功した。
+- ✅ Supabase設定値の既存バリデーション挙動を維持した。
+- ✅ `notes/09_state_machines.md`、`notes/10_glossary.md`、`notes/05_data_model.md` の更新は不要。
+
+### 関連ファイル
+
+- `ios-native/Sources/MegrumData/SupabaseConfiguration.swift`
+
+---
+
 ## イテレーション679：AccountClientのプロフィール文字列正規化をSupabaseTextNormalizerへ集約
 
 ### 背景・問題意識

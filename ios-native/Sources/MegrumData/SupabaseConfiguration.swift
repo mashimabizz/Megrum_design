@@ -45,10 +45,8 @@ public struct SupabaseConfiguration: Equatable, Sendable {
         accessToken: String?
     ) -> SupabaseConfiguration? {
         guard
-            let rawURL = urlString?.trimmingCharacters(in: .whitespacesAndNewlines),
-            let key = publishableKey?.trimmingCharacters(in: .whitespacesAndNewlines),
-            !rawURL.isEmpty,
-            !key.isEmpty,
+            let rawURL = SupabaseTextNormalizer.optional(urlString),
+            let key = SupabaseTextNormalizer.optional(publishableKey),
             !rawURL.contains("$("),
             !key.contains("$("),
             let url = URL(string: rawURL),
@@ -58,11 +56,10 @@ public struct SupabaseConfiguration: Equatable, Sendable {
             return nil
         }
 
-        let token = accessToken?.trimmingCharacters(in: .whitespacesAndNewlines)
         return SupabaseConfiguration(
             projectURL: url,
             publishableKey: key,
-            accessToken: token?.isEmpty == false ? token : nil
+            accessToken: SupabaseTextNormalizer.optional(accessToken)
         )
     }
 }
