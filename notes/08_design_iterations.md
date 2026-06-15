@@ -4,6 +4,45 @@
 
 ---
 
+## イテレーション689：設定表示テキストのfallback正規化を共通化
+
+### 背景・問題意識
+
+継続リファクタリングとして、設定画面モデル内で重複していた「trimして空ならfallbackを返す」表示用処理を小さな共通helperへまとめる。設定画面の表示文言やバリデーションは変えず、Account概要とログイン/セキュリティ概要の同じ処理を一箇所に集約する。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/SettingsModels.swift`
+- `SettingsDisplayText.nonEmpty(_:fallback:)` を追加した。
+- `SettingsAccountSummary` のhandle/displayName/activityAreaのfallback正規化を共通helperへ差し替えた。
+- `LoginSecuritySummary` のemail fallback正規化を共通helperへ差し替えた。
+- 各struct内に重複していた `trimmed(_:fallback:)` を削除した。
+
+### 影響範囲
+
+- 設定画面のアカウント概要表示
+- ログイン/セキュリティ概要表示
+- 表示文言、fallback値、住所バリデーション、支払い設定、DB schema、API payload、状態遷移の意味は変更なし。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumApp/SettingsModels.swift ios-native/Tests/MegrumAppTests/SettingsScreenTests.swift`
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-settings-display-text-build --enable-xctest --disable-swift-testing -j 1 --filter SettingsScreenTests`
+- `xcodebuild -quiet -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -configuration Debug -destination 'generic/platform=iOS Simulator' -derivedDataPath /tmp/megrum-native-xcodebuild-settings-display-text CODE_SIGNING_ALLOWED=NO build`
+
+### セルフレビュー結果
+
+- ✅ SettingsScreenTests 12件が成功した。
+- ✅ Xcode Debug build が成功した。
+- ✅ 既存のfallback文字列とtrim範囲は変更していない。
+- ✅ `notes/09_state_machines.md`、`notes/10_glossary.md`、`notes/05_data_model.md` の更新は不要。
+
+### 関連ファイル
+
+- `ios-native/Sources/MegrumApp/SettingsModels.swift`
+
+---
+
 ## イテレーション688：App層の開発ログをLoggerへ統一
 
 ### 背景・問題意識

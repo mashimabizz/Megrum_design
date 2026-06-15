@@ -17,9 +17,9 @@ struct SettingsAccountSummary: Equatable {
         mailingAddress: MailingAddress?
     ) {
         userIDText = viewer?.id.uuidString.lowercased() ?? "未読み込み"
-        handleText = Self.trimmed(viewer?.handle, fallback: "未設定")
-        displayNameText = Self.trimmed(viewer?.displayName, fallback: "未設定")
-        activityAreaText = Self.trimmed(viewer?.prefecture, fallback: "未設定")
+        handleText = SettingsDisplayText.nonEmpty(viewer?.handle, fallback: "未設定")
+        displayNameText = SettingsDisplayText.nonEmpty(viewer?.displayName, fallback: "未設定")
+        activityAreaText = SettingsDisplayText.nonEmpty(viewer?.prefecture, fallback: "未設定")
         accountStatusText = viewer?.accountStatus.settingsDisplayName ?? "未読み込み"
         paymentMethodsText = Self.paymentMethodsText(viewer?.paymentMethods ?? [], otherNote: viewer?.paymentNote)
         pushNotificationText = pushNotificationsEnabled ? "ON" : "OFF"
@@ -33,11 +33,6 @@ struct SettingsAccountSummary: Equatable {
 
     var shortStatusText: String {
         "\(displayNameText) / 通知\(pushNotificationText)"
-    }
-
-    private static func trimmed(_ value: String?, fallback: String) -> String {
-        let trimmedValue = value?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-        return trimmedValue.isEmpty ? fallback : trimmedValue
     }
 
     private static func paymentMethodsText(_ methods: [UserPaymentMethod], otherNote: String?) -> String {
@@ -60,7 +55,7 @@ struct LoginSecuritySummary: Equatable {
         accountSummary: SettingsAccountSummary
     ) {
         authStatusText = isAuthenticated ? "ログイン中" : "再ログインが必要"
-        emailText = Self.trimmed(authSession?.user.email, fallback: "メール未取得")
+        emailText = SettingsDisplayText.nonEmpty(authSession?.user.email, fallback: "メール未取得")
         authUserIDText = authSession?.user.id.uuidString.lowercased() ?? "セッション未確認"
         profileUserIDText = accountSummary.userIDText
         authConfigurationText = isAuthConfigured ? "Supabase接続" : "プレビュー接続"
@@ -75,7 +70,10 @@ struct LoginSecuritySummary: Equatable {
         emailText == "メール未取得" ? "" : emailText
     }
 
-    private static func trimmed(_ value: String?, fallback: String) -> String {
+}
+
+private enum SettingsDisplayText {
+    static func nonEmpty(_ value: String?, fallback: String) -> String {
         let trimmedValue = value?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
         return trimmedValue.isEmpty ? fallback : trimmedValue
     }
