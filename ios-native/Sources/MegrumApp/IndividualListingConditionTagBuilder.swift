@@ -7,7 +7,10 @@ struct IndividualListingConditionTagBuilder {
     var selectedGroupID: UUID?
 
     func candidateNames(limit: Int = 10) -> [String] {
-        Array(uniqueTagNames(from: matchingInventory.flatMap { $0.tags.map(\.name) } + matchingWishes.flatMap { $0.tags.map(\.name) }).prefix(limit))
+        TagNameNormalizer.uniquePreservingOrder(
+            matchingInventory.flatMap { $0.tags.map(\.name) } + matchingWishes.flatMap { $0.tags.map(\.name) },
+            limit: limit
+        )
     }
 
     func previewItemsByTag() -> [String: [TagPreviewItem]] {
@@ -59,21 +62,4 @@ struct IndividualListingConditionTagBuilder {
         }
     }
 
-    private func uniqueTagNames(from names: [String]) -> [String] {
-        var seen: Set<String> = []
-        var result: [String] = []
-        for name in names {
-            let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
-            guard !trimmed.isEmpty else {
-                continue
-            }
-            let key = trimmed.lowercased()
-            guard !seen.contains(key) else {
-                continue
-            }
-            seen.insert(key)
-            result.append(trimmed)
-        }
-        return result
-    }
 }

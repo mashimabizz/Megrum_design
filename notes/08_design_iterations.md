@@ -4,6 +4,56 @@
 
 ---
 
+## イテレーション687：タグ候補名の正規化を共通化
+
+### 背景・問題意識
+
+継続リファクタリングとして、マイグッズ/個別募集まわりのタグ候補名生成に残っていた重複排除・trim処理を共通化する。タグ候補の表示順や絞り込みの意味は既存どおり維持し、今後のタグ候補UI改善で同じ正規化処理を再実装しないようにする。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/TagNameNormalizer.swift`
+- タグ名配列のtrim、空文字除去、大文字小文字を無視した重複排除を行う小さな共通ヘルパーを追加した。
+- 既存用途に合わせて、出現順を維持する `uniquePreservingOrder` と、表示用に自然順ソートする `uniqueSorted` を分けた。
+
+#### `ios-native/Sources/MegrumApp/CollectionScreens.swift`
+- マイグッズ/Wish一覧のフィルター候補タグ名生成を `TagNameNormalizer.uniqueSorted` へ差し替えた。
+- 複数選択時のタグ付け候補生成を `TagNameNormalizer.uniquePreservingOrder` へ差し替えた。
+- ファイル内に重複していたタグ名正規化関数を削除した。
+
+#### `ios-native/Sources/MegrumApp/IndividualListingConditionTagBuilder.swift`
+- 個別募集の条件指定タグ候補生成を `TagNameNormalizer.uniquePreservingOrder` へ差し替えた。
+- ファイル内の重複正規化関数を削除した。
+
+### 影響範囲
+
+- マイグッズ/Wish一覧のタグフィルター候補生成
+- 複数選択時のタグ付け候補生成
+- 個別募集の条件指定タグ候補生成
+- UIレイアウト、表示文言、DB schema、API payload、状態遷移の意味は変更なし。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumApp/TagNameNormalizer.swift ios-native/Sources/MegrumApp/CollectionScreens.swift ios-native/Sources/MegrumApp/IndividualListingConditionTagBuilder.swift ios-native/Tests/MegrumAppTests/GoodsGridLayoutTests.swift ios-native/Tests/MegrumAppTests/IndividualListingDraftTests.swift`
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-tag-name-normalizer-build --enable-xctest --disable-swift-testing -j 1 --filter 'GoodsGridLayoutTests|IndividualListingDraftTests'`
+- `xcodebuild -quiet -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -configuration Debug -destination 'generic/platform=iOS Simulator' -derivedDataPath /tmp/megrum-native-xcodebuild-tag-name-normalizer CODE_SIGNING_ALLOWED=NO build`
+
+### セルフレビュー結果
+
+- ✅ 対象テスト29件が成功した。
+- ✅ Xcode Debug build が成功した。
+- ✅ 一覧フィルター候補は既存どおり自然順ソート、タグ付け/個別募集候補は既存どおり出現順維持に分けた。
+- ✅ UI文言・レイアウト・API payload・DB schemaは変更していない。
+- ✅ `notes/09_state_machines.md`、`notes/10_glossary.md`、`notes/05_data_model.md` の更新は不要。
+
+### 関連ファイル
+
+- `ios-native/Sources/MegrumApp/TagNameNormalizer.swift`
+- `ios-native/Sources/MegrumApp/CollectionScreens.swift`
+- `ios-native/Sources/MegrumApp/IndividualListingConditionTagBuilder.swift`
+
+---
+
 ## イテレーション686：AuthClientの認証文字列正規化を共通化
 
 ### 背景・問題意識

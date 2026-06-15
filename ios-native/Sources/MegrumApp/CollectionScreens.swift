@@ -60,24 +60,7 @@ struct GoodsCollectionFilterChoices {
         let names = items
             .filter(structuralFilter.matches)
             .flatMap { $0.tags.map(\.name) }
-        return uniqueSortedTagNames(names, limit: limit)
-    }
-
-    private static func uniqueSortedTagNames(_ names: [String], limit: Int) -> [String] {
-        let uniqueNamesByKey = names.reduce(into: [String: String]()) { result, name in
-            let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
-            guard !trimmed.isEmpty else {
-                return
-            }
-            if result[trimmed.lowercased()] == nil {
-                result[trimmed.lowercased()] = trimmed
-            }
-        }
-
-        return Array(uniqueNamesByKey.values)
-            .sorted { $0.localizedStandardCompare($1) == .orderedAscending }
-            .prefix(limit)
-            .map { $0 }
+        return TagNameNormalizer.uniqueSorted(names, limit: limit)
     }
 }
 
@@ -672,7 +655,7 @@ struct GoodsCollectionScreen: View {
                 limit: 10
             )
         }
-        return uniqueTagNames(suggestions, limit: 10)
+        return TagNameNormalizer.uniquePreservingOrder(suggestions, limit: 10)
     }
 
     private func bulkTagPreviewItemsByTag(for itemIDs: Set<UUID>) -> [String: [TagPreviewItem]] {
@@ -696,26 +679,6 @@ struct GoodsCollectionScreen: View {
     private func orderedGroupIDs(from targetItems: [GoodsItem]) -> [UUID] {
         Array(Set(targetItems.compactMap(\.groupID)))
             .sorted { $0.uuidString < $1.uuidString }
-    }
-
-    private func uniqueTagNames(_ names: [String], limit: Int) -> [String] {
-        var seen: Set<String> = []
-        var result: [String] = []
-        for name in names {
-            let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
-            guard !trimmed.isEmpty else {
-                continue
-            }
-            let key = trimmed.lowercased()
-            guard seen.insert(key).inserted else {
-                continue
-            }
-            result.append(trimmed)
-            if result.count == limit {
-                break
-            }
-        }
-        return result
     }
 
     private func deleteSelectedItems() {
