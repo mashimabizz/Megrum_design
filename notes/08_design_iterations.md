@@ -4,6 +4,44 @@
 
 ---
 
+## イテレーション686：AuthClientの認証文字列正規化を共通化
+
+### 背景・問題意識
+
+継続リファクタリングとして、`SupabaseAuthClient` のemail/refresh token/metadata/OAuth scope/error messageに残っていたファイルローカルの `authTrimmed` / `authNilIfBlank` を `SupabaseTextNormalizer` 経由へ寄せる。AuthRedirectParserはtoken文字列をtrimしない既存挙動があるため、今回の対象外とした。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumData/SupabaseAuthClient.swift`
+- password sign-in / refresh / sign-up / ID token / password reset の入力trimを `SupabaseTextNormalizer.trimmed(_:)` と `optional(_:)` に差し替えた。
+- OAuth scopeのtrim+空文字除去を `SupabaseTextNormalizer.nonEmptyValues(_:)` に差し替えた。
+- Supabaseエラーmessageの抽出を共通Normalizer経由にした。
+- ファイルローカルの `authTrimmed` / `authNilIfBlank` extension を削除した。
+
+### 影響範囲
+
+- Supabase認証リクエストpayloadとOAuth authorize URL生成
+- redirect fragment token解析、sign out/user requestのbearer値、URL/HTTP method、DB schema、UI文言、状態遷移の意味は変更なし。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumData/SupabaseAuthClient.swift ios-native/Tests/MegrumDataTests/SupabaseAuthClientTests.swift ios-native/Tests/MegrumDataTests/SupabaseTextNormalizerTests.swift`
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-auth-client-normalizer-build --enable-xctest --disable-swift-testing -j 1 --filter 'SupabaseTextNormalizerTests|SupabaseAuthClientTests'`
+- `xcodebuild -quiet -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -configuration Debug -destination 'generic/platform=iOS Simulator' -derivedDataPath /tmp/megrum-native-xcodebuild-auth-client-normalizer CODE_SIGNING_ALLOWED=NO build`
+
+### セルフレビュー結果
+
+- ✅ 対象テスト16件が成功した。
+- ✅ Xcode Debug build が成功した。
+- ✅ AuthRedirectParserのtoken文字列扱いは変更していない。
+- ✅ `notes/09_state_machines.md`、`notes/10_glossary.md`、`notes/05_data_model.md` の更新は不要。
+
+### 関連ファイル
+
+- `ios-native/Sources/MegrumData/SupabaseAuthClient.swift`
+
+---
+
 ## イテレーション685：FaceRecognitionClientの文字列正規化を共通化
 
 ### 背景・問題意識

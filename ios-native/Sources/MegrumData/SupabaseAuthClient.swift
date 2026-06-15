@@ -133,7 +133,7 @@ public final class SupabaseAuthClient: @unchecked Sendable {
     }
 
     public func makePasswordSignInRequest(email: String, password: String) throws -> URLRequest {
-        let payload = PasswordPayload(email: email.authTrimmed, password: password)
+        let payload = PasswordPayload(email: SupabaseTextNormalizer.trimmed(email), password: password)
         return try makeAuthRequest(
             path: "/auth/v1/token",
             queryItems: [URLQueryItem(name: "grant_type", value: "password")],
@@ -144,7 +144,7 @@ public final class SupabaseAuthClient: @unchecked Sendable {
     }
 
     public func makeRefreshSessionRequest(refreshToken: String) throws -> URLRequest {
-        let payload = RefreshTokenPayload(refreshToken: refreshToken.authTrimmed)
+        let payload = RefreshTokenPayload(refreshToken: SupabaseTextNormalizer.trimmed(refreshToken))
         return try makeAuthRequest(
             path: "/auth/v1/token",
             queryItems: [URLQueryItem(name: "grant_type", value: "refresh_token")],
@@ -160,10 +160,10 @@ public final class SupabaseAuthClient: @unchecked Sendable {
         metadata: SupabaseAuthProfileMetadata = SupabaseAuthProfileMetadata(),
         emailRedirectTo: URL? = nil
     ) throws -> URLRequest {
-        let normalizedHandle = metadata.handle.authNilIfBlank
-        let normalizedDisplayName = metadata.displayName.authNilIfBlank
+        let normalizedHandle = SupabaseTextNormalizer.optional(metadata.handle)
+        let normalizedDisplayName = SupabaseTextNormalizer.optional(metadata.displayName)
         let payload = SignUpPayload(
-            email: email.authTrimmed,
+            email: SupabaseTextNormalizer.trimmed(email),
             password: password,
             data: SignUpMetadata(
                 handle: normalizedHandle,
@@ -187,9 +187,9 @@ public final class SupabaseAuthClient: @unchecked Sendable {
     ) throws -> URLRequest {
         let payload = IDTokenPayload(
             provider: provider.rawValue,
-            idToken: idToken.authTrimmed,
-            accessToken: accessToken.authNilIfBlank,
-            nonce: nonce.authNilIfBlank
+            idToken: SupabaseTextNormalizer.trimmed(idToken),
+            accessToken: SupabaseTextNormalizer.optional(accessToken),
+            nonce: SupabaseTextNormalizer.optional(nonce)
         )
         return try makeAuthRequest(
             path: "/auth/v1/token",
@@ -215,7 +215,7 @@ public final class SupabaseAuthClient: @unchecked Sendable {
         if let redirectTo {
             queryItems.append(URLQueryItem(name: "redirect_to", value: redirectTo.absoluteString))
         }
-        let normalizedScopes = scopes.map(\.authTrimmed).filter { !$0.isEmpty }
+        let normalizedScopes = SupabaseTextNormalizer.nonEmptyValues(scopes)
         if !normalizedScopes.isEmpty {
             queryItems.append(URLQueryItem(name: "scopes", value: normalizedScopes.joined(separator: " ")))
         }
@@ -243,7 +243,7 @@ public final class SupabaseAuthClient: @unchecked Sendable {
     }
 
     public func makePasswordResetRequest(email: String, emailRedirectTo: URL? = nil) throws -> URLRequest {
-        let payload = PasswordResetPayload(email: email.authTrimmed)
+        let payload = PasswordResetPayload(email: SupabaseTextNormalizer.trimmed(email))
         let queryItems = emailRedirectTo.map {
             [URLQueryItem(name: "redirect_to", value: $0.absoluteString)]
         } ?? []
@@ -408,8 +408,8 @@ private struct AuthErrorResponse: Decodable {
 
     var message: String? {
         [msg, messageText, errorDescription, error]
-            .compactMap { $0?.authTrimmed }
-            .first { !$0.isEmpty }
+            .compactMap(SupabaseTextNormalizer.optional)
+            .first
     }
 
     enum CodingKeys: String, CodingKey {
@@ -417,20 +417,5 @@ private struct AuthErrorResponse: Decodable {
         case messageText = "message"
         case errorDescription
         case error
-    }
-}
-
-private extension String {
-    var authTrimmed: String {
-        trimmingCharacters(in: .whitespacesAndNewlines)
-    }
-}
-
-private extension Optional where Wrapped == String {
-    var authNilIfBlank: String? {
-        guard let value = self?.authTrimmed, !value.isEmpty else {
-            return nil
-        }
-        return value
     }
 }
