@@ -345,12 +345,6 @@ struct BoardPrefecturePickerSheet: View {
     }
 }
 
-private extension String {
-    var nilIfBlank: String? {
-        isEmpty ? nil : self
-    }
-}
-
 private let japanesePrefectures = [
     "北海道",
     "青森県",

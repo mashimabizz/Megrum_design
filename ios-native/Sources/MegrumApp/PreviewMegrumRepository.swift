@@ -958,12 +958,6 @@ private func resolvedAcceptanceExchangeMethod(
     }
 }
 
-private extension String {
-    var nilIfBlank: String? {
-        isEmpty ? nil : self
-    }
-}
-
 private func normalizedPostalCode(_ value: String) -> String {
     String(value.filter(\.isNumber).prefix(7))
 }

@@ -370,9 +370,3 @@ struct MeguriScreen: View {
     }
 
 }
-
-private extension String {
-    var nilIfBlank: String? {
-        isEmpty ? nil : self
-    }
-}

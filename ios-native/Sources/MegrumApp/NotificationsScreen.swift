@@ -279,22 +279,6 @@ private struct NotificationLinkComponents {
     }
 }
 
-private extension Optional where Wrapped == String {
-    var nilIfBlank: String? {
-        guard let value = self?.trimmingCharacters(in: .whitespacesAndNewlines), !value.isEmpty else {
-            return nil
-        }
-        return value
-    }
-}
-
-private extension String {
-    var nilIfBlank: String? {
-        let value = trimmingCharacters(in: .whitespacesAndNewlines)
-        return value.isEmpty ? nil : value
-    }
-}
-
 @MainActor
 struct NotificationCenterScreen: View {
     @ObservedObject var appState: MegrumAppState

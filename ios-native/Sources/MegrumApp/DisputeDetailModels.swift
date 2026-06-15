@@ -709,14 +709,4 @@ private extension String {
             .replacingOccurrences(of: "-", with: "_")
     }
 
-    var nilIfBlank: String? {
-        let trimmed = trimmingCharacters(in: .whitespacesAndNewlines)
-        return trimmed.isEmpty ? nil : trimmed
-    }
-}
-
-private extension Optional where Wrapped == String {
-    var nilIfBlank: String? {
-        flatMap(\.nilIfBlank)
-    }
 }

@@ -654,9 +654,3 @@ private extension BoardThread {
         return "同じ現場"
     }
 }
-
-private extension String {
-    var nilIfBlank: String? {
-        isEmpty ? nil : self
-    }
-}

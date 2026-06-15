@@ -261,9 +261,3 @@ struct AddressSettingsScreen: View {
         case phoneNumber
     }
 }
-
-private extension String {
-    var nilIfBlank: String? {
-        isEmpty ? nil : self
-    }
-}

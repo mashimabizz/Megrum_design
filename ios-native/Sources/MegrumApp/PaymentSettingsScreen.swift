@@ -565,10 +565,3 @@ private extension View {
             .shadow(color: .black.opacity(0.04), radius: 18, y: 10)
     }
 }
-
-private extension String {
-    var nilIfBlank: String? {
-        let trimmed = trimmingCharacters(in: .whitespacesAndNewlines)
-        return trimmed.isEmpty ? nil : trimmed
-    }
-}

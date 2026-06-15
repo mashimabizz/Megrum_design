@@ -4,6 +4,59 @@
 
 ---
 
+## イテレーション690：nilIfBlankをApp共通拡張へ集約
+
+### 背景・問題意識
+
+継続リファクタリングとして、複数のApp層ファイルに散っていた `String.nilIfBlank` / `Optional<String>.nilIfBlank` のprivate実装を共通拡張へ集約する。呼び出し側の処理や画面文言は変えず、空白文字の扱いを一箇所に寄せて、今後の入力/表示正規化を追いやすくする。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/AppStringExtensions.swift`
+- `String.nilIfBlank` と `Optional<String>.nilIfBlank` を追加した。
+- 既存の `nilIfEmpty` はそのまま維持した。
+
+#### App層の各画面/モデル
+- `AddressSettingsScreen`、`BoardThreadDetailScreen`、`DisputeDetailModels`、`GroomStoryViews`、`MegrumAuthState`、`MeguriBoardComposerViews`、`MeguriScreen`、`NotificationsScreen`、`OshiSettingsSheetViews`、`PaymentSettingsScreen`、`PreviewMegrumRepository`、`SupabasePaymentSettingsClient` にあった重複private拡張を削除した。
+
+### 影響範囲
+
+- 住所設定、通知ルーティング、めぐり投稿/閲覧、推し設定リクエスト、支払い設定、プレビューRepository、認証入力、異議詳細表示の空文字nil化
+- 呼び出し元、表示文言、API payload、DB schema、状態遷移の意味は変更なし。
+
+### 確認方法
+
+- `rg -n -C 2 "var nilIfBlank" ios-native/Sources/MegrumApp`
+- `git diff --check -- ios-native/Sources/MegrumApp/AppStringExtensions.swift ios-native/Sources/MegrumApp/MeguriBoardComposerViews.swift ios-native/Sources/MegrumApp/AddressSettingsScreen.swift ios-native/Sources/MegrumApp/NotificationsScreen.swift ios-native/Sources/MegrumApp/MeguriScreen.swift ios-native/Sources/MegrumApp/OshiSettingsSheetViews.swift ios-native/Sources/MegrumApp/DisputeDetailModels.swift ios-native/Sources/MegrumApp/PaymentSettingsScreen.swift ios-native/Sources/MegrumApp/PreviewMegrumRepository.swift ios-native/Sources/MegrumApp/GroomStoryViews.swift ios-native/Sources/MegrumApp/BoardThreadDetailScreen.swift ios-native/Sources/MegrumApp/MegrumAuthState.swift ios-native/Sources/MegrumApp/SupabasePaymentSettingsClient.swift`
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-nil-if-blank-build --enable-xctest --disable-swift-testing -j 1 --filter 'SettingsScreenTests|NotificationRouteTests|MegrumAppStateTests|OshiSettingsDraftTests|DisputeDetailScreenTests|MeguriFeedStateReducerTests|SupabasePaymentSettingsPersistenceTests|AuthScreenInputTests|AccountSetupScreenTests'`
+- `xcodebuild -quiet -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -configuration Debug -destination 'generic/platform=iOS Simulator' -derivedDataPath /tmp/megrum-native-xcodebuild-nil-if-blank CODE_SIGNING_ALLOWED=NO build`
+
+### セルフレビュー結果
+
+- ✅ `nilIfBlank` 実装が `AppStringExtensions.swift` のみになった。
+- ✅ 対象テスト130件が成功した。
+- ✅ Xcode Debug build が成功した。
+- ✅ API payload、DB schema、画面文言、状態遷移の意味は変更していない。
+- ✅ `notes/09_state_machines.md`、`notes/10_glossary.md`、`notes/05_data_model.md` の更新は不要。
+
+### 関連ファイル
+
+- `ios-native/Sources/MegrumApp/AppStringExtensions.swift`
+- `ios-native/Sources/MegrumApp/AddressSettingsScreen.swift`
+- `ios-native/Sources/MegrumApp/BoardThreadDetailScreen.swift`
+- `ios-native/Sources/MegrumApp/DisputeDetailModels.swift`
+- `ios-native/Sources/MegrumApp/GroomStoryViews.swift`
+- `ios-native/Sources/MegrumApp/MegrumAuthState.swift`
+- `ios-native/Sources/MegrumApp/MeguriBoardComposerViews.swift`
+- `ios-native/Sources/MegrumApp/MeguriScreen.swift`
+- `ios-native/Sources/MegrumApp/NotificationsScreen.swift`
+- `ios-native/Sources/MegrumApp/OshiSettingsSheetViews.swift`
+- `ios-native/Sources/MegrumApp/PaymentSettingsScreen.swift`
+- `ios-native/Sources/MegrumApp/PreviewMegrumRepository.swift`
+- `ios-native/Sources/MegrumApp/SupabasePaymentSettingsClient.swift`
+
+---
+
 ## イテレーション689：設定表示テキストのfallback正規化を共通化
 
 ### 背景・問題意識

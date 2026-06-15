@@ -638,12 +638,6 @@ public final class MegrumAuthState: ObservableObject {
     }
 }
 
-private extension String {
-    var nilIfBlank: String? {
-        isEmpty ? nil : self
-    }
-}
-
 public enum MegrumAuthStateFactory {
     @MainActor
     public static func makeDefault() -> MegrumAuthState {
