@@ -1,5 +1,6 @@
 import Foundation
 import MegrumCore
+import MegrumData
 
 public struct PreviewMegrumRepository: MegrumRepository {
     public init() {}
@@ -890,7 +891,7 @@ public struct PreviewMegrumRepository: MegrumRepository {
     }
 
     public func lookupAddress(postalCode: String) async throws -> PostalCodeAddress? {
-        guard normalizedPostalCode(postalCode) == "1000001" else {
+        guard PostalCodeAddressClient.normalizedPostalCode(postalCode) == "1000001" else {
             return nil
         }
         return PostalCodeAddress(
@@ -956,8 +957,4 @@ private func resolvedAcceptanceExchangeMethod(
         }
         return proposal.exchangeMethod
     }
-}
-
-private func normalizedPostalCode(_ value: String) -> String {
-    String(value.filter(\.isNumber).prefix(7))
 }

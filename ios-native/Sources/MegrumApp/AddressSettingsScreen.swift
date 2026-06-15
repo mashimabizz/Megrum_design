@@ -91,7 +91,7 @@ struct AddressSettingsScreen: View {
                     .keyboardType(.numberPad)
                     #endif
                     .onChange(of: postalCode) { _, value in
-                        let normalized = normalizedPostalCode(value)
+                        let normalized = MegrumAppStateInputNormalizer.postalCode(value)
                         if normalized != value {
                             postalCode = normalized
                         }
@@ -186,7 +186,7 @@ struct AddressSettingsScreen: View {
         MailingAddress(
             userID: appState.viewer?.id ?? NativePreviewData.viewerID,
             recipientName: recipientName.trimmingCharacters(in: .whitespacesAndNewlines),
-            postalCode: normalizedPostalCode(postalCode),
+            postalCode: MegrumAppStateInputNormalizer.postalCode(postalCode),
             prefecture: prefecture.trimmingCharacters(in: .whitespacesAndNewlines),
             city: city.trimmingCharacters(in: .whitespacesAndNewlines),
             line1: line1.trimmingCharacters(in: .whitespacesAndNewlines),
@@ -221,10 +221,6 @@ struct AddressSettingsScreen: View {
         line2 = address.line2 ?? ""
         phoneNumber = address.phoneNumber ?? ""
         lastAppliedPostalCode = address.postalCode
-    }
-
-    private func normalizedPostalCode(_ value: String) -> String {
-        String(value.filter(\.isNumber).prefix(7))
     }
 
     private func schedulePostalCodeLookup(_ value: String) {

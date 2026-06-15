@@ -4,6 +4,53 @@
 
 ---
 
+## イテレーション694：郵便番号正規化をData層へ集約
+
+### 背景・問題意識
+
+継続リファクタリングとして、郵便番号から数字だけを取り出して先頭7桁に丸める処理が、住所設定画面、App入力正規化、Preview repository、ZipCloudクライアントに重複していた。外部住所検索と同じ正規化をApp内でも使うようにして、入力・プレビュー・API境界の意味を揃える。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/MegrumAppStateInputNormalizer.swift`
+- `postalCode(_:)` を `PostalCodeAddressClient.normalizedPostalCode(_:)` へ委譲した。
+
+#### `ios-native/Sources/MegrumApp/AddressSettingsScreen.swift`
+- 画面ローカルの `normalizedPostalCode(_:)` を削除し、郵便番号入力補正と保存draft生成を `MegrumAppStateInputNormalizer.postalCode(_:)` 経由にした。
+
+#### `ios-native/Sources/MegrumApp/PreviewMegrumRepository.swift`
+- Preview用の重複 `normalizedPostalCode(_:)` を削除し、Data層の正規化を使うようにした。
+
+### 影響範囲
+
+- 住所設定画面の郵便番号入力補正
+- 住所保存draftの郵便番号正規化
+- Preview repositoryの郵便番号lookup
+- 数字のみ先頭7桁という既存挙動は維持し、保存payload、DB schema、画面文言、状態遷移の意味は変更なし。
+
+### 確認方法
+
+- `rg -n "private func normalizedPostalCode|String\\(value\\.filter\\(\\\\\\.isNumber\\)\\.prefix\\(7\\)\\)|String\\(.*filter\\(\\\\\\.isNumber\\).*prefix\\(7\\)" ios-native/Sources/MegrumApp ios-native/Sources/MegrumData ios-native/Tests -g '*.swift' || true`
+- `git diff --check -- ios-native/Sources/MegrumApp/MegrumAppStateInputNormalizer.swift ios-native/Sources/MegrumApp/PreviewMegrumRepository.swift ios-native/Sources/MegrumApp/AddressSettingsScreen.swift`
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-postal-normalizer-build --enable-xctest --disable-swift-testing -j 1 --filter 'PostalCodeAddressClientTests|MegrumAppStateInputNormalizerTests|SettingsScreenTests|MegrumAppStateTests'`
+- `xcodebuild -quiet -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -configuration Debug -destination 'generic/platform=iOS Simulator' -derivedDataPath /tmp/megrum-native-xcodebuild-postal-normalizer CODE_SIGNING_ALLOWED=NO build`
+
+### セルフレビュー結果
+
+- ✅ 郵便番号正規化の実装本体が `PostalCodeAddressClient.normalizedPostalCode(_:)` に集約された。
+- ✅ 対象テスト99件が成功した。
+- ✅ Xcode Debug build が成功した。
+- ✅ 住所保存・プレビューlookupの既存仕様は変更していない。
+- ✅ `notes/09_state_machines.md`、`notes/10_glossary.md`、`notes/05_data_model.md` の更新は不要。
+
+### 関連ファイル
+
+- `ios-native/Sources/MegrumApp/MegrumAppStateInputNormalizer.swift`
+- `ios-native/Sources/MegrumApp/AddressSettingsScreen.swift`
+- `ios-native/Sources/MegrumApp/PreviewMegrumRepository.swift`
+
+---
+
 ## イテレーション693：画像content-type正規化をData層で共通化
 
 ### 背景・問題意識

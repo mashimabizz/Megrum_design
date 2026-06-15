@@ -1,4 +1,5 @@
 import Foundation
+import MegrumData
 
 enum MegrumAppStateInputNormalizer {
     static func trimmedText(_ value: String) -> String {
@@ -50,6 +51,6 @@ enum MegrumAppStateInputNormalizer {
     }
 
     static func postalCode(_ value: String) -> String {
-        String(value.filter(\.isNumber).prefix(7))
+        PostalCodeAddressClient.normalizedPostalCode(value)
     }
 }
