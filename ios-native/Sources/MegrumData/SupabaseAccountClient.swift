@@ -59,8 +59,7 @@ public final class SupabaseAccountClient: @unchecked Sendable {
     }
 
     public static func normalizedHandle(_ rawHandle: String?, fallbackUserID: UUID) -> String {
-        let raw = rawHandle?
-            .trimmingCharacters(in: .whitespacesAndNewlines)
+        let raw = SupabaseTextNormalizer.optional(rawHandle)?
             .lowercased()
             .trimmingPrefix("@") ?? ""
         let sanitized = raw.map { character in
@@ -78,11 +77,10 @@ public final class SupabaseAccountClient: @unchecked Sendable {
     }
 
     private static func normalizedDisplayName(_ rawDisplayName: String?, handle: String?, email: String?) -> String {
-        let displayName = rawDisplayName?.trimmingCharacters(in: .whitespacesAndNewlines)
-        if let displayName, !displayName.isEmpty {
+        if let displayName = SupabaseTextNormalizer.optional(rawDisplayName) {
             return displayName
         }
-        let trimmedHandle = handle?.trimmingCharacters(in: .whitespacesAndNewlines).trimmingPrefix("@")
+        let trimmedHandle = SupabaseTextNormalizer.optional(handle)?.trimmingPrefix("@")
         if let trimmedHandle, !trimmedHandle.isEmpty {
             return String(trimmedHandle)
         }

@@ -4,6 +4,42 @@
 
 ---
 
+## イテレーション679：AccountClientのプロフィール文字列正規化をSupabaseTextNormalizerへ集約
+
+### 背景・問題意識
+
+継続リファクタリングとして、ユーザープロフィールupsert時のhandle/displayName正規化に残っていたtrim処理を `SupabaseTextNormalizer` 経由へ寄せる。handleの小文字化、`@` 除去、ASCIIサニタイズ、短すぎる場合のfallback生成は既存挙動のまま維持した。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumData/SupabaseAccountClient.swift`
+- `normalizedHandle(_:)` の空白除去を `SupabaseTextNormalizer.optional(_:)` 経由へ差し替えた。
+- `normalizedDisplayName(_:)` のdisplayName/handle fallback判定を共通Normalizer経由へ差し替えた。
+
+### 影響範囲
+
+- アカウント初期化時の `users` upsert payload生成とfallbackプロフィール生成
+- handleの生成規則、displayName fallback順序、URL/HTTP method、DB schema、UI文言、状態遷移の意味は変更なし。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumData/SupabaseAccountClient.swift ios-native/Tests/MegrumDataTests/SupabaseAccountClientTests.swift ios-native/Tests/MegrumDataTests/SupabaseTextNormalizerTests.swift`
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-account-normalizer-build --enable-xctest --disable-swift-testing -j 1 --filter 'SupabaseTextNormalizerTests|SupabaseAccountClientTests'`
+- `xcodebuild -quiet -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -configuration Debug -destination 'generic/platform=iOS Simulator' -derivedDataPath /tmp/megrum-native-xcodebuild-account-normalizer CODE_SIGNING_ALLOWED=NO build`
+
+### セルフレビュー結果
+
+- ✅ 対象テスト6件が成功した。
+- ✅ Xcode Debug build が成功した。
+- ✅ handle/displayNameの既存fallback挙動を維持した。
+- ✅ `notes/09_state_machines.md`、`notes/10_glossary.md`、`notes/05_data_model.md` の更新は不要。
+
+### 関連ファイル
+
+- `ios-native/Sources/MegrumData/SupabaseAccountClient.swift`
+
+---
+
 ## イテレーション678：GroomClientの文字列正規化をSupabaseTextNormalizerへ集約
 
 ### 背景・問題意識
