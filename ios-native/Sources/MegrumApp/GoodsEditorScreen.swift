@@ -693,7 +693,7 @@ struct GoodsEditorSheet: View {
                 }
             } catch {
                 #if DEBUG
-                print("Face tagging analysis failed: \(error)")
+                MegrumAppLogger.general.debug("Face tagging analysis failed: \(String(describing: error), privacy: .public)")
                 #endif
             }
         }

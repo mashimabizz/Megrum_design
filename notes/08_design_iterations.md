@@ -4,6 +4,55 @@
 
 ---
 
+## イテレーション688：App層の開発ログをLoggerへ統一
+
+### 背景・問題意識
+
+継続リファクタリングとして、App層に残っていた DEBUG 用の `print` ログを標準の `Logger` へ寄せる。ユーザー向けの表示、失敗時fallback、エラー握りつぶし方は変えず、開発時ログの出力経路だけ整理する。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/MegrumAppLogger.swift`
+- MegrumApp用の共通 `Logger` を追加した。
+
+#### `ios-native/Sources/MegrumApp/MegrumAppState.swift`
+- メンバー顔特徴量読み込み失敗時の DEBUG ログを `MegrumAppLogger` 経由へ差し替えた。
+
+#### `ios-native/Sources/MegrumApp/SupabaseInitialSnapshotLoader.swift`
+- 初期snapshotの部分読み込み失敗時の DEBUG ログを `MegrumAppLogger` 経由へ差し替えた。
+
+#### `ios-native/Sources/MegrumApp/GoodsEditorScreen.swift`
+- 顔タグ推定失敗時の DEBUG ログを `MegrumAppLogger` 経由へ差し替えた。
+
+### 影響範囲
+
+- DEBUG ビルド時の開発ログ出力
+- ユーザー向けエラー文言、fallback挙動、顔タグ推定/初期snapshot/メンバー顔特徴量の処理結果、DB schema、API payload、状態遷移の意味は変更なし。
+
+### 確認方法
+
+- `rg -n "print\\(|debugPrint\\(" ios-native/Sources/MegrumApp ios-native/Sources/MegrumData ios-native/Sources/MegrumCore || true`
+- `git diff --check -- ios-native/Sources/MegrumApp/MegrumAppLogger.swift ios-native/Sources/MegrumApp/MegrumAppState.swift ios-native/Sources/MegrumApp/SupabaseInitialSnapshotLoader.swift ios-native/Sources/MegrumApp/GoodsEditorScreen.swift`
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-app-logger-build --enable-xctest --disable-swift-testing -j 1 --filter 'MegrumAppStateTests|SupabaseInitialSnapshotLoaderTests|GoodsEditorDraftTests'`
+- `xcodebuild -quiet -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -configuration Debug -destination 'generic/platform=iOS Simulator' -derivedDataPath /tmp/megrum-native-xcodebuild-app-logger CODE_SIGNING_ALLOWED=NO build`
+
+### セルフレビュー結果
+
+- ✅ App/Data/Coreの `print` / `debugPrint` が残っていないことを確認した。
+- ✅ 対象テスト104件が成功した。
+- ✅ Xcode Debug build が成功した。
+- ✅ 失敗時のfallbackやユーザー向け表示は変更していない。
+- ✅ `notes/09_state_machines.md`、`notes/10_glossary.md`、`notes/05_data_model.md` の更新は不要。
+
+### 関連ファイル
+
+- `ios-native/Sources/MegrumApp/MegrumAppLogger.swift`
+- `ios-native/Sources/MegrumApp/MegrumAppState.swift`
+- `ios-native/Sources/MegrumApp/SupabaseInitialSnapshotLoader.swift`
+- `ios-native/Sources/MegrumApp/GoodsEditorScreen.swift`
+
+---
+
 ## イテレーション687：タグ候補名の正規化を共通化
 
 ### 背景・問題意識

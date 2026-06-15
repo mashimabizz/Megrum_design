@@ -84,7 +84,7 @@ struct SupabaseInitialSnapshotLoader: Sendable {
             return try await operation()
         } catch {
             #if DEBUG
-            print("Megrum initial section failed: \(error)")
+            MegrumAppLogger.general.debug("Megrum initial section failed: \(String(describing: error), privacy: .public)")
             #endif
             return fallback
         }

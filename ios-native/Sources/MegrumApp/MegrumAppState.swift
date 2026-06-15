@@ -690,7 +690,7 @@ public final class MegrumAppState: ObservableObject {
             )
         } catch {
             #if DEBUG
-            print("Member face profiles could not be loaded: \(error)")
+            MegrumAppLogger.general.debug("Member face profiles could not be loaded: \(String(describing: error), privacy: .public)")
             #endif
             return []
         }
