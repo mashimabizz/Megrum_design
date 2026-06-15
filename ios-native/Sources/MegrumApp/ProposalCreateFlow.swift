@@ -12,6 +12,8 @@ struct ProposalCreateFlow: View {
     var receiverGoodsIDs: [UUID]?
     var initialSenderGoodsIDs: [UUID] = []
     var matchType: ProposalMatchType = .perfect
+    var initialExchangeMethod: ExchangeMethod? = nil
+    var initialCashAmount: Int? = nil
     var initialStep: ProposalCreateStep = .give
     var visualQAInitialScreen: VisualQAInitialScreen? = nil
     var onCompletionAction: (ProposalCompletionAction) -> Void = { _ in }
@@ -20,12 +22,12 @@ struct ProposalCreateFlow: View {
     @State private var selectedStep: ProposalCreateStep = .give
     @State private var selectedSenderGoodsIDs: Set<UUID> = []
     @State private var selectedReceiverGoodsIDs: Set<UUID> = []
+    @State private var proposalCashAmount: Int?
     @State private var senderGroupFilterID: UUID?
     @State private var senderGoodsTypeFilterID: UUID?
     @State private var receiverGroupFilterID: UUID?
     @State private var receiverGoodsTypeFilterID: UUID?
     @State private var exchangeMethod: ExchangeMethod = .hand
-    @State private var selectedConditionTags: Set<String> = []
     @State private var shareSchedule = true
     @State private var message = ""
     @State private var meetupStartAt = Date()
@@ -38,6 +40,7 @@ struct ProposalCreateFlow: View {
     @State private var meetupCalendarAnchorDate = Date()
     @State private var meetupPlaceSheetRoute: ProposalMeetupPlaceSheetRoute?
     @State private var submittedSummary: ProposalSubmittedSummary?
+    @State private var didApplyInitialExchangeMethod = false
     @State private var didApplyInitialStep = false
     @State private var didApplyVisualQAState = false
     @State private var showsAddressSettings = false
@@ -83,6 +86,7 @@ struct ProposalCreateFlow: View {
     private var receiverChoiceGoods: [GoodsItem] {
         let loaded = appState.publicTradeGoodsByUserID[targetItem.ownerID] ?? []
         return MatchRelationComposer.deduplicatedGoods([targetItem] + loaded)
+            .filter { $0.marketAvailableQuantity > 0 }
     }
 
     private var filteredSenderGoods: [GoodsItem] {
@@ -139,6 +143,7 @@ struct ProposalCreateFlow: View {
         ProposalCreateConfiguration(
             exchangeMethod: exchangeMethod,
             hasSelectedSenderGoods: !orderedSenderGoodsIDs.isEmpty,
+            hasCashOffer: proposalCashAmount != nil,
             isCreatingProposal: appState.isCreatingProposal,
             hasReadyMailingAddress: appState.mailingAddress?.isReady == true,
             isLoadingMailingAddress: appState.isLoadingMailingAddress,
@@ -146,14 +151,6 @@ struct ProposalCreateFlow: View {
             receiverGoodsCount: resolvedReceiverGoodsIDs.count,
             isListingSource: listingID != nil
         )
-    }
-
-    private var conditionTagOptions: [String] {
-        configuration.conditionTagOptions
-    }
-
-    private var orderedConditionTags: [String] {
-        conditionTagOptions.filter { selectedConditionTags.contains($0) }
     }
 
     private var meetupInput: ProposalMeetupInput? {
@@ -237,7 +234,6 @@ struct ProposalCreateFlow: View {
                     usesInlineBottomBar: usesInlineBottomBar,
                     meetupHasTimeDraft: !displayMeetupCandidateDrafts.isEmpty,
                     isCreating: appState.isCreatingProposal,
-                    displayPartnerHandle: displayPartnerHandle,
                     onBack: handleHeaderLeadingAction,
                     onPrimary: primaryAction,
                     giveContent: {
@@ -395,8 +391,6 @@ struct ProposalCreateFlow: View {
             exchangeMethod: exchangeMethod,
             mailingAddress: appState.mailingAddress,
             isLoadingMailingAddress: appState.isLoadingMailingAddress,
-            conditionTagOptions: conditionTagOptions,
-            selectedConditionTags: $selectedConditionTags,
             meetupInputs: meetupInputsForSubmission,
             message: $message,
             messageLimit: Self.messageLimit,
@@ -440,6 +434,8 @@ struct ProposalCreateFlow: View {
     }
 
     private func prepareInitialProposalState() {
+        applyInitialExchangeMethodIfNeeded()
+        applyInitialCashAmountIfNeeded()
         seedDefaultSenderSelection()
         seedDefaultReceiverSelection()
         normalizeMeetupEnd()
@@ -456,6 +452,7 @@ struct ProposalCreateFlow: View {
         if appState.mailingAddress == nil {
             await appState.loadMailingAddress()
         }
+        applyInitialStepIfNeeded()
     }
 
     private func loadProposalChoiceCatalogsIfNeeded() async {
@@ -478,10 +475,10 @@ struct ProposalCreateFlow: View {
     }
 
     private func handleExchangeMethodChange() {
-        selectedConditionTags = selectedConditionTags.intersection(Set(conditionTagOptions))
         if selectedStep == .meetup && !configuration.requiresMeetupBeforeSubmit {
             selectedStep = .confirm
         }
+        applyInitialStepIfNeeded()
     }
 
     private func enforceMessageLimit(_ newValue: String) {
@@ -531,6 +528,9 @@ struct ProposalCreateFlow: View {
         guard selectedSenderGoodsIDs.isEmpty else {
             return
         }
+        guard proposalCashAmount == nil else {
+            return
+        }
         let availableIDs = Set(selectableSenderGoods.map(\.id))
         let seededIDs = initialSenderGoodsIDs.filter { availableIDs.contains($0) }
         if !seededIDs.isEmpty {
@@ -562,6 +562,27 @@ struct ProposalCreateFlow: View {
         }
     }
 
+    private func applyInitialExchangeMethodIfNeeded() {
+        guard !didApplyInitialExchangeMethod else {
+            return
+        }
+        didApplyInitialExchangeMethod = true
+        guard let initialExchangeMethod else {
+            return
+        }
+        exchangeMethod = initialExchangeMethod
+    }
+
+    private func applyInitialCashAmountIfNeeded() {
+        guard proposalCashAmount == nil,
+              let initialCashAmount,
+              initialCashAmount > 0
+        else {
+            return
+        }
+        proposalCashAmount = initialCashAmount
+    }
+
     private func applyVisualQAStateIfNeeded() {
         guard !didApplyVisualQAState else {
             return
@@ -571,7 +592,6 @@ struct ProposalCreateFlow: View {
             return
         }
         seedVisualQAMeetupCandidateIfNeeded()
-        selectedConditionTags = []
         message = ""
         shareSchedule = true
         selectedStep = .confirm
@@ -582,7 +602,7 @@ struct ProposalCreateFlow: View {
                 partnerHandle: displayPartnerHandle,
                 methodTitle: Self.methodTitle(exchangeMethod),
                 meetupSummary: meetupSummary,
-                conditionTags: orderedConditionTags,
+                conditionTags: [],
                 exchangeMethod: exchangeMethod
             )
         }
@@ -611,15 +631,16 @@ struct ProposalCreateFlow: View {
         guard !didApplyInitialStep else {
             return
         }
-        didApplyInitialStep = true
         guard visibleSteps.contains(initialStep) else {
+            didApplyInitialStep = true
             return
         }
-        if ProposalCreateStep.allCases
+        if visibleSteps
             .prefix(while: { $0 != initialStep })
             .allSatisfy({ configuration.canAdvance(from: $0) })
         {
             selectedStep = initialStep
+            didApplyInitialStep = true
         }
     }
 
@@ -636,14 +657,20 @@ struct ProposalCreateFlow: View {
         meetupCandidateDrafts[selectedMeetupCandidateIndex] = selectedMeetupCandidateDraft
     }
 
-    private func applyMeetupCandidate(_ draft: ProposalMeetupCandidateDraft, at index: Int) {
+    private func applyMeetupCandidate(
+        _ draft: ProposalMeetupCandidateDraft,
+        at index: Int,
+        reanchorCalendar: Bool = true
+    ) {
         selectedMeetupCandidateIndex = index
         meetupStartAt = draft.startAt
         meetupEndAt = draft.endAt
         meetupPlaceName = draft.placeName
         meetupLatitudeText = draft.latitudeText
         meetupLongitudeText = draft.longitudeText
-        meetupCalendarAnchorDate = calendarAnchorDate(for: draft.startAt)
+        if reanchorCalendar {
+            meetupCalendarAnchorDate = calendarAnchorDate(for: draft.startAt)
+        }
         normalizeMeetupEnd()
     }
 
@@ -795,13 +822,14 @@ struct ProposalCreateFlow: View {
             senderGoodsIDs: orderedSenderGoodsIDs,
             receiverGoodsIDs: resolvedReceiverGoodsIDs,
             exchangeMethod: exchangeMethod,
-            conditionTags: orderedConditionTags,
+            conditionTags: [],
             message: message,
             matchType: matchType,
             status: targetStatus,
             meetupCandidates: meetupCandidates,
             exposeCalendar: shareSchedule,
             listingID: listingID,
+            cashAmount: proposalCashAmount,
             senderCount: orderedSenderGoodsIDs.count,
             receiverCount: resolvedReceiverGoodsIDs.count,
             partnerHandle: partnerHandle,
@@ -863,7 +891,7 @@ struct ProposalCreateFlow: View {
         )
         meetupCandidateDrafts[index] = updated
         if index == selectedMeetupCandidateIndex {
-            applyMeetupCandidate(updated, at: index)
+            applyMeetupCandidate(updated, at: index, reanchorCalendar: false)
         }
     }
 

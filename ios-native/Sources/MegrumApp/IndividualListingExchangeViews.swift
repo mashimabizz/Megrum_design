@@ -57,58 +57,62 @@ struct IndividualListingExchangeStep: View {
                 }
             }
 
-            VStack(alignment: .leading, spacing: 14) {
-                Text("2. 現地交換の条件")
-                    .font(.system(size: 18, weight: .black, design: .rounded))
-                    .foregroundStyle(MegrumTheme.ink)
-                VStack(spacing: 0) {
-                    IndividualListingFormValueRow(title: "都道府県", value: localPrefecture, showsChevron: true)
-                    Divider().padding(.leading, 16)
-                    HStack {
-                        Text("場所メモ（任意）")
-                            .font(.system(size: 16, weight: .bold, design: .rounded))
-                            .foregroundStyle(MegrumTheme.ink)
-                        Spacer()
-                        TextField("例：会場周辺、駅周辺なら可", text: $localPlaceMemo)
-                            .font(.system(size: 15, weight: .semibold, design: .rounded))
-                            .multilineTextAlignment(.trailing)
-                            .foregroundStyle(MegrumTheme.ink)
+            if handoffMethod == .local || handoffMethod == .both {
+                VStack(alignment: .leading, spacing: 14) {
+                    Text("2. 現地交換の条件")
+                        .font(.system(size: 18, weight: .black, design: .rounded))
+                        .foregroundStyle(MegrumTheme.ink)
+                    VStack(spacing: 0) {
+                        IndividualListingFormValueRow(title: "都道府県", value: localPrefecture, showsChevron: true)
+                        Divider().padding(.leading, 16)
+                        HStack {
+                            Text("場所メモ（任意）")
+                                .font(.system(size: 16, weight: .bold, design: .rounded))
+                                .foregroundStyle(MegrumTheme.ink)
+                            Spacer()
+                            TextField("例：会場周辺、駅周辺なら可", text: $localPlaceMemo)
+                                .font(.system(size: 15, weight: .semibold, design: .rounded))
+                                .multilineTextAlignment(.trailing)
+                                .foregroundStyle(MegrumTheme.ink)
+                        }
+                        .frame(height: 58)
+                        .padding(.horizontal, 16)
+                        Divider().padding(.leading, 16)
+                        IndividualListingFormValueRow(title: "日程", value: "相談して決める", showsChevron: true)
                     }
-                    .frame(height: 58)
-                    .padding(.horizontal, 16)
-                    Divider().padding(.leading, 16)
-                    IndividualListingFormValueRow(title: "日程", value: "相談して決める", showsChevron: true)
-                }
-                .background(.white.opacity(0.92), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
-                .overlay {
-                    RoundedRectangle(cornerRadius: 18, style: .continuous)
-                        .stroke(MegrumTheme.ink.opacity(0.08), lineWidth: 1)
+                    .background(.white.opacity(0.92), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 18, style: .continuous)
+                            .stroke(MegrumTheme.ink.opacity(0.08), lineWidth: 1)
+                    }
                 }
             }
 
-            VStack(alignment: .leading, spacing: 14) {
-                Text("3. 郵送交換の条件")
-                    .font(.system(size: 18, weight: .black, design: .rounded))
-                    .foregroundStyle(MegrumTheme.ink)
-                VStack(spacing: 18) {
-                    IndividualListingSegmentRow(
-                        title: "送料",
-                        selection: $shippingFee,
-                        values: IndividualListingShippingFeeDraft.allCases
-                    )
-                    Divider()
-                    IndividualListingSegmentRow(
-                        title: "発送目安",
-                        selection: $shippingDays,
-                        values: IndividualListingShippingDaysDraft.allCases
-                    )
-                }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 18)
-                .background(.white.opacity(0.92), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
-                .overlay {
-                    RoundedRectangle(cornerRadius: 18, style: .continuous)
-                        .stroke(MegrumTheme.ink.opacity(0.08), lineWidth: 1)
+            if handoffMethod == .mail || handoffMethod == .both {
+                VStack(alignment: .leading, spacing: 14) {
+                    Text("3. 郵送交換の条件")
+                        .font(.system(size: 18, weight: .black, design: .rounded))
+                        .foregroundStyle(MegrumTheme.ink)
+                    VStack(spacing: 18) {
+                        IndividualListingSegmentRow(
+                            title: "送料",
+                            selection: $shippingFee,
+                            values: IndividualListingShippingFeeDraft.allCases
+                        )
+                        Divider()
+                        IndividualListingSegmentRow(
+                            title: "発送目安",
+                            selection: $shippingDays,
+                            values: IndividualListingShippingDaysDraft.allCases
+                        )
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 18)
+                    .background(.white.opacity(0.92), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 18, style: .continuous)
+                            .stroke(MegrumTheme.ink.opacity(0.08), lineWidth: 1)
+                    }
                 }
             }
 
@@ -137,13 +141,10 @@ struct IndividualListingStepTitle: View {
     var step: IndividualListingEditorStep
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 11) {
+        VStack(alignment: .leading, spacing: 0) {
             Text(step.title)
-                .font(.system(size: step == .exchange ? 30 : 32, weight: .black, design: .rounded))
+                .font(.system(size: step == .exchange ? 27 : 29, weight: .black, design: .rounded))
                 .foregroundStyle(MegrumTheme.ink)
-            Text(step.subtitle)
-                .font(.system(size: 16, weight: .semibold, design: .rounded))
-                .foregroundStyle(MegrumTheme.muted)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }

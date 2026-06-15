@@ -206,8 +206,8 @@ enum ProposalFlowScreenCopy {
         step == .confirm ? "送信確認" : "提示物の選択"
     }
 
-    static func confirmNoticeText(partnerHandle: String) -> String {
-        "@\(partnerHandle) に下記の内容で打診を送ります。"
+    static func showsHeaderKicker(for step: ProposalCreateStep) -> Bool {
+        step != .confirm
     }
 
     static func selectionTabs(from steps: [ProposalCreateStep]) -> [ProposalCreateStep] {
@@ -222,7 +222,6 @@ enum ProposalConfirmSectionCopy {
 enum ProposalConfirmSectionKind: String, CaseIterable, Identifiable, Equatable {
     case exchangeContent
     case method
-    case conditionTags
     case meetupCandidates
     case message
     case scheduleShare
@@ -233,7 +232,6 @@ enum ProposalConfirmSectionKind: String, CaseIterable, Identifiable, Equatable {
         [
             .exchangeContent,
             .method,
-            .conditionTags,
             requiresMeetupBeforeSubmit ? .meetupCandidates : nil,
             .message,
             requiresMeetupBeforeSubmit ? .scheduleShare : nil
@@ -279,6 +277,7 @@ struct ProposalCreateSubmissionDraft: Equatable {
     var meetupCandidates: [ProposalMeetupInput]
     var exposeCalendar: Bool
     var listingID: UUID?
+    var cashAmount: Int? = nil
     var senderCount: Int
     var receiverCount: Int
     var partnerHandle: String
@@ -298,7 +297,9 @@ struct ProposalCreateSubmissionDraft: Equatable {
             meetup: meetupCandidates.first,
             meetupCandidates: meetupCandidates,
             exposeCalendar: exposeCalendar,
-            listingID: listingID
+            listingID: listingID,
+            cashOffer: cashAmount != nil,
+            cashAmount: cashAmount
         )
     }
 
@@ -645,7 +646,7 @@ extension ProposalCreateConfiguration {
     func canAdvance(from step: ProposalCreateStep) -> Bool {
         switch step {
         case .give:
-            hasSelectedSenderGoods
+            hasSelectedSenderGoods || hasCashOffer
         case .receive:
             receiverGoodsCount > 0
         case .meetup:

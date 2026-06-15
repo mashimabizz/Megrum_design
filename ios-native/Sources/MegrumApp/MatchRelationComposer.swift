@@ -73,7 +73,7 @@ enum MatchRelationComposer {
             }
             switch item.status {
             case nil, .active, .reserved:
-                return true
+                return item.marketAvailableQuantity > 0
             case .keep, .traded, .archived:
                 return false
             }

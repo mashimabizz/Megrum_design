@@ -67,6 +67,7 @@ struct HomeSheetSectionTitle: View {
 
 enum HomeMiniCardStyle {
     case condition(String)
+    case conditionTags(HomeConditionTagSet)
     case chips([String])
 }
 
@@ -74,6 +75,7 @@ struct HomeCandidateMiniRail: View {
     var goods: [HomeMockGoods]
     var selectedIndex: Int
     var labels: [String] = []
+    var conditionTagSets: [HomeConditionTagSet] = []
     var cardStyle: HomeMiniCardStyle
 
     var body: some View {
@@ -84,13 +86,307 @@ struct HomeCandidateMiniRail: View {
                         goods: goods,
                         selected: index == selectedIndex,
                         label: labels.indices.contains(index) ? labels[index] : nil,
-                        style: cardStyle
+                        style: conditionTagSets.indices.contains(index) ? .conditionTags(conditionTagSets[index]) : cardStyle
                     )
                     .frame(width: 118, height: 144)
                 }
             }
             .padding(.trailing, 18)
         }
+    }
+}
+
+struct HomeGoodsImagePanelRail: View {
+    var goods: [HomeMockGoods]
+    var selectedIndices: Set<Int>
+    var selectedBannerText: String?
+    var onSelect: (Int) -> Void
+
+    init(
+        goods: [HomeMockGoods],
+        selectedIndices: Set<Int>,
+        selectedBannerText: String? = nil,
+        onSelect: @escaping (Int) -> Void
+    ) {
+        self.goods = goods
+        self.selectedIndices = selectedIndices
+        self.selectedBannerText = selectedBannerText
+        self.onSelect = onSelect
+    }
+
+    var body: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 12) {
+                ForEach(Array(goods.enumerated()), id: \.element.id) { index, goods in
+                    Button {
+                        onSelect(index)
+                    } label: {
+                        HomeImagePanelGoodsCard(
+                            goods: goods,
+                            selected: selectedIndices.contains(index),
+                            selectedBannerText: selectedBannerText
+                        )
+                    }
+                    .buttonStyle(.plain)
+                    .frame(width: 118, height: 144)
+                    .accessibilityLabel(goods.title)
+                    .accessibilityAddTraits(selectedIndices.contains(index) ? [.isSelected] : [])
+                }
+            }
+            .padding(.trailing, 18)
+        }
+    }
+}
+
+struct HomeGoodsImagePanelGrid: View {
+    var goods: [HomeMockGoods]
+    var selectedIndices: Set<Int>
+    var selectedBannerText: String?
+    var onSelect: (Int) -> Void
+
+    private var columns: [GridItem] {
+        [
+            GridItem(.flexible(), spacing: 12),
+            GridItem(.flexible(), spacing: 12)
+        ]
+    }
+
+    init(
+        goods: [HomeMockGoods],
+        selectedIndices: Set<Int>,
+        selectedBannerText: String? = nil,
+        onSelect: @escaping (Int) -> Void
+    ) {
+        self.goods = goods
+        self.selectedIndices = selectedIndices
+        self.selectedBannerText = selectedBannerText
+        self.onSelect = onSelect
+    }
+
+    var body: some View {
+        LazyVGrid(columns: columns, spacing: 12) {
+            ForEach(Array(goods.enumerated()), id: \.element.id) { index, goods in
+                Button {
+                    onSelect(index)
+                } label: {
+                    HomeImagePanelGoodsCard(
+                        goods: goods,
+                        selected: selectedIndices.contains(index),
+                        selectedBannerText: selectedBannerText
+                    )
+                    .aspectRatio(1, contentMode: .fit)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(goods.title)
+                .accessibilityAddTraits(selectedIndices.contains(index) ? [.isSelected] : [])
+            }
+        }
+    }
+}
+
+struct HomeGoodsImagePanelPagedGrid: View {
+    var goods: [HomeMockGoods]
+    var selectedIndices: Set<Int>
+    var selectedBannerText: String?
+    var onSelect: (Int) -> Void
+
+    private let columnsPerPage = 3
+    private let rowsPerPage = 2
+    private let spacing: CGFloat = 10
+
+    init(
+        goods: [HomeMockGoods],
+        selectedIndices: Set<Int>,
+        selectedBannerText: String? = nil,
+        onSelect: @escaping (Int) -> Void
+    ) {
+        self.goods = goods
+        self.selectedIndices = selectedIndices
+        self.selectedBannerText = selectedBannerText
+        self.onSelect = onSelect
+    }
+
+    var body: some View {
+        GeometryReader { proxy in
+            let cellSide = max(88, min(112, (proxy.size.width - spacing * CGFloat(columnsPerPage - 1)) / CGFloat(columnsPerPage)))
+            let columns = Array(
+                repeating: GridItem(.fixed(cellSide), spacing: spacing),
+                count: columnsPerPage
+            )
+
+            ScrollView(.horizontal, showsIndicators: false) {
+                LazyHStack(alignment: .top, spacing: 12) {
+                    ForEach(Array(pages.enumerated()), id: \.offset) { _, page in
+                        LazyVGrid(columns: columns, alignment: .leading, spacing: spacing) {
+                            ForEach(page, id: \.element.id) { index, goods in
+                                Button {
+                                    onSelect(index)
+                                } label: {
+                                    HomeImagePanelGoodsCard(
+                                        goods: goods,
+                                        selected: selectedIndices.contains(index),
+                                        selectedBannerText: selectedBannerText
+                                    )
+                                    .frame(width: cellSide, height: cellSide)
+                                }
+                                .buttonStyle(.plain)
+                                .accessibilityLabel(goods.title)
+                                .accessibilityAddTraits(selectedIndices.contains(index) ? [.isSelected] : [])
+                            }
+                        }
+                        .frame(width: proxy.size.width, alignment: .leading)
+                    }
+                }
+                .padding(.trailing, 18)
+            }
+        }
+        .frame(height: 234)
+    }
+
+    private var pages: [[(offset: Int, element: HomeMockGoods)]] {
+        let pageSize = columnsPerPage * rowsPerPage
+        return Array(goods.enumerated()).chunked(into: pageSize)
+    }
+}
+
+struct HomeListingWantedOptionRail: View {
+    var options: [HomeIndividualListingWantedOption]
+    var selectedIndices: Set<Int>
+    var previewGoodsByOptionID: [UUID: HomeMockGoods]
+    var onSelect: (Int) -> Void
+
+    var body: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 12) {
+                ForEach(Array(options.enumerated()), id: \.element.id) { index, option in
+                    Button {
+                        onSelect(index)
+                    } label: {
+                        HomeListingWantedOptionCard(
+                            option: option,
+                            selected: selectedIndices.contains(index),
+                            previewGoods: previewGoodsByOptionID[option.id]
+                        )
+                    }
+                    .buttonStyle(.plain)
+                    .frame(width: 118, height: 144)
+                    .accessibilityLabel(option.title)
+                    .accessibilityAddTraits(selectedIndices.contains(index) ? [.isSelected] : [])
+                }
+            }
+            .padding(.trailing, 18)
+        }
+    }
+}
+
+private struct HomeListingWantedOptionCard: View {
+    var option: HomeIndividualListingWantedOption
+    var selected: Bool
+    var previewGoods: HomeMockGoods?
+
+    var body: some View {
+        Group {
+            if let previewGoods, option.kind == .goods {
+                HomeImagePanelGoodsCard(
+                    goods: previewGoods,
+                    selected: selected,
+                    selectedBannerText: nil
+                )
+            } else {
+                optionTextCard
+            }
+        }
+    }
+
+    private var optionTextCard: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Image(systemName: symbolName)
+                .font(.system(size: 24, weight: .black))
+                .foregroundStyle(MegrumTheme.lavender)
+                .frame(width: 36, height: 36)
+                .background(MegrumTheme.lavender.opacity(0.13), in: Circle())
+
+            Spacer(minLength: 4)
+
+            Text(option.title)
+                .font(.system(size: 14, weight: .black, design: .rounded))
+                .foregroundStyle(MegrumTheme.ink)
+                .lineLimit(3)
+                .minimumScaleFactor(0.74)
+
+            if let subtitle = option.subtitle {
+                Text(subtitle)
+                    .font(.system(size: 10.5, weight: .bold, design: .rounded))
+                    .foregroundStyle(MegrumTheme.muted)
+                    .lineLimit(2)
+            }
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+        .background(.white.opacity(0.82), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .overlay(alignment: .topLeading) {
+            Image(systemName: selected ? "checkmark.circle.fill" : "circle")
+                .font(.system(size: 22, weight: .black))
+                .foregroundStyle(selected ? MegrumTheme.lavender : MegrumTheme.muted.opacity(0.5))
+                .padding(9)
+        }
+        .overlay {
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .stroke(
+                    selected ? MegrumTheme.lavender : MegrumTheme.ink.opacity(0.08),
+                    lineWidth: selected ? 2.2 : 1
+                )
+        }
+        .shadow(color: .black.opacity(selected ? 0.16 : 0.08), radius: selected ? 12 : 7, y: selected ? 6 : 3)
+    }
+
+    private var symbolName: String {
+        switch option.kind {
+        case .goods:
+            "shippingbox.fill"
+        case .condition:
+            "line.3.horizontal.decrease.circle.fill"
+        case .cash:
+            "yensign.circle.fill"
+        }
+    }
+}
+
+private struct HomeImagePanelGoodsCard: View {
+    var goods: HomeMockGoods
+    var selected: Bool
+    var selectedBannerText: String?
+
+    var body: some View {
+        HomeGoodsArtwork(goods: goods)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .overlay(alignment: .topLeading) {
+                Image(systemName: selected ? "checkmark.circle.fill" : "circle")
+                    .font(.system(size: 22, weight: .black))
+                    .foregroundStyle(selected ? MegrumTheme.lavender : .white.opacity(0.92))
+                    .symbolRenderingMode(.hierarchical)
+                    .padding(9)
+                    .shadow(color: .black.opacity(0.22), radius: 4, y: 2)
+            }
+            .overlay(alignment: .bottom) {
+                if selected, let selectedBannerText {
+                    Text(selectedBannerText)
+                        .font(.system(size: 12.5, weight: .black, design: .rounded))
+                        .foregroundStyle(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 7)
+                        .background(MegrumTheme.lavender.opacity(0.92))
+                }
+            }
+            .overlay {
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .stroke(
+                        selected ? MegrumTheme.lavender : .white.opacity(0.72),
+                        lineWidth: selected ? 2.2 : 1
+                    )
+            }
+            .shadow(color: .black.opacity(selected ? 0.16 : 0.08), radius: selected ? 12 : 7, y: selected ? 6 : 3)
     }
 }
 
@@ -115,6 +411,8 @@ struct HomeSelectableGoodsCard: View {
             switch style {
             case .condition(let title):
                 HomeConditionPill(title: title, color: MegrumTheme.pink, compact: true)
+            case .conditionTags(let tags):
+                HomeMiniConditionTagRows(conditionTags: tags)
             case .chips(let chips):
                 FlexibleChipRows(chips: chips)
             }
@@ -132,6 +430,37 @@ struct HomeSelectableGoodsCard: View {
             RoundedRectangle(cornerRadius: 14, style: .continuous)
                 .stroke(selected ? MegrumTheme.lavender : MegrumTheme.ink.opacity(0.08), lineWidth: selected ? 1.6 : 1)
         }
+    }
+}
+
+private struct HomeMiniConditionTagRows: View {
+    var conditionTags: HomeConditionTagSet
+
+    var body: some View {
+        VStack(spacing: 5) {
+            HStack(spacing: 5) {
+                tag(title: conditionTags.goods.floatingTagTitle, color: conditionTags.goods.accent)
+                tag(title: conditionTags.exchange.floatingTagTitle, color: conditionTags.exchange.accent)
+            }
+            tag(title: conditionTags.payment.floatingTagTitle, color: conditionTags.payment.accent)
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(conditionTags.accessibilityText)
+    }
+
+    private func tag(title: String, color: Color) -> some View {
+        Text(title)
+            .font(.system(size: 9.2, weight: .black, design: .rounded))
+            .foregroundStyle(color)
+            .lineLimit(1)
+            .minimumScaleFactor(0.72)
+            .padding(.horizontal, 5)
+            .padding(.vertical, 3)
+            .background(.white.opacity(0.92), in: Capsule())
+            .overlay {
+                Capsule()
+                    .strokeBorder(color.opacity(0.28), lineWidth: 1)
+            }
     }
 }
 
@@ -186,31 +515,55 @@ struct HomeTinyGoodsThumbnail: View {
 }
 
 struct HomeOtherExchangeRows: View {
+    var addedCandidateIDs: Set<UUID> = []
+    var excludedGoodsIDs: Set<UUID> = []
     var onOpenNestedSheet: (HomeDiscoverySheet) -> Void
 
+    private var listingHitGoods: [HomeMockGoods] {
+        HomeOtherExchangePolicy.visibleGoods(
+            HomeDiscoveryFixtures.otherListingHit,
+            excluding: excludedGoodsIDs
+        )
+    }
+
+    private var wishHitGoods: [HomeMockGoods] {
+        HomeOtherExchangePolicy.visibleGoods(
+            HomeDiscoveryFixtures.otherWishHit,
+            excluding: excludedGoodsIDs
+        )
+    }
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: 14) {
             Text("他にも交換できそうなもの")
                 .font(.system(size: 20, weight: .black, design: .rounded))
                 .foregroundStyle(MegrumTheme.ink)
 
-            VStack(spacing: 0) {
-                row(
-                    title: "個別募集でHit",
-                    color: MegrumTheme.pink,
-                    goods: HomeDiscoveryFixtures.otherListingHit,
-                    sheet: .extraListingHit
-                )
+            VStack(alignment: .leading, spacing: 16) {
+                if !listingHitGoods.isEmpty {
+                    imageSection(
+                        title: "個別募集でHit",
+                        color: MegrumTheme.pink,
+                        goods: listingHitGoods,
+                        kind: .listing
+                    )
+                }
 
-                Divider().opacity(0.45)
+                if !listingHitGoods.isEmpty && !wishHitGoods.isEmpty {
+                    Divider().opacity(0.45)
+                }
 
-                row(
-                    title: "WishでHit",
-                    color: MegrumTheme.sky,
-                    goods: HomeDiscoveryFixtures.otherWishHit,
-                    sheet: .extraWishHit
-                )
+                if !wishHitGoods.isEmpty {
+                    imageSection(
+                        title: "WishでHit",
+                        color: MegrumTheme.sky,
+                        goods: wishHitGoods,
+                        kind: .wish
+                    )
+                }
             }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 14)
             .background(.white.opacity(0.78), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
             .overlay {
                 RoundedRectangle(cornerRadius: 16, style: .continuous)
@@ -219,33 +572,93 @@ struct HomeOtherExchangeRows: View {
         }
     }
 
-    private func row(title: String, color: Color, goods: [HomeMockGoods], sheet: HomeDiscoverySheet) -> some View {
-        Button {
-            onOpenNestedSheet(sheet)
-        } label: {
-            HStack(spacing: 12) {
-                Text(title)
-                    .font(.system(size: 16, weight: .black, design: .rounded))
-                    .foregroundStyle(color)
-                    .frame(width: 118, alignment: .leading)
+    private func imageSection(
+        title: String,
+        color: Color,
+        goods: [HomeMockGoods],
+        kind: HomeExtraHitKind
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 9) {
+            Text(title)
+                .font(.system(size: 14, weight: .black, design: .rounded))
+                .foregroundStyle(color)
 
-                HStack(spacing: 9) {
-                    ForEach(goods.prefix(4)) { item in
-                        HomeTinyGoodsThumbnail(goods: item)
-                            .frame(width: 46, height: 46)
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 10) {
+                    ForEach(Array(goods.enumerated()), id: \.element.id) { index, item in
+                        let payload = payload(kind: kind, goods: item, index: index)
+                        HomeOtherExchangeThumbnailButton(
+                            goods: item,
+                            selected: addedCandidateIDs.contains(item.id)
+                        ) {
+                            onOpenNestedSheet(payload.nestedSheet)
+                        }
                     }
                 }
-
-                Spacer()
-
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 18, weight: .black))
-                    .foregroundStyle(MegrumTheme.lavender)
+                .padding(.vertical, 2)
             }
-            .padding(.horizontal, 14)
-            .padding(.vertical, 13)
+        }
+    }
+
+    private func payload(kind: HomeExtraHitKind, goods: HomeMockGoods, index: Int) -> HomeExtraHitPayload {
+        HomeExtraHitPayload(
+            kind: kind,
+            goods: goods,
+            signals: conditionSignals(kind: kind, index: index)
+        )
+    }
+
+    private func conditionSignals(kind: HomeExtraHitKind, index: Int) -> HomeCandidateConditionSignals {
+        switch kind {
+        case .listing:
+            HomeDiscoveryFixtures.miiListingHitSignals(index: index)
+        case .wish:
+            HomeCandidateConditionSignalDefaults.possible(index: index)
+        }
+    }
+}
+
+enum HomeOtherExchangePolicy {
+    static func visibleGoods(_ goods: [HomeMockGoods], excluding excludedGoodsIDs: Set<UUID>) -> [HomeMockGoods] {
+        guard !excludedGoodsIDs.isEmpty else {
+            return goods
+        }
+        return goods.filter { !excludedGoodsIDs.contains($0.id) }
+    }
+}
+
+private struct HomeOtherExchangeThumbnailButton: View {
+    var goods: HomeMockGoods
+    var selected: Bool
+    var action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            ZStack(alignment: .topLeading) {
+                HomeTinyGoodsThumbnail(goods: goods)
+                    .frame(width: 58, height: 58)
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 13, style: .continuous)
+                            .stroke(
+                                selected ? MegrumTheme.lavender : MegrumTheme.ink.opacity(0.08),
+                                lineWidth: selected ? 3 : 1
+                            )
+                    }
+
+                if selected {
+                    Image(systemName: "checkmark")
+                        .font(.system(size: 13, weight: .black))
+                        .foregroundStyle(.white)
+                        .frame(width: 24, height: 24)
+                        .background(MegrumTheme.lavender, in: Circle())
+                        .offset(x: -5, y: -5)
+                        .shadow(color: .black.opacity(0.10), radius: 5, y: 2)
+                }
+            }
+            .padding(3)
         }
         .buttonStyle(.plain)
+        .accessibilityLabel("\(goods.title)を交換候補として確認")
     }
 }
 

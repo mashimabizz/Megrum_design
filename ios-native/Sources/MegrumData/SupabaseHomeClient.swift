@@ -14,6 +14,7 @@ public enum SupabaseHomeCandidateBucket: String, Codable, Sendable, CaseIterable
 
 public struct SupabaseHomeComposition: Equatable, Sendable {
     public var localMode: SupabaseHomeLocalModeRow?
+    public var viewerUser: SupabaseHomeUserRow?
     public var viewerInventory: [SupabaseHomeGoodsRow]
     public var viewerWishes: [SupabaseHomeGoodsRow]
     public var viewerListings: [SupabaseHomeListingRow]
@@ -29,6 +30,7 @@ public struct SupabaseHomeComposition: Equatable, Sendable {
 
     public init(
         localMode: SupabaseHomeLocalModeRow?,
+        viewerUser: SupabaseHomeUserRow? = nil,
         viewerInventory: [SupabaseHomeGoodsRow],
         viewerWishes: [SupabaseHomeGoodsRow],
         viewerListings: [SupabaseHomeListingRow],
@@ -43,6 +45,7 @@ public struct SupabaseHomeComposition: Equatable, Sendable {
         unreadNotificationIDs: [UUID]
     ) {
         self.localMode = localMode
+        self.viewerUser = viewerUser
         self.viewerInventory = viewerInventory
         self.viewerWishes = viewerWishes
         self.viewerListings = viewerListings
@@ -110,6 +113,8 @@ public struct SupabaseHomeGoodsRow: Decodable, Equatable, Sendable, Identifiable
     public var title: String
     public var photoUrls: [String]
     public var quantity: Int?
+    public var lockedQty: Int?
+    public var marketAvailableQty: Int?
     public var exchangeType: String?
     public var hue: String?
     public var status: String?
@@ -129,6 +134,8 @@ public struct SupabaseHomeGoodsRow: Decodable, Equatable, Sendable, Identifiable
         case title
         case photoUrls
         case quantity
+        case lockedQty
+        case marketAvailableQty
         case exchangeType
         case hue
         case status
@@ -150,6 +157,8 @@ public struct SupabaseHomeGoodsRow: Decodable, Equatable, Sendable, Identifiable
         self.title = try container.decode(String.self, forKey: .title)
         self.photoUrls = try container.decodeIfPresent([String].self, forKey: .photoUrls) ?? []
         self.quantity = try container.decodeIfPresent(Int.self, forKey: .quantity)
+        self.lockedQty = try container.decodeIfPresent(Int.self, forKey: .lockedQty)
+        self.marketAvailableQty = try container.decodeIfPresent(Int.self, forKey: .marketAvailableQty)
         self.exchangeType = try container.decodeIfPresent(String.self, forKey: .exchangeType)
         self.hue = try container.decodeIfPresent(SupabaseHomeFlexibleString.self, forKey: .hue)?.value
         self.status = try container.decodeIfPresent(String.self, forKey: .status)
@@ -166,6 +175,29 @@ public struct SupabaseHomeUserRow: Decodable, Equatable, Sendable, Identifiable 
     public var displayName: String?
     public var primaryArea: String?
     public var avatarUrl: String?
+    public var paymentMethods: [String]
+    public var paymentNote: String?
+
+    enum CodingKeys: CodingKey {
+        case id
+        case handle
+        case displayName
+        case primaryArea
+        case avatarUrl
+        case paymentMethods
+        case paymentNote
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.id = try container.decode(UUID.self, forKey: .id)
+        self.handle = try container.decodeIfPresent(String.self, forKey: .handle)
+        self.displayName = try container.decodeIfPresent(String.self, forKey: .displayName)
+        self.primaryArea = try container.decodeIfPresent(String.self, forKey: .primaryArea)
+        self.avatarUrl = try container.decodeIfPresent(String.self, forKey: .avatarUrl)
+        self.paymentMethods = try container.decodeIfPresent([String].self, forKey: .paymentMethods) ?? []
+        self.paymentNote = try container.decodeIfPresent(String.self, forKey: .paymentNote)
+    }
 }
 
 public struct SupabaseHomeListingRow: Decodable, Equatable, Sendable, Identifiable {
@@ -337,6 +369,11 @@ public final class SupabaseHomeClient: @unchecked Sendable {
             select: SupabaseHomeLocalModeRow.select,
             queryItems: localModeQueryItems(userID: userID)
         )
+        async let viewerUsers: [SupabaseHomeUserRow] = client.fetchRows(
+            from: "users",
+            select: SupabaseHomeUserRow.select,
+            queryItems: viewerUserQueryItems(userID: userID)
+        )
         async let viewerInventory: [SupabaseHomeGoodsRow] = client.fetchRows(
             from: "goods_inventory",
             select: SupabaseHomeGoodsRow.select,
@@ -390,6 +427,7 @@ public final class SupabaseHomeClient: @unchecked Sendable {
 
         let initialRows = try await (
             localModeRows,
+            viewerUsers,
             viewerInventory,
             viewerWishes,
             viewerListings,
@@ -403,26 +441,27 @@ public final class SupabaseHomeClient: @unchecked Sendable {
         )
 
         async let listingWishOptions = loadListingWishOptionsIfNeeded(
-            listingIDs: (initialRows.3 + initialRows.7).map(\.id)
+            listingIDs: (initialRows.4 + initialRows.8).map(\.id)
         )
         async let inventoryTags = loadInventoryTagsIfNeeded(
-            inventoryIDs: (initialRows.1 + initialRows.2 + initialRows.4 + initialRows.5).map(\.id)
+            inventoryIDs: (initialRows.2 + initialRows.3 + initialRows.5 + initialRows.6).map(\.id)
         )
 
         return try await SupabaseHomeComposition(
             localMode: initialRows.0.first,
-            viewerInventory: initialRows.1,
-            viewerWishes: initialRows.2,
-            viewerListings: initialRows.3,
-            partnerInventory: initialRows.4,
-            partnerWishes: initialRows.5,
-            partnerUsers: initialRows.6,
-            partnerListings: initialRows.7,
+            viewerUser: initialRows.1.first,
+            viewerInventory: initialRows.2,
+            viewerWishes: initialRows.3,
+            viewerListings: initialRows.4,
+            partnerInventory: initialRows.5,
+            partnerWishes: initialRows.6,
+            partnerUsers: initialRows.7,
+            partnerListings: initialRows.8,
             listingWishOptions: listingWishOptions,
-            viewerActivityWindows: initialRows.8,
-            partnerActivityWindows: initialRows.9,
+            viewerActivityWindows: initialRows.9,
+            partnerActivityWindows: initialRows.10,
             inventoryTags: inventoryTags,
-            unreadNotificationIDs: initialRows.10.map(\.id)
+            unreadNotificationIDs: initialRows.11.map(\.id)
         )
     }
 
@@ -559,6 +598,13 @@ public final class SupabaseHomeClient: @unchecked Sendable {
         ]
     }
 
+    private func viewerUserQueryItems(userID: UUID) -> [URLQueryItem] {
+        [
+            URLQueryItem(name: "id", value: "eq.\(userID.lowercaseString)"),
+            URLQueryItem(name: "limit", value: "1")
+        ]
+    }
+
     private func viewerTradeGoodsQueryItems(userID: UUID) -> [URLQueryItem] {
         goodsQueryItems(userID: userID, userFilter: "eq", kind: "for_trade", statusFilter: "eq.active")
     }
@@ -681,11 +727,11 @@ extension SupabaseHomeLocalModeRow {
 }
 
 extension SupabaseHomeGoodsRow {
-    static let select = "id,user_id,kind,group_id,character_id,character_request_id,goods_type_id,title,photo_urls,quantity,exchange_type,hue,status,group:groups_master(name),character:characters_master(name),goods_type:goods_types_master(name),updated_at"
+    static let select = "id,user_id,kind,group_id,character_id,character_request_id,goods_type_id,title,photo_urls,quantity,locked_qty,market_available_qty,exchange_type,hue,status,group:groups_master(name),character:characters_master(name),goods_type:goods_types_master(name),updated_at"
 }
 
 extension SupabaseHomeUserRow {
-    static let select = "id,handle,display_name,primary_area,avatar_url"
+    static let select = "id,handle,display_name,primary_area,avatar_url,payment_methods,payment_note"
 }
 
 extension SupabaseHomeListingRow {

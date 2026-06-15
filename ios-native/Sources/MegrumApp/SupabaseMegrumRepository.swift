@@ -2,19 +2,14 @@ import Foundation
 import MegrumCore
 import MegrumData
 
-private enum ProfilePhotoUploadError: Error, Equatable, Sendable {
-    case imageTooLarge
-    case unsupportedImageContentType
-}
-
 public struct SupabaseMegrumRepository: MegrumRepository {
-    private static let chatPhotoBucket = "chat-photos"
-    private static let maxChatPhotoUploadBytes = Int(9.5 * 1_024 * 1_024)
-    private static let profilePhotoBucket = "profile-photos"
-    private static let maxProfilePhotoUploadBytes = 10 * 1_024 * 1_024
     private let client: SupabaseRESTClient
     private let oshiClient: SupabaseOshiClient
+    private let accountProfilePersistence: SupabaseAccountProfilePersistence
+    private let ownedGoodsPersistence: SupabaseOwnedGoodsPersistence
+    private let initialSnapshotLoader: SupabaseInitialSnapshotLoader
     private let goodsInventoryClient: SupabaseGoodsInventoryClient
+    private let goodsEntryPersistence: SupabaseGoodsEntryPersistence
     private let goodsReportClient: SupabaseGoodsReportClient
     private let listingClient: SupabaseListingClient
     private let mailingAddressClient: SupabaseMailingAddressClient
@@ -24,105 +19,83 @@ public struct SupabaseMegrumRepository: MegrumRepository {
     private let proposalClient: SupabaseProposalClient
     private let disputeClient: SupabaseDisputeClient
     private let messageClient: SupabaseMessageClient
-    private let scheduleClient: SupabaseScheduleClient
-    private let activityWindowClient: SupabaseActivityWindowClient
+    private let tradeSchedulePersistence: SupabaseTradeSchedulePersistence
+    private let homeLocalModePersistence: SupabaseHomeLocalModePersistence
     private let groomClient: SupabaseGroomClient
     private let meguriMessageClient: SupabaseMeguriMessageClient
     private let boardClient: SupabaseBoardClient
-    private let userProfileClient: SupabaseUserProfileClient
+    private let publicProfilePersistence: SupabasePublicProfilePersistence
     private let homeClient: SupabaseHomeClient
+    private let paymentSettingsPersistence: SupabasePaymentSettingsPersistence
+    private let faceRecognitionClient: SupabaseFaceRecognitionClient
+    private let chatPhotoStorage: SupabaseChatPhotoStorage
     private let viewerID: UUID
 
     public init(client: SupabaseRESTClient, viewerID: UUID) {
         self.client = client
-        self.oshiClient = SupabaseOshiClient(client: client)
-        self.goodsInventoryClient = SupabaseGoodsInventoryClient(client: client)
+        let oshiClient = SupabaseOshiClient(client: client)
+        self.oshiClient = oshiClient
+        let accountProfilePersistence = SupabaseAccountProfilePersistence(
+            client: client,
+            oshiClient: oshiClient,
+            profilePhotoStorage: SupabaseProfilePhotoStorage(client: client),
+            userID: viewerID
+        )
+        self.accountProfilePersistence = accountProfilePersistence
+        let ownedGoodsPersistence = SupabaseOwnedGoodsPersistence(client: client, userID: viewerID)
+        self.ownedGoodsPersistence = ownedGoodsPersistence
+        let goodsInventoryClient = SupabaseGoodsInventoryClient(client: client)
+        self.goodsInventoryClient = goodsInventoryClient
+        self.goodsEntryPersistence = SupabaseGoodsEntryPersistence(
+            goodsInventoryClient: goodsInventoryClient,
+            userID: viewerID
+        )
         self.goodsReportClient = SupabaseGoodsReportClient(client: client)
-        self.listingClient = SupabaseListingClient(client: client)
+        let listingClient = SupabaseListingClient(client: client)
+        self.listingClient = listingClient
         self.mailingAddressClient = SupabaseMailingAddressClient(client: client)
         self.postalCodeAddressClient = PostalCodeAddressClient()
         self.blockClient = SupabaseBlockClient(client: client)
         self.notificationClient = SupabaseNotificationClient(client: client)
-        self.proposalClient = SupabaseProposalClient(client: client)
+        let proposalClient = SupabaseProposalClient(client: client)
+        self.proposalClient = proposalClient
         self.disputeClient = SupabaseDisputeClient(client: client)
         self.messageClient = SupabaseMessageClient(client: client)
-        self.scheduleClient = SupabaseScheduleClient(client: client)
-        self.activityWindowClient = SupabaseActivityWindowClient(client: client)
-        self.groomClient = SupabaseGroomClient(client: client)
+        self.tradeSchedulePersistence = SupabaseTradeSchedulePersistence(
+            scheduleClient: SupabaseScheduleClient(client: client),
+            userID: viewerID
+        )
+        self.homeLocalModePersistence = SupabaseHomeLocalModePersistence(
+            activityWindowClient: SupabaseActivityWindowClient(client: client),
+            userID: viewerID
+        )
+        let groomClient = SupabaseGroomClient(client: client)
+        self.groomClient = groomClient
         self.meguriMessageClient = SupabaseMeguriMessageClient(client: client)
-        self.boardClient = SupabaseBoardClient(client: client)
-        self.userProfileClient = SupabaseUserProfileClient(client: client)
+        let boardClient = SupabaseBoardClient(client: client)
+        self.boardClient = boardClient
+        self.publicProfilePersistence = SupabasePublicProfilePersistence(
+            userProfileClient: SupabaseUserProfileClient(client: client),
+            oshiClient: oshiClient
+        )
         self.homeClient = SupabaseHomeClient(client: client)
+        self.paymentSettingsPersistence = SupabasePaymentSettingsPersistence(client: client)
+        self.faceRecognitionClient = SupabaseFaceRecognitionClient(client: client)
+        self.chatPhotoStorage = SupabaseChatPhotoStorage(client: client)
         self.viewerID = viewerID
+        self.initialSnapshotLoader = SupabaseInitialSnapshotLoader(
+            accountProfilePersistence: accountProfilePersistence,
+            ownedGoodsPersistence: ownedGoodsPersistence,
+            listingClient: listingClient,
+            proposalClient: proposalClient,
+            groomClient: groomClient,
+            boardClient: boardClient,
+            userID: viewerID
+        )
     }
 
     public func loadInitialSnapshot() async throws -> MegrumAppSnapshot {
-        let viewer = try await loadViewer()
-        async let inventory = bestEffortInitialSection([]) {
-            try await loadGoods(kind: "for_trade")
-        }
-        async let wishes = bestEffortInitialSection([]) {
-            try await loadWishes()
-        }
-        async let listings = bestEffortInitialSection([]) {
-            try await loadIndividualListings()
-        }
-        async let proposals = bestEffortInitialSection([]) {
-            try await loadProposals()
-        }
-        async let grooms = bestEffortInitialSection([]) {
-            try await loadGrooms(latitude: nil, longitude: nil, radiusMeters: 1_000)
-        }
-        async let threads = bestEffortInitialSection([]) {
-            try await loadBoardThreads(
-                latitude: nil,
-                longitude: nil,
-                prefecture: viewer.prefecture,
-                scope: viewer.prefecture == nil ? .nearby3km : .samePrefecture
-            )
-        }
-
-        return MegrumAppSnapshot(
-            viewer: viewer,
-            inventory: await inventory,
-            wishes: await wishes,
-            listings: await listings,
-            proposals: await proposals,
-            grooms: await grooms,
-            threads: await threads
-        )
-    }
-
-    private func bestEffortInitialSection<Value>(
-        _ fallback: Value,
-        operation: () async throws -> Value
-    ) async -> Value {
-        do {
-            return try await operation()
-        } catch {
-            #if DEBUG
-            print("Megrum initial section failed: \(error)")
-            #endif
-            return fallback
-        }
-    }
-
-    private func loadViewer() async throws -> UserProfile {
-        let rows: [UserRow] = try await client.fetchRows(
-            from: "users",
-            select: "id,handle,display_name,avatar_url,gender,primary_area,account_status",
-            queryItems: [
-                URLQueryItem(name: "id", value: "eq.\(viewerID.uuidString.lowercased())"),
-                URLQueryItem(name: "limit", value: "1")
-            ]
-        )
-        return rows.first?.profile ?? UserProfile(
-            id: viewerID,
-            handle: "megrum",
-            displayName: "Megrum",
-            prefecture: nil,
-            accountStatus: .onboarding
-        )
+        try await initialSnapshotLoader.loadSnapshot()
     }
 
     public func loadHomeCandidateSections() async throws -> HomeCandidateSections {
@@ -142,23 +115,16 @@ public struct SupabaseMegrumRepository: MegrumRepository {
         try await oshiClient.loadCharacters(groupID: groupID, limit: limit)
     }
 
+    public func loadMemberFaceProfiles(memberIDs: [UUID], limit: Int) async throws -> [MemberFaceProfile] {
+        try await faceRecognitionClient.loadMemberFaceProfiles(memberIDs: memberIDs, limit: limit)
+    }
+
     public func loadUserOshiSelections() async throws -> [UserOshiSelection] {
         try await oshiClient.loadUserSelections(userID: viewerID)
     }
 
     public func saveUserOshiSelections(_ selections: [AccountSetupOshiInput]) async throws -> [UserOshiSelection] {
-        let rows = selections.map { selection in
-            UserOshiSelection(
-                id: UUID(),
-                userID: viewerID,
-                groupID: selection.groupID,
-                characterID: selection.characterID,
-                kind: selection.kind,
-                priority: selection.priority,
-                oshiRequestID: selection.oshiRequestID,
-                characterRequestID: selection.characterRequestID
-            )
-        }
+        let rows = UserOshiSelectionPersistenceMapper.selections(from: selections, userID: viewerID)
         return try await oshiClient.replaceUserSelections(userID: viewerID, selections: rows)
     }
 
@@ -175,45 +141,11 @@ public struct SupabaseMegrumRepository: MegrumRepository {
     }
 
     public func createGoodsEntry(_ input: GoodsEntryInput) async throws -> GoodsItem {
-        let uploadedPhotoURL = try await uploadGoodsPhotoIfNeeded(
-            input.photoUpload,
-            client: goodsInventoryClient,
-            viewerID: viewerID
-        )
-        return try await goodsInventoryClient.createGoodsEntry(
-            userID: viewerID,
-            input: input,
-            photoURLs: uploadedPhotoURL.map { [$0] } ?? []
-        )
+        try await goodsEntryPersistence.createGoodsEntry(input)
     }
 
     public func updateGoodsEntry(itemID: UUID, kind: GoodsEntryKind, input: GoodsEntryUpdateInput) async throws -> GoodsItem {
-        let status = GoodsInventoryStatus(rawValue: input.status.rawValue) ?? .active
-        let uploadedPhotoURL = try await uploadGoodsPhotoIfNeeded(
-            input.photoUpload,
-            client: goodsInventoryClient,
-            viewerID: viewerID
-        )
-        let photoURLs = uploadedPhotoURL.map { [$0] } ?? input.photoURLs
-        let updated = try await goodsInventoryClient.updateGoodsItem(
-            userID: viewerID,
-            itemID: itemID,
-            input: GoodsInventoryUpdateInput(
-                title: input.title,
-                groupID: input.groupID,
-                characterID: input.memberID,
-                clearsCharacterID: input.clearsMemberID,
-                goodsTypeID: input.goodsTypeID,
-                quantity: input.quantity,
-                status: status,
-                photoURLs: photoURLs,
-                tagNames: input.tagNames
-            )
-        )
-        if let updated {
-            return updated
-        }
-        throw MegrumRepositoryError.unsupportedMutation
+        try await goodsEntryPersistence.updateGoodsEntry(itemID: itemID, input: input)
     }
 
     public func searchGoods(_ input: GoodsSearchInput) async throws -> [GoodsItem] {
@@ -255,6 +187,10 @@ public struct SupabaseMegrumRepository: MegrumRepository {
         )
     }
 
+    public func archiveIndividualListing(listingID: UUID) async throws {
+        try await listingClient.archiveListing(userID: viewerID, listingID: listingID)
+    }
+
     public func loadPublicTradeGoods(userID: UUID, limit: Int) async throws -> [GoodsItem] {
         try await goodsInventoryClient.loadPublicTradeGoods(userID: userID, limit: limit)
     }
@@ -264,11 +200,11 @@ public struct SupabaseMegrumRepository: MegrumRepository {
     }
 
     public func loadPublicUserProfile(userID: UUID) async throws -> PublicUserProfile? {
-        try await userProfileClient.loadProfile(userID: userID)
+        try await publicProfilePersistence.loadProfile(userID: userID)
     }
 
     public func loadUserEvaluations(userID: UUID, limit: Int) async throws -> [UserEvaluation] {
-        try await userProfileClient.loadEvaluations(userID: userID, limit: limit)
+        try await publicProfilePersistence.loadEvaluations(userID: userID, limit: limit)
     }
 
     public func createProposal(_ input: ProposalCreateInput) async throws -> TradeProposal {
@@ -291,6 +227,10 @@ public struct SupabaseMegrumRepository: MegrumRepository {
         try await proposalClient.addEvidencePhoto(userID: viewerID, input: input)
     }
 
+    public func loadTradeEvidencePhotos(proposalID: UUID) async throws -> [TradeEvidencePhoto] {
+        try await proposalClient.loadEvidencePhotos(proposalID: proposalID)
+    }
+
     public func approveTradeEvidence(proposalID: UUID) async throws -> TradeProposal {
         try await proposalClient.approveEvidence(userID: viewerID, proposalID: proposalID)
     }
@@ -307,36 +247,24 @@ public struct SupabaseMegrumRepository: MegrumRepository {
         try await messageClient.loadMessages(proposalID: proposalID, limit: limit)
     }
 
+    public func loadProposalReadState(proposalID: UUID, userID: UUID) async throws -> ProposalReadState? {
+        try await messageClient.loadProposalReadState(proposalID: proposalID, userID: userID)
+    }
+
+    public func markProposalMessagesRead(proposalID: UUID, userID: UUID, lastReadAt: Date) async throws -> ProposalReadState? {
+        try await messageClient.markProposalMessagesRead(
+            proposalID: proposalID,
+            userID: userID,
+            lastReadAt: lastReadAt
+        )
+    }
+
     public func sendMessage(_ input: TradeMessageCreateInput) async throws -> TradeMessage {
         try await messageClient.sendTextMessage(senderID: viewerID, input: input)
     }
 
     public func sendPhotoMessage(_ input: TradePhotoMessageCreateInput) async throws -> TradeMessage {
-        guard [.photo, .outfitPhoto].contains(input.messageType) else {
-            throw SupabaseMessageClientError.invalidPhotoMessageType
-        }
-        guard input.imageData.count <= Self.maxChatPhotoUploadBytes else {
-            throw SupabaseProposalClientError.imageTooLarge
-        }
-
-        let contentType = normalizedChatImageContentType(input.imageContentType)
-        let path = chatPhotoPath(
-            proposalID: input.proposalID,
-            messageType: input.messageType,
-            contentType: contentType
-        )
-        try await client.uploadObject(
-            bucket: Self.chatPhotoBucket,
-            path: path,
-            data: input.imageData,
-            contentType: contentType,
-            upsert: false
-        )
-        let signedURL = try await client.createSignedURL(
-            bucket: Self.chatPhotoBucket,
-            path: path,
-            expiresIn: 60 * 60 * 24 * 365
-        )
+        let signedURL = try await chatPhotoStorage.uploadPhoto(input)
         return try await messageClient.sendPhotoMessage(
             senderID: viewerID,
             proposalID: input.proposalID,
@@ -418,47 +346,26 @@ public struct SupabaseMegrumRepository: MegrumRepository {
     }
 
     public func loadSchedules(for proposal: TradeProposal, startAt: Date, endAt: Date) async throws -> [PersonalSchedule] {
-        guard proposal.isParticipant(viewerID) else {
-            return []
-        }
-        var userIDs = [viewerID]
-        if let partnerID = proposal.partnerID(for: viewerID) {
-            userIDs.append(partnerID)
-        }
-        return try await scheduleClient.loadSchedules(
-            userIDs: userIDs,
-            startAt: startAt,
-            endAt: endAt
-        )
+        try await tradeSchedulePersistence.loadSchedules(for: proposal, startAt: startAt, endAt: endAt)
+    }
+
+    public func loadPersonalSchedules(startAt: Date, endAt: Date) async throws -> [PersonalSchedule] {
+        try await tradeSchedulePersistence.loadPersonalSchedules(startAt: startAt, endAt: endAt)
     }
 
     public func createSchedule(_ input: PersonalScheduleCreateInput) async throws -> PersonalSchedule {
-        try await scheduleClient.createSchedule(userID: viewerID, input: input)
+        try await tradeSchedulePersistence.createSchedule(input)
     }
 
     public func loadHomeLocalModeSettings(now: Date) async throws -> HomeLocalActivitySettings? {
-        async let storedSettings = activityWindowClient.loadLocalModeSettings(userID: viewerID)
-        async let activityWindows = activityWindowClient.loadActivityWindows(userID: viewerID, limit: 50)
-
-        let settings = try await storedSettings
-        let windows = try await activityWindows
-        let selectedWindow = homeLocalModeWindow(from: windows, settings: settings, now: now)
-
-        if settings == nil, selectedWindow == nil {
-            return nil
-        }
-        return homeLocalModeSettings(from: settings, activityWindow: selectedWindow)
+        try await homeLocalModePersistence.loadSettings(now: now)
     }
 
     public func saveHomeLocalModeSettings(
         _ settings: HomeLocalActivitySettings,
         now: Date
     ) async throws -> HomeLocalActivitySettings {
-        let prepared = settings.normalizedForPersistence(now: now)
-        if prepared.isEnabled {
-            return try await saveEnabledHomeLocalModeSettings(prepared, now: now)
-        }
-        return try await saveDisabledHomeLocalModeSettings(prepared, now: now)
+        try await homeLocalModePersistence.saveSettings(settings, now: now)
     }
 
     public func loadGrooms(latitude: Double?, longitude: Double?, radiusMeters: Int) async throws -> [GroomPost] {
@@ -551,6 +458,14 @@ public struct SupabaseMegrumRepository: MegrumRepository {
         try await mailingAddressClient.upsertAddress(address)
     }
 
+    public func loadPaymentSettings() async throws -> UserPaymentSettings? {
+        try await paymentSettingsPersistence.loadSettings(userID: viewerID)
+    }
+
+    public func savePaymentSettings(_ settings: UserPaymentSettings) async throws -> (profile: UserProfile, settings: UserPaymentSettings) {
+        try await paymentSettingsPersistence.saveSettings(settings, userID: viewerID)
+    }
+
     public func lookupAddress(postalCode: String) async throws -> PostalCodeAddress? {
         try await postalCodeAddressClient.lookup(postalCode: postalCode)
     }
@@ -600,509 +515,10 @@ public struct SupabaseMegrumRepository: MegrumRepository {
     }
 
     public func updateOwnProfile(_ input: OwnProfileUpdateInput) async throws -> UserProfile {
-        let uploadedAvatarURL = try await uploadProfilePhotoIfNeeded(input.avatarUpload)
-        let avatarURL = uploadedAvatarURL ?? (input.clearsAvatar ? nil : input.avatarURL)
-        let shouldEncodeAvatarURL = input.avatarUpload != nil || input.clearsAvatar || input.avatarURL != nil
-
-        let rows: [UserRow] = try await client.updateRows(
-            in: "users",
-            values: UserOwnProfileUpdatePayload(
-                handle: input.handle,
-                displayName: input.displayName,
-                avatarUrl: avatarURL,
-                shouldEncodeAvatarUrl: shouldEncodeAvatarURL,
-                gender: input.gender,
-                primaryArea: input.prefecture
-            ),
-            select: "id,handle,display_name,avatar_url,gender,primary_area,account_status",
-            queryItems: [
-                URLQueryItem(name: "id", value: "eq.\(viewerID.uuidString.lowercased())"),
-                URLQueryItem(name: "limit", value: "1")
-            ]
-        )
-        return rows.first?.profile ?? UserProfile(
-            id: viewerID,
-            handle: input.handle,
-            displayName: input.displayName,
-            avatarURL: avatarURL,
-            gender: input.gender,
-            prefecture: input.prefecture,
-            accountStatus: .active
-        )
-    }
-
-    private func uploadProfilePhotoIfNeeded(_ upload: GoodsPhotoUpload?) async throws -> URL? {
-        guard let upload else {
-            return nil
-        }
-        guard upload.data.count <= Self.maxProfilePhotoUploadBytes else {
-            throw ProfilePhotoUploadError.imageTooLarge
-        }
-
-        let contentType = try Self.normalizedProfilePhotoContentType(upload.contentType)
-        let path = Self.profilePhotoPath(userID: viewerID, contentType: contentType)
-        try await client.uploadObject(
-            bucket: Self.profilePhotoBucket,
-            path: path,
-            data: upload.data,
-            contentType: contentType,
-            upsert: false
-        )
-        return try client.publicStorageObjectURL(bucket: Self.profilePhotoBucket, path: path)
-    }
-
-    private static func normalizedProfilePhotoContentType(_ value: String) throws -> String {
-        switch value.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() {
-        case "image/jpeg", "image/jpg":
-            "image/jpeg"
-        case "image/png":
-            "image/png"
-        case "image/webp":
-            "image/webp"
-        case "image/gif":
-            "image/gif"
-        default:
-            throw ProfilePhotoUploadError.unsupportedImageContentType
-        }
-    }
-
-    private static func profilePhotoPath(userID: UUID, contentType: String) -> String {
-        let milliseconds = Int(Date().timeIntervalSince1970 * 1_000)
-        return [
-            userID.uuidString.lowercased(),
-            "\(milliseconds)_\(UUID().uuidString.lowercased()).\(profilePhotoFileExtension(for: contentType))"
-        ].joined(separator: "/")
-    }
-
-    private static func profilePhotoFileExtension(for contentType: String) -> String {
-        switch contentType {
-        case "image/png":
-            "png"
-        case "image/webp":
-            "webp"
-        case "image/gif":
-            "gif"
-        default:
-            "jpg"
-        }
+        try await accountProfilePersistence.updateOwnProfile(input)
     }
 
     public func completeAccountSetup(_ input: AccountSetupInput) async throws -> UserProfile {
-        let selections = input.oshiSelections.map { selection in
-            UserOshiSelection(
-                id: UUID(),
-                userID: viewerID,
-                groupID: selection.groupID,
-                characterID: selection.characterID,
-                kind: selection.kind,
-                priority: selection.priority,
-                oshiRequestID: selection.oshiRequestID,
-                characterRequestID: selection.characterRequestID
-            )
-        }
-        if !selections.isEmpty {
-            _ = try await oshiClient.replaceUserSelections(userID: viewerID, selections: selections)
-        }
-
-        let rows: [UserRow] = try await client.updateRows(
-            in: "users",
-            values: UserProfileUpdatePayload(
-                displayName: input.displayName,
-                primaryArea: input.prefecture,
-                accountStatus: AccountStatus.active.rawValue
-            ),
-            select: "id,handle,display_name,avatar_url,gender,primary_area,account_status",
-            queryItems: [
-                URLQueryItem(name: "id", value: "eq.\(viewerID.uuidString.lowercased())"),
-                URLQueryItem(name: "limit", value: "1")
-            ]
-        )
-        return rows.first?.profile ?? UserProfile(
-            id: viewerID,
-            handle: "megrum",
-            displayName: input.displayName,
-            prefecture: input.prefecture,
-            accountStatus: .active
-        )
+        try await accountProfilePersistence.completeAccountSetup(input)
     }
-
-    private func loadGoods(kind: String) async throws -> [GoodsItem] {
-        let rows: [GoodsInventoryRow] = try await client.fetchRows(
-            from: "goods_inventory",
-            select: "id,user_id,kind,status,group_id,character_id,goods_type_id,title,photo_urls,quantity",
-            queryItems: [
-                URLQueryItem(name: "user_id", value: "eq.\(viewerID.uuidString.lowercased())"),
-                URLQueryItem(name: "kind", value: "eq.\(kind)"),
-                URLQueryItem(name: "status", value: "neq.archived")
-            ]
-        )
-        return rows.compactMap(\.goodsItem)
-    }
-
-    private func loadWishes() async throws -> [WishItem] {
-        let rows: [GoodsInventoryRow] = try await client.fetchRows(
-            from: "goods_inventory",
-            select: "id,user_id,kind,status,group_id,character_id,goods_type_id,title,photo_urls,quantity",
-            queryItems: [
-                URLQueryItem(name: "user_id", value: "eq.\(viewerID.uuidString.lowercased())"),
-                URLQueryItem(name: "kind", value: "eq.wanted"),
-                URLQueryItem(name: "status", value: "neq.archived")
-            ]
-        )
-        return rows.compactMap(\.wishItem)
-    }
-
-    private func loadProposals() async throws -> [TradeProposal] {
-        try await proposalClient.loadProposals(viewerID: viewerID)
-    }
-
-    private func saveEnabledHomeLocalModeSettings(
-        _ settings: HomeLocalActivitySettings,
-        now: Date
-    ) async throws -> HomeLocalActivitySettings {
-        let startAt = settings.startedAt ?? now
-        let endAt = settings.endDate(now: now)
-        let existingActivityWindowID: UUID?
-        if let activityWindowID = settings.activityWindowID {
-            existingActivityWindowID = activityWindowID
-        } else {
-            existingActivityWindowID = try await loadHomeLocalModeSettings(now: now)?.activityWindowID
-        }
-        let activityWindow: SupabaseActivityWindow
-
-        if let existingActivityWindowID,
-           let updated = try await activityWindowClient.updateActivityWindow(
-            userID: viewerID,
-            activityWindowID: existingActivityWindowID,
-            input: SupabaseActivityWindowUpdateInput(
-                venue: settings.normalizedVenue,
-                center: supabaseCoordinate(from: settings.coordinate),
-                clearsCenter: settings.coordinate == nil,
-                radiusMeters: settings.normalizedRadiusMeters,
-                clearsEventName: true,
-                eventless: true,
-                startAt: startAt,
-                endAt: endAt,
-                clearsNote: true,
-                status: .enabled
-            )
-           ) {
-            activityWindow = updated
-        } else {
-            activityWindow = try await activityWindowClient.createActivityWindow(
-                userID: viewerID,
-                input: SupabaseActivityWindowCreateInput(
-                    venue: settings.normalizedVenue,
-                    center: supabaseCoordinate(from: settings.coordinate),
-                    radiusMeters: settings.normalizedRadiusMeters,
-                    eventless: true,
-                    startAt: startAt,
-                    endAt: endAt,
-                    status: .enabled
-                )
-            )
-        }
-
-        _ = try await activityWindowClient.disableOtherEnabledActivityWindows(
-            userID: viewerID,
-            keeping: activityWindow.id
-        )
-        _ = try await activityWindowClient.upsertLocalModeSettings(
-            userID: viewerID,
-            input: SupabaseLocalModeSettingsUpsertInput(
-                enabled: true,
-                activityWindowID: activityWindow.id,
-                radiusMeters: settings.normalizedRadiusMeters,
-                selectedCarryingIDs: sortedUUIDs(settings.selectedCarryingIDs),
-                selectedWishIDs: [],
-                lastLocation: supabaseCoordinate(from: settings.coordinate),
-                clearsLastLocation: settings.coordinate == nil
-            )
-        )
-
-        return homeLocalModeSettings(
-            enabled: true,
-            activityWindowID: activityWindow.id,
-            radiusMeters: settings.normalizedRadiusMeters,
-            selectedCarryingIDs: sortedUUIDs(settings.selectedCarryingIDs),
-            coordinate: activityWindow.center ?? supabaseCoordinate(from: settings.coordinate),
-            activityWindow: activityWindow
-        )
-    }
-
-    private func saveDisabledHomeLocalModeSettings(
-        _ settings: HomeLocalActivitySettings,
-        now: Date
-    ) async throws -> HomeLocalActivitySettings {
-        let existingActivityWindowID: UUID?
-        if let activityWindowID = settings.activityWindowID {
-            existingActivityWindowID = activityWindowID
-        } else {
-            existingActivityWindowID = try await loadHomeLocalModeSettings(now: now)?.activityWindowID
-        }
-        var disabledWindow: SupabaseActivityWindow?
-
-        if let existingActivityWindowID {
-            disabledWindow = try await activityWindowClient.updateActivityWindow(
-                userID: viewerID,
-                activityWindowID: existingActivityWindowID,
-                input: SupabaseActivityWindowUpdateInput(status: .disabled)
-            )
-        }
-
-        _ = try await activityWindowClient.upsertLocalModeSettings(
-            userID: viewerID,
-            input: SupabaseLocalModeSettingsUpsertInput(
-                enabled: false,
-                activityWindowID: existingActivityWindowID,
-                radiusMeters: settings.normalizedRadiusMeters,
-                selectedCarryingIDs: sortedUUIDs(settings.selectedCarryingIDs),
-                selectedWishIDs: [],
-                lastLocation: supabaseCoordinate(from: settings.coordinate),
-                clearsLastLocation: settings.coordinate == nil
-            )
-        )
-
-        if let disabledWindow {
-            return homeLocalModeSettings(
-                enabled: false,
-                activityWindowID: existingActivityWindowID,
-                radiusMeters: settings.normalizedRadiusMeters,
-                selectedCarryingIDs: sortedUUIDs(settings.selectedCarryingIDs),
-                coordinate: disabledWindow.center ?? supabaseCoordinate(from: settings.coordinate),
-                activityWindow: disabledWindow
-            )
-        }
-
-        return HomeLocalActivitySettings(
-            activityWindowID: existingActivityWindowID,
-            isEnabled: false,
-            venue: settings.normalizedVenue,
-            coordinate: settings.coordinate,
-            startedAt: settings.startedAt,
-            durationMinutes: settings.normalizedDurationMinutes,
-            radiusMeters: settings.normalizedRadiusMeters,
-            selectedCarryingIDs: settings.selectedCarryingIDs
-        )
-    }
-
-    private func homeLocalModeWindow(
-        from windows: [SupabaseActivityWindow],
-        settings: SupabaseLocalModeSettings?,
-        now: Date
-    ) -> SupabaseActivityWindow? {
-        if let activityWindowID = settings?.activityWindowID,
-           let window = windows.first(where: { $0.id == activityWindowID }) {
-            return window
-        }
-        return windows
-            .filter { $0.status == .enabled && $0.endAt >= now }
-            .sorted { $0.startAt < $1.startAt }
-            .first
-    }
-
-    private func homeLocalModeSettings(
-        from settings: SupabaseLocalModeSettings?,
-        activityWindow: SupabaseActivityWindow?
-    ) -> HomeLocalActivitySettings {
-        homeLocalModeSettings(
-            enabled: settings?.enabled,
-            activityWindowID: settings?.activityWindowID,
-            radiusMeters: settings?.radiusMeters,
-            selectedCarryingIDs: settings?.selectedCarryingIDs ?? [],
-            coordinate: settings?.lastLocation ?? activityWindow?.center,
-            activityWindow: activityWindow
-        )
-    }
-
-    private func homeLocalModeSettings(
-        enabled: Bool?,
-        activityWindowID: UUID?,
-        radiusMeters: Int?,
-        selectedCarryingIDs: [UUID],
-        coordinate: SupabaseActivityWindowCoordinate? = nil,
-        activityWindow: SupabaseActivityWindow?
-    ) -> HomeLocalActivitySettings {
-        let durationMinutes = activityWindow.map { window in
-            max(30, Int(window.endAt.timeIntervalSince(window.startAt) / 60))
-        } ?? HomeLocalActivitySettings.defaultDurationMinutes
-        let activityWindowIsEnabled = activityWindow?.status == .enabled
-
-        return HomeLocalActivitySettings(
-            activityWindowID: activityWindowID ?? activityWindow?.id,
-            isEnabled: (enabled ?? activityWindowIsEnabled) && activityWindowIsEnabled,
-            venue: activityWindow?.venue ?? "",
-            coordinate: megrumCoordinate(from: coordinate ?? activityWindow?.center),
-            startedAt: activityWindow?.startAt,
-            durationMinutes: HomeLocalActivitySettings.normalizedDurationMinutes(durationMinutes),
-            radiusMeters: HomeLocalActivitySettings.normalizedRadiusMeters(
-                radiusMeters ?? activityWindow?.radiusMeters ?? HomeLocalActivitySettings.defaultRadiusMeters
-            ),
-            selectedCarryingIDs: Set(selectedCarryingIDs)
-        )
-    }
-
-    private func supabaseCoordinate(from coordinate: MegrumLocationCoordinate?) -> SupabaseActivityWindowCoordinate? {
-        guard let coordinate else {
-            return nil
-        }
-        return SupabaseActivityWindowCoordinate(latitude: coordinate.latitude, longitude: coordinate.longitude)
-    }
-
-    private func megrumCoordinate(from coordinate: SupabaseActivityWindowCoordinate?) -> MegrumLocationCoordinate? {
-        guard let coordinate else {
-            return nil
-        }
-        return MegrumLocationCoordinate(latitude: coordinate.latitude, longitude: coordinate.longitude)
-    }
-}
-
-private struct UserRow: Decodable, Sendable {
-    var id: UUID
-    var handle: String?
-    var displayName: String?
-    var avatarUrl: URL?
-    var gender: UserGender?
-    var primaryArea: String?
-    var accountStatus: String?
-
-    var profile: UserProfile {
-        UserProfile(
-            id: id,
-            handle: handle ?? "unknown",
-            displayName: displayName ?? handle ?? "Megrum",
-            avatarURL: avatarUrl,
-            gender: gender,
-            prefecture: primaryArea,
-            accountStatus: AccountStatus(rawValue: accountStatus ?? "") ?? .active
-        )
-    }
-}
-
-private struct UserProfileUpdatePayload: Encodable, Sendable {
-    var displayName: String
-    var primaryArea: String?
-    var accountStatus: String
-}
-
-private struct UserOwnProfileUpdatePayload: Encodable, Sendable {
-    var handle: String
-    var displayName: String
-    var avatarUrl: URL?
-    var shouldEncodeAvatarUrl: Bool
-    var gender: UserGender?
-    var primaryArea: String?
-
-    enum CodingKeys: String, CodingKey {
-        case handle
-        case displayName
-        case avatarUrl
-        case gender
-        case primaryArea
-    }
-
-    func encode(to encoder: Encoder) throws {
-        var container = encoder.container(keyedBy: CodingKeys.self)
-        try container.encode(handle, forKey: .handle)
-        try container.encode(displayName, forKey: .displayName)
-        if shouldEncodeAvatarUrl {
-            if let avatarUrl {
-                try container.encode(avatarUrl, forKey: .avatarUrl)
-            } else {
-                try container.encodeNil(forKey: .avatarUrl)
-            }
-        }
-        try container.encodeIfPresent(gender, forKey: .gender)
-        try container.encodeIfPresent(primaryArea, forKey: .primaryArea)
-    }
-}
-
-private struct GoodsInventoryRow: Decodable, Sendable {
-    var id: UUID
-    var userId: UUID
-    var kind: String?
-    var status: String?
-    var groupId: UUID?
-    var characterId: UUID?
-    var goodsTypeId: UUID?
-    var title: String
-    var photoUrls: [String]?
-    var quantity: Int?
-
-    var goodsItem: GoodsItem {
-        GoodsItem(
-            id: id,
-            ownerID: userId,
-            kind: GoodsEntryKind(inventoryKind: kind),
-            status: status.flatMap(GoodsEntryStatus.init(rawValue:)),
-            groupID: groupId,
-            memberID: characterId,
-            goodsTypeID: goodsTypeId,
-            title: title,
-            imageURL: photoUrls?.compactMap(URL.init(string:)).first,
-            tags: [],
-            quantity: quantity ?? 1
-        )
-    }
-
-    var wishItem: WishItem {
-        WishItem(
-            id: id,
-            ownerID: userId,
-            groupID: groupId,
-            memberID: characterId,
-            goodsTypeID: goodsTypeId,
-            title: title,
-            imageURL: photoUrls?.compactMap(URL.init(string:)).first,
-            tags: [],
-            quantity: quantity ?? 1
-        )
-    }
-}
-
-private func normalizedChatImageContentType(_ value: String) -> String {
-    switch value.lowercased() {
-    case "image/png":
-        "image/png"
-    case "image/webp":
-        "image/webp"
-    default:
-        "image/jpeg"
-    }
-}
-
-private func uploadGoodsPhotoIfNeeded(
-    _ upload: GoodsPhotoUpload?,
-    client: SupabaseGoodsInventoryClient,
-    viewerID: UUID
-) async throws -> String? {
-    guard let upload else {
-        return nil
-    }
-    return try await client.uploadGoodsPhoto(
-        userID: viewerID,
-        imageData: upload.data,
-        contentType: upload.contentType
-    )
-}
-
-private func chatImageFileExtension(for contentType: String) -> String {
-    switch normalizedChatImageContentType(contentType) {
-    case "image/png":
-        "png"
-    case "image/webp":
-        "webp"
-    default:
-        "jpg"
-    }
-}
-
-private func chatPhotoPath(proposalID: UUID, messageType: TradeMessageType, contentType: String) -> String {
-    let milliseconds = Int(Date().timeIntervalSince1970 * 1_000)
-    let prefix = messageType == .outfitPhoto ? "outfit" : "photo"
-    return "\(proposalID.uuidString.lowercased())/\(prefix)-\(milliseconds)-\(UUID().uuidString.lowercased()).\(chatImageFileExtension(for: contentType))"
-}
-
-private func sortedUUIDs(_ ids: Set<UUID>) -> [UUID] {
-    ids.sorted { $0.uuidString < $1.uuidString }
 }

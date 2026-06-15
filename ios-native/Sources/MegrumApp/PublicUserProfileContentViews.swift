@@ -8,9 +8,17 @@ struct PublicUserProfileContent: View {
     var bio: String
     var ratingText: String
     var chips: [String]
+    var oshiTags: [ProfileVisualTagItem]
     var gridItems: [ProfileVisualGridItem]
+    var listings: [IndividualListing]
+    var listingGoodsByID: [UUID: GoodsItem]
+    var listingWishByID: [UUID: WishItem]
+    var groups: [OshiGroup]
+    var characters: [OshiCharacter]
+    var goodsTypes: [GoodsType]
     var onPrimaryAction: () -> Void
     var onSelectGridItem: (ProfileVisualGridItem) -> Void
+    var onSelectListing: (UUID) -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
@@ -23,6 +31,9 @@ struct PublicUserProfileContent: View {
                     tradeCount: "\(publicProfile.completedTradeCount)",
                     ratingText: ratingText,
                     chips: chips,
+                    tagItems: oshiTags,
+                    tagSize: .compact,
+                    avatarSize: 64,
                     actionTitle: "打診する",
                     isPrimaryAction: true,
                     onAction: onPrimaryAction
@@ -30,10 +41,23 @@ struct PublicUserProfileContent: View {
 
                 ProfileVisualTabs(selection: $selectedVisualTab)
 
-                ProfileVisualGrid(
-                    items: gridItems,
-                    onSelect: onSelectGridItem
-                )
+                switch selectedVisualTab {
+                case .listings:
+                    PublicProfileListingsList(
+                        listings: listings,
+                        inventoryByID: listingGoodsByID,
+                        wishByID: listingWishByID,
+                        groups: groups,
+                        characters: characters,
+                        goodsTypes: goodsTypes,
+                        onSelect: onSelectListing
+                    )
+                case .goods, .wish:
+                    ProfileVisualGrid(
+                        items: gridItems,
+                        onSelect: onSelectGridItem
+                    )
+                }
             } else {
                 PublicProfileSkeleton()
             }
@@ -61,5 +85,53 @@ private struct PublicProfileSkeleton: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 30, style: .continuous))
         .redacted(reason: .placeholder)
+    }
+}
+
+private struct PublicProfileListingsList: View {
+    var listings: [IndividualListing]
+    var inventoryByID: [UUID: GoodsItem]
+    var wishByID: [UUID: WishItem]
+    var groups: [OshiGroup]
+    var characters: [OshiCharacter]
+    var goodsTypes: [GoodsType]
+    var onSelect: (UUID) -> Void
+
+    var body: some View {
+        if listings.isEmpty {
+            ContentUnavailableView(
+                "個別募集はまだありません",
+                systemImage: "rectangle.stack.badge.plus",
+                description: Text("登録された個別募集がここに表示されます")
+            )
+            .frame(maxWidth: .infinity)
+            .padding(.top, 42)
+        } else {
+            VStack(spacing: 18) {
+                ForEach(Array(listings.enumerated()), id: \.element.id) { index, listing in
+                    Button {
+                        onSelect(listing.id)
+                    } label: {
+                        IndividualListingDesignCard(
+                            listing: listing,
+                            listingIndex: index,
+                            listingCount: listings.count,
+                            inventoryByID: inventoryByID,
+                            wishByID: wishByID,
+                            groups: groups,
+                            characters: characters,
+                            goodsTypes: goodsTypes,
+                            canEdit: false,
+                            onEdit: {},
+                            onAddCondition: {},
+                            onDelete: {}
+                        )
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("個別募集 交換条件 \(index + 1)を開く")
+                }
+            }
+        }
     }
 }

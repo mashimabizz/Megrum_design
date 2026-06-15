@@ -34,6 +34,20 @@ struct ProfileVisualGridItem: Identifiable, Hashable {
     }
 }
 
+struct ProfileVisualTagItem: Identifiable, Hashable {
+    var title: String
+    var colorKey: String
+
+    var id: String {
+        "\(colorKey):\(title)"
+    }
+}
+
+enum ProfileVisualTagSize {
+    case regular
+    case compact
+}
+
 struct ProfileVisualHero: View {
     var displayName: String
     var handle: String
@@ -42,6 +56,9 @@ struct ProfileVisualHero: View {
     var tradeCount: String
     var ratingText: String
     var chips: [String]
+    var tagItems: [ProfileVisualTagItem] = []
+    var tagSize: ProfileVisualTagSize = .regular
+    var avatarSize: CGFloat = 116
     var actionTitle: String
     var isPrimaryAction: Bool = false
     var onAction: () -> Void
@@ -49,7 +66,7 @@ struct ProfileVisualHero: View {
     var body: some View {
         VStack(spacing: 22) {
             HStack(alignment: .top, spacing: 22) {
-                ProfileVisualAvatar(url: avatarURL, fallback: displayName, size: 116)
+                ProfileVisualAvatar(url: avatarURL, fallback: displayName, size: avatarSize)
 
                 VStack(alignment: .leading, spacing: 9) {
                     Text(displayName)
@@ -79,19 +96,15 @@ struct ProfileVisualHero: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
 
-            if !chips.isEmpty {
+            if !resolvedTags.isEmpty {
                 ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 12) {
-                        ForEach(Array(chips.prefix(5).enumerated()), id: \.offset) { index, chip in
-                            Text(chip)
-                                .font(.system(size: 15, weight: .semibold, design: .rounded))
-                                .foregroundStyle(chipColor(index))
-                                .padding(.horizontal, 18)
-                                .frame(height: 44)
-                                .background(chipColor(index).opacity(0.14), in: Capsule())
-                                .overlay {
-                                    Capsule().stroke(chipColor(index).opacity(0.20), lineWidth: 1)
-                                }
+                    HStack(spacing: tagSpacing) {
+                        ForEach(Array(resolvedTags.prefix(8).enumerated()), id: \.offset) { index, tag in
+                            ProfileVisualTagChip(
+                                title: tag.title,
+                                color: chipColor(for: tag, index: index),
+                                size: tagSize
+                            )
                         }
                     }
                 }
@@ -116,14 +129,80 @@ struct ProfileVisualHero: View {
         }
     }
 
-    private func chipColor(_ index: Int) -> Color {
-        switch index % 3 {
-        case 0:
-            MegrumTheme.lavender
-        case 1:
-            MegrumTheme.sky
-        default:
-            MegrumTheme.pink
+    private var resolvedTags: [ProfileVisualTagItem] {
+        if !tagItems.isEmpty {
+            return tagItems
+        }
+        return chips.map { ProfileVisualTagItem(title: $0, colorKey: $0) }
+    }
+
+    private var tagSpacing: CGFloat {
+        switch tagSize {
+        case .regular:
+            12
+        case .compact:
+            7
+        }
+    }
+
+    private func chipColor(for tag: ProfileVisualTagItem, index: Int) -> Color {
+        let palette = [
+            MegrumTheme.lavender,
+            MegrumTheme.sky,
+            MegrumTheme.pink,
+            Color(red: 0.95, green: 0.55, blue: 0.28),
+            Color(red: 0.35, green: 0.70, blue: 0.48)
+        ]
+        let colorIndex = tag.colorKey.unicodeScalars.reduce(index) { partial, scalar in
+            partial + Int(scalar.value)
+        }
+        return palette[colorIndex % palette.count]
+    }
+}
+
+private struct ProfileVisualTagChip: View {
+    var title: String
+    var color: Color
+    var size: ProfileVisualTagSize
+
+    var body: some View {
+        Text(title)
+            .font(.system(size: fontSize, weight: .bold, design: .rounded))
+            .foregroundStyle(color)
+            .lineLimit(1)
+            .minimumScaleFactor(0.78)
+            .padding(.horizontal, horizontalPadding)
+            .frame(height: height)
+            .background(color.opacity(0.13), in: Capsule())
+            .overlay {
+                Capsule().stroke(color.opacity(0.19), lineWidth: 1)
+            }
+    }
+
+    private var fontSize: CGFloat {
+        switch size {
+        case .regular:
+            15
+        case .compact:
+            12.5
+        }
+    }
+
+    private var horizontalPadding: CGFloat {
+        switch size {
+        case .regular:
+            18
+        case .compact:
+            10
+        }
+    }
+
+    private var height: CGFloat {
+        switch size {
+        case .regular:
+            44
+        case .compact:
+            30
         }
     }
 }

@@ -131,7 +131,8 @@ public final class SupabaseDisputeClient: @unchecked Sendable {
         guard let respondentID = proposal.partnerID(for: userID) else {
             throw SupabaseDisputeClientError.missingRespondent
         }
-        guard !input.factMemo.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+        let factMemo = SupabaseTextNormalizer.trimmed(input.factMemo)
+        guard !factMemo.isEmpty else {
             throw SupabaseDisputeClientError.emptyFactMemo
         }
 
@@ -144,7 +145,7 @@ public final class SupabaseDisputeClient: @unchecked Sendable {
                     reporterID: userID,
                     respondentID: respondentID,
                     category: input.category.rawValue,
-                    factMemo: input.factMemo.trimmingCharacters(in: .whitespacesAndNewlines),
+                    factMemo: factMemo,
                     evidencePhotoUrls: [],
                     ticketNo: ticketNo
                 )
@@ -186,7 +187,7 @@ public final class SupabaseDisputeClient: @unchecked Sendable {
         try validateReply(input)
         let rows: [DisputeDetailRow] = try await client.updateRows(
             in: "disputes",
-            values: DisputeRespondentReplyPayload(input: input, respondedAt: isoTimestamp(respondedAt)),
+            values: DisputeRespondentReplyPayload(input: input, respondedAt: SupabaseDateEncoding.isoTimestamp(respondedAt)),
             select: DisputeDetailRow.select,
             queryItems: respondentReplyQueryItems(ticketID: input.disputeID, respondentID: input.senderID)
         )
@@ -201,7 +202,7 @@ public final class SupabaseDisputeClient: @unchecked Sendable {
     ) async throws -> SupabaseDisputeDetail? {
         let rows: [DisputeDetailRow] = try await client.updateRows(
             in: "disputes",
-            values: DisputeWithdrawPayload(closedAt: isoTimestamp(closedAt)),
+            values: DisputeWithdrawPayload(closedAt: SupabaseDateEncoding.isoTimestamp(closedAt)),
             select: DisputeDetailRow.select,
             queryItems: withdrawQueryItems(ticketID: ticketID, reporterID: reporterID)
         )
@@ -238,7 +239,8 @@ public final class SupabaseDisputeClient: @unchecked Sendable {
         guard let respondentID = proposal.partnerID(for: userID) else {
             throw SupabaseDisputeClientError.missingRespondent
         }
-        guard !input.factMemo.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+        let factMemo = SupabaseTextNormalizer.trimmed(input.factMemo)
+        guard !factMemo.isEmpty else {
             throw SupabaseDisputeClientError.emptyFactMemo
         }
         return try client.makeInsertRequest(
@@ -249,7 +251,7 @@ public final class SupabaseDisputeClient: @unchecked Sendable {
                     reporterID: userID,
                     respondentID: respondentID,
                     category: input.category.rawValue,
-                    factMemo: input.factMemo.trimmingCharacters(in: .whitespacesAndNewlines),
+                    factMemo: factMemo,
                     evidencePhotoUrls: [],
                     ticketNo: ticketNo
                 )
@@ -278,7 +280,7 @@ public final class SupabaseDisputeClient: @unchecked Sendable {
                 URLQueryItem(name: "select", value: DisputeDetailRow.select)
             ] + respondentReplyQueryItems(ticketID: input.disputeID, respondentID: input.senderID),
             method: "PATCH",
-            body: encoder.encode(DisputeRespondentReplyPayload(input: input, respondedAt: isoTimestamp(respondedAt))),
+            body: encoder.encode(DisputeRespondentReplyPayload(input: input, respondedAt: SupabaseDateEncoding.isoTimestamp(respondedAt))),
             prefer: "return=representation"
         )
     }
@@ -294,7 +296,7 @@ public final class SupabaseDisputeClient: @unchecked Sendable {
                 URLQueryItem(name: "select", value: DisputeDetailRow.select)
             ] + withdrawQueryItems(ticketID: ticketID, reporterID: reporterID),
             method: "PATCH",
-            body: encoder.encode(DisputeWithdrawPayload(closedAt: isoTimestamp(closedAt))),
+            body: encoder.encode(DisputeWithdrawPayload(closedAt: SupabaseDateEncoding.isoTimestamp(closedAt))),
             prefer: "return=representation"
         )
     }
@@ -331,7 +333,7 @@ public final class SupabaseDisputeClient: @unchecked Sendable {
     }
 
     private func validateReply(_ input: SupabaseDisputeReplyCreateInput) throws {
-        let body = input.body.trimmingCharacters(in: .whitespacesAndNewlines)
+        let body = SupabaseTextNormalizer.trimmed(input.body)
         guard !body.isEmpty else {
             throw SupabaseDisputeClientError.emptyReplyBody
         }
@@ -498,10 +500,8 @@ private struct DisputeReplyInsertPayload: Encodable, Sendable {
         self.disputeID = input.disputeID
         self.senderID = input.senderID
         self.senderRole = input.senderRole.rawValue
-        self.body = input.body.trimmingCharacters(in: .whitespacesAndNewlines)
-        self.photoUrls = input.photoURLs
-            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
-            .filter { !$0.isEmpty }
+        self.body = SupabaseTextNormalizer.trimmed(input.body)
+        self.photoUrls = SupabaseTextNormalizer.nonEmptyValues(input.photoURLs)
     }
 }
 
@@ -513,10 +513,8 @@ private struct DisputeRespondentReplyPayload: Encodable, Sendable {
     var status = "arbitrating"
 
     init(input: SupabaseDisputeReplyCreateInput, respondedAt: String) {
-        self.respondentResponseText = input.body.trimmingCharacters(in: .whitespacesAndNewlines)
-        self.respondentEvidenceUrls = input.photoURLs
-            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
-            .filter { !$0.isEmpty }
+        self.respondentResponseText = SupabaseTextNormalizer.trimmed(input.body)
+        self.respondentEvidenceUrls = SupabaseTextNormalizer.nonEmptyValues(input.photoURLs)
         self.respondentRespondedAt = respondedAt
     }
 }
@@ -579,10 +577,4 @@ private struct SystemMessagePayload: Encodable, Sendable {
 
 private struct SystemMessageAckRow: Decodable, Sendable {
     var id: UUID
-}
-
-private func isoTimestamp(_ date: Date) -> String {
-    let formatter = ISO8601DateFormatter()
-    formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-    return formatter.string(from: date)
 }

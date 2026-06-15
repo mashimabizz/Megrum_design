@@ -98,6 +98,49 @@ public final class SupabaseMessageClient: @unchecked Sendable {
         return rows.compactMap(\.message)
     }
 
+    public func loadProposalReadState(proposalID: UUID, userID: UUID) async throws -> ProposalReadState? {
+        do {
+            let rows: [ProposalReadStateRow] = try await client.fetchRows(
+                from: "proposal_read_states",
+                select: ProposalReadStateRow.select,
+                queryItems: [
+                    URLQueryItem(name: "proposal_id", value: "eq.\(proposalID.uuidString.lowercased())"),
+                    URLQueryItem(name: "user_id", value: "eq.\(userID.uuidString.lowercased())"),
+                    URLQueryItem(name: "limit", value: "1")
+                ]
+            )
+            return rows.first?.readState
+        } catch let error as SupabaseRESTError where Self.isOptionalReadStateError(error) {
+            return nil
+        }
+    }
+
+    public func markProposalMessagesRead(
+        proposalID: UUID,
+        userID: UUID,
+        lastReadAt: Date,
+        updatedAt: Date = .now
+    ) async throws -> ProposalReadState? {
+        do {
+            let rows: [ProposalReadStateRow] = try await client.upsertRows(
+                into: "proposal_read_states",
+                values: [
+                    ProposalReadStateUpsertPayload(
+                        proposalID: proposalID,
+                        userID: userID,
+                        lastReadAt: lastReadAt,
+                        updatedAt: updatedAt
+                    )
+                ],
+                select: ProposalReadStateRow.select,
+                onConflict: "proposal_id,user_id"
+            )
+            return rows.first?.readState
+        } catch let error as SupabaseRESTError where Self.isOptionalReadStateError(error) {
+            return nil
+        }
+    }
+
     public func sendTextMessage(senderID: UUID, input: TradeMessageCreateInput) async throws -> TradeMessage {
         try await sendMessage(
             senderID: senderID,
@@ -154,15 +197,15 @@ public final class SupabaseMessageClient: @unchecked Sendable {
         body: String? = nil
     ) async throws -> TradeMessage {
         try validateLocation(latitude: latitude, longitude: longitude)
-        let normalizedLabel = label.trimmingCharacters(in: .whitespacesAndNewlines)
+        let normalizedLabel = SupabaseTextNormalizer.trimmed(label)
         return try await sendMessage(
             senderID: senderID,
             proposalID: proposalID,
             messageType: .location,
-            body: body?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty ?? normalizedLabel.nilIfEmpty,
+            body: SupabaseTextNormalizer.optional(body) ?? SupabaseTextNormalizer.optional(normalizedLabel),
             locationLatitude: latitude,
             locationLongitude: longitude,
-            locationLabel: normalizedLabel.nilIfEmpty
+            locationLabel: SupabaseTextNormalizer.optional(normalizedLabel)
         )
     }
 
@@ -255,7 +298,7 @@ public final class SupabaseMessageClient: @unchecked Sendable {
             senderID: senderID,
             proposalID: proposalID,
             messageType: .arrivalStatus,
-            body: body?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty ?? status.defaultBody,
+            body: SupabaseTextNormalizer.optional(body) ?? status.defaultBody,
             meta: ["status": status.rawValue]
         )
     }
@@ -331,6 +374,38 @@ public final class SupabaseMessageClient: @unchecked Sendable {
         )
     }
 
+    public func makeLoadProposalReadStateRequest(proposalID: UUID, userID: UUID) throws -> URLRequest {
+        try client.makeRequest(
+            path: "/rest/v1/proposal_read_states",
+            queryItems: [
+                URLQueryItem(name: "select", value: ProposalReadStateRow.select),
+                URLQueryItem(name: "proposal_id", value: "eq.\(proposalID.uuidString.lowercased())"),
+                URLQueryItem(name: "user_id", value: "eq.\(userID.uuidString.lowercased())"),
+                URLQueryItem(name: "limit", value: "1")
+            ]
+        )
+    }
+
+    public func makeMarkProposalMessagesReadRequest(
+        proposalID: UUID,
+        userID: UUID,
+        lastReadAt: Date,
+        updatedAt: Date = .now
+    ) throws -> URLRequest {
+        let payload = ProposalReadStateUpsertPayload(
+            proposalID: proposalID,
+            userID: userID,
+            lastReadAt: lastReadAt,
+            updatedAt: updatedAt
+        )
+        return try client.makeUpsertRequest(
+            into: "proposal_read_states",
+            values: [payload],
+            select: ProposalReadStateRow.select,
+            onConflict: "proposal_id,user_id"
+        )
+    }
+
     public func makeSendTextMessageRequest(senderID: UUID, input: TradeMessageCreateInput) throws -> URLRequest {
         try makeSendMessageRequest(
             senderID: senderID,
@@ -387,15 +462,15 @@ public final class SupabaseMessageClient: @unchecked Sendable {
         body: String? = nil
     ) throws -> URLRequest {
         try validateLocation(latitude: latitude, longitude: longitude)
-        let normalizedLabel = label.trimmingCharacters(in: .whitespacesAndNewlines)
+        let normalizedLabel = SupabaseTextNormalizer.trimmed(label)
         return try makeSendMessageRequest(
             senderID: senderID,
             proposalID: proposalID,
             messageType: .location,
-            body: body?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty ?? normalizedLabel.nilIfEmpty,
+            body: SupabaseTextNormalizer.optional(body) ?? SupabaseTextNormalizer.optional(normalizedLabel),
             locationLatitude: latitude,
             locationLongitude: longitude,
-            locationLabel: normalizedLabel.nilIfEmpty
+            locationLabel: SupabaseTextNormalizer.optional(normalizedLabel)
         )
     }
 
@@ -488,7 +563,7 @@ public final class SupabaseMessageClient: @unchecked Sendable {
             senderID: senderID,
             proposalID: proposalID,
             messageType: .arrivalStatus,
-            body: body?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty ?? status.defaultBody,
+            body: SupabaseTextNormalizer.optional(body) ?? status.defaultBody,
             meta: ["status": status.rawValue]
         )
     }
@@ -585,7 +660,7 @@ public final class SupabaseMessageClient: @unchecked Sendable {
         note: String?
     ) throws -> MessageCreatePayload {
         let normalizedReason = try requiredText(reason)
-        let normalizedNote = note?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
+        let normalizedNote = SupabaseTextNormalizer.optional(note)
         let body = "\(lateMinutes.label)遅れる旨が通知されました\n理由：\(normalizedReason)\(normalizedNote.map { "\n\($0)" } ?? "")"
         return MessageCreatePayload(
             proposalID: proposalID,
@@ -609,7 +684,7 @@ public final class SupabaseMessageClient: @unchecked Sendable {
         note: String?
     ) throws -> MessageCreatePayload {
         let normalizedReason = try requiredText(reason)
-        let normalizedNote = note?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
+        let normalizedNote = SupabaseTextNormalizer.optional(note)
         let body = "取引キャンセルが申請されました\n理由：\(normalizedReason)\(normalizedNote.map { "\n\($0)" } ?? "")"
         return MessageCreatePayload(
             proposalID: proposalID,
@@ -690,7 +765,7 @@ public final class SupabaseMessageClient: @unchecked Sendable {
                 try validateLocation(latitude: locationLatitude, longitude: locationLongitude)
                 throw SupabaseMessageClientError.invalidLocation
             }
-            if locationLatitude != nil || locationLongitude != nil || locationLabel?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty != nil {
+            if locationLatitude != nil || locationLongitude != nil || SupabaseTextNormalizer.optional(locationLabel) != nil {
                 throw SupabaseMessageClientError.invalidLocation
             }
         case .location:
@@ -698,7 +773,7 @@ public final class SupabaseMessageClient: @unchecked Sendable {
                 throw SupabaseMessageClientError.invalidLocation
             }
             try validateLocation(latitude: locationLatitude, longitude: locationLongitude)
-            guard locationLabel?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty != nil else {
+            guard SupabaseTextNormalizer.optional(locationLabel) != nil else {
                 throw SupabaseMessageClientError.invalidLocation
             }
             if photoURL != nil {
@@ -725,13 +800,13 @@ public final class SupabaseMessageClient: @unchecked Sendable {
         if photoURL != nil {
             throw SupabaseMessageClientError.invalidPhotoURL
         }
-        if locationLatitude != nil || locationLongitude != nil || locationLabel?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty != nil {
+        if locationLatitude != nil || locationLongitude != nil || SupabaseTextNormalizer.optional(locationLabel) != nil {
             throw SupabaseMessageClientError.invalidLocation
         }
     }
 
     private func requiredText(_ text: String?) throws -> String {
-        guard let normalized = text?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty else {
+        guard let normalized = SupabaseTextNormalizer.optional(text) else {
             throw SupabaseMessageClientError.invalidBody
         }
         return normalized
@@ -739,6 +814,47 @@ public final class SupabaseMessageClient: @unchecked Sendable {
 
     private func defaultPhotoBody(for messageType: TradeMessageType) -> String? {
         messageType == .outfitPhoto ? "服装写真を共有しました" : nil
+    }
+
+    private static func isOptionalReadStateError(_ error: SupabaseRESTError) -> Bool {
+        switch error {
+        case .unexpectedStatus(400), .unexpectedStatus(404):
+            true
+        case .invalidURL, .unexpectedStatus:
+            false
+        }
+    }
+}
+
+private struct ProposalReadStateRow: Decodable, Sendable {
+    static let select = "proposal_id,user_id,last_read_at,updated_at"
+
+    var proposalId: UUID
+    var userId: UUID
+    var lastReadAt: Date
+    var updatedAt: Date?
+
+    var readState: ProposalReadState {
+        ProposalReadState(
+            proposalID: proposalId,
+            userID: userId,
+            lastReadAt: lastReadAt,
+            updatedAt: updatedAt
+        )
+    }
+}
+
+private struct ProposalReadStateUpsertPayload: Encodable, Sendable {
+    var proposalId: UUID
+    var userId: UUID
+    var lastReadAt: String
+    var updatedAt: String
+
+    init(proposalID: UUID, userID: UUID, lastReadAt: Date, updatedAt: Date) {
+        self.proposalId = proposalID
+        self.userId = userID
+        self.lastReadAt = SupabaseDateEncoding.isoTimestamp(lastReadAt)
+        self.updatedAt = SupabaseDateEncoding.isoTimestamp(updatedAt)
     }
 }
 
@@ -881,11 +997,11 @@ private struct MessageCreatePayload: Encodable, Sendable {
         self.proposalId = proposalID
         self.senderId = senderID
         self.messageType = messageType.rawValue
-        self.body = body?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
+        self.body = SupabaseTextNormalizer.optional(body)
         self.photoUrl = photoURL?.absoluteString
         self.locationLat = locationLatitude
         self.locationLng = locationLongitude
-        self.locationLabel = locationLabel?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
+        self.locationLabel = SupabaseTextNormalizer.optional(locationLabel)
         self.meta = meta?.isEmpty == true ? nil : meta
     }
 
@@ -899,11 +1015,5 @@ private struct MessageCreatePayload: Encodable, Sendable {
 
     var tradeMeta: [String: String] {
         meta?.compactMapValues(\.stringValue) ?? [:]
-    }
-}
-
-private extension String {
-    var nilIfEmpty: String? {
-        isEmpty ? nil : self
     }
 }

@@ -6,6 +6,7 @@ import SwiftUI
 struct TradeDetailEvidenceSection: View {
     var proposal: TradeProposal
     var viewerID: UUID?
+    var evidencePhotos: [TradeEvidencePhoto]
     @Binding var selectedPhotoItem: PhotosPickerItem?
     var evaluationState: TradeEvaluationPromptState
     var isAddingEvidence: Bool
@@ -21,6 +22,7 @@ struct TradeDetailEvidenceSection: View {
             TradeEvidencePanel(
                 proposal: proposal,
                 viewerID: viewerID,
+                evidencePhotos: evidencePhotos,
                 selectedPhotoItem: $selectedPhotoItem,
                 evaluationState: evaluationState,
                 isAddingEvidence: isAddingEvidence,

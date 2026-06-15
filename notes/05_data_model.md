@@ -3,8 +3,8 @@
 > **目的**：Megrum の全エンティティのDBスキーマ設計と、状態・マッチング・取引のデータフロー定義。
 > 実装の正解集。`09_state_machines.md` と完全に整合させ、`10_glossary.md` の用語を使う。
 
-最終更新: 2026-05-31
-ステータス: Draft v2.33（iter353 Swift Nativeグッズ通報を反映）
+最終更新: 2026-06-14
+ステータス: Draft v2.37（iter616 推し文脈に閉じたメンバー候補付けを反映）
 
 ## 最新化履歴
 
@@ -45,6 +45,10 @@
 | **v2.31** | **2026-05-31** | **iter347 反映（Swift Native取引詳細から `chat-photos` / `proposal_evidence_photos` / `proposals.approved_by_*` / `user_evaluations` を使う最小完了フローを追加）** |
 | **v2.32** | **2026-05-31** | **iter352 反映（Swift Native在庫/Wish長押しメニューから `goods_inventory.status='archived'` の非表示と本人所有行DELETEへ接続）** |
 | **v2.33** | **2026-05-31** | **iter353 反映（他ユーザー所有グッズの長押し通報を `goods_reports` へ保存するSwift Native境界とRLSを追加）** |
+| **v2.34** | **2026-06-14** | **iter601 反映（左ドロワーのプロフィール表示で都道府県横に年齢を出せるよう、`users.age` を任意列として追加）** |
+| **v2.35** | **2026-06-14** | **iter613 反映（顔検出・メンバー候補付け用に `member_face_profiles` / `face_uploaded_images` / `detected_faces` / `face_match_candidates` / `face_match_corrections` を追加）** |
+| **v2.36** | **2026-06-14** | **iter614 反映（画像種別、対象種別、認識方式、汎用品質、profile_type を追加し、実写/アニメ/イラスト/漫画の候補付けを同じ保存形式で扱う）** |
+| **v2.37** | **2026-06-14** | **iter616 反映（グッズ登録時のメンバー候補付けを選択済み `groups_master` 文脈へ限定し、`kind='solo'` はL2指定不要として扱う）** |
 | **v2.20** | **2026-05-29** | **iter168.90 反映（`search_query_logs` と人気検索RPCを追加。検索結果はマッチ分類つきグッズパネルで表示）** |
 | **v2.21** | **2026-05-30** | **iter168.97 反映（`schedules.place_name` 追加。合意時に `both` を単一手段へ固定し、現地交換の複数候補は1件へ固定する運用を追記）** |
 
@@ -134,6 +138,101 @@ iter24 で「推し2階層」（グループ/作品 → メンバー/キャラ�
 | `display_order` | int | |
 | `created_at` | timestamptz | |
 
+### 顔検出・メンバー候補付け（iter613 / iter614）
+
+アップロード画像から顔またはキャラクター候補を検出し、`characters_master` のメンバー/キャラ候補に紐付けるための補助テーブル群。画像本体はStorageまたは既存画像URLに置き、DBには参照・画像種別・検出結果・補正履歴を保存する。実写はApple Vision + 差し替え可能な特徴量モデル、アニメ/イラスト/漫画は専用モデルまたはサーバー認識APIへ差し替える前提で、未設定時は `unknown` / `needs_review` 側に倒す。グッズ登録時は、先に選んだ `groups_master` が `kind in ('group','work')` の場合だけ、そのL1に紐づく `characters_master` と `member_face_profiles` を候補計算へ渡す。`kind='solo'` はL1そのものが推し対象なので、L2メンバー指定とメンバー推定を行わない。
+
+#### `member_face_profiles`
+
+運営管理の顔特徴量プロフィール。ユーザーが任意に書き込むものではなく、同意確認済みデータをservice role / 管理バックエンドから登録する。
+
+| カラム | 型 | 説明 |
+|---|---|---|
+| `id` | uuid | PK |
+| `character_id` | uuid | → characters_master |
+| `profile_type` | text | `real_face` / `anime_face` / `anime_character` / `illustration_embedding` |
+| `embedding` | double precision[] | 顔特徴量ベクトル。モデル差し替えを考慮しpgvectorではなく配列で保持 |
+| `embedding_model` | text | 特徴量を生成したモデル識別子 |
+| `source_image_url` | text nullable | 学習元画像の参照URL |
+| `consent_recorded_at` | timestamptz | 学習データ利用の同意を記録した日時 |
+| `created_by` | uuid nullable | → users（登録した運営者/管理ユーザー。削除時NULL） |
+| `created_at` / `updated_at` | timestamptz | |
+| `deleted_at` | timestamptz nullable | 論理削除。削除済みは候補計算に使わない |
+
+#### `face_uploaded_images`
+
+顔解析対象として登録されたアップロード画像。ユーザー所有で、RLS上は本人だけ参照できる。
+
+| カラム | 型 | 説明 |
+|---|---|---|
+| `id` | uuid | PK |
+| `user_id` | uuid | → users |
+| `inventory_id` | uuid nullable | → goods_inventory（グッズ登録画像に紐づく場合） |
+| `storage_bucket` / `storage_path` | text nullable | Storage上の保存先 |
+| `image_url` | text nullable | 既存画像URLを解析した場合の参照 |
+| `image_hash` | text nullable | 重複検出用ハッシュ |
+| `content_type` | text | `image/jpeg` 等 |
+| `image_type` | text | `real_photo` / `anime` / `illustration` / `manga` / `unknown` |
+| `analysis_status` | text nullable | 画像単位の解析ステータス。対象がない場合は `no_face` / `no_subject` をここに保持 |
+| `created_at` | timestamptz | |
+| `deleted_at` | timestamptz nullable | 論理削除 |
+
+#### `detected_faces`
+
+1枚の画像内で検出された顔またはキャラクター候補。既存互換のためテーブル名は `detected_faces` のまま維持する。`bounding_box` は画像上の正規化 top-left 座標で、`x/y/width/height` を持つ。
+
+| カラム | 型 | 説明 |
+|---|---|---|
+| `id` | uuid | PK |
+| `uploaded_image_id` | uuid | → face_uploaded_images |
+| `bounding_box` | jsonb | 正規化矩形 |
+| `detection_confidence` | double precision | Vision等の検出信頼度 0〜1 |
+| `quality_score` | double precision | サイズ・信頼度からの品質 0〜1 |
+| `image_type` | text | 解析元画像種別 |
+| `subject_type` | text | `real_face` / `anime_face` / `character` / `unknown` |
+| `recognition_method` | text | `vision_face` / `coreml_real_face` / `real_face_embedding` / `anime_face_detector` / `anime_character_classifier` / `anime_embedding_similarity` / `manual` / `unknown` |
+| `legacy_quality_status` | text | iter613互換の `usable` / `too_small` / `low_confidence` / `low_quality` |
+| `quality_status` | text | 汎用品質。`ok` / `low_quality` / `too_small` / `occluded` / `side_face` / `stylized` / `unknown` |
+| `model_version` | text nullable | 認識モデルまたは埋め込みモデルの識別子 |
+| `profile_type` | text nullable | 照合対象プロフィール種別 |
+| `match_status` | text | `auto_matched` / `needs_review` / `unknown` / `no_face` / `no_subject` / `low_quality` |
+| `matched_character_id` | uuid nullable | 自動一致時の → characters_master |
+| `matched_confidence` | double precision nullable | 自動一致時の信頼度 0〜1 |
+| `created_at` / `updated_at` | timestamptz | |
+
+#### `face_match_candidates`
+
+検出顔ごとの上位候補。
+
+| カラム | 型 | 説明 |
+|---|---|---|
+| `id` | uuid | PK |
+| `detected_face_id` | uuid | → detected_faces |
+| `character_id` | uuid | → characters_master |
+| `confidence` | double precision | cosine similarity を正規化した候補信頼度 0〜1 |
+| `rank` | integer | 候補順位 |
+| `profile_count` | integer | そのメンバーに使われた顔プロフィール数 |
+| `created_at` | timestamptz | |
+
+#### `face_match_corrections`
+
+ユーザーが確認画面で補正した履歴。`should_add_training_data` は既定trueで保存し、学習データ利用の可否はプロダクト/法務方針と運営側処理で管理する。
+
+| カラム | 型 | 説明 |
+|---|---|---|
+| `id` | uuid | PK |
+| `detected_face_id` | uuid | → detected_faces |
+| `user_id` | uuid | → users |
+| `original_match_status` | text | 補正前ステータス |
+| `selected_character_id` | uuid nullable | 手動選択した → characters_master |
+| `selected_member_name` | text nullable | 候補外入力・表示補助 |
+| `image_type` | text | 補正対象の画像種別 |
+| `subject_type` | text | 補正対象の対象種別 |
+| `recognition_method` | text | 補正時は通常 `manual` |
+| `selected_profile_type` | text nullable | 学習データ追加時の保存先プロフィール種別 |
+| `should_add_training_data` | boolean | 学習データ追加対象として扱うか。既定true |
+| `created_at` | timestamptz | |
+
 ### `goods_types_master`
 
 | カラム | 型 | 説明 |
@@ -162,6 +261,9 @@ iter24 で「推し2階層」（グループ/作品 → メンバー/キャラ�
 | `avatar_url` | text nullable | |
 | `gender` | text nullable | 任意（オンボで聞く） |
 | `primary_area` | text nullable | "東京都" 等の粗い検索用エリア |
+| `age` | integer nullable | プロフィール表示用の任意年齢。1〜120の範囲制約。未設定ならUIでは表示しない |
+| `payment_methods` | text[] | 支払い条件の自己申告配列。`bank_transfer` / `paypay` / `cash_exchange` / `other` |
+| `payment_note` | text nullable | 支払い条件のその他表示メモ。口座番号などの機微情報は入れない |
 | `account_status` | text | `registered` / `verified` / `onboarding` / `active` / `suspended` / `deletion_requested` / `deleted` (09と一致) |
 | `email_verified_at` | timestamptz nullable | |
 | `deletion_requested_at` | timestamptz nullable | 30日猶予の起点 |
@@ -173,7 +275,8 @@ iter24 で「推し2階層」（グループ/作品 → メンバー/キャラ�
 - `gender` を必須にするか任意にするか（マッチング条件に使う？）
 
 RLS / 権限（iter278）：
-- `anon` / `authenticated` に公開する `users` のSELECT列は、公開プロフィール表示に使う `id, handle, display_name, avatar_url, gender, primary_area, account_status, created_at` に限定する。
+- `anon` / `authenticated` に公開する `users` のSELECT列は、公開プロフィール表示に使う `id, handle, display_name, avatar_url, gender, primary_area, age, account_status, created_at` に限定する。
+- `payment_methods` / `payment_note` は公開プロフィール表示には使わない。ホーム候補・打診前確認など、authenticated の取引前表示経路だけで参照する。
 - `email_verified_at` / `deletion_requested_at` / `last_login_at` / `updated_at` などの内部運用列は公開SELECT権限を付与しない。
 - 公開プロフィール読み取りは `account_status not in ('deleted', 'suspended')` のユーザーだけに限定する。
 - 本人更新ポリシーは `using (auth.uid() = id)` に加えて `with check (auth.uid() = id)` を必須にし、直接API操作で `id` を別ユーザーへ移す更新を拒否する。
@@ -198,6 +301,26 @@ RLS / 権限（iter278）：
 - 打診で `exchange_method='mail'` または `exchange_method='both'` を含める場合、送信者はこの行が存在しないと送れない
 - 合意後にだけ、当事者双方へ相手の住所を表示する
 - 取引途中で設定画面の住所が変わっても履歴が壊れないよう、合意時点で取引側へスナップショット保存する前提
+
+### `user_payment_settings`（支払い条件詳細 / iter587）
+
+本人が設定一覧の「支払い条件設定」から編集する、支払い条件の詳細テーブル。ホーム候補や選んだグッズのヘッダーに表示する公開寄りの要約は `users.payment_methods` / `users.payment_note` を使い、銀行口座の詳細はこのテーブルに分離する。
+
+| カラム | 型 | 説明 |
+|---|---|---|
+| `user_id` | uuid | → users。PK 相当（1ユーザー1件） |
+| `bank_name` | text nullable | 銀行名 |
+| `bank_branch_name` | text nullable | 支店名 |
+| `bank_account_type` | text nullable | 普通などの口座種別 |
+| `bank_account_number` | text nullable | 口座番号。本人用保存値で、相手向けプレビューではマスク表示する |
+| `bank_account_holder` | text nullable | 口座名義 |
+| `other_note` | text nullable | その他支払い方法の補足。`users.payment_note` へも反映する公開寄りメモ |
+| `created_at` / `updated_at` | timestamptz | |
+
+運用ルール：
+- RLS は本人だけが SELECT / INSERT / UPDATE / DELETE できる。
+- `users.payment_methods` は対応可能な方法の要約、`user_payment_settings` は本人専用の詳細として扱う。
+- 口座詳細をホーム候補や公開プロフィールのSELECT経路へ混ぜない。
 
 ### `notifications`（通知一覧 / iter92, iter276）
 
@@ -515,6 +638,7 @@ iter29 で 1行=1個 の方針確定。UI で集約表示し、選択時は N �
 > `keep` を譲りたくなったら、まず `kind='for_trade'` に変更してから提案を受ける。アプリケーションレベルでバリデーション必須。
 >
 > **iter153 市場残数**：マイ在庫に表示する実在庫 `quantity` は、打診が `agreed` になった時点では減らさない。マッチング市場・打診作成・個別募集作成では、派生値 `market_available_qty = quantity - sum(agreed proposal の未完了承認分 qty)` を使う。取引完了承認時に初めて実在庫 `quantity` を減算する。
+> Swift Native実装では `goods_inventory.locked_qty` に `agreed` かつ未完了の打診で確保済みの数量を保存し、`goods_inventory.market_available_qty = greatest(quantity - locked_qty, 0)` を生成列として持つ。`respond_to_proposal_for_viewer` は `agreed` 遷移直前に双方の譲在庫を行ロックし、市場残数不足なら成立させない。proposal trigger が `locked_qty` を再計算し、完了・取消・拒否・期限切れなど `agreed` から外れた行は市場ロックから外れる。
 >
 > **iter154.18 譲り済み履歴の不変性**：`status='traded'` の在庫は取引履歴の証跡として扱い、ユーザー操作による更新・削除を不可にする。画面上は詳細確認のみ、サーバーアクションでも update/delete を拒否する。
 >
@@ -1262,21 +1386,66 @@ RLS:
 
 ## 11. マッチング計算ロジック
 
-### 既存ロジック（user_haves × user_wants）
+### 現行ホーム判定（iter582）
 
-- `genre_tag_id` 完全一致（必須）
-- `character_id` 照合（want側 NULL or flexibility 高 ならスキップ）
-- `goods_type_id` 照合（want側 NULL or flexibility 高 ならスキップ）
+詳細は `notes/18_matching_v2_design.md` の「2026-06-13 現行ホーム判定仕様（最新）」を正とする。
 
-### 追加ロジック（iter後）
+ホームは「完全マッチ / forward / backward」などのユーザー向け棚では分けない。カードごとに `グッズ条件`、`交換条件`、`支払い条件` を判定し、そのうえで現行ホームの `ユーザー×タグでマッチ` / `ユーザーでマッチ` / `譲るものから見る` へ振り分ける。
 
-- **完全マッチ**：双方の haves と wants が両方向で一致 → `match_type='perfect'`
-- **forward マッチ**：私の wants と相手の haves のみ一致（私の haves は不問）→ `match_type='forward'`
-- **backward マッチ**：相手の wants と私の haves のみ一致（相手の haves は不問）→ `match_type='backward'`
-- **AW交差**：`availability_windows` の時空交差（lat/lng/start_at/end_at）で重み加算
-- **携帯グッズ**：`is_carrying=true` のみを完全マッチタブで対象（`carry_event_id` で絞り込み可）
-- **「断った」フィルタ**：`rejected_partners` 既登録ペアを除外
-- **flexibility**：want側の flexibility に応じて character_id / goods_type_id の照合をスキップ
+#### グッズ条件
+
+| 判定 | データ上の条件 |
+|---|---|
+| `◎` | 相手の個別募集（`listings` / `listing_wish_options`）に、自分の譲候補が一致している |
+| `○` | 相手の Wish に、自分の譲候補が1つ以上一致している |
+| `△` | 相手の Wish / 個別募集の中に、自分の譲候補が1つもない |
+
+#### 交換条件
+
+| 判定 | データ上の条件 |
+|---|---|
+| `◎` | `exchange_method` が発送OK（`mail`）同士、または現地交換OK同士かつ都道府県が一致 |
+| `○` | 現地交換OK同士だが都道府県が一致しない |
+| `△` | 共通する交換方法がない、または判定不能 |
+
+日程は `交換条件` の◎/○/△判定には使わない。発送（`mail`）のみの場合、都道府県一致も条件に含めない。
+
+#### 支払い条件
+
+支払い条件は、ユーザーがあらかじめ設定する対応可能な支払い方法の自己申告配列として扱う。アプリ内決済ではなく、定価交換や差額相談などで、相手と対応可能な方法が重なるかを表示するための条件である。選んだグッズの詳細では、そのグッズ所有者の `payment_methods` / `payment_note` をデフォルト表示する。
+
+| 値 | 表示 | 判定対象 |
+|---|---|---|
+| `bank_transfer` | 銀行振込 | yes |
+| `paypay` | PayPay | yes |
+| `cash_exchange` | 現金交換 | yes |
+| `other` | その他 / 自由入力メモ | no |
+
+| 判定 | データ上の条件 |
+|---|---|
+| `○` | 自分と相手の `payment_methods` のうち、判定対象の `bank_transfer` / `paypay` / `cash_exchange` が1つ以上一致 |
+| `△` | 判定対象の一致がない、または片方が未設定 |
+
+`account` / `口座` は独立した支払い方法として扱わない。銀行口座の詳細は `user_payment_settings` に本人専用データとして保存し、ホーム候補や公開プロフィールのSELECT経路には出さない。相手向けの取引前表示は `銀行振込 / PayPay / 現金交換 / メルペイ相談可` のような要約に留める。
+
+#### タグ
+
+- グッズタグはマッチング条件として使う。
+- 1つ以上一致すれば `ユーザー×タグでマッチ` に出す。
+- 複数一致した場合は同じ棚の中で表示順位を上げる。
+- タグ一致は `グッズ条件◎/○/△` の判定には含めない。
+
+#### Wish の L1 / L2
+
+- L1 = グループ / 作品。
+- L2 = メンバー / キャラクター。
+- L2 マスターに値がある場合、Wish の L2 無指定は禁止。
+- L2 マスターに値がない場合だけ、L1 そのものを Wish 対象として保存できる。
+- Wish に優先度・妥協度は持たせない。
+
+#### 市場残数
+
+ホーム、検索、打診作成、個別募集作成では、実在庫 `quantity` ではなく `market_available_qty = quantity - locked_qty` を使う。`market_available_qty <= 0` の譲候補は候補から除外し、履歴保持のため物理削除ではなく論理削除・非表示・closed/archived 相当で扱う。`locked_qty` は `proposals.status='agreed'` の `sender_have_ids` / `receiver_have_ids` と数量配列から再計算し、`agreed` へ遷移する直前には `quantity - locked_qty >= proposal qty` を満たすことをRPCで検証する。
 
 ### 計算タイミング
 
@@ -1302,9 +1471,8 @@ RPC:
 - `get_popular_search_terms(p_limit)`：直近30日の検索実績から人気検索を返す。
 
 検索結果分類:
-- `matched`：検索ヒットした相手の譲が自分のwishに合い、相手も自分の譲候補を求めている。
-- `possible`：自分のwishまたは相手のwishのどちらか一方に合う。
-- `none`：検索にはヒットしたが、現時点の交換条件には合わない。
+- 内部的に `matched` / `possible` / `none` を持つ場合でも、ユーザー向け棚は `ユーザー×タグでマッチ` / `ユーザーでマッチ` / `譲るものから見る` を正とする。
+- 検索結果にも `グッズ条件`、`交換条件`、`支払い条件`、タグ一致理由を持たせ、なぜ候補に出たかを説明できるようにする。
 
 ⚠️ 要確認：
 - バッチ頻度（毎日 / 6h おき / 1h おき）

@@ -63,8 +63,6 @@ struct ProposalConfirmStepView: View {
     var exchangeMethod: ExchangeMethod
     var mailingAddress: MailingAddress?
     var isLoadingMailingAddress: Bool
-    var conditionTagOptions: [String]
-    @Binding var selectedConditionTags: Set<String>
     var meetupInputs: [ProposalMeetupInput]
     @Binding var message: String
     var messageLimit: Int
@@ -106,13 +104,6 @@ struct ProposalConfirmStepView: View {
                 isLoadingMailingAddress: isLoadingMailingAddress,
                 onOpenAddressSettings: onOpenAddressSettings
             )
-        case .conditionTags:
-            ProposalConfirmSection(title: "交換条件タグ") {
-                ProposalTagGrid(
-                    tags: conditionTagOptions,
-                    selectedTags: $selectedConditionTags
-                )
-            }
         case .meetupCandidates:
             ProposalConfirmMeetupCandidatesCard(candidates: meetupInputs)
         case .message:
@@ -125,60 +116,6 @@ struct ProposalConfirmStepView: View {
             }
         case .scheduleShare:
             ProposalScheduleShareCard(shareSchedule: $shareSchedule)
-        }
-    }
-}
-
-struct ProposalTagGrid: View {
-    var tags: [String]
-    @Binding var selectedTags: Set<String>
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text("打診の条件として相手に伝えたいものを選べます。")
-                .font(.system(size: 11, weight: .bold, design: .rounded))
-                .foregroundStyle(MegrumTheme.muted)
-                .fixedSize(horizontal: false, vertical: true)
-
-            if tags.isEmpty {
-                Text("この方法で使えるタグはありません")
-                    .font(.system(size: 14, weight: .bold, design: .rounded))
-                    .foregroundStyle(MegrumTheme.muted)
-            } else {
-                LazyVGrid(columns: [GridItem(.adaptive(minimum: 78), spacing: 7)], spacing: 7) {
-                    ForEach(tags, id: \.self) { tag in
-                        Button {
-                            if selectedTags.contains(tag) {
-                                selectedTags.remove(tag)
-                            } else {
-                                selectedTags.insert(tag)
-                            }
-                        } label: {
-                            Text(tag)
-                                .font(.system(size: 11, weight: .black, design: .rounded))
-                                .lineLimit(1)
-                                .foregroundStyle(selectedTags.contains(tag) ? MegrumTheme.lavender : MegrumTheme.ink)
-                                .padding(.horizontal, 8)
-                                .frame(height: 32)
-                                .background(
-                                    selectedTags.contains(tag) ? AnyShapeStyle(MegrumTheme.lavender.opacity(0.16)) : AnyShapeStyle(MegrumTheme.ink.opacity(0.05)),
-                                    in: Capsule()
-                                )
-                                .overlay {
-                                    Capsule()
-                                        .stroke(selectedTags.contains(tag) ? MegrumTheme.lavender.opacity(0.42) : MegrumTheme.ink.opacity(0.08), lineWidth: 1)
-                                }
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
-            }
-        }
-        .padding(12)
-        .background(Color.white.opacity(0.78), in: RoundedRectangle(cornerRadius: 15, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: 15, style: .continuous)
-                .stroke(MegrumTheme.ink.opacity(0.08), lineWidth: 1)
         }
     }
 }
@@ -326,32 +263,11 @@ struct ProposalConfirmMeetupCandidatesCard: View {
     }
 
     private func syncCameraPosition() {
-        guard !candidates.isEmpty else {
+        guard let region = ProposalMeetupMapRegionBuilder.region(for: candidates) else {
             cameraPosition = .automatic
             return
         }
-        if candidates.count == 1 {
-            let candidate = candidates[0]
-            cameraPosition = .region(
-                MKCoordinateRegion(
-                    center: CLLocationCoordinate2D(latitude: candidate.latitude, longitude: candidate.longitude),
-                    span: MKCoordinateSpan(latitudeDelta: 0.008, longitudeDelta: 0.008)
-                )
-            )
-            return
-        }
-
-        let latitudes = candidates.map(\.latitude)
-        let longitudes = candidates.map(\.longitude)
-        let center = CLLocationCoordinate2D(
-            latitude: (latitudes.min()! + latitudes.max()!) / 2,
-            longitude: (longitudes.min()! + longitudes.max()!) / 2
-        )
-        let span = MKCoordinateSpan(
-            latitudeDelta: max(0.01, (latitudes.max()! - latitudes.min()!) * 1.8),
-            longitudeDelta: max(0.01, (longitudes.max()! - longitudes.min()!) * 1.8)
-        )
-        cameraPosition = .region(MKCoordinateRegion(center: center, span: span))
+        cameraPosition = .region(region)
     }
 }
 
@@ -511,11 +427,6 @@ struct ProposalConfirmMethodCard: View {
                     .frame(height: 26)
                     .background(MegrumTheme.lavender.opacity(0.12), in: Capsule())
 
-                Text(methodDescription)
-                    .font(.system(size: 11.5, weight: .bold, design: .rounded))
-                    .foregroundStyle(MegrumTheme.muted)
-                    .fixedSize(horizontal: false, vertical: true)
-
                 if exchangeMethod == .mail || exchangeMethod == .both {
                     VStack(alignment: .leading, spacing: 6) {
                         Text("あなたの住所登録")
@@ -579,27 +490,6 @@ struct ProposalConfirmMethodCard: View {
         }
     }
 
-    private var iconName: String {
-        switch exchangeMethod {
-        case .hand:
-            "figure.wave"
-        case .mail:
-            "shippingbox"
-        case .both:
-            "arrow.triangle.2.circlepath"
-        }
-    }
-
-    private var methodDescription: String {
-        switch exchangeMethod {
-        case .hand:
-            return "現地交換では、待ち合わせ候補と場所を相手に送ります。"
-        case .mail:
-            return "郵送交換では、待ち合わせ候補は送りません。合意後にだけ当事者へ住所を表示します。"
-        case .both:
-            return "現地交換の候補と、郵送に使う住所登録の両方を確認します。合意後にだけ当事者へ住所を表示します。"
-        }
-    }
 }
 
 private struct ProposalSummaryRow: View {

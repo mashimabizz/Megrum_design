@@ -13,6 +13,7 @@ struct MeguriScreen: View {
     @AppStorage("megrum.meguri.board.prefecture") private var storedBoardPrefecture = ""
     @AppStorage("megrum.meguri.board.scope") private var storedBoardScopeRaw = BoardThread.Audience.nearby3km.rawValue
     @State private var selectedThread: BoardThread?
+    @State private var pendingCreatedThread: BoardThread?
     @State private var selectedGroom: GroomPost?
     @State private var selectedGroomPhotoItem: PhotosPickerItem?
     @State private var isShowingGroomComposer = false
@@ -21,7 +22,8 @@ struct MeguriScreen: View {
     @State private var isShowingThreadComposer = false
     @State private var isShowingPrefecturePicker = false
     @State private var localNoticeMessage: String?
-    @State private var isBoardSheetExpanded = false
+    @State private var boardSheetDetent: MeguriBoardSheetDetent = .regular
+    @State private var shouldCenterHomeMapWhenLocationArrives = false
     @State private var homeCameraPosition = MapCameraPosition.region(
         MKCoordinateRegion(
             center: CLLocationCoordinate2D(latitude: 35.7056, longitude: 139.7519),
@@ -52,8 +54,10 @@ struct MeguriScreen: View {
             selectedScope: selectedBoardScope,
             selectedPrefecture: selectedBoardPrefecture ?? "都道府県",
             notice: notice,
-            isBoardSheetExpanded: $isBoardSheetExpanded,
+            isRequestingLocation: locationState.isRequestingLocation,
+            boardSheetDetent: $boardSheetDetent,
             onOpenMap: { activeMap = .boards },
+            onRecenterMap: centerHomeMapOnCurrentLocation,
             onSelectGroom: openGroomFromStrip,
             onSelectThread: { selectedThread = $0 },
             onNoticeAction: handleLocationNoticeAction,
@@ -86,13 +90,20 @@ struct MeguriScreen: View {
                 )
             }
         }
-        .sheet(isPresented: $isShowingThreadComposer) {
+        .sheet(
+            isPresented: $isShowingThreadComposer,
+            onDismiss: openPendingCreatedThreadIfNeeded
+        ) {
             NavigationStack {
                 BoardThreadComposerSheet(
                     appState: appState,
-                    coordinate: locationState.coordinate,
+                    locationState: locationState,
+                    fallbackCoordinate: locationState.coordinate,
                     selectedPrefecture: selectedBoardPrefecture,
-                    initialScope: selectedBoardScope
+                    onCreated: { thread in
+                        boardSheetDetent = .regular
+                        pendingCreatedThread = thread
+                    }
                 )
             }
             .presentationDetents([.large])
@@ -177,6 +188,11 @@ struct MeguriScreen: View {
     }
 
     private func handleCoordinateChange(_ coordinate: MegrumLocationCoordinate) {
+        if shouldCenterHomeMapWhenLocationArrives {
+            shouldCenterHomeMapWhenLocationArrives = false
+            centerHomeMap(on: coordinate, animated: true)
+        }
+
         Task {
             await appState.loadMeguriFeed(
                 latitude: coordinate.latitude,
@@ -281,6 +297,40 @@ struct MeguriScreen: View {
         }
         localNoticeMessage = nil
         selectedGroom = groom
+    }
+
+    private func centerHomeMapOnCurrentLocation() {
+        guard let coordinate = locationState.coordinate else {
+            shouldCenterHomeMapWhenLocationArrives = true
+            locationState.requestCurrentLocation()
+            return
+        }
+        centerHomeMap(on: coordinate, animated: true)
+    }
+
+    private func openPendingCreatedThreadIfNeeded() {
+        guard let thread = pendingCreatedThread else {
+            return
+        }
+        pendingCreatedThread = nil
+        selectedThread = thread
+    }
+
+    private func centerHomeMap(on coordinate: MegrumLocationCoordinate, animated: Bool) {
+        let region = MKCoordinateRegion(
+            center: coordinate.clLocationCoordinate,
+            span: MKCoordinateSpan(latitudeDelta: 0.018, longitudeDelta: 0.018)
+        )
+        let update = {
+            homeCameraPosition = .region(region)
+        }
+        if animated {
+            withAnimation(.smooth(duration: 0.28)) {
+                update()
+            }
+        } else {
+            update()
+        }
     }
 
     private var notice: MegrumLocationNotice? {

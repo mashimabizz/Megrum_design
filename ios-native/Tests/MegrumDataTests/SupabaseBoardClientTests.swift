@@ -214,7 +214,8 @@ final class SupabaseBoardClientTests: XCTestCase {
                 audience: .nearby3km,
                 latitude: 35.681236,
                 longitude: 139.767125,
-                prefecture: " 東京都 "
+                prefecture: " 東京都 ",
+                imagePaths: ["board_threads/22222222-2222-2222-2222-222222222222/thumb.jpg"]
             )
         )
         let body = try XCTUnwrap(request.httpBody)
@@ -222,14 +223,14 @@ final class SupabaseBoardClientTests: XCTestCase {
         let json = try XCTUnwrap(rows.first)
 
         XCTAssertEqual(request.httpMethod, "POST")
-        XCTAssertTrue(request.url?.absoluteString.hasPrefix("https://example.supabase.co/rest/v1/meguri_board_threads?select=id,author_id,title,body,audience_scope,origin_lat,origin_lng,prefecture,latest_activity_at,created_at") == true)
+        XCTAssertTrue(request.url?.absoluteString.hasPrefix("https://example.supabase.co/rest/v1/meguri_board_threads?select=id,author_id,title,body,audience_scope,origin_lat,origin_lng,prefecture,image_paths,latest_activity_at,created_at") == true)
         XCTAssertEqual(request.value(forHTTPHeaderField: "Prefer"), "return=representation")
         XCTAssertEqual(json["author_id"] as? String, authorID.uuidString.uppercased())
         XCTAssertEqual(json["title"] as? String, "物販列どのくらい？")
         XCTAssertEqual(json["body"] as? String, "北口側が動いています")
         XCTAssertEqual(json["audience_scope"] as? String, "nearby_3km")
         XCTAssertEqual(json["category"] as? String, "chat")
-        XCTAssertEqual((json["image_paths"] as? [String]) ?? ["unexpected"], [])
+        XCTAssertEqual((json["image_paths"] as? [String]) ?? ["unexpected"], ["board_threads/22222222-2222-2222-2222-222222222222/thumb.jpg"])
         XCTAssertEqual(json["origin_lat"] as? Double, 35.681236)
         XCTAssertEqual(json["origin_lng"] as? Double, 139.767125)
         XCTAssertEqual(json["prefecture"] as? String, "東京都")

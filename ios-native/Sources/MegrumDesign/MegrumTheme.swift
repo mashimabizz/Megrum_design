@@ -8,6 +8,9 @@ public enum MegrumTheme {
     public static let muted = Color(red: 0.584, green: 0.557, blue: 0.643)
     public static let ok = Color(red: 0.286, green: 0.690, blue: 0.443)
     public static let canvas = Color(red: 0.984, green: 0.976, blue: 0.988)
+    public static let conditionExact = Color(red: 0.914, green: 0.224, blue: 0.310)
+    public static let conditionPossible = Color(red: 0.914, green: 0.494, blue: 0.145)
+    public static let conditionWarning = pink
 }
 
 public enum MegrumGlassShape: Equatable {

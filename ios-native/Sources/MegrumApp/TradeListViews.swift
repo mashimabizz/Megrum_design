@@ -17,152 +17,86 @@ struct TradeDetailUnavailableScreen: View {
 }
 
 struct TradeCard: View {
-    private static let actionColor = Color(red: 0.84, green: 0.46, blue: 0.36)
-    private static let calmColor = Color(red: 0.23, green: 0.49, blue: 0.58)
-
     var proposal: TradeProposal
     var viewerID: UUID?
     var profilesByUserID: [UUID: PublicUserProfile] = [:]
     var goodsByID: [UUID: GoodsItem] = [:]
+    var lastActivityAt: Date?
+    var viewerLastReadAt: Date?
+    var isSelectionMode = false
+    var isSelected = false
+    var isSelectionEnabled = false
+    var onLongPress: () -> Void = {}
     var onOpen: () -> Void
 
     private var presentation: TradeCardPresentation {
         TradeCardPresentation(
             proposal: proposal,
             viewerID: viewerID,
-            profilesByUserID: profilesByUserID
+            profilesByUserID: profilesByUserID,
+            lastActivityAt: lastActivityAt,
+            viewerLastReadAt: viewerLastReadAt
         )
     }
 
     var body: some View {
-        Button(action: onOpen) {
-            VStack(alignment: .leading, spacing: 13) {
-                HStack(spacing: 10) {
-                    RoundedRectangle(cornerRadius: 14, style: .continuous)
-                        .fill(MegrumTheme.lavender.opacity(0.16))
-                        .frame(width: 42, height: 42)
-                        .overlay {
-                            Text(presentation.partnerInitial)
-                                .font(.system(size: 17, weight: .black, design: .rounded))
-                                .foregroundStyle(MegrumTheme.lavender)
-                        }
+        cardContent
+            .contentShape(Rectangle())
+            .modifier(TradeCardExclusivePressModifier(
+                onTap: onOpen,
+                onLongPress: isSelectionEnabled ? onLongPress : nil
+            ))
+            .accessibilityAddTraits(.isButton)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(accessibilityLabel)
+        .accessibilityHint(isSelectionMode ? "選択状態を切り替えます" : "取引詳細をページで開きます")
+    }
 
-                    VStack(alignment: .leading, spacing: 3) {
-                        HStack(spacing: 8) {
-                            Text("@\(presentation.partnerHandle)")
-                                .font(.system(size: 16, weight: .black, design: .rounded))
-                                .foregroundStyle(MegrumTheme.ink)
-                                .lineLimit(1)
-
-                            Text(presentation.directionText)
-                                .font(.system(size: 9.5, weight: .black, design: .rounded))
-                                .foregroundStyle(directionForegroundColor)
-                                .padding(.horizontal, 8)
-                                .padding(.vertical, 4)
-                                .background(directionBackgroundColor, in: Capsule())
-                        }
-                    }
-
-                    Spacer(minLength: 8)
-
-                    Label("詳細", systemImage: "chevron.right")
-                        .font(.system(size: 11, weight: .black, design: .rounded))
-                        .labelStyle(.titleAndIcon)
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 7)
-                        .background(statusColor.opacity(0.11), in: Capsule())
-                        .foregroundStyle(statusColor)
-                }
-
-                HStack(spacing: 8) {
-                    Text(presentation.statusText)
-                        .font(.system(size: 10.5, weight: .black, design: .rounded))
-                        .foregroundStyle(statusColor)
-                        .padding(.horizontal, 9)
-                        .padding(.vertical, 4)
-                        .background(statusColor.opacity(0.12), in: Capsule())
-
-                    if let responseText = presentation.responseText {
-                        Text(responseText)
-                            .font(.system(size: 10, weight: .black, design: .rounded))
-                            .foregroundStyle(responseColor)
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 4)
-                            .background(responseColor.opacity(0.10), in: Capsule())
-                    }
-
-                    Spacer(minLength: 0)
-                }
+    private var cardContent: some View {
+        VStack(spacing: 0) {
+            VStack(alignment: .leading, spacing: 12) {
+                TradeCardHeader(presentation: presentation)
 
                 TradeDealGoodsPanel(
                     offeredItems: previewItems(for: offeredGoodsIDs),
                     requestedItems: previewItems(for: requestedGoodsIDs)
                 )
 
-                HStack(alignment: .top, spacing: 9) {
-                    Image(systemName: "mappin.circle")
-                        .font(.system(size: 17, weight: .bold))
-                        .foregroundStyle(MegrumTheme.lavender)
-
-                    VStack(alignment: .leading, spacing: 5) {
-                        Text(presentation.meetupSummaryText)
-                            .font(.system(size: 12, weight: .bold, design: .rounded))
-                            .foregroundStyle(MegrumTheme.ink)
-                            .lineLimit(2)
-                    }
-                }
+                TradeMeetupSummaryLine(
+                    text: presentation.meetupSummaryText,
+                    readState: presentation.readState
+                )
             }
-            .padding(.horizontal, 14)
-            .padding(.vertical, 16)
-            .background(Color.white.opacity(0.92), in: RoundedRectangle(cornerRadius: 22, style: .continuous))
-            .overlay(alignment: .leading) {
-                if presentation.needsAction {
-                    RoundedRectangle(cornerRadius: 3, style: .continuous)
-                        .fill(Self.actionColor)
-                        .frame(width: 3)
-                        .padding(.vertical, 18)
-                }
+            .padding(.vertical, 17)
+
+            TradeCardDivider(readState: presentation.readState)
+        }
+        .overlay(alignment: .topTrailing) {
+            if isSelectionMode {
+                TradeSelectionIndicator(
+                    isSelected: isSelected,
+                    isEnabled: isSelectionEnabled
+                )
+                .padding(.top, 15)
+                .padding(.trailing, 4)
             }
-            .overlay {
-                RoundedRectangle(cornerRadius: 22, style: .continuous)
-                    .stroke(cardBorderColor, lineWidth: presentation.needsAction ? 1.4 : 1)
+        }
+        .background {
+            if presentation.readState == .unopened {
+                RoundedRectangle(cornerRadius: 24, style: .continuous)
+                    .fill(
+                        LinearGradient(
+                            colors: [
+                                MegrumTheme.lavender.opacity(0.21),
+                                MegrumTheme.pink.opacity(0.13)
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
             }
-            .shadow(color: MegrumTheme.ink.opacity(0.07), radius: 18, y: 10)
         }
-        .buttonStyle(.plain)
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel(accessibilityLabel)
-        .accessibilityHint("取引詳細をページで開きます")
-    }
-
-    private var statusColor: Color {
-        switch presentation.tone {
-        case .action:
-            Self.actionColor
-        case .live:
-            Self.calmColor
-        case .idle:
-            MegrumTheme.ink
-        }
-    }
-
-    private var cardBorderColor: Color {
-        presentation.needsAction ? Self.actionColor.opacity(0.24) : MegrumTheme.ink.opacity(0.08)
-    }
-
-    private var directionForegroundColor: Color {
-        presentation.isReceived ? MegrumTheme.lavender : Self.calmColor
-    }
-
-    private var directionBackgroundColor: Color {
-        if presentation.isReceived {
-            return MegrumTheme.lavender.opacity(0.14)
-        }
-        return MegrumTheme.sky.opacity(0.22)
-    }
-
-    private var responseColor: Color {
-        presentation.needsAction ? Self.actionColor : Self.calmColor
+        .opacity(isSelectionMode && !isSelectionEnabled ? 0.48 : 1)
     }
 
     private func previewItems(for ids: [UUID]) -> [GoodsItem] {
@@ -178,17 +112,251 @@ struct TradeCard: View {
     }
 
     private var accessibilityLabel: String {
-        var parts = [
+        let parts = [
             "取引",
-            presentation.statusText,
+            presentation.readState.title,
             proposal.exchangeMethod.displayName,
             "ゆずるグッズ \(offeredGoodsIDs.count)件",
             "求めるグッズ \(requestedGoodsIDs.count)件"
         ]
-        if !proposal.conditionTags.isEmpty {
-            parts.append("条件 \(proposal.conditionTags.joined(separator: "、"))")
-        }
         return parts.joined(separator: "、")
+    }
+}
+
+private struct TradeCardExclusivePressModifier: ViewModifier {
+    var onTap: () -> Void
+    var onLongPress: (() -> Void)?
+
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        if let onLongPress {
+            content.gesture(
+                ExclusiveGesture(
+                    LongPressGesture(minimumDuration: 0.45, maximumDistance: 18),
+                    TapGesture()
+                )
+                .onEnded { value in
+                    switch value {
+                    case .first(true):
+                        onLongPress()
+                    case .second:
+                        onTap()
+                    case .first(false):
+                        break
+                    }
+                }
+            )
+        } else {
+            content.onTapGesture(perform: onTap)
+        }
+    }
+}
+
+private struct TradeSelectionIndicator: View {
+    var isSelected: Bool
+    var isEnabled: Bool
+
+    var body: some View {
+        Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+            .font(.system(size: 24, weight: .heavy))
+            .foregroundStyle(isSelected ? MegrumTheme.lavender : MegrumTheme.muted.opacity(isEnabled ? 0.62 : 0.32))
+            .background(.white.opacity(0.88), in: Circle())
+            .accessibilityHidden(true)
+    }
+}
+
+private struct TradeCardHeader: View {
+    var presentation: TradeCardPresentation
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 12) {
+            VStack(alignment: .leading, spacing: 6) {
+                TradeReadStateLabel(readState: presentation.readState)
+
+                HStack(spacing: 7) {
+                    TradePartnerAvatar(initial: presentation.partnerInitial, readState: presentation.readState)
+
+                    Text("@\(presentation.partnerHandle)")
+                        .font(.system(size: 12.5, weight: presentation.readState.handleWeight, design: .rounded))
+                        .foregroundStyle(presentation.readState.handleColor)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.78)
+
+                    Text("・\(presentation.updatedText)")
+                        .font(.system(size: 11, weight: .semibold, design: .rounded))
+                        .foregroundStyle(MegrumTheme.muted.opacity(0.76))
+                        .lineLimit(1)
+                }
+            }
+
+            Spacer(minLength: 10)
+
+            TradeDetailLink(readState: presentation.readState)
+        }
+    }
+}
+
+private struct TradeReadStateLabel: View {
+    var readState: TradeCardReadState
+
+    var body: some View {
+        Text(readState.title)
+            .font(.system(size: 13, weight: readState.stateWeight, design: .rounded))
+            .foregroundStyle(readState.stateColor)
+            .lineLimit(1)
+            .padding(.horizontal, readState.showsStateBackground ? 8 : 0)
+            .padding(.vertical, readState.showsStateBackground ? 4 : 0)
+            .background {
+                if readState.showsStateBackground {
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .fill(readState.stateBackgroundColor)
+                }
+            }
+            .overlay {
+                if readState.showsStateBackground {
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .strokeBorder(readState.stateBorderColor, lineWidth: 0.8)
+                }
+            }
+    }
+}
+
+private struct TradePartnerAvatar: View {
+    var initial: String
+    var readState: TradeCardReadState
+
+    var body: some View {
+        RoundedRectangle(cornerRadius: 9, style: .continuous)
+            .fill(MegrumTheme.lavender.opacity(readState == .unopened ? 0.14 : 0.09))
+            .frame(width: 22, height: 22)
+            .overlay {
+                Text(initial)
+                    .font(.system(size: 10.5, weight: .black, design: .rounded))
+                    .foregroundStyle(MegrumTheme.lavender.opacity(readState == .waitingForReply ? 0.62 : 0.92))
+            }
+            .accessibilityHidden(true)
+    }
+}
+
+private struct TradeDetailLink: View {
+    var readState: TradeCardReadState
+
+    var body: some View {
+        HStack(spacing: 4) {
+            Text("詳細")
+            Image(systemName: "chevron.right")
+                .font(.system(size: 10, weight: .bold))
+        }
+        .font(.system(size: 12, weight: readState == .unopened ? .bold : .semibold, design: .rounded))
+        .foregroundStyle(MegrumTheme.ink.opacity(readState == .waitingForReply ? 0.50 : 0.68))
+        .padding(.top, 1)
+    }
+}
+
+private struct TradeMeetupSummaryLine: View {
+    var text: String
+    var readState: TradeCardReadState
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 8) {
+            Image(systemName: "mappin.circle")
+                .font(.system(size: 15.5, weight: .bold))
+                .foregroundStyle(MegrumTheme.muted.opacity(readState == .waitingForReply ? 0.54 : 0.78))
+
+            Text(text)
+                .font(.system(size: 12, weight: readState == .unopened ? .bold : .semibold, design: .rounded))
+                .foregroundStyle(MegrumTheme.ink.opacity(readState == .waitingForReply ? 0.62 : 0.84))
+                .lineLimit(2)
+                .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+}
+
+private struct TradeCardDivider: View {
+    var readState: TradeCardReadState
+
+    var body: some View {
+        Rectangle()
+            .fill(MegrumTheme.ink.opacity(readState == .unopened ? 0.10 : 0.065))
+            .frame(height: 0.5)
+            .padding(.leading, 2)
+    }
+}
+
+private extension TradeCardReadState {
+    var showsStateBackground: Bool {
+        switch self {
+        case .unopened, .opened:
+            true
+        case .waitingForReply:
+            false
+        }
+    }
+
+    var stateBackgroundColor: Color {
+        switch self {
+        case .unopened:
+            MegrumTheme.ink.opacity(0.09)
+        case .opened:
+            MegrumTheme.ink.opacity(0.055)
+        case .waitingForReply:
+            .clear
+        }
+    }
+
+    var stateBorderColor: Color {
+        switch self {
+        case .unopened:
+            MegrumTheme.ink.opacity(0.14)
+        case .opened:
+            MegrumTheme.ink.opacity(0.10)
+        case .waitingForReply:
+            .clear
+        }
+    }
+
+    var stateColor: Color {
+        switch self {
+        case .unopened:
+            MegrumTheme.ink
+        case .opened:
+            MegrumTheme.ink.opacity(0.72)
+        case .waitingForReply:
+            MegrumTheme.muted.opacity(0.70)
+        }
+    }
+
+    var handleColor: Color {
+        switch self {
+        case .unopened:
+            MegrumTheme.ink
+        case .opened:
+            MegrumTheme.ink.opacity(0.78)
+        case .waitingForReply:
+            MegrumTheme.muted.opacity(0.78)
+        }
+    }
+
+    var stateWeight: Font.Weight {
+        switch self {
+        case .unopened:
+            .black
+        case .opened:
+            .bold
+        case .waitingForReply:
+            .semibold
+        }
+    }
+
+    var handleWeight: Font.Weight {
+        switch self {
+        case .unopened:
+            .bold
+        case .opened:
+            .semibold
+        case .waitingForReply:
+            .semibold
+        }
     }
 }
 

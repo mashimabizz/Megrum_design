@@ -148,7 +148,7 @@ public final class SupabaseOshiClient: @unchecked Sendable {
             URLQueryItem(name: "order", value: "display_order.asc,name.asc"),
             URLQueryItem(name: "limit", value: "\(limit)")
         ]
-        let trimmedSearchText = searchText?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmedSearchText = SupabaseTextNormalizer.optional(searchText)
         if let trimmedSearchText, !trimmedSearchText.isEmpty {
             queryItems.append(URLQueryItem(name: "name", value: "ilike.*\(trimmedSearchText)*"))
         }
@@ -320,7 +320,7 @@ private struct OshiRequestPayload: Encodable, Sendable {
         self.requestedName = input.requestedName
         self.requestedGenreId = input.requestedGenreID
         self.requestedKind = input.requestedKind
-        self.note = input.note?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfBlank
+        self.note = SupabaseTextNormalizer.optional(input.note)
     }
 }
 
@@ -336,12 +336,6 @@ private struct CharacterRequestPayload: Encodable, Sendable {
         self.groupId = input.groupID
         self.oshiRequestId = input.oshiRequestID
         self.requestedName = input.requestedName
-        self.note = input.note?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfBlank
-    }
-}
-
-private extension String {
-    var nilIfBlank: String? {
-        isEmpty ? nil : self
+        self.note = SupabaseTextNormalizer.optional(input.note)
     }
 }

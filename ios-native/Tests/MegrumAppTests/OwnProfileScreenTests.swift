@@ -8,7 +8,8 @@ final class OwnProfileScreenTests: XCTestCase {
             handle: " @Michi_Lion ",
             displayName: " みちりおん ",
             prefecture: " 東京都 ",
-            gender: .noAnswer
+            gender: .noAnswer,
+            paymentMethods: [.cashExchange, .paypay, .paypay]
         )
 
         let normalized = draft.normalized
@@ -17,7 +18,25 @@ final class OwnProfileScreenTests: XCTestCase {
         XCTAssertEqual(normalized.displayName, "みちりおん")
         XCTAssertEqual(normalized.prefecture, "東京都")
         XCTAssertEqual(normalized.gender, .noAnswer)
+        XCTAssertEqual(normalized.paymentMethods, [.paypay, .cashExchange])
         XCTAssertNil(normalized.validationError)
+    }
+
+    func testProfileDraftTogglesPaymentMethods() {
+        var draft = OwnProfileEditDraft(
+            handle: "michi",
+            displayName: "みち",
+            prefecture: "東京都",
+            gender: nil,
+            paymentMethods: [.bankTransfer]
+        )
+
+        draft.setPaymentMethod(.cashExchange, isSelected: true)
+        draft.setPaymentMethod(.bankTransfer, isSelected: false)
+
+        XCTAssertFalse(draft.containsPaymentMethod(.bankTransfer))
+        XCTAssertTrue(draft.containsPaymentMethod(.cashExchange))
+        XCTAssertEqual(draft.normalized.paymentMethods, [.cashExchange])
     }
 
     func testProfileDraftHoldsLocalAvatarUpload() {
@@ -127,7 +146,8 @@ final class OwnProfileScreenTests: XCTestCase {
             handle: "new_handle",
             displayName: "新しい表示名",
             prefecture: "東京都",
-            gender: .female
+            gender: .female,
+            paymentMethods: [.paypay, .cashExchange]
         )
 
         let summary = OwnProfileSummary(
@@ -142,6 +162,7 @@ final class OwnProfileScreenTests: XCTestCase {
         XCTAssertEqual(summary?.displayName, "新しい表示名")
         XCTAssertEqual(summary?.prefectureText, "東京都")
         XCTAssertEqual(summary?.genderText, "女性")
+        XCTAssertEqual(summary?.paymentMethodsText, "PayPay / 現金交換")
     }
 
     func testSummaryAllowsLocalDraftToClearPrefecture() {

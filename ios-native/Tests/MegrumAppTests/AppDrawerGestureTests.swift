@@ -9,8 +9,7 @@ final class AppDrawerGestureTests: XCTestCase {
                 "プロフィール",
                 "通知",
                 "推し設定",
-                "スケジュール",
-                "完了した取引"
+                "スケジュール"
             ]
         )
         XCTAssertEqual(
@@ -31,7 +30,6 @@ final class AppDrawerGestureTests: XCTestCase {
         XCTAssertEqual(AppDrawerVisualMetrics.foregroundCornerRadius, 18)
         XCTAssertEqual(AppDrawerVisualMetrics.whiteoutOpacity, 0.18)
         XCTAssertEqual(AppDrawerVisualMetrics.foregroundShadowOpacity, 0.16)
-        XCTAssertEqual(AppDrawerVisualMetrics.drawerParallax, -12)
         XCTAssertEqual(
             AppDrawerVisualMetrics.drawerWidth(screenWidth: 402),
             361.8,
@@ -41,6 +39,51 @@ final class AppDrawerGestureTests: XCTestCase {
             AppDrawerVisualMetrics.openOffset(screenWidth: 402),
             273.36,
             accuracy: 0.01
+        )
+        XCTAssertEqual(
+            AppDrawerVisualMetrics.drawerOffset(drawerWidth: 361.8, progress: 0),
+            -361.8,
+            accuracy: 0.01
+        )
+        XCTAssertEqual(
+            AppDrawerVisualMetrics.drawerOffset(drawerWidth: 361.8, progress: 0.5),
+            -180.9,
+            accuracy: 0.01
+        )
+        XCTAssertEqual(
+            AppDrawerVisualMetrics.drawerOffset(drawerWidth: 361.8, progress: 1),
+            0,
+            accuracy: 0.01
+        )
+    }
+
+    func testDrawerPresentationProgressTracksContentAndDrawerTogether() {
+        XCTAssertEqual(
+            AppDrawerVisualMetrics.presentationProgress(
+                isPresented: false,
+                dragTranslation: 80,
+                drawerTravel: 200
+            ),
+            0.4,
+            accuracy: 0.001
+        )
+        XCTAssertEqual(
+            AppDrawerVisualMetrics.presentationProgress(
+                isPresented: true,
+                dragTranslation: -80,
+                drawerTravel: 200
+            ),
+            0.6,
+            accuracy: 0.001
+        )
+        XCTAssertEqual(
+            AppDrawerVisualMetrics.presentationProgress(
+                isPresented: true,
+                dragTranslation: 80,
+                drawerTravel: 200
+            ),
+            1,
+            accuracy: 0.001
         )
     }
 

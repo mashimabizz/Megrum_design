@@ -13,7 +13,7 @@ enum GoodsEditorMode: String, CaseIterable, Identifiable {
         case .create:
             "NEW"
         case .edit:
-            "EDIT"
+            "更新"
         case .readonly:
             "詳細のみ"
         }

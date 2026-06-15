@@ -7,6 +7,10 @@ struct GoodsDetailSheet: View {
     var context: GoodsGridContext
     @Environment(\.dismiss) private var dismiss
 
+    private var presentation: GoodsTilePresentation {
+        GoodsTilePresentation(item: item, context: context, isBusy: false)
+    }
+
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
@@ -63,7 +67,7 @@ struct GoodsDetailSheet: View {
                 }
             }
             .overlay(alignment: .topLeading) {
-                GoodsStatusPill(text: context.statusLabel)
+                GoodsStatusPill(text: presentation.statusLabel)
                     .padding(14)
             }
             .shadow(color: MegrumTheme.ink.opacity(0.12), radius: 22, y: 12)
@@ -81,7 +85,7 @@ struct GoodsDetailSheet: View {
 
             HStack(spacing: 12) {
                 DetailMetric(label: context.quantityLabel, value: "\(max(1, item.quantity))")
-                DetailMetric(label: "状態", value: context.statusLabel)
+                DetailMetric(label: "状態", value: presentation.statusLabel)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)

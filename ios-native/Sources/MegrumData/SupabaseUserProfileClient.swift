@@ -67,6 +67,7 @@ private struct PublicUserProfileRow: Decodable, Sendable {
     var displayName: String?
     var avatarUrl: URL?
     var primaryArea: String?
+    var age: Int?
     var accountStatus: String?
     var averageStars: Double?
     var evaluationCount: Int?
@@ -80,6 +81,7 @@ private struct PublicUserProfileRow: Decodable, Sendable {
                 displayName: displayName ?? handle ?? "Megrum",
                 avatarURL: avatarUrl,
                 prefecture: primaryArea,
+                age: age,
                 accountStatus: AccountStatus(rawValue: accountStatus ?? "") ?? .active
             ),
             averageStars: averageStars,

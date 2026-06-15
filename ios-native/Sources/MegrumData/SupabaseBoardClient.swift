@@ -1,9 +1,15 @@
 import Foundation
 import MegrumCore
 
+public enum SupabaseBoardClientError: Error, Equatable, Sendable {
+    case imageTooLarge
+}
+
 public final class SupabaseBoardClient: @unchecked Sendable {
-    private static let threadSelect = "id,author_id,title,body,audience_scope,origin_lat,origin_lng,prefecture,latest_activity_at,created_at"
+    private static let threadSelect = "id,author_id,title,body,audience_scope,origin_lat,origin_lng,prefecture,image_paths,latest_activity_at,created_at"
     private static let nearbyRadiusMeters = 3_000.0
+    private static let boardMediaBucket = "meguri-board-media"
+    private static let maxUploadBytes = Int(9.5 * 1_024 * 1_024)
 
     private let client: SupabaseRESTClient
 
@@ -30,6 +36,7 @@ public final class SupabaseBoardClient: @unchecked Sendable {
                 scope: scope
             )
         )
+        let signedURLs = await signedURLMap(for: rows)
         return rows.compactMap { row in
             guard row.isVisibleInRequestedScope(
                 latitude: latitude,
@@ -40,7 +47,7 @@ public final class SupabaseBoardClient: @unchecked Sendable {
             ) else {
                 return nil
             }
-            return row.thread
+            return row.thread(signedURLs: signedURLs)
         }
     }
 
@@ -73,25 +80,29 @@ public final class SupabaseBoardClient: @unchecked Sendable {
             id: UUID(),
             threadID: input.threadID,
             authorID: UUID(),
-            body: input.body.trimmingCharacters(in: .whitespacesAndNewlines)
+            body: SupabaseTextNormalizer.trimmed(input.body)
         )
     }
 
     public func createThread(_ input: BoardThreadCreateInput) async throws -> BoardThread {
+        let imagePaths = try await boardImagePaths(for: input)
         let rows: [BoardThreadRow] = try await client.insertRows(
             into: "meguri_board_threads",
-            values: [BoardThreadInsertPayload(input: input)],
+            values: [BoardThreadInsertPayload(input: input, imagePaths: imagePaths)],
             select: Self.threadSelect
         )
-        return rows.first?.thread ?? BoardThread(
+        let signedURLs = await signedURLMap(for: rows)
+        return rows.first?.thread(signedURLs: signedURLs) ?? BoardThread(
             id: UUID(),
             authorID: input.authorID,
-            title: input.title.trimmingCharacters(in: .whitespacesAndNewlines),
-            body: input.body.trimmingCharacters(in: .whitespacesAndNewlines),
+            title: SupabaseTextNormalizer.trimmed(input.title),
+            body: SupabaseTextNormalizer.trimmed(input.body),
             audience: input.audience,
             latitude: input.latitude,
             longitude: input.longitude,
-            prefecture: input.prefecture?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
+            prefecture: SupabaseTextNormalizer.optional(input.prefecture),
+            imageURLs: imagePaths.compactMap { displayURL(for: $0, signedURLs: signedURLs) },
+            imagePaths: imagePaths
         )
     }
 
@@ -141,9 +152,52 @@ public final class SupabaseBoardClient: @unchecked Sendable {
     public func makeCreateThreadRequest(_ input: BoardThreadCreateInput) throws -> URLRequest {
         try client.makeInsertRequest(
             into: "meguri_board_threads",
-            values: [BoardThreadInsertPayload(input: input)],
+            values: [BoardThreadInsertPayload(input: input, imagePaths: input.imagePaths)],
             select: Self.threadSelect
         )
+    }
+
+    private func boardImagePaths(for input: BoardThreadCreateInput) async throws -> [String] {
+        var paths = input.imagePaths.map(SupabaseTextNormalizer.trimmed)
+            .filter { !$0.isEmpty }
+        if let upload = input.thumbnailUpload {
+            guard upload.data.count <= Self.maxUploadBytes else {
+                throw SupabaseBoardClientError.imageTooLarge
+            }
+            let contentType = normalizedImageContentType(upload.contentType)
+            let imagePath = boardImagePath(userID: input.authorID, contentType: contentType)
+            try await client.uploadObject(
+                bucket: Self.boardMediaBucket,
+                path: imagePath,
+                data: upload.data,
+                contentType: contentType,
+                upsert: false
+            )
+            paths.insert(imagePath, at: 0)
+        }
+        return Array(paths.prefix(4))
+    }
+
+    private func signedURLMap(for rows: [BoardThreadRow]) async -> [String: URL] {
+        var signedURLs: [String: URL] = [:]
+        let paths = Set(rows.flatMap { $0.imagePaths ?? [] }.filter { storagePathCandidate($0) })
+        for path in paths {
+            signedURLs[path] = try? await client.createSignedURL(bucket: Self.boardMediaBucket, path: path)
+        }
+        return signedURLs
+    }
+
+    private func storagePathCandidate(_ path: String) -> Bool {
+        URL(string: path)?.scheme == nil
+    }
+
+    private func displayURL(for path: String, signedURLs: [String: URL]) -> URL? {
+        signedURLs[path] ?? URL(string: path)
+    }
+
+    private func boardImagePath(userID: UUID, contentType: String) -> String {
+        let milliseconds = Int(Date().timeIntervalSince1970 * 1_000)
+        return "\(userID.uuidString.lowercased())/\(milliseconds)_\(UUID().uuidString.lowercased()).\(fileExtension(for: contentType))"
     }
 }
 
@@ -203,11 +257,13 @@ private struct BoardThreadRow: Decodable, Sendable {
     var originLat: Double?
     var originLng: Double?
     var prefecture: String?
+    var imagePaths: [String]?
     var latestActivityAt: Date?
     var createdAt: Date?
 
-    var thread: BoardThread? {
+    func thread(signedURLs: [String: URL]) -> BoardThread? {
         let audience = BoardThread.Audience(rawValue: audienceScope ?? "") ?? .nearby3km
+        let paths = imagePaths ?? []
         return BoardThread(
             id: id,
             authorID: authorId,
@@ -217,6 +273,8 @@ private struct BoardThreadRow: Decodable, Sendable {
             latitude: originLat,
             longitude: originLng,
             prefecture: prefecture,
+            imageURLs: paths.compactMap { signedURLs[$0] ?? URL(string: $0) },
+            imagePaths: paths,
             createdAt: latestActivityAt ?? createdAt ?? .now
         )
     }
@@ -246,8 +304,8 @@ private struct BoardThreadRow: Decodable, Sendable {
             ) <= radiusMeters
         case .samePrefecture:
             guard
-                let requestedPrefecture = prefecture?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty,
-                let threadPrefecture = self.prefecture?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
+                let requestedPrefecture = SupabaseTextNormalizer.optional(prefecture),
+                let threadPrefecture = SupabaseTextNormalizer.optional(self.prefecture)
             else {
                 return true
             }
@@ -272,18 +330,18 @@ private struct BoardThreadInsertPayload: Encodable, Sendable {
     var spotLabel: String?
     var title: String
 
-    init(input: BoardThreadCreateInput) {
+    init(input: BoardThreadCreateInput, imagePaths: [String]) {
         self.authorId = input.authorID
         self.audienceScope = input.audience.rawValue
-        self.body = input.body.trimmingCharacters(in: .whitespacesAndNewlines)
+        self.body = SupabaseTextNormalizer.trimmed(input.body)
         self.category = "chat"
-        self.imagePaths = []
+        self.imagePaths = imagePaths
         self.originLat = input.latitude
         self.originLng = input.longitude
-        self.prefecture = input.prefecture?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
+        self.prefecture = SupabaseTextNormalizer.optional(input.prefecture)
         self.spotKey = nil
         self.spotLabel = nil
-        self.title = input.title.trimmingCharacters(in: .whitespacesAndNewlines)
+        self.title = SupabaseTextNormalizer.trimmed(input.title)
     }
 
     enum CodingKeys: String, CodingKey {
@@ -405,7 +463,7 @@ private struct BoardReplyAppendPayload: Encodable, Sendable {
             scope: input.scope
         )
         self.pThreadId = input.threadID
-        self.pBody = input.body.trimmingCharacters(in: .whitespacesAndNewlines)
+        self.pBody = SupabaseTextNormalizer.trimmed(input.body)
         self.pViewerLat = context.latitude
         self.pViewerLng = context.longitude
         self.pPrefecture = context.prefecture
@@ -484,7 +542,7 @@ private struct BoardScopeQueryContext: Sendable {
     var rpcScope: BoardThread.Audience
 
     init(latitude: Double?, longitude: Double?, prefecture: String?, scope: BoardThread.Audience) {
-        let trimmedPrefecture = prefecture?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
+        let trimmedPrefecture = SupabaseTextNormalizer.optional(prefecture)
         switch scope {
         case .nearby3km:
             self.latitude = latitude
@@ -505,12 +563,6 @@ private struct BoardScopeQueryContext: Sendable {
     }
 }
 
-private extension String {
-    var nilIfEmpty: String? {
-        isEmpty ? nil : self
-    }
-}
-
 private func haversineMeters(
     fromLatitude: Double,
     fromLongitude: Double,
@@ -525,4 +577,26 @@ private func haversineMeters(
     let a = sin(deltaLat / 2) * sin(deltaLat / 2)
         + cos(fromLat) * cos(toLat) * sin(deltaLng / 2) * sin(deltaLng / 2)
     return earthRadius * 2 * atan2(sqrt(a), sqrt(1 - a))
+}
+
+private func normalizedImageContentType(_ value: String) -> String {
+    switch value.lowercased() {
+    case "image/png":
+        "image/png"
+    case "image/webp":
+        "image/webp"
+    default:
+        "image/jpeg"
+    }
+}
+
+private func fileExtension(for contentType: String) -> String {
+    switch normalizedImageContentType(contentType) {
+    case "image/png":
+        "png"
+    case "image/webp":
+        "webp"
+    default:
+        "jpg"
+    }
 }

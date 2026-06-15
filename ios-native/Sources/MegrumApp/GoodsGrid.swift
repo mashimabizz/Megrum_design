@@ -44,15 +44,29 @@ enum GoodsQuickActionKind: CaseIterable, Identifiable, Equatable {
     case delete
 
     static let inventoryActions: [GoodsQuickActionKind] = [.edit, .moveToKeep, .tag, .delete]
+    static let wishActions: [GoodsQuickActionKind] = [.edit, .tag, .delete]
+
+    static func actions(for entryKind: GoodsEntryKind) -> [GoodsQuickActionKind] {
+        switch entryKind {
+        case .inventory:
+            inventoryActions
+        case .wish:
+            wishActions
+        }
+    }
 
     var id: String { title }
 
     var title: String {
+        title(for: nil)
+    }
+
+    func title(for itemStatus: GoodsEntryStatus?) -> String {
         switch self {
         case .edit:
             "編集する"
         case .moveToKeep:
-            "自分用キープへ"
+            itemStatus == .keep ? "譲る候補へ" : "自分用キープへ"
         case .tag:
             "タグをつける"
         case .delete:
@@ -288,6 +302,12 @@ struct GoodsTileActionPolicy: Equatable {
     }
 }
 
+enum GoodsTileContextMenuPolicy {
+    static func isEnabled(actions: [GoodsTileAction], hasLongPressSelection: Bool) -> Bool {
+        !hasLongPressSelection && actions.count > 1
+    }
+}
+
 struct GoodsGrid: View {
     var items: [GoodsItem]
     var columns: Int = 3
@@ -322,10 +342,11 @@ struct GoodsGrid: View {
     var body: some View {
         LazyVGrid(columns: gridItems, spacing: GoodsGridLayout.rowSpacing) {
             ForEach(items) { item in
+                let tileActions = actions(for: item)
                 GoodsTile(
                     item: item,
                     context: context,
-                    actions: actions(for: item),
+                    actions: tileActions,
                     onOpenDetail: {
                         if isSelectionMode, let onToggleSelection {
                             onToggleSelection(item)
@@ -345,7 +366,10 @@ struct GoodsGrid: View {
                     isBusy: busyItemID == item.id,
                     isSelectionMode: isSelectionMode,
                     isSelected: selectedItemIDs.contains(item.id),
-                    usesSystemContextMenu: onBeginSelection == nil,
+                    usesSystemContextMenu: GoodsTileContextMenuPolicy.isEnabled(
+                        actions: tileActions,
+                        hasLongPressSelection: onBeginSelection != nil
+                    ),
                     onLongPress: onBeginSelection.map { beginSelection in
                         { beginSelection(item) }
                     }

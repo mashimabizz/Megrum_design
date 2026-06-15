@@ -2,9 +2,27 @@
 import XCTest
 
 final class MegrumAppStateInputNormalizerTests: XCTestCase {
+    func testTrimmedTextRemovesOuterWhitespace() {
+        XCTAssertEqual(MegrumAppStateInputNormalizer.trimmedText("  サナ  \n"), "サナ")
+    }
+
+    func testOptionalTextTrimsBlankValues() {
+        XCTAssertEqual(MegrumAppStateInputNormalizer.optionalText("  PayPay相談可 "), "PayPay相談可")
+        XCTAssertNil(MegrumAppStateInputNormalizer.optionalText(" \n "))
+        XCTAssertNil(MegrumAppStateInputNormalizer.optionalText(nil))
+    }
+
     func testProfileHandleTrimsLowercasesAndDropsLeadingAtMarks() {
         XCTAssertEqual(MegrumAppStateInputNormalizer.profileHandle("  @@Megrum_User  "), "megrum_user")
         XCTAssertNil(MegrumAppStateInputNormalizer.profileHandle(" @@@ "))
+    }
+
+    func testProfileHandleValidationUsesProfileEditRules() {
+        XCTAssertTrue(MegrumAppStateInputNormalizer.isValidProfileHandle("michi_1"))
+        XCTAssertTrue(MegrumAppStateInputNormalizer.isValidProfileHandle("abc"))
+        XCTAssertFalse(MegrumAppStateInputNormalizer.isValidProfileHandle("mi"))
+        XCTAssertFalse(MegrumAppStateInputNormalizer.isValidProfileHandle("michi-name"))
+        XCTAssertFalse(MegrumAppStateInputNormalizer.isValidProfileHandle("michi_name_12345678901"))
     }
 
     func testPostalCodeKeepsFirstSevenDigits() {
@@ -16,6 +34,12 @@ final class MegrumAppStateInputNormalizerTests: XCTestCase {
         XCTAssertEqual(MegrumAppStateInputNormalizer.prefecture(" Tokyo "), "Tokyo")
         XCTAssertNil(MegrumAppStateInputNormalizer.prefecture("  \n "))
         XCTAssertNil(MegrumAppStateInputNormalizer.prefecture(nil))
+    }
+
+    func testGoodsQuantityClampsToSupportedRange() {
+        XCTAssertEqual(MegrumAppStateInputNormalizer.goodsQuantity(-1), 1)
+        XCTAssertEqual(MegrumAppStateInputNormalizer.goodsQuantity(12), 12)
+        XCTAssertEqual(MegrumAppStateInputNormalizer.goodsQuantity(1_000), 999)
     }
 
     func testTagNamesTrimHashesDeduplicateAndCapCount() {

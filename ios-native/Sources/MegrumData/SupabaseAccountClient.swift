@@ -20,7 +20,7 @@ public final class SupabaseAccountClient: @unchecked Sendable {
         let rows: [SupabaseUserProfileRow] = try await client.upsertRows(
             into: "users",
             values: [payload],
-            select: "id,handle,display_name,avatar_url,primary_area",
+            select: "id,handle,display_name,avatar_url,primary_area,age",
             onConflict: "id"
         )
         return rows.first?.profile ?? fallbackProfile(session: session, handle: handle, displayName: displayName)
@@ -36,7 +36,7 @@ public final class SupabaseAccountClient: @unchecked Sendable {
         return try SupabaseRESTClient(configuration: configuration.withAccessToken(session.accessToken)).makeMutationRequest(
             path: "/rest/v1/users",
             queryItems: [
-                URLQueryItem(name: "select", value: "id,handle,display_name,avatar_url,primary_area,account_status"),
+                URLQueryItem(name: "select", value: "id,handle,display_name,avatar_url,primary_area,age,account_status"),
                 URLQueryItem(name: "on_conflict", value: "id")
             ],
             method: "POST",
@@ -114,6 +114,7 @@ private struct SupabaseUserProfileRow: Decodable, Sendable {
     var displayName: String?
     var avatarUrl: URL?
     var primaryArea: String?
+    var age: Int?
     var accountStatus: String?
 
     var profile: UserProfile {
@@ -123,6 +124,7 @@ private struct SupabaseUserProfileRow: Decodable, Sendable {
             displayName: displayName ?? handle ?? "Megrum",
             avatarURL: avatarUrl,
             prefecture: primaryArea,
+            age: age,
             accountStatus: AccountStatus(rawValue: accountStatus ?? "") ?? .onboarding
         )
     }

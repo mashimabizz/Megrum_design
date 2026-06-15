@@ -14,7 +14,6 @@ struct ProposalCreateActiveContent<GiveContent: View, ReceiveContent: View, Meet
     var usesInlineBottomBar: Bool
     var meetupHasTimeDraft: Bool
     var isCreating: Bool
-    var displayPartnerHandle: String
     var onBack: () -> Void
     var onPrimary: () -> Void
     private var giveContent: () -> GiveContent
@@ -34,7 +33,6 @@ struct ProposalCreateActiveContent<GiveContent: View, ReceiveContent: View, Meet
         usesInlineBottomBar: Bool,
         meetupHasTimeDraft: Bool,
         isCreating: Bool,
-        displayPartnerHandle: String,
         onBack: @escaping () -> Void,
         onPrimary: @escaping () -> Void,
         @ViewBuilder giveContent: @escaping () -> GiveContent,
@@ -53,7 +51,6 @@ struct ProposalCreateActiveContent<GiveContent: View, ReceiveContent: View, Meet
         self.usesInlineBottomBar = usesInlineBottomBar
         self.meetupHasTimeDraft = meetupHasTimeDraft
         self.isCreating = isCreating
-        self.displayPartnerHandle = displayPartnerHandle
         self.onBack = onBack
         self.onPrimary = onPrimary
         self.giveContent = giveContent
@@ -66,6 +63,7 @@ struct ProposalCreateActiveContent<GiveContent: View, ReceiveContent: View, Meet
         VStack(spacing: 0) {
             ProposalFlowScreenHeader(
                 title: ProposalFlowScreenCopy.title(for: selectedStep),
+                showsKicker: ProposalFlowScreenCopy.showsHeaderKicker(for: selectedStep),
                 onBack: onBack
             )
             .padding(.horizontal, 18)
@@ -107,10 +105,6 @@ struct ProposalCreateActiveContent<GiveContent: View, ReceiveContent: View, Meet
         case .meetup:
             meetupContent()
         case .confirm:
-            ProposalConfirmNoticeCard(
-                title: ProposalFlowScreenCopy.title(for: selectedStep),
-                text: ProposalFlowScreenCopy.confirmNoticeText(partnerHandle: displayPartnerHandle)
-            )
             confirmContent()
             ProposalFlowBottomBar(
                 selectedStep: selectedStep,

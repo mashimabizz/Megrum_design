@@ -178,6 +178,18 @@ public final class SupabaseListingClient: @unchecked Sendable {
         return listingRow.listing(options: optionRows.map(\.option))
     }
 
+    public func archiveListing(userID: UUID, listingID: UUID) async throws {
+        let rows: [ListingRow] = try await client.updateRows(
+            in: "listings",
+            values: ListingStatusPayload(status: IndividualListingStatus.closed.rawValue),
+            select: ListingRow.select,
+            queryItems: ownedListingQueryItems(userID: userID, listingID: listingID)
+        )
+        guard !rows.isEmpty else {
+            throw SupabaseRESTError.unexpectedStatus(-1)
+        }
+    }
+
     public func makeLoadListingsRequest(userID: UUID) throws -> URLRequest {
         try client.makeRequest(
             path: "/rest/v1/listings",

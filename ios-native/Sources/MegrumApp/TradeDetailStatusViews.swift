@@ -1,6 +1,5 @@
 import MegrumCore
 import MegrumDesign
-import PhotosUI
 import SwiftUI
 
 struct TradeProposalResponsePanel: View {
@@ -357,93 +356,5 @@ struct TradeDisputeBanner: View {
         }
         .buttonStyle(.plain)
         .accessibilityLabel("\(summary.bannerTitle)。\(summary.bannerBody)。詳細を見る")
-    }
-}
-
-struct TradeDayOfBanner: View {
-    var presentation: TradeDayOfBannerPresentation
-    @Binding var selectedOutfitPhotoItem: PhotosPickerItem?
-    var isSending: Bool
-    var canUseCamera: Bool
-    var onOpenOutfitCamera: () -> Void
-    var onMarkArrived: () -> Void
-    var onShareLocation: () -> Void
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Label("当日の合流サポート", systemImage: "figure.wave")
-                .font(.system(size: 16, weight: .heavy, design: .rounded))
-                .foregroundStyle(MegrumTheme.ink)
-
-            Text(presentation.promptText)
-                .font(.system(size: 12, weight: .semibold, design: .rounded))
-                .foregroundStyle(MegrumTheme.muted)
-
-            HStack(spacing: 8) {
-                statusChip(title: "あなた", value: presentation.myArrivalText)
-                statusChip(title: "相手", value: presentation.partnerArrivalText)
-            }
-
-            HStack(spacing: 8) {
-                statusChip(title: "服装写真", value: presentation.myOutfitText)
-                statusChip(title: "相手の服装", value: presentation.partnerOutfitText)
-            }
-
-            HStack(spacing: 8) {
-                Button(action: onMarkArrived) {
-                    Label("到着", systemImage: "checkmark.circle")
-                }
-                .disabled(isSending)
-
-                Button(action: onShareLocation) {
-                    Label("現在地", systemImage: "location")
-                }
-                .disabled(isSending)
-
-                Menu {
-#if os(iOS)
-                    Button(action: onOpenOutfitCamera) {
-                        Label("カメラで撮る", systemImage: "camera.fill")
-                    }
-                    .disabled(!canUseCamera || isSending)
-#endif
-
-                    PhotosPicker(selection: $selectedOutfitPhotoItem, matching: .images) {
-                        Label("写真から選ぶ", systemImage: "photo.on.rectangle")
-                    }
-                    .disabled(isSending)
-                } label: {
-                    Label("服装", systemImage: "person.crop.rectangle")
-                }
-                .disabled(isSending)
-            }
-            .font(.system(size: 13, weight: .heavy, design: .rounded))
-            .buttonStyle(.bordered)
-            .controlSize(.small)
-        }
-        .padding(16)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: 24, style: .continuous)
-                .strokeBorder(.white.opacity(0.7), lineWidth: 1)
-        }
-        .accessibilityElement(children: .combine)
-    }
-
-    private func statusChip(title: String, value: String) -> some View {
-        VStack(alignment: .leading, spacing: 3) {
-            Text(title)
-                .font(.system(size: 11, weight: .heavy, design: .rounded))
-                .foregroundStyle(MegrumTheme.muted)
-            Text(value)
-                .font(.system(size: 13, weight: .heavy, design: .rounded))
-                .foregroundStyle(MegrumTheme.ink)
-                .lineLimit(1)
-                .minimumScaleFactor(0.8)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, 11)
-        .padding(.vertical, 9)
-        .background(.white.opacity(0.72), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
     }
 }

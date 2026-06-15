@@ -7,6 +7,134 @@ import UniformTypeIdentifiers
 import XCTest
 
 final class GoodsEditorDraftTests: XCTestCase {
+    func testGoodsEditorPresentationTextPreservesExistingCopy() {
+        XCTAssertEqual(
+            GoodsEditorPresentationText.navigationTitle(mode: .create, entryKind: .inventory),
+            "マイグッズに追加"
+        )
+        XCTAssertEqual(
+            GoodsEditorPresentationText.navigationTitle(mode: .edit, entryKind: .wish),
+            "Wishを編集"
+        )
+        XCTAssertEqual(GoodsEditorMode.edit.badgeTitle, "更新")
+        XCTAssertEqual(
+            GoodsEditorPresentationText.headerDescription(usesInventoryCreateFlow: true, entryKind: .inventory),
+            "推し・種別、写真、写真ごとの詳細の順に登録できます。"
+        )
+        XCTAssertEqual(
+            GoodsEditorPresentationText.saveButtonTitle(
+                mode: .edit,
+                entryKind: .inventory,
+                isMutatingCurrentItem: true,
+                isCreatingGoodsEntry: false
+            ),
+            "更新しています"
+        )
+        XCTAssertEqual(
+            GoodsEditorPresentationText.saveButtonTitle(
+                mode: .create,
+                entryKind: .wish,
+                isMutatingCurrentItem: false,
+                isCreatingGoodsEntry: false
+            ),
+            "Wishを登録"
+        )
+        XCTAssertEqual(
+            GoodsEditorPresentationText.photoActionTitle(entryKind: .inventory, hasDisplayPhoto: true),
+            "撮り直す / 差し替え"
+        )
+        XCTAssertEqual(GoodsEditorPresentationText.wishImageHint(hasDisplayPhoto: false), "任意")
+    }
+
+    func testGoodsEditorTagSuggestionBuilderRanksHistoryAndExcludesSelectedTags() {
+        let groupID = UUID()
+        let otherGroupID = UUID()
+        let ownerID = UUID()
+        let inventory = [
+            makeGoodsItem(ownerID: ownerID, groupID: groupID, tagNames: ["LIVE", "zeta"]),
+            makeGoodsItem(ownerID: ownerID, groupID: otherGroupID, tagNames: ["otherOnly"])
+        ]
+        let wishes = [
+            makeWishItem(ownerID: ownerID, groupID: groupID, tagNames: ["LIVE", "alpha"])
+        ]
+
+        let suggestions = GoodsEditorTagSuggestionBuilder.suggestions(
+            groupID: groupID,
+            selectedTags: ["live"],
+            inventory: inventory,
+            wishes: wishes,
+            limit: 4
+        )
+
+        XCTAssertEqual(Array(suggestions.prefix(2)), ["alpha", "zeta"])
+        XCTAssertFalse(suggestions.contains("LIVE"))
+        XCTAssertFalse(suggestions.contains("otherOnly"))
+        XCTAssertEqual(suggestions.count, 4)
+    }
+
+    func testGoodsEditorTagSuggestionBuilderUsesFallbackOrderWhenHistoryIsEmpty() {
+        let suggestions = GoodsEditorTagSuggestionBuilder.suggestions(
+            groupID: UUID(),
+            selectedTags: ["会場限定"],
+            inventory: [],
+            wishes: [],
+            limit: 3
+        )
+
+        XCTAssertEqual(suggestions, ["未開封", "トレカ", "ラキドロ"])
+    }
+
+    func testGoodsEditorMemberScopeKeepsMembersInsideSelectedGroupOrWork() {
+        let selectedGroupID = UUID()
+        let otherGroupID = UUID()
+        let selectedGroup = OshiGroup(id: selectedGroupID, name: "TWICE", kind: .group)
+        let selectedMember = OshiCharacter(id: UUID(), groupID: selectedGroupID, name: "SANA")
+        let otherMember = OshiCharacter(id: UUID(), groupID: otherGroupID, name: "KARINA")
+
+        let members = GoodsEditorMemberScope.members(
+            for: selectedGroup,
+            from: [selectedMember, otherMember]
+        )
+
+        XCTAssertEqual(members, [selectedMember])
+        XCTAssertTrue(
+            GoodsEditorMemberScope.canUseMemberID(
+                selectedMember.id,
+                group: selectedGroup,
+                members: [selectedMember, otherMember]
+            )
+        )
+        XCTAssertFalse(
+            GoodsEditorMemberScope.canUseMemberID(
+                otherMember.id,
+                group: selectedGroup,
+                members: [selectedMember, otherMember]
+            )
+        )
+    }
+
+    func testGoodsEditorMemberScopeHidesMembersForSoloOshi() {
+        let soloGroup = OshiGroup(id: UUID(), name: "IU", kind: .solo)
+        let soloCharacter = OshiCharacter(id: UUID(), groupID: soloGroup.id, name: "IU")
+
+        XCTAssertTrue(GoodsEditorMemberScope.members(for: soloGroup, from: [soloCharacter]).isEmpty)
+        XCTAssertTrue(GoodsEditorMemberScope.memberIDs(for: soloGroup, from: [soloCharacter]).isEmpty)
+        XCTAssertFalse(
+            GoodsEditorMemberScope.canUseMemberID(
+                soloCharacter.id,
+                group: soloGroup,
+                members: [soloCharacter]
+            )
+        )
+        XCTAssertTrue(
+            GoodsEditorMemberScope.canUseMemberID(
+                nil,
+                group: soloGroup,
+                members: [soloCharacter]
+            )
+        )
+    }
+
     func testInventoryCreateMetaBuildsInputPerPhoto() throws {
         let groupID = UUID()
         let memberID = UUID()
@@ -33,6 +161,35 @@ final class GoodsEditorDraftTests: XCTestCase {
         XCTAssertEqual(input.memberID, memberID)
         XCTAssertEqual(input.quantity, 2)
         XCTAssertEqual(input.tagNames, ["会場限定"])
+        XCTAssertEqual(input.photoUpload, photoUpload)
+    }
+
+    func testInventoryCreateInputBuilderResolvesPhotoAndMemberPerMeta() throws {
+        let groupID = UUID()
+        let memberID = UUID()
+        let goodsTypeID = UUID()
+        let photoID = UUID()
+        let photoUpload = GoodsPhotoUpload(data: Data([0xFF, 0xD8, 0xFF]), contentType: "image/jpeg")
+        var draft = GoodsEditorDraft(mode: .create, entryKind: .inventory)
+        draft.groupID = groupID
+        draft.goodsTypeID = goodsTypeID
+        draft.addTag("ラキドロ")
+
+        let inputs = GoodsInventoryCreateInputBuilder.inputs(
+            metas: [GoodsCreateMetaDraft(photoID: photoID, memberID: memberID, quantity: 3)],
+            photos: [GoodsCreatePhotoDraft(id: photoID, upload: photoUpload)],
+            sharedDraft: draft,
+            groupName: "TWICE",
+            members: [OshiCharacter(id: memberID, groupID: groupID, name: "MOMO")],
+            goodsTypeName: "トレカ"
+        )
+
+        let input = try XCTUnwrap(inputs.first)
+        XCTAssertEqual(inputs.count, 1)
+        XCTAssertEqual(input.title, "MOMO TWICE トレカ")
+        XCTAssertEqual(input.memberID, memberID)
+        XCTAssertEqual(input.quantity, 3)
+        XCTAssertEqual(input.tagNames, ["ラキドロ"])
         XCTAssertEqual(input.photoUpload, photoUpload)
     }
 
@@ -307,6 +464,22 @@ final class GoodsEditorDraftTests: XCTestCase {
         XCTAssertFalse(results.first?.data.isEmpty ?? true)
     }
 
+    func testTradingCardBulkRecognizerCropsManualFrames() throws {
+        let data = try makeSolidJPEGData(width: 80, height: 100)
+        let frame = TradingCardCropFrame(
+            rect: CGRect(x: 0.25, y: 0.20, width: 0.50, height: 0.60),
+            source: .detected
+        )
+
+        let results = try TradingCardBulkRecognizer.cropFramesSynchronously([frame], in: data)
+
+        XCTAssertEqual(results.count, 1)
+        XCTAssertEqual(results.first?.id, frame.id)
+        XCTAssertEqual(results.first?.source, .detected)
+        XCTAssertEqual(results.first?.contentType, "image/jpeg")
+        XCTAssertFalse(results.first?.data.isEmpty ?? true)
+    }
+
     func testTradingCardBulkRecognizerRejectsInvalidImageData() async {
         do {
             _ = try await TradingCardBulkRecognizer.recognizeCards(in: Data([0x00, 0x01, 0x02]))
@@ -357,5 +530,25 @@ final class GoodsEditorDraftTests: XCTestCase {
             return Data()
         }
         return output as Data
+    }
+
+    private func makeGoodsItem(ownerID: UUID, groupID: UUID, tagNames: [String]) -> GoodsItem {
+        GoodsItem(
+            id: UUID(),
+            ownerID: ownerID,
+            groupID: groupID,
+            title: "タグ候補テスト",
+            tags: tagNames.map { GoodsTag(id: UUID(), name: $0) }
+        )
+    }
+
+    private func makeWishItem(ownerID: UUID, groupID: UUID, tagNames: [String]) -> WishItem {
+        WishItem(
+            id: UUID(),
+            ownerID: ownerID,
+            groupID: groupID,
+            title: "タグ候補テスト",
+            tags: tagNames.map { GoodsTag(id: UUID(), name: $0) }
+        )
     }
 }

@@ -4,9 +4,11 @@ import SwiftUI
 
 struct GoodsEditorTagsSection: View {
     var tagNames: [String]
+    var suggestedTagNames: [String] = []
     @Binding var tagDraft: String
     var isTagFieldFocused: FocusState<Bool>.Binding
     var isItemReadOnly: Bool
+    var onAddSuggestedTag: (String) -> Void = { _ in }
     var onRemoveTag: (String) -> Void
     var onAddTag: () -> Void
 
@@ -16,10 +18,20 @@ struct GoodsEditorTagsSection: View {
             && tagNames.count < 5
     }
 
+    private var availableSuggestedTags: [String] {
+        suggestedTagNames
+            .filter { suggestion in
+                !tagNames.contains { $0.caseInsensitiveCompare(suggestion) == .orderedSame }
+            }
+            .prefix(max(0, 5 - tagNames.count))
+            .map(\.self)
+    }
+
     var body: some View {
         GoodsEditorSectionContainer(title: "タグ", systemImage: "tag") {
             VStack(alignment: .leading, spacing: 12) {
                 tagList
+                suggestedTagList
                 tagInput
 
                 Text("タグは5件まで入力できます。保存時にグッズへ反映されます。")
@@ -31,11 +43,7 @@ struct GoodsEditorTagsSection: View {
 
     @ViewBuilder
     private var tagList: some View {
-        if tagNames.isEmpty {
-            Text("タグなし")
-                .font(.subheadline.weight(.bold))
-                .foregroundStyle(MegrumTheme.muted)
-        } else {
+        if !tagNames.isEmpty {
             GoodsEditorFlowLayout(spacing: 8) {
                 ForEach(tagNames, id: \.self) { tag in
                     Button {
@@ -54,6 +62,32 @@ struct GoodsEditorTagsSection: View {
                     }
                     .buttonStyle(.plain)
                     .disabled(isItemReadOnly)
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var suggestedTagList: some View {
+        if !availableSuggestedTags.isEmpty {
+            GoodsEditorFlowLayout(spacing: 8) {
+                ForEach(availableSuggestedTags, id: \.self) { tag in
+                    Button {
+                        onAddSuggestedTag(tag)
+                    } label: {
+                        Text("#\(tag)")
+                            .font(.caption.weight(.black))
+                            .foregroundStyle(MegrumTheme.lavender)
+                            .padding(.horizontal, 11)
+                            .padding(.vertical, 7)
+                            .background(MegrumTheme.lavender.opacity(0.10), in: Capsule())
+                            .overlay {
+                                Capsule()
+                                    .strokeBorder(MegrumTheme.lavender.opacity(0.20), lineWidth: 1)
+                            }
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(isItemReadOnly || tagNames.count >= 5)
                 }
             }
         }

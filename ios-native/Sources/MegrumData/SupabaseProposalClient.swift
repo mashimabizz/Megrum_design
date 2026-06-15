@@ -35,7 +35,7 @@ public final class SupabaseProposalClient: @unchecked Sendable {
             select: ProposalRow.select,
             queryItems: [
                 URLQueryItem(name: "or", value: "(sender_id.eq.\(viewer),receiver_id.eq.\(viewer))"),
-                URLQueryItem(name: "order", value: "created_at.desc")
+                URLQueryItem(name: "order", value: "updated_at.desc.nullslast,created_at.desc")
             ]
         )
         return rows.compactMap(\.proposal)
@@ -57,9 +57,12 @@ public final class SupabaseProposalClient: @unchecked Sendable {
             senderGoodsIDs: input.senderGoodsIDs,
             receiverGoodsIDs: input.receiverGoodsIDs,
             conditionTags: input.conditionTags,
+            cashOffer: input.cashOffer,
+            cashAmount: input.cashAmount,
             agreedBySender: [.sent, .negotiating, .agreementOneSide, .agreed].contains(input.status),
             agreedByReceiver: input.status == .agreed,
-            createdAt: now
+            createdAt: now,
+            updatedAt: now
         )
     }
 
@@ -98,7 +101,7 @@ public final class SupabaseProposalClient: @unchecked Sendable {
         try? await createSystemMessage(
             proposalID: proposalID,
             senderID: userID,
-            body: "打診を断りました"
+            body: updated.senderID == userID ? "打診を取り下げました" : "打診を断りました"
         )
         return updated
     }
@@ -132,7 +135,7 @@ public final class SupabaseProposalClient: @unchecked Sendable {
         )
 
         let nextPosition = try await nextEvidencePhotoPosition(proposalID: input.proposalID)
-        let now = isoTimestamp(.now)
+        let now = SupabaseDateEncoding.isoTimestamp(.now)
         let _: [EvidencePhotoAckRow] = try await client.insertRows(
             into: "proposal_evidence_photos",
             values: [
@@ -166,6 +169,18 @@ public final class SupabaseProposalClient: @unchecked Sendable {
             body: "取引証跡が追加されました"
         )
         return updated
+    }
+
+    public func loadEvidencePhotos(proposalID: UUID) async throws -> [TradeEvidencePhoto] {
+        let rows: [EvidencePhotoRow] = try await client.fetchRows(
+            from: "proposal_evidence_photos",
+            select: EvidencePhotoRow.select,
+            queryItems: [
+                URLQueryItem(name: "proposal_id", value: "eq.\(proposalID.uuidString.lowercased())"),
+                URLQueryItem(name: "order", value: "position.asc")
+            ]
+        )
+        return rows.compactMap(\.evidencePhoto)
     }
 
     public func approveEvidence(userID: UUID, proposalID: UUID) async throws -> TradeProposal {
@@ -225,7 +240,7 @@ public final class SupabaseProposalClient: @unchecked Sendable {
                     raterID: userID,
                     rateeID: rateeID,
                     stars: input.stars,
-                    comment: input.comment?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
+                    comment: SupabaseTextNormalizer.optional(input.comment)
                 )
             ],
             select: "id,rater_id,stars,comment,created_at"
@@ -248,7 +263,18 @@ public final class SupabaseProposalClient: @unchecked Sendable {
             queryItems: [
                 URLQueryItem(name: "select", value: ProposalRow.select),
                 URLQueryItem(name: "or", value: "(sender_id.eq.\(viewer),receiver_id.eq.\(viewer))"),
-                URLQueryItem(name: "order", value: "created_at.desc")
+                URLQueryItem(name: "order", value: "updated_at.desc.nullslast,created_at.desc")
+            ]
+        )
+    }
+
+    public func makeLoadEvidencePhotosRequest(proposalID: UUID) throws -> URLRequest {
+        try client.makeRequest(
+            path: "/rest/v1/proposal_evidence_photos",
+            queryItems: [
+                URLQueryItem(name: "select", value: EvidencePhotoRow.select),
+                URLQueryItem(name: "proposal_id", value: "eq.\(proposalID.uuidString.lowercased())"),
+                URLQueryItem(name: "order", value: "position.asc")
             ]
         )
     }
@@ -345,7 +371,7 @@ public final class SupabaseProposalClient: @unchecked Sendable {
                     raterID: userID,
                     rateeID: rateeID,
                     stars: input.stars,
-                    comment: input.comment?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
+                    comment: SupabaseTextNormalizer.optional(input.comment)
                 )
             ],
             select: "id,rater_id,stars,comment,created_at"
@@ -424,6 +450,8 @@ private struct ProposalRow: Decodable, Sendable {
         "exchange_method",
         "sender_have_ids",
         "receiver_have_ids",
+        "cash_offer",
+        "cash_amount",
         "option_tags",
         "agreed_by_sender",
         "agreed_by_receiver",
@@ -439,7 +467,8 @@ private struct ProposalRow: Decodable, Sendable {
         "meetup_lat",
         "meetup_lng",
         "meetup_candidates",
-        "created_at"
+        "created_at",
+        "updated_at"
     ].joined(separator: ",")
 
     var id: UUID
@@ -450,6 +479,8 @@ private struct ProposalRow: Decodable, Sendable {
     var exchangeMethod: String?
     var senderHaveIds: [UUID]?
     var receiverHaveIds: [UUID]?
+    var cashOffer: Bool?
+    var cashAmount: Int?
     var optionTags: [String]?
     var agreedBySender: Bool?
     var agreedByReceiver: Bool?
@@ -466,6 +497,7 @@ private struct ProposalRow: Decodable, Sendable {
     var meetupLng: Double?
     var meetupCandidates: [ProposalMeetupCandidateRow]?
     var createdAt: Date?
+    var updatedAt: Date?
 
     var proposal: TradeProposal? {
         guard let proposalStatus = ProposalStatus(rawValue: status) else {
@@ -481,6 +513,8 @@ private struct ProposalRow: Decodable, Sendable {
             senderGoodsIDs: senderHaveIds ?? [],
             receiverGoodsIDs: receiverHaveIds ?? [],
             conditionTags: optionTags ?? [],
+            cashOffer: cashOffer ?? false,
+            cashAmount: cashAmount,
             agreedBySender: agreedBySender ?? false,
             agreedByReceiver: agreedByReceiver ?? false,
             evidencePhotoURL: evidencePhotoUrl.flatMap(URL.init(string:)),
@@ -490,6 +524,7 @@ private struct ProposalRow: Decodable, Sendable {
             approvedByReceiver: approvedByReceiver ?? false,
             completedAt: completedAt,
             createdAt: createdAt ?? .now,
+            updatedAt: updatedAt,
             meetupCandidates: normalizedMeetupCandidates
         )
     }
@@ -497,7 +532,7 @@ private struct ProposalRow: Decodable, Sendable {
     private var mirroredMeetup: ProposalMeetupInput? {
         guard let meetupStartAt,
               let meetupEndAt,
-              let placeName = meetupPlaceName?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty,
+              let placeName = SupabaseTextNormalizer.optional(meetupPlaceName),
               let meetupLat,
               let meetupLng
         else {
@@ -586,20 +621,20 @@ private struct ProposalCreatePayload: Encodable, Sendable {
         self.senderHaveQtys = input.senderGoodsIDs.map { _ in 1 }
         self.receiverHaveIds = input.receiverGoodsIDs
         self.receiverHaveQtys = input.receiverGoodsIDs.map { _ in 1 }
-        self.message = input.message?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
+        self.message = SupabaseTextNormalizer.optional(input.message)
         self.messageTone = "standard"
         self.status = input.status.rawValue
-        self.lastActionAt = isoTimestamp(now)
-        self.expiresAt = input.status == .draft ? nil : expiresAt.map(isoTimestamp)
+        self.lastActionAt = SupabaseDateEncoding.isoTimestamp(now)
+        self.expiresAt = input.status == .draft ? nil : expiresAt.map(SupabaseDateEncoding.isoTimestamp)
         self.exchangeMethod = input.exchangeMethod.rawValue
         self.optionTags = input.conditionTags
         self.exposeCalendar = input.requiresMeetupBeforeSending && input.exposeCalendar
         self.listingId = input.listingID
-        self.cashOffer = false
-        self.cashAmount = nil
-        self.meetupStartAt = meetup.map { isoTimestamp($0.startAt) }
-        self.meetupEndAt = meetup.map { isoTimestamp($0.endAt) }
-        self.meetupPlaceName = meetup?.normalizedPlaceName.nilIfEmpty
+        self.cashOffer = input.cashOffer
+        self.cashAmount = input.cashAmount
+        self.meetupStartAt = meetup.map { SupabaseDateEncoding.isoTimestamp($0.startAt) }
+        self.meetupEndAt = meetup.map { SupabaseDateEncoding.isoTimestamp($0.endAt) }
+        self.meetupPlaceName = SupabaseTextNormalizer.optional(meetup?.normalizedPlaceName)
         self.meetupLat = meetup?.latitude
         self.meetupLng = meetup?.longitude
         self.meetupCandidates = meetupCandidates.map(ProposalMeetupCandidatePayload.init)
@@ -625,8 +660,8 @@ private struct ProposalMeetupCandidatePayload: Encodable, Sendable {
     var mode: String
 
     init(meetup: ProposalMeetupInput) {
-        self.startAt = isoTimestamp(meetup.startAt)
-        self.endAt = isoTimestamp(meetup.endAt)
+        self.startAt = SupabaseDateEncoding.isoTimestamp(meetup.startAt)
+        self.endAt = SupabaseDateEncoding.isoTimestamp(meetup.endAt)
         self.placeName = meetup.normalizedPlaceName
         self.lat = meetup.latitude
         self.lng = meetup.longitude
@@ -720,7 +755,7 @@ private struct ProposalCancelApprovalUpdatePayload: Encodable, Sendable {
     var lastActionAt: String
 
     init(now: Date) {
-        self.lastActionAt = isoTimestamp(now)
+        self.lastActionAt = SupabaseDateEncoding.isoTimestamp(now)
     }
 }
 
@@ -738,6 +773,31 @@ private struct EvidencePhotoAckRow: Decodable, Sendable {
 
 private struct EvidencePhotoPositionRow: Decodable, Sendable {
     var position: Int?
+}
+
+private struct EvidencePhotoRow: Decodable, Sendable {
+    static let select = "id,proposal_id,photo_url,position,taken_at,taken_by"
+
+    var id: UUID
+    var proposalId: UUID
+    var photoUrl: String
+    var position: Int?
+    var takenAt: Date?
+    var takenBy: UUID
+
+    var evidencePhoto: TradeEvidencePhoto? {
+        guard let url = URL(string: photoUrl) else {
+            return nil
+        }
+        return TradeEvidencePhoto(
+            id: id,
+            proposalID: proposalId,
+            photoURL: url,
+            position: position ?? 1,
+            takenAt: takenAt,
+            takenBy: takenBy
+        )
+    }
 }
 
 private struct SystemMessagePayload: Encodable, Sendable {
@@ -777,18 +837,6 @@ private struct EvaluationInsertRow: Decodable, Sendable {
             createdAt: createdAt ?? .now
         )
     }
-}
-
-private extension String {
-    var nilIfEmpty: String? {
-        isEmpty ? nil : self
-    }
-}
-
-private func isoTimestamp(_ date: Date) -> String {
-    let formatter = ISO8601DateFormatter()
-    formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-    return formatter.string(from: date)
 }
 
 private func normalizedImageContentType(_ value: String) -> String {

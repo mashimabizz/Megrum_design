@@ -300,16 +300,14 @@ private struct GoodsCollectionTagPlate: View {
 
     var body: some View {
         GeometryReader { proxy in
-            HStack {
-                Spacer(minLength: 0)
-                GoodsTagTextPill(
-                    text: text,
-                    fontSize: GoodsTileCollectionCardMetrics.tagFontSize,
-                    horizontalPadding: GoodsTileCollectionCardMetrics.tagHorizontalPadding,
-                    verticalPadding: GoodsTileCollectionCardMetrics.tagVerticalPadding
-                )
-                .frame(maxWidth: proxy.size.width * GoodsTileCollectionCardMetrics.tagMaxWidthRatio)
-            }
+            GoodsTagTextPill(
+                text: text,
+                fontSize: GoodsTileCollectionCardMetrics.tagFontSize,
+                horizontalPadding: GoodsTileCollectionCardMetrics.tagHorizontalPadding,
+                verticalPadding: GoodsTileCollectionCardMetrics.tagVerticalPadding
+            )
+            .frame(maxWidth: proxy.size.width * GoodsTileCollectionCardMetrics.tagMaxWidthRatio, alignment: .trailing)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
             .padding(GoodsTileCollectionCardMetrics.tagInset)
         }
         .accessibilityHidden(true)

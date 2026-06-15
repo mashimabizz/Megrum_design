@@ -96,7 +96,7 @@ public final class SupabaseGoodsInventoryClient: @unchecked Sendable {
             groupID: input.groupID,
             memberID: input.memberID,
             goodsTypeID: input.goodsTypeID,
-            title: input.title.trimmingCharacters(in: .whitespacesAndNewlines),
+            title: SupabaseTextNormalizer.trimmed(input.title),
             imageURL: normalizedPhotoURLs.compactMap(URL.init(string:)).first,
             quantity: max(1, min(input.quantity, 999))
         )
@@ -352,12 +352,13 @@ public final class SupabaseGoodsInventoryClient: @unchecked Sendable {
         var queryItems = [
             URLQueryItem(name: "kind", value: "eq.for_trade"),
             URLQueryItem(name: "status", value: "in.(active,reserved)"),
+            URLQueryItem(name: "market_available_qty", value: "gt.0"),
             URLQueryItem(name: "user_id", value: "neq.\(viewerID.uuidString.lowercased())"),
             URLQueryItem(name: "order", value: "updated_at.desc"),
             URLQueryItem(name: "limit", value: "\(max(1, min(input.limit, 100)))")
         ]
 
-        let query = input.query.trimmingCharacters(in: .whitespacesAndNewlines)
+        let query = SupabaseTextNormalizer.trimmed(input.query)
         if !query.isEmpty {
             queryItems.append(URLQueryItem(name: "title", value: "ilike.*\(query)*"))
         }
@@ -377,6 +378,7 @@ public final class SupabaseGoodsInventoryClient: @unchecked Sendable {
         [
             URLQueryItem(name: "kind", value: "eq.for_trade"),
             URLQueryItem(name: "status", value: "in.(active,reserved)"),
+            URLQueryItem(name: "market_available_qty", value: "gt.0"),
             URLQueryItem(name: "user_id", value: "eq.\(userID.uuidString.lowercased())"),
             URLQueryItem(name: "order", value: "updated_at.desc"),
             URLQueryItem(name: "limit", value: "\(max(1, min(limit, 100)))")
@@ -392,16 +394,13 @@ public final class SupabaseGoodsInventoryClient: @unchecked Sendable {
     }
 
     private func validateCreateInput(_ input: GoodsEntryInput) throws {
-        guard !input.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+        guard !SupabaseTextNormalizer.trimmed(input.title).isEmpty else {
             throw SupabaseGoodsInventoryClientError.emptyTitle
         }
     }
 
     private func normalizedPhotoURLs(_ photoURLs: [String]) -> [String] {
-        photoURLs.compactMap { url in
-            let normalized = url.trimmingCharacters(in: .whitespacesAndNewlines)
-            return normalized.isEmpty ? nil : normalized
-        }
+        SupabaseTextNormalizer.nonEmptyValues(photoURLs)
     }
 
     private func goodsItemsWithTags(from rows: [GoodsInventoryRow]) async throws -> [GoodsItem] {
@@ -451,15 +450,14 @@ public final class SupabaseGoodsInventoryClient: @unchecked Sendable {
     }
 
     private func normalizedTagName(_ raw: String) -> String? {
-        let normalized = raw
-            .trimmingCharacters(in: .whitespacesAndNewlines)
+        let normalized = SupabaseTextNormalizer.trimmed(raw)
             .trimmingCharacters(in: CharacterSet(charactersIn: "#＃"))
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-        return normalized.isEmpty ? nil : String(normalized.prefix(50))
+        let label = SupabaseTextNormalizer.trimmed(normalized)
+        return label.isEmpty ? nil : String(label.prefix(50))
     }
 
     private func normalizedImageContentType(_ contentType: String) throws -> String {
-        switch contentType.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() {
+        switch SupabaseTextNormalizer.trimmed(contentType).lowercased() {
         case "image/jpeg", "image/jpg":
             "image/jpeg"
         case "image/png":
@@ -520,7 +518,7 @@ private struct GoodsTypeRow: Decodable, Sendable {
 }
 
 private struct GoodsInventoryRow: Decodable, Sendable {
-    static let select = "id,user_id,kind,status,group_id,character_id,goods_type_id,title,photo_urls,quantity,exchange_type"
+    static let select = "id,user_id,kind,status,group_id,character_id,goods_type_id,title,photo_urls,quantity,locked_qty,market_available_qty,exchange_type"
 
     var id: UUID
     var userId: UUID
@@ -532,6 +530,8 @@ private struct GoodsInventoryRow: Decodable, Sendable {
     var title: String
     var photoUrls: [String]?
     var quantity: Int?
+    var lockedQty: Int?
+    var marketAvailableQty: Int?
     var exchangeType: String?
 
     var goodsItem: GoodsItem {
@@ -547,6 +547,8 @@ private struct GoodsInventoryRow: Decodable, Sendable {
             imageURL: photoUrls?.compactMap(URL.init(string:)).first,
             tags: [],
             quantity: max(1, quantity ?? 1),
+            lockedQuantity: max(0, lockedQty ?? 0),
+            marketAvailableQuantity: marketAvailableQty.map { max(0, $0) },
             exchangeMethod: ExchangeMethod(exchangeTypeValue: exchangeType)
         )
     }
@@ -589,7 +591,7 @@ private struct GoodsEntryPayload: Encodable, Sendable {
         self.groupId = input.groupID
         self.characterId = input.memberID
         self.goodsTypeId = input.goodsTypeID
-        self.title = input.title.trimmingCharacters(in: .whitespacesAndNewlines)
+        self.title = SupabaseTextNormalizer.trimmed(input.title)
         self.condition = input.kind == .inventory ? "good" : nil
         self.priority = input.kind == .wish ? "second" : nil
         self.flexLevel = input.kind == .wish ? "normal" : nil
@@ -645,7 +647,7 @@ private struct GoodsInventoryUpdatePayload: Encodable, Sendable {
 
     init(input: GoodsInventoryUpdateInput) throws {
         if let title = input.title {
-            let normalized = title.trimmingCharacters(in: .whitespacesAndNewlines)
+            let normalized = SupabaseTextNormalizer.trimmed(title)
             guard !normalized.isEmpty else {
                 throw SupabaseGoodsInventoryClientError.emptyTitle
             }
@@ -661,12 +663,7 @@ private struct GoodsInventoryUpdatePayload: Encodable, Sendable {
         self.groupId = input.groupID
         self.goodsTypeId = input.goodsTypeID
         self.status = input.status?.rawValue
-        self.photoUrls = input.photoURLs.map { urls in
-            urls.compactMap { url in
-                let normalized = url.trimmingCharacters(in: .whitespacesAndNewlines)
-                return normalized.isEmpty ? nil : normalized
-            }
-        }
+        self.photoUrls = input.photoURLs.map(SupabaseTextNormalizer.nonEmptyValues)
 
         if let characterID = input.characterID {
             self.characterId = .some(.some(characterID))

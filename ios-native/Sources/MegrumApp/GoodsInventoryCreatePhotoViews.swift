@@ -12,6 +12,7 @@ import AppKit
 struct GoodsCreatePhotoSelectionGrid: View {
     var photos: [GoodsCreatePhotoDraft]
     var onRemovePhoto: (UUID) -> Void
+    var onCropPhoto: (UUID) -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -27,9 +28,11 @@ struct GoodsCreatePhotoSelectionGrid: View {
 
             LazyVGrid(columns: [GridItem(.adaptive(minimum: 92), spacing: 10)], spacing: 10) {
                 ForEach(photos) { photo in
-                    GoodsCreatePhotoTile(photo: photo) {
-                        onRemovePhoto(photo.id)
-                    }
+                    GoodsCreatePhotoTile(
+                        photo: photo,
+                        onOpen: { onCropPhoto(photo.id) },
+                        onRemove: { onRemovePhoto(photo.id) }
+                    )
                 }
             }
         }
@@ -44,6 +47,7 @@ struct GoodsCreatePhotoSelectionGrid: View {
 
 struct GoodsCreatePhotoTile: View {
     var photo: GoodsCreatePhotoDraft
+    var onOpen: () -> Void
     var onRemove: () -> Void
 
     var body: some View {
@@ -60,6 +64,9 @@ struct GoodsCreatePhotoTile: View {
                         .background(.black.opacity(0.34), in: Capsule())
                         .padding(8)
                 }
+                .contentShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+                .onTapGesture(perform: onOpen)
+                .accessibilityLabel("写真を切り取る")
 
             Button(action: onRemove) {
                 Image(systemName: "xmark")

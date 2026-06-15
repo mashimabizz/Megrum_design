@@ -36,6 +36,51 @@ struct GoodsCollectionFilter: Equatable {
     }
 }
 
+struct GoodsCollectionFilterChoices {
+    static func groups(items: [GoodsItem], allGroups: [OshiGroup]) -> [OshiGroup] {
+        let usedGroupIDs = Set(items.compactMap(\.groupID))
+        return allGroups.filter { usedGroupIDs.contains($0.id) }
+    }
+
+    static func goodsTypes(items: [GoodsItem], allGoodsTypes: [GoodsType]) -> [GoodsType] {
+        let usedGoodsTypeIDs = Set(items.compactMap(\.goodsTypeID))
+        return allGoodsTypes.filter { usedGoodsTypeIDs.contains($0.id) }
+    }
+
+    static func tagNames(
+        items: [GoodsItem],
+        selectedGroupID: UUID?,
+        selectedGoodsTypeID: UUID?,
+        limit: Int = 20
+    ) -> [String] {
+        let structuralFilter = GoodsCollectionFilter(
+            groupID: selectedGroupID,
+            goodsTypeID: selectedGoodsTypeID
+        )
+        let names = items
+            .filter(structuralFilter.matches)
+            .flatMap { $0.tags.map(\.name) }
+        return uniqueSortedTagNames(names, limit: limit)
+    }
+
+    private static func uniqueSortedTagNames(_ names: [String], limit: Int) -> [String] {
+        let uniqueNamesByKey = names.reduce(into: [String: String]()) { result, name in
+            let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !trimmed.isEmpty else {
+                return
+            }
+            if result[trimmed.lowercased()] == nil {
+                result[trimmed.lowercased()] = trimmed
+            }
+        }
+
+        return Array(uniqueNamesByKey.values)
+            .sorted { $0.localizedStandardCompare($1) == .orderedAscending }
+            .prefix(limit)
+            .map { $0 }
+    }
+}
+
 enum CollectionScreenLayoutMetrics {
     static let mainStackSpacing: CGFloat = 12
     static let horizontalPadding: CGFloat = 20
@@ -59,6 +104,8 @@ struct GoodsCollectionScreen: View {
     var appState: MegrumAppState?
     var entryKind: GoodsEntryKind = .inventory
     var headerAccessory: AnyView?
+    var showsHeader = true
+    var showsColumnToggle = true
     @State private var columns = GoodsGridLayout.minimumColumns
     @State private var editorRoute: GoodsEditorRoute?
     @State private var isShowingUnavailableAlert = false
@@ -79,12 +126,13 @@ struct GoodsCollectionScreen: View {
         GoodsCollectionFilter(groupID: selectedGroupID, goodsTypeID: selectedGoodsTypeID, tagNames: selectedTagNames)
     }
 
-    private var statusFilteredItems: [GoodsItem] {
+    private func statusFilteredItems(for inventoryStatus: GoodsEntryStatus? = nil) -> [GoodsItem] {
         guard entryKind == .inventory else {
             return items
         }
+        let inventoryStatus = inventoryStatus ?? selectedInventoryStatus
         return items.filter { item in
-            switch selectedInventoryStatus {
+            switch inventoryStatus {
             case .active:
                 return item.status == nil || item.status == .active || item.status == .reserved
             case .keep:
@@ -100,7 +148,11 @@ struct GoodsCollectionScreen: View {
     }
 
     private var filteredItems: [GoodsItem] {
-        statusFilteredItems.filter(activeFilter.matches)
+        filteredItems(for: nil)
+    }
+
+    private func filteredItems(for inventoryStatus: GoodsEntryStatus?) -> [GoodsItem] {
+        statusFilteredItems(for: inventoryStatus).filter(activeFilter.matches)
     }
 
     private var hasActiveFilters: Bool {
@@ -115,16 +167,52 @@ struct GoodsCollectionScreen: View {
         items.filter { selectedItemIDs.contains($0.id) }
     }
 
-    private var supportsInventoryManagementActions: Bool {
-        entryKind == .inventory && appState != nil
+    private func supportsInventoryManagementActions(for inventoryStatus: GoodsEntryStatus?) -> Bool {
+        entryKind == .inventory && appState != nil && !isReadOnlyInventoryPage(inventoryStatus)
+    }
+
+    private func supportsOwnedItemQuickActions(for inventoryStatus: GoodsEntryStatus?) -> Bool {
+        appState != nil && (entryKind == .wish || (entryKind == .inventory && !isReadOnlyInventoryPage(inventoryStatus)))
+    }
+
+    private func supportsSystemCardActions(for inventoryStatus: GoodsEntryStatus?) -> Bool {
+        appState != nil && entryKind == .inventory && !isReadOnlyInventoryPage(inventoryStatus)
+    }
+
+    private func isReadOnlyInventoryPage(_ inventoryStatus: GoodsEntryStatus?) -> Bool {
+        entryKind == .inventory && (inventoryStatus ?? selectedInventoryStatus) == .traded
+    }
+
+    private var filterBaseItems: [GoodsItem] {
+        statusFilteredItems()
+    }
+
+    private var availableGroups: [OshiGroup] {
+        guard let appState else {
+            return []
+        }
+        return GoodsCollectionFilterChoices.groups(
+            items: filterBaseItems,
+            allGroups: appState.oshiGroups
+        )
+    }
+
+    private var availableGoodsTypes: [GoodsType] {
+        guard let appState else {
+            return []
+        }
+        return GoodsCollectionFilterChoices.goodsTypes(
+            items: filterBaseItems,
+            allGoodsTypes: appState.goodsTypes
+        )
     }
 
     private var availableTagNames: [String] {
-        let structuralFilter = GoodsCollectionFilter(groupID: selectedGroupID, goodsTypeID: selectedGoodsTypeID)
-        return Array(Set(statusFilteredItems.filter(structuralFilter.matches).flatMap { $0.tags.map(\.name) }))
-            .sorted { $0.localizedStandardCompare($1) == .orderedAscending }
-            .prefix(20)
-            .map { $0 }
+        GoodsCollectionFilterChoices.tagNames(
+            items: filterBaseItems,
+            selectedGroupID: selectedGroupID,
+            selectedGoodsTypeID: selectedGoodsTypeID
+        )
     }
 
     private var inventoryStatusCounts: [GoodsEntryStatus: Int] {
@@ -154,6 +242,10 @@ struct GoodsCollectionScreen: View {
     }
 
     private var emptyMessageTitle: String {
+        emptyMessageTitle(for: nil)
+    }
+
+    private func emptyMessageTitle(for inventoryStatus: GoodsEntryStatus?) -> String {
         if hasActiveFilters {
             return "条件に合うグッズがありません"
         }
@@ -162,7 +254,7 @@ struct GoodsCollectionScreen: View {
         }
         switch entryKind {
         case .inventory:
-            switch selectedInventoryStatus {
+            switch inventoryStatus ?? selectedInventoryStatus {
             case .active, .reserved:
                 return "譲る候補はまだありません"
             case .keep:
@@ -178,6 +270,10 @@ struct GoodsCollectionScreen: View {
     }
 
     private var emptyMessageDetail: String {
+        emptyMessageDetail(for: nil)
+    }
+
+    private func emptyMessageDetail(for inventoryStatus: GoodsEntryStatus?) -> String {
         if hasActiveFilters {
             return "フィルターを変えると表示されることがあります。"
         }
@@ -186,7 +282,7 @@ struct GoodsCollectionScreen: View {
         }
         switch entryKind {
         case .inventory:
-            switch selectedInventoryStatus {
+            switch inventoryStatus ?? selectedInventoryStatus {
             case .active, .reserved:
                 return "譲る候補を登録すると、検索や打診に使えるようになります。"
             case .keep:
@@ -202,6 +298,10 @@ struct GoodsCollectionScreen: View {
     }
 
     private var emptyMessageSystemImage: String {
+        emptyMessageSystemImage(for: nil)
+    }
+
+    private func emptyMessageSystemImage(for inventoryStatus: GoodsEntryStatus?) -> String {
         if hasActiveFilters {
             return "line.3.horizontal.decrease.circle"
         }
@@ -210,7 +310,7 @@ struct GoodsCollectionScreen: View {
         }
         switch entryKind {
         case .inventory:
-            switch selectedInventoryStatus {
+            switch inventoryStatus ?? selectedInventoryStatus {
             case .active, .reserved:
                 return "shippingbox"
             case .keep:
@@ -244,64 +344,7 @@ struct GoodsCollectionScreen: View {
 
     var body: some View {
         ZStack(alignment: .bottomLeading) {
-            ScrollView(.vertical) {
-                VStack(alignment: .leading, spacing: CollectionScreenLayoutMetrics.mainStackSpacing) {
-                    CollectionHeader(
-                        title: title,
-                        subtitle: subtitle,
-                        columns: $columns,
-                        accessory: headerAccessory
-                    )
-                    if entryKind == .inventory {
-                        InventoryStatusTabs(
-                            selectedStatus: $selectedInventoryStatus,
-                            counts: inventoryStatusCounts
-                        )
-                    }
-                    if let appState {
-                        CollectionFilterBar(
-                            appState: appState,
-                            selectedGroupID: $selectedGroupID,
-                            selectedGoodsTypeID: $selectedGoodsTypeID,
-                            selectedTagNames: $selectedTagNames,
-                            availableTagNames: availableTagNames
-                        )
-                    }
-                    GoodsCollectionResultsArea(
-                        isShowingLoadingState: isShowingLoadingState,
-                        filteredItems: filteredItems,
-                        columns: columns,
-                        emptyMessageTitle: emptyMessageTitle,
-                        emptyMessageSystemImage: emptyMessageSystemImage,
-                        emptyMessageDetail: emptyMessageDetail,
-                        emptyMessageActionTitle: emptyMessageActionTitle,
-                        emptyMessageAction: emptyMessageAction,
-                        entryKind: entryKind,
-                        viewerID: appState?.viewer?.id,
-                        busyItemID: appState?.mutatingGoodsItemID,
-                        isSelectionMode: isSelectionMode,
-                        selectedItemIDs: selectedItemIDs,
-                        onOpenItem: supportsInventoryManagementActions ? { item in
-                            if isSelectionMode {
-                                toggleSelection(item)
-                            } else if isOwnedItem(item) {
-                                quickActionItem = item
-                            }
-                        } : nil,
-                        onCreateIndividualListing: canCreateListingFromItems ? { listingSeedWish = $0 } : nil,
-                        onEditItem: appState == nil ? nil : { editorRoute = .edit($0, entryKind) },
-                        onHideItem: appState == nil ? nil : { hideItem($0) },
-                        onDeleteItem: appState == nil ? nil : { deleteItem($0) },
-                        onBeginSelection: supportsInventoryManagementActions ? { beginSelection(with: $0) } : nil,
-                        onToggleSelection: supportsInventoryManagementActions ? { toggleSelection($0) } : nil
-                    )
-                }
-                .padding(.horizontal, CollectionScreenLayoutMetrics.horizontalPadding)
-                .padding(.top, CollectionScreenLayoutMetrics.topPadding)
-                .padding(.bottom, FloatingActionLayoutMetrics.contentBottomPadding)
-            }
-            .background(MegrumTheme.canvas.ignoresSafeArea())
-            .megrumHiddenNavigationBar()
+            collectionContent
 
             GoodsCollectionFloatingControls(
                 showsAddButton: showsAddButton,
@@ -309,6 +352,7 @@ struct GoodsCollectionScreen: View {
                 addButtonHint: addButtonHint,
                 isSelectionMode: isSelectionMode,
                 quickActionItem: quickActionItem,
+                quickActions: GoodsQuickActionKind.actions(for: entryKind),
                 selectedCount: selectedItemIDs.count,
                 onAdd: openAddForm,
                 onDismissQuickAction: {
@@ -349,7 +393,11 @@ struct GoodsCollectionScreen: View {
             }
         }
         .sheet(item: $bulkTagRoute) { route in
-            GoodsBulkTagSheet(selectedCount: route.itemIDs.count) { tagName in
+            GoodsBulkTagSheet(
+                selectedCount: route.itemIDs.count,
+                candidateNames: bulkTagCandidateNames(for: route.itemIDs),
+                previewItemsByTag: bulkTagPreviewItemsByTag(for: route.itemIDs)
+            ) { tagName in
                 applyBulkTag(tagName, to: route.itemIDs)
             }
         }
@@ -393,8 +441,112 @@ struct GoodsCollectionScreen: View {
         .onChange(of: selectedGoodsTypeID) { _, _ in
             reconcileSelectedTags()
         }
+        .onChange(of: selectedInventoryStatus) { _, _ in
+            quickActionItem = nil
+            selectedItemIDs = []
+            reconcileSelectedFilters()
+        }
+        .onChange(of: items.map(\.id)) { _, _ in
+            reconcileSelectedFilters()
+        }
         .onChange(of: filteredItems.map(\.id)) { _, visibleIDs in
             selectedItemIDs.formIntersection(Set(visibleIDs))
+        }
+    }
+
+    @ViewBuilder
+    private var collectionContent: some View {
+        if entryKind == .inventory {
+            VStack(alignment: .leading, spacing: CollectionScreenLayoutMetrics.mainStackSpacing) {
+                collectionTopChrome
+                    .padding(.horizontal, CollectionScreenLayoutMetrics.horizontalPadding)
+                    .padding(.top, CollectionScreenLayoutMetrics.topPadding)
+
+                TabView(selection: $selectedInventoryStatus) {
+                    ForEach(Self.inventoryStatuses, id: \.self) { status in
+                        collectionPageScroll(status: status)
+                            .tag(status)
+                    }
+                }
+                .megrumPageTabViewStyle()
+            }
+            .background(MegrumTheme.canvas.ignoresSafeArea())
+            .megrumHiddenNavigationBar()
+        } else {
+            collectionPageScroll(status: nil, includesTopChrome: showsHeader)
+                .background(MegrumTheme.canvas.ignoresSafeArea())
+                .megrumHiddenNavigationBar()
+        }
+    }
+
+    @ViewBuilder
+    private var collectionTopChrome: some View {
+        if showsHeader {
+            CollectionHeader(
+                title: title,
+                subtitle: subtitle,
+                columns: $columns,
+                accessory: headerAccessory,
+                showsColumnToggle: showsColumnToggle
+            )
+        }
+        if entryKind == .inventory {
+            InventoryStatusTabs(
+                selectedStatus: $selectedInventoryStatus,
+                counts: inventoryStatusCounts
+            )
+        }
+    }
+
+    private func collectionPageScroll(status: GoodsEntryStatus?, includesTopChrome: Bool = false) -> some View {
+        ScrollView(.vertical) {
+            VStack(alignment: .leading, spacing: CollectionScreenLayoutMetrics.mainStackSpacing) {
+                if includesTopChrome {
+                    collectionTopChrome
+                }
+                if let appState {
+                    CollectionFilterBar(
+                        appState: appState,
+                        selectedGroupID: $selectedGroupID,
+                        selectedGoodsTypeID: $selectedGoodsTypeID,
+                        selectedTagNames: $selectedTagNames,
+                        availableGroups: availableGroups,
+                        availableGoodsTypes: availableGoodsTypes,
+                        availableTagNames: availableTagNames
+                    )
+                }
+                GoodsCollectionResultsArea(
+                    isShowingLoadingState: isShowingLoadingState,
+                    filteredItems: filteredItems(for: status),
+                    columns: columns,
+                    emptyMessageTitle: emptyMessageTitle(for: status),
+                    emptyMessageSystemImage: emptyMessageSystemImage(for: status),
+                    emptyMessageDetail: emptyMessageDetail(for: status),
+                    emptyMessageActionTitle: emptyMessageActionTitle,
+                    emptyMessageAction: emptyMessageAction,
+                    entryKind: entryKind,
+                    viewerID: appState?.viewer?.id,
+                    busyItemID: appState?.mutatingGoodsItemID,
+                    isSelectionMode: isSelectionMode,
+                    selectedItemIDs: selectedItemIDs,
+                    onOpenItem: supportsOwnedItemQuickActions(for: status) ? { item in
+                        if isSelectionMode {
+                            toggleSelection(item)
+                        } else if isOwnedItem(item) {
+                            quickActionItem = item
+                        }
+                    } : nil,
+                    onCreateIndividualListing: canCreateListingFromItems ? { listingSeedWish = $0 } : nil,
+                    onEditItem: supportsSystemCardActions(for: status) ? { editorRoute = .edit($0, entryKind) } : nil,
+                    onHideItem: supportsSystemCardActions(for: status) ? { hideItem($0) } : nil,
+                    onDeleteItem: supportsSystemCardActions(for: status) ? { deleteItem($0) } : nil,
+                    onBeginSelection: supportsInventoryManagementActions(for: status) ? { beginSelection(with: $0) } : nil,
+                    onToggleSelection: supportsInventoryManagementActions(for: status) ? { toggleSelection($0) } : nil
+                )
+            }
+            .padding(.horizontal, CollectionScreenLayoutMetrics.horizontalPadding)
+            .padding(.top, includesTopChrome ? CollectionScreenLayoutMetrics.topPadding : 0)
+            .padding(.bottom, FloatingActionLayoutMetrics.contentBottomPadding)
         }
     }
 
@@ -472,7 +624,7 @@ struct GoodsCollectionScreen: View {
         case .edit:
             editorRoute = .edit(item, entryKind)
         case .moveToKeep:
-            moveItem(item, to: .keep)
+            moveItem(item, to: item.status == .keep ? .active : .keep)
         case .tag:
             bulkTagRoute = GoodsBulkTagRoute(itemIDs: [item.id])
         case .delete:
@@ -504,6 +656,66 @@ struct GoodsCollectionScreen: View {
             }
             selectedItemIDs.subtract(itemIDs)
         }
+    }
+
+    private func bulkTagCandidateNames(for itemIDs: Set<UUID>) -> [String] {
+        guard let appState else {
+            return []
+        }
+        let groupIDs = orderedGroupIDs(from: bulkTagTargetItems(for: itemIDs))
+        let suggestions = groupIDs.flatMap { groupID in
+            GoodsEditorTagSuggestionBuilder.suggestions(
+                groupID: groupID,
+                selectedTags: [],
+                inventory: items,
+                wishes: appState.wishes,
+                limit: 10
+            )
+        }
+        return uniqueTagNames(suggestions, limit: 10)
+    }
+
+    private func bulkTagPreviewItemsByTag(for itemIDs: Set<UUID>) -> [String: [TagPreviewItem]] {
+        guard let appState else {
+            return [:]
+        }
+        let groupIDs = orderedGroupIDs(from: bulkTagTargetItems(for: itemIDs))
+        let selectedGroupID = groupIDs.count == 1 ? groupIDs.first : nil
+        return IndividualListingConditionTagBuilder(
+            inventory: items,
+            wishes: appState.wishes,
+            selectedGroupID: selectedGroupID
+        )
+        .previewItemsByTag()
+    }
+
+    private func bulkTagTargetItems(for itemIDs: Set<UUID>) -> [GoodsItem] {
+        items.filter { itemIDs.contains($0.id) && isOwnedItem($0) }
+    }
+
+    private func orderedGroupIDs(from targetItems: [GoodsItem]) -> [UUID] {
+        Array(Set(targetItems.compactMap(\.groupID)))
+            .sorted { $0.uuidString < $1.uuidString }
+    }
+
+    private func uniqueTagNames(_ names: [String], limit: Int) -> [String] {
+        var seen: Set<String> = []
+        var result: [String] = []
+        for name in names {
+            let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !trimmed.isEmpty else {
+                continue
+            }
+            let key = trimmed.lowercased()
+            guard seen.insert(key).inserted else {
+                continue
+            }
+            result.append(trimmed)
+            if result.count == limit {
+                break
+            }
+        }
+        return result
     }
 
     private func deleteSelectedItems() {
@@ -555,6 +767,20 @@ struct GoodsCollectionScreen: View {
         selectedTagNames = selectedTagNames.intersection(available)
     }
 
+    private func reconcileSelectedFilters() {
+        if let selectedGroupID,
+           appState?.isLoadingOshiGroups != true,
+           !availableGroups.contains(where: { $0.id == selectedGroupID }) {
+            self.selectedGroupID = nil
+        }
+        if let selectedGoodsTypeID,
+           appState?.isLoadingGoodsTypes != true,
+           !availableGoodsTypes.contains(where: { $0.id == selectedGoodsTypeID }) {
+            self.selectedGoodsTypeID = nil
+        }
+        reconcileSelectedTags()
+    }
+
     private var canCreateListingFromItems: Bool {
         appState != nil && entryKind == .wish
     }
@@ -572,12 +798,22 @@ struct WishCollectionScreen: View {
     var items: [WishItem]
     var appState: MegrumAppState?
     @State private var selectedSection: WishSection = .wishes
+    @State private var columns = GoodsGridLayout.minimumColumns
 
     private enum WishSection: String, CaseIterable, Identifiable {
         case wishes = "Wish"
         case listings = "個別募集"
 
         var id: String { rawValue }
+
+        var navigationTitle: String {
+            switch self {
+            case .wishes:
+                "ウィッシュ"
+            case .listings:
+                "個別募集"
+            }
+        }
     }
 
     private var goodsLikeItems: [GoodsItem] {
@@ -599,34 +835,61 @@ struct WishCollectionScreen: View {
     }
 
     var body: some View {
-        Group {
-            switch selectedSection {
-            case .wishes:
-                GoodsCollectionScreen(
-                    title: "Wish",
-                    subtitle: "ほしいグッズ",
-                    items: goodsLikeItems,
-                    showsAddButton: true,
-                    appState: appState,
-                    entryKind: .wish,
-                    headerAccessory: sectionPicker
-                )
-            case .listings:
-                if let appState {
-                    IndividualListingsScreen(appState: appState, headerAccessory: sectionPicker)
-                } else {
-                    GoodsCollectionScreen(
-                        title: "個別募集",
-                        subtitle: "条件を指定した募集",
-                        items: [],
-                        showsAddButton: false,
-                        headerAccessory: sectionPicker
-                    )
+        VStack(alignment: .leading, spacing: CollectionScreenLayoutMetrics.mainStackSpacing) {
+            CollectionHeader(
+                title: selectedSection.navigationTitle,
+                subtitle: "",
+                columns: $columns,
+                accessory: sectionPicker,
+                showsColumnToggle: false
+            )
+            .padding(.horizontal, CollectionScreenLayoutMetrics.horizontalPadding)
+            .padding(.top, CollectionScreenLayoutMetrics.topPadding)
+
+            TabView(selection: $selectedSection) {
+                ForEach(WishSection.allCases) { section in
+                    wishSectionPage(section)
+                        .tag(section)
                 }
             }
+            .megrumPageTabViewStyle()
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(MegrumTheme.canvas.ignoresSafeArea())
+    }
+
+    @ViewBuilder
+    private func wishSectionPage(_ section: WishSection) -> some View {
+        switch section {
+        case .wishes:
+            GoodsCollectionScreen(
+                title: section.navigationTitle,
+                subtitle: "",
+                items: goodsLikeItems,
+                showsAddButton: true,
+                appState: appState,
+                entryKind: .wish,
+                showsHeader: false,
+                showsColumnToggle: false
+            )
+        case .listings:
+            if let appState {
+                IndividualListingsScreen(
+                    appState: appState,
+                    headerTitle: section.navigationTitle,
+                    showsHeader: false
+                )
+            } else {
+                GoodsCollectionScreen(
+                    title: section.navigationTitle,
+                    subtitle: "条件を指定した募集",
+                    items: [],
+                    showsAddButton: false,
+                    showsHeader: false,
+                    showsColumnToggle: false
+                )
+            }
+        }
     }
 
     private var sectionPicker: AnyView {

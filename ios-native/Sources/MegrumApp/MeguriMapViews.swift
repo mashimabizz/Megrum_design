@@ -164,6 +164,20 @@ private struct MeguriMapScreen: View {
             }
             .padding(.horizontal, 18)
             .padding(.top, 14)
+
+            VStack {
+                HStack {
+                    Spacer()
+                    MeguriMapRecenterButton(
+                        isRequesting: locationState.isRequestingLocation,
+                        action: centerMapOnCurrentLocation
+                    )
+                }
+                .padding(.top, 72)
+                .padding(.trailing, 18)
+
+                Spacer()
+            }
         }
         .task {
             if !VisualQAPreviewMode.isEnabled(environment: ProcessInfo.processInfo.environment) {
@@ -234,6 +248,24 @@ private struct MeguriMapScreen: View {
         if userCoordinate != nil {
             hasCenteredMapOnLocation = true
         }
+    }
+
+    private func centerMapOnCurrentLocation() {
+        guard let coordinate = locationState.coordinate else {
+            mapNotice = "現在地を確認中"
+            locationState.requestCurrentLocation()
+            return
+        }
+
+        let region = MKCoordinateRegion(
+            center: coordinate.clLocationCoordinate,
+            span: kind.regionSpan
+        )
+        withAnimation(.smooth(duration: 0.28)) {
+            cameraPosition = .region(region)
+        }
+        mapNotice = nil
+        hasCenteredMapOnLocation = true
     }
 
     private var mapGrooms: [GroomPost] {

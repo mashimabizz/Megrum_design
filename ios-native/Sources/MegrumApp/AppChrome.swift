@@ -7,7 +7,6 @@ enum AppDrawerDestination: String, Identifiable {
     case profileEdit
     case oshiSettings
     case schedules
-    case completedTrades
     case settings
     case help
 
@@ -17,8 +16,7 @@ enum AppDrawerDestination: String, Identifiable {
         .profile,
         .notifications,
         .oshiSettings,
-        .schedules,
-        .completedTrades
+        .schedules
     ]
 
     static let compactItems: [AppDrawerDestination] = [
@@ -38,8 +36,6 @@ enum AppDrawerDestination: String, Identifiable {
             "推し設定"
         case .schedules:
             "スケジュール"
-        case .completedTrades:
-            "完了した取引"
         case .settings:
             "設定とプライバシー"
         case .help:
@@ -59,8 +55,6 @@ enum AppDrawerDestination: String, Identifiable {
             "sparkles"
         case .schedules:
             "calendar"
-        case .completedTrades:
-            "checkmark.circle"
         case .settings:
             "checkmark.shield"
         case .help:
@@ -79,7 +73,7 @@ enum AppDrawerVisualMetrics {
     static let whiteoutOpacity: CGFloat = 0.18
     static let foregroundShadowOpacity: CGFloat = 0.16
     static let foregroundShadowRadius: CGFloat = 18
-    static let drawerParallax: CGFloat = -12
+    static let closedEdgeGestureWidth: CGFloat = 28
 
     static func drawerWidth(screenWidth: CGFloat) -> CGFloat {
         min(maximumDrawerWidth, max(minimumDrawerWidth, screenWidth * drawerWidthRatio))
@@ -88,6 +82,85 @@ enum AppDrawerVisualMetrics {
     static func openOffset(screenWidth: CGFloat) -> CGFloat {
         let width = drawerWidth(screenWidth: screenWidth)
         return min(width - foregroundOpenInset, screenWidth * foregroundOpenRatio)
+    }
+
+    static func drawerOffset(drawerWidth: CGFloat, progress: CGFloat) -> CGFloat {
+        -drawerWidth * (1 - clampedProgress(progress))
+    }
+
+    static func presentationProgress(
+        isPresented: Bool,
+        dragTranslation: CGFloat,
+        drawerTravel: CGFloat
+    ) -> CGFloat {
+        guard drawerTravel > 0 else {
+            return isPresented ? 1 : 0
+        }
+        let baseOffset = isPresented ? drawerTravel : 0
+        let gestureOffset = isPresented ? min(0, dragTranslation) : max(0, dragTranslation)
+        let revealed = min(drawerTravel, max(0, baseOffset + gestureOffset))
+        return revealed / drawerTravel
+    }
+
+    static func clampedProgress(_ progress: CGFloat) -> CGFloat {
+        min(1, max(0, progress))
+    }
+}
+
+enum AppDrawerGestureResolver {
+    static let closedStartMinimumDistance: CGFloat = 5
+    static let openStartMinimumDistance: CGFloat = 6
+    static let closedHorizontalDominance: CGFloat = 1
+    static let openHorizontalDominance: CGFloat = 1
+    static let openThresholdRatio: CGFloat = 0.24
+    static let predictedMomentumBonus: CGFloat = 32
+
+    static func activeTranslation(isPresented: Bool, translation: CGSize) -> CGFloat? {
+        guard isHorizontalSwipe(translation, isPresented: isPresented) else {
+            return nil
+        }
+        if isPresented {
+            guard translation.width < 0 else {
+                return nil
+            }
+            return translation.width
+        }
+
+        guard translation.width > 0 else {
+            return nil
+        }
+        return translation.width
+    }
+
+    static func targetVisibility(
+        isPresented: Bool,
+        translation: CGSize,
+        predictedEndTranslationWidth: CGFloat,
+        drawerWidth: CGFloat
+    ) -> Bool? {
+        guard isHorizontalSwipe(translation, isPresented: isPresented) else {
+            return nil
+        }
+
+        let absX = abs(translation.width)
+        let threshold = drawerWidth * openThresholdRatio
+        let fastEnough = abs(predictedEndTranslationWidth) >= absX + predictedMomentumBonus
+
+        if isPresented {
+            let shouldClose = translation.width <= -threshold || (translation.width < 0 && fastEnough)
+            return !shouldClose
+        }
+
+        let shouldOpen = translation.width >= threshold || (translation.width > 0 && fastEnough)
+        return shouldOpen
+    }
+
+    private static func isHorizontalSwipe(_ translation: CGSize, isPresented: Bool) -> Bool {
+        let absX = abs(translation.width)
+        let absY = abs(translation.height)
+        let minimumDistance = isPresented ? openStartMinimumDistance : closedStartMinimumDistance
+        let dominance = isPresented ? openHorizontalDominance : closedHorizontalDominance
+        return absX > minimumDistance && absX > absY * dominance
     }
 }
 
@@ -109,10 +182,8 @@ struct AppDrawerOverlay: View {
             .frame(maxHeight: .infinity)
             .background(Color.white)
             .opacity(drawerOpacity)
-            .offset(x: drawerParallaxOffset)
+            .offset(x: drawerOffset)
         .allowsHitTesting(presentationProgress > 0.001)
-        .animation(drawerAnimation, value: isPresented)
-        .animation(drawerAnimation, value: isClosing)
         .onChange(of: isPresented) { _, newValue in
             if newValue {
                 isClosing = false
@@ -184,14 +255,11 @@ struct AppDrawerOverlay: View {
 
     private var profileHeader: some View {
         VStack(alignment: .leading, spacing: 5) {
-            Circle()
-                .fill(MegrumTheme.lavender.opacity(0.16))
-                .frame(width: 64, height: 64)
-                .overlay {
-                    Text(profileInitial)
-                        .font(.system(size: 24, weight: .heavy, design: .rounded))
-                        .foregroundStyle(MegrumTheme.ink)
-                }
+            ProfileVisualAvatar(
+                url: appState.viewer?.avatarURL,
+                fallback: appState.viewer?.displayName ?? appState.viewer?.handle ?? "M",
+                size: 64
+            )
                 .padding(.bottom, 9)
 
             Text(appState.viewer?.displayName ?? "Megrum")
@@ -258,44 +326,49 @@ struct AppDrawerOverlay: View {
     }
 
     private var drawerOpacity: Double {
-        let raw = presentationProgress / 0.3
+        let raw = AppDrawerVisualMetrics.clampedProgress(presentationProgress) / 0.3
         return Double(min(1, max(0, raw)))
     }
 
-    private var drawerParallaxOffset: CGFloat {
-        AppDrawerVisualMetrics.drawerParallax * (1 - presentationProgress)
+    private var drawerOffset: CGFloat {
+        AppDrawerVisualMetrics.drawerOffset(
+            drawerWidth: drawerWidth,
+            progress: presentationProgress
+        )
     }
 
     private var drawerAnimation: Animation {
         reduceMotion ? .easeOut(duration: 0.12) : .interactiveSpring(response: 0.32, dampingFraction: 0.88)
     }
 
-    private var profileInitial: String {
-        guard let first = appState.viewer?.displayName.first else {
-            return "M"
-        }
-        return String(first)
-    }
-
     private var profileAreaText: String {
-        guard let prefecture = appState.viewer?.prefecture, !prefecture.isEmpty else {
+        var parts: [String] = []
+        if let prefecture = appState.viewer?.prefecture?.trimmingCharacters(in: .whitespacesAndNewlines),
+           !prefecture.isEmpty {
+            parts.append(prefecture)
+        }
+        if let ageText = appState.viewer?.ageText {
+            parts.append(ageText)
+        }
+        guard !parts.isEmpty else {
             return "エリア未設定"
         }
-        return prefecture
+        return parts.joined(separator: " ・ ")
     }
 
     private func select(_ destination: AppDrawerDestination) {
         guard !isClosing else {
             return
         }
-        close {
-            onSelectDestination(destination)
-        }
+        onSelectDestination(destination)
+        close()
     }
 
     private func close(completion: (() -> Void)? = nil) {
         isClosing = true
-        isPresented = false
+        withAnimation(drawerAnimation) {
+            isPresented = false
+        }
         let delay = reduceMotion ? 0.08 : 0.18
         DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
             isClosing = false

@@ -34,7 +34,7 @@ public final class SupabaseMeguriMessageClient: @unchecked Sendable {
             senderID: input.senderID,
             recipientID: input.recipientID,
             sourceGroomReplyID: input.sourceGroomReplyID,
-            body: input.body.trimmingCharacters(in: .whitespacesAndNewlines)
+            body: SupabaseTextNormalizer.trimmed(input.body)
         )
     }
 
@@ -46,7 +46,7 @@ public final class SupabaseMeguriMessageClient: @unchecked Sendable {
     ) async throws -> [MeguriMessage] {
         let rows: [MeguriMessageRow] = try await client.updateRows(
             in: "meguri_messages",
-            values: MeguriMessageReadPayload(readAt: isoTimestamp(readAt)),
+            values: MeguriMessageReadPayload(readAt: SupabaseDateEncoding.isoTimestamp(readAt)),
             select: MeguriMessageRow.insertSelect,
             queryItems: markConversationReadQueryItems(viewerID: viewerID, peerID: peerID)
         )
@@ -79,7 +79,7 @@ public final class SupabaseMeguriMessageClient: @unchecked Sendable {
                 URLQueryItem(name: "select", value: MeguriMessageRow.insertSelect)
             ] + markConversationReadQueryItems(viewerID: viewerID, peerID: peerID),
             method: "PATCH",
-            body: encoder.encode(MeguriMessageReadPayload(readAt: isoTimestamp(readAt))),
+            body: encoder.encode(MeguriMessageReadPayload(readAt: SupabaseDateEncoding.isoTimestamp(readAt))),
             prefer: "return=representation"
         )
     }
@@ -179,7 +179,7 @@ private struct MeguriMessageCreatePayload: Encodable, Sendable {
     var sourceGroomReplyId: UUID?
 
     init(input: MeguriMessageCreateInput) {
-        self.body = input.body.trimmingCharacters(in: .whitespacesAndNewlines)
+        self.body = SupabaseTextNormalizer.trimmed(input.body)
         self.recipientId = input.recipientID
         self.senderId = input.senderID
         self.sourceGroomReplyId = input.sourceGroomReplyID
@@ -188,10 +188,4 @@ private struct MeguriMessageCreatePayload: Encodable, Sendable {
 
 private struct MeguriMessageReadPayload: Encodable, Sendable {
     var readAt: String
-}
-
-private func isoTimestamp(_ date: Date) -> String {
-    let formatter = ISO8601DateFormatter()
-    formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-    return formatter.string(from: date)
 }

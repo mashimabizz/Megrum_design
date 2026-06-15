@@ -31,6 +31,7 @@ struct ProposalMeetupCalendarBoardTouchState {
     var originalStartSlot: Int?
     var originalEndSlot: Int?
     var pointerStartOffsetSlots: Int?
+    var hasMovedBeyondTapTolerance = false
 }
 
 enum ProposalMeetupCalendarCandidateTouchMode {
@@ -48,4 +49,5 @@ struct ProposalMeetupCalendarCandidateTouchState {
     var originalEndSlot: Int
     var pointerStartOffsetSlots: Int
     var mode: ProposalMeetupCalendarCandidateTouchMode
+    var hasMovedBeyondTapTolerance = false
 }

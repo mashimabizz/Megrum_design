@@ -52,14 +52,39 @@ enum NativePreviewData {
         id: viewerID,
         handle: "michilion",
         displayName: "みちりおん",
-        prefecture: "東京都"
+        avatarURL: testGoodsImageURL("twice_dahyun_1"),
+        prefecture: "大阪府",
+        age: 24,
+        paymentMethods: [.bankTransfer, .paypay, .cashExchange, .other],
+        paymentNote: "メルペイ相談可"
     )
 
     static let partner = UserProfile(
         id: partnerID,
         handle: "michi1",
         displayName: "michi",
-        prefecture: "東京都"
+        prefecture: "東京都",
+        paymentMethods: [.paypay, .other],
+        paymentNote: "差額相談可"
+    )
+
+    private static func ownerPaymentMethods(for ownerID: UUID) -> [UserPaymentMethod] {
+        ownerID == viewerID ? viewer.paymentMethods : partner.paymentMethods
+    }
+
+    private static func ownerPaymentNote(for ownerID: UUID) -> String? {
+        ownerID == viewerID ? viewer.paymentNote : partner.paymentNote
+    }
+
+    static let paymentSettings = UserPaymentSettings(
+        userID: viewerID,
+        methods: [.bankTransfer, .paypay, .cashExchange, .other],
+        bankName: "みずほ銀行",
+        bankBranchName: "渋谷支店",
+        bankAccountType: "普通",
+        bankAccountNumber: "1234567",
+        bankAccountHolder: "ヤマダ ハナコ",
+        otherNote: "メルペイ、楽天ペイも相談可"
     )
 
     static let tags = [
@@ -209,7 +234,9 @@ enum NativePreviewData {
             tags: [tags[3], tags[6], tags[2]],
             quantity: 1,
             exchangeMethod: .both,
-            ownerPrefecture: "東京都"
+            ownerPrefecture: "東京都",
+            ownerPaymentMethods: ownerPaymentMethods(for: viewerID),
+            ownerPaymentNote: ownerPaymentNote(for: viewerID)
         ),
         GoodsItem(
             id: UUID(uuidString: "00000000-0000-0000-0000-000000000202")!,
@@ -222,7 +249,9 @@ enum NativePreviewData {
             tags: [tags[4], tags[2]],
             quantity: 1,
             exchangeMethod: .mail,
-            ownerPrefecture: "東京都"
+            ownerPrefecture: "東京都",
+            ownerPaymentMethods: ownerPaymentMethods(for: viewerID),
+            ownerPaymentNote: ownerPaymentNote(for: viewerID)
         ),
         GoodsItem(
             id: UUID(uuidString: "00000000-0000-0000-0000-000000000203")!,
@@ -236,7 +265,9 @@ enum NativePreviewData {
             tags: [tags[3], tags[6], tags[2]],
             quantity: 1,
             exchangeMethod: .hand,
-            ownerPrefecture: "福岡県"
+            ownerPrefecture: "福岡県",
+            ownerPaymentMethods: ownerPaymentMethods(for: partnerID),
+            ownerPaymentNote: ownerPaymentNote(for: partnerID)
         ),
         GoodsItem(
             id: UUID(uuidString: "00000000-0000-0000-0000-000000000204")!,
@@ -248,7 +279,9 @@ enum NativePreviewData {
             tags: [tags[0], tags[2]],
             quantity: 1,
             exchangeMethod: .both,
-            ownerPrefecture: "東京都"
+            ownerPrefecture: "東京都",
+            ownerPaymentMethods: ownerPaymentMethods(for: partnerID),
+            ownerPaymentNote: ownerPaymentNote(for: partnerID)
         ),
         GoodsItem(
             id: UUID(uuidString: "00000000-0000-0000-0000-000000000205")!,
@@ -261,7 +294,9 @@ enum NativePreviewData {
             tags: [tags[3], tags[1], tags[2]],
             quantity: 1,
             exchangeMethod: .hand,
-            ownerPrefecture: "大阪府"
+            ownerPrefecture: "大阪府",
+            ownerPaymentMethods: ownerPaymentMethods(for: partnerID),
+            ownerPaymentNote: ownerPaymentNote(for: partnerID)
         ),
         GoodsItem(
             id: UUID(uuidString: "00000000-0000-0000-0000-000000000206")!,
@@ -273,7 +308,9 @@ enum NativePreviewData {
             tags: [tags[3], tags[7]],
             quantity: 1,
             exchangeMethod: .mail,
-            ownerPrefecture: "東京都"
+            ownerPrefecture: "東京都",
+            ownerPaymentMethods: ownerPaymentMethods(for: partnerID),
+            ownerPaymentNote: ownerPaymentNote(for: partnerID)
         ),
         GoodsItem(
             id: UUID(uuidString: "00000000-0000-0000-0000-000000000207")!,
@@ -286,7 +323,9 @@ enum NativePreviewData {
             tags: [tags[4], tags[2]],
             quantity: 1,
             exchangeMethod: .both,
-            ownerPrefecture: "兵庫県"
+            ownerPrefecture: "兵庫県",
+            ownerPaymentMethods: ownerPaymentMethods(for: partnerID),
+            ownerPaymentNote: ownerPaymentNote(for: partnerID)
         ),
         GoodsItem(
             id: UUID(uuidString: "00000000-0000-0000-0000-000000000208")!,
@@ -298,7 +337,9 @@ enum NativePreviewData {
             tags: [tags[5], tags[2]],
             quantity: 1,
             exchangeMethod: .hand,
-            ownerPrefecture: "愛知県"
+            ownerPrefecture: "愛知県",
+            ownerPaymentMethods: ownerPaymentMethods(for: partnerID),
+            ownerPaymentNote: ownerPaymentNote(for: partnerID)
         ),
         GoodsItem(
             id: UUID(uuidString: "00000000-0000-0000-0000-000000000209")!,
@@ -310,7 +351,9 @@ enum NativePreviewData {
             tags: [tags[5], tags[2]],
             quantity: 1,
             exchangeMethod: .mail,
-            ownerPrefecture: "神奈川県"
+            ownerPrefecture: "神奈川県",
+            ownerPaymentMethods: ownerPaymentMethods(for: partnerID),
+            ownerPaymentNote: ownerPaymentNote(for: partnerID)
         ),
         GoodsItem(
             id: UUID(uuidString: "00000000-0000-0000-0000-000000000210")!,
@@ -322,7 +365,9 @@ enum NativePreviewData {
             tags: [tags[3], tags[6]],
             quantity: 1,
             exchangeMethod: .both,
-            ownerPrefecture: "東京都"
+            ownerPrefecture: "東京都",
+            ownerPaymentMethods: ownerPaymentMethods(for: viewerID),
+            ownerPaymentNote: ownerPaymentNote(for: viewerID)
         ),
         GoodsItem(
             id: UUID(uuidString: "00000000-0000-0000-0000-000000000211")!,
@@ -335,7 +380,9 @@ enum NativePreviewData {
             tags: [tags[4], tags[2]],
             quantity: 1,
             exchangeMethod: .mail,
-            ownerPrefecture: "東京都"
+            ownerPrefecture: "東京都",
+            ownerPaymentMethods: ownerPaymentMethods(for: viewerID),
+            ownerPaymentNote: ownerPaymentNote(for: viewerID)
         ),
         GoodsItem(
             id: UUID(uuidString: "00000000-0000-0000-0000-000000000212")!,
@@ -347,7 +394,9 @@ enum NativePreviewData {
             tags: [tags[5], tags[2]],
             quantity: 1,
             exchangeMethod: .hand,
-            ownerPrefecture: "東京都"
+            ownerPrefecture: "東京都",
+            ownerPaymentMethods: ownerPaymentMethods(for: viewerID),
+            ownerPaymentNote: ownerPaymentNote(for: viewerID)
         ),
         GoodsItem(
             id: UUID(uuidString: "00000000-0000-0000-0000-000000000213")!,
@@ -359,7 +408,9 @@ enum NativePreviewData {
             tags: [tags[0], tags[2]],
             quantity: 1,
             exchangeMethod: .both,
-            ownerPrefecture: "東京都"
+            ownerPrefecture: "東京都",
+            ownerPaymentMethods: ownerPaymentMethods(for: viewerID),
+            ownerPaymentNote: ownerPaymentNote(for: viewerID)
         )
     ]
 
@@ -415,7 +466,10 @@ enum NativePreviewData {
                 haveGroupID: groupID,
                 haveGoodsTypeID: cardGoodsTypeID,
                 status: .active,
-                note: "会場周辺で交換できる方を探しています。",
+                note: """
+                会場周辺で交換できる方を探しています。
+                交換手段: どちらもOK / 都道府県: 東京都 / 場所メモ: 東京ドーム周辺 / 日程: 相談して決める / 送料: 要相談 / 発送目安: 2〜4日以内 / 条件外打診: 可
+                """,
                 options: [
                     IndividualListingWishOption(
                         id: UUID(uuidString: "00000000-0000-0000-0000-000000000352")!,
@@ -451,7 +505,10 @@ enum NativePreviewData {
                 haveGroupID: secondGroupID,
                 haveGoodsTypeID: cardGoodsTypeID,
                 status: .active,
-                note: "カリナ春ver.を探しています。",
+                note: """
+                カリナ春ver.を探しています。
+                交換手段: 現地交換 / 都道府県: 大阪府 / 場所メモ: 会場周辺 / 日程: 相談して決める / 条件外打診: 不可
+                """,
                 options: [
                     IndividualListingWishOption(
                         id: UUID(uuidString: "00000000-0000-0000-0000-000000000362")!,
@@ -465,6 +522,26 @@ enum NativePreviewData {
                         exchangeType: .any,
                         wishGroupID: groupID,
                         wishGoodsTypeID: cardGoodsTypeID
+                    ),
+                    IndividualListingWishOption(
+                        id: UUID(uuidString: "00000000-0000-0000-0000-000000000363")!,
+                        listingID: listingID,
+                        position: 2,
+                        wishes: [],
+                        logic: .one,
+                        exchangeType: .any,
+                        wishGroupID: groupID,
+                        wishGoodsTypeID: cardGoodsTypeID
+                    ),
+                    IndividualListingWishOption(
+                        id: UUID(uuidString: "00000000-0000-0000-0000-000000000364")!,
+                        listingID: listingID,
+                        position: 3,
+                        wishes: [],
+                        logic: .one,
+                        exchangeType: .any,
+                        isCashOffer: true,
+                        cashAmount: 1_500
                     )
                 ],
                 createdAt: Date(timeIntervalSinceNow: -2_400),
@@ -496,6 +573,8 @@ enum NativePreviewData {
             senderGoodsIDs: [inventory[2].id],
             receiverGoodsIDs: [inventory[1].id],
             conditionTags: ["会場付近"],
+            cashOffer: true,
+            cashAmount: 1_100,
             agreedBySender: true,
             agreedByReceiver: true,
             createdAt: Date(timeIntervalSinceNow: -5_400),

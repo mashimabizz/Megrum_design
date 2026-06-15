@@ -4,6 +4,7 @@ import SwiftUI
 
 struct ProposalFlowScreenHeader: View {
     var title: String
+    var showsKicker = true
     var onBack: () -> Void
 
     var body: some View {
@@ -26,45 +27,18 @@ struct ProposalFlowScreenHeader: View {
             .accessibilityLabel("戻る")
 
             VStack(alignment: .leading, spacing: 3) {
-                Text("PROPOSAL")
-                    .font(.system(size: ProposalFlowHeaderMetrics.kickerFontSize, weight: .black, design: .rounded))
-                    .tracking(ProposalFlowHeaderMetrics.kickerTracking)
-                    .foregroundStyle(MegrumTheme.lavender)
+                if showsKicker {
+                    Text("PROPOSAL")
+                        .font(.system(size: ProposalFlowHeaderMetrics.kickerFontSize, weight: .black, design: .rounded))
+                        .tracking(ProposalFlowHeaderMetrics.kickerTracking)
+                        .foregroundStyle(MegrumTheme.lavender)
+                }
                 Text(title)
                     .font(.system(size: ProposalFlowHeaderMetrics.titleFontSize, weight: .black, design: .rounded))
                     .foregroundStyle(MegrumTheme.ink)
             }
 
             Spacer(minLength: 12)
-        }
-    }
-}
-
-struct ProposalConfirmNoticeCard: View {
-    var title: String
-    var text: String
-
-    var body: some View {
-        HStack(alignment: .center, spacing: 8) {
-            Text(title)
-                .font(.system(size: 10, weight: .black, design: .rounded))
-                .foregroundStyle(MegrumTheme.lavender)
-                .padding(.horizontal, 8)
-                .frame(height: 22)
-                .background(MegrumTheme.lavender.opacity(0.12), in: Capsule())
-
-            Text(text)
-                .font(.system(size: 11.5, weight: .bold, design: .rounded))
-                .foregroundStyle(MegrumTheme.ink)
-                .lineLimit(2)
-            Spacer(minLength: 0)
-        }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 10)
-        .background(MegrumTheme.lavender.opacity(0.08), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .stroke(.white.opacity(0.64), lineWidth: 1)
         }
     }
 }

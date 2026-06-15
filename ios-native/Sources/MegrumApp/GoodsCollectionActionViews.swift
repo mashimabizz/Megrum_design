@@ -23,6 +23,7 @@ struct GoodsQuickActionBackdrop: View {
 
 struct GoodsInventoryQuickActionPanel: View {
     var item: GoodsItem
+    var actions: [GoodsQuickActionKind] = GoodsQuickActionKind.inventoryActions
     var onAction: (GoodsQuickActionKind) -> Void
 
     var body: some View {
@@ -52,16 +53,17 @@ struct GoodsInventoryQuickActionPanel: View {
                     Spacer(minLength: 0)
                 }
 
-                ForEach(GoodsQuickActionKind.inventoryActions) { action in
+                ForEach(actions) { action in
                     Button(role: action.role) {
                         onAction(action)
                     } label: {
+                        let actionTitle = action.title(for: item.status)
                         HStack(spacing: 10) {
                             Image(systemName: action.systemImage)
                                 .font(.system(size: 16, weight: .bold))
                                 .frame(width: 22)
 
-                            Text(action.title)
+                            Text(actionTitle)
                                 .font(.system(size: 15, weight: .heavy, design: .rounded))
 
                             Spacer()
@@ -77,7 +79,7 @@ struct GoodsInventoryQuickActionPanel: View {
                         )
                     }
                     .buttonStyle(.plain)
-                    .accessibilityLabel(action.title)
+                    .accessibilityLabel(action.title(for: item.status))
                 }
             }
             .padding(14)
@@ -100,6 +102,7 @@ struct GoodsCollectionFloatingControls: View {
     var addButtonHint: String
     var isSelectionMode: Bool
     var quickActionItem: GoodsItem?
+    var quickActions: [GoodsQuickActionKind]
     var selectedCount: Int
     var onAdd: () -> Void
     var onDismissQuickAction: () -> Void
@@ -119,6 +122,7 @@ struct GoodsCollectionFloatingControls: View {
             GoodsQuickActionBackdrop(onDismiss: onDismissQuickAction)
             GoodsInventoryQuickActionPanel(
                 item: quickActionItem,
+                actions: quickActions,
                 onAction: onQuickAction
             )
             .padding(.horizontal, GoodsSelectionFooterMetrics.horizontalPadding)
@@ -205,10 +209,13 @@ private struct GoodsSelectionFooterButton: View {
 
 struct GoodsBulkTagSheet: View {
     var selectedCount: Int
+    var candidateNames: [String] = []
+    var previewItemsByTag: [String: [TagPreviewItem]] = [:]
     var onApply: (String) -> Void
 
     @Environment(\.dismiss) private var dismiss
     @State private var tagDraft = ""
+    @State private var selectedCandidateNames: [String] = []
 
     private var trimmedTag: String {
         tagDraft.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -217,6 +224,23 @@ struct GoodsBulkTagSheet: View {
     var body: some View {
         NavigationStack {
             Form {
+                if !candidateNames.isEmpty {
+                    Section {
+                        TagCandidatePreviewSelector(
+                            candidateNames: candidateNames,
+                            previewItemsByTag: previewItemsByTag,
+                            selectedNames: $selectedCandidateNames,
+                            maxSelection: 1,
+                            emptyMessage: "このグループに紐づくタグ候補はまだありません",
+                            onToggle: toggleCandidateTag
+                        )
+                    } header: {
+                        Text("候補")
+                    } footer: {
+                        Text("候補はもう一度タップすると入力欄に入ります。")
+                    }
+                }
+
                 Section {
                     TextField("例：会場限定", text: $tagDraft)
                 } header: {
@@ -241,6 +265,18 @@ struct GoodsBulkTagSheet: View {
                     .disabled(trimmedTag.isEmpty)
                 }
             }
+        }
+    }
+
+    private func toggleCandidateTag(_ name: String) {
+        if selectedCandidateNames.contains(where: { $0.caseInsensitiveCompare(name) == .orderedSame }) {
+            selectedCandidateNames = []
+            if trimmedTag.caseInsensitiveCompare(name) == .orderedSame {
+                tagDraft = ""
+            }
+        } else {
+            selectedCandidateNames = [name]
+            tagDraft = name
         }
     }
 }

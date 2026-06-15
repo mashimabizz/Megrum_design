@@ -3,8 +3,8 @@
 > **目的**：Megrum で使う用語の定義を一元化。実装・デザイン・仕様書で「同じ用語を同じ意味で」使うための基準。
 > 新環境（別Claudeセッション・別エンジニア）でも、これだけ読めばコンテキストがつかめる。
 
-最終更新: 2026-05-31
-ステータス: Draft v3.95（iter395 Swift Nativeの現地交換モード座標表示を反映）
+最終更新: 2026-06-14
+ステータス: Draft v3.97（iter614 アニメ/イラスト画像対応のメンバー候補付け拡張を反映）
 
 ---
 
@@ -57,6 +57,12 @@
 | **通知バッジ** | unread badge | 未読通知数を示す小さな件数表示。左ドロワーの「通知」項目やアプリアイコンバッジで使う | iter276 |
 | **AI機能** | AI feature, automated processing | 人工知能、機械学習、画像解析、自然言語処理、生成AIその他自動処理技術を用いて、グッズ登録補助、画像切り出し、カテゴリ推定、検索、マッチング、文章作成補助、不正利用検知、通報又は問い合わせ対応補助などを行う機能。外部AIサービスへ個人情報を送る場合は明示と必要な同意が必要 | iter384 |
 | **外部AIサービス** | third-party AI service | Megrum外の事業者が提供するAI処理基盤。会員の個人情報、投稿内容、画像、取引情報、問い合わせ内容などを送信する場合は、送信情報、利用目的、送信先、保存期間、学習利用の有無を明示する | iter384 |
+| **顔検出** | face detection | アップロード画像から顔の位置を検出する処理。Swift Native版ではApple Visionで矩形検出だけを行い、Face IDや端末の生体認証APIは使わない | iter613 |
+| **顔特徴量** | face embedding | 検出顔を数値ベクトル化したもの。`member_face_profiles.embedding` に保存し、モデル識別子 `embedding_model` と一緒に扱う。モデルはCore MLまたは信頼済みサーバ実装へ差し替える | iter613 |
+| **メンバー候補付け** | member face suggestion | 顔特徴量と運営管理のメンバー顔プロフィールを照合し、`characters_master` の候補を提示する機能。ユーザー確認・手動補正を前提にする | iter613 |
+| **画像タイプ判定** | image type classification | アップロード画像を `real_photo` / `anime` / `illustration` / `manga` / `unknown` に分類する入口。根拠のない固定判定はせず、判定不能時は `unknown` として安全側に倒す | iter614 |
+| **アニメ/イラスト認識** | anime recognition | アニメ顔・キャラクター領域・画像埋め込み類似度など、実写顔認識とは別に差し替え可能な認識処理。モデル未設定時はクラッシュさせず `unknown` / `needs_review` 扱いにする | iter614 |
+| **メンバープロフィール種別** | member profile type | `member_face_profiles.profile_type`。実写顔、アニメ顔、キャラクター分類、イラスト埋め込みを分け、誤った特徴量同士を混ぜないための種別 | iter614 |
 | **相手プロフィール** | public user profile | 他ユーザーの公開プロフィール。Swift Native版ではグッズパネルの相手所有物タップから開き、上半分にアイコン・表示名・handle・都道府県・評価サマリ・完了取引数を表示する | iter346 |
 | **評価一覧** | user evaluations | 相手プロフィールの評価サマリから開く一覧。評価者アイコン、ユーザーネーム、評価日、星、コメントを表示する。Swift Native版では公開RPC経由で読み込む | iter277, iter346 |
 | **共通ロジック** | shared core | Web/iOSで挙動を揃えるため `packages/core/` に切り出す状態判定・マッチング優先度・市場残数などの処理 | iter154.75 |
@@ -252,6 +258,7 @@
 | **混合交換** | any、どちらでも | 同種・異種を問わない（デフォルト） | notes/18 §A-1 |
 | **交換シーンタグ** | exchange context tags | 「終演後交換OK」「グッズ販売中交換OK」など、交換しやすい状況を表す自己申告タグ。UI名は「交換条件タグ」に統一 | iter168.71 / iter284 |
 | **交換条件タグ** | proposal condition tags | 打診確認画面で選ぶ条件タグ。`proposals.option_tags` に打診単位で保存し、郵送可の時は「即日発送」「同日発送」を候補に含める。旧UI名「オプションタグ」は廃止 | iter170 / iter284 |
+| **支払い条件** | payment methods | 定価交換や差額相談がある候補で、ユーザー同士の対応可能な支払い方法が重なるかを見る自己申告条件。保存候補は銀行振込 / PayPay / 現金交換 / その他。ホーム判定に使うのは銀行振込 / PayPay / 現金交換のみ。その他は表示メモとして扱い、口座は独立した選択肢にせず本人専用の支払い条件詳細に分離する | iter583, iter584, iter587 |
 | **グッズタグ** | goods tags | `goods_inventory_tags` / `tags_master` でグッズ単位に登録するタグ。検索フィルターでは交換条件タグと混ぜない | iter284 |
 | **交換比率** | exchange ratio | 譲 N 個 ↔ 受 M 個の比率。1:10〜10:1 まで | notes/18 §A-2 |
 | **カレンダー公開** | calendar disclosure | 打診時オプション。相手と自分のスケジュールを重ね見可能にする | notes/18 §A-5, iter168.97 |
@@ -335,6 +342,79 @@
 | `for_trade` | 譲る候補 | Item |
 | `keep` | 自分用キープ | Item |
 | `traded` | 譲り済 | Item |
+
+### Face match status（iter613 / iter614）
+
+| 値 | 意味 | エンティティ |
+|---|---|---|
+| `auto_matched` | 閾値以上で自動一致した顔候補 | detected_faces |
+| `needs_review` | 候補はあるがユーザー確認が必要 | detected_faces |
+| `unknown` | 十分な候補がない、または特徴量モデル未設定 | detected_faces |
+| `no_face` | 画像内に顔が検出されなかった | face_uploaded_images / detected_faces |
+| `no_subject` | 顔に限らず、候補対象を検出できなかった | face_uploaded_images / detected_faces |
+| `low_quality` | 小さすぎる・低信頼度など品質不足 | detected_faces |
+
+### Legacy face quality status（iter613）
+
+| 値 | 意味 | エンティティ |
+|---|---|---|
+| `usable` | 照合対象にできる品質 | detected_faces |
+| `too_small` | 顔矩形が小さすぎる | detected_faces |
+| `low_confidence` | Vision等の検出信頼度が低い | detected_faces |
+| `low_quality` | サイズ・信頼度の総合品質が不足 | detected_faces |
+
+### Member tagging image type（iter614）
+
+| 値 | 意味 | エンティティ |
+|---|---|---|
+| `real_photo` | 実写写真。既存の実写向け顔検出・特徴量照合へ流す | face_uploaded_images / detected_faces |
+| `anime` | アニメ絵。専用のアニメ認識サービスへ流す | face_uploaded_images / detected_faces |
+| `illustration` | イラスト、AI生成風、ファンアート等。専用認識サービスへ流す | face_uploaded_images / detected_faces |
+| `manga` | 漫画風・モノクロ漫画画像。専用認識サービスへ流す | face_uploaded_images / detected_faces |
+| `unknown` | 判定不能。安全側に倒して自動一致させない | face_uploaded_images / detected_faces |
+
+### Member tagging subject type（iter614）
+
+| 値 | 意味 | エンティティ |
+|---|---|---|
+| `real_face` | 実写の顔 |
+| `anime_face` | アニメ/イラスト内の顔 |
+| `character` | 顔以外も含むキャラクター領域 |
+| `unknown` | 対象種別不明 |
+
+### Member tagging recognition method（iter614）
+
+| 値 | 意味 | エンティティ |
+|---|---|---|
+| `vision_face` | Apple Visionの顔矩形検出 |
+| `coreml_real_face` | Core ML実写顔モデル |
+| `real_face_embedding` | 実写顔埋め込み類似度 |
+| `anime_face_detector` | アニメ顔検出モデル |
+| `anime_character_classifier` | アニメ/イラストのキャラクター分類 |
+| `anime_embedding_similarity` | アニメ/イラスト向け画像埋め込み類似度 |
+| `manual` | ユーザーまたは運営者の手動補正 |
+| `unknown` | 認識方式不明、またはモデル未設定 |
+
+### Member tagging quality status（iter614）
+
+| 値 | 意味 | エンティティ |
+|---|---|---|
+| `ok` | 照合対象にできる品質 |
+| `low_quality` | 総合品質不足 |
+| `too_small` | 対象矩形が小さすぎる |
+| `occluded` | 顔やキャラクターが隠れている |
+| `side_face` | 横顔・後ろ姿など正面でない |
+| `stylized` | SDキャラや強いデフォルメ |
+| `unknown` | 品質判定不能 |
+
+### Member profile type（iter614）
+
+| 値 | 意味 | エンティティ |
+|---|---|---|
+| `real_face` | 実写顔特徴量 |
+| `anime_face` | アニメ顔特徴量 |
+| `anime_character` | キャラクター分類・キャラ単位の特徴量 |
+| `illustration_embedding` | イラスト/漫画向け画像埋め込み |
 
 ### Dispute resolution（iter39 確定）
 

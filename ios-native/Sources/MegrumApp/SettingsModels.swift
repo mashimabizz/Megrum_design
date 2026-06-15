@@ -7,6 +7,7 @@ struct SettingsAccountSummary: Equatable {
     var displayNameText: String
     var activityAreaText: String
     var accountStatusText: String
+    var paymentMethodsText: String
     var pushNotificationText: String
     var addressStatusText: String
 
@@ -20,6 +21,7 @@ struct SettingsAccountSummary: Equatable {
         displayNameText = Self.trimmed(viewer?.displayName, fallback: "未設定")
         activityAreaText = Self.trimmed(viewer?.prefecture, fallback: "未設定")
         accountStatusText = viewer?.accountStatus.settingsDisplayName ?? "未読み込み"
+        paymentMethodsText = Self.paymentMethodsText(viewer?.paymentMethods ?? [], otherNote: viewer?.paymentNote)
         pushNotificationText = pushNotificationsEnabled ? "ON" : "OFF"
 
         if let mailingAddress, mailingAddress.isReady {
@@ -36,6 +38,10 @@ struct SettingsAccountSummary: Equatable {
     private static func trimmed(_ value: String?, fallback: String) -> String {
         let trimmedValue = value?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
         return trimmedValue.isEmpty ? fallback : trimmedValue
+    }
+
+    private static func paymentMethodsText(_ methods: [UserPaymentMethod], otherNote: String?) -> String {
+        UserPaymentMethod.displayText(for: methods, otherNote: otherNote)
     }
 }
 
@@ -101,6 +107,7 @@ enum SettingsEssentialRoute: String, CaseIterable, Identifiable {
     case notifications
     case mobilePush
     case address
+    case payment
     case blockedUsers
     case privacy
     case loginSecurity
@@ -117,6 +124,7 @@ enum SettingsEssentialRoute: String, CaseIterable, Identifiable {
         .notifications,
         .mobilePush,
         .address,
+        .payment,
         .blockedUsers,
         .privacy,
         .loginSecurity,

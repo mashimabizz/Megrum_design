@@ -41,6 +41,9 @@ struct ProposalMeetupPlaceSheet: View {
     @State private var searchResults: [ProposalMeetupPlaceSearchResult] = []
     @State private var isSearchingPlace = false
     @State private var placeSearchError: String?
+    @State private var activeSearchQuery: String?
+    @State private var placeSearchTask: Task<Void, Never>?
+    @State private var suppressNextPlaceSearch = false
     @FocusState private var focusedField: Field?
 
     private static let fallbackCoordinate = CLLocationCoordinate2D(latitude: 35.681236, longitude: 139.767125)
@@ -110,7 +113,6 @@ struct ProposalMeetupPlaceSheet: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
-                    headerCard
                     actionRow
                     placeInputCard
                     mapCard
@@ -138,6 +140,12 @@ struct ProposalMeetupPlaceSheet: View {
             focusedField = .place
             syncCameraToSelectedCoordinate(animated: false)
         }
+        .onDisappear {
+            cancelPlaceSearch()
+        }
+        .onChange(of: draft.placeName) { _, placeName in
+            schedulePlaceSearch(for: placeName)
+        }
         .onChange(of: draft.latitudeText) { _, _ in
             syncCameraToSelectedCoordinate(animated: true)
         }
@@ -150,33 +158,6 @@ struct ProposalMeetupPlaceSheet: View {
             }
             isWaitingForCurrentLocation = false
             applyCurrentLocation(coordinate)
-        }
-    }
-
-    private var headerCard: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text("候補\(route.index + 1)")
-                .font(.system(size: 12, weight: .black, design: .rounded))
-                .foregroundStyle(MegrumTheme.lavender)
-                .padding(.horizontal, 10)
-                .frame(height: 28)
-                .background(MegrumTheme.lavender.opacity(0.12), in: Capsule())
-
-            Text(timeRangeText)
-                .font(.system(size: 20, weight: .black, design: .rounded))
-                .foregroundStyle(MegrumTheme.ink)
-
-            Text("交換できる場所を入力します。候補時間はカレンダー上で動かせます。")
-                .font(.system(size: 13, weight: .bold, design: .rounded))
-                .foregroundStyle(MegrumTheme.muted)
-                .fixedSize(horizontal: false, vertical: true)
-        }
-        .padding(16)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(.white.opacity(0.84), in: RoundedRectangle(cornerRadius: 24, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: 24, style: .continuous)
-                .stroke(.white.opacity(0.7), lineWidth: 1)
         }
     }
 
@@ -225,13 +206,15 @@ struct ProposalMeetupPlaceSheet: View {
                     .proposalPlaceSheetTextInputBehavior()
                     .onSubmit {
                         Task {
-                            await searchPlace()
+                            cancelPlaceSearch()
+                            await searchPlace(query: trimmedSearchQuery)
                         }
                     }
 
                 Button {
                     Task {
-                        await searchPlace()
+                        cancelPlaceSearch()
+                        await searchPlace(query: trimmedSearchQuery)
                     }
                 } label: {
                     if isSearchingPlace {
@@ -392,10 +375,6 @@ struct ProposalMeetupPlaceSheet: View {
         )
     }
 
-    private var timeRangeText: String {
-        "\(Self.dateTimeText(draft.startAt)) - \(Self.timeText(draft.endAt))"
-    }
-
     private func useCurrentLocation() {
         if let currentCoordinate {
             applyCurrentLocation(currentCoordinate)
@@ -406,6 +385,8 @@ struct ProposalMeetupPlaceSheet: View {
     }
 
     private func applyCurrentLocation(_ coordinate: MegrumLocationCoordinate) {
+        clearPlaceSearchState()
+        suppressNextPlaceSearch = true
         draft = draft.applyingCurrentLocation(coordinate)
         syncCamera(to: coordinate.clLocationCoordinate, animated: true)
     }
@@ -414,6 +395,8 @@ struct ProposalMeetupPlaceSheet: View {
         guard let previousDraft else {
             return
         }
+        clearPlaceSearchState()
+        suppressNextPlaceSearch = true
         draft.placeName = previousDraft.placeName
         draft.latitudeText = previousDraft.latitudeText
         draft.longitudeText = previousDraft.longitudeText
@@ -423,15 +406,21 @@ struct ProposalMeetupPlaceSheet: View {
     }
 
     @MainActor
-    private func searchPlace() async {
-        guard !trimmedSearchQuery.isEmpty else {
+    private func searchPlace(query rawQuery: String) async {
+        let query = rawQuery.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !query.isEmpty else {
+            searchResults = []
+            placeSearchError = nil
+            isSearchingPlace = false
+            activeSearchQuery = nil
             return
         }
+        activeSearchQuery = query
         isSearchingPlace = true
         placeSearchError = nil
 
         let request = MKLocalSearch.Request()
-        request.naturalLanguageQuery = trimmedSearchQuery
+        request.naturalLanguageQuery = query
         request.region = MKCoordinateRegion(
             center: selectedCoordinate ?? currentCoordinate?.clLocationCoordinate ?? Self.fallbackCoordinate,
             span: MKCoordinateSpan(latitudeDelta: 0.08, longitudeDelta: 0.08)
@@ -439,6 +428,9 @@ struct ProposalMeetupPlaceSheet: View {
 
         do {
             let response = try await MKLocalSearch(request: request).start()
+            guard activeSearchQuery == query, !Task.isCancelled else {
+                return
+            }
             let results = response.mapItems.prefix(3).compactMap { item -> ProposalMeetupPlaceSearchResult? in
                 let coordinate = item.placemark.coordinate
                 guard ProposalMeetupMapDraft.isValid(latitude: coordinate.latitude, longitude: coordinate.longitude) else {
@@ -446,7 +438,7 @@ struct ProposalMeetupPlaceSheet: View {
                 }
                 let title = item.name?.trimmingCharacters(in: .whitespacesAndNewlines)
                     ?? item.placemark.name?.trimmingCharacters(in: .whitespacesAndNewlines)
-                    ?? trimmedSearchQuery
+                    ?? query
                 let subtitle = Self.placeAreaText(for: item.placemark)
                 return ProposalMeetupPlaceSearchResult(title: title, subtitle: subtitle, coordinate: coordinate)
             }
@@ -455,12 +447,20 @@ struct ProposalMeetupPlaceSheet: View {
                 placeSearchError = "場所が見つかりませんでした。別の名前で検索してください。"
             }
         } catch {
+            guard activeSearchQuery == query, !Task.isCancelled else {
+                return
+            }
             placeSearchError = "場所検索に失敗しました。通信状況を確認してください。"
         }
-        isSearchingPlace = false
+        if activeSearchQuery == query {
+            isSearchingPlace = false
+            activeSearchQuery = nil
+        }
     }
 
     private func applySearchResult(_ result: ProposalMeetupPlaceSearchResult, clearsResults: Bool = true) {
+        clearPlaceSearchState()
+        suppressNextPlaceSearch = true
         draft.placeName = result.title
         draft.latitudeText = ProposalMeetupMapDraft.coordinateText(result.coordinate.latitude)
         draft.longitudeText = ProposalMeetupMapDraft.coordinateText(result.coordinate.longitude)
@@ -476,11 +476,13 @@ struct ProposalMeetupPlaceSheet: View {
         guard ProposalMeetupMapDraft.isValid(latitude: coordinate.latitude, longitude: coordinate.longitude) else {
             return
         }
+        clearPlaceSearchState()
         draft.latitudeText = ProposalMeetupMapDraft.coordinateText(coordinate.latitude)
         draft.longitudeText = ProposalMeetupMapDraft.coordinateText(coordinate.longitude)
         placeSearchError = nil
         let trimmedPlaceName = draft.normalizedPlaceName
         if trimmedPlaceName.isEmpty || trimmedPlaceName == "現在地" {
+            suppressNextPlaceSearch = true
             draft.placeName = ProposalMeetupMapDraft.fallbackPlaceName
         }
         searchResults = []
@@ -505,17 +507,6 @@ struct ProposalMeetupPlaceSheet: View {
         }
     }
 
-    private static func dateTimeText(_ date: Date) -> String {
-        date.formatted(
-            .dateTime
-                .locale(Locale(identifier: "ja_JP"))
-                .month()
-                .day()
-                .hour()
-                .minute()
-        )
-    }
-
     private static func placeAreaText(for placemark: MKPlacemark) -> String {
         let rawParts = [
             placemark.administrativeArea,
@@ -535,13 +526,44 @@ struct ProposalMeetupPlaceSheet: View {
         return placemark.title?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
     }
 
-    private static func timeText(_ date: Date) -> String {
-        date.formatted(
-            .dateTime
-                .locale(Locale(identifier: "ja_JP"))
-                .hour()
-                .minute()
-        )
+    private func schedulePlaceSearch(for placeName: String) {
+        if suppressNextPlaceSearch {
+            suppressNextPlaceSearch = false
+            return
+        }
+        cancelPlaceSearch()
+        let query = placeName.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !query.isEmpty else {
+            searchResults = []
+            placeSearchError = nil
+            isSearchingPlace = false
+            activeSearchQuery = nil
+            return
+        }
+        placeSearchTask = Task { @MainActor in
+            do {
+                try await Task.sleep(nanoseconds: 260_000_000)
+            } catch {
+                return
+            }
+            guard !Task.isCancelled else {
+                return
+            }
+            await searchPlace(query: query)
+        }
+    }
+
+    private func cancelPlaceSearch() {
+        placeSearchTask?.cancel()
+        placeSearchTask = nil
+    }
+
+    private func clearPlaceSearchState() {
+        cancelPlaceSearch()
+        activeSearchQuery = nil
+        isSearchingPlace = false
+        searchResults = []
+        placeSearchError = nil
     }
 }
 

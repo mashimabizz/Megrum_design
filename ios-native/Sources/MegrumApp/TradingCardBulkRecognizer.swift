@@ -54,6 +54,35 @@ struct TradingCardBulkRecognitionResult: Equatable, Identifiable, Sendable {
     }
 }
 
+struct TradingCardCropFrame: Equatable, Identifiable, Sendable {
+    var id: UUID
+    var rect: CGRect
+    var source: TradingCardBulkRecognitionResult.Source
+
+    init(
+        id: UUID = UUID(),
+        rect: CGRect,
+        source: TradingCardBulkRecognitionResult.Source = .detected
+    ) {
+        self.id = id
+        self.rect = TradingCardCropFrame.normalized(rect)
+        self.source = source
+    }
+
+    private static func normalized(_ rect: CGRect) -> CGRect {
+        let x = min(max(rect.minX, 0), 1)
+        let y = min(max(rect.minY, 0), 1)
+        let maxX = min(max(rect.maxX, 0), 1)
+        let maxY = min(max(rect.maxY, 0), 1)
+        return CGRect(
+            x: min(x, maxX),
+            y: min(y, maxY),
+            width: abs(maxX - x),
+            height: abs(maxY - y)
+        )
+    }
+}
+
 enum TradingCardBulkRecognizer {
     static func recognizeCards(
         in imageData: Data,
@@ -61,6 +90,24 @@ enum TradingCardBulkRecognizer {
     ) async throws -> [TradingCardBulkRecognitionResult] {
         try await Task.detached(priority: .userInitiated) {
             try recognizeCardsSynchronously(in: imageData, maximumCards: maximumCards)
+        }.value
+    }
+
+    static func detectCropFrames(
+        in imageData: Data,
+        maximumCards: Int = TradingCardRectangleDetectionConfig.maximumObservations
+    ) async throws -> [TradingCardCropFrame] {
+        try await Task.detached(priority: .userInitiated) {
+            try detectCropFramesSynchronously(in: imageData, maximumCards: maximumCards)
+        }.value
+    }
+
+    static func cropFrames(
+        _ frames: [TradingCardCropFrame],
+        in imageData: Data
+    ) async throws -> [TradingCardBulkRecognitionResult] {
+        try await Task.detached(priority: .userInitiated) {
+            try cropFramesSynchronously(frames, in: imageData)
         }.value
     }
 
@@ -103,6 +150,41 @@ enum TradingCardBulkRecognizer {
                 )
             ]
             : crops
+    }
+
+    static func detectCropFramesSynchronously(
+        in imageData: Data,
+        maximumCards: Int = TradingCardRectangleDetectionConfig.maximumObservations
+    ) throws -> [TradingCardCropFrame] {
+        guard let rawImage = CIImage(data: imageData) else {
+            throw TradingCardBulkRecognitionError.imageLoadFailed
+        }
+        let image = rawImage.oriented(exifOrientation(from: imageData))
+        return try detectRectangles(in: image, maximumCards: maximumCards)
+            .map { observation in
+                TradingCardCropFrame(
+                    rect: normalizedBoundingRect(observation),
+                    source: .detected
+                )
+            }
+    }
+
+    static func cropFramesSynchronously(
+        _ frames: [TradingCardCropFrame],
+        in imageData: Data
+    ) throws -> [TradingCardBulkRecognitionResult] {
+        guard let rawImage = CIImage(data: imageData) else {
+            throw TradingCardBulkRecognitionError.imageLoadFailed
+        }
+        let image = rawImage.oriented(exifOrientation(from: imageData))
+        let context = CIContext(options: [.useSoftwareRenderer: false])
+        return try frames.map { frame in
+            TradingCardBulkRecognitionResult(
+                id: frame.id,
+                data: try crop(rect: frame.rect, from: image, context: context),
+                source: frame.source
+            )
+        }
     }
 
     private static func detectRectangles(
@@ -157,6 +239,25 @@ enum TradingCardBulkRecognizer {
         return try jpegData(from: outputImage, context: context)
     }
 
+    private static func crop(
+        rect normalizedRect: CGRect,
+        from image: CIImage,
+        context: CIContext
+    ) throws -> Data {
+        let extent = image.extent
+        let cropRect = CGRect(
+            x: extent.minX + normalizedRect.minX * extent.width,
+            y: extent.minY + (1 - normalizedRect.maxY) * extent.height,
+            width: normalizedRect.width * extent.width,
+            height: normalizedRect.height * extent.height
+        ).integral
+
+        guard cropRect.width > 1, cropRect.height > 1 else {
+            throw TradingCardBulkRecognitionError.cropFailed
+        }
+        return try jpegData(from: image.cropped(to: cropRect), context: context)
+    }
+
     private static func jpegData(from image: CIImage, context: CIContext) throws -> Data {
         guard let cgImage = context.createCGImage(image, from: image.extent.integral) else {
             throw TradingCardBulkRecognitionError.cgImageUnavailable
@@ -203,6 +304,31 @@ enum TradingCardBulkRecognizer {
                     + observation.bottomLeft.x
             ) / 4,
             y: 1 - visionCenterY
+        )
+    }
+
+    private static func normalizedBoundingRect(_ observation: VNRectangleObservation) -> CGRect {
+        let xs = [
+            observation.topLeft.x,
+            observation.topRight.x,
+            observation.bottomRight.x,
+            observation.bottomLeft.x
+        ]
+        let ys = [
+            observation.topLeft.y,
+            observation.topRight.y,
+            observation.bottomRight.y,
+            observation.bottomLeft.y
+        ]
+        let minX = xs.min() ?? 0
+        let maxX = xs.max() ?? 1
+        let minVisionY = ys.min() ?? 0
+        let maxVisionY = ys.max() ?? 1
+        return CGRect(
+            x: minX,
+            y: 1 - maxVisionY,
+            width: maxX - minX,
+            height: maxVisionY - minVisionY
         )
     }
 

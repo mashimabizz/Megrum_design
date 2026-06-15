@@ -22,6 +22,16 @@ final class MegrumCoreTests: XCTestCase {
         XCTAssertEqual(AccountStatus.deletionRequested.rawValue, "deletion_requested")
     }
 
+    func testOshiRequestKindMemberSelectionBoundary() {
+        XCTAssertTrue(OshiRequestKind.group.supportsMemberSelection)
+        XCTAssertTrue(OshiRequestKind.work.supportsMemberSelection)
+        XCTAssertFalse(OshiRequestKind.solo.supportsMemberSelection)
+
+        XCTAssertTrue(OshiGroup(id: UUID(), name: "TWICE", kind: .group).supportsMemberSelection)
+        XCTAssertTrue(OshiGroup(id: UUID(), name: "呪術廻戦", kind: .work).supportsMemberSelection)
+        XCTAssertFalse(OshiGroup(id: UUID(), name: "IU", kind: .solo).supportsMemberSelection)
+    }
+
     func testBoardAudienceRawValuesMatchDatabase() {
         XCTAssertEqual(BoardThread.Audience.nearby3km.rawValue, "nearby_3km")
         XCTAssertEqual(BoardThread.Audience.samePrefecture.rawValue, "same_prefecture")

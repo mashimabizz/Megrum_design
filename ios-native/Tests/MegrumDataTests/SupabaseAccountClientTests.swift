@@ -19,7 +19,7 @@ final class SupabaseAccountClientTests: XCTestCase {
             displayName: "みちりおん"
         )
 
-        XCTAssertEqual(request.url?.absoluteString, "https://example.supabase.co/rest/v1/users?select=id,handle,display_name,avatar_url,primary_area,account_status&on_conflict=id")
+        XCTAssertEqual(request.url?.absoluteString, "https://example.supabase.co/rest/v1/users?select=id,handle,display_name,avatar_url,primary_area,age,account_status&on_conflict=id")
         XCTAssertEqual(request.httpMethod, "POST")
         XCTAssertEqual(request.value(forHTTPHeaderField: "apikey"), "sb_publishable_test")
         XCTAssertEqual(request.value(forHTTPHeaderField: "Authorization"), "Bearer session_token")

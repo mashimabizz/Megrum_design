@@ -13,8 +13,10 @@ struct MeguriHomeContent: View {
     var selectedScope: BoardThread.Audience
     var selectedPrefecture: String
     var notice: MegrumLocationNotice?
-    @Binding var isBoardSheetExpanded: Bool
+    var isRequestingLocation: Bool
+    @Binding var boardSheetDetent: MeguriBoardSheetDetent
     var onOpenMap: () -> Void
+    var onRecenterMap: () -> Void
     var onSelectGroom: (GroomPost) -> Void
     var onSelectThread: (BoardThread) -> Void
     var onNoticeAction: () -> Void
@@ -46,10 +48,20 @@ struct MeguriHomeContent: View {
                             .padding(.top, 18)
                     }
 
+                    HStack {
+                        Spacer()
+                        MeguriMapRecenterButton(
+                            isRequesting: isRequestingLocation,
+                            action: onRecenterMap
+                        )
+                    }
+                    .padding(.horizontal, 18)
+                    .padding(.top, 10)
+
                     Spacer()
 
                     MeguriBoardBottomSheet(
-                        isExpanded: $isBoardSheetExpanded,
+                        detent: $boardSheetDetent,
                         threads: threads,
                         grooms: grooms,
                         replyCounts: replyCounts,
@@ -62,8 +74,9 @@ struct MeguriHomeContent: View {
                         onOpenThreadComposer: onOpenThreadComposer,
                         onOpenThread: onSelectThread
                     )
-                    .frame(height: isBoardSheetExpanded ? proxy.size.height * 0.76 : proxy.size.height * 0.48)
-                    .animation(.smooth(duration: 0.24), value: isBoardSheetExpanded)
+                    .frame(height: boardSheetDetent.height(in: proxy.size.height))
+                    .clipped()
+                    .animation(.smooth(duration: 0.24), value: boardSheetDetent)
                 }
             }
         }
@@ -127,6 +140,36 @@ struct MeguriHomeMapBackdrop: View {
     }
 }
 
+struct MeguriMapRecenterButton: View {
+    var isRequesting: Bool
+    var action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Group {
+                if isRequesting {
+                    ProgressView()
+                        .controlSize(.small)
+                        .tint(MegrumTheme.lavender)
+                } else {
+                    Image(systemName: "location.fill")
+                        .font(.system(size: 18, weight: .heavy))
+                        .foregroundStyle(MegrumTheme.lavender)
+                }
+            }
+            .frame(width: 48, height: 48)
+            .background(.regularMaterial, in: Circle())
+            .overlay {
+                Circle()
+                    .stroke(.white.opacity(0.66), lineWidth: 1)
+            }
+            .shadow(color: MegrumTheme.ink.opacity(0.12), radius: 12, y: 6)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("現在地へ移動")
+    }
+}
+
 struct MeguriHomeTopBar: View {
     var body: some View {
         ZStack {
@@ -152,7 +195,7 @@ struct MeguriHomeNoticeCard: View {
                     .frame(width: 48, height: 48)
                     .background(MegrumTheme.lavender.opacity(0.12), in: Circle())
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("現在地を確認中")
+                    Text(title)
                         .font(.system(size: 16, weight: .black, design: .rounded))
                     Text(notice.message)
                         .font(.system(size: 12, weight: .semibold, design: .rounded))
@@ -166,6 +209,16 @@ struct MeguriHomeNoticeCard: View {
             .shadow(color: MegrumTheme.ink.opacity(0.09), radius: 14, y: 8)
         }
         .buttonStyle(.plain)
+    }
+
+    private var title: String {
+        if notice.message.contains("掲示板") || notice.message.contains("投稿") {
+            return "投稿できませんでした"
+        }
+        if notice.message.contains("読み込") {
+            return "読み込めませんでした"
+        }
+        return "現在地を確認中"
     }
 }
 

@@ -12,8 +12,10 @@ struct TradeDetailScreen: View {
     var proposal: TradeProposal
     @State private var draftMessage = ""
     @State private var selectedEvidencePhotoItem: PhotosPickerItem?
+    @State private var selectedChatPhotoItem: PhotosPickerItem?
     @State private var selectedOutfitPhotoItem: PhotosPickerItem?
     @State private var isShowingEvidenceCamera = false
+    @State private var isShowingChatCamera = false
     @State private var isShowingOutfitCamera = false
     @State private var isShowingEvaluationPage = false
     @State private var isShowingDisputePage = false
@@ -25,6 +27,7 @@ struct TradeDetailScreen: View {
     @State private var selectedRemoteImage: RemoteImageSelection?
     @State private var isWaitingToShareLocation = false
     @State private var disputeDetailRoute: TradeDisputeDetailRoute?
+    @State private var partnerProfileRoute: TradePartnerProfileRoute?
     @State private var didSubmitEvaluation = false
     @StateObject private var locationState = MegrumLocationState()
 
@@ -56,10 +59,31 @@ struct TradeDetailScreen: View {
         TradeChatInputAvailability(proposal: currentProposal)
     }
 
+    private var isChatInputVisible: Bool {
+        guard let viewerID else {
+            return false
+        }
+        return currentProposal.isParticipant(viewerID) && chatInputAvailability.canSendMessages
+    }
+
+    private var messageInputContext: TradeMessageInputContext {
+        TradeMessageInputContext(
+            isSending: appState.sendingMessageProposalID == proposal.id,
+            canUseCamera: canUseCamera,
+            proposalStatus: currentProposal.status,
+            supportsHandExchange: supportsHandExchange,
+            showsCounterProposal: currentProposal.canCreateCounterProposal(from: viewerID)
+        )
+    }
+
+    private var supportsHandExchange: Bool {
+        currentProposal.exchangeMethod == .hand || currentProposal.exchangeMethod == .both
+    }
+
     private var evaluationPromptState: TradeEvaluationPromptState {
         TradeEvaluationPromptState(
             proposal: currentProposal,
-            viewerID: appState.viewer?.id,
+            viewerID: viewerID,
             messages: messages,
             localSubmission: didSubmitEvaluation
         )
@@ -67,6 +91,14 @@ struct TradeDetailScreen: View {
 
     private var viewerID: UUID? {
         appState.viewer?.id
+    }
+
+    private var partnerID: UUID? {
+        viewerID.flatMap { currentProposal.partnerID(for: $0) }
+    }
+
+    private var partnerProfile: UserProfile? {
+        partnerID.flatMap { appState.publicProfilesByUserID[$0]?.profile }
     }
 
     private var heroPresentation: TradeDetailHeroPresentation {
@@ -83,6 +115,25 @@ struct TradeDetailScreen: View {
 
     private var requestedGoodsIDs: [UUID] {
         viewerID.flatMap { currentProposal.goodsRequested(by: $0) } ?? currentProposal.receiverGoodsIDs
+    }
+
+    private var requestedGoods: [GoodsItem] {
+        tradeItems(for: requestedGoodsIDs)
+    }
+
+    private var offeredGoods: [GoodsItem] {
+        tradeItems(for: offeredGoodsIDs)
+    }
+
+    private var paymentSummaryText: String? {
+        guard currentProposal.cashOffer else {
+            return nil
+        }
+        return UserPaymentMethod.displayText(
+            for: partnerProfile?.paymentMethods ?? [],
+            otherNote: partnerProfile?.paymentNote,
+            emptyText: "未設定"
+        )
     }
 
     var body: some View {
@@ -113,21 +164,19 @@ struct TradeDetailScreen: View {
 #if os(iOS)
         .sheet(isPresented: $isShowingEvidenceCamera) {
             NativeCameraCaptureView { imageData in
-                Task {
-                    await addEvidence(data: imageData, imageContentType: "image/jpeg")
-                }
+                handleCapturedEvidenceImage(imageData)
             }
             .ignoresSafeArea()
         }
         .sheet(isPresented: $isShowingOutfitCamera) {
             NativeCameraCaptureView { imageData in
-                Task {
-                    await addChatPhoto(
-                        data: imageData,
-                        messageType: .outfitPhoto,
-                        imageContentType: "image/jpeg"
-                    )
-                }
+                handleCapturedOutfitImage(imageData)
+            }
+            .ignoresSafeArea()
+        }
+        .sheet(isPresented: $isShowingChatCamera) {
+            NativeCameraCaptureView { imageData in
+                handleCapturedChatImage(imageData)
             }
             .ignoresSafeArea()
         }
@@ -156,22 +205,27 @@ struct TradeDetailScreen: View {
         TradeDetailContent(
             proposal: currentProposal,
             messages: messages,
-            viewerID: appState.viewer?.id,
+            viewerID: viewerID,
             heroPresentation: heroPresentation,
             latestDisputeSummary: latestDisputeSummary,
             tradeSummaryLine: tradeSummaryLine,
-            chatDateDividerText: chatDateDividerText,
-            selectedOutfitPhotoItem: $selectedOutfitPhotoItem,
+            requestedGoods: requestedGoods,
+            offeredGoods: offeredGoods,
+            requestedGoodsCount: requestedGoodsIDs.count,
+            offeredGoodsCount: offeredGoodsIDs.count,
+            paymentSummaryText: paymentSummaryText,
+            evidencePhotos: appState.evidencePhotos(for: currentProposal),
             selectedEvidencePhotoItem: $selectedEvidencePhotoItem,
+            partnerLastReadAt: appState.partnerLastReadAt(for: currentProposal.id),
             evaluationState: evaluationPromptState,
             isResponding: appState.respondingProposalID == currentProposal.id,
-            isSendingDayOfMessage: appState.sendingMessageProposalID == proposal.id,
             isLoadingMessages: appState.loadingMessagesProposalID == proposal.id,
             isApprovingCancel: appState.respondingProposalID == currentProposal.id,
             isAddingEvidence: appState.addingEvidenceProposalID == currentProposal.id,
             isApprovingEvidence: appState.approvingEvidenceProposalID == currentProposal.id,
             canUseCamera: canUseCamera,
             onOpenDispute: openDisputeDetail,
+            onOpenPartnerProfile: openPartnerProfile,
             onAgree: { acceptedExchangeMethod in
                 Task {
                     await appState.agreeProposal(
@@ -186,13 +240,6 @@ struct TradeDetailScreen: View {
             onCounterProposal: {
                 isShowingCounterProposalPage = true
             },
-            onOpenOutfitCamera: {
-                isShowingOutfitCamera = true
-            },
-            onMarkArrived: {
-                sendArrivalQuickAction(.arrived)
-            },
-            onShareLocation: shareCurrentLocation,
             onOpenEvidenceCamera: {
                 isShowingEvidenceCamera = true
             },
@@ -218,12 +265,10 @@ struct TradeDetailScreen: View {
         .safeAreaInset(edge: .bottom) {
             TradeDetailMessageInputBar(
                 text: $draftMessage,
+                selectedChatPhotoItem: $selectedChatPhotoItem,
                 selectedOutfitPhotoItem: $selectedOutfitPhotoItem,
-                isVisible: appState.viewer.map({ currentProposal.isParticipant($0.id) }) == true
-                    && chatInputAvailability.canSendMessages,
-                isSending: appState.sendingMessageProposalID == proposal.id,
-                showsCounterProposal: currentProposal.canCreateCounterProposal(from: appState.viewer?.id),
-                canUseCamera: canUseCamera,
+                isVisible: isChatInputVisible,
+                context: messageInputContext,
                 onOpenSchedule: {
                     isShowingSchedulePage = true
                 },
@@ -232,6 +277,9 @@ struct TradeDetailScreen: View {
                 },
                 onOpenLocationPlaceholder: {
                     shareCurrentLocation()
+                },
+                onOpenChatCamera: {
+                    isShowingChatCamera = true
                 },
                 onOpenOutfitCamera: {
                     isShowingOutfitCamera = true
@@ -248,14 +296,7 @@ struct TradeDetailScreen: View {
                 onReport: {
                     isShowingDisputePage = true
                 },
-                onSendMessage: {
-                    Task {
-                        let sent = await appState.sendMessage(proposalID: proposal.id, body: draftMessage)
-                        if sent {
-                            draftMessage = ""
-                        }
-                    }
-                }
+                onSendMessage: sendDraftMessage
             )
         }
         .navigationTitle("@\(heroPresentation.partnerHandle)")
@@ -265,22 +306,19 @@ struct TradeDetailScreen: View {
 #endif
         .task {
             await appState.loadMessages(proposalID: proposal.id)
+            await appState.loadTradeEvidencePhotos(proposal: currentProposal, reportsFailure: false)
+            if let partnerID, appState.publicProfilesByUserID[partnerID] == nil {
+                await appState.loadPublicUserProfile(userID: partnerID, reportsFailure: false)
+            }
         }
         .onChange(of: selectedEvidencePhotoItem) { _, item in
-            guard let item else {
-                return
-            }
-            Task {
-                await addEvidence(from: item)
-            }
+            handleSelectedEvidencePhoto(item)
+        }
+        .onChange(of: selectedChatPhotoItem) { _, item in
+            handleSelectedChatPhoto(item)
         }
         .onChange(of: selectedOutfitPhotoItem) { _, item in
-            guard let item else {
-                return
-            }
-            Task {
-                await addChatPhoto(from: item, messageType: .outfitPhoto)
-            }
+            handleSelectedOutfitPhoto(item)
         }
         .navigationDestination(isPresented: $isShowingEvaluationPage) {
             TradeEvaluationSheet(
@@ -353,24 +391,26 @@ struct TradeDetailScreen: View {
         .navigationDestination(item: $disputeDetailRoute) { route in
             DisputeDetailScreen(model: route.model)
         }
+        .navigationDestination(item: $partnerProfileRoute) { route in
+            PublicUserProfileScreen(appState: appState, userID: route.userID)
+        }
         .onChange(of: locationState.coordinate) { _, coordinate in
-            guard isWaitingToShareLocation, let coordinate else {
-                return
-            }
-            isWaitingToShareLocation = false
-            sendLocationMessage(coordinate)
+            handleLocationCoordinateChange(coordinate)
         }
         .onChange(of: locationState.locationErrorMessage) { _, errorMessage in
-            guard isWaitingToShareLocation, errorMessage != nil else {
-                return
-            }
-            isWaitingToShareLocation = false
-            unavailableChatAction = .location
+            handleLocationErrorChange(errorMessage)
         }
     }
 
     private var tradeSummaryLine: String {
-        "受け取る \(goodsSummary(for: requestedGoodsIDs))  ⇄  出す \(goodsSummary(for: offeredGoodsIDs))"
+        "受け取る \(receiveSummaryText)  ⇄  出す \(goodsSummary(for: offeredGoodsIDs))"
+    }
+
+    private var receiveSummaryText: String {
+        if currentProposal.cashOffer, requestedGoodsIDs.isEmpty {
+            return TradeAmountFormatter.fixedPrice(amount: currentProposal.cashAmount, fallback: "定価交換")
+        }
+        return goodsSummary(for: requestedGoodsIDs)
     }
 
     private func goodsSummary(for ids: [UUID]) -> String {
@@ -382,18 +422,96 @@ struct TradeDetailScreen: View {
         return "\(first.title)\(first.quantity > 1 ? "×\(first.quantity)" : "")\(suffix)"
     }
 
-    private var chatDateDividerText: String {
-        let date = currentProposal.createdAt
-        let day = date.formatted(.dateTime.month(.defaultDigits).day().weekday(.abbreviated))
-        let time = date.formatted(.dateTime.hour().minute())
-        return "\(day)・\(time)"
-    }
-
     private func openDisputeDetail(_ summary: TradeDisputeSummary) {
         disputeDetailRoute = TradeDisputeDetailRoute(
             summary: summary,
-            model: summary.detailModel(proposal: currentProposal, viewerID: appState.viewer?.id)
+            model: summary.detailModel(proposal: currentProposal, viewerID: viewerID)
         )
+    }
+
+    private func openPartnerProfile() {
+        guard let partnerID else {
+            return
+        }
+        partnerProfileRoute = TradePartnerProfileRoute(userID: partnerID)
+    }
+
+    private func handleSelectedEvidencePhoto(_ item: PhotosPickerItem?) {
+        guard let item else {
+            return
+        }
+        Task {
+            await addEvidence(from: item)
+        }
+    }
+
+    private func handleSelectedChatPhoto(_ item: PhotosPickerItem?) {
+        guard let item else {
+            return
+        }
+        Task {
+            await addChatPhoto(from: item, messageType: .photo)
+        }
+    }
+
+    private func handleSelectedOutfitPhoto(_ item: PhotosPickerItem?) {
+        guard let item else {
+            return
+        }
+        Task {
+            await addChatPhoto(from: item, messageType: .outfitPhoto)
+        }
+    }
+
+    private func handleCapturedEvidenceImage(_ imageData: Data) {
+        Task {
+            await addEvidence(data: imageData, imageContentType: "image/jpeg")
+        }
+    }
+
+    private func handleCapturedOutfitImage(_ imageData: Data) {
+        Task {
+            await addChatPhoto(
+                data: imageData,
+                messageType: .outfitPhoto,
+                imageContentType: "image/jpeg"
+            )
+        }
+    }
+
+    private func handleCapturedChatImage(_ imageData: Data) {
+        Task {
+            await addChatPhoto(
+                data: imageData,
+                messageType: .photo,
+                imageContentType: "image/jpeg"
+            )
+        }
+    }
+
+    private func sendDraftMessage() {
+        Task {
+            let sent = await appState.sendMessage(proposalID: proposal.id, body: draftMessage)
+            if sent {
+                draftMessage = ""
+            }
+        }
+    }
+
+    private func handleLocationCoordinateChange(_ coordinate: MegrumLocationCoordinate?) {
+        guard isWaitingToShareLocation, let coordinate else {
+            return
+        }
+        isWaitingToShareLocation = false
+        sendLocationMessage(coordinate)
+    }
+
+    private func handleLocationErrorChange(_ errorMessage: String?) {
+        guard isWaitingToShareLocation, errorMessage != nil else {
+            return
+        }
+        isWaitingToShareLocation = false
+        unavailableChatAction = .location
     }
 
     private func addEvidence(from item: PhotosPickerItem) async {
@@ -416,10 +534,17 @@ struct TradeDetailScreen: View {
 
     private func addChatPhoto(from item: PhotosPickerItem, messageType: TradeMessageType) async {
         defer {
-            selectedOutfitPhotoItem = nil
+            switch messageType {
+            case .outfitPhoto:
+                selectedOutfitPhotoItem = nil
+            case .photo:
+                selectedChatPhotoItem = nil
+            case .text, .location, .arrivalStatus, .system:
+                break
+            }
         }
         guard let data = try? await item.loadTransferable(type: Data.self) else {
-            unavailableChatAction = .outfitPhoto
+            unavailableChatAction = messageType == .photo ? .photo : .outfitPhoto
             return
         }
         await addChatPhoto(
@@ -441,7 +566,7 @@ struct TradeDetailScreen: View {
             body: messageType == .outfitPhoto ? intent.body : nil
         )
         if !sent {
-            unavailableChatAction = .outfitPhoto
+            unavailableChatAction = messageType == .photo ? .photo : .outfitPhoto
         }
     }
 
@@ -494,4 +619,10 @@ struct TradeDetailScreen: View {
     private func tradeItems(for ids: [UUID]) -> [GoodsItem] {
         ids.compactMap { goodsByID[$0] }
     }
+}
+
+private struct TradePartnerProfileRoute: Identifiable, Hashable {
+    var userID: UUID
+
+    var id: UUID { userID }
 }

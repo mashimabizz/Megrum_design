@@ -26,6 +26,8 @@ final class SupabaseHomeClientTests: XCTestCase {
         XCTAssertTrue(tradeSelect.contains("character_request_id"))
         XCTAssertTrue(tradeSelect.contains("exchange_type"))
         XCTAssertTrue(tradeSelect.contains("hue"))
+        XCTAssertTrue(tradeSelect.contains("locked_qty"))
+        XCTAssertTrue(tradeSelect.contains("market_available_qty"))
 
         let wishRequest = try client.makeLoadViewerWishesRequest(userID: userID)
         let wishQuery = try queryItems(in: wishRequest)
@@ -64,7 +66,7 @@ final class SupabaseHomeClientTests: XCTestCase {
         let usersQuery = try queryItems(in: usersRequest)
 
         XCTAssertEqual(usersRequest.url?.path, "/rest/v1/users")
-        XCTAssertEqual(usersQuery["select"], "id,handle,display_name,primary_area,avatar_url")
+        XCTAssertEqual(usersQuery["select"], "id,handle,display_name,primary_area,avatar_url,payment_methods,payment_note")
         XCTAssertEqual(usersQuery["id"], "neq.11111111-1111-1111-1111-111111111111")
         XCTAssertEqual(usersQuery["limit"], "42")
         XCTAssertNil(usersRequest.httpBody)
@@ -209,6 +211,8 @@ final class SupabaseHomeClientTests: XCTestCase {
                   "title": "スア 春ver.",
                   "photo_urls": ["https://cdn.example.com/goods/a.jpg"],
                   "quantity": 2,
+                  "locked_qty": 1,
+                  "market_available_qty": 1,
                   "exchange_type": "any",
                   "hue": 214,
                   "status": "active",
@@ -223,6 +227,9 @@ final class SupabaseHomeClientTests: XCTestCase {
 
         XCTAssertEqual(goods.id, uuid("22222222-2222-2222-2222-222222222222"))
         XCTAssertEqual(goods.photoUrls, ["https://cdn.example.com/goods/a.jpg"])
+        XCTAssertEqual(goods.quantity, 2)
+        XCTAssertEqual(goods.lockedQty, 1)
+        XCTAssertEqual(goods.marketAvailableQty, 1)
         XCTAssertEqual(goods.hue, "214")
         XCTAssertEqual(goods.groupName, "aespa")
         XCTAssertEqual(goods.characterName, "スア")
@@ -250,6 +257,26 @@ final class SupabaseHomeClientTests: XCTestCase {
         XCTAssertEqual(activityWindow.venue, "東京ドーム")
         XCTAssertEqual(try XCTUnwrap(activityWindow.centerLat), 35.70564, accuracy: 0.000001)
         XCTAssertEqual(try XCTUnwrap(activityWindow.centerLng), 139.75189, accuracy: 0.000001)
+
+        let user = try decoder.decode(
+            SupabaseHomeUserRow.self,
+            from: Data(
+                #"""
+                {
+                  "id": "77777777-7777-7777-7777-777777777777",
+                  "handle": "mii_trade",
+                  "display_name": "みい",
+                  "primary_area": "東京都",
+                  "avatar_url": null,
+                  "payment_methods": ["bank_transfer", "cash_exchange"],
+                  "payment_note": "メルペイ相談可"
+                }
+                """#.utf8
+            )
+        )
+
+        XCTAssertEqual(user.paymentMethods, ["bank_transfer", "cash_exchange"])
+        XCTAssertEqual(user.paymentNote, "メルペイ相談可")
 
         let listing = try decoder.decode(
             SupabaseHomeListingRow.self,

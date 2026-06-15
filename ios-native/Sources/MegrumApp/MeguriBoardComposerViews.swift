@@ -1,27 +1,40 @@
 import MegrumCore
 import MegrumDesign
+import PhotosUI
 import SwiftUI
+#if canImport(UIKit)
+import UIKit
+#endif
 
 struct BoardThreadComposerSheet: View {
     @ObservedObject var appState: MegrumAppState
-    var coordinate: MegrumLocationCoordinate?
+    @ObservedObject var locationState: MegrumLocationState
+    var fallbackCoordinate: MegrumLocationCoordinate?
     var selectedPrefecture: String?
+    var onCreated: (BoardThread) -> Void
 
     @Environment(\.dismiss) private var dismiss
     @State private var title = ""
     @State private var bodyText = ""
-    @State private var scope: BoardThread.Audience = .nearby3km
+    @State private var thumbnailItem: PhotosPickerItem?
+    @State private var thumbnailUpload: GoodsPhotoUpload?
+    @State private var thumbnailErrorMessage: String?
+    #if canImport(UIKit)
+    @State private var thumbnailPreviewImage: UIImage?
+    #endif
 
     init(
         appState: MegrumAppState,
-        coordinate: MegrumLocationCoordinate?,
+        locationState: MegrumLocationState,
+        fallbackCoordinate: MegrumLocationCoordinate? = nil,
         selectedPrefecture: String?,
-        initialScope: BoardThread.Audience = .nearby3km
+        onCreated: @escaping (BoardThread) -> Void = { _ in }
     ) {
         self.appState = appState
-        self.coordinate = coordinate
+        self.locationState = locationState
+        self.fallbackCoordinate = fallbackCoordinate
         self.selectedPrefecture = selectedPrefecture
-        _scope = State(initialValue: initialScope)
+        self.onCreated = onCreated
     }
 
     private var canSubmit: Bool {
@@ -32,33 +45,31 @@ struct BoardThreadComposerSheet: View {
     }
 
     private var missingContextMessage: String? {
-        switch scope {
-        case .nearby3km:
-            if coordinate == nil {
-                return "3km圏内のスレッドには現在地が必要です"
-            }
-            if selectedPrefecture?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfBlank == nil,
-               appState.viewer?.prefecture?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfBlank == nil {
-                return "3km圏内のスレッドには都道府県設定が必要です"
-            }
-            return nil
-        case .samePrefecture:
-            if selectedPrefecture?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfBlank == nil,
-               appState.viewer?.prefecture?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfBlank == nil {
-                return "都道府県を選択してください"
-            }
-            return nil
-        case .sameSpot, .global:
-            return "この公開範囲はまだ作成できません"
+        if submitScope == .samePrefecture && submitPrefecture == nil {
+            return "プロフィールの都道府県を設定してください"
         }
+        return thumbnailErrorMessage
     }
 
     private var submitLatitude: Double? {
-        scope == .nearby3km ? coordinate?.latitude : nil
+        submitScope == .nearby3km ? submitCoordinate?.latitude : nil
     }
 
     private var submitLongitude: Double? {
-        scope == .nearby3km ? coordinate?.longitude : nil
+        submitScope == .nearby3km ? submitCoordinate?.longitude : nil
+    }
+
+    private var submitScope: BoardThread.Audience {
+        submitCoordinate == nil ? .samePrefecture : .nearby3km
+    }
+
+    private var submitCoordinate: MegrumLocationCoordinate? {
+        locationState.coordinate ?? fallbackCoordinate
+    }
+
+    private var submitPrefecture: String? {
+        selectedPrefecture?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfBlank
+            ?? appState.viewer?.prefecture?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfBlank
     }
 
     var body: some View {
@@ -74,15 +85,11 @@ struct BoardThreadComposerSheet: View {
                         .foregroundStyle(MegrumTheme.muted)
                 }
 
-                Picker("公開範囲", selection: $scope) {
-                    Text("3km圏内").tag(BoardThread.Audience.nearby3km)
-                    Text(selectedPrefecture ?? appState.viewer?.prefecture ?? "都道府県").tag(BoardThread.Audience.samePrefecture)
-                }
-                .pickerStyle(.segmented)
-
                 if let missingContextMessage {
                     MeguriNoticeBanner(message: missingContextMessage)
                 }
+
+                thumbnailPickerSection
 
                 VStack(alignment: .leading, spacing: 8) {
                     Text("タイトル")
@@ -131,15 +138,17 @@ struct BoardThreadComposerSheet: View {
         .safeAreaInset(edge: .bottom) {
             Button {
                 Task {
-                    let created = await appState.createBoardThread(
+                    let created = await appState.createBoardThreadRecord(
                         title: title,
                         body: bodyText,
-                        scope: scope,
+                        scope: submitScope,
                         latitude: submitLatitude,
                         longitude: submitLongitude,
-                        prefecture: selectedPrefecture
+                        prefecture: submitPrefecture,
+                        thumbnailUpload: thumbnailUpload
                     )
-                    if created {
+                    if let created {
+                        onCreated(created)
                         dismiss()
                     }
                 }
@@ -174,6 +183,123 @@ struct BoardThreadComposerSheet: View {
                 }
             }
         }
+        .onChange(of: thumbnailItem) { _, item in
+            loadThumbnail(item)
+        }
+        .task {
+            if submitCoordinate == nil {
+                locationState.requestCurrentLocation()
+            }
+        }
+    }
+
+    private var thumbnailPickerSection: some View {
+        let hasThumbnail = thumbnailUpload != nil
+        return VStack(alignment: .leading, spacing: 8) {
+            Text("サムネイル")
+                .font(.system(size: 14, weight: .heavy, design: .rounded))
+                .foregroundStyle(MegrumTheme.ink)
+
+            HStack(spacing: 12) {
+                thumbnailPreview
+
+                VStack(alignment: .leading, spacing: 8) {
+                    PhotosPicker(selection: $thumbnailItem, matching: .images) {
+                        BoardThreadThumbnailPickerLabel(hasThumbnail: hasThumbnail)
+                    }
+                    .buttonStyle(.plain)
+
+                    if thumbnailUpload != nil {
+                        Button {
+                            thumbnailItem = nil
+                            thumbnailUpload = nil
+                            thumbnailErrorMessage = nil
+                            #if canImport(UIKit)
+                            thumbnailPreviewImage = nil
+                            #endif
+                        } label: {
+                            Label("削除", systemImage: "xmark.circle")
+                                .font(.system(size: 13, weight: .heavy, design: .rounded))
+                                .foregroundStyle(MegrumTheme.muted)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+            }
+            .padding(14)
+            .background(.white.opacity(0.72), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        }
+    }
+
+    private var thumbnailPreview: some View {
+        ZStack {
+            #if canImport(UIKit)
+            if let thumbnailPreviewImage {
+                Image(uiImage: thumbnailPreviewImage)
+                    .resizable()
+                    .scaledToFill()
+            } else {
+                thumbnailFallback
+            }
+            #else
+            thumbnailFallback
+            #endif
+        }
+        .frame(width: 78, height: 78)
+        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+    }
+
+    private var thumbnailFallback: some View {
+        RoundedRectangle(cornerRadius: 16, style: .continuous)
+            .fill(MegrumTheme.lavender.opacity(0.12))
+            .overlay {
+                Image(systemName: "photo")
+                    .font(.system(size: 24, weight: .bold))
+                    .foregroundStyle(MegrumTheme.lavender)
+            }
+    }
+
+    private func loadThumbnail(_ item: PhotosPickerItem?) {
+        guard let item else {
+            return
+        }
+        Task {
+            guard let data = try? await item.loadTransferable(type: Data.self) else {
+                await MainActor.run {
+                    thumbnailErrorMessage = "サムネイルを読み込めませんでした"
+                }
+                return
+            }
+            let upload = normalizedPhotoUpload(from: data)
+            await MainActor.run {
+                if upload.data.count > goodsEditorMaxPhotoUploadBytes {
+                    thumbnailErrorMessage = "サムネイルは10MB以下にしてください"
+                    thumbnailUpload = nil
+                    #if canImport(UIKit)
+                    thumbnailPreviewImage = nil
+                    #endif
+                    return
+                }
+                thumbnailUpload = upload
+                thumbnailErrorMessage = nil
+                #if canImport(UIKit)
+                thumbnailPreviewImage = UIImage(data: upload.data)
+                #endif
+            }
+        }
+    }
+}
+
+private struct BoardThreadThumbnailPickerLabel: View {
+    var hasThumbnail: Bool
+
+    var body: some View {
+        Label(hasThumbnail ? "写真を変更" : "写真を選ぶ", systemImage: "photo")
+            .font(.system(size: 14, weight: .heavy, design: .rounded))
+            .foregroundStyle(MegrumTheme.lavender)
+            .frame(maxWidth: .infinity)
+            .frame(height: 42)
+            .background(.white.opacity(0.9), in: Capsule())
     }
 }
 

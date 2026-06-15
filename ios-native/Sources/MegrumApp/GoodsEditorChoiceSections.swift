@@ -1,45 +1,6 @@
-import Foundation
 import MegrumCore
 import MegrumDesign
 import SwiftUI
-
-struct GoodsEditorGroupSelectionSection: View {
-    var title: String
-    var required: Bool
-    var groups: [OshiGroup]
-    var isLoading: Bool
-    @Binding var selectedGroupID: UUID?
-    var isItemReadOnly: Bool
-
-    var body: some View {
-        GoodsEditorSectionContainer(title: title, systemImage: "person.2", required: required) {
-            VStack(alignment: .leading, spacing: 10) {
-                if isLoading {
-                    ProgressView()
-                        .controlSize(.small)
-                }
-
-                if groups.isEmpty && !isLoading {
-                    Text("推し設定に登録済みのグループがありません")
-                        .font(.caption.weight(.bold))
-                        .foregroundStyle(MegrumTheme.muted)
-                } else {
-                    GoodsEditorFlowLayout(spacing: 9) {
-                        ForEach(groups) { group in
-                            GoodsEditorSelectionChip(
-                                title: group.name,
-                                isSelected: selectedGroupID == group.id,
-                                isDisabled: isItemReadOnly
-                            ) {
-                                selectedGroupID = group.id
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
 
 struct GoodsEditorMemberSelectionSection: View {
     var entryKind: GoodsEntryKind

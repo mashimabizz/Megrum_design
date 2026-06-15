@@ -1,15 +1,10 @@
+import Foundation
 import MegrumCore
 import MegrumDesign
 #if canImport(PhotosUI)
 import PhotosUI
 #endif
 import SwiftUI
-#if canImport(UIKit)
-import UIKit
-#endif
-#if canImport(AppKit)
-import AppKit
-#endif
 
 struct GoodsEditorSheet: View {
     @ObservedObject var appState: MegrumAppState
@@ -41,6 +36,10 @@ struct GoodsEditorSheet: View {
     @State private var isShowingTradingCardBulkPhotoLibraryPicker = false
     @State private var isProcessingTradingCardBulk = false
     @State private var tradingCardBulkStatusMessage: String?
+    @State private var cropSession: GoodsPhotoCropSession?
+    @State private var faceTaggingReviewQueue = FaceTaggingReviewQueue()
+    @State private var showsCreateOshiMasterSheet = false
+    @State private var createOshiRequestSheet: OshiRequestSheetState?
     @State private var deleteErrorMessage: String?
     @State private var didAssignDefaults = false
     @FocusState private var isTagFieldFocused: Bool
@@ -152,6 +151,59 @@ struct GoodsEditorSheet: View {
                 .ignoresSafeArea()
             }
 #endif
+            .sheet(item: $cropSession) { session in
+                GoodsPhotoCropSheet(
+                    session: session,
+                    title: cropSheetTitle(for: session),
+                    onCancel: { cropSession = nil },
+                    onApply: { uploads in
+                        applyCropUploads(uploads, from: session)
+                    }
+                )
+                .presentationDetents([.large])
+                .presentationDragIndicator(.hidden)
+            }
+            .sheet(
+                item: $faceTaggingReviewQueue.current,
+                onDismiss: presentNextFaceTaggingReview
+            ) { context in
+                FaceTaggingReviewSheet(
+                    imageData: context.imageData,
+                    analysis: context.analysis,
+                    memberOptions: faceTaggingMemberOptions,
+                    onSave: { drafts in
+                        applyFaceTaggingCorrections(drafts, target: context.target)
+                    }
+                )
+                .presentationDetents([.large])
+                .presentationDragIndicator(.visible)
+            }
+            .sheet(isPresented: $showsCreateOshiMasterSheet) {
+                OshiMasterSelectSheet(
+                    genres: appState.oshiGenres,
+                    groups: appState.oshiGroups,
+                    selectedGroupIDs: draft.groupID.map { Set([$0]) } ?? [],
+                    charactersByGroupID: [:],
+                    onClose: { showsCreateOshiMasterSheet = false },
+                    onRequest: { query in
+                        showsCreateOshiMasterSheet = false
+                        createOshiRequestSheet = .oshi(initialName: query)
+                    },
+                    onSelect: selectCreateOshiGroup
+                )
+                .presentationDetents([.large])
+                .presentationDragIndicator(.hidden)
+            }
+            .sheet(item: $createOshiRequestSheet) { state in
+                OshiRequestSheet(
+                    state: state,
+                    genres: appState.oshiGenres,
+                    onClose: { createOshiRequestSheet = nil },
+                    onSubmit: { submitCreateOshiRequest($0) }
+                )
+                .presentationDetents([.large])
+                .presentationDragIndicator(.hidden)
+            }
             .goodsEditorTradingCardBulkSourceDialog(
                 isPresented: $isShowingTradingCardBulkSourceDialog,
                 onPickCamera: startTradingCardBulkCamera,
@@ -177,10 +229,7 @@ struct GoodsEditorSheet: View {
     }
 
     private var navigationTitle: String {
-        if draft.mode == .edit {
-            return draft.entryKind == .inventory ? "マイグッズを編集" : "Wishを編集"
-        }
-        return draft.entryKind == .inventory ? "マイグッズに追加" : "Wishに追加"
+        GoodsEditorPresentationText.navigationTitle(mode: draft.mode, entryKind: draft.entryKind)
     }
 
     private var selectedGroup: OshiGroup? {
@@ -194,7 +243,21 @@ struct GoodsEditorSheet: View {
         guard let memberID = draft.memberID else {
             return nil
         }
-        return appState.oshiCharacters.first { $0.id == memberID }
+        return scopedOshiCharacters.first { $0.id == memberID }
+    }
+
+    private var selectedGroupSupportsMemberSelection: Bool {
+        selectedGroup?.supportsMemberSelection == true
+    }
+
+    private var scopedOshiCharacters: [OshiCharacter] {
+        GoodsEditorMemberScope.members(for: selectedGroup, from: appState.oshiCharacters)
+    }
+
+    private var faceTaggingMemberOptions: [FaceTaggingMemberOption] {
+        scopedOshiCharacters.map { member in
+            FaceTaggingMemberOption(memberID: member.id, name: member.name)
+        }
     }
 
     private var selectedGoodsType: GoodsType? {
@@ -263,19 +326,28 @@ struct GoodsEditorSheet: View {
         selectedGoodsType?.name == "トレカ"
     }
 
+    private var editorTagSuggestions: [String] {
+        return GoodsEditorTagSuggestionBuilder.suggestions(
+            groupID: draft.groupID,
+            selectedTags: draft.tagNames,
+            inventory: appState.inventory,
+            wishes: appState.wishes
+        )
+    }
+
     private var photoSourceDialogTitle: String {
         draft.hasDisplayPhoto ? "写真を差し替え" : "写真を追加"
     }
 
     private var photoActionTitle: String {
-        if draft.entryKind == .wish {
-            return draft.hasDisplayPhoto ? "差し替え" : "+ 画像を選択"
-        }
-        return draft.hasDisplayPhoto ? "撮り直す / 差し替え" : "写真を追加"
+        GoodsEditorPresentationText.photoActionTitle(
+            entryKind: draft.entryKind,
+            hasDisplayPhoto: draft.hasDisplayPhoto
+        )
     }
 
     private var wishImageHint: String {
-        draft.hasDisplayPhoto ? "1枚登録済" : "任意"
+        GoodsEditorPresentationText.wishImageHint(hasDisplayPhoto: draft.hasDisplayPhoto)
     }
 
     private var isWishPhotoRemovalLocked: Bool {
@@ -301,11 +373,12 @@ struct GoodsEditorSheet: View {
             createPhotos: createPhotos,
             groups: appState.oshiGroups,
             isLoadingOshiGroups: appState.isLoadingOshiGroups,
-            members: appState.oshiCharacters,
+            members: scopedOshiCharacters,
             isLoadingOshiCharacters: appState.isLoadingOshiCharacters,
             goodsTypes: appState.goodsTypes,
             isLoadingGoodsTypes: appState.isLoadingGoodsTypes,
             selectedGroupName: selectedGroup?.name,
+            selectedGroupSupportsMemberSelection: selectedGroupSupportsMemberSelection,
             selectedGoodsTypeName: selectedGoodsType?.name,
             createError: createError,
             canAdvanceFromCreateCommon: canAdvanceFromCreateCommon,
@@ -314,6 +387,7 @@ struct GoodsEditorSheet: View {
             tradingCardBulkStatusMessage: tradingCardBulkStatusMessage,
             canSaveInventoryCreateMetas: canSaveInventoryCreateMetas,
             isCreatingGoodsEntry: appState.isCreatingGoodsEntry,
+            tagSuggestions: editorTagSuggestions,
             photoError: photoError,
             photoActionTitle: photoActionTitle,
             titlePreview: resolvedTitlePreview,
@@ -321,11 +395,14 @@ struct GoodsEditorSheet: View {
             isWishPhotoRemovalLocked: isWishPhotoRemovalLocked,
             onRemoveTag: removeTag,
             onAddTag: addCurrentTag,
+            onAddSuggestedTag: addSuggestedTag,
+            onShowCreateOshiPicker: showCreateOshiMasterSheet,
             onCommonNext: goToCreateShoot,
             onPickCamera: startInventoryCreateCamera,
             onPickPhotos: showInventoryCreatePhotoLibrary,
             onStartTradingCardBulk: showTradingCardBulkSourceDialog,
             onRemovePhoto: removeCreatePhoto,
+            onCropPhoto: showCropForCreatePhoto,
             onShootBack: returnToCreateCommonStep,
             onShootNext: goToCreateMetaWithPhotos,
             onContinueWithoutPhoto: goToCreateMetaWithoutPhoto,
@@ -338,26 +415,19 @@ struct GoodsEditorSheet: View {
     }
 
     private var headerDescription: String {
-        if usesInventoryCreateFlow {
-            return "推し・種別、写真、写真ごとの詳細の順に登録できます。"
-        }
-        if draft.entryKind == .inventory {
-            return "写真、推し、数量、タグを編集できます。"
-        }
-        return "推し、数量、画像、タグを編集できます。"
+        GoodsEditorPresentationText.headerDescription(
+            usesInventoryCreateFlow: usesInventoryCreateFlow,
+            entryKind: draft.entryKind
+        )
     }
 
     private var saveButtonTitle: String {
-        if draft.mode == .edit {
-            if appState.mutatingGoodsItemID == draft.existingItemID {
-                return "更新しています"
-            }
-            return draft.entryKind == .wish ? "ウィッシュを更新" : "変更を保存"
-        }
-        if appState.isCreatingGoodsEntry {
-            return "保存しています"
-        }
-        return draft.entryKind == .inventory ? "マイグッズを登録" : "Wishを登録"
+        GoodsEditorPresentationText.saveButtonTitle(
+            mode: draft.mode,
+            entryKind: draft.entryKind,
+            isMutatingCurrentItem: appState.mutatingGoodsItemID == draft.existingItemID,
+            isCreatingGoodsEntry: appState.isCreatingGoodsEntry
+        )
     }
 
     private func dismissEditor() {
@@ -480,6 +550,9 @@ struct GoodsEditorSheet: View {
         photoError = nil
         tradingCardBulkStatusMessage = nil
         isProcessingTradingCardBulk = false
+        cropSession = nil
+        showsCreateOshiMasterSheet = false
+        createOshiRequestSheet = nil
         #if canImport(PhotosUI)
         selectedCreatePhotoItems = []
         selectedTradingCardBulkPhotoItem = nil
@@ -521,30 +594,154 @@ struct GoodsEditorSheet: View {
         }
     }
 
-    private func memberName(for memberID: UUID?) -> String? {
-        guard let memberID else {
-            return nil
+    private func showCropForCreatePhoto(_ photoID: UUID) {
+        guard let photo = createPhotos.first(where: { $0.id == photoID }) else {
+            return
         }
-        return appState.oshiCharacters.first { $0.id == memberID }?.name
+        cropSession = GoodsPhotoCropSession(
+            source: .selectedPhoto(photoID: photoID),
+            upload: photo.upload
+        )
     }
 
-    private func photoUpload(for photoID: UUID?) -> GoodsPhotoUpload? {
-        guard let photoID else {
-            return nil
+    private func cropSheetTitle(for session: GoodsPhotoCropSession) -> String {
+        switch session.source {
+        case .selectedPhoto:
+            "写真を切り取る"
+        case .tradingCardBulk:
+            "トレカAI一括登録"
         }
-        return createPhotos.first { $0.id == photoID }?.upload
+    }
+
+    private func applyCropUploads(_ uploads: [GoodsPhotoUpload], from session: GoodsPhotoCropSession) {
+        let nextDrafts = uploads.compactMap { upload -> GoodsCreatePhotoDraft? in
+            if let uploadError = goodsEditorPhotoUploadError(for: upload) {
+                createError = uploadError
+                return nil
+            }
+            return GoodsCreatePhotoDraft(upload: upload)
+        }
+
+        guard !nextDrafts.isEmpty else {
+            createError = createError ?? "切り取り画像を追加できませんでした"
+            return
+        }
+
+        switch session.source {
+        case .selectedPhoto(let photoID):
+            if let index = createPhotos.firstIndex(where: { $0.id == photoID }) {
+                createPhotos.replaceSubrange(index...index, with: nextDrafts)
+            } else {
+                createPhotos.append(contentsOf: nextDrafts)
+            }
+            tradingCardBulkStatusMessage = nil
+        case .tradingCardBulk:
+            createPhotos.append(contentsOf: nextDrafts)
+            tradingCardBulkStatusMessage = "\(nextDrafts.count)枚の切り取り画像を写真一覧へ追加しました。"
+        }
+
+        if createStep == .meta {
+            syncCreateMetasWithPhotos()
+        }
+        nextDrafts.forEach { draft in
+            analyzeFaceTagsIfNeeded(upload: draft.upload, target: .createPhoto(draft.id))
+        }
+        createError = nil
+        cropSession = nil
+    }
+
+    private func analyzeFaceTagsIfNeeded(upload: GoodsPhotoUpload, target: FaceTaggingReviewTarget) {
+        let imageData = upload.data
+        guard let group = selectedGroup, group.supportsMemberSelection else {
+            return
+        }
+        let initialMemberIDs = GoodsEditorMemberScope.memberIDs(for: group, from: appState.oshiCharacters)
+
+        Task {
+            do {
+                let eligibleMemberIDs: [UUID]
+                if initialMemberIDs.isEmpty {
+                    await loadMembers(for: group.id)
+                    eligibleMemberIDs = GoodsEditorMemberScope.memberIDs(for: group, from: appState.oshiCharacters)
+                } else {
+                    eligibleMemberIDs = initialMemberIDs
+                }
+                guard !eligibleMemberIDs.isEmpty else {
+                    return
+                }
+
+                let memberIDSet = Set(eligibleMemberIDs)
+                let loadedProfiles = await appState.loadMemberFaceProfiles(memberIDs: eligibleMemberIDs)
+                let memberProfiles = loadedProfiles.filter { memberIDSet.contains($0.memberID) }
+                let service = UnifiedMemberTaggingService()
+                let analysis = try await service.analyzeImage(
+                    imageData,
+                    imageID: UUID(),
+                    memberProfiles: memberProfiles
+                )
+                guard !analysis.results.isEmpty else {
+                    return
+                }
+                await MainActor.run {
+                    enqueueFaceTaggingReview(
+                        FaceTaggingReviewContext(
+                            target: target,
+                            imageData: imageData,
+                            analysis: analysis
+                        )
+                    )
+                }
+            } catch {
+                #if DEBUG
+                print("Face tagging analysis failed: \(error)")
+                #endif
+            }
+        }
+    }
+
+    private func enqueueFaceTaggingReview(_ context: FaceTaggingReviewContext) {
+        faceTaggingReviewQueue.enqueue(context)
+    }
+
+    private func presentNextFaceTaggingReview() {
+        faceTaggingReviewQueue.presentNextIfNeeded()
+    }
+
+    private func applyFaceTaggingCorrections(
+        _ corrections: [FaceTaggingCorrectionDraft],
+        target: FaceTaggingReviewTarget
+    ) {
+        guard let selectedMemberID = corrections.compactMap(\.selectedMemberID).first else {
+            return
+        }
+        guard GoodsEditorMemberScope.canUseMemberID(
+            selectedMemberID,
+            group: selectedGroup,
+            members: appState.oshiCharacters
+        ) else {
+            return
+        }
+        switch target {
+        case .draft:
+            draft.memberID = selectedMemberID
+        case .createPhoto(let photoID):
+            if let index = createMetas.firstIndex(where: { $0.photoID == photoID }) {
+                createMetas[index].memberID = selectedMemberID
+            } else {
+                createMetas.append(GoodsCreateMetaDraft(photoID: photoID, memberID: selectedMemberID))
+            }
+        }
     }
 
     private func inventoryCreateInputs() -> [GoodsEntryInput] {
-        createMetas.compactMap { meta in
-            meta.createInput(
-                sharedDraft: draft,
-                photoUpload: photoUpload(for: meta.photoID),
-                groupName: selectedGroup?.name,
-                memberName: memberName(for: meta.memberID),
-                goodsTypeName: selectedGoodsType?.name
-            )
-        }
+        GoodsInventoryCreateInputBuilder.inputs(
+            metas: createMetas,
+            photos: createPhotos,
+            sharedDraft: draft,
+            groupName: selectedGroup?.name,
+            members: scopedOshiCharacters,
+            goodsTypeName: selectedGoodsType?.name
+        )
     }
 
     private func saveInventoryCreateFlow() async {
@@ -573,7 +770,7 @@ struct GoodsEditorSheet: View {
     }
 
     private func loadChoices() async {
-        if appState.oshiGroups.isEmpty {
+        if appState.oshiGroups.isEmpty || appState.oshiGenres.isEmpty {
             await appState.loadOshiGroups()
         }
         if appState.goodsTypes.isEmpty {
@@ -588,13 +785,14 @@ struct GoodsEditorSheet: View {
         guard draft.mode == .create, !didAssignDefaults else {
             return
         }
-        if draft.groupID == nil {
+        let skipsGroupDefault = usesInventoryCreateFlow && draft.entryKind == .inventory
+        if draft.groupID == nil && !skipsGroupDefault {
             draft.groupID = appState.oshiGroups.first?.id
         }
         if draft.goodsTypeID == nil {
             draft.goodsTypeID = appState.goodsTypes.first?.id
         }
-        didAssignDefaults = draft.groupID != nil && draft.goodsTypeID != nil
+        didAssignDefaults = (skipsGroupDefault || draft.groupID != nil) && draft.goodsTypeID != nil
     }
 
     private func loadMembers(for groupID: UUID?) async {
@@ -602,11 +800,19 @@ struct GoodsEditorSheet: View {
               let group = appState.oshiGroups.first(where: { $0.id == groupID })
         else {
             draft.memberID = nil
+            resetCreateMetaMembers()
+            await appState.loadOshiCharacters(group: nil)
+            return
+        }
+        guard group.supportsMemberSelection else {
+            draft.memberID = nil
+            resetCreateMetaMembers()
+            await appState.loadOshiCharacters(group: nil)
             return
         }
         await appState.loadOshiCharacters(group: group)
         if let memberID = draft.memberID,
-           !appState.oshiCharacters.contains(where: { $0.id == memberID }) {
+           !GoodsEditorMemberScope.canUseMemberID(memberID, group: group, members: appState.oshiCharacters) {
             draft.memberID = nil
         }
     }
@@ -617,6 +823,49 @@ struct GoodsEditorSheet: View {
         }
         draft.addTag(tagDraft)
         tagDraft = ""
+    }
+
+    private func addSuggestedTag(_ tag: String) {
+        guard !isItemReadOnly else {
+            return
+        }
+        draft.addTag(tag)
+    }
+
+    private func showCreateOshiMasterSheet() {
+        showsCreateOshiMasterSheet = true
+    }
+
+    private func selectCreateOshiGroup(_ group: OshiGroup) {
+        draft.groupID = group.id
+        draft.memberID = nil
+        createError = nil
+        showsCreateOshiMasterSheet = false
+        Task {
+            await loadMembers(for: group.id)
+        }
+    }
+
+    private func submitCreateOshiRequest(_ payload: OshiRequestSheetPayload) {
+        Task {
+            await submitCreateOshiRequestAsync(payload)
+        }
+    }
+
+    private func submitCreateOshiRequestAsync(_ payload: OshiRequestSheetPayload) async {
+        createOshiRequestSheet = nil
+        guard await appState.createOshiRequest(
+            OshiRequestCreateInput(
+                requestedName: payload.name,
+                requestedKind: payload.kind,
+                requestedGenreID: payload.genreID,
+                note: payload.note
+            )
+        ) != nil else {
+            createError = appState.errorMessage ?? "追加リクエストを送信できませんでした"
+            return
+        }
+        createError = nil
     }
 
     private func removeTag(_ tag: String) {
@@ -682,15 +931,18 @@ struct GoodsEditorSheet: View {
             return
         }
         if photoCaptureTarget == .inventoryCreate {
-            createPhotos.append(GoodsCreatePhotoDraft(upload: upload))
+            let photo = GoodsCreatePhotoDraft(upload: upload)
+            createPhotos.append(photo)
             if createStep == .meta {
                 syncCreateMetasWithPhotos()
             }
+            analyzeFaceTagsIfNeeded(upload: upload, target: .createPhoto(photo.id))
             createError = nil
             photoError = nil
             return
         }
         draft.setLocalPhotoUpload(upload)
+        analyzeFaceTagsIfNeeded(upload: upload, target: .draft)
         photoError = nil
         #if canImport(PhotosUI)
         selectedPhotoItem = nil
@@ -722,6 +974,7 @@ struct GoodsEditorSheet: View {
                 return
             }
             draft.setLocalPhotoUpload(upload)
+            analyzeFaceTagsIfNeeded(upload: upload, target: .draft)
             photoError = nil
         } catch {
             draft.hasLocalPhoto = false
@@ -762,6 +1015,9 @@ struct GoodsEditorSheet: View {
             if createStep == .meta {
                 syncCreateMetasWithPhotos()
             }
+            nextPhotos.forEach { photo in
+                analyzeFaceTagsIfNeeded(upload: photo.upload, target: .createPhoto(photo.id))
+            }
             createError = lastError
         }
         selectedCreatePhotoItems = []
@@ -800,41 +1056,23 @@ struct GoodsEditorSheet: View {
         }
 
         do {
-            let results = try await TradingCardBulkRecognizer.recognizeCards(in: data)
-            appendTradingCardBulkResults(results)
+            let upload = normalizedPhotoUpload(from: data)
+            if let uploadError = goodsEditorPhotoUploadError(for: upload) {
+                createError = uploadError
+                return
+            }
+            let frames = try await TradingCardBulkRecognizer.detectCropFrames(in: upload.data)
+            cropSession = GoodsPhotoCropSession(
+                source: .tradingCardBulk,
+                upload: upload,
+                initialFrames: frames
+            )
+            tradingCardBulkStatusMessage = frames.isEmpty
+                ? "カード枠を検出できませんでした。写真上をドラッグして手動で切り取り枠を追加してください。"
+                : "\(frames.count)件の候補を検出しました。黄色い枠を確認してから追加してください。"
         } catch {
             createError = error.localizedDescription
         }
-    }
-
-    private func appendTradingCardBulkResults(_ results: [TradingCardBulkRecognitionResult]) {
-        var nextPhotos: [GoodsCreatePhotoDraft] = []
-        var lastError: String?
-
-        for result in results {
-            let upload = result.upload
-            if let uploadError = goodsEditorPhotoUploadError(for: upload) {
-                lastError = uploadError
-                continue
-            }
-            nextPhotos.append(GoodsCreatePhotoDraft(upload: upload))
-        }
-
-        guard !nextPhotos.isEmpty else {
-            createError = lastError ?? "AIで追加できるカード画像がありませんでした"
-            return
-        }
-
-        createPhotos.append(contentsOf: nextPhotos)
-        if createStep == .meta {
-            syncCreateMetasWithPhotos()
-        }
-
-        let usedFallback = results.contains { $0.source == .fallbackOriginal }
-        tradingCardBulkStatusMessage = usedFallback
-            ? "カード枠を検出できなかったため、元写真を1枚追加しました。必要なら撮り直すか、写真一覧から削除してください。"
-            : "\(nextPhotos.count)枚のカードを切り出して追加しました。続けて追加するか、詳細設定へ進めます。"
-        createError = lastError
     }
 
     private func save() async {

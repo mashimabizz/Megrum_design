@@ -11,8 +11,9 @@ final class MatchRelationScreenTests: XCTestCase {
         let keep = goods(id: 12, ownerID: viewerID, status: .keep)
         let traded = goods(id: 13, ownerID: viewerID, status: .traded)
         let archived = goods(id: 14, ownerID: viewerID, status: .archived)
+        let locked = goods(id: 15, ownerID: viewerID, status: .active, quantity: 2, lockedQuantity: 2)
 
-        let result = MatchRelationComposer.selectableSenderGoods(from: [active, reserved, keep, traded, archived])
+        let result = MatchRelationComposer.selectableSenderGoods(from: [active, reserved, keep, traded, archived, locked])
 
         XCTAssertEqual(result.map(\.id), [active.id, reserved.id])
     }
@@ -463,7 +464,9 @@ final class MatchRelationScreenTests: XCTestCase {
         ownerID: UUID,
         status: GoodsEntryStatus? = .active,
         groupID: UUID = UUID(uuidString: "00000000-0000-0000-0000-000000000020")!,
-        goodsTypeID: UUID = UUID(uuidString: "00000000-0000-0000-0000-000000000021")!
+        goodsTypeID: UUID = UUID(uuidString: "00000000-0000-0000-0000-000000000021")!,
+        quantity: Int = 1,
+        lockedQuantity: Int = 0
     ) -> GoodsItem {
         GoodsItem(
             id: uuid(id),
@@ -472,7 +475,9 @@ final class MatchRelationScreenTests: XCTestCase {
             status: status,
             groupID: groupID,
             goodsTypeID: goodsTypeID,
-            title: "item-\(id)"
+            title: "item-\(id)",
+            quantity: quantity,
+            lockedQuantity: lockedQuantity
         )
     }
 

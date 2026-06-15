@@ -1,16 +1,17 @@
+import MegrumCore
 import PhotosUI
 import SwiftUI
 
 struct TradeDetailMessageInputBar: View {
     @Binding var text: String
+    @Binding var selectedChatPhotoItem: PhotosPickerItem?
     @Binding var selectedOutfitPhotoItem: PhotosPickerItem?
     var isVisible: Bool
-    var isSending: Bool
-    var showsCounterProposal: Bool
-    var canUseCamera: Bool
+    var context: TradeMessageInputContext
     var onOpenSchedule: () -> Void
     var onSendArrivalStatus: (TradeArrivalQuickAction) -> Void
     var onOpenLocationPlaceholder: () -> Void
+    var onOpenChatCamera: () -> Void
     var onOpenOutfitCamera: () -> Void
     var onCounterProposal: () -> Void
     var onRequestLate: () -> Void
@@ -22,13 +23,13 @@ struct TradeDetailMessageInputBar: View {
         if isVisible {
             TradeMessageInput(
                 text: $text,
+                selectedChatPhotoItem: $selectedChatPhotoItem,
                 selectedOutfitPhotoItem: $selectedOutfitPhotoItem,
-                isSending: isSending,
-                showsCounterProposal: showsCounterProposal,
+                context: context,
                 onOpenSchedule: onOpenSchedule,
                 onSendArrivalStatus: onSendArrivalStatus,
                 onOpenLocationPlaceholder: onOpenLocationPlaceholder,
-                canUseCamera: canUseCamera,
+                onOpenChatCamera: onOpenChatCamera,
                 onOpenOutfitCamera: onOpenOutfitCamera,
                 onCounterProposal: onCounterProposal,
                 onRequestLate: onRequestLate,

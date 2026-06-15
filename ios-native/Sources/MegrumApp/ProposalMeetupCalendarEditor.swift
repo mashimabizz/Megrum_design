@@ -96,9 +96,19 @@ struct ProposalMeetupCalendarEditor: View {
                                 selectedDayIndex: selectedDayIndex
                             )
                                 .contentShape(Rectangle())
-                                .gesture(boardGesture(days: days, dayWidth: dayWidth))
+                                .gesture(
+                                    boardGesture(
+                                        days: days,
+                                        dayWidth: dayWidth,
+                                        containerWidth: gridWidth
+                                    )
+                                )
                                 .zIndex(0)
-                            candidateBlocks(days: days, dayWidth: dayWidth)
+                            candidateBlocks(
+                                days: days,
+                                dayWidth: dayWidth,
+                                containerWidth: gridWidth
+                            )
                                 .zIndex(2)
                             ProposalMeetupCalendarWeekPreviewBlock(
                                 preview: previewDraft,
@@ -134,7 +144,11 @@ struct ProposalMeetupCalendarEditor: View {
     }
 
     @ViewBuilder
-    private func candidateBlocks(days: [Date], dayWidth: CGFloat) -> some View {
+    private func candidateBlocks(
+        days: [Date],
+        dayWidth: CGFloat,
+        containerWidth: CGFloat
+    ) -> some View {
         ProposalMeetupCalendarWeekCandidateBlocks(
             blocks: renderedCandidateBlocks(days: days, dayWidth: dayWidth),
             onTap: { index in
@@ -147,7 +161,8 @@ struct ProposalMeetupCalendarEditor: View {
                     action: action,
                     value: value,
                     days: days,
-                    dayWidth: dayWidth
+                    dayWidth: dayWidth,
+                    containerWidth: containerWidth
                 )
             },
             onEnd: { value, index, action in
@@ -156,7 +171,8 @@ struct ProposalMeetupCalendarEditor: View {
                     action: action,
                     value: value,
                     days: days,
-                    dayWidth: dayWidth
+                    dayWidth: dayWidth,
+                    containerWidth: containerWidth
                 )
             },
             onRemove: onRemoveDraft
@@ -230,26 +246,49 @@ struct ProposalMeetupCalendarEditor: View {
         )
     }
 
-    private func candidateIndex(at location: CGPoint, days: [Date], dayWidth: CGFloat) -> Int? {
+    private func candidateIndex(
+        at location: CGPoint,
+        days: [Date],
+        dayWidth: CGFloat,
+        containerWidth: CGFloat
+    ) -> Int? {
+        let gridLocation = ProposalMeetupCalendarModel.weekGridPoint(
+            from: location,
+            containerWidth: containerWidth,
+            dayWidth: dayWidth
+        )
         for (index, draft) in drafts.enumerated().reversed() {
             guard let layout = candidateLayout(for: draft, index: index, days: days, dayWidth: dayWidth) else {
                 continue
             }
             let rect = CGRect(x: layout.x, y: layout.y, width: layout.width, height: layout.height)
                 .insetBy(dx: -6, dy: -ProposalMeetupCalendarModel.slotHeight)
-            if rect.contains(location) {
+            if rect.contains(gridLocation) {
                 return index
             }
         }
         return nil
     }
 
-    private func boardGesture(days: [Date], dayWidth: CGFloat) -> some Gesture {
+    private func boardGesture(
+        days: [Date],
+        dayWidth: CGFloat,
+        containerWidth: CGFloat
+    ) -> some Gesture {
         DragGesture(minimumDistance: 0, coordinateSpace: .named("proposalMeetupCalendar"))
             .onChanged { value in
                 if boardTouchState == nil {
-                    let point = calendarPoint(from: value.startLocation, dayWidth: dayWidth)
-                    let touchedCandidateIndex = candidateIndex(at: value.startLocation, days: days, dayWidth: dayWidth)
+                    let point = calendarPoint(
+                        from: value.startLocation,
+                        dayWidth: dayWidth,
+                        containerWidth: containerWidth
+                    )
+                    let touchedCandidateIndex = candidateIndex(
+                        at: value.startLocation,
+                        days: days,
+                        dayWidth: dayWidth,
+                        containerWidth: containerWidth
+                    )
                     let originalEdit = touchedCandidateIndex.map { currentCandidateEdit(index: $0, days: days) }
                     let pointerOffset = originalEdit.map {
                         max(0, min($0.endSlot - $0.startSlot - 1, point.slot - $0.startSlot))
@@ -289,27 +328,35 @@ struct ProposalMeetupCalendarEditor: View {
                 }
                 if state.mode == .pending,
                    hypot(dx, dy) > ProposalMeetupCalendarModel.touchCancelDistance {
-                    cancelBoardLongPress()
                     if state.candidateIndex == nil {
+                        cancelBoardLongPress()
                         state.mode = .creating
                         boardTouchState = state
-                        let point = calendarPoint(from: value.location, dayWidth: dayWidth)
+                        let point = calendarPoint(
+                            from: value.location,
+                            dayWidth: dayWidth,
+                            containerWidth: containerWidth
+                        )
                         previewDraft = ProposalMeetupCalendarPreview(
-                            dayIndex: state.dayIndex,
+                            dayIndex: point.dayIndex,
                             startSlot: state.startSlot,
                             currentSlot: point.slot
                         )
                         return
                     } else {
-                        boardTouchState = nil
-                        previewDraftCleanup()
+                        state.hasMovedBeyondTapTolerance = true
+                        boardTouchState = state
                         return
                     }
                 }
                 if state.mode == .creating {
-                    let point = calendarPoint(from: value.location, dayWidth: dayWidth)
+                    let point = calendarPoint(
+                        from: value.location,
+                        dayWidth: dayWidth,
+                        containerWidth: containerWidth
+                    )
                     previewDraft = ProposalMeetupCalendarPreview(
-                        dayIndex: state.dayIndex,
+                        dayIndex: point.dayIndex,
                         startSlot: state.startSlot,
                         currentSlot: point.slot
                     )
@@ -319,7 +366,11 @@ struct ProposalMeetupCalendarEditor: View {
                    let originalStartSlot = state.originalStartSlot,
                    let originalEndSlot = state.originalEndSlot,
                    let pointerStartOffsetSlots = state.pointerStartOffsetSlots {
-                    let point = calendarPoint(from: value.location, dayWidth: dayWidth)
+                    let point = calendarPoint(
+                        from: value.location,
+                        dayWidth: dayWidth,
+                        containerWidth: containerWidth
+                    )
                     let duration = max(1, originalEndSlot - originalStartSlot)
                     let startSlot = ProposalMeetupCalendarModel.clampedStartSlot(
                         point.slot - pointerStartOffsetSlots,
@@ -379,7 +430,11 @@ struct ProposalMeetupCalendarEditor: View {
                     else {
                         return
                     }
-                    let point = calendarPoint(from: value.location, dayWidth: dayWidth)
+                    let point = calendarPoint(
+                        from: value.location,
+                        dayWidth: dayWidth,
+                        containerWidth: containerWidth
+                    )
                     let duration = max(1, originalEndSlot - originalStartSlot)
                     let startSlot = ProposalMeetupCalendarModel.clampedStartSlot(
                         point.slot - pointerStartOffsetSlots,
@@ -394,7 +449,16 @@ struct ProposalMeetupCalendarEditor: View {
                     onUpdateDraft(candidateIndex, days[point.dayIndex], startSlot, startSlot + duration)
                     onSelectDraft(candidateIndex)
                 case .pending:
-                    if let candidateIndex = candidateIndex(at: value.location, days: days, dayWidth: dayWidth) {
+                    guard !state.hasMovedBeyondTapTolerance else {
+                        resetWeekDragOffset()
+                        return
+                    }
+                    if let candidateIndex = candidateIndex(
+                        at: value.location,
+                        days: days,
+                        dayWidth: dayWidth,
+                        containerWidth: containerWidth
+                    ) {
                         onSelectDraft(candidateIndex)
                         onOpenPlaceEntry(candidateIndex)
                         return
@@ -449,11 +513,16 @@ struct ProposalMeetupCalendarEditor: View {
         action: ProposalMeetupCalendarCandidateEditAction,
         value: DragGesture.Value,
         days: [Date],
-        dayWidth: CGFloat
+        dayWidth: CGFloat,
+        containerWidth: CGFloat
     ) {
         if candidateTouchState == nil {
             let original = currentCandidateEdit(index: index, days: days)
-            let pointerPoint = calendarPoint(from: value.startLocation, dayWidth: dayWidth)
+            let pointerPoint = calendarPoint(
+                from: value.startLocation,
+                dayWidth: dayWidth,
+                containerWidth: containerWidth
+            )
             let pointerOffset = max(0, min(original.endSlot - original.startSlot - 1, pointerPoint.slot - original.startSlot))
             candidateTouchState = ProposalMeetupCalendarCandidateTouchState(
                 startTime: Date(),
@@ -468,22 +537,24 @@ struct ProposalMeetupCalendarEditor: View {
             )
             scheduleCandidateLongPress(index: index)
         }
-        guard let state = candidateTouchState else {
+        guard var state = candidateTouchState else {
             return
         }
         let dx = value.location.x - state.startLocation.x
         let dy = value.location.y - state.startLocation.y
         if state.mode == .pending,
            hypot(dx, dy) > ProposalMeetupCalendarModel.touchCancelDistance {
-            cancelCandidateLongPress()
-            candidateTouchState = nil
-            candidateEdit = nil
-            return
+            state.hasMovedBeyondTapTolerance = true
+            candidateTouchState = state
         }
         guard state.mode == .editing else {
             return
         }
-        let point = calendarPoint(from: value.location, dayWidth: dayWidth)
+        let point = calendarPoint(
+            from: value.location,
+            dayWidth: dayWidth,
+            containerWidth: containerWidth
+        )
         let duration = max(1, state.originalEndSlot - state.originalStartSlot)
         switch state.action {
         case .move:
@@ -510,7 +581,8 @@ struct ProposalMeetupCalendarEditor: View {
         action: ProposalMeetupCalendarCandidateEditAction,
         value: DragGesture.Value,
         days: [Date],
-        dayWidth: CGFloat
+        dayWidth: CGFloat,
+        containerWidth: CGFloat
     ) {
         defer {
             cancelCandidateLongPress()
@@ -521,13 +593,20 @@ struct ProposalMeetupCalendarEditor: View {
             return
         }
         if state.mode == .pending {
+            guard !state.hasMovedBeyondTapTolerance else {
+                return
+            }
             onSelectDraft(index)
             if action == .move {
                 onOpenPlaceEntry(index)
             }
             return
         }
-        let point = calendarPoint(from: value.location, dayWidth: dayWidth)
+        let point = calendarPoint(
+            from: value.location,
+            dayWidth: dayWidth,
+            containerWidth: containerWidth
+        )
         let duration = max(1, state.originalEndSlot - state.originalStartSlot)
         let edit: ProposalMeetupCalendarCandidateEdit
         switch action {
@@ -551,15 +630,16 @@ struct ProposalMeetupCalendarEditor: View {
         return ProposalMeetupCalendarCandidateEdit(index: index, dayIndex: dayIndex, startSlot: startSlot, endSlot: endSlot)
     }
 
-    private func calendarPoint(from location: CGPoint, dayWidth: CGFloat) -> (dayIndex: Int, slot: Int) {
-        let x = max(0, location.x - ProposalMeetupCalendarModel.timeLabelWidth)
-        let columnWidth = dayWidth + ProposalMeetupCalendarModel.daySpacing
-        let rawDay = Int(floor(x / max(columnWidth, 1)))
-        let dayIndex = max(0, min(ProposalMeetupCalendarModel.visibleDayCount - 1, rawDay))
-        let y = max(0, location.y)
-        let rawSlot = Int(floor(y / ProposalMeetupCalendarModel.slotHeight))
-        let slot = max(0, min(ProposalMeetupCalendarModel.slotCount - 1, rawSlot))
-        return (dayIndex, slot)
+    private func calendarPoint(
+        from location: CGPoint,
+        dayWidth: CGFloat,
+        containerWidth: CGFloat
+    ) -> (dayIndex: Int, slot: Int) {
+        ProposalMeetupCalendarModel.weekCalendarPoint(
+            from: location,
+            containerWidth: containerWidth,
+            dayWidth: dayWidth
+        )
     }
 
     private func previewDraftCleanup() {
@@ -583,7 +663,8 @@ struct ProposalMeetupCalendarEditor: View {
                 originalDayIndex: state.originalDayIndex,
                 originalStartSlot: state.originalStartSlot,
                 originalEndSlot: state.originalEndSlot,
-                pointerStartOffsetSlots: state.pointerStartOffsetSlots
+                pointerStartOffsetSlots: state.pointerStartOffsetSlots,
+                hasMovedBeyondTapTolerance: state.hasMovedBeyondTapTolerance
             )
             if let candidateIndex = state.candidateIndex,
                let originalDayIndex = state.originalDayIndex,
@@ -633,7 +714,8 @@ struct ProposalMeetupCalendarEditor: View {
                 originalStartSlot: state.originalStartSlot,
                 originalEndSlot: state.originalEndSlot,
                 pointerStartOffsetSlots: state.pointerStartOffsetSlots,
-                mode: .editing
+                mode: .editing,
+                hasMovedBeyondTapTolerance: state.hasMovedBeyondTapTolerance
             )
         }
         candidateLongPressTask = task

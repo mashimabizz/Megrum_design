@@ -30,6 +30,18 @@ public struct HomeExchangeConditionSignals: Equatable, Sendable {
     }
 }
 
+public struct HomePaymentConditionSignals: Equatable, Sendable {
+    public var hasCompatiblePaymentMethod: Bool
+
+    public init(hasCompatiblePaymentMethod: Bool) {
+        self.hasCompatiblePaymentMethod = hasCompatiblePaymentMethod
+    }
+
+    public static var none: HomePaymentConditionSignals {
+        HomePaymentConditionSignals(hasCompatiblePaymentMethod: false)
+    }
+}
+
 public struct HomeCandidateLinkCounts: Equatable, Sendable {
     public var wishCount: Int
     public var listingCount: Int
@@ -48,19 +60,180 @@ public struct HomeCandidateLinkCounts: Equatable, Sendable {
     }
 }
 
+public struct HomeIndividualListingSelectionContext: Equatable, Sendable {
+    public var wantedLogic: ListingLogic
+    public var offeredLogic: ListingLogic
+    public var wantedOptions: [HomeIndividualListingWantedOption]
+
+    public init(
+        wantedLogic: ListingLogic = .one,
+        offeredLogic: ListingLogic = .all,
+        wantedOptions: [HomeIndividualListingWantedOption] = []
+    ) {
+        self.wantedLogic = wantedLogic
+        self.offeredLogic = offeredLogic
+        self.wantedOptions = wantedOptions
+    }
+
+    public static var defaultSelection: HomeIndividualListingSelectionContext {
+        HomeIndividualListingSelectionContext()
+    }
+}
+
+public struct HomeIndividualListingWantedOption: Identifiable, Equatable, Sendable {
+    public enum Kind: Equatable, Sendable {
+        case goods
+        case condition
+        case cash
+    }
+
+    public var id: UUID
+    public var listingID: UUID
+    public var position: Int
+    public var title: String
+    public var subtitle: String?
+    public var logic: ListingLogic
+    public var kind: Kind
+    public var goodsIDs: [UUID]
+    public var matchingGoodsIDs: [UUID]
+    public var groupID: UUID?
+    public var goodsTypeID: UUID?
+    public var cashAmount: Int?
+
+    public init(
+        id: UUID,
+        listingID: UUID,
+        position: Int,
+        title: String,
+        subtitle: String? = nil,
+        logic: ListingLogic = .one,
+        kind: Kind,
+        goodsIDs: [UUID] = [],
+        matchingGoodsIDs: [UUID] = [],
+        groupID: UUID? = nil,
+        goodsTypeID: UUID? = nil,
+        cashAmount: Int? = nil
+    ) {
+        self.id = id
+        self.listingID = listingID
+        self.position = position
+        self.title = title
+        self.subtitle = subtitle
+        self.logic = logic
+        self.kind = kind
+        self.goodsIDs = goodsIDs
+        self.matchingGoodsIDs = matchingGoodsIDs
+        self.groupID = groupID
+        self.goodsTypeID = goodsTypeID
+        self.cashAmount = cashAmount.map { max(0, $0) }
+    }
+
+    public var isCashOffer: Bool {
+        kind == .cash
+    }
+}
+
 public struct HomeCandidateConditionSignals: Equatable, Sendable {
     public var goods: HomeGoodsConditionSignals
     public var exchange: HomeExchangeConditionSignals
+    public var payment: HomePaymentConditionSignals
     public var linkCounts: HomeCandidateLinkCounts
+    public var individualListingSelection: HomeIndividualListingSelectionContext?
+    public var matchesViewerWish: Bool
+    public var tagMatchCount: Int
 
     public init(
         goods: HomeGoodsConditionSignals,
         exchange: HomeExchangeConditionSignals,
-        linkCounts: HomeCandidateLinkCounts = .zero
+        payment: HomePaymentConditionSignals = .none,
+        linkCounts: HomeCandidateLinkCounts = .zero,
+        individualListingSelection: HomeIndividualListingSelectionContext? = nil,
+        matchesViewerWish: Bool = false,
+        tagMatchCount: Int = 0
     ) {
         self.goods = goods
         self.exchange = exchange
+        self.payment = payment
         self.linkCounts = linkCounts
+        self.individualListingSelection = individualListingSelection
+        self.matchesViewerWish = matchesViewerWish
+        self.tagMatchCount = max(0, tagMatchCount)
+    }
+}
+
+enum HomeListingSelectionPolicy {
+    static func initialWantedIndices(itemCount: Int, logic: ListingLogic) -> Set<Int> {
+        switch logic {
+        case .all:
+            return allIndices(itemCount: itemCount)
+        case .one:
+            return []
+        }
+    }
+
+    static func wantedIndices(
+        afterTapping index: Int,
+        current: Set<Int>,
+        itemCount: Int,
+        logic: ListingLogic
+    ) -> Set<Int> {
+        guard (0..<itemCount).contains(index) else {
+            return normalized(current, itemCount: itemCount)
+        }
+
+        switch logic {
+        case .all:
+            return allIndices(itemCount: itemCount)
+        case .one:
+            return current.contains(index) ? [] : [index]
+        }
+    }
+
+    static func offerIndices(
+        afterTapping index: Int,
+        current: Set<Int>,
+        itemCount: Int,
+        logic: ListingLogic
+    ) -> Set<Int> {
+        guard (0..<itemCount).contains(index) else {
+            return normalized(current, itemCount: itemCount)
+        }
+
+        switch logic {
+        case .all:
+            var updated = normalized(current, itemCount: itemCount)
+            if updated.contains(index) {
+                updated.remove(index)
+            } else {
+                updated.insert(index)
+            }
+            return updated
+        case .one:
+            return current.contains(index) ? [] : [index]
+        }
+    }
+
+    static func label(for logic: ListingLogic) -> String {
+        switch logic {
+        case .all:
+            return "すべて希望"
+        case .one:
+            return "どれか1つだけ"
+        }
+    }
+
+    private static func allIndices(itemCount: Int) -> Set<Int> {
+        guard itemCount > 0 else {
+            return []
+        }
+        return Set(0..<itemCount)
+    }
+
+    private static func normalized(_ indices: Set<Int>, itemCount: Int) -> Set<Int> {
+        guard itemCount > 0 else {
+            return []
+        }
+        return indices.filter { (0..<itemCount).contains($0) }
     }
 }
 
@@ -79,13 +252,17 @@ enum HomeDiscoveryMatchPolicy {
         if signals.postalAcceptedByBoth {
             return .exact
         }
-        if signals.localExchangeSelected && signals.prefectureMatches && signals.dateMatches {
+        if signals.localExchangeSelected && signals.prefectureMatches {
             return .exact
         }
-        if signals.localExchangeSelected && signals.prefectureMatches {
+        if signals.localExchangeSelected {
             return .possible
         }
         return .warning
+    }
+
+    static func paymentCondition(for signals: HomePaymentConditionSignals) -> HomePaymentCondition {
+        signals.hasCompatiblePaymentMethod ? .compatible : .warning
     }
 }
 
@@ -116,10 +293,13 @@ enum HomeCandidateConditionSignalDefaults {
                 prefectureMatches: true,
                 dateMatches: index.isMultiple(of: 3)
             ),
+            payment: HomePaymentConditionSignals(hasCompatiblePaymentMethod: index.isMultiple(of: 2)),
             linkCounts: HomeCandidateLinkCounts(
                 wishCount: max(1, 6 - index),
                 listingCount: index.isMultiple(of: 2) ? 2 : 1
-            )
+            ),
+            matchesViewerWish: true,
+            tagMatchCount: max(1, 3 - index)
         )
     }
 
@@ -135,10 +315,13 @@ enum HomeCandidateConditionSignalDefaults {
                 prefectureMatches: !index.isMultiple(of: 2),
                 dateMatches: false
             ),
+            payment: HomePaymentConditionSignals(hasCompatiblePaymentMethod: !index.isMultiple(of: 2)),
             linkCounts: HomeCandidateLinkCounts(
                 wishCount: max(1, 4 - index),
                 listingCount: index.isMultiple(of: 2) ? 1 : 0
-            )
+            ),
+            matchesViewerWish: !index.isMultiple(of: 3),
+            tagMatchCount: index.isMultiple(of: 2) ? 1 : 0
         )
     }
 

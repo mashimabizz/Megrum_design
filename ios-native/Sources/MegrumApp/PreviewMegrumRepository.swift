@@ -19,13 +19,17 @@ public struct PreviewMegrumRepository: MegrumRepository {
     public func loadHomeCandidateSections() async throws -> HomeCandidateSections {
         let matchedItems = NativePreviewData.homeMatchedItems
         let possibleItems = NativePreviewData.homePossibleItems
+        var conditionSignalsByItemID = HomeCandidateConditionSignalDefaults.previewSignals(
+            matchedItems: matchedItems,
+            possibleItems: possibleItems
+        )
+        for item in matchedItems where item.ownerID == NativePreviewData.partnerID {
+            conditionSignalsByItemID[item.id]?.individualListingSelection = HomeDiscoveryFixtures.miiIndividualListingSelection
+        }
         return HomeCandidateSections(
             matchedItems: matchedItems,
             possibleItems: possibleItems,
-            conditionSignalsByItemID: HomeCandidateConditionSignalDefaults.previewSignals(
-                matchedItems: matchedItems,
-                possibleItems: possibleItems
-            )
+            conditionSignalsByItemID: conditionSignalsByItemID
         )
     }
 
@@ -36,6 +40,8 @@ public struct PreviewMegrumRepository: MegrumRepository {
             displayName: input.displayName,
             avatarURL: NativePreviewData.viewer.avatarURL,
             prefecture: input.prefecture,
+            paymentMethods: NativePreviewData.viewer.paymentMethods,
+            paymentNote: NativePreviewData.viewer.paymentNote,
             accountStatus: .active
         )
     }
@@ -57,8 +63,30 @@ public struct PreviewMegrumRepository: MegrumRepository {
             avatarURL: avatarURL,
             gender: input.gender,
             prefecture: input.prefecture,
+            paymentMethods: input.paymentMethods,
+            paymentNote: NativePreviewData.viewer.paymentNote,
             accountStatus: .active
         )
+    }
+
+    public func loadPaymentSettings() async throws -> UserPaymentSettings? {
+        NativePreviewData.paymentSettings
+    }
+
+    public func savePaymentSettings(_ settings: UserPaymentSettings) async throws -> (profile: UserProfile, settings: UserPaymentSettings) {
+        let normalized = settings.normalized(for: NativePreviewData.viewer.id)
+        let profile = UserProfile(
+            id: NativePreviewData.viewer.id,
+            handle: NativePreviewData.viewer.handle,
+            displayName: NativePreviewData.viewer.displayName,
+            avatarURL: NativePreviewData.viewer.avatarURL,
+            gender: NativePreviewData.viewer.gender,
+            prefecture: NativePreviewData.viewer.prefecture,
+            paymentMethods: normalized.methods,
+            paymentNote: normalized.otherNote,
+            accountStatus: .active
+        )
+        return (profile, normalized)
     }
 
     private func normalizedHandle(_ handle: String) -> String {
@@ -101,18 +129,15 @@ public struct PreviewMegrumRepository: MegrumRepository {
     }
 
     public func saveUserOshiSelections(_ selections: [AccountSetupOshiInput]) async throws -> [UserOshiSelection] {
-        selections.enumerated().map { offset, selection in
-            UserOshiSelection(
-                id: UUID(),
-                userID: NativePreviewData.viewerID,
-                groupID: selection.groupID,
-                characterID: selection.characterID,
-                kind: selection.kind,
-                priority: offset + 1,
-                oshiRequestID: selection.oshiRequestID,
-                characterRequestID: selection.characterRequestID
-            )
+        let prioritizedSelections = selections.enumerated().map { offset, selection in
+            var next = selection
+            next.priority = offset + 1
+            return next
         }
+        return UserOshiSelectionPersistenceMapper.selections(
+            from: prioritizedSelections,
+            userID: NativePreviewData.viewerID
+        )
     }
 
     public func createOshiRequest(_ input: OshiRequestCreateInput) async throws -> UUID {
@@ -249,6 +274,8 @@ public struct PreviewMegrumRepository: MegrumRepository {
         )
     }
 
+    public func archiveIndividualListing(listingID: UUID) async throws {}
+
     public func loadPublicTradeGoods(userID: UUID, limit: Int) async throws -> [GoodsItem] {
         let goods = NativePreviewData.inventory.filter { item in
             item.ownerID == userID
@@ -278,8 +305,33 @@ public struct PreviewMegrumRepository: MegrumRepository {
             profile: profile,
             averageStars: average,
             evaluationCount: evaluations.count,
-            completedTradeCount: 12
+            completedTradeCount: 12,
+            oshiTags: previewPublicOshiTags(for: userID)
         )
+    }
+
+    private func previewPublicOshiTags(for userID: UUID) -> [PublicOshiTag] {
+        if userID == NativePreviewData.partnerID {
+            return [
+                PublicOshiTag(title: "TWICE", groupID: NativePreviewData.groupID, priority: 1),
+                PublicOshiTag(title: "IVE", groupID: NativePreviewData.secondGroupID, priority: 2),
+                PublicOshiTag(
+                    title: "ウォニョン",
+                    groupID: NativePreviewData.secondGroupID,
+                    characterID: NativePreviewData.secondMemberID,
+                    priority: 2
+                )
+            ]
+        }
+        return [
+            PublicOshiTag(title: "aespa", groupID: NativePreviewData.groupID, priority: 1),
+            PublicOshiTag(
+                title: "カリナ",
+                groupID: NativePreviewData.groupID,
+                characterID: NativePreviewData.memberID,
+                priority: 1
+            )
+        ]
     }
 
     public func loadUserEvaluations(userID: UUID, limit: Int) async throws -> [UserEvaluation] {
@@ -296,6 +348,8 @@ public struct PreviewMegrumRepository: MegrumRepository {
             senderGoodsIDs: input.senderGoodsIDs,
             receiverGoodsIDs: input.receiverGoodsIDs,
             conditionTags: input.conditionTags,
+            cashOffer: input.cashOffer,
+            cashAmount: input.cashAmount,
             agreedBySender: [.sent, .negotiating, .agreementOneSide, .agreed].contains(input.status),
             agreedByReceiver: input.status == .agreed
         )
@@ -324,6 +378,8 @@ public struct PreviewMegrumRepository: MegrumRepository {
             senderGoodsIDs: proposal.senderGoodsIDs,
             receiverGoodsIDs: proposal.receiverGoodsIDs,
             conditionTags: proposal.conditionTags,
+            cashOffer: proposal.cashOffer,
+            cashAmount: proposal.cashAmount,
             agreedBySender: agreedBySender,
             agreedByReceiver: agreedByReceiver,
             evidencePhotoURL: proposal.evidencePhotoURL,
@@ -356,6 +412,8 @@ public struct PreviewMegrumRepository: MegrumRepository {
             senderGoodsIDs: proposal.senderGoodsIDs,
             receiverGoodsIDs: proposal.receiverGoodsIDs,
             conditionTags: proposal.conditionTags,
+            cashOffer: proposal.cashOffer,
+            cashAmount: proposal.cashAmount,
             agreedBySender: proposal.agreedBySender,
             agreedByReceiver: proposal.agreedByReceiver,
             evidencePhotoURL: proposal.evidencePhotoURL,
@@ -388,6 +446,8 @@ public struct PreviewMegrumRepository: MegrumRepository {
             senderGoodsIDs: proposal.senderGoodsIDs,
             receiverGoodsIDs: proposal.receiverGoodsIDs,
             conditionTags: proposal.conditionTags,
+            cashOffer: proposal.cashOffer,
+            cashAmount: proposal.cashAmount,
             agreedBySender: proposal.agreedBySender,
             agreedByReceiver: proposal.agreedByReceiver,
             evidencePhotoURL: proposal.evidencePhotoURL,
@@ -433,6 +493,8 @@ public struct PreviewMegrumRepository: MegrumRepository {
             senderGoodsIDs: proposal.senderGoodsIDs,
             receiverGoodsIDs: proposal.receiverGoodsIDs,
             conditionTags: proposal.conditionTags,
+            cashOffer: proposal.cashOffer,
+            cashAmount: proposal.cashAmount,
             agreedBySender: proposal.agreedBySender,
             agreedByReceiver: proposal.agreedByReceiver,
             evidencePhotoURL: URL(string: "https://example.com/evidence.jpg")!,
@@ -468,6 +530,8 @@ public struct PreviewMegrumRepository: MegrumRepository {
             senderGoodsIDs: proposal.senderGoodsIDs,
             receiverGoodsIDs: proposal.receiverGoodsIDs,
             conditionTags: proposal.conditionTags,
+            cashOffer: proposal.cashOffer,
+            cashAmount: proposal.cashAmount,
             agreedBySender: proposal.agreedBySender,
             agreedByReceiver: proposal.agreedByReceiver,
             evidencePhotoURL: proposal.evidencePhotoURL ?? URL(string: "https://example.com/evidence.jpg")!,
@@ -478,6 +542,27 @@ public struct PreviewMegrumRepository: MegrumRepository {
             completedAt: approvedBySender && approvedByReceiver ? .now : proposal.completedAt,
             createdAt: proposal.createdAt
         )
+    }
+
+    public func loadTradeEvidencePhotos(proposalID: UUID) async throws -> [TradeEvidencePhoto] {
+        [
+            TradeEvidencePhoto(
+                id: UUID(uuidString: "00000000-0000-0000-0000-00000000e101")!,
+                proposalID: proposalID,
+                photoURL: URL(string: "https://picsum.photos/seed/megrum-evidence-1/640/480")!,
+                position: 1,
+                takenAt: .now,
+                takenBy: NativePreviewData.viewerID
+            ),
+            TradeEvidencePhoto(
+                id: UUID(uuidString: "00000000-0000-0000-0000-00000000e102")!,
+                proposalID: proposalID,
+                photoURL: URL(string: "https://picsum.photos/seed/megrum-evidence-2/640/480")!,
+                position: 2,
+                takenAt: .now.addingTimeInterval(-120),
+                takenBy: NativePreviewData.partnerID
+            )
+        ]
     }
 
     public func submitTradeEvaluation(_ input: TradeEvaluationCreateInput) async throws -> UserEvaluation {
@@ -640,6 +725,12 @@ public struct PreviewMegrumRepository: MegrumRepository {
             .sorted { $0.startAt < $1.startAt }
     }
 
+    public func loadPersonalSchedules(startAt: Date, endAt: Date) async throws -> [PersonalSchedule] {
+        NativePreviewData.schedules
+            .filter { $0.userID == NativePreviewData.viewerID && $0.overlaps(start: startAt, end: endAt) }
+            .sorted { $0.startAt < $1.startAt }
+    }
+
     public func createSchedule(_ input: PersonalScheduleCreateInput) async throws -> PersonalSchedule {
         guard input.isValid else {
             throw MegrumRepositoryError.unsupportedMutation
@@ -752,7 +843,8 @@ public struct PreviewMegrumRepository: MegrumRepository {
     }
 
     public func createBoardThread(_ input: BoardThreadCreateInput) async throws -> BoardThread {
-        BoardThread(
+        let imageURLs = previewBoardThreadImageURLs(from: input)
+        return BoardThread(
             id: UUID(),
             authorID: NativePreviewData.viewerID,
             title: input.title.trimmingCharacters(in: .whitespacesAndNewlines),
@@ -760,8 +852,33 @@ public struct PreviewMegrumRepository: MegrumRepository {
             audience: input.audience,
             latitude: input.latitude,
             longitude: input.longitude,
-            prefecture: input.prefecture
+            prefecture: input.prefecture,
+            imageURLs: imageURLs,
+            imagePaths: input.imagePaths
         )
+    }
+
+    private func previewBoardThreadImageURLs(from input: BoardThreadCreateInput) -> [URL] {
+        var urls = input.imagePaths.compactMap(URL.init(string:))
+        if let thumbnailURL = previewBoardThreadThumbnailURL(from: input.thumbnailUpload) {
+            urls.insert(thumbnailURL, at: 0)
+        }
+        return urls
+    }
+
+    private func previewBoardThreadThumbnailURL(from upload: GoodsPhotoUpload?) -> URL? {
+        guard let upload else {
+            return nil
+        }
+        let fileExtension = upload.contentType.lowercased().contains("png") ? "png" : "jpg"
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("megrum-board-thumbnail-\(UUID().uuidString).\(fileExtension)")
+        do {
+            try upload.data.write(to: url, options: .atomic)
+            return url
+        } catch {
+            return nil
+        }
     }
 
     public func loadMailingAddress() async throws -> MailingAddress? {

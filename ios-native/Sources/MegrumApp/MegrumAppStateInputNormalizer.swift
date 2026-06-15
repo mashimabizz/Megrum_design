@@ -1,9 +1,21 @@
 import Foundation
 
 enum MegrumAppStateInputNormalizer {
-    static func prefecture(_ value: String?) -> String? {
+    static func trimmedText(_ value: String) -> String {
+        value.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    static func optionalText(_ value: String?) -> String? {
         let normalized = value?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
         return normalized.isEmpty ? nil : normalized
+    }
+
+    static func prefecture(_ value: String?) -> String? {
+        optionalText(value)
+    }
+
+    static func goodsQuantity(_ quantity: Int) -> Int {
+        max(1, min(quantity, 999))
     }
 
     static func tagNames(_ tagNames: [String]) -> [String] {
@@ -31,6 +43,10 @@ enum MegrumAppStateInputNormalizer {
             normalized.removeFirst()
         }
         return normalized.isEmpty ? nil : normalized
+    }
+
+    static func isValidProfileHandle(_ handle: String) -> Bool {
+        handle.range(of: #"^[a-z0-9_]{3,20}$"#, options: .regularExpression) != nil
     }
 
     static func postalCode(_ value: String) -> String {

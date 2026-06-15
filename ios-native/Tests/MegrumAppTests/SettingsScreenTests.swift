@@ -6,7 +6,7 @@ final class SettingsScreenTests: XCTestCase {
     func testDrawerItemsMatchRnProfileDrawerDestinations() {
         XCTAssertEqual(
             AppDrawerDestination.primaryItems,
-            [.profile, .notifications, .oshiSettings, .schedules, .completedTrades]
+            [.profile, .notifications, .oshiSettings, .schedules]
         )
         XCTAssertFalse(AppDrawerDestination.primaryItems.contains(.profileEdit))
         XCTAssertEqual(
@@ -17,7 +17,6 @@ final class SettingsScreenTests: XCTestCase {
         XCTAssertEqual(AppDrawerDestination.notifications.title, "通知")
         XCTAssertEqual(AppDrawerDestination.oshiSettings.title, "推し設定")
         XCTAssertEqual(AppDrawerDestination.schedules.title, "スケジュール")
-        XCTAssertEqual(AppDrawerDestination.completedTrades.title, "完了した取引")
         XCTAssertEqual(AppDrawerDestination.help.title, "ヘルプ")
         XCTAssertEqual(AppDrawerDestination.oshiSettings.systemImage, "sparkles")
         XCTAssertEqual(AppDrawerDestination.settings.systemImage, "checkmark.shield")
@@ -30,6 +29,7 @@ final class SettingsScreenTests: XCTestCase {
                 .notifications,
                 .mobilePush,
                 .address,
+                .payment,
                 .blockedUsers,
                 .privacy,
                 .loginSecurity,
@@ -49,7 +49,9 @@ final class SettingsScreenTests: XCTestCase {
             id: viewerID,
             handle: "michilion",
             displayName: " みちりおん ",
-            prefecture: " 東京都 "
+            prefecture: " 東京都 ",
+            paymentMethods: [.bankTransfer, .cashExchange, .other],
+            paymentNote: "メルペイ相談可"
         )
         let address = MailingAddress(
             userID: viewerID,
@@ -71,6 +73,7 @@ final class SettingsScreenTests: XCTestCase {
         XCTAssertEqual(summary.displayNameText, "みちりおん")
         XCTAssertEqual(summary.activityAreaText, "東京都")
         XCTAssertEqual(summary.accountStatusText, "アクティブ")
+        XCTAssertEqual(summary.paymentMethodsText, "銀行振込 / 現金交換 / メルペイ相談可")
         XCTAssertEqual(summary.pushNotificationText, "ON")
         XCTAssertEqual(summary.addressStatusText, "登録済み")
         XCTAssertEqual(summary.shortStatusText, "みちりおん / 通知ON")
@@ -93,6 +96,7 @@ final class SettingsScreenTests: XCTestCase {
         XCTAssertEqual(summary.displayNameText, "未設定")
         XCTAssertEqual(summary.activityAreaText, "未設定")
         XCTAssertEqual(summary.accountStatusText, "アクティブ")
+        XCTAssertEqual(summary.paymentMethodsText, "未設定")
         XCTAssertEqual(summary.pushNotificationText, "OFF")
         XCTAssertEqual(summary.addressStatusText, "未登録")
         XCTAssertEqual(summary.shortStatusText, "未設定 / 通知OFF")
@@ -110,6 +114,25 @@ final class SettingsScreenTests: XCTestCase {
         XCTAssertEqual(summary.displayNameText, "未設定")
         XCTAssertEqual(summary.activityAreaText, "未設定")
         XCTAssertEqual(summary.accountStatusText, "未読み込み")
+    }
+
+    func testPaymentSettingsDraftFormatsPreviewAndValidation() {
+        var draft = PaymentSettingsDraft(
+            methods: [.bankTransfer, .paypay, .cashExchange, .other],
+            bankName: " みずほ銀行 ",
+            bankBranchName: " 渋谷支店 ",
+            bankAccountType: " 普通 ",
+            bankAccountNumber: "1234567",
+            bankAccountHolder: " ヤマダ ハナコ ",
+            otherNote: " メルペイ、楽天ペイも相談可 "
+        )
+
+        XCTAssertNil(draft.validationMessage)
+        XCTAssertEqual(draft.normalized.summaryText, "銀行振込 / PayPay / 現金交換 / メルペイ、楽天ペイも相談可")
+        XCTAssertEqual(draft.normalized.bankPreviewText, "口座: みずほ銀行 渋谷支店 普通 ****4567")
+
+        draft.otherNote = " "
+        XCTAssertEqual(draft.validationMessage, "その他を選ぶ場合は自由入力を入力してください")
     }
 
     func testLoginSecuritySummaryFormatsAuthenticatedSession() {

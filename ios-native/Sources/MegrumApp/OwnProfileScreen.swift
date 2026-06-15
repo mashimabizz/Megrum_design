@@ -10,6 +10,8 @@ struct OwnProfileSummary: Equatable, Sendable {
     var handle: String
     var prefecture: String?
     var gender: UserGender?
+    var paymentMethods: [UserPaymentMethod]
+    var paymentNote: String?
     var avatarURL: URL?
     var inventoryCount: Int
     var wishCount: Int
@@ -27,6 +29,10 @@ struct OwnProfileSummary: Equatable, Sendable {
 
     var genderText: String {
         gender?.label ?? "未設定"
+    }
+
+    var paymentMethodsText: String {
+        UserPaymentMethod.displayText(for: paymentMethods, otherNote: paymentNote)
     }
 
     var activeTradeText: String {
@@ -60,6 +66,8 @@ struct OwnProfileSummary: Equatable, Sendable {
             self.prefecture = viewer.prefectureForDisplay
         }
         self.gender = localDraft?.gender ?? viewer.gender
+        self.paymentMethods = localDraft?.paymentMethods ?? viewer.paymentMethods
+        self.paymentNote = viewer.paymentNote
         if let localDraft {
             self.avatarURL = localDraft.visibleAvatarURL
         } else {
@@ -84,18 +92,26 @@ struct OwnProfileEditDraft: Equatable, Sendable {
     var displayName: String
     var prefecture: String
     var gender: UserGender?
+    var paymentMethods: [UserPaymentMethod]
     var existingAvatarURL: URL?
     var localAvatarData: Data?
     var localAvatarContentType: String?
     var clearsAvatar: Bool
 
-    static let empty = OwnProfileEditDraft(handle: "", displayName: "", prefecture: "", gender: nil)
+    static let empty = OwnProfileEditDraft(
+        handle: "",
+        displayName: "",
+        prefecture: "",
+        gender: nil,
+        paymentMethods: []
+    )
 
     init(
         handle: String,
         displayName: String,
         prefecture: String,
         gender: UserGender?,
+        paymentMethods: [UserPaymentMethod] = [],
         existingAvatarURL: URL? = nil,
         localAvatarData: Data? = nil,
         localAvatarContentType: String? = nil,
@@ -105,6 +121,7 @@ struct OwnProfileEditDraft: Equatable, Sendable {
         self.displayName = displayName
         self.prefecture = prefecture
         self.gender = gender
+        self.paymentMethods = Self.normalizedPaymentMethods(paymentMethods)
         self.existingAvatarURL = existingAvatarURL
         self.localAvatarData = localAvatarData
         self.localAvatarContentType = localAvatarContentType
@@ -116,6 +133,7 @@ struct OwnProfileEditDraft: Equatable, Sendable {
         self.displayName = summary.displayName
         self.prefecture = summary.prefecture ?? ""
         self.gender = summary.gender
+        self.paymentMethods = summary.paymentMethods
         self.existingAvatarURL = summary.avatarURL
         self.localAvatarData = nil
         self.localAvatarContentType = nil
@@ -123,18 +141,15 @@ struct OwnProfileEditDraft: Equatable, Sendable {
     }
 
     var normalizedHandle: String {
-        let trimmed = handle
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-            .lowercased()
-        return String(trimmed.drop(while: { $0 == "@" }))
+        MegrumAppStateInputNormalizer.profileHandle(handle) ?? ""
     }
 
     var normalizedDisplayName: String {
-        displayName.trimmingCharacters(in: .whitespacesAndNewlines)
+        MegrumAppStateInputNormalizer.trimmedText(displayName)
     }
 
     var normalizedPrefecture: String {
-        prefecture.trimmingCharacters(in: .whitespacesAndNewlines)
+        MegrumAppStateInputNormalizer.trimmedText(prefecture)
     }
 
     var normalized: OwnProfileEditDraft {
@@ -143,6 +158,7 @@ struct OwnProfileEditDraft: Equatable, Sendable {
             displayName: normalizedDisplayName,
             prefecture: normalizedPrefecture,
             gender: gender,
+            paymentMethods: Self.normalizedPaymentMethods(paymentMethods),
             existingAvatarURL: existingAvatarURL,
             localAvatarData: localAvatarData,
             localAvatarContentType: localAvatarContentType,
@@ -189,6 +205,19 @@ struct OwnProfileEditDraft: Equatable, Sendable {
         clearsAvatar = true
     }
 
+    mutating func setPaymentMethod(_ method: UserPaymentMethod, isSelected: Bool) {
+        if isSelected {
+            paymentMethods.append(method)
+        } else {
+            paymentMethods.removeAll { $0 == method }
+        }
+        paymentMethods = Self.normalizedPaymentMethods(paymentMethods)
+    }
+
+    func containsPaymentMethod(_ method: UserPaymentMethod) -> Bool {
+        paymentMethods.contains(method)
+    }
+
     var validationError: String? {
         OwnProfileEditValidation.validationError(for: self)
     }
@@ -196,12 +225,18 @@ struct OwnProfileEditDraft: Equatable, Sendable {
     var isValid: Bool {
         validationError == nil
     }
+
+    private static func normalizedPaymentMethods(_ methods: [UserPaymentMethod]) -> [UserPaymentMethod] {
+        UserPaymentMethod.allCases.filter { method in
+            methods.contains(method)
+        }
+    }
 }
 
 enum OwnProfileEditValidation {
     static func validationError(for draft: OwnProfileEditDraft) -> String? {
         let handle = draft.normalizedHandle
-        if handle.range(of: #"^[a-z0-9_]{3,20}$"#, options: .regularExpression) == nil {
+        if !MegrumAppStateInputNormalizer.isValidProfileHandle(handle) {
             return "ユーザーIDは半角英数字・_ の3〜20文字で入力してください"
         }
 
@@ -314,7 +349,8 @@ struct OwnProfileScreen: View {
     private func profileBio(_ summary: OwnProfileSummary) -> String {
         let parts = [
             summary.prefectureText,
-            summary.genderText
+            summary.genderText,
+            summary.paymentMethodsText
         ].filter { !$0.isEmpty && $0 != "未設定" }
         guard !parts.isEmpty else {
             return "プロフィール情報を編集できます"
@@ -385,6 +421,7 @@ struct OwnProfileScreen: View {
                 displayName: normalized.displayName,
                 gender: normalized.gender,
                 prefecture: trimmedNonEmpty(normalized.prefecture),
+                paymentMethods: normalized.paymentMethods,
                 avatarURL: normalized.visibleAvatarURL,
                 avatarUpload: normalized.avatarUpload,
                 clearsAvatar: normalized.clearsAvatar

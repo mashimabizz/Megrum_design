@@ -1,11 +1,6 @@
 import MegrumCore
 import MegrumDesign
 import SwiftUI
-#if canImport(UIKit)
-import UIKit
-#elseif canImport(AppKit)
-import AppKit
-#endif
 
 struct HomeDiscoveryViewerAvatar: View {
     var viewer: UserProfile?
@@ -66,31 +61,21 @@ struct HomeDiscoverySection: View {
     var title: String
     var candidates: [HomeDiscoveryCandidate]
     var layout: HomeDiscoverySectionLayout
+    var cardTitleStyle: HomeDiscoveryCardTitleStyle = .plain
+    var showsGridHeaderTitle = true
+    var showsSeeAllButton = true
     var onSelect: (HomeDiscoverySheet) -> Void
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack {
-                Text(title)
-                    .font(.system(size: 20, weight: .black, design: .rounded))
-                    .foregroundStyle(MegrumTheme.lavender)
-                Spacer()
-                Button {
-                    if let firstCandidate = candidates.first {
-                        onSelect(firstCandidate.sheet)
-                    }
-                } label: {
-                    HStack(spacing: 4) {
-                        Text("すべて見る")
-                            .font(.system(size: 14, weight: .black, design: .rounded))
-                        Image(systemName: "chevron.right")
-                            .font(.system(size: 14, weight: .black))
-                    }
-                    .foregroundStyle(MegrumTheme.lavender)
-                }
-                .buttonStyle(.plain)
-                .disabled(candidates.isEmpty)
-            }
+        VStack(alignment: .leading, spacing: layout == .grid ? 8 : 10) {
+            HomeDiscoverySectionHeader(
+                title: title,
+                layout: layout,
+                showsGridHeaderTitle: showsGridHeaderTitle,
+                showsSeeAllButton: showsSeeAllButton,
+                isSeeAllDisabled: candidates.isEmpty,
+                onSeeAll: openFirstCandidate
+            )
 
             switch layout {
             case .grid:
@@ -98,7 +83,8 @@ struct HomeDiscoverySection: View {
                     ForEach(candidates) { candidate in
                         HomeDiscoveryCandidateButton(
                             candidate: candidate,
-                            cardHeight: 158,
+                            titleStyle: cardTitleStyle,
+                            cardHeight: 170,
                             onSelect: onSelect
                         )
                     }
@@ -119,6 +105,50 @@ struct HomeDiscoverySection: View {
             }
         }
     }
+
+    private func openFirstCandidate() {
+        if let firstCandidate = candidates.first {
+            onSelect(firstCandidate.sheet)
+        }
+    }
+}
+
+private struct HomeDiscoverySectionHeader: View {
+    var title: String
+    var layout: HomeDiscoverySectionLayout
+    var showsGridHeaderTitle: Bool
+    var showsSeeAllButton: Bool
+    var isSeeAllDisabled: Bool
+    var onSeeAll: () -> Void
+
+    var body: some View {
+        HStack {
+            if layout == .rail || showsGridHeaderTitle {
+                Text(title)
+                    .font(.system(size: layout == .rail ? 20 : 18, weight: .heavy))
+                    .foregroundStyle(MegrumTheme.lavender)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.78)
+            }
+
+            Spacer()
+
+            if showsSeeAllButton {
+                Button(action: onSeeAll) {
+                    HStack(spacing: 4) {
+                        Text("すべて見る")
+                            .font(.system(size: 14, weight: .heavy))
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 14, weight: .black))
+                }
+                .foregroundStyle(MegrumTheme.lavender)
+            }
+            .buttonStyle(.plain)
+                .disabled(isSeeAllDisabled)
+            }
+        }
+        .frame(minHeight: layout == .grid ? 18 : 24)
+    }
 }
 
 private struct HomeHavesCandidateButton: View {
@@ -128,10 +158,12 @@ private struct HomeHavesCandidateButton: View {
     var body: some View {
         VStack(spacing: 7) {
             if let goods = candidate.goods.first {
+                let conditionTags = candidate.conditionTags(for: goods)
                 HomeDiscoveryGoodsCard(
                     goods: goods,
-                    goodsCondition: candidate.goodsCondition,
-                    exchangeCondition: candidate.exchangeCondition,
+                    goodsCondition: conditionTags.goods,
+                    exchangeCondition: conditionTags.exchange,
+                    paymentCondition: conditionTags.payment,
                     prominence: 1,
                     showsConditionOverlay: false
                 )
@@ -153,8 +185,8 @@ private struct HomeHavesCandidateButton: View {
         }
         .accessibilityAddTraits(.isButton)
         .accessibilityLabel("\(candidate.title)の詳細を見る")
-        .accessibilityValue("Wishまたは個別募集 \(countText)")
-        .accessibilityHint("タップでこのグッズをWishに入れている人を見ます。")
+        .accessibilityValue("欲しがられている候補 \(countText)")
+        .accessibilityHint("タップでこのグッズを欲しがっている候補を見ます。")
     }
 
     private var countText: String {
@@ -164,17 +196,34 @@ private struct HomeHavesCandidateButton: View {
 
 private struct HomeDiscoveryCandidateButton: View {
     var candidate: HomeDiscoveryCandidate
+    var titleStyle: HomeDiscoveryCardTitleStyle
     var cardHeight: CGFloat
     var onSelect: (HomeDiscoverySheet) -> Void
 
     @State private var selectedGoods: HomeMockGoods?
 
     var body: some View {
-        VStack(spacing: 5) {
+        VStack(spacing: 0) {
+            Text(cardTitle)
+                .font(.system(size: 14.5, weight: .heavy))
+                .foregroundStyle(MegrumTheme.ink)
+                .lineLimit(1)
+                .minimumScaleFactor(0.68)
+                .frame(maxWidth: .infinity, alignment: .center)
+                .contentShape(Rectangle())
+                .onTapGesture {
+                    openSelectedSheet()
+                }
+                .padding(.bottom, 10)
+
             HomeDiscoveryRotaryCard(
                 goods: candidate.goods,
                 goodsCondition: candidate.goodsCondition,
                 exchangeCondition: candidate.exchangeCondition,
+                paymentCondition: candidate.paymentCondition,
+                conditionTagsForGoods: { goods in
+                    candidate.conditionTags(for: goods)
+                },
                 showsConditionOverlay: false,
                 onSelectionChange: { goods in
                     selectedGoods = goods
@@ -183,24 +232,12 @@ private struct HomeDiscoveryCandidateButton: View {
                     onSelect(candidate.sheet(selectedGoods: goods))
                 }
             )
-            .frame(height: max(118, cardHeight - 28))
+            .frame(height: max(118, cardHeight - 42))
 
             HomeDiscoveryCandidateConditionTags(
-                goodsCondition: candidate.goodsCondition,
-                exchangeCondition: candidate.exchangeCondition
+                conditionTags: candidate.conditionTags(for: selectedGoods)
             )
-
-            Text(candidate.title)
-                .font(.system(size: cardHeight > 150 ? 13.5 : 0, weight: .regular, design: .rounded))
-                .foregroundStyle(MegrumTheme.ink)
-                .lineLimit(1)
-                .minimumScaleFactor(0.7)
-                .opacity(cardHeight > 150 ? 1 : 0)
-                .frame(height: cardHeight > 150 ? 17 : 0)
-                .contentShape(Rectangle())
-                .onTapGesture {
-                    openSelectedSheet()
-                }
+            .padding(.top, 4)
         }
         .contentShape(Rectangle())
         .onTapGesture {
@@ -220,32 +257,44 @@ private struct HomeDiscoveryCandidateButton: View {
         }
     }
 
+    private var cardTitle: String {
+        if titleStyle == .memberTag {
+            return candidate.title
+        }
+        return HomeDiscoveryCardTitleFormatter.title(
+            for: selectedGoods ?? candidate.goods.first,
+            fallback: candidate.title,
+            style: titleStyle
+        )
+    }
+
     private func openSelectedSheet() {
         onSelect(candidate.sheet(selectedGoods: selectedGoods))
     }
 }
 
 private struct HomeDiscoveryCandidateConditionTags: View {
-    var goodsCondition: HomeGoodsCondition
-    var exchangeCondition: HomeExchangeCondition
+    var conditionTags: HomeConditionTagSet
 
     var body: some View {
         HStack(spacing: 5) {
-            tag(title: goodsCondition.floatingTagTitle, color: goodsCondition.accent)
-            tag(title: exchangeCondition.floatingTagTitle, color: exchangeCondition.accent)
+            tag(title: conditionTags.goods.floatingTagTitle, color: conditionTags.goods.accent)
+            tag(title: conditionTags.exchange.floatingTagTitle, color: conditionTags.exchange.accent)
+            tag(title: conditionTags.payment.floatingTagTitle, color: conditionTags.payment.accent)
         }
         .frame(maxWidth: .infinity)
         .accessibilityElement(children: .combine)
+        .accessibilityLabel(conditionTags.accessibilityText)
     }
 
     private func tag(title: String, color: Color) -> some View {
         Text(title)
-            .font(.system(size: 9.5, weight: .black, design: .rounded))
+            .font(.system(size: 12.6, weight: .black, design: .rounded))
             .foregroundStyle(color)
             .lineLimit(1)
-            .minimumScaleFactor(0.76)
-            .padding(.horizontal, 6)
-            .padding(.vertical, 4)
+            .minimumScaleFactor(0.66)
+            .padding(.horizontal, 8.5)
+            .padding(.vertical, 4.8)
             .background(.white.opacity(0.92), in: Capsule())
             .overlay {
                 Capsule()
@@ -294,6 +343,8 @@ struct HomeDiscoveryRotaryCard: View {
     var goods: [HomeMockGoods]
     var goodsCondition: HomeGoodsCondition
     var exchangeCondition: HomeExchangeCondition
+    var paymentCondition: HomePaymentCondition
+    var conditionTagsForGoods: ((HomeMockGoods) -> HomeConditionTagSet)? = nil
     var showsConditionOverlay = true
     var onSelectionChange: ((HomeMockGoods) -> Void)? = nil
     var onActivate: ((HomeMockGoods) -> Void)? = nil
@@ -311,10 +362,12 @@ struct HomeDiscoveryRotaryCard: View {
                         stageWidth: proxy.size.width,
                         stageHeight: proxy.size.height
                     )
+                    let conditionTags = conditionTags(for: entry.goods)
                     HomeDiscoveryGoodsCard(
                         goods: entry.goods,
-                        goodsCondition: goodsCondition,
-                        exchangeCondition: exchangeCondition,
+                        goodsCondition: conditionTags.goods,
+                        exchangeCondition: conditionTags.exchange,
+                        paymentCondition: conditionTags.payment,
                         prominence: metrics.prominence,
                         showsConditionOverlay: showsConditionOverlay
                     )
@@ -335,19 +388,10 @@ struct HomeDiscoveryRotaryCard: View {
                     )
                     .accessibilityHidden(abs(entry.position) > 0.45)
                 }
-
-                if goods.count > 1 {
-                    pagePill
-                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-                        .padding(.leading, max(8, proxy.size.width * 0.14))
-                        .padding(.top, 8)
-                        .allowsHitTesting(false)
-                        .zIndex(40)
-                }
             }
             .frame(width: proxy.size.width, height: proxy.size.height)
             .contentShape(Rectangle())
-            .gesture(dragGesture(width: proxy.size.width))
+            .simultaneousGesture(dragGesture(width: proxy.size.width))
         }
         .accessibilityElement(children: .combine)
         .accessibilityLabel("グッズ画像を横スワイプで回転")
@@ -382,6 +426,14 @@ struct HomeDiscoveryRotaryCard: View {
         return goods[selectedIndex]
     }
 
+    private func conditionTags(for goods: HomeMockGoods) -> HomeConditionTagSet {
+        conditionTagsForGoods?(goods) ?? HomeConditionTagSet(
+            goods: goodsCondition,
+            exchange: exchangeCondition,
+            payment: paymentCondition
+        )
+    }
+
     private var displayedDragProgress: Double {
         reduceMotion ? 0 : dragProgress
     }
@@ -391,20 +443,6 @@ struct HomeDiscoveryRotaryCard: View {
             return "0/0"
         }
         return "\(selectedIndex + 1)/\(goods.count)"
-    }
-
-    private var pagePill: some View {
-        Text(countText)
-            .font(.system(size: 10, weight: .black, design: .rounded))
-            .foregroundStyle(MegrumTheme.lavender)
-            .padding(.horizontal, 7)
-            .padding(.vertical, 4)
-            .background(.white.opacity(0.88), in: Capsule())
-            .overlay {
-                Capsule()
-                    .strokeBorder(MegrumTheme.lavender.opacity(0.22), lineWidth: 1)
-            }
-            .shadow(color: .black.opacity(0.08), radius: 5, y: 2)
     }
 
     private var visibleEntries: [HomeRotaryEntry] {
@@ -439,15 +477,24 @@ struct HomeDiscoveryRotaryCard: View {
                 guard goods.count > 1, !reduceMotion else {
                     return
                 }
-                let denominator = max(width * 0.58, 72)
+                guard let progress = carouselDragProgress(translation: value.translation, width: width) else {
+                    if abs(value.translation.height) > abs(value.translation.width) {
+                        dragProgress = 0
+                    }
+                    return
+                }
                 var transaction = Transaction()
                 transaction.disablesAnimations = true
                 withTransaction(transaction) {
-                    dragProgress = max(-1.15, min(1.15, -Double(value.translation.width / denominator)))
+                    dragProgress = progress
                 }
             }
             .onEnded { value in
                 guard goods.count > 1 else {
+                    dragProgress = 0
+                    return
+                }
+                guard isHorizontalCarouselDrag(value.translation) else {
                     dragProgress = 0
                     return
                 }
@@ -465,6 +512,20 @@ struct HomeDiscoveryRotaryCard: View {
                 }
                 settleCarousel(indexDelta: delta)
             }
+    }
+
+    private func carouselDragProgress(translation: CGSize, width: CGFloat) -> Double? {
+        guard isHorizontalCarouselDrag(translation) else {
+            return nil
+        }
+        let denominator = max(width * 0.58, 72)
+        return max(-1.15, min(1.15, -Double(translation.width / denominator)))
+    }
+
+    private func isHorizontalCarouselDrag(_ translation: CGSize) -> Bool {
+        let absX = abs(translation.width)
+        let absY = abs(translation.height)
+        return absX > 6 && absX > absY * 1.15
     }
 
     private func handleTap(position: Double) {
@@ -515,6 +576,7 @@ struct HomeDiscoveryGoodsCard: View {
     var goods: HomeMockGoods
     var goodsCondition: HomeGoodsCondition
     var exchangeCondition: HomeExchangeCondition
+    var paymentCondition: HomePaymentCondition
     var prominence: Double
     var showsConditionOverlay: Bool
 
@@ -535,7 +597,8 @@ struct HomeDiscoveryGoodsCard: View {
             if isFront && showsConditionOverlay {
                 HomeFloatingConditionTags(
                     goodsCondition: goodsCondition,
-                    exchangeCondition: exchangeCondition
+                    exchangeCondition: exchangeCondition,
+                    paymentCondition: paymentCondition
                 )
                 .offset(x: 24, y: 6)
                 .zIndex(100)
@@ -549,11 +612,13 @@ struct HomeDiscoveryGoodsCard: View {
 private struct HomeFloatingConditionTags: View {
     var goodsCondition: HomeGoodsCondition
     var exchangeCondition: HomeExchangeCondition
+    var paymentCondition: HomePaymentCondition
 
     var body: some View {
         VStack(alignment: .trailing, spacing: 5) {
             tag(title: goodsCondition.floatingTagTitle, color: goodsCondition.accent)
             tag(title: exchangeCondition.floatingTagTitle, color: exchangeCondition.accent)
+            tag(title: paymentCondition.floatingTagTitle, color: paymentCondition.accent)
         }
         .fixedSize(horizontal: true, vertical: true)
         .shadow(color: .black.opacity(0.10), radius: 8, y: 4)
@@ -573,286 +638,6 @@ private struct HomeFloatingConditionTags: View {
                 Capsule()
                     .strokeBorder(color.opacity(0.30), lineWidth: 1)
             }
-    }
-}
-
-enum HomeGoodsArtworkLayout {
-    static func unit(in size: CGSize) -> CGFloat {
-        max(1, min(size.width, size.height))
-    }
-
-    static func portraitHeadDiameter(in size: CGSize) -> CGFloat {
-        let base = unit(in: size)
-        return min(base * 0.43, size.width * 0.62, size.height * 0.38)
-    }
-
-    static func portraitBodySize(in size: CGSize) -> CGSize {
-        let base = unit(in: size)
-        return CGSize(
-            width: min(base * 0.40, size.width * 0.56),
-            height: min(base * 0.58, size.height * 0.44)
-        )
-    }
-
-    static func badgeDiameter(in size: CGSize) -> CGFloat {
-        let base = unit(in: size)
-        return min(base * 0.76, size.width * 0.82, size.height * 0.82)
-    }
-
-    static func standFigureSize(in size: CGSize) -> CGSize {
-        let base = unit(in: size)
-        return CGSize(
-            width: min(base * 0.34, size.width * 0.42),
-            height: min(base * 0.74, size.height * 0.68)
-        )
-    }
-
-    static func standBaseSize(in size: CGSize) -> CGSize {
-        let base = unit(in: size)
-        return CGSize(
-            width: min(base * 0.58, size.width * 0.76),
-            height: min(base * 0.15, size.height * 0.14)
-        )
-    }
-
-    static func keychainRingDiameter(in size: CGSize) -> CGFloat {
-        let base = unit(in: size)
-        return min(base * 0.20, size.width * 0.30, size.height * 0.18)
-    }
-
-    static func keychainHeartSize(in size: CGSize) -> CGFloat {
-        let base = unit(in: size)
-        return min(base * 0.62, size.width * 0.74, size.height * 0.66)
-    }
-
-    static func plushHeadDiameter(in size: CGSize) -> CGFloat {
-        let base = unit(in: size)
-        return min(base * 0.58, size.width * 0.68, size.height * 0.54)
-    }
-
-    static func plushBodySize(in size: CGSize) -> CGSize {
-        let base = unit(in: size)
-        return CGSize(
-            width: min(base * 0.54, size.width * 0.66),
-            height: min(base * 0.36, size.height * 0.32)
-        )
-    }
-}
-
-struct HomeGoodsArtwork: View {
-    var goods: HomeMockGoods
-
-    var body: some View {
-        GeometryReader { proxy in
-            let size = proxy.size
-
-            ZStack {
-                LinearGradient(
-                    colors: goods.palette,
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
-
-                if let imageURL = goods.imageURL {
-                    HomeActualGoodsImage(url: imageURL, fallbackPalette: goods.palette)
-                        .frame(width: size.width, height: size.height)
-                        .clipped()
-                } else {
-                    switch goods.shape {
-                    case .portrait:
-                        portrait(in: size)
-                    case .badge:
-                        badge(in: size)
-                    case .stand:
-                        stand(in: size)
-                    case .keychain:
-                        keychain(in: size)
-                    case .plush:
-                        plush(in: size)
-                    }
-                }
-            }
-            .frame(width: size.width, height: size.height)
-            .clipped()
-        }
-    }
-
-    private func portrait(in size: CGSize) -> some View {
-        let headDiameter = HomeGoodsArtworkLayout.portraitHeadDiameter(in: size)
-        let bodySize = HomeGoodsArtworkLayout.portraitBodySize(in: size)
-
-        return VStack(spacing: max(2, HomeGoodsArtworkLayout.unit(in: size) * 0.06)) {
-            Circle()
-                .fill(.white.opacity(0.30))
-                .frame(width: headDiameter, height: headDiameter)
-                .overlay {
-                    Text(goods.symbol)
-                        .font(.system(size: max(9, headDiameter * 0.52), weight: .black, design: .rounded))
-                        .foregroundStyle(.white)
-                }
-
-            Capsule()
-                .fill(.white.opacity(0.28))
-                .frame(width: bodySize.width, height: bodySize.height)
-                .overlay(alignment: .top) {
-                    Capsule()
-                        .fill(.white.opacity(0.34))
-                        .frame(width: bodySize.width * 0.60, height: bodySize.height * 0.46)
-                        .padding(.top, bodySize.height * 0.10)
-                }
-        }
-        .shadow(color: .black.opacity(0.12), radius: max(4, HomeGoodsArtworkLayout.unit(in: size) * 0.08), y: max(2, HomeGoodsArtworkLayout.unit(in: size) * 0.04))
-    }
-
-    private func badge(in size: CGSize) -> some View {
-        let diameter = HomeGoodsArtworkLayout.badgeDiameter(in: size)
-
-        return Circle()
-            .fill(
-                RadialGradient(
-                    colors: [.white.opacity(0.90), MegrumTheme.sky.opacity(0.44), MegrumTheme.lavender.opacity(0.30)],
-                    center: .center,
-                    startRadius: 4,
-                    endRadius: diameter * 0.75
-                )
-            )
-            .frame(width: diameter, height: diameter)
-            .overlay {
-                Text(goods.symbol)
-                    .font(.system(size: max(9, diameter * 0.36), weight: .black, design: .rounded))
-                    .foregroundStyle(MegrumTheme.lavender)
-            }
-            .overlay(Circle().stroke(.white.opacity(0.88), lineWidth: max(1, diameter * 0.03)))
-            .shadow(color: .black.opacity(0.12), radius: max(4, diameter * 0.09), y: max(2, diameter * 0.05))
-    }
-
-    private func stand(in size: CGSize) -> some View {
-        let figureSize = HomeGoodsArtworkLayout.standFigureSize(in: size)
-        let baseSize = HomeGoodsArtworkLayout.standBaseSize(in: size)
-
-        return VStack(spacing: 0) {
-            Capsule()
-                .fill(MegrumTheme.lavender.opacity(0.30))
-                .frame(width: figureSize.width, height: figureSize.height)
-                .overlay {
-                    Text(goods.symbol)
-                        .font(.system(size: max(8, figureSize.width * 0.62), weight: .black, design: .rounded))
-                        .foregroundStyle(MegrumTheme.lavender)
-                }
-
-            Ellipse()
-                .fill(.white.opacity(0.78))
-                .frame(width: baseSize.width, height: baseSize.height)
-                .overlay(Ellipse().stroke(MegrumTheme.lavender.opacity(0.28), lineWidth: 1))
-        }
-        .shadow(color: .black.opacity(0.10), radius: max(3, HomeGoodsArtworkLayout.unit(in: size) * 0.07), y: max(2, HomeGoodsArtworkLayout.unit(in: size) * 0.04))
-    }
-
-    private func keychain(in size: CGSize) -> some View {
-        let ringDiameter = HomeGoodsArtworkLayout.keychainRingDiameter(in: size)
-        let heartSize = HomeGoodsArtworkLayout.keychainHeartSize(in: size)
-
-        return VStack(spacing: -max(1, HomeGoodsArtworkLayout.unit(in: size) * 0.04)) {
-            Circle()
-                .stroke(MegrumTheme.lavender.opacity(0.54), lineWidth: max(1.2, ringDiameter * 0.18))
-                .frame(width: ringDiameter, height: ringDiameter)
-
-            Image(systemName: "heart.fill")
-                .font(.system(size: heartSize, weight: .bold))
-                .foregroundStyle(MegrumTheme.pink.opacity(0.70))
-                .overlay {
-                    Text(goods.symbol)
-                        .font(.system(size: max(8, heartSize * 0.28), weight: .black, design: .rounded))
-                        .foregroundStyle(.white)
-                }
-        }
-        .shadow(color: .black.opacity(0.12), radius: max(3, HomeGoodsArtworkLayout.unit(in: size) * 0.07), y: max(2, HomeGoodsArtworkLayout.unit(in: size) * 0.04))
-    }
-
-    private func plush(in size: CGSize) -> some View {
-        let headDiameter = HomeGoodsArtworkLayout.plushHeadDiameter(in: size)
-        let bodySize = HomeGoodsArtworkLayout.plushBodySize(in: size)
-
-        return VStack(spacing: -max(1, HomeGoodsArtworkLayout.unit(in: size) * 0.02)) {
-            Circle()
-                .fill(MegrumTheme.lavender.opacity(0.48))
-                .frame(width: headDiameter, height: headDiameter)
-                .overlay {
-                    Text(goods.symbol)
-                        .font(.system(size: max(9, headDiameter * 0.42), weight: .black, design: .rounded))
-                        .foregroundStyle(.white)
-                }
-            Capsule()
-                .fill(MegrumTheme.lavender.opacity(0.35))
-                .frame(width: bodySize.width, height: bodySize.height)
-        }
-        .shadow(color: .black.opacity(0.10), radius: max(3, HomeGoodsArtworkLayout.unit(in: size) * 0.07), y: max(2, HomeGoodsArtworkLayout.unit(in: size) * 0.04))
-    }
-}
-
-private struct HomeActualGoodsImage: View {
-    var url: URL
-    var fallbackPalette: [Color]
-
-    var body: some View {
-        ZStack {
-            LinearGradient(
-                colors: fallbackPalette,
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-
-            loadedImage
-        }
-    }
-
-    @ViewBuilder
-    private var loadedImage: some View {
-        if let platformImage = HomeLocalGoodsImageLoader.image(from: url) {
-            platformImage
-                .resizable()
-                .scaledToFill()
-        } else {
-            AsyncImage(url: url) { phase in
-                switch phase {
-                case .success(let image):
-                    image
-                        .resizable()
-                        .scaledToFill()
-                case .failure:
-                    Image(systemName: "photo")
-                        .font(.system(size: 24, weight: .semibold))
-                        .foregroundStyle(.white.opacity(0.82))
-                case .empty:
-                    ProgressView()
-                        .tint(.white)
-                @unknown default:
-                    EmptyView()
-                }
-            }
-        }
-    }
-}
-
-private enum HomeLocalGoodsImageLoader {
-    static func image(from url: URL) -> Image? {
-        guard url.isFileURL else {
-            return nil
-        }
-
-        #if canImport(UIKit)
-        guard let image = UIImage(contentsOfFile: url.path) else {
-            return nil
-        }
-        return Image(uiImage: image)
-        #elseif canImport(AppKit)
-        guard let image = NSImage(contentsOf: url) else {
-            return nil
-        }
-        return Image(nsImage: image)
-        #else
-        return nil
-        #endif
     }
 }
 

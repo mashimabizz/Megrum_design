@@ -311,7 +311,7 @@ private struct NativePushDevicePayload: Encodable, Sendable {
         self.platform = "ios"
         self.pushProvider = "apns"
         self.nativeDeviceToken = deviceToken.normalizedNativeDeviceToken
-        self.appVersion = appVersion?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfBlank
+        self.appVersion = SupabaseTextNormalizer.optional(appVersion)
         self.lastSeenAt = isoTimestamp(seenAt)
     }
 
@@ -343,14 +343,10 @@ private func isoTimestamp(_ date: Date) -> String {
 
 private extension String {
     var normalizedNativeDeviceToken: String {
-        trimmingCharacters(in: .whitespacesAndNewlines)
+        SupabaseTextNormalizer.trimmed(self)
             .replacingOccurrences(of: " ", with: "")
             .replacingOccurrences(of: "<", with: "")
             .replacingOccurrences(of: ">", with: "")
             .lowercased()
-    }
-
-    var nilIfBlank: String? {
-        isEmpty ? nil : self
     }
 }

@@ -75,6 +75,20 @@ final class MegrumAppStateTests: XCTestCase {
         XCTAssertNil(state.updatingIndividualListingID)
     }
 
+    func testAppStateArchivesPreviewIndividualListingLocally() async {
+        let state = MegrumAppState(repository: PreviewMegrumRepository())
+
+        await state.loadInitialData()
+        let listing = try! XCTUnwrap(state.listings.first)
+        let initialCount = state.listings.count
+        let archived = await state.archiveIndividualListing(listing.id)
+
+        XCTAssertTrue(archived)
+        XCTAssertEqual(state.listings.count, initialCount - 1)
+        XCTAssertFalse(state.listings.contains { $0.id == listing.id })
+        XCTAssertNil(state.updatingIndividualListingID)
+    }
+
     func testAppStateCreatesPreviewScheduleForProposal() async {
         let state = MegrumAppState(repository: PreviewMegrumRepository())
 
@@ -303,7 +317,7 @@ final class MegrumAppStateTests: XCTestCase {
 
         await state.loadMeguriFeed(scope: .samePrefecture)
 
-        XCTAssertFalse(state.threads.isEmpty)
+        XCTAssertTrue(state.threads.isEmpty)
         XCTAssertTrue(state.threads.allSatisfy { $0.audience == .samePrefecture })
     }
 
@@ -349,7 +363,8 @@ final class MegrumAppStateTests: XCTestCase {
             body: " 北口はまだゆっくり進めます ",
             scope: .nearby3km,
             latitude: 35.681236,
-            longitude: 139.767125
+            longitude: 139.767125,
+            thumbnailUpload: GoodsPhotoUpload(data: Data([0xff, 0xd8, 0xff]), contentType: "image/jpeg")
         )
 
         XCTAssertTrue(created)
@@ -357,7 +372,19 @@ final class MegrumAppStateTests: XCTestCase {
         XCTAssertEqual(state.threads.first?.title, "終演後の混雑")
         XCTAssertEqual(state.threads.first?.body, "北口はまだゆっくり進めます")
         XCTAssertEqual(state.threads.first?.audience, .nearby3km)
+        XCTAssertNotNil(state.threads.first?.thumbnailURL)
         XCTAssertFalse(state.isCreatingBoardThread)
+
+        let record = await state.createBoardThreadRecord(
+            title: " 退場口 ",
+            body: " 西側が空いています ",
+            scope: .nearby3km,
+            latitude: 35.681236,
+            longitude: 139.767125
+        )
+
+        XCTAssertEqual(record?.title, "退場口")
+        XCTAssertEqual(state.threads.first?.id, record?.id)
     }
 
     func testAppStateCreatesPreviewGroomPost() async {
@@ -515,6 +542,21 @@ final class MegrumAppStateTests: XCTestCase {
         XCTAssertEqual(state.userOshiSelections.first?.groupID, groupID)
         XCTAssertEqual(state.userOshiSelections.first?.kind, .box)
         XCTAssertFalse(state.isSavingAccountSetup)
+    }
+
+    func testPreviewRepositorySavesOshiSelectionsWithDisplayOrderPriority() async throws {
+        let repository = PreviewMegrumRepository()
+        let firstGroupID = UUID(uuidString: "00000000-0000-0000-0000-000000000111")!
+        let secondGroupID = UUID(uuidString: "00000000-0000-0000-0000-000000000112")!
+
+        let selections = try await repository.saveUserOshiSelections([
+            AccountSetupOshiInput(groupID: firstGroupID, characterID: nil, kind: .box, priority: 99),
+            AccountSetupOshiInput(groupID: secondGroupID, characterID: nil, kind: .box, priority: 99)
+        ])
+
+        XCTAssertEqual(selections.map(\.groupID), [firstGroupID, secondGroupID])
+        XCTAssertEqual(selections.map(\.priority), [1, 2])
+        XCTAssertEqual(Set(selections.map(\.userID)).count, 1)
     }
 
     func testAppStateRequiresOshiSelectionForAccountSetup() async {
@@ -839,6 +881,25 @@ final class MegrumAppStateTests: XCTestCase {
         XCTAssertNil(state.sendingMessageProposalID)
     }
 
+    func testAppStateLoadsPartnerReadStateAndMarksCurrentReadPosition() async {
+        let repository = TradeReadStateRecordingRepository()
+        let state = MegrumAppState(repository: repository)
+        await state.loadInitialData()
+
+        await state.loadMessages(proposalID: TradeReadStateRecordingRepository.proposalID)
+
+        XCTAssertEqual(
+            state.partnerLastReadAt(for: TradeReadStateRecordingRepository.proposalID),
+            TradeReadStateRecordingRepository.partnerLastReadAt
+        )
+
+        let marks = await repository.marksSnapshot()
+        XCTAssertEqual(marks.count, 1)
+        XCTAssertEqual(marks.first?.proposalID, TradeReadStateRecordingRepository.proposalID)
+        XCTAssertEqual(marks.first?.userID, TradeReadStateRecordingRepository.viewerID)
+        XCTAssertEqual(marks.first?.lastReadAt, TradeReadStateRecordingRepository.latestMessageAt)
+    }
+
     func testAppStateSendsPreviewOutfitPhotoMessage() async {
         let state = MegrumAppState(repository: PreviewMegrumRepository())
         await state.loadInitialData()
@@ -862,6 +923,29 @@ final class MegrumAppStateTests: XCTestCase {
         XCTAssertNil(state.errorMessage)
     }
 
+    func testAppStateSendsPreviewChatPhotoMessage() async {
+        let state = MegrumAppState(repository: PreviewMegrumRepository())
+        await state.loadInitialData()
+        let proposalID = try! XCTUnwrap(state.proposals.first?.id)
+
+        await state.loadMessages(proposalID: proposalID)
+        let initialCount = state.messages(for: proposalID).count
+
+        let sent = await state.sendPhotoMessage(
+            proposalID: proposalID,
+            imageData: Data([0xff, 0xd8, 0xff]),
+            imageContentType: "image/jpeg",
+            messageType: .photo
+        )
+
+        XCTAssertTrue(sent)
+        XCTAssertEqual(state.messages(for: proposalID).count, initialCount + 1)
+        XCTAssertEqual(state.messages(for: proposalID).last?.messageType, .photo)
+        XCTAssertNotNil(state.messages(for: proposalID).last?.photoURL)
+        XCTAssertNil(state.sendingMessageProposalID)
+        XCTAssertNil(state.errorMessage)
+    }
+
     func testAppStateAddsEvidenceApprovesAndSubmitsPreviewEvaluation() async {
         let state = MegrumAppState(repository: PreviewMegrumRepository())
         await state.loadInitialData()
@@ -875,6 +959,7 @@ final class MegrumAppStateTests: XCTestCase {
 
         XCTAssertTrue(added)
         XCTAssertNotNil(state.proposals.first(where: { $0.id == proposalID })?.evidencePhotoURL)
+        XCTAssertFalse(state.evidencePhotos(for: state.proposals.first { $0.id == proposalID }!).isEmpty)
         XCTAssertNil(state.addingEvidenceProposalID)
 
         let approved = await state.approveTradeEvidence(proposalID: proposalID)
@@ -1353,6 +1438,92 @@ private struct RedirectAuthRepository: MegrumAuthRepository {
                 email: "redirect@example.com"
             )
         )
+    }
+}
+
+private struct ProposalReadMark: Equatable, Sendable {
+    var proposalID: UUID
+    var userID: UUID
+    var lastReadAt: Date
+}
+
+private actor TradeReadStateRecordingRepository: MegrumRepository {
+    static let viewerID = UUID(uuidString: "11111111-1111-1111-1111-111111111111")!
+    static let partnerID = UUID(uuidString: "22222222-2222-2222-2222-222222222222")!
+    static let proposalID = UUID(uuidString: "33333333-3333-3333-3333-333333333333")!
+    static let partnerLastReadAt = Date(timeIntervalSince1970: 1_800_000_120)
+    static let latestMessageAt = Date(timeIntervalSince1970: 1_800_000_060)
+
+    private var marks: [ProposalReadMark] = []
+
+    func loadInitialSnapshot() async throws -> MegrumAppSnapshot {
+        MegrumAppSnapshot(
+            viewer: UserProfile(
+                id: Self.viewerID,
+                handle: "michilion",
+                displayName: "みちりおん"
+            ),
+            inventory: [],
+            wishes: [],
+            proposals: [
+                TradeProposal(
+                    id: Self.proposalID,
+                    senderID: Self.viewerID,
+                    receiverID: Self.partnerID,
+                    status: .negotiating,
+                    exchangeMethod: .hand,
+                    senderGoodsIDs: [],
+                    receiverGoodsIDs: [],
+                    createdAt: Date(timeIntervalSince1970: 1_800_000_000)
+                )
+            ],
+            grooms: [],
+            threads: []
+        )
+    }
+
+    func loadMessages(proposalID: UUID, limit: Int) async throws -> [TradeMessage] {
+        [
+            TradeMessage(
+                id: UUID(uuidString: "44444444-4444-4444-4444-444444444444")!,
+                proposalID: proposalID,
+                senderID: Self.partnerID,
+                messageType: .text,
+                body: "確認お願いします",
+                createdAt: Date(timeIntervalSince1970: 1_800_000_030)
+            ),
+            TradeMessage(
+                id: UUID(uuidString: "55555555-5555-5555-5555-555555555555")!,
+                proposalID: proposalID,
+                senderID: Self.viewerID,
+                messageType: .text,
+                body: "了解しました",
+                createdAt: Self.latestMessageAt
+            )
+        ]
+    }
+
+    func loadProposalReadState(proposalID: UUID, userID: UUID) async throws -> ProposalReadState? {
+        ProposalReadState(
+            proposalID: proposalID,
+            userID: userID,
+            lastReadAt: Self.partnerLastReadAt,
+            updatedAt: Self.partnerLastReadAt
+        )
+    }
+
+    func markProposalMessagesRead(proposalID: UUID, userID: UUID, lastReadAt: Date) async throws -> ProposalReadState? {
+        marks.append(ProposalReadMark(proposalID: proposalID, userID: userID, lastReadAt: lastReadAt))
+        return ProposalReadState(
+            proposalID: proposalID,
+            userID: userID,
+            lastReadAt: lastReadAt,
+            updatedAt: lastReadAt
+        )
+    }
+
+    func marksSnapshot() -> [ProposalReadMark] {
+        marks
     }
 }
 

@@ -1,210 +1,725 @@
+import Foundation
+import MegrumCore
 import MegrumDesign
 import SwiftUI
 
 struct HomeDiscoverySheetView: View {
     var sheet: HomeDiscoverySheet
-    var onOpenNestedSheet: (HomeDiscoverySheet) -> Void
+    var viewerOfferGoods: [HomeMockGoods] = []
+    var onClose: (() -> Void)? = nil
+    var onAddExtraCandidate: (HomeExtraHitPayload) -> Void = { _ in }
+    var onStartProposal: (HomeDiscoveryProposalSelection) -> Void = { _ in }
+    @State private var nestedSheet: HomeDiscoverySheet?
+    @State private var addedExtraCandidateIDs: Set<UUID> = []
 
     var body: some View {
+        sheetContent
+            .sheet(item: $nestedSheet) { sheet in
+                HomeDiscoverySheetView(
+                    sheet: sheet,
+                    viewerOfferGoods: viewerOfferGoods,
+                    onClose: {
+                        nestedSheet = nil
+                    },
+                    onAddExtraCandidate: { payload in
+                        addedExtraCandidateIDs.insert(payload.goods.id)
+                        nestedSheet = nil
+                    },
+                    onStartProposal: onStartProposal
+                )
+                    .presentationDetents([.large])
+                    .presentationDragIndicator(.visible)
+            }
+    }
+
+    @ViewBuilder
+    private var sheetContent: some View {
         switch sheet {
-        case .goodsHit(let selectedGoods):
-            HomeGoodsHitDetailSheet(selectedGoods: selectedGoods, onOpenNestedSheet: onOpenNestedSheet)
-        case .wishHit(let selectedGoods):
-            HomeWishHitDetailSheet(selectedGoods: selectedGoods, onOpenNestedSheet: onOpenNestedSheet)
-        case .havesLookup:
-            HomeHavesLookupSheet()
-        case .extraListingHit:
-            HomeExtraListingHitSheet()
-        case .extraWishHit:
-            HomeExtraWishHitSheet()
+        case .goodsHit(let payload):
+            HomeGoodsHitDetailSheet(
+                selection: payload,
+                viewerOfferGoods: viewerOfferGoods,
+                addedExtraCandidateIDs: addedExtraCandidateIDs,
+                onOpenNestedSheet: { nestedSheet = $0 },
+                onStartProposal: onStartProposal
+            )
+        case .wishHit(let payload):
+            HomeWishHitDetailSheet(
+                selection: payload,
+                viewerOfferGoods: viewerOfferGoods,
+                addedExtraCandidateIDs: addedExtraCandidateIDs,
+                onOpenNestedSheet: { nestedSheet = $0 },
+                onStartProposal: onStartProposal
+            )
+        case .havesLookup(let payload):
+            HomeHavesLookupSheet(
+                payload: payload,
+                onOpenNestedSheet: { nestedSheet = $0 }
+            )
+        case .extraListingHit(let payload), .extraWishHit(let payload):
+            switch payload.kind {
+            case .listing:
+                HomeExtraHitDetailSheet(
+                    payload: payload,
+                    viewerOfferGoods: viewerOfferGoods,
+                    onClose: onClose,
+                    onAddCandidate: {
+                        onAddExtraCandidate(payload)
+                    }
+                )
+            case .wish:
+                HomeWishHitDetailSheet(
+                    selection: payload.sheetPayload,
+                    viewerOfferGoods: viewerOfferGoods,
+                    addedExtraCandidateIDs: addedExtraCandidateIDs,
+                    onOpenNestedSheet: { nestedSheet = $0 },
+                    onStartProposal: onStartProposal
+                )
+            }
         }
     }
 }
 
 private struct HomeGoodsHitDetailSheet: View {
-    var selectedGoods: HomeMockGoods
+    var selection: HomeDiscoverySheetPayload
+    var viewerOfferGoods: [HomeMockGoods]
+    var addedExtraCandidateIDs: Set<UUID>
     var onOpenNestedSheet: (HomeDiscoverySheet) -> Void
+    var onStartProposal: (HomeDiscoveryProposalSelection) -> Void
+    @State private var selectionState = HomeListingSheetSelectionState()
 
     var body: some View {
-        HomeSheetScaffold(bottomButton: "この内容で打診する", showsWishCopyButton: true) {
-            HomeSelectedGoodsHeader(goods: selectedGoods)
+        HomeSheetScaffold(
+            bottomButton: "この内容で打診する",
+            showsWishCopyButton: true,
+            bottomButtonDisabled: !canStartProposal,
+            bottomButtonAction: startProposal
+        ) {
+            HomeSelectedGoodsHeader(goods: selection.goods, conditionTags: selection.conditionTags)
 
             Divider().opacity(0.55)
 
-            HomeSheetSectionTitle(systemName: "person", title: "相手が求める候補")
-            HomeCandidateMiniRail(
-                goods: HomeDiscoveryFixtures.wantedGoods,
-                selectedIndex: 0,
-                cardStyle: .condition(HomeGoodsCondition.direct.shortTitle)
+            HomeSheetSectionTitle(
+                systemName: "person",
+                title: "相手が欲しいグッズから選ぶ",
+                trailing: selectionRequirementLabel
             )
+            wantedSelectionRail
 
-            HomeSheetSectionTitle(systemName: "gift", title: "あなたが出せる候補", trailing: "4件の候補")
-            HomeCandidateMiniRail(
-                goods: HomeDiscoveryFixtures.offerGoods,
-                selectedIndex: 0,
-                cardStyle: .chips(["同タグ", "提示OK", "状態良"])
+            if !selectionState.selectedWantedIndices.isEmpty {
+                if let selectedCashOption {
+                    HomeCashAmountEntryCard(
+                        amountText: $selectionState.cashAmountText,
+                        suggestedAmount: selectedCashOption.cashAmount
+                    )
+                } else {
+                    HomeSheetSectionTitle(
+                        systemName: "gift",
+                        title: "選んだグッズはどれと一致する？",
+                        trailing: selectionRequirementLabel
+                    )
+                    if offerGoods.isEmpty {
+                        HomeNoMatchingOfferGoodsPanel()
+                    } else {
+                        HomeGoodsImagePanelRail(
+                            goods: offerGoods,
+                            selectedIndices: selectionState.selectedOfferIndices,
+                            selectedBannerText: "これを譲る",
+                            onSelect: toggleOfferGoods
+                        )
+                    }
+                }
+            }
+
+            HomeOtherExchangeRows(
+                addedCandidateIDs: addedExtraCandidateIDs,
+                excludedGoodsIDs: [selection.goods.id],
+                onOpenNestedSheet: onOpenNestedSheet
             )
-
-            HomeOtherExchangeRows(onOpenNestedSheet: onOpenNestedSheet)
         }
+        .onAppear(perform: prepareInitialSelections)
+        .onChange(of: selection.id) { _, _ in
+            resetSelections()
+        }
+    }
+
+    private var wantedGoods: [HomeMockGoods] {
+        HomeDiscoveryFixtures.wantedGoods
+    }
+
+    private var wantedOptions: [HomeIndividualListingWantedOption] {
+        selection.individualListingSelection.wantedOptions
+    }
+
+    private var usesListingWantedOptions: Bool {
+        !wantedOptions.isEmpty
+    }
+
+    private var allOfferGoods: [HomeMockGoods] {
+        HomeOfferGoodsOrdering.ordered(
+            viewerOfferGoods.isEmpty ? HomeDiscoveryFixtures.offerGoods : viewerOfferGoods,
+            preferredOfferGoodsID: selection.preferredOfferGoodsID
+        )
+    }
+
+    private var offerGoods: [HomeMockGoods] {
+        guard usesListingWantedOptions else {
+            return allOfferGoods
+        }
+        let matchingIDs = Set(selectedWantedOptions.flatMap(\.matchingGoodsIDs))
+        guard !matchingIDs.isEmpty else {
+            return []
+        }
+        return allOfferGoods.filter { matchingIDs.contains($0.id) }
+    }
+
+    private var wantedLogic: ListingLogic {
+        selection.individualListingSelection.wantedLogic
+    }
+
+    private var wantedItemCount: Int {
+        usesListingWantedOptions ? wantedOptions.count : wantedGoods.count
+    }
+
+    private var selectedWantedOptions: [HomeIndividualListingWantedOption] {
+        guard usesListingWantedOptions else {
+            return []
+        }
+        return selectionState.selectedWantedIndices
+            .sorted()
+            .compactMap { wantedOptions.indices.contains($0) ? wantedOptions[$0] : nil }
+    }
+
+    private var selectedCashOption: HomeIndividualListingWantedOption? {
+        selectedWantedOptions.first { $0.isCashOffer }
+    }
+
+    private var cashAmountValue: Int? {
+        let digits = selectionState.cashAmountText.filter { $0.isNumber }
+        guard !digits.isEmpty else {
+            return nil
+        }
+        return Int(digits).flatMap { $0 > 0 ? $0 : nil }
+    }
+
+    private var selectionRequirementLabel: String {
+        HomeListingSelectionPolicy.label(for: wantedLogic)
+    }
+
+    private var canStartProposal: Bool {
+        if selectedCashOption != nil {
+            return !selectionState.selectedWantedIndices.isEmpty && cashAmountValue != nil
+        }
+        return !selectionState.selectedWantedIndices.isEmpty && !selectionState.selectedOfferIndices.isEmpty
+    }
+
+    @ViewBuilder
+    private var wantedSelectionRail: some View {
+        if usesListingWantedOptions {
+            HomeListingWantedOptionRail(
+                options: wantedOptions,
+                selectedIndices: selectionState.selectedWantedIndices,
+                previewGoodsByOptionID: previewGoodsByWantedOptionID,
+                onSelect: toggleWantedGoods
+            )
+        } else {
+            HomeGoodsImagePanelRail(
+                goods: wantedGoods,
+                selectedIndices: selectionState.selectedWantedIndices,
+                onSelect: toggleWantedGoods
+            )
+        }
+    }
+
+    private var previewGoodsByWantedOptionID: [UUID: HomeMockGoods] {
+        Dictionary(uniqueKeysWithValues: wantedOptions.compactMap { option in
+            guard option.kind == .goods,
+                  let previewGoods = allOfferGoods.first(where: { option.matchingGoodsIDs.contains($0.id) })
+            else {
+                return nil
+            }
+            return (option.id, previewGoods)
+        })
+    }
+
+    private func toggleWantedGoods(at index: Int) {
+        selectionState = HomeListingSheetSelectionStateReducer.togglingWanted(
+            at: index,
+            in: selectionState,
+            itemCount: wantedItemCount,
+            logic: wantedLogic
+        )
+        if selectionState.selectedWantedIndices.isEmpty {
+            return
+        }
+        fillSuggestedCashAmountIfNeeded()
+        selectPreferredOfferIfNeeded()
+    }
+
+    private func toggleOfferGoods(at index: Int) {
+        selectionState = HomeListingSheetSelectionStateReducer.togglingOffer(
+            at: index,
+            in: selectionState,
+            itemCount: offerGoods.count,
+            logic: wantedLogic
+        )
+    }
+
+    private func prepareInitialSelections() {
+        selectionState = HomeListingSheetSelectionStateReducer.preparingInitialSelection(
+            itemCount: wantedItemCount,
+            logic: wantedLogic
+        )
+        if !selectionState.selectedWantedIndices.isEmpty {
+            fillSuggestedCashAmountIfNeeded()
+            selectPreferredOfferIfNeeded()
+        }
+    }
+
+    private func resetSelections() {
+        prepareInitialSelections()
+    }
+
+    private func fillSuggestedCashAmountIfNeeded() {
+        guard selectionState.cashAmountText.isEmpty,
+              let amount = selectedCashOption?.cashAmount,
+              amount > 0
+        else {
+            return
+        }
+        selectionState.cashAmountText = String(amount)
+    }
+
+    private func selectPreferredOfferIfNeeded() {
+        guard selectedCashOption == nil,
+              selectionState.selectedOfferIndices.isEmpty,
+              let preferredOfferIndex
+        else {
+            return
+        }
+        selectionState.selectedOfferIndices = [preferredOfferIndex]
+    }
+
+    private var preferredOfferIndex: Int? {
+        guard let preferredOfferGoodsID = selection.preferredOfferGoodsID else {
+            return nil
+        }
+        return offerGoods.firstIndex { $0.id == preferredOfferGoodsID }
+    }
+
+    private func startProposal() {
+        if let cashAmountValue {
+            onStartProposal(
+                HomeDiscoveryProposalSelection(
+                    receiverGoodsID: selection.goods.id,
+                    senderGoodsIDs: [],
+                    matchType: .perfect,
+                    receiverGoods: selection.goods,
+                    senderGoods: [],
+                    exchangeMethod: selection.signals.preferredProposalExchangeMethod,
+                    cashAmount: cashAmountValue
+                )
+            )
+            return
+        }
+        let senderGoods = selectionState.selectedOfferIndices
+            .sorted()
+            .compactMap { index in
+                offerGoods.indices.contains(index) ? offerGoods[index] : nil
+            }
+        guard !senderGoods.isEmpty else {
+            return
+        }
+        onStartProposal(
+            HomeDiscoveryProposalSelection(
+                receiverGoodsID: selection.goods.id,
+                senderGoodsIDs: senderGoods.map(\.id),
+                matchType: .perfect,
+                receiverGoods: selection.goods,
+                senderGoods: senderGoods,
+                exchangeMethod: selection.signals.preferredProposalExchangeMethod,
+                cashAmount: nil
+            )
+        )
     }
 }
 
 private struct HomeWishHitDetailSheet: View {
-    var selectedGoods: HomeMockGoods
+    var selection: HomeDiscoverySheetPayload
+    var viewerOfferGoods: [HomeMockGoods]
+    var addedExtraCandidateIDs: Set<UUID>
     var onOpenNestedSheet: (HomeDiscoverySheet) -> Void
+    var onStartProposal: (HomeDiscoveryProposalSelection) -> Void
+    @State private var selectedOfferIndex: Int? = 0
 
     var body: some View {
-        HomeSheetScaffold(bottomButton: "この内容で打診する", showsWishCopyButton: true) {
-            HomeSelectedGoodsHeader(goods: selectedGoods)
+        HomeSheetScaffold(
+            bottomButton: "この内容で打診する",
+            showsWishCopyButton: true,
+            bottomButtonDisabled: selectedOfferIndex == nil,
+            bottomButtonAction: startProposal
+        ) {
+            HomeSelectedGoodsHeader(goods: selection.goods, conditionTags: selection.conditionTags)
 
             Divider().opacity(0.55)
 
             HomeSheetSectionTitle(
                 systemName: "gift",
-                title: "あなたが譲れる候補",
-                subtitle: "相手のWishに合う、あなたの譲れるもの",
-                trailing: "4件の候補"
+                title: "相手が欲しくてあなたが譲れるもの",
+                trailing: "\(offerGoods.count)件の候補"
             )
 
-            LazyVGrid(columns: [GridItem(.flexible(), spacing: 12), GridItem(.flexible(), spacing: 12)], spacing: 12) {
-                ForEach(Array(HomeDiscoveryFixtures.offerGoods.enumerated()), id: \.element.id) { index, goods in
-                    HomeSelectableGoodsCard(
-                        goods: goods,
-                        selected: index == 0,
-                        style: .chips(["メンバー一致", "タグ一致", "グッズ条件○"])
-                    )
-                }
-            }
+            HomeGoodsImagePanelPagedGrid(
+                goods: offerGoods,
+                selectedIndices: selectedOfferIndex.map { [$0] } ?? [],
+                selectedBannerText: "これを譲る",
+                onSelect: { selectedOfferIndex = $0 }
+            )
 
-            HomeOtherExchangeRows(onOpenNestedSheet: onOpenNestedSheet)
+            HomeOtherExchangeRows(
+                addedCandidateIDs: addedExtraCandidateIDs,
+                excludedGoodsIDs: [selection.goods.id],
+                onOpenNestedSheet: onOpenNestedSheet
+            )
         }
+    }
+
+    private var offerGoods: [HomeMockGoods] {
+        HomeOfferGoodsOrdering.ordered(
+            viewerOfferGoods.isEmpty ? HomeDiscoveryFixtures.offerGoods : viewerOfferGoods,
+            preferredOfferGoodsID: selection.preferredOfferGoodsID
+        )
+    }
+
+    private func startProposal() {
+        guard let selectedOfferIndex,
+              offerGoods.indices.contains(selectedOfferIndex)
+        else {
+            return
+        }
+        onStartProposal(
+            HomeDiscoveryProposalSelection(
+                receiverGoodsID: selection.goods.id,
+                senderGoodsIDs: [offerGoods[selectedOfferIndex].id],
+                matchType: .forward,
+                receiverGoods: selection.goods,
+                senderGoods: [offerGoods[selectedOfferIndex]],
+                exchangeMethod: selection.signals.preferredProposalExchangeMethod
+            )
+        )
+    }
+}
+
+private extension HomeCandidateConditionSignals {
+    var preferredProposalExchangeMethod: ExchangeMethod {
+        if exchange.localExchangeSelected && exchange.postalAcceptedByBoth {
+            return .both
+        }
+        if exchange.localExchangeSelected {
+            return .hand
+        }
+        if exchange.postalAcceptedByBoth {
+            return .mail
+        }
+        return .hand
     }
 }
 
 private struct HomeHavesLookupSheet: View {
+    var payload: HomeHavesLookupPayload
+    var onOpenNestedSheet: (HomeDiscoverySheet) -> Void
+
     var body: some View {
-        HomeSheetScaffold(bottomButton: "選んだ人に打診する", secondaryButton: "条件を変更する") {
-            HomeSheetTitle(icon: "heart", title: "譲るものから見る", subtitle: "このグッズをWishに入れている人")
+        HomeSheetScaffold(bottomButton: nil) {
+            HomeHavesSelectedGoodsPanel(
+                goods: payload.offeredGoods,
+                conditionTags: payload.offeredConditionTags
+            )
 
-            HStack(alignment: .center, spacing: 22) {
-                HomeDiscoveryRotaryCard(
-                    goods: [HomeDiscoveryFixtures.sanaLavender, HomeDiscoveryFixtures.sanaBadge, HomeDiscoveryFixtures.sanaStand],
-                    goodsCondition: .direct,
-                    exchangeCondition: .exact,
-                    showsConditionOverlay: false
+            if payload.shouldShowTagMatches {
+                HomeDiscoverySection(
+                    title: "メンバー×タグでマッチ",
+                    candidates: payload.tagMatchedCandidates,
+                    layout: .grid,
+                    showsGridHeaderTitle: true,
+                    showsSeeAllButton: false,
+                    onSelect: onOpenNestedSheet
                 )
-                .frame(width: 112, height: 132)
-
-                VStack(alignment: .leading, spacing: 12) {
-                    Text("サナ×2026 LIVE")
-                        .font(.system(size: 18, weight: .black, design: .rounded))
-                        .foregroundStyle(MegrumTheme.ink)
-                    HomeConditionPill(title: "12人", color: MegrumTheme.lavender)
-                }
-
-                Spacer()
             }
 
-            HStack(spacing: 10) {
-                HomeFilterChip(title: "近い順", systemName: "arrow.up.arrow.down", selected: true)
-                HomeFilterChip(title: "評価高め", systemName: "star", selected: false)
-                HomeFilterChip(title: "候補あり", systemName: "gift", selected: false)
+            if !payload.memberMatchedCandidates.isEmpty {
+                HomeDiscoverySection(
+                    title: "メンバーでマッチ",
+                    candidates: payload.memberMatchedCandidates,
+                    layout: .grid,
+                    showsGridHeaderTitle: true,
+                    showsSeeAllButton: false,
+                    onSelect: onOpenNestedSheet
+                )
             }
 
-            Text("Wish登録しているユーザー")
-                .font(.system(size: 19, weight: .black, design: .rounded))
-                .foregroundStyle(MegrumTheme.ink)
-
-            VStack(spacing: 8) {
-                ForEach(HomeWishUserRow.sampleRows) { row in
-                    HomeWishUserRowView(row: row)
-                }
+            if !payload.hasAnyMatches {
+                HomeHavesEmptyMatchPanel()
             }
         }
     }
 }
 
-private struct HomeExtraListingHitSheet: View {
-    var body: some View {
-        HomeSheetScaffold(bottomButton: "このグッズも交換候補に追加する", secondaryButton: "別の求める候補を選ぶ") {
-            HomeSheetTitle(icon: "tag", title: "追加で交換依頼をする", subtitle: "相手の条件に合わせて、追加する候補を選ぶ")
+private struct HomeHavesSelectedGoodsPanel: View {
+    var goods: HomeMockGoods
+    var conditionTags: HomeConditionTagSet
 
-            Text("選んだ相手の譲るグッズ")
-                .font(.system(size: 16, weight: .black, design: .rounded))
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("選んだグッズ")
+                .font(.system(size: 14, weight: .black, design: .rounded))
                 .foregroundStyle(MegrumTheme.ink)
 
-            HStack(spacing: 22) {
-                HomeDiscoveryRotaryCard(
-                    goods: [HomeDiscoveryFixtures.selectedYellow, HomeDiscoveryFixtures.sanaBadge, HomeDiscoveryFixtures.sanaStand],
-                    goodsCondition: .wish,
-                    exchangeCondition: .possible,
-                    showsConditionOverlay: false
-                )
-                .frame(width: 120, height: 134)
+            HStack {
+                HomeSelectedGoodsSingleCard(goods: goods, conditionTags: conditionTags)
+                    .frame(width: 118, height: 142)
 
-                VStack(alignment: .leading, spacing: 12) {
-                    HomeConditionPill(title: "交換条件○", color: MegrumTheme.lavender)
-                    HomeConditionPill(title: "支払い相談可", color: MegrumTheme.ok)
-                }
                 Spacer()
             }
+        }
+        .padding(.bottom, 2)
+    }
+}
 
-            HomeSheetSectionTitle(systemName: "person", title: "相手が求める候補")
-            HomeCandidateMiniRail(
-                goods: HomeDiscoveryFixtures.wantedGoods,
-                selectedIndex: 0,
-                labels: ["2025 LIVE", "ファンミ", "トレカ"],
-                cardStyle: .condition(HomeGoodsCondition.direct.shortTitle)
-            )
-
-            HomeSheetSectionTitle(systemName: "gift", title: "あなたが出せる候補", trailing: "4件の候補")
-            HomeCandidateMiniRail(
-                goods: HomeDiscoveryFixtures.offerGoods,
-                selectedIndex: 0,
-                cardStyle: .chips(["提示OK", "同タグ", "状態良"])
-            )
-
-            HomeExchangeSummaryBox(left: HomeDiscoveryFixtures.selectedYellow, right: HomeDiscoveryFixtures.sanaLavender)
+private struct HomeHavesEmptyMatchPanel: View {
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Image(systemName: "sparkle.magnifyingglass")
+                .font(.system(size: 24, weight: .bold))
+                .foregroundStyle(MegrumTheme.lavender)
+            Text("一致する候補はまだありません")
+                .font(.system(size: 17, weight: .black, design: .rounded))
+                .foregroundStyle(MegrumTheme.ink)
+            Text("このグッズを欲しがっている相手が見つかったらここに表示されます。")
+                .font(.system(size: 13, weight: .semibold, design: .rounded))
+                .foregroundStyle(MegrumTheme.muted)
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(.white.opacity(0.78), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .stroke(MegrumTheme.ink.opacity(0.08), lineWidth: 1)
         }
     }
 }
 
-private struct HomeExtraWishHitSheet: View {
+private struct HomeExtraHitDetailSheet: View {
+    var payload: HomeExtraHitPayload
+    var viewerOfferGoods: [HomeMockGoods]
+    var onClose: (() -> Void)?
+    var onAddCandidate: () -> Void
+    @State private var selectionState = HomeListingSheetSelectionState()
+
     var body: some View {
-        HomeSheetScaffold(bottomButton: "このグッズも交換候補に追加する", secondaryButton: "あとで選ぶ") {
-            HomeSheetTitle(icon: "sparkles", title: "Wishでヒット！", subtitle: "相手のWishに合う、あなたの譲れるもの")
+        HomeSheetScaffold(
+            bottomButton: "このグッズも交換候補に追加する",
+            bottomButtonDisabled: !canAddCandidate,
+            bottomButtonAction: addCandidate,
+            dismissAction: onClose
+        ) {
+            HomeSelectedGoodsHeader(goods: payload.goods, conditionTags: payload.conditionTags)
 
-            HomeSheetSectionTitle(systemName: "person", title: "相手のWish")
-            HStack(spacing: 12) {
-                ForEach(HomeDiscoveryFixtures.otherWishHit.prefix(5)) { goods in
-                    HomeTinyGoodsThumbnail(goods: goods)
-                        .frame(width: 61, height: 68)
-                }
-            }
+            Divider().opacity(0.55)
 
-            Divider().opacity(0.5)
+            HomeSheetSectionTitle(
+                systemName: "person",
+                title: "相手が欲しいグッズから選ぶ",
+                trailing: selectionRequirementLabel
+            )
+            wantedSelectionRail
 
-            HomeSheetSectionTitle(systemName: "gift", title: "あなたが譲れる候補", trailing: "4件の候補")
-            LazyVGrid(columns: [GridItem(.flexible(), spacing: 12), GridItem(.flexible(), spacing: 12)], spacing: 12) {
-                ForEach(Array(HomeDiscoveryFixtures.offerGoods.enumerated()), id: \.element.id) { index, goods in
-                    HomeSelectableGoodsCard(
-                        goods: goods,
-                        selected: index == 0,
-                        style: .chips(["メンバー一致", "タグ一致", "グッズ条件○"])
+            if !selectionState.selectedWantedIndices.isEmpty {
+                if let selectedCashOption {
+                    HomeCashAmountEntryCard(
+                        amountText: $selectionState.cashAmountText,
+                        suggestedAmount: selectedCashOption.cashAmount
                     )
+                } else {
+                    HomeSheetSectionTitle(
+                        systemName: "gift",
+                        title: "選んだグッズはどれと一致する？",
+                        trailing: selectionRequirementLabel
+                    )
+                    if offerGoods.isEmpty {
+                        HomeNoMatchingOfferGoodsPanel()
+                    } else {
+                        HomeGoodsImagePanelRail(
+                            goods: offerGoods,
+                            selectedIndices: selectionState.selectedOfferIndices,
+                            selectedBannerText: "これを譲る",
+                            onSelect: toggleOfferGoods
+                        )
+                    }
                 }
             }
-
-            HomeExchangeSummaryBox(leftTitle: "相手のWish", rightTitle: "あなたが譲るもの", left: HomeDiscoveryFixtures.sanaBadge, right: HomeDiscoveryFixtures.sanaLavender)
         }
+        .onAppear(perform: prepareInitialSelections)
+        .onChange(of: payload.id) { _, _ in
+            resetSelections()
+        }
+    }
+
+    private var wantedGoods: [HomeMockGoods] {
+        HomeDiscoveryFixtures.wantedGoods
+    }
+
+    private var wantedOptions: [HomeIndividualListingWantedOption] {
+        payload.individualListingSelection.wantedOptions
+    }
+
+    private var usesListingWantedOptions: Bool {
+        !wantedOptions.isEmpty
+    }
+
+    private var allOfferGoods: [HomeMockGoods] {
+        viewerOfferGoods.isEmpty ? HomeDiscoveryFixtures.offerGoods : viewerOfferGoods
+    }
+
+    private var offerGoods: [HomeMockGoods] {
+        guard usesListingWantedOptions else {
+            return allOfferGoods
+        }
+        let matchingIDs = Set(selectedWantedOptions.flatMap(\.matchingGoodsIDs))
+        guard !matchingIDs.isEmpty else {
+            return []
+        }
+        return allOfferGoods.filter { matchingIDs.contains($0.id) }
+    }
+
+    private var wantedLogic: ListingLogic {
+        payload.individualListingSelection.wantedLogic
+    }
+
+    private var wantedItemCount: Int {
+        usesListingWantedOptions ? wantedOptions.count : wantedGoods.count
+    }
+
+    private var selectedWantedOptions: [HomeIndividualListingWantedOption] {
+        guard usesListingWantedOptions else {
+            return []
+        }
+        return selectionState.selectedWantedIndices
+            .sorted()
+            .compactMap { wantedOptions.indices.contains($0) ? wantedOptions[$0] : nil }
+    }
+
+    private var selectedCashOption: HomeIndividualListingWantedOption? {
+        selectedWantedOptions.first { $0.isCashOffer }
+    }
+
+    private var cashAmountValue: Int? {
+        let digits = selectionState.cashAmountText.filter { $0.isNumber }
+        guard !digits.isEmpty else {
+            return nil
+        }
+        return Int(digits).flatMap { $0 > 0 ? $0 : nil }
+    }
+
+    private var selectionRequirementLabel: String {
+        HomeListingSelectionPolicy.label(for: wantedLogic)
+    }
+
+    private var canAddCandidate: Bool {
+        if selectedCashOption != nil {
+            return !selectionState.selectedWantedIndices.isEmpty && cashAmountValue != nil
+        }
+        return !selectionState.selectedWantedIndices.isEmpty && !selectionState.selectedOfferIndices.isEmpty
+    }
+
+    @ViewBuilder
+    private var wantedSelectionRail: some View {
+        if usesListingWantedOptions {
+            HomeListingWantedOptionRail(
+                options: wantedOptions,
+                selectedIndices: selectionState.selectedWantedIndices,
+                previewGoodsByOptionID: previewGoodsByWantedOptionID,
+                onSelect: toggleWantedGoods
+            )
+        } else {
+            HomeGoodsImagePanelRail(
+                goods: wantedGoods,
+                selectedIndices: selectionState.selectedWantedIndices,
+                onSelect: toggleWantedGoods
+            )
+        }
+    }
+
+    private var previewGoodsByWantedOptionID: [UUID: HomeMockGoods] {
+        Dictionary(uniqueKeysWithValues: wantedOptions.compactMap { option in
+            guard option.kind == .goods,
+                  let previewGoods = allOfferGoods.first(where: { option.matchingGoodsIDs.contains($0.id) })
+            else {
+                return nil
+            }
+            return (option.id, previewGoods)
+        })
+    }
+
+    private func toggleWantedGoods(at index: Int) {
+        selectionState = HomeListingSheetSelectionStateReducer.togglingWanted(
+            at: index,
+            in: selectionState,
+            itemCount: wantedItemCount,
+            logic: wantedLogic
+        )
+        if selectionState.selectedWantedIndices.isEmpty {
+            return
+        }
+        fillSuggestedCashAmountIfNeeded()
+    }
+
+    private func toggleOfferGoods(at index: Int) {
+        selectionState = HomeListingSheetSelectionStateReducer.togglingOffer(
+            at: index,
+            in: selectionState,
+            itemCount: offerGoods.count,
+            logic: wantedLogic
+        )
+    }
+
+    private func prepareInitialSelections() {
+        selectionState = HomeListingSheetSelectionStateReducer.preparingInitialSelection(
+            itemCount: wantedItemCount,
+            logic: wantedLogic
+        )
+        fillSuggestedCashAmountIfNeeded()
+    }
+
+    private func resetSelections() {
+        prepareInitialSelections()
+    }
+
+    private func fillSuggestedCashAmountIfNeeded() {
+        guard selectionState.cashAmountText.isEmpty,
+              let amount = selectedCashOption?.cashAmount,
+              amount > 0
+        else {
+            return
+        }
+        selectionState.cashAmountText = String(amount)
+    }
+
+    private func addCandidate() {
+        guard canAddCandidate else {
+            return
+        }
+        onAddCandidate()
     }
 }
 
 private struct HomeSheetScaffold<Content: View>: View {
-    var bottomButton: String
+    var bottomButton: String?
     var secondaryButton: String?
     var showsWishCopyButton: Bool = false
+    var bottomButtonDisabled: Bool = false
+    var bottomButtonAction: () -> Void = {}
+    var dismissAction: (() -> Void)?
     @ViewBuilder var content: Content
     @Environment(\.dismiss) private var dismiss
 
@@ -214,19 +729,23 @@ private struct HomeSheetScaffold<Content: View>: View {
                 VStack(alignment: .leading, spacing: 18) {
                     content
 
-                    Button(action: {}) {
-                        HStack(spacing: 10) {
-                            Image(systemName: "ellipsis.message.fill")
-                            Text(bottomButton)
+                    if let bottomButton {
+                        Button(action: bottomButtonAction) {
+                            HStack(spacing: 10) {
+                                Image(systemName: "ellipsis.message.fill")
+                                Text(bottomButton)
+                            }
+                            .font(.system(size: 19, weight: .black, design: .rounded))
+                            .foregroundStyle(.white)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 17)
+                            .background(MegrumTheme.lavender, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
                         }
-                        .font(.system(size: 19, weight: .black, design: .rounded))
-                        .foregroundStyle(.white)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 17)
-                        .background(MegrumTheme.lavender, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                        .buttonStyle(.plain)
+                        .disabled(bottomButtonDisabled)
+                        .opacity(bottomButtonDisabled ? 0.48 : 1)
+                        .padding(.top, 2)
                     }
-                    .buttonStyle(.plain)
-                    .padding(.top, 2)
 
                     if let secondaryButton {
                         Button(action: {}) {
@@ -247,7 +766,11 @@ private struct HomeSheetScaffold<Content: View>: View {
             .overlay(alignment: .topTrailing) {
                 HStack(spacing: 8) {
                     Button {
-                        dismiss()
+                        if let dismissAction {
+                            dismissAction()
+                        } else {
+                            dismiss()
+                        }
                     } label: {
                         Image(systemName: "xmark")
                             .font(.system(size: 20, weight: .black))
@@ -282,6 +805,7 @@ private struct HomeSheetScaffold<Content: View>: View {
 
 private struct HomeSelectedGoodsHeader: View {
     var goods: HomeMockGoods
+    var conditionTags: HomeConditionTagSet
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -290,7 +814,7 @@ private struct HomeSelectedGoodsHeader: View {
                 .foregroundStyle(MegrumTheme.ink)
 
             HStack(alignment: .top, spacing: 20) {
-                HomeSelectedGoodsSingleCard(goods: goods)
+                HomeSelectedGoodsSingleCard(goods: goods, conditionTags: conditionTags)
                 .frame(width: 136, height: 162)
 
                 VStack(alignment: .leading, spacing: 10) {
@@ -298,8 +822,9 @@ private struct HomeSelectedGoodsHeader: View {
 
                     HomeExchangeMethodBlock()
 
-                    HomePaymentBox()
+                    HomePaymentBox(summaryText: goods.ownerPaymentSummaryText)
                 }
+                .padding(.top, 20)
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
@@ -308,12 +833,14 @@ private struct HomeSelectedGoodsHeader: View {
 
 private struct HomeSelectedGoodsSingleCard: View {
     var goods: HomeMockGoods
+    var conditionTags: HomeConditionTagSet
 
     var body: some View {
         HomeDiscoveryGoodsCard(
             goods: goods,
-            goodsCondition: .direct,
-            exchangeCondition: .exact,
+            goodsCondition: conditionTags.goods,
+            exchangeCondition: conditionTags.exchange,
+            paymentCondition: conditionTags.payment,
             prominence: 1,
             showsConditionOverlay: false
         )
@@ -379,6 +906,8 @@ private struct HomeExchangeMethodBlock: View {
 }
 
 private struct HomePaymentBox: View {
+    var summaryText: String
+
     var body: some View {
         VStack(alignment: .leading, spacing: 5) {
             HStack(spacing: 6) {
@@ -388,11 +917,17 @@ private struct HomePaymentBox: View {
             .font(.system(size: 12.5, weight: .semibold, design: .rounded))
             .foregroundStyle(MegrumTheme.ink)
 
-            Text("差額相談可 / PayPay相談可")
+            Text(summaryText)
                 .font(.system(size: 13, weight: .regular, design: .rounded))
                 .foregroundStyle(MegrumTheme.ok)
                 .lineLimit(2)
                 .fixedSize(horizontal: false, vertical: true)
         }
+    }
+}
+
+private extension Array {
+    subscript(safe index: Int) -> Element? {
+        indices.contains(index) ? self[index] : nil
     }
 }

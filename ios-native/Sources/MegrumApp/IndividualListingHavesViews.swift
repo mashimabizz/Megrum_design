@@ -4,26 +4,49 @@ import MegrumDesign
 import SwiftUI
 
 struct IndividualListingHavesStep: View {
+    enum Tab: String {
+        case goods
+        case cash
+    }
+
     var inventory: [GoodsItem]
     var selectedIDs: Set<UUID>
-    @Binding var haveLogic: ListingLogic
-    var onCash: () -> Void
+    @Binding var selectedTab: Tab
+    @Binding var cashAmount: Int
     var onToggle: (GoodsItem) -> Void
 
     private let columns = Array(repeating: GridItem(.flexible(), spacing: 12), count: 3)
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 20) {
+        VStack(alignment: .leading, spacing: 22) {
             IndividualListingStepTitle(step: .haves)
 
             IndividualListingEditorTabsLike(
                 leftTitle: "譲る候補から選ぶ",
                 rightTitle: "定価",
-                isLeftSelected: true,
-                onLeft: {},
-                onRight: onCash
+                isLeftSelected: selectedTab == .goods,
+                onLeft: {
+                    withAnimation(.smooth(duration: 0.2)) {
+                        selectedTab = .goods
+                    }
+                },
+                onRight: {
+                    withAnimation(.smooth(duration: 0.2)) {
+                        selectedTab = .cash
+                    }
+                }
             )
 
+            if selectedTab == .goods {
+                goodsSelection
+            } else {
+                cashSelection
+            }
+        }
+    }
+
+    private var goodsSelection: some View {
+        VStack(alignment: .leading, spacing: 18) {
             Text("譲る候補")
                 .font(.system(size: 20, weight: .black, design: .rounded))
                 .foregroundStyle(MegrumTheme.ink)
@@ -55,13 +78,6 @@ struct IndividualListingHavesStep: View {
                 .buttonStyle(.plain)
             }
 
-            HStack(spacing: 12) {
-                IndividualListingFilterChip(title: "すべて", isSelected: true, color: MegrumTheme.lavender)
-                IndividualListingFilterChip(title: "TWICE", isSelected: false, color: MegrumTheme.sky)
-                IndividualListingFilterChip(title: "トレカ", isSelected: false, color: MegrumTheme.lavender)
-                IndividualListingFilterChip(title: "未設定あり", isSelected: false, color: MegrumTheme.muted)
-            }
-
             LazyVGrid(columns: columns, spacing: 12) {
                 ForEach(inventory) { item in
                     Button {
@@ -78,6 +94,16 @@ struct IndividualListingHavesStep: View {
                     .accessibilityAddTraits(selectedIDs.contains(item.id) ? .isSelected : [])
                 }
             }
+        }
+    }
+
+    private var cashSelection: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text("定価で譲る")
+                .font(.system(size: 20, weight: .black, design: .rounded))
+                .foregroundStyle(MegrumTheme.ink)
+
+            IndividualListingCashAmountCard(amount: $cashAmount)
         }
     }
 }
@@ -105,10 +131,10 @@ private struct IndividualListingEditorTabsLike: View {
     private func tab(title: String, selected: Bool, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Text(title)
-                .font(.system(size: 17, weight: .bold, design: .rounded))
+                .font(.system(size: 16, weight: .bold, design: .rounded))
                 .foregroundStyle(selected ? .white : MegrumTheme.ink)
                 .frame(maxWidth: .infinity)
-                .frame(height: 53)
+                .frame(height: 48)
                 .background {
                     if selected {
                         RoundedRectangle(cornerRadius: 14, style: .continuous)
@@ -120,18 +146,60 @@ private struct IndividualListingEditorTabsLike: View {
     }
 }
 
-private struct IndividualListingFilterChip: View {
-    var title: String
-    var isSelected: Bool
-    var color: Color
+struct IndividualListingCashAmountCard: View {
+    @Binding var amount: Int
 
     var body: some View {
-        Text(title)
-            .font(.system(size: 15, weight: .bold, design: .rounded))
-            .foregroundStyle(isSelected ? .white : color)
-            .padding(.horizontal, 17)
-            .frame(height: 36)
-            .background((isSelected ? color : color.opacity(0.14)), in: Capsule())
+        VStack(spacing: 0) {
+            HStack {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("定価")
+                        .font(.system(size: 17, weight: .bold, design: .rounded))
+                        .foregroundStyle(MegrumTheme.ink)
+                    Text("購入時の税込価格")
+                        .font(.system(size: 13, weight: .semibold, design: .rounded))
+                        .foregroundStyle(MegrumTheme.muted)
+                }
+
+                Spacer()
+
+                amountField
+            }
+            .padding(.horizontal, 20)
+            .frame(height: 92)
+        }
+        .background(.white.opacity(0.94), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .strokeBorder(MegrumTheme.ink.opacity(0.08), lineWidth: 1)
+        }
+    }
+
+    @ViewBuilder
+    private var amountField: some View {
+        let field = TextField("1100", value: $amount, format: .number)
+            .multilineTextAlignment(.trailing)
+            .font(.system(size: 22, weight: .regular, design: .rounded))
+            .foregroundStyle(MegrumTheme.ink)
+            .padding(.horizontal, 16)
+            .frame(width: 136, height: 56)
+            .background(.white, in: RoundedRectangle(cornerRadius: 13, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: 13, style: .continuous)
+                    .stroke(MegrumTheme.ink.opacity(0.12), lineWidth: 1)
+            }
+            .overlay(alignment: .leading) {
+                Text("¥")
+                    .font(.system(size: 18, weight: .semibold, design: .rounded))
+                    .foregroundStyle(MegrumTheme.ink.opacity(0.68))
+                    .padding(.leading, 14)
+            }
+
+        #if os(iOS)
+        field.keyboardType(.numberPad)
+        #else
+        field
+        #endif
     }
 }
 

@@ -36,6 +36,10 @@ struct PublicUserProfileScreen: View {
         Dictionary(uniqueKeysWithValues: tradeGoods.map { ($0.id, $0) })
     }
 
+    private var publicWishByID: [UUID: WishItem] {
+        Dictionary(uniqueKeysWithValues: appState.wishes.map { ($0.id, $0) })
+    }
+
     var body: some View {
         ScrollView {
             PublicUserProfileContent(
@@ -43,10 +47,18 @@ struct PublicUserProfileScreen: View {
                 selectedVisualTab: $selectedVisualTab,
                 bio: publicProfile.map(publicProfileBio) ?? "",
                 ratingText: publicProfile.map(publicProfileRating) ?? "—",
-                chips: publicProfile.map(publicProfileChips) ?? [],
+                chips: [],
+                oshiTags: publicProfile.map(publicProfileOshiTags) ?? [],
                 gridItems: publicProfileGridItems(for: selectedVisualTab),
+                listings: listings,
+                listingGoodsByID: goodsByID,
+                listingWishByID: publicWishByID,
+                groups: appState.oshiGroups,
+                characters: appState.oshiCharacters,
+                goodsTypes: appState.goodsTypes,
                 onPrimaryAction: startPrimaryProposal,
-                onSelectGridItem: selectProfileGridItem
+                onSelectGridItem: selectProfileGridItem,
+                onSelectListing: selectProfileListing
             )
         }
         .background(MegrumTheme.canvas.ignoresSafeArea())
@@ -63,6 +75,12 @@ struct PublicUserProfileScreen: View {
             await appState.loadPublicUserProfile(userID: userID)
             await appState.loadPublicExchangeContent(userID: userID)
             await appState.loadUserEvaluations(userID: userID)
+            if appState.oshiGroups.isEmpty {
+                await appState.loadOshiGroups()
+            }
+            if appState.goodsTypes.isEmpty {
+                await appState.loadGoodsTypes()
+            }
         }
         .sheet(item: $proposalTargetItem) { item in
             NavigationStack {
@@ -99,16 +117,10 @@ struct PublicUserProfileScreen: View {
         return String(format: "%.1f", averageStars)
     }
 
-    private func publicProfileChips(_ publicProfile: PublicUserProfile) -> [String] {
-        var chips: [String] = []
-        if let prefecture = cleanText(publicProfile.profile.prefecture) {
-            chips.append(prefecture)
+    private func publicProfileOshiTags(_ publicProfile: PublicUserProfile) -> [ProfileVisualTagItem] {
+        publicProfile.oshiTags.map { tag in
+            ProfileVisualTagItem(title: tag.title, colorKey: tag.colorKey)
         }
-        if publicProfile.evaluationCount > 0 {
-            chips.append("評価 \(publicProfile.evaluationCount)件")
-        }
-        chips.append("取引 \(publicProfile.completedTradeCount)件")
-        return chips
     }
 
     private func publicProfileGridItems(for tab: ProfileVisualTab) -> [ProfileVisualGridItem] {
@@ -147,14 +159,18 @@ struct PublicUserProfileScreen: View {
             }
             proposalTargetItem = goods
         case .listings:
-            guard let listing = listings.first(where: { $0.id == item.id }),
-                  let target = ListingProposalTarget(listing: listing, goodsByID: goodsByID) else {
-                return
-            }
-            listingProposalTarget = target
+            selectProfileListing(item.id)
         case .wish:
             break
         }
+    }
+
+    private func selectProfileListing(_ listingID: UUID) {
+        guard let listing = listings.first(where: { $0.id == listingID }),
+              let target = ListingProposalTarget(listing: listing, goodsByID: goodsByID) else {
+            return
+        }
+        listingProposalTarget = target
     }
 
     private func cleanText(_ value: String?) -> String? {

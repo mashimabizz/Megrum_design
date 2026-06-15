@@ -21,6 +21,7 @@ struct GoodsEditorFormContentView: View {
     var goodsTypes: [GoodsType]
     var isLoadingGoodsTypes: Bool
     var selectedGroupName: String?
+    var selectedGroupSupportsMemberSelection: Bool
     var selectedGoodsTypeName: String?
     var createError: String?
     var canAdvanceFromCreateCommon: Bool
@@ -29,6 +30,7 @@ struct GoodsEditorFormContentView: View {
     var tradingCardBulkStatusMessage: String?
     var canSaveInventoryCreateMetas: Bool
     var isCreatingGoodsEntry: Bool
+    var tagSuggestions: [String]
     var photoError: String?
     var photoActionTitle: String
     var titlePreview: String
@@ -36,11 +38,14 @@ struct GoodsEditorFormContentView: View {
     var isWishPhotoRemovalLocked: Bool
     var onRemoveTag: (String) -> Void
     var onAddTag: () -> Void
+    var onAddSuggestedTag: (String) -> Void
+    var onShowCreateOshiPicker: () -> Void
     var onCommonNext: () -> Void
     var onPickCamera: () -> Void
     var onPickPhotos: () -> Void
     var onStartTradingCardBulk: () -> Void
     var onRemovePhoto: (UUID) -> Void
+    var onCropPhoto: (UUID) -> Void
     var onShootBack: () -> Void
     var onShootNext: () -> Void
     var onContinueWithoutPhoto: () -> Void
@@ -51,7 +56,7 @@ struct GoodsEditorFormContentView: View {
     var onRemoveWishPhoto: () -> Void
 
     var body: some View {
-        if draft.mode == .create {
+        if draft.mode == .create && !usesInventoryCreateFlow {
             GoodsEditorHeaderCard(
                 entryKind: draft.entryKind,
                 title: navigationTitle,
@@ -77,6 +82,7 @@ struct GoodsEditorFormContentView: View {
                 goodsTypes: goodsTypes,
                 isLoadingGoodsTypes: isLoadingGoodsTypes,
                 oshiCharacters: members,
+                allowsMemberSelection: selectedGroupSupportsMemberSelection,
                 selectedGroupName: selectedGroupName,
                 selectedGoodsTypeName: selectedGoodsTypeName,
                 createError: createError,
@@ -87,13 +93,17 @@ struct GoodsEditorFormContentView: View {
                 canSaveMetas: canSaveInventoryCreateMetas,
                 isItemReadOnly: isItemReadOnly,
                 isCreatingGoodsEntry: isCreatingGoodsEntry,
+                tagSuggestions: tagSuggestions,
                 onRemoveTag: onRemoveTag,
                 onAddTag: onAddTag,
+                onAddSuggestedTag: onAddSuggestedTag,
+                onShowOshiPicker: onShowCreateOshiPicker,
                 onCommonNext: onCommonNext,
                 onPickCamera: onPickCamera,
                 onPickPhotos: onPickPhotos,
                 onStartTradingCardBulk: onStartTradingCardBulk,
                 onRemovePhoto: onRemovePhoto,
+                onCropPhoto: onCropPhoto,
                 onShootBack: onShootBack,
                 onShootNext: onShootNext,
                 onContinueWithoutPhoto: onContinueWithoutPhoto,
@@ -111,18 +121,22 @@ struct GoodsEditorFormContentView: View {
                 isLoadingOshiCharacters: isLoadingOshiCharacters,
                 goodsTypes: goodsTypes,
                 isLoadingGoodsTypes: isLoadingGoodsTypes,
-                includesStatus: draft.mode == .create,
+                selectedGroupSupportsMemberSelection: selectedGroupSupportsMemberSelection,
+                includesStatus: draft.mode == .create && draft.entryKind == .inventory,
+                tagSuggestions: tagSuggestions,
                 photoError: photoError,
                 photoActionTitle: photoActionTitle,
                 titlePreview: titlePreview,
                 wishImageHint: wishImageHint,
                 isItemReadOnly: isItemReadOnly,
                 isWishPhotoRemovalLocked: isWishPhotoRemovalLocked,
+                onShowOshiPicker: onShowCreateOshiPicker,
                 onShowPhotoSource: onShowPhotoSource,
                 onClearLocalPhoto: onClearLocalPhoto,
                 onRemoveWishPhoto: onRemoveWishPhoto,
                 onRemoveTag: onRemoveTag,
-                onAddTag: onAddTag
+                onAddTag: onAddTag,
+                onAddSuggestedTag: onAddSuggestedTag
             )
         }
     }
@@ -141,6 +155,7 @@ struct GoodsInventoryCreateFlowView: View {
     var goodsTypes: [GoodsType]
     var isLoadingGoodsTypes: Bool
     var oshiCharacters: [OshiCharacter]
+    var allowsMemberSelection: Bool
     var selectedGroupName: String?
     var selectedGoodsTypeName: String?
     var createError: String?
@@ -151,13 +166,17 @@ struct GoodsInventoryCreateFlowView: View {
     var canSaveMetas: Bool
     var isItemReadOnly: Bool
     var isCreatingGoodsEntry: Bool
+    var tagSuggestions: [String]
     var onRemoveTag: (String) -> Void
     var onAddTag: () -> Void
+    var onAddSuggestedTag: (String) -> Void
+    var onShowOshiPicker: () -> Void
     var onCommonNext: () -> Void
     var onPickCamera: () -> Void
     var onPickPhotos: () -> Void
     var onStartTradingCardBulk: () -> Void
     var onRemovePhoto: (UUID) -> Void
+    var onCropPhoto: (UUID) -> Void
     var onShootBack: () -> Void
     var onShootNext: () -> Void
     var onContinueWithoutPhoto: () -> Void
@@ -174,9 +193,11 @@ struct GoodsInventoryCreateFlowView: View {
                     groups: groups,
                     isLoadingOshiGroups: isLoadingOshiGroups,
                     selectedGroupID: $draft.groupID,
+                    selectedGroupName: selectedGroupName,
                     goodsTypes: goodsTypes,
                     isLoadingGoodsTypes: isLoadingGoodsTypes,
                     selectedGoodsTypeID: $draft.goodsTypeID,
+                    tagSuggestions: tagSuggestions,
                     tagNames: draft.tagNames,
                     tagDraft: $tagDraft,
                     isTagFieldFocused: isTagFieldFocused,
@@ -186,6 +207,8 @@ struct GoodsInventoryCreateFlowView: View {
                     isCreatingGoodsEntry: isCreatingGoodsEntry,
                     onRemoveTag: onRemoveTag,
                     onAddTag: onAddTag,
+                    onAddSuggestedTag: onAddSuggestedTag,
+                    onShowOshiPicker: onShowOshiPicker,
                     onNext: onCommonNext
                 )
             case .shoot:
@@ -200,6 +223,7 @@ struct GoodsInventoryCreateFlowView: View {
                     onPickPhotos: onPickPhotos,
                     onStartTradingCardBulk: onStartTradingCardBulk,
                     onRemovePhoto: onRemovePhoto,
+                    onCropPhoto: onCropPhoto,
                     onBack: onShootBack,
                     onNext: onShootNext,
                     onContinueWithoutPhoto: onContinueWithoutPhoto
@@ -209,6 +233,7 @@ struct GoodsInventoryCreateFlowView: View {
                     createMetas: $createMetas,
                     createPhotos: createPhotos,
                     oshiCharacters: oshiCharacters,
+                    allowsMemberSelection: allowsMemberSelection,
                     draftGroupID: draft.groupID,
                     selectedGroupName: selectedGroupName,
                     selectedGoodsTypeName: selectedGoodsTypeName,
@@ -234,27 +259,33 @@ struct GoodsEditorStandardSectionsView: View {
     var isLoadingOshiCharacters: Bool
     var goodsTypes: [GoodsType]
     var isLoadingGoodsTypes: Bool
+    var selectedGroupSupportsMemberSelection: Bool
     var includesStatus: Bool
+    var tagSuggestions: [String]
     var photoError: String?
     var photoActionTitle: String
     var titlePreview: String
     var wishImageHint: String
     var isItemReadOnly: Bool
     var isWishPhotoRemovalLocked: Bool
+    var onShowOshiPicker: () -> Void
     var onShowPhotoSource: () -> Void
     var onClearLocalPhoto: () -> Void
     var onRemoveWishPhoto: () -> Void
     var onRemoveTag: (String) -> Void
     var onAddTag: () -> Void
+    var onAddSuggestedTag: (String) -> Void
 
     var body: some View {
         if draft.entryKind == .inventory {
             inventoryPhotoSection
-            groupSection(title: "グループ", required: true)
+            groupPickerSection(title: "グループ")
         } else {
-            groupSection(title: "推し", required: true)
+            groupPickerSection(title: "推し")
         }
-        memberSection
+        if selectedGroupSupportsMemberSelection {
+            memberSection
+        }
         goodsTypeSection
         quantitySection
         if draft.entryKind == .wish {
@@ -291,14 +322,13 @@ struct GoodsEditorStandardSectionsView: View {
         )
     }
 
-    private func groupSection(title: String, required: Bool) -> some View {
-        GoodsEditorGroupSelectionSection(
+    private func groupPickerSection(title: String) -> some View {
+        GoodsCreateOshiPickerRow(
             title: title,
-            required: required,
-            groups: groups,
             isLoading: isLoadingOshiGroups,
-            selectedGroupID: $draft.groupID,
-            isItemReadOnly: isItemReadOnly
+            selectedGroupName: groups.first { $0.id == draft.groupID }?.name,
+            isItemReadOnly: isItemReadOnly,
+            action: onShowOshiPicker
         )
     }
 
@@ -340,9 +370,11 @@ struct GoodsEditorStandardSectionsView: View {
     private var tagsSection: some View {
         GoodsEditorTagsSection(
             tagNames: draft.tagNames,
+            suggestedTagNames: tagSuggestions,
             tagDraft: $tagDraft,
             isTagFieldFocused: isTagFieldFocused,
             isItemReadOnly: isItemReadOnly,
+            onAddSuggestedTag: onAddSuggestedTag,
             onRemoveTag: onRemoveTag,
             onAddTag: onAddTag
         )

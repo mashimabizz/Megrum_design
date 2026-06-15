@@ -18,6 +18,48 @@ final class SupabaseMessageClientTests: XCTestCase {
         XCTAssertTrue(url.contains("limit=50"))
     }
 
+    func testBuildsLoadProposalReadStateRequest() throws {
+        let client = SupabaseMessageClient(configuration: configuration)
+        let proposalID = UUID(uuidString: "11111111-1111-1111-1111-111111111111")!
+        let userID = UUID(uuidString: "22222222-2222-2222-2222-222222222222")!
+
+        let request = try client.makeLoadProposalReadStateRequest(proposalID: proposalID, userID: userID)
+        let url = try XCTUnwrap(request.url?.absoluteString)
+
+        XCTAssertEqual(request.httpMethod, "GET")
+        XCTAssertTrue(url.hasPrefix("https://example.supabase.co/rest/v1/proposal_read_states?select=proposal_id,user_id,last_read_at,updated_at"))
+        XCTAssertTrue(url.contains("proposal_id=eq.11111111-1111-1111-1111-111111111111"))
+        XCTAssertTrue(url.contains("user_id=eq.22222222-2222-2222-2222-222222222222"))
+        XCTAssertTrue(url.contains("limit=1"))
+    }
+
+    func testBuildsMarkProposalMessagesReadRequest() throws {
+        let client = SupabaseMessageClient(configuration: configuration)
+        let proposalID = UUID(uuidString: "11111111-1111-1111-1111-111111111111")!
+        let userID = UUID(uuidString: "22222222-2222-2222-2222-222222222222")!
+        let lastReadAt = Date(timeIntervalSince1970: 1_800_000_000)
+        let updatedAt = Date(timeIntervalSince1970: 1_800_000_120)
+
+        let request = try client.makeMarkProposalMessagesReadRequest(
+            proposalID: proposalID,
+            userID: userID,
+            lastReadAt: lastReadAt,
+            updatedAt: updatedAt
+        )
+        let body = try XCTUnwrap(request.httpBody)
+        let json = try XCTUnwrap(JSONSerialization.jsonObject(with: body) as? [[String: Any]])
+        let payload = try XCTUnwrap(json.first)
+        let url = try XCTUnwrap(request.url?.absoluteString)
+
+        XCTAssertEqual(request.httpMethod, "POST")
+        XCTAssertEqual(request.value(forHTTPHeaderField: "Prefer"), "resolution=merge-duplicates,return=representation")
+        XCTAssertTrue(url.contains("on_conflict=proposal_id,user_id"))
+        XCTAssertEqual(payload["proposal_id"] as? String, "11111111-1111-1111-1111-111111111111")
+        XCTAssertEqual(payload["user_id"] as? String, "22222222-2222-2222-2222-222222222222")
+        XCTAssertEqual(payload["last_read_at"] as? String, "2027-01-15T08:00:00.000Z")
+        XCTAssertEqual(payload["updated_at"] as? String, "2027-01-15T08:02:00.000Z")
+    }
+
     func testBuildsSendTextMessageRequest() throws {
         let client = SupabaseMessageClient(configuration: configuration)
         let senderID = UUID(uuidString: "11111111-1111-1111-1111-111111111111")!

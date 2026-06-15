@@ -2,8 +2,50 @@ import MegrumCore
 import MegrumDesign
 import SwiftUI
 
+enum MeguriBoardSheetDetent: Equatable {
+    case compact
+    case regular
+    case expanded
+
+    var isCompact: Bool {
+        self == .compact
+    }
+
+    var usesExpandedRows: Bool {
+        self == .expanded
+    }
+
+    func height(in viewportHeight: CGFloat) -> CGFloat {
+        switch self {
+        case .compact:
+            min(max(viewportHeight * 0.14, 112), 128)
+        case .regular:
+            viewportHeight * 0.48
+        case .expanded:
+            viewportHeight * 0.76
+        }
+    }
+
+    func moved(up: Bool) -> Self {
+        switch (self, up) {
+        case (.compact, true):
+            .regular
+        case (.regular, true):
+            .expanded
+        case (.expanded, true):
+            .expanded
+        case (.expanded, false):
+            .regular
+        case (.regular, false):
+            .compact
+        case (.compact, false):
+            .compact
+        }
+    }
+}
+
 struct MeguriBoardBottomSheet: View {
-    @Binding var isExpanded: Bool
+    @Binding var detent: MeguriBoardSheetDetent
     var threads: [BoardThread]
     var grooms: [GroomPost]
     var replyCounts: [UUID: Int]
@@ -16,10 +58,12 @@ struct MeguriBoardBottomSheet: View {
     var onOpenThreadComposer: () -> Void
     var onOpenThread: (BoardThread) -> Void
 
+    @GestureState private var dragTranslation: CGFloat = 0
+
     private let filters = ["同じ現場", "同じ推し", "新着", "盛り上がり"]
 
     var body: some View {
-        VStack(alignment: .leading, spacing: isExpanded ? 18 : 16) {
+        VStack(alignment: .leading, spacing: 16) {
             Capsule()
                 .fill(MegrumTheme.muted.opacity(0.38))
                 .frame(width: 38, height: 5)
@@ -27,50 +71,79 @@ struct MeguriBoardBottomSheet: View {
                 .padding(.top, 12)
 
             MeguriBoardBottomSheetHeader(
-                isExpanded: isExpanded,
                 onOpenGroomComposer: onOpenGroomComposer,
                 onOpenThreadComposer: onOpenThreadComposer
             )
 
-            MeguriBoardFilterChips(filters: filters, isExpanded: isExpanded)
+            MeguriBoardFilterChips(filters: filters)
 
             MeguriBoardThreadListState(
                 threads: threads,
                 grooms: grooms,
                 replyCounts: replyCounts,
                 isLoading: isLoading,
-                isExpanded: isExpanded,
                 onOpenThread: onOpenThread
             )
         }
-        .padding(.horizontal, isExpanded ? 22 : 20)
+        .padding(.horizontal, 20)
         .padding(.bottom, 18)
-        .background(.regularMaterial, in: UnevenRoundedRectangle(topLeadingRadius: 28, topTrailingRadius: 28))
+        .frame(maxHeight: .infinity, alignment: .top)
+        .background(alignment: .bottom) {
+            ZStack(alignment: .bottom) {
+                Rectangle()
+                    .fill(MegrumTheme.canvas)
+                    .frame(height: 220)
+                    .offset(y: 130)
+
+                UnevenRoundedRectangle(topLeadingRadius: 28, topTrailingRadius: 28)
+                    .fill(.regularMaterial)
+
+                Rectangle()
+                    .fill(MegrumTheme.canvas)
+                    .frame(height: 180)
+                    .offset(y: 120)
+            }
+            .ignoresSafeArea(edges: .bottom)
+        }
+        .offset(y: interactiveDragOffset)
         .gesture(
             DragGesture(minimumDistance: 14)
+                .updating($dragTranslation) { value, state, _ in
+                    state = value.translation.height
+                }
                 .onEnded { value in
                     if value.translation.height < -24 {
-                        isExpanded = true
+                        detent = detent.moved(up: true)
                     } else if value.translation.height > 24 {
-                        isExpanded = false
+                        detent = detent.moved(up: false)
                     }
                 }
         )
         .onTapGesture(count: 2) {
-            isExpanded.toggle()
+            detent = detent == .expanded ? .regular : .expanded
+        }
+    }
+
+    private var interactiveDragOffset: CGFloat {
+        switch detent {
+        case .compact:
+            return min(max(dragTranslation, -180), 24)
+        case .regular:
+            return min(max(dragTranslation, -220), 220)
+        case .expanded:
+            return min(max(dragTranslation, -24), 260)
         }
     }
 }
 
 private struct MeguriBoardBottomSheetHeader: View {
-    var isExpanded: Bool
     var onOpenGroomComposer: () -> Void
     var onOpenThreadComposer: () -> Void
 
     var body: some View {
         HStack(alignment: .firstTextBaseline) {
             Text("今この場で話されていること")
-                .font(.system(size: isExpanded ? 18 : 19, weight: .black, design: .rounded))
+                .font(.system(size: 19, weight: .black, design: .rounded))
                 .foregroundStyle(MegrumTheme.ink)
                 .lineLimit(2)
                 .minimumScaleFactor(0.78)
@@ -84,7 +157,7 @@ private struct MeguriBoardBottomSheetHeader: View {
             )
 
             MeguriBoardComposerButton(
-                title: "話題",
+                title: "スレッド",
                 systemImage: "pencil",
                 action: onOpenThreadComposer
             )
@@ -115,17 +188,16 @@ private struct MeguriBoardComposerButton: View {
 
 private struct MeguriBoardFilterChips: View {
     var filters: [String]
-    var isExpanded: Bool
 
     var body: some View {
         ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: isExpanded ? 10 : 12) {
+            HStack(spacing: 12) {
                 ForEach(filters, id: \.self) { filter in
                     Text(filter)
-                        .font(.system(size: isExpanded ? 12 : 13, weight: .heavy, design: .rounded))
+                        .font(.system(size: 13, weight: .heavy, design: .rounded))
                         .foregroundStyle(filter == filters.first ? .white : MegrumTheme.ink.opacity(0.72))
-                        .padding(.horizontal, isExpanded ? 15 : 17)
-                        .frame(height: isExpanded ? 30 : 34)
+                        .padding(.horizontal, 17)
+                        .frame(height: 34)
                         .background(filter == filters.first ? MegrumTheme.lavender : .white.opacity(0.88), in: Capsule())
                         .overlay {
                             Capsule().stroke(MegrumTheme.ink.opacity(0.08), lineWidth: filter == filters.first ? 0 : 1)
@@ -141,7 +213,6 @@ private struct MeguriBoardThreadListState: View {
     var grooms: [GroomPost]
     var replyCounts: [UUID: Int]
     var isLoading: Bool
-    var isExpanded: Bool
     var onOpenThread: (BoardThread) -> Void
 
     var body: some View {
@@ -158,7 +229,7 @@ private struct MeguriBoardThreadListState: View {
             )
         } else {
             ScrollView(showsIndicators: false) {
-                LazyVStack(spacing: isExpanded ? 0 : 14) {
+                LazyVStack(spacing: 14) {
                     ForEach(Array(threads.enumerated()), id: \.element.id) { index, thread in
                         Button {
                             onOpenThread(thread)
@@ -167,14 +238,10 @@ private struct MeguriBoardThreadListState: View {
                                 thread: thread,
                                 grooms: grooms,
                                 replyCount: replyCounts[thread.id, default: 0],
-                                index: index,
-                                isExpanded: isExpanded
+                                index: index
                             )
                         }
                         .buttonStyle(.plain)
-                        if isExpanded {
-                            Divider()
-                        }
                     }
                 }
             }
@@ -187,21 +254,16 @@ private struct MeguriThreadListRow: View {
     var grooms: [GroomPost]
     var replyCount: Int
     var index: Int
-    var isExpanded: Bool
 
     var body: some View {
-        if isExpanded {
-            expandedBody
-        } else {
-            normalBody
-        }
+        normalBody
     }
 
     private var normalBody: some View {
         HStack(spacing: 14) {
             MeguriThreadThumbnail(
                 thread: thread,
-                imageURL: primaryGroom?.imageURL,
+                imageURL: thread.thumbnailURL ?? primaryGroom?.imageURL,
                 size: 58
             )
 
@@ -248,7 +310,7 @@ private struct MeguriThreadListRow: View {
         HStack(spacing: 14) {
             MeguriThreadThumbnail(
                 thread: thread,
-                imageURL: primaryGroom?.imageURL,
+                imageURL: thread.thumbnailURL ?? primaryGroom?.imageURL,
                 size: 60
             )
 

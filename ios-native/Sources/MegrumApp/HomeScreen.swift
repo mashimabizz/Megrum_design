@@ -44,6 +44,122 @@ struct HomeRelationRoute: Identifiable, Equatable {
     var id: UUID { item.id }
 }
 
+struct HomeProposalRoute: Identifiable, Equatable {
+    var id = UUID()
+    var item: GoodsItem
+    var receiverGoodsIDs: [UUID]
+    var senderGoodsIDs: [UUID]
+    var matchType: ProposalMatchType
+    var initialExchangeMethod: ExchangeMethod?
+    var initialCashAmount: Int?
+    var initialStep: ProposalCreateStep
+}
+
+enum HomeDiscoveryProposalRouteResolver {
+    static func route(
+        selection: HomeDiscoveryProposalSelection,
+        viewerID: UUID?,
+        matchedItems: [GoodsItem],
+        possibleItems: [GoodsItem],
+        inventoryItems: [GoodsItem]
+    ) -> HomeProposalRoute? {
+        guard let targetItem = proposalTargetItem(
+            for: selection,
+            viewerID: viewerID,
+            matchedItems: matchedItems,
+            possibleItems: possibleItems
+        ) else {
+            return nil
+        }
+
+        return HomeProposalRoute(
+            item: targetItem,
+            receiverGoodsIDs: [targetItem.id],
+            senderGoodsIDs: validSenderGoodsIDs(
+                selection.senderGoodsIDs,
+                viewerID: viewerID,
+                inventoryItems: inventoryItems
+            ),
+            matchType: selection.matchType,
+            initialExchangeMethod: selection.exchangeMethod,
+            initialCashAmount: selection.cashAmount,
+            initialStep: .give
+        )
+    }
+
+    private static func proposalTargetItem(
+        for selection: HomeDiscoveryProposalSelection,
+        viewerID: UUID?,
+        matchedItems: [GoodsItem],
+        possibleItems: [GoodsItem]
+    ) -> GoodsItem? {
+        let selectedGoodsItem = selection.receiverGoods.flatMap { goodsItem(from: $0) }
+        let candidates = MatchRelationComposer.deduplicatedGoods(
+            [selectedGoodsItem].compactMap(\.self) + matchedItems + possibleItems
+        )
+        if let target = candidates.first(where: { item in
+            item.id == selection.receiverGoodsID && item.ownerID != viewerID
+        }) {
+            return target
+        }
+        return candidates.first { $0.ownerID != viewerID }
+    }
+
+    private static func validSenderGoodsIDs(
+        _ ids: [UUID],
+        viewerID: UUID?,
+        inventoryItems: [GoodsItem]
+    ) -> [UUID] {
+        let validIDs = Set(
+            MatchRelationComposer
+                .selectableSenderGoods(from: inventoryItems)
+                .filter { item in
+                    guard let viewerID else {
+                        return true
+                    }
+                    return item.ownerID == viewerID
+                }
+                .map(\.id)
+        )
+        return ids.filter { validIDs.contains($0) }
+    }
+
+    private static func goodsItem(from goods: HomeMockGoods) -> GoodsItem? {
+        guard let ownerID = goods.ownerID else {
+            return nil
+        }
+        return GoodsItem(
+            id: goods.id,
+            ownerID: ownerID,
+            groupID: goods.groupID,
+            memberID: goods.memberID,
+            title: goods.title,
+            imageURL: goods.imageURL,
+            tags: goods.rawTagNames.map { GoodsTag(id: stableTagID(for: $0), name: $0) },
+            quantity: 1,
+            ownerPaymentMethods: goods.ownerPaymentMethods,
+            ownerPaymentNote: goods.ownerPaymentNote
+        )
+    }
+
+    private static func stableTagID(for name: String) -> UUID {
+        let hash = name
+            .lowercased()
+            .utf8
+            .reduce(UInt64(14_695_981_039_346_656_037)) { partial, byte in
+                (partial ^ UInt64(byte)).multipliedReportingOverflow(by: 1_099_511_628_211).partialValue
+            }
+        let tail = String(format: "%012llu", hash % 1_000_000_000_000)
+        return UUID(uuidString: "00000000-0000-0000-0000-\(tail)") ?? UUID(uuidString: "00000000-0000-0000-0000-000000000001")!
+    }
+}
+
+private extension ExchangeMethod {
+    var requiresMeetupBeforeProposal: Bool {
+        self == .hand || self == .both
+    }
+}
+
 @MainActor
 struct HomeScreen: View {
     var viewer: UserProfile?
@@ -71,6 +187,7 @@ struct HomeScreen: View {
     @State private var loadedLocalActivitySettings: HomeLocalActivitySettings?
     @State private var showsLocalModeSettings = false
     @State private var relationRoute: HomeRelationRoute?
+    @State private var proposalRoute: HomeProposalRoute?
     @State private var didOpenVisualQAInitialRoute = false
 
     var body: some View {
@@ -87,6 +204,7 @@ struct HomeScreen: View {
             onOpenSearch: {
                 showsSearch = true
             },
+            onStartProposal: startProposalFromDiscovery,
             onRefresh: {
                 await onRefresh()
                 await loadLocalActivitySettings()
@@ -112,6 +230,29 @@ struct HomeScreen: View {
                         visualQAInitialScreen: visualQAInitialScreen,
                         onCompletionAction: { action in
                             relationRoute = nil
+                            if action == .openTrades {
+                                onOpenTrades?()
+                            }
+                        }
+                    )
+                }
+            }
+        }
+        .homeProposalPresentation(item: $proposalRoute) { route in
+            if let relationState = localModeState {
+                NavigationStack {
+                    ProposalCreateFlow(
+                        appState: relationState,
+                        targetItem: route.item,
+                        receiverGoodsIDs: route.receiverGoodsIDs,
+                        initialSenderGoodsIDs: route.senderGoodsIDs,
+                        matchType: route.matchType,
+                        initialExchangeMethod: route.initialExchangeMethod,
+                        initialCashAmount: route.initialCashAmount,
+                        initialStep: route.initialStep,
+                        visualQAInitialScreen: visualQAInitialScreen,
+                        onCompletionAction: { action in
+                            proposalRoute = nil
                             if action == .openTrades {
                                 onOpenTrades?()
                             }
@@ -188,6 +329,19 @@ struct HomeScreen: View {
         localModeState?.grooms ?? []
     }
 
+    private func startProposalFromDiscovery(_ selection: HomeDiscoveryProposalSelection) {
+        guard let route = HomeDiscoveryProposalRouteResolver.route(
+            selection: selection,
+            viewerID: viewer?.id,
+            matchedItems: matchedItems,
+            possibleItems: possibleItems,
+            inventoryItems: localModeState?.inventory ?? []
+        ) else {
+            return
+        }
+        proposalRoute = route
+    }
+
     private func saveLocalActivitySettings(_ settings: HomeLocalActivitySettings) {
         let availableIDs = Set(localCarryingCandidates.map(\.id))
         let sanitized = settings
@@ -259,6 +413,18 @@ private extension View {
     func homeRelationPresentation<Content: View>(
         item: Binding<HomeRelationRoute?>,
         @ViewBuilder content: @escaping (HomeRelationRoute) -> Content
+    ) -> some View {
+        #if os(iOS)
+        fullScreenCover(item: item, content: content)
+        #else
+        sheet(item: item, content: content)
+        #endif
+    }
+
+    @ViewBuilder
+    func homeProposalPresentation<Content: View>(
+        item: Binding<HomeProposalRoute?>,
+        @ViewBuilder content: @escaping (HomeProposalRoute) -> Content
     ) -> some View {
         #if os(iOS)
         fullScreenCover(item: item, content: content)

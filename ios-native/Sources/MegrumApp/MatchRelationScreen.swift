@@ -10,8 +10,7 @@ struct MatchRelationScreen: View {
 
     @Environment(\.dismiss) private var dismiss
     @State private var currentTargetItem: GoodsItem
-    @State private var selectedCandidateIDsByListingID: [UUID: Set<UUID>] = [:]
-    @State private var selectedHaveIDsByListingID: [UUID: Set<UUID>] = [:]
+    @State private var selectionState = MatchRelationSelectionState()
     @State private var popupTarget: MatchRelationWishPopupTarget?
     @State private var proposalTarget: MatchRelationProposalTarget?
     @State private var relationSwipeOffset: CGFloat = 0
@@ -54,6 +53,7 @@ struct MatchRelationScreen: View {
             visualQAFallback = []
         }
         return MatchRelationComposer.deduplicatedGoods([currentTargetItem] + loaded + visualQAFallback)
+            .filter { $0.marketAvailableQuantity > 0 }
     }
 
     private var senderGoods: [GoodsItem] {
@@ -82,8 +82,8 @@ struct MatchRelationScreen: View {
     private var aggregate: MatchRelationAggregate {
         MatchRelationComposer.aggregateSelection(
             details: relationDetails,
-            selectedCandidateIDsByListingID: selectedCandidateIDsByListingID,
-            selectedHaveIDsByListingID: selectedHaveIDsByListingID
+            selectedCandidateIDsByListingID: selectionState.selectedCandidateIDsByListingID,
+            selectedHaveIDsByListingID: selectionState.selectedHaveIDsByListingID
         )
     }
 
@@ -151,8 +151,8 @@ struct MatchRelationScreen: View {
                     partnerDetails: partnerDetails,
                     partnerHandle: partnerHandle,
                     highlightedItemID: currentTargetItem.id,
-                    selectedCandidateIDsByListingID: selectedCandidateIDsByListingID,
-                    selectedHaveIDsByListingID: selectedHaveIDsByListingID,
+                    selectedCandidateIDsByListingID: selectionState.selectedCandidateIDsByListingID,
+                    selectedHaveIDsByListingID: selectionState.selectedHaveIDsByListingID,
                     targetItem: currentTargetItem,
                     simpleSenderItems: simpleSenderIDs.compactMap { id in senderGoods.first { $0.id == id } },
                     showsSummary: canStartRelationProposal,
@@ -214,7 +214,7 @@ struct MatchRelationScreen: View {
                     target: target,
                     partnerHandle: partnerHandle,
                     highlightedItemID: currentTargetItem.id,
-                    selectedCandidateIDs: selectedCandidateIDsByListingID[target.listingID] ?? [],
+                    selectedCandidateIDs: selectionState.selectedCandidateIDsByListingID[target.listingID] ?? [],
                     onToggleCandidate: { candidateID in
                         toggleCandidate(listingID: target.listingID, candidateID: candidateID)
                     },
@@ -264,16 +264,11 @@ struct MatchRelationScreen: View {
 
     private func seedInitialSelection(force: Bool) {
         let details = relationDetails
-        guard force || selectedCandidateIDsByListingID.isEmpty else {
-            return
-        }
-        selectedCandidateIDsByListingID = MatchRelationComposer.initialCandidateSelection(
-            for: details,
-            highlightedItemID: currentTargetItem.id
-        )
-        selectedHaveIDsByListingID = MatchRelationComposer.initialHaveSelection(
-            for: details,
-            highlightedItemID: currentTargetItem.id
+        selectionState = MatchRelationSelectionStateReducer.seedingInitialSelection(
+            in: selectionState,
+            details: details,
+            highlightedItemID: currentTargetItem.id,
+            force: force
         )
         applyVisualQACandidateExpansionIfNeeded(details: details)
     }
@@ -293,32 +288,24 @@ struct MatchRelationScreen: View {
     }
 
     private func resetRelationSelection() {
-        selectedCandidateIDsByListingID = [:]
+        selectionState = MatchRelationSelectionStateReducer.resettingCandidates(in: selectionState)
         popupTarget = nil
     }
 
     private func toggleCandidate(listingID: UUID, candidateID: UUID) {
-        var ids = selectedCandidateIDsByListingID[listingID] ?? []
-        if ids.contains(candidateID) {
-            ids.remove(candidateID)
-        } else {
-            ids.insert(candidateID)
-        }
-        if ids.isEmpty {
-            selectedCandidateIDsByListingID.removeValue(forKey: listingID)
-        } else {
-            selectedCandidateIDsByListingID[listingID] = ids
-        }
+        selectionState = MatchRelationSelectionStateReducer.togglingCandidate(
+            listingID: listingID,
+            candidateID: candidateID,
+            in: selectionState
+        )
     }
 
     private func toggleHave(listingID: UUID, haveID: UUID) {
-        var ids = selectedHaveIDsByListingID[listingID] ?? []
-        if ids.contains(haveID) {
-            ids.remove(haveID)
-        } else {
-            ids.insert(haveID)
-        }
-        selectedHaveIDsByListingID[listingID] = ids
+        selectionState = MatchRelationSelectionStateReducer.togglingHave(
+            listingID: listingID,
+            haveID: haveID,
+            in: selectionState
+        )
     }
 
     private func startProposal() {

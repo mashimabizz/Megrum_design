@@ -187,6 +187,7 @@ struct CounterProposalSheet: View {
 struct TradeEvidencePanel: View {
     var proposal: TradeProposal
     var viewerID: UUID?
+    var evidencePhotos: [TradeEvidencePhoto]
     @Binding var selectedPhotoItem: PhotosPickerItem?
     var evaluationState: TradeEvaluationPromptState
     var isAddingEvidence: Bool
@@ -211,6 +212,10 @@ struct TradeEvidencePanel: View {
         return proposal.partnerApproved(for: viewerID)
     }
 
+    private var hasEvidencePhotos: Bool {
+        !evidencePhotos.isEmpty
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             HStack {
@@ -230,41 +235,12 @@ struct TradeEvidencePanel: View {
                 }
             }
 
-            if let evidencePhotoURL = proposal.evidencePhotoURL {
-                Button {
-                    onOpenImage(evidencePhotoURL)
-                } label: {
-                    AsyncImage(url: evidencePhotoURL) { phase in
-                        switch phase {
-                        case .success(let image):
-                            image
-                                .resizable()
-                                .scaledToFill()
-                        case .failure:
-                            MegrumTheme.sky.opacity(0.18)
-                                .overlay {
-                                    Image(systemName: "photo")
-                                        .font(.system(size: 28, weight: .bold))
-                                        .foregroundStyle(MegrumTheme.muted)
-                                }
-                        case .empty:
-                            MegrumTheme.sky.opacity(0.12)
-                                .overlay {
-                                    ProgressView()
-                                }
-                        @unknown default:
-                            Color.clear
-                        }
-                    }
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("証跡写真を拡大表示")
-                .frame(height: 172)
-                .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
-                .overlay {
-                    RoundedRectangle(cornerRadius: 22, style: .continuous)
-                        .strokeBorder(.white.opacity(0.7), lineWidth: 1)
-                }
+            if hasEvidencePhotos {
+                TradeEvidencePhotoCarousel(
+                    photos: evidencePhotos,
+                    viewerID: viewerID,
+                    onOpenImage: onOpenImage
+                )
             }
 
             HStack(spacing: 8) {
@@ -292,7 +268,7 @@ struct TradeEvidencePanel: View {
                     }
                     .buttonStyle(.plain)
                 }
-            } else if proposal.evidencePhotoURL == nil {
+            } else if !hasEvidencePhotos {
                 Button(action: onOpenCamera) {
                     Label(isAddingEvidence ? "追加中" : "交換後にグッズを撮影", systemImage: "camera.fill")
                         .font(.system(size: 16, weight: .heavy, design: .rounded))
@@ -359,6 +335,100 @@ struct TradeEvidencePanel: View {
         .padding(.horizontal, 10)
         .padding(.vertical, 7)
         .background(.white.opacity(0.72), in: Capsule())
+    }
+}
+
+private struct TradeEvidencePhotoCarousel: View {
+    var photos: [TradeEvidencePhoto]
+    var viewerID: UUID?
+    var onOpenImage: (URL) -> Void
+
+    var body: some View {
+        GeometryReader { proxy in
+            let cardWidth = max(246, proxy.size.width - 48)
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 12) {
+                    ForEach(Array(photos.enumerated()), id: \.element.id) { index, photo in
+                        TradeEvidencePhotoCard(
+                            photo: photo,
+                            index: index,
+                            count: photos.count,
+                            viewerID: viewerID,
+                            onOpenImage: onOpenImage
+                        )
+                        .frame(width: cardWidth)
+                    }
+                }
+                .padding(.trailing, 46)
+            }
+        }
+        .frame(height: 178)
+    }
+}
+
+private struct TradeEvidencePhotoCard: View {
+    var photo: TradeEvidencePhoto
+    var index: Int
+    var count: Int
+    var viewerID: UUID?
+    var onOpenImage: (URL) -> Void
+
+    private var uploaderText: String {
+        photo.isUploadedBy(viewerID) ? "あなたがアップロード" : "相手がアップロード"
+    }
+
+    var body: some View {
+        Button {
+            onOpenImage(photo.photoURL)
+        } label: {
+            AsyncImage(url: photo.photoURL) { phase in
+                ZStack {
+                    switch phase {
+                    case .success(let image):
+                        image
+                            .resizable()
+                            .scaledToFill()
+                    case .failure:
+                        MegrumTheme.sky.opacity(0.18)
+                            .overlay {
+                                Image(systemName: "photo")
+                                    .font(.system(size: 28, weight: .bold))
+                                    .foregroundStyle(MegrumTheme.muted)
+                            }
+                    case .empty:
+                        MegrumTheme.sky.opacity(0.12)
+                            .overlay {
+                                ProgressView()
+                            }
+                    @unknown default:
+                        Color.clear
+                    }
+
+                    VStack {
+                        HStack(spacing: 7) {
+                            Text(uploaderText)
+                            Text("\(index + 1)/\(count)")
+                        }
+                        .font(.system(size: 12, weight: .heavy, design: .rounded))
+                        .foregroundStyle(MegrumTheme.ink)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 7)
+                        .background(.white.opacity(0.88), in: Capsule())
+                        .padding(10)
+
+                        Spacer()
+                    }
+                }
+            }
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("\(uploaderText)した証跡写真 \(index + 1)枚目を拡大表示")
+        .frame(height: 178)
+        .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 22, style: .continuous)
+                .strokeBorder(.white.opacity(0.7), lineWidth: 1)
+        }
     }
 }
 

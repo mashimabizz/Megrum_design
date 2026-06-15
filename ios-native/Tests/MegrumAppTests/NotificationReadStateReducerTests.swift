@@ -1,0 +1,98 @@
+import MegrumApp
+import MegrumCore
+import XCTest
+
+final class NotificationReadStateReducerTests: XCTestCase {
+    func testMarkReadOnlyUpdatesUnreadMatchingNotification() {
+        let targetID = UUID(uuidString: "00000000-0000-0000-0000-000000000101")!
+        let otherID = UUID(uuidString: "00000000-0000-0000-0000-000000000102")!
+        let existingReadAt = Date(timeIntervalSince1970: 100)
+        let readAt = Date(timeIntervalSince1970: 200)
+        let notifications = [
+            makeNotification(id: targetID),
+            makeNotification(id: otherID, readAt: existingReadAt),
+        ]
+
+        let updated = NotificationReadStateReducer.markRead(
+            notifications,
+            id: targetID,
+            readAt: readAt
+        )
+
+        XCTAssertEqual(updated.first(where: { $0.id == targetID })?.readAt, readAt)
+        XCTAssertEqual(updated.first(where: { $0.id == otherID })?.readAt, existingReadAt)
+        XCTAssertEqual(NotificationReadStateReducer.unreadCount(in: updated), 0)
+    }
+
+    func testMarkUnreadRollsBackOnlyMatchingNotification() {
+        let targetID = UUID(uuidString: "00000000-0000-0000-0000-000000000103")!
+        let otherID = UUID(uuidString: "00000000-0000-0000-0000-000000000104")!
+        let readAt = Date(timeIntervalSince1970: 300)
+        let notifications = [
+            makeNotification(id: targetID, readAt: readAt),
+            makeNotification(id: otherID, readAt: readAt),
+        ]
+
+        let updated = NotificationReadStateReducer.markUnread(notifications, id: targetID)
+
+        XCTAssertNil(updated.first(where: { $0.id == targetID })?.readAt)
+        XCTAssertEqual(updated.first(where: { $0.id == otherID })?.readAt, readAt)
+    }
+
+    func testMarkAllReadKeepsExistingReadTimestamps() {
+        let unreadID = UUID(uuidString: "00000000-0000-0000-0000-000000000105")!
+        let readID = UUID(uuidString: "00000000-0000-0000-0000-000000000106")!
+        let existingReadAt = Date(timeIntervalSince1970: 400)
+        let readAt = Date(timeIntervalSince1970: 500)
+        let notifications = [
+            makeNotification(id: unreadID),
+            makeNotification(id: readID, readAt: existingReadAt),
+        ]
+
+        let updated = NotificationReadStateReducer.markAllRead(notifications, readAt: readAt)
+
+        XCTAssertEqual(updated.first(where: { $0.id == unreadID })?.readAt, readAt)
+        XCTAssertEqual(updated.first(where: { $0.id == readID })?.readAt, existingReadAt)
+        XCTAssertEqual(NotificationReadStateReducer.unreadCount(in: updated), 0)
+    }
+
+    func testMergingUpdatedReplacesOnlyReturnedNotifications() {
+        let targetID = UUID(uuidString: "00000000-0000-0000-0000-000000000107")!
+        let otherID = UUID(uuidString: "00000000-0000-0000-0000-000000000108")!
+        let notifications = [
+            makeNotification(id: targetID, title: "古い通知"),
+            makeNotification(id: otherID, title: "そのまま"),
+        ]
+        let serverReadAt = Date(timeIntervalSince1970: 600)
+        let serverNotification = makeNotification(
+            id: targetID,
+            title: "サーバー通知",
+            readAt: serverReadAt
+        )
+
+        let updated = NotificationReadStateReducer.mergingUpdated(
+            notifications,
+            updated: [serverNotification]
+        )
+
+        XCTAssertEqual(updated.first(where: { $0.id == targetID })?.title, "サーバー通知")
+        XCTAssertEqual(updated.first(where: { $0.id == targetID })?.readAt, serverReadAt)
+        XCTAssertEqual(updated.first(where: { $0.id == otherID })?.title, "そのまま")
+    }
+
+    private func makeNotification(
+        id: UUID,
+        title: String = "通知",
+        readAt: Date? = nil
+    ) -> MegrumNotification {
+        MegrumNotification(
+            id: id,
+            kind: .proposalReceived,
+            title: title,
+            body: "本文",
+            linkPath: "/proposals/\(id.uuidString)",
+            readAt: readAt,
+            createdAt: Date(timeIntervalSince1970: 0)
+        )
+    }
+}

@@ -313,6 +313,30 @@ final class TradeRequestDraftProposalCreateFlowTests: XCTestCase {
         XCTAssertEqual(upwardRange.upperBound, 41)
     }
 
+    func testProposalMeetupCalendarPointMapsCenteredWeekColumnsToDays() {
+        let containerWidth: CGFloat = 353
+        let dayWidth = ProposalMeetupCalendarModel.dayWidth(containerWidth: containerWidth)
+        let gridInset = ProposalMeetupCalendarModel.weekGridLeadingInset(
+            containerWidth: containerWidth,
+            dayWidth: dayWidth
+        )
+        let targetX = gridInset
+            + ProposalMeetupCalendarModel.timeLabelWidth
+            + dayWidth * 2
+            + dayWidth / 2
+        let targetY = ProposalMeetupCalendarModel.slotHeight * 48 + 1
+
+        let point = ProposalMeetupCalendarModel.weekCalendarPoint(
+            from: CGPoint(x: targetX, y: targetY),
+            containerWidth: containerWidth,
+            dayWidth: dayWidth
+        )
+
+        XCTAssertEqual(gridInset, 1.5, accuracy: 0.001)
+        XCTAssertEqual(point.dayIndex, 2)
+        XCTAssertEqual(point.slot, 48)
+    }
+
     func testProposalMeetupCandidateDraftApplyingCalendarRangeRewritesDates() {
         let calendar = Calendar(identifier: .gregorian)
         let day = Date(timeIntervalSince1970: 86_400 * 10)

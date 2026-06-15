@@ -35,6 +35,8 @@ final class GoodsGridLayoutTests: XCTestCase {
         XCTAssertEqual(GoodsQuickActionKind.inventoryActions, [.edit, .moveToKeep, .tag, .delete])
         XCTAssertEqual(GoodsQuickActionKind.edit.title, "編集する")
         XCTAssertEqual(GoodsQuickActionKind.moveToKeep.title, "自分用キープへ")
+        XCTAssertEqual(GoodsQuickActionKind.moveToKeep.title(for: .active), "自分用キープへ")
+        XCTAssertEqual(GoodsQuickActionKind.moveToKeep.title(for: .keep), "譲る候補へ")
         XCTAssertEqual(GoodsQuickActionKind.tag.title, "タグをつける")
         XCTAssertEqual(GoodsQuickActionKind.delete.title, "削除する")
         XCTAssertNil(GoodsQuickActionKind.edit.role)
@@ -81,6 +83,20 @@ final class GoodsGridLayoutTests: XCTestCase {
         XCTAssertEqual(presentation.tagSummary, "#会場限定 +1")
         XCTAssertEqual(presentation.tileMetadataText, "譲る候補 ・ 3点 ・ #会場限定 +1")
         XCTAssertEqual(presentation.accessibilityValue, "譲る候補、3点、#会場限定 +1、処理中")
+    }
+
+    func testTilePresentationUsesTradedInventoryStatus() {
+        let item = GoodsItem(
+            id: UUID(),
+            ownerID: UUID(),
+            status: .traded,
+            title: "譲渡済みトレカ"
+        )
+
+        let presentation = GoodsTilePresentation(item: item, context: .inventory, isBusy: false)
+
+        XCTAssertEqual(presentation.statusLabel, "過去に譲った")
+        XCTAssertEqual(presentation.tileMetadataText, "過去に譲った ・ 1点")
     }
 
     func testCollectionCardStyleUsesStableGlyphAndTagLine() {
@@ -144,6 +160,87 @@ final class GoodsGridLayoutTests: XCTestCase {
         XCTAssertEqual(filter.activeCount, 4)
     }
 
+    func testCollectionFilterChoicesOnlyIncludeValuesUsedByItems() {
+        let groupA = OshiGroup(id: UUID(), name: "TWICE")
+        let groupB = OshiGroup(id: UUID(), name: "aespa")
+        let unusedGroup = OshiGroup(id: UUID(), name: "NCT")
+        let cardType = GoodsType(id: UUID(), name: "トレカ")
+        let acrylicType = GoodsType(id: UUID(), name: "アクスタ")
+        let unusedType = GoodsType(id: UUID(), name: "生写真")
+        let items = [
+            GoodsItem(
+                id: UUID(),
+                ownerID: UUID(),
+                groupID: groupB.id,
+                goodsTypeID: acrylicType.id,
+                title: "アクスタ A"
+            ),
+            GoodsItem(
+                id: UUID(),
+                ownerID: UUID(),
+                groupID: groupA.id,
+                goodsTypeID: cardType.id,
+                title: "トレカ A"
+            )
+        ]
+
+        let groups = GoodsCollectionFilterChoices.groups(
+            items: items,
+            allGroups: [groupA, groupB, unusedGroup]
+        )
+        let goodsTypes = GoodsCollectionFilterChoices.goodsTypes(
+            items: items,
+            allGoodsTypes: [cardType, acrylicType, unusedType]
+        )
+
+        XCTAssertEqual(groups.map(\.name), ["TWICE", "aespa"])
+        XCTAssertEqual(goodsTypes.map(\.name), ["トレカ", "アクスタ"])
+    }
+
+    func testCollectionTagChoicesFollowSelectedGroupAndGoodsType() {
+        let groupA = UUID()
+        let groupB = UUID()
+        let cardType = UUID()
+        let acrylicType = UUID()
+        let items = [
+            GoodsItem(
+                id: UUID(),
+                ownerID: UUID(),
+                groupID: groupA,
+                goodsTypeID: cardType,
+                title: "トレカ A",
+                tags: [
+                    GoodsTag(id: UUID(), name: "2026 LIVE"),
+                    GoodsTag(id: UUID(), name: " aespa ")
+                ]
+            ),
+            GoodsItem(
+                id: UUID(),
+                ownerID: UUID(),
+                groupID: groupA,
+                goodsTypeID: acrylicType,
+                title: "アクスタ A",
+                tags: [GoodsTag(id: UUID(), name: "アクスタ")]
+            ),
+            GoodsItem(
+                id: UUID(),
+                ownerID: UUID(),
+                groupID: groupB,
+                goodsTypeID: cardType,
+                title: "トレカ B",
+                tags: [GoodsTag(id: UUID(), name: "NCT")]
+            )
+        ]
+
+        let tagNames = GoodsCollectionFilterChoices.tagNames(
+            items: items,
+            selectedGroupID: groupA,
+            selectedGoodsTypeID: cardType
+        )
+
+        XCTAssertEqual(tagNames, ["2026 LIVE", "aespa"])
+    }
+
     func testCollectionFilterUsesCompactChipMetrics() {
         XCTAssertEqual(CollectionScreenLayoutMetrics.mainStackSpacing, 12)
         XCTAssertEqual(CollectionScreenLayoutMetrics.topPadding, 14)
@@ -194,5 +291,11 @@ final class GoodsGridLayoutTests: XCTestCase {
         XCTAssertEqual(ownedPolicy.actions, [.detail, .edit, .createIndividualListing, .hide, .delete])
         XCTAssertEqual(remotePolicy.actions, [.detail, .addToExchangeList, .report])
         XCTAssertEqual(signedOutPolicy.actions, [.detail])
+    }
+
+    func testContextMenuPolicyHidesReadOnlyDetailOnlyCards() {
+        XCTAssertFalse(GoodsTileContextMenuPolicy.isEnabled(actions: [.detail], hasLongPressSelection: false))
+        XCTAssertFalse(GoodsTileContextMenuPolicy.isEnabled(actions: [.detail, .edit], hasLongPressSelection: true))
+        XCTAssertTrue(GoodsTileContextMenuPolicy.isEnabled(actions: [.detail, .report], hasLongPressSelection: false))
     }
 }

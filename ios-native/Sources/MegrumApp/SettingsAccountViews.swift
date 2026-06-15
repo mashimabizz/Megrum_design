@@ -20,6 +20,7 @@ struct AccountOverviewScreen: View {
                 SettingsValueRow(title: "ユーザーID", value: summary.handleText)
                 SettingsValueRow(title: "表示名", value: summary.displayNameText)
                 SettingsValueRow(title: "活動エリア", value: summary.activityAreaText)
+                SettingsValueRow(title: "支払い条件", value: summary.paymentMethodsText)
                 SettingsValueRow(title: "アカウント状態", value: summary.accountStatusText)
             } header: {
                 Text("基本情報")

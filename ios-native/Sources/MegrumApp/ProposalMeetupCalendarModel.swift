@@ -135,6 +135,37 @@ enum ProposalMeetupCalendarModel {
             + daySpacing * CGFloat(visibleDayCount - 1)
     }
 
+    static func weekGridLeadingInset(containerWidth: CGFloat, dayWidth: CGFloat) -> CGFloat {
+        max(0, (containerWidth - weekGridWidth(dayWidth: dayWidth)) / 2)
+    }
+
+    static func weekGridPoint(from location: CGPoint, containerWidth: CGFloat, dayWidth: CGFloat) -> CGPoint {
+        CGPoint(
+            x: location.x - weekGridLeadingInset(containerWidth: containerWidth, dayWidth: dayWidth),
+            y: location.y
+        )
+    }
+
+    static func weekCalendarPoint(
+        from location: CGPoint,
+        containerWidth: CGFloat,
+        dayWidth: CGFloat
+    ) -> (dayIndex: Int, slot: Int) {
+        let gridLocation = weekGridPoint(
+            from: location,
+            containerWidth: containerWidth,
+            dayWidth: dayWidth
+        )
+        let x = max(0, gridLocation.x - timeLabelWidth)
+        let columnWidth = dayWidth + daySpacing
+        let rawDay = Int(floor(x / max(columnWidth, 1)))
+        let dayIndex = max(0, min(visibleDayCount - 1, rawDay))
+        let y = max(0, gridLocation.y)
+        let rawSlot = Int(floor(y / slotHeight))
+        let slot = max(0, min(slotCount - 1, rawSlot))
+        return (dayIndex, slot)
+    }
+
     static func clampedWeekDragOffset(_ translationWidth: CGFloat, containerWidth: CGFloat) -> CGFloat {
         let maxDrag = max(1, containerWidth) * edgeCarryRatio
         return max(-maxDrag, min(maxDrag, translationWidth))

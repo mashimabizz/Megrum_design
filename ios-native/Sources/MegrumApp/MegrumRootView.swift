@@ -42,63 +42,6 @@ public enum MegrumTab: String, CaseIterable, Identifiable, Sendable {
     }
 }
 
-enum AppDrawerGestureResolver {
-    static let closedStartMinimumDistance: CGFloat = 5
-    static let openStartMinimumDistance: CGFloat = 6
-    static let closedHorizontalDominance: CGFloat = 1
-    static let openHorizontalDominance: CGFloat = 1
-    static let openThresholdRatio: CGFloat = 0.24
-    static let predictedMomentumBonus: CGFloat = 32
-
-    static func activeTranslation(isPresented: Bool, translation: CGSize) -> CGFloat? {
-        guard isHorizontalSwipe(translation, isPresented: isPresented) else {
-            return nil
-        }
-        if isPresented {
-            guard translation.width < 0 else {
-                return nil
-            }
-            return translation.width
-        }
-
-        guard translation.width > 0 else {
-            return nil
-        }
-        return translation.width
-    }
-
-    static func targetVisibility(
-        isPresented: Bool,
-        translation: CGSize,
-        predictedEndTranslationWidth: CGFloat,
-        drawerWidth: CGFloat
-    ) -> Bool? {
-        guard isHorizontalSwipe(translation, isPresented: isPresented) else {
-            return nil
-        }
-
-        let absX = abs(translation.width)
-        let threshold = drawerWidth * openThresholdRatio
-        let fastEnough = abs(predictedEndTranslationWidth) >= absX + predictedMomentumBonus
-
-        if isPresented {
-            let shouldClose = translation.width <= -threshold || (translation.width < 0 && fastEnough)
-            return !shouldClose
-        }
-
-        let shouldOpen = translation.width >= threshold || (translation.width > 0 && fastEnough)
-        return shouldOpen
-    }
-
-    private static func isHorizontalSwipe(_ translation: CGSize, isPresented: Bool) -> Bool {
-        let absX = abs(translation.width)
-        let absY = abs(translation.height)
-        let minimumDistance = isPresented ? openStartMinimumDistance : closedStartMinimumDistance
-        let dominance = isPresented ? openHorizontalDominance : closedHorizontalDominance
-        return absX > minimumDistance && absX > absY * dominance
-    }
-}
-
 struct ProposalCompletionRouteState: Equatable {
     var selectedTab: MegrumTab
     var requestedTradesStage: TradeStage?
@@ -340,6 +283,12 @@ public struct MegrumRootView: View {
                         drawerPageDestination = nil
                     }
                 }
+            } else if drawerPageDestination == .schedules {
+                NavigationStack {
+                    PersonalScheduleScreen(appState: appState) {
+                        drawerPageDestination = nil
+                    }
+                }
             } else {
                 authenticatedTabs
             }
@@ -434,6 +383,28 @@ public struct MegrumRootView: View {
             let foregroundWhiteoutOpacity = AppDrawerVisualMetrics.whiteoutOpacity * drawerProgress
 
             ZStack(alignment: .leading) {
+                AppDrawerOverlay(
+                    isPresented: $showsDrawer,
+                    presentationProgress: drawerProgress,
+                    drawerWidth: drawerWidth,
+                    appState: appState,
+                    onSelectDestination: { destination in
+                        openDrawerDestination(destination)
+                    },
+                    onSignOut: {
+                        await authState.signOut()
+                        Task {
+                            await appState.revokeRegisteredNativePushDeviceToken()
+                        }
+                        drawerDestination = nil
+                        drawerPageDestination = nil
+                        publicProfileRoute = nil
+                        showsDrawer = false
+                    }
+                )
+                .allowsHitTesting(drawerProgress > 0.001)
+                .zIndex(0)
+
                 TabView(selection: $selectedTab) {
                     NavigationStack {
                         HomeScreen(
@@ -511,7 +482,6 @@ public struct MegrumRootView: View {
                     }
                 }
                 .tint(MegrumTheme.lavender)
-                .disabled(showsDrawer)
                 .offset(x: contentOffset)
                 .clipShape(
                     UnevenRoundedRectangle(
@@ -538,35 +508,22 @@ public struct MegrumRootView: View {
                                     showsDrawer = false
                                 }
                             }
+                            .gesture(drawerPanGesture(drawerTravel: drawerOpenOffset))
                     }
                 }
 
-                if drawerProgress > 0.001 {
-                    AppDrawerOverlay(
-                        isPresented: $showsDrawer,
-                        presentationProgress: drawerProgress,
-                        drawerWidth: drawerWidth,
-                        appState: appState,
-                        onSelectDestination: { destination in
-                            openDrawerDestination(destination)
-                        },
-                        onSignOut: {
-                            await authState.signOut()
-                            Task {
-                                await appState.revokeRegisteredNativePushDeviceToken()
-                            }
-                            drawerDestination = nil
-                            drawerPageDestination = nil
-                            publicProfileRoute = nil
-                            showsDrawer = false
-                        }
-                    )
-                    .zIndex(10)
+                if selectedTab == .home && !showsDrawer {
+                    Color.clear
+                        .frame(width: AppDrawerVisualMetrics.closedEdgeGestureWidth)
+                        .frame(maxHeight: .infinity)
+                        .contentShape(Rectangle())
+                        .ignoresSafeArea(edges: .vertical)
+                        .highPriorityGesture(drawerPanGesture(drawerTravel: drawerOpenOffset))
+                        .zIndex(8)
                 }
             }
             .background(MegrumTheme.canvas.ignoresSafeArea())
             .contentShape(Rectangle())
-            .highPriorityGesture(drawerPanGesture(drawerTravel: drawerOpenOffset), including: .subviews)
         }
     }
 
@@ -575,13 +532,11 @@ public struct MegrumRootView: View {
     }
 
     private func resolvedDrawerProgress(drawerTravel: CGFloat) -> CGFloat {
-        guard drawerTravel > 0 else {
-            return showsDrawer ? 1 : 0
-        }
-        let baseOffset = showsDrawer ? drawerTravel : 0
-        let gestureOffset = showsDrawer ? min(0, drawerDragTranslation) : max(0, drawerDragTranslation)
-        let revealed = min(drawerTravel, max(0, baseOffset + gestureOffset))
-        return revealed / drawerTravel
+        AppDrawerVisualMetrics.presentationProgress(
+            isPresented: showsDrawer,
+            dragTranslation: drawerDragTranslation,
+            drawerTravel: drawerTravel
+        )
     }
 
     private func drawerPanGesture(drawerTravel: CGFloat) -> some Gesture {
@@ -648,19 +603,14 @@ public struct MegrumRootView: View {
         drawerDestination = nil
         drawerPageDestination = nil
 
+        let presentationDelay: TimeInterval = showsDrawer ? 0.18 : 0
         switch destination {
-        case .profile:
-            DispatchQueue.main.async {
+        case .profile, .schedules:
+            DispatchQueue.main.asyncAfter(deadline: .now() + presentationDelay) {
                 drawerPageDestination = destination
             }
-        case .schedules:
-            requestedTradesStage = .inProgress
-            selectedTab = .trades
-        case .completedTrades:
-            requestedTradesStage = .completed
-            selectedTab = .trades
         default:
-            DispatchQueue.main.async {
+            DispatchQueue.main.asyncAfter(deadline: .now() + presentationDelay) {
                 drawerDestination = destination
             }
         }
@@ -684,9 +634,7 @@ public struct MegrumRootView: View {
             case .oshiSettings:
                 OshiSettingsScreen(appState: appState)
             case .schedules:
-                TradesScreen(appState: appState, requestedStage: .constant(.inProgress))
-            case .completedTrades:
-                TradesScreen(appState: appState, requestedStage: .constant(.completed))
+                PersonalScheduleScreen(appState: appState)
             case .settings:
                 SettingsScreen(
                     appState: appState,

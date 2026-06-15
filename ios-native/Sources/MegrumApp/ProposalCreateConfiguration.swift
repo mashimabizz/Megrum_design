@@ -3,6 +3,7 @@ import MegrumCore
 struct ProposalCreateConfiguration: Equatable {
     var exchangeMethod: ExchangeMethod
     var hasSelectedSenderGoods: Bool
+    var hasCashOffer: Bool = false
     var isCreatingProposal: Bool
     var hasReadyMailingAddress: Bool
     var isLoadingMailingAddress: Bool
@@ -33,7 +34,7 @@ struct ProposalCreateConfiguration: Equatable {
     }
 
     var canSubmit: Bool {
-        hasSelectedSenderGoods
+        (hasSelectedSenderGoods || hasCashOffer)
             && receiverGoodsCount > 0
             && !isCreatingProposal
             && !isLoadingMailingAddress

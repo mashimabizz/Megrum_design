@@ -6,6 +6,7 @@ import SwiftUI
 struct TradeMessageBubble: View {
     var message: TradeMessage
     var isMine: Bool
+    var isReadByPartner: Bool = false
     var cancelApprovalPrompt: TradeCancelApprovalPrompt?
     var isApprovingCancel: Bool = false
     var onOpenImage: (URL) -> Void
@@ -25,34 +26,40 @@ struct TradeMessageBubble: View {
     }
 
     private var userMessage: some View {
-        VStack(alignment: isMine ? .trailing : .leading, spacing: 4) {
-            if let photoURL = message.photoURL {
-                photoMessage(photoURL)
+        HStack(alignment: .bottom, spacing: 6) {
+            if isMine {
+                TradeMessageMeta(message: message, isMine: isMine, isReadByPartner: isReadByPartner)
             }
 
-            switch message.messageType {
-            case .location:
-                let presentation = TradeOperationalMessagePresentation(message: message)
-                locationPreviewBubble(presentation: presentation)
-            case .arrivalStatus:
-                let presentation = TradeOperationalMessagePresentation(message: message)
-                richTextBubble(
-                    title: presentation.title,
-                    systemImage: presentation.systemImage,
-                    body: presentation.body,
-                    detail: presentation.detail
-                )
-            case .text, .photo, .outfitPhoto:
-                if let bodyText {
-                    textBubble(bodyText)
+            VStack(alignment: isMine ? .trailing : .leading, spacing: 4) {
+                if let photoURL = message.photoURL {
+                    photoMessage(photoURL)
                 }
-            case .system:
-                EmptyView()
+
+                switch message.messageType {
+                case .location:
+                    let presentation = TradeOperationalMessagePresentation(message: message)
+                    locationPreviewBubble(presentation: presentation)
+                case .arrivalStatus:
+                    let presentation = TradeOperationalMessagePresentation(message: message)
+                    richTextBubble(
+                        title: presentation.title,
+                        systemImage: presentation.systemImage,
+                        body: presentation.body,
+                        detail: presentation.detail
+                    )
+                case .text, .photo, .outfitPhoto:
+                    if let bodyText {
+                        textBubble(bodyText)
+                    }
+                case .system:
+                    EmptyView()
+                }
             }
 
-            Text(message.createdAt.formatted(date: .omitted, time: .shortened))
-                .font(.system(size: 11, weight: .bold, design: .rounded))
-                .foregroundStyle(MegrumTheme.muted)
+            if !isMine {
+                TradeMessageMeta(message: message, isMine: isMine, isReadByPartner: isReadByPartner)
+            }
         }
         .frame(maxWidth: .infinity, alignment: isMine ? .trailing : .leading)
     }
@@ -174,17 +181,7 @@ struct TradeMessageBubble: View {
     }
 
     private func textBubble(_ text: String) -> some View {
-        Text(text)
-            .font(.system(size: 15, weight: .bold, design: .rounded))
-            .foregroundStyle(isMine ? .white : MegrumTheme.ink)
-            .fixedSize(horizontal: false, vertical: true)
-            .frame(maxWidth: 300, alignment: isMine ? .trailing : .leading)
-            .padding(.horizontal, 14)
-            .padding(.vertical, 10)
-            .background(
-                isMine ? AnyShapeStyle(MegrumTheme.lavender) : AnyShapeStyle(.white.opacity(0.9)),
-                in: RoundedRectangle(cornerRadius: 18, style: .continuous)
-            )
+        TradeTextMessageBubble(text: text, isMine: isMine)
     }
 
     private func richTextBubble(title: String, systemImage: String, body: String, detail: String? = nil) -> some View {
@@ -293,5 +290,43 @@ struct TradeMessageBubble: View {
         default:
             nil
         }
+    }
+}
+
+private struct TradeMessageMeta: View {
+    var message: TradeMessage
+    var isMine: Bool
+    var isReadByPartner: Bool
+
+    var body: some View {
+        VStack(alignment: isMine ? .trailing : .leading, spacing: 1) {
+            if isMine, isReadByPartner {
+                Text("既読")
+            }
+            Text(message.createdAt.formatted(date: .omitted, time: .shortened))
+        }
+        .font(.system(size: 10.5, weight: .bold, design: .rounded))
+        .foregroundStyle(MegrumTheme.muted.opacity(0.82))
+        .padding(.bottom, 2)
+    }
+}
+
+private struct TradeTextMessageBubble: View {
+    var text: String
+    var isMine: Bool
+
+    var body: some View {
+        Text(text)
+            .font(.system(size: 15, weight: .bold, design: .rounded))
+            .foregroundStyle(isMine ? .white : MegrumTheme.ink)
+            .multilineTextAlignment(isMine ? .trailing : .leading)
+            .fixedSize(horizontal: false, vertical: true)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 10)
+            .background(
+                isMine ? AnyShapeStyle(MegrumTheme.lavender) : AnyShapeStyle(.white.opacity(0.9)),
+                in: RoundedRectangle(cornerRadius: 18, style: .continuous)
+            )
+            .frame(maxWidth: 300, alignment: isMine ? .trailing : .leading)
     }
 }

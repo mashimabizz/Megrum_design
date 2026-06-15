@@ -78,6 +78,16 @@ struct SettingsScreen: View {
                 }
 
                 NavigationLink {
+                    PaymentSettingsScreen(appState: appState)
+                } label: {
+                    SettingsMenuRowLabel(
+                        title: "支払い条件設定",
+                        subtitle: paymentStatusText,
+                        systemImage: "yensign.circle"
+                    )
+                }
+
+                NavigationLink {
                     BlockedUsersScreen(appState: appState)
                 } label: {
                     SettingsMenuRowLabel(
@@ -221,6 +231,10 @@ struct SettingsScreen: View {
         return address.summary
     }
 
+    private var paymentStatusText: String {
+        appState.viewer?.paymentSummaryText ?? "未設定"
+    }
+
     private var accountSummary: SettingsAccountSummary {
         SettingsAccountSummary(
             viewer: appState.viewer,
@@ -258,6 +272,9 @@ struct SettingsScreen: View {
             await appState.loadNotifications()
         }
         await appState.loadPushNotificationSetting()
+        if appState.paymentSettings == nil {
+            await appState.loadPaymentSettings()
+        }
     }
 
     private func performSignOut(dismissSettings: Bool) async {

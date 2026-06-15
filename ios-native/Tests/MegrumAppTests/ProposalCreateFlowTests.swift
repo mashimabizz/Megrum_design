@@ -1,5 +1,6 @@
 @testable import MegrumApp
 import Foundation
+import MapKit
 import MegrumCore
 import XCTest
 
@@ -76,6 +77,38 @@ final class ProposalCreateFlowTests: XCTestCase {
         XCTAssertTrue(ProposalCreateStep.allCases.allSatisfy { configuration.canAdvance(from: $0) })
         XCTAssertEqual(configuration.targetStatus, .sent)
         XCTAssertEqual(configuration.targetSupplement, "ほか1件も受け取る条件です")
+    }
+
+    func testProposalMeetupMapRegionBuilderKeepsExistingSpans() throws {
+        XCTAssertNil(ProposalMeetupMapRegionBuilder.region(for: []))
+
+        let primary = ProposalMeetupInput(
+            startAt: Date(timeIntervalSince1970: 1_000),
+            endAt: Date(timeIntervalSince1970: 2_800),
+            placeName: "東京ドーム 22ゲート前",
+            latitude: 35.7056,
+            longitude: 139.7519
+        )
+        let single = try XCTUnwrap(ProposalMeetupMapRegionBuilder.region(for: [primary]))
+
+        XCTAssertEqual(single.center.latitude, 35.7056, accuracy: 0.000_001)
+        XCTAssertEqual(single.center.longitude, 139.7519, accuracy: 0.000_001)
+        XCTAssertEqual(single.span.latitudeDelta, 0.008, accuracy: 0.000_001)
+        XCTAssertEqual(single.span.longitudeDelta, 0.008, accuracy: 0.000_001)
+
+        let secondary = ProposalMeetupInput(
+            startAt: Date(timeIntervalSince1970: 4_000),
+            endAt: Date(timeIntervalSince1970: 5_800),
+            placeName: "水道橋駅 東口",
+            latitude: 35.7014,
+            longitude: 139.7548
+        )
+        let multiple = try XCTUnwrap(ProposalMeetupMapRegionBuilder.region(for: [primary, secondary]))
+
+        XCTAssertEqual(multiple.center.latitude, (35.7014 + 35.7056) / 2, accuracy: 0.000_001)
+        XCTAssertEqual(multiple.center.longitude, (139.7519 + 139.7548) / 2, accuracy: 0.000_001)
+        XCTAssertEqual(multiple.span.latitudeDelta, 0.01, accuracy: 0.000_001)
+        XCTAssertEqual(multiple.span.longitudeDelta, 0.01, accuracy: 0.000_001)
     }
 
     func testProposalSubmittedSummaryOmitsTagsWhenEmpty() {
@@ -399,10 +432,8 @@ final class ProposalCreateFlowTests: XCTestCase {
         XCTAssertEqual(ProposalFlowScreenCopy.title(for: .give), "提示物の選択")
         XCTAssertEqual(ProposalFlowScreenCopy.title(for: .receive), "提示物の選択")
         XCTAssertEqual(ProposalFlowScreenCopy.title(for: .confirm), "送信確認")
-        XCTAssertEqual(
-            ProposalFlowScreenCopy.confirmNoticeText(partnerHandle: "michilion"),
-            "@michilion に下記の内容で打診を送ります。"
-        )
+        XCTAssertTrue(ProposalFlowScreenCopy.showsHeaderKicker(for: .give))
+        XCTAssertFalse(ProposalFlowScreenCopy.showsHeaderKicker(for: .confirm))
         XCTAssertEqual(ProposalConfirmSectionCopy.meetupCandidatesTitle, "交換できる候補")
     }
 
@@ -449,7 +480,6 @@ final class ProposalCreateFlowTests: XCTestCase {
             [
                 .exchangeContent,
                 .method,
-                .conditionTags,
                 .meetupCandidates,
                 .message,
                 .scheduleShare
@@ -460,7 +490,6 @@ final class ProposalCreateFlowTests: XCTestCase {
             [
                 .exchangeContent,
                 .method,
-                .conditionTags,
                 .message
             ]
         )

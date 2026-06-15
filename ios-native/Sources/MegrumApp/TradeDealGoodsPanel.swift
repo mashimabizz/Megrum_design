@@ -365,14 +365,6 @@ private struct TradeGoodsOrbitCard: View {
             .background(accentColor.opacity(labelOpacity))
         }
         .clipShape(RoundedRectangle(cornerRadius: 13 + CGFloat(clampedProminence), style: .continuous))
-        .overlay(alignment: .topTrailing) {
-            Image(systemName: "star.fill")
-                .font(.system(size: 8 + CGFloat(clampedProminence) * 2, weight: .black))
-                .foregroundStyle(.white)
-                .padding(5)
-                .background(accentColor.opacity(0.66), in: Circle())
-                .padding(5)
-        }
         .overlay {
             RoundedRectangle(cornerRadius: 13 + CGFloat(clampedProminence), style: .continuous)
                 .strokeBorder(accentColor.opacity(0.44 + clampedProminence * 0.12), lineWidth: 1.2 + CGFloat(clampedProminence) * 0.45)
@@ -501,14 +493,6 @@ private struct TradeGoodsHeroCard: View {
             .background(accentColor.opacity(0.72))
         }
         .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-        .overlay(alignment: .topTrailing) {
-            Image(systemName: "star.fill")
-                .font(.system(size: 10, weight: .black))
-                .foregroundStyle(.white)
-                .padding(6)
-                .background(accentColor.opacity(0.68), in: Circle())
-                .padding(6)
-        }
         .overlay {
             RoundedRectangle(cornerRadius: 14, style: .continuous)
                 .strokeBorder(accentColor.opacity(0.48), lineWidth: 1.6)

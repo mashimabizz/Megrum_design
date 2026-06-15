@@ -97,6 +97,63 @@ public enum UserGender: String, Codable, Sendable, CaseIterable, Identifiable {
     }
 }
 
+public enum UserPaymentMethod: String, Codable, Sendable, CaseIterable, Identifiable {
+    case bankTransfer = "bank_transfer"
+    case paypay
+    case cashExchange = "cash_exchange"
+    case other
+
+    public var id: String { rawValue }
+
+    public var displayName: String {
+        switch self {
+        case .bankTransfer:
+            "銀行振込"
+        case .paypay:
+            "PayPay"
+        case .cashExchange:
+            "現金交換"
+        case .other:
+            "その他"
+        }
+    }
+
+    public var isHomeConditionTarget: Bool {
+        switch self {
+        case .bankTransfer, .paypay, .cashExchange:
+            true
+        case .other:
+            false
+        }
+    }
+
+    public static func normalized(_ methods: [UserPaymentMethod]) -> [UserPaymentMethod] {
+        UserPaymentMethod.allCases.filter { method in
+            methods.contains(method)
+        }
+    }
+
+    public static func displayText(
+        for methods: [UserPaymentMethod],
+        otherNote: String?,
+        emptyText: String = "未設定"
+    ) -> String {
+        let normalizedMethods = normalized(methods)
+        guard !normalizedMethods.isEmpty else {
+            return emptyText
+        }
+
+        let trimmedOtherNote = otherNote?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        let titles = normalizedMethods.map { method in
+            if method == .other, !trimmedOtherNote.isEmpty {
+                return trimmedOtherNote
+            }
+            return method.displayName
+        }
+        return titles.joined(separator: " / ")
+    }
+}
+
 public struct UserProfile: Identifiable, Codable, Hashable, Sendable {
     public var id: UUID
     public var handle: String
@@ -104,6 +161,9 @@ public struct UserProfile: Identifiable, Codable, Hashable, Sendable {
     public var avatarURL: URL?
     public var gender: UserGender?
     public var prefecture: String?
+    public var age: Int?
+    public var paymentMethods: [UserPaymentMethod]
+    public var paymentNote: String?
     public var accountStatus: AccountStatus
 
     public init(
@@ -113,6 +173,9 @@ public struct UserProfile: Identifiable, Codable, Hashable, Sendable {
         avatarURL: URL? = nil,
         gender: UserGender? = nil,
         prefecture: String? = nil,
+        age: Int? = nil,
+        paymentMethods: [UserPaymentMethod] = [],
+        paymentNote: String? = nil,
         accountStatus: AccountStatus = .active
     ) {
         self.id = id
@@ -121,7 +184,83 @@ public struct UserProfile: Identifiable, Codable, Hashable, Sendable {
         self.avatarURL = avatarURL
         self.gender = gender
         self.prefecture = prefecture
+        self.age = age
+        self.paymentMethods = paymentMethods
+        self.paymentNote = paymentNote
         self.accountStatus = accountStatus
+    }
+
+    public var paymentSummaryText: String {
+        UserPaymentMethod.displayText(for: paymentMethods, otherNote: paymentNote)
+    }
+
+    public var ageText: String? {
+        guard let age, age > 0 else {
+            return nil
+        }
+        return "\(age)歳"
+    }
+}
+
+public struct UserPaymentSettings: Identifiable, Codable, Hashable, Sendable {
+    public var userID: UUID
+    public var methods: [UserPaymentMethod]
+    public var bankName: String
+    public var bankBranchName: String
+    public var bankAccountType: String
+    public var bankAccountNumber: String
+    public var bankAccountHolder: String
+    public var otherNote: String?
+    public var createdAt: Date?
+    public var updatedAt: Date?
+
+    public var id: UUID { userID }
+
+    public init(
+        userID: UUID,
+        methods: [UserPaymentMethod] = [],
+        bankName: String = "",
+        bankBranchName: String = "",
+        bankAccountType: String = "",
+        bankAccountNumber: String = "",
+        bankAccountHolder: String = "",
+        otherNote: String? = nil,
+        createdAt: Date? = nil,
+        updatedAt: Date? = nil
+    ) {
+        self.userID = userID
+        self.methods = UserPaymentMethod.normalized(methods)
+        self.bankName = bankName
+        self.bankBranchName = bankBranchName
+        self.bankAccountType = bankAccountType
+        self.bankAccountNumber = bankAccountNumber
+        self.bankAccountHolder = bankAccountHolder
+        self.otherNote = otherNote
+        self.createdAt = createdAt
+        self.updatedAt = updatedAt
+    }
+
+    public var publicSummaryText: String {
+        UserPaymentMethod.displayText(for: methods, otherNote: otherNote)
+    }
+
+    public func normalized(for userID: UUID? = nil) -> UserPaymentSettings {
+        UserPaymentSettings(
+            userID: userID ?? self.userID,
+            methods: UserPaymentMethod.normalized(methods),
+            bankName: Self.trimmed(bankName),
+            bankBranchName: Self.trimmed(bankBranchName),
+            bankAccountType: Self.trimmed(bankAccountType),
+            bankAccountNumber: Self.trimmed(bankAccountNumber),
+            bankAccountHolder: Self.trimmed(bankAccountHolder),
+            otherNote: Self.trimmed(otherNote).nilIfBlank,
+            createdAt: createdAt,
+            updatedAt: updatedAt
+        )
+    }
+
+    private static func trimmed(_ value: String?) -> String {
+        value?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
     }
 }
 
@@ -131,17 +270,20 @@ public struct PublicUserProfile: Identifiable, Codable, Hashable, Sendable {
     public var averageStars: Double?
     public var evaluationCount: Int
     public var completedTradeCount: Int
+    public var oshiTags: [PublicOshiTag]
 
     public init(
         profile: UserProfile,
         averageStars: Double? = nil,
         evaluationCount: Int = 0,
-        completedTradeCount: Int = 0
+        completedTradeCount: Int = 0,
+        oshiTags: [PublicOshiTag] = []
     ) {
         self.profile = profile
         self.averageStars = averageStars
         self.evaluationCount = evaluationCount
         self.completedTradeCount = completedTradeCount
+        self.oshiTags = oshiTags
     }
 
     public var ratingSummary: String {
@@ -149,6 +291,90 @@ public struct PublicUserProfile: Identifiable, Codable, Hashable, Sendable {
             return "評価なし"
         }
         return String(format: "★ %.1f", averageStars)
+    }
+}
+
+public struct PublicOshiTag: Identifiable, Codable, Hashable, Sendable {
+    public var title: String
+    public var groupID: UUID?
+    public var characterID: UUID?
+    public var priority: Int
+
+    public var id: String {
+        "\(groupID?.uuidString ?? "groupless"):\(characterID?.uuidString ?? title):\(priority)"
+    }
+
+    public var colorKey: String {
+        groupID?.uuidString ?? title
+    }
+
+    public init(title: String, groupID: UUID? = nil, characterID: UUID? = nil, priority: Int = 0) {
+        self.title = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        self.groupID = groupID
+        self.characterID = characterID
+        self.priority = priority
+    }
+
+    public static func makeTags(from selections: [UserOshiSelection], limit: Int = 12) -> [PublicOshiTag] {
+        var tags: [PublicOshiTag] = []
+        var seen: Set<String> = []
+
+        for selection in selections.sorted(by: { $0.priority < $1.priority }) {
+            let colorGroupID = selection.groupID
+            if let groupTitle = selection.displayGroupTitle {
+                appendTag(
+                    PublicOshiTag(
+                        title: groupTitle,
+                        groupID: colorGroupID,
+                        priority: selection.priority
+                    ),
+                    into: &tags,
+                    seen: &seen
+                )
+            }
+            if let characterTitle = selection.displayCharacterTitle {
+                appendTag(
+                    PublicOshiTag(
+                        title: characterTitle,
+                        groupID: colorGroupID,
+                        characterID: selection.characterID,
+                        priority: selection.priority
+                    ),
+                    into: &tags,
+                    seen: &seen
+                )
+            }
+            if tags.count >= limit {
+                break
+            }
+        }
+
+        return Array(tags.prefix(max(0, limit)))
+    }
+
+    private static func appendTag(_ tag: PublicOshiTag, into tags: inout [PublicOshiTag], seen: inout Set<String>) {
+        guard !tag.title.isEmpty else {
+            return
+        }
+        let key = "\(tag.colorKey):\(tag.title)"
+        guard seen.insert(key).inserted else {
+            return
+        }
+        tags.append(tag)
+    }
+}
+
+private extension UserOshiSelection {
+    var displayGroupTitle: String? {
+        [groupName, oshiRequestName]
+            .compactMap { $0?.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .first { !$0.isEmpty }
+    }
+
+    var displayCharacterTitle: String? {
+        [characterName, characterRequestName]
+            .compactMap { $0?.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .first { !$0.isEmpty }
     }
 }
 
@@ -259,6 +485,15 @@ public enum OshiRequestKind: String, Codable, Sendable, CaseIterable, Identifiab
             "ソロ"
         }
     }
+
+    public var supportsMemberSelection: Bool {
+        switch self {
+        case .group, .work:
+            true
+        case .solo:
+            false
+        }
+    }
 }
 
 public struct OshiGenre: Identifiable, Codable, Hashable, Sendable {
@@ -333,6 +568,10 @@ public struct OshiGroup: Identifiable, Codable, Hashable, Sendable {
         self.genreID = genreID
         self.genreName = genreName
         self.displayOrder = displayOrder
+    }
+
+    public var supportsMemberSelection: Bool {
+        kind.supportsMemberSelection
     }
 }
 
@@ -600,8 +839,12 @@ public struct GoodsItem: Identifiable, Codable, Hashable, Sendable {
     public var imageURL: URL?
     public var tags: [GoodsTag]
     public var quantity: Int
+    public var lockedQuantity: Int
+    public var marketAvailableQuantity: Int
     public var exchangeMethod: ExchangeMethod?
     public var ownerPrefecture: String?
+    public var ownerPaymentMethods: [UserPaymentMethod]
+    public var ownerPaymentNote: String?
 
     public init(
         id: UUID,
@@ -615,9 +858,15 @@ public struct GoodsItem: Identifiable, Codable, Hashable, Sendable {
         imageURL: URL? = nil,
         tags: [GoodsTag] = [],
         quantity: Int = 1,
+        lockedQuantity: Int = 0,
+        marketAvailableQuantity: Int? = nil,
         exchangeMethod: ExchangeMethod? = nil,
-        ownerPrefecture: String? = nil
+        ownerPrefecture: String? = nil,
+        ownerPaymentMethods: [UserPaymentMethod] = [],
+        ownerPaymentNote: String? = nil
     ) {
+        let normalizedQuantity = max(0, quantity)
+        let normalizedLockedQuantity = max(0, lockedQuantity)
         self.id = id
         self.ownerID = ownerID
         self.kind = kind
@@ -628,9 +877,13 @@ public struct GoodsItem: Identifiable, Codable, Hashable, Sendable {
         self.title = title
         self.imageURL = imageURL
         self.tags = tags
-        self.quantity = quantity
+        self.quantity = normalizedQuantity
+        self.lockedQuantity = normalizedLockedQuantity
+        self.marketAvailableQuantity = max(0, marketAvailableQuantity ?? (normalizedQuantity - normalizedLockedQuantity))
         self.exchangeMethod = exchangeMethod
         self.ownerPrefecture = ownerPrefecture
+        self.ownerPaymentMethods = UserPaymentMethod.normalized(ownerPaymentMethods)
+        self.ownerPaymentNote = ownerPaymentNote
     }
 }
 
@@ -1148,6 +1401,8 @@ public struct ProposalCreateInput: Equatable, Sendable {
     public var meetupCandidates: [ProposalMeetupInput]
     public var exposeCalendar: Bool
     public var listingID: UUID?
+    public var cashOffer: Bool
+    public var cashAmount: Int?
 
     public init(
         receiverID: UUID,
@@ -1161,7 +1416,9 @@ public struct ProposalCreateInput: Equatable, Sendable {
         meetup: ProposalMeetupInput? = nil,
         meetupCandidates: [ProposalMeetupInput] = [],
         exposeCalendar: Bool = false,
-        listingID: UUID? = nil
+        listingID: UUID? = nil,
+        cashOffer: Bool = false,
+        cashAmount: Int? = nil
     ) {
         self.receiverID = receiverID
         self.senderGoodsIDs = senderGoodsIDs
@@ -1175,6 +1432,8 @@ public struct ProposalCreateInput: Equatable, Sendable {
         self.meetupCandidates = meetupCandidates
         self.exposeCalendar = exposeCalendar
         self.listingID = listingID
+        self.cashAmount = cashAmount.map { max(0, $0) }
+        self.cashOffer = cashOffer || self.cashAmount != nil
     }
 
     public var requiresMeetupBeforeSending: Bool {
@@ -1192,6 +1451,8 @@ public struct TradeProposal: Identifiable, Codable, Hashable, Sendable {
     public var senderGoodsIDs: [UUID]
     public var receiverGoodsIDs: [UUID]
     public var conditionTags: [String]
+    public var cashOffer: Bool
+    public var cashAmount: Int?
     public var agreedBySender: Bool
     public var agreedByReceiver: Bool
     public var evidencePhotoURL: URL?
@@ -1201,6 +1462,7 @@ public struct TradeProposal: Identifiable, Codable, Hashable, Sendable {
     public var approvedByReceiver: Bool
     public var completedAt: Date?
     public var createdAt: Date
+    public var updatedAt: Date?
     public var meetupCandidates: [ProposalMeetupInput]?
 
     public init(
@@ -1213,6 +1475,8 @@ public struct TradeProposal: Identifiable, Codable, Hashable, Sendable {
         senderGoodsIDs: [UUID],
         receiverGoodsIDs: [UUID],
         conditionTags: [String] = [],
+        cashOffer: Bool = false,
+        cashAmount: Int? = nil,
         agreedBySender: Bool = false,
         agreedByReceiver: Bool = false,
         evidencePhotoURL: URL? = nil,
@@ -1222,6 +1486,7 @@ public struct TradeProposal: Identifiable, Codable, Hashable, Sendable {
         approvedByReceiver: Bool = false,
         completedAt: Date? = nil,
         createdAt: Date = .now,
+        updatedAt: Date? = nil,
         meetupCandidates: [ProposalMeetupInput]? = nil
     ) {
         self.id = id
@@ -1233,6 +1498,8 @@ public struct TradeProposal: Identifiable, Codable, Hashable, Sendable {
         self.senderGoodsIDs = senderGoodsIDs
         self.receiverGoodsIDs = receiverGoodsIDs
         self.conditionTags = conditionTags
+        self.cashOffer = cashOffer
+        self.cashAmount = cashAmount.map { max(0, $0) }
         self.agreedBySender = agreedBySender
         self.agreedByReceiver = agreedByReceiver
         self.evidencePhotoURL = evidencePhotoURL
@@ -1242,6 +1509,7 @@ public struct TradeProposal: Identifiable, Codable, Hashable, Sendable {
         self.approvedByReceiver = approvedByReceiver
         self.completedAt = completedAt
         self.createdAt = createdAt
+        self.updatedAt = updatedAt
         self.meetupCandidates = meetupCandidates
     }
 
@@ -1342,6 +1610,35 @@ public struct TradeProposal: Identifiable, Codable, Hashable, Sendable {
             status: .negotiating,
             listingID: listingID
         )
+    }
+}
+
+public struct TradeEvidencePhoto: Identifiable, Codable, Hashable, Sendable {
+    public var id: UUID
+    public var proposalID: UUID
+    public var photoURL: URL
+    public var position: Int
+    public var takenAt: Date?
+    public var takenBy: UUID
+
+    public init(
+        id: UUID,
+        proposalID: UUID,
+        photoURL: URL,
+        position: Int,
+        takenAt: Date? = nil,
+        takenBy: UUID
+    ) {
+        self.id = id
+        self.proposalID = proposalID
+        self.photoURL = photoURL
+        self.position = max(1, position)
+        self.takenAt = takenAt
+        self.takenBy = takenBy
+    }
+
+    public func isUploadedBy(_ userID: UUID?) -> Bool {
+        takenBy == userID
     }
 }
 
@@ -1587,6 +1884,29 @@ public struct TradeMessage: Identifiable, Codable, Hashable, Sendable {
     }
 }
 
+public struct ProposalReadState: Identifiable, Codable, Hashable, Sendable {
+    public var proposalID: UUID
+    public var userID: UUID
+    public var lastReadAt: Date
+    public var updatedAt: Date?
+
+    public var id: String {
+        "\(proposalID.uuidString.lowercased())-\(userID.uuidString.lowercased())"
+    }
+
+    public init(
+        proposalID: UUID,
+        userID: UUID,
+        lastReadAt: Date,
+        updatedAt: Date? = nil
+    ) {
+        self.proposalID = proposalID
+        self.userID = userID
+        self.lastReadAt = lastReadAt
+        self.updatedAt = updatedAt
+    }
+}
+
 public struct TradeMessageCreateInput: Equatable, Sendable {
     public var proposalID: UUID
     public var body: String
@@ -1822,7 +2142,13 @@ public struct BoardThread: Identifiable, Codable, Hashable, Sendable {
     public var latitude: Double?
     public var longitude: Double?
     public var prefecture: String?
+    public var imageURLs: [URL]?
+    public var imagePaths: [String]?
     public var createdAt: Date
+
+    public var thumbnailURL: URL? {
+        imageURLs?.first
+    }
 
     public init(
         id: UUID,
@@ -1833,6 +2159,8 @@ public struct BoardThread: Identifiable, Codable, Hashable, Sendable {
         latitude: Double? = nil,
         longitude: Double? = nil,
         prefecture: String? = nil,
+        imageURLs: [URL] = [],
+        imagePaths: [String] = [],
         createdAt: Date = .now
     ) {
         self.id = id
@@ -1843,6 +2171,8 @@ public struct BoardThread: Identifiable, Codable, Hashable, Sendable {
         self.latitude = latitude
         self.longitude = longitude
         self.prefecture = prefecture
+        self.imageURLs = imageURLs.isEmpty ? nil : imageURLs
+        self.imagePaths = imagePaths.isEmpty ? nil : imagePaths
         self.createdAt = createdAt
     }
 }
@@ -1855,6 +2185,8 @@ public struct BoardThreadCreateInput: Equatable, Sendable {
     public var latitude: Double?
     public var longitude: Double?
     public var prefecture: String?
+    public var imagePaths: [String]
+    public var thumbnailUpload: GoodsPhotoUpload?
 
     public init(
         authorID: UUID,
@@ -1863,7 +2195,9 @@ public struct BoardThreadCreateInput: Equatable, Sendable {
         audience: BoardThread.Audience = .nearby3km,
         latitude: Double? = nil,
         longitude: Double? = nil,
-        prefecture: String? = nil
+        prefecture: String? = nil,
+        imagePaths: [String] = [],
+        thumbnailUpload: GoodsPhotoUpload? = nil
     ) {
         self.authorID = authorID
         self.title = title
@@ -1872,6 +2206,8 @@ public struct BoardThreadCreateInput: Equatable, Sendable {
         self.latitude = latitude
         self.longitude = longitude
         self.prefecture = prefecture
+        self.imagePaths = imagePaths
+        self.thumbnailUpload = thumbnailUpload
     }
 }
 

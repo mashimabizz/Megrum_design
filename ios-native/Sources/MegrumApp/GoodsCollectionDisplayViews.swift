@@ -7,6 +7,7 @@ struct CollectionHeader: View {
     var subtitle: String
     @Binding var columns: Int
     var accessory: AnyView?
+    var showsColumnToggle = true
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
@@ -17,8 +18,10 @@ struct CollectionHeader: View {
 
                 Spacer()
 
-                ColumnToggleButton(columns: $columns)
-                    .padding(.top, 3)
+                if showsColumnToggle {
+                    ColumnToggleButton(columns: $columns)
+                        .padding(.top, 3)
+                }
             }
 
             if let accessory {
@@ -156,6 +159,8 @@ struct CollectionFilterBar: View {
     @Binding var selectedGroupID: UUID?
     @Binding var selectedGoodsTypeID: UUID?
     @Binding var selectedTagNames: Set<String>
+    var availableGroups: [OshiGroup]
+    var availableGoodsTypes: [GoodsType]
     var availableTagNames: [String]
 
     var body: some View {
@@ -164,7 +169,7 @@ struct CollectionFilterBar: View {
                 ChoiceChip(title: "すべて", isSelected: selectedGroupID == nil, style: .compact) {
                     selectedGroupID = nil
                 }
-                ForEach(appState.oshiGroups) { group in
+                ForEach(availableGroups) { group in
                     ChoiceChip(title: group.name, isSelected: selectedGroupID == group.id, style: .compact) {
                         selectedGroupID = group.id
                     }
@@ -175,7 +180,7 @@ struct CollectionFilterBar: View {
                 ChoiceChip(title: "すべて", isSelected: selectedGoodsTypeID == nil, style: .compact) {
                     selectedGoodsTypeID = nil
                 }
-                ForEach(appState.goodsTypes) { goodsType in
+                ForEach(availableGoodsTypes) { goodsType in
                     ChoiceChip(title: goodsType.name, isSelected: selectedGoodsTypeID == goodsType.id, style: .compact) {
                         selectedGoodsTypeID = goodsType.id
                     }
@@ -256,12 +261,7 @@ struct ChoiceChip: View {
 
     @ViewBuilder
     private var label: some View {
-        if style == .compact {
-            baseLabel
-                .megrumLiquidGlass(.capsule, tint: glassTint, interactive: true)
-        } else {
-            baseLabel
-        }
+        baseLabel
     }
 
     private var baseLabel: some View {
@@ -282,13 +282,6 @@ struct ChoiceChip: View {
         isSelected
             ? AnyShapeStyle(MegrumTheme.lavender)
             : AnyShapeStyle(.regularMaterial)
-    }
-
-    private var glassTint: Color {
-        if isSelected {
-            return MegrumTheme.lavender.opacity(CollectionScreenLayoutMetrics.filterChipGlassSelectedOpacity)
-        }
-        return Color.white.opacity(CollectionScreenLayoutMetrics.filterChipGlassIdleOpacity)
     }
 
     private var fontSize: CGFloat {
@@ -337,6 +330,7 @@ struct EmptyCollectionMessage: View {
             if let actionTitle, let action {
                 Button(action: action) {
                     Label(actionTitle, systemImage: "plus")
+                        .foregroundStyle(.white)
                 }
                 .buttonStyle(.borderedProminent)
                 .tint(MegrumTheme.lavender)

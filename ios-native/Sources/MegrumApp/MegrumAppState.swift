@@ -13,7 +13,11 @@ public final class MegrumAppState: ObservableObject {
     @Published public private(set) var listings: [IndividualListing] = []
     @Published public private(set) var proposals: [TradeProposal] = []
     @Published public private(set) var messagesByProposalID: [UUID: [TradeMessage]] = [:]
+    @Published public private(set) var evidencePhotosByProposalID: [UUID: [TradeEvidencePhoto]] = [:]
+    @Published public private(set) var viewerReadAtByProposalID: [UUID: Date] = [:]
+    @Published public private(set) var partnerReadAtByProposalID: [UUID: Date] = [:]
     @Published public private(set) var schedulesByProposalID: [UUID: [PersonalSchedule]] = [:]
+    @Published public private(set) var personalSchedules: [PersonalSchedule] = []
     @Published public private(set) var boardRepliesByThreadID: [UUID: [BoardReply]] = [:]
     @Published public private(set) var groomRepliesByPostID: [UUID: [GroomReply]] = [:]
     @Published public private(set) var meguriMessages: [MeguriMessage] = []
@@ -33,6 +37,7 @@ public final class MegrumAppState: ObservableObject {
     @Published public private(set) var publicListingsByUserID: [UUID: [IndividualListing]] = [:]
     @Published public private(set) var userEvaluationsByUserID: [UUID: [UserEvaluation]] = [:]
     @Published public private(set) var mailingAddress: MailingAddress?
+    @Published public private(set) var paymentSettings: UserPaymentSettings?
     @Published public private(set) var blockedUsers: [BlockedUser] = []
     @Published public private(set) var notifications: [MegrumNotification] = []
     @Published public private(set) var pushNotificationsEnabled = true
@@ -46,6 +51,7 @@ public final class MegrumAppState: ObservableObject {
     @Published public private(set) var loadingPublicExchangeUserID: UUID?
     @Published public private(set) var loadingEvaluationsUserID: UUID?
     @Published public private(set) var isLoadingMailingAddress = false
+    @Published public private(set) var isLoadingPaymentSettings = false
     @Published public private(set) var isLoadingBlockedUsers = false
     @Published public private(set) var isLoadingNotifications = false
     @Published public private(set) var isLoadingPushNotificationSetting = false
@@ -56,6 +62,7 @@ public final class MegrumAppState: ObservableObject {
     @Published public private(set) var isLoadingMeguriMessages = false
     @Published public private(set) var isLookingUpPostalCode = false
     @Published public private(set) var isSavingMailingAddress = false
+    @Published public private(set) var isSavingPaymentSettings = false
     @Published public private(set) var isCreatingGoodsEntry = false
     @Published public private(set) var isLoadingIndividualListings = false
     @Published public private(set) var isCreatingIndividualListing = false
@@ -71,7 +78,9 @@ public final class MegrumAppState: ObservableObject {
     @Published public private(set) var isCreatingGroomPost = false
     @Published public private(set) var isCreatingBoardThread = false
     @Published public private(set) var loadingMessagesProposalID: UUID?
+    @Published public private(set) var loadingEvidencePhotosProposalID: UUID?
     @Published public private(set) var loadingSchedulesProposalID: UUID?
+    @Published public private(set) var isLoadingPersonalSchedules = false
     @Published public private(set) var isCreatingSchedule = false
     @Published public private(set) var sendingMessageProposalID: UUID?
     @Published public private(set) var sendingGroomReplyPostID: UUID?
@@ -103,15 +112,27 @@ public final class MegrumAppState: ObservableObject {
     }
 
     public var unreadNotificationCount: Int {
-        notifications.filter(\.isUnread).count
+        NotificationReadStateReducer.unreadCount(in: notifications)
     }
 
     public func messages(for proposalID: UUID) -> [TradeMessage] {
         messagesByProposalID[proposalID] ?? []
     }
 
+    public func partnerLastReadAt(for proposalID: UUID) -> Date? {
+        partnerReadAtByProposalID[proposalID]
+    }
+
     public func schedules(for proposalID: UUID) -> [PersonalSchedule] {
         schedulesByProposalID[proposalID] ?? []
+    }
+
+    public func evidencePhotos(for proposal: TradeProposal) -> [TradeEvidencePhoto] {
+        TradeEvidencePhotoStateReducer.photos(
+            for: proposal,
+            in: evidencePhotosByProposalID,
+            viewerID: viewer?.id
+        )
     }
 
     public func boardReplies(for threadID: UUID) -> [BoardReply] {
@@ -267,10 +288,8 @@ public final class MegrumAppState: ObservableObject {
                     longitude: longitude
                 )
             )
-            grooms.removeAll { $0.id == post.id }
-            grooms.insert(post, at: 0)
-            groomMapPosts.removeAll { $0.id == post.id }
-            groomMapPosts.insert(post, at: 0)
+            grooms = MeguriFeedStateReducer.upsertingGroomPost(post, into: grooms)
+            groomMapPosts = MeguriFeedStateReducer.upsertingGroomPost(post, into: groomMapPosts)
             isCreatingGroomPost = false
             return true
         } catch {
@@ -281,7 +300,10 @@ public final class MegrumAppState: ObservableObject {
     }
 
     public func markGroomViewed(_ postID: UUID) async {
-        viewedGroomIDs.insert(postID)
+        viewedGroomIDs = GroomInteractionStateReducer.markingViewed(
+            postID: postID,
+            in: viewedGroomIDs
+        )
         do {
             try await repository.markGroomViewed(postID: postID)
         } catch {
@@ -291,11 +313,11 @@ public final class MegrumAppState: ObservableObject {
 
     public func setGroomLiked(_ postID: UUID, isLiked: Bool) async {
         let previousLikedIDs = likedGroomIDs
-        if isLiked {
-            likedGroomIDs.insert(postID)
-        } else {
-            likedGroomIDs.remove(postID)
-        }
+        likedGroomIDs = GroomInteractionStateReducer.settingLiked(
+            postID: postID,
+            isLiked: isLiked,
+            in: likedGroomIDs
+        )
         do {
             try await repository.setGroomLiked(postID: postID, isLiked: isLiked)
         } catch {
@@ -310,7 +332,7 @@ public final class MegrumAppState: ObservableObject {
         body: String,
         groomImageURL: URL?
     ) async -> Bool {
-        let trimmed = body.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmed = MegrumAppStateInputNormalizer.trimmedText(body)
         guard !trimmed.isEmpty else {
             return false
         }
@@ -338,7 +360,11 @@ public final class MegrumAppState: ObservableObject {
                     groomImageURL: groomImageURL
                 )
             )
-            groomRepliesByPostID[postID, default: []].append(reply)
+            groomRepliesByPostID = ReplyThreadStateReducer.appendingGroomReply(
+                reply,
+                to: groomRepliesByPostID,
+                postID: postID
+            )
             sendingGroomReplyPostID = nil
             return true
         } catch {
@@ -368,7 +394,7 @@ public final class MegrumAppState: ObservableObject {
         body: String,
         sourceGroomReplyID: UUID? = nil
     ) async -> Bool {
-        let trimmed = body.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmed = MegrumAppStateInputNormalizer.trimmedText(body)
         guard !trimmed.isEmpty else {
             return false
         }
@@ -395,7 +421,10 @@ public final class MegrumAppState: ObservableObject {
                     body: trimmed
                 )
             )
-            meguriMessages.append(message)
+            meguriMessages = MeguriMessageReadStateReducer.appendingSentMessage(
+                message,
+                to: meguriMessages
+            )
             sendingMeguriMessageRecipientID = nil
             return true
         } catch {
@@ -410,29 +439,29 @@ public final class MegrumAppState: ObservableObject {
             return
         }
 
-        let targetIndexes = meguriMessages.indices.filter { index in
-            let message = meguriMessages[index]
-            return message.senderID == peerID
-                && message.recipientID == viewer.id
-                && message.readAt == nil
-        }
-        guard !targetIndexes.isEmpty else {
+        guard MeguriMessageReadStateReducer.hasUnreadIncomingMessages(
+            meguriMessages,
+            peerID: peerID,
+            viewerID: viewer.id
+        ) else {
             return
         }
 
         let readAt = Date()
         let previous = meguriMessages
-        for index in targetIndexes {
-            meguriMessages[index].readAt = readAt
-        }
+        meguriMessages = MeguriMessageReadStateReducer.markIncomingMessagesRead(
+            meguriMessages,
+            peerID: peerID,
+            viewerID: viewer.id,
+            readAt: readAt
+        )
 
         do {
             let updated = try await repository.markMeguriMessagesRead(peerID: peerID, readAt: readAt)
-            guard !updated.isEmpty else {
-                return
-            }
-            let updatedByID = Dictionary(uniqueKeysWithValues: updated.map { ($0.id, $0) })
-            meguriMessages = meguriMessages.map { updatedByID[$0.id] ?? $0 }
+            meguriMessages = MeguriMessageReadStateReducer.mergingUpdated(
+                meguriMessages,
+                updated: updated
+            )
         } catch {
             meguriMessages = previous
             errorMessage = "めぐりメッセージを既読にできませんでした"
@@ -454,12 +483,17 @@ public final class MegrumAppState: ObservableObject {
         loadingBoardRepliesThreadID = threadID
         errorMessage = nil
         do {
-            boardRepliesByThreadID[threadID] = try await repository.loadBoardReplies(
+            let replies = try await repository.loadBoardReplies(
                 threadID: threadID,
                 latitude: latitude,
                 longitude: longitude,
                 prefecture: selectedPrefecture,
                 scope: scope
+            )
+            boardRepliesByThreadID = ReplyThreadStateReducer.replacingBoardReplies(
+                in: boardRepliesByThreadID,
+                threadID: threadID,
+                replies: replies
             )
         } catch {
             errorMessage = "掲示板の返信を読み込めませんでした"
@@ -475,7 +509,7 @@ public final class MegrumAppState: ObservableObject {
         prefecture: String? = nil,
         scope: BoardThread.Audience = .nearby3km
     ) async -> Bool {
-        let trimmed = body.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmed = MegrumAppStateInputNormalizer.trimmedText(body)
         guard !trimmed.isEmpty else {
             return false
         }
@@ -497,7 +531,11 @@ public final class MegrumAppState: ObservableObject {
                     scope: scope
                 )
             )
-            boardRepliesByThreadID[threadID, default: []].append(reply)
+            boardRepliesByThreadID = ReplyThreadStateReducer.appendingBoardReply(
+                reply,
+                to: boardRepliesByThreadID,
+                threadID: threadID
+            )
             sendingBoardReplyThreadID = nil
             return true
         } catch {
@@ -513,25 +551,46 @@ public final class MegrumAppState: ObservableObject {
         scope: BoardThread.Audience = .nearby3km,
         latitude: Double? = nil,
         longitude: Double? = nil,
-        prefecture: String? = nil
+        prefecture: String? = nil,
+        thumbnailUpload: GoodsPhotoUpload? = nil
     ) async -> Bool {
+        await createBoardThreadRecord(
+            title: title,
+            body: body,
+            scope: scope,
+            latitude: latitude,
+            longitude: longitude,
+            prefecture: prefecture,
+            thumbnailUpload: thumbnailUpload
+        ) != nil
+    }
+
+    public func createBoardThreadRecord(
+        title: String,
+        body: String,
+        scope: BoardThread.Audience = .nearby3km,
+        latitude: Double? = nil,
+        longitude: Double? = nil,
+        prefecture: String? = nil,
+        thumbnailUpload: GoodsPhotoUpload? = nil
+    ) async -> BoardThread? {
         guard !isCreatingBoardThread else {
-            return false
+            return nil
         }
         guard let viewer else {
             errorMessage = "プロフィールを読み込んでから投稿してください"
-            return false
+            return nil
         }
 
-        let trimmedTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
-        let trimmedBody = body.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmedTitle = MegrumAppStateInputNormalizer.trimmedText(title)
+        let trimmedBody = MegrumAppStateInputNormalizer.trimmedText(body)
         guard !trimmedTitle.isEmpty else {
             errorMessage = "タイトルを入力してください"
-            return false
+            return nil
         }
         guard !trimmedBody.isEmpty else {
             errorMessage = "本文を入力してください"
-            return false
+            return nil
         }
 
         let normalizedPrefecture = boardPrefecture(explicitPrefecture: prefecture)
@@ -539,16 +598,16 @@ public final class MegrumAppState: ObservableObject {
         case .nearby3km:
             guard latitude != nil, longitude != nil, normalizedPrefecture != nil else {
                 errorMessage = "現在地と都道府県を確認してから投稿してください"
-                return false
+                return nil
             }
         case .samePrefecture:
             guard normalizedPrefecture != nil else {
                 errorMessage = "プロフィールの都道府県を設定してください"
-                return false
+                return nil
             }
         case .sameSpot, .global:
             errorMessage = "この公開範囲はまだ作成できません"
-            return false
+            return nil
         }
 
         isCreatingBoardThread = true
@@ -562,17 +621,17 @@ public final class MegrumAppState: ObservableObject {
                     audience: scope,
                     latitude: latitude,
                     longitude: longitude,
-                    prefecture: normalizedPrefecture
+                    prefecture: normalizedPrefecture,
+                    thumbnailUpload: thumbnailUpload
                 )
             )
-            threads.removeAll { $0.id == created.id }
-            threads.insert(created, at: 0)
+            threads = MeguriFeedStateReducer.upsertingBoardThread(created, into: threads)
             isCreatingBoardThread = false
-            return true
+            return created
         } catch {
             errorMessage = "掲示板を作成できませんでした"
             isCreatingBoardThread = false
-            return false
+            return nil
         }
     }
 
@@ -616,6 +675,25 @@ public final class MegrumAppState: ObservableObject {
             errorMessage = "推しメンバーを読み込めませんでした"
         }
         isLoadingOshiCharacters = false
+    }
+
+    public func loadMemberFaceProfiles(memberIDs: [UUID]) async -> [MemberFaceProfile] {
+        let uniqueIDs = Array(Set(memberIDs))
+        guard !uniqueIDs.isEmpty else {
+            return []
+        }
+
+        do {
+            return try await repository.loadMemberFaceProfiles(
+                memberIDs: uniqueIDs,
+                limit: max(40, uniqueIDs.count * 20)
+            )
+        } catch {
+            #if DEBUG
+            print("Member face profiles could not be loaded: \(error)")
+            #endif
+            return []
+        }
     }
 
     public func loadUserOshiSelections() async {
@@ -684,7 +762,7 @@ public final class MegrumAppState: ObservableObject {
             return false
         }
 
-        let trimmedTitle = input.title.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmedTitle = MegrumAppStateInputNormalizer.trimmedText(input.title)
         guard !trimmedTitle.isEmpty else {
             errorMessage = "グッズ名を入力してください"
             return false
@@ -695,7 +773,7 @@ public final class MegrumAppState: ObservableObject {
             groupID: input.groupID,
             memberID: input.memberID,
             goodsTypeID: input.goodsTypeID,
-            quantity: max(1, min(input.quantity, 999)),
+            quantity: MegrumAppStateInputNormalizer.goodsQuantity(input.quantity),
             status: input.status,
             tagNames: MegrumAppStateInputNormalizer.tagNames(input.tagNames),
             photoUpload: input.photoUpload
@@ -720,7 +798,7 @@ public final class MegrumAppState: ObservableObject {
             return false
         }
 
-        let trimmedTitle = input.title.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmedTitle = MegrumAppStateInputNormalizer.trimmedText(input.title)
         guard !trimmedTitle.isEmpty else {
             errorMessage = "グッズ名を入力してください"
             return false
@@ -732,7 +810,7 @@ public final class MegrumAppState: ObservableObject {
             memberID: input.memberID,
             clearsMemberID: input.clearsMemberID,
             goodsTypeID: input.goodsTypeID,
-            quantity: max(1, min(input.quantity, 999)),
+            quantity: MegrumAppStateInputNormalizer.goodsQuantity(input.quantity),
             status: input.status,
             photoURLs: input.photoURLs,
             tagNames: input.tagNames.map(MegrumAppStateInputNormalizer.tagNames),
@@ -776,7 +854,7 @@ public final class MegrumAppState: ObservableObject {
                 SearchResultItem(
                     item: item,
                     ownerUserID: item.ownerID,
-                    bucket: searchBucket(for: item)
+                    bucket: GoodsLocalStateReducer.searchBucket(for: item, wishes: wishes)
                 )
             }
             guard activeSearchRequestID == requestID else {
@@ -846,7 +924,6 @@ public final class MegrumAppState: ObservableObject {
             return false
         }
 
-        let trimmedNote = note.trimmingCharacters(in: .whitespacesAndNewlines)
         reportingGoodsItemID = itemID
         errorMessage = nil
         do {
@@ -855,7 +932,7 @@ public final class MegrumAppState: ObservableObject {
                     goodsItemID: itemID,
                     reportedUserID: reportedUserID,
                     reason: reason,
-                    note: trimmedNote.nilIfBlank
+                    note: MegrumAppStateInputNormalizer.optionalText(note)
                 )
             )
             reportingGoodsItemID = nil
@@ -886,19 +963,18 @@ public final class MegrumAppState: ObservableObject {
         guard !isCreatingIndividualListing else {
             return false
         }
-        guard !input.haveItems.isEmpty, !input.wishItems.isEmpty else {
+        guard !input.haveItems.isEmpty, input.hasReceivableCondition else {
             errorMessage = "譲るものと求めるものを選択してください"
             return false
         }
 
-        let normalizedInput = normalizedIndividualListingInput(input)
+        let normalizedInput = IndividualListingInputNormalizer.normalized(input)
 
         isCreatingIndividualListing = true
         errorMessage = nil
         do {
             let created = try await repository.createIndividualListing(normalizedInput)
-            listings.removeAll { $0.id == created.id }
-            listings.insert(created, at: 0)
+            listings = IndividualListingStateReducer.upserting(created, into: listings)
             isCreatingIndividualListing = false
             return true
         } catch {
@@ -917,12 +993,12 @@ public final class MegrumAppState: ObservableObject {
         guard updatingIndividualListingID == nil else {
             return nil
         }
-        guard !input.haveItems.isEmpty, !input.wishItems.isEmpty else {
+        guard !input.haveItems.isEmpty, input.hasReceivableCondition else {
             errorMessage = "譲るものと求めるものを選択してください"
             return nil
         }
 
-        let normalizedInput = normalizedIndividualListingInput(input)
+        let normalizedInput = IndividualListingInputNormalizer.normalized(input)
 
         updatingIndividualListingID = listingID
         errorMessage = nil
@@ -933,8 +1009,7 @@ public final class MegrumAppState: ObservableObject {
                 input: normalizedInput,
                 status: status
             )
-            listings.removeAll { $0.id == updated.id }
-            listings.insert(updated, at: 0)
+            listings = IndividualListingStateReducer.upserting(updated, into: listings)
             updatingIndividualListingID = nil
             return updated
         } catch {
@@ -944,19 +1019,23 @@ public final class MegrumAppState: ObservableObject {
         }
     }
 
-    private func normalizedIndividualListingInput(_ input: IndividualListingCreateInput) -> IndividualListingCreateInput {
-        IndividualListingCreateInput(
-            haveItems: input.haveItems.map(normalizedListingItemQuantity),
-            haveLogic: input.haveLogic,
-            wishItems: input.wishItems.map(normalizedListingItemQuantity),
-            wishLogic: input.wishLogic,
-            exchangeType: input.exchangeType,
-            note: input.note?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfBlank
-        )
-    }
+    public func archiveIndividualListing(_ listingID: UUID) async -> Bool {
+        guard updatingIndividualListingID == nil else {
+            return false
+        }
 
-    private func normalizedListingItemQuantity(_ item: ListingItemQuantity) -> ListingItemQuantity {
-        ListingItemQuantity(itemID: item.itemID, quantity: max(1, min(item.quantity, 99)))
+        updatingIndividualListingID = listingID
+        errorMessage = nil
+        do {
+            try await repository.archiveIndividualListing(listingID: listingID)
+            listings = IndividualListingStateReducer.removing(listingID: listingID, from: listings)
+            updatingIndividualListingID = nil
+            return true
+        } catch {
+            errorMessage = "個別募集を削除できませんでした"
+            updatingIndividualListingID = nil
+            return false
+        }
     }
 
     public func loadPublicUserProfile(userID: UUID, reportsFailure: Bool = true) async {
@@ -967,7 +1046,11 @@ public final class MegrumAppState: ObservableObject {
         errorMessage = nil
         do {
             if let profile = try await repository.loadPublicUserProfile(userID: userID) {
-                publicProfilesByUserID[userID] = profile
+                publicProfilesByUserID = PublicUserContentStateReducer.storingProfile(
+                    profile,
+                    for: userID,
+                    in: publicProfilesByUserID
+                )
             }
         } catch {
             if reportsFailure {
@@ -986,8 +1069,16 @@ public final class MegrumAppState: ObservableObject {
         do {
             async let tradeGoods = repository.loadPublicTradeGoods(userID: userID, limit: 60)
             async let listings = repository.loadPublicIndividualListings(userID: userID)
-            publicTradeGoodsByUserID[userID] = try await tradeGoods
-            publicListingsByUserID[userID] = try await listings
+            publicTradeGoodsByUserID = PublicUserContentStateReducer.storingTradeGoods(
+                try await tradeGoods,
+                for: userID,
+                in: publicTradeGoodsByUserID
+            )
+            publicListingsByUserID = PublicUserContentStateReducer.storingIndividualListings(
+                try await listings,
+                for: userID,
+                in: publicListingsByUserID
+            )
         } catch {
             errorMessage = "プロフィールの交換情報を読み込めませんでした"
         }
@@ -1001,7 +1092,11 @@ public final class MegrumAppState: ObservableObject {
         loadingEvaluationsUserID = userID
         errorMessage = nil
         do {
-            userEvaluationsByUserID[userID] = try await repository.loadUserEvaluations(userID: userID, limit: limit)
+            userEvaluationsByUserID = PublicUserContentStateReducer.storingEvaluations(
+                try await repository.loadUserEvaluations(userID: userID, limit: limit),
+                for: userID,
+                in: userEvaluationsByUserID
+            )
         } catch {
             errorMessage = "評価を読み込めませんでした"
         }
@@ -1012,7 +1107,7 @@ public final class MegrumAppState: ObservableObject {
         guard !isCreatingProposal else {
             return false
         }
-        guard !input.senderGoodsIDs.isEmpty, !input.receiverGoodsIDs.isEmpty else {
+        guard (input.cashOffer || !input.senderGoodsIDs.isEmpty), !input.receiverGoodsIDs.isEmpty else {
             errorMessage = "提示物を選択してください"
             return false
         }
@@ -1021,7 +1116,10 @@ public final class MegrumAppState: ObservableObject {
         errorMessage = nil
         do {
             let proposal = try await repository.createProposal(input)
-            proposals.insert(proposal, at: 0)
+            proposals = TradeProposalStateReducer.prependingCreatedProposal(
+                proposal,
+                to: proposals
+            )
             isCreatingProposal = false
             return true
         } catch {
@@ -1084,7 +1182,11 @@ public final class MegrumAppState: ObservableObject {
         do {
             let result = try await repository.approveTradeCancel(proposalID: proposalID)
             replaceProposal(result.proposal)
-            messagesByProposalID[proposalID, default: []].append(result.message)
+            messagesByProposalID = TradeMessageStateReducer.appendingMessage(
+                result.message,
+                to: messagesByProposalID,
+                proposalID: proposalID
+            )
             respondingProposalID = nil
             return true
         } catch {
@@ -1115,6 +1217,7 @@ public final class MegrumAppState: ObservableObject {
             )
             replaceProposal(proposal)
             addingEvidenceProposalID = nil
+            await loadTradeEvidencePhotos(proposal: proposal, reportsFailure: false)
             await loadMessages(proposalID: proposalID)
             return true
         } catch {
@@ -1122,6 +1225,34 @@ public final class MegrumAppState: ObservableObject {
             addingEvidenceProposalID = nil
             return false
         }
+    }
+
+    public func loadTradeEvidencePhotos(proposal: TradeProposal, reportsFailure: Bool = true) async {
+        guard loadingEvidencePhotosProposalID != proposal.id else {
+            return
+        }
+
+        loadingEvidencePhotosProposalID = proposal.id
+        do {
+            let photos = try await repository.loadTradeEvidencePhotos(proposalID: proposal.id)
+            evidencePhotosByProposalID = TradeEvidencePhotoStateReducer.replacingLoadedPhotos(
+                in: evidencePhotosByProposalID,
+                proposal: proposal,
+                loadedPhotos: photos,
+                viewerID: viewer?.id
+            )
+        } catch {
+            evidencePhotosByProposalID = TradeEvidencePhotoStateReducer.replacingLoadedPhotos(
+                in: evidencePhotosByProposalID,
+                proposal: proposal,
+                loadedPhotos: [],
+                viewerID: viewer?.id
+            )
+            if reportsFailure {
+                errorMessage = "証跡写真を読み込めませんでした"
+            }
+        }
+        loadingEvidencePhotosProposalID = nil
     }
 
     public func approveTradeEvidence(proposalID: UUID) async -> Bool {
@@ -1173,7 +1304,7 @@ public final class MegrumAppState: ObservableObject {
         category: TradeDisputeCategory,
         factMemo: String
     ) async -> Bool {
-        let trimmed = factMemo.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmed = MegrumAppStateInputNormalizer.trimmedText(factMemo)
         guard !trimmed.isEmpty else {
             errorMessage = "申告内容を入力してください"
             return false
@@ -1209,35 +1340,108 @@ public final class MegrumAppState: ObservableObject {
         loadingMessagesProposalID = proposalID
         errorMessage = nil
         do {
-            messagesByProposalID[proposalID] = try await repository.loadMessages(proposalID: proposalID, limit: limit)
+            let messages = try await repository.loadMessages(proposalID: proposalID, limit: limit)
+            messagesByProposalID = TradeMessageStateReducer.replacingMessages(
+                in: messagesByProposalID,
+                proposalID: proposalID,
+                messages: messages
+            )
+            await refreshPartnerReadState(proposalID: proposalID)
+            await markProposalRead(proposalID: proposalID, messages: messages)
         } catch {
             errorMessage = "メッセージを読み込めませんでした"
         }
         loadingMessagesProposalID = nil
     }
 
+    public func markProposalRead(proposalID: UUID) async {
+        await markProposalRead(proposalID: proposalID, messages: messagesByProposalID[proposalID] ?? [])
+    }
+
+    private func refreshPartnerReadState(proposalID: UUID) async {
+        guard
+            let viewerID = viewer?.id,
+            let proposal = proposals.first(where: { $0.id == proposalID }),
+            let partnerID = proposal.partnerID(for: viewerID)
+        else {
+            partnerReadAtByProposalID = TradeMessageStateReducer.settingReadAt(
+                in: partnerReadAtByProposalID,
+                proposalID: proposalID,
+                readAt: nil
+            )
+            return
+        }
+
+        do {
+            let readState = try await repository.loadProposalReadState(
+                proposalID: proposalID,
+                userID: partnerID
+            )
+            partnerReadAtByProposalID = TradeMessageStateReducer.settingReadAt(
+                in: partnerReadAtByProposalID,
+                proposalID: proposalID,
+                readAt: readState?.lastReadAt
+            )
+        } catch {
+            partnerReadAtByProposalID = TradeMessageStateReducer.settingReadAt(
+                in: partnerReadAtByProposalID,
+                proposalID: proposalID,
+                readAt: nil
+            )
+        }
+    }
+
+    private func markProposalRead(proposalID: UUID, messages: [TradeMessage]) async {
+        guard
+            let viewerID = viewer?.id,
+            let proposal = proposals.first(where: { $0.id == proposalID })
+        else {
+            return
+        }
+        let latestReadAt = TradeMessageStateReducer.latestReadAt(
+            for: proposal,
+            proposalID: proposalID,
+            messages: messages
+        )
+        viewerReadAtByProposalID = TradeMessageStateReducer.settingReadAt(
+            in: viewerReadAtByProposalID,
+            proposalID: proposalID,
+            readAt: latestReadAt
+        )
+
+        do {
+            let readState = try await repository.markProposalMessagesRead(
+                proposalID: proposalID,
+                userID: viewerID,
+                lastReadAt: latestReadAt
+            )
+            viewerReadAtByProposalID = TradeMessageStateReducer.settingReadAt(
+                in: viewerReadAtByProposalID,
+                proposalID: proposalID,
+                readAt: TradeMessageStateReducer.resolvedReadAt(
+                    from: readState,
+                    fallback: latestReadAt
+                )
+            )
+        } catch {
+            return
+        }
+    }
+
     public func sendMessage(proposalID: UUID, body: String) async -> Bool {
-        let trimmed = body.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmed = MegrumAppStateInputNormalizer.trimmedText(body)
         guard !trimmed.isEmpty else {
             return false
         }
-        guard sendingMessageProposalID != proposalID else {
-            return false
-        }
 
-        sendingMessageProposalID = proposalID
-        errorMessage = nil
-        do {
-            let message = try await repository.sendMessage(
+        return await sendTradeMessage(
+            proposalID: proposalID,
+            failureMessage: "メッセージを送信できませんでした",
+            marksReadAfterSend: true
+        ) {
+            try await repository.sendMessage(
                 TradeMessageCreateInput(proposalID: proposalID, body: trimmed)
             )
-            messagesByProposalID[proposalID, default: []].append(message)
-            sendingMessageProposalID = nil
-            return true
-        } catch {
-            errorMessage = "メッセージを送信できませんでした"
-            sendingMessageProposalID = nil
-            return false
         }
     }
 
@@ -1251,14 +1455,13 @@ public final class MegrumAppState: ObservableObject {
         guard [.photo, .outfitPhoto].contains(messageType), !imageData.isEmpty else {
             return false
         }
-        guard sendingMessageProposalID != proposalID else {
-            return false
-        }
 
-        sendingMessageProposalID = proposalID
-        errorMessage = nil
-        do {
-            let message = try await repository.sendPhotoMessage(
+        return await sendTradeMessage(
+            proposalID: proposalID,
+            failureMessage: "写真を取引チャットへ送信できませんでした",
+            marksReadAfterSend: true
+        ) {
+            try await repository.sendPhotoMessage(
                 TradePhotoMessageCreateInput(
                     proposalID: proposalID,
                     imageData: imageData,
@@ -1267,36 +1470,20 @@ public final class MegrumAppState: ObservableObject {
                     body: body
                 )
             )
-            messagesByProposalID[proposalID, default: []].append(message)
-            sendingMessageProposalID = nil
-            return true
-        } catch {
-            errorMessage = "写真を取引チャットへ送信できませんでした"
-            sendingMessageProposalID = nil
-            return false
         }
     }
 
     public func sendSystemMessage(proposalID: UUID, body: String) async -> Bool {
-        let trimmed = body.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmed = MegrumAppStateInputNormalizer.trimmedText(body)
         guard !trimmed.isEmpty else {
             return false
         }
-        guard sendingMessageProposalID != proposalID else {
-            return false
-        }
 
-        sendingMessageProposalID = proposalID
-        errorMessage = nil
-        do {
-            let message = try await repository.sendSystemMessage(proposalID: proposalID, body: trimmed)
-            messagesByProposalID[proposalID, default: []].append(message)
-            sendingMessageProposalID = nil
-            return true
-        } catch {
-            errorMessage = "取引チャットへ送信できませんでした"
-            sendingMessageProposalID = nil
-            return false
+        return await sendTradeMessage(
+            proposalID: proposalID,
+            failureMessage: "取引チャットへ送信できませんでした"
+        ) {
+            try await repository.sendSystemMessage(proposalID: proposalID, body: trimmed)
         }
     }
 
@@ -1306,27 +1493,21 @@ public final class MegrumAppState: ObservableObject {
         reason: String,
         note: String? = nil
     ) async -> Bool {
-        let normalizedReason = reason.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !normalizedReason.isEmpty, sendingMessageProposalID != proposalID else {
+        let normalizedReason = MegrumAppStateInputNormalizer.trimmedText(reason)
+        guard !normalizedReason.isEmpty else {
             return false
         }
 
-        sendingMessageProposalID = proposalID
-        errorMessage = nil
-        do {
-            let message = try await repository.sendLateNoticeMessage(
+        return await sendTradeMessage(
+            proposalID: proposalID,
+            failureMessage: "遅刻連絡を送信できませんでした"
+        ) {
+            try await repository.sendLateNoticeMessage(
                 proposalID: proposalID,
                 lateMinutes: lateMinutes,
                 reason: normalizedReason,
                 note: note
             )
-            messagesByProposalID[proposalID, default: []].append(message)
-            sendingMessageProposalID = nil
-            return true
-        } catch {
-            errorMessage = "遅刻連絡を送信できませんでした"
-            sendingMessageProposalID = nil
-            return false
         }
     }
 
@@ -1335,26 +1516,20 @@ public final class MegrumAppState: ObservableObject {
         reason: String,
         note: String? = nil
     ) async -> Bool {
-        let normalizedReason = reason.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !normalizedReason.isEmpty, sendingMessageProposalID != proposalID else {
+        let normalizedReason = MegrumAppStateInputNormalizer.trimmedText(reason)
+        guard !normalizedReason.isEmpty else {
             return false
         }
 
-        sendingMessageProposalID = proposalID
-        errorMessage = nil
-        do {
-            let message = try await repository.sendCancelRequestMessage(
+        return await sendTradeMessage(
+            proposalID: proposalID,
+            failureMessage: "キャンセル申請を送信できませんでした"
+        ) {
+            try await repository.sendCancelRequestMessage(
                 proposalID: proposalID,
                 reason: normalizedReason,
                 note: note
             )
-            messagesByProposalID[proposalID, default: []].append(message)
-            sendingMessageProposalID = nil
-            return true
-        } catch {
-            errorMessage = "キャンセル申請を送信できませんでした"
-            sendingMessageProposalID = nil
-            return false
         }
     }
 
@@ -1365,28 +1540,22 @@ public final class MegrumAppState: ObservableObject {
         label: String,
         body: String? = nil
     ) async -> Bool {
-        let normalizedLabel = label.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !normalizedLabel.isEmpty, sendingMessageProposalID != proposalID else {
+        let normalizedLabel = MegrumAppStateInputNormalizer.trimmedText(label)
+        guard !normalizedLabel.isEmpty else {
             return false
         }
 
-        sendingMessageProposalID = proposalID
-        errorMessage = nil
-        do {
-            let message = try await repository.sendLocationMessage(
+        return await sendTradeMessage(
+            proposalID: proposalID,
+            failureMessage: "現在地を共有できませんでした"
+        ) {
+            try await repository.sendLocationMessage(
                 proposalID: proposalID,
                 latitude: latitude,
                 longitude: longitude,
                 label: normalizedLabel,
                 body: body
             )
-            messagesByProposalID[proposalID, default: []].append(message)
-            sendingMessageProposalID = nil
-            return true
-        } catch {
-            errorMessage = "現在地を共有できませんでした"
-            sendingMessageProposalID = nil
-            return false
         }
     }
 
@@ -1395,6 +1564,24 @@ public final class MegrumAppState: ObservableObject {
         status: TradeArrivalStatus,
         body: String? = nil
     ) async -> Bool {
+        return await sendTradeMessage(
+            proposalID: proposalID,
+            failureMessage: "到着ステータスを送信できませんでした"
+        ) {
+            try await repository.sendArrivalStatusMessage(
+                proposalID: proposalID,
+                status: status,
+                body: body
+            )
+        }
+    }
+
+    private func sendTradeMessage(
+        proposalID: UUID,
+        failureMessage: String,
+        marksReadAfterSend: Bool = false,
+        operation: () async throws -> TradeMessage
+    ) async -> Bool {
         guard sendingMessageProposalID != proposalID else {
             return false
         }
@@ -1402,16 +1589,22 @@ public final class MegrumAppState: ObservableObject {
         sendingMessageProposalID = proposalID
         errorMessage = nil
         do {
-            let message = try await repository.sendArrivalStatusMessage(
-                proposalID: proposalID,
-                status: status,
-                body: body
+            let message = try await operation()
+            messagesByProposalID = TradeMessageStateReducer.appendingMessage(
+                message,
+                to: messagesByProposalID,
+                proposalID: proposalID
             )
-            messagesByProposalID[proposalID, default: []].append(message)
+            if marksReadAfterSend {
+                await markProposalRead(
+                    proposalID: proposalID,
+                    messages: messagesByProposalID[proposalID] ?? [message]
+                )
+            }
             sendingMessageProposalID = nil
             return true
         } catch {
-            errorMessage = "到着ステータスを送信できませんでした"
+            errorMessage = failureMessage
             sendingMessageProposalID = nil
             return false
         }
@@ -1422,22 +1615,50 @@ public final class MegrumAppState: ObservableObject {
             return
         }
         guard startAt < endAt else {
-            schedulesByProposalID[proposal.id] = []
+            schedulesByProposalID = ScheduleStateReducer.replacingProposalSchedules(
+                in: schedulesByProposalID,
+                proposalID: proposal.id,
+                schedules: []
+            )
             return
         }
 
         loadingSchedulesProposalID = proposal.id
         errorMessage = nil
         do {
-            schedulesByProposalID[proposal.id] = try await repository.loadSchedules(
+            let schedules = try await repository.loadSchedules(
                 for: proposal,
                 startAt: startAt,
                 endAt: endAt
+            )
+            schedulesByProposalID = ScheduleStateReducer.replacingProposalSchedules(
+                in: schedulesByProposalID,
+                proposalID: proposal.id,
+                schedules: schedules
             )
         } catch {
             errorMessage = "スケジュールを読み込めませんでした"
         }
         loadingSchedulesProposalID = nil
+    }
+
+    public func loadPersonalSchedules(startAt: Date, endAt: Date) async {
+        guard !isLoadingPersonalSchedules else {
+            return
+        }
+        guard startAt < endAt else {
+            personalSchedules = []
+            return
+        }
+
+        isLoadingPersonalSchedules = true
+        errorMessage = nil
+        do {
+            personalSchedules = try await repository.loadPersonalSchedules(startAt: startAt, endAt: endAt)
+        } catch {
+            errorMessage = "スケジュールを読み込めませんでした"
+        }
+        isLoadingPersonalSchedules = false
     }
 
     public func createSchedule(_ input: PersonalScheduleCreateInput, for proposal: TradeProposal? = nil) async -> Bool {
@@ -1454,8 +1675,16 @@ public final class MegrumAppState: ObservableObject {
         do {
             let schedule = try await repository.createSchedule(input)
             if let proposal {
-                schedulesByProposalID[proposal.id, default: []].append(schedule)
-                schedulesByProposalID[proposal.id]?.sort { $0.startAt < $1.startAt }
+                schedulesByProposalID = ScheduleStateReducer.appendingProposalSchedule(
+                    schedule,
+                    to: schedulesByProposalID,
+                    proposalID: proposal.id
+                )
+            } else {
+                personalSchedules = ScheduleStateReducer.appendingPersonalSchedule(
+                    schedule,
+                    to: personalSchedules
+                )
             }
             isCreatingSchedule = false
             return true
@@ -1537,11 +1766,7 @@ public final class MegrumAppState: ObservableObject {
     }
 
     private func replaceProposal(_ proposal: TradeProposal) {
-        if let index = proposals.firstIndex(where: { $0.id == proposal.id }) {
-            proposals[index] = proposal
-        } else {
-            proposals.insert(proposal, at: 0)
-        }
+        proposals = TradeProposalStateReducer.replacingOrPrepending(proposal, in: proposals)
     }
 
     public func loadMailingAddress() async {
@@ -1577,6 +1802,45 @@ public final class MegrumAppState: ObservableObject {
         } catch {
             errorMessage = "住所を保存できませんでした"
             isSavingMailingAddress = false
+            return false
+        }
+    }
+
+    public func loadPaymentSettings() async {
+        guard !isLoadingPaymentSettings else {
+            return
+        }
+
+        isLoadingPaymentSettings = true
+        errorMessage = nil
+        do {
+            paymentSettings = try await repository.loadPaymentSettings()
+        } catch {
+            errorMessage = "支払い条件を読み込めませんでした"
+        }
+        isLoadingPaymentSettings = false
+    }
+
+    public func savePaymentSettings(_ settings: UserPaymentSettings) async -> Bool {
+        guard !isSavingPaymentSettings else {
+            return false
+        }
+        guard let viewer else {
+            errorMessage = "プロフィールを読み込めませんでした"
+            return false
+        }
+
+        isSavingPaymentSettings = true
+        errorMessage = nil
+        do {
+            let saved = try await repository.savePaymentSettings(settings.normalized(for: viewer.id))
+            self.viewer = saved.profile
+            self.paymentSettings = saved.settings
+            isSavingPaymentSettings = false
+            return true
+        } catch {
+            errorMessage = "支払い条件を保存できませんでした"
+            isSavingPaymentSettings = false
             return false
         }
     }
@@ -1632,7 +1896,10 @@ public final class MegrumAppState: ObservableObject {
         errorMessage = nil
         do {
             try await repository.unblockUser(userID)
-            blockedUsers.removeAll { $0.userID == userID }
+            blockedUsers = BlockedUserStateReducer.removing(
+                userID: userID,
+                from: blockedUsers
+            )
             unblockingUserID = nil
             return true
         } catch {
@@ -1658,21 +1925,25 @@ public final class MegrumAppState: ObservableObject {
     }
 
     public func markNotificationRead(_ notificationID: UUID) async {
-        guard let index = notifications.firstIndex(where: { $0.id == notificationID }) else {
-            return
-        }
-        guard notifications[index].isUnread else {
+        guard NotificationReadStateReducer.containsUnread(notifications, id: notificationID) else {
             return
         }
 
         let readAt = Date()
-        notifications[index].readAt = readAt
+        notifications = NotificationReadStateReducer.markRead(
+            notifications,
+            id: notificationID,
+            readAt: readAt
+        )
         do {
             if let updated = try await repository.markNotificationRead(notificationID) {
-                notifications[index] = updated
+                notifications = NotificationReadStateReducer.mergingUpdated(
+                    notifications,
+                    updated: [updated]
+                )
             }
         } catch {
-            notifications[index].readAt = nil
+            notifications = NotificationReadStateReducer.markUnread(notifications, id: notificationID)
             errorMessage = "通知を既読にできませんでした"
         }
     }
@@ -1689,17 +1960,13 @@ public final class MegrumAppState: ObservableObject {
         errorMessage = nil
         let previous = notifications
         let readAt = Date()
-        notifications = notifications.map { notification in
-            var next = notification
-            next.readAt = next.readAt ?? readAt
-            return next
-        }
+        notifications = NotificationReadStateReducer.markAllRead(notifications, readAt: readAt)
         do {
             let updated = try await repository.markAllNotificationsRead()
-            if !updated.isEmpty {
-                let updatedByID = Dictionary(uniqueKeysWithValues: updated.map { ($0.id, $0) })
-                notifications = notifications.map { updatedByID[$0.id] ?? $0 }
-            }
+            notifications = NotificationReadStateReducer.mergingUpdated(
+                notifications,
+                updated: updated
+            )
         } catch {
             notifications = previous
             errorMessage = "通知を既読にできませんでした"
@@ -1746,7 +2013,7 @@ public final class MegrumAppState: ObservableObject {
 
     @discardableResult
     public func registerNativePushDeviceToken(_ token: String, appVersion: String? = nil) async -> Bool {
-        let trimmedToken = token.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmedToken = MegrumAppStateInputNormalizer.trimmedText(token)
         guard !trimmedToken.isEmpty else {
             return false
         }
@@ -1802,7 +2069,7 @@ public final class MegrumAppState: ObservableObject {
         guard !isSavingAccountSetup else {
             return false
         }
-        let trimmedDisplayName = displayName.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmedDisplayName = MegrumAppStateInputNormalizer.trimmedText(displayName)
         guard !trimmedDisplayName.isEmpty else {
             errorMessage = "表示名を入力してください"
             return false
@@ -1819,23 +2086,15 @@ public final class MegrumAppState: ObservableObject {
             let savedViewer = try await repository.completeAccountSetup(
                 AccountSetupInput(
                     displayName: trimmedDisplayName,
-                    prefecture: prefecture?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfBlank,
+                    prefecture: MegrumAppStateInputNormalizer.prefecture(prefecture),
                     oshiSelections: oshiSelections
                 )
             )
             viewer = savedViewer
-            userOshiSelections = oshiSelections.map { selection in
-                UserOshiSelection(
-                    id: UUID(),
-                    userID: savedViewer.id,
-                    groupID: selection.groupID,
-                    characterID: selection.characterID,
-                    kind: selection.kind,
-                    priority: selection.priority,
-                    oshiRequestID: selection.oshiRequestID,
-                    characterRequestID: selection.characterRequestID
-                )
-            }
+            userOshiSelections = UserOshiSelectionPersistenceMapper.selections(
+                from: oshiSelections,
+                userID: savedViewer.id
+            )
             isSavingAccountSetup = false
             return true
         } catch {
@@ -1851,12 +2110,12 @@ public final class MegrumAppState: ObservableObject {
         }
 
         let normalizedHandle = MegrumAppStateInputNormalizer.profileHandle(input.handle)
-        let trimmedDisplayName = input.displayName.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmedDisplayName = MegrumAppStateInputNormalizer.trimmedText(input.displayName)
         guard let normalizedHandle else {
             errorMessage = "ユーザーIDを入力してください"
             return false
         }
-        guard normalizedHandle.range(of: #"^[a-z0-9_]{3,20}$"#, options: .regularExpression) != nil else {
+        guard MegrumAppStateInputNormalizer.isValidProfileHandle(normalizedHandle) else {
             errorMessage = "ユーザーIDは半角英数字・_ の3〜20文字で入力してください"
             return false
         }
@@ -1874,7 +2133,8 @@ public final class MegrumAppState: ObservableObject {
                     handle: normalizedHandle,
                     displayName: trimmedDisplayName,
                     gender: input.gender,
-                    prefecture: input.prefecture?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfBlank,
+                    prefecture: MegrumAppStateInputNormalizer.prefecture(input.prefecture),
+                    paymentMethods: input.paymentMethods,
                     avatarURL: input.avatarURL,
                     avatarUpload: input.avatarUpload,
                     clearsAvatar: input.clearsAvatar
@@ -1898,8 +2158,11 @@ public final class MegrumAppState: ObservableObject {
         proposals = snapshot.proposals
         grooms = snapshot.grooms
         groomMapPosts = snapshot.grooms
-        viewedGroomIDs.formIntersection(Set(snapshot.grooms.map(\.id)))
-        likedGroomIDs = Set(snapshot.grooms.filter(\.liked).map(\.id))
+        viewedGroomIDs = GroomInteractionStateReducer.visibleViewedIDs(
+            viewedGroomIDs,
+            in: snapshot.grooms
+        )
+        likedGroomIDs = GroomInteractionStateReducer.likedIDs(from: snapshot.grooms)
         threads = snapshot.threads
     }
 
@@ -1911,80 +2174,43 @@ public final class MegrumAppState: ObservableObject {
     }
 
     private func removeGoodsItemLocally(_ itemID: UUID) {
-        inventory.removeAll { $0.id == itemID }
-        wishes.removeAll { $0.id == itemID }
-        homeMatchedItems.removeAll { $0.id == itemID }
-        homePossibleItems.removeAll { $0.id == itemID }
-        homeCandidateConditionSignals.removeValue(forKey: itemID)
-        searchResults.removeAll { $0.item.id == itemID }
-        listings = listings.compactMap { listing in
-            var next = listing
-            next.haves.removeAll { $0.itemID == itemID }
-            next.options = next.options.compactMap { option in
-                var nextOption = option
-                nextOption.wishes.removeAll { $0.itemID == itemID }
-                return nextOption.wishes.isEmpty && !nextOption.isCashOffer ? nil : nextOption
-            }
-            return next.haves.isEmpty || next.options.isEmpty ? nil : next
-        }
+        applyGoodsLocalState(
+            GoodsLocalStateReducer.removing(
+                itemID: itemID,
+                from: currentGoodsLocalState
+            )
+        )
     }
 
     private func upsertGoodsItemLocally(_ item: GoodsItem, kind: GoodsEntryKind) {
-        inventory.removeAll { $0.id == item.id }
-        wishes.removeAll { $0.id == item.id }
-
-        switch kind {
-        case .inventory:
-            inventory.insert(item, at: 0)
-        case .wish:
-            wishes.insert(
-                WishItem(
-                    id: item.id,
-                    ownerID: item.ownerID,
-                    groupID: item.groupID,
-                    memberID: item.memberID,
-                    goodsTypeID: item.goodsTypeID,
-                    title: item.title,
-                    tags: item.tags
-                ),
-                at: 0
+        applyGoodsLocalState(
+            GoodsLocalStateReducer.upserting(
+                item,
+                kind: kind,
+                in: currentGoodsLocalState
             )
-        }
-        upsertHomeCandidateIfPresent(item)
-
-        searchResults = searchResults.map { result in
-            guard result.item.id == item.id else {
-                return result
-            }
-            return SearchResultItem(
-                item: item,
-                ownerUserID: item.ownerID,
-                bucket: searchBucket(for: item)
-            )
-        }
+        )
     }
 
-    private func upsertHomeCandidateIfPresent(_ item: GoodsItem) {
-        if let index = homeMatchedItems.firstIndex(where: { $0.id == item.id }) {
-            homeMatchedItems[index] = item
-        }
-        if let index = homePossibleItems.firstIndex(where: { $0.id == item.id }) {
-            homePossibleItems[index] = item
-        }
+    private var currentGoodsLocalState: GoodsLocalState {
+        GoodsLocalState(
+            inventory: inventory,
+            wishes: wishes,
+            homeMatchedItems: homeMatchedItems,
+            homePossibleItems: homePossibleItems,
+            homeCandidateConditionSignals: homeCandidateConditionSignals,
+            searchResults: searchResults,
+            listings: listings
+        )
     }
 
-    private func searchBucket(for item: GoodsItem) -> SearchMatchBucket {
-        let matchesWish = wishes.contains { wish in
-            let groupMatches = wish.groupID == nil || item.groupID == wish.groupID
-            let typeMatches = wish.goodsTypeID == nil || item.goodsTypeID == wish.goodsTypeID
-            return groupMatches && typeMatches
-        }
-        return matchesWish ? .possible : .none
-    }
-}
-
-private extension String {
-    var nilIfBlank: String? {
-        isEmpty ? nil : self
+    private func applyGoodsLocalState(_ state: GoodsLocalState) {
+        inventory = state.inventory
+        wishes = state.wishes
+        homeMatchedItems = state.homeMatchedItems
+        homePossibleItems = state.homePossibleItems
+        homeCandidateConditionSignals = state.homeCandidateConditionSignals
+        searchResults = state.searchResults
+        listings = state.listings
     }
 }

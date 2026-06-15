@@ -13,22 +13,12 @@ enum IndividualListingEditorStep: Int, CaseIterable, Identifiable {
         case .haves:
             "譲るものを選ぶ"
         case .options:
-            "受け取れる条件を追加"
+            "欲しいものを登録"
         case .exchange:
             "交換条件を設定する"
         }
     }
 
-    var subtitle: String {
-        switch self {
-        case .haves:
-            "まず、あなたが譲れるものを選びます"
-        case .options:
-            "相手から受け取りたいものを選びます"
-        case .exchange:
-            "この募集で受け付ける交換の条件を設定してください"
-        }
-    }
 }
 
 enum IndividualListingHandoffDraft: String, CaseIterable, Identifiable {
@@ -138,7 +128,11 @@ struct IndividualListingDraft: Equatable {
     var wishQuantities: [UUID: Int]
     var optionKind: IndividualListingOptionKind
     var conditionGroupID: UUID?
+    var conditionMemberIDs: Set<UUID>
+    var excludesSelectedConditionMembers: Bool
     var conditionGoodsTypeID: UUID?
+    var conditionTagNames: [String]
+    var conditionQuantity: Int
     var cashAmount: Int
     var haveLogic: ListingLogic
     var wishLogic: ListingLogic
@@ -163,7 +157,11 @@ struct IndividualListingDraft: Equatable {
             self.wishQuantities = preselectedWishID.map { [$0: 1] } ?? [:]
             self.optionKind = .wish
             self.conditionGroupID = nil
+            self.conditionMemberIDs = []
+            self.excludesSelectedConditionMembers = false
             self.conditionGoodsTypeID = nil
+            self.conditionTagNames = []
+            self.conditionQuantity = 1
             self.cashAmount = 1_100
             self.haveLogic = .all
             self.wishLogic = .one
@@ -176,9 +174,11 @@ struct IndividualListingDraft: Equatable {
             self.shippingFee = .negotiate
             self.shippingDays = .twoToFourDays
             self.acceptsOutsideCondition = true
-            self.includesExchangeConditionSummary = false
+            self.includesExchangeConditionSummary = true
         case .edit(let listing):
             let primaryOption = listing.options.sorted { $0.position < $1.position }.first
+            let extractedNote = IndividualListingExchangeSummary.extract(from: listing.note)
+            let exchangeSummary = extractedNote.summary ?? IndividualListingExchangeSummary()
             self.selectedHaveIDs = Set(listing.haves.map(\.itemID))
             self.haveQuantities = Dictionary(uniqueKeysWithValues: listing.haves.map { ($0.itemID, boundedQuantity($0.quantity)) })
             self.selectedWishIDs = Set(primaryOption?.wishes.map(\.itemID) ?? [])
@@ -191,20 +191,24 @@ struct IndividualListingDraft: Equatable {
                 self.optionKind = .wish
             }
             self.conditionGroupID = primaryOption?.wishGroupID
+            self.conditionMemberIDs = []
+            self.excludesSelectedConditionMembers = false
             self.conditionGoodsTypeID = primaryOption?.wishGoodsTypeID
+            self.conditionTagNames = []
+            self.conditionQuantity = 1
             self.cashAmount = max(1, primaryOption?.cashAmount ?? 1_100)
             self.haveLogic = listing.haveLogic
             self.wishLogic = primaryOption?.logic ?? .one
             self.exchangeType = primaryOption?.exchangeType ?? .any
             self.status = listing.status
-            self.note = listing.note ?? ""
-            self.handoffMethod = .both
-            self.localPrefecture = "東京都"
-            self.localPlaceMemo = ""
-            self.shippingFee = .negotiate
-            self.shippingDays = .twoToFourDays
-            self.acceptsOutsideCondition = true
-            self.includesExchangeConditionSummary = false
+            self.note = extractedNote.remainingNote ?? ""
+            self.handoffMethod = exchangeSummary.handoffMethod
+            self.localPrefecture = exchangeSummary.localPrefecture
+            self.localPlaceMemo = exchangeSummary.localPlaceMemo
+            self.shippingFee = exchangeSummary.shippingFee
+            self.shippingDays = exchangeSummary.shippingDays
+            self.acceptsOutsideCondition = exchangeSummary.acceptsOutsideCondition
+            self.includesExchangeConditionSummary = true
         }
     }
 
@@ -249,6 +253,51 @@ struct IndividualListingDraft: Equatable {
         }
     }
 
+    mutating func setConditionGroupID(_ id: UUID?) {
+        guard conditionGroupID != id else {
+            return
+        }
+        conditionGroupID = id
+        conditionMemberIDs.removeAll()
+        excludesSelectedConditionMembers = false
+        conditionTagNames.removeAll()
+    }
+
+    mutating func toggleConditionMember(_ id: UUID) {
+        if conditionMemberIDs.contains(id) {
+            conditionMemberIDs.remove(id)
+            if conditionMemberIDs.isEmpty {
+                excludesSelectedConditionMembers = false
+            }
+        } else {
+            conditionMemberIDs.insert(id)
+        }
+    }
+
+    mutating func setExcludesSelectedConditionMembers(_ value: Bool) {
+        excludesSelectedConditionMembers = value && !conditionMemberIDs.isEmpty
+    }
+
+    mutating func toggleConditionTag(_ name: String) {
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else {
+            return
+        }
+        if let index = conditionTagNames.firstIndex(where: { $0.caseInsensitiveCompare(trimmed) == .orderedSame }) {
+            conditionTagNames.remove(at: index)
+        } else if conditionTagNames.count < 5 {
+            conditionTagNames.append(trimmed)
+        }
+    }
+
+    mutating func setConditionQuantity(_ quantity: Int) {
+        conditionQuantity = boundedQuantity(quantity)
+    }
+
+    var usesConditionLogicChoice: Bool {
+        conditionMemberIDs.count > 1 || excludesSelectedConditionMembers
+    }
+
     mutating func setHaveQuantity(_ id: UUID, quantity: Int, maxQuantity: Int = 99) {
         guard selectedHaveIDs.contains(id) else {
             return
@@ -278,6 +327,12 @@ struct IndividualListingDraft: Equatable {
         let selectedHaveItems = selectedInventoryItems(from: inventory)
         if selectedHaveItems.count != selectedHaveIDs.count {
             return "選択したマイグッズを読み込めませんでした"
+        }
+        if selectedHaveItems.contains(where: { maxHaveQuantity(for: $0) <= 0 }) {
+            return "選択した譲るものの残数が足りません"
+        }
+        if selectedHaveItems.contains(where: { haveQuantity(for: $0.id) > maxHaveQuantity(for: $0) }) {
+            return "選択した譲るものの残数が足りません"
         }
         if !hasSameGroupAndType(selectedHaveItems) {
             return "譲るものは同じグループ・同じ種別で選んでください"
@@ -317,7 +372,10 @@ struct IndividualListingDraft: Equatable {
         let selectedWishItems = optionKind == .wish ? selectedWishItems(from: wishes) : []
         return IndividualListingCreateInput(
             haveItems: selectedInventoryItems(from: inventory).map { item in
-                ListingItemQuantity(itemID: item.id, quantity: haveQuantity(for: item.id))
+                ListingItemQuantity(
+                    itemID: item.id,
+                    quantity: min(haveQuantity(for: item.id), max(1, maxHaveQuantity(for: item)))
+                )
             },
             haveLogic: haveLogic,
             wishItems: selectedWishItems.map { item in
@@ -391,21 +449,30 @@ struct IndividualListingDraft: Equatable {
     }
 
     private var exchangeConditionSummary: String {
-        var parts: [String] = ["交換手段: \(handoffMethod.title)"]
-        if handoffMethod != .mail {
-            let place = localPlaceMemo.trimmingCharacters(in: .whitespacesAndNewlines)
-            parts.append("現地: \(localPrefecture)\(place.isEmpty ? "" : " / \(place)")")
-        }
-        if handoffMethod != .local {
-            parts.append("送料: \(shippingFee.title)")
-            parts.append("発送目安: \(shippingDays.title)")
-        }
-        parts.append(acceptsOutsideCondition ? "条件外打診: 可" : "条件外打診: 不可")
-        return parts.joined(separator: " / ")
+        IndividualListingExchangeSummary(
+            handoffMethod: handoffMethod,
+            localPrefecture: localPrefecture,
+            localPlaceMemo: localPlaceMemo,
+            shippingFee: shippingFee,
+            shippingDays: shippingDays,
+            acceptsOutsideCondition: acceptsOutsideCondition
+        )
+        .storageLine
     }
 
     private func selectedInventoryItems(from inventory: [GoodsItem]) -> [GoodsItem] {
         inventory.filter { selectedHaveIDs.contains($0.id) }
+    }
+
+    func maxHaveQuantity(for item: GoodsItem) -> Int {
+        max(0, item.marketAvailableQuantity) + originalHaveQuantity(for: item.id)
+    }
+
+    private func originalHaveQuantity(for id: UUID) -> Int {
+        guard case .edit(let listing) = mode else {
+            return 0
+        }
+        return listing.haves.first(where: { $0.itemID == id })?.quantity ?? 0
     }
 
     private func selectedWishItems(from wishes: [WishItem]) -> [WishItem] {

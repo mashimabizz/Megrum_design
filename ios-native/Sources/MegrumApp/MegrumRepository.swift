@@ -71,6 +71,7 @@ public struct OwnProfileUpdateInput: Equatable, Sendable {
     public var displayName: String
     public var gender: UserGender?
     public var prefecture: String?
+    public var paymentMethods: [UserPaymentMethod]
     public var avatarURL: URL?
     public var avatarUpload: GoodsPhotoUpload?
     public var clearsAvatar: Bool
@@ -80,6 +81,7 @@ public struct OwnProfileUpdateInput: Equatable, Sendable {
         displayName: String,
         gender: UserGender? = nil,
         prefecture: String? = nil,
+        paymentMethods: [UserPaymentMethod] = [],
         avatarURL: URL? = nil,
         avatarUpload: GoodsPhotoUpload? = nil,
         clearsAvatar: Bool = false
@@ -88,6 +90,7 @@ public struct OwnProfileUpdateInput: Equatable, Sendable {
         self.displayName = displayName
         self.gender = gender
         self.prefecture = prefecture
+        self.paymentMethods = paymentMethods
         self.avatarURL = avatarURL
         self.avatarUpload = avatarUpload
         self.clearsAvatar = clearsAvatar
@@ -104,6 +107,7 @@ public protocol MegrumRepository: Sendable {
     func loadOshiGenres(limit: Int) async throws -> [OshiGenre]
     func loadOshiGroups(searchText: String?, limit: Int) async throws -> [OshiGroup]
     func loadOshiCharacters(groupID: UUID, limit: Int) async throws -> [OshiCharacter]
+    func loadMemberFaceProfiles(memberIDs: [UUID], limit: Int) async throws -> [MemberFaceProfile]
     func loadUserOshiSelections() async throws -> [UserOshiSelection]
     func saveUserOshiSelections(_ selections: [AccountSetupOshiInput]) async throws -> [UserOshiSelection]
     func createOshiRequest(_ input: OshiRequestCreateInput) async throws -> UUID
@@ -123,6 +127,7 @@ public protocol MegrumRepository: Sendable {
         input: IndividualListingCreateInput,
         status: IndividualListingStatus
     ) async throws -> IndividualListing
+    func archiveIndividualListing(listingID: UUID) async throws
     func loadPublicTradeGoods(userID: UUID, limit: Int) async throws -> [GoodsItem]
     func loadPublicIndividualListings(userID: UUID) async throws -> [IndividualListing]
     func loadPublicUserProfile(userID: UUID) async throws -> PublicUserProfile?
@@ -132,10 +137,13 @@ public protocol MegrumRepository: Sendable {
     func rejectProposal(proposalID: UUID) async throws -> TradeProposal
     func approveTradeCancel(proposalID: UUID) async throws -> (proposal: TradeProposal, message: TradeMessage)
     func addTradeEvidence(_ input: TradeEvidenceCreateInput) async throws -> TradeProposal
+    func loadTradeEvidencePhotos(proposalID: UUID) async throws -> [TradeEvidencePhoto]
     func approveTradeEvidence(proposalID: UUID) async throws -> TradeProposal
     func submitTradeEvaluation(_ input: TradeEvaluationCreateInput) async throws -> UserEvaluation
     func fileTradeDispute(_ input: TradeDisputeCreateInput) async throws -> TradeDisputeTicket
     func loadMessages(proposalID: UUID, limit: Int) async throws -> [TradeMessage]
+    func loadProposalReadState(proposalID: UUID, userID: UUID) async throws -> ProposalReadState?
+    func markProposalMessagesRead(proposalID: UUID, userID: UUID, lastReadAt: Date) async throws -> ProposalReadState?
     func sendMessage(_ input: TradeMessageCreateInput) async throws -> TradeMessage
     func sendPhotoMessage(_ input: TradePhotoMessageCreateInput) async throws -> TradeMessage
     func sendSystemMessage(proposalID: UUID, body: String) async throws -> TradeMessage
@@ -144,6 +152,7 @@ public protocol MegrumRepository: Sendable {
     func sendLocationMessage(proposalID: UUID, latitude: Double, longitude: Double, label: String, body: String?) async throws -> TradeMessage
     func sendArrivalStatusMessage(proposalID: UUID, status: TradeArrivalStatus, body: String?) async throws -> TradeMessage
     func loadSchedules(for proposal: TradeProposal, startAt: Date, endAt: Date) async throws -> [PersonalSchedule]
+    func loadPersonalSchedules(startAt: Date, endAt: Date) async throws -> [PersonalSchedule]
     func createSchedule(_ input: PersonalScheduleCreateInput) async throws -> PersonalSchedule
     func loadHomeLocalModeSettings(now: Date) async throws -> HomeLocalActivitySettings?
     func saveHomeLocalModeSettings(_ settings: HomeLocalActivitySettings, now: Date) async throws -> HomeLocalActivitySettings
@@ -162,6 +171,8 @@ public protocol MegrumRepository: Sendable {
     func createBoardThread(_ input: BoardThreadCreateInput) async throws -> BoardThread
     func loadMailingAddress() async throws -> MailingAddress?
     func saveMailingAddress(_ address: MailingAddress) async throws -> MailingAddress
+    func loadPaymentSettings() async throws -> UserPaymentSettings?
+    func savePaymentSettings(_ settings: UserPaymentSettings) async throws -> (profile: UserProfile, settings: UserPaymentSettings)
     func lookupAddress(postalCode: String) async throws -> PostalCodeAddress?
     func loadBlockedUsers() async throws -> [BlockedUser]
     func unblockUser(_ userID: UUID) async throws
@@ -190,6 +201,10 @@ public extension MegrumRepository {
     }
 
     func loadOshiCharacters(groupID: UUID, limit: Int) async throws -> [OshiCharacter] {
+        []
+    }
+
+    func loadMemberFaceProfiles(memberIDs: [UUID], limit: Int) async throws -> [MemberFaceProfile] {
         []
     }
 
@@ -254,6 +269,10 @@ public extension MegrumRepository {
         throw MegrumRepositoryError.unsupportedMutation
     }
 
+    func archiveIndividualListing(listingID: UUID) async throws {
+        throw MegrumRepositoryError.unsupportedMutation
+    }
+
     func loadPublicTradeGoods(userID: UUID, limit: Int) async throws -> [GoodsItem] {
         []
     }
@@ -290,6 +309,10 @@ public extension MegrumRepository {
         throw MegrumRepositoryError.unsupportedMutation
     }
 
+    func loadTradeEvidencePhotos(proposalID: UUID) async throws -> [TradeEvidencePhoto] {
+        []
+    }
+
     func approveTradeEvidence(proposalID: UUID) async throws -> TradeProposal {
         throw MegrumRepositoryError.unsupportedMutation
     }
@@ -304,6 +327,14 @@ public extension MegrumRepository {
 
     func loadMessages(proposalID: UUID, limit: Int) async throws -> [TradeMessage] {
         []
+    }
+
+    func loadProposalReadState(proposalID: UUID, userID: UUID) async throws -> ProposalReadState? {
+        nil
+    }
+
+    func markProposalMessagesRead(proposalID: UUID, userID: UUID, lastReadAt: Date) async throws -> ProposalReadState? {
+        nil
     }
 
     func sendMessage(_ input: TradeMessageCreateInput) async throws -> TradeMessage {
@@ -335,6 +366,10 @@ public extension MegrumRepository {
     }
 
     func loadSchedules(for proposal: TradeProposal, startAt: Date, endAt: Date) async throws -> [PersonalSchedule] {
+        []
+    }
+
+    func loadPersonalSchedules(startAt: Date, endAt: Date) async throws -> [PersonalSchedule] {
         []
     }
 
@@ -403,6 +438,14 @@ public extension MegrumRepository {
     }
 
     func saveMailingAddress(_ address: MailingAddress) async throws -> MailingAddress {
+        throw MegrumRepositoryError.unsupportedMutation
+    }
+
+    func loadPaymentSettings() async throws -> UserPaymentSettings? {
+        nil
+    }
+
+    func savePaymentSettings(_ settings: UserPaymentSettings) async throws -> (profile: UserProfile, settings: UserPaymentSettings) {
         throw MegrumRepositoryError.unsupportedMutation
     }
 

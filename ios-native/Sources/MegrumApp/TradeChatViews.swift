@@ -6,59 +6,64 @@ import SwiftUI
 
 struct TradeChatPartnerStrip: View {
     var presentation: TradeDetailHeroPresentation
+    var onOpenProfile: () -> Void = {}
 
     var body: some View {
-        HStack(spacing: 10) {
-            Circle()
-                .fill(
-                    LinearGradient(
-                        colors: [
-                            MegrumTheme.lavender.opacity(0.42),
-                            MegrumTheme.sky.opacity(0.3)
-                        ],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
+        Button(action: onOpenProfile) {
+            HStack(spacing: 10) {
+                Circle()
+                    .fill(
+                        LinearGradient(
+                            colors: [
+                                MegrumTheme.lavender.opacity(0.42),
+                                MegrumTheme.sky.opacity(0.3)
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
                     )
-                )
-                .frame(width: 38, height: 38)
-                .overlay {
-                    Text(presentation.partnerInitial)
-                        .font(.system(size: 16, weight: .black, design: .rounded))
-                        .foregroundStyle(.white)
-                }
+                    .frame(width: 38, height: 38)
+                    .overlay {
+                        Text(presentation.partnerInitial)
+                            .font(.system(size: 16, weight: .black, design: .rounded))
+                            .foregroundStyle(.white)
+                    }
 
-            VStack(alignment: .leading, spacing: 3) {
-                Text("@\(presentation.partnerHandle)")
-                    .font(.system(size: 14, weight: .black, design: .rounded))
-                    .foregroundStyle(MegrumTheme.ink)
-                    .lineLimit(1)
-
-                HStack(spacing: 5) {
-                    Circle()
-                        .fill(MegrumTheme.muted.opacity(0.42))
-                        .frame(width: 4.5, height: 4.5)
-                    Text(presentation.partnerMetaText)
-                        .font(.system(size: 10.5, weight: .heavy, design: .rounded))
-                        .foregroundStyle(MegrumTheme.muted)
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("@\(presentation.partnerHandle)")
+                        .font(.system(size: 14, weight: .black, design: .rounded))
+                        .foregroundStyle(MegrumTheme.ink)
                         .lineLimit(1)
-                        .minimumScaleFactor(0.72)
+
+                    HStack(spacing: 5) {
+                        Circle()
+                            .fill(MegrumTheme.muted.opacity(0.42))
+                            .frame(width: 4.5, height: 4.5)
+                        Text(presentation.partnerMetaText)
+                            .font(.system(size: 10.5, weight: .heavy, design: .rounded))
+                            .foregroundStyle(MegrumTheme.muted)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.72)
+                    }
                 }
+
+                Spacer(minLength: 8)
+
+                Text(presentation.agreementLabel)
+                    .font(.system(size: 11, weight: .black, design: .rounded))
+                    .foregroundStyle(statusForeground)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .background(statusBackground, in: Capsule())
             }
-
-            Spacer(minLength: 8)
-
-            Text(presentation.agreementLabel)
-                .font(.system(size: 11, weight: .black, design: .rounded))
-                .foregroundStyle(statusForeground)
-                .lineLimit(1)
-                .minimumScaleFactor(0.7)
-                .padding(.horizontal, 10)
-                .padding(.vertical, 6)
-                .background(statusBackground, in: Capsule())
+            .frame(minHeight: 44)
         }
-        .frame(minHeight: 44)
+        .buttonStyle(.plain)
         .accessibilityElement(children: .combine)
         .accessibilityLabel("@\(presentation.partnerHandle)。\(presentation.partnerMetaText)。\(presentation.agreementLabel)")
+        .accessibilityHint("プロフィールを開きます")
     }
 
     private var statusForeground: Color {
@@ -88,8 +93,21 @@ struct TradeCollapsedSummaryCard: View {
     var label: String
     var summary: String
     var systemImage: String
+    var action: (() -> Void)?
 
     var body: some View {
+        if let action {
+            Button(action: action) {
+                cardContent
+            }
+            .buttonStyle(.plain)
+            .accessibilityHint("詳細を開きます")
+        } else {
+            cardContent
+        }
+    }
+
+    private var cardContent: some View {
         HStack(spacing: 9) {
             Image(systemName: systemImage)
                 .font(.system(size: 13, weight: .black))
