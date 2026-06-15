@@ -23,8 +23,8 @@ struct BoardThreadDetailScreen: View {
         case .nearby3km:
             coordinate == nil ? "この話題への返信には現在地が必要です" : nil
         case .samePrefecture:
-            selectedPrefecture?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfBlank == nil
-                && appState.viewer?.prefecture?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfBlank == nil
+            selectedPrefecture.nilIfBlank == nil
+                && (appState.viewer?.prefecture).nilIfBlank == nil
                 ? "この話題への返信には都道府県設定が必要です"
                 : nil
         case .sameSpot, .global:

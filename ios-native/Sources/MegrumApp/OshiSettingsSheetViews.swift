@@ -255,7 +255,7 @@ struct OshiRequestSheet: View {
                     onSubmit(
                         OshiRequestSheetPayload(
                             name: name.trimmingCharacters(in: .whitespacesAndNewlines),
-                            note: note.trimmingCharacters(in: .whitespacesAndNewlines).nilIfBlank,
+                            note: note.nilIfBlank,
                             kind: kind,
                             genreID: genreID
                         )

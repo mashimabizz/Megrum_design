@@ -190,8 +190,8 @@ struct AddressSettingsScreen: View {
             prefecture: prefecture.trimmingCharacters(in: .whitespacesAndNewlines),
             city: city.trimmingCharacters(in: .whitespacesAndNewlines),
             line1: line1.trimmingCharacters(in: .whitespacesAndNewlines),
-            line2: line2.trimmingCharacters(in: .whitespacesAndNewlines).nilIfBlank,
-            phoneNumber: phoneNumber.trimmingCharacters(in: .whitespacesAndNewlines).nilIfBlank
+            line2: line2.nilIfBlank,
+            phoneNumber: phoneNumber.nilIfBlank
         )
     }
 

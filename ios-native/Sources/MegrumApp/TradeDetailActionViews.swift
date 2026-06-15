@@ -531,7 +531,7 @@ struct TradeEvaluationSheet: View {
 
             Button {
                 Task {
-                    await onSubmit(stars, comment.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty)
+                    await onSubmit(stars, comment.nilIfBlank)
                 }
             } label: {
                 Group {

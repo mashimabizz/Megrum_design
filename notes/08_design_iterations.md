@@ -4,6 +4,58 @@
 
 ---
 
+## イテレーション692：nilIfBlank呼び出しを簡潔化
+
+### 背景・問題意識
+
+iter690/691でApp層の空白nil化を `nilIfBlank` へ集約したため、呼び出し側に残っていた `trimmingCharacters(in: .whitespacesAndNewlines).nilIfBlank` / `nilIfEmpty` の冗長な連鎖を整理する。文字列正規化の意味は変えず、読み手が「空白ならnil」を一目で追える形にする。
+
+### 変更内容
+
+#### App層の各画面/モデル
+- `AddressSettingsScreen`、`BoardThreadDetailScreen`、`MeguriBoardComposerViews`、`OshiSettingsSheetViews`、`PreviewMegrumRepository` などのOptional文字列正規化を `value.nilIfBlank` へ差し替えた。
+- `TradeMessageBubbleViews`、`TradeMessageInputModels`、`TradeDetailActionViews`、`TradeDetailPresentationModels`、`TradeDisputeSummaryModels` の取引チャット関連表示/入力正規化も同じ形に統一した。
+- `IndividualListingInputNormalizer`、`MegrumAuthState`、`MeguriScreen` の入力正規化で同じ冗長連鎖を削除した。
+
+### 影響範囲
+
+- 住所設定、掲示板/めぐり投稿、推し設定、プレビューRepository、認証入力、個別募集入力、取引チャット/証跡/異議関連の空白nil化
+- 既存のtrim後に空文字ならnilという挙動を維持し、UI文言、API payload、DB schema、状態遷移の意味は変更なし。
+- `TradeListPresentationModels.swift` の `nilIfEmpty` は、既に正規化済みの場所名にfallbackを付ける用途なので今回の置換対象外。
+
+### 確認方法
+
+- `rg -n "trimmingCharacters\\(in: \\.whitespacesAndNewlines\\)\\.nilIfEmpty|trimmingCharacters\\(in: \\.whitespacesAndNewlines\\)\\.nilIfBlank|nilIfEmpty" ios-native/Sources/MegrumApp ios-native/Tests/MegrumAppTests`
+- `git diff --check -- ios-native/Sources/MegrumApp/AddressSettingsScreen.swift ios-native/Sources/MegrumApp/BoardThreadDetailScreen.swift ios-native/Sources/MegrumApp/IndividualListingInputNormalizer.swift ios-native/Sources/MegrumApp/MegrumAuthState.swift ios-native/Sources/MegrumApp/MeguriBoardComposerViews.swift ios-native/Sources/MegrumApp/MeguriScreen.swift ios-native/Sources/MegrumApp/OshiSettingsSheetViews.swift ios-native/Sources/MegrumApp/PreviewMegrumRepository.swift ios-native/Sources/MegrumApp/TradeDetailActionViews.swift ios-native/Sources/MegrumApp/TradeDetailPresentationModels.swift ios-native/Sources/MegrumApp/TradeDisputeSummaryModels.swift ios-native/Sources/MegrumApp/TradeMessageBubbleViews.swift ios-native/Sources/MegrumApp/TradeMessageInputModels.swift`
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-nil-if-blank-callsite-build --enable-xctest --disable-swift-testing -j 1 --filter 'SettingsScreenTests|NotificationRouteTests|MegrumAppStateTests|OshiSettingsDraftTests|DisputeDetailScreenTests|MeguriFeedStateReducerTests|SupabasePaymentSettingsPersistenceTests|AuthScreenInputTests|AccountSetupScreenTests|OwnProfileScreenTests|OwnProfileSummaryTests|MeguriAccessPolicyTests|HomeLocalModeTests|IndividualListingDraftTests|TradeMessageStateReducerTests|TradeChatAffordanceTests|TradeRequestDraftTests'`
+- `xcodebuild -quiet -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -configuration Debug -destination 'generic/platform=iOS Simulator' -derivedDataPath /tmp/megrum-native-xcodebuild-nil-if-blank-callsite CODE_SIGNING_ALLOWED=NO build`
+
+### セルフレビュー結果
+
+- ✅ 冗長なtrim + nilIfBlank/nilIfEmpty連鎖が残っていないことを確認した。
+- ✅ 対象テスト233件が成功した。
+- ✅ Xcode Debug build が成功した。
+- ✅ 表示文言、保存payload、DB schema、状態遷移の意味は変更していない。
+- ✅ `notes/09_state_machines.md`、`notes/10_glossary.md`、`notes/05_data_model.md` の更新は不要。
+
+### 関連ファイル
+
+- `ios-native/Sources/MegrumApp/AddressSettingsScreen.swift`
+- `ios-native/Sources/MegrumApp/BoardThreadDetailScreen.swift`
+- `ios-native/Sources/MegrumApp/IndividualListingInputNormalizer.swift`
+- `ios-native/Sources/MegrumApp/MegrumAuthState.swift`
+- `ios-native/Sources/MegrumApp/MeguriBoardComposerViews.swift`
+- `ios-native/Sources/MegrumApp/MeguriScreen.swift`
+- `ios-native/Sources/MegrumApp/OshiSettingsSheetViews.swift`
+- `ios-native/Sources/MegrumApp/PreviewMegrumRepository.swift`
+- `ios-native/Sources/MegrumApp/TradeDetailActionViews.swift`
+- `ios-native/Sources/MegrumApp/TradeDetailPresentationModels.swift`
+- `ios-native/Sources/MegrumApp/TradeDisputeSummaryModels.swift`
+- `ios-native/Sources/MegrumApp/TradeMessageBubbleViews.swift`
+- `ios-native/Sources/MegrumApp/TradeMessageInputModels.swift`
+
+---
+
 ## イテレーション691：trimmedNonEmptyをnilIfBlankへ統一
 
 ### 背景・問題意識

@@ -605,7 +605,7 @@ public struct PreviewMegrumRepository: MegrumRepository {
             proposalID: input.proposalID,
             senderID: NativePreviewData.viewerID,
             messageType: input.messageType,
-            body: input.body?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfBlank,
+            body: input.body.nilIfBlank,
             photoURL: URL(string: "https://preview.megrum.local/chat/\(UUID().uuidString.lowercased()).jpg")
         )
     }
@@ -630,7 +630,7 @@ public struct PreviewMegrumRepository: MegrumRepository {
         guard !normalizedReason.isEmpty else {
             throw MegrumRepositoryError.unsupportedMutation
         }
-        let normalizedNote = note?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfBlank
+        let normalizedNote = note.nilIfBlank
         let body = "\(Self.lateMinutesLabel(lateMinutes))遅れる旨が通知されました\n理由：\(normalizedReason)\(normalizedNote.map { "\n\($0)" } ?? "")"
         var meta = [
             "action": "late_notice",
@@ -660,7 +660,7 @@ public struct PreviewMegrumRepository: MegrumRepository {
         guard !normalizedReason.isEmpty else {
             throw MegrumRepositoryError.unsupportedMutation
         }
-        let normalizedNote = note?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfBlank
+        let normalizedNote = note.nilIfBlank
         let body = "取引キャンセルが申請されました\n理由：\(normalizedReason)\(normalizedNote.map { "\n\($0)" } ?? "")"
         var meta = [
             "action": "cancel_requested",
@@ -686,7 +686,7 @@ public struct PreviewMegrumRepository: MegrumRepository {
             proposalID: proposalID,
             senderID: NativePreviewData.viewerID,
             messageType: .location,
-            body: body?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfBlank ?? label,
+            body: body.nilIfBlank ?? label,
             locationLatitude: latitude,
             locationLongitude: longitude,
             locationLabel: label
@@ -699,7 +699,7 @@ public struct PreviewMegrumRepository: MegrumRepository {
             proposalID: proposalID,
             senderID: NativePreviewData.viewerID,
             messageType: .arrivalStatus,
-            body: body?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfBlank ?? status.defaultBody,
+            body: body.nilIfBlank ?? status.defaultBody,
             meta: ["status": status.rawValue]
         )
     }

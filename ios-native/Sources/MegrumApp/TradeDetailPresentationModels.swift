@@ -31,7 +31,7 @@ struct TradeDetailHeroPresentation: Equatable, Sendable {
         self.partnerHandle = handle
         self.partnerInitial = String(handle.prefix(1)).uppercased()
         self.exchangeMethodText = proposal.exchangeMethod.displayName
-        let area = profile?.prefecture?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
+        let area = (profile?.prefecture).nilIfBlank
         self.partnerMetaText = area.map { "未共有・\($0)" } ?? "未共有"
 
         let isSender = viewerID.map { proposal.senderID == $0 } ?? false
@@ -190,7 +190,7 @@ struct TradeSystemMessagePresentation: Equatable, Sendable {
     }
 
     init(message: TradeMessage) {
-        let fallbackBody = message.body?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty ?? "取引が更新されました"
+        let fallbackBody = message.body.nilIfBlank ?? "取引が更新されました"
         if let disputeSummary = TradeDisputeSummary(message: message) {
             title = "申告受付"
             systemImage = "exclamationmark.bubble"
@@ -272,25 +272,25 @@ struct TradeOperationalMessagePresentation: Equatable, Sendable {
     init(message: TradeMessage) {
         switch message.messageType {
         case .location:
-            title = message.locationLabel?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty ?? "現在地共有"
+            title = message.locationLabel.nilIfBlank ?? "現在地共有"
             systemImage = "location.fill"
             body = Self.locationBody(message: message)
             detail = "位置情報"
         case .arrivalStatus:
             title = "到着ステータス"
             systemImage = "checkmark.circle.fill"
-            body = message.body?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty ?? "到着状況を共有しました"
+            body = message.body.nilIfBlank ?? "到着状況を共有しました"
             detail = message.meta["status"].flatMap(Self.arrivalDetail(for:))
         default:
             title = "取引メッセージ"
             systemImage = "info.circle.fill"
-            body = message.body?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty ?? "取引が更新されました"
+            body = message.body.nilIfBlank ?? "取引が更新されました"
             detail = nil
         }
     }
 
     private static func locationBody(message: TradeMessage) -> String {
-        if let body = message.body?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty {
+        if let body = message.body.nilIfBlank {
             return body
         }
         if let latitude = message.locationLatitude, let longitude = message.locationLongitude {

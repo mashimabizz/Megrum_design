@@ -535,7 +535,7 @@ struct TradeAssistanceRequestDraft: Equatable, Sendable {
     }
 
     var normalizedNote: String? {
-        note.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
+        note.nilIfBlank
     }
 
     var isSubmittable: Bool {

@@ -68,8 +68,8 @@ struct BoardThreadComposerSheet: View {
     }
 
     private var submitPrefecture: String? {
-        selectedPrefecture?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfBlank
-            ?? appState.viewer?.prefecture?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfBlank
+        selectedPrefecture.nilIfBlank
+            ?? (appState.viewer?.prefecture).nilIfBlank
     }
 
     var body: some View {

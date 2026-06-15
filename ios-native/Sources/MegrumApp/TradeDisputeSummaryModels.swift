@@ -18,7 +18,7 @@ struct TradeDisputeSummary: Identifiable, Equatable, Sendable {
             return nil
         }
 
-        let body = message.body?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
+        let body = message.body.nilIfBlank
         let ticketNo = message.meta.firstNonBlank([
             "ticket_no",
             "ticketNo",

@@ -40,7 +40,7 @@ struct MeguriScreen: View {
         if !stored.isEmpty {
             return stored
         }
-        return appState.viewer?.prefecture?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfBlank
+        return (appState.viewer?.prefecture).nilIfBlank
     }
 
     var body: some View {

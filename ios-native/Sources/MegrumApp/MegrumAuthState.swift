@@ -51,7 +51,7 @@ public enum MegrumAuthInputValidator {
     }
 
     public static func normalizedHandle(_ handle: String?) -> String? {
-        handle?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfBlank
+        handle.nilIfBlank
     }
 
     public static func isValidHandle(_ handle: String?) -> Bool {
@@ -355,7 +355,7 @@ public final class MegrumAuthState: ObservableObject {
             try await repository.signInWithApple(
                 idToken: trimmedIDToken,
                 nonce: trimmedNonce,
-                fullName: fullName?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfBlank
+                fullName: fullName.nilIfBlank
             )
         }
     }

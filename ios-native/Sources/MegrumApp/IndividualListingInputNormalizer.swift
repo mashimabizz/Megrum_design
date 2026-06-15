@@ -13,7 +13,7 @@ enum IndividualListingInputNormalizer {
             cashAmount: input.cashAmount,
             wishGroupID: input.wishGroupID,
             wishGoodsTypeID: input.wishGoodsTypeID,
-            note: input.note?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
+            note: input.note.nilIfBlank
         )
     }
 

@@ -14,7 +14,7 @@ struct TradeMessageBubble: View {
     var onApproveCancel: () -> Void = {}
 
     private var bodyText: String? {
-        message.body?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
+        message.body.nilIfBlank
     }
 
     var body: some View {
