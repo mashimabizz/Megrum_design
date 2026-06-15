@@ -4,6 +4,55 @@
 
 ---
 
+## イテレーション693：画像content-type正規化をData層で共通化
+
+### 背景・問題意識
+
+継続リファクタリングとして、`SupabaseBoardClient`、`SupabaseGroomClient`、`SupabaseProposalClient` に重複していた画像content-typeのlenient正規化と拡張子判定を共通helperへまとめる。掲示板、めぐり、取引証跡の画像アップロードは、既存どおり `image/png` と `image/webp` だけを保持し、それ以外は `image/jpeg` に倒す挙動を維持する。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumData/SupabaseImageContentTypeNormalizer.swift`
+- `SupabaseImageContentTypeNormalizer.lenient(_:)` を追加し、既存3クライアントのcontent-type正規化を集約した。
+- `lenientFileExtension(for:)` を追加し、正規化後の拡張子判定も一箇所にまとめた。
+
+#### Data層の各Supabaseクライアント
+- `SupabaseBoardClient`、`SupabaseGroomClient`、`SupabaseProposalClient` の重複private関数を削除し、共通helperを使うようにした。
+- `SupabaseGoodsInventoryClient` は unsupported content-type をthrowする別仕様なので変更していない。
+
+#### `ios-native/Tests/MegrumDataTests/SupabaseImageContentTypeNormalizerTests.swift`
+- `png/webp` の保持、その他入力の `jpeg` fallback、既存どおり空白入り入力をtrimしないことをテストで固定した。
+
+### 影響範囲
+
+- めぐり掲示板画像、めぐり投稿画像、取引証跡画像のアップロード時content-type/拡張子判定
+- 既存挙動を維持し、API payload、DB schema、画面文言、状態遷移の意味は変更なし。
+
+### 確認方法
+
+- `rg -n "private func normalizedImageContentType|private func fileExtension\\(for contentType" ios-native/Sources/MegrumData/SupabaseBoardClient.swift ios-native/Sources/MegrumData/SupabaseGroomClient.swift ios-native/Sources/MegrumData/SupabaseProposalClient.swift ios-native/Sources/MegrumData`
+- `git diff --check -- ios-native/Sources/MegrumData/SupabaseBoardClient.swift ios-native/Sources/MegrumData/SupabaseGroomClient.swift ios-native/Sources/MegrumData/SupabaseProposalClient.swift ios-native/Sources/MegrumData/SupabaseImageContentTypeNormalizer.swift ios-native/Tests/MegrumDataTests/SupabaseImageContentTypeNormalizerTests.swift`
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-image-content-type-normalizer-build --enable-xctest --disable-swift-testing -j 1 --filter 'SupabaseImageContentTypeNormalizerTests|SupabaseBoardClientTests|SupabaseGroomClientTests|SupabaseProposalClientTests|SupabaseGoodsInventoryClientTests'`
+- `xcodebuild -quiet -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -configuration Debug -destination 'generic/platform=iOS Simulator' -derivedDataPath /tmp/megrum-native-xcodebuild-image-content-type-normalizer CODE_SIGNING_ALLOWED=NO build`
+
+### セルフレビュー結果
+
+- ✅ 対象3クライアントから重複private関数が消えたことを確認した。
+- ✅ 対象テスト56件が成功した。
+- ✅ Xcode Debug build が成功した。
+- ✅ 在庫写真アップロードのunsupported content-type判定は別仕様として維持した。
+- ✅ `notes/09_state_machines.md`、`notes/10_glossary.md`、`notes/05_data_model.md` の更新は不要。
+
+### 関連ファイル
+
+- `ios-native/Sources/MegrumData/SupabaseImageContentTypeNormalizer.swift`
+- `ios-native/Sources/MegrumData/SupabaseBoardClient.swift`
+- `ios-native/Sources/MegrumData/SupabaseGroomClient.swift`
+- `ios-native/Sources/MegrumData/SupabaseProposalClient.swift`
+- `ios-native/Tests/MegrumDataTests/SupabaseImageContentTypeNormalizerTests.swift`
+
+---
+
 ## イテレーション692：nilIfBlank呼び出しを簡潔化
 
 ### 背景・問題意識

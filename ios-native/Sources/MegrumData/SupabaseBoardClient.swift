@@ -164,7 +164,7 @@ public final class SupabaseBoardClient: @unchecked Sendable {
             guard upload.data.count <= Self.maxUploadBytes else {
                 throw SupabaseBoardClientError.imageTooLarge
             }
-            let contentType = normalizedImageContentType(upload.contentType)
+            let contentType = SupabaseImageContentTypeNormalizer.lenient(upload.contentType)
             let imagePath = boardImagePath(userID: input.authorID, contentType: contentType)
             try await client.uploadObject(
                 bucket: Self.boardMediaBucket,
@@ -197,7 +197,7 @@ public final class SupabaseBoardClient: @unchecked Sendable {
 
     private func boardImagePath(userID: UUID, contentType: String) -> String {
         let milliseconds = Int(Date().timeIntervalSince1970 * 1_000)
-        return "\(userID.uuidString.lowercased())/\(milliseconds)_\(UUID().uuidString.lowercased()).\(fileExtension(for: contentType))"
+        return "\(userID.uuidString.lowercased())/\(milliseconds)_\(UUID().uuidString.lowercased()).\(SupabaseImageContentTypeNormalizer.lenientFileExtension(for: contentType))"
     }
 }
 
@@ -577,26 +577,4 @@ private func haversineMeters(
     let a = sin(deltaLat / 2) * sin(deltaLat / 2)
         + cos(fromLat) * cos(toLat) * sin(deltaLng / 2) * sin(deltaLng / 2)
     return earthRadius * 2 * atan2(sqrt(a), sqrt(1 - a))
-}
-
-private func normalizedImageContentType(_ value: String) -> String {
-    switch value.lowercased() {
-    case "image/png":
-        "image/png"
-    case "image/webp":
-        "image/webp"
-    default:
-        "image/jpeg"
-    }
-}
-
-private func fileExtension(for contentType: String) -> String {
-    switch normalizedImageContentType(contentType) {
-    case "image/png":
-        "png"
-    case "image/webp":
-        "webp"
-    default:
-        "jpg"
-    }
 }

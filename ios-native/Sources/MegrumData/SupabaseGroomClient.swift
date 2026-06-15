@@ -72,7 +72,7 @@ public final class SupabaseGroomClient: @unchecked Sendable {
             throw SupabaseGroomClientError.imageTooLarge
         }
 
-        let contentType = normalizedImageContentType(input.imageContentType)
+        let contentType = SupabaseImageContentTypeNormalizer.lenient(input.imageContentType)
         let imagePath = groomImagePath(userID: input.authorID, contentType: contentType)
         try await client.uploadObject(
             bucket: Self.groomBucket,
@@ -237,7 +237,7 @@ public final class SupabaseGroomClient: @unchecked Sendable {
 
     private func groomImagePath(userID: UUID, contentType: String) -> String {
         let milliseconds = Int(Date().timeIntervalSince1970 * 1_000)
-        return "\(userID.uuidString.lowercased())/\(milliseconds)_\(UUID().uuidString.lowercased()).\(fileExtension(for: contentType))"
+        return "\(userID.uuidString.lowercased())/\(milliseconds)_\(UUID().uuidString.lowercased()).\(SupabaseImageContentTypeNormalizer.lenientFileExtension(for: contentType))"
     }
 }
 
@@ -509,28 +509,6 @@ private struct GroomReplyNotificationPayload: Encodable, Sendable {
 
 private struct NotificationAckRow: Decodable, Sendable {
     var id: UUID?
-}
-
-private func normalizedImageContentType(_ value: String) -> String {
-    switch value.lowercased() {
-    case "image/png":
-        "image/png"
-    case "image/webp":
-        "image/webp"
-    default:
-        "image/jpeg"
-    }
-}
-
-private func fileExtension(for contentType: String) -> String {
-    switch normalizedImageContentType(contentType) {
-    case "image/png":
-        "png"
-    case "image/webp":
-        "webp"
-    default:
-        "jpg"
-    }
 }
 
 private func haversineMeters(

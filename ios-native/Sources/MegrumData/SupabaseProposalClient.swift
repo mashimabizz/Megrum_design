@@ -119,7 +119,7 @@ public final class SupabaseProposalClient: @unchecked Sendable {
             throw SupabaseProposalClientError.invalidStatus
         }
 
-        let contentType = normalizedImageContentType(input.imageContentType)
+        let contentType = SupabaseImageContentTypeNormalizer.lenient(input.imageContentType)
         let path = evidencePhotoPath(proposalID: input.proposalID, contentType: contentType)
         try await client.uploadObject(
             bucket: Self.chatPhotoBucket,
@@ -430,7 +430,7 @@ public final class SupabaseProposalClient: @unchecked Sendable {
 
     private func evidencePhotoPath(proposalID: UUID, contentType: String) -> String {
         let milliseconds = Int(Date().timeIntervalSince1970 * 1_000)
-        return "\(proposalID.uuidString.lowercased())/evidence-\(milliseconds)-\(UUID().uuidString.lowercased()).\(fileExtension(for: contentType))"
+        return "\(proposalID.uuidString.lowercased())/evidence-\(milliseconds)-\(UUID().uuidString.lowercased()).\(SupabaseImageContentTypeNormalizer.lenientFileExtension(for: contentType))"
     }
 
     private static func makeEncoder() -> JSONEncoder {
@@ -836,28 +836,6 @@ private struct EvaluationInsertRow: Decodable, Sendable {
             comment: comment,
             createdAt: createdAt ?? .now
         )
-    }
-}
-
-private func normalizedImageContentType(_ value: String) -> String {
-    switch value.lowercased() {
-    case "image/png":
-        "image/png"
-    case "image/webp":
-        "image/webp"
-    default:
-        "image/jpeg"
-    }
-}
-
-private func fileExtension(for contentType: String) -> String {
-    switch normalizedImageContentType(contentType) {
-    case "image/png":
-        "png"
-    case "image/webp":
-        "webp"
-    default:
-        "jpg"
     }
 }
 
