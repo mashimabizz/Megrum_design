@@ -328,10 +328,10 @@ private struct GroomFeedRow: Decodable, Sendable {
     }
 
     var storageImagePath: String? {
-        if let imagePath = imagePath?.trimmingCharacters(in: .whitespacesAndNewlines), !imagePath.isEmpty {
+        if let imagePath = SupabaseTextNormalizer.optional(imagePath) {
             return imagePath
         }
-        guard let imageUrl = imageUrl?.trimmingCharacters(in: .whitespacesAndNewlines), !imageUrl.isEmpty else {
+        guard let imageUrl = SupabaseTextNormalizer.optional(imageUrl) else {
             return nil
         }
         if URL(string: imageUrl)?.scheme == nil {
@@ -358,10 +358,7 @@ private struct GroomFeedRow: Decodable, Sendable {
     }
 
     private var normalizedImageURL: String? {
-        guard let imageUrl = imageUrl?.trimmingCharacters(in: .whitespacesAndNewlines), !imageUrl.isEmpty else {
-            return nil
-        }
-        return imageUrl
+        SupabaseTextNormalizer.optional(imageUrl)
     }
 }
 
@@ -382,12 +379,12 @@ private struct GroomPostInsertPayload: Encodable, Sendable {
     var userId: UUID
 
     init(input: GroomPostCreateInput, imagePath: String) {
-        self.caption = input.caption?.trimmingCharacters(in: .whitespacesAndNewlines)
+        self.caption = input.caption.map(SupabaseTextNormalizer.trimmed)
         self.imagePath = imagePath
         self.imageUrl = imagePath
         self.originLat = input.latitude
         self.originLng = input.longitude
-        self.placeHint = input.placeHint?.trimmingCharacters(in: .whitespacesAndNewlines) ?? "今日の現場付近"
+        self.placeHint = input.placeHint.map(SupabaseTextNormalizer.trimmed) ?? "今日の現場付近"
         self.userId = input.authorID
     }
 }
@@ -429,7 +426,7 @@ private struct GroomReplyPayload: Encodable, Sendable {
     var senderID: UUID
 
     init(input: GroomReplyCreateInput) {
-        self.body = input.body.trimmingCharacters(in: .whitespacesAndNewlines)
+        self.body = SupabaseTextNormalizer.trimmed(input.body)
         self.groomPostID = input.groomPostID
         self.groomSnapshot = GroomSnapshotPayload(imageURL: input.groomImageURL)
         self.recipientID = input.recipientID

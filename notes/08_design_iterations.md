@@ -4,6 +4,42 @@
 
 ---
 
+## イテレーション678：GroomClientの文字列正規化をSupabaseTextNormalizerへ集約
+
+### 背景・問題意識
+
+継続リファクタリングとして、Groom投稿/返信Data層に残っていた画像URL/パス、caption、placeHint、返信本文のtrim処理を `SupabaseTextNormalizer` 経由へ寄せる。既存payloadの意味を変えないため、blankをnilにしていたURL系は `optional(_:)`、caption/placeHint/本文はtrim後の値をそのまま保持する形で分けた。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumData/SupabaseGroomClient.swift`
+- `GroomFeedRow.storageImagePath` と `normalizedImageURL` の空文字nil化を `SupabaseTextNormalizer.optional(_:)` に差し替えた。
+- `GroomPostInsertPayload.caption` / `placeHint` と `GroomReplyPayload.body` のtrimを `SupabaseTextNormalizer.trimmed(_:)` 経由へ差し替えた。
+
+### 影響範囲
+
+- グルーム投稿作成、グルームフィード行の画像URL解決、グルーム返信作成payloadの文字列前処理
+- 空白caption/placeHintの扱い、URL/HTTP method/select句、RPC payload、DB schema、UI文言、状態遷移の意味は変更なし。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumData/SupabaseGroomClient.swift ios-native/Tests/MegrumDataTests/SupabaseGroomClientTests.swift ios-native/Tests/MegrumDataTests/SupabaseTextNormalizerTests.swift`
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-groom-normalizer-build --enable-xctest --disable-swift-testing -j 1 --filter 'SupabaseTextNormalizerTests|SupabaseGroomClientTests'`
+- `xcodebuild -quiet -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -configuration Debug -destination 'generic/platform=iOS Simulator' -derivedDataPath /tmp/megrum-native-xcodebuild-groom-normalizer CODE_SIGNING_ALLOWED=NO build`
+
+### セルフレビュー結果
+
+- ✅ 対象テスト13件が成功した。
+- ✅ Xcode Debug build が成功した。
+- ✅ `SupabaseGroomClient` 内の直書きtrimを共通Normalizerへ集約した。
+- ✅ `notes/09_state_machines.md`、`notes/10_glossary.md`、`notes/05_data_model.md` の更新は不要。
+
+### 関連ファイル
+
+- `ios-native/Sources/MegrumData/SupabaseGroomClient.swift`
+
+---
+
 ## イテレーション677：GoodsReportのnote正規化をSupabaseTextNormalizerへ集約
 
 ### 背景・問題意識
