@@ -25,16 +25,16 @@ public struct SupabaseAuthRedirectPayload: Equatable, Sendable {
 public enum SupabaseAuthRedirectParser {
     public static func parse(_ url: URL) -> SupabaseAuthRedirectPayload? {
         let parameters = parameters(from: url)
-        guard let accessToken = parameters["access_token"]?.nilIfBlank else {
+        guard let accessToken = nonEmptyParameter(parameters["access_token"]) else {
             return nil
         }
 
         return SupabaseAuthRedirectPayload(
             accessToken: accessToken,
-            refreshToken: parameters["refresh_token"]?.nilIfBlank,
+            refreshToken: nonEmptyParameter(parameters["refresh_token"]),
             expiresIn: parameters["expires_in"].flatMap(Int.init),
             expiresAt: parameters["expires_at"].flatMap(Double.init).map(Date.init(timeIntervalSince1970:)),
-            tokenType: parameters["token_type"]?.nilIfBlank ?? "bearer"
+            tokenType: nonEmptyParameter(parameters["token_type"]) ?? "bearer"
         )
     }
 
@@ -49,6 +49,13 @@ public enum SupabaseAuthRedirectParser {
         }
         return values
     }
+
+    private static func nonEmptyParameter(_ value: String?) -> String? {
+        guard let value, !value.isEmpty else {
+            return nil
+        }
+        return value
+    }
 }
 
 private extension Array where Element == URLQueryItem {
@@ -56,11 +63,5 @@ private extension Array where Element == URLQueryItem {
         reduce(into: [:]) { result, item in
             result[item.name] = item.value ?? ""
         }
-    }
-}
-
-private extension String {
-    var nilIfBlank: String? {
-        isEmpty ? nil : self
     }
 }

@@ -4,6 +4,42 @@
 
 ---
 
+## イテレーション681：AuthRedirectParserの空文字判定を明示関数へ整理
+
+### 背景・問題意識
+
+継続リファクタリングとして、Supabase OAuth redirect fragment解析に残っていた `String.nilIfBlank` extension を削除する。この箇所はtoken文字列をtrimしない既存挙動だったため、共通Normalizerへ寄せず、空文字だけをnilにする `nonEmptyParameter(_:)` へ置き換えて意図を明確にした。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumData/SupabaseAuthRedirect.swift`
+- access/refresh/tokenTypeの空文字判定を `nonEmptyParameter(_:)` へ集約した。
+- ファイルローカルの `String.nilIfBlank` extension を削除した。
+
+### 影響範囲
+
+- Supabase OAuth redirect URLのquery/fragment解析
+- token文字列のtrimなし扱い、expiresIn/expiresAt解析、tokenType fallback、認証状態復元、DB schema、UI文言、状態遷移の意味は変更なし。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumData/SupabaseAuthRedirect.swift ios-native/Tests/MegrumDataTests/SupabaseAuthClientTests.swift ios-native/Tests/MegrumAppTests/MegrumAppStateTests.swift`
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-auth-redirect-cleanup-build --enable-xctest --disable-swift-testing -j 1 --filter 'SupabaseAuthClientTests|MegrumAppStateTests'`
+- `xcodebuild -quiet -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -configuration Debug -destination 'generic/platform=iOS Simulator' -derivedDataPath /tmp/megrum-native-xcodebuild-auth-redirect-cleanup CODE_SIGNING_ALLOWED=NO build`
+
+### セルフレビュー結果
+
+- ✅ 対象テスト87件が成功した。
+- ✅ Xcode Debug build が成功した。
+- ✅ redirect token文字列の既存扱いを維持した。
+- ✅ `notes/09_state_machines.md`、`notes/10_glossary.md`、`notes/05_data_model.md` の更新は不要。
+
+### 関連ファイル
+
+- `ios-native/Sources/MegrumData/SupabaseAuthRedirect.swift`
+
+---
+
 ## イテレーション680：SupabaseConfigurationの環境値正規化を共通化
 
 ### 背景・問題意識
