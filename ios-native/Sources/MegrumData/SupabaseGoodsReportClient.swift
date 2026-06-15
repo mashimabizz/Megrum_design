@@ -65,12 +65,6 @@ private struct GoodsReportPayload: Encodable, Sendable {
         self.goodsInventoryId = input.goodsItemID
         self.reportedUserId = input.reportedUserID
         self.reason = input.reason.rawValue
-        self.note = input.note?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfBlank
-    }
-}
-
-private extension String {
-    var nilIfBlank: String? {
-        isEmpty ? nil : self
+        self.note = SupabaseTextNormalizer.optional(input.note)
     }
 }

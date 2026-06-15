@@ -4,6 +4,42 @@
 
 ---
 
+## イテレーション677：GoodsReportのnote正規化をSupabaseTextNormalizerへ集約
+
+### 背景・問題意識
+
+継続リファクタリングとして、グッズ通報Data層に残っていたnoteのtrim/空文字nil化を `SupabaseTextNormalizer` 経由へ寄せる。通報payloadの形式や省略挙動は変えず、clientローカルの重複実装だけを減らした。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumData/SupabaseGoodsReportClient.swift`
+- `GoodsReportPayload.note` の正規化を `SupabaseTextNormalizer.optional(_:)` に差し替えた。
+- ファイルローカルの `String.nilIfBlank` extension を削除した。
+
+### 影響範囲
+
+- グッズ通報作成payloadのnote前処理
+- URL、HTTP method、select句、reason、note空文字省略、DB schema、UI文言、状態遷移の意味は変更なし。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumData/SupabaseGoodsReportClient.swift ios-native/Tests/MegrumDataTests/SupabaseGoodsReportClientTests.swift ios-native/Tests/MegrumDataTests/InventoryWishRequestHardeningTests.swift`
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-goods-report-normalizer-build --enable-xctest --disable-swift-testing -j 1 --filter 'SupabaseTextNormalizerTests|SupabaseGoodsReportClientTests|InventoryWishRequestHardeningTests'`
+- `xcodebuild -quiet -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -configuration Debug -destination 'generic/platform=iOS Simulator' -derivedDataPath /tmp/megrum-native-xcodebuild-goods-report-normalizer CODE_SIGNING_ALLOWED=NO build`
+
+### セルフレビュー結果
+
+- ✅ 対象テスト13件が成功した。
+- ✅ Xcode Debug build が成功した。
+- ✅ グッズ通報noteの空文字省略は既存テスト通り維持した。
+- ✅ `notes/09_state_machines.md`、`notes/10_glossary.md`、`notes/05_data_model.md` の更新は不要。
+
+### 関連ファイル
+
+- `ios-native/Sources/MegrumData/SupabaseGoodsReportClient.swift`
+
+---
+
 ## イテレーション676：Notification/Oshiの文字列正規化をSupabaseTextNormalizerへ集約
 
 ### 背景・問題意識
