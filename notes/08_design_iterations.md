@@ -4,6 +4,42 @@
 
 ---
 
+## イテレーション682：ScheduleClientの行文字列正規化をSupabaseTextNormalizerへ集約
+
+### 背景・問題意識
+
+継続リファクタリングとして、`SupabaseScheduleClient` のDB行から `PersonalSchedule` を復元する箇所に残っていたtitle/place/noteのtrim/空文字nil化を `SupabaseTextNormalizer` 経由へ寄せる。日時エンコードは既存テストで非fractional ISO8601形式が固定されているため、今回の変更対象から外した。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumData/SupabaseScheduleClient.swift`
+- `ScheduleRow.schedule` のtitle/placeName/note正規化を `SupabaseTextNormalizer.optional(_:)` に差し替えた。
+- ファイルローカルの `String.nilIfBlank` extension を削除した。
+
+### 影響範囲
+
+- スケジュール取得後の表示用モデル復元
+- スケジュール作成payload、日時文字列形式、URL/HTTP method、DB schema、UI文言、状態遷移の意味は変更なし。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumData/SupabaseScheduleClient.swift ios-native/Tests/MegrumDataTests/SupabaseScheduleClientTests.swift ios-native/Tests/MegrumDataTests/SupabaseTextNormalizerTests.swift`
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-schedule-normalizer-build --enable-xctest --disable-swift-testing -j 1 --filter 'SupabaseTextNormalizerTests|SupabaseScheduleClientTests'`
+- `xcodebuild -quiet -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -configuration Debug -destination 'generic/platform=iOS Simulator' -derivedDataPath /tmp/megrum-native-xcodebuild-schedule-normalizer CODE_SIGNING_ALLOWED=NO build`
+
+### セルフレビュー結果
+
+- ✅ 対象テスト6件が成功した。
+- ✅ Xcode Debug build が成功した。
+- ✅ Scheduleの日時形式と作成payloadは維持した。
+- ✅ `notes/09_state_machines.md`、`notes/10_glossary.md`、`notes/05_data_model.md` の更新は不要。
+
+### 関連ファイル
+
+- `ios-native/Sources/MegrumData/SupabaseScheduleClient.swift`
+
+---
+
 ## イテレーション681：AuthRedirectParserの空文字判定を明示関数へ整理
 
 ### 背景・問題意識

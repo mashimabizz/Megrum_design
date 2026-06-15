@@ -138,18 +138,12 @@ private struct ScheduleRow: Decodable, Sendable {
         return PersonalSchedule(
             id: id,
             userID: userId,
-            title: title?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfBlank ?? "予定",
-            placeName: placeName?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfBlank,
+            title: SupabaseTextNormalizer.optional(title) ?? "予定",
+            placeName: SupabaseTextNormalizer.optional(placeName),
             startAt: startAt,
             endAt: endAt,
             allDay: allDay ?? false,
-            note: note?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfBlank
+            note: SupabaseTextNormalizer.optional(note)
         )
-    }
-}
-
-private extension String {
-    var nilIfBlank: String? {
-        isEmpty ? nil : self
     }
 }
