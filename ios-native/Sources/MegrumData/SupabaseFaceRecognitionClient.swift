@@ -351,11 +351,11 @@ private struct FaceUploadedImagePayload: Encodable, Sendable {
     init(userID: UUID, input: FaceUploadedImageInput) {
         self.userID = userID
         self.inventoryID = input.inventoryID
-        self.storageBucket = input.storageBucket?.trimmedNonEmpty
-        self.storagePath = input.storagePath?.trimmedNonEmpty
-        self.imageURL = input.imageURL?.trimmedNonEmpty
-        self.imageHash = input.imageHash?.trimmedNonEmpty
-        self.contentType = input.contentType.trimmedNonEmpty ?? "image/jpeg"
+        self.storageBucket = SupabaseTextNormalizer.optional(input.storageBucket)
+        self.storagePath = SupabaseTextNormalizer.optional(input.storagePath)
+        self.imageURL = SupabaseTextNormalizer.optional(input.imageURL)
+        self.imageHash = SupabaseTextNormalizer.optional(input.imageHash)
+        self.contentType = SupabaseTextNormalizer.optional(input.contentType) ?? "image/jpeg"
         self.imageType = input.imageType
         self.analysisStatus = input.analysisStatus
     }
@@ -404,7 +404,7 @@ private struct DetectedFacePayload: Encodable, Sendable {
         self.imageType = result.imageType
         self.subjectType = result.subjectType
         self.recognitionMethod = result.recognitionMethod
-        self.modelVersion = result.modelVersion?.trimmedNonEmpty
+        self.modelVersion = SupabaseTextNormalizer.optional(result.modelVersion)
         self.profileType = result.profileType
         self.matchStatus = result.status
         self.matchedCharacterID = result.matchedMemberID
@@ -459,7 +459,7 @@ private struct FaceMatchCorrectionPayload: Encodable, Sendable {
         self.userID = userID
         self.originalMatchStatus = input.originalMatchStatus
         self.selectedCharacterID = input.selectedCharacterID
-        self.selectedMemberName = input.selectedMemberName?.trimmedNonEmpty
+        self.selectedMemberName = SupabaseTextNormalizer.optional(input.selectedMemberName)
         self.imageType = input.imageType
         self.subjectType = input.subjectType
         self.recognitionMethod = input.recognitionMethod
@@ -486,11 +486,4 @@ private extension DetectedFaceRecord {
 
 private extension FaceMatchCandidateRecord {
     static let select = "id,detected_face_id,character_id,confidence,rank,profile_count,created_at"
-}
-
-private extension String {
-    var trimmedNonEmpty: String? {
-        let value = trimmingCharacters(in: .whitespacesAndNewlines)
-        return value.isEmpty ? nil : value
-    }
 }

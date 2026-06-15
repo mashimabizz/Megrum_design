@@ -4,6 +4,44 @@
 
 ---
 
+## イテレーション685：FaceRecognitionClientの文字列正規化を共通化
+
+### 背景・問題意識
+
+継続リファクタリングとして、`SupabaseFaceRecognitionClient` のアップロード画像payload、検出結果payload、補正payloadに残っていたファイルローカルの `String.trimmedNonEmpty` を `SupabaseTextNormalizer` 経由へ寄せる。顔検出・候補推定・学習可否・DB endpointの挙動は変更しない。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumData/SupabaseFaceRecognitionClient.swift`
+- storage bucket/path/image URL/image hash/content type/model version/selected member nameのtrim/空文字nil化を `SupabaseTextNormalizer.optional(_:)` に差し替えた。
+- content typeの空文字時fallback `image/jpeg` は維持した。
+- ファイルローカルの `String.trimmedNonEmpty` extension を削除した。
+
+### 影響範囲
+
+- 顔認識用アップロード画像・検出顔・補正リクエストのpayload生成
+- 顔検出結果、候補ランキング、学習データ追加フラグ、URL/HTTP method、DB schema、UI文言、状態遷移の意味は変更なし。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumData/SupabaseFaceRecognitionClient.swift ios-native/Tests/MegrumDataTests/SupabaseFaceRecognitionClientTests.swift ios-native/Tests/MegrumDataTests/SupabaseTextNormalizerTests.swift`
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-face-normalizer-build --enable-xctest --disable-swift-testing -j 1 --filter 'SupabaseTextNormalizerTests|SupabaseFaceRecognitionClientTests'`
+- `xcodebuild -quiet -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -configuration Debug -destination 'generic/platform=iOS Simulator' -derivedDataPath /tmp/megrum-native-xcodebuild-face-normalizer CODE_SIGNING_ALLOWED=NO build`
+
+### セルフレビュー結果
+
+- ✅ 対象テスト11件が成功した。
+- ✅ Xcode Debug build が成功した。
+- ✅ 初回テストで見つかった `trimmedNonEmpty` の置換漏れを全て修正した。
+- ✅ 顔認識・候補推定・学習フラグの意味は変更していない。
+- ✅ `notes/09_state_machines.md`、`notes/10_glossary.md`、`notes/05_data_model.md` の更新は不要。
+
+### 関連ファイル
+
+- `ios-native/Sources/MegrumData/SupabaseFaceRecognitionClient.swift`
+
+---
+
 ## イテレーション684：ListingClientの更新note正規化を共通化
 
 ### 背景・問題意識
