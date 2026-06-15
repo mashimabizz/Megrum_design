@@ -460,7 +460,7 @@ public final class SupabaseActivityWindowClient: @unchecked Sendable {
     }
 
     private func validateVenue(_ venue: String) throws {
-        let normalized = venue.trimmingCharacters(in: .whitespacesAndNewlines)
+        let normalized = SupabaseTextNormalizer.trimmed(venue)
         guard !normalized.isEmpty, normalized.count <= 100 else {
             throw SupabaseActivityWindowClientError.invalidVenue
         }
@@ -481,13 +481,13 @@ public final class SupabaseActivityWindowClient: @unchecked Sendable {
     }
 
     private func validateEventName(_ eventName: String?) throws {
-        guard eventName?.trimmingCharacters(in: .whitespacesAndNewlines).count ?? 0 <= 100 else {
+        guard SupabaseTextNormalizer.optional(eventName)?.count ?? 0 <= 100 else {
             throw SupabaseActivityWindowClientError.invalidEventName
         }
     }
 
     private func validateNote(_ note: String?) throws {
-        guard note?.trimmingCharacters(in: .whitespacesAndNewlines).count ?? 0 <= 200 else {
+        guard SupabaseTextNormalizer.optional(note)?.count ?? 0 <= 200 else {
             throw SupabaseActivityWindowClientError.invalidNote
         }
     }
@@ -566,15 +566,15 @@ private struct ActivityWindowCreatePayload: Encodable, Sendable {
 
     init(userID: UUID, input: SupabaseActivityWindowCreateInput, dateFormatter: ISO8601DateFormatter) {
         self.userId = userID
-        self.venue = input.venue.trimmingCharacters(in: .whitespacesAndNewlines)
+        self.venue = SupabaseTextNormalizer.trimmed(input.venue)
         self.centerLat = input.center?.latitude
         self.centerLng = input.center?.longitude
         self.radiusM = input.radiusMeters
-        self.eventName = input.eventName?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfBlank
+        self.eventName = SupabaseTextNormalizer.optional(input.eventName)
         self.eventless = input.eventless
         self.startAt = dateFormatter.string(from: input.startAt)
         self.endAt = dateFormatter.string(from: input.endAt)
-        self.note = input.note?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfBlank
+        self.note = SupabaseTextNormalizer.optional(input.note)
         self.status = input.status.rawValue
     }
 
@@ -626,7 +626,7 @@ private struct ActivityWindowUpdatePayload: Encodable, Sendable {
 
     init(input: SupabaseActivityWindowUpdateInput, dateFormatter: ISO8601DateFormatter) throws {
         if let venue = input.venue {
-            let normalized = venue.trimmingCharacters(in: .whitespacesAndNewlines)
+            let normalized = SupabaseTextNormalizer.trimmed(venue)
             guard !normalized.isEmpty, normalized.count <= 100 else {
                 throw SupabaseActivityWindowClientError.invalidVenue
             }
@@ -651,11 +651,11 @@ private struct ActivityWindowUpdatePayload: Encodable, Sendable {
             self.radiusM = radiusMeters
         }
         if let eventName = input.eventName {
-            let normalized = eventName.trimmingCharacters(in: .whitespacesAndNewlines)
+            let normalized = SupabaseTextNormalizer.trimmed(eventName)
             guard normalized.count <= 100 else {
                 throw SupabaseActivityWindowClientError.invalidEventName
             }
-            self.eventName = .some(normalized.nilIfBlank)
+            self.eventName = .some(normalized.isEmpty ? nil : normalized)
         } else if input.clearsEventName {
             self.eventName = .some(nil)
         }
@@ -670,11 +670,11 @@ private struct ActivityWindowUpdatePayload: Encodable, Sendable {
             throw SupabaseActivityWindowClientError.invalidTimeRange
         }
         if let note = input.note {
-            let normalized = note.trimmingCharacters(in: .whitespacesAndNewlines)
+            let normalized = SupabaseTextNormalizer.trimmed(note)
             guard normalized.count <= 200 else {
                 throw SupabaseActivityWindowClientError.invalidNote
             }
-            self.note = .some(normalized.nilIfBlank)
+            self.note = .some(normalized.isEmpty ? nil : normalized)
         } else if input.clearsNote {
             self.note = .some(nil)
         }
@@ -897,11 +897,5 @@ private struct FlexibleDouble: Decodable, Sendable {
             )
         }
         self.value = value
-    }
-}
-
-private extension String {
-    var nilIfBlank: String? {
-        isEmpty ? nil : self
     }
 }

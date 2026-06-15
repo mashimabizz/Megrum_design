@@ -4,6 +4,43 @@
 
 ---
 
+## イテレーション683：ActivityWindowClientの入力文字列正規化を共通化
+
+### 背景・問題意識
+
+継続リファクタリングとして、`SupabaseActivityWindowClient` の作成・更新payloadと入力検証に残っていたvenue/eventName/noteのtrim/空文字nil化を `SupabaseTextNormalizer` 経由へ寄せる。日時エンコード、座標・半径・時間帯バリデーション、HTTP request形状は既存挙動を維持する。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumData/SupabaseActivityWindowClient.swift`
+- venueの必須trim検証とpayload格納を `SupabaseTextNormalizer.trimmed(_:)` に差し替えた。
+- eventName/noteの任意文字列検証と空文字nil化を `SupabaseTextNormalizer.optional(_:)` へ寄せた。
+- ファイルローカルの `String.nilIfBlank` extension を削除した。
+
+### 影響範囲
+
+- AW（Activity Window）の作成・更新リクエストpayload生成
+- Local Mode設定、日時文字列形式、URL/HTTP method、DB schema、UI文言、状態遷移の意味は変更なし。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumData/SupabaseActivityWindowClient.swift ios-native/Tests/MegrumDataTests/SupabaseActivityWindowClientTests.swift ios-native/Tests/MegrumDataTests/SupabaseTextNormalizerTests.swift`
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-activity-window-normalizer-build --enable-xctest --disable-swift-testing -j 1 --filter 'SupabaseTextNormalizerTests|SupabaseActivityWindowClientTests'`
+- `xcodebuild -quiet -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -configuration Debug -destination 'generic/platform=iOS Simulator' -derivedDataPath /tmp/megrum-native-xcodebuild-activity-window-normalizer CODE_SIGNING_ALLOWED=NO build`
+
+### セルフレビュー結果
+
+- ✅ 対象テスト16件が成功した。
+- ✅ Xcode Debug build が成功した。
+- ✅ AWの日時形式、空文字clear扱い、座標・半径・時間帯バリデーションを維持した。
+- ✅ `notes/09_state_machines.md`、`notes/10_glossary.md`、`notes/05_data_model.md` の更新は不要。
+
+### 関連ファイル
+
+- `ios-native/Sources/MegrumData/SupabaseActivityWindowClient.swift`
+
+---
+
 ## イテレーション682：ScheduleClientの行文字列正規化をSupabaseTextNormalizerへ集約
 
 ### 背景・問題意識
