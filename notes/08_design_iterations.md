@@ -4,6 +4,44 @@
 
 ---
 
+## イテレーション846：Face recognition matchingを分割
+
+### 背景・問題意識
+
+次の上位候補として `FaceRecognitionModels.swift` を確認した。このファイルは、顔認識/メンバータグ付けのCodableモデルと、認識閾値、cosine similarity、候補rank、match status判定が同居していた。Core modelは他層から広く参照されるため、型名やpublic APIは維持し、モデル定義とmatchingロジックを別ファイルへ分けて読み分けやすくする。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumCore/FaceRecognitionModels.swift`
+- `FaceRecognitionThresholds`、`MemberTaggingThresholds`、`FaceMatchResolver` を移動した。
+- 顔認識/タグ付けのenum、bounding box、embedding、profile、observation、candidate、analysis/result modelは残した。
+- ファイル行数を457行から302行へ縮小した。
+
+#### `ios-native/Sources/MegrumCore/FaceRecognitionMatching.swift`
+- 認識閾値、image type別threshold選択、cosine similarity、candidate ranking、status判定を移動した。
+- 閾値、confidence正規化、rank付与、profile type filter、quality判定、public API名は変更していない。
+
+### 影響範囲
+
+- Swift Native iOS版の顔認識Core model、顔認識候補rank、auto match/review/unknown判定、anime/illustration向け閾値選択、Supabase顔認識payload。
+- 挙動変更ではなく責務分離。Codable schema、public type名、閾値、計算式、status判定、状態名、状態遷移、用語は変更しない。
+
+### 確認方法
+
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-face-matching-build`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-face-matching-tests --enable-xctest --disable-swift-testing -j 1 --filter 'FaceRecognitionModelTests|SupabaseFaceRecognitionClientTests|FaceTaggingServiceTests'`
+  - 22 tests passed
+
+### セルフレビュー結果
+
+- ✅ 顔認識model定義とmatching判定ロジックを分け、Core modelの責務を読みやすくした。
+- ✅ FaceRecognition model、Supabase face recognition request、FaceTagging service周辺は対象テストで既存挙動維持を確認した。
+- ✅ Codable schema、public type名、閾値、計算式、status判定、状態遷移、状態名、用語は変更していない。
+- ✅ 状態名・用語・DBスキーマの変更はないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション845：Supabase message payload builderを分割
 
 ### 背景・問題意識
