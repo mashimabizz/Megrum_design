@@ -4,6 +4,44 @@
 
 ---
 
+## イテレーション875：Individual listing panel option viewsを分割
+
+### 背景・問題意識
+
+次の候補として `IndividualListingPanels.swift` を確認した。このファイルは、個別募集詳細の親パネルである「求めるもの」「譲るもの」と、求めるものの行表示、現金カード、価格バッジ、条件チップ、条件編集行が同居していた。親パネルの構造と、選択肢/現金/条件表示の子部品を分け、個別募集の表示調整時に読む範囲を狭める。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/IndividualListingPanels.swift`
+- `ListingOfferCashCard`、`IndividualListingOptionRow`、`IndividualListingEmptyOptionRow`、`ListingOptionPriceBadge`、`ListingConditionTokenFlow`、`IndividualListingAddConditionRow` を移動した。
+- `IndividualListingReceivePanel`、`IndividualListingOfferPanel`、`IndividualListingPanelEditButton` を残した。
+- ファイル行数を368行から172行へ縮小した。
+
+#### `ios-native/Sources/MegrumApp/IndividualListingPanelOptionViews.swift`
+- 個別募集の現金カード、求めるもの行、空表示、価格バッジ、条件token flow、条件編集行を移動した。
+- 価格表示、option title、logic title、wish image表示、条件token fallback、条件編集ボタン文言/見た目は変更していない。
+
+### 影響範囲
+
+- Swift Native iOS版の個別募集詳細/一覧で表示する「求めるもの」「譲るもの」パネル、現金表示、求めるものの選択肢行、条件編集行。
+- 挙動変更ではなく責務分離。個別募集draft、保存処理、選択filter、option logic、状態名、状態遷移、用語は変更しない。
+
+### 確認方法
+
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-individual-listing-panel-options-build --disable-index-store`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-individual-listing-panel-options-tests --disable-index-store --enable-xctest --disable-swift-testing -j 1 --filter 'IndividualListingDraftTests'`
+  - 35 tests passed
+- 容量不足で初回buildが失敗したため、`/private/tmp/megrum-ios-native-refactor-*` などのMegrum検証用scratchを削除し、空き容量を約26GB確保して再実行した。
+
+### セルフレビュー結果
+
+- ✅ 個別募集パネルの子部品配置だけを分け、価格表示、option title、logic title、wish image/condition token、条件編集ボタン文言は変更していない。
+- ✅ IndividualListingDraftTestsで、option logic、1個以上/何個以上、すべて登録/解除、選択filter、保存失敗文言、個別募集draftの既存挙動を確認した。
+- ✅ 状態名・用語・DBスキーマの変更はないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション874：Search result filter policyを分割
 
 ### 背景・問題意識
