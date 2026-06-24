@@ -4,6 +4,52 @@
 
 ---
 
+## イテレーション818：Supabase repository委譲を領域別extensionへ分割
+
+### 背景・問題意識
+
+次の未処理上位候補として `SupabaseMegrumRepository.swift` を確認した。このファイルは、Supabase clientの初期化、初期snapshot/home読み込み、推し/在庫/個別募集/公開プロフィール、提案/証跡/チャット、めぐり/掲示板、予定/住所/支払い/通知/プロフィール更新の委譲が1ファイルに集約されていた。Repositoryは保存処理やライブデータ連携の入口なので、修正対象領域ごとに読み取り範囲を分ける。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/SupabaseMegrumRepository.swift`
+- Supabase client群の保持、初期化、初期snapshot/subscription/home candidate読み込みを残した。
+- 領域別extensionから既存clientへ委譲できるよう、保存プロパティをモジュール内アクセスへ広げた。
+- ファイル行数を550行から111行へ縮小した。
+
+#### `ios-native/Sources/MegrumApp/SupabaseMegrumRepositoryCatalog.swift`
+- 推し、顔認識、ユーザー推し選択、在庫/ウィッシュ、個別募集、公開プロフィール/評価のRepository委譲を移動した。
+
+#### `ios-native/Sources/MegrumApp/SupabaseMegrumRepositoryTrade.swift`
+- 打診、合意/拒否、証跡、評価/異議申し立て、取引チャット、写真/位置/到着/遅刻/キャンセル関連messageのRepository委譲を移動した。
+
+#### `ios-native/Sources/MegrumApp/SupabaseMegrumRepositoryMeguri.swift`
+- グルーム、めぐりメッセージ、掲示板thread/replyのRepository委譲を移動した。
+
+#### `ios-native/Sources/MegrumApp/SupabaseMegrumRepositorySettings.swift`
+- 予定、ホーム現地モード、住所、支払い、ブロック、通知、push token、プロフィール更新/初期設定完了のRepository委譲を移動した。
+
+### 影響範囲
+
+- Swift Native iOS版のSupabase live repository全般。
+- 挙動変更ではなく責務分離。委譲先client、DB/API payload、状態名、状態遷移、用語、画面レイアウトは変更しない。
+
+### 確認方法
+
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-supabase-repository-build`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-supabase-repository-tests --enable-xctest --disable-swift-testing -j 1 --filter 'MegrumAppStateTests|MegrumAppStateInputNormalizerTests|SupabaseInitialSnapshotLoaderTests|SupabaseGoodsEntryPersistenceTests|SupabaseHomeLocalModePersistenceTests|SupabasePaymentSettingsPersistenceTests|SupabasePublicProfilePersistenceTests|SupabaseTradeSchedulePersistenceTests'`
+  - 107 tests passed
+
+### セルフレビュー結果
+
+- ✅ live repositoryを本体、catalog、trade、meguri、settingsの領域別extensionへ分割した。
+- ✅ `MegrumRepository` protocol適合、Repository factory経由のlive repository生成、AppState周辺テスト、Supabase persistence周辺テストはbuild/testで維持を確認した。
+- ✅ 委譲先client、DB/API payload、状態遷移、状態名、用語、画面レイアウトは変更していない。
+- ✅ 状態名・用語・DBスキーマの変更はないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション817：個別募集条件previewを表示単位で分割
 
 ### 背景・問題意識
