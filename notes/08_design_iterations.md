@@ -4,6 +4,49 @@
 
 ---
 
+## イテレーション879：Trade presentation modelsを用途別分割
+
+### 背景・問題意識
+
+次の候補として `TradeDetailPresentationModels.swift` を確認した。このファイルは、取引詳細hero、評価prompt、system message、証跡message、キャンセル承認prompt、現在地/到着message、スケジュール表示mode、取引サムネイルstyleが同居していた。取引チャット/取引詳細は表示調整と状態判定が混ざりやすいため、用途別の表示モデルへ分ける。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/TradeDetailPresentationModels.swift`
+- すべての型を用途別ファイルへ移動し、集合ファイルを削除した。
+
+#### `ios-native/Sources/MegrumApp/TradeDetailHeroPresentation.swift`
+- `TradeDetailHeroPresentation` を移動した。
+- incoming/outgoing、status label、agreement label、guidance、ゆずる/求めるsummaryの文言は変更していない。
+
+#### `ios-native/Sources/MegrumApp/TradeMessagePresentationModels.swift`
+- `TradeEvaluationPromptState`、`TradeSystemMessagePresentation`、`TradeEvidenceSystemMessage`、`TradeCancelApprovalPrompt`、`TradeOperationalMessagePresentation` を移動した。
+- 評価提出検出、証跡system message、遅刻/キャンセル申請/キャンセル合意、現在地/到着表示、キャンセル承認条件は変更していない。
+
+#### `ios-native/Sources/MegrumApp/TradeSchedulePresentationModels.swift`
+- `TradeScheduleCalendarMode` と `TradePreviewThumbnailStyle` を移動した。
+- 週/月title、preview glyph、theme色分岐は変更していない。
+
+### 影響範囲
+
+- Swift Native iOS版の取引詳細hero、取引チャットsystem message、証跡message、キャンセル承認、現在地/到着message、取引スケジュール表示、取引goods preview。
+- 挙動変更ではなく責務分離。取引状態、打診状態、証跡、キャンセル承認、状態名、状態遷移、用語、DBスキーマは変更しない。
+
+### 確認方法
+
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-trade-presentation-models-build --disable-index-store`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-trade-presentation-models-tests --disable-index-store --enable-xctest --disable-swift-testing -j 1 --filter 'TradeChatAffordanceTests'`
+  - 47 tests passed
+
+### セルフレビュー結果
+
+- ✅ 表示モデルの配置だけを分け、hero文言、system message文言、証跡判定、キャンセル承認条件、現在地/到着表示、サムネイルglyph/colorは変更していない。
+- ✅ TradeChatAffordanceTestsで、hero incoming/outgoing、agreement/completed、証跡message、キャンセル承認、現在地/到着、サムネイルglyph、取引カード/チャット入力actionを確認した。
+- ✅ 状態名・用語・DBスキーマの変更はないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション878：Goods photo crop viewsを分割
 
 ### 背景・問題意識
