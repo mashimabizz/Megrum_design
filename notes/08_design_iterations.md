@@ -4,6 +4,48 @@
 
 ---
 
+## イテレーション834：Meguri state actionsを領域別に分割
+
+### 背景・問題意識
+
+次の上位候補として `MegrumAppStateMeguriActions.swift` を確認した。このファイルは、めぐりfeed読み込み、グルーム投稿/閲覧/いいね/返信/アーカイブ、めぐりメッセージ、掲示板返信/作成が同居していた。`MegrumAppState` の操作入口は広く壊すと影響が大きいため、関数本体のロジックや公開メソッド名は変えず、グルーム系とめぐりメッセージ系だけを別extensionへ移して、掲示板/feed側の読み取り範囲を狭める。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/MegrumAppStateMeguriActions.swift`
+- `loadMeguriFeed`、board prefecture補助、掲示板返信/作成actionを残した。
+- グルーム系actionとめぐりメッセージ系actionを移動した。
+- ファイル行数を492行から210行へ縮小した。
+
+#### `ios-native/Sources/MegrumApp/MegrumAppStateGroomActions.swift`
+- `loadGroomMapPosts`、`loadGroomArchive`、`createGroomPost`、`markGroomViewed`、`setGroomLiked`、`sendGroomReply`、アーカイブ用public profile読み込み補助を移動した。
+- state flag、error message、repository呼び出し、reducer適用順は変更していない。
+
+#### `ios-native/Sources/MegrumApp/MegrumAppStateMeguriMessageActions.swift`
+- `loadMeguriMessages`、`sendMeguriMessage`、`markMeguriMessagesRead` を移動した。
+- read state optimistic update、rollback、repository呼び出し、error messageは変更していない。
+
+### 影響範囲
+
+- Swift Native iOS版のめぐりfeed、グルーム、グルームアーカイブ、めぐりメッセージ、掲示板。
+- 挙動変更ではなく責務分離。公開メソッド名、repository呼び出し、state flag、error message、reducer適用、状態名、状態遷移、用語、画面レイアウトは変更しない。
+
+### 確認方法
+
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-meguri-actions-build`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-meguri-actions-tests --enable-xctest --disable-swift-testing -j 1 --filter 'MegrumAppStateTests|GroomInteractionStateReducerTests|MeguriMessageReadStateReducerTests|MeguriFeedStateReducerTests|ReplyThreadStateReducerTests'`
+  - 93 tests passed
+
+### セルフレビュー結果
+
+- ✅ `MegrumAppStateMeguriActions.swift` をfeed/掲示板中心へ薄くし、グルーム系とめぐりメッセージ系の変更箇所を分離した。
+- ✅ `MegrumAppStateTests` と関連reducerテストで、グルーム投稿/閲覧/いいね/返信、めぐりメッセージ、掲示板作成/返信、feed refreshの既存挙動維持を確認した。
+- ✅ 公開メソッド名、repository呼び出し、state flag、error message、reducer適用、状態遷移、状態名、用語、画面レイアウトは変更していない。
+- ✅ 状態名・用語・DBスキーマの変更はないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション833：Dispute detailのstatusとtimelineを分割
 
 ### 背景・問題意識
