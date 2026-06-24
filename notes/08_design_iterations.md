@@ -4,6 +4,51 @@
 
 ---
 
+## イテレーション865：Proposal create derived stateを責務分割
+
+### 背景・問題意識
+
+次の上位候補として `ProposalCreateFlowDerivedState.swift` を確認した。このファイルは、個別募集/打診作成フローのvisible steps、グッズ選択、待ち合わせ、交換条件、支払い、確認画面condition tagが1つのextensionに集まっていた。今後の修正で「支払いだけ」「待ち合わせだけ」「選択だけ」を追いやすくするため、派生状態を責務別extensionへ分割する。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/ProposalCreateFlowDerivedState.swift`
+- `visibleSteps`、`configuration`、`proposalConditionTags` だけを残した。
+- ファイル行数を419行から53行へ縮小した。
+
+#### `ios-native/Sources/MegrumApp/ProposalCreateFlowSelectionDerivedState.swift`
+- selectable sender/receiver goods、ordered/selected IDs、resolved receiver IDsを移動した。
+
+#### `ios-native/Sources/MegrumApp/ProposalCreateFlowMeetupDerivedState.swift`
+- meetup input、submission inputs、candidate draft、schedule context、meetup summary、prefecture/place/coordinate derived stateを移動した。
+
+#### `ios-native/Sources/MegrumApp/ProposalCreateFlowExchangeDerivedState.swift`
+- viewer/partner listing exchange summary、condition display listing、local/shipping condition text、draft exchange summaryを移動した。
+
+#### `ios-native/Sources/MegrumApp/ProposalCreateFlowPaymentDerivedState.swift`
+- cash amount、cash side、payment step判定、cash reference rows、payment method/option derived stateを移動した。
+
+### 影響範囲
+
+- Swift Native iOS版の個別募集/打診作成フローの派生状態全般。
+- 挙動変更ではなく責務分離。visible step順、選択数、待ち合わせvalid判定、交換条件抽出、支払いoption選定、condition tag生成、状態名、状態遷移、用語は変更しない。
+
+### 確認方法
+
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-proposal-derived-state-build --disable-index-store`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-proposal-derived-state-tests --disable-index-store --enable-xctest --disable-swift-testing -j 1 --filter 'ProposalCreateFlowTests'`
+  - 55 tests passed
+
+### セルフレビュー結果
+
+- ✅ 派生状態の配置だけを分け、visible step順、選択数、cash validation、payment option selection、meetup input、condition tag生成は変更していない。
+- ✅ ProposalCreateFlowTests / TradeRequestDraftProposalCreateFlowTestsで、ステップ遷移、支払い必須判定、待ち合わせ、提出summary、calendar/schedule contextの既存挙動を確認した。
+- ✅ ビルドで分割後のextension参照切れがないことを確認した。
+- ✅ 状態名・用語・DBスキーマの変更はないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション864：Oshi settings group card viewsを分割
 
 ### 背景・問題意識
