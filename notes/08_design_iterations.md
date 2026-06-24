@@ -4,6 +4,43 @@
 
 ---
 
+## イテレーション820：GoodsEditorSheetのpresentation状態を分割
+
+### 背景・問題意識
+
+次の未処理上位候補として `GoodsEditorScreen.swift` を確認した。このファイルは、sheetの状態保持とbodyに加えて、toolbar、表示用の派生状態、form composition、保存/写真/削除処理を起動する薄いUI action wrapperが同居していた。グッズ登録・Wish登録・在庫一括作成は今後も修正頻度が高いため、画面本体と表示判断を分けて読み取り範囲を狭める。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/GoodsEditorScreen.swift`
+- `GoodsEditorSheet` の状態、初期化、body、sheet/dialog/photos picker連携を残した。
+- ファイル行数を541行から228行へ縮小した。
+
+#### `ios-native/Sources/MegrumApp/GoodsEditorSheetPresentation.swift`
+- toolbar、navigation title、選択中の推し/メンバー/グッズ種別、保存可否、写真文言、tag候補、Wish写真削除ロックなどの表示用派生状態を移動した。
+- `GoodsEditorFormContentView` への入力組み立てと、保存/削除/写真選択を起動する薄いUI action wrapperを移動した。
+
+### 影響範囲
+
+- Swift Native iOS版のグッズ登録、Wish登録、在庫編集、在庫一括作成sheet。
+- 挙動変更ではなく責務分離。保存処理、写真処理、DB/API payload、状態名、状態遷移、用語、画面レイアウトは変更しない。
+
+### 確認方法
+
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-goods-editor-screen-build`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-goods-editor-screen-tests --enable-xctest --disable-swift-testing -j 1 --filter 'GoodsEditorDraftTests|GoodsEditorWishPhotoRemovalPolicyTests|GoodsGridLayoutTests|MegrumAppStateTests|ImageUploadContentTypeTests'`
+  - 134 tests passed
+
+### セルフレビュー結果
+
+- ✅ `GoodsEditorScreen.swift` をsheet state/init/body中心へ薄くし、presentation用computed propertyとform compositionを別ファイルへ分割した。
+- ✅ グッズ/Wish登録input、写真upload content type、Wish写真削除ロック、グリッド、AppState保存系の対象テストで既存挙動維持を確認した。
+- ✅ 保存処理、写真処理、DB/API payload、状態遷移、状態名、用語、画面レイアウトは変更していない。
+- ✅ 状態名・用語・DBスキーマの変更はないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション819：Meguri掲示板bottom sheetを表示部品へ分割
 
 ### 背景・問題意識
