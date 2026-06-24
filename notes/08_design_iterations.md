@@ -4,6 +4,41 @@
 
 ---
 
+## イテレーション895：Meguri creation location previewを分割
+
+### 背景・問題意識
+
+`MeguriCreationLocationPicker.swift` は、地図タップ/現在地/範囲判定の本体ロジックと、現在地ドット、作成場所ピン、グツマル/掲示板プレビュー表示が同居していた。めぐり作成場所の地図挙動とピンの見た目を別々に調整できるよう、描画部品を分離する。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/MeguriCreationLocationPicker.swift`
+- `MeguriCreationLocationPicker` 本体だけを残し、見出し、現在地ボタン、Map、タップ選択、範囲外判定、初期位置合わせに集中させた。
+- ファイル行数を365行から217行へ縮小した。
+
+#### `ios-native/Sources/MegrumApp/MeguriCreationLocationPreviewViews.swift`
+- `MeguriCreationLocationPreview`、現在地ドット、作成場所annotation、グツマルpreview、掲示板previewを移動した。
+
+### 影響範囲
+
+- Swift Native iOS版のめぐりグツマル作成、掲示板作成における作成場所選択マップ、現在地表示、作成場所ピン、プレビューbubble。
+- 挙動変更ではなく責務分離。1km作成範囲、範囲外メッセージ、現在地ボタン、初期選択座標、状態名、用語、DBスキーマは変更しない。
+
+### 確認方法
+
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-meguri-location-picker-build --disable-index-store`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-meguri-location-picker-tests --disable-index-store --enable-xctest --disable-swift-testing -j 1 --filter 'MeguriAccessPolicyTests|GroomInteractionStateReducerTests|MeguriFeedStateReducerTests'`
+  - 14 tests passed
+
+### セルフレビュー結果
+
+- ✅ 地図タップ、現在地へ戻る、作成可能範囲1km、範囲外メッセージ、初期選択座標は変更していない。
+- ✅ MeguriAccessPolicyTests / GroomInteractionStateReducerTests / MeguriFeedStateReducerTestsで、作成場所範囲、アクセス範囲、feed state更新を確認した。
+- ✅ 状態名・用語・DBスキーマの変更はないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション894：Goods collection action viewsを分割
 
 ### 背景・問題意識
