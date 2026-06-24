@@ -39,20 +39,20 @@ struct MeguriMapPresentationModifier: ViewModifier {
     }
 }
 
-private struct MeguriMapScreen: View {
+struct MeguriMapScreen: View {
     var kind: MeguriMapKind
     @ObservedObject var appState: MegrumAppState
     @ObservedObject var locationState: MegrumLocationState
     var selectedPrefecture: String?
     var boardScope: BoardThread.Audience
     @Environment(\.dismiss) private var dismiss
-    @State private var cameraPosition: MapCameraPosition
-    @State private var selectedGroom: GroomPost?
-    @State private var selectedThread: BoardThread?
-    @State private var mapNotice: String?
-    @State private var outOfRangeAlertMessage = ""
-    @State private var isShowingOutOfRangeAlert = false
-    @State private var hasCenteredMapOnLocation = false
+    @State var cameraPosition: MapCameraPosition
+    @State var selectedGroom: GroomPost?
+    @State var selectedThread: BoardThread?
+    @State var mapNotice: String?
+    @State var outOfRangeAlertMessage = ""
+    @State var isShowingOutOfRangeAlert = false
+    @State var hasCenteredMapOnLocation = false
 
     init(
         kind: MeguriMapKind,
@@ -163,225 +163,5 @@ private struct MeguriMapScreen: View {
         } message: {
             Text(outOfRangeAlertMessage)
         }
-    }
-
-    private func alignCameraToVisibleContent(
-        userCoordinate: MegrumLocationCoordinate?,
-        animated: Bool,
-        force: Bool = false
-    ) {
-        if !force, userCoordinate != nil, hasCenteredMapOnLocation {
-            return
-        }
-
-        let region = kind.visibleRegion(
-            userCoordinate: userCoordinate,
-            grooms: mapGrooms,
-            threads: appState.threads,
-            boardScope: boardScope
-        )
-        let update = {
-            cameraPosition = .region(region)
-        }
-        if animated {
-            withAnimation(.smooth(duration: 0.28)) {
-                update()
-            }
-        } else {
-            update()
-        }
-        if userCoordinate != nil {
-            hasCenteredMapOnLocation = true
-        }
-    }
-
-    private func centerMapOnCurrentLocation() {
-        guard let coordinate = locationState.coordinate else {
-            mapNotice = "現在地を確認中"
-            locationState.requestCurrentLocation()
-            return
-        }
-
-        let region = MKCoordinateRegion(
-            center: coordinate.clLocationCoordinate,
-            span: kind.regionSpan
-        )
-        withAnimation(.smooth(duration: 0.28)) {
-            cameraPosition = .region(region)
-        }
-        mapNotice = nil
-        hasCenteredMapOnLocation = true
-    }
-
-    private var mapGrooms: [GroomPost] {
-        appState.groomMapPosts.isEmpty ? appState.grooms : appState.groomMapPosts
-    }
-
-    private var isLoadingMapContent: Bool {
-        switch kind {
-        case .grooms:
-            appState.isLoadingGroomMap
-        case .boards:
-            appState.isLoadingMeguri
-        }
-    }
-
-    private func reloadMapContent(latitude: Double?, longitude: Double?) async {
-        switch kind {
-        case .grooms:
-            await appState.loadGroomMapPosts(
-                latitude: latitude,
-                longitude: longitude,
-                radiusMeters: 3_000
-            )
-        case .boards:
-            if boardScope == .nearby3km, (latitude == nil || longitude == nil) {
-                await MainActor.run {
-                    locationState.requestCurrentLocation()
-                }
-                return
-            }
-            await appState.loadMeguriFeed(
-                latitude: latitude,
-                longitude: longitude,
-                prefecture: selectedPrefecture,
-                scope: mapBoardScope
-            )
-        }
-    }
-
-    private var rangeCircle: MeguriMapRangeCircle? {
-        guard let coordinate = locationState.coordinate else {
-            return nil
-        }
-        return MeguriMapRangeCircle(center: coordinate.clLocationCoordinate, radius: kind.radiusMeters)
-    }
-
-    private var mapStatusMessage: String? {
-        if isLoadingMapContent || locationState.isRequestingLocation {
-            return "現在地と投稿を読み込み中"
-        }
-        if let locationErrorMessage = locationState.locationErrorMessage, kind == .grooms || boardScope == .nearby3km {
-            return locationErrorMessage
-        }
-        if kind == .boards, boardScope == .samePrefecture {
-            return "都道府県内の位置つき掲示板を表示中。1km圏外は閲覧できません"
-        }
-        if kind == .grooms, rangeCircle != nil {
-            return "現在地周辺のグルームを表示中。1km圏外は閲覧できません"
-        }
-        if kind == .boards, rangeCircle != nil {
-            return "現在地周辺の掲示板を表示中。1km圏外は閲覧できません"
-        }
-        if rangeCircle == nil {
-            return "範囲円は現在地取得後に表示されます"
-        }
-        return nil
-    }
-
-    private var mapBoardScope: BoardThread.Audience {
-        switch kind {
-        case .grooms:
-            .nearby3km
-        case .boards:
-            boardScope
-        }
-    }
-
-    private func openGroomIfInRange(_ groom: GroomPost) {
-        guard kind == .grooms else {
-            selectedGroom = groom
-            return
-        }
-        if canOpen(groom: groom) {
-            mapNotice = nil
-            selectedGroom = groom
-            return
-        }
-        guard locationState.coordinate != nil else {
-            locationState.requestCurrentLocation()
-            showOutOfRangeAlert(
-                MeguriAccessPolicy.groomAccessMessage(
-                    groom,
-                    currentCoordinate: locationState.coordinate,
-                    viewerID: appState.viewer?.id
-                )
-            )
-            return
-        }
-        showOutOfRangeAlert(groomRangeNotice(groom))
-    }
-
-    private func openThreadIfInRange(_ thread: BoardThread) {
-        if canOpen(thread: thread) {
-            mapNotice = nil
-            selectedThread = thread
-            return
-        }
-        guard locationState.coordinate != nil else {
-            locationState.requestCurrentLocation()
-            showOutOfRangeAlert(
-                MeguriAccessPolicy.boardAccessMessage(
-                    thread,
-                    currentCoordinate: locationState.coordinate,
-                    viewerID: appState.viewer?.id
-                )
-            )
-            return
-        }
-        showOutOfRangeAlert(boardRangeNotice(thread))
-    }
-
-    private func isGroomOutOfRange(_ groom: GroomPost) -> Bool {
-        !MeguriAccessPolicy.canOpenGroom(
-            groom,
-            currentCoordinate: locationState.coordinate,
-            viewerID: appState.viewer?.id
-        )
-    }
-
-    private func isBoardOutOfRange(_ thread: BoardThread) -> Bool {
-        !MeguriAccessPolicy.canOpenBoard(
-            thread,
-            currentCoordinate: locationState.coordinate,
-            viewerID: appState.viewer?.id
-        )
-    }
-
-    private func canOpen(groom: GroomPost) -> Bool {
-        MeguriAccessPolicy.canOpenGroom(
-            groom,
-            currentCoordinate: locationState.coordinate,
-            viewerID: appState.viewer?.id
-        )
-    }
-
-    private func canOpen(thread: BoardThread) -> Bool {
-        MeguriAccessPolicy.canOpenBoard(
-            thread,
-            currentCoordinate: locationState.coordinate,
-            viewerID: appState.viewer?.id
-        )
-    }
-
-    private func groomRangeNotice(_ groom: GroomPost) -> String {
-        MeguriAccessPolicy.groomAccessMessage(
-            groom,
-            currentCoordinate: locationState.coordinate,
-            viewerID: appState.viewer?.id
-        )
-    }
-
-    private func boardRangeNotice(_ thread: BoardThread) -> String {
-        MeguriAccessPolicy.boardAccessMessage(
-            thread,
-            currentCoordinate: locationState.coordinate,
-            viewerID: appState.viewer?.id
-        )
-    }
-
-    private func showOutOfRangeAlert(_ message: String) {
-        outOfRangeAlertMessage = message.isEmpty ? "半径1km以内のグルームと掲示板のみ開けます。" : message
-        isShowingOutOfRangeAlert = true
     }
 }

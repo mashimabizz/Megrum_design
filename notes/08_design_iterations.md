@@ -4,6 +4,45 @@
 
 ---
 
+## イテレーション888：Meguri map screen state/actionsを分割
+
+### 背景・問題意識
+
+`MeguriMapViews.swift` はiter883でMap描画を `MeguriMapScene` へ分けたが、まだMap画面本体に、現在地/投稿読み込み、visible region計算、範囲円/status copy、グルーム/掲示板の範囲判定、範囲外alert処理が残っていた。Map画面本体をScene・chrome・sheet・taskの構成中心にし、位置/範囲関連の状態と操作を追いやすくする。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/MeguriMapViews.swift`
+- 派生状態と操作処理を専用extensionへ移動し、Map画面本体をScene表示、ヘッダー/status badge、recenter button、task、sheet、alert中心に整理した。
+- 分割先extensionから参照するため、`MeguriMapScreen` と画面内部状態のアクセス範囲をfile-private相当からmodule内アクセスへ緩めた。
+- ファイル行数を387行から167行へ縮小した。
+
+#### `ios-native/Sources/MegrumApp/MeguriMapScreenDerivedState.swift`
+- map grooms、loading state、range circle、status message、board scopeの派生状態を移動した。
+
+#### `ios-native/Sources/MegrumApp/MeguriMapScreenActions.swift`
+- camera alignment、現在地recenter、Map content reload、グルーム/掲示板open判定、範囲外判定、範囲外message/alert処理を移動した。
+
+### 影響範囲
+
+- Swift Native iOS版のめぐりMap、グルームMap、掲示板Map、現在地recenter、投稿読み込み、1km範囲円、範囲外alert、グルーム/掲示板detail sheet。
+- 挙動変更ではなく責務分離。MeguriMapScene、MeguriAccessPolicy、Map region計算、loadGroomMapPosts、loadMeguriFeed、状態名、状態遷移、用語、DBスキーマは変更しない。
+
+### 確認方法
+
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-meguri-map-screen-build --disable-index-store`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-meguri-map-screen-tests --disable-index-store --enable-xctest --disable-swift-testing -j 1 --filter 'MeguriAccessPolicyTests|MeguriFeedStateReducerTests|MeguriMessageReadStateReducerTests'`
+  - 14 tests passed
+
+### セルフレビュー結果
+
+- ✅ 派生状態と操作処理の移動だけに留め、Map描画、投稿読み込み、現在地取得要求、範囲円半径、範囲外判定、detail sheet表示は変更していない。
+- ✅ MeguriAccessPolicyTests / MeguriFeedStateReducerTests / MeguriMessageReadStateReducerTestsで、1km access policy、Map radius、feed upsert、message read stateを確認した。
+- ✅ 状態名・用語・DBスキーマの変更はないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション887：Vision face detection serviceを分割
 
 ### 背景・問題意識
