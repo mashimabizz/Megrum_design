@@ -4,6 +4,49 @@
 
 ---
 
+## イテレーション815：MeguriScreenを画面本体と操作extensionへ分割
+
+### 背景・問題意識
+
+次の未処理上位候補として `MeguriScreen.swift` を確認した。このファイルは、めぐりホーム本体、掲示板scope/prefecture操作、位置情報更新、グルーム写真選択/カメラ/投稿、toast/alert、アプリ設定遷移、カメラ可否判定が同居していた。めぐりは地図・位置情報・グルーム・掲示板の状態が交差するため、画面本体と操作ロジックの読み取り範囲を分ける。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/MeguriScreen.swift`
+- `MeguriHomeContent` とsheet/cover/modifier構成を中心に残した。
+- 分割extensionから状態へアクセスできるよう、`@State` / `@AppStorage` / helper computed property のアクセス範囲をモジュール内へ広げた。
+- ファイル行数を558行から239行へ縮小した。
+
+#### `ios-native/Sources/MegrumApp/MeguriScreenBoardActions.swift`
+- 初期位置要求、位置変化時のfeed/map再読み込み、掲示板prefecture/scope更新、掲示板composer/detail起動、ホームmap recenterを移動した。
+
+#### `ios-native/Sources/MegrumApp/MeguriScreenGroomActions.swift`
+- PhotosPicker item処理、グルーム作者profile preload、写真準備、カメラ撮影反映、グルーム投稿、draft reset、グルームviewer起動を移動した。
+
+#### `ios-native/Sources/MegrumApp/MeguriScreenFeedback.swift`
+- 範囲外alert、toast、notice解決、位置権限action、アプリ設定遷移、カメラ可否判定を移動した。
+
+### 影響範囲
+
+- Swift Native iOS版のめぐりホーム、掲示板sheet、グルーム投稿/閲覧、位置情報notice、map recenter、toast/alert。
+- 挙動変更ではなく責務分離。DB/API payload、状態名、状態遷移、用語、画面レイアウトは変更しない。
+
+### 確認方法
+
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-meguri-screen-build`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-meguri-screen-tests --enable-xctest --disable-swift-testing -j 1 --filter 'MeguriAccessPolicyTests|MeguriFeedStateReducerTests|MeguriMessageReadStateReducerTests|MeguriNoticeResolverTests|GroomInteractionStateReducerTests|SupabaseHomeLocalModePersistenceTests|HomeLocalModeTests'`
+  - 45 tests passed
+
+### セルフレビュー結果
+
+- ✅ `MeguriScreen` を画面構成、掲示板/位置操作、グルーム操作、feedback/権限操作へ分割した。
+- ✅ 位置情報notice、範囲制御、グルーム既読/like、めぐりfeed reducer、home local mode persistenceは対象テストで維持を確認した。
+- ✅ DB/API payload、状態遷移、状態名、用語、画面レイアウトは変更していない。
+- ✅ 状態名・用語・DBスキーマの変更はないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション814：在庫Supabase clientをAPI操作・request・query・tag・photoへ分割
 
 ### 背景・問題意識
