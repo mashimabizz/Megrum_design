@@ -4,6 +4,49 @@
 
 ---
 
+## イテレーション804：グルームアーカイブ画面を入口・地図・ストーリーへ分割
+
+### 背景・問題意識
+
+現在の未処理上位候補として `GroomArchiveScreen.swift` を確認した。このファイルは、アーカイブ画面入口、地図表示、地図ピン、ヘッダー、空状態、サムネイルレール、ストーリー閲覧、反応シート、ユーザー反応行、地図region計算まで同居していた。グルーム周辺は地図・ストーリー・反応という異なる調整軸があるため、画面入口をロード/選択/camera更新に絞り、表示部品の読み取り範囲を分ける。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/GroomArchiveScreen.swift`
+- アーカイブ画面の入口、`appState.loadGroomArchive()`、選択中グルーム、camera更新、story sheet表示だけを残した。
+- ファイル行数を約685行から87行へ縮小した。
+
+#### `ios-native/Sources/MegrumApp/GroomArchiveMapViews.swift`
+- `GroomArchiveMap`、地図ピン、ヘッダー、空状態、サムネイルレール、地図region計算、三角Shapeを移動した。
+- 地図annotation、現在地表示、アーカイブ件数表示、空状態文言、thumbnail選択表示は移動のみで維持した。
+
+#### `ios-native/Sources/MegrumApp/GroomArchiveStoryViews.swift`
+- `GroomArchiveStoryScreen`、反応pill、反応sheet、反応section、ユーザー反応row/avatarを移動した。
+- ストーリー左右タップ、上スワイプで反応表示、下スワイプで閉じる、いいね/コメント表示の挙動は維持した。
+
+### 影響範囲
+
+- Swift Native iOS版のめぐり内グルームアーカイブ画面、アーカイブ地図、過去グルーム閲覧、反応表示sheet。
+- 挙動変更ではなく責務分離。DB/API payload、状態名、用語、保存/読み込み処理は変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumApp/GroomArchiveScreen.swift ios-native/Sources/MegrumApp/GroomArchiveMapViews.swift ios-native/Sources/MegrumApp/GroomArchiveStoryViews.swift`
+  - passed
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-groom-archive-build`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-groom-archive-tests --enable-xctest --disable-swift-testing -j 1 --filter 'GroomInteractionStateReducerTests|MeguriAccessPolicyTests|MegrumAppStateTests/testAppStateLoadsOwnGroomArchiveWithEngagement|MegrumAppStateTests/testAppStateCreatesPreviewGroomPost|MegrumAppStateTests/testAppStateMarksPreviewGroomViewedAndLiked|MegrumAppStateTests/testAppStateSendsPreviewGroomReply'`
+  - 15 tests passed
+
+### セルフレビュー結果
+
+- ✅ `GroomArchiveScreen` は画面入口として、ロード・選択・camera更新・story sheet表示だけを所有する構造へ整理した。
+- ✅ 地図UI、ヘッダー/空状態、サムネイルレール、ストーリー閲覧、反応sheetの文言・見た目・gesture条件は移動のみで変更していない。
+- ✅ `GroomArchiveOrdering`、`MegrumAppState` のアーカイブ読み込み/反応取得、グルームアクセス条件は対象テストで維持を確認した。
+- ✅ 状態名・用語・DBスキーマの変更はないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション803：相互マッチ候補生成を評価・signal・表示整形へ分割
 
 ### 背景・問題意識
