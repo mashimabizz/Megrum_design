@@ -4,6 +4,45 @@
 
 ---
 
+## イテレーション893：Meetup place sheet state/actionsを分割
+
+### 背景・問題意識
+
+`ProposalMeetupPlaceSheet.swift` はiter882で入力カードを分離した後も、シート本体に場所検索、現在地適用、前回候補適用、地図タップ、カメラ位置同期、検索debounce、保存可否/ステータス文言が残っていた。画面本体を表示構造中心にして、地図/検索まわりの処理を追いやすくする。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/ProposalMeetupPlaceSheet.swift`
+- 派生状態と操作処理を専用extensionへ移動し、シート本体をNavigationStack、action/input/map/status/save表示中心に整理した。
+- 分割先extensionから参照するため、シート内部状態のアクセス範囲をmodule内アクセスへ緩めた。
+- ファイル行数を377行から156行へ縮小した。
+
+#### `ios-native/Sources/MegrumApp/ProposalMeetupPlaceSheetDerivedState.swift`
+- 選択座標、保存可否、検索文字列、ステータス文言、座標captionを移動した。
+
+#### `ios-native/Sources/MegrumApp/ProposalMeetupPlaceSheetActions.swift`
+- 現在地適用、前回候補適用、場所検索、検索結果選択、地図タップ、カメラ同期、検索debounce/cancel/clear処理を移動した。
+
+### 影響範囲
+
+- Swift Native iOS版の個別募集作成/打診作成における待ち合わせ場所シート、場所検索、現在地適用、前回候補適用、地図タップ、ピン座標、保存可否、ステータス文言。
+- 挙動変更ではなく責務分離。ProposalMeetupCandidateDraft、ProposalMeetupMapDraft、保存payload、検索上限3件、debounce時間、状態名、状態遷移、用語、DBスキーマは変更しない。
+
+### 確認方法
+
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-proposal-meetup-place-sheet-build --disable-index-store`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-proposal-meetup-place-sheet-tests --disable-index-store --enable-xctest --disable-swift-testing -j 1 --filter 'ProposalCreateFlowTests|ProposalCreateSheetTests|TradeRequestDraftProposalCreateFlowTests'`
+  - 62 tests passed
+
+### セルフレビュー結果
+
+- ✅ 現在地適用、前回候補適用、検索、地図タップ、保存可否、meetup draft生成、オンサイト手渡し時の待ち合わせ必須条件は変更していない。
+- ✅ ProposalCreateFlowTests / ProposalCreateSheetTests / TradeRequestDraftProposalCreateFlowTestsで、proposal step、meetup required条件、map draft座標parse/bounds、current location適用、calendar/meetup候補生成を確認した。
+- ✅ 状態名・用語・DBスキーマの変更はないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション892：Face tagging review viewsを分割
 
 ### 背景・問題意識
