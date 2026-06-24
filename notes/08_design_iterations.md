@@ -4,6 +4,44 @@
 
 ---
 
+## イテレーション853：Proposal meetup formを分割
+
+### 背景・問題意識
+
+iter852後に `ProposalCreateSheet.swift` を確認したところ、画面本体、送信条件、打診作成、位置情報反映、待ち合わせフォームViewが同居していた。送信処理や設定値には触れず、独立したViewとして完結している待ち合わせフォームだけを別ファイルへ移して、打診作成シート本体を読みやすくする。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/ProposalCreateSheet.swift`
+- `ProposalMeetupForm` と `proposalMeetupRow()` を移動した。
+- 画面本体、状態、位置情報反映、`createProposal()` は残した。
+- ファイル行数を434行から365行へ縮小した。
+
+#### `ios-native/Sources/MegrumApp/ProposalMeetupForm.swift`
+- 待ち合わせ候補のDatePicker、場所名、緯度/経度入力、位置情報取得中表示、エラー文言表示を移動した。
+- rowのminHeight/padding、material背景、border、keyboardType、binding構成は変更していない。
+
+### 影響範囲
+
+- Swift Native iOS版の旧打診作成シートにある待ち合わせ候補入力UI。
+- 挙動変更ではなく責務分離。打診作成payload、送信可否、位置情報の反映条件、状態名、状態遷移、用語は変更しない。
+
+### 確認方法
+
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-proposal-meetup-form-build --disable-index-store`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-proposal-meetup-form-tests --disable-index-store --enable-xctest --disable-swift-testing -j 1 --filter 'ProposalCreateSheetTests|ProposalCreateFlowTests'`
+  - 62 tests passed
+
+### セルフレビュー結果
+
+- ✅ 待ち合わせフォームViewだけを分け、送信処理やpayload生成には触れていない。
+- ✅ ProposalCreateSheet/Flow周辺は対象テストで既存挙動維持を確認した。
+- ✅ row metrics、material背景、keyboardType、binding構成、位置情報反映条件、状態名、用語は変更していない。
+- ✅ 状態名・用語・DBスキーマの変更はないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション852：Proposal create initial state actionsを分割
 
 ### 背景・問題意識
