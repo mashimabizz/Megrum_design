@@ -4,6 +4,47 @@
 
 ---
 
+## イテレーション892：Face tagging review viewsを分割
+
+### 背景・問題意識
+
+`FaceTaggingReviewViews.swift` はレビューシート本体、補正draftモデル、画像preview、候補行、status chip、空状態、画像サイズ計算helperが同居していた。顔認識レビューは今後も候補表示や手動補正UIを調整しやすい領域なので、シート本体と表示部品を分離する。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/FaceTaggingReviewViews.swift`
+- `FaceTaggingReviewSheet` だけを残し、NavigationStack、draft binding、保存/閉じる操作に集中させた。
+- UIKit/AppKit依存を削除し、ファイル行数を381行から94行へ縮小した。
+
+#### `ios-native/Sources/MegrumApp/FaceTaggingReviewModels.swift`
+- `FaceTaggingMemberOption` と `FaceTaggingCorrectionDraft` を移動した。
+
+#### `ios-native/Sources/MegrumApp/FaceTaggingReviewImagePreview.swift`
+- 画像preview、UIKit/AppKit画像表示、placeholder、fitted rect計算を移動した。
+
+#### `ios-native/Sources/MegrumApp/FaceTaggingReviewRows.swift`
+- 候補行、status chip、空状態、review表示文言/色を移動した。
+
+### 影響範囲
+
+- Swift Native iOS版の顔認識レビューシート、候補メンバー選択、手動メンバー選択、候補confidence表示、空状態、画像preview。
+- 挙動変更ではなく責務分離。FaceTaggingAnalysis、補正draft初期値、training data default、face recognition service、Supabase correction payload、状態名、状態遷移、用語、DBスキーマは変更しない。
+
+### 確認方法
+
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-face-tagging-review-build --disable-index-store`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-face-tagging-review-tests --disable-index-store --enable-xctest --disable-swift-testing -j 1 --filter 'FaceTaggingServiceTests|FaceRecognitionModelTests|SupabaseFaceRecognitionClientTests'`
+  - 22 tests passed
+
+### セルフレビュー結果
+
+- ✅ draft初期化、候補選択、手動選択、保存callback、画像preview、status label/color は移動だけで挙動を変更していない。
+- ✅ FaceTaggingServiceTests / FaceRecognitionModelTests / SupabaseFaceRecognitionClientTestsで、draft default、review queue、real/anime route、status threshold、Supabase correction requestを確認した。
+- ✅ 状態名・用語・DBスキーマの変更はないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション891：Auth state supportを分割
 
 ### 背景・問題意識
