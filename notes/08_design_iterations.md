@@ -4,6 +4,48 @@
 
 ---
 
+## イテレーション881：Root authenticated contentを分割
+
+### 背景・問題意識
+
+次の候補として `MegrumRootView.swift` を確認した。このファイルは、認証状態のRoot切り替え、読み込み/初回設定/Visual QA直行/Drawer page分岐、drawer destination sheet、通知route処理が同居していた。Rootはアプリ全体の入口なので、状態保持と外部イベント処理を読みやすくし、画面分岐とdrawer sheetの責務を専用Viewへ分ける。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/MegrumRootView.swift`
+- 認証済みrootの大きな分岐を `MegrumRootAuthenticatedContent` へ移動した。
+- drawer destination sheetの内容生成と通知route処理を `MegrumRootDrawerDestinationSheet` へ移動した。
+- `MegrumRootView` はauth/session同期、tab/drawer/public profile/home settings/ad interstitialなどの状態保持とsheet wiringに寄せた。
+- ファイル行数を426行から273行へ縮小した。
+
+#### `ios-native/Sources/MegrumApp/MegrumRootAuthenticatedContent.swift`
+- 読み込み失敗、初回設定、Visual QA直行、個別募集Visual QA、プロフィール直行、drawer page、通常tab表示の分岐を移動した。
+- direct proposal/relation route、proposal completion callback、loading retry/sign-out callbackは親から受け取る形にし、既存挙動を維持した。
+
+#### `ios-native/Sources/MegrumApp/MegrumRootDrawerDestinationSheet.swift`
+- drawer destinationごとのsheet内容、通知destination tab反映、public profile route遅延表示、settings/help経由のsign-out処理を移動した。
+- 通知routeのfallback tab、profile/evaluation route、drawer dismissalの挙動は変更していない。
+
+### 影響範囲
+
+- Swift Native iOS版のRoot表示、ログイン済み起動、初回設定分岐、Visual QA直行、drawer destination sheet、通知routeからのタブ/プロフィール遷移、設定/ヘルプ内ログアウト。
+- 挙動変更ではなく責務分離。認証session、通知linkPath解釈、drawer destination、状態名、状態遷移、用語、DBスキーマは変更しない。
+
+### 確認方法
+
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-root-content-build --disable-index-store`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-root-content-tests --disable-index-store --enable-xctest --disable-swift-testing -j 1 --filter 'AuthScreenInputTests|AppDrawerGestureTests|NotificationRouteTests|SettingsScreenTests'`
+  - 49 tests passed
+
+### セルフレビュー結果
+
+- ✅ Rootの状態保持とauthenticated content/drawer sheetの表示責務を分け、認証済み起動、Visual QA直行、drawer page、通知route、settings sign-outの既存分岐は維持した。
+- ✅ AuthScreenInputTests / AppDrawerGestureTests / NotificationRouteTests / SettingsScreenTestsで、auth session、drawer gesture、通知fallback/profile route、settings essential routeを確認した。
+- ✅ 状態名・用語・DBスキーマの変更はないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション880：Trade message input modelsを分割
 
 ### 背景・問題意識
