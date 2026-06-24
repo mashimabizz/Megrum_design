@@ -4,6 +4,44 @@
 
 ---
 
+## イテレーション842：Trade summary detail sheetを分割
+
+### 背景・問題意識
+
+次の上位候補として `TradeDetailPinnedSummaryArea.swift` を確認した。このファイルは、取引詳細上部に固定表示するsummary本体、支払いsummaryカード、summaryタップ後の詳細シート、交換内容のグッズ行/サムネイル/空表示まで同居していた。上部summaryは表示頻度が高いため、UI配置やsheet表示条件には触れず、タップ後の詳細シート側だけを別ファイルへ移して、固定summary本体を読みやすくする。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/TradeDetailPinnedSummaryArea.swift`
+- `TradeSummaryDetailSheet` と下位のsheet/row/thumb/empty view群を移動した。
+- 固定summary本体、dispute banner、交換手段/交換内容カード、支払いsummaryカード、提案応答barは残した。
+- ファイル行数を471行から142行へ縮小した。
+
+#### `ios-native/Sources/MegrumApp/TradeSummaryDetailSheet.swift`
+- `TradeSummaryDetailRoute`、detail sheet、現地/郵送候補表示、交換内容goods section、goods row/thumb、cash panel、empty textを移動した。
+- navigation title、閉じるbutton、section spacing、goods count/cash fallback、thumb fallback、meetup time表示は変更していない。
+
+### 影響範囲
+
+- Swift Native iOS版の取引詳細画面上部summary、交換手段/交換内容の詳細sheet、現地候補、郵送説明、交換内容のgoods/cash表示。
+- 挙動変更ではなく責務分離。sheet表示条件、navigation title、文言、spacing、画像fallback、cash表示、状態名、状態遷移、用語は変更しない。
+
+### 確認方法
+
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-trade-summary-sheet-build`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-trade-summary-sheet-tests --enable-xctest --disable-swift-testing -j 1 --filter 'TradeChatAffordanceTests|TradeProposalStateReducerTests|TradeEvidencePhotoStateReducerTests'`
+  - 53 tests passed
+
+### セルフレビュー結果
+
+- ✅ detail sheetを分け、`TradeDetailPinnedSummaryArea.swift` を固定summaryと支払いsummaryカード中心へ薄くした。
+- ✅ 取引詳細hero/一覧/チャット補助/証跡/提案状態周辺は対象テストで既存挙動維持を確認した。
+- ✅ sheet表示条件、navigation title、文言、spacing、画像fallback、cash表示、状態遷移、状態名、用語は変更していない。
+- ✅ 状態名・用語・DBスキーマの変更はないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション841：Supabase proposal request builderを分割
 
 ### 背景・問題意識
