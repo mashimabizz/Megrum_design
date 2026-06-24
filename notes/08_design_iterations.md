@@ -4,6 +4,49 @@
 
 ---
 
+## イテレーション832：Proposal rowとpayload定義を分割
+
+### 背景・問題意識
+
+次の上位候補として `SupabaseProposalRows.swift` を確認した。このファイルは、proposal/evidence/evaluationのDB row decodeと、create/RPC/update/system message/evaluationのmutation payload、さらに `TradeProposal` のSupabase向け補助ロジックが同居していた。打診API境界は保存payloadの崩れが怖い領域なので、endpointやencoding値には触れず、row変換・payload・domain補助をファイル単位で分けて読み取り範囲を狭める。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumData/SupabaseProposalRows.swift`
+- `ProposalRow`、meetup candidate row、evidence photo row、system message ack row、evaluation rowを残した。
+- create/RPC/update/system/evaluation payloadと `TradeProposal` 補助extensionを移動した。
+- ファイル行数を481行から200行へ縮小した。
+
+#### `ios-native/Sources/MegrumData/SupabaseProposalPayloads.swift`
+- `ProposalCreatePayload`、meetup candidate payload、response/approval RPC payload、evidence update/replacement payload、cancel approval payload、system message payload、evaluation insert payloadを移動した。
+- payload field名、default値、meetup candidate正規化、encoding形式は変更していない。
+
+#### `ios-native/Sources/MegrumData/SupabaseProposalDomainExtensions.swift`
+- `TradeProposal` のSupabase client向け補助メソッドを移動した。
+- acceptance時のexchange method解決とagreement flag計算は変更していない。
+
+### 影響範囲
+
+- Swift Native iOS版の打診作成、打診応答、証跡写真、取引評価、Supabase data boundary。
+- 挙動変更ではなく責務分離。REST/RPC endpoint、query items、payload field名、encoding形式、DB/API payload、状態名、状態遷移、用語、画面レイアウトは変更しない。
+
+### 確認方法
+
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-proposal-payloads-build`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-proposal-payloads-tests --enable-xctest --disable-swift-testing -j 1 --filter 'SupabaseProposalClientTests|ProposalCreateFlowTests|TradeProposalStateReducerTests'`
+  - 80 tests passed
+
+### セルフレビュー結果
+
+- ✅ proposal row decode、mutation payload、domain補助extensionの境界を分け、DB row mappingの読み取り範囲を大きく縮小した。
+- ✅ `SupabaseProposalClientTests` でcreate/RPC/evidence/evaluation request生成とvalidationの既存挙動維持を確認した。
+- ✅ Proposal create flow、trade proposal reducer周辺は対象テストで既存挙動維持を確認した。
+- ✅ REST/RPC endpoint、query items、payload field名、encoding形式、状態遷移、状態名、用語、画面レイアウトは変更していない。
+- ✅ 状態名・用語・DBスキーマの変更はないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション831：Activity Windowのpublicモデルを分割
 
 ### 背景・問題意識
