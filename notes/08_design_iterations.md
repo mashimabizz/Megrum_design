@@ -4,6 +4,48 @@
 
 ---
 
+## イテレーション806：取引詳細の画面構成と送信アクションを分割
+
+### 背景・問題意識
+
+次の未処理上位候補として `TradeDetailScreen.swift` を確認した。このファイルは、取引詳細の画面構成、sheet/navigation、取引サマリー生成、証跡写真/チャット写真/服装写真の送信、到着ステータス、現在地共有、通報詳細/相手プロフィール遷移まで同居していた。取引チャットは入力バー・証跡・通報・評価・待ち合わせ導線が重なるため、画面構成と送信/遷移アクションの読み取り範囲を分ける。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/TradeDetailScreen.swift`
+- `TradeDetailContent`、sheet、navigationDestination、toolbar、onChange/taskなど画面構成を残した。
+- 写真/位置共有/到着ステータス/証跡/相手プロフィール遷移などの操作系処理をextensionへ委譲し、ファイル行数を約656行から440行へ縮小した。
+- `TradePartnerProfileRoute` はextensionファイルから参照できるようmodule内可視へ変更した。
+
+#### `ios-native/Sources/MegrumApp/TradeDetailScreenActions.swift`
+- 取引サマリー文言生成、証跡写真追加、チャット写真/服装写真送信、到着ステータス送信、現在地共有、通報詳細/相手プロフィール遷移、カメラ利用可否判定を移動した。
+- 既存の `TradeOutfitPhotoSendIntent`、`TradeArrivalStatusSendIntent`、`TradeLocationShareIntent`、`inferredEvidenceImageContentType` の利用は維持した。
+
+### 影響範囲
+
+- Swift Native iOS版の取引詳細画面、取引チャット入力バー、証跡写真sheet、服装写真/通常写真送信、現在地共有、到着ステータス、通報詳細/相手プロフィール遷移。
+- 挙動変更ではなく責務分離。DB/API payload、状態名、用語、保存処理は変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumApp/TradeDetailScreen.swift ios-native/Sources/MegrumApp/TradeDetailScreenActions.swift`
+  - passed
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-trade-detail-build`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-trade-detail-tests --enable-xctest --disable-swift-testing -j 1 --filter 'TradeChatAffordanceTests|TradeMessageStateReducerTests|TradeEvidencePhotoStateReducerTests|MegrumAppStateTests/testAppStateAddsTradeEvidence|MegrumAppStateTests/testAppStateApprovesTradeEvidence'`
+  - 55 tests passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-trade-detail-tests --enable-xctest --disable-swift-testing -j 1 --filter 'MegrumAppStateTests.testAppStateAddsEvidenceApprovesAndSubmitsPreviewEvaluation'`
+  - 1 test passed
+
+### セルフレビュー結果
+
+- ✅ `TradeDetailScreen` は画面構成、表示sheet、navigationDestination、toolbar、ロード/onChangeの入口を所有する構造へ整理した。
+- ✅ 写真/証跡/位置共有/到着ステータス/通報詳細/相手プロフィール遷移の呼び出し条件とpayload生成は移動のみで変更していない。
+- ✅ 取引チャット入力状態、証跡写真state reducer、メッセージread state、証跡追加/承認/評価のAppState動作は対象テストで維持を確認した。
+- ✅ 状態名・用語・DBスキーマの変更はないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション805：待ち合わせカレンダーを週Editorとgestureへ分割
 
 ### 背景・問題意識

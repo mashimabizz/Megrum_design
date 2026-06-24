@@ -3,44 +3,41 @@ import MegrumCore
 import MegrumDesign
 import PhotosUI
 import SwiftUI
-#if os(iOS)
-import UIKit
-#endif
 
 struct TradeDetailScreen: View {
     @ObservedObject var appState: MegrumAppState
     var proposal: TradeProposal
-    @State private var draftMessage = ""
-    @State private var selectedEvidencePhotoItem: PhotosPickerItem?
-    @State private var selectedChatPhotoItem: PhotosPickerItem?
-    @State private var selectedOutfitPhotoItem: PhotosPickerItem?
-    @State private var isShowingEvidenceCamera = false
-    @State private var isShowingChatCamera = false
-    @State private var isShowingOutfitCamera = false
-    @State private var isShowingEvidenceList = false
-    @State private var isShowingEvaluationPage = false
-    @State private var isShowingDisputePage = false
-    @State private var isShowingRejectConfirmation = false
-    @State private var isShowingCounterProposalPage = false
-    @State private var isShowingSchedulePage = false
-    @State private var unavailableChatAction: TradeUnavailableChatAction?
-    @State private var assistanceRequestKind: TradeAssistanceRequestKind?
-    @State private var selectedRemoteImage: RemoteImageSelection?
-    @State private var isWaitingToShareLocation = false
-    @State private var disputeDetailRoute: TradeDisputeDetailRoute?
-    @State private var partnerProfileRoute: TradePartnerProfileRoute?
-    @State private var didSubmitEvaluation = false
-    @StateObject private var locationState = MegrumLocationState()
+    @State var draftMessage = ""
+    @State var selectedEvidencePhotoItem: PhotosPickerItem?
+    @State var selectedChatPhotoItem: PhotosPickerItem?
+    @State var selectedOutfitPhotoItem: PhotosPickerItem?
+    @State var isShowingEvidenceCamera = false
+    @State var isShowingChatCamera = false
+    @State var isShowingOutfitCamera = false
+    @State var isShowingEvidenceList = false
+    @State var isShowingEvaluationPage = false
+    @State var isShowingDisputePage = false
+    @State var isShowingRejectConfirmation = false
+    @State var isShowingCounterProposalPage = false
+    @State var isShowingSchedulePage = false
+    @State var unavailableChatAction: TradeUnavailableChatAction?
+    @State var assistanceRequestKind: TradeAssistanceRequestKind?
+    @State var selectedRemoteImage: RemoteImageSelection?
+    @State var isWaitingToShareLocation = false
+    @State var disputeDetailRoute: TradeDisputeDetailRoute?
+    @State var partnerProfileRoute: TradePartnerProfileRoute?
+    @State var didSubmitEvaluation = false
+    @StateObject var locationState = MegrumLocationState()
 
-    private var messages: [TradeMessage] {
+    var messages: [TradeMessage] {
         appState.messages(for: proposal.id)
     }
 
-    private var currentProposal: TradeProposal {
+    var currentProposal: TradeProposal {
         appState.proposals.first { $0.id == proposal.id } ?? proposal
     }
 
-    private var goodsByID: [UUID: GoodsItem] {
+    var goodsByID: [UUID: GoodsItem] {
         TradeGoodsLookup.build(
             inventory: appState.inventory,
             homeMatchedItems: appState.homeMatchedItems,
@@ -50,24 +47,24 @@ struct TradeDetailScreen: View {
         )
     }
 
-    private var latestDisputeSummary: TradeDisputeSummary? {
+    var latestDisputeSummary: TradeDisputeSummary? {
         messages
             .compactMap(TradeDisputeSummary.init(message:))
             .max { $0.submittedAt < $1.submittedAt }
     }
 
-    private var chatInputAvailability: TradeChatInputAvailability {
+    var chatInputAvailability: TradeChatInputAvailability {
         TradeChatInputAvailability(proposal: currentProposal)
     }
 
-    private var isChatInputVisible: Bool {
+    var isChatInputVisible: Bool {
         guard let viewerID else {
             return false
         }
         return currentProposal.isParticipant(viewerID) && chatInputAvailability.canSendMessages
     }
 
-    private var messageInputContext: TradeMessageInputContext {
+    var messageInputContext: TradeMessageInputContext {
         TradeMessageInputContext(
             isSending: appState.sendingMessageProposalID == proposal.id,
             canUseCamera: canUseCamera,
@@ -77,11 +74,11 @@ struct TradeDetailScreen: View {
         )
     }
 
-    private var supportsHandExchange: Bool {
+    var supportsHandExchange: Bool {
         currentProposal.exchangeMethod == .hand || currentProposal.exchangeMethod == .both
     }
 
-    private var evaluationPromptState: TradeEvaluationPromptState {
+    var evaluationPromptState: TradeEvaluationPromptState {
         TradeEvaluationPromptState(
             proposal: currentProposal,
             viewerID: viewerID,
@@ -90,19 +87,19 @@ struct TradeDetailScreen: View {
         )
     }
 
-    private var viewerID: UUID? {
+    var viewerID: UUID? {
         appState.viewer?.id
     }
 
-    private var partnerID: UUID? {
+    var partnerID: UUID? {
         viewerID.flatMap { currentProposal.partnerID(for: $0) }
     }
 
-    private var partnerProfile: UserProfile? {
+    var partnerProfile: UserProfile? {
         partnerID.flatMap { appState.publicProfilesByUserID[$0]?.profile }
     }
 
-    private var heroPresentation: TradeDetailHeroPresentation {
+    var heroPresentation: TradeDetailHeroPresentation {
         TradeDetailHeroPresentation(
             proposal: currentProposal,
             viewerID: viewerID,
@@ -110,23 +107,23 @@ struct TradeDetailScreen: View {
         )
     }
 
-    private var offeredGoodsIDs: [UUID] {
+    var offeredGoodsIDs: [UUID] {
         viewerID.flatMap { currentProposal.goodsOffered(by: $0) } ?? currentProposal.senderGoodsIDs
     }
 
-    private var requestedGoodsIDs: [UUID] {
+    var requestedGoodsIDs: [UUID] {
         viewerID.flatMap { currentProposal.goodsRequested(by: $0) } ?? currentProposal.receiverGoodsIDs
     }
 
-    private var requestedGoods: [GoodsItem] {
+    var requestedGoods: [GoodsItem] {
         tradeItems(for: requestedGoodsIDs)
     }
 
-    private var offeredGoods: [GoodsItem] {
+    var offeredGoods: [GoodsItem] {
         tradeItems(for: offeredGoodsIDs)
     }
 
-    private var paymentSummaryText: String? {
+    var paymentSummaryText: String? {
         guard currentProposal.cashOffer else {
             return nil
         }
@@ -434,222 +431,9 @@ struct TradeDetailScreen: View {
             handleLocationErrorChange(errorMessage)
         }
     }
-
-    private var tradeSummaryLine: String {
-        "受け取る \(receiveSummaryText)  ⇄  出す \(goodsSummary(for: offeredGoodsIDs))"
-    }
-
-    private var receiveSummaryText: String {
-        if currentProposal.cashOffer, requestedGoodsIDs.isEmpty {
-            return TradeAmountFormatter.fixedPrice(amount: currentProposal.cashAmount, fallback: "定価交換")
-        }
-        return goodsSummary(for: requestedGoodsIDs)
-    }
-
-    private func goodsSummary(for ids: [UUID]) -> String {
-        let items = tradeItems(for: ids)
-        guard let first = items.first else {
-            return ids.isEmpty ? "未設定" : "\(ids.count)点"
-        }
-        let suffix = items.count > 1 ? " 他\(items.count - 1)点" : ""
-        return "\(first.title)\(first.quantity > 1 ? "×\(first.quantity)" : "")\(suffix)"
-    }
-
-    private func openDisputeDetail(_ summary: TradeDisputeSummary) {
-        disputeDetailRoute = TradeDisputeDetailRoute(
-            summary: summary,
-            model: summary.detailModel(proposal: currentProposal, viewerID: viewerID)
-        )
-    }
-
-    private func openPartnerProfile() {
-        guard let partnerID else {
-            return
-        }
-        partnerProfileRoute = TradePartnerProfileRoute(userID: partnerID)
-    }
-
-    private func handleSelectedEvidencePhoto(_ item: PhotosPickerItem?) {
-        guard let item else {
-            return
-        }
-        Task {
-            await addEvidence(from: item)
-        }
-    }
-
-    private func handleSelectedChatPhoto(_ item: PhotosPickerItem?) {
-        guard let item else {
-            return
-        }
-        Task {
-            await addChatPhoto(from: item, messageType: .photo)
-        }
-    }
-
-    private func handleSelectedOutfitPhoto(_ item: PhotosPickerItem?) {
-        guard let item else {
-            return
-        }
-        Task {
-            await addChatPhoto(from: item, messageType: .outfitPhoto)
-        }
-    }
-
-    private func handleCapturedEvidenceImage(_ imageData: Data) {
-        Task {
-            await addEvidence(data: imageData, imageContentType: "image/jpeg")
-        }
-    }
-
-    private func handleCapturedOutfitImage(_ imageData: Data) {
-        Task {
-            await addChatPhoto(
-                data: imageData,
-                messageType: .outfitPhoto,
-                imageContentType: "image/jpeg"
-            )
-        }
-    }
-
-    private func handleCapturedChatImage(_ imageData: Data) {
-        Task {
-            await addChatPhoto(
-                data: imageData,
-                messageType: .photo,
-                imageContentType: "image/jpeg"
-            )
-        }
-    }
-
-    private func sendDraftMessage() {
-        Task {
-            let sent = await appState.sendMessage(proposalID: proposal.id, body: draftMessage)
-            if sent {
-                draftMessage = ""
-            }
-        }
-    }
-
-    private func handleLocationCoordinateChange(_ coordinate: MegrumLocationCoordinate?) {
-        guard isWaitingToShareLocation, let coordinate else {
-            return
-        }
-        isWaitingToShareLocation = false
-        sendLocationMessage(coordinate)
-    }
-
-    private func handleLocationErrorChange(_ errorMessage: String?) {
-        guard isWaitingToShareLocation, errorMessage != nil else {
-            return
-        }
-        isWaitingToShareLocation = false
-        unavailableChatAction = .location
-    }
-
-    private func addEvidence(from item: PhotosPickerItem) async {
-        defer {
-            selectedEvidencePhotoItem = nil
-        }
-        guard let data = try? await item.loadTransferable(type: Data.self) else {
-            return
-        }
-        await addEvidence(data: data, imageContentType: inferredEvidenceImageContentType(from: data))
-    }
-
-    private func addEvidence(data: Data, imageContentType: String) async {
-        _ = await appState.addTradeEvidence(
-            proposalID: currentProposal.id,
-            imageData: data,
-            imageContentType: imageContentType
-        )
-    }
-
-    private func addChatPhoto(from item: PhotosPickerItem, messageType: TradeMessageType) async {
-        defer {
-            switch messageType {
-            case .outfitPhoto:
-                selectedOutfitPhotoItem = nil
-            case .photo:
-                selectedChatPhotoItem = nil
-            case .text, .location, .arrivalStatus, .system:
-                break
-            }
-        }
-        guard let data = try? await item.loadTransferable(type: Data.self) else {
-            unavailableChatAction = messageType == .photo ? .photo : .outfitPhoto
-            return
-        }
-        await addChatPhoto(
-            data: data,
-            messageType: messageType,
-            imageContentType: inferredEvidenceImageContentType(from: data)
-        )
-    }
-
-    private func addChatPhoto(data: Data, messageType: TradeMessageType, imageContentType: String) async {
-        let intent = TradeOutfitPhotoSendIntent(
-            imageContentType: imageContentType
-        )
-        let sent = await appState.sendPhotoMessage(
-            proposalID: currentProposal.id,
-            imageData: data,
-            imageContentType: intent.imageContentType,
-            messageType: messageType == .outfitPhoto ? intent.messageType : messageType,
-            body: messageType == .outfitPhoto ? intent.body : nil
-        )
-        if !sent {
-            unavailableChatAction = messageType == .photo ? .photo : .outfitPhoto
-        }
-    }
-
-    private func sendArrivalQuickAction(_ action: TradeArrivalQuickAction) {
-        let intent = TradeArrivalStatusSendIntent(action: action)
-        Task {
-            _ = await appState.sendArrivalStatusMessage(
-                proposalID: currentProposal.id,
-                status: intent.status,
-                body: intent.body
-            )
-        }
-    }
-
-    private func shareCurrentLocation() {
-        isWaitingToShareLocation = true
-        locationState.requestCurrentLocation(clearsPreviousCoordinate: true)
-    }
-
-    private func sendLocationMessage(_ coordinate: MegrumLocationCoordinate) {
-        let intent = TradeLocationShareIntent(coordinate: coordinate)
-        guard intent.isSubmittable else {
-            unavailableChatAction = .location
-            return
-        }
-        Task {
-            _ = await appState.sendLocationMessage(
-                proposalID: currentProposal.id,
-                latitude: intent.coordinate.latitude,
-                longitude: intent.coordinate.longitude,
-                label: intent.normalizedLabel,
-                body: intent.body
-            )
-        }
-    }
-
-    private var canUseCamera: Bool {
-#if os(iOS)
-        UIImagePickerController.isSourceTypeAvailable(.camera)
-#else
-        false
-#endif
-    }
-
-    private func tradeItems(for ids: [UUID]) -> [GoodsItem] {
-        ids.compactMap { goodsByID[$0] }
-    }
 }
 
-private struct TradePartnerProfileRoute: Identifiable, Hashable {
+struct TradePartnerProfileRoute: Identifiable, Hashable {
     var userID: UUID
 
     var id: UUID { userID }
