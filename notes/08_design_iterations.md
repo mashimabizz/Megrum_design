@@ -4,6 +4,47 @@
 
 ---
 
+## イテレーション894：Goods collection action viewsを分割
+
+### 背景・問題意識
+
+`GoodsCollectionActionViews.swift` に、商品一覧の浮遊操作司令塔、クイックアクションパネル、選択フッター、一括タグ付けシートが同居していた。商品一覧はフィルター、選択、一括操作、クイックメニューの調整頻度が高いため、各UI部品を独立して追えるようにする。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/GoodsCollectionActionViews.swift`
+- `GoodsCollectionFloatingControls` だけを残し、追加ボタン、クイックアクション、選択フッターの表示切り替えに集中させた。
+- ファイル行数を377行から59行へ縮小した。
+
+#### `ios-native/Sources/MegrumApp/GoodsCollectionQuickActionViews.swift`
+- クイックアクションの表示metrics、header presentation、backdrop、panel、item previewを移動した。
+
+#### `ios-native/Sources/MegrumApp/GoodsSelectionFooter.swift`
+- 選択中件数表示、タグ付け/削除/解除ボタンを移動した。
+
+#### `ios-native/Sources/MegrumApp/GoodsBulkTagSheet.swift`
+- 一括タグ付けroute、候補タグ選択、タグ入力、適用処理を移動した。
+
+### 影響範囲
+
+- Swift Native iOS版の商品一覧、Wish一覧、選択モード、クイックアクションメニュー、一括タグ付けシート。
+- 挙動変更ではなく責務分離。クイックアクションの表示順、候補タグ選択、タグ適用payload、選択モード、状態名、用語、DBスキーマは変更しない。
+
+### 確認方法
+
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-goods-collection-actions-build --disable-index-store`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-goods-collection-actions-tests --disable-index-store --enable-xctest --disable-swift-testing -j 1 --filter 'GoodsGridLayoutTests|GoodsLocalStateReducerTests|GoodsEditorDraftTests'`
+  - 52 tests passed
+
+### セルフレビュー結果
+
+- ✅ クイックアクション表示metrics、preview metrics、header生成、選択フッターmetrics、一括タグ付け候補選択の挙動は変更していない。
+- ✅ GoodsGridLayoutTests / GoodsLocalStateReducerTests / GoodsEditorDraftTestsで、クイックアクション表示順、header/tag表示、選択フッターmetrics、フィルター、ローカル状態更新、タグ/写真付き作成inputを確認した。
+- ✅ 状態名・用語・DBスキーマの変更はないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション893：Meetup place sheet state/actionsを分割
 
 ### 背景・問題意識
