@@ -4,6 +4,43 @@
 
 ---
 
+## イテレーション828：取引グッズカルーセルのstage描画を分割
+
+### 背景・問題意識
+
+次の上位候補として `TradeDealGoodsCarouselViews.swift` を確認した。このファイルは、カルーセル列の状態管理、drag gesture、layout metrics、stage/card/artwork/table/empty state描画が同居していた。取引詳細・募集/打診確認で使うグッズ表示なので、入口の状態管理と描画専用部品を分けて、表示調整時の読み取り範囲を狭める。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/TradeDealGoodsCarouselViews.swift`
+- `TradeGoodsCarouselColumn`、drag gesture、layout metrics、card metrics modelを残した。
+- ファイル行数を513行から214行へ縮小した。
+
+#### `ios-native/Sources/MegrumApp/TradeDealGoodsCarouselStageViews.swift`
+- `TradeGoodsCarouselStage`、stage entry、orbit card、rotating table、artwork、empty stageを移動した。
+- カード寸法、回転、shadow、fallback glyph、empty state表示は変更していない。
+
+### 影響範囲
+
+- Swift Native iOS版の取引詳細、取引一覧、募集/打診確認で使う取引グッズカルーセル表示。
+- 挙動変更ではなく責務分離。drag gesture、card metrics、fallback glyph、取引状態、打診payload、状態名、状態遷移、用語、画面レイアウト数値は変更しない。
+
+### 確認方法
+
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-trade-carousel-stage-build`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-trade-carousel-stage-tests --enable-xctest --disable-swift-testing -j 1 --filter 'TradeChatAffordanceTests|ProposalCreateFlowTests'`
+  - 102 tests passed
+
+### セルフレビュー結果
+
+- ✅ `TradeDealGoodsCarouselViews.swift` をカルーセル入口とgesture/layout中心へ薄くし、stage描画部品を専用ファイルへ分けた。
+- ✅ Trade chat affordance、carousel metrics、proposal create flow周辺は対象テストで既存挙動維持を確認した。
+- ✅ drag gesture、card metrics、fallback glyph、取引状態、打診payload、状態遷移、状態名、用語、画面レイアウト数値は変更していない。
+- ✅ 状態名・用語・DBスキーマの変更はないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション827：MatchRelationComposerを選択集約とスワイプ判定に分割
 
 ### 背景・問題意識
