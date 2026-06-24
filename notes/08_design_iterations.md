@@ -4,6 +4,44 @@
 
 ---
 
+## イテレーション840：Proposal createのderived stateを分割
+
+### 背景・問題意識
+
+次の上位候補として `ProposalCreateFlow.swift` を確認した。このファイルは、画面のstored state、選択中グッズ、支払い/待ち合わせ/配送のderived state、募集条件summary、支払い候補、確認用condition tagが同居していた。個別募集/打診作成フローは保存処理への影響が大きいため、actionやView bodyには触れず、同じ計算プロパティを別extensionへ移して入口ファイルを状態定義に集中させる。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/ProposalCreateFlow.swift`
+- derived stateの計算プロパティ群を移動した。
+- `@State` / `@ObservedObject` / 初期入力など、画面が保持する状態だけに近い形へ整理した。
+- ファイル行数を472行から56行へ縮小した。
+
+#### `ios-native/Sources/MegrumApp/ProposalCreateFlowDerivedState.swift`
+- visible steps、選択可能グッズ、ordered selection、configuration、meetup input、cash amount、listing condition summary、payment option、condition tagを移動した。
+- selection count、payment method fallback、listing condition extraction、meetup place/coordinate fallback、submission tag生成の条件は変更していない。
+
+### 影響範囲
+
+- Swift Native iOS版の個別募集/打診作成フロー、譲る/受け取る選択、待ち合わせ、配送、支払い方法、確認画面、送信後summary。
+- 挙動変更ではなく責務分離。View body、button action、保存payload、step navigation、支払い候補、condition tag、UI layout、文言、状態名、状態遷移、用語は変更しない。
+
+### 確認方法
+
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-proposal-derived-state-build`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-proposal-derived-state-tests --enable-xctest --disable-swift-testing -j 1 --filter 'TradeRequestDraftProposalCreateFlowTests|ProposalCreateFlowTests|ProposalCreateSheetTests'`
+  - 62 tests passed
+
+### セルフレビュー結果
+
+- ✅ `ProposalCreateFlow.swift` を画面入力/state定義中心にし、derived stateを `ProposalCreateFlowDerivedState.swift` へ分離した。
+- ✅ 個別募集/打診作成のstep navigation、選択制約、支払い候補、待ち合わせcalendar、確認summary、submission draft周辺は対象テストで既存挙動維持を確認した。
+- ✅ View body、button action、保存payload、step navigation、支払い候補、condition tag、UI layout、文言、状態遷移、状態名、用語は変更していない。
+- ✅ 状態名・用語・DBスキーマの変更はないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション839：Meetup calendarのboard gesture handlerを分割
 
 ### 背景・問題意識
