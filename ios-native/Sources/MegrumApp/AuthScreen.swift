@@ -1,60 +1,8 @@
 #if canImport(AuthenticationServices)
 import AuthenticationServices
-import CryptoKit
-#endif
-#if canImport(UIKit)
-import UIKit
 #endif
 import MegrumDesign
 import SwiftUI
-
-public enum AuthScreenMode: String, CaseIterable, Identifiable {
-    case signIn
-    case signUp
-
-    public var id: String { rawValue }
-
-    var title: String {
-        switch self {
-        case .signIn:
-            "ログイン"
-        case .signUp:
-            "新規登録"
-        }
-    }
-}
-
-enum AuthFlowRoute: Equatable {
-    case signInChoice
-    case signUpChoice
-    case signInEmail
-    case signUpEmail
-    case passwordReset
-
-    init(visualQAInitialScreen: VisualQAInitialScreen?) {
-        switch visualQAInitialScreen {
-        case .authSignUp:
-            self = .signUpChoice
-        case .authEmailSignIn:
-            self = .signInEmail
-        case .authEmailSignUp:
-            self = .signUpEmail
-        case .authPasswordReset:
-            self = .passwordReset
-        default:
-            self = .signInChoice
-        }
-    }
-
-    var mode: AuthScreenMode {
-        switch self {
-        case .signUpChoice, .signUpEmail:
-            .signUp
-        case .signInChoice, .signInEmail, .passwordReset:
-            .signIn
-        }
-    }
-}
 
 @MainActor
 public struct AuthScreen: View {
@@ -394,37 +342,4 @@ private extension AuthScreen {
     }
 }
 
-private enum AppleSignInNonce {
-    static func make() -> String {
-        "\(UUID().uuidString).\(UUID().uuidString)"
-    }
-
-    static func sha256(_ input: String) -> String {
-        SHA256.hash(data: Data(input.utf8))
-            .map { String(format: "%02x", $0) }
-            .joined()
-    }
-
-    static func displayName(from components: PersonNameComponents?) -> String? {
-        guard let components else {
-            return nil
-        }
-        let value = PersonNameComponentsFormatter.localizedString(from: components, style: .default)
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-        return value.isEmpty ? nil : value
-    }
-}
-
-#if canImport(UIKit)
-private final class OAuthPresentationContextProvider: NSObject, ASWebAuthenticationPresentationContextProviding {
-    static let shared = OAuthPresentationContextProvider()
-
-    func presentationAnchor(for session: ASWebAuthenticationSession) -> ASPresentationAnchor {
-        UIApplication.shared.connectedScenes
-            .compactMap { $0 as? UIWindowScene }
-            .flatMap(\.windows)
-            .first { $0.isKeyWindow } ?? ASPresentationAnchor()
-    }
-}
-#endif
 #endif

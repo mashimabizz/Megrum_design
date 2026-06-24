@@ -4,6 +4,48 @@
 
 ---
 
+## イテレーション863：Auth screen route/helperを分割
+
+### 背景・問題意識
+
+次の上位候補として `AuthScreen.swift` を確認した。このファイルは、ログイン/登録画面本体、route model、AuthScreenMode、Apple Sign In nonce helper、Google OAuth presentation context helperが同居していた。AuthScreen本体の状態・アクションはSwiftUIのprivate stateに密接なため無理に外へ出さず、画面挙動に触れないroute/modelとidentity provider helperだけを分ける。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/AuthScreen.swift`
+- `AuthScreenMode`、`AuthFlowRoute`、`AppleSignInNonce`、`OAuthPresentationContextProvider` を移動した。
+- 画面本体、入力状態、route遷移、feedback、submit/password reset、Apple/Googleログイン処理は残した。
+- ファイル行数を430行から345行へ縮小した。
+
+#### `ios-native/Sources/MegrumApp/AuthScreenModels.swift`
+- `AuthScreenMode` と `AuthFlowRoute` を移動した。
+- VisualQA初期画面からrouteを決める挙動、signIn/signUp mode判定、title文言は変更していない。
+
+#### `ios-native/Sources/MegrumApp/AuthIdentityProviderHelpers.swift`
+- Apple Sign In nonce生成/hash/display name helperと、Google OAuth用presentation context providerを移動した。
+- nonce形式、SHA256 hex化、display name trimming、key window探索は変更していない。
+
+### 影響範囲
+
+- Swift Native iOS版のログイン/新規登録/パスワード再設定画面、Apple/Googleログイン補助処理。
+- 挙動変更ではなく責務分離。入力validation、auth state、feedback表示、OAuth callback処理、状態名、状態遷移、用語は変更しない。
+
+### 確認方法
+
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-auth-screen-models-build --disable-index-store`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-auth-screen-models-tests --disable-index-store --enable-xctest --disable-swift-testing -j 1 --filter 'AuthScreenInputTests'`
+  - 14 tests passed
+
+### セルフレビュー結果
+
+- ✅ AuthScreenのprivate stateを緩めず、route/modelとidentity provider helperだけを分けた。
+- ✅ 入力validation、auth state feedback、password reset、Apple/Google login callback処理は変更していない。
+- ✅ AuthScreenInputTestsでvalidation、feedback clear、session refresh/sign out、VisualQA auth fallbackの既存挙動を確認した。
+- ✅ 状態名・用語・DBスキーマの変更はないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション862：Home local mode modelsを責務分割
 
 ### 背景・問題意識
