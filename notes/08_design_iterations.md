@@ -4,6 +4,43 @@
 
 ---
 
+## イテレーション873：Trade message input action viewsを分割
+
+### 背景・問題意識
+
+次の候補として `TradeMessageInputViews.swift` を確認した。このファイルは、取引チャットの入力欄本体、横クイックアクション、`+` オーバーフローメニュー、写真/服装写真 picker、到着ステータス、遅刻/キャンセル相談の分岐が同居していた。チャット入力欄のTextField/送信ボタンと、入力欄に付随する操作メニューを別ファイルへ分け、取引チャットのUI調整時に読む範囲を狭める。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/TradeMessageInputViews.swift`
+- `TradeMessageQuickActionStrip`、`TradeMessageOverflowMenu`、quick action chip/labelを移動した。
+- `TradeMessageInput` と `TradeMessageComposerRow` を残し、入力欄本体と送信ボタンに責務を寄せた。
+- ファイル行数を366行から140行へ縮小した。
+
+#### `ios-native/Sources/MegrumApp/TradeMessageInputActionViews.swift`
+- 横クイックアクション、`+` オーバーフローメニュー、写真/服装写真のカメラ・アルバム導線、到着ステータス、遅刻/キャンセル相談、schedule/counter proposal actionを移動した。
+- quick action copy、SF Symbols、disabled条件、PhotosPicker binding、到着ステータス送信、assistance action割当は変更していない。
+
+### 影響範囲
+
+- Swift Native iOS版の取引チャット入力欄、横クイックアクション、`+` メニュー、写真/服装写真送信、到着ステータス、遅刻/キャンセル相談。
+- 挙動変更ではなく責務分離。チャット状態、action policy、送信処理、PhotosPicker binding、状態名、状態遷移、用語は変更しない。
+
+### 確認方法
+
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-trade-message-input-actions-build --disable-index-store`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-trade-message-input-actions-tests --disable-index-store --enable-xctest --disable-swift-testing -j 1 --filter 'TradeChatAffordanceTests'`
+  - 47 tests passed
+
+### セルフレビュー結果
+
+- ✅ 入力欄付随action viewsの配置だけを分け、quick action/overflow actionのcopy、icon、disabled条件、handler割当は変更していない。
+- ✅ TradeChatAffordanceTestsで、到着ステータス、服装写真、写真送信、遅刻/キャンセル相談、入力中のquick action非表示、取引チャット周辺の既存挙動を確認した。
+- ✅ 状態名・用語・DBスキーマの変更はないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション872：Goods tile action policyを分割
 
 ### 背景・問題意識
