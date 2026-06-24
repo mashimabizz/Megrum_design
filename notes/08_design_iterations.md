@@ -4,6 +4,43 @@
 
 ---
 
+## イテレーション885：Dispute detail loaded list componentsを分割
+
+### 背景・問題意識
+
+次の候補として `DisputeDetailLoadedList.swift` を確認した。このファイルは、読み込み済みトラブル詳細のList構成、ステータスヘッダー、タイムライン、証跡行、返信履歴行、反論Composerが同居していた。通信・Store・申告ロジックには触れず、表示専用部品を分けてList本体の見通しを上げる。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/DisputeDetailLoadedList.swift`
+- ステータスヘッダー、タイムライン、返信行、証跡グループ、反論Composerを専用ファイルへ移動した。
+- List本体は「ステータス」「タイムライン」「申告内容」「証跡」「仲裁結果」「返信履歴」「反論」「操作」の構成を読むだけの形に整理した。
+- ファイル行数を396行から130行へ縮小した。
+
+#### `ios-native/Sources/MegrumApp/DisputeDetailLoadedListComponents.swift`
+- `DisputeStatusHeader`、`DisputeTimelineView`、`DisputeMessageRow`、`DisputeEvidenceGroupView`、`DisputeReplyComposer` を追加した。
+- status chip、timeline marker、証跡Link、返信TextEditor placeholder、送信ボタンのdisabled/opacityは既存挙動を維持した。
+
+### 影響範囲
+
+- Swift Native iOS版のトラブル詳細画面、申告ステータス、タイムライン、証跡表示、返信履歴、反論入力、遅刻/キャンセル申請への操作導線。
+- 挙動変更ではなく責務分離。DisputeDetailStore、Supabase mapper、返信/取り下げ処理、通知ルート、取引チャット由来のdispute summary、状態名、状態遷移、用語、DBスキーマは変更しない。
+
+### 確認方法
+
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-dispute-loaded-list-build --disable-index-store`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-dispute-loaded-list-tests --disable-index-store --enable-xctest --disable-swift-testing -j 1 --filter 'DisputeDetailScreenTests|TradeChatAffordanceTests|NotificationRouteTests'`
+  - 66 tests passed
+
+### セルフレビュー結果
+
+- ✅ 表示部品の移動だけに留め、申告load/reply/withdraw、Supabase mapping、通知deeplink、取引チャットからのdispute detail生成は変更していない。
+- ✅ DisputeDetailScreenTests / TradeChatAffordanceTests / NotificationRouteTestsで、timeline、reply validation、store遷移、dispute summary、deeplink fallbackを確認した。
+- ✅ 状態名・用語・DBスキーマの変更はないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション884：Account setup form viewsを分割
 
 ### 背景・問題意識
