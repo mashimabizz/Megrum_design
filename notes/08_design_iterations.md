@@ -4,6 +4,44 @@
 
 ---
 
+## イテレーション843：Home mutual match pair list componentsを分割
+
+### 背景・問題意識
+
+次の上位候補として `HomeMutualMatchDetailSheetComponents.swift` を確認した。このファイルは、選択中の相互マッチpreview、確認ポイントhelp、条件review row、他の個別募集ペア一覧、ペア選択button、条件tag rowが同居していた。相互マッチ詳細はユーザーが候補を比較する画面なので、UI挙動や表示文言には触れず、他候補ペア一覧側だけを別ファイルへ移して、選択中preview/確認ポイントと候補一覧を読み分けやすくする。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/HomeMutualMatchDetailSheetComponents.swift`
+- `HomeMutualMatchPairButton`、`HomeMutualMatchPairSide`、`HomeOtherMutualMatchPairsSection`、`HomeMutualMatchConditionTagRow` を移動した。
+- 選択中preview card、条件help popover、preview side/artwork、condition review rowは残した。
+- ファイル行数を464行から315行へ縮小した。
+
+#### `ios-native/Sources/MegrumApp/HomeMutualMatchPairListComponents.swift`
+- 他候補ペア一覧、ペア選択button、ペア片側表示、条件tag rowを移動した。
+- selected state、accessibility label、condition tag表示、件数badge、spacing、色、corner radius、文言は変更していない。
+
+### 影響範囲
+
+- Swift Native iOS版ホームの相互マッチ詳細sheet、選択中ペアpreview、個別募集同士でヒットする他候補一覧、条件tag表示。
+- 挙動変更ではなく責務分離。selection state、button action、condition tag、accessibility label、UI layout、文言、状態名、状態遷移、用語は変更しない。
+
+### 確認方法
+
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-mutual-pair-list-build`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-mutual-pair-list-tests --enable-xctest --disable-swift-testing -j 1 --filter 'HomeScreenFlowTests|HomeMutualMatchConditionPoliciesTests|HomeMutualMatchLiveDataTests'`
+  - 58 tests passed, 2 skipped
+
+### セルフレビュー結果
+
+- ✅ 他候補ペア一覧を分け、`HomeMutualMatchDetailSheetComponents.swift` を選択中preview/確認ポイント中心へ薄くした。
+- ✅ Home相互マッチcandidate/pair/condition policy/live data周辺は対象テストで既存挙動維持を確認した。
+- ✅ selection state、button action、condition tag、accessibility label、UI layout、文言、状態遷移、状態名、用語は変更していない。
+- ✅ 状態名・用語・DBスキーマの変更はないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション842：Trade summary detail sheetを分割
 
 ### 背景・問題意識
