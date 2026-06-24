@@ -4,6 +4,48 @@
 
 ---
 
+## イテレーション833：Dispute detailのstatusとtimelineを分割
+
+### 背景・問題意識
+
+次の上位候補として `DisputeDetailModels.swift` を確認した。このファイルは、異議申し立て詳細のstatus正規化/表示/許可判定、timeline eventとbuilder、message/detail model、evidence groupが同居していた。詳細model本体はSupabase mapper、store、取引チャットsummaryから参照されるため、まず状態表示とtimeline構築だけを別ファイルへ移し、詳細model本体の読み取り範囲を狭める。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/DisputeDetailModels.swift`
+- `DisputeDetailMessageSenderRole`、`DisputeDetailViewerRole`、`DisputeDetailMessageModel`、`DisputeDetailModel`、`DisputeEvidenceGroup` を残した。
+- status enum、status文字列正規化、timeline event/builderを移動した。
+- ファイル行数を496行から274行へ縮小した。
+
+#### `ios-native/Sources/MegrumApp/DisputeDetailStatus.swift`
+- `DisputeDetailStatus` とstatus文字列正規化を移動した。
+- Supabase status mapping、表示名、SF Symbols、tint、reply/withdrawal許可判定は変更していない。
+
+#### `ios-native/Sources/MegrumApp/DisputeDetailTimelineModels.swift`
+- `DisputeTimelineEventState`、`DisputeTimelineEvent`、`DisputeDetailTimelineBuilder` を移動した。
+- timeline順序、current/completed/pending判定、日付/説明文生成は変更していない。
+
+### 影響範囲
+
+- Swift Native iOS版の異議申し立て詳細、異議申し立てsummary、取引チャットからの異議申し立て詳細表示。
+- 挙動変更ではなく責務分離。Supabase mapping、status値、timeline順序、reply/withdrawal許可判定、状態名、状態遷移、用語、画面レイアウトは変更しない。
+
+### 確認方法
+
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-dispute-detail-models-build`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-dispute-detail-models-tests --enable-xctest --disable-swift-testing -j 1 --filter 'DisputeDetailScreenTests|TradeChatAffordanceTests'`
+  - 61 tests passed
+
+### セルフレビュー結果
+
+- ✅ status正規化/表示/許可判定とtimeline構築を分け、`DisputeDetailModels.swift` をdetail model本体中心へ薄くした。
+- ✅ Dispute detail screen/store/mapping、取引チャットのdispute summary周辺は対象テストで既存挙動維持を確認した。
+- ✅ Supabase mapping、status値、timeline順序、reply/withdrawal許可判定、状態遷移、状態名、用語、画面レイアウトは変更していない。
+- ✅ 状態名・用語・DBスキーマの変更はないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション832：Proposal rowとpayload定義を分割
 
 ### 背景・問題意識
