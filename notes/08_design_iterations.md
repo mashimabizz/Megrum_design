@@ -4,6 +4,44 @@
 
 ---
 
+## イテレーション836：通知一覧からMeguri message画面を分割
+
+### 背景・問題意識
+
+次の上位候補として `SettingsNotificationViews.swift` を確認した。このファイルは、通知一覧、通知filter/row表示、通知link解決、めぐりメッセージ画面、メッセージbubble/inputが同居していた。通知一覧の修正時にメッセージ画面のUIまで読む必要があったため、画面遷移や既読処理は変えず、めぐりメッセージ画面一式を別ファイルへ移して一覧側の責務を絞る。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/SettingsNotificationViews.swift`
+- `NotificationsScreen`、`NotificationFilter`、`NotificationRow`、通知link/種類表示policyを残した。
+- `MeguriMessagesScreen`、`MeguriMessageBubble`、`MeguriMessageInput`、peer routeを移動した。
+- ファイル行数を483行から299行へ縮小した。
+
+#### `ios-native/Sources/MegrumApp/MeguriMessageViews.swift`
+- めぐりメッセージのpeer route、会話画面、bubble、inputを移動した。
+- load/send/mark-read呼び出し、scroll-to-last、空状態、文言、layout値は変更していない。
+
+### 影響範囲
+
+- Swift Native iOS版の通知画面、通知からめぐりメッセージへの遷移、めぐりメッセージ会話画面。
+- 挙動変更ではなく責務分離。通知filter、既読処理、link path解決、メッセージ送信、既読更新、画面レイアウト、文言、状態名、状態遷移、用語は変更しない。
+
+### 確認方法
+
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-notification-meguri-build`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-notification-meguri-tests --enable-xctest --disable-swift-testing -j 1 --filter 'MegrumAppStateTests|NotificationReadStateReducerTests|MeguriMessageReadStateReducerTests'`
+  - 87 tests passed
+
+### セルフレビュー結果
+
+- ✅ 通知一覧とめぐりメッセージ会話画面を分け、通知画面側をfilter/row/link解決中心へ薄くした。
+- ✅ 通知既読、通知link routing、めぐりメッセージload/send/read state周辺は対象テストで既存挙動維持を確認した。
+- ✅ 通知filter、既読処理、link path解決、メッセージ送信、既読更新、画面レイアウト、文言、状態遷移、状態名、用語は変更していない。
+- ✅ 状態名・用語・DBスキーマの変更はないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション835：Account setupのmodeとvalidatorを分割
 
 ### 背景・問題意識
