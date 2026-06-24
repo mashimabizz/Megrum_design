@@ -7,17 +7,17 @@ struct IndividualListingEditorSheet: View {
     var onLocalEditSaved: ((IndividualListing) -> Void)?
     var onSaved: (() -> Void)?
 
-    @Environment(\.dismiss) private var dismiss
+    @Environment(\.dismiss) var dismiss
     @State var draft: IndividualListingDraft
     @State var step: IndividualListingEditorStep
     @State var havesTab: IndividualListingHavesStep.Tab = .goods
     @State var haveSelectionFilter = IndividualListingSelectionFilter()
     @State var wishSelectionFilter = IndividualListingSelectionFilter()
-    @State private var stagedOptionSummaries: [IndividualListingOptionReviewItem] = []
-    @State private var showsOptionReview = false
-    @State private var optionToastMessage: String?
-    @State private var optionToastID = UUID()
-    @State private var saveErrorMessage: String?
+    @State var stagedOptionSummaries: [IndividualListingOptionReviewItem] = []
+    @State var showsOptionReview = false
+    @State var optionToastMessage: String?
+    @State var optionToastID = UUID()
+    @State var saveErrorMessage: String?
 
     init(
         appState: MegrumAppState,
@@ -147,209 +147,5 @@ struct IndividualListingEditorSheet: View {
         .onChange(of: havesTab) { _, newValue in
             draft.setHaveOfferKind(newValue == .cash ? .cash : .goods)
         }
-    }
-
-    private func loadConditionCharacters(_ group: OshiGroup) {
-        Task {
-            await appState.loadOshiCharacters(group: group)
-        }
-    }
-
-    private func loadSelectedConditionCharacters() {
-        guard let group = appState.oshiGroups.first(where: { $0.id == draft.conditionGroupID }) else {
-            return
-        }
-        loadConditionCharacters(group)
-    }
-
-    private func createOshiRequest(_ payload: OshiRequestSheetPayload) {
-        Task {
-            _ = await appState.createOshiRequest(
-                OshiRequestCreateInput(
-                    requestedName: payload.name,
-                    requestedKind: payload.kind,
-                    requestedGenreID: payload.genreID,
-                    note: payload.note
-                )
-            )
-            await appState.loadOshiGroups()
-        }
-    }
-
-    private var stepValidationMessage: String? {
-        IndividualListingEditorStepValidationPolicy.message(
-            for: step,
-            draft: draft,
-            inventory: appState.inventory,
-            wishes: appState.wishes
-        )
-    }
-
-    private var isSaving: Bool {
-        switch draft.mode {
-        case .create:
-            return appState.isCreatingIndividualListing
-        case .edit(let listing):
-            return appState.updatingIndividualListingID == listing.id
-        }
-    }
-
-    private var saveErrorBinding: Binding<Bool> {
-        Binding(
-            get: { saveErrorMessage != nil },
-            set: { if !$0 { saveErrorMessage = nil } }
-        )
-    }
-
-    private func save() async {
-        saveErrorMessage = nil
-        guard let input = draft.createInput(inventory: appState.inventory, wishes: appState.wishes) else {
-            saveErrorMessage = stepValidationMessage
-                ?? IndividualListingEditorSaveFailurePresentation.fallbackMessage
-            return
-        }
-        if case .edit(let listing) = draft.mode {
-            let primaryOptionID = listing.options.sorted { $0.position < $1.position }.first?.id
-            if let updated = await appState.updateIndividualListing(
-                listingID: listing.id,
-                primaryOptionID: primaryOptionID,
-                input: input,
-                status: draft.status
-            ) {
-                onLocalEditSaved?(updated)
-                finishSuccessfulSave()
-            } else {
-                saveErrorMessage = appState.errorMessage
-                    ?? IndividualListingEditorSaveFailurePresentation.fallbackMessage
-            }
-            return
-        }
-        let saved = await appState.createIndividualListing(
-            input
-        )
-        if saved {
-            finishSuccessfulSave()
-        } else {
-            saveErrorMessage = appState.errorMessage
-                ?? IndividualListingEditorSaveFailurePresentation.fallbackMessage
-        }
-    }
-
-    private func finishSuccessfulSave() {
-        dismiss()
-        onSaved?()
-    }
-
-    private func goBack() {
-        dismiss()
-    }
-
-    private func selectStep(_ targetStep: IndividualListingEditorStep) {
-        withAnimation(.smooth(duration: 0.2)) {
-            step = targetStep
-        }
-    }
-
-    private func primaryAction() {
-        guard stepValidationMessage == nil else {
-            return
-        }
-        switch step {
-        case .haves:
-            withAnimation(.smooth(duration: 0.2)) {
-                step = .options
-            }
-        case .options:
-            withAnimation(.smooth(duration: 0.2)) {
-                step = .exchange
-            }
-        case .exchange:
-            draft.includesExchangeConditionSummary = true
-            Task {
-                await save()
-            }
-        }
-    }
-
-    private func addCurrentOption() {
-        guard step == .options, stepValidationMessage == nil else {
-            return
-        }
-        guard let item = makeCurrentOptionReviewItem(title: "選択肢\(stagedOptionSummaries.count + 1)") else {
-            return
-        }
-        stagedOptionSummaries.append(item)
-        draft.resetCurrentOptionSelection()
-        showOptionAddedToast(for: item)
-    }
-
-    private func deleteOptionReviewItem(_ item: IndividualListingOptionReviewItem) {
-        switch item.source {
-        case .staged:
-            stagedOptionSummaries = IndividualListingOptionReviewReducer.deleting(
-                itemID: item.id,
-                from: stagedOptionSummaries
-            )
-        case .current:
-            clearCurrentOption()
-        }
-    }
-
-    private func clearCurrentOption() {
-        draft.resetCurrentOptionSelection()
-    }
-
-    private func showOptionAddedToast(for item: IndividualListingOptionReviewItem) {
-        let toastID = UUID()
-        optionToastID = toastID
-        withAnimation(.snappy(duration: 0.18)) {
-            optionToastMessage = item.addedToastMessage
-        }
-        Task { @MainActor in
-            try? await Task.sleep(nanoseconds: 2_200_000_000)
-            guard optionToastID == toastID else {
-                return
-            }
-            withAnimation(.snappy(duration: 0.18)) {
-                optionToastMessage = nil
-            }
-        }
-    }
-
-    private func seedDraftDefaultsIfNeeded() {
-        if step != .haves,
-           draft.selectedHaveIDs.isEmpty,
-           let firstHave = appState.inventory.first(where: { draft.maxHaveQuantity(for: $0) > 0 }) {
-            draft.toggleHave(firstHave.id, maxQuantity: draft.maxHaveQuantity(for: firstHave))
-        }
-        if step == .exchange, draft.optionKind == .wish, draft.selectedWishIDs.isEmpty, let firstWish = appState.wishes.first {
-            draft.toggleWish(firstWish.id)
-        }
-    }
-
-    private var optionReviewItems: [IndividualListingOptionReviewItem] {
-        var items = stagedOptionSummaries
-        if let current = makeCurrentOptionReviewItem(
-            title: items.isEmpty ? "編集中の選択肢" : "編集中",
-            source: .current
-        ) {
-            items.append(current)
-        }
-        return items
-    }
-
-    private func makeCurrentOptionReviewItem(
-        title: String,
-        source: IndividualListingOptionReviewSource = .staged
-    ) -> IndividualListingOptionReviewItem? {
-        IndividualListingOptionReviewItemFactory.make(
-            title: title,
-            source: source,
-            draft: draft,
-            wishes: appState.wishes,
-            groups: appState.oshiGroups,
-            goodsTypes: appState.goodsTypes,
-            characters: appState.oshiCharacters
-        )
     }
 }

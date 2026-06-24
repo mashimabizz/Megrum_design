@@ -4,6 +4,46 @@
 
 ---
 
+## イテレーション900：Individual listing editor sheet state/actionsを分割
+
+### 背景・問題意識
+
+`IndividualListingEditorSheet.swift` は個別募集作成/編集の画面構造、保存処理、初期表示補正、ステップ遷移、選択肢レビュー生成、トースト制御、推しリクエスト作成が同居していた。個別募集が作成できない/保存できない系の調査で、画面レイアウトと保存ロジックを別々に追えるよう分割する。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/IndividualListingEditorSheet.swift`
+- 画面構造、content、bottom bar、sheet/alert、lifecycle hookに集中させた。
+- 分割先extensionから参照するため、必要な内部状態のアクセス範囲をmodule内アクセスへ緩めた。
+- ファイル行数を355行から151行へ縮小した。
+
+#### `ios-native/Sources/MegrumApp/IndividualListingEditorSheetDerivedState.swift`
+- step validation、保存中判定、保存失敗alert binding、選択肢レビューitems生成を移動した。
+
+#### `ios-native/Sources/MegrumApp/IndividualListingEditorSheetActions.swift`
+- 推しキャラクター読み込み、推しリクエスト作成、create/update保存、保存成功dismiss、ステップ遷移、選択肢追加/削除、トースト制御、初期default seedを移動した。
+
+### 影響範囲
+
+- Swift Native iOS版の個別募集作成/編集シート、譲るもの選択、欲しいもの登録、交換条件設定、保存/更新、選択肢レビュー、追加トースト、推しリクエスト作成。
+- 挙動変更ではなく責務分離。保存payload、create/update分岐、step validation、すべて登録/解除、選択肢レビュー、保存失敗文言、状態名、用語、DBスキーマは変更しない。
+
+### 確認方法
+
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-listing-editor-sheet-build --disable-index-store`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-listing-editor-sheet-tests --disable-index-store --enable-xctest --disable-swift-testing -j 1 --filter 'IndividualListingDraftTests|IndividualListingStateReducerTests|MegrumAppStateTests'`
+  - 117 tests passed
+
+### セルフレビュー結果
+
+- ✅ create/update保存処理、primaryOptionID解決、保存成功dismiss、onSaved/onLocalEditSaved、保存失敗alert文言は変更していない。
+- ✅ step遷移、初期default seed、選択肢追加/削除、トースト表示時間、推しリクエスト作成後のgroups reloadは変更していない。
+- ✅ IndividualListingDraftTests / IndividualListingStateReducerTests / MegrumAppStateTestsで、個別募集payload、保存文言、選択肢レビュー、1個以上、すべて登録/解除、作成/更新stateを確認した。
+- ✅ 状態名・用語・DBスキーマの変更はないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション899：Trade detail status viewsを分割
 
 ### 背景・問題意識
