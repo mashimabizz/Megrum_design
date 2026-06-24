@@ -4,6 +4,55 @@
 
 ---
 
+## イテレーション811：検索フィルターsheetをsection別ファイルへ分割
+
+### 背景・問題意識
+
+次の未処理上位候補として `SearchFilterViews.swift` を確認した。このファイルは、検索フィルターsheet本体、相手が譲るグッズの絞り込み、条件マッチtoggle、交換条件、支払い条件、リセットsectionまで同居していた。検索画面は直近でフィルター条件、タグ候補、個別募集hit、支払い条件、交換条件の調整が続いているため、フィルターsheet本体と各section UIの読み取り範囲を分ける。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/SearchFilterViews.swift`
+- `SearchFilterSheet` の状態、body、sheet操作、日程追加/削除、グループ選択/解除、reset操作だけを残した。
+- ファイル行数を577行から203行へ縮小した。
+
+#### `ios-native/Sources/MegrumApp/SearchFilterOfferedGoodsSection.swift`
+- グループ/メンバー/グッズ種別/タグ行と、グループ選択destinationを移動した。
+- グループ選択後のメンバーpicker無効化、loading表示、タグsheet起動の導線は移動のみで維持した。
+
+#### `ios-native/Sources/MegrumApp/SearchFilterConditionMatchSection.swift`
+- Wish/個別募集/交換条件/支払条件の条件マッチtoggle群を移動した。
+- 表示文言とtoggle bindingは移動のみで維持した。
+
+#### `ios-native/Sources/MegrumApp/SearchFilterExchangeConditionSection.swift`
+- 交換手段、都道府県、場所メモ、日程、送料、発送目安、条件外打診toggleを移動した。
+- 都道府県一覧と日付表示helperをsection側へ閉じた。
+
+#### `ios-native/Sources/MegrumApp/SearchFilterPaymentSection.swift`
+- 支払い方法chip、支払い条件section、リセットsectionを移動した。
+- 支払い方法toggleとchip表示は移動のみで維持した。
+
+### 影響範囲
+
+- Swift Native iOS版の検索フィルターsheet、検索条件summary、検索結果filter、ホーム候補由来の検索導線。
+- 挙動変更ではなく責務分離。フィルター状態、検索条件、DB/API payload、状態名、用語、画面レイアウトは変更しない。
+
+### 確認方法
+
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-search-filter-views-build`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-search-filter-views-tests --enable-xctest --disable-swift-testing -j 1 --filter 'SearchScreenTests|HomeDiscoveryMatchPolicyTests|GoodsLocalStateReducerTests'`
+  - 72 tests passed
+
+### セルフレビュー結果
+
+- ✅ `SearchFilterSheet` はfilter draftの状態操作とsheet構成だけを所有する構造へ整理した。
+- ✅ 相手が譲るグッズ、条件マッチ、交換条件、支払い条件、リセットsectionは移動のみで、表示文言とbindingを変えていない。
+- ✅ 検索条件summary、支払い/Wish/個別募集条件filter、タグ候補、戻るgesture周辺は対象テストで維持を確認した。
+- ✅ 状態名・用語・DBスキーマの変更はないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション810：Core共通モデルを領域別ファイルへ分割
 
 ### 背景・問題意識
