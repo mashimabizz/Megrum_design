@@ -4,6 +4,44 @@
 
 ---
 
+## イテレーション850：Goods collection filter barを分割
+
+### 背景・問題意識
+
+iter849後の `GoodsCollectionDisplayViews.swift` には、一覧ヘッダー、列数切替、ステータスタブ、loading notice、filter bar、choice chipが残っていた。`ChoiceChip` は個別募集のフィルタUIからも参照される共通部品で、filter rowと同じ文脈で読める方が変更時の影響範囲を追いやすいため、filter/chip系を専用ファイルへ移す。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/GoodsCollectionDisplayViews.swift`
+- `CollectionFilterBar`、`FilterChoiceRow`、`ChoiceChipStyle`、`ChoiceChip` を移動した。
+- `CollectionHeader`、列数切替、追加ボタン、在庫status tabs、loading noticeは残した。
+- ファイル行数を326行から155行へ縮小した。
+
+#### `ios-native/Sources/MegrumApp/GoodsCollectionFilterBar.swift`
+- グループ/グッズ種別/タグのfilter bar、horizontal filter row、choice chipを移動した。
+- chip metrics、selected色、filter更新、available group/goods type算出、tag toggle処理は変更していない。
+
+### 影響範囲
+
+- Swift Native iOS版のマイグッズ/ウィッシュ一覧フィルタ、個別募集作成時の譲る/ウィッシュ選択フィルタchip。
+- 挙動変更ではなく責務分離。filter条件、chip metrics、選択色、tag toggle、状態名、状態遷移、用語は変更しない。
+
+### 確認方法
+
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-goods-filter-build --disable-index-store`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-goods-filter-tests --disable-index-store --enable-xctest --disable-swift-testing -j 1 --filter 'GoodsGridLayoutTests|IndividualListingDraftTests'`
+  - 60 tests passed
+
+### セルフレビュー結果
+
+- ✅ filter/chip表示部品だけを分け、filter policyや保存/削除/編集actionには触れていない。
+- ✅ 在庫グリッド/フィルタと個別募集draft周辺は対象テストで既存挙動維持を確認した。
+- ✅ chip metrics、selected色、filter更新、available group/goods type算出、tag toggle、状態遷移、状態名、用語は変更していない。
+- ✅ 状態名・用語・DBスキーマの変更はないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション849：Goods collection results areaを分割
 
 ### 背景・問題意識
