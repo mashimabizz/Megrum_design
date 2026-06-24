@@ -4,6 +4,51 @@
 
 ---
 
+## イテレーション809：ホーム発見体験をbody・候補導出・操作へ分割
+
+### 背景・問題意識
+
+次の未処理上位候補として `HomeDiscoveryExperience.swift` を確認した。このファイルは、ホーム上部タブのbody、マッチ候補/求められているグッズ/相互マッチの候補導出、haves lookup payload、sheet遷移、固定ヘッダー、横スワイプ進捗まで同居していた。ホームは直近で相互マッチ、マッチ候補、募集タイムライン、sheet表示、個別募集作成導線の修正が続いているため、画面構成・候補導出・操作/chromeの読み取り範囲を分ける。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/HomeDiscoveryExperience.swift`
+- `HomeDiscoveryExperience` の入力、状態、AppStorage、body、sheet/navigation構成だけを残した。
+- ファイル行数を638行から212行へ縮小した。
+
+#### `ios-native/Sources/MegrumApp/HomeDiscoveryExperienceDerivedState.swift`
+- メンバー×タグ候補、メンバー候補、求められているグッズ候補、相互マッチ候補、viewer offer goods、default exchange settings、condition signals適用を移動した。
+- haves lookup payload、tag/member matched items、候補dedupe、wish hit count判定は移動のみで維持した。
+
+#### `ios-native/Sources/MegrumApp/HomeDiscoveryExperienceActions.swift`
+- 初期haves sheet表示、個別募集作成sheet表示、検索criteria遷移、sheet閉じ後の打診/プロフィール遷移を移動した。
+- sheet dismissal delayと既存callbackの呼び出し順は維持した。
+
+#### `ios-native/Sources/MegrumApp/HomeDiscoveryExperienceChrome.swift`
+- 固定ヘッダー、ヘルプボタン、タブindicator swipe progress、横スワイプgesture、header top padding metricを移動した。
+- タブ切り替え表示と横スワイプ進捗計算は移動のみで維持した。
+
+### 影響範囲
+
+- Swift Native iOS版ホームの相互マッチ、マッチ候補、募集タイムライン、求められているグッズ、ホームsheet、個別募集作成導線、固定ヘッダー/上部タブ。
+- 挙動変更ではなく責務分離。DB/API payload、状態名、用語、画面レイアウトは変更しない。
+
+### 確認方法
+
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-home-discovery-experience-build`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-home-discovery-experience-tests --enable-xctest --disable-swift-testing -j 1 --filter 'HomeDiscoveryMatchPolicyTests|HomeScreenFlowTests|HomeCandidateComposerTests|HomeMutualMatchLiveDataTests'`
+  - 120 tests passed, 2 live Supabase tests skipped by missing environment flags
+
+### セルフレビュー結果
+
+- ✅ `HomeDiscoveryExperience` は状態とbody/sheet/navigation構成だけを所有する構造へ整理した。
+- ✅ マッチ候補、相互マッチ、求められているグッズ、haves lookup payload、検索/打診/プロフィール遷移、固定ヘッダーは移動のみで、条件と文言を変えていない。
+- ✅ ホーム候補生成、Wish L1/L2判定、個別募集hit、支払unknown、タブindicator、相互マッチ条件reviewは対象テストで維持を確認した。
+- ✅ 状態名・用語・DBスキーマの変更はないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション808：検索画面をbody・導出状態・操作へ分割
 
 ### 背景・問題意識
