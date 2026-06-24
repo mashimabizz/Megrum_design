@@ -1,0 +1,156 @@
+import Foundation
+import MegrumCore
+
+extension MegrumAppState {
+    public func loadNotifications() async {
+        guard !isLoadingNotifications else {
+            return
+        }
+
+        isLoadingNotifications = true
+        errorMessage = nil
+        do {
+            notifications = try await repository.loadNotifications(limit: 100)
+        } catch {
+            errorMessage = "通知を読み込めませんでした"
+        }
+        isLoadingNotifications = false
+    }
+
+    public func markNotificationRead(_ notificationID: UUID) async {
+        guard NotificationReadStateReducer.containsUnread(notifications, id: notificationID) else {
+            return
+        }
+
+        let readAt = Date()
+        notifications = NotificationReadStateReducer.markRead(
+            notifications,
+            id: notificationID,
+            readAt: readAt
+        )
+        do {
+            if let updated = try await repository.markNotificationRead(notificationID) {
+                notifications = NotificationReadStateReducer.mergingUpdated(
+                    notifications,
+                    updated: [updated]
+                )
+            }
+        } catch {
+            notifications = NotificationReadStateReducer.markUnread(notifications, id: notificationID)
+            errorMessage = "通知を既読にできませんでした"
+        }
+    }
+
+    public func markAllNotificationsRead() async {
+        guard !isMarkingNotificationsRead else {
+            return
+        }
+        guard unreadNotificationCount > 0 else {
+            return
+        }
+
+        isMarkingNotificationsRead = true
+        errorMessage = nil
+        let previous = notifications
+        let readAt = Date()
+        notifications = NotificationReadStateReducer.markAllRead(notifications, readAt: readAt)
+        do {
+            let updated = try await repository.markAllNotificationsRead()
+            notifications = NotificationReadStateReducer.mergingUpdated(
+                notifications,
+                updated: updated
+            )
+        } catch {
+            notifications = previous
+            errorMessage = "通知を既読にできませんでした"
+        }
+        isMarkingNotificationsRead = false
+    }
+
+    public func loadPushNotificationSetting() async {
+        guard !isLoadingPushNotificationSetting else {
+            return
+        }
+
+        isLoadingPushNotificationSetting = true
+        errorMessage = nil
+        do {
+            pushNotificationsEnabled = try await repository.loadPushNotificationsEnabled()
+        } catch {
+            errorMessage = "モバイル通知設定を読み込めませんでした"
+        }
+        isLoadingPushNotificationSetting = false
+    }
+
+    @discardableResult
+    public func setPushNotificationsEnabled(_ enabled: Bool) async -> Bool {
+        guard !isSavingPushNotificationSetting else {
+            return false
+        }
+
+        let previous = pushNotificationsEnabled
+        pushNotificationsEnabled = enabled
+        isSavingPushNotificationSetting = true
+        errorMessage = nil
+        do {
+            pushNotificationsEnabled = try await repository.setPushNotificationsEnabled(enabled)
+            isSavingPushNotificationSetting = false
+            return true
+        } catch {
+            pushNotificationsEnabled = previous
+            errorMessage = "モバイル通知設定を保存できませんでした"
+            isSavingPushNotificationSetting = false
+            return false
+        }
+    }
+
+    @discardableResult
+    public func registerNativePushDeviceToken(_ token: String, appVersion: String? = nil) async -> Bool {
+        let trimmedToken = MegrumAppStateInputNormalizer.trimmedText(token)
+        guard !trimmedToken.isEmpty else {
+            return false
+        }
+        guard !isRegisteringNativePushDevice else {
+            return false
+        }
+
+        isRegisteringNativePushDevice = true
+        errorMessage = nil
+        do {
+            try await repository.registerNativePushDeviceToken(trimmedToken, appVersion: appVersion)
+            registeredNativePushDeviceToken = trimmedToken
+            isRegisteringNativePushDevice = false
+            return true
+        } catch {
+            errorMessage = "モバイル通知の端末登録に失敗しました"
+            isRegisteringNativePushDevice = false
+            return false
+        }
+    }
+
+    @discardableResult
+    public func revokeRegisteredNativePushDeviceToken(revokedAt: Date = .now) async -> Bool {
+        guard let registeredNativePushDeviceToken, !registeredNativePushDeviceToken.isEmpty else {
+            return false
+        }
+        guard !isRevokingNativePushDevice else {
+            return false
+        }
+
+        isRevokingNativePushDevice = true
+        errorMessage = nil
+        do {
+            try await repository.revokeNativePushDeviceToken(
+                registeredNativePushDeviceToken,
+                revokedAt: revokedAt
+            )
+            self.registeredNativePushDeviceToken = nil
+            isRevokingNativePushDevice = false
+            return true
+        } catch {
+            errorMessage = "モバイル通知の端末登録を解除できませんでした"
+            isRevokingNativePushDevice = false
+            return false
+        }
+    }
+}

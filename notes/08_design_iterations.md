@@ -4,6 +4,44 @@
 
 ---
 
+## イテレーション847：MegrumAppState notification actionsを分割
+
+### 背景・問題意識
+
+次の上位候補として `MegrumAppStateSettingsActions.swift` を確認した。このファイルは、現地交換モード、住所/支払い、郵便番号、ブロック、通知一覧、push通知設定、native device token、アカウントセットアップ、プロフィール更新が同居していた。通知まわりは既読状態とpush端末登録がまとまっており、他の設定保存とは調査観点が異なるため、通知系actionだけを別ファイルへ移して責務を分ける。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/MegrumAppStateSettingsActions.swift`
+- 通知一覧読み込み、通知既読、全既読、push通知設定、native device token登録/解除を移動した。
+- 現地交換モード、住所/支払い、郵便番号、ブロック、アカウントセットアップ、プロフィール更新は残した。
+- ファイル行数を455行から303行へ縮小した。
+
+#### `ios-native/Sources/MegrumApp/MegrumAppStateNotificationActions.swift`
+- 通知一覧/read state/push設定/native device token actionを移動した。
+- optimistic update、rollback、repository呼び出し、error message、loading/saving flag、token trim処理は変更していない。
+
+### 影響範囲
+
+- Swift Native iOS版の通知一覧読み込み、通知既読、全既読、push通知設定、native push device token登録/解除。
+- 挙動変更ではなく責務分離。repository呼び出し、error message、optimistic update、rollback、loading/saving flag、状態名、状態遷移、用語は変更しない。
+
+### 確認方法
+
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-notification-actions-build`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-notification-actions-tests --enable-xctest --disable-swift-testing -j 1 --filter 'MegrumAppStateTests|NotificationReadStateReducerTests|NotificationRouteTests'`
+  - 88 tests passed
+
+### セルフレビュー結果
+
+- ✅ 通知系AppState actionを分け、settings actions本体を住所/支払い/profile系中心へ薄くした。
+- ✅ AppState、通知read reducer、notification route周辺は対象テストで既存挙動維持を確認した。
+- ✅ repository呼び出し、error message、optimistic update、rollback、loading/saving flag、状態遷移、状態名、用語は変更していない。
+- ✅ 状態名・用語・DBスキーマの変更はないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション846：Face recognition matchingを分割
 
 ### 背景・問題意識
