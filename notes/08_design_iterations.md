@@ -4,6 +4,48 @@
 
 ---
 
+## イテレーション829：Meguri Mapのkind定義とchromeを分割
+
+### 背景・問題意識
+
+次の上位候補として `MeguriMapViews.swift` を確認した。このファイルは、Map screen本体、地図種別定義、範囲半径/初期span、header/status badgeのchrome表示が同居していた。Map本体は現在地取得、reload、範囲外判定、sheet表示が絡むため、まず低リスクなkind定義とchrome部品を外へ出して、Map screen本体の読み取り範囲を狭める。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/MeguriMapViews.swift`
+- `MeguriMapScreen` とpresentation modifier、reload/access判定を残した。
+- `MeguriMapKind`、`MapGlassHeader`、`MapStatusBadge` を移動した。
+- ファイル行数を512行から418行へ縮小した。
+
+#### `ios-native/Sources/MegrumApp/MeguriMapKind.swift`
+- `MeguriMapKind`、title、range radius、region spanを移動した。
+- グルーム/掲示板mapの半径やspan値は変更していない。
+
+#### `ios-native/Sources/MegrumApp/MeguriMapChromeViews.swift`
+- map headerとstatus badgeを移動した。
+- close button、material、font、padding、loading indicator表示は変更していない。
+
+### 影響範囲
+
+- Swift Native iOS版のMeguri map full screen/sheet表示、グルーム/掲示板map種別、map header/status badge。
+- 挙動変更ではなく責務分離。現在地取得、map reload、範囲外判定、map radius/span、状態名、状態遷移、用語、画面レイアウト数値は変更しない。
+
+### 確認方法
+
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-meguri-map-chrome-build`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-meguri-map-chrome-tests --enable-xctest --disable-swift-testing -j 1 --filter 'MeguriAccessPolicyTests|MeguriFeedStateReducerTests|MeguriNoticeResolverTests'`
+  - 14 tests passed
+
+### セルフレビュー結果
+
+- ✅ `MeguriMapViews.swift` からkind定義とchrome表示を分け、Map screen本体をreload/access判定中心へ近づけた。
+- ✅ Meguri access policy、feed reducer、notice resolver周辺は対象テストで既存挙動維持を確認した。
+- ✅ 現在地取得、map reload、範囲外判定、map radius/span、状態遷移、状態名、用語、画面レイアウト数値は変更していない。
+- ✅ 状態名・用語・DBスキーマの変更はないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション828：取引グッズカルーセルのstage描画を分割
 
 ### 背景・問題意識

@@ -39,40 +39,6 @@ struct MeguriMapPresentationModifier: ViewModifier {
     }
 }
 
-enum MeguriMapKind: String, Identifiable {
-    case grooms
-    case boards
-
-    var id: String { rawValue }
-
-    var title: String {
-        switch self {
-        case .grooms:
-            "グルームマップ"
-        case .boards:
-            "掲示板マップ"
-        }
-    }
-
-    var radiusMeters: CLLocationDistance {
-        switch self {
-        case .grooms:
-            MeguriAccessPolicy.groomOpenRadiusMeters
-        case .boards:
-            MeguriAccessPolicy.boardOpenRadiusMeters
-        }
-    }
-
-    var regionSpan: MKCoordinateSpan {
-        switch self {
-        case .grooms:
-            MKCoordinateSpan(latitudeDelta: 0.024, longitudeDelta: 0.024)
-        case .boards:
-            MKCoordinateSpan(latitudeDelta: 0.07, longitudeDelta: 0.07)
-        }
-    }
-}
-
 private struct MeguriMapScreen: View {
     var kind: MeguriMapKind
     @ObservedObject var appState: MegrumAppState
@@ -448,65 +414,5 @@ private struct MeguriMapScreen: View {
     private func showOutOfRangeAlert(_ message: String) {
         outOfRangeAlertMessage = message.isEmpty ? "半径1km以内のグルームと掲示板のみ開けます。" : message
         isShowingOutOfRangeAlert = true
-    }
-}
-
-private struct MapGlassHeader: View {
-    var title: String
-    var onClose: () -> Void
-
-    var body: some View {
-        HStack {
-            Button(action: onClose) {
-                Image(systemName: "xmark")
-                    .font(.system(size: 15, weight: .heavy))
-                    .foregroundStyle(MegrumTheme.ink)
-                    .frame(width: 42, height: 42)
-                    .background(.regularMaterial, in: Circle())
-            }
-            .buttonStyle(.plain)
-
-            Spacer()
-
-            Text(title)
-                .font(.system(size: 18, weight: .heavy, design: .rounded))
-                .foregroundStyle(MegrumTheme.ink)
-                .padding(.horizontal, 16)
-                .frame(height: 42)
-                .background(.regularMaterial, in: Capsule())
-
-            Spacer()
-
-            Color.clear
-                .frame(width: 42, height: 42)
-        }
-    }
-}
-
-private struct MapStatusBadge: View {
-    var message: String
-    var isLoading: Bool
-
-    var body: some View {
-        HStack(spacing: 8) {
-            if isLoading {
-                ProgressView()
-                    .controlSize(.small)
-                    .tint(MegrumTheme.lavender)
-            } else {
-                Image(systemName: "location")
-                    .font(.system(size: 13, weight: .heavy))
-                    .foregroundStyle(MegrumTheme.lavender)
-            }
-
-            Text(message)
-                .font(.system(size: 13, weight: .heavy, design: .rounded))
-                .foregroundStyle(MegrumTheme.ink)
-                .lineLimit(2)
-                .multilineTextAlignment(.center)
-        }
-        .padding(.horizontal, 14)
-        .frame(minHeight: 38)
-        .background(.regularMaterial, in: Capsule())
     }
 }
