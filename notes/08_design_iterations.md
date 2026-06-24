@@ -4,6 +4,44 @@
 
 ---
 
+## イテレーション871：Home mutual match payment policyを分割
+
+### 背景・問題意識
+
+次の候補として `HomeMutualMatchConditionPolicies.swift` を確認した。このファイルは、相互マッチの交換条件判定と支払い条件判定が同居していた。ユーザー指摘でも支払いタグは交換条件とは別軸で扱う必要があるため、支払い方法の互換/未設定/要相談判定を専用ファイルへ分け、交換条件policyと支払い条件policyの入口を分離する。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/HomeMutualMatchConditionPolicies.swift`
+- `HomeMutualMatchPaymentEvaluation`、`paymentEvaluation`、`PaymentProfile`、payment method display helperを移動した。
+- 交換方法、現地/郵送ルート、都道府県、日程、送料の判定は残した。
+- ファイル行数を397行から303行へ縮小した。
+
+#### `ios-native/Sources/MegrumApp/HomeMutualMatchPaymentConditionPolicy.swift`
+- 支払い条件評価、未設定/片側未設定/互換/要相談/不一致判定、raw/supported method profile、表示順helperを移動した。
+- `requiresPayment == false` のskip、other-onlyの要相談、compatible判定、attention kind割当は変更していない。
+
+### 影響範囲
+
+- Swift Native iOS版のホーム相互マッチ条件タグ、支払い条件タグ、支払い未設定/要相談/不一致判定。
+- 挙動変更ではなく責務分離。支払い状態、attention kind、交換条件判定、状態名、状態遷移、用語は変更しない。
+
+### 確認方法
+
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-mutual-payment-policy-build --disable-index-store`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-mutual-payment-policy-tests --disable-index-store --enable-xctest --disable-swift-testing -j 1 --filter 'HomeMutualMatchConditionPoliciesTests|HomeScreenFlowTests'`
+  - 56 tests passed
+
+### セルフレビュー結果
+
+- ✅ 支払い条件評価の配置だけを分け、skip/compatible/unset/needsDiscussion/mismatch判定とattention kindは変更していない。
+- ✅ HomeMutualMatchConditionPoliciesTestsで、交換条件と支払い条件の既存判定を確認した。
+- ✅ HomeScreenFlowTestsで、相互マッチ条件review/attention tag/ホーム導線の既存挙動を確認した。
+- ✅ 状態名・用語・DBスキーマの変更はないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション870：Profile visual grid viewsを分割
 
 ### 背景・問題意識
