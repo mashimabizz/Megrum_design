@@ -4,6 +4,43 @@
 
 ---
 
+## イテレーション872：Goods tile action policyを分割
+
+### 背景・問題意識
+
+次の候補として `GoodsGridPresentation.swift` を確認した。このファイルは、グッズグリッドのカードmetrics、カード表示policy、表示メタデータと、タイルの所有者/相手/未ログイン時アクションpolicyが同居していた。タイルメニューは今後「個別募集する」「交換リストに追加」「通報」などの条件調整が入りやすいため、グリッド表示から独立したファイルへ分ける。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/GoodsGridPresentation.swift`
+- `GoodsTileActionPolicy`、`GoodsTileContextMenuPolicy`、`GoodsTileAction` を移動した。
+- グリッドmetrics、image-only policy、quick action種別、カードstyle、layout、context、tile presentationは残した。
+- ファイル行数を377行から261行へ縮小した。
+
+#### `ios-native/Sources/MegrumApp/GoodsTileActionPolicy.swift`
+- タイルの所有者/相手/未ログイン時のaction配列、context menu有効条件、action title/symbol/roleを移動した。
+- owner action order、remote action order、read-only detail menuの非表示条件、delete destructive roleは変更していない。
+
+### 影響範囲
+
+- Swift Native iOS版のマイグッズ/ウィッシュ/交換候補グリッドのタイルメニュー、context menu、タイル表示メタデータ。
+- 挙動変更ではなく責務分離。グリッド列数、カード比率、quick action、bulk selection、状態名、状態遷移、用語は変更しない。
+
+### 確認方法
+
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-goods-tile-action-policy-build --disable-index-store`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-goods-tile-action-policy-tests --disable-index-store --enable-xctest --disable-swift-testing -j 1 --filter 'GoodsGridLayoutTests'`
+  - 25 tests passed
+
+### セルフレビュー結果
+
+- ✅ タイルアクションpolicyの配置だけを分け、所有者/相手/未ログイン時のaction orderとcontext menu条件は変更していない。
+- ✅ GoodsGridLayoutTestsで、layout metrics、quick action、filter、tile presentation、tile action policyの既存挙動を確認した。
+- ✅ 状態名・用語・DBスキーマの変更はないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション871：Home mutual match payment policyを分割
 
 ### 背景・問題意識
