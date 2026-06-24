@@ -4,6 +4,44 @@
 
 ---
 
+## イテレーション851：Proposal create selection actionsを分割
+
+### 背景・問題意識
+
+次の上位候補として `ProposalCreateFlowActions.swift` を確認した。このファイルは、初期読み込み、譲る/受け取る選択、現金入力正規化、支払い選択同期、初期値反映、visual QA state、step navigation、proposal作成送信が同居していた。proposal作成送信は取引導線の中心なので触れず、まず譲る/受け取る選択・現金・支払い同期に関わるactionだけを別extensionへ移して責務を分ける。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/ProposalCreateFlowActions.swift`
+- sender/receiver選択reconcile、selection mode handler、現金入力正規化、payment selection sync、goods toggle、default selection seed、initial cash amount反映を移動した。
+- 初期読み込み、交換方法変更、message制限、meetup/current location、visual QA、step navigation、`createProposal()` は残した。
+- ファイル行数を445行から343行へ縮小した。
+
+#### `ios-native/Sources/MegrumApp/ProposalCreateFlowSelectionActions.swift`
+- 譲る/受け取るgoods選択、cash amount入力正規化、支払い選択同期、初期goods/cash seedを移動した。
+- Set操作、cash input normalizer、payment option selection fallback、初期候補IDの反映条件は変更していない。
+
+### 影響範囲
+
+- Swift Native iOS版の打診作成flow、譲る/受け取る選択、現金選択、支払い方法選択、個別募集経由の打診作成。
+- 挙動変更ではなく責務分離。proposal作成payload、送信処理、step遷移、meetup候補、状態名、状態遷移、用語は変更しない。
+
+### 確認方法
+
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-proposal-selection-actions-build --disable-index-store`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-proposal-selection-actions-tests --disable-index-store --enable-xctest --disable-swift-testing -j 1 --filter 'ProposalCreateFlowTests|ProposalCreateSheetTests|TradeRequestDraftProposalCreateFlowTests'`
+  - 62 tests passed
+
+### セルフレビュー結果
+
+- ✅ 選択/現金/支払い同期actionだけを分け、proposal送信処理には触れていない。
+- ✅ ProposalCreateFlow/Sheet、取引リクエストdraft経由のproposal作成条件は対象テストで既存挙動維持を確認した。
+- ✅ Set操作、cash input normalizer、payment option selection fallback、初期候補ID反映条件、proposal作成payload、step遷移、状態名、用語は変更していない。
+- ✅ 状態名・用語・DBスキーマの変更はないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション850：Goods collection filter barを分割
 
 ### 背景・問題意識
