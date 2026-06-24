@@ -4,6 +4,44 @@
 
 ---
 
+## イテレーション901：Trading card bulk recognizerを分割
+
+### 背景・問題意識
+
+`TradingCardBulkRecognizer.swift` は、トレカ一括認識の公開API、認識結果モデル、手動クロップ枠、Vision矩形検出、透視補正クロップ、JPEG書き出し、EXIF向き補正、検出パラメータが同居していた。画像処理の低レベル処理と呼び出しAPIを分け、トレカ一括登録の不具合調査や調整をしやすくする。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/TradingCardBulkRecognizer.swift`
+- 非同期/同期の認識API、検出枠取得、手動クロップ、並び順APIに集中させた。
+- ファイル行数を355行から108行へ縮小した。
+
+#### `ios-native/Sources/MegrumApp/TradingCardBulkRecognitionModels.swift`
+- `TradingCardBulkRecognitionError`、`TradingCardBulkRecognitionResult`、`TradingCardCropFrame` を移動した。
+
+#### `ios-native/Sources/MegrumApp/TradingCardBulkRecognizerSupport.swift`
+- Vision矩形検出、上左順sort helper、透視補正/矩形クロップ、JPEG書き出し、bounding rect変換、EXIF orientation、検出configを移動した。
+
+### 影響範囲
+
+- Swift Native iOS版のグッズ登録におけるトレカ一括認識、検出枠プレビュー、手動クロップ、画像アップロード用の切り出し結果。
+- 挙動変更ではなく責務分離。検出パラメータ、上左順ソート、fallback original、JPEG品質、EXIF向き補正、手動クロップ座標、状態名、用語、DBスキーマは変更しない。
+
+### 確認方法
+
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-trading-card-recognizer-build --disable-index-store`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-trading-card-recognizer-tests --disable-index-store --enable-xctest --disable-swift-testing -j 1 --filter 'GoodsEditorDraftTests'`
+  - 24 tests passed
+
+### セルフレビュー結果
+
+- ✅ Vision矩形検出config、検出なしfallback、透視補正クロップ、手動crop frame、JPEG品質、EXIF向き補正は変更していない。
+- ✅ GoodsEditorDraftTestsで、トレカ一括認識の上左順sort、fallback original、手動クロップ、無効画像エラーを確認した。
+- ✅ 状態名・用語・DBスキーマの変更はないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション900：Individual listing editor sheet state/actionsを分割
 
 ### 背景・問題意識
