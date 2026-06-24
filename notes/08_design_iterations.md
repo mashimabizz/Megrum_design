@@ -4,6 +4,44 @@
 
 ---
 
+## イテレーション824：GoodsEditor draftモデルを分割
+
+### 背景・問題意識
+
+次の未処理上位候補として `GoodsEditorModels.swift` を確認した。このファイルは、editor route/mode/status/保存失敗表示と、実際に登録・編集payloadを組み立てる `GoodsEditorDraft` / 一括作成meta draftが同居していた。グッズ登録・Wish登録は写真、タグ、数量、ステータス、個別募集への依存が重なるため、周辺enumと入力draft本体を分けて読む範囲を狭める。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/GoodsEditorModels.swift`
+- `GoodsEditorMode`、`GoodsEditorRoute`、`GoodsCreateStep`、`GoodsEditorStatus`、`GoodsEditorSaveBlocker`、`GoodsEditorSaveFailure` を残した。
+- ファイル行数を524行から241行へ縮小した。
+
+#### `ios-native/Sources/MegrumApp/GoodsEditorDraftModels.swift`
+- `GoodsCreatePhotoDraft`、`GoodsCreateMetaDraft`、`GoodsEditorDraft` を移動した。
+- 既存のtitle解決、数量clamp、tag normalization、photo upload、create/update input生成の実装は変更していない。
+
+### 影響範囲
+
+- Swift Native iOS版のグッズ登録、Wish登録、在庫編集、在庫一括作成、写真/タグ付き保存payload生成。
+- 挙動変更ではなく責務分離。保存処理、DB/API payload、状態名、状態遷移、用語、画面レイアウトは変更しない。
+
+### 確認方法
+
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-goods-editor-models-build`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-goods-editor-models-tests --enable-xctest --disable-swift-testing -j 1 --filter 'GoodsEditorDraftTests|GoodsEditorWishPhotoRemovalPolicyTests|ImageUploadContentTypeTests|MegrumAppStateTests'`
+  - 109 tests passed
+- 初回testは `/tmp` のscratch build残骸により `No space left on device` で失敗したため、`/tmp/megrum-ios-native-*` の過去scratchを削除して再実行した。
+
+### セルフレビュー結果
+
+- ✅ `GoodsEditorModels.swift` をroute/status/保存失敗系とdraft入力モデルへ分割した。
+- ✅ グッズ/Wish作成input、編集update input、写真upload、タグ正規化、Wish写真削除ロック、AppState周辺は対象テストで既存挙動維持を確認した。
+- ✅ 保存処理、DB/API payload、状態遷移、状態名、用語、画面レイアウトは変更していない。
+- ✅ 状態名・用語・DBスキーマの変更はないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション823：GoodsGridのpresentation policyを分割
 
 ### 背景・問題意識
