@@ -4,6 +4,65 @@
 
 ---
 
+## イテレーション810：Core共通モデルを領域別ファイルへ分割
+
+### 背景・問題意識
+
+次の未処理上位候補として `MegrumModels.swift` を確認した。このファイルは、交換/打診状態の共通enumに加えて、ユーザー、支払い、公開プロフィール、認証session、推し選択、住所、ブロック、通知モデルまで同居していた。CoreモデルはMegrumData/MegrumApp全体から参照されるため、機能別の変更時に読む範囲を狭め、支払い・プロフィール・通知などの変更が互いに見えすぎない構造へ分ける。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumCore/MegrumModels.swift`
+- `ExchangeMethod`、`ProposalStatus`、`MatchBucket` の共通enumだけを残した。
+- ファイル行数を667行から55行へ縮小した。
+
+#### `ios-native/Sources/MegrumCore/UserProfileModels.swift`
+- `AccountStatus`、`UserGender`、`UserProfile`、`PublicUserProfile`、`PublicOshiTag`、`UserEvaluation` を移動した。
+- 公開プロフィールの推しtag生成と評価summaryは移動のみで維持した。
+
+#### `ios-native/Sources/MegrumCore/UserPaymentModels.swift`
+- `UserPaymentMethod` と `UserPaymentSettings` を移動した。
+- 支払い方法の正規化、表示名、公開summary、trim処理は移動のみで維持した。
+
+#### `ios-native/Sources/MegrumCore/AuthSessionModels.swift`
+- `AuthUser` と `AuthSession` を移動した。
+- Authorization headerとrefresh判定は移動のみで維持した。
+
+#### `ios-native/Sources/MegrumCore/UserOshiSelectionModels.swift`
+- `UserOshiSelection` を移動した。
+
+#### `ios-native/Sources/MegrumCore/AddressModels.swift`
+- `MailingAddress` と `PostalCodeAddress` を移動した。
+- 郵便番号表示、住所summary、入力ready判定は移動のみで維持した。
+
+#### `ios-native/Sources/MegrumCore/BlockedUserModels.swift`
+- `BlockedUser` を移動した。
+
+#### `ios-native/Sources/MegrumCore/NotificationModels.swift`
+- `MegrumNotificationKind` と `MegrumNotification` を移動した。
+- 未読判定は移動のみで維持した。
+
+### 影響範囲
+
+- Swift Native iOS版のCoreモデル、認証session保存、プロフィール表示/編集、支払い設定、住所設定、通知、ブロック、ホーム候補の支払条件判定。
+- 挙動変更ではなく責務分離。Codable field、raw value、public initializer、DB/API payload、状態名、用語、画面レイアウトは変更しない。
+
+### 確認方法
+
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-core-models-build`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-core-models-tests --enable-xctest --disable-swift-testing -j 1 --filter 'MegrumCoreTests|AuthSessionStoreTests|SupabaseAuthClientTests|SupabaseUserProfileClientTests|SupabasePaymentSettingsPersistenceTests|SupabaseMailingAddressClientTests|SupabaseNotificationClientTests|PublicUserProfileScreenTests|OwnProfileScreenTests|AccountSetupScreenTests|HomeDiscoveryMatchPolicyTests'`
+  - 129 tests passed
+
+### セルフレビュー結果
+
+- ✅ Coreのpublic型は型名、raw value、stored property、public initializer、computed propertyを維持してファイル移動のみ行った。
+- ✅ 支払い、プロフィール、公開プロフィール、認証session、住所、通知、ホーム候補支払条件に近い対象テストで維持を確認した。
+- ✅ DB/API payload、Codable key、状態名、用語、画面レイアウトは変更していない。
+- ✅ 状態名・用語・DBスキーマの変更はないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション809：ホーム発見体験をbody・候補導出・操作へ分割
 
 ### 背景・問題意識
