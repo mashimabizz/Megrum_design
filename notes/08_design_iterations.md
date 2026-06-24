@@ -4,6 +4,44 @@
 
 ---
 
+## イテレーション867：Board thread reply viewsを分割
+
+### 背景・問題意識
+
+次の上位候補として `BoardThreadDetailComponents.swift` を確認した。このファイルは、話題詳細のヘッダー、親カード、返信入力、返信行、自分の返信行、参加者アバター表示が1ファイルに同居していた。画面状態や送信処理には触れず、返信表示とアバター表示を別ファイルへ切り出して、話題詳細カード本体を読みやすくする。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/BoardThreadDetailComponents.swift`
+- `BoardThreadReplyRow`、`BoardThreadMineReply`、`BoardThreadDetailAvatarStack`、`BoardThreadDetailAvatar` を移動した。
+- 親カード、ヘッダー、返信入力、`BoardThread.detailTagTitle` は残した。
+- ファイル行数を419行から253行へ縮小した。
+
+#### `ios-native/Sources/MegrumApp/BoardThreadDetailReplyViews.swift`
+- 返信行、自分の返信行、参加者アバタースタック、アバター単体表示を移動した。
+- 削除済み返信文言、時刻badge、アバターfallback、5件以上の参加者数表示は変更していない。
+
+### 影響範囲
+
+- Swift Native iOS版のめぐり掲示板の話題詳細、返信一覧、参加者アバター表示。
+- 挙動変更ではなく責務分離。返信ロード/送信、reply status、表示文言、状態名、状態遷移、用語は変更しない。
+
+### 確認方法
+
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-board-reply-views-build --disable-index-store`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-board-reply-views-tests --disable-index-store --enable-xctest --disable-swift-testing -j 1 --filter 'ReplyThreadStateReducerTests|MegrumAppStateTests/testAppStateLoadsAndSendsPreviewBoardReplies'`
+  - 4 tests passed
+
+### セルフレビュー結果
+
+- ✅ 返信行とアバター表示の配置だけを分け、文言・余白・色・status判定は変更していない。
+- ✅ buildで分割後のSwiftUI参照切れがないことを確認した。
+- ✅ ReplyThreadStateReducerTestsとpreview board replyのapp stateテストで、返信データの置換/追加とロード/送信の既存挙動を確認した。
+- ✅ 状態名・用語・DBスキーマの変更はないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション866：Preview repository trade methodsを分割
 
 ### 背景・問題意識
