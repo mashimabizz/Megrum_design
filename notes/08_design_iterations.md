@@ -4,6 +4,42 @@
 
 ---
 
+## イテレーション897：Home discovery goods card viewsを分割
+
+### 背景・問題意識
+
+`HomeDiscoveryRotaryCard.swift` はカルーセルの選択/ドラッグ処理と、グッズカード本体、条件タグoverlay、汎用条件pillが同居していた。ホームの横スワイプ挙動とカード視覚調整を別々に触れるよう、カード描画側を分離する。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/HomeDiscoveryRotaryCard.swift`
+- `HomeDiscoveryRotaryCard`、カルーセルlayout、visible entry、tap/drag/selection処理だけを残した。
+- ファイル行数を363行から277行へ縮小した。
+
+#### `ios-native/Sources/MegrumApp/HomeDiscoveryGoodsCardViews.swift`
+- `HomeDiscoveryGoodsCard`、前面カードの条件タグoverlay、`HomeConditionPill` を移動した。
+
+### 影響範囲
+
+- Swift Native iOS版ホームのマッチ候補/相互マッチ/個別募集候補で使うグッズカード、横スワイプカルーセル、条件タグ表示。
+- 挙動変更ではなく責務分離。カルーセルmetrics、横スワイプ判定、選択通知、条件タグ文言/色、カード影/枠線、状態名、用語、DBスキーマは変更しない。
+
+### 確認方法
+
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-home-rotary-card-build --disable-index-store`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-home-rotary-card-tests --disable-index-store --enable-xctest --disable-swift-testing -j 1 --filter 'HomeDiscoveryMatchPolicyTests|HomeScreenFlowTests|HomeMutualMatchLiveDataTests|GoodsGridLayoutTests/testQuickActionPresentationUsesSharedSoftPopupMetrics'`
+  - 104 tests passed, 2 skipped
+
+### セルフレビュー結果
+
+- ✅ カルーセルのlayout計算、drag progress、tapで選択/詳細表示、アクセシビリティ操作、条件タグoverlay、カード枠線/影は変更していない。
+- ✅ HomeDiscoveryMatchPolicyTests / HomeScreenFlowTestsで、rotary stack metrics、横スワイプintent、ホームタブ/候補表示、条件タグ、マッチ候補周辺のロジックを確認した。
+- ✅ HomeMutualMatchLiveDataTestsの2件は環境変数がないためskip。ライブSupabase検証は未実行だが、今回の変更はローカルView分割のみ。
+- ✅ 状態名・用語・DBスキーマの変更はないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション896：Meguri board composer state/actionsを分割
 
 ### 背景・問題意識
