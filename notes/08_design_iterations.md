@@ -4,6 +4,53 @@
 
 ---
 
+## イテレーション807：個別募集ドラフトを初期化・選択操作・保存変換へ分割
+
+### 背景・問題意識
+
+次の未処理上位候補として `IndividualListingDraftModels.swift` を確認した。このファイルは、個別募集ドラフトのプロパティ/初期化、譲るもの・Wish・条件タグの選択操作、数量/「何個以上」正規化、validation、create/update payload生成、交換条件メタデータのnote保存まで同居していた。個別募集作成は直近で「すべて登録/解除」「1個以上」「何個以上」などの調整が続いているため、選択操作と保存変換の読み取り範囲を分ける。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/IndividualListingDraftModels.swift`
+- `IndividualListingDraft` のプロパティ、create/edit初期化、navigation/confirmationタイトルだけを残した。
+- ファイル行数を約656行から125行へ縮小した。
+
+#### `ios-native/Sources/MegrumApp/IndividualListingDraftSelection.swift`
+- 譲るもの/Wishのtoggle、表示中一覧の一括選択/解除、条件メンバー/タグ操作、数量変更、`one` / `all` / `atLeast` と最低個数の正規化を移動した。
+- 2件以上選択時の「1個以上」初期値、選択数が2件未満になった時のlogicリセット、現金譲渡時の譲るものリセットは維持した。
+
+#### `ios-native/Sources/MegrumApp/IndividualListingDraftPersistence.swift`
+- validation、`IndividualListingCreateInput` 生成、編集時の `IndividualListing` 更新、noteへの交換条件/現金譲渡summary保存を移動した。
+- グループ/グッズ種別一致、在庫残数、Wish/条件/金額option、編集時の既存option維持は移動のみで維持した。
+
+#### `ios-native/Sources/MegrumApp/IndividualListingDraftBounds.swift`
+- 数量と最低個数の境界処理を `IndividualListingDraft` のstatic helperとして分離した。
+- module全体へ裸のhelper名を広げないよう、`IndividualListingDraft` 配下に閉じた。
+
+### 影響範囲
+
+- Swift Native iOS版の個別募集作成/編集、譲るもの選択、Wish選択、条件指定、現金option、保存payload生成、編集時のローカル反映。
+- 挙動変更ではなく責務分離。DB/API payload、状態名、用語、画面レイアウトは変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumApp/IndividualListingDraftModels.swift ios-native/Sources/MegrumApp/IndividualListingDraftSelection.swift ios-native/Sources/MegrumApp/IndividualListingDraftPersistence.swift ios-native/Sources/MegrumApp/IndividualListingDraftBounds.swift`
+  - passed
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-listing-draft-build`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-listing-draft-tests --enable-xctest --disable-swift-testing -j 1 --filter 'IndividualListingDraftTests|IndividualListingStateReducerTests|HomeDiscoveryMatchPolicyTests'`
+  - 93 tests passed
+
+### セルフレビュー結果
+
+- ✅ `IndividualListingDraftModels` はドラフト本体と初期化だけを所有する構造へ整理した。
+- ✅ 選択操作、数量境界、minimum logic、validation、create/update payload生成は移動のみで、既存の文言・条件・payload値を変更していない。
+- ✅ 「何個以上」「すべて登録/解除」「編集復元」「在庫残数」「個別募集選択ロジック」は対象テストで維持を確認した。
+- ✅ 状態名・用語・DBスキーマの変更はないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション806：取引詳細の画面構成と送信アクションを分割
 
 ### 背景・問題意識
