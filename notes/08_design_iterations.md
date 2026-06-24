@@ -4,6 +4,43 @@
 
 ---
 
+## イテレーション889：Groom story composer stepsを分割
+
+### 背景・問題意識
+
+`GroomStoryComposerViews.swift` はグルーム投稿作成シートの親状態、写真選択UI、投稿前の場所選択UI、写真プレビュー、toast/公開/破棄処理が同居していた。投稿作成の保存・破棄・位置制限ロジックを親に残しつつ、見た目のstepを分離して、写真選択や場所選択のUI修正を安全に行えるようにする。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/GroomStoryComposerViews.swift`
+- 写真選択stepと最終位置選択stepを専用Viewへ移動し、親画面はシート構造、状態、toast、公開/破棄、初期位置seed処理に集中させた。
+- UIKit importを削除し、画像preview依存を分割先へ閉じ込めた。
+- ファイル行数を299行から208行へ縮小した。
+
+#### `ios-native/Sources/MegrumApp/GroomStoryComposerSteps.swift`
+- `GroomStoryPhotoSelectionStep`、`GroomStoryFinalLocationStep`、写真preview、action tileを追加した。
+- `PhotosPicker`、カメラ選択tile、caption入力、`MeguriCreationLocationPicker`、投稿/写真選び直しボタンの表示責務を移動した。
+
+### 影響範囲
+
+- Swift Native iOS版のグルーム投稿作成シート、写真選択、カメラ起動導線、投稿前caption入力、投稿位置選択、1km範囲外toast。
+- 挙動変更ではなく責務分離。投稿payload、`onPublish`、`onDiscard`、写真draft初期化、現在地要求、状態名、状態遷移、用語、DBスキーマは変更しない。
+
+### 確認方法
+
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-groom-story-composer-build --disable-index-store`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-groom-story-composer-tests --disable-index-store --enable-xctest --disable-swift-testing -j 1 --filter 'GroomInteractionStateReducerTests|MeguriAccessPolicyTests|MeguriFeedStateReducerTests'`
+  - 14 tests passed
+
+### セルフレビュー結果
+
+- ✅ 写真選択、カメラ不可toast、場所未選択toast、1km範囲外toast、公開後discard/dismiss、写真選び直しの呼び出し関係は変更していない。
+- ✅ GroomInteractionStateReducerTests / MeguriAccessPolicyTests / MeguriFeedStateReducerTestsで、Groom閲覧/like状態、1km作成制限、feed upsertを確認した。
+- ✅ 状態名・用語・DBスキーマの変更はないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション888：Meguri map screen state/actionsを分割
 
 ### 背景・問題意識
