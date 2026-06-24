@@ -4,6 +4,48 @@
 
 ---
 
+## イテレーション877：Goods editor sheet actionsを責務分割
+
+### 背景・問題意識
+
+次の候補として `GoodsEditorSheetActions.swift` を確認した。このファイルは、グッズ/ウィッシュ編集sheetの選択肢読み込み、初期値設定、タグ操作、推しマスタ申請、写真選択/カメラ/トレカ一括登録、保存/削除が同居していた。マイグッズ登録、ウィッシュ画像、個別募集で使うWish画像ロックに関わるファイルなので、写真系・選択系・永続化系の入口を分け、今後の不具合調査で読む範囲を狭める。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/GoodsEditorSheetActions.swift`
+- 保存と削除だけを残した。
+- ファイル行数を371行から51行へ縮小した。
+
+#### `ios-native/Sources/MegrumApp/GoodsEditorSheetChoiceActions.swift`
+- 選択肢読み込み、初期値設定、メンバー読み込み、タグ追加/削除、推しマスタ申請のアクションを移動した。
+- group/goods type default、solo推しのmember扱い、タグ正規化入口、推しマスタ申請payloadは変更していない。
+
+#### `ios-native/Sources/MegrumApp/GoodsEditorSheetPhotoActions.swift`
+- 写真選択、カメラ撮影、Wish画像削除、トレカ一括登録、PhotosPicker読み込みのアクションを移動した。
+- 写真uploadのcontent type/size検証、既存Wish画像削除ロック、トレカ枠検出、エラー文言は変更していない。
+
+### 影響範囲
+
+- Swift Native iOS版のマイグッズ/ウィッシュ編集sheet、写真選択、カメラ撮影、トレカ一括登録、タグ操作、推しマスタ申請、グッズ保存/削除。
+- 挙動変更ではなく責務分離。保存payload、画像upload、Wish画像削除ロック、状態名、状態遷移、用語、DBスキーマは変更しない。
+
+### 確認方法
+
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-goods-editor-actions-build --disable-index-store`
+  - first run failed after moving imports because `PhotosPickerItem` / `GoodsPhotoUpload` imports were missing
+  - fixed imports and reran: passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-goods-editor-actions-tests --disable-index-store --enable-xctest --disable-swift-testing -j 1 --filter 'GoodsEditorDraftTests|GoodsEditorWishPhotoRemovalPolicyTests|GoodsLocalStateReducerTests'`
+  - 30 tests passed
+
+### セルフレビュー結果
+
+- ✅ GoodsEditorSheetのアクション配置だけを分け、保存/削除、写真読み込み、トレカ一括登録、Wish画像削除ロック、タグ/推しマスタ申請の条件と文言は変更していない。
+- ✅ GoodsEditorDraftTestsで、写真upload、トレカ一括認識、タグ、create/update input、保存失敗文言を確認した。
+- ✅ GoodsEditorWishPhotoRemovalPolicyTestsで、個別募集に使われているWish画像の削除ロック条件を確認した。
+- ✅ 状態名・用語・DBスキーマの変更はないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション876：Home candidate composer utilitiesを分割
 
 ### 背景・問題意識
