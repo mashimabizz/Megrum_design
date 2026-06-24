@@ -4,6 +4,45 @@
 
 ---
 
+## イテレーション886：Match relation screen state/actionsを分割
+
+### 背景・問題意識
+
+次の候補として `MatchRelationScreen.swift` を確認した。このファイルは、マッチ関係画面のbody、相手プロフィール/所持品/個別募集の派生状態、初期選択seed、候補/譲るもの選択、打診開始、横スワイプ切替処理が同居していた。表示部品は既に周辺ファイルへ分かれているため、今回は親画面から派生状態と操作処理を分け、bodyを画面構成中心に戻す。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/MatchRelationScreen.swift`
+- 派生状態と操作処理を専用extensionへ移動し、body、safe area inset、overlay、打診作成presentationを読む構成に整理した。
+- 分割先extensionから参照するため、画面内部状態のアクセス範囲をfile-private相当からmodule内アクセスへ緩めた。
+- ファイル行数を395行から154行へ縮小した。
+
+#### `ios-native/Sources/MegrumApp/MatchRelationScreenDerivedState.swift`
+- partner profile/handle、partner goods、sender goods、own/partner listings、relation details、aggregate、simple proposal IDs、loading、proposal availability、seed key、swipe targets、bottom bar countsを移動した。
+
+#### `ios-native/Sources/MegrumApp/MatchRelationScreenActions.swift`
+- 初期選択seed、Visual QA candidate expansion、reset、candidate/have toggle、打診開始、横スワイプgestureを移動した。
+
+### 影響範囲
+
+- Swift Native iOS版のマッチ関係画面、ホーム/マッチ候補からの関係詳細、候補選択sheet、打診作成への遷移、横スワイプでの対象切替。
+- 挙動変更ではなく責務分離。MatchRelationComposer、SelectionStateReducer、MatchRelationSwipeResolver、ProposalCreateFlow、ホームのルーティング、状態名、状態遷移、用語、DBスキーマは変更しない。
+
+### 確認方法
+
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-match-relation-screen-build --disable-index-store`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-match-relation-screen-tests --disable-index-store --enable-xctest --disable-swift-testing -j 1 --filter 'MatchRelationScreenTests|MatchRelationSelectionStateReducerTests|HomeScreenFlowTests'`
+  - 64 tests passed
+
+### セルフレビュー結果
+
+- ✅ 派生状態と操作処理の移動だけに留め、マッチ関係生成、初期選択、候補集計、横スワイプ閾値、打診作成payloadは変更していない。
+- ✅ MatchRelationScreenTests / MatchRelationSelectionStateReducerTests / HomeScreenFlowTestsで、候補集計、popup copy、bottom bar copy、横スワイプ、ホームからのrelation route、Visual QA routeを確認した。
+- ✅ 状態名・用語・DBスキーマの変更はないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション885：Dispute detail loaded list componentsを分割
 
 ### 背景・問題意識
