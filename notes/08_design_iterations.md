@@ -4,6 +4,49 @@
 
 ---
 
+## イテレーション805：待ち合わせカレンダーを週Editorとgestureへ分割
+
+### 背景・問題意識
+
+次の未処理上位候補として `ProposalMeetupCalendarEditor.swift` を確認した。このファイルは、週/月表示の入口、週表示UI、候補ブロック描画、ドラッグ/長押し/週スワイプ操作、プレビュー生成、候補更新処理まで同居しており、個別募集作成の待ち合わせ調整で触る範囲が広くなっていた。保存フローやモデルは維持したまま、親Editor・週表示・gesture処理の読み取り範囲を分ける。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/ProposalMeetupCalendarEditor.swift`
+- 親Editorには週/月表示切替、月表示のrouting、共通cardだけを残した。
+- 週表示は `ProposalMeetupCalendarWeekEditor` へ委譲し、ファイル行数を約678行から71行へ縮小した。
+
+#### `ios-native/Sources/MegrumApp/ProposalMeetupCalendarWeekEditor.swift`
+- 週表示のローカル状態、週タイムライン、候補ブロック描画、選択候補/編集候補の導出を移動した。
+- 既存の `ProposalMeetupCalendarWeekGrid`、候補ブロック、長押しヒント、場所入力導線の表示構成は維持した。
+
+#### `ios-native/Sources/MegrumApp/ProposalMeetupCalendarWeekEditorGestures.swift`
+- 週表示のドラッグ選択、候補ドラッグ編集、長押し作成、週ヘッダースワイプ、プレビュー破棄処理を移動した。
+- タップ/長押しでの候補作成、ドラッグ時間正規化、週スワイプ閾値、既存候補更新/削除の呼び出しは維持した。
+
+### 影響範囲
+
+- Swift Native iOS版の個別募集作成/打診作成における待ち合わせカレンダーの週表示、月表示切替、候補作成/編集gesture。
+- 挙動変更ではなく責務分離。DB/API payload、状態名、用語、保存処理は変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumApp/ProposalMeetupCalendarEditor.swift ios-native/Sources/MegrumApp/ProposalMeetupCalendarWeekEditor.swift ios-native/Sources/MegrumApp/ProposalMeetupCalendarWeekEditorGestures.swift`
+  - passed
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-meetup-calendar-build`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-meetup-calendar-tests --enable-xctest --disable-swift-testing -j 1 --filter 'TradeRequestDraftProposalCreateFlowTests|ProposalCreateFlowTests'`
+  - 55 tests passed
+
+### セルフレビュー結果
+
+- ✅ 親Editorは週/月切替と月表示routingだけを所有する構造へ整理した。
+- ✅ 週表示UI、候補ブロック描画、ドラッグ/長押し/週スワイプ処理は移動のみで、既存の操作条件とcallback呼び出しを維持した。
+- ✅ 待ち合わせ必須判定、候補作成/編集モデル、月グリッド、週グリッド、打診作成フローは対象テストで維持を確認した。
+- ✅ 状態名・用語・DBスキーマの変更はないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション804：グルームアーカイブ画面を入口・地図・ストーリーへ分割
 
 ### 背景・問題意識
