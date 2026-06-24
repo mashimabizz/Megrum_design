@@ -4,6 +4,55 @@
 
 ---
 
+## イテレーション812：取引AppState actionを打診・証跡・評価申告・チャットへ分割
+
+### 背景・問題意識
+
+次の未処理上位候補として `MegrumAppStateTradeActions.swift` を確認した。このファイルは、打診作成/承諾/拒否、キャンセル承認、証跡写真、証跡承認、評価、申告、取引チャット読み込み/送信、既読同期、現在地/遅刻/キャンセル/到着ステータス送信まで同居していた。取引フローは状態遷移・チャット・証跡・評価/申告が絡むため、保存処理を変えずに責務別の読み取り範囲を分ける。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/MegrumAppStateTradeActions.swift`
+- 共通helper `replaceProposal(_:)` だけを残した。
+- ファイル行数を568行から8行へ縮小した。
+
+#### `ios-native/Sources/MegrumApp/MegrumAppStateTradeProposalActions.swift`
+- 打診作成、承諾、拒否、キャンセル申請承認を移動した。
+- `respondingProposalID`、`isCreatingProposal`、error message、messages再読み込みの流れは移動のみで維持した。
+
+#### `ios-native/Sources/MegrumApp/MegrumAppStateTradeEvidenceActions.swift`
+- 証跡写真追加/読み込み/削除、証跡承認、ローカル証跡notice補完を移動した。
+- evidence photo reducer、messages再読み込み、既存notice重複防止は移動のみで維持した。
+
+#### `ios-native/Sources/MegrumApp/MegrumAppStateTradeResolutionActions.swift`
+- 取引評価送信と申告送信を移動した。
+- 入力trim、空文字validation、申告後messages再読み込みは移動のみで維持した。
+
+#### `ios-native/Sources/MegrumApp/MegrumAppStateTradeMessageActions.swift`
+- 取引チャット読み込み、既読同期、テキスト/写真/system/遅刻/キャンセル/現在地/到着ステータス送信を移動した。
+- partner/viewer read state、send中guard、送信後append、既読markの順序は移動のみで維持した。
+
+### 影響範囲
+
+- Swift Native iOS版の打診作成/承諾/拒否、取引チャット、証跡写真、証跡承認、評価、申告、キャンセル申請、遅刻連絡、現在地共有、到着ステータス。
+- 挙動変更ではなく責務分離。DB/API payload、状態名、状態遷移、用語、画面レイアウトは変更しない。
+
+### 確認方法
+
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-trade-actions-build`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-trade-actions-tests --enable-xctest --disable-swift-testing -j 1 --filter 'TradeProposalStateReducerTests|TradeMessageStateReducerTests|TradeEvidencePhotoStateReducerTests|TradeRequestDraftTests|TradeRequestDraftProposalCreateFlowTests|TradeChatAffordanceTests|ProposalCreateFlowTests|ProposalCreateSheetTests|MegrumAppStateTests|SupabaseProposalClientTests|SupabaseTradeSchedulePersistenceTests'`
+  - 230 tests passed
+
+### セルフレビュー結果
+
+- ✅ 取引AppState actionは打診/証跡/評価申告/チャットへ分割し、既存のrepository呼び出し・guard・error message・state更新順序を維持した。
+- ✅ 証跡、評価、申告、チャット送信、既読同期、打診作成/承諾/拒否、キャンセル申請系は対象テストで維持を確認した。
+- ✅ DB/API payload、状態遷移、状態名、用語、画面レイアウトは変更していない。
+- ✅ 状態名・用語・DBスキーマの変更はないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション811：検索フィルターsheetをsection別ファイルへ分割
 
 ### 背景・問題意識
