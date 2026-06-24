@@ -4,6 +4,44 @@
 
 ---
 
+## イテレーション890：Goods editor form stepsを分割
+
+### 背景・問題意識
+
+`GoodsEditorFormViews.swift` はグッズ編集フォームの親分岐、在庫一括作成フロー、通常編集セクションが同居していた。保存処理やdraft変換には触れず、表示フロー単位でファイルを分けることで、グッズ登録/編集のUI修正時に影響範囲を読みやすくする。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/GoodsEditorFormViews.swift`
+- `GoodsEditorFormContentView` だけを残し、create flow と standard sections の分岐親に集中させた。
+- ファイル行数を386行から145行へ縮小した。
+
+#### `ios-native/Sources/MegrumApp/GoodsEditorInventoryCreateFlowView.swift`
+- `GoodsInventoryCreateFlowView` を移動し、common/shoot/meta step の切り替え表示を専用ファイルへ分離した。
+
+#### `ios-native/Sources/MegrumApp/GoodsEditorStandardSectionsView.swift`
+- `GoodsEditorStandardSectionsView` を移動し、通常の写真/推し/メンバー/種別/数量/status/tag セクション表示を専用ファイルへ分離した。
+
+### 影響範囲
+
+- Swift Native iOS版のグッズ登録/編集フォーム、在庫作成フロー、通常編集フォーム、写真/タグ/数量/状態/Wish画像セクション。
+- 挙動変更ではなく責務分離。draft生成、画像upload判定、タグ正規化、Wish画像削除ロック、保存payload、状態名、状態遷移、用語、DBスキーマは変更しない。
+
+### 確認方法
+
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-goods-editor-form-build --disable-index-store`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-goods-editor-form-tests --disable-index-store --enable-xctest --disable-swift-testing -j 1 --filter 'GoodsEditorDraftTests|GoodsEditorWishPhotoRemovalPolicyTests|GoodsLocalStateReducerTests|ImageUploadContentTypeTests'`
+  - 33 tests passed
+
+### セルフレビュー結果
+
+- ✅ Viewの移動だけに留め、create step遷移、写真選択/削除、タグ追加/削除、数量/status binding、保存関連callbackの接続は変更していない。
+- ✅ GoodsEditorDraftTests / GoodsEditorWishPhotoRemovalPolicyTests / GoodsLocalStateReducerTests / ImageUploadContentTypeTestsで、draft input、写真upload、タグ、Wish写真削除ロック、local goods更新、content typeを確認した。
+- ✅ 状態名・用語・DBスキーマの変更はないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション889：Groom story composer stepsを分割
 
 ### 背景・問題意識
