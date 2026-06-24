@@ -39,6 +39,7 @@ struct GoodsEditorFormContentView: View {
     var onRemoveTag: (String) -> Void
     var onAddTag: () -> Void
     var onAddSuggestedTag: (String) -> Void
+    var onOpenTagSheet: (() -> Void)?
     var onShowCreateOshiPicker: () -> Void
     var onCommonNext: () -> Void
     var onPickCamera: () -> Void
@@ -136,7 +137,8 @@ struct GoodsEditorFormContentView: View {
                 onRemoveWishPhoto: onRemoveWishPhoto,
                 onRemoveTag: onRemoveTag,
                 onAddTag: onAddTag,
-                onAddSuggestedTag: onAddSuggestedTag
+                onAddSuggestedTag: onAddSuggestedTag,
+                onOpenTagSheet: onOpenTagSheet
             )
         }
     }
@@ -275,6 +277,7 @@ struct GoodsEditorStandardSectionsView: View {
     var onRemoveTag: (String) -> Void
     var onAddTag: () -> Void
     var onAddSuggestedTag: (String) -> Void
+    var onOpenTagSheet: (() -> Void)?
 
     var body: some View {
         if draft.entryKind == .inventory {
@@ -374,6 +377,7 @@ struct GoodsEditorStandardSectionsView: View {
             tagDraft: $tagDraft,
             isTagFieldFocused: isTagFieldFocused,
             isItemReadOnly: isItemReadOnly,
+            onOpenTagSheet: draft.entryKind == .wish ? onOpenTagSheet : nil,
             onAddSuggestedTag: onAddSuggestedTag,
             onRemoveTag: onRemoveTag,
             onAddTag: onAddTag

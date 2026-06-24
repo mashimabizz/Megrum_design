@@ -31,4 +31,15 @@ public enum ReplyThreadStateReducer {
         next[postID] = (next[postID] ?? []) + [reply]
         return next
     }
+
+    public static func mergingGroomReplies(
+        _ replies: [GroomReply],
+        into repliesByPostID: [UUID: [GroomReply]]
+    ) -> [UUID: [GroomReply]] {
+        var next = repliesByPostID
+        for (postID, postReplies) in Dictionary(grouping: replies, by: \.groomPostID) {
+            next[postID] = postReplies.sorted { $0.createdAt > $1.createdAt }
+        }
+        return next
+    }
 }

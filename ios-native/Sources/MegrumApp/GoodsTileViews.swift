@@ -226,6 +226,7 @@ private struct GoodsTileExclusivePressModifier: ViewModifier {
                 .onEnded { value in
                     switch value {
                     case .first(true):
+                        MegrumHaptics.longPress()
                         onLongPress()
                     case .second:
                         onTap()
@@ -262,7 +263,7 @@ private struct GoodsSelectionBadge: View {
     }
 }
 
-private struct GoodsCollectionFallback: View {
+struct GoodsCollectionFallback: View {
     var item: GoodsItem
 
     var body: some View {

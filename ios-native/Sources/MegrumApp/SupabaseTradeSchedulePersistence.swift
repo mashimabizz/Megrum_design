@@ -35,6 +35,14 @@ struct SupabaseTradeSchedulePersistence: Sendable {
         )
     }
 
+    func loadProfileSchedules(userID profileUserID: UUID, startAt: Date, endAt: Date) async throws -> [PersonalSchedule] {
+        try await scheduleClient.loadSchedules(
+            userIDs: [profileUserID],
+            startAt: startAt,
+            endAt: endAt
+        )
+    }
+
     func createSchedule(_ input: PersonalScheduleCreateInput) async throws -> PersonalSchedule {
         try await scheduleClient.createSchedule(userID: userID, input: input)
     }

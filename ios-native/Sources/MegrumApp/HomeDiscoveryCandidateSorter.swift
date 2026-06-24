@@ -79,6 +79,8 @@ struct HomeDiscoveryCandidateSorter: Sendable {
         }
         switch HomeDiscoveryMatchPolicy.paymentCondition(for: signals.payment) {
         case .compatible:
+            return 3
+        case .unknown:
             return 2
         case .warning:
             return 1

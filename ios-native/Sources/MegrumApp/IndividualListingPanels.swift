@@ -14,7 +14,7 @@ struct IndividualListingReceivePanel: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Text("受け取れる候補")
+            Text("求めるもの")
                 .font(.system(size: 22, weight: .black, design: .rounded))
                 .foregroundStyle(MegrumTheme.ink)
                 .lineLimit(1)
@@ -62,6 +62,8 @@ struct IndividualListingOfferPanel: View {
     var haveItems: [GoodsItem]
     var goodsTypes: [GoodsType]
     var fallbackCashAmount: Int?
+    var canEdit: Bool = false
+    var onEdit: () -> Void = {}
 
     private var displayGoods: [HomeMockGoods] {
         haveItems.enumerated().map { index, item in
@@ -70,37 +72,59 @@ struct IndividualListingOfferPanel: View {
     }
 
     var body: some View {
-        VStack(spacing: 16) {
-            Spacer(minLength: 0)
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(spacing: 8) {
+                Text("譲るもの")
+                    .font(.system(size: 22, weight: .black, design: .rounded))
+                    .foregroundStyle(MegrumTheme.ink)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.72)
 
-            Text("譲るもの")
-                .font(.system(size: 16, weight: .black, design: .rounded))
-                .foregroundStyle(MegrumTheme.muted)
+                if canEdit {
+                    Button(action: onEdit) {
+                        Image(systemName: "pencil")
+                            .font(.system(size: 13, weight: .black, design: .rounded))
+                            .foregroundStyle(MegrumTheme.lavender)
+                            .frame(width: 30, height: 30)
+                            .background(MegrumTheme.lavender.opacity(0.10), in: Circle())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("譲るものを編集")
+                }
 
-            if displayGoods.isEmpty {
-                ListingOfferCashCard(amount: fallbackCashAmount)
-            } else {
-                HomeDiscoveryRotaryCard(
-                    goods: displayGoods,
-                    goodsCondition: .direct,
-                    exchangeCondition: .possible,
-                    paymentCondition: .compatible,
-                    showsConditionOverlay: false
-                )
-                .frame(height: 172)
-
-                Text(offerCaption)
-                    .font(.system(size: 13, weight: .heavy, design: .rounded))
-                    .foregroundStyle(MegrumTheme.ink.opacity(0.74))
-                    .lineLimit(2)
-                    .multilineTextAlignment(.center)
-                    .minimumScaleFactor(0.78)
+                Spacer(minLength: 0)
             }
 
-            Spacer(minLength: 0)
+            Divider()
+
+            VStack(spacing: 16) {
+                Spacer(minLength: 0)
+
+                if displayGoods.isEmpty {
+                    ListingOfferCashCard(amount: fallbackCashAmount)
+                } else {
+                    HomeDiscoveryRotaryCard(
+                        goods: displayGoods,
+                        goodsCondition: .direct,
+                        exchangeCondition: .possible,
+                        paymentCondition: .compatible,
+                        showsConditionOverlay: false
+                    )
+                    .frame(height: 172)
+
+                    Text(offerCaption)
+                        .font(.system(size: 13, weight: .heavy, design: .rounded))
+                        .foregroundStyle(MegrumTheme.ink.opacity(0.74))
+                        .lineLimit(2)
+                        .multilineTextAlignment(.center)
+                        .minimumScaleFactor(0.78)
+                }
+
+                Spacer(minLength: 0)
+            }
+            .frame(maxWidth: .infinity, minHeight: 320)
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 18)
+        .padding(14)
         .frame(maxWidth: .infinity, minHeight: 404)
         .background(Color.white.opacity(0.88), in: RoundedRectangle(cornerRadius: 24, style: .continuous))
         .overlay {
@@ -112,9 +136,38 @@ struct IndividualListingOfferPanel: View {
     private var offerCaption: String {
         let count = listing.haves.reduce(0) { $0 + $1.quantity }
         if count > 1 {
-            return listing.haveLogic == .one ? "\(count)点からどれか" : "\(count)点セット"
+            switch listing.haveLogic {
+            case .one:
+                return "\(count)点からどれか"
+            case .all:
+                return "\(count)点セット"
+            case .atLeast:
+                return "\(listing.haveMinimumCount)点以上"
+            }
         }
         return haveItems.first?.title ?? "グッズ"
+    }
+}
+
+struct IndividualListingPanelEditButton: View {
+    var accessibilityLabel: String
+    var action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: "pencil")
+                .font(.system(size: 15, weight: .black, design: .rounded))
+                .foregroundStyle(.white)
+                .frame(width: 44, height: 44)
+                .background(MegrumTheme.lavender, in: Circle())
+                .overlay {
+                    Circle()
+                        .strokeBorder(.white.opacity(0.70), lineWidth: 1)
+                }
+                .shadow(color: MegrumTheme.ink.opacity(0.14), radius: 10, y: 5)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(accessibilityLabel)
     }
 }
 
@@ -233,7 +286,7 @@ private struct IndividualListingOptionRow: View {
 
 private struct IndividualListingEmptyOptionRow: View {
     var body: some View {
-        Text("受け取れる候補が未設定です")
+        Text("求めるものが未設定です")
             .font(.system(size: 15, weight: .semibold, design: .rounded))
             .foregroundStyle(MegrumTheme.muted)
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -299,7 +352,7 @@ struct IndividualListingAddConditionRow: View {
                     .frame(width: 30, height: 30)
                     .background(MegrumTheme.lavender, in: Circle())
 
-                Text("条件を追加")
+                Text("条件を編集")
                     .font(.system(size: 15, weight: .black, design: .rounded))
                     .foregroundStyle(MegrumTheme.lavender)
 
@@ -310,6 +363,6 @@ struct IndividualListingAddConditionRow: View {
             .background(MegrumTheme.lavender.opacity(0.08), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
         }
         .buttonStyle(.plain)
-        .accessibilityLabel("条件を追加")
+        .accessibilityLabel("条件を編集")
     }
 }

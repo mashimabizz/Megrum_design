@@ -65,10 +65,12 @@ struct ProposalStepHeader: View {
                             .font(.system(size: ProposalSectionTabsMetrics.labelFontSize, weight: .black, design: .rounded))
                             .lineLimit(1)
                             .minimumScaleFactor(0.82)
-                        Text(badgeText(for: step))
-                            .font(.system(size: ProposalSectionTabsMetrics.countFontSize, weight: .black, design: .rounded))
-                            .foregroundStyle(badgeColor(for: step))
-                            .lineLimit(1)
+                        if let badge = badgeText(for: step) {
+                            Text(badge)
+                                .font(.system(size: ProposalSectionTabsMetrics.countFontSize, weight: .black, design: .rounded))
+                                .foregroundStyle(badgeColor(for: step))
+                                .lineLimit(1)
+                        }
                     }
                     .foregroundStyle(
                         selectedStep == step
@@ -110,14 +112,18 @@ struct ProposalStepHeader: View {
         .shadow(color: MegrumTheme.ink.opacity(0.08), radius: 18, x: 0, y: 10)
     }
 
-    private func badgeText(for step: ProposalCreateStep) -> String {
+    private func badgeText(for step: ProposalCreateStep) -> String? {
         switch step {
         case .give:
             senderCount > 0 ? "\(senderCount)" : "!"
         case .receive:
             receiverCount > 0 ? "\(receiverCount)" : "!"
         case .meetup:
-            configuration.targetStatus == nil ? "!" : "OK"
+            configuration.targetStatus == nil ? "!" : nil
+        case .shipping:
+            nil
+        case .payment:
+            configuration.requiresPaymentSelection && !configuration.hasSelectedPaymentMethod ? "!" : nil
         case .confirm:
             configuration.canSubmit ? "OK" : "!"
         }
@@ -131,6 +137,10 @@ struct ProposalStepHeader: View {
             receiverCount > 0 ? MegrumTheme.sky : MegrumTheme.muted
         case .meetup:
             configuration.targetStatus == nil ? MegrumTheme.muted : MegrumTheme.lavender
+        case .shipping:
+            MegrumTheme.sky
+        case .payment:
+            configuration.hasSelectedPaymentMethod ? MegrumTheme.lavender : MegrumTheme.muted
         case .confirm:
             configuration.canSubmit ? MegrumTheme.lavender : MegrumTheme.muted
         }
@@ -144,6 +154,10 @@ struct ProposalStepHeader: View {
             "受け取る"
         case .meetup:
             "待ち合わせ"
+        case .shipping:
+            "送料"
+        case .payment:
+            "支払"
         case .confirm:
             "確認"
         }
@@ -225,7 +239,14 @@ struct ProposalFlowBottomBar: View {
                 .frame(maxWidth: .infinity)
                 .frame(minHeight: ProposalFlowBottomBarMetrics.buttonMinHeight)
                 .background(
-                    MegrumTheme.lavender,
+                    LinearGradient(
+                        colors: [
+                            MegrumTheme.lavender,
+                            MegrumTheme.lavender.opacity(0.88)
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ),
                     in: RoundedRectangle(cornerRadius: ProposalFlowBottomBarMetrics.buttonCornerRadius, style: .continuous)
                 )
                 .shadow(color: MegrumTheme.lavender.opacity(canUsePrimary ? 0.28 : 0), radius: 14, y: 8)

@@ -92,97 +92,97 @@ struct ProposalSelectableGoodsRow: View {
     var action: () -> Void
 
     var body: some View {
-        Button(action: action) {
-            HStack(spacing: ProposalSelectableGoodsRowMetrics.rowSpacing) {
-                RoundedRectangle(cornerRadius: ProposalSelectableGoodsRowMetrics.thumbnailCornerRadius, style: .continuous)
-                    .fill(ProposalSelectableGoodsRowStyle.thumbnailColor(for: item))
-                    .frame(
-                        width: ProposalSelectableGoodsRowMetrics.thumbnailWidth,
-                        height: ProposalSelectableGoodsRowMetrics.thumbnailHeight
-                    )
-                    .overlay {
-                        if let imageURL = item.imageURL {
-                            AsyncImage(url: imageURL) { phase in
-                                switch phase {
-                                case .success(let image):
-                                    image
-                                        .resizable()
-                                        .scaledToFill()
-                                case .failure:
-                                    Image(systemName: "photo")
-                                        .font(.system(size: 24, weight: .bold))
-                                        .foregroundStyle(.white)
-                                case .empty:
-                                    ProgressView()
-                                        .controlSize(.small)
-                                        .tint(.white)
-                                @unknown default:
-                                    EmptyView()
-                                }
-                            }
-                            .clipShape(
-                                RoundedRectangle(
-                                    cornerRadius: ProposalSelectableGoodsRowMetrics.thumbnailCornerRadius,
-                                    style: .continuous
-                                )
-                            )
-                        } else {
-                            ZStack {
-                                Circle()
-                                    .fill(.white.opacity(0.25))
-                                    .frame(
-                                        width: ProposalSelectableGoodsRowMetrics.thumbnailShineSize,
-                                        height: ProposalSelectableGoodsRowMetrics.thumbnailShineSize
-                                    )
-                                    .offset(
-                                        x: ProposalSelectableGoodsRowMetrics.thumbnailShineOffsetX,
-                                        y: ProposalSelectableGoodsRowMetrics.thumbnailShineOffsetY
-                                    )
-                                Text(ProposalSelectableGoodsRowStyle.glyph(for: item))
-                                    .font(.system(size: ProposalSelectableGoodsRowMetrics.glyphFontSize, weight: .black, design: .rounded))
+        HStack(spacing: ProposalSelectableGoodsRowMetrics.rowSpacing) {
+            RoundedRectangle(cornerRadius: ProposalSelectableGoodsRowMetrics.thumbnailCornerRadius, style: .continuous)
+                .fill(ProposalSelectableGoodsRowStyle.thumbnailColor(for: item))
+                .frame(
+                    width: ProposalSelectableGoodsRowMetrics.thumbnailWidth,
+                    height: ProposalSelectableGoodsRowMetrics.thumbnailHeight
+                )
+                .overlay {
+                    if let imageURL = item.imageURL {
+                        AsyncImage(url: imageURL) { phase in
+                            switch phase {
+                            case .success(let image):
+                                image
+                                    .resizable()
+                                    .scaledToFill()
+                            case .failure:
+                                Image(systemName: "photo")
+                                    .font(.system(size: 24, weight: .bold))
                                     .foregroundStyle(.white)
+                            case .empty:
+                                ProgressView()
+                                    .controlSize(.small)
+                                    .tint(.white)
+                            @unknown default:
+                                EmptyView()
                             }
                         }
+                        .clipShape(
+                            RoundedRectangle(
+                                cornerRadius: ProposalSelectableGoodsRowMetrics.thumbnailCornerRadius,
+                                style: .continuous
+                            )
+                        )
+                    } else {
+                        ZStack {
+                            Circle()
+                                .fill(.white.opacity(0.25))
+                                .frame(
+                                    width: ProposalSelectableGoodsRowMetrics.thumbnailShineSize,
+                                    height: ProposalSelectableGoodsRowMetrics.thumbnailShineSize
+                                )
+                                .offset(
+                                    x: ProposalSelectableGoodsRowMetrics.thumbnailShineOffsetX,
+                                    y: ProposalSelectableGoodsRowMetrics.thumbnailShineOffsetY
+                                )
+                            Text(ProposalSelectableGoodsRowStyle.glyph(for: item))
+                                .font(.system(size: ProposalSelectableGoodsRowMetrics.glyphFontSize, weight: .black, design: .rounded))
+                                .foregroundStyle(.white)
+                        }
                     }
-
-                VStack(alignment: .leading, spacing: 6) {
-                    Text(item.title)
-                        .font(.system(size: 15, weight: .black, design: .rounded))
-                        .foregroundStyle(MegrumTheme.ink)
-                        .lineLimit(1)
-                    if !subtitleText.isEmpty {
-                        Text(subtitleText)
-                            .font(.system(size: 11, weight: .bold, design: .rounded))
-                            .foregroundStyle(MegrumTheme.muted)
-                            .lineLimit(1)
-                    }
-                    Text(hintText)
-                        .font(.system(size: 10, weight: .black, design: .rounded))
-                        .foregroundStyle(MegrumTheme.sky)
-                        .lineLimit(1)
-                        .padding(.horizontal, 8)
-                        .frame(height: 22)
-                        .background(MegrumTheme.sky.opacity(0.22), in: Capsule())
                 }
 
-                Spacer()
+            VStack(alignment: .leading, spacing: 6) {
+                Text(item.title)
+                    .font(.system(size: 15, weight: .black, design: .rounded))
+                    .foregroundStyle(MegrumTheme.ink)
+                    .lineLimit(1)
+                if !subtitleText.isEmpty {
+                    Text(subtitleText)
+                        .font(.system(size: 11, weight: .bold, design: .rounded))
+                        .foregroundStyle(MegrumTheme.muted)
+                        .lineLimit(1)
+                }
+                Text(hintText)
+                    .font(.system(size: 10, weight: .black, design: .rounded))
+                    .foregroundStyle(MegrumTheme.sky)
+                    .lineLimit(1)
+                    .padding(.horizontal, 8)
+                    .frame(height: 22)
+                    .background(MegrumTheme.sky.opacity(0.22), in: Capsule())
+            }
 
-                ProposalSelectableGoodsCheckmark(isSelected: isSelected)
-            }
-            .padding(ProposalSelectableGoodsRowMetrics.rowPadding)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(
-                rowBackground,
-                in: RoundedRectangle(cornerRadius: ProposalSelectableGoodsRowMetrics.rowCornerRadius, style: .continuous)
-            )
-            .overlay {
-                RoundedRectangle(cornerRadius: ProposalSelectableGoodsRowMetrics.rowCornerRadius, style: .continuous)
-                    .stroke(rowBorderColor, lineWidth: 1)
-            }
+            Spacer()
+
+            ProposalSelectableGoodsCheckmark(isSelected: isSelected)
         }
-        .buttonStyle(.plain)
+        .padding(ProposalSelectableGoodsRowMetrics.rowPadding)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            rowBackground,
+            in: RoundedRectangle(cornerRadius: ProposalSelectableGoodsRowMetrics.rowCornerRadius, style: .continuous)
+        )
+        .overlay {
+            RoundedRectangle(cornerRadius: ProposalSelectableGoodsRowMetrics.rowCornerRadius, style: .continuous)
+                .stroke(rowBorderColor, lineWidth: 1)
+        }
+        .contentShape(RoundedRectangle(cornerRadius: ProposalSelectableGoodsRowMetrics.rowCornerRadius, style: .continuous))
+        .onTapGesture(perform: action)
         .accessibilityLabel(item.title)
         .accessibilityValue(isSelected ? "選択中" : "未選択")
+        .accessibilityAddTraits(.isButton)
     }
 
     private var subtitleText: String {

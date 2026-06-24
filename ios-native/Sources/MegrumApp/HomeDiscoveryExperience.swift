@@ -3,59 +3,133 @@ import MegrumDesign
 import SwiftUI
 
 struct HomeDiscoveryExperience: View {
+    var appState: MegrumAppState?
     var viewer: UserProfile?
     var inventoryItems: [GoodsItem] = []
     var matchedItems: [GoodsItem] = []
     var possibleItems: [GoodsItem] = []
     var goodsTypes: [GoodsType] = []
     var conditionSignalsByItemID: [UUID: HomeCandidateConditionSignals] = [:]
+    var mutualMatchCandidateData: [HomeMutualMatchCandidateData] = []
     var isLoading: Bool
+    var adDisplayContext: AdDisplayContext = AdDisplayContext()
     var opensInitialHavesLookup: Bool = false
     var onOpenSettings: () -> Void
     var onOpenSearch: () -> Void
+    var onOpenSearchWithCriteria: (SearchInitialCriteria) -> Void = { _ in }
+    var onOpenWish: () -> Void = {}
+    var onOpenIndividualListings: () -> Void = {}
+    var onOpenExchangeSettings: () -> Void = {}
+    var onOpenPaymentSettings: () -> Void = {}
+    var onOpenOwnerProfile: (UUID) -> Void = { _ in }
     var onStartProposal: (HomeDiscoveryProposalSelection) -> Void = { _ in }
     var onRefresh: () async -> Void
 
+    @AppStorage(HomeExchangeSettingsStorageKeys.preference) private var exchangePreferenceRawValue = HomeDefaultExchangeSettings.standard.preference.rawValue
+    @AppStorage(HomeExchangeSettingsStorageKeys.requiresSamePrefecture) private var exchangeRequiresSamePrefecture = HomeDefaultExchangeSettings.standard.requiresSamePrefecture
+    @AppStorage(HomeExchangeSettingsStorageKeys.requiresDateOverlap) private var exchangeRequiresDateOverlap = HomeDefaultExchangeSettings.standard.requiresDateOverlap
     @State private var selectedSheet: HomeDiscoverySheet?
+    @State private var selectedMutualMatchCandidate: HomeMutualMatchCandidate?
+    @State private var showsMatchHelp = false
     @State private var pendingProposalSelection: HomeDiscoveryProposalSelection?
+    @State private var pendingProfileUserID: UUID?
     @State private var didOpenInitialSheet = false
+    @State private var selectedPrimaryTab: HomeDiscoveryPrimaryTab = .mutual
+    @State private var showsIndividualListingCreation = false
+    @State private var primaryTabPageWidth: CGFloat = 1
+    @GestureState private var primaryTabDragTranslation: CGFloat = 0
 
     var body: some View {
         ZStack(alignment: .top) {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 14) {
-                    HomeDiscoverySection(
-                        title: "メンバー×タグでマッチ",
-                        candidates: userTagCandidates,
-                        layout: .grid,
-                        cardTitleStyle: .memberTag,
-                        onSelect: { selectedSheet = $0 }
+            GeometryReader { geometry in
+                TabView(selection: $selectedPrimaryTab) {
+                    HomeMutualMatchPage(
+                        candidates: mutualMatchCandidates,
+                        listingCount: viewerIndividualListingCount,
+                        contentTopPadding: HomeDiscoveryHeaderMetrics.contentTopPadding,
+                        onSelect: { selectedMutualMatchCandidate = $0 },
+                        onCreateListing: openIndividualListingCreation
                     )
-
-                    HomeDiscoverySection(
-                        title: "メンバーでマッチ",
-                        candidates: userCandidates,
-                        layout: .grid,
-                        cardTitleStyle: .member,
-                        onSelect: { selectedSheet = $0 }
-                    )
-
-                    if !havesCandidates.isEmpty {
-                        HomeDiscoverySection(
-                            title: "欲しがられているグッズ",
-                            candidates: havesCandidates,
-                            layout: .rail,
-                            onSelect: { selectedSheet = $0 }
-                        )
+                    .refreshable {
+                        await onRefresh()
                     }
+                    .tag(HomeDiscoveryPrimaryTab.mutual)
+
+                    ScrollView {
+                        VStack(alignment: .leading, spacing: 14) {
+                            HomeDiscoverySection(
+                                title: "メンバー×タグでマッチ",
+                                candidates: userTagCandidates,
+                                layout: .grid,
+                                cardTitleStyle: .memberTag,
+                                onSelect: { selectedSheet = $0 },
+                                onSearchCandidate: { candidate, selectedGoods in
+                                    openSearch(for: candidate, selectedGoods: selectedGoods, source: .userTag)
+                                }
+                            )
+
+                            HomeDiscoverySection(
+                                title: "メンバーでマッチ",
+                                candidates: userCandidates,
+                                layout: .grid,
+                                cardTitleStyle: .member,
+                                onSelect: { selectedSheet = $0 },
+                                onSearchCandidate: { candidate, selectedGoods in
+                                    openSearch(for: candidate, selectedGoods: selectedGoods, source: .user)
+                                }
+                            )
+
+                            if !havesCandidates.isEmpty {
+                                HomeDiscoverySection(
+                                    title: "求められているグッズ",
+                                    candidates: havesCandidates,
+                                    layout: .rail,
+                                    onSelect: { selectedSheet = $0 }
+                                )
+                            }
+
+                            AdBannerSlot(
+                                placement: .homeFeedBanner,
+                                displayContext: adDisplayContext
+                            )
+                        }
+                        .padding(.horizontal, 20)
+                        .padding(.top, HomeDiscoveryHeaderMetrics.contentTopPadding)
+                        .padding(.bottom, 34)
+                    }
+                    .refreshable {
+                        await onRefresh()
+                    }
+                    .tag(HomeDiscoveryPrimaryTab.candidates)
+
+                    HomeListingTimelinePage(
+                        contentTopPadding: HomeDiscoveryHeaderMetrics.contentTopPadding
+                    )
+                    .refreshable {
+                        await onRefresh()
+                    }
+                    .tag(HomeDiscoveryPrimaryTab.timeline)
                 }
-                .padding(.horizontal, 20)
-                .padding(.top, HomeDiscoveryHeaderMetrics.contentTopPadding)
-                .padding(.bottom, 34)
+                .megrumPageTabViewStyle()
+                .simultaneousGesture(primaryTabDragGesture(pageWidth: geometry.size.width))
+                .onAppear {
+                    primaryTabPageWidth = max(1, geometry.size.width)
+                }
+                .onChange(of: geometry.size.width) { _, width in
+                    primaryTabPageWidth = max(1, width)
+                }
             }
-            .refreshable {
-                await onRefresh()
+
+            VStack {
+                Spacer()
+                HStack {
+                    LiquidGlassSearchButton(action: onOpenSearch)
+                    Spacer()
+                }
+                .padding(.leading, FloatingActionLayoutMetrics.leadingPadding)
+                .padding(.bottom, FloatingActionLayoutMetrics.homeSearchBottomPadding)
             }
+            .ignoresSafeArea(.keyboard, edges: .bottom)
 
             pinnedHeader
         }
@@ -73,8 +147,59 @@ struct HomeDiscoveryExperience: View {
         ) { sheet in
             HomeDiscoverySheetView(
                 sheet: sheet,
+                appState: appState,
                 viewerOfferGoods: viewerOfferGoods,
+                onOpenOwnerProfile: requestProfilePresentation,
                 onStartProposal: requestProposalPresentation
+            )
+            .presentationDetents([.large])
+            .presentationDragIndicator(.visible)
+        }
+        .sheet(item: $selectedMutualMatchCandidate) { candidate in
+            HomeMutualMatchDetailSheet(
+                candidate: candidate,
+                allCandidates: mutualMatchCandidates,
+                appState: appState,
+                viewerOfferGoods: viewerOfferGoods,
+                goodsTypes: goodsTypes,
+                matchedItems: matchedItems,
+                possibleItems: possibleItems,
+                conditionSignalsByItemID: displayConditionSignalsByItemID,
+                onOpenOwnerProfile: requestProfilePresentationFromMutualMatch,
+                onStartProposal: requestProposalPresentationFromMutualMatch
+            )
+            .presentationDetents([.large])
+            .presentationDragIndicator(.visible)
+        }
+        .homeIndividualListingCreationPresentation(isPresented: $showsIndividualListingCreation) {
+            if let appState {
+                NavigationStack {
+                    IndividualListingEditorSheet(
+                        appState: appState,
+                        initialStep: .haves
+                    )
+                }
+            }
+        }
+        .sheet(isPresented: $showsMatchHelp) {
+            HomeMatchLogicHelpSheet(
+                exchangeSettings: defaultExchangeSettings,
+                onOpenWish: {
+                    showsMatchHelp = false
+                    onOpenWish()
+                },
+                onOpenIndividualListings: {
+                    showsMatchHelp = false
+                    onOpenIndividualListings()
+                },
+                onOpenExchangeSettings: {
+                    showsMatchHelp = false
+                    onOpenExchangeSettings()
+                },
+                onOpenPaymentSettings: {
+                    showsMatchHelp = false
+                    onOpenPaymentSettings()
+                }
             )
             .presentationDetents([.large])
             .presentationDragIndicator(.visible)
@@ -87,46 +212,51 @@ struct HomeDiscoveryExperience: View {
     private var userTagCandidates: [HomeDiscoveryCandidate] {
         let items = partnerItems(from: matchedItems + possibleItems)
             .filter { item in
-                let signals = conditionSignalsByItemID[item.id]
-                return signals?.matchesViewerWish == true && (signals?.tagMatchCount ?? 0) > 0
+                HomeDiscoveryMatchPolicy.isMemberTagMatchEligible(
+                    item: item,
+                    signals: displayConditionSignalsByItemID[item.id]
+                )
             }
             .sorted(by: candidateSorter.areInCandidateOrder)
         let candidates = HomeDiscoveryCandidateFactory.candidates(
             from: items,
             source: .userTag,
             goodsTypes: goodsTypes,
-            conditionSignalsByItemID: conditionSignalsByItemID
+            conditionSignalsByItemID: displayConditionSignalsByItemID
         )
-        return candidates.isEmpty ? HomeDiscoveryFixtures.userTagCandidates : Array(candidates.prefix(4))
+        return Array(candidates.prefix(4))
     }
 
     private var userCandidates: [HomeDiscoveryCandidate] {
-        let usedIDs = Set(userTagCandidates.flatMap { $0.goods.map(\.id) })
         let items = partnerItems(from: matchedItems + possibleItems)
             .filter { item in
-                !usedIDs.contains(item.id)
-                    && conditionSignalsByItemID[item.id]?.matchesViewerWish == true
+                HomeDiscoveryMatchPolicy.isMemberMatchEligible(
+                    item: item,
+                    signals: displayConditionSignalsByItemID[item.id]
+                )
             }
             .sorted(by: candidateSorter.areInCandidateOrder)
         let candidates = HomeDiscoveryCandidateFactory.candidates(
-            from: Array(items.prefix(4)),
+            from: items,
             source: .user,
             goodsTypes: goodsTypes,
-            conditionSignalsByItemID: conditionSignalsByItemID
+            conditionSignalsByItemID: displayConditionSignalsByItemID
         )
-        return candidates.isEmpty ? HomeDiscoveryFixtures.userCandidates : candidates
+        return Array(candidates.prefix(HomeDiscoveryCandidateFactory.memberCandidateDisplayLimit))
     }
 
     private var havesCandidates: [HomeDiscoveryCandidate] {
         let inventoryViewerItems = ownItems(from: inventoryItems)
         let viewerItems = inventoryViewerItems.isEmpty ? ownItems(from: matchedItems + possibleItems) : inventoryViewerItems
         let sourceItems = viewerItems.isEmpty ? possibleItems : viewerItems
-        let sortedSourceItems = sourceItems.sorted(by: candidateSorter.areInHavesOrder)
+        let sortedSourceItems = sourceItems
+            .filter { havesWishHitCount(for: $0) > 0 }
+            .sorted(by: candidateSorter.areInHavesOrder)
         let candidates = HomeDiscoveryCandidateFactory.candidates(
             from: Array(sortedSourceItems.prefix(8)),
             source: .haves,
             goodsTypes: goodsTypes,
-            conditionSignalsByItemID: conditionSignalsByItemID
+            conditionSignalsByItemID: displayConditionSignalsByItemID
         )
         let itemByID = sortedSourceItems.reduce(into: [UUID: GoodsItem]()) { result, item in
             result[item.id] = result[item.id] ?? item
@@ -146,8 +276,36 @@ struct HomeDiscoveryExperience: View {
             }
     }
 
+    private var mutualMatchCandidates: [HomeMutualMatchCandidate] {
+        HomeMutualMatchCandidateFactory.candidates(
+            mutualMatchData: mutualMatchCandidateData,
+            viewerID: viewer?.id,
+            inventoryItems: inventoryItems,
+            matchedItems: matchedItems,
+            possibleItems: possibleItems,
+            goodsTypes: goodsTypes,
+            conditionSignalsByItemID: displayConditionSignalsByItemID
+        )
+    }
+
+    private var viewerIndividualListingCount: Int {
+        appState?.listings.filter { $0.status != .closed }.count ?? 0
+    }
+
     private var candidateSorter: HomeDiscoveryCandidateSorter {
-        HomeDiscoveryCandidateSorter(conditionSignalsByItemID: conditionSignalsByItemID)
+        HomeDiscoveryCandidateSorter(conditionSignalsByItemID: displayConditionSignalsByItemID)
+    }
+
+    private var defaultExchangeSettings: HomeDefaultExchangeSettings {
+        HomeDefaultExchangeSettings(
+            preferenceRawValue: exchangePreferenceRawValue,
+            requiresSamePrefecture: exchangeRequiresSamePrefecture,
+            requiresDateOverlap: exchangeRequiresDateOverlap
+        )
+    }
+
+    private var displayConditionSignalsByItemID: [UUID: HomeCandidateConditionSignals] {
+        defaultExchangeSettings.applying(to: conditionSignalsByItemID)
     }
 
     private func partnerItems(from items: [GoodsItem]) -> [GoodsItem] {
@@ -172,18 +330,83 @@ struct HomeDiscoveryExperience: View {
         selectedSheet = havesCandidates.first?.sheet
     }
 
+    private func openIndividualListingCreation() {
+        guard let appState else {
+            onOpenIndividualListings()
+            return
+        }
+
+        showsIndividualListingCreation = true
+        Task {
+            if appState.oshiGroups.isEmpty || appState.oshiGenres.isEmpty {
+                await appState.loadOshiGroups()
+            }
+            if appState.goodsTypes.isEmpty {
+                await appState.loadGoodsTypes()
+            }
+        }
+    }
+
+    private func openSearch(
+        for candidate: HomeDiscoveryCandidate,
+        selectedGoods: HomeMockGoods?,
+        source: HomeDiscoveryCandidateSource
+    ) {
+        onOpenSearchWithCriteria(
+            HomeDiscoverySearchRoutePolicy.criteria(
+                for: candidate,
+                selectedGoods: selectedGoods,
+                source: source
+            )
+        )
+    }
+
     private func requestProposalPresentation(_ selection: HomeDiscoveryProposalSelection) {
-        pendingProposalSelection = selection
+        pendingProposalSelection = nil
+        selectedSheet = nil
+        Task { @MainActor in
+            try? await Task.sleep(nanoseconds: HomeDiscoveryDeferredPresentationPolicy.sheetDismissalDelayNanoseconds)
+            onStartProposal(selection)
+        }
+    }
+
+    private func requestProfilePresentation(_ userID: UUID) {
+        pendingProfileUserID = userID
         selectedSheet = nil
     }
 
+    private func requestProposalPresentationFromMutualMatch(_ selection: HomeDiscoveryProposalSelection) {
+        selectedMutualMatchCandidate = nil
+        Task { @MainActor in
+            try? await Task.sleep(nanoseconds: HomeDiscoveryDeferredPresentationPolicy.sheetDismissalDelayNanoseconds)
+            onStartProposal(selection)
+        }
+    }
+
+    private func requestProfilePresentationFromMutualMatch(_ userID: UUID) {
+        selectedMutualMatchCandidate = nil
+        Task { @MainActor in
+            try? await Task.sleep(nanoseconds: HomeDiscoveryDeferredPresentationPolicy.sheetDismissalDelayNanoseconds)
+            onOpenOwnerProfile(userID)
+        }
+    }
+
     private func presentPendingProposalIfNeeded() {
+        if let pendingProfileUserID {
+            self.pendingProfileUserID = nil
+            Task { @MainActor in
+                try? await Task.sleep(nanoseconds: HomeDiscoveryDeferredPresentationPolicy.sheetDismissalDelayNanoseconds)
+                onOpenOwnerProfile(pendingProfileUserID)
+            }
+            return
+        }
+
         guard let selection = pendingProposalSelection else {
             return
         }
         pendingProposalSelection = nil
         Task { @MainActor in
-            await Task.yield()
+            try? await Task.sleep(nanoseconds: HomeDiscoveryDeferredPresentationPolicy.sheetDismissalDelayNanoseconds)
             onStartProposal(selection)
         }
     }
@@ -222,7 +445,7 @@ struct HomeDiscoveryExperience: View {
             index: 0,
             goodsTypes: goodsTypes
         )
-        let offeredSignals = conditionSignalsByItemID[offeredItem.id] ?? baseCandidate.signals
+        let offeredSignals = displayConditionSignalsByItemID[offeredItem.id] ?? baseCandidate.signals
         let tagMatchedItems = havesTagMatchedItems(for: offeredItem)
         let tagMatchedIDs = Set(tagMatchedItems.map(\.id))
         let memberMatchedItems = havesMemberMatchedItems(for: offeredItem)
@@ -250,19 +473,23 @@ struct HomeDiscoveryExperience: View {
             return []
         }
         return havesPartnerPool(for: offeredItem)
-            .filter { memberMatches($0, offeredItem) && !matchingTagSet(for: $0).isDisjoint(with: offeredTags) }
+            .filter { !matchingTagSet(for: $0).isDisjoint(with: offeredTags) }
             .sorted(by: candidateSorter.areInCandidateOrder)
     }
 
     private func havesMemberMatchedItems(for offeredItem: GoodsItem) -> [GoodsItem] {
         havesPartnerPool(for: offeredItem)
-            .filter { memberMatches($0, offeredItem) }
             .sorted(by: candidateSorter.areInCandidateOrder)
     }
 
     private func havesPartnerPool(for offeredItem: GoodsItem) -> [GoodsItem] {
-        partnerItems(from: matchedItems + possibleItems)
+        let partnerUserIDs = Set(displayConditionSignalsByItemID[offeredItem.id]?.wishMatchedPartnerUserIDs ?? [])
+        guard !partnerUserIDs.isEmpty else {
+            return []
+        }
+        return partnerItems(from: matchedItems + possibleItems)
             .filter { $0.id != offeredItem.id }
+            .filter { partnerUserIDs.contains($0.ownerID) }
     }
 
     private func havesMatchCandidates(
@@ -274,7 +501,7 @@ struct HomeDiscoveryExperience: View {
             from: Array(items.prefix(6)),
             source: source,
             goodsTypes: goodsTypes,
-            conditionSignalsByItemID: conditionSignalsByItemID
+            conditionSignalsByItemID: displayConditionSignalsByItemID
         )
         .map { candidate in
             var updated = candidate
@@ -304,8 +531,8 @@ struct HomeDiscoveryExperience: View {
            let rhsMemberID = rhs.memberID {
             return lhsMemberID == rhsMemberID
         }
-        let lhsMemberName = HomeDiscoveryTitleParser.comparableMemberName(from: lhs.title)
-        let rhsMemberName = HomeDiscoveryTitleParser.comparableMemberName(from: rhs.title)
+        let lhsMemberName = normalizedMasterName(lhs.memberName)
+        let rhsMemberName = normalizedMasterName(rhs.memberName)
         if !lhsMemberName.isEmpty, lhsMemberName == rhsMemberName {
             return true
         }
@@ -316,8 +543,18 @@ struct HomeDiscoveryExperience: View {
         return false
     }
 
+    private func normalizedMasterName(_ value: String?) -> String {
+        value?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .lowercased() ?? ""
+    }
+
     private func matchingTagSet(for item: GoodsItem) -> Set<String> {
         Set(HomeDiscoveryTagFormatter.matchingTagNames(for: item, goodsTypes: goodsTypes))
+    }
+
+    private func havesWishHitCount(for item: GoodsItem) -> Int {
+        displayConditionSignalsByItemID[item.id]?.linkCounts.wishCount ?? 0
     }
 
     private var header: some View {
@@ -337,17 +574,32 @@ struct HomeDiscoveryExperience: View {
 
             Spacer()
 
-            Color.clear
-                .frame(width: 44, height: 44)
+            Button {
+                showsMatchHelp = true
+            } label: {
+                Image(systemName: "questionmark.circle.fill")
+                    .font(.system(size: 24, weight: .bold))
+                    .foregroundStyle(MegrumTheme.lavender)
+                    .frame(width: 44, height: 44)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("マッチ表示のヘルプを開く")
         }
         .padding(.vertical, 2)
     }
 
     private var pinnedHeader: some View {
-        header
-            .padding(.horizontal, 20)
+        VStack(spacing: 0) {
+            header
+                .padding(.horizontal, 20)
+                .padding(.bottom, 8)
+            HomeDiscoveryTabSwitcher(
+                selection: $selectedPrimaryTab,
+                swipeProgress: primaryTabSwipeProgress
+            )
+        }
             .padding(.top, 10)
-            .padding(.bottom, 8)
+            .padding(.bottom, 0)
             .frame(maxWidth: .infinity)
             .background {
                 Rectangle()
@@ -362,8 +614,25 @@ struct HomeDiscoveryExperience: View {
             }
             .zIndex(10)
     }
+
+    private var primaryTabSwipeProgress: CGFloat {
+        let selectedIndex = CGFloat(selectedPrimaryTab.index)
+        let rawProgress = selectedIndex - (primaryTabDragTranslation / max(1, primaryTabPageWidth))
+        let maximumProgress = CGFloat(HomeDiscoveryPrimaryTab.allCases.count - 1)
+        return min(max(rawProgress, 0), maximumProgress)
+    }
+
+    private func primaryTabDragGesture(pageWidth: CGFloat) -> some Gesture {
+        DragGesture(minimumDistance: 1, coordinateSpace: .local)
+            .updating($primaryTabDragTranslation) { value, state, _ in
+                guard abs(value.translation.width) > abs(value.translation.height) else {
+                    return
+                }
+                state = value.translation.width
+            }
+    }
 }
 
 private enum HomeDiscoveryHeaderMetrics {
-    static let contentTopPadding: CGFloat = 72
+    static let contentTopPadding: CGFloat = 122
 }

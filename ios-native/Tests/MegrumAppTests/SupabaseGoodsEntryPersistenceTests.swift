@@ -7,7 +7,22 @@ final class SupabaseGoodsEntryPersistenceTests: XCTestCase {
     func testCreatePhotoURLsUsesUploadedPhotoOnlyWhenPresent() {
         XCTAssertEqual(SupabaseGoodsEntryPersistence.createPhotoURLs(uploadedPhotoURL: nil), [])
         XCTAssertEqual(
-            SupabaseGoodsEntryPersistence.createPhotoURLs(uploadedPhotoURL: "https://example.com/goods.jpg"),
+            SupabaseGoodsEntryPersistence.createPhotoURLs(
+                uploadedPhotoURL: nil,
+                copiedPhotoURLs: [
+                    " https://example.com/copied.jpg ",
+                    "",
+                    "https://example.com/copied.jpg",
+                    "not-a-url"
+                ]
+            ),
+            ["https://example.com/copied.jpg"]
+        )
+        XCTAssertEqual(
+            SupabaseGoodsEntryPersistence.createPhotoURLs(
+                uploadedPhotoURL: "https://example.com/goods.jpg",
+                copiedPhotoURLs: ["https://example.com/copied.jpg"]
+            ),
             ["https://example.com/goods.jpg"]
         )
     }

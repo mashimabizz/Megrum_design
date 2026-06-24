@@ -39,7 +39,7 @@ final class IndividualListingDraftTests: XCTestCase {
             input.note,
             """
             会場で相談
-            交換手段: どちらもOK / 都道府県: 東京都 / 場所メモ: 相談 / 日程: 相談して決める / 送料: 要相談 / 発送目安: 2〜4日以内 / 条件外打診: 可
+            交換手段: 現地交換・郵送OK / 都道府県: 東京都 / 場所メモ: 相談 / 日程: 相談して決める / 送料: 要相談 / 発送目安: 2〜4日以内 / 条件外打診: 可
             """
         )
     }
@@ -66,11 +66,47 @@ final class IndividualListingDraftTests: XCTestCase {
         XCTAssertFalse(draft.acceptsOutsideCondition)
     }
 
+    func testDraftStoresMultipleLocalScheduleCandidates() throws {
+        let groupID = UUID()
+        let goodsTypeID = UUID()
+        let have = GoodsItem(
+            id: UUID(),
+            ownerID: UUID(),
+            groupID: groupID,
+            goodsTypeID: goodsTypeID,
+            title: "譲るトレカ",
+            quantity: 2
+        )
+        let wish = WishItem(
+            id: UUID(),
+            ownerID: UUID(),
+            groupID: groupID,
+            goodsTypeID: goodsTypeID,
+            title: "ほしいトレカ"
+        )
+
+        var draft = IndividualListingDraft(mode: .create(preselectedWishID: wish.id))
+        draft.toggleHave(have.id, maxQuantity: have.quantity)
+        draft.localSchedule = "6/28 18:00、6/29 13:00"
+
+        let input = try XCTUnwrap(draft.createInput(inventory: [have], wishes: [wish]))
+
+        XCTAssertTrue(input.note?.contains("日程: 6/28 18:00、6/29 13:00") == true)
+    }
+
+    func testShippingFeeSelectableCasesKeepOnlyOwnerAndNegotiation() {
+        XCTAssertEqual(
+            IndividualListingShippingFeeDraft.selectableCases.map(\.title),
+            ["自己負担", "要相談"]
+        )
+        XCTAssertEqual(IndividualListingShippingFeeDraft.partner.title, "相手負担")
+    }
+
     func testIndividualListingListPresentationUsesListSpecificLabels() {
         XCTAssertEqual(IndividualListingListPresentation.optionTitle(index: 1), "選択肢1")
         XCTAssertEqual(IndividualListingListPresentation.handoffMethodTitle(for: .local), "現地交換")
         XCTAssertEqual(IndividualListingListPresentation.handoffMethodTitle(for: .mail), "郵送交換")
-        XCTAssertEqual(IndividualListingListPresentation.handoffMethodTitle(for: .both), "現地交換・郵送交換のどちらもOK")
+        XCTAssertEqual(IndividualListingListPresentation.handoffMethodTitle(for: .both), "現地交換・郵送OK")
 
         let listingID = UUID()
         let singleGoodsOption = IndividualListingWishOption(
@@ -100,10 +136,22 @@ final class IndividualListingDraftTests: XCTestCase {
             ],
             logic: .all
         )
-        let cashOption = IndividualListingWishOption(
+        let atLeastGoodsOption = IndividualListingWishOption(
             id: UUID(),
             listingID: listingID,
             position: 4,
+            wishes: [
+                ListingItemQuantity(itemID: UUID(), quantity: 1),
+                ListingItemQuantity(itemID: UUID(), quantity: 1),
+                ListingItemQuantity(itemID: UUID(), quantity: 1)
+            ],
+            logic: .atLeast,
+            minimumCount: 3
+        )
+        let cashOption = IndividualListingWishOption(
+            id: UUID(),
+            listingID: listingID,
+            position: 5,
             wishes: [],
             logic: .one,
             isCashOffer: true,
@@ -113,6 +161,7 @@ final class IndividualListingDraftTests: XCTestCase {
         XCTAssertNil(IndividualListingListPresentation.optionLogicTitle(for: singleGoodsOption))
         XCTAssertEqual(IndividualListingListPresentation.optionLogicTitle(for: multipleGoodsOption), "どれか1つだけ")
         XCTAssertEqual(IndividualListingListPresentation.optionLogicTitle(for: allGoodsOption), "全部ほしい")
+        XCTAssertEqual(IndividualListingListPresentation.optionLogicTitle(for: atLeastGoodsOption), "3個以上")
         XCTAssertNil(IndividualListingListPresentation.optionLogicTitle(for: cashOption))
     }
 
@@ -127,6 +176,7 @@ final class IndividualListingDraftTests: XCTestCase {
 
         let normalized = IndividualListingInputNormalizer.normalized(input)
 
+        XCTAssertTrue(normalized.hasOfferCondition)
         XCTAssertTrue(normalized.hasReceivableCondition)
         XCTAssertEqual(normalized.haveItems, [ListingItemQuantity(itemID: haveID, quantity: 1)])
         XCTAssertEqual(normalized.wishItems, [ListingItemQuantity(itemID: wishID, quantity: 99)])
@@ -177,6 +227,432 @@ final class IndividualListingDraftTests: XCTestCase {
             draft.validationMessage(inventory: inventory, wishes: wishes),
             "両方を「どれか1つだけ」にする場合は、片方を1件にしてください"
         )
+    }
+
+    func testDraftBuildsAtLeastLogicWithSeparateMinimumCount() throws {
+        let groupID = UUID()
+        let goodsTypeID = UUID()
+        let inventory = (1...3).map { index in
+            GoodsItem(
+                id: UUID(),
+                ownerID: UUID(),
+                groupID: groupID,
+                goodsTypeID: goodsTypeID,
+                title: "譲る\(index)",
+                quantity: 1,
+                marketAvailableQuantity: 1
+            )
+        }
+        let wishes = (1...4).map { index in
+            WishItem(
+                id: UUID(),
+                ownerID: UUID(),
+                groupID: groupID,
+                goodsTypeID: goodsTypeID,
+                title: "求める\(index)"
+            )
+        }
+
+        var draft = IndividualListingDraft(mode: .create(preselectedWishID: nil))
+        inventory.forEach { draft.toggleHave($0.id, maxQuantity: 1) }
+        wishes.forEach { draft.toggleWish($0.id) }
+        draft.setHaveLogic(.atLeast)
+        draft.setHaveMinimumCount(2)
+        draft.setWishLogic(.atLeast)
+        draft.setWishMinimumCount(3)
+
+        let input = try XCTUnwrap(draft.createInput(inventory: inventory, wishes: wishes))
+
+        XCTAssertEqual(input.haveLogic, .atLeast)
+        XCTAssertEqual(input.haveMinimumCount, 2)
+        XCTAssertEqual(input.haveItems.map(\.quantity), [1, 1, 1])
+        XCTAssertEqual(input.wishLogic, .atLeast)
+        XCTAssertEqual(input.wishMinimumCount, 3)
+        XCTAssertEqual(input.wishItems.map(\.quantity), [1, 1, 1, 1])
+    }
+
+    func testAtLeastLogicAllowsTwoItemsAndResetsWhenSelectionDropsBelowTwo() {
+        let first = UUID()
+        let second = UUID()
+        let third = UUID()
+        var draft = IndividualListingDraft(mode: .create(preselectedWishID: nil))
+        [first, second, third].forEach { draft.toggleWish($0) }
+        draft.setWishLogic(.atLeast)
+        draft.setWishMinimumCount(3)
+
+        draft.toggleWish(third)
+
+        XCTAssertEqual(draft.wishLogic, .atLeast)
+        XCTAssertEqual(draft.resolvedWishMinimumCount, 2)
+
+        draft.setWishMinimumCount(1)
+
+        XCTAssertEqual(draft.resolvedWishMinimumCount, 1)
+
+        draft.toggleWish(second)
+
+        XCTAssertEqual(draft.wishLogic, .one)
+        XCTAssertEqual(draft.resolvedWishMinimumCount, 1)
+    }
+
+    func testDraftSelectsAllVisibleHavesAndWishes() {
+        let groupID = UUID()
+        let goodsTypeID = UUID()
+        let visibleHaves = (1...2).map { index in
+            GoodsItem(
+                id: UUID(),
+                ownerID: UUID(),
+                groupID: groupID,
+                goodsTypeID: goodsTypeID,
+                title: "譲る\(index)",
+                quantity: index + 1
+            )
+        }
+        let hiddenHave = GoodsItem(
+            id: UUID(),
+            ownerID: UUID(),
+            groupID: groupID,
+            goodsTypeID: goodsTypeID,
+            title: "非表示の譲る",
+            quantity: 1
+        )
+        let visibleWishes = (1...2).map { index in
+            WishItem(
+                id: UUID(),
+                ownerID: UUID(),
+                groupID: groupID,
+                goodsTypeID: goodsTypeID,
+                title: "求める\(index)"
+            )
+        }
+        let hiddenWish = WishItem(
+            id: UUID(),
+            ownerID: UUID(),
+            groupID: groupID,
+            goodsTypeID: goodsTypeID,
+            title: "非表示のWish"
+        )
+        var draft = IndividualListingDraft(mode: .create(preselectedWishID: nil))
+
+        draft.selectAllHaves(visibleHaves)
+        draft.selectAllWishes(visibleWishes)
+
+        XCTAssertEqual(draft.selectedHaveIDs, Set(visibleHaves.map(\.id)))
+        XCTAssertFalse(draft.selectedHaveIDs.contains(hiddenHave.id))
+        XCTAssertEqual(draft.selectedWishIDs, Set(visibleWishes.map(\.id)))
+        XCTAssertFalse(draft.selectedWishIDs.contains(hiddenWish.id))
+        XCTAssertEqual(draft.haveQuantity(for: visibleHaves[1].id), 1)
+        XCTAssertEqual(draft.wishQuantity(for: visibleWishes[0].id), 1)
+        XCTAssertEqual(draft.haveLogic, .atLeast)
+        XCTAssertEqual(draft.resolvedHaveMinimumCount, 1)
+        XCTAssertEqual(draft.wishLogic, .atLeast)
+        XCTAssertEqual(draft.resolvedWishMinimumCount, 1)
+    }
+
+    func testDraftDeselectsOnlyVisibleHavesAndWishes() {
+        let groupID = UUID()
+        let goodsTypeID = UUID()
+        let visibleHave = GoodsItem(
+            id: UUID(),
+            ownerID: UUID(),
+            groupID: groupID,
+            goodsTypeID: goodsTypeID,
+            title: "表示中の譲る",
+            quantity: 1
+        )
+        let hiddenHave = GoodsItem(
+            id: UUID(),
+            ownerID: UUID(),
+            groupID: groupID,
+            goodsTypeID: goodsTypeID,
+            title: "非表示の譲る",
+            quantity: 1
+        )
+        let visibleWish = WishItem(
+            id: UUID(),
+            ownerID: UUID(),
+            groupID: groupID,
+            goodsTypeID: goodsTypeID,
+            title: "表示中のWish"
+        )
+        let hiddenWish = WishItem(
+            id: UUID(),
+            ownerID: UUID(),
+            groupID: groupID,
+            goodsTypeID: goodsTypeID,
+            title: "非表示のWish"
+        )
+        var draft = IndividualListingDraft(mode: .create(preselectedWishID: nil))
+        draft.selectAllHaves([visibleHave, hiddenHave])
+        draft.selectAllWishes([visibleWish, hiddenWish])
+
+        draft.deselectHaves([visibleHave])
+        draft.deselectWishes([visibleWish])
+
+        XCTAssertEqual(draft.selectedHaveIDs, Set([hiddenHave.id]))
+        XCTAssertEqual(draft.selectedWishIDs, Set([hiddenWish.id]))
+        XCTAssertEqual(draft.haveLogic, .all)
+        XCTAssertEqual(draft.wishLogic, .one)
+    }
+
+    func testAtLeastLogicCanUseOneMinimumWithTwoItems() throws {
+        let groupID = UUID()
+        let goodsTypeID = UUID()
+        let inventory = (1...2).map { index in
+            GoodsItem(
+                id: UUID(),
+                ownerID: UUID(),
+                groupID: groupID,
+                goodsTypeID: goodsTypeID,
+                title: "譲る\(index)",
+                quantity: 1
+            )
+        }
+        let wishes = (1...2).map { index in
+            WishItem(
+                id: UUID(),
+                ownerID: UUID(),
+                groupID: groupID,
+                goodsTypeID: goodsTypeID,
+                title: "求める\(index)"
+            )
+        }
+
+        var draft = IndividualListingDraft(mode: .create(preselectedWishID: nil))
+        draft.selectAllHaves(inventory)
+        draft.selectAllWishes(wishes)
+        draft.setHaveMinimumCount(1)
+        draft.setWishMinimumCount(1)
+
+        let input = try XCTUnwrap(draft.createInput(inventory: inventory, wishes: wishes))
+
+        XCTAssertEqual(input.haveLogic, .atLeast)
+        XCTAssertEqual(input.haveMinimumCount, 1)
+        XCTAssertEqual(input.wishLogic, .atLeast)
+        XCTAssertEqual(input.wishMinimumCount, 1)
+    }
+
+    func testSecondSelectionDefaultsToOneOrMoreLogic() {
+        let firstHave = UUID()
+        let secondHave = UUID()
+        let firstWish = UUID()
+        let secondWish = UUID()
+        var draft = IndividualListingDraft(mode: .create(preselectedWishID: nil))
+
+        draft.toggleHave(firstHave)
+        XCTAssertEqual(draft.haveLogic, .all)
+
+        draft.toggleHave(secondHave)
+        XCTAssertEqual(draft.haveLogic, .atLeast)
+        XCTAssertEqual(draft.resolvedHaveMinimumCount, 1)
+
+        draft.toggleWish(firstWish)
+        XCTAssertEqual(draft.wishLogic, .one)
+
+        draft.toggleWish(secondWish)
+        XCTAssertEqual(draft.wishLogic, .atLeast)
+        XCTAssertEqual(draft.resolvedWishMinimumCount, 1)
+    }
+
+    func testHavesStepValidationClearsAfterSelectingHave() {
+        let have = GoodsItem(
+            id: UUID(),
+            ownerID: UUID(),
+            groupID: UUID(),
+            goodsTypeID: UUID(),
+            title: "譲るトレカ",
+            quantity: 2
+        )
+
+        var draft = IndividualListingDraft(mode: .create(preselectedWishID: nil))
+
+        XCTAssertEqual(
+            IndividualListingEditorStepValidationPolicy.message(
+                for: .haves,
+                draft: draft,
+                inventory: [have],
+                wishes: []
+            ),
+            "譲るものを選択してください"
+        )
+
+        draft.toggleHave(have.id, maxQuantity: have.quantity)
+
+        XCTAssertNil(
+            IndividualListingEditorStepValidationPolicy.message(
+                for: .haves,
+                draft: draft,
+                inventory: [have],
+                wishes: []
+            )
+        )
+    }
+
+    func testCashOptionDoesNotBypassHaveStepValidation() {
+        var draft = IndividualListingDraft(mode: .create(preselectedWishID: nil))
+        draft.setOptionKind(.cash)
+        draft.cashAmount = 1_500
+
+        XCTAssertEqual(
+            IndividualListingEditorStepValidationPolicy.message(
+                for: .haves,
+                draft: draft,
+                inventory: [],
+                wishes: []
+            ),
+            "譲るものを選択してください"
+        )
+    }
+
+    func testCashOptionBuildsInputAfterSelectingHave() throws {
+        let have = GoodsItem(
+            id: UUID(),
+            ownerID: UUID(),
+            groupID: UUID(),
+            goodsTypeID: UUID(),
+            title: "譲るトレカ",
+            quantity: 2
+        )
+
+        var draft = IndividualListingDraft(mode: .create(preselectedWishID: nil))
+        draft.toggleHave(have.id, maxQuantity: have.quantity)
+        draft.setOptionKind(.cash)
+        draft.cashPricingMode = .specifiedAmount
+        draft.cashAmount = 1_500
+
+        let input = try XCTUnwrap(draft.createInput(inventory: [have], wishes: []))
+
+        XCTAssertEqual(input.haveItems, [ListingItemQuantity(itemID: have.id, quantity: 1)])
+        XCTAssertTrue(input.isCashOffer)
+        XCTAssertEqual(input.cashAmount, 1_500)
+        XCTAssertTrue(input.wishItems.isEmpty)
+    }
+
+    func testCashOptionCanUseListPriceWithoutAmount() throws {
+        let have = GoodsItem(
+            id: UUID(),
+            ownerID: UUID(),
+            groupID: UUID(),
+            goodsTypeID: UUID(),
+            title: "譲るトレカ",
+            quantity: 2
+        )
+
+        var draft = IndividualListingDraft(mode: .create(preselectedWishID: nil))
+        draft.toggleHave(have.id, maxQuantity: have.quantity)
+        draft.setOptionKind(.cash)
+        draft.cashPricingMode = .listPrice
+        draft.cashAmount = 0
+
+        let input = try XCTUnwrap(draft.createInput(inventory: [have], wishes: []))
+
+        XCTAssertTrue(input.isCashOffer)
+        XCTAssertNil(input.cashAmount)
+        XCTAssertNil(
+            IndividualListingEditorStepValidationPolicy.message(
+                for: .options,
+                draft: draft,
+                inventory: [have],
+                wishes: []
+            )
+        )
+    }
+
+    func testHaveCashOfferCanProceedWithoutGoodsAndStoresSummary() throws {
+        let wish = WishItem(
+            id: UUID(),
+            ownerID: UUID(),
+            groupID: UUID(),
+            goodsTypeID: UUID(),
+            title: "ほしいトレカ"
+        )
+
+        var draft = IndividualListingDraft(mode: .create(preselectedWishID: wish.id))
+        draft.setHaveOfferKind(.cash)
+        draft.haveCashPricingMode = .specifiedAmount
+        draft.haveCashAmount = 1_500
+
+        XCTAssertNil(
+            IndividualListingEditorStepValidationPolicy.message(
+                for: .haves,
+                draft: draft,
+                inventory: [],
+                wishes: [wish]
+            )
+        )
+
+        let input = try XCTUnwrap(draft.createInput(inventory: [], wishes: [wish]))
+        XCTAssertTrue(input.hasOfferCondition)
+        XCTAssertTrue(input.haveItems.isEmpty)
+        XCTAssertEqual(input.wishItems, [ListingItemQuantity(itemID: wish.id, quantity: 1)])
+        XCTAssertTrue(input.note?.contains("譲る金額: ¥1500") == true)
+    }
+
+    func testHaveCashOfferRestoresFromNoteWhenEditing() throws {
+        let listing = IndividualListing(
+            id: UUID(),
+            ownerID: UUID(),
+            haves: [],
+            note: """
+            メモ本文
+            譲る金額: ¥2,000
+            交換手段: 現地交換 / 都道府県: 大阪府 / 場所メモ: 京セラ周辺 / 日程: 6/28 / 条件外打診: 可
+            """,
+            options: []
+        )
+
+        let draft = IndividualListingDraft(mode: .edit(listing))
+
+        XCTAssertEqual(draft.note, "メモ本文")
+        XCTAssertEqual(draft.haveOfferKind, .cash)
+        XCTAssertEqual(draft.haveCashPricingMode, .specifiedAmount)
+        XCTAssertEqual(draft.haveCashAmount, 2_000)
+        XCTAssertEqual(draft.handoffMethod, .local)
+        XCTAssertEqual(draft.localPrefecture, "大阪府")
+    }
+
+    func testCashOptionRequiresAmountOnlyWhenSpecifiedAmount() {
+        var draft = IndividualListingDraft(mode: .create(preselectedWishID: nil))
+        draft.setOptionKind(.cash)
+        draft.cashPricingMode = .specifiedAmount
+        draft.cashAmount = 0
+
+        XCTAssertEqual(
+            IndividualListingEditorStepValidationPolicy.message(
+                for: .options,
+                draft: draft,
+                inventory: [],
+                wishes: []
+            ),
+            "金額を入力してください"
+        )
+
+        draft.cashPricingMode = .listPrice
+
+        XCTAssertNil(
+            IndividualListingEditorStepValidationPolicy.message(
+                for: .options,
+                draft: draft,
+                inventory: [],
+                wishes: []
+            )
+        )
+    }
+
+    func testPreviewListingEditKeepsSelectedHaveStepValid() throws {
+        let listing = try XCTUnwrap(NativePreviewData.listings.first)
+
+        let draft = IndividualListingDraft(mode: .edit(listing))
+
+        XCTAssertNil(
+            IndividualListingEditorStepValidationPolicy.message(
+                for: .haves,
+                draft: draft,
+                inventory: NativePreviewData.inventory,
+                wishes: NativePreviewData.wishes
+            )
+        )
+        XCTAssertEqual(draft.selectedHaveIDs, Set(listing.haves.map(\.itemID)))
     }
 
     func testDraftUsesMarketAvailableQuantityForHaveLimit() throws {
@@ -283,6 +759,99 @@ final class IndividualListingDraftTests: XCTestCase {
         XCTAssertEqual(draft.conditionQuantity, 4)
     }
 
+    func testResetCurrentOptionSelectionClearsOnlyCurrentOptionFields() {
+        let wishID = UUID()
+        let groupID = UUID()
+        let goodsTypeID = UUID()
+        let memberID = UUID()
+        var draft = IndividualListingDraft(mode: .create(preselectedWishID: nil))
+
+        draft.setOptionKind(.wish)
+        draft.toggleWish(wishID)
+        draft.setWishQuantity(wishID, quantity: 3)
+        draft.resetCurrentOptionSelection()
+
+        XCTAssertTrue(draft.selectedWishIDs.isEmpty)
+        XCTAssertTrue(draft.wishQuantities.isEmpty)
+
+        draft.setOptionKind(.condition)
+        draft.setConditionGroupID(groupID)
+        draft.conditionGoodsTypeID = goodsTypeID
+        draft.toggleConditionMember(memberID)
+        draft.setExcludesSelectedConditionMembers(true)
+        draft.toggleConditionTag("会場限定")
+        draft.setConditionQuantity(4)
+        draft.resetCurrentOptionSelection()
+
+        XCTAssertNil(draft.conditionGroupID)
+        XCTAssertNil(draft.conditionGoodsTypeID)
+        XCTAssertTrue(draft.conditionMemberIDs.isEmpty)
+        XCTAssertFalse(draft.excludesSelectedConditionMembers)
+        XCTAssertTrue(draft.conditionTagNames.isEmpty)
+        XCTAssertEqual(draft.conditionQuantity, 1)
+
+        draft.setOptionKind(.cash)
+        draft.cashPricingMode = .specifiedAmount
+        draft.cashAmount = 1_800
+        draft.resetCurrentOptionSelection()
+
+        XCTAssertEqual(draft.cashPricingMode, .listPrice)
+        XCTAssertEqual(draft.cashAmount, 1_100)
+    }
+
+    func testEditorStepOrderMatchesTappableProgressDots() {
+        XCTAssertEqual(
+            IndividualListingEditorStep.allCases.map(\.title),
+            ["譲るものを選ぶ", "欲しいものを登録", "交換条件を設定する"]
+        )
+        XCTAssertEqual(IndividualListingEditorStep.allCases.map(\.rawValue), [1, 2, 3])
+    }
+
+    func testOptionReviewReducerDeletesAndRetitlesStagedOptions() {
+        let first = IndividualListingOptionReviewItem(title: "選択肢1", kind: "Wish", detail: "サナ")
+        let secondID = UUID()
+        let second = IndividualListingOptionReviewItem(id: secondID, title: "選択肢2", kind: "定価", detail: "¥1,500")
+        let third = IndividualListingOptionReviewItem(title: "選択肢3", kind: "条件", detail: "TWICE")
+
+        let reduced = IndividualListingOptionReviewReducer.deleting(
+            itemID: secondID,
+            from: [first, second, third]
+        )
+
+        XCTAssertEqual(reduced.map(\.title), ["選択肢1", "選択肢2"])
+        XCTAssertEqual(reduced.map(\.kind), ["Wish", "条件"])
+        XCTAssertEqual(reduced.map(\.source), [.staged, .staged])
+    }
+
+    func testOptionReviewToastMessageIncludesAddedOptionDetail() {
+        let item = IndividualListingOptionReviewItem(
+            title: "選択肢1",
+            kind: "定価",
+            detail: "¥1,500"
+        )
+
+        XCTAssertEqual(item.addedToastMessage, "選択肢1（定価：¥1,500）を追加しました")
+    }
+
+    func testBottomBarPresentationKeepsAddOptionTitleStable() {
+        XCTAssertEqual(IndividualListingEditorBottomBarPresentation.addOptionTitle, "選択肢に追加")
+        XCTAssertEqual(IndividualListingEditorBottomBarPresentation.selectAllVisibleTitle, "すべて登録")
+        XCTAssertEqual(IndividualListingEditorBottomBarPresentation.deselectAllVisibleTitle, "すべて解除")
+        XCTAssertEqual(IndividualListingEditorBottomBarPresentation.selectedCountTitle(12), "選択中12件")
+        XCTAssertEqual(ListingLogic.minimumCountTitle(1), "1個以上")
+    }
+
+    func testIndividualListingEditorSaveFailureCopyIsVisible() {
+        XCTAssertEqual(
+            IndividualListingEditorSaveFailurePresentation.title,
+            "個別募集を保存できませんでした"
+        )
+        XCTAssertEqual(
+            IndividualListingEditorSaveFailurePresentation.fallbackMessage,
+            "通信状況を確認してからもう一度お試しください。"
+        )
+    }
+
     func testConditionTagBuilderDeduplicatesAndFiltersByGroup() {
         let targetGroupID = UUID()
         let otherGroupID = UUID()
@@ -325,6 +894,59 @@ final class IndividualListingDraftTests: XCTestCase {
         XCTAssertEqual(builder.candidateNames(), ["会場限定", "終演後OK", "ファンミ"])
         XCTAssertEqual(builder.previewItemsByTag()["会場限定"]?.count, 2)
         XCTAssertNil(builder.previewItemsByTag()["別タグ"])
+    }
+
+    func testIndividualListingSelectionFilterMatchesGoodsAndWishes() {
+        let groupID = UUID()
+        let otherGroupID = UUID()
+        let goodsTypeID = UUID()
+        let otherGoodsTypeID = UUID()
+        let filter = IndividualListingSelectionFilter(
+            searchText: "会場",
+            groupID: groupID,
+            goodsTypeID: goodsTypeID,
+            tagNames: ["ファンミ"]
+        )
+        let matchingGoods = GoodsItem(
+            id: UUID(),
+            ownerID: UUID(),
+            groupID: groupID,
+            goodsTypeID: goodsTypeID,
+            title: "トレカ",
+            tags: [
+                GoodsTag(id: UUID(), name: "会場限定"),
+                GoodsTag(id: UUID(), name: "ファンミ")
+            ]
+        )
+        let mismatchedGoods = GoodsItem(
+            id: UUID(),
+            ownerID: UUID(),
+            groupID: otherGroupID,
+            goodsTypeID: goodsTypeID,
+            title: "会場 トレカ",
+            tags: [GoodsTag(id: UUID(), name: "ファンミ")]
+        )
+        let matchingWish = WishItem(
+            id: UUID(),
+            ownerID: UUID(),
+            groupID: groupID,
+            goodsTypeID: goodsTypeID,
+            title: "会場 トレカ",
+            tags: [GoodsTag(id: UUID(), name: "ファンミ")]
+        )
+        let mismatchedWish = WishItem(
+            id: UUID(),
+            ownerID: UUID(),
+            groupID: groupID,
+            goodsTypeID: otherGoodsTypeID,
+            title: "会場 トレカ",
+            tags: [GoodsTag(id: UUID(), name: "ファンミ")]
+        )
+
+        XCTAssertTrue(filter.matches(matchingGoods))
+        XCTAssertFalse(filter.matches(mismatchedGoods))
+        XCTAssertTrue(filter.matches(matchingWish))
+        XCTAssertFalse(filter.matches(mismatchedWish))
     }
 
     func testEditDraftBuildsLocalUpdatedListing() throws {
@@ -383,7 +1005,7 @@ final class IndividualListingDraftTests: XCTestCase {
         XCTAssertEqual(updated.status, .active)
         XCTAssertEqual(
             updated.note,
-            "交換手段: どちらもOK / 都道府県: 東京都 / 場所メモ: 相談 / 日程: 相談して決める / 送料: 要相談 / 発送目安: 2〜4日以内 / 条件外打診: 可"
+            "交換手段: 現地交換・郵送OK / 都道府県: 東京都 / 場所メモ: 相談 / 日程: 相談して決める / 送料: 要相談 / 発送目安: 2〜4日以内 / 条件外打診: 可"
         )
         XCTAssertEqual(updated.options.first?.id, optionID)
         XCTAssertEqual(updated.options.first?.wishes, [ListingItemQuantity(itemID: wish.id, quantity: 3)])

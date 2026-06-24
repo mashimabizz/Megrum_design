@@ -10,7 +10,7 @@ struct HomeCashAmountEntryCard: View {
         VStack(alignment: .leading, spacing: 10) {
             HomeSheetSectionTitle(
                 systemName: "yensign.circle",
-                title: "定価",
+                title: "渡す金額を入力",
                 trailing: suggestedAmount.map { TradeAmountFormatter.fixedPrice(amount: $0) }
             )
 
@@ -18,15 +18,7 @@ struct HomeCashAmountEntryCard: View {
                 Text("¥")
                     .font(.system(size: 20, weight: .black, design: .rounded))
                     .foregroundStyle(MegrumTheme.lavender)
-                TextField("金額を入力", text: $amountText)
-                    .font(.system(size: 18, weight: .black, design: .rounded))
-                    .foregroundStyle(MegrumTheme.ink)
-                    .onChange(of: amountText) { _, newValue in
-                        let digits = newValue.filter { $0.isNumber }
-                        if digits != newValue {
-                            amountText = digits
-                        }
-                    }
+                amountField
             }
             .padding(.horizontal, 14)
             .padding(.vertical, 12)
@@ -36,6 +28,33 @@ struct HomeCashAmountEntryCard: View {
                     .stroke(MegrumTheme.lavender.opacity(0.2), lineWidth: 1)
             }
         }
+    }
+
+    @ViewBuilder
+    private var amountField: some View {
+        let field = TextField("金額を入力", text: $amountText)
+            .font(.system(size: 18, weight: .black, design: .rounded))
+            .foregroundStyle(MegrumTheme.ink)
+            .onChange(of: amountText) { _, newValue in
+                normalizeAmountText(newValue)
+            }
+            .onAppear {
+                normalizeAmountText(amountText)
+            }
+
+        #if os(iOS)
+        field.keyboardType(.numberPad)
+        #else
+        field
+        #endif
+    }
+
+    private func normalizeAmountText(_ text: String) {
+        let normalizedText = TradeAmountFormatter.cashInputText(from: text)
+        guard normalizedText != amountText else {
+            return
+        }
+        amountText = normalizedText
     }
 }
 

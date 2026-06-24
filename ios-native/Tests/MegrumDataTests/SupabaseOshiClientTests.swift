@@ -35,6 +35,82 @@ final class SupabaseOshiClientTests: XCTestCase {
         XCTAssertEqual(request.value(forHTTPHeaderField: "Prefer"), "return=minimal")
     }
 
+    func testBuildsCreateOshiRequest() throws {
+        let client = SupabaseOshiClient(configuration: configuration)
+        let userID = UUID(uuidString: "11111111-1111-1111-1111-111111111111")!
+        let genreID = UUID(uuidString: "22222222-2222-2222-2222-222222222222")!
+
+        let request = try client.makeCreateOshiRequest(
+            userID: userID,
+            input: OshiRequestCreateInput(
+                requestedName: "新しい推し",
+                requestedKind: .group,
+                requestedGenreID: genreID,
+                note: "管理人確認用"
+            )
+        )
+        let body = try XCTUnwrap(request.httpBody)
+        let json = try XCTUnwrap(JSONSerialization.jsonObject(with: body) as? [[String: Any]])
+
+        XCTAssertEqual(request.url?.absoluteString, "https://example.supabase.co/rest/v1/oshi_requests?select=id")
+        XCTAssertEqual(request.httpMethod, "POST")
+        XCTAssertEqual(request.value(forHTTPHeaderField: "Prefer"), "return=representation")
+        XCTAssertEqual(json.first?["user_id"] as? String, "11111111-1111-1111-1111-111111111111")
+        XCTAssertEqual(json.first?["requested_name"] as? String, "新しい推し")
+        XCTAssertEqual(json.first?["requested_kind"] as? String, "group")
+        XCTAssertEqual(json.first?["requested_genre_id"] as? String, "22222222-2222-2222-2222-222222222222")
+        XCTAssertEqual(json.first?["note"] as? String, "管理人確認用")
+    }
+
+    func testBuildsCreateCharacterRequestForMasterGroup() throws {
+        let client = SupabaseOshiClient(configuration: configuration)
+        let userID = UUID(uuidString: "11111111-1111-1111-1111-111111111111")!
+        let groupID = UUID(uuidString: "33333333-3333-3333-3333-333333333333")!
+
+        let request = try client.makeCreateCharacterRequest(
+            userID: userID,
+            input: CharacterRequestCreateInput(
+                groupID: groupID,
+                requestedName: "ミナ",
+                note: "メンバー追加"
+            )
+        )
+        let body = try XCTUnwrap(request.httpBody)
+        let json = try XCTUnwrap(JSONSerialization.jsonObject(with: body) as? [[String: Any]])
+
+        XCTAssertEqual(request.url?.absoluteString, "https://example.supabase.co/rest/v1/character_requests?select=id")
+        XCTAssertEqual(request.httpMethod, "POST")
+        XCTAssertEqual(request.value(forHTTPHeaderField: "Prefer"), "return=representation")
+        XCTAssertEqual(json.first?["user_id"] as? String, "11111111-1111-1111-1111-111111111111")
+        XCTAssertEqual(json.first?["group_id"] as? String, "33333333-3333-3333-3333-333333333333")
+        XCTAssertNil(json.first?["oshi_request_id"] as? String)
+        XCTAssertEqual(json.first?["requested_name"] as? String, "ミナ")
+        XCTAssertEqual(json.first?["note"] as? String, "メンバー追加")
+    }
+
+    func testBuildsCreateCharacterRequestForPendingOshiRequest() throws {
+        let client = SupabaseOshiClient(configuration: configuration)
+        let userID = UUID(uuidString: "11111111-1111-1111-1111-111111111111")!
+        let oshiRequestID = UUID(uuidString: "44444444-4444-4444-4444-444444444444")!
+
+        let request = try client.makeCreateCharacterRequest(
+            userID: userID,
+            input: CharacterRequestCreateInput(
+                groupID: nil,
+                oshiRequestID: oshiRequestID,
+                requestedName: "新メンバー"
+            )
+        )
+        let body = try XCTUnwrap(request.httpBody)
+        let json = try XCTUnwrap(JSONSerialization.jsonObject(with: body) as? [[String: Any]])
+
+        XCTAssertEqual(request.url?.absoluteString, "https://example.supabase.co/rest/v1/character_requests?select=id")
+        XCTAssertEqual(request.httpMethod, "POST")
+        XCTAssertNil(json.first?["group_id"] as? String)
+        XCTAssertEqual(json.first?["oshi_request_id"] as? String, "44444444-4444-4444-4444-444444444444")
+        XCTAssertEqual(json.first?["requested_name"] as? String, "新メンバー")
+    }
+
     func testBuildsLoadUserSelectionsRequest() throws {
         let client = SupabaseOshiClient(configuration: configuration)
         let userID = UUID(uuidString: "11111111-1111-1111-1111-111111111111")!

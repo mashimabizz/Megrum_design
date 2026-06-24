@@ -16,7 +16,10 @@ final class SupabaseGoodsEntryPersistence: @unchecked Sendable {
         return try await goodsInventoryClient.createGoodsEntry(
             userID: userID,
             input: input,
-            photoURLs: Self.createPhotoURLs(uploadedPhotoURL: uploadedPhotoURL)
+            photoURLs: Self.createPhotoURLs(
+                uploadedPhotoURL: uploadedPhotoURL,
+                copiedPhotoURLs: input.photoURLs
+            )
         )
     }
 
@@ -33,8 +36,25 @@ final class SupabaseGoodsEntryPersistence: @unchecked Sendable {
         throw MegrumRepositoryError.unsupportedMutation
     }
 
-    static func createPhotoURLs(uploadedPhotoURL: String?) -> [String] {
-        uploadedPhotoURL.map { [$0] } ?? []
+    static func createPhotoURLs(uploadedPhotoURL: String?, copiedPhotoURLs: [String] = []) -> [String] {
+        if let uploadedPhotoURL {
+            return [uploadedPhotoURL]
+        }
+
+        return copiedPhotoURLs.reduce(into: []) { result, raw in
+            let normalized = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard result.count < 6,
+                  let url = URL(string: normalized),
+                  url.scheme?.isEmpty == false,
+                  url.host?.isEmpty == false
+            else {
+                return
+            }
+            let value = url.absoluteString
+            if !result.contains(value) {
+                result.append(value)
+            }
+        }
     }
 
     static func updateInput(

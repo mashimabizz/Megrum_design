@@ -4,6 +4,8 @@ import MegrumData
 import XCTest
 
 final class SupabaseGoodsInventoryClientTests: XCTestCase {
+    private let goodsInventorySelect = "id,user_id,kind,status,group_id,character_id,goods_type_id,title,photo_urls,quantity,exchange_type,group:groups_master(name),character:characters_master(name),goods_type:goods_types_master(name)"
+
     func testBuildsGoodsTypesRequest() throws {
         let client = SupabaseGoodsInventoryClient(configuration: configuration)
 
@@ -31,7 +33,7 @@ final class SupabaseGoodsInventoryClientTests: XCTestCase {
         let body = try XCTUnwrap(request.httpBody)
         let json = try XCTUnwrap(JSONSerialization.jsonObject(with: body) as? [[String: Any]])
 
-        XCTAssertEqual(request.url?.absoluteString, "https://example.supabase.co/rest/v1/goods_inventory?select=id,user_id,kind,status,group_id,character_id,goods_type_id,title,photo_urls,quantity,locked_qty,market_available_qty,exchange_type")
+        XCTAssertEqual(request.url?.absoluteString, "https://example.supabase.co/rest/v1/goods_inventory?select=\(goodsInventorySelect)")
         XCTAssertEqual(request.httpMethod, "POST")
         XCTAssertEqual(request.value(forHTTPHeaderField: "Prefer"), "resolution=merge-duplicates,return=representation")
         XCTAssertEqual(json.first?["user_id"] as? String, "11111111-1111-1111-1111-111111111111")
@@ -64,7 +66,7 @@ final class SupabaseGoodsInventoryClientTests: XCTestCase {
         XCTAssertEqual(json.first?["kind"] as? String, "wanted")
         XCTAssertNil(json.first?["condition"])
         XCTAssertEqual(json.first?["priority"] as? String, "second")
-        XCTAssertEqual(json.first?["flex_level"] as? String, "normal")
+        XCTAssertNil(json.first?["flex_level"])
         XCTAssertEqual(json.first?["exchange_type"] as? String, "any")
     }
 
@@ -114,7 +116,7 @@ final class SupabaseGoodsInventoryClientTests: XCTestCase {
         let url = try XCTUnwrap(request.url?.absoluteString)
 
         XCTAssertEqual(request.httpMethod, "GET")
-        XCTAssertTrue(url.hasPrefix("https://example.supabase.co/rest/v1/goods_inventory?select=id,user_id,kind,status,group_id,character_id,goods_type_id,title,photo_urls,quantity,locked_qty,market_available_qty"))
+        XCTAssertTrue(url.hasPrefix("https://example.supabase.co/rest/v1/goods_inventory?select=id,user_id,kind,status,group_id,character_id,goods_type_id,title,photo_urls,quantity"))
         XCTAssertTrue(url.contains("kind=eq.for_trade"))
         XCTAssertTrue(url.contains("status=in.(active,reserved)"))
         XCTAssertTrue(url.contains("market_available_qty=gt.0"))
@@ -127,6 +129,28 @@ final class SupabaseGoodsInventoryClientTests: XCTestCase {
         XCTAssertTrue(url.contains("goods_type_id=eq.33333333-3333-3333-3333-333333333333"))
     }
 
+    func testBuildsLegacySearchGoodsRequestWithQuantityAvailability() throws {
+        let client = SupabaseGoodsInventoryClient(configuration: configuration)
+        let viewerID = UUID(uuidString: "11111111-1111-1111-1111-111111111111")!
+        let input = GoodsSearchInput(
+            query: "",
+            goodsTypeID: UUID(uuidString: "33333333-3333-3333-3333-333333333333")!,
+            limit: 25
+        )
+
+        let request = try client.makeLegacySearchGoodsRequest(viewerID: viewerID, input: input)
+        let url = try XCTUnwrap(request.url?.absoluteString)
+
+        XCTAssertEqual(request.httpMethod, "GET")
+        XCTAssertTrue(url.hasPrefix("https://example.supabase.co/rest/v1/goods_inventory?select=id,user_id,kind,status,group_id,character_id,goods_type_id,title,photo_urls,quantity,exchange_type"))
+        XCTAssertTrue(url.contains("kind=eq.for_trade"))
+        XCTAssertTrue(url.contains("status=in.(active,reserved)"))
+        XCTAssertTrue(url.contains("quantity=gt.0"))
+        XCTAssertFalse(url.contains("market_available_qty=gt.0"))
+        XCTAssertTrue(url.contains("user_id=neq.11111111-1111-1111-1111-111111111111"))
+        XCTAssertTrue(url.contains("goods_type_id=eq.33333333-3333-3333-3333-333333333333"))
+    }
+
     func testBuildsLoadPublicTradeGoodsRequest() throws {
         let client = SupabaseGoodsInventoryClient(configuration: configuration)
         let userID = UUID(uuidString: "22222222-2222-2222-2222-222222222222")!
@@ -135,10 +159,28 @@ final class SupabaseGoodsInventoryClientTests: XCTestCase {
         let url = try XCTUnwrap(request.url?.absoluteString)
 
         XCTAssertEqual(request.httpMethod, "GET")
-        XCTAssertTrue(url.hasPrefix("https://example.supabase.co/rest/v1/goods_inventory?select=id,user_id,kind,status,group_id,character_id,goods_type_id,title,photo_urls,quantity,locked_qty,market_available_qty"))
+        XCTAssertTrue(url.hasPrefix("https://example.supabase.co/rest/v1/goods_inventory?select=id,user_id,kind,status,group_id,character_id,goods_type_id,title,photo_urls,quantity"))
         XCTAssertTrue(url.contains("kind=eq.for_trade"))
         XCTAssertTrue(url.contains("status=in.(active,reserved)"))
         XCTAssertTrue(url.contains("market_available_qty=gt.0"))
+        XCTAssertTrue(url.contains("user_id=eq.22222222-2222-2222-2222-222222222222"))
+        XCTAssertTrue(url.contains("order=updated_at.desc"))
+        XCTAssertTrue(url.contains("limit=24"))
+    }
+
+    func testBuildsLegacyLoadPublicTradeGoodsRequestWithQuantityAvailability() throws {
+        let client = SupabaseGoodsInventoryClient(configuration: configuration)
+        let userID = UUID(uuidString: "22222222-2222-2222-2222-222222222222")!
+
+        let request = try client.makeLegacyLoadPublicTradeGoodsRequest(userID: userID, limit: 24)
+        let url = try XCTUnwrap(request.url?.absoluteString)
+
+        XCTAssertEqual(request.httpMethod, "GET")
+        XCTAssertTrue(url.hasPrefix("https://example.supabase.co/rest/v1/goods_inventory?select=id,user_id,kind,status,group_id,character_id,goods_type_id,title,photo_urls,quantity,exchange_type"))
+        XCTAssertTrue(url.contains("kind=eq.for_trade"))
+        XCTAssertTrue(url.contains("status=in.(active,reserved)"))
+        XCTAssertTrue(url.contains("quantity=gt.0"))
+        XCTAssertFalse(url.contains("market_available_qty=gt.0"))
         XCTAssertTrue(url.contains("user_id=eq.22222222-2222-2222-2222-222222222222"))
         XCTAssertTrue(url.contains("order=updated_at.desc"))
         XCTAssertTrue(url.contains("limit=24"))
@@ -156,7 +198,7 @@ final class SupabaseGoodsInventoryClientTests: XCTestCase {
         XCTAssertEqual(request.httpMethod, "PATCH")
         XCTAssertEqual(
             request.url?.absoluteString,
-            "https://example.supabase.co/rest/v1/goods_inventory?select=id,user_id,kind,status,group_id,character_id,goods_type_id,title,photo_urls,quantity,locked_qty,market_available_qty,exchange_type&id=eq.44444444-4444-4444-4444-444444444444&user_id=eq.11111111-1111-1111-1111-111111111111&status=neq.traded"
+            "https://example.supabase.co/rest/v1/goods_inventory?select=\(goodsInventorySelect)&id=eq.44444444-4444-4444-4444-444444444444&user_id=eq.11111111-1111-1111-1111-111111111111&status=neq.traded"
         )
         XCTAssertEqual(request.value(forHTTPHeaderField: "Prefer"), "return=representation")
         XCTAssertEqual(json["status"] as? String, "archived")
@@ -187,7 +229,7 @@ final class SupabaseGoodsInventoryClientTests: XCTestCase {
         XCTAssertEqual(request.httpMethod, "PATCH")
         XCTAssertEqual(
             request.url?.absoluteString,
-            "https://example.supabase.co/rest/v1/goods_inventory?select=id,user_id,kind,status,group_id,character_id,goods_type_id,title,photo_urls,quantity,locked_qty,market_available_qty,exchange_type&id=eq.44444444-4444-4444-4444-444444444444&user_id=eq.11111111-1111-1111-1111-111111111111&status=neq.traded"
+            "https://example.supabase.co/rest/v1/goods_inventory?select=\(goodsInventorySelect)&id=eq.44444444-4444-4444-4444-444444444444&user_id=eq.11111111-1111-1111-1111-111111111111&status=neq.traded"
         )
         XCTAssertEqual(request.value(forHTTPHeaderField: "Prefer"), "return=representation")
         XCTAssertEqual(json["title"] as? String, "ラントレ B")

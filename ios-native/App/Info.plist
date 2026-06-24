@@ -41,6 +41,32 @@
 	<false/>
 	<key>MegrumAuthEmailRedirectURL</key>
 	<string>$(MEGRUM_AUTH_EMAIL_REDIRECT_URL)</string>
+	<key>MegrumAdMobAppID</key>
+	<string>$(MEGRUM_ADMOB_APP_ID)</string>
+	<key>MegrumAdMobHomeBannerUnitID</key>
+	<string>$(MEGRUM_ADMOB_HOME_BANNER_UNIT_ID)</string>
+	<key>MegrumAdMobHomeInterstitialUnitID</key>
+	<string>$(MEGRUM_ADMOB_HOME_INTERSTITIAL_UNIT_ID)</string>
+	<key>MegrumAdMobMeguriInterstitialUnitID</key>
+	<string>$(MEGRUM_ADMOB_MEGURI_INTERSTITIAL_UNIT_ID)</string>
+	<key>MegrumAdMobProfileBannerUnitID</key>
+	<string>$(MEGRUM_ADMOB_PROFILE_BANNER_UNIT_ID)</string>
+	<key>MegrumAdMobSearchBannerUnitID</key>
+	<string>$(MEGRUM_ADMOB_SEARCH_BANNER_UNIT_ID)</string>
+	<key>MegrumAdMobSearchInterstitialUnitID</key>
+	<string>$(MEGRUM_ADMOB_SEARCH_INTERSTITIAL_UNIT_ID)</string>
+	<key>MegrumAdMobTradesBannerUnitID</key>
+	<string>$(MEGRUM_ADMOB_TRADES_BANNER_UNIT_ID)</string>
+	<key>MegrumAdMobWishBannerUnitID</key>
+	<string>$(MEGRUM_ADMOB_WISH_BANNER_UNIT_ID)</string>
+	<key>MegrumAdMobWishInterstitialUnitID</key>
+	<string>$(MEGRUM_ADMOB_WISH_INTERSTITIAL_UNIT_ID)</string>
+	<key>MegrumAdPlaceholdersEnabled</key>
+	<string>$(MEGRUM_AD_PLACEHOLDERS_ENABLED)</string>
+	<key>MegrumAdProvider</key>
+	<string>$(MEGRUM_AD_PROVIDER)</string>
+	<key>MegrumAdsEnabled</key>
+	<string>$(MEGRUM_ADS_ENABLED)</string>
 	<key>MegrumSupabasePublishableKey</key>
 	<string>$(MEGRUM_SUPABASE_PUBLISHABLE_KEY)</string>
 	<key>MegrumSupabaseURL</key>

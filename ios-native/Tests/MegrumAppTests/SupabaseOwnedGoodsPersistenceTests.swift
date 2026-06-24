@@ -1,4 +1,5 @@
 @testable import MegrumApp
+import MegrumCore
 import XCTest
 
 final class SupabaseOwnedGoodsPersistenceTests: XCTestCase {
@@ -40,6 +41,22 @@ final class SupabaseOwnedGoodsPersistenceTests: XCTestCase {
         XCTAssertEqual(items[0].marketAvailableQuantity, 1)
     }
 
+    func testGoodsItemsApplyLoadedTags() {
+        let row = makeRow(
+            kind: "for_trade",
+            status: "active",
+            title: "ミナ トレカ"
+        )
+        let tag = GoodsTag(
+            id: UUID(uuidString: "00000000-0000-0000-0000-000000000956")!,
+            name: "会場限定"
+        )
+
+        let items = SupabaseOwnedGoodsPersistence.goodsItems(from: [row], tagMap: [row.id: [tag]])
+
+        XCTAssertEqual(items[0].tags, [tag])
+    }
+
     func testWishItemsMapRowsThroughWishItemProjection() {
         let row = makeRow(
             kind: "wanted",
@@ -57,16 +74,64 @@ final class SupabaseOwnedGoodsPersistenceTests: XCTestCase {
         XCTAssertEqual(wishes[0].quantity, 3)
     }
 
+    func testWishItemsApplyLoadedTags() {
+        let row = makeRow(
+            kind: "wanted",
+            status: "active",
+            title: "サナ ペンライト"
+        )
+        let tag = GoodsTag(
+            id: UUID(uuidString: "00000000-0000-0000-0000-000000000957")!,
+            name: "缶バッジ"
+        )
+
+        let wishes = SupabaseOwnedGoodsPersistence.wishItems(from: [row], tagMap: [row.id: [tag]])
+
+        XCTAssertEqual(wishes[0].tags, [tag])
+    }
+
+    func testGoodsTagQueryItemsSortInventoryIDsAndKeepCreatedOrder() {
+        let items = SupabaseOwnedGoodsPersistence.goodsTagQueryItems(inventoryIDs: [
+            UUID(uuidString: "00000000-0000-0000-0000-000000000959")!,
+            UUID(uuidString: "00000000-0000-0000-0000-000000000958")!
+        ])
+
+        XCTAssertEqual(items.map(\.name), ["inventory_id", "order"])
+        XCTAssertEqual(
+            items.map(\.value),
+            [
+                "in.(00000000-0000-0000-0000-000000000958,00000000-0000-0000-0000-000000000959)",
+                "created_at.asc"
+            ]
+        )
+    }
+
+    func testGoodsTagMapPreservesRowsByInventory() {
+        let inventoryID = UUID(uuidString: "00000000-0000-0000-0000-000000000952")!
+        let tagID = UUID(uuidString: "00000000-0000-0000-0000-000000000956")!
+        let rows = [
+            OwnedGoodsInventoryTagRow(
+                inventoryId: inventoryID,
+                tag: OwnedGoodsTagRow(id: tagID, label: "会場限定")
+            )
+        ]
+
+        let tagMap = SupabaseOwnedGoodsPersistence.goodsTagMap(from: rows)
+
+        XCTAssertEqual(tagMap[inventoryID], [GoodsTag(id: tagID, name: "会場限定")])
+    }
+
     private func makeRow(
         kind: String?,
         status: String?,
         title: String,
+        id: UUID = UUID(uuidString: "00000000-0000-0000-0000-000000000952")!,
         quantity: Int? = nil,
         lockedQty: Int? = nil,
         marketAvailableQty: Int? = nil
     ) -> GoodsInventoryRow {
         GoodsInventoryRow(
-            id: UUID(uuidString: "00000000-0000-0000-0000-000000000952")!,
+            id: id,
             userId: userID,
             kind: kind,
             status: status,

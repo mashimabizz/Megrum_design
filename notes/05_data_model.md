@@ -3,8 +3,8 @@
 > **目的**：Megrum の全エンティティのDBスキーマ設計と、状態・マッチング・取引のデータフロー定義。
 > 実装の正解集。`09_state_machines.md` と完全に整合させ、`10_glossary.md` の用語を使う。
 
-最終更新: 2026-06-14
-ステータス: Draft v2.37（iter616 推し文脈に閉じたメンバー候補付けを反映）
+最終更新: 2026-06-24
+ステータス: Draft v2.43（iter788 個別募集の最低数条件を2件以上・1個以上へ拡張）
 
 ## 最新化履歴
 
@@ -49,6 +49,12 @@
 | **v2.35** | **2026-06-14** | **iter613 反映（顔検出・メンバー候補付け用に `member_face_profiles` / `face_uploaded_images` / `detected_faces` / `face_match_candidates` / `face_match_corrections` を追加）** |
 | **v2.36** | **2026-06-14** | **iter614 反映（画像種別、対象種別、認識方式、汎用品質、profile_type を追加し、実写/アニメ/イラスト/漫画の候補付けを同じ保存形式で扱う）** |
 | **v2.37** | **2026-06-14** | **iter616 反映（グッズ登録時のメンバー候補付けを選択済み `groups_master` 文脈へ限定し、`kind='solo'` はL2指定不要として扱う）** |
+| **v2.38** | **2026-06-23** | **iter731 反映（Swift Native版が `user_entitlements` から `premium` / `meguri_plus` を読み、広告非表示や有料権限をサーバー集約値で判定する境界を追加）** |
+| **v2.39** | **2026-06-24** | **iter756 反映（`users.is_test_account` を追加し、ホーム候補から検証アカウントを除外。`goods_inventory.title` をdeprecated化し、候補表示はL1/L2/グッズ種別/タグのマスタを正とする）** |
+| **v2.40** | **2026-06-24** | **iter763 反映（`proposals.cash_offer` を片側が金額指定・片側がグッズの両方向に対応。`sender_have_ids` または `receiver_have_ids` のどちらか一方が空の金額打診を許容）** |
+| **v2.41** | **2026-06-24** | **iter765 反映（`proposals.cash_amount_side` を追加し、金額指定が `sender` / `receiver` のどちら側かを保存。金額指定側にもグッズを同時に含められるようCHECKを更新）** |
+| **v2.42** | **2026-06-24** | **iter787 反映（個別募集に `at_least` ロジックを追加し、譲側 `have_min_count` / 求側 `listing_wish_options.min_count` で「何個以上」を保存。既存 qty は各アイテム数量として維持）** |
+| **v2.43** | **2026-06-24** | **iter788 反映（`at_least` を2件以上選択時から利用可能にし、最低数は1〜選択件数として保存。選択画面のフィルタ後全選択ボタンを追加）** |
 | **v2.20** | **2026-05-29** | **iter168.90 反映（`search_query_logs` と人気検索RPCを追加。検索結果はマッチ分類つきグッズパネルで表示）** |
 | **v2.21** | **2026-05-30** | **iter168.97 反映（`schedules.place_name` 追加。合意時に `both` を単一手段へ固定し、現地交換の複数候補は1件へ固定する運用を追記）** |
 
@@ -264,6 +270,7 @@ iter24 で「推し2階層」（グループ/作品 → メンバー/キャラ�
 | `age` | integer nullable | プロフィール表示用の任意年齢。1〜120の範囲制約。未設定ならUIでは表示しない |
 | `payment_methods` | text[] | 支払い条件の自己申告配列。`bank_transfer` / `paypay` / `cash_exchange` / `other` |
 | `payment_note` | text nullable | 支払い条件のその他表示メモ。口座番号などの機微情報は入れない |
+| `is_test_account` | boolean | 検証用アカウント印。通常ユーザー向けのホーム候補・検索候補から除外する |
 | `account_status` | text | `registered` / `verified` / `onboarding` / `active` / `suspended` / `deletion_requested` / `deleted` (09と一致) |
 | `email_verified_at` | timestamptz nullable | |
 | `deletion_requested_at` | timestamptz nullable | 30日猶予の起点 |
@@ -643,6 +650,8 @@ iter29 で 1行=1個 の方針確定。UI で集約表示し、選択時は N �
 > **iter154.18 譲り済み履歴の不変性**：`status='traded'` の在庫は取引履歴の証跡として扱い、ユーザー操作による更新・削除を不可にする。画面上は詳細確認のみ、サーバーアクションでも update/delete を拒否する。
 >
 > **iter352 Swift Native操作**：在庫/Wishの「非表示」は `goods_inventory.status='archived'` に更新し、本人所有行だけを対象にする。「削除」は本人所有行を `id + user_id` で絞ってDELETEする。取引履歴に入った `traded` 行の削除禁止は別途サーバー側制約として維持する。
+>
+> **iter756 マスター表示の正規化**：`goods_inventory.title` は旧UIの自由入力表示名としてdeprecated扱いにする。ホーム候補、Wish、マイグッズ、個別募集の表示・判定は `groups_master` / `characters_master` / `goods_types_master` / `tags_master` を正とし、`title` の先頭語をL1/L2名として解析しない。`character_id` が入る場合は同じ行の `group_id` と所属関係が一致することをDB triggerで検証し、`group_id` 未指定なら `characters_master.group_id` で補完する。`goods_type_id` は既存FKで `goods_types_master(id)` 外の値を拒否する。
 
 | `is_carrying` | boolean | 「今日持参する」フラグ（F2 携帯モード） |
 | `carry_event_id` | uuid nullable | → events |
@@ -698,16 +707,20 @@ iter67.4 で求側を **「複数選択肢」モデル** に再設計。listings
 | `user_id` | uuid | → users（オーナー） |
 | `have_ids` | uuid[] | → goods_inventory（譲側、`kind=for_trade`） |
 | `have_qtys` | int[] | 各譲の数量（各 1〜99） |
-| `have_logic` | text | `'and'`（全部セット）/ `'or'`（いずれか）、default `'and'` |
+| `have_logic` | text | `'and'`（全部セット）/ `'or'`（いずれか）/ `'at_least'`（何個以上）、default `'and'` |
+| `have_min_count` | int | `have_logic='at_least'` の最低成立数。通常は 1。`at_least` は have_ids 2件以上かつ 1〜have_ids件数 |
 | `have_group_id` | uuid | trigger で全 haves から自動算出（同一性検証） |
 | `have_goods_type_id` | uuid | 同上 |
 | `status` | text | `active` / `paused` / `matched` / `closed` |
 | `note` | text nullable | |
 | `created_at` / `updated_at` | timestamptz | |
 
+> iter774 暫定互換：譲る側を `定価で選ぶ` / `金額指定` にした個別募集では、DBカラム追加を避けるため `have_ids=[]` / `have_qtys=[]` とし、`note` 内に `譲る金額: 定価` または `譲る金額: ¥1500` のメタ行を保存する。将来、金額条件を相互マッチの主判定へより厳密に組み込む時は、`listings` 側に専用の譲側金額カラムを追加する。
+
 制約：
 - have_ids 全件が **同 group + 同 goods_type**（trigger 検証）
 - have_qtys 各値 1〜99（trigger）
+- have_logic='at_least' の時は have_ids 2件以上、have_min_count は 1〜have_ids件数。それ以外は have_min_count=1
 - have_ids 全件が listing 所有者の `kind=for_trade` インベントリ
 - iter153: 譲アイテムが削除または非 active 化された場合、開いている個別募集の `have_ids` / `have_qtys` からそのアイテムを除外する。残り譲が 0 件なら `status='closed'`。
 - iter153: マッチング市場では `have_qtys` が市場残数を超える個別募集条件は候補から外す（OR 条件は残数のある譲だけに縮退、AND 条件はいずれか不足したら非表示）。
@@ -725,7 +738,8 @@ iter67.4 で求側を **「複数選択肢」モデル** に再設計。listings
 | `position` | int | 1〜5、表示順（listing_id 内で unique） |
 | `wish_ids` | uuid[] | → goods_inventory（求側、`kind=wanted`） |
 | `wish_qtys` | int[] | 各 wish の数量（各 1〜99） |
-| `logic` | text | `'and'`（全部セット）/ `'or'`（いずれか）、default `'or'` |
+| `logic` | text | `'and'`（全部セット）/ `'or'`（いずれか）/ `'at_least'`（何個以上）、default `'or'` |
+| `min_count` | int | `logic='at_least'` の最低成立数。通常は 1。`at_least` は wish_ids 2件以上かつ 1〜wish_ids件数 |
 | `exchange_type` | text | `'same_kind'` / `'cross_kind'` / `'any'`、default `'any'` |
 | `is_cash_offer` | bool | true なら定価交換選択肢（マッチング演算対象外） |
 | `cash_amount` | int nullable | is_cash_offer=true の時の希望金額（1〜9,999,999） |
@@ -737,6 +751,7 @@ iter67.4 で求側を **「複数選択肢」モデル** に再設計。listings
 - 1 listing につき最大 5 選択肢（trigger）
 - 通常選択肢：wish_ids/qtys 長さ一致、qty 1〜99、wish 全件が listing 所有者の `kind=wanted`
 - 通常選択肢：wish_ids 全件が **同 group + 同 goods_type**（trigger）
+- 通常選択肢：logic='at_least' の時は wish_ids 2件以上、min_count は 1〜wish_ids件数。それ以外は min_count=1
 - **OR × OR ガード**：listing.have_logic='or' AND option.logic='or' AND 両側 ≥2 アイテム は禁止
 - 定価交換選択肢：wish_ids/qtys 空、cash_amount 必須
 
@@ -880,12 +895,15 @@ iter28（match_type）/ iter29（数量）/ iter30（7日期限）/ iter32（合
 | `receiver_mailing_address` | jsonb nullable | iter168.74、`exchange_method='mail'` / `both` で合意成立した時点の受信者住所スナップショット |
 | `expose_calendar` | bool default false | iter67 で再定義：送信者が自分の **個人スケジュール（schedules）** を相手に公開する ON/OFF。受信側は受信表示画面で送信者の予定を見られる（取引完了で自動的に RLS 不可）。AW は対象外 |
 | `listing_id` | uuid nullable | iter64、個別募集 (`listings`) 経由の打診ならその id。直接打診なら null |
-| `cash_offer` | bool default false | iter67.7、定価交換打診なら true（receiver_have_ids 空 + cash_amount 必須） |
-| `cash_amount` | int nullable | iter67.7、定価交換金額（1〜9,999,999）。cash_offer=true のときのみ |
+| `cash_offer` | bool default false | iter765 更新、提案内に金額指定を含むなら true（`cash_amount` + `cash_amount_side` 必須） |
+| `cash_amount` | int nullable | iter765 更新、金額指定の金額（1〜9,999,999）。cash_offer=true のときのみ |
+| `cash_amount_side` | text nullable | iter765 追加、`sender` = 出す側に金額指定を含む / `receiver` = 受け取る側に金額指定を含む |
 | `created_at` / `updated_at` | timestamptz | |
 
 CHECK 制約 `proposals_meetup_required`（iter168.82 更新）：`exchange_method='hand'` または `exchange_method='both'` かつ `status!='draft'` の時だけ 5 列すべて NOT NULL かつ `meetup_end_at > meetup_start_at`。`mail` の時は待ち合わせ列を必須にしない。
 CHECK 制約 `proposals_meetup_candidates_array`（iter154.34）：`meetup_candidates` は JSON 配列、最大3件。
+CHECK 制約 `proposals_cash_amount_side_check`（iter765 追加）：`cash_amount_side` は null / `sender` / `receiver` のいずれか。
+CHECK 制約 `proposals_cash_offer_consistency`（iter765 更新）：`cash_offer=true` の時は `cash_amount` と `cash_amount_side` 必須。`cash_amount_side='sender'` なら受け取る側に1件以上、`cash_amount_side='receiver'` なら出す側に1件以上のグッズが必要。金額指定側にもグッズを同時に含めてよい。`cash_offer=false` の時は両側にグッズがあり、`cash_amount` / `cash_amount_side` は null。
 
 iter168.97 追加運用：
 - `exchange_method='both'` の打診に合意する時は、合意前に `hand` または `mail` のどちらか1つへ固定して保存する。
@@ -965,6 +983,8 @@ iter34 で `message_type` 拡張。
 - 取引完了のSwift Native最小フローは、専用 `deals` 実テーブルではなく既存 `proposals` の `evidence_photo_url` / `evidence_taken_at` / `evidence_taken_by` / `approved_by_sender` / `approved_by_receiver` / `completed_at` / `status='completed'` と、複数枚対応の `proposal_evidence_photos`、評価の `user_evaluations` を使う。
 - 証跡画像は Storage `chat-photos` に保存し、`proposal_evidence_photos.photo_url` と `proposals.evidence_photo_url`（最初の1枚の互換ミラー）に保持する。
 - Swift Nativeの `SupabaseProposalClient` は、証跡追加、承認、評価投稿をこの境界に接続する。
+- iter725 以降、証跡写真は `proposal_evidence_photos.id` / `proposal_id` / `taken_by` で絞って、アップロードした本人だけ削除できる。削除後は `proposals.evidence_photo_url` / `evidence_taken_at` / `evidence_taken_by` の互換ミラーを残りの先頭写真、または `NULL` に更新する。
+- 証跡追加時は `messages` に `message_type='system'`、`meta.action='evidence_added'` の通知を追加する。表示文言は閲覧者視点で `取引証跡を送りました` / `取引証跡が届きました` に変換する。
 
 ### `deals`（旧 `exchanges` をリネーム、用語集と一致）
 
@@ -1217,6 +1237,17 @@ iter45 で追加。`notes/16_monetization.md` の戦略に対応するテーブ�
 > iter166: 実装上のPremium判定は `subscriptions` の生ステータスではなく、Stripe webhook/管理者操作で集約された `user_entitlements(feature_key='premium', active=true)` を参照する。
 > `subscriptions` 本体はプロバイダーIDを含むためクライアントへ直接SELECTさせず、ユーザー向け表示は server route で必要列だけ返す。
 > iter168.43: めぐりPlusは Premium とは別権限として `user_entitlements(feature_key='meguri_plus', active=true)` を参照する。`meguri_plus_monthly` の webhook は `meguri_plus` 権限を更新する。
+> iter731: Swift Native版も同じ方針に合わせ、アプリ内の広告非表示・有料導線は `user_entitlements(feature_key in ('premium','meguri_plus'))` の有効行を読む。Apple StoreKit、Stripe、管理者手動付与のどれで発生しても、最終的には `user_entitlements` へ集約する。
+
+#### StoreKit product id 候補（iter731）
+
+| plan_type | product_id候補 | 付与する feature_key |
+|---|---|---|
+| `premium_monthly` | `megrum.premium.monthly` | `premium` |
+| `premium_yearly` | `megrum.premium.yearly` | `premium` |
+| `meguri_plus_monthly` | `megrum.meguri_plus.monthly` | `meguri_plus` |
+
+product_id は App Store Connect 登録時に最終決定する。DB上は `subscriptions.transaction_provider='apple'` と `transaction_provider_subscription_id` / `transactions.provider_transaction_id` にApple側IDを保存し、`user_entitlements` には利用権だけを保存する。
 
 ### `boosts`（ブースト残数管理）
 

@@ -128,6 +128,7 @@ private extension WishItem {
             memberID: item.memberID,
             goodsTypeID: item.goodsTypeID,
             title: item.title,
+            imageURL: item.imageURL,
             tags: item.tags
         )
     }

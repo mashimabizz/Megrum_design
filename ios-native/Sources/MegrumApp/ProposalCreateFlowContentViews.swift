@@ -2,7 +2,7 @@ import MegrumCore
 import MegrumDesign
 import SwiftUI
 
-struct ProposalCreateActiveContent<GiveContent: View, ReceiveContent: View, MeetupContent: View, ConfirmContent: View>: View {
+struct ProposalCreateActiveContent<GiveContent: View, ReceiveContent: View, MeetupContent: View, ShippingContent: View, PaymentContent: View, ConfirmContent: View>: View {
     @Binding var selectedStep: ProposalCreateStep
     @Binding var exchangeMethod: ExchangeMethod
     var selectionTabs: [ProposalCreateStep]
@@ -19,6 +19,8 @@ struct ProposalCreateActiveContent<GiveContent: View, ReceiveContent: View, Meet
     private var giveContent: () -> GiveContent
     private var receiveContent: () -> ReceiveContent
     private var meetupContent: () -> MeetupContent
+    private var shippingContent: () -> ShippingContent
+    private var paymentContent: () -> PaymentContent
     private var confirmContent: () -> ConfirmContent
 
     init(
@@ -38,6 +40,8 @@ struct ProposalCreateActiveContent<GiveContent: View, ReceiveContent: View, Meet
         @ViewBuilder giveContent: @escaping () -> GiveContent,
         @ViewBuilder receiveContent: @escaping () -> ReceiveContent,
         @ViewBuilder meetupContent: @escaping () -> MeetupContent,
+        @ViewBuilder shippingContent: @escaping () -> ShippingContent,
+        @ViewBuilder paymentContent: @escaping () -> PaymentContent,
         @ViewBuilder confirmContent: @escaping () -> ConfirmContent
     ) {
         _selectedStep = selectedStep
@@ -56,6 +60,8 @@ struct ProposalCreateActiveContent<GiveContent: View, ReceiveContent: View, Meet
         self.giveContent = giveContent
         self.receiveContent = receiveContent
         self.meetupContent = meetupContent
+        self.shippingContent = shippingContent
+        self.paymentContent = paymentContent
         self.confirmContent = confirmContent
     }
 
@@ -72,7 +78,7 @@ struct ProposalCreateActiveContent<GiveContent: View, ReceiveContent: View, Meet
 
             ScrollView {
                 VStack(alignment: .leading, spacing: contentSpacing) {
-                    if selectedStep != .confirm {
+                    if selectedStep != .payment && selectedStep != .confirm {
                         ProposalExchangeMethodSelector(
                             exchangeMethod: $exchangeMethod
                         )
@@ -104,16 +110,22 @@ struct ProposalCreateActiveContent<GiveContent: View, ReceiveContent: View, Meet
             receiveContent()
         case .meetup:
             meetupContent()
+        case .shipping:
+            shippingContent()
+        case .payment:
+            paymentContent()
         case .confirm:
             confirmContent()
-            ProposalFlowBottomBar(
-                selectedStep: selectedStep,
-                configuration: configuration,
-                meetupHasTimeDraft: meetupHasTimeDraft,
-                isCreating: isCreating,
-                isInline: true,
-                onPrimary: onPrimary
-            )
+            if usesInlineBottomBar {
+                ProposalFlowBottomBar(
+                    selectedStep: selectedStep,
+                    configuration: configuration,
+                    meetupHasTimeDraft: meetupHasTimeDraft,
+                    isCreating: isCreating,
+                    isInline: true,
+                    onPrimary: onPrimary
+                )
+            }
         }
     }
 }

@@ -78,12 +78,12 @@ struct SettingsScreen: View {
                 }
 
                 NavigationLink {
-                    PaymentSettingsScreen(appState: appState)
+                    SubscriptionSettingsScreen(appState: appState)
                 } label: {
                     SettingsMenuRowLabel(
-                        title: "支払い条件設定",
-                        subtitle: paymentStatusText,
-                        systemImage: "yensign.circle"
+                        title: "Premium会員",
+                        subtitle: subscriptionStatusText,
+                        systemImage: "sparkles.rectangle.stack"
                     )
                 }
 
@@ -231,8 +231,8 @@ struct SettingsScreen: View {
         return address.summary
     }
 
-    private var paymentStatusText: String {
-        appState.viewer?.paymentSummaryText ?? "未設定"
+    private var subscriptionStatusText: String {
+        appState.subscriptionState.isPremiumActive ? "有効" : "未加入"
     }
 
     private var accountSummary: SettingsAccountSummary {
@@ -272,9 +272,7 @@ struct SettingsScreen: View {
             await appState.loadNotifications()
         }
         await appState.loadPushNotificationSetting()
-        if appState.paymentSettings == nil {
-            await appState.loadPaymentSettings()
-        }
+        await appState.loadSubscriptionState(reportsFailure: false)
     }
 
     private func performSignOut(dismissSettings: Bool) async {

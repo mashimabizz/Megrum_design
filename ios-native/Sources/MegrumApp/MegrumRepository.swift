@@ -9,6 +9,7 @@ public struct MegrumAppSnapshot: Sendable {
     public var proposals: [TradeProposal]
     public var grooms: [GroomPost]
     public var threads: [BoardThread]
+    public var subscriptionState: UserSubscriptionState
 
     public init(
         viewer: UserProfile,
@@ -17,7 +18,8 @@ public struct MegrumAppSnapshot: Sendable {
         listings: [IndividualListing] = [],
         proposals: [TradeProposal],
         grooms: [GroomPost],
-        threads: [BoardThread]
+        threads: [BoardThread],
+        subscriptionState: UserSubscriptionState = .free
     ) {
         self.viewer = viewer
         self.inventory = inventory
@@ -26,6 +28,7 @@ public struct MegrumAppSnapshot: Sendable {
         self.proposals = proposals
         self.grooms = grooms
         self.threads = threads
+        self.subscriptionState = subscriptionState
     }
 }
 
@@ -103,6 +106,7 @@ public enum MegrumRepositoryError: Error, Equatable, Sendable {
 
 public protocol MegrumRepository: Sendable {
     func loadInitialSnapshot() async throws -> MegrumAppSnapshot
+    func loadSubscriptionState() async throws -> UserSubscriptionState
     func loadHomeCandidateSections() async throws -> HomeCandidateSections
     func loadOshiGenres(limit: Int) async throws -> [OshiGenre]
     func loadOshiGroups(searchText: String?, limit: Int) async throws -> [OshiGroup]
@@ -138,6 +142,7 @@ public protocol MegrumRepository: Sendable {
     func approveTradeCancel(proposalID: UUID) async throws -> (proposal: TradeProposal, message: TradeMessage)
     func addTradeEvidence(_ input: TradeEvidenceCreateInput) async throws -> TradeProposal
     func loadTradeEvidencePhotos(proposalID: UUID) async throws -> [TradeEvidencePhoto]
+    func deleteTradeEvidencePhoto(proposalID: UUID, photoID: UUID) async throws -> TradeProposal
     func approveTradeEvidence(proposalID: UUID) async throws -> TradeProposal
     func submitTradeEvaluation(_ input: TradeEvaluationCreateInput) async throws -> UserEvaluation
     func fileTradeDispute(_ input: TradeDisputeCreateInput) async throws -> TradeDisputeTicket
@@ -153,11 +158,15 @@ public protocol MegrumRepository: Sendable {
     func sendArrivalStatusMessage(proposalID: UUID, status: TradeArrivalStatus, body: String?) async throws -> TradeMessage
     func loadSchedules(for proposal: TradeProposal, startAt: Date, endAt: Date) async throws -> [PersonalSchedule]
     func loadPersonalSchedules(startAt: Date, endAt: Date) async throws -> [PersonalSchedule]
+    func loadProfileSchedules(userID: UUID, startAt: Date, endAt: Date) async throws -> [PersonalSchedule]
     func createSchedule(_ input: PersonalScheduleCreateInput) async throws -> PersonalSchedule
     func loadHomeLocalModeSettings(now: Date) async throws -> HomeLocalActivitySettings?
     func saveHomeLocalModeSettings(_ settings: HomeLocalActivitySettings, now: Date) async throws -> HomeLocalActivitySettings
     func loadGrooms(latitude: Double?, longitude: Double?, radiusMeters: Int) async throws -> [GroomPost]
     func loadGroomMapPosts(latitude: Double?, longitude: Double?, radiusMeters: Int) async throws -> [GroomPost]
+    func loadOwnGroomArchive(limit: Int) async throws -> [GroomPost]
+    func loadGroomReactions(postIDs: [UUID]) async throws -> [GroomReaction]
+    func loadGroomReplies(postIDs: [UUID]) async throws -> [GroomReply]
     func createGroomPost(_ input: GroomPostCreateInput) async throws -> GroomPost
     func markGroomViewed(postID: UUID) async throws
     func setGroomLiked(postID: UUID, isLiked: Bool) async throws
@@ -188,6 +197,10 @@ public protocol MegrumRepository: Sendable {
 }
 
 public extension MegrumRepository {
+    func loadSubscriptionState() async throws -> UserSubscriptionState {
+        .free
+    }
+
     func loadHomeCandidateSections() async throws -> HomeCandidateSections {
         throw MegrumRepositoryError.unsupportedMutation
     }
@@ -313,6 +326,10 @@ public extension MegrumRepository {
         []
     }
 
+    func deleteTradeEvidencePhoto(proposalID: UUID, photoID: UUID) async throws -> TradeProposal {
+        throw MegrumRepositoryError.unsupportedMutation
+    }
+
     func approveTradeEvidence(proposalID: UUID) async throws -> TradeProposal {
         throw MegrumRepositoryError.unsupportedMutation
     }
@@ -373,6 +390,10 @@ public extension MegrumRepository {
         []
     }
 
+    func loadProfileSchedules(userID: UUID, startAt: Date, endAt: Date) async throws -> [PersonalSchedule] {
+        []
+    }
+
     func createSchedule(_ input: PersonalScheduleCreateInput) async throws -> PersonalSchedule {
         throw MegrumRepositoryError.unsupportedMutation
     }
@@ -391,6 +412,18 @@ public extension MegrumRepository {
 
     func loadGroomMapPosts(latitude: Double?, longitude: Double?, radiusMeters: Int) async throws -> [GroomPost] {
         try await loadGrooms(latitude: latitude, longitude: longitude, radiusMeters: radiusMeters)
+    }
+
+    func loadOwnGroomArchive(limit: Int) async throws -> [GroomPost] {
+        []
+    }
+
+    func loadGroomReactions(postIDs: [UUID]) async throws -> [GroomReaction] {
+        []
+    }
+
+    func loadGroomReplies(postIDs: [UUID]) async throws -> [GroomReply] {
+        []
     }
 
     func createGroomPost(_ input: GroomPostCreateInput) async throws -> GroomPost {

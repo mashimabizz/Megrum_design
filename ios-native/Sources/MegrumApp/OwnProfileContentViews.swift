@@ -1,22 +1,27 @@
 import MegrumDesign
 import SwiftUI
 
+enum OwnProfileLayoutMetrics {
+    static let contentSpacing = ProfileVisualCompactHeroMetrics.contentSpacing
+    static let horizontalPadding = ProfileVisualCompactHeroMetrics.horizontalPadding
+    static let topPadding = ProfileVisualCompactHeroMetrics.topPadding
+    static let bottomPadding = ProfileVisualCompactHeroMetrics.bottomPadding
+    static let compactHeroAvatarSize = ProfileVisualCompactHeroMetrics.avatarSize
+}
+
 struct OwnProfileContent: View {
     var summary: OwnProfileSummary?
     @Binding var selectedProfileTab: ProfileVisualTab
     var profileBio: String
-    var profileChips: [String]
+    var profileTagItems: [ProfileVisualTagItem]
     var profileGridItems: [ProfileVisualGridItem]
     var onClose: () -> Void
     var onEdit: () -> Void
+    var onOpenSchedule: () -> Void
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 15) {
-            OwnProfilePageHeader(
-                canEdit: summary != nil,
-                onClose: onClose,
-                onEdit: onEdit
-            )
+        VStack(alignment: .leading, spacing: OwnProfileLayoutMetrics.contentSpacing) {
+            OwnProfilePageHeader(onClose: onClose)
 
             if let summary {
                 ProfileVisualHero(
@@ -26,9 +31,15 @@ struct OwnProfileContent: View {
                     avatarURL: summary.avatarURL,
                     tradeCount: summary.completedTradeText,
                     ratingText: "—",
-                    chips: profileChips,
+                    chips: [],
+                    tagItems: profileTagItems,
+                    tagSize: .compact,
+                    avatarSize: OwnProfileLayoutMetrics.compactHeroAvatarSize,
+                    density: .compact,
                     actionTitle: "プロフィールを編集",
-                    onAction: onEdit
+                    showsScheduleAction: true,
+                    onAction: onEdit,
+                    onScheduleAction: onOpenSchedule
                 )
 
                 ProfileVisualTabs(selection: $selectedProfileTab)
@@ -38,9 +49,9 @@ struct OwnProfileContent: View {
                 OwnProfileUnavailableView()
             }
         }
-        .padding(.horizontal, 20)
-        .padding(.top, 18)
-        .padding(.bottom, 34)
+        .padding(.horizontal, OwnProfileLayoutMetrics.horizontalPadding)
+        .padding(.top, OwnProfileLayoutMetrics.topPadding)
+        .padding(.bottom, OwnProfileLayoutMetrics.bottomPadding)
     }
 }
 

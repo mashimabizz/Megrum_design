@@ -7,17 +7,43 @@ struct PublicProfileRoute: Identifiable, Equatable {
     var id: UUID { userID }
 }
 
+enum PublicProfilePresentationContext: Equatable, Sendable {
+    case standalone
+    case stackedFromHomeDiscoverySheet
+    case tradeChat
+
+    var allowsProposalActions: Bool {
+        self == .standalone
+    }
+
+    var showsDismissToolbarButton: Bool {
+        self != .tradeChat
+    }
+}
+
 struct PublicUserProfileScreen: View {
     @ObservedObject var appState: MegrumAppState
     var userID: UUID
+    var presentationContext: PublicProfilePresentationContext = .standalone
+    var adDisplayContext: AdDisplayContext = AdDisplayContext()
+    var adPlacement: AdPlacement?
 
     @Environment(\.dismiss) private var dismiss
     @State private var selectedVisualTab: ProfileVisualTab = .goods
     @State private var proposalTargetItem: GoodsItem?
     @State private var listingProposalTarget: ListingProposalTarget?
+    @State private var isSchedulePresented = false
 
     private var publicProfile: PublicUserProfile? {
         appState.publicProfilesByUserID[userID]
+    }
+
+    private var displayedPublicProfile: PublicUserProfile? {
+        publicProfile ?? fallbackPublicProfile
+    }
+
+    private var fallbackPublicProfile: PublicUserProfile? {
+        userID == HomeDiscoveryFixtures.ownerID ? HomeDiscoveryFixtures.ownerPublicProfile : nil
     }
 
     private var evaluations: [UserEvaluation] {
@@ -41,14 +67,15 @@ struct PublicUserProfileScreen: View {
     }
 
     var body: some View {
+        let profile = displayedPublicProfile
         ScrollView {
             PublicUserProfileContent(
-                publicProfile: publicProfile,
+                publicProfile: profile,
                 selectedVisualTab: $selectedVisualTab,
-                bio: publicProfile.map(publicProfileBio) ?? "",
-                ratingText: publicProfile.map(publicProfileRating) ?? "—",
+                bio: profile.map(publicProfileBio) ?? "",
+                ratingText: profile.map(publicProfileRating) ?? "—",
                 chips: [],
-                oshiTags: publicProfile.map(publicProfileOshiTags) ?? [],
+                oshiTags: profile.map(publicProfileOshiTags) ?? [],
                 gridItems: publicProfileGridItems(for: selectedVisualTab),
                 listings: listings,
                 listingGoodsByID: goodsByID,
@@ -56,7 +83,11 @@ struct PublicUserProfileScreen: View {
                 groups: appState.oshiGroups,
                 characters: appState.oshiCharacters,
                 goodsTypes: appState.goodsTypes,
+                adDisplayContext: adDisplayContext,
+                adPlacement: adPlacement,
+                showsProposalAction: presentationContext.allowsProposalActions,
                 onPrimaryAction: startPrimaryProposal,
+                onOpenSchedule: openSchedule,
                 onSelectGridItem: selectProfileGridItem,
                 onSelectListing: selectProfileListing
             )
@@ -65,11 +96,16 @@ struct PublicUserProfileScreen: View {
         .navigationTitle("プロフィール")
         .megrumInlineNavigationTitle()
         .toolbar {
-            ToolbarItem(placement: .cancellationAction) {
-                Button("閉じる") {
-                    dismiss()
+            if presentationContext.showsDismissToolbarButton {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("閉じる") {
+                        dismiss()
+                    }
                 }
             }
+        }
+        .megrumEdgeBackSwipe {
+            dismiss()
         }
         .task(id: userID) {
             await appState.loadPublicUserProfile(userID: userID)
@@ -95,6 +131,17 @@ struct PublicUserProfileScreen: View {
                     listingID: target.listing.id,
                     receiverGoodsIDs: target.receiverGoodsIDs
                 )
+            }
+        }
+        .sheet(isPresented: $isSchedulePresented) {
+            NavigationStack {
+                ProfileScheduleScreen(
+                    appState: appState,
+                    userID: userID,
+                    displayName: displayedPublicProfile?.profile.displayName ?? "相手"
+                ) {
+                    isSchedulePresented = false
+                }
             }
         }
     }
@@ -152,6 +199,9 @@ struct PublicUserProfileScreen: View {
     }
 
     private func selectProfileGridItem(_ item: ProfileVisualGridItem) {
+        guard presentationContext.allowsProposalActions else {
+            return
+        }
         switch selectedVisualTab {
         case .goods:
             guard let goods = tradeGoods.first(where: { $0.id == item.id }) else {
@@ -166,6 +216,9 @@ struct PublicUserProfileScreen: View {
     }
 
     private func selectProfileListing(_ listingID: UUID) {
+        guard presentationContext.allowsProposalActions else {
+            return
+        }
         guard let listing = listings.first(where: { $0.id == listingID }),
               let target = ListingProposalTarget(listing: listing, goodsByID: goodsByID) else {
             return
@@ -179,6 +232,9 @@ struct PublicUserProfileScreen: View {
     }
 
     private func startPrimaryProposal() {
+        guard presentationContext.allowsProposalActions else {
+            return
+        }
         if let goods = tradeGoods.first {
             proposalTargetItem = goods
             return
@@ -186,6 +242,10 @@ struct PublicUserProfileScreen: View {
         if let target = listings.compactMap({ ListingProposalTarget(listing: $0, goodsByID: goodsByID) }).first {
             listingProposalTarget = target
         }
+    }
+
+    private func openSchedule() {
+        isSchedulePresented = true
     }
 }
 

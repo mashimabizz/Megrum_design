@@ -60,6 +60,19 @@ struct IndividualListingExchangeSummary: Equatable {
         return "\(normalized(localPrefecture, fallback: "未設定")) / \(place) / \(normalized(localSchedule, fallback: Self.defaultLocalSchedule))"
     }
 
+    var localDetailTextForProposalDisplay: String? {
+        guard includesLocal else {
+            return nil
+        }
+        return [
+            normalized(localPrefecture, fallback: "未設定"),
+            localPlaceMemo.trimmingCharacters(in: .whitespacesAndNewlines).nilIfBlank,
+            normalized(localSchedule, fallback: Self.defaultLocalSchedule)
+        ]
+        .compactMap(\.self)
+        .joined(separator: " / ")
+    }
+
     var mailDetailText: String? {
         guard includesMail else {
             return nil
@@ -104,7 +117,7 @@ struct IndividualListingExchangeSummary: Equatable {
         }
 
         guard let methodTitle = value(for: "交換手段:"),
-              let method = IndividualListingHandoffDraft.allCases.first(where: { $0.title == methodTitle })
+              let method = IndividualListingHandoffDraft.method(fromTitle: methodTitle)
         else {
             return nil
         }
@@ -140,5 +153,14 @@ struct IndividualListingExchangeSummary: Equatable {
     private func normalized(_ value: String, fallback: String) -> String {
         let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
         return trimmed.isEmpty ? fallback : trimmed
+    }
+}
+
+private extension IndividualListingHandoffDraft {
+    static func method(fromTitle title: String) -> IndividualListingHandoffDraft? {
+        let normalized = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        return allCases.first { method in
+            method.title == normalized || (method == .both && normalized == "どちらもOK")
+        }
     }
 }

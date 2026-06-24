@@ -46,6 +46,19 @@ final class TradeChatAffordanceTests: XCTestCase {
         XCTAssertEqual(TradeAmountFormatter.fixedPrice(amount: nil, fallback: "定価も可"), "定価も可")
     }
 
+    func testTradeAmountFormatterNormalizesCashInputToDigitsAndCommas() {
+        XCTAssertEqual(TradeAmountFormatter.cashInputText(from: "1500"), "1,500")
+        XCTAssertEqual(TradeAmountFormatter.cashInputText(from: "¥1,500円"), "1,500")
+        XCTAssertEqual(TradeAmountFormatter.cashInputText(from: "１２３４５６７"), "1,234,567")
+        XCTAssertEqual(TradeAmountFormatter.cashInputText(from: "abc"), "")
+        XCTAssertEqual(TradeAmountFormatter.cashInputText(from: "0001500"), "1,500")
+
+        XCTAssertEqual(TradeAmountFormatter.cashInputValue(from: "1,500"), 1_500)
+        XCTAssertEqual(TradeAmountFormatter.cashInputValue(from: "１２,０００円"), 12_000)
+        XCTAssertNil(TradeAmountFormatter.cashInputValue(from: "0"))
+        XCTAssertNil(TradeAmountFormatter.cashInputValue(from: "abc"))
+    }
+
     func testNativePreviewPendingListMirrorsRnVisualQaCount() {
         let pending = NativePreviewData.proposals.filter { TradeStage.pending.contains($0.status) }
         XCTAssertEqual(pending.count, 4)
@@ -756,6 +769,26 @@ final class TradeChatAffordanceTests: XCTestCase {
         XCTAssertEqual(presentation.body, "理由：電車遅延\n補足：東口から向かいます")
         XCTAssertEqual(presentation.detail, "見込み：20分")
         XCTAssertTrue(presentation.accessibilityLabel.contains("見込み：20分"))
+    }
+
+    func testEvidenceSystemMessagePresentationUsesSenderPerspective() {
+        let message = TradeMessage(
+            id: UUID(uuidString: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaac")!,
+            proposalID: UUID(uuidString: "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb")!,
+            senderID: UUID(uuidString: "cccccccc-cccc-cccc-cccc-cccccccccccc")!,
+            messageType: .system,
+            body: "取引証跡が追加されました",
+            meta: ["action": TradeEvidenceSystemMessage.action]
+        )
+
+        let outgoing = TradeSystemMessagePresentation(message: message, isMine: true)
+        let incoming = TradeSystemMessagePresentation(message: message, isMine: false)
+
+        XCTAssertTrue(TradeEvidenceSystemMessage.isEvidenceNotice(message))
+        XCTAssertEqual(outgoing.title, "取引証跡を送りました")
+        XCTAssertEqual(incoming.title, "取引証跡が届きました")
+        XCTAssertEqual(outgoing.systemImage, "doc.viewfinder")
+        XCTAssertEqual(outgoing.body, "タップして証跡写真を確認")
     }
 
     func testCancelApprovalPromptShowsOnlyForIncomingRequestOnAgreedTrade() {

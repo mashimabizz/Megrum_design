@@ -48,148 +48,66 @@ enum ProfileVisualTagSize {
     case compact
 }
 
-struct ProfileVisualHero: View {
-    var displayName: String
-    var handle: String
-    var bio: String
-    var avatarURL: URL?
-    var tradeCount: String
-    var ratingText: String
-    var chips: [String]
-    var tagItems: [ProfileVisualTagItem] = []
-    var tagSize: ProfileVisualTagSize = .regular
-    var avatarSize: CGFloat = 116
-    var actionTitle: String
-    var isPrimaryAction: Bool = false
-    var onAction: () -> Void
+enum ProfileVisualHeroDensity {
+    case regular
+    case compact
 
-    var body: some View {
-        VStack(spacing: 22) {
-            HStack(alignment: .top, spacing: 22) {
-                ProfileVisualAvatar(url: avatarURL, fallback: displayName, size: avatarSize)
-
-                VStack(alignment: .leading, spacing: 9) {
-                    Text(displayName)
-                        .font(.system(size: 26, weight: .black, design: .rounded))
-                        .foregroundStyle(MegrumTheme.ink)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.80)
-                    Text("@\(handle)")
-                        .font(.system(size: 18, weight: .semibold, design: .rounded))
-                        .foregroundStyle(MegrumTheme.lavender.opacity(0.86))
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.76)
-
-                    Text(bio)
-                        .font(.system(size: 15, weight: .semibold, design: .rounded))
-                        .foregroundStyle(MegrumTheme.ink.opacity(0.78))
-                        .lineLimit(2)
-
-                    HStack(spacing: 18) {
-                        ProfileVisualStat(title: "取引", value: tradeCount, accent: false)
-                        Divider()
-                            .frame(height: 32)
-                        ProfileVisualStat(title: "評価", value: ratingText, accent: true)
-                    }
-                    .padding(.top, 2)
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-            }
-
-            if !resolvedTags.isEmpty {
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: tagSpacing) {
-                        ForEach(Array(resolvedTags.prefix(8).enumerated()), id: \.offset) { index, tag in
-                            ProfileVisualTagChip(
-                                title: tag.title,
-                                color: chipColor(for: tag, index: index),
-                                size: tagSize
-                            )
-                        }
-                    }
-                }
-            }
-
-            Button(action: onAction) {
-                Text(actionTitle)
-                    .font(.system(size: 17, weight: .heavy, design: .rounded))
-                    .foregroundStyle(isPrimaryAction ? .white : MegrumTheme.lavender)
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 56)
-                    .background(
-                        isPrimaryAction ? AnyShapeStyle(MegrumTheme.lavender) : AnyShapeStyle(.white.opacity(0.74)),
-                        in: RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    )
-                    .overlay {
-                        RoundedRectangle(cornerRadius: 12, style: .continuous)
-                            .stroke(MegrumTheme.lavender.opacity(0.78), lineWidth: isPrimaryAction ? 0 : 1.2)
-                    }
-            }
-            .buttonStyle(.plain)
-        }
-    }
-
-    private var resolvedTags: [ProfileVisualTagItem] {
-        if !tagItems.isEmpty {
-            return tagItems
-        }
-        return chips.map { ProfileVisualTagItem(title: $0, colorKey: $0) }
-    }
-
-    private var tagSpacing: CGFloat {
-        switch tagSize {
+    var verticalSpacing: CGFloat {
+        switch self {
         case .regular:
-            12
+            22
         case .compact:
-            7
+            9
         }
     }
 
-    private func chipColor(for tag: ProfileVisualTagItem, index: Int) -> Color {
-        let palette = [
-            MegrumTheme.lavender,
-            MegrumTheme.sky,
-            MegrumTheme.pink,
-            Color(red: 0.95, green: 0.55, blue: 0.28),
-            Color(red: 0.35, green: 0.70, blue: 0.48)
-        ]
-        let colorIndex = tag.colorKey.unicodeScalars.reduce(index) { partial, scalar in
-            partial + Int(scalar.value)
+    var avatarInfoSpacing: CGFloat {
+        switch self {
+        case .regular:
+            22
+        case .compact:
+            12
         }
-        return palette[colorIndex % palette.count]
-    }
-}
-
-private struct ProfileVisualTagChip: View {
-    var title: String
-    var color: Color
-    var size: ProfileVisualTagSize
-
-    var body: some View {
-        Text(title)
-            .font(.system(size: fontSize, weight: .bold, design: .rounded))
-            .foregroundStyle(color)
-            .lineLimit(1)
-            .minimumScaleFactor(0.78)
-            .padding(.horizontal, horizontalPadding)
-            .frame(height: height)
-            .background(color.opacity(0.13), in: Capsule())
-            .overlay {
-                Capsule().stroke(color.opacity(0.19), lineWidth: 1)
-            }
     }
 
-    private var fontSize: CGFloat {
-        switch size {
+    var infoSpacing: CGFloat {
+        switch self {
+        case .regular:
+            9
+        case .compact:
+            3
+        }
+    }
+
+    var displayNameFontSize: CGFloat {
+        switch self {
+        case .regular:
+            26
+        case .compact:
+            20
+        }
+    }
+
+    var handleFontSize: CGFloat {
+        switch self {
+        case .regular:
+            18
+        case .compact:
+            13
+        }
+    }
+
+    var bioFontSize: CGFloat {
+        switch self {
         case .regular:
             15
         case .compact:
-            12.5
+            11.5
         }
     }
 
-    private var horizontalPadding: CGFloat {
-        switch size {
+    var statRowSpacing: CGFloat {
+        switch self {
         case .regular:
             18
         case .compact:
@@ -197,39 +115,103 @@ private struct ProfileVisualTagChip: View {
         }
     }
 
-    private var height: CGFloat {
-        switch size {
+    var statTitleFontSize: CGFloat {
+        switch self {
         case .regular:
-            44
+            14
         case .compact:
-            30
+            10.5
+        }
+    }
+
+    var statValueFontSize: CGFloat {
+        switch self {
+        case .regular:
+            21
+        case .compact:
+            15
+        }
+    }
+
+    var statIconFontSize: CGFloat {
+        switch self {
+        case .regular:
+            15
+        case .compact:
+            12
+        }
+    }
+
+    var statSpacing: CGFloat {
+        switch self {
+        case .regular:
+            5
+        case .compact:
+            2
+        }
+    }
+
+    var statDividerHeight: CGFloat {
+        switch self {
+        case .regular:
+            32
+        case .compact:
+            22
+        }
+    }
+
+    var statMinWidth: CGFloat {
+        switch self {
+        case .regular:
+            52
+        case .compact:
+            52
+        }
+    }
+
+    var actionFontSize: CGFloat {
+        switch self {
+        case .regular:
+            17
+        case .compact:
+            14.5
+        }
+    }
+
+    var actionHeight: CGFloat {
+        switch self {
+        case .regular:
+            56
+        case .compact:
+            44
+        }
+    }
+
+    var scheduleActionHeight: CGFloat {
+        switch self {
+        case .regular:
+            48
+        case .compact:
+            38
+        }
+    }
+
+    var actionCornerRadius: CGFloat {
+        switch self {
+        case .regular:
+            12
+        case .compact:
+            11
         }
     }
 }
 
-private struct ProfileVisualStat: View {
-    var title: String
-    var value: String
-    var accent: Bool
-
-    var body: some View {
-        VStack(spacing: 5) {
-            Text(title)
-                .font(.system(size: 14, weight: .semibold, design: .rounded))
-                .foregroundStyle(MegrumTheme.ink.opacity(0.62))
-            HStack(spacing: 4) {
-                if accent {
-                    Image(systemName: "star.fill")
-                        .font(.system(size: 15, weight: .black))
-                        .foregroundStyle(Color.orange)
-                }
-                Text(value)
-                    .font(.system(size: 21, weight: .regular, design: .rounded))
-                    .foregroundStyle(MegrumTheme.ink)
-            }
-        }
-        .frame(minWidth: 52)
-    }
+enum ProfileVisualCompactHeroMetrics {
+    static let contentSpacing: CGFloat = 10
+    static let horizontalPadding: CGFloat = 14
+    static let topPadding: CGFloat = 12
+    static let bottomPadding: CGFloat = 28
+    static let avatarSize: CGFloat = 70
 }
 
 struct ProfileVisualTabs: View {

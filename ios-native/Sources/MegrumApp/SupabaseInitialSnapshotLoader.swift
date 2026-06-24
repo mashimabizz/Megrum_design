@@ -4,6 +4,7 @@ import MegrumData
 
 struct SupabaseInitialSnapshotLoader: Sendable {
     static let defaultGroomRadiusMeters = 1_000
+    static let requiresListingsForInitialSnapshot = true
 
     private let accountProfilePersistence: SupabaseAccountProfilePersistence
     private let ownedGoodsPersistence: SupabaseOwnedGoodsPersistence
@@ -39,9 +40,7 @@ struct SupabaseInitialSnapshotLoader: Sendable {
         async let wishes = Self.bestEffortInitialSection([]) {
             try await ownedGoodsPersistence.loadWishes()
         }
-        async let listings = Self.bestEffortInitialSection([]) {
-            try await listingClient.loadListings(userID: userID)
-        }
+        async let listings = listingClient.loadListings(userID: userID)
         async let proposals = Self.bestEffortInitialSection([]) {
             try await proposalClient.loadProposals(viewerID: userID)
         }
@@ -65,7 +64,7 @@ struct SupabaseInitialSnapshotLoader: Sendable {
             viewer: viewer,
             inventory: await inventory,
             wishes: await wishes,
-            listings: await listings,
+            listings: try await listings,
             proposals: await proposals,
             grooms: await grooms,
             threads: await threads

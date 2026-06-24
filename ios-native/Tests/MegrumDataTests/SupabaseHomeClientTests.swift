@@ -66,10 +66,19 @@ final class SupabaseHomeClientTests: XCTestCase {
         let usersQuery = try queryItems(in: usersRequest)
 
         XCTAssertEqual(usersRequest.url?.path, "/rest/v1/users")
-        XCTAssertEqual(usersQuery["select"], "id,handle,display_name,primary_area,avatar_url,payment_methods,payment_note")
+        XCTAssertEqual(usersQuery["select"], "id,handle,display_name,primary_area,avatar_url,gender,age,payment_methods,payment_note,is_test_account")
         XCTAssertEqual(usersQuery["id"], "neq.11111111-1111-1111-1111-111111111111")
         XCTAssertEqual(usersQuery["limit"], "42")
         XCTAssertNil(usersRequest.httpBody)
+
+        let userSummariesRequest = try client.makeLoadPartnerUserSummariesRequest(excludingUserID: userID, limit: 42)
+        let userSummariesBody = try XCTUnwrap(userSummariesRequest.httpBody)
+        let userSummariesPayload = try JSONSerialization.jsonObject(with: userSummariesBody) as? [String: Any]
+
+        XCTAssertEqual(userSummariesRequest.httpMethod, "POST")
+        XCTAssertEqual(userSummariesRequest.url?.path, "/rest/v1/rpc/list_home_user_summaries_for_viewer")
+        XCTAssertEqual(userSummariesPayload?["p_excluded_user_id"] as? String, "11111111-1111-1111-1111-111111111111")
+        XCTAssertEqual(userSummariesPayload?["p_limit"] as? Int, 42)
     }
 
     func testBuildsListingsAndListingWishOptionsRequests() throws {
@@ -88,6 +97,7 @@ final class SupabaseHomeClientTests: XCTestCase {
         XCTAssertNil(viewerListingsQuery["limit"])
         XCTAssertTrue(viewerListingSelect.contains("have_ids"))
         XCTAssertTrue(viewerListingSelect.contains("have_logic"))
+        XCTAssertTrue(viewerListingSelect.contains("have_min_count"))
         XCTAssertTrue(viewerListingSelect.contains("have_group_id"))
         XCTAssertTrue(viewerListingSelect.contains("have_goods_type_id"))
 
@@ -111,6 +121,7 @@ final class SupabaseHomeClientTests: XCTestCase {
         )
         XCTAssertEqual(optionsQuery["order"], "position.asc")
         XCTAssertTrue(optionsSelect.contains("wish_ids"))
+        XCTAssertTrue(optionsSelect.contains("min_count"))
         XCTAssertTrue(optionsSelect.contains("is_cash_offer"))
         XCTAssertTrue(optionsSelect.contains("cash_amount"))
         XCTAssertNil(optionsRequest.httpBody)
@@ -268,15 +279,27 @@ final class SupabaseHomeClientTests: XCTestCase {
                   "display_name": "みい",
                   "primary_area": "東京都",
                   "avatar_url": null,
+                  "gender": "female",
+                  "age": 24,
                   "payment_methods": ["bank_transfer", "cash_exchange"],
-                  "payment_note": "メルペイ相談可"
+                  "payment_note": "メルペイ相談可",
+                  "is_test_account": true,
+                  "average_stars": 4.75,
+                  "evaluation_count": 12,
+                  "completed_trade_count": 20
                 }
                 """#.utf8
             )
         )
 
+        XCTAssertEqual(user.age, 24)
+        XCTAssertEqual(user.gender, "female")
         XCTAssertEqual(user.paymentMethods, ["bank_transfer", "cash_exchange"])
         XCTAssertEqual(user.paymentNote, "メルペイ相談可")
+        XCTAssertEqual(user.isTestAccount, true)
+        XCTAssertEqual(user.averageStars, 4.75)
+        XCTAssertEqual(user.evaluationCount, 12)
+        XCTAssertEqual(user.completedTradeCount, 20)
 
         let listing = try decoder.decode(
             SupabaseHomeListingRow.self,

@@ -13,12 +13,14 @@ struct SupabaseOwnedGoodsPersistence: Sendable {
 
     func loadTradeGoods() async throws -> [GoodsItem] {
         let rows = try await fetchOwnGoodsRows(kind: GoodsEntryKind.inventory.inventoryKind)
-        return Self.goodsItems(from: rows)
+        let tagMap = await bestEffortGoodsTagMap(inventoryIDs: rows.map(\.id))
+        return Self.goodsItems(from: rows, tagMap: tagMap)
     }
 
     func loadWishes() async throws -> [WishItem] {
         let rows = try await fetchOwnGoodsRows(kind: GoodsEntryKind.wish.inventoryKind)
-        return Self.wishItems(from: rows)
+        let tagMap = await bestEffortGoodsTagMap(inventoryIDs: rows.map(\.id))
+        return Self.wishItems(from: rows, tagMap: tagMap)
     }
 
     private func fetchOwnGoodsRows(kind: String) async throws -> [GoodsInventoryRow] {
@@ -37,6 +39,26 @@ struct SupabaseOwnedGoodsPersistence: Sendable {
         }
     }
 
+    private func bestEffortGoodsTagMap(inventoryIDs: [UUID]) async -> [UUID: [GoodsTag]] {
+        do {
+            return try await loadGoodsTagMap(inventoryIDs: inventoryIDs)
+        } catch {
+            return [:]
+        }
+    }
+
+    private func loadGoodsTagMap(inventoryIDs: [UUID]) async throws -> [UUID: [GoodsTag]] {
+        guard !inventoryIDs.isEmpty else {
+            return [:]
+        }
+        let rows: [OwnedGoodsInventoryTagRow] = try await client.fetchRows(
+            from: "goods_inventory_tags",
+            select: OwnedGoodsInventoryTagRow.select,
+            queryItems: Self.goodsTagQueryItems(inventoryIDs: inventoryIDs)
+        )
+        return Self.goodsTagMap(from: rows)
+    }
+
     static func ownGoodsQueryItems(userID: UUID, kind: String) -> [URLQueryItem] {
         [
             URLQueryItem(name: "user_id", value: "eq.\(userID.uuidString.lowercased())"),
@@ -45,11 +67,46 @@ struct SupabaseOwnedGoodsPersistence: Sendable {
         ]
     }
 
+    static func goodsTagQueryItems(inventoryIDs: [UUID]) -> [URLQueryItem] {
+        [
+            URLQueryItem(
+                name: "inventory_id",
+                value: "in.(\(inventoryIDs.map { $0.uuidString.lowercased() }.sorted().joined(separator: ",")))"
+            ),
+            URLQueryItem(name: "order", value: "created_at.asc")
+        ]
+    }
+
+    static func goodsTagMap(from rows: [OwnedGoodsInventoryTagRow]) -> [UUID: [GoodsTag]] {
+        rows.reduce(into: [UUID: [GoodsTag]]()) { result, row in
+            guard let tag = row.tag?.goodsTag else {
+                return
+            }
+            result[row.inventoryId, default: []].append(tag)
+        }
+    }
+
     static func goodsItems(from rows: [GoodsInventoryRow]) -> [GoodsItem] {
-        rows.map(\.goodsItem)
+        goodsItems(from: rows, tagMap: [:])
+    }
+
+    static func goodsItems(from rows: [GoodsInventoryRow], tagMap: [UUID: [GoodsTag]]) -> [GoodsItem] {
+        rows.map { row in
+            var item = row.goodsItem
+            item.tags = tagMap[row.id] ?? []
+            return item
+        }
     }
 
     static func wishItems(from rows: [GoodsInventoryRow]) -> [WishItem] {
-        rows.map(\.wishItem)
+        wishItems(from: rows, tagMap: [:])
+    }
+
+    static func wishItems(from rows: [GoodsInventoryRow], tagMap: [UUID: [GoodsTag]]) -> [WishItem] {
+        rows.map { row in
+            var item = row.wishItem
+            item.tags = tagMap[row.id] ?? []
+            return item
+        }
     }
 }

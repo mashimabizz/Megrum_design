@@ -11,6 +11,7 @@ struct TradeMessageBubble: View {
     var isApprovingCancel: Bool = false
     var onOpenImage: (URL) -> Void
     var onOpenDispute: (TradeDisputeSummary) -> Void = { _ in }
+    var onOpenEvidenceList: () -> Void = {}
     var onApproveCancel: () -> Void = {}
 
     private var bodyText: String? {
@@ -66,11 +67,16 @@ struct TradeMessageBubble: View {
 
     @ViewBuilder
     private var systemMessage: some View {
-        let presentation = TradeSystemMessagePresentation(message: message)
+        let presentation = TradeSystemMessagePresentation(message: message, isMine: isMine)
         if let disputeSummary = TradeDisputeSummary(message: message) {
             Button {
                 onOpenDispute(disputeSummary)
             } label: {
+                systemMessageContent(presentation: presentation, showsDisclosure: true)
+            }
+            .buttonStyle(.plain)
+        } else if TradeEvidenceSystemMessage.isEvidenceNotice(message) {
+            Button(action: onOpenEvidenceList) {
                 systemMessageContent(presentation: presentation, showsDisclosure: true)
             }
             .buttonStyle(.plain)

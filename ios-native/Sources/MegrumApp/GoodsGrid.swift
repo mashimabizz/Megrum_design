@@ -328,7 +328,6 @@ struct GoodsGrid: View {
     var onToggleSelection: ((GoodsItem) -> Void)?
     @State private var detailItem: GoodsItem?
     @State private var actionMessage: String?
-    @State private var pendingDeleteItem: GoodsItem?
     @State private var reportItem: GoodsItem?
 
     private var gridItems: [GridItem] {
@@ -399,24 +398,6 @@ struct GoodsGrid: View {
                 Text(actionMessage)
             }
         }
-        .confirmationDialog("削除しますか？", isPresented: Binding(
-            get: { pendingDeleteItem != nil },
-            set: { if !$0 { pendingDeleteItem = nil } }
-        ), titleVisibility: .visible) {
-            Button("削除する", role: .destructive) {
-                if let pendingDeleteItem {
-                    onDeleteItem?(pendingDeleteItem)
-                }
-                pendingDeleteItem = nil
-            }
-            Button("キャンセル", role: .cancel) {
-                pendingDeleteItem = nil
-            }
-        } message: {
-            if let pendingDeleteItem {
-                Text("「\(pendingDeleteItem.title)」を削除します。")
-            }
-        }
     }
 
     private func handle(_ action: GoodsTileAction, item: GoodsItem) {
@@ -455,7 +436,7 @@ struct GoodsGrid: View {
             }
         case .delete:
             if item.ownerID == viewerID, onDeleteItem != nil {
-                pendingDeleteItem = item
+                onDeleteItem?(item)
             } else {
                 actionMessage = "「\(item.title)」を削除する処理は、自分のマイグッズ/Wishでのみ使えます。"
             }

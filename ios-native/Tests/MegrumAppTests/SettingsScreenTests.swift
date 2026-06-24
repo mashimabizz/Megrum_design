@@ -6,7 +6,7 @@ final class SettingsScreenTests: XCTestCase {
     func testDrawerItemsMatchRnProfileDrawerDestinations() {
         XCTAssertEqual(
             AppDrawerDestination.primaryItems,
-            [.profile, .notifications, .oshiSettings, .schedules]
+            [.profile, .notifications, .oshiSettings, .schedules, .paymentSettings, .exchangeSettings]
         )
         XCTAssertFalse(AppDrawerDestination.primaryItems.contains(.profileEdit))
         XCTAssertEqual(
@@ -17,8 +17,12 @@ final class SettingsScreenTests: XCTestCase {
         XCTAssertEqual(AppDrawerDestination.notifications.title, "通知")
         XCTAssertEqual(AppDrawerDestination.oshiSettings.title, "推し設定")
         XCTAssertEqual(AppDrawerDestination.schedules.title, "スケジュール")
+        XCTAssertEqual(AppDrawerDestination.paymentSettings.title, "支払条件設定")
+        XCTAssertEqual(AppDrawerDestination.exchangeSettings.title, "交換条件設定")
         XCTAssertEqual(AppDrawerDestination.help.title, "ヘルプ")
         XCTAssertEqual(AppDrawerDestination.oshiSettings.systemImage, "sparkles")
+        XCTAssertEqual(AppDrawerDestination.paymentSettings.systemImage, "yensign.circle")
+        XCTAssertEqual(AppDrawerDestination.exchangeSettings.systemImage, "arrow.left.arrow.right.circle")
         XCTAssertEqual(AppDrawerDestination.settings.systemImage, "checkmark.shield")
     }
 
@@ -29,7 +33,7 @@ final class SettingsScreenTests: XCTestCase {
                 .notifications,
                 .mobilePush,
                 .address,
-                .payment,
+                .premium,
                 .blockedUsers,
                 .privacy,
                 .loginSecurity,
@@ -124,15 +128,20 @@ final class SettingsScreenTests: XCTestCase {
             bankAccountType: " 普通 ",
             bankAccountNumber: "1234567",
             bankAccountHolder: " ヤマダ ハナコ ",
-            otherNote: " メルペイ、楽天ペイも相談可 "
+            otherNote: " 楽天ペイ相談可能です "
         )
 
         XCTAssertNil(draft.validationMessage)
-        XCTAssertEqual(draft.normalized.summaryText, "銀行振込 / PayPay / 現金交換 / メルペイ、楽天ペイも相談可")
+        XCTAssertEqual(PaymentSettingsDraft.limitedOtherNote("123456789"), "12345678")
+        XCTAssertEqual(draft.normalized.otherNote, "楽天ペイ相談可能")
+        XCTAssertEqual(draft.normalized.summaryText, "銀行振込 / PayPay / 現金交換 / 楽天ペイ相談可能")
         XCTAssertEqual(draft.normalized.bankPreviewText, "口座: みずほ銀行 渋谷支店 普通 ****4567")
 
         draft.otherNote = " "
         XCTAssertEqual(draft.validationMessage, "その他を選ぶ場合は自由入力を入力してください")
+
+        draft.set(.other, isSelected: false)
+        XCTAssertNil(draft.settings(userID: UUID()).otherNote)
     }
 
     func testLoginSecuritySummaryFormatsAuthenticatedSession() {

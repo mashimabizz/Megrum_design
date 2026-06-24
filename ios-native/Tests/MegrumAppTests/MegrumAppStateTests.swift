@@ -189,6 +189,27 @@ final class MegrumAppStateTests: XCTestCase {
         XCTAssertNil(state.errorMessage)
     }
 
+    func testAppStateSavesPreviewPaymentSettings() async {
+        let state = MegrumAppState(repository: PreviewMegrumRepository())
+
+        await state.loadInitialData()
+        let saved = await state.savePaymentSettings(
+            UserPaymentSettings(
+                userID: UUID(uuidString: "99999999-9999-9999-9999-999999999999")!,
+                methods: [.other, .paypay],
+                otherNote: "楽天ペイ相談可能"
+            )
+        )
+
+        XCTAssertTrue(saved)
+        XCTAssertEqual(state.paymentSettings?.methods, [.paypay, .other])
+        XCTAssertEqual(state.paymentSettings?.otherNote, "楽天ペイ相談可能")
+        XCTAssertEqual(state.viewer?.paymentMethods, [.paypay, .other])
+        XCTAssertEqual(state.viewer?.paymentNote, "楽天ペイ相談可能")
+        XCTAssertFalse(state.isSavingPaymentSettings)
+        XCTAssertNil(state.errorMessage)
+    }
+
     func testAppStateRejectsInvalidOwnProfileHandle() async {
         let state = MegrumAppState(repository: PreviewMegrumRepository())
 
@@ -387,6 +408,26 @@ final class MegrumAppStateTests: XCTestCase {
         XCTAssertEqual(state.threads.first?.id, record?.id)
     }
 
+    func testAppStateCreatesNearbyBoardThreadWithoutViewerPrefecture() async {
+        let state = MegrumAppState(repository: NoPrefectureBoardCreationRepository())
+        await state.loadInitialData()
+
+        let record = await state.createBoardThreadRecord(
+            title: " 近くの様子 ",
+            body: " 入口付近に集まっています ",
+            scope: .nearby3km,
+            latitude: 35.681236,
+            longitude: 139.767125,
+            prefecture: nil
+        )
+
+        XCTAssertEqual(record?.title, "近くの様子")
+        XCTAssertEqual(record?.latitude, 35.681236)
+        XCTAssertEqual(record?.longitude, 139.767125)
+        XCTAssertNil(record?.prefecture)
+        XCTAssertNil(state.errorMessage)
+    }
+
     func testAppStateCreatesPreviewGroomPost() async {
         let state = MegrumAppState(repository: PreviewMegrumRepository())
         await state.loadInitialData()
@@ -441,6 +482,26 @@ final class MegrumAppStateTests: XCTestCase {
         XCTAssertEqual(state.groomReplies(for: postID).last?.recipientID, recipientID)
         XCTAssertNil(state.sendingGroomReplyPostID)
         XCTAssertNil(state.errorMessage)
+    }
+
+    func testAppStateLoadsOwnGroomArchiveWithEngagement() async {
+        let state = MegrumAppState(repository: PreviewMegrumRepository())
+
+        await state.loadInitialData()
+        await state.loadGroomArchive()
+
+        XCTAssertFalse(state.ownGroomArchive.isEmpty)
+        XCTAssertTrue(state.ownGroomArchive.allSatisfy { $0.authorID == state.viewer?.id })
+        XCTAssertEqual(
+            state.ownGroomArchive.map(\.id),
+            GroomArchiveOrdering.sorted(state.ownGroomArchive).map(\.id)
+        )
+
+        let firstArchivedPostID = try! XCTUnwrap(state.ownGroomArchive.first?.id)
+        XCTAssertFalse(state.groomReactions(for: firstArchivedPostID).isEmpty)
+        XCTAssertFalse(state.groomReplies(for: firstArchivedPostID).isEmpty)
+        XCTAssertNil(state.errorMessage)
+        XCTAssertFalse(state.isLoadingGroomArchive)
     }
 
     func testAppStateLoadsAndSendsPreviewMeguriMessages() async {
@@ -623,7 +684,8 @@ final class MegrumAppStateTests: XCTestCase {
                 kind: .wish,
                 title: "新しいWish",
                 groupID: groupID,
-                goodsTypeID: goodsTypeID
+                goodsTypeID: goodsTypeID,
+                photoURLs: ["https://example.com/copied-wish.jpg"]
             )
         )
 
@@ -634,6 +696,7 @@ final class MegrumAppStateTests: XCTestCase {
         XCTAssertEqual(state.inventory.first?.quantity, 2)
         XCTAssertEqual(state.wishes.count, wishCount + 1)
         XCTAssertEqual(state.wishes.first?.title, "新しいWish")
+        XCTAssertEqual(state.wishes.first?.imageURL?.absoluteString, "https://example.com/copied-wish.jpg")
         XCTAssertFalse(state.isCreatingGoodsEntry)
     }
 
@@ -960,6 +1023,13 @@ final class MegrumAppStateTests: XCTestCase {
         XCTAssertTrue(added)
         XCTAssertNotNil(state.proposals.first(where: { $0.id == proposalID })?.evidencePhotoURL)
         XCTAssertFalse(state.evidencePhotos(for: state.proposals.first { $0.id == proposalID }!).isEmpty)
+        XCTAssertTrue(
+            state.messages(for: proposalID).contains { message in
+                message.messageType == .system
+                    && message.meta["action"] == "evidence_added"
+                    && message.body == "取引証跡が追加されました"
+            }
+        )
         XCTAssertNil(state.addingEvidenceProposalID)
 
         let approved = await state.approveTradeEvidence(proposalID: proposalID)
@@ -1302,6 +1372,25 @@ final class MegrumAppStateTests: XCTestCase {
         XCTAssertEqual(state.userEvaluationsByUserID[partnerID]?.first?.stars, 5)
     }
 
+    func testAppStateRefreshHomeDiscoveryReloadsSnapshotAndHomeCandidates() async {
+        let repository = HomeDiscoveryRefreshRepository()
+        let state = MegrumAppState(repository: repository)
+
+        await state.loadInitialData()
+        XCTAssertEqual(state.viewer?.displayName, "初回ユーザー")
+        XCTAssertEqual(state.homeMatchedItems.map(\.title), ["初回候補"])
+
+        await state.refreshHomeDiscovery()
+
+        XCTAssertEqual(state.viewer?.displayName, "更新後ユーザー")
+        XCTAssertEqual(state.homeMatchedItems.map(\.title), ["更新候補"])
+        XCTAssertNil(state.errorMessage)
+
+        let counts = await repository.countsSnapshot()
+        XCTAssertEqual(counts.snapshotLoads, 2)
+        XCTAssertEqual(counts.homeCandidateLoads, 2)
+    }
+
     private static func nativeInfoPlist() throws -> [String: Any] {
         let data = try Data(contentsOf: iosNativeRoot.appendingPathComponent("App/Info.plist"))
         let plist = try PropertyListSerialization.propertyList(from: data, options: [], format: nil)
@@ -1330,6 +1419,58 @@ final class MegrumAppStateTests: XCTestCase {
             .deletingLastPathComponent()
             .deletingLastPathComponent()
             .deletingLastPathComponent()
+    }
+}
+
+private actor HomeDiscoveryRefreshRepository: MegrumRepository {
+    private let viewerID = UUID(uuidString: "11111111-2222-3333-4444-555555555555")!
+    private let partnerID = UUID(uuidString: "66666666-7777-8888-9999-000000000000")!
+    private var snapshotLoads = 0
+    private var homeCandidateLoads = 0
+
+    func loadInitialSnapshot() async throws -> MegrumAppSnapshot {
+        snapshotLoads += 1
+        let displayName = snapshotLoads == 1 ? "初回ユーザー" : "更新後ユーザー"
+        return MegrumAppSnapshot(
+            viewer: UserProfile(
+                id: viewerID,
+                handle: "michilion",
+                displayName: displayName
+            ),
+            inventory: [
+                GoodsItem(
+                    id: UUID(uuidString: "11111111-2222-3333-4444-555555555556")!,
+                    ownerID: viewerID,
+                    title: "自分の譲るもの",
+                    quantity: 1
+                )
+            ],
+            wishes: [],
+            listings: [],
+            proposals: [],
+            grooms: [],
+            threads: []
+        )
+    }
+
+    func loadHomeCandidateSections() async throws -> HomeCandidateSections {
+        homeCandidateLoads += 1
+        let title = homeCandidateLoads == 1 ? "初回候補" : "更新候補"
+        return HomeCandidateSections(
+            matchedItems: [
+                GoodsItem(
+                    id: UUID(uuidString: "66666666-7777-8888-9999-000000000001")!,
+                    ownerID: partnerID,
+                    title: title,
+                    quantity: 1
+                )
+            ],
+            possibleItems: []
+        )
+    }
+
+    func countsSnapshot() -> (snapshotLoads: Int, homeCandidateLoads: Int) {
+        (snapshotLoads, homeCandidateLoads)
     }
 }
 
@@ -1584,6 +1725,38 @@ private struct SingleSnapshotRepository: MegrumRepository {
             proposals: [],
             grooms: [],
             threads: []
+        )
+    }
+}
+
+private struct NoPrefectureBoardCreationRepository: MegrumRepository {
+    private let viewerID = UUID(uuidString: "55555555-5555-5555-5555-555555555555")!
+
+    func loadInitialSnapshot() async throws -> MegrumAppSnapshot {
+        MegrumAppSnapshot(
+            viewer: UserProfile(
+                id: viewerID,
+                handle: "no_prefecture",
+                displayName: "都道府県なし"
+            ),
+            inventory: [],
+            wishes: [],
+            proposals: [],
+            grooms: [],
+            threads: []
+        )
+    }
+
+    func createBoardThread(_ input: BoardThreadCreateInput) async throws -> BoardThread {
+        BoardThread(
+            id: UUID(uuidString: "55555555-5555-5555-5555-555555555556")!,
+            authorID: input.authorID,
+            title: input.title.trimmingCharacters(in: .whitespacesAndNewlines),
+            body: input.body.trimmingCharacters(in: .whitespacesAndNewlines),
+            audience: input.audience,
+            latitude: input.latitude,
+            longitude: input.longitude,
+            prefecture: input.prefecture
         )
     }
 }

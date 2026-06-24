@@ -490,6 +490,11 @@ enum MatchRelationComposer {
         if option.option.logic == .all {
             return deduplicatedIDs(visibleWishes.compactMap { $0.candidates.first?.item.id })
         }
+        if option.option.logic == .atLeast {
+            return deduplicatedIDs(visibleWishes.compactMap { $0.candidates.first?.item.id })
+                .prefix(max(1, option.option.minimumCount))
+                .map { $0 }
+        }
         return visibleWishes.first?.candidates.first.map { [$0.item.id] } ?? []
     }
 

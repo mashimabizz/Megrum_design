@@ -50,3 +50,19 @@ struct GoodsInventoryRow: Decodable, Sendable {
         )
     }
 }
+
+struct OwnedGoodsInventoryTagRow: Decodable, Sendable {
+    static let select = "inventory_id,tag:tags_master(id,label)"
+
+    var inventoryId: UUID
+    var tag: OwnedGoodsTagRow?
+}
+
+struct OwnedGoodsTagRow: Decodable, Sendable {
+    var id: UUID
+    var label: String
+
+    var goodsTag: GoodsTag {
+        GoodsTag(id: id, name: label)
+    }
+}

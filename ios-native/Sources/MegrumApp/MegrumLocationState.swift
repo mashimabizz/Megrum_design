@@ -47,9 +47,12 @@ final class MegrumLocationState: NSObject, ObservableObject {
         manager.desiredAccuracy = kCLLocationAccuracyHundredMeters
     }
 
-    func requestCurrentLocation() {
+    func requestCurrentLocation(clearsPreviousCoordinate: Bool = false) {
         locationErrorMessage = nil
         resolvedLocationLabel = nil
+        if clearsPreviousCoordinate {
+            coordinate = nil
+        }
         authorizationStatus = manager.authorizationStatus
 
         guard CLLocationManager.locationServicesEnabled() else {
@@ -165,7 +168,7 @@ final class MegrumLocationState: NSObject, ObservableObject {
         case .servicesDisabled:
             return MegrumLocationNotice(message: "位置情報サービスがオフです", actionTitle: "設定")
         case .notDetermined:
-            return MegrumLocationNotice(message: "現在地を許可すると、近くのグルームと3km圏内の掲示板を表示できます", actionTitle: "許可")
+            return MegrumLocationNotice(message: "現在地を許可すると、近くのグルームと1km圏内の掲示板を表示できます", actionTitle: "許可")
         case .requesting:
             return MegrumLocationNotice(message: "現在地を確認しています", actionTitle: nil)
         case .authorized:

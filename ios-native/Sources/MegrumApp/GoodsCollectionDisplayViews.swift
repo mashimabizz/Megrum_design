@@ -159,8 +159,7 @@ struct CollectionFilterBar: View {
     @Binding var selectedGroupID: UUID?
     @Binding var selectedGoodsTypeID: UUID?
     @Binding var selectedTagNames: Set<String>
-    var availableGroups: [OshiGroup]
-    var availableGoodsTypes: [GoodsType]
+    var items: [GoodsItem]
     var availableTagNames: [String]
 
     var body: some View {
@@ -204,6 +203,20 @@ struct CollectionFilterBar: View {
                 }
             }
         }
+    }
+
+    private var availableGroups: [OshiGroup] {
+        GoodsCollectionFilterChoices.groups(
+            items: items,
+            allGroups: appState.oshiGroups
+        )
+    }
+
+    private var availableGoodsTypes: [GoodsType] {
+        GoodsCollectionFilterChoices.goodsTypes(
+            items: items,
+            allGoodsTypes: appState.goodsTypes
+        )
     }
 }
 
@@ -397,6 +410,8 @@ struct GoodsCollectionResultsArea: View {
     var onDeleteItem: ((GoodsItem) -> Void)?
     var onBeginSelection: ((GoodsItem) -> Void)?
     var onToggleSelection: ((GoodsItem) -> Void)?
+    var adPlacement: AdPlacement?
+    var adDisplayContext: AdDisplayContext = AdDisplayContext()
 
     var body: some View {
         if isShowingLoadingState {
@@ -427,6 +442,12 @@ struct GoodsCollectionResultsArea: View {
                 onBeginSelection: onBeginSelection,
                 onToggleSelection: onToggleSelection
             )
+            if let adPlacement {
+                AdBannerSlot(
+                    placement: adPlacement,
+                    displayContext: adDisplayContext
+                )
+            }
         }
     }
 }

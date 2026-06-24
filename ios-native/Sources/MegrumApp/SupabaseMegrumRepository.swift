@@ -29,6 +29,7 @@ public struct SupabaseMegrumRepository: MegrumRepository {
     private let paymentSettingsPersistence: SupabasePaymentSettingsPersistence
     private let faceRecognitionClient: SupabaseFaceRecognitionClient
     private let chatPhotoStorage: SupabaseChatPhotoStorage
+    private let entitlementClient: SupabaseEntitlementClient
     private let viewerID: UUID
 
     public init(client: SupabaseRESTClient, viewerID: UUID) {
@@ -82,6 +83,7 @@ public struct SupabaseMegrumRepository: MegrumRepository {
         self.paymentSettingsPersistence = SupabasePaymentSettingsPersistence(client: client)
         self.faceRecognitionClient = SupabaseFaceRecognitionClient(client: client)
         self.chatPhotoStorage = SupabaseChatPhotoStorage(client: client)
+        self.entitlementClient = SupabaseEntitlementClient(client: client)
         self.viewerID = viewerID
         self.initialSnapshotLoader = SupabaseInitialSnapshotLoader(
             accountProfilePersistence: accountProfilePersistence,
@@ -96,6 +98,10 @@ public struct SupabaseMegrumRepository: MegrumRepository {
 
     public func loadInitialSnapshot() async throws -> MegrumAppSnapshot {
         try await initialSnapshotLoader.loadSnapshot()
+    }
+
+    public func loadSubscriptionState() async throws -> UserSubscriptionState {
+        try await entitlementClient.loadSubscriptionState(userID: viewerID)
     }
 
     public func loadHomeCandidateSections() async throws -> HomeCandidateSections {
@@ -231,6 +237,10 @@ public struct SupabaseMegrumRepository: MegrumRepository {
         try await proposalClient.loadEvidencePhotos(proposalID: proposalID)
     }
 
+    public func deleteTradeEvidencePhoto(proposalID: UUID, photoID: UUID) async throws -> TradeProposal {
+        try await proposalClient.deleteEvidencePhoto(userID: viewerID, proposalID: proposalID, photoID: photoID)
+    }
+
     public func approveTradeEvidence(proposalID: UUID) async throws -> TradeProposal {
         try await proposalClient.approveEvidence(userID: viewerID, proposalID: proposalID)
     }
@@ -353,6 +363,10 @@ public struct SupabaseMegrumRepository: MegrumRepository {
         try await tradeSchedulePersistence.loadPersonalSchedules(startAt: startAt, endAt: endAt)
     }
 
+    public func loadProfileSchedules(userID: UUID, startAt: Date, endAt: Date) async throws -> [PersonalSchedule] {
+        try await tradeSchedulePersistence.loadProfileSchedules(userID: userID, startAt: startAt, endAt: endAt)
+    }
+
     public func createSchedule(_ input: PersonalScheduleCreateInput) async throws -> PersonalSchedule {
         try await tradeSchedulePersistence.createSchedule(input)
     }
@@ -382,6 +396,18 @@ public struct SupabaseMegrumRepository: MegrumRepository {
             longitude: longitude,
             radiusMeters: radiusMeters
         )
+    }
+
+    public func loadOwnGroomArchive(limit: Int) async throws -> [GroomPost] {
+        try await groomClient.loadOwnGroomArchive(userID: viewerID, limit: limit)
+    }
+
+    public func loadGroomReactions(postIDs: [UUID]) async throws -> [GroomReaction] {
+        try await groomClient.loadReactions(postIDs: postIDs)
+    }
+
+    public func loadGroomReplies(postIDs: [UUID]) async throws -> [GroomReply] {
+        try await groomClient.loadReplies(postIDs: postIDs)
     }
 
     public func createGroomPost(_ input: GroomPostCreateInput) async throws -> GroomPost {

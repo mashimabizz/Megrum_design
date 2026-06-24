@@ -70,8 +70,9 @@ struct IndividualListingsContent: View {
     var characters: [OshiCharacter]
     var goodsTypes: [GoodsType]
     var viewerID: UUID?
-    var onEdit: (IndividualListing) -> Void
+    var onEditOffer: (IndividualListing) -> Void
     var onAddCondition: (IndividualListing) -> Void
+    var onEditExchangeCondition: (IndividualListing) -> Void
     var onDelete: (IndividualListing) -> Void
     @State private var activeListingID: UUID?
 
@@ -102,11 +103,14 @@ struct IndividualListingsContent: View {
                         characters: characters,
                         goodsTypes: goodsTypes,
                         canEdit: activeListing.ownerID == viewerID,
-                        onEdit: {
-                            onEdit(activeListing)
+                        onEditOffer: {
+                            onEditOffer(activeListing)
                         },
                         onAddCondition: {
                             onAddCondition(activeListing)
+                        },
+                        onEditExchangeCondition: {
+                            onEditExchangeCondition(activeListing)
                         },
                         onDelete: {
                             onDelete(activeListing)
@@ -234,8 +238,9 @@ struct IndividualListingDesignCard: View {
     var characters: [OshiCharacter]
     var goodsTypes: [GoodsType]
     var canEdit: Bool
-    var onEdit: () -> Void
+    var onEditOffer: () -> Void
     var onAddCondition: () -> Void
+    var onEditExchangeCondition: () -> Void
     var onDelete: () -> Void
 
     private var haveItems: [GoodsItem] {
@@ -264,7 +269,10 @@ struct IndividualListingDesignCard: View {
                     listing: listing,
                     haveItems: haveItems,
                     goodsTypes: goodsTypes,
-                    fallbackCashAmount: sortedOptions.first(where: \.isCashOffer)?.cashAmount
+                    fallbackCashAmount: IndividualListingHaveCashSummary.extract(from: listing.note).summary?.amount
+                        ?? sortedOptions.first(where: \.isCashOffer)?.cashAmount,
+                    canEdit: canEdit,
+                    onEdit: onEditOffer
                 )
                 .frame(maxWidth: .infinity)
             }
@@ -272,6 +280,7 @@ struct IndividualListingDesignCard: View {
             IndividualListingExchangeConditionPanel(
                 listing: listing,
                 canEdit: canEdit,
+                onEdit: onEditExchangeCondition,
                 onDelete: onDelete
             )
         }
@@ -348,7 +357,7 @@ private struct IndividualListingCard: View {
                     .accessibilityLabel("個別募集を編集")
                 }
 
-                Text(listing.haveLogic == .all ? "譲るもの全部" : "どれか譲る")
+                Text(IndividualListingListPresentation.haveLogicTitle(for: listing))
                     .font(.system(size: 13, weight: .heavy, design: .rounded))
                     .foregroundStyle(MegrumTheme.muted)
             }

@@ -35,6 +35,10 @@ final class SupabaseInitialSnapshotLoaderTests: XCTestCase {
         XCTAssertEqual(SupabaseInitialSnapshotLoader.defaultGroomRadiusMeters, 1_000)
     }
 
+    func testListingsAreRequiredForInitialSnapshot() {
+        XCTAssertTrue(SupabaseInitialSnapshotLoader.requiresListingsForInitialSnapshot)
+    }
+
     private func makeViewer(prefecture: String?) -> UserProfile {
         UserProfile(
             id: UUID(uuidString: "00000000-0000-0000-0000-000000000981")!,

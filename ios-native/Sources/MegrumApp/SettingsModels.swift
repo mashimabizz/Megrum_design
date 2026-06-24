@@ -106,6 +106,7 @@ enum SettingsEssentialRoute: String, CaseIterable, Identifiable {
     case mobilePush
     case address
     case payment
+    case premium
     case blockedUsers
     case privacy
     case loginSecurity
@@ -122,7 +123,7 @@ enum SettingsEssentialRoute: String, CaseIterable, Identifiable {
         .notifications,
         .mobilePush,
         .address,
-        .payment,
+        .premium,
         .blockedUsers,
         .privacy,
         .loginSecurity,

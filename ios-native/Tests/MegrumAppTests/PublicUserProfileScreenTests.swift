@@ -3,6 +3,19 @@ import MegrumCore
 import XCTest
 
 final class PublicUserProfileScreenTests: XCTestCase {
+    func testPublicProfileUsesOwnProfileCompactHeaderMetrics() {
+        XCTAssertEqual(PublicProfileLayoutMetrics.contentSpacing, OwnProfileLayoutMetrics.contentSpacing)
+        XCTAssertEqual(PublicProfileLayoutMetrics.horizontalPadding, OwnProfileLayoutMetrics.horizontalPadding)
+        XCTAssertEqual(PublicProfileLayoutMetrics.topPadding, OwnProfileLayoutMetrics.topPadding)
+        XCTAssertEqual(PublicProfileLayoutMetrics.bottomPadding, OwnProfileLayoutMetrics.bottomPadding)
+        XCTAssertEqual(PublicProfileLayoutMetrics.compactHeroAvatarSize, OwnProfileLayoutMetrics.compactHeroAvatarSize)
+        XCTAssertEqual(PublicProfileLayoutMetrics.compactHeroAvatarSize, 70)
+        XCTAssertEqual(ProfileVisualHeroDensity.compact.displayNameFontSize, 20)
+        XCTAssertEqual(ProfileVisualHeroDensity.compact.handleFontSize, 13)
+        XCTAssertEqual(ProfileVisualHeroDensity.compact.scheduleActionHeight, 38)
+        XCTAssertGreaterThanOrEqual(ProfileVisualHeroDensity.compact.statMinWidth, 52)
+    }
+
     func testPublicOshiTagsKeepGroupAndMemberInSameColorGroup() {
         let groupID = UUID(uuidString: "10000000-0000-0000-0000-000000000101")!
         let characterID = UUID(uuidString: "10000000-0000-0000-0000-000000000102")!
@@ -89,5 +102,40 @@ final class PublicUserProfileScreenTests: XCTestCase {
         XCTAssertFalse(state.showsLoading)
         XCTAssertFalse(state.showsEmpty)
         XCTAssertEqual(state.evaluationCount, 1)
+    }
+
+    func testPreviewRepositoryLoadsProfileSchedulesForPartner() async throws {
+        let partnerSchedules = NativePreviewData.schedules.filter { $0.userID == NativePreviewData.partnerID }
+        let startAt = try XCTUnwrap(partnerSchedules.map(\.startAt).min()).addingTimeInterval(-3_600)
+        let endAt = try XCTUnwrap(partnerSchedules.map(\.endAt).max()).addingTimeInterval(3_600)
+
+        let schedules = try await PreviewMegrumRepository().loadProfileSchedules(
+            userID: NativePreviewData.partnerID,
+            startAt: startAt,
+            endAt: endAt
+        )
+
+        XCTAssertFalse(schedules.isEmpty)
+        XCTAssertTrue(schedules.allSatisfy { $0.userID == NativePreviewData.partnerID })
+        XCTAssertTrue(schedules.contains { $0.title == "開演前準備" })
+    }
+
+    @MainActor
+    func testAppStateStoresProfileSchedulesByUserID() async throws {
+        let partnerSchedules = NativePreviewData.schedules.filter { $0.userID == NativePreviewData.partnerID }
+        let startAt = try XCTUnwrap(partnerSchedules.map(\.startAt).min()).addingTimeInterval(-3_600)
+        let endAt = try XCTUnwrap(partnerSchedules.map(\.endAt).max()).addingTimeInterval(3_600)
+        let state = MegrumAppState(repository: PreviewMegrumRepository())
+
+        await state.loadProfileSchedules(
+            userID: NativePreviewData.partnerID,
+            startAt: startAt,
+            endAt: endAt
+        )
+
+        let storedSchedules = state.profileSchedules(for: NativePreviewData.partnerID)
+        let loadingUserID = state.loadingProfileScheduleUserID
+        XCTAssertEqual(storedSchedules, partnerSchedules.sorted { $0.startAt < $1.startAt })
+        XCTAssertNil(loadingUserID)
     }
 }

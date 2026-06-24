@@ -32,6 +32,7 @@ struct TradeDetailContent: View {
     var onReject: () -> Void
     var onCounterProposal: () -> Void
     var onOpenEvidenceCamera: () -> Void
+    var onOpenEvidenceList: () -> Void
     var onOpenImage: (URL) -> Void
     var onApproveEvidence: () -> Void
     var onRate: () -> Void
@@ -79,6 +80,7 @@ struct TradeDetailContent: View {
                             isApprovingCancel: isApprovingCancel,
                             onOpenImage: onOpenImage,
                             onOpenDispute: onOpenDispute,
+                            onOpenEvidenceList: onOpenEvidenceList,
                             onApproveCancel: onApproveCancel
                         )
                         TradeDetailEvidenceSection(
@@ -91,6 +93,7 @@ struct TradeDetailContent: View {
                             isApproving: isApprovingEvidence,
                             canUseCamera: canUseCamera,
                             onOpenCamera: onOpenEvidenceCamera,
+                            onOpenEvidenceList: onOpenEvidenceList,
                             onOpenImage: onOpenImage,
                             onApprove: onApproveEvidence,
                             onRate: onRate

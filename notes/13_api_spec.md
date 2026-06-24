@@ -3,8 +3,8 @@
 > **目的**：Megrum のバックエンドAPI（REST）の draft 仕様。実装着手時の正解集。
 > 全エンドポイントを `[METHOD /path]` の形式で網羅し、各々で入力・出力・認証要否・状態遷移・備考を定義。
 
-最終更新: 2026-05-30（iter180）
-ステータス: Draft v1.6
+最終更新: 2026-06-23（iter731）
+ステータス: Draft v1.7
 
 ---
 
@@ -1444,8 +1444,35 @@ Premium 会員またはめぐりPlusの決済セッション開始。
 - **Auth**: 必須
 - **Request**: `{ plan_type: "premium_monthly" | "premium_yearly" | "meguri_plus_monthly" | "monthly" | "yearly", provider: "stripe" | "apple" | "google" }`
 - **Response 200**: `{ checkout_url, session_id }`（Stripe 等の決済画面 URL）
-- **備考**: Apple/Google の場合は in-app purchase でクライアント側完結 ⚠️
+- **備考**: iOSのApple In-App PurchaseはStoreKitで購入し、購入後に `POST /api/v1/subscriptions/apple/sync` でサーバー検証・権限反映する。Stripe等の外部checkoutは、iOSアプリ内のデジタル機能解放導線には使わない。
 - **Screen**: 「Premium 会員になる」/「めぐりPlusをはじめる」CTA → 決済画面
+
+### POST /api/v1/subscriptions/apple/sync
+
+Swift Native iOS版がStoreKit購入・復元・`currentEntitlements` 読み込み後に、サーバーへApple transactionを同期する。
+
+- **Auth**: 必須
+- **Request**: `{ product_id, transaction_id, original_transaction_id, signed_transaction_info, signed_renewal_info?, environment }`
+- **Response 200**: `{ subscription: { plan_type, status, current_period_end, cancelled_at } | null, entitlements: { premium: boolean, meguri_plus: boolean } }`
+- **Side effects**:
+  - Apple署名済みtransactionをサーバー側で検証
+  - `product_id` を `plan_type` に解決
+  - `subscriptions.transaction_provider='apple'` の行をupsert
+  - `user_entitlements.feature_key='premium'` または `meguri_plus` を更新
+  - `transactions.kind='subscription_initial' | 'subscription_renewal'` を必要に応じて記録
+- **備考**: クライアントは購入直後のUI反映にStoreKitの現在権限を使ってよいが、永続的な機能解放はサーバー集約後の `user_entitlements` を正とする。
+
+### POST /api/v1/subscriptions/webhooks/apple
+
+App Store Server Notificationsを受け取る。
+
+- **Auth**: Apple署名検証
+- **Request**: Apple `signedPayload`
+- **Side effects**:
+  - 通知IDを保存して冪等化
+  - 更新、解約、billing retry、grace period、返金、revocationを `subscriptions` へ反映
+  - `user_entitlements` の `active` / `expires_at` を更新
+  - 必要に応じて `ad_overrides` と月次ブースト付与ジョブを同期
 
 ### POST /api/v1/subscriptions/webhooks/stripe
 

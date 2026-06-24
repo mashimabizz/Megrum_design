@@ -3,8 +3,8 @@
 > **目的**：Megrum の収益化戦略。広告・ブースト・Premium会員・アフィリエイト・公式コラボの設計と Phase別ロードマップ。
 > ファン層に嫌われない健全なマネタイズを実現する。
 
-最終更新: 2026-05-01（iter45）
-ステータス: Draft v1.0（戦略確定、価格は調整余地あり）
+最終更新: 2026-06-23（iter731）
+ステータス: Draft v1.1（戦略確定、Swift Native課金下準備を追加）
 
 ---
 
@@ -359,8 +359,6 @@ ad_overrides table:
 
 詳細は `notes/05_data_model.md` 参照。
 
----
-
 ## 7. Premium 会員
 
 ### 7-1. 設計原則
@@ -425,6 +423,37 @@ subscriptions table:
 ```
 
 詳細は `notes/05_data_model.md` 参照。
+
+### 7-6. Swift Native 実装下準備（iter731）
+
+課金プランの特典はまだ最終固定しない。ただし、実装上の境界は先に固定する。
+
+#### 固定する境界
+
+- iOSアプリ内でデジタル機能を解放する購入は、Apple In-App Purchase / StoreKitを前提にする。
+- アプリの機能判定は、決済プロバイダーの生ステータスではなく `user_entitlements` を見る。
+- `subscriptions` は決済・更新・解約・返金などの原本、`user_entitlements` はアプリが見る利用権の集約結果とする。
+- Premium 会員の広告非表示は `user_entitlements.feature_key='premium'` が有効な時だけ発火する。
+- めぐりPlusは `premium` に含めず、`feature_key='meguri_plus'` として分離する。
+- 打診、取引チャット、証跡、通報、評価、アカウント安全機能は有料権限にしない。
+
+#### Swift側の初期カタログ
+
+| plan_type | StoreKit product id候補 | 価格表示 | 権限 |
+|---|---|---:|---|
+| `premium_monthly` | `megrum.premium.monthly` | 月 ¥500 | `premium` |
+| `premium_yearly` | `megrum.premium.yearly` | 年 ¥4,800 | `premium` |
+| `meguri_plus_monthly` | `megrum.meguri_plus.monthly` | 月 ¥1,000 | `meguri_plus` |
+
+product id は App Store Connect 登録時に最終確認する。変更する場合も、Swift側は `SubscriptionCatalog` の差し替えだけで済むようにする。
+
+#### 次に必要なもの
+
+- App Store Connectでサブスクリプショングループ、商品ID、価格、表示名、説明文を作る。
+- StoreKit 2で商品取得、購入、復元、`currentEntitlements` 読み込みを実装する。
+- サーバー側でApple署名済みtransactionを検証し、`subscriptions` と `user_entitlements` を更新する。
+- App Store Server Notificationsを受け、更新、解約、billing retry、grace period、返金、revocationを反映する。
+- 管理者画面では `plan_overrides` 経由で一時付与/停止できるようにし、直接アプリから `subscriptions` を信じない。
 
 ---
 

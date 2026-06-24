@@ -56,6 +56,139 @@ final class HomeCandidateComposerTests: XCTestCase {
         XCTAssertEqual(resolved, sections)
     }
 
+    func testWishRowRequiresL2MatchOnlyWhenWishSpecifiesCharacter() throws {
+        let groupID = "20000000-0000-0000-0000-0000000000a1"
+        let goodsTypeID = "30000000-0000-0000-0000-0000000000a1"
+        let sanaID = "70000000-0000-0000-0000-0000000000a1"
+        let momoID = "70000000-0000-0000-0000-0000000000a2"
+        let l2Wish = try goodsRow(
+            id: "10000000-0000-0000-0000-0000000000a1",
+            userID: "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+            groupID: groupID,
+            characterID: sanaID,
+            goodsTypeID: goodsTypeID,
+            title: "相手Wish サナ"
+        )
+        let sameL2Item = try goodsRow(
+            id: "10000000-0000-0000-0000-0000000000a2",
+            userID: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+            groupID: groupID,
+            characterID: sanaID,
+            goodsTypeID: goodsTypeID,
+            title: "自分のサナ"
+        )
+        let differentL2Item = try goodsRow(
+            id: "10000000-0000-0000-0000-0000000000a3",
+            userID: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+            groupID: groupID,
+            characterID: momoID,
+            goodsTypeID: goodsTypeID,
+            title: "自分のモモ"
+        )
+        let l1OnlyWish = try goodsRow(
+            id: "10000000-0000-0000-0000-0000000000a4",
+            userID: "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+            groupID: groupID,
+            goodsTypeID: goodsTypeID,
+            title: "相手Wish TWICE"
+        )
+
+        XCTAssertTrue(HomeCandidateComposer.wishRow(l2Wish, matches: sameL2Item))
+        XCTAssertFalse(HomeCandidateComposer.wishRow(l2Wish, matches: differentL2Item))
+        XCTAssertTrue(HomeCandidateComposer.wishRow(l1OnlyWish, matches: differentL2Item))
+    }
+
+    func testComposerMarksPaymentUnknownWhenViewerOrPartnerPaymentIsUnset() throws {
+        func paymentStatus(
+            viewerPaymentMethods: [String],
+            partnerPaymentMethods: [String]
+        ) throws -> HomePaymentConditionStatus? {
+            let viewerID = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
+            let partnerID = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
+            let viewerOfferID = "10000000-0000-0000-0000-0000000000b1"
+            let viewerWishID = "10000000-0000-0000-0000-0000000000b2"
+            let partnerOfferID = "10000000-0000-0000-0000-0000000000b3"
+            let partnerWishID = "10000000-0000-0000-0000-0000000000b4"
+            let groupID = "20000000-0000-0000-0000-0000000000b1"
+            let goodsTypeID = "30000000-0000-0000-0000-0000000000b1"
+
+            let composition = SupabaseHomeComposition(
+                localMode: nil,
+                viewerUser: try userRow(
+                    id: viewerID,
+                    handle: "viewer_trade",
+                    primaryArea: "東京都",
+                    paymentMethods: viewerPaymentMethods
+                ),
+                viewerInventory: [
+                    try goodsRow(
+                        id: viewerOfferID,
+                        userID: viewerID,
+                        groupID: groupID,
+                        goodsTypeID: goodsTypeID,
+                        title: "自分が譲るトレカ"
+                    )
+                ],
+                viewerWishes: [
+                    try goodsRow(
+                        id: viewerWishID,
+                        userID: viewerID,
+                        groupID: groupID,
+                        goodsTypeID: goodsTypeID,
+                        title: "自分のWish"
+                    )
+                ],
+                viewerListings: [],
+                partnerInventory: [
+                    try goodsRow(
+                        id: partnerOfferID,
+                        userID: partnerID,
+                        groupID: groupID,
+                        goodsTypeID: goodsTypeID,
+                        title: "相手が譲るトレカ"
+                    )
+                ],
+                partnerWishes: [
+                    try goodsRow(
+                        id: partnerWishID,
+                        userID: partnerID,
+                        groupID: groupID,
+                        goodsTypeID: goodsTypeID,
+                        title: "相手のWish"
+                    )
+                ],
+                partnerUsers: [
+                    try userRow(
+                        id: partnerID,
+                        handle: "partner_trade",
+                        primaryArea: "東京都",
+                        paymentMethods: partnerPaymentMethods
+                    )
+                ],
+                partnerListings: [],
+                listingWishOptions: [],
+                viewerActivityWindows: [],
+                partnerActivityWindows: [],
+                inventoryTags: [],
+                unreadNotificationIDs: []
+            )
+
+            let sections = HomeCandidateComposer.sections(from: composition)
+            return sections.conditionSignalsByItemID[
+                UUID(uuidString: partnerOfferID)!
+            ]?.payment.status
+        }
+
+        XCTAssertEqual(
+            try paymentStatus(viewerPaymentMethods: [], partnerPaymentMethods: ["paypay"]),
+            .viewerUnset
+        )
+        XCTAssertEqual(
+            try paymentStatus(viewerPaymentMethods: ["paypay"], partnerPaymentMethods: []),
+            .partnerUnset
+        )
+    }
+
     func testComposerPromotesTwoSidedMatches() throws {
         let composition = SupabaseHomeComposition(
             localMode: nil,
@@ -133,6 +266,14 @@ final class HomeCandidateComposerTests: XCTestCase {
             HomeCandidateLinkCounts(wishCount: 1, listingCount: 0)
         )
         XCTAssertEqual(
+            sections.conditionSignalsByItemID[UUID(uuidString: "10000000-0000-0000-0000-000000000003")!]?.wishMatchedOfferGoodsIDs,
+            [UUID(uuidString: "10000000-0000-0000-0000-000000000001")!]
+        )
+        XCTAssertEqual(
+            sections.conditionSignalsByItemID[UUID(uuidString: "10000000-0000-0000-0000-000000000003")!]?.wishMatchedPartnerUserIDs,
+            [UUID(uuidString: "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb")!]
+        )
+        XCTAssertEqual(
             sections.conditionSignalsByItemID[UUID(uuidString: "10000000-0000-0000-0000-000000000003")!]?.matchesViewerWish,
             true
         )
@@ -145,6 +286,14 @@ final class HomeCandidateComposerTests: XCTestCase {
             HomeCandidateLinkCounts(wishCount: 1, listingCount: 0)
         )
         XCTAssertEqual(
+            sections.conditionSignalsByItemID[UUID(uuidString: "10000000-0000-0000-0000-000000000001")!]?.wishMatchedOfferGoodsIDs,
+            [UUID(uuidString: "10000000-0000-0000-0000-000000000001")!]
+        )
+        XCTAssertEqual(
+            sections.conditionSignalsByItemID[UUID(uuidString: "10000000-0000-0000-0000-000000000001")!]?.wishMatchedPartnerUserIDs,
+            [UUID(uuidString: "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb")!]
+        )
+        XCTAssertEqual(
             HomeDiscoveryMatchPolicy.goodsCondition(
                 for: try XCTUnwrap(sections.conditionSignalsByItemID[
                     UUID(uuidString: "10000000-0000-0000-0000-000000000003")!
@@ -153,6 +302,574 @@ final class HomeCandidateComposerTests: XCTestCase {
             .wish
         )
         XCTAssertTrue(sections.possibleItems.isEmpty)
+    }
+
+    func testComposerUsesMasterNamesForMemberCandidateTitlesInsteadOfGoodsTitle() throws {
+        let composition = SupabaseHomeComposition(
+            localMode: nil,
+            viewerInventory: [],
+            viewerWishes: [
+                try goodsRow(
+                    id: "10000000-0000-0000-0000-0000000000a1",
+                    userID: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+                    groupID: "20000000-0000-0000-0000-0000000000a1",
+                    characterID: "21000000-0000-0000-0000-0000000000a1",
+                    goodsTypeID: "30000000-0000-0000-0000-0000000000a1",
+                    title: "ウジ トレカ",
+                    groupName: "SEVENTEEN",
+                    characterName: "ウジ",
+                    goodsTypeName: "トレカ"
+                )
+            ],
+            viewerListings: [],
+            partnerInventory: [
+                try goodsRow(
+                    id: "10000000-0000-0000-0000-0000000000a2",
+                    userID: "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+                    groupID: "20000000-0000-0000-0000-0000000000a1",
+                    characterID: "21000000-0000-0000-0000-0000000000a1",
+                    goodsTypeID: "30000000-0000-0000-0000-0000000000a1",
+                    title: "SEVENTEEN ウジ 2026 SG トレカ",
+                    groupName: "SEVENTEEN",
+                    characterName: "ウジ",
+                    goodsTypeName: "トレカ"
+                ),
+                try goodsRow(
+                    id: "10000000-0000-0000-0000-0000000000a3",
+                    userID: "cccccccc-cccc-cccc-cccc-cccccccccccc",
+                    groupID: "20000000-0000-0000-0000-0000000000a1",
+                    characterID: "21000000-0000-0000-0000-0000000000a1",
+                    goodsTypeID: "30000000-0000-0000-0000-0000000000a1",
+                    title: "Codex unrelated title token",
+                    groupName: "SEVENTEEN",
+                    characterName: "ウジ",
+                    goodsTypeName: "トレカ"
+                )
+            ],
+            partnerWishes: [],
+            partnerUsers: [
+                try userRow(id: "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb", handle: "real_partner_a", primaryArea: "東京都"),
+                try userRow(id: "cccccccc-cccc-cccc-cccc-cccccccccccc", handle: "real_partner_b", primaryArea: "東京都")
+            ],
+            partnerListings: [],
+            listingWishOptions: [],
+            viewerActivityWindows: [],
+            partnerActivityWindows: [],
+            inventoryTags: [],
+            unreadNotificationIDs: []
+        )
+
+        let sections = HomeCandidateComposer.sections(from: composition)
+        let candidates = HomeDiscoveryCandidateFactory.candidates(
+            from: sections.possibleItems,
+            source: .user,
+            goodsTypes: [],
+            conditionSignalsByItemID: sections.conditionSignalsByItemID
+        )
+
+        XCTAssertEqual(candidates.map(\.title), ["ウジ"])
+        XCTAssertEqual(candidates.first?.goods.map(\.title), ["ウジ トレカ", "ウジ トレカ"])
+        XCTAssertFalse(candidates.map(\.title).contains("Codex"))
+        XCTAssertFalse(candidates.map(\.title).contains("SEVENTEEN"))
+    }
+
+    func testComposerExcludesCodexMutualMatchTestAccountsFromNormalHomeCandidates() throws {
+        let composition = SupabaseHomeComposition(
+            localMode: nil,
+            viewerUser: try userRow(id: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa", handle: "michilion", primaryArea: "大阪府"),
+            viewerInventory: [],
+            viewerWishes: [
+                try goodsRow(
+                    id: "10000000-0000-0000-0000-0000000000b1",
+                    userID: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+                    groupID: "20000000-0000-0000-0000-0000000000b1",
+                    characterID: "21000000-0000-0000-0000-0000000000b1",
+                    goodsTypeID: "30000000-0000-0000-0000-0000000000b1",
+                    title: "RM トレカ",
+                    groupName: "BTS",
+                    characterName: "RM",
+                    goodsTypeName: "トレカ"
+                )
+            ],
+            viewerListings: [],
+            partnerInventory: [
+                try goodsRow(
+                    id: "10000000-0000-0000-0000-0000000000b2",
+                    userID: "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+                    groupID: "20000000-0000-0000-0000-0000000000b1",
+                    characterID: "21000000-0000-0000-0000-0000000000b1",
+                    goodsTypeID: "30000000-0000-0000-0000-0000000000b1",
+                    title: "Codex 金額不足 自分譲 RM トレカ",
+                    groupName: "BTS",
+                    characterName: "RM",
+                    goodsTypeName: "トレカ"
+                ),
+                try goodsRow(
+                    id: "10000000-0000-0000-0000-0000000000b3",
+                    userID: "cccccccc-cccc-cccc-cccc-cccccccccccc",
+                    groupID: "20000000-0000-0000-0000-0000000000b1",
+                    characterID: "21000000-0000-0000-0000-0000000000b1",
+                    goodsTypeID: "30000000-0000-0000-0000-0000000000b1",
+                    title: "RM トレカ",
+                    groupName: "BTS",
+                    characterName: "RM",
+                    goodsTypeName: "トレカ"
+                )
+            ],
+            partnerWishes: [],
+            partnerUsers: [
+                try userRow(
+                    id: "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+                    handle: "codex_mm_cash",
+                    primaryArea: "東京都",
+                    isTestAccount: true
+                ),
+                try userRow(id: "cccccccc-cccc-cccc-cccc-cccccccccccc", handle: "real_partner", primaryArea: "東京都")
+            ],
+            partnerListings: [],
+            listingWishOptions: [],
+            viewerActivityWindows: [],
+            partnerActivityWindows: [],
+            inventoryTags: [],
+            unreadNotificationIDs: []
+        )
+
+        let sections = HomeCandidateComposer.sections(from: composition)
+
+        XCTAssertEqual(
+            sections.possibleItems.map(\.id),
+            [UUID(uuidString: "10000000-0000-0000-0000-0000000000b3")!]
+        )
+        XCTAssertFalse(sections.possibleItems.map(\.title).contains { $0.contains("Codex") })
+    }
+
+    func testComposerBuildsMutualMatchFromReciprocalListings() throws {
+        let viewerID = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
+        let partnerID = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
+        let viewerOfferID = "10000000-0000-0000-0000-000000000061"
+        let partnerOfferID = "10000000-0000-0000-0000-000000000062"
+        let viewerListingID = "50000000-0000-0000-0000-000000000061"
+        let partnerListingID = "50000000-0000-0000-0000-000000000062"
+        let sharedExchangeSummary = IndividualListingExchangeSummary(
+            handoffMethod: .local,
+            localPrefecture: "東京都",
+            localPlaceMemo: "東京ドーム",
+            localSchedule: "6/28",
+            shippingFee: .owner
+        )
+
+        let composition = SupabaseHomeComposition(
+            localMode: nil,
+            viewerUser: try userRow(
+                id: viewerID,
+                handle: "viewer_trade",
+                primaryArea: "東京都"
+            ),
+            viewerInventory: [
+                try goodsRow(
+                    id: viewerOfferID,
+                    userID: viewerID,
+                    groupID: "20000000-0000-0000-0000-000000000061",
+                    goodsTypeID: "30000000-0000-0000-0000-000000000061",
+                    title: "自分が譲るトレカ"
+                )
+            ],
+            viewerWishes: [],
+            viewerListings: [
+                try listingRow(
+                    id: viewerListingID,
+                    userID: viewerID,
+                    haveIDs: [viewerOfferID],
+                    haveGroupID: "20000000-0000-0000-0000-000000000061",
+                    haveGoodsTypeID: "30000000-0000-0000-0000-000000000061",
+                    note: sharedExchangeSummary.storageLine
+                )
+            ],
+            partnerInventory: [
+                try goodsRow(
+                    id: partnerOfferID,
+                    userID: partnerID,
+                    groupID: "20000000-0000-0000-0000-000000000062",
+                    goodsTypeID: "30000000-0000-0000-0000-000000000061",
+                    title: "相手が譲るトレカ",
+                    photoURLs: ["https://example.com/partner.jpg"]
+                )
+            ],
+            partnerWishes: [],
+            partnerUsers: [
+                try userRow(
+                    id: partnerID,
+                    handle: "partner_trade",
+                    primaryArea: "東京都",
+                    age: 24,
+                    averageStars: 4.75,
+                    evaluationCount: 12
+                )
+            ],
+            partnerListings: [
+                try listingRow(
+                    id: partnerListingID,
+                    userID: partnerID,
+                    haveIDs: [partnerOfferID],
+                    haveGroupID: "20000000-0000-0000-0000-000000000062",
+                    haveGoodsTypeID: "30000000-0000-0000-0000-000000000061",
+                    note: sharedExchangeSummary.storageLine
+                )
+            ],
+            listingWishOptions: [
+                try listingWishOptionRow(
+                    id: "60000000-0000-0000-0000-000000000061",
+                    listingID: viewerListingID,
+                    wishIDs: [partnerOfferID],
+                    wishGroupID: "20000000-0000-0000-0000-000000000062",
+                    wishGoodsTypeID: "30000000-0000-0000-0000-000000000061"
+                ),
+                try listingWishOptionRow(
+                    id: "60000000-0000-0000-0000-000000000062",
+                    listingID: partnerListingID,
+                    wishIDs: [viewerOfferID],
+                    wishGroupID: "20000000-0000-0000-0000-000000000061",
+                    wishGoodsTypeID: "30000000-0000-0000-0000-000000000061"
+                )
+            ],
+            viewerActivityWindows: [],
+            partnerActivityWindows: [],
+            inventoryTags: [
+                try inventoryTagRow(
+                    inventoryID: viewerOfferID,
+                    tagID: "40000000-0000-0000-0000-000000000061",
+                    label: "ライブ2026"
+                ),
+                try inventoryTagRow(
+                    inventoryID: partnerOfferID,
+                    tagID: "40000000-0000-0000-0000-000000000062",
+                    label: "ライブ2026"
+                )
+            ],
+            unreadNotificationIDs: []
+        )
+
+        let sections = HomeCandidateComposer.sections(from: composition)
+        let candidate = try XCTUnwrap(sections.mutualMatchCandidates.first)
+
+        XCTAssertEqual(sections.mutualMatchCandidates.count, 1)
+        XCTAssertEqual(candidate.partnerID, UUID(uuidString: partnerID))
+        XCTAssertEqual(candidate.partnerGoodsItems.map(\.id), [UUID(uuidString: partnerOfferID)!])
+        XCTAssertEqual(candidate.viewerGoodsItems.map(\.id), [UUID(uuidString: viewerOfferID)!])
+        XCTAssertEqual(candidate.partnerGoodsItems.first?.imageURL?.absoluteString, "https://example.com/partner.jpg")
+        XCTAssertEqual(candidate.attentionKinds, [.ready])
+        XCTAssertEqual(candidate.signals.goods, HomeGoodsConditionSignals(hasIndividualListingHit: true, hasWishHit: false))
+        XCTAssertEqual(candidate.signals.individualListingSelection?.wantedLogic, .one)
+        XCTAssertEqual(candidate.signals.individualListingSelection?.offeredLogic, .one)
+        XCTAssertEqual(candidate.partnerAgeRangeText, "20代")
+        XCTAssertEqual(candidate.partnerEvaluationSummaryText, "評価12件 ★4.8")
+    }
+
+    func testComposerAddsMutualConditionAttentionKindsFromListingNotesAndPaymentMethods() throws {
+        let viewerID = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
+        let partnerID = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
+        let viewerOfferID = "10000000-0000-0000-0000-000000000091"
+        let partnerOfferID = "10000000-0000-0000-0000-000000000092"
+        let viewerListingID = "50000000-0000-0000-0000-000000000091"
+        let partnerListingID = "50000000-0000-0000-0000-000000000092"
+        let groupID = "20000000-0000-0000-0000-000000000091"
+        let goodsTypeID = "30000000-0000-0000-0000-000000000091"
+        let viewerSummary = IndividualListingExchangeSummary(
+            handoffMethod: .local,
+            localPrefecture: "東京都",
+            localSchedule: "6/28 18:00",
+            shippingFee: .owner
+        )
+        let partnerSummary = IndividualListingExchangeSummary(
+            handoffMethod: .local,
+            localPrefecture: "大阪府",
+            localSchedule: "6/29 18:00",
+            shippingFee: .owner
+        )
+
+        let composition = SupabaseHomeComposition(
+            localMode: nil,
+            viewerUser: try userRow(
+                id: viewerID,
+                handle: "viewer_trade",
+                primaryArea: "東京都",
+                paymentMethods: ["bank_transfer"]
+            ),
+            viewerInventory: [
+                try goodsRow(
+                    id: viewerOfferID,
+                    userID: viewerID,
+                    groupID: groupID,
+                    goodsTypeID: goodsTypeID,
+                    title: "自分が譲るトレカ"
+                )
+            ],
+            viewerWishes: [],
+            viewerListings: [
+                try listingRow(
+                    id: viewerListingID,
+                    userID: viewerID,
+                    haveIDs: [viewerOfferID],
+                    haveGroupID: groupID,
+                    haveGoodsTypeID: goodsTypeID,
+                    note: viewerSummary.storageLine
+                )
+            ],
+            partnerInventory: [
+                try goodsRow(
+                    id: partnerOfferID,
+                    userID: partnerID,
+                    groupID: groupID,
+                    goodsTypeID: goodsTypeID,
+                    title: "相手が譲るトレカ"
+                )
+            ],
+            partnerWishes: [],
+            partnerUsers: [
+                try userRow(
+                    id: partnerID,
+                    handle: "partner_trade",
+                    primaryArea: "大阪府",
+                    paymentMethods: ["paypay"]
+                )
+            ],
+            partnerListings: [
+                try listingRow(
+                    id: partnerListingID,
+                    userID: partnerID,
+                    haveIDs: [partnerOfferID],
+                    haveGroupID: groupID,
+                    haveGoodsTypeID: goodsTypeID,
+                    note: partnerSummary.storageLine
+                )
+            ],
+            listingWishOptions: [
+                try listingWishOptionRow(
+                    id: "60000000-0000-0000-0000-000000000091",
+                    listingID: viewerListingID,
+                    wishIDs: [],
+                    wishGroupID: nil,
+                    wishGoodsTypeID: nil,
+                    isCashOffer: true,
+                    cashAmount: 2_000
+                ),
+                try listingWishOptionRow(
+                    id: "60000000-0000-0000-0000-000000000092",
+                    listingID: partnerListingID,
+                    wishIDs: [],
+                    wishGroupID: nil,
+                    wishGoodsTypeID: nil,
+                    isCashOffer: true,
+                    cashAmount: 2_000
+                )
+            ],
+            viewerActivityWindows: [],
+            partnerActivityWindows: [],
+            inventoryTags: [],
+            unreadNotificationIDs: []
+        )
+
+        let candidate = try XCTUnwrap(HomeCandidateComposer.sections(from: composition).mutualMatchCandidates.first)
+
+        XCTAssertTrue(candidate.attentionKinds.contains(.prefectureNeedsDiscussion))
+        XCTAssertTrue(candidate.attentionKinds.contains(.dateNeedsDiscussion))
+        XCTAssertTrue(candidate.attentionKinds.contains(.paymentMethodMismatch))
+        XCTAssertEqual(candidate.signals.payment.status, .methodMismatch)
+        XCTAssertTrue(candidate.signals.payment.requiresPayment)
+    }
+
+    func testComposerDoesNotBuildMutualMatchWhenWantedMemberDiffers() throws {
+        let viewerID = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
+        let partnerID = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
+        let viewerOfferID = "10000000-0000-0000-0000-000000000071"
+        let viewerWantedID = "10000000-0000-0000-0000-000000000072"
+        let partnerOfferID = "10000000-0000-0000-0000-000000000073"
+        let partnerWantedID = "10000000-0000-0000-0000-000000000074"
+        let viewerListingID = "50000000-0000-0000-0000-000000000071"
+        let partnerListingID = "50000000-0000-0000-0000-000000000072"
+        let groupID = "20000000-0000-0000-0000-000000000071"
+        let goodsTypeID = "30000000-0000-0000-0000-000000000071"
+
+        let composition = SupabaseHomeComposition(
+            localMode: nil,
+            viewerInventory: [
+                try goodsRow(
+                    id: viewerOfferID,
+                    userID: viewerID,
+                    groupID: groupID,
+                    characterID: "70000000-0000-0000-0000-000000000071",
+                    goodsTypeID: goodsTypeID,
+                    title: "自分が譲るジン トレカ"
+                )
+            ],
+            viewerWishes: [
+                try goodsRow(
+                    id: viewerWantedID,
+                    userID: viewerID,
+                    groupID: groupID,
+                    characterID: "70000000-0000-0000-0000-000000000072",
+                    goodsTypeID: goodsTypeID,
+                    title: "自分が求めるサナ トレカ"
+                )
+            ],
+            viewerListings: [
+                try listingRow(
+                    id: viewerListingID,
+                    userID: viewerID,
+                    haveIDs: [viewerOfferID],
+                    haveGroupID: groupID,
+                    haveGoodsTypeID: goodsTypeID
+                )
+            ],
+            partnerInventory: [
+                try goodsRow(
+                    id: partnerOfferID,
+                    userID: partnerID,
+                    groupID: groupID,
+                    characterID: "70000000-0000-0000-0000-000000000073",
+                    goodsTypeID: goodsTypeID,
+                    title: "相手が譲るモモ トレカ"
+                )
+            ],
+            partnerWishes: [
+                try goodsRow(
+                    id: partnerWantedID,
+                    userID: partnerID,
+                    groupID: groupID,
+                    characterID: "70000000-0000-0000-0000-000000000071",
+                    goodsTypeID: goodsTypeID,
+                    title: "相手が求めるジン トレカ"
+                )
+            ],
+            partnerUsers: [],
+            partnerListings: [
+                try listingRow(
+                    id: partnerListingID,
+                    userID: partnerID,
+                    haveIDs: [partnerOfferID],
+                    haveGroupID: groupID,
+                    haveGoodsTypeID: goodsTypeID
+                )
+            ],
+            listingWishOptions: [
+                try listingWishOptionRow(
+                    id: "60000000-0000-0000-0000-000000000071",
+                    listingID: viewerListingID,
+                    wishIDs: [viewerWantedID],
+                    wishGroupID: groupID,
+                    wishGoodsTypeID: goodsTypeID
+                ),
+                try listingWishOptionRow(
+                    id: "60000000-0000-0000-0000-000000000072",
+                    listingID: partnerListingID,
+                    wishIDs: [partnerWantedID],
+                    wishGroupID: groupID,
+                    wishGoodsTypeID: goodsTypeID
+                )
+            ],
+            viewerActivityWindows: [],
+            partnerActivityWindows: [],
+            inventoryTags: [],
+            unreadNotificationIDs: []
+        )
+
+        let sections = HomeCandidateComposer.sections(from: composition)
+
+        XCTAssertTrue(sections.mutualMatchCandidates.isEmpty)
+    }
+
+    func testComposerKeepsCashWantedOptionsAsMutualMatchDisplayItems() throws {
+        let viewerID = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
+        let partnerID = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
+        let viewerOfferID = "10000000-0000-0000-0000-000000000081"
+        let partnerOfferID = "10000000-0000-0000-0000-000000000082"
+        let viewerListingID = "50000000-0000-0000-0000-000000000081"
+        let partnerListingID = "50000000-0000-0000-0000-000000000082"
+        let groupID = "20000000-0000-0000-0000-000000000081"
+        let goodsTypeID = "30000000-0000-0000-0000-000000000081"
+
+        let composition = SupabaseHomeComposition(
+            localMode: nil,
+            viewerInventory: [
+                try goodsRow(
+                    id: viewerOfferID,
+                    userID: viewerID,
+                    groupID: groupID,
+                    goodsTypeID: goodsTypeID,
+                    title: "自分が譲るRM トレカ"
+                )
+            ],
+            viewerWishes: [],
+            viewerListings: [
+                try listingRow(
+                    id: viewerListingID,
+                    userID: viewerID,
+                    haveIDs: [viewerOfferID],
+                    haveGroupID: groupID,
+                    haveGoodsTypeID: goodsTypeID
+                )
+            ],
+            partnerInventory: [
+                try goodsRow(
+                    id: partnerOfferID,
+                    userID: partnerID,
+                    groupID: groupID,
+                    goodsTypeID: goodsTypeID,
+                    title: "相手が譲るジン トレカ"
+                )
+            ],
+            partnerWishes: [],
+            partnerUsers: [
+                try userRow(
+                    id: partnerID,
+                    handle: "cash_match_fixture",
+                    primaryArea: "福岡県"
+                )
+            ],
+            partnerListings: [
+                try listingRow(
+                    id: partnerListingID,
+                    userID: partnerID,
+                    haveIDs: [partnerOfferID],
+                    haveGroupID: groupID,
+                    haveGoodsTypeID: goodsTypeID
+                )
+            ],
+            listingWishOptions: [
+                try listingWishOptionRow(
+                    id: "60000000-0000-0000-0000-000000000081",
+                    listingID: viewerListingID,
+                    wishIDs: [],
+                    wishGroupID: nil,
+                    wishGoodsTypeID: nil,
+                    isCashOffer: true,
+                    cashAmount: 2_000
+                ),
+                try listingWishOptionRow(
+                    id: "60000000-0000-0000-0000-000000000082",
+                    listingID: partnerListingID,
+                    wishIDs: [],
+                    wishGroupID: nil,
+                    wishGoodsTypeID: nil,
+                    isCashOffer: true,
+                    cashAmount: 1_500
+                )
+            ],
+            viewerActivityWindows: [],
+            partnerActivityWindows: [],
+            inventoryTags: [],
+            unreadNotificationIDs: []
+        )
+
+        let candidate = try XCTUnwrap(HomeCandidateComposer.sections(from: composition).mutualMatchCandidates.first)
+
+        XCTAssertTrue(candidate.attentionKinds.contains(.amountInsufficient))
+        XCTAssertEqual(candidate.partnerDisplayItems.map(\.title), ["¥2,000"])
+        XCTAssertEqual(candidate.partnerDisplayItems.map(\.kind), [.cashAmount])
+        XCTAssertEqual(candidate.viewerDisplayItems.map(\.title), ["¥1,500"])
+        XCTAssertEqual(candidate.viewerDisplayItems.map(\.kind), [.cashAmount])
+        XCTAssertEqual(candidate.partnerGoodsItems.map(\.title), ["相手が譲るジン トレカ"])
+        XCTAssertEqual(candidate.viewerGoodsItems.map(\.title), ["自分が譲るRM トレカ"])
     }
 
     func testComposerMarksIndividualListingHitAsGoodsConditionDirect() throws {
@@ -242,7 +959,7 @@ final class HomeCandidateComposerTests: XCTestCase {
         XCTAssertEqual(signals.goods, HomeGoodsConditionSignals(hasIndividualListingHit: true, hasWishHit: false))
         XCTAssertEqual(signals.linkCounts, HomeCandidateLinkCounts(wishCount: 0, listingCount: 1))
         XCTAssertEqual(HomeDiscoveryMatchPolicy.goodsCondition(for: signals.goods), .direct)
-        XCTAssertEqual(HomeDiscoveryMatchPolicy.exchangeCondition(for: signals.exchange), .exact)
+        XCTAssertEqual(HomeDiscoveryMatchPolicy.exchangeCondition(for: signals.exchange), .possible)
         XCTAssertEqual(HomeDiscoveryMatchPolicy.paymentCondition(for: signals.payment), .compatible)
         let partnerSelection = try XCTUnwrap(signals.individualListingSelection)
         XCTAssertEqual(partnerSelection.wantedLogic, .all)
@@ -450,6 +1167,108 @@ final class HomeCandidateComposerTests: XCTestCase {
         )
     }
 
+    func testComposerDoesNotTreatGroupOnlyWishAsMemberWishMatch() throws {
+        let groupID = "20000000-0000-0000-0000-0000000000f1"
+        let sanaID = "21000000-0000-0000-0000-0000000000f1"
+        let goodsTypeID = "30000000-0000-0000-0000-0000000000f1"
+        let partnerGoodsID = UUID(uuidString: "10000000-0000-0000-0000-0000000000f1")!
+
+        let composition = SupabaseHomeComposition(
+            localMode: nil,
+            viewerInventory: [],
+            viewerWishes: [
+                try goodsRow(
+                    id: "10000000-0000-0000-0000-0000000000f2",
+                    userID: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+                    groupID: groupID,
+                    goodsTypeID: goodsTypeID,
+                    title: "TWICE トレカ"
+                )
+            ],
+            viewerListings: [],
+            partnerInventory: [
+                try goodsRow(
+                    id: partnerGoodsID.uuidString,
+                    userID: "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+                    groupID: groupID,
+                    characterID: sanaID,
+                    goodsTypeID: goodsTypeID,
+                    title: "サナ トレカ",
+                    groupName: "TWICE",
+                    characterName: "サナ",
+                    goodsTypeName: "トレカ"
+                )
+            ],
+            partnerWishes: [],
+            partnerUsers: [],
+            partnerListings: [],
+            listingWishOptions: [],
+            viewerActivityWindows: [],
+            partnerActivityWindows: [],
+            inventoryTags: [],
+            unreadNotificationIDs: []
+        )
+
+        let sections = HomeCandidateComposer.sections(from: composition)
+        let signals = try XCTUnwrap(sections.conditionSignalsByItemID[partnerGoodsID])
+
+        XCTAssertTrue(signals.matchesViewerWish)
+        XCTAssertFalse(signals.matchesViewerWishCharacter)
+    }
+
+    func testComposerMarksExactL2WishAsMemberWishMatch() throws {
+        let groupID = "20000000-0000-0000-0000-0000000000f3"
+        let sanaID = "21000000-0000-0000-0000-0000000000f3"
+        let goodsTypeID = "30000000-0000-0000-0000-0000000000f3"
+        let partnerGoodsID = UUID(uuidString: "10000000-0000-0000-0000-0000000000f3")!
+
+        let composition = SupabaseHomeComposition(
+            localMode: nil,
+            viewerInventory: [],
+            viewerWishes: [
+                try goodsRow(
+                    id: "10000000-0000-0000-0000-0000000000f4",
+                    userID: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+                    groupID: groupID,
+                    characterID: sanaID,
+                    goodsTypeID: goodsTypeID,
+                    title: "サナ トレカ",
+                    groupName: "TWICE",
+                    characterName: "サナ",
+                    goodsTypeName: "トレカ"
+                )
+            ],
+            viewerListings: [],
+            partnerInventory: [
+                try goodsRow(
+                    id: partnerGoodsID.uuidString,
+                    userID: "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+                    groupID: groupID,
+                    characterID: sanaID,
+                    goodsTypeID: goodsTypeID,
+                    title: "サナ トレカ",
+                    groupName: "TWICE",
+                    characterName: "サナ",
+                    goodsTypeName: "トレカ"
+                )
+            ],
+            partnerWishes: [],
+            partnerUsers: [],
+            partnerListings: [],
+            listingWishOptions: [],
+            viewerActivityWindows: [],
+            partnerActivityWindows: [],
+            inventoryTags: [],
+            unreadNotificationIDs: []
+        )
+
+        let sections = HomeCandidateComposer.sections(from: composition)
+        let signals = try XCTUnwrap(sections.conditionSignalsByItemID[partnerGoodsID])
+
+        XCTAssertTrue(signals.matchesViewerWish)
+        XCTAssertTrue(signals.matchesViewerWishCharacter)
+    }
+
     func testComposerHidesUnavailablePartnerStock() throws {
         let composition = SupabaseHomeComposition(
             localMode: nil,
@@ -509,8 +1328,12 @@ final class HomeCandidateComposerTests: XCTestCase {
         id: String,
         userID: String,
         groupID: String?,
+        characterID: String? = nil,
         goodsTypeID: String?,
         title: String,
+        groupName: String? = nil,
+        characterName: String? = nil,
+        goodsTypeName: String? = nil,
         photoURLs: [String] = [],
         quantity: Int = 1,
         lockedQty: Int? = nil,
@@ -522,7 +1345,7 @@ final class HomeCandidateComposerTests: XCTestCase {
             "userId": userID,
             "kind": "for_trade",
             "groupId": groupID,
-            "characterId": nil,
+            "characterId": characterID,
             "characterRequestId": nil,
             "goodsTypeId": goodsTypeID,
             "title": title,
@@ -532,7 +1355,10 @@ final class HomeCandidateComposerTests: XCTestCase {
             "marketAvailableQty": marketAvailableQty,
             "exchangeType": exchangeType,
             "hue": nil,
-            "status": "active"
+            "status": "active",
+            "group": groupName.map { ["name": $0] },
+            "character": characterName.map { ["name": $0] },
+            "goodsType": goodsTypeName.map { ["name": $0] }
         ]
         return try decode(SupabaseHomeGoodsRow.self, payload)
     }
@@ -542,7 +1368,12 @@ final class HomeCandidateComposerTests: XCTestCase {
         handle: String,
         primaryArea: String,
         paymentMethods: [String] = [],
-        paymentNote: String? = nil
+        paymentNote: String? = nil,
+        isTestAccount: Bool? = nil,
+        age: Int? = nil,
+        averageStars: Double? = nil,
+        evaluationCount: Int? = nil,
+        completedTradeCount: Int? = nil
     ) throws -> SupabaseHomeUserRow {
         try decode(
             SupabaseHomeUserRow.self,
@@ -552,8 +1383,13 @@ final class HomeCandidateComposerTests: XCTestCase {
                 "displayName": handle,
                 "primaryArea": primaryArea,
                 "avatarUrl": nil,
+                "age": age,
                 "paymentMethods": paymentMethods,
-                "paymentNote": paymentNote
+                "paymentNote": paymentNote,
+                "isTestAccount": isTestAccount,
+                "averageStars": averageStars,
+                "evaluationCount": evaluationCount,
+                "completedTradeCount": completedTradeCount
             ]
         )
     }
@@ -564,7 +1400,8 @@ final class HomeCandidateComposerTests: XCTestCase {
         haveIDs: [String],
         haveGroupID: String?,
         haveGoodsTypeID: String?,
-        haveLogic: String = "or"
+        haveLogic: String = "or",
+        note: String? = nil
     ) throws -> SupabaseHomeListingRow {
         try decode(
             SupabaseHomeListingRow.self,
@@ -577,7 +1414,7 @@ final class HomeCandidateComposerTests: XCTestCase {
                 "haveGroupId": haveGroupID,
                 "haveGoodsTypeId": haveGoodsTypeID,
                 "status": "active",
-                "note": nil,
+                "note": note,
                 "createdAt": nil,
                 "updatedAt": nil
             ]

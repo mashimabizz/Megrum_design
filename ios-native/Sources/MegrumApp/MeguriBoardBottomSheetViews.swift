@@ -16,14 +16,7 @@ enum MeguriBoardSheetDetent: Equatable {
     }
 
     func height(in viewportHeight: CGFloat) -> CGFloat {
-        switch self {
-        case .compact:
-            min(max(viewportHeight * 0.14, 112), 128)
-        case .regular:
-            viewportHeight * 0.48
-        case .expanded:
-            viewportHeight * 0.76
-        }
+        MeguriBoardSheetLayout.visibleHeight(for: self, in: viewportHeight)
     }
 
     func moved(up: Bool) -> Self {
@@ -44,8 +37,56 @@ enum MeguriBoardSheetDetent: Equatable {
     }
 }
 
+enum MeguriBoardSheetLayout {
+    static func expandedHeight(in viewportHeight: CGFloat) -> CGFloat {
+        max(viewportHeight - 8, 1)
+    }
+
+    static func visibleHeight(for detent: MeguriBoardSheetDetent, in viewportHeight: CGFloat) -> CGFloat {
+        let expanded = expandedHeight(in: viewportHeight)
+        switch detent {
+        case .compact:
+            return min(max(viewportHeight * 0.20, 154), 166)
+        case .regular:
+            return min(max(viewportHeight * 0.48, 330), expanded)
+        case .expanded:
+            return expanded
+        }
+    }
+
+    static func restingOffset(for detent: MeguriBoardSheetDetent, in viewportHeight: CGFloat) -> CGFloat {
+        expandedHeight(in: viewportHeight) - visibleHeight(for: detent, in: viewportHeight)
+    }
+
+    static func interactiveOffset(
+        for detent: MeguriBoardSheetDetent,
+        in viewportHeight: CGFloat,
+        dragTranslation: CGFloat
+    ) -> CGFloat {
+        let compactOffset = restingOffset(for: .compact, in: viewportHeight)
+        let proposed = restingOffset(for: detent, in: viewportHeight) + dragTranslation
+        return min(max(proposed, 0), compactOffset)
+    }
+
+    static func targetDetent(
+        from detent: MeguriBoardSheetDetent,
+        translation: CGFloat,
+        predictedTranslation: CGFloat
+    ) -> MeguriBoardSheetDetent {
+        let movement = abs(predictedTranslation) > abs(translation) ? predictedTranslation : translation
+        if movement < -36 {
+            return .expanded
+        }
+        if movement > 36 {
+            return .compact
+        }
+        return detent
+    }
+}
+
 struct MeguriBoardBottomSheet: View {
     @Binding var detent: MeguriBoardSheetDetent
+    var viewportHeight: CGFloat
     var threads: [BoardThread]
     var grooms: [GroomPost]
     var replyCounts: [UUID: Int]
@@ -60,151 +101,140 @@ struct MeguriBoardBottomSheet: View {
 
     @GestureState private var dragTranslation: CGFloat = 0
 
-    private let filters = ["同じ現場", "同じ推し", "新着", "盛り上がり"]
-
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            Capsule()
-                .fill(MegrumTheme.muted.opacity(0.38))
-                .frame(width: 38, height: 5)
-                .frame(maxWidth: .infinity)
-                .padding(.top, 12)
+        VStack(alignment: .leading, spacing: 0) {
+            MeguriBoardSheetGrabber()
+                .gesture(sheetDragGesture)
 
-            MeguriBoardBottomSheetHeader(
+            MeguriBoardSheetTopSurface(
+                groomCount: grooms.count,
+                threadCount: threads.count,
                 onOpenGroomComposer: onOpenGroomComposer,
                 onOpenThreadComposer: onOpenThreadComposer
             )
 
-            MeguriBoardFilterChips(filters: filters)
-
-            MeguriBoardThreadListState(
-                threads: threads,
-                grooms: grooms,
-                replyCounts: replyCounts,
-                isLoading: isLoading,
-                onOpenThread: onOpenThread
-            )
+            VStack(alignment: .leading, spacing: 16) {
+                MeguriBoardThreadListState(
+                    threads: threads,
+                    grooms: grooms,
+                    replyCounts: replyCounts,
+                    isLoading: isLoading,
+                    onOpenThread: onOpenThread
+                )
+            }
+            .padding(.top, 16)
         }
         .padding(.horizontal, 20)
         .padding(.bottom, 18)
-        .frame(maxHeight: .infinity, alignment: .top)
-        .background(alignment: .bottom) {
-            ZStack(alignment: .bottom) {
-                Rectangle()
-                    .fill(MegrumTheme.canvas)
-                    .frame(height: 220)
-                    .offset(y: 130)
-
-                UnevenRoundedRectangle(topLeadingRadius: 28, topTrailingRadius: 28)
-                    .fill(.regularMaterial)
-
-                Rectangle()
-                    .fill(MegrumTheme.canvas)
-                    .frame(height: 180)
-                    .offset(y: 120)
-            }
-            .ignoresSafeArea(edges: .bottom)
+        .frame(height: MeguriBoardSheetLayout.expandedHeight(in: viewportHeight), alignment: .top)
+        .background(.regularMaterial, in: UnevenRoundedRectangle(topLeadingRadius: 28, topTrailingRadius: 28))
+        .overlay(alignment: .top) {
+            UnevenRoundedRectangle(topLeadingRadius: 28, topTrailingRadius: 28)
+                .stroke(MegrumTheme.lavender.opacity(0.14), lineWidth: 1)
         }
-        .offset(y: interactiveDragOffset)
-        .gesture(
-            DragGesture(minimumDistance: 14)
-                .updating($dragTranslation) { value, state, _ in
-                    state = value.translation.height
-                }
-                .onEnded { value in
-                    if value.translation.height < -24 {
-                        detent = detent.moved(up: true)
-                    } else if value.translation.height > 24 {
-                        detent = detent.moved(up: false)
-                    }
-                }
-        )
-        .onTapGesture(count: 2) {
-            detent = detent == .expanded ? .regular : .expanded
-        }
+        .shadow(color: MegrumTheme.ink.opacity(0.10), radius: 18, y: -8)
+        .offset(y: MeguriBoardSheetLayout.interactiveOffset(
+            for: detent,
+            in: viewportHeight,
+            dragTranslation: dragTranslation
+        ))
+        .animation(.interactiveSpring(response: 0.32, dampingFraction: 0.88), value: detent)
+        .ignoresSafeArea(edges: .bottom)
     }
 
-    private var interactiveDragOffset: CGFloat {
-        switch detent {
-        case .compact:
-            return min(max(dragTranslation, -180), 24)
-        case .regular:
-            return min(max(dragTranslation, -220), 220)
-        case .expanded:
-            return min(max(dragTranslation, -24), 260)
-        }
+    private var sheetDragGesture: some Gesture {
+        DragGesture(minimumDistance: 8)
+            .updating($dragTranslation) { value, state, _ in
+                state = value.translation.height
+            }
+            .onEnded { value in
+                detent = MeguriBoardSheetLayout.targetDetent(
+                    from: detent,
+                    translation: value.translation.height,
+                    predictedTranslation: value.predictedEndTranslation.height
+                )
+            }
     }
 }
 
-private struct MeguriBoardBottomSheetHeader: View {
+private struct MeguriBoardSheetGrabber: View {
+    var body: some View {
+        Color.clear
+            .frame(maxWidth: .infinity)
+            .frame(height: 34)
+            .overlay(alignment: .top) {
+                Capsule()
+                    .fill(MegrumTheme.muted.opacity(0.38))
+                    .frame(width: 38, height: 5)
+                    .padding(.top, 12)
+            }
+            .contentShape(Rectangle())
+            .accessibilityHidden(true)
+    }
+}
+
+private struct MeguriBoardSheetTopSurface: View {
+    var groomCount: Int
+    var threadCount: Int
     var onOpenGroomComposer: () -> Void
     var onOpenThreadComposer: () -> Void
 
     var body: some View {
-        HStack(alignment: .firstTextBaseline) {
-            Text("今この場で話されていること")
-                .font(.system(size: 19, weight: .black, design: .rounded))
-                .foregroundStyle(MegrumTheme.ink)
-                .lineLimit(2)
-                .minimumScaleFactor(0.78)
-
-            Spacer()
-
-            MeguriBoardComposerButton(
+        VStack(spacing: 10) {
+            MeguriBoardQuickActionRow(
                 title: "グルーム",
+                subtitle: "\(groomCount)件の近くの投稿",
                 systemImage: "camera",
+                actionTitle: "投稿",
                 action: onOpenGroomComposer
             )
 
-            MeguriBoardComposerButton(
-                title: "スレッド",
+            MeguriBoardQuickActionRow(
+                title: "掲示板",
+                subtitle: "\(threadCount)件の現地トピック",
                 systemImage: "pencil",
+                actionTitle: "作成",
                 action: onOpenThreadComposer
             )
         }
     }
 }
 
-private struct MeguriBoardComposerButton: View {
+private struct MeguriBoardQuickActionRow: View {
     var title: String
+    var subtitle: String
     var systemImage: String
+    var actionTitle: String
     var action: () -> Void
 
     var body: some View {
         Button(action: action) {
-            VStack(spacing: 4) {
-                Image(systemName: systemImage)
-                    .font(.system(size: 19, weight: .semibold))
-                    .frame(width: 44, height: 44)
-                    .background(.white, in: Circle())
-                Text(title)
-                    .font(.system(size: 11.5, weight: .semibold, design: .rounded))
+            HStack(spacing: 12) {
+                Label(title, systemImage: systemImage)
+                    .font(.system(size: 16, weight: .black, design: .rounded))
+                    .foregroundStyle(MegrumTheme.ink)
+                    .labelStyle(.titleAndIcon)
+
+                Spacer(minLength: 8)
+
+                Text(subtitle)
+                    .font(.system(size: 12, weight: .bold, design: .rounded))
+                    .foregroundStyle(MegrumTheme.muted)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.78)
+
+                Text(actionTitle)
+                    .font(.system(size: 13, weight: .heavy, design: .rounded))
+                    .foregroundStyle(MegrumTheme.lavender)
+                    .padding(.horizontal, 12)
+                    .frame(height: 28)
+                    .background(MegrumTheme.lavender.opacity(0.10), in: Capsule())
             }
-            .foregroundStyle(MegrumTheme.lavender)
+            .padding(.horizontal, 14)
+            .frame(height: 54)
+            .background(.white.opacity(0.76), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
         }
         .buttonStyle(.plain)
-    }
-}
-
-private struct MeguriBoardFilterChips: View {
-    var filters: [String]
-
-    var body: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 12) {
-                ForEach(filters, id: \.self) { filter in
-                    Text(filter)
-                        .font(.system(size: 13, weight: .heavy, design: .rounded))
-                        .foregroundStyle(filter == filters.first ? .white : MegrumTheme.ink.opacity(0.72))
-                        .padding(.horizontal, 17)
-                        .frame(height: 34)
-                        .background(filter == filters.first ? MegrumTheme.lavender : .white.opacity(0.88), in: Capsule())
-                        .overlay {
-                            Capsule().stroke(MegrumTheme.ink.opacity(0.08), lineWidth: filter == filters.first ? 0 : 1)
-                        }
-                }
-            }
-        }
     }
 }
 
@@ -426,7 +456,7 @@ private struct BoardScopeSelector: View {
         HStack(spacing: 10) {
             Button(action: onNearbyTap) {
                 scopeChip(
-                    title: "3km圏内",
+                    title: "1km圏内",
                     systemImage: "location.fill",
                     isSelected: selectedScope == .nearby3km
                 )

@@ -106,20 +106,42 @@ public final class SupabaseGoodsInventoryClient: @unchecked Sendable {
     }
 
     public func searchGoods(viewerID: UUID, input: GoodsSearchInput) async throws -> [GoodsItem] {
-        let rows: [GoodsInventoryRow] = try await client.fetchRows(
-            from: "goods_inventory",
-            select: GoodsInventoryRow.select,
-            queryItems: searchQueryItems(viewerID: viewerID, input: input)
-        )
+        let rows: [GoodsInventoryRow]
+        do {
+            rows = try await client.fetchRows(
+                from: "goods_inventory",
+                select: GoodsInventoryRow.select,
+                queryItems: searchQueryItems(viewerID: viewerID, input: input, availability: .marketAvailableQuantity)
+            )
+        } catch let error as SupabaseRESTError where error == .unexpectedStatus(400) {
+            rows = try await client.fetchRows(
+                from: "goods_inventory",
+                select: GoodsInventoryRow.legacySelect,
+                queryItems: searchQueryItems(viewerID: viewerID, input: input, availability: .quantity)
+            )
+        }
         return try await goodsItemsWithTags(from: rows)
     }
 
     public func loadPublicTradeGoods(userID: UUID, limit: Int = 60) async throws -> [GoodsItem] {
-        let rows: [GoodsInventoryRow] = try await client.fetchRows(
-            from: "goods_inventory",
-            select: GoodsInventoryRow.select,
-            queryItems: publicTradeGoodsQueryItems(userID: userID, limit: limit)
-        )
+        let rows: [GoodsInventoryRow]
+        do {
+            rows = try await client.fetchRows(
+                from: "goods_inventory",
+                select: GoodsInventoryRow.select,
+                queryItems: publicTradeGoodsQueryItems(
+                    userID: userID,
+                    limit: limit,
+                    availability: .marketAvailableQuantity
+                )
+            )
+        } catch let error as SupabaseRESTError where error == .unexpectedStatus(400) {
+            rows = try await client.fetchRows(
+                from: "goods_inventory",
+                select: GoodsInventoryRow.legacySelect,
+                queryItems: publicTradeGoodsQueryItems(userID: userID, limit: limit, availability: .quantity)
+            )
+        }
         return try await goodsItemsWithTags(from: rows)
     }
 
@@ -292,7 +314,16 @@ public final class SupabaseGoodsInventoryClient: @unchecked Sendable {
             path: "/rest/v1/goods_inventory",
             queryItems: [
                 URLQueryItem(name: "select", value: GoodsInventoryRow.select)
-            ] + searchQueryItems(viewerID: viewerID, input: input)
+            ] + searchQueryItems(viewerID: viewerID, input: input, availability: .marketAvailableQuantity)
+        )
+    }
+
+    public func makeLegacySearchGoodsRequest(viewerID: UUID, input: GoodsSearchInput) throws -> URLRequest {
+        try client.makeRequest(
+            path: "/rest/v1/goods_inventory",
+            queryItems: [
+                URLQueryItem(name: "select", value: GoodsInventoryRow.legacySelect)
+            ] + searchQueryItems(viewerID: viewerID, input: input, availability: .quantity)
         )
     }
 
@@ -301,7 +332,16 @@ public final class SupabaseGoodsInventoryClient: @unchecked Sendable {
             path: "/rest/v1/goods_inventory",
             queryItems: [
                 URLQueryItem(name: "select", value: GoodsInventoryRow.select)
-            ] + publicTradeGoodsQueryItems(userID: userID, limit: limit)
+            ] + publicTradeGoodsQueryItems(userID: userID, limit: limit, availability: .marketAvailableQuantity)
+        )
+    }
+
+    public func makeLegacyLoadPublicTradeGoodsRequest(userID: UUID, limit: Int = 60) throws -> URLRequest {
+        try client.makeRequest(
+            path: "/rest/v1/goods_inventory",
+            queryItems: [
+                URLQueryItem(name: "select", value: GoodsInventoryRow.legacySelect)
+            ] + publicTradeGoodsQueryItems(userID: userID, limit: limit, availability: .quantity)
         )
     }
 
@@ -348,11 +388,29 @@ public final class SupabaseGoodsInventoryClient: @unchecked Sendable {
         max(1, min(limit, upperBound))
     }
 
-    private func searchQueryItems(viewerID: UUID, input: GoodsSearchInput) -> [URLQueryItem] {
+    private enum AvailabilityQueryMode {
+        case marketAvailableQuantity
+        case quantity
+
+        var queryItem: URLQueryItem {
+            switch self {
+            case .marketAvailableQuantity:
+                URLQueryItem(name: "market_available_qty", value: "gt.0")
+            case .quantity:
+                URLQueryItem(name: "quantity", value: "gt.0")
+            }
+        }
+    }
+
+    private func searchQueryItems(
+        viewerID: UUID,
+        input: GoodsSearchInput,
+        availability: AvailabilityQueryMode
+    ) -> [URLQueryItem] {
         var queryItems = [
             URLQueryItem(name: "kind", value: "eq.for_trade"),
             URLQueryItem(name: "status", value: "in.(active,reserved)"),
-            URLQueryItem(name: "market_available_qty", value: "gt.0"),
+            availability.queryItem,
             URLQueryItem(name: "user_id", value: "neq.\(viewerID.uuidString.lowercased())"),
             URLQueryItem(name: "order", value: "updated_at.desc"),
             URLQueryItem(name: "limit", value: "\(max(1, min(input.limit, 100)))")
@@ -374,11 +432,15 @@ public final class SupabaseGoodsInventoryClient: @unchecked Sendable {
         return queryItems
     }
 
-    private func publicTradeGoodsQueryItems(userID: UUID, limit: Int) -> [URLQueryItem] {
+    private func publicTradeGoodsQueryItems(
+        userID: UUID,
+        limit: Int,
+        availability: AvailabilityQueryMode
+    ) -> [URLQueryItem] {
         [
             URLQueryItem(name: "kind", value: "eq.for_trade"),
             URLQueryItem(name: "status", value: "in.(active,reserved)"),
-            URLQueryItem(name: "market_available_qty", value: "gt.0"),
+            availability.queryItem,
             URLQueryItem(name: "user_id", value: "eq.\(userID.uuidString.lowercased())"),
             URLQueryItem(name: "order", value: "updated_at.desc"),
             URLQueryItem(name: "limit", value: "\(max(1, min(limit, 100)))")
@@ -496,218 +558,5 @@ public final class SupabaseGoodsInventoryClient: @unchecked Sendable {
         let encoder = JSONEncoder()
         encoder.keyEncodingStrategy = .convertToSnakeCase
         return encoder
-    }
-}
-
-private struct GoodsTypeRow: Decodable, Sendable {
-    static let select = "id,name,category,display_order"
-
-    var id: UUID
-    var name: String
-    var category: String?
-    var displayOrder: Int?
-
-    var goodsType: GoodsType {
-        GoodsType(
-            id: id,
-            name: name,
-            category: category,
-            displayOrder: displayOrder ?? 0
-        )
-    }
-}
-
-private struct GoodsInventoryRow: Decodable, Sendable {
-    static let select = "id,user_id,kind,status,group_id,character_id,goods_type_id,title,photo_urls,quantity,locked_qty,market_available_qty,exchange_type"
-
-    var id: UUID
-    var userId: UUID
-    var kind: String?
-    var status: String?
-    var groupId: UUID?
-    var characterId: UUID?
-    var goodsTypeId: UUID?
-    var title: String
-    var photoUrls: [String]?
-    var quantity: Int?
-    var lockedQty: Int?
-    var marketAvailableQty: Int?
-    var exchangeType: String?
-
-    var goodsItem: GoodsItem {
-        GoodsItem(
-            id: id,
-            ownerID: userId,
-            kind: GoodsEntryKind(inventoryKind: kind),
-            status: status.flatMap(GoodsEntryStatus.init(rawValue:)),
-            groupID: groupId,
-            memberID: characterId,
-            goodsTypeID: goodsTypeId,
-            title: title,
-            imageURL: photoUrls?.compactMap(URL.init(string:)).first,
-            tags: [],
-            quantity: max(1, quantity ?? 1),
-            lockedQuantity: max(0, lockedQty ?? 0),
-            marketAvailableQuantity: marketAvailableQty.map { max(0, $0) },
-            exchangeMethod: ExchangeMethod(exchangeTypeValue: exchangeType)
-        )
-    }
-}
-
-private struct GoodsInventoryTagRow: Decodable, Sendable {
-    static let select = "inventory_id,tag:tags_master(id,label)"
-
-    var inventoryId: UUID
-    var tag: GoodsTagRow?
-}
-
-private struct GoodsTagRow: Decodable, Sendable {
-    var id: UUID
-    var label: String
-
-    var goodsTag: GoodsTag {
-        GoodsTag(id: id, name: label)
-    }
-}
-
-private struct GoodsEntryPayload: Encodable, Sendable {
-    var userId: UUID
-    var kind: String
-    var groupId: UUID
-    var characterId: UUID?
-    var goodsTypeId: UUID
-    var title: String
-    var condition: String?
-    var priority: String?
-    var flexLevel: String?
-    var exchangeType: String
-    var quantity: Int
-    var status: String?
-    var photoUrls: [String]
-
-    init(userID: UUID, input: GoodsEntryInput, photoURLs: [String] = []) {
-        self.userId = userID
-        self.kind = input.kind.inventoryKind
-        self.groupId = input.groupID
-        self.characterId = input.memberID
-        self.goodsTypeId = input.goodsTypeID
-        self.title = SupabaseTextNormalizer.trimmed(input.title)
-        self.condition = input.kind == .inventory ? "good" : nil
-        self.priority = input.kind == .wish ? "second" : nil
-        self.flexLevel = input.kind == .wish ? "normal" : nil
-        self.exchangeType = "any"
-        self.quantity = max(1, min(input.quantity, 999))
-        self.status = input.status?.rawValue
-        self.photoUrls = photoURLs
-    }
-}
-
-private struct AttachInventoryTagPayload: Encodable, Sendable {
-    var inventoryID: UUID
-    var rawLabel: String
-
-    init(inventoryID: UUID, rawLabel: String) {
-        self.inventoryID = inventoryID
-        self.rawLabel = rawLabel
-    }
-
-    enum CodingKeys: String, CodingKey {
-        case inventoryID = "p_inventory_id"
-        case rawLabel = "p_raw_label"
-    }
-}
-
-private struct DetachInventoryTagPayload: Encodable, Sendable {
-    var inventoryID: UUID
-    var tagID: UUID
-
-    init(inventoryID: UUID, tagID: UUID) {
-        self.inventoryID = inventoryID
-        self.tagID = tagID
-    }
-
-    enum CodingKeys: String, CodingKey {
-        case inventoryID = "p_inventory_id"
-        case tagID = "p_tag_id"
-    }
-}
-
-private struct GoodsInventoryStatusPayload: Encodable, Sendable {
-    var status: String
-}
-
-private struct GoodsInventoryUpdatePayload: Encodable, Sendable {
-    private var title: String?
-    private var groupId: UUID?
-    private var characterId: UUID??
-    private var goodsTypeId: UUID?
-    private var quantity: Int?
-    private var status: String?
-    private var photoUrls: [String]?
-
-    init(input: GoodsInventoryUpdateInput) throws {
-        if let title = input.title {
-            let normalized = SupabaseTextNormalizer.trimmed(title)
-            guard !normalized.isEmpty else {
-                throw SupabaseGoodsInventoryClientError.emptyTitle
-            }
-            self.title = normalized
-        }
-        if let quantity = input.quantity {
-            guard (1...999).contains(quantity) else {
-                throw SupabaseGoodsInventoryClientError.invalidQuantity
-            }
-            self.quantity = quantity
-        }
-
-        self.groupId = input.groupID
-        self.goodsTypeId = input.goodsTypeID
-        self.status = input.status?.rawValue
-        self.photoUrls = input.photoURLs.map(SupabaseTextNormalizer.nonEmptyValues)
-
-        if let characterID = input.characterID {
-            self.characterId = .some(.some(characterID))
-        } else if input.clearsCharacterID {
-            self.characterId = .some(nil)
-        }
-
-        guard title != nil
-            || groupId != nil
-            || characterId != nil
-            || goodsTypeId != nil
-            || quantity != nil
-            || status != nil
-            || photoUrls != nil
-        else {
-            throw SupabaseGoodsInventoryClientError.emptyUpdate
-        }
-    }
-
-    enum CodingKeys: String, CodingKey {
-        case title
-        case groupId
-        case characterId
-        case goodsTypeId
-        case quantity
-        case status
-        case photoUrls
-    }
-
-    func encode(to encoder: Encoder) throws {
-        var container = encoder.container(keyedBy: CodingKeys.self)
-        try container.encodeIfPresent(title, forKey: .title)
-        try container.encodeIfPresent(groupId, forKey: .groupId)
-        if let characterId {
-            switch characterId {
-            case let .some(id):
-                try container.encode(id, forKey: .characterId)
-            case .none:
-                try container.encodeNil(forKey: .characterId)
-            }
-        }
-        try container.encodeIfPresent(goodsTypeId, forKey: .goodsTypeId)
-        try container.encodeIfPresent(quantity, forKey: .quantity)
-        try container.encodeIfPresent(status, forKey: .status)
-        try container.encodeIfPresent(photoUrls, forKey: .photoUrls)
     }
 }

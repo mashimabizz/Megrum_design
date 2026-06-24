@@ -5,6 +5,7 @@ import SwiftUI
 struct IndividualListingExchangeConditionPanel: View {
     var listing: IndividualListing
     var canEdit: Bool
+    var onEdit: () -> Void
     var onDelete: () -> Void
 
     private var extractedSummary: IndividualListingExchangeSummary? {
@@ -32,6 +33,13 @@ struct IndividualListingExchangeConditionPanel: View {
                 }
 
                 Spacer()
+
+                if canEdit {
+                    IndividualListingPanelEditButton(
+                        accessibilityLabel: "交換条件を編集",
+                        action: onEdit
+                    )
+                }
             }
 
             if let summary = extractedSummary {

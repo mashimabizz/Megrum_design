@@ -33,6 +33,7 @@ final class GoodsGridLayoutTests: XCTestCase {
 
     func testInventoryQuickActionsMatchOwnerMenuOrder() {
         XCTAssertEqual(GoodsQuickActionKind.inventoryActions, [.edit, .moveToKeep, .tag, .delete])
+        XCTAssertEqual(GoodsQuickActionKind.wishActions, [.edit, .tag, .delete])
         XCTAssertEqual(GoodsQuickActionKind.edit.title, "編集する")
         XCTAssertEqual(GoodsQuickActionKind.moveToKeep.title, "自分用キープへ")
         XCTAssertEqual(GoodsQuickActionKind.moveToKeep.title(for: .active), "自分用キープへ")
@@ -43,12 +44,116 @@ final class GoodsGridLayoutTests: XCTestCase {
         XCTAssertNotNil(GoodsQuickActionKind.delete.role)
     }
 
+    func testBulkSelectionPolicyAllowsWishAndEditableInventory() {
+        XCTAssertTrue(GoodsCollectionBulkActionPolicy.allowsOwnedSelection(
+            entryKind: .wish,
+            inventoryStatus: nil,
+            hasAppState: true
+        ))
+        XCTAssertTrue(GoodsCollectionBulkActionPolicy.allowsOwnedSelection(
+            entryKind: .inventory,
+            inventoryStatus: .active,
+            hasAppState: true
+        ))
+        XCTAssertTrue(GoodsCollectionBulkActionPolicy.allowsOwnedSelection(
+            entryKind: .inventory,
+            inventoryStatus: .keep,
+            hasAppState: true
+        ))
+        XCTAssertFalse(GoodsCollectionBulkActionPolicy.allowsOwnedSelection(
+            entryKind: .inventory,
+            inventoryStatus: .traded,
+            hasAppState: true
+        ))
+        XCTAssertFalse(GoodsCollectionBulkActionPolicy.allowsOwnedSelection(
+            entryKind: .wish,
+            inventoryStatus: nil,
+            hasAppState: false
+        ))
+    }
+
     func testSelectionFooterUsesFixedGlassActionMetrics() {
         XCTAssertEqual(GoodsSelectionFooterMetrics.bottomPadding, 12)
         XCTAssertEqual(GoodsSelectionFooterMetrics.horizontalPadding, 18)
         XCTAssertEqual(GoodsSelectionFooterMetrics.cornerRadius, 28)
         XCTAssertEqual(GoodsSelectionFooterMetrics.actionHeight, 52)
         XCTAssertEqual(GoodsSelectionFooterMetrics.actionSpacing, 10)
+    }
+
+    func testQuickActionPresentationUsesSharedSoftPopupMetrics() {
+        XCTAssertEqual(GoodsQuickActionPresentationMetrics.backdropOpacity, 0.12)
+        XCTAssertEqual(GoodsQuickActionPresentationMetrics.panelTransitionScale, 0.96)
+        XCTAssertEqual(GoodsQuickActionPresentationMetrics.panelAnimationResponse, 0.34)
+        XCTAssertEqual(GoodsQuickActionPresentationMetrics.panelAnimationDampingFraction, 0.86)
+    }
+
+    func testQuickActionPreviewUsesStableImagePreviewMetrics() {
+        XCTAssertEqual(GoodsQuickActionPreviewMetrics.width, 50)
+        XCTAssertEqual(GoodsQuickActionPreviewMetrics.height, 64)
+        XCTAssertEqual(GoodsQuickActionPreviewMetrics.cornerRadius, 14)
+        XCTAssertEqual(GoodsQuickActionPreviewMetrics.fallbackGlyphFontSize, 24)
+        XCTAssertEqual(TagCandidatePreviewMetrics.width, 232)
+    }
+
+    func testQuickActionHeaderUsesMasterNamesAndTags() {
+        let item = GoodsItem(
+            id: UUID(),
+            ownerID: UUID(),
+            title: "サナ トレカ",
+            tags: [
+                GoodsTag(id: UUID(), name: "会場限定"),
+                GoodsTag(id: UUID(), name: "未開封"),
+                GoodsTag(id: UUID(), name: "サイン入り"),
+                GoodsTag(id: UUID(), name: " 予備 ")
+            ]
+        )
+
+        let header = GoodsQuickActionHeaderPresentation(
+            item: item,
+            l1Name: "TWICE",
+            l2Name: "サナ"
+        )
+
+        XCTAssertEqual(header.masterLine, "TWICE　サナ")
+        XCTAssertEqual(header.tagLine, "#会場限定 #未開封 #サイン入り +1")
+    }
+
+    func testQuickActionHeaderFallsBackWhenMasterOrTagsAreMissing() {
+        let item = GoodsItem(
+            id: UUID(),
+            ownerID: UUID(),
+            title: "グループ未設定トレカ"
+        )
+
+        let header = GoodsQuickActionHeaderPresentation(item: item)
+
+        XCTAssertEqual(header.masterLine, "グループ未設定トレカ")
+        XCTAssertEqual(header.tagLine, "タグ未設定")
+    }
+
+    func testDeleteConfirmationPresentationMatchesOshiDeleteCalloutCopy() {
+        let item = GoodsItem(
+            id: UUID(),
+            ownerID: UUID(),
+            title: "サナ トレカ"
+        )
+
+        XCTAssertEqual(GoodsCollectionDeleteConfirmationPresentation.title, OshiSettingsPresentationText.removeGroupConfirmationTitle)
+        XCTAssertEqual(GoodsCollectionDeleteConfirmationPresentation.destructiveTitle, OshiSettingsPresentationText.removeGroupConfirmationAction)
+        XCTAssertEqual(GoodsCollectionDeleteConfirmationPresentation.message(for: item), "「サナ トレカ」を削除します。")
+        XCTAssertEqual(GoodsCollectionDeleteConfirmationPresentation.message(selectedCount: 3), "3件のグッズを削除します。")
+    }
+
+    func testCollectionChromePolicyPinsWishHeaderWhenShown() {
+        XCTAssertTrue(GoodsCollectionChromePolicy.usesPinnedTopChrome(entryKind: .inventory, showsHeader: true))
+        XCTAssertTrue(GoodsCollectionChromePolicy.usesPinnedTopChrome(entryKind: .inventory, showsHeader: false))
+        XCTAssertTrue(GoodsCollectionChromePolicy.usesPinnedTopChrome(entryKind: .wish, showsHeader: true))
+        XCTAssertFalse(GoodsCollectionChromePolicy.usesPinnedTopChrome(entryKind: .wish, showsHeader: false))
+    }
+
+    func testWishCollectionUsesSwipePagingWithSharedPinnedHeader() {
+        XCTAssertFalse(WishCollectionPresentationPolicy.usesDirectSectionRendering)
+        XCTAssertTrue(WishCollectionPresentationPolicy.usesSwipePaging)
     }
 
     func testGridContextLabelsFollowEntryKind() {

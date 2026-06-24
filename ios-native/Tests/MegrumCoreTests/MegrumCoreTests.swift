@@ -5,7 +5,7 @@ final class MegrumCoreTests: XCTestCase {
     func testExchangeMethodDisplayNames() {
         XCTAssertEqual(ExchangeMethod.hand.displayName, "現地交換")
         XCTAssertEqual(ExchangeMethod.mail.displayName, "郵送交換")
-        XCTAssertEqual(ExchangeMethod.both.displayName, "どちらもOK")
+        XCTAssertEqual(ExchangeMethod.both.displayName, "現地交換・郵送OK")
     }
 
     func testProposalStatusRawValueMatchesExistingStateMachine() {
@@ -26,6 +26,7 @@ final class MegrumCoreTests: XCTestCase {
         XCTAssertTrue(OshiRequestKind.group.supportsMemberSelection)
         XCTAssertTrue(OshiRequestKind.work.supportsMemberSelection)
         XCTAssertFalse(OshiRequestKind.solo.supportsMemberSelection)
+        XCTAssertEqual(OshiRequestKind.allCases.map(\.displayName), ["グループ", "作品", "ソロ活動"])
 
         XCTAssertTrue(OshiGroup(id: UUID(), name: "TWICE", kind: .group).supportsMemberSelection)
         XCTAssertTrue(OshiGroup(id: UUID(), name: "呪術廻戦", kind: .work).supportsMemberSelection)

@@ -9,7 +9,7 @@ struct MatchRelationHaveList: View {
     var onToggleHave: (UUID) -> Void
 
     private var isInteractive: Bool {
-        detail.listing.haveLogic == .one && detail.haves.count >= 2
+        (detail.listing.haveLogic == .one || detail.listing.haveLogic == .atLeast) && detail.haves.count >= 2
     }
 
     private var visibleHaves: [MatchRelationHave] {
@@ -40,10 +40,21 @@ struct MatchRelationHaveList: View {
             }
 
             if detail.haves.count > 1 {
-                Text(detail.listing.haveLogic == .all ? "全部まとめて" : "どれかを選択")
+                Text(logicHint)
                     .font(.system(size: 11, weight: .heavy, design: .rounded))
                     .foregroundStyle(MegrumTheme.muted)
             }
+        }
+    }
+
+    private var logicHint: String {
+        switch detail.listing.haveLogic {
+        case .all:
+            return "全部まとめて"
+        case .one:
+            return "どれかを選択"
+        case .atLeast:
+            return "\(ListingLogic.minimumCountTitle(detail.listing.haveMinimumCount))を選択"
         }
     }
 }

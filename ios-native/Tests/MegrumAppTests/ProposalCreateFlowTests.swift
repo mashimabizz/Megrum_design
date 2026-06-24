@@ -8,8 +8,13 @@ final class ProposalCreateFlowTests: XCTestCase {
     func testProposalCreateStepsStayInVisibleParityOrder() {
         XCTAssertEqual(
             ProposalCreateStep.allCases.map(\.title),
-            ["出すもの", "受け取る", "待ち合わせ", "確認"]
+            ["出すもの", "受け取る", "待ち合わせ", "送料", "支払方法", "確認"]
         )
+    }
+
+    func testProposalMeetupConditionRowsUseSharedMinimumHeight() {
+        XCTAssertEqual(ProposalMeetupConditionMetrics.rowMinHeight, 48)
+        XCTAssertEqual(ProposalMeetupConditionMetrics.rowVerticalPadding, 10)
     }
 
     func testProposalFlowCannotAdvancePastGiveWithoutSenderGoods() {
@@ -60,6 +65,146 @@ final class ProposalCreateFlowTests: XCTestCase {
 
         XCTAssertFalse(configuration.canSubmit)
         XCTAssertEqual(configuration.submitTitle, "受け取るものを選択")
+    }
+
+    func testProposalFlowCanUseCashOnReceiverSideInsteadOfReceiverGoods() {
+        let configuration = ProposalCreateConfiguration(
+            exchangeMethod: .mail,
+            hasSelectedSenderGoods: true,
+            hasReceiverCashRequest: true,
+            isCreatingProposal: false,
+            hasReadyMailingAddress: true,
+            isLoadingMailingAddress: false,
+            hasValidMeetup: false,
+            receiverGoodsCount: 0,
+            isListingSource: false
+        )
+
+        XCTAssertTrue(configuration.canAdvance(from: .receive))
+        XCTAssertTrue(configuration.canSubmit)
+    }
+
+    func testProposalFlowRequiresPaymentSelectionWhenCashIsIncluded() {
+        let configuration = ProposalCreateConfiguration(
+            exchangeMethod: .mail,
+            hasSelectedSenderGoods: true,
+            hasReceiverCashRequest: true,
+            isCreatingProposal: false,
+            hasReadyMailingAddress: true,
+            isLoadingMailingAddress: false,
+            hasValidMeetup: false,
+            requiresPaymentSelection: true,
+            hasSelectedPaymentMethod: false,
+            receiverGoodsCount: 0,
+            isListingSource: false
+        )
+
+        XCTAssertFalse(configuration.canAdvance(from: .payment))
+        XCTAssertFalse(configuration.canSubmit)
+        XCTAssertEqual(configuration.blockedTitle(for: .payment), "支払方法を選択してください")
+
+        let selected = ProposalCreateConfiguration(
+            exchangeMethod: .mail,
+            hasSelectedSenderGoods: true,
+            hasReceiverCashRequest: true,
+            isCreatingProposal: false,
+            hasReadyMailingAddress: true,
+            isLoadingMailingAddress: false,
+            hasValidMeetup: false,
+            requiresPaymentSelection: true,
+            hasSelectedPaymentMethod: true,
+            receiverGoodsCount: 0,
+            isListingSource: false
+        )
+
+        XCTAssertTrue(selected.canAdvance(from: .payment))
+        XCTAssertTrue(selected.canSubmit)
+    }
+
+    func testProposalPaymentCatalogShowsSharedMethodsAndPartnerOtherAsAccepted() {
+        let sections = ProposalPaymentOptionCatalog.sections(
+            viewerMethods: [.paypay, .bankTransfer],
+            viewerOtherNote: "メルペイ",
+            partnerMethods: [.paypay, .cashExchange, .other],
+            partnerOtherNote: "楽天ペイ"
+        )
+        let mutuallyAccepted = sections.first { $0.section == .mutuallyAccepted }?.options ?? []
+        let discussion = sections.first { $0.section == .needsDiscussion }?.options ?? []
+
+        XCTAssertEqual(mutuallyAccepted.map(\.title), ["PayPay", "その他（相手の入力）"])
+        XCTAssertEqual(mutuallyAccepted.map(\.confirmationTitle), ["PayPay", "楽天ペイ"])
+        XCTAssertTrue(discussion.map(\.title).contains("銀行振込"))
+        XCTAssertTrue(discussion.map(\.title).contains("現金交換"))
+        XCTAssertTrue(discussion.map(\.title).contains("その他（自分の入力）"))
+        XCTAssertFalse(discussion.map(\.title).contains("その他（相手の入力）"))
+    }
+
+    func testProposalPaymentCatalogMovesAllOptionsToDiscussionWhenThereIsNoSharedConcreteMethod() {
+        let sections = ProposalPaymentOptionCatalog.sections(
+            viewerMethods: [.bankTransfer],
+            viewerOtherNote: "メルペイ",
+            partnerMethods: [.paypay, .other],
+            partnerOtherNote: "楽天ペイ"
+        )
+
+        XCTAssertNil(sections.first { $0.section == .mutuallyAccepted })
+        let discussion = sections.first { $0.section == .needsDiscussion }?.options ?? []
+        XCTAssertEqual(
+            discussion.map(\.title),
+            ["銀行振込", "PayPay", "その他（自分の入力）", "その他（相手の入力）"]
+        )
+        XCTAssertEqual(discussion.last?.confirmationTitle, "楽天ペイ")
+    }
+
+    func testProposalPaymentCatalogFallsBackToDiscussionWhenBothUsersHaveNoPaymentSettings() {
+        let sections = ProposalPaymentOptionCatalog.sections(
+            viewerMethods: [],
+            viewerOtherNote: nil,
+            partnerMethods: [],
+            partnerOtherNote: nil
+        )
+
+        XCTAssertNil(sections.first { $0.section == .mutuallyAccepted })
+        XCTAssertEqual(
+            sections.first { $0.section == .needsDiscussion }?.options.map(\.title),
+            ["相談して決める"]
+        )
+    }
+
+    func testProposalFlowCanUseGoodsAndCashOnSenderSideTogether() {
+        let configuration = ProposalCreateConfiguration(
+            exchangeMethod: .mail,
+            hasSelectedSenderGoods: true,
+            hasCashOffer: true,
+            isCreatingProposal: false,
+            hasReadyMailingAddress: true,
+            isLoadingMailingAddress: false,
+            hasValidMeetup: false,
+            receiverGoodsCount: 1,
+            isListingSource: false
+        )
+
+        XCTAssertTrue(configuration.canAdvance(from: .give))
+        XCTAssertTrue(configuration.canAdvance(from: .receive))
+        XCTAssertTrue(configuration.canSubmit)
+    }
+
+    func testProposalFlowRejectsCashOnBothSides() {
+        let configuration = ProposalCreateConfiguration(
+            exchangeMethod: .mail,
+            hasSelectedSenderGoods: true,
+            hasCashOffer: true,
+            hasReceiverCashRequest: true,
+            isCreatingProposal: false,
+            hasReadyMailingAddress: true,
+            isLoadingMailingAddress: false,
+            hasValidMeetup: false,
+            receiverGoodsCount: 1,
+            isListingSource: false
+        )
+
+        XCTAssertFalse(configuration.canSubmit)
+        XCTAssertEqual(configuration.submitTitle, "片側はグッズを選択")
     }
 
     func testProposalFlowCanReachConfirmWhenSelectionsAndMeetupAreReady() {
@@ -197,6 +342,8 @@ final class ProposalCreateFlowTests: XCTestCase {
             meetupCandidates: [primaryMeetup, secondaryMeetup],
             exposeCalendar: true,
             listingID: listingID,
+            cashAmount: 1_200,
+            cashAmountSide: .sender,
             senderCount: 1,
             receiverCount: 1,
             partnerHandle: "michilion",
@@ -213,6 +360,8 @@ final class ProposalCreateFlowTests: XCTestCase {
         XCTAssertEqual(draft.input.meetup, primaryMeetup)
         XCTAssertEqual(draft.input.meetupCandidates, [primaryMeetup, secondaryMeetup])
         XCTAssertEqual(draft.input.exposeCalendar, true)
+        XCTAssertEqual(draft.input.cashAmount, 1_200)
+        XCTAssertEqual(draft.input.cashAmountSide, .sender)
         XCTAssertEqual(draft.summary.completionMessage, "@michilion に打診を送りました。返事が届いたら通知と打診一覧で確認できます。")
         XCTAssertEqual(draft.summary.detailText, "1件を提示 / 1件を受け取り候補・終演後OK / 短時間OK")
     }
@@ -232,9 +381,18 @@ final class ProposalCreateFlowTests: XCTestCase {
                 from: .receive,
                 translationWidth: -90,
                 translationHeight: 8,
-                visibleSteps: [.give, .receive, .meetup, .confirm]
+                visibleSteps: [.give, .receive, .meetup, .shipping, .confirm]
             ),
             .meetup
+        )
+        XCTAssertEqual(
+            ProposalStepSwipeNavigator.destination(
+                from: .meetup,
+                translationWidth: -90,
+                translationHeight: 8,
+                visibleSteps: [.give, .receive, .meetup, .shipping, .confirm]
+            ),
+            .shipping
         )
         XCTAssertEqual(
             ProposalStepSwipeNavigator.destination(
@@ -326,7 +484,35 @@ final class ProposalCreateFlowTests: XCTestCase {
                 configuration: readyMail,
                 meetupHasTimeDraft: false
             ),
-            "次へ：送信確認"
+            "送料へ進む"
+        )
+        let paymentReady = ProposalCreateConfiguration(
+            exchangeMethod: .mail,
+            hasSelectedSenderGoods: true,
+            isCreatingProposal: false,
+            hasReadyMailingAddress: true,
+            isLoadingMailingAddress: false,
+            hasValidMeetup: false,
+            requiresPaymentSelection: true,
+            hasSelectedPaymentMethod: true,
+            receiverGoodsCount: 1,
+            isListingSource: false
+        )
+        XCTAssertEqual(
+            ProposalCreateBottomBarCopy.primaryTitle(
+                selectedStep: .shipping,
+                configuration: paymentReady,
+                meetupHasTimeDraft: false
+            ),
+            "支払方法へ進む"
+        )
+        XCTAssertEqual(
+            ProposalCreateBottomBarCopy.primaryTitle(
+                selectedStep: .payment,
+                configuration: paymentReady,
+                meetupHasTimeDraft: false
+            ),
+            "この方法にする"
         )
         XCTAssertEqual(
             ProposalCreateBottomBarCopy.primaryTitle(
@@ -342,7 +528,7 @@ final class ProposalCreateFlowTests: XCTestCase {
                 configuration: blockedMeetup,
                 meetupHasTimeDraft: true
             ),
-            "場所未設定の候補があります"
+            "待ち合わせ入力が必要"
         )
         XCTAssertEqual(
             ProposalCreateBottomBarCopy.primaryTitle(
@@ -350,7 +536,7 @@ final class ProposalCreateFlowTests: XCTestCase {
                 configuration: blockedMeetup,
                 meetupHasTimeDraft: false
             ),
-            "交換できる時間を設定してください"
+            "待ち合わせ入力が必要"
         )
     }
 
@@ -385,6 +571,18 @@ final class ProposalCreateFlowTests: XCTestCase {
             receiverGoodsCount: 0,
             isListingSource: false
         )
+        let paymentReady = ProposalCreateConfiguration(
+            exchangeMethod: .mail,
+            hasSelectedSenderGoods: true,
+            isCreatingProposal: false,
+            hasReadyMailingAddress: true,
+            isLoadingMailingAddress: false,
+            hasValidMeetup: false,
+            requiresPaymentSelection: true,
+            hasSelectedPaymentMethod: true,
+            receiverGoodsCount: 1,
+            isListingSource: false
+        )
 
         XCTAssertEqual(
             ProposalCreatePrimaryStepDestination.destination(
@@ -398,9 +596,9 @@ final class ProposalCreateFlowTests: XCTestCase {
             ProposalCreatePrimaryStepDestination.destination(
                 from: .give,
                 configuration: readyMail,
-                visibleSteps: [.give, .receive, .confirm]
+                visibleSteps: [.give, .receive, .shipping, .confirm]
             ),
-            .confirm
+            .shipping
         )
         XCTAssertEqual(
             ProposalCreatePrimaryStepDestination.destination(
@@ -420,9 +618,41 @@ final class ProposalCreateFlowTests: XCTestCase {
         )
         XCTAssertEqual(
             ProposalCreatePrimaryStepDestination.destination(
+                from: .receive,
+                configuration: readyMail,
+                visibleSteps: [.give, .receive, .shipping, .confirm]
+            ),
+            .shipping
+        )
+        XCTAssertEqual(
+            ProposalCreatePrimaryStepDestination.destination(
                 from: .meetup,
                 configuration: readyHand,
                 visibleSteps: [.give, .receive, .meetup, .confirm]
+            ),
+            .confirm
+        )
+        XCTAssertEqual(
+            ProposalCreatePrimaryStepDestination.destination(
+                from: .shipping,
+                configuration: readyMail,
+                visibleSteps: [.give, .receive, .shipping, .confirm]
+            ),
+            .confirm
+        )
+        XCTAssertEqual(
+            ProposalCreatePrimaryStepDestination.destination(
+                from: .shipping,
+                configuration: paymentReady,
+                visibleSteps: [.give, .receive, .shipping, .payment, .confirm]
+            ),
+            .payment
+        )
+        XCTAssertEqual(
+            ProposalCreatePrimaryStepDestination.destination(
+                from: .payment,
+                configuration: paymentReady,
+                visibleSteps: [.give, .receive, .shipping, .payment, .confirm]
             ),
             .confirm
         )
@@ -431,8 +661,9 @@ final class ProposalCreateFlowTests: XCTestCase {
     func testProposalFlowScreenCopyMatchesRnHeaders() {
         XCTAssertEqual(ProposalFlowScreenCopy.title(for: .give), "提示物の選択")
         XCTAssertEqual(ProposalFlowScreenCopy.title(for: .receive), "提示物の選択")
+        XCTAssertEqual(ProposalFlowScreenCopy.title(for: .payment), "支払方法")
         XCTAssertEqual(ProposalFlowScreenCopy.title(for: .confirm), "送信確認")
-        XCTAssertTrue(ProposalFlowScreenCopy.showsHeaderKicker(for: .give))
+        XCTAssertFalse(ProposalFlowScreenCopy.showsHeaderKicker(for: .give))
         XCTAssertFalse(ProposalFlowScreenCopy.showsHeaderKicker(for: .confirm))
         XCTAssertEqual(ProposalConfirmSectionCopy.meetupCandidatesTitle, "交換できる候補")
     }
@@ -454,11 +685,11 @@ final class ProposalCreateFlowTests: XCTestCase {
     }
 
     func testProposalSectionTabsUseRnLikeSegmentMetrics() {
-        XCTAssertEqual(ProposalSectionTabsMetrics.containerPadding, 4)
+        XCTAssertEqual(ProposalSectionTabsMetrics.containerPadding, 3)
         XCTAssertEqual(ProposalSectionTabsMetrics.tabGap, 4)
         XCTAssertEqual(ProposalSectionTabsMetrics.tabHorizontalPadding, 5)
-        XCTAssertEqual(ProposalSectionTabsMetrics.tabVerticalPadding, 8)
-        XCTAssertEqual(ProposalSectionTabsMetrics.minTabHeight, 36)
+        XCTAssertEqual(ProposalSectionTabsMetrics.tabVerticalPadding, 5)
+        XCTAssertEqual(ProposalSectionTabsMetrics.minTabHeight, 30)
         XCTAssertEqual(ProposalSectionTabsMetrics.labelFontSize, 11.5)
         XCTAssertEqual(ProposalSectionTabsMetrics.countFontSize, 10)
     }
@@ -481,25 +712,31 @@ final class ProposalCreateFlowTests: XCTestCase {
                 .exchangeContent,
                 .method,
                 .meetupCandidates,
-                .message,
-                .scheduleShare
+                .message
             ]
         )
         XCTAssertEqual(
-            ProposalConfirmSectionKind.visibleOrder(requiresMeetupBeforeSubmit: false),
+            ProposalConfirmSectionKind.visibleOrder(
+                requiresMeetupBeforeSubmit: false,
+                requiresShippingBeforeSubmit: true,
+                requiresPaymentSelection: true
+            ),
             [
                 .exchangeContent,
                 .method,
+                .shipping,
+                .payment,
                 .message
             ]
         )
     }
 
-    func testProposalConfirmUsesRnLikeInlineSubmitButtonPlacement() {
+    func testProposalConfirmUsesFixedFooterSubmitButtonPlacement() {
         XCTAssertFalse(ProposalFlowBottomBarPlacement.usesInlineScrollButton(for: .give))
         XCTAssertFalse(ProposalFlowBottomBarPlacement.usesInlineScrollButton(for: .receive))
         XCTAssertFalse(ProposalFlowBottomBarPlacement.usesInlineScrollButton(for: .meetup))
-        XCTAssertTrue(ProposalFlowBottomBarPlacement.usesInlineScrollButton(for: .confirm))
+        XCTAssertFalse(ProposalFlowBottomBarPlacement.usesInlineScrollButton(for: .shipping))
+        XCTAssertFalse(ProposalFlowBottomBarPlacement.usesInlineScrollButton(for: .confirm))
     }
 
     func testProposalBottomBarUsesRnLikeFixedFooterMetrics() {
@@ -510,18 +747,6 @@ final class ProposalCreateFlowTests: XCTestCase {
         XCTAssertEqual(ProposalFlowBottomBarMetrics.inlineBottomPadding, 4)
         XCTAssertEqual(ProposalFlowBottomBarMetrics.buttonMinHeight, 56)
         XCTAssertEqual(ProposalFlowBottomBarMetrics.buttonCornerRadius, 18)
-    }
-
-    func testProposalScheduleShareCardUsesRnLikeMetrics() {
-        XCTAssertEqual(ProposalScheduleShareMetrics.cardGap, 12)
-        XCTAssertEqual(ProposalScheduleShareMetrics.cardPadding, 13)
-        XCTAssertEqual(ProposalScheduleShareMetrics.cardCornerRadius, 16)
-        XCTAssertEqual(ProposalScheduleShareMetrics.titleFontSize, 13)
-        XCTAssertEqual(ProposalScheduleShareMetrics.statusFontSize, 11)
-        XCTAssertEqual(ProposalScheduleShareMetrics.statusTopSpacing, 2)
-        XCTAssertEqual(ProposalScheduleShareMetrics.activeBackgroundOpacity, 0.08)
-        XCTAssertEqual(ProposalScheduleShareMetrics.activeBorderOpacity, 0.48)
-        XCTAssertEqual(ProposalScheduleShareMetrics.inactiveBorderOpacity, 0.08)
     }
 
     func testProposalPreviewGlyphResolverUsesRnLikeMemberGlyphs() {

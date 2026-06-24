@@ -29,7 +29,8 @@ struct OshiSettingsScreen: View {
             onToggleExpanded: toggleExpandedGroup,
             onRemoveGroup: removeGroupTapped,
             onRemoveMember: removeMemberTapped(_:from:),
-            onAddMember: addMemberTapped(_:to:)
+            onAddMember: addMemberTapped(_:to:),
+            onRequestMember: requestMemberTapped
         )
         .background(MegrumTheme.canvas.ignoresSafeArea())
         .megrumHiddenNavigationBar()
@@ -39,25 +40,38 @@ struct OshiSettingsScreen: View {
                 groups: appState.oshiGroups,
                 selectedGroupIDs: Set(groups.compactMap(\.groupID)),
                 charactersByGroupID: charactersByGroupID,
+                allowsMultipleSelection: true,
                 onClose: { showsMasterSheet = false },
                 onRequest: { query in
                     showsMasterSheet = false
                     requestSheet = .oshi(initialName: query)
                 },
-                onSelect: addMasterGroupTapped
+                onSelect: addMasterGroupTapped,
+                onRegisterSelected: addMasterGroupsTapped
             )
             .presentationDetents([.large])
             .presentationDragIndicator(.hidden)
         }
         .sheet(item: $requestSheet) { state in
-            OshiRequestSheet(
-                state: state,
-                genres: appState.oshiGenres,
-                onClose: { requestSheet = nil },
-                onSubmit: { submitRequestTapped($0, state: state) }
-            )
-            .presentationDetents([.large])
-            .presentationDragIndicator(.hidden)
+            switch state {
+            case .oshi:
+                OshiRequestSheet(
+                    state: state,
+                    genres: appState.oshiGenres,
+                    onClose: { requestSheet = nil },
+                    onSubmit: submitOshiRequestTapped
+                )
+                .presentationDetents([.large])
+                .presentationDragIndicator(.hidden)
+            case .member(let context):
+                OshiMemberRequestSheet(
+                    context: context,
+                    onClose: { requestSheet = nil },
+                    onSubmit: { submitMemberRequestTapped($0, context: context) }
+                )
+                .presentationDetents([.medium])
+                .presentationDragIndicator(.visible)
+            }
         }
         .task {
             await prepare()
@@ -82,6 +96,10 @@ struct OshiSettingsScreen: View {
         Task { await addMasterGroup(group) }
     }
 
+    private func addMasterGroupsTapped(_ selectedGroups: [OshiGroup]) {
+        Task { await addMasterGroups(selectedGroups) }
+    }
+
     private func removeGroupTapped(_ group: OshiSettingsGroupDraft) {
         Task { await removeGroup(group) }
     }
@@ -94,8 +112,16 @@ struct OshiSettingsScreen: View {
         Task { await addMember(character, to: group) }
     }
 
-    private func submitRequestTapped(_ payload: OshiRequestSheetPayload, state: OshiRequestSheetState) {
-        Task { await submitRequest(payload, state: state) }
+    private func requestMemberTapped(_ group: OshiSettingsGroupDraft) {
+        requestSheet = .member(OshiMemberRequestContext(group: group))
+    }
+
+    private func submitOshiRequestTapped(_ payload: OshiRequestSheetPayload) {
+        Task { await submitOshiRequest(payload) }
+    }
+
+    private func submitMemberRequestTapped(_ payload: OshiMemberRequestSheetPayload, context: OshiMemberRequestContext) {
+        Task { await submitMemberRequest(payload, context: context) }
     }
 
     private func prepare() async {
@@ -149,6 +175,28 @@ struct OshiSettingsScreen: View {
         await persist(next, success: "推しを追加しました。")
     }
 
+    private func addMasterGroups(_ selectedGroups: [OshiGroup]) async {
+        showsMasterSheet = false
+        let existingIDs = Set(groups.compactMap(\.groupID))
+        let groupsToAdd = selectedGroups.filter { !existingIDs.contains($0.id) }
+        guard !groupsToAdd.isEmpty else {
+            noticeMessage = "すでに追加済みです。"
+            return
+        }
+
+        for group in groupsToAdd {
+            await loadCharactersIfNeeded(groupID: group.id)
+        }
+
+        var next = groups
+        for group in groupsToAdd {
+            next.append(OshiSettingsGroupDraft(masterGroup: group, priority: next.count + 1))
+        }
+
+        let success = groupsToAdd.count == 1 ? "推しを追加しました。" : "\(groupsToAdd.count)件の推しを追加しました。"
+        await persist(next, success: success)
+    }
+
     private func removeGroup(_ group: OshiSettingsGroupDraft) async {
         await persist(
             groups.filter { $0.key != group.key },
@@ -177,7 +225,7 @@ struct OshiSettingsScreen: View {
         await persist(next, success: "推しメンバーを追加しました。")
     }
 
-    private func submitRequest(_ payload: OshiRequestSheetPayload, state: OshiRequestSheetState) async {
+    private func submitOshiRequest(_ payload: OshiRequestSheetPayload) async {
         requestSheet = nil
         guard let requestID = await appState.createOshiRequest(
             OshiRequestCreateInput(
@@ -200,6 +248,52 @@ struct OshiSettingsScreen: View {
             )
         )
         await persist(next, success: "追加リクエストを送信し、推し設定に仮登録しました。")
+    }
+
+    private func submitMemberRequest(
+        _ payload: OshiMemberRequestSheetPayload,
+        context: OshiMemberRequestContext
+    ) async {
+        requestSheet = nil
+        let requestedName = payload.name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !requestedName.isEmpty else {
+            return
+        }
+        guard context.canCreateCharacterRequest else {
+            errorMessage = "対象の推しを確認できませんでした"
+            return
+        }
+        guard let groupIndex = groups.firstIndex(where: { $0.key == context.groupKey }) else {
+            errorMessage = "対象の推しを確認できませんでした"
+            return
+        }
+        guard groups[groupIndex].members.contains(where: { member in
+            member.name.compare(requestedName, options: [.caseInsensitive, .widthInsensitive, .diacriticInsensitive]) == .orderedSame
+        }) == false else {
+            noticeMessage = "すでに追加済みです。"
+            return
+        }
+        guard let requestID = await appState.createCharacterRequest(
+            CharacterRequestCreateInput(
+                groupID: context.groupID,
+                oshiRequestID: context.oshiRequestID,
+                requestedName: requestedName,
+                note: payload.note
+            )
+        ) else {
+            errorMessage = appState.errorMessage
+            return
+        }
+
+        var next = groups
+        next[groupIndex].members.append(
+            OshiSettingsMemberDraft(
+                characterRequestID: requestID,
+                name: requestedName,
+                pending: true
+            )
+        )
+        await persist(next, success: OshiSettingsPresentationText.memberRequestSubmitSuccess)
     }
 
     private func persist(_ nextGroups: [OshiSettingsGroupDraft], success: String) async {

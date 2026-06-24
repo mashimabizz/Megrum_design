@@ -189,13 +189,20 @@ struct TradeSystemMessagePresentation: Equatable, Sendable {
         [title, body, detail].compactMap(\.self).joined(separator: "。")
     }
 
-    init(message: TradeMessage) {
+    init(message: TradeMessage, isMine: Bool? = nil) {
         let fallbackBody = message.body.nilIfBlank ?? "取引が更新されました"
         if let disputeSummary = TradeDisputeSummary(message: message) {
             title = "申告受付"
             systemImage = "exclamationmark.bubble"
             body = disputeSummary.body
             detail = disputeSummary.bannerBody
+            return
+        }
+        if TradeEvidenceSystemMessage.isEvidenceNotice(message) {
+            title = isMine == true ? "取引証跡を送りました" : "取引証跡が届きました"
+            systemImage = "doc.viewfinder"
+            body = "タップして証跡写真を確認"
+            detail = nil
             return
         }
 
@@ -232,6 +239,16 @@ struct TradeSystemMessagePresentation: Equatable, Sendable {
             lines.append("補足：\(note)")
         }
         return lines.isEmpty ? fallbackBody : lines.joined(separator: "\n")
+    }
+}
+
+enum TradeEvidenceSystemMessage {
+    static let action = "evidence_added"
+    private static let legacyBody = "取引証跡が追加されました"
+
+    static func isEvidenceNotice(_ message: TradeMessage) -> Bool {
+        message.messageType == .system
+            && (message.meta["action"] == action || message.body?.trimmingCharacters(in: .whitespacesAndNewlines) == legacyBody)
     }
 }
 

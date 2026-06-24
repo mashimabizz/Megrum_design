@@ -4,10 +4,13 @@ struct ProposalCreateConfiguration: Equatable {
     var exchangeMethod: ExchangeMethod
     var hasSelectedSenderGoods: Bool
     var hasCashOffer: Bool = false
+    var hasReceiverCashRequest: Bool = false
     var isCreatingProposal: Bool
     var hasReadyMailingAddress: Bool
     var isLoadingMailingAddress: Bool
     var hasValidMeetup: Bool = false
+    var requiresPaymentSelection: Bool = false
+    var hasSelectedPaymentMethod: Bool = false
     var receiverGoodsCount: Int
     var isListingSource: Bool
 
@@ -33,11 +36,25 @@ struct ProposalCreateConfiguration: Equatable {
         exchangeMethod == .mail || exchangeMethod == .both
     }
 
+    var requiresShippingBeforeSubmit: Bool {
+        requiresMailingAddressBeforeSubmit
+    }
+
+    var hasSenderSelection: Bool {
+        hasSelectedSenderGoods || hasCashOffer
+    }
+
+    var hasReceiverSelection: Bool {
+        receiverGoodsCount > 0 || hasReceiverCashRequest
+    }
+
     var canSubmit: Bool {
-        (hasSelectedSenderGoods || hasCashOffer)
-            && receiverGoodsCount > 0
+        hasSenderSelection
+            && hasReceiverSelection
+            && !(hasCashOffer && hasReceiverCashRequest)
             && !isCreatingProposal
             && !isLoadingMailingAddress
+            && (!requiresPaymentSelection || hasSelectedPaymentMethod)
             && targetStatus != nil
     }
 
@@ -52,14 +69,20 @@ struct ProposalCreateConfiguration: Equatable {
     }
 
     var submitTitle: String {
-        if receiverGoodsCount <= 0 {
+        if !hasReceiverSelection {
             return "受け取るものを選択"
+        }
+        if hasCashOffer && hasReceiverCashRequest {
+            return "片側はグッズを選択"
         }
         if requiresMailingAddressBeforeSubmit && !hasReadyMailingAddress {
             return "住所登録が必要"
         }
         if requiresMeetupBeforeSubmit && !hasValidMeetup {
             return "待ち合わせ入力が必要"
+        }
+        if requiresPaymentSelection && !hasSelectedPaymentMethod {
+            return "支払方法を選択"
         }
         return "この内容で打診を送信"
     }

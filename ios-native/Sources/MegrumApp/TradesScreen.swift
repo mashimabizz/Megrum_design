@@ -10,6 +10,7 @@ import UIKit
 struct TradesScreen: View {
     @ObservedObject var appState: MegrumAppState
     @Binding var requestedStage: TradeStage?
+    var adDisplayContext: AdDisplayContext = AdDisplayContext()
 
     @State private var selectedStage: TradeStage = .pending
     @State private var detailRoute: TradeDetailRoute?
@@ -120,6 +121,13 @@ struct TradesScreen: View {
                                 openProposal(proposal)
                             }
                         }
+                    }
+                    if stage == .completed {
+                        AdBannerSlot(
+                            placement: .pastTradesFooterBanner,
+                            displayContext: adDisplayContext
+                        )
+                        .padding(.top, 12)
                     }
                 }
             }

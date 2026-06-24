@@ -1,5 +1,7 @@
 @testable import MegrumApp
+import CoreGraphics
 import MegrumCore
+import MegrumDesign
 import XCTest
 
 final class HomeScreenFlowTests: XCTestCase {
@@ -19,6 +21,28 @@ final class HomeScreenFlowTests: XCTestCase {
 
     func testHomeDoesNotShowGroomRail() {
         XCTAssertFalse(HomeGroomRailPolicy.isVisibleOnHome)
+    }
+
+    func testMutualMatchEmptyStatePromptsListingCreationWhenNoListingsExist() {
+        let presentation = HomeMutualMatchEmptyStatePresentation(listingCount: 0)
+
+        XCTAssertEqual(presentation.title, "個別募集を作成しましょう")
+        XCTAssertEqual(
+            presentation.message,
+            "個別募集を1件も作っていないので、譲れるものと欲しいものを設定してみましょう。"
+        )
+        XCTAssertEqual(presentation.buttonTitle, "個別募集を作成")
+    }
+
+    func testMutualMatchEmptyStateShowsExistingListingCountAndEncouragesMoreSettings() {
+        let presentation = HomeMutualMatchEmptyStatePresentation(listingCount: 3)
+
+        XCTAssertEqual(presentation.title, "個別募集を3件作成中")
+        XCTAssertEqual(
+            presentation.message,
+            "今作成中の個別募集は3件です。譲るものや欲しい条件をもっと設定すると、相互マッチが増えやすくなります。"
+        )
+        XCTAssertEqual(presentation.buttonTitle, "個別募集を追加")
     }
 
     func testNativePreviewHomeCandidatesUseBundledGoodsImages() throws {
@@ -266,6 +290,7 @@ final class HomeScreenFlowTests: XCTestCase {
     func testFloatingActionsSitJustAboveFooter() {
         XCTAssertEqual(FloatingActionLayoutMetrics.leadingPadding, 24)
         XCTAssertEqual(FloatingActionLayoutMetrics.bottomGapAboveFooter, 12)
+        XCTAssertEqual(FloatingActionLayoutMetrics.homeSearchBottomPadding, FloatingActionLayoutMetrics.bottomGapAboveFooter)
         XCTAssertEqual(FloatingActionLayoutMetrics.contentBottomPadding, 104)
     }
 
@@ -294,5 +319,663 @@ final class HomeScreenFlowTests: XCTestCase {
 
         XCTAssertEqual(firstMatched?.ownerID, NativePreviewData.partnerID)
         XCTAssertEqual(HomeCandidateTileStyle.letter(for: firstMatched!), "S")
+    }
+
+    func testHomeDiscoveryPrimaryTabsUseRequestedCopy() {
+        XCTAssertEqual(HomeDiscoveryPrimaryTab.mutual.title, "相互にマッチ")
+        XCTAssertEqual(HomeDiscoveryPrimaryTab.candidates.title, "マッチ候補")
+        XCTAssertEqual(HomeDiscoveryPrimaryTab.timeline.title, "募集タイムライン")
+        XCTAssertEqual(HomeDiscoveryPrimaryTab.allCases.map(\.title), ["相互にマッチ", "マッチ候補", "募集タイムライン"])
+        XCTAssertEqual(HomeDiscoveryPrimaryTab.allCases.map(\.index), [0, 1, 2])
+    }
+
+    func testHomeDiscoveryTopTabsUseTimelineLikeBarMetrics() {
+        XCTAssertEqual(HomeDiscoveryTabSwitcherMetrics.itemSpacing, 32)
+        XCTAssertEqual(HomeDiscoveryTabSwitcherMetrics.fontSize, 17)
+        XCTAssertEqual(HomeDiscoveryTabSwitcherMetrics.underlineHeight, 4)
+        XCTAssertEqual(HomeDiscoveryTabSwitcherMetrics.totalBottomPadding, 19)
+    }
+
+    func testHomeDiscoveryTabIndicatorInterpolatesAcrossLabelFrames() throws {
+        let frames: [HomeDiscoveryPrimaryTab: CGRect] = [
+            .mutual: CGRect(x: 20, y: 0, width: 82, height: 24),
+            .candidates: CGRect(x: 132, y: 0, width: 68, height: 24),
+            .timeline: CGRect(x: 230, y: 0, width: 118, height: 24)
+        ]
+
+        let halfway = try XCTUnwrap(
+            HomeDiscoveryTabIndicatorFrame.interpolated(
+                progress: 1.5,
+                frames: frames
+            )
+        )
+
+        XCTAssertEqual(halfway.minX, 181)
+        XCTAssertEqual(halfway.width, 93)
+    }
+
+    func testHomeListingTimelineShellUsesRequestedCopy() {
+        XCTAssertEqual(HomeListingTimelinePresentation.title, "募集タイムライン")
+        XCTAssertEqual(HomeListingTimelinePresentation.sortLabel, "新着順")
+        XCTAssertEqual(HomeListingTimelinePresentation.placeholderRowCount, 3)
+    }
+
+    func testMutualMatchShellDoesNotInventCandidatesWithoutData() {
+        let candidates = HomeMutualMatchCandidateFactory.candidates(
+            viewerID: NativePreviewData.viewerID,
+            inventoryItems: [],
+            matchedItems: [],
+            possibleItems: [],
+            goodsTypes: [],
+            conditionSignalsByItemID: [:]
+        )
+
+        XCTAssertTrue(candidates.isEmpty)
+    }
+
+    func testMutualMatchFactoryUsesOnlyExplicitMutualMatchData() {
+        let candidates = HomeMutualMatchCandidateFactory.candidates(
+            mutualMatchData: [explicitMutualMatchCandidateData()],
+            viewerID: NativePreviewData.viewerID,
+            inventoryItems: [],
+            matchedItems: [],
+            possibleItems: [],
+            goodsTypes: [],
+            conditionSignalsByItemID: [:]
+        )
+
+        XCTAssertEqual(candidates.count, 1)
+        XCTAssertEqual(candidates.first?.partnerGoodsItems.first?.title, "相手が譲る サナ")
+        XCTAssertEqual(candidates.first?.viewerGoodsItems.first?.title, "自分が譲る モモ")
+        XCTAssertEqual(candidates.first?.partnerGoodsItems.count, 2)
+        XCTAssertEqual(candidates.first?.viewerGoodsItems.count, 2)
+        XCTAssertEqual(candidates.first?.requestedGoodsBadgeTitle, "セット")
+        XCTAssertEqual(candidates.first?.offeredGoodsBadgeTitle, "どれか1つ")
+        XCTAssertEqual(candidates.flatMap(\.attentionTags).map(\.title).contains("タグ不一致？"), true)
+        XCTAssertEqual(candidates.flatMap(\.attentionTags).map(\.title).contains("金額込み候補"), true)
+        XCTAssertEqual(candidates.first?.partnerMetaText, "東京都 ・ 20代 ・ 評価12件 ★4.8")
+        XCTAssertFalse(candidates.first?.partnerMetaText.contains("サナ推し") == true)
+    }
+
+    func testMutualMatchGoodsLogicBadgeOnlyAppearsForMultipleItems() {
+        XCTAssertNil(HomeMutualMatchGoodsLogicBadgePolicy.badgeTitle(logic: .all, itemCount: 1))
+        XCTAssertNil(HomeMutualMatchGoodsLogicBadgePolicy.badgeTitle(logic: .one, itemCount: 0))
+        XCTAssertEqual(HomeMutualMatchGoodsLogicBadgePolicy.badgeTitle(logic: .all, itemCount: 2), "セット")
+        XCTAssertEqual(HomeMutualMatchGoodsLogicBadgePolicy.badgeTitle(logic: .one, itemCount: 2), "どれか1つ")
+    }
+
+    func testMutualMatchCashCompatibilityPolicyUsesFixedPriceAndSpecifiedAmountRules() {
+        XCTAssertEqual(
+            HomeMutualMatchCashCompatibilityPolicy.compatibility(
+                requestedAmount: nil,
+                counterpartAmount: nil
+            ),
+            .matched
+        )
+        XCTAssertEqual(
+            HomeMutualMatchCashCompatibilityPolicy.compatibility(
+                requestedAmount: nil,
+                counterpartAmount: 1_500
+            ),
+            .amountIncluded
+        )
+        XCTAssertEqual(
+            HomeMutualMatchCashCompatibilityPolicy.compatibility(
+                requestedAmount: 1_500,
+                counterpartAmount: nil
+            ),
+            .amountIncluded
+        )
+        XCTAssertEqual(
+            HomeMutualMatchCashCompatibilityPolicy.compatibility(
+                requestedAmount: 1_500,
+                counterpartAmount: 1_800
+            ),
+            .matched
+        )
+        XCTAssertEqual(
+            HomeMutualMatchCashCompatibilityPolicy.compatibility(
+                requestedAmount: 1_500,
+                counterpartAmount: 1_200
+            ),
+            .amountInsufficient
+        )
+    }
+
+    func testMutualMatchPairsOpenGoodsHitSheetsWithPreferredOffer() throws {
+        let candidates = HomeMutualMatchCandidateFactory.candidates(
+            mutualMatchData: [explicitMutualMatchCandidateData()],
+            viewerID: NativePreviewData.viewerID,
+            inventoryItems: [],
+            matchedItems: [],
+            possibleItems: [],
+            goodsTypes: [],
+            conditionSignalsByItemID: [:]
+        )
+        let firstCandidate = try XCTUnwrap(candidates.first)
+        let pairs = HomeMutualMatchProposalPairFactory.pairs(
+            for: firstCandidate,
+            in: candidates,
+            goodsTypes: []
+        )
+        let firstPair = try XCTUnwrap(pairs.first)
+
+        XCTAssertEqual(pairs.count, 2)
+        XCTAssertEqual(firstPair.receiverGoods.title, "相手が譲る サナ")
+        XCTAssertEqual(firstPair.senderGoods.title, "自分が譲る モモ")
+
+        guard case .goodsHit(let payload) = firstPair.sheet else {
+            return XCTFail("相互マッチの候補は個別募集Hitの詳細シートへ進む必要があります")
+        }
+        XCTAssertEqual(payload.goods.id, firstPair.receiverGoods.id)
+        XCTAssertEqual(payload.preferredOfferGoodsID, firstPair.senderGoods.id)
+    }
+
+    func testMutualMatchPairsPreferCashDisplayItemsOverFallbackGoods() throws {
+        var cashData = explicitMutualMatchCandidateData()
+        cashData.partnerDisplayItems = [
+            HomeMutualMatchDisplayItemData.cash(
+                id: UUID(uuidString: "10000000-0000-0000-0000-000000000081")!,
+                amount: 2_000
+            )
+        ]
+        cashData.viewerDisplayItems = [
+            HomeMutualMatchDisplayItemData.cash(
+                id: UUID(uuidString: "10000000-0000-0000-0000-000000000082")!,
+                amount: 1_500
+            )
+        ]
+
+        let candidate = try XCTUnwrap(
+            HomeMutualMatchCandidateFactory.candidates(
+                mutualMatchData: [cashData],
+                viewerID: NativePreviewData.viewerID,
+                inventoryItems: [],
+                matchedItems: [],
+                possibleItems: [],
+                goodsTypes: [],
+                conditionSignalsByItemID: [:]
+            ).first
+        )
+        let pair = try XCTUnwrap(
+            HomeMutualMatchProposalPairFactory.pairs(
+                for: candidate,
+                in: [candidate],
+                goodsTypes: []
+            ).first
+        )
+
+        XCTAssertEqual(pair.receiverDisplayItem.title, "¥2,000")
+        XCTAssertEqual(pair.receiverDisplayItem.data.kind, .cashAmount)
+        XCTAssertNil(pair.receiverDisplayItem.goods)
+        XCTAssertEqual(pair.senderDisplayItem.title, "¥1,500")
+        XCTAssertEqual(pair.proposalCashAmount, 1_500)
+        XCTAssertEqual(pair.receiverGoods.title, "相手が譲る サナ")
+    }
+
+    func testMutualMatchProposalExchangeMethodUsesCandidateSignals() {
+        let bothSignals = HomeDiscoveryFixtures.miiListingHitSignals(index: 0)
+        XCTAssertEqual(
+            HomeMutualMatchProposalExchangeMethodPolicy.preferredExchangeMethod(for: bothSignals),
+            bothSignals.exchange.localExchangeSelected && bothSignals.exchange.postalAcceptedByBoth ? .both : .hand
+        )
+    }
+
+    func testMutualMatchConditionReviewShowsFullMatchForLocalExchange() {
+        let review = mutualMatchReview(
+            exchange: HomeExchangeConditionSignals(
+                postalAcceptedByBoth: false,
+                localExchangeSelected: true,
+                prefectureMatches: true,
+                dateMatches: true
+            ),
+            payment: HomePaymentConditionSignals(hasCompatiblePaymentMethod: true)
+        )
+
+        XCTAssertEqual(review.exchangeItems.map(\.title), ["全一致"])
+        XCTAssertEqual(review.exchangeItems.map(\.status), [.matched])
+        XCTAssertEqual(review.paymentItems.map(\.title), ["物々交換なら確認不要"])
+        XCTAssertEqual(review.paymentItems.map(\.status), [.skipped])
+    }
+
+    func testMutualMatchConditionReviewSeparatesLocalPlaceAndDateConcerns() {
+        let review = mutualMatchReview(
+            exchange: HomeExchangeConditionSignals(
+                postalAcceptedByBoth: false,
+                localExchangeSelected: true,
+                prefectureMatches: false,
+                dateMatches: false
+            ),
+            payment: HomePaymentConditionSignals(hasCompatiblePaymentMethod: true)
+        )
+
+        XCTAssertEqual(
+            review.exchangeItems.map(\.title),
+            ["都道府県の確認が必要", "日程調整が必要"]
+        )
+        XCTAssertEqual(review.exchangeItems.map(\.status), [.needsDecision, .needsDecision])
+    }
+
+    func testMutualMatchConditionReviewUsesPostalFallbackBeforeLocalConcerns() {
+        let review = mutualMatchReview(
+            exchange: HomeExchangeConditionSignals(
+                postalAcceptedByBoth: true,
+                localExchangeSelected: true,
+                prefectureMatches: false,
+                dateMatches: false
+            ),
+            payment: HomePaymentConditionSignals(hasCompatiblePaymentMethod: true)
+        )
+
+        XCTAssertEqual(
+            review.exchangeItems.map(\.title),
+            ["郵送交換で成立可能", "都道府県の確認が必要", "日程調整が必要"]
+        )
+        XCTAssertEqual(review.exchangeItems.map(\.status), [.matched, .needsDecision, .needsDecision])
+    }
+
+    func testMutualMatchConditionReviewShowsExchangeMethodMismatch() {
+        let review = mutualMatchReview(
+            exchange: HomeExchangeConditionSignals(
+                postalAcceptedByBoth: false,
+                localExchangeSelected: false,
+                prefectureMatches: false,
+                dateMatches: false
+            ),
+            payment: HomePaymentConditionSignals(hasCompatiblePaymentMethod: true)
+        )
+
+        XCTAssertEqual(review.exchangeItems.map(\.title), ["交換手段が不一致"])
+        XCTAssertEqual(review.exchangeItems.map(\.status), [.mismatch])
+    }
+
+    func testMutualMatchConditionReviewChecksPaymentOnlyForCashOptions() {
+        let compatible = mutualMatchReview(
+            exchange: HomeExchangeConditionSignals(
+                postalAcceptedByBoth: false,
+                localExchangeSelected: true,
+                prefectureMatches: true,
+                dateMatches: true
+            ),
+            payment: HomePaymentConditionSignals(hasCompatiblePaymentMethod: true),
+            includesCash: true
+        )
+        XCTAssertEqual(compatible.paymentItems.map(\.title), ["全一致"])
+        XCTAssertEqual(compatible.paymentItems.map(\.status), [.matched])
+
+        let needsDecision = mutualMatchReview(
+            exchange: HomeExchangeConditionSignals(
+                postalAcceptedByBoth: false,
+                localExchangeSelected: true,
+                prefectureMatches: true,
+                dateMatches: true
+            ),
+            payment: HomePaymentConditionSignals(hasCompatiblePaymentMethod: false),
+            includesCash: true
+        )
+        XCTAssertEqual(needsDecision.paymentItems.map(\.title), ["支払方法不一致"])
+        XCTAssertEqual(needsDecision.paymentItems.map(\.status), [.mismatch])
+    }
+
+    func testMutualMatchConditionReviewPointsExposeTagsAndCounterpartValues() {
+        let exchange = HomeExchangeConditionSignals(
+            postalAcceptedByBoth: false,
+            localExchangeSelected: false,
+            prefectureMatches: false,
+            dateMatches: false,
+            viewerExchangeMethodTitle: "現地交換",
+            partnerExchangeMethodTitle: "郵送交換",
+            viewerLocalConditionText: "東京都 / 東京ドーム / 6/28",
+            partnerLocalConditionText: "対象外",
+            viewerShippingFeeTitle: "対象外",
+            partnerShippingFeeTitle: "送料 自己負担 / 発送 2〜4日以内"
+        )
+        let payment = HomePaymentConditionSignals(
+            hasCompatiblePaymentMethod: false,
+            requiresPayment: true,
+            status: .methodMismatch,
+            viewerMethods: [.paypay],
+            partnerMethods: [.bankTransfer]
+        )
+        let pair = mutualMatchPair(
+            exchange: exchange,
+            payment: payment,
+            receiverDisplayItem: HomeMutualMatchProposalItem(
+                data: .cash(
+                    id: UUID(uuidString: "10000000-0000-0000-0000-000000000611")!,
+                    amount: 2_000
+                ),
+                goods: nil
+            ),
+            senderDisplayItem: HomeMutualMatchProposalItem(
+                data: .cash(
+                    id: UUID(uuidString: "10000000-0000-0000-0000-000000000612")!,
+                    amount: 1_500
+                ),
+                goods: nil
+            )
+        )
+        let review = HomeMutualMatchConditionReviewPolicy.review(for: pair)
+        let points = HomeMutualMatchConditionReviewPointPolicy.points(for: pair, review: review)
+
+        XCTAssertEqual(points.map(\.title), ["交換条件", "現地交換条件", "郵送交換条件", "金額条件", "支払条件"])
+        XCTAssertEqual(points[0].tagTitle, "交換条件不一致")
+        XCTAssertEqual(points[0].partnerValue, "郵送交換")
+        XCTAssertEqual(points[0].viewerValue, "現地交換")
+        XCTAssertEqual(points[3].tagTitle, "金額不足")
+        XCTAssertEqual(points[3].partnerValue, "¥2,000")
+        XCTAssertEqual(points[3].viewerValue, "¥1,500")
+        XCTAssertEqual(points[4].tagTitle, "支払方法不一致")
+        XCTAssertEqual(points[4].partnerValue, "銀行振込")
+        XCTAssertEqual(points[4].viewerValue, "PayPay")
+    }
+
+    func testMutualMatchConditionReviewPointsSkipAmountAndPaymentForGoodsOnly() {
+        let pair = mutualMatchPair(
+            exchange: HomeExchangeConditionSignals(
+                postalAcceptedByBoth: false,
+                localExchangeSelected: true,
+                prefectureMatches: true,
+                dateMatches: true,
+                viewerExchangeMethodTitle: "現地交換",
+                partnerExchangeMethodTitle: "現地交換",
+                viewerLocalConditionText: "東京都 / 相談 / 相談して決める",
+                partnerLocalConditionText: "東京都 / 相談 / 相談して決める"
+            ),
+            payment: HomePaymentConditionSignals(hasCompatiblePaymentMethod: true)
+        )
+        let review = HomeMutualMatchConditionReviewPolicy.review(for: pair)
+        let points = HomeMutualMatchConditionReviewPointPolicy.points(for: pair, review: review)
+
+        XCTAssertEqual(points[3].title, "金額条件")
+        XCTAssertEqual(points[3].tagTitle, "ー")
+        XCTAssertEqual(points[3].partnerValue, "")
+        XCTAssertEqual(points[3].viewerValue, "")
+        XCTAssertEqual(points[4].title, "支払条件")
+        XCTAssertEqual(points[4].tagTitle, "ー")
+        XCTAssertEqual(points[4].partnerValue, "")
+        XCTAssertEqual(points[4].viewerValue, "")
+    }
+
+    func testMutualMatchConditionReviewPointsShowDateNeedsDiscussionForFlexibleSchedule() {
+        let pair = mutualMatchPair(
+            exchange: HomeExchangeConditionSignals(
+                postalAcceptedByBoth: false,
+                localExchangeSelected: true,
+                prefectureMatches: true,
+                dateMatches: true,
+                dateNeedsDiscussion: true,
+                viewerExchangeMethodTitle: "現地交換",
+                partnerExchangeMethodTitle: "現地交換",
+                viewerLocalConditionText: "東京都 / 東京ドーム / 相談して決める",
+                partnerLocalConditionText: "東京都 / 東京ドーム / 6/28 18:00"
+            ),
+            payment: HomePaymentConditionSignals(hasCompatiblePaymentMethod: true)
+        )
+        let review = HomeMutualMatchConditionReviewPolicy.review(for: pair)
+        let points = HomeMutualMatchConditionReviewPointPolicy.points(for: pair, review: review)
+
+        XCTAssertEqual(review.exchangeItems.map(\.title), ["日程調整が必要"])
+        XCTAssertEqual(points[0].title, "交換条件")
+        XCTAssertEqual(points[0].tagTitle, "OK")
+        XCTAssertEqual(points[0].status, .matched)
+        XCTAssertEqual(points[1].title, "現地交換条件")
+        XCTAssertEqual(points[1].tagTitle, "日程要相談")
+        XCTAssertEqual(points[1].status, .needsDecision)
+        XCTAssertEqual(points[1].partnerValue, "東京都 / 東京ドーム / 6/28 18:00")
+        XCTAssertEqual(points[1].viewerValue, "東京都 / 東京ドーム / 日程は相談")
+    }
+
+    func testMutualMatchConditionReviewPointsHideBlankPlaceMemo() {
+        let pair = mutualMatchPair(
+            exchange: HomeExchangeConditionSignals(
+                postalAcceptedByBoth: false,
+                localExchangeSelected: true,
+                prefectureMatches: true,
+                dateMatches: true,
+                dateNeedsDiscussion: true,
+                viewerExchangeMethodTitle: "現地交換",
+                partnerExchangeMethodTitle: "現地交換",
+                viewerLocalConditionText: "東京都 / 場所相談 / 相談して決める",
+                partnerLocalConditionText: "東京都 / 東京ドーム / 6/28 18:00"
+            ),
+            payment: HomePaymentConditionSignals(hasCompatiblePaymentMethod: true)
+        )
+        let review = HomeMutualMatchConditionReviewPolicy.review(for: pair)
+        let points = HomeMutualMatchConditionReviewPointPolicy.points(for: pair, review: review)
+
+        XCTAssertEqual(points[1].tagTitle, "日程要相談")
+        XCTAssertEqual(points[1].viewerValue, "東京都 / 日程は相談")
+        XCTAssertFalse(points[1].viewerValue.contains("場所相談"))
+    }
+
+    func testMutualMatchConditionReviewPointRenamesPrefectureDiscussionForDisplay() {
+        let exchange = HomeExchangeConditionSignals(
+            postalAcceptedByBoth: false,
+            localExchangeSelected: true,
+            prefectureMatches: false,
+            dateMatches: true,
+            viewerLocalConditionText: "東京都 / 6/28",
+            partnerLocalConditionText: "大阪府 / 6/28"
+        )
+        let pair = mutualMatchPair(
+            exchange: exchange,
+            payment: HomePaymentConditionSignals(hasCompatiblePaymentMethod: true)
+        )
+        let review = HomeMutualMatchConditionReviewPolicy.review(for: pair)
+        let points = HomeMutualMatchConditionReviewPointPolicy.points(for: pair, review: review)
+
+        XCTAssertEqual(points.first { $0.title == "現地交換条件" }?.tagTitle, "交換場所要相談")
+        XCTAssertEqual(HomeMutualMatchAttentionTag.prefectureNeedsDiscussion.title, "交換場所要相談")
+    }
+
+    func testMutualMatchPanelAttentionTagsUseConditionReviewColors() {
+        XCTAssertEqual(HomeMutualMatchAttentionTag.ready.tint, MegrumTheme.ok)
+        XCTAssertEqual(HomeMutualMatchAttentionTag.tagMismatch.tint, MegrumTheme.conditionPossible)
+        XCTAssertEqual(HomeMutualMatchAttentionTag.amountIncluded.tint, MegrumTheme.conditionPossible)
+        XCTAssertEqual(HomeMutualMatchAttentionTag.shippingFeeNeedsDiscussion.tint, MegrumTheme.conditionPossible)
+        XCTAssertEqual(HomeMutualMatchAttentionTag.paymentMethodNeedsDiscussion.tint, MegrumTheme.conditionPossible)
+    }
+
+    func testMutualMatchDetailEmptyOtherCandidatesCopy() {
+        XCTAssertEqual(
+            HomeOtherExchangeCopy.noOtherExchangeCandidates,
+            "他に交換できそうなものはありません"
+        )
+    }
+
+    func testMutualMatchConditionReviewPointsDoNotMarkLocalConditionOKWhenLocalRouteIsNotSelected() {
+        let pair = mutualMatchPair(
+            exchange: HomeExchangeConditionSignals(
+                postalAcceptedByBoth: true,
+                localExchangeSelected: false,
+                prefectureMatches: true,
+                dateMatches: true,
+                viewerExchangeMethodTitle: "郵送交換",
+                partnerExchangeMethodTitle: "どちらもOK",
+                viewerLocalConditionText: nil,
+                partnerLocalConditionText: "大阪府 / 相談して決める",
+                viewerShippingFeeTitle: "送料 自己負担 / 発送 2〜4日以内",
+                partnerShippingFeeTitle: "送料 要相談 / 発送 2〜4日以内"
+            ),
+            payment: HomePaymentConditionSignals(hasCompatiblePaymentMethod: true)
+        )
+        let review = HomeMutualMatchConditionReviewPolicy.review(for: pair)
+        let points = HomeMutualMatchConditionReviewPointPolicy.points(for: pair, review: review)
+
+        XCTAssertEqual(points[0].title, "交換条件")
+        XCTAssertEqual(points[0].tagTitle, "郵送交換")
+        XCTAssertEqual(points[0].status, .matched)
+        XCTAssertEqual(points[1].title, "現地交換条件")
+        XCTAssertEqual(points[1].tagTitle, "ー")
+        XCTAssertEqual(points[1].status, .skipped)
+        XCTAssertEqual(points[1].partnerValue, "")
+        XCTAssertEqual(points[1].viewerValue, "")
+    }
+
+    func testMutualMatchConditionReviewPointsResolveBothAndLocalToLocalExchange() {
+        let pair = mutualMatchPair(
+            exchange: HomeExchangeConditionSignals(
+                postalAcceptedByBoth: false,
+                localExchangeSelected: true,
+                prefectureMatches: true,
+                dateMatches: true,
+                viewerExchangeMethodTitle: "現地交換",
+                partnerExchangeMethodTitle: "どちらもOK",
+                viewerLocalConditionText: "東京都 / 東京ドーム / 6/28",
+                partnerLocalConditionText: "東京都 / 東京ドーム / 6/28"
+            ),
+            payment: HomePaymentConditionSignals(hasCompatiblePaymentMethod: true)
+        )
+        let review = HomeMutualMatchConditionReviewPolicy.review(for: pair)
+        let points = HomeMutualMatchConditionReviewPointPolicy.points(for: pair, review: review)
+
+        XCTAssertEqual(points[0].title, "交換条件")
+        XCTAssertEqual(points[0].tagTitle, "現地交換")
+        XCTAssertEqual(points[0].status, .matched)
+        XCTAssertEqual(points[1].title, "現地交換条件")
+        XCTAssertEqual(points[1].tagTitle, "OK")
+        XCTAssertEqual(points[2].title, "郵送交換条件")
+        XCTAssertEqual(points[2].tagTitle, "ー")
+        XCTAssertEqual(points[2].status, .skipped)
+        XCTAssertEqual(points[2].partnerValue, "")
+        XCTAssertEqual(points[2].viewerValue, "")
+    }
+
+    func testMutualMatchConditionReviewPointsShowDiscussionForBothExchangeMethod() {
+        let pair = mutualMatchPair(
+            exchange: HomeExchangeConditionSignals(
+                postalAcceptedByBoth: false,
+                localExchangeSelected: true,
+                prefectureMatches: true,
+                dateMatches: true,
+                viewerExchangeMethodTitle: "どちらもOK",
+                partnerExchangeMethodTitle: "どちらもOK",
+                viewerLocalConditionText: "東京都 / 東京ドーム / 6/28 18:00",
+                partnerLocalConditionText: "東京都 / 東京ドーム / 6/28 18:00"
+            ),
+            payment: HomePaymentConditionSignals(hasCompatiblePaymentMethod: true)
+        )
+        let review = HomeMutualMatchConditionReviewPolicy.review(for: pair)
+        let points = HomeMutualMatchConditionReviewPointPolicy.points(for: pair, review: review)
+
+        XCTAssertEqual(points[0].title, "交換条件")
+        XCTAssertEqual(points[0].tagTitle, "要相談")
+        XCTAssertEqual(points[0].status, .needsDecision)
+    }
+
+    private func explicitMutualMatchCandidateData() -> HomeMutualMatchCandidateData {
+        let signals = HomeCandidateConditionSignals(
+            goods: HomeGoodsConditionSignals(
+                hasIndividualListingHit: true,
+                hasWishHit: false
+            ),
+            exchange: HomeExchangeConditionSignals(
+                postalAcceptedByBoth: true,
+                localExchangeSelected: true,
+                prefectureMatches: true,
+                dateMatches: true
+            ),
+            payment: HomePaymentConditionSignals(hasCompatiblePaymentMethod: true),
+            linkCounts: HomeCandidateLinkCounts(
+                wishCount: 0,
+                listingCount: 1
+            ),
+            individualListingSelection: HomeIndividualListingSelectionContext(
+                wantedLogic: .one,
+                offeredLogic: .all,
+                wantedOptions: []
+            ),
+            matchesViewerWish: true,
+            tagMatchCount: 0
+        )
+        let partnerItems = [
+            GoodsItem(
+                id: UUID(uuidString: "10000000-0000-0000-0000-000000000071")!,
+                ownerID: NativePreviewData.partnerID,
+                title: "相手が譲る サナ"
+            ),
+            GoodsItem(
+                id: UUID(uuidString: "10000000-0000-0000-0000-000000000072")!,
+                ownerID: NativePreviewData.partnerID,
+                title: "相手が譲る ミナ"
+            )
+        ]
+        let viewerItems = [
+            GoodsItem(
+                id: UUID(uuidString: "10000000-0000-0000-0000-000000000073")!,
+                ownerID: NativePreviewData.viewerID,
+                title: "自分が譲る モモ"
+            ),
+            GoodsItem(
+                id: UUID(uuidString: "10000000-0000-0000-0000-000000000074")!,
+                ownerID: NativePreviewData.viewerID,
+                title: "自分が譲る ジヒョ"
+            )
+        ]
+        return HomeMutualMatchCandidateData(
+            id: UUID(uuidString: "10000000-0000-0000-0000-000000000075")!,
+            partnerID: NativePreviewData.partnerID,
+            partnerName: "partner_trade",
+            partnerHandle: "partner_trade",
+            partnerInitial: "P",
+            partnerArea: "東京都",
+            partnerOshiText: "サナ推し",
+            partnerAgeRangeText: "20代",
+            partnerEvaluationSummaryText: "評価12件 ★4.8",
+            partnerGoodsItems: partnerItems,
+            viewerGoodsItems: viewerItems,
+            signals: signals,
+            conditionSignalsByPartnerGoodsID: Dictionary(
+                uniqueKeysWithValues: partnerItems.map { ($0.id, signals) }
+            ),
+            attentionKinds: [.tagMismatch, .amountIncluded]
+        )
+    }
+
+    private func mutualMatchReview(
+        exchange: HomeExchangeConditionSignals,
+        payment: HomePaymentConditionSignals,
+        includesCash: Bool = false
+    ) -> HomeMutualMatchConditionReview {
+        HomeMutualMatchConditionReviewPolicy.review(
+            for: mutualMatchPair(exchange: exchange, payment: payment, includesCash: includesCash)
+        )
+    }
+
+    private func mutualMatchPair(
+        exchange: HomeExchangeConditionSignals,
+        payment: HomePaymentConditionSignals,
+        includesCash: Bool = false,
+        receiverDisplayItem: HomeMutualMatchProposalItem = .goods(HomeDiscoveryFixtures.sanaBadge),
+        senderDisplayItem: HomeMutualMatchProposalItem = .goods(HomeDiscoveryFixtures.momoFanmi)
+    ) -> HomeMutualMatchProposalPair {
+        let signals = HomeCandidateConditionSignals(
+            goods: HomeGoodsConditionSignals(
+                hasIndividualListingHit: true,
+                hasWishHit: false
+            ),
+            exchange: exchange,
+            payment: payment,
+            individualListingSelection: HomeIndividualListingSelectionContext(
+                wantedOptions: includesCash ? [
+                    HomeIndividualListingWantedOption(
+                        id: UUID(uuidString: "10000000-0000-0000-0000-000000000601")!,
+                        listingID: UUID(uuidString: "10000000-0000-0000-0000-000000000602")!,
+                        position: 0,
+                        title: "定価",
+                        kind: .cash
+                    )
+                ] : []
+            )
+        )
+        return HomeMutualMatchProposalPair(
+            id: "preview",
+            receiverGoods: HomeDiscoveryFixtures.sanaBadge,
+            senderGoods: HomeDiscoveryFixtures.momoFanmi,
+            receiverDisplayItem: receiverDisplayItem,
+            senderDisplayItem: senderDisplayItem,
+            signals: signals
+        )
     }
 }

@@ -138,6 +138,7 @@ private struct TradeCardExclusivePressModifier: ViewModifier {
                 .onEnded { value in
                     switch value {
                     case .first(true):
+                        MegrumHaptics.longPress()
                         onLongPress()
                     case .second:
                         onTap()

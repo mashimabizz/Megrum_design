@@ -11,133 +11,117 @@ struct IndividualListingHavesStep: View {
 
     var inventory: [GoodsItem]
     var selectedIDs: Set<UUID>
+    @Binding var filter: IndividualListingSelectionFilter
+    var groups: [OshiGroup]
+    var goodsTypes: [GoodsType]
     @Binding var selectedTab: Tab
+    @Binding var cashPricingMode: IndividualListingCashPricingMode
     @Binding var cashAmount: Int
     var onToggle: (GoodsItem) -> Void
 
     private let columns = Array(repeating: GridItem(.flexible(), spacing: 12), count: 3)
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 22) {
+        VStack(alignment: .leading, spacing: 16) {
             IndividualListingStepTitle(step: .haves)
 
-            IndividualListingEditorTabsLike(
-                leftTitle: "譲る候補から選ぶ",
-                rightTitle: "定価",
-                isLeftSelected: selectedTab == .goods,
-                onLeft: {
-                    withAnimation(.smooth(duration: 0.2)) {
-                        selectedTab = .goods
-                    }
-                },
-                onRight: {
-                    withAnimation(.smooth(duration: 0.2)) {
-                        selectedTab = .cash
-                    }
-                }
-            )
+            IndividualListingHaveTabs(selection: $selectedTab)
 
-            if selectedTab == .goods {
+            switch selectedTab {
+            case .goods:
                 goodsSelection
-            } else {
-                cashSelection
+            case .cash:
+                IndividualListingCashTab(
+                    pricingMode: $cashPricingMode,
+                    amount: $cashAmount
+                )
             }
         }
     }
 
     private var goodsSelection: some View {
         VStack(alignment: .leading, spacing: 18) {
-            Text("譲る候補")
-                .font(.system(size: 20, weight: .black, design: .rounded))
-                .foregroundStyle(MegrumTheme.ink)
+            IndividualListingSelectionSearchAndFilterBar(
+                filter: $filter,
+                searchPlaceholder: "グッズを検索",
+                groups: availableGroups,
+                goodsTypes: availableGoodsTypes,
+                tagNames: availableTagNames
+            )
 
-            HStack(spacing: 12) {
-                HStack(spacing: 12) {
-                    Image(systemName: "magnifyingglass")
-                        .font(.system(size: 24, weight: .medium))
-                    Text("グッズを検索")
-                    Spacer()
-                }
-                .font(.system(size: 17, weight: .semibold, design: .rounded))
-                .foregroundStyle(MegrumTheme.muted.opacity(0.72))
-                .padding(.horizontal, 16)
-                .frame(height: 52)
-                .background(MegrumTheme.ink.opacity(0.045), in: RoundedRectangle(cornerRadius: 13, style: .continuous))
-
-                Button {} label: {
-                    Image(systemName: "slider.horizontal.3")
-                        .font(.system(size: 22, weight: .bold))
-                        .foregroundStyle(MegrumTheme.lavender)
-                        .frame(width: 52, height: 52)
-                        .background(.white.opacity(0.88), in: RoundedRectangle(cornerRadius: 13, style: .continuous))
-                        .overlay {
-                            RoundedRectangle(cornerRadius: 13, style: .continuous)
-                                .stroke(MegrumTheme.ink.opacity(0.08), lineWidth: 1)
+            if filteredInventory.isEmpty {
+                IndividualListingSelectionEmptyMessage(filterIsActive: filter.isActive)
+            } else {
+                LazyVGrid(columns: columns, spacing: 12) {
+                    ForEach(filteredInventory) { item in
+                        Button {
+                            onToggle(item)
+                        } label: {
+                            ListingSquareSelectableImageTile(
+                                imageURL: item.imageURL,
+                                title: item.title,
+                                isSelected: selectedIDs.contains(item.id)
+                            )
                         }
-                }
-                .buttonStyle(.plain)
-            }
-
-            LazyVGrid(columns: columns, spacing: 12) {
-                ForEach(inventory) { item in
-                    Button {
-                        onToggle(item)
-                    } label: {
-                        ListingSquareSelectableImageTile(
-                            imageURL: item.imageURL,
-                            title: item.title,
-                            isSelected: selectedIDs.contains(item.id)
-                        )
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("\(item.title)を譲るものに選択")
+                        .accessibilityAddTraits(selectedIDs.contains(item.id) ? .isSelected : [])
                     }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel("\(item.title)を譲るものに選択")
-                    .accessibilityAddTraits(selectedIDs.contains(item.id) ? .isSelected : [])
                 }
             }
         }
     }
 
-    private var cashSelection: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            Text("定価で譲る")
-                .font(.system(size: 20, weight: .black, design: .rounded))
-                .foregroundStyle(MegrumTheme.ink)
-
-            IndividualListingCashAmountCard(amount: $cashAmount)
-        }
+    private var filteredInventory: [GoodsItem] {
+        inventory.filter(filter.matches)
     }
+
+    private var availableGroups: [OshiGroup] {
+        IndividualListingSelectionFilterChoices.groups(items: inventory, allGroups: groups)
+    }
+
+    private var availableGoodsTypes: [GoodsType] {
+        IndividualListingSelectionFilterChoices.goodsTypes(items: inventory, allGoodsTypes: goodsTypes)
+    }
+
+    private var availableTagNames: [String] {
+        IndividualListingSelectionFilterChoices.tagNames(items: inventory, filter: filter)
+    }
+
 }
 
-private struct IndividualListingEditorTabsLike: View {
-    var leftTitle: String
-    var rightTitle: String
-    var isLeftSelected: Bool
-    var onLeft: () -> Void
-    var onRight: () -> Void
+struct IndividualListingHaveTabs: View {
+    @Binding var selection: IndividualListingHavesStep.Tab
 
     var body: some View {
-        HStack(spacing: 0) {
-            tab(title: leftTitle, selected: isLeftSelected, action: onLeft)
-            tab(title: rightTitle, selected: !isLeftSelected, action: onRight)
+        HStack(spacing: 8) {
+            tabButton(.goods, title: IndividualListingHaveOfferKind.goods.title)
+            tabButton(.cash, title: IndividualListingHaveOfferKind.cash.title)
         }
         .padding(4)
-        .background(.white.opacity(0.92), in: RoundedRectangle(cornerRadius: 17, style: .continuous))
+        .background(.white.opacity(0.90), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
         .overlay {
-            RoundedRectangle(cornerRadius: 17, style: .continuous)
-                .stroke(MegrumTheme.ink.opacity(0.08), lineWidth: 1)
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .strokeBorder(MegrumTheme.ink.opacity(0.08), lineWidth: 1)
         }
     }
 
-    private func tab(title: String, selected: Bool, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
+    private func tabButton(_ tab: IndividualListingHavesStep.Tab, title: String) -> some View {
+        Button {
+            withAnimation(.smooth(duration: 0.2)) {
+                selection = tab
+            }
+        } label: {
             Text(title)
-                .font(.system(size: 16, weight: .bold, design: .rounded))
-                .foregroundStyle(selected ? .white : MegrumTheme.ink)
+                .font(.system(size: 15, weight: .semibold, design: .rounded))
+                .foregroundStyle(selection == tab ? .white : MegrumTheme.ink.opacity(0.78))
+                .lineLimit(1)
+                .minimumScaleFactor(0.78)
                 .frame(maxWidth: .infinity)
-                .frame(height: 48)
+                .frame(height: 46)
                 .background {
-                    if selected {
-                        RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    if selection == tab {
+                        RoundedRectangle(cornerRadius: 13, style: .continuous)
                             .fill(MegrumTheme.lavender)
                     }
                 }
@@ -153,12 +137,9 @@ struct IndividualListingCashAmountCard: View {
         VStack(spacing: 0) {
             HStack {
                 VStack(alignment: .leading, spacing: 6) {
-                    Text("定価")
+                    Text("金額")
                         .font(.system(size: 17, weight: .bold, design: .rounded))
                         .foregroundStyle(MegrumTheme.ink)
-                    Text("購入時の税込価格")
-                        .font(.system(size: 13, weight: .semibold, design: .rounded))
-                        .foregroundStyle(MegrumTheme.muted)
                 }
 
                 Spacer()
@@ -177,7 +158,7 @@ struct IndividualListingCashAmountCard: View {
 
     @ViewBuilder
     private var amountField: some View {
-        let field = TextField("1100", value: $amount, format: .number)
+        let field = TextField("入力…", value: $amount, format: .number)
             .multilineTextAlignment(.trailing)
             .font(.system(size: 22, weight: .regular, design: .rounded))
             .foregroundStyle(MegrumTheme.ink)
@@ -228,5 +209,23 @@ private struct ListingSquareSelectableImageTile: View {
                 RoundedRectangle(cornerRadius: 12, style: .continuous)
                     .stroke(isSelected ? MegrumTheme.lavender : MegrumTheme.ink.opacity(0.08), lineWidth: isSelected ? 2 : 1)
             }
+    }
+}
+
+struct IndividualListingSelectionEmptyMessage: View {
+    var filterIsActive: Bool
+
+    var body: some View {
+        VStack(spacing: 8) {
+            Image(systemName: filterIsActive ? "line.3.horizontal.decrease.circle" : "shippingbox")
+                .font(.system(size: 24, weight: .semibold))
+                .foregroundStyle(MegrumTheme.lavender)
+            Text(filterIsActive ? "条件に合うグッズがありません" : "選べるグッズがありません")
+                .font(.system(size: 14, weight: .heavy, design: .rounded))
+                .foregroundStyle(MegrumTheme.ink)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 28)
+        .background(.white.opacity(0.68), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
     }
 }

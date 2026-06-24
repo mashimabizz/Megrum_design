@@ -7,8 +7,10 @@ struct MeguriHomeContent: View {
     @Binding var cameraPosition: MapCameraPosition
     var viewer: UserProfile?
     var grooms: [GroomPost]
+    var mapGrooms: [GroomPost]
     var threads: [BoardThread]
     var replyCounts: [UUID: Int]
+    var currentCoordinate: MegrumLocationCoordinate?
     var isLoading: Bool
     var selectedScope: BoardThread.Audience
     var selectedPrefecture: String
@@ -24,60 +26,61 @@ struct MeguriHomeContent: View {
     var onOpenPrefecture: () -> Void
     var onOpenGroomComposer: () -> Void
     var onOpenThreadComposer: () -> Void
+    var onOpenGroomArchive: () -> Void
 
     var body: some View {
         GeometryReader { proxy in
             ZStack(alignment: .bottom) {
                 MeguriHomeMapBackdrop(
                     cameraPosition: $cameraPosition,
-                    grooms: grooms,
+                    grooms: mapGrooms,
                     threads: threads,
+                    currentCoordinate: currentCoordinate,
+                    viewerID: viewer?.id,
                     onSelectGroom: onSelectGroom,
                     onSelectThread: onSelectThread
                 )
                 .ignoresSafeArea()
 
                 VStack(spacing: 0) {
-                    MeguriHomeTopBar()
+                    HStack {
+                        Spacer()
+                        VStack(spacing: 10) {
+                            MeguriMapRecenterButton(
+                                isRequesting: isRequestingLocation,
+                                action: onRecenterMap
+                            )
+                            MeguriGroomArchiveButton(action: onOpenGroomArchive)
+                        }
+                    }
                     .padding(.horizontal, 18)
-                    .padding(.top, 28)
+                    .padding(.top, 78)
 
                     if let notice {
                         MeguriHomeNoticeCard(notice: notice, action: onNoticeAction)
                             .padding(.horizontal, 38)
-                            .padding(.top, 18)
+                            .padding(.top, 14)
                     }
-
-                    HStack {
-                        Spacer()
-                        MeguriMapRecenterButton(
-                            isRequesting: isRequestingLocation,
-                            action: onRecenterMap
-                        )
-                    }
-                    .padding(.horizontal, 18)
-                    .padding(.top, 10)
 
                     Spacer()
-
-                    MeguriBoardBottomSheet(
-                        detent: $boardSheetDetent,
-                        threads: threads,
-                        grooms: grooms,
-                        replyCounts: replyCounts,
-                        isLoading: isLoading,
-                        selectedScope: selectedScope,
-                        selectedPrefecture: selectedPrefecture,
-                        onChangeScope: onChangeScope,
-                        onOpenPrefecture: onOpenPrefecture,
-                        onOpenGroomComposer: onOpenGroomComposer,
-                        onOpenThreadComposer: onOpenThreadComposer,
-                        onOpenThread: onSelectThread
-                    )
-                    .frame(height: boardSheetDetent.height(in: proxy.size.height))
-                    .clipped()
-                    .animation(.smooth(duration: 0.24), value: boardSheetDetent)
                 }
+
+                MeguriBoardBottomSheet(
+                    detent: $boardSheetDetent,
+                    viewportHeight: proxy.size.height,
+                    threads: threads,
+                    grooms: grooms,
+                    replyCounts: replyCounts,
+                    isLoading: isLoading,
+                    selectedScope: selectedScope,
+                    selectedPrefecture: selectedPrefecture,
+                    onChangeScope: onChangeScope,
+                    onOpenPrefecture: onOpenPrefecture,
+                    onOpenGroomComposer: onOpenGroomComposer,
+                    onOpenThreadComposer: onOpenThreadComposer,
+                    onOpenThread: onSelectThread
+                )
+                .frame(height: MeguriBoardSheetLayout.expandedHeight(in: proxy.size.height), alignment: .top)
             }
         }
     }
@@ -87,19 +90,35 @@ struct MeguriHomeMapBackdrop: View {
     @Binding var cameraPosition: MapCameraPosition
     var grooms: [GroomPost]
     var threads: [BoardThread]
+    var currentCoordinate: MegrumLocationCoordinate?
+    var viewerID: UUID?
     var onSelectGroom: (GroomPost) -> Void
     var onSelectThread: (BoardThread) -> Void
 
     var body: some View {
         Map(position: $cameraPosition, interactionModes: [.pan, .zoom]) {
+            if let currentCoordinate {
+                MapCircle(
+                    center: currentCoordinate.clLocationCoordinate,
+                    radius: MeguriAccessPolicy.groomOpenRadiusMeters
+                )
+                .foregroundStyle(MegrumTheme.lavender.opacity(0.08))
+                .stroke(MegrumTheme.lavender.opacity(0.48), lineWidth: 1.8)
+            }
+
             ForEach(grooms) { groom in
                 Annotation("グルーム", coordinate: groom.coordinate) {
                     Button {
                         onSelectGroom(groom)
                     } label: {
-                        GroomThumbnailCircle(url: groom.imageURL, size: 60)
-                            .overlay(Circle().stroke(.white, lineWidth: 4))
-                            .shadow(color: MegrumTheme.ink.opacity(0.18), radius: 14, y: 8)
+                        GroomMapPin(
+                            groom: groom,
+                            isOutOfRange: !MeguriAccessPolicy.canOpenGroom(
+                                groom,
+                                currentCoordinate: currentCoordinate,
+                                viewerID: viewerID
+                            )
+                        )
                     }
                     .buttonStyle(.plain)
                 }
@@ -110,19 +129,14 @@ struct MeguriHomeMapBackdrop: View {
                     Button {
                         onSelectThread(annotation.thread)
                     } label: {
-                        VStack(spacing: 0) {
-                            Text(annotation.thread.shortMapTitle)
-                                .font(.system(size: 15, weight: .black, design: .rounded))
-                                .foregroundStyle(.white)
-                                .padding(.horizontal, 14)
-                                .frame(height: 56)
-                                .background(MegrumTheme.lavender, in: Circle())
-                                .shadow(color: MegrumTheme.lavender.opacity(0.28), radius: 14, y: 8)
-                            Circle()
-                                .fill(MegrumTheme.lavender)
-                                .frame(width: 10, height: 10)
-                                .offset(y: -2)
-                        }
+                        BoardMapPin(
+                            thread: annotation.thread,
+                            isOutOfRange: !MeguriAccessPolicy.canOpenBoard(
+                                annotation.thread,
+                                currentCoordinate: currentCoordinate,
+                                viewerID: viewerID
+                            )
+                        )
                     }
                     .buttonStyle(.plain)
                 }
@@ -170,15 +184,24 @@ struct MeguriMapRecenterButton: View {
     }
 }
 
-struct MeguriHomeTopBar: View {
+struct MeguriGroomArchiveButton: View {
+    var action: () -> Void
+
     var body: some View {
-        ZStack {
-            Text("めぐり")
-                .font(.system(size: 23, weight: .black, design: .rounded))
-                .foregroundStyle(MegrumTheme.ink)
+        Button(action: action) {
+            Image(systemName: "archivebox.fill")
+                .font(.system(size: 18, weight: .heavy))
+                .foregroundStyle(MegrumTheme.lavender)
+                .frame(width: 48, height: 48)
+                .background(.regularMaterial, in: Circle())
+                .overlay {
+                    Circle()
+                        .stroke(.white.opacity(0.66), lineWidth: 1)
+                }
+                .shadow(color: MegrumTheme.ink.opacity(0.12), radius: 12, y: 6)
         }
-        .frame(height: 40)
-        .frame(maxWidth: .infinity)
+        .buttonStyle(.plain)
+        .accessibilityLabel("グルームアーカイブを開く")
     }
 }
 

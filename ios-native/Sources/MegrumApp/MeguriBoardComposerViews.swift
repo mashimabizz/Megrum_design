@@ -19,6 +19,10 @@ struct BoardThreadComposerSheet: View {
     @State private var thumbnailItem: PhotosPickerItem?
     @State private var thumbnailUpload: GoodsPhotoUpload?
     @State private var thumbnailErrorMessage: String?
+    @State private var selectedCoordinate: MegrumLocationCoordinate?
+    @State private var isShowingLocationStep = false
+    @State private var toastMessage: String?
+    @State private var toastID = UUID()
     #if canImport(UIKit)
     @State private var thumbnailPreviewImage: UIImage?
     #endif
@@ -38,32 +42,85 @@ struct BoardThreadComposerSheet: View {
     }
 
     private var canSubmit: Bool {
-        !title.isBlank
-            && !bodyText.isBlank
-            && missingContextMessage == nil
+        isShowingLocationStep
+            && contentMessage == nil
+            && locationMessage == nil
             && !appState.isCreatingBoardThread
     }
 
     private var missingContextMessage: String? {
-        if submitScope == .samePrefecture && submitPrefecture == nil {
-            return "プロフィールの都道府県を設定してください"
+        if let contentMessage {
+            return contentMessage
         }
-        return thumbnailErrorMessage
+        guard isShowingLocationStep else {
+            return nil
+        }
+        return locationMessage
+    }
+
+    private var contentMessage: String? {
+        if let thumbnailErrorMessage {
+            return thumbnailErrorMessage
+        }
+        guard !title.isBlank else {
+            return "タイトルを入力してください"
+        }
+        guard !bodyText.isBlank else {
+            return "本文を入力してください"
+        }
+        return nil
+    }
+
+    private var locationMessage: String? {
+        guard baseCoordinate != nil else {
+            return "現在地を確認してから作成場所を選んでください"
+        }
+        guard selectedCoordinate != nil else {
+            return "地図上で作成場所を選んでください"
+        }
+        guard submitCoordinate != nil else {
+            return "1km圏外には作成できません"
+        }
+        return nil
+    }
+
+    private var canAdvanceToLocationStep: Bool {
+        contentMessage == nil && !appState.isCreatingBoardThread
+    }
+
+    private var primaryActionTitle: String {
+        isShowingLocationStep ? "この場所で作成する" : "最後に場所を決める"
+    }
+
+    private var primaryActionEnabled: Bool {
+        isShowingLocationStep ? canSubmit : canAdvanceToLocationStep
     }
 
     private var submitLatitude: Double? {
-        submitScope == .nearby3km ? submitCoordinate?.latitude : nil
+        submitCoordinate?.latitude
     }
 
     private var submitLongitude: Double? {
-        submitScope == .nearby3km ? submitCoordinate?.longitude : nil
+        submitCoordinate?.longitude
     }
 
     private var submitScope: BoardThread.Audience {
-        submitCoordinate == nil ? .samePrefecture : .nearby3km
+        .nearby3km
     }
 
     private var submitCoordinate: MegrumLocationCoordinate? {
+        guard let selectedCoordinate,
+              MeguriAccessPolicy.canCreateAt(
+                  selectedCoordinate,
+                  currentCoordinate: baseCoordinate
+              )
+        else {
+            return nil
+        }
+        return selectedCoordinate
+    }
+
+    private var baseCoordinate: MegrumLocationCoordinate? {
         locationState.coordinate ?? fallbackCoordinate
     }
 
@@ -126,39 +183,24 @@ struct BoardThreadComposerSheet: View {
                     .background(.white.opacity(0.9), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
                 }
 
-                if let errorMessage = appState.errorMessage {
-                    Text(errorMessage)
-                        .font(.system(size: 13, weight: .heavy, design: .rounded))
-                        .foregroundStyle(.red)
+                if isShowingLocationStep {
+                    locationFinalStep
+                } else {
+                    MeguriNoticeBanner(message: "タイトルと本文が決まったら、最後に地図上で表示される場所を選びます。")
                 }
+
             }
             .padding(20)
         }
         .background(MegrumTheme.canvas.ignoresSafeArea())
         .safeAreaInset(edge: .bottom) {
-            Button {
-                Task {
-                    let created = await appState.createBoardThreadRecord(
-                        title: title,
-                        body: bodyText,
-                        scope: submitScope,
-                        latitude: submitLatitude,
-                        longitude: submitLongitude,
-                        prefecture: submitPrefecture,
-                        thumbnailUpload: thumbnailUpload
-                    )
-                    if let created {
-                        onCreated(created)
-                        dismiss()
-                    }
-                }
-            } label: {
+            Button(action: handlePrimaryAction) {
                 Group {
                     if appState.isCreatingBoardThread {
                         ProgressView()
                             .tint(.white)
                     } else {
-                        Text("作成する")
+                        Text(primaryActionTitle)
                     }
                 }
                 .font(.system(size: 17, weight: .heavy, design: .rounded))
@@ -171,8 +213,15 @@ struct BoardThreadComposerSheet: View {
                 .background(.regularMaterial)
             }
             .buttonStyle(.plain)
-            .disabled(!canSubmit)
-            .opacity(canSubmit ? 1 : 0.48)
+            .disabled(!primaryActionEnabled)
+            .opacity(primaryActionEnabled ? 1 : 0.48)
+        }
+        .overlay(alignment: .bottom) {
+            if let toastMessage {
+                MeguriToastView(message: toastMessage)
+                    .padding(.bottom, 84)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
         }
         .navigationTitle("掲示板")
         .megrumInlineNavigationTitle()
@@ -187,10 +236,56 @@ struct BoardThreadComposerSheet: View {
             loadThumbnail(item)
         }
         .task {
-            if submitCoordinate == nil {
+            if baseCoordinate == nil {
                 locationState.requestCurrentLocation()
             }
         }
+        .onChange(of: locationState.coordinate) { _, _ in
+            if isShowingLocationStep {
+                seedSelectedCoordinateIfNeeded()
+            }
+        }
+    }
+
+    private var locationFinalStep: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            VStack(alignment: .leading, spacing: 5) {
+                Text("最後に立てる場所を決める")
+                    .font(.system(size: 18, weight: .heavy, design: .rounded))
+                    .foregroundStyle(MegrumTheme.ink)
+
+                Text("掲示板が地図上に表示される見え方を確認しながら、半径1km以内にピンを立ててください。")
+                    .font(.system(size: 12, weight: .bold, design: .rounded))
+                    .foregroundStyle(MegrumTheme.muted)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            BoardThreadDraftMapPreview(
+                title: title.nilIfBlank ?? "掲示板",
+                summary: bodyText.nilIfBlank ?? "現地の話題",
+                hasThumbnail: thumbnailUpload != nil
+            )
+
+            MeguriCreationLocationPicker(
+                title: "地図での表示プレビュー",
+                subtitle: "現在地から半径1km以内の地図上をタップして選択",
+                currentCoordinate: baseCoordinate,
+                isRequestingLocation: locationState.isRequestingLocation,
+                preview: .board(
+                    title: title.nilIfBlank ?? "掲示板",
+                    summary: bodyText.nilIfBlank ?? "現地の話題",
+                    hasThumbnail: thumbnailUpload != nil
+                ),
+                selectedCoordinate: $selectedCoordinate,
+                onRequestLocation: {
+                    locationState.requestCurrentLocation()
+                },
+                onOutOfRange: showToast
+            )
+        }
+        .padding(14)
+        .background(.white.opacity(0.72), in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .onAppear(perform: seedSelectedCoordinateIfNeeded)
     }
 
     private var thumbnailPickerSection: some View {
@@ -288,109 +383,78 @@ struct BoardThreadComposerSheet: View {
             }
         }
     }
-}
 
-private struct BoardThreadThumbnailPickerLabel: View {
-    var hasThumbnail: Bool
-
-    var body: some View {
-        Label(hasThumbnail ? "写真を変更" : "写真を選ぶ", systemImage: "photo")
-            .font(.system(size: 14, weight: .heavy, design: .rounded))
-            .foregroundStyle(MegrumTheme.lavender)
-            .frame(maxWidth: .infinity)
-            .frame(height: 42)
-            .background(.white.opacity(0.9), in: Capsule())
+    private func handlePrimaryAction() {
+        if !isShowingLocationStep {
+            revealLocationStep()
+            return
+        }
+        submitThread()
     }
-}
 
-struct BoardPrefecturePickerSheet: View {
-    var selectedPrefecture: String?
-    var onSelect: (String) -> Void
+    private func revealLocationStep() {
+        guard canAdvanceToLocationStep else {
+            if let contentMessage {
+                showToast(contentMessage)
+            }
+            return
+        }
+        isShowingLocationStep = true
+        if baseCoordinate == nil {
+            locationState.requestCurrentLocation()
+        }
+        seedSelectedCoordinateIfNeeded()
+    }
 
-    @Environment(\.dismiss) private var dismiss
-
-    var body: some View {
-        List(japanesePrefectures, id: \.self) { prefecture in
-            Button {
-                onSelect(prefecture)
+    private func submitThread() {
+        guard canSubmit else {
+            if let missingContextMessage {
+                showToast(missingContextMessage)
+            }
+            return
+        }
+        Task {
+            let created = await appState.createBoardThreadRecord(
+                title: title,
+                body: bodyText,
+                scope: submitScope,
+                latitude: submitLatitude,
+                longitude: submitLongitude,
+                prefecture: submitPrefecture,
+                thumbnailUpload: thumbnailUpload
+            )
+            if let created {
+                onCreated(created)
                 dismiss()
-            } label: {
-                HStack {
-                    Text(prefecture)
-                        .font(.system(size: 17, weight: .bold, design: .rounded))
-                        .foregroundStyle(MegrumTheme.ink)
-
-                    Spacer()
-
-                    if selectedPrefecture == prefecture {
-                        Image(systemName: "checkmark.circle.fill")
-                            .font(.system(size: 19, weight: .bold))
-                            .foregroundStyle(MegrumTheme.lavender)
-                    }
-                }
-                .padding(.vertical, 6)
+            } else {
+                let message = appState.errorMessage ?? "掲示板を作成できませんでした"
+                showToast(message)
+                appState.clearErrorMessage()
             }
-            .buttonStyle(.plain)
-            .accessibilityLabel("\(prefecture)を掲示板の都道府県に設定")
         }
-        .navigationTitle("都道府県を選択")
-        .megrumInlineNavigationTitle()
-        .toolbar {
-            ToolbarItem(placement: .cancellationAction) {
-                Button("閉じる") {
-                    dismiss()
-                }
+    }
+
+    private func seedSelectedCoordinateIfNeeded() {
+        guard selectedCoordinate == nil else {
+            return
+        }
+        selectedCoordinate = baseCoordinate
+    }
+
+    private func showToast(_ message: String) {
+        let toastID = UUID()
+        self.toastID = toastID
+        withAnimation(.smooth(duration: 0.18)) {
+            toastMessage = message
+        }
+        Task { @MainActor in
+            try? await Task.sleep(for: .seconds(2.4))
+            guard self.toastID == toastID else {
+                return
+            }
+            withAnimation(.smooth(duration: 0.18)) {
+                toastMessage = nil
             }
         }
     }
 }
-
-private let japanesePrefectures = [
-    "北海道",
-    "青森県",
-    "岩手県",
-    "宮城県",
-    "秋田県",
-    "山形県",
-    "福島県",
-    "茨城県",
-    "栃木県",
-    "群馬県",
-    "埼玉県",
-    "千葉県",
-    "東京都",
-    "神奈川県",
-    "新潟県",
-    "富山県",
-    "石川県",
-    "福井県",
-    "山梨県",
-    "長野県",
-    "岐阜県",
-    "静岡県",
-    "愛知県",
-    "三重県",
-    "滋賀県",
-    "京都府",
-    "大阪府",
-    "兵庫県",
-    "奈良県",
-    "和歌山県",
-    "鳥取県",
-    "島根県",
-    "岡山県",
-    "広島県",
-    "山口県",
-    "徳島県",
-    "香川県",
-    "愛媛県",
-    "高知県",
-    "福岡県",
-    "佐賀県",
-    "長崎県",
-    "熊本県",
-    "大分県",
-    "宮崎県",
-    "鹿児島県",
-    "沖縄県"
-]

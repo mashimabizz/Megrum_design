@@ -3,6 +3,47 @@ import MegrumCore
 import XCTest
 
 final class PublicProfileProposalOriginTests: XCTestCase {
+    func testStandalonePublicProfileAllowsProposalActions() {
+        XCTAssertTrue(PublicProfilePresentationContext.standalone.allowsProposalActions)
+    }
+
+    func testHomeDiscoveryStackedPublicProfileDisablesProposalActions() {
+        XCTAssertFalse(PublicProfilePresentationContext.stackedFromHomeDiscoverySheet.allowsProposalActions)
+    }
+
+    func testTradeChatPublicProfileDisablesProposalActionsAndDismissButton() {
+        XCTAssertFalse(PublicProfilePresentationContext.tradeChat.allowsProposalActions)
+        XCTAssertFalse(PublicProfilePresentationContext.tradeChat.showsDismissToolbarButton)
+    }
+
+    func testStandalonePublicProfileKeepsDismissButton() {
+        XCTAssertTrue(PublicProfilePresentationContext.standalone.showsDismissToolbarButton)
+    }
+
+    func testHomeDiscoveryProfileRoutingStacksWhenSheetCanHostProfile() {
+        let userID = UUID(uuidString: "00000000-0000-0000-0000-000000000111")!
+
+        XCTAssertEqual(
+            HomeDiscoveryOwnerProfileRoutingPolicy.decision(
+                for: userID,
+                canPresentNestedProfile: true
+            ),
+            .nested(PublicProfileRoute(userID: userID))
+        )
+    }
+
+    func testHomeDiscoveryProfileRoutingFallsBackToParentWhenSheetCannotHostProfile() {
+        let userID = UUID(uuidString: "00000000-0000-0000-0000-000000000112")!
+
+        XCTAssertEqual(
+            HomeDiscoveryOwnerProfileRoutingPolicy.decision(
+                for: userID,
+                canPresentNestedProfile: false
+            ),
+            .parent(userID)
+        )
+    }
+
     func testListingProposalTargetPreservesListingOriginAndReceiverGoodsOrder() throws {
         let ownerID = UUID(uuidString: "00000000-0000-0000-0000-000000000101")!
         let firstGoodsID = UUID(uuidString: "00000000-0000-0000-0000-000000000201")!

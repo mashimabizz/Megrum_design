@@ -166,6 +166,28 @@ struct OshiSettingsMemberDraft: Identifiable, Hashable, Sendable {
     }
 }
 
+struct OshiMemberRequestContext: Identifiable, Hashable, Sendable {
+    var groupKey: String
+    var groupID: UUID?
+    var oshiRequestID: UUID?
+    var groupName: String
+    var initialName: String?
+
+    var id: String { groupKey }
+
+    init(group: OshiSettingsGroupDraft, initialName: String? = nil) {
+        self.groupKey = group.key
+        self.groupID = group.groupID
+        self.oshiRequestID = group.requestID
+        self.groupName = group.name
+        self.initialName = initialName
+    }
+
+    var canCreateCharacterRequest: Bool {
+        groupID != nil || oshiRequestID != nil
+    }
+}
+
 extension Array where Element == OshiSettingsGroupDraft {
     func reprioritized() -> [OshiSettingsGroupDraft] {
         enumerated().map { offset, group in

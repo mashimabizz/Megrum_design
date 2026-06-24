@@ -283,6 +283,31 @@ final class SupabaseGroomClientTests: XCTestCase {
         XCTAssertEqual(notificationPayload["title"] as? String, "グルームに返信が届きました")
     }
 
+    func testBuildsGroomArchiveAndEngagementRequests() throws {
+        let client = SupabaseGroomClient(configuration: configuration)
+        let userID = UUID(uuidString: "00000000-0000-0000-0000-000000000001")!
+        let firstPostID = UUID(uuidString: "00000000-0000-0000-0000-000000000501")!
+        let secondPostID = UUID(uuidString: "00000000-0000-0000-0000-000000000502")!
+
+        let archiveRequest = try client.makeLoadOwnGroomArchiveRequest(userID: userID, limit: 42)
+        XCTAssertEqual(
+            archiveRequest.url?.absoluteString,
+            "https://example.supabase.co/rest/v1/groom_posts?select=id,user_id,image_url,image_path,published_at,created_at,origin_lat,origin_lng&user_id=eq.00000000-0000-0000-0000-000000000001&status=eq.published&order=published_at.desc.nullslast,created_at.desc&limit=42"
+        )
+
+        let reactionsRequest = try client.makeLoadReactionsRequest(postIDs: [secondPostID, firstPostID])
+        XCTAssertEqual(
+            reactionsRequest.url?.absoluteString,
+            "https://example.supabase.co/rest/v1/groom_reactions?select=groom_post_id,user_id,reaction_type,created_at&groom_post_id=in.(00000000-0000-0000-0000-000000000501,00000000-0000-0000-0000-000000000502)&order=created_at.desc&reaction_type=eq.like"
+        )
+
+        let repliesRequest = try client.makeLoadRepliesRequest(postIDs: [secondPostID, firstPostID])
+        XCTAssertEqual(
+            repliesRequest.url?.absoluteString,
+            "https://example.supabase.co/rest/v1/groom_replies?select=id,groom_post_id,sender_id,recipient_id,body,groom_snapshot,read_at,created_at&groom_post_id=in.(00000000-0000-0000-0000-000000000501,00000000-0000-0000-0000-000000000502)&order=created_at.desc"
+        )
+    }
+
     private var configuration: SupabaseConfiguration {
         SupabaseConfiguration(
             projectURL: URL(string: "https://example.supabase.co")!,

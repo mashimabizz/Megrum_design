@@ -180,69 +180,22 @@ struct ProposalMeetupCalendarEditor: View {
     }
 
     private func renderedCandidateBlocks(days: [Date], dayWidth: CGFloat) -> [ProposalMeetupCalendarRenderedCandidateBlock] {
-        drafts.enumerated().compactMap { index, draft in
-            let renderedDraft = renderedCandidateDraft(draft, index: index, days: days)
-            guard let layout = candidateLayout(for: renderedDraft, index: index, days: days, dayWidth: dayWidth) else {
-                return nil
-            }
-            return ProposalMeetupCalendarRenderedCandidateBlock(
-                draft: renderedDraft,
-                index: index,
-                isSelected: index == selectedIndex,
-                x: layout.x,
-                y: layout.y,
-                width: layout.width,
-                height: layout.height
-            )
-        }
-    }
-
-    private func renderedCandidateDraft(
-        _ draft: ProposalMeetupCandidateDraft,
-        index: Int,
-        days: [Date]
-    ) -> ProposalMeetupCandidateDraft {
-        guard let candidateEdit,
-              candidateEdit.index == index,
-              days.indices.contains(candidateEdit.dayIndex)
-        else {
-            return draft
-        }
-        return draft.applyingCalendarRange(
-            day: days[candidateEdit.dayIndex],
-            startSlot: candidateEdit.startSlot,
-            endSlot: candidateEdit.endSlot,
+        ProposalMeetupCalendarLayoutBuilder.renderedCandidateBlocks(
+            drafts: drafts,
+            selectedIndex: selectedIndex,
+            candidateEdit: candidateEdit,
+            days: days,
+            dayWidth: dayWidth,
             calendar: calendar
         )
     }
 
     private var selectedDayIndex: Int {
-        let days = ProposalMeetupCalendarModel.visibleDays(anchorDate: anchorDate, calendar: calendar)
-        guard drafts.indices.contains(selectedIndex) else {
-            return 0
-        }
-        let selectedDay = calendar.startOfDay(for: drafts[selectedIndex].startAt)
-        return days.firstIndex(where: { calendar.isDate($0, inSameDayAs: selectedDay) }) ?? 0
-    }
-
-    private func candidateLayout(
-        for draft: ProposalMeetupCandidateDraft,
-        index: Int,
-        days: [Date],
-        dayWidth: CGFloat
-    ) -> (x: CGFloat, y: CGFloat, width: CGFloat, height: CGFloat)? {
-        let day = calendar.startOfDay(for: draft.startAt)
-        guard let dayIndex = days.firstIndex(where: { calendar.isDate($0, inSameDayAs: day) }) else {
-            return nil
-        }
-        let startSlot = ProposalMeetupCalendarModel.slotIndex(for: draft.startAt, calendar: calendar)
-        let endSlot = max(startSlot + 1, ProposalMeetupCalendarModel.slotIndex(for: draft.endAt, calendar: calendar))
-        let height = CGFloat(endSlot - startSlot) * ProposalMeetupCalendarModel.slotHeight - 4
-        return (
-            x: ProposalMeetupCalendarModel.timeLabelWidth + CGFloat(dayIndex) * (dayWidth + ProposalMeetupCalendarModel.daySpacing) + 4,
-            y: CGFloat(startSlot) * ProposalMeetupCalendarModel.slotHeight + 2,
-            width: dayWidth - 8,
-            height: max(20, height)
+        ProposalMeetupCalendarLayoutBuilder.selectedDayIndex(
+            drafts: drafts,
+            selectedIndex: selectedIndex,
+            anchorDate: anchorDate,
+            calendar: calendar
         )
     }
 
@@ -252,22 +205,15 @@ struct ProposalMeetupCalendarEditor: View {
         dayWidth: CGFloat,
         containerWidth: CGFloat
     ) -> Int? {
-        let gridLocation = ProposalMeetupCalendarModel.weekGridPoint(
-            from: location,
+        ProposalMeetupCalendarLayoutBuilder.candidateIndex(
+            at: location,
+            drafts: drafts,
+            candidateEdit: candidateEdit,
+            days: days,
+            dayWidth: dayWidth,
             containerWidth: containerWidth,
-            dayWidth: dayWidth
+            calendar: calendar
         )
-        for (index, draft) in drafts.enumerated().reversed() {
-            guard let layout = candidateLayout(for: draft, index: index, days: days, dayWidth: dayWidth) else {
-                continue
-            }
-            let rect = CGRect(x: layout.x, y: layout.y, width: layout.width, height: layout.height)
-                .insetBy(dx: -6, dy: -ProposalMeetupCalendarModel.slotHeight)
-            if rect.contains(gridLocation) {
-                return index
-            }
-        }
-        return nil
     }
 
     private func boardGesture(
@@ -622,12 +568,12 @@ struct ProposalMeetupCalendarEditor: View {
     }
 
     private func currentCandidateEdit(index: Int, days: [Date]) -> ProposalMeetupCalendarCandidateEdit {
-        let draft = drafts[index]
-        let day = calendar.startOfDay(for: draft.startAt)
-        let dayIndex = days.firstIndex(where: { calendar.isDate($0, inSameDayAs: day) }) ?? 0
-        let startSlot = ProposalMeetupCalendarModel.slotIndex(for: draft.startAt, calendar: calendar)
-        let endSlot = max(startSlot + 1, ProposalMeetupCalendarModel.slotIndex(for: draft.endAt, calendar: calendar))
-        return ProposalMeetupCalendarCandidateEdit(index: index, dayIndex: dayIndex, startSlot: startSlot, endSlot: endSlot)
+        ProposalMeetupCalendarLayoutBuilder.currentCandidateEdit(
+            index: index,
+            drafts: drafts,
+            days: days,
+            calendar: calendar
+        )
     }
 
     private func calendarPoint(

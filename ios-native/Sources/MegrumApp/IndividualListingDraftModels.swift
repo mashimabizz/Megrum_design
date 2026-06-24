@@ -1,129 +1,13 @@
 import Foundation
 import MegrumCore
 
-enum IndividualListingEditorStep: Int, CaseIterable, Identifiable {
-    case haves = 1
-    case options = 2
-    case exchange = 3
-
-    var id: Int { rawValue }
-
-    var title: String {
-        switch self {
-        case .haves:
-            "譲るものを選ぶ"
-        case .options:
-            "欲しいものを登録"
-        case .exchange:
-            "交換条件を設定する"
-        }
-    }
-
-}
-
-enum IndividualListingHandoffDraft: String, CaseIterable, Identifiable {
-    case local
-    case mail
-    case both
-
-    var id: String { rawValue }
-
-    var title: String {
-        switch self {
-        case .local:
-            "現地交換"
-        case .mail:
-            "郵送交換"
-        case .both:
-            "どちらもOK"
-        }
-    }
-
-    var symbolName: String {
-        switch self {
-        case .local:
-            "mappin"
-        case .mail:
-            "envelope"
-        case .both:
-            "mappin.and.ellipse"
-        }
-    }
-}
-
-enum IndividualListingShippingFeeDraft: String, CaseIterable, Identifiable {
-    case owner
-    case partner
-    case negotiate
-
-    var id: String { rawValue }
-
-    var title: String {
-        switch self {
-        case .owner:
-            "自己負担"
-        case .partner:
-            "相手負担"
-        case .negotiate:
-            "要相談"
-        }
-    }
-}
-
-enum IndividualListingShippingDaysDraft: String, CaseIterable, Identifiable {
-    case oneDay
-    case twoToFourDays
-    case afterFiveDays
-
-    var id: String { rawValue }
-
-    var title: String {
-        switch self {
-        case .oneDay:
-            "成立後1日以内"
-        case .twoToFourDays:
-            "2〜4日以内"
-        case .afterFiveDays:
-            "5日以降"
-        }
-    }
-}
-
-enum IndividualListingEditorMode: Equatable {
-    case create(preselectedWishID: UUID?)
-    case edit(IndividualListing)
-
-    var isEditing: Bool {
-        if case .edit = self {
-            return true
-        }
-        return false
-    }
-}
-
-enum IndividualListingOptionKind: String, CaseIterable, Identifiable {
-    case wish
-    case condition
-    case cash
-
-    var id: String { rawValue }
-
-    var title: String {
-        switch self {
-        case .wish:
-            "Wishから選ぶ"
-        case .condition:
-            "条件から選ぶ"
-        case .cash:
-            "定価"
-        }
-    }
-}
-
 struct IndividualListingDraft: Equatable {
     var mode: IndividualListingEditorMode
     var selectedHaveIDs: Set<UUID>
     var haveQuantities: [UUID: Int]
+    var haveOfferKind: IndividualListingHaveOfferKind
+    var haveCashPricingMode: IndividualListingCashPricingMode
+    var haveCashAmount: Int
     var selectedWishIDs: Set<UUID>
     var wishQuantities: [UUID: Int]
     var optionKind: IndividualListingOptionKind
@@ -133,15 +17,19 @@ struct IndividualListingDraft: Equatable {
     var conditionGoodsTypeID: UUID?
     var conditionTagNames: [String]
     var conditionQuantity: Int
+    var cashPricingMode: IndividualListingCashPricingMode
     var cashAmount: Int
     var haveLogic: ListingLogic
+    var haveMinimumCount: Int
     var wishLogic: ListingLogic
+    var wishMinimumCount: Int
     var exchangeType: IndividualListingExchangeType
     var status: IndividualListingStatus
     var note: String
     var handoffMethod: IndividualListingHandoffDraft
     var localPrefecture: String
     var localPlaceMemo: String
+    var localSchedule: String
     var shippingFee: IndividualListingShippingFeeDraft
     var shippingDays: IndividualListingShippingDaysDraft
     var acceptsOutsideCondition: Bool
@@ -153,6 +41,9 @@ struct IndividualListingDraft: Equatable {
         case .create(let preselectedWishID):
             self.selectedHaveIDs = []
             self.haveQuantities = [:]
+            self.haveOfferKind = .goods
+            self.haveCashPricingMode = .listPrice
+            self.haveCashAmount = 1_100
             self.selectedWishIDs = preselectedWishID.map { Set([$0]) } ?? []
             self.wishQuantities = preselectedWishID.map { [$0: 1] } ?? [:]
             self.optionKind = .wish
@@ -162,25 +53,33 @@ struct IndividualListingDraft: Equatable {
             self.conditionGoodsTypeID = nil
             self.conditionTagNames = []
             self.conditionQuantity = 1
+            self.cashPricingMode = .listPrice
             self.cashAmount = 1_100
             self.haveLogic = .all
+            self.haveMinimumCount = 1
             self.wishLogic = .one
+            self.wishMinimumCount = 1
             self.exchangeType = .any
             self.status = .active
             self.note = ""
             self.handoffMethod = .both
             self.localPrefecture = "東京都"
             self.localPlaceMemo = ""
+            self.localSchedule = IndividualListingExchangeSummary.defaultLocalSchedule
             self.shippingFee = .negotiate
             self.shippingDays = .twoToFourDays
             self.acceptsOutsideCondition = true
             self.includesExchangeConditionSummary = true
         case .edit(let listing):
             let primaryOption = listing.options.sorted { $0.position < $1.position }.first
-            let extractedNote = IndividualListingExchangeSummary.extract(from: listing.note)
+            let extractedHaveCash = IndividualListingHaveCashSummary.extract(from: listing.note)
+            let extractedNote = IndividualListingExchangeSummary.extract(from: extractedHaveCash.remainingNote)
             let exchangeSummary = extractedNote.summary ?? IndividualListingExchangeSummary()
             self.selectedHaveIDs = Set(listing.haves.map(\.itemID))
             self.haveQuantities = Dictionary(uniqueKeysWithValues: listing.haves.map { ($0.itemID, boundedQuantity($0.quantity)) })
+            self.haveOfferKind = extractedHaveCash.summary == nil ? .goods : .cash
+            self.haveCashPricingMode = extractedHaveCash.summary?.pricingMode ?? .listPrice
+            self.haveCashAmount = max(1, extractedHaveCash.summary?.amount ?? 1_100)
             self.selectedWishIDs = Set(primaryOption?.wishes.map(\.itemID) ?? [])
             self.wishQuantities = Dictionary(uniqueKeysWithValues: (primaryOption?.wishes ?? []).map { ($0.itemID, boundedQuantity($0.quantity)) })
             if primaryOption?.isCashOffer == true {
@@ -196,15 +95,19 @@ struct IndividualListingDraft: Equatable {
             self.conditionGoodsTypeID = primaryOption?.wishGoodsTypeID
             self.conditionTagNames = []
             self.conditionQuantity = 1
+            self.cashPricingMode = primaryOption?.cashAmount == nil ? .listPrice : .specifiedAmount
             self.cashAmount = max(1, primaryOption?.cashAmount ?? 1_100)
             self.haveLogic = listing.haveLogic
+            self.haveMinimumCount = listing.haveMinimumCount
             self.wishLogic = primaryOption?.logic ?? .one
+            self.wishMinimumCount = primaryOption?.minimumCount ?? 1
             self.exchangeType = primaryOption?.exchangeType ?? .any
             self.status = listing.status
             self.note = extractedNote.remainingNote ?? ""
             self.handoffMethod = exchangeSummary.handoffMethod
             self.localPrefecture = exchangeSummary.localPrefecture
             self.localPlaceMemo = exchangeSummary.localPlaceMemo
+            self.localSchedule = exchangeSummary.localSchedule
             self.shippingFee = exchangeSummary.shippingFee
             self.shippingDays = exchangeSummary.shippingDays
             self.acceptsOutsideCondition = exchangeSummary.acceptsOutsideCondition
@@ -221,6 +124,8 @@ struct IndividualListingDraft: Equatable {
     }
 
     mutating func toggleHave(_ id: UUID, maxQuantity: Int = 99) {
+        let previousCount = selectedHaveIDs.count
+        haveOfferKind = .goods
         if selectedHaveIDs.contains(id) {
             selectedHaveIDs.remove(id)
             haveQuantities.removeValue(forKey: id)
@@ -228,9 +133,40 @@ struct IndividualListingDraft: Equatable {
             selectedHaveIDs.insert(id)
             haveQuantities[id] = boundedQuantity(haveQuantities[id] ?? 1, maxQuantity: maxQuantity)
         }
+        normalizeHaveMinimumCount()
+        defaultHaveMinimumLogicIfNeeded(previousCount: previousCount)
+    }
+
+    mutating func selectAllHaves(_ items: [GoodsItem]) {
+        guard !items.isEmpty else {
+            return
+        }
+        let previousCount = selectedHaveIDs.count
+        haveOfferKind = .goods
+        for item in items {
+            selectedHaveIDs.insert(item.id)
+            haveQuantities[item.id] = boundedQuantity(
+                haveQuantities[item.id] ?? 1,
+                maxQuantity: maxHaveQuantity(for: item)
+            )
+        }
+        normalizeHaveMinimumCount()
+        defaultHaveMinimumLogicIfNeeded(previousCount: previousCount)
+    }
+
+    mutating func deselectHaves(_ items: [GoodsItem]) {
+        guard !items.isEmpty else {
+            return
+        }
+        for item in items {
+            selectedHaveIDs.remove(item.id)
+            haveQuantities.removeValue(forKey: item.id)
+        }
+        normalizeHaveMinimumCount()
     }
 
     mutating func toggleWish(_ id: UUID) {
+        let previousCount = selectedWishIDs.count
         if selectedWishIDs.contains(id) {
             selectedWishIDs.remove(id)
             wishQuantities.removeValue(forKey: id)
@@ -238,10 +174,50 @@ struct IndividualListingDraft: Equatable {
             selectedWishIDs.insert(id)
             wishQuantities[id] = boundedQuantity(wishQuantities[id] ?? 1)
         }
+        normalizeWishMinimumCount()
+        defaultWishMinimumLogicIfNeeded(previousCount: previousCount)
+    }
+
+    mutating func selectAllWishes(_ items: [WishItem]) {
+        guard !items.isEmpty else {
+            return
+        }
+        let previousCount = selectedWishIDs.count
+        for item in items {
+            selectedWishIDs.insert(item.id)
+            wishQuantities[item.id] = boundedQuantity(wishQuantities[item.id] ?? 1)
+        }
+        normalizeWishMinimumCount()
+        defaultWishMinimumLogicIfNeeded(previousCount: previousCount)
+    }
+
+    mutating func deselectWishes(_ items: [WishItem]) {
+        guard !items.isEmpty else {
+            return
+        }
+        for item in items {
+            selectedWishIDs.remove(item.id)
+            wishQuantities.removeValue(forKey: item.id)
+        }
+        normalizeWishMinimumCount()
     }
 
     mutating func setOptionKind(_ kind: IndividualListingOptionKind) {
         optionKind = kind
+        if kind != .wish, wishLogic == .atLeast {
+            wishLogic = .one
+            wishMinimumCount = 1
+        }
+    }
+
+    mutating func setHaveOfferKind(_ kind: IndividualListingHaveOfferKind) {
+        haveOfferKind = kind
+        if kind == .cash {
+            selectedHaveIDs.removeAll()
+            haveQuantities.removeAll()
+            haveLogic = .all
+            haveMinimumCount = 1
+        }
     }
 
     mutating func ensureDefaultCondition(groupID: UUID?, goodsTypeID: UUID?) {
@@ -294,6 +270,34 @@ struct IndividualListingDraft: Equatable {
         conditionQuantity = boundedQuantity(quantity)
     }
 
+    mutating func resetCurrentOptionSelection() {
+        switch optionKind {
+        case .wish:
+            selectedWishIDs.removeAll()
+            wishQuantities.removeAll()
+            wishLogic = .one
+            wishMinimumCount = 1
+        case .condition:
+            conditionGroupID = nil
+            conditionMemberIDs.removeAll()
+            excludesSelectedConditionMembers = false
+            conditionGoodsTypeID = nil
+            conditionTagNames.removeAll()
+            conditionQuantity = 1
+            if wishLogic == .atLeast {
+                wishLogic = .one
+                wishMinimumCount = 1
+            }
+        case .cash:
+            cashPricingMode = .listPrice
+            cashAmount = 1_100
+            if wishLogic == .atLeast {
+                wishLogic = .one
+                wishMinimumCount = 1
+            }
+        }
+    }
+
     var usesConditionLogicChoice: Bool {
         conditionMemberIDs.count > 1 || excludesSelectedConditionMembers
     }
@@ -320,22 +324,78 @@ struct IndividualListingDraft: Equatable {
         boundedQuantity(wishQuantities[id] ?? 1)
     }
 
+    var resolvedHaveMinimumCount: Int {
+        guard haveLogic == .atLeast else {
+            return 1
+        }
+        return boundedMinimumCount(haveMinimumCount, itemCount: selectedHaveIDs.count)
+    }
+
+    var resolvedWishMinimumCount: Int {
+        guard wishLogic == .atLeast else {
+            return 1
+        }
+        return boundedMinimumCount(wishMinimumCount, itemCount: selectedWishIDs.count)
+    }
+
+    mutating func setHaveLogic(_ logic: ListingLogic) {
+        haveLogic = logic
+        if logic == .atLeast {
+            haveMinimumCount = defaultMinimumCount(for: selectedHaveIDs.count, current: haveMinimumCount)
+        } else {
+            haveMinimumCount = 1
+        }
+    }
+
+    mutating func setWishLogic(_ logic: ListingLogic) {
+        wishLogic = logic
+        if logic == .atLeast {
+            wishMinimumCount = defaultMinimumCount(for: selectedWishIDs.count, current: wishMinimumCount)
+        } else {
+            wishMinimumCount = 1
+        }
+    }
+
+    mutating func setHaveMinimumCount(_ count: Int) {
+        haveMinimumCount = boundedMinimumCount(count, itemCount: selectedHaveIDs.count)
+        if selectedHaveIDs.count >= 2 {
+            haveLogic = .atLeast
+        }
+    }
+
+    mutating func setWishMinimumCount(_ count: Int) {
+        wishMinimumCount = boundedMinimumCount(count, itemCount: selectedWishIDs.count)
+        if selectedWishIDs.count >= 2 {
+            wishLogic = .atLeast
+        }
+    }
+
     func validationMessage(inventory: [GoodsItem], wishes: [WishItem]) -> String? {
-        if selectedHaveIDs.isEmpty {
-            return "譲るものを選択してください"
-        }
         let selectedHaveItems = selectedInventoryItems(from: inventory)
-        if selectedHaveItems.count != selectedHaveIDs.count {
-            return "選択したマイグッズを読み込めませんでした"
-        }
-        if selectedHaveItems.contains(where: { maxHaveQuantity(for: $0) <= 0 }) {
-            return "選択した譲るものの残数が足りません"
-        }
-        if selectedHaveItems.contains(where: { haveQuantity(for: $0.id) > maxHaveQuantity(for: $0) }) {
-            return "選択した譲るものの残数が足りません"
-        }
-        if !hasSameGroupAndType(selectedHaveItems) {
-            return "譲るものは同じグループ・同じ種別で選んでください"
+        switch haveOfferKind {
+        case .goods:
+            if selectedHaveIDs.isEmpty {
+                return "譲るものを選択してください"
+            }
+            if selectedHaveItems.count != selectedHaveIDs.count {
+                return "選択したマイグッズを読み込めませんでした"
+            }
+            if selectedHaveItems.contains(where: { maxHaveQuantity(for: $0) <= 0 }) {
+                return "選択した譲るものの残数が足りません"
+            }
+            if selectedHaveItems.contains(where: { haveQuantity(for: $0.id) > maxHaveQuantity(for: $0) }) {
+                return "選択した譲るものの残数が足りません"
+            }
+            if !hasSameGroupAndType(selectedHaveItems) {
+                return "譲るものは同じグループ・同じ種別で選んでください"
+            }
+            if haveLogic == .atLeast, selectedHaveIDs.count < 2 {
+                return "「何個以上」は2件以上選んだ時に設定できます"
+            }
+        case .cash:
+            if haveCashPricingMode == .specifiedAmount, haveCashAmount <= 0 {
+                return "金額を入力してください"
+            }
         }
 
         switch optionKind {
@@ -350,6 +410,9 @@ struct IndividualListingDraft: Equatable {
             if !hasSameGroupAndType(selectedWishItems) {
                 return "求めるものは同じグループ・同じ種別で選んでください"
             }
+            if wishLogic == .atLeast, selectedWishIDs.count < 2 {
+                return "「何個以上」は2件以上選んだ時に設定できます"
+            }
             if haveLogic == .one, wishLogic == .one, selectedHaveIDs.count > 1, selectedWishIDs.count > 1 {
                 return "両方を「どれか1つだけ」にする場合は、片方を1件にしてください"
             }
@@ -358,8 +421,8 @@ struct IndividualListingDraft: Equatable {
                 return "グループとグッズ種別を選択してください"
             }
         case .cash:
-            if cashAmount <= 0 {
-                return "定価を入力してください"
+            if cashPricingMode == .specifiedAmount, cashAmount <= 0 {
+                return "金額を入力してください"
             }
         }
         return nil
@@ -371,23 +434,25 @@ struct IndividualListingDraft: Equatable {
         }
         let selectedWishItems = optionKind == .wish ? selectedWishItems(from: wishes) : []
         return IndividualListingCreateInput(
-            haveItems: selectedInventoryItems(from: inventory).map { item in
+            haveItems: haveOfferKind == .cash ? [] : selectedInventoryItems(from: inventory).map { item in
                 ListingItemQuantity(
                     itemID: item.id,
                     quantity: min(haveQuantity(for: item.id), max(1, maxHaveQuantity(for: item)))
                 )
             },
             haveLogic: haveLogic,
+            haveMinimumCount: haveLogic == .atLeast ? resolvedHaveMinimumCount : 1,
             wishItems: selectedWishItems.map { item in
                 ListingItemQuantity(itemID: item.id, quantity: wishQuantity(for: item.id))
             },
             wishLogic: wishLogic,
+            wishMinimumCount: wishLogic == .atLeast ? resolvedWishMinimumCount : 1,
             exchangeType: exchangeType,
             isCashOffer: optionKind == .cash,
-            cashAmount: optionKind == .cash ? cashAmount : nil,
+            cashAmount: optionKind == .cash && cashPricingMode == .specifiedAmount ? cashAmount : nil,
             wishGroupID: optionWishGroupID(selectedWishItems: selectedWishItems),
             wishGoodsTypeID: optionWishGoodsTypeID(selectedWishItems: selectedWishItems),
-            note: trimmedNoteWithExchangeCondition
+            note: trimmedNoteWithListingMetadata
         )
     }
 
@@ -404,6 +469,7 @@ struct IndividualListingDraft: Equatable {
             position: existingOption?.position ?? 1,
             wishes: input.wishItems,
             logic: input.wishLogic,
+            minimumCount: input.wishMinimumCount,
             exchangeType: input.exchangeType,
             isCashOffer: input.isCashOffer,
             cashAmount: input.cashAmount,
@@ -422,8 +488,9 @@ struct IndividualListingDraft: Equatable {
             ownerID: original.ownerID,
             haves: input.haveItems,
             haveLogic: input.haveLogic,
-            haveGroupID: selectedHaveItems.first?.groupID,
-            haveGoodsTypeID: selectedHaveItems.first?.goodsTypeID,
+            haveMinimumCount: input.haveMinimumCount,
+            haveGroupID: haveOfferKind == .cash ? nil : selectedHaveItems.first?.groupID,
+            haveGoodsTypeID: haveOfferKind == .cash ? nil : selectedHaveItems.first?.goodsTypeID,
             status: status,
             note: input.note,
             options: options,
@@ -437,15 +504,26 @@ struct IndividualListingDraft: Equatable {
         return trimmed.isEmpty ? nil : trimmed
     }
 
-    private var trimmedNoteWithExchangeCondition: String? {
-        guard includesExchangeConditionSummary else {
-            return trimmedNote
+    private var trimmedNoteWithListingMetadata: String? {
+        var lines: [String] = []
+        if let trimmedNote {
+            lines.append(trimmedNote)
         }
-        let condition = exchangeConditionSummary
-        guard let trimmedNote else {
-            return condition
+        if includesExchangeConditionSummary {
+            lines.append(exchangeConditionSummary)
         }
-        return "\(trimmedNote)\n\(condition)"
+        if haveOfferKind == .cash {
+            lines.append(haveCashSummary.storageLine)
+        }
+        let joined = lines.joined(separator: "\n").trimmingCharacters(in: .whitespacesAndNewlines)
+        return joined.isEmpty ? nil : joined
+    }
+
+    private var haveCashSummary: IndividualListingHaveCashSummary {
+        IndividualListingHaveCashSummary(
+            pricingMode: haveCashPricingMode,
+            amount: haveCashPricingMode == .specifiedAmount ? haveCashAmount : nil
+        )
     }
 
     private var exchangeConditionSummary: String {
@@ -453,6 +531,7 @@ struct IndividualListingDraft: Equatable {
             handoffMethod: handoffMethod,
             localPrefecture: localPrefecture,
             localPlaceMemo: localPlaceMemo,
+            localSchedule: localSchedule,
             shippingFee: shippingFee,
             shippingDays: shippingDays,
             acceptsOutsideCondition: acceptsOutsideCondition
@@ -514,8 +593,64 @@ struct IndividualListingDraft: Equatable {
         }
         return items.allSatisfy { $0.groupID == first.groupID && $0.goodsTypeID == first.goodsTypeID }
     }
+
+    private mutating func normalizeHaveMinimumCount() {
+        guard haveLogic == .atLeast else {
+            haveMinimumCount = 1
+            return
+        }
+        if selectedHaveIDs.count < 2 {
+            haveLogic = .all
+            haveMinimumCount = 1
+        } else {
+            haveMinimumCount = boundedMinimumCount(haveMinimumCount, itemCount: selectedHaveIDs.count)
+        }
+    }
+
+    private mutating func normalizeWishMinimumCount() {
+        guard wishLogic == .atLeast else {
+            wishMinimumCount = 1
+            return
+        }
+        if selectedWishIDs.count < 2 {
+            wishLogic = .one
+            wishMinimumCount = 1
+        } else {
+            wishMinimumCount = boundedMinimumCount(wishMinimumCount, itemCount: selectedWishIDs.count)
+        }
+    }
+
+    private mutating func defaultHaveMinimumLogicIfNeeded(previousCount: Int) {
+        guard previousCount < 2, selectedHaveIDs.count >= 2 else {
+            return
+        }
+        haveLogic = .atLeast
+        haveMinimumCount = 1
+    }
+
+    private mutating func defaultWishMinimumLogicIfNeeded(previousCount: Int) {
+        guard previousCount < 2, selectedWishIDs.count >= 2 else {
+            return
+        }
+        wishLogic = .atLeast
+        wishMinimumCount = 1
+    }
 }
 
 private func boundedQuantity(_ quantity: Int, maxQuantity: Int = 99) -> Int {
     max(1, min(quantity, max(1, maxQuantity), 99))
+}
+
+private func defaultMinimumCount(for itemCount: Int, current: Int) -> Int {
+    guard itemCount > 0 else {
+        return 1
+    }
+    return boundedMinimumCount(current, itemCount: itemCount)
+}
+
+private func boundedMinimumCount(_ count: Int, itemCount: Int) -> Int {
+    guard itemCount > 0 else {
+        return 1
+    }
+    return max(1, min(count, itemCount))
 }

@@ -3,6 +3,91 @@ import MegrumCore
 import XCTest
 
 final class OwnProfileScreenTests: XCTestCase {
+    func testOwnProfileUsesCompactHeaderMetrics() {
+        XCTAssertEqual(OwnProfileLayoutMetrics.contentSpacing, 10)
+        XCTAssertEqual(OwnProfileLayoutMetrics.horizontalPadding, 14)
+        XCTAssertEqual(OwnProfileLayoutMetrics.topPadding, 12)
+        XCTAssertEqual(OwnProfileLayoutMetrics.compactHeroAvatarSize, 70)
+
+        XCTAssertEqual(ProfileVisualHeroDensity.compact.verticalSpacing, 9)
+        XCTAssertEqual(ProfileVisualHeroDensity.compact.displayNameFontSize, 20)
+        XCTAssertEqual(ProfileVisualHeroDensity.compact.handleFontSize, 13)
+        XCTAssertEqual(ProfileVisualHeroDensity.compact.actionHeight, 44)
+        XCTAssertEqual(ProfileVisualHeroDensity.compact.scheduleActionHeight, 38)
+        XCTAssertLessThan(ProfileVisualHeroDensity.compact.actionHeight, ProfileVisualHeroDensity.regular.actionHeight)
+        XCTAssertLessThan(ProfileVisualHeroDensity.compact.displayNameFontSize, ProfileVisualHeroDensity.regular.displayNameFontSize)
+    }
+
+    func testOwnProfileOshiTagsRenderL1ThenL2Separately() {
+        let groupID = UUID(uuidString: "20000000-0000-0000-0000-000000000101")!
+        let userID = UUID(uuidString: "20000000-0000-0000-0000-000000000102")!
+        let selections = [
+            UserOshiSelection(
+                id: UUID(uuidString: "20000000-0000-0000-0000-000000000103")!,
+                userID: userID,
+                groupID: groupID,
+                characterID: UUID(uuidString: "20000000-0000-0000-0000-000000000104")!,
+                kind: .specific,
+                priority: 1,
+                groupName: "TWICE",
+                characterName: "モモ"
+            )
+        ]
+
+        let tags = OwnProfileOshiTagPresentation.tagItems(from: selections)
+
+        XCTAssertEqual(tags.map(\.title), ["TWICE", "モモ"])
+        XCTAssertEqual(tags[0].colorKey, tags[1].colorKey)
+    }
+
+    func testOwnProfileOshiTagsPreservePriorityAndDeduplicateL1() {
+        let twiceID = UUID(uuidString: "20000000-0000-0000-0000-000000000201")!
+        let iveID = UUID(uuidString: "20000000-0000-0000-0000-000000000202")!
+        let userID = UUID(uuidString: "20000000-0000-0000-0000-000000000203")!
+        let selections = [
+            UserOshiSelection(
+                id: UUID(uuidString: "20000000-0000-0000-0000-000000000204")!,
+                userID: userID,
+                groupID: iveID,
+                characterID: UUID(uuidString: "20000000-0000-0000-0000-000000000205")!,
+                kind: .specific,
+                priority: 3,
+                groupName: "IVE",
+                characterName: "レイ"
+            ),
+            UserOshiSelection(
+                id: UUID(uuidString: "20000000-0000-0000-0000-000000000206")!,
+                userID: userID,
+                groupID: twiceID,
+                characterID: UUID(uuidString: "20000000-0000-0000-0000-000000000207")!,
+                kind: .specific,
+                priority: 1,
+                groupName: "TWICE",
+                characterName: "モモ"
+            ),
+            UserOshiSelection(
+                id: UUID(uuidString: "20000000-0000-0000-0000-000000000208")!,
+                userID: userID,
+                groupID: twiceID,
+                characterID: UUID(uuidString: "20000000-0000-0000-0000-000000000209")!,
+                kind: .specific,
+                priority: 2,
+                groupName: "TWICE",
+                characterName: "サナ"
+            )
+        ]
+
+        let tags = OwnProfileOshiTagPresentation.tagItems(from: selections)
+
+        XCTAssertEqual(tags.map(\.title), ["TWICE", "モモ", "サナ", "IVE", "レイ"])
+    }
+
+    func testOwnProfileOshiTagsShowFallbackWhenUnset() {
+        let tags = OwnProfileOshiTagPresentation.tagItems(from: [])
+
+        XCTAssertEqual(tags.map(\.title), ["推し未設定"])
+    }
+
     func testProfileDraftNormalizesEditableFields() {
         let draft = OwnProfileEditDraft(
             handle: " @Michi_Lion ",

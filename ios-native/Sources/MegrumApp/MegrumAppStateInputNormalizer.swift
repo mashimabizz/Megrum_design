@@ -38,6 +38,23 @@ enum MegrumAppStateInputNormalizer {
         }
     }
 
+    static func photoURLs(_ photoURLs: [String]) -> [String] {
+        photoURLs.reduce(into: []) { result, raw in
+            let normalized = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard result.count < 6,
+                  let url = URL(string: normalized),
+                  url.scheme?.isEmpty == false,
+                  url.host?.isEmpty == false
+            else {
+                return
+            }
+            let value = url.absoluteString
+            if !result.contains(value) {
+                result.append(value)
+            }
+        }
+    }
+
     static func profileHandle(_ handle: String) -> String? {
         var normalized = handle.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         while normalized.first == "@" {

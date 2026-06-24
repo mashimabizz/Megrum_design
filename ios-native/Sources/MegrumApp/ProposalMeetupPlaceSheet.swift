@@ -4,23 +4,6 @@ import MegrumCore
 import MegrumDesign
 import SwiftUI
 
-struct ProposalMeetupPlaceSheetRoute: Identifiable, Equatable {
-    let presentationID = UUID()
-    var index: Int
-    var draft: ProposalMeetupCandidateDraft
-
-    var id: String {
-        "\(index)-\(draft.id.uuidString)-\(presentationID.uuidString)"
-    }
-}
-
-private struct ProposalMeetupPlaceSearchResult: Identifiable {
-    let id = UUID()
-    var title: String
-    var subtitle: String
-    var coordinate: CLLocationCoordinate2D
-}
-
 struct ProposalMeetupPlaceSheet: View {
     private enum Field: Hashable {
         case place
@@ -162,34 +145,12 @@ struct ProposalMeetupPlaceSheet: View {
     }
 
     private var actionRow: some View {
-        HStack(spacing: 10) {
-            Button {
-                useCurrentLocation()
-            } label: {
-                Label {
-                    Text("現在地を中心に")
-                } icon: {
-                    if isRequestingLocation {
-                        ProgressView()
-                            .controlSize(.small)
-                    } else {
-                        Image(systemName: "location.fill")
-                    }
-                }
-                .frame(maxWidth: .infinity)
-            }
-            .proposalPlaceSheetActionStyle(isEnabled: true)
-
-            Button {
-                applyPreviousDraft()
-            } label: {
-                Label("前の設定と同じに", systemImage: "clock.arrow.circlepath")
-                    .frame(maxWidth: .infinity)
-            }
-            .proposalPlaceSheetActionStyle(isEnabled: previousDraft != nil)
-            .disabled(previousDraft == nil)
-        }
-        .font(.system(size: 13, weight: .black, design: .rounded))
+        ProposalMeetupPlaceActionRow(
+            isRequestingLocation: isRequestingLocation,
+            canApplyPreviousDraft: previousDraft != nil,
+            onUseCurrentLocation: useCurrentLocation,
+            onApplyPreviousDraft: applyPreviousDraft
+        )
     }
 
     private var placeInputCard: some View {
@@ -243,125 +204,38 @@ struct ProposalMeetupPlaceSheet: View {
     }
 
     private var mapCard: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Label("地図で場所を選択", systemImage: "map")
-                .font(.system(size: 14, weight: .heavy, design: .rounded))
-                .foregroundStyle(MegrumTheme.ink)
-
-            MapReader { proxy in
-                Map(position: $cameraPosition, interactionModes: [.pan, .zoom]) {
-                    if let selectedCoordinate {
-                        Marker(
-                            draft.normalizedPlaceName.isEmpty ? "待ち合わせ" : draft.normalizedPlaceName,
-                            coordinate: selectedCoordinate
-                        )
-                        .tint(MegrumTheme.lavender)
-                    }
-
-                }
-                .frame(height: 216)
-                .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
-                .overlay {
-                    RoundedRectangle(cornerRadius: 22, style: .continuous)
-                        .stroke(.white.opacity(0.72), lineWidth: 1)
-                }
-                .gesture(
-                    SpatialTapGesture()
-                        .onEnded { value in
-                            guard let coordinate = proxy.convert(value.location, from: .local) else {
-                                return
-                            }
-                            applyMapSelection(coordinate)
-                        }
-                )
-            }
-
-            Text(coordinateCaption)
-                .font(.system(size: 12, weight: .bold, design: .rounded))
-                .foregroundStyle(MegrumTheme.muted)
-        }
-        .padding(16)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+        ProposalMeetupPlaceMapCard(
+            cameraPosition: $cameraPosition,
+            selectedCoordinate: selectedCoordinate,
+            markerTitle: draft.normalizedPlaceName,
+            coordinateCaption: coordinateCaption,
+            onSelectCoordinate: applyMapSelection
+        )
     }
 
     @ViewBuilder
     private var searchResultsSection: some View {
         if !searchResults.isEmpty {
-            VStack(spacing: 4) {
-                ForEach(searchResults) { result in
-                    Button {
-                        applySearchResult(result)
-                    } label: {
-                        HStack(spacing: 8) {
-                            Image(systemName: "mappin.circle.fill")
-                                .font(.system(size: 14, weight: .bold))
-                                .foregroundStyle(MegrumTheme.lavender)
-                            VStack(alignment: .leading, spacing: 1) {
-                                Text(result.title)
-                                    .font(.system(size: 13, weight: .black, design: .rounded))
-                                    .foregroundStyle(MegrumTheme.ink)
-                                    .lineLimit(1)
-                                if !result.subtitle.isEmpty {
-                                    Text(result.subtitle)
-                                        .font(.system(size: 10, weight: .semibold, design: .rounded))
-                                        .foregroundStyle(MegrumTheme.muted)
-                                        .lineLimit(1)
-                                }
-                            }
-                            Spacer(minLength: 0)
-                        }
-                        .padding(.horizontal, 10)
-                        .frame(maxWidth: .infinity, minHeight: 38, alignment: .leading)
-                        .background(.white.opacity(0.72), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-                        .overlay {
-                            RoundedRectangle(cornerRadius: 12, style: .continuous)
-                                .stroke(MegrumTheme.lavender.opacity(0.1), lineWidth: 1)
-                        }
-                    }
-                    .buttonStyle(.plain)
+            ProposalMeetupPlaceSearchResultsList(
+                results: searchResults,
+                onSelect: { result in
+                    applySearchResult(result)
                 }
-            }
-            .padding(.top, 2)
+            )
         }
     }
 
     private var statusRow: some View {
-        HStack(alignment: .top, spacing: 8) {
-            Image(systemName: canSave ? "checkmark.circle.fill" : "exclamationmark.circle.fill")
-                .foregroundStyle(canSave ? MegrumTheme.ok : MegrumTheme.pink)
-            Text(locationStatusText)
-                .font(.system(size: 13, weight: .bold, design: .rounded))
-                .foregroundStyle(MegrumTheme.muted)
-                .fixedSize(horizontal: false, vertical: true)
-        }
-        .padding(.horizontal, 4)
+        ProposalMeetupPlaceStatusRow(canSave: canSave, message: locationStatusText)
     }
 
     private var saveButton: some View {
-        Button {
+        ProposalMeetupPlaceSaveButton(canSave: canSave) {
             var normalizedDraft = draft
             normalizedDraft.placeName = normalizedDraft.normalizedPlaceName
             onSave(normalizedDraft, route.index)
             dismiss()
-        } label: {
-            Text("この場所にする")
-                .font(.system(size: 17, weight: .heavy, design: .rounded))
-                .foregroundStyle(.white)
-                .frame(maxWidth: .infinity)
-                .frame(minHeight: ProposalFlowBottomBarMetrics.buttonMinHeight)
-                .background(
-                    MegrumTheme.lavender,
-                    in: RoundedRectangle(cornerRadius: ProposalFlowBottomBarMetrics.buttonCornerRadius, style: .continuous)
-                )
-                .shadow(color: MegrumTheme.lavender.opacity(canSave ? 0.28 : 0), radius: 14, y: 8)
         }
-        .buttonStyle(.plain)
-        .disabled(!canSave)
-        .opacity(canSave ? 1 : 0.48)
-        .padding(.horizontal, ProposalFlowBottomBarMetrics.horizontalPadding)
-        .padding(.top, ProposalFlowBottomBarMetrics.topPadding)
-        .padding(.bottom, ProposalFlowBottomBarMetrics.bottomPadding)
-        .background(MegrumTheme.canvas.ignoresSafeArea(edges: .bottom))
     }
 
     private var coordinateCaption: String {
@@ -439,7 +313,7 @@ struct ProposalMeetupPlaceSheet: View {
                 let title = item.name?.trimmingCharacters(in: .whitespacesAndNewlines)
                     ?? item.placemark.name?.trimmingCharacters(in: .whitespacesAndNewlines)
                     ?? query
-                let subtitle = Self.placeAreaText(for: item.placemark)
+                let subtitle = ProposalMeetupPlaceFormatter.placeAreaText(for: item.placemark)
                 return ProposalMeetupPlaceSearchResult(title: title, subtitle: subtitle, coordinate: coordinate)
             }
             searchResults = Array(results)
@@ -507,25 +381,6 @@ struct ProposalMeetupPlaceSheet: View {
         }
     }
 
-    private static func placeAreaText(for placemark: MKPlacemark) -> String {
-        let rawParts = [
-            placemark.administrativeArea,
-            placemark.locality ?? placemark.subAdministrativeArea ?? placemark.subLocality
-        ]
-        var parts: [String] = []
-        for rawPart in rawParts {
-            let part = rawPart?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-            guard !part.isEmpty, !parts.contains(part) else {
-                continue
-            }
-            parts.append(part)
-        }
-        if !parts.isEmpty {
-            return parts.joined(separator: " ")
-        }
-        return placemark.title?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-    }
-
     private func schedulePlaceSearch(for placeName: String) {
         if suppressNextPlaceSearch {
             suppressNextPlaceSearch = false
@@ -564,36 +419,5 @@ struct ProposalMeetupPlaceSheet: View {
         isSearchingPlace = false
         searchResults = []
         placeSearchError = nil
-    }
-}
-
-extension View {
-    func proposalPlaceSheetActionStyle(isEnabled: Bool) -> some View {
-        self
-            .foregroundStyle(isEnabled ? MegrumTheme.ink : MegrumTheme.muted)
-            .frame(height: 44)
-            .padding(.horizontal, 10)
-            .background(.white.opacity(isEnabled ? 0.82 : 0.46), in: Capsule())
-            .overlay {
-                Capsule()
-                    .stroke(MegrumTheme.lavender.opacity(isEnabled ? 0.22 : 0.08), lineWidth: 1)
-            }
-            .buttonStyle(.plain)
-            .opacity(isEnabled ? 1 : 0.58)
-    }
-
-    @ViewBuilder
-    func proposalPlaceSheetTextInputBehavior() -> some View {
-        #if os(iOS)
-        self.textInputAutocapitalization(.never)
-        #else
-        self
-        #endif
-    }
-
-    func proposalFlowMeetupRow() -> some View {
-        self
-            .frame(minHeight: 48)
-            .padding(.vertical, 6)
     }
 }

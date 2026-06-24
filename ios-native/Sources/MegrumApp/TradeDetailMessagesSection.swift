@@ -12,6 +12,7 @@ struct TradeDetailMessagesSection: View {
     var isApprovingCancel: Bool
     var onOpenImage: (URL) -> Void
     var onOpenDispute: (TradeDisputeSummary) -> Void
+    var onOpenEvidenceList: () -> Void
     var onApproveCancel: () -> Void
 
     private var timelineRows: [TradeChatTimelineRow] {
@@ -51,6 +52,7 @@ struct TradeDetailMessagesSection: View {
                         isApprovingCancel: isApprovingCancel,
                         onOpenImage: onOpenImage,
                         onOpenDispute: onOpenDispute,
+                        onOpenEvidenceList: onOpenEvidenceList,
                         onApproveCancel: onApproveCancel
                     )
                 }

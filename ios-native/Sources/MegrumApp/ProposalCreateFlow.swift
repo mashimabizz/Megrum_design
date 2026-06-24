@@ -4,7 +4,7 @@ import MegrumDesign
 import SwiftUI
 
 struct ProposalCreateFlow: View {
-    private static let messageLimit = 400
+    static let messageLimit = 400
 
     @ObservedObject var appState: MegrumAppState
     var targetItem: GoodsItem
@@ -18,64 +18,58 @@ struct ProposalCreateFlow: View {
     var visualQAInitialScreen: VisualQAInitialScreen? = nil
     var onCompletionAction: (ProposalCompletionAction) -> Void = { _ in }
 
-    @Environment(\.dismiss) private var dismiss
-    @State private var selectedStep: ProposalCreateStep = .give
-    @State private var selectedSenderGoodsIDs: Set<UUID> = []
-    @State private var selectedReceiverGoodsIDs: Set<UUID> = []
-    @State private var proposalCashAmount: Int?
-    @State private var senderGroupFilterID: UUID?
-    @State private var senderGoodsTypeFilterID: UUID?
-    @State private var receiverGroupFilterID: UUID?
-    @State private var receiverGoodsTypeFilterID: UUID?
-    @State private var exchangeMethod: ExchangeMethod = .hand
-    @State private var shareSchedule = true
-    @State private var message = ""
-    @State private var meetupStartAt = Date()
-    @State private var meetupEndAt = Date().addingTimeInterval(30 * 60)
-    @State private var meetupPlaceName = ""
-    @State private var meetupLatitudeText = ""
-    @State private var meetupLongitudeText = ""
-    @State private var meetupCandidateDrafts: [ProposalMeetupCandidateDraft] = []
-    @State private var selectedMeetupCandidateIndex = 0
-    @State private var meetupCalendarAnchorDate = Date()
-    @State private var meetupPlaceSheetRoute: ProposalMeetupPlaceSheetRoute?
-    @State private var submittedSummary: ProposalSubmittedSummary?
-    @State private var didApplyInitialExchangeMethod = false
-    @State private var didApplyInitialStep = false
-    @State private var didApplyVisualQAState = false
-    @State private var showsAddressSettings = false
-    @StateObject private var locationState = MegrumLocationState()
+    @Environment(\.dismiss) var dismiss
+    @State var selectedStep: ProposalCreateStep = .give
+    @State var selectedSenderGoodsIDs: Set<UUID> = []
+    @State var selectedReceiverGoodsIDs: Set<UUID> = []
+    @State var senderSelectionMode: ProposalSideSelectionMode = .goods
+    @State var receiverSelectionMode: ProposalSideSelectionMode = .goods
+    @State var senderCashAmountText = ""
+    @State var receiverCashAmountText = ""
+    @State var selectedPaymentOptionID: String?
+    @State var senderGroupFilterID: UUID?
+    @State var senderGoodsTypeFilterID: UUID?
+    @State var receiverGroupFilterID: UUID?
+    @State var receiverGoodsTypeFilterID: UUID?
+    @State var exchangeMethod: ExchangeMethod = .hand
+    @State var shareSchedule = true
+    @State var message = ""
+    @State var meetupPrefecture = ""
+    @State var meetupPlaceMemo = ""
+    @State var meetupStartAt = Date()
+    @State var meetupEndAt = Date().addingTimeInterval(30 * 60)
+    @State var meetupPlaceName = ""
+    @State var meetupLatitudeText = ""
+    @State var meetupLongitudeText = ""
+    @State var meetupCandidateDrafts: [ProposalMeetupCandidateDraft] = []
+    @State var selectedMeetupCandidateIndex = 0
+    @State var meetupCalendarAnchorDate = Date()
+    @State var meetupPlaceSheetRoute: ProposalMeetupPlaceSheetRoute?
+    @State var submittedSummary: ProposalSubmittedSummary?
+    @State var didApplyInitialExchangeMethod = false
+    @State var didApplyInitialStep = false
+    @State var didApplyVisualQAState = false
+    @State var showsAddressSettings = false
+    @State var shippingFee: IndividualListingShippingFeeDraft = .negotiate
+    @State var shippingDays: IndividualListingShippingDaysDraft = .twoToFourDays
+    @StateObject var locationState = MegrumLocationState()
 
-    private var visibleSteps: [ProposalCreateStep] {
+    var visibleSteps: [ProposalCreateStep] {
         var steps: [ProposalCreateStep] = [.give, .receive]
         if configuration.requiresMeetupBeforeSubmit {
             steps.append(.meetup)
+        }
+        if configuration.requiresShippingBeforeSubmit {
+            steps.append(.shipping)
+        }
+        if configuration.requiresPaymentSelection {
+            steps.append(.payment)
         }
         steps.append(.confirm)
         return steps
     }
 
-    private var selectionTabs: [ProposalCreateStep] {
-        ProposalFlowScreenCopy.selectionTabs(from: visibleSteps)
-    }
-
-    private var usesInlineBottomBar: Bool {
-        ProposalFlowBottomBarPlacement.usesInlineScrollButton(for: selectedStep)
-    }
-
-    private var horizontalContentPadding: CGFloat {
-        selectedStep == .confirm
-            ? ProposalFlowContentMetrics.confirmHorizontalPadding
-            : ProposalFlowContentMetrics.defaultHorizontalPadding
-    }
-
-    private var contentSpacing: CGFloat {
-        selectedStep == .confirm
-            ? ProposalFlowContentMetrics.confirmContentSpacing
-            : ProposalFlowContentMetrics.defaultContentSpacing
-    }
-
-    private var selectableSenderGoods: [GoodsItem] {
+    var selectableSenderGoods: [GoodsItem] {
         let senderGoods = MatchRelationComposer.selectableSenderGoods(from: appState.inventory)
         guard let viewerID = appState.viewer?.id else {
             return senderGoods
@@ -83,95 +77,68 @@ struct ProposalCreateFlow: View {
         return senderGoods.filter { $0.ownerID == viewerID }
     }
 
-    private var receiverChoiceGoods: [GoodsItem] {
+    var receiverChoiceGoods: [GoodsItem] {
         let loaded = appState.publicTradeGoodsByUserID[targetItem.ownerID] ?? []
         return MatchRelationComposer.deduplicatedGoods([targetItem] + loaded)
             .filter { $0.marketAvailableQuantity > 0 }
     }
 
-    private var filteredSenderGoods: [GoodsItem] {
-        selectableSenderGoods.filter { item in
-            (senderGroupFilterID == nil || item.groupID == senderGroupFilterID)
-                && (senderGoodsTypeFilterID == nil || item.goodsTypeID == senderGoodsTypeFilterID)
-        }
+    var orderedSenderGoodsIDs: [UUID] {
+        return selectableSenderGoods.map(\.id).filter { selectedSenderGoodsIDs.contains($0) }
     }
 
-    private var senderGroupFilterChoices: [ProposalFilterChoice] {
-        ProposalGoodsFilterCatalog.groupChoices(items: selectableSenderGoods, groups: appState.oshiGroups)
+    var orderedReceiverGoodsIDs: [UUID] {
+        return receiverChoiceGoods.map(\.id).filter { selectedReceiverGoodsIDs.contains($0) }
     }
 
-    private var senderGoodsTypeFilterChoices: [ProposalFilterChoice] {
-        ProposalGoodsFilterCatalog.goodsTypeChoices(items: selectableSenderGoods, goodsTypes: appState.goodsTypes)
+    var selectedSenderGoods: [GoodsItem] {
+        return selectableSenderGoods.filter { selectedSenderGoodsIDs.contains($0.id) }
     }
 
-    private var filteredReceiverGoods: [GoodsItem] {
-        receiverChoiceGoods.filter { item in
-            (receiverGroupFilterID == nil || item.groupID == receiverGroupFilterID)
-                && (receiverGoodsTypeFilterID == nil || item.goodsTypeID == receiverGoodsTypeFilterID)
-        }
+    var selectedReceiverGoods: [GoodsItem] {
+        return receiverChoiceGoods.filter { selectedReceiverGoodsIDs.contains($0.id) }
     }
 
-    private var receiverGroupFilterChoices: [ProposalFilterChoice] {
-        ProposalGoodsFilterCatalog.groupChoices(items: receiverChoiceGoods, groups: appState.oshiGroups)
-    }
-
-    private var receiverGoodsTypeFilterChoices: [ProposalFilterChoice] {
-        ProposalGoodsFilterCatalog.goodsTypeChoices(items: receiverChoiceGoods, goodsTypes: appState.goodsTypes)
-    }
-
-    private var orderedSenderGoodsIDs: [UUID] {
-        selectableSenderGoods.map(\.id).filter { selectedSenderGoodsIDs.contains($0) }
-    }
-
-    private var orderedReceiverGoodsIDs: [UUID] {
-        receiverChoiceGoods.map(\.id).filter { selectedReceiverGoodsIDs.contains($0) }
-    }
-
-    private var selectedSenderGoods: [GoodsItem] {
-        selectableSenderGoods.filter { selectedSenderGoodsIDs.contains($0.id) }
-    }
-
-    private var selectedReceiverGoods: [GoodsItem] {
-        receiverChoiceGoods.filter { selectedReceiverGoodsIDs.contains($0.id) }
-    }
-
-    private var resolvedReceiverGoodsIDs: [UUID] {
+    var resolvedReceiverGoodsIDs: [UUID] {
         orderedReceiverGoodsIDs
     }
 
-    private var configuration: ProposalCreateConfiguration {
+    var configuration: ProposalCreateConfiguration {
         ProposalCreateConfiguration(
             exchangeMethod: exchangeMethod,
             hasSelectedSenderGoods: !orderedSenderGoodsIDs.isEmpty,
-            hasCashOffer: proposalCashAmount != nil,
+            hasCashOffer: senderCashAmount != nil,
+            hasReceiverCashRequest: receiverCashAmount != nil,
             isCreatingProposal: appState.isCreatingProposal,
             hasReadyMailingAddress: appState.mailingAddress?.isReady == true,
             isLoadingMailingAddress: appState.isLoadingMailingAddress,
             hasValidMeetup: meetupInput?.isValid == true,
+            requiresPaymentSelection: requiresPaymentStep,
+            hasSelectedPaymentMethod: !requiresPaymentStep || selectedPaymentOption != nil,
             receiverGoodsCount: resolvedReceiverGoodsIDs.count,
             isListingSource: listingID != nil
         )
     }
 
-    private var meetupInput: ProposalMeetupInput? {
-        guard meetupCandidateDrafts.indices.contains(selectedMeetupCandidateIndex) else {
+    var meetupInput: ProposalMeetupInput? {
+        guard exchangeMethod == .hand || exchangeMethod == .both else {
             return nil
         }
-        return selectedMeetupCandidateDraft.meetupInput
-    }
-
-    private var meetupInputsForSubmission: [ProposalMeetupInput] {
-        let drafts = displayMeetupCandidateDrafts
-        let orderedIndices = [selectedMeetupCandidateIndex]
-            + drafts.indices.filter { $0 != selectedMeetupCandidateIndex }
-        return Array(
-            orderedIndices
-                .compactMap { index in drafts.indices.contains(index) ? drafts[index].meetupInput : nil }
-                .prefix(ProposalMeetupCandidateDraft.maxCandidates)
+        let input = ProposalMeetupInput(
+            startAt: meetupStartAt,
+            endAt: meetupEndAt,
+            placeName: meetupDisplayPlaceName,
+            latitude: meetupLatitude,
+            longitude: meetupLongitude
         )
+        return input.isValid ? input : nil
     }
 
-    private var selectedMeetupCandidateDraft: ProposalMeetupCandidateDraft {
+    var meetupInputsForSubmission: [ProposalMeetupInput] {
+        meetupInput.map { [$0] } ?? []
+    }
+
+    var selectedMeetupCandidateDraft: ProposalMeetupCandidateDraft {
         let candidateID = meetupCandidateDrafts.indices.contains(selectedMeetupCandidateIndex)
             ? meetupCandidateDrafts[selectedMeetupCandidateIndex].id
             : UUID()
@@ -185,7 +152,7 @@ struct ProposalCreateFlow: View {
         )
     }
 
-    private var displayMeetupCandidateDrafts: [ProposalMeetupCandidateDraft] {
+    var displayMeetupCandidateDrafts: [ProposalMeetupCandidateDraft] {
         var drafts = meetupCandidateDrafts
         if drafts.indices.contains(selectedMeetupCandidateIndex) {
             drafts[selectedMeetupCandidateIndex] = selectedMeetupCandidateDraft
@@ -193,7 +160,7 @@ struct ProposalCreateFlow: View {
         return drafts
     }
 
-    private var proposalScheduleContext: ProposalScheduleContext {
+    var proposalScheduleContext: ProposalScheduleContext {
         let cachedSchedules = appState.schedulesByProposalID.values.reduce(into: [PersonalSchedule]()) { result, schedules in
             result.append(contentsOf: schedules)
         }
@@ -206,726 +173,300 @@ struct ProposalCreateFlow: View {
         )
     }
 
-    private var meetupSummary: String {
+    var meetupSummary: String {
         if let meetupInput {
             return "\(Self.dateText(meetupInput.startAt)) / \(meetupInput.normalizedPlaceName)"
         }
         return configuration.requiresMeetupBeforeSubmit ? "未設定" : "現地では会わない設定"
     }
 
-    var body: some View {
-        Group {
-            if let submittedSummary {
-                ProposalCreateCompletionView(
-                    summary: submittedSummary,
-                    onSearchMore: handleCompletionSearchMore,
-                    onOpenTrades: handleCompletionOpenTrades
-                )
-            } else {
-                ProposalCreateActiveContent(
-                    selectedStep: $selectedStep,
-                    exchangeMethod: $exchangeMethod,
-                    selectionTabs: selectionTabs,
-                    configuration: configuration,
-                    senderCount: orderedSenderGoodsIDs.count,
-                    receiverCount: resolvedReceiverGoodsIDs.count,
-                    contentSpacing: contentSpacing,
-                    horizontalContentPadding: horizontalContentPadding,
-                    usesInlineBottomBar: usesInlineBottomBar,
-                    meetupHasTimeDraft: !displayMeetupCandidateDrafts.isEmpty,
-                    isCreating: appState.isCreatingProposal,
-                    onBack: handleHeaderLeadingAction,
-                    onPrimary: primaryAction,
-                    giveContent: {
-                        giveStep
-                            .contentShape(Rectangle())
-                            .simultaneousGesture(stepSwipeGesture)
-                    },
-                    receiveContent: {
-                        receiveStep
-                            .contentShape(Rectangle())
-                            .simultaneousGesture(stepSwipeGesture)
-                    },
-                    meetupContent: {
-                        meetupStep
-                    },
-                    confirmContent: {
-                        confirmStep
-                    }
-                )
-            }
-        }
-        .safeAreaInset(edge: .bottom, spacing: 0) {
-            if submittedSummary == nil && !usesInlineBottomBar {
-                ProposalFlowBottomBar(
-                    selectedStep: selectedStep,
-                    configuration: configuration,
-                    meetupHasTimeDraft: !displayMeetupCandidateDrafts.isEmpty,
-                    isCreating: appState.isCreatingProposal,
-                    onPrimary: primaryAction
-                )
-            }
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(MegrumTheme.canvas.ignoresSafeArea())
-        #if os(iOS)
-        .toolbar(.hidden, for: .navigationBar)
-        #else
-        .megrumInlineNavigationTitle()
-        #endif
-        .interactiveDismissDisabled(appState.isCreatingProposal || submittedSummary != nil)
-        .onAppear {
-            prepareInitialProposalState()
-        }
-        .task(id: targetItem.ownerID) {
-            await loadTargetOwnerExchangeContent()
-        }
-        .task {
-            await loadMailingAddressIfNeeded()
-        }
-        .task {
-            await loadProposalChoiceCatalogsIfNeeded()
-        }
-        .sheet(isPresented: $showsAddressSettings) {
-            NavigationStack {
-                AddressSettingsScreen(
-                    appState: appState,
-                    saveButtonTitle: "更新して戻る"
-                )
-            }
-        }
-        .sheet(
-            item: $meetupPlaceSheetRoute,
-            onDismiss: {
-                meetupPlaceSheetRoute = nil
-            }
-        ) { route in
-            ProposalMeetupPlaceSheet(
-                route: route,
-                previousDraft: previousMeetupPlaceDraft(before: route.index),
-                currentCoordinate: locationState.coordinate,
-                isRequestingLocation: locationState.isRequestingLocation,
-                locationErrorMessage: locationState.locationErrorMessage,
-                onRequestCurrentLocation: {
-                    locationState.requestCurrentLocation()
-                },
-                onSave: saveMeetupPlaceSheetDraft
-            )
-            .presentationDetents([.medium, .large])
-            .presentationDragIndicator(.visible)
-        }
-        .onChange(of: selectableSenderGoods.map(\.id)) { _, ids in
-            reconcileSenderSelection(with: ids)
-        }
-        .onChange(of: receiverChoiceGoods.map(\.id)) { _, ids in
-            reconcileReceiverSelection(with: ids)
-        }
-        .onChange(of: exchangeMethod) { _, _ in
-            handleExchangeMethodChange()
-        }
-        .onChange(of: message) { _, newValue in
-            enforceMessageLimit(newValue)
-        }
-        .onChange(of: meetupStartAt) { _, newValue in
-            ensureMeetupEndAfterStart(newValue)
-        }
-        .onChange(of: locationState.coordinate) { _, _ in
-            applyCurrentLocationToSelectedMeetupCandidate()
-        }
+    var senderCashAmount: Int? {
+        return TradeAmountFormatter.cashInputValue(from: senderCashAmountText)
     }
 
-    private var giveStep: some View {
-        ProposalGiveGoodsStep(
-            selectableGoods: selectableSenderGoods,
-            filteredGoods: filteredSenderGoods,
-            groupChoices: senderGroupFilterChoices,
-            goodsTypeChoices: senderGoodsTypeFilterChoices,
-            selectedGoodsIDs: selectedSenderGoodsIDs,
-            selectedGroupID: $senderGroupFilterID,
-            selectedGoodsTypeID: $senderGoodsTypeFilterID,
-            onToggleGoods: toggleSenderGoods
-        )
+    var receiverCashAmount: Int? {
+        return TradeAmountFormatter.cashInputValue(from: receiverCashAmountText)
     }
 
-    private var receiveStep: some View {
-        ProposalReceiveGoodsStep(
-            filteredGoods: filteredReceiverGoods,
-            groupChoices: receiverGroupFilterChoices,
-            goodsTypeChoices: receiverGoodsTypeFilterChoices,
-            selectedGoodsIDs: selectedReceiverGoodsIDs,
-            selectedGroupID: $receiverGroupFilterID,
-            selectedGoodsTypeID: $receiverGoodsTypeFilterID,
-            onToggleGoods: toggleReceiverGoods
-        )
+    var proposalCashAmount: Int? {
+        senderCashAmount ?? receiverCashAmount
     }
 
-    private var meetupStep: some View {
-        VStack(alignment: .leading, spacing: 18) {
-            if configuration.requiresMeetupBeforeSubmit {
-                ProposalMeetupCalendarEditor(
-                    drafts: displayMeetupCandidateDrafts,
-                    selectedIndex: selectedMeetupCandidateIndex,
-                    anchorDate: meetupCalendarAnchorDate,
-                    scheduleContext: proposalScheduleContext,
-                    onSelectDraft: selectMeetupCandidate,
-                    onShiftWeek: shiftMeetupWeek,
-                    onSelectMonthDay: selectMeetupCalendarDay,
-                    onShiftMonth: shiftMeetupMonth,
-                    onCreateDraft: createMeetupCandidate,
-                    onUpdateDraft: updateMeetupCandidate,
-                    onRemoveDraft: removeMeetupCandidate,
-                    onOpenPlaceEntry: { index in
-                        openMeetupPlaceSheet(for: index)
-                    }
-                )
-            }
-
+    var proposalCashAmountSide: ProposalCashSide? {
+        if senderCashAmount != nil {
+            return .sender
         }
-    }
-
-    private var confirmStep: some View {
-        ProposalConfirmStepView(
-            requiresMeetupBeforeSubmit: configuration.requiresMeetupBeforeSubmit,
-            senderGoods: selectedSenderGoods,
-            receiverGoods: selectedReceiverGoods,
-            exchangeMethod: exchangeMethod,
-            mailingAddress: appState.mailingAddress,
-            isLoadingMailingAddress: appState.isLoadingMailingAddress,
-            meetupInputs: meetupInputsForSubmission,
-            message: $message,
-            messageLimit: Self.messageLimit,
-            shareSchedule: $shareSchedule,
-            errorMessage: appState.errorMessage,
-            onOpenAddressSettings: {
-                showsAddressSettings = true
-            }
-        )
-    }
-
-    private var methodNotice: String? {
-        if configuration.requiresMailingAddressBeforeSubmit && appState.isLoadingMailingAddress {
-            return "住所登録を確認しています。"
-        }
-        if configuration.requiresMailingAddressBeforeSubmit && appState.mailingAddress?.isReady != true {
-            return "郵送交換は住所登録が必要です。設定から住所を登録してください。"
-        }
-        if configuration.requiresMeetupBeforeSubmit && meetupInput == nil {
-            return "日時、場所名、緯度経度を入れると次へ進めます。"
+        if receiverCashAmount != nil {
+            return .receiver
         }
         return nil
     }
 
-    private func handleHeaderLeadingAction() {
-        if selectedStep == .confirm {
-            previousStep()
-        } else {
-            dismiss()
-        }
+    var requiresPaymentStep: Bool {
+        senderCashAmount != nil || receiverCashAmount != nil
     }
 
-    private func handleCompletionSearchMore() {
-        onCompletionAction(.searchMore)
-        dismiss()
+    var senderSelectionCount: Int {
+        orderedSenderGoodsIDs.count + (senderCashAmount == nil ? 0 : 1)
     }
 
-    private func handleCompletionOpenTrades() {
-        onCompletionAction(.openTrades)
-        dismiss()
+    var receiverSelectionCount: Int {
+        resolvedReceiverGoodsIDs.count + (receiverCashAmount == nil ? 0 : 1)
     }
 
-    private func prepareInitialProposalState() {
-        applyInitialExchangeMethodIfNeeded()
-        applyInitialCashAmountIfNeeded()
-        seedDefaultSenderSelection()
-        seedDefaultReceiverSelection()
-        normalizeMeetupEnd()
-        applyVisualQAStateIfNeeded()
-        applyInitialStepIfNeeded()
-        meetupCalendarAnchorDate = calendarAnchorDate(for: meetupStartAt)
-    }
-
-    private func loadTargetOwnerExchangeContent() async {
-        await appState.loadPublicExchangeContent(userID: targetItem.ownerID)
-    }
-
-    private func loadMailingAddressIfNeeded() async {
-        if appState.mailingAddress == nil {
-            await appState.loadMailingAddress()
-        }
-        applyInitialStepIfNeeded()
-    }
-
-    private func loadProposalChoiceCatalogsIfNeeded() async {
-        if appState.oshiGroups.isEmpty {
-            await appState.loadOshiGroups()
-        }
-        if appState.goodsTypes.isEmpty {
-            await appState.loadGoodsTypes()
-        }
-    }
-
-    private func reconcileSenderSelection(with ids: [UUID]) {
-        selectedSenderGoodsIDs = selectedSenderGoodsIDs.intersection(Set(ids))
-        seedDefaultSenderSelection()
-    }
-
-    private func reconcileReceiverSelection(with ids: [UUID]) {
-        selectedReceiverGoodsIDs = selectedReceiverGoodsIDs.intersection(Set(ids))
-        seedDefaultReceiverSelection()
-    }
-
-    private func handleExchangeMethodChange() {
-        if selectedStep == .meetup && !configuration.requiresMeetupBeforeSubmit {
-            selectedStep = .confirm
-        }
-        applyInitialStepIfNeeded()
-    }
-
-    private func enforceMessageLimit(_ newValue: String) {
-        guard newValue.count > Self.messageLimit else {
-            return
-        }
-        message = String(newValue.prefix(Self.messageLimit))
-    }
-
-    private func ensureMeetupEndAfterStart(_ newValue: Date) {
-        if meetupEndAt <= newValue {
-            meetupEndAt = newValue.addingTimeInterval(30 * 60)
-        }
-    }
-
-    private func applyCurrentLocationToSelectedMeetupCandidate() {
-        guard let coordinate = locationState.coordinate, configuration.requiresMeetupBeforeSubmit else {
-            return
-        }
-        let updatedDraft = selectedMeetupCandidateDraft.applyingCurrentLocation(coordinate)
-        applyMeetupCandidate(updatedDraft, at: selectedMeetupCandidateIndex)
-    }
-
-    private func toggleSenderGoods(_ id: UUID) {
-        if selectedSenderGoodsIDs.contains(id) {
-            guard selectedSenderGoodsIDs.count > 1 else {
-                return
-            }
-            selectedSenderGoodsIDs.remove(id)
-        } else {
-            selectedSenderGoodsIDs.insert(id)
-        }
-    }
-
-    private func toggleReceiverGoods(_ id: UUID) {
-        if selectedReceiverGoodsIDs.contains(id) {
-            guard selectedReceiverGoodsIDs.count > 1 else {
-                return
-            }
-            selectedReceiverGoodsIDs.remove(id)
-        } else {
-            selectedReceiverGoodsIDs.insert(id)
-        }
-    }
-
-    private func seedDefaultSenderSelection() {
-        guard selectedSenderGoodsIDs.isEmpty else {
-            return
-        }
-        guard proposalCashAmount == nil else {
-            return
-        }
-        let availableIDs = Set(selectableSenderGoods.map(\.id))
-        let seededIDs = initialSenderGoodsIDs.filter { availableIDs.contains($0) }
-        if !seededIDs.isEmpty {
-            selectedSenderGoodsIDs = Set(seededIDs)
-            return
-        }
-        guard let firstID = selectableSenderGoods.first?.id else {
-            return
-        }
-        selectedSenderGoodsIDs.insert(firstID)
-    }
-
-    private func seedDefaultReceiverSelection() {
-        guard selectedReceiverGoodsIDs.isEmpty else {
-            return
-        }
-        let availableIDs = Set(receiverChoiceGoods.map(\.id))
-        let candidateIDs = (receiverGoodsIDs ?? [targetItem.id]).filter { availableIDs.contains($0) }
-        if !candidateIDs.isEmpty {
-            selectedReceiverGoodsIDs = Set(candidateIDs)
-            return
-        }
-        if availableIDs.contains(targetItem.id) {
-            selectedReceiverGoodsIDs.insert(targetItem.id)
-            return
-        }
-        if let firstID = receiverChoiceGoods.first?.id {
-            selectedReceiverGoodsIDs.insert(firstID)
-        }
-    }
-
-    private func applyInitialExchangeMethodIfNeeded() {
-        guard !didApplyInitialExchangeMethod else {
-            return
-        }
-        didApplyInitialExchangeMethod = true
-        guard let initialExchangeMethod else {
-            return
-        }
-        exchangeMethod = initialExchangeMethod
-    }
-
-    private func applyInitialCashAmountIfNeeded() {
-        guard proposalCashAmount == nil,
-              let initialCashAmount,
-              initialCashAmount > 0
-        else {
-            return
-        }
-        proposalCashAmount = initialCashAmount
-    }
-
-    private func applyVisualQAStateIfNeeded() {
-        guard !didApplyVisualQAState else {
-            return
-        }
-        didApplyVisualQAState = true
-        guard visualQAInitialScreen == .proposalConfirm || visualQAInitialScreen == .proposalComplete else {
-            return
-        }
-        seedVisualQAMeetupCandidateIfNeeded()
-        message = ""
-        shareSchedule = true
-        selectedStep = .confirm
-        if visualQAInitialScreen == .proposalComplete {
-            submittedSummary = ProposalSubmittedSummary(
-                senderCount: max(orderedSenderGoodsIDs.count, 1),
-                receiverCount: max(resolvedReceiverGoodsIDs.count, 1),
-                partnerHandle: displayPartnerHandle,
-                methodTitle: Self.methodTitle(exchangeMethod),
-                meetupSummary: meetupSummary,
-                conditionTags: [],
-                exchangeMethod: exchangeMethod
-            )
-        }
-    }
-
-    private func seedVisualQAMeetupCandidateIfNeeded() {
-        guard configuration.requiresMeetupBeforeSubmit, meetupCandidateDrafts.isEmpty else {
-            return
-        }
-        var calendar = Calendar(identifier: .gregorian)
-        calendar.timeZone = TimeZone(identifier: "Asia/Tokyo") ?? .current
-        let start = calendar.date(from: DateComponents(year: 2026, month: 6, day: 7, hour: 16, minute: 30)) ?? Date()
-        let end = start.addingTimeInterval(45 * 60)
-        let draft = ProposalMeetupCandidateDraft(
-            startAt: start,
-            endAt: end,
-            placeName: "東京ドーム 22ゲート前",
-            latitudeText: "35.7056",
-            longitudeText: "139.7519"
+    var draftExchangeSummary: IndividualListingExchangeSummary {
+        IndividualListingExchangeSummary(
+            handoffMethod: exchangeMethod.listingHandoffDraft,
+            localPrefecture: currentMeetupPrefecture,
+            localPlaceMemo: meetupPlaceMemo,
+            localSchedule: Self.dateText(meetupStartAt),
+            shippingFee: shippingFee,
+            shippingDays: shippingDays,
+            acceptsOutsideCondition: true
         )
-        meetupCandidateDrafts = [draft]
-        applyMeetupCandidate(draft, at: 0)
     }
 
-    private func applyInitialStepIfNeeded() {
-        guard !didApplyInitialStep else {
-            return
+    var viewerListingExchangeSummary: IndividualListingExchangeSummary? {
+        let selectedOrInitialSenderIDs = selectedSenderGoodsIDs.union(Set(initialSenderGoodsIDs))
+        if let listingID,
+           let listing = appState.listings.first(where: { $0.id == listingID }) {
+            return IndividualListingExchangeSummary.extract(from: listing.note).summary
         }
-        guard visibleSteps.contains(initialStep) else {
-            didApplyInitialStep = true
-            return
+        guard !selectedOrInitialSenderIDs.isEmpty else {
+            return nil
         }
-        if visibleSteps
-            .prefix(while: { $0 != initialStep })
-            .allSatisfy({ configuration.canAdvance(from: $0) })
-        {
-            selectedStep = initialStep
-            didApplyInitialStep = true
-        }
+        return appState.listings
+            .filter { $0.status == .active }
+            .first { listing in
+                listing.haves.contains { selectedOrInitialSenderIDs.contains($0.itemID) }
+            }
+            .flatMap { IndividualListingExchangeSummary.extract(from: $0.note).summary }
     }
 
-    private func normalizeMeetupEnd() {
-        if meetupEndAt <= meetupStartAt {
-            meetupEndAt = meetupStartAt.addingTimeInterval(30 * 60)
+    var partnerExchangeSummary: IndividualListingExchangeSummary? {
+        let partnerListings = appState.publicListingsByUserID[targetItem.ownerID] ?? []
+        if let listingID,
+           let listing = partnerListings.first(where: { $0.id == listingID }) {
+            return IndividualListingExchangeSummary.extract(from: listing.note).summary
         }
+        let receiverIDs = Set((receiverGoodsIDs ?? []) + [targetItem.id])
+        return partnerListings
+            .filter { $0.status == .active }
+            .first { listing in
+                listing.haves.contains { receiverIDs.contains($0.itemID) }
+            }
+            .flatMap { IndividualListingExchangeSummary.extract(from: $0.note).summary }
     }
 
-    private func saveSelectedMeetupCandidate() {
-        guard meetupCandidateDrafts.indices.contains(selectedMeetupCandidateIndex) else {
-            return
+    var viewerListingForConditionDisplay: IndividualListing? {
+        let selectedOrInitialSenderIDs = selectedSenderGoodsIDs.union(Set(initialSenderGoodsIDs))
+        if let listingID,
+           let listing = appState.listings.first(where: { $0.id == listingID }) {
+            return listing
         }
-        meetupCandidateDrafts[selectedMeetupCandidateIndex] = selectedMeetupCandidateDraft
-    }
-
-    private func applyMeetupCandidate(
-        _ draft: ProposalMeetupCandidateDraft,
-        at index: Int,
-        reanchorCalendar: Bool = true
-    ) {
-        selectedMeetupCandidateIndex = index
-        meetupStartAt = draft.startAt
-        meetupEndAt = draft.endAt
-        meetupPlaceName = draft.placeName
-        meetupLatitudeText = draft.latitudeText
-        meetupLongitudeText = draft.longitudeText
-        if reanchorCalendar {
-            meetupCalendarAnchorDate = calendarAnchorDate(for: draft.startAt)
+        guard !selectedOrInitialSenderIDs.isEmpty else {
+            return nil
         }
-        normalizeMeetupEnd()
-    }
-
-    private func selectMeetupCandidate(_ index: Int) {
-        guard meetupCandidateDrafts.indices.contains(index), index != selectedMeetupCandidateIndex else {
-            return
-        }
-        saveSelectedMeetupCandidate()
-        applyMeetupCandidate(meetupCandidateDrafts[index], at: index)
-    }
-
-    private func openMeetupPlaceSheet(for index: Int) {
-        guard meetupCandidateDrafts.indices.contains(index) else {
-            return
-        }
-        saveSelectedMeetupCandidate()
-        let draft = meetupCandidateDrafts[index]
-        applyMeetupCandidate(draft, at: index)
-        meetupPlaceSheetRoute = ProposalMeetupPlaceSheetRoute(index: index, draft: draft)
-    }
-
-    private func previousMeetupPlaceDraft(before index: Int) -> ProposalMeetupCandidateDraft? {
-        let drafts = displayMeetupCandidateDrafts
-        return drafts.indices
-            .filter { $0 != index }
-            .reversed()
-            .map { drafts[$0] }
-            .first { draft in
-                !draft.normalizedPlaceName.isEmpty
-                    || ProposalMeetupMapDraft.coordinate(
-                        latitudeText: draft.latitudeText,
-                        longitudeText: draft.longitudeText
-                    ) != nil
+        return appState.listings
+            .filter { $0.status == .active }
+            .first { listing in
+                listing.haves.contains { selectedOrInitialSenderIDs.contains($0.itemID) }
             }
     }
 
-    private func saveMeetupPlaceSheetDraft(_ draft: ProposalMeetupCandidateDraft, at index: Int) {
-        guard meetupCandidateDrafts.indices.contains(index) else {
-            return
+    var partnerListingForConditionDisplay: IndividualListing? {
+        let partnerListings = appState.publicListingsByUserID[targetItem.ownerID] ?? []
+        if let listingID,
+           let listing = partnerListings.first(where: { $0.id == listingID }) {
+            return listing
         }
-        meetupCandidateDrafts[index] = draft
-        applyMeetupCandidate(draft, at: index)
-    }
-
-    private func addMeetupCandidate() {
-        guard meetupCandidateDrafts.count < ProposalMeetupCandidateDraft.maxCandidates else {
-            return
-        }
-        saveSelectedMeetupCandidate()
-        let start = meetupEndAt.addingTimeInterval(30 * 60)
-        let draft = ProposalMeetupCandidateDraft(
-            startAt: start,
-            placeName: meetupPlaceName,
-            latitudeText: meetupLatitudeText,
-            longitudeText: meetupLongitudeText
-        )
-        meetupCandidateDrafts.append(draft)
-        let newIndex = meetupCandidateDrafts.count - 1
-        applyMeetupCandidate(draft, at: newIndex)
-        meetupPlaceSheetRoute = ProposalMeetupPlaceSheetRoute(index: newIndex, draft: draft)
-    }
-
-    private func removeMeetupCandidate(_ index: Int) {
-        guard meetupCandidateDrafts.indices.contains(index) else {
-            return
-        }
-        saveSelectedMeetupCandidate()
-        meetupCandidateDrafts.remove(at: index)
-        if meetupCandidateDrafts.isEmpty {
-            selectedMeetupCandidateIndex = 0
-            meetupPlaceName = ""
-            meetupLatitudeText = ""
-            meetupLongitudeText = ""
-            meetupEndAt = meetupStartAt.addingTimeInterval(ProposalMeetupCandidateDraft.defaultDuration)
-            meetupPlaceSheetRoute = nil
-            return
-        }
-        let nextIndex: Int
-        if index < selectedMeetupCandidateIndex {
-            nextIndex = max(0, selectedMeetupCandidateIndex - 1)
-        } else if index == selectedMeetupCandidateIndex {
-            nextIndex = min(index, meetupCandidateDrafts.count - 1)
-        } else {
-            nextIndex = selectedMeetupCandidateIndex
-        }
-        applyMeetupCandidate(meetupCandidateDrafts[nextIndex], at: nextIndex)
-    }
-
-    private func previousStep() {
-        guard let index = visibleSteps.firstIndex(of: selectedStep), index > 0 else {
-            return
-        }
-        withAnimation(.snappy) {
-            selectedStep = visibleSteps[index - 1]
-        }
-    }
-
-    private func primaryAction() {
-        if selectedStep == .confirm {
-            Task {
-                await createProposal()
-            }
-            return
-        }
-        guard let destination = ProposalCreatePrimaryStepDestination.destination(
-            from: selectedStep,
-            configuration: configuration,
-            visibleSteps: visibleSteps
-        ) else {
-            return
-        }
-        withAnimation(.snappy) {
-            selectedStep = destination
-        }
-    }
-
-    private var stepSwipeGesture: some Gesture {
-        DragGesture(minimumDistance: 12)
-            .onEnded { value in
-                guard selectedStep != .meetup, selectedStep != .confirm else {
-                    return
-                }
-                guard let destination = ProposalStepSwipeNavigator.destination(
-                    from: selectedStep,
-                    translationWidth: value.translation.width,
-                    translationHeight: value.translation.height,
-                    visibleSteps: visibleSteps
-                ) else {
-                    return
-                }
-                withAnimation(.snappy) {
-                    selectedStep = destination
-                }
+        let receiverIDs = Set((receiverGoodsIDs ?? []) + [targetItem.id])
+        return partnerListings
+            .filter { $0.status == .active }
+            .first { listing in
+                listing.haves.contains { receiverIDs.contains($0.itemID) }
             }
     }
 
-    private func createProposal() async {
-        guard configuration.canSubmit, let targetStatus = configuration.targetStatus else {
-            return
+    var listingCashReferenceRows: [ProposalCashReferenceRow] {
+        [
+            partnerListingCashReferenceText.map { ProposalCashReferenceRow(label: "相手", value: $0) },
+            viewerListingCashReferenceText.map { ProposalCashReferenceRow(label: "自分", value: $0) }
+        ]
+        .compactMap(\.self)
+    }
+
+    private var viewerListingCashReferenceText: String? {
+        cashReferenceText(from: viewerListingForConditionDisplay)
+    }
+
+    private var partnerListingCashReferenceText: String? {
+        cashReferenceText(from: partnerListingForConditionDisplay)
+    }
+
+    private func cashReferenceText(from listing: IndividualListing?) -> String? {
+        guard let listing else {
+            return nil
         }
-        saveSelectedMeetupCandidate()
-        let meetupCandidates = configuration.requiresMeetupBeforeSubmit ? meetupInputsForSubmission : []
-        let meetup = meetupCandidates.first
-        guard !configuration.requiresMeetupBeforeSubmit || meetup != nil else {
-            return
+        let values = listing.options
+            .filter(\.isCashOffer)
+            .map { TradeAmountFormatter.fixedPrice(amount: $0.cashAmount) }
+        guard !values.isEmpty else {
+            return nil
         }
-        let draft = ProposalCreateSubmissionDraft(
-            receiverID: targetItem.ownerID,
-            senderGoodsIDs: orderedSenderGoodsIDs,
-            receiverGoodsIDs: resolvedReceiverGoodsIDs,
-            exchangeMethod: exchangeMethod,
-            conditionTags: [],
-            message: message,
-            matchType: matchType,
-            status: targetStatus,
-            meetupCandidates: meetupCandidates,
-            exposeCalendar: shareSchedule,
-            listingID: listingID,
-            cashAmount: proposalCashAmount,
-            senderCount: orderedSenderGoodsIDs.count,
-            receiverCount: resolvedReceiverGoodsIDs.count,
-            partnerHandle: partnerHandle,
-            methodTitle: Self.methodTitle(exchangeMethod),
-            meetupSummary: meetupSummary
+        var seen = Set<String>()
+        let uniqueValues = values.filter { seen.insert($0).inserted }
+        return uniqueValues.joined(separator: " / ")
+    }
+
+    var currentMeetupPrefecture: String {
+        meetupPrefecture.nilIfBlank
+            ?? appState.viewer?.prefecture.nilIfBlank
+            ?? targetItem.ownerPrefecture.nilIfBlank
+            ?? "未設定"
+    }
+
+    var meetupDisplayPlaceName: String {
+        [currentMeetupPrefecture.nilIfBlank, meetupPlaceMemo.nilIfBlank]
+            .compactMap(\.self)
+            .joined(separator: " / ")
+    }
+
+    var meetupLatitude: Double {
+        Double(meetupLatitudeText) ?? locationState.coordinate?.latitude ?? 0
+    }
+
+    var meetupLongitude: Double {
+        Double(meetupLongitudeText) ?? locationState.coordinate?.longitude ?? 0
+    }
+
+    var viewerLocalConditionText: String {
+        viewerListingExchangeSummary?.localDetailTextForProposalDisplay ?? "未設定"
+    }
+
+    var partnerLocalConditionText: String {
+        if let text = partnerExchangeSummary?.localDetailTextForProposalDisplay {
+            return text
+        }
+        return "未設定"
+    }
+
+    var viewerShippingConditionText: String {
+        viewerListingExchangeSummary?.mailDetailText ?? "未設定"
+    }
+
+    var partnerShippingConditionText: String {
+        partnerExchangeSummary?.mailDetailText ?? "未設定"
+    }
+
+    var proposalMeetupSummaryText: String {
+        draftExchangeSummary.localDetailTextForProposalDisplay ?? "未設定"
+    }
+
+    var proposalShippingSummaryText: String {
+        draftExchangeSummary.mailDetailText ?? "未設定"
+    }
+
+    var viewerPaymentSummaryText: String {
+        UserPaymentMethod.displayText(
+            for: appState.paymentSettings?.methods ?? appState.viewer?.paymentMethods ?? [],
+            otherNote: appState.paymentSettings?.otherNote ?? appState.viewer?.paymentNote
         )
-        let created = await appState.createProposal(draft.input)
-        if created {
-            withAnimation(.snappy) {
-                submittedSummary = draft.summary
+    }
+
+    var partnerPaymentSummaryText: String {
+        if let profile = appState.publicProfilesByUserID[targetItem.ownerID]?.profile {
+            return profile.paymentSummaryText
+        }
+        return UserPaymentMethod.displayText(
+            for: targetItem.ownerPaymentMethods,
+            otherNote: targetItem.ownerPaymentNote
+        )
+    }
+
+    var viewerPaymentOtherNote: String? {
+        appState.paymentSettings?.otherNote ?? appState.viewer?.paymentNote
+    }
+
+    var partnerPaymentOtherNote: String? {
+        if let profile = appState.publicProfilesByUserID[targetItem.ownerID]?.profile {
+            return profile.paymentNote
+        }
+        return targetItem.ownerPaymentNote
+    }
+
+    var viewerPaymentMethods: [UserPaymentMethod] {
+        UserPaymentMethod.normalized(appState.paymentSettings?.methods ?? appState.viewer?.paymentMethods ?? [])
+    }
+
+    var partnerPaymentMethods: [UserPaymentMethod] {
+        if let profile = appState.publicProfilesByUserID[targetItem.ownerID]?.profile {
+            return UserPaymentMethod.normalized(profile.paymentMethods)
+        }
+        return UserPaymentMethod.normalized(targetItem.ownerPaymentMethods)
+    }
+
+    var paymentNeedsDiscussion: Bool {
+        guard senderCashAmount != nil || receiverCashAmount != nil else {
+            return false
+        }
+        let commonMethods = Set(viewerPaymentMethods).intersection(Set(partnerPaymentMethods))
+        return commonMethods.count != 1
+    }
+
+    var paymentOptionSections: [(section: ProposalPaymentOptionSection, options: [ProposalPaymentOption])] {
+        ProposalPaymentOptionCatalog.sections(
+            viewerMethods: viewerPaymentMethods,
+            viewerOtherNote: viewerPaymentOtherNote,
+            partnerMethods: partnerPaymentMethods,
+            partnerOtherNote: partnerPaymentOtherNote
+        )
+    }
+
+    var selectedPaymentOption: ProposalPaymentOption? {
+        guard requiresPaymentStep else {
+            return nil
+        }
+        let options = paymentOptionSections.flatMap(\.options)
+        if let selectedPaymentOptionID,
+           let selected = options.first(where: { $0.id == selectedPaymentOptionID }) {
+            return selected
+        }
+        return options.first
+    }
+
+    var selectedPaymentSummaryText: String? {
+        selectedPaymentOption?.confirmationTitle
+    }
+
+    var proposalConditionTags: [String] {
+        var tags: [String] = []
+        if configuration.requiresMeetupBeforeSubmit {
+            tags.append("待ち合わせ: \(viewerLocalConditionText)")
+        }
+        if configuration.requiresShippingBeforeSubmit {
+            tags.append("送料: \(shippingFee.title)")
+            tags.append("発送目安: \(shippingDays.title)")
+        }
+        if senderCashAmount != nil || receiverCashAmount != nil {
+            if let selectedPaymentSummaryText {
+                tags.append("支払方法: \(selectedPaymentSummaryText)")
             }
         }
+        return tags
     }
 
-    private func shiftMeetupWeek(_ direction: Int) {
-        meetupCalendarAnchorDate = ProposalMeetupCalendarModel.shiftedAnchor(
-            anchorDate: meetupCalendarAnchorDate,
-            direction: direction
-        )
-    }
+}
 
-    private func shiftMeetupMonth(_ direction: Int) {
-        meetupCalendarAnchorDate = ProposalMeetupCalendarModel.shiftedMonthAnchor(
-            anchorDate: meetupCalendarAnchorDate,
-            direction: direction
-        )
-    }
-
-    private func selectMeetupCalendarDay(_ day: Date) {
-        meetupCalendarAnchorDate = calendarAnchorDate(for: day)
-    }
-
-    private func createMeetupCandidate(day: Date, startSlot: Int, endSlot: Int) {
-        let draft = ProposalMeetupCandidateDraft(
-            startAt: ProposalMeetupCalendarModel.date(for: day, slot: startSlot),
-            endAt: ProposalMeetupCalendarModel.date(for: day, slot: endSlot)
-        )
-        saveSelectedMeetupCandidate()
-        if meetupCandidateDrafts.count < ProposalMeetupCandidateDraft.maxCandidates {
-            meetupCandidateDrafts.append(draft)
-            let newIndex = meetupCandidateDrafts.count - 1
-            applyMeetupCandidate(draft, at: newIndex)
-            meetupPlaceSheetRoute = ProposalMeetupPlaceSheetRoute(index: newIndex, draft: draft)
-        } else if meetupCandidateDrafts.indices.contains(selectedMeetupCandidateIndex) {
-            meetupCandidateDrafts[selectedMeetupCandidateIndex] = draft
-            applyMeetupCandidate(draft, at: selectedMeetupCandidateIndex)
-            meetupPlaceSheetRoute = ProposalMeetupPlaceSheetRoute(index: selectedMeetupCandidateIndex, draft: draft)
-        }
-    }
-
-    private func updateMeetupCandidate(index: Int, day: Date, startSlot: Int, endSlot: Int) {
-        guard meetupCandidateDrafts.indices.contains(index) else {
-            return
-        }
-        let updated = meetupCandidateDrafts[index].applyingCalendarRange(
-            day: day,
-            startSlot: startSlot,
-            endSlot: endSlot
-        )
-        meetupCandidateDrafts[index] = updated
-        if index == selectedMeetupCandidateIndex {
-            applyMeetupCandidate(updated, at: index, reanchorCalendar: false)
-        }
-    }
-
-    private func calendarAnchorDate(for date: Date) -> Date {
-        Calendar.current.startOfDay(for: date)
-    }
-
-    private static func methodTitle(_ method: ExchangeMethod) -> String {
-        switch method {
+private extension ExchangeMethod {
+    var listingHandoffDraft: IndividualListingHandoffDraft {
+        switch self {
         case .hand:
-            "現地交換"
+            .local
         case .mail:
-            "郵送交換"
+            .mail
         case .both:
-            "現地 / 郵送"
+            .both
         }
-    }
-
-    private static func dateText(_ date: Date) -> String {
-        date.formatted(
-            .dateTime
-                .locale(Locale(identifier: "ja_JP"))
-                .month()
-                .day()
-                .hour()
-                .minute()
-        )
-    }
-
-    private var partnerHandle: String {
-        appState.publicProfilesByUserID[targetItem.ownerID]?.profile.handle ?? "相手"
-    }
-
-    private var displayPartnerHandle: String {
-        visualQAInitialScreen == nil ? partnerHandle : "michilion"
     }
 }

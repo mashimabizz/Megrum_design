@@ -13,7 +13,7 @@ final class SupabaseProposalClientTests: XCTestCase {
         let queryItems = URLComponents(string: url)?.queryItems ?? []
 
         XCTAssertEqual(request.httpMethod, "GET")
-        XCTAssertTrue(url.hasPrefix("https://example.supabase.co/rest/v1/proposals?select=id,sender_id,receiver_id,listing_id,status,exchange_method,sender_have_ids,receiver_have_ids,cash_offer,cash_amount,option_tags"))
+        XCTAssertTrue(url.hasPrefix("https://example.supabase.co/rest/v1/proposals?select=id,sender_id,receiver_id,listing_id,status,exchange_method,sender_have_ids,receiver_have_ids,cash_offer,cash_amount,cash_amount_side,option_tags"))
         XCTAssertTrue(url.contains("agreed_by_sender"))
         XCTAssertTrue(url.contains("agreed_by_receiver"))
         XCTAssertTrue(url.contains("evidence_photo_url"))
@@ -38,6 +38,27 @@ final class SupabaseProposalClientTests: XCTestCase {
         XCTAssertTrue(url.hasPrefix("https://example.supabase.co/rest/v1/proposal_evidence_photos?select=id,proposal_id,photo_url,position,taken_at,taken_by"))
         XCTAssertTrue(url.contains("proposal_id=eq.33333333-3333-3333-3333-333333333333"))
         XCTAssertTrue(url.contains("order=position.asc"))
+    }
+
+    func testBuildsDeleteEvidencePhotoRequestScopedToUploader() throws {
+        let client = SupabaseProposalClient(configuration: configuration)
+        let userID = UUID(uuidString: "11111111-1111-1111-1111-111111111111")!
+        let proposalID = UUID(uuidString: "33333333-3333-3333-3333-333333333333")!
+        let photoID = UUID(uuidString: "44444444-4444-4444-4444-444444444444")!
+
+        let request = try client.makeDeleteEvidencePhotoRequest(
+            userID: userID,
+            proposalID: proposalID,
+            photoID: photoID
+        )
+        let url = try XCTUnwrap(request.url?.absoluteString)
+
+        XCTAssertEqual(request.httpMethod, "DELETE")
+        XCTAssertEqual(request.value(forHTTPHeaderField: "Prefer"), "return=minimal")
+        XCTAssertTrue(url.hasPrefix("https://example.supabase.co/rest/v1/proposal_evidence_photos?"))
+        XCTAssertTrue(url.contains("id=eq.44444444-4444-4444-4444-444444444444"))
+        XCTAssertTrue(url.contains("proposal_id=eq.33333333-3333-3333-3333-333333333333"))
+        XCTAssertTrue(url.contains("taken_by=eq.11111111-1111-1111-1111-111111111111"))
     }
 
     func testBuildsCreateProposalRequest() throws {
@@ -84,6 +105,7 @@ final class SupabaseProposalClientTests: XCTestCase {
         XCTAssertEqual(json.first?["listing_id"] as? String, "55555555-5555-5555-5555-555555555555")
         XCTAssertEqual(json.first?["cash_offer"] as? Bool, false)
         XCTAssertNil(json.first?["cash_amount"])
+        XCTAssertNil(json.first?["cash_amount_side"])
         XCTAssertEqual(json.first?["agreed_by_sender"] as? Bool, true)
     }
 
@@ -113,6 +135,67 @@ final class SupabaseProposalClientTests: XCTestCase {
         XCTAssertEqual(json.first?["receiver_have_ids"] as? [String], ["44444444-4444-4444-4444-444444444444"])
         XCTAssertEqual(json.first?["cash_offer"] as? Bool, true)
         XCTAssertEqual(json.first?["cash_amount"] as? Int, 1_500)
+        XCTAssertEqual(json.first?["cash_amount_side"] as? String, "sender")
+    }
+
+    func testBuildsCreateCashProposalRequestWhenReceiverSideIsCash() throws {
+        let client = SupabaseProposalClient(configuration: configuration)
+        let senderID = UUID(uuidString: "11111111-1111-1111-1111-111111111111")!
+        let receiverID = UUID(uuidString: "22222222-2222-2222-2222-222222222222")!
+        let senderGoodsID = UUID(uuidString: "33333333-3333-3333-3333-333333333333")!
+        let input = ProposalCreateInput(
+            receiverID: receiverID,
+            senderGoodsIDs: [senderGoodsID],
+            receiverGoodsIDs: [],
+            exchangeMethod: .mail,
+            cashAmount: 2_800
+        )
+
+        let request = try client.makeCreateProposalRequest(
+            senderID: senderID,
+            input: input,
+            now: Date(timeIntervalSince1970: 0)
+        )
+        let body = try XCTUnwrap(request.httpBody)
+        let json = try XCTUnwrap(JSONSerialization.jsonObject(with: body) as? [[String: Any]])
+
+        XCTAssertEqual(json.first?["sender_have_ids"] as? [String], ["33333333-3333-3333-3333-333333333333"])
+        XCTAssertEqual(json.first?["sender_have_qtys"] as? [Int], [1])
+        XCTAssertEqual(json.first?["receiver_have_ids"] as? [String], [])
+        XCTAssertEqual(json.first?["receiver_have_qtys"] as? [Int], [])
+        XCTAssertEqual(json.first?["cash_offer"] as? Bool, true)
+        XCTAssertEqual(json.first?["cash_amount"] as? Int, 2_800)
+        XCTAssertEqual(json.first?["cash_amount_side"] as? String, "receiver")
+    }
+
+    func testBuildsCreateProposalRequestWhenGoodsAndCashAreOnSenderSide() throws {
+        let client = SupabaseProposalClient(configuration: configuration)
+        let senderID = UUID(uuidString: "11111111-1111-1111-1111-111111111111")!
+        let receiverID = UUID(uuidString: "22222222-2222-2222-2222-222222222222")!
+        let senderGoodsID = UUID(uuidString: "33333333-3333-3333-3333-333333333333")!
+        let receiverGoodsID = UUID(uuidString: "44444444-4444-4444-4444-444444444444")!
+        let input = ProposalCreateInput(
+            receiverID: receiverID,
+            senderGoodsIDs: [senderGoodsID],
+            receiverGoodsIDs: [receiverGoodsID],
+            exchangeMethod: .mail,
+            cashAmount: 1_200,
+            cashAmountSide: .sender
+        )
+
+        let request = try client.makeCreateProposalRequest(
+            senderID: senderID,
+            input: input,
+            now: Date(timeIntervalSince1970: 0)
+        )
+        let body = try XCTUnwrap(request.httpBody)
+        let json = try XCTUnwrap(JSONSerialization.jsonObject(with: body) as? [[String: Any]])
+
+        XCTAssertEqual(json.first?["sender_have_ids"] as? [String], ["33333333-3333-3333-3333-333333333333"])
+        XCTAssertEqual(json.first?["receiver_have_ids"] as? [String], ["44444444-4444-4444-4444-444444444444"])
+        XCTAssertEqual(json.first?["cash_offer"] as? Bool, true)
+        XCTAssertEqual(json.first?["cash_amount"] as? Int, 1_200)
+        XCTAssertEqual(json.first?["cash_amount_side"] as? String, "sender")
     }
 
     func testCreateProposalPayloadUsesNonDefaultMatchType() throws {

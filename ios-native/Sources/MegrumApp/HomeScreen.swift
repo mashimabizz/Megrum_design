@@ -74,7 +74,7 @@ enum HomeDiscoveryProposalRouteResolver {
 
         return HomeProposalRoute(
             item: targetItem,
-            receiverGoodsIDs: [targetItem.id],
+            receiverGoodsIDs: receiverGoodsIDs(for: selection, targetItem: targetItem),
             senderGoodsIDs: validSenderGoodsIDs(
                 selection.senderGoodsIDs,
                 viewerID: viewerID,
@@ -105,6 +105,18 @@ enum HomeDiscoveryProposalRouteResolver {
         return candidates.first { $0.ownerID != viewerID }
     }
 
+    private static func receiverGoodsIDs(
+        for selection: HomeDiscoveryProposalSelection,
+        targetItem: GoodsItem
+    ) -> [UUID] {
+        var seen: Set<UUID> = []
+        var result: [UUID] = []
+        for id in [targetItem.id] + selection.receiverGoodsIDs where seen.insert(id).inserted {
+            result.append(id)
+        }
+        return result
+    }
+
     private static func validSenderGoodsIDs(
         _ ids: [UUID],
         viewerID: UUID?,
@@ -125,18 +137,26 @@ enum HomeDiscoveryProposalRouteResolver {
     }
 
     private static func goodsItem(from goods: HomeMockGoods) -> GoodsItem? {
-        guard let ownerID = goods.ownerID else {
-            return nil
-        }
+        let ownerID = goods.ownerID ?? HomeDiscoveryFixtures.ownerID
         return GoodsItem(
             id: goods.id,
             ownerID: ownerID,
             groupID: goods.groupID,
             memberID: goods.memberID,
+            goodsTypeID: goods.goodsTypeID,
             title: goods.title,
             imageURL: goods.imageURL,
             tags: goods.rawTagNames.map { GoodsTag(id: stableTagID(for: $0), name: $0) },
             quantity: 1,
+            ownerPrefecture: goods.ownerPrefecture,
+            ownerDisplayName: goods.ownerDisplayName,
+            ownerHandle: goods.ownerHandle,
+            ownerAvatarURL: goods.ownerAvatarURL,
+            ownerGender: goods.ownerGender,
+            ownerAge: goods.ownerAge,
+            ownerAverageStars: goods.ownerAverageStars,
+            ownerEvaluationCount: goods.ownerEvaluationCount,
+            ownerCompletedTradeCount: goods.ownerCompletedTradeCount,
             ownerPaymentMethods: goods.ownerPaymentMethods,
             ownerPaymentNote: goods.ownerPaymentNote
         )
@@ -166,10 +186,17 @@ struct HomeScreen: View {
     var matchedItems: [GoodsItem]
     var possibleItems: [GoodsItem]
     var isLoading: Bool
+    var adDisplayContext: AdDisplayContext = AdDisplayContext()
     @Binding var showsSearch: Bool
     var onRefresh: () async -> Void
     var appState: MegrumAppState? = nil
     var onOpenSettings: () -> Void = {}
+    var onOpenSearchRequested: (() -> Void)? = nil
+    var onOpenSearchWithCriteria: (SearchInitialCriteria) -> Void = { _ in }
+    var onOpenWish: () -> Void = {}
+    var onOpenIndividualListings: () -> Void = {}
+    var onOpenExchangeSettings: () -> Void = {}
+    var onOpenPaymentSettings: () -> Void = {}
     var onOpenOwnerProfile: (UUID) -> Void = { _ in }
     var onOpenMeguri: (() -> Void)? = nil
     var onOpenTrades: (() -> Void)? = nil
@@ -192,18 +219,31 @@ struct HomeScreen: View {
 
     var body: some View {
         HomeDiscoveryExperience(
+            appState: appState,
             viewer: viewer,
             inventoryItems: appState?.inventory ?? [],
             matchedItems: matchedItems,
             possibleItems: possibleItems,
             goodsTypes: appState?.goodsTypes ?? [],
             conditionSignalsByItemID: appState?.homeCandidateConditionSignals ?? [:],
+            mutualMatchCandidateData: appState?.homeMutualMatchCandidates ?? [],
             isLoading: isLoading,
+            adDisplayContext: adDisplayContext,
             opensInitialHavesLookup: visualQAInitialScreen == .homeHavesLookup,
             onOpenSettings: onOpenSettings,
             onOpenSearch: {
-                showsSearch = true
+                if let onOpenSearchRequested {
+                    onOpenSearchRequested()
+                } else {
+                    showsSearch = true
+                }
             },
+            onOpenSearchWithCriteria: onOpenSearchWithCriteria,
+            onOpenWish: onOpenWish,
+            onOpenIndividualListings: onOpenIndividualListings,
+            onOpenExchangeSettings: onOpenExchangeSettings,
+            onOpenPaymentSettings: onOpenPaymentSettings,
+            onOpenOwnerProfile: onOpenOwnerProfile,
             onStartProposal: startProposalFromDiscovery,
             onRefresh: {
                 await onRefresh()

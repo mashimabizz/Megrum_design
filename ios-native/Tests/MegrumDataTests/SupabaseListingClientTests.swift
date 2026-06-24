@@ -12,7 +12,7 @@ final class SupabaseListingClientTests: XCTestCase {
         let url = try XCTUnwrap(request.url?.absoluteString)
 
         XCTAssertEqual(request.httpMethod, "GET")
-        XCTAssertTrue(url.hasPrefix("https://example.supabase.co/rest/v1/listings?select=id,user_id,have_ids,have_qtys,have_logic,have_group_id,have_goods_type_id,status,note,created_at,updated_at"))
+        XCTAssertTrue(url.hasPrefix("https://example.supabase.co/rest/v1/listings?select=id,user_id,have_ids,have_qtys,have_logic,have_min_count,have_group_id,have_goods_type_id,status,note,created_at,updated_at"))
         XCTAssertTrue(url.contains("user_id=eq.11111111-1111-1111-1111-111111111111"))
         XCTAssertTrue(url.contains("status=in.(active,paused,matched)"))
         XCTAssertTrue(url.contains("order=updated_at.desc"))
@@ -26,7 +26,7 @@ final class SupabaseListingClientTests: XCTestCase {
         let url = try XCTUnwrap(request.url?.absoluteString)
 
         XCTAssertEqual(request.httpMethod, "GET")
-        XCTAssertTrue(url.hasPrefix("https://example.supabase.co/rest/v1/listings?select=id,user_id,have_ids,have_qtys,have_logic,have_group_id,have_goods_type_id,status,note,created_at,updated_at"))
+        XCTAssertTrue(url.hasPrefix("https://example.supabase.co/rest/v1/listings?select=id,user_id,have_ids,have_qtys,have_logic,have_min_count,have_group_id,have_goods_type_id,status,note,created_at,updated_at"))
         XCTAssertTrue(url.contains("user_id=eq.11111111-1111-1111-1111-111111111111"))
         XCTAssertTrue(url.contains("status=eq.active"))
         XCTAssertTrue(url.contains("order=updated_at.desc"))
@@ -41,7 +41,7 @@ final class SupabaseListingClientTests: XCTestCase {
         let url = try XCTUnwrap(request.url?.absoluteString)
 
         XCTAssertEqual(request.httpMethod, "GET")
-        XCTAssertTrue(url.hasPrefix("https://example.supabase.co/rest/v1/listing_wish_options?select=id,listing_id,position,wish_ids,wish_qtys,logic,exchange_type,is_cash_offer,cash_amount,wish_group_id,wish_goods_type_id,created_at,updated_at"))
+        XCTAssertTrue(url.hasPrefix("https://example.supabase.co/rest/v1/listing_wish_options?select=id,listing_id,position,wish_ids,wish_qtys,logic,min_count,exchange_type,is_cash_offer,cash_amount,wish_group_id,wish_goods_type_id,created_at,updated_at"))
         XCTAssertTrue(url.contains("listing_id=in.(22222222-2222-2222-2222-222222222222,33333333-3333-3333-3333-333333333333)"))
         XCTAssertTrue(url.contains("order=position.asc,created_at.asc"))
     }
@@ -72,6 +72,7 @@ final class SupabaseListingClientTests: XCTestCase {
         XCTAssertEqual(json.first?["have_ids"] as? [String], ["22222222-2222-2222-2222-222222222222"])
         XCTAssertEqual(json.first?["have_qtys"] as? [Int], [2])
         XCTAssertEqual(json.first?["have_logic"] as? String, "and")
+        XCTAssertEqual(json.first?["have_min_count"] as? Int, 1)
         XCTAssertEqual(json.first?["status"] as? String, "active")
         XCTAssertEqual(json.first?["note"] as? String, "会場で交換したい")
     }
@@ -102,6 +103,7 @@ final class SupabaseListingClientTests: XCTestCase {
         XCTAssertEqual(json.first?["wish_ids"] as? [String], ["33333333-3333-3333-3333-333333333333"])
         XCTAssertEqual(json.first?["wish_qtys"] as? [Int], [3])
         XCTAssertEqual(json.first?["logic"] as? String, "and")
+        XCTAssertEqual(json.first?["min_count"] as? Int, 1)
         XCTAssertEqual(json.first?["exchange_type"] as? String, "same_kind")
         XCTAssertEqual(json.first?["is_cash_offer"] as? Bool, false)
         XCTAssertNil(json.first?["cash_amount"] ?? nil)
@@ -127,7 +129,7 @@ final class SupabaseListingClientTests: XCTestCase {
 
         XCTAssertEqual(request.httpMethod, "PATCH")
         XCTAssertEqual(request.value(forHTTPHeaderField: "Prefer"), "return=representation")
-        XCTAssertTrue(url.hasPrefix("https://example.supabase.co/rest/v1/listings?select=id,user_id,have_ids,have_qtys,have_logic,have_group_id,have_goods_type_id,status,note,created_at,updated_at"))
+        XCTAssertTrue(url.hasPrefix("https://example.supabase.co/rest/v1/listings?select=id,user_id,have_ids,have_qtys,have_logic,have_min_count,have_group_id,have_goods_type_id,status,note,created_at,updated_at"))
         XCTAssertTrue(url.contains("id=eq.44444444-4444-4444-4444-444444444444"))
         XCTAssertTrue(url.contains("user_id=eq.11111111-1111-1111-1111-111111111111"))
         XCTAssertEqual(json["have_ids"] as? [String], ["22222222-2222-2222-2222-222222222222"])
@@ -175,7 +177,7 @@ final class SupabaseListingClientTests: XCTestCase {
 
         XCTAssertEqual(request.httpMethod, "PATCH")
         XCTAssertEqual(request.value(forHTTPHeaderField: "Prefer"), "return=representation")
-        XCTAssertTrue(url.hasPrefix("https://example.supabase.co/rest/v1/listing_wish_options?select=id,listing_id,position,wish_ids,wish_qtys,logic,exchange_type,is_cash_offer,cash_amount,wish_group_id,wish_goods_type_id,created_at,updated_at"))
+        XCTAssertTrue(url.hasPrefix("https://example.supabase.co/rest/v1/listing_wish_options?select=id,listing_id,position,wish_ids,wish_qtys,logic,min_count,exchange_type,is_cash_offer,cash_amount,wish_group_id,wish_goods_type_id,created_at,updated_at"))
         XCTAssertTrue(url.contains("id=eq.55555555-5555-5555-5555-555555555555"))
         XCTAssertTrue(url.contains("listing_id=eq.44444444-4444-4444-4444-444444444444"))
         XCTAssertEqual(json["wish_ids"] as? [String], ["33333333-3333-3333-3333-333333333333"])

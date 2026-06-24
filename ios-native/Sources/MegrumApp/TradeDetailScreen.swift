@@ -17,6 +17,7 @@ struct TradeDetailScreen: View {
     @State private var isShowingEvidenceCamera = false
     @State private var isShowingChatCamera = false
     @State private var isShowingOutfitCamera = false
+    @State private var isShowingEvidenceList = false
     @State private var isShowingEvaluationPage = false
     @State private var isShowingDisputePage = false
     @State private var isShowingRejectConfirmation = false
@@ -161,6 +162,31 @@ struct TradeDetailScreen: View {
             FullScreenRemoteImageView(url: selection.url)
         }
 #endif
+        .sheet(isPresented: $isShowingEvidenceList) {
+            TradeEvidenceListSheet(
+                proposal: currentProposal,
+                viewerID: viewerID,
+                evidencePhotos: appState.evidencePhotos(for: currentProposal),
+                selectedPhotoItem: $selectedEvidencePhotoItem,
+                isAddingEvidence: appState.addingEvidenceProposalID == currentProposal.id,
+                deletingPhotoID: appState.deletingEvidencePhotoID,
+                canUseCamera: canUseCamera,
+                onOpenCamera: {
+                    isShowingEvidenceCamera = true
+                },
+                onOpenImage: { url in
+                    selectedRemoteImage = RemoteImageSelection(url: url)
+                },
+                onDelete: { photo in
+                    Task {
+                        await appState.deleteTradeEvidencePhoto(
+                            proposalID: currentProposal.id,
+                            photoID: photo.id
+                        )
+                    }
+                }
+            )
+        }
 #if os(iOS)
         .sheet(isPresented: $isShowingEvidenceCamera) {
             NativeCameraCaptureView { imageData in
@@ -242,6 +268,9 @@ struct TradeDetailScreen: View {
             },
             onOpenEvidenceCamera: {
                 isShowingEvidenceCamera = true
+            },
+            onOpenEvidenceList: {
+                isShowingEvidenceList = true
             },
             onOpenImage: { url in
                 selectedRemoteImage = RemoteImageSelection(url: url)
@@ -392,7 +421,11 @@ struct TradeDetailScreen: View {
             DisputeDetailScreen(model: route.model)
         }
         .navigationDestination(item: $partnerProfileRoute) { route in
-            PublicUserProfileScreen(appState: appState, userID: route.userID)
+            PublicUserProfileScreen(
+                appState: appState,
+                userID: route.userID,
+                presentationContext: .tradeChat
+            )
         }
         .onChange(of: locationState.coordinate) { _, coordinate in
             handleLocationCoordinateChange(coordinate)
@@ -582,13 +615,8 @@ struct TradeDetailScreen: View {
     }
 
     private func shareCurrentLocation() {
-        if let coordinate = locationState.coordinate {
-            sendLocationMessage(coordinate)
-            return
-        }
-
         isWaitingToShareLocation = true
-        locationState.requestCurrentLocation()
+        locationState.requestCurrentLocation(clearsPreviousCoordinate: true)
     }
 
     private func sendLocationMessage(_ coordinate: MegrumLocationCoordinate) {

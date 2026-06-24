@@ -131,6 +131,32 @@ public final class SupabaseOshiClient: @unchecked Sendable {
         )
     }
 
+    public func makeCreateOshiRequest(userID: UUID, input: OshiRequestCreateInput) throws -> URLRequest {
+        try client.makeInsertRequest(
+            into: "oshi_requests",
+            values: [
+                OshiRequestPayload(
+                    userID: userID,
+                    input: input
+                )
+            ],
+            select: "id"
+        )
+    }
+
+    public func makeCreateCharacterRequest(userID: UUID, input: CharacterRequestCreateInput) throws -> URLRequest {
+        try client.makeInsertRequest(
+            into: "character_requests",
+            values: [
+                CharacterRequestPayload(
+                    userID: userID,
+                    input: input
+                )
+            ],
+            select: "id"
+        )
+    }
+
     public func makeUpsertUserSelectionsRequest(_ selections: [UserOshiSelection]) throws -> URLRequest {
         let encoder = JSONEncoder()
         encoder.keyEncodingStrategy = .convertToSnakeCase

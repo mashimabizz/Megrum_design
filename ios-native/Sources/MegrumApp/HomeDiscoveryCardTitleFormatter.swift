@@ -16,16 +16,19 @@ enum HomeDiscoveryCardTitleFormatter {
         case .plain:
             return fallback
         case .member:
-            return HomeDiscoveryTitleParser.memberName(from: goods?.title ?? fallback)
+            if let name = goods?.masterDisplayName {
+                return name
+            }
+            return fallbackTitle(goods?.title ?? fallback)
         case .memberTag:
             guard let goods else {
                 return fallback
             }
-            let member = HomeDiscoveryTitleParser.memberName(from: goods.title)
+            let member = goods.masterDisplayName ?? fallbackTitle(goods.title)
             if let tag = firstDisplayTag(for: goods) {
                 return HomeDiscoveryTitleParser.joinedMemberTagTitle(member: member, tag: tag)
             }
-            return fallback.contains("×") ? HomeDiscoveryTitleParser.memberTagTitle(from: fallback) : member
+            return member
         }
     }
 
@@ -43,6 +46,11 @@ enum HomeDiscoveryCardTitleFormatter {
         }
         return trimmed.hasPrefix("#") ? trimmed : "#\(trimmed)"
     }
+
+    private static func fallbackTitle(_ value: String) -> String {
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? "推し未設定" : trimmed
+    }
 }
 
 enum HomeDiscoveryTitleParser {
@@ -51,10 +59,7 @@ enum HomeDiscoveryTitleParser {
            let leftSide = title.split(separator: "×", maxSplits: 1, omittingEmptySubsequences: true).first {
             return String(leftSide).trimmingCharacters(in: .whitespacesAndNewlines)
         }
-        return title
-            .split(separator: " ", maxSplits: 1, omittingEmptySubsequences: true)
-            .first
-            .map(String.init) ?? title
+        return title.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     static func memberTagTitle(from title: String) -> String {
@@ -68,11 +73,7 @@ enum HomeDiscoveryTitleParser {
                 tag: String(parts[1]).trimmingCharacters(in: .whitespacesAndNewlines)
             )
         }
-        let parts = title.split(separator: " ", maxSplits: 1, omittingEmptySubsequences: true)
-        guard parts.count == 2 else {
-            return title
-        }
-        return joinedMemberTagTitle(member: String(parts[0]), tag: String(parts[1]))
+        return title.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     static func comparableMemberName(from title: String) -> String {

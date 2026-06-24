@@ -8,9 +8,7 @@ import AppKit
 #endif
 
 struct OwnProfilePageHeader: View {
-    var canEdit: Bool
     var onClose: () -> Void
-    var onEdit: () -> Void
 
     var body: some View {
         HStack {
@@ -36,21 +34,9 @@ struct OwnProfilePageHeader: View {
 
             Spacer()
 
-            Button(action: onEdit) {
-                Image(systemName: "square.and.pencil")
-                    .font(.system(size: 18, weight: .bold))
-                    .foregroundStyle(MegrumTheme.ink)
-                    .frame(width: 38, height: 38)
-                    .background(.white.opacity(0.86), in: Circle())
-                    .overlay {
-                        Circle()
-                            .strokeBorder(MegrumTheme.ink.opacity(0.08), lineWidth: 1)
-                    }
-            }
-            .buttonStyle(.plain)
-            .disabled(!canEdit)
-            .opacity(canEdit ? 1 : 0.42)
-            .accessibilityLabel("プロフィール編集")
+            Color.clear
+                .frame(width: 38, height: 38)
+                .accessibilityHidden(true)
         }
     }
 }

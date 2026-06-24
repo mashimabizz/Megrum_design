@@ -1,5 +1,6 @@
 import MegrumCore
 import MegrumDesign
+import Foundation
 import SwiftUI
 
 struct GoodsBulkTagRoute: Identifiable, Equatable {
@@ -10,43 +11,79 @@ struct GoodsBulkTagRoute: Identifiable, Equatable {
     }
 }
 
+enum GoodsQuickActionPresentationMetrics {
+    static let backdropOpacity: Double = 0.12
+    static let panelTransitionScale: CGFloat = 0.96
+    static let panelAnimationResponse: Double = 0.34
+    static let panelAnimationDampingFraction: Double = 0.86
+}
+
+enum GoodsQuickActionPreviewMetrics {
+    static let width: CGFloat = 50
+    static let height: CGFloat = 64
+    static let cornerRadius: CGFloat = 14
+    static let fallbackGlyphFontSize: CGFloat = 24
+}
+
+struct GoodsQuickActionHeaderPresentation: Equatable {
+    var masterLine: String
+    var tagLine: String
+
+    init(item: GoodsItem, l1Name: String? = nil, l2Name: String? = nil) {
+        let masterNames = [l1Name, l2Name]
+            .compactMap { $0?.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+        masterLine = masterNames.isEmpty ? item.title : masterNames.joined(separator: "　")
+
+        let tagNames = TagNameNormalizer.uniquePreservingOrder(
+            item.tags.map(\.name),
+            limit: item.tags.count
+        )
+        let visibleTagNames = Array(tagNames.prefix(3))
+        var tagParts = visibleTagNames.map { "#\($0)" }
+        if tagNames.count > visibleTagNames.count {
+            tagParts.append("+\(tagNames.count - visibleTagNames.count)")
+        }
+        tagLine = tagParts.isEmpty ? "タグ未設定" : tagParts.joined(separator: " ")
+    }
+}
+
 struct GoodsQuickActionBackdrop: View {
     var onDismiss: () -> Void
 
     var body: some View {
-        Color.black.opacity(0.12)
+        Color.black.opacity(GoodsQuickActionPresentationMetrics.backdropOpacity)
             .ignoresSafeArea()
             .onTapGesture(perform: onDismiss)
             .accessibilityLabel("メニューを閉じる")
     }
 }
 
-struct GoodsInventoryQuickActionPanel: View {
+struct GoodsCollectionQuickActionPanel: View {
     var item: GoodsItem
+    var headerPresentation: GoodsQuickActionHeaderPresentation?
     var actions: [GoodsQuickActionKind] = GoodsQuickActionKind.inventoryActions
     var onAction: (GoodsQuickActionKind) -> Void
+
+    private var header: GoodsQuickActionHeaderPresentation {
+        headerPresentation ?? GoodsQuickActionHeaderPresentation(item: item)
+    }
 
     var body: some View {
         MegrumGlassGroup(spacing: 10) {
             VStack(alignment: .leading, spacing: 12) {
                 HStack(spacing: 12) {
-                    RoundedRectangle(cornerRadius: 14, style: .continuous)
-                        .fill(GoodsTileCollectionCardStyle.hue(for: item))
-                        .frame(width: 50, height: 64)
-                        .overlay {
-                            Text(GoodsTileCollectionCardStyle.glyph(for: item))
-                                .font(.system(size: 24, weight: .black, design: .rounded))
-                                .foregroundStyle(.white)
-                        }
+                    GoodsQuickActionItemPreview(item: item)
 
                     VStack(alignment: .leading, spacing: 4) {
-                        Text(item.title)
+                        Text(header.masterLine)
                             .font(.system(size: 15, weight: .heavy, design: .rounded))
                             .lineLimit(1)
                             .foregroundStyle(MegrumTheme.ink)
 
-                        Text("グッズ操作")
+                        Text(header.tagLine)
                             .font(.system(size: 11, weight: .bold, design: .rounded))
+                            .lineLimit(1)
                             .foregroundStyle(MegrumTheme.muted)
                     }
 
@@ -96,12 +133,58 @@ struct GoodsInventoryQuickActionPanel: View {
     }
 }
 
+private struct GoodsQuickActionItemPreview: View {
+    var item: GoodsItem
+
+    var body: some View {
+        RoundedRectangle(cornerRadius: GoodsQuickActionPreviewMetrics.cornerRadius, style: .continuous)
+            .fill(GoodsTileCollectionCardStyle.hue(for: item))
+            .frame(width: GoodsQuickActionPreviewMetrics.width, height: GoodsQuickActionPreviewMetrics.height)
+            .overlay {
+                if let imageURL = item.imageURL {
+                    AsyncImage(url: imageURL, transaction: Transaction(animation: .easeInOut(duration: 0.18))) { phase in
+                        switch phase {
+                        case let .success(image):
+                            GeometryReader { proxy in
+                                image
+                                    .resizable()
+                                    .scaledToFill()
+                                    .frame(width: proxy.size.width, height: proxy.size.height)
+                                    .clipped()
+                            }
+                        case .failure:
+                            fallbackPreview
+                        default:
+                            ProgressView()
+                                .tint(.white)
+                        }
+                    }
+                } else {
+                    fallbackPreview
+                }
+            }
+            .clipShape(RoundedRectangle(cornerRadius: GoodsQuickActionPreviewMetrics.cornerRadius, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: GoodsQuickActionPreviewMetrics.cornerRadius, style: .continuous)
+                    .strokeBorder(Color.white.opacity(0.78), lineWidth: 1)
+            }
+            .accessibilityHidden(true)
+    }
+
+    private var fallbackPreview: some View {
+        Text(GoodsTileCollectionCardStyle.glyph(for: item))
+            .font(.system(size: GoodsQuickActionPreviewMetrics.fallbackGlyphFontSize, weight: .black, design: .rounded))
+            .foregroundStyle(.white)
+    }
+}
+
 struct GoodsCollectionFloatingControls: View {
     var showsAddButton: Bool
     var addButtonLabel: String
     var addButtonHint: String
     var isSelectionMode: Bool
     var quickActionItem: GoodsItem?
+    var quickActionHeader: GoodsQuickActionHeaderPresentation?
     var quickActions: [GoodsQuickActionKind]
     var selectedCount: Int
     var onAdd: () -> Void
@@ -120,14 +203,22 @@ struct GoodsCollectionFloatingControls: View {
 
         if let quickActionItem {
             GoodsQuickActionBackdrop(onDismiss: onDismissQuickAction)
-            GoodsInventoryQuickActionPanel(
+                .transition(.opacity)
+            GoodsCollectionQuickActionPanel(
                 item: quickActionItem,
+                headerPresentation: quickActionHeader,
                 actions: quickActions,
                 onAction: onQuickAction
             )
             .padding(.horizontal, GoodsSelectionFooterMetrics.horizontalPadding)
             .padding(.bottom, FloatingActionLayoutMetrics.contentBottomPadding)
-            .transition(.move(edge: .bottom).combined(with: .opacity))
+            .transition(
+                .scale(
+                    scale: GoodsQuickActionPresentationMetrics.panelTransitionScale,
+                    anchor: .bottom
+                )
+                .combined(with: .opacity)
+            )
         }
 
         if isSelectionMode {
@@ -211,6 +302,10 @@ struct GoodsBulkTagSheet: View {
     var selectedCount: Int
     var candidateNames: [String] = []
     var previewItemsByTag: [String: [TagPreviewItem]] = [:]
+    var navigationTitle = "タグをつける"
+    var textFieldPlaceholder = "例：会場限定"
+    var footerText: String?
+    var confirmationTitle = "追加"
     var onApply: (String) -> Void
 
     @Environment(\.dismiss) private var dismiss
@@ -242,14 +337,14 @@ struct GoodsBulkTagSheet: View {
                 }
 
                 Section {
-                    TextField("例：会場限定", text: $tagDraft)
+                    TextField(textFieldPlaceholder, text: $tagDraft)
                 } header: {
                     Text("追加するタグ")
                 } footer: {
-                    Text("\(selectedCount)件のグッズに同じタグを追加します。")
+                    Text(footerText ?? "\(selectedCount)件のグッズに同じタグを追加します。")
                 }
             }
-            .navigationTitle("タグをつける")
+            .navigationTitle(navigationTitle)
             .megrumInlineNavigationTitle()
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -258,7 +353,7 @@ struct GoodsBulkTagSheet: View {
                     }
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("追加") {
+                    Button(confirmationTitle) {
                         onApply(trimmedTag)
                         dismiss()
                     }

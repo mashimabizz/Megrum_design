@@ -2,131 +2,16 @@ import MegrumCore
 import MegrumDesign
 import SwiftUI
 
-public enum MegrumTab: String, CaseIterable, Identifiable, Sendable {
-    case home
-    case inventory
-    case wish
-    case trades
-    case meguri
+enum HomeSettingsRoute: Identifiable, Equatable {
+    case exchange
+    case payment
 
-    public var id: String { rawValue }
-
-    var title: String {
+    var id: String {
         switch self {
-        case .home:
-            "ホーム"
-        case .inventory:
-            "マイグッズ"
-        case .wish:
-            "Wish"
-        case .trades:
-            "やりとり"
-        case .meguri:
-            "めぐり"
-        }
-    }
-
-    var symbolName: String {
-        switch self {
-        case .home:
-            "house"
-        case .inventory:
-            "shippingbox"
-        case .wish:
-            "heart"
-        case .trades:
-            "arrow.left.arrow.right"
-        case .meguri:
-            "dot.radiowaves.left.and.right"
-        }
-    }
-}
-
-struct ProposalCompletionRouteState: Equatable {
-    var selectedTab: MegrumTab
-    var requestedTradesStage: TradeStage?
-}
-
-enum ProposalCompletionRouteResolver {
-    static func resolve(action: ProposalCompletionAction) -> ProposalCompletionRouteState {
-        switch action {
-        case .searchMore:
-            ProposalCompletionRouteState(selectedTab: .home, requestedTradesStage: nil)
-        case .openTrades:
-            ProposalCompletionRouteState(selectedTab: .trades, requestedTradesStage: .pending)
-        }
-    }
-}
-
-enum VisualQAProposalRouteResolver {
-    static func shouldOpenProposalFlow(for screen: VisualQAInitialScreen?) -> Bool {
-        initialStep(for: screen) != nil
-    }
-
-    static func shouldRenderDirectRoot(for screen: VisualQAInitialScreen?) -> Bool {
-        shouldOpenProposalFlow(for: screen)
-    }
-
-    static func initialStep(for screen: VisualQAInitialScreen?) -> ProposalCreateStep? {
-        switch screen {
-        case .proposalGive:
-            .give
-        case .proposalReceive:
-            .receive
-        case .proposalMeetup, .proposalMeetupMonth:
-            .meetup
-        case .proposalConfirm, .proposalComplete:
-            .confirm
-        default:
-            nil
-        }
-    }
-
-    static func targetItem(candidates: [GoodsItem], viewerID: UUID?) -> GoodsItem? {
-        VisualQATargetItemResolver.targetItem(candidates: candidates, viewerID: viewerID)
-    }
-}
-
-enum VisualQARelationRouteResolver {
-    static func shouldRenderDirectRoot(for screen: VisualQAInitialScreen?) -> Bool {
-        switch screen {
-        case .matchRelation, .matchRelationCandidates:
-            true
-        default:
-            false
-        }
-    }
-}
-
-enum VisualQATargetItemResolver {
-    static func targetItem(candidates: [GoodsItem], viewerID: UUID?) -> GoodsItem? {
-        candidates.first { item in
-            guard let viewerID else {
-                return false
-            }
-            return item.ownerID != viewerID
-        } ?? candidates.first
-    }
-}
-
-enum VisualQATabRouteResolver {
-    static func initialTab(for screen: VisualQAInitialScreen?) -> MegrumTab {
-        switch screen {
-        case .meguri:
-            .meguri
-        case .proposalPending:
-            .trades
-        default:
-            .home
-        }
-    }
-
-    static func requestedTradesStage(for screen: VisualQAInitialScreen?) -> TradeStage? {
-        switch screen {
-        case .proposalPending:
-            .pending
-        default:
-            nil
+        case .exchange:
+            "exchange"
+        case .payment:
+            "payment"
         }
     }
 }
@@ -142,10 +27,13 @@ public struct MegrumRootView: View {
     @State private var drawerDestination: AppDrawerDestination?
     @State private var drawerPageDestination: AppDrawerDestination?
     @State private var publicProfileRoute: PublicProfileRoute?
+    @State private var homeSettingsRoute: HomeSettingsRoute?
+    @State private var requestedWishSection: WishCollectionSection?
+    @State private var interstitialAdRequest: AdInterstitialRequest?
     @State private var visualQAProposalRoute: HomeRelationRoute?
     @State private var didOpenVisualQAProposalRoute = false
     private let visualQAInitialScreen: VisualQAInitialScreen?
-    @GestureState private var drawerDragTranslation: CGFloat = 0
+    @State private var drawerDragTranslation: CGFloat = 0
     @Environment(\.scenePhase) private var scenePhase
     @Binding private var notificationDestinationTab: MegrumTab?
 
@@ -178,6 +66,7 @@ public struct MegrumRootView: View {
                 AuthScreen(authState: authState, visualQAInitialScreen: visualQAInitialScreen)
             }
         }
+        .megrumInteractionFeedback()
         .onOpenURL { url in
             Task {
                 await authState.handleOpenURL(url)
@@ -275,7 +164,12 @@ public struct MegrumRootView: View {
                 }
             } else if visualQAInitialScreen == .publicProfile {
                 NavigationStack {
-                    PublicUserProfileScreen(appState: appState, userID: NativePreviewData.partnerID)
+                    PublicUserProfileScreen(
+                        appState: appState,
+                        userID: NativePreviewData.partnerID,
+                        adDisplayContext: adDisplayContext,
+                        adPlacement: .publicProfileFooterBanner
+                    )
                 }
             } else if drawerPageDestination == .profile {
                 NavigationStack {
@@ -304,17 +198,27 @@ public struct MegrumRootView: View {
                 await syncRepositoryWithAuthSession()
             }
         }
-        .sheet(isPresented: $showsSearch) {
-            NavigationStack {
-                SearchScreen(appState: appState)
-            }
-        }
         .sheet(item: $drawerDestination) { destination in
             drawerDestinationView(destination)
         }
         .sheet(item: $publicProfileRoute) { route in
             NavigationStack {
-                PublicUserProfileScreen(appState: appState, userID: route.userID)
+                PublicUserProfileScreen(
+                    appState: appState,
+                    userID: route.userID,
+                    adDisplayContext: adDisplayContext,
+                    adPlacement: .publicProfileFooterBanner
+                )
+            }
+        }
+        .sheet(item: $homeSettingsRoute) { route in
+            NavigationStack {
+                switch route {
+                case .exchange:
+                    HomeExchangeSettingsScreen()
+                case .payment:
+                    PaymentSettingsScreen(appState: appState)
+                }
             }
         }
         .rootVisualQAProposalPresentation(item: $visualQAProposalRoute) { route in
@@ -331,6 +235,11 @@ public struct MegrumRootView: View {
         .onChange(of: appState.homeMatchedItems.map(\.id), initial: true) { _, _ in
             openVisualQAProposalRouteIfNeeded()
         }
+        .adInterstitialPresenter(
+            request: $interstitialAdRequest,
+            displayContext: adDisplayContext,
+            configuration: adConfiguration
+        )
     }
 
     private var directVisualQAProposalRoute: HomeRelationRoute? {
@@ -373,196 +282,37 @@ public struct MegrumRootView: View {
     }
 
     private var authenticatedTabs: some View {
-        GeometryReader { proxy in
-            let drawerWidth = AppDrawerVisualMetrics.drawerWidth(screenWidth: proxy.size.width)
-            let drawerOpenOffset = AppDrawerVisualMetrics.openOffset(screenWidth: proxy.size.width)
-            let drawerProgress = resolvedDrawerProgress(drawerTravel: drawerOpenOffset)
-            let contentOffset = drawerOpenOffset * drawerProgress
-            let foregroundCornerRadius = AppDrawerVisualMetrics.foregroundCornerRadius * drawerProgress
-            let foregroundShadowOpacity = AppDrawerVisualMetrics.foregroundShadowOpacity * drawerProgress
-            let foregroundWhiteoutOpacity = AppDrawerVisualMetrics.whiteoutOpacity * drawerProgress
-
-            ZStack(alignment: .leading) {
-                AppDrawerOverlay(
-                    isPresented: $showsDrawer,
-                    presentationProgress: drawerProgress,
-                    drawerWidth: drawerWidth,
-                    appState: appState,
-                    onSelectDestination: { destination in
-                        openDrawerDestination(destination)
-                    },
-                    onSignOut: {
-                        await authState.signOut()
-                        Task {
-                            await appState.revokeRegisteredNativePushDeviceToken()
-                        }
-                        drawerDestination = nil
-                        drawerPageDestination = nil
-                        publicProfileRoute = nil
-                        showsDrawer = false
-                    }
-                )
-                .allowsHitTesting(drawerProgress > 0.001)
-                .zIndex(0)
-
-                TabView(selection: $selectedTab) {
-                    NavigationStack {
-                        HomeScreen(
-                            viewer: appState.viewer,
-                            matchedItems: appState.homeMatchedItems,
-                            possibleItems: appState.homePossibleItems,
-                            isLoading: appState.isLoading,
-                            showsSearch: $showsSearch,
-                            onRefresh: appState.refresh,
-                            appState: appState,
-                            onOpenSettings: {
-                                withAnimation(drawerAnimation) {
-                                    showsDrawer = true
-                                }
-                            },
-                            onOpenOwnerProfile: { userID in
-                                publicProfileRoute = PublicProfileRoute(userID: userID)
-                            },
-                            onOpenMeguri: {
-                                requestedTradesStage = nil
-                                selectedTab = .meguri
-                            },
-                            onOpenTrades: {
-                                requestedTradesStage = nil
-                                selectedTab = .trades
-                            },
-                            visualQAInitialScreen: visualQAInitialScreen
-                        )
-                    }
-                    .tag(MegrumTab.home)
-                    .tabItem {
-                        Label(MegrumTab.home.title, systemImage: MegrumTab.home.symbolName)
-                    }
-
-                    NavigationStack {
-                        GoodsCollectionScreen(
-                            title: "マイグッズ",
-                            subtitle: "",
-                            items: appState.inventory,
-                            showsAddButton: true,
-                            appState: appState,
-                            entryKind: .inventory
-                        )
-                    }
-                    .tag(MegrumTab.inventory)
-                    .tabItem {
-                        Label(MegrumTab.inventory.title, systemImage: MegrumTab.inventory.symbolName)
-                    }
-
-                    NavigationStack {
-                        WishCollectionScreen(items: appState.wishes, appState: appState)
-                    }
-                    .tag(MegrumTab.wish)
-                    .tabItem {
-                        Label(MegrumTab.wish.title, systemImage: MegrumTab.wish.symbolName)
-                    }
-
-                    NavigationStack {
-                        TradesScreen(
-                            appState: appState,
-                            requestedStage: $requestedTradesStage
-                        )
-                    }
-                    .tag(MegrumTab.trades)
-                    .tabItem {
-                        Label(MegrumTab.trades.title, systemImage: MegrumTab.trades.symbolName)
-                    }
-
-                    NavigationStack {
-                        MeguriScreen(appState: appState)
-                    }
-                    .tag(MegrumTab.meguri)
-                    .tabItem {
-                        Label(MegrumTab.meguri.title, systemImage: MegrumTab.meguri.symbolName)
-                    }
-                }
-                .tint(MegrumTheme.lavender)
-                .offset(x: contentOffset)
-                .clipShape(
-                    UnevenRoundedRectangle(
-                        topLeadingRadius: foregroundCornerRadius,
-                        bottomLeadingRadius: foregroundCornerRadius,
-                        bottomTrailingRadius: 0,
-                        topTrailingRadius: 0
-                    )
-                )
-                .shadow(
-                    color: Color.black.opacity(foregroundShadowOpacity),
-                    radius: AppDrawerVisualMetrics.foregroundShadowRadius,
-                    x: -5,
-                    y: 0
-                )
-                .overlay {
-                    if drawerProgress > 0.001 {
-                        Color.white
-                            .opacity(foregroundWhiteoutOpacity)
-                            .ignoresSafeArea()
-                            .contentShape(Rectangle())
-                            .onTapGesture {
-                                withAnimation(drawerAnimation) {
-                                    showsDrawer = false
-                                }
-                            }
-                            .gesture(drawerPanGesture(drawerTravel: drawerOpenOffset))
-                    }
-                }
-
-                if selectedTab == .home && !showsDrawer {
-                    Color.clear
-                        .frame(width: AppDrawerVisualMetrics.closedEdgeGestureWidth)
-                        .frame(maxHeight: .infinity)
-                        .contentShape(Rectangle())
-                        .ignoresSafeArea(edges: .vertical)
-                        .highPriorityGesture(drawerPanGesture(drawerTravel: drawerOpenOffset))
-                        .zIndex(8)
-                }
-            }
-            .background(MegrumTheme.canvas.ignoresSafeArea())
-            .contentShape(Rectangle())
-        }
-    }
-
-    private var drawerAnimation: Animation {
-        .interactiveSpring(response: 0.30, dampingFraction: 0.88)
-    }
-
-    private func resolvedDrawerProgress(drawerTravel: CGFloat) -> CGFloat {
-        AppDrawerVisualMetrics.presentationProgress(
-            isPresented: showsDrawer,
-            dragTranslation: drawerDragTranslation,
-            drawerTravel: drawerTravel
+        MegrumAuthenticatedTabsView(
+            appState: appState,
+            selectedTab: $selectedTab,
+            showsSearch: $showsSearch,
+            showsDrawer: $showsDrawer,
+            requestedTradesStage: $requestedTradesStage,
+            drawerDestination: $drawerDestination,
+            drawerPageDestination: $drawerPageDestination,
+            publicProfileRoute: $publicProfileRoute,
+            homeSettingsRoute: $homeSettingsRoute,
+            requestedWishSection: $requestedWishSection,
+            drawerDragTranslation: $drawerDragTranslation,
+            adDisplayContext: adDisplayContext,
+            visualQAInitialScreen: visualQAInitialScreen,
+            onSignOut: {
+                await authState.signOut()
+                await appState.revokeRegisteredNativePushDeviceToken()
+            },
+            onRequestInterstitial: requestInterstitial
         )
     }
 
-    private func drawerPanGesture(drawerTravel: CGFloat) -> some Gesture {
-        DragGesture(minimumDistance: 6)
-            .updating($drawerDragTranslation) { value, state, _ in
-                if let translation = AppDrawerGestureResolver.activeTranslation(
-                    isPresented: showsDrawer,
-                    translation: value.translation
-                ) {
-                    state = translation
-                }
-            }
-            .onEnded { value in
-                guard let targetVisibility = AppDrawerGestureResolver.targetVisibility(
-                    isPresented: showsDrawer,
-                    translation: value.translation,
-                    predictedEndTranslationWidth: value.predictedEndTranslation.width,
-                    drawerWidth: drawerTravel
-                ) else {
-                    return
-                }
+    private var adConfiguration: AdRuntimeConfiguration {
+        AdRuntimeConfiguration.current()
+    }
 
-                withAnimation(drawerAnimation) {
-                    showsDrawer = targetVisibility
-                }
-            }
+    private var adDisplayContext: AdDisplayContext {
+        AdDisplayContext(
+            viewerID: appState.viewer?.id,
+            isPremiumSubscriber: appState.subscriptionState.suppressesAds
+        )
     }
 
     private func syncRepositoryWithAuthSession() async {
@@ -599,21 +349,8 @@ public struct MegrumRootView: View {
         VisualQAProposalRouteResolver.initialStep(for: visualQAInitialScreen) ?? .meetup
     }
 
-    private func openDrawerDestination(_ destination: AppDrawerDestination) {
-        drawerDestination = nil
-        drawerPageDestination = nil
-
-        let presentationDelay: TimeInterval = showsDrawer ? 0.18 : 0
-        switch destination {
-        case .profile, .schedules:
-            DispatchQueue.main.asyncAfter(deadline: .now() + presentationDelay) {
-                drawerPageDestination = destination
-            }
-        default:
-            DispatchQueue.main.asyncAfter(deadline: .now() + presentationDelay) {
-                drawerDestination = destination
-            }
-        }
+    private func requestInterstitial(_ placement: AdPlacement) {
+        interstitialAdRequest = AdInterstitialRequest(placement: placement)
     }
 
     @ViewBuilder
@@ -635,6 +372,10 @@ public struct MegrumRootView: View {
                 OshiSettingsScreen(appState: appState)
             case .schedules:
                 PersonalScheduleScreen(appState: appState)
+            case .paymentSettings:
+                PaymentSettingsScreen(appState: appState)
+            case .exchangeSettings:
+                HomeExchangeSettingsScreen()
             case .settings:
                 SettingsScreen(
                     appState: appState,

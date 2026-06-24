@@ -16,12 +16,21 @@ struct MeguriScreen: View {
     @State private var pendingCreatedThread: BoardThread?
     @State private var selectedGroom: GroomPost?
     @State private var selectedGroomPhotoItem: PhotosPickerItem?
+    @State private var groomDraftPhotoData: Data?
+    @State private var groomDraftPhotoContentType = "image/jpeg"
+    @State private var isPreparingGroomPhoto = false
+    @State private var groomCreationCoordinate: MegrumLocationCoordinate?
     @State private var isShowingGroomComposer = false
     @State private var isShowingGroomCamera = false
+    @State private var isShowingGroomArchive = false
     @State private var activeMap: MeguriMapKind?
     @State private var isShowingThreadComposer = false
     @State private var isShowingPrefecturePicker = false
     @State private var localNoticeMessage: String?
+    @State private var toastMessage: String?
+    @State private var toastID = UUID()
+    @State private var outOfRangeAlertMessage = ""
+    @State private var isShowingOutOfRangeAlert = false
     @State private var boardSheetDetent: MeguriBoardSheetDetent = .regular
     @State private var shouldCenterHomeMapWhenLocationArrives = false
     @State private var homeCameraPosition = MapCameraPosition.region(
@@ -48,8 +57,10 @@ struct MeguriScreen: View {
             cameraPosition: $homeCameraPosition,
             viewer: appState.viewer,
             grooms: appState.grooms,
+            mapGrooms: appState.groomMapPosts.isEmpty ? appState.grooms : appState.groomMapPosts,
             threads: appState.threads,
             replyCounts: appState.boardRepliesByThreadID.mapValues(\.count),
+            currentCoordinate: locationState.coordinate,
             isLoading: appState.isLoadingMeguri,
             selectedScope: selectedBoardScope,
             selectedPrefecture: selectedBoardPrefecture ?? "都道府県",
@@ -59,13 +70,15 @@ struct MeguriScreen: View {
             onOpenMap: { activeMap = .boards },
             onRecenterMap: centerHomeMapOnCurrentLocation,
             onSelectGroom: openGroomFromStrip,
-            onSelectThread: { selectedThread = $0 },
+            onSelectThread: openThreadFromHome,
             onNoticeAction: handleLocationNoticeAction,
             onChangeScope: updateBoardScope,
             onOpenPrefecture: { isShowingPrefecturePicker = true },
-            onOpenGroomComposer: { isShowingGroomComposer = true },
-            onOpenThreadComposer: { isShowingThreadComposer = true }
+            onOpenGroomComposer: openGroomComposer,
+            onOpenThreadComposer: openThreadComposer,
+            onOpenGroomArchive: { isShowingGroomArchive = true }
         )
+        .allowsHitTesting(!isShowingGroomArchive)
         .background(MegrumTheme.canvas.ignoresSafeArea())
         .megrumHiddenNavigationBar()
         .task {
@@ -79,6 +92,18 @@ struct MeguriScreen: View {
         }
         .onChange(of: selectedGroomPhotoItem) { _, item in
             handleSelectedGroomPhotoItem(item)
+        }
+        .alert(MeguriAccessPolicy.outOfRangeTitle, isPresented: $isShowingOutOfRangeAlert) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(outOfRangeAlertMessage)
+        }
+        .overlay(alignment: .bottom) {
+            if let toastMessage {
+                MeguriToastView(message: toastMessage)
+                    .padding(.bottom, 104)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
         }
         .sheet(item: $selectedThread) { thread in
             NavigationStack {
@@ -123,27 +148,49 @@ struct MeguriScreen: View {
         .fullScreenCover(isPresented: $isShowingGroomComposer) {
             GroomStoryComposerScreen(
                 selectedPhotoItem: $selectedGroomPhotoItem,
+                selectedCreationCoordinate: $groomCreationCoordinate,
+                draftPhotoData: $groomDraftPhotoData,
+                draftPhotoContentType: $groomDraftPhotoContentType,
+                isPreparingPhoto: isPreparingGroomPhoto,
                 isCreating: appState.isCreatingGroomPost,
                 canUseCamera: canUseCamera,
+                currentCoordinate: locationState.coordinate,
+                isRequestingLocation: locationState.isRequestingLocation,
+                onRequestLocation: {
+                    locationState.requestCurrentLocation()
+                },
                 onOpenCamera: {
                     isShowingGroomComposer = false
                     if canUseCamera {
                         isShowingGroomCamera = true
                     } else {
-                        localNoticeMessage = "この端末ではカメラを利用できません。写真から選択してください。"
+                        showToast("この端末ではカメラを利用できません。写真から選択してください。")
                     }
-                }
+                },
+                onPublish: publishGroomPhoto,
+                onDiscard: resetGroomDraft
             )
         }
 #else
         .sheet(isPresented: $isShowingGroomComposer) {
             GroomStoryComposerScreen(
                 selectedPhotoItem: $selectedGroomPhotoItem,
+                selectedCreationCoordinate: $groomCreationCoordinate,
+                draftPhotoData: $groomDraftPhotoData,
+                draftPhotoContentType: $groomDraftPhotoContentType,
+                isPreparingPhoto: isPreparingGroomPhoto,
                 isCreating: appState.isCreatingGroomPost,
                 canUseCamera: false,
+                currentCoordinate: locationState.coordinate,
+                isRequestingLocation: locationState.isRequestingLocation,
+                onRequestLocation: {
+                    locationState.requestCurrentLocation()
+                },
                 onOpenCamera: {
-                    localNoticeMessage = "この端末ではカメラを利用できません。写真から選択してください。"
-                }
+                    showToast("この端末ではカメラを利用できません。写真から選択してください。")
+                },
+                onPublish: publishGroomPhoto,
+                onDiscard: resetGroomDraft
             )
         }
 #endif
@@ -151,15 +198,28 @@ struct MeguriScreen: View {
         .sheet(isPresented: $isShowingGroomCamera) {
             NativeCameraCaptureView(
                 onCapture: { imageData in
-                    Task {
-                        await publishGroomPhoto(data: imageData, imageContentType: "image/jpeg")
-                    }
+                    prepareCapturedGroomPhoto(imageData)
                 },
                 onFailure: { message in
-                    localNoticeMessage = message
+                    showToast(message)
                 }
             )
             .ignoresSafeArea()
+        }
+#endif
+#if os(iOS)
+        .fullScreenCover(isPresented: $isShowingGroomArchive) {
+            GroomArchiveScreen(
+                appState: appState,
+                currentCoordinate: locationState.coordinate
+            )
+        }
+#else
+        .sheet(isPresented: $isShowingGroomArchive) {
+            GroomArchiveScreen(
+                appState: appState,
+                currentCoordinate: locationState.coordinate
+            )
         }
 #endif
         .modifier(
@@ -200,6 +260,11 @@ struct MeguriScreen: View {
                 prefecture: selectedBoardPrefecture,
                 scope: selectedBoardScope
             )
+            await appState.loadGroomMapPosts(
+                latitude: coordinate.latitude,
+                longitude: coordinate.longitude,
+                radiusMeters: 3_000
+            )
         }
     }
 
@@ -208,7 +273,7 @@ struct MeguriScreen: View {
             return
         }
         Task {
-            await publishSelectedGroomPhoto(item)
+            await prepareSelectedGroomPhoto(item)
         }
     }
 
@@ -252,31 +317,107 @@ struct MeguriScreen: View {
             prefecture: selectedBoardPrefecture,
             scope: targetScope
         )
+        if let coordinate = locationState.coordinate {
+            await appState.loadGroomMapPosts(
+                latitude: coordinate.latitude,
+                longitude: coordinate.longitude,
+                radiusMeters: 3_000
+            )
+        }
     }
 
-    private func publishSelectedGroomPhoto(_ item: PhotosPickerItem) async {
+    private func prepareSelectedGroomPhoto(_ item: PhotosPickerItem) async {
+        isPreparingGroomPhoto = true
         defer {
             selectedGroomPhotoItem = nil
+            isPreparingGroomPhoto = false
         }
 
         guard let data = try? await item.loadTransferable(type: Data.self) else {
-            localNoticeMessage = "写真を読み込めませんでした"
+            showToast("写真を読み込めませんでした")
             return
         }
-        await publishGroomPhoto(data: data, imageContentType: inferredPhotoMessageContentType(from: data))
+        groomDraftPhotoData = data
+        groomDraftPhotoContentType = inferredPhotoMessageContentType(from: data)
+        if groomCreationCoordinate == nil {
+            groomCreationCoordinate = locationState.coordinate
+        }
     }
 
-    private func publishGroomPhoto(data: Data, imageContentType: String) async {
+    private func prepareCapturedGroomPhoto(_ imageData: Data) {
+        groomDraftPhotoData = imageData
+        groomDraftPhotoContentType = "image/jpeg"
+        if groomCreationCoordinate == nil {
+            groomCreationCoordinate = locationState.coordinate
+        }
+        isShowingGroomCamera = false
+        isShowingGroomComposer = true
+    }
+
+    private func publishGroomPhoto(
+        data: Data,
+        imageContentType: String,
+        caption: String?,
+        coordinate: MegrumLocationCoordinate
+    ) async -> Bool {
+        guard locationState.coordinate != nil else {
+            locationState.requestCurrentLocation()
+            showToast("現在地を確認してから投稿してください")
+            return false
+        }
+        guard MeguriAccessPolicy.canCreateAt(
+            coordinate,
+            currentCoordinate: locationState.coordinate
+        ) else {
+            showToast(
+                MeguriAccessPolicy.creationLocationMessage(
+                    selectedCoordinate: coordinate,
+                    currentCoordinate: locationState.coordinate
+                )
+            )
+            return false
+        }
+
         let created = await appState.createGroomPost(
             imageData: data,
             imageContentType: imageContentType,
-            latitude: locationState.coordinate?.latitude,
-            longitude: locationState.coordinate?.longitude
+            caption: caption,
+            latitude: coordinate.latitude,
+            longitude: coordinate.longitude
         )
         if created {
             localNoticeMessage = nil
             await reloadMeguriFeed()
+            return true
+        } else {
+            let message = appState.errorMessage ?? "グルームを投稿できませんでした"
+            showToast(message)
+            appState.clearErrorMessage()
+            return false
         }
+    }
+
+    private func openGroomComposer() {
+        resetGroomDraft()
+        if locationState.coordinate == nil {
+            locationState.requestCurrentLocation()
+        }
+        isShowingGroomComposer = true
+    }
+
+    private func resetGroomDraft() {
+        selectedGroomPhotoItem = nil
+        groomDraftPhotoData = nil
+        groomDraftPhotoContentType = "image/jpeg"
+        groomCreationCoordinate = nil
+        isPreparingGroomPhoto = false
+    }
+
+    private func openThreadComposer() {
+        if locationState.coordinate == nil {
+            locationState.requestCurrentLocation()
+        }
+        isShowingThreadComposer = true
     }
 
     private func openGroomFromStrip(_ groom: GroomPost) {
@@ -288,15 +429,60 @@ struct MeguriScreen: View {
             if locationState.coordinate == nil {
                 locationState.requestCurrentLocation()
             }
-            localNoticeMessage = MeguriAccessPolicy.groomAccessMessage(
-                groom,
-                currentCoordinate: locationState.coordinate,
-                viewerID: appState.viewer?.id
+            showOutOfRangeAlert(
+                MeguriAccessPolicy.groomAccessMessage(
+                    groom,
+                    currentCoordinate: locationState.coordinate,
+                    viewerID: appState.viewer?.id
+                )
             )
             return
         }
         localNoticeMessage = nil
         selectedGroom = groom
+    }
+
+    private func openThreadFromHome(_ thread: BoardThread) {
+        guard MeguriAccessPolicy.canOpenBoard(
+            thread,
+            currentCoordinate: locationState.coordinate,
+            viewerID: appState.viewer?.id
+        ) else {
+            if locationState.coordinate == nil {
+                locationState.requestCurrentLocation()
+            }
+            showOutOfRangeAlert(
+                MeguriAccessPolicy.boardAccessMessage(
+                    thread,
+                    currentCoordinate: locationState.coordinate,
+                    viewerID: appState.viewer?.id
+                )
+            )
+            return
+        }
+        selectedThread = thread
+    }
+
+    private func showOutOfRangeAlert(_ message: String) {
+        outOfRangeAlertMessage = message.isEmpty ? "半径1km以内のグルームと掲示板のみ開けます。" : message
+        isShowingOutOfRangeAlert = true
+    }
+
+    private func showToast(_ message: String) {
+        let toastID = UUID()
+        self.toastID = toastID
+        withAnimation(.smooth(duration: 0.18)) {
+            toastMessage = message
+        }
+        Task { @MainActor in
+            try? await Task.sleep(for: .seconds(2.4))
+            guard self.toastID == toastID else {
+                return
+            }
+            withAnimation(.smooth(duration: 0.18)) {
+                toastMessage = nil
+            }
+        }
     }
 
     private func centerHomeMapOnCurrentLocation() {

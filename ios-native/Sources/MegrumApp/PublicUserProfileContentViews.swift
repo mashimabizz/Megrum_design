@@ -2,6 +2,14 @@ import MegrumCore
 import MegrumDesign
 import SwiftUI
 
+enum PublicProfileLayoutMetrics {
+    static let contentSpacing = ProfileVisualCompactHeroMetrics.contentSpacing
+    static let horizontalPadding = ProfileVisualCompactHeroMetrics.horizontalPadding
+    static let topPadding = ProfileVisualCompactHeroMetrics.topPadding
+    static let bottomPadding = ProfileVisualCompactHeroMetrics.bottomPadding
+    static let compactHeroAvatarSize = ProfileVisualCompactHeroMetrics.avatarSize
+}
+
 struct PublicUserProfileContent: View {
     var publicProfile: PublicUserProfile?
     @Binding var selectedVisualTab: ProfileVisualTab
@@ -16,12 +24,16 @@ struct PublicUserProfileContent: View {
     var groups: [OshiGroup]
     var characters: [OshiCharacter]
     var goodsTypes: [GoodsType]
+    var adDisplayContext: AdDisplayContext = AdDisplayContext()
+    var adPlacement: AdPlacement?
+    var showsProposalAction: Bool = true
     var onPrimaryAction: () -> Void
+    var onOpenSchedule: () -> Void
     var onSelectGridItem: (ProfileVisualGridItem) -> Void
     var onSelectListing: (UUID) -> Void
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 20) {
+        VStack(alignment: .leading, spacing: PublicProfileLayoutMetrics.contentSpacing) {
             if let publicProfile {
                 ProfileVisualHero(
                     displayName: publicProfile.profile.displayName,
@@ -33,10 +45,14 @@ struct PublicUserProfileContent: View {
                     chips: chips,
                     tagItems: oshiTags,
                     tagSize: .compact,
-                    avatarSize: 64,
+                    avatarSize: PublicProfileLayoutMetrics.compactHeroAvatarSize,
+                    density: .compact,
                     actionTitle: "打診する",
+                    showsAction: showsProposalAction,
                     isPrimaryAction: true,
-                    onAction: onPrimaryAction
+                    showsScheduleAction: true,
+                    onAction: onPrimaryAction,
+                    onScheduleAction: onOpenSchedule
                 )
 
                 ProfileVisualTabs(selection: $selectedVisualTab)
@@ -58,13 +74,20 @@ struct PublicUserProfileContent: View {
                         onSelect: onSelectGridItem
                     )
                 }
+
+                if let adPlacement {
+                    AdBannerSlot(
+                        placement: adPlacement,
+                        displayContext: adDisplayContext
+                    )
+                }
             } else {
                 PublicProfileSkeleton()
             }
         }
-        .padding(.horizontal, 22)
-        .padding(.top, 18)
-        .padding(.bottom, 42)
+        .padding(.horizontal, PublicProfileLayoutMetrics.horizontalPadding)
+        .padding(.top, PublicProfileLayoutMetrics.topPadding)
+        .padding(.bottom, PublicProfileLayoutMetrics.bottomPadding)
     }
 }
 
@@ -122,8 +145,9 @@ private struct PublicProfileListingsList: View {
                             characters: characters,
                             goodsTypes: goodsTypes,
                             canEdit: false,
-                            onEdit: {},
+                            onEditOffer: {},
                             onAddCondition: {},
+                            onEditExchangeCondition: {},
                             onDelete: {}
                         )
                         .contentShape(Rectangle())
