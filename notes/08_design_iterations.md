@@ -4,6 +4,45 @@
 
 ---
 
+## イテレーション858：Trade card viewsを分割
+
+### 背景・問題意識
+
+次の上位候補として `TradeListViews.swift` を確認した。このファイルは、取引一覧のステージ切替/空状態と、取引カード本体、カード内の既読状態ラベル、相手avatar、詳細リンク、待ち合わせ行、選択indicator、press modifierが同居していた。一覧の枠とカードの細部は責務が違うため、取引カード表示一式を別ファイルへ移して、一覧画面の構造を追いやすくする。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/TradeListViews.swift`
+- `TradeCard` とカード内小部品、`TradeCardReadState` の表示用extensionを移動した。
+- `TradeDetailUnavailableScreen`、`TradeStageBar`、`EmptyTradeStage` は残した。
+- 未使用になった `Foundation` / `MegrumCore` importを削除した。
+- ファイル行数を432行から85行へ縮小した。
+
+#### `ios-native/Sources/MegrumApp/TradeCardViews.swift`
+- `TradeCard`、exclusive press modifier、selection indicator、card header、read state label、partner avatar、detail link、meetup summary line、divider、read state表示色/weight extensionを移動した。
+- `TradeCardPresentation`、goods preview lookup、長押し/タップgesture、accessibility label、選択状態表示は変更していない。
+
+### 影響範囲
+
+- Swift Native iOS版の取引一覧カード、ステージ別一覧、未読/既読/返信待ち表示、pending proposalの選択表示。
+- 挙動変更ではなく責務分離。取引一覧のordering、stage resolver、カードpresentation、取引状態、状態名、状態遷移、用語は変更しない。
+
+### 確認方法
+
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-trade-card-views-build --disable-index-store`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-trade-card-views-tests --disable-index-store --enable-xctest --disable-swift-testing -j 1 --filter 'TradeChatAffordanceTests'`
+  - 47 tests passed
+
+### セルフレビュー結果
+
+- ✅ 取引カード表示一式だけを分け、取引一覧のstage切替、navigation、withdraw selection logicには触れていない。
+- ✅ Trade card presentation、ordering、stage resolver、chat affordanceは対象テストで既存挙動維持を確認した。
+- ✅ goods preview lookup、長押し/タップgesture、accessibility label、選択状態表示、状態名、用語は変更していない。
+- ✅ 状態名・用語・DBスキーマの変更はないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション857：Trade assistance request sheetを分割
 
 ### 背景・問題意識
