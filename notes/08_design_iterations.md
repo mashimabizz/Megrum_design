@@ -4,6 +4,44 @@
 
 ---
 
+## イテレーション821：旧Home候補表示policyだけを残して未使用Viewを削除
+
+### 背景・問題意識
+
+次の未処理上位候補として `HomeScreenLegacyViews.swift` を確認した。現在の `HomeScreen` は `HomeDiscoveryExperience` を正としており、旧Home header、グルームrail、旧候補grid/tile/skeleton View群は実画面から参照されていなかった。一方で、RN由来の候補表示メトリクスと `HomeCandidateTileStyle` は `HomeScreenFlowTests` が仕様値として確認しているため、未使用Viewとテスト対象policyを分ける。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/HomeScreenLegacyViews.swift`
+- 実画面から未参照だった旧Home header、グルームrail、旧候補grid/tile/skeleton View群を削除した。
+- 旧ファイルを削除した。
+
+#### `ios-native/Sources/MegrumApp/HomeLegacyCandidatePresentation.swift`
+- `HomeLayoutMetrics`、`HomeCandidateGridMetrics`、`HomeCandidatePriorityFrameStyle`、`HomeCandidatePriorityFrameMetrics`、`HomeCandidateTileStyle` を移動した。
+- テストが保証している旧候補表示のメトリクス/文字/タグ/色policyだけを144行の専用ファイルとして残した。
+
+### 影響範囲
+
+- Swift Native iOS版ホームの旧候補表示policyとテスト補助。
+- 現行ホーム画面は `HomeDiscoveryExperience` を利用しており、実画面の表示ツリー、DB/API payload、状態名、状態遷移、用語は変更しない。
+
+### 確認方法
+
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-home-legacy-build`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-home-legacy-tests --enable-xctest --disable-swift-testing -j 1 --filter 'HomeScreenFlowTests|HomeDiscoveryMatchPolicyTests|MegrumAppStateTests'`
+  - 180 tests passed
+
+### セルフレビュー結果
+
+- ✅ `HomeScreenLegacyViews.swift` の未使用旧View群を削除し、必要なcandidate presentation policyだけを専用ファイルへ退避した。
+- ✅ `rg` で削除対象View群が実画面・テストから未参照であることを確認した。
+- ✅ Homeのcandidate metrics、tile letter/tag policy、match policy、AppState周辺は対象テストで既存挙動維持を確認した。
+- ✅ DB/API payload、状態遷移、状態名、用語、画面レイアウトは変更していない。
+- ✅ 状態名・用語・DBスキーマの変更はないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション820：GoodsEditorSheetのpresentation状態を分割
 
 ### 背景・問題意識
