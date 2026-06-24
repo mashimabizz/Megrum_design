@@ -4,6 +4,44 @@
 
 ---
 
+## イテレーション830：個別募集editorの選択肢レビューFactoryを分割
+
+### 背景・問題意識
+
+次の上位候補として `IndividualListingEditorSheet.swift` を確認した。このファイルは、個別募集作成/編集sheetの状態管理、step遷移、保存処理、全選択、選択肢レビューsheet制御に加えて、Wish/条件/定価のレビュー文言生成が同居していた。Editor本体は保存・遷移・選択状態が絡むため、まず純粋に表示文言を組み立てる処理だけを外へ出し、保存処理やstep制御の読み取り範囲を狭める。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/IndividualListingEditorSheet.swift`
+- 選択肢レビュー文言のswitchを削除し、Factory呼び出しへ置き換えた。
+- step遷移、保存処理、全選択、toast表示、review sheet制御は残した。
+- ファイル行数を509行から465行へ縮小した。
+
+#### `ios-native/Sources/MegrumApp/IndividualListingOptionReviewItemFactory.swift`
+- Wish/条件/定価の `IndividualListingOptionReviewItem` 生成を移動した。
+- Wish数量表示、条件member/tag/数量表示、定価金額表示、member summaryは変更していない。
+
+### 影響範囲
+
+- Swift Native iOS版の個別募集作成/編集sheet、選択肢レビューsheet、選択肢追加toast。
+- 挙動変更ではなく責務分離。保存payload、step遷移、選択状態、全選択、状態名、状態遷移、用語、画面レイアウトは変更しない。
+
+### 確認方法
+
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-listing-review-factory-build`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-listing-review-factory-tests --enable-xctest --disable-swift-testing -j 1 --filter 'IndividualListingDraftTests|IndividualListingStateReducerTests|HomeListingSheetSelectionStateReducerTests|ProposalCreateSheetTests'`
+  - 49 tests passed
+
+### セルフレビュー結果
+
+- ✅ `IndividualListingEditorSheet.swift` から選択肢レビュー文言生成を分け、sheet本体を状態管理/保存/step制御中心へ近づけた。
+- ✅ IndividualListing draft/state、home listing sheet selection、proposal create sheet周辺は対象テストで既存挙動維持を確認した。
+- ✅ 保存payload、step遷移、選択状態、全選択、状態遷移、状態名、用語、画面レイアウトは変更していない。
+- ✅ 状態名・用語・DBスキーマの変更はないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション829：Meguri Mapのkind定義とchromeを分割
 
 ### 背景・問題意識
