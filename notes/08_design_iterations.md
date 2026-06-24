@@ -4,6 +4,44 @@
 
 ---
 
+## イテレーション845：Supabase message payload builderを分割
+
+### 背景・問題意識
+
+次の上位候補として `SupabaseMessageRequestBuilder.swift` を確認した。このファイルは、メッセージ読み込み/read state/send系のURLRequest生成と、message payload作成、late/cancel system metadata、photo/location/arrival validationが同居していた。request builderはテストが厚く、責務分離の効果を安全に確認しやすいため、公開request生成APIは残し、payload/validationだけを別extensionへ移す。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumData/SupabaseMessageRequestBuilder.swift`
+- `makeMessageCreatePayload`、late/cancel payload builder、photo/location/message validation helper、default photo body helperを移動した。
+- load/read-state/send request生成、mutation request生成は残した。
+- ファイル行数を452行から261行へ縮小した。
+
+#### `ios-native/Sources/MegrumData/SupabaseMessagePayloadBuilder.swift`
+- message create payload、operation system message metadata、attachment/location/arrival validation helperを移動した。
+- REST path、query item、select文字列、payload column、metadata key、validation順、error typeは変更していない。
+
+### 影響範囲
+
+- Swift Native iOS版の取引チャットmessage request生成、写真/服装写真/現在地/到着status/遅刻連絡/キャンセル申請message payload。
+- 挙動変更ではなく責務分離。DB/API payload、metadata key、validation、REST path、query item、状態名、状態遷移、用語は変更しない。
+
+### 確認方法
+
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-message-payload-build`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-message-payload-tests --enable-xctest --disable-swift-testing -j 1 --filter 'SupabaseMessageClientTests|SupabaseRequestParityTests|SupabaseChatPhotoStorageTests'`
+  - 38 tests passed
+
+### セルフレビュー結果
+
+- ✅ message request builderをrequest生成中心に寄せ、payload/validationを別ファイルで読めるようにした。
+- ✅ Supabase message request、payload parity、chat photo storage周辺は対象テストで既存挙動維持を確認した。
+- ✅ DB/API payload、metadata key、validation、REST path、query item、状態遷移、状態名、用語は変更していない。
+- ✅ 状態名・用語・DBスキーマの変更はないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション844：Meguri board composer form componentsを分割
 
 ### 背景・問題意識
