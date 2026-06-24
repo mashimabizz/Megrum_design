@@ -4,6 +4,44 @@
 
 ---
 
+## イテレーション839：Meetup calendarのboard gesture handlerを分割
+
+### 背景・問題意識
+
+次の上位候補として `ProposalMeetupCalendarWeekEditorGestures.swift` を確認した。このファイルは、board gesture wiring、week header swipe、candidate drag、long press scheduling、board drag state machineが同居していた。gestureは挙動変更リスクが高いため、閾値や状態遷移には触れず、board drag handlerだけを別extensionへ移して、gesture wiring側の読み取り範囲を狭める。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/ProposalMeetupCalendarWeekEditorGestures.swift`
+- `handleBoardChanged` と `handleBoardEnded` を移動した。
+- `boardGesture` / `weekHeaderSwipeGesture`、candidate drag、long press scheduling、cleanupは残した。
+- ファイル行数を473行から261行へ縮小した。
+
+#### `ios-native/Sources/MegrumApp/ProposalMeetupCalendarBoardGestureHandlers.swift`
+- board dragのpending/swiping/creating/movingCandidate/end処理を移動した。
+- drag threshold、long press cancellation、preview draft生成、candidate move更新、week shift判定、create/update/select callback順は変更していない。
+
+### 影響範囲
+
+- Swift Native iOS版の個別募集/打診作成フロー内の待ち合わせカレンダー週表示、board drag、week swipe、candidate move/resize。
+- 挙動変更ではなく責務分離。gesture threshold、long press timing、preview draft、candidate update、week shift、UI layout、文言、状態名、状態遷移、用語は変更しない。
+
+### 確認方法
+
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-meetup-board-gestures-build`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-meetup-board-gestures-tests --enable-xctest --disable-swift-testing -j 1 --filter 'TradeRequestDraftProposalCreateFlowTests|ProposalCreateFlowTests|ProposalCreateSheetTests'`
+  - 62 tests passed
+
+### セルフレビュー結果
+
+- ✅ board drag handlerを分け、`ProposalMeetupCalendarWeekEditorGestures.swift` をgesture wiring、candidate gesture、long press scheduling中心へ薄くした。
+- ✅ proposal create flow、proposal create sheet、meetup calendar model周辺は対象テストで既存挙動維持を確認した。
+- ✅ gesture threshold、long press timing、preview draft、candidate update、week shift、UI layout、文言、状態遷移、状態名、用語は変更していない。
+- ✅ 状態名・用語・DBスキーマの変更はないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション838：Supabase home listing rowを分割
 
 ### 背景・問題意識
