@@ -4,6 +4,45 @@
 
 ---
 
+## イテレーション868：Home other exchange rowsを分割
+
+### 背景・問題意識
+
+次の上位候補として `HomeDiscoverySheetUtilityViews.swift` を確認した。このファイルは、ホーム詳細シートのサムネイル、交換候補サマリー、filter chip、Wish user rowと、「他にも交換できそうなもの」の表示/重複除外policyが同居していた。ユーザー指摘が多いWish hit/個別募集hit/他候補まわりを追いやすくするため、他候補セクションを独立ファイルへ分ける。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/HomeDiscoverySheetUtilityViews.swift`
+- `HomeOtherExchangeRows`、empty panel、copy、policy、thumbnail buttonを移動した。
+- 汎用の小サムネイル、交換候補サマリー、filter chip、Wish user row、avatar、Array chunk helperは残した。
+- ファイル行数を417行から183行へ縮小した。
+
+#### `ios-native/Sources/MegrumApp/HomeOtherExchangeRows.swift`
+- 「他にも交換できそうなもの」の表示、個別募集hit/Wish hitの横スクロール、追加済み選択表示、空表示文言を移動した。
+- `HomeOtherExchangePolicy` を同居させ、現在シートのグッズ除外と個別募集hitからWish hitへの重複除外を同じ入口で読めるようにした。
+- 表示文言、色、選択枠、accessibility label、除外条件は変更していない。
+
+### 影響範囲
+
+- Swift Native iOS版ホームのマッチ候補詳細、相互マッチ詳細、Wish hit詳細で表示する「他にも交換できそうなもの」セクション。
+- 挙動変更ではなく責務分離。Wish hit/個別募集hitの候補抽出、重複除外、空表示文言、状態名、状態遷移、用語は変更しない。
+
+### 確認方法
+
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-home-other-exchange-build --disable-index-store`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-home-other-exchange-tests --disable-index-store --enable-xctest --disable-swift-testing -j 1 --filter 'HomeDiscoveryMatchPolicyTests|HomeScreenFlowTests'`
+  - 101 tests passed
+
+### セルフレビュー結果
+
+- ✅ 「他にも交換できそうなもの」の配置だけを分け、文言、色、選択状態、thumbnail sizing、重複除外条件は変更していない。
+- ✅ HomeDiscoveryMatchPolicyTestsで、現在シートgoods除外、個別募集hitからWish hitへの重複除外、Wish hit sheet routingの既存挙動を確認した。
+- ✅ HomeScreenFlowTestsで、相互マッチ詳細の空表示文言やホームタブ/マッチ候補まわりの既存挙動を確認した。
+- ✅ 状態名・用語・DBスキーマの変更はないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション867：Board thread reply viewsを分割
 
 ### 背景・問題意識
