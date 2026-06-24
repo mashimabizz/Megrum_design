@@ -4,6 +4,44 @@
 
 ---
 
+## イテレーション844：Meguri board composer form componentsを分割
+
+### 背景・問題意識
+
+次の上位候補として `MeguriBoardComposerViews.swift` を確認した。このファイルは、掲示板作成sheetの状態、入力validation、保存処理、画像読み込み、タイトル/本文入力、サムネイル選択、場所決めステップが同居していた。掲示板作成は位置制限と保存処理が絡むため、actionやvalidationは親sheetに残し、表示部品だけを別ファイルへ移して作成処理の流れを読みやすくする。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/MeguriBoardComposerViews.swift`
+- タイトル入力、本文入力、サムネイル選択、場所決めステップのUI本体を移動した。
+- 親sheetにはstate、validation、画像読み込み、サムネイル削除、場所step遷移、保存処理、toast処理を残した。
+- ファイル行数を460行から364行へ縮小した。
+
+#### `ios-native/Sources/MegrumApp/MeguriBoardComposerFormComponents.swift`
+- `BoardThreadTitleField`、`BoardThreadBodyEditor`、`BoardThreadThumbnailSection`、`BoardThreadThumbnailPreview`、`BoardThreadComposerLocationStep` を追加した。
+- 入力placeholder、font、spacing、background、サムネイル削除表示、地図preview、1km範囲外callback、onAppear seed処理は変更していない。
+
+### 影響範囲
+
+- Swift Native iOS版のMeguri掲示板作成sheet、タイトル/本文入力、サムネイル選択、地図での作成場所選択。
+- 挙動変更ではなく責務分離。validation、保存payload、画像圧縮/容量判定、位置制限、toast、navigation title、文言、状態名、状態遷移、用語は変更しない。
+
+### 確認方法
+
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-board-composer-build`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-board-composer-tests --enable-xctest --disable-swift-testing -j 1 --filter 'MeguriAccessPolicyTests|MeguriFeedStateReducerTests|MegrumAppStateTests'`
+  - 89 tests passed
+
+### セルフレビュー結果
+
+- ✅ 掲示板作成sheetの表示部品を分け、`MeguriBoardComposerViews.swift` をstate/action/保存処理中心へ薄くした。
+- ✅ 掲示板作成、位置制限、feed反映、AppState周辺は対象テストで既存挙動維持を確認した。
+- ✅ validation、保存payload、画像圧縮/容量判定、位置制限、toast、navigation title、文言、状態遷移、状態名、用語は変更していない。
+- ✅ 状態名・用語・DBスキーマの変更はないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション843：Home mutual match pair list componentsを分割
 
 ### 背景・問題意識

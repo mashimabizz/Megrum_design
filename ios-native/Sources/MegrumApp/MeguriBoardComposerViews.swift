@@ -146,45 +146,14 @@ struct BoardThreadComposerSheet: View {
                     MeguriNoticeBanner(message: missingContextMessage)
                 }
 
-                thumbnailPickerSection
+                thumbnailSection
 
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("タイトル")
-                        .font(.system(size: 14, weight: .heavy, design: .rounded))
-                        .foregroundStyle(MegrumTheme.ink)
+                BoardThreadTitleField(title: $title)
 
-                    TextField("例：物販列どのくらい？", text: $title)
-                        .font(.system(size: 17, weight: .bold, design: .rounded))
-                        .padding(15)
-                        .background(.white.opacity(0.9), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
-                }
-
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("本文")
-                        .font(.system(size: 14, weight: .heavy, design: .rounded))
-                        .foregroundStyle(MegrumTheme.ink)
-
-                    ZStack(alignment: .topLeading) {
-                        if bodyText.isEmpty {
-                            Text("いま見えている状況や聞きたいことを書いてください")
-                                .font(.system(size: 16, weight: .bold, design: .rounded))
-                                .foregroundStyle(MegrumTheme.muted.opacity(0.72))
-                                .padding(.horizontal, 18)
-                                .padding(.vertical, 18)
-                        }
-
-                        TextEditor(text: $bodyText)
-                            .font(.system(size: 16, weight: .bold, design: .rounded))
-                            .scrollContentBackground(.hidden)
-                            .padding(12)
-                            .frame(minHeight: 170)
-                            .background(.clear)
-                    }
-                    .background(.white.opacity(0.9), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
-                }
+                BoardThreadBodyEditor(bodyText: $bodyText)
 
                 if isShowingLocationStep {
-                    locationFinalStep
+                    locationStep
                 } else {
                     MeguriNoticeBanner(message: "タイトルと本文が決まったら、最後に地図上で表示される場所を選びます。")
                 }
@@ -247,111 +216,37 @@ struct BoardThreadComposerSheet: View {
         }
     }
 
-    private var locationFinalStep: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            VStack(alignment: .leading, spacing: 5) {
-                Text("最後に立てる場所を決める")
-                    .font(.system(size: 18, weight: .heavy, design: .rounded))
-                    .foregroundStyle(MegrumTheme.ink)
-
-                Text("掲示板が地図上に表示される見え方を確認しながら、半径1km以内にピンを立ててください。")
-                    .font(.system(size: 12, weight: .bold, design: .rounded))
-                    .foregroundStyle(MegrumTheme.muted)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-
-            BoardThreadDraftMapPreview(
-                title: title.nilIfBlank ?? "掲示板",
-                summary: bodyText.nilIfBlank ?? "現地の話題",
-                hasThumbnail: thumbnailUpload != nil
-            )
-
-            MeguriCreationLocationPicker(
-                title: "地図での表示プレビュー",
-                subtitle: "現在地から半径1km以内の地図上をタップして選択",
-                currentCoordinate: baseCoordinate,
-                isRequestingLocation: locationState.isRequestingLocation,
-                preview: .board(
-                    title: title.nilIfBlank ?? "掲示板",
-                    summary: bodyText.nilIfBlank ?? "現地の話題",
-                    hasThumbnail: thumbnailUpload != nil
-                ),
-                selectedCoordinate: $selectedCoordinate,
-                onRequestLocation: {
-                    locationState.requestCurrentLocation()
-                },
-                onOutOfRange: showToast
-            )
-        }
-        .padding(14)
-        .background(.white.opacity(0.72), in: RoundedRectangle(cornerRadius: 22, style: .continuous))
-        .onAppear(perform: seedSelectedCoordinateIfNeeded)
+    private var thumbnailSection: some View {
+        #if canImport(UIKit)
+        BoardThreadThumbnailSection(
+            thumbnailItem: $thumbnailItem,
+            hasThumbnail: thumbnailUpload != nil,
+            previewImage: thumbnailPreviewImage,
+            onRemoveThumbnail: clearThumbnail
+        )
+        #else
+        BoardThreadThumbnailSection(
+            thumbnailItem: $thumbnailItem,
+            hasThumbnail: thumbnailUpload != nil,
+            onRemoveThumbnail: clearThumbnail
+        )
+        #endif
     }
 
-    private var thumbnailPickerSection: some View {
-        let hasThumbnail = thumbnailUpload != nil
-        return VStack(alignment: .leading, spacing: 8) {
-            Text("サムネイル")
-                .font(.system(size: 14, weight: .heavy, design: .rounded))
-                .foregroundStyle(MegrumTheme.ink)
-
-            HStack(spacing: 12) {
-                thumbnailPreview
-
-                VStack(alignment: .leading, spacing: 8) {
-                    PhotosPicker(selection: $thumbnailItem, matching: .images) {
-                        BoardThreadThumbnailPickerLabel(hasThumbnail: hasThumbnail)
-                    }
-                    .buttonStyle(.plain)
-
-                    if thumbnailUpload != nil {
-                        Button {
-                            thumbnailItem = nil
-                            thumbnailUpload = nil
-                            thumbnailErrorMessage = nil
-                            #if canImport(UIKit)
-                            thumbnailPreviewImage = nil
-                            #endif
-                        } label: {
-                            Label("削除", systemImage: "xmark.circle")
-                                .font(.system(size: 13, weight: .heavy, design: .rounded))
-                                .foregroundStyle(MegrumTheme.muted)
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
-            }
-            .padding(14)
-            .background(.white.opacity(0.72), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
-        }
-    }
-
-    private var thumbnailPreview: some View {
-        ZStack {
-            #if canImport(UIKit)
-            if let thumbnailPreviewImage {
-                Image(uiImage: thumbnailPreviewImage)
-                    .resizable()
-                    .scaledToFill()
-            } else {
-                thumbnailFallback
-            }
-            #else
-            thumbnailFallback
-            #endif
-        }
-        .frame(width: 78, height: 78)
-        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-    }
-
-    private var thumbnailFallback: some View {
-        RoundedRectangle(cornerRadius: 16, style: .continuous)
-            .fill(MegrumTheme.lavender.opacity(0.12))
-            .overlay {
-                Image(systemName: "photo")
-                    .font(.system(size: 24, weight: .bold))
-                    .foregroundStyle(MegrumTheme.lavender)
-            }
+    private var locationStep: some View {
+        BoardThreadComposerLocationStep(
+            title: title.nilIfBlank ?? "掲示板",
+            summary: bodyText.nilIfBlank ?? "現地の話題",
+            hasThumbnail: thumbnailUpload != nil,
+            currentCoordinate: baseCoordinate,
+            isRequestingLocation: locationState.isRequestingLocation,
+            selectedCoordinate: $selectedCoordinate,
+            onRequestLocation: {
+                locationState.requestCurrentLocation()
+            },
+            onOutOfRange: showToast,
+            onAppear: seedSelectedCoordinateIfNeeded
+        )
     }
 
     private func loadThumbnail(_ item: PhotosPickerItem?) {
@@ -382,6 +277,15 @@ struct BoardThreadComposerSheet: View {
                 #endif
             }
         }
+    }
+
+    private func clearThumbnail() {
+        thumbnailItem = nil
+        thumbnailUpload = nil
+        thumbnailErrorMessage = nil
+        #if canImport(UIKit)
+        thumbnailPreviewImage = nil
+        #endif
     }
 
     private func handlePrimaryAction() {
