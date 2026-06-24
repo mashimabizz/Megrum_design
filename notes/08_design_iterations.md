@@ -4,6 +4,44 @@
 
 ---
 
+## イテレーション869：Proposal confirm card primitivesを分割
+
+### 背景・問題意識
+
+次の上位候補として `ProposalConfirmCards.swift` を確認した。このファイルは、個別募集/打診作成の確認画面で使う公開カード群と、カードprimitive、行表示、現地/郵送条件summaryを行に分解する処理が同居していた。確認画面の構成を読みやすくするため、下位部品と行分解ロジックを別ファイルへ分ける。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/ProposalConfirmCards.swift`
+- `ProposalConfirmPlainCard`、`ProposalConfirmRoundIcon`、`ProposalConfirmDetailCard`、`ProposalConfirmDetailRow`、`ProposalConfirmPill`、summary row、現地/郵送条件row builderを移動した。
+- 確認画面で直接使う公開カード群とsection wrapperだけを残した。
+- ファイル行数を404行から194行へ縮小した。
+
+#### `ios-native/Sources/MegrumApp/ProposalConfirmCardPrimitives.swift`
+- 確認画面カードprimitive、pill、detail row、summary row、現地/郵送条件row builder、summary text cleanup helperを移動した。
+- カードの角丸、material、stroke、font、未設定/未選択fallback、現地/郵送条件の分解ルールは変更していない。
+
+### 影響範囲
+
+- Swift Native iOS版の個別募集/打診作成の確認画面カード、現地/郵送条件表示、支払方法/受け渡し方法表示。
+- 挙動変更ではなく責務分離。提出可否、確認画面の情報順、footer placement、状態名、状態遷移、用語は変更しない。
+
+### 確認方法
+
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-proposal-confirm-primitives-build --disable-index-store`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-proposal-confirm-primitives-tests --disable-index-store --enable-xctest --disable-swift-testing -j 1 --filter 'ProposalCreateFlowTests|ProposalCreateSheetTests|TradeRequestDraftProposalCreateFlowTests'`
+  - 62 tests passed
+
+### セルフレビュー結果
+
+- ✅ 確認画面カードのprimitive配置だけを分け、font、色、余白、角丸、fallback文言、summary分解ルールは変更していない。
+- ✅ ProposalCreateFlowTestsで、確認画面の情報順、画面padding/spacing、footer submit配置、submitted summaryの既存挙動を確認した。
+- ✅ ProposalCreateSheetTests / TradeRequestDraftProposalCreateFlowTestsで、提出可否、住所/待ち合わせ必須判定、候補作成の既存挙動を確認した。
+- ✅ 状態名・用語・DBスキーマの変更はないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション868：Home other exchange rowsを分割
 
 ### 背景・問題意識
