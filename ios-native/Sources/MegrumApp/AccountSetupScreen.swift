@@ -14,7 +14,7 @@ public struct AccountSetupScreen: View {
     @State private var didSeedEditSelections = false
     @State private var showsCompletionAlert = false
     @State private var setupInputErrorMessage: String?
-    @FocusState private var focusedField: Field?
+    @FocusState private var focusedField: AccountSetupFocusedField?
 
     public init(appState: MegrumAppState, mode: AccountSetupMode = .onboarding) {
         self.appState = appState
@@ -50,65 +50,18 @@ public struct AccountSetupScreen: View {
     }
 
     private var header: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text(mode.headerTitle)
-                .font(.system(size: 32, weight: .black, design: .rounded))
-                .foregroundStyle(MegrumTheme.ink)
-
-            Text(mode.headerSubtitle)
-                .font(.system(size: 15, weight: .bold, design: .rounded))
-                .foregroundStyle(MegrumTheme.muted)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
+        AccountSetupHeader(mode: mode)
     }
 
     private var form: some View {
-        VStack(spacing: 16) {
-            TextField("表示名", text: $displayName)
-                .focused($focusedField, equals: .displayName)
-                .textContentType(.name)
-                .submitLabel(.next)
-                .onSubmit {
-                    focusedField = .prefecture
-                }
-                .megrumTextFieldStyle()
-                .accessibilityLabel("表示名")
-                .accessibilityHint("アプリ内で相手に表示する名前を入力します")
-                .onChange(of: displayName) { _, _ in
-                    setupInputErrorMessage = nil
-                }
-
-            TextField("都道府県", text: $prefecture)
-                .focused($focusedField, equals: .prefecture)
-                .textContentType(.addressState)
-                .submitLabel(.done)
-                .onSubmit {
-                    Task { await save() }
-                }
-                .megrumTextFieldStyle()
-                .accessibilityLabel("活動エリア")
-                .accessibilityHint("主に交換する都道府県を入力します")
-                .onChange(of: prefecture) { _, _ in
-                    setupInputErrorMessage = nil
-                }
-
-            if let setupInputErrorMessage {
-                Text(setupInputErrorMessage)
-                    .font(.system(size: 13, weight: .bold, design: .rounded))
-                    .foregroundStyle(Color(red: 0.851, green: 0.51, blue: 0.42))
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(14)
-                    .background(Color(red: 0.851, green: 0.51, blue: 0.42).opacity(0.1), in: RoundedRectangle(cornerRadius: 16))
-                    .accessibilityLabel(setupInputErrorMessage)
-            } else if let errorMessage = appState.errorMessage {
-                Text(errorMessage)
-                    .font(.system(size: 13, weight: .bold, design: .rounded))
-                    .foregroundStyle(Color(red: 0.851, green: 0.51, blue: 0.42))
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(14)
-                    .background(Color(red: 0.851, green: 0.51, blue: 0.42).opacity(0.1), in: RoundedRectangle(cornerRadius: 16))
-            }
-        }
+        AccountSetupProfileForm(
+            displayName: $displayName,
+            prefecture: $prefecture,
+            setupInputErrorMessage: $setupInputErrorMessage,
+            focusedField: $focusedField,
+            appErrorMessage: appState.errorMessage,
+            onSubmit: saveFromForm
+        )
     }
 
     private var oshiSection: some View {
@@ -300,33 +253,15 @@ public struct AccountSetupScreen: View {
     }
 
     private var saveButton: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Button {
-                Task { await save() }
-            } label: {
-                HStack(spacing: 10) {
-                    if appState.isSavingAccountSetup {
-                        ProgressView()
-                            .controlSize(.small)
-                    }
-                    Text(mode.saveTitle)
-                        .font(.system(size: 16, weight: .black, design: .rounded))
-                }
-                .frame(maxWidth: .infinity)
-                .frame(height: 54)
-            }
-            .buttonStyle(.borderedProminent)
-            .buttonBorderShape(.roundedRectangle(radius: 18))
-            .tint(MegrumTheme.lavender)
-            .disabled(appState.isSavingAccountSetup)
-            .accessibilityHint(mode.completionFootnote)
+        AccountSetupSaveSection(
+            mode: mode,
+            isSaving: appState.isSavingAccountSetup,
+            onSave: saveFromForm
+        )
+    }
 
-            Text(mode.completionFootnote)
-                .font(.footnote.weight(.semibold))
-                .foregroundStyle(MegrumTheme.muted)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .accessibilityHidden(true)
-        }
+    private func saveFromForm() {
+        Task { await save() }
     }
 
     private func save() async {
@@ -395,11 +330,5 @@ public struct AccountSetupScreen: View {
 
     private func isWholeGroupSelected(_ group: OshiGroup) -> Bool {
         OnboardingOshiSelectionLogic.isWholeGroupSelected(group, in: selectedOshiDrafts)
-    }
-
-    private enum Field {
-        case displayName
-        case prefecture
-        case groupSearch
     }
 }

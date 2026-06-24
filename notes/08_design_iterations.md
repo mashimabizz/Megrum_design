@@ -4,6 +4,45 @@
 
 ---
 
+## イテレーション884：Account setup form viewsを分割
+
+### 背景・問題意識
+
+次の候補として `AccountSetupScreen.swift` を確認した。このファイルは、初回設定/プロフィール編集の画面本体、ヘッダー、表示名/都道府県フォーム、入力エラー表示、推し選択、保存ボタン、保存処理、編集時の推しseed処理が同居していた。まず保存や推し選択の状態処理に触れず、表示責務が薄いヘッダー・プロフィールフォーム・保存セクションを専用Viewへ分ける。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/AccountSetupScreen.swift`
+- ヘッダーを `AccountSetupHeader` へ移動した。
+- 表示名/都道府県フォームとエラー表示を `AccountSetupProfileForm` へ移動した。
+- 保存ボタンと補足文を `AccountSetupSaveSection` へ移動した。
+- focus対象を `AccountSetupFocusedField` として専用ファイルへ移し、親は保存処理・推し選択・初期seed処理を持つ構成にした。
+- ファイル行数を405行から334行へ縮小した。
+
+#### `ios-native/Sources/MegrumApp/AccountSetupFormViews.swift`
+- `AccountSetupFocusedField`、`AccountSetupHeader`、`AccountSetupProfileForm`、`AccountSetupSaveSection`、`AccountSetupErrorBanner` を追加した。
+- 表示名/都道府県のTextField、submit遷移、入力変更時のローカルエラーclear、保存ボタンのdisabled/loading表示、補足文は既存挙動を維持した。
+
+### 影響範囲
+
+- Swift Native iOS版の初回プロフィール設定、プロフィール編集、表示名/活動エリア入力、入力エラー表示、保存CTA。
+- 挙動変更ではなく責務分離。推し選択、保存payload、account setup validation、user_oshi保存、状態名、状態遷移、用語、DBスキーマは変更しない。
+
+### 確認方法
+
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-account-setup-form-build --disable-index-store`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-account-setup-form-tests --disable-index-store --enable-xctest --disable-swift-testing -j 1 --filter 'AccountSetupScreenTests|OnboardingOshiSelectionTests|OshiSettingsDraftTests|UserOshiSelectionPersistenceMapperTests'`
+  - 24 tests passed
+
+### セルフレビュー結果
+
+- ✅ ヘッダー/フォーム/保存セクションの表示だけを分け、保存処理、推し選択、編集時seed、AccountSetupDraftValidator、account setup payloadは変更していない。
+- ✅ AccountSetupScreenTests / OnboardingOshiSelectionTests / OshiSettingsDraftTests / UserOshiSelectionPersistenceMapperTestsで、validation、mode copy、推し選択draft/input変換、永続化mapperを確認した。
+- ✅ 状態名・用語・DBスキーマの変更はないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション883：Meguri map sceneを分割
 
 ### 背景・問題意識
