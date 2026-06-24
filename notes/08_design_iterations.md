@@ -4,6 +4,49 @@
 
 ---
 
+## イテレーション808：検索画面をbody・導出状態・操作へ分割
+
+### 背景・問題意識
+
+次の未処理上位候補として `SearchScreen.swift` を確認した。このファイルは、検索画面の状態、検索結果filter/sort、active chip生成、候補section生成、body、検索ロード、filter適用、候補適用、検索スケジュール、戻るgestureまで同居していた。検索画面はホーム連携、個別募集条件、支払条件、Wish候補、横スクロール抑制付き戻るgestureが絡むため、画面構成・導出状態・操作の読み取り範囲を分ける。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/SearchScreen.swift`
+- `SearchScreen` の状態、AppStorage、body、sheet/navigation構成だけを残した。
+- ファイル行数を約641行から141行へ縮小した。
+
+#### `ios-native/Sources/MegrumApp/SearchScreenDerivedState.swift`
+- 結果件数、検索条件有無、filtered/sorted results、クエリ由来のgoods type/tag解決、active filter count、active criteria chips、suggestion sections、選択中suggestion actionを移動した。
+- 検索結果の個別募集条件/支払条件/交換条件filterと、検索候補の表示状態は移動のみで維持した。
+
+#### `ios-native/Sources/MegrumApp/SearchScreenActions.swift`
+- 初期ロード、initial criteria適用、検索実行、検索スケジュール、filter draft適用、active criteria削除、suggestion適用、通報、戻るgesture、候補横スクロール抑制を移動した。
+- `SearchBackSwipeResolver`、`SearchSuggestionTagPolicy`、`SearchQueryResolver` の既存呼び出し条件は維持した。
+
+### 影響範囲
+
+- Swift Native iOS版の検索画面、検索候補、検索結果filter/sort、filter sheet、active criteria chip、戻るスワイプ、検索結果からの打診作成/プロフィール表示。
+- 挙動変更ではなく責務分離。DB/API payload、状態名、用語、画面レイアウトは変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumApp/SearchScreen.swift ios-native/Sources/MegrumApp/SearchScreenDerivedState.swift ios-native/Sources/MegrumApp/SearchScreenActions.swift`
+  - passed
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-search-screen-build`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-search-screen-tests --enable-xctest --disable-swift-testing -j 1 --filter 'SearchScreenTests|HomeDiscoveryMatchPolicyTests|GoodsLocalStateReducerTests'`
+  - 72 tests passed
+
+### セルフレビュー結果
+
+- ✅ `SearchScreen` は画面状態とbody/sheet/navigation構成だけを所有する構造へ整理した。
+- ✅ 検索結果filter/sort、候補構築、active criteria chip、filter draft、検索ロード/検索実行/候補適用/戻るgestureは移動のみで、条件と文言を変えていない。
+- ✅ 検索条件、戻るスワイプ、候補tag policy、検索結果の支払/Wish/個別募集条件filter、ホーム連携は対象テストで維持を確認した。
+- ✅ 状態名・用語・DBスキーマの変更はないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション807：個別募集ドラフトを初期化・選択操作・保存変換へ分割
 
 ### 背景・問題意識
