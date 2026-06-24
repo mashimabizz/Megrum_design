@@ -4,6 +4,44 @@
 
 ---
 
+## イテレーション860：Meguri design preview sheet viewsを分割
+
+### 背景・問題意識
+
+次の上位候補として `MeguriDesignPreviewHomeViews.swift` を確認した。このファイルは、デザインpreview用のmetrics/colors/topic samples、地図pin、会話シート、トピック行、タブバーが同居していた。preview専用でも500行を超えると見通しが落ちるため、まず会話シートとトピック行を別ファイルへ移して、preview homeの地図/タブ周辺とシート表示を読み分けやすくする。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/MeguriDesignPreviewHomeViews.swift`
+- `MeguriConversationSheet`、`MeguriSheetAction`、`MeguriTopicRow`、`MeguriExpandedTopicRow` を移動した。
+- metrics/colors/topic samples、home header、map overlay、map pin、map controls、tab barは残した。
+- ファイル行数を512行から333行へ縮小した。
+
+#### `ios-native/Sources/MegrumApp/MeguriDesignPreviewSheetViews.swift`
+- 会話シート、sheet action、通常/拡張topic rowを移動した。
+- sheet modeごとのtopic表示数、行レイアウト、画像/avatar、reply count、tag表示、文言は変更していない。
+
+### 影響範囲
+
+- Swift Native iOS版のDEBUG限定めぐりデザインpreview。
+- 挙動変更ではなくpreview表示部品の責務分離。実アプリのめぐり画面、状態名、状態遷移、用語は変更しない。
+
+### 確認方法
+
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-meguri-preview-sheet-build --disable-index-store`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-meguri-preview-sheet-tests --disable-index-store --enable-xctest --disable-swift-testing -j 1 --filter 'HomeScreenFlowTests/testVisualQAPreviewModeParsesInitialScreens'`
+  - 1 test passed
+
+### セルフレビュー結果
+
+- ✅ DEBUG限定previewの会話シート表示だけを分け、実アプリのめぐり画面やデータ更新処理には触れていない。
+- ✅ sheet modeごとのtopic表示数、行レイアウト、画像/avatar、reply count、tag表示、文言は変更していない。
+- ✅ buildとVisualQA preview modeの小テストで参照切れがないことを確認した。
+- ✅ 状態名・用語・DBスキーマの変更はないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション859：Home discovery fixturesを種別分割
 
 ### 背景・問題意識
