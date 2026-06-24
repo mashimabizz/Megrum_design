@@ -11,7 +11,6 @@ struct PersonalScheduleScreen: View {
     @State private var isShowingScheduleEditor = false
 
     private let calendar = Calendar.current
-    private let weekdayLabels = ["日", "月", "火", "水", "木", "金", "土"]
 
     private var visibleInterval: DateInterval {
         switch mode {
@@ -40,14 +39,7 @@ struct PersonalScheduleScreen: View {
                 .pickerStyle(.segmented)
 
                 if appState.isLoadingPersonalSchedules {
-                    HStack(spacing: 10) {
-                        ProgressView()
-                        Text("スケジュールを読み込んでいます")
-                            .font(.system(size: 14, weight: .bold, design: .rounded))
-                            .foregroundStyle(MegrumTheme.muted)
-                    }
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 12)
+                    ScheduleLoadingNotice()
                 }
 
                 switch mode {
@@ -128,58 +120,15 @@ struct PersonalScheduleScreen: View {
     }
 
     private var monthView: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Text(monthTitle)
-                    .font(.system(size: 20, weight: .heavy, design: .rounded))
-                    .foregroundStyle(MegrumTheme.ink)
-                Spacer()
-                Button {
-                    moveAnchor(by: -1)
-                } label: {
-                    Image(systemName: "chevron.left.circle.fill")
-                }
-                .buttonStyle(.plain)
-                .foregroundStyle(MegrumTheme.lavender)
-
-                Button {
-                    moveAnchor(by: 1)
-                } label: {
-                    Image(systemName: "chevron.right.circle.fill")
-                }
-                .buttonStyle(.plain)
-                .foregroundStyle(MegrumTheme.lavender)
-            }
-
-            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 6), count: 7), spacing: 8) {
-                ForEach(weekdayLabels, id: \.self) { label in
-                    Text(label)
-                        .font(.system(size: 12, weight: .heavy, design: .rounded))
-                        .foregroundStyle(MegrumTheme.muted)
-                        .frame(maxWidth: .infinity)
-                }
-
-                ForEach(Array(monthGridDays.enumerated()), id: \.offset) { _, day in
-                    if let day {
-                        ScheduleMonthCell(
-                            day: day,
-                            schedules: schedules(on: day),
-                            isToday: calendar.isDateInToday(day),
-                            viewerID: appState.viewer?.id
-                        )
-                    } else {
-                        Color.clear
-                            .frame(height: 76)
-                    }
-                }
-            }
-        }
-        .padding(16)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 26, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: 26, style: .continuous)
-                .strokeBorder(.white.opacity(0.7), lineWidth: 1)
-        }
+        ScheduleMonthGrid(
+            monthTitle: monthTitle,
+            monthGridDays: monthGridDays,
+            calendar: calendar,
+            viewerID: appState.viewer?.id,
+            schedulesForDay: schedules(on:),
+            onPreviousMonth: { moveAnchor(by: -1) },
+            onNextMonth: { moveAnchor(by: 1) }
+        )
     }
 
     private var fiveVisibleDays: [Date] {
@@ -229,7 +178,6 @@ struct TradeScheduleSheet: View {
     @State private var isShowingScheduleEditor = false
 
     private let calendar = Calendar.current
-    private let weekdayLabels = ["日", "月", "火", "水", "木", "金", "土"]
 
     private var visibleInterval: DateInterval {
         switch mode {
@@ -268,14 +216,7 @@ struct TradeScheduleSheet: View {
                 ScheduleLegend()
 
                 if appState.loadingSchedulesProposalID == proposal.id {
-                    HStack(spacing: 10) {
-                        ProgressView()
-                        Text("スケジュールを読み込んでいます")
-                            .font(.system(size: 14, weight: .bold, design: .rounded))
-                            .foregroundStyle(MegrumTheme.muted)
-                    }
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 12)
+                    ScheduleLoadingNotice()
                 }
 
                 switch mode {
@@ -348,58 +289,15 @@ struct TradeScheduleSheet: View {
     }
 
     private var monthView: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Text(monthTitle)
-                    .font(.system(size: 20, weight: .heavy, design: .rounded))
-                    .foregroundStyle(MegrumTheme.ink)
-                Spacer()
-                Button {
-                    moveAnchor(by: -1)
-                } label: {
-                    Image(systemName: "chevron.left.circle.fill")
-                }
-                .buttonStyle(.plain)
-                .foregroundStyle(MegrumTheme.lavender)
-
-                Button {
-                    moveAnchor(by: 1)
-                } label: {
-                    Image(systemName: "chevron.right.circle.fill")
-                }
-                .buttonStyle(.plain)
-                .foregroundStyle(MegrumTheme.lavender)
-            }
-
-            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 6), count: 7), spacing: 8) {
-                ForEach(weekdayLabels, id: \.self) { label in
-                    Text(label)
-                        .font(.system(size: 12, weight: .heavy, design: .rounded))
-                        .foregroundStyle(MegrumTheme.muted)
-                        .frame(maxWidth: .infinity)
-                }
-
-                ForEach(Array(monthGridDays.enumerated()), id: \.offset) { _, day in
-                    if let day {
-                        ScheduleMonthCell(
-                            day: day,
-                            schedules: schedules(on: day),
-                            isToday: calendar.isDateInToday(day),
-                            viewerID: viewerID
-                        )
-                    } else {
-                        Color.clear
-                            .frame(height: 76)
-                    }
-                }
-            }
-        }
-        .padding(16)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 26, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: 26, style: .continuous)
-                .strokeBorder(.white.opacity(0.7), lineWidth: 1)
-        }
+        ScheduleMonthGrid(
+            monthTitle: monthTitle,
+            monthGridDays: monthGridDays,
+            calendar: calendar,
+            viewerID: viewerID,
+            schedulesForDay: schedules(on:),
+            onPreviousMonth: { moveAnchor(by: -1) },
+            onNextMonth: { moveAnchor(by: 1) }
+        )
     }
 
     private var fiveVisibleDays: [Date] {

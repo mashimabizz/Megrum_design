@@ -4,6 +4,46 @@
 
 ---
 
+## イテレーション854：Trade schedule calendar viewsを分割
+
+### 背景・問題意識
+
+次の上位候補として `TradeScheduleViews.swift` を確認した。このファイルは、個人スケジュール画面と取引内スケジュールシートの2画面を持ち、読み込み表示と月グリッドUIがほぼ同じ形で重複していた。予定の取得条件や日別filterには触れず、共通表示部品だけを分けることで、月表示の見た目調整時の直し忘れを減らす。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/TradeScheduleViews.swift`
+- 個人スケジュール画面と取引内スケジュールシートの読み込み表示を `ScheduleLoadingNotice` へ置き換えた。
+- 両画面の月表示を `ScheduleMonthGrid` へ置き換えた。
+- visible interval、reload key、日別schedule filter、anchor移動、editor sheet表示は残した。
+- ファイル行数を441行から339行へ縮小した。
+
+#### `ios-native/Sources/MegrumApp/TradeScheduleCalendarViews.swift`
+- 共通の読み込み表示 `ScheduleLoadingNotice` を追加した。
+- 月タイトル、前後月ボタン、曜日ヘッダー、blank cell、`ScheduleMonthCell` 表示をまとめた `ScheduleMonthGrid` を追加した。
+- 月移動、viewerID、日別schedule取得は呼び出し元から渡す形にし、既存の取得条件は変更していない。
+
+### 影響範囲
+
+- Swift Native iOS版の自分のスケジュール画面、取引内スケジュールシートの月表示と読み込み表示。
+- 挙動変更ではなく責務分離。予定取得範囲、reload key、日別filter、取引別schedule取得、状態名、状態遷移、用語は変更しない。
+
+### 確認方法
+
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-trade-schedule-calendar-build --disable-index-store`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-trade-schedule-calendar-tests --disable-index-store --enable-xctest --disable-swift-testing -j 1 --filter 'MegrumAppStateTests|SupabaseTradeSchedulePersistenceTests'`
+  - 82 tests passed
+
+### セルフレビュー結果
+
+- ✅ 共通表示部品だけを分け、予定取得・保存・日別filterには触れていない。
+- ✅ 個人スケジュール読み込み、取引スケジュール読み込み、Supabase schedule participant判定は対象テストで既存挙動維持を確認した。
+- ✅ 月タイトル、前後月ボタン、曜日ヘッダー、blank cell、today表示、viewerID色分け、状態名、用語は変更していない。
+- ✅ 状態名・用語・DBスキーマの変更はないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション853：Proposal meetup formを分割
 
 ### 背景・問題意識
