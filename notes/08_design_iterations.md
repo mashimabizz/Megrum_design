@@ -4,6 +4,50 @@
 
 ---
 
+## イテレーション878：Goods photo crop viewsを分割
+
+### 背景・問題意識
+
+次の候補として `GoodsPhotoCropViews.swift` を確認した。このファイルは、写真切り取りsheet本体、切り取り枠を描画するcanvas、切り取りプレビュー一覧、画像サイズ/座標変換helperが同居していた。トレカ一括登録や写真cropの不具合調査時に、UI本体と座標計算を切り分けて読めるようにする。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/GoodsPhotoCropViews.swift`
+- `GoodsPhotoCropSession` と `GoodsPhotoCropSheet` だけを残した。
+- ファイル行数を418行から142行へ縮小した。
+
+#### `ios-native/Sources/MegrumApp/GoodsPhotoCropCanvasViews.swift`
+- `GoodsCropFrameCanvas` と source image表示を移動した。
+- ドラッグ開始/終了、28px未満の枠破棄、選択枠stroke、draft枠表示は変更していない。
+
+#### `ios-native/Sources/MegrumApp/GoodsPhotoCropPreviewViews.swift`
+- 切り取りプレビューstripとtileを移動した。
+- empty copy、件数表示、削除ボタン、選択stroke、preview crop生成は変更していない。
+
+#### `ios-native/Sources/MegrumApp/GoodsPhotoCropGeometry.swift`
+- 画像サイズ取得、fitted image rect、screen/normalized rect変換、drag rect、point clampを `GoodsPhotoCropGeometry` に移動した。
+- 汎用的な `rect` / `clamped` などのprivate global helperを型に閉じ込め、他ファイルとの名前衝突リスクを下げた。
+
+### 影響範囲
+
+- Swift Native iOS版のトレカ一括登録/写真切り取りsheet、切り取り枠drag、切り取りプレビュー、crop適用。
+- 挙動変更ではなく責務分離。crop frameの正規化、手動枠、検出fallback、写真upload、状態名、状態遷移、用語、DBスキーマは変更しない。
+
+### 確認方法
+
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-goods-photo-crop-views-build --disable-index-store`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-goods-photo-crop-views-tests --disable-index-store --enable-xctest --disable-swift-testing -j 1 --filter 'GoodsEditorDraftTests'`
+  - 24 tests passed
+
+### セルフレビュー結果
+
+- ✅ crop sheet本体、canvas、preview、geometryの配置だけを分け、drag/crop/preview生成/エラー文言は変更していない。
+- ✅ GoodsEditorDraftTestsで、手動crop、検出なしfallback、不正画像reject、top-to-bottom/left-to-right sort、写真uploadまわりを確認した。
+- ✅ 状態名・用語・DBスキーマの変更はないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション877：Goods editor sheet actionsを責務分割
 
 ### 背景・問題意識
