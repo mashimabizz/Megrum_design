@@ -4,6 +4,44 @@
 
 ---
 
+## イテレーション848：Individual listing editor selection stateを分割
+
+### 背景・問題意識
+
+次の上位候補として `IndividualListingEditorSheet.swift` を確認した。このファイルは、個別募集作成/編集sheetのstate、body、譲る/ウィッシュ選択toggle、フィルタ中一覧の全選択/解除、logic/minimum count binding、option追加、保存処理が同居していた。保存処理は作成失敗の再発リスクがあるため今回は触れず、譲る/ウィッシュ選択とfooter制御に関わるselection stateだけを別extensionへ移して、親sheetを画面状態と保存導線中心に読みやすくする。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/IndividualListingEditorSheet.swift`
+- `toggleHave` / `toggleWish`、フィルタ中一覧の全選択/解除、visible selection computed properties、select-all button state/title、logic/minimum count bindingsを移動した。
+- body、onAppear/onChange、option追加、保存処理、alert/toast、navigation step処理は残した。
+- ファイル行数を465行から355行へ縮小した。
+
+#### `ios-native/Sources/MegrumApp/IndividualListingEditorSheetSelectionState.swift`
+- 譲る/ウィッシュ選択、フィルタ適用中のvisible item計算、footerの「すべて登録/すべて解除」状態、logic/minimum count bindingを移動した。
+- filter条件、選択/解除対象、button title、Binding get/set、最大数量判定は変更していない。
+
+### 影響範囲
+
+- Swift Native iOS版の個別募集作成/編集sheet、譲るから選ぶ、ウィッシュから選ぶ、フィルタ中一覧の全選択/解除、footer logic/minimum count選択。
+- 挙動変更ではなく責務分離。保存処理、validation、draft mutation、button title、filter条件、状態名、状態遷移、用語は変更しない。
+
+### 確認方法
+
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-listing-editor-selection-build`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-listing-editor-selection-tests --enable-xctest --disable-swift-testing -j 1 --filter 'IndividualListingDraftTests|IndividualListingStateReducerTests|HomeScreenFlowTests'`
+  - 84 tests passed
+
+### セルフレビュー結果
+
+- ✅ selection/footer stateだけを分け、保存処理には触れていない。
+- ✅ 個別募集draft/stateとHome作成導線周辺は対象テストで既存挙動維持を確認した。
+- ✅ 保存処理、validation、draft mutation、button title、filter条件、状態遷移、状態名、用語は変更していない。
+- ✅ 状態名・用語・DBスキーマの変更はないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション847：MegrumAppState notification actionsを分割
 
 ### 背景・問題意識
