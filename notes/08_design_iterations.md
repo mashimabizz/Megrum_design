@@ -4,6 +4,44 @@
 
 ---
 
+## イテレーション831：Activity Windowのpublicモデルを分割
+
+### 背景・問題意識
+
+次の上位候補として `SupabaseActivityWindowClient.swift` を確認した。このファイルは、Activity Window/Local Modeのpublic error/status/DTO/input型と、REST clientのload/create/update/upsert/request生成/query/validationが同居していた。DB/API境界は変更リスクが高いため、payloadやqueryには触れず、まずpublicモデル群だけを別ファイルへ移してclient本体の読み取り範囲を狭める。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumData/SupabaseActivityWindowClient.swift`
+- REST client本体、request生成、query item生成、validationを残した。
+- Activity Window/Local Modeのpublic error/status/DTO/input型を移動した。
+- ファイル行数を510行から346行へ縮小した。
+
+#### `ios-native/Sources/MegrumData/SupabaseActivityWindowModels.swift`
+- `SupabaseActivityWindowClientError`、`SupabaseActivityWindowStatus`、`SupabaseActivityWindowCoordinate`、`SupabaseActivityWindow`、create/update input、Local Mode settings/upsert inputを移動した。
+- public API名、initializer、default値、Sendable/Equatable/Identifiable conformanceは変更していない。
+
+### 影響範囲
+
+- Swift Native iOS版のActivity Window、Local Mode settings、Supabase data boundary。
+- 挙動変更ではなく責務分離。REST endpoint、query items、payload encoding、validation条件、DB/API payload、状態名、状態遷移、用語、画面レイアウトは変更しない。
+
+### 確認方法
+
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-aw-models-build`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-aw-models-tests --enable-xctest --disable-swift-testing -j 1 --filter 'SupabaseActivityWindowClientTests|SupabaseHomeLocalModePersistenceTests|HomeLocalModeTests'`
+  - 35 tests passed
+
+### セルフレビュー結果
+
+- ✅ `SupabaseActivityWindowClient.swift` からActivity Window/Local Modeのpublicモデル群を分け、client本体をREST処理とvalidation中心へ薄くした。
+- ✅ public API名、initializer、default値、Sendable/Equatable/Identifiable conformanceは維持した。
+- ✅ REST endpoint、query items、payload encoding、validation条件、DB/API payload、状態遷移、状態名、用語、画面レイアウトは変更していない。
+- ✅ 状態名・用語・DBスキーマの変更はないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション830：個別募集editorの選択肢レビューFactoryを分割
 
 ### 背景・問題意識
