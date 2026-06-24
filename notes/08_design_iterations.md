@@ -4,6 +4,44 @@
 
 ---
 
+## イテレーション864：Oshi settings group card viewsを分割
+
+### 背景・問題意識
+
+次の上位候補として `OshiSettingsContentViews.swift` を確認した。このファイルは、推し設定のメイン画面、ヘッダー、空状態、読み込み表示、グループカード、選択済みメンバーtag、メンバー追加リクエストtag、削除確認表示が同居していた。メイン画面の一覧構造と、1グループ内のメンバー操作/削除確認は責務が違うため、グループカード一式を別ファイルへ分ける。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/OshiSettingsContentViews.swift`
+- `OshiSettingsGroupCard`、`OshiSelectedMemberTag`、`OshiMemberRequestTag`、`OshiPalette` を移動した。
+- メイン画面、ヘッダー、空状態、読み込み表示、左下の「推しを追加」ボタンは残した。
+- ファイル行数を427行から178行へ縮小した。
+
+#### `ios-native/Sources/MegrumApp/OshiSettingsGroupCardViews.swift`
+- グループカード、選択済みメンバーtag、メンバー追加リクエストtag、警告色paletteを移動した。
+- 承認待ちbadge、summary表示、削除確認popover、削除confirm遅延、追加可能メンバー表示、リクエストtag表示は変更していない。
+
+### 影響範囲
+
+- Swift Native iOS版の推し設定画面、推しグループカード、メンバー追加/削除操作の表示。
+- 挙動変更ではなく責務分離。推し設定draft、保存処理、削除確認文言、メンバーchip文言、状態名、状態遷移、用語は変更しない。
+
+### 確認方法
+
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-oshi-settings-group-card-build --disable-index-store`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-oshi-settings-group-card-tests --disable-index-store --enable-xctest --disable-swift-testing -j 1 --filter 'OshiSettingsDraftTests'`
+  - 15 tests passed
+
+### セルフレビュー結果
+
+- ✅ 推し設定のメイン画面構造とグループカード内操作を分けただけで、表示文言・削除確認・メンバー追加/削除callbackは変更していない。
+- ✅ OshiSettingsDraftTestsで、削除確認文言、メンバーchip文言、summary、request sheet metrics、master selection copyの既存挙動を確認した。
+- ✅ ビルドで分割後の参照切れがないことを確認した。
+- ✅ 状態名・用語・DBスキーマの変更はないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション863：Auth screen route/helperを分割
 
 ### 背景・問題意識
