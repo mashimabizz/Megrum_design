@@ -9,68 +9,17 @@ struct ProposalCreateSheet: View {
     var listingID: UUID?
     var receiverGoodsIDs: [UUID]?
 
-    @Environment(\.dismiss) private var dismiss
-    @State private var selectedSenderGoodsID: UUID?
-    @State private var exchangeMethod: ExchangeMethod = .mail
-    @State private var selectedConditionTags: Set<String> = []
-    @State private var message = ""
-    @State private var meetupStartAt = Date()
-    @State private var meetupEndAt = Date().addingTimeInterval(30 * 60)
-    @State private var meetupPlaceName = ""
-    @State private var meetupLatitudeText = ""
-    @State private var meetupLongitudeText = ""
-    @StateObject private var locationState = MegrumLocationState()
-
-    private var selectedSenderID: UUID? {
-        selectedSenderGoodsID ?? appState.inventory.first?.id
-    }
-
-    private var resolvedReceiverGoodsIDs: [UUID] {
-        var uniqueIDs: [UUID] = []
-        let candidateIDs = receiverGoodsIDs ?? [targetItem.id]
-        for id in candidateIDs where !uniqueIDs.contains(id) {
-            uniqueIDs.append(id)
-        }
-        return uniqueIDs.isEmpty ? [targetItem.id] : uniqueIDs
-    }
-
-    private var configuration: ProposalCreateConfiguration {
-        ProposalCreateConfiguration(
-            exchangeMethod: exchangeMethod,
-            hasSelectedSenderGoods: selectedSenderID != nil,
-            isCreatingProposal: appState.isCreatingProposal,
-            hasReadyMailingAddress: appState.mailingAddress?.isReady == true,
-            isLoadingMailingAddress: appState.isLoadingMailingAddress,
-            hasValidMeetup: meetupInput?.isValid == true,
-            receiverGoodsCount: resolvedReceiverGoodsIDs.count,
-            isListingSource: listingID != nil
-        )
-    }
-
-    private var conditionTagOptions: [String] {
-        configuration.conditionTagOptions
-    }
-
-    private var orderedConditionTags: [String] {
-        conditionTagOptions.filter { selectedConditionTags.contains($0) }
-    }
-
-    private var meetupInput: ProposalMeetupInput? {
-        guard
-            let latitude = Self.coordinateValue(from: meetupLatitudeText),
-            let longitude = Self.coordinateValue(from: meetupLongitudeText)
-        else {
-            return nil
-        }
-        let input = ProposalMeetupInput(
-            startAt: meetupStartAt,
-            endAt: meetupEndAt,
-            placeName: meetupPlaceName,
-            latitude: latitude,
-            longitude: longitude
-        )
-        return input.isValid ? input : nil
-    }
+    @Environment(\.dismiss) var dismiss
+    @State var selectedSenderGoodsID: UUID?
+    @State var exchangeMethod: ExchangeMethod = .mail
+    @State var selectedConditionTags: Set<String> = []
+    @State var message = ""
+    @State var meetupStartAt = Date()
+    @State var meetupEndAt = Date().addingTimeInterval(30 * 60)
+    @State var meetupPlaceName = ""
+    @State var meetupLatitudeText = ""
+    @State var meetupLongitudeText = ""
+    @StateObject var locationState = MegrumLocationState()
 
     var body: some View {
         ScrollView {
@@ -150,11 +99,7 @@ struct ProposalCreateSheet: View {
                     LazyVGrid(columns: [GridItem(.adaptive(minimum: 118), spacing: 10)], spacing: 10) {
                         ForEach(conditionTagOptions, id: \.self) { tag in
                             Button {
-                                if selectedConditionTags.contains(tag) {
-                                    selectedConditionTags.remove(tag)
-                                } else {
-                                    selectedConditionTags.insert(tag)
-                                }
+                                toggleConditionTag(tag)
                             } label: {
                                 Text(tag)
                                     .font(.system(size: 15, weight: .heavy, design: .rounded))
@@ -223,11 +168,7 @@ struct ProposalCreateSheet: View {
             }
         }
         .onAppear {
-            selectedSenderGoodsID = selectedSenderID
-            if meetupEndAt <= meetupStartAt {
-                meetupEndAt = meetupStartAt.addingTimeInterval(30 * 60)
-            }
-            requestLocationIfNeeded()
+            prepareOnAppear()
         }
         .task {
             if appState.mailingAddress == nil {
@@ -235,27 +176,13 @@ struct ProposalCreateSheet: View {
             }
         }
         .onChange(of: exchangeMethod) { _, _ in
-            selectedConditionTags = selectedConditionTags.intersection(Set(conditionTagOptions))
-            requestLocationIfNeeded()
+            handleExchangeMethodChange()
         }
         .onChange(of: meetupStartAt) { _, newValue in
-            if meetupEndAt <= newValue {
-                meetupEndAt = newValue.addingTimeInterval(30 * 60)
-            }
+            boundMeetupEnd(after: newValue)
         }
         .onChange(of: locationState.coordinate) { _, coordinate in
-            guard let coordinate, configuration.requiresMeetupBeforeSubmit else {
-                return
-            }
-            if meetupPlaceName.isBlank {
-                meetupPlaceName = "現在地"
-            }
-            if meetupLatitudeText.isBlank {
-                meetupLatitudeText = Self.coordinateText(coordinate.latitude)
-            }
-            if meetupLongitudeText.isBlank {
-                meetupLongitudeText = Self.coordinateText(coordinate.longitude)
-            }
+            applyCurrentLocation(coordinate)
         }
     }
 
@@ -322,44 +249,4 @@ struct ProposalCreateSheet: View {
         .buttonStyle(.plain)
     }
 
-    private func createProposal() async {
-        guard let selectedSenderID, let targetStatus = configuration.targetStatus else {
-            return
-        }
-        let meetup = configuration.requiresMeetupBeforeSubmit ? meetupInput : nil
-        guard !configuration.requiresMeetupBeforeSubmit || meetup != nil else {
-            return
-        }
-        let created = await appState.createProposal(
-            ProposalCreateInput(
-                receiverID: targetItem.ownerID,
-                senderGoodsIDs: [selectedSenderID],
-                receiverGoodsIDs: resolvedReceiverGoodsIDs,
-                exchangeMethod: exchangeMethod,
-                conditionTags: orderedConditionTags,
-                message: message,
-                status: targetStatus,
-                meetup: meetup,
-                listingID: listingID
-            )
-        )
-        if created {
-            dismiss()
-        }
-    }
-
-    private static func coordinateValue(from text: String) -> Double? {
-        Double(text.trimmingCharacters(in: .whitespacesAndNewlines))
-    }
-
-    private static func coordinateText(_ value: Double) -> String {
-        String(format: "%.6f", value)
-    }
-
-    private func requestLocationIfNeeded() {
-        guard configuration.requiresMeetupBeforeSubmit else {
-            return
-        }
-        locationState.requestCurrentLocation()
-    }
 }

@@ -4,6 +4,46 @@
 
 ---
 
+## イテレーション898：Proposal create sheet state/actionsを分割
+
+### 背景・問題意識
+
+`ProposalCreateSheet.swift` は打診作成シートの表示、送信可否の派生状態、条件タグ切替、待ち合わせ入力補正、現在地反映、作成submitが一つのViewに同居していた。打診作成の保存条件とUI調整を別々に追えるよう、状態計算と操作処理を分離する。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/ProposalCreateSheet.swift`
+- 画面構造と既存の表示部品に集中させた。
+- `onAppear` / `onChange` / 条件タグtapからは専用actionを呼ぶ形へ整理した。
+- ファイル行数を365行から252行へ縮小した。
+
+#### `ios-native/Sources/MegrumApp/ProposalCreateSheetDerivedState.swift`
+- 選択中の譲るグッズ、受け取る側goods ID解決、`ProposalCreateConfiguration`、条件タグ表示順、待ち合わせ入力の生成を移動した。
+
+#### `ios-native/Sources/MegrumApp/ProposalCreateSheetActions.swift`
+- 初期表示補正、条件タグ切替、交換手段変更時のタグ整理、待ち合わせ終了時刻補正、現在地反映、位置情報request、作成submitを移動した。
+
+### 影響範囲
+
+- Swift Native iOS版の打診作成シート、交換手段選択、条件タグ選択、待ち合わせ入力、作成submit。
+- 挙動変更ではなく責務分離。送信可否、郵送住所必須、現地待ち合わせ必須、条件タグの絞り込み、現在地の空欄補完、状態名、用語、DBスキーマは変更しない。
+
+### 確認方法
+
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-proposal-create-sheet-build --disable-index-store`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-proposal-create-sheet-tests --disable-index-store --enable-xctest --disable-swift-testing -j 1 --filter 'ProposalCreateSheetTests|ProposalCreateFlowTests|TradeRequestDraftProposalCreateFlowTests|MegrumAppStateTests'`
+  - 141 tests passed
+
+### セルフレビュー結果
+
+- ✅ 打診作成payload、receiver/sender goods ID、listingID、交換手段、条件タグ順、message、meetup入力、dismiss条件は変更していない。
+- ✅ ProposalCreateSheetTests / ProposalCreateFlowTests / TradeRequestDraftProposalCreateFlowTestsで、郵送・現地・両方の送信可否、待ち合わせ必須、listing source、支払い/確認フロー周辺を確認した。
+- ✅ MegrumAppStateTestsで、preview proposal作成とschedule作成を含むアプリ状態側の作成処理を確認した。
+- ✅ 状態名・用語・DBスキーマの変更はないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション897：Home discovery goods card viewsを分割
 
 ### 背景・問題意識
