@@ -4,6 +4,56 @@
 
 ---
 
+## イテレーション814：在庫Supabase clientをAPI操作・request・query・tag・photoへ分割
+
+### 背景・問題意識
+
+次の未処理上位候補として `SupabaseGoodsInventoryClient.swift` を確認した。このファイルは、在庫/ウィッシュ登録・検索・公開在庫読み込み・archive/update/delete・画像アップロード・tag同期・テスト用URLRequest生成・query item組み立て・公開型定義まで同居していた。DB/API payloadに関わるため挙動を変えず、責務別に読み取り範囲を分ける。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumData/SupabaseGoodsInventoryClient.swift`
+- 実際のSupabase操作（load/create/search/archive/update/delete/upload/tag attach/detach）を中心に残した。
+- ファイル行数を562行から192行へ縮小した。
+
+#### `ios-native/Sources/MegrumData/SupabaseGoodsInventoryClientTypes.swift`
+- `SupabaseGoodsInventoryClientError`、`GoodsInventoryStatus`、`GoodsInventoryUpdateInput` を移動した。
+
+#### `ios-native/Sources/MegrumData/SupabaseGoodsInventoryClientRequests.swift`
+- `make*Request` 系のURLRequest生成メソッドを移動した。
+- 既存の公開メソッド名、HTTP method、select、Prefer、payload encodingは維持した。
+
+#### `ios-native/Sources/MegrumData/SupabaseGoodsInventoryClientQueries.swift`
+- goods type / search / public trade goods / owned item のquery item組み立てを移動した。
+- `market_available_qty` と legacy `quantity` fallback の切り替えは維持した。
+
+#### `ios-native/Sources/MegrumData/SupabaseGoodsInventoryClientTags.swift`
+- goods itemへのtag付与、tag同期、tag名正規化を移動した。
+
+#### `ios-native/Sources/MegrumData/SupabaseGoodsInventoryClientPhoto.swift`
+- 登録入力validation、photo URL正規化、画像content type正規化、storage path生成、encoder生成を移動した。
+
+### 影響範囲
+
+- Swift Native iOS版の在庫/ウィッシュ登録・更新・削除・検索、公開交換可能グッズ読み込み、画像アップロード、goods tag attach/detach。
+- 挙動変更ではなく責務分離。SupabaseのURLRequest、DB/API payload、状態名、状態遷移、用語、画面レイアウトは変更しない。
+
+### 確認方法
+
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-goods-inventory-client-build`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-goods-inventory-client-tests --enable-xctest --disable-swift-testing -j 1 --filter 'SupabaseGoodsInventoryClientTests|InventoryWishRequestHardeningTests|SupabaseRequestParityTests|SupabaseGoodsInventoryRowModelsTests|SupabaseGoodsEntryPersistenceTests|SupabaseOwnedGoodsPersistenceTests'`
+  - 49 tests passed
+
+### セルフレビュー結果
+
+- ✅ 在庫Supabase clientをAPI操作、request生成、query生成、tag同期、photo/validation、公開型定義へ分割した。
+- ✅ リクエストURL、HTTP method、Prefer header、payload、入力validation、tag query、在庫/ウィッシュ行変換は対象テストで維持を確認した。
+- ✅ DB/API payload、状態遷移、状態名、用語、画面レイアウトは変更していない。
+- ✅ 状態名・用語・DBスキーマの変更はないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション813：ホーム発見sheet部品を表示単位で分割
 
 ### 背景・問題意識
