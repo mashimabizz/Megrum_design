@@ -4,6 +4,44 @@
 
 ---
 
+## イテレーション855：Trade detail derived stateを分割
+
+### 背景・問題意識
+
+次の上位候補として `TradeDetailScreen.swift` を確認した。この画面は、取引詳細の状態、派生値、本文View、シート/遷移、確認dialogが同居していた。actionは既に `TradeDetailScreenActions.swift` に分かれているため、まず `messages`、`currentProposal`、goods lookup、相手プロフィール、支払い表示、hero/evaluation/input context などの読み取り専用派生値を別extensionへ移して、画面本体と派生値を読み分けやすくする。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/TradeDetailScreen.swift`
+- 取引詳細の読み取り専用派生値を移動した。
+- `@State`、`body`、dialog/sheet/navigationDestination、message input、toolbarは残した。
+- ファイル行数を440行から335行へ縮小した。
+
+#### `ios-native/Sources/MegrumApp/TradeDetailScreenDerivedState.swift`
+- `messages`、`currentProposal`、`goodsByID`、`latestDisputeSummary`、chat input availability/context、viewer/partner、hero presentation、requested/offered goods、payment summaryを移動した。
+- goods lookup、相手プロフィール参照、cash offer表示、participant判定、evaluation prompt判定は変更していない。
+
+### 影響範囲
+
+- Swift Native iOS版の取引詳細画面、取引チャット入力、取引サマリー、評価/通報表示、相手プロフィール参照、支払い表示。
+- 挙動変更ではなく責務分離。メッセージ送信、写真送信、位置共有、証跡、通報、評価、proposal state更新、状態名、状態遷移、用語は変更しない。
+
+### 確認方法
+
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-trade-detail-derived-build --disable-index-store`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-trade-detail-derived-tests --disable-index-store --enable-xctest --disable-swift-testing -j 1 --filter 'TradeChatAffordanceTests|TradeProposalStateReducerTests|MegrumAppStateTests'`
+  - 129 tests passed
+
+### セルフレビュー結果
+
+- ✅ 読み取り専用派生値だけを分け、取引actionやnavigation本体には触れていない。
+- ✅ 取引チャットaffordance、proposal state reducer、app stateのpreview取引動作は対象テストで既存挙動維持を確認した。
+- ✅ goods lookup、相手プロフィール参照、cash offer表示、participant判定、evaluation prompt判定、状態名、用語は変更していない。
+- ✅ 状態名・用語・DBスキーマの変更はないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション854：Trade schedule calendar viewsを分割
 
 ### 背景・問題意識
