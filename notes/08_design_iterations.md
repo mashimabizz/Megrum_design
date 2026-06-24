@@ -4,6 +4,52 @@
 
 ---
 
+## イテレーション803：相互マッチ候補生成を評価・signal・表示整形へ分割
+
+### 背景・問題意識
+
+リファクタリング優先順位1〜10と追加の条件レビュー整理後、ホーム相互マッチ周辺でまだ `HomeMutualMatchCandidateComposer.swift` が候補生成本体、個別募集Wanted条件評価、金額互換評価、条件signal生成、注意タグ並び替え、ユーザー表示情報整形を同居させていた。相互マッチは個別募集・支払条件・交換条件の調整が続く領域なので、候補生成の流れと、判定/表示補助の読み取り範囲を分ける。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/HomeMutualMatchCandidateComposer.swift`
+- 相互マッチ候補の二重ループ、候補payload組み立て、active listing / offered rows / option sort / rows lookupだけを残した。
+- Wanted条件評価、条件signal、表示用メタ情報整形を専用ファイルへ委譲した。
+- ファイル行数を約634行から215行へ縮小した。
+
+#### `ios-native/Sources/MegrumApp/HomeMutualMatchListingEvaluation.swift`
+- `MutualListingSideEvaluation` / `MutualListingOptionEvaluation` と、個別募集Wanted条件・金額option・タグ不一致判定を移動した。
+- L1/L2一致、`all` / `atLeast` / `one`、金額不足/金額込み/タグ不一致の既存判定は維持した。
+
+#### `ios-native/Sources/MegrumApp/HomeMutualMatchCandidateSignals.swift`
+- 相互マッチ候補の `HomeCandidateConditionSignals` 生成と、attention kind の並び順/scoreを分離した。
+
+#### `ios-native/Sources/MegrumApp/HomeMutualMatchCandidatePresentation.swift`
+- 候補に表示するGoodsItem変換、現金表示item優先、安定ID、ユーザー名/handle/initial/年齢/評価/推し文言の整形を分離した。
+
+### 影響範囲
+
+- Swift Native iOS版ホームの相互マッチ候補生成、相互マッチ詳細シートへ渡す候補payload。
+- 挙動変更ではなく責務分離。DB/API payload、画面レイアウト、状態名、用語は変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumApp/HomeMutualMatchCandidateComposer.swift ios-native/Sources/MegrumApp/HomeMutualMatchListingEvaluation.swift ios-native/Sources/MegrumApp/HomeMutualMatchCandidateSignals.swift ios-native/Sources/MegrumApp/HomeMutualMatchCandidatePresentation.swift`
+  - passed
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-mutual-candidate-build`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-mutual-candidate-tests --enable-xctest --disable-swift-testing -j 1 --filter 'HomeCandidateComposerTests|HomeMutualMatchLiveDataTests|HomeScreenFlowTests'`
+  - 65 tests passed, 2 live Supabase tests skipped by environment
+
+### セルフレビュー結果
+
+- ✅ 候補生成本体は `HomeCandidateComposer.mutualMatchCandidates(...)` の入口を維持した。
+- ✅ Wish / 個別募集 / 金額option / 支払条件 / 交換条件の既存判定は対象テストで維持を確認した。
+- ✅ 相互マッチ候補payloadの表示項目と安定ID生成は移動のみで、文言・並び順・fallback値を変えていない。
+- ✅ 状態名・用語・DBスキーマの変更はないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション802：相互マッチ条件レビューをモデル・表示ポイント・判定へ分割
 
 ### 背景・問題意識
