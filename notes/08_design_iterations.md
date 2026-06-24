@@ -4,6 +4,44 @@
 
 ---
 
+## イテレーション823：GoodsGridのpresentation policyを分割
+
+### 背景・問題意識
+
+次の未処理上位候補として `GoodsGrid.swift` を確認した。このファイルは、グリッドView本体に加えて、collection card metrics、quick action、grid context、tile presentation、action policy、context menu policy、action enumが同居していた。在庫/Wish一覧は登録・編集・個別募集作成・選択footerなどの起点になるため、表示policyとView本体を分け、今後の修正時に読む範囲を狭める。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/GoodsGrid.swift`
+- `GoodsGrid` のView本体、sheet/report alert、action handlingを残した。
+- ファイル行数を526行から153行へ縮小した。
+
+#### `ios-native/Sources/MegrumApp/GoodsGridPresentation.swift`
+- `GoodsTileCollectionCardMetrics`、`GoodsTileCardPolicy`、`GoodsSelectionFooterMetrics`、`GoodsQuickActionKind`、`GoodsTileCollectionCardStyle` を移動した。
+- `GoodsGridLayout`、`GoodsGridContext`、`GoodsTilePresentation`、`GoodsTileActionPolicy`、`GoodsTileContextMenuPolicy`、`GoodsTileAction` を移動した。
+
+### 影響範囲
+
+- Swift Native iOS版のマイグッズ/Wishグリッド、タイル表示、選択footer、quick action、collection card表示。
+- 挙動変更ではなく責務分離。保存処理、DB/API payload、状態名、状態遷移、用語、画面レイアウトは変更しない。
+
+### 確認方法
+
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-goods-grid-build`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-goods-grid-tests --enable-xctest --disable-swift-testing -j 1 --filter 'GoodsGridLayoutTests|GoodsLocalStateReducerTests|GoodsEditorDraftTests|MegrumAppStateTests'`
+  - 131 tests passed
+
+### セルフレビュー結果
+
+- ✅ `GoodsGrid.swift` をグリッドView本体とaction handling中心へ薄くし、表示policy/metrics/action enumを専用ファイルへ分割した。
+- ✅ `GoodsGridLayoutTests` でタイル表示、collection card metrics、quick action、Wish collection pagingなどの既存仕様を確認した。
+- ✅ グッズdraft、local reducer、AppState周辺は対象テストで既存挙動維持を確認した。
+- ✅ 保存処理、DB/API payload、状態遷移、状態名、用語、画面レイアウトは変更していない。
+- ✅ 状態名・用語・DBスキーマの変更はないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション822：個別募集一覧のchrome部品を分割
 
 ### 背景・問題意識
