@@ -4,6 +4,46 @@
 
 ---
 
+## イテレーション817：個別募集条件previewを表示単位で分割
+
+### 背景・問題意識
+
+次の未処理上位候補として `ListingConditionDesignPreview.swift` を確認した。このファイルは、DEBUG用の個別募集条件デザインpreview本体、scenario/metrics/colors、上部header、条件switcher、受け取れる候補panel、候補row、thumbnail読み込みが同居していた。プレビューは今後、個別募集条件UIの見た目確認で触る可能性があるため、表示単位ごとに読み取り範囲を分ける。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/ListingConditionDesignPreview.swift`
+- preview本体、scenario、metrics、colors、Preview定義だけを残した。
+- ファイル行数を556行から107行へ縮小した。
+
+#### `ios-native/Sources/MegrumApp/ListingConditionDesignPreviewNavigation.swift`
+- header、丸アイコン、条件switcher、active/side condition cardを移動した。
+
+#### `ios-native/Sources/MegrumApp/ListingConditionDesignPreviewReceivePanel.swift`
+- split content、受け取れる候補panel、条件/画像/価格option row、tag chip、divider、thumbnail読み込みを移動した。
+- `ListingConditionThumbnail` は既存の右側panelからも参照されるため、モジュール内参照可能なまま維持した。
+
+### 影響範囲
+
+- Swift Native iOS版のDEBUG用 `individual-listing-condition` デザインpreview。
+- 挙動変更ではなく責務分離。実画面のDB/API payload、状態名、状態遷移、用語、画面レイアウトは変更しない。
+
+### 確認方法
+
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-listing-condition-preview-build`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-listing-condition-preview-tests --enable-xctest --disable-swift-testing -j 1 --filter 'IndividualListingDraftTests|SearchScreenTests'`
+  - 49 tests passed
+
+### セルフレビュー結果
+
+- ✅ 個別募集条件previewを本体/共通定義、上部navigation、受け取れる候補panel、既存の譲る/下部panelへ分割した。
+- ✅ DEBUG previewの表示値、文言、画像resource読み込み、panel構成は移動のみで維持した。
+- ✅ 実画面のDB/API payload、状態遷移、状態名、用語、画面レイアウトは変更していない。
+- ✅ 状態名・用語・DBスキーマの変更はないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション816：推し設定request sheetを分割
 
 ### 背景・問題意識
