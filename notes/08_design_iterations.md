@@ -4,6 +4,43 @@
 
 ---
 
+## イテレーション816：推し設定request sheetを分割
+
+### 背景・問題意識
+
+次の未処理上位候補として `OshiSettingsSheetViews.swift` を確認した。このファイルは、推しマスター選択sheet、ジャンルsegment、候補tag、推し追加リクエストsheet、メンバー追加リクエストsheet、リクエスト用filter chip/footerが同居していた。推し設定はオンボーディング・プロフィール編集・未登録推し/メンバー申請が交差するため、マスター選択と追加リクエストの読み取り範囲を分ける。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/OshiSettingsSheetViews.swift`
+- `OshiMasterSelectSheet`、ジャンルsegment、推しマスター候補tagを中心に残した。
+- ファイル行数を557行から294行へ縮小した。
+
+#### `ios-native/Sources/MegrumApp/OshiSettingsRequestSheets.swift`
+- `OshiRequestSheet`、`OshiMemberRequestSheet`、`OshiFilterChip`、リクエスト送信footerを移動した。
+- 推し/メンバー追加リクエストの入力、送信可否、payload生成は移動のみで維持した。
+
+### 影響範囲
+
+- Swift Native iOS版の推し設定、推しマスター選択sheet、推し追加リクエストsheet、メンバー追加リクエストsheet。
+- 挙動変更ではなく責務分離。DB/API payload、状態名、状態遷移、用語、画面レイアウトは変更しない。
+
+### 確認方法
+
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-oshi-sheet-build`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-oshi-sheet-tests --enable-xctest --disable-swift-testing -j 1 --filter 'OshiSettingsDraftTests|OnboardingOshiSelectionTests|OshiMasterSelectionTests|GoodsEditorDraftTests|SearchScreenTests'`
+  - 58 tests passed
+
+### セルフレビュー結果
+
+- ✅ 推しマスター選択sheetと推し/メンバー追加リクエストsheetを責務別ファイルへ分割した。
+- ✅ 追加リクエストの入力初期値、送信可否、payload生成は対象テストとbuildで維持を確認した。
+- ✅ DB/API payload、状態遷移、状態名、用語、画面レイアウトは変更していない。
+- ✅ 状態名・用語・DBスキーマの変更はないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション815：MeguriScreenを画面本体と操作extensionへ分割
 
 ### 背景・問題意識
