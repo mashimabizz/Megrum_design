@@ -4,6 +4,44 @@
 
 ---
 
+## イテレーション835：Account setupのmodeとvalidatorを分割
+
+### 背景・問題意識
+
+次の上位候補として `AccountSetupScreen.swift` を確認した。このファイルは、初回/編集mode別文言、draft validation、画面状態、推し選択UI、保存処理が同居していた。画面レイアウトや保存フローは変更せず、まず純粋なmode/validation定義を別ファイルへ移して、画面本体の読み取り範囲を狭める。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/AccountSetupScreen.swift`
+- `AccountSetupMode` と `AccountSetupDraftValidator` を移動した。
+- 画面状態、TextField、推し選択UI、保存処理、アクセシビリティ、layout値は残した。
+- ファイル行数を491行から405行へ縮小した。
+
+#### `ios-native/Sources/MegrumApp/AccountSetupModels.swift`
+- `AccountSetupMode` のonboarding/edit文言と `AccountSetupDraftValidator` を移動した。
+- header/navigation/save/completion文言、validation message、validation条件は変更していない。
+
+### 影響範囲
+
+- Swift Native iOS版の初回プロフィール設定、プロフィール編集、推し設定初期化、account setup validation。
+- 挙動変更ではなく責務分離。保存payload、推し選択状態、validation条件、画面レイアウト、文言、状態名、状態遷移、用語は変更しない。
+
+### 確認方法
+
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-account-setup-models-build`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-account-setup-models-tests --enable-xctest --disable-swift-testing -j 1 --filter 'AccountSetupScreenTests|OnboardingOshiSelectionTests|MegrumAppStateTests'`
+  - 87 tests passed
+
+### セルフレビュー結果
+
+- ✅ mode別文言とdraft validationを画面本体から分け、`AccountSetupScreen.swift` をUI/state/save中心へ近づけた。
+- ✅ account setup validator、onboarding oshi selection、app state account setup周辺は対象テストで既存挙動維持を確認した。
+- ✅ 保存payload、推し選択状態、validation条件、画面レイアウト、文言、状態遷移、状態名、用語は変更していない。
+- ✅ 状態名・用語・DBスキーマの変更はないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション834：Meguri state actionsを領域別に分割
 
 ### 背景・問題意識
