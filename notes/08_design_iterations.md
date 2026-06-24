@@ -4,6 +4,48 @@
 
 ---
 
+## イテレーション827：MatchRelationComposerを選択集約とスワイプ判定に分割
+
+### 背景・問題意識
+
+次の上位候補として `MatchRelationComposer.swift` を確認した。このファイルは、候補グッズの抽出、個別募集からrelation detailを作る処理、初期選択・popup・aggregate生成、横スワイプ判定が同居していた。マッチ関係画面は候補選択から打診作成へつながるため、ユーザー操作に近い選択集約と画面gesture判定を分け、relation detail生成本体の読み取り範囲を狭める。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/MatchRelationComposer.swift`
+- 候補グッズ抽出、relation detail生成、goods matching helperを残した。
+- ファイル行数を510行から225行へ縮小した。
+
+#### `ios-native/Sources/MegrumApp/MatchRelationSelectionComposer.swift`
+- 初期candidate/have選択、default popup target、選択candidate helper、aggregate生成を移動した。
+- `MatchRelationComposer` の既存static API名は維持した。
+
+#### `ios-native/Sources/MegrumApp/MatchRelationSwipeResolver.swift`
+- `MatchRelationSwipeDirection` と `MatchRelationSwipeResolver` を移動した。
+- スワイプ閾値、edge resistance、縦スクロール優先判定は変更していない。
+
+### 影響範囲
+
+- Swift Native iOS版のマッチ関係画面、candidate選択、wish popup、打診作成へ渡すaggregate、横スワイプ対象切替。
+- 挙動変更ではなく責務分離。選択API名、選択条件、スワイプ閾値、打診payload、状態名、状態遷移、用語、画面レイアウトは変更しない。
+
+### 確認方法
+
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-match-relation-composer-build`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-match-relation-composer-tests --enable-xctest --disable-swift-testing -j 1 --filter 'MatchRelationScreenTests|MatchRelationSelectionStateReducerTests|ProposalCreateFlowTests'`
+  - 73 tests passed
+
+### セルフレビュー結果
+
+- ✅ `MatchRelationComposer.swift` をrelation detail生成中心へ薄くし、選択集約とgesture判定を専用ファイルへ分けた。
+- ✅ MatchRelation screen、selection reducer、proposal create flow周辺は対象テストで既存挙動維持を確認した。
+- ✅ `MatchRelationComposer.initialCandidateSelection` などの既存呼び出し口は維持した。
+- ✅ 打診payload、状態遷移、状態名、用語、画面レイアウトは変更していない。
+- ✅ 状態名・用語・DBスキーマの変更はないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション826：MegrumRepository default実装を分割
 
 ### 背景・問題意識
