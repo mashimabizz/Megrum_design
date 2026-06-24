@@ -4,6 +4,45 @@
 
 ---
 
+## イテレーション841：Supabase proposal request builderを分割
+
+### 背景・問題意識
+
+次の上位候補として `SupabaseProposalClient.swift` を確認した。このファイルは、打診の実行系API処理、証跡写真処理、評価送信、テスト/previewで使うURLRequest生成が同居していた。既存の `SupabaseMessageClient` / `SupabaseGoodsInventoryClient` はrequest builderを別extensionに分けているため、同じ構造へ寄せ、保存実処理とrequest parity確認用の生成処理を読み分けやすくする。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumData/SupabaseProposalClient.swift`
+- `make*Request` 系メソッドを移動した。
+- `client` / `encoder` とrequest helperで使うquery item helperを、既存Data client分割と同じmodule内アクセスに揃えた。
+- 実行系の `loadProposals` / `createProposal` / `agreeProposal` / `addEvidencePhoto` / `approveEvidence` / `submitEvaluation` などは残した。
+- ファイル行数を507行から375行へ縮小した。
+
+#### `ios-native/Sources/MegrumData/SupabaseProposalClientRequests.swift`
+- proposal/evidence/evaluationのURLRequest生成メソッドを移動した。
+- request path、query items、select文字列、RPC function名、payload、validation順は変更していない。
+
+### 影響範囲
+
+- Swift Native iOS版のSupabase打診作成/合意/拒否/証跡/キャンセル承認/評価送信のrequest生成と実行系client。
+- 挙動変更ではなく責務分離。REST/RPC path、select文字列、payload column名、query item、validation、DB/API payload、状態名、状態遷移、用語は変更しない。
+
+### 確認方法
+
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-proposal-client-requests-build`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-proposal-client-requests-tests --enable-xctest --disable-swift-testing -j 1 --filter 'SupabaseProposalClientTests|SupabaseRequestParityTests|SupabaseChatPhotoStorageTests'`
+  - 36 tests passed
+
+### セルフレビュー結果
+
+- ✅ proposal clientのrequest builderを分け、`SupabaseProposalClient.swift` を実行系API処理中心へ薄くした。
+- ✅ Supabase proposal request、payload schema parity、chat photo storage周辺は対象テストで既存挙動維持を確認した。
+- ✅ REST/RPC path、select文字列、payload column名、query item、validation、DB/API payload、状態遷移、状態名、用語は変更していない。
+- ✅ 状態名・用語・DBスキーマの変更はないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション840：Proposal createのderived stateを分割
 
 ### 背景・問題意識
