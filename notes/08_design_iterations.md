@@ -4,6 +4,44 @@
 
 ---
 
+## イテレーション822：個別募集一覧のchrome部品を分割
+
+### 背景・問題意識
+
+次の未処理上位候補として `IndividualListingListViews.swift` を確認した。このファイルは、個別募集一覧content本体、top bar、loading skeleton、条件strip、現行の2カラムdesign card、empty state、追加ボタンに加えて、現行画面から未参照の旧card/hero表示部品が同居していた。個別募集一覧は自分の一覧と公開プロフィールの両方から参照されるため、現行contentと周辺chromeを分け、未使用部品を削除して読む範囲を狭める。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/IndividualListingListViews.swift`
+- `IndividualListingsContent` と `IndividualListingDesignCard` を残した。
+- ファイル行数を532行から155行へ縮小した。
+- 未使用だった `ListingHeroStack`、旧 `IndividualListingCard`、`ListingItemGroup`、`ListedItemLabel` を削除した。
+
+#### `ios-native/Sources/MegrumApp/IndividualListingListChromeViews.swift`
+- `IndividualListingTopBar`、`IndividualListingSkeletons`、`IndividualListingConditionStrip`、`EmptyListingView`、`AddIndividualListingButton` を移動した。
+
+### 影響範囲
+
+- Swift Native iOS版の個別募集一覧、自分の個別募集画面、公開プロフィール内の個別募集カード表示。
+- 挙動変更ではなく責務分離と未使用private View削除。保存処理、DB/API payload、状態名、状態遷移、用語、画面レイアウトは変更しない。
+
+### 確認方法
+
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-individual-list-build`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-individual-list-tests --enable-xctest --disable-swift-testing -j 1 --filter 'IndividualListingDraftTests|IndividualListingStateReducerTests|PublicUserProfileScreenTests|MegrumAppStateTests'`
+  - 125 tests passed
+
+### セルフレビュー結果
+
+- ✅ 個別募集一覧の本体/cardとchrome部品を分割し、未参照の旧card/hero表示部品を削除した。
+- ✅ `rg` で削除対象View群が実画面・テストから未参照であることを確認した。
+- ✅ 個別募集draft、state reducer、公開プロフィール経由、AppState周辺は対象テストで既存挙動維持を確認した。
+- ✅ 保存処理、DB/API payload、状態遷移、状態名、用語、画面レイアウトは変更していない。
+- ✅ 状態名・用語・DBスキーマの変更はないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション821：旧Home候補表示policyだけを残して未使用Viewを削除
 
 ### 背景・問題意識
