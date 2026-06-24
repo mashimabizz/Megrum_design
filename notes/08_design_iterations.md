@@ -4,6 +4,43 @@
 
 ---
 
+## イテレーション887：Vision face detection serviceを分割
+
+### 背景・問題意識
+
+次の候補として `FaceRecognitionServices.swift` を確認した。このファイルは、顔認識/タグ付けの抽象サービス、実写真/アニメ判定の統合サービス、Visionを使った顔検出、Exif orientation処理、Vision observationからMegrumモデルへの変換が同居していた。まず最も境界が明確なVision依存の低レベル顔検出だけを別ファイルへ移し、上位のタグ付け判断と分ける。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/FaceRecognitionServices.swift`
+- `VisionFaceDetectionService`、`VisionFaceDetectionConfiguration`、Vision同期検出helper、Face observation変換、Exif orientation helperを専用ファイルへ移動した。
+- CoreImage / ImageIO / Vision importを削除し、顔認識サービスの抽象・分類・タグ付け統合処理に寄せた。
+- ファイル行数を393行から290行へ縮小した。
+
+#### `ios-native/Sources/MegrumApp/VisionFaceDetectionService.swift`
+- Vision依存の顔検出実装と画像orientation/品質判定変換helperを追加した。
+- 画像読み込み失敗、Vision request失敗、bounding box変換、quality status判定、顔の並び順は既存挙動を維持した。
+
+### 影響範囲
+
+- Swift Native iOS版の顔検出、実写真/アニメ判定の前段、グッズ登録時の顔タグ候補生成、顔認識テスト。
+- 挙動変更ではなく責務分離。FaceMatchResolver、DefaultFaceTaggingService、UnifiedMemberTaggingService、Supabase保存payload、状態名、状態遷移、用語、DBスキーマは変更しない。
+
+### 確認方法
+
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-vision-face-detection-build --disable-index-store`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-vision-face-detection-tests --disable-index-store --enable-xctest --disable-swift-testing -j 1 --filter 'FaceTaggingServiceTests|FaceRecognitionModelTests|SupabaseFaceRecognitionClientTests'`
+  - 22 tests passed
+
+### セルフレビュー結果
+
+- ✅ Vision依存実装の移動だけに留め、顔検出、品質判定、タグ付けstatus、アニメ/実写真route、Supabase request生成は変更していない。
+- ✅ FaceTaggingServiceTests / FaceRecognitionModelTests / SupabaseFaceRecognitionClientTestsで、embedding provider未設定時のfallback、no face、auto match、anime route、threshold、API requestを確認した。
+- ✅ 状態名・用語・DBスキーマの変更はないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション886：Match relation screen state/actionsを分割
 
 ### 背景・問題意識
