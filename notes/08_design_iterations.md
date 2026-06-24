@@ -4,6 +4,44 @@
 
 ---
 
+## イテレーション870：Profile visual grid viewsを分割
+
+### 背景・問題意識
+
+次の候補として `ProfileVisualComponents.swift` を確認した。このファイルは、プロフィールタブ、grid item/tag model、hero density metrics、タブUI、グリッド表示、アバター表示が同居していた。自分プロフィール/相手プロフィールで共用するグリッド表示だけを別ファイルへ分け、プロフィールのモデル/タブ/hero metricsと一覧描画の入口を分離する。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/ProfileVisualComponents.swift`
+- `ProfileVisualGrid`、grid tile、condition tag、fallback tileを移動した。
+- `ProfileVisualTab`、grid/tag item model、tag size、hero density metrics、compact metrics、tabs、avatarは残した。
+- ファイル行数を388行から283行へ縮小した。
+
+#### `ios-native/Sources/MegrumApp/ProfileVisualGridViews.swift`
+- プロフィールの3列グリッド、空表示、選択可能tile、match tag overlay、画像fallbackを移動した。
+- グリッド列数、spacing、aspect ratio、match tag文言、fallback gradient、空表示文言は変更していない。
+
+### 影響範囲
+
+- Swift Native iOS版の自分プロフィール/相手プロフィールの譲るグッズ、個別募集、Wishのグリッド表示。
+- 挙動変更ではなく責務分離。プロフィールタブ、grid item生成、選択時route、hero metrics、状態名、状態遷移、用語は変更しない。
+
+### 確認方法
+
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-profile-grid-build --disable-index-store`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-profile-grid-tests --disable-index-store --enable-xctest --disable-swift-testing -j 1 --filter 'OwnProfileScreenTests|PublicUserProfileScreenTests'`
+  - 22 tests passed
+
+### セルフレビュー結果
+
+- ✅ グリッド表示の配置だけを分け、列数、spacing、aspect ratio、match tag、fallback表示、空表示文言は変更していない。
+- ✅ OwnProfileScreenTestsで、自分プロフィールのcompact header metrics、profile draft、avatar upload、推しtag summaryの既存挙動を確認した。
+- ✅ PublicUserProfileScreenTestsで、相手プロフィールのcompact header metrics、profile schedule、評価list state、推しtag表示の既存挙動を確認した。
+- ✅ 状態名・用語・DBスキーマの変更はないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション869：Proposal confirm card primitivesを分割
 
 ### 背景・問題意識
