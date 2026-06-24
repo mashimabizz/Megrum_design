@@ -4,6 +4,44 @@
 
 ---
 
+## イテレーション876：Home candidate composer utilitiesを分割
+
+### 背景・問題意識
+
+次の候補として `HomeCandidateComposer.swift` を確認した。このファイルは、ホームの候補section構築本体と、候補sort、交換方法許容、AW重なり、都道府県正規化、condition signal組み立て、重複排除が同居していた。マッチ候補/Wish hit/個別募集hitの中心ファイルなので、本体loopを読みやすくし、次の仕様調整で触る範囲を狭める。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/HomeCandidateComposer.swift`
+- `sections(from:)` と `wishRow` / `wishRowHasSameConfirmedCharacter` の入口を中心に残した。
+- sort、exchange、area、AW overlap、condition signal、dedupe helperを移動した。
+- ファイル行数を369行から238行へ縮小した。
+
+#### `ios-native/Sources/MegrumApp/HomeCandidateComposerUtilities.swift`
+- `sortedCandidates`、`conditionSignals`、`exchangeAllowsMail` / `exchangeAllowsLocal`、`activityWindowsOverlap`、`prefecturesMatch`、`orderedUnique`、`deduplicated` を移動した。
+- 候補並び順、local/mail default、AW overlap、エリア正規化、重複排除順、支払いcondition signalの意味は変更していない。
+
+### 影響範囲
+
+- Swift Native iOS版ホームのマッチ候補、ウィッシュでヒット、個別募集でヒット、候補condition tag、候補詳細sheetの信号値。
+- 挙動変更ではなく責務分離。Wish L1/L2一致、個別募集hit、支払い不明判定、状態名、状態遷移、用語、DBスキーマは変更しない。
+
+### 確認方法
+
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-home-candidate-utilities-build --disable-index-store`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-home-candidate-utilities-tests --disable-index-store --enable-xctest --disable-swift-testing -j 1 --filter 'HomeCandidateComposerTests|HomeMutualMatchLiveDataTests'`
+  - 17 tests passed
+  - 2 live Supabase tests skipped because `MEGRUM_LIVE_MICHILION_MUTUAL_MATCH_TEST` / `MEGRUM_LIVE_MUTUAL_MATCH_TEST` were not set
+
+### セルフレビュー結果
+
+- ✅ ホーム候補の本体loopと補助判定の配置だけを分け、候補分類、Wish L1/L2一致、個別募集hit、支払い/交換/エリア/AW condition signalは変更していない。
+- ✅ HomeCandidateComposerTestsで、L2指定WishはL2一致必須、L1のみWishはL1一致、空Wish fallback、個別募集hit、支払い未設定の不明表示、相互マッチ生成の既存挙動を確認した。
+- ✅ 状態名・用語・DBスキーマの変更はないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション875：Individual listing panel option viewsを分割
 
 ### 背景・問題意識
