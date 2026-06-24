@@ -4,6 +4,45 @@
 
 ---
 
+## イテレーション899：Trade detail status viewsを分割
+
+### 背景・問題意識
+
+`TradeDetailStatusViews.swift` は、合意返答パネル、取引詳細ヒーロー、異議申し立てバナーという用途の違うViewが同居していた。取引詳細ヘッダーの見た目、合意操作、異議申し立て導線を別々に調整しやすくするため、表示部品を責務別ファイルへ分割する。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/TradeDetailStatusViews.swift`
+- `TradeProposalResponsePanel` のみを残した。
+- ファイル行数を360行から180行へ縮小した。
+
+#### `ios-native/Sources/MegrumApp/TradeDetailHeroView.swift`
+- `TradeDetailHero` と内部chip描画を移動した。
+
+#### `ios-native/Sources/MegrumApp/TradeDisputeBannerView.swift`
+- `TradeDisputeBanner` を移動した。
+
+### 影響範囲
+
+- Swift Native iOS版の取引詳細画面、合意返答パネル、取引詳細ヘッダー、異議申し立てバナー。
+- 挙動変更ではなく責務分離。合意/見送り/再打診アクション、ヒーロー文言、status色、異議申し立て導線、アクセシビリティ文言、状態名、用語、DBスキーマは変更しない。
+
+### 確認方法
+
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-trade-status-views-build --disable-index-store`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-trade-status-views-tests --disable-index-store --enable-xctest --disable-swift-testing -j 1 --filter 'TradeChatAffordanceTests|TradeProposalStateReducerTests|DisputeDetailScreenTests|MegrumAppStateTests'`
+  - 143 tests passed
+
+### セルフレビュー結果
+
+- ✅ `TradeDetailHero` のstatus色、agreement/meta chip、accessibility label、影/枠線/余白は変更していない。
+- ✅ `TradeDisputeBanner` の文言、詳細open callback、アクセシビリティ文言、pink枠線は変更していない。
+- ✅ TradeChatAffordanceTests / DisputeDetailScreenTestsで、取引詳細ヒーロー、チャット入力状態、異議申し立てsummary/detail、運用メッセージを確認した。
+- ✅ 状態名・用語・DBスキーマの変更はないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション898：Proposal create sheet state/actionsを分割
 
 ### 背景・問題意識
