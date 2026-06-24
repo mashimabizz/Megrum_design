@@ -4,6 +4,42 @@
 
 ---
 
+## イテレーション891：Auth state supportを分割
+
+### 背景・問題意識
+
+`MegrumAuthState.swift` はサインイン/サインアップ/リフレッシュ/ログアウトの状態更新に加えて、認証操作のタイムアウト処理、メール確認必要時の判定、Supabase認証エラーの日本語メッセージ変換が同居していた。認証フロー本体を読みやすくするため、補助処理だけを別ファイルへ移す。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/MegrumAuthState.swift`
+- タイムアウトhelper、メール確認required判定、認証エラー文言変換を専用extensionへ移動した。
+- ファイル行数を381行から310行へ縮小した。
+
+#### `ios-native/Sources/MegrumApp/MegrumAuthStateSupport.swift`
+- `MegrumAuthStateError`、`withAuthTimeout`、`isLikelyEmailConfirmationRequiredAfterSignUp`、`normalizedMessage` を追加した。
+- 既存の日本語エラー文言、タイムアウト文言、SupabaseAuthErrorの判定順は維持した。
+
+### 影響範囲
+
+- Swift Native iOS版の認証状態管理、サインイン、サインアップ、Apple/Google認証、パスワード再設定、セッション復元/更新、ログアウト時のlocal session clear。
+- 挙動変更ではなく責務分離。repository呼び出し、sessionStore保存/削除、isLoading、feedback message、状態名、状態遷移、用語、DBスキーマは変更しない。
+
+### 確認方法
+
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-auth-state-support-build --disable-index-store`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-auth-state-support-tests --disable-index-store --enable-xctest --disable-swift-testing -j 1 --filter 'AuthScreenInputTests|MegrumAppStateTests/testAuthState|AuthSessionStoreTests'`
+  - 28 tests passed
+
+### セルフレビュー結果
+
+- ✅ 認証API呼び出し、入力validation、session activate/store、logout local clear、refresh session before use、timeout handling の挙動は変更していない。
+- ✅ AuthScreenInputTests / MegrumAppStateTests のAuthState系 / AuthSessionStoreTestsで、サインイン、サインアップ確認メール、Apple/Google、redirect復元、保存session復元、refresh、logout、timeout、feedback clearを確認した。
+- ✅ 状態名・用語・DBスキーマの変更はないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション890：Goods editor form stepsを分割
 
 ### 背景・問題意識
