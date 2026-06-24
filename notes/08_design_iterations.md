@@ -4,6 +4,48 @@
 
 ---
 
+## イテレーション866：Preview repository trade methodsを分割
+
+### 背景・問題意識
+
+次の上位候補として `PreviewMegrumRepositoryTrade.swift` を確認した。このファイルは、preview repositoryの提案作成/同意/拒否、キャンセル同意、証跡写真、評価、異議申し立て、チャット/位置/到着/遅延/キャンセル申請メッセージが同居していた。preview実装でも取引系の責務が広すぎるため、提案操作、証跡/評価/異議、メッセージ送信を読み分けられる構造へ分ける。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/PreviewMegrumRepositoryTrade.swift`
+- 提案作成、同意、拒否、キャンセル同意、accepted exchange method resolverだけを残した。
+- 証跡/評価/異議申し立てとメッセージ送信系を移動した。
+- ファイル行数を419行から160行へ縮小した。
+
+#### `ios-native/Sources/MegrumApp/PreviewMegrumRepositoryTradeEvidence.swift`
+- `addTradeEvidence`、`approveTradeEvidence`、`loadTradeEvidencePhotos`、`deleteTradeEvidencePhoto`、`submitTradeEvaluation`、`fileTradeDispute` を移動した。
+- preview証跡URL、approval/completed判定、評価payload、dispute ticketは変更していない。
+
+#### `ios-native/Sources/MegrumApp/PreviewMegrumRepositoryTradeMessages.swift`
+- `loadMessages`、text/photo/system/location/arrival/late/cancel request message送信とlate minutes labelを移動した。
+- message body、meta keys、photo URL、arrival status fallback bodyは変更していない。
+
+### 影響範囲
+
+- Swift Native iOS版preview repositoryの取引、証跡、評価、異議申し立て、チャット/位置/到着/遅延/キャンセル申請メッセージ。
+- 挙動変更ではなく責務分離。preview data、proposal status更新、message body/meta、状態名、状態遷移、用語は変更しない。
+
+### 確認方法
+
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-preview-repository-trade-build --disable-index-store`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-preview-repository-trade-tests --disable-index-store --enable-xctest --disable-swift-testing -j 1 --filter 'TradeProposalStateReducerTests|TradeMessageStateReducerTests|TradeEvidencePhotoStateReducerTests|TradeChatAffordanceTests'`
+  - 58 tests passed
+
+### セルフレビュー結果
+
+- ✅ preview repositoryの取引操作、証跡/評価/異議、メッセージ送信をファイル分割しただけで、payloadやbody/meta生成は変更していない。
+- ✅ buildで分割後のprotocol conformanceと参照切れがないことを確認した。
+- ✅ trade/evidence/message系の対象テストで状態reducerと表示affordanceの既存挙動を確認した。
+- ✅ 状態名・用語・DBスキーマの変更はないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション865：Proposal create derived stateを責務分割
 
 ### 背景・問題意識
