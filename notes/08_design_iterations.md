@@ -4,6 +4,49 @@
 
 ---
 
+## イテレーション859：Home discovery fixturesを種別分割
+
+### 背景・問題意識
+
+次の上位候補として `HomeDiscoveryFixtures.swift` を確認した。このファイルは、fixture helper、owner profile、condition signal、グッズfixture、個別募集selection、候補リスト、haves lookup payloadが1ファイルに集まっていた。ホーム発見のpreview/テストデータは今後も増えやすいため、グッズfixtureと候補fixtureを別ファイルへ分け、元ファイルを共通helper/プロフィール/condition tag定義に絞る。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/HomeDiscoveryFixtures.swift`
+- `imageURL` / `uuid` / 共通ID、owner profile、condition signal、condition tag helperだけを残した。
+- グッズfixture、候補fixture、haves payload、表示用goods配列を移動した。
+- extension側から使うため、fixture helperと共通IDを同一module内で参照できるstatic memberにした。
+- ファイル行数を534行から116行へ縮小した。
+
+#### `ios-native/Sources/MegrumApp/HomeDiscoveryGoodsFixtures.swift`
+- `selectedYellow`、`sanaLavender`、`momoFanmi`、`momoFanmiAlt`、`momoFanmiStand`、`sanaBadge`、`sanaStand`、`sanaKeychain`、`plush` を移動した。
+- グッズID、画像URL、group/member/goods type、tag、shape、palette、symbolは変更していない。
+
+#### `ios-native/Sources/MegrumApp/HomeDiscoveryCandidateFixtures.swift`
+- `miiIndividualListingSelection`、`userTagCandidates`、`userCandidates`、`havesCandidates`、`havesPayload`、`wantedGoods` / `offerGoods` / `otherListingHit` / `otherWishHit` を移動した。
+- 候補ID、condition signal、sheet payload、haves lookup payload、個別募集selection contextは変更していない。
+
+### 影響範囲
+
+- Swift Native iOS版のホーム発見preview/fixture、ホーム候補テスト、haves lookup、個別募集selection付き候補。
+- 挙動変更ではなくfixture責務分離。候補生成ロジック、match policy、ホーム画面、状態名、状態遷移、用語は変更しない。
+
+### 確認方法
+
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-home-discovery-fixtures-build --disable-index-store`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-home-discovery-fixtures-tests --disable-index-store --enable-xctest --disable-swift-testing -j 1 --filter 'HomeCandidateComposerTests|HomeDiscoveryMatchPolicyTests|HomeScreenFlowTests|HomeLocalModeTests'`
+  - 138 tests passed
+
+### セルフレビュー結果
+
+- ✅ fixtureデータだけを種別分割し、候補生成ロジックやmatch policyには触れていない。
+- ✅ ホーム候補composer、match policy、ホーム画面flow、ローカルモードは対象テストで既存挙動維持を確認した。
+- ✅ グッズID、画像URL、condition signal、sheet payload、haves lookup payload、個別募集selection context、状態名、用語は変更していない。
+- ✅ 状態名・用語・DBスキーマの変更はないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション858：Trade card viewsを分割
 
 ### 背景・問題意識
