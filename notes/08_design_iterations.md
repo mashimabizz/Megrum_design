@@ -4,6 +4,45 @@
 
 ---
 
+## イテレーション880：Trade message input modelsを分割
+
+### 背景・問題意識
+
+次の候補として `TradeMessageInputModels.swift` を確認した。このファイルは、チャット入力欄のquick/overflow action、入力context、利用不可action、到着/現在地/服装写真の送信intent、送信可否が同居していた。取引チャット入力は状態ごとに表示actionが変わるため、表示action modelと送信intentを分け、変更時に読む範囲を狭める。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/TradeMessageInputModels.swift`
+- すべての型を用途別ファイルへ移動し、集合ファイルを削除した。
+
+#### `ios-native/Sources/MegrumApp/TradeMessageInputActionModels.swift`
+- `TradeArrivalQuickAction`、`TradeMessageQuickActionKind`、`TradeMessageOverflowActionKind`、`TradeMessageInputActionPolicy`、`TradeMessageInputContext`、`TradeUnavailableChatAction` を移動した。
+- agreed/negotiating時のquick/overflow action構成、文言、SF Symbol、利用不可説明は変更していない。
+
+#### `ios-native/Sources/MegrumApp/TradeMessageSendIntents.swift`
+- `TradeArrivalStatusSendIntent`、`TradeLocationShareIntent`、`TradeOutfitPhotoSendIntent`、`TradeChatInputAvailability` を移動した。
+- arrival metadata、現在地label正規化、座標validation、服装写真body、送信可否statusは変更していない。
+
+### 影響範囲
+
+- Swift Native iOS版の取引チャット入力欄、quick actions、overflow actions、到着status、現在地共有、服装写真、チャット送信可否。
+- 挙動変更ではなく責務分離。取引状態、打診状態、メッセージpayload、状態名、状態遷移、用語、DBスキーマは変更しない。
+
+### 確認方法
+
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-trade-message-input-models-build --disable-index-store`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-trade-message-input-models-tests --disable-index-store --enable-xctest --disable-swift-testing -j 1 --filter 'TradeChatAffordanceTests'`
+  - 47 tests passed
+
+### セルフレビュー結果
+
+- ✅ チャット入力action modelと送信intentの配置だけを分け、quick/overflow action構成、arrival metadata、現在地validation、服装写真body、送信可否は変更していない。
+- ✅ TradeChatAffordanceTestsで、agreed/negotiation action policy、context表示、到着send intent、現在地validation、服装写真intent、チャット可否を確認した。
+- ✅ 状態名・用語・DBスキーマの変更はないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション879：Trade presentation modelsを用途別分割
 
 ### 背景・問題意識
