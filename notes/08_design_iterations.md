@@ -4,6 +4,44 @@
 
 ---
 
+## イテレーション838：Supabase home listing rowを分割
+
+### 背景・問題意識
+
+次の上位候補として `SupabaseHomeRows.swift` を確認した。このファイルは、home composition、local mode row、goods/user/listing/listing wish option/activity window/tag/notification row、select定義、柔軟decode helperが同居していた。DB/API境界は変更リスクが高いため、private helperに依存しないlisting rowだけをselect定義ごと別ファイルへ移し、home rows本体の読み取り範囲を狭める。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumData/SupabaseHomeRows.swift`
+- `SupabaseHomeListingRow` と `SupabaseHomeListingWishOptionRow` を移動した。
+- composition、local mode/goods/user/activity window/inventory tag/notification row、flexible decoder、UUID helperは残した。
+- ファイル行数を476行から370行へ縮小した。
+
+#### `ios-native/Sources/MegrumData/SupabaseHomeListingRows.swift`
+- 個別募集rowと募集wish option row、およびそれぞれの `select` 定義を移動した。
+- field名、decode default、select文字列、created/updated date decodeは変更していない。
+
+### 影響範囲
+
+- Swift Native iOS版のSupabase home composition取得、個別募集row decode、listing wish option decode、ホーム候補composer。
+- 挙動変更ではなく責務分離。REST request、select文字列、DB/API payload、decode default、候補生成、状態名、状態遷移、用語は変更しない。
+
+### 確認方法
+
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-home-listing-rows-build`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-home-listing-rows-tests --enable-xctest --disable-swift-testing -j 1 --filter 'SupabaseHomeClientTests|HomeCandidateComposerTests|HomeMutualMatchLiveDataTests|HomeMutualMatchConditionPoliciesTests'`
+  - 35 tests passed, 2 live Supabase tests skipped due to missing opt-in env vars
+
+### セルフレビュー結果
+
+- ✅ 個別募集rowとlisting wish option rowを分け、`SupabaseHomeRows.swift` をhome共通row/helper中心へ薄くした。
+- ✅ Supabase home request/decode、Home candidate composer、相互マッチ条件policy周辺は対象テストで既存挙動維持を確認した。
+- ✅ REST request、select文字列、DB/API payload、decode default、候補生成、状態遷移、状態名、用語は変更していない。
+- ✅ 状態名・用語・DBスキーマの変更はないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション837：Home screenのroute resolverを分割
 
 ### 背景・問題意識
