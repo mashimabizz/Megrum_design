@@ -4,6 +4,44 @@
 
 ---
 
+## イテレーション852：Proposal create initial state actionsを分割
+
+### 背景・問題意識
+
+iter851後の `ProposalCreateFlowActions.swift` には、header/completion action、初期読み込み、初期値seed、exchange method変更時のstep補正、message/meetup補助、visual QA state、step navigation、proposal作成送信が残っていた。proposal送信処理は取引導線の中心なので触れず、初期読み込み・初期seed・visual QA用seed・初期step反映を別extensionへ移して、作成画面の起動準備と送信処理を読み分けやすくする。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/ProposalCreateFlowActions.swift`
+- `prepareInitialProposalState`、初期load系、meetup/shipping default seed、exchange method変更時のstep補正、initial exchange/visual QA/initial step反映を移動した。
+- header/completion action、message制限、current location反映、step navigation、`createProposal()`、表示 helperは残した。
+- ファイル行数を343行から191行へ縮小した。
+
+#### `ios-native/Sources/MegrumApp/ProposalCreateFlowInitialStateActions.swift`
+- proposal作成flowの起動準備、必要catalog/address/paymentのload、listing summary由来のmeetup/shipping seed、visual QA seed、initial step反映を移動した。
+- load順、seed条件、exchange method変更時のstep補正、visual QA completion summary、initial step判定は変更していない。
+
+### 影響範囲
+
+- Swift Native iOS版の打診作成flow起動時の初期表示、個別募集経由の初期値反映、現地/郵送条件の初期seed、支払い方法同期、visual QA初期画面。
+- 挙動変更ではなく責務分離。proposal作成payload、送信処理、goods/cash選択、meetup候補保存、状態名、状態遷移、用語は変更しない。
+
+### 確認方法
+
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-proposal-initial-actions-build --disable-index-store`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-proposal-initial-actions-tests --disable-index-store --enable-xctest --disable-swift-testing -j 1 --filter 'ProposalCreateFlowTests|ProposalCreateSheetTests|TradeRequestDraftProposalCreateFlowTests'`
+  - 62 tests passed
+
+### セルフレビュー結果
+
+- ✅ 初期読み込み/初期seed/visual QA stateだけを分け、proposal送信処理には触れていない。
+- ✅ ProposalCreateFlow/Sheet、取引リクエストdraft経由のproposal作成条件は対象テストで既存挙動維持を確認した。
+- ✅ load順、seed条件、exchange method変更時のstep補正、visual QA completion summary、initial step判定、proposal作成payload、状態名、用語は変更していない。
+- ✅ 状態名・用語・DBスキーマの変更はないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション851：Proposal create selection actionsを分割
 
 ### 背景・問題意識
