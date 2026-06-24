@@ -4,6 +4,48 @@
 
 ---
 
+## イテレーション849：Goods collection results areaを分割
+
+### 背景・問題意識
+
+次の上位候補として `GoodsCollectionDisplayViews.swift` を確認した。このファイルは、一覧ヘッダー、列数切替、フィルタバー、chip、空状態、loading skeleton、結果グリッド/広告表示が同居していた。まず挙動を変えずに切り出しやすい下半分の結果表示だけを別ファイルへ移し、在庫/ウィッシュ一覧の読み込み・空状態・グリッド表示を追いやすくする。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/GoodsCollectionDisplayViews.swift`
+- `EmptyCollectionMessage`、`CollectionGridSkeleton`、`GoodsCollectionResultsArea` を移動した。
+- ヘッダー、列数切替、filter bar、choice chip、loading noticeは残した。
+- ファイル行数を453行から326行へ縮小した。
+
+#### `ios-native/Sources/MegrumApp/GoodsCollectionResultsArea.swift`
+- 空状態、loading skeleton、結果グリッド、結果下広告表示を移動した。
+- empty copy、skeleton layout、GoodsGrid引数、ad placement/display context、selection mode引数は変更していない。
+
+### 影響範囲
+
+- Swift Native iOS版のマイグッズ/ウィッシュ一覧、読み込み表示、空状態、結果グリッド、一覧下広告表示。
+- 挙動変更ではなく責務分離。filter条件、empty state文言、grid layout、selection state、広告表示条件、状態名、状態遷移、用語は変更しない。
+
+### 確認方法
+
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-goods-results-build`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-goods-results-tests --enable-xctest --disable-swift-testing -j 1 --filter 'GoodsGridLayoutTests|GoodsLocalStateReducerTests|IndividualListingDraftTests'`
+  - failed: `/tmp` のSwiftPM scratch蓄積により `No space left on device`
+- `rm -rf /tmp/megrum-ios-native-refactor-*`
+  - `/tmp` 空き容量を117MBから26GBへ回復
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-goods-results-tests --disable-index-store --enable-xctest --disable-swift-testing -j 1 --filter 'GoodsGridLayoutTests|GoodsLocalStateReducerTests|IndividualListingDraftTests'`
+  - 63 tests passed
+
+### セルフレビュー結果
+
+- ✅ 結果表示エリアだけを分け、filter stateや削除/編集/保存actionには触れていない。
+- ✅ 在庫グリッドlayout、local state reducer、個別募集draft周辺は対象テストで既存挙動維持を確認した。
+- ✅ empty copy、skeleton layout、GoodsGrid引数、selection mode、広告表示条件、状態遷移、状態名、用語は変更していない。
+- ✅ 状態名・用語・DBスキーマの変更はないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション848：Individual listing editor selection stateを分割
 
 ### 背景・問題意識
