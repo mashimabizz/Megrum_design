@@ -4,6 +4,43 @@
 
 ---
 
+## イテレーション883：Meguri map sceneを分割
+
+### 背景・問題意識
+
+次の候補として `MeguriMapViews.swift` を確認した。このファイルは、地図presentation modifier、Map本体、グルーム/掲示板annotation、範囲円、MapKit controls、上部chrome、recenter、読み込み、範囲判定、詳細sheetが同居していた。まずMap描画そのものを専用Viewへ分け、`MeguriMapScreen` を読み込み・選択・範囲判定の状態管理へ寄せる。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/MeguriMapViews.swift`
+- Map本体、範囲円、グルーム/掲示板annotation、Map controlsを `MeguriMapScene` へ移動した。
+- `rangeCircle` を匿名tupleから `MeguriMapRangeCircle` へ変更し、Map描画側へ渡す値を明示した。
+- ファイル行数を418行から387行へ縮小した。
+
+#### `ios-native/Sources/MegrumApp/MeguriMapScene.swift`
+- MapKitの描画責務として、camera binding、map kind、range circle、grooms/threads、out-of-range判定closure、open closureを受け取る専用Viewを追加した。
+- `@MapContentBuilder` でグルームannotationと掲示板annotationを分け、pin表示、lock表示、MapUserLocationButtonのVisual QA無効化は既存挙動を維持した。
+
+### 影響範囲
+
+- Swift Native iOS版のめぐりMap、グルームMap pin、掲示板Map pin、1km範囲円、Map controls、pinタップ時の範囲判定呼び出し。
+- 挙動変更ではなく責務分離。位置取得、投稿読み込み、1km access policy、詳細sheet、掲示板scope、状態名、状態遷移、用語、DBスキーマは変更しない。
+
+### 確認方法
+
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-meguri-map-scene-build --disable-index-store`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-meguri-map-scene-tests --disable-index-store --enable-xctest --disable-swift-testing -j 1 --filter 'MeguriAccessPolicyTests|MeguriFeedStateReducerTests|MeguriMessageReadStateReducerTests'`
+  - 14 tests passed
+
+### セルフレビュー結果
+
+- ✅ Map描画だけを分け、範囲円、annotation、pin lock表示、Map controls、pin tap時のopen判定呼び出しは維持した。
+- ✅ MeguriAccessPolicyTests / MeguriFeedStateReducerTests / MeguriMessageReadStateReducerTestsで、1km access policy、Map range、feed upsert、message read stateを確認した。
+- ✅ 状態名・用語・DBスキーマの変更はないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション882：Proposal meetup place input cardを分割
 
 ### 背景・問題意識

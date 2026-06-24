@@ -72,49 +72,18 @@ private struct MeguriMapScreen: View {
 
     var body: some View {
         ZStack(alignment: .top) {
-            Map(position: $cameraPosition, interactionModes: [.pan, .zoom, .rotate]) {
-                if let rangeCircle {
-                    MapCircle(center: rangeCircle.center, radius: rangeCircle.radius)
-                        .foregroundStyle(MegrumTheme.lavender.opacity(0.08))
-                        .stroke(MegrumTheme.lavender.opacity(0.42), lineWidth: 1.5)
-                }
-
-                switch kind {
-                case .grooms:
-                    ForEach(mapGrooms) { groom in
-                        Annotation("グルーム", coordinate: groom.coordinate) {
-                            Button {
-                                openGroomIfInRange(groom)
-                            } label: {
-                                GroomMapPin(groom: groom, isOutOfRange: isGroomOutOfRange(groom))
-                            }
-                            .buttonStyle(.plain)
-                        }
-                    }
-                case .boards:
-                    ForEach(appState.threads.compactMap(BoardMapAnnotation.init(thread:))) { annotation in
-                        Annotation(annotation.thread.title, coordinate: annotation.coordinate) {
-                            Button {
-                                openThreadIfInRange(annotation.thread)
-                            } label: {
-                                BoardMapPin(
-                                    thread: annotation.thread,
-                                    isOutOfRange: isBoardOutOfRange(annotation.thread)
-                                )
-                            }
-                            .buttonStyle(.plain)
-                        }
-                    }
-                }
-            }
-            .mapControls {
-                if !VisualQAPreviewMode.isEnabled(environment: ProcessInfo.processInfo.environment) {
-                    MapUserLocationButton()
-                }
-                MapCompass()
-                MapScaleView()
-            }
-            .ignoresSafeArea()
+            MeguriMapScene(
+                cameraPosition: $cameraPosition,
+                kind: kind,
+                rangeCircle: rangeCircle,
+                grooms: mapGrooms,
+                threads: appState.threads,
+                isVisualQAPreviewEnabled: VisualQAPreviewMode.isEnabled(environment: ProcessInfo.processInfo.environment),
+                isGroomOutOfRange: isGroomOutOfRange,
+                isBoardOutOfRange: isBoardOutOfRange,
+                onOpenGroom: openGroomIfInRange,
+                onOpenThread: openThreadIfInRange
+            )
 
             VStack(spacing: 10) {
                 MapGlassHeader(title: kind.title) {
@@ -281,11 +250,11 @@ private struct MeguriMapScreen: View {
         }
     }
 
-    private var rangeCircle: (center: CLLocationCoordinate2D, radius: CLLocationDistance)? {
+    private var rangeCircle: MeguriMapRangeCircle? {
         guard let coordinate = locationState.coordinate else {
             return nil
         }
-        return (coordinate.clLocationCoordinate, kind.radiusMeters)
+        return MeguriMapRangeCircle(center: coordinate.clLocationCoordinate, radius: kind.radiusMeters)
     }
 
     private var mapStatusMessage: String? {
