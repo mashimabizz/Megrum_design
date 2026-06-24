@@ -4,6 +4,44 @@
 
 ---
 
+## イテレーション856：Match relation option viewsを分割
+
+### 背景・問題意識
+
+次の上位候補として `MatchRelationScreenViews.swift` を確認した。このファイルは、マッチ関係シートの全体構成、個別募集カード、候補option、wish行、選択中サムネイル表示が同居していた。候補抽出や選択reducerには触れず、候補option/wish行の表示部品だけを別ファイルへ移して、シート構造と候補行の細部を読み分けやすくする。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/MatchRelationScreenViews.swift`
+- `MatchRelationOwnerLabel`、`MatchRelationOptionList`、`MatchRelationOptionGroup`、`MatchRelationWishRow` を移動した。
+- loading panel、section header、content、tree cardは残した。
+- ファイル行数を439行から206行へ縮小した。
+
+#### `ios-native/Sources/MegrumApp/MatchRelationOptionViews.swift`
+- owner label、候補option list、option group、wish row、選択中候補stripを移動した。
+- visible option/wish filter、matched優先sort、fallback have、popup target生成、selected candidate表示、accessibility hintは変更していない。
+
+### 影響範囲
+
+- Swift Native iOS版のマッチ関係シート、個別募集同士の候補表示、wish候補行、候補選択ポップアップ導線。
+- 挙動変更ではなく責務分離。候補抽出、候補選択、have選択、popup target、swipe resolver、状態名、状態遷移、用語は変更しない。
+
+### 確認方法
+
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-match-relation-options-build --disable-index-store`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-match-relation-options-tests --disable-index-store --enable-xctest --disable-swift-testing -j 1 --filter 'MatchRelationScreenTests|MatchRelationSelectionStateReducerTests'`
+  - 18 tests passed
+
+### セルフレビュー結果
+
+- ✅ 候補option/wish行の表示部品だけを分け、composer/reducer/swipe logicには触れていない。
+- ✅ マッチ関係の候補抽出、初期選択、popup copy、選択helper、swipe resolver、selection reducerは対象テストで既存挙動維持を確認した。
+- ✅ visible option/wish filter、matched優先sort、fallback have、popup target生成、selected candidate表示、accessibility hint、状態名、用語は変更していない。
+- ✅ 状態名・用語・DBスキーマの変更はないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション855：Trade detail derived stateを分割
 
 ### 背景・問題意識
