@@ -4,6 +4,44 @@
 
 ---
 
+## イテレーション882：Proposal meetup place input cardを分割
+
+### 背景・問題意識
+
+次の候補として `ProposalMeetupPlaceSheet.swift` を確認した。このファイルは、待ち合わせ場所sheet本体、場所名TextField、検索ボタン、検索結果リスト、MapKit検索/地図選択/現在地反映の状態処理が同居していた。まず表示責務として独立しやすい場所入力カードを切り出し、sheet本体を検索/地図選択の状態管理へ寄せる。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/ProposalMeetupPlaceSheet.swift`
+- 場所名入力カードのTextField、検索ボタン、検索結果表示を `ProposalMeetupPlaceInputCard` へ移動した。
+- 入力欄は1つだけなので、`Field.place` enumのFocusStateを `Bool` のFocusStateへ簡素化した。
+- `searchCurrentPlaceName()` を追加し、submit/検索ボタンの検索開始処理を親sheet側に残した。
+- ファイル行数を423行から375行へ縮小した。
+
+#### `ios-native/Sources/MegrumApp/ProposalMeetupPlaceInputCard.swift`
+- 場所名TextField、検索ボタン、検索中表示、検索結果リスト、focus時のborder強調を専用Viewへ移動した。
+- 検索実行と検索結果選択はclosureで親へ渡し、MapKit検索・draft更新・ピン同期の挙動は変更していない。
+
+### 影響範囲
+
+- Swift Native iOS版の個別打診作成時の待ち合わせ場所sheet、場所名検索、検索結果選択、TextField focus表示。
+- 挙動変更ではなく責務分離。MapKit検索、現在地反映、前回設定反映、地図ピン選択、保存payload、状態名、状態遷移、用語、DBスキーマは変更しない。
+
+### 確認方法
+
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-place-input-card-build --disable-index-store`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-place-input-card-tests --disable-index-store --enable-xctest --disable-swift-testing -j 1 --filter 'ProposalCreateFlowTests|ProposalCreateSheetTests|TradeRequestDraftProposalCreateFlowTests'`
+  - 62 tests passed
+
+### セルフレビュー結果
+
+- ✅ 入力カードの表示だけを分け、検索実行、検索結果選択、現在地/前回設定/地図選択、保存時のdraft正規化は変更していない。
+- ✅ ProposalCreateFlowTests / ProposalCreateSheetTests / TradeRequestDraftProposalCreateFlowTestsで、打診作成、待ち合わせ必須判定、meetup candidate draft、地図座標、カレンダー選択を確認した。
+- ✅ 状態名・用語・DBスキーマの変更はないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション881：Root authenticated contentを分割
 
 ### 背景・問題意識

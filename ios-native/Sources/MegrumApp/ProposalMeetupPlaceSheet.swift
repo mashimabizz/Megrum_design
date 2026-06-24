@@ -5,10 +5,6 @@ import MegrumDesign
 import SwiftUI
 
 struct ProposalMeetupPlaceSheet: View {
-    private enum Field: Hashable {
-        case place
-    }
-
     @Environment(\.dismiss) private var dismiss
     var route: ProposalMeetupPlaceSheetRoute
     var previousDraft: ProposalMeetupCandidateDraft?
@@ -27,7 +23,7 @@ struct ProposalMeetupPlaceSheet: View {
     @State private var activeSearchQuery: String?
     @State private var placeSearchTask: Task<Void, Never>?
     @State private var suppressNextPlaceSearch = false
-    @FocusState private var focusedField: Field?
+    @FocusState private var isPlaceFocused: Bool
 
     private static let fallbackCoordinate = CLLocationCoordinate2D(latitude: 35.681236, longitude: 139.767125)
     private static let mapSpan = MKCoordinateSpan(latitudeDelta: 0.008, longitudeDelta: 0.008)
@@ -120,7 +116,7 @@ struct ProposalMeetupPlaceSheet: View {
             }
         }
         .onAppear {
-            focusedField = .place
+            isPlaceFocused = true
             syncCameraToSelectedCoordinate(animated: false)
         }
         .onDisappear {
@@ -154,53 +150,16 @@ struct ProposalMeetupPlaceSheet: View {
     }
 
     private var placeInputCard: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("場所名")
-                .font(.system(size: 13, weight: .black, design: .rounded))
-                .foregroundStyle(MegrumTheme.muted)
-
-            HStack(spacing: 8) {
-                TextField("交換できる場所", text: $draft.placeName)
-                    .focused($focusedField, equals: .place)
-                    .font(.system(size: 18, weight: .heavy, design: .rounded))
-                    .foregroundStyle(MegrumTheme.ink)
-                    .proposalPlaceSheetTextInputBehavior()
-                    .onSubmit {
-                        Task {
-                            cancelPlaceSearch()
-                            await searchPlace(query: trimmedSearchQuery)
-                        }
-                    }
-
-                Button {
-                    Task {
-                        cancelPlaceSearch()
-                        await searchPlace(query: trimmedSearchQuery)
-                    }
-                } label: {
-                    if isSearchingPlace {
-                        ProgressView()
-                            .controlSize(.small)
-                    } else {
-                        Text("検索")
-                            .font(.system(size: 13, weight: .black, design: .rounded))
-                    }
-                }
-                .disabled(trimmedSearchQuery.isEmpty || isSearchingPlace)
-                .foregroundStyle(trimmedSearchQuery.isEmpty ? MegrumTheme.muted : MegrumTheme.lavender)
+        ProposalMeetupPlaceInputCard(
+            placeName: $draft.placeName,
+            isPlaceFocused: $isPlaceFocused,
+            searchResults: searchResults,
+            isSearchingPlace: isSearchingPlace,
+            onSearch: searchCurrentPlaceName,
+            onSelectSearchResult: { result in
+                applySearchResult(result)
             }
-            .padding(.horizontal, 14)
-            .frame(minHeight: 52)
-            .background(.white.opacity(0.86), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
-            .overlay {
-                RoundedRectangle(cornerRadius: 18, style: .continuous)
-                    .stroke(MegrumTheme.lavender.opacity(focusedField == .place ? 0.36 : 0.14), lineWidth: 1.2)
-            }
-
-            searchResultsSection
-        }
-        .padding(16)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+        )
     }
 
     private var mapCard: some View {
@@ -211,18 +170,6 @@ struct ProposalMeetupPlaceSheet: View {
             coordinateCaption: coordinateCaption,
             onSelectCoordinate: applyMapSelection
         )
-    }
-
-    @ViewBuilder
-    private var searchResultsSection: some View {
-        if !searchResults.isEmpty {
-            ProposalMeetupPlaceSearchResultsList(
-                results: searchResults,
-                onSelect: { result in
-                    applySearchResult(result)
-                }
-            )
-        }
     }
 
     private var statusRow: some View {
@@ -256,6 +203,13 @@ struct ProposalMeetupPlaceSheet: View {
         }
         isWaitingForCurrentLocation = true
         onRequestCurrentLocation()
+    }
+
+    private func searchCurrentPlaceName() {
+        Task {
+            cancelPlaceSearch()
+            await searchPlace(query: trimmedSearchQuery)
+        }
     }
 
     private func applyCurrentLocation(_ coordinate: MegrumLocationCoordinate) {
@@ -339,7 +293,7 @@ struct ProposalMeetupPlaceSheet: View {
         draft.latitudeText = ProposalMeetupMapDraft.coordinateText(result.coordinate.latitude)
         draft.longitudeText = ProposalMeetupMapDraft.coordinateText(result.coordinate.longitude)
         placeSearchError = nil
-        focusedField = nil
+        isPlaceFocused = false
         if clearsResults {
             searchResults = []
         }
