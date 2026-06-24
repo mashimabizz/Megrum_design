@@ -4,6 +4,43 @@
 
 ---
 
+## イテレーション874：Search result filter policyを分割
+
+### 背景・問題意識
+
+次の候補として `SearchFilterState.swift` を確認した。このファイルは、検索フィルターのdraft状態、条件マッチfilter、sort/presentation値と、検索結果を実際に絞り込む `SearchResultFilterPolicy` が同居していた。検索結果filterは「ウィッシュでヒット」「個別募集でヒット」「交換条件一致」「支払条件一致」に直結するため、状態定義から独立したファイルへ分け、条件ヒットロジックの入口を見つけやすくする。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/SearchFilterState.swift`
+- `SearchResultFilterPolicy` と関連private helperを移動した。
+- `SearchFilterDraft`、`SearchConditionMatchFilters`、`SearchResultSort`、`SearchFilterPresentation`、badge zIndexは残した。
+- ファイル行数を367行から172行へ縮小した。
+
+#### `ios-native/Sources/MegrumApp/SearchResultFilterPolicy.swift`
+- 検索結果filter、sort、wish match、partner individual listing match、payment method、exchange condition、viewer condition match helperを移動した。
+- member/goods type/tag/payment/exchange/wish/individual listing/condition matchの判定順と条件は変更していない。
+
+### 影響範囲
+
+- Swift Native iOS版の検索結果、検索フィルター、条件マッチfilter、ウィッシュでヒット、個別募集でヒット、交換条件/支払条件一致。
+- 挙動変更ではなく責務分離。フィルターdraft、active count、chip表示、sort、状態名、状態遷移、用語は変更しない。
+
+### 確認方法
+
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-search-result-filter-policy-build --disable-index-store`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-search-result-filter-policy-tests --disable-index-store --enable-xctest --disable-swift-testing -j 1 --filter 'SearchScreenTests'`
+  - 14 tests passed
+
+### セルフレビュー結果
+
+- ✅ 検索結果filter policyの配置だけを分け、wish/individual listing/payment/exchange conditionの判定順と条件は変更していない。
+- ✅ SearchScreenTestsで、検索filter draft、active criteria chip、Wish/支払いfilter、個別募集条件とviewer inventoryの既存挙動を確認した。
+- ✅ 状態名・用語・DBスキーマの変更はないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション873：Trade message input action viewsを分割
 
 ### 背景・問題意識
