@@ -4,6 +4,48 @@
 
 ---
 
+## イテレーション862：Home local mode modelsを責務分割
+
+### 背景・問題意識
+
+次の上位候補として `HomeLocalModeModels.swift` を確認した。このファイルは、現地モードの活動設定、公開preview、持参グッズ候補、持参ID codec、現在地ラベル、座標保存codecが同居していた。現地モードは表示・保存・位置パースの不具合調査入口になりやすいため、活動設定本体、持参グッズ、位置/座標codecを読み分けられる構造へ分ける。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/HomeLocalModeModels.swift`
+- `HomeLocalActivitySettings`、`HomeLocalActivityStatus`、`HomeLocalPublicPreview`、`HomeLocalActivityFormatter` だけを残した。
+- 持参グッズ候補/summary/selection codecと位置/座標codecを移動した。
+- ファイル行数を430行から238行へ縮小した。
+
+#### `ios-native/Sources/MegrumApp/HomeLocalCarryingModels.swift`
+- `HomeLocalCarryingCandidate`、`HomeLocalCarryingSummary`、`HomeLocalCarryingSelectionCodec` を移動した。
+- viewer item filter、重複除外、inventory優先fallback、選択ID encode/decode、summary文言は変更していない。
+
+#### `ios-native/Sources/MegrumApp/HomeLocalLocationModels.swift`
+- `HomeLocalLocationLabel`、`HomeLocalCoordinateStorageCodec`、座標文字列抽出用のprivate String helperを移動した。
+- 現在地ラベル文言、legacy座標text判定、座標valid範囲、保存用小数桁は変更していない。
+
+### 影響範囲
+
+- Swift Native iOS版のホーム現地モード設定、公開preview、持参グッズ選択、現在地/座標保存表示。
+- 挙動変更ではなく責務分離。保存payload、公開判定、持参候補の絞り込み、状態名、状態遷移、用語は変更しない。
+
+### 確認方法
+
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-home-local-models-build --disable-index-store`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-home-local-models-tests --disable-index-store --enable-xctest --disable-swift-testing -j 1 --filter 'HomeLocalModeTests'`
+  - 20 tests passed
+
+### セルフレビュー結果
+
+- ✅ 活動設定本体、持参グッズ、位置/座標codecを分けただけで、保存・公開preview・持参候補selectionの挙動は変更していない。
+- ✅ HomeLocalModeTestsで、持参候補filter/summary/codec、位置label/座標codec、公開preview、app state保存fallbackの既存挙動を確認した。
+- ✅ ビルドでファイル分割後の参照切れがないことを確認した。
+- ✅ 状態名・用語・DBスキーマの変更はないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション861：Home wish hit detail sheetを分割
 
 ### 背景・問題意識
