@@ -4,6 +4,45 @@
 
 ---
 
+## イテレーション857：Trade assistance request sheetを分割
+
+### 背景・問題意識
+
+次の上位候補として `TradeChatViews.swift` を確認した。このファイルは、チャット上部の相手strip、折りたたみサマリー、timestamp divider、合意compact bar、送信不可action sheet、遅刻/キャンセル申請フォームが同居していた。チャット表示の小部品と申請フォームは責務が違うため、まず独立している `TradeAssistanceRequestSheet` を別ファイルへ移して、取引チャット表示本体を読みやすくする。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/TradeChatViews.swift`
+- `TradeAssistanceRequestSheet` を移動した。
+- 未使用になった `PhotosUI` importを削除した。
+- partner strip、collapsed summary、timestamp divider、agreement compact bar、unavailable action sheetは残した。
+- ファイル行数を434行から320行へ縮小した。
+
+#### `ios-native/Sources/MegrumApp/TradeAssistanceRequestSheet.swift`
+- 遅刻/キャンセル申請フォーム、delay picker、理由/補足入力、確認toggle、送信プレビュー、送信toolbarを移動した。
+- `TradeAssistanceRequestDraft` の初期化、submit guard、送信中表示、accessibility label、文言は変更していない。
+
+### 影響範囲
+
+- Swift Native iOS版の取引チャット内の遅刻申請/キャンセル申請フォーム。
+- 挙動変更ではなく責務分離。システムintent生成、draft validation、チャット送信、取引状態、状態名、状態遷移、用語は変更しない。
+
+### 確認方法
+
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-trade-assistance-sheet-build-2 --disable-index-store`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-trade-assistance-sheet-tests-2 --disable-index-store --enable-xctest --disable-swift-testing -j 1 --filter 'TradeRequestDraftTests|TradeChatAffordanceTests'`
+  - 53 tests passed
+
+### セルフレビュー結果
+
+- ✅ 遅刻/キャンセル申請フォームだけを分け、チャット送信actionやdraft modelには触れていない。
+- ✅ 取引チャットaffordanceと申請draftは対象テストで既存挙動維持を確認した。
+- ✅ `TradeAssistanceRequestDraft` 初期化、submit guard、送信中表示、accessibility label、文言、システムintent生成、状態名、用語は変更していない。
+- ✅ 状態名・用語・DBスキーマの変更はないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション856：Match relation option viewsを分割
 
 ### 背景・問題意識
