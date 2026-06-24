@@ -4,6 +4,44 @@
 
 ---
 
+## イテレーション861：Home wish hit detail sheetを分割
+
+### 背景・問題意識
+
+次の上位候補として `HomeDiscoveryHitDetailSheets.swift` を確認した。このファイルは、個別募集ヒット詳細、Wishヒット詳細、Wishヒット用offer filter policy、提案時の交換方法helperが同居していた。グッズヒット側とWishヒット側は画面上の役割が違うため、まず `HomeWishHitDetailSheet` と `HomeWishHitOfferGoodsPolicy` を別ファイルへ移して、グッズヒット詳細の選択ロジックを追いやすくする。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/HomeDiscoveryHitDetailSheets.swift`
+- `HomeWishHitDetailSheet` と `HomeWishHitOfferGoodsPolicy` を移動した。
+- `HomeGoodsHitDetailSheet` と `HomeCandidateConditionSignals.preferredProposalExchangeMethod` は残した。
+- ファイル行数を431行から302行へ縮小した。
+
+#### `ios-native/Sources/MegrumApp/HomeWishHitDetailSheet.swift`
+- Wishヒット詳細シート、譲れるWish候補grid、候補数badge、初期選択、proposal開始、Wishヒット用offer filter policyを移動した。
+- matchedOfferGoodsIDsが空なら候補を出さない挙動、preferredOfferGoodsID ordering、preselectFirstOffer、startProposal payloadは変更していない。
+
+### 影響範囲
+
+- Swift Native iOS版のホーム発見シートのうち、Wishヒット詳細と「あなたが譲れる相手のWish」候補表示。
+- 挙動変更ではなく責務分離。個別募集ヒット詳細、proposal selection、Wish候補filter、交換方法helper、状態名、状態遷移、用語は変更しない。
+
+### 確認方法
+
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-home-wish-hit-sheet-build --disable-index-store`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-home-wish-hit-sheet-tests --disable-index-store --enable-xctest --disable-swift-testing -j 1 --filter 'HomeDiscoveryMatchPolicyTests'`
+  - 55 tests passed
+
+### セルフレビュー結果
+
+- ✅ Wishヒット詳細とWish用offer policyだけを分け、個別募集ヒット詳細の選択reducerやproposal payload生成には触れていない。
+- ✅ Wishヒットoffer filter、haves lookup、other exchange policy、ホーム発見policyは対象テストで既存挙動維持を確認した。
+- ✅ matchedOfferGoodsIDsが空なら候補を出さない挙動、preferredOfferGoodsID ordering、preselectFirstOffer、startProposal payload、状態名、用語は変更していない。
+- ✅ 状態名・用語・DBスキーマの変更はないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション860：Meguri design preview sheet viewsを分割
 
 ### 背景・問題意識
