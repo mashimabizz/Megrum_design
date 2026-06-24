@@ -1,6 +1,20 @@
 import Foundation
 import MegrumCore
 
+enum HomeSettingsRoute: Identifiable, Equatable {
+    case exchange
+    case payment
+
+    var id: String {
+        switch self {
+        case .exchange:
+            "exchange"
+        case .payment:
+            "payment"
+        }
+    }
+}
+
 public enum MegrumTab: String, CaseIterable, Identifiable, Sendable {
     case home
     case inventory

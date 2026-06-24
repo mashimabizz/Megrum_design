@@ -4,6 +4,47 @@
 
 ---
 
+## イテレーション825：MegrumRootの補助Viewを分割
+
+### 背景・問題意識
+
+次の未処理上位候補として `MegrumRootView.swift` を確認した。このファイルは、認証済みrootの分岐、drawer/通知/VisualQA routing、tab rootの状態管理に加えて、loading/failure表示とVisualQA proposal presentation modifierが同居していた。root本体は認証・通知・drawer・VisualQAが絡むため、まず低リスクな補助Viewとroute enumだけを外へ出し、入口画面の読み取り範囲を狭める。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/MegrumRootView.swift`
+- root状態管理、認証済みroot分岐、drawer destination、通知route intent処理を残した。
+- `NativeLoadingScreen`、`NativeLoadingFailureScreen`、`rootVisualQAProposalPresentation` を移動した。
+- 未使用になった `MegrumDesign` importを削除した。
+- ファイル行数を538行から427行へ縮小した。
+
+#### `ios-native/Sources/MegrumApp/MegrumRootAuxiliaryViews.swift`
+- loading screen、loading failure screen、VisualQA proposal presentation modifierを移動した。
+
+#### `ios-native/Sources/MegrumApp/MegrumRootRouting.swift`
+- `HomeSettingsRoute` をroot routing側へ移動した。
+
+### 影響範囲
+
+- Swift Native iOS版のアプリroot、認証中loading/error表示、VisualQA proposal presentation、ホーム設定sheet route。
+- 挙動変更ではなく責務分離。認証、通知route、drawer、タブ遷移、DB/API payload、状態名、状態遷移、用語、画面レイアウトは変更しない。
+
+### 確認方法
+
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-root-aux-build`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-root-aux-tests --enable-xctest --disable-swift-testing -j 1 --filter 'MegrumAppStateTests|NotificationRouteTests|MegrumTabBarAppearanceTests|AppDrawerGestureTests|AuthScreenInputTests'`
+  - 118 tests passed
+
+### セルフレビュー結果
+
+- ✅ `MegrumRootView.swift` から補助Viewとpresentation modifierを分け、root本体を認証/通知/drawer/tab routing中心へ薄くした。
+- ✅ AuthState、AppState、通知route、tab appearance、drawer gesture周辺は対象テストで既存挙動維持を確認した。
+- ✅ 認証、通知route、drawer、タブ遷移、DB/API payload、状態遷移、状態名、用語、画面レイアウトは変更していない。
+- ✅ 状態名・用語・DBスキーマの変更はないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション824：GoodsEditor draftモデルを分割
 
 ### 背景・問題意識
