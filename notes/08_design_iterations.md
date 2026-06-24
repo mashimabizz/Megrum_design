@@ -4,6 +4,48 @@
 
 ---
 
+## イテレーション819：Meguri掲示板bottom sheetを表示部品へ分割
+
+### 背景・問題意識
+
+次の未処理上位候補として `MeguriBoardBottomSheetViews.swift` を確認した。このファイルは、bottom sheetのdetent/layout、sheet本体、grabber、グルーム/掲示板のクイックアクション、掲示板thread一覧、thumbnail/avatar、scope selector、empty state、thread表示タグが同居していた。めぐり画面は位置情報・グルーム・掲示板が交差するため、sheetの状態/レイアウトと表示部品の読み取り範囲を分ける。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/MeguriBoardBottomSheetViews.swift`
+- `MeguriBoardSheetDetent`、`MeguriBoardSheetLayout`、`MeguriBoardBottomSheet` 本体を残した。
+- ファイル行数を545行から158行へ縮小した。
+
+#### `ios-native/Sources/MegrumApp/MeguriBoardBottomSheetChrome.swift`
+- sheet grabber、上部のグルーム/掲示板クイックアクション、クイックアクションrowを移動した。
+
+#### `ios-native/Sources/MegrumApp/MeguriBoardThreadListViews.swift`
+- 掲示板threadのloading/empty/list状態、thread row、thumbnail、avatar stack、empty state、thread表示タグを移動した。
+
+#### `ios-native/Sources/MegrumApp/MeguriBoardScopeSelector.swift`
+- 既存のscope selector部品を単独ファイルへ移動した。
+
+### 影響範囲
+
+- Swift Native iOS版のめぐり画面の掲示板bottom sheet、グルーム/掲示板投稿導線、掲示板thread一覧表示。
+- 挙動変更ではなく責務分離。DB/API payload、状態名、状態遷移、用語、画面レイアウトは変更しない。
+
+### 確認方法
+
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-meguri-board-sheet-build`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-meguri-board-sheet-tests --enable-xctest --disable-swift-testing -j 1 --filter 'MeguriAccessPolicyTests|MeguriFeedStateReducerTests|ReplyThreadStateReducerTests|MeguriMessageReadStateReducerTests|MeguriNoticeResolverTests|MegrumAppStateTests'`
+  - 100 tests passed
+
+### セルフレビュー結果
+
+- ✅ めぐり掲示板bottom sheetを本体/layout、chrome、thread list、scope selectorへ分割した。
+- ✅ bottom sheet detent計算、掲示板/グルーム状態処理、返信thread reducer、notice resolver、AppState周辺は対象テストで維持を確認した。
+- ✅ DB/API payload、状態遷移、状態名、用語、画面レイアウトは変更していない。
+- ✅ 状態名・用語・DBスキーマの変更はないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション818：Supabase repository委譲を領域別extensionへ分割
 
 ### 背景・問題意識
