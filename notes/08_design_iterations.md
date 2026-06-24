@@ -4,6 +4,43 @@
 
 ---
 
+## イテレーション826：MegrumRepository default実装を分割
+
+### 背景・問題意識
+
+次の未処理上位候補として `MegrumRepository.swift` を確認した。このファイルは、snapshot/input/error、repository protocolの要求一覧、全領域のdefault fallback実装が同居していた。RepositoryはPreview/Supabase/テストstubの境界なので、まずprotocol本体とdefault fallbackを分けて、実装境界の読み取り範囲を狭める。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/MegrumRepository.swift`
+- snapshot/input/errorと `MegrumRepository` protocol本体を残した。
+- ファイル行数を526行から197行へ縮小した。
+
+#### `ios-native/Sources/MegrumApp/MegrumRepositoryDefaults.swift`
+- `MegrumRepository` のdefault fallback実装を移動した。
+- fallbackの戻り値、`unsupportedMutation`、no-op実装は変更していない。
+
+### 影響範囲
+
+- Swift Native iOS版のPreview/Supabase/test repository境界全般。
+- 挙動変更ではなく責務分離。Repository protocol要求、各repository実装、DB/API payload、状態名、状態遷移、用語、画面レイアウトは変更しない。
+
+### 確認方法
+
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-repository-defaults-build`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-repository-defaults-tests --enable-xctest --disable-swift-testing -j 1 --filter 'MegrumAppStateTests|HomeDiscoveryMatchPolicyTests|PublicUserProfileScreenTests|SupabaseInitialSnapshotLoaderTests|SupabaseGoodsEntryPersistenceTests'`
+  - 151 tests passed
+
+### セルフレビュー結果
+
+- ✅ `MegrumRepository.swift` をsnapshot/input/error/protocol本体中心へ薄くし、default fallback実装を専用ファイルへ分割した。
+- ✅ AppState、home discovery、public profile、Supabase initial snapshot、goods entry persistence周辺は対象テストで既存挙動維持を確認した。
+- ✅ Repository protocol要求、Preview/Supabase repository実装、DB/API payload、状態遷移、状態名、用語、画面レイアウトは変更していない。
+- ✅ 状態名・用語・DBスキーマの変更はないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション825：MegrumRootの補助Viewを分割
 
 ### 背景・問題意識
