@@ -4,6 +4,45 @@
 
 ---
 
+## イテレーション914：Home owner summary modelsを分割
+
+### 背景・問題意識
+
+`HomeMockGoodsModels.swift` は、ホーム候補で使うgoods表示モデル本体、fixture生成helper、`GoodsItem` からの表示モデル変換、owner summary、個別募集由来の交換手段summary、shape/palette推定が1ファイルに同居していた。直近のマッチ候補シートではユーザーアイコン、プロフィール遷移、支払い/交換条件表示の調整が続いているため、owner表示・交換summaryをgoods表示モデル本体から分離し、表示修正時に触る範囲を小さくする。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/HomeMockGoodsModels.swift`
+- `HomeMockGoods`、`HomeMockGoodsShape`、`HomeMockGoods.make(...)`、`HomeMockGoods.from(...)`、shape/palette推定に絞った。
+- ファイル行数を332行から233行へ縮小した。
+
+#### `ios-native/Sources/MegrumApp/HomeDiscoveryOwnerSummaryModels.swift`
+- `HomeDiscoveryGoodsOwnerSummary` と `HomeDiscoveryOwnerExchangeSummary` を新規ファイルへ移動した。
+- owner initial、性別/年齢、評価/交換件数copy、個別募集ヒット時の交換手段/送料detail生成は維持した。
+
+### 影響範囲
+
+- Swift Native iOS版ホーム候補シート、Wish/グッズヒットsheet、owner avatar/user summary、交換手段/支払い条件表示、プロフィール導線で使うowner summary。
+- 挙動変更ではなく責務分離。goods表示モデル変換、owner fallback、交換手段summary、状態名、用語、DBスキーマは変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumApp/HomeMockGoodsModels.swift ios-native/Sources/MegrumApp/HomeDiscoveryOwnerSummaryModels.swift`
+  - passed
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-home-mock-goods-build --disable-index-store`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-home-mock-goods-tests --disable-index-store --enable-xctest --disable-swift-testing -j 1 --filter 'HomeDiscoveryMatchPolicyTests|HomeScreenFlowTests|HomeCandidateComposerTests'`
+  - 118 tests passed
+
+### セルフレビュー結果
+
+- ✅ owner summaryのinitial、評価/交換件数、性別/年齢、prefecture、avatar URL、display name fallbackは移動のみで維持した。
+- ✅ 個別募集ヒット時の交換手段summary、`どちらもOK` 表示normalize、送料detail、blank除外は変更していない。
+- ✅ HomeDiscoveryMatchPolicyTests / HomeCandidateComposerTests / HomeScreenFlowTestsで、owner summary、候補生成、Wish/グッズヒット、home tab/候補導線を確認した。
+- ✅ 状態名・用語・DBスキーマの変更はないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション913：Home discovery candidate factoryを分割
 
 ### 背景・問題意識
