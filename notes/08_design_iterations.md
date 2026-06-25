@@ -4,6 +4,43 @@
 
 ---
 
+## イテレーション1080：dispute status chipを分離
+
+### 背景・問題意識
+
+`DisputeDetailLoadedListComponents.swift` の `DisputeStatusHeader` は、ヘッダー本体の状態アイコン/説明表示とstatus chipの描画helperを同じ型に抱えていた。ヘッダー本体を状態に応じてどのchipを出すかへ集中させるため、chip表示を専用Viewへ分離する。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/DisputeDetailLoadedListComponents.swift`
+- `statusChip(title:value:)` helperを削除し、`DisputeStatusChip` 呼び出しへ置き換えた。
+- 受付、反論、運営、完了の表示条件と日付/期限表示は維持した。
+
+#### `ios-native/Sources/MegrumApp/DisputeStatusChip.swift`
+- `DisputeStatusChip` を追加し、title/valueのfont、foreground、line limit、minimum scale、padding、backgroundを担当させた。
+
+### 影響範囲
+
+- Swift Native iOS版の異議申し立て詳細ヘッダー。
+- 異議申し立て状態、返信可否、withdrawal、DB/API、状態名、表示文言は変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumApp/DisputeDetailLoadedListComponents.swift ios-native/Sources/MegrumApp/DisputeStatusChip.swift`
+  - passed
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-dispute-status-chip`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-dispute-status-chip --enable-xctest --disable-swift-testing -j 1 --filter 'DisputeDetailScreenTests|TradeEvidencePhotoStateReducerTests'`
+  - passed（17 tests）
+
+### セルフレビュー結果
+
+- ✅ status chipのfont、foreground、line limit、minimum scale、padding、backgroundを維持した。
+- ✅ `DisputeDetailLoadedListComponents.swift` は 218行から 201行へ縮小し、status chipを 23行の専用ファイルへ分離した。
+- ✅ 新しい状態名・用語・DB列は追加していないため、`notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション1079：meguri thread row metaを分離
 
 ### 背景・問題意識

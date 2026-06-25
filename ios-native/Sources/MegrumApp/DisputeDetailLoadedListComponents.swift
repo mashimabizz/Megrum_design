@@ -26,13 +26,13 @@ struct DisputeStatusHeader: View {
             }
 
             HStack(spacing: 8) {
-                statusChip(title: "受付", value: model.submittedAt.formatted(date: .abbreviated, time: .shortened))
+                DisputeStatusChip(title: "受付", value: model.submittedAt.formatted(date: .abbreviated, time: .shortened))
                 if model.canSubmitReply {
-                    statusChip(title: "反論", value: model.replyCountdownText())
+                    DisputeStatusChip(title: "反論", value: model.replyCountdownText())
                 } else if let operatorDeadlineAt = model.operatorDeadlineAt, model.status == .arbitration {
-                    statusChip(title: "運営", value: operatorDeadlineAt.formatted(date: .abbreviated, time: .shortened))
+                    DisputeStatusChip(title: "運営", value: operatorDeadlineAt.formatted(date: .abbreviated, time: .shortened))
                 } else if let resolvedAt = model.resolvedAt, model.status == .resolved || model.status == .withdrawn {
-                    statusChip(title: "完了", value: resolvedAt.formatted(date: .abbreviated, time: .shortened))
+                    DisputeStatusChip(title: "完了", value: resolvedAt.formatted(date: .abbreviated, time: .shortened))
                 }
             }
 
@@ -51,22 +51,6 @@ struct DisputeStatusHeader: View {
             RoundedRectangle(cornerRadius: 26, style: .continuous)
                 .strokeBorder(.white.opacity(0.72), lineWidth: 1)
         }
-    }
-
-    private func statusChip(title: String, value: String) -> some View {
-        VStack(alignment: .leading, spacing: 3) {
-            Text(title)
-                .font(.system(size: 11, weight: .heavy, design: .rounded))
-                .foregroundStyle(MegrumTheme.muted)
-            Text(value)
-                .font(.system(size: 13, weight: .heavy, design: .rounded))
-                .foregroundStyle(MegrumTheme.ink)
-                .lineLimit(1)
-                .minimumScaleFactor(0.78)
-        }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 9)
-        .background(.white.opacity(0.72), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
     }
 }
 
