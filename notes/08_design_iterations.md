@@ -4,6 +4,45 @@
 
 ---
 
+## イテレーション1050：proposal create sheet sectionsを分割
+
+### 背景・問題意識
+
+`ProposalCreateSheet.swift` は、作成処理、位置情報同期、初期選択、meetup補正に加えて、ヘッダー、対象カード、出すもの、交換手段、条件タグ、メッセージ、submit button の表示もbody内に抱えていた。親Viewは入力状態と保存処理に集中させ、静的な表示セクションを専用Viewへ分離した。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/ProposalCreateSheet.swift`
+- ヘッダー、対象カード、出すもの、交換手段、条件タグ、メッセージ、submit buttonを専用Viewへ委譲した。
+- `ProposalMeetupForm`、初期化、住所読み込み、交換手段変更、meetup時刻補正、現在地反映、作成処理は親Viewに残した。
+
+#### `ios-native/Sources/MegrumApp/ProposalCreateSheetSections.swift`
+- `ProposalCreateSheetHeader`、`ProposalCreateTargetCard`、`ProposalCreateSenderGoodsSection`、`ProposalCreateExchangeMethodSection`、`ProposalCreateConditionTagsSection`、`ProposalCreateMessageSection`、`ProposalCreateSubmitButton` を追加した。
+- 既存のfont、spacing、material背景、goods choice、tag選択style、submit button disabled/opacity、progress表示を維持した。
+
+### 影響範囲
+
+- Swift Native iOS版の旧打診作成sheet。
+- 対象表示、出すもの選択、交換手段、条件タグ、メッセージ、submit buttonの表示構成。
+- 作成payload、meetup入力、住所読み込み、位置情報、状態名、用語、DBスキーマ、表示文言は変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumApp/ProposalCreateSheet.swift ios-native/Sources/MegrumApp/ProposalCreateSheetSections.swift`
+  - passed
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-proposal-create-sheet-sections`
+  - passed
+
+### セルフレビュー結果
+
+- ✅ 静的な表示セクションだけを専用Viewへ移動し、保存処理・初期化・位置情報・meetup補正は親Viewに残した。
+- ✅ header、target card、goods choice、交換手段picker、tag grid、message field、submit buttonの既存styleを維持した。
+- ✅ 新ファイルには廃止用語を追加していない。
+- ✅ `ProposalCreateSheet.swift` は 252行から 106行へ縮小し、表示セクションを 231行の専用ファイルへ分離した。
+- ✅ 新しい状態名・用語・DB列は追加していないため、`notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション1049：proposal flow step contentを分離
 
 ### 背景・問題意識
