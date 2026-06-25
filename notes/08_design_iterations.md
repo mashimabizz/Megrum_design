@@ -4,6 +4,67 @@
 
 ---
 
+## イテレーション981：個別募集詳細の交換条件表示と相手募集データを補正
+
+### 背景・問題意識
+
+ホームのマッチ候補で個別募集経由のグッズ◎画像をタップした後、上部の「現地交換・郵送OK」表示が紫の大きなバッジで目立ちすぎていた。また、「個別募集の詳細を見る」で表示する組み合わせが、相手が設定している個別募集そのものではなく、打診に使える候補へ寄った見え方になり、譲るものが複数ある時や条件指定の時に実際の募集と違って見える可能性があった。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/HomeDiscoveryOwnerSummaryModels.swift`
+#### `ios-native/Sources/MegrumApp/HomeDiscoveryOwnerSummaryViews.swift`
+- 個別募集経由の候補シート上部の交換条件を、紫塗りバッジではなく「交換条件」小見出し + 本文の静かな表示へ変更した。
+- `どちらもOK` / `現地交換・郵送OK` は、このシート内では `現地交換、郵送OK` と表示するようにした。
+- 支払い条件と近い文字サイズ・表示密度に揃えた。
+
+#### `ios-native/Sources/MegrumApp/HomeCandidateConditionSignals.swift`
+#### `ios-native/Sources/MegrumApp/HomeCandidateListingMatchPolicy.swift`
+#### `ios-native/Sources/MegrumApp/HomeCandidateComposer.swift`
+- 個別募集詳細ポップアップ用に、求めるもののpreview画像を保持できる `HomeIndividualListingWantedPreviewItem` を追加した。
+- 打診操作用の `wantedOptions` はこれまで通り「自分が出せる条件」に絞りつつ、詳細ポップアップ用の `detail.wantedOptions` は相手の募集に登録されている条件全体を保持するようにした。
+- 相手の譲るものが `have_ids` 指定の場合はそのID群を、グループ/種別などの条件指定の場合は相手の在庫から条件一致する譲るもの全体を、詳細ポップアップ用 `offeredItems` へ詰めるようにした。
+
+#### `ios-native/Sources/MegrumApp/HomeIndividualListingDetailPopup.swift`
+- 求めるもの側に画像previewがある場合は、テキストトークンだけでなく画像を表示するようにした。
+- 譲るもの側は、個別募集一覧と同じ `HomeDiscoveryRotaryCard` を使い、複数ある場合に横スワイプで切り替えられる表示へ変更した。
+
+#### `ios-native/Tests/MegrumAppTests/HomeCandidateComposerTests.swift`
+- 相手募集の詳細contextに、複数の譲るもの、相手が登録したWish画像、打診操作用には出ない詳細用Wanted optionが残ることをテストで固定した。
+- `have_ids` ではなく条件指定で譲るものを登録している個別募集でも、タップした1件だけでなく相手在庫の条件一致全体を詳細へ渡すことをテストで固定した。
+
+### 影響範囲
+
+- Swift Native iOS版ホームのマッチ候補/他にも交換できそうなもの/個別募集経由の詳細シート。
+- 個別募集詳細ポップアップの表示。
+- 候補生成時の詳細表示用context。
+- 打診操作用の選択肢、Proposal作成payload、DBスキーマ、状態遷移は変更しない。
+
+### 確認方法
+
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-listing-detail-display-build --disable-index-store`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-listing-detail-display-test --disable-index-store --enable-xctest --disable-swift-testing -j 1 --filter 'HomeCandidateComposerTests|HomeDiscoveryMatchPolicyTests|HomeScreenFlowTests'`
+  - 120 tests passed
+- `xcodebuild -quiet -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -destination 'id=C70DDDBB-2602-49E0-8F95-1F043BCCED76' -derivedDataPath /tmp/megrum-ios-native-listing-detail-display-xcode build`
+  - passed
+- `xcrun simctl install C70DDDBB-2602-49E0-8F95-1F043BCCED76 /tmp/megrum-ios-native-listing-detail-display-xcode/Build/Products/Debug-iphonesimulator/MegrumNative.app`
+  - passed
+- `xcrun simctl launch C70DDDBB-2602-49E0-8F95-1F043BCCED76 tokyo.megrum.native.preview`
+  - launched
+- `xcrun simctl io C70DDDBB-2602-49E0-8F95-1F043BCCED76 screenshot /tmp/megrum-listing-detail-display.png`
+  - screenshot captured
+
+### セルフレビュー結果
+
+- ✅ 交換条件は支払い条件と同じ小見出し + 本文の表示になり、紫バッジの強い主張を外した。
+- ✅ 個別募集詳細は相手が設定した募集のdetailを表示し、打診操作用の候補絞り込みとは分離した。
+- ✅ 譲るものが複数ある場合は、個別募集一覧と同じスワイプ可能な回転カードで確認できる。
+- ✅ 求めるものは画像previewがある場合に画像を表示する。
+- ✅ Proposal payload、状態名、DBスキーマは変更していないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション980：個別募集ヒットの受け取り選択と打診前確認を追加
 
 ### 背景・問題意識

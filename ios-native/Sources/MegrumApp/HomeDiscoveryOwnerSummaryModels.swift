@@ -69,7 +69,7 @@ struct HomeDiscoveryOwnerExchangeSummary: Equatable, Sendable {
 
     private static func inferredMethodTitle(from exchange: HomeExchangeConditionSignals) -> String? {
         if exchange.localExchangeSelected && exchange.postalAcceptedByBoth {
-            return "現地交換・郵送OK"
+            return "現地交換、郵送OK"
         }
         if exchange.localExchangeSelected {
             return "現地交換"
@@ -96,6 +96,11 @@ struct HomeDiscoveryOwnerExchangeSummary: Equatable, Sendable {
     }
 
     private static func normalizedMethodTitle(_ value: String?) -> String? {
-        value == "どちらもOK" ? "現地交換・郵送OK" : value
+        switch value {
+        case "どちらもOK", "現地交換・郵送OK":
+            return "現地交換、郵送OK"
+        default:
+            return value
+        }
     }
 }

@@ -109,6 +109,15 @@ private struct HomeIndividualListingWantedRow: View {
 
             if option.isCashOffer {
                 HomeIndividualListingCashToken(amount: option.cashAmount)
+            } else if !option.previewItems.isEmpty {
+                HStack(spacing: 8) {
+                    ForEach(option.previewItems.prefix(2)) { item in
+                        ListingGoodsImage(url: item.imageURL, title: item.title, cornerRadius: 9)
+                            .frame(width: 50, height: 50)
+                            .accessibilityLabel(item.title)
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
             } else {
                 FlowLayout(spacing: 7, rowSpacing: 7) {
                     ForEach(displayTokens, id: \.self) { token in
@@ -194,8 +203,14 @@ private struct HomeIndividualListingOfferedPanel: View {
                 if detail.offeredItems.isEmpty {
                     ListingOfferCashCard(amount: detail.offeredCashAmount)
                 } else {
-                    HomeIndividualListingOfferedStack(items: detail.offeredItems)
-                        .frame(height: 138)
+                    HomeDiscoveryRotaryCard(
+                        goods: displayGoods,
+                        goodsCondition: .direct,
+                        exchangeCondition: .possible,
+                        paymentCondition: .compatible,
+                        showsConditionOverlay: false
+                    )
+                    .frame(height: 150)
 
                     Text(offerCaption)
                         .font(.system(size: 12.5, weight: .heavy, design: .rounded))
@@ -233,33 +248,22 @@ private struct HomeIndividualListingOfferedPanel: View {
         }
         return detail.offeredItems.first?.title ?? "グッズ"
     }
-}
 
-private struct HomeIndividualListingOfferedStack: View {
-    var items: [HomeIndividualListingOfferedItem]
-
-    private var visibleItems: [HomeIndividualListingOfferedItem] {
-        Array(items.prefix(3))
-    }
-
-    var body: some View {
-        ZStack {
-            ForEach(Array(visibleItems.enumerated()), id: \.element.id) { index, item in
-                ListingGoodsImage(url: item.imageURL, title: item.title, cornerRadius: 14)
-                    .frame(width: 86, height: 108)
-                    .scaleEffect(index == 0 ? 1 : 0.92)
-                    .offset(x: offset(for: index), y: index == 0 ? 0 : 5)
-                    .zIndex(Double(visibleItems.count - index))
-                    .accessibilityLabel(item.title)
-            }
+    private var displayGoods: [HomeMockGoods] {
+        detail.offeredItems.enumerated().map { index, item in
+            HomeMockGoods.from(
+                item: GoodsItem(
+                    id: item.id,
+                    ownerID: Self.fallbackOwnerID,
+                    title: item.title,
+                    imageURL: item.imageURL,
+                    quantity: item.quantity
+                ),
+                index: index,
+                goodsTypes: []
+            )
         }
-        .frame(maxWidth: .infinity)
     }
 
-    private func offset(for index: Int) -> CGFloat {
-        guard visibleItems.count > 1 else {
-            return 0
-        }
-        return CGFloat(index) * 28 - CGFloat(visibleItems.count - 1) * 14
-    }
+    private static let fallbackOwnerID = UUID(uuidString: "44444444-4444-4444-4444-444444444444")!
 }

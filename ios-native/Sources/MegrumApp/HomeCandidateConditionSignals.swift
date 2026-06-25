@@ -178,6 +178,22 @@ public struct HomeIndividualListingDetailContext: Identifiable, Equatable, Senda
     }
 }
 
+public struct HomeIndividualListingWantedPreviewItem: Identifiable, Equatable, Sendable {
+    public var id: UUID
+    public var title: String
+    public var imageURL: URL?
+
+    public init(
+        id: UUID,
+        title: String,
+        imageURL: URL? = nil
+    ) {
+        self.id = id
+        self.title = title.trimmingCharacters(in: .whitespacesAndNewlines).nilIfBlank ?? "グッズ"
+        self.imageURL = imageURL
+    }
+}
+
 public struct HomeIndividualListingSelectionContext: Equatable, Sendable {
     public var wantedLogic: ListingLogic
     public var offeredLogic: ListingLogic
@@ -227,6 +243,7 @@ public struct HomeIndividualListingWantedOption: Identifiable, Equatable, Sendab
     public var kind: Kind
     public var goodsIDs: [UUID]
     public var matchingGoodsIDs: [UUID]
+    public var previewItems: [HomeIndividualListingWantedPreviewItem]
     public var groupID: UUID?
     public var goodsTypeID: UUID?
     public var cashAmount: Int?
@@ -242,6 +259,7 @@ public struct HomeIndividualListingWantedOption: Identifiable, Equatable, Sendab
         kind: Kind,
         goodsIDs: [UUID] = [],
         matchingGoodsIDs: [UUID] = [],
+        previewItems: [HomeIndividualListingWantedPreviewItem] = [],
         groupID: UUID? = nil,
         goodsTypeID: UUID? = nil,
         cashAmount: Int? = nil
@@ -256,6 +274,7 @@ public struct HomeIndividualListingWantedOption: Identifiable, Equatable, Sendab
         self.kind = kind
         self.goodsIDs = goodsIDs
         self.matchingGoodsIDs = matchingGoodsIDs
+        self.previewItems = previewItems
         self.groupID = groupID
         self.goodsTypeID = goodsTypeID
         self.cashAmount = cashAmount.map { max(0, $0) }

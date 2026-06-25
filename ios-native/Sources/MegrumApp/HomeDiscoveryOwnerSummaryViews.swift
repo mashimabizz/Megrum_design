@@ -49,29 +49,26 @@ struct HomeExchangeMethodBlock: View {
     var summary: HomeDiscoveryOwnerExchangeSummary
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 7) {
+        VStack(alignment: .leading, spacing: 5) {
             HStack(spacing: 6) {
-                Image(systemName: "person.2")
-                Text(summary.methodTitle)
+                Image(systemName: "arrow.left.arrow.right.circle")
+                Text("交換条件")
             }
-            .font(.system(size: 14.5, weight: .semibold, design: .rounded))
-            .foregroundStyle(.white)
-            .padding(.horizontal, 14)
-            .padding(.vertical, 7)
-            .background(MegrumTheme.lavender, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .font(.system(size: 12.5, weight: .semibold, design: .rounded))
+            .foregroundStyle(MegrumTheme.ink)
+
+            Text(summary.methodTitle)
+                .font(.system(size: 13, weight: .regular, design: .rounded))
+                .foregroundStyle(MegrumTheme.ink.opacity(0.78))
+                .lineLimit(2)
+                .fixedSize(horizontal: false, vertical: true)
 
             if let detailText = summary.detailText {
-                HStack(alignment: .top, spacing: 6) {
-                    Image(systemName: "location.fill")
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(MegrumTheme.lavender)
-                        .padding(.top, 1)
-                    Text(detailText)
-                        .font(.system(size: 14, weight: .medium, design: .rounded))
-                        .foregroundStyle(MegrumTheme.ink.opacity(0.78))
-                        .lineLimit(2)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
+                Text(detailText)
+                    .font(.system(size: 12.5, weight: .regular, design: .rounded))
+                    .foregroundStyle(MegrumTheme.muted)
+                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
             }
         }
     }

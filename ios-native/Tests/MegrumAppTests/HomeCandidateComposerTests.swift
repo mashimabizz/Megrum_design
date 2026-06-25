@@ -984,6 +984,8 @@ final class HomeCandidateComposerTests: XCTestCase {
         let viewerConditionID = "10000000-0000-0000-0000-000000000062"
         let viewerUnmatchedID = "10000000-0000-0000-0000-000000000063"
         let partnerHaveID = "10000000-0000-0000-0000-000000000064"
+        let partnerSecondHaveID = "10000000-0000-0000-0000-000000000069"
+        let partnerWishOnlyID = "10000000-0000-0000-0000-000000000070"
         let listingID = "10000000-0000-0000-0000-000000000065"
         let conditionGroupID = "20000000-0000-0000-0000-000000000062"
         let conditionGoodsTypeID = "30000000-0000-0000-0000-000000000062"
@@ -996,7 +998,8 @@ final class HomeCandidateComposerTests: XCTestCase {
                     userID: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
                     groupID: "20000000-0000-0000-0000-000000000061",
                     goodsTypeID: "30000000-0000-0000-0000-000000000061",
-                    title: "自分の指定グッズ"
+                    title: "自分の指定グッズ",
+                    photoURLs: ["https://example.com/viewer-exact.jpg"]
                 ),
                 try goodsRow(
                     id: viewerConditionID,
@@ -1022,16 +1025,32 @@ final class HomeCandidateComposerTests: XCTestCase {
                     groupID: "20000000-0000-0000-0000-000000000064",
                     goodsTypeID: "30000000-0000-0000-0000-000000000064",
                     title: "相手が譲るグッズ"
+                ),
+                try goodsRow(
+                    id: partnerSecondHaveID,
+                    userID: "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+                    groupID: "20000000-0000-0000-0000-000000000064",
+                    goodsTypeID: "30000000-0000-0000-0000-000000000064",
+                    title: "相手が譲る別グッズ"
                 )
             ],
-            partnerWishes: [],
+            partnerWishes: [
+                try goodsRow(
+                    id: partnerWishOnlyID,
+                    userID: "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+                    groupID: "20000000-0000-0000-0000-000000000070",
+                    goodsTypeID: "30000000-0000-0000-0000-000000000070",
+                    title: "相手が登録したWish画像",
+                    photoURLs: ["https://example.com/partner-wish.jpg"]
+                )
+            ],
             partnerUsers: [],
             partnerListings: [
                 try listingRow(
                     id: listingID,
                     userID: "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
-                    haveIDs: [partnerHaveID],
-                    haveQtys: [2],
+                    haveIDs: [partnerHaveID, partnerSecondHaveID],
+                    haveQtys: [2, 1],
                     haveGroupID: nil,
                     haveGoodsTypeID: nil,
                     haveLogic: "or",
@@ -1067,6 +1086,14 @@ final class HomeCandidateComposerTests: XCTestCase {
                     wishGoodsTypeID: nil,
                     isCashOffer: true,
                     cashAmount: 1_500
+                ),
+                try listingWishOptionRow(
+                    id: "10000000-0000-0000-0000-000000000071",
+                    listingID: listingID,
+                    position: 4,
+                    wishIDs: [partnerWishOnlyID],
+                    wishGroupID: nil,
+                    wishGoodsTypeID: nil
                 )
             ],
             viewerActivityWindows: [],
@@ -1088,15 +1115,97 @@ final class HomeCandidateComposerTests: XCTestCase {
         let partnerDetail = try XCTUnwrap(partnerSignals.individualListingSelection?.detail)
         XCTAssertEqual(partnerDetail.listingID, UUID(uuidString: listingID)!)
         XCTAssertEqual(partnerDetail.offeredLogic, .one)
-        XCTAssertEqual(partnerDetail.offeredItems.map(\.id), [UUID(uuidString: partnerHaveID)!])
-        XCTAssertEqual(partnerDetail.offeredItems.map(\.title), ["相手が譲るグッズ"])
-        XCTAssertEqual(partnerDetail.offeredItems.map(\.quantity), [2])
-        XCTAssertEqual(partnerDetail.wantedOptions.map(\.kind), [.goods, .condition, .cash])
+        XCTAssertEqual(partnerDetail.offeredItems.map(\.id), [UUID(uuidString: partnerHaveID)!, UUID(uuidString: partnerSecondHaveID)!])
+        XCTAssertEqual(partnerDetail.offeredItems.map(\.title), ["相手が譲るグッズ", "相手が譲る別グッズ"])
+        XCTAssertEqual(partnerDetail.offeredItems.map(\.quantity), [2, 1])
+        XCTAssertEqual(partnerDetail.wantedOptions.map(\.kind), [.goods, .condition, .cash, .goods])
+        XCTAssertEqual(partnerDetail.wantedOptions[0].previewItems.map(\.imageURL?.absoluteString), ["https://example.com/viewer-exact.jpg"])
+        XCTAssertEqual(partnerDetail.wantedOptions[3].previewItems.map(\.imageURL?.absoluteString), ["https://example.com/partner-wish.jpg"])
 
         let viewerSignals = try XCTUnwrap(sections.conditionSignalsByItemID[UUID(uuidString: viewerExactID)!])
         XCTAssertEqual(viewerSignals.individualListingSelection?.wantedOptions.map(\.kind), [.goods])
         XCTAssertEqual(viewerSignals.individualListingSelection?.listingNote, "条件外でも写真を見て相談したいです")
-        XCTAssertEqual(viewerSignals.individualListingSelection?.detail?.offeredItems.map(\.title), ["相手が譲るグッズ"])
+        XCTAssertEqual(viewerSignals.individualListingSelection?.detail?.offeredItems.map(\.title), ["相手が譲るグッズ", "相手が譲る別グッズ"])
+    }
+
+    func testComposerExpandsConditionBasedListingOfferItemsForDetailContext() throws {
+        let viewerHaveID = "10000000-0000-0000-0000-000000000072"
+        let partnerFirstHaveID = "10000000-0000-0000-0000-000000000073"
+        let partnerSecondHaveID = "10000000-0000-0000-0000-000000000074"
+        let partnerOtherHaveID = "10000000-0000-0000-0000-000000000075"
+        let listingID = "10000000-0000-0000-0000-000000000076"
+        let offeredGroupID = "20000000-0000-0000-0000-000000000073"
+        let offeredGoodsTypeID = "30000000-0000-0000-0000-000000000073"
+
+        let composition = SupabaseHomeComposition(
+            localMode: nil,
+            viewerInventory: [
+                try goodsRow(
+                    id: viewerHaveID,
+                    userID: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+                    groupID: "20000000-0000-0000-0000-000000000072",
+                    goodsTypeID: "30000000-0000-0000-0000-000000000072",
+                    title: "自分が譲れるグッズ"
+                )
+            ],
+            viewerWishes: [],
+            viewerListings: [],
+            partnerInventory: [
+                try goodsRow(
+                    id: partnerFirstHaveID,
+                    userID: "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+                    groupID: offeredGroupID,
+                    goodsTypeID: offeredGoodsTypeID,
+                    title: "条件一致の相手グッズ1"
+                ),
+                try goodsRow(
+                    id: partnerSecondHaveID,
+                    userID: "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+                    groupID: offeredGroupID,
+                    goodsTypeID: offeredGoodsTypeID,
+                    title: "条件一致の相手グッズ2"
+                ),
+                try goodsRow(
+                    id: partnerOtherHaveID,
+                    userID: "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+                    groupID: "20000000-0000-0000-0000-000000000075",
+                    goodsTypeID: offeredGoodsTypeID,
+                    title: "条件外の相手グッズ"
+                )
+            ],
+            partnerWishes: [],
+            partnerUsers: [],
+            partnerListings: [
+                try listingRow(
+                    id: listingID,
+                    userID: "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+                    haveIDs: [],
+                    haveGroupID: offeredGroupID,
+                    haveGoodsTypeID: offeredGoodsTypeID,
+                    haveLogic: "at_least"
+                )
+            ],
+            listingWishOptions: [
+                try listingWishOptionRow(
+                    id: "10000000-0000-0000-0000-000000000077",
+                    listingID: listingID,
+                    wishIDs: [viewerHaveID],
+                    wishGroupID: nil,
+                    wishGoodsTypeID: nil
+                )
+            ],
+            viewerActivityWindows: [],
+            partnerActivityWindows: [],
+            inventoryTags: [],
+            unreadNotificationIDs: []
+        )
+
+        let sections = HomeCandidateComposer.sections(from: composition)
+        let signals = try XCTUnwrap(sections.conditionSignalsByItemID[UUID(uuidString: partnerFirstHaveID)!])
+        let detail = try XCTUnwrap(signals.individualListingSelection?.detail)
+
+        XCTAssertEqual(detail.offeredLogic, .atLeast)
+        XCTAssertEqual(detail.offeredItems.map(\.title), ["条件一致の相手グッズ1", "条件一致の相手グッズ2"])
     }
 
     func testComposerKeepsOneSidedCandidatesPossible() throws {

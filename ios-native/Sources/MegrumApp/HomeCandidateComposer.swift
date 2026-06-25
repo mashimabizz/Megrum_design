@@ -97,6 +97,7 @@ enum HomeCandidateComposer {
                 optionsByListingID: listingOptionsByListingID,
                 viewerInventory: availableViewerInventory,
                 listingInventory: partnerInventory,
+                listingWantedInventory: partnerWishesForCandidate + availableViewerInventory,
                 candidate: candidate,
                 includesCash: true
             )
@@ -162,7 +163,8 @@ enum HomeCandidateComposer {
                 listings: matchingPartnerListings,
                 optionsByListingID: listingOptionsByListingID,
                 viewerInventory: [viewerItem],
-                listingInventory: partnerInventory
+                listingInventory: partnerInventory,
+                listingWantedInventory: partnerWishes + [viewerItem]
             )
 
             conditionSignalsByItemID[viewerItem.id] = HomeCandidateConditionSignals(
