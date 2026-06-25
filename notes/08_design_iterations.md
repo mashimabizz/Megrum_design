@@ -4,6 +4,42 @@
 
 ---
 
+## イテレーション951：Supabase groom payloadsを分割
+
+### 背景・問題意識
+
+`SupabaseGroomRows.swift` は、めぐり投稿/閲覧/リアクション/返信のrowと、feed RPC、投稿作成、閲覧、リアクション、返信、通知作成payloadを1ファイルに持っていた。めぐりはホーム周辺の投稿表示、返信通知、ユーザー間の軽い接点にまたがるため、読み取りrowと書き込みpayloadを分け、表示取得側と保存/通知側の変更範囲を切り分けやすくする。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumData/SupabaseGroomRows.swift`
+- `GroomFeedRow`、view/reaction/reply/snapshot/notification ack row、距離計算helperに絞った。
+- ファイル行数を305行から185行へ縮小した。
+
+#### `ios-native/Sources/MegrumData/SupabaseGroomPayloads.swift`
+- feed RPC、投稿作成、画像transform、view、reaction、reply、snapshot、reply notification payloadを新規ファイルへ移動した。
+- radius clamp、caption/placeHint trim、imagePath/imageUrl、reply body trim、通知link path生成は維持した。
+
+### 影響範囲
+
+- Swift Native iOS版のめぐり投稿取得、地図投稿取得、自分の投稿履歴、投稿作成、閲覧記録、リアクション、返信、返信通知。
+- 挙動変更ではなく責務分離。Supabase table名、RPC function名、select、query、payload key、状態名、用語、DBスキーマは変更しない。
+
+### 確認方法
+
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-groom-payloads-build --disable-index-store`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-groom-payloads-tests --disable-index-store --enable-xctest --disable-swift-testing -j 1 --filter SupabaseGroomClientTests`
+  - 10 tests passed
+
+### セルフレビュー結果
+
+- ✅ 読み取りrowと書き込み/RPC payloadを移動中心で分割した。
+- ✅ めぐり取得、地図取得、投稿作成、view/reaction/reply/notification request、signed URL fallback、距離filterの既存テストを通した。
+- ✅ 状態名・用語・DBスキーマの変更はないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション950：Supabase goods inventory payloadsを分割
 
 ### 背景・問題意識
