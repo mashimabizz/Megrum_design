@@ -4,6 +4,50 @@
 
 ---
 
+## イテレーション953：Trade core modelsを分割
+
+### 背景・問題意識
+
+`TradeCoreModels.swift` は、証跡写真、個人予定、評価、申告、取引チャットメッセージ、既読状態、写真送信inputを1ファイルに持っていた。取引まわりは打診、取引チャット、証跡、申告、待ち合わせ予定にまたがるため、公開モデルを機能ごとに分け、変更時に読むべきCore範囲を狭める。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumCore/TradeEvidenceModels.swift`
+- `TradeEvidencePhoto`、`TradeEvidenceCreateInput`、`TradeEvaluationCreateInput` を新規ファイルへ移動した。
+
+#### `ios-native/Sources/MegrumCore/PersonalScheduleModels.swift`
+- `PersonalSchedule`、`PersonalScheduleCreateInput` を新規ファイルへ移動した。
+- overlap、durationInterval、入力正規化/validationは維持した。
+
+#### `ios-native/Sources/MegrumCore/TradeDisputeModels.swift`
+- `TradeDisputeCategory`、`TradeDisputeCreateInput`、`TradeDisputeTicket` を新規ファイルへ移動した。
+
+#### `ios-native/Sources/MegrumCore/TradeMessageModels.swift`
+- `TradeMessageType`、`TradeArrivalStatus`、`TradeMessage`、`ProposalReadState`、`TradeMessageCreateInput`、`TradePhotoMessageCreateInput` を新規ファイルへ移動した。
+
+#### `ios-native/Sources/MegrumCore/TradeCoreModels.swift`
+- 上記4ファイルへ分割したため削除した。
+
+### 影響範囲
+
+- Swift Native iOS版の取引チャット、既読状態、到着/位置/服装写真メッセージ、証跡写真、評価、申告、個人予定/スケジュール。
+- 挙動変更ではなく責務分離。型名、public initializer、プロパティ、状態名、用語、DBスキーマは変更しない。
+
+### 確認方法
+
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-trade-core-models-build --disable-index-store`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-trade-core-models-tests --disable-index-store --enable-xctest --disable-swift-testing -j 1 --filter 'MegrumCoreTests|SupabaseMessageClientTests|SupabaseDisputeClientTests|SupabaseProposalClientTests|SupabaseScheduleClientTests|TradeMessageStateReducerTests|ScheduleStateReducerTests|TradeChatAffordanceTests|TradeEvidencePhotoStateReducerTests|DisputeDetailScreenTests|TradeScheduleCalendarWindowTests'`
+  - 154 tests passed
+
+### セルフレビュー結果
+
+- ✅ 既存モデルを移動中心で分割し、公開APIと初期化引数を維持した。
+- ✅ Core schedule validation、Supabase message/dispute/proposal/schedule client、取引チャット、証跡、申告、スケジュール表示の対象テストを通した。
+- ✅ 状態名・用語・DBスキーマの変更はないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション952：Meguri core modelsを分割
 
 ### 背景・問題意識
