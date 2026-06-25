@@ -1032,7 +1032,11 @@ final class HomeCandidateComposerTests: XCTestCase {
                     userID: "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
                     haveIDs: [partnerHaveID],
                     haveGroupID: nil,
-                    haveGoodsTypeID: nil
+                    haveGoodsTypeID: nil,
+                    note: """
+                    条件外でも写真を見て相談したいです
+                    交換手段: 現地交換 / 都道府県: 東京都 / 場所メモ: 相談 / 日程: 相談して決める / 送料: 要相談 / 発送目安: 2〜4日以内 / 条件外打診: 可
+                    """
                 )
             ],
             listingWishOptions: [
@@ -1078,9 +1082,11 @@ final class HomeCandidateComposerTests: XCTestCase {
         XCTAssertEqual(options[1].matchingGoodsIDs, [UUID(uuidString: viewerConditionID)!])
         XCTAssertEqual(options[2].cashAmount, 1_500)
         XCTAssertFalse(options[1].matchingGoodsIDs.contains(UUID(uuidString: viewerUnmatchedID)!))
+        XCTAssertEqual(partnerSignals.individualListingSelection?.listingNote, "条件外でも写真を見て相談したいです")
 
         let viewerSignals = try XCTUnwrap(sections.conditionSignalsByItemID[UUID(uuidString: viewerExactID)!])
         XCTAssertEqual(viewerSignals.individualListingSelection?.wantedOptions.map(\.kind), [.goods])
+        XCTAssertEqual(viewerSignals.individualListingSelection?.listingNote, "条件外でも写真を見て相談したいです")
     }
 
     func testComposerKeepsOneSidedCandidatesPossible() throws {

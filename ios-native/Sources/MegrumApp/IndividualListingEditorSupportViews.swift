@@ -144,7 +144,8 @@ struct IndividualListingEditorContent: View {
                 localSchedule: $draft.localSchedule,
                 shippingFee: $draft.shippingFee,
                 shippingDays: $draft.shippingDays,
-                acceptsOutsideCondition: $draft.acceptsOutsideCondition
+                acceptsOutsideCondition: $draft.acceptsOutsideCondition,
+                note: $draft.note
             )
         }
     }

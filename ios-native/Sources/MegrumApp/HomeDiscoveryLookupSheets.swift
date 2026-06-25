@@ -103,6 +103,7 @@ struct HomeExtraHitDetailSheet: View {
                 goods: payload.goods,
                 conditionTags: payload.conditionTags,
                 exchangeSummary: HomeDiscoveryOwnerExchangeSummary.fromListingSignals(payload.signals),
+                listingNote: payload.individualListingSelection.listingNote,
                 onOpenOwnerProfile: onOpenOwnerProfile
             )
 

@@ -4,6 +4,72 @@
 
 ---
 
+## イテレーション978：個別募集メモを一覧と候補詳細へ表示
+
+### 背景・問題意識
+
+個別募集作成の最後の3/3画面では、支払い・交換条件・条件外打診可否までしか登録できず、「その他要望など」を自由に残す場所がなかった。作成者の補足意図は、個別募集一覧とホームのマッチ候補詳細でも確認できる必要がある。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/IndividualListingExchangeViews.swift`
+#### `ios-native/Sources/MegrumApp/IndividualListingEditorSupportViews.swift`
+- 個別募集作成/編集の3/3画面に「5. その他要望など」を追加した。
+- 複数行入力できる自由テキスト欄を追加し、既存の `IndividualListingDraft.note` へ保存するようにした。
+
+#### `ios-native/Sources/MegrumApp/IndividualListingNotePresentation.swift`
+- `listings.note` から、譲る金額サマリーと交換条件サマリーを除外し、ユーザーが入力した自由メモだけを取り出す表示用 helper を追加した。
+
+#### `ios-native/Sources/MegrumApp/IndividualListingExchangeConditionPanel.swift`
+- 個別募集一覧の交換条件パネルで、条件外打診可否の行の下に自由メモを小さく表示するようにした。
+
+#### `ios-native/Sources/MegrumApp/HomeCandidateConditionSignals.swift`
+#### `ios-native/Sources/MegrumApp/HomeCandidateListingMatchPolicy.swift`
+#### `ios-native/Sources/MegrumApp/HomeDiscoverySheetSharedViews.swift`
+#### `ios-native/Sources/MegrumApp/HomeDiscoveryHitDetailSheets.swift`
+#### `ios-native/Sources/MegrumApp/HomeWishHitDetailSheet.swift`
+#### `ios-native/Sources/MegrumApp/HomeDiscoveryLookupSheets.swift`
+- 個別募集経由のマッチ候補詳細シートへ、該当募集の自由メモを渡すようにした。
+- シート上部のグッズ画像・ユーザー名・支払い条件ブロック全体の下に、メモを支払い条件と近い小さめの文字サイズで表示するようにした。
+
+#### `ios-native/Tests/MegrumAppTests/IndividualListingDraftTests.swift`
+#### `ios-native/Tests/MegrumAppTests/HomeCandidateComposerTests.swift`
+- 自由メモだけが表示用に抽出されることをテストで固定した。
+- 個別募集経由のホーム候補コンテキストに自由メモが渡ることをテストで固定した。
+
+### 影響範囲
+
+- Swift Native iOS版の個別募集作成/編集3/3画面、個別募集一覧、ホームの個別募集経由マッチ候補詳細シート。
+- 保存先は既存の `listings.note` を利用するため、DBスキーマ変更は不要。
+- 状態名、用語、打診開始payload、候補生成のマッチ判定条件は変更しない。
+
+### 確認方法
+
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-listing-note-build --disable-index-store`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-listing-note-test --disable-index-store --enable-xctest --disable-swift-testing -j 1 --filter 'IndividualListingDraftTests|HomeCandidateComposerTests|HomeScreenFlowTests'`
+  - 98 tests passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-listing-note-test --disable-index-store --enable-xctest --disable-swift-testing -j 1 --filter 'HomeCandidateComposerTests/testComposerPassesIndividualListingWantedOptionsToHomeSheetContext|IndividualListingDraftTests/testListingNotePresentationReturnsOnlyUserMemo'`
+  - 2 tests passed after test fixture wording cleanup
+- `xcodebuild -quiet -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -destination 'id=C70DDDBB-2602-49E0-8F95-1F043BCCED76' -derivedDataPath /tmp/megrum-ios-native-listing-note-xcode build`
+  - passed
+- `xcrun simctl install C70DDDBB-2602-49E0-8F95-1F043BCCED76 /tmp/megrum-ios-native-listing-note-xcode/Build/Products/Debug-iphonesimulator/MegrumNative.app`
+  - passed
+- `xcrun simctl launch C70DDDBB-2602-49E0-8F95-1F043BCCED76 tokyo.megrum.native.preview`
+  - launched
+- `xcrun simctl io C70DDDBB-2602-49E0-8F95-1F043BCCED76 screenshot /tmp/megrum-listing-note-simulator.png`
+  - screenshot captured
+
+### セルフレビュー結果
+
+- ✅ 個別募集作成/編集3/3画面に「その他要望など」を追加した。
+- ✅ 自由メモは一覧の条件外打診可否の下、ホーム候補詳細の上部情報ブロック下に表示される。
+- ✅ 交換条件・譲る金額の保存用サマリーは、表示メモから除外される。
+- ✅ 既存の `listings.note` を利用しており、DBスキーマ変更は不要。
+- ✅ 状態名・用語の追加変更はないため `notes/09_state_machines.md` / `notes/10_glossary.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション977：マッチ候補シートのユーザーアイコンを非表示
 
 ### 背景・問題意識

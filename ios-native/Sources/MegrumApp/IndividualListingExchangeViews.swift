@@ -9,6 +9,7 @@ struct IndividualListingExchangeStep: View {
     @Binding var shippingFee: IndividualListingShippingFeeDraft
     @Binding var shippingDays: IndividualListingShippingDaysDraft
     @Binding var acceptsOutsideCondition: Bool
+    @Binding var note: String
 
     var body: some View {
         VStack(alignment: .leading, spacing: 28) {
@@ -137,6 +138,29 @@ struct IndividualListingExchangeStep: View {
                 .tint(MegrumTheme.lavender)
                 .padding(16)
                 .background(.white.opacity(0.92), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+            }
+
+            VStack(alignment: .leading, spacing: 14) {
+                Text("5. その他要望など")
+                    .font(.system(size: 18, weight: .black, design: .rounded))
+                    .foregroundStyle(MegrumTheme.ink)
+
+                VStack(alignment: .leading, spacing: 8) {
+                    TextField("例：条件外でも写真を見て相談したいです", text: $note, axis: .vertical)
+                        .font(.system(size: 15, weight: .semibold, design: .rounded))
+                        .foregroundStyle(MegrumTheme.ink)
+                        .lineLimit(3...6)
+
+                    Text("一覧やマッチ候補の詳細に小さく表示されます。")
+                        .font(.system(size: 12.5, weight: .semibold, design: .rounded))
+                        .foregroundStyle(MegrumTheme.muted)
+                }
+                .padding(16)
+                .background(.white.opacity(0.92), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                .overlay {
+                    RoundedRectangle(cornerRadius: 18, style: .continuous)
+                        .stroke(MegrumTheme.ink.opacity(0.08), lineWidth: 1)
+                }
             }
         }
     }

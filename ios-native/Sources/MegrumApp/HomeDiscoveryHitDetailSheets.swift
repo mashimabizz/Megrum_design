@@ -30,6 +30,7 @@ struct HomeGoodsHitDetailSheet: View {
                 goods: selection.goods,
                 conditionTags: selection.conditionTags,
                 exchangeSummary: HomeDiscoveryOwnerExchangeSummary.fromListingSignals(selection.signals),
+                listingNote: selection.individualListingSelection.listingNote,
                 onOpenOwnerProfile: onOpenOwnerProfile
             )
 

@@ -81,7 +81,8 @@ enum HomeCandidateListingMatchPolicy {
                 offeredLogic: ListingLogic(rawValue: listing.haveLogic ?? "") ?? .all,
                 wantedMinimumCount: firstOption.minimumCount,
                 offeredMinimumCount: listing.haveMinCount ?? 1,
-                wantedOptions: wantedOptions
+                wantedOptions: wantedOptions,
+                listingNote: IndividualListingNotePresentation.userMemo(from: listing.note)
             )
         }
         return nil

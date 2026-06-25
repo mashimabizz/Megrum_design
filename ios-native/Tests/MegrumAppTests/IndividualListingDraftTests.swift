@@ -66,6 +66,19 @@ final class IndividualListingDraftTests: XCTestCase {
         XCTAssertFalse(draft.acceptsOutsideCondition)
     }
 
+    func testListingNotePresentationReturnsOnlyUserMemo() {
+        let note = """
+        異種は写真を見て相談したいです
+        譲る金額: ¥2,000
+        交換手段: 現地交換 / 都道府県: 大阪府 / 場所メモ: 京セラ周辺 / 日程: 6/28 / 条件外打診: 可
+        """
+
+        XCTAssertEqual(
+            IndividualListingNotePresentation.userMemo(from: note),
+            "異種は写真を見て相談したいです"
+        )
+    }
+
     func testDraftStoresMultipleLocalScheduleCandidates() throws {
         let groupID = UUID()
         let goodsTypeID = UUID()

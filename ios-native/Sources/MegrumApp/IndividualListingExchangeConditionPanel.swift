@@ -12,6 +12,10 @@ struct IndividualListingExchangeConditionPanel: View {
         IndividualListingExchangeSummary.extract(from: listing.note).summary
     }
 
+    private var userMemo: String? {
+        IndividualListingNotePresentation.userMemo(from: listing.note)
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             HStack(spacing: 10) {
@@ -75,6 +79,10 @@ struct IndividualListingExchangeConditionPanel: View {
                 .foregroundStyle(MegrumTheme.ink)
                 .frame(maxWidth: .infinity, alignment: .leading)
 
+            if let userMemo {
+                IndividualListingMemoPanel(memo: userMemo)
+            }
+
             if canEdit {
                 Divider()
 
@@ -96,6 +104,26 @@ struct IndividualListingExchangeConditionPanel: View {
             RoundedRectangle(cornerRadius: 24, style: .continuous)
                 .strokeBorder(MegrumTheme.ink.opacity(0.07), lineWidth: 1)
         }
+    }
+}
+
+private struct IndividualListingMemoPanel: View {
+    var memo: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 5) {
+            Text("メモ")
+                .font(.system(size: 12.5, weight: .semibold, design: .rounded))
+                .foregroundStyle(MegrumTheme.muted)
+            Text(memo)
+                .font(.system(size: 13, weight: .regular, design: .rounded))
+                .foregroundStyle(MegrumTheme.ink.opacity(0.78))
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 9)
+        .background(MegrumTheme.ink.opacity(0.035), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
     }
 }
 
