@@ -27,42 +27,42 @@ public final class SupabaseHomeClient: @unchecked Sendable {
         async let localModeRows: [SupabaseHomeLocalModeRow] = client.fetchRows(
             from: "user_local_mode_settings",
             select: SupabaseHomeLocalModeRow.select,
-            queryItems: localModeQueryItems(userID: userID)
+            queryItems: SupabaseHomeQueryItems.localMode(userID: userID)
         )
         async let viewerUsers = loadViewerUsers(userID: userID)
-        async let viewerInventory = loadGoodsRows(queryItems: viewerTradeGoodsQueryItems(userID: userID))
-        async let viewerWishes = loadGoodsRows(queryItems: viewerWishesQueryItems(userID: userID))
+        async let viewerInventory = loadGoodsRows(queryItems: SupabaseHomeQueryItems.viewerTradeGoods(userID: userID))
+        async let viewerWishes = loadGoodsRows(queryItems: SupabaseHomeQueryItems.viewerWishes(userID: userID))
         async let viewerListings: [SupabaseHomeListingRow] = client.fetchRows(
             from: "listings",
             select: SupabaseHomeListingRow.select,
-            queryItems: viewerListingsQueryItems(userID: userID)
+            queryItems: SupabaseHomeQueryItems.viewerListings(userID: userID)
         )
         async let partnerInventory = loadGoodsRows(
-            queryItems: partnerTradeGoodsQueryItems(excludingUserID: userID, limit: partnerLimit)
+            queryItems: SupabaseHomeQueryItems.partnerTradeGoods(excludingUserID: userID, limit: partnerLimit)
         )
         async let partnerWishes = loadGoodsRows(
-            queryItems: partnerWishesQueryItems(excludingUserID: userID, limit: partnerLimit)
+            queryItems: SupabaseHomeQueryItems.partnerWishes(excludingUserID: userID, limit: partnerLimit)
         )
         async let partnerUsers = loadPartnerUsers(excludingUserID: userID, limit: partnerLimit)
         async let partnerListings: [SupabaseHomeListingRow] = client.fetchRows(
             from: "listings",
             select: SupabaseHomeListingRow.select,
-            queryItems: partnerListingsQueryItems(excludingUserID: userID, limit: partnerLimit)
+            queryItems: SupabaseHomeQueryItems.partnerListings(excludingUserID: userID, limit: partnerLimit)
         )
         async let viewerActivityWindows: [SupabaseHomeActivityWindowRow] = client.fetchRows(
             from: "activity_windows",
             select: SupabaseHomeActivityWindowRow.select,
-            queryItems: viewerActivityWindowsQueryItems(userID: userID)
+            queryItems: SupabaseHomeQueryItems.viewerActivityWindows(userID: userID)
         )
         async let partnerActivityWindows: [SupabaseHomeActivityWindowRow] = client.fetchRows(
             from: "activity_windows",
             select: SupabaseHomeActivityWindowRow.select,
-            queryItems: partnerActivityWindowsQueryItems(excludingUserID: userID, limit: partnerLimit)
+            queryItems: SupabaseHomeQueryItems.partnerActivityWindows(excludingUserID: userID, limit: partnerLimit)
         )
         async let unreadNotificationIDs: [SupabaseHomeNotificationIDRow] = client.fetchRows(
             from: "notifications",
             select: SupabaseHomeNotificationIDRow.select,
-            queryItems: unreadNotificationsQueryItems(userID: userID, limit: 1_000)
+            queryItems: SupabaseHomeQueryItems.unreadNotifications(userID: userID, limit: 1_000)
         )
 
         let initialRows = try await (
@@ -109,7 +109,7 @@ public final class SupabaseHomeClient: @unchecked Sendable {
         try client.makeRequest(
             path: "/rest/v1/user_local_mode_settings",
             queryItems: [URLQueryItem(name: "select", value: SupabaseHomeLocalModeRow.select)]
-                + localModeQueryItems(userID: userID)
+                + SupabaseHomeQueryItems.localMode(userID: userID)
         )
     }
 
@@ -117,7 +117,7 @@ public final class SupabaseHomeClient: @unchecked Sendable {
         try client.makeRequest(
             path: "/rest/v1/goods_inventory",
             queryItems: [URLQueryItem(name: "select", value: SupabaseHomeGoodsRow.select)]
-                + viewerTradeGoodsQueryItems(userID: userID)
+                + SupabaseHomeQueryItems.viewerTradeGoods(userID: userID)
         )
     }
 
@@ -125,7 +125,7 @@ public final class SupabaseHomeClient: @unchecked Sendable {
         try client.makeRequest(
             path: "/rest/v1/goods_inventory",
             queryItems: [URLQueryItem(name: "select", value: SupabaseHomeGoodsRow.select)]
-                + viewerWishesQueryItems(userID: userID)
+                + SupabaseHomeQueryItems.viewerWishes(userID: userID)
         )
     }
 
@@ -133,7 +133,7 @@ public final class SupabaseHomeClient: @unchecked Sendable {
         try client.makeRequest(
             path: "/rest/v1/goods_inventory",
             queryItems: [URLQueryItem(name: "select", value: SupabaseHomeGoodsRow.select)]
-                + partnerTradeGoodsQueryItems(excludingUserID: userID, limit: limit)
+                + SupabaseHomeQueryItems.partnerTradeGoods(excludingUserID: userID, limit: limit)
         )
     }
 
@@ -141,7 +141,7 @@ public final class SupabaseHomeClient: @unchecked Sendable {
         try client.makeRequest(
             path: "/rest/v1/goods_inventory",
             queryItems: [URLQueryItem(name: "select", value: SupabaseHomeGoodsRow.select)]
-                + partnerWishesQueryItems(excludingUserID: userID, limit: limit)
+                + SupabaseHomeQueryItems.partnerWishes(excludingUserID: userID, limit: limit)
         )
     }
 
@@ -149,7 +149,7 @@ public final class SupabaseHomeClient: @unchecked Sendable {
         try client.makeRequest(
             path: "/rest/v1/users",
             queryItems: [URLQueryItem(name: "select", value: SupabaseHomeUserRow.select)]
-                + partnerUsersQueryItems(excludingUserID: userID, limit: limit)
+                + SupabaseHomeQueryItems.partnerUsers(excludingUserID: userID, limit: limit)
         )
     }
 
@@ -164,7 +164,7 @@ public final class SupabaseHomeClient: @unchecked Sendable {
         try client.makeRequest(
             path: "/rest/v1/listings",
             queryItems: [URLQueryItem(name: "select", value: SupabaseHomeListingRow.select)]
-                + viewerListingsQueryItems(userID: userID)
+                + SupabaseHomeQueryItems.viewerListings(userID: userID)
         )
     }
 
@@ -172,7 +172,7 @@ public final class SupabaseHomeClient: @unchecked Sendable {
         try client.makeRequest(
             path: "/rest/v1/listings",
             queryItems: [URLQueryItem(name: "select", value: SupabaseHomeListingRow.select)]
-                + partnerListingsQueryItems(excludingUserID: userID, limit: limit)
+                + SupabaseHomeQueryItems.partnerListings(excludingUserID: userID, limit: limit)
         )
     }
 
@@ -180,7 +180,7 @@ public final class SupabaseHomeClient: @unchecked Sendable {
         try client.makeRequest(
             path: "/rest/v1/listing_wish_options",
             queryItems: [URLQueryItem(name: "select", value: SupabaseHomeListingWishOptionRow.select)]
-                + listingWishOptionsQueryItems(listingIDs: listingIDs)
+                + SupabaseHomeQueryItems.listingWishOptions(listingIDs: listingIDs)
         )
     }
 
@@ -188,7 +188,7 @@ public final class SupabaseHomeClient: @unchecked Sendable {
         try client.makeRequest(
             path: "/rest/v1/activity_windows",
             queryItems: [URLQueryItem(name: "select", value: SupabaseHomeActivityWindowRow.select)]
-                + viewerActivityWindowsQueryItems(userID: userID)
+                + SupabaseHomeQueryItems.viewerActivityWindows(userID: userID)
         )
     }
 
@@ -196,7 +196,7 @@ public final class SupabaseHomeClient: @unchecked Sendable {
         try client.makeRequest(
             path: "/rest/v1/activity_windows",
             queryItems: [URLQueryItem(name: "select", value: SupabaseHomeActivityWindowRow.select)]
-                + partnerActivityWindowsQueryItems(excludingUserID: userID, limit: limit)
+                + SupabaseHomeQueryItems.partnerActivityWindows(excludingUserID: userID, limit: limit)
         )
     }
 
@@ -204,7 +204,7 @@ public final class SupabaseHomeClient: @unchecked Sendable {
         try client.makeRequest(
             path: "/rest/v1/goods_inventory_tags",
             queryItems: [URLQueryItem(name: "select", value: SupabaseHomeInventoryTagRow.select)]
-                + inventoryTagsQueryItems(inventoryIDs: inventoryIDs)
+                + SupabaseHomeQueryItems.inventoryTags(inventoryIDs: inventoryIDs)
         )
     }
 
@@ -212,7 +212,7 @@ public final class SupabaseHomeClient: @unchecked Sendable {
         try client.makeRequest(
             path: "/rest/v1/notifications",
             queryItems: [URLQueryItem(name: "select", value: SupabaseHomeNotificationIDRow.select)]
-                + unreadNotificationsQueryItems(userID: userID, limit: limit)
+                + SupabaseHomeQueryItems.unreadNotifications(userID: userID, limit: limit)
         )
     }
 
@@ -223,7 +223,7 @@ public final class SupabaseHomeClient: @unchecked Sendable {
         return try await client.fetchRows(
             from: "listing_wish_options",
             select: SupabaseHomeListingWishOptionRow.select,
-            queryItems: try listingWishOptionsQueryItems(listingIDs: listingIDs)
+            queryItems: try SupabaseHomeQueryItems.listingWishOptions(listingIDs: listingIDs)
         )
     }
 
@@ -234,7 +234,7 @@ public final class SupabaseHomeClient: @unchecked Sendable {
         return try await client.fetchRows(
             from: "goods_inventory_tags",
             select: SupabaseHomeInventoryTagRow.select,
-            queryItems: try inventoryTagsQueryItems(inventoryIDs: inventoryIDs)
+            queryItems: try SupabaseHomeQueryItems.inventoryTags(inventoryIDs: inventoryIDs)
         )
     }
 
@@ -258,10 +258,10 @@ public final class SupabaseHomeClient: @unchecked Sendable {
         do {
             return try await client.rpcRows(
                 function: "list_home_user_summaries_for_viewer",
-                payload: HomeUserSummaryPayload(userID: userID, limit: 1)
-            )
+            payload: HomeUserSummaryPayload(userID: userID, limit: 1)
+        )
         } catch let error as SupabaseRESTError where error == .unexpectedStatus(400) || error == .unexpectedStatus(404) {
-            return try await loadUsersLegacy(queryItems: viewerUserQueryItems(userID: userID))
+            return try await loadUsersLegacy(queryItems: SupabaseHomeQueryItems.viewerUser(userID: userID))
         } catch {
             throw error
         }
@@ -271,10 +271,12 @@ public final class SupabaseHomeClient: @unchecked Sendable {
         do {
             return try await client.rpcRows(
                 function: "list_home_user_summaries_for_viewer",
-                payload: HomeUserSummaryPayload(excludingUserID: userID, limit: limit)
-            )
+            payload: HomeUserSummaryPayload(excludingUserID: userID, limit: limit)
+        )
         } catch let error as SupabaseRESTError where error == .unexpectedStatus(400) || error == .unexpectedStatus(404) {
-            return try await loadUsersLegacy(queryItems: partnerUsersQueryItems(excludingUserID: userID, limit: limit))
+            return try await loadUsersLegacy(
+                queryItems: SupabaseHomeQueryItems.partnerUsers(excludingUserID: userID, limit: limit)
+            )
         } catch {
             throw error
         }
@@ -296,145 +298,4 @@ public final class SupabaseHomeClient: @unchecked Sendable {
         }
     }
 
-    private func localModeQueryItems(userID: UUID) -> [URLQueryItem] {
-        [
-            URLQueryItem(name: "user_id", value: "eq.\(userID.lowercaseString)"),
-            URLQueryItem(name: "limit", value: "1")
-        ]
-    }
-
-    private func viewerUserQueryItems(userID: UUID) -> [URLQueryItem] {
-        [
-            URLQueryItem(name: "id", value: "eq.\(userID.lowercaseString)"),
-            URLQueryItem(name: "limit", value: "1")
-        ]
-    }
-
-    private func viewerTradeGoodsQueryItems(userID: UUID) -> [URLQueryItem] {
-        goodsQueryItems(userID: userID, userFilter: "eq", kind: "for_trade", statusFilter: "eq.active")
-    }
-
-    private func viewerWishesQueryItems(userID: UUID) -> [URLQueryItem] {
-        goodsQueryItems(userID: userID, userFilter: "eq", kind: "wanted", statusFilter: "neq.archived")
-    }
-
-    private func partnerTradeGoodsQueryItems(excludingUserID userID: UUID, limit: Int) -> [URLQueryItem] {
-        goodsQueryItems(
-            userID: userID,
-            userFilter: "neq",
-            kind: "for_trade",
-            statusFilter: "eq.active",
-            limit: limit
-        )
-    }
-
-    private func partnerWishesQueryItems(excludingUserID userID: UUID, limit: Int) -> [URLQueryItem] {
-        goodsQueryItems(
-            userID: userID,
-            userFilter: "neq",
-            kind: "wanted",
-            statusFilter: "neq.archived",
-            limit: limit
-        )
-    }
-
-    private func goodsQueryItems(
-        userID: UUID,
-        userFilter: String,
-        kind: String,
-        statusFilter: String,
-        limit: Int? = nil
-    ) -> [URLQueryItem] {
-        var queryItems = [
-            URLQueryItem(name: "user_id", value: "\(userFilter).\(userID.lowercaseString)"),
-            URLQueryItem(name: "kind", value: "eq.\(kind)"),
-            URLQueryItem(name: "status", value: statusFilter)
-        ]
-        if let limit {
-            queryItems.append(URLQueryItem(name: "limit", value: "\(boundedLimit(limit))"))
-        }
-        return queryItems
-    }
-
-    private func partnerUsersQueryItems(excludingUserID userID: UUID, limit: Int) -> [URLQueryItem] {
-        [
-            URLQueryItem(name: "id", value: "neq.\(userID.lowercaseString)"),
-            URLQueryItem(name: "limit", value: "\(boundedLimit(limit))")
-        ]
-    }
-
-    private func viewerListingsQueryItems(userID: UUID) -> [URLQueryItem] {
-        [
-            URLQueryItem(name: "user_id", value: "eq.\(userID.lowercaseString)"),
-            URLQueryItem(name: "status", value: "eq.active")
-        ]
-    }
-
-    private func partnerListingsQueryItems(excludingUserID userID: UUID, limit: Int) -> [URLQueryItem] {
-        [
-            URLQueryItem(name: "user_id", value: "neq.\(userID.lowercaseString)"),
-            URLQueryItem(name: "status", value: "eq.active"),
-            URLQueryItem(name: "limit", value: "\(boundedLimit(limit))")
-        ]
-    }
-
-    private func listingWishOptionsQueryItems(listingIDs: [UUID]) throws -> [URLQueryItem] {
-        [
-            URLQueryItem(name: "listing_id", value: try uuidInFilter(listingIDs)),
-            URLQueryItem(name: "order", value: "position.asc")
-        ]
-    }
-
-    private func viewerActivityWindowsQueryItems(userID: UUID) -> [URLQueryItem] {
-        [
-            URLQueryItem(name: "user_id", value: "eq.\(userID.lowercaseString)"),
-            URLQueryItem(name: "status", value: "eq.enabled")
-        ]
-    }
-
-    private func partnerActivityWindowsQueryItems(excludingUserID userID: UUID, limit: Int) -> [URLQueryItem] {
-        [
-            URLQueryItem(name: "user_id", value: "neq.\(userID.lowercaseString)"),
-            URLQueryItem(name: "status", value: "eq.enabled"),
-            URLQueryItem(name: "limit", value: "\(boundedLimit(limit))")
-        ]
-    }
-
-    private func inventoryTagsQueryItems(inventoryIDs: [UUID]) throws -> [URLQueryItem] {
-        [
-            URLQueryItem(name: "inventory_id", value: try uuidInFilter(inventoryIDs))
-        ]
-    }
-
-    private func unreadNotificationsQueryItems(userID: UUID, limit: Int) -> [URLQueryItem] {
-        [
-            URLQueryItem(name: "user_id", value: "eq.\(userID.lowercaseString)"),
-            URLQueryItem(name: "read_at", value: "is.null"),
-            URLQueryItem(name: "limit", value: "\(boundedLimit(limit, upperBound: 1_000))")
-        ]
-    }
-
-    private func uuidInFilter(_ ids: [UUID]) throws -> String {
-        let values = ids.uniqueLowercaseStrings()
-        guard !values.isEmpty else {
-            throw SupabaseHomeClientError.emptyIdentifierList
-        }
-        return "in.(\(values.joined(separator: ",")))"
-    }
-
-    private func boundedLimit(_ limit: Int, upperBound: Int = 500) -> Int {
-        max(1, min(limit, upperBound))
-    }
-}
-
-private struct HomeUserSummaryPayload: Encodable, Sendable {
-    var pUserId: UUID?
-    var pExcludedUserId: UUID?
-    var pLimit: Int
-
-    init(userID: UUID? = nil, excludingUserID: UUID? = nil, limit: Int) {
-        self.pUserId = userID
-        self.pExcludedUserId = excludingUserID
-        self.pLimit = max(1, min(limit, 500))
-    }
 }

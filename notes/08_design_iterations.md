@@ -4,6 +4,46 @@
 
 ---
 
+## イテレーション930：Supabase home query itemsを分割
+
+### 背景・問題意識
+
+`SupabaseHomeClient.swift` は、ホーム構成取得の通信本体、リクエスト生成、fallback付きfetch、`URLQueryItem` 組み立て、RPC payload定義を1ファイルに持っていた。Data層のクライアントはAPI挙動への影響が大きいため、まず通信順序やfallbackには触れず、query item生成だけを独立させる。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumData/SupabaseHomeClient.swift`
+- `SupabaseHomeQueryItems` 経由でquery itemを取得するようにした。
+- `HomeUserSummaryPayload` を専用ファイル側へ移動した。
+- ファイル行数を440行から301行へ縮小した。
+
+#### `ios-native/Sources/MegrumData/SupabaseHomeQueryItems.swift`
+- local mode、viewer/partner goods、users、listings、listing wish options、activity windows、inventory tags、unread notifications のquery item生成を新規ファイルへ移動した。
+- `boundedLimit` と UUID `in.(...)` filter生成を同じ責務の中へまとめた。
+- `HomeUserSummaryPayload` をRPC payloadとして同居させ、limit丸め条件は既存の 1...500 を維持した。
+
+### 影響範囲
+
+- Swift Native iOS版のホーム構成取得で使うSupabaseリクエスト生成。
+- 挙動変更ではなく責務分離。fetch対象、fallback条件、select文字列、状態名、用語、DBスキーマは変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumData/SupabaseHomeClient.swift ios-native/Sources/MegrumData/SupabaseHomeQueryItems.swift`
+  - passed
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-home-client-build --disable-index-store`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-home-client-tests --disable-index-store --enable-xctest --disable-swift-testing -j 1 --filter SupabaseHomeClientTests`
+  - 6 tests passed
+
+### セルフレビュー結果
+
+- ✅ request path、select、query parameter名/value、limit丸め、空UUID配列エラーは既存テストで維持確認した。
+- ✅ `loadHomeComposition` の並列取得順、fallback付き goods/users fetch、DTO decodeは変更していない。
+- ✅ 状態名・用語・DBスキーマの変更はないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション929：Meguri design preview home viewsを分割
 
 ### 背景・問題意識
