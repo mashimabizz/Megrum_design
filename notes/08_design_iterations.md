@@ -4,6 +4,46 @@
 
 ---
 
+## イテレーション952：Meguri core modelsを分割
+
+### 背景・問題意識
+
+`MeguriModels.swift` は、グルーム投稿、グルーム返信/リアクション、めぐり手紙、掲示板スレッド/返信を1ファイルに持っていた。Coreの公開モデルはData層・App層の両方から広く参照されるため、機能ごとに分け、めぐり投稿・手紙・掲示板の変更範囲を見分けやすくする。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumCore/GroomModels.swift`
+- `GroomPost`、`GroomPostCreateInput`、`GroomReply`、`GroomReplyCreateInput`、`GroomReaction` を新規ファイルへ移動した。
+
+#### `ios-native/Sources/MegrumCore/MeguriMessageModels.swift`
+- `MeguriMessageType`、`MeguriMessage`、`MeguriMessageCreateInput` を新規ファイルへ移動した。
+
+#### `ios-native/Sources/MegrumCore/MeguriBoardModels.swift`
+- `BoardThread`、`BoardThreadCreateInput`、`BoardReply`、`BoardReplyCreateInput` を新規ファイルへ移動した。
+
+#### `ios-native/Sources/MegrumCore/MeguriModels.swift`
+- 上記3ファイルへ分割したため削除した。
+
+### 影響範囲
+
+- Swift Native iOS版のめぐり投稿、めぐり手紙、掲示板、返信、通知経由導線、Supabase groom/board/message client。
+- 挙動変更ではなく責務分離。型名、public initializer、プロパティ、状態名、用語、DBスキーマは変更しない。
+
+### 確認方法
+
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-meguri-models-build --disable-index-store`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-meguri-models-tests --disable-index-store --enable-xctest --disable-swift-testing -j 1 --filter 'MegrumCoreTests|SupabaseGroomClientTests|SupabaseBoardClientTests|SupabaseMeguriMessageClientTests|MeguriFeedStateReducerTests|MeguriMessageReadStateReducerTests|MeguriAccessPolicyTests|ReplyThreadStateReducerTests|GroomInteractionStateReducerTests'`
+  - 62 tests passed
+
+### セルフレビュー結果
+
+- ✅ 既存モデルを移動中心で分割し、公開APIと初期化引数を維持した。
+- ✅ Core raw value、Supabase groom/board/message request、App側のfeed/read/reply/access reducerの対象テストを通した。
+- ✅ 状態名・用語・DBスキーマの変更はないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション951：Supabase groom payloadsを分割
 
 ### 背景・問題意識
