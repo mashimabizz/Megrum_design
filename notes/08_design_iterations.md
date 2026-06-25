@@ -4,6 +4,44 @@
 
 ---
 
+## イテレーション933：ActivityWindow local mode rowsを分割
+
+### 背景・問題意識
+
+`SupabaseActivityWindowRows.swift` は、AW本体のrow/create/update/status payloadと、ホームのローカルモード設定row/upsert payloadを同じファイルに持っていた。AW本体とローカルモード設定は保存先と更新条件が異なるため、row/payload定義を責務別に分ける。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumData/SupabaseActivityWindowRows.swift`
+- `ActivityWindowRow`、create/update/status payload、`ActivityWindowFlexibleDouble` に絞った。
+- ファイル行数を392行から267行へ縮小した。
+
+#### `ios-native/Sources/MegrumData/SupabaseLocalModeSettingsRows.swift`
+- `LocalModeSettingsRow` と `LocalModeSettingsUpsertPayload` を新規ファイルへ移動した。
+- selected carrying/wish IDのdedupe、activity window ID / last location clear時のnil encode、radius/coordinate validationは維持した。
+
+### 影響範囲
+
+- Swift Native iOS版のAW取得/作成/更新、ホームのローカルモード設定取得/upsert。
+- 挙動変更ではなく責務分離。Supabase select、payload key、clear時のnil encode、validation、状態名、用語、DBスキーマは変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumData/SupabaseActivityWindowRows.swift ios-native/Sources/MegrumData/SupabaseLocalModeSettingsRows.swift`
+  - passed
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-aw-rows-build --disable-index-store`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-aw-rows-tests --disable-index-store --enable-xctest --disable-swift-testing -j 1 --filter SupabaseActivityWindowClientTests`
+  - 12 tests passed
+
+### セルフレビュー結果
+
+- ✅ AW本体row/payloadとローカルモード設定row/payloadを移動のみで分割した。
+- ✅ AW作成/更新、他AW無効化、ローカルモード取得/upsert、位置clear、入力validationの既存テストを通した。
+- ✅ 状態名・用語・DBスキーマの変更はないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション932：Goods core modelsを分割
 
 ### 背景・問題意識
