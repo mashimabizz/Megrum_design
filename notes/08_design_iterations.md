@@ -4,6 +4,44 @@
 
 ---
 
+## イテレーション1116：authenticated tabs drawer actionsを分離
+
+### 背景・問題意識
+
+`MegrumAuthenticatedTabsView` は、drawer overlay、foreground layer、tab contentを組み立てる `body` / `tabContent` の中に、drawerを開く、閉じる、drawer内サインアウト後にroute状態を消す、という副作用をinline closureとして抱えていた。gestureやrouting条件は維持しつつ、操作意図が読める小さなメソッドへ分離する。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/MegrumAuthenticatedTabsView.swift`
+- `onOpenDrawer` のinline animationを `openDrawer()` へ分離した。
+- overlay tapのinline close animationを `closeDrawer()` へ分離した。
+- drawer内サインアウト後のdestination/route/drag/drawer状態リセットを `signOutFromDrawer()` へ分離した。
+- drawer gesture resolver、presentation state、destination routing、tab content構成は変更していない。
+
+### 影響範囲
+
+- Swift Native iOS版の認証後タブshellとdrawer開閉。
+- drawer内サインアウト時のroute/drawer状態リセット。
+- drawer gesture判定、tab selection、drawer destination routing、広告interstitial要求、DB/API、状態名、表示文言は変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumApp/MegrumAuthenticatedTabsView.swift`
+  - passed
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-auth-tabs-drawer-actions`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-auth-tabs-drawer-actions --enable-xctest --disable-swift-testing -j 1 --filter 'AppDrawerGestureTests|MegrumTabBarAppearanceTests|MegrumAppStateTests'`
+  - passed（101 tests）
+
+### セルフレビュー結果
+
+- ✅ drawerを開く/閉じるanimation、drawer内サインアウト後のdestination/route/drag/drawerリセットを維持した。
+- ✅ gesture resolver、presentation progress、destination delay、tab content、interstitial要求は変更していない。
+- ✅ 行数削減ではなく、`body` と `tabContent` 内のinline副作用を3つの名前付きメソッドへ分離した。
+- ✅ 新しい状態名・用語・DB列は追加していないため、`notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション1115：login security sectionsを分離
 
 ### 背景・問題意識

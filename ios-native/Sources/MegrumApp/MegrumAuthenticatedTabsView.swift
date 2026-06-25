@@ -37,14 +37,7 @@ struct MegrumAuthenticatedTabsView: View {
                     onSelectDestination: { destination in
                         openDrawerDestination(destination)
                     },
-                    onSignOut: {
-                        await onSignOut()
-                        drawerDestination = nil
-                        drawerPageDestination = nil
-                        publicProfileRoute = nil
-                        drawerDragTranslation = 0
-                        showsDrawer = false
-                    }
+                    onSignOut: signOutFromDrawer
                 )
                 .allowsHitTesting(drawerPresentation.isInteractive)
                 .zIndex(AppDrawerVisualMetrics.drawerZIndex)
@@ -56,12 +49,7 @@ struct MegrumAuthenticatedTabsView: View {
                         drawerTravel: drawerPresentation.drawerOpenOffset,
                         containerSize: proxy.size
                     ),
-                    onCloseOverlayTap: {
-                        withAnimation(drawerAnimation) {
-                            drawerDragTranslation = 0
-                            showsDrawer = false
-                        }
-                    }
+                    onCloseOverlayTap: closeDrawer
                 ) {
                     tabContent
                 }
@@ -89,12 +77,7 @@ struct MegrumAuthenticatedTabsView: View {
             requestedWishSection: $requestedWishSection,
             adDisplayContext: adDisplayContext,
             visualQAInitialScreen: visualQAInitialScreen,
-            onOpenDrawer: {
-                withAnimation(drawerAnimation) {
-                    drawerDragTranslation = 0
-                    showsDrawer = true
-                }
-            },
+            onOpenDrawer: openDrawer,
             onRequestInterstitial: onRequestInterstitial
         )
     }
@@ -185,6 +168,29 @@ struct MegrumAuthenticatedTabsView: View {
         } else {
             updateDrawerDragTranslation(0)
         }
+    }
+
+    private func openDrawer() {
+        withAnimation(drawerAnimation) {
+            drawerDragTranslation = 0
+            showsDrawer = true
+        }
+    }
+
+    private func closeDrawer() {
+        withAnimation(drawerAnimation) {
+            drawerDragTranslation = 0
+            showsDrawer = false
+        }
+    }
+
+    private func signOutFromDrawer() async {
+        await onSignOut()
+        drawerDestination = nil
+        drawerPageDestination = nil
+        publicProfileRoute = nil
+        drawerDragTranslation = 0
+        showsDrawer = false
     }
 
     private func openDrawerDestination(_ destination: AppDrawerDestination) {
