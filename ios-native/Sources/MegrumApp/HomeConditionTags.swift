@@ -33,7 +33,7 @@ struct HomeConditionTagSet: Equatable, Sendable {
     }
 
     var homeCandidateShowsExchangeTag: Bool {
-        goods != .wish
+        goods == .direct
     }
 
     var homeCandidateAccessibilityText: String {

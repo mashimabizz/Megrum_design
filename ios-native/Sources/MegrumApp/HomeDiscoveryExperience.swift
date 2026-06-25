@@ -34,7 +34,7 @@ struct HomeDiscoveryExperience: View {
     @State var pendingProposalSelection: HomeDiscoveryProposalSelection?
     @State var pendingProfileUserID: UUID?
     @State var didOpenInitialSheet = false
-    @State var selectedPrimaryTab: HomeDiscoveryPrimaryTab = .mutual
+    @State var selectedPrimaryTab: HomeDiscoveryPrimaryTab = .candidates
     @State var showsIndividualListingCreation = false
     @State var primaryTabPageWidth: CGFloat = 1
     @GestureState var primaryTabDragTranslation: CGFloat = 0
@@ -43,18 +43,6 @@ struct HomeDiscoveryExperience: View {
         ZStack(alignment: .top) {
             GeometryReader { geometry in
                 TabView(selection: $selectedPrimaryTab) {
-                    HomeMutualMatchPage(
-                        candidates: mutualMatchCandidates,
-                        listingCount: viewerIndividualListingCount,
-                        contentTopPadding: HomeDiscoveryHeaderMetrics.contentTopPadding,
-                        onSelect: { selectedMutualMatchCandidate = $0 },
-                        onCreateListing: openIndividualListingCreation
-                    )
-                    .refreshable {
-                        await onRefresh()
-                    }
-                    .tag(HomeDiscoveryPrimaryTab.mutual)
-
                     ScrollView {
                         VStack(alignment: .leading, spacing: 14) {
                             HomeDiscoverySection(
@@ -102,13 +90,17 @@ struct HomeDiscoveryExperience: View {
                     }
                     .tag(HomeDiscoveryPrimaryTab.candidates)
 
-                    HomeListingTimelinePage(
-                        contentTopPadding: HomeDiscoveryHeaderMetrics.contentTopPadding
+                    HomeMutualMatchPage(
+                        candidates: mutualMatchCandidates,
+                        listingCount: viewerIndividualListingCount,
+                        contentTopPadding: HomeDiscoveryHeaderMetrics.contentTopPadding,
+                        onSelect: { selectedMutualMatchCandidate = $0 },
+                        onCreateListing: openIndividualListingCreation
                     )
                     .refreshable {
                         await onRefresh()
                     }
-                    .tag(HomeDiscoveryPrimaryTab.timeline)
+                    .tag(HomeDiscoveryPrimaryTab.mutual)
                 }
                 .megrumPageTabViewStyle()
                 .simultaneousGesture(primaryTabDragGesture(pageWidth: geometry.size.width))

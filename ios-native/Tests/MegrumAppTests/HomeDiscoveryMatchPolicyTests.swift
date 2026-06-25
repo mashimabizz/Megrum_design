@@ -510,7 +510,7 @@ final class HomeDiscoveryMatchPolicyTests: XCTestCase {
         XCTAssertEqual(HomePaymentCondition.warning.floatingTagTitle, "支払▲")
     }
 
-    func testHomeCandidateTagSetHidesExchangeWhenGoodsConditionIsWish() {
+    func testHomeCandidateTagSetShowsExchangeOnlyWhenGoodsConditionIsDirect() {
         let wishTags = HomeConditionTagSet(
             goods: .wish,
             exchange: .possible,
@@ -518,6 +518,14 @@ final class HomeDiscoveryMatchPolicyTests: XCTestCase {
         )
         XCTAssertFalse(wishTags.homeCandidateShowsExchangeTag)
         XCTAssertEqual(wishTags.homeCandidateAccessibilityText, "グッズ○、支払?")
+
+        let noneTags = HomeConditionTagSet(
+            goods: .none,
+            exchange: .warning,
+            payment: .warning
+        )
+        XCTAssertFalse(noneTags.homeCandidateShowsExchangeTag)
+        XCTAssertEqual(noneTags.homeCandidateAccessibilityText, "グッズ▲、支払▲")
 
         let directTags = HomeConditionTagSet(
             goods: .direct,

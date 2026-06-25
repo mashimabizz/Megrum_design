@@ -322,11 +322,10 @@ final class HomeScreenFlowTests: XCTestCase {
     }
 
     func testHomeDiscoveryPrimaryTabsUseRequestedCopy() {
-        XCTAssertEqual(HomeDiscoveryPrimaryTab.mutual.title, "相互にマッチ")
         XCTAssertEqual(HomeDiscoveryPrimaryTab.candidates.title, "マッチ候補")
-        XCTAssertEqual(HomeDiscoveryPrimaryTab.timeline.title, "募集タイムライン")
-        XCTAssertEqual(HomeDiscoveryPrimaryTab.allCases.map(\.title), ["相互にマッチ", "マッチ候補", "募集タイムライン"])
-        XCTAssertEqual(HomeDiscoveryPrimaryTab.allCases.map(\.index), [0, 1, 2])
+        XCTAssertEqual(HomeDiscoveryPrimaryTab.mutual.title, "相互マッチ(β版)")
+        XCTAssertEqual(HomeDiscoveryPrimaryTab.allCases.map(\.title), ["マッチ候補", "相互マッチ(β版)"])
+        XCTAssertEqual(HomeDiscoveryPrimaryTab.allCases.map(\.index), [0, 1])
     }
 
     func testHomeDiscoveryTopTabsUseTimelineLikeBarMetrics() {
@@ -338,26 +337,19 @@ final class HomeScreenFlowTests: XCTestCase {
 
     func testHomeDiscoveryTabIndicatorInterpolatesAcrossLabelFrames() throws {
         let frames: [HomeDiscoveryPrimaryTab: CGRect] = [
-            .mutual: CGRect(x: 20, y: 0, width: 82, height: 24),
-            .candidates: CGRect(x: 132, y: 0, width: 68, height: 24),
-            .timeline: CGRect(x: 230, y: 0, width: 118, height: 24)
+            .candidates: CGRect(x: 20, y: 0, width: 68, height: 24),
+            .mutual: CGRect(x: 120, y: 0, width: 128, height: 24)
         ]
 
         let halfway = try XCTUnwrap(
             HomeDiscoveryTabIndicatorFrame.interpolated(
-                progress: 1.5,
+                progress: 0.5,
                 frames: frames
             )
         )
 
-        XCTAssertEqual(halfway.minX, 181)
-        XCTAssertEqual(halfway.width, 93)
-    }
-
-    func testHomeListingTimelineShellUsesRequestedCopy() {
-        XCTAssertEqual(HomeListingTimelinePresentation.title, "募集タイムライン")
-        XCTAssertEqual(HomeListingTimelinePresentation.sortLabel, "新着順")
-        XCTAssertEqual(HomeListingTimelinePresentation.placeholderRowCount, 3)
+        XCTAssertEqual(halfway.minX, 70)
+        XCTAssertEqual(halfway.width, 98)
     }
 
     func testMutualMatchShellDoesNotInventCandidatesWithoutData() {

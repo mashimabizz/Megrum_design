@@ -134,10 +134,14 @@ struct HomeMutualMatchConditionTagRow: View {
     var body: some View {
         HStack(spacing: 6) {
             conditionTag(title: conditionTags.goods.floatingTagTitle, color: conditionTags.goods.accent)
-            conditionTag(title: conditionTags.exchange.floatingTagTitle, color: conditionTags.exchange.accent)
+            if conditionTags.homeCandidateShowsExchangeTag {
+                conditionTag(title: conditionTags.exchange.floatingTagTitle, color: conditionTags.exchange.accent)
+            }
             conditionTag(title: conditionTags.payment.floatingTagTitle, color: conditionTags.payment.accent)
             Spacer(minLength: 0)
         }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(conditionTags.homeCandidateAccessibilityText)
     }
 
     private func conditionTag(title: String, color: Color) -> some View {

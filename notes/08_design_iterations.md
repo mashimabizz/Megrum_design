@@ -4,6 +4,60 @@
 
 ---
 
+## イテレーション973：ホーム候補タブ構成を整理
+
+### 背景・問題意識
+
+ホーム上部の主タブに一旦追加していた「募集タイムライン」は、現時点では画面の箱だけであり、オーナー確認では不要になった。あわせて、タブ順は「マッチ候補」を左端にし、「相互にマッチ」はβ版表記へ変える必要がある。また `グッズ▲` は個別募集での交換条件判定に進めない状態なので、交換タグを表示すると意味が過剰になる。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/HomeDiscoveryPrimaryTab.swift`
+- ホーム主タブを `マッチ候補` / `相互マッチ(β版)` の2つに整理した。
+- `HomeDiscoveryPrimaryTab.allCases` の順序を、左から `マッチ候補`、`相互マッチ(β版)` にした。
+
+#### `ios-native/Sources/MegrumApp/HomeDiscoveryExperience.swift`
+- 初期表示タブを `マッチ候補` に変更した。
+- `募集タイムライン` のTabView pageを削除した。
+
+#### `ios-native/Sources/MegrumApp/HomeListingTimelinePage.swift`
+- 未使用になった募集タイムラインのプレースホルダー画面を削除した。
+
+#### `ios-native/Sources/MegrumApp/HomeConditionTags.swift`
+- 候補系の交換タグ表示条件を `グッズ◎` の時だけに変更した。
+- `グッズ○` / `グッズ▲` の時は交換タグを隠し、アクセシビリティ文言からも外すようにした。
+
+#### `ios-native/Sources/MegrumApp/HomeDiscoveryGoodsCardViews.swift`
+#### `ios-native/Sources/MegrumApp/HomeMutualMatchPairListComponents.swift`
+#### `ios-native/Sources/MegrumApp/SearchResultGridViews.swift`
+- 候補カード、相互マッチ行、検索結果の条件タグ表示で同じ交換タグ表示条件を使うようにした。
+
+#### `ios-native/Tests/MegrumAppTests/HomeScreenFlowTests.swift`
+#### `ios-native/Tests/MegrumAppTests/HomeDiscoveryMatchPolicyTests.swift`
+- 2タブ構成、タブ順、β版表記、インジケータ補間、`グッズ▲` の交換タグ非表示をテストへ反映した。
+
+### 影響範囲
+
+- Swift Native iOS版のホーム画面上部タブ、マッチ候補画面、相互マッチ(β版)画面、候補系条件タグ、検索結果の小型条件タグ。
+- タブから募集タイムライン画面へは到達しない。
+- 状態名、DBスキーマ、個別募集の保存/読込ロジックは変更しない。
+
+### 確認方法
+
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-home-tabs-build --disable-index-store`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-home-tabs-build --disable-index-store --enable-xctest --disable-swift-testing -j 1 --filter 'HomeScreenFlowTests|HomeDiscoveryMatchPolicyTests|HomeCandidateComposerTests|SearchScreenTests'`
+  - 131 tests passed
+
+### セルフレビュー結果
+
+- ✅ ホーム主タブは `マッチ候補` / `相互マッチ(β版)` の2タブになり、`マッチ候補` が左端かつ初期表示になった。
+- ✅ `募集タイムライン` のホーム画面とタブ参照を削除した。
+- ✅ `グッズ▲` と `グッズ○` では交換タグを出さず、`グッズ◎` の時だけ交換タグを出すように揃えた。
+- ✅ 状態名・用語定義・DBスキーマの追加変更はないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション972：Oshi master select sheetを部品分割
 
 ### 背景・問題意識

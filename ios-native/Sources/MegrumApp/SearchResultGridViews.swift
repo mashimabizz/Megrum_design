@@ -167,11 +167,13 @@ private struct SearchResultConditionTags: View {
         VStack(alignment: .leading, spacing: 4) {
             HStack(spacing: 4) {
                 SearchResultMiniConditionPill(title: tags.goods.floatingTagTitle, color: tags.goods.accent)
-                SearchResultMiniConditionPill(title: tags.exchange.floatingTagTitle, color: tags.exchange.accent)
+                if tags.homeCandidateShowsExchangeTag {
+                    SearchResultMiniConditionPill(title: tags.exchange.floatingTagTitle, color: tags.exchange.accent)
+                }
             }
             SearchResultMiniConditionPill(title: tags.payment.floatingTagTitle, color: tags.payment.accent)
         }
-        .accessibilityLabel(tags.accessibilityText)
+        .accessibilityLabel(tags.homeCandidateAccessibilityText)
     }
 }
 

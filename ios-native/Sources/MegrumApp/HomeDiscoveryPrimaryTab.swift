@@ -1,9 +1,8 @@
 import Foundation
 
 enum HomeDiscoveryPrimaryTab: String, CaseIterable, Identifiable {
-    case mutual
     case candidates
-    case timeline
+    case mutual
 
     var id: String { rawValue }
 
@@ -13,12 +12,10 @@ enum HomeDiscoveryPrimaryTab: String, CaseIterable, Identifiable {
 
     var title: String {
         switch self {
-        case .mutual:
-            "相互にマッチ"
         case .candidates:
             "マッチ候補"
-        case .timeline:
-            "募集タイムライン"
+        case .mutual:
+            "相互マッチ(β版)"
         }
     }
 }

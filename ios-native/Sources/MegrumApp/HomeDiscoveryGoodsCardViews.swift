@@ -43,15 +43,26 @@ private struct HomeFloatingConditionTags: View {
     var exchangeCondition: HomeExchangeCondition
     var paymentCondition: HomePaymentCondition
 
+    private var conditionTags: HomeConditionTagSet {
+        HomeConditionTagSet(
+            goods: goodsCondition,
+            exchange: exchangeCondition,
+            payment: paymentCondition
+        )
+    }
+
     var body: some View {
         VStack(alignment: .trailing, spacing: 5) {
-            tag(title: goodsCondition.floatingTagTitle, color: goodsCondition.accent)
-            tag(title: exchangeCondition.floatingTagTitle, color: exchangeCondition.accent)
-            tag(title: paymentCondition.floatingTagTitle, color: paymentCondition.accent)
+            tag(title: conditionTags.goods.floatingTagTitle, color: conditionTags.goods.accent)
+            if conditionTags.homeCandidateShowsExchangeTag {
+                tag(title: conditionTags.exchange.floatingTagTitle, color: conditionTags.exchange.accent)
+            }
+            tag(title: conditionTags.payment.floatingTagTitle, color: conditionTags.payment.accent)
         }
         .fixedSize(horizontal: true, vertical: true)
         .shadow(color: .black.opacity(0.10), radius: 8, y: 4)
         .accessibilityElement(children: .combine)
+        .accessibilityLabel(conditionTags.homeCandidateAccessibilityText)
     }
 
     private func tag(title: String, color: Color) -> some View {
