@@ -4,6 +4,52 @@
 
 ---
 
+## イテレーション918：Auth screen viewsを画面別に分割
+
+### 背景・問題意識
+
+`AuthScreenViews.swift` は、共通feedback型、Apple/Google/メール選択画面、メールログイン/登録画面、パスワード再設定画面が1ファイルに同居していた。Authは初回体験と再ログインに直結する画面なので、表示調整時に選択画面・メール入力・再設定の差分を分けて追えるよう、画面単位で分割する。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/AuthScreenViews.swift`
+- `AuthVisualFeedback` の共通型だけを残した。
+- ファイル行数を322行から10行へ縮小した。
+
+#### `ios-native/Sources/MegrumApp/AuthChoiceScreen.swift`
+- `AuthChoiceScreen` を新規ファイルへ移動した。
+- Apple Sign in overlay、Google/メールprovider button、ログイン/登録切り替え、利用規約文言は維持した。
+
+#### `ios-native/Sources/MegrumApp/AuthEmailScreen.swift`
+- `AuthEmailScreen` を新規ファイルへ移動した。
+- email/password binding、feedback row、primary action、password reset導線、providerへ戻る導線、ログイン/登録切り替えは維持した。
+
+#### `ios-native/Sources/MegrumApp/AuthPasswordResetScreen.swift`
+- `AuthPasswordResetScreen` を新規ファイルへ移動した。
+- reset mail送信CTA、feedback、ログインへ戻る導線、入力変更callbackは維持した。
+
+### 影響範囲
+
+- Swift Native iOS版のログイン/登録/パスワード再設定画面。
+- 挙動変更ではなく責務分離。Auth状態、入力validation、Supabase auth request、redirect設定、状態名、用語、DBスキーマは変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumApp/AuthScreenViews.swift ios-native/Sources/MegrumApp/AuthChoiceScreen.swift ios-native/Sources/MegrumApp/AuthEmailScreen.swift ios-native/Sources/MegrumApp/AuthPasswordResetScreen.swift`
+  - passed
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-auth-views-build --disable-index-store`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-auth-views-tests --disable-index-store --enable-xctest --disable-swift-testing -j 1 --filter 'AuthScreenInputTests|SupabaseAuthClientTests|AuthSessionStoreTests|MegrumAppStateTests/testAuthState|MegrumAppStateTests/testNativeAuth|MegrumAppStateTests/testAuthConfigurationPlistKeepsRequiredKeys'`
+  - 41 tests passed
+
+### セルフレビュー結果
+
+- ✅ Authの画面別UIをファイル分割し、文言・余白・button構成・Apple Sign in overlayは移動のみで維持した。
+- ✅ AuthScreenInputTests / SupabaseAuthClientTests / AuthSessionStoreTests / MegrumAppStateTestsで、入力validation、session保存/復元、OAuth/password reset、redirect設定を確認した。
+- ✅ 状態名・用語・DBスキーマの変更はないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション917：Oshi settings screen actionsを分割
 
 ### 背景・問題意識
