@@ -4,6 +4,49 @@
 
 ---
 
+## イテレーション949：Supabase dispute clientを分割
+
+### 背景・問題意識
+
+`SupabaseDisputeClient.swift` は、申告一覧/詳細取得、申告作成、申告返信、相手返信受領更新、申告取り下げ、request生成API、query helper、返信validation、proposal取得、system message作成、ticket番号生成を1ファイルに持っていた。申告は取引状態、キャンセル、証跡、サポート導線に近いため、挙動は変えずに実行処理、request生成、support helperを分け、申告まわりの変更時の確認範囲を狭める。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumData/SupabaseDisputeClient.swift`
+- load/create/reply/update/withdrawの実行処理に絞った。
+- request/support extensionから参照するため、内部 `client` / `encoder` をmodule internalにした。
+- ファイル行数を300行から129行へ縮小した。
+
+#### `ios-native/Sources/MegrumData/SupabaseDisputeClientRequests.swift`
+- 申告一覧/詳細、申告作成、申告返信、相手返信受領更新、申告取り下げのrequest生成APIを新規ファイルへ移動した。
+- disputes/dispute_messagesのtable名、select、PATCH/POST、Prefer header、payload keyは維持した。
+
+#### `ios-native/Sources/MegrumData/SupabaseDisputeClientSupport.swift`
+- query helper、返信validation、proposal取得、system message作成、JSON encoder生成、ticket番号生成を新規ファイルへ移動した。
+- status条件、reporter/respondent制約、返信本文上限、ticket番号形式は維持した。
+
+### 影響範囲
+
+- Swift Native iOS版の取引申告、申告返信、相手返信受領、申告取り下げ、申告受付system message。
+- 挙動変更ではなく責務分離。Supabase table名、select、query、payload key、状態名、用語、DBスキーマは変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumData/SupabaseDisputeClient.swift ios-native/Sources/MegrumData/SupabaseDisputeClientRequests.swift ios-native/Sources/MegrumData/SupabaseDisputeClientSupport.swift`
+  - passed
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-dispute-client-build --disable-index-store`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-dispute-client-tests --disable-index-store --enable-xctest --disable-swift-testing -j 1 --filter SupabaseDisputeClientTests`
+  - 10 tests passed
+
+### セルフレビュー結果
+
+- ✅ 実行処理、request builder、support helperを移動中心で分割した。
+- ✅ 申告作成、返信、返信受領更新、取り下げ、入力validationの既存テストを通した。
+- ✅ 状態名・用語・DBスキーマの変更はないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション948：Supabase home clientを分割
 
 ### 背景・問題意識
