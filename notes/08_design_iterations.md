@@ -4,6 +4,44 @@
 
 ---
 
+## イテレーション1021：検索フッターbarを分割
+
+### 背景・問題意識
+
+`SearchDisplayViews.swift` は、検索content本体、filter summary、下部検索フッター、filter badgeを同じファイルに抱えていた。検索結果/サジェストの表示ロジックと、画面下部の入力・filter・submit操作を分け、検索画面の表示調整を小さく進められるようにした。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/SearchDisplayViews.swift`
+- `SearchContent`、`SearchFilterSummaryBar`、`SearchResultsHeader` を既存ファイルに残した。
+- 下部検索フッターとfilter icon / badge / input bar表示を専用ファイルへ委譲した。
+
+#### `ios-native/Sources/MegrumApp/SearchFooterBarViews.swift`
+- `SearchFooterBar`、`SearchInputBar`、`SearchFilterIconButtonContent`、`SearchFilterCountBadge` を移動した。
+- glass group spacing、filter badgeのz-index、検索buttonのgradient、アクセシビリティ文言は既存どおり維持した。
+
+### 影響範囲
+
+- Swift Native iOS版の検索画面下部フッター。
+- filter button、検索入力、検索submit button、filter件数badge。
+- 検索条件、検索結果filter、サジェスト、状態名、用語、DBスキーマ、表示文言は変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumApp/SearchDisplayViews.swift ios-native/Sources/MegrumApp/SearchFooterBarViews.swift`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-search-footer --enable-xctest --disable-swift-testing -j 1 --filter SearchScreenTests`
+  - passed（14 tests）
+
+### セルフレビュー結果
+
+- ✅ `SearchFooterBar` のbinding、filter tap、submit action、badge表示条件は移動のみで維持した。
+- ✅ `SearchContent` の結果/空状態/skeleton/サジェスト分岐には触れていない。
+- ✅ `SearchDisplayViews.swift` は 280行から 174行へ縮小し、下部フッター表示を 108行の専用ファイルへ分離した。
+- ✅ 新しい状態名・用語・DB列は追加していないため、`notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション1020：マッチ関係summary panelを分割
 
 ### 背景・問題意識
