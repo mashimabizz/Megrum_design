@@ -4,6 +4,44 @@
 
 ---
 
+## イテレーション1082：proposal confirm row modelsを分離
+
+### 背景・問題意識
+
+`ProposalConfirmCardPrimitives.swift` は、確認画面のcard/row/pillなどSwiftUI primitiveと、現地/発送条件のsummary textを確認行へ分解するデータ整形を同じファイルに抱えていた。UI primitive側をView定義に集中させるため、確認行モデルと文字列整形helperを専用ファイルへ分離する。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/ProposalConfirmCardPrimitives.swift`
+- `ProposalConfirmRowItem` / `ProposalConfirmLocalRows` / `ProposalConfirmShippingRows` と文字列整形helperを移動した。
+- `ProposalConfirmPlainCard`、`ProposalConfirmDetailCard`、`ProposalConfirmDetailRow`、`ProposalConfirmPill`、`ProposalSummaryRow` の見た目は維持した。
+
+#### `ios-native/Sources/MegrumApp/ProposalConfirmRowModels.swift`
+- 確認行モデルと、summary textから都道府県/メモ/日程/送料/発送目安を作る整形処理を追加した。
+- 未設定/対象外の除外、prefix除去、fallback値を維持した。
+
+### 影響範囲
+
+- Swift Native iOS版の打診作成確認画面。
+- 打診作成step、送信payload、支払い/待ち合わせ条件、DB/API、状態名、表示文言は変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumApp/ProposalConfirmCardPrimitives.swift ios-native/Sources/MegrumApp/ProposalConfirmRowModels.swift`
+  - passed
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-proposal-confirm-row-models`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-proposal-confirm-row-models --enable-xctest --disable-swift-testing -j 1 --filter 'ProposalCreateFlowTests|ProposalCreateSheetTests'`
+  - passed（62 tests）
+
+### セルフレビュー結果
+
+- ✅ 確認行の分割、未設定/対象外filter、prefix除去、fallback値を維持した。
+- ✅ `ProposalConfirmCardPrimitives.swift` は 214行から 124行へ縮小し、確認行モデルを 89行の専用ファイルへ分離した。
+- ✅ 新しい状態名・用語・DB列は追加していないため、`notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション1081：individual listing bottom bar buttonsを分離
 
 ### 背景・問題意識
