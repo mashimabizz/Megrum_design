@@ -4,6 +4,44 @@
 
 ---
 
+## イテレーション1029：掲示板reply inputを分割
+
+### 背景・問題意識
+
+`BoardThreadDetailComponents.swift` は、話題詳細カード、参加者/返信表示、返信入力バーを同じファイルに抱えていた。返信入力バーは text binding、送信中表示、disabled状態、submit処理を持つ独立した入力UIなので、詳細カードの表示部品から切り出し、スレッド本文表示と入力バーの変更範囲を分けた。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/BoardThreadDetailComponents.swift`
+- `BoardReplyDisplay`、`BoardParticipantAvatar`、`BoardThreadDetailHeader`、`BoardThreadDetailCard` を既存ファイルに残した。
+- `BoardReplyInput` 表示を専用ファイルへ委譲した。
+
+#### `ios-native/Sources/MegrumApp/BoardReplyInputView.swift`
+- `BoardReplyInput` を移動した。
+- photo/camera icon、TextField、send button、ProgressView、disabled/opacity条件、submit時の送信判定は既存どおり維持した。
+
+### 影響範囲
+
+- Swift Native iOS版の掲示板スレッド詳細画面。
+- 返信入力バー、送信button表示、送信中表示。
+- 返信送信処理、返信一覧、参加者avatar、状態名、用語、DBスキーマ、表示文言は変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumApp/BoardThreadDetailComponents.swift ios-native/Sources/MegrumApp/BoardReplyInputView.swift`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-board-reply-input --enable-xctest --disable-swift-testing -j 1 --filter ReplyThreadStateReducerTests`
+  - passed（3 tests）
+
+### セルフレビュー結果
+
+- ✅ `BoardReplyInput` は移動のみで、binding、submit処理、send buttonの活性条件、loading表示を維持した。
+- ✅ `BoardThreadDetailCard`、返信一覧、参加者avatar、detail tagの表示は変更していない。
+- ✅ `BoardThreadDetailComponents.swift` は 253行から 189行へ縮小し、返信入力バーを 66行の専用ファイルへ分離した。
+- ✅ 新しい状態名・用語・DB列は追加していないため、`notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション1028：取引証跡photo viewsを分割
 
 ### 背景・問題意識
