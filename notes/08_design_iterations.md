@@ -4,6 +4,46 @@
 
 ---
 
+## イテレーション1060：proposal meetup long pressを分離
+
+### 背景・問題意識
+
+`ProposalMeetupCalendarWeekEditorGestures.swift` は、board/candidate drag gestureの処理に加えて、board/candidate long pressの遅延task schedulingも同じextensionに抱えていた。gestureの読みやすさを保つため、long press schedulingとcancel処理だけを専用extensionへ分離した。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/ProposalMeetupCalendarWeekEditorGestures.swift`
+- board gesture、week header swipe、candidate drag changed/ended、preview cleanup、week drag resetに集中させた。
+- long press scheduling/cancel処理を移動した。
+
+#### `ios-native/Sources/MegrumApp/ProposalMeetupCalendarWeekEditorLongPress.swift`
+- `ProposalMeetupCalendarWeekEditor` extensionを追加し、board/candidateのlong press schedulingとcancel処理を担当させた。
+- board long press後のpreview draft作成、既存candidate移動開始、candidate edit開始、`DispatchWorkItem` cancel挙動を維持した。
+
+### 影響範囲
+
+- Swift Native iOS版の打診作成内、待ち合わせ候補カレンダー。
+- board/candidate drag gesture、long pressでの候補作成/移動/編集開始。
+- カレンダーlayout、submit payload、状態名、用語、DBスキーマ、表示文言は変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumApp/ProposalMeetupCalendarWeekEditorGestures.swift ios-native/Sources/MegrumApp/ProposalMeetupCalendarWeekEditorLongPress.swift`
+  - passed
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-proposal-meetup-long-press`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-proposal-meetup-long-press --enable-xctest --disable-swift-testing -j 1 --filter 'TradeRequestDraftProposalCreateFlowTests|ProposalCreateFlowTests'`
+  - passed（55 tests）
+
+### セルフレビュー結果
+
+- ✅ long press scheduling/cancelだけを専用extensionへ移し、drag changed/ended処理は元ファイルに残した。
+- ✅ board long pressのpreview作成、candidate移動開始、candidate long pressのediting遷移、task cancel挙動を維持した。
+- ✅ `ProposalMeetupCalendarWeekEditorGestures.swift` は 261行から 179行へ縮小し、long press処理を 86行の専用ファイルへ分離した。
+- ✅ 新しい状態名・用語・DB列は追加していないため、`notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション1059：proposal create goods sectionsを分離
 
 ### 背景・問題意識
