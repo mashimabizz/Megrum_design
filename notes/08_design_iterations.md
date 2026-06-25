@@ -4,6 +4,45 @@
 
 ---
 
+## イテレーション1075：trade goods fallback artworkを分離
+
+### 背景・問題意識
+
+`TradeGoodsArtwork.swift` は、取引グッズ画像のAsyncImage表示と、画像がない/失敗した時のfallback表示を同じView内に抱えていた。画像読み込みの分岐は親Viewに残し、fallbackの見た目だけを専用Viewへ分離する。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/TradeGoodsArtwork.swift`
+- 画像なし、読み込み失敗、unknown phaseのfallback呼び出しを `TradeGoodsFallbackArtwork` に置き換えた。
+- LinearGradient、AsyncImage、ProgressView、成功時のresizable/scaledToFill、clippedは維持した。
+
+#### `ios-native/Sources/MegrumApp/TradeGoodsFallbackArtwork.swift`
+- `TradeGoodsFallbackArtwork` を追加し、photo iconと `TradePreviewThumbnailStyle.glyph(for:)` の表示を担当させた。
+- spacing、icon font、glyph font、白opacityを維持した。
+
+### 影響範囲
+
+- Swift Native iOS版の取引グッズcarousel / orbit cardで表示される画像fallback。
+- 画像URL読み込み、成功画像表示、取引状態、チャット入力、DB/API、状態名、表示文言は変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumApp/TradeGoodsArtwork.swift ios-native/Sources/MegrumApp/TradeGoodsFallbackArtwork.swift`
+  - passed
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-trade-goods-fallback-artwork`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-trade-goods-fallback-artwork --enable-xctest --disable-swift-testing -j 1 --filter 'TradeChatAffordanceTests|TradeRequestDraftTests|TradeMessageStateReducerTests'`
+  - passed（61 tests）
+
+### セルフレビュー結果
+
+- ✅ AsyncImageのempty/success/failure/unknown分岐は維持し、fallbackの見た目だけを専用ファイルへ移した。
+- ✅ photo icon、glyph、font size、opacity、spacingを維持した。
+- ✅ `TradeGoodsArtwork.swift` は 56行から 44行へ縮小し、trade goods fallback artworkを 18行の専用ファイルへ分離した。
+- ✅ 新しい状態名・用語・DB列は追加していないため、`notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション1074：profile schedule month cellを分離
 
 ### 背景・問題意識

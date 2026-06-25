@@ -30,27 +30,15 @@ struct TradeGoodsArtwork: View {
                             .resizable()
                             .scaledToFill()
                     case .failure:
-                        fallback
+                        TradeGoodsFallbackArtwork(item: item)
                     @unknown default:
-                        fallback
+                        TradeGoodsFallbackArtwork(item: item)
                     }
                 }
             } else {
-                fallback
+                TradeGoodsFallbackArtwork(item: item)
             }
         }
         .clipped()
-    }
-
-    private var fallback: some View {
-        VStack(spacing: 8) {
-            Image(systemName: "photo")
-                .font(.system(size: 26, weight: .bold))
-                .foregroundStyle(.white.opacity(0.88))
-
-            Text(TradePreviewThumbnailStyle.glyph(for: item))
-                .font(.system(size: 30, weight: .black, design: .rounded))
-                .foregroundStyle(.white.opacity(0.92))
-        }
     }
 }
