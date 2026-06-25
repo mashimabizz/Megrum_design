@@ -4,6 +4,44 @@
 
 ---
 
+## イテレーション934：Supabase dispute modelsを分割
+
+### 背景・問題意識
+
+`SupabaseDisputeClient.swift` は、異議申し立ての通信処理と、外部から参照されるエラー/入力/詳細/メッセージモデルを同じファイルに持っていた。client本体をrequest生成・load/create/reply/withdraw処理へ集中させ、support modelを専用ファイルに分ける。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumData/SupabaseDisputeClient.swift`
+- `SupabaseDisputeClient` の通信処理に絞った。
+- ファイル行数を382行から300行へ縮小した。
+
+#### `ios-native/Sources/MegrumData/SupabaseDisputeModels.swift`
+- `SupabaseDisputeClientError`、`SupabaseDisputeParticipantRole`、`SupabaseDisputeReplyCreateInput`、`SupabaseDisputeDetail`、`SupabaseDisputeMessage` を新規ファイルへ移動した。
+- ticket変換、role raw value、reply inputのinitializerは維持した。
+
+### 影響範囲
+
+- Swift Native iOS版の異議申し立て/通報詳細データclient、取引異議申し立て詳細表示。
+- 挙動変更ではなく責務分離。Supabase API path、query、payload key、validation、状態名、用語、DBスキーマは変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumData/SupabaseDisputeClient.swift ios-native/Sources/MegrumData/SupabaseDisputeModels.swift`
+  - passed
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-dispute-client-build --disable-index-store`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-dispute-client-tests --disable-index-store --enable-xctest --disable-swift-testing -j 1 --filter SupabaseDisputeClientTests`
+  - 10 tests passed
+
+### セルフレビュー結果
+
+- ✅ public model型の移動のみで、raw value、initializer、ticket変換、validation分岐は維持した。
+- ✅ create/load/reply/withdraw request生成と入力validationの既存テストを通した。
+- ✅ 状態名・用語・DBスキーマの変更はないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション933：ActivityWindow local mode rowsを分割
 
 ### 背景・問題意識
