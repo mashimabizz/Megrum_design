@@ -4,6 +4,47 @@
 
 ---
 
+## イテレーション907：Trade message bubble viewsを分割
+
+### 背景・問題意識
+
+`TradeMessageBubbleViews.swift` は、チャット吹き出し本体、system/user分岐、システム通知カード、異議申し立て/証跡導線、キャンセル同意ボタン、写真吹き出し、位置情報プレビュー、到着ステータス、本文吹き出し、既読/時刻metaが1ファイルに同居していた。取引チャットのUI調整時に触る責務を見つけやすくするため、rootの振り分けと表示部品を分割する。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/TradeMessageBubbleViews.swift`
+- `TradeMessageBubble` をsystem/userの振り分けと、mine/partner配置の組み立てに集中させた。
+- ファイル行数を338行から46行へ縮小した。
+
+#### `ios-native/Sources/MegrumApp/TradeMessageBubbleSystemViews.swift`
+- `TradeSystemMessageBubble`、system message content、キャンセル同意ボタンを移動した。
+- 異議申し立てsummary tap、証跡一覧tap、キャンセル同意CTA、disabled/loading状態、accessibility labelは維持した。
+
+#### `ios-native/Sources/MegrumApp/TradeMessageBubbleContentViews.swift`
+- `TradeUserMessageStack`、既読/時刻meta、写真、到着ステータス、位置情報プレビュー、map grid、本文吹き出しを移動した。
+- 写真サイズ/label、服装写真label、位置情報プレビュー、到着ステータス文言、既読表示、本文bubble styleは維持した。
+
+### 影響範囲
+
+- Swift Native iOS版の取引チャットメッセージ表示、system message、異議申し立て/証跡notice、キャンセル同意CTA、写真/服装写真、位置情報、到着ステータス、既読/時刻表示。
+- 挙動変更ではなく責務分離。message type判定、callback、accessibility label、色/サイズ/角丸、既読判定、状態名、用語、DBスキーマは変更しない。
+
+### 確認方法
+
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-trade-message-bubbles-build --disable-index-store`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-trade-message-bubbles-tests --disable-index-store --enable-xctest --disable-swift-testing -j 1 --filter 'TradeChatAffordanceTests|TradeMessageStateReducerTests'`
+  - 52 tests passed
+
+### セルフレビュー結果
+
+- ✅ system/user message分岐、mine/partner配置、既読/時刻meta、写真拡大callback、異議申し立て/証跡/cancel approval callbackは変更していない。
+- ✅ system message content、キャンセル同意ボタン、写真/位置情報/到着ステータス/本文bubbleの見た目値は移動のみで維持した。
+- ✅ TradeChatAffordanceTests / TradeMessageStateReducerTestsで、取引チャット導線、system message presentation、cancel approval、location/arrival/outfit photo、read receipts、message reducerを確認した。
+- ✅ 状態名・用語・DBスキーマの変更はないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション906：Trade schedule calendar windowを共通化
 
 ### 背景・問題意識
