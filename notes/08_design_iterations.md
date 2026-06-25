@@ -4,6 +4,53 @@
 
 ---
 
+## イテレーション967：HomeDiscovery cardsを部品分割
+
+### 背景・問題意識
+
+`HomeDiscoveryCards.swift` は、ホームのviewer avatar、候補セクション、横レール候補、候補カード、条件タグを1ファイルに持っていた。マッチ候補タブのカード表示は今後も文言、タグ、カードサイズ、タップ挙動の調整が入りやすいため、見た目と挙動を変えずに部品単位へ分け、カード調整時に読む範囲を狭める。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/HomeDiscoveryViewerAvatar.swift`
+- `HomeDiscoveryViewerAvatar` を新規ファイルへ移動した。
+
+#### `ios-native/Sources/MegrumApp/HomeDiscoverySection.swift`
+- `HomeDiscoverySectionLayout`、`HomeDiscoverySection`、private `HomeDiscoverySectionHeader` を新規ファイルへ移動した。
+
+#### `ios-native/Sources/MegrumApp/HomeHavesCandidateButton.swift`
+- 横レール用の `HomeHavesCandidateButton` を新規ファイルへ移動した。
+
+#### `ios-native/Sources/MegrumApp/HomeDiscoveryCandidateButton.swift`
+- grid候補用の `HomeDiscoveryCandidateButton` を新規ファイルへ移動した。
+
+#### `ios-native/Sources/MegrumApp/HomeDiscoveryCandidateConditionTags.swift`
+- 候補カード下の条件タグ表示を新規ファイルへ移動した。
+
+#### `ios-native/Sources/MegrumApp/HomeDiscoveryCards.swift`
+- 上記5ファイルへ分割したため削除した。
+
+### 影響範囲
+
+- Swift Native iOS版ホームのマッチ候補タブ、相互マッチ/候補カード、欲しがられている候補レール、検索起動。
+- 挙動変更ではなく責務分離。カードサイズ、条件タグ文言、検索起動、シート起動、状態名、用語、DBスキーマは変更しない。
+
+### 確認方法
+
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-home-discovery-cards-build --disable-index-store`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-home-discovery-cards-build --disable-index-store --enable-xctest --disable-swift-testing -j 1 --filter 'HomeScreenFlowTests|HomeDiscoveryMatchPolicyTests|HomeCandidateComposerTests|SearchScreenTests'`
+  - 132 tests passed
+
+### セルフレビュー結果
+
+- ✅ avatar、section、haves rail候補、grid候補、条件タグを移動のみで分割し、カード表示とタップ導線を維持した。
+- ✅ ホーム候補、条件タグ、検索連携、候補生成の対象テストを通した。
+- ✅ 分割に伴ってprivate補助型の一部はモジュール内アクセスになったが、MegrumApp内の表示部品に閉じている。
+- ✅ 状態名・用語・DBスキーマの変更はないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション966：旧通知画面を整理
 
 ### 背景・問題意識
