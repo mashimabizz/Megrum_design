@@ -4,6 +4,45 @@
 
 ---
 
+## イテレーション955：Proposal core modelsを分割
+
+### 背景・問題意識
+
+`ProposalModels.swift` は、打診作成時の入力モデル、待ち合わせ候補、支払い側、保存済みの `TradeProposal` と参加者/カウンター提案helperを1ファイルに持っていた。打診作成フロー、ホーム/プロフィールからの打診、取引チャット、カウンター提案にまたがるCoreモデルなので、作成inputと保存済み打診モデルを分け、変更時の確認範囲を狭める。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumCore/ProposalCreateModels.swift`
+- `ProposalMatchType`、`ProposalMeetupInput`、`ProposalCreateInput`、`ProposalCashSide` を新規ファイルへ移動した。
+- match type raw value、meetup candidate validation、create inputの正規化、cash side raw valueは維持した。
+
+#### `ios-native/Sources/MegrumCore/TradeProposalModels.swift`
+- `TradeProposal` を新規ファイルへ移動した。
+- `isParticipant`、`isSender`、`partnerAgreement`、`partnerApproved`、`partnerID`、`allowsCounterProposal`、`canCreateCounterProposal`、`counterProposalInput` などのhelperを維持した。
+
+#### `ios-native/Sources/MegrumCore/ProposalModels.swift`
+- 上記2ファイルへ分割したため削除した。
+
+### 影響範囲
+
+- Swift Native iOS版の打診作成、待ち合わせ候補、ホーム/プロフィール起点の打診、カウンター提案、取引チャット/取引一覧、Supabase proposal request。
+- 挙動変更ではなく責務分離。型名、raw value、public initializer、プロパティ、状態名、用語、DBスキーマは変更しない。
+
+### 確認方法
+
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-proposal-models-build --disable-index-store`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-current --disable-index-store --enable-xctest --disable-swift-testing -j 1 --filter 'MegrumCoreTests|SupabaseProposalClientTests|SupabaseRequestParityTests|SupabaseDisputeClientTests|TradeProposalStateReducerTests|TradeChatAffordanceTests|TradeMessageStateReducerTests|ProposalCreateFlowTests|TradeRequestDraftProposalCreateFlowTests|SupabaseTradeSchedulePersistenceTests|TradeEvidencePhotoStateReducerTests|OwnProfileSummaryTests'`
+  - 180 tests passed
+
+### セルフレビュー結果
+
+- ✅ 既存モデルを移動中心で分割し、公開API、raw value、初期化引数、helperの戻り値を維持した。
+- ✅ 打診作成、Supabase proposal/dispute/request parity、取引提案reducer、取引チャット、証跡、プロフィール要約の対象テストを通した。
+- ✅ 状態名・用語・DBスキーマの変更はないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション954：Face recognition core modelsを分割
 
 ### 背景・問題意識
