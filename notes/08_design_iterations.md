@@ -4,6 +4,45 @@
 
 ---
 
+## イテレーション909：Individual listing footer logicを分割
+
+### 背景・問題意識
+
+`IndividualListingEditorBottomBar.swift` は、個別募集作成シートのfooter配置、戻る/保存/次へ/選択肢追加/すべて登録・解除CTA、選択数表示、さらに「1個以上」「すべて希望」「全部ほしい」などのロジック選択セグメントまで1ファイルに同居していた。直近で個別募集の選択条件や一括選択まわりの修正が続いているため、footer本体とロジック選択UIを分け、次のUI調整時に読む範囲を小さくする。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/IndividualListingEditorBottomBar.swift`
+- `IndividualListingEditorBottomBar` をfooter全体の表示条件、action row、primary/secondary/select-all CTA、binding解決に集中させた。
+- ファイル行数を335行から218行へ縮小した。
+
+#### `ios-native/Sources/MegrumApp/IndividualListingFooterLogicSegment.swift`
+- `IndividualListingFooterLogicSegment` を新規追加し、「どれか1つだけ」「1個以上」「すべて希望/すべて譲る/全部ほしい」と、何個以上popoverを移動した。
+- `minimumChoices`、`ListingLogic.minimumCountTitle` 表示、選択時の `selection` / `minimumCount` 更新、popover位置指定、見た目値は維持した。
+
+### 影響範囲
+
+- Swift Native iOS版の個別募集作成/編集シートfooter、譲るから選ぶ/ウィッシュから選ぶ/条件から選ぶ時のロジック選択、一括登録/解除CTA、選択肢追加CTA。
+- 挙動変更ではなく責務分離。選択条件、表示文言、button enabled/disabled条件、一括登録/解除の判定、保存処理、状態名、用語、DBスキーマは変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumApp/IndividualListingEditorBottomBar.swift ios-native/Sources/MegrumApp/IndividualListingFooterLogicSegment.swift`
+  - passed
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-listing-bottom-bar-build --disable-index-store`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-listing-bottom-bar-tests --disable-index-store --enable-xctest --disable-swift-testing -j 1 --filter 'IndividualListingDraftTests|IndividualListingStateReducerTests'`
+  - 38 tests passed
+
+### セルフレビュー結果
+
+- ✅ 個別募集footerの戻る/保存/次へ/選択肢追加/すべて登録・解除CTAと表示条件は変更していない。
+- ✅ 「1個以上」「すべて希望」「すべて譲る」「全部ほしい」と、何個以上popoverの選択更新は移動のみで維持した。
+- ✅ IndividualListingDraftTests / IndividualListingStateReducerTestsで、一括登録/解除、1個以上、atLeast制約、保存入力生成、編集復元、listing upsert/removeを確認した。
+- ✅ 状態名・用語・DBスキーマの変更はないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション908：Trade detail presentationを分割
 
 ### 背景・問題意識
