@@ -4,6 +4,44 @@
 
 ---
 
+## イテレーション1033：推しsettings member tagsを分割
+
+### 背景・問題意識
+
+`OshiSettingsGroupCardViews.swift` は、推しグループカード本体、選択済みメンバーtag、メンバー追加リクエストtag、共通paletteを同じファイルに抱えていた。tag表示はカード本体の削除確認stateや展開ロジックから独立しているため、専用ファイルへ切り出し、カード本体とメンバーtagの変更範囲を分けた。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/OshiSettingsGroupCardViews.swift`
+- `OshiSettingsGroupCard` 本体に、展開表示、削除確認popover、追加可能メンバー一覧の構造を残した。
+- `OshiSelectedMemberTag`、`OshiMemberRequestTag`、`OshiPalette` を専用ファイルへ委譲した。
+
+#### `ios-native/Sources/MegrumApp/OshiSettingsMemberTagViews.swift`
+- `OshiSelectedMemberTag`、`OshiMemberRequestTag`、`OshiPalette` を追加した。
+- 選択済みメンバーtag、承認待ちtagの破線、削除accessibility label、リクエストtagの表示を既存どおり維持した。
+
+### 影響範囲
+
+- Swift Native iOS版の推し設定画面。
+- 推しグループカード内の選択済みメンバーtagとメンバー追加リクエストtag。
+- 推しグループ削除確認、展開/折りたたみ、メンバー追加/削除処理、状態名、用語、DBスキーマ、表示文言は変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumApp/OshiSettingsGroupCardViews.swift ios-native/Sources/MegrumApp/OshiSettingsMemberTagViews.swift`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-oshi-member-tags --enable-xctest --disable-swift-testing -j 1 --filter OshiSettingsDraftTests`
+  - passed（15 tests）
+
+### セルフレビュー結果
+
+- ✅ `OshiSettingsGroupCard` の `@State`、削除確認popover、展開条件、メンバー追加/削除callbackは変更していない。
+- ✅ `OshiSelectedMemberTag` と `OshiMemberRequestTag` は移動のみで、色、破線、disabled条件、accessibility labelを維持した。
+- ✅ `OshiSettingsGroupCardViews.swift` は 255行から 186行へ縮小し、メンバーtag表示を 69行の専用ファイルへ分離した。
+- ✅ 新しい状態名・用語・DB列は追加していないため、`notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション1032：取引card read state styleを分割
 
 ### 背景・問題意識
