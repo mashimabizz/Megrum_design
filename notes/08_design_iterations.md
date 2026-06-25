@@ -4,6 +4,46 @@
 
 ---
 
+## イテレーション1044：グルームviewer chrome viewsを分割
+
+### 背景・問題意識
+
+`GroomViewerScreen.swift` は、画像viewer本体、左右tap遷移、drag dismiss、既読mark、返信送信、like処理に加えて、page indicator、閉じるボタン、返信composer、likeボタンの表示を同じbodyに抱えていた。viewerの状態遷移と副作用は本体に残し、画面chrome表示だけを専用ファイルへ分けた。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/GroomViewerScreen.swift`
+- `GroomViewerScreen` は画像表示、左右tap遷移、drag dismiss、既読mark、返信送信、like toggleの orchestration に集中させた。
+- page indicator、閉じるボタン、返信composer、likeボタンを専用Viewへ委譲した。
+- like toggle の `Task` を `toggleCurrentGroomLike()` に出し、body直下の副作用記述を薄くした。
+
+#### `ios-native/Sources/MegrumApp/GroomViewerChromeViews.swift`
+- `GroomViewerPageIndicator`、`GroomViewerCloseButton`、`GroomViewerBottomControls`、返信composer、like buttonを追加した。
+- 既存のspacing、padding、font、button size、background opacity、disabled/opacity条件、accessibility labelを維持した。
+
+### 影響範囲
+
+- Swift Native iOS版のグルーム画像viewer。
+- viewer上部chrome、返信composer、likeボタン表示。
+- 画像読み込み、左右tap遷移、下drag dismiss、既読mark、返信送信、like保存、状態名、用語、DBスキーマ、表示文言は変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumApp/GroomViewerScreen.swift ios-native/Sources/MegrumApp/GroomViewerChromeViews.swift`
+  - passed
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-groom-viewer-chrome`
+  - passed
+
+### セルフレビュー結果
+
+- ✅ 画像viewerのcurrent index、tap遷移、drag dismiss、既読mark、返信送信、like保存の条件は維持した。
+- ✅ 返信composerとlikeボタンの文言、サイズ、disabled/opacity、accessibility labelを維持した。
+- ✅ 新ファイルには廃止用語を追加していない。
+- ✅ `GroomViewerScreen.swift` は 233行から 174行へ縮小し、chrome表示を 125行の専用ファイルへ分離した。
+- ✅ 新しい状態名・用語・DB列は追加していないため、`notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション1043：めぐりboard detail previewを分割
 
 ### 背景・問題意識

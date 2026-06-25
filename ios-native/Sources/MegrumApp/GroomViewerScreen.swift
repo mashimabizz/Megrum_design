@@ -92,90 +92,25 @@ private struct GroomViewerScreen: View {
             }
 
             VStack(spacing: 0) {
-                HStack(spacing: 6) {
-                    ForEach(grooms.indices, id: \.self) { index in
-                        Capsule()
-                            .fill(index <= currentIndex ? .white : .white.opacity(0.28))
-                            .frame(height: 3)
-                    }
-                }
-                .padding(.horizontal, 14)
-                .padding(.top, 14)
+                GroomViewerPageIndicator(
+                    totalCount: grooms.count,
+                    currentIndex: currentIndex
+                )
 
-                HStack {
-                    Spacer()
-                    Button {
-                        dismiss()
-                    } label: {
-                        Image(systemName: "xmark")
-                            .font(.system(size: 16, weight: .heavy))
-                            .foregroundStyle(.white)
-                            .frame(width: 44, height: 44)
-                            .background(.black.opacity(0.28), in: Circle())
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel("閉じる")
+                GroomViewerCloseButton {
+                    dismiss()
                 }
-                .padding(.horizontal, 14)
-                .padding(.top, 10)
 
                 Spacer()
 
-                HStack(spacing: 10) {
-                    if canReplyToCurrentGroom {
-                        TextField("返信を送る", text: $replyDraft)
-                            .font(.system(size: 15, weight: .bold, design: .rounded))
-                            .foregroundStyle(.white)
-                            .tint(.white)
-                            .submitLabel(.send)
-                            .padding(.horizontal, 14)
-                            .frame(height: 46)
-                            .background(.white.opacity(0.16), in: Capsule())
-                            .overlay(Capsule().stroke(.white.opacity(0.22), lineWidth: 1))
-                            .onSubmit {
-                                submitGroomReply()
-                            }
-
-                        Button {
-                            submitGroomReply()
-                        } label: {
-                            Group {
-                                if isSendingReply {
-                                    ProgressView()
-                                        .controlSize(.small)
-                                        .tint(.white)
-                                } else {
-                                    Image(systemName: "arrow.up")
-                                        .font(.system(size: 18, weight: .heavy))
-                                }
-                            }
-                            .foregroundStyle(.white)
-                            .frame(width: 46, height: 46)
-                            .background(MegrumTheme.lavender, in: Circle())
-                        }
-                        .buttonStyle(.plain)
-                        .disabled(replyDraft.isBlank || isSendingReply)
-                        .opacity(replyDraft.isBlank ? 0.52 : 1)
-                    } else {
-                        Spacer()
-                    }
-
-                    Button {
-                        Task {
-                            await appState.setGroomLiked(currentGroom.id, isLiked: !isCurrentGroomLiked)
-                        }
-                    } label: {
-                        Image(systemName: isCurrentGroomLiked ? "heart.fill" : "heart")
-                            .font(.system(size: 24, weight: .heavy))
-                            .foregroundStyle(isCurrentGroomLiked ? MegrumTheme.pink : .white)
-                            .frame(width: 54, height: 54)
-                            .background(.black.opacity(0.28), in: Circle())
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel(isCurrentGroomLiked ? "いいねを取り消す" : "いいね")
-                }
-                .padding(.horizontal, 18)
-                .padding(.bottom, 24)
+                GroomViewerBottomControls(
+                    canReply: canReplyToCurrentGroom,
+                    isSendingReply: isSendingReply,
+                    isLiked: isCurrentGroomLiked,
+                    onSubmitReply: submitGroomReply,
+                    onToggleLike: toggleCurrentGroomLike,
+                    replyDraft: $replyDraft
+                )
             }
         }
         .task(id: currentGroom.id) {
@@ -210,6 +145,12 @@ private struct GroomViewerScreen: View {
         }
         withAnimation(.smooth(duration: 0.18)) {
             currentIndex = nextIndex
+        }
+    }
+
+    private func toggleCurrentGroomLike() {
+        Task {
+            await appState.setGroomLiked(currentGroom.id, isLiked: !isCurrentGroomLiked)
         }
     }
 
