@@ -4,6 +4,46 @@
 
 ---
 
+## イテレーション1059：proposal create goods sectionsを分離
+
+### 背景・問題意識
+
+`ProposalCreateSheetSections.swift` は、打診作成sheetのヘッダー、受け取るカード、私が出すグッズ選択、交換手段、条件タグ、メッセージ、送信ボタンをまとめて抱えていた。打診作成の表示変更を進めやすくするため、グッズ表示/選択セクションだけを専用ファイルへ分離した。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/ProposalCreateSheetSections.swift`
+- `ProposalCreateSheetHeader`、交換手段、条件タグ、メッセージ、送信ボタンの表示に集中させた。
+- `ProposalCreateTargetCard`、`ProposalCreateSenderGoodsSection`、`ProposalCreateGoodsChoice` を移動した。
+
+#### `ios-native/Sources/MegrumApp/ProposalCreateGoodsSections.swift`
+- `ProposalCreateTargetCard`、`ProposalCreateSenderGoodsSection`、`ProposalCreateGoodsChoice` を追加した。
+- 受け取るカード、マイグッズ未登録時copy、横スクロールの出品グッズ選択、選択中アイコン表示を維持した。
+
+### 影響範囲
+
+- Swift Native iOS版の打診作成sheet。
+- 受け取るカード、私が出すグッズ選択、交換手段/条件タグ/メッセージ/送信ボタンのファイル責務。
+- 打診作成flow、選択state、submit payload、状態名、用語、DBスキーマ、表示文言は変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumApp/ProposalCreateSheetSections.swift ios-native/Sources/MegrumApp/ProposalCreateGoodsSections.swift`
+  - passed
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-proposal-create-goods-sections`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-proposal-create-goods-sections --enable-xctest --disable-swift-testing -j 1 --filter 'ProposalCreateSheetTests|ProposalCreateFlowTests'`
+  - passed（62 tests）
+
+### セルフレビュー結果
+
+- ✅ グッズ表示/選択セクションだけを専用ファイルへ移し、交換手段、条件タグ、メッセージ、送信ボタンは元ファイルに残した。
+- ✅ 受け取るカード、未登録copy、横スクロール、選択中アイコン、binding更新を維持した。
+- ✅ `ProposalCreateSheetSections.swift` は 231行から 124行へ縮小し、グッズ表示/選択を 110行の専用ファイルへ分離した。
+- ✅ 新しい状態名・用語・DB列は追加していないため、`notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション1058：trade message overflow menuを分離
 
 ### 背景・問題意識
