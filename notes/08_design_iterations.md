@@ -4,6 +4,44 @@
 
 ---
 
+## イテレーション1035：住所settings content viewを分割
+
+### 背景・問題意識
+
+`AddressSettingsScreen.swift` は、住所入力state、郵便番号lookup、validation、保存処理に加えて、ヘッダーと保存ボタンの表示も同じファイルに持っていた。住所保存まわりの副作用は画面本体に残しつつ、純表示の部品だけを切り出して、入力/保存ロジックと見た目調整の変更範囲を分けた。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/AddressSettingsScreen.swift`
+- 住所入力form、郵便番号lookup、draft生成、validation、保存処理を既存ファイルに残した。
+- ヘッダー表示と保存ボタン表示を専用Viewへ委譲した。
+
+#### `ios-native/Sources/MegrumApp/AddressSettingsContentViews.swift`
+- `AddressSettingsHeader` を追加し、タイトル/補足文のfont・色・spacingを移動した。
+- `AddressSettingsSaveButton` を追加し、保存中indicator、button style、disabled条件、accessibility hintを移動した。
+
+### 影響範囲
+
+- Swift Native iOS版の住所設定画面。
+- 住所設定画面のヘッダーと保存ボタン表示。
+- 入力field、郵便番号lookup、validation、保存処理、dismiss、状態名、用語、DBスキーマ、表示文言は変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumApp/AddressSettingsScreen.swift ios-native/Sources/MegrumApp/AddressSettingsContentViews.swift`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-address-content --enable-xctest --disable-swift-testing -j 1 --filter SettingsScreenTests`
+  - passed（16 tests）
+
+### セルフレビュー結果
+
+- ✅ `AddressSettingsScreen` の `@State`、`@FocusState`、lookup task、draft生成、validation、保存時dismissは変更していない。
+- ✅ ヘッダーと保存ボタンは移動のみで、font、色、button style、disabled条件、accessibility hintを維持した。
+- ✅ `AddressSettingsScreen.swift` は 259行から 239行へ縮小し、純表示部品を 41行の専用ファイルへ分離した。
+- ✅ 新しい状態名・用語・DB列は追加していないため、`notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション1034：交換calendar drag selectionを分割
 
 ### 背景・問題意識

@@ -64,14 +64,7 @@ struct AddressSettingsScreen: View {
     }
 
     private var header: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("住所設定")
-                .font(.system(size: 34, weight: .black, design: .rounded))
-                .foregroundStyle(MegrumTheme.ink)
-            Text("取引で必要になる住所を、本人だけが編集できます")
-                .font(.system(size: 14, weight: .bold, design: .rounded))
-                .foregroundStyle(MegrumTheme.muted)
-        }
+        AddressSettingsHeader()
     }
 
     private var form: some View {
@@ -161,25 +154,12 @@ struct AddressSettingsScreen: View {
     }
 
     private var saveButton: some View {
-        Button {
+        AddressSettingsSaveButton(
+            title: saveButtonTitle,
+            isSaving: appState.isSavingMailingAddress
+        ) {
             Task { await save() }
-        } label: {
-            HStack(spacing: 10) {
-                if appState.isSavingMailingAddress {
-                    ProgressView()
-                        .controlSize(.small)
-                }
-                Text(saveButtonTitle)
-                    .font(.system(size: 16, weight: .black, design: .rounded))
-            }
-            .frame(maxWidth: .infinity)
-            .frame(height: 54)
         }
-        .buttonStyle(.borderedProminent)
-        .buttonBorderShape(.roundedRectangle(radius: 18))
-        .tint(MegrumTheme.lavender)
-        .disabled(appState.isSavingMailingAddress)
-        .accessibilityHint("入力した住所を保存します")
     }
 
     private var draftAddress: MailingAddress {
