@@ -4,6 +4,48 @@
 
 ---
 
+## イテレーション917：Oshi settings screen actionsを分割
+
+### 背景・問題意識
+
+`OshiSettingsScreen.swift` は、推し設定画面のbody、sheet表示、グループ/メンバー追加削除、リクエスト送信、初期ロード、保存処理が1ファイルに同居していた。推し設定はアカウント初期設定やプロフィール導線とも関係するため、画面構成と副作用の責務を分け、今後の表示調整や保存不具合調査の対象を絞りやすくする。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/OshiSettingsScreen.swift`
+- 画面body、sheet、task、confirmation dialogの構成に絞った。
+- ファイル行数を324行から80行へ縮小した。
+
+#### `ios-native/Sources/MegrumApp/OshiSettingsScreenActions.swift`
+- close、master sheet表示、グループ/メンバー追加削除、推し/メンバー申請、初期ロード、保存処理を新規ファイルへ移動した。
+- async load/save/request、feedback文言、dismiss挙動、pending request生成、priority維持は変更していない。
+
+#### `ios-native/Sources/MegrumApp/OshiSettingsScreenDerivedState.swift`
+- master groupごとの追加可能character算出を新規ファイルへ移動した。
+
+### 影響範囲
+
+- Swift Native iOS版の推し設定画面、アカウント初期設定へ渡す推し選択入力、推し/メンバー追加申請。
+- 挙動変更ではなく責務分離。sheet表示、削除確認、保存payload、状態名、用語、DBスキーマは変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumApp/OshiSettingsScreen.swift ios-native/Sources/MegrumApp/OshiSettingsScreenActions.swift ios-native/Sources/MegrumApp/OshiSettingsScreenDerivedState.swift`
+  - passed
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-oshi-settings-build --disable-index-store`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-oshi-settings-tests --disable-index-store --enable-xctest --disable-swift-testing -j 1 --filter 'OshiSettingsDraftTests|OnboardingOshiSelectionTests|AccountSetupScreenTests|MegrumAppStateTests/testAppStateCompletesAccountSetupThroughRepository|MegrumAppStateTests/testAppStateRequiresOshiSelectionForAccountSetup|MegrumAppStateTests/testPreviewRepositorySavesOshiSelectionsWithDisplayOrderPriority'`
+  - 26 tests passed
+
+### セルフレビュー結果
+
+- ✅ 画面body、sheet、task、confirmation dialogは `OshiSettingsScreen.swift` に残し、UI構造を追いやすくした。
+- ✅ 追加/削除/申請/保存処理は移動のみで、feedback文言、dismiss、pending request、priority順は維持した。
+- ✅ OshiSettingsDraftTests / OnboardingOshiSelectionTests / AccountSetupScreenTests / MegrumAppStateTestsで、推し設定・初期設定連携・保存順を確認した。
+- ✅ 状態名・用語・DBスキーマの変更はないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション916：Meguri home map/chrome viewsを分割
 
 ### 背景・問題意識
