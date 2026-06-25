@@ -4,6 +4,47 @@
 
 ---
 
+## イテレーション1110：blocked users contentを分離
+
+### 背景・問題意識
+
+`BlockedUsersScreen` は、ブロック一覧の読み込み/refresh、解除確認dialog、解除対象の状態管理を持ちながら、loading row、empty row、ブロックユーザーrow、avatar表示、解除ボタン表示を同じファイルに抱えていた。親画面を状態管理と解除確認に寄せ、一覧表示とrow描画を専用Viewへ分離する。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/BlockedUsersScreen.swift`
+- `List` 本体を `BlockedUsersContent` 呼び出しへ置き換えた。
+- 解除確認dialogを開く状態更新を `requestUnblock(_:)` へ分離した。
+- `BlockedUserRow` とavatar/placeholder/blockedAt表示を専用ファイルへ移動した。
+
+#### `ios-native/Sources/MegrumApp/BlockedUsersContent.swift`
+- `BlockedUsersContent` を追加した。
+- loading row、empty row、ブロックユーザーrow、件数headerを移動した。
+- `BlockedUsersLoadingRow` / `BlockedUsersEmptyRow` / `BlockedUserRow` を追加した。
+
+### 影響範囲
+
+- Swift Native iOS版のブロックした人画面。
+- ブロック一覧読み込み、pull-to-refresh、解除確認dialog、解除実行、解除中progress、表示文言、DB/API、状態名は変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumApp/BlockedUsersScreen.swift ios-native/Sources/MegrumApp/BlockedUsersContent.swift`
+  - passed
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-blocked-users-content`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-blocked-users-content --enable-xctest --disable-swift-testing -j 1 --filter 'BlockedUserStateReducerTests|SupabaseBlockClientTests|MegrumAppStateTests'`
+  - passed（84 tests）
+
+### セルフレビュー結果
+
+- ✅ loading表示、empty表示、件数header、ユーザーrow、avatar、解除ボタン、解除中progressを維持した。
+- ✅ 一覧読み込み、refresh、解除確認dialog、解除実行は親画面に残した。
+- ✅ `BlockedUsersScreen.swift` は148行から47行へ縮小し、一覧表示を136行の専用ファイルへ分離した。
+- ✅ 新しい状態名・用語・DB列は追加していないため、`notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション1109：notification center contentを分離
 
 ### 背景・問題意識
