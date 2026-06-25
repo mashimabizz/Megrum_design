@@ -20,13 +20,20 @@ enum HomeMutualMatchConditionReviewPointPolicy {
         review: HomeMutualMatchConditionReview
     ) -> HomeMutualMatchConditionReviewPoint {
         let isMismatch = review.exchangeItems.containsTitle("交換手段が不一致")
-        let resolvedTitle = resolvedExchangeMethodTitle(signals)
-        let needsDiscussion = !isMismatch && resolvedTitle == nil && exchangeMethodNeedsDiscussion(signals)
+        let resolvedTitle = HomeMutualMatchExchangeConditionReviewDisplay.resolvedMethodTitle(signals)
+        let needsDiscussion = !isMismatch && resolvedTitle == nil
+            && HomeMutualMatchExchangeConditionReviewDisplay.methodNeedsDiscussion(signals)
         return HomeMutualMatchConditionReviewPoint(
             title: "交換条件",
             tagTitle: isMismatch ? "交換条件不一致" : (resolvedTitle ?? (needsDiscussion ? "要相談" : "OK")),
-            partnerValue: displayExchangeMethodTitle(signals.partnerExchangeMethodTitle) ?? inferredExchangeMethodTitle(signals),
-            viewerValue: displayExchangeMethodTitle(signals.viewerExchangeMethodTitle) ?? inferredExchangeMethodTitle(signals),
+            partnerValue: HomeMutualMatchExchangeConditionReviewDisplay.methodTitle(
+                signals.partnerExchangeMethodTitle,
+                signals: signals
+            ),
+            viewerValue: HomeMutualMatchExchangeConditionReviewDisplay.methodTitle(
+                signals.viewerExchangeMethodTitle,
+                signals: signals
+            ),
             status: isMismatch ? .mismatch : (needsDiscussion ? .needsDecision : .matched)
         )
     }
@@ -49,8 +56,12 @@ enum HomeMutualMatchConditionReviewPointPolicy {
         return HomeMutualMatchConditionReviewPoint(
             title: "現地交換条件",
             tagTitle: issueTags.isEmpty ? "OK" : issueTags.joined(separator: " / "),
-            partnerValue: displayLocalConditionText(signals.partnerLocalConditionText) ?? "未設定",
-            viewerValue: displayLocalConditionText(signals.viewerLocalConditionText) ?? "未設定",
+            partnerValue: HomeMutualMatchExchangeConditionReviewDisplay.localConditionText(
+                signals.partnerLocalConditionText
+            ) ?? "未設定",
+            viewerValue: HomeMutualMatchExchangeConditionReviewDisplay.localConditionText(
+                signals.viewerLocalConditionText
+            ) ?? "未設定",
             status: issueTags.isEmpty ? .matched : .needsDecision
         )
     }
@@ -170,106 +181,6 @@ enum HomeMutualMatchConditionReviewPointPolicy {
             tags.append("日程要相談")
         }
         return tags
-    }
-
-    private static func resolvedExchangeMethodTitle(_ signals: HomeExchangeConditionSignals) -> String? {
-        guard let viewerMethod = handoffDraft(from: signals.viewerExchangeMethodTitle),
-              let partnerMethod = handoffDraft(from: signals.partnerExchangeMethodTitle)
-        else {
-            return nil
-        }
-
-        switch (viewerMethod, partnerMethod) {
-        case (.both, .local), (.local, .both):
-            return IndividualListingHandoffDraft.local.title
-        case (.both, .mail), (.mail, .both):
-            return IndividualListingHandoffDraft.mail.title
-        default:
-            return nil
-        }
-    }
-
-    private static func exchangeMethodNeedsDiscussion(_ signals: HomeExchangeConditionSignals) -> Bool {
-        let methods = [
-            handoffDraft(from: signals.viewerExchangeMethodTitle),
-            handoffDraft(from: signals.partnerExchangeMethodTitle)
-        ]
-
-        if methods.allSatisfy({ $0 == .both }) {
-            return true
-        }
-
-        if methods.contains(where: { $0 == .both }) && methods.contains(where: { $0 == nil }) {
-            return true
-        }
-
-        return inferredExchangeMethodTitle(signals) == IndividualListingHandoffDraft.both.title
-    }
-
-    private static func handoffDraft(from title: String?) -> IndividualListingHandoffDraft? {
-        guard let title = title?.trimmingCharacters(in: .whitespacesAndNewlines),
-              !title.isEmpty
-        else {
-            return nil
-        }
-        return IndividualListingHandoffDraft.allCases.first { draft in
-            draft.title == title || (draft == .both && title == "どちらもOK")
-        }
-    }
-
-    private static func displayExchangeMethodTitle(_ title: String?) -> String? {
-        guard let title = title?.trimmingCharacters(in: .whitespacesAndNewlines),
-              !title.isEmpty
-        else {
-            return nil
-        }
-        return title == "どちらもOK" ? IndividualListingHandoffDraft.both.title : title
-    }
-
-    private static func displayLocalConditionText(_ value: String?) -> String? {
-        guard let value = value?.trimmingCharacters(in: .whitespacesAndNewlines),
-              !value.isEmpty
-        else {
-            return nil
-        }
-        let parts = value
-            .components(separatedBy: " / ")
-            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
-            .compactMap { part -> String? in
-                guard !part.isEmpty else {
-                    return nil
-                }
-                let normalized = normalizedForDisplay(part)
-                if normalized == normalizedForDisplay("場所相談") || normalized == normalizedForDisplay("相談") {
-                    return nil
-                }
-                if normalized == normalizedForDisplay(IndividualListingExchangeSummary.defaultLocalSchedule) {
-                    return "日程は相談"
-                }
-                return part
-            }
-        return parts.isEmpty ? nil : parts.joined(separator: " / ")
-    }
-
-    private static func normalizedForDisplay(_ value: String) -> String {
-        value
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-            .replacingOccurrences(of: "　", with: "")
-            .replacingOccurrences(of: " ", with: "")
-            .lowercased()
-    }
-
-    private static func inferredExchangeMethodTitle(_ signals: HomeExchangeConditionSignals) -> String {
-        switch (signals.localExchangeSelected, signals.postalAcceptedByBoth) {
-        case (true, true):
-            return IndividualListingHandoffDraft.both.title
-        case (true, false):
-            return "現地交換"
-        case (false, true):
-            return "郵送交換"
-        case (false, false):
-            return "未設定"
-        }
     }
 
     private static func amountValue(_ item: HomeMutualMatchProposalItem) -> String {

@@ -4,6 +4,44 @@
 
 ---
 
+## イテレーション1014：相互マッチ条件レビューの交換表示を分割
+
+### 背景・問題意識
+
+`HomeMutualMatchConditionReviewPointPolicy.swift` は、レビューpoint生成に加えて、交換手段の解決、`どちらもOK` の表示正規化、現地条件メモの表示整形まで抱えていた。pointの順序やstatus判定はそのままに、交換条件まわりの表示整形だけを専用formatterへ分けた。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/HomeMutualMatchConditionReviewPointPolicy.swift`
+- 交換条件pointと現地交換条件pointの表示値生成を `HomeMutualMatchExchangeConditionReviewDisplay` へ委譲した。
+- 金額条件、支払条件、local issue tag 判定は既存の policy 本体に残した。
+
+#### `ios-native/Sources/MegrumApp/HomeMutualMatchExchangeConditionReviewDisplay.swift`
+- 交換手段の解決、要相談判定、表示用タイトル、現地条件テキスト整形を集約した。
+- `場所相談` / `相談` の非表示、既定日程文言の `日程は相談` 変換、空白正規化は既存挙動を維持した。
+
+### 影響範囲
+
+- Swift Native iOS版ホームの相互マッチ条件レビュー。
+- 交換条件、現地交換条件、金額条件、支払条件のレビューpoint表示。
+- 状態名、用語、DBスキーマ、表示文言は変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumApp/HomeMutualMatchConditionReviewPointPolicy.swift ios-native/Sources/MegrumApp/HomeMutualMatchExchangeConditionReviewDisplay.swift`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-mutual-review-display --enable-xctest --disable-swift-testing -j 1 --filter 'HomeMutualMatchConditionPoliciesTests|HomeScreenFlowTests'`
+  - passed（55 tests）
+
+### セルフレビュー結果
+
+- ✅ レビューpointの個数、順序、title、tagTitle、status の判定は維持した。
+- ✅ 交換手段の `どちらもOK` 正規化、両対応時の要相談判定、現地条件メモの非表示処理は移動のみで維持した。
+- ✅ `HomeMutualMatchConditionReviewPointPolicy.swift` は 291行から 202行へ縮小し、交換条件の表示整形を 111行の専用formatterへ分離した。
+- ✅ 新しい状態名・用語・DB列は追加していないため、`notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション1013：検索候補Viewをタグと画像候補へ分割
 
 ### 背景・問題意識
