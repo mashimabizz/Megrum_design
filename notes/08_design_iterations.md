@@ -4,6 +4,48 @@
 
 ---
 
+## イテレーション971：IndividualListingDraft選択ロジックを分割
+
+### 背景・問題意識
+
+`IndividualListingDraftSelection.swift` は、個別募集作成/編集の譲る・Wish選択、すべて登録/解除、受け取り条件、option種別切替、数量、最低数ロジックを1ファイルに持っていた。個別募集は作成保存、ホーム候補、検索候補、打診作成へ影響するため、選択操作と条件/数量ロジックを分け、個別募集作成まわりの不具合調査範囲を狭める。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/IndividualListingDraftSelection.swift`
+- 譲る/ウィッシュのtoggle、すべて登録、すべて解除、最低数normalize/default補助だけを残し、295行級から128行へ縮小した。
+
+#### `ios-native/Sources/MegrumApp/IndividualListingDraftOptionSelection.swift`
+- `setOptionKind`、`setHaveOfferKind`、`resetCurrentOptionSelection` を新規ファイルへ移動した。
+- 現金offer時の譲る選択clear、optionリセット時のWish/条件/現金初期化を維持した。
+
+#### `ios-native/Sources/MegrumApp/IndividualListingDraftConditionSelection.swift`
+- 条件group/goods type default、条件group変更、member/tag/quantity操作、条件ロジック選択可否を新規ファイルへ移動した。
+
+#### `ios-native/Sources/MegrumApp/IndividualListingDraftQuantityLogic.swift`
+- 譲る/Wish数量、resolved minimum count、`atLeast` / `all` / `one` 切替、最低数設定を新規ファイルへ移動した。
+
+### 影響範囲
+
+- Swift Native iOS版の個別募集作成/編集、譲る/ウィッシュ選択、条件指定、すべて登録/解除、最低数ロジック、ホーム候補の個別募集条件判定。
+- 挙動変更ではなく責務分離。保存payload、フィルタ条件、最低数のdefault、状態名、用語、DBスキーマは変更しない。
+
+### 確認方法
+
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-listing-draft-selection-build --disable-index-store`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-listing-draft-selection-build --disable-index-store --enable-xctest --disable-swift-testing -j 1 --filter 'IndividualListingDraftTests|IndividualListingStateReducerTests|HomeDiscoveryMatchPolicyTests|HomeCandidateComposerTests'`
+  - 110 tests passed
+
+### セルフレビュー結果
+
+- ✅ 個別募集draftの選択、option切替、条件指定、数量/最低数を移動のみで分割した。
+- ✅ 個別募集draft、state reducer、ホーム候補、候補生成の対象テストを通した。
+- ✅ すべて登録/解除、2件以上選択時の1個以上default、条件フィルタ、保存payloadは変更していない。
+- ✅ 状態名・用語・DBスキーマの変更はないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション970：PublicUserProfileScreenを分割
 
 ### 背景・問題意識
