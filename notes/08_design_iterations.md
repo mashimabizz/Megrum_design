@@ -4,6 +4,45 @@
 
 ---
 
+## イテレーション1076：auth visual feedback rowを分離
+
+### 背景・問題意識
+
+`AuthFormComponents.swift` は、primary button、input row、visual feedback rowを同じファイルに抱えていた。フォーム入力の状態管理とpassword toggleはそのまま残し、feedback messageの表示だけを専用Viewへ分離する。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/AuthFormComponents.swift`
+- `AuthPrimaryActionButton` と `AuthInputRow` を残した。
+- `AuthVisualFeedbackRow` の表示本体を移動した。
+
+#### `ios-native/Sources/MegrumApp/AuthVisualFeedbackRow.swift`
+- `AuthVisualFeedbackRow` を追加し、message text、style別foreground、背景tintを担当させた。
+- error/success/infoの色、font、padding、corner radius、leading alignmentを維持した。
+
+### 影響範囲
+
+- Swift Native iOS版のメール認証画面とパスワードリセット画面で表示されるfeedback row。
+- 入力validation、認証状態、password表示切替、ログイン/登録/リセット処理、DB/API、状態名、表示文言は変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumApp/AuthFormComponents.swift ios-native/Sources/MegrumApp/AuthVisualFeedbackRow.swift`
+  - passed
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-auth-visual-feedback-row`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-auth-visual-feedback-row --enable-xctest --disable-swift-testing -j 1 --filter 'AuthScreenInputTests'`
+  - passed（15 tests）
+
+### セルフレビュー結果
+
+- ✅ `AuthInputRow` のBinding、keyboard/textContentType、password visibility toggleは維持した。
+- ✅ feedback rowのmessage、style別色、font、padding、背景tintを専用ファイルへ移した。
+- ✅ `AuthFormComponents.swift` は 115行から 90行へ縮小し、auth visual feedback rowを 27行の専用ファイルへ分離した。
+- ✅ 新しい状態名・用語・DB列は追加していないため、`notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション1075：trade goods fallback artworkを分離
 
 ### 背景・問題意識
