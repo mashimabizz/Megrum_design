@@ -4,6 +4,47 @@
 
 ---
 
+## イテレーション1114：privacy settings contentを分離
+
+### 背景・問題意識
+
+`PrivacySettingsScreen` は、画面タイトルを持つ親画面でありながら、安全管理section、共有される情報section、ブロック一覧/プライバシーポリシーへのNavigationLink、説明rowを同じ `body` に抱えていた。親画面をnavigation modifierに寄せ、設定項目のList表示を専用Viewへ分離する。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/SettingsPrivacyViews.swift`
+- `List` 本体を `PrivacySettingsContent` 呼び出しへ置き換えた。
+- navigation title / inline title modifierは親画面に残した。
+
+#### `ios-native/Sources/MegrumApp/PrivacySettingsContent.swift`
+- `PrivacySettingsContent` を追加した。
+- 安全管理sectionと共有される情報sectionを移動した。
+- ブロック一覧、プライバシーポリシー、位置情報、通知表示、住所情報のrow表示とNavigationLinkを維持した。
+
+### 影響範囲
+
+- Swift Native iOS版のプライバシーと安全画面。
+- ブロック一覧画面、プライバシーポリシー入口、位置情報/通知/住所情報の案内row。
+- ブロック解除処理、法務入口文言、通知設定、住所設定、DB/API、状態名、表示文言は変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumApp/SettingsPrivacyViews.swift ios-native/Sources/MegrumApp/PrivacySettingsContent.swift`
+  - passed
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-privacy-settings-content`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-privacy-settings-content --enable-xctest --disable-swift-testing -j 1 --filter 'SettingsScreenTests|BlockedUserStateReducerTests|SupabaseBlockClientTests|MegrumAppStateTests'`
+  - passed（100 tests）
+
+### セルフレビュー結果
+
+- ✅ ブロック一覧、プライバシーポリシー、位置情報、通知表示、住所情報のrowタイトル/説明/アイコン/遷移先を維持した。
+- ✅ ブロック解除、法務入口、通知設定、住所設定の処理やDB/API境界には触れていない。
+- ✅ `SettingsPrivacyViews.swift` は57行から13行へ縮小し、プライバシー設定List表示を61行の専用ファイルへ分離した。
+- ✅ 新しい状態名・用語・DB列は追加していないため、`notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション1113：legal document contentを分離
 
 ### 背景・問題意識
