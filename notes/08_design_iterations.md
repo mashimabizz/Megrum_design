@@ -4,6 +4,44 @@
 
 ---
 
+## イテレーション1022：グッズ詳細sheetを分割
+
+### 背景・問題意識
+
+`GoodsGridDisplayViews.swift` は、グッズ詳細sheet、通報sheet、共通remote image、tag pill、quantity badgeを同じファイルに抱えていた。詳細sheet専用のhero/copy/metric表示と、他画面からも使う共通表示部品を分け、グッズ詳細の調整をgrid共通部品から切り離して扱えるようにした。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/GoodsGridDisplayViews.swift`
+- `GoodsReportSheet`、`GoodsRemoteImage`、`GoodsTagPill`、`GoodsTagTextPill`、`GoodsQuantityBadge` を既存ファイルに残した。
+- 詳細sheet本体と詳細専用のprivate表示部品を専用ファイルへ委譲した。
+
+#### `ios-native/Sources/MegrumApp/GoodsDetailSheetViews.swift`
+- `GoodsDetailSheet`、`GoodsStatusPill`、`FlowTags`、`DetailMetric` を移動した。
+- hero gradient、image overlay、tag表示、status pill、数量/状態metric、閉じるtoolbarは既存どおり維持した。
+
+### 影響範囲
+
+- Swift Native iOS版のグッズgrid詳細sheet。
+- グッズ一覧/検索/プロフィールなどで使う共通画像・tag・数量badge表示。
+- グッズ状態、数量、通報、検索結果、状態名、用語、DBスキーマ、表示文言は変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumApp/GoodsGridDisplayViews.swift ios-native/Sources/MegrumApp/GoodsDetailSheetViews.swift`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-goods-detail-sheet --enable-xctest --disable-swift-testing -j 1 --filter GoodsGridLayoutTests`
+  - passed（25 tests）
+
+### セルフレビュー結果
+
+- ✅ `GoodsDetailSheet` は移動のみで、hero/copy/toolbar/metric表示を維持した。
+- ✅ `GoodsRemoteImage`、`GoodsTagPill`、`GoodsTagTextPill`、`GoodsQuantityBadge` は元ファイルに残し、他画面からの参照を維持した。
+- ✅ `GoodsGridDisplayViews.swift` は 277行から 140行へ縮小し、詳細sheet表示を 140行の専用ファイルへ分離した。
+- ✅ 新しい状態名・用語・DB列は追加していないため、`notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション1021：検索フッターbarを分割
 
 ### 背景・問題意識
