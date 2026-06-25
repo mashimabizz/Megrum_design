@@ -4,6 +4,46 @@
 
 ---
 
+## イテレーション1019：やりとり一覧のstage pageとfooterを分割
+
+### 背景・問題意識
+
+`TradesScreen.swift` は、選択中stageの状態、詳細遷移、既読化、相手プロフィール読み込みに加えて、stageごとの一覧描画、長押し選択、完了stage広告、下部stage bar / 取り下げfooterまで同じViewに抱えていた。親画面を状態管理と遷移に寄せ、一覧ページとfooter表示を専用Viewに分けることで、やりとり一覧の表示調整を小さく触れるようにした。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/TradesScreen.swift`
+- `TradeStagePage` と `TradesFooter` へ一覧描画・下部footer表示を委譲した。
+- `selectedStage`、`detailRoute`、選択中proposal、既読化、相手プロフィール読み込みは親画面に残した。
+- 長押しで選択開始する処理を `startPendingProposalSelection(_:)` として明示した。
+
+#### `ios-native/Sources/MegrumApp/TradesScreenStageViews.swift`
+- stage別一覧、空状態、完了stage広告、選択モード時の行tap/long press分岐を `TradeStagePage` へ移動した。
+- stage bar と取り下げbuttonの切り替えを `TradesFooter` へ移動した。
+- 表示文言、選択条件、既読/未読表示、並び順、広告placementは既存どおり維持した。
+
+### 影響範囲
+
+- Swift Native iOS版のやりとり一覧。
+- 打診中/進行中/完了済みstageの一覧表示、長押し選択、選択した打診の取り下げfooter、完了stage広告。
+- 状態名、用語、DBスキーマ、表示文言は変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumApp/TradesScreen.swift ios-native/Sources/MegrumApp/TradesScreenStageViews.swift`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-trades-screen --enable-xctest --disable-swift-testing -j 1 --filter 'HomeScreenFlowTests|TradeChatAffordanceTests'`
+  - passed（95 tests）
+
+### セルフレビュー結果
+
+- ✅ stage判定、並び順、既読/未読計算、相手プロフィール読み込み、詳細遷移、既読化taskは変更していない。
+- ✅ 長押し選択、選択中tap、取り下げbuttonのdisabled条件とアクセシビリティ文言は維持した。
+- ✅ `TradesScreen.swift` は 285行から 242行へ縮小し、stage page / footer表示を 124行の専用ファイルへ分離した。
+- ✅ 新しい状態名・用語・DB列は追加していないため、`notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション1018：交換条件カレンダーのchrome表示を分割
 
 ### 背景・問題意識

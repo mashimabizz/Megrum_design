@@ -51,7 +51,22 @@ struct TradesScreen: View {
         ZStack(alignment: .bottom) {
             TabView(selection: $selectedStage) {
                 ForEach(TradeStage.allCases) { stage in
-                    tradeStagePage(stage)
+                    TradeStagePage(
+                        stage: stage,
+                        proposals: visibleProposals(for: stage),
+                        viewerID: appState.viewer?.id,
+                        profilesByUserID: appState.publicProfilesByUserID,
+                        goodsByID: goodsByID,
+                        messagesByProposalID: appState.messagesByProposalID,
+                        viewerReadAtByProposalID: appState.viewerReadAtByProposalID,
+                        isSelectingPendingProposals: isSelectingPendingProposals,
+                        selectedPendingProposalIDs: selectedPendingProposalIDs,
+                        adDisplayContext: adDisplayContext,
+                        canWithdraw: { canWithdrawPendingProposal($0, in: stage) },
+                        onStartSelection: startPendingProposalSelection,
+                        onToggleSelection: togglePendingProposalSelection,
+                        onOpen: openProposal
+                    )
                         .tag(stage)
                 }
             }
@@ -80,60 +95,6 @@ struct TradesScreen: View {
             for userID in visiblePartnerIDs where appState.publicProfilesByUserID[userID] == nil {
                 await appState.loadPublicUserProfile(userID: userID)
             }
-        }
-    }
-
-    private func tradeStagePage(_ stage: TradeStage) -> some View {
-        ScrollView {
-            LazyVStack(alignment: .leading, spacing: 0) {
-                let stageProposals = visibleProposals(for: stage)
-                if stageProposals.isEmpty {
-                    EmptyTradeStage(stage: stage)
-                        .padding(.top, 8)
-                } else {
-                    ForEach(stageProposals) { proposal in
-                        let canWithdraw = canWithdrawPendingProposal(proposal, in: stage)
-                        TradeCard(
-                            proposal: proposal,
-                            viewerID: appState.viewer?.id,
-                            profilesByUserID: appState.publicProfilesByUserID,
-                            goodsByID: goodsByID,
-                            lastActivityAt: TradeListOrdering.lastActivityAt(
-                                for: proposal,
-                                messagesByProposalID: appState.messagesByProposalID
-                            ),
-                            viewerLastReadAt: appState.viewerReadAtByProposalID[proposal.id],
-                            isSelectionMode: isSelectingPendingProposals && stage == .pending,
-                            isSelected: selectedPendingProposalIDs.contains(proposal.id),
-                            isSelectionEnabled: canWithdraw,
-                            onLongPress: {
-                                guard canWithdraw else {
-                                    return
-                                }
-                                withAnimation(.snappy(duration: 0.22)) {
-                                    _ = selectedPendingProposalIDs.insert(proposal.id)
-                                }
-                            }
-                        ) {
-                            if isSelectingPendingProposals && stage == .pending {
-                                togglePendingProposalSelection(proposal)
-                            } else {
-                                openProposal(proposal)
-                            }
-                        }
-                    }
-                    if stage == .completed {
-                        AdBannerSlot(
-                            placement: .pastTradesFooterBanner,
-                            displayContext: adDisplayContext
-                        )
-                        .padding(.top, 12)
-                    }
-                }
-            }
-            .padding(.horizontal, 20)
-            .padding(.top, 8)
-            .padding(.bottom, 132)
         }
     }
 
@@ -168,29 +129,16 @@ struct TradesScreen: View {
 
     @ViewBuilder
     private var tradeFooter: some View {
-        if isSelectingPendingProposals {
-            Button {
-                withdrawSelectedPendingProposals()
-            } label: {
-                Label("打診を取り下げる", systemImage: "arrow.uturn.backward")
-                    .font(.system(size: 17, weight: .heavy, design: .rounded))
-                    .foregroundStyle(.white)
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 58)
-                    .background(MegrumTheme.lavender, in: Capsule())
-                    .shadow(color: MegrumTheme.lavender.opacity(0.30), radius: 18, y: 10)
-            }
-            .buttonStyle(.plain)
-            .disabled(selectedPendingProposalIDs.isEmpty || appState.respondingProposalID != nil)
-            .accessibilityLabel("選択した\(selectedPendingProposalIDs.count)件の打診を取り下げる")
-        } else {
-            TradeStageBar(
-                selectedStage: $selectedStage,
-                pendingCount: proposals.filter { TradeStage.pending.contains($0.status) }.count,
-                inProgressCount: proposals.filter { TradeStage.inProgress.contains($0.status) }.count,
-                completedCount: proposals.filter { TradeStage.completed.contains($0.status) }.count
-            )
-        }
+        TradesFooter(
+            selectedStage: $selectedStage,
+            isSelectingPendingProposals: isSelectingPendingProposals,
+            selectedPendingCount: selectedPendingProposalIDs.count,
+            isResponding: appState.respondingProposalID != nil,
+            pendingCount: proposals.filter { TradeStage.pending.contains($0.status) }.count,
+            inProgressCount: proposals.filter { TradeStage.inProgress.contains($0.status) }.count,
+            completedCount: proposals.filter { TradeStage.completed.contains($0.status) }.count,
+            onWithdrawSelected: withdrawSelectedPendingProposals
+        )
     }
 
     private var selectedStageSubtitle: String {
@@ -253,6 +201,15 @@ struct TradesScreen: View {
             } else {
                 selectedPendingProposalIDs.insert(proposal.id)
             }
+        }
+    }
+
+    private func startPendingProposalSelection(_ proposal: TradeProposal) {
+        guard canWithdrawPendingProposal(proposal) else {
+            return
+        }
+        withAnimation(.snappy(duration: 0.22)) {
+            _ = selectedPendingProposalIDs.insert(proposal.id)
         }
     }
 
