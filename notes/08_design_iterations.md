@@ -4,6 +4,54 @@
 
 ---
 
+## イテレーション1007：交換条件設定画面を責務別ファイルへ分割
+
+### 背景・問題意識
+
+夜通しの大きめリファクタリングに入る前提で、まず優先度の高い巨大SwiftUI画面から着手した。`HomeExchangeSettingsScreen.swift` は画面本体、月間カレンダー、ドラッグ選択、日付詳細sheet、個別募集条件の反映、保存用codecまで1ファイルに集まっており、次の仕様追加や不具合修正で差分衝突とレビュー負荷が大きくなる状態だった。
+
+今回の目的は、交換条件設定画面の挙動・保存形式・表示文言を変えずに、責務ごとのファイルへ分けて次の変更を当てやすくすること。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/HomeExchangeSettingsScreen.swift`
+- 画面本体、AppStorageの読み書き、保存ボタン、基本設定カード、通知カード、ナビゲーションバー制御だけを残した。
+- カレンダーUI、日付詳細sheet、日付モデル/codecを別ファイルへ移動した。
+
+#### `ios-native/Sources/MegrumApp/HomeExchangeSettingsCalendarViews.swift`
+- `HomeExchangeSettingsCalendarCard`、横方向ドラッグ選択ポリシー、選択範囲resolver、都道府県menu、日付セル、選択背景shapeを集約した。
+- テスト対象のドラッグ選択ロジックはinternalのまま維持し、UI内部部品はprivateに閉じた。
+
+#### `ios-native/Sources/MegrumApp/HomeExchangeDateDetailSheet.swift`
+- ローカル日付詳細sheetとsheet専用のchrome/detent helperを分離した。
+- 既存の表示、編集、削除、個別募集条件の反映導線は維持した。
+
+#### `ios-native/Sources/MegrumApp/HomeExchangeDateModels.swift`
+- `HomeExchangeLocalDateDetail`、編集対象、個別募集条件reflector、保存codec、カレンダー月生成、都道府県表示名変換を集約した。
+- AppStorage保存文字列の形式、`specific_date` の扱い、複数メモ表示の文言は変更していない。
+
+### 影響範囲
+
+- Swift Native iOS版のホーム左ドロワー内「交換条件」画面。
+- 交換条件カレンダーの日付選択、日付詳細sheet、個別募集条件の反映。
+- 状態名、用語、DBスキーマ、ナビゲーション、保存キーは変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumApp/HomeExchangeSettingsScreen.swift ios-native/Sources/MegrumApp/HomeExchangeSettingsCalendarViews.swift ios-native/Sources/MegrumApp/HomeExchangeDateDetailSheet.swift ios-native/Sources/MegrumApp/HomeExchangeDateModels.swift ios-native/Tests/MegrumAppTests/HomeExchangeSettingsScreenTests.swift`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-home-exchange --enable-xctest --disable-swift-testing -j 1 --filter HomeExchangeSettingsScreenTests`
+  - passed（4 tests）
+
+### セルフレビュー結果
+
+- ✅ 画面構造の分割のみで、交換条件の保存形式・初期表示・日付選択・sheet表示文言は維持した。
+- ✅ 親画面からカレンダー/日付sheetへ渡す値は既存の必要値に限定し、親モデル全体の受け渡しは増やしていない。
+- ✅ ドラッグ選択と個別募集条件反映の既存テストを通し、分割後もロジックが維持されることを確認した。
+- ✅ 新しい状態名・用語・DB列は追加していないため、`notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション990：支払タグを共通手段の強さで分岐
 
 ### 背景・問題意識
