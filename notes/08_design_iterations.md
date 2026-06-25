@@ -4,6 +4,45 @@
 
 ---
 
+## イテレーション1036：グッズeditor photo previewを分割
+
+### 背景・問題意識
+
+`GoodsEditorPhotoViews.swift` は、在庫/欲しいものの写真section本体と、ローカル画像data、保存済みURL、読み込みplaceholder、状態badgeのpreview実装を同じファイルに抱えていた。写真sectionの操作UIと画像previewのplatform別処理を分け、写真操作ボタン側の調整と画像表示側の調整を独立して追えるようにした。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/GoodsEditorPhotoViews.swift`
+- `GoodsEditorInventoryPhotoSection` と `GoodsEditorWishPhotoSection` を既存ファイルに残した。
+- `GoodsEditorPhotoPreview` と `PhotoStatusBadge` を専用ファイルへ委譲した。
+- preview移動に伴い、画像decodeに必要だったplatform importを削除した。
+
+#### `ios-native/Sources/MegrumApp/GoodsEditorPhotoPreview.swift`
+- `GoodsEditorPhotoPreview` と `PhotoStatusBadge` を追加した。
+- ローカル画像data、保存済みURL、読み込み中/失敗placeholder、状態badge表示を既存どおり維持した。
+
+### 影響範囲
+
+- Swift Native iOS版のグッズ編集画面。
+- 在庫写真section、欲しいもの画像section内のpreview表示。
+- 写真選択/削除button、保存時upload、削除ロック、状態名、用語、DBスキーマ、表示文言は変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumApp/GoodsEditorPhotoViews.swift ios-native/Sources/MegrumApp/GoodsEditorPhotoPreview.swift`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-goods-editor-photo-preview --enable-xctest --disable-swift-testing -j 1 --filter 'GoodsEditorDraftTests|GoodsEditorWishPhotoRemovalPolicyTests'`
+  - passed（29 tests）
+
+### セルフレビュー結果
+
+- ✅ `GoodsEditorInventoryPhotoSection` / `GoodsEditorWishPhotoSection` の操作button、disabled条件、削除ロック表示、error表示は変更していない。
+- ✅ `GoodsEditorPhotoPreview` は移動のみで、local data、AsyncImage、placeholder、badgeの表示条件を維持した。
+- ✅ `GoodsEditorPhotoViews.swift` は 269行から 157行へ縮小し、画像previewを 112行の専用ファイルへ分離した。
+- ✅ 新しい状態名・用語・DB列は追加していないため、`notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション1035：住所settings content viewを分割
 
 ### 背景・問題意識
