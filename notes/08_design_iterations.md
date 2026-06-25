@@ -4,6 +4,46 @@
 
 ---
 
+## イテレーション1099：proposal place modifiersを分離
+
+### 背景・問題意識
+
+`ProposalMeetupPlaceSheetComponents.swift` は、場所検索sheetのView部品と、button/text input/row用modifier定義を同じファイルに抱えていた。components側を表示部品に集中させるため、場所検索sheet専用modifierを専用ファイルへ分離する。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/ProposalMeetupPlaceSheetComponents.swift`
+- `proposalPlaceSheetActionStyle(isEnabled:)`、`proposalPlaceSheetTextInputBehavior()`、`proposalFlowMeetupRow()` を移動した。
+- 直接使わなくなった `MegrumDesign` importを削除した。
+- action rowとsearch results listの構成は維持した。
+
+#### `ios-native/Sources/MegrumApp/ProposalMeetupPlaceSheetModifiers.swift`
+- 場所検索sheet用modifier群を追加した。
+- action styleのforeground、height、padding、background、border、button style、opacityを維持した。
+- iOS向けtext input autocapitalizationとmeetup row minimum height/paddingを維持した。
+
+### 影響範囲
+
+- Swift Native iOS版の打診作成フローにおける待ち合わせ場所検索sheet。
+- action button style、text input behavior、meetup row layout、場所検索、保存処理、送信payload、DB/API、状態名、表示文言は変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumApp/ProposalMeetupPlaceSheetComponents.swift ios-native/Sources/MegrumApp/ProposalMeetupPlaceSheetModifiers.swift`
+  - passed
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-proposal-place-modifiers`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-proposal-place-modifiers --enable-xctest --disable-swift-testing -j 1 --filter 'ProposalCreateFlowTests|ProposalCreateSheetTests'`
+  - passed（62 tests）
+
+### セルフレビュー結果
+
+- ✅ action style、text input autocapitalization、meetup row minimum height/paddingを維持した。
+- ✅ `ProposalMeetupPlaceSheetComponents.swift` は 76行から 44行へ縮小し、modifier群を33行の専用ファイルへ分離した。
+- ✅ 新しい状態名・用語・DB列は追加していないため、`notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション1098：proposal place status controlsを分離
 
 ### 背景・問題意識
