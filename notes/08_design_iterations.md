@@ -4,6 +4,48 @@
 
 ---
 
+## イテレーション916：Meguri home map/chrome viewsを分割
+
+### 背景・問題意識
+
+`MeguriHomeViews.swift` は、Meguri home本体、Map backdrop、現在地/アーカイブfloating button、location notice card、共通notice banner、avatar helper、map title helperが1ファイルに同居していた。Meguri画面は地図・bottom sheet・notice・floating controlsの責務が異なるため、画面本体とmap/chrome部品を分け、地図UIやnotice UIの調整範囲を小さくする。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/MeguriHomeViews.swift`
+- `MeguriHomeContent` に絞り、map backdropとfloating chromeを呼び出す画面本体として整理した。
+- ファイル行数を325行から86行へ縮小した。
+
+#### `ios-native/Sources/MegrumApp/MeguriHomeMapBackdrop.swift`
+- `MeguriHomeMapBackdrop` とmap title helperを新規ファイルへ移動した。
+- current location circle、groom/board annotation、range判定、map style、top gradient overlayは維持した。
+
+#### `ios-native/Sources/MegrumApp/MeguriHomeChromeViews.swift`
+- `MeguriMapRecenterButton`、`MeguriGroomArchiveButton`、`MeguriHomeNoticeCard`、`MeguriNoticeBanner`、avatar helperを新規ファイルへ移動した。
+- button size/material/shadow/accessibility label、notice title resolver、banner copy/layoutは維持した。
+
+### 影響範囲
+
+- Swift Native iOS版Meguri home、map backdrop、floating controls、location notice、board composer/detailで使うnotice banner。
+- 挙動変更ではなく責務分離。map annotation selection、distance access policy、bottom sheet、notice resolver、状態名、用語、DBスキーマは変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumApp/MeguriHomeViews.swift ios-native/Sources/MegrumApp/MeguriHomeMapBackdrop.swift ios-native/Sources/MegrumApp/MeguriHomeChromeViews.swift`
+  - passed
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-meguri-home-build --disable-index-store`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-meguri-home-tests --disable-index-store --enable-xctest --disable-swift-testing -j 1 --filter 'MeguriAccessPolicyTests|MeguriFeedStateReducerTests|MeguriMessageReadStateReducerTests|MeguriNoticeResolverTests|GroomInteractionStateReducerTests|MegrumAppStateTests/testAppStateLoadsOwnGroomArchiveWithEngagement'`
+  - 23 tests passed
+
+### セルフレビュー結果
+
+- ✅ Meguri homeのmap annotation、current location circle、floating button、archive button、notice card、notice bannerは移動のみで維持した。
+- ✅ MeguriAccessPolicyTests / MeguriFeedStateReducerTests / MeguriMessageReadStateReducerTests / MeguriNoticeResolverTests / GroomInteractionStateReducerTests / MegrumAppStateTestsで、距離判定、feed/read state、notice、groom archive周辺を確認した。
+- ✅ 状態名・用語・DBスキーマの変更はないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション915：Repository default実装をドメイン別に分割
 
 ### 背景・問題意識
