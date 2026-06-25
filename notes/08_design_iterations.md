@@ -4,6 +4,47 @@
 
 ---
 
+## イテレーション1111：subscription settings contentを分離
+
+### 背景・問題意識
+
+`SubscriptionSettingsScreen` は、Premium会員状態の読み込みとreload actionを持ちながら、現在状態section、プラン候補section、有効な権限section、状態row、プランrowまで同じファイルに抱えていた。親画面をsubscription stateの取得と画面modifierに寄せ、List表示とrow描画を専用Viewへ分離する。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/SubscriptionSettingsScreen.swift`
+- `List` 本体を `SubscriptionSettingsContent` 呼び出しへ置き換えた。
+- 手動更新の `Task` 起動を `reloadSubscriptionState()` へ分離した。
+- `SubscriptionStatusRow` / `SubscriptionPlanRow` とplan/entitlement派生表示を専用ファイルへ移動した。
+
+#### `ios-native/Sources/MegrumApp/SubscriptionSettingsContent.swift`
+- `SubscriptionSettingsContent` を追加した。
+- 現在状態section、プラン候補section、有効な権限sectionを移動した。
+- `SubscriptionStatusRow` / `SubscriptionPlanRow` を追加し、状態badge、価格、feature表示、accessibility label/hintを維持した。
+
+### 影響範囲
+
+- Swift Native iOS版のPremium会員設定画面。
+- subscription state読み込み、手動更新、Premium/Meguri Plus判定、有効権限表示、広告抑制に使うsubscription model、DB/API、状態名、表示文言は変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumApp/SubscriptionSettingsScreen.swift ios-native/Sources/MegrumApp/SubscriptionSettingsContent.swift`
+  - passed
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-subscription-settings-content`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-subscription-settings-content --enable-xctest --disable-swift-testing -j 1 --filter 'SubscriptionModelsTests|SupabaseEntitlementClientTests|AdDisplayPolicyTests|SettingsScreenTests|MegrumAppStateTests'`
+  - passed（108 tests）
+
+### セルフレビュー結果
+
+- ✅ 現在状態、確認中表示、状態更新button、プラン候補、有効な権限、empty権限文言を維持した。
+- ✅ subscription state読み込み、手動reload、Premium/Meguri Plus判定、広告抑制モデル、DB/API境界は変更していない。
+- ✅ `SubscriptionSettingsScreen.swift` は160行から30行へ縮小し、Premium会員設定のList表示を157行の専用ファイルへ分離した。
+- ✅ 新しい状態名・用語・DB列は追加していないため、`notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション1110：blocked users contentを分離
 
 ### 背景・問題意識
