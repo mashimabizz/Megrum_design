@@ -4,6 +4,43 @@
 
 ---
 
+## イテレーション902：Authenticated tabs contentを分割
+
+### 背景・問題意識
+
+`MegrumAuthenticatedTabsView.swift` は、認証後Rootのドロワー外枠、ドロワーgesture、TabView内の各タブ構成、ホーム検索初期条件、Wish/個別募集/めぐり/やりとりへのタブ遷移、広告interstitial requestが同居していた。ドロワー挙動とタブ構成を別々に追えるようにし、ホーム/タブ追加時の差分がドロワーgestureへ混ざらないよう責務を分ける。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/MegrumAuthenticatedTabsView.swift`
+- ドロワーoverlay、前景contentのoffset/clip/shadow、白out overlay、開閉gesture、drawer destination dispatchに集中させた。
+- TabView構成を `MegrumAuthenticatedTabContentView` へ移し、ファイル行数を351行から239行へ縮小した。
+
+#### `ios-native/Sources/MegrumApp/MegrumAuthenticatedTabContentView.swift`
+- ホーム/マイグッズ/Wish/やりとり/めぐりのNavigationStackとtab item構成を移動した。
+- ホーム検索初期条件、Wish/個別募集へのタブ遷移、めぐり/やりとり遷移、home settings/public profile route、tab変更時のinterstitial requestを保持した。
+
+### 影響範囲
+
+- Swift Native iOS版の認証後Root、ホーム、マイグッズ、Wish、やりとり、めぐり、ホーム検索遷移、左ドロワー開閉、タブ切り替え時の広告request。
+- 挙動変更ではなく責務分離。TabViewのタブ順、tab item文言/アイコン、ホーム検索初期条件、Wish/個別募集section遷移、ドロワーgesture閾値、drawer destination遅延、interstitial placement、状態名、用語、DBスキーマは変更しない。
+
+### 確認方法
+
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-auth-tabs-build --disable-index-store`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-auth-tabs-tests --disable-index-store --enable-xctest --disable-swift-testing -j 1 --filter 'AppDrawerGestureTests|AdDisplayPolicyTests|HomeScreenFlowTests|MegrumTabBarAppearanceTests'`
+  - 74 tests passed
+
+### セルフレビュー結果
+
+- ✅ TabViewのタブ順、NavigationStack構成、tab item、HomeScreen callback、SearchScreenへのinitialCriteria受け渡しは変更していない。
+- ✅ 左ドロワーのpresentation progress、foreground offset/clip/shadow、overlay tap close、開閉gesture、drawer destination dispatchは親Viewに残し、挙動を変更していない。
+- ✅ AppDrawerGestureTests / AdDisplayPolicyTests / HomeScreenFlowTests / MegrumTabBarAppearanceTestsで、ドロワーgesture、広告interstitial placement、ホームタブ周辺、タブバー表示を確認した。
+- ✅ 状態名・用語・DBスキーマの変更はないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション901：Trading card bulk recognizerを分割
 
 ### 背景・問題意識
