@@ -4,6 +4,44 @@
 
 ---
 
+## イテレーション1038：グルームstory tile viewsを分割
+
+### 背景・問題意識
+
+`GroomStoryViews.swift` は、グルームstrip本体、表示順policy、自分のstory tile、他ユーザーstory tile、ring/avatar/empty hintを同じファイルに抱えていた。strip本体は表示順と選択callbackを持つ親Viewなので、tile表示だけを専用ファイルへ分け、グルーム横並びの制御とtile見た目の変更範囲を分離した。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/GroomStoryViews.swift`
+- `GroomFeedOrdering` と `GroomStrip` を既存ファイルに残した。
+- `GroomMyStoryTile`、`GroomStoryTile`、`GroomEmptyStoryHint` と補助Viewを専用ファイルへ委譲した。
+
+#### `ios-native/Sources/MegrumApp/GroomStoryTileViews.swift`
+- 自分のグルーム追加tile、他ユーザーstory tile、ring、avatar、empty hintを追加した。
+- 既存のサイズ、spacing、gradient、shadow、disabled条件、accessibility labelを維持した。
+
+### 影響範囲
+
+- Swift Native iOS版のめぐり画面上部グルームstrip。
+- グルーム追加tile、既読/未読story tile、empty hint表示。
+- グルーム表示順、選択callback、作成処理、状態名、用語、DBスキーマ、表示文言は変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumApp/GroomStoryViews.swift ios-native/Sources/MegrumApp/GroomStoryTileViews.swift`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-groom-story-tiles --enable-xctest --disable-swift-testing -j 1 --filter GroomInteractionStateReducerTests`
+  - passed（4 tests）
+
+### セルフレビュー結果
+
+- ✅ `GroomStrip` の表示順、`onAdd` / `onSelect` callback、accessibility label、id指定は変更していない。
+- ✅ tile表示は移動のみで、サイズ、色、gradient、shadow、既読opacity、disabled条件を維持した。
+- ✅ `GroomStoryViews.swift` は 267行から 75行へ縮小し、tile表示を 195行の専用ファイルへ分離した。
+- ✅ 新しい状態名・用語・DB列は追加していないため、`notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション1037：検索結果grid card viewを分割
 
 ### 背景・問題意識
