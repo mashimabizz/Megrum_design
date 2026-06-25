@@ -77,6 +77,32 @@ struct AuthResponse: Decodable {
     }
 }
 
+struct SignUpPendingConfirmationResponse: Decodable {
+    var user: UserResponse?
+    var accessToken: String?
+    var session: SignUpSessionPlaceholder?
+
+    var requiresEmailConfirmation: Bool {
+        user != nil && accessToken == nil && session == nil
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case user
+        case accessToken
+        case session
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        let wrappedUser = try container.decodeIfPresent(UserResponse.self, forKey: .user)
+        self.user = wrappedUser ?? (try? UserResponse(from: decoder))
+        self.accessToken = try container.decodeIfPresent(String.self, forKey: .accessToken)
+        self.session = try container.decodeIfPresent(SignUpSessionPlaceholder.self, forKey: .session)
+    }
+}
+
+struct SignUpSessionPlaceholder: Decodable {}
+
 struct UserResponse: Decodable {
     var id: UUID
     var email: String?

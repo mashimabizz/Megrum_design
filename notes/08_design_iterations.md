@@ -4,6 +4,62 @@
 
 ---
 
+## イテレーション986：メール登録の確認待ちレスポンスを修正
+
+### 背景・問題意識
+
+メールアドレスで新規登録しようとすると、画面に `認証に失敗しました。時間をおいてもう一度お試しください` が出ることがあった。Supabase Auth の signup は、メール確認が必要な設定や環境では、登録自体は成功してもすぐに `access_token` / session を返さず、user だけを返す形になる。この正常系を汎用decode失敗として扱うと、ユーザーには認証失敗に見えてしまう。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumData/SupabaseAuthClient.swift`
+#### `ios-native/Sources/MegrumData/SupabaseAuthClientSupport.swift`
+- signup 専用のレスポンス処理 `performSignUpRequest` を追加した。
+- 通常の session 付き signup は従来通り `AuthSession` を返す。
+- `user` は返っているが `access_token` / `session` がないレスポンスは、失敗ではなく `SupabaseAuthError.emailConfirmationRequired` として扱うようにした。
+
+#### `ios-native/Sources/MegrumData/SupabaseAuthDTOs.swift`
+- Supabase の `{"user": ..., "session": null}` 形式と、user がトップレベルで返る形式の両方を検出できる `SignUpPendingConfirmationResponse` を追加した。
+
+#### `ios-native/Sources/MegrumApp/MegrumAuthStateSupport.swift`
+- `SupabaseAuthError.emailConfirmationRequired` を、登録後の確認メール送信済み成功表示へつなげるようにした。
+- 既存の fallback 判定でも、Swift のdecode上 `accessToken` として欠落が出る場合を拾えるようにした。
+
+#### `ios-native/Tests/MegrumDataTests/SupabaseAuthClientTests.swift`
+#### `ios-native/Tests/MegrumAppTests/AuthScreenInputTests.swift`
+- sessionなしsignupレスポンスを確認待ちとして扱うテストを追加した。
+- App側で確認待ちerrorを受けた時、汎用エラーではなく `確認メールを送信しました...` の成功メッセージになることを固定した。
+
+### 影響範囲
+
+- Swift Native iOS版のメールアドレス新規登録。
+- Supabase Auth signup のレスポンスdecode。
+- ログイン、パスワードリセット、OAuth、session復元、DBスキーマ、状態名は変更しない。
+
+### 確認方法
+
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-auth-signup-test --disable-index-store --enable-xctest --disable-swift-testing -j 1 --filter 'SupabaseAuthClientTests/testSignUpTreatsWrappedUserWithoutSessionAsEmailConfirmationRequired|SupabaseAuthClientTests/testSignUpTreatsDirectUserWithoutAccessTokenAsEmailConfirmationRequired|AuthScreenInputTests/testAuthStateShowsEmailConfirmationSuccessWhenSupabaseRequiresEmailConfirmation|AuthScreenInputTests/testAuthStateShowsEmailConfirmationSuccessWhenSignUpReturnsNoSession'`
+  - selected tests passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-auth-suite-test --disable-index-store --enable-xctest --disable-swift-testing -j 1 --filter 'SupabaseAuthClientTests|AuthScreenInputTests|MegrumAppStateTests/testAuthStateTrimsSignUpInputThroughRepository|MegrumAppStateTests/testAuthStateValidatesSignUpPasswordLength|MegrumAppStateTests/testAuthStateValidatesSignUpHandle'`
+  - auth related tests passed
+- `xcodebuild -quiet -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -destination 'id=C70DDDBB-2602-49E0-8F95-1F043BCCED76' -derivedDataPath /tmp/megrum-ios-native-auth-signup-xcode build`
+  - passed
+- `xcrun simctl install C70DDDBB-2602-49E0-8F95-1F043BCCED76 /tmp/megrum-ios-native-auth-signup-xcode/Build/Products/Debug-iphonesimulator/MegrumNative.app`
+  - passed
+- `xcrun simctl launch C70DDDBB-2602-49E0-8F95-1F043BCCED76 tokyo.megrum.native.preview`
+  - launched
+- `xcrun simctl io C70DDDBB-2602-49E0-8F95-1F043BCCED76 screenshot /tmp/megrum-auth-signup-fix-after-wait.png`
+  - screenshot captured
+
+### セルフレビュー結果
+
+- ✅ signup だけに専用分岐を追加し、sign-in / refresh / OAuth の decode 経路は維持した。
+- ✅ session付きsignupは従来通り即ログイン、sessionなしsignupは確認メール案内へ分岐する。
+- ✅ 既存の `access_token` 欠落fallbackに加え、Swift側の `accessToken` 欠落にも対応した。
+- ✅ 状態名、用語定義、DBスキーマの追加はないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション985：詳細ステップの画像グリッドを簡素化
 
 ### 背景・問題意識

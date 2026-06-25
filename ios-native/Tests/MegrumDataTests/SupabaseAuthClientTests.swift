@@ -181,6 +181,63 @@ final class SupabaseAuthClientTests: XCTestCase {
         }
     }
 
+    func testSignUpTreatsWrappedUserWithoutSessionAsEmailConfirmationRequired() async throws {
+        let client = SupabaseAuthClient(configuration: configuration, session: mockSession())
+        AuthMockURLProtocol.requestHandler = { request in
+            let url = try XCTUnwrap(request.url)
+            let data = Data(
+                #"""
+                {
+                  "user": {
+                    "id": "44444444-4444-4444-4444-444444444444",
+                    "email": "michi@example.com",
+                    "created_at": "2026-01-01T00:00:00Z"
+                  },
+                  "session": null
+                }
+                """#.utf8
+            )
+            return (AuthMockURLProtocol.response(for: url, statusCode: 200), data)
+        }
+        defer {
+            AuthMockURLProtocol.requestHandler = nil
+        }
+
+        do {
+            _ = try await client.signUp(email: "michi@example.com", password: "password123")
+            XCTFail("Expected pending email confirmation error")
+        } catch let error as SupabaseAuthError {
+            XCTAssertEqual(error, .emailConfirmationRequired)
+        }
+    }
+
+    func testSignUpTreatsDirectUserWithoutAccessTokenAsEmailConfirmationRequired() async throws {
+        let client = SupabaseAuthClient(configuration: configuration, session: mockSession())
+        AuthMockURLProtocol.requestHandler = { request in
+            let url = try XCTUnwrap(request.url)
+            let data = Data(
+                #"""
+                {
+                  "id": "55555555-5555-5555-5555-555555555555",
+                  "email": "michi@example.com",
+                  "created_at": "2026-01-01T00:00:00Z"
+                }
+                """#.utf8
+            )
+            return (AuthMockURLProtocol.response(for: url, statusCode: 200), data)
+        }
+        defer {
+            AuthMockURLProtocol.requestHandler = nil
+        }
+
+        do {
+            _ = try await client.signUp(email: "michi@example.com", password: "password123")
+            XCTFail("Expected pending email confirmation error")
+        } catch let error as SupabaseAuthError {
+            XCTAssertEqual(error, .emailConfirmationRequired)
+        }
+    }
+
     func testRefreshSessionDecodesExpiresAtFromExpiresIn() async throws {
         let client = SupabaseAuthClient(configuration: configuration, session: mockSession())
         AuthMockURLProtocol.requestHandler = { request in

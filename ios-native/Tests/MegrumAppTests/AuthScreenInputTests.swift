@@ -79,6 +79,20 @@ final class AuthScreenInputTests: XCTestCase {
         XCTAssertFalse(state.isLoading)
     }
 
+    func testAuthStateShowsEmailConfirmationSuccessWhenSupabaseRequiresEmailConfirmation() async {
+        let state = MegrumAuthState(repository: SupabaseEmailConfirmationRequiredAuthRepository())
+
+        await state.signUp(email: "michi@example.com", password: "password123", handle: "michi_1")
+
+        XCTAssertNil(state.session)
+        XCTAssertNil(state.errorMessage)
+        XCTAssertEqual(
+            state.successMessage,
+            "確認メールを送信しました。メール内のリンクで認証を完了してからログインしてください"
+        )
+        XCTAssertFalse(state.isLoading)
+    }
+
     func testAuthStateCanClearFeedbackAfterModeChanges() async {
         let state = MegrumAuthState(repository: PasswordResetSuccessAuthRepository())
 
@@ -274,6 +288,20 @@ private struct EmailConfirmationRequiredAuthRepository: MegrumAuthRepository {
             AuthCodingKey(stringValue: "access_token"),
             DecodingError.Context(codingPath: [], debugDescription: "Session is pending email confirmation")
         )
+    }
+
+    func signOut(session: AuthSession) async throws {}
+}
+
+private struct SupabaseEmailConfirmationRequiredAuthRepository: MegrumAuthRepository {
+    var isConfigured: Bool { true }
+
+    func signIn(email: String, password: String) async throws -> AuthSession {
+        throw TestAuthError.unused
+    }
+
+    func signUp(_ input: AuthSignUpInput) async throws -> AuthSession {
+        throw SupabaseAuthError.emailConfirmationRequired
     }
 
     func signOut(session: AuthSession) async throws {}

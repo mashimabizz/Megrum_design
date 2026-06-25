@@ -3,6 +3,7 @@ import MegrumCore
 
 public enum SupabaseAuthError: Error, Equatable, Sendable {
     case invalidURL
+    case emailConfirmationRequired
     case unexpectedStatus(Int, String?)
 }
 
@@ -63,7 +64,7 @@ public final class SupabaseAuthClient: @unchecked Sendable {
             metadata: metadata,
             emailRedirectTo: emailRedirectTo
         )
-        return try await performAuthRequest(request)
+        return try await performSignUpRequest(request)
     }
 
     public func signInWithIDToken(

@@ -14,6 +14,27 @@ extension SupabaseAuthClient {
         return try decoder.decode(AuthResponse.self, from: data).session
     }
 
+    func performSignUpRequest(_ request: URLRequest) async throws -> AuthSession {
+        let (data, response) = try await session.data(for: request)
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw SupabaseAuthError.unexpectedStatus(-1, nil)
+        }
+        guard (200..<300).contains(httpResponse.statusCode) else {
+            let message = try? decoder.decode(AuthErrorResponse.self, from: data).message
+            throw SupabaseAuthError.unexpectedStatus(httpResponse.statusCode, message)
+        }
+
+        do {
+            return try decoder.decode(AuthResponse.self, from: data).session
+        } catch {
+            if let pending = try? decoder.decode(SignUpPendingConfirmationResponse.self, from: data),
+               pending.requiresEmailConfirmation {
+                throw SupabaseAuthError.emailConfirmationRequired
+            }
+            throw error
+        }
+    }
+
     func makeAuthRequest(
         path: String,
         queryItems: [URLQueryItem] = [],

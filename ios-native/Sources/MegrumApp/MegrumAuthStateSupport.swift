@@ -28,7 +28,13 @@ extension MegrumAuthState {
     }
 
     func isLikelyEmailConfirmationRequiredAfterSignUp(_ error: Error) -> Bool {
+        if case SupabaseAuthError.emailConfirmationRequired = error {
+            return true
+        }
         if case let DecodingError.keyNotFound(key, _) = error, key.stringValue == "access_token" {
+            return true
+        }
+        if case let DecodingError.keyNotFound(key, _) = error, key.stringValue == "accessToken" {
             return true
         }
         if case let SupabaseAuthError.unexpectedStatus(_, message) = error,
