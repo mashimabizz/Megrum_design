@@ -4,6 +4,44 @@
 
 ---
 
+## イテレーション1028：取引証跡photo viewsを分割
+
+### 背景・問題意識
+
+`TradeEvidencePanel.swift` は、取引証跡パネルの状態分岐、承認状態表示、写真カルーセル、写真カードを同じファイルに抱えていた。写真表示は証跡パネル本体の分岐から独立した表示部品なので、専用ファイルへ切り出し、承認/評価/撮影導線の本体ロジックを追いやすくした。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/TradeEvidencePanel.swift`
+- `TradeEvidencePanel` 本体と、証跡有無・承認状態・評価/撮影/承認buttonの分岐を既存ファイルに残した。
+- 承認chip、写真carousel、写真cardを専用Viewへ委譲した。
+
+#### `ios-native/Sources/MegrumApp/TradeEvidencePhotoViews.swift`
+- `TradeEvidenceApprovalChip`、`TradeEvidencePhotoCarousel`、`TradeEvidencePhotoCard` を追加した。
+- 画像読み込み、fallback表示、アップロード者label、枚数label、拡大表示action、accessibility label は既存どおり維持した。
+
+### 影響範囲
+
+- Swift Native iOS版の取引詳細内の証跡パネル。
+- 証跡写真carousel、承認chip、評価/撮影/承認button表示。
+- 証跡追加、写真選択、承認処理、評価処理、状態名、用語、DBスキーマ、表示文言は変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumApp/TradeEvidencePanel.swift ios-native/Sources/MegrumApp/TradeEvidencePhotoViews.swift`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-trade-evidence-photo-views --enable-xctest --disable-swift-testing -j 1 --filter TradeEvidencePhotoStateReducerTests`
+  - passed（3 tests）
+
+### セルフレビュー結果
+
+- ✅ `TradeEvidencePanel` の status分岐、PhotosPicker binding、撮影/承認/評価action は変更していない。
+- ✅ 写真carouselと写真cardは移動のみで、画像phaseごとの表示、tap action、accessibility labelを維持した。
+- ✅ `TradeEvidencePanel.swift` は 263行から 157行へ縮小し、証跡写真表示を 114行の専用ファイルへ分離した。
+- ✅ 新しい状態名・用語・DB列は追加していないため、`notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション1027：異議申し立てreply composerを分割
 
 ### 背景・問題意識
