@@ -4,6 +4,44 @@
 
 ---
 
+## イテレーション1034：交換calendar drag selectionを分割
+
+### 背景・問題意識
+
+`HomeExchangeSettingsCalendarViews.swift` は、交換条件設定のカレンダーカード本体と、横ドラッグ選択を許可するpolicy、選択中keyを解決するresolverを同じファイルに抱えていた。policy/resolverは表示階層から独立してテストされているため、専用ファイルへ切り出し、カレンダーView本体を月表示とgesture配線に集中させた。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/HomeExchangeSettingsCalendarViews.swift`
+- `HomeExchangeSettingsCalendarCard` 本体に、月移動、weekday header、grid表示、drag gesture配線を残した。
+- `HomeExchangeCalendarDragSelectionPolicy` と `HomeExchangeCalendarDragSelectionResolver` を専用ファイルへ委譲した。
+
+#### `ios-native/Sources/MegrumApp/HomeExchangeCalendarDragSelection.swift`
+- 横方向かつ同一週内のドラッグだけを許可するpolicyを移動した。
+- drag previewで蓄積した日付keyと最終rangeを、表示順に解決するresolverを移動した。
+
+### 影響範囲
+
+- Swift Native iOS版の交換条件設定画面。
+- カレンダーの日付drag選択、drag preview、同一週判定。
+- 月表示、日付tap、都道府県色、凡例、状態名、用語、DBスキーマ、表示文言は変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumApp/HomeExchangeSettingsCalendarViews.swift ios-native/Sources/MegrumApp/HomeExchangeCalendarDragSelection.swift`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-home-exchange-drag-selection --enable-xctest --disable-swift-testing -j 1 --filter HomeExchangeSettingsScreenTests`
+  - passed（4 tests）
+
+### セルフレビュー結果
+
+- ✅ `HomeExchangeSettingsCalendarCard` の `@State`、month移動、tap/drag callback、day color、selection connectionは変更していない。
+- ✅ drag selection policy/resolverは移動のみで、既存テストの期待値を維持した。
+- ✅ `HomeExchangeSettingsCalendarViews.swift` は 276行から 248行へ縮小し、drag選択ロジックを 30行の専用ファイルへ分離した。
+- ✅ 新しい状態名・用語・DB列は追加していないため、`notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション1033：推しsettings member tagsを分割
 
 ### 背景・問題意識
