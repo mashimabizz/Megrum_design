@@ -4,6 +4,44 @@
 
 ---
 
+## イテレーション1012：待ち合わせ月カレンダーViewを分割
+
+### 背景・問題意識
+
+`ProposalMeetupCalendarViews.swift` は、候補ブロック、表示モード切替、月表示カレンダー、共通カード枠を同じファイルに持っていた。週表示系は既に複数ファイルへ分かれているため、月表示も専用ファイルに分け、待ち合わせカレンダーの表示単位ごとに編集しやすくした。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/ProposalMeetupCalendarViews.swift`
+- `ProposalMeetupMonthCalendar` と月表示 day cell / navigation button helper を別ファイルへ移した。
+- 候補ブロック、表示モード切替、共通カード枠は元ファイルに残した。
+
+#### `ios-native/Sources/MegrumApp/ProposalMeetupMonthCalendarViews.swift`
+- 月表示グリッド、月移動ヘッダー、月内日付セルを集約した。
+- 月内予定チップの背景色式を private helper にして、既存の自分/相手予定の色分けを維持した。
+
+### 影響範囲
+
+- Swift Native iOS版の打診作成フロー内、待ち合わせ候補の月表示カレンダー。
+- 月移動、日付選択、予定チップ表示、週表示への遷移導線。
+- 状態名、用語、DBスキーマ、表示文言は変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumApp/ProposalMeetupCalendarViews.swift ios-native/Sources/MegrumApp/ProposalMeetupMonthCalendarViews.swift`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-proposal-meetup-calendar --enable-xctest --disable-swift-testing -j 1 --filter 'ProposalCreateFlowTests|TradeRequestDraftProposalCreateFlowTests'`
+  - passed（55 tests）
+
+### セルフレビュー結果
+
+- ✅ 月表示の title、前月/次月ボタン、weekday label、日付セル、予定チップ、日付選択 callback は維持した。
+- ✅ `ProposalMeetupCalendarViews.swift` は 291行から 136行へ縮小し、月表示を 169行の専用ファイルに分離した。
+- ✅ 待ち合わせ作成条件、calendar model、proposal payload には触れていない。
+- ✅ 新しい状態名・用語・DB列は追加していないため、`notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション1011：設定画面のListセクションを分割
 
 ### 背景・問題意識
