@@ -4,6 +4,45 @@
 
 ---
 
+## イテレーション924：Profile schedule componentsを分割
+
+### 背景・問題意識
+
+`ProfileScheduleScreen.swift` は、公開スケジュール画面の読み込み条件・期間計算・toolbarと、header、日別カード、予定行、月セルの表示部品が1ファイルに同居していた。公開プロフィール画面から開くスケジュール表示はデータ取得と表示調整の変更理由が異なるため、画面本体と表示部品を分ける。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/ProfileScheduleScreen.swift`
+- 画面本体、表示mode、visible interval、reload key、日/月の切り替え、toolbar、load taskに絞った。
+- ファイル行数を316行から167行へ縮小した。
+
+#### `ios-native/Sources/MegrumApp/ProfileScheduleComponents.swift`
+- `ProfileScheduleHeader`、`ProfileScheduleDayCard`、`ProfileScheduleRowView`、`ProfileScheduleMonthCell` を新規ファイルへ移動した。
+- header文言、今日badge、予定なし表示、相手/あなたbadge、時刻/場所表示、月セルの2件previewは維持した。
+
+### 影響範囲
+
+- Swift Native iOS版の公開プロフィール内スケジュール画面、日別表示、月表示。
+- 挙動変更ではなく責務分離。スケジュール取得条件、保存/表示データ、状態名、用語、DBスキーマは変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumApp/ProfileScheduleScreen.swift ios-native/Sources/MegrumApp/ProfileScheduleComponents.swift`
+  - passed
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-profile-schedule-build --disable-index-store`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-profile-schedule-tests --disable-index-store --enable-xctest --disable-swift-testing -j 1 --filter 'PublicUserProfileScreenTests|ScheduleStateReducerTests'`
+  - 11 tests passed
+
+### セルフレビュー結果
+
+- ✅ visible interval、reload key、日/月切り替え、前後移動、loadProfileSchedulesの引数は維持した。
+- ✅ 日別カード/月セルの文言・色・badge・時刻/場所表示は移動のみで維持した。
+- ✅ PublicUserProfileScreenTests / ScheduleStateReducerTestsで、公開プロフィールのスケジュール読み込み、appState保存、予定の並び順を確認した。
+- ✅ 状態名・用語・DBスキーマの変更はないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション923：Goods tile viewsを本体と装飾に分割
 
 ### 背景・問題意識
