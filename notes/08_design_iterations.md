@@ -4,6 +4,48 @@
 
 ---
 
+## イテレーション1013：検索候補Viewをタグと画像候補へ分割
+
+### 背景・問題意識
+
+`SearchSuggestionViews.swift` は、検索候補セクション、推し候補の2段タグ、汎用タグwrap、wish画像横スクロール、画像チップ、placeholder artwork を1ファイルに持っていた。検索候補は今後も候補ソースや表示形式が増えやすいため、セクション構成は残しつつ、タグ表示と画像候補表示を専用ファイルへ分けた。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/SearchSuggestionViews.swift`
+- セクション全体と推し候補の group/member 分割だけを残した。
+- 汎用タグ表示と wish 画像候補行を専用ファイルへ委譲した。
+
+#### `ios-native/Sources/MegrumApp/SearchSuggestionTagViews.swift`
+- `SearchSuggestionTagWrap` とタグボタン表示を移動した。
+- 選択状態、chip styling、アクセシビリティ文言は維持した。
+
+#### `ios-native/Sources/MegrumApp/SearchSuggestionImageViews.swift`
+- wish画像横スクロール、画像チップ、placeholder artwork を移動した。
+- 横スクロール時の `SearchBackSwipeResolver` による戻るスワイプ抑制 callback を維持した。
+
+### 影響範囲
+
+- Swift Native iOS版の検索画面、初期検索候補セクション。
+- 推し候補タグ、wish画像候補、その他タグ候補の表示と選択。
+- 状態名、用語、DBスキーマ、表示文言は変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumApp/SearchSuggestionViews.swift ios-native/Sources/MegrumApp/SearchSuggestionTagViews.swift ios-native/Sources/MegrumApp/SearchSuggestionImageViews.swift`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-search-suggestions --enable-xctest --disable-swift-testing -j 1 --filter SearchScreenTests`
+  - passed（14 tests）
+
+### セルフレビュー結果
+
+- ✅ 候補の section title、system image、tint、選択状態、アクセシビリティ文言は維持した。
+- ✅ wish横スクロール時の nested horizontal scroll 判定と callback 呼び出しは移動のみで維持した。
+- ✅ `SearchSuggestionViews.swift` は 290行から 127行へ縮小し、タグ表示と画像候補表示を専用ファイルへ分離した。
+- ✅ 新しい状態名・用語・DB列は追加していないため、`notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション1012：待ち合わせ月カレンダーViewを分割
 
 ### 背景・問題意識
