@@ -22,19 +22,17 @@ struct MegrumAuthenticatedTabsView: View {
 
     var body: some View {
         GeometryReader { proxy in
-            let drawerWidth = AppDrawerVisualMetrics.drawerWidth(screenWidth: proxy.size.width)
-            let drawerOpenOffset = AppDrawerVisualMetrics.openOffset(screenWidth: proxy.size.width)
-            let drawerProgress = resolvedDrawerProgress(drawerTravel: drawerOpenOffset)
-            let contentOffset = drawerOpenOffset * drawerProgress
-            let foregroundCornerRadius = AppDrawerVisualMetrics.foregroundCornerRadius * drawerProgress
-            let foregroundShadowOpacity = AppDrawerVisualMetrics.foregroundShadowOpacity * drawerProgress
-            let foregroundWhiteoutOpacity = AppDrawerVisualMetrics.whiteoutOpacity * drawerProgress
+            let drawerPresentation = AppDrawerPresentationState(
+                containerWidth: proxy.size.width,
+                isPresented: showsDrawer,
+                dragTranslation: drawerDragTranslation
+            )
 
             ZStack(alignment: .leading) {
                 AppDrawerOverlay(
                     isPresented: $showsDrawer,
-                    presentationProgress: drawerProgress,
-                    drawerWidth: drawerWidth,
+                    presentationProgress: drawerPresentation.progress,
+                    drawerWidth: drawerPresentation.drawerWidth,
                     appState: appState,
                     onSelectDestination: { destination in
                         openDrawerDestination(destination)
@@ -48,54 +46,31 @@ struct MegrumAuthenticatedTabsView: View {
                         showsDrawer = false
                     }
                 )
-                .allowsHitTesting(drawerProgress > 0.001)
+                .allowsHitTesting(drawerPresentation.isInteractive)
                 .zIndex(AppDrawerVisualMetrics.drawerZIndex)
 
-                tabContent
-                    .zIndex(AppDrawerVisualMetrics.foregroundZIndex)
-                    .offset(x: contentOffset)
-                    .clipShape(
-                        UnevenRoundedRectangle(
-                            topLeadingRadius: foregroundCornerRadius,
-                            bottomLeadingRadius: foregroundCornerRadius,
-                            bottomTrailingRadius: 0,
-                            topTrailingRadius: 0
-                        )
-                    )
-                    .shadow(
-                        color: Color.black.opacity(foregroundShadowOpacity),
-                        radius: AppDrawerVisualMetrics.foregroundShadowRadius,
-                        x: -5,
-                        y: 0
-                    )
-                    .overlay {
-                        if drawerProgress > 0.001 {
-                            Color.white
-                                .opacity(foregroundWhiteoutOpacity)
-                                .ignoresSafeArea()
-                                .contentShape(Rectangle())
-                                .onTapGesture {
-                                    withAnimation(drawerAnimation) {
-                                        drawerDragTranslation = 0
-                                        showsDrawer = false
-                                    }
-                                }
-                                .gesture(drawerPanGesture(drawerTravel: drawerOpenOffset))
+                AppDrawerForegroundLayer(
+                    presentation: drawerPresentation,
+                    closeGesture: drawerPanGesture(drawerTravel: drawerPresentation.drawerOpenOffset),
+                    homeGesture: homeDrawerPanGesture(
+                        drawerTravel: drawerPresentation.drawerOpenOffset,
+                        containerSize: proxy.size
+                    ),
+                    onCloseOverlayTap: {
+                        withAnimation(drawerAnimation) {
+                            drawerDragTranslation = 0
+                            showsDrawer = false
                         }
                     }
-                    .simultaneousGesture(
-                        homeDrawerPanGesture(
-                            drawerTravel: drawerOpenOffset,
-                            containerSize: proxy.size
-                        ),
-                        including: .gesture
-                    )
+                ) {
+                    tabContent
+                }
             }
             .background(MegrumTheme.canvas.ignoresSafeArea())
             .contentShape(Rectangle())
             .simultaneousGesture(
                 openDrawerPanGesture(
-                    drawerTravel: drawerOpenOffset,
+                    drawerTravel: drawerPresentation.drawerOpenOffset,
                     containerSize: proxy.size
                 ),
                 including: showsDrawer ? .all : .subviews
@@ -126,14 +101,6 @@ struct MegrumAuthenticatedTabsView: View {
 
     private var drawerAnimation: Animation {
         .interactiveSpring(response: 0.30, dampingFraction: 0.88)
-    }
-
-    private func resolvedDrawerProgress(drawerTravel: CGFloat) -> CGFloat {
-        AppDrawerVisualMetrics.presentationProgress(
-            isPresented: showsDrawer,
-            dragTranslation: drawerDragTranslation,
-            drawerTravel: drawerTravel
-        )
     }
 
     private func homeDrawerPanGesture(drawerTravel: CGFloat, containerSize: CGSize) -> some Gesture {

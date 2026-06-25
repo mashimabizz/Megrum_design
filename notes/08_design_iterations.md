@@ -4,6 +4,47 @@
 
 ---
 
+## イテレーション1052：authenticated tabs drawer layerを分離
+
+### 背景・問題意識
+
+`MegrumAuthenticatedTabsView.swift` は、tab本体の組み立て、drawer gesture、drawer destination処理に加えて、drawer開閉時の前景offset、corner、shadow、whiteout overlayの描画もbody直下に抱えていた。gesture判定と状態更新は親Viewに残し、drawer前景の表示計算とchromeだけを専用Viewへ分離した。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/MegrumAuthenticatedTabsView.swift`
+- drawer幅、開閉progress、前景offsetなどを `AppDrawerPresentationState` に委譲した。
+- 前景tab contentのoffset、clip、shadow、whiteout overlay、home gesture適用を `AppDrawerForegroundLayer` に委譲した。
+- drawerを閉じるtap処理、pan gesture、destination遷移、sign out後の状態resetは親Viewに残した。
+
+#### `ios-native/Sources/MegrumApp/AppDrawerForegroundLayer.swift`
+- `AppDrawerPresentationState` を追加し、drawer width / open offset / progress / foreground style値を集約した。
+- `AppDrawerForegroundLayer` を追加し、前景contentのdrawer連動chromeとclose overlayを担当させた。
+
+### 影響範囲
+
+- Swift Native iOS版の認証後tab画面と左drawerの前景レイヤー。
+- drawer開閉progress、foreground push、corner radius、shadow、whiteout overlay、tap/dragで閉じる動き。
+- tab routing、drawer item selection、sign out、検索表示、状態名、用語、DBスキーマ、表示文言は変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumApp/MegrumAuthenticatedTabsView.swift ios-native/Sources/MegrumApp/AppDrawerForegroundLayer.swift`
+  - passed
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-auth-tabs-drawer-layer`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-auth-tabs-drawer-layer-tests --enable-xctest --disable-swift-testing -j 1 --filter AppDrawerGestureTests`
+  - passed（20 tests）
+
+### セルフレビュー結果
+
+- ✅ drawer gesture判定、drawer drag state更新、destination遷移、sign out後resetは親Viewに残した。
+- ✅ foreground offset、corner、shadow、whiteout overlay、tap/drag close overlayを専用Viewへ移し、既存metricsを維持した。
+- ✅ `MegrumAuthenticatedTabsView.swift` は 239行から 206行へ縮小し、drawer前景chromeを 100行の専用ファイルへ分離した。
+- ✅ 新しい状態名・用語・DB列は追加していないため、`notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション1051：home other exchange supportを分離
 
 ### 背景・問題意識
