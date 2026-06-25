@@ -4,6 +4,49 @@
 
 ---
 
+## イテレーション943：Supabase listing clientを分割
+
+### 背景・問題意識
+
+`SupabaseListingClient.swift` は、個別募集のload/create/update/archive実行処理に加えて、request生成API、query helper、encoder生成を同じファイルに持っていた。個別募集は作成・編集・ホーム募集タイムライン・マッチ候補に関わるため、挙動は変えずに通信実行とrequest生成を分け、保存不具合の調査範囲を狭める。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumData/SupabaseListingClient.swift`
+- 個別募集のload/create/update/archive実行処理に絞った。
+- request extensionから参照するため、`client` / `encoder` をmodule internalにした。
+- ファイル行数を336行から200行へ縮小した。
+
+#### `ios-native/Sources/MegrumData/SupabaseListingClientRequests.swift`
+- load/listing wish option/create/update/archive/deleteのrequest生成APIを新規ファイルへ移動した。
+- listings/listing_wish_options のURL、select、Prefer header、PATCH/DELETE method、payload encodeは維持した。
+
+#### `ios-native/Sources/MegrumData/SupabaseListingClientSupport.swift`
+- listings/listing_wish_options 用query helperとencoder生成を新規ファイルへ移動した。
+- public listingと自分のlistingのstatus条件、option並び順、所有者条件は維持した。
+
+### 影響範囲
+
+- Swift Native iOS版の個別募集一覧取得、公開募集取得、個別募集作成/更新/archive/delete request生成。
+- 挙動変更ではなく責務分離。Supabase table名、select、query、payload key、状態名、用語、DBスキーマは変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumData/SupabaseListingClient.swift ios-native/Sources/MegrumData/SupabaseListingClientRequests.swift ios-native/Sources/MegrumData/SupabaseListingClientSupport.swift`
+  - passed
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-listing-client-build --disable-index-store`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-listing-client-tests --disable-index-store --enable-xctest --disable-swift-testing -j 1 --filter SupabaseListingClientTests`
+  - 11 tests passed
+
+### セルフレビュー結果
+
+- ✅ client本体、request builder、query/helperを移動中心で分割した。
+- ✅ 個別募集load/create/update/archive/deleteの既存request生成テストを通した。
+- ✅ 状態名・用語・DBスキーマの変更はないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション942：Supabase activity window clientを分割
 
 ### 背景・問題意識
