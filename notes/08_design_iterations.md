@@ -4,6 +4,55 @@
 
 ---
 
+## イテレーション987：詳細画像タイルの設定表示を再配置
+
+### 背景・問題意識
+
+マイグッズ追加の詳細ステップで、未設定/設定済みアイコンが画像右上にあり、右上へタグを表示したい既存のマイグッズ一覧の見え方と衝突していた。オーナーから、状態アイコンは画像左上へ移動し、未設定数を数字バッジで示し、右上には設定済みタグ、画像内右下にはメンバー名を表示したいという指摘があった。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/GoodsInventoryCreateMetaViews.swift`
+- 詳細ステップの画像タイルで、未設定/設定済み状態アイコンを右上から左上へ移動した。
+- 未設定時は、未設定項目数を状態アイコン右上の数字バッジとして表示するようにした。
+- 画像右上に、マイグッズ一覧のタグ表示と同じ `GoodsTagTextPill` 系のタグプレートを表示するようにした。
+- 画像右下に、設定済みのメンバー名を小さな黒背景タグとして表示するようにした。
+- 選択状態は引き続きタイル枠線で示し、タップ操作と保存payloadは変更しない。
+
+#### `ios-native/Sources/MegrumApp/GoodsInventoryCreateMetaTilePresentation.swift`
+- 詳細画像タイル用に、未設定項目数とタグ表示文字列を作る補助ロジックを追加した。
+
+#### `ios-native/Tests/MegrumAppTests/GoodsInventoryCreateMetaTilePresentationTests.swift`
+- メンバーとタグの未設定数、ソロ推しでメンバー登録が不要な場合、タグ表示の省略形をテストで固定した。
+
+### 影響範囲
+
+- Swift Native iOS版のマイグッズ追加フロー、詳細ステップ。
+- 画像ごとの未設定数、タグ、メンバー名の視認方法。
+- 保存payload、登録validation、タグ一括登録/メンバー一括登録、DBスキーマ、状態名は変更しない。
+
+### 確認方法
+
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-meta-tile-presentation-test --disable-index-store --enable-xctest --disable-swift-testing -j 1 --filter 'GoodsInventoryCreateMetaTilePresentationTests|GoodsEditorDraftTests/testInventoryCreateValidationRequiresPhotosAndMembersButOnlyWarnsForTags|GoodsEditorDraftTests/testInventoryCreateInputBuilderResolvesPhotoAndMemberPerMeta'`
+  - selected tests passed
+- `xcodebuild -quiet -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -destination 'id=C70DDDBB-2602-49E0-8F95-1F043BCCED76' -derivedDataPath /tmp/megrum-ios-native-meta-tile-xcode build`
+  - passed
+- `xcrun simctl install C70DDDBB-2602-49E0-8F95-1F043BCCED76 /tmp/megrum-ios-native-meta-tile-xcode/Build/Products/Debug-iphonesimulator/MegrumNative.app`
+  - passed
+- `xcrun simctl launch C70DDDBB-2602-49E0-8F95-1F043BCCED76 tokyo.megrum.native.preview`
+  - launched
+- `xcrun simctl io C70DDDBB-2602-49E0-8F95-1F043BCCED76 screenshot /tmp/megrum-meta-tile-badges.png`
+  - screenshot captured
+
+### セルフレビュー結果
+
+- ✅ 状態アイコン、タグ、メンバー名を画像内の各隅へ分散し、右上タグ表示と状態アイコンが重ならないようにした。
+- ✅ 未設定数は数字バッジで示すため、タグのみ未設定/メンバーのみ未設定/両方未設定の差が見える。
+- ✅ タグ表示は既存のマイグッズ一覧と同じタグピル系コンポーネントを使った。
+- ✅ 保存payload、validation、状態名、用語定義、DBスキーマの変更はないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション986：メール登録の確認待ちレスポンスを修正
 
 ### 背景・問題意識

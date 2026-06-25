@@ -191,9 +191,20 @@ private struct GoodsInventoryCreateMetaTile: View {
             .overlay {
                 photoContent
             }
-            .overlay(alignment: .topTrailing) {
+            .overlay(alignment: .topLeading) {
                 setupStatusBadge
                     .padding(6)
+            }
+            .overlay(alignment: .topTrailing) {
+                if let tagLine {
+                    GoodsInventoryCreateMetaTagPlate(text: tagLine)
+                }
+            }
+            .overlay(alignment: .bottomTrailing) {
+                if let memberName {
+                    GoodsInventoryCreateMetaMemberPlate(text: memberName)
+                        .padding(6)
+                }
             }
             .overlay {
                 RoundedRectangle(cornerRadius: GoodsGridLayout.tileCornerRadius, style: .continuous)
@@ -221,21 +232,45 @@ private struct GoodsInventoryCreateMetaTile: View {
     }
 
     private var setupStatusBadge: some View {
-        Image(systemName: isSetupComplete ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
-            .font(.system(size: 21, weight: .black))
-            .foregroundStyle(isSetupComplete ? MegrumTheme.ok : MegrumTheme.conditionPossible)
-            .padding(5)
-            .background(.white.opacity(0.90), in: Circle())
-            .shadow(color: .black.opacity(0.12), radius: 5, y: 2)
-            .accessibilityHidden(true)
+        ZStack(alignment: .topTrailing) {
+            Image(systemName: isSetupComplete ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
+                .font(.system(size: 20, weight: .black))
+                .foregroundStyle(isSetupComplete ? MegrumTheme.ok : MegrumTheme.conditionPossible)
+                .frame(width: 32, height: 32)
+                .background(.white.opacity(0.92), in: Circle())
+                .shadow(color: .black.opacity(0.12), radius: 5, y: 2)
+
+            if missingSetupCount > 0 {
+                Text("\(missingSetupCount)")
+                    .font(.system(size: 9, weight: .black, design: .rounded))
+                    .monospacedDigit()
+                    .foregroundStyle(.white)
+                    .frame(width: 16, height: 16)
+                    .background(MegrumTheme.conditionExact, in: Circle())
+                    .overlay {
+                        Circle()
+                            .strokeBorder(.white.opacity(0.92), lineWidth: 1.4)
+                    }
+                    .offset(x: 5, y: -5)
+            }
+        }
+        .accessibilityHidden(true)
+    }
+
+    private var tagLine: String? {
+        GoodsInventoryCreateMetaTilePresentation.tagLine(for: meta.tagNames)
+    }
+
+    private var missingSetupCount: Int {
+        GoodsInventoryCreateMetaTilePresentation.missingSetupCount(
+            for: meta,
+            allowsMemberSelection: allowsMemberSelection,
+            memberName: memberName
+        )
     }
 
     private var isSetupComplete: Bool {
-        isMemberComplete && !meta.tagNames.isEmpty
-    }
-
-    private var isMemberComplete: Bool {
-        !allowsMemberSelection || memberName != nil
+        missingSetupCount == 0
     }
 
     private var accessibilityValue: Text {
@@ -246,5 +281,40 @@ private struct GoodsInventoryCreateMetaTile: View {
             parts.append("未設定項目あり")
         }
         return Text(parts.joined(separator: "、"))
+    }
+}
+
+private struct GoodsInventoryCreateMetaTagPlate: View {
+    var text: String
+
+    var body: some View {
+        GeometryReader { proxy in
+            GoodsTagTextPill(
+                text: text,
+                fontSize: GoodsTileCollectionCardMetrics.tagFontSize,
+                horizontalPadding: GoodsTileCollectionCardMetrics.tagHorizontalPadding,
+                verticalPadding: GoodsTileCollectionCardMetrics.tagVerticalPadding
+            )
+            .frame(maxWidth: proxy.size.width * GoodsTileCollectionCardMetrics.tagMaxWidthRatio, alignment: .trailing)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
+            .padding(GoodsTileCollectionCardMetrics.tagInset)
+        }
+        .accessibilityHidden(true)
+    }
+}
+
+private struct GoodsInventoryCreateMetaMemberPlate: View {
+    var text: String
+
+    var body: some View {
+        Text(text)
+            .font(.system(size: 9, weight: .heavy, design: .rounded))
+            .lineLimit(1)
+            .minimumScaleFactor(0.78)
+            .foregroundStyle(.white)
+            .padding(.horizontal, 7)
+            .padding(.vertical, 4)
+            .background(MegrumTheme.ink.opacity(0.58), in: Capsule())
+            .accessibilityHidden(true)
     }
 }
