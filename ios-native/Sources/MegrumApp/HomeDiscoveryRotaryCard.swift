@@ -17,28 +17,14 @@ struct HomeDiscoveryRotaryCard: View {
     @State private var dragProgress: Double = 0
 
     var body: some View {
-        GeometryReader { proxy in
-            ZStack {
-                ForEach(visibleEntries) { entry in
-                    let metrics = HomeRotaryGoodsStackLayout.cardMetrics(
-                        for: entry.position,
-                        stageWidth: proxy.size.width,
-                        stageHeight: proxy.size.height
-                    )
-                    HomeDiscoveryRotaryCardItem(
-                        entry: entry,
-                        metrics: metrics,
-                        conditionTags: conditionTags(for: entry.goods),
-                        showsConditionOverlay: showsConditionOverlay
-                    ) {
-                        handleTap(position: entry.position)
-                    }
-                }
-            }
-            .frame(width: proxy.size.width, height: proxy.size.height)
-            .contentShape(Rectangle())
-            .highPriorityGesture(dragGesture(width: proxy.size.width))
-        }
+        HomeDiscoveryRotaryCardStage(
+            entries: visibleEntries,
+            showsConditionOverlay: showsConditionOverlay,
+            conditionTags: { conditionTags(for: $0) },
+            onTapPosition: { handleTap(position: $0) },
+            onDragChanged: handleDragChanged,
+            onDragEnded: handleDragEnded
+        )
         .accessibilityElement(children: .combine)
         .accessibilityAddTraits(.isButton)
         .accessibilityLabel("\(selectedGoods?.title ?? "グッズ")の詳細を見る")
@@ -124,47 +110,45 @@ struct HomeDiscoveryRotaryCard: View {
         return shortest - displayedDragProgress
     }
 
-    private func dragGesture(width: CGFloat) -> some Gesture {
-        DragGesture(minimumDistance: HorizontalSwipeIntentResolver.minimumHorizontalDistance)
-            .onChanged { value in
-                guard goods.count > 1, !reduceMotion else {
-                    return
-                }
-                guard let progress = carouselDragProgress(translation: value.translation, width: width) else {
-                    if abs(value.translation.height) > abs(value.translation.width) {
-                        dragProgress = 0
-                    }
-                    return
-                }
-                var transaction = Transaction()
-                transaction.disablesAnimations = true
-                withTransaction(transaction) {
-                    dragProgress = progress
-                }
+    private func handleDragChanged(_ value: DragGesture.Value, width: CGFloat) {
+        guard goods.count > 1, !reduceMotion else {
+            return
+        }
+        guard let progress = carouselDragProgress(translation: value.translation, width: width) else {
+            if abs(value.translation.height) > abs(value.translation.width) {
+                dragProgress = 0
             }
-            .onEnded { value in
-                guard goods.count > 1 else {
-                    dragProgress = 0
-                    return
-                }
-                guard isHorizontalCarouselDrag(value.translation) else {
-                    dragProgress = 0
-                    return
-                }
-                let denominator = max(width * 0.58, 72)
-                let projectedProgress = -Double(value.predictedEndTranslation.width / denominator)
-                let actualProgress = -Double(value.translation.width / denominator)
-                let progress = abs(projectedProgress) > abs(actualProgress) ? projectedProgress : actualProgress
-                let delta: Int
-                if progress > 0.34 {
-                    delta = 1
-                } else if progress < -0.34 {
-                    delta = -1
-                } else {
-                    delta = 0
-                }
-                settleCarousel(indexDelta: delta)
-            }
+            return
+        }
+        var transaction = Transaction()
+        transaction.disablesAnimations = true
+        withTransaction(transaction) {
+            dragProgress = progress
+        }
+    }
+
+    private func handleDragEnded(_ value: DragGesture.Value, width: CGFloat) {
+        guard goods.count > 1 else {
+            dragProgress = 0
+            return
+        }
+        guard isHorizontalCarouselDrag(value.translation) else {
+            dragProgress = 0
+            return
+        }
+        let denominator = max(width * 0.58, 72)
+        let projectedProgress = -Double(value.predictedEndTranslation.width / denominator)
+        let actualProgress = -Double(value.translation.width / denominator)
+        let progress = abs(projectedProgress) > abs(actualProgress) ? projectedProgress : actualProgress
+        let delta: Int
+        if progress > 0.34 {
+            delta = 1
+        } else if progress < -0.34 {
+            delta = -1
+        } else {
+            delta = 0
+        }
+        settleCarousel(indexDelta: delta)
     }
 
     private func carouselDragProgress(translation: CGSize, width: CGFloat) -> Double? {

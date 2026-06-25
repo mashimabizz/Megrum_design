@@ -4,6 +4,47 @@
 
 ---
 
+## イテレーション1127：home rotary card stageを分離
+
+### 背景・問題意識
+
+`HomeDiscoveryRotaryCard.swift` は、選択index、drag progress、reduce motion対応、アクセシビリティ、表示entry生成、横スワイプ処理を担いながら、`GeometryReader` 内のカードstage描画とgesture組み立ても同じ `body` に抱えていた。選択状態とgesture判定は親に残し、カードstageの描画だけを専用Viewへ分離する。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/HomeDiscoveryRotaryCard.swift`
+- `GeometryReader` / `ZStack` / `ForEach` のstage描画を `HomeDiscoveryRotaryCardStage` 呼び出しへ置き換えた。
+- 既存の `dragGesture(width:)` を `handleDragChanged` / `handleDragEnded` に分け、drag progress更新とsettle判定を親に残した。
+- `visibleEntries`、`relativePosition(for:)`、`conditionTags(for:)`、選択通知、アクセシビリティ文言/操作は維持した。
+
+#### `ios-native/Sources/MegrumApp/HomeDiscoveryRotaryCardStage.swift`
+- `HomeDiscoveryRotaryCardStage` を追加し、stageサイズに応じた `HomeRotaryGoodsStackLayout.cardMetrics` 計算と `HomeDiscoveryRotaryCardItem` 配置を移動した。
+- stage全体の `contentShape` と `highPriorityGesture` を移動し、drag valueとstage widthだけを親へ返すようにした。
+
+### 影響範囲
+
+- Swift Native iOS版ホーム発見カードのロータリー表示。
+- 横スワイプ、side card tap、選択変更通知、表示中カードのcondition tag overlay。
+- 候補生成、排序、カードlayout metrics、スワイプ閾値、アクセシビリティ文言、DB/API、状態名、表示文言は変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumApp/HomeDiscoveryRotaryCard.swift ios-native/Sources/MegrumApp/HomeDiscoveryRotaryCardStage.swift`
+  - passed
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-home-rotary-card-stage`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-home-rotary-card-stage --enable-xctest --disable-swift-testing -j 1 --filter 'HomeDiscoveryMatchPolicyTests|MegrumAppStateTests'`
+  - passed（148 tests）
+
+### セルフレビュー結果
+
+- ✅ `HomeRotaryGoodsStackLayout.cardMetrics`、表示entryの最大3件、zIndex/order、tap position、condition tagの渡し方を維持した。
+- ✅ drag progress更新、横スワイプ判定、predicted translation優先、settle閾値、reduce motion時の挙動は親側に残して変更していない。
+- ✅ `HomeDiscoveryRotaryCard.swift` は217行から201行へ縮小し、stage描画を45行の専用ファイルへ分離した。
+- ✅ 新しい状態名・用語・DB列は追加していないため、`notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション1126：groom story composer step partsを分離
 
 ### 背景・問題意識
