@@ -4,6 +4,44 @@
 
 ---
 
+## イテレーション1094：proposal completion buttonsを分離
+
+### 背景・問題意識
+
+`ProposalCreateCompletionView.swift` は、完了画面本体、完了カード、下部ボタン群、ボタンrole別style resolverを同じファイルに抱えていた。完了画面側をsummary表示と画面構成に集中させるため、下部ボタンstackを専用Viewファイルへ分離する。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/ProposalCreateCompletionView.swift`
+- 完了画面下部のbutton stackを `ProposalCompletionButtonStack` 呼び出しへ置き換えた。
+- summary、completion card、decorative background、検索継続/やりとり表示のaction dispatchは維持した。
+
+#### `ios-native/Sources/MegrumApp/ProposalCompletionButtonStack.swift`
+- `ProposalCompletionButtonStack` を追加した。
+- `ProposalCompletionButtonCopy.buttons` の表示順、role別font/foreground/height/background、secondary border、plain button styleを維持した。
+
+### 影響範囲
+
+- Swift Native iOS版の打診作成完了画面。
+- 完了後の検索継続/やりとり表示action、button copy、button order、送信payload、DB/API、状態名、表示文言は変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumApp/ProposalCreateCompletionView.swift ios-native/Sources/MegrumApp/ProposalCompletionButtonStack.swift`
+  - passed
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-proposal-completion-button-stack`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-proposal-completion-button-stack --enable-xctest --disable-swift-testing -j 1 --filter 'ProposalCreateFlowTests|ProposalCreateSheetTests'`
+  - passed（62 tests）
+
+### セルフレビュー結果
+
+- ✅ button copy、表示順、role別font/foreground/height/background、secondary border、plain button styleを維持した。
+- ✅ `ProposalCreateCompletionView.swift` は 152行から 95行へ縮小し、button stackを 67行の専用ファイルへ分離した。
+- ✅ 新しい状態名・用語・DB列は追加していないため、`notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション1093：proposal step headerを分離
 
 ### 背景・問題意識
