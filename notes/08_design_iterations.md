@@ -4,6 +4,49 @@
 
 ---
 
+## イテレーション946：Supabase auth clientを分割
+
+### 背景・問題意識
+
+`SupabaseAuthClient.swift` は、signIn/refresh/signUp/ID token/signOut/loadUserなどの認証フロー、request生成API、OAuth URL生成、共通HTTP request builder、認証レスポンス処理を1ファイルに持っていた。認証は起動時セッション復元やログイン継続に影響するため、挙動は変えずに通信フロー、request生成、HTTP supportを分け、変更時の確認範囲を狭める。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumData/SupabaseAuthClient.swift`
+- signIn、refreshSession、signUp、ID token sign-in、password reset送信、signOut、redirect session復元、loadUserのフロー処理に絞った。
+- request/support extensionから参照するため、`configuration` / `session` / `decoder` / `encoder` をmodule internalにした。
+- ファイル行数を315行から134行へ縮小した。
+
+#### `ios-native/Sources/MegrumData/SupabaseAuthClientRequests.swift`
+- password sign-in、refresh、sign-up、ID token sign-in、OAuth authorize、password reset、signOut、user取得のrequest生成APIを新規ファイルへ移動した。
+- auth path、grant_type、redirect_to、scope整形、bearer token、payload keyは維持した。
+
+#### `ios-native/Sources/MegrumData/SupabaseAuthClientSupport.swift`
+- `performAuthRequest` と共通 `makeAuthRequest` を新規ファイルへ移動した。
+- apikey/Authorization/Accept/Content-Type header、HTTP status処理、Supabase error message decodeは維持した。
+
+### 影響範囲
+
+- Swift Native iOS版のメールログイン、セッションrefresh、sign-up、ID tokenログイン、Google OAuth、password reset、sign-out、redirect session復元、user取得。
+- 挙動変更ではなく責務分離。認証endpoint、payload key、header、状態名、用語、DBスキーマは変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumData/SupabaseAuthClient.swift ios-native/Sources/MegrumData/SupabaseAuthClientRequests.swift ios-native/Sources/MegrumData/SupabaseAuthClientSupport.swift`
+  - passed
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-auth-client-build --disable-index-store`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-auth-client-tests --disable-index-store --enable-xctest --disable-swift-testing -j 1 --filter SupabaseAuthClientTests`
+  - 12 tests passed
+
+### セルフレビュー結果
+
+- ✅ client本体、request builder、HTTP supportを移動中心で分割した。
+- ✅ 認証request生成、OAuth URL、error decode、refresh session decode、redirect parserの既存テストを通した。
+- ✅ 状態名・用語・DBスキーマの変更はないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション945：Supabase groom clientを分割
 
 ### 背景・問題意識
