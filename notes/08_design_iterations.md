@@ -4,6 +4,43 @@
 
 ---
 
+## イテレーション1078：auth primary action buttonを分離
+
+### 背景・問題意識
+
+`AuthFormComponents.swift` は iter1077 時点で `AuthPrimaryActionButton` だけを持つ汎用名ファイルになっていた。認証フォームのprimary action buttonを責務名の専用ファイルへ移し、今後のinput/feedback系View追加と混ざらない構造にする。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/AuthFormComponents.swift`
+- `AuthPrimaryActionButton` の移動に伴い削除した。
+
+#### `ios-native/Sources/MegrumApp/AuthPrimaryActionButton.swift`
+- `AuthPrimaryActionButton` を追加し、title、loading indicator、action、disabled/opacity、primary gradient backgroundを担当させた。
+- spacing、font、height、corner radius、loading中の表示を維持した。
+
+### 影響範囲
+
+- Swift Native iOS版のメール認証画面とパスワードリセット画面で使うprimary action button。
+- 入力validation、認証状態、feedback表示、ログイン/登録/リセット処理、DB/API、状態名、表示文言は変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumApp/AuthFormComponents.swift ios-native/Sources/MegrumApp/AuthPrimaryActionButton.swift`
+  - passed
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-auth-primary-action-button`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-auth-primary-action-button --enable-xctest --disable-swift-testing -j 1 --filter 'AuthScreenInputTests'`
+  - passed（15 tests）
+
+### セルフレビュー結果
+
+- ✅ `AuthPrimaryActionButton` のtitle、loading indicator、disabled/opacity、gradient、heightを維持した。
+- ✅ `AuthFormComponents.swift` は役割が残らなくなったため削除し、責務名の `AuthPrimaryActionButton.swift` へ分離した。
+- ✅ 新しい状態名・用語・DB列は追加していないため、`notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション1077：auth input rowを分離
 
 ### 背景・問題意識
