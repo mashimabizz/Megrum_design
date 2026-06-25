@@ -37,74 +37,39 @@ struct GroomStoryComposerScreen: View {
             Color.black.ignoresSafeArea()
 
             VStack(spacing: 0) {
-                HStack {
-                    Button("閉じる", systemImage: "xmark", action: closeComposer)
-                        .labelStyle(.iconOnly)
-                        .font(.system(size: 26, weight: .semibold))
-                        .foregroundStyle(.white)
-                        .frame(width: 48, height: 48)
-                    .buttonStyle(.plain)
-
-                    Spacer()
-
-                    Text(hasPhotoDraft ? "投稿前の確認" : "グルームに追加")
-                        .font(.system(size: 20, weight: .heavy, design: .rounded))
-                        .foregroundStyle(.white)
-
-                    Spacer()
-
-                    Color.clear
-                        .frame(width: 48, height: 48)
-                }
-                .padding(.horizontal, 20)
-                .padding(.top, 22)
+                GroomStoryComposerHeader(
+                    hasPhotoDraft: hasPhotoDraft,
+                    onClose: closeComposer
+                )
 
                 ScrollView {
-                    if let draftPhotoData {
-                        GroomStoryFinalLocationStep(
-                            photoData: draftPhotoData,
-                            captionText: $captionText,
-                            selectedCreationCoordinate: $selectedCreationCoordinate,
-                            currentCoordinate: currentCoordinate,
-                            isRequestingLocation: isRequestingLocation,
-                            isCreating: isCreating,
-                            canCreateAtSelectedLocation: canCreateAtSelectedLocation,
-                            onRequestLocation: onRequestLocation,
-                            onOutOfRange: showToast,
-                            onPublish: publishDraftPhoto,
-                            onResetPhotoDraft: resetPhotoDraft
-                        )
-                        .onAppear(perform: seedSelectedCoordinateForFinalStepIfNeeded)
-                    } else {
-                        GroomStoryPhotoSelectionStep(
-                            selectedPhotoItem: $selectedPhotoItem,
-                            isPreparingPhoto: isPreparingPhoto,
-                            isCreating: isCreating,
-                            canUseCamera: canUseCamera,
-                            cameraSubtitle: cameraSubtitle,
-                            onOpenCamera: openCameraIfPossible
-                        )
-                    }
+                    GroomStoryComposerStepContent(
+                        selectedPhotoItem: $selectedPhotoItem,
+                        selectedCreationCoordinate: $selectedCreationCoordinate,
+                        captionText: $captionText,
+                        draftPhotoData: draftPhotoData,
+                        isPreparingPhoto: isPreparingPhoto,
+                        isCreating: isCreating,
+                        canUseCamera: canUseCamera,
+                        cameraSubtitle: cameraSubtitle,
+                        currentCoordinate: currentCoordinate,
+                        isRequestingLocation: isRequestingLocation,
+                        canCreateAtSelectedLocation: canCreateAtSelectedLocation,
+                        onRequestLocation: onRequestLocation,
+                        onOpenCamera: openCameraIfPossible,
+                        onOutOfRange: showToast,
+                        onPublish: publishDraftPhoto,
+                        onResetPhotoDraft: resetPhotoDraft,
+                        onPrepareFinalStep: seedSelectedCoordinateForFinalStepIfNeeded
+                    )
                 }
 
                 Spacer()
 
-                Text("投稿したグルームは近くの人にだけ表示されます。正確な位置は表示しません。")
-                    .font(.system(size: 12, weight: .bold, design: .rounded))
-                    .foregroundStyle(.white.opacity(0.62))
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal, 34)
-                    .padding(.bottom, 24)
+                GroomStoryComposerPrivacyFooter()
             }
 
-            if let toastMessage {
-                VStack {
-                    Spacer()
-                    MeguriToastView(message: toastMessage)
-                        .padding(.bottom, 92)
-                }
-                .transition(.move(edge: .bottom).combined(with: .opacity))
-            }
+            GroomStoryComposerToastOverlay(message: toastMessage)
         }
         .onAppear(perform: seedSelectedCoordinateForFinalStepIfNeeded)
         .onChange(of: currentCoordinate) { _, _ in

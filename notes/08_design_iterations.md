@@ -4,6 +4,49 @@
 
 ---
 
+## イテレーション1125：groom story composer chromeを分離
+
+### 背景・問題意識
+
+`GroomStoryComposerViews.swift` は、写真選択/投稿確認のstate、位置作成範囲チェック、投稿実行、toast制御を持ちながら、閉じるheader、写真選択/最終確認stepの分岐、下部privacy footer、toast overlayの描画も同じ `body` に抱えていた。親画面を投稿stateと副作用に寄せ、画面chromeとstep表示を専用Viewへ分離する。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/GroomStoryComposerViews.swift`
+- 閉じるheaderを `GroomStoryComposerHeader` 呼び出しへ置き換えた。
+- 写真選択/最終確認stepの分岐を `GroomStoryComposerStepContent` 呼び出しへ置き換えた。
+- 下部privacy footerとtoast overlayを `GroomStoryComposerPrivacyFooter` / `GroomStoryComposerToastOverlay` 呼び出しへ置き換えた。
+- caption state、写真draft reset、投稿実行、位置範囲validation、toast timer、dismiss処理は親画面に残した。
+
+#### `ios-native/Sources/MegrumApp/GroomStoryComposerChromeViews.swift`
+- `GroomStoryComposerHeader` を追加し、閉じるbuttonと画面titleを移動した。
+- `GroomStoryComposerStepContent` を追加し、写真選択stepと最終位置確認stepの切り替えを移動した。
+- `GroomStoryComposerPrivacyFooter` / `GroomStoryComposerToastOverlay` を追加し、下部注意文とtoast表示を移動した。
+
+### 影響範囲
+
+- Swift Native iOS版めぐりのグルーム投稿composer。
+- 写真選択step、投稿前確認step、現在地/作成場所確認、toast表示、閉じる導線。
+- 投稿payload、画像content type、位置範囲判定、toast文言、dismiss順序、DB/API、状態名、表示文言は変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumApp/GroomStoryComposerViews.swift ios-native/Sources/MegrumApp/GroomStoryComposerChromeViews.swift`
+  - passed
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-groom-story-composer-chrome`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-groom-story-composer-chrome --enable-xctest --disable-swift-testing -j 1 --filter 'GroomInteractionStateReducerTests|MeguriFeedStateReducerTests|ReplyThreadStateReducerTests|MeguriAccessPolicyTests|MegrumAppStateTests|SupabaseGroomClientTests'`
+  - passed（106 tests）
+
+### セルフレビュー結果
+
+- ✅ 閉じるbutton、title、写真選択step、投稿前確認step、privacy footer、toast overlay、余白、文字サイズを維持した。
+- ✅ `publishDraftPhoto()`、`resetPhotoDraft()`、`openCameraIfPossible()`、位置範囲validation、toast timer、`dismiss()` 順序は変更していない。
+- ✅ `GroomStoryComposerViews.swift` は208行から173行へ縮小し、画面chrome/step表示を107行の専用ファイルへ分離した。
+- ✅ 新しい状態名・用語・DB列は追加していないため、`notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション1124：board thread detail card partsを分離
 
 ### 背景・問題意識
