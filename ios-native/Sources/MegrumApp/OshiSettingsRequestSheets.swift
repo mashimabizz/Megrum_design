@@ -32,74 +32,14 @@ struct OshiRequestSheet: View {
     }
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 18) {
-                HStack(alignment: .center, spacing: 12) {
-                    VStack(alignment: .leading, spacing: 0) {
-                        Text("推し追加リクエスト")
-                            .font(.system(size: 22, weight: .black, design: .rounded))
-                            .foregroundStyle(MegrumTheme.ink)
-                    }
-                    Spacer()
-                    Button(action: onClose) {
-                        Image(systemName: "xmark")
-                            .font(.system(size: 20, weight: .black, design: .rounded))
-                            .foregroundStyle(MegrumTheme.muted)
-                            .frame(width: 48, height: 48)
-                            .background(.black.opacity(0.04), in: Circle())
-                    }
-                    .buttonStyle(.plain)
-                }
-
-                TextField("グループ・作品名", text: $name)
-                    .font(.system(size: 16, weight: .black, design: .rounded))
-                    .padding(.horizontal, 16)
-                    .frame(height: 66)
-                    .background(.white.opacity(0.94), in: RoundedRectangle(cornerRadius: 24, style: .continuous))
-                    .overlay {
-                        RoundedRectangle(cornerRadius: 24, style: .continuous)
-                            .strokeBorder(.black.opacity(0.08), lineWidth: 1)
-                    }
-
-                WrappingTagFlow(spacing: 9, rowSpacing: 9) {
-                    ForEach(OshiRequestKind.allCases) { option in
-                        OshiFilterChip(title: option.displayName, isSelected: kind == option) {
-                            kind = option
-                        }
-                    }
-                }
-
-                VStack(alignment: .leading, spacing: 10) {
-                    Text("ジャンル")
-                        .font(.system(size: 14, weight: .black, design: .rounded))
-                        .foregroundStyle(MegrumTheme.muted)
-
-                    WrappingTagFlow(spacing: 9, rowSpacing: 9) {
-                        OshiFilterChip(title: "ジャンル未選択", isSelected: genreID == nil) {
-                            genreID = nil
-                        }
-                        ForEach(genres) { genre in
-                            OshiFilterChip(title: genre.name, isSelected: genreID == genre.id) {
-                                genreID = genre.id
-                            }
-                        }
-                    }
-                }
-
-                TextField("補足（任意）", text: $note, axis: .vertical)
-                    .font(.system(size: 16, weight: .black, design: .rounded))
-                    .lineLimit(4, reservesSpace: true)
-                    .padding(16)
-                    .background(.white.opacity(0.94), in: RoundedRectangle(cornerRadius: 24, style: .continuous))
-                    .overlay {
-                        RoundedRectangle(cornerRadius: 24, style: .continuous)
-                            .strokeBorder(.black.opacity(0.08), lineWidth: 1)
-                    }
-            }
-            .padding(.horizontal, 18)
-            .padding(.top, 26)
-            .padding(.bottom, OshiRequestSheetLayoutMetrics.scrollBottomPadding)
-        }
+        OshiRequestSheetContent(
+            name: $name,
+            note: $note,
+            kind: $kind,
+            genreID: $genreID,
+            genres: genres,
+            onClose: onClose
+        )
         .safeAreaInset(edge: .bottom) {
             OshiRequestSubmitFooter(
                 canSubmit: canSubmit,
@@ -146,52 +86,12 @@ struct OshiMemberRequestSheet: View {
     }
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 18) {
-                HStack(alignment: .center, spacing: 12) {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(OshiSettingsPresentationText.memberRequestSheetTitle)
-                            .font(.system(size: 22, weight: .black, design: .rounded))
-                            .foregroundStyle(MegrumTheme.ink)
-                        Text(context.groupName)
-                            .font(.system(size: 13, weight: .black, design: .rounded))
-                            .foregroundStyle(MegrumTheme.lavender)
-                    }
-                    Spacer()
-                    Button(action: onClose) {
-                        Image(systemName: "xmark")
-                            .font(.system(size: 20, weight: .black, design: .rounded))
-                            .foregroundStyle(MegrumTheme.muted)
-                            .frame(width: 48, height: 48)
-                            .background(.black.opacity(0.04), in: Circle())
-                    }
-                    .buttonStyle(.plain)
-                }
-
-                TextField(OshiSettingsPresentationText.memberRequestPlaceholder, text: $name)
-                    .font(.system(size: 16, weight: .black, design: .rounded))
-                    .padding(.horizontal, 16)
-                    .frame(height: 66)
-                    .background(.white.opacity(0.94), in: RoundedRectangle(cornerRadius: 24, style: .continuous))
-                    .overlay {
-                        RoundedRectangle(cornerRadius: 24, style: .continuous)
-                            .strokeBorder(.black.opacity(0.08), lineWidth: 1)
-                    }
-
-                TextField("補足（任意）", text: $note, axis: .vertical)
-                    .font(.system(size: 16, weight: .black, design: .rounded))
-                    .lineLimit(4, reservesSpace: true)
-                    .padding(16)
-                    .background(.white.opacity(0.94), in: RoundedRectangle(cornerRadius: 24, style: .continuous))
-                    .overlay {
-                        RoundedRectangle(cornerRadius: 24, style: .continuous)
-                            .strokeBorder(.black.opacity(0.08), lineWidth: 1)
-                    }
-            }
-            .padding(.horizontal, 18)
-            .padding(.top, 26)
-            .padding(.bottom, OshiRequestSheetLayoutMetrics.scrollBottomPadding)
-        }
+        OshiMemberRequestSheetContent(
+            context: context,
+            name: $name,
+            note: $note,
+            onClose: onClose
+        )
         .safeAreaInset(edge: .bottom) {
             OshiRequestSubmitFooter(
                 canSubmit: canSubmit,

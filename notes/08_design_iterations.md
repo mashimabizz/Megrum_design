@@ -4,6 +4,48 @@
 
 ---
 
+## イテレーション1121：oshi request sheet contentを分離
+
+### 背景・問題意識
+
+`OshiSettingsRequestSheets.swift` は、推し追加リクエストとメンバー追加リクエストの2つのsheetで、入力state、submit payload生成、ScrollView本文、header、名前入力、補足入力の描画を同じファイルに抱えていた。親sheetを入力stateとsubmitに寄せ、本文表示と重複するUI部品を専用Viewへ分離する。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/OshiSettingsRequestSheets.swift`
+- `OshiRequestSheet` のScrollView本文を `OshiRequestSheetContent` 呼び出しへ置き換えた。
+- `OshiMemberRequestSheet` のScrollView本文を `OshiMemberRequestSheetContent` 呼び出しへ置き換えた。
+- `safeAreaInset` のsubmit footer、keyboard dismiss、背景、submit payload生成は親sheetに残した。
+
+#### `ios-native/Sources/MegrumApp/OshiRequestSheetContent.swift`
+- `OshiRequestSheetContent` と `OshiMemberRequestSheetContent` を追加した。
+- 推し追加リクエストの種類chip、ジャンルchip、名前入力、補足入力を移動した。
+- 共通のscroll padding、header、close button、名前入力field、補足入力fieldをprivate小部品へ分離した。
+
+### 影響範囲
+
+- Swift Native iOS版の推し追加リクエストsheetとメンバー追加リクエストsheet。
+- 推し設定画面、グッズ登録中の推し追加リクエスト、個別募集編集からの推し追加リクエスト。
+- submit payload、入力validation、footer metrics、推し保存処理、DB/API、状態名、表示文言は変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumApp/OshiSettingsRequestSheets.swift ios-native/Sources/MegrumApp/OshiRequestSheetContent.swift`
+  - passed
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-oshi-request-content`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-oshi-request-content --enable-xctest --disable-swift-testing -j 1 --filter 'OshiSettingsDraftTests|GoodsEditorDraftTests|MegrumAppStateTests'`
+  - passed（120 tests）
+
+### セルフレビュー結果
+
+- ✅ 推し追加リクエストのtitle、種類chip、ジャンルchip、名前入力、補足入力、close button、submit footer、背景を維持した。
+- ✅ メンバー追加リクエストのtitle、group name、placeholder、補足入力、close button、submit footer、背景を維持した。
+- ✅ `OshiSettingsRequestSheets.swift` は213行から113行へ縮小し、本文表示と共通UI部品を153行の専用ファイルへ分離した。
+- ✅ 新しい状態名・用語・DB列は追加していないため、`notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション1120：dispute detail contentを分離
 
 ### 背景・問題意識
