@@ -4,6 +4,44 @@
 
 ---
 
+## イテレーション1026：個人schedule画面を分割
+
+### 背景・問題意識
+
+`TradeScheduleViews.swift` は、プロフィール/ドロワーから開く個人スケジュール画面と、取引詳細から開く取引スケジュールsheetを同じファイルに抱えていた。2つの画面は参照元も読み込み先も分かれているため、個人スケジュール画面を専用ファイルへ移し、取引schedule側の変更と個人schedule側の変更を分けて扱えるようにした。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/TradeScheduleViews.swift`
+- `TradeScheduleSheet` を既存ファイルに残した。
+- `PersonalScheduleScreen` を専用ファイルへ委譲した。
+
+#### `ios-native/Sources/MegrumApp/PersonalScheduleScreen.swift`
+- `PersonalScheduleScreen` を移動した。
+- 表示mode、anchor date、予定追加sheet、戻るbutton、前後移動button、5日表示、月表示、個人スケジュール読み込みtaskは既存どおり維持した。
+
+### 影響範囲
+
+- Swift Native iOS版のプロフィール/ドロワーから開く個人スケジュール画面。
+- 取引詳細の `TradeScheduleSheet`。
+- スケジュール取得、保存、予定window計算、状態名、用語、DBスキーマ、表示文言は変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumApp/TradeScheduleViews.swift ios-native/Sources/MegrumApp/PersonalScheduleScreen.swift`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-personal-schedule-screen --enable-xctest --disable-swift-testing -j 1 --filter 'TradeScheduleCalendarWindowTests|MegrumAppStateTests/testAppStateLoadsPreviewTradeSchedules'`
+  - passed（4 tests）
+
+### セルフレビュー結果
+
+- ✅ `PersonalScheduleScreen` は移動のみで、toolbar、sheet、読み込みtask、5日/月表示を維持した。
+- ✅ `TradeScheduleSheet` は元ファイルに残し、取引詳細からの参照と取引別schedule読み込みを維持した。
+- ✅ `TradeScheduleViews.swift` は 273行から 140行へ縮小し、個人schedule画面を 137行の専用ファイルへ分離した。
+- ✅ 新しい状態名・用語・DB列は追加していないため、`notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション1025：打診作成schedule月gridを分割
 
 ### 背景・問題意識

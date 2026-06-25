@@ -3,10 +3,9 @@ import MegrumCore
 import MegrumDesign
 import SwiftUI
 
-struct TradeScheduleSheet: View {
+struct PersonalScheduleScreen: View {
     @ObservedObject var appState: MegrumAppState
-    var proposal: TradeProposal
-    @Environment(\.dismiss) private var dismiss
+    var onClose: (() -> Void)?
     @State private var mode: TradeScheduleCalendarMode = .fiveDays
     @State private var anchorDate = Date()
     @State private var isShowingScheduleEditor = false
@@ -25,14 +24,6 @@ struct TradeScheduleSheet: View {
         calendarWindow.reloadKey
     }
 
-    private var schedules: [PersonalSchedule] {
-        appState.schedules(for: proposal.id)
-    }
-
-    private var viewerID: UUID? {
-        appState.viewer?.id
-    }
-
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
@@ -43,9 +34,7 @@ struct TradeScheduleSheet: View {
                 }
                 .pickerStyle(.segmented)
 
-                ScheduleLegend()
-
-                if appState.loadingSchedulesProposalID == proposal.id {
+                if appState.isLoadingPersonalSchedules {
                     ScheduleLoadingNotice()
                 }
 
@@ -64,14 +53,22 @@ struct TradeScheduleSheet: View {
         .navigationTitle("スケジュール")
         .megrumInlineNavigationTitle()
         .task(id: reloadKey) {
-            await appState.loadSchedules(for: proposal, startAt: visibleInterval.start, endAt: visibleInterval.end)
+            await appState.loadPersonalSchedules(startAt: visibleInterval.start, endAt: visibleInterval.end)
         }
         .toolbar {
+            if let onClose {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("戻る") {
+                        onClose()
+                    }
+                }
+            }
+
             ToolbarItem(placement: .primaryAction) {
                 Button {
                     isShowingScheduleEditor = true
                 } label: {
-                    Label("更新", systemImage: "plus")
+                    Label("追加", systemImage: "plus")
                 }
                 .accessibilityLabel("自分のスケジュールを追加")
             }
@@ -98,7 +95,7 @@ struct TradeScheduleSheet: View {
             NavigationStack {
                 ScheduleEditorSheet(
                     appState: appState,
-                    proposal: proposal,
+                    proposal: nil,
                     defaultDate: anchorDate
                 )
             }
@@ -112,7 +109,7 @@ struct TradeScheduleSheet: View {
                 ScheduleDayCard(
                     day: day,
                     schedules: schedules(on: day),
-                    viewerID: viewerID
+                    viewerID: appState.viewer?.id
                 )
             }
         }
@@ -123,7 +120,7 @@ struct TradeScheduleSheet: View {
             monthTitle: calendarWindow.monthTitle,
             monthGridDays: calendarWindow.monthGridDays,
             calendar: calendar,
-            viewerID: viewerID,
+            viewerID: appState.viewer?.id,
             schedulesForDay: schedules(on:),
             onPreviousMonth: { moveAnchor(by: -1) },
             onNextMonth: { moveAnchor(by: 1) }
@@ -131,7 +128,7 @@ struct TradeScheduleSheet: View {
     }
 
     private func schedules(on day: Date) -> [PersonalSchedule] {
-        calendarWindow.schedules(on: day, from: schedules)
+        calendarWindow.schedules(on: day, from: appState.personalSchedules)
     }
 
     private func moveAnchor(by value: Int) {
