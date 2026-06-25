@@ -4,6 +4,44 @@
 
 ---
 
+## イテレーション1040：めぐりboard thread row viewsを分割
+
+### 背景・問題意識
+
+`MeguriBoardThreadListViews.swift` は、読み込み/空/list状態の分岐と、thread row、thumbnail、avatar stack、empty state、tag title判定を同じファイルに抱えていた。list state本体は表示状態の分岐に集中させ、row内の見た目と補助表示を専用ファイルへ分けた。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/MeguriBoardThreadListViews.swift`
+- `MeguriBoardThreadListState` を既存ファイルに残した。
+- thread row、thumbnail、avatar stack、inline empty state、tag title判定を専用ファイルへ委譲した。
+
+#### `ios-native/Sources/MegrumApp/MeguriBoardThreadRowViews.swift`
+- `MeguriThreadListRow`、`MeguriThreadThumbnail`、`MeguriBoardAvatarStack`、`MeguriInlineEmptyState` を追加した。
+- 既存のrow高さ、spacing、font、reply count、tag pill、fallback thumbnail、avatar stack表示を維持した。
+
+### 影響範囲
+
+- Swift Native iOS版のめぐり掲示板thread list。
+- thread row、thumbnail、avatar stack、空状態表示。
+- listの読み込み/空/list分岐、thread tap callback、reply count、状態名、用語、DBスキーマ、表示文言は変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumApp/MeguriBoardThreadListViews.swift ios-native/Sources/MegrumApp/MeguriBoardThreadRowViews.swift`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-meguri-board-thread-row --enable-xctest --disable-swift-testing -j 1 --filter MeguriFeedStateReducerTests`
+  - passed（3 tests）
+
+### セルフレビュー結果
+
+- ✅ `MeguriBoardThreadListState` の loading / empty / list 分岐と `onOpenThread` callbackは変更していない。
+- ✅ row表示は移動のみで、thumbnail fallback、avatar stack、reply count、tag pill、chevron表示を維持した。
+- ✅ `MeguriBoardThreadListViews.swift` は 259行から 44行へ縮小し、row表示を 218行の専用ファイルへ分離した。
+- ✅ 新しい状態名・用語・DB列は追加していないため、`notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション1039：グルームarchive chrome viewsを分割
 
 ### 背景・問題意識
