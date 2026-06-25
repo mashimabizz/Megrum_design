@@ -4,6 +4,44 @@
 
 ---
 
+## イテレーション1016：交換条件カレンダーの日付セルを分割
+
+### 背景・問題意識
+
+`HomeExchangeSettingsCalendarViews.swift` は、月移動、drag選択、legend計算、都道府県メニュー、日付セル、選択背景shapeを1ファイルに抱えていた。カレンダー本体の状態処理と、日付セルの見た目を分けることで、日付表示だけを調整する変更を小さく安全にできるようにした。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/HomeExchangeSettingsCalendarViews.swift`
+- `HomeExchangeSettingsCalendarCard`、drag選択policy/resolver、都道府県メニューを既存ファイルに残した。
+- 日付セルと選択背景shapeを専用Viewファイルへ移動した。
+
+#### `ios-native/Sources/MegrumApp/HomeExchangeCalendarDayCellViews.swift`
+- `HomeExchangeCalendarDayCell`、`HomeExchangeCalendarSelectionConnection`、`HomeExchangeCalendarSelectionBackgroundShape` を移動した。
+- 選択状態、都道府県短縮表示、アクセシビリティ文言、連続選択背景の角丸制御は既存どおり維持した。
+
+### 影響範囲
+
+- Swift Native iOS版の交換条件設定カレンダー。
+- 現地交換日程の選択状態表示、日付セルのアクセシビリティ、横drag選択時の連続背景表示。
+- 状態名、用語、DBスキーマ、表示文言は変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumApp/HomeExchangeSettingsCalendarViews.swift ios-native/Sources/MegrumApp/HomeExchangeCalendarDayCellViews.swift`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-exchange-calendar-cell --enable-xctest --disable-swift-testing -j 1 --filter HomeExchangeSettingsScreenTests`
+  - passed（4 tests）
+
+### セルフレビュー結果
+
+- ✅ カレンダー本体の月移動、drag選択、legend計算、都道府県メニューは変更していない。
+- ✅ 日付セルの表示、選択背景、短縮都道府県ラベル、アクセシビリティ文言は移動のみで維持した。
+- ✅ `HomeExchangeSettingsCalendarViews.swift` は 489行から 369行へ縮小し、日付セル表示を 122行の専用ファイルへ分離した。
+- ✅ 新しい状態名・用語・DB列は追加していないため、`notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション1015：ホームgoods artworkのplaceholder描画を分割
 
 ### 背景・問題意識
