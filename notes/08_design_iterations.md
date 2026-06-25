@@ -4,6 +4,46 @@
 
 ---
 
+## イテレーション1010：個別募集Hit選択contextを変換責務別に分割
+
+### 背景・問題意識
+
+`HomeGoodsHitDetailSelectionContext.swift` は、個別募集Hit detail の選択状態だけでなく、受け取るgoods変換、wanted option preview生成、offer goods絞り込み、打診payload生成まで抱えていた。前回までに個別募集詳細ポップアップと個別募集マッチ判定を分けたので、同じ周辺の選択contextも挙動を変えずに責務を分け、今後の打診開始条件やpreview表示の調整を小さく触れるようにした。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/HomeGoodsHitDetailSelectionContext.swift`
+- 既存の公開computed propertyと `proposalSelection()` を維持しつつ、goods変換と打診payload生成を専用helperへ委譲した。
+- 選択状態、必要個数、開始可否、初期選択indexの判定はcontext本体に残した。
+
+#### `ios-native/Sources/MegrumApp/HomeGoodsHitDetailGoodsResolver.swift`
+- 受け取るgoodsの展開、wanted option preview goods生成、offer goodsの並び替え/絞り込み、preview goods pool生成を集約した。
+
+#### `ios-native/Sources/MegrumApp/HomeGoodsHitProposalSelectionBuilder.swift`
+- 選択済み受け取りgoods、提示goods、金額条件から `HomeDiscoveryProposalSelection` を作る処理を分離した。
+
+### 影響範囲
+
+- Swift Native iOS版ホーム候補の個別募集Hit detail sheet。
+- 個別募集Hitから打診へ進む時の選択状態、preview表示、proposal selection生成。
+- 状態名、用語、DBスキーマ、表示文言は変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumApp/HomeGoodsHitDetailSelectionContext.swift ios-native/Sources/MegrumApp/HomeGoodsHitDetailGoodsResolver.swift ios-native/Sources/MegrumApp/HomeGoodsHitProposalSelectionBuilder.swift`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-goods-hit-selection --enable-xctest --disable-swift-testing -j 1 --filter HomeDiscoveryMatchPolicyTests`
+  - passed（69 tests）
+
+### セルフレビュー結果
+
+- ✅ `HomeGoodsHitDetailSelectionContext` の既存computed property名と `proposalSelection()` は維持した。
+- ✅ 受け取るgoodsのowner情報引き継ぎ、wanted option preview fallback、金額条件のproposal生成は既存コードのまま移動した。
+- ✅ 個別募集Hitの選択状態、開始可否、preview、proposal route周辺を既存テストで確認した。
+- ✅ 新しい状態名・用語・DB列は追加していないため、`notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション1009：個別募集詳細ポップアップの左右パネルを分割
 
 ### 背景・問題意識

@@ -19,36 +19,7 @@ struct HomeGoodsHitDetailSelectionContext {
     }
 
     var receiveGoods: [HomeMockGoods] {
-        let offeredItems = selection.individualListingSelection.detail?.offeredItems ?? []
-        let mappedGoods = offeredItems.enumerated().map { index, item in
-            if item.id == selection.goods.id {
-                return selection.goods
-            }
-            let ownerID = selection.goods.ownerID ?? HomeDiscoveryFixtures.ownerID
-            return HomeMockGoods.from(
-                item: GoodsItem(
-                    id: item.id,
-                    ownerID: ownerID,
-                    title: item.title,
-                    imageURL: item.imageURL,
-                    quantity: item.quantity,
-                    ownerPrefecture: selection.goods.ownerPrefecture,
-                    ownerDisplayName: selection.goods.ownerDisplayName,
-                    ownerHandle: selection.goods.ownerHandle,
-                    ownerAvatarURL: selection.goods.ownerAvatarURL,
-                    ownerGender: selection.goods.ownerGender,
-                    ownerAge: selection.goods.ownerAge,
-                    ownerAverageStars: selection.goods.ownerAverageStars,
-                    ownerEvaluationCount: selection.goods.ownerEvaluationCount,
-                    ownerCompletedTradeCount: selection.goods.ownerCompletedTradeCount,
-                    ownerPaymentMethods: selection.goods.ownerPaymentMethods,
-                    ownerPaymentNote: selection.goods.ownerPaymentNote
-                ),
-                index: index,
-                goodsTypes: []
-            )
-        }
-        return mappedGoods.isEmpty ? [selection.goods] : mappedGoods
+        HomeGoodsHitDetailGoodsResolver.receiveGoods(selection: selection)
     }
 
     var usesListingWantedOptions: Bool {
@@ -64,29 +35,11 @@ struct HomeGoodsHitDetailSelectionContext {
     }
 
     var wantedOptionPreviewGoods: [HomeMockGoods] {
-        guard usesListingWantedOptions, let option = displayedWantedOption else {
-            return []
-        }
-        let previewGoods = option.previewItems.enumerated().map { index, item in
-            HomeMockGoods.from(
-                wantedPreviewItem: item,
-                index: index,
-                subtitle: option.subtitle ?? option.title
-            )
-        }
-        if !previewGoods.isEmpty {
-            return previewGoods
-        }
-
-        let preferredIDs = option.matchingGoodsIDs + option.goodsIDs
-        let goodsPool = wantedOptionPreviewGoodsPool
-        var seen: Set<UUID> = []
-        return preferredIDs.compactMap { id in
-            guard seen.insert(id).inserted else {
-                return nil
-            }
-            return goodsPool.first { $0.id == id }
-        }
+        HomeGoodsHitDetailGoodsResolver.wantedOptionPreviewGoods(
+            option: displayedWantedOption,
+            usesListingWantedOptions: usesListingWantedOptions,
+            goodsPool: wantedOptionPreviewGoodsPool
+        )
     }
 
     var selectedWantedOptionPreviewIndices: Set<Int> {
@@ -107,21 +60,18 @@ struct HomeGoodsHitDetailSelectionContext {
     }
 
     var allOfferGoods: [HomeMockGoods] {
-        HomeOfferGoodsOrdering.ordered(
-            viewerOfferGoods.isEmpty ? HomeDiscoveryFixtures.offerGoods : viewerOfferGoods,
+        HomeGoodsHitDetailGoodsResolver.allOfferGoods(
+            viewerOfferGoods: viewerOfferGoods,
             preferredOfferGoodsID: selection.preferredOfferGoodsID
         )
     }
 
     var offerGoods: [HomeMockGoods] {
-        guard usesListingWantedOptions else {
-            return allOfferGoods
-        }
-        let matchingIDs = Set(selectedWantedOptions.flatMap(\.matchingGoodsIDs))
-        guard !matchingIDs.isEmpty else {
-            return []
-        }
-        return allOfferGoods.filter { matchingIDs.contains($0.id) }
+        HomeGoodsHitDetailGoodsResolver.offerGoods(
+            usesListingWantedOptions: usesListingWantedOptions,
+            allOfferGoods: allOfferGoods,
+            selectedWantedOptions: selectedWantedOptions
+        )
     }
 
     var wantedLogic: ListingLogic {
@@ -270,52 +220,21 @@ struct HomeGoodsHitDetailSelectionContext {
     }
 
     func proposalSelection() -> HomeDiscoveryProposalSelection? {
-        let receiverGoodsCandidates = selectedReceiveGoods.isEmpty ? [selection.goods] : selectedReceiveGoods
-        guard let primaryReceiverGoods = receiverGoodsCandidates.first else {
-            return nil
-        }
-
-        if let cashAmountValue {
-            return HomeDiscoveryProposalSelection(
-                receiverGoodsID: primaryReceiverGoods.id,
-                receiverGoodsIDs: receiverGoodsCandidates.map(\.id),
-                senderGoodsIDs: [],
-                matchType: .perfect,
-                receiverGoods: primaryReceiverGoods,
-                senderGoods: [],
-                exchangeMethod: selection.signals.preferredProposalExchangeMethod,
-                cashAmount: cashAmountValue
-            )
-        }
-
-        let senderGoods = selectionState.selectedOfferIndices
-            .sorted()
-            .compactMap { index in
-                offerGoods.indices.contains(index) ? offerGoods[index] : nil
-            }
-        guard !senderGoods.isEmpty else {
-            return nil
-        }
-        return HomeDiscoveryProposalSelection(
-            receiverGoodsID: primaryReceiverGoods.id,
-            receiverGoodsIDs: receiverGoodsCandidates.map(\.id),
-            senderGoodsIDs: senderGoods.map(\.id),
-            matchType: .perfect,
-            receiverGoods: primaryReceiverGoods,
-            senderGoods: senderGoods,
-            exchangeMethod: selection.signals.preferredProposalExchangeMethod,
-            cashAmount: nil
+        HomeGoodsHitProposalSelectionBuilder.proposalSelection(
+            selection: selection,
+            selectedReceiveGoods: selectedReceiveGoods,
+            selectedOfferIndices: selectionState.selectedOfferIndices,
+            offerGoods: offerGoods,
+            cashAmountValue: cashAmountValue
         )
     }
 
     private var wantedOptionPreviewGoodsPool: [HomeMockGoods] {
-        HomeListingWantedOptionPreviewPolicy.uniqueGoodsPool([
-            allOfferGoods,
-            wantedGoods,
-            HomeDiscoveryFixtures.offerGoods,
-            HomeDiscoveryFixtures.wantedGoods,
-            [selection.goods]
-        ])
+        HomeGoodsHitDetailGoodsResolver.wantedOptionPreviewGoodsPool(
+            allOfferGoods: allOfferGoods,
+            wantedGoods: wantedGoods,
+            selectedGoods: selection.goods
+        )
     }
 
     private var preferredReceiveIndex: Int? {
