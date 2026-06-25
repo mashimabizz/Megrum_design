@@ -4,6 +4,50 @@
 
 ---
 
+## イテレーション959：Own profile modelsを分割
+
+### 背景・問題意識
+
+`OwnProfileModels.swift` は、自分プロフィールの表示サマリ、推しタグ表示、編集ドラフト、バリデーション、アイコンアップロード検証、関連private extensionを1ファイルに持っていた。プロフィール画面は表示・編集・保存payload・AppState更新にまたがるため、表示用モデルと編集用モデルを分け、変更時の確認範囲を狭める。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/OwnProfileSummary.swift`
+- `OwnProfileSummary` と、表示用の `UserGender` / `UserProfile` / `ProposalStatus` private extensionを新規ファイルへ移動した。
+
+#### `ios-native/Sources/MegrumApp/OwnProfileOshiTagPresentation.swift`
+- `OwnProfileOshiTagPresentation` を新規ファイルへ移動した。
+
+#### `ios-native/Sources/MegrumApp/OwnProfileEditDraft.swift`
+- `OwnProfileEditDraft` と `ownProfileAvatarUploadError` を新規ファイルへ移動した。
+- 入力正規化、支払い方法順序、アイコンupload/削除状態、validation forwardingは維持した。
+
+#### `ios-native/Sources/MegrumApp/OwnProfileEditValidation.swift`
+- `OwnProfileEditValidation` と都道府県リストを新規ファイルへ移動した。
+
+#### `ios-native/Sources/MegrumApp/OwnProfileModels.swift`
+- 上記4ファイルへ分割したため削除した。
+
+### 影響範囲
+
+- Swift Native iOS版の自分プロフィール画面、プロフィール編集、アイコンアップロード/削除、支払い方法表示、推しタグ表示、Supabaseプロフィール保存fallback。
+- 挙動変更ではなく責務分離。表示文言、入力正規化、validation、保存payload、状態名、用語、DBスキーマは変更しない。
+
+### 確認方法
+
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-own-profile-models-build --disable-index-store`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-own-profile-models-build --disable-index-store --enable-xctest --disable-swift-testing -j 1 --filter 'OwnProfileScreenTests|OwnProfileSummaryTests|SupabaseAccountProfilePersistenceTests|SupabaseUserProfilePersistenceModelsTests|MegrumAppStateTests|PublicUserProfileScreenTests'`
+  - 115 tests passed
+
+### セルフレビュー結果
+
+- ✅ 表示サマリ、推しタグ、編集ドラフト、validationを分け、公開APIと表示/保存挙動を維持した。
+- ✅ 自分プロフィール、公開プロフィール、AppState、Supabase profile persistenceの対象テストを通した。
+- ✅ 状態名・用語・DBスキーマの変更はないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション958：Proposal meetup candidate pickerを分割
 
 ### 背景・問題意識
