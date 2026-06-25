@@ -4,6 +4,44 @@
 
 ---
 
+## イテレーション1032：取引card read state styleを分割
+
+### 背景・問題意識
+
+`TradeCardComponents.swift` は、取引カードの表示部品と `TradeCardReadState` の色・font weight・背景有無の拡張を同じファイルに抱えていた。read state の見た目ルールはカード部品から独立した presentation style なので、専用ファイルへ切り出し、カード構造と状態styleを分けて追えるようにした。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/TradeCardComponents.swift`
+- `TradeCardExclusivePressModifier`、`TradeSelectionIndicator`、`TradeCardHeader`、`TradeReadStateLabel`、`TradePartnerAvatar`、`TradeDetailLink`、`TradeMeetupSummaryLine`、`TradeCardDivider` を既存ファイルに残した。
+- `TradeCardReadState` のstyle拡張を専用ファイルへ委譲した。
+
+#### `ios-native/Sources/MegrumApp/TradeCardReadStateStyle.swift`
+- `showsStateBackground`、`stateBackgroundColor`、`stateBorderColor`、`stateColor`、`handleColor`、`stateWeight`、`handleWeight` を移動した。
+- 未開封/開封済み/返信待ちごとの色、背景、font weight は既存どおり維持した。
+
+### 影響範囲
+
+- Swift Native iOS版の取引一覧カード。
+- 取引カードのread state label、handle、avatar、詳細link、区切り線表示。
+- read state判定、取引一覧filter、tap/long press処理、状態名、用語、DBスキーマ、表示文言は変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumApp/TradeCardComponents.swift ios-native/Sources/MegrumApp/TradeCardReadStateStyle.swift`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-trade-card-read-state-style --enable-xctest --disable-swift-testing -j 1 --filter 'TradeChatAffordanceTests/testTradeCardPresentation'`
+  - passed（5 tests）
+
+### セルフレビュー結果
+
+- ✅ `TradeCardReadState` のstyle拡張は移動のみで、各状態の色、背景、font weightを維持した。
+- ✅ `TradeCardHeader`、avatar、detail link、meetup line、divider、exclusive tap/long press処理は変更していない。
+- ✅ `TradeCardComponents.swift` は 240行から 163行へ縮小し、read state styleを 79行の専用ファイルへ分離した。
+- ✅ 新しい状態名・用語・DB列は追加していないため、`notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション1031：ホームrotary card itemを分割
 
 ### 背景・問題意識
