@@ -4,6 +4,44 @@
 
 ---
 
+## イテレーション1015：ホームgoods artworkのplaceholder描画を分割
+
+### 背景・問題意識
+
+`HomeGoodsArtworkViews.swift` は、実画像表示のfallbackと、portrait / badge / stand / keychain / plush のplaceholder形状描画を同じ `HomeGoodsArtwork` に抱えていた。goods artworkはホーム候補、詳細sheet、検索結果など複数箇所で使われるため、実画像読み込みとplaceholder形状描画を分けて、今後の見た目調整を小さく触れるようにした。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/HomeGoodsArtworkViews.swift`
+- `HomeGoodsArtwork` 本体は、背景gradient、実画像表示、placeholderへの委譲だけに整理した。
+- `HomeGoodsArtworkLayout` と実画像読み込みfallbackは既存ファイルに残した。
+
+#### `ios-native/Sources/MegrumApp/HomeGoodsPlaceholderArtworkViews.swift`
+- `portrait` / `badge` / `stand` / `keychain` / `plush` のplaceholder描画を専用Viewへ移動した。
+- `goods.symbol`、影、opacity、layout計算、shapeごとの見た目は既存どおり維持した。
+
+### 影響範囲
+
+- Swift Native iOS版のホーム候補・詳細sheet・検索結果などで使うgoods artwork。
+- 実画像がない場合のplaceholder形状描画。
+- 状態名、用語、DBスキーマ、表示文言は変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumApp/HomeGoodsArtworkViews.swift ios-native/Sources/MegrumApp/HomeGoodsPlaceholderArtworkViews.swift`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-home-goods-artwork --enable-xctest --disable-swift-testing -j 1 --filter HomeDiscoveryMatchPolicyTests`
+  - passed（69 tests）
+
+### セルフレビュー結果
+
+- ✅ `HomeGoodsArtworkLayout` の数値計算は変更していない。
+- ✅ 実画像表示、file URL loader、AsyncImage fallback は既存ファイルに残して挙動を維持した。
+- ✅ placeholder の shape 分岐、symbol、色、影、opacity は移動のみで維持した。
+- ✅ 新しい状態名・用語・DB列は追加していないため、`notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション1014：相互マッチ条件レビューの交換表示を分割
 
 ### 背景・問題意識
