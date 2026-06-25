@@ -105,18 +105,17 @@ struct DisputeDetailScreen: View {
     }
 
     var body: some View {
-        Group {
-            switch store.state {
-            case .loading:
-                loadingView
-            case .loaded(let model):
-                loadedList(model: model)
-            case .empty:
-                emptyView
-            case .failed(let message):
-                errorView(message: message)
-            }
-        }
+        DisputeDetailScreenContent(
+            state: store.state,
+            replyDraft: replyDraftBinding,
+            isSubmittingReply: store.isSubmittingReply,
+            isWithdrawing: store.isWithdrawing,
+            onRetryLoad: retryLoad,
+            onSubmitReply: submitReply,
+            onRequestWithdraw: requestWithdrawConfirmation,
+            onOpenLateRequest: openLateRequest,
+            onOpenCancellationRequest: openCancellationRequest
+        )
         .task {
             await store.loadIfNeeded()
         }
@@ -124,16 +123,12 @@ struct DisputeDetailScreen: View {
         .megrumInlineNavigationTitle()
         .toolbar {
             ToolbarItem(placement: .cancellationAction) {
-                Button("閉じる") {
-                    dismiss()
-                }
+                Button("閉じる", action: dismissScreen)
             }
 
             if store.state.model?.canWithdraw == true {
                 ToolbarItem(placement: .primaryAction) {
-                    Button(role: .destructive) {
-                        isShowingWithdrawConfirmation = true
-                    } label: {
+                    Button(role: .destructive, action: requestWithdrawConfirmation) {
                         if store.isWithdrawing {
                             ProgressView()
                         } else {
@@ -156,9 +151,7 @@ struct DisputeDetailScreen: View {
             titleVisibility: .visible
         ) {
             Button("取り下げる", role: .destructive) {
-                Task {
-                    await store.withdrawDispute()
-                }
+                withdrawDispute()
             }
             Button("キャンセル", role: .cancel) {}
         } message: {
@@ -183,45 +176,44 @@ struct DisputeDetailScreen: View {
         }
     }
 
-    private var loadingView: some View {
-        DisputeDetailLoadingStateView()
+    private var replyDraftBinding: Binding<DisputeReplyDraft> {
+        Binding(
+            get: { store.replyDraft },
+            set: { store.replyDraft = $0 }
+        )
     }
 
-    private var emptyView: some View {
-        DisputeDetailEmptyStateView()
+    private func dismissScreen() {
+        dismiss()
     }
 
-    private func errorView(message: String) -> some View {
-        DisputeDetailErrorStateView(message: message) {
-            Task {
-                await store.load()
-            }
+    private func retryLoad() {
+        Task {
+            await store.load()
         }
     }
 
-    private func loadedList(model: DisputeDetailModel) -> some View {
-        DisputeDetailLoadedList(
-            model: model,
-            replyDraft: Binding(
-                get: { store.replyDraft },
-                set: { store.replyDraft = $0 }
-            ),
-            isSubmittingReply: store.isSubmittingReply,
-            isWithdrawing: store.isWithdrawing,
-            onSubmitReply: {
-                Task {
-                    await store.submitReply()
-                }
-            },
-            onRequestWithdraw: {
-                isShowingWithdrawConfirmation = true
-            },
-            onOpenLateRequest: {
-                presentedRequestKind = .late
-            },
-            onOpenCancellationRequest: {
-                presentedRequestKind = .cancellation
-            }
-        )
+    private func submitReply() {
+        Task {
+            await store.submitReply()
+        }
+    }
+
+    private func requestWithdrawConfirmation() {
+        isShowingWithdrawConfirmation = true
+    }
+
+    private func withdrawDispute() {
+        Task {
+            await store.withdrawDispute()
+        }
+    }
+
+    private func openLateRequest() {
+        presentedRequestKind = .late
+    }
+
+    private func openCancellationRequest() {
+        presentedRequestKind = .cancellation
     }
 }

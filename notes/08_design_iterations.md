@@ -4,6 +4,48 @@
 
 ---
 
+## イテレーション1120：dispute detail contentを分離
+
+### 背景・問題意識
+
+`DisputeDetailScreen` は、`DisputeDetailStore` の生成とload/reply/withdraw操作、trade request sheet、取り下げ確認dialog、alert制御を持ちながら、load stateごとの表示分岐とloaded listへのbinding/callback組み立ても同じ `body` に抱えていた。親画面をstore操作とsheet/dialog管理へ寄せ、異議詳細の表示分岐を専用Viewへ分離する。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/DisputeDetailScreen.swift`
+- load stateごとの `Group` 表示を `DisputeDetailScreenContent` 呼び出しへ置き換えた。
+- reply draft bindingを `replyDraftBinding` に分離した。
+- 閉じる、再読み込み、返信送信、取り下げ確認、取り下げ実行、遅刻/キャンセル申請sheet表示を名前付きメソッドへ分離した。
+
+#### `ios-native/Sources/MegrumApp/DisputeDetailScreenContent.swift`
+- `DisputeDetailScreenContent` を追加した。
+- loading / loaded / empty / failed の表示分岐を移動した。
+- loaded時の `DisputeDetailLoadedList` へのbinding、送信/取り下げ/補助申請callbackを明示的な入力として受け取るようにした。
+
+### 影響範囲
+
+- Swift Native iOS版の異議詳細画面。
+- 異議詳細の読み込み状態、返信フォーム、取り下げ、遅刻/キャンセル申請sheet。
+- Supabase dispute client、storeのload/reply/withdraw処理、trade request draft、DB/API、状態名、表示文言は変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumApp/DisputeDetailScreen.swift ios-native/Sources/MegrumApp/DisputeDetailScreenContent.swift`
+  - passed
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-dispute-detail-content`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-dispute-detail-content --enable-xctest --disable-swift-testing -j 1 --filter 'DisputeDetailScreenTests|TradeRequestDraftTests|MegrumAppStateTests'`
+  - passed（99 tests）
+
+### セルフレビュー結果
+
+- ✅ loading / loaded / empty / failed の表示、返信draft binding、返信送信、取り下げ確認、遅刻/キャンセル申請sheet導線を維持した。
+- ✅ `DisputeDetailStore` のload/reply/withdraw処理、Supabase mapper/client、trade request draft、alert文言、navigation titleは変更していない。
+- ✅ `DisputeDetailScreen.swift` は227行から219行へ縮小し、状態別の表示分岐を37行の専用ファイルへ分離した。
+- ✅ 新しい状態名・用語・DB列は追加していないため、`notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション1119：home exchange settings contentを分離
 
 ### 背景・問題意識
