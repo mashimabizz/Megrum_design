@@ -1,92 +1,6 @@
 import Foundation
 import MegrumCore
 
-struct SearchInitialCriteria: Equatable, Sendable {
-    var query: String
-    var groupID: UUID?
-    var memberID: UUID?
-    var goodsTypeID: UUID?
-    var tagNames: [String]
-
-    init(
-        query: String = "",
-        groupID: UUID? = nil,
-        memberID: UUID? = nil,
-        goodsTypeID: UUID? = nil,
-        tagNames: [String] = []
-    ) {
-        self.query = query.trimmingCharacters(in: .whitespacesAndNewlines)
-        self.groupID = groupID
-        self.memberID = memberID
-        self.goodsTypeID = goodsTypeID
-        self.tagNames = TagNameNormalizer.uniquePreservingOrder(tagNames, limit: 8)
-    }
-
-    var id: String {
-        [
-            query,
-            groupID?.uuidString ?? "",
-            memberID?.uuidString ?? "",
-            goodsTypeID?.uuidString ?? "",
-            tagNames.joined(separator: ",")
-        ].joined(separator: "|")
-    }
-}
-
-enum SearchSuggestionAction: Hashable, Sendable {
-    case group(UUID)
-    case member(groupID: UUID, memberID: UUID)
-    case wish(groupID: UUID?, memberID: UUID?, goodsTypeID: UUID?, tagNames: [String])
-    case goodsType(UUID)
-    case tag(String)
-    case payment(UserPaymentMethod)
-    case meetupPrefecture(String)
-    case query(String)
-}
-
-struct SearchSuggestionItem: Identifiable, Equatable, Sendable {
-    var id: String
-    var title: String
-    var subtitle: String?
-    var imageURL: URL?
-    var systemImageName: String?
-    var action: SearchSuggestionAction
-
-    init(
-        id: String,
-        title: String,
-        subtitle: String? = nil,
-        imageURL: URL? = nil,
-        systemImageName: String? = nil,
-        action: SearchSuggestionAction
-    ) {
-        self.id = id
-        self.title = title
-        self.subtitle = subtitle
-        self.imageURL = imageURL
-        self.systemImageName = systemImageName
-        self.action = action
-    }
-}
-
-struct SearchSuggestionSection: Identifiable, Equatable, Sendable {
-    var id: String
-    var title: String
-    var systemImageName: String
-    var tintRole: SearchSuggestionTintRole
-    var items: [SearchSuggestionItem]
-
-    var isEmpty: Bool {
-        items.isEmpty
-    }
-}
-
-enum SearchSuggestionTintRole: Equatable, Sendable {
-    case lavender
-    case pink
-    case muted
-}
-
 enum SearchSuggestionBuilder {
     static func tagCandidateNames(
         userOshiSelections: [UserOshiSelection],
@@ -278,7 +192,6 @@ enum SearchSuggestionBuilder {
             )
         }
     }
-
 }
 
 private extension WishItem {

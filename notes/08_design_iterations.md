@@ -4,6 +4,48 @@
 
 ---
 
+## イテレーション957：Search suggestion modelsを分割
+
+### 背景・問題意識
+
+`SearchSuggestionModels.swift` は、検索初期条件、候補アクション/表示item/section、推し/Wish/タグ候補を生成するbuilderを1ファイルに持っていた。検索画面はホームから渡される条件、候補チップ、フィルター、検索結果表示にまたがるため、表示型と候補生成ロジックを分け、検索候補の変更範囲を追いやすくする。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/SearchInitialCriteria.swift`
+- `SearchInitialCriteria` を新規ファイルへ移動した。
+- query trim、tag nameの重複除去/上限、`id` 生成は維持した。
+
+#### `ios-native/Sources/MegrumApp/SearchSuggestionTypes.swift`
+- `SearchSuggestionAction`、`SearchSuggestionItem`、`SearchSuggestionSection`、`SearchSuggestionTintRole` を新規ファイルへ移動した。
+
+#### `ios-native/Sources/MegrumApp/SearchSuggestionBuilder.swift`
+- `SearchSuggestionBuilder` と、Wish/在庫をタグ候補ソースとして扱うprivate extensionを新規ファイルへ移動した。
+- 推し候補、Wish候補、共有タグ候補の生成条件は維持した。
+
+#### `ios-native/Sources/MegrumApp/SearchSuggestionModels.swift`
+- 上記3ファイルへ分割したため削除した。
+
+### 影響範囲
+
+- Swift Native iOS版の検索画面、ホームから検索を開く導線、検索候補チップ、タグ候補、検索結果とホーム条件タグ連携。
+- 挙動変更ではなく責務分離。候補の表示文言、L1/L2判定、Wish/タグ抽出条件、状態名、用語、DBスキーマは変更しない。
+
+### 確認方法
+
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-search-suggestions-build --disable-index-store`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-search-suggestions-build --disable-index-store --enable-xctest --disable-swift-testing -j 1 --filter 'SearchScreenTests|HomeDiscoveryMatchPolicyTests'`
+  - 69 tests passed
+
+### セルフレビュー結果
+
+- ✅ 型定義、検索初期条件、候補生成builderを分け、公開APIと候補生成結果を維持した。
+- ✅ 検索候補、検索フィルター、ホーム検索導線、ホーム条件タグの対象テストを通した。
+- ✅ 状態名・用語・DBスキーマの変更はないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション956：Megrum location stateを分割
 
 ### 背景・問題意識
