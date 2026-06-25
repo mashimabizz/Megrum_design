@@ -4,6 +4,44 @@
 
 ---
 
+## イテレーション1088：proposal meetup month day cellを分離
+
+### 背景・問題意識
+
+`ProposalMeetupMonthCalendarViews.swift` は、月カレンダー本体と、各日セルの予定表示・今日表示・週表示への遷移buttonを同じファイルに抱えていた。月カレンダー側をgrid構成と月移動に集中させるため、day cellと月移動button styleを専用Viewファイルへ分離する。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/ProposalMeetupMonthCalendarViews.swift`
+- `ProposalMeetupMonthDayCell` と `proposalMeetupMonthNavigationButtonStyle` を移動した。
+- 月タイトル、前月/次月button、曜日row、月grid、空セル、day cell呼び出しは維持した。
+
+#### `ios-native/Sources/MegrumApp/ProposalMeetupMonthDayCell.swift`
+- 月表示用day cellと月移動button styleを追加した。
+- 今日表示、予定3件までの表示、超過件数、予定の所有者別背景色、週表示へ開くaccessibility labelを維持した。
+
+### 影響範囲
+
+- Swift Native iOS版の打診作成フローにおける待ち合わせ月カレンダー表示。
+- 待ち合わせ候補作成、週表示への遷移、月移動、送信payload、DB/API、状態名、表示文言は変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumApp/ProposalMeetupMonthCalendarViews.swift ios-native/Sources/MegrumApp/ProposalMeetupMonthDayCell.swift`
+  - passed
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-proposal-meetup-month-day-cell`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-proposal-meetup-month-day-cell --enable-xctest --disable-swift-testing -j 1 --filter 'ProposalCreateFlowTests|ProposalCreateSheetTests'`
+  - passed（62 tests）
+
+### セルフレビュー結果
+
+- ✅ 月gridの列数、cell高さ、今日表示、予定3件までの表示、超過件数表示を維持した。
+- ✅ `ProposalMeetupMonthCalendarViews.swift` は 169行から 88行へ縮小し、day cell表示を 85行の専用ファイルへ分離した。
+- ✅ 新しい状態名・用語・DB列は追加していないため、`notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション1087：proposal schedule mini viewsを分離
 
 ### 背景・問題意識
