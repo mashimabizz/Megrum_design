@@ -8,7 +8,7 @@ struct HomeGoodsHitDetailSheet: View {
     var viewerOfferGoods: [HomeMockGoods]
     var addedExtraCandidateIDs: Set<UUID>
     var showsOtherExchangeRows: Bool = true
-    var bottomButtonTitle: String = "この内容で打診する"
+    var bottomButtonTitle: String = "交換内容を確認する"
     var preselectPreferredOffer: Bool = true
     var onOpenOwnerProfile: (UUID) -> Void
     var onOpenNestedSheet: (HomeDiscoverySheet) -> Void

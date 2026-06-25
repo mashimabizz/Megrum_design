@@ -220,7 +220,7 @@ enum HomeDiscoverySheetPresentationContext: Equatable {
     var bottomButtonTitle: String {
         switch self {
         case .primary:
-            return "この内容で打診する"
+            return "交換内容を確認する"
         case .additionalCandidate:
             return "このグッズも追加する"
         }

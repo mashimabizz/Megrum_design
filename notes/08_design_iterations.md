@@ -4,6 +4,49 @@
 
 ---
 
+## イテレーション989：打診前CTAの文言を確認導線へ変更
+
+### 背景・問題意識
+
+マッチ候補タブで Goods20 丸の画像を押した後のシート下部CTAが `この内容で打診する` になっており、実際には打診前に交換内容確認ポップアップを挟む導線と表現がずれていた。オーナーから、CTA文言を `交換内容を確認する` に変更したいという指摘があった。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/HomeDiscoverySheets.swift`
+- primary の候補詳細シートCTAを `交換内容を確認する` に変更した。
+
+#### `ios-native/Sources/MegrumApp/HomeDiscoveryHitDetailSheets.swift`
+#### `ios-native/Sources/MegrumApp/HomeWishHitDetailSheet.swift`
+- 直接初期化時のデフォルトCTA文言も `交換内容を確認する` に揃えた。
+
+### 影響範囲
+
+- Swift Native iOS版のホーム、マッチ候補タブ、候補詳細シート。
+- CTAタップ後の確認ポップアップ、打診作成payload、選択ロジック、DBスキーマ、状態名は変更しない。
+
+### 確認方法
+
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-cta-label-test --disable-index-store --enable-xctest --disable-swift-testing -j 1 --filter HomeListingSheetSelectionStateReducerTests`
+  - selected tests passed
+- `xcodebuild -quiet -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -destination 'id=C70DDDBB-2602-49E0-8F95-1F043BCCED76' -derivedDataPath /tmp/megrum-ios-native-cta-label-xcode build`
+  - passed
+- `xcrun simctl install C70DDDBB-2602-49E0-8F95-1F043BCCED76 /tmp/megrum-ios-native-cta-label-xcode/Build/Products/Debug-iphonesimulator/MegrumNative.app`
+  - passed
+- `xcrun simctl launch --terminate-running-process C70DDDBB-2602-49E0-8F95-1F043BCCED76 tokyo.megrum.native.preview`
+  - launched
+- `baguette describe-ui --udid C70DDDBB-2602-49E0-8F95-1F043BCCED76`
+  - 候補詳細シート下部CTAが `交換内容を確認する` になっていることを確認
+- `baguette screenshot --udid C70DDDBB-2602-49E0-8F95-1F043BCCED76 --output /tmp/megrum-cta-label-confirm.png`
+  - screenshot captured
+
+### セルフレビュー結果
+
+- ✅ 文言だけの変更に留め、打診前確認ポップアップと後続フローは維持した。
+- ✅ Goods20詳細とWishヒット詳細のデフォルトCTAを揃え、入口による表記揺れを避けた。
+- ✅ 状態名、用語定義、DBスキーマの変更はないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション988：個別募集希望の画像表示を修正
 
 ### 背景・問題意識
