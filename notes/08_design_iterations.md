@@ -4,6 +4,59 @@
 
 ---
 
+## イテレーション944：Supabase face recognition rowsを分割
+
+### 背景・問題意識
+
+`SupabaseFaceRecognitionRows.swift` は、顔認識の公開input/record、member face profile row、DB payload、select定義を1ファイルに持っていた。顔認識はグッズ画像のメンバー推定、レビュー、将来の一括タグ付けに関わるため、挙動は変えずに型の責務を分け、payload変更時にrecordsやprofile rowへ波及しない構造へ整理する。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumData/SupabaseFaceRecognitionClient.swift`
+- member face profile load、uploaded image作成、detected faces作成、match candidate作成、correction作成の実行処理に絞った。
+- request extensionから参照するため、内部 `client` をmodule internalにした。
+- ファイル行数を137行から86行へ縮小した。
+
+#### `ios-native/Sources/MegrumData/SupabaseFaceRecognitionClientRequests.swift`
+- 顔認識系のrequest生成APIとmember face profile query helperを新規ファイルへ移動した。
+- table名、select、空配列validation、memberIDのdedupe/sort条件は維持した。
+
+#### `ios-native/Sources/MegrumData/SupabaseFaceRecognitionRecords.swift`
+- `FaceUploadedImageInput`、`FaceUploadedImageRecord`、`DetectedFaceRecord`、`FaceMatchCandidateRecord`、`FaceMatchCorrectionInput` とselect定義を新規ファイルへ移動した。
+
+#### `ios-native/Sources/MegrumData/SupabaseFaceRecognitionPayloads.swift`
+- `FaceUploadedImagePayload`、`DetectedFacePayload`、`FaceBoundingBoxPayload`、`FaceMatchCandidatePayload`、`FaceMatchCorrectionPayload`、`FaceMatchCorrectionRow` を新規ファイルへ移動した。
+- content type fallback、text normalizer、legacy quality status、bbox encode、correction member name trimmingは維持した。
+
+#### `ios-native/Sources/MegrumData/SupabaseFaceRecognitionProfileRows.swift`
+- `MemberFaceProfileRow` と `FaceRecognitionRelation` を新規ファイルへ移動した。
+- character relation、embedding mapping、profile type fallback、deleted_at mappingは維持した。
+
+#### `ios-native/Sources/MegrumData/SupabaseFaceRecognitionRows.swift`
+- 役割別ファイルへ置き換えたため削除した。
+
+### 影響範囲
+
+- Swift Native iOS版の顔認識用Supabase通信、画像アップロード記録、検出顔保存、match candidate保存、手動補正保存、member face profile取得。
+- 挙動変更ではなく責務分離。Supabase table名、select、query、payload key、状態名、用語、DBスキーマは変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumData/SupabaseFaceRecognitionClient.swift ios-native/Sources/MegrumData/SupabaseFaceRecognitionClientRequests.swift ios-native/Sources/MegrumData/SupabaseFaceRecognitionRecords.swift ios-native/Sources/MegrumData/SupabaseFaceRecognitionPayloads.swift ios-native/Sources/MegrumData/SupabaseFaceRecognitionProfileRows.swift ios-native/Sources/MegrumData/SupabaseFaceRecognitionRows.swift`
+  - passed
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-face-recognition-build --disable-index-store`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-face-recognition-tests --disable-index-store --enable-xctest --disable-swift-testing -j 1 --filter SupabaseFaceRecognitionClientTests`
+  - 7 tests passed
+
+### セルフレビュー結果
+
+- ✅ records、payloads、profile rows、request builder、client本体を移動中心で分割した。
+- ✅ 顔認識のrequest生成、payload key、空配列validationの既存テストを通した。
+- ✅ 状態名・用語・DBスキーマの変更はないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション943：Supabase listing clientを分割
 
 ### 背景・問題意識
