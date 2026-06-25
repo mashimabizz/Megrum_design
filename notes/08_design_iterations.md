@@ -4,6 +4,46 @@
 
 ---
 
+## イテレーション1054：individual listing editor chromeを分離
+
+### 背景・問題意識
+
+`IndividualListingEditorSupportViews.swift` は、step content本体に加えて、選択画像tileとeditor header chromeも同じファイルに抱えていた。draft bindingが集中するstep contentは元ファイルに残し、表示primitiveとheader chromeだけを専用ファイルへ分離した。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/IndividualListingEditorSupportViews.swift`
+- `IndividualListingEditorContent` とstepごとのcontent switchだけを残した。
+- `ListingSelectableImageTile` と `IndividualListingEditorHeader` を専用ファイルへ移動した。
+
+#### `ios-native/Sources/MegrumApp/IndividualListingEditorChromeViews.swift`
+- `ListingSelectableImageTile` を追加し、既存の画像比率、選択check、選択枠styleを維持した。
+- `IndividualListingEditorHeader` を追加し、back button、title、選択肢確認button、step progressを小さなcomputed viewへ分けた。
+
+### 影響範囲
+
+- Swift Native iOS版の個別募集editor。
+- editor header、step progress、選択肢確認button、画像選択tile。
+- step validation、draft更新、選択filter、保存処理、状態名、用語、DBスキーマ、表示文言は変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumApp/IndividualListingEditorSupportViews.swift ios-native/Sources/MegrumApp/IndividualListingEditorChromeViews.swift`
+  - passed
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-individual-listing-editor-chrome`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-individual-listing-editor-chrome --enable-xctest --disable-swift-testing -j 1 --filter 'IndividualListingDraftTests|IndividualListingStateReducerTests'`
+  - passed（39 tests）
+
+### セルフレビュー結果
+
+- ✅ draft bindingとstep content switchは `IndividualListingEditorSupportViews.swift` に残し、表示primitive / header chromeだけを移動した。
+- ✅ headerのback button、title、選択肢確認button、step progress、画像tileの既存style値を維持した。
+- ✅ `IndividualListingEditorSupportViews.swift` は 239行から 121行へ縮小し、chrome表示を 134行の専用ファイルへ分離した。
+- ✅ 新しい状態名・用語・DB列は追加していないため、`notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション1053：meguri screen presentationsを分離
 
 ### 背景・問題意識
