@@ -4,6 +4,48 @@
 
 ---
 
+## イテレーション932：Goods core modelsを分割
+
+### 背景・問題意識
+
+`GoodsModels.swift` は、グッズ本体、作成/更新入力、検索入力/結果、wish表示モデル、通報モデルを1ファイルに持っていた。Core層のpublicモデルは多くの画面から参照されるため、型名・プロパティ・initializerは維持し、検索系と通報系だけを役割別ファイルへ移す。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumCore/GoodsModels.swift`
+- `GoodsType`、`GoodsTag`、`GoodsItem`、`GoodsPhotoUpload`、`GoodsEntryKind`、`GoodsEntryStatus`、`GoodsEntryInput`、`GoodsEntryUpdateInput` に絞った。
+- ファイル行数を417行から278行へ縮小した。
+
+#### `ios-native/Sources/MegrumCore/GoodsSearchModels.swift`
+- `GoodsSearchInput`、`SearchMatchBucket`、`SearchResultItem`、`WishItem` を新規ファイルへ移動した。
+- 検索結果バケット表示文言とwishモデルのinitializerは維持した。
+
+#### `ios-native/Sources/MegrumCore/GoodsReportModels.swift`
+- `GoodsReportReason`、`GoodsReportCreateInput`、`GoodsReportTicket` を新規ファイルへ移動した。
+- 通報理由のraw valueと表示文言は維持した。
+
+### 影響範囲
+
+- Swift Native iOS版のCoreグッズモデル、検索、wish、通報、グッズ編集/一覧/検索画面。
+- 挙動変更ではなく責務分離。public型名、プロパティ、initializer、状態名、用語、DBスキーマは変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumCore/GoodsModels.swift ios-native/Sources/MegrumCore/GoodsSearchModels.swift ios-native/Sources/MegrumCore/GoodsReportModels.swift`
+  - passed
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-goods-models-build --disable-index-store`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-goods-models-tests --disable-index-store --enable-xctest --disable-swift-testing -j 1 --filter 'MegrumCoreTests|GoodsEditorDraftTests|SearchScreenTests'`
+  - 59 tests passed
+
+### セルフレビュー結果
+
+- ✅ Core public modelの型名・プロパティ・initializerを変えず、配置だけを分けた。
+- ✅ グッズ編集作成/更新入力、検索条件/結果、Core状態値に関わる既存テストを通した。
+- ✅ 状態名・用語・DBスキーマの変更はないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション931：Supabase auth DTOsを分割
 
 ### 背景・問題意識
