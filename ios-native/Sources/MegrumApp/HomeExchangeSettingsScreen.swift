@@ -26,48 +26,19 @@ struct HomeExchangeSettingsScreen: View {
     @State private var didLoadDraft = false
 
     var body: some View {
-        ZStack {
-            HomeExchangeSettingsBackground()
-
-            ScrollView {
-                VStack(alignment: .leading, spacing: 15) {
-                    HomeExchangeSettingsHeader(onClose: dismiss.callAsFunction)
-
-                    HomeExchangePreferenceCardPicker(
-                        selection: $draftPreference,
-                        onSelect: selectPreference
-                    )
-
-                    if draftPreference.acceptsMail {
-                        HomeExchangeMailConditionsCard(
-                            shippingFee: $draftMailShippingFee,
-                            shippingDays: $draftMailShippingDays
-                        )
-                    }
-
-                    if draftPreference.acceptsLocal {
-                        Text("現地交換可能な場所と日程")
-                            .font(.subheadline.weight(.black))
-                            .foregroundStyle(MegrumTheme.ink)
-                            .padding(.horizontal, 8)
-
-                        HomeExchangeSettingsCalendarCard(
-                            visibleMonth: $visibleMonth,
-                            selectedPrefecture: $draftLocalPrefecture,
-                            selectedDateKeys: displayedLocalDateKeys,
-                            dateDetails: displayedLocalDateDetails,
-                            onTapDay: tapDate,
-                            onFinishDragSelection: finishDragSelection
-                        )
-
-                        HomeExchangeSettingsInstructionBanner()
-                    }
-                }
-                .padding(.horizontal, 18)
-                .padding(.top, 18)
-                .padding(.bottom, 108)
-            }
-        }
+        HomeExchangeSettingsContent(
+            draftPreference: $draftPreference,
+            draftLocalPrefecture: $draftLocalPrefecture,
+            draftMailShippingFee: $draftMailShippingFee,
+            draftMailShippingDays: $draftMailShippingDays,
+            visibleMonth: $visibleMonth,
+            selectedDateKeys: displayedLocalDateKeys,
+            dateDetails: displayedLocalDateDetails,
+            onClose: dismiss.callAsFunction,
+            onSelectPreference: selectPreference,
+            onTapDay: tapDate,
+            onFinishDragSelection: finishDragSelection
+        )
         .safeAreaInset(edge: .bottom) {
             HomeExchangeSettingsSaveFooter(action: save)
         }

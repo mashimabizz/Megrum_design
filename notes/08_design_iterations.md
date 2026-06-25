@@ -4,6 +4,47 @@
 
 ---
 
+## イテレーション1119：home exchange settings contentを分離
+
+### 背景・問題意識
+
+`HomeExchangeSettingsScreen` は、AppStorageの読み書き、draftのload/save、日付編集sheet、日付タップ/ドラッグ選択、個別募集反映日程のmergeを持ちながら、背景、header、交換方法picker、配送条件、現地交換カレンダー、操作bannerの本文表示も同じ `body` に抱えていた。親画面を保存・日付編集ロジックに寄せ、画面本文の組み立てを専用Viewへ分離する。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/HomeExchangeSettingsScreen.swift`
+- `ZStack` / `ScrollView` の本文表示を `HomeExchangeSettingsContent` 呼び出しへ置き換えた。
+- AppStorage、draft load/save、日付編集sheet、日付タップ/ドラッグ選択、保存footer、navigation bar hidden設定は親画面に残した。
+
+#### `ios-native/Sources/MegrumApp/HomeExchangeSettingsContent.swift`
+- `HomeExchangeSettingsContent` を追加した。
+- 背景、header、交換方法picker、配送条件card、現地交換カレンダー、instruction bannerを移動した。
+- 配送条件と現地交換条件の条件表示を `mailConditionsSection` / `localConditionsSection` に分離した。
+
+### 影響範囲
+
+- Swift Native iOS版ホームの交換条件設定画面。
+- 標準交換条件の表示、配送条件、現地交換可能な場所と日程、日付タップ/横ドラッグ選択。
+- 保存payload、AppStorage key、個別募集反映日程、日付詳細sheet、DB/API、状態名、表示文言は変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumApp/HomeExchangeSettingsScreen.swift ios-native/Sources/MegrumApp/HomeExchangeSettingsContent.swift`
+  - passed
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-home-exchange-settings-content`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-home-exchange-settings-content --enable-xctest --disable-swift-testing -j 1 --filter 'HomeExchangeSettingsScreenTests|MegrumAppStateTests'`
+  - passed（83 tests）
+
+### セルフレビュー結果
+
+- ✅ header、交換方法picker、配送条件、現地交換タイトル、カレンダー、instruction banner、padding、背景、保存footerを維持した。
+- ✅ AppStorageのload/save、`configuredAt` 更新、個別募集反映日程のmerge、日付詳細sheet、日付タップ/横ドラッグ選択は変更していない。
+- ✅ `HomeExchangeSettingsScreen.swift` は225行から196行へ縮小し、本文表示を72行の専用ファイルへ分離した。
+- ✅ 新しい状態名・用語・DB列は追加していないため、`notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション1118：home local mode settings contentを分離
 
 ### 背景・問題意識
