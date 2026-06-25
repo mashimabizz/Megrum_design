@@ -4,6 +4,45 @@
 
 ---
 
+## イテレーション1041：交換条件preference card viewsを分割
+
+### 背景・問題意識
+
+`HomeExchangeSettingsScreenComponents.swift` は、交換条件画面の背景、ヘッダー、交換方法picker、配送条件カード、説明banner、保存footerを同じファイルに抱えていた。今回は表示文言や保存処理には触れず、交換方法pickerとカード表示だけを専用ファイルへ分け、設定画面chromeと選択カードの変更範囲を分離した。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/HomeExchangeSettingsScreenComponents.swift`
+- 背景、ヘッダー、条件カード、説明banner、保存footer、navigation helperを既存ファイルに残した。
+- `HomeExchangePreferenceCardPicker`、`HomeExchangePreferenceCard`、`HomeExchangePreference` のicon表示拡張を専用ファイルへ委譲した。
+
+#### `ios-native/Sources/MegrumApp/HomeExchangePreferenceCardViews.swift`
+- 交換方法picker、選択カード、アイコン名/色のpresentation拡張を追加した。
+- 既存のspacing、font、card高さ、selected stroke、shadow、accessibility labelを維持した。
+
+### 影響範囲
+
+- Swift Native iOS版の交換条件設定画面。
+- 交換方法pickerと選択カード表示。
+- 保存処理、カレンダー、条件入力、配送条件カード、状態名、用語、DBスキーマ、表示文言は変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumApp/HomeExchangeSettingsScreenComponents.swift ios-native/Sources/MegrumApp/HomeExchangePreferenceCardViews.swift`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-home-exchange-preference-card --enable-xctest --disable-swift-testing -j 1 --filter HomeExchangeSettingsScreenTests`
+  - passed（4 tests）
+
+### セルフレビュー結果
+
+- ✅ `HomeExchangePreferenceCardPicker` の選択callbackと `@Binding` は変更していない。
+- ✅ preference card表示は移動のみで、選択状態、icon、stroke、shadow、accessibility labelを維持した。
+- ✅ 既存の条件カード文言や保存footer、calendar関連Viewには触れていない。
+- ✅ `HomeExchangeSettingsScreenComponents.swift` は 281行から 185行へ縮小し、preference card表示を 99行の専用ファイルへ分離した。
+- ✅ 新しい状態名・用語・DB列は追加していないため、`notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション1040：めぐりboard thread row viewsを分割
 
 ### 背景・問題意識
