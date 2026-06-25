@@ -28,163 +28,33 @@ struct SettingsScreen: View {
 
     var body: some View {
         List {
-            Section {
-                NavigationLink {
-                    OwnProfileScreen(appState: appState)
-                } label: {
-                    SettingsMenuRowLabel(
-                        title: "自分のプロフィール",
-                        subtitle: profileStatusText,
-                        systemImage: "person.crop.circle"
-                    )
+            SettingsPrimarySection(
+                appState: appState,
+                profileStatusText: profileStatusText,
+                notificationStatusText: notificationStatusText,
+                pushNotificationStatusText: pushNotificationStatusText,
+                addressStatusText: addressStatusText,
+                subscriptionStatusText: subscriptionStatusText,
+                onOpenNotificationDestination: onOpenNotificationDestination,
+                onOpenNotificationRouteIntent: onOpenNotificationRouteIntent,
+                onSetPushNotificationsEnabled: setPushNotificationsEnabled
+            )
+
+            SettingsSupportAccountSection(
+                appState: appState,
+                securityAuthState: securityAuthState,
+                isSigningOut: isSigningOut,
+                accountSummary: accountSummary,
+                loginSecuritySummary: loginSecuritySummary,
+                onSignOut: {
+                    await performSignOut(dismissSettings: true)
                 }
+            )
 
-                NavigationLink {
-                    NotificationCenterScreen(appState: appState) { tab in
-                        dismiss()
-                        onOpenNotificationDestination(tab)
-                    } onOpenRouteIntent: { intent in
-                        if onOpenNotificationRouteIntent(intent) {
-                            dismiss()
-                            return true
-                        }
-                        return false
-                    }
-                } label: {
-                    SettingsMenuRowLabel(
-                        title: "通知",
-                        subtitle: notificationStatusText,
-                        systemImage: "bell",
-                        badgeCount: appState.unreadNotificationCount
-                    )
-                }
-
-                SettingsPushNotificationRow(
-                    statusText: pushNotificationStatusText,
-                    isEnabled: appState.pushNotificationsEnabled,
-                    isLoading: appState.isLoadingPushNotificationSetting,
-                    isSaving: appState.isSavingPushNotificationSetting,
-                    onToggle: setPushNotificationsEnabled
-                )
-
-                NavigationLink {
-                    AddressSettingsScreen(appState: appState)
-                } label: {
-                    SettingsMenuRowLabel(
-                        title: "住所設定",
-                        subtitle: addressStatusText,
-                        systemImage: "shippingbox"
-                    )
-                }
-
-                NavigationLink {
-                    SubscriptionSettingsScreen(appState: appState)
-                } label: {
-                    SettingsMenuRowLabel(
-                        title: "Premium会員",
-                        subtitle: subscriptionStatusText,
-                        systemImage: "sparkles.rectangle.stack"
-                    )
-                }
-
-                NavigationLink {
-                    BlockedUsersScreen(appState: appState)
-                } label: {
-                    SettingsMenuRowLabel(
-                        title: "ブロックした人",
-                        subtitle: "一覧と解除",
-                        systemImage: "person.crop.circle.badge.xmark"
-                    )
-                }
-            }
-
-            Section {
-                NavigationLink {
-                    SettingsHelpScreen()
-                } label: {
-                    SettingsMenuRowLabel(
-                        title: "ヘルプ",
-                        subtitle: "問い合わせと困った時の確認",
-                        systemImage: "questionmark.circle"
-                    )
-                }
-
-                NavigationLink {
-                    PrivacySettingsScreen(appState: appState)
-                } label: {
-                    SettingsMenuRowLabel(
-                        title: "プライバシーと安全",
-                        subtitle: "ブロック・公開範囲・ポリシー",
-                        systemImage: "lock.shield"
-                    )
-                }
-
-                NavigationLink {
-                    LoginSecuritySettingsScreen(
-                        authState: securityAuthState,
-                        isSigningOut: isSigningOut,
-                        accountSummary: accountSummary,
-                        onSignOut: {
-                            await performSignOut(dismissSettings: true)
-                        }
-                    )
-                } label: {
-                    SettingsMenuRowLabel(
-                        title: "ログインとセキュリティ",
-                        subtitle: loginSecuritySummary.shortStatusText,
-                        systemImage: "person.badge.key"
-                    )
-                }
-
-                NavigationLink {
-                    LegalDocumentScreen(kind: .terms)
-                } label: {
-                    SettingsMenuRowLabel(
-                        title: "利用規約",
-                        subtitle: "公開前確認用の要約",
-                        systemImage: "doc.text"
-                    )
-                }
-
-                NavigationLink {
-                    LegalDocumentScreen(kind: .privacy)
-                } label: {
-                    SettingsMenuRowLabel(
-                        title: "プライバシーポリシー",
-                        subtitle: "取り扱う情報の要点",
-                        systemImage: "hand.raised"
-                    )
-                }
-
-                NavigationLink {
-                    LegalDocumentScreen(kind: .commerce)
-                } label: {
-                    SettingsMenuRowLabel(
-                        title: "特定商取引法に基づく表記",
-                        subtitle: "有料機能と事業者表示の入口",
-                        systemImage: "building.columns"
-                    )
-                }
-
-                NavigationLink {
-                    AccountOverviewScreen(appState: appState)
-                } label: {
-                    SettingsMenuRowLabel(
-                        title: "アカウント",
-                        subtitle: accountSummary.shortStatusText,
-                        systemImage: "person.text.rectangle"
-                    )
-                }
-            } header: {
-                Text("サポートとアカウント")
-            }
-
-            Section {
-                SettingsSignOutButtonRow(
-                    isSigningOut: isSigningOut,
-                    onTap: startSignOut
-                )
-            }
+            SettingsDangerSection(
+                isSigningOut: isSigningOut,
+                onSignOut: startSignOut
+            )
         }
         .navigationTitle("設定")
         .megrumInlineNavigationTitle()

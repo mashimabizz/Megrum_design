@@ -4,6 +4,44 @@
 
 ---
 
+## イテレーション1011：設定画面のListセクションを分割
+
+### 背景・問題意識
+
+`SettingsScreen.swift` は、プロフィール/通知/住所/Premium/サポート/法務/アカウント/ログアウトの遷移行を1つの `body` に直書きしていた。設定画面は今後もアカウント・通知・法務導線が増減しやすいため、画面状態と副作用は親に残しつつ、List の表示セクションだけを小さな View に分けた。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/SettingsScreen.swift`
+- `body` の巨大な `Section` 群を `SettingsPrimarySection` / `SettingsSupportAccountSection` / `SettingsDangerSection` へ委譲した。
+- 既存の status text、account summary、login security summary、初期ロード、ログアウト、通知トグル処理は親に残した。
+
+#### `ios-native/Sources/MegrumApp/SettingsScreenSections.swift`
+- プロフィール/通知/住所/Premium/ブロック導線、サポート/法務/アカウント導線、ログアウト行を専用 View として追加した。
+- 通知センターからタブ/route intent を開く時の dismiss 挙動と、ログインセキュリティ画面への sign out callback を既存どおり維持した。
+
+### 影響範囲
+
+- Swift Native iOS版の設定画面。
+- 設定画面内のプロフィール、通知、住所、Premium、ブロック、ヘルプ、プライバシー、ログインとセキュリティ、法務、アカウント、ログアウト導線。
+- 状態名、用語、DBスキーマ、表示文言は変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumApp/SettingsScreen.swift ios-native/Sources/MegrumApp/SettingsScreenSections.swift`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-settings --enable-xctest --disable-swift-testing -j 1 --filter SettingsScreenTests`
+  - passed（16 tests）
+
+### セルフレビュー結果
+
+- ✅ 設定画面の navigation link、subtitle、badge、section header、ログアウト行の文言は維持した。
+- ✅ 初期ロード、通知トグル、ログアウト、通知route dismissの副作用は既存と同じ呼び出し順にした。
+- ✅ `SettingsScreen.swift` は 291行から 161行へ縮小し、セクション責務を `SettingsScreenSections.swift` に分離した。
+- ✅ 新しい状態名・用語・DB列は追加していないため、`notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション1010：個別募集Hit選択contextを変換責務別に分割
 
 ### 背景・問題意識
