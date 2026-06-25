@@ -4,6 +4,44 @@
 
 ---
 
+## イテレーション1023：打診作成bottom barを分割
+
+### 背景・問題意識
+
+`ProposalCreateChromeViews.swift` は、画面ヘッダー、ステップタブ、交換手段selector、下部CTA barを同じファイルに抱えていた。固定footerとinline footerの両方で使う `ProposalFlowBottomBar` を切り出し、Proposal作成画面のchrome調整を小さく進められるようにした。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/ProposalCreateChromeViews.swift`
+- `ProposalFlowScreenHeader`、`ProposalStepHeader`、`ProposalExchangeMethodSelector` を既存ファイルに残した。
+- 下部CTA bar表示を専用ファイルへ委譲した。
+
+#### `ios-native/Sources/MegrumApp/ProposalCreateBottomBarViews.swift`
+- `ProposalFlowBottomBar` を移動した。
+- primary buttonの活性条件、文言、loading indicator、fixed/inline padding、背景、gradient、shadowは既存どおり維持した。
+
+### 影響範囲
+
+- Swift Native iOS版の打診作成画面。
+- 下部固定CTA、confirm画面のinline CTA、作成中loading表示。
+- 画面遷移、送信payload、選択状態、状態名、用語、DBスキーマ、表示文言は変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumApp/ProposalCreateChromeViews.swift ios-native/Sources/MegrumApp/ProposalCreateBottomBarViews.swift`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-proposal-bottom-bar --enable-xctest --disable-swift-testing -j 1 --filter ProposalCreateFlowTests`
+  - passed（55 tests）
+
+### セルフレビュー結果
+
+- ✅ `ProposalFlowBottomBar` は移動のみで、`configuration.canAdvance(from:)`、`ProposalCreateBottomBarCopy.primaryTitle`、loading表示を維持した。
+- ✅ ヘッダー、ステップタブ、交換手段selector、primary actionの実行先は変更していない。
+- ✅ `ProposalCreateChromeViews.swift` は 284行から 217行へ縮小し、bottom bar表示を 69行の専用ファイルへ分離した。
+- ✅ 新しい状態名・用語・DB列は追加していないため、`notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション1022：グッズ詳細sheetを分割
 
 ### 背景・問題意識
