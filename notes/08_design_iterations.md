@@ -4,6 +4,52 @@
 
 ---
 
+## イテレーション947：Supabase message clientを分割
+
+### 背景・問題意識
+
+`SupabaseMessageClient.swift` は、チャットメッセージ取得、proposal既読状態取得/更新、通常送信、写真送信、現在地送信、遅刻通知、キャンセル申請、到着ステータス送信、共通upsert実行を1ファイルに持っていた。取引チャットは打診後の合流・証跡・キャンセル導線にまたがるため、挙動は変えずに読み取り、送信、support実行を分け、チャット系の修正時に確認範囲を狭める。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumData/SupabaseMessageClient.swift`
+- 初期化とSupabase REST client保持に絞った。
+- ファイル行数を309行から17行へ縮小した。
+
+#### `ios-native/Sources/MegrumData/SupabaseMessageClientReads.swift`
+- `loadMessages`、`loadProposalReadState`、`markProposalMessagesRead` を新規ファイルへ移動した。
+- messages/proposal_read_statesのtable名、select、limit clamp、on_conflict、400/404 optional read state fallbackは維持した。
+
+#### `ios-native/Sources/MegrumData/SupabaseMessageClientSends.swift`
+- text/photo/outfit/location/current location/system/late notice/cancel/arrival status/generic sendの実行APIを新規ファイルへ移動した。
+- public API、deprecated location overload、message type validation、default body、metadata生成は維持した。
+
+#### `ios-native/Sources/MegrumData/SupabaseMessageClientSupport.swift`
+- 共通 `sendMessagePayload`、JSON encoder生成、optional read state error判定を新規ファイルへ移動した。
+- upsert先、select、fallback `TradeMessage` 生成は維持した。
+
+### 影響範囲
+
+- Swift Native iOS版の取引チャット、メッセージ送信、写真/服装写真共有、現在地共有、遅刻通知、キャンセル申請、到着ステータス、proposal既読状態。
+- 挙動変更ではなく責務分離。Supabase table名、select、payload key、状態名、用語、DBスキーマは変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumData/SupabaseMessageClient.swift ios-native/Sources/MegrumData/SupabaseMessageClientReads.swift ios-native/Sources/MegrumData/SupabaseMessageClientSends.swift ios-native/Sources/MegrumData/SupabaseMessageClientSupport.swift`
+  - passed
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-message-client-build --disable-index-store`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-message-client-tests --disable-index-store --enable-xctest --disable-swift-testing -j 1 --filter SupabaseMessageClientTests`
+  - 24 tests passed
+
+### セルフレビュー結果
+
+- ✅ client本体、read operations、send operations、support helperを移動中心で分割した。
+- ✅ text/photo/outfit/location/system/late/cancel/arrival/read state requestの既存テストを通した。
+- ✅ 状態名・用語・DBスキーマの変更はないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション946：Supabase auth clientを分割
 
 ### 背景・問題意識
