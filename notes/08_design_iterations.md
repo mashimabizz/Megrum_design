@@ -4,6 +4,49 @@
 
 ---
 
+## イテレーション929：Meguri design preview home viewsを分割
+
+### 背景・問題意識
+
+`MeguriDesignPreviewHomeViews.swift` は、Meguri系デザインプレビューのヘッダー、計測値、色、サンプルデータ、地図ピン、地図操作、タブバーを1ファイルに持っていた。DEBUGプレビュー用の画面部品は今後も見た目調整が入りやすいため、表示部品とサンプル/定数を役割別に分ける。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/MeguriDesignPreviewHomeViews.swift`
+- `MeguriHomeHeader` のみに絞った。
+- ファイル行数を333行から16行へ縮小した。
+
+#### `ios-native/Sources/MegrumApp/MeguriDesignPreviewModels.swift`
+- `MeguriDesignMetrics`、preview chrome非表示modifier、`MeguriDesignColors`、`MeguriDesignTopic` とサンプルデータを新規ファイルへ移動した。
+
+#### `ios-native/Sources/MegrumApp/MeguriDesignPreviewMapPins.swift`
+- `MeguriMapOverlay`、pin bubble、chat/image/stacked pin、map controls、floating iconを新規ファイルへ移動した。
+
+#### `ios-native/Sources/MegrumApp/MeguriDesignPreviewTabBar.swift`
+- `MeguriTabBar` と `MeguriTabItem` を新規ファイルへ移動した。
+
+### 影響範囲
+
+- Swift Native iOS版のDEBUG Meguri design preview。
+- 挙動変更ではなく責務分離。通常アプリ画面、状態名、用語、DBスキーマは変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumApp/MeguriDesignPreviewHomeViews.swift ios-native/Sources/MegrumApp/MeguriDesignPreviewModels.swift ios-native/Sources/MegrumApp/MeguriDesignPreviewMapPins.swift ios-native/Sources/MegrumApp/MeguriDesignPreviewTabBar.swift`
+  - passed
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-meguri-design-preview-build --disable-index-store`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-meguri-design-preview-tests --disable-index-store --enable-xctest --disable-swift-testing -j 1 --filter 'HomeScreenFlowTests/testVisualQAPreviewModeParsesInitialScreens|HomeScreenFlowTests/testVisualQATabRouteResolverCanOpenPendingTradesAfterCompletion'`
+  - 2 tests passed
+
+### セルフレビュー結果
+
+- ✅ DEBUGプレビュー用のサンプル/定数/表示部品を移動のみで分割し、表示文言・色・サイズ・位置は維持した。
+- ✅ `MeguriHomeHeader` の外部APIは変えず、プレビュー画面側の呼び出しを壊さない形にした。
+- ✅ 通常アプリ画面・状態名・用語・DBスキーマの変更はないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション928：Proposal goods selection viewsを分割
 
 ### 背景・問題意識
