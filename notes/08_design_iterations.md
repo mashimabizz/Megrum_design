@@ -4,6 +4,53 @@
 
 ---
 
+## イテレーション940：Supabase oshi clientを分割
+
+### 背景・問題意識
+
+`SupabaseOshiClient.swift` は、推しmaster/ユーザー推し設定のload/create/replace処理、request生成API、query helper、row DTO、payload DTOを1ファイルに持っていた。推し設定まわりはオンボーディング、プロフィール、検索、グッズ登録から参照されるため、通信処理とDTO/request builderを分けて、変更時の読み分けをしやすくする。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumData/SupabaseOshiClient.swift`
+- `loadGenres`、`loadGroups`、`loadCharacters`、`loadUserSelections`、`createOshiRequest`、`createCharacterRequest`、`replaceUserSelections` に絞った。
+- request extensionから参照するため、内部 `client` をmodule internalにした。
+- ファイル行数を367行から100行へ縮小した。
+
+#### `ios-native/Sources/MegrumData/SupabaseOshiClientRequests.swift`
+- request生成APIとquery/select helperを新規ファイルへ移動した。
+- groups/characters/user_oshi/oshi_requests/character_requests のURL、select、Prefer header、snake_case encodingは維持した。
+
+#### `ios-native/Sources/MegrumData/SupabaseOshiRows.swift`
+- `OshiGenreRow`、`OshiGroupRow`、`OshiCharacterRow`、`UserOshiSelectionRow`、nested name/request rows、`CreatedIDRow` を新規ファイルへ移動した。
+- master rowからdomain modelへの変換、aliases fallback、genre fallback、仮登録名の反映は維持した。
+
+#### `ios-native/Sources/MegrumData/SupabaseOshiPayloads.swift`
+- `UserOshiSelectionPayload`、`OshiRequestPayload`、`CharacterRequestPayload` を新規ファイルへ移動した。
+- note trimming、group request/character request payload keyは維持した。
+
+### 影響範囲
+
+- Swift Native iOS版の推しmaster取得、ユーザー推し設定取得/保存、推し追加リクエスト、メンバー追加リクエスト。
+- 挙動変更ではなく責務分離。Supabase table名、select、query、payload key、状態名、用語、DBスキーマは変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumData/SupabaseOshiClient.swift ios-native/Sources/MegrumData/SupabaseOshiClientRequests.swift ios-native/Sources/MegrumData/SupabaseOshiRows.swift ios-native/Sources/MegrumData/SupabaseOshiPayloads.swift`
+  - passed
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-oshi-client-build --disable-index-store`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-oshi-client-tests --disable-index-store --enable-xctest --disable-swift-testing -j 1 --filter SupabaseOshiClientTests`
+  - 8 tests passed
+
+### セルフレビュー結果
+
+- ✅ client本体、request builder、row DTO、payload DTOを移動中心で分割した。
+- ✅ groups/characters/user_oshi/oshi_requests/character_requests の既存request生成テストを通した。
+- ✅ 状態名・用語・DBスキーマの変更はないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション939：Supabase home rowsを分割
 
 ### 背景・問題意識
