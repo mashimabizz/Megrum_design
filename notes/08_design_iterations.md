@@ -4,6 +4,46 @@
 
 ---
 
+## イテレーション1070：schedule row viewを分離
+
+### 背景・問題意識
+
+`ScheduleDayCard.swift` は、日付カード本体と予定1件分の行表示を同じファイルに抱えていた。カード側は日付header、今日badge、空状態、行の繰り返しに集中させ、予定行の表示だけを専用Viewへ分離する。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/ScheduleDayCard.swift`
+- `ScheduleDayCard` を残し、日付header、今日badge、空状態、`ScheduleRowView` の呼び出しだけに整理した。
+- 予定行の内部表示、role chip、時刻表示、場所表示を移動した。
+
+#### `ios-native/Sources/MegrumApp/ScheduleRowView.swift`
+- `ScheduleRowView` を追加し、色分け、予定title、role chip、時刻範囲、場所label、row背景を担当させた。
+- all-day表示、start/end時刻format、mine/partner色分けを維持した。
+
+### 影響範囲
+
+- Swift Native iOS版の取引スケジュールsheetと個人スケジュール一覧で使う日別予定カード。
+- 予定行の表示、role chip、時刻範囲、場所label。
+- スケジュール作成/読み込み、カレンダーwindow、DB/API、状態名、用語、表示文言は変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumApp/ScheduleDayCard.swift ios-native/Sources/MegrumApp/ScheduleRowView.swift`
+  - passed
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-schedule-row-view`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-schedule-row-view --enable-xctest --disable-swift-testing -j 1 --filter 'ScheduleStateReducerTests|TradeScheduleCalendarWindowTests|SupabaseScheduleClientTests'`
+  - passed（8 tests）
+
+### セルフレビュー結果
+
+- ✅ `ScheduleDayCard` の日付header、今日badge、空状態、row呼び出しは維持し、予定行の表示だけを専用ファイルへ移した。
+- ✅ role chip、色、padding、row背景、時刻範囲、場所label、all-day表示を維持した。
+- ✅ `ScheduleDayCard.swift` は 106行から 52行へ縮小し、row componentを 58行の専用ファイルへ分離した。
+- ✅ 新しい状態名・用語・DB列は追加していないため、`notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション1069：settings help row viewsを分離
 
 ### 背景・問題意識
