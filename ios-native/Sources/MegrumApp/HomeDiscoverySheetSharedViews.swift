@@ -7,7 +7,9 @@ struct HomeSelectedGoodsHeader: View {
     var conditionTags: HomeConditionTagSet
     var exchangeSummary: HomeDiscoveryOwnerExchangeSummary?
     var listingNote: String?
+    var listingDetail: HomeIndividualListingDetailContext?
     var onOpenOwnerProfile: (UUID) -> Void = { _ in }
+    @State private var presentedListingDetail: HomeIndividualListingDetailContext?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -29,6 +31,12 @@ struct HomeSelectedGoodsHeader: View {
                     }
 
                     HomePaymentBox(summaryText: goods.ownerPaymentSummaryText)
+
+                    if let listingDetail {
+                        HomeListingDetailButton {
+                            presentedListingDetail = listingDetail
+                        }
+                    }
                 }
                 .padding(.top, 4)
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -37,6 +45,11 @@ struct HomeSelectedGoodsHeader: View {
             if let listingNote = listingNote?.nilIfBlank {
                 HomeListingNoteBox(note: listingNote)
             }
+        }
+        .sheet(item: $presentedListingDetail) { detail in
+            HomeIndividualListingDetailPopup(detail: detail)
+                .presentationDetents([.medium, .large])
+                .presentationDragIndicator(.visible)
         }
     }
 }
@@ -80,5 +93,33 @@ private struct HomeListingNoteBox: View {
         .padding(.horizontal, 12)
         .padding(.vertical, 10)
         .background(MegrumTheme.ink.opacity(0.035), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+    }
+}
+
+private struct HomeListingDetailButton: View {
+    var action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 7) {
+                Image(systemName: "doc.text.magnifyingglass")
+                    .font(.system(size: 12.5, weight: .black, design: .rounded))
+                Text("個別募集の詳細を見る")
+                    .font(.system(size: 12.5, weight: .black, design: .rounded))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.74)
+            }
+            .foregroundStyle(MegrumTheme.lavender)
+            .frame(maxWidth: .infinity)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 9)
+            .background(MegrumTheme.lavender.opacity(0.10), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .strokeBorder(MegrumTheme.lavender.opacity(0.18), lineWidth: 1)
+            }
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("個別募集の詳細を見る")
     }
 }

@@ -1031,8 +1031,10 @@ final class HomeCandidateComposerTests: XCTestCase {
                     id: listingID,
                     userID: "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
                     haveIDs: [partnerHaveID],
+                    haveQtys: [2],
                     haveGroupID: nil,
                     haveGoodsTypeID: nil,
+                    haveLogic: "or",
                     note: """
                     条件外でも写真を見て相談したいです
                     交換手段: 現地交換 / 都道府県: 東京都 / 場所メモ: 相談 / 日程: 相談して決める / 送料: 要相談 / 発送目安: 2〜4日以内 / 条件外打診: 可
@@ -1083,10 +1085,18 @@ final class HomeCandidateComposerTests: XCTestCase {
         XCTAssertEqual(options[2].cashAmount, 1_500)
         XCTAssertFalse(options[1].matchingGoodsIDs.contains(UUID(uuidString: viewerUnmatchedID)!))
         XCTAssertEqual(partnerSignals.individualListingSelection?.listingNote, "条件外でも写真を見て相談したいです")
+        let partnerDetail = try XCTUnwrap(partnerSignals.individualListingSelection?.detail)
+        XCTAssertEqual(partnerDetail.listingID, UUID(uuidString: listingID)!)
+        XCTAssertEqual(partnerDetail.offeredLogic, .one)
+        XCTAssertEqual(partnerDetail.offeredItems.map(\.id), [UUID(uuidString: partnerHaveID)!])
+        XCTAssertEqual(partnerDetail.offeredItems.map(\.title), ["相手が譲るグッズ"])
+        XCTAssertEqual(partnerDetail.offeredItems.map(\.quantity), [2])
+        XCTAssertEqual(partnerDetail.wantedOptions.map(\.kind), [.goods, .condition, .cash])
 
         let viewerSignals = try XCTUnwrap(sections.conditionSignalsByItemID[UUID(uuidString: viewerExactID)!])
         XCTAssertEqual(viewerSignals.individualListingSelection?.wantedOptions.map(\.kind), [.goods])
         XCTAssertEqual(viewerSignals.individualListingSelection?.listingNote, "条件外でも写真を見て相談したいです")
+        XCTAssertEqual(viewerSignals.individualListingSelection?.detail?.offeredItems.map(\.title), ["相手が譲るグッズ"])
     }
 
     func testComposerKeepsOneSidedCandidatesPossible() throws {
@@ -1404,6 +1414,7 @@ final class HomeCandidateComposerTests: XCTestCase {
         id: String,
         userID: String,
         haveIDs: [String],
+        haveQtys: [Int]? = nil,
         haveGroupID: String?,
         haveGoodsTypeID: String?,
         haveLogic: String = "or",
@@ -1415,7 +1426,7 @@ final class HomeCandidateComposerTests: XCTestCase {
                 "id": id,
                 "userId": userID,
                 "haveIds": haveIDs,
-                "haveQtys": haveIDs.map { _ in 1 },
+                "haveQtys": haveQtys ?? haveIDs.map { _ in 1 },
                 "haveLogic": haveLogic,
                 "haveGroupId": haveGroupID,
                 "haveGoodsTypeId": haveGoodsTypeID,

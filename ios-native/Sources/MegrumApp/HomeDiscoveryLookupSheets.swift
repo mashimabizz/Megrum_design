@@ -104,6 +104,7 @@ struct HomeExtraHitDetailSheet: View {
                 conditionTags: payload.conditionTags,
                 exchangeSummary: HomeDiscoveryOwnerExchangeSummary.fromListingSignals(payload.signals),
                 listingNote: payload.individualListingSelection.listingNote,
+                listingDetail: payload.individualListingSelection.detail,
                 onOpenOwnerProfile: onOpenOwnerProfile
             )
 

@@ -4,6 +4,74 @@
 
 ---
 
+## イテレーション979：個別募集詳細ポップアップを候補シートへ追加
+
+### 背景・問題意識
+
+ホームのマッチ候補で個別募集経由のグッズ画像をタップした後、その他要望メモだけでは募集全体の組み合わせを確認しづらい。支払い条件の近くから、個別募集一覧で見ている「求めるもの / 譲るもの」の組み合わせをその場で確認できる導線が必要になった。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/HomeCandidateConditionSignals.swift`
+- ホーム候補の個別募集コンテキストに、ポップアップ表示用の `HomeIndividualListingDetailContext` と `HomeIndividualListingOfferedItem` を追加した。
+- 募集ID、求めるものの選択肢、譲るもの、譲る側ロジック、最低数条件を持てるようにした。
+
+#### `ios-native/Sources/MegrumApp/HomeCandidateListingMatchPolicy.swift`
+#### `ios-native/Sources/MegrumApp/HomeCandidateComposer.swift`
+- 個別募集でヒットした候補に、相手募集の譲るグッズと数量を詰めるようにした。
+- `have_ids` で紐づく相手在庫を優先し、条件指定募集で表示対象が空になる場合はタップ中の候補グッズを表示用 fallback にするようにした。
+
+#### `ios-native/Sources/MegrumApp/HomeDiscoverySheetSharedViews.swift`
+#### `ios-native/Sources/MegrumApp/HomeDiscoveryHitDetailSheets.swift`
+#### `ios-native/Sources/MegrumApp/HomeWishHitDetailSheet.swift`
+#### `ios-native/Sources/MegrumApp/HomeDiscoveryLookupSheets.swift`
+- 詳細シート上部の支払い条件の下に「個別募集の詳細を見る」ボタンを追加した。
+- ボタンを押すと、個別募集の組み合わせ詳細をシートで表示するようにした。
+- その他要望メモは、これまで通り上部グッズ/ユーザー情報ブロックの下に表示する。
+
+#### `ios-native/Sources/MegrumApp/HomeIndividualListingDetailPopup.swift`
+- 個別募集詳細ポップアップを追加した。
+- 左に「求めるもの」、右に「譲るもの」の2カラムを出し、個別募集一覧の組み合わせ表示に近い構成で確認できるようにした。
+
+#### `ios-native/Sources/MegrumApp/HomeDiscoveryCandidateFixtures.swift`
+- Previewの個別募集候補でも詳細ボタンとポップアップが確認できるよう、fixtureに詳細コンテキストを追加した。
+
+#### `ios-native/Tests/MegrumAppTests/HomeCandidateComposerTests.swift`
+- 個別募集ヒットのホーム候補コンテキストに、詳細ポップアップ用の譲るもの・数量・ロジックが入ることをテストで固定した。
+
+### 影響範囲
+
+- Swift Native iOS版ホームのマッチ候補/他にも交換できそうなもの/個別募集経由の詳細シート。
+- 個別募集の保存処理、打診payload、状態遷移、DBスキーマは変更しない。
+- 相互マッチ側の一覧・詳細は今回の対象外。
+
+### 確認方法
+
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-listing-detail-build --disable-index-store`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-listing-detail-test --disable-index-store --enable-xctest --disable-swift-testing -j 1 --filter 'HomeCandidateComposerTests|HomeScreenFlowTests|IndividualListingDraftTests'`
+  - 98 tests passed
+- `xcodebuild -quiet -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -destination 'id=C70DDDBB-2602-49E0-8F95-1F043BCCED76' -derivedDataPath /tmp/megrum-ios-native-listing-detail-xcode build`
+  - passed
+- `xcrun simctl install C70DDDBB-2602-49E0-8F95-1F043BCCED76 /tmp/megrum-ios-native-listing-detail-xcode/Build/Products/Debug-iphonesimulator/MegrumNative.app`
+  - passed
+- `xcrun simctl launch C70DDDBB-2602-49E0-8F95-1F043BCCED76 tokyo.megrum.native.preview`
+  - launched
+- `baguette describe-ui --udid C70DDDBB-2602-49E0-8F95-1F043BCCED76`
+  - 支払い条件の下に「個別募集の詳細を見る」ボタンが出ることを確認
+- `xcrun simctl io C70DDDBB-2602-49E0-8F95-1F043BCCED76 screenshot /tmp/megrum-listing-detail-home.png`
+  - screenshot captured
+
+### セルフレビュー結果
+
+- ✅ 支払い条件の下に「個別募集の詳細を見る」導線を追加した。
+- ✅ 詳細ポップアップでは、一覧と同じ考え方で「求めるもの / 譲るもの」の組み合わせを確認できる。
+- ✅ その他要望メモはボタンの下側、上部情報ブロック全体の下に維持した。
+- ✅ 個別募集の保存処理、打診payload、DBスキーマには触れていない。
+- ✅ 状態名・用語の追加変更はないため `notes/09_state_machines.md` / `notes/10_glossary.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション978：個別募集メモを一覧と候補詳細へ表示
 
 ### 背景・問題意識

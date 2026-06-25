@@ -50,6 +50,7 @@ enum HomeCandidateListingMatchPolicy {
         listings: [SupabaseHomeListingRow],
         optionsByListingID: [UUID: [SupabaseHomeListingWishOptionRow]],
         viewerInventory: [SupabaseHomeGoodsRow],
+        listingInventory: [SupabaseHomeGoodsRow] = [],
         candidate: SupabaseHomeGoodsRow? = nil,
         includesCash: Bool = false
     ) -> HomeIndividualListingSelectionContext? {
@@ -76,13 +77,30 @@ enum HomeCandidateListingMatchPolicy {
                 continue
             }
 
-            return HomeIndividualListingSelectionContext(
-                wantedLogic: firstOption.logic,
-                offeredLogic: ListingLogic(rawValue: listing.haveLogic ?? "") ?? .all,
-                wantedMinimumCount: firstOption.minimumCount,
-                offeredMinimumCount: listing.haveMinCount ?? 1,
+            let wantedLogic = firstOption.logic
+            let offeredLogic = ListingLogic(rawValue: listing.haveLogic ?? "") ?? .all
+            let wantedMinimumCount = firstOption.minimumCount
+            let offeredMinimumCount = listing.haveMinCount ?? 1
+            let listingNote = IndividualListingNotePresentation.userMemo(from: listing.note)
+            let detail = detailContext(
+                listing: listing,
+                wantedLogic: wantedLogic,
+                offeredLogic: offeredLogic,
+                wantedMinimumCount: wantedMinimumCount,
+                offeredMinimumCount: offeredMinimumCount,
                 wantedOptions: wantedOptions,
-                listingNote: IndividualListingNotePresentation.userMemo(from: listing.note)
+                listingInventory: listingInventory,
+                candidate: candidate
+            )
+
+            return HomeIndividualListingSelectionContext(
+                wantedLogic: wantedLogic,
+                offeredLogic: offeredLogic,
+                wantedMinimumCount: wantedMinimumCount,
+                offeredMinimumCount: offeredMinimumCount,
+                wantedOptions: wantedOptions,
+                listingNote: listingNote,
+                detail: detail
             )
         }
         return nil
@@ -184,5 +202,64 @@ enum HomeCandidateListingMatchPolicy {
             return "\(matchingCount)件の候補"
         }
         return nil
+    }
+
+    private static func detailContext(
+        listing: SupabaseHomeListingRow,
+        wantedLogic: ListingLogic,
+        offeredLogic: ListingLogic,
+        wantedMinimumCount: Int,
+        offeredMinimumCount: Int,
+        wantedOptions: [HomeIndividualListingWantedOption],
+        listingInventory: [SupabaseHomeGoodsRow],
+        candidate: SupabaseHomeGoodsRow?
+    ) -> HomeIndividualListingDetailContext {
+        HomeIndividualListingDetailContext(
+            listingID: listing.id,
+            wantedLogic: wantedLogic,
+            offeredLogic: offeredLogic,
+            wantedMinimumCount: wantedMinimumCount,
+            offeredMinimumCount: offeredMinimumCount,
+            wantedOptions: wantedOptions,
+            offeredItems: offeredItems(
+                listing: listing,
+                listingInventory: listingInventory,
+                candidate: candidate
+            ),
+            offeredCashAmount: IndividualListingHaveCashSummary.extract(from: listing.note).summary?.amount
+        )
+    }
+
+    private static func offeredItems(
+        listing: SupabaseHomeListingRow,
+        listingInventory: [SupabaseHomeGoodsRow],
+        candidate: SupabaseHomeGoodsRow?
+    ) -> [HomeIndividualListingOfferedItem] {
+        let quantityByID = listingHaveQuantityByID(listing)
+        let inventoryByID = Dictionary(uniqueKeysWithValues: listingInventory.map { ($0.id, $0) })
+        var rows = listing.haveIds.compactMap { inventoryByID[$0] }
+        if rows.isEmpty,
+           let candidate,
+           listingIncludesCandidate(listing, candidate: candidate) {
+            rows = [candidate]
+        }
+
+        return rows.enumerated().map { _, row in
+            HomeIndividualListingOfferedItem(
+                id: row.id,
+                title: row.title,
+                imageURL: row.photoUrls.compactMap(URL.init(string:)).first,
+                quantity: quantityByID[row.id] ?? 1
+            )
+        }
+    }
+
+    private static func listingHaveQuantityByID(_ listing: SupabaseHomeListingRow) -> [UUID: Int] {
+        var quantityByID: [UUID: Int] = [:]
+        for (index, id) in listing.haveIds.enumerated() {
+            let quantity = listing.haveQtys.indices.contains(index) ? listing.haveQtys[index] : 1
+            quantityByID[id] = max(1, quantity)
+        }
+        return quantityByID
     }
 }

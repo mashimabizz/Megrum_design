@@ -31,6 +31,7 @@ struct HomeWishHitDetailSheet: View {
                 conditionTags: selection.conditionTags,
                 exchangeSummary: HomeDiscoveryOwnerExchangeSummary.fromListingSignals(selection.signals),
                 listingNote: selection.individualListingSelection.listingNote,
+                listingDetail: selection.individualListingSelection.detail,
                 onOpenOwnerProfile: onOpenOwnerProfile
             )
 

@@ -126,6 +126,58 @@ public struct HomeCandidateLinkCounts: Equatable, Sendable {
     }
 }
 
+public struct HomeIndividualListingOfferedItem: Identifiable, Equatable, Sendable {
+    public var id: UUID
+    public var title: String
+    public var imageURL: URL?
+    public var quantity: Int
+
+    public init(
+        id: UUID,
+        title: String,
+        imageURL: URL? = nil,
+        quantity: Int = 1
+    ) {
+        self.id = id
+        self.title = title.trimmingCharacters(in: .whitespacesAndNewlines).nilIfBlank ?? "グッズ"
+        self.imageURL = imageURL
+        self.quantity = max(1, quantity)
+    }
+}
+
+public struct HomeIndividualListingDetailContext: Identifiable, Equatable, Sendable {
+    public var listingID: UUID
+    public var wantedLogic: ListingLogic
+    public var offeredLogic: ListingLogic
+    public var wantedMinimumCount: Int
+    public var offeredMinimumCount: Int
+    public var wantedOptions: [HomeIndividualListingWantedOption]
+    public var offeredItems: [HomeIndividualListingOfferedItem]
+    public var offeredCashAmount: Int?
+
+    public var id: UUID { listingID }
+
+    public init(
+        listingID: UUID,
+        wantedLogic: ListingLogic = .one,
+        offeredLogic: ListingLogic = .all,
+        wantedMinimumCount: Int = 1,
+        offeredMinimumCount: Int = 1,
+        wantedOptions: [HomeIndividualListingWantedOption] = [],
+        offeredItems: [HomeIndividualListingOfferedItem] = [],
+        offeredCashAmount: Int? = nil
+    ) {
+        self.listingID = listingID
+        self.wantedLogic = wantedLogic
+        self.offeredLogic = offeredLogic
+        self.wantedMinimumCount = max(1, wantedMinimumCount)
+        self.offeredMinimumCount = max(1, offeredMinimumCount)
+        self.wantedOptions = wantedOptions
+        self.offeredItems = offeredItems
+        self.offeredCashAmount = offeredCashAmount.map { max(0, $0) }
+    }
+}
+
 public struct HomeIndividualListingSelectionContext: Equatable, Sendable {
     public var wantedLogic: ListingLogic
     public var offeredLogic: ListingLogic
@@ -133,6 +185,7 @@ public struct HomeIndividualListingSelectionContext: Equatable, Sendable {
     public var offeredMinimumCount: Int
     public var wantedOptions: [HomeIndividualListingWantedOption]
     public var listingNote: String?
+    public var detail: HomeIndividualListingDetailContext?
 
     public init(
         wantedLogic: ListingLogic = .one,
@@ -140,7 +193,8 @@ public struct HomeIndividualListingSelectionContext: Equatable, Sendable {
         wantedMinimumCount: Int = 1,
         offeredMinimumCount: Int = 1,
         wantedOptions: [HomeIndividualListingWantedOption] = [],
-        listingNote: String? = nil
+        listingNote: String? = nil,
+        detail: HomeIndividualListingDetailContext? = nil
     ) {
         self.wantedLogic = wantedLogic
         self.offeredLogic = offeredLogic
@@ -148,6 +202,7 @@ public struct HomeIndividualListingSelectionContext: Equatable, Sendable {
         self.offeredMinimumCount = max(1, offeredMinimumCount)
         self.wantedOptions = wantedOptions
         self.listingNote = listingNote?.nilIfBlank
+        self.detail = detail
     }
 
     public static var defaultSelection: HomeIndividualListingSelectionContext {

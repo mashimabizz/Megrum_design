@@ -39,7 +39,58 @@ extension HomeDiscoveryFixtures {
                 kind: .cash,
                 cashAmount: 1_500
             )
-        ]
+        ],
+        detail: HomeIndividualListingDetailContext(
+            listingID: uuid("000000000980"),
+            wantedLogic: .one,
+            offeredLogic: .all,
+            wantedOptions: [
+                HomeIndividualListingWantedOption(
+                    id: uuid("000000000981"),
+                    listingID: uuid("000000000980"),
+                    position: 1,
+                    title: "サナ トレカ",
+                    subtitle: "グッズ指定",
+                    logic: .one,
+                    kind: .goods,
+                    goodsIDs: [sanaLavender.id],
+                    matchingGoodsIDs: [sanaLavender.id],
+                    groupID: nil,
+                    goodsTypeID: nil
+                ),
+                HomeIndividualListingWantedOption(
+                    id: uuid("000000000982"),
+                    listingID: uuid("000000000980"),
+                    position: 2,
+                    title: "TWICE モモ / トレカ",
+                    subtitle: "条件指定・該当するグッズから選択",
+                    logic: .one,
+                    kind: .condition,
+                    goodsIDs: [],
+                    matchingGoodsIDs: [momoFanmi.id],
+                    groupID: nil,
+                    goodsTypeID: nil
+                ),
+                HomeIndividualListingWantedOption(
+                    id: uuid("000000000983"),
+                    listingID: uuid("000000000980"),
+                    position: 3,
+                    title: "定価1,500円",
+                    subtitle: "金額で受け取る条件",
+                    logic: .one,
+                    kind: .cash,
+                    cashAmount: 1_500
+                )
+            ],
+            offeredItems: [
+                HomeIndividualListingOfferedItem(
+                    id: selectedYellow.id,
+                    title: selectedYellow.title,
+                    imageURL: selectedYellow.imageURL,
+                    quantity: 1
+                )
+            ]
+        )
     )
 
     static let userTagCandidates: [HomeDiscoveryCandidate] = [

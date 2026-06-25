@@ -96,6 +96,7 @@ enum HomeCandidateComposer {
                 listings: partnerListingsByUser[candidate.userId, default: []],
                 optionsByListingID: listingOptionsByListingID,
                 viewerInventory: availableViewerInventory,
+                listingInventory: partnerInventory,
                 candidate: candidate,
                 includesCash: true
             )
@@ -160,7 +161,8 @@ enum HomeCandidateComposer {
             let individualListingSelection = HomeCandidateListingMatchPolicy.firstSelection(
                 listings: matchingPartnerListings,
                 optionsByListingID: listingOptionsByListingID,
-                viewerInventory: [viewerItem]
+                viewerInventory: [viewerItem],
+                listingInventory: partnerInventory
             )
 
             conditionSignalsByItemID[viewerItem.id] = HomeCandidateConditionSignals(
