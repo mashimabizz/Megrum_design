@@ -4,6 +4,43 @@
 
 ---
 
+## イテレーション956：Megrum location stateを分割
+
+### 背景・問題意識
+
+`MegrumLocationState.swift` は、`CLLocationManager` を使う現在地取得の副作用、座標/権限/通知モデル、めぐり用の権限表示ポリシーを1ファイルに持っていた。現在地取得そのものは壊すと影響が大きいため、manager/delegate/geocoderの本体には触れず、純粋なモデルと表示ポリシーだけを分けて読みやすくする。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/MegrumLocationModels.swift`
+- `MegrumLocationCoordinate`、`MegrumLocationPermissionPhase`、`MegrumLocationNotice` を新規ファイルへ移動した。
+
+#### `ios-native/Sources/MegrumApp/MegrumLocationPermissionPolicy.swift`
+- `permissionPhase`、`meguriNotice`、権限状態から表示フェーズ/通知文言を決めるstatic helperを新規ファイルへ移動した。
+
+#### `ios-native/Sources/MegrumApp/MegrumLocationState.swift`
+- 現在地要求、権限変更delegate、位置更新delegate、逆ジオコーディング、エラー処理は既存挙動のまま残した。
+
+### 影響範囲
+
+- Swift Native iOS版のめぐりマップ/掲示板、グルーム作成、現地モード、打診作成の待ち合わせ候補、取引詳細の位置共有。
+- 挙動変更ではなく責務分離。位置情報取得、権限文言、座標保存、状態名、用語、DBスキーマは変更しない。
+
+### 確認方法
+
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-location-state-build --disable-index-store`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-location-state-build --disable-index-store --enable-xctest --disable-swift-testing -j 1 --filter 'MeguriAccessPolicyTests|HomeLocalModeTests|TradeRequestDraftProposalCreateFlowTests'`
+  - 46 tests passed
+
+### セルフレビュー結果
+
+- ✅ 副作用を持つ `CLLocationManager` / delegate / geocoder 本体は `MegrumLocationState.swift` に残し、モデルと純粋な表示ポリシーのみ分割した。
+- ✅ 位置情報権限notice、現地モード座標保存、打診作成の現在地候補まわりの対象テストを通した。
+- ✅ 状態名・用語・DBスキーマの変更はないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション955：Proposal core modelsを分割
 
 ### 背景・問題意識
