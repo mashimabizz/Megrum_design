@@ -4,6 +4,46 @@
 
 ---
 
+## イテレーション1071：goods editor status option rowを分離
+
+### 背景・問題意識
+
+`GoodsEditorValueSections.swift` は、数量section、状態section、状態選択rowの表示を同じファイルに抱えていた。数量/状態sectionの構造は維持し、状態1件分のrow表示だけを専用Viewへ分離する。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/GoodsEditorValueSections.swift`
+- `GoodsEditorQuantitySection` と `GoodsEditorStatusSection` を残した。
+- `GoodsEditorStatusOptionRow` の表示本体を移動した。
+
+#### `ios-native/Sources/MegrumApp/GoodsEditorStatusOptionRow.swift`
+- `GoodsEditorStatusOptionRow` を追加し、status icon、title、selected checkmark、背景materialを担当させた。
+- icon size、selected/unselected色、padding、corner radius、checkmark表示を維持した。
+
+### 影響範囲
+
+- Swift Native iOS版のGoods Editorにおける数量/状態section。
+- 状態選択rowのicon、title、selected表示。
+- 数量normalization、状態選択、保存payload、DB/API、状態名、用語、表示文言は変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumApp/GoodsEditorValueSections.swift ios-native/Sources/MegrumApp/GoodsEditorStatusOptionRow.swift`
+  - passed
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-goods-editor-status-option-row`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-goods-editor-status-option-row --enable-xctest --disable-swift-testing -j 1 --filter 'GoodsEditorDraftTests|GoodsEditorWishPhotoRemovalPolicyTests|GoodsInventoryCreateMetaTilePresentationTests'`
+  - passed（32 tests）
+
+### セルフレビュー結果
+
+- ✅ 状態選択button、disabled制御、数量入力は親sectionに残し、状態rowの見た目だけを専用ファイルへ移した。
+- ✅ status icon、selected色、title font、checkmark、padding、regular material背景を維持した。
+- ✅ `GoodsEditorValueSections.swift` は 106行から 76行へ縮小し、status option rowを 33行の専用ファイルへ分離した。
+- ✅ 新しい状態名・用語・DB列は追加していないため、`notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション1070：schedule row viewを分離
 
 ### 背景・問題意識
