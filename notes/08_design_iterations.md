@@ -4,6 +4,46 @@
 
 ---
 
+## イテレーション1095：proposal completion cardを分離
+
+### 背景・問題意識
+
+`ProposalCreateCompletionView.swift` は、完了画面本体の中に、完了カードの背景、checkmark、title/message表示まで抱えていた。完了画面側をsummaryとaction stackの構成に集中させるため、完了カードを専用Viewファイルへ分離する。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/ProposalCreateCompletionView.swift`
+- `completionCard` と `decorativeBackground` を移動した。
+- `ProposalCompletionCard(summary:)` と `ProposalCompletionButtonStack(onAction:)` の画面構成に整理した。
+- 検索継続/やりとり表示のaction dispatchは維持した。
+
+#### `ios-native/Sources/MegrumApp/ProposalCompletionCard.swift`
+- `ProposalCompletionCard` を追加した。
+- card background、checkmark badge、completion title/message、padding、height、clip shapeを維持した。
+- `ProposalCompletionDecorativeBackground` をprivate subviewとして追加した。
+
+### 影響範囲
+
+- Swift Native iOS版の打診作成完了画面。
+- 完了summary、button stack、完了後action、送信payload、DB/API、状態名、表示文言は変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumApp/ProposalCreateCompletionView.swift ios-native/Sources/MegrumApp/ProposalCompletionCard.swift`
+  - passed
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-proposal-completion-card`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-proposal-completion-card --enable-xctest --disable-swift-testing -j 1 --filter 'ProposalCreateFlowTests|ProposalCreateSheetTests'`
+  - passed（62 tests）
+
+### セルフレビュー結果
+
+- ✅ card background、checkmark badge、completion title/message、padding、height、clip shapeを維持した。
+- ✅ `ProposalCreateCompletionView.swift` は 95行から 30行へ縮小し、completion cardを 77行の専用ファイルへ分離した。
+- ✅ 新しい状態名・用語・DB列は追加していないため、`notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション1094：proposal completion buttonsを分離
 
 ### 背景・問題意識
