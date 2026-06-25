@@ -4,6 +4,46 @@
 
 ---
 
+## イテレーション1066：proposal step header tabを分離
+
+### 背景・問題意識
+
+`ProposalCreateChromeViews.swift` の `ProposalStepHeader` は、ステップ遷移可否、badge文言/色、タブtitle判定に加えて、タブ1個分のButton見た目を同じbody内に抱えていた。親Viewは進行ロジックと表示値の決定に集中させ、タブの見た目だけを専用Viewへ分離する。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/ProposalCreateChromeViews.swift`
+- `ProposalStepHeader` の `ForEach` 内からタブButtonのstyleを移動した。
+- `canJump(to:)`、`badgeText(for:)`、`badgeColor(for:)`、`tabTitle(for:)` と `selectedStep` 更新は親Viewに残した。
+
+#### `ios-native/Sources/MegrumApp/ProposalStepHeaderTab.swift`
+- `ProposalStepHeaderTab` を追加し、タブtitle、badge、選択状態、disabled/opacity、selected background、shadowを担当させた。
+- `ProposalSectionTabsMetrics` をそのまま使い、既存のfont、spacing、padding、min height、badge色、selected capsuleを維持した。
+
+### 影響範囲
+
+- Swift Native iOS版の打診作成フロー上部ステップタブ。
+- ステップタブの表示、badge、選択状態、disabled表示。
+- 打診作成の進行条件、送信payload、待ち合わせ/支払/送料validation、DB/API、状態名、用語、表示文言は変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumApp/ProposalCreateChromeViews.swift ios-native/Sources/MegrumApp/ProposalStepHeaderTab.swift`
+  - passed
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-proposal-step-header-tab`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-proposal-step-header-tab --enable-xctest --disable-swift-testing -j 1 --filter 'ProposalCreateFlowTests|ProposalCreateSheetTests|TradeRequestDraftProposalCreateFlowTests'`
+  - passed（62 tests）
+
+### セルフレビュー結果
+
+- ✅ タブstyleだけを専用Viewへ移し、ステップ遷移可否、badge判定、selectedStep更新は親Viewに残した。
+- ✅ `ProposalSectionTabsMetrics` のfont、spacing、padding、min height、selected capsule、shadow、disabled opacityを維持した。
+- ✅ `ProposalCreateChromeViews.swift` は 217行から 184行へ縮小し、タブ表示を 57行の専用ファイルへ分離した。
+- ✅ 新しい状態名・用語・DB列は追加していないため、`notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション1065：meguri groom presentationを分離
 
 ### 背景・問題意識

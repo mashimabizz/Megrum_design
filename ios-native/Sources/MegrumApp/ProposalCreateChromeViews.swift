@@ -53,54 +53,21 @@ struct ProposalStepHeader: View {
     var body: some View {
         HStack(spacing: 0) {
             ForEach(steps) { step in
-                Button {
-                    if canJump(to: step) {
-                        withAnimation(.snappy) {
-                            selectedStep = step
-                        }
+                let isEnabled = canJump(to: step)
+                ProposalStepHeaderTab(
+                    title: tabTitle(for: step),
+                    badge: badgeText(for: step),
+                    badgeColor: badgeColor(for: step),
+                    isSelected: selectedStep == step,
+                    isEnabled: isEnabled
+                ) {
+                    guard isEnabled else {
+                        return
                     }
-                } label: {
-                    HStack(spacing: ProposalSectionTabsMetrics.tabGap) {
-                        Text(tabTitle(for: step))
-                            .font(.system(size: ProposalSectionTabsMetrics.labelFontSize, weight: .black, design: .rounded))
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.82)
-                        if let badge = badgeText(for: step) {
-                            Text(badge)
-                                .font(.system(size: ProposalSectionTabsMetrics.countFontSize, weight: .black, design: .rounded))
-                                .foregroundStyle(badgeColor(for: step))
-                                .lineLimit(1)
-                        }
+                    withAnimation(.snappy) {
+                        selectedStep = step
                     }
-                    .foregroundStyle(
-                        selectedStep == step
-                            ? MegrumTheme.ink
-                            : MegrumTheme.ink.opacity(0.55)
-                    )
-                    .frame(maxWidth: .infinity)
-                    .frame(minHeight: ProposalSectionTabsMetrics.minTabHeight)
-                    .padding(.horizontal, ProposalSectionTabsMetrics.tabHorizontalPadding)
-                    .padding(.vertical, ProposalSectionTabsMetrics.tabVerticalPadding)
-                    .background(
-                        selectedStep == step ? AnyShapeStyle(Color.white.opacity(0.92)) : AnyShapeStyle(Color.clear),
-                        in: Capsule()
-                    )
-                    .overlay {
-                        if selectedStep == step {
-                            Capsule()
-                                .stroke(Color.white.opacity(0.92), lineWidth: 1)
-                        }
-                    }
-                    .shadow(
-                        color: selectedStep == step ? MegrumTheme.ink.opacity(0.13) : .clear,
-                        radius: 12,
-                        x: 0,
-                        y: 5
-                    )
                 }
-                .buttonStyle(.plain)
-                .disabled(!canJump(to: step))
-                .opacity(canJump(to: step) ? 1 : 0.62)
             }
         }
         .padding(ProposalSectionTabsMetrics.containerPadding)
