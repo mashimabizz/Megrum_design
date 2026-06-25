@@ -4,6 +4,45 @@
 
 ---
 
+## イテレーション931：Supabase auth DTOsを分割
+
+### 背景・問題意識
+
+`SupabaseAuthClient.swift` は、認証処理本体、request生成、OAuth URL生成、error handlingに加えて、password / refresh / signup / id token payload と auth/user/error response DTOを同じファイルに持っていた。認証フローは影響範囲が大きいため、ログイン・refresh・redirect処理は維持し、DTOだけを別ファイルへ移す。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumData/SupabaseAuthClient.swift`
+- 末尾のpayload/response DTO定義を専用ファイルへ移動した。
+- ファイル行数を421行から315行へ縮小した。
+- 認証request生成、OAuth authorize URL生成、session refresh、redirect token parse、error handlingの処理順は変更していない。
+
+#### `ios-native/Sources/MegrumData/SupabaseAuthDTOs.swift`
+- `PasswordPayload`、`RefreshTokenPayload`、`PasswordResetPayload`、`SignUpPayload`、`IDTokenPayload`、`SignUpMetadata` を新規ファイルへ移動した。
+- `AuthResponse`、`UserResponse`、`AuthErrorResponse` と `AuthSession` / `AuthUser` への変換を新規ファイルへ移動した。
+
+### 影響範囲
+
+- Swift Native iOS版のSupabase認証クライアント。
+- 挙動変更ではなく責務分離。認証API path、payload key、error message抽出、refresh session decode、状態名、用語、DBスキーマは変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumData/SupabaseAuthClient.swift ios-native/Sources/MegrumData/SupabaseAuthDTOs.swift`
+  - passed
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-auth-client-build --disable-index-store`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-auth-client-tests --disable-index-store --enable-xctest --disable-swift-testing -j 1 --filter SupabaseAuthClientTests`
+  - 12 tests passed
+
+### セルフレビュー結果
+
+- ✅ password sign in、refresh、signup metadata、id token、password reset、OAuth authorize、sign out、user requestのpayload/header/pathを既存テストで維持確認した。
+- ✅ Supabase error message/error_description decode、refresh sessionのexpiresAt算出、redirect fragment parseを既存テストで維持確認した。
+- ✅ 状態名・用語・DBスキーマの変更はないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション930：Supabase home query itemsを分割
 
 ### 背景・問題意識
