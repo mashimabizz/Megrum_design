@@ -4,6 +4,54 @@
 
 ---
 
+## イテレーション939：Supabase home rowsを分割
+
+### 背景・問題意識
+
+`SupabaseHomeRows.swift` は、Home composition、現地モードrow、グッズrow、ユーザーrow、活動予定row、タグrow、通知IDrow、decode補助を1ファイルに持っていた。Home取得の全体構造と各テーブルrowの変更観点が混ざっていたため、public APIとdecode挙動は維持しながら責務別ファイルへ分ける。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumData/SupabaseHomeRows.swift`
+- `SupabaseHomeComposition` のみを残し、ファイル行数を370行から54行へ縮小した。
+
+#### `ios-native/Sources/MegrumData/SupabaseHomeGoodsRows.swift`
+- `SupabaseHomeGoodsRow` と `SupabaseHomeInventoryTagRow`、それぞれのselect文字列を新規ファイルへ移動した。
+- embedded relation、hueの柔軟decode、market_available_qty/locked_qty、タグlabel decodeは維持した。
+
+#### `ios-native/Sources/MegrumData/SupabaseHomeLocalRows.swift`
+- `SupabaseHomeLocalModeRow` と `SupabaseHomeActivityWindowRow`、それぞれのselect文字列を新規ファイルへ移動した。
+- lat/lng/center座標の文字列・数値両対応decodeは維持した。
+
+#### `ios-native/Sources/MegrumData/SupabaseHomeUserRows.swift`
+- `SupabaseHomeUserRow` と `SupabaseHomeNotificationIDRow`、それぞれのselect文字列を新規ファイルへ移動した。
+- payment method、評価サマリ、legacy select fallbackの定義は維持した。
+
+#### `ios-native/Sources/MegrumData/SupabaseHomeRowDecoding.swift`
+- Home row共通のembedded relation decode、柔軟なDouble/String decode、UUID lowercase helperを新規ファイルへ移動した。
+
+### 影響範囲
+
+- Swift Native iOS版のホーム composition 取得、相互マッチ/マッチ候補/募集タイムラインの元データrow decode。
+- 挙動変更ではなく責務分離。Supabase table名、select、query、decode fallback、状態名、用語、DBスキーマは変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumData/SupabaseHomeRows.swift ios-native/Sources/MegrumData/SupabaseHomeGoodsRows.swift ios-native/Sources/MegrumData/SupabaseHomeLocalRows.swift ios-native/Sources/MegrumData/SupabaseHomeRowDecoding.swift ios-native/Sources/MegrumData/SupabaseHomeUserRows.swift`
+  - passed
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-home-rows-build --disable-index-store`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-home-rows-tests --disable-index-store --enable-xctest --disable-swift-testing -j 1 --filter SupabaseHomeClientTests`
+  - 6 tests passed
+
+### セルフレビュー結果
+
+- ✅ Home composition、グッズ/タグrow、現地モード/AW row、ユーザー/通知row、decode補助を移動のみで分割した。
+- ✅ Home取得query、row decode、embedded relation、柔軟な数値decodeの既存テストを通した。
+- ✅ 状態名・用語・DBスキーマの変更はないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション938：Supabase proposal evidence clientを分割
 
 ### 背景・問題意識
