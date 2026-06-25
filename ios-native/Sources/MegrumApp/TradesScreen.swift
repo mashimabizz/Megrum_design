@@ -1,11 +1,6 @@
 import MegrumCore
 import MegrumDesign
-import Foundation
-import PhotosUI
 import SwiftUI
-#if os(iOS)
-import UIKit
-#endif
 
 struct TradesScreen: View {
     @ObservedObject var appState: MegrumAppState
@@ -83,9 +78,13 @@ struct TradesScreen: View {
         }
         .background(MegrumTheme.canvas.ignoresSafeArea())
         .megrumHiddenNavigationBar()
-        .tradeDetailPresentation(item: $detailRoute) { route in
-            tradeDetailView(for: route)
-        }
+        .modifier(
+            TradesDetailPresentationModifier(
+                detailRoute: $detailRoute,
+                appState: appState,
+                proposals: proposals
+            )
+        )
         .onAppear {
             consumeRequestedStage()
         }
@@ -98,35 +97,6 @@ struct TradesScreen: View {
         .task(id: partnerProfileTaskKey) {
             for userID in visiblePartnerIDs where appState.publicProfilesByUserID[userID] == nil {
                 await appState.loadPublicUserProfile(userID: userID)
-            }
-        }
-    }
-
-    @ViewBuilder
-    private func tradeDetailView(for route: TradeDetailRoute) -> some View {
-        NavigationStack {
-            if let proposal = proposals.first(where: { $0.id == route.proposalID }) {
-                TradeDetailScreen(appState: appState, proposal: proposal)
-                    .toolbar {
-                        ToolbarItem(placement: .cancellationAction) {
-                            Button {
-                                detailRoute = nil
-                            } label: {
-                                Image(systemName: "chevron.left")
-                                    .font(.system(size: 18, weight: .heavy))
-                            }
-                            .accessibilityLabel("やりとり一覧に戻る")
-                        }
-                    }
-            } else {
-                TradeDetailUnavailableScreen()
-                    .toolbar {
-                        ToolbarItem(placement: .cancellationAction) {
-                            Button("閉じる") {
-                                detailRoute = nil
-                            }
-                        }
-                    }
             }
         }
     }
@@ -215,19 +185,5 @@ struct TradesScreen: View {
             }
             selectedPendingProposalIDs.removeAll()
         }
-    }
-}
-
-private extension View {
-    @ViewBuilder
-    func tradeDetailPresentation<Content: View>(
-        item: Binding<TradeDetailRoute?>,
-        @ViewBuilder content: @escaping (TradeDetailRoute) -> Content
-    ) -> some View {
-        #if os(iOS)
-        fullScreenCover(item: item, content: content)
-        #else
-        sheet(item: item, content: content)
-        #endif
     }
 }

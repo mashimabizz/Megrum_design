@@ -4,6 +4,48 @@
 
 ---
 
+## イテレーション1056：trades detail presentationを分離
+
+### 背景・問題意識
+
+`TradesScreen.swift` は、やり取り一覧、stage切り替え、pending選択/取り下げ処理に加えて、取引詳細のfullScreenCover / sheet presentationとfallback画面も同じファイルに抱えていた。一覧と選択処理を親Viewに残し、詳細presentationだけを専用modifierへ分離した。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/TradesScreen.swift`
+- `TradesDetailPresentationModifier` を適用し、detail route表示を委譲した。
+- stage一覧、footer、requested stage消費、pending選択、既読化、取り下げ処理は親Viewに残した。
+- 不要になった `Foundation` / `PhotosUI` / `UIKit` import を削除した。
+
+#### `ios-native/Sources/MegrumApp/TradesDetailPresentationModifier.swift`
+- `TradesDetailPresentationModifier` を追加し、proposalが見つかる場合の `TradeDetailScreen` と、見つからない場合の `TradeDetailUnavailableScreen` を担当させた。
+- iOSは `fullScreenCover`、それ以外は `sheet` の既存presentation分岐を移動した。
+- 戻る/閉じる操作で `detailRoute = nil` にする挙動を維持した。
+
+### 影響範囲
+
+- Swift Native iOS版のやり取り一覧から取引詳細を開くpresentation。
+- 取引詳細への遷移、閉じる操作、fallback unavailable画面。
+- stage一覧、pending選択、取り下げ、既読化、状態名、用語、DBスキーマ、表示文言は変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumApp/TradesScreen.swift ios-native/Sources/MegrumApp/TradesDetailPresentationModifier.swift`
+  - passed
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-trades-detail-presentation`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-trades-detail-presentation --enable-xctest --disable-swift-testing -j 1 --filter 'TradeChatAffordanceTests|TradeRequestDraftTests|TradeMessageStateReducerTests'`
+  - passed（61 tests）
+
+### セルフレビュー結果
+
+- ✅ detail presentation / fallbackだけを専用modifierへ移し、一覧とpending選択/取り下げ処理は親Viewに残した。
+- ✅ iOS fullScreenCover / 非iOS sheet、戻る/閉じる挙動、既読化の発火位置を維持した。
+- ✅ `TradesScreen.swift` は 233行から 189行へ縮小し、detail presentationを 57行の専用ファイルへ分離した。
+- ✅ 新しい状態名・用語・DB列は追加していないため、`notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション1055：match relation option cardsを分離
 
 ### 背景・問題意識
