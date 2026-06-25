@@ -4,6 +4,48 @@
 
 ---
 
+## イテレーション935：Supabase board rowsを分割
+
+### 背景・問題意識
+
+`SupabaseBoardRows.swift` は、Meguri掲示板のスレッドrow/payload、返信row/payload、scope query context、距離フィルタを1ファイルに持っていた。スレッド取得/作成と返信取得/追加は同じclientから使われるが、row/payloadとしては別責務なので、返信系とscope変換を専用ファイルへ分ける。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumData/SupabaseBoardRows.swift`
+- `BoardThreadListPayload`、`BoardThreadRow`、`BoardThreadInsertPayload`、スレッド距離フィルタに絞った。
+- ファイル行数を380行から203行へ縮小した。
+
+#### `ios-native/Sources/MegrumData/SupabaseBoardReplyRows.swift`
+- `BoardReplyListPayload`、`BoardReplyAppendPayload`、`BoardReplyRow` を新規ファイルへ移動した。
+- reply body trimming、parent/quote nil encode、image paths初期値、status fallbackは維持した。
+
+#### `ios-native/Sources/MegrumData/SupabaseBoardScopeQueryContext.swift`
+- `BoardScopeQueryContext` をスレッド/返信payload共通のscope変換として新規ファイルへ移動した。
+- nearby/samePrefecture/sameSpot/globalのRPC scope変換とprefecture trimmingは維持した。
+
+### 影響範囲
+
+- Swift Native iOS版のMeguri掲示板スレッド一覧/作成、返信一覧/追加、scope別表示。
+- 挙動変更ではなく責務分離。Supabase RPC名、payload key、距離フィルタ、状態名、用語、DBスキーマは変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumData/SupabaseBoardRows.swift ios-native/Sources/MegrumData/SupabaseBoardReplyRows.swift ios-native/Sources/MegrumData/SupabaseBoardScopeQueryContext.swift`
+  - passed
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-board-rows-build --disable-index-store`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-board-rows-tests --disable-index-store --enable-xctest --disable-swift-testing -j 1 --filter SupabaseBoardClientTests`
+  - 7 tests passed
+
+### セルフレビュー結果
+
+- ✅ スレッドrow/payload、返信row/payload、scope変換の移動のみで、RPC payload keyとnil encodeは維持した。
+- ✅ nearby/samePrefecture/sameSpot scope変換とclient-side距離フィルタの既存テストを通した。
+- ✅ 状態名・用語・DBスキーマの変更はないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション934：Supabase dispute modelsを分割
 
 ### 背景・問題意識
