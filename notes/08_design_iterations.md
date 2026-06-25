@@ -4,6 +4,45 @@
 
 ---
 
+## イテレーション1077：auth input rowを分離
+
+### 背景・問題意識
+
+`AuthFormComponents.swift` は、primary buttonと状態を持つinput rowを同じファイルに抱えていた。button側は認証フォームの主要CTAに集中させ、email/password入力とpassword表示切替を持つrowを専用Viewへ分離する。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/AuthFormComponents.swift`
+- `AuthPrimaryActionButton` を残した。
+- `AuthInputRow` の表示本体と `showsPassword` stateを移動した。
+
+#### `ios-native/Sources/MegrumApp/AuthInputRow.swift`
+- `AuthInputRow` を追加し、icon、TextField/SecureField切替、keyboard/textContentType、password visibility button、onChange callbackを担当させた。
+- spacing、font、foreground、height、background、stroke、password toggle挙動を維持した。
+
+### 影響範囲
+
+- Swift Native iOS版のメール認証画面とパスワードリセット画面で使う入力row。
+- 入力validation、認証状態、feedback表示、ログイン/登録/リセット処理、DB/API、状態名、表示文言は変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumApp/AuthFormComponents.swift ios-native/Sources/MegrumApp/AuthInputRow.swift`
+  - passed
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-auth-input-row`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-auth-input-row --enable-xctest --disable-swift-testing -j 1 --filter 'AuthScreenInputTests'`
+  - passed（15 tests）
+
+### セルフレビュー結果
+
+- ✅ `AuthInputRow` のBinding、email/password分岐、keyboard/textContentType、password visibility toggleを維持した。
+- ✅ `AuthPrimaryActionButton` のgradient、loading indicator、disabled/opacityは変更していない。
+- ✅ `AuthFormComponents.swift` は 90行から 28行へ縮小し、auth input rowを 64行の専用ファイルへ分離した。
+- ✅ 新しい状態名・用語・DB列は追加していないため、`notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション1076：auth visual feedback rowを分離
 
 ### 背景・問題意識
