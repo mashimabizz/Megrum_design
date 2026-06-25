@@ -4,6 +4,49 @@
 
 ---
 
+## イテレーション965：HomeScreen local mode routingを分割
+
+### 背景・問題意識
+
+`HomeScreen.swift` は、ホーム画面本体、ローカルモードのAppStorage永続化、グルーム表示用のローカルモード要約、初期Visual QA/打診ルーティング、sheet presentation補助を1ファイルに持っていた。ホームは相互マッチ、マッチ候補、募集タイムライン、現地モードの入口が集まるため、表示本体と周辺状態処理を分け、候補表示や現地モード修正時に読む範囲を狭める。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/HomeScreen.swift`
+- bodyと主要modifierを中心に残し、303行から135行へ縮小した。
+- extension分割のため、`HomeScreen` 内部状態の一部を `private` からモジュール内アクセスへ変更した。`HomeScreen` 自体はinternalで、外部公開APIは増やしていない。
+
+#### `ios-native/Sources/MegrumApp/HomeScreenLocalMode.swift`
+- ローカルモードの設定生成、AppStorage fallback、表示状態、持ち物候補、保存/読込処理を新規ファイルへ移動した。
+- `HomeLocalActivitySettings.mergingMissingLocalCoordinate(from:)` を同ファイルへ移動した。
+
+#### `ios-native/Sources/MegrumApp/HomeScreenRouting.swift`
+- ホーム候補から打診作成を開始する処理と、Visual QA初期ルートを開く処理を新規ファイルへ移動した。
+
+#### `ios-native/Sources/MegrumApp/HomeScreenPresentationModifiers.swift`
+- relation/proposal sheet presentation用の `View` extensionを新規ファイルへ移動した。
+
+### 影響範囲
+
+- Swift Native iOS版のホーム画面、ローカルモード設定、ホーム候補からの打診作成、Visual QA初期ルート。
+- 挙動変更ではなく責務分離。ホームタブ構成、候補生成、ローカルモード保存payload、打診作成ルート、状態名、用語、DBスキーマは変更しない。
+
+### 確認方法
+
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-home-screen-build --disable-index-store`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-home-screen-build --disable-index-store --enable-xctest --disable-swift-testing -j 1 --filter 'HomeScreenFlowTests|HomeLocalModeTests|HomeCandidateComposerTests|TradeRequestDraftProposalCreateFlowTests|ProposalCreateSheetTests'`
+  - 109 tests passed
+
+### セルフレビュー結果
+
+- ✅ `HomeScreen` 本体からローカルモード永続化、ルーティング、presentation補助を分け、body周辺の見通しを改善した。
+- ✅ ホーム候補、ローカルモード、打診作成周辺の対象テストを通した。
+- ✅ 分割に伴うアクセス制御変更はMegrumAppモジュール内に閉じており、外部公開APIは増やしていない。
+- ✅ 状態名・用語・DBスキーマの変更はないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション964：Trade goods carousel stageを分割
 
 ### 背景・問題意識
