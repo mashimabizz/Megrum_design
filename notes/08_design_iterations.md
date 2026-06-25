@@ -4,6 +4,46 @@
 
 ---
 
+## イテレーション1074：profile schedule month cellを分離
+
+### 背景・問題意識
+
+`ProfileScheduleComponents.swift` は、日別予定カードの分離後も月表示セルを同じファイルに残していた。公開予定の共通componentsファイルはheaderと日別カードに集中させ、月表示セルの小さなカレンダー表示を専用Viewへ分離する。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/ProfileScheduleComponents.swift`
+- `ProfileScheduleHeader` と `ProfileScheduleDayCard` を残した。
+- `ProfileScheduleMonthCell` の表示本体を移動した。
+
+#### `ios-native/Sources/MegrumApp/ProfileScheduleMonthCell.swift`
+- `ProfileScheduleMonthCell` を追加し、日付label、最大2件の予定preview、mine/partner dot、cell背景を担当させた。
+- 今日の色分け、preview件数、font、spacing、minHeight、padding、corner radiusを維持した。
+
+### 影響範囲
+
+- Swift Native iOS版のプロフィール公開予定における月表示セル。
+- 月表示内の予定preview、mine/partner dot、日付label。
+- スケジュール作成/読み込み、カレンダーwindow、DB/API、状態名、表示文言は変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumApp/ProfileScheduleComponents.swift ios-native/Sources/MegrumApp/ProfileScheduleMonthCell.swift`
+  - passed
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-profile-schedule-month-cell`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-profile-schedule-month-cell --enable-xctest --disable-swift-testing -j 1 --filter 'ScheduleStateReducerTests|TradeScheduleCalendarWindowTests|TradeRequestDraftProposalCreateFlowTests/testProposalScheduleContextFiltersDedupesAndFindsSelectedOverlap|MegrumCoreTests/testPersonalSchedule'`
+  - passed（9 tests）
+
+### セルフレビュー結果
+
+- ✅ `ProfileScheduleMonthCell` の日付label、最大2件preview、dot色、cell backgroundだけを専用ファイルへ移した。
+- ✅ `ProfileScheduleComponents.swift` は 98行から 67行へ縮小し、profile schedule month cellを 34行の専用ファイルへ分離した。
+- ✅ スケジュールの作成/読み込み、日付window計算、予定の並び順、表示文言は変更していない。
+- ✅ 新しい状態名・用語・DB列は追加していないため、`notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション1073：profile schedule row viewを分離
 
 ### 背景・問題意識
