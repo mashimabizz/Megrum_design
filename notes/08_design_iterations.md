@@ -4,6 +4,47 @@
 
 ---
 
+## イテレーション1109：notification center contentを分離
+
+### 背景・問題意識
+
+`NotificationCenterScreen` は、通知読み込み・既読化・通知タップ時の遷移fallbackを扱いながら、filter Picker、loading/empty row、通知一覧、filter別件数表示、filter別empty文言を同じ `body` / computed view内に抱えていた。親画面を通知操作と画面modifierに寄せ、List表示とfilter派生表示を専用Viewへ分離する。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/NotificationsScreen.swift`
+- `List` 本体を `NotificationCenterContent` 呼び出しへ置き換えた。
+- 通知タップ時の既読化、route intent生成、fallback tab遷移を `openNotification(_:)` へ分離した。
+- `loadingRow` / `emptyRow` / `visibleNotifications` / `emptyTitle` computed viewを削除した。
+
+#### `ios-native/Sources/MegrumApp/NotificationCenterContent.swift`
+- `NotificationCenterContent` を追加した。
+- filter Picker、loading/empty row、通知一覧、filter別件数headerを移動した。
+- filter別の `visibleNotifications` と `emptyTitle` をContent内に閉じ込めた。
+
+### 影響範囲
+
+- Swift Native iOS版の通知センター画面。
+- 通知読み込み、pull-to-refresh、すべて既読、通知タップ時の既読化、route intent、fallback tab、filter種別、表示文言、DB/API、状態名は変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumApp/NotificationsScreen.swift ios-native/Sources/MegrumApp/NotificationCenterContent.swift`
+  - passed
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-notification-center-content`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-notification-center-content --enable-xctest --disable-swift-testing -j 1 --filter 'NotificationRouteTests|NotificationReadStateReducerTests|SupabaseNotificationClientTests|MegrumAppStateTests'`
+  - passed（96 tests）
+
+### セルフレビュー結果
+
+- ✅ filter Picker、loading表示、empty表示、件数header、通知row表示を維持した。
+- ✅ 既読化、route intent、fallback tab遷移、通知読み込み、すべて既読処理は親画面に残した。
+- ✅ `NotificationsScreen.swift` は122行から62行へ縮小し、通知List表示を83行の専用ファイルへ分離した。
+- ✅ 新しい状態名・用語・DB列は追加していないため、`notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション1108：board composer contentを分離
 
 ### 背景・問題意識
