@@ -4,6 +4,78 @@
 
 ---
 
+## イテレーション980：個別募集ヒットの受け取り選択と打診前確認を追加
+
+### 背景・問題意識
+
+ホームのマッチ候補で個別募集経由のグッズ◎画像をタップした時、相手の個別募集が「譲るもの」を何個以上で指定している場合でも、打診前にどれを受け取るか選ぶ導線がなかった。また、候補シートの「この内容で打診する」からすぐ打診作成へ進むため、自分が受け取るものと相手が受け取るものの組み合わせを送信前に確認しづらかった。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/HomeGoodsHitDetailSelectionContext.swift`
+#### `ios-native/Sources/MegrumApp/HomeDiscoveryHitDetailSheets.swift`
+- 個別募集の相手譲り側が `atLeast` の場合、相手の希望から譲るものを選ぶ前に「受け取るものを選ぶ」セクションを表示するようにした。
+- 「2個以上」などの最低数ラベルを表示し、必要数に満たない間は「この内容で打診する」を無効化するようにした。
+- 相手の希望側、自分が譲る側も `atLeast` の最低数を満たすまで打診開始できないよう、共通判定へ寄せた。
+- 打診へ渡す `receiverGoodsIDs` に、選んだ受け取りグッズを複数反映するようにした。
+
+#### `ios-native/Sources/MegrumApp/HomeListingSelectionPolicy.swift`
+#### `ios-native/Sources/MegrumApp/HomeListingSheetSelectionStateReducer.swift`
+- `ListingLogic.atLeast` の表示を「3個以上」など具体数へ変更した。
+- `one` / `all` / `atLeast` の選択充足判定を共通化し、受け取り側の選択Stateを追加した。
+
+#### `ios-native/Sources/MegrumApp/HomeProposalStartConfirmationPayload.swift`
+#### `ios-native/Sources/MegrumApp/HomeProposalStartConfirmationSheet.swift`
+#### `ios-native/Sources/MegrumApp/HomeMockGoodsProposalBridge.swift`
+- 「この内容で打診する」タップ後に、打診前確認ポップアップを表示するようにした。
+- ポップアップでは既存のやり取り一覧の交換グッズUIを使い、「受け取るもの」と「私が出すもの」を画像で確認できるようにした。
+- `HomeMockGoods` から `GoodsItem` へ変換する処理を共通化し、確認ポップアップと打診作成Routeで同じ解釈を使うようにした。
+
+#### `ios-native/Sources/MegrumApp/HomeScreenRoutes.swift`
+- ホーム候補から打診作成へ進む時、現地交換なら待ち合わせ、郵送交換なら送料ステップを初期表示するようにした。
+- 既に受け取るもの・出すものが選ばれていれば、提示物選択を飛ばして交換条件入力に入れる。
+
+#### `ios-native/Sources/MegrumApp/HomeDiscoveryCandidateFixtures.swift`
+- Previewの個別募集候補に、譲るもの「2個以上」のケースを追加し、受け取り選択UIを確認できるようにした。
+
+#### `ios-native/Tests/MegrumAppTests/HomeDiscoveryMatchPolicyTests.swift`
+- `atLeast` の最低数充足、受け取り選択不足時の打診開始不可、複数 `receiverGoodsIDs` 反映、交換手段ごとの初期ステップをテストで固定した。
+
+### 影響範囲
+
+- Swift Native iOS版ホームのマッチ候補タブ、個別募集経由のグッズ◎詳細シート、ホーム候補からの打診作成導線。
+- DBスキーマ、Proposal状態名、個別募集保存形式は変更しない。
+- Wishヒット単体の詳細シートは、今回の受け取り選択追加対象外。
+
+### 確認方法
+
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-proposal-receive-build --disable-index-store`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-proposal-receive-test --disable-index-store --enable-xctest --disable-swift-testing -j 1 --filter 'HomeDiscoveryMatchPolicyTests|HomeListingSheetSelectionStateReducerTests|HomeCandidateComposerTests|ProposalCreateFlowTests'`
+  - 133 tests passed
+- `xcodebuild -quiet -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -destination 'id=C70DDDBB-2602-49E0-8F95-1F043BCCED76' -derivedDataPath /tmp/megrum-ios-native-proposal-receive-xcode build`
+  - passed
+- `xcrun simctl install C70DDDBB-2602-49E0-8F95-1F043BCCED76 /tmp/megrum-ios-native-proposal-receive-xcode/Build/Products/Debug-iphonesimulator/MegrumNative.app`
+  - passed
+- `xcrun simctl launch C70DDDBB-2602-49E0-8F95-1F043BCCED76 tokyo.megrum.native.preview`
+  - launched
+- `baguette describe-ui --udid C70DDDBB-2602-49E0-8F95-1F043BCCED76`
+  - 打診前確認ポップアップに「この内容で打診しますか？」「受け取るもの」「私が出すもの」「打診に進む」が出ることを確認
+  - live表示中の候補は相手譲り側が `atLeast` ではなかったため、「受け取るものを選ぶ」は表示されないことを確認。`atLeast` の表示・最低数制御はテストとPreview fixtureで固定
+- `baguette screenshot --udid C70DDDBB-2602-49E0-8F95-1F043BCCED76 --output /tmp/megrum-proposal-start-confirmation.jpg`
+  - screenshot captured
+- XcodeBuildMCPは `session_show_defaults` / `open_sim` が `Transport closed` になったため、Simulator反映は `xcodebuild` / `simctl` / `baguette` で実施した。
+
+### セルフレビュー結果
+
+- ✅ 相手譲り側が「何個以上」の時だけ、先に「受け取るものを選ぶ」を出す。
+- ✅ 「何個以上」は具体数表示になり、最低数未満では打診開始できない。
+- ✅ 打診前確認では既存の交換グッズUIを使い、受け取るもの/私が出すものを画像で確認できる。
+- ✅ 打診作成は現地交換なら待ち合わせ、郵送交換なら送料ステップから始まる。
+- ✅ 状態名・DBスキーマ・用語の追加変更はないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション979：個別募集詳細ポップアップを候補シートへ追加
 
 ### 背景・問題意識

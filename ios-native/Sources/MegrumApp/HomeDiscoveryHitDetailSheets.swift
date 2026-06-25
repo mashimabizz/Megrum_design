@@ -16,6 +16,7 @@ struct HomeGoodsHitDetailSheet: View {
     var onCopyToWish: (HomeMockGoods) -> Void
     var isWishCopyInProgress: Bool
     @State private var selectionState = HomeListingSheetSelectionState()
+    @State private var proposalConfirmation: HomeProposalStartConfirmationPayload?
 
     var body: some View {
         HomeSheetScaffold(
@@ -37,10 +38,24 @@ struct HomeGoodsHitDetailSheet: View {
 
             Divider().opacity(0.55)
 
+            if selectionContext.showsReceiveSelection {
+                HomeSheetSectionTitle(
+                    systemName: "sparkles",
+                    title: "受け取るものを選ぶ",
+                    trailing: selectionContext.receiveRequirementLabel
+                )
+                HomeGoodsImagePanelRail(
+                    goods: selectionContext.receiveGoods,
+                    selectedIndices: selectionState.selectedReceiveIndices,
+                    selectedBannerText: "受け取る",
+                    onSelect: toggleReceiveGoods
+                )
+            }
+
             HomeSheetSectionTitle(
                 systemName: "person",
-                title: "相手の希望から譲を選ぶ",
-                trailing: selectionContext.selectionRequirementLabel
+                title: "相手の希望から譲ろうを選ぶ",
+                trailing: selectionContext.wantedRequirementLabel
             )
             wantedSelectionRail
 
@@ -54,7 +69,7 @@ struct HomeGoodsHitDetailSheet: View {
                     HomeSheetSectionTitle(
                         systemName: "gift",
                         title: "譲るグッズを選ぶ",
-                        trailing: selectionContext.selectionRequirementLabel
+                        trailing: selectionContext.offerRequirementLabel
                     )
                     if selectionContext.offerGoods.isEmpty {
                         HomeNoMatchingOfferGoodsPanel()
@@ -80,6 +95,14 @@ struct HomeGoodsHitDetailSheet: View {
         .onAppear(perform: prepareInitialSelections)
         .onChange(of: selection.id) { _, _ in
             resetSelections()
+        }
+        .sheet(item: $proposalConfirmation) { confirmation in
+            HomeProposalStartConfirmationSheet(
+                payload: confirmation,
+                onConfirm: confirmProposalStart
+            )
+            .presentationDetents([.medium, .large])
+            .presentationDragIndicator(.visible)
         }
     }
 
@@ -129,7 +152,16 @@ struct HomeGoodsHitDetailSheet: View {
             at: index,
             in: selectionState,
             itemCount: selectionContext.offerGoods.count,
-            logic: selectionContext.wantedLogic
+            logic: selectionContext.offerLogic
+        )
+    }
+
+    private func toggleReceiveGoods(at index: Int) {
+        selectionState = HomeListingSheetSelectionStateReducer.togglingReceive(
+            at: index,
+            in: selectionState,
+            itemCount: selectionContext.receiveGoods.count,
+            logic: selectionContext.receiveLogic
         )
     }
 
@@ -139,6 +171,7 @@ struct HomeGoodsHitDetailSheet: View {
             itemCount: context.wantedItemCount,
             logic: context.wantedLogic
         )
+        selectionState.selectedReceiveIndices = context.initialReceiveIndices
         if !selectionState.selectedWantedIndices.isEmpty {
             fillSuggestedCashAmountIfNeeded()
             if preselectPreferredOffer {
@@ -165,6 +198,7 @@ struct HomeGoodsHitDetailSheet: View {
         let context = selectionContext
         guard context.selectedCashOption == nil,
               selectionState.selectedOfferIndices.isEmpty,
+              context.offerMinimumCount <= 1,
               let preferredOfferIndex = context.preferredOfferIndex
         else {
             return
@@ -176,6 +210,24 @@ struct HomeGoodsHitDetailSheet: View {
         guard let proposalSelection = selectionContext.proposalSelection() else {
             return
         }
-        onStartProposal(proposalSelection)
+        proposalConfirmation = HomeProposalStartConfirmationPayload(
+            proposalSelection: proposalSelection,
+            receiverGoods: confirmationReceiverGoods(for: proposalSelection),
+            senderGoods: selectionContext.selectedCashOption == nil ? proposalSelection.senderGoods : [],
+            senderCashAmount: proposalSelection.cashAmount
+        )
+    }
+
+    private func confirmProposalStart(_ selection: HomeDiscoveryProposalSelection) {
+        proposalConfirmation = nil
+        onStartProposal(selection)
+    }
+
+    private func confirmationReceiverGoods(for proposalSelection: HomeDiscoveryProposalSelection) -> [HomeMockGoods] {
+        let receiverGoods = selectionContext.selectedReceiveGoods
+        if !receiverGoods.isEmpty {
+            return receiverGoods
+        }
+        return proposalSelection.receiverGoods.map { [$0] } ?? [selection.goods]
     }
 }

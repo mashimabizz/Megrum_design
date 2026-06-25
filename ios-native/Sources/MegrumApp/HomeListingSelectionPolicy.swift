@@ -70,14 +70,33 @@ enum HomeListingSelectionPolicy {
         }
     }
 
-    static func label(for logic: ListingLogic) -> String {
+    static func label(for logic: ListingLogic, minimumCount: Int = 1) -> String {
         switch logic {
         case .all:
             return "すべて希望"
         case .one:
             return "どれか1つだけ"
         case .atLeast:
-            return "何個以上"
+            return ListingLogic.minimumCountTitle(minimumCount)
+        }
+    }
+
+    static func isSatisfied(
+        selectedCount: Int,
+        itemCount: Int,
+        logic: ListingLogic,
+        minimumCount: Int = 1
+    ) -> Bool {
+        guard itemCount > 0 else {
+            return false
+        }
+        switch logic {
+        case .all:
+            return selectedCount >= itemCount
+        case .one:
+            return selectedCount >= 1
+        case .atLeast:
+            return selectedCount >= min(max(1, minimumCount), itemCount)
         }
     }
 

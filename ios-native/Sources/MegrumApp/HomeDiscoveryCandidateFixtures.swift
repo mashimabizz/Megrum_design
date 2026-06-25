@@ -1,7 +1,8 @@
 extension HomeDiscoveryFixtures {
     static let miiIndividualListingSelection = HomeIndividualListingSelectionContext(
         wantedLogic: .one,
-        offeredLogic: .all,
+        offeredLogic: .atLeast,
+        offeredMinimumCount: 2,
         wantedOptions: [
             HomeIndividualListingWantedOption(
                 id: uuid("000000000981"),
@@ -43,7 +44,8 @@ extension HomeDiscoveryFixtures {
         detail: HomeIndividualListingDetailContext(
             listingID: uuid("000000000980"),
             wantedLogic: .one,
-            offeredLogic: .all,
+            offeredLogic: .atLeast,
+            offeredMinimumCount: 2,
             wantedOptions: [
                 HomeIndividualListingWantedOption(
                     id: uuid("000000000981"),
@@ -87,6 +89,18 @@ extension HomeDiscoveryFixtures {
                     id: selectedYellow.id,
                     title: selectedYellow.title,
                     imageURL: selectedYellow.imageURL,
+                    quantity: 1
+                ),
+                HomeIndividualListingOfferedItem(
+                    id: sanaBadge.id,
+                    title: sanaBadge.title,
+                    imageURL: sanaBadge.imageURL,
+                    quantity: 1
+                ),
+                HomeIndividualListingOfferedItem(
+                    id: sanaStand.id,
+                    title: sanaStand.title,
+                    imageURL: sanaStand.imageURL,
                     quantity: 1
                 )
             ]

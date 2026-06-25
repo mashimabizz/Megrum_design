@@ -82,7 +82,7 @@ enum HomeDiscoveryProposalRouteResolver {
             matchType: selection.matchType,
             initialExchangeMethod: selection.exchangeMethod,
             initialCashAmount: selection.cashAmount,
-            initialStep: .give
+            initialStep: initialStep(for: selection.exchangeMethod)
         )
     }
 
@@ -92,7 +92,7 @@ enum HomeDiscoveryProposalRouteResolver {
         matchedItems: [GoodsItem],
         possibleItems: [GoodsItem]
     ) -> GoodsItem? {
-        let selectedGoodsItem = selection.receiverGoods.flatMap { goodsItem(from: $0) }
+        let selectedGoodsItem = selection.receiverGoods?.proposalGoodsItem()
         let candidates = MatchRelationComposer.deduplicatedGoods(
             [selectedGoodsItem].compactMap(\.self) + matchedItems + possibleItems
         )
@@ -135,46 +135,14 @@ enum HomeDiscoveryProposalRouteResolver {
         return ids.filter { validIDs.contains($0) }
     }
 
-    private static func goodsItem(from goods: HomeMockGoods) -> GoodsItem? {
-        let ownerID = goods.ownerID ?? HomeDiscoveryFixtures.ownerID
-        return GoodsItem(
-            id: goods.id,
-            ownerID: ownerID,
-            groupID: goods.groupID,
-            memberID: goods.memberID,
-            goodsTypeID: goods.goodsTypeID,
-            title: goods.title,
-            imageURL: goods.imageURL,
-            tags: goods.rawTagNames.map { GoodsTag(id: stableTagID(for: $0), name: $0) },
-            quantity: 1,
-            ownerPrefecture: goods.ownerPrefecture,
-            ownerDisplayName: goods.ownerDisplayName,
-            ownerHandle: goods.ownerHandle,
-            ownerAvatarURL: goods.ownerAvatarURL,
-            ownerGender: goods.ownerGender,
-            ownerAge: goods.ownerAge,
-            ownerAverageStars: goods.ownerAverageStars,
-            ownerEvaluationCount: goods.ownerEvaluationCount,
-            ownerCompletedTradeCount: goods.ownerCompletedTradeCount,
-            ownerPaymentMethods: goods.ownerPaymentMethods,
-            ownerPaymentNote: goods.ownerPaymentNote
-        )
-    }
-
-    private static func stableTagID(for name: String) -> UUID {
-        let hash = name
-            .lowercased()
-            .utf8
-            .reduce(UInt64(14_695_981_039_346_656_037)) { partial, byte in
-                (partial ^ UInt64(byte)).multipliedReportingOverflow(by: 1_099_511_628_211).partialValue
-            }
-        let tail = String(format: "%012llu", hash % 1_000_000_000_000)
-        return UUID(uuidString: "00000000-0000-0000-0000-\(tail)") ?? UUID(uuidString: "00000000-0000-0000-0000-000000000001")!
-    }
-}
-
-private extension ExchangeMethod {
-    var requiresMeetupBeforeProposal: Bool {
-        self == .hand || self == .both
+    private static func initialStep(for exchangeMethod: ExchangeMethod?) -> ProposalCreateStep {
+        switch exchangeMethod {
+        case .hand, .both:
+            return .meetup
+        case .mail:
+            return .shipping
+        case nil:
+            return .give
+        }
     }
 }

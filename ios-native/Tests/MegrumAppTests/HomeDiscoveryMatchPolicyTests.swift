@@ -99,6 +99,141 @@ final class HomeDiscoveryMatchPolicyTests: XCTestCase {
             ),
             [2]
         )
+        XCTAssertEqual(HomeListingSelectionPolicy.label(for: .atLeast, minimumCount: 3), "3個以上")
+        XCTAssertFalse(
+            HomeListingSelectionPolicy.isSatisfied(
+                selectedCount: 2,
+                itemCount: 4,
+                logic: .atLeast,
+                minimumCount: 3
+            )
+        )
+        XCTAssertTrue(
+            HomeListingSelectionPolicy.isSatisfied(
+                selectedCount: 3,
+                itemCount: 4,
+                logic: .atLeast,
+                minimumCount: 3
+            )
+        )
+    }
+
+    func testGoodsHitDetailRequiresOfferedMinimumBeforeProposalStart() {
+        let firstReceive = HomeDiscoveryFixtures.selectedYellow
+        let secondReceive = HomeDiscoveryFixtures.sanaBadge
+        let offerGoods = HomeDiscoveryFixtures.offerGoods[0]
+        let wantedOptionID = UUID(uuidString: "11111111-1111-1111-1111-111111111111")!
+        let listingID = UUID(uuidString: "22222222-2222-2222-2222-222222222222")!
+        let selectionContext = HomeIndividualListingSelectionContext(
+            wantedLogic: .one,
+            offeredLogic: .atLeast,
+            offeredMinimumCount: 2,
+            wantedOptions: [
+                HomeIndividualListingWantedOption(
+                    id: wantedOptionID,
+                    listingID: listingID,
+                    position: 1,
+                    title: "譲ってほしいもの",
+                    logic: .one,
+                    kind: .goods,
+                    matchingGoodsIDs: [offerGoods.id]
+                )
+            ],
+            detail: HomeIndividualListingDetailContext(
+                listingID: listingID,
+                wantedLogic: .one,
+                offeredLogic: .atLeast,
+                offeredMinimumCount: 2,
+                wantedOptions: [],
+                offeredItems: [
+                    HomeIndividualListingOfferedItem(
+                        id: firstReceive.id,
+                        title: firstReceive.title,
+                        imageURL: firstReceive.imageURL
+                    ),
+                    HomeIndividualListingOfferedItem(
+                        id: secondReceive.id,
+                        title: secondReceive.title,
+                        imageURL: secondReceive.imageURL
+                    )
+                ]
+            )
+        )
+        let payload = HomeDiscoverySheetPayload(
+            goods: firstReceive,
+            signals: HomeCandidateConditionSignals(
+                goods: .init(hasIndividualListingHit: true, hasWishHit: false),
+                exchange: .init(
+                    postalAcceptedByBoth: false,
+                    localExchangeSelected: true,
+                    prefectureMatches: true,
+                    dateMatches: true
+                ),
+                individualListingSelection: selectionContext
+            )
+        )
+
+        let incomplete = HomeGoodsHitDetailSelectionContext(
+            selection: payload,
+            viewerOfferGoods: [offerGoods],
+            selectionState: HomeListingSheetSelectionState(
+                selectedWantedIndices: [0],
+                selectedOfferIndices: [0],
+                selectedReceiveIndices: [0],
+                cashAmountText: ""
+            )
+        )
+        XCTAssertTrue(incomplete.showsReceiveSelection)
+        XCTAssertEqual(incomplete.receiveRequirementLabel, "2個以上")
+        XCTAssertFalse(incomplete.canStartProposal)
+
+        let complete = HomeGoodsHitDetailSelectionContext(
+            selection: payload,
+            viewerOfferGoods: [offerGoods],
+            selectionState: HomeListingSheetSelectionState(
+                selectedWantedIndices: [0],
+                selectedOfferIndices: [0],
+                selectedReceiveIndices: [0, 1],
+                cashAmountText: ""
+            )
+        )
+        XCTAssertTrue(complete.canStartProposal)
+        XCTAssertEqual(complete.proposalSelection()?.receiverGoodsIDs, [firstReceive.id, secondReceive.id])
+    }
+
+    func testDiscoveryProposalRouteStartsAtConditionStepForKnownExchangeMethod() {
+        let viewerID = UUID(uuidString: "33333333-3333-3333-3333-333333333333")!
+        let partnerID = UUID(uuidString: "44444444-4444-4444-4444-444444444444")!
+        let receiver = GoodsItem(id: UUID(), ownerID: partnerID, title: "受け取るもの")
+        let sender = GoodsItem(id: UUID(), ownerID: viewerID, title: "私が出すもの")
+
+        let mailRoute = HomeDiscoveryProposalRouteResolver.route(
+            selection: HomeDiscoveryProposalSelection(
+                receiverGoodsID: receiver.id,
+                senderGoodsIDs: [sender.id],
+                matchType: .perfect,
+                exchangeMethod: .mail
+            ),
+            viewerID: viewerID,
+            matchedItems: [receiver],
+            possibleItems: [],
+            inventoryItems: [sender]
+        )
+        XCTAssertEqual(mailRoute?.initialStep, .shipping)
+
+        let handRoute = HomeDiscoveryProposalRouteResolver.route(
+            selection: HomeDiscoveryProposalSelection(
+                receiverGoodsID: receiver.id,
+                senderGoodsIDs: [sender.id],
+                matchType: .perfect,
+                exchangeMethod: .hand
+            ),
+            viewerID: viewerID,
+            matchedItems: [receiver],
+            possibleItems: [],
+            inventoryItems: [sender]
+        )
+        XCTAssertEqual(handRoute?.initialStep, .meetup)
     }
 
     func testOtherExchangePolicyExcludesCurrentSheetGoods() {
@@ -840,7 +975,7 @@ final class HomeDiscoveryMatchPolicyTests: XCTestCase {
         XCTAssertEqual(route.senderGoodsIDs, [senderGoodsID])
         XCTAssertEqual(route.matchType, .perfect)
         XCTAssertEqual(route.initialExchangeMethod, .mail)
-        XCTAssertEqual(route.initialStep, .give)
+        XCTAssertEqual(route.initialStep, .shipping)
     }
 
     func testHomeProposalRouteKeepsAdditionalReceiverGoodsIDsFromDiscoverySelection() throws {
@@ -912,7 +1047,7 @@ final class HomeDiscoveryMatchPolicyTests: XCTestCase {
         XCTAssertEqual(route.initialExchangeMethod, .hand)
     }
 
-    func testHomeProposalRouteKeepsLocalExchangeButStartsAtSelection() throws {
+    func testHomeProposalRouteKeepsLocalExchangeAndStartsAtMeetup() throws {
         let viewerID = UUID(uuidString: "00000000-0000-0000-0000-000000000555")!
         let partnerID = UUID(uuidString: "00000000-0000-0000-0000-000000000556")!
         let receiverGoodsID = UUID(uuidString: "00000000-0000-0000-0000-000000000557")!
@@ -948,7 +1083,7 @@ final class HomeDiscoveryMatchPolicyTests: XCTestCase {
         )
 
         XCTAssertEqual(route.initialExchangeMethod, .hand)
-        XCTAssertEqual(route.initialStep, .give)
+        XCTAssertEqual(route.initialStep, .meetup)
     }
 
     func testHomeWishCopyInputCopiesTappedGoodsAsIndependentWish() throws {
