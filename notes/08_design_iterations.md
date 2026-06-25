@@ -4,6 +4,45 @@
 
 ---
 
+## イテレーション1092：proposal exchange method selectorを分離
+
+### 背景・問題意識
+
+`ProposalCreateChromeViews.swift` は、画面ヘッダー、step header、交換手段selectorを同じファイルに抱えていた。header/chrome側を画面上部とstep遷移表示に集中させるため、交換手段selectorを専用Viewファイルへ分離する。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/ProposalCreateChromeViews.swift`
+- `ProposalExchangeMethodSelector` を移動した。
+- 画面ヘッダー、step header、badge表示、step jump判定は維持した。
+- selector移動により不要になった `MegrumCore` importを削除した。
+
+#### `ios-native/Sources/MegrumApp/ProposalExchangeMethodSelector.swift`
+- `ProposalExchangeMethodSelector` を追加した。
+- `ExchangeMethod.allCases` のsegmented表示、選択時animation、selected style、accessibility selected traitを維持した。
+
+### 影響範囲
+
+- Swift Native iOS版の打診作成フローにおける交換手段selector。
+- step header、step遷移、交換手段binding、送信payload、DB/API、状態名、表示文言は変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumApp/ProposalCreateChromeViews.swift ios-native/Sources/MegrumApp/ProposalExchangeMethodSelector.swift`
+  - passed
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-proposal-exchange-method-selector`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-proposal-exchange-method-selector --enable-xctest --disable-swift-testing -j 1 --filter 'ProposalCreateFlowTests|ProposalCreateSheetTests'`
+  - passed（62 tests）
+
+### セルフレビュー結果
+
+- ✅ selectorのsegmented表示、animation、selected色、accessibility traitを維持した。
+- ✅ `ProposalCreateChromeViews.swift` は 184行から 139行へ縮小し、交換手段selectorを 47行の専用ファイルへ分離した。
+- ✅ 新しい状態名・用語・DB列は追加していないため、`notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション1091：proposal meetup map cardを分離
 
 ### 背景・問題意識
