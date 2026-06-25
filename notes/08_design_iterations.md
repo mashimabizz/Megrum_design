@@ -4,6 +4,46 @@
 
 ---
 
+## イテレーション1068：individual listing haves goods selectionを分離
+
+### 背景・問題意識
+
+`IndividualListingHavesViews.swift` は、個別募集の「譲るもの」ステップでタブ切り替え、現金入力、グッズ検索/filter、grid選択、選択tile表示を同じファイルに抱えていた。親ステップはタブと入力ルートの切り替えに集中させ、グッズ選択gridと候補filter計算を専用Viewへ分離する。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/IndividualListingHavesViews.swift`
+- `IndividualListingHavesStep` からグッズ選択grid、filter候補計算、選択tile表示を移動した。
+- `IndividualListingHaveTabs`、`IndividualListingCashAmountCard`、empty messageは残し、タブ切り替えと現金入力の既存構造を維持した。
+
+#### `ios-native/Sources/MegrumApp/IndividualListingHavesGoodsSelection.swift`
+- `IndividualListingHavesGoodsSelection` を追加し、検索/filter bar、空状態、3列grid、選択button、accessibility label/selected traitsを担当させた。
+- `ListingSquareSelectableImageTile` を同ファイル内のprivate Viewとして移動した。
+
+### 影響範囲
+
+- Swift Native iOS版の個別募集作成/編集における「譲るもの」ステップ。
+- グッズ検索/filter、3列grid、選択チェック表示、accessibility selected traits。
+- 個別募集draft、保存payload、状態名、用語、DB/API、表示文言は変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumApp/IndividualListingHavesViews.swift ios-native/Sources/MegrumApp/IndividualListingHavesGoodsSelection.swift`
+  - passed
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-individual-listing-haves-goods-selection`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-individual-listing-haves-goods-selection --enable-xctest --disable-swift-testing -j 1 --filter 'IndividualListingDraftTests|IndividualListingStateReducerTests'`
+  - passed（39 tests）
+
+### セルフレビュー結果
+
+- ✅ `selectedTab`、cash pricing mode、cash amount、`onToggle` の呼び出しは維持し、goods tab内の表示責務だけを専用Viewへ移した。
+- ✅ search/filter候補計算、3列grid spacing、tile角丸、checkmark、border、accessibility label/selected traitsを維持した。
+- ✅ `IndividualListingHavesViews.swift` は 231行から 162行へ縮小し、goods selectionを 92行の専用ファイルへ分離した。
+- ✅ 新しい状態名・用語・DB列は追加していないため、`notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション1067：trade goods carousel layoutを分離
 
 ### 背景・問題意識
