@@ -4,6 +4,46 @@
 
 ---
 
+## イテレーション1062：trade summary goods componentsを分離
+
+### 背景・問題意識
+
+`TradeSummarySheetComponents.swift` は、サマリーsection枠、待ち合わせ候補行、グッズ表示、金額パネル、empty text、ExchangeMethod helperを同じファイルに抱えていた。取引サマリーの枠/待ち合わせ表示と、グッズ表示/金額表示の責務を分けるため、グッズ系コンポーネントだけを専用ファイルへ分離した。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/TradeSummarySheetComponents.swift`
+- `TradeSummarySheetSection`、`TradeMeetupCandidateSummaryRow`、`ExchangeMethod` helperだけを残した。
+- グッズsection、グッズ行、サムネイル、金額パネル、empty textを移動した。
+
+#### `ios-native/Sources/MegrumApp/TradeSummaryGoodsComponents.swift`
+- `TradeSummaryGoodsSection`、`TradeSummaryGoodsRow`、`TradeSummaryGoodsThumb`、`TradeCashAmountPanel`、`TradeSummaryEmptyText` を追加した。
+- expected count、cash offer表示、AsyncImage fallback、数量badge、固定金額表示を維持した。
+
+### 影響範囲
+
+- Swift Native iOS版の取引サマリーsheet。
+- グッズ一覧、cash offer金額パネル、サムネイルfallback、待ち合わせ候補行。
+- 取引状態、打診payload、DB/API、状態名、用語、表示文言は変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumApp/TradeSummarySheetComponents.swift ios-native/Sources/MegrumApp/TradeSummaryGoodsComponents.swift`
+  - passed
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-trade-summary-goods-components`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-trade-summary-goods-components --enable-xctest --disable-swift-testing -j 1 --filter 'TradeChatAffordanceTests|TradeRequestDraftTests|TradeRequestDraftProposalCreateFlowTests'`
+  - passed（75 tests）
+
+### セルフレビュー結果
+
+- ✅ グッズ表示/金額表示だけを専用ファイルへ移し、section枠、待ち合わせ候補行、ExchangeMethod helperは元ファイルに残した。
+- ✅ expected count、cash offer表示、AsyncImage fallback、数量badge、固定金額表示を維持した。
+- ✅ `TradeSummarySheetComponents.swift` は 222行から 63行へ縮小し、グッズ系表示を 162行の専用ファイルへ分離した。
+- ✅ 新しい状態名・用語・DB列は追加していないため、`notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション1061：address settings error bannerを分離
 
 ### 背景・問題意識
