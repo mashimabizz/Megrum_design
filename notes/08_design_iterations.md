@@ -4,6 +4,44 @@
 
 ---
 
+## イテレーション1017：交換条件設定画面の表示部品を分割
+
+### 背景・問題意識
+
+`HomeExchangeSettingsScreen.swift` は、AppStorageからのdraft復元、保存、日付詳細編集に加えて、背景、ヘッダー、交換手段カード、mail条件カード、説明banner、保存footerまで同じファイルに抱えていた。画面状態と表示部品を分けることで、保存ロジックや日付編集に触れずにUI部品だけを調整できるようにした。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/HomeExchangeSettingsScreen.swift`
+- draft復元、保存、日付選択、日付詳細sheet連携だけを残した。
+- 背景、ヘッダー、交換手段カード、mail条件カード、説明banner、保存footerを専用componentsファイルへ移動した。
+
+#### `ios-native/Sources/MegrumApp/HomeExchangeSettingsScreenComponents.swift`
+- `HomeExchangeSettingsBackground`、`HomeExchangeSettingsHeader`、`HomeExchangePreferenceCardPicker`、`HomeExchangeMailConditionsCard`、`HomeExchangeSettingsInstructionBanner`、`HomeExchangeSettingsSaveFooter` を移動した。
+- `HomeExchangePreference` のアイコン/tint補助とnavigation bar非表示modifierを、画面部品側に集約した。
+
+### 影響範囲
+
+- Swift Native iOS版の交換条件設定画面。
+- 交換手段選択、mail条件選択、説明banner、保存footerの表示。
+- 保存値、日付詳細編集、状態名、用語、DBスキーマ、表示文言は変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumApp/HomeExchangeSettingsScreen.swift ios-native/Sources/MegrumApp/HomeExchangeSettingsScreenComponents.swift`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-exchange-settings-components --enable-xctest --disable-swift-testing -j 1 --filter HomeExchangeSettingsScreenTests`
+  - passed（4 tests）
+
+### セルフレビュー結果
+
+- ✅ AppStorage key、draft復元、保存、日付選択、日付詳細sheetの処理は変更していない。
+- ✅ 交換手段カード、mail条件カード、説明banner、保存footerの文言・余白・色・アクセシビリティは移動のみで維持した。
+- ✅ `HomeExchangeSettingsScreen.swift` は 503行から 225行へ縮小し、表示部品を 281行の専用componentsファイルへ分離した。
+- ✅ 新しい状態名・用語・DB列は追加していないため、`notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション1016：交換条件カレンダーの日付セルを分割
 
 ### 背景・問題意識
