@@ -85,8 +85,6 @@ enum AppDrawerVisualMetrics {
     static let foregroundShadowOpacity: CGFloat = 0.16
     static let foregroundShadowRadius: CGFloat = 18
     static let closedEdgeGestureWidth: CGFloat = 28
-    static let closedHomeContentGestureTopInset: CGFloat = 92
-    static let closedHomeContentGestureBottomInset: CGFloat = 116
     static let foregroundZIndex: Double = 1
     static let closedEdgeGestureZIndex: Double = 8
     static let drawerZIndex: Double = 10
@@ -132,30 +130,6 @@ enum AppDrawerGestureResolver {
     static let predictedMomentumBonus: CGFloat = 32
     static let drawerItemTapSuppressionDistance: CGFloat = 8
     static let drawerItemTapSuppressionDuration: Double = 0.28
-    private static let homeDiscoveryContentTopPadding: CGFloat = 72
-    private static let homeDiscoveryFirstGridRows = 2
-    private static let homeDiscoverySecondSectionTop: CGFloat = 466
-    private static let homeDiscoverySecondGridRows = 5
-    private static let homeDiscoveryHorizontalPadding: CGFloat = 20
-    private static let homeDiscoveryColumnSpacing: CGFloat = 22
-    private static let homeDiscoveryGridHeaderHeight: CGFloat = 18
-    private static let homeDiscoveryGridSpacing: CGFloat = 8
-    private static let homeDiscoveryCardHeight: CGFloat = 170
-    private static let homeDiscoveryGridRowSpacing: CGFloat = 14
-    private static let homeDiscoveryCardImageTopInset: CGFloat = 26
-    private static let homeDiscoveryCardImageHeight: CGFloat = 132
-
-    static func isHomeContentSwipeStartAllowed(startLocation: CGPoint, screenSize: CGSize) -> Bool {
-        guard screenSize.height > 0 else {
-            return true
-        }
-        let topBoundary = AppDrawerVisualMetrics.closedHomeContentGestureTopInset
-        let bottomBoundary = max(topBoundary, screenSize.height - AppDrawerVisualMetrics.closedHomeContentGestureBottomInset)
-        guard startLocation.y >= topBoundary && startLocation.y <= bottomBoundary else {
-            return false
-        }
-        return !isHomeGoodsCardStart(startLocation: startLocation, screenWidth: screenSize.width)
-    }
 
     static func isClosedHomeDrawerSwipeStartAllowed(
         isHomeTabSelected: Bool,
@@ -167,7 +141,17 @@ enum AppDrawerGestureResolver {
         isHomeTabSelected
             && !isDrawerPresented
             && !isSearchPresented
-            && isHomeContentSwipeStartAllowed(startLocation: startLocation, screenSize: screenSize)
+            && isClosedEdgeSwipeStartAllowed(startLocation: startLocation, screenSize: screenSize)
+    }
+
+    static func isClosedEdgeSwipeStartAllowed(startLocation: CGPoint, screenSize: CGSize) -> Bool {
+        guard screenSize.width > 0, screenSize.height > 0 else {
+            return false
+        }
+        guard CGRect(origin: .zero, size: screenSize).contains(startLocation) else {
+            return false
+        }
+        return startLocation.x <= AppDrawerVisualMetrics.closedEdgeGestureWidth
     }
 
     static func isOpenDrawerSwipeStartAllowed(startLocation: CGPoint, screenSize: CGSize) -> Bool {
@@ -219,49 +203,6 @@ enum AppDrawerGestureResolver {
 
         let shouldOpen = translation.width >= threshold || (translation.width > 0 && fastEnough)
         return shouldOpen
-    }
-
-    private static func isHomeGoodsCardStart(startLocation: CGPoint, screenWidth: CGFloat) -> Bool {
-        guard isInsideHomeCandidateColumn(startX: startLocation.x, screenWidth: screenWidth) else {
-            return false
-        }
-        return isInsideHomeGridImageRows(
-            startY: startLocation.y,
-            sectionTop: homeDiscoveryContentTopPadding,
-            rowCount: homeDiscoveryFirstGridRows
-        ) || isInsideHomeGridImageRows(
-            startY: startLocation.y,
-            sectionTop: homeDiscoverySecondSectionTop,
-            rowCount: homeDiscoverySecondGridRows
-        )
-    }
-
-    private static func isInsideHomeCandidateColumn(startX: CGFloat, screenWidth: CGFloat) -> Bool {
-        let columnWidth = max(
-            0,
-            (screenWidth - homeDiscoveryHorizontalPadding * 2 - homeDiscoveryColumnSpacing) / 2
-        )
-        let leftColumn = homeDiscoveryHorizontalPadding...(homeDiscoveryHorizontalPadding + columnWidth)
-        let rightColumnStart = homeDiscoveryHorizontalPadding + columnWidth + homeDiscoveryColumnSpacing
-        let rightColumn = rightColumnStart...(rightColumnStart + columnWidth)
-        return leftColumn.contains(startX) || rightColumn.contains(startX)
-    }
-
-    private static func isInsideHomeGridImageRows(startY: CGFloat, sectionTop: CGFloat, rowCount: Int) -> Bool {
-        let firstRowTop = sectionTop + homeDiscoveryGridHeaderHeight + homeDiscoveryGridSpacing
-
-        for rowIndex in 0..<rowCount {
-            let rowTop = firstRowTop + CGFloat(rowIndex) * (
-                homeDiscoveryCardHeight + homeDiscoveryGridRowSpacing
-            )
-            let imageRange = (rowTop + homeDiscoveryCardImageTopInset)...(
-                rowTop + homeDiscoveryCardImageTopInset + homeDiscoveryCardImageHeight
-            )
-            if imageRange.contains(startY) {
-                return true
-            }
-        }
-        return false
     }
 
     private static func isHorizontalSwipe(_ translation: CGSize, isPresented: Bool) -> Bool {

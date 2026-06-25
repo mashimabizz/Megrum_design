@@ -35,8 +35,7 @@ final class AppDrawerGestureTests: XCTestCase {
         XCTAssertEqual(AppDrawerVisualMetrics.foregroundZIndex, 1)
         XCTAssertEqual(AppDrawerVisualMetrics.closedEdgeGestureZIndex, 8)
         XCTAssertEqual(AppDrawerVisualMetrics.drawerZIndex, 10)
-        XCTAssertEqual(AppDrawerVisualMetrics.closedHomeContentGestureTopInset, 92)
-        XCTAssertEqual(AppDrawerVisualMetrics.closedHomeContentGestureBottomInset, 116)
+        XCTAssertEqual(AppDrawerVisualMetrics.closedEdgeGestureWidth, 28)
         XCTAssertEqual(
             AppDrawerVisualMetrics.drawerWidth(screenWidth: 402),
             361.8,
@@ -114,7 +113,7 @@ final class AppDrawerGestureTests: XCTestCase {
         XCTAssertEqual(translation, 6)
     }
 
-    func testClosedDrawerDoesNotRequireLeadingEdgeOrigin() {
+    func testClosedDrawerTranslationStillOnlyChecksDirection() {
         let translation = AppDrawerGestureResolver.activeTranslation(
             isPresented: false,
             translation: CGSize(width: 54, height: 6)
@@ -123,46 +122,64 @@ final class AppDrawerGestureTests: XCTestCase {
         XCTAssertEqual(translation, 54)
     }
 
-    func testHomeDrawerSwipeStartAreaExcludesHeaderAndFooter() {
+    func testClosedHomeDrawerSwipeStartsOnlyFromLeadingEdge() {
         let screenSize = CGSize(width: 402, height: 874)
 
-        XCTAssertFalse(
-            AppDrawerGestureResolver.isHomeContentSwipeStartAllowed(
-                startLocation: CGPoint(x: 220, y: 60),
+        XCTAssertTrue(
+            AppDrawerGestureResolver.isClosedHomeDrawerSwipeStartAllowed(
+                isHomeTabSelected: true,
+                isDrawerPresented: false,
+                isSearchPresented: false,
+                startLocation: CGPoint(x: 18, y: 402),
                 screenSize: screenSize
             )
         )
-        XCTAssertTrue(
-            AppDrawerGestureResolver.isHomeContentSwipeStartAllowed(
+        XCTAssertFalse(
+            AppDrawerGestureResolver.isClosedHomeDrawerSwipeStartAllowed(
+                isHomeTabSelected: true,
+                isDrawerPresented: false,
+                isSearchPresented: false,
                 startLocation: CGPoint(x: 201, y: 180),
                 screenSize: screenSize
             )
         )
         XCTAssertFalse(
-            AppDrawerGestureResolver.isHomeContentSwipeStartAllowed(
-                startLocation: CGPoint(x: 220, y: 820),
+            AppDrawerGestureResolver.isClosedHomeDrawerSwipeStartAllowed(
+                isHomeTabSelected: true,
+                isDrawerPresented: false,
+                isSearchPresented: false,
+                startLocation: CGPoint(x: 30, y: 402),
                 screenSize: screenSize
             )
         )
     }
 
-    func testHomeDrawerSwipeStartAreaExcludesGoodsImageCardsButKeepsGutters() {
+    func testClosedHomeDrawerSwipeDoesNotStartFromGoodsImageOrTabContent() {
         let screenSize = CGSize(width: 402, height: 874)
 
         XCTAssertFalse(
-            AppDrawerGestureResolver.isHomeContentSwipeStartAllowed(
+            AppDrawerGestureResolver.isClosedHomeDrawerSwipeStartAllowed(
+                isHomeTabSelected: true,
+                isDrawerPresented: false,
+                isSearchPresented: false,
                 startLocation: CGPoint(x: 88, y: 180),
                 screenSize: screenSize
             )
         )
         XCTAssertFalse(
-            AppDrawerGestureResolver.isHomeContentSwipeStartAllowed(
+            AppDrawerGestureResolver.isClosedHomeDrawerSwipeStartAllowed(
+                isHomeTabSelected: true,
+                isDrawerPresented: false,
+                isSearchPresented: false,
                 startLocation: CGPoint(x: 300, y: 402),
                 screenSize: screenSize
             )
         )
-        XCTAssertTrue(
-            AppDrawerGestureResolver.isHomeContentSwipeStartAllowed(
+        XCTAssertFalse(
+            AppDrawerGestureResolver.isClosedHomeDrawerSwipeStartAllowed(
+                isHomeTabSelected: true,
+                isDrawerPresented: false,
+                isSearchPresented: false,
                 startLocation: CGPoint(x: 201, y: 402),
                 screenSize: screenSize
             )
@@ -171,7 +188,7 @@ final class AppDrawerGestureTests: XCTestCase {
 
     func testClosedHomeDrawerSwipeIsDisabledWhileSearchIsPresented() {
         let screenSize = CGSize(width: 402, height: 874)
-        let allowedHomeStart = CGPoint(x: 201, y: 180)
+        let allowedHomeStart = CGPoint(x: 18, y: 180)
 
         XCTAssertTrue(
             AppDrawerGestureResolver.isClosedHomeDrawerSwipeStartAllowed(

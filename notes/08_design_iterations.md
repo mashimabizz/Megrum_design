@@ -4,6 +4,50 @@
 
 ---
 
+## イテレーション976：左ドロワーを画面端スワイプだけに限定
+
+### 背景・問題意識
+
+ホーム画面のグッズ画像やタブ切り替えで横スワイプした時に、左ドロワーが開いてしまうことがあった。ドロワーは画面左端から右へスワイプした時だけ開き、それ以外の横スワイプはタブ切り替えやカード操作に任せる必要がある。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/AppDrawerModels.swift`
+- 閉じた状態のドロワー開始判定を、ホームコンテンツ領域ベースから画面左端 `28pt` 以内の開始だけに変更した。
+- ホームのカード画像位置を推定して除外する旧ロジックを削除した。
+- ドロワーが開いている状態で左スワイプして閉じる挙動は維持した。
+
+#### `ios-native/Tests/MegrumAppTests/AppDrawerGestureTests.swift`
+- 左端からの開始だけ許可されることをテストへ追加した。
+- グッズ画像上やタブコンテンツ中央からの横スワイプではドロワーが開始しないことをテストで固定した。
+
+### 影響範囲
+
+- Swift Native iOS版のアプリ全体ドロワージェスチャー。
+- ホーム画面のタブ切り替え、グッズ画像スワイプ、ドロワーメニュー項目、ドロワーを開いた後の閉じるスワイプ、DBスキーマ、状態名は変更しない。
+
+### 確認方法
+
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-drawer-edge-build --disable-index-store`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-drawer-edge-test --disable-index-store --enable-xctest --disable-swift-testing -j 1 --filter AppDrawerGestureTests`
+  - 18 tests passed
+- `xcodebuild -quiet -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -destination 'id=C70DDDBB-2602-49E0-8F95-1F043BCCED76' -derivedDataPath /tmp/megrum-ios-native-drawer-edge-xcode build`
+  - passed
+- `xcrun simctl install C70DDDBB-2602-49E0-8F95-1F043BCCED76 /tmp/megrum-ios-native-drawer-edge-xcode/Build/Products/Debug-iphonesimulator/MegrumNative.app`
+  - passed
+- `xcrun simctl launch C70DDDBB-2602-49E0-8F95-1F043BCCED76 tokyo.megrum.native.preview`
+  - launched
+
+### セルフレビュー結果
+
+- ✅ 閉じている左ドロワーは、画面左端からの右スワイプだけで開始する。
+- ✅ ホーム画像・タブコンテンツ中央の横スワイプはドロワー開始条件から外した。
+- ✅ 既に開いているドロワーを左スワイプで閉じる挙動は維持した。
+- ✅ 状態名・用語・DBスキーマの追加変更はないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション975：グッズ登録を画像単位の一括設定へ
 
 ### 背景・問題意識
