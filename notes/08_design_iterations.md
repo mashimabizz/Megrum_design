@@ -4,6 +4,52 @@
 
 ---
 
+## イテレーション970：PublicUserProfileScreenを分割
+
+### 背景・問題意識
+
+`PublicUserProfileScreen.swift` は、公開プロフィール画面本体、プロフィール表示用の派生値、route/contextモデル、グリッド選択、個別募集起点の打診target、評価一覧表示stateを1ファイルに持っていた。公開プロフィールはホーム候補、検索結果、取引チャット、相手プロフィールからの打診作成にまたがるため、画面本体と周辺ロジックを分け、プロフィール導線の調査範囲を狭める。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/PublicUserProfileScreen.swift`
+- body、sheet、task、toolbarを中心に残し、295行級から97行へ縮小した。
+- extension分割のため、`@Environment` / `@State` の一部を `private` からモジュール内アクセスへ変更した。`PublicUserProfileScreen` 自体はinternalで、外部公開APIは増やしていない。
+
+#### `ios-native/Sources/MegrumApp/PublicProfileRouteModels.swift`
+- `PublicProfileRoute` と `PublicProfilePresentationContext` を新規ファイルへ移動した。
+- standalone / ホーム候補sheet内stack / 取引チャット起点での打診許可と閉じるボタン表示ルールを維持した。
+
+#### `ios-native/Sources/MegrumApp/PublicUserProfileScreenDerivedState.swift`
+- 公開プロフィールfallback、評価、公開譲在庫、個別募集、id lookup、bio/rating/推しtag/grid item変換を新規ファイルへ移動した。
+
+#### `ios-native/Sources/MegrumApp/PublicUserProfileScreenActions.swift`
+- グリッド選択、個別募集選択、主要打診CTA、予定sheet起動を新規ファイルへ移動した。
+
+#### `ios-native/Sources/MegrumApp/PublicProfileProposalModels.swift`
+- `ListingProposalTarget`、`PublicProfileEvaluationListState`、UUID重複排除補助を新規ファイルへ移動した。
+
+### 影響範囲
+
+- Swift Native iOS版の公開プロフィール画面、相手プロフィールからの打診作成、個別募集起点の打診、評価一覧state、プロフィール予定sheet。
+- 挙動変更ではなく責務分離。公開プロフィールの表示内容、閉じるボタン条件、edge back swipe、打診作成sheet、予定sheet、状態名、用語、DBスキーマは変更しない。
+
+### 確認方法
+
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-public-profile-build --disable-index-store`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-public-profile-build --disable-index-store --enable-xctest --disable-swift-testing -j 1 --filter 'PublicUserProfileScreenTests|PublicProfileProposalOriginTests|PublicUserContentStateReducerTests|SupabasePublicProfilePersistenceTests|HomeDiscoveryMatchPolicyTests|TradeChatAffordanceTests'`
+  - 123 tests passed
+
+### セルフレビュー結果
+
+- ✅ 公開プロフィール本体、route/context、表示派生値、アクション、proposal/evaluation補助モデルを分け、画面本体をbody中心に整理した。
+- ✅ 公開プロフィール、ホーム候補、相手プロフィール起点の打診、取引チャット関連の対象テストを通した。
+- ✅ 分割に伴うアクセス制御変更はMegrumAppモジュール内に閉じており、外部公開APIは増やしていない。
+- ✅ 状態名・用語・DBスキーマの変更はないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション969：SearchScreen actionsを分割
 
 ### 背景・問題意識
