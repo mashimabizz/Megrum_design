@@ -61,70 +61,20 @@ struct BoardThreadDetailCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text(thread.detailTagTitle)
-                .font(.system(size: 11.5, weight: .heavy, design: .rounded))
-                .foregroundStyle(MegrumTheme.lavender)
-                .padding(.horizontal, 13)
-                .frame(height: 23)
-                .background(
-                    LinearGradient(
-                        colors: [MegrumTheme.lavender.opacity(0.20), MegrumTheme.lavender.opacity(0.07)],
-                        startPoint: .leading,
-                        endPoint: .trailing
-                    ),
-                    in: Capsule()
-                )
+            BoardThreadDetailPostHeader(
+                detailTagTitle: thread.detailTagTitle,
+                title: thread.title,
+                threadBody: thread.body,
+                authorName: authorName,
+                authorAvatarURL: authorAvatarURL,
+                authorInitial: authorInitial,
+                authorRelativeTime: authorRelativeTime
+            )
 
-            Text(thread.title)
-                .font(.system(size: 23, weight: .black, design: .rounded))
-                .foregroundStyle(MegrumTheme.ink)
-                .lineLimit(2)
-                .minimumScaleFactor(0.82)
-
-            HStack(alignment: .top, spacing: 12) {
-                BoardThreadDetailAvatar(
-                    imageURL: authorAvatarURL,
-                    initial: authorInitial,
-                    size: 42
-                )
-
-                VStack(alignment: .leading, spacing: 7) {
-                    HStack(spacing: 12) {
-                        Text(authorName)
-                            .font(.system(size: 14, weight: .black, design: .rounded))
-                            .foregroundStyle(MegrumTheme.lavender)
-                        Text(authorRelativeTime)
-                            .font(.system(size: 11.5, weight: .semibold, design: .rounded))
-                            .foregroundStyle(MegrumTheme.muted)
-                    }
-
-                    Text(thread.body)
-                        .font(.system(size: 14, weight: .semibold, design: .rounded))
-                        .foregroundStyle(MegrumTheme.ink)
-                        .lineSpacing(3)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-            }
-
-            HStack(alignment: .center) {
-                BoardThreadDetailAvatarStack(avatars: participantAvatars)
-
-                Spacer()
-
-                VStack(alignment: .trailing, spacing: 5) {
-                    HStack(spacing: 8) {
-                        Image(systemName: "bubble")
-                            .font(.system(size: 18, weight: .medium, design: .rounded))
-                        Text("\(replyCount)")
-                            .font(.system(size: 15, weight: .black, design: .rounded))
-                    }
-                    .foregroundStyle(MegrumTheme.lavender)
-
-                    Text("話題への返信数")
-                        .font(.system(size: 11, weight: .heavy, design: .rounded))
-                        .foregroundStyle(MegrumTheme.muted)
-                }
-            }
+            BoardThreadDetailReplySummary(
+                replyCount: replyCount,
+                participantAvatars: participantAvatars
+            )
 
             Divider()
                 .background(MegrumTheme.ink.opacity(0.09))
@@ -133,37 +83,12 @@ struct BoardThreadDetailCard: View {
                 MeguriNoticeBanner(message: missingReplyContextMessage)
             }
 
-            HStack(spacing: 8) {
-                Image(systemName: "person.3.fill")
-                    .foregroundStyle(MegrumTheme.muted)
-                Text("この話題に参加している人")
-                    .font(.system(size: 13.5, weight: .heavy, design: .rounded))
-                    .foregroundStyle(MegrumTheme.ink)
-            }
+            BoardThreadDetailParticipantsHeader()
 
-            VStack(spacing: 7) {
-                ForEach(replies) { reply in
-                    BoardThreadReplyRow(display: reply)
-                }
-
-                if isLoadingReplies {
-                    HStack(spacing: 8) {
-                        ProgressView()
-                            .controlSize(.small)
-                        Text("返信を読み込み中")
-                            .font(.system(size: 12, weight: .heavy, design: .rounded))
-                            .foregroundStyle(MegrumTheme.muted)
-                    }
-                    .frame(maxWidth: .infinity)
-                    .padding(.top, 4)
-                } else if replies.isEmpty {
-                    Text("まだ返信はありません")
-                        .font(.system(size: 13, weight: .heavy, design: .rounded))
-                        .foregroundStyle(MegrumTheme.muted)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 20)
-                }
-            }
+            BoardThreadDetailRepliesSection(
+                replies: replies,
+                isLoadingReplies: isLoadingReplies
+            )
         }
         .padding(.horizontal, 16)
         .padding(.top, 12)

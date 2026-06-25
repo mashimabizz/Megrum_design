@@ -4,6 +4,49 @@
 
 ---
 
+## イテレーション1124：board thread detail card partsを分離
+
+### 背景・問題意識
+
+`BoardThreadDetailComponents.swift` は、掲示板詳細のデータ表示モデル、ヘッダー、詳細カード、投稿本文header、返信数サマリー、参加者header、返信リストのloading/empty表示まで同じファイルに抱えていた。詳細カード本体を外枠とセクション配置に寄せ、表示だけの内部部品を専用Viewへ分離する。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/BoardThreadDetailComponents.swift`
+- `BoardThreadDetailCard` の投稿本文headerを `BoardThreadDetailPostHeader` 呼び出しへ置き換えた。
+- 返信数と参加者avatar summaryを `BoardThreadDetailReplySummary` 呼び出しへ置き換えた。
+- 参加者headerと返信リスト表示を `BoardThreadDetailParticipantsHeader` / `BoardThreadDetailRepliesSection` 呼び出しへ置き換えた。
+- card外枠、notice banner、`BoardThread.detailTagTitle` の判定、padding/background/strokeは維持した。
+
+#### `ios-native/Sources/MegrumApp/BoardThreadDetailCardParts.swift`
+- `BoardThreadDetailPostHeader` を追加し、tag、title、author row、本文を移動した。
+- `BoardThreadDetailReplySummary` を追加し、参加者avatar stackと返信数表示を移動した。
+- `BoardThreadDetailParticipantsHeader` / `BoardThreadDetailRepliesSection` を追加し、参加者見出し、返信row、loading/empty表示を移動した。
+
+### 影響範囲
+
+- Swift Native iOS版めぐり掲示板の話題詳細カード。
+- 投稿本文header、返信数サマリー、参加者見出し、返信リストのloading/empty表示。
+- 掲示板/返信の読み込み、送信、participant avatar生成、notice表示条件、DB/API、状態名、表示文言は変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumApp/BoardThreadDetailComponents.swift ios-native/Sources/MegrumApp/BoardThreadDetailCardParts.swift`
+  - passed
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-board-thread-detail-card-parts`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-board-thread-detail-card-parts --enable-xctest --disable-swift-testing -j 1 --filter 'ReplyThreadStateReducerTests|MeguriFeedStateReducerTests|MegrumAppStateTests|SupabaseBoardClientTests'`
+  - passed（92 tests）
+
+### セルフレビュー結果
+
+- ✅ tag、title、author row、本文、avatar stack、返信数、notice、参加者見出し、loading/empty表示、余白、角丸、枠線を維持した。
+- ✅ `detailTagTitle` の判定、返信row model、掲示板/返信のload/send処理、Supabase requestは変更していない。
+- ✅ `BoardThreadDetailComponents.swift` は189行から114行へ縮小し、詳細カード内部表示を148行の専用ファイルへ分離した。
+- ✅ 新しい状態名・用語・DB列は追加していないため、`notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション1123：match relation tree card partsを分離
 
 ### 背景・問題意識
