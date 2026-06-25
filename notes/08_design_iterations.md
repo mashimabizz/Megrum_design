@@ -4,6 +4,47 @@
 
 ---
 
+## イテレーション1107：address settings formを分離
+
+### 背景・問題意識
+
+`AddressSettingsScreen.swift` は、住所設定画面の保存処理、住所反映、郵便番号検索スケジュールに加えて、宛名/郵便番号/都道府県/市区町村/番地/補足住所/電話番号の入力フォームを `form` computed viewとして抱えていた。親画面を状態保持と保存/検索 orchestration に寄せるため、入力フォームを専用Viewへ分離する。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/AddressSettingsScreen.swift`
+- `form` computed viewを `AddressSettingsForm` 呼び出しへ置き換えた。
+- 郵便番号の正規化とlookup schedule起動を `handlePostalCodeChange(_:)` へ分離した。
+- `Field` enumを画面外の `AddressSettingsField` に置き換え、focus状態を子Viewへ渡せるようにした。
+
+#### `ios-native/Sources/MegrumApp/AddressSettingsForm.swift`
+- `AddressSettingsField` と `AddressSettingsForm` を追加した。
+- 住所入力TextField群、郵便番号lookup ProgressView、入力/app error banner表示を移動した。
+- 画面全体やappStateではなく、各入力binding、focus binding、lookup中flag、error文言、郵便番号変更callbackだけを受け取る構成にした。
+
+### 影響範囲
+
+- Swift Native iOS版の住所設定画面。
+- 保存処理、住所validation、郵便番号正規化、郵便番号lookup、住所反映、dismiss、保存payload、DB/API、状態名、表示文言は変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumApp/AddressSettingsScreen.swift ios-native/Sources/MegrumApp/AddressSettingsForm.swift`
+  - passed
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-address-settings-form`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-address-settings-form --enable-xctest --disable-swift-testing -j 1 --filter 'SettingsScreenTests|MegrumAppStateInputNormalizerTests|MegrumAppStateTests'`
+  - passed（104 tests）
+
+### セルフレビュー結果
+
+- ✅ TextFieldのplaceholder、textContentType、submit遷移、keyboardType、入力styleを維持した。
+- ✅ 郵便番号正規化、lookup debounce、lookup progress、error bannerの表示順を維持した。
+- ✅ `AddressSettingsScreen.swift` は228行から168行へ縮小し、住所入力formを97行の専用ファイルへ分離した。
+- ✅ 新しい状態名・用語・DB列は追加していないため、`notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション1106：goods editor photo sectionsを分離
 
 ### 背景・問題意識

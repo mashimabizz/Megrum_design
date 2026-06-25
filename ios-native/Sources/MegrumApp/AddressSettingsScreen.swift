@@ -9,7 +9,7 @@ struct AddressSettingsScreen: View {
     var onSaveCompleted: (() -> Void)?
 
     @Environment(\.dismiss) private var dismiss
-    @FocusState private var focusedField: Field?
+    @FocusState private var focusedField: AddressSettingsField?
 
     @State private var recipientName = ""
     @State private var postalCode = ""
@@ -68,78 +68,20 @@ struct AddressSettingsScreen: View {
     }
 
     private var form: some View {
-        VStack(spacing: 12) {
-            TextField("宛名", text: $recipientName)
-                .focused($focusedField, equals: .recipientName)
-                .textContentType(.name)
-                .submitLabel(.next)
-                .onSubmit { focusedField = .postalCode }
-                .megrumTextFieldStyle()
-
-            HStack(spacing: 10) {
-                TextField("郵便番号（ハイフンなし）", text: $postalCode)
-                    .focused($focusedField, equals: .postalCode)
-                    .textContentType(.postalCode)
-                    #if os(iOS)
-                    .keyboardType(.numberPad)
-                    #endif
-                    .onChange(of: postalCode) { _, value in
-                        let normalized = MegrumAppStateInputNormalizer.postalCode(value)
-                        if normalized != value {
-                            postalCode = normalized
-                        }
-                        schedulePostalCodeLookup(normalized)
-                    }
-
-                if appState.isLookingUpPostalCode {
-                    ProgressView()
-                        .controlSize(.small)
-                }
-            }
-                .megrumTextFieldStyle()
-
-            TextField("都道府県", text: $prefecture)
-                .focused($focusedField, equals: .prefecture)
-                .textContentType(.addressState)
-                .submitLabel(.next)
-                .onSubmit { focusedField = .city }
-                .megrumTextFieldStyle()
-
-            TextField("市区町村", text: $city)
-                .focused($focusedField, equals: .city)
-                .textContentType(.addressCity)
-                .submitLabel(.next)
-                .onSubmit { focusedField = .line1 }
-                .megrumTextFieldStyle()
-
-            TextField("番地・建物名", text: $line1)
-                .focused($focusedField, equals: .line1)
-                .textContentType(.streetAddressLine1)
-                .submitLabel(.next)
-                .onSubmit { focusedField = .line2 }
-                .megrumTextFieldStyle()
-
-            TextField("補足住所（任意）", text: $line2)
-                .focused($focusedField, equals: .line2)
-                .textContentType(.streetAddressLine2)
-                .submitLabel(.next)
-                .onSubmit { focusedField = .phoneNumber }
-                .megrumTextFieldStyle()
-
-            TextField("電話番号（任意）", text: $phoneNumber)
-                .focused($focusedField, equals: .phoneNumber)
-                .textContentType(.telephoneNumber)
-                #if os(iOS)
-                .keyboardType(.phonePad)
-                #endif
-                .megrumTextFieldStyle()
-
-            if let inputErrorMessage {
-                AddressSettingsErrorBanner(message: inputErrorMessage)
-            } else if let errorMessage = appState.errorMessage {
-                AddressSettingsErrorBanner(message: errorMessage)
-            }
-        }
+        AddressSettingsForm(
+            recipientName: $recipientName,
+            postalCode: $postalCode,
+            prefecture: $prefecture,
+            city: $city,
+            line1: $line1,
+            line2: $line2,
+            phoneNumber: $phoneNumber,
+            focusedField: $focusedField,
+            isLookingUpPostalCode: appState.isLookingUpPostalCode,
+            inputErrorMessage: inputErrorMessage,
+            appErrorMessage: appState.errorMessage,
+            onPostalCodeChange: handlePostalCodeChange
+        )
     }
 
     private var saveButton: some View {
@@ -192,6 +134,14 @@ struct AddressSettingsScreen: View {
         lastAppliedPostalCode = address.postalCode
     }
 
+    private func handlePostalCodeChange(_ value: String) {
+        let normalized = MegrumAppStateInputNormalizer.postalCode(value)
+        if normalized != value {
+            postalCode = normalized
+        }
+        schedulePostalCodeLookup(normalized)
+    }
+
     private func schedulePostalCodeLookup(_ value: String) {
         postalCodeLookupTask?.cancel()
         guard value.count == 7, value != lastAppliedPostalCode else {
@@ -214,15 +164,5 @@ struct AddressSettingsScreen: View {
             line1 = address.line1Suggestion
             lastAppliedPostalCode = address.postalCode
         }
-    }
-
-    private enum Field {
-        case recipientName
-        case postalCode
-        case prefecture
-        case city
-        case line1
-        case line2
-        case phoneNumber
     }
 }
