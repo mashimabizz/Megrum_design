@@ -4,6 +4,45 @@
 
 ---
 
+## イテレーション1097：proposal place action buttonを分離
+
+### 背景・問題意識
+
+`ProposalMeetupPlaceSheetComponents.swift` は、場所検索sheet上部の「現在地」「前の設定」button描画を `ProposalMeetupPlaceActionRow` の中に直接抱えていた。action row側を2つのaction配置とenabled/progress入力に集中させるため、共通action buttonを専用Viewファイルへ分離する。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/ProposalMeetupPlaceSheetComponents.swift`
+- `ProposalMeetupPlaceActionRow` 内の2つのbutton描画を `ProposalMeetupPlaceActionButton` 呼び出しへ置き換えた。
+- HStack spacing、font、現在地buttonのprogress表示、前回設定buttonのenabled条件は維持した。
+
+#### `ios-native/Sources/MegrumApp/ProposalMeetupPlaceActionButton.swift`
+- `ProposalMeetupPlaceActionButton` を追加した。
+- title、systemImage、enabled、progress表示、tap callbackを明示的な入力として受け取るようにした。
+- 既存の `proposalPlaceSheetActionStyle(isEnabled:)` とdisabled挙動を維持した。
+
+### 影響範囲
+
+- Swift Native iOS版の打診作成フローにおける待ち合わせ場所検索sheet。
+- 現在地取得action、前回設定適用action、場所検索、保存処理、送信payload、DB/API、状態名、表示文言は変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumApp/ProposalMeetupPlaceSheetComponents.swift ios-native/Sources/MegrumApp/ProposalMeetupPlaceActionButton.swift`
+  - passed
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-proposal-place-action-button`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-proposal-place-action-button --enable-xctest --disable-swift-testing -j 1 --filter 'ProposalCreateFlowTests|ProposalCreateSheetTests'`
+  - passed（62 tests）
+
+### セルフレビュー結果
+
+- ✅ 現在地buttonのprogress表示、前回設定buttonのdisabled条件、action style、HStack spacing、fontを維持した。
+- ✅ `ProposalMeetupPlaceSheetComponents.swift` は 133行から 122行へ縮小し、action buttonを 28行の専用ファイルへ分離した。
+- ✅ 新しい状態名・用語・DB列は追加していないため、`notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション1096：proposal place result buttonを分離
 
 ### 背景・問題意識

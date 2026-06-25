@@ -9,31 +9,20 @@ struct ProposalMeetupPlaceActionRow: View {
 
     var body: some View {
         HStack(spacing: 10) {
-            Button {
-                onUseCurrentLocation()
-            } label: {
-                Label {
-                    Text("現在地を中心に")
-                } icon: {
-                    if isRequestingLocation {
-                        ProgressView()
-                            .controlSize(.small)
-                    } else {
-                        Image(systemName: "location.fill")
-                    }
-                }
-                .frame(maxWidth: .infinity)
-            }
-            .proposalPlaceSheetActionStyle(isEnabled: true)
+            ProposalMeetupPlaceActionButton(
+                title: "現在地を中心に",
+                systemImage: "location.fill",
+                isEnabled: true,
+                showsProgress: isRequestingLocation,
+                onTap: onUseCurrentLocation
+            )
 
-            Button {
-                onApplyPreviousDraft()
-            } label: {
-                Label("前の設定と同じに", systemImage: "clock.arrow.circlepath")
-                    .frame(maxWidth: .infinity)
-            }
-            .proposalPlaceSheetActionStyle(isEnabled: canApplyPreviousDraft)
-            .disabled(!canApplyPreviousDraft)
+            ProposalMeetupPlaceActionButton(
+                title: "前の設定と同じに",
+                systemImage: "clock.arrow.circlepath",
+                isEnabled: canApplyPreviousDraft,
+                onTap: onApplyPreviousDraft
+            )
         }
         .font(.system(size: 13, weight: .black, design: .rounded))
     }
