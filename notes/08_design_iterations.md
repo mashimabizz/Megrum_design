@@ -4,6 +4,47 @@
 
 ---
 
+## イテレーション1065：meguri groom presentationを分離
+
+### 背景・問題意識
+
+`MeguriScreenPresentationModifiers.swift` は、掲示板thread/composer、都道府県picker、Groom作成、Groom camera、Groom archive、viewer、map presentationを同じファイルに抱えていた。Meguri全体のpresentation束から、Groom作成/camera/archiveのOS別presentationだけを専用ファイルへ分離する。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/MeguriScreenPresentationModifiers.swift`
+- `MeguriScreenPresentationModifier` 本体と、掲示板/都道府県picker/viewer/map presentationの呼び出しを残した。
+- Groom作成、camera、archive presentation modifierとView extensionを移動した。
+
+#### `ios-native/Sources/MegrumApp/MeguriGroomPresentationModifiers.swift`
+- `MeguriGroomComposerPresentationModifier` を追加し、Groom作成/camera/archiveのpresentation chainを担当させた。
+- iOSの `fullScreenCover` / `sheet` と、非iOS向け `sheet` fallbackの分岐を維持した。
+
+### 影響範囲
+
+- Swift Native iOS版のMeguri画面presentation。
+- Groom作成画面、camera capture、Groom archiveの表示。
+- Meguriの投稿/掲示板状態、位置情報、DB/API、状態名、用語、表示文言は変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumApp/MeguriScreenPresentationModifiers.swift ios-native/Sources/MegrumApp/MeguriGroomPresentationModifiers.swift`
+  - passed
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-meguri-groom-presentation`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-meguri-groom-presentation --enable-xctest --disable-swift-testing -j 1 --filter 'MeguriAccessPolicyTests|MeguriFeedStateReducerTests|MeguriMessageReadStateReducerTests|MeguriNoticeResolverTests'`
+  - passed（18 tests）
+
+### セルフレビュー結果
+
+- ✅ `groomComposerPresentation` / `groomCameraPresentation` / `groomArchivePresentation` の中身をそのまま専用ファイルへ移した。
+- ✅ `MeguriScreenPresentationModifier` のmodifier chain、binding、callback、OS別presentation分岐を維持した。
+- ✅ 移動に伴い `MeguriGroomComposerPresentationModifier` は同一module内から参照できる通常のinternal型にした。
+- ✅ `MeguriScreenPresentationModifiers.swift` は 267行から 114行へ縮小し、Groom presentationを 157行の専用ファイルへ分離した。
+- ✅ 新しい状態名・用語・DB列は追加していないため、`notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション1064：account setup oshi componentsを分離
 
 ### 背景・問題意識
