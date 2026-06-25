@@ -4,6 +4,44 @@
 
 ---
 
+## イテレーション1096：proposal place result buttonを分離
+
+### 背景・問題意識
+
+`ProposalMeetupPlaceSheetComponents.swift` は、場所検索結果リストの中に、結果1行のbutton描画、アイコン、title/subtitle、背景、borderを直接抱えていた。検索結果リスト側をresultsの反復とselect callbackに集中させるため、結果行buttonを専用Viewファイルへ分離する。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/ProposalMeetupPlaceSheetComponents.swift`
+- `ProposalMeetupPlaceSearchResultsList` 内の検索結果button描画を `ProposalMeetupPlaceSearchResultButton` 呼び出しへ置き換えた。
+- resultsの反復、select callback、list spacing、top paddingは維持した。
+
+#### `ios-native/Sources/MegrumApp/ProposalMeetupPlaceSearchResultButton.swift`
+- `ProposalMeetupPlaceSearchResultButton` を追加した。
+- mappin icon、title/subtitle表示、lineLimit、padding、minHeight、background、border、plain button styleを維持した。
+
+### 影響範囲
+
+- Swift Native iOS版の打診作成フローにおける待ち合わせ場所検索sheet。
+- 場所検索結果の選択callback、検索結果データ、保存処理、送信payload、DB/API、状態名、表示文言は変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumApp/ProposalMeetupPlaceSheetComponents.swift ios-native/Sources/MegrumApp/ProposalMeetupPlaceSearchResultButton.swift`
+  - passed
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-proposal-place-result-button`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-proposal-place-result-button --enable-xctest --disable-swift-testing -j 1 --filter 'ProposalCreateFlowTests|ProposalCreateSheetTests'`
+  - passed（62 tests）
+
+### セルフレビュー結果
+
+- ✅ result icon、title/subtitle、lineLimit、padding、minHeight、background、border、plain button styleを維持した。
+- ✅ `ProposalMeetupPlaceSheetComponents.swift` は 160行から 133行へ縮小し、search result buttonを 41行の専用ファイルへ分離した。
+- ✅ 新しい状態名・用語・DB列は追加していないため、`notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション1095：proposal completion cardを分離
 
 ### 背景・問題意識
