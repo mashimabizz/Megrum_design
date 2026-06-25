@@ -2,66 +2,6 @@ import Foundation
 import MegrumDesign
 import SwiftUI
 
-struct HomeOwnerAvatarButton: View {
-    var owner: HomeDiscoveryGoodsOwnerSummary
-    var size: CGFloat = 42
-    var onOpenProfile: (UUID) -> Void
-
-    var body: some View {
-        Button {
-            onOpenProfile(owner.id)
-        } label: {
-            HomeOwnerAvatar(owner: owner)
-                .frame(width: size, height: size)
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel("\(owner.displayName)のプロフィールを開く")
-    }
-}
-
-struct HomeOwnerAvatar: View {
-    var owner: HomeDiscoveryGoodsOwnerSummary
-
-    var body: some View {
-        Circle()
-            .fill(
-                LinearGradient(
-                    colors: [MegrumTheme.lavender.opacity(0.86), MegrumTheme.pink.opacity(0.72)],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
-            )
-            .overlay {
-                if let avatarURL = owner.avatarURL {
-                    AsyncImage(url: avatarURL) { phase in
-                        switch phase {
-                        case .success(let image):
-                            image
-                                .resizable()
-                                .scaledToFill()
-                        default:
-                            fallbackInitial
-                        }
-                    }
-                    .clipShape(Circle())
-                } else {
-                    fallbackInitial
-                }
-            }
-            .overlay {
-                Circle()
-                    .stroke(.white.opacity(0.86), lineWidth: 1.2)
-            }
-            .shadow(color: MegrumTheme.lavender.opacity(0.16), radius: 8, y: 4)
-    }
-
-    private var fallbackInitial: some View {
-        Text(owner.initial)
-            .font(.system(size: 18, weight: .heavy, design: .rounded))
-            .foregroundStyle(.white)
-    }
-}
-
 struct HomeUserSummary: View {
     var owner: HomeDiscoveryGoodsOwnerSummary
     var onOpenProfile: (UUID) -> Void

@@ -8,8 +8,6 @@ struct HomeSelectedGoodsHeader: View {
     var exchangeSummary: HomeDiscoveryOwnerExchangeSummary?
     var onOpenOwnerProfile: (UUID) -> Void = { _ in }
 
-    private let ownerColumnCloseButtonAlignmentOffset: CGFloat = -42
-
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             Text(title)
@@ -22,11 +20,6 @@ struct HomeSelectedGoodsHeader: View {
 
                 VStack(alignment: .leading, spacing: 10) {
                     if let ownerSummary = goods.ownerSummary {
-                        HomeOwnerAvatarButton(
-                            owner: ownerSummary,
-                            size: 46,
-                            onOpenProfile: onOpenOwnerProfile
-                        )
                         HomeUserSummary(owner: ownerSummary, onOpenProfile: onOpenOwnerProfile)
                     }
 
@@ -37,7 +30,6 @@ struct HomeSelectedGoodsHeader: View {
                     HomePaymentBox(summaryText: goods.ownerPaymentSummaryText)
                 }
                 .padding(.top, 4)
-                .offset(y: goods.ownerSummary == nil ? 0 : ownerColumnCloseButtonAlignmentOffset)
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
         }

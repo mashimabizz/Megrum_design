@@ -4,6 +4,43 @@
 
 ---
 
+## イテレーション977：マッチ候補シートのユーザーアイコンを非表示
+
+### 背景・問題意識
+
+マッチ候補タブで画像をタップした後の詳細シートでは、相手ユーザーアイコンを表示する必要がない。直近ではアイコン位置の調整をしていたが、シート内ではグッズと条件確認を優先し、相手情報はユーザー名・評価・交換件数だけで十分になった。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/HomeDiscoverySheetSharedViews.swift`
+- 選択グッズヘッダーの相手ユーザーアイコン表示を削除した。
+- アイコンを右上の閉じるボタン高さへ合わせるための上方向オフセットも削除し、ユーザー名ブロックを自然な位置へ戻した。
+
+#### `ios-native/Sources/MegrumApp/HomeDiscoveryOwnerSummaryViews.swift`
+- シート内で使われなくなった owner avatar button / avatar view を削除した。
+- ユーザー名、性別・年齢、評価、交換件数、プロフィール導線は維持した。
+
+### 影響範囲
+
+- Swift Native iOS版ホームのマッチ候補/ウィッシュヒット/他にも交換できそうなもの詳細シート。
+- 候補生成、Wish抽出、打診開始payload、プロフィール遷移、状態名、用語、DBスキーマは変更しない。
+
+### 確認方法
+
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-no-owner-avatar-build --disable-index-store`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-no-owner-avatar-test --disable-index-store --enable-xctest --disable-swift-testing -j 1 --filter HomeScreenFlowTests`
+  - 45 tests passed
+
+### セルフレビュー結果
+
+- ✅ マッチ候補シートの相手ユーザーアイコン表示を削除した。
+- ✅ ユーザー名・評価・交換件数とプロフィール導線は維持した。
+- ✅ アイコン用の上方向オフセットも削除し、閉じるボタン付近へ不要な表示が寄らないようにした。
+- ✅ 状態名・用語・DBスキーマの追加変更はないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション976：左ドロワーを画面端スワイプだけに限定
 
 ### 背景・問題意識
