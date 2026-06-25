@@ -4,6 +4,52 @@
 
 ---
 
+## イテレーション964：Trade goods carousel stageを分割
+
+### 背景・問題意識
+
+`TradeDealGoodsCarouselStageViews.swift` は、取引/相互マッチで使うグッズカルーセルのステージ本体、軌道カード、回転台、画像描画、空状態を1ファイルに持っていた。カルーセルは見た目の調整が細かく入りやすいため、表示数値やアニメーション条件は変えずに部品単位へ分け、カード装飾や画像fallbackだけを変更しやすくする。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/TradeGoodsCarouselStage.swift`
+- `TradeGoodsCarouselStage` と private `TradeGoodsCarouselEntry` を新規ファイルへ移動した。
+
+#### `ios-native/Sources/MegrumApp/TradeGoodsOrbitCard.swift`
+- `TradeGoodsOrbitCard` を新規ファイルへ移動した。
+
+#### `ios-native/Sources/MegrumApp/TradeRotatingGoodsTable.swift`
+- `TradeRotatingGoodsTable` を新規ファイルへ移動した。
+
+#### `ios-native/Sources/MegrumApp/TradeGoodsArtwork.swift`
+- `TradeGoodsArtwork` を新規ファイルへ移動した。
+
+#### `ios-native/Sources/MegrumApp/TradeGoodsEmptyCarouselStage.swift`
+- `TradeGoodsEmptyCarouselStage` を新規ファイルへ移動した。
+
+#### `ios-native/Sources/MegrumApp/TradeDealGoodsCarouselStageViews.swift`
+- 上記5ファイルへ分割したため削除した。
+
+### 影響範囲
+
+- Swift Native iOS版の取引カード、取引詳細、相互マッチ、打診確認で使うグッズカルーセル表示。
+- 挙動変更ではなく責務分離。カルーセルのdrag計算、カードmetrics、空状態文言、画像fallback、状態名、用語、DBスキーマは変更しない。
+
+### 確認方法
+
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-trade-carousel-stage-build --disable-index-store`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-trade-carousel-stage-build --disable-index-store --enable-xctest --disable-swift-testing -j 1 --filter 'TradeChatAffordanceTests|TradeRequestDraftTests|HomeScreenFlowTests|ProposalCreateFlowTests|ProposalCreateSheetTests'`
+  - 161 tests passed
+
+### セルフレビュー結果
+
+- ✅ ステージ本体、カード、回転台、画像、空状態を移動のみで分割し、カルーセルの数値・drag処理・fallback表示を維持した。
+- ✅ 取引、ホーム、打診作成周辺の対象テストを通した。
+- ✅ 状態名・用語・DBスキーマの変更はないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション963：Trade schedule componentsを分割
 
 ### 背景・問題意識
