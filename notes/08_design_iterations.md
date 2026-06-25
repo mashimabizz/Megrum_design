@@ -4,6 +4,44 @@
 
 ---
 
+## イテレーション1083：proposal confirm exchange artworkを分離
+
+### 背景・問題意識
+
+`ProposalConfirmExchangePreviewViews.swift` は、打診確認画面の交換preview row構造と、グッズ/金額のartwork表示を同じファイルに抱えていた。row側を左右の交換構造とcash互換分岐に集中させるため、artwork表示を専用Viewファイルへ分離する。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/ProposalConfirmExchangePreviewViews.swift`
+- `ProposalConfirmExchangeArtwork` / `ProposalConfirmGoodsArtwork` を移動した。
+- `ProposalExchangePreviewRow`、cash互換row、左右side、glyph resolverは維持した。
+
+#### `ios-native/Sources/MegrumApp/ProposalConfirmExchangeArtworkViews.swift`
+- `ProposalConfirmExchangeArtwork` と `ProposalConfirmGoodsArtwork` を追加した。
+- cash placeholder、件数badge、AsyncImage成功/失敗/loading、fallback glyph、corner radius、strokeを維持した。
+
+### 影響範囲
+
+- Swift Native iOS版の打診作成確認画面の交換preview表示。
+- 打診作成step、送信payload、支払い/待ち合わせ条件、DB/API、状態名、表示文言は変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumApp/ProposalConfirmExchangePreviewViews.swift ios-native/Sources/MegrumApp/ProposalConfirmExchangeArtworkViews.swift`
+  - passed
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-proposal-confirm-exchange-artwork`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-proposal-confirm-exchange-artwork --enable-xctest --disable-swift-testing -j 1 --filter 'ProposalCreateFlowTests|ProposalCreateSheetTests'`
+  - passed（62 tests）
+
+### セルフレビュー結果
+
+- ✅ cash placeholder、件数badge、AsyncImage状態分岐、fallback glyph、corner radius、strokeを維持した。
+- ✅ `ProposalConfirmExchangePreviewViews.swift` は 215行から 121行へ縮小し、artwork表示を 96行の専用ファイルへ分離した。
+- ✅ 新しい状態名・用語・DB列は追加していないため、`notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション1082：proposal confirm row modelsを分離
 
 ### 背景・問題意識
