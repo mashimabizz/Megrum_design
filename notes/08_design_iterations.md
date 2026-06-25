@@ -4,6 +4,44 @@
 
 ---
 
+## イテレーション1085：proposal selection controlsを分離
+
+### 背景・問題意識
+
+`ProposalCreateSelectionSteps.swift` は、出すもの/受け取るものstep本体と、選択モードタブ・金額入力controlを同じファイルに抱えていた。step側を候補リストと空状態の表示に集中させるため、共通controlを専用Viewファイルへ分離する。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/ProposalCreateSelectionSteps.swift`
+- `ProposalSideSelectionModeTabs` と `ProposalCashAmountEntry` を移動した。
+- 出すもの/受け取るものstepの selection mode 分岐、filter bar、候補row、空状態表示は維持した。
+
+#### `ios-native/Sources/MegrumApp/ProposalCreateSelectionControls.swift`
+- `ProposalSideSelectionModeTabs` と `ProposalCashAmountEntry` を追加した。
+- tabのanimation、selected styling、accessibility trait、金額入力の正規化、reference row表示を維持した。
+
+### 影響範囲
+
+- Swift Native iOS版の打診作成フローにおける出すもの/受け取るもの選択step。
+- 打診作成step順、選択状態、金額入力の正規化、送信payload、DB/API、状態名、表示文言は変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumApp/ProposalCreateSelectionSteps.swift ios-native/Sources/MegrumApp/ProposalCreateSelectionControls.swift`
+  - passed
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-proposal-selection-controls`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-proposal-selection-controls --enable-xctest --disable-swift-testing -j 1 --filter 'ProposalCreateFlowTests|ProposalCreateSheetTests'`
+  - passed（62 tests）
+
+### セルフレビュー結果
+
+- ✅ selection mode tab、金額入力field、reference row、入力正規化の挙動を維持した。
+- ✅ `ProposalCreateSelectionSteps.swift` は 233行から 129行へ縮小し、control群を 107行の専用ファイルへ分離した。
+- ✅ 新しい状態名・用語・DB列は追加していないため、`notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション1084：proposal confirm summaryを分離
 
 ### 背景・問題意識
