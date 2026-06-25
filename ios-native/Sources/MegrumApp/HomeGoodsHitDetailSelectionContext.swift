@@ -63,6 +63,49 @@ struct HomeGoodsHitDetailSelectionContext {
         selectedWantedOptions.first?.id ?? focusedWantedOptionID ?? wantedOptions.first?.id
     }
 
+    var wantedOptionPreviewGoods: [HomeMockGoods] {
+        guard usesListingWantedOptions, let option = displayedWantedOption else {
+            return []
+        }
+        let previewGoods = option.previewItems.enumerated().map { index, item in
+            HomeMockGoods.from(
+                wantedPreviewItem: item,
+                index: index,
+                subtitle: option.subtitle ?? option.title
+            )
+        }
+        if !previewGoods.isEmpty {
+            return previewGoods
+        }
+
+        let preferredIDs = option.matchingGoodsIDs + option.goodsIDs
+        let goodsPool = wantedOptionPreviewGoodsPool
+        var seen: Set<UUID> = []
+        return preferredIDs.compactMap { id in
+            guard seen.insert(id).inserted else {
+                return nil
+            }
+            return goodsPool.first { $0.id == id }
+        }
+    }
+
+    var selectedWantedOptionPreviewIndices: Set<Int> {
+        guard usesListingWantedOptions,
+              displayedWantedOption != nil,
+              !selectionState.selectedWantedIndices.isEmpty
+        else {
+            return []
+        }
+        return Set(wantedOptionPreviewGoods.indices)
+    }
+
+    var displayedWantedOptionIndex: Int? {
+        guard let option = displayedWantedOption else {
+            return nil
+        }
+        return wantedOptions.firstIndex { $0.id == option.id }
+    }
+
     var allOfferGoods: [HomeMockGoods] {
         HomeOfferGoodsOrdering.ordered(
             viewerOfferGoods.isEmpty ? HomeDiscoveryFixtures.offerGoods : viewerOfferGoods,
@@ -293,5 +336,9 @@ struct HomeGoodsHitDetailSelectionContext {
             return nil
         }
         return availableWantedOptions.first { $0.id == focusedWantedOptionID }
+    }
+
+    private var displayedWantedOption: HomeIndividualListingWantedOption? {
+        selectedWantedOptions.first ?? focusedWantedOption ?? wantedOptions.first
     }
 }

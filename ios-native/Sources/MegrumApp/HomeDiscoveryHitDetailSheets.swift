@@ -56,7 +56,7 @@ struct HomeGoodsHitDetailSheet: View {
 
             HomeWantedSelectionSectionHeader(
                 systemName: "person",
-                title: "相手の希望から譲を選ぶ",
+                title: "相手の希望から譲るを選ぶ",
                 trailing: selectionContext.wantedRequirementLabel,
                 showsOtherOptionsButton: selectionContext.showsWantedOptionPicker
                     && selection.individualListingSelection.detail != nil,
@@ -131,12 +131,12 @@ struct HomeGoodsHitDetailSheet: View {
 
     @ViewBuilder
     private var wantedSelectionRail: some View {
-        if selectionContext.usesListingWantedOptions {
-            HomeListingWantedOptionRail(
-                options: selectionContext.wantedOptions,
-                selectedIndices: selectionState.selectedWantedIndices,
-                previewGoodsByOptionID: selectionContext.previewGoodsByWantedOptionID,
-                onSelect: toggleWantedGoods
+        if selectionContext.usesListingWantedOptions,
+           !selectionContext.wantedOptionPreviewGoods.isEmpty {
+            HomeGoodsImagePanelRail(
+                goods: selectionContext.wantedOptionPreviewGoods,
+                selectedIndices: selectionContext.selectedWantedOptionPreviewIndices,
+                onSelect: toggleWantedOptionPreviewGoods
             )
         } else {
             HomeGoodsImagePanelRail(
@@ -145,6 +145,13 @@ struct HomeGoodsHitDetailSheet: View {
                 onSelect: toggleWantedGoods
             )
         }
+    }
+
+    private func toggleWantedOptionPreviewGoods(at _: Int) {
+        guard let optionIndex = selectionContext.displayedWantedOptionIndex else {
+            return
+        }
+        toggleWantedGoods(at: optionIndex)
     }
 
     private func toggleWantedGoods(at index: Int) {
@@ -276,19 +283,29 @@ private struct HomeWantedSelectionSectionHeader: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
-            HStack(alignment: .center, spacing: 10) {
-                HStack(spacing: 9) {
-                    Image(systemName: systemName)
-                        .font(.system(size: 19, weight: .bold))
-                        .foregroundStyle(MegrumTheme.lavender)
+            HStack(alignment: .top, spacing: 10) {
+                Image(systemName: systemName)
+                    .font(.system(size: 19, weight: .bold))
+                    .foregroundStyle(MegrumTheme.lavender)
+                    .frame(width: 24, height: 24)
+                    .padding(.top, 1)
+
+                VStack(alignment: .leading, spacing: 2) {
                     Text(title)
                         .font(.system(size: 19, weight: .black, design: .rounded))
                         .foregroundStyle(MegrumTheme.ink)
                         .lineLimit(1)
-                        .minimumScaleFactor(0.72)
-                }
+                        .minimumScaleFactor(0.68)
 
-                Spacer(minLength: 4)
+                    if let trailing {
+                        Text(trailing)
+                            .font(.system(size: 11.5, weight: .black, design: .rounded))
+                            .foregroundStyle(MegrumTheme.lavender)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.82)
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
 
                 if showsOtherOptionsButton {
                     Button("他の選択肢", systemImage: "list.bullet.rectangle", action: onOpenOtherOptions)
@@ -304,14 +321,6 @@ private struct HomeWantedSelectionSectionHeader: View {
                                 .strokeBorder(MegrumTheme.lavender.opacity(0.20), lineWidth: 1)
                         }
                         .buttonStyle(.plain)
-                }
-
-                if let trailing {
-                    Text(trailing)
-                        .font(.system(size: 14, weight: .black, design: .rounded))
-                        .foregroundStyle(MegrumTheme.lavender)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.72)
                 }
             }
         }

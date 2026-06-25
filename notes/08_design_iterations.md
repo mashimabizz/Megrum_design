@@ -4,6 +4,60 @@
 
 ---
 
+## イテレーション988：個別募集希望の画像表示を修正
+
+### 背景・問題意識
+
+マッチ候補タブで Goods20 丸の画像を押した後のシートにおいて、`相手の希望から譲るを選ぶ` の見出しが右側の条件ラベルと競合して途中で切れていた。また、個別募集詳細で選択中の求めるものが複数画像を持つ場合、その複数画像がメインの `相手の希望から譲るを選ぶ` 欄へ反映されず、選択肢カード相当の単一表示になっていた。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/HomeDiscoveryHitDetailSheets.swift`
+- `相手の希望から譲るを選ぶ` の見出し下に、`すべて希望` などの条件ラベルを小さく表示するレイアウトへ変更した。
+- 個別募集の求めるもの選択時は、選択中オプションのプレビュー画像を `HomeGoodsImagePanelRail` で表示するようにした。
+- プレビュー画像のタップは、従来通り個別募集オプション単位の選択へつなげるようにした。
+
+#### `ios-native/Sources/MegrumApp/HomeGoodsHitDetailSelectionContext.swift`
+- 選択中またはフォーカス中の wanted option から、`previewItems` を `HomeMockGoods` に変換して表示用一覧を作るロジックを追加した。
+- `previewItems` がない既存データでは、従来の matching goods / goods IDs から表示候補を補完する fallback を維持した。
+
+#### `ios-native/Sources/MegrumApp/HomeMockGoodsModels.swift`
+- 個別募集の wanted preview item を画像レール表示用の `HomeMockGoods` に変換する factory を追加した。
+
+#### `ios-native/Tests/MegrumAppTests/HomeDiscoveryMatchPolicyTests.swift`
+- フォーカス中の wanted option が複数 `previewItems` を持つ場合、その画像URLとタイトルが詳細シートの表示コンテキストへ反映されることをテストで固定した。
+
+### 影響範囲
+
+- Swift Native iOS版のホーム、マッチ候補タブ、Goods20 丸の詳細シート。
+- 個別募集詳細ポップアップで選んだ求めるものの表示反映。
+- 打診payload、選択ロジック、DBスキーマ、状態名、用語定義は変更しない。
+
+### 確認方法
+
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-home-goods-hit-detail-test --disable-index-store --enable-xctest --disable-swift-testing -j 1 --filter 'HomeDiscoveryMatchPolicyTests/testFocusedWantedOptionUpdatesGoodsHitSelectionContext|HomeListingSheetSelectionStateReducerTests'`
+  - selected tests passed
+- `xcodebuild -quiet -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -destination 'id=C70DDDBB-2602-49E0-8F95-1F043BCCED76' -derivedDataPath /tmp/megrum-ios-native-home-goods-hit-detail-xcode build`
+  - passed
+- `xcrun simctl install C70DDDBB-2602-49E0-8F95-1F043BCCED76 /tmp/megrum-ios-native-home-goods-hit-detail-xcode/Build/Products/Debug-iphonesimulator/MegrumNative.app`
+  - passed
+- `xcrun simctl launch --terminate-running-process C70DDDBB-2602-49E0-8F95-1F043BCCED76 tokyo.megrum.native.preview`
+  - launched
+- `baguette describe-ui --udid C70DDDBB-2602-49E0-8F95-1F043BCCED76`
+  - `相手の希望から譲るを選ぶ` が省略されず、`すべて希望` が見出し下に表示されることを確認
+  - 選択中オプションの `ジョングク トレカ` / `ジミン トレカ` がメイン欄へ複数表示されることを確認
+- `baguette screenshot --udid C70DDDBB-2602-49E0-8F95-1F043BCCED76 --output /tmp/megrum-home-goods-hit-detail-target.png`
+  - screenshot captured
+
+### セルフレビュー結果
+
+- ✅ 見出しと条件ラベルの横並び競合を解消し、見出しが読める幅を確保した。
+- ✅ 個別募集詳細ポップアップで見える選択肢内の複数画像が、メインの選択欄にも同じ粒度で出るようにした。
+- ✅ 選択そのものは既存の wanted option 単位を維持し、打診payloadの意味を変えないようにした。
+- ✅ 状態名、用語定義、DBスキーマの変更はないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション987：詳細画像タイルの設定表示を再配置
 
 ### 背景・問題意識

@@ -140,6 +140,27 @@ struct HomeMockGoods: Identifiable, Equatable, Sendable {
         )
     }
 
+    static func from(
+        wantedPreviewItem item: HomeIndividualListingWantedPreviewItem,
+        index: Int,
+        subtitle: String? = nil
+    ) -> HomeMockGoods {
+        let shape = HomeMockGoodsShape.bestGuess(for: item.title)
+        return HomeMockGoods(
+            id: item.id,
+            title: item.title,
+            subtitle: subtitle?.nilIfBlank ?? "",
+            displayTags: [],
+            rawTagNames: [],
+            ownerPaymentMethods: [],
+            ownerPaymentNote: nil,
+            shape: shape,
+            palette: HomeMockGoodsPalette.palette(for: index, itemID: item.id),
+            symbol: item.title.first.map(String.init) ?? "M",
+            imageURL: item.imageURL
+        )
+    }
+
     var masterDisplayName: String? {
         if memberID != nil, let memberName = normalizedMasterName(memberName) {
             return memberName

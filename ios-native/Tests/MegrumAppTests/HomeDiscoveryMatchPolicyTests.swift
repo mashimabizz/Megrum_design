@@ -181,7 +181,19 @@ final class HomeDiscoveryMatchPolicyTests: XCTestCase {
             title: "選択肢2",
             logic: .one,
             kind: .goods,
-            matchingGoodsIDs: [secondOffer.id]
+            matchingGoodsIDs: [secondOffer.id],
+            previewItems: [
+                HomeIndividualListingWantedPreviewItem(
+                    id: UUID(uuidString: "22222222-2222-2222-2222-222222222104")!,
+                    title: "ジョングク トレカ",
+                    imageURL: URL(string: "https://example.com/jungkook-1.jpg")
+                ),
+                HomeIndividualListingWantedPreviewItem(
+                    id: UUID(uuidString: "22222222-2222-2222-2222-222222222105")!,
+                    title: "SUGA トレカ",
+                    imageURL: URL(string: "https://example.com/suga-1.jpg")
+                )
+            ]
         )
         let selectionContext = HomeIndividualListingSelectionContext(
             wantedLogic: .one,
@@ -226,6 +238,12 @@ final class HomeDiscoveryMatchPolicyTests: XCTestCase {
         XCTAssertEqual(focusedContext.wantedOptions.map(\.id), [secondOption.id])
         XCTAssertEqual(focusedContext.offerGoods.map(\.id), [secondOffer.id])
         XCTAssertEqual(focusedContext.selectedWantedOptionID, secondOption.id)
+        XCTAssertEqual(focusedContext.wantedOptionPreviewGoods.map(\.title), ["ジョングク トレカ", "SUGA トレカ"])
+        XCTAssertEqual(
+            focusedContext.wantedOptionPreviewGoods.map(\.imageURL?.absoluteString),
+            ["https://example.com/jungkook-1.jpg", "https://example.com/suga-1.jpg"]
+        )
+        XCTAssertEqual(focusedContext.selectedWantedOptionPreviewIndices, Set([0, 1]))
     }
 
     func testGoodsHitDetailRequiresOfferedMinimumBeforeProposalStart() {
