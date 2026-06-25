@@ -20,7 +20,18 @@ struct HomeDiscoverySheetView: View {
     @State private var copyingWishGoodsID: UUID?
 
     var body: some View {
-        sheetContent
+        HomeDiscoverySheetContent(
+            sheet: sheet,
+            viewerOfferGoods: viewerOfferGoods,
+            addedExtraCandidateIDs: addedExtraCandidateIDs,
+            presentationContext: presentationContext,
+            copyingWishGoodsID: copyingWishGoodsID,
+            onClose: onClose,
+            onOpenOwnerProfile: openOwnerProfile,
+            onOpenNestedSheet: { nestedPresentation = .discoverySheet($0) },
+            onStartProposal: submitSelection,
+            onCopyToWish: copyGoodsToWish
+        )
             .overlay(alignment: .bottom) {
                 if let wishCopyToastMessage {
                     MeguriToastView(message: wishCopyToastMessage)
@@ -64,69 +75,6 @@ struct HomeDiscoverySheetView: View {
                     }
                 }
             }
-    }
-
-    @ViewBuilder
-    private var sheetContent: some View {
-        switch sheet {
-        case .goodsHit(let payload):
-            HomeGoodsHitDetailSheet(
-                selection: payload,
-                viewerOfferGoods: viewerOfferGoods,
-                addedExtraCandidateIDs: addedExtraCandidateIDs,
-                showsOtherExchangeRows: presentationContext.showsOtherExchangeRows,
-                bottomButtonTitle: presentationContext.bottomButtonTitle,
-                preselectPreferredOffer: presentationContext.preselectPreferredOffer,
-                onOpenOwnerProfile: openOwnerProfile,
-                onOpenNestedSheet: { nestedPresentation = .discoverySheet($0) },
-                onStartProposal: submitSelection,
-                onCopyToWish: copyGoodsToWish,
-                isWishCopyInProgress: copyingWishGoodsID == payload.goods.id
-            )
-        case .wishHit(let payload):
-            HomeWishHitDetailSheet(
-                selection: payload,
-                viewerOfferGoods: viewerOfferGoods,
-                addedExtraCandidateIDs: addedExtraCandidateIDs,
-                showsOtherExchangeRows: presentationContext.showsOtherExchangeRows,
-                bottomButtonTitle: presentationContext.bottomButtonTitle,
-                preselectFirstOffer: presentationContext.preselectPreferredOffer,
-                onOpenOwnerProfile: openOwnerProfile,
-                onOpenNestedSheet: { nestedPresentation = .discoverySheet($0) },
-                onStartProposal: submitSelection,
-                onCopyToWish: copyGoodsToWish,
-                isWishCopyInProgress: copyingWishGoodsID == payload.goods.id
-            )
-        case .havesLookup(let payload):
-            HomeHavesLookupSheet(
-                payload: payload,
-                onOpenNestedSheet: { nestedPresentation = .discoverySheet($0) }
-            )
-        case .extraListingHit(let payload), .extraWishHit(let payload):
-            switch payload.kind {
-            case .listing:
-                HomeExtraHitDetailSheet(
-                    payload: payload,
-                    viewerOfferGoods: viewerOfferGoods,
-                    onClose: onClose,
-                    onOpenOwnerProfile: openOwnerProfile
-                )
-            case .wish:
-                HomeWishHitDetailSheet(
-                    selection: payload.sheetPayload,
-                    viewerOfferGoods: viewerOfferGoods,
-                    addedExtraCandidateIDs: addedExtraCandidateIDs,
-                    showsOtherExchangeRows: presentationContext.showsOtherExchangeRows,
-                    bottomButtonTitle: presentationContext.bottomButtonTitle,
-                    preselectFirstOffer: presentationContext.preselectPreferredOffer,
-                    onOpenOwnerProfile: openOwnerProfile,
-                    onOpenNestedSheet: { nestedPresentation = .discoverySheet($0) },
-                    onStartProposal: submitSelection,
-                    onCopyToWish: copyGoodsToWish,
-                    isWishCopyInProgress: copyingWishGoodsID == payload.goods.id
-                )
-            }
-        }
     }
 
     private var addedExtraCandidateIDs: Set<UUID> {

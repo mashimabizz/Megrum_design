@@ -4,6 +4,47 @@
 
 ---
 
+## イテレーション1045：home discovery sheet contentを分割
+
+### 背景・問題意識
+
+`HomeDiscoverySheets.swift` は、nested sheet、toast、wish copy、proposal selection の状態管理に加えて、goods hit / wish hit / haves lookup / extra hit の表示switchも同じファイルに抱えていた。親Viewはsheet状態と副作用の管理に集中させ、sheet種別ごとの表示構成を専用Viewへ分けた。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/HomeDiscoverySheets.swift`
+- `HomeDiscoverySheetView` から `sheetContent` の大きなswitchを削除した。
+- `HomeDiscoverySheetContent` に `sheet`、viewer goods、追加候補ID、presentation context、copy中ID、各callbackを明示的に渡す構成へ変更した。
+- nested presentation、toast、wish copy、submit selection、owner profile routing は親Viewに残した。
+
+#### `ios-native/Sources/MegrumApp/HomeDiscoverySheetContent.swift`
+- `HomeDiscoverySheetContent` を追加し、goods hit / wish hit / haves lookup / extra listing hit / extra wish hit の表示switchを移動した。
+- 既存のbottom button title、other exchange row表示、preferred offer preselect、wish copy進行表示、owner profile / nested sheet / proposal callbacksを維持した。
+
+### 影響範囲
+
+- Swift Native iOS版のHome discovery詳細sheet。
+- goods hit / wish hit / haves lookup / extra hit sheetの表示構成。
+- nested sheet状態、toast、wish copy保存、proposal開始、owner profile routing、状態名、用語、DBスキーマ、表示文言は変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumApp/HomeDiscoverySheets.swift ios-native/Sources/MegrumApp/HomeDiscoverySheetContent.swift`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-home-discovery-sheet-content --enable-xctest --disable-swift-testing -j 1 --filter 'HomeScreenFlowTests|HomeCandidateComposerTests|HomeDiscoveryMatchPolicyTests'`
+  - first run failed at link due to `/tmp` capacity (`No space left on device`)
+  - after removing `/tmp/megrum-ios-native-refactor-*` scratch directories, passed（133 tests）
+
+### セルフレビュー結果
+
+- ✅ sheet種別ごとの表示switchは移動のみで、渡していたpayload、callback、copy中判定を維持した。
+- ✅ nested sheet、toast、wish copy、proposal selection、owner profile routingの状態管理は親Viewに残した。
+- ✅ 新ファイルには廃止用語を追加していない。
+- ✅ `HomeDiscoverySheets.swift` は 232行から 180行へ縮小し、sheet表示switchを 78行の専用ファイルへ分離した。
+- ✅ 新しい状態名・用語・DB列は追加していないため、`notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション1044：グルームviewer chrome viewsを分割
 
 ### 背景・問題意識
