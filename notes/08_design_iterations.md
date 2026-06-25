@@ -4,6 +4,40 @@
 
 ---
 
+## イテレーション1100：proposal place save actionを分離
+
+### 背景・問題意識
+
+`ProposalMeetupPlaceSheet.swift` は、下部保存buttonのView構成内に、draft正規化、保存callback、sheet dismissの処理をinlineで抱えていた。View描画から保存時の副作用を外すため、保存処理を小さな専用methodへ分離する。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/ProposalMeetupPlaceSheet.swift`
+- `ProposalMeetupPlaceSaveButton` のinline closureを `savePlace` 呼び出しへ置き換えた。
+- `savePlace()` を追加し、draftのplaceName正規化、`onSave(normalizedDraft, route.index)`、`dismiss()` を移動した。
+
+### 影響範囲
+
+- Swift Native iOS版の打診作成フローにおける待ち合わせ場所検索sheet。
+- 保存buttonの有効条件、保存payload、route index、sheet dismiss、場所検索、DB/API、状態名、表示文言は変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumApp/ProposalMeetupPlaceSheet.swift`
+  - passed
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-proposal-place-save-action`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-proposal-place-save-action --enable-xctest --disable-swift-testing -j 1 --filter 'ProposalCreateFlowTests|ProposalCreateSheetTests'`
+  - passed（62 tests）
+
+### セルフレビュー結果
+
+- ✅ draftのplaceName正規化、`onSave` の引数、route index、dismiss順序を維持した。
+- ✅ `saveButton` はView構成だけを返し、副作用は `savePlace()` に閉じ込めた。
+- ✅ 新しい状態名・用語・DB列は追加していないため、`notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション1099：proposal place modifiersを分離
 
 ### 背景・問題意識

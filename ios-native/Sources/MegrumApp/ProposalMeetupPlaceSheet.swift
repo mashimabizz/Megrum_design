@@ -146,11 +146,13 @@ struct ProposalMeetupPlaceSheet: View {
     }
 
     private var saveButton: some View {
-        ProposalMeetupPlaceSaveButton(canSave: canSave) {
-            var normalizedDraft = draft
-            normalizedDraft.placeName = normalizedDraft.normalizedPlaceName
-            onSave(normalizedDraft, route.index)
-            dismiss()
-        }
+        ProposalMeetupPlaceSaveButton(canSave: canSave, onSave: savePlace)
+    }
+
+    private func savePlace() {
+        var normalizedDraft = draft
+        normalizedDraft.placeName = normalizedDraft.normalizedPlaceName
+        onSave(normalizedDraft, route.index)
+        dismiss()
     }
 }
