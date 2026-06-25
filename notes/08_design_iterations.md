@@ -4,6 +4,48 @@
 
 ---
 
+## イテレーション923：Goods tile viewsを本体と装飾に分割
+
+### 背景・問題意識
+
+`GoodsTileViews.swift` は、グッズカード本体、context menu/long press modifier、選択badge、画像なしカードfallback、タグplateが1ファイルに同居していた。GoodsCollection周辺の一覧操作を分割したため、カード表示側も本体・操作modifier・装飾の責務に分け、在庫/WISHカードの見た目調整と操作調整を分けて追えるようにする。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/GoodsTileViews.swift`
+- `GoodsTile` 本体に絞った。
+- ファイル行数を316行から178行へ縮小した。
+
+#### `ios-native/Sources/MegrumApp/GoodsTileInteractionModifiers.swift`
+- `GoodsTileContextMenuModifier` と `GoodsTileExclusivePressModifier` を新規ファイルへ移動した。
+- context menuのprimary/destructive action、long press/tap gesture、hapticは維持した。
+
+#### `ios-native/Sources/MegrumApp/GoodsTileCollectionOverlays.swift`
+- `GoodsSelectionBadge`、`GoodsCollectionFallback`、`GoodsCollectionTagPlate` を新規ファイルへ移動した。
+- 選択badge、画像なしカードのglyph/shine、タグplateのサイズ・配置は維持した。
+
+### 影響範囲
+
+- Swift Native iOS版の在庫/WISH/交換候補グッズカード、一覧カードの選択表示、context menu/long press操作。
+- 挙動変更ではなく責務分離。カード表示policy、selection state、アクション種別、状態名、用語、DBスキーマは変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumApp/GoodsTileViews.swift ios-native/Sources/MegrumApp/GoodsTileInteractionModifiers.swift ios-native/Sources/MegrumApp/GoodsTileCollectionOverlays.swift`
+  - passed
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-goods-tile-build --disable-index-store`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-goods-tile-tests --disable-index-store --enable-xctest --disable-swift-testing -j 1 --filter 'GoodsGridLayoutTests|GoodsLocalStateReducerTests'`
+  - 28 tests passed
+
+### セルフレビュー結果
+
+- ✅ GoodsTileのaccessibility hint/value、image only card、context menu、long press、selection badge、quantity badge、busy overlayは移動のみで維持した。
+- ✅ GoodsGridLayoutTests / GoodsLocalStateReducerTestsで、カードpolicy、action policy、selection footer、tag/glyph表示、在庫/WISHのローカル状態更新を確認した。
+- ✅ 状態名・用語・DBスキーマの変更はないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション922：Goods collection actionsを責務別に分割
 
 ### 背景・問題意識
