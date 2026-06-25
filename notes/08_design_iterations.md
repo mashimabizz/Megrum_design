@@ -4,6 +4,49 @@
 
 ---
 
+## イテレーション919：Goods editor presentationを分割
+
+### 背景・問題意識
+
+`GoodsEditorSheetPresentation.swift` は、toolbar、選択中の推し/メンバー/グッズ種別の派生状態、`GoodsEditorFormContentView` への大量引数、保存/削除/写真選択などのUI handler wrapperが1ファイルに同居していた。グッズ登録/編集は在庫・WISH・個別募集コピー導線と関係するため、表示派生値とform組み立て、UI操作wrapperを分け、今後の入力UI調整や保存不具合調査の対象を絞りやすくする。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/GoodsEditorSheetPresentation.swift`
+- toolbar、navigation title、選択中group/member/goods type、保存可否、写真/タグ関連の派生状態に絞った。
+- ファイル行数を321行から153行へ縮小した。
+
+#### `ios-native/Sources/MegrumApp/GoodsEditorSheetFormPresentation.swift`
+- `formContent`、header description、tag preview items、save button titleを新規ファイルへ移動した。
+- `GoodsEditorFormContentView` へ渡す値、callback、文言、タグ/写真/在庫一括登録導線は維持した。
+
+#### `ios-native/Sources/MegrumApp/GoodsEditorSheetPresentationActions.swift`
+- dismiss、save/delete開始、写真削除確認、在庫作成step遷移、PhotosPicker変更handlerなどのUI wrapperを新規ファイルへ移動した。
+- 実際の保存処理、削除処理、写真読み込み、bulk recognition処理の中身は変更していない。
+
+### 影響範囲
+
+- Swift Native iOS版のグッズ登録/編集シート、在庫作成フロー、WISH画像削除制約、タグ候補表示。
+- 挙動変更ではなく責務分離。保存payload、写真upload、タグ正規化、状態名、用語、DBスキーマは変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumApp/GoodsEditorSheetPresentation.swift ios-native/Sources/MegrumApp/GoodsEditorSheetFormPresentation.swift ios-native/Sources/MegrumApp/GoodsEditorSheetPresentationActions.swift`
+  - passed
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-goods-editor-presentation-build --disable-index-store`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-goods-editor-presentation-tests --disable-index-store --enable-xctest --disable-swift-testing -j 1 --filter 'GoodsEditorDraftTests|GoodsEditorWishPhotoRemovalPolicyTests|SupabaseGoodsEntryPersistenceTests|MegrumAppStateTests/testAppStateCreatesGoodsEntryThroughRepository|MegrumAppStateTests/testAppStateUpdatesGoodsEntryThroughRepository|MegrumAppStateTests/testAppStateArchivesGoodsEntryThroughRepository|MegrumAppStateTests/testAppStateCreatesInventoryWishFromHomeCopy'`
+  - 30 tests passed
+
+### セルフレビュー結果
+
+- ✅ `formContent` の値渡し、タグ候補、写真CTA、在庫作成step callbackは移動のみで維持した。
+- ✅ save/delete/photo load/bulk recognitionの本体には触らず、UIから呼ぶwrapperだけを分割した。
+- ✅ GoodsEditorDraftTests / GoodsEditorWishPhotoRemovalPolicyTests / SupabaseGoodsEntryPersistenceTestsで、ドラフト生成、画像削除制約、保存payloadを確認した。
+- ✅ 状態名・用語・DBスキーマの変更はないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション918：Auth screen viewsを画面別に分割
 
 ### 背景・問題意識
