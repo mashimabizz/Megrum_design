@@ -4,6 +4,43 @@
 
 ---
 
+## イテレーション905：Groom archive story componentsを分割
+
+### 背景・問題意識
+
+`GroomArchiveStoryViews.swift` は、ストーリー表示画面本体、上/下スワイプと左右タップの操作、反応を見るピル、インサイトシート、反応section、ユーザーrow、avatar表示が1ファイルに同居していた。グルームアーカイブのストーリー操作と、反応/コメント表示の調整を別々に追えるようにし、今後のUI修正時に読む範囲を短くする。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/GroomArchiveStoryViews.swift`
+- `GroomArchiveStoryScreen` 本体、現在表示中のpost解決、左右tap移動、上下drag処理、sheet表示状態に集中させた。
+- ファイル行数を344行から147行へ縮小した。
+
+#### `ios-native/Sources/MegrumApp/GroomArchiveStoryComponents.swift`
+- `GroomArchiveInsightPill`、`GroomArchiveInsightsSheet`、`GroomArchiveReactionSection`、`GroomArchiveUserReactionRow`、`GroomArchiveUserAvatar` を移動した。
+- いいね/コメントの降順表示、public profileからの表示名/handle解決、空状態文言、thumbnail/avatar表示は移動のみで維持した。
+
+### 影響範囲
+
+- Swift Native iOS版のグルームアーカイブstory表示、左右tapによる前後移動、上スワイプ/ピルtapによる反応シート表示、下スワイプ/閉じるボタンによるdismiss、いいね/コメント一覧表示。
+- 挙動変更ではなく責務分離。storyの並び順、drag閾値、animation、reaction/reply取得、表示文言、状態名、用語、DBスキーマは変更しない。
+
+### 確認方法
+
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-groom-archive-story-build --disable-index-store`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-groom-archive-story-tests --disable-index-store --enable-xctest --disable-swift-testing -j 1 --filter 'MegrumAppStateTests/testAppStateLoadsOwnGroomArchiveWithEngagement|GroomInteractionStateReducerTests'`
+  - 5 tests passed
+
+### セルフレビュー結果
+
+- ✅ `GroomArchiveStoryScreen` のcurrent index clamp、左右tap移動、最終post後のdismiss、上下drag閾値、sheet detentsは変更していない。
+- ✅ インサイトシートのいいね/コメント降順、表示名/handle fallback、空状態文言、avatar fallbackは移動のみで変更していない。
+- ✅ Swift buildとグルームアーカイブ/interaction reducerの対象テストで、分割後の型解決と投稿・反応・コメント取得を確認した。
+- ✅ 状態名・用語・DBスキーマの変更はないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション904：Auth screen state/actionsを分割
 
 ### 背景・問題意識
