@@ -4,6 +4,47 @@
 
 ---
 
+## イテレーション1102：proposal place input rowを分離
+
+### 背景・問題意識
+
+`ProposalMeetupPlaceInputCard.swift` は、card全体の構成に加えて、TextField、検索button、検索可否判定、focus borderを `inputRow` computed viewとして抱えていた。card側をラベルと結果リストの組み立てに寄せ、入力行の状態表現を専用Viewへ分離する。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/ProposalMeetupPlaceInputCard.swift`
+- `inputRow` computed viewを `ProposalMeetupPlaceInputRow` 呼び出しへ置き換えた。
+- 検索結果リスト表示をbody内の局所条件表示にし、card本体の構成を読みやすくした。
+- 入力行分離により不要になった `Foundation` importとtrim/search可否のcomputed propertyを削除した。
+
+#### `ios-native/Sources/MegrumApp/ProposalMeetupPlaceInputRow.swift`
+- `ProposalMeetupPlaceInputRow` を追加した。
+- TextField、検索button、検索中ProgressView、検索可否判定、focus borderを移動した。
+- placeName binding、focus binding、検索中flag、検索callbackだけを受け取る構成にした。
+
+### 影響範囲
+
+- Swift Native iOS版の打診作成フローにおける待ち合わせ場所検索sheetの場所名入力card。
+- 入力文言、検索button表示、検索可否、focus表示、検索結果選択、場所検索処理、保存処理、DB/API、状態名は変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumApp/ProposalMeetupPlaceInputCard.swift ios-native/Sources/MegrumApp/ProposalMeetupPlaceInputRow.swift`
+  - passed
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-proposal-place-input-row`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-proposal-place-input-row --enable-xctest --disable-swift-testing -j 1 --filter 'ProposalCreateFlowTests|ProposalCreateSheetTests'`
+  - passed（62 tests）
+
+### セルフレビュー結果
+
+- ✅ TextField placeholder、font、foreground、submit時の検索callbackを維持した。
+- ✅ 検索buttonの検索中ProgressView、有効条件、foreground色、focus borderを維持した。
+- ✅ `ProposalMeetupPlaceInputCard.swift` は 73行から 35行へ縮小し、入力行を48行の専用ファイルへ分離した。
+- ✅ 新しい状態名・用語・DB列は追加していないため、`notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション1101：proposal place sheet contentを分離
 
 ### 背景・問題意識
