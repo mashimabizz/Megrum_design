@@ -47,6 +47,10 @@ struct TradesScreen: View {
         selectedStage == .pending && !selectedPendingProposalIDs.isEmpty
     }
 
+    private var stageCounts: TradeStageCounts {
+        TradeStageCounts(proposals: proposals)
+    }
+
     var body: some View {
         ZStack(alignment: .bottom) {
             TabView(selection: $selectedStage) {
@@ -134,36 +138,22 @@ struct TradesScreen: View {
             isSelectingPendingProposals: isSelectingPendingProposals,
             selectedPendingCount: selectedPendingProposalIDs.count,
             isResponding: appState.respondingProposalID != nil,
-            pendingCount: proposals.filter { TradeStage.pending.contains($0.status) }.count,
-            inProgressCount: proposals.filter { TradeStage.inProgress.contains($0.status) }.count,
-            completedCount: proposals.filter { TradeStage.completed.contains($0.status) }.count,
+            pendingCount: stageCounts.pending,
+            inProgressCount: stageCounts.inProgress,
+            completedCount: stageCounts.completed,
             onWithdrawSelected: withdrawSelectedPendingProposals
         )
     }
 
-    private var selectedStageSubtitle: String {
-        "\(selectedStage.subtitle) ・ \(visibleProposals.count)件"
-    }
-
     private var partnerProfileTaskKey: String {
-        visiblePartnerIDs
-            .map(\.uuidString)
-            .sorted()
-            .joined(separator: ",")
+        TradesVisiblePartnerProfiles.taskKey(for: visiblePartnerIDs)
     }
 
     private var visiblePartnerIDs: [UUID] {
-        guard let viewerID = appState.viewer?.id else {
-            return []
-        }
-        var seen: Set<UUID> = []
-        return visibleProposals.compactMap { proposal in
-            guard let partnerID = proposal.partnerID(for: viewerID), !seen.contains(partnerID) else {
-                return nil
-            }
-            seen.insert(partnerID)
-            return partnerID
-        }
+        TradesVisiblePartnerProfiles.partnerIDs(
+            in: visibleProposals,
+            viewerID: appState.viewer?.id
+        )
     }
 
     private func consumeRequestedStage() {
@@ -178,10 +168,11 @@ struct TradesScreen: View {
     }
 
     private func canWithdrawPendingProposal(_ proposal: TradeProposal, in stage: TradeStage? = nil) -> Bool {
-        guard (stage ?? selectedStage) == .pending, proposal.senderID == appState.viewer?.id else {
-            return false
-        }
-        return [.sent, .negotiating, .agreementOneSide].contains(proposal.status)
+        TradePendingWithdrawalPolicy.canWithdraw(
+            proposal,
+            stage: stage ?? selectedStage,
+            viewerID: appState.viewer?.id
+        )
     }
 
     private func openProposal(_ proposal: TradeProposal) {

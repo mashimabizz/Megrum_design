@@ -4,6 +4,47 @@
 
 ---
 
+## イテレーション1048：trades screen presentationを分離
+
+### 背景・問題意識
+
+`TradesScreen.swift` は、TabView、detail presentation、選択状態の更新に加えて、stage別件数、取り下げ可否、partner profile preload対象の算出も同じView内に抱えていた。画面側は一覧状態と遷移に集中させ、表示/可否判定の小さな計算を専用型へ分離した。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/TradesScreen.swift`
+- footer件数を `TradeStageCounts` から受け取る構成へ変更した。
+- partner profile preload のtask keyと対象IDを `TradesVisiblePartnerProfiles` に委譲した。
+- 打診取り下げ可否を `TradePendingWithdrawalPolicy` に委譲した。
+- 未使用だった `selectedStageSubtitle` を削除した。
+
+#### `ios-native/Sources/MegrumApp/TradesScreenPresentation.swift`
+- `TradeStageCounts`、`TradePendingWithdrawalPolicy`、`TradesVisiblePartnerProfiles` を追加した。
+- stage別件数、pending stage限定の取り下げ可否、partner IDの重複排除、task key生成を移動した。
+
+### 影響範囲
+
+- Swift Native iOS版のやり取り一覧。
+- stage footer件数、打診取り下げ選択、partner profile preload対象の算出。
+- 一覧ソート、カード表示、detail遷移、既読mark、取り下げ実行、状態名、用語、DBスキーマ、表示文言は変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumApp/TradesScreen.swift ios-native/Sources/MegrumApp/TradesScreenPresentation.swift`
+  - passed
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-trades-screen-presentation`
+  - passed
+
+### セルフレビュー結果
+
+- ✅ stage件数、partner profile preload対象、取り下げ可否だけを専用型へ移動し、画面遷移と選択状態は親Viewに残した。
+- ✅ pending stageかつ自分がsenderの `sent` / `negotiating` / `agreementOneSide` のみ取り下げ可能という既存条件を維持した。
+- ✅ 新ファイルには廃止用語を追加していない。
+- ✅ `TradesScreen.swift` は 242行から 233行へ縮小し、表示計算を 46行の専用ファイルへ分離した。
+- ✅ 新しい状態名・用語・DB列は追加していないため、`notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション1047：board thread detail presentationを分離
 
 ### 背景・問題意識
