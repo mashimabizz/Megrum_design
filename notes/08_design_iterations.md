@@ -4,6 +4,49 @@
 
 ---
 
+## イテレーション912：Home discovery sheet shared viewsを分割
+
+### 背景・問題意識
+
+`HomeDiscoverySheetSharedViews.swift` は、ホーム候補シート共通の外枠、下部CTA、閉じる/Wish追加button、選択グッズヘッダー、owner avatar/user summary、交換手段/支払い条件表示が1ファイルに同居していた。マッチ候補シートは直近で表示位置、プロフィール遷移、Wish候補、支払い/交換タグ調整が続いているため、外枠・選択グッズヘッダー・owner周辺表示を分け、次のUI修正時に触る範囲を小さくする。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/HomeDiscoverySheetSharedViews.swift`
+- `HomeSelectedGoodsHeader` と `HomeSelectedGoodsSingleCard` に絞った。
+- ファイル行数を331行から63行へ縮小した。
+
+#### `ios-native/Sources/MegrumApp/HomeSheetScaffold.swift`
+- `HomeSheetScaffold` を新規追加し、scroll container、bottom bar、閉じるbutton、Wish追加button、bottom paddingを移動した。
+- 既存の呼び出しAPI、dismiss fallback、button disabled/opacity、accessibility label、余白/角丸/素材は維持した。
+
+#### `ios-native/Sources/MegrumApp/HomeDiscoveryOwnerSummaryViews.swift`
+- `HomeOwnerAvatarButton`、`HomeOwnerAvatar`、`HomeUserSummary`、`HomeExchangeMethodBlock`、`HomePaymentBox` を移動した。
+- owner profile callback、avatar fallback、評価/取引数表示、交換手段detail、支払い条件copy、色/余白/文字サイズは維持した。
+
+### 影響範囲
+
+- Swift Native iOS版のホーム候補シート、Wishヒット/グッズヒット/detail lookup、相互マッチ詳細、owner profile遷移、シート下部CTA、選択グッズヘッダー、交換手段/支払い条件表示。
+- 挙動変更ではなく責務分離。マッチ判定、Wish候補抽出、proposal開始payload、profile routing、状態名、用語、DBスキーマは変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumApp/HomeDiscoverySheetSharedViews.swift ios-native/Sources/MegrumApp/HomeSheetScaffold.swift ios-native/Sources/MegrumApp/HomeDiscoveryOwnerSummaryViews.swift`
+  - passed
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-home-sheet-shared-build --disable-index-store`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-home-sheet-shared-tests --disable-index-store --enable-xctest --disable-swift-testing -j 1 --filter 'HomeDiscoveryMatchPolicyTests|HomeCandidateComposerTests|HomeScreenFlowTests|HomeListingSheetSelectionStateReducerTests|PublicProfileProposalOriginTests'`
+  - 130 tests passed
+
+### セルフレビュー結果
+
+- ✅ `HomeSheetScaffold` のbottom CTA、閉じるbutton、Wish追加button、dismiss挙動、bottom padding、safeAreaInsetは移動のみで維持した。
+- ✅ 選択グッズヘッダー、owner avatar/user summary、交換手段/支払い条件の表示値とcallbackは変更していない。
+- ✅ HomeDiscoveryMatchPolicyTests / HomeCandidateComposerTests / HomeScreenFlowTests / HomeListingSheetSelectionStateReducerTests / PublicProfileProposalOriginTestsで、Wishヒット抽出、L2一致、支払いunknown、候補シート選択、profile routing、home tab/候補導線を確認した。
+- ✅ 状態名・用語・DBスキーマの変更はないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション911：Trade summary sheet componentsを分割
 
 ### 背景・問題意識
