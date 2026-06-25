@@ -4,6 +4,48 @@
 
 ---
 
+## イテレーション1112：account overview contentを分離
+
+### 背景・問題意識
+
+`AccountOverviewScreen` は、アカウントsummary生成、住所/通知設定の読み込みtask、基本情報section、設定状態section、共有値rowを同じファイルに抱えていた。親画面を状態依存と画面modifierに寄せ、List表示と値row描画を専用Viewへ分離する。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/SettingsAccountViews.swift`
+- `List` 本体を `AccountOverviewContent` 呼び出しへ置き換えた。
+- 住所/通知設定の読み込みtaskを `loadAccountOverviewSettings()` へ分離した。
+- `SettingsValueRow` を専用ファイルへ移動し、ログイン/セキュリティ画面からの共有利用は維持した。
+
+#### `ios-native/Sources/MegrumApp/AccountOverviewContent.swift`
+- `AccountOverviewContent` を追加した。
+- 基本情報sectionと設定状態sectionを移動した。
+- `SettingsValueRow` を移動し、monospaced表示、text selection、accessibility labelを維持した。
+
+### 影響範囲
+
+- Swift Native iOS版のアカウント概要画面。
+- ログイン/セキュリティ画面が共有する `SettingsValueRow`。
+- アカウントsummary生成、住所/通知設定の読み込み、DB/API、状態名、表示文言は変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumApp/SettingsAccountViews.swift ios-native/Sources/MegrumApp/AccountOverviewContent.swift`
+  - passed
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-account-overview-content`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-account-overview-content --enable-xctest --disable-swift-testing -j 1 --filter 'SettingsScreenTests|MegrumAppStateTests|SupabaseMailingAddressClientTests|SupabaseNotificationClientTests'`
+  - passed（105 tests）
+
+### セルフレビュー結果
+
+- ✅ アカウントID、ユーザーID、表示名、活動エリア、支払い条件、アカウント状態、モバイル通知、住所登録の表示を維持した。
+- ✅ 住所/通知設定の読み込み順、summary fallback、共有rowのtext selection/accessibilityを維持した。
+- ✅ `SettingsAccountViews.swift` は69行から31行へ縮小し、アカウント概要のList表示を57行の専用ファイルへ分離した。
+- ✅ 新しい状態名・用語・DB列は追加していないため、`notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション1111：subscription settings contentを分離
 
 ### 背景・問題意識
