@@ -4,6 +4,50 @@
 
 ---
 
+## イテレーション1126：groom story composer step partsを分離
+
+### 背景・問題意識
+
+`GroomStoryComposerSteps.swift` は、写真選択stepと投稿前確認stepの大枠を担いながら、共通header、写真アクションgrid、caption入力、投稿button、選び直しbutton、写真preview、action tileの描画も同じファイルに抱えていた。step本体を流れの組み立てに寄せ、表示だけの部品を専用Viewへ分離する。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/GroomStoryComposerSteps.swift`
+- 写真選択stepのheaderを `GroomStoryComposerStepHeader` 呼び出しへ置き換えた。
+- カメラ/写真選択gridを `GroomStoryPhotoActionGrid` 呼び出しへ置き換えた。
+- 投稿前確認stepのheader、caption入力、投稿button、写真選び直しbuttonを専用View呼び出しへ置き換えた。
+- `MeguriCreationLocationPicker`、投稿/リセットcallback、位置選択binding、作成可否判定の受け渡しは維持した。
+
+#### `ios-native/Sources/MegrumApp/GroomStoryComposerStepParts.swift`
+- `GroomStoryComposerStepHeader` を追加し、step title/subtitleを共通化した。
+- `GroomStoryPhotoActionGrid` と `GroomComposerActionTile` を追加し、カメラ/写真選択tile表示を移動した。
+- `GroomStoryCaptionField` / `GroomStoryPublishButton` / `GroomStoryResetPhotoButton` を追加し、投稿前確認stepの入力/操作部品を移動した。
+- `GroomDraftPhotoPreview` を移動し、写真previewとcaption overlayのUIKit fallbackを維持した。
+
+### 影響範囲
+
+- Swift Native iOS版めぐりのグルーム投稿composer。
+- 写真選択step、投稿前確認step、写真preview、caption入力、投稿/選び直し操作。
+- 投稿payload、画像content type、位置範囲判定、位置picker、toast文言、DB/API、状態名、表示文言は変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumApp/GroomStoryComposerSteps.swift ios-native/Sources/MegrumApp/GroomStoryComposerStepParts.swift`
+  - passed
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-groom-story-composer-step-parts`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-groom-story-composer-step-parts --enable-xctest --disable-swift-testing -j 1 --filter 'GroomInteractionStateReducerTests|MeguriFeedStateReducerTests|ReplyThreadStateReducerTests|MeguriAccessPolicyTests|MegrumAppStateTests|SupabaseGroomClientTests'`
+  - passed（106 tests）
+
+### セルフレビュー結果
+
+- ✅ step title/subtitle、カメラ/写真選択tile、caption入力、写真preview、caption overlay、投稿button、選び直しbutton、余白、文字サイズを維持した。
+- ✅ `onOpenCamera`、`selectedPhotoItem` binding、`selectedCreationCoordinate` binding、`onPublish`、`onResetPhotoDraft`、作成可否判定の渡し方は変更していない。
+- ✅ `GroomStoryComposerSteps.swift` は224行から85行へ縮小し、step内表示部品を202行の専用ファイルへ分離した。
+- ✅ 新しい状態名・用語・DB列は追加していないため、`notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション1125：groom story composer chromeを分離
 
 ### 背景・問題意識
