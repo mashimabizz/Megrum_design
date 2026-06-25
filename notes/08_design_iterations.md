@@ -4,6 +4,46 @@
 
 ---
 
+## イテレーション1073：profile schedule row viewを分離
+
+### 背景・問題意識
+
+`ProfileScheduleComponents.swift` は、公開予定のheader、日別カード、予定row、月表示セルを同じファイルに抱えていた。日別カード側は日付header、今日badge、空状態、rowの繰り返しに集中させ、予定1件分のrow表示だけを専用Viewへ分離する。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/ProfileScheduleComponents.swift`
+- `ProfileScheduleHeader`、`ProfileScheduleDayCard`、`ProfileScheduleMonthCell` を残した。
+- `ProfileScheduleRowView` の表示本体を移動した。
+
+#### `ios-native/Sources/MegrumApp/ProfileScheduleRowView.swift`
+- `ProfileScheduleRowView` を追加し、mine/partner色分け、予定title、role chip、時刻範囲、場所label、row背景を担当させた。
+- all-day表示、start/end時刻format、mine/partner label、padding、corner radiusを維持した。
+
+### 影響範囲
+
+- Swift Native iOS版のプロフィール公開予定における日別予定カード。
+- 予定rowのtitle、role chip、時刻範囲、場所label。
+- スケジュール作成/読み込み、カレンダーwindow、DB/API、状態名、表示文言は変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumApp/ProfileScheduleComponents.swift ios-native/Sources/MegrumApp/ProfileScheduleRowView.swift`
+  - passed
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-profile-schedule-row-view`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-profile-schedule-row-view --enable-xctest --disable-swift-testing -j 1 --filter 'ScheduleStateReducerTests|TradeScheduleCalendarWindowTests|TradeRequestDraftProposalCreateFlowTests/testProposalScheduleContextFiltersDedupesAndFindsSelectedOverlap|MegrumCoreTests/testPersonalSchedule'`
+  - passed（9 tests）
+
+### セルフレビュー結果
+
+- ✅ `ProfileScheduleDayCard` の日付header、今日badge、空状態、row呼び出しは維持し、予定rowの表示だけを専用ファイルへ移した。
+- ✅ mine/partner色、role chip、all-day表示、時刻範囲、場所label、row背景を維持した。
+- ✅ `ProfileScheduleComponents.swift` は 152行から 98行へ縮小し、profile schedule rowを 57行の専用ファイルへ分離した。
+- ✅ 新しい状態名・用語・DB列は追加していないため、`notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション1072：proposal condition segment rowを分離
 
 ### 背景・問題意識
