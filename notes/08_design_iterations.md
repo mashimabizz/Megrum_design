@@ -4,6 +4,48 @@
 
 ---
 
+## イテレーション1098：proposal place status controlsを分離
+
+### 背景・問題意識
+
+`ProposalMeetupPlaceSheetComponents.swift` は、場所検索sheetの共通部品に加えて、保存可否status rowと下部保存buttonの描画まで抱えていた。components側をaction/search list/共通modifierに寄せ、保存状態表示と保存buttonを専用Viewファイルへ分離する。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/ProposalMeetupPlaceSheetComponents.swift`
+- `ProposalMeetupPlaceStatusRow` と `ProposalMeetupPlaceSaveButton` を移動した。
+- action row、search results list、場所sheet用modifierは維持した。
+
+#### `ios-native/Sources/MegrumApp/ProposalMeetupPlaceStatusRow.swift`
+- `ProposalMeetupPlaceStatusRow` を追加した。
+- canSaveに応じたicon、foreground、message typography、fixedSize、horizontal paddingを維持した。
+
+#### `ios-native/Sources/MegrumApp/ProposalMeetupPlaceSaveButton.swift`
+- `ProposalMeetupPlaceSaveButton` を追加した。
+- 保存buttonのcopy、font、height、background、shadow、disabled/opacity、bottom bar padding、safe-area backgroundを維持した。
+
+### 影響範囲
+
+- Swift Native iOS版の打診作成フローにおける待ち合わせ場所検索sheet。
+- 保存可否表示、保存action、場所検索、送信payload、DB/API、状態名、表示文言は変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumApp/ProposalMeetupPlaceSheetComponents.swift ios-native/Sources/MegrumApp/ProposalMeetupPlaceStatusRow.swift ios-native/Sources/MegrumApp/ProposalMeetupPlaceSaveButton.swift`
+  - passed
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-proposal-place-status-save`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-proposal-place-status-save --enable-xctest --disable-swift-testing -j 1 --filter 'ProposalCreateFlowTests|ProposalCreateSheetTests'`
+  - passed（62 tests）
+
+### セルフレビュー結果
+
+- ✅ status rowのicon/色/message typography/paddingと、保存buttonのcopy/font/height/background/shadow/disabled/opacity/bottom paddingを維持した。
+- ✅ `ProposalMeetupPlaceSheetComponents.swift` は 122行から 76行へ縮小し、status rowを20行、save buttonを29行の専用ファイルへ分離した。
+- ✅ 新しい状態名・用語・DB列は追加していないため、`notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション1097：proposal place action buttonを分離
 
 ### 背景・問題意識
