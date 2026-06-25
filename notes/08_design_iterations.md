@@ -4,6 +4,46 @@
 
 ---
 
+## イテレーション1046：individual listing condition rowsを分割
+
+### 背景・問題意識
+
+`IndividualListingConditionTab.swift` は、条件入力tabの状態、member picker / tag sheet、tag追加ロジックに加えて、グループ、メンバー、グッズ種別、タグ、数量、希望の扱いの行表示も同じファイルに抱えていた。親Viewは選択状態とsheet制御に集中させ、行表示を専用Viewへ分けた。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/IndividualListingConditionTab.swift`
+- グループ/作品、メンバー/キャラ、グッズ種別、タグ、数量、希望の扱いの行表示を専用Viewへ委譲した。
+- `memberSummary`、`tagSummary`、tag候補生成、tag追加、member picker / tag sheet表示の状態管理は親Viewに残した。
+
+#### `ios-native/Sources/MegrumApp/IndividualListingConditionRows.swift`
+- `IndividualListingActionRow`、`IndividualListingGoodsTypeRow`、`IndividualListingTagRow`、`IndividualListingQuantityRow`、`IndividualListingLogicHintRow` を追加した。
+- 既存のheight、padding、font、lavender chip、chevron、quantity button、disabled条件、数量clampを維持した。
+
+### 影響範囲
+
+- Swift Native iOS版のlisting条件入力tab。
+- グループ/作品、メンバー/キャラ、グッズ種別、タグ、数量、希望の扱いの行表示。
+- member picker、tag sheet、tag追加上限、数量範囲、状態名、用語、DBスキーマ、表示文言は変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumApp/IndividualListingConditionTab.swift ios-native/Sources/MegrumApp/IndividualListingConditionRows.swift`
+  - passed
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-individual-listing-condition-rows`
+  - first run found a new `IndividualListingConditionRowValue` argument-label issue
+  - fixed and passed
+
+### セルフレビュー結果
+
+- ✅ 行表示は専用Viewへ移動し、選択状態、sheet表示、tag追加ロジックは親Viewに残した。
+- ✅ グッズ種別menu、tag row、数量button、希望の扱いchipの表示と条件を維持した。
+- ✅ 新ファイルには廃止用語を追加していない。
+- ✅ `IndividualListingConditionTab.swift` は 255行から 145行へ縮小し、行表示を 159行の専用ファイルへ分離した。
+- ✅ 新しい状態名・用語・DB列は追加していないため、`notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション1045：home discovery sheet contentを分割
 
 ### 背景・問題意識

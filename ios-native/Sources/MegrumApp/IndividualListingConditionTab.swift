@@ -48,26 +48,32 @@ struct IndividualListingConditionTab: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             VStack(spacing: 0) {
-                actionRow(
+                IndividualListingActionRow(
                     title: "グループ / 作品",
                     value: selectedGroup?.name ?? "選択",
                     action: onShowOshiPicker
                 )
                 Divider()
-                actionRow(
+                IndividualListingActionRow(
                     title: "メンバー / キャラ",
                     value: memberSummary,
                     action: { showsMemberPicker = true }
                 )
                 Divider()
-                goodsTypeRow
+                IndividualListingGoodsTypeRow(
+                    goodsTypes: goodsTypes,
+                    selectedGoodsTypeName: selectedGoodsType?.name ?? "選択",
+                    selectedGoodsTypeID: $selectedGoodsTypeID
+                )
                 Divider()
-                tagRow
+                IndividualListingTagRow(tagSummary: tagSummary) {
+                    showsTagSheet = true
+                }
                 Divider()
                 if usesLogicChoice {
-                    logicHintRow
+                    IndividualListingLogicHintRow()
                 } else {
-                    quantityRow
+                    IndividualListingQuantityRow(quantity: $quantity)
                 }
             }
             .background(.white.opacity(0.92), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
@@ -99,76 +105,6 @@ struct IndividualListingConditionTab: View {
                 addConditionTag(tagName)
             }
         }
-    }
-
-    private var goodsTypeRow: some View {
-        HStack {
-            rowTitle("グッズ種別")
-            Spacer()
-            Menu {
-                ForEach(goodsTypes) { type in
-                    Button(type.name) {
-                        selectedGoodsTypeID = type.id
-                    }
-                }
-            } label: {
-                rowValue(selectedGoodsType?.name ?? "選択", showsChevron: true)
-            }
-            .disabled(goodsTypes.isEmpty)
-        }
-        .padding(.horizontal, 16)
-        .frame(height: 58)
-    }
-
-    private var tagRow: some View {
-        Button {
-            showsTagSheet = true
-        } label: {
-            HStack {
-                rowTitle("タグ")
-                Spacer()
-                rowValue(tagSummary, showsChevron: true)
-            }
-            .padding(.horizontal, 16)
-            .frame(height: 58)
-        }
-        .buttonStyle(.plain)
-    }
-
-    private var quantityRow: some View {
-        HStack {
-            rowTitle("数量")
-            Spacer()
-            HStack(spacing: 10) {
-                quantityButton(systemName: "minus") {
-                    quantity = max(1, quantity - 1)
-                }
-                Text("\(quantity)点")
-                    .font(.system(size: 16, weight: .black, design: .rounded))
-                    .foregroundStyle(MegrumTheme.ink)
-                    .frame(width: 52)
-                quantityButton(systemName: "plus") {
-                    quantity = min(99, quantity + 1)
-                }
-            }
-        }
-        .padding(.horizontal, 16)
-        .frame(height: 58)
-    }
-
-    private var logicHintRow: some View {
-        HStack {
-            rowTitle("希望の扱い")
-            Spacer()
-            Text("下の選択で指定")
-                .font(.system(size: 14, weight: .heavy, design: .rounded))
-                .foregroundStyle(MegrumTheme.lavender)
-                .padding(.horizontal, 12)
-                .frame(height: 32)
-                .background(MegrumTheme.lavender.opacity(0.10), in: Capsule())
-        }
-        .padding(.horizontal, 16)
-        .frame(height: 58)
     }
 
     private var memberSummary: String {
@@ -205,51 +141,5 @@ struct IndividualListingConditionTab: View {
             return
         }
         selectedTagNames.append(trimmed)
-    }
-
-    private func actionRow(title: String, value: String, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            HStack {
-                rowTitle(title)
-                Spacer()
-                rowValue(value, showsChevron: true)
-            }
-            .padding(.horizontal, 16)
-            .frame(height: 58)
-        }
-        .buttonStyle(.plain)
-    }
-
-    private func rowTitle(_ title: String) -> some View {
-        Text(title)
-            .font(.system(size: 15, weight: .semibold, design: .rounded))
-            .foregroundStyle(MegrumTheme.ink)
-    }
-
-    private func rowValue(_ value: String, showsChevron: Bool) -> some View {
-        HStack(spacing: 6) {
-            Text(value)
-                .font(.system(size: 14, weight: .heavy, design: .rounded))
-                .lineLimit(1)
-            if showsChevron {
-                Image(systemName: "chevron.forward")
-                    .font(.system(size: 11, weight: .bold))
-            }
-        }
-        .foregroundStyle(MegrumTheme.lavender)
-        .padding(.horizontal, 12)
-        .frame(height: 32)
-        .background(MegrumTheme.lavender.opacity(0.10), in: Capsule())
-    }
-
-    private func quantityButton(systemName: String, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            Image(systemName: systemName)
-                .font(.system(size: 13, weight: .black))
-                .foregroundStyle(MegrumTheme.lavender)
-                .frame(width: 32, height: 32)
-                .background(MegrumTheme.lavender.opacity(0.10), in: Circle())
-        }
-        .buttonStyle(.plain)
     }
 }
