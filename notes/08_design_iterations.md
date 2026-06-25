@@ -4,6 +4,44 @@
 
 ---
 
+## イテレーション1020：マッチ関係summary panelを分割
+
+### 背景・問題意識
+
+`MatchRelationHaveSummaryViews.swift` は、提示候補の選択chip、結論summary panel、simple panel、thumbnail、flow layoutを同じファイルに抱えていた。提示候補の選択UIと、交換結果summaryの表示を分け、相互マッチ/個別募集の結論表示だけを小さく調整できるようにした。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/MatchRelationHaveSummaryViews.swift`
+- `MatchRelationHaveList` と have chip / button / flow layout / thumbnail を既存ファイルに残した。
+- summary panel 系の表示を専用ファイルへ委譲した。
+
+#### `ios-native/Sources/MegrumApp/MatchRelationSummaryPanelViews.swift`
+- `MatchRelationSummaryPanel`、`MatchRelationSimplePanel`、`MatchRelationSummarySide` を移動した。
+- 受け取る/譲るのラベル、thumbnail重ね表示、件数overflow表示、色・余白・枠線は既存どおり維持した。
+
+### 影響範囲
+
+- Swift Native iOS版のマッチ関係画面のsummary panel。
+- 相互マッチ/個別募集などで表示する「この交換」の結論表示。
+- 状態名、用語、DBスキーマ、表示文言は変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumApp/MatchRelationHaveSummaryViews.swift ios-native/Sources/MegrumApp/MatchRelationSummaryPanelViews.swift`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-match-relation-summary --enable-xctest --disable-swift-testing -j 1 --filter 'MatchRelationScreenTests|MatchRelationSelectionStateReducerTests'`
+  - passed（18 tests）
+
+### セルフレビュー結果
+
+- ✅ summary panel / simple panel / summary side は移動のみで、受け取る/譲るの表示順、件数overflow、thumbnail表示を維持した。
+- ✅ have候補の選択条件、chip表示、logic hint、thumbnail fallbackは変更していない。
+- ✅ `MatchRelationHaveSummaryViews.swift` は 286行から 197行へ縮小し、summary panel表示を 92行の専用ファイルへ分離した。
+- ✅ 新しい状態名・用語・DB列は追加していないため、`notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション1019：やりとり一覧のstage pageとfooterを分割
 
 ### 背景・問題意識
