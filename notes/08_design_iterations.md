@@ -4,6 +4,44 @@
 
 ---
 
+## イテレーション936：Supabase message modelsを分割
+
+### 背景・問題意識
+
+`SupabaseMessageClient.swift` は、取引チャットmessageのload/send/read-state処理と、message送信に使う公開support enumを同じファイルに持っていた。payload/request builderは既に別ファイル化されているため、client本体を通信処理へ寄せ、エラー/到着状態/遅刻分数/system actionを専用ファイルへ分ける。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumData/SupabaseMessageClient.swift`
+- `SupabaseMessageClient` のload/send/read-state処理に絞った。
+- ファイル行数を379行から309行へ縮小した。
+
+#### `ios-native/Sources/MegrumData/SupabaseMessageModels.swift`
+- `SupabaseMessageClientError`、`SupabaseMessageArrivalStatus`、`SupabaseMessageLateMinutes`、`SupabaseMessageSystemAction`、`TradeArrivalStatus` からの変換extensionを新規ファイルへ移動した。
+- arrival default body、late minute label、invalid metadata validationは維持した。
+
+### 影響範囲
+
+- Swift Native iOS版の取引チャットmessage送信、既読状態、写真/位置/遅刻/キャンセル/到着ステータス送信。
+- 挙動変更ではなく責務分離。public型名、raw value、default body、payload validation、状態名、用語、DBスキーマは変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumData/SupabaseMessageClient.swift ios-native/Sources/MegrumData/SupabaseMessageModels.swift`
+  - passed
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-message-models-build --disable-index-store`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-message-models-tests --disable-index-store --enable-xctest --disable-swift-testing -j 1 --filter SupabaseMessageClientTests`
+  - 24 tests passed
+
+### セルフレビュー結果
+
+- ✅ public support enumの移動のみで、raw value、default body、late minute label、validation errorは維持した。
+- ✅ テキスト/写真/位置/遅刻/キャンセル/到着ステータス/既読状態の既存テストを通した。
+- ✅ 状態名・用語・DBスキーマの変更はないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション935：Supabase board rowsを分割
 
 ### 背景・問題意識
