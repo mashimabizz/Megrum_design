@@ -4,6 +4,45 @@
 
 ---
 
+## イテレーション1043：めぐりboard detail previewを分割
+
+### 背景・問題意識
+
+`MeguriDesignPreviews.swift` は、めぐりホームpreviewと掲示板詳細previewを同じファイルに抱えていた。ホームpreviewはMapKitとsheet modeの確認、掲示板詳細previewはheader/card/reply inputの確認が中心で責務が分かれているため、表示内容を変えずに掲示板詳細preview一式を専用ファイルへ分けた。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/MeguriDesignPreviews.swift`
+- `MeguriHomeDesignPreview` と `MeguriHomeSheetMode`、ホーム用 `#Preview` を既存ファイルに残した。
+- 掲示板詳細preview本体、header、card、詳細用 `#Preview` を専用ファイルへ委譲した。
+
+#### `ios-native/Sources/MegrumApp/MeguriBoardDetailDesignPreview.swift`
+- `MeguriBoardDetailDesignPreview`、`MeguriBoardDetailHeader`、`MeguriBoardDetailCard`、掲示板詳細 `#Preview` を追加した。
+- 既存のframe、spacing、font、gradient、avatar/reply表示、input bar配置、preview chrome非表示指定を維持した。
+
+### 影響範囲
+
+- Swift Native iOS版のめぐりデザインpreview。
+- めぐり掲示板詳細previewのファイル配置。
+- 実行時の画面、状態名、用語、DBスキーマ、表示文言は変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumApp/MeguriDesignPreviews.swift ios-native/Sources/MegrumApp/MeguriBoardDetailDesignPreview.swift`
+  - passed
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-meguri-design-preview`
+  - passed
+
+### セルフレビュー結果
+
+- ✅ preview表示の移動のみで、めぐりホームpreviewと掲示板詳細previewの見た目・文言は維持した。
+- ✅ `MeguriReplyInputBar`、`MeguriReplyRow`、`MeguriAvatarStack` など既存preview部品の参照はそのまま維持した。
+- ✅ 新ファイルには廃止用語を追加していない。
+- ✅ `MeguriDesignPreviews.swift` は 279行から 103行へ縮小し、掲示板詳細previewを 182行の専用ファイルへ分離した。
+- ✅ 新しい状態名・用語・DB列は追加していないため、`notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション1042：交換条件settings chrome viewsを分割
 
 ### 背景・問題意識
