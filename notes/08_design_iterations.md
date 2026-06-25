@@ -4,6 +4,50 @@
 
 ---
 
+## イテレーション969：SearchScreen actionsを分割
+
+### 背景・問題意識
+
+`SearchScreenActions.swift` は、検索画面の戻るジェスチャ、初期データロード、検索実行、通報、フィルタリセット/削除/適用、条件マッチdefault反映、サジェスト適用を1ファイルに持っていた。検索画面はホーム候補からの遷移、フィルタ、サジェスト、検索結果表示にまたがるため、副作用の種類ごとに分け、検索不具合の調査範囲を狭める。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/SearchScreenBackSwipeActions.swift`
+- 左端戻るスワイプと横スクロール抑制記録を新規ファイルへ移動した。
+
+#### `ios-native/Sources/MegrumApp/SearchScreenSearchActions.swift`
+- 初期ロード、初期検索条件適用、検索実行、通報、検索schedule、検索結果ownerの公開交換情報読み込みを新規ファイルへ移動した。
+
+#### `ios-native/Sources/MegrumApp/SearchScreenFilterActions.swift`
+- フィルタリセット、active criteria削除、filter draft適用、交換/支払い条件default反映を新規ファイルへ移動した。
+
+#### `ios-native/Sources/MegrumApp/SearchScreenSuggestionActions.swift`
+- 検索サジェスト適用と適用中flag解除を新規ファイルへ移動した。
+
+#### `ios-native/Sources/MegrumApp/SearchScreenActions.swift`
+- 上記4ファイルへ分割したため削除した。
+
+### 影響範囲
+
+- Swift Native iOS版の検索画面、ホーム候補からの検索遷移、検索フィルタ、検索サジェスト、検索結果の個別募集条件判定。
+- 挙動変更ではなく責務分離。検索query解決、フィルタ条件、サジェスト選択、戻るスワイプ閾値、状態名、用語、DBスキーマは変更しない。
+
+### 確認方法
+
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-search-actions-build --disable-index-store`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-search-actions-build --disable-index-store --enable-xctest --disable-swift-testing -j 1 --filter 'SearchScreenTests|HomeDiscoveryMatchPolicyTests|HomeCandidateComposerTests'`
+  - 86 tests passed
+
+### セルフレビュー結果
+
+- ✅ 検索実行、フィルタ、サジェスト、戻るジェスチャを移動のみで分割し、検索画面の副作用を追いやすくした。
+- ✅ SearchScreen、ホーム候補、候補生成の対象テストを通した。
+- ✅ 検索条件、フィルタ文言、DB payload、状態名、用語、DBスキーマは変更していない。
+- ✅ 状態名・用語・DBスキーマの変更はないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション968：Listing condition preview receive panelを分割
 
 ### 背景・問題意識
