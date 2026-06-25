@@ -4,6 +4,45 @@
 
 ---
 
+## イテレーション1039：グルームarchive chrome viewsを分割
+
+### 背景・問題意識
+
+`GroomArchiveMapViews.swift` は、地図annotation、map region計算、ヘッダー、空状態、サムネイルrailを同じファイルに抱えていた。地図本体とregion計算はMapKit寄りの責務なので既存ファイルに残し、アーカイブ画面の上部/空状態/下部railの純表示を専用ファイルへ分けた。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/GroomArchiveMapViews.swift`
+- `GroomArchiveMap`、`GroomArchiveMapPin`、`GroomArchiveMapRegion`、`GroomArchiveTriangle` を既存ファイルに残した。
+- ヘッダー、空状態、サムネイルrail表示を専用ファイルへ委譲した。
+
+#### `ios-native/Sources/MegrumApp/GroomArchiveChromeViews.swift`
+- `GroomArchiveHeader`、`GroomArchiveEmptyState`、`GroomArchiveThumbnailRail`、`GroomArchiveThumbnail` を追加した。
+- 既存のfont、material、shadow、stroke、選択中サムネイル表示、戻るbutton accessibility labelを維持した。
+
+### 影響範囲
+
+- Swift Native iOS版のグルームアーカイブ画面。
+- アーカイブのヘッダー、空状態、サムネイルrail表示。
+- 地図annotation、map region計算、サムネイル選択callback、状態名、用語、DBスキーマ、表示文言は変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumApp/GroomArchiveMapViews.swift ios-native/Sources/MegrumApp/GroomArchiveChromeViews.swift`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-groom-archive-chrome --enable-xctest --disable-swift-testing -j 1 --filter GroomInteractionStateReducerTests`
+  - passed（4 tests）
+
+### セルフレビュー結果
+
+- ✅ `GroomArchiveMap` のMapKit annotation、現在地pin、過去グルームpin、map styleは変更していない。
+- ✅ `GroomArchiveMapRegion` の計算式、fallback座標、span clampは変更していない。
+- ✅ chrome表示は移動のみで、ヘッダー、空状態、サムネイルrailの見た目とcallbackを維持した。
+- ✅ `GroomArchiveMapViews.swift` は 261行から 145行へ縮小し、chrome表示を 119行の専用ファイルへ分離した。
+- ✅ 新しい状態名・用語・DB列は追加していないため、`notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション1038：グルームstory tile viewsを分割
 
 ### 背景・問題意識
