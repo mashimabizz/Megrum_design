@@ -4,6 +4,43 @@
 
 ---
 
+## イテレーション966：旧通知画面を整理
+
+### 背景・問題意識
+
+`SettingsNotificationViews.swift` には、旧 `NotificationsScreen`、旧通知行、旧フィルタ、通知種別表示extension、めぐりメッセージpeer抽出、通知linkからタブへfallbackするextensionが同居していた。現行の設定画面は `NotificationCenterScreen` / `NotificationCenterViews` / `NotificationRouteIntent` を使っており、旧画面は参照されていなかったため、残す必要があるfallback resolverだけを専用ファイルへ移し、古い重複実装を削除する。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/NotificationLinkTabResolver.swift`
+- `MegrumTab.init?(notificationLinkPath:)` を新規ファイルへ移動した。
+- 既存テストが参照している通知linkからタブへのfallback変換を維持した。
+
+#### `ios-native/Sources/MegrumApp/SettingsNotificationViews.swift`
+- 未参照の旧 `NotificationsScreen`、旧 `NotificationRow`、旧 `NotificationFilter`、旧通知種別表示extension、旧めぐりpeer抽出を削除した。
+
+### 影響範囲
+
+- Swift Native iOS版の設定画面内通知導線、通知センター、通知link fallback。
+- 現行の `NotificationCenterScreen` / `NotificationCenterViews` / `NotificationRouteIntent` は変更しない。
+- 挙動変更ではなく未参照コード整理。通知既読処理、push通知設定、通知ルーティングintent、状態名、用語、DBスキーマは変更しない。
+
+### 確認方法
+
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-notification-views-build --disable-index-store`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-notification-views-build --disable-index-store --enable-xctest --disable-swift-testing -j 1 --filter 'MegrumAppStateTests|NotificationRouteTests|NotificationReadStateReducerTests|SettingsScreenTests'`
+  - 100 tests passed
+
+### セルフレビュー結果
+
+- ✅ 現行通知画面で使われていない旧画面/旧行/旧filterを削除し、通知画面の正を `NotificationCenterScreen` 系へ一本化した。
+- ✅ 通知linkのタブfallbackは `NotificationLinkTabResolver.swift` へ移動し、既存テストで挙動維持を確認した。
+- ✅ 設定画面、通知既読、通知ルート、AppStateの対象テストを通した。
+- ✅ 状態名・用語・DBスキーマの変更はないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション965：HomeScreen local mode routingを分割
 
 ### 背景・問題意識
