@@ -4,6 +4,48 @@
 
 ---
 
+## イテレーション1128：dispute detail chromeを分離
+
+### 背景・問題意識
+
+`DisputeDetailScreen.swift` は、`DisputeDetailStore` の読み込み/返信/取り下げ状態を持ちながら、toolbar、取引リクエストsheet、取り下げ確認dialog、操作error alertも同じ `body` に抱えていた。画面本体をstore stateとaction wiringに寄せ、画面chromeとpresentation modifierを専用ファイルへ分離する。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/DisputeDetailScreen.swift`
+- toolbarを `DisputeDetailToolbarContent` 呼び出しへ置き換えた。
+- 取引リクエストsheet、取り下げ確認dialog、操作error alertを専用modifier呼び出しへ置き換えた。
+- `DisputeDetailScreenContent` へのstate/callback受け渡し、store読み込み、返信/取り下げ/遅刻・キャンセル申請のactionは維持した。
+
+#### `ios-native/Sources/MegrumApp/DisputeDetailScreenChrome.swift`
+- `DisputeDetailToolbarContent` を追加し、閉じるbuttonと取り下げbutton表示を移動した。
+- `disputeDetailTradeRequestSheet` を追加し、`TradeRequestSheet` の `NavigationStack` / detent / drag indicatorを移動した。
+- `disputeDetailWithdrawConfirmation` と `disputeDetailActionErrorAlert` を追加し、confirmation dialogとerror alert表示を移動した。
+
+### 影響範囲
+
+- Swift Native iOS版の異議詳細画面。
+- toolbar、取引リクエストsheet、取り下げ確認dialog、操作error alert。
+- 異議詳細の読み込み、返信送信、取り下げ処理、取引リクエストpayload、状態名、DB/API、表示文言は変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumApp/DisputeDetailScreen.swift ios-native/Sources/MegrumApp/DisputeDetailScreenChrome.swift`
+  - passed
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-dispute-detail-chrome`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-dispute-detail-chrome --enable-xctest --disable-swift-testing -j 1 --filter 'DisputeDetailScreenTests|TradeRequestDraftTests|MegrumAppStateTests'`
+  - passed（99 tests）
+
+### セルフレビュー結果
+
+- ✅ 閉じるbutton、取り下げbutton/loading表示、取引リクエストsheet、取り下げ確認文言、操作error alert文言を維持した。
+- ✅ `store.loadIfNeeded()`、返信draft binding、`submitReply()`、`withdrawDispute()`、`presentedRequestKind` の更新、`onSubmitTradeRequest` の渡し方は変更していない。
+- ✅ `DisputeDetailScreen.swift` は219行から186行へ縮小し、chrome/presentation modifierを121行の専用ファイルへ分離した。
+- ✅ 新しい状態名・用語・DB列は追加していないため、`notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション1127：home rotary card stageを分離
 
 ### 背景・問題意識

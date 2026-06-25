@@ -122,58 +122,25 @@ struct DisputeDetailScreen: View {
         .navigationTitle("異議詳細")
         .megrumInlineNavigationTitle()
         .toolbar {
-            ToolbarItem(placement: .cancellationAction) {
-                Button("閉じる", action: dismissScreen)
-            }
-
-            if store.state.model?.canWithdraw == true {
-                ToolbarItem(placement: .primaryAction) {
-                    Button(role: .destructive, action: requestWithdrawConfirmation) {
-                        if store.isWithdrawing {
-                            ProgressView()
-                        } else {
-                            Label("取り下げ", systemImage: "arrow.uturn.backward")
-                        }
-                    }
-                }
-            }
-        }
-        .sheet(item: $presentedRequestKind) { kind in
-            NavigationStack {
-                TradeRequestSheet(kind: kind, onSubmit: onSubmitTradeRequest)
-            }
-            .presentationDetents([.medium, .large])
-            .presentationDragIndicator(.visible)
-        }
-        .confirmationDialog(
-            "申告を取り下げますか？",
-            isPresented: $isShowingWithdrawConfirmation,
-            titleVisibility: .visible
-        ) {
-            Button("取り下げる", role: .destructive) {
-                withdrawDispute()
-            }
-            Button("キャンセル", role: .cancel) {}
-        } message: {
-            Text("取り下げ後は、この申告への反論や仲裁確認を進められません。")
-        }
-        .alert(
-            "操作を完了できませんでした",
-            isPresented: Binding(
-                get: { store.actionErrorMessage != nil },
-                set: { isPresented in
-                    if !isPresented {
-                        store.clearActionError()
-                    }
-                }
+            DisputeDetailToolbarContent(
+                canWithdraw: store.state.model?.canWithdraw == true,
+                isWithdrawing: store.isWithdrawing,
+                onDismiss: dismissScreen,
+                onRequestWithdraw: requestWithdrawConfirmation
             )
-        ) {
-            Button("OK", role: .cancel) {
-                store.clearActionError()
-            }
-        } message: {
-            Text(store.actionErrorMessage ?? "")
         }
+        .disputeDetailTradeRequestSheet(
+            presentedRequestKind: $presentedRequestKind,
+            onSubmitTradeRequest: onSubmitTradeRequest
+        )
+        .disputeDetailWithdrawConfirmation(
+            isPresented: $isShowingWithdrawConfirmation,
+            onWithdraw: withdrawDispute
+        )
+        .disputeDetailActionErrorAlert(
+            message: store.actionErrorMessage,
+            onClear: { store.clearActionError() }
+        )
     }
 
     private var replyDraftBinding: Binding<DisputeReplyDraft> {
