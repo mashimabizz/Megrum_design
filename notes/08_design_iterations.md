@@ -4,6 +4,52 @@
 
 ---
 
+## イテレーション974：ホームタブを均等幅に固定
+
+### 背景・問題意識
+
+ホーム上部の `マッチ候補` / `相互マッチ(β版)` タブが左側に寄って見えていた。2タブ構成では各タブが画面横幅の半分ずつを占める方が自然で、タップ領域も分かりやすい。また、タブ下線のドラッグ連動をホーム全体にかけていたため、タブ内のグッズ複数枚スワイプでも下線が動いてしまっていた。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/HomeDiscoveryTabSwitcher.swift`
+- 横スクロール式のタブ列をやめ、2タブが画面幅を均等に分けるHStackへ変更した。
+- タブ下線の基準をテキスト幅ではなく各タブの半幅セルに合わせた。
+- 不要になったタブ列スクロール用animation定数を削除した。
+
+#### `ios-native/Sources/MegrumApp/HomeDiscoveryExperience.swift`
+- 下線補間用だけに使っていたGeometryReaderと全体同時ドラッグ検知を削除した。
+- TabView本体は維持し、タブページの左右スワイプ切り替えはSwiftUI標準のPageTabView挙動へ任せる。
+
+#### `ios-native/Sources/MegrumApp/HomeDiscoveryExperienceChrome.swift`
+- 下線のprogressを選択中タブindexだけにした。
+- グッズ横スワイプのtranslationが下線へ伝わらないようにした。
+
+#### `ios-native/Tests/MegrumAppTests/HomeScreenFlowTests.swift`
+- タブspacing / paddingを均等幅前提に更新した。
+- 下線補間テストを半幅セル基準に更新した。
+
+### 影響範囲
+
+- Swift Native iOS版ホーム画面の上部タブ表示、タブ下線、タブ内グッズ横スクロール。
+- マッチ候補/相互マッチの候補生成、保存処理、DBスキーマ、状態名は変更しない。
+
+### 確認方法
+
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-home-tab-width-build --disable-index-store`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-home-tab-width-build --disable-index-store --enable-xctest --disable-swift-testing -j 1 --filter 'HomeScreenFlowTests|HomeDiscoveryMatchPolicyTests|HomeCandidateComposerTests'`
+  - 117 tests passed
+
+### セルフレビュー結果
+
+- ✅ `マッチ候補` / `相互マッチ(β版)` が画面横幅を2分割した領域で表示されるようにした。
+- ✅ タブ内のグッズ横スワイプではタブ下線が動かないよう、ホーム全体の同時ドラッグ検知を削除した。
+- ✅ SwiftUI標準のTabView page切り替えは維持している。
+- ✅ 状態名・用語・DBスキーマの変更はないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション973：ホーム候補タブ構成を整理
 
 ### 背景・問題意識

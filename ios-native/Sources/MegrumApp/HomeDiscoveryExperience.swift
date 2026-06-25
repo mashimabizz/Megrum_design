@@ -36,81 +36,70 @@ struct HomeDiscoveryExperience: View {
     @State var didOpenInitialSheet = false
     @State var selectedPrimaryTab: HomeDiscoveryPrimaryTab = .candidates
     @State var showsIndividualListingCreation = false
-    @State var primaryTabPageWidth: CGFloat = 1
-    @GestureState var primaryTabDragTranslation: CGFloat = 0
 
     var body: some View {
         ZStack(alignment: .top) {
-            GeometryReader { geometry in
-                TabView(selection: $selectedPrimaryTab) {
-                    ScrollView {
-                        VStack(alignment: .leading, spacing: 14) {
-                            HomeDiscoverySection(
-                                title: "メンバー×タグでマッチ",
-                                candidates: userTagCandidates,
-                                layout: .grid,
-                                cardTitleStyle: .memberTag,
-                                onSelect: { selectedSheet = $0 },
-                                onSearchCandidate: { candidate, selectedGoods in
-                                    openSearch(for: candidate, selectedGoods: selectedGoods, source: .userTag)
-                                }
-                            )
-
-                            HomeDiscoverySection(
-                                title: "メンバーでマッチ",
-                                candidates: userCandidates,
-                                layout: .grid,
-                                cardTitleStyle: .member,
-                                onSelect: { selectedSheet = $0 },
-                                onSearchCandidate: { candidate, selectedGoods in
-                                    openSearch(for: candidate, selectedGoods: selectedGoods, source: .user)
-                                }
-                            )
-
-                            if !havesCandidates.isEmpty {
-                                HomeDiscoverySection(
-                                    title: "求められているグッズ",
-                                    candidates: havesCandidates,
-                                    layout: .rail,
-                                    onSelect: { selectedSheet = $0 }
-                                )
+            TabView(selection: $selectedPrimaryTab) {
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 14) {
+                        HomeDiscoverySection(
+                            title: "メンバー×タグでマッチ",
+                            candidates: userTagCandidates,
+                            layout: .grid,
+                            cardTitleStyle: .memberTag,
+                            onSelect: { selectedSheet = $0 },
+                            onSearchCandidate: { candidate, selectedGoods in
+                                openSearch(for: candidate, selectedGoods: selectedGoods, source: .userTag)
                             }
+                        )
 
-                            AdBannerSlot(
-                                placement: .homeFeedBanner,
-                                displayContext: adDisplayContext
+                        HomeDiscoverySection(
+                            title: "メンバーでマッチ",
+                            candidates: userCandidates,
+                            layout: .grid,
+                            cardTitleStyle: .member,
+                            onSelect: { selectedSheet = $0 },
+                            onSearchCandidate: { candidate, selectedGoods in
+                                openSearch(for: candidate, selectedGoods: selectedGoods, source: .user)
+                            }
+                        )
+
+                        if !havesCandidates.isEmpty {
+                            HomeDiscoverySection(
+                                title: "求められているグッズ",
+                                candidates: havesCandidates,
+                                layout: .rail,
+                                onSelect: { selectedSheet = $0 }
                             )
                         }
-                        .padding(.horizontal, 20)
-                        .padding(.top, HomeDiscoveryHeaderMetrics.contentTopPadding)
-                        .padding(.bottom, 34)
-                    }
-                    .refreshable {
-                        await onRefresh()
-                    }
-                    .tag(HomeDiscoveryPrimaryTab.candidates)
 
-                    HomeMutualMatchPage(
-                        candidates: mutualMatchCandidates,
-                        listingCount: viewerIndividualListingCount,
-                        contentTopPadding: HomeDiscoveryHeaderMetrics.contentTopPadding,
-                        onSelect: { selectedMutualMatchCandidate = $0 },
-                        onCreateListing: openIndividualListingCreation
-                    )
-                    .refreshable {
-                        await onRefresh()
+                        AdBannerSlot(
+                            placement: .homeFeedBanner,
+                            displayContext: adDisplayContext
+                        )
                     }
-                    .tag(HomeDiscoveryPrimaryTab.mutual)
+                    .padding(.horizontal, 20)
+                    .padding(.top, HomeDiscoveryHeaderMetrics.contentTopPadding)
+                    .padding(.bottom, 34)
                 }
-                .megrumPageTabViewStyle()
-                .simultaneousGesture(primaryTabDragGesture(pageWidth: geometry.size.width))
-                .onAppear {
-                    primaryTabPageWidth = max(1, geometry.size.width)
+                .refreshable {
+                    await onRefresh()
                 }
-                .onChange(of: geometry.size.width) { _, width in
-                    primaryTabPageWidth = max(1, width)
+                .tag(HomeDiscoveryPrimaryTab.candidates)
+
+                HomeMutualMatchPage(
+                    candidates: mutualMatchCandidates,
+                    listingCount: viewerIndividualListingCount,
+                    contentTopPadding: HomeDiscoveryHeaderMetrics.contentTopPadding,
+                    onSelect: { selectedMutualMatchCandidate = $0 },
+                    onCreateListing: openIndividualListingCreation
+                )
+                .refreshable {
+                    await onRefresh()
                 }
+                .tag(HomeDiscoveryPrimaryTab.mutual)
             }
+            .megrumPageTabViewStyle()
 
             VStack {
                 Spacer()

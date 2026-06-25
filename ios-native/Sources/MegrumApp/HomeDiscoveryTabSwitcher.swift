@@ -6,69 +6,66 @@ struct HomeDiscoveryTabSwitcher: View {
     var swipeProgress: CGFloat
 
     var body: some View {
-        ScrollViewReader { proxy in
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(alignment: .bottom, spacing: HomeDiscoveryTabSwitcherMetrics.itemSpacing) {
-                    ForEach(HomeDiscoveryPrimaryTab.allCases) { tab in
-                        Button {
-                            select(tab, proxy: proxy)
-                        } label: {
-                            HomeDiscoveryTabSwitcherItem(
-                                tab: tab,
-                                isSelected: selection == tab
-                            )
-                        }
-                        .buttonStyle(.plain)
-                        .id(tab.id)
-                        .accessibilityAddTraits(selection == tab ? .isSelected : [])
-                    }
+        HStack(alignment: .bottom, spacing: HomeDiscoveryTabSwitcherMetrics.itemSpacing) {
+            ForEach(HomeDiscoveryPrimaryTab.allCases) { tab in
+                Button {
+                    select(tab)
+                } label: {
+                    HomeDiscoveryTabSwitcherItem(
+                        tab: tab,
+                        isSelected: selection == tab
+                    )
                 }
-                .padding(.horizontal, HomeDiscoveryTabSwitcherMetrics.horizontalPadding)
-                .padding(.top, HomeDiscoveryTabSwitcherMetrics.topPadding)
-                .padding(.bottom, HomeDiscoveryTabSwitcherMetrics.totalBottomPadding)
-                .overlayPreferenceValue(HomeDiscoveryTabFramePreferenceKey.self) { anchors in
-                    GeometryReader { proxy in
-                        let frames = anchors.mapValues { proxy[$0] }
-                        if let indicator = HomeDiscoveryTabIndicatorFrame.interpolated(
-                            progress: swipeProgress,
-                            frames: frames
-                        ) {
-                            Capsule(style: .continuous)
-                                .fill(MegrumTheme.lavender)
-                                .frame(
-                                    width: indicator.width,
-                                    height: HomeDiscoveryTabSwitcherMetrics.underlineHeight
-                                )
-                                .offset(
-                                    x: indicator.minX,
-                                    y: proxy.size.height
-                                        - HomeDiscoveryTabSwitcherMetrics.bottomPadding
-                                        - HomeDiscoveryTabSwitcherMetrics.underlineHeight
-                                )
-                                .animation(
-                                    .snappy(duration: HomeDiscoveryTabSwitcherMetrics.selectionAnimationDuration),
-                                    value: selection
-                                )
-                        }
-                    }
-                    .allowsHitTesting(false)
+                .buttonStyle(.plain)
+                .frame(maxWidth: .infinity)
+                .anchorPreference(
+                    key: HomeDiscoveryTabFramePreferenceKey.self,
+                    value: .bounds
+                ) { anchor in
+                    [tab: anchor]
+                }
+                .contentShape(Rectangle())
+                .accessibilityAddTraits(selection == tab ? .isSelected : [])
+            }
+        }
+        .padding(.horizontal, HomeDiscoveryTabSwitcherMetrics.horizontalPadding)
+        .padding(.top, HomeDiscoveryTabSwitcherMetrics.topPadding)
+        .padding(.bottom, HomeDiscoveryTabSwitcherMetrics.totalBottomPadding)
+        .overlayPreferenceValue(HomeDiscoveryTabFramePreferenceKey.self) { anchors in
+            GeometryReader { proxy in
+                let frames = anchors.mapValues { proxy[$0] }
+                if let indicator = HomeDiscoveryTabIndicatorFrame.interpolated(
+                    progress: swipeProgress,
+                    frames: frames
+                ) {
+                    Capsule(style: .continuous)
+                        .fill(MegrumTheme.lavender)
+                        .frame(
+                            width: indicator.width,
+                            height: HomeDiscoveryTabSwitcherMetrics.underlineHeight
+                        )
+                        .offset(
+                            x: indicator.minX,
+                            y: proxy.size.height
+                                - HomeDiscoveryTabSwitcherMetrics.bottomPadding
+                                - HomeDiscoveryTabSwitcherMetrics.underlineHeight
+                        )
+                        .animation(
+                            .snappy(duration: HomeDiscoveryTabSwitcherMetrics.selectionAnimationDuration),
+                            value: selection
+                        )
                 }
             }
-            .onChange(of: selection) { _, newValue in
-                withAnimation(.snappy(duration: HomeDiscoveryTabSwitcherMetrics.scrollAnimationDuration)) {
-                    proxy.scrollTo(newValue.id, anchor: .center)
-                }
-            }
+            .allowsHitTesting(false)
         }
     }
 
-    private func select(_ tab: HomeDiscoveryPrimaryTab, proxy: ScrollViewProxy) {
+    private func select(_ tab: HomeDiscoveryPrimaryTab) {
         guard selection != tab else {
             return
         }
         withAnimation(.snappy(duration: HomeDiscoveryTabSwitcherMetrics.selectionAnimationDuration)) {
             selection = tab
-            proxy.scrollTo(tab.id, anchor: .center)
         }
     }
 }
@@ -93,20 +90,14 @@ private struct HomeDiscoveryTabSwitcherItem: View {
             )
             .lineLimit(1)
             .fixedSize(horizontal: true, vertical: false)
-            .anchorPreference(
-                key: HomeDiscoveryTabFramePreferenceKey.self,
-                value: .bounds
-            ) { anchor in
-                [tab: anchor]
-            }
-            .contentShape(Rectangle())
+            .frame(maxWidth: .infinity)
             .accessibilityLabel(tab.title)
     }
 }
 
 enum HomeDiscoveryTabSwitcherMetrics {
-    static let itemSpacing: CGFloat = 32
-    static let horizontalPadding: CGFloat = 20
+    static let itemSpacing: CGFloat = 0
+    static let horizontalPadding: CGFloat = 0
     static let topPadding: CGFloat = 8
     static let bottomPadding: CGFloat = 7
     static let fontSize: CGFloat = 17
@@ -114,7 +105,6 @@ enum HomeDiscoveryTabSwitcherMetrics {
     static let underlineHeight: CGFloat = 4
     static let inactiveTextOpacity = 0.34
     static let selectionAnimationDuration = 0.22
-    static let scrollAnimationDuration = 0.20
 
     static var totalBottomPadding: CGFloat {
         bottomPadding + labelUnderlineSpacing + underlineHeight

@@ -328,8 +328,9 @@ final class HomeScreenFlowTests: XCTestCase {
         XCTAssertEqual(HomeDiscoveryPrimaryTab.allCases.map(\.index), [0, 1])
     }
 
-    func testHomeDiscoveryTopTabsUseTimelineLikeBarMetrics() {
-        XCTAssertEqual(HomeDiscoveryTabSwitcherMetrics.itemSpacing, 32)
+    func testHomeDiscoveryTopTabsUseEqualHalfWidthMetrics() {
+        XCTAssertEqual(HomeDiscoveryTabSwitcherMetrics.itemSpacing, 0)
+        XCTAssertEqual(HomeDiscoveryTabSwitcherMetrics.horizontalPadding, 0)
         XCTAssertEqual(HomeDiscoveryTabSwitcherMetrics.fontSize, 17)
         XCTAssertEqual(HomeDiscoveryTabSwitcherMetrics.underlineHeight, 4)
         XCTAssertEqual(HomeDiscoveryTabSwitcherMetrics.totalBottomPadding, 19)
@@ -337,8 +338,8 @@ final class HomeScreenFlowTests: XCTestCase {
 
     func testHomeDiscoveryTabIndicatorInterpolatesAcrossLabelFrames() throws {
         let frames: [HomeDiscoveryPrimaryTab: CGRect] = [
-            .candidates: CGRect(x: 20, y: 0, width: 68, height: 24),
-            .mutual: CGRect(x: 120, y: 0, width: 128, height: 24)
+            .candidates: CGRect(x: 0, y: 0, width: 195, height: 24),
+            .mutual: CGRect(x: 195, y: 0, width: 195, height: 24)
         ]
 
         let halfway = try XCTUnwrap(
@@ -348,8 +349,8 @@ final class HomeScreenFlowTests: XCTestCase {
             )
         )
 
-        XCTAssertEqual(halfway.minX, 70)
-        XCTAssertEqual(halfway.width, 98)
+        XCTAssertEqual(halfway.minX, 97.5)
+        XCTAssertEqual(halfway.width, 195)
     }
 
     func testMutualMatchShellDoesNotInventCandidatesWithoutData() {

@@ -29,16 +29,6 @@ extension HomeDiscoveryExperience {
             .zIndex(10)
     }
 
-    func primaryTabDragGesture(pageWidth: CGFloat) -> some Gesture {
-        DragGesture(minimumDistance: 1, coordinateSpace: .local)
-            .updating($primaryTabDragTranslation) { value, state, _ in
-                guard abs(value.translation.width) > abs(value.translation.height) else {
-                    return
-                }
-                state = value.translation.width
-            }
-    }
-
     private var header: some View {
         HStack {
             Button(action: onOpenSettings) {
@@ -71,10 +61,7 @@ extension HomeDiscoveryExperience {
     }
 
     private var primaryTabSwipeProgress: CGFloat {
-        let selectedIndex = CGFloat(selectedPrimaryTab.index)
-        let rawProgress = selectedIndex - (primaryTabDragTranslation / max(1, primaryTabPageWidth))
-        let maximumProgress = CGFloat(HomeDiscoveryPrimaryTab.allCases.count - 1)
-        return min(max(rawProgress, 0), maximumProgress)
+        CGFloat(selectedPrimaryTab.index)
     }
 }
 
