@@ -1,6 +1,5 @@
 import Foundation
 import MegrumCore
-import MegrumDesign
 import SwiftUI
 
 struct GoodsEditorActionButtons: View {
@@ -19,59 +18,24 @@ struct GoodsEditorActionButtons: View {
     var body: some View {
         VStack(spacing: 10) {
             if isItemReadOnly {
-                closeButton
+                GoodsEditorCloseButton(onClose: onClose)
             } else {
-                saveButton
+                GoodsEditorSaveButton(
+                    title: saveButtonTitle,
+                    isSaving: isSavingCurrentItem,
+                    canSave: canSave,
+                    onSave: onSave
+                )
+
                 if entryKind == .inventory, mode == .edit {
-                    deleteButton
+                    GoodsEditorDeleteButton(
+                        hasExistingItem: existingItemID != nil,
+                        isMutating: isMutatingCurrentItem,
+                        onConfirmDelete: onConfirmDelete
+                    )
                 }
             }
         }
-    }
-
-    private var closeButton: some View {
-        Button(action: onClose) {
-            Text("戻る")
-                .font(.headline.weight(.black))
-                .frame(maxWidth: .infinity)
-                .frame(height: 54)
-        }
-        .buttonStyle(.borderedProminent)
-        .tint(MegrumTheme.lavender)
-    }
-
-    private var saveButton: some View {
-        Button(action: onSave) {
-            HStack(spacing: 10) {
-                if isSavingCurrentItem {
-                    ProgressView()
-                        .tint(.white)
-                }
-                Text(saveButtonTitle)
-                    .font(.headline.weight(.black))
-            }
-            .frame(maxWidth: .infinity)
-            .frame(height: 54)
-        }
-        .buttonStyle(.borderedProminent)
-        .tint(MegrumTheme.lavender)
-        .disabled(!canSave)
-    }
-
-    private var deleteButton: some View {
-        Button(role: .destructive, action: onConfirmDelete) {
-            HStack(spacing: 8) {
-                if isMutatingCurrentItem {
-                    ProgressView()
-                }
-                Text("このマイグッズを削除")
-                    .font(.headline.weight(.black))
-            }
-            .frame(maxWidth: .infinity)
-            .frame(height: 52)
-        }
-        .buttonStyle(.bordered)
-        .disabled(existingItemID == nil || isMutatingCurrentItem)
     }
 }
 

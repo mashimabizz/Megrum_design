@@ -4,6 +4,47 @@
 
 ---
 
+## イテレーション1104：goods editor action controlsを分離
+
+### 背景・問題意識
+
+`GoodsEditorActionViews.swift` は、`GoodsEditorActionButtons` の分岐に加えて、戻るbutton、保存button、削除buttonの描画をcomputed viewとして抱えていた。親Viewをread-only/edit状態の分岐に寄せ、各buttonの見た目とdisabled条件を専用Viewへ分離する。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/GoodsEditorActionViews.swift`
+- `closeButton`、`saveButton`、`deleteButton` のcomputed viewを専用View呼び出しへ置き換えた。
+- `GoodsEditorActionButtons` には read-only時の戻るbutton、通常時の保存button、inventory edit時の削除buttonという構成だけを残した。
+- 直接使わなくなった `MegrumDesign` importを削除した。
+
+#### `ios-native/Sources/MegrumApp/GoodsEditorActionControls.swift`
+- `GoodsEditorCloseButton`、`GoodsEditorSaveButton`、`GoodsEditorDeleteButton` を追加した。
+- 各buttonの文言、font、height、button style、tint、ProgressView、disabled条件を維持した。
+- 親のitem ID全体ではなく、削除可否に必要な `hasExistingItem` とmutation状態だけを受け取る構成にした。
+
+### 影響範囲
+
+- Swift Native iOS版のグッズ登録/編集sheet下部action。
+- 保存処理、削除確認処理、read-only時の戻る処理、保存可否、削除可否、保存payload、DB/API、状態名、表示文言は変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumApp/GoodsEditorActionViews.swift ios-native/Sources/MegrumApp/GoodsEditorActionControls.swift`
+  - passed
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-goods-editor-action-controls`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-goods-editor-action-controls --enable-xctest --disable-swift-testing -j 1 --filter 'GoodsEditor|GoodsInventoryCreate'`
+  - passed（32 tests）
+
+### セルフレビュー結果
+
+- ✅ 戻る/保存/削除buttonの文言、サイズ、style、tint、ProgressView表示を維持した。
+- ✅ 保存buttonの `!canSave` disabled、削除buttonの `!hasExistingItem || isMutating` disabledを維持した。
+- ✅ `GoodsEditorActionViews.swift` は 126行から 89行へ縮小し、action button群を64行の専用ファイルへ分離した。
+- ✅ 新しい状態名・用語・DB列は追加していないため、`notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション1103：goods editor tag controlsを分離
 
 ### 背景・問題意識
