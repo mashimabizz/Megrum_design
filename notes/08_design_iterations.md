@@ -4,6 +4,49 @@
 
 ---
 
+## イテレーション948：Supabase home clientを分割
+
+### 背景・問題意識
+
+`SupabaseHomeClient.swift` は、ホームcomposition取得、viewer/partner goods・wish・listing・AW・通知IDのfetch、request生成API、RPC fallback、legacy select fallbackを1ファイルに持っていた。ホームは相互マッチ、マッチ候補、募集タイムライン、未読通知にまたがるため、挙動は変えずにcomposition本体、request生成、support helperを分け、ホーム不具合調査時の確認範囲を狭める。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumData/SupabaseHomeClient.swift`
+- `loadHomeComposition` と初期化に絞った。
+- request/support extensionから参照するため、内部 `client` をmodule internalにした。
+- ファイル行数を301行から107行へ縮小した。
+
+#### `ios-native/Sources/MegrumData/SupabaseHomeClientRequests.swift`
+- local mode、viewer/partner goods、viewer/partner wishes、partner users、user summaries RPC、viewer/partner listings、listing wish options、activity windows、inventory tags、unread notificationsのrequest生成APIを新規ファイルへ移動した。
+- table名、RPC function名、select、query item組み立て、limit条件は維持した。
+
+#### `ios-native/Sources/MegrumData/SupabaseHomeClientSupport.swift`
+- listing wish options / inventory tagsの空配列guard、goods/usersのlegacy select fallback、viewer/partner user summaries RPC fallbackを新規ファイルへ移動した。
+- RPCの400/404 fallback条件、legacy users/goods select fallbackは維持した。
+
+### 影響範囲
+
+- Swift Native iOS版ホームの相互マッチ、マッチ候補、募集タイムライン、ローカルモード、AW、未読通知、候補タグスコア用inventory tags取得。
+- 挙動変更ではなく責務分離。Supabase table名、RPC function名、select、query、payload key、状態名、用語、DBスキーマは変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumData/SupabaseHomeClient.swift ios-native/Sources/MegrumData/SupabaseHomeClientRequests.swift ios-native/Sources/MegrumData/SupabaseHomeClientSupport.swift`
+  - passed
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-home-client-build --disable-index-store`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-home-client-tests --disable-index-store --enable-xctest --disable-swift-testing -j 1 --filter SupabaseHomeClientTests`
+  - 6 tests passed
+
+### セルフレビュー結果
+
+- ✅ composition本体、request builder、support helperを移動中心で分割した。
+- ✅ ホーム取得リクエスト、listing wish options、inventory tags、local mode/AW/通知ID、DTO decodeの既存テストを通した。
+- ✅ 状態名・用語・DBスキーマの変更はないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション947：Supabase message clientを分割
 
 ### 背景・問題意識
