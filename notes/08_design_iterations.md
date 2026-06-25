@@ -4,6 +4,44 @@
 
 ---
 
+## イテレーション1030：推しrequest controlsを分割
+
+### 背景・問題意識
+
+`OshiSettingsRequestSheets.swift` は、推し追加リクエストsheet、メンバー追加リクエストsheet、共通chip、共通submit footerを同じファイルに抱えていた。chipとfooterは2種類のsheetから使われる表示部品なので、フォーム本体から切り出し、入力stateと共通controlの変更範囲を分けた。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/OshiSettingsRequestSheets.swift`
+- `OshiRequestSheet` と `OshiMemberRequestSheet` の入力state、payload生成、submit処理を既存ファイルに残した。
+- `OshiFilterChip` と `OshiRequestSubmitFooter` を専用ファイルへ委譲した。
+
+#### `ios-native/Sources/MegrumApp/OshiRequestSheetControls.swift`
+- `OshiFilterChip` と `OshiRequestSubmitFooter` を追加した。
+- chipのselected表示、submit buttonのdisabled/opacity相当の背景色、footer高さ、safe area insetからの呼び出しは既存どおり維持した。
+
+### 影響範囲
+
+- Swift Native iOS版の推し追加リクエストsheet。
+- Swift Native iOS版のメンバー追加リクエストsheet。
+- リクエストpayload、genre選択、kind選択、送信処理、状態名、用語、DBスキーマ、表示文言は変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumApp/OshiSettingsRequestSheets.swift ios-native/Sources/MegrumApp/OshiRequestSheetControls.swift`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-oshi-request-controls --enable-xctest --disable-swift-testing -j 1 --filter OshiSettingsDraftTests`
+  - passed（15 tests）
+
+### セルフレビュー結果
+
+- ✅ `OshiRequestSheet` / `OshiMemberRequestSheet` の `@State`、validation、payload生成、submit処理は変更していない。
+- ✅ `OshiFilterChip` と `OshiRequestSubmitFooter` は移動のみで、色、サイズ、disabled条件、footer borderを維持した。
+- ✅ `OshiSettingsRequestSheets.swift` は 267行から 213行へ縮小し、共通controlを 59行の専用ファイルへ分離した。
+- ✅ 新しい状態名・用語・DB列は追加していないため、`notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション1029：掲示板reply inputを分割
 
 ### 背景・問題意識
