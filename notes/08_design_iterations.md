@@ -4,6 +4,45 @@
 
 ---
 
+## イテレーション1042：交換条件settings chrome viewsを分割
+
+### 背景・問題意識
+
+`HomeExchangeSettingsScreenComponents.swift` は、交換条件の条件カードに加えて、背景、ヘッダー、説明banner、保存footer、navigation helperも同じファイルに抱えていた。条件カード側には既存文言が残っているため動かさず、画面chromeだけを専用ファイルへ分け、交換条件の入力部品と画面外枠の変更範囲を分離した。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/HomeExchangeSettingsScreenComponents.swift`
+- `HomeExchangeMailConditionsCard` と `HomeExchangeMailConditionSegmentRow` を既存ファイルに残した。
+- 背景、ヘッダー、説明banner、保存footer、navigation helperを専用ファイルへ委譲した。
+
+#### `ios-native/Sources/MegrumApp/HomeExchangeSettingsChromeViews.swift`
+- `HomeExchangeSettingsBackground`、`HomeExchangeSettingsHeader`、`HomeExchangeSettingsInstructionBanner`、`HomeExchangeSettingsSaveFooter`、`homeExchangeSettingsNavigationBarHidden()` を追加した。
+- 既存のgradient、button style、material、shadow、navigation bar hidden条件、表示文言を維持した。
+
+### 影響範囲
+
+- Swift Native iOS版の交換条件設定画面。
+- 交換条件設定画面の背景、ヘッダー、説明banner、保存footer、navigation bar表示制御。
+- 条件カード、交換方法picker、保存処理、カレンダー、状態名、用語、DBスキーマ、表示文言は変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumApp/HomeExchangeSettingsScreenComponents.swift ios-native/Sources/MegrumApp/HomeExchangeSettingsChromeViews.swift`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-home-exchange-chrome --enable-xctest --disable-swift-testing -j 1 --filter HomeExchangeSettingsScreenTests`
+  - passed（4 tests）
+
+### セルフレビュー結果
+
+- ✅ `HomeExchangeMailConditionsCard` と segment row の入力binding、選択処理、表示文言には触れていない。
+- ✅ chrome表示は移動のみで、背景gradient、閉じるbutton、説明banner、保存footer、navigation bar hidden条件を維持した。
+- ✅ 新ファイルには廃止用語を追加していない。
+- ✅ `HomeExchangeSettingsScreenComponents.swift` は 185行から 85行へ縮小し、chrome表示を 102行の専用ファイルへ分離した。
+- ✅ 新しい状態名・用語・DB列は追加していないため、`notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション1041：交換条件preference card viewsを分割
 
 ### 背景・問題意識
