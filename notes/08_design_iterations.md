@@ -4,6 +4,47 @@
 
 ---
 
+## イテレーション1051：home other exchange supportを分離
+
+### 背景・問題意識
+
+`HomeOtherExchangeRows.swift` は、他候補セクションの表示本体に加えて、空状態copy、候補除外policy、thumbnail button primitiveも同じファイルに抱えていた。行表示の本体を見やすくし、テスト対象のpolicyと小さな表示primitiveを専用ファイルへ分離した。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/HomeOtherExchangeRows.swift`
+- `HomeOtherExchangeRows` 本体と `EmptyView` 用initializerだけを残した。
+- listing hit / wish hit sectionの構成、divider条件、nested sheet callback、leading contentは維持した。
+
+#### `ios-native/Sources/MegrumApp/HomeOtherExchangeSupport.swift`
+- `HomeOtherExchangeEmptyPanel`、`HomeOtherExchangeCopy`、`HomeOtherExchangePolicy`、`HomeOtherExchangeThumbnailButton` を追加した。
+- 候補除外、wish hitからlisting hitを除く処理、空状態copy、thumbnail選択枠/チェック表示を移動した。
+
+### 影響範囲
+
+- Swift Native iOS版のホーム候補detail内「他にも交換できそうなもの」セクション。
+- listing hit / wish hit の表示、除外policy、空状態copy、thumbnail選択表示。
+- nested sheet route、追加済みcandidate判定、状態名、用語、DBスキーマ、表示文言は変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumApp/HomeOtherExchangeRows.swift ios-native/Sources/MegrumApp/HomeOtherExchangeSupport.swift`
+  - passed
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-home-other-exchange-support`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-home-other-exchange-support-tests --enable-xctest --disable-swift-testing -j 1 --filter 'HomeDiscoveryMatchPolicyTests|HomeScreenFlowTests'`
+  - passed（114 tests）
+
+### セルフレビュー結果
+
+- ✅ section本体は `HomeOtherExchangeRows` に残し、copy/policy/thumbnail primitiveだけを専用ファイルへ移動した。
+- ✅ listing hit / wish hitの除外policy、空状態copy、thumbnail選択style、nested sheet callbackを維持した。
+- ✅ 新ファイルには廃止用語を追加していない。
+- ✅ `HomeOtherExchangeRows.swift` は 236行から 144行へ縮小し、support要素を 95行の専用ファイルへ分離した。
+- ✅ 新しい状態名・用語・DB列は追加していないため、`notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション1050：proposal create sheet sectionsを分割
 
 ### 背景・問題意識
