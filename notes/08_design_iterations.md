@@ -4,6 +4,49 @@
 
 ---
 
+## イテレーション920：Trade chat viewsを役割別に分割
+
+### 背景・問題意識
+
+`TradeChatViews.swift` は、取引相手strip、collapsed summary、timestamp divider、合意compact bar、未利用アクションsheetが1ファイルに同居していた。合意barは `TradeProposal` の状態判定とUI操作を持ち、チャット表示部品とは変更理由が異なるため、取引チャット周辺のUI調整や合意状態調査の対象を分ける。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/TradeChatViews.swift`
+- partner strip、collapsed summary card、timestamp dividerに絞った。
+- ファイル行数を320行から158行へ縮小した。
+
+#### `ios-native/Sources/MegrumApp/TradeAgreementCompactBar.swift`
+- `TradeAgreementCompactBar` を新規ファイルへ移動した。
+- 承認可否、相手/自分の承認状態、交換手段picker、見送り/調整/承認buttonの表示・disabled条件は維持した。
+
+#### `ios-native/Sources/MegrumApp/TradeUnavailableChatActionSheet.swift`
+- `TradeUnavailableChatActionSheet` を新規ファイルへ移動した。
+- title、description、close button、navigation titleは維持した。
+
+### 影響範囲
+
+- Swift Native iOS版の取引チャット、合意compact bar、未利用チャットアクションsheet。
+- 挙動変更ではなく責務分離。取引状態、合意判定、メッセージ送信、状態名、用語、DBスキーマは変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumApp/TradeChatViews.swift ios-native/Sources/MegrumApp/TradeAgreementCompactBar.swift ios-native/Sources/MegrumApp/TradeUnavailableChatActionSheet.swift`
+  - passed
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-trade-chat-views-build --disable-index-store`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-trade-chat-views-tests --disable-index-store --enable-xctest --disable-swift-testing -j 1 --filter 'TradeChatAffordanceTests|TradeProposalStateReducerTests|TradeMessageStateReducerTests|TradeRequestDraftTests|MegrumAppStateTests/testAppStateSendsTradeMessageThroughRepository|MegrumAppStateTests/testAppStateUpdatesTradeProposalThroughRepository'`
+  - 61 tests passed
+
+### セルフレビュー結果
+
+- ✅ 合意compact barのstatus text、accept text、exchange method picker、button disabled条件は移動のみで維持した。
+- ✅ 未利用チャットアクションsheetの文言・close動線・navigation titleは維持した。
+- ✅ TradeChatAffordanceTests / TradeProposalStateReducerTests / TradeMessageStateReducerTests / TradeRequestDraftTestsで、チャット入力可否、合意/提案状態、メッセージ状態、依頼draftを確認した。
+- ✅ 状態名・用語・DBスキーマの変更はないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション919：Goods editor presentationを分割
 
 ### 背景・問題意識
