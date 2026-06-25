@@ -4,6 +4,48 @@
 
 ---
 
+## イテレーション913：Home discovery candidate factoryを分割
+
+### 背景・問題意識
+
+`HomeDiscoveryCandidateFactory.swift` は、候補生成の入口、メンバー/タグ単位のgrouping、候補1件のsignals/sheet/goods stack構築、title/member fallbackが1ファイルに同居していた。マッチ候補タブの候補表示、Wish/グッズヒット、L2/L1一致、支払いタグなどの調整が続く場所なので、候補生成の入口と周辺組み立てを分け、判定の読み違いと修正時の巻き込みを減らす。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/HomeDiscoveryCandidateFactory.swift`
+- `candidates(...)` と候補1件の `candidate(...)` を残し、factory入口としての責務に絞った。
+- ファイル行数を331行から68行へ縮小した。
+
+#### `ios-native/Sources/MegrumApp/HomeDiscoveryCandidateGrouping.swift`
+- `MemberTagGroupKey` / `MemberGroupKey` / descriptor、member/tag grouping、member identity/display name、tag比較用normalizeを移動した。
+- `memberCandidateDisplayLimit`、ordered grouping、fallback title、tag titleの生成条件は維持した。
+
+#### `ios-native/Sources/MegrumApp/HomeDiscoveryCandidatePresentation.swift`
+- `conditionSignalsByGoodsID`、fallback signals、sheet payload、title、goods stack構築を移動した。
+- `.haves` lookup、`.goodsHit` / `.wishHit` の分岐、fallback goods、近傍goods stackの条件は維持した。
+
+### 影響範囲
+
+- Swift Native iOS版ホームのマッチ候補/相互マッチ周辺、Wishヒット/グッズヒット、member/tag候補の表示title、候補シートpayload、候補goods stack。
+- 挙動変更ではなく責務分離。L2/L1一致、支払い条件判定、proposal routing、profile routing、状態名、用語、DBスキーマは変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumApp/HomeDiscoveryCandidateFactory.swift ios-native/Sources/MegrumApp/HomeDiscoveryCandidateGrouping.swift ios-native/Sources/MegrumApp/HomeDiscoveryCandidatePresentation.swift`
+  - passed
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-home-candidate-factory-build --disable-index-store`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-home-candidate-factory-tests --disable-index-store --enable-xctest --disable-swift-testing -j 1 --filter 'HomeDiscoveryMatchPolicyTests|HomeCandidateComposerTests|HomeScreenFlowTests'`
+  - 118 tests passed
+
+### セルフレビュー結果
+
+- ✅ `source == .userTag` / `.user` / `.haves` の分岐、member grouping limit、ordered grouping、fallback signals、sheet selectionは移動のみで維持した。
+- ✅ HomeDiscoveryMatchPolicyTests / HomeCandidateComposerTests / HomeScreenFlowTestsで、L2 Wish一致、Wish/グッズヒット、member候補、proposal route、home tab/候補導線を確認した。
+- ✅ 状態名・用語・DBスキーマの変更はないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション912：Home discovery sheet shared viewsを分割
 
 ### 背景・問題意識
