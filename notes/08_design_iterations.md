@@ -4,6 +4,51 @@
 
 ---
 
+## イテレーション938：Supabase proposal evidence clientを分割
+
+### 背景・問題意識
+
+`SupabaseProposalClient.swift` は、打診の作成/合意/拒否/承認/評価と、取引証跡写真のupload/load/delete、共通query helper、client errorを同じファイルに持っていた。打診本体の状態操作と証跡写真のstorage/DB操作は読む観点が異なるため、public API名と挙動は維持してextensionへ分ける。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumData/SupabaseProposalClient.swift`
+- 打診本体のload/create/agree/reject/approveEvidence/approveCancel/submitEvaluationに絞った。
+- `chatPhotoBucket` と `maxUploadBytes` は証跡extensionから参照できるようmodule internalにした。
+- ファイル行数を375行から172行へ縮小した。
+
+#### `ios-native/Sources/MegrumData/SupabaseProposalEvidenceClient.swift`
+- `addEvidencePhoto`、`loadEvidencePhotos`、`deleteEvidencePhoto`、証跡写真position/path helperを新規ファイルへ移動した。
+- upload size validation、participant/status validation、signed URL、代表証跡差し替え、system message metadataは維持した。
+
+#### `ios-native/Sources/MegrumData/SupabaseProposalClientSupport.swift`
+- `loadProposal`、system message作成、proposal/cancel/evidence delete query helper、encoder生成を新規ファイルへ移動した。
+
+#### `ios-native/Sources/MegrumData/SupabaseProposalModels.swift`
+- `SupabaseProposalClientError` と `SupabaseProposalSystemAction` を新規ファイルへ移動した。
+
+### 影響範囲
+
+- Swift Native iOS版の打診作成/合意/拒否/証跡写真追加・削除/証跡承認/キャンセル承認/評価送信。
+- 挙動変更ではなく責務分離。public method名、payload、query、validation、状態名、用語、DBスキーマは変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumData/SupabaseProposalClient.swift ios-native/Sources/MegrumData/SupabaseProposalEvidenceClient.swift ios-native/Sources/MegrumData/SupabaseProposalClientSupport.swift ios-native/Sources/MegrumData/SupabaseProposalModels.swift`
+  - passed
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-proposal-client-build --disable-index-store`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-proposal-client-tests --disable-index-store --enable-xctest --disable-swift-testing -j 1 --filter SupabaseProposalClientTests`
+  - 22 tests passed
+
+### セルフレビュー結果
+
+- ✅ proposal本体操作、証跡写真操作、support helper、error modelを移動のみで分割した。
+- ✅ 打診作成/合意/拒否/証跡/キャンセル承認/評価の既存テストを通した。
+- ✅ 状態名・用語・DBスキーマの変更はないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション937：Supabase REST request builderを分割
 
 ### 背景・問題意識
