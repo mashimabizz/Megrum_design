@@ -4,6 +4,48 @@
 
 ---
 
+## イテレーション954：Face recognition core modelsを分割
+
+### 背景・問題意識
+
+`FaceRecognitionModels.swift` は、顔認識/メンバータグ付けの状態値、画像種別、認識方式、品質、顔プロフィール、検出結果、候補、解析結果を1ファイルに持っていた。顔認識はCore、Supabase保存、App側レビューUIにまたがるため、状態/分類値、プロフィール、解析結果を分け、変更時の確認範囲を狭める。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumCore/FaceRecognitionTaxonomyModels.swift`
+- `FaceMatchStatus`、`MemberTaggingImageType`、`MemberTaggingSubjectType`、`MemberTaggingRecognitionMethod`、`MemberTaggingQualityStatus`、`MemberProfileType`、`FaceQualityStatus` を新規ファイルへ移動した。
+
+#### `ios-native/Sources/MegrumCore/FaceRecognitionProfileModels.swift`
+- `FaceBoundingBox`、`FaceEmbedding`、`MemberFaceProfile` を新規ファイルへ移動した。
+- bounding box clamp、area、embedding model identifier trimは維持した。
+
+#### `ios-native/Sources/MegrumCore/FaceTaggingAnalysisModels.swift`
+- `DetectedFaceObservation`、`FaceMatchCandidate`、`FaceTaggingResult`、`FaceTaggingAnalysis` を新規ファイルへ移動した。
+- confidence/quality/rank/profileCount clamp、quality category fallback、analysis defaultsは維持した。
+
+#### `ios-native/Sources/MegrumCore/FaceRecognitionModels.swift`
+- 上記3ファイルへ分割したため削除した。
+
+### 影響範囲
+
+- Swift Native iOS版の顔認識、メンバータグ付け、Supabase顔認識保存、タグ付けレビュー画面。
+- 挙動変更ではなく責務分離。型名、raw value、public initializer、プロパティ、状態名、用語、DBスキーマは変更しない。
+
+### 確認方法
+
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-face-models-build --disable-index-store`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-face-models-tests --disable-index-store --enable-xctest --disable-swift-testing -j 1 --filter 'FaceRecognitionModelTests|SupabaseFaceRecognitionClientTests|FaceTaggingServiceTests'`
+  - 22 tests passed
+
+### セルフレビュー結果
+
+- ✅ 既存モデルを移動中心で分割し、raw value、公開API、初期化引数を維持した。
+- ✅ Coreの閾値/候補判定、Supabase顔認識request、App側の統合タグ付け/レビューキューの対象テストを通した。
+- ✅ 状態名・用語・DBスキーマの変更はないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション953：Trade core modelsを分割
 
 ### 背景・問題意識
