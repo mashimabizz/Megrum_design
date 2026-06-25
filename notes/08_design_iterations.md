@@ -4,6 +4,53 @@
 
 ---
 
+## イテレーション925：Home mutual match detail部品を分割
+
+### 背景・問題意識
+
+`HomeMutualMatchDetailSheetComponents.swift` は、相互マッチ詳細シートの選択中プレビューカード、確認ポイントhelp、左右の交換アイテム表示、確認ポイント行が1ファイルに同居していた。マッチ候補/相互マッチのシートは今後も表示位置・タグ・条件文言の調整が入りやすいため、変更理由ごとに部品を分ける。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/HomeMutualMatchDetailSheetComponents.swift`
+- `HomeMutualMatchSelectedPreviewCard` に絞った。
+- ファイル行数を315行から82行へ縮小した。
+
+#### `ios-native/Sources/MegrumApp/HomeMutualMatchConditionHelpPopover.swift`
+- 確認ポイントhelp popoverを新規ファイルへ移動した。
+- help文言、popover size、行背景は維持した。
+
+#### `ios-native/Sources/MegrumApp/HomeMutualMatchProposalPreviewViews.swift`
+- `HomeMutualMatchPreviewSide` と `HomeMutualMatchDisplayArtwork` を新規ファイルへ移動した。
+- グッズ/定価/金額指定の表示、左右ラベル、thumbnail/placeholderの見た目は維持した。
+
+#### `ios-native/Sources/MegrumApp/HomeMutualMatchConditionReviewRow.swift`
+- `HomeMutualMatchConditionReviewRow` と counterpart値表示判定を新規ファイルへ移動した。
+- status別tint/icon、tag pill、相手/自分の値表示は維持した。
+
+### 影響範囲
+
+- Swift Native iOS版の相互マッチ詳細シート、選択中交換プレビュー、確認ポイントhelp、条件確認行。
+- 挙動変更ではなく責務分離。相互マッチ生成、条件評価、タグ判定、状態名、用語、DBスキーマは変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumApp/HomeMutualMatchDetailSheetComponents.swift ios-native/Sources/MegrumApp/HomeMutualMatchConditionHelpPopover.swift ios-native/Sources/MegrumApp/HomeMutualMatchProposalPreviewViews.swift ios-native/Sources/MegrumApp/HomeMutualMatchConditionReviewRow.swift`
+  - passed
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-home-mutual-match-detail-components-build --disable-index-store`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-home-mutual-match-detail-components-tests --disable-index-store --enable-xctest --disable-swift-testing -j 1 --filter 'HomeScreenFlowTests|HomeMutualMatchConditionPoliciesTests|HomeMutualMatchLiveDataTests'`
+  - 58 tests passed, 2 skipped because live Supabase seed env vars were not set
+
+### セルフレビュー結果
+
+- ✅ 選択中プレビューカード、左右の交換アイテム表示、確認ポイントhelp、status別review rowは移動のみで文言・色・サイズを維持した。
+- ✅ HomeScreenFlowTests / HomeMutualMatchConditionPoliciesTestsで、相互マッチ候補、条件タグ、確認ポイント、金額/支払/交換条件の評価を確認した。
+- ✅ live Supabase前提の2件は既存どおり環境変数未設定でskipされた。
+- ✅ 状態名・用語・DBスキーマの変更はないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション924：Profile schedule componentsを分割
 
 ### 背景・問題意識
