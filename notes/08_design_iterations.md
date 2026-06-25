@@ -4,6 +4,46 @@
 
 ---
 
+## イテレーション1009：個別募集詳細ポップアップの左右パネルを分割
+
+### 背景・問題意識
+
+`HomeIndividualListingDetailPopup.swift` はポップアップ入口、左右2カラムの組み立て、求めるもの一覧、選択状態、金額表示、譲るものカード変換まで1ファイルにまとまっていた。個別募集Hit detail はホーム候補・相互マッチ・打診開始前確認から参照されるため、左右パネルを分けて表示変更の影響範囲を読みやすくした。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/HomeIndividualListingDetailPopup.swift`
+- ポップアップ入口と左右パネルの組み立てだけを残した。
+
+#### `ios-native/Sources/MegrumApp/HomeIndividualListingWantedPanel.swift`
+- 「求めるもの」パネル、選択可能row、wanted option row、金額tokenを集約した。
+- 選択状態、accessibility label、logic表示、preview item表示は維持した。
+
+#### `ios-native/Sources/MegrumApp/HomeIndividualListingOfferedPanel.swift`
+- 「譲るもの」パネル、提示物carousel用の `HomeMockGoods` 変換、数量caption生成を集約した。
+
+### 影響範囲
+
+- Swift Native iOS版ホーム候補の個別募集詳細ポップアップ。
+- 個別募集Hitから打診へ進む前のwanted option選択表示。
+- 状態名、用語、DBスキーマ、表示文言は変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumApp/HomeIndividualListingDetailPopup.swift ios-native/Sources/MegrumApp/HomeIndividualListingWantedPanel.swift ios-native/Sources/MegrumApp/HomeIndividualListingOfferedPanel.swift`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-listing-popup --enable-xctest --disable-swift-testing -j 1 --filter HomeDiscoveryMatchPolicyTests`
+  - passed（69 tests）
+
+### セルフレビュー結果
+
+- ✅ ポップアップ入口の引数、sheet構造、左右パネル構成は維持した。
+- ✅ wanted optionの選択状態、accessibility label、logic/金額/preview表示は既存コードのまま移動した。
+- ✅ 提示物carousel用の `HomeMockGoods` 変換とcaption生成を分離し、表示文言は変更していない。
+- ✅ 新しい状態名・用語・DB列は追加していないため、`notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション1008：個別募集マッチ判定を生成責務別に分割
 
 ### 背景・問題意識
