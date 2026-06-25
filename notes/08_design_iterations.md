@@ -4,6 +4,50 @@
 
 ---
 
+## イテレーション926：Match relation chrome viewsを分割
+
+### 背景・問題意識
+
+`MatchRelationSheetChromeViews.swift` は、ウィッシュ候補のbottom sheet本体、popup内の候補ボタン、関係図画面のheader/footer chromeが1ファイルに同居していた。マッチ候補・相互マッチから関係図へ入る導線は、今後もシート内表示、候補選択、下部CTAの調整が入りやすいため、変更理由ごとにファイルを分ける。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/MatchRelationSheetChromeViews.swift`
+- `MatchRelationWishBottomSheet` に絞った。
+- ファイル行数を307行から136行へ縮小した。
+
+#### `ios-native/Sources/MegrumApp/MatchRelationPopupComponents.swift`
+- `MatchRelationMiniAvatar` と `MatchRelationPopupCandidateButton` を新規ファイルへ移動した。
+- 候補thumbnail、選択元badge、選択済みcheck、highlight/selected背景とborderは維持した。
+
+#### `ios-native/Sources/MegrumApp/MatchRelationChromeBars.swift`
+- `MatchRelationBottomBar`、`MatchRelationHeader`、`MatchRelationVisual` を新規ファイルへ移動した。
+- 下部CTA文言、close button、header線、footer shadow/backgroundは維持した。
+
+### 影響範囲
+
+- Swift Native iOS版の関係図画面、ウィッシュ候補bottom sheet、関係図から打診作成へ進む下部CTA。
+- 挙動変更ではなく責務分離。候補生成、選択状態、打診作成payload、状態名、用語、DBスキーマは変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumApp/MatchRelationSheetChromeViews.swift ios-native/Sources/MegrumApp/MatchRelationPopupComponents.swift ios-native/Sources/MegrumApp/MatchRelationChromeBars.swift`
+  - passed
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-match-relation-chrome-build --disable-index-store`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-match-relation-chrome-tests --disable-index-store --enable-xctest --disable-swift-testing -j 1 --filter 'MatchRelationScreenTests|ProposalCreateFlowTests|HomeScreenFlowTests/testMatchedShelfRoutesToRelationScreen|HomeScreenFlowTests/testPossibleShelfRoutesToRelationScreenAsOneWayCandidate'`
+  - 71 tests passed
+
+### セルフレビュー結果
+
+- ✅ bottom sheet本体、候補button、header/footer chromeは移動と小さな部品化のみで文言・色・余白・選択表示を維持した。
+- ✅ MatchRelationScreenTestsでpopup copy、選択状態、swipe、候補集約、bottom bar copyを確認した。
+- ✅ HomeScreenFlowTestsでホームの相互マッチ/片方向候補から関係図へ遷移する意図を確認した。
+- ✅ ProposalCreateFlowTestsで関係図から進む打診作成フローの主要ガード・表示文言・payload生成を確認した。
+- ✅ 状態名・用語・DBスキーマの変更はないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション925：Home mutual match detail部品を分割
 
 ### 背景・問題意識
