@@ -4,6 +4,46 @@
 
 ---
 
+## イテレーション960：MegrumAppState settings actionsを分割
+
+### 背景・問題意識
+
+`MegrumAppStateSettingsActions.swift` は、現地交換モード、住所、支払い条件、郵便番号検索、ブロック解除、アカウントセットアップ、自分プロフィール更新を1つのextensionに持っていた。設定系は保存副作用が多いため、処理内容は変えずに領域ごとへ分け、保存/読込の変更時に読む範囲を狭める。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/MegrumAppStateHomeLocalModeSettingsActions.swift`
+- `loadHomeLocalModeSettings`、`saveHomeLocalModeSettings` を新規ファイルへ移動した。
+
+#### `ios-native/Sources/MegrumApp/MegrumAppStateAccountSettingsActions.swift`
+- 住所読込/保存、支払い条件読込/保存、郵便番号検索、ブロック一覧読込/解除を新規ファイルへ移動した。
+
+#### `ios-native/Sources/MegrumApp/MegrumAppStateProfileSettingsActions.swift`
+- `completeAccountSetup`、`updateOwnProfile` を新規ファイルへ移動した。
+
+#### `ios-native/Sources/MegrumApp/MegrumAppStateSettingsActions.swift`
+- 上記3ファイルへ分割したため削除した。
+
+### 影響範囲
+
+- Swift Native iOS版の現地交換モード、住所設定、支払い条件設定、郵便番号検索、ブロック解除、オンボーディング完了、自分プロフィール更新。
+- 挙動変更ではなく責務分離。保存/読込順序、errorMessage、loading/saving flag、状態名、用語、DBスキーマは変更しない。
+
+### 確認方法
+
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-app-state-settings-build --disable-index-store`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-app-state-settings-build --disable-index-store --enable-xctest --disable-swift-testing -j 1 --filter 'HomeLocalModeTests|MegrumAppStateTests|SupabasePaymentSettingsPersistenceTests|SupabaseAccountProfilePersistenceTests|OwnProfileScreenTests|BlockedUserStateReducerTests|SupabaseMailingAddressClientTests'`
+  - 127 tests passed
+
+### セルフレビュー結果
+
+- ✅ 保存副作用の中身は変更せず、extensionを領域別ファイルへ移動した。
+- ✅ 現地モード、住所、支払い条件、ブロック、プロフィール/AppStateの対象テストを通した。
+- ✅ 状態名・用語・DBスキーマの変更はないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション959：Own profile modelsを分割
 
 ### 背景・問題意識
