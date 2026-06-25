@@ -4,6 +4,50 @@
 
 ---
 
+## イテレーション963：Trade schedule componentsを分割
+
+### 背景・問題意識
+
+`TradeScheduleComponents.swift` は、予定編集シート、凡例、日別カード、予定行、月表示セルを1ファイルに持っていた。取引スケジュールとプロフィールスケジュールは画面・保存・カレンダー表示にまたがるため、見た目と保存処理は変えずに部品単位へ分割し、予定編集や表示カードの変更時に読む範囲を狭める。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/ScheduleEditorSheet.swift`
+- `ScheduleEditorSheet` を新規ファイルへ移動した。
+- 初期日時、終日toggle、保存payload、footer文言、dismiss条件は維持した。
+
+#### `ios-native/Sources/MegrumApp/ScheduleLegend.swift`
+- `ScheduleLegend` を新規ファイルへ移動した。
+
+#### `ios-native/Sources/MegrumApp/ScheduleDayCard.swift`
+- `ScheduleDayCard` と private `ScheduleRowView` を新規ファイルへ移動した。
+
+#### `ios-native/Sources/MegrumApp/ScheduleMonthCell.swift`
+- `ScheduleMonthCell` を新規ファイルへ移動した。
+
+#### `ios-native/Sources/MegrumApp/TradeScheduleComponents.swift`
+- 上記4ファイルへ分割したため削除した。
+
+### 影響範囲
+
+- Swift Native iOS版の自分スケジュール画面、取引スケジュールシート、スケジュール追加/更新シート、日別/年月表示。
+- 挙動変更ではなく責務分離。予定保存payload、日時補正、読み込み範囲、状態名、用語、DBスキーマは変更しない。
+
+### 確認方法
+
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-trade-schedule-components-build --disable-index-store`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-trade-schedule-components-build --disable-index-store --enable-xctest --disable-swift-testing -j 1 --filter 'TradeScheduleCalendarWindowTests|SupabaseTradeSchedulePersistenceTests|MegrumAppStateTests'`
+  - 85 tests passed
+
+### セルフレビュー結果
+
+- ✅ 予定編集シート、凡例、日別カード、月セルは移動のみで、表示文言・余白・保存処理を維持した。
+- ✅ スケジュールwindow、Supabase schedule persistence、AppStateの対象テストを通した。
+- ✅ 状態名・用語・DBスキーマの変更はないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション962：相互マッチ交換条件ポリシーを分割
 
 ### 背景・問題意識
