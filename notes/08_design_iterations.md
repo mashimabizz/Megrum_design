@@ -4,6 +4,68 @@
 
 ---
 
+## イテレーション975：グッズ登録を画像単位の一括設定へ
+
+### 背景・問題意識
+
+マイグッズ追加では、最初の共通条件画面でタグを入れるより、写真を選んで切り抜いたあとに各画像へメンバーやタグをまとめて割り当てる方が実運用に近い。譲るグッズは画像必須であり、「写真なしで登録する」導線は不要。また、ソロ推しのようにL2メンバーが存在しない場合は、メンバー登録ステップ自体を出す必要がない。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/GoodsInventoryCreateViews.swift`
+- グッズ登録の最初の共通条件画面からタグ入力欄を削除した。
+- 写真ステップから「写真なしで登録する」導線を削除した。
+
+#### `ios-native/Sources/MegrumApp/GoodsEditorDraftModels.swift`
+#### `ios-native/Sources/MegrumApp/GoodsInventoryCreateInputBuilder.swift`
+#### `ios-native/Sources/MegrumApp/TagNameNormalizer.swift`
+- `GoodsCreateMetaDraft` に画像単位の `tagNames` を追加した。
+- 一括作成時の保存payloadは、共有draftのタグではなく各画像メタのタグを使うようにした。
+- タグ正規化を共通 helper から使えるようにした。
+
+#### `ios-native/Sources/MegrumApp/GoodsInventoryCreateMetaViews.swift`
+#### `ios-native/Sources/MegrumApp/GoodsInventoryCreateMetaFooterView.swift`
+#### `ios-native/Sources/MegrumApp/GoodsEditorLayoutViews.swift`
+- 詳細ステップを、画像カード一覧から複数選択して一括設定するUIへ変更した。
+- 固定フッターに `メンバー登録` / `タグ登録` / `戻る` / `まとめて登録` を配置した。
+- L2メンバー候補がある場合だけ `メンバー登録` を表示し、ソロ推しやL2候補なしではタグ登録のみ表示する。
+- 各画像カードにメンバー未設定、タグ未設定、数量、登録済みタグを表示し、タグは個別に外せるようにした。
+
+#### `ios-native/Sources/MegrumApp/GoodsEditorSheetInventoryFlow.swift`
+#### `ios-native/Sources/MegrumApp/GoodsEditorSheetPresentationActions.swift`
+#### `ios-native/Sources/MegrumApp/GoodsInventoryCreateValidation.swift`
+- 詳細ステップに入った時点で画像を全選択し、一括操作しやすくした。
+- 選択中画像へメンバーまたはタグを一括適用する処理を追加した。
+- 譲るグッズは写真必須として、写真なし保存をブロックする。
+- L2メンバー候補がある推しでは、全画像にメンバーが登録されていないと保存できないようにした。
+- タグ未設定の画像がある場合は、保存前に検索・マッチ候補で見つかりにくい可能性を伝える確認アラートを出し、「このまま登録」も選べるようにした。
+
+#### `ios-native/Tests/MegrumAppTests/GoodsEditorDraftTests.swift`
+- 画像単位タグが保存payloadへ入ること、共有draftタグが一括作成へ漏れないことをテストで固定した。
+- 写真必須、メンバー必須、タグ未設定警告のvalidationをテストへ追加した。
+
+### 影響範囲
+
+- Swift Native iOS版のマイグッズ追加フロー。
+- Wish登録/編集、既存グッズ編集、グッズ一覧の一括タグ付け、DBスキーマ、状態名は変更しない。
+
+### 確認方法
+
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-goods-registration-flow-build --disable-index-store`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-goods-registration-flow-test --disable-index-store --enable-xctest --disable-swift-testing -j 1 --filter GoodsEditorDraftTests`
+  - 25 tests passed
+
+### セルフレビュー結果
+
+- ✅ 初回共通条件からタグ登録を外し、タグは画像ごとの詳細ステップで登録する導線にした。
+- ✅ 譲るグッズの「写真なしで登録」導線を削除し、保存時にも写真必須を検証する。
+- ✅ L2メンバー候補がある場合だけメンバー一括登録を表示し、ソロ推しではメンバー登録を不要にした。
+- ✅ タグ未設定は保存ブロックではなく警告アラートにし、検索されにくくなる可能性を明示する。
+- ✅ 状態名・用語・DBスキーマの追加変更はないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション974：ホームタブを均等幅に固定
 
 ### 背景・問題意識

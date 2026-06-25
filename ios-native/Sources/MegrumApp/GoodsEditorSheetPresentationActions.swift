@@ -51,6 +51,17 @@ extension GoodsEditorSheet {
     }
 
     func startSaveInventoryCreateFlow() {
+        guard !GoodsInventoryCreateValidation.hasMissingMemberAssignments(
+            metas: createMetas,
+            requiresMemberAssignment: inventoryCreateAllowsMemberAssignment
+        ) else {
+            createError = "メンバーがある推しは、すべての画像にメンバーを登録してください"
+            return
+        }
+        if GoodsInventoryCreateValidation.hasMissingTags(metas: createMetas) {
+            isConfirmingInventoryCreateWithoutTags = true
+            return
+        }
         Task {
             await saveInventoryCreateFlow()
         }

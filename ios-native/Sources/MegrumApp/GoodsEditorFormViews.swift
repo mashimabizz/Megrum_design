@@ -14,6 +14,7 @@ struct GoodsEditorFormContentView: View {
     var isItemReadOnly: Bool
     var createStep: GoodsCreateStep
     var createPhotos: [GoodsCreatePhotoDraft]
+    var selectedCreateMetaIDs: Set<UUID>
     var groups: [OshiGroup]
     var isLoadingOshiGroups: Bool
     var members: [OshiCharacter]
@@ -22,13 +23,12 @@ struct GoodsEditorFormContentView: View {
     var isLoadingGoodsTypes: Bool
     var selectedGroupName: String?
     var selectedGroupSupportsMemberSelection: Bool
-    var selectedGoodsTypeName: String?
+    var inventoryCreateAllowsMemberAssignment: Bool
     var createError: String?
     var canAdvanceFromCreateCommon: Bool
     var isTradingCardType: Bool
     var isProcessingTradingCardBulk: Bool
     var tradingCardBulkStatusMessage: String?
-    var canSaveInventoryCreateMetas: Bool
     var isCreatingGoodsEntry: Bool
     var tagSuggestions: [String]
     var photoError: String?
@@ -49,9 +49,11 @@ struct GoodsEditorFormContentView: View {
     var onCropPhoto: (UUID) -> Void
     var onShootBack: () -> Void
     var onShootNext: () -> Void
-    var onContinueWithoutPhoto: () -> Void
     var onMetaBack: () -> Void
-    var onSaveMetas: () -> Void
+    var onToggleMetaSelection: (UUID) -> Void
+    var onSelectAllMetas: () -> Void
+    var onClearMetaSelection: () -> Void
+    var onRemoveMetaTag: (UUID, String) -> Void
     var onShowPhotoSource: () -> Void
     var onClearLocalPhoto: () -> Void
     var onRemoveWishPhoto: () -> Void
@@ -73,31 +75,24 @@ struct GoodsEditorFormContentView: View {
         if usesInventoryCreateFlow {
             GoodsInventoryCreateFlowView(
                 draft: $draft,
-                tagDraft: $tagDraft,
-                isTagFieldFocused: isTagFieldFocused,
                 createMetas: $createMetas,
                 createStep: createStep,
                 createPhotos: createPhotos,
+                selectedCreateMetaIDs: selectedCreateMetaIDs,
                 groups: groups,
                 isLoadingOshiGroups: isLoadingOshiGroups,
                 goodsTypes: goodsTypes,
                 isLoadingGoodsTypes: isLoadingGoodsTypes,
                 oshiCharacters: members,
-                allowsMemberSelection: selectedGroupSupportsMemberSelection,
+                allowsMemberSelection: inventoryCreateAllowsMemberAssignment,
                 selectedGroupName: selectedGroupName,
-                selectedGoodsTypeName: selectedGoodsTypeName,
                 createError: createError,
                 canAdvanceFromCommon: canAdvanceFromCreateCommon,
                 isTradingCardType: isTradingCardType,
                 isProcessingTradingCardBulk: isProcessingTradingCardBulk,
                 tradingCardBulkStatusMessage: tradingCardBulkStatusMessage,
-                canSaveMetas: canSaveInventoryCreateMetas,
                 isItemReadOnly: isItemReadOnly,
                 isCreatingGoodsEntry: isCreatingGoodsEntry,
-                tagSuggestions: tagSuggestions,
-                onRemoveTag: onRemoveTag,
-                onAddTag: onAddTag,
-                onAddSuggestedTag: onAddSuggestedTag,
                 onShowOshiPicker: onShowCreateOshiPicker,
                 onCommonNext: onCommonNext,
                 onPickCamera: onPickCamera,
@@ -107,9 +102,11 @@ struct GoodsEditorFormContentView: View {
                 onCropPhoto: onCropPhoto,
                 onShootBack: onShootBack,
                 onShootNext: onShootNext,
-                onContinueWithoutPhoto: onContinueWithoutPhoto,
                 onMetaBack: onMetaBack,
-                onSaveMetas: onSaveMetas
+                onToggleMetaSelection: onToggleMetaSelection,
+                onSelectAllMetas: onSelectAllMetas,
+                onClearMetaSelection: onClearMetaSelection,
+                onRemoveMetaTag: onRemoveMetaTag
             )
         } else {
             GoodsEditorStandardSectionsView(

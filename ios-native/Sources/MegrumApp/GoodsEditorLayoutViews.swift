@@ -20,6 +20,7 @@ struct GoodsEditorFlowLayout<Content: View>: View {
 
 struct GoodsEditorSheetScrollContent<FormContent: View>: View {
     var formContent: FormContent
+    var fixedFooter: AnyView?
     var blockingReasons: [GoodsEditorSaveBlocker]
     var lastSaveFailure: GoodsEditorSaveFailure?
     var usesInventoryCreateFlow: Bool
@@ -54,9 +55,11 @@ struct GoodsEditorSheetScrollContent<FormContent: View>: View {
         onClose: @escaping () -> Void,
         onSave: @escaping () -> Void,
         onConfirmDelete: @escaping () -> Void,
+        fixedFooter: AnyView? = nil,
         @ViewBuilder formContent: () -> FormContent
     ) {
         self.formContent = formContent()
+        self.fixedFooter = fixedFooter
         self.blockingReasons = blockingReasons
         self.lastSaveFailure = lastSaveFailure
         self.usesInventoryCreateFlow = usesInventoryCreateFlow
@@ -101,6 +104,15 @@ struct GoodsEditorSheetScrollContent<FormContent: View>: View {
             .padding(.horizontal, 20)
             .padding(.top, 18)
             .padding(.bottom, 40)
+        }
+        .safeAreaInset(edge: .bottom) {
+            if let fixedFooter {
+                fixedFooter
+                    .padding(.horizontal, 20)
+                    .padding(.top, 12)
+                    .padding(.bottom, 10)
+                    .background(.ultraThinMaterial)
+            }
         }
     }
 }

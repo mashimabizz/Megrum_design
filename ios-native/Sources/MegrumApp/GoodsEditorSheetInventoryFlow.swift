@@ -3,7 +3,13 @@ import MegrumCore
 
 extension GoodsEditorSheet {
     var canSaveInventoryCreateMetas: Bool {
-        !inventoryCreateInputs().isEmpty && !appState.isCreatingGoodsEntry
+        !GoodsInventoryCreateValidation.hasMissingPhotos(metas: createMetas, photos: createPhotos)
+            && !inventoryCreateInputs().isEmpty
+            && !appState.isCreatingGoodsEntry
+    }
+
+    var selectedCreateMetas: [GoodsCreateMetaDraft] {
+        createMetas.filter { selectedCreateMetaIDs.contains($0.id) }
     }
 
     func goToCreateShoot() {
@@ -21,12 +27,7 @@ extension GoodsEditorSheet {
             return
         }
         syncCreateMetasWithPhotos()
-        createError = nil
-        createStep = .meta
-    }
-
-    func goToCreateMetaWithoutPhoto() {
-        createMetas = [GoodsCreateMetaDraft()]
+        selectAllCreateMetas()
         createError = nil
         createStep = .meta
     }
@@ -35,6 +36,7 @@ extension GoodsEditorSheet {
         createStep = .common
         createPhotos = []
         createMetas = [GoodsCreateMetaDraft()]
+        selectedCreateMetaIDs = []
         createError = nil
         photoError = nil
         tradingCardBulkStatusMessage = nil
@@ -72,6 +74,7 @@ extension GoodsEditorSheet {
         createMetas = createPhotos.map { photo in
             currentByPhotoID[photo.id] ?? GoodsCreateMetaDraft(photoID: photo.id)
         }
+        pruneCreateMetaSelection()
     }
 
     func removeCreatePhoto(_ photoID: UUID) {
@@ -80,6 +83,7 @@ extension GoodsEditorSheet {
             syncCreateMetasWithPhotos()
         } else {
             createMetas.removeAll { $0.photoID == photoID }
+            pruneCreateMetaSelection()
         }
     }
 
@@ -222,6 +226,85 @@ extension GoodsEditorSheet {
         }
     }
 
+    func toggleCreateMetaSelection(_ metaID: UUID) {
+        if selectedCreateMetaIDs.contains(metaID) {
+            selectedCreateMetaIDs.remove(metaID)
+        } else {
+            selectedCreateMetaIDs.insert(metaID)
+        }
+        createError = nil
+    }
+
+    func selectAllCreateMetas() {
+        selectedCreateMetaIDs = Set(createMetas.map(\.id))
+    }
+
+    func clearCreateMetaSelection() {
+        selectedCreateMetaIDs = []
+    }
+
+    func pruneCreateMetaSelection() {
+        let validIDs = Set(createMetas.map(\.id))
+        selectedCreateMetaIDs = selectedCreateMetaIDs.intersection(validIDs)
+    }
+
+    func applyCreateBulkMember(_ memberID: UUID?) {
+        guard !selectedCreateMetaIDs.isEmpty else {
+            createError = "メンバーを設定する画像を選択してください"
+            return
+        }
+        guard memberID == nil || GoodsEditorMemberScope.canUseMemberID(
+            memberID,
+            group: selectedGroup,
+            members: appState.oshiCharacters
+        ) else {
+            createError = "この推しに登録できないメンバーです"
+            return
+        }
+        createMetas = createMetas.map { meta in
+            guard selectedCreateMetaIDs.contains(meta.id) else {
+                return meta
+            }
+            var next = meta
+            next.memberID = memberID
+            return next
+        }
+        createError = nil
+    }
+
+    func showCreateBulkTagSheet() {
+        guard !selectedCreateMetaIDs.isEmpty else {
+            createError = "タグを設定する画像を選択してください"
+            return
+        }
+        createError = nil
+        isShowingCreateBulkTagSelectionSheet = true
+    }
+
+    func applyCreateBulkTag(_ tagName: String) {
+        guard !selectedCreateMetaIDs.isEmpty else {
+            createError = "タグを設定する画像を選択してください"
+            return
+        }
+        createMetas = createMetas.map { meta in
+            guard selectedCreateMetaIDs.contains(meta.id) else {
+                return meta
+            }
+            var next = meta
+            next.addTag(tagName)
+            return next
+        }
+        createError = nil
+    }
+
+    func removeCreateMetaTag(metaID: UUID, tagName: String) {
+        guard let index = createMetas.firstIndex(where: { $0.id == metaID }) else {
+            return
+        }
+        createMetas[index].removeTag(tagName)
+        createError = nil
+    }
+
     func inventoryCreateInputs() -> [GoodsEntryInput] {
         GoodsInventoryCreateInputBuilder.inputs(
             metas: createMetas,
@@ -236,6 +319,17 @@ extension GoodsEditorSheet {
     func saveInventoryCreateFlow() async {
         guard canAdvanceFromCreateCommon else {
             createError = "グループとグッズ種別を選択してください"
+            return
+        }
+        guard !GoodsInventoryCreateValidation.hasMissingPhotos(metas: createMetas, photos: createPhotos) else {
+            createError = "譲るグッズは写真が必要です。登録する写真を選んでください"
+            return
+        }
+        guard !GoodsInventoryCreateValidation.hasMissingMemberAssignments(
+            metas: createMetas,
+            requiresMemberAssignment: inventoryCreateAllowsMemberAssignment
+        ) else {
+            createError = "メンバーがある推しは、すべての画像にメンバーを登録してください"
             return
         }
         let inputs = inventoryCreateInputs()

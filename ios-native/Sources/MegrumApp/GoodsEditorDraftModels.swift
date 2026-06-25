@@ -17,13 +17,22 @@ struct GoodsCreateMetaDraft: Identifiable, Equatable {
     var memberID: UUID?
     var title: String
     var quantity: Int
+    var tagNames: [String]
 
-    init(id: UUID = UUID(), photoID: UUID? = nil, memberID: UUID? = nil, title: String = "", quantity: Int = 1) {
+    init(
+        id: UUID = UUID(),
+        photoID: UUID? = nil,
+        memberID: UUID? = nil,
+        title: String = "",
+        quantity: Int = 1,
+        tagNames: [String] = []
+    ) {
         self.id = id
         self.photoID = photoID
         self.memberID = memberID
         self.title = title
         self.quantity = quantity
+        self.tagNames = Self.normalizedTags(tagNames)
     }
 
     var normalizedQuantity: Int {
@@ -66,9 +75,34 @@ struct GoodsCreateMetaDraft: Identifiable, Equatable {
             goodsTypeID: goodsTypeID,
             quantity: normalizedQuantity,
             status: sharedDraft.status.persistedStatus,
-            tagNames: sharedDraft.tagNames,
+            tagNames: tagNames,
             photoUpload: photoUpload
         )
+    }
+
+    mutating func addTag(_ rawTag: String) {
+        let normalized = TagNameNormalizer.normalized(rawTag)
+        guard let normalized, tagNames.count < 5 else {
+            return
+        }
+        if !tagNames.contains(where: { $0.caseInsensitiveCompare(normalized) == .orderedSame }) {
+            tagNames.append(normalized)
+        }
+    }
+
+    mutating func removeTag(_ tag: String) {
+        tagNames.removeAll { $0 == tag }
+    }
+
+    private static func normalizedTags(_ tags: [String]) -> [String] {
+        tags.reduce(into: []) { result, tag in
+            guard result.count < 5, let normalized = TagNameNormalizer.normalized(tag) else {
+                return
+            }
+            if !result.contains(where: { $0.caseInsensitiveCompare(normalized) == .orderedSame }) {
+                result.append(normalized)
+            }
+        }
     }
 }
 
@@ -276,10 +310,6 @@ struct GoodsEditorDraft: Equatable {
     }
 
     private static func normalizedTag(_ tag: String) -> String? {
-        let normalized = tag
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-            .trimmingCharacters(in: CharacterSet(charactersIn: "#＃"))
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-        return normalized.isEmpty ? nil : String(normalized.prefix(40))
+        TagNameNormalizer.normalized(tag)
     }
 }

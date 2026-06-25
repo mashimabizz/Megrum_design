@@ -43,6 +43,10 @@ extension GoodsEditorSheet {
         selectedGroup?.supportsMemberSelection == true
     }
 
+    var inventoryCreateAllowsMemberAssignment: Bool {
+        selectedGroupSupportsMemberSelection && !scopedOshiCharacters.isEmpty
+    }
+
     var scopedOshiCharacters: [OshiCharacter] {
         GoodsEditorMemberScope.members(for: selectedGroup, from: appState.oshiCharacters)
     }

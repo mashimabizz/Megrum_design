@@ -143,9 +143,9 @@ final class GoodsEditorDraftTests: XCTestCase {
         var draft = GoodsEditorDraft(mode: .create, entryKind: .inventory)
         draft.groupID = groupID
         draft.goodsTypeID = goodsTypeID
-        draft.addTag("会場限定")
 
-        let meta = GoodsCreateMetaDraft(photoID: UUID(), memberID: memberID, quantity: 2)
+        var meta = GoodsCreateMetaDraft(photoID: UUID(), memberID: memberID, quantity: 2)
+        meta.addTag("会場限定")
         let input = try XCTUnwrap(
             meta.createInput(
                 sharedDraft: draft,
@@ -173,10 +173,10 @@ final class GoodsEditorDraftTests: XCTestCase {
         var draft = GoodsEditorDraft(mode: .create, entryKind: .inventory)
         draft.groupID = groupID
         draft.goodsTypeID = goodsTypeID
-        draft.addTag("ラキドロ")
+        draft.addTag("共有タグは画像単位登録へ流れない")
 
         let inputs = GoodsInventoryCreateInputBuilder.inputs(
-            metas: [GoodsCreateMetaDraft(photoID: photoID, memberID: memberID, quantity: 3)],
+            metas: [GoodsCreateMetaDraft(photoID: photoID, memberID: memberID, quantity: 3, tagNames: ["ラキドロ"])],
             photos: [GoodsCreatePhotoDraft(id: photoID, upload: photoUpload)],
             sharedDraft: draft,
             groupName: "TWICE",
@@ -191,6 +191,33 @@ final class GoodsEditorDraftTests: XCTestCase {
         XCTAssertEqual(input.quantity, 3)
         XCTAssertEqual(input.tagNames, ["ラキドロ"])
         XCTAssertEqual(input.photoUpload, photoUpload)
+    }
+
+    func testInventoryCreateValidationRequiresPhotosAndMembersButOnlyWarnsForTags() {
+        let photoID = UUID()
+        let photo = GoodsCreatePhotoDraft(
+            id: photoID,
+            upload: GoodsPhotoUpload(data: Data([0xFF, 0xD8, 0xFF]), contentType: "image/jpeg")
+        )
+        let missingMember = GoodsCreateMetaDraft(photoID: photoID)
+        let complete = GoodsCreateMetaDraft(photoID: photoID, memberID: UUID(), tagNames: ["会場限定"])
+
+        XCTAssertTrue(GoodsInventoryCreateValidation.hasMissingPhotos(metas: [missingMember], photos: []))
+        XCTAssertFalse(GoodsInventoryCreateValidation.hasMissingPhotos(metas: [missingMember], photos: [photo]))
+        XCTAssertTrue(
+            GoodsInventoryCreateValidation.hasMissingMemberAssignments(
+                metas: [missingMember],
+                requiresMemberAssignment: true
+            )
+        )
+        XCTAssertFalse(
+            GoodsInventoryCreateValidation.hasMissingMemberAssignments(
+                metas: [missingMember],
+                requiresMemberAssignment: false
+            )
+        )
+        XCTAssertTrue(GoodsInventoryCreateValidation.hasMissingTags(metas: [missingMember]))
+        XCTAssertFalse(GoodsInventoryCreateValidation.hasMissingTags(metas: [complete]))
     }
 
     func testInventoryCreateMetaAutoResolvesTitleForOtherGoodsType() throws {

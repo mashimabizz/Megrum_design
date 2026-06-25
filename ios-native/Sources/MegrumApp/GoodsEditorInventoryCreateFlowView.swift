@@ -4,12 +4,11 @@ import SwiftUI
 
 struct GoodsInventoryCreateFlowView: View {
     @Binding var draft: GoodsEditorDraft
-    @Binding var tagDraft: String
-    var isTagFieldFocused: FocusState<Bool>.Binding
     @Binding var createMetas: [GoodsCreateMetaDraft]
 
     var createStep: GoodsCreateStep
     var createPhotos: [GoodsCreatePhotoDraft]
+    var selectedCreateMetaIDs: Set<UUID>
     var groups: [OshiGroup]
     var isLoadingOshiGroups: Bool
     var goodsTypes: [GoodsType]
@@ -17,19 +16,13 @@ struct GoodsInventoryCreateFlowView: View {
     var oshiCharacters: [OshiCharacter]
     var allowsMemberSelection: Bool
     var selectedGroupName: String?
-    var selectedGoodsTypeName: String?
     var createError: String?
     var canAdvanceFromCommon: Bool
     var isTradingCardType: Bool
     var isProcessingTradingCardBulk: Bool
     var tradingCardBulkStatusMessage: String?
-    var canSaveMetas: Bool
     var isItemReadOnly: Bool
     var isCreatingGoodsEntry: Bool
-    var tagSuggestions: [String]
-    var onRemoveTag: (String) -> Void
-    var onAddTag: () -> Void
-    var onAddSuggestedTag: (String) -> Void
     var onShowOshiPicker: () -> Void
     var onCommonNext: () -> Void
     var onPickCamera: () -> Void
@@ -39,9 +32,11 @@ struct GoodsInventoryCreateFlowView: View {
     var onCropPhoto: (UUID) -> Void
     var onShootBack: () -> Void
     var onShootNext: () -> Void
-    var onContinueWithoutPhoto: () -> Void
     var onMetaBack: () -> Void
-    var onSaveMetas: () -> Void
+    var onToggleMetaSelection: (UUID) -> Void
+    var onSelectAllMetas: () -> Void
+    var onClearMetaSelection: () -> Void
+    var onRemoveMetaTag: (UUID, String) -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
@@ -57,17 +52,10 @@ struct GoodsInventoryCreateFlowView: View {
                     goodsTypes: goodsTypes,
                     isLoadingGoodsTypes: isLoadingGoodsTypes,
                     selectedGoodsTypeID: $draft.goodsTypeID,
-                    tagSuggestions: tagSuggestions,
-                    tagNames: draft.tagNames,
-                    tagDraft: $tagDraft,
-                    isTagFieldFocused: isTagFieldFocused,
                     createError: createError,
                     canAdvance: canAdvanceFromCommon,
                     isItemReadOnly: isItemReadOnly,
                     isCreatingGoodsEntry: isCreatingGoodsEntry,
-                    onRemoveTag: onRemoveTag,
-                    onAddTag: onAddTag,
-                    onAddSuggestedTag: onAddSuggestedTag,
                     onShowOshiPicker: onShowOshiPicker,
                     onNext: onCommonNext
                 )
@@ -85,23 +73,20 @@ struct GoodsInventoryCreateFlowView: View {
                     onRemovePhoto: onRemovePhoto,
                     onCropPhoto: onCropPhoto,
                     onBack: onShootBack,
-                    onNext: onShootNext,
-                    onContinueWithoutPhoto: onContinueWithoutPhoto
+                    onNext: onShootNext
                 )
             case .meta:
                 GoodsInventoryCreateMetaStepView(
                     createMetas: $createMetas,
                     createPhotos: createPhotos,
+                    selectedCreateMetaIDs: selectedCreateMetaIDs,
                     oshiCharacters: oshiCharacters,
                     allowsMemberSelection: allowsMemberSelection,
-                    draftGroupID: draft.groupID,
-                    selectedGroupName: selectedGroupName,
-                    selectedGoodsTypeName: selectedGoodsTypeName,
                     createError: createError,
-                    canSaveMetas: canSaveMetas,
-                    isCreatingGoodsEntry: isCreatingGoodsEntry,
-                    onBack: onMetaBack,
-                    onSave: onSaveMetas
+                    onToggleSelection: onToggleMetaSelection,
+                    onSelectAll: onSelectAllMetas,
+                    onClearSelection: onClearMetaSelection,
+                    onRemoveTag: onRemoveMetaTag
                 )
             }
         }

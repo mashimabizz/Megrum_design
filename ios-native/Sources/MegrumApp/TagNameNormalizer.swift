@@ -1,6 +1,14 @@
 import Foundation
 
 enum TagNameNormalizer {
+    static func normalized(_ name: String, maxLength: Int = 40) -> String? {
+        let normalized = name
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .trimmingCharacters(in: CharacterSet(charactersIn: "#＃"))
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        return normalized.isEmpty ? nil : String(normalized.prefix(maxLength))
+    }
+
     static func uniquePreservingOrder(_ names: [String], limit: Int? = nil) -> [String] {
         var seen: Set<String> = []
         var result: [String] = []

@@ -42,17 +42,10 @@ struct GoodsInventoryCreateCommonStepView: View {
     var goodsTypes: [GoodsType]
     var isLoadingGoodsTypes: Bool
     @Binding var selectedGoodsTypeID: UUID?
-    var tagSuggestions: [String]
-    var tagNames: [String]
-    @Binding var tagDraft: String
-    var isTagFieldFocused: FocusState<Bool>.Binding
     var createError: String?
     var canAdvance: Bool
     var isItemReadOnly: Bool
     var isCreatingGoodsEntry: Bool
-    var onRemoveTag: (String) -> Void
-    var onAddTag: () -> Void
-    var onAddSuggestedTag: (String) -> Void
     var onShowOshiPicker: () -> Void
     var onNext: () -> Void
 
@@ -69,16 +62,6 @@ struct GoodsInventoryCreateCommonStepView: View {
                 isLoading: isLoadingGoodsTypes,
                 selectedGoodsTypeID: $selectedGoodsTypeID,
                 isItemReadOnly: isItemReadOnly
-            )
-            GoodsEditorTagsSection(
-                tagNames: tagNames,
-                suggestedTagNames: tagSuggestions,
-                tagDraft: $tagDraft,
-                isTagFieldFocused: isTagFieldFocused,
-                isItemReadOnly: isItemReadOnly,
-                onAddSuggestedTag: onAddSuggestedTag,
-                onRemoveTag: onRemoveTag,
-                onAddTag: onAddTag
             )
 
             if let createError {
@@ -109,7 +92,6 @@ struct GoodsInventoryCreateShootStepView: View {
     var onCropPhoto: (UUID) -> Void
     var onBack: () -> Void
     var onNext: () -> Void
-    var onContinueWithoutPhoto: () -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -153,15 +135,6 @@ struct GoodsInventoryCreateShootStepView: View {
                     action: onNext
                 )
             }
-
-            Button(action: onContinueWithoutPhoto) {
-                Text("写真なしで登録する →")
-                    .font(.subheadline.weight(.black))
-                    .foregroundStyle(MegrumTheme.lavender)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 8)
-            }
-            .buttonStyle(.plain)
         }
     }
 

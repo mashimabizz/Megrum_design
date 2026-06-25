@@ -14,6 +14,7 @@ extension GoodsEditorSheet {
             isItemReadOnly: isItemReadOnly,
             createStep: createStep,
             createPhotos: createPhotos,
+            selectedCreateMetaIDs: selectedCreateMetaIDs,
             groups: appState.oshiGroups,
             isLoadingOshiGroups: appState.isLoadingOshiGroups,
             members: scopedOshiCharacters,
@@ -22,13 +23,12 @@ extension GoodsEditorSheet {
             isLoadingGoodsTypes: appState.isLoadingGoodsTypes,
             selectedGroupName: selectedGroup?.name,
             selectedGroupSupportsMemberSelection: selectedGroupSupportsMemberSelection,
-            selectedGoodsTypeName: selectedGoodsType?.name,
+            inventoryCreateAllowsMemberAssignment: inventoryCreateAllowsMemberAssignment,
             createError: createError,
             canAdvanceFromCreateCommon: canAdvanceFromCreateCommon,
             isTradingCardType: isTradingCardType,
             isProcessingTradingCardBulk: isProcessingTradingCardBulk,
             tradingCardBulkStatusMessage: tradingCardBulkStatusMessage,
-            canSaveInventoryCreateMetas: canSaveInventoryCreateMetas,
             isCreatingGoodsEntry: appState.isCreatingGoodsEntry,
             tagSuggestions: editorTagSuggestions,
             photoError: photoError,
@@ -49,9 +49,11 @@ extension GoodsEditorSheet {
             onCropPhoto: showCropForCreatePhoto,
             onShootBack: returnToCreateCommonStep,
             onShootNext: goToCreateMetaWithPhotos,
-            onContinueWithoutPhoto: goToCreateMetaWithoutPhoto,
             onMetaBack: returnFromCreateMetaStep,
-            onSaveMetas: startSaveInventoryCreateFlow,
+            onToggleMetaSelection: toggleCreateMetaSelection,
+            onSelectAllMetas: selectAllCreateMetas,
+            onClearMetaSelection: clearCreateMetaSelection,
+            onRemoveMetaTag: removeCreateMetaTag,
             onShowPhotoSource: showDraftPhotoSourceDialog,
             onClearLocalPhoto: clearLocalPhotoSelection,
             onRemoveWishPhoto: removeWishPhoto
@@ -72,6 +74,35 @@ extension GoodsEditorSheet {
             selectedGroupID: draft.groupID
         )
         .previewItemsByTag()
+    }
+
+    var createBulkTagSuggestions: [String] {
+        GoodsEditorTagSuggestionBuilder.suggestions(
+            groupID: draft.groupID,
+            selectedTags: selectedCreateMetas.flatMap(\.tagNames),
+            inventory: appState.inventory,
+            wishes: appState.wishes
+        )
+    }
+
+    var fixedInventoryCreateFooter: AnyView? {
+        guard usesInventoryCreateFlow, createStep == .meta else {
+            return nil
+        }
+        return AnyView(
+            GoodsInventoryCreateMetaFooterView(
+                selectedCount: selectedCreateMetaIDs.count,
+                totalCount: createMetas.count,
+                memberOptions: scopedOshiCharacters,
+                allowsMemberSelection: inventoryCreateAllowsMemberAssignment,
+                canSaveMetas: canSaveInventoryCreateMetas,
+                isCreatingGoodsEntry: appState.isCreatingGoodsEntry,
+                onAssignMember: applyCreateBulkMember,
+                onShowTagAssignment: showCreateBulkTagSheet,
+                onBack: returnFromCreateMetaStep,
+                onSave: startSaveInventoryCreateFlow
+            )
+        )
     }
 
     var saveButtonTitle: String {

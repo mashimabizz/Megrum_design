@@ -51,49 +51,56 @@ struct GoodsInventoryCreateMetaStepView: View {
     @Binding var createMetas: [GoodsCreateMetaDraft]
 
     var createPhotos: [GoodsCreatePhotoDraft]
+    var selectedCreateMetaIDs: Set<UUID>
     var oshiCharacters: [OshiCharacter]
     var allowsMemberSelection: Bool
-    var draftGroupID: UUID?
-    var selectedGroupName: String?
-    var selectedGoodsTypeName: String?
     var createError: String?
-    var canSaveMetas: Bool
-    var isCreatingGoodsEntry: Bool
-    var onBack: () -> Void
-    var onSave: () -> Void
+    var onToggleSelection: (UUID) -> Void
+    var onSelectAll: () -> Void
+    var onClearSelection: () -> Void
+    var onRemoveTag: (UUID, String) -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            VStack(alignment: .leading, spacing: 12) {
+            GoodsCreateHintCard(
+                title: "画像を選んでまとめて設定",
+                text: allowsMemberSelection
+                    ? "登録したい画像を選んで、下の固定ボタンからメンバーやタグをまとめて割り当てます。"
+                    : "この推しはメンバー登録が不要です。登録したい画像を選んで、タグをまとめて割り当てます。"
+            )
+
+            GoodsInventoryCreateMetaSelectionHeader(
+                selectedCount: selectedCreateMetaIDs.count,
+                totalCount: createMetas.count,
+                onSelectAll: onSelectAll,
+                onClearSelection: onClearSelection
+            )
+
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: 142), spacing: 12)], spacing: 12) {
                 ForEach($createMetas) { $meta in
-                    GoodsInventoryCreateMetaCard(
+                    GoodsInventoryCreateMetaTile(
                         meta: $meta,
                         index: index(for: meta.id),
                         photo: photo(for: meta.photoID),
-                        oshiCharacters: oshiCharacters,
                         allowsMemberSelection: allowsMemberSelection,
-                        draftGroupID: draftGroupID
+                        memberName: memberName(for: meta.memberID),
+                        isSelected: selectedCreateMetaIDs.contains(meta.id),
+                        onToggleSelection: {
+                            onToggleSelection(meta.id)
+                        },
+                        onRemoveTag: { tag in
+                            onRemoveTag(meta.id, tag)
+                        }
                     )
                 }
             }
 
-            if let createError {
-                GoodsCreateErrorNotice(message: createError)
+            if allowsMemberSelection, oshiCharacters.isEmpty {
+                GoodsCreateMemberRequestInfo()
             }
 
-            HStack(spacing: 10) {
-                GoodsCreateSecondaryButton(
-                    title: "戻る",
-                    isCreatingGoodsEntry: isCreatingGoodsEntry,
-                    action: onBack
-                )
-                GoodsCreatePrimaryButton(
-                    title: "\(createMetas.count)件まとめて登録",
-                    isDisabled: !canSaveMetas,
-                    isCreatingGoodsEntry: isCreatingGoodsEntry,
-                    showsProgress: true,
-                    action: onSave
-                )
+            if let createError {
+                GoodsCreateErrorNotice(message: createError)
             }
         }
     }
@@ -107,6 +114,13 @@ struct GoodsInventoryCreateMetaStepView: View {
             return nil
         }
         return createPhotos.first { $0.id == photoID }
+    }
+
+    private func memberName(for memberID: UUID?) -> String? {
+        guard let memberID else {
+            return nil
+        }
+        return oshiCharacters.first { $0.id == memberID }?.name
     }
 }
 
@@ -133,51 +147,77 @@ struct GoodsCreateMemberRequestInfo: View {
     }
 }
 
-private struct GoodsInventoryCreateMetaCard: View {
+private struct GoodsInventoryCreateMetaSelectionHeader: View {
+    var selectedCount: Int
+    var totalCount: Int
+    var onSelectAll: () -> Void
+    var onClearSelection: () -> Void
+
+    var body: some View {
+        HStack(spacing: 12) {
+            VStack(alignment: .leading, spacing: 3) {
+                Text("\(selectedCount)/\(totalCount)件を選択中")
+                    .font(.subheadline.weight(.black))
+                    .foregroundStyle(MegrumTheme.ink)
+                Text("画像をタップして選択を切り替え")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(MegrumTheme.muted)
+            }
+            Spacer(minLength: 8)
+            Button(selectedCount == totalCount ? "すべて解除" : "すべて選択") {
+                if selectedCount == totalCount {
+                    onClearSelection()
+                } else {
+                    onSelectAll()
+                }
+            }
+            .font(.caption.weight(.black))
+            .foregroundStyle(MegrumTheme.lavender)
+            .padding(.horizontal, 11)
+            .frame(height: 32)
+            .background(.white.opacity(0.86), in: Capsule())
+            .overlay {
+                Capsule()
+                    .strokeBorder(MegrumTheme.lavender.opacity(0.18), lineWidth: 1)
+            }
+        }
+    }
+}
+
+private struct GoodsInventoryCreateMetaTile: View {
     @Binding var meta: GoodsCreateMetaDraft
 
     var index: Int
     var photo: GoodsCreatePhotoDraft?
-    var oshiCharacters: [OshiCharacter]
     var allowsMemberSelection: Bool
-    var draftGroupID: UUID?
+    var memberName: String?
+    var isSelected: Bool
+    var onToggleSelection: () -> Void
+    var onRemoveTag: (String) -> Void
 
     var body: some View {
-        HStack(alignment: .top, spacing: 12) {
-            thumbnail
-
-            VStack(alignment: .leading, spacing: 12) {
-                if allowsMemberSelection {
-                    GoodsEditorFlowLayout(spacing: 8) {
-                        GoodsEditorSelectionChip(
-                            title: "指定なし",
-                            isSelected: meta.memberID == nil,
-                            isCompact: true
-                        ) {
-                            meta.memberID = nil
-                        }
-                        ForEach(oshiCharacters) { member in
-                            GoodsEditorSelectionChip(
-                                title: member.name,
-                                isSelected: meta.memberID == member.id,
-                                isDisabled: draftGroupID == nil,
-                                isCompact: true
-                            ) {
-                                meta.memberID = member.id
-                            }
-                        }
-                    }
+        VStack(alignment: .leading, spacing: 10) {
+            Button(action: onToggleSelection) {
+                VStack(alignment: .leading, spacing: 8) {
+                    thumbnail
+                    statusLabels
                 }
-
-                quantityStepper
+                .contentShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
+            .buttonStyle(.plain)
+            .accessibilityLabel("画像\(index)を選択")
+            .accessibilityValue(isSelected ? "選択中" : "未選択")
+
+            VStack(alignment: .leading, spacing: 9) {
+                quantityStepper
+                tagChips
+            }
         }
-        .padding(14)
+        .padding(10)
         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
         .overlay {
             RoundedRectangle(cornerRadius: 22, style: .continuous)
-                .strokeBorder(.white.opacity(0.48), lineWidth: 1)
+                .strokeBorder(isSelected ? MegrumTheme.lavender.opacity(0.72) : .white.opacity(0.48), lineWidth: isSelected ? 2 : 1)
         }
     }
 
@@ -189,7 +229,8 @@ private struct GoodsInventoryCreateMetaCard: View {
                 GoodsCreatePhotoPreviewPlaceholder()
             }
         }
-        .frame(width: 78, height: 98)
+        .frame(maxWidth: .infinity)
+        .frame(height: 150)
         .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
         .overlay(alignment: .topLeading) {
             Text("#\(index)")
@@ -200,6 +241,25 @@ private struct GoodsInventoryCreateMetaCard: View {
                 .background(.white.opacity(0.82), in: Capsule())
                 .padding(7)
         }
+        .overlay(alignment: .topTrailing) {
+            Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+                .font(.system(size: 24, weight: .black))
+                .foregroundStyle(isSelected ? MegrumTheme.lavender : .white.opacity(0.92))
+                .padding(7)
+                .shadow(color: .black.opacity(0.12), radius: 5, y: 2)
+        }
+    }
+
+    private var statusLabels: some View {
+        VStack(alignment: .leading, spacing: 5) {
+            if allowsMemberSelection {
+                Label(memberName ?? "メンバー未設定", systemImage: memberName == nil ? "person.crop.circle.badge.exclamationmark" : "person.crop.circle.fill")
+                    .foregroundStyle(memberName == nil ? MegrumTheme.pink : MegrumTheme.ink)
+            }
+            Label(meta.tagNames.isEmpty ? "タグ未設定" : "\(meta.tagNames.count)タグ", systemImage: meta.tagNames.isEmpty ? "tag.slash" : "tag.fill")
+                .foregroundStyle(meta.tagNames.isEmpty ? MegrumTheme.muted : MegrumTheme.lavender)
+        }
+        .font(.caption.weight(.black))
     }
 
     private var quantityStepper: some View {
@@ -231,6 +291,37 @@ private struct GoodsInventoryCreateMetaCard: View {
                 meta.quantity = min(999, meta.quantity + 1)
             }
             .disabled(meta.normalizedQuantity >= 999)
+        }
+    }
+
+    @ViewBuilder
+    private var tagChips: some View {
+        if meta.tagNames.isEmpty {
+            Text("タグ登録で検索されやすくなります")
+                .font(.caption2.weight(.bold))
+                .foregroundStyle(MegrumTheme.muted)
+                .fixedSize(horizontal: false, vertical: true)
+        } else {
+            WrappingTagFlow(spacing: 6, rowSpacing: 6) {
+                ForEach(meta.tagNames, id: \.self) { tag in
+                    Button {
+                        onRemoveTag(tag)
+                    } label: {
+                        HStack(spacing: 4) {
+                            Text("#\(tag)")
+                            Image(systemName: "xmark")
+                                .font(.system(size: 8, weight: .black))
+                        }
+                        .font(.system(size: 10, weight: .black, design: .rounded))
+                        .foregroundStyle(MegrumTheme.lavender)
+                        .padding(.horizontal, 7)
+                        .frame(height: 24)
+                        .background(MegrumTheme.lavender.opacity(0.10), in: Capsule())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("タグ #\(tag) を外す")
+                }
+            }
         }
     }
 }

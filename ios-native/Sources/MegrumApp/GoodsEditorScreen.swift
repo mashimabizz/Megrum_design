@@ -24,6 +24,7 @@ struct GoodsEditorSheet: View {
     @State var createStep: GoodsCreateStep = .common
     @State var createPhotos: [GoodsCreatePhotoDraft] = []
     @State var createMetas: [GoodsCreateMetaDraft] = [GoodsCreateMetaDraft()]
+    @State var selectedCreateMetaIDs: Set<UUID> = []
     @State var createError: String?
     @State var photoCaptureTarget: PhotoCaptureTarget = .draft
     @State var isShowingPhotoRemovalDialog = false
@@ -43,6 +44,8 @@ struct GoodsEditorSheet: View {
     @State var deleteErrorMessage: String?
     @State var didAssignDefaults = false
     @State var isShowingTagSelectionSheet = false
+    @State var isShowingCreateBulkTagSelectionSheet = false
+    @State var isConfirmingInventoryCreateWithoutTags = false
     @FocusState var isTagFieldFocused: Bool
     #if canImport(PhotosUI)
     @State var selectedPhotoItem: PhotosPickerItem?
@@ -73,7 +76,8 @@ struct GoodsEditorSheet: View {
             onRequestPhotoRemoval: requestPhotoRemoval,
             onClose: dismissEditor,
             onSave: startSave,
-            onConfirmDelete: requestInventoryDeleteConfirmation
+            onConfirmDelete: requestInventoryDeleteConfirmation,
+            fixedFooter: fixedInventoryCreateFooter
         ) {
             formContent
         }
@@ -218,6 +222,33 @@ struct GoodsEditorSheet: View {
                 )
                 .presentationDetents([.large])
                 .presentationDragIndicator(.visible)
+            }
+            .sheet(isPresented: $isShowingCreateBulkTagSelectionSheet) {
+                GoodsBulkTagSheet(
+                    selectedCount: selectedCreateMetaIDs.count,
+                    candidateNames: createBulkTagSuggestions,
+                    previewItemsByTag: editorTagPreviewItemsByTag,
+                    navigationTitle: "タグを一括登録",
+                    textFieldPlaceholder: "例：会場限定",
+                    footerText: "\(selectedCreateMetaIDs.count)件の画像に同じタグを追加します。",
+                    confirmationTitle: "登録",
+                    onApply: applyCreateBulkTag
+                )
+                .presentationDetents([.large])
+                .presentationDragIndicator(.visible)
+            }
+            .alert(
+                "タグ未設定の画像があります",
+                isPresented: $isConfirmingInventoryCreateWithoutTags
+            ) {
+                Button("タグを設定する", role: .cancel) {}
+                Button("このまま登録") {
+                    Task {
+                        await saveInventoryCreateFlow()
+                    }
+                }
+            } message: {
+                Text("タグを登録していないと、検索やマッチ候補で見つかりにくくなる可能性があります。なるべくタグを登録してください。")
             }
             .goodsEditorTradingCardBulkSourceDialog(
                 isPresented: $isShowingTradingCardBulkSourceDialog,
