@@ -4,6 +4,46 @@
 
 ---
 
+## イテレーション1063：home exchange calendar gridを分離
+
+### 背景・問題意識
+
+`HomeExchangeSettingsCalendarViews.swift` は、設定カードの月移動・凡例・配色に加えて、曜日header、6週grid、drag preview state、drag selection gesture、selection connection計算を同じViewに抱えていた。親Cardの責務を月/凡例/配色へ寄せ、gridとdrag previewだけを専用Viewへ分ける。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/HomeExchangeSettingsCalendarViews.swift`
+- `HomeExchangeSettingsCalendarCard` から曜日header、grid描画、drag preview state、drag selection gesture、selection connection計算を移動した。
+- 月移動、表示月の組み立て、凡例、都道府県ごとの選択色、曜日色の決定は親Cardに残した。
+
+#### `ios-native/Sources/MegrumApp/HomeExchangeSettingsCalendarGrid.swift`
+- `HomeExchangeSettingsCalendarWeekdayHeader` を追加し、曜日header表示を担当させた。
+- `HomeExchangeSettingsCalendarGrid` を追加し、6週grid、day cell配置、drag preview、horizontal same-row selection、selection connection、divider表示を担当させた。
+
+### 影響範囲
+
+- Swift Native iOS版のホーム交換条件設定カレンダー。
+- 日付セル表示、drag selection preview、選択範囲の連結背景、凡例表示。
+- 保存処理、AppStorage key、デフォルト交換条件、DB/API、状態名、用語、表示文言は変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumApp/HomeExchangeSettingsCalendarViews.swift ios-native/Sources/MegrumApp/HomeExchangeSettingsCalendarGrid.swift`
+  - passed
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-home-exchange-calendar-grid`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-home-exchange-calendar-grid --enable-xctest --disable-swift-testing -j 1 --filter 'HomeExchangeSettingsScreenTests|HomeDiscoveryMatchPolicyTests|HomeMutualMatchConditionPoliciesTests'`
+  - passed（83 tests）
+
+### セルフレビュー結果
+
+- ✅ `HomeExchangeCalendarDayCell` の引数、frame高、overlay、clipShape、divider、drag判定を新Viewへそのまま移した。
+- ✅ 親Cardには月移動、表示月、凡例、配色だけを残し、gridの一時状態 `dragPreviewKeys` を子Viewへ閉じ込めた。
+- ✅ `HomeExchangeSettingsCalendarViews.swift` は 248行から 137行へ縮小し、grid/weekday headerを 152行の専用ファイルへ分離した。
+- ✅ 新しい状態名・用語・DB列は追加していないため、`notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション1062：trade summary goods componentsを分離
 
 ### 背景・問題意識

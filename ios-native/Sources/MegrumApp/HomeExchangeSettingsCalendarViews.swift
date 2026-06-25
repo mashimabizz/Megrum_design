@@ -11,7 +11,6 @@ struct HomeExchangeSettingsCalendarCard: View {
     var onFinishDragSelection: ([HomeExchangeCalendarDay]) -> Void
 
     private let calendar = Calendar.current
-    @State private var dragPreviewKeys: Set<String> = []
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -35,79 +34,21 @@ struct HomeExchangeSettingsCalendarCard: View {
     }
 
     private var weekdayHeader: some View {
-        HStack(spacing: 0) {
-            ForEach(HomeExchangeCalendarMonthBuilder.weekdaySymbols, id: \.self) { symbol in
-                Text(symbol)
-                    .font(.footnote.weight(.bold))
-                    .foregroundStyle(weekdayColor(symbol: symbol, isCurrentMonth: true))
-                    .frame(maxWidth: .infinity)
-            }
+        HomeExchangeSettingsCalendarWeekdayHeader { symbol, isCurrentMonth in
+            weekdayColor(symbol: symbol, isCurrentMonth: isCurrentMonth)
         }
-        .padding(.top, 4)
     }
 
     private var calendarGrid: some View {
-        GeometryReader { proxy in
-            VStack(spacing: 0) {
-                ForEach(Array(calendarWeeks.enumerated()), id: \.offset) { rowIndex, week in
-                    HStack(spacing: 0) {
-                        ForEach(Array(week.enumerated()), id: \.element.id) { columnIndex, day in
-                            HomeExchangeCalendarDayCell(
-                                day: day,
-                                detail: dateDetails[day.key],
-                                isSelected: activeSelectedDateKeys.contains(day.key),
-                                color: dayColor(day),
-                                selectionColor: color(for: day),
-                                selectionConnection: selectionConnection(in: week, at: columnIndex),
-                                showsTrailingDivider: showsTrailingDivider(in: week, at: columnIndex),
-                                action: { onTapDay(day) }
-                            )
-                            .frame(height: proxy.size.height / 6)
-                        }
-                    }
-
-                    if rowIndex < calendarWeeks.count - 1 {
-                        Divider().overlay(MegrumTheme.ink.opacity(0.08))
-                    }
-                }
-            }
-            .contentShape(Rectangle())
-            .simultaneousGesture(
-                DragGesture(minimumDistance: 8, coordinateSpace: .local)
-                    .onChanged { value in
-                        let finalDays = selectedDays(in: value, size: proxy.size)
-                        let resolvedKeys = HomeExchangeCalendarDragSelectionResolver.resolvedKeys(
-                            accumulatedKeys: dragPreviewKeys,
-                            finalKeys: finalDays.map(\.key),
-                            visibleKeys: flattenedDays.map(\.key)
-                        )
-                        let nextPreviewKeys = Set(resolvedKeys)
-                        guard !nextPreviewKeys.isEmpty,
-                              nextPreviewKeys != dragPreviewKeys else {
-                            return
-                        }
-                        dragPreviewKeys = nextPreviewKeys
-                    }
-                    .onEnded { value in
-                        let finalDays = selectedDays(in: value, size: proxy.size)
-                        let resolvedKeys = HomeExchangeCalendarDragSelectionResolver.resolvedKeys(
-                            accumulatedKeys: dragPreviewKeys,
-                            finalKeys: finalDays.map(\.key),
-                            visibleKeys: flattenedDays.map(\.key)
-                        )
-                        let dayByKey = Dictionary(uniqueKeysWithValues: flattenedDays.map { ($0.key, $0) })
-                        let days = resolvedKeys.compactMap { dayByKey[$0] }
-                        onFinishDragSelection(days)
-                        dragPreviewKeys = []
-                    }
-            )
-        }
-        .frame(height: 272)
-        .overlay {
-            RoundedRectangle(cornerRadius: 12)
-                .stroke(MegrumTheme.ink.opacity(0.08), lineWidth: 1)
-        }
-        .clipShape(RoundedRectangle(cornerRadius: 12))
+        HomeExchangeSettingsCalendarGrid(
+            calendarWeeks: calendarWeeks,
+            dateDetails: dateDetails,
+            selectedDateKeys: selectedDateKeys,
+            dayColor: dayColor,
+            selectionColor: { day in color(for: day) },
+            onTapDay: onTapDay,
+            onFinishDragSelection: onFinishDragSelection
+        )
     }
 
     private var calendarWeeks: [[HomeExchangeCalendarDay]] {
@@ -153,10 +94,6 @@ struct HomeExchangeSettingsCalendarCard: View {
         calendarWeeks.flatMap(\.self)
     }
 
-    private var activeSelectedDateKeys: Set<String> {
-        selectedDateKeys.union(dragPreviewKeys)
-    }
-
     private func previousMonth() {
         moveMonth(by: -1)
     }
@@ -183,54 +120,6 @@ struct HomeExchangeSettingsCalendarCard: View {
             return unsetSelectionColor
         }
         return HomeExchangePrefecturePresentation.color(for: prefecture)
-    }
-
-    private func selectionConnection(
-        in week: [HomeExchangeCalendarDay],
-        at index: Int
-    ) -> HomeExchangeCalendarSelectionConnection {
-        guard week.indices.contains(index),
-              activeSelectedDateKeys.contains(week[index].key)
-        else {
-            return .isolated
-        }
-        return HomeExchangeCalendarSelectionConnection(
-            connectsFromPrevious: index > 0 && activeSelectedDateKeys.contains(week[index - 1].key),
-            connectsToNext: index < week.count - 1 && activeSelectedDateKeys.contains(week[index + 1].key)
-        )
-    }
-
-    private func showsTrailingDivider(in week: [HomeExchangeCalendarDay], at index: Int) -> Bool {
-        guard index < week.count - 1 else {
-            return false
-        }
-        return !selectionConnection(in: week, at: index).connectsToNext
-    }
-
-    private func dayIndex(at location: CGPoint, in size: CGSize) -> Int? {
-        guard size.width > 0, size.height > 0 else {
-            return nil
-        }
-        let column = min(max(Int(location.x / (size.width / 7)), 0), 6)
-        let row = min(max(Int(location.y / (size.height / 6)), 0), 5)
-        return row * 7 + column
-    }
-
-    private func selectedDays(in value: DragGesture.Value, size: CGSize) -> [HomeExchangeCalendarDay] {
-        guard let startIndex = dayIndex(at: value.startLocation, in: size),
-              let endIndex = dayIndex(at: value.location, in: size),
-              HomeExchangeCalendarDragSelectionPolicy.allowsSelection(
-                  startIndex: startIndex,
-                  endIndex: endIndex,
-                  translation: value.translation
-              ) else {
-            return []
-        }
-        let lowerBound = min(startIndex, endIndex)
-        let upperBound = max(startIndex, endIndex)
-        return (lowerBound...upperBound).compactMap { index in
-            flattenedDays.indices.contains(index) ? flattenedDays[index] : nil
-        }
     }
 
     private func weekdayColor(symbol: String, isCurrentMonth: Bool) -> Color {
