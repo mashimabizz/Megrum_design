@@ -4,6 +4,47 @@
 
 ---
 
+## イテレーション1101：proposal place sheet contentを分離
+
+### 背景・問題意識
+
+`ProposalMeetupPlaceSheet.swift` は、NavigationStackやlifecycle/onChangeに加えて、ScrollView内のaction row、place input、map card、status rowの画面構成をcomputed viewとして抱えていた。sheet本体を状態保持、lifecycle、保存処理に寄せるため、ScrollView内のcontent構成を専用Viewへ分離する。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/ProposalMeetupPlaceSheet.swift`
+- ScrollView内のcontent構成を `ProposalMeetupPlaceSheetContent` 呼び出しへ置き換えた。
+- `actionRow`、`placeInputCard`、`mapCard`、`statusRow` のcomputed viewを移動した。
+- search/current location/map selection/save/lifecycle/onChangeの処理は維持した。
+
+#### `ios-native/Sources/MegrumApp/ProposalMeetupPlaceSheetContent.swift`
+- `ProposalMeetupPlaceSheetContent` を追加した。
+- action row、place input card、map card、status rowの表示順、spacing、paddingを維持した。
+- draft全体ではなく、placeName/cameraPosition bindingと必要な表示値/callbackだけを受け取る構成にした。
+
+### 影響範囲
+
+- Swift Native iOS版の打診作成フローにおける待ち合わせ場所検索sheet。
+- 現在地取得、前回設定適用、場所検索、検索結果選択、map選択、保存処理、送信payload、DB/API、状態名、表示文言は変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumApp/ProposalMeetupPlaceSheet.swift ios-native/Sources/MegrumApp/ProposalMeetupPlaceSheetContent.swift`
+  - passed
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-proposal-place-sheet-content`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-proposal-place-sheet-content --enable-xctest --disable-swift-testing -j 1 --filter 'ProposalCreateFlowTests|ProposalCreateSheetTests'`
+  - passed（62 tests）
+
+### セルフレビュー結果
+
+- ✅ action row、place input card、map card、status rowの表示順と余白を維持した。
+- ✅ `ProposalMeetupPlaceSheet.swift` は 158行から 132行へ縮小し、sheet contentを55行の専用ファイルへ分離した。
+- ✅ search/current location/map selection/save/lifecycle/onChangeの処理は親sheet側に残し、子Viewには必要なbindingとcallbackだけを渡した。
+- ✅ 新しい状態名・用語・DB列は追加していないため、`notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション1100：proposal place save actionを分離
 
 ### 背景・問題意識

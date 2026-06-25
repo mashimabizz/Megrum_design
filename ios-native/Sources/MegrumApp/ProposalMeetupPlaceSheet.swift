@@ -60,15 +60,27 @@ struct ProposalMeetupPlaceSheet: View {
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(alignment: .leading, spacing: 16) {
-                    actionRow
-                    placeInputCard
-                    mapCard
-                    statusRow
-                }
-                .padding(.horizontal, 18)
-                .padding(.top, 16)
-                .padding(.bottom, 104)
+                ProposalMeetupPlaceSheetContent(
+                    isRequestingLocation: isRequestingLocation,
+                    canApplyPreviousDraft: previousDraft != nil,
+                    placeName: $draft.placeName,
+                    isPlaceFocused: $isPlaceFocused,
+                    searchResults: searchResults,
+                    isSearchingPlace: isSearchingPlace,
+                    cameraPosition: $cameraPosition,
+                    selectedCoordinate: selectedCoordinate,
+                    markerTitle: draft.normalizedPlaceName,
+                    coordinateCaption: coordinateCaption,
+                    canSave: canSave,
+                    locationStatusText: locationStatusText,
+                    onUseCurrentLocation: useCurrentLocation,
+                    onApplyPreviousDraft: applyPreviousDraft,
+                    onSearch: searchCurrentPlaceName,
+                    onSelectSearchResult: { result in
+                        applySearchResult(result)
+                    },
+                    onSelectCoordinate: applyMapSelection
+                )
             }
             .background(MegrumTheme.canvas.ignoresSafeArea())
             .navigationTitle("交換できる場所")
@@ -107,42 +119,6 @@ struct ProposalMeetupPlaceSheet: View {
             isWaitingForCurrentLocation = false
             applyCurrentLocation(coordinate)
         }
-    }
-
-    private var actionRow: some View {
-        ProposalMeetupPlaceActionRow(
-            isRequestingLocation: isRequestingLocation,
-            canApplyPreviousDraft: previousDraft != nil,
-            onUseCurrentLocation: useCurrentLocation,
-            onApplyPreviousDraft: applyPreviousDraft
-        )
-    }
-
-    private var placeInputCard: some View {
-        ProposalMeetupPlaceInputCard(
-            placeName: $draft.placeName,
-            isPlaceFocused: $isPlaceFocused,
-            searchResults: searchResults,
-            isSearchingPlace: isSearchingPlace,
-            onSearch: searchCurrentPlaceName,
-            onSelectSearchResult: { result in
-                applySearchResult(result)
-            }
-        )
-    }
-
-    private var mapCard: some View {
-        ProposalMeetupPlaceMapCard(
-            cameraPosition: $cameraPosition,
-            selectedCoordinate: selectedCoordinate,
-            markerTitle: draft.normalizedPlaceName,
-            coordinateCaption: coordinateCaption,
-            onSelectCoordinate: applyMapSelection
-        )
-    }
-
-    private var statusRow: some View {
-        ProposalMeetupPlaceStatusRow(canSave: canSave, message: locationStatusText)
     }
 
     private var saveButton: some View {
