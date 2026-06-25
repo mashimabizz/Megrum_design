@@ -200,7 +200,7 @@ struct HomeMutualMatchDetailSheet: View {
                 matchType: .perfect,
                 receiverGoods: selectedPair.receiverGoods,
                 senderGoods: selectedPair.senderDisplayItem.goods.map { [$0] } ?? [],
-                exchangeMethod: HomeMutualMatchProposalExchangeMethodPolicy.preferredExchangeMethod(for: selectedPair.signals),
+                exchangeMethod: selectedPair.signals.preferredProposalExchangeMethod,
                 cashAmount: selectedPair.proposalCashAmount
             )
             .includingExtraSelections(addedExtraSelections)

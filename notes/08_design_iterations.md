@@ -4,6 +4,56 @@
 
 ---
 
+## イテレーション927：Home goods hit detail selectionを分割
+
+### 背景・問題意識
+
+`HomeDiscoveryHitDetailSheets.swift` は、画像タップ後の「相手の希望から譲を選ぶ」シートのUI、候補絞り込み、初期選択、金額補完、打診開始payload作成を1つのView内に持っていた。マッチ候補/相互マッチのシートは、表示調整と打診作成条件の変更がどちらも入りやすいため、UI本体と選択状態の解釈を分ける。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/HomeDiscoveryHitDetailSheets.swift`
+- `HomeGoodsHitDetailSheet` をシートUIとユーザー操作の薄い橋渡しに絞った。
+- ファイル行数を302行から179行へ縮小した。
+
+#### `ios-native/Sources/MegrumApp/HomeGoodsHitDetailSelectionContext.swift`
+- wanted options、譲れる候補、選択中cash option、金額入力値、選択可否、preview goods、打診payload作成を新規contextへ移動した。
+- cash指定時とグッズ指定時の `HomeDiscoveryProposalSelection` 作成条件は維持した。
+
+#### `ios-native/Sources/MegrumApp/HomeProposalExchangeMethodPolicy.swift`
+- `HomeMutualMatchProposalExchangeMethodPolicy` をホーム共通の `HomeProposalExchangeMethodPolicy` へ置き換えた。
+- `HomeCandidateConditionSignals.preferredProposalExchangeMethod` を共通policy経由にして、ウィッシュヒット/個別募集ヒット/相互マッチで同じ交換方法判定を使うようにした。
+
+#### `ios-native/Sources/MegrumApp/HomeMutualMatchDetailSheet.swift`
+- 相互マッチ詳細の打診開始時も `selectedPair.signals.preferredProposalExchangeMethod` を使うようにした。
+
+#### `ios-native/Tests/MegrumAppTests/HomeScreenFlowTests.swift`
+- 交換方法policy名の変更に合わせて既存テスト参照を更新した。
+
+### 影響範囲
+
+- Swift Native iOS版のマッチ候補/相互マッチから開くグッズヒット詳細シート、ウィッシュヒット詳細シート、相互マッチ詳細シート、打診作成へ渡す交換方法。
+- 挙動変更ではなく責務分離。候補抽出条件、金額入力条件、打診payload、状態名、用語、DBスキーマは変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumApp/HomeDiscoveryHitDetailSheets.swift ios-native/Sources/MegrumApp/HomeGoodsHitDetailSelectionContext.swift ios-native/Sources/MegrumApp/HomeProposalExchangeMethodPolicy.swift ios-native/Sources/MegrumApp/HomeMutualMatchDetailSheet.swift ios-native/Tests/MegrumAppTests/HomeScreenFlowTests.swift`
+  - passed
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-home-goods-hit-detail-build --disable-index-store`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-home-goods-hit-detail-tests --disable-index-store --enable-xctest --disable-swift-testing -j 1 --filter 'HomeScreenFlowTests|HomeDiscoveryMatchPolicyTests|ProposalCreateFlowTests|TradeRequestDraftProposalCreateFlowTests'`
+  - 156 tests passed
+
+### セルフレビュー結果
+
+- ✅ シート内の表示順、文言、選択rail、cash amount入力、他にも交換できそうなものの表示は維持した。
+- ✅ cash指定時/グッズ指定時の `HomeDiscoveryProposalSelection` 作成条件はcontextへ移しただけで、既存のguard条件を維持した。
+- ✅ 交換方法判定は同じ条件式の共通policy化であり、相互マッチ・ウィッシュヒット・個別募集ヒットの判断を1箇所へ寄せた。
+- ✅ HomeScreenFlowTests / HomeDiscoveryMatchPolicyTests / ProposalCreateFlowTests / TradeRequestDraftProposalCreateFlowTestsで、ホーム候補、条件タグ、打診作成ガード、支払い/交換条件、待ち合わせ条件を確認した。
+- ✅ 状態名・用語・DBスキーマの変更はないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション926：Match relation chrome viewsを分割
 
 ### 背景・問題意識

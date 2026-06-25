@@ -516,7 +516,7 @@ final class HomeScreenFlowTests: XCTestCase {
     func testMutualMatchProposalExchangeMethodUsesCandidateSignals() {
         let bothSignals = HomeDiscoveryFixtures.miiListingHitSignals(index: 0)
         XCTAssertEqual(
-            HomeMutualMatchProposalExchangeMethodPolicy.preferredExchangeMethod(for: bothSignals),
+            HomeProposalExchangeMethodPolicy.preferredExchangeMethod(for: bothSignals),
             bothSignals.exchange.localExchangeSelected && bothSignals.exchange.postalAcceptedByBoth ? .both : .hand
         )
     }

@@ -23,7 +23,7 @@ struct HomeGoodsHitDetailSheet: View {
             showsWishCopyButton: false,
             wishCopyButtonDisabled: isWishCopyInProgress,
             wishCopyButtonAction: { onCopyToWish(selection.goods) },
-            bottomButtonDisabled: !canStartProposal,
+            bottomButtonDisabled: !selectionContext.canStartProposal,
             bottomButtonAction: startProposal
         ) {
             HomeSelectedGoodsHeader(
@@ -38,12 +38,12 @@ struct HomeGoodsHitDetailSheet: View {
             HomeSheetSectionTitle(
                 systemName: "person",
                 title: "相手の希望から譲を選ぶ",
-                trailing: selectionRequirementLabel
+                trailing: selectionContext.selectionRequirementLabel
             )
             wantedSelectionRail
 
             if !selectionState.selectedWantedIndices.isEmpty {
-                if let selectedCashOption {
+                if let selectedCashOption = selectionContext.selectedCashOption {
                     HomeCashAmountEntryCard(
                         amountText: $selectionState.cashAmountText,
                         suggestedAmount: selectedCashOption.cashAmount
@@ -52,13 +52,13 @@ struct HomeGoodsHitDetailSheet: View {
                     HomeSheetSectionTitle(
                         systemName: "gift",
                         title: "譲るグッズを選ぶ",
-                        trailing: selectionRequirementLabel
+                        trailing: selectionContext.selectionRequirementLabel
                     )
-                    if offerGoods.isEmpty {
+                    if selectionContext.offerGoods.isEmpty {
                         HomeNoMatchingOfferGoodsPanel()
                     } else {
                         HomeGoodsImagePanelRail(
-                            goods: offerGoods,
+                            goods: selectionContext.offerGoods,
                             selectedIndices: selectionState.selectedOfferIndices,
                             selectedBannerText: "これを譲る",
                             onSelect: toggleOfferGoods
@@ -81,113 +81,39 @@ struct HomeGoodsHitDetailSheet: View {
         }
     }
 
-    private var wantedGoods: [HomeMockGoods] {
-        HomeDiscoveryFixtures.wantedGoods
-    }
-
-    private var wantedOptions: [HomeIndividualListingWantedOption] {
-        selection.individualListingSelection.wantedOptions
-    }
-
-    private var usesListingWantedOptions: Bool {
-        !wantedOptions.isEmpty
-    }
-
-    private var allOfferGoods: [HomeMockGoods] {
-        HomeOfferGoodsOrdering.ordered(
-            viewerOfferGoods.isEmpty ? HomeDiscoveryFixtures.offerGoods : viewerOfferGoods,
-            preferredOfferGoodsID: selection.preferredOfferGoodsID
+    private var selectionContext: HomeGoodsHitDetailSelectionContext {
+        HomeGoodsHitDetailSelectionContext(
+            selection: selection,
+            viewerOfferGoods: viewerOfferGoods,
+            selectionState: selectionState
         )
-    }
-
-    private var offerGoods: [HomeMockGoods] {
-        guard usesListingWantedOptions else {
-            return allOfferGoods
-        }
-        let matchingIDs = Set(selectedWantedOptions.flatMap(\.matchingGoodsIDs))
-        guard !matchingIDs.isEmpty else {
-            return []
-        }
-        return allOfferGoods.filter { matchingIDs.contains($0.id) }
-    }
-
-    private var wantedLogic: ListingLogic {
-        selection.individualListingSelection.wantedLogic
-    }
-
-    private var wantedItemCount: Int {
-        usesListingWantedOptions ? wantedOptions.count : wantedGoods.count
-    }
-
-    private var selectedWantedOptions: [HomeIndividualListingWantedOption] {
-        guard usesListingWantedOptions else {
-            return []
-        }
-        return selectionState.selectedWantedIndices
-            .sorted()
-            .compactMap { wantedOptions.indices.contains($0) ? wantedOptions[$0] : nil }
-    }
-
-    private var selectedCashOption: HomeIndividualListingWantedOption? {
-        selectedWantedOptions.first { $0.isCashOffer }
-    }
-
-    private var cashAmountValue: Int? {
-        TradeAmountFormatter.cashInputValue(from: selectionState.cashAmountText)
-    }
-
-    private var selectionRequirementLabel: String {
-        HomeListingSelectionPolicy.label(for: wantedLogic)
-    }
-
-    private var canStartProposal: Bool {
-        if selectedCashOption != nil {
-            return !selectionState.selectedWantedIndices.isEmpty && cashAmountValue != nil
-        }
-        return !selectionState.selectedWantedIndices.isEmpty && !selectionState.selectedOfferIndices.isEmpty
     }
 
     @ViewBuilder
     private var wantedSelectionRail: some View {
-        if usesListingWantedOptions {
+        if selectionContext.usesListingWantedOptions {
             HomeListingWantedOptionRail(
-                options: wantedOptions,
+                options: selectionContext.wantedOptions,
                 selectedIndices: selectionState.selectedWantedIndices,
-                previewGoodsByOptionID: previewGoodsByWantedOptionID,
+                previewGoodsByOptionID: selectionContext.previewGoodsByWantedOptionID,
                 onSelect: toggleWantedGoods
             )
         } else {
             HomeGoodsImagePanelRail(
-                goods: wantedGoods,
+                goods: selectionContext.wantedGoods,
                 selectedIndices: selectionState.selectedWantedIndices,
                 onSelect: toggleWantedGoods
             )
         }
     }
 
-    private var previewGoodsByWantedOptionID: [UUID: HomeMockGoods] {
-        HomeListingWantedOptionPreviewPolicy.previewGoodsByOptionID(
-            options: wantedOptions,
-            goodsPool: wantedOptionPreviewGoodsPool
-        )
-    }
-
-    private var wantedOptionPreviewGoodsPool: [HomeMockGoods] {
-        HomeListingWantedOptionPreviewPolicy.uniqueGoodsPool([
-            allOfferGoods,
-            wantedGoods,
-            HomeDiscoveryFixtures.offerGoods,
-            HomeDiscoveryFixtures.wantedGoods,
-            [selection.goods]
-        ])
-    }
-
     private func toggleWantedGoods(at index: Int) {
+        let context = selectionContext
         selectionState = HomeListingSheetSelectionStateReducer.togglingWanted(
             at: index,
             in: selectionState,
-            itemCount: wantedItemCount,
-            logic: wantedLogic
+            itemCount: context.wantedItemCount,
+            logic: context.wantedLogic
         )
         if selectionState.selectedWantedIndices.isEmpty {
             return
@@ -200,15 +126,16 @@ struct HomeGoodsHitDetailSheet: View {
         selectionState = HomeListingSheetSelectionStateReducer.togglingOffer(
             at: index,
             in: selectionState,
-            itemCount: offerGoods.count,
-            logic: wantedLogic
+            itemCount: selectionContext.offerGoods.count,
+            logic: selectionContext.wantedLogic
         )
     }
 
     private func prepareInitialSelections() {
+        let context = selectionContext
         selectionState = HomeListingSheetSelectionStateReducer.preparingInitialSelection(
-            itemCount: wantedItemCount,
-            logic: wantedLogic
+            itemCount: context.wantedItemCount,
+            logic: context.wantedLogic
         )
         if !selectionState.selectedWantedIndices.isEmpty {
             fillSuggestedCashAmountIfNeeded()
@@ -224,7 +151,7 @@ struct HomeGoodsHitDetailSheet: View {
 
     private func fillSuggestedCashAmountIfNeeded() {
         guard selectionState.cashAmountText.isEmpty,
-              let amount = selectedCashOption?.cashAmount,
+              let amount = selectionContext.selectedCashOption?.cashAmount,
               amount > 0
         else {
             return
@@ -233,70 +160,20 @@ struct HomeGoodsHitDetailSheet: View {
     }
 
     private func selectPreferredOfferIfNeeded() {
-        guard selectedCashOption == nil,
+        let context = selectionContext
+        guard context.selectedCashOption == nil,
               selectionState.selectedOfferIndices.isEmpty,
-              let preferredOfferIndex
+              let preferredOfferIndex = context.preferredOfferIndex
         else {
             return
         }
         selectionState.selectedOfferIndices = [preferredOfferIndex]
     }
 
-    private var preferredOfferIndex: Int? {
-        guard let preferredOfferGoodsID = selection.preferredOfferGoodsID else {
-            return nil
-        }
-        return offerGoods.firstIndex { $0.id == preferredOfferGoodsID }
-    }
-
     private func startProposal() {
-        if let cashAmountValue {
-            onStartProposal(
-                HomeDiscoveryProposalSelection(
-                    receiverGoodsID: selection.goods.id,
-                    senderGoodsIDs: [],
-                    matchType: .perfect,
-                    receiverGoods: selection.goods,
-                    senderGoods: [],
-                    exchangeMethod: selection.signals.preferredProposalExchangeMethod,
-                    cashAmount: cashAmountValue
-                )
-            )
+        guard let proposalSelection = selectionContext.proposalSelection() else {
             return
         }
-        let senderGoods = selectionState.selectedOfferIndices
-            .sorted()
-            .compactMap { index in
-                offerGoods.indices.contains(index) ? offerGoods[index] : nil
-            }
-        guard !senderGoods.isEmpty else {
-            return
-        }
-        onStartProposal(
-            HomeDiscoveryProposalSelection(
-                receiverGoodsID: selection.goods.id,
-                senderGoodsIDs: senderGoods.map(\.id),
-                matchType: .perfect,
-                receiverGoods: selection.goods,
-                senderGoods: senderGoods,
-                exchangeMethod: selection.signals.preferredProposalExchangeMethod,
-                cashAmount: nil
-            )
-        )
-    }
-}
-
-extension HomeCandidateConditionSignals {
-    var preferredProposalExchangeMethod: ExchangeMethod {
-        if exchange.localExchangeSelected && exchange.postalAcceptedByBoth {
-            return .both
-        }
-        if exchange.localExchangeSelected {
-            return .hand
-        }
-        if exchange.postalAcceptedByBoth {
-            return .mail
-        }
-        return .hand
+        onStartProposal(proposalSelection)
     }
 }

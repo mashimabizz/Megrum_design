@@ -1,6 +1,6 @@
 import MegrumCore
 
-enum HomeMutualMatchProposalExchangeMethodPolicy {
+enum HomeProposalExchangeMethodPolicy {
     static func preferredExchangeMethod(for signals: HomeCandidateConditionSignals) -> ExchangeMethod {
         if signals.exchange.localExchangeSelected && signals.exchange.postalAcceptedByBoth {
             return .both
@@ -12,5 +12,11 @@ enum HomeMutualMatchProposalExchangeMethodPolicy {
             return .mail
         }
         return .hand
+    }
+}
+
+extension HomeCandidateConditionSignals {
+    var preferredProposalExchangeMethod: ExchangeMethod {
+        HomeProposalExchangeMethodPolicy.preferredExchangeMethod(for: self)
     }
 }
