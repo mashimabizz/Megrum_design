@@ -4,6 +4,49 @@
 
 ---
 
+## イテレーション904：Auth screen state/actionsを分割
+
+### 背景・問題意識
+
+`AuthScreen.swift` は、認証画面のルート切り替え、入力フィードバックの派生状態、メール/パスワード送信、パスワードリセット、Appleログイン、Google OAuth開始/復帰処理が同居していた。認証画面の表示構造と、入力validation・OAuth副作用を別々に追えるようにし、ログイン/登録/パスワードリセット調査時の読み筋を短くする。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/AuthScreen.swift`
+- 画面ルートごとの `AuthChoiceScreen` / `AuthEmailScreen` / `AuthPasswordResetScreen` の表示構造、状態保持、lifecycle hookに集中させた。
+- 分割先extensionから参照するため、必要な内部状態のアクセス範囲をmodule内アクセスへ緩めた。
+- ファイル行数を345行から131行へ縮小した。
+
+#### `ios-native/Sources/MegrumApp/AuthScreenDerivedState.swift`
+- 現在mode、通常フィードバック、パスワードリセット用フィードバック、submit validation messageを移動した。
+
+#### `ios-native/Sources/MegrumApp/AuthScreenActions.swift`
+- route切り替え、submit button task起動、パスワードリセット送信、入力正規化、メール/パスワードログイン/登録submit、feedback clearを移動した。
+
+#### `ios-native/Sources/MegrumApp/AuthScreenIdentityProviderActions.swift`
+- Googleログイン開始、ASWebAuthenticationSession callback処理、Appleログインnonce生成/credential処理を移動した。
+
+### 影響範囲
+
+- Swift Native iOS版の未ログイン画面、ログイン/登録切り替え、メール/パスワードログイン、メール/パスワード登録、パスワードリセット、Appleログイン、Googleログイン。
+- 挙動変更ではなく責務分離。入力validation文言、メール/handle正規化、feedback優先順位、OAuth callback scheme、Apple nonce、Google/Appleエラー文言、keyboard toolbar、状態名、用語、DBスキーマは変更しない。
+
+### 確認方法
+
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-auth-screen-build --disable-index-store`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-auth-screen-tests --disable-index-store --enable-xctest --disable-swift-testing -j 1 --filter 'AuthScreenInputTests|MegrumAppStateTests/testAuthState'`
+  - 26 tests passed
+
+### セルフレビュー結果
+
+- ✅ メール/パスワードログイン、登録、パスワードリセットの入力validation、正規化、feedback clear順は変更していない。
+- ✅ Appleログインのnonce生成、identity token取得、キャンセル時の無視、Google OAuthのcallback handling、エラー文言は移動のみで変更していない。
+- ✅ AuthScreenInputTests / MegrumAppStateTestsの認証系テストで、入力validation、session restore、sign in/sign up/password reset、Apple sign in、Google OAuth URL生成を確認した。
+- ✅ 状態名・用語・DBスキーマの変更はないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション903：Trade card componentsを分割
 
 ### 背景・問題意識
