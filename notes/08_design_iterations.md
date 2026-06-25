@@ -4,6 +4,50 @@
 
 ---
 
+## イテレーション928：Proposal goods selection viewsを分割
+
+### 背景・問題意識
+
+`ProposalCreateGoodsSelectionViews.swift` は、個別募集/打診作成のグッズ選択フィルタ、選択行、サムネイル表示、チェックマーク、受け取り内容カードが1ファイルに同居していた。譲る/ウィッシュから選ぶフローではフィルタ・行表示・固定受け取り表示の変更理由が異なるため、表示部品を役割別に分ける。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/ProposalCreateGoodsSelectionViews.swift`
+- `ProposalGoodsFilterBar`、`ProposalFilterChoice`、filter row/chipに絞った。
+- ファイル行数を300行から86行へ縮小した。
+
+#### `ios-native/Sources/MegrumApp/ProposalSelectableGoodsRow.swift`
+- `ProposalSelectableGoodsRow`、remote thumbnail、glyph thumbnail、checkmark、`ProposalSelectableGoodsRowStyle` を新規ファイルへ移動した。
+- サムネイルサイズ、placeholder glyph、選択背景、border、accessibility label/valueは維持した。
+
+#### `ios-native/Sources/MegrumApp/ProposalReceiveCard.swift`
+- 受け取り内容固定カードを新規ファイルへ移動した。
+- `個別募集から選択` / `相手のマイグッズから選択` の表示と固定説明labelは維持した。
+
+### 影響範囲
+
+- Swift Native iOS版の打診作成/個別募集作成で使うグッズ選択フィルタ、候補行、受け取り内容カード。
+- 挙動変更ではなく責務分離。選択ロジック、フィルタ条件、状態名、用語、DBスキーマは変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumApp/ProposalCreateGoodsSelectionViews.swift ios-native/Sources/MegrumApp/ProposalSelectableGoodsRow.swift ios-native/Sources/MegrumApp/ProposalReceiveCard.swift`
+  - passed
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-proposal-goods-selection-build --disable-index-store`
+  - first run failed because `/tmp` had only 125MB free; removed Megrum SwiftPM scratch directories under `/tmp/megrum-ios-native-refactor-*`, then passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-proposal-goods-selection-tests --disable-index-store --enable-xctest --disable-swift-testing -j 1 --filter 'ProposalCreateFlowTests|TradeRequestDraftProposalCreateFlowTests'`
+  - 55 tests passed
+
+### セルフレビュー結果
+
+- ✅ フィルタバー、候補行、サムネイル、選択check、受け取り固定カードは移動のみで表示文言・色・サイズを維持した。
+- ✅ ProposalCreateFlowTestsで、候補一覧spacing、行metrics、glyph、フィルタcatalog、打診作成ガードを確認した。
+- ✅ TradeRequestDraftProposalCreateFlowTestsで、候補一覧の1列表示、待ち合わせ/配送条件、カレンダー/スケジュール周辺を確認した。
+- ✅ `/tmp` の容量不足は生成済みscratch削除で解消し、再実行結果はpassed。
+- ✅ 状態名・用語・DBスキーマの変更はないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション927：Home goods hit detail selectionを分割
 
 ### 背景・問題意識
