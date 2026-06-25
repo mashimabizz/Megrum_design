@@ -4,6 +4,44 @@
 
 ---
 
+## イテレーション1093：proposal step headerを分離
+
+### 背景・問題意識
+
+`ProposalCreateChromeViews.swift` は、画面ヘッダーと、step navigation用のbadge/色/遷移可否判定を持つ `ProposalStepHeader` を同じファイルに抱えていた。chrome側を画面ヘッダーに集中させるため、step headerを専用Viewファイルへ分離する。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/ProposalCreateChromeViews.swift`
+- `ProposalStepHeader` を移動した。
+- `ProposalFlowScreenHeader` の戻るbutton、kicker、title表示は維持した。
+
+#### `ios-native/Sources/MegrumApp/ProposalStepHeader.swift`
+- `ProposalStepHeader` を追加した。
+- step tab生成、badge文言、badge色、step jump可否判定、selected step更新animationを維持した。
+
+### 影響範囲
+
+- Swift Native iOS版の打診作成フローにおけるstep header。
+- step順、step遷移可否、badge表示、画面ヘッダー、送信payload、DB/API、状態名、表示文言は変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumApp/ProposalCreateChromeViews.swift ios-native/Sources/MegrumApp/ProposalStepHeader.swift`
+  - passed
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-proposal-step-header`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-proposal-step-header --enable-xctest --disable-swift-testing -j 1 --filter 'ProposalCreateFlowTests|ProposalCreateSheetTests'`
+  - passed（62 tests）
+
+### セルフレビュー結果
+
+- ✅ step tab生成、badge文言、badge色、jump可否判定、selected step animationを維持した。
+- ✅ `ProposalCreateChromeViews.swift` は 139行から 43行へ縮小し、step headerを 98行の専用ファイルへ分離した。
+- ✅ 新しい状態名・用語・DB列は追加していないため、`notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション1092：proposal exchange method selectorを分離
 
 ### 背景・問題意識
