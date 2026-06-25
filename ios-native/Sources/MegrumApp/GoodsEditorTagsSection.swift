@@ -31,12 +31,33 @@ struct GoodsEditorTagsSection: View {
     var body: some View {
         GoodsEditorSectionContainer(title: "タグ", systemImage: "tag") {
             VStack(alignment: .leading, spacing: 12) {
-                tagList
+                GoodsEditorSelectedTagList(
+                    tagNames: tagNames,
+                    isItemReadOnly: isItemReadOnly,
+                    onRemoveTag: onRemoveTag
+                )
+
                 if let onOpenTagSheet {
-                    tagPickerButton(action: onOpenTagSheet)
+                    GoodsEditorTagPickerButton(
+                        tagCount: tagNames.count,
+                        isItemReadOnly: isItemReadOnly,
+                        action: onOpenTagSheet
+                    )
                 } else {
-                    suggestedTagList
-                    tagInput
+                    GoodsEditorSuggestedTagList(
+                        tagNames: availableSuggestedTags,
+                        currentTagCount: tagNames.count,
+                        isItemReadOnly: isItemReadOnly,
+                        onAddSuggestedTag: onAddSuggestedTag
+                    )
+
+                    GoodsEditorTagInputRow(
+                        tagDraft: $tagDraft,
+                        isTagFieldFocused: isTagFieldFocused,
+                        isItemReadOnly: isItemReadOnly,
+                        canAddTag: canAddTag,
+                        onAddTag: onAddTag
+                    )
                 }
 
                 Text("タグは5件まで入力できます。保存時にグッズへ反映されます。")
@@ -44,96 +65,5 @@ struct GoodsEditorTagsSection: View {
                     .foregroundStyle(MegrumTheme.muted)
             }
         }
-    }
-
-    private func tagPickerButton(action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            HStack(spacing: 10) {
-                Image(systemName: "tag")
-                    .font(.system(size: 15, weight: .black))
-                Text(tagNames.isEmpty ? "タグを選ぶ" : "タグを追加")
-                    .font(.system(size: 15, weight: .black, design: .rounded))
-                Spacer()
-                Image(systemName: "chevron.forward")
-                    .font(.system(size: 12, weight: .black))
-            }
-            .foregroundStyle(MegrumTheme.lavender)
-            .padding(.horizontal, 14)
-            .frame(height: 48)
-            .background(MegrumTheme.lavender.opacity(0.10), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-            .overlay {
-                RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .strokeBorder(MegrumTheme.lavender.opacity(0.20), lineWidth: 1)
-            }
-        }
-        .buttonStyle(.plain)
-        .disabled(isItemReadOnly || tagNames.count >= 5)
-    }
-
-    @ViewBuilder
-    private var tagList: some View {
-        if !tagNames.isEmpty {
-            GoodsEditorFlowLayout(spacing: 8) {
-                ForEach(tagNames, id: \.self) { tag in
-                    Button {
-                        onRemoveTag(tag)
-                    } label: {
-                        HStack(spacing: 5) {
-                            Text("#\(tag)")
-                            Image(systemName: "xmark")
-                                .font(.caption.weight(.black))
-                        }
-                        .font(.caption.weight(.black))
-                        .foregroundStyle(MegrumTheme.ink)
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 7)
-                        .background(.white.opacity(0.9), in: Capsule())
-                    }
-                    .buttonStyle(.plain)
-                    .disabled(isItemReadOnly)
-                }
-            }
-        }
-    }
-
-    @ViewBuilder
-    private var suggestedTagList: some View {
-        if !availableSuggestedTags.isEmpty {
-            GoodsEditorFlowLayout(spacing: 8) {
-                ForEach(availableSuggestedTags, id: \.self) { tag in
-                    Button {
-                        onAddSuggestedTag(tag)
-                    } label: {
-                        Text("#\(tag)")
-                            .font(.caption.weight(.black))
-                            .foregroundStyle(MegrumTheme.lavender)
-                            .padding(.horizontal, 11)
-                            .padding(.vertical, 7)
-                            .background(MegrumTheme.lavender.opacity(0.10), in: Capsule())
-                            .overlay {
-                                Capsule()
-                                    .strokeBorder(MegrumTheme.lavender.opacity(0.20), lineWidth: 1)
-                            }
-                    }
-                    .buttonStyle(.plain)
-                    .disabled(isItemReadOnly || tagNames.count >= 5)
-                }
-            }
-        }
-    }
-
-    private var tagInput: some View {
-        HStack(spacing: 10) {
-            TextField("例：会場限定", text: $tagDraft)
-                .focused(isTagFieldFocused)
-                .submitLabel(.done)
-                .onSubmit(onAddTag)
-                .megrumTextFieldStyle()
-            Button("追加", action: onAddTag)
-                .buttonStyle(.bordered)
-                .tint(MegrumTheme.lavender)
-                .disabled(!canAddTag)
-        }
-        .disabled(isItemReadOnly)
     }
 }

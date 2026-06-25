@@ -4,6 +4,47 @@
 
 ---
 
+## イテレーション1103：goods editor tag controlsを分離
+
+### 背景・問題意識
+
+`GoodsEditorTagsSection.swift` は、タグsectionの組み立てに加えて、選択済みタグリスト、候補タグリスト、タグ選択button、手入力行の描画をcomputed viewとして抱えていた。section本体をタグ入力フローの構成に寄せ、個別のタグUI部品を専用Viewへ分離する。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/GoodsEditorTagsSection.swift`
+- `tagList`、`suggestedTagList`、`tagInput`、`tagPickerButton` のcomputed view/helperを専用View呼び出しへ置き換えた。
+- section本体には、選択済みタグ、タグ選択buttonまたは候補/入力行、補足文の並びだけを残した。
+- タグ候補の算出、追加可否、既存callbackの受け渡しは維持した。
+
+#### `ios-native/Sources/MegrumApp/GoodsEditorTagControls.swift`
+- `GoodsEditorTagPickerButton`、`GoodsEditorSelectedTagList`、`GoodsEditorSuggestedTagList`、`GoodsEditorTagInputRow` を追加した。
+- タグchip、候補chip、入力TextField、追加buttonの見た目とdisabled条件を移動した。
+- 親のdraft全体ではなく、tag名配列、focus binding、read-only flag、callbackだけを受け取る構成にした。
+
+### 影響範囲
+
+- Swift Native iOS版のグッズ登録/編集におけるタグsection。
+- タグ正規化、タグ上限、候補タグ抽出、タグ追加/削除処理、保存payload、DB/API、状態名、表示文言は変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumApp/GoodsEditorTagsSection.swift ios-native/Sources/MegrumApp/GoodsEditorTagControls.swift`
+  - passed
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-goods-editor-tag-controls`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-goods-editor-tag-controls --enable-xctest --disable-swift-testing -j 1 --filter 'GoodsEditor|GoodsInventoryCreate'`
+  - passed（32 tests）
+
+### セルフレビュー結果
+
+- ✅ 選択済みタグchip、候補タグchip、タグ選択button、手入力行の見た目とdisabled条件を維持した。
+- ✅ `GoodsEditorTagsSection.swift` は 139行から 69行へ縮小し、タグUI部品を118行の専用ファイルへ分離した。
+- ✅ タグ追加/削除callback、タグ候補算出、保存payloadは変更していない。
+- ✅ 新しい状態名・用語・DB列は追加していないため、`notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション1102：proposal place input rowを分離
 
 ### 背景・問題意識
