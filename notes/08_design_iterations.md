@@ -4,6 +4,49 @@
 
 ---
 
+## イテレーション1113：legal document contentを分離
+
+### 背景・問題意識
+
+`LegalDocumentScreen` は、法務入口のdocument kindとnavigation titleを持ちながら、ステータスsection、主要項目section、問い合わせ先section、summary rowまで同じファイルに抱えていた。法務文言は変更せず、画面のList表示とrow描画だけを専用Viewへ分離する。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/SettingsLegalViews.swift`
+- `List` 本体を `LegalDocumentContent` 呼び出しへ置き換えた。
+- `LegalSummaryItem` / `LegalSummaryRow` を専用ファイルへ移動した。
+- `LegalDocumentKind` のtitle、status、summary文言は維持した。
+
+#### `ios-native/Sources/MegrumApp/LegalDocumentContent.swift`
+- `LegalDocumentContent` を追加した。
+- ステータスsection、主要項目section、問い合わせ先sectionを移動した。
+- `LegalSummaryItem` と `LegalSummaryRow` を移動し、summary rowのfont、色、余白、accessibility label/hintを維持した。
+
+### 影響範囲
+
+- Swift Native iOS版の利用規約、プライバシーポリシー、特定商取引法に基づく表記の入口画面。
+- 法務本文そのもの、公開前ドラフト、代表者情報方針、問い合わせ先、DB/API、状態名、表示文言は変更しない。
+
+### 確認方法
+
+- `notes/17_legal_alignment.md`
+  - 法務原典/公開前ドラフトの位置付けを確認し、今回は文言改訂ではなく表示構造の分離に限定した。
+- `git diff --check -- ios-native/Sources/MegrumApp/SettingsLegalViews.swift ios-native/Sources/MegrumApp/LegalDocumentContent.swift`
+  - passed
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-legal-document-content`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-legal-document-content --enable-xctest --disable-swift-testing -j 1 --filter 'SettingsScreenTests|MegrumAppStateTests'`
+  - passed（95 tests）
+
+### セルフレビュー結果
+
+- ✅ ステータス、主要項目、問い合わせ先、summary rowの表示とaccessibilityを維持した。
+- ✅ `LegalDocumentKind` のtitle/status/summary文言、代表者情報方針、問い合わせ先は変更していない。
+- ✅ `SettingsLegalViews.swift` は151行から99行へ縮小し、法務入口のList表示を72行の専用ファイルへ分離した。
+- ✅ 新しい状態名・用語・DB列は追加していないため、`notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション1112：account overview contentを分離
 
 ### 背景・問題意識

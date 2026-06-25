@@ -5,33 +5,7 @@ struct LegalDocumentScreen: View {
     var kind: LegalDocumentKind
 
     var body: some View {
-        List {
-            Section {
-                Text(kind.statusMessage)
-                    .font(.body)
-                    .foregroundStyle(MegrumTheme.ink)
-                    .padding(.vertical, 4)
-            } header: {
-                Text("ステータス")
-            }
-
-            Section {
-                ForEach(kind.summaryItems) { item in
-                    LegalSummaryRow(item: item)
-                }
-            } header: {
-                Text("主要項目")
-            }
-
-            Section {
-                Text("support@megrum.jp")
-                    .font(.body.weight(.semibold))
-                    .foregroundStyle(MegrumTheme.lavender)
-                    .textSelection(.enabled)
-            } header: {
-                Text("問い合わせ先")
-            }
-        }
+        LegalDocumentContent(kind: kind)
         .navigationTitle(kind.title)
         .megrumInlineNavigationTitle()
     }
@@ -121,31 +95,5 @@ enum LegalDocumentKind {
                 )
             ]
         }
-    }
-}
-
-struct LegalSummaryItem: Identifiable, Equatable {
-    var title: String
-    var body: String
-
-    var id: String { title }
-}
-
-private struct LegalSummaryRow: View {
-    var item: LegalSummaryItem
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 5) {
-            Text(item.title)
-                .font(.body.weight(.semibold))
-                .foregroundStyle(MegrumTheme.ink)
-            Text(item.body)
-                .font(.subheadline)
-                .foregroundStyle(MegrumTheme.muted)
-        }
-        .padding(.vertical, 4)
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel(item.title)
-        .accessibilityHint(item.body)
     }
 }
