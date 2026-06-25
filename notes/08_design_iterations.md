@@ -4,6 +4,56 @@
 
 ---
 
+## イテレーション921：Auth screen componentsを部品別に分割
+
+### 背景・問題意識
+
+`AuthScreenComponents.swift` は、top bar、ブランドlockup、provider button、primary/input/feedback、visual style/backgroundが1ファイルに同居していた。認証画面は見た目の微調整と入力・認証状態の調査が頻繁に起きるため、部品単位で変更理由を分け、Auth画面修正時の影響範囲を追いやすくする。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/AuthScreenComponents.swift`
+- `AuthTopBar` だけに絞った。
+- ファイル行数を320行から26行へ縮小した。
+
+#### `ios-native/Sources/MegrumApp/AuthBrandComponents.swift`
+- `AuthBrandLockup` / `AuthRibbonMark` / `AuthSparkleDecor` を新規ファイルへ移動した。
+- Megrumロゴ、Mg tile、sparkle装飾、gradient overlayの見た目は維持した。
+
+#### `ios-native/Sources/MegrumApp/AuthProviderButton.swift`
+- `AuthProviderButton` を新規ファイルへ移動した。
+- Apple / Google / mail icon、filled style、loading/disabledの見た目は維持した。
+
+#### `ios-native/Sources/MegrumApp/AuthFormComponents.swift`
+- `AuthPrimaryActionButton` / `AuthInputRow` / `AuthVisualFeedbackRow` を新規ファイルへ移動した。
+- loading表示、secure toggle、feedback color、入力行の文言・状態表示は維持した。
+
+#### `ios-native/Sources/MegrumApp/AuthVisualStyle.swift`
+- `AuthVisualStyle` と `authVisualBackground` を新規ファイルへ移動した。
+- 認証画面のgradient/background表現は維持した。
+
+### 影響範囲
+
+- Swift Native iOS版の認証画面共通UI。
+- 挙動変更ではなく責務分離。入力validation、認証request、session保存、状態名、用語、DBスキーマは変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumApp/AuthScreenComponents.swift ios-native/Sources/MegrumApp/AuthBrandComponents.swift ios-native/Sources/MegrumApp/AuthProviderButton.swift ios-native/Sources/MegrumApp/AuthFormComponents.swift ios-native/Sources/MegrumApp/AuthVisualStyle.swift`
+  - passed
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-auth-components-build --disable-index-store`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-auth-components-tests --disable-index-store --enable-xctest --disable-swift-testing -j 1 --filter 'AuthScreenInputTests|SupabaseAuthClientTests|AuthSessionStoreTests|MegrumAppStateTests/testAuthState|MegrumAppStateTests/testNativeAuth|MegrumAppStateTests/testAuthConfigurationPlistKeepsRequiredKeys'`
+  - 41 tests passed
+
+### セルフレビュー結果
+
+- ✅ AuthTopBar、brand lockup、provider button、form入力、feedback、backgroundは移動のみで、文言・色・disabled/loading表示を維持した。
+- ✅ Auth/session/auth client系41件で、入力状態、認証client、session保存、auth設定の回帰を確認した。
+- ✅ 状態名・用語・DBスキーマの変更はないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション920：Trade chat viewsを役割別に分割
 
 ### 背景・問題意識
