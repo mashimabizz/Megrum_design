@@ -4,6 +4,47 @@
 
 ---
 
+## イテレーション1117：home match logic help contentを分離
+
+### 背景・問題意識
+
+`HomeMatchLogicHelpSheet` は、`NavigationStack` / dismiss付き遷移actionを持つsheet親でありながら、intro、4つの説明section、row/actionモデル、section描画まで同じファイルに抱えていた。sheetの責務をnavigationとdismissに寄せ、本文表示を専用Viewへ分離する。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/HomeMatchLogicHelpSheet.swift`
+- `ScrollView` 本体を `HomeMatchLogicHelpContent` 呼び出しへ置き換えた。
+- navigation title、toolbarの閉じるボタン、dismissしてからWish/個別募集/交換条件/支払条件へ進むactionは親sheetに残した。
+
+#### `ios-native/Sources/MegrumApp/HomeMatchLogicHelpContent.swift`
+- `HomeMatchLogicHelpContent` を追加した。
+- intro、相互マッチ/グッズ条件/定価・金額条件/交換・支払条件の4sectionを移動した。
+- `HomeMatchLogicHelpRow` / `HomeMatchLogicHelpAction` / `HomeMatchLogicHelpSection` を本文側へ移動した。
+
+### 影響範囲
+
+- Swift Native iOS版ホームの相互マッチ説明sheet。
+- 表示文言、icon、section順、button action、標準交換条件footer、styleは変更しない。
+- ホームのマッチ判定policy、candidate composer、標準交換条件の保存、DB/API、状態名、表示文言は変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumApp/HomeMatchLogicHelpSheet.swift ios-native/Sources/MegrumApp/HomeMatchLogicHelpContent.swift`
+  - passed
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-home-match-logic-help-content`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-home-match-logic-help-content --enable-xctest --disable-swift-testing -j 1 --filter 'HomeMutualMatchConditionPoliciesTests|HomeMutualMatchLiveDataTests|HomeDiscoveryMatchPolicyTests|HomeCandidateComposerTests|HomeScreenFlowTests'`
+  - passed（146 tests、3 skipped）
+
+### セルフレビュー結果
+
+- ✅ 説明文、icon、section順、ボタン文言、標準交換条件footer、余白/角丸/色を維持した。
+- ✅ 各遷移actionは従来通り `dismiss()` 後にrouting callbackを呼ぶ構造を維持した。
+- ✅ `HomeMatchLogicHelpSheet.swift` は208行から50行へ縮小し、本文表示を190行の専用ファイルへ分離した。
+- ✅ 新しい状態名・用語・DB列は追加していないため、`notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション1116：authenticated tabs drawer actionsを分離
 
 ### 背景・問題意識
