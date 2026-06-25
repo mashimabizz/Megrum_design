@@ -4,6 +4,44 @@
 
 ---
 
+## イテレーション1037：検索結果grid card viewを分割
+
+### 背景・問題意識
+
+`SearchResultGridViews.swift` は、検索結果grid本体のsheet/state制御と、カード表示、条件tag、mini pillを同じファイルに抱えていた。grid本体は詳細sheet・通報sheet・プロフィール遷移の状態を持つため、カード内の純表示部品だけを専用ファイルへ分け、検索結果の表示調整を小さく追えるようにした。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/SearchResultGridViews.swift`
+- `SearchResultGrid` 本体に、検索結果のgrid構築、詳細sheet、通報sheet、遅延プロフィール/打診遷移、home presentation変換を残した。
+- `SearchResultGridCard`、`SearchResultConditionTags`、`SearchResultMiniConditionPill` を専用ファイルへ委譲した。
+
+#### `ios-native/Sources/MegrumApp/SearchResultGridCardViews.swift`
+- 検索結果カード、条件tag stack、mini condition pillを追加した。
+- artwork比率、角丸、shadow、context menu、accessibility label/hint、pillのfont/色/strokeを既存どおり維持した。
+
+### 影響範囲
+
+- Swift Native iOS版の検索結果grid。
+- 検索結果カードの画像、条件tag、通報context menu。
+- 検索結果filter、詳細sheet種別、プロフィール遷移、打診開始、状態名、用語、DBスキーマ、表示文言は変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumApp/SearchResultGridViews.swift ios-native/Sources/MegrumApp/SearchResultGridCardViews.swift`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-search-result-grid-card --enable-xctest --disable-swift-testing -j 1 --filter SearchScreenTests`
+  - passed（14 tests）
+
+### セルフレビュー結果
+
+- ✅ `SearchResultGrid` の `@State`、sheet表示、通報処理、プロフィール/打診の遅延presentationは変更していない。
+- ✅ `SearchResultGridCard` と条件tag部品は移動のみで、context menu、accessibility、pill表示条件を維持した。
+- ✅ `SearchResultGridViews.swift` は 238行から 167行へ縮小し、カード表示を 74行の専用ファイルへ分離した。
+- ✅ 新しい状態名・用語・DB列は追加していないため、`notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション1036：グッズeditor photo previewを分割
 
 ### 背景・問題意識
