@@ -4,6 +4,44 @@
 
 ---
 
+## イテレーション950：Supabase goods inventory payloadsを分割
+
+### 背景・問題意識
+
+`SupabaseGoodsInventoryRows.swift` は、グッズ種別row、在庫/wish row、タグrow、登録/更新/tag RPC/status変更payloadを1ファイルに持っていた。グッズ在庫はホーム候補、検索、個別募集、Wish、タグ操作の土台なので、読み取りrowと書き込みpayloadを分け、候補表示側と保存/更新側の変更範囲を切り分けやすくする。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumData/SupabaseGoodsInventoryRows.swift`
+- `GoodsTypeRow`、`GoodsInventoryRow`、relation row、tag rowに絞った。
+- ファイル行数を303行から161行へ縮小した。
+
+#### `ios-native/Sources/MegrumData/SupabaseGoodsInventoryPayloads.swift`
+- `GoodsEntryPayload`、tag attach/detach payload、status payload、update payloadを新規ファイルへ移動した。
+- title trimming、quantity clamp、wish priority、inventory condition、characterID clear encoding、empty update validationは維持した。
+
+### 影響範囲
+
+- Swift Native iOS版のグッズ登録、Wish登録、グッズ更新、タグ追加/削除、status変更、検索/公開グッズ取得。
+- 挙動変更ではなく責務分離。Supabase table名、RPC function名、payload key、状態名、用語、DBスキーマは変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumData/SupabaseGoodsInventoryRows.swift ios-native/Sources/MegrumData/SupabaseGoodsInventoryPayloads.swift`
+  - passed
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-goods-inventory-payloads-build --disable-index-store`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-goods-inventory-payloads-tests --disable-index-store --enable-xctest --disable-swift-testing -j 1 --filter SupabaseGoodsInventoryClientTests`
+  - 20 tests passed
+
+### セルフレビュー結果
+
+- ✅ 読み取りrowと書き込みpayloadを移動中心で分割した。
+- ✅ グッズ/Wish作成、更新、tag RPC、写真upload、検索/公開取得の既存テストを通した。
+- ✅ 状態名・用語・DBスキーマの変更はないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション949：Supabase dispute clientを分割
 
 ### 背景・問題意識
