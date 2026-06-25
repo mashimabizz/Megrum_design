@@ -23,17 +23,7 @@ struct LoginSecuritySettingsScreen: View {
 
     var body: some View {
         List {
-            Section {
-                SettingsValueRow(title: "認証状態", value: summary.authStatusText)
-                SettingsValueRow(title: "ログインメール", value: summary.emailText)
-                SettingsValueRow(title: "認証ユーザーID", value: summary.authUserIDText, isMonospaced: true)
-                SettingsValueRow(title: "プロフィールID", value: summary.profileUserIDText, isMonospaced: true)
-                SettingsValueRow(title: "接続状態", value: summary.authConfigurationText)
-                SettingsValueRow(title: "アカウント状態", value: summary.accountStatusText)
-            } header: {
-                Text("現在の状態")
-            }
-
+            LoginSecurityStatusSection(summary: summary)
             Section {
                 resetEmailField
 
@@ -63,14 +53,10 @@ struct LoginSecuritySettingsScreen: View {
                 Text("メール/パスワードでログインしている場合は、登録メールへ再設定リンクを送れます。")
             }
 
-            Section {
-                SettingsSignOutButtonRow(
-                    isSigningOut: isSigningOut,
-                    onTap: startSignOut
-                )
-            } footer: {
-                Text("ログアウトすると、この端末のセッションを外してログイン/新規登録画面に戻ります。")
-            }
+            LoginSecuritySignOutSection(
+                isSigningOut: isSigningOut,
+                onTap: startSignOut
+            )
         }
         .navigationTitle("ログインとセキュリティ")
         .megrumInlineNavigationTitle()

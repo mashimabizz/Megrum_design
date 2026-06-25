@@ -4,6 +4,47 @@
 
 ---
 
+## イテレーション1115：login security sectionsを分離
+
+### 背景・問題意識
+
+`LoginSecuritySettingsScreen` は、パスワード再設定の入力状態、FocusState、認証summary生成、サインアウト実行を持ちながら、現在の状態sectionとログアウトsectionの表示も同じ `body` に抱えていた。フォーム状態と副作用は親に残し、純表示に近いsectionを専用Viewへ分離する。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/SettingsLoginSecurityViews.swift`
+- 現在の状態sectionを `LoginSecurityStatusSection` 呼び出しへ置き換えた。
+- ログアウトsectionを `LoginSecuritySignOutSection` 呼び出しへ置き換えた。
+- パスワード再設定フォーム、validation、feedback、FocusState、サインアウトTaskは親画面に残した。
+
+#### `ios-native/Sources/MegrumApp/LoginSecuritySettingsSections.swift`
+- `LoginSecurityStatusSection` を追加し、認証状態、ログインメール、認証ユーザーID、プロフィールID、接続状態、アカウント状態のrow表示を移動した。
+- `LoginSecuritySignOutSection` を追加し、ログアウトbutton rowとfooter文言を移動した。
+
+### 影響範囲
+
+- Swift Native iOS版のログインとセキュリティ画面。
+- 認証状態summary表示、パスワード再設定、ログアウト導線。
+- パスワード再設定validation、AuthState feedback、サインアウト処理、DB/API、状態名、表示文言は変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumApp/SettingsLoginSecurityViews.swift ios-native/Sources/MegrumApp/LoginSecuritySettingsSections.swift`
+  - passed
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-login-security-sections`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-login-security-sections --enable-xctest --disable-swift-testing -j 1 --filter 'SettingsScreenTests|MegrumAppStateTests|AuthScreenInputTests'`
+  - passed（110 tests）
+
+### セルフレビュー結果
+
+- ✅ 認証状態、ログインメール、認証ユーザーID、プロフィールID、接続状態、アカウント状態のrow表示を維持した。
+- ✅ パスワード再設定フォーム、validation、feedback表示、keyboard toolbar、FocusState、ログアウトTaskを維持した。
+- ✅ `SettingsLoginSecurityViews.swift` は181行から167行へ縮小し、状態表示/ログアウトsectionを34行の専用ファイルへ分離した。
+- ✅ 新しい状態名・用語・DB列は追加していないため、`notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション1114：privacy settings contentを分離
 
 ### 背景・問題意識
