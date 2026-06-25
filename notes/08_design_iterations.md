@@ -4,6 +4,45 @@
 
 ---
 
+## イテレーション1086：proposal selectable goods artworkを分離
+
+### 背景・問題意識
+
+`ProposalSelectableGoodsRow.swift` は、候補row本体と、thumbnail、glyph fallback、checkmark、色/glyph resolverを同じファイルに抱えていた。row側をtitle・subtitle・hint・選択状態の構成に集中させるため、artwork系のViewとstyle resolverを専用ファイルへ分離する。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/ProposalSelectableGoodsRow.swift`
+- `ProposalSelectableGoodsRemoteThumbnail`、`ProposalSelectableGoodsGlyphThumbnail`、`ProposalSelectableGoodsCheckmark`、`ProposalSelectableGoodsRowStyle` を移動した。
+- row spacing、padding、background、border、tap action、accessibility label/valueは維持した。
+- artwork分離により不要になった `Foundation` importを削除した。
+
+#### `ios-native/Sources/MegrumApp/ProposalSelectableGoodsArtworkViews.swift`
+- remote thumbnail、glyph fallback thumbnail、checkmark、色/glyph resolverを追加した。
+- AsyncImageのsuccess/failure/loading分岐、clip shape、fallback glyph、selected checkmark表示を維持した。
+
+### 影響範囲
+
+- Swift Native iOS版の打診作成フローにおける候補グッズrow表示。
+- 候補選択、金額入力、step遷移、送信payload、DB/API、状態名、表示文言は変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumApp/ProposalSelectableGoodsRow.swift ios-native/Sources/MegrumApp/ProposalSelectableGoodsArtworkViews.swift`
+  - passed
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-proposal-selectable-goods-artwork`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-proposal-selectable-goods-artwork --enable-xctest --disable-swift-testing -j 1 --filter 'ProposalCreateFlowTests|ProposalCreateSheetTests'`
+  - passed（62 tests）
+
+### セルフレビュー結果
+
+- ✅ thumbnail色、fallback glyph、AsyncImage状態分岐、checkmark、row tap/accessibilityを維持した。
+- ✅ `ProposalSelectableGoodsRow.swift` は 193行から 86行へ縮小し、artwork系を 110行の専用ファイルへ分離した。
+- ✅ 新しい状態名・用語・DB列は追加していないため、`notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション1085：proposal selection controlsを分離
 
 ### 背景・問題意識
