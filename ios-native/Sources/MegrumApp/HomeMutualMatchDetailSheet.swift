@@ -52,40 +52,19 @@ struct HomeMutualMatchDetailSheet: View {
         .onChange(of: mutualPairs.map(\.id)) { _, _ in
             seedInitialSelection()
         }
-        .sheet(item: $nestedPresentation) { presentation in
-            switch presentation {
-            case .discoverySheet(let sheet):
-                HomeDiscoverySheetView(
-                    sheet: sheet,
-                    appState: appState,
-                    viewerOfferGoods: viewerOfferGoods,
-                    presentationContext: .additionalCandidate,
-                    onClose: {
-                        nestedPresentation = nil
-                    },
-                    onAddExtraProposalSelection: { selection in
-                        addedExtraSelections.append(selection)
-                        nestedPresentation = nil
-                    },
-                    onOpenOwnerProfile: openOwnerProfile,
-                    onStartProposal: startNestedProposal
-                )
-                .presentationDetents([.large])
-                .presentationDragIndicator(.visible)
-            case .publicProfile(let route):
-                if let appState {
-                    NavigationStack {
-                        PublicUserProfileScreen(
-                            appState: appState,
-                            userID: route.userID,
-                            presentationContext: .stackedFromHomeDiscoverySheet
-                        )
-                    }
-                    .presentationDetents([.large])
-                    .presentationDragIndicator(.visible)
-                }
-            }
-        }
+        .modifier(
+            HomeMutualMatchNestedPresentationModifier(
+                nestedPresentation: $nestedPresentation,
+                appState: appState,
+                viewerOfferGoods: viewerOfferGoods,
+                onAddExtraProposalSelection: { selection in
+                    addedExtraSelections.append(selection)
+                    nestedPresentation = nil
+                },
+                onOpenOwnerProfile: openOwnerProfile,
+                onStartProposal: startNestedProposal
+            )
+        )
     }
 
     private var mutualPairs: [HomeMutualMatchProposalPair] {

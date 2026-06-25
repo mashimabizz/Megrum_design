@@ -4,6 +4,46 @@
 
 ---
 
+## イテレーション1057：home mutual match nested presentationを分離
+
+### 背景・問題意識
+
+`HomeMutualMatchDetailSheet.swift` は、相互マッチpair選択、追加候補payload、proposal開始処理に加えて、追加候補sheetとpublic profileのnested presentationも同じbodyに抱えていた。選択/payload処理は親Viewに残し、nested sheet presentationだけを専用modifierへ分離した。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/HomeMutualMatchDetailSheet.swift`
+- `HomeMutualMatchNestedPresentationModifier` を適用し、`nestedPresentation` のsheet表示を委譲した。
+- pair選択、partner-scoped payload生成、extra selection保持、proposal開始、owner profile routingは親Viewに残した。
+
+#### `ios-native/Sources/MegrumApp/HomeMutualMatchNestedPresentationModifier.swift`
+- `HomeMutualMatchNestedPresentationModifier` を追加し、additional candidateの `HomeDiscoverySheetView` とnested public profile表示を担当させた。
+- extra selection追加、owner profile routing、proposal開始は親から渡したcallbackで処理する構造にした。
+
+### 影響範囲
+
+- Swift Native iOS版のホーム相互マッチdetail sheet。
+- 追加候補sheet、nested public profile、extra proposal selection追加。
+- pair選択、payload生成、proposal開始、状態名、用語、DBスキーマ、表示文言は変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumApp/HomeMutualMatchDetailSheet.swift ios-native/Sources/MegrumApp/HomeMutualMatchNestedPresentationModifier.swift`
+  - passed
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-home-mutual-match-nested-presentation`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-home-mutual-match-nested-presentation --enable-xctest --disable-swift-testing -j 1 --filter 'HomeMutualMatchConditionPoliciesTests|HomeMutualMatchLiveDataTests|HomeScreenFlowTests'`
+  - passed（58 tests / 3 skipped）
+
+### セルフレビュー結果
+
+- ✅ nested presentationだけを専用modifierへ移し、pair選択、payload生成、extra selection保持、proposal開始は親Viewに残した。
+- ✅ additional candidate sheet、nested public profile、presentationDetents / dragIndicator、close/add/start callbacksを維持した。
+- ✅ `HomeMutualMatchDetailSheet.swift` は 226行から 205行へ縮小し、nested presentationを 44行の専用ファイルへ分離した。
+- ✅ 新しい状態名・用語・DB列は追加していないため、`notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション1056：trades detail presentationを分離
 
 ### 背景・問題意識
