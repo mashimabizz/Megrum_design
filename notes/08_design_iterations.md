@@ -4,6 +4,44 @@
 
 ---
 
+## イテレーション1031：ホームrotary card itemを分割
+
+### 背景・問題意識
+
+`HomeDiscoveryRotaryCard.swift` は、選択index、drag progress、swipe/tap処理に加えて、カード1枚の描画、3D回転、opacity、zIndex、layout計算まで同じファイルに抱えていた。gesture stateと表示itemを分けることで、カルーセル挙動を保ったまま、カード描画とlayout補助を小さく調整できるようにした。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/HomeDiscoveryRotaryCard.swift`
+- `HomeDiscoveryRotaryCard` 本体に、選択index、drag progress、visibleEntries計算、tap/swipe処理を残した。
+- 1枚分のカード描画を `HomeDiscoveryRotaryCardItem` へ委譲した。
+
+#### `ios-native/Sources/MegrumApp/HomeDiscoveryRotaryCardItem.swift`
+- `HomeRotaryGoodsStackLayout`、`HomeRotaryEntry`、`HomeDiscoveryRotaryCardItem` を追加した。
+- 既存のhero width/height、side peek、3D rotation、offset、opacity、zIndex、tap gesture、accessibility hidden条件を維持した。
+
+### 影響範囲
+
+- Swift Native iOS版のホーム発見カード内の複数グッズrotary表示。
+- 個別募集/ホーム候補で使われる `HomeDiscoveryRotaryCard`。
+- 選択index更新、swipe判定、tap時の詳細表示、条件tag、状態名、用語、DBスキーマ、表示文言は変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumApp/HomeDiscoveryRotaryCard.swift ios-native/Sources/MegrumApp/HomeDiscoveryRotaryCardItem.swift`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-home-rotary-card-item --enable-xctest --disable-swift-testing -j 1 --filter 'HomeDiscoveryMatchPolicyTests/testHomeRotaryGoodsStack'`
+  - passed（3 tests）
+
+### セルフレビュー結果
+
+- ✅ `HomeDiscoveryRotaryCard` の selection、drag progress、relative position、tap/swipe処理は変更していない。
+- ✅ `HomeRotaryGoodsStackLayout` は移動のみで、既存のlayout testを維持した。
+- ✅ `HomeDiscoveryRotaryCard.swift` は 277行から 217行へ縮小し、描画itemとlayout補助を 81行の専用ファイルへ分離した。
+- ✅ 新しい状態名・用語・DB列は追加していないため、`notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション1030：推しrequest controlsを分割
 
 ### 背景・問題意識
