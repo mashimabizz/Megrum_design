@@ -121,75 +121,21 @@ struct MatchRelationTreeCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            HStack(alignment: .firstTextBaseline) {
-                Text("個別募集\(index + 1)")
-                    .font(.system(size: 17, weight: .heavy, design: .rounded))
-                    .foregroundStyle(MegrumTheme.ink)
-                Text("選択肢 \(detail.selectableOptionCount) 件")
-                    .font(.system(size: 12, weight: .heavy, design: .rounded))
-                    .foregroundStyle(MegrumTheme.muted)
-                Spacer()
-                if let cashOption {
-                    Text(cashText(cashOption))
-                        .font(.system(size: 12, weight: .heavy, design: .rounded))
-                        .foregroundStyle(MegrumTheme.lavender)
-                        .padding(.horizontal, 10)
-                        .frame(height: 28)
-                        .background(MegrumTheme.lavender.opacity(0.12), in: Capsule())
-                }
-            }
+            MatchRelationTreeCardHeader(
+                index: index,
+                selectableOptionCount: detail.selectableOptionCount,
+                cashOption: cashOption
+            )
 
-            HStack(alignment: .top, spacing: 12) {
-                VStack(alignment: .leading, spacing: 10) {
-                    MatchRelationOwnerLabel(
-                        title: detail.isMyListing ? "@\(partnerHandle) が譲る候補" : "@\(partnerHandle) が譲るもの",
-                        color: MegrumTheme.pink
-                    )
-                    if detail.isMyListing {
-                        MatchRelationOptionList(
-                            detail: detail,
-                            viewpoint: .mine,
-                            partnerHandle: partnerHandle,
-                            highlightedItemID: highlightedItemID,
-                            selectedCandidateIDs: selectedCandidateIDs,
-                            onOpenPopup: onOpenPopup
-                        )
-                    } else {
-                        MatchRelationHaveList(
-                            detail: detail,
-                            highlightedItemID: highlightedItemID,
-                            selectedHaveIDs: selectedHaveIDs,
-                            onToggleHave: onToggleHave
-                        )
-                    }
-                }
-                .frame(maxWidth: .infinity, alignment: .topLeading)
-
-                VStack(alignment: .leading, spacing: 10) {
-                    MatchRelationOwnerLabel(
-                        title: detail.isMyListing ? "あなたが譲るもの" : "あなたが譲れる候補",
-                        color: MegrumTheme.lavender
-                    )
-                    if detail.isMyListing {
-                        MatchRelationHaveList(
-                            detail: detail,
-                            highlightedItemID: highlightedItemID,
-                            selectedHaveIDs: selectedHaveIDs,
-                            onToggleHave: onToggleHave
-                        )
-                    } else {
-                        MatchRelationOptionList(
-                            detail: detail,
-                            viewpoint: .partner,
-                            partnerHandle: partnerHandle,
-                            highlightedItemID: highlightedItemID,
-                            selectedCandidateIDs: selectedCandidateIDs,
-                            onOpenPopup: onOpenPopup
-                        )
-                    }
-                }
-                .frame(maxWidth: .infinity, alignment: .topLeading)
-            }
+            MatchRelationTreeCardColumns(
+                detail: detail,
+                partnerHandle: partnerHandle,
+                highlightedItemID: highlightedItemID,
+                selectedCandidateIDs: selectedCandidateIDs,
+                selectedHaveIDs: selectedHaveIDs,
+                onToggleHave: onToggleHave,
+                onOpenPopup: onOpenPopup
+            )
         }
         .padding(14)
         .background(.white, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
@@ -198,9 +144,5 @@ struct MatchRelationTreeCard: View {
                 .strokeBorder(MegrumTheme.ink.opacity(0.08), lineWidth: 1)
         }
         .shadow(color: MegrumTheme.ink.opacity(0.04), radius: 8, y: 2)
-    }
-
-    private func cashText(_ option: IndividualListingWishOption) -> String {
-        TradeAmountFormatter.fixedPrice(amount: option.cashAmount, fallback: "定価も可")
     }
 }

@@ -4,6 +4,48 @@
 
 ---
 
+## イテレーション1123：match relation tree card partsを分離
+
+### 背景・問題意識
+
+`MatchRelationScreenViews.swift` は、マッチ関係のsection表示、relation card一覧、tree card本体、tree card内のheader、金額pill、左右カラムの候補/譲るもの表示まで同じファイルに抱えていた。`MatchRelationTreeCard` をcard外枠とデータ受け渡しに寄せ、headerと2カラム表示を専用Viewへ分離する。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/MatchRelationScreenViews.swift`
+- `MatchRelationTreeCard` のheader描画を `MatchRelationTreeCardHeader` 呼び出しへ置き換えた。
+- 左右カラムの `MatchRelationOptionList` / `MatchRelationHaveList` 分岐を `MatchRelationTreeCardColumns` 呼び出しへ置き換えた。
+- card外枠、padding、background、stroke、shadow、選択state/callbackの受け渡しは維持した。
+
+#### `ios-native/Sources/MegrumApp/MatchRelationTreeCardParts.swift`
+- `MatchRelationTreeCardHeader` を追加し、個別募集番号、選択肢数、定価pillを移動した。
+- `MatchRelationTreeCardColumns` を追加し、左右カラムのレイアウトを移動した。
+- `MatchRelationTreePartnerColumn` / `MatchRelationTreeViewerColumn` を追加し、`detail.isMyListing` に応じた候補/譲るもの表示を分離した。
+
+### 影響範囲
+
+- Swift Native iOS版のマッチ関係画面。
+- 個別募集tree cardのheader、定価pill、相手側/自分側カラム表示。
+- マッチ候補生成、初期選択、選択toggle、popup target、swipe、DB/API、状態名、表示文言は変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumApp/MatchRelationScreenViews.swift ios-native/Sources/MegrumApp/MatchRelationTreeCardParts.swift`
+  - passed
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-match-relation-tree-parts`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-match-relation-tree-parts --enable-xctest --disable-swift-testing -j 1 --filter 'MatchRelationScreenTests|MatchRelationSelectionStateReducerTests|MegrumAppStateTests'`
+  - passed（97 tests）
+
+### セルフレビュー結果
+
+- ✅ 個別募集番号、選択肢数、定価pill、左右カラムのlabel、候補list、譲るものlist、余白、角丸、影を維持した。
+- ✅ `onToggleHave`、`onOpenPopup`、highlighted item、selected candidate/have stateの渡し方は変更していない。
+- ✅ `MatchRelationScreenViews.swift` は206行から148行へ縮小し、tree card内部表示を147行の専用ファイルへ分離した。
+- ✅ 新しい状態名・用語・DB列は追加していないため、`notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション1122：meguri location picker partsを分離
 
 ### 背景・問題意識
