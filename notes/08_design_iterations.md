@@ -4,6 +4,48 @@
 
 ---
 
+## イテレーション1131：individual listing selection filter viewsを分離
+
+### 背景・問題意識
+
+`IndividualListingSelectionFilter.swift` は、個別募集の選択フィルタ値・choices計算と、検索欄/グループ/グッズ種別/タグchip UIを同じファイルに抱えていた。フィルタの判定ロジックをデータ側に残し、SwiftUI表示部品を専用ファイルへ分離する。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/IndividualListingSelectionFilter.swift`
+- `IndividualListingSelectionFilter` と `IndividualListingSelectionFilterChoices` だけを残した。
+- `MegrumDesign` / `SwiftUI` importを外し、フィルタ判定・choices計算のファイルに寄せた。
+- `matches(_:)`、`reconcile(...)`、group/goods type/tag choices計算は維持した。
+
+#### `ios-native/Sources/MegrumApp/IndividualListingSelectionFilterViews.swift`
+- `IndividualListingSelectionSearchAndFilterBar` を移動した。
+- `IndividualListingFilterChoiceRow` を移動し、検索欄、clear button、グループ/グッズ種別/タグchip列の表示を維持した。
+- `onChange` によるfilter reconcileと、chip tapによる `groupID` / `goodsTypeID` / `tagNames` 更新を維持した。
+
+### 影響範囲
+
+- Swift Native iOS版の個別募集作成/編集の選択フィルタUI。
+- Wish選択、譲るグッズ選択で使う検索欄とfilter chip列。
+- フィルタ判定、選択状態更新、DB/API、状態名、表示文言は変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumApp/IndividualListingSelectionFilter.swift ios-native/Sources/MegrumApp/IndividualListingSelectionFilterViews.swift`
+  - passed
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-individual-listing-filter-views`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-individual-listing-filter-views --enable-xctest --disable-swift-testing -j 1 --filter 'IndividualListingDraftTests|SupabaseListingClientTests'`
+  - passed（47 tests）
+
+### セルフレビュー結果
+
+- ✅ 検索placeholder、検索語clear button、グループ/グッズ種別/タグchipの文言、選択判定、余白、角丸、色を維持した。
+- ✅ `IndividualListingSelectionFilter.matches(_:)`、`reconcile(...)`、choices生成、chip tap時のbinding更新は変更していない。
+- ✅ `IndividualListingSelectionFilter.swift` は235行から107行へ縮小し、UI部品を129行の専用ファイルへ分離した。
+- ✅ 新しい状態名・用語・DB列は追加していないため、`notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション1130：meguri message conversation viewsを分離
 
 ### 背景・問題意識
