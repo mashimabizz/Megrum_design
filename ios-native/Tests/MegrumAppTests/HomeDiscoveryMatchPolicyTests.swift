@@ -118,6 +118,116 @@ final class HomeDiscoveryMatchPolicyTests: XCTestCase {
         )
     }
 
+    func testOwnerSummaryProfileMetaShowsGenderEvaluationCountAndAverage() {
+        let owner = HomeDiscoveryGoodsOwnerSummary(
+            id: UUID(uuidString: "11111111-1111-1111-1111-111111111101")!,
+            displayName: "michilion",
+            handle: "michilion",
+            avatarURL: nil,
+            gender: .female,
+            age: 25,
+            prefecture: "東京都",
+            averageStars: 4.8,
+            evaluationCount: 32,
+            completedTradeCount: 12
+        )
+
+        XCTAssertEqual(owner.profileMetaText, "女性　評価32件　平均評価4.8")
+    }
+
+    func testOwnerExchangeSummaryFormatsLocalAndMailRowsForDetailSheet() {
+        let summary = HomeDiscoveryOwnerExchangeSummary.fromListingSignals(
+            HomeCandidateConditionSignals(
+                goods: .init(hasIndividualListingHit: true, hasWishHit: false),
+                exchange: .init(
+                    postalAcceptedByBoth: true,
+                    localExchangeSelected: true,
+                    prefectureMatches: true,
+                    dateMatches: true,
+                    partnerExchangeMethodTitle: "現地交換・郵送OK",
+                    partnerLocalConditionText: "東京都 / 東京ドーム / 相談して決める",
+                    partnerShippingFeeTitle: "送料 自己負担 / 発送 2〜4日以内"
+                )
+            )
+        )
+
+        XCTAssertEqual(summary?.methodTitle, "現地交換、郵送OK")
+        XCTAssertEqual(
+            summary?.rows,
+            [
+                "現地交換：東京都、日程相談",
+                "郵送交換：送料 自己負担、発送目安 2〜4日以内"
+            ]
+        )
+    }
+
+    func testFocusedWantedOptionUpdatesGoodsHitSelectionContext() {
+        let firstOffer = HomeDiscoveryFixtures.offerGoods[0]
+        let secondOffer = HomeDiscoveryFixtures.offerGoods[1]
+        let listingID = UUID(uuidString: "22222222-2222-2222-2222-222222222101")!
+        let firstOption = HomeIndividualListingWantedOption(
+            id: UUID(uuidString: "22222222-2222-2222-2222-222222222102")!,
+            listingID: listingID,
+            position: 1,
+            title: "選択肢1",
+            logic: .one,
+            kind: .goods,
+            matchingGoodsIDs: [firstOffer.id]
+        )
+        let secondOption = HomeIndividualListingWantedOption(
+            id: UUID(uuidString: "22222222-2222-2222-2222-222222222103")!,
+            listingID: listingID,
+            position: 2,
+            title: "選択肢2",
+            logic: .one,
+            kind: .goods,
+            matchingGoodsIDs: [secondOffer.id]
+        )
+        let selectionContext = HomeIndividualListingSelectionContext(
+            wantedLogic: .one,
+            offeredLogic: .all,
+            wantedOptions: [firstOption, secondOption],
+            detail: HomeIndividualListingDetailContext(
+                listingID: listingID,
+                wantedLogic: .one,
+                offeredLogic: .all,
+                wantedOptions: [firstOption, secondOption]
+            )
+        )
+        let payload = HomeDiscoverySheetPayload(
+            goods: HomeDiscoveryFixtures.selectedYellow,
+            signals: HomeCandidateConditionSignals(
+                goods: .init(hasIndividualListingHit: true, hasWishHit: false),
+                exchange: .init(
+                    postalAcceptedByBoth: false,
+                    localExchangeSelected: true,
+                    prefectureMatches: true,
+                    dateMatches: true
+                ),
+                individualListingSelection: selectionContext
+            )
+        )
+
+        let defaultContext = HomeGoodsHitDetailSelectionContext(
+            selection: payload,
+            viewerOfferGoods: [firstOffer, secondOffer],
+            selectionState: HomeListingSheetSelectionState()
+        )
+        XCTAssertTrue(defaultContext.showsWantedOptionPicker)
+        XCTAssertEqual(defaultContext.wantedOptions.map(\.id), [firstOption.id, secondOption.id])
+        XCTAssertEqual(defaultContext.selectedWantedOptionID, firstOption.id)
+
+        let focusedContext = HomeGoodsHitDetailSelectionContext(
+            selection: payload,
+            viewerOfferGoods: [firstOffer, secondOffer],
+            selectionState: HomeListingSheetSelectionState(selectedWantedIndices: [0]),
+            focusedWantedOptionID: secondOption.id
+        )
+        XCTAssertEqual(focusedContext.wantedOptions.map(\.id), [secondOption.id])
+        XCTAssertEqual(focusedContext.offerGoods.map(\.id), [secondOffer.id])
+        XCTAssertEqual(focusedContext.selectedWantedOptionID, secondOption.id)
+    }
+
     func testGoodsHitDetailRequiresOfferedMinimumBeforeProposalStart() {
         let firstReceive = HomeDiscoveryFixtures.selectedYellow
         let secondReceive = HomeDiscoveryFixtures.sanaBadge

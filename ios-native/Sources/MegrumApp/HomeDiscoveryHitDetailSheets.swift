@@ -17,6 +17,8 @@ struct HomeGoodsHitDetailSheet: View {
     var isWishCopyInProgress: Bool
     @State private var selectionState = HomeListingSheetSelectionState()
     @State private var proposalConfirmation: HomeProposalStartConfirmationPayload?
+    @State private var focusedWantedOptionID: UUID?
+    @State private var presentedWantedOptionDetail: HomeIndividualListingDetailContext?
 
     var body: some View {
         HomeSheetScaffold(
@@ -52,10 +54,13 @@ struct HomeGoodsHitDetailSheet: View {
                 )
             }
 
-            HomeSheetSectionTitle(
+            HomeWantedSelectionSectionHeader(
                 systemName: "person",
                 title: "相手の希望から譲を選ぶ",
-                trailing: selectionContext.wantedRequirementLabel
+                trailing: selectionContext.wantedRequirementLabel,
+                showsOtherOptionsButton: selectionContext.showsWantedOptionPicker
+                    && selection.individualListingSelection.detail != nil,
+                onOpenOtherOptions: openWantedOptionPicker
             )
             wantedSelectionRail
 
@@ -96,6 +101,15 @@ struct HomeGoodsHitDetailSheet: View {
         .onChange(of: selection.id) { _, _ in
             resetSelections()
         }
+        .sheet(item: $presentedWantedOptionDetail) { detail in
+            HomeIndividualListingDetailPopup(
+                detail: detail,
+                selectedWantedOptionID: selectionContext.selectedWantedOptionID,
+                onSelectWantedOption: selectWantedOptionFromDetail
+            )
+            .presentationDetents([.medium, .large])
+            .presentationDragIndicator(.visible)
+        }
         .sheet(item: $proposalConfirmation) { confirmation in
             HomeProposalStartConfirmationSheet(
                 payload: confirmation,
@@ -110,7 +124,8 @@ struct HomeGoodsHitDetailSheet: View {
         HomeGoodsHitDetailSelectionContext(
             selection: selection,
             viewerOfferGoods: viewerOfferGoods,
-            selectionState: selectionState
+            selectionState: selectionState,
+            focusedWantedOptionID: focusedWantedOptionID
         )
     }
 
@@ -181,7 +196,27 @@ struct HomeGoodsHitDetailSheet: View {
     }
 
     private func resetSelections() {
+        focusedWantedOptionID = nil
         prepareInitialSelections()
+    }
+
+    private func openWantedOptionPicker() {
+        presentedWantedOptionDetail = selection.individualListingSelection.detail
+    }
+
+    private func selectWantedOptionFromDetail(_ option: HomeIndividualListingWantedOption) {
+        focusedWantedOptionID = option.id
+        selectionState = HomeListingSheetSelectionState(
+            selectedWantedIndices: [0],
+            selectedOfferIndices: [],
+            selectedReceiveIndices: selectionState.selectedReceiveIndices,
+            cashAmountText: ""
+        )
+        presentedWantedOptionDetail = nil
+        fillSuggestedCashAmountIfNeeded()
+        if preselectPreferredOffer {
+            selectPreferredOfferIfNeeded()
+        }
     }
 
     private func fillSuggestedCashAmountIfNeeded() {
@@ -229,5 +264,56 @@ struct HomeGoodsHitDetailSheet: View {
             return receiverGoods
         }
         return proposalSelection.receiverGoods.map { [$0] } ?? [selection.goods]
+    }
+}
+
+private struct HomeWantedSelectionSectionHeader: View {
+    var systemName: String
+    var title: String
+    var trailing: String?
+    var showsOtherOptionsButton: Bool
+    var onOpenOtherOptions: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(alignment: .center, spacing: 10) {
+                HStack(spacing: 9) {
+                    Image(systemName: systemName)
+                        .font(.system(size: 19, weight: .bold))
+                        .foregroundStyle(MegrumTheme.lavender)
+                    Text(title)
+                        .font(.system(size: 19, weight: .black, design: .rounded))
+                        .foregroundStyle(MegrumTheme.ink)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.72)
+                }
+
+                Spacer(minLength: 4)
+
+                if showsOtherOptionsButton {
+                    Button("他の選択肢", systemImage: "list.bullet.rectangle", action: onOpenOtherOptions)
+                        .font(.system(size: 12.5, weight: .black, design: .rounded))
+                        .foregroundStyle(MegrumTheme.lavender)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.70)
+                        .padding(.horizontal, 9)
+                        .frame(height: 30)
+                        .background(MegrumTheme.lavender.opacity(0.10), in: Capsule())
+                        .overlay {
+                            Capsule()
+                                .strokeBorder(MegrumTheme.lavender.opacity(0.20), lineWidth: 1)
+                        }
+                        .buttonStyle(.plain)
+                }
+
+                if let trailing {
+                    Text(trailing)
+                        .font(.system(size: 14, weight: .black, design: .rounded))
+                        .foregroundStyle(MegrumTheme.lavender)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.72)
+                }
+            }
+        }
     }
 }

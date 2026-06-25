@@ -4,6 +4,67 @@
 
 ---
 
+## イテレーション983：候補詳細の相手情報と選択肢切替を改善
+
+### 背景・問題意識
+
+ホームのマッチ候補でグッズ画像をタップした後のシートについて、「選んだグッズ」見出し位置に相手ユーザーの基本情報を出し、交換条件を現地/郵送の具体条件として読める形にしたい。また、個別募集の求めるものが複数選択肢ある場合、別の選択肢へ切り替えて、その選択肢に合わせて譲る候補一覧を更新できる必要があった。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/HomeDiscoverySheetSharedViews.swift`
+#### `ios-native/Sources/MegrumApp/HomeDiscoveryOwnerSummaryViews.swift`
+- 「選んだグッズ」見出しの位置に、相手のユーザーネーム、性別、評価件数、平均評価を表示するようにした。
+- 相手情報部分はこれまで通りタップでプロフィールを開く導線として維持した。
+- 個別募集以外の別タイトル表示では、従来通りグッズ右側にユーザー情報を表示する分岐を残した。
+
+#### `ios-native/Sources/MegrumApp/HomeDiscoveryOwnerSummaryModels.swift`
+- 個別募集経由の交換条件を、`交換条件` 小見出し配下に `現地交換：都道府県、日程` と `郵送交換：送料条件、発送目安` の行で出せるように整形した。
+- 未設定/対象外の値は行表示に出さず、相談系の日程は `日程相談` として表示するようにした。
+
+#### `ios-native/Sources/MegrumApp/HomeDiscoveryHitDetailSheets.swift`
+#### `ios-native/Sources/MegrumApp/HomeGoodsHitDetailSelectionContext.swift`
+#### `ios-native/Sources/MegrumApp/HomeIndividualListingDetailPopup.swift`
+- `相手の希望から譲を選ぶ` の横に `他の選択肢` ボタンを追加した。
+- ボタンから個別募集詳細ポップアップを開き、現在選択中の求めるもの選択肢を枠で示すようにした。
+- ポップアップ内で別の選択肢を選ぶと、その選択肢に絞ってシートの求めるもの/譲る候補一覧を再計算するようにした。
+
+#### `ios-native/Tests/MegrumAppTests/HomeDiscoveryMatchPolicyTests.swift`
+- 相手プロフィールメタ表示、現地/郵送の交換条件整形、選択肢切替時の候補更新をユニットテストで固定した。
+
+### 影響範囲
+
+- Swift Native iOS版ホームのマッチ候補タブ。
+- グッズ◎/個別募集経由の詳細シート。
+- 個別募集詳細ポップアップの求めるもの選択肢表示。
+- DBスキーマ、状態名、Proposal payload は変更しない。
+
+### 確認方法
+
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-hit-detail-options-test --disable-index-store --enable-xctest --disable-swift-testing -j 1 --filter 'HomeDiscoveryMatchPolicyTests/testOwnerSummaryProfileMetaShowsGenderEvaluationCountAndAverage|HomeDiscoveryMatchPolicyTests/testOwnerExchangeSummaryFormatsLocalAndMailRowsForDetailSheet|HomeDiscoveryMatchPolicyTests/testFocusedWantedOptionUpdatesGoodsHitSelectionContext|HomeDiscoveryMatchPolicyTests/testGoodsHitDetailRequiresOfferedMinimumBeforeProposalStart'`
+  - selected tests passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-hit-detail-home-tests --disable-index-store --enable-xctest --disable-swift-testing -j 1 --filter 'HomeDiscoveryMatchPolicyTests|HomeCandidateComposerTests|HomeScreenFlowTests'`
+  - Home related tests passed
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-hit-detail-options-build --disable-index-store`
+  - passed
+- `xcodebuild -quiet -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -destination 'id=C70DDDBB-2602-49E0-8F95-1F043BCCED76' -derivedDataPath /tmp/megrum-ios-native-hit-detail-options-xcode build`
+  - passed
+- `xcrun simctl install C70DDDBB-2602-49E0-8F95-1F043BCCED76 /tmp/megrum-ios-native-hit-detail-options-xcode/Build/Products/Debug-iphonesimulator/MegrumNative.app`
+  - passed
+- `xcrun simctl launch C70DDDBB-2602-49E0-8F95-1F043BCCED76 tokyo.megrum.native.preview`
+  - launched
+- `xcrun simctl io C70DDDBB-2602-49E0-8F95-1F043BCCED76 screenshot /tmp/megrum-hit-detail-options-after-wait.png`
+  - screenshot captured
+
+### セルフレビュー結果
+
+- ✅ 「選んだグッズ」位置の相手情報表示は、プロフィール遷移のButton構造を維持した。
+- ✅ 交換条件は紫の強調タグではなく、支払い条件に近い密度のテキスト行として表示するようにした。
+- ✅ `他の選択肢` で選んだ求めるものを、打診用の譲る候補一覧に反映するようにした。
+- ✅ 状態名、用語定義、DBスキーマの追加はないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション982：michilion向け受け取り選択データを追加
 
 ### 背景・問題意識

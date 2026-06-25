@@ -4,6 +4,18 @@ import SwiftUI
 
 struct HomeIndividualListingDetailPopup: View {
     var detail: HomeIndividualListingDetailContext
+    var selectedWantedOptionID: UUID?
+    var onSelectWantedOption: ((HomeIndividualListingWantedOption) -> Void)?
+
+    init(
+        detail: HomeIndividualListingDetailContext,
+        selectedWantedOptionID: UUID? = nil,
+        onSelectWantedOption: ((HomeIndividualListingWantedOption) -> Void)? = nil
+    ) {
+        self.detail = detail
+        self.selectedWantedOptionID = selectedWantedOptionID
+        self.onSelectWantedOption = onSelectWantedOption
+    }
 
     var body: some View {
         HomeSheetScaffold(bottomButton: nil) {
@@ -12,7 +24,11 @@ struct HomeIndividualListingDetailPopup: View {
                     .font(.system(size: 21, weight: .black, design: .rounded))
                     .foregroundStyle(MegrumTheme.ink)
 
-                HomeIndividualListingCombinationPanels(detail: detail)
+                HomeIndividualListingCombinationPanels(
+                    detail: detail,
+                    selectedWantedOptionID: selectedWantedOptionID,
+                    onSelectWantedOption: onSelectWantedOption
+                )
             }
         }
     }
@@ -20,10 +36,26 @@ struct HomeIndividualListingDetailPopup: View {
 
 private struct HomeIndividualListingCombinationPanels: View {
     var detail: HomeIndividualListingDetailContext
+    var selectedWantedOptionID: UUID?
+    var onSelectWantedOption: ((HomeIndividualListingWantedOption) -> Void)?
+
+    init(
+        detail: HomeIndividualListingDetailContext,
+        selectedWantedOptionID: UUID? = nil,
+        onSelectWantedOption: ((HomeIndividualListingWantedOption) -> Void)? = nil
+    ) {
+        self.detail = detail
+        self.selectedWantedOptionID = selectedWantedOptionID
+        self.onSelectWantedOption = onSelectWantedOption
+    }
 
     var body: some View {
         HStack(alignment: .top, spacing: 10) {
-            HomeIndividualListingWantedPanel(detail: detail)
+            HomeIndividualListingWantedPanel(
+                detail: detail,
+                selectedWantedOptionID: selectedWantedOptionID,
+                onSelectWantedOption: onSelectWantedOption
+            )
                 .frame(maxWidth: .infinity)
 
             HomeIndividualListingOfferedPanel(detail: detail)
@@ -34,6 +66,8 @@ private struct HomeIndividualListingCombinationPanels: View {
 
 private struct HomeIndividualListingWantedPanel: View {
     var detail: HomeIndividualListingDetailContext
+    var selectedWantedOptionID: UUID?
+    var onSelectWantedOption: ((HomeIndividualListingWantedOption) -> Void)?
 
     private var sortedOptions: [HomeIndividualListingWantedOption] {
         detail.wantedOptions.sorted { lhs, rhs in
@@ -56,7 +90,14 @@ private struct HomeIndividualListingWantedPanel: View {
 
             VStack(spacing: 0) {
                 ForEach(Array(sortedOptions.enumerated()), id: \.element.id) { index, option in
-                    HomeIndividualListingWantedRow(index: index + 1, option: option)
+                    HomeIndividualListingWantedSelectableRow(
+                        index: index + 1,
+                        option: option,
+                        isSelected: selectedWantedOptionID == option.id,
+                        onSelect: onSelectWantedOption.map { action in
+                            { action(option) }
+                        }
+                    )
                     if index < sortedOptions.count - 1 {
                         Divider()
                     }
@@ -77,6 +118,44 @@ private struct HomeIndividualListingWantedPanel: View {
             RoundedRectangle(cornerRadius: 22, style: .continuous)
                 .strokeBorder(MegrumTheme.ink.opacity(0.07), lineWidth: 1)
         }
+    }
+}
+
+private struct HomeIndividualListingWantedSelectableRow: View {
+    var index: Int
+    var option: HomeIndividualListingWantedOption
+    var isSelected: Bool
+    var onSelect: (() -> Void)?
+
+    var body: some View {
+        Group {
+            if let onSelect {
+                Button(action: onSelect) {
+                    content
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("\(IndividualListingListPresentation.optionTitle(index: index))、\(option.title)")
+                .accessibilityAddTraits(isSelected ? [.isSelected] : [])
+            } else {
+                content
+            }
+        }
+    }
+
+    private var content: some View {
+        HomeIndividualListingWantedRow(index: index, option: option)
+            .padding(.horizontal, isSelected ? 8 : 0)
+            .background(
+                RoundedRectangle(cornerRadius: 15, style: .continuous)
+                    .fill(isSelected ? MegrumTheme.lavender.opacity(0.07) : Color.clear)
+            )
+            .overlay {
+                if isSelected {
+                    RoundedRectangle(cornerRadius: 15, style: .continuous)
+                        .strokeBorder(MegrumTheme.lavender.opacity(0.72), lineWidth: 2)
+                }
+            }
+            .contentShape(RoundedRectangle(cornerRadius: 15, style: .continuous))
     }
 }
 

@@ -5,13 +5,17 @@ struct HomeGoodsHitDetailSelectionContext {
     var selection: HomeDiscoverySheetPayload
     var viewerOfferGoods: [HomeMockGoods]
     var selectionState: HomeListingSheetSelectionState
+    var focusedWantedOptionID: UUID?
 
     var wantedGoods: [HomeMockGoods] {
         HomeDiscoveryFixtures.wantedGoods
     }
 
     var wantedOptions: [HomeIndividualListingWantedOption] {
-        selection.individualListingSelection.wantedOptions
+        if let focusedWantedOption {
+            return [focusedWantedOption]
+        }
+        return selectableWantedOptions
     }
 
     var receiveGoods: [HomeMockGoods] {
@@ -48,7 +52,15 @@ struct HomeGoodsHitDetailSelectionContext {
     }
 
     var usesListingWantedOptions: Bool {
-        !wantedOptions.isEmpty
+        !availableWantedOptions.isEmpty
+    }
+
+    var showsWantedOptionPicker: Bool {
+        availableWantedOptions.count > 1
+    }
+
+    var selectedWantedOptionID: UUID? {
+        selectedWantedOptions.first?.id ?? focusedWantedOptionID ?? wantedOptions.first?.id
     }
 
     var allOfferGoods: [HomeMockGoods] {
@@ -265,5 +277,21 @@ struct HomeGoodsHitDetailSelectionContext {
 
     private var preferredReceiveIndex: Int? {
         receiveGoods.firstIndex { $0.id == selection.goods.id }
+    }
+
+    private var selectableWantedOptions: [HomeIndividualListingWantedOption] {
+        selection.individualListingSelection.wantedOptions
+    }
+
+    private var availableWantedOptions: [HomeIndividualListingWantedOption] {
+        let detailOptions = selection.individualListingSelection.detail?.wantedOptions ?? []
+        return detailOptions.isEmpty ? selectableWantedOptions : detailOptions
+    }
+
+    private var focusedWantedOption: HomeIndividualListingWantedOption? {
+        guard let focusedWantedOptionID else {
+            return nil
+        }
+        return availableWantedOptions.first { $0.id == focusedWantedOptionID }
     }
 }

@@ -13,16 +13,20 @@ struct HomeSelectedGoodsHeader: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Text(title)
-                .font(.system(size: 14, weight: .black, design: .rounded))
-                .foregroundStyle(MegrumTheme.ink)
+            if usesOwnerSummaryAsHeader, let ownerSummary = goods.ownerSummary {
+                HomeUserSummary(owner: ownerSummary, onOpenProfile: onOpenOwnerProfile)
+            } else {
+                Text(title)
+                    .font(.system(size: 14, weight: .black, design: .rounded))
+                    .foregroundStyle(MegrumTheme.ink)
+            }
 
             HStack(alignment: .top, spacing: 20) {
                 HomeSelectedGoodsSingleCard(goods: goods, conditionTags: conditionTags)
                     .frame(width: 136, height: 162)
 
                 VStack(alignment: .leading, spacing: 10) {
-                    if let ownerSummary = goods.ownerSummary {
+                    if !usesOwnerSummaryAsHeader, let ownerSummary = goods.ownerSummary {
                         HomeUserSummary(owner: ownerSummary, onOpenProfile: onOpenOwnerProfile)
                     }
 
@@ -51,6 +55,10 @@ struct HomeSelectedGoodsHeader: View {
                 .presentationDetents([.medium, .large])
                 .presentationDragIndicator(.visible)
         }
+    }
+
+    private var usesOwnerSummaryAsHeader: Bool {
+        title == "選んだグッズ"
     }
 }
 
