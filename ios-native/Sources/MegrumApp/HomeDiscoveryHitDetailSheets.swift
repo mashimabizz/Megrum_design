@@ -54,7 +54,7 @@ struct HomeGoodsHitDetailSheet: View {
 
             HomeSheetSectionTitle(
                 systemName: "person",
-                title: "相手の希望から譲ろうを選ぶ",
+                title: "相手の希望から譲を選ぶ",
                 trailing: selectionContext.wantedRequirementLabel
             )
             wantedSelectionRail

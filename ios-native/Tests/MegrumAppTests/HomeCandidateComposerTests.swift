@@ -1208,6 +1208,100 @@ final class HomeCandidateComposerTests: XCTestCase {
         XCTAssertEqual(detail.offeredItems.map(\.title), ["条件一致の相手グッズ1", "条件一致の相手グッズ2"])
     }
 
+    func testExplicitHaveIDsDoNotUseStaleConditionFieldsForCandidateMatching() throws {
+        let viewerHaveID = "10000000-0000-0000-0000-000000000091"
+        let oldPartnerHaveID = "10000000-0000-0000-0000-000000000092"
+        let targetPartnerHaveID = "10000000-0000-0000-0000-000000000093"
+        let oldListingID = "10000000-0000-0000-0000-000000000094"
+        let targetListingID = "10000000-0000-0000-0000-000000000095"
+        let groupID = "20000000-0000-0000-0000-000000000091"
+        let goodsTypeID = "30000000-0000-0000-0000-000000000091"
+
+        let composition = SupabaseHomeComposition(
+            localMode: nil,
+            viewerInventory: [
+                try goodsRow(
+                    id: viewerHaveID,
+                    userID: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+                    groupID: groupID,
+                    goodsTypeID: goodsTypeID,
+                    title: "自分が譲るグッズ"
+                )
+            ],
+            viewerWishes: [],
+            viewerListings: [],
+            partnerInventory: [
+                try goodsRow(
+                    id: oldPartnerHaveID,
+                    userID: "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+                    groupID: groupID,
+                    goodsTypeID: goodsTypeID,
+                    title: "古い募集の譲るグッズ"
+                ),
+                try goodsRow(
+                    id: targetPartnerHaveID,
+                    userID: "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+                    groupID: groupID,
+                    goodsTypeID: goodsTypeID,
+                    title: "対象の譲るグッズ"
+                )
+            ],
+            partnerWishes: [],
+            partnerUsers: [
+                try userRow(
+                    id: "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+                    handle: "explicit_have_ids",
+                    primaryArea: "大阪府"
+                )
+            ],
+            partnerListings: [
+                try listingRow(
+                    id: oldListingID,
+                    userID: "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+                    haveIDs: [oldPartnerHaveID],
+                    haveGroupID: groupID,
+                    haveGoodsTypeID: goodsTypeID,
+                    haveLogic: "or"
+                ),
+                try listingRow(
+                    id: targetListingID,
+                    userID: "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+                    haveIDs: [targetPartnerHaveID],
+                    haveGroupID: nil,
+                    haveGoodsTypeID: nil,
+                    haveLogic: "or"
+                )
+            ],
+            listingWishOptions: [
+                try listingWishOptionRow(
+                    id: "10000000-0000-0000-0000-000000000096",
+                    listingID: oldListingID,
+                    wishIDs: [],
+                    wishGroupID: groupID,
+                    wishGoodsTypeID: goodsTypeID
+                ),
+                try listingWishOptionRow(
+                    id: "10000000-0000-0000-0000-000000000097",
+                    listingID: targetListingID,
+                    wishIDs: [],
+                    wishGroupID: groupID,
+                    wishGoodsTypeID: goodsTypeID
+                )
+            ],
+            viewerActivityWindows: [],
+            partnerActivityWindows: [],
+            inventoryTags: [],
+            unreadNotificationIDs: []
+        )
+
+        let sections = HomeCandidateComposer.sections(from: composition)
+        let signals = try XCTUnwrap(sections.conditionSignalsByItemID[UUID(uuidString: targetPartnerHaveID)!])
+        let selection = try XCTUnwrap(signals.individualListingSelection)
+
+        XCTAssertEqual(selection.detail?.listingID, UUID(uuidString: targetListingID))
+        XCTAssertEqual(selection.detail?.offeredItems.map(\.id), [UUID(uuidString: targetPartnerHaveID)!])
+    }
+
     func testComposerKeepsOneSidedCandidatesPossible() throws {
         let composition = SupabaseHomeComposition(
             localMode: nil,

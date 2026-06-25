@@ -4,6 +4,68 @@
 
 ---
 
+## イテレーション982：michilion向け受け取り選択データを追加
+
+### 背景・問題意識
+
+ホームのマッチ候補で個別募集経由のグッズ◎をタップした時、相手が「譲るもの」を複数件から何個以上で指定しているケースを、michilion アカウントから実データで確認できる状態にしたい。また、シート内の小見出し文言を「相手の希望から譲を選ぶ」へ変更する必要があった。
+
+### 変更内容
+
+#### `scripts/seed_michilion_receive_selection_live_data.py`
+- Supabase のライブデータに、michilion から確認できる個別募集ケースを投入するseed scriptを追加した。
+- `haru_trade_0624` の募集として、譲るもの3件から2個以上を受け取る `at_least` 条件を作成する。
+- michilion 側の既存在庫「ジン トレカ」を、相手が求めるものに一致する確認用データとして利用する。
+
+#### `ios-native/Sources/MegrumApp/HomeDiscoveryHitDetailSheets.swift`
+- 小見出し文言を「相手の希望から譲ろうを選ぶ」から「相手の希望から譲を選ぶ」へ変更した。
+
+#### `ios-native/Sources/MegrumApp/HomeCandidateListingMatchPolicy.swift`
+- `have_ids` が明示されている個別募集は、そのID群だけで候補一致を判定するようにした。
+- 明示ID付きの古い募集が、残っているグループ/種別条件で別の候補を拾ってしまう挙動を防いだ。
+
+#### `ios-native/Tests/MegrumAppTests/HomeMutualMatchLiveDataTests.swift`
+#### `ios-native/Tests/MegrumAppTests/HomeCandidateComposerTests.swift`
+- michilion 視点のライブデータで、「受け取るものを選ぶ」セクションが出ることを確認する gated test を追加した。
+- 明示 `have_ids` の募集が stale condition fields で誤一致しないことをユニットテストで固定した。
+
+### 影響範囲
+
+- Swift Native iOS版ホームのマッチ候補/個別募集経由の詳細シート。
+- ライブSupabase上の確認用テストデータ。
+- 個別募集の `have_ids` 一致判定。
+- DBスキーマ、状態名、Proposal payload は変更しない。
+
+### 確認方法
+
+- `scripts/seed_michilion_receive_selection_live_data.py`
+  - passed
+  - listing `150b273c-1674-559a-9237-bd0bb5411c60` を作成/更新
+  - partner `haru_trade_0624` の譲るもの3件から2個以上の募集として確認
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-receive-selection-unit --disable-index-store --enable-xctest --disable-swift-testing -j 1 --filter 'HomeCandidateComposerTests/testExplicitHaveIDsDoNotUseStaleConditionFieldsForCandidateMatching|HomeCandidateComposerTests/testComposerExpandsConditionBasedListingOfferItemsForDetailContext|HomeDiscoveryMatchPolicyTests/testReceiveSelectionRequiresAtLeastMinimumBeforeProposalStart'`
+  - selected tests passed
+- `MEGRUM_LIVE_MICHILION_RECEIVE_SELECTION_TEST=1 MEGRUM_MUTUAL_MATCH_VIEWER_ID=72ea1426-24ce-46b3-a22f-886c67498b02 MEGRUM_RECEIVE_SELECTION_EXPECTED_HANDLE=haru_trade_0624 swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-receive-selection-live-2 --disable-index-store --enable-xctest --disable-swift-testing -j 1 --filter 'HomeMutualMatchLiveDataTests/testMichilionLiveReceiveSelectionAppearsForSeededPartnerListing'`
+  - passed
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-receive-selection-build --disable-index-store`
+  - passed
+- `xcodebuild -quiet -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -destination 'id=C70DDDBB-2602-49E0-8F95-1F043BCCED76' -derivedDataPath /tmp/megrum-ios-native-receive-selection-xcode build`
+  - passed
+- `xcrun simctl install C70DDDBB-2602-49E0-8F95-1F043BCCED76 /tmp/megrum-ios-native-receive-selection-xcode/Build/Products/Debug-iphonesimulator/MegrumNative.app`
+  - passed
+- `xcrun simctl launch C70DDDBB-2602-49E0-8F95-1F043BCCED76 tokyo.megrum.native.preview`
+  - launched
+- `xcrun simctl io C70DDDBB-2602-49E0-8F95-1F043BCCED76 screenshot /tmp/megrum-receive-selection-live.png`
+  - screenshot captured
+
+### セルフレビュー結果
+
+- ✅ michilion から確認できる実データとして、相手が複数の譲るものを `2個以上` で指定する募集を投入した。
+- ✅ ライブデータのgated testで、`受け取るものを選ぶ` が出る条件を確認した。
+- ✅ 明示 `have_ids` の募集が別募集の条件一致へ流れないよう、候補一致ロジックを絞った。
+- ✅ DBスキーマ、状態名、用語定義の追加はないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション981：個別募集詳細の交換条件表示と相手募集データを補正
 
 ### 背景・問題意識

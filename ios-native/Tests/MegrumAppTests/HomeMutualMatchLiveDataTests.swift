@@ -63,6 +63,52 @@ final class HomeMutualMatchLiveDataTests: XCTestCase {
         XCTAssertEqual(uiCandidate.viewerGoodsItems.first?.memberName, "ジン")
     }
 
+    func testMichilionLiveReceiveSelectionAppearsForSeededPartnerListing() async throws {
+        let environment = ProcessInfo.processInfo.environment
+        guard environment["MEGRUM_LIVE_MICHILION_RECEIVE_SELECTION_TEST"] == "1" else {
+            throw XCTSkip("Set MEGRUM_LIVE_MICHILION_RECEIVE_SELECTION_TEST=1 after running scripts/seed_michilion_receive_selection_live_data.py.")
+        }
+        guard
+            let configuration = SupabaseConfiguration.fromEnvironment(environment),
+            let viewerIDValue = environment["MEGRUM_MUTUAL_MATCH_VIEWER_ID"],
+            let viewerID = UUID(uuidString: viewerIDValue)
+        else {
+            XCTFail("Missing MEGRUM_SUPABASE_URL / MEGRUM_SUPABASE_PUBLISHABLE_KEY / MEGRUM_MUTUAL_MATCH_VIEWER_ID.")
+            return
+        }
+
+        let expectedHandle = environment["MEGRUM_RECEIVE_SELECTION_EXPECTED_HANDLE"] ?? "haru_trade_0624"
+        let composition = try await loadScopedLiveComposition(
+            configuration: configuration,
+            viewerID: viewerID,
+            expectedPartnerHandle: expectedHandle
+        )
+        let sections = HomeCandidateComposer.sections(from: composition)
+        let expectedOwnerID = try XCTUnwrap(composition.partnerUsers.first?.id)
+        let candidate = try XCTUnwrap(
+            receiveSelectionCandidate(in: sections, expectedOwnerID: expectedOwnerID),
+            "The seeded partner listing should create a goods candidate with receive selection context."
+        )
+        let signals = try XCTUnwrap(sections.conditionSignalsByItemID[candidate.id])
+        let detail = try XCTUnwrap(signals.individualListingSelection?.detail)
+
+        XCTAssertEqual(detail.offeredLogic, .atLeast)
+        XCTAssertEqual(detail.offeredMinimumCount, 2)
+        XCTAssertGreaterThanOrEqual(detail.offeredItems.count, 3)
+
+        let sheetContext = HomeGoodsHitDetailSelectionContext(
+            selection: HomeDiscoverySheetPayload(
+                goods: HomeMockGoods.from(item: candidate, index: 0, goodsTypes: []),
+                signals: signals
+            ),
+            viewerOfferGoods: [],
+            selectionState: HomeListingSheetSelectionState()
+        )
+        XCTAssertTrue(sheetContext.showsReceiveSelection)
+        XCTAssertEqual(sheetContext.receiveRequirementLabel, "2個以上")
+        XCTAssertEqual(sheetContext.receiveGoods.count, detail.offeredItems.count)
+    }
+
     private func loadScopedLiveComposition(
         configuration: SupabaseConfiguration,
         viewerID: UUID,
@@ -207,6 +253,23 @@ final class HomeMutualMatchLiveDataTests: XCTestCase {
 
     private func inFilter(_ ids: [UUID]) -> String {
         "in.(\(ids.map { $0.uuidString.lowercased() }.joined(separator: ",")))"
+    }
+
+    private func receiveSelectionCandidate(
+        in sections: HomeCandidateSections,
+        expectedOwnerID: UUID
+    ) -> GoodsItem? {
+        (sections.matchedItems + sections.possibleItems).first { item in
+            guard item.ownerID == expectedOwnerID,
+                  let selection = sections.conditionSignalsByItemID[item.id]?.individualListingSelection,
+                  let detail = selection.detail
+            else {
+                return false
+            }
+            return detail.offeredLogic == .atLeast
+                && detail.offeredMinimumCount >= 2
+                && detail.offeredItems.count > 1
+        }
     }
 
     private static let goodsSelect = "id,user_id,kind,group_id,character_id,character_request_id,goods_type_id,title,photo_urls,quantity,locked_qty,market_available_qty,exchange_type,hue,status,group:groups_master(name),character:characters_master(name),goods_type:goods_types_master(name),updated_at"

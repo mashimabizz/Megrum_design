@@ -36,14 +36,14 @@ enum HomeCandidateListingMatchPolicy {
         _ listing: SupabaseHomeListingRow,
         candidate: SupabaseHomeGoodsRow
     ) -> Bool {
-        if listing.haveIds.contains(candidate.id) {
-            return true
+        if !listing.haveIds.isEmpty {
+            return listing.haveIds.contains(candidate.id)
         }
         if HomeCandidateGoodsMatchPolicy.fieldMatches(listing.haveGroupId, candidate.groupId),
            HomeCandidateGoodsMatchPolicy.fieldMatches(listing.haveGoodsTypeId, candidate.goodsTypeId) {
             return true
         }
-        return listing.haveIds.isEmpty && listing.haveGroupId == nil && listing.haveGoodsTypeId == nil
+        return listing.haveGroupId == nil && listing.haveGoodsTypeId == nil
     }
 
     static func firstSelection(
