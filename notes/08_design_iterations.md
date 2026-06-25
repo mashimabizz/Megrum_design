@@ -4,6 +4,47 @@
 
 ---
 
+## イテレーション1064：account setup oshi componentsを分離
+
+### 背景・問題意識
+
+`AccountSetupOshiSection.swift` は、推し選択の検索/選択ロジックに加えて、header、chip、選択中サマリー、選択解除chipの見た目を同じViewに抱えていた。FocusStateを持つ検索fieldと選択トグル処理は親に残し、再利用しやすい表示部品だけを専用ファイルへ分離する。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/AccountSetupOshiSection.swift`
+- `AccountSetupOshiHeader`、`AccountSetupOshiChip`、`AccountSetupSelectedOshiSummary` を使う構成へ置き換えた。
+- グループ選択、メンバー選択、グループ全体選択、検索submit、FocusStateは親Viewに残した。
+
+#### `ios-native/Sources/MegrumApp/AccountSetupOshiComponents.swift`
+- header、推しchip、選択中サマリー、選択解除chipを追加した。
+- chipはSwiftUIの型推論タイムアウトを避けるため、label本体、fill色、foreground色、border色を小さなprivate propertyへ分けた。
+
+### 影響範囲
+
+- Swift Native iOS版のアカウント初期設定/編集内の推し選択section。
+- グループchip、メンバーchip、選択中chip、loading header。
+- 推し選択ロジック、保存payload、検索submit、FocusState、DB/API、状態名、用語、表示文言は変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumApp/AccountSetupOshiSection.swift ios-native/Sources/MegrumApp/AccountSetupOshiComponents.swift`
+  - passed
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-account-setup-oshi-components`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-account-setup-oshi-components --enable-xctest --disable-swift-testing -j 1 --filter 'AccountSetupScreenTests|OnboardingOshiSelectionTests|OshiSettingsDraftTests'`
+  - passed（23 tests）
+
+### セルフレビュー結果
+
+- ✅ FocusStateを持つ検索fieldと、グループ/メンバー/全体選択の状態更新は親Viewに残した。
+- ✅ chipのfont、height、padding、fill、foreground、border、accessibility label/value/hintを維持した。
+- ✅ 初回buildで `AccountSetupOshiChip` の型推論タイムアウトが出たため、label/styleを小分けにして解消した。
+- ✅ `AccountSetupOshiSection.swift` は 225行から 140行へ縮小し、表示部品を 121行の専用ファイルへ分離した。
+- ✅ 新しい状態名・用語・DB列は追加していないため、`notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション1063：home exchange calendar gridを分離
 
 ### 背景・問題意識
