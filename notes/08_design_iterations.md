@@ -4,6 +4,48 @@
 
 ---
 
+## イテレーション937：Supabase REST request builderを分割
+
+### 背景・問題意識
+
+`SupabaseRESTClient.swift` は、fetch/upsert/rpc/delete/storage実行処理と、URLRequest生成、共通ヘッダー、storage request、REST error/response modelを1ファイルに持っていた。全Data clientの足場なので挙動は変えず、実行処理とrequest builderを分けて、共通HTTP基盤の読み分けをしやすくする。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumData/SupabaseRESTClient.swift`
+- fetch/upsert/insert/update/rpc/delete/upload/signed URL実行処理に絞った。
+- request builder extensionから参照するため、`configuration` と `encoder` をmodule internalにした。
+- ファイル行数を376行から209行へ縮小した。
+
+#### `ios-native/Sources/MegrumData/SupabaseRESTRequestBuilder.swift`
+- `makeRequest`、`makeRPCRequest`、insert/upsert/delete request、storage upload/signed URL request、public storage URL、mutation query helperを新規ファイルへ移動した。
+- apikey/Auth/Accept/Content-Type/Preferヘッダー設定は維持し、共通ヘッダーだけ小さなhelperへ集約した。
+
+#### `ios-native/Sources/MegrumData/SupabaseRESTModels.swift`
+- `SupabaseRESTError` と `StorageSignedURLResponse` を新規ファイルへ移動した。
+
+### 影響範囲
+
+- Swift Native iOS版の全Supabase Data client、storage upload/signed URL/public URL、request builderを使うテスト・永続化処理。
+- 挙動変更ではなく責務分離。public request builder API、HTTP method、headers、query key、状態名、用語、DBスキーマは変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumData/SupabaseRESTClient.swift ios-native/Sources/MegrumData/SupabaseRESTRequestBuilder.swift ios-native/Sources/MegrumData/SupabaseRESTModels.swift`
+  - passed
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-rest-client-build --disable-index-store`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-rest-client-tests --disable-index-store --enable-xctest --disable-swift-testing -j 1 --filter 'SupabaseConfigurationTests|SupabaseRequestParityTests'`
+  - 17 tests passed
+
+### セルフレビュー結果
+
+- ✅ `makeRequest` / `makeMutationRequest` 系public API名と引数は維持した。
+- ✅ 共通ヘッダー、storage upload request、signed URL request、proposal/notification payload parityを既存テストで確認した。
+- ✅ 状態名・用語・DBスキーマの変更はないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション936：Supabase message modelsを分割
 
 ### 背景・問題意識
