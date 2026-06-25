@@ -7,12 +7,12 @@ public enum SupabaseGroomClientError: Error, Equatable, Sendable {
 }
 
 public final class SupabaseGroomClient: @unchecked Sendable {
-    private static let groomBucket = "groom-posts"
-    private static let maxUploadBytes = Int(9.5 * 1_024 * 1_024)
-    private static let maxFeedRadiusMeters = 1_000
-    private static let maxMapRadiusMeters = 3_000
-    private static let minRadiusMeters = 100
-    private let client: SupabaseRESTClient
+    static let groomBucket = "groom-posts"
+    static let maxUploadBytes = Int(9.5 * 1_024 * 1_024)
+    static let maxFeedRadiusMeters = 1_000
+    static let maxMapRadiusMeters = 3_000
+    static let minRadiusMeters = 100
+    let client: SupabaseRESTClient
 
     public init(configuration: SupabaseConfiguration, session: URLSession = .shared) {
         self.client = SupabaseRESTClient(configuration: configuration, session: session)
@@ -130,74 +130,6 @@ public final class SupabaseGroomClient: @unchecked Sendable {
         return post
     }
 
-    public func makeLoadNearbyGroomsRequest(
-        latitude: Double?,
-        longitude: Double?,
-        radiusMeters: Int = 1_000
-    ) throws -> URLRequest {
-        try client.makeRPCRequest(
-            function: "list_groom_feed_nearby",
-            payload: GroomFeedPayload(
-                latitude: latitude,
-                longitude: longitude,
-                radiusMeters: radiusMeters,
-                maxRadiusMeters: Self.maxFeedRadiusMeters,
-                minRadiusMeters: Self.minRadiusMeters
-            )
-        )
-    }
-
-    public func makeLoadGroomMapPostsRequest(
-        latitude: Double?,
-        longitude: Double?,
-        radiusMeters: Int = 3_000
-    ) throws -> URLRequest {
-        try client.makeRPCRequest(
-            function: "list_groom_feed_nearby",
-            payload: GroomFeedPayload(
-                latitude: latitude,
-                longitude: longitude,
-                radiusMeters: radiusMeters,
-                maxRadiusMeters: Self.maxMapRadiusMeters,
-                minRadiusMeters: Self.minRadiusMeters
-            )
-        )
-    }
-
-    public func makeLoadOwnGroomArchiveRequest(userID: UUID, limit: Int = 120) throws -> URLRequest {
-        try client.makeRequest(
-            path: "/rest/v1/groom_posts",
-            queryItems: [URLQueryItem(name: "select", value: GroomFeedRow.select)]
-                + ownGroomArchiveQueryItems(userID: userID, limit: limit)
-        )
-    }
-
-    public func makeLoadReactionsRequest(postIDs: [UUID]) throws -> URLRequest {
-        try client.makeRequest(
-            path: "/rest/v1/groom_reactions",
-            queryItems: [URLQueryItem(name: "select", value: GroomReactionRow.select)]
-                + engagementQueryItems(postIDs: postIDs, order: "created_at.desc") + [
-                    URLQueryItem(name: "reaction_type", value: "eq.like")
-                ]
-        )
-    }
-
-    public func makeLoadRepliesRequest(postIDs: [UUID]) throws -> URLRequest {
-        try client.makeRequest(
-            path: "/rest/v1/groom_replies",
-            queryItems: [URLQueryItem(name: "select", value: GroomReplyRow.select)]
-                + engagementQueryItems(postIDs: postIDs, order: "created_at.desc")
-        )
-    }
-
-    public func makeCreatePostRequest(_ input: GroomPostCreateInput, imagePath: String) throws -> URLRequest {
-        try client.makeInsertRequest(
-            into: "groom_posts",
-            values: [GroomPostInsertPayload(input: input, imagePath: imagePath)],
-            select: GroomFeedRow.select
-        )
-    }
-
     public func markViewed(userID: UUID, postID: UUID) async throws {
         let _: [GroomViewRow] = try await client.upsertRows(
             into: "groom_views",
@@ -225,32 +157,6 @@ public final class SupabaseGroomClient: @unchecked Sendable {
         }
     }
 
-    public func makeMarkViewedRequest(userID: UUID, postID: UUID) throws -> URLRequest {
-        try client.makeUpsertRequest(
-            into: "groom_views",
-            values: [GroomViewPayload(groomPostID: postID, userID: userID)],
-            onConflict: "groom_post_id,user_id"
-        )
-    }
-
-    public func makeSetLikedRequest(userID: UUID, postID: UUID, isLiked: Bool) throws -> URLRequest {
-        if isLiked {
-            return try client.makeUpsertRequest(
-                into: "groom_reactions",
-                values: [GroomReactionPayload(groomPostID: postID, userID: userID)],
-                onConflict: "groom_post_id,user_id,reaction_type"
-            )
-        }
-        return try client.makeDeleteRequest(
-            from: "groom_reactions",
-            queryItems: [
-                URLQueryItem(name: "groom_post_id", value: "eq.\(postID.uuidString.lowercased())"),
-                URLQueryItem(name: "user_id", value: "eq.\(userID.uuidString.lowercased())"),
-                URLQueryItem(name: "reaction_type", value: "eq.like")
-            ]
-        )
-    }
-
     public func sendReply(_ input: GroomReplyCreateInput) async throws -> GroomReply {
         let rows: [GroomReplyRow] = try await client.insertRows(
             into: "groom_replies",
@@ -262,63 +168,5 @@ public final class SupabaseGroomClient: @unchecked Sendable {
         }
         try? await createReplyNotification(reply: reply)
         return reply
-    }
-
-    public func makeSendReplyRequest(_ input: GroomReplyCreateInput) throws -> URLRequest {
-        try client.makeInsertRequest(
-            into: "groom_replies",
-            values: [GroomReplyPayload(input: input)],
-            select: GroomReplyRow.select
-        )
-    }
-
-    public func makeReplyNotificationRequest(reply: GroomReply) throws -> URLRequest {
-        try client.makeInsertRequest(
-            into: "notifications",
-            values: [GroomReplyNotificationPayload(reply: reply)],
-            select: "id"
-        )
-    }
-
-    private func signedURLMap(for rows: [GroomFeedRow]) async -> [String: URL] {
-        var signedURLs: [String: URL] = [:]
-        let paths = Set(rows.compactMap(\.storageImagePath))
-        for path in paths {
-            signedURLs[path] = try? await client.createSignedURL(bucket: Self.groomBucket, path: path)
-        }
-        return signedURLs
-    }
-
-    private func createReplyNotification(reply: GroomReply) async throws {
-        let _: [GroomNotificationAckRow] = try await client.insertRows(
-            into: "notifications",
-            values: [GroomReplyNotificationPayload(reply: reply)],
-            select: "id"
-        )
-    }
-
-    private func ownGroomArchiveQueryItems(userID: UUID, limit: Int) -> [URLQueryItem] {
-        [
-            URLQueryItem(name: "user_id", value: "eq.\(userID.uuidString.lowercased())"),
-            URLQueryItem(name: "status", value: "eq.published"),
-            URLQueryItem(name: "order", value: "published_at.desc.nullslast,created_at.desc"),
-            URLQueryItem(name: "limit", value: "\(max(1, min(limit, 300)))")
-        ]
-    }
-
-    private func engagementQueryItems(postIDs: [UUID], order: String) -> [URLQueryItem] {
-        let ids = postIDs
-            .map { $0.uuidString.lowercased() }
-            .sorted()
-            .joined(separator: ",")
-        return [
-            URLQueryItem(name: "groom_post_id", value: "in.(\(ids))"),
-            URLQueryItem(name: "order", value: order)
-        ]
-    }
-
-    private func groomImagePath(userID: UUID, contentType: String) -> String {
-        let milliseconds = Int(Date().timeIntervalSince1970 * 1_000)
-        return "\(userID.uuidString.lowercased())/\(milliseconds)_\(UUID().uuidString.lowercased()).\(SupabaseImageContentTypeNormalizer.lenientFileExtension(for: contentType))"
     }
 }

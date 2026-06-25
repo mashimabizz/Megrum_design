@@ -4,6 +4,49 @@
 
 ---
 
+## イテレーション945：Supabase groom clientを分割
+
+### 背景・問題意識
+
+`SupabaseGroomClient.swift` は、グルームのfeed/map/archive/reaction/reply/post作成の通信実行、request生成API、query helper、signed URL取得、画像path生成、返信通知作成を1ファイルに持っていた。グルームはホーム、MapKit表示、投稿、いいね、返信通知にまたがるため、挙動は変えずに通信実行、request生成、support helperを分け、確認範囲を狭める。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumData/SupabaseGroomClient.swift`
+- nearby/map/archive/reactions/replies/post作成/view/like/reply送信の実行処理に絞った。
+- request/support extensionから参照するため、`client` とbucket/radius/upload limit定数をmodule internalにした。
+- ファイル行数を324行から172行へ縮小した。
+
+#### `ios-native/Sources/MegrumData/SupabaseGroomClientRequests.swift`
+- feed/map RPC、archive、reactions、replies、post作成、view、like/unlike、reply、reply notificationのrequest生成APIを新規ファイルへ移動した。
+- RPC function名、table名、select、Prefer header、on_conflict、delete queryは維持した。
+
+#### `ios-native/Sources/MegrumData/SupabaseGroomClientSupport.swift`
+- signed URL取得、reply notification作成、archive/engagement query helper、groom image path生成を新規ファイルへ移動した。
+- 半径上限、archive limit clamp、post ID sort、storage path fallbackは維持した。
+
+### 影響範囲
+
+- Swift Native iOS版のグルームfeed/map/archive、投稿作成、いいね、既読、返信、返信通知。
+- 挙動変更ではなく責務分離。Supabase table名、RPC function名、select、query、payload key、状態名、用語、DBスキーマは変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumData/SupabaseGroomClient.swift ios-native/Sources/MegrumData/SupabaseGroomClientRequests.swift ios-native/Sources/MegrumData/SupabaseGroomClientSupport.swift`
+  - passed
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-groom-client-build --disable-index-store`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-groom-client-tests --disable-index-store --enable-xctest --disable-swift-testing -j 1 --filter SupabaseGroomClientTests`
+  - 10 tests passed
+
+### セルフレビュー結果
+
+- ✅ client本体、request builder、support helperを移動中心で分割した。
+- ✅ feed/map RPC、archive/engagement request、post/reply/notification payload、signed URL fallbackの既存テストを通した。
+- ✅ 状態名・用語・DBスキーマの変更はないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション944：Supabase face recognition rowsを分割
 
 ### 背景・問題意識
