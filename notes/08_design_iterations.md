@@ -4,6 +4,46 @@
 
 ---
 
+## イテレーション1058：trade message overflow menuを分離
+
+### 背景・問題意識
+
+`TradeMessageInputActionViews.swift` は、横並びquick action stripと `+` overflow menuの両方を同じファイルに抱えていた。入力バー周辺の変更時にquick actionとmenu actionの責務が混ざらないよう、overflow menuだけを専用ファイルへ分離した。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/TradeMessageInputActionViews.swift`
+- `TradeMessageQuickActionStrip` とquick action chip表示だけを残した。
+- 不要になった `MegrumCore` import を削除した。
+
+#### `ios-native/Sources/MegrumApp/TradeMessageOverflowMenu.swift`
+- `TradeMessageOverflowMenu` を追加し、arrival status、location、服装写真、assistance request、schedule、counter proposal、chat photoのmenu表示を担当させた。
+- 既存のaction callback、PhotosPicker binding、camera availability、accessibility labelを維持した。
+
+### 影響範囲
+
+- Swift Native iOS版の取引チャット入力バー。
+- `+` overflow menu、横並びquick action strip、写真選択/カメラ起動callback。
+- action policy、message send intent、状態名、用語、DBスキーマ、表示文言は変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumApp/TradeMessageInputActionViews.swift ios-native/Sources/MegrumApp/TradeMessageOverflowMenu.swift`
+  - passed
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-trade-message-overflow-menu`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-trade-message-overflow-menu --enable-xctest --disable-swift-testing -j 1 --filter 'TradeChatAffordanceTests|TradeMessageStateReducerTests'`
+  - passed（55 tests）
+
+### セルフレビュー結果
+
+- ✅ overflow menuだけを専用ファイルへ移し、quick action stripとchip表示は元ファイルに残した。
+- ✅ arrival status、現在地、服装写真、遅れる/中止依頼、スケジュール、再打診、写真送信のmenu actionを維持した。
+- ✅ `TradeMessageInputActionViews.swift` は 230行から 128行へ縮小し、overflow menuを 104行の専用ファイルへ分離した。
+- ✅ 新しい状態名・用語・DB列は追加していないため、`notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション1057：home mutual match nested presentationを分離
 
 ### 背景・問題意識
