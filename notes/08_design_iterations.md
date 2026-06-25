@@ -4,6 +4,45 @@
 
 ---
 
+## イテレーション1091：proposal meetup map cardを分離
+
+### 背景・問題意識
+
+`ProposalMeetupPlaceSheetComponents.swift` は、場所sheetのaction row/search/status/save buttonに加えて、MapKitのMapReader/Marker/座標tap処理を持つ地図カードも同じファイルに抱えていた。place sheet components側を軽い操作・表示部品に寄せるため、地図選択カードを専用Viewファイルへ分離する。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/ProposalMeetupPlaceSheetComponents.swift`
+- `ProposalMeetupPlaceMapCard` を移動した。
+- action row、検索結果list、status row、save button、place sheet用modifierは維持した。
+- 地図カード移動により不要になった `MapKit` importを削除した。
+
+#### `ios-native/Sources/MegrumApp/ProposalMeetupPlaceMapCard.swift`
+- `ProposalMeetupPlaceMapCard` を追加した。
+- MapReader、Map camera binding、Marker表示、座標tap変換、coordinate caption、regularMaterial背景を維持した。
+
+### 影響範囲
+
+- Swift Native iOS版の打診作成フローにおける待ち合わせ場所sheet。
+- 場所検索、現在地適用、前回設定適用、地図tapによる座標選択、候補保存、送信payload、DB/API、状態名、表示文言は変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumApp/ProposalMeetupPlaceSheetComponents.swift ios-native/Sources/MegrumApp/ProposalMeetupPlaceMapCard.swift`
+  - passed
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-proposal-meetup-place-map-card`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-proposal-meetup-place-map-card --enable-xctest --disable-swift-testing -j 1 --filter 'ProposalCreateFlowTests|ProposalCreateSheetTests'`
+  - passed（62 tests）
+
+### セルフレビュー結果
+
+- ✅ MapReader、Marker、tap座標変換、caption、背景materialを維持した。
+- ✅ `ProposalMeetupPlaceSheetComponents.swift` は 207行から 160行へ縮小し、地図カードを 49行の専用ファイルへ分離した。
+- ✅ 新しい状態名・用語・DB列は追加していないため、`notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション1090：proposal payment option rowを分離
 
 ### 背景・問題意識
