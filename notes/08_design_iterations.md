@@ -4,6 +4,44 @@
 
 ---
 
+## イテレーション1081：individual listing bottom bar buttonsを分離
+
+### 背景・問題意識
+
+`IndividualListingEditorBottomBar.swift` は、stepごとのfooter分岐、logic controls、buttonの見た目定義を同じ型に抱えていた。bottom bar本体をstep分岐と状態計算に集中させるため、戻る/primary/表示中一括選択/選択肢追加buttonを専用Viewへ分離する。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/IndividualListingEditorBottomBar.swift`
+- 戻るbutton、primary button、表示中一括選択button、選択肢追加buttonの描画本体を専用View呼び出しへ置き換えた。
+- step別action row、logic controls表示条件、selected count、logic binding、secondary button width算出は維持した。
+
+#### `ios-native/Sources/MegrumApp/IndividualListingEditorBottomBarButtons.swift`
+- `IndividualListingEditorBackBottomBarButton` / `IndividualListingEditorPrimaryBottomBarButton` / `IndividualListingEditorSelectAllVisibleButton` / `IndividualListingEditorAddOptionButton` を追加した。
+- 各buttonのfont、width/height、background、stroke、disabled/opacity、primary gradient、accessibility labelを維持した。
+
+### 影響範囲
+
+- Swift Native iOS版の個別募集エディタbottom bar。
+- 個別募集のstep遷移、選択状態、logic設定、保存処理、DB/API、状態名、表示文言は変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumApp/IndividualListingEditorBottomBar.swift ios-native/Sources/MegrumApp/IndividualListingEditorBottomBarButtons.swift`
+  - passed
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-individual-listing-bottom-bar-buttons`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-individual-listing-bottom-bar-buttons --enable-xctest --disable-swift-testing -j 1 --filter 'IndividualListingDraftTests|IndividualListingStateReducerTests'`
+  - passed（39 tests）
+
+### セルフレビュー結果
+
+- ✅ 戻る/primary/表示中一括選択/選択肢追加buttonのfont、frame、background、stroke、disabled/opacity、accessibility labelを維持した。
+- ✅ `IndividualListingEditorBottomBar.swift` は 219行から 166行へ縮小し、button群を 106行の専用ファイルへ分離した。
+- ✅ 新しい状態名・用語・DB列は追加していないため、`notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション1080：dispute status chipを分離
 
 ### 背景・問題意識
