@@ -4,6 +4,45 @@
 
 ---
 
+## イテレーション911：Trade summary sheet componentsを分割
+
+### 背景・問題意識
+
+`TradeSummaryDetailSheet.swift` は、取引詳細の固定サマリーから開くシート本体、交換手段/交換内容のroute分岐、section chrome、現地交換候補row、受け取る/出すgoods section、goods row、thumbnail、金額panel、空表示、`ExchangeMethod` 判定が1ファイルに同居していた。取引詳細まわりの調整時にシート構成と細かい表示部品を分けて追えるよう、表示部品を別ファイルへ移す。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/TradeSummaryDetailSheet.swift`
+- `TradeSummaryDetailSheet` をNavigationStack、routeごとのcontent選択、交換手段/交換内容の構成に集中させた。
+- ファイル行数を332行から114行へ縮小した。
+
+#### `ios-native/Sources/MegrumApp/TradeSummarySheetComponents.swift`
+- `TradeSummarySheetSection`、`TradeMeetupCandidateSummaryRow`、`TradeSummaryGoodsSection`、`TradeSummaryGoodsRow`、`TradeSummaryGoodsThumb`、`TradeCashAmountPanel`、`TradeSummaryEmptyText`、`ExchangeMethod` のhand/mail判定を移動した。
+- 現地候補時刻表示、goods件数表示、定価交換表示、thumbnail fallback、空表示文言、色/余白/角丸は維持した。
+
+### 影響範囲
+
+- Swift Native iOS版の取引詳細固定サマリーから開く「交換手段」「交換内容」シート、現地交換候補、郵送説明、受け取る/出すgoods一覧、金額表示。
+- 挙動変更ではなく責務分離。navigation title、dismiss、route、proposal/goods入力、状態名、用語、DBスキーマは変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumApp/TradeSummaryDetailSheet.swift ios-native/Sources/MegrumApp/TradeSummarySheetComponents.swift`
+  - passed
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-trade-summary-sheet-build --disable-index-store`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-trade-summary-sheet-tests --disable-index-store --enable-xctest --disable-swift-testing -j 1 --filter 'TradeChatAffordanceTests|TradeMessageStateReducerTests|TradeProposalStateReducerTests'`
+  - 55 tests passed
+
+### セルフレビュー結果
+
+- ✅ 交換手段/交換内容route、navigation title、閉じるbutton、入力props、現地/郵送表示条件は変更していない。
+- ✅ goods sectionの件数表示、cash offer表示、thumbnail fallback、空表示文言、現地候補時刻表示は移動のみで維持した。
+- ✅ TradeChatAffordanceTests / TradeMessageStateReducerTests / TradeProposalStateReducerTestsで、取引詳細hero、取引一覧、現地候補summary、cash copy、message/proposal stateを確認した。
+- ✅ 状態名・用語・DBスキーマの変更はないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション910：Account setup oshi sectionを分割
 
 ### 背景・問題意識
