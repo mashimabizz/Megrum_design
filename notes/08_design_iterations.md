@@ -4,6 +4,41 @@
 
 ---
 
+## イテレーション958：Proposal meetup candidate pickerを分割
+
+### 背景・問題意識
+
+`ProposalCreateMeetupViews.swift` は、待ち合わせ候補の横スクロールピッカーと、地図/日時/場所入力フォームを1ファイルに持っていた。SwiftUI view refactor方針に沿って、見た目や操作は変えずに、候補ピッカーを専用Viewファイルへ分け、待ち合わせ入力フォーム側の責務を読みやすくする。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/ProposalMeetupCandidatePicker.swift`
+- `ProposalMeetupCandidatePicker` と private `ProposalMeetupCandidateButton` を新規ファイルへ移動した。
+- 候補カード、追加ボタン、削除context menu、アクセシビリティラベル、色/余白/サイズは維持した。
+
+#### `ios-native/Sources/MegrumApp/ProposalCreateMeetupViews.swift`
+- 地図、日時、場所名、緯度経度、場所候補、現在地状態を扱う `ProposalFlowMeetupForm` のみに整理した。
+
+### 影響範囲
+
+- Swift Native iOS版の個別募集/ホーム/取引導線から開く打診作成フローの待ち合わせ候補選択。
+- 挙動変更ではなく責務分離。候補追加/選択/削除、地図選択、日時/場所入力、状態名、用語、DBスキーマは変更しない。
+
+### 確認方法
+
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-proposal-meetup-views-build --disable-index-store`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-proposal-meetup-views-build --disable-index-store --enable-xctest --disable-swift-testing -j 1 --filter 'TradeRequestDraftProposalCreateFlowTests|HomeScreenFlowTests|ProposalCreateSheetTests'`
+  - 72 tests passed
+
+### セルフレビュー結果
+
+- ✅ SwiftUI view refactor方針に沿い、親状態全体を渡さず、既存の小さな入力値/callbackだけを持つ専用Viewとして分離した。
+- ✅ 見た目の数値、文言、context menu、候補選択callbackは移動のみで維持した。
+- ✅ 状態名・用語・DBスキーマの変更はないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション957：Search suggestion modelsを分割
 
 ### 背景・問題意識
