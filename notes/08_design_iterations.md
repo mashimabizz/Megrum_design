@@ -4,6 +4,49 @@
 
 ---
 
+## イテレーション1122：meguri location picker partsを分離
+
+### 背景・問題意識
+
+`MeguriCreationLocationPicker.swift` は、MapKitのcamera制御、タップ座標の範囲判定、現在地再取得、初期選択の副作用を持ちながら、header、現在地なしplaceholder、選択地点captionの描画も同じ `body` / computed view に抱えていた。親pickerを位置選択ロジックに寄せ、純粋な表示部品を小さなViewへ分離する。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/MeguriCreationLocationPicker.swift`
+- header描画を `MeguriCreationLocationPickerHeader` 呼び出しへ置き換えた。
+- 現在地未取得時のplaceholderを `MeguriCreationMissingLocationView` 呼び出しへ置き換えた。
+- 選択地点captionを `MeguriCreationLocationCaption` 呼び出しへ置き換えた。
+- MapKitの `MapReader`、annotation、tap gesture、範囲判定、camera制御、初期選択処理は親pickerに残した。
+
+#### `ios-native/Sources/MegrumApp/MeguriCreationLocationPickerComponents.swift`
+- `MeguriCreationLocationPickerHeader` を追加し、title/subtitleと現在地buttonを移動した。
+- `MeguriCreationMissingLocationView` を追加し、現在地確認placeholderとbuttonを移動した。
+- `MeguriCreationLocationCaption` を追加し、選択地点caption rowを移動した。
+
+### 影響範囲
+
+- Swift Native iOS版めぐり投稿/掲示板作成時の作成場所picker。
+- 現在地に戻るbutton、現在地未取得placeholder、選択地点caption。
+- 作成可能範囲判定、Map annotation、camera移動、選択座標binding、DB/API、状態名、表示文言は変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumApp/MeguriCreationLocationPicker.swift ios-native/Sources/MegrumApp/MeguriCreationLocationPickerComponents.swift`
+  - passed
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-meguri-location-picker`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-meguri-location-picker --enable-xctest --disable-swift-testing -j 1 --filter 'MeguriAccessPolicyTests|MeguriFeedStateReducerTests|MegrumAppStateTests'`
+  - passed（89 tests）
+
+### セルフレビュー結果
+
+- ✅ title/subtitle、現在地button、loading表示、placeholder文言、caption文言、余白、角丸、色を維持した。
+- ✅ `onRequestLocation`、`selectedCoordinate` binding、作成可能範囲判定、範囲外message、Map camera制御は変更していない。
+- ✅ `MeguriCreationLocationPicker.swift` は217行から158行へ縮小し、表示だけの3部品を93行の専用ファイルへ分離した。
+- ✅ 新しい状態名・用語・DB列は追加していないため、`notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション1121：oshi request sheet contentを分離
 
 ### 背景・問題意識
