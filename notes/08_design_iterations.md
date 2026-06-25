@@ -4,6 +4,43 @@
 
 ---
 
+## イテレーション1025：打診作成schedule月gridを分割
+
+### 背景・問題意識
+
+`ProposalCreateScheduleViews.swift` は、スケジュール背景section、選択時間の予定重複banner、legend、日別strip、予定mini row、月gridを同じファイルに抱えていた。月表示gridは `ProposalScheduleContext` と `anchorDate` だけで完結しているため、スケジュール背景sectionから切り出し、打診作成の予定表示を小さな単位で調整できるようにした。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/ProposalCreateScheduleViews.swift`
+- `ProposalScheduleBackgroundSection`、重複banner、legend、日別strip、予定mini rowを既存ファイルに残した。
+- 月表示gridを専用ファイルへ委譲した。
+
+#### `ios-native/Sources/MegrumApp/ProposalScheduleMonthGridViews.swift`
+- `ProposalScheduleMonthGrid` と `ProposalScheduleMonthCell` を移動した。
+- 年月見出し、曜日行、月内日付padding、当日表示、予定dot、cellサイズと背景は既存どおり維持した。
+
+### 影響範囲
+
+- Swift Native iOS版の打診作成におけるスケジュール背景の月表示。
+- 予定重複判定、日別strip、候補日時作成、送信payload、状態名、用語、DBスキーマ、表示文言は変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumApp/ProposalCreateScheduleViews.swift ios-native/Sources/MegrumApp/ProposalScheduleMonthGridViews.swift`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-proposal-schedule-month-grid --enable-xctest --disable-swift-testing -j 1 --filter ProposalCreateFlowTests`
+  - passed（55 tests）
+
+### セルフレビュー結果
+
+- ✅ `ProposalScheduleMonthGrid` は移動のみで、月gridの日付生成、曜日表示、当日pill、予定dot表示を維持した。
+- ✅ `ProposalScheduleBackgroundSection`、予定重複banner、日別strip、予定mini rowは変更していない。
+- ✅ `ProposalCreateScheduleViews.swift` は 272行から 185行へ縮小し、月grid表示を 91行の専用ファイルへ分離した。
+- ✅ 新しい状態名・用語・DB列は追加していないため、`notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション1024：検索条件chip表示を分割
 
 ### 背景・問題意識
