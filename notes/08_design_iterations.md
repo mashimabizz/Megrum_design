@@ -4,6 +4,47 @@
 
 ---
 
+## イテレーション1053：meguri screen presentationsを分離
+
+### 背景・問題意識
+
+`MeguriScreen.swift` は、ホーム本体、位置情報task、notice/toast、掲示板sheet、都道府県picker、グルーム投稿/カメラ/archive、viewer/map presentationをbody直下に抱えていた。めぐり画面の状態更新とactionは既存extensionに残し、sheet / cover / presentation modifier群を専用ファイルへ分離した。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/MeguriScreen.swift`
+- 掲示板detail、掲示板composer、都道府県picker、グルーム投稿、カメラ、archive、viewer、mapのpresentationを `MeguriScreenPresentationModifier` に委譲した。
+- 位置情報task、notice/toast、投稿/掲示板action、`boardSheetDetent` と `pendingCreatedThread` の状態更新は親Viewに残した。
+- iOSではカメラを開く前にcomposerを閉じ、非iOSでは既存どおりtoastだけを出す挙動を維持した。
+
+#### `ios-native/Sources/MegrumApp/MeguriScreenPresentationModifiers.swift`
+- `MeguriScreenPresentationModifier` を追加し、めぐり画面のsheet / cover / viewer / map presentationを集約した。
+- `MeguriGroomComposerPresentationModifier` とplatform別helperを追加し、iOSのfullScreenCover、カメラsheet、archive fullScreenCover、非iOS fallback sheetを分離した。
+
+### 影響範囲
+
+- Swift Native iOS版のめぐり画面。
+- 掲示板detail / composer、都道府県picker、グルーム投稿、カメラ、archive、グルームviewer、map presentation。
+- 位置情報読み込み、投稿作成、掲示板作成、access policy、状態名、用語、DBスキーマ、表示文言は変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumApp/MeguriScreen.swift ios-native/Sources/MegrumApp/MeguriScreenPresentationModifiers.swift`
+  - passed
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-meguri-presentations`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-meguri-presentations --enable-xctest --disable-swift-testing -j 1 --filter 'MeguriAccessPolicyTests|MeguriFeedStateReducerTests|MeguriNoticeResolverTests'`
+  - passed（14 tests）
+
+### セルフレビュー結果
+
+- ✅ sheet / cover / viewer / map presentationだけを専用modifierへ移し、位置情報task、notice/toast、投稿/掲示板actionは親Viewと既存extensionに残した。
+- ✅ iOSのcomposer fullScreenCover、camera sheet、archive fullScreenCoverと、非iOS fallback sheetの既存分岐を維持した。
+- ✅ `MeguriScreen.swift` は 239行から 153行へ縮小し、presentation群を専用ファイルへ分離した。
+- ✅ 新しい状態名・用語・DB列は追加していないため、`notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション1052：authenticated tabs drawer layerを分離
 
 ### 背景・問題意識

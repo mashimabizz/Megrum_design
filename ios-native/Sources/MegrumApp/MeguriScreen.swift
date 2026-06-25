@@ -102,137 +102,51 @@ struct MeguriScreen: View {
                     .transition(.move(edge: .bottom).combined(with: .opacity))
             }
         }
-        .sheet(item: $selectedThread) { thread in
-            NavigationStack {
-                BoardThreadDetailScreen(
-                    appState: appState,
-                    thread: thread,
-                    selectedPrefecture: selectedBoardPrefecture,
-                    coordinate: locationState.coordinate
-                )
-            }
-        }
-        .sheet(
-            isPresented: $isShowingThreadComposer,
-            onDismiss: openPendingCreatedThreadIfNeeded
-        ) {
-            NavigationStack {
-                BoardThreadComposerSheet(
-                    appState: appState,
-                    locationState: locationState,
-                    fallbackCoordinate: locationState.coordinate,
-                    selectedPrefecture: selectedBoardPrefecture,
-                    onCreated: { thread in
-                        boardSheetDetent = .regular
-                        pendingCreatedThread = thread
-                    }
-                )
-            }
-            .presentationDetents([.large])
-            .presentationDragIndicator(.visible)
-        }
-        .sheet(isPresented: $isShowingPrefecturePicker) {
-            NavigationStack {
-                BoardPrefecturePickerSheet(
-                    selectedPrefecture: selectedBoardPrefecture,
-                    onSelect: selectBoardPrefecture
-                )
-            }
-            .presentationDetents([.medium, .large])
-            .presentationDragIndicator(.visible)
-        }
-#if os(iOS)
-        .fullScreenCover(isPresented: $isShowingGroomComposer) {
-            GroomStoryComposerScreen(
-                selectedPhotoItem: $selectedGroomPhotoItem,
-                selectedCreationCoordinate: $groomCreationCoordinate,
-                draftPhotoData: $groomDraftPhotoData,
-                draftPhotoContentType: $groomDraftPhotoContentType,
-                isPreparingPhoto: isPreparingGroomPhoto,
-                isCreating: appState.isCreatingGroomPost,
+        .modifier(
+            MeguriScreenPresentationModifier(
+                appState: appState,
+                locationState: locationState,
+                selectedThread: $selectedThread,
+                isShowingThreadComposer: $isShowingThreadComposer,
+                isShowingPrefecturePicker: $isShowingPrefecturePicker,
+                selectedGroomPhotoItem: $selectedGroomPhotoItem,
+                groomCreationCoordinate: $groomCreationCoordinate,
+                groomDraftPhotoData: $groomDraftPhotoData,
+                groomDraftPhotoContentType: $groomDraftPhotoContentType,
+                isPreparingGroomPhoto: isPreparingGroomPhoto,
+                isShowingGroomComposer: $isShowingGroomComposer,
+                isShowingGroomCamera: $isShowingGroomCamera,
+                isShowingGroomArchive: $isShowingGroomArchive,
+                selectedGroom: $selectedGroom,
+                activeMap: $activeMap,
+                selectedPrefecture: selectedBoardPrefecture,
+                boardScope: selectedBoardScope,
                 canUseCamera: canUseCamera,
-                currentCoordinate: locationState.coordinate,
-                isRequestingLocation: locationState.isRequestingLocation,
+                onThreadComposerDismiss: openPendingCreatedThreadIfNeeded,
+                onThreadCreated: { thread in
+                    boardSheetDetent = .regular
+                    pendingCreatedThread = thread
+                },
+                onSelectPrefecture: selectBoardPrefecture,
                 onRequestLocation: {
                     locationState.requestCurrentLocation()
                 },
-                onOpenCamera: {
+                onOpenGroomCamera: {
+                    #if os(iOS)
                     isShowingGroomComposer = false
                     if canUseCamera {
                         isShowingGroomCamera = true
                     } else {
                         showToast("この端末ではカメラを利用できません。写真から選択してください。")
                     }
-                },
-                onPublish: publishGroomPhoto,
-                onDiscard: resetGroomDraft
-            )
-        }
-#else
-        .sheet(isPresented: $isShowingGroomComposer) {
-            GroomStoryComposerScreen(
-                selectedPhotoItem: $selectedGroomPhotoItem,
-                selectedCreationCoordinate: $groomCreationCoordinate,
-                draftPhotoData: $groomDraftPhotoData,
-                draftPhotoContentType: $groomDraftPhotoContentType,
-                isPreparingPhoto: isPreparingGroomPhoto,
-                isCreating: appState.isCreatingGroomPost,
-                canUseCamera: false,
-                currentCoordinate: locationState.coordinate,
-                isRequestingLocation: locationState.isRequestingLocation,
-                onRequestLocation: {
-                    locationState.requestCurrentLocation()
-                },
-                onOpenCamera: {
+                    #else
                     showToast("この端末ではカメラを利用できません。写真から選択してください。")
+                    #endif
                 },
-                onPublish: publishGroomPhoto,
-                onDiscard: resetGroomDraft
-            )
-        }
-#endif
-#if os(iOS)
-        .sheet(isPresented: $isShowingGroomCamera) {
-            NativeCameraCaptureView(
-                onCapture: { imageData in
-                    prepareCapturedGroomPhoto(imageData)
-                },
-                onFailure: { message in
-                    showToast(message)
-                }
-            )
-            .ignoresSafeArea()
-        }
-#endif
-#if os(iOS)
-        .fullScreenCover(isPresented: $isShowingGroomArchive) {
-            GroomArchiveScreen(
-                appState: appState,
-                currentCoordinate: locationState.coordinate
-            )
-        }
-#else
-        .sheet(isPresented: $isShowingGroomArchive) {
-            GroomArchiveScreen(
-                appState: appState,
-                currentCoordinate: locationState.coordinate
-            )
-        }
-#endif
-        .modifier(
-            GroomViewerPresentationModifier(
-                selectedGroom: $selectedGroom,
-                grooms: appState.grooms,
-                appState: appState
-            )
-        )
-        .modifier(
-            MeguriMapPresentationModifier(
-                activeMap: $activeMap,
-                appState: appState,
-                locationState: locationState,
-                selectedPrefecture: selectedBoardPrefecture,
-                boardScope: selectedBoardScope
+                onPrepareCapturedGroomPhoto: prepareCapturedGroomPhoto,
+                onShowToast: showToast,
+                onPublishGroomPhoto: publishGroomPhoto,
+                onResetGroomDraft: resetGroomDraft
             )
         )
     }
