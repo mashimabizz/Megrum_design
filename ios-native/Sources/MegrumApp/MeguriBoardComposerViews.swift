@@ -42,122 +42,85 @@ struct BoardThreadComposerSheet: View {
     }
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 20) {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("スレッドを立てる")
-                        .font(.system(size: 30, weight: .heavy, design: .rounded))
-                        .foregroundStyle(MegrumTheme.ink)
-
-                    Text("周辺の人と現地情報を共有できます")
-                        .font(.system(size: 14, weight: .bold, design: .rounded))
-                        .foregroundStyle(MegrumTheme.muted)
-                }
-
-                if let missingContextMessage {
-                    MeguriNoticeBanner(message: missingContextMessage)
-                }
-
-                thumbnailSection
-
-                BoardThreadTitleField(title: $title)
-
-                BoardThreadBodyEditor(bodyText: $bodyText)
-
-                if isShowingLocationStep {
-                    locationStep
-                } else {
-                    MeguriNoticeBanner(message: "タイトルと本文が決まったら、最後に地図上で表示される場所を選びます。")
-                }
-
+        composerContent
+            .background(MegrumTheme.canvas.ignoresSafeArea())
+            .safeAreaInset(edge: .bottom) {
+                BoardThreadComposerPrimaryActionBar(
+                    title: primaryActionTitle,
+                    isCreating: appState.isCreatingBoardThread,
+                    isEnabled: primaryActionEnabled,
+                    action: handlePrimaryAction
+                )
             }
-            .padding(20)
-        }
-        .background(MegrumTheme.canvas.ignoresSafeArea())
-        .safeAreaInset(edge: .bottom) {
-            Button(action: handlePrimaryAction) {
-                Group {
-                    if appState.isCreatingBoardThread {
-                        ProgressView()
-                            .tint(.white)
-                    } else {
-                        Text(primaryActionTitle)
+            .overlay(alignment: .bottom) {
+                if let toastMessage {
+                    MeguriToastView(message: toastMessage)
+                        .padding(.bottom, 84)
+                        .transition(.move(edge: .bottom).combined(with: .opacity))
+                }
+            }
+            .navigationTitle("掲示板")
+            .megrumInlineNavigationTitle()
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("閉じる") {
+                        dismiss()
                     }
                 }
-                .font(.system(size: 17, weight: .heavy, design: .rounded))
-                .frame(maxWidth: .infinity)
-                .frame(height: 56)
-                .background(MegrumTheme.lavender, in: Capsule())
-                .foregroundStyle(.white)
-                .padding(.horizontal, 20)
-                .padding(.vertical, 10)
-                .background(.regularMaterial)
             }
-            .buttonStyle(.plain)
-            .disabled(!primaryActionEnabled)
-            .opacity(primaryActionEnabled ? 1 : 0.48)
-        }
-        .overlay(alignment: .bottom) {
-            if let toastMessage {
-                MeguriToastView(message: toastMessage)
-                    .padding(.bottom, 84)
-                    .transition(.move(edge: .bottom).combined(with: .opacity))
+            .onChange(of: thumbnailItem) { _, item in
+                loadThumbnail(item)
             }
-        }
-        .navigationTitle("掲示板")
-        .megrumInlineNavigationTitle()
-        .toolbar {
-            ToolbarItem(placement: .cancellationAction) {
-                Button("閉じる") {
-                    dismiss()
+            .task {
+                if baseCoordinate == nil {
+                    locationState.requestCurrentLocation()
                 }
             }
-        }
-        .onChange(of: thumbnailItem) { _, item in
-            loadThumbnail(item)
-        }
-        .task {
-            if baseCoordinate == nil {
-                locationState.requestCurrentLocation()
+            .onChange(of: locationState.coordinate) { _, _ in
+                if isShowingLocationStep {
+                    seedSelectedCoordinateIfNeeded()
+                }
             }
-        }
-        .onChange(of: locationState.coordinate) { _, _ in
-            if isShowingLocationStep {
-                seedSelectedCoordinateIfNeeded()
-            }
-        }
     }
 
-    private var thumbnailSection: some View {
+    private var composerContent: some View {
         #if canImport(UIKit)
-        BoardThreadThumbnailSection(
+        BoardThreadComposerContent(
+            title: $title,
+            bodyText: $bodyText,
             thumbnailItem: $thumbnailItem,
-            hasThumbnail: thumbnailUpload != nil,
-            previewImage: thumbnailPreviewImage,
-            onRemoveThumbnail: clearThumbnail
-        )
-        #else
-        BoardThreadThumbnailSection(
-            thumbnailItem: $thumbnailItem,
-            hasThumbnail: thumbnailUpload != nil,
-            onRemoveThumbnail: clearThumbnail
-        )
-        #endif
-    }
-
-    private var locationStep: some View {
-        BoardThreadComposerLocationStep(
-            title: title.nilIfBlank ?? "掲示板",
-            summary: bodyText.nilIfBlank ?? "現地の話題",
+            missingContextMessage: missingContextMessage,
+            isShowingLocationStep: isShowingLocationStep,
             hasThumbnail: thumbnailUpload != nil,
             currentCoordinate: baseCoordinate,
             isRequestingLocation: locationState.isRequestingLocation,
             selectedCoordinate: $selectedCoordinate,
+            thumbnailPreviewImage: thumbnailPreviewImage,
+            onRemoveThumbnail: clearThumbnail,
             onRequestLocation: {
                 locationState.requestCurrentLocation()
             },
             onOutOfRange: showToast,
-            onAppear: seedSelectedCoordinateIfNeeded
+            onLocationStepAppear: seedSelectedCoordinateIfNeeded
         )
+        #else
+        BoardThreadComposerContent(
+            title: $title,
+            bodyText: $bodyText,
+            thumbnailItem: $thumbnailItem,
+            missingContextMessage: missingContextMessage,
+            isShowingLocationStep: isShowingLocationStep,
+            hasThumbnail: thumbnailUpload != nil,
+            currentCoordinate: baseCoordinate,
+            isRequestingLocation: locationState.isRequestingLocation,
+            selectedCoordinate: $selectedCoordinate,
+            onRemoveThumbnail: clearThumbnail,
+            onRequestLocation: {
+                locationState.requestCurrentLocation()
+            },
+            onOutOfRange: showToast,
+            onLocationStepAppear: seedSelectedCoordinateIfNeeded
+        )
+        #endif
     }
 }

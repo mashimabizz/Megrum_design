@@ -4,6 +4,48 @@
 
 ---
 
+## イテレーション1108：board composer contentを分離
+
+### 背景・問題意識
+
+`BoardThreadComposerSheet` は、スレッド作成の状態、写真読み込み、位置選択、作成アクション、sheet/toolbar管理を持ちながら、スクロール中身、サムネイルsection、位置選択step、下部CTAの描画も同じ `body` / computed view内に抱えていた。親画面を作成フローの状態管理に寄せ、フォーム描画と下部操作バーを専用Viewへ分離する。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/MeguriBoardComposerViews.swift`
+- スクロール中身を `BoardThreadComposerContent` 呼び出しへ置き換えた。
+- 下部CTAを `BoardThreadComposerPrimaryActionBar` 呼び出しへ置き換えた。
+- `thumbnailSection` / `locationStep` computed viewを削除し、親は状態、アクション、sheet/toolbar modifierの保持に寄せた。
+- UIKit preview image有無で `BoardThreadComposerContent` の初期化を分ける `composerContent` factoryを追加した。
+
+#### `ios-native/Sources/MegrumApp/BoardThreadComposerContent.swift`
+- `BoardThreadComposerContent` を追加し、ヘッダー、欠落context notice、サムネイルsection、タイトル/本文入力、位置選択stepを移動した。
+- `BoardThreadComposerHeader` を追加し、作成シートの見出し表示を分離した。
+- `BoardThreadComposerPrimaryActionBar` を追加し、作成中progress、主ボタン文言、disabled/opacityを移動した。
+
+### 影響範囲
+
+- Swift Native iOS版のめぐり掲示板スレッド作成シート。
+- タイトル/本文入力、写真選択/削除、位置選択、toast、作成アクション、位置権限要求、sheet/toolbar、保存payload、DB/API、状態名、表示文言は変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumApp/MeguriBoardComposerViews.swift ios-native/Sources/MegrumApp/BoardThreadComposerContent.swift`
+  - passed
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-board-composer-content`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-board-composer-content --enable-xctest --disable-swift-testing -j 1 --filter 'MegrumAppStateTests|MeguriAccessPolicyTests|MeguriFeedStateReducerTests|SupabaseBoardClientTests'`
+  - passed（96 tests）
+
+### セルフレビュー結果
+
+- ✅ スレッド作成の見出し、notice、サムネイル、タイトル/本文入力、位置選択step、下部CTAの文言と表示条件を維持した。
+- ✅ 作成処理、写真読み込み、位置要求、toast、sheet/toolbar modifierは親画面に残し、描画だけを分離した。
+- ✅ `MeguriBoardComposerViews.swift` は163行から104行へ縮小し、フォーム描画と下部CTAを127行の専用ファイルへ分離した。
+- ✅ 新しい状態名・用語・DB列は追加していないため、`notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション1107：address settings formを分離
 
 ### 背景・問題意識
