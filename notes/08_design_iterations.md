@@ -4,6 +4,47 @@
 
 ---
 
+## イテレーション1105：goods editor photo preview contentを分離
+
+### 背景・問題意識
+
+`GoodsEditorPhotoPreview.swift` は、draft全体を受け取るwrapperでありながら、local photo、既存URL、placeholder、status badge overlayの条件表示まで同じView内に抱えていた。draft依存を薄い入口に閉じ、写真previewの分岐とplaceholder描画を専用Viewへ分離する。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/GoodsEditorPhotoPreview.swift`
+- `GoodsEditorPhotoPreviewContent` 呼び出しへ置き換えた。
+- draft全体から必要な `localPhotoData`、`existingImageURL`、`photoStatusText`、`hasDisplayPhoto` だけを渡す構成にした。
+- 直接使わなくなった `Foundation` / UIKit / AppKit importを削除した。
+
+#### `ios-native/Sources/MegrumApp/GoodsEditorPhotoPreviewContent.swift`
+- `GoodsEditorPhotoPreviewContent` を追加した。
+- local photo、既存URLの `AsyncImage`、placeholder、読み込み中/失敗時表示を移動した。
+- `GoodsEditorPhotoPlaceholder` を追加し、progress表示とphoto icon placeholderを分離した。
+
+### 影響範囲
+
+- Swift Native iOS版のグッズ登録/編集における写真preview。
+- 写真選択、既存写真URL、読み込み中/失敗時文言、status badge表示、保存payload、DB/API、状態名は変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumApp/GoodsEditorPhotoPreview.swift ios-native/Sources/MegrumApp/GoodsEditorPhotoPreviewContent.swift`
+  - passed
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-goods-editor-photo-preview-content`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-goods-editor-photo-preview-content --enable-xctest --disable-swift-testing -j 1 --filter 'GoodsEditor|GoodsInventoryCreate'`
+  - passed（32 tests）
+
+### セルフレビュー結果
+
+- ✅ local photo / 既存URL / placeholder / 読み込み中 / 失敗時の分岐を維持した。
+- ✅ status badge overlay、placeholder icon、progress表示、文言を維持した。
+- ✅ `GoodsEditorPhotoPreview.swift` は 100行から31行へ縮小し、preview contentを118行の専用ファイルへ分離した。
+- ✅ 新しい状態名・用語・DB列は追加していないため、`notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション1104：goods editor action controlsを分離
 
 ### 背景・問題意識
