@@ -4,6 +4,44 @@
 
 ---
 
+## イテレーション1027：異議申し立てreply composerを分割
+
+### 背景・問題意識
+
+`DisputeDetailLoadedListComponents.swift` は、状態header、timeline、message row、証跡group、反論composerを同じファイルに抱えていた。反論composerは入力、validation表示、証跡確認toggle、送信buttonを持つ独立した入力領域なので、詳細listの表示部品から切り出し、異議申し立て詳細の入力UIだけを小さく調整できるようにした。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/DisputeDetailLoadedListComponents.swift`
+- `DisputeStatusHeader`、`DisputeTimelineView`、`DisputeMessageRow`、`DisputeEvidenceGroupView` を既存ファイルに残した。
+- 反論composer表示を専用ファイルへ委譲した。
+
+#### `ios-native/Sources/MegrumApp/DisputeReplyComposerView.swift`
+- `DisputeReplyComposer` を移動した。
+- `TextEditor`、placeholder、証跡確認toggle、validation message、送信button、disabled/opacity条件は既存どおり維持した。
+
+### 影響範囲
+
+- Swift Native iOS版の異議申し立て詳細画面。
+- 反論入力、証跡確認toggle、送信button表示。
+- 反論送信処理、store更新、timeline、message row、証跡link、状態名、用語、DBスキーマ、表示文言は変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumApp/DisputeDetailLoadedListComponents.swift ios-native/Sources/MegrumApp/DisputeReplyComposerView.swift`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-dispute-reply-composer --enable-xctest --disable-swift-testing -j 1 --filter DisputeDetailScreenTests`
+  - passed（14 tests）
+
+### セルフレビュー結果
+
+- ✅ `DisputeReplyComposer` は移動のみで、binding、validation表示、送信buttonの活性条件、loading表示を維持した。
+- ✅ `DisputeStatusHeader`、timeline、message row、証跡group、storeの送信処理は変更していない。
+- ✅ `DisputeDetailLoadedListComponents.swift` は 268行から 217行へ縮小し、反論composerを 53行の専用ファイルへ分離した。
+- ✅ 新しい状態名・用語・DB列は追加していないため、`notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション1026：個人schedule画面を分割
 
 ### 背景・問題意識
