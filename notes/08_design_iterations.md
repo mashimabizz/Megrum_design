@@ -4,6 +4,50 @@
 
 ---
 
+## イテレーション1130：meguri message conversation viewsを分離
+
+### 背景・問題意識
+
+`MeguriMessageViews.swift` は、めぐりメッセージ画面の読み込み/既読化、peer title算出、送信処理を担いながら、message listのloading/empty表示、bubble、inputまで同じファイルに抱えていた。親画面を会話stateと送信actionに寄せ、会話表示部品を専用Viewへ分離する。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/MeguriMessageViews.swift`
+- `ScrollView` / `LazyVStack` / loading row / empty state / bubble loopを `MeguriMessageList` 呼び出しへ置き換えた。
+- 送信buttonのinline `Task` を `sendMessage()` へ移動した。
+- `MeguriMessageBubble` と `MeguriMessageInput` を専用ファイルへ移動した。
+- `messages` 取得、`peerTitle` 算出、`loadMeguriMessages()`、`markMeguriMessagesRead(peerID:)`、送信後draft clearは維持した。
+
+#### `ios-native/Sources/MegrumApp/MeguriMessageConversationViews.swift`
+- `MeguriMessageList` を追加し、loading/empty/message list表示を移動した。
+- `MeguriMessageLoadingRow` / `MeguriMessageEmptyState` を追加し、読み込み中と空状態表示を分離した。
+- `MeguriMessageBubble` を移動し、locked/image/text messageの表示文言と左右寄せを維持した。
+- `MeguriMessageInput` を移動し、入力field、送信button、sending表示、disabled/opacityを維持した。
+
+### 影響範囲
+
+- Swift Native iOS版めぐりメッセージ画面。
+- メッセージ一覧、loading/empty表示、message bubble、入力欄、送信button。
+- メッセージ読み込み、既読化、送信payload、peer title、DB/API、状態名、表示文言は変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumApp/MeguriMessageViews.swift ios-native/Sources/MegrumApp/MeguriMessageConversationViews.swift`
+  - passed
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-meguri-message-conversation`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-meguri-message-conversation --enable-xctest --disable-swift-testing -j 1 --filter 'MeguriMessageReadStateReducerTests|MegrumAppStateTests|SupabaseMeguriMessageClientTests'`
+  - passed（86 tests）
+
+### セルフレビュー結果
+
+- ✅ loading文言、empty文言、bubbleのlocked/image/text表示、左右寄せ、時刻表示、inputのTextField/送信button/sending表示、余白、角丸、色を維持した。
+- ✅ `loadMeguriMessages()`、`markMeguriMessagesRead(peerID:)`、`sendMeguriMessage(recipientID:body:)`、送信後draft clear、`peerTitle` 算出は変更していない。
+- ✅ `MeguriMessageViews.swift` は188行から87行へ縮小し、会話表示部品を133行の専用ファイルへ分離した。
+- ✅ 新しい状態名・用語・DB列は追加していないため、`notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション1129：groom archive reactionsを分離
 
 ### 背景・問題意識
