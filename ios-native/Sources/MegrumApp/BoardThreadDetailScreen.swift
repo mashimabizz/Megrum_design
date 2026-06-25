@@ -32,39 +32,20 @@ struct BoardThreadDetailScreen: View {
         }
     }
 
-    private var replyRows: [BoardReplyDisplay] {
-        replies.enumerated().map { index, reply in
-            let profile = profile(for: reply.authorID)
-            let isMine = reply.authorID == appState.viewer?.id
-            return BoardReplyDisplay(
-                reply: reply,
-                displayName: isMine ? "あなた" : profile?.displayName ?? fallbackParticipantName(index: index),
-                avatarURL: profile?.avatarURL ?? fallbackGroomURL(index: index + 1),
-                initial: profile?.displayName.first.map(String.init) ?? fallbackParticipantName(index: index).first.map(String.init) ?? "話",
-                isMine: isMine,
-                relativeTime: relativeTime(from: reply.createdAt)
-            )
-        }
-    }
-
-    private var participantAvatars: [BoardParticipantAvatar] {
-        uniqueParticipantIDs.enumerated().map { index, id in
-            let profile = profile(for: id)
-            let isMine = id == appState.viewer?.id
-            return BoardParticipantAvatar(
-                id: id,
-                avatarURL: profile?.avatarURL ?? fallbackGroomURL(index: index),
-                initial: isMine ? "あ" : profile?.displayName.first.map(String.init) ?? fallbackParticipantName(index: index).first.map(String.init) ?? "話"
-            )
-        }
-    }
-
-    private var uniqueParticipantIDs: [UUID] {
-        var seen = Set<UUID>()
-        return ([thread.authorID] + replies.map(\.authorID)).filter { seen.insert($0).inserted }
+    private var detailPresentation: BoardThreadDetailPresentation {
+        BoardThreadDetailPresentationBuilder(
+            thread: thread,
+            replies: replies,
+            viewer: appState.viewer,
+            profilesByUserID: appState.publicProfilesByUserID,
+            grooms: appState.grooms
+        )
+        .makePresentation()
     }
 
     var body: some View {
+        let presentation = detailPresentation
+
         ScrollViewReader { proxy in
             ZStack {
                 MegrumTheme.canvas
@@ -81,13 +62,13 @@ struct BoardThreadDetailScreen: View {
                         VStack(spacing: 0) {
                             BoardThreadDetailCard(
                                 thread: thread,
-                                authorName: authorDisplayName,
-                                authorAvatarURL: authorAvatarURL,
-                                authorInitial: authorInitial,
-                                authorRelativeTime: relativeTime(from: thread.createdAt),
+                                authorName: presentation.authorName,
+                                authorAvatarURL: presentation.authorAvatarURL,
+                                authorInitial: presentation.authorInitial,
+                                authorRelativeTime: presentation.authorRelativeTime,
                                 replyCount: max(replies.count, appState.boardRepliesByThreadID[thread.id]?.count ?? replies.count),
-                                participantAvatars: participantAvatars,
-                                replies: replyRows,
+                                participantAvatars: presentation.participantAvatars,
+                                replies: presentation.replies,
                                 isLoadingReplies: appState.loadingBoardRepliesThreadID == thread.id,
                                 missingReplyContextMessage: missingReplyContextMessage
                             )
@@ -132,40 +113,9 @@ struct BoardThreadDetailScreen: View {
         }
     }
 
-    private var authorDisplayName: String {
-        if thread.authorID == appState.viewer?.id {
-            return appState.viewer?.displayName ?? "あなた"
-        }
-        return profile(for: thread.authorID)?.displayName ?? "miki"
-    }
-
-    private var authorAvatarURL: URL? {
-        profile(for: thread.authorID)?.avatarURL ?? fallbackGroomURL(index: 0)
-    }
-
-    private var authorInitial: String {
-        authorDisplayName.first.map(String.init) ?? "話"
-    }
-
-    private func profile(for userID: UUID) -> UserProfile? {
-        if userID == appState.viewer?.id {
-            return appState.viewer
-        }
-        return appState.publicProfilesByUserID[userID]?.profile
-    }
-
-    private func fallbackGroomURL(index: Int) -> URL? {
-        guard !appState.grooms.isEmpty else { return nil }
-        return appState.grooms[index % appState.grooms.count].imageURL
-    }
-
-    private func fallbackParticipantName(index: Int) -> String {
-        ["yuna", "haru", "saku", "miki"][index % 4]
-    }
-
     private func preloadParticipantProfiles() async {
         let viewerID = appState.viewer?.id
-        for userID in uniqueParticipantIDs where userID != viewerID && appState.publicProfilesByUserID[userID] == nil {
+        for userID in detailPresentation.participantIDs where userID != viewerID && appState.publicProfilesByUserID[userID] == nil {
             await appState.loadPublicUserProfile(userID: userID, reportsFailure: false)
         }
     }
@@ -205,20 +155,6 @@ struct BoardThreadDetailScreen: View {
         } else {
             scroll()
         }
-    }
-
-    private func relativeTime(from date: Date) -> String {
-        let elapsed = max(0, Date().timeIntervalSince(date))
-        if elapsed < 60 {
-            return "たった今"
-        }
-        if elapsed < 3_600 {
-            return "\(Int(elapsed / 60))分前"
-        }
-        if elapsed < 86_400 {
-            return "\(Int(elapsed / 3_600))時間前"
-        }
-        return date.formatted(date: .numeric, time: .omitted)
     }
 }
 

@@ -4,6 +4,46 @@
 
 ---
 
+## イテレーション1047：board thread detail presentationを分離
+
+### 背景・問題意識
+
+`BoardThreadDetailScreen.swift` は、返信load/sendとscroll制御に加えて、著者名、返信行、参加者avatar、相対時刻、fallback画像/名前の組み立ても同じView内に抱えていた。画面側は状態・副作用・入力欄に集中させ、表示用データ変換を専用builderへ分離した。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/BoardThreadDetailScreen.swift`
+- `BoardThreadDetailPresentationBuilder` から受け取った表示用データを `BoardThreadDetailCard` に渡す構成へ変更した。
+- 返信load、public profile preload、返信send、scroll制御、missing reply context判定、bottom input、navigation chromeは親Viewに残した。
+
+#### `ios-native/Sources/MegrumApp/BoardThreadDetailPresentation.swift`
+- `BoardThreadDetailPresentation` と `BoardThreadDetailPresentationBuilder` を追加した。
+- 著者表示名/avatar/initial、返信行display、参加者avatar、participant ID、相対時刻、fallback groom画像/名前の生成を移動した。
+- 既存の「あなた」表示、fallback名、fallback avatar、相対時刻表示、参加者重複排除を維持した。
+
+### 影響範囲
+
+- Swift Native iOS版のめぐりboard話題detail画面。
+- 返信一覧、参加者avatar、著者表示、public profile preload対象の組み立て。
+- 返信load/send、入力disabled条件、scroll挙動、状態名、用語、DBスキーマ、表示文言は変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumApp/BoardThreadDetailScreen.swift ios-native/Sources/MegrumApp/BoardThreadDetailPresentation.swift`
+  - passed
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-board-thread-detail-presentation`
+  - passed
+
+### セルフレビュー結果
+
+- ✅ 画面側には返信load/send、scroll、input、context判定を残し、表示用データ変換だけを専用builderへ移動した。
+- ✅ 著者名、avatar、initial、返信行、参加者avatar、相対時刻、fallbackの既存挙動を維持した。
+- ✅ 新ファイルには廃止用語を追加していない。
+- ✅ `BoardThreadDetailScreen.swift` は 240行から 176行へ縮小し、表示変換を 109行の専用ファイルへ分離した。
+- ✅ 新しい状態名・用語・DB列は追加していないため、`notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション1046：individual listing condition rowsを分割
 
 ### 背景・問題意識
