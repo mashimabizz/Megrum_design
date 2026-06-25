@@ -4,6 +4,42 @@
 
 ---
 
+## イテレーション908：Trade detail presentationを分割
+
+### 背景・問題意識
+
+`TradeDetailScreen.swift` は、取引詳細画面の状態保持、上位sheet/dialog/toolbar、content構成、message input bar、初期load task、写真選択onChange、評価/通報/再打診/スケジュール/補助申請/相手プロフィールなどのnavigation destinationが同居していた。既にaction/derived stateは別ファイル化されているため、残っていたcontent/destination構成を別ファイルへ移し、画面本体で追うべき責務を短くする。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/TradeDetailScreen.swift`
+- `TradeDetailScreen` の状態保持、上位confirmation dialog、remote image cover、証跡sheet、camera sheet、toolbarに集中させた。
+- ファイル行数を335行から128行へ縮小した。
+
+#### `ios-native/Sources/MegrumApp/TradeDetailScreenPresentation.swift`
+- `bodyBeforeDialogs` を移動し、`TradeDetailContent` の組み立て、message input bar、navigation title、initial load task、写真選択onChange、評価/通報/再打診/スケジュール/補助申請/申告詳細/相手プロフィールdestinationを集約した。
+
+### 影響範囲
+
+- Swift Native iOS版の取引詳細画面、チャット、証跡、評価、通報、再打診、スケジュール、補助申請、相手プロフィール遷移、写真選択/カメラ連携。
+- 挙動変更ではなく責務分離。各callback、navigation destination、task内容、sheet表示条件、message input bar、状態名、用語、DBスキーマは変更しない。
+
+### 確認方法
+
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-trade-detail-presentation-build --disable-index-store`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-trade-detail-presentation-tests --disable-index-store --enable-xctest --disable-swift-testing -j 1 --filter 'TradeChatAffordanceTests|TradeEvidencePhotoStateReducerTests|TradeMessageStateReducerTests'`
+  - 55 tests passed
+
+### セルフレビュー結果
+
+- ✅ 取引詳細のcontent構成、message input bar、評価/通報/再打診/スケジュール/補助申請/申告詳細/相手プロフィールdestinationは移動のみで維持した。
+- ✅ 初期load task、写真選択onChange、location state onChange、証跡/評価/通報/キャンセル同意/現在地共有/写真送信callbackは変更していない。
+- ✅ TradeChatAffordanceTests / TradeEvidencePhotoStateReducerTests / TradeMessageStateReducerTestsで、取引チャット導線、証跡状態、message reducer、取引詳細hero/入力/補助導線を確認した。
+- ✅ 状態名・用語・DBスキーマの変更はないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション907：Trade message bubble viewsを分割
 
 ### 背景・問題意識
