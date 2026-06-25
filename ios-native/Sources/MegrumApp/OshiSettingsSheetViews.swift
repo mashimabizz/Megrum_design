@@ -46,108 +46,31 @@ struct OshiMasterSelectSheet: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            HStack(alignment: .center, spacing: 12) {
-                VStack(alignment: .leading, spacing: 0) {
-                    Text("推しを追加")
-                        .font(.system(size: 22, weight: .black, design: .rounded))
-                        .foregroundStyle(MegrumTheme.ink)
-                }
-                Spacer()
-                Button {
-                    onRequest(searchText.nilIfBlank)
-                } label: {
-                    Text("追加リクエスト")
-                        .font(.system(size: 14, weight: .black, design: .rounded))
-                        .foregroundStyle(MegrumTheme.lavender)
-                        .padding(.horizontal, 16)
-                        .frame(height: 42)
-                        .background(MegrumTheme.lavender.opacity(0.11), in: Capsule())
-                }
-                .buttonStyle(.plain)
-
-                Button(action: onClose) {
-                    Image(systemName: "xmark")
-                        .font(.system(size: 20, weight: .black, design: .rounded))
-                        .foregroundStyle(MegrumTheme.muted)
-                        .frame(width: 48, height: 48)
-                        .background(.black.opacity(0.04), in: Circle())
-                }
-                .buttonStyle(.plain)
-            }
-            .padding(.horizontal, 18)
-            .padding(.top, 24)
-            .padding(.bottom, 10)
+            OshiMasterSelectHeader(
+                onRequest: { onRequest(searchText.nilIfBlank) },
+                onClose: onClose
+            )
 
             ScrollView {
-                WrappingTagFlow(
-                    spacing: OshiMasterSelectLayoutMetrics.candidateTagSpacing,
-                    rowSpacing: OshiMasterSelectLayoutMetrics.candidateTagRowSpacing
-                ) {
-                    ForEach(filteredGroups) { group in
-                        OshiMasterCandidateTag(
-                            title: group.name,
-                            isSelected: isSelected(group),
-                            isLocked: selectedGroupIDs.contains(group.id),
-                            action: { handleCandidateTap(group) }
-                        )
-                    }
-                }
-                .padding(.horizontal, 18)
+                OshiMasterCandidateGrid(
+                    groups: filteredGroups,
+                    selectedGroupIDs: selectedGroupIDs,
+                    isSelected: isSelected,
+                    onSelect: handleCandidateTap
+                )
                 .padding(.bottom, scrollBottomPadding)
             }
         }
         .background(MegrumTheme.canvas.ignoresSafeArea())
         .safeAreaInset(edge: .bottom) {
-            VStack(spacing: 10) {
-                OshiGenreSegmentBar(options: categoryOptions, selection: $selectedGenreID)
-
-                HStack(spacing: 10) {
-                    Image(systemName: "magnifyingglass")
-                        .font(.system(size: 17, weight: .bold, design: .rounded))
-                        .foregroundStyle(MegrumTheme.muted)
-                    TextField("作品名・グループ名で検索", text: $searchText)
-                        .font(.system(size: 15, weight: .bold, design: .rounded))
-                        .autocorrectionDisabled()
-                }
-                .padding(.horizontal, 14)
-                .frame(height: OshiMasterSelectLayoutMetrics.searchHeight)
-                .background(.white.opacity(0.94), in: RoundedRectangle(cornerRadius: 19, style: .continuous))
-                .overlay {
-                    RoundedRectangle(cornerRadius: 19, style: .continuous)
-                        .strokeBorder(.black.opacity(0.08), lineWidth: 1)
-                }
-                .padding(.horizontal, 18)
-
-                if allowsMultipleSelection, !pendingSelectedGroupIDs.isEmpty {
-                    Text(OshiSettingsPresentationText.masterSelectionCountTitle(selectionCount: pendingSelectedGroupIDs.count))
-                        .font(.system(size: 12, weight: .black, design: .rounded))
-                        .foregroundStyle(MegrumTheme.lavender)
-                        .frame(maxWidth: .infinity)
-                        .padding(.horizontal, 18)
-                        .transition(.opacity)
-
-                    Button(action: registerPendingSelection) {
-                        Text(OshiSettingsPresentationText.masterRegisterButtonTitle(selectionCount: pendingSelectedGroupIDs.count))
-                            .font(.system(size: 17, weight: .black, design: .rounded))
-                            .foregroundStyle(.white)
-                            .frame(maxWidth: .infinity)
-                            .frame(height: OshiMasterSelectLayoutMetrics.registerButtonHeight)
-                            .background(MegrumTheme.lavender, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
-                    }
-                    .buttonStyle(.plain)
-                    .padding(.horizontal, 18)
-                    .transition(.move(edge: .bottom).combined(with: .opacity))
-                    .accessibilityLabel(OshiSettingsPresentationText.masterRegisterButtonTitle(selectionCount: pendingSelectedGroupIDs.count))
-                }
-            }
-            .padding(.top, 10)
-            .padding(.bottom, 14)
-            .background(MegrumTheme.canvas.opacity(0.96))
-            .overlay(alignment: .top) {
-                Rectangle()
-                    .fill(.black.opacity(0.08))
-                    .frame(height: 0.5)
-            }
+            OshiMasterSelectFooter(
+                categoryOptions: categoryOptions,
+                selectedGenreID: $selectedGenreID,
+                searchText: $searchText,
+                allowsMultipleSelection: allowsMultipleSelection,
+                pendingSelectionCount: pendingSelectedGroupIDs.count,
+                onRegister: registerPendingSelection
+            )
         }
         .onAppear(perform: resetPendingSelection)
         .onChange(of: selectedGroupIDs) { _, _ in
@@ -187,108 +110,5 @@ struct OshiMasterSelectSheet: View {
 
     private func resetPendingSelection() {
         pendingSelectedGroupIDs = []
-    }
-}
-
-private struct OshiGenreSegmentBar: View {
-    var options: [OshiCategoryOption]
-    @Binding var selection: UUID?
-
-    var body: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 0) {
-                ForEach(Array(options.enumerated()), id: \.offset) { index, option in
-                    Button {
-                        withAnimation(.snappy(duration: 0.16)) {
-                            selection = option.id
-                        }
-                    } label: {
-                        Text(option.title)
-                            .font(.system(size: 13.5, weight: .black, design: .rounded))
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.82)
-                            .foregroundStyle(selection == option.id ? .white : MegrumTheme.ink)
-                            .padding(.horizontal, 15)
-                            .frame(minWidth: OshiMasterSelectLayoutMetrics.genreSegmentMinWidth)
-                            .frame(height: OshiMasterSelectLayoutMetrics.genreSegmentHeight - 6)
-                            .background(selection == option.id ? MegrumTheme.lavender : .clear, in: Capsule())
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel(option.title)
-
-                    if index < options.count - 1 {
-                        Rectangle()
-                            .fill(.black.opacity(0.08))
-                            .frame(width: 0.5, height: 18)
-                            .padding(.horizontal, 2)
-                    }
-                }
-            }
-            .padding(3)
-            .background(.white.opacity(0.94), in: Capsule())
-            .overlay {
-                Capsule()
-                    .strokeBorder(.black.opacity(0.08), lineWidth: 1)
-            }
-            .padding(.horizontal, 18)
-            .padding(.vertical, 1)
-        }
-    }
-}
-
-private struct OshiMasterCandidateTag: View {
-    var title: String
-    var isSelected: Bool
-    var isLocked: Bool = false
-    var action: () -> Void
-
-    var body: some View {
-        Button(action: action) {
-            Text(title)
-                .font(.system(size: 14.5, weight: .black, design: .rounded))
-                .lineLimit(1)
-                .minimumScaleFactor(0.76)
-                .foregroundStyle(foregroundStyle)
-                .padding(.horizontal, OshiMasterSelectLayoutMetrics.candidateTagHorizontalPadding)
-                .frame(
-                    minWidth: OshiMasterSelectLayoutMetrics.candidateTagMinimumWidth,
-                    minHeight: OshiMasterSelectLayoutMetrics.candidateTagMinHeight
-                )
-                .background(
-                    backgroundStyle,
-                    in: Capsule()
-                )
-                .overlay {
-                    Capsule()
-                        .strokeBorder(borderStyle, lineWidth: 1)
-                }
-        }
-        .buttonStyle(.plain)
-        .disabled(isLocked)
-        .accessibilityLabel(isSelected ? "\(title)、選択済み" : title)
-    }
-
-    private var foregroundStyle: AnyShapeStyle {
-        if isSelected, !isLocked {
-            return AnyShapeStyle(.white)
-        }
-        if isSelected {
-            return AnyShapeStyle(MegrumTheme.lavender.opacity(0.82))
-        }
-        return AnyShapeStyle(MegrumTheme.ink)
-    }
-
-    private var backgroundStyle: AnyShapeStyle {
-        if isSelected, !isLocked {
-            return AnyShapeStyle(MegrumTheme.lavender)
-        }
-        if isSelected {
-            return AnyShapeStyle(MegrumTheme.lavender.opacity(0.10))
-        }
-        return AnyShapeStyle(.white.opacity(0.94))
-    }
-
-    private var borderStyle: Color {
-        isSelected ? MegrumTheme.lavender.opacity(isLocked ? 0.34 : 0.8) : .black.opacity(0.08)
     }
 }

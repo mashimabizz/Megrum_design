@@ -4,6 +4,53 @@
 
 ---
 
+## イテレーション972：Oshi master select sheetを部品分割
+
+### 背景・問題意識
+
+`OshiSettingsSheetViews.swift` は、推し追加sheet本体、ヘッダー、候補タグgrid、ジャンルsegment、検索欄、複数選択時の登録footer、候補タグの見た目を1ファイルに持っていた。推し追加sheetは推し設定、グッズ登録、検索フィルタ、個別募集作成から使われるため、表示部品を分け、推し選択UI調整時に読む範囲を狭める。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/OshiSettingsSheetViews.swift`
+- `OshiMasterSelectSheet` 本体を状態、検索/絞り込み、選択処理、sheet構造に集中させ、294行から114行へ縮小した。
+
+#### `ios-native/Sources/MegrumApp/OshiMasterSelectHeader.swift`
+- 「推しを追加」タイトル、追加リクエスト、閉じるボタンを新規ファイルへ移動した。
+
+#### `ios-native/Sources/MegrumApp/OshiMasterCandidateGrid.swift`
+- 推し候補タグの `WrappingTagFlow` gridを新規ファイルへ移動した。
+
+#### `ios-native/Sources/MegrumApp/OshiMasterSelectFooter.swift`
+- ジャンルsegment、検索欄、複数選択時の件数/登録CTAを新規ファイルへ移動した。
+
+#### `ios-native/Sources/MegrumApp/OshiGenreSegmentBar.swift`
+- 横スクロールのジャンルsegment barを新規ファイルへ移動した。
+
+#### `ios-native/Sources/MegrumApp/OshiMasterCandidateTag.swift`
+- 推し候補タグの色、ロック/選択状態、アクセシビリティlabelを新規ファイルへ移動した。
+
+### 影響範囲
+
+- Swift Native iOS版の推し設定、初回設定、グッズ登録、検索フィルタ、個別募集作成で使う推し追加sheet。
+- 挙動変更ではなく責務分離。検索条件、ジャンル絞り込み、複数選択、追加リクエスト、登録CTA文言、状態名、用語、DBスキーマは変更しない。
+
+### 確認方法
+
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-oshi-sheet-build --disable-index-store`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-oshi-sheet-build --disable-index-store --enable-xctest --disable-swift-testing -j 1 --filter 'OshiSettingsDraftTests|OnboardingOshiSelectionTests|GoodsEditorDraftTests|SearchScreenTests'`
+  - 58 tests passed
+
+### セルフレビュー結果
+
+- ✅ 推し追加sheet本体からヘッダー、候補grid、footer、ジャンルsegment、候補タグを移動のみで分割した。
+- ✅ 推し設定、オンボーディング、グッズ登録、検索画面の対象テストを通した。
+- ✅ 推し選択、検索、複数登録、追加リクエスト、表示文言、レイアウト定数は変更していない。
+- ✅ 状態名・用語・DBスキーマの変更はないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション971：IndividualListingDraft選択ロジックを分割
 
 ### 背景・問題意識
