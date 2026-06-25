@@ -4,6 +4,44 @@
 
 ---
 
+## イテレーション1079：meguri thread row metaを分離
+
+### 背景・問題意識
+
+`MeguriBoardThreadRowViews.swift` は、thread row本体のtitle/body/thumbnail配置と、右側のavatar stack・返信数・tag pill表示を同じbody内に抱えていた。row本体の見通しを上げるため、右側meta表示を専用Viewへ分離する。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/MeguriBoardThreadRowViews.swift`
+- `MeguriThreadListRow` の右側meta表示を `MeguriThreadListRowTrailingMeta` 呼び出しへ置き換えた。
+- thumbnail、title/body、chevron、row height、primary groom / avatar groom算出は維持した。
+
+#### `ios-native/Sources/MegrumApp/MeguriBoardThreadMetaViews.swift`
+- `MeguriThreadListRowTrailingMeta` を追加し、avatar stack、reply count、tag pillを担当させた。
+- `MeguriBoardAvatarStack` を同ファイルへ移し、spacing、stroke、empty state circleを維持した。
+
+### 影響範囲
+
+- Swift Native iOS版のMeguri掲示板thread list row表示。
+- Meguriの投稿/返信状態、位置制限、DB/API、状態名、表示文言は変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumApp/MeguriBoardThreadRowViews.swift ios-native/Sources/MegrumApp/MeguriBoardThreadMetaViews.swift`
+  - passed
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-meguri-thread-meta`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-meguri-thread-meta --enable-xctest --disable-swift-testing -j 1 --filter 'MeguriAccessPolicyTests|MeguriFeedStateReducerTests'`
+  - passed（10 tests）
+
+### セルフレビュー結果
+
+- ✅ avatar stack、reply count、tag pillのfont、spacing、color、capsule背景を維持した。
+- ✅ `MeguriBoardThreadRowViews.swift` は 219行から 186行へ縮小し、右側meta表示を 49行の専用ファイルへ分離した。
+- ✅ 新しい状態名・用語・DB列は追加していないため、`notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション1078：auth primary action buttonを分離
 
 ### 背景・問題意識
