@@ -4,6 +4,46 @@
 
 ---
 
+## イテレーション1084：proposal confirm summaryを分離
+
+### 背景・問題意識
+
+`ProposalConfirmCards.swift` は、個別の確認カード群と、打診確認画面全体のsummary cardを同じファイルに抱えていた。カード群側を受け渡し方法・条件・支払方法・メッセージの表示に集中させるため、summary cardを専用Viewファイルへ分離する。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/ProposalConfirmCards.swift`
+- `ProposalConfirmSummary` を移動した。
+- `ProposalCardSection`、受け渡し方法、条件、支払方法、メッセージの各カード表示は維持した。
+- summary分離により不要になった `Foundation` importを削除した。
+
+#### `ios-native/Sources/MegrumApp/ProposalConfirmSummary.swift`
+- `ProposalConfirmSummary` を追加した。
+- `ProposalExchangePreviewRow`、`methodTitle`、`meetupSummary`、`conditionTags` の表示順を維持した。
+- spacing、padding、背景、strokeを維持した。
+
+### 影響範囲
+
+- Swift Native iOS版の打診作成確認画面のsummary表示。
+- 打診作成step、送信payload、支払い/待ち合わせ条件、DB/API、状態名、表示文言は変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumApp/ProposalConfirmCards.swift ios-native/Sources/MegrumApp/ProposalConfirmSummary.swift`
+  - passed
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-proposal-confirm-summary`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-proposal-confirm-summary --enable-xctest --disable-swift-testing -j 1 --filter 'ProposalCreateFlowTests|ProposalCreateSheetTests'`
+  - passed（62 tests）
+
+### セルフレビュー結果
+
+- ✅ `ProposalExchangePreviewRow`、交換方法、待ち合わせ、条件タグの表示順を維持した。
+- ✅ `ProposalConfirmCards.swift` は 195行から 161行へ縮小し、summary表示を 35行の専用ファイルへ分離した。
+- ✅ 新しい状態名・用語・DB列は追加していないため、`notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション1083：proposal confirm exchange artworkを分離
 
 ### 背景・問題意識
