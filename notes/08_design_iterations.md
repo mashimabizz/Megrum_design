@@ -4,6 +4,45 @@
 
 ---
 
+## イテレーション1072：proposal condition segment rowを分離
+
+### 背景・問題意識
+
+`ProposalCreateConditionSteps.swift` は、打診作成の条件stepとsegment rowの汎用表示を同じファイルに抱えていた。条件step側はsection構成と相互条件カードに集中させ、segment rowの選択UIだけを専用Viewへ分離する。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/ProposalCreateConditionSteps.swift`
+- `ProposalMeetupConditionStep`、`ProposalShippingConditionStep`、`ProposalMutualConditionCard` を残した。
+- `ProposalConditionSegmentRow` の表示本体を移動した。
+
+#### `ios-native/Sources/MegrumApp/ProposalConditionSegmentRow.swift`
+- `ProposalConditionSegmentRow` を追加し、title、segment button、selected表示、accessibility selected traitを担当させた。
+- font、spacing、height、capsule背景、選択時の色、title fallbackを維持した。
+
+### 影響範囲
+
+- Swift Native iOS版の打診作成における条件stepのsegment選択UI。
+- 条件stepのsection構成、相互条件カード、選択値のBinding、submit payload、DB/API、状態名、表示文言は変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumApp/ProposalCreateConditionSteps.swift ios-native/Sources/MegrumApp/ProposalConditionSegmentRow.swift`
+  - passed
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-proposal-condition-segment-row`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-proposal-condition-segment-row --enable-xctest --disable-swift-testing -j 1 --filter 'ProposalCreateFlowTests|ProposalCreateSheetTests|TradeRequestDraftProposalCreateFlowTests'`
+  - passed（62 tests）
+
+### セルフレビュー結果
+
+- ✅ `ProposalShippingConditionStep` のsection、Divider、Binding接続は維持し、segment rowの見た目と選択処理だけを専用ファイルへ移した。
+- ✅ segment title、selected/unselected色、button height、capsule背景、accessibility selected traitを維持した。
+- ✅ `ProposalCreateConditionSteps.swift` は 187行から 141行へ縮小し、condition segment rowを 49行の専用ファイルへ分離した。
+- ✅ 新しい状態名・用語・DB列は追加していないため、`notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション1071：goods editor status option rowを分離
 
 ### 背景・問題意識
