@@ -12,20 +12,16 @@ struct PersonalScheduleScreen: View {
 
     private let calendar = Calendar.current
 
+    private var calendarWindow: TradeScheduleCalendarWindow {
+        TradeScheduleCalendarWindow(mode: mode, anchorDate: anchorDate, calendar: calendar)
+    }
+
     private var visibleInterval: DateInterval {
-        switch mode {
-        case .fiveDays:
-            let start = calendar.startOfDay(for: anchorDate)
-            let end = calendar.date(byAdding: .day, value: 5, to: start) ?? start.addingTimeInterval(86_400 * 5)
-            return DateInterval(start: start, end: end)
-        case .month:
-            return calendar.dateInterval(of: .month, for: anchorDate)
-                ?? DateInterval(start: calendar.startOfDay(for: anchorDate), duration: 86_400 * 31)
-        }
+        calendarWindow.visibleInterval
     }
 
     private var reloadKey: String {
-        "\(mode.rawValue)-\(Int(visibleInterval.start.timeIntervalSince1970))"
+        calendarWindow.reloadKey
     }
 
     var body: some View {
@@ -109,7 +105,7 @@ struct PersonalScheduleScreen: View {
 
     private var fiveDayView: some View {
         VStack(spacing: 12) {
-            ForEach(fiveVisibleDays, id: \.self) { day in
+            ForEach(calendarWindow.fiveVisibleDays, id: \.self) { day in
                 ScheduleDayCard(
                     day: day,
                     schedules: schedules(on: day),
@@ -121,8 +117,8 @@ struct PersonalScheduleScreen: View {
 
     private var monthView: some View {
         ScheduleMonthGrid(
-            monthTitle: monthTitle,
-            monthGridDays: monthGridDays,
+            monthTitle: calendarWindow.monthTitle,
+            monthGridDays: calendarWindow.monthGridDays,
             calendar: calendar,
             viewerID: appState.viewer?.id,
             schedulesForDay: schedules(on:),
@@ -131,41 +127,12 @@ struct PersonalScheduleScreen: View {
         )
     }
 
-    private var fiveVisibleDays: [Date] {
-        let start = calendar.startOfDay(for: anchorDate)
-        return (0..<5).compactMap { calendar.date(byAdding: .day, value: $0, to: start) }
-    }
-
-    private var monthGridDays: [Date?] {
-        guard let month = calendar.dateInterval(of: .month, for: anchorDate),
-              let dayRange = calendar.range(of: .day, in: .month, for: anchorDate)
-        else {
-            return []
-        }
-        let leadingBlanks = (calendar.component(.weekday, from: month.start) + 6) % 7
-        var days: [Date?] = Array(repeating: nil, count: leadingBlanks)
-        days.append(contentsOf: dayRange.compactMap { day in
-            calendar.date(byAdding: .day, value: day - 1, to: month.start)
-        })
-        while days.count % 7 != 0 {
-            days.append(nil)
-        }
-        return days
-    }
-
-    private var monthTitle: String {
-        anchorDate.formatted(.dateTime.year().month(.wide))
-    }
-
     private func schedules(on day: Date) -> [PersonalSchedule] {
-        let start = calendar.startOfDay(for: day)
-        let end = calendar.date(byAdding: .day, value: 1, to: start) ?? start.addingTimeInterval(86_400)
-        return appState.personalSchedules.filter { $0.overlaps(start: start, end: end) }
+        calendarWindow.schedules(on: day, from: appState.personalSchedules)
     }
 
     private func moveAnchor(by value: Int) {
-        let component: Calendar.Component = mode == .month ? .month : .day
-        anchorDate = calendar.date(byAdding: component, value: value, to: anchorDate) ?? anchorDate
+        anchorDate = calendarWindow.movedAnchor(by: value)
     }
 }
 
@@ -179,20 +146,16 @@ struct TradeScheduleSheet: View {
 
     private let calendar = Calendar.current
 
+    private var calendarWindow: TradeScheduleCalendarWindow {
+        TradeScheduleCalendarWindow(mode: mode, anchorDate: anchorDate, calendar: calendar)
+    }
+
     private var visibleInterval: DateInterval {
-        switch mode {
-        case .fiveDays:
-            let start = calendar.startOfDay(for: anchorDate)
-            let end = calendar.date(byAdding: .day, value: 5, to: start) ?? start.addingTimeInterval(86_400 * 5)
-            return DateInterval(start: start, end: end)
-        case .month:
-            return calendar.dateInterval(of: .month, for: anchorDate)
-                ?? DateInterval(start: calendar.startOfDay(for: anchorDate), duration: 86_400 * 31)
-        }
+        calendarWindow.visibleInterval
     }
 
     private var reloadKey: String {
-        "\(mode.rawValue)-\(Int(visibleInterval.start.timeIntervalSince1970))"
+        calendarWindow.reloadKey
     }
 
     private var schedules: [PersonalSchedule] {
@@ -278,7 +241,7 @@ struct TradeScheduleSheet: View {
 
     private var fiveDayView: some View {
         VStack(spacing: 12) {
-            ForEach(fiveVisibleDays, id: \.self) { day in
+            ForEach(calendarWindow.fiveVisibleDays, id: \.self) { day in
                 ScheduleDayCard(
                     day: day,
                     schedules: schedules(on: day),
@@ -290,8 +253,8 @@ struct TradeScheduleSheet: View {
 
     private var monthView: some View {
         ScheduleMonthGrid(
-            monthTitle: monthTitle,
-            monthGridDays: monthGridDays,
+            monthTitle: calendarWindow.monthTitle,
+            monthGridDays: calendarWindow.monthGridDays,
             calendar: calendar,
             viewerID: viewerID,
             schedulesForDay: schedules(on:),
@@ -300,40 +263,11 @@ struct TradeScheduleSheet: View {
         )
     }
 
-    private var fiveVisibleDays: [Date] {
-        let start = calendar.startOfDay(for: anchorDate)
-        return (0..<5).compactMap { calendar.date(byAdding: .day, value: $0, to: start) }
-    }
-
-    private var monthGridDays: [Date?] {
-        guard let month = calendar.dateInterval(of: .month, for: anchorDate),
-              let dayRange = calendar.range(of: .day, in: .month, for: anchorDate)
-        else {
-            return []
-        }
-        let leadingBlanks = (calendar.component(.weekday, from: month.start) + 6) % 7
-        var days: [Date?] = Array(repeating: nil, count: leadingBlanks)
-        days.append(contentsOf: dayRange.compactMap { day in
-            calendar.date(byAdding: .day, value: day - 1, to: month.start)
-        })
-        while days.count % 7 != 0 {
-            days.append(nil)
-        }
-        return days
-    }
-
-    private var monthTitle: String {
-        anchorDate.formatted(.dateTime.year().month(.wide))
-    }
-
     private func schedules(on day: Date) -> [PersonalSchedule] {
-        let start = calendar.startOfDay(for: day)
-        let end = calendar.date(byAdding: .day, value: 1, to: start) ?? start.addingTimeInterval(86_400)
-        return schedules.filter { $0.overlaps(start: start, end: end) }
+        calendarWindow.schedules(on: day, from: schedules)
     }
 
     private func moveAnchor(by value: Int) {
-        let component: Calendar.Component = mode == .month ? .month : .day
-        anchorDate = calendar.date(byAdding: component, value: value, to: anchorDate) ?? anchorDate
+        anchorDate = calendarWindow.movedAnchor(by: value)
     }
 }

@@ -4,6 +4,46 @@
 
 ---
 
+## イテレーション906：Trade schedule calendar windowを共通化
+
+### 背景・問題意識
+
+`TradeScheduleViews.swift` は、個人スケジュール画面と取引内スケジュールシートの2箇所で、5日表示の可視期間、月表示のDateInterval、月グリッド生成、日別予定filter、前後移動の計算を重複して持っていた。週/月表示や日付境界を後で調整する時に2画面の挙動がずれないよう、カレンダー表示期間の計算を共通モデルへ寄せる。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/TradeScheduleViews.swift`
+- `PersonalScheduleScreen` / `TradeScheduleSheet` から重複していた可視期間、reload key、5日配列、月グリッド、月タイトル、日別filter、前後移動計算を削除した。
+- 各画面は `TradeScheduleCalendarWindow` を通して表示期間と日別予定を解決するようにした。
+- ファイル行数を339行から273行へ縮小した。
+
+#### `ios-native/Sources/MegrumApp/TradeSchedulePresentationModels.swift`
+- `TradeScheduleCalendarWindow` を追加し、週/月の `visibleInterval`、`reloadKey`、`fiveVisibleDays`、`monthGridDays`、`monthTitle`、日別予定filter、anchor移動を集約した。
+
+#### `ios-native/Tests/MegrumAppTests/TradeScheduleCalendarWindowTests.swift`
+- 5日表示の期間/日付配列、月表示の空白埋めgrid、月移動、予定overlap境界のテストを追加した。
+
+### 影響範囲
+
+- Swift Native iOS版の個人スケジュール画面、取引内スケジュールシート、週/月切り替え、前月/翌月・前週/翌週移動、日別予定表示。
+- 挙動変更ではなく責務分離。読み込みAPI、toolbar構成、schedule editor起動、legend、カードUI、予定保存処理、状態名、用語、DBスキーマは変更しない。
+
+### 確認方法
+
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-trade-schedule-window-build --disable-index-store`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-trade-schedule-window-tests --disable-index-store --enable-xctest --disable-swift-testing -j 1 --filter 'TradeScheduleCalendarWindowTests|ScheduleStateReducerTests|MegrumCoreTests/testPersonalSchedule'`
+  - 8 tests passed
+
+### セルフレビュー結果
+
+- ✅ `PersonalScheduleScreen` と `TradeScheduleSheet` の読み込み先、sheet表示、toolbar button、週/月切り替えUIは変更していない。
+- ✅ 5日表示、月表示、月グリッド、前後移動、予定overlap filterは共通モデルへ移動し、追加テストで境界を確認した。
+- ✅ スケジュール保存処理、proposal別/personal別の予定bucket更新、PersonalSchedule正規化・overlap境界の既存テストも通過した。
+- ✅ 状態名・用語・DBスキーマの変更はないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション905：Groom archive story componentsを分割
 
 ### 背景・問題意識
