@@ -4,6 +4,44 @@
 
 ---
 
+## イテレーション1087：proposal schedule mini viewsを分離
+
+### 背景・問題意識
+
+`ProposalCreateScheduleViews.swift` は、スケジュール背景section本体と、重複予定banner、legend、day strip、mini rowを同じファイルに抱えていた。section側を表示modeと空状態/5日表示/月表示の切り替えに集中させるため、小さな表示部品を専用Viewファイルへ分離する。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/ProposalCreateScheduleViews.swift`
+- `ProposalSelectedScheduleOverlapBanner`、`ProposalScheduleLegend`、`ProposalScheduleDayStrip`、`ProposalScheduleMiniRow` を移動した。
+- segmented picker、legend配置、空状態、重複予定banner表示、5日表示/月表示切り替えは維持した。
+
+#### `ios-native/Sources/MegrumApp/ProposalScheduleMiniViews.swift`
+- 重複予定banner、legend、day strip、mini rowを追加した。
+- role text、表示件数制限、日付/曜日、時刻範囲、場所表示、色分けを維持した。
+
+### 影響範囲
+
+- Swift Native iOS版の打診作成フローにおけるスケジュール背景表示。
+- 待ち合わせ候補作成、カレンダー操作、step遷移、送信payload、DB/API、状態名、表示文言は変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumApp/ProposalCreateScheduleViews.swift ios-native/Sources/MegrumApp/ProposalScheduleMiniViews.swift`
+  - passed
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-proposal-schedule-mini-views`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-proposal-schedule-mini-views --enable-xctest --disable-swift-testing -j 1 --filter 'ProposalCreateFlowTests|ProposalCreateSheetTests'`
+  - passed（62 tests）
+
+### セルフレビュー結果
+
+- ✅ 重複予定banner、legend、day strip、mini rowの表示順・色・件数制限を維持した。
+- ✅ `ProposalCreateScheduleViews.swift` は 185行から 57行へ縮小し、小部品群を 132行の専用ファイルへ分離した。
+- ✅ 新しい状態名・用語・DB列は追加していないため、`notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション1086：proposal selectable goods artworkを分離
 
 ### 背景・問題意識
