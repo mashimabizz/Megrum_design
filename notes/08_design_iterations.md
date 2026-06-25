@@ -4,6 +4,49 @@
 
 ---
 
+## イテレーション961：MegrumAuthState actionsを分割
+
+### 背景・問題意識
+
+`MegrumAuthState.swift` は、認証状態の保持、メールログイン、Appleログイン、Google OAuth URL生成、新規登録、パスワード再設定、セッション更新、URL callback復元、ログアウトを1ファイルに持っていた。認証は起動時復元・設定画面・ログイン画面に影響するため、挙動は変えずにアクション領域ごとへ分け、調査範囲を狭める。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/MegrumAuthState.swift`
+- 状態保持、初期化、`isAuthenticated` / `oauthCallbackScheme`、`clearFeedback`、共通の `runAuthAction` / `activateSession` を残した。
+- 別ファイルextensionから状態更新できるよう、公開getterは維持したまま `@Published public internal(set)` に変更した。
+- repository/sessionStore/timeout値と共通helperをMegrumAppモジュール内アクセスにした。
+
+#### `ios-native/Sources/MegrumApp/MegrumAuthStateSignInActions.swift`
+- メールログイン、Appleログイン、Google OAuth URL生成を新規ファイルへ移動した。
+
+#### `ios-native/Sources/MegrumApp/MegrumAuthStateSignUpActions.swift`
+- 新規登録とパスワード再設定を新規ファイルへ移動した。
+
+#### `ios-native/Sources/MegrumApp/MegrumAuthStateSessionActions.swift`
+- preview session、セッション更新、redirect URL復元、ログアウトを新規ファイルへ移動した。
+
+### 影響範囲
+
+- Swift Native iOS版のログイン、新規登録、Appleログイン、Google OAuth、パスワード再設定、起動時セッション復元、ログアウト。
+- 挙動変更ではなく責務分離。validation文言、timeout、保存失敗時メッセージ、remote sign-out失敗時の扱い、状態名、用語、DBスキーマは変更しない。
+
+### 確認方法
+
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-auth-state-build --disable-index-store`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-auth-state-build --disable-index-store --enable-xctest --disable-swift-testing -j 1 --filter 'AuthScreenInputTests|MegrumAppStateTests|SupabaseAuthClientTests'`
+  - 105 tests passed
+
+### セルフレビュー結果
+
+- ✅ 認証の公開メソッド名・引数・戻り値は維持し、処理本体は移動に留めた。
+- ✅ `private(set)` 由来の分割不能箇所は、外部公開setterではなく `internal(set)` にしてMegrumApp内に閉じた。
+- ✅ ログイン/登録/パスワード再設定/セッション復元/ログアウト/Supabase auth clientの対象テストを通した。
+- ✅ 状態名・用語・DBスキーマの変更はないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション960：MegrumAppState settings actionsを分割
 
 ### 背景・問題意識
