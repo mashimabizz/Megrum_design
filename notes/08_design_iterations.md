@@ -4,6 +4,45 @@
 
 ---
 
+## イテレーション910：Account setup oshi sectionを分割
+
+### 背景・問題意識
+
+`AccountSetupScreen.swift` は、初回設定/プロフィール編集画面の保存処理、初期データload、編集時の推し選択seed、プロフィールform、推し検索/グループchip/メンバーchip/選択中summaryまで1ファイルに同居していた。推し選択UIはオンボーディング体験の調整対象になりやすいため、画面本体から分離し、保存・初期化ロジックと表示部品を追う範囲を分ける。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/AccountSetupScreen.swift`
+- `AccountSetupScreen` を画面全体の状態保持、header/form/save section、保存処理、初期load、編集時seedに集中させた。
+- ファイル行数を334行から161行へ縮小した。
+
+#### `ios-native/Sources/MegrumApp/AccountSetupOshiSection.swift`
+- 推し選択セクションを新規追加し、検索field、グループchip、グループ全体button、メンバーchip、選択中summaryを移動した。
+- グループ検索submit、グループ選択時のcharacter load、全体/メンバー選択、選択解除、loading indicator、accessibility label/hint/value、見た目値は維持した。
+
+### 影響範囲
+
+- Swift Native iOS版の初回アカウント設定画面、プロフィール編集から開く推し設定、推しグループ検索、推しグループ/メンバー選択、保存前validation。
+- 挙動変更ではなく責務分離。保存payload、推し選択priority、初期load、編集時seed、状態名、用語、DBスキーマは変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumApp/AccountSetupScreen.swift ios-native/Sources/MegrumApp/AccountSetupOshiSection.swift`
+  - passed
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-account-setup-build --disable-index-store`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-account-setup-tests --disable-index-store --enable-xctest --disable-swift-testing -j 1 --filter 'AccountSetupScreenTests|OnboardingOshiSelectionTests|MegrumAppStateTests/testAppStateCompletesAccountSetupThroughRepository|MegrumAppStateTests/testAppStateRequiresOshiSelectionForAccountSetup'`
+  - 10 tests passed
+
+### セルフレビュー結果
+
+- ✅ グループ検索、グループ選択時のメンバーload、グループ全体/メンバー選択、選択中summaryからの解除は移動のみで維持した。
+- ✅ 保存処理、displayName/prefecture入力、validation、編集時の既存推し選択seed、完了alertは `AccountSetupScreen` 側に残した。
+- ✅ AccountSetupScreenTests / OnboardingOshiSelectionTests / MegrumAppStateTestsで、必須validation、推し選択priority、グループ全体/メンバー切替、account setup完了処理を確認した。
+- ✅ 状態名・用語・DBスキーマの変更はないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション909：Individual listing footer logicを分割
 
 ### 背景・問題意識
