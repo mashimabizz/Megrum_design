@@ -4,6 +4,44 @@
 
 ---
 
+## イテレーション1089：proposal meetup form fieldsを分離
+
+### 背景・問題意識
+
+`ProposalCreateMeetupViews.swift` は、待ち合わせ候補フォーム本体の中に、日時入力、場所候補chip、現在地status表示を直接抱えていた。地図のstate同期や座標入力処理は親Viewに残しつつ、副作用のない入力/表示部品を専用Viewファイルへ分離する。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/ProposalCreateMeetupViews.swift`
+- 日時入力、場所候補chip、現在地status表示を専用View呼び出しへ置き換えた。
+- MapReader、座標TextField、focus制御、地図tap時の座標反映、camera同期は維持した。
+
+#### `ios-native/Sources/MegrumApp/ProposalMeetupFormFields.swift`
+- `ProposalMeetupDateRangeFields`、`ProposalMeetupPlaceSuggestionChips`、`ProposalMeetupLocationStatusMessage` を追加した。
+- DatePicker row、suggestion chip、現在地loading表示、status文言のfont/spacing/backgroundを維持した。
+
+### 影響範囲
+
+- Swift Native iOS版の打診作成フローにおける待ち合わせ候補フォーム。
+- 地図選択、座標入力、候補場所反映、step遷移、送信payload、DB/API、状態名、表示文言は変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumApp/ProposalCreateMeetupViews.swift ios-native/Sources/MegrumApp/ProposalMeetupFormFields.swift`
+  - passed
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-proposal-meetup-form-fields`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-proposal-meetup-form-fields --enable-xctest --disable-swift-testing -j 1 --filter 'ProposalCreateFlowTests|ProposalCreateSheetTests'`
+  - passed（62 tests）
+
+### セルフレビュー結果
+
+- ✅ DatePicker、場所候補chip、現在地statusの表示と文言を維持した。
+- ✅ `ProposalCreateMeetupViews.swift` は 181行から 142行へ縮小し、form field群を 73行の専用ファイルへ分離した。
+- ✅ 新しい状態名・用語・DB列は追加していないため、`notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション1088：proposal meetup month day cellを分離
 
 ### 背景・問題意識
