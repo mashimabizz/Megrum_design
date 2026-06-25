@@ -4,6 +4,46 @@
 
 ---
 
+## イテレーション1067：trade goods carousel layoutを分離
+
+### 背景・問題意識
+
+`TradeDealGoodsCarouselViews.swift` は、取引グッズcarouselのView状態/gestureと、カード配置metrics計算を同じファイルに抱えていた。`TradeGoodsCarouselLayout.cardMetrics` は `TradeGoodsCarouselStage`、`HomeDiscoveryRotaryCardItem`、テストからも参照される共有layout計算なので、carousel view本体から切り離す。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/TradeDealGoodsCarouselViews.swift`
+- `TradeGoodsCarouselColumn` を残し、View state、drag gesture、accessibility adjustable action、empty stage切り替えに集中させた。
+- `TradeGoodsCarouselLayout` と `TradeGoodsCarouselCardMetrics` を移動した。
+
+#### `ios-native/Sources/MegrumApp/TradeGoodsCarouselLayout.swift`
+- `TradeGoodsCarouselLayout` と `TradeGoodsCarouselCardMetrics` を追加した。
+- stage height、card metrics、orbit offset、yaw、opacity、zIndex計算を維持した。
+
+### 影響範囲
+
+- Swift Native iOS版の取引詳細内グッズcarousel。
+- `TradeGoodsCarouselStage` と `HomeDiscoveryRotaryCardItem` の共有card metrics。
+- 取引状態、打診payload、DB/API、状態名、用語、表示文言は変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumApp/TradeDealGoodsCarouselViews.swift ios-native/Sources/MegrumApp/TradeGoodsCarouselLayout.swift`
+  - passed
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-trade-goods-carousel-layout`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-trade-goods-carousel-layout --enable-xctest --disable-swift-testing -j 1 --filter 'TradeChatAffordanceTests'`
+  - passed（50 tests）
+
+### セルフレビュー結果
+
+- ✅ View state、drag gesture、accessibility adjustable actionは `TradeGoodsCarouselColumn` に残し、layout/metricsだけを専用ファイルへ移した。
+- ✅ stage height、card metrics、orbit offset、yaw、opacity、zIndex計算を維持した。
+- ✅ `TradeDealGoodsCarouselViews.swift` は 214行から 166行へ縮小し、layout/metricsを 50行の専用ファイルへ分離した。
+- ✅ 新しい状態名・用語・DB列は追加していないため、`notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション1066：proposal step header tabを分離
 
 ### 背景・問題意識
