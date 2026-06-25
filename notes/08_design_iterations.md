@@ -4,6 +4,45 @@
 
 ---
 
+## イテレーション1061：address settings error bannerを分離
+
+### 背景・問題意識
+
+`AddressSettingsScreen.swift` は、入力バリデーションエラーとrepository由来のエラー表示で同じ警告バナーstyleを重複して持っていた。住所保存や郵便番号lookupのロジックは維持し、エラー表示だけを共通viewへ分離した。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/AddressSettingsScreen.swift`
+- `inputErrorMessage` と `appState.errorMessage` の表示を `AddressSettingsErrorBanner` へ置き換えた。
+- 入力field、focus遷移、郵便番号正規化、lookup scheduling、保存処理は変更しない。
+
+#### `ios-native/Sources/MegrumApp/AddressSettingsContentViews.swift`
+- `AddressSettingsErrorBanner` を追加し、住所設定画面のエラー文言、色、余白、角丸、アクセシビリティlabelを一箇所にまとめた。
+
+### 影響範囲
+
+- Swift Native iOS版の住所設定画面。
+- 入力エラー/保存エラーの表示style。
+- 住所保存、郵便番号lookup、DB/API、状態名、用語、表示文言は変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumApp/AddressSettingsScreen.swift ios-native/Sources/MegrumApp/AddressSettingsContentViews.swift`
+  - passed
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-address-settings-error-banner`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-address-settings-error-banner --enable-xctest --disable-swift-testing -j 1 --filter 'SettingsScreenTests|MegrumAppStateInputNormalizerTests|PostalCodeAddressClientTests|SupabaseMailingAddressClientTests'`
+  - passed（30 tests）
+
+### セルフレビュー結果
+
+- ✅ エラーバナー表示だけを共通viewへ移し、入力field、focus、郵便番号lookup、保存処理には触れていない。
+- ✅ 既存の警告色、font、padding、cornerRadius、入力エラー優先表示を維持した。
+- ✅ `AddressSettingsScreen.swift` は 239行から 228行へ縮小し、`AddressSettingsContentViews.swift` に 16行の共通バナーを追加した。
+- ✅ 新しい状態名・用語・DB列は追加していないため、`notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション1060：proposal meetup long pressを分離
 
 ### 背景・問題意識

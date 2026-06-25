@@ -135,20 +135,9 @@ struct AddressSettingsScreen: View {
                 .megrumTextFieldStyle()
 
             if let inputErrorMessage {
-                Text(inputErrorMessage)
-                    .font(.system(size: 13, weight: .bold, design: .rounded))
-                    .foregroundStyle(Color(red: 0.851, green: 0.51, blue: 0.42))
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(14)
-                    .background(Color(red: 0.851, green: 0.51, blue: 0.42).opacity(0.1), in: RoundedRectangle(cornerRadius: 16))
-                    .accessibilityLabel(inputErrorMessage)
+                AddressSettingsErrorBanner(message: inputErrorMessage)
             } else if let errorMessage = appState.errorMessage {
-                Text(errorMessage)
-                    .font(.system(size: 13, weight: .bold, design: .rounded))
-                    .foregroundStyle(Color(red: 0.851, green: 0.51, blue: 0.42))
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(14)
-                    .background(Color(red: 0.851, green: 0.51, blue: 0.42).opacity(0.1), in: RoundedRectangle(cornerRadius: 16))
+                AddressSettingsErrorBanner(message: errorMessage)
             }
         }
     }

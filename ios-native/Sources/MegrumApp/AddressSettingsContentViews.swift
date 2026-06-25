@@ -39,3 +39,19 @@ struct AddressSettingsSaveButton: View {
         .accessibilityHint("入力した住所を保存します")
     }
 }
+
+struct AddressSettingsErrorBanner: View {
+    var message: String
+
+    private let tint = Color(red: 0.851, green: 0.51, blue: 0.42)
+
+    var body: some View {
+        Text(message)
+            .font(.system(size: 13, weight: .bold, design: .rounded))
+            .foregroundStyle(tint)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(14)
+            .background(tint.opacity(0.1), in: RoundedRectangle(cornerRadius: 16))
+            .accessibilityLabel(message)
+    }
+}
