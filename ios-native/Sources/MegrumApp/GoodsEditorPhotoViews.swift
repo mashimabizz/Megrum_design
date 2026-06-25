@@ -14,7 +14,7 @@ struct GoodsEditorInventoryPhotoSection: View {
         GoodsEditorSectionContainer(title: "写真", systemImage: "camera") {
             VStack(alignment: .leading, spacing: 12) {
                 RoundedRectangle(cornerRadius: 24, style: .continuous)
-                    .fill(photoGradient)
+                    .fill(GoodsEditorPhotoBackground.gradient)
                     .aspectRatio(draft.entryKind == .inventory ? 0.78 : 1.45, contentMode: .fit)
                     .overlay {
                         GoodsEditorPhotoPreview(draft: draft)
@@ -59,99 +59,5 @@ struct GoodsEditorInventoryPhotoSection: View {
                 }
             }
         }
-    }
-
-    private var photoGradient: LinearGradient {
-        LinearGradient(
-            colors: [
-                MegrumTheme.sky.opacity(0.62),
-                MegrumTheme.lavender.opacity(0.72),
-                MegrumTheme.pink.opacity(0.54)
-            ],
-            startPoint: .topLeading,
-            endPoint: .bottomTrailing
-        )
-    }
-}
-
-struct GoodsEditorWishPhotoSection: View {
-    var draft: GoodsEditorDraft
-    var photoError: String?
-    var photoActionTitle: String
-    var titlePreview: String
-    var wishImageHint: String
-    var isItemReadOnly: Bool
-    var isWishPhotoRemovalLocked: Bool
-    var onShowPhotoSource: () -> Void
-    var onRemoveWishPhoto: () -> Void
-
-    var body: some View {
-        GoodsEditorSectionContainer(title: "画像", systemImage: "photo", hint: wishImageHint) {
-            VStack(alignment: .leading, spacing: 12) {
-                HStack(alignment: .center, spacing: 14) {
-                    RoundedRectangle(cornerRadius: 18, style: .continuous)
-                        .fill(photoGradient)
-                        .frame(width: 88, height: 88)
-                        .overlay {
-                            GoodsEditorPhotoPreview(draft: draft)
-                        }
-                        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
-                        .shadow(color: MegrumTheme.ink.opacity(0.08), radius: 12, y: 6)
-
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text(titlePreview.isEmpty ? "Wish画像" : titlePreview)
-                            .font(.subheadline.weight(.black))
-                            .foregroundStyle(MegrumTheme.ink)
-                            .lineLimit(1)
-                        Text(draft.hasDisplayPhoto ? "画像を登録しました" : "未紐付け")
-                            .font(.caption.weight(.bold))
-                            .foregroundStyle(MegrumTheme.muted)
-                            .lineLimit(1)
-
-                        HStack(spacing: 8) {
-                            Button(action: onShowPhotoSource) {
-                                Text(photoActionTitle)
-                            }
-                            .buttonStyle(.bordered)
-                            .tint(MegrumTheme.lavender)
-                            .disabled(isItemReadOnly)
-
-                            if draft.hasDisplayPhoto {
-                                Button(role: .destructive, action: onRemoveWishPhoto) {
-                                    Text("削除")
-                                }
-                                .buttonStyle(.bordered)
-                                .disabled(isItemReadOnly || isWishPhotoRemovalLocked)
-                            }
-                        }
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                }
-
-                if isWishPhotoRemovalLocked && draft.hasDisplayPhoto {
-                    Text("個別募集で使用中のため削除できません。差し替えは可能です。")
-                        .font(.caption.weight(.bold))
-                        .foregroundStyle(MegrumTheme.muted)
-                }
-
-                if let photoError {
-                    Text(photoError)
-                        .font(.caption.weight(.bold))
-                        .foregroundStyle(.red)
-                }
-            }
-        }
-    }
-
-    private var photoGradient: LinearGradient {
-        LinearGradient(
-            colors: [
-                MegrumTheme.sky.opacity(0.62),
-                MegrumTheme.lavender.opacity(0.72),
-                MegrumTheme.pink.opacity(0.54)
-            ],
-            startPoint: .topLeading,
-            endPoint: .bottomTrailing
-        )
     }
 }

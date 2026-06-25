@@ -4,6 +4,49 @@
 
 ---
 
+## イテレーション1106：goods editor photo sectionsを分離
+
+### 背景・問題意識
+
+`GoodsEditorPhotoViews.swift` は、inventory写真sectionとWish画像sectionの2つを同居させ、同じ写真背景gradientをそれぞれのprivate propertyとして重複定義していた。写真sectionごとの責務を分け、共通背景を1箇所に寄せる。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/GoodsEditorPhotoViews.swift`
+- `GoodsEditorWishPhotoSection` を専用ファイルへ移動した。
+- inventory写真previewの背景を `GoodsEditorPhotoBackground.gradient` 参照へ切り替えた。
+- 重複していた `photoGradient` computed propertyを削除した。
+
+#### `ios-native/Sources/MegrumApp/GoodsEditorWishPhotoSection.swift`
+- `GoodsEditorWishPhotoSection` を追加した。
+- Wish画像preview、タイトル/状態表示、差し替えbutton、削除button、削除ロック説明、error表示を移動した。
+
+#### `ios-native/Sources/MegrumApp/GoodsEditorPhotoBackground.swift`
+- inventory写真sectionとWish画像sectionで共通利用する写真背景gradientを追加した。
+
+### 影響範囲
+
+- Swift Native iOS版のグッズ登録/編集におけるinventory写真sectionとWish画像section。
+- 写真選択、選択解除、Wish画像削除、削除ロック条件、表示文言、保存payload、DB/API、状態名は変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumApp/GoodsEditorPhotoViews.swift ios-native/Sources/MegrumApp/GoodsEditorPhotoBackground.swift ios-native/Sources/MegrumApp/GoodsEditorWishPhotoSection.swift`
+  - passed
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-goods-editor-photo-sections`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-goods-editor-photo-sections --enable-xctest --disable-swift-testing -j 1 --filter 'GoodsEditor|GoodsInventoryCreate'`
+  - passed（32 tests）
+
+### セルフレビュー結果
+
+- ✅ inventory写真sectionのpreview、写真選択button、選択解除button、補足文、error表示を維持した。
+- ✅ Wish画像sectionのpreview、差し替え/削除button、削除ロック説明、error表示を維持した。
+- ✅ `GoodsEditorPhotoViews.swift` は 157行から63行へ縮小し、Wish画像sectionを72行、共通背景gradientを16行の専用ファイルへ分離した。
+- ✅ 新しい状態名・用語・DB列は追加していないため、`notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション1105：goods editor photo preview contentを分離
 
 ### 背景・問題意識
