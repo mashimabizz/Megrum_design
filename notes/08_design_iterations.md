@@ -4,6 +4,44 @@
 
 ---
 
+## イテレーション1024：検索条件chip表示を分割
+
+### 背景・問題意識
+
+`SearchResultStateViews.swift` は、検索結果section、空状態、loading skeleton、toolbar、検索条件chip列、検索条件summaryを同じファイルに抱えていた。検索結果の状態表示と、検索条件chipの表示・削除操作を分け、検索画面のheaderまわりだけを小さく調整できるようにした。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/SearchResultStateViews.swift`
+- `SearchResultSection`、`SearchEmptyMessage`、`SearchIdleMessage`、`SearchResultSkeleton`、`SearchResultToolbar`、`SearchResultQuerySummary` を既存ファイルに残した。
+- 検索条件chip列の表示を専用ファイルへ委譲した。
+
+#### `ios-native/Sources/MegrumApp/SearchActiveCriteriaChipViews.swift`
+- `SearchActiveCriteriaChips` と `SearchActiveCriteriaChip` を移動した。
+- chip色分岐、削除button、horizontal scroll、padding、アクセシビリティ文言は既存どおり維持した。
+
+### 影響範囲
+
+- Swift Native iOS版の検索画面header。
+- 適用中検索条件chipの表示と削除button。
+- 検索条件生成、検索結果filter、sort、状態名、用語、DBスキーマ、表示文言は変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumApp/SearchResultStateViews.swift ios-native/Sources/MegrumApp/SearchActiveCriteriaChipViews.swift`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-search-active-chips --enable-xctest --disable-swift-testing -j 1 --filter SearchScreenTests`
+  - passed（14 tests）
+
+### セルフレビュー結果
+
+- ✅ `SearchActiveCriteriaChips` は移動のみで、chip順、削除callback、scroll/padding、色分岐を維持した。
+- ✅ 検索結果section、toolbar、empty/skeleton表示、検索条件生成は変更していない。
+- ✅ `SearchResultStateViews.swift` は 247行から 166行へ縮小し、条件chip表示を 83行の専用ファイルへ分離した。
+- ✅ 新しい状態名・用語・DB列は追加していないため、`notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション1023：打診作成bottom barを分割
 
 ### 背景・問題意識
