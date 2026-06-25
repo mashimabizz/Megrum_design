@@ -4,6 +4,57 @@
 
 ---
 
+## イテレーション941：Supabase notification clientを分割
+
+### 背景・問題意識
+
+`SupabaseNotificationClient.swift` は、通知一覧取得/既読化/push設定/APNs端末登録の通信処理、request生成API、query helper、row DTO、payload DTO、APNs token正規化を1ファイルに持っていた。通知設定と端末登録はリリース前の不具合影響が大きいため、挙動は変えずに責務を分け、修正時の確認範囲を狭める。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumData/SupabaseNotificationClient.swift`
+- `loadNotifications`、既読化、push設定取得/保存、APNs端末登録/解除、device token文字列化に絞った。
+- request extensionから参照するため、`client` / `encoder` / native push conflict targetをmodule internalにした。
+- ファイル行数を352行から116行へ縮小した。
+
+#### `ios-native/Sources/MegrumData/SupabaseNotificationClientRequests.swift`
+- request生成APIとquery helper、encoder生成を新規ファイルへ移動した。
+- notifications/user_notification_settings/notification_devices のURL、select、Prefer header、on_conflict、query条件は維持した。
+
+#### `ios-native/Sources/MegrumData/SupabaseNotificationRows.swift`
+- `NotificationRow`、`NotificationSettingRow`、`NotificationDeviceRow` を新規ファイルへ移動した。
+- 通知kind fallback、read_at/created_at mapping、push_enabled/id selectは維持した。
+
+#### `ios-native/Sources/MegrumData/SupabaseNotificationPayloads.swift`
+- `MarkReadPayload`、`NotificationSettingPayload`、`RevokeNativePushDevicePayload`、`NativePushDevicePayload` を新規ファイルへ移動した。
+- APNs device token正規化、app version trimming、last_seen_at、revoked_at nil encodeは維持した。
+
+#### `ios-native/Sources/MegrumData/SupabaseNotificationSupport.swift`
+- 通知用ISO timestamp helperとAPNs token正規化extensionを新規ファイルへ移動した。
+- 汎用global名の衝突を避けるため、日時helperは `notificationISOTimestamp` とした。
+
+### 影響範囲
+
+- Swift Native iOS版の通知一覧、既読化、push通知設定、APNs端末登録/解除。
+- 挙動変更ではなく責務分離。Supabase table名、select、query、payload key、状態名、用語、DBスキーマは変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumData/SupabaseNotificationClient.swift ios-native/Sources/MegrumData/SupabaseNotificationClientRequests.swift ios-native/Sources/MegrumData/SupabaseNotificationRows.swift ios-native/Sources/MegrumData/SupabaseNotificationPayloads.swift ios-native/Sources/MegrumData/SupabaseNotificationSupport.swift`
+  - passed
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-notification-client-build --disable-index-store`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-notification-client-tests --disable-index-store --enable-xctest --disable-swift-testing -j 1 --filter SupabaseNotificationClientTests`
+  - 8 tests passed
+
+### セルフレビュー結果
+
+- ✅ client本体、request builder、row DTO、payload DTO、support helperを移動中心で分割した。
+- ✅ 通知一覧/既読化/push設定/APNs登録解除/token整形の既存request生成テストを通した。
+- ✅ 状態名・用語・DBスキーマの変更はないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション940：Supabase oshi clientを分割
 
 ### 背景・問題意識
