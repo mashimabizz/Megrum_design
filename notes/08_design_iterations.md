@@ -4,6 +4,44 @@
 
 ---
 
+## イテレーション1018：交換条件カレンダーのchrome表示を分割
+
+### 背景・問題意識
+
+`HomeExchangeSettingsCalendarViews.swift` には、カレンダーgridとdrag選択処理に加えて、月移動ヘッダー、都道府県メニュー、legend表示も残っていた。gridの選択処理と周辺chromeを分け、今後の月ヘッダーやlegend調整をdrag処理から切り離して扱えるようにした。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/HomeExchangeSettingsCalendarViews.swift`
+- `HomeExchangeSettingsCalendarCard` は、月ヘッダーとlegendを専用Viewへ委譲する構成にした。
+- weekday表示、grid、drag選択、日付色、selection connection計算は既存ファイルに残した。
+
+#### `ios-native/Sources/MegrumApp/HomeExchangeCalendarChromeViews.swift`
+- `HomeExchangeCalendarHeader`、`HomeExchangeCalendarLegend`、都道府県menu表示を移動した。
+- 月移動ボタン、既定都道府県menu、legendの色・文言・layoutは既存どおり維持した。
+
+### 影響範囲
+
+- Swift Native iOS版の交換条件設定カレンダー。
+- 月移動ヘッダー、既定都道府県menu、登録都道府県legend。
+- 日付選択、drag選択、保存値、状態名、用語、DBスキーマ、表示文言は変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumApp/HomeExchangeSettingsCalendarViews.swift ios-native/Sources/MegrumApp/HomeExchangeCalendarChromeViews.swift`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-exchange-settings-components --enable-xctest --disable-swift-testing -j 1 --filter HomeExchangeSettingsScreenTests`
+  - passed（4 tests）
+
+### セルフレビュー結果
+
+- ✅ 月移動buttonのaction、既定都道府県menu、legendの表示条件は移動のみで維持した。
+- ✅ 日付grid、drag選択policy/resolver、日付詳細sheet連携は変更していない。
+- ✅ `HomeExchangeSettingsCalendarViews.swift` は 369行から 276行へ縮小し、chrome表示を 111行の専用ファイルへ分離した。
+- ✅ 新しい状態名・用語・DB列は追加していないため、`notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション1017：交換条件設定画面の表示部品を分割
 
 ### 背景・問題意識
