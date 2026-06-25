@@ -4,6 +4,52 @@
 
 ---
 
+## イテレーション915：Repository default実装をドメイン別に分割
+
+### 背景・問題意識
+
+`MegrumRepositoryDefaults.swift` は、未実装repository methodのdefault return/unsupported mutationを、home/oshi/goods/listing/public profile、trade/message/schedule、local/groom/meguri/board、settings/notification/profile更新まで1ファイルに集約していた。Repository境界の調査時に「どのdomainのdefaultか」「実装済みか未対応throwか」を追いにくいため、default実装をドメイン別に分割する。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/MegrumRepositoryDefaults.swift`
+- subscription/home/oshi/goods/listing/public profile/evaluationのdefault実装に絞った。
+- ファイル行数を331行から109行へ縮小した。
+
+#### `ios-native/Sources/MegrumApp/MegrumRepositoryTradeDefaults.swift`
+- proposal、trade evidence、trade messages、schedule related default実装を移動した。
+- `unsupportedMutation`、空配列、nil返却、message read state defaultは維持した。
+
+#### `ios-native/Sources/MegrumApp/MegrumRepositoryCommunityDefaults.swift`
+- home local mode、groom、meguri、board related default実装を移動した。
+- `loadGroomMapPosts` の `loadGrooms` delegation、view/like no-op、unsupported mutationは維持した。
+
+#### `ios-native/Sources/MegrumApp/MegrumRepositorySettingsDefaults.swift`
+- mailing address、payment settings、blocked users、notifications、push token、own profile/account setup related default実装を移動した。
+- empty/nil/default bool/no-op/unsupported mutationは維持した。
+
+### 影響範囲
+
+- Swift Native iOS版のRepository protocol default実装全般。実装済みrepositoryではなく、未override時のfallback behaviorのみ。
+- 挙動変更ではなく責務分離。返却値、throwするerror、no-op、状態名、用語、DBスキーマは変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumApp/MegrumRepositoryDefaults.swift ios-native/Sources/MegrumApp/MegrumRepositoryTradeDefaults.swift ios-native/Sources/MegrumApp/MegrumRepositoryCommunityDefaults.swift ios-native/Sources/MegrumApp/MegrumRepositorySettingsDefaults.swift`
+  - passed
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-repository-defaults-build --disable-index-store`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-repository-defaults-tests --disable-index-store --enable-xctest --disable-swift-testing -j 1 --filter 'MegrumAppStateTests|HomeScreenFlowTests|TradeChatAffordanceTests|SettingsScreenTests|NotificationReadStateReducerTests|GroomInteractionStateReducerTests'`
+  - 192 tests passed
+
+### セルフレビュー結果
+
+- ✅ default return値、`MegrumRepositoryError.unsupportedMutation`、no-op method、`loadGroomMapPosts` delegationは移動のみで維持した。
+- ✅ MegrumAppStateTests / HomeScreenFlowTests / TradeChatAffordanceTests / SettingsScreenTests / NotificationReadStateReducerTests / GroomInteractionStateReducerTestsで、Repository factory、home、trade、settings、notification、groom周辺を確認した。
+- ✅ 状態名・用語・DBスキーマの変更はないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション914：Home owner summary modelsを分割
 
 ### 背景・問題意識
