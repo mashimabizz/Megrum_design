@@ -4,6 +4,47 @@
 
 ---
 
+## イテレーション962：相互マッチ交換条件ポリシーを分割
+
+### 背景・問題意識
+
+`HomeMutualMatchConditionPolicies.swift` は、相互マッチの交換条件入口、現地/郵送ルート評価、ルート優先度、日程文字列の突き合わせ、表示用signal再構成を1ファイルに持っていた。マッチ候補の条件判定は今後も調整が入りやすいため、挙動は変えずに交換ルート評価と日程判定を分け、修正対象を見つけやすくする。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/HomeMutualMatchConditionPolicies.swift`
+- `exchangeEvaluation` の入口と `HomeMutualMatchExchangeEvaluation` に整理した。
+
+#### `ios-native/Sources/MegrumApp/HomeMutualMatchExchangeRouteEvaluation.swift`
+- 交換ルート種別、ルート評価結果、相互マッチ交換条件用のissue重み付けを新規ファイルへ移動した。
+
+#### `ios-native/Sources/MegrumApp/HomeMutualMatchExchangeRoutePolicy.swift`
+- listing noteからの交換条件summary抽出、共通ルート判定、現地/郵送ルート評価、ルート優先度、表示signal再構成を新規ファイルへ移動した。
+
+#### `ios-native/Sources/MegrumApp/HomeMutualMatchExchangeSchedulePolicy.swift`
+- 日程一致判定、相談扱い判定、日程token化、文字列正規化を新規ファイルへ移動した。
+
+### 影響範囲
+
+- Swift Native iOS版ホームの相互マッチ、マッチ候補条件タグ、交換条件レビュー、個別募集同士の候補生成。
+- 挙動変更ではなく責務分離。現地/郵送の優先順位、日程要相談、都道府県未設定、送料要相談、支払い条件、状態名、用語、DBスキーマは変更しない。
+
+### 確認方法
+
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-mutual-exchange-policy-build --disable-index-store`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-mutual-exchange-policy-build --disable-index-store --enable-xctest --disable-swift-testing -j 1 --filter 'HomeMutualMatchConditionPoliciesTests|HomeMutualMatchLiveDataTests|HomeCandidateComposerTests|HomeScreenFlowTests'`
+  - 75 tests passed, 2 skipped（live Supabase seed testは環境変数未設定のため既存どおりskip）
+
+### セルフレビュー結果
+
+- ✅ `exchangeEvaluation` の公開呼び出し形は維持し、現地/郵送/日程判定は移動に留めた。
+- ✅ 相互マッチ条件、候補生成、ホーム表示の対象テストを通した。
+- ✅ live Supabase seed testのskipは既存の環境変数条件によるもので、今回の変更に起因しない。
+- ✅ 状態名・用語・DBスキーマの変更はないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション961：MegrumAuthState actionsを分割
 
 ### 背景・問題意識
