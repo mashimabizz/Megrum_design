@@ -4,6 +4,47 @@
 
 ---
 
+## イテレーション968：Listing condition preview receive panelを分割
+
+### 背景・問題意識
+
+`ListingConditionDesignPreviewReceivePanel.swift` は、個別募集の条件デザイン確認用プレビューで、split配置、受け取り候補パネル、サムネイル画像読込、候補行、タグチップを1ファイルに持っていた。DEBUG用の画面だが、条件UIの見た目確認に使うため、配置・画像・候補リストを分け、デザイン調整時に読む範囲を狭める。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/ListingConditionDesignPreviewSplitContent.swift`
+- `ListingConditionSplitContent` を新規ファイルへ移動した。
+
+#### `ios-native/Sources/MegrumApp/ListingConditionThumbnail.swift`
+- `ListingConditionThumbnail` と画像fallback表示を新規ファイルへ移動した。
+
+#### `ios-native/Sources/MegrumApp/ListingConditionReceivePanel.swift`
+- `ListingConditionReceivePanel`、候補行、タグチップ、dividerを新規ファイルへ移動した。
+
+#### `ios-native/Sources/MegrumApp/ListingConditionDesignPreviewReceivePanel.swift`
+- 上記3ファイルへ分割したため削除した。
+
+### 影響範囲
+
+- Swift Native iOS版のDEBUG用 `ListingConditionDesignPreview`。
+- 挙動変更ではなく責務分離。split比率、候補文言、画像名、パネル余白、状態名、用語、DBスキーマは変更しない。
+
+### 確認方法
+
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-listing-condition-preview-build --disable-index-store`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-listing-condition-preview-build --disable-index-store --enable-xctest --disable-swift-testing -j 1 --filter 'IndividualListingDraftTests|IndividualListingStateReducerTests|HomeScreenFlowTests'`
+  - 84 tests passed
+
+### セルフレビュー結果
+
+- ✅ DEBUGプレビューのsplit配置、サムネイル読込、受け取り候補パネルを移動のみで分割した。
+- ✅ 個別募集draft/stateとホーム周辺の対象テストを通した。
+- ✅ 本番の個別募集保存、候補生成、検索、状態名、用語、DBスキーマは変更していない。
+- ✅ 状態名・用語・DBスキーマの変更はないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション967：HomeDiscovery cardsを部品分割
 
 ### 背景・問題意識
