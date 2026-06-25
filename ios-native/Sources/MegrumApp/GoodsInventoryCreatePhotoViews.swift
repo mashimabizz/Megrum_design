@@ -16,25 +16,24 @@ struct GoodsCreatePhotoSelectionGrid: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Text("\(photos.count)件 選択済")
+            if photos.count > 1 {
+                Text("\(photos.count)件")
                     .font(.caption.weight(.black))
                     .foregroundStyle(MegrumTheme.muted)
-                Spacer()
-                Text("保存時にアップロード")
-                    .font(.caption.weight(.bold))
-                    .foregroundStyle(MegrumTheme.lavender)
             }
 
-            LazyVGrid(columns: [GridItem(.adaptive(minimum: 92), spacing: 10)], spacing: 10) {
-                ForEach(photos) { photo in
-                    GoodsCreatePhotoTile(
-                        photo: photo,
-                        onOpen: { onCropPhoto(photo.id) },
-                        onRemove: { onRemovePhoto(photo.id) }
-                    )
+            ScrollView(.horizontal) {
+                HStack(spacing: 10) {
+                    ForEach(photos) { photo in
+                        GoodsCreatePhotoTile(
+                            photo: photo,
+                            onOpen: { onCropPhoto(photo.id) },
+                            onRemove: { onRemovePhoto(photo.id) }
+                        )
+                    }
                 }
             }
+            .scrollIndicators(.hidden)
         }
         .padding(14)
         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
@@ -52,21 +51,14 @@ struct GoodsCreatePhotoTile: View {
 
     var body: some View {
         ZStack(alignment: .topTrailing) {
-            GoodsCreatePhotoPreview(data: photo.upload.data)
-                .frame(height: 118)
-                .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
-                .overlay(alignment: .bottomLeading) {
-                    Text("選択済み")
-                        .font(.caption2.weight(.black))
-                        .foregroundStyle(.white)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 5)
-                        .background(.black.opacity(0.34), in: Capsule())
-                        .padding(8)
-                }
-                .contentShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
-                .onTapGesture(perform: onOpen)
-                .accessibilityLabel("写真を切り取る")
+            Button(action: onOpen) {
+                GoodsCreatePhotoPreview(data: photo.upload.data)
+                    .frame(width: 118, height: 118)
+                    .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+                    .contentShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("写真を切り取る")
 
             Button(action: onRemove) {
                 Image(systemName: "xmark")
@@ -79,6 +71,7 @@ struct GoodsCreatePhotoTile: View {
             .padding(7)
             .accessibilityLabel("写真を削除")
         }
+        .frame(width: 118, height: 118)
     }
 }
 

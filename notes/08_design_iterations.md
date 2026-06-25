@@ -4,6 +4,49 @@
 
 ---
 
+## イテレーション984：写真選択済みエリアのはみ出しを修正
+
+### 背景・問題意識
+
+マイグッズ追加の写真ステップで画像を選ぶと、選択済み画像が枠の外へはみ出すことがあった。複数枚アップロードした場合もタイル同士が重なって窮屈に見え、さらに `保存時にアップロード` と `選択済み` の文言が画面上で不要だった。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/GoodsInventoryCreatePhotoViews.swift`
+- 選択済み写真エリアを adaptive grid から横スクロールの固定幅タイル列へ変更した。
+- 写真タイルを 118pt 四方に固定し、画像自体も同じ幅/高さでclipすることで、枠外へはみ出さないようにした。
+- 複数枚の写真は10pt間隔で横並びにし、重なりを避けるようにした。
+- `保存時にアップロード` と写真上の `選択済み` 表示を削除した。
+- 写真の切り取り起動は `onTapGesture` ではなく `Button` に変更し、既存のアクセシビリティラベルを維持した。
+
+### 影響範囲
+
+- Swift Native iOS版のマイグッズ追加フロー、写真ステップ。
+- 写真選択済みエリアの表示と切り取り起動操作。
+- DBスキーマ、状態名、保存payloadは変更しない。
+
+### 確認方法
+
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-photo-selection-build --disable-index-store`
+  - passed
+- `xcodebuild -quiet -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -destination 'id=C70DDDBB-2602-49E0-8F95-1F043BCCED76' -derivedDataPath /tmp/megrum-ios-native-photo-selection-xcode build`
+  - passed
+- `xcrun simctl install C70DDDBB-2602-49E0-8F95-1F043BCCED76 /tmp/megrum-ios-native-photo-selection-xcode/Build/Products/Debug-iphonesimulator/MegrumNative.app`
+  - passed
+- `xcrun simctl launch C70DDDBB-2602-49E0-8F95-1F043BCCED76 tokyo.megrum.native.preview`
+  - launched
+- `xcrun simctl io C70DDDBB-2602-49E0-8F95-1F043BCCED76 screenshot /tmp/megrum-photo-selection-fixed.png`
+  - screenshot captured
+
+### セルフレビュー結果
+
+- ✅ 画像タイルは明示的な幅/高さとclipを持つため、選択済みエリアの外へはみ出しにくい構造にした。
+- ✅ 複数枚は横スクロールのHStackで並ぶため、タイル同士が重ならない。
+- ✅ 不要指定のあった `保存時にアップロード` / `選択済み` の画面表示を削除した。
+- ✅ 状態名、用語定義、DBスキーマの追加はないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション983：候補詳細の相手情報と選択肢切替を改善
 
 ### 背景・問題意識
