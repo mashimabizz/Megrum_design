@@ -4,6 +4,47 @@
 
 ---
 
+## イテレーション1129：groom archive reactionsを分離
+
+### 背景・問題意識
+
+`GroomArchiveStoryComponents.swift` は、アーカイブstoryのinsight pillとinsights sheetを担いながら、反応section、反応ユーザー行、ユーザーavatar表示まで同じファイルに抱えていた。sheet本体をいいね/コメントの構成に寄せ、反応リストの表示部品を専用ファイルへ分離する。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/GroomArchiveStoryComponents.swift`
+- `GroomArchiveReactionSection` / `GroomArchiveUserReactionRow` / `GroomArchiveUserAvatar` を専用ファイルへ移動した。
+- `GroomArchiveInsightPill` と `GroomArchiveInsightsSheet` は残し、likes/repliesの取得・sort・section構成は維持した。
+
+#### `ios-native/Sources/MegrumApp/GroomArchiveReactionViews.swift`
+- `GroomArchiveReactionSection` を追加し、empty表示とsection title表示を移動した。
+- `GroomArchiveUserReactionRow` を追加し、display name、handle、subtitle、comment body表示を移動した。
+- `GroomArchiveUserAvatar` を追加し、avatar URL表示とfallback initial表示を移動した。
+
+### 影響範囲
+
+- Swift Native iOS版めぐりのグルームアーカイブinsights sheet。
+- いいね/コメントsection、反応ユーザー行、avatar fallback表示。
+- グルームアーカイブ取得、reaction/reply sort、公開プロフィールlookup、DB/API、状態名、表示文言は変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumApp/GroomArchiveStoryComponents.swift ios-native/Sources/MegrumApp/GroomArchiveReactionViews.swift`
+  - passed
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-groom-archive-reactions`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-groom-archive-reactions --enable-xctest --disable-swift-testing -j 1 --filter 'MegrumAppStateTests|SupabaseGroomClientTests'`
+  - passed（89 tests）
+
+### セルフレビュー結果
+
+- ✅ いいね/コメントsection title、empty text、反応行のdisplay name/handle/subtitle/comment、avatar fallback、余白、角丸、枠線を維持した。
+- ✅ `appState.groomReactions` / `appState.groomReplies` の取得と `createdAt` 降順sort、`publicProfilesByUserID` lookupは変更していない。
+- ✅ `GroomArchiveStoryComponents.swift` は200行から96行へ縮小し、反応リスト部品を107行の専用ファイルへ分離した。
+- ✅ 新しい状態名・用語・DB列は追加していないため、`notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション1128：dispute detail chromeを分離
 
 ### 背景・問題意識
