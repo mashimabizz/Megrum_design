@@ -4,6 +4,52 @@
 
 ---
 
+## イテレーション942：Supabase activity window clientを分割
+
+### 背景・問題意識
+
+`SupabaseActivityWindowClient.swift` は、AWのload/create/update/disable、現地モード設定のload/upsert、request生成API、query helper、入力validation、encoder/date formatter生成を1ファイルに持っていた。AWはホーム/検索/募集導線の候補表示に影響するため、挙動は変えずに通信実行、request生成、validation、support helperを分け、修正時の影響範囲を狭める。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumData/SupabaseActivityWindowClient.swift`
+- `loadActivityWindows`、`loadVisibleActivityWindows`、`createActivityWindow`、`updateActivityWindow`、`disableOtherEnabledActivityWindows`、現地モード設定のload/upsert実行処理に絞った。
+- request/validation extensionから参照するため、`client` / `encoder` / `dateFormatter` をmodule internalにした。
+- ファイル行数を346行から133行へ縮小した。
+
+#### `ios-native/Sources/MegrumData/SupabaseActivityWindowClientRequests.swift`
+- AWと現地モード設定のrequest生成API、query helperを新規ファイルへ移動した。
+- activity_windows/local_mode_settings のURL、select、Prefer header、query条件、limit上限処理は維持した。
+
+#### `ios-native/Sources/MegrumData/SupabaseActivityWindowClientSupport.swift`
+- `boundedLimit`、encoder生成、date formatter生成を新規ファイルへ移動した。
+
+#### `ios-native/Sources/MegrumData/SupabaseActivityWindowClientValidation.swift`
+- create input、venue、radius、coordinate、event name、noteのvalidationを新規ファイルへ移動した。
+- validation条件と投げる `ActivityWindowRepositoryError` は維持した。
+
+### 影響範囲
+
+- Swift Native iOS版のAW一覧取得、表示可能AW取得、AW作成/更新、他AW無効化、現地モード設定取得/保存。
+- 挙動変更ではなく責務分離。Supabase table名、select、query、payload key、状態名、用語、DBスキーマは変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumData/SupabaseActivityWindowClient.swift ios-native/Sources/MegrumData/SupabaseActivityWindowClientRequests.swift ios-native/Sources/MegrumData/SupabaseActivityWindowClientSupport.swift ios-native/Sources/MegrumData/SupabaseActivityWindowClientValidation.swift`
+  - passed
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-aw-client-build --disable-index-store`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-aw-client-tests --disable-index-store --enable-xctest --disable-swift-testing -j 1 --filter SupabaseActivityWindowClientTests`
+  - 12 tests passed
+
+### セルフレビュー結果
+
+- ✅ client本体、request builder、validation、support helperを移動中心で分割した。
+- ✅ AW作成/更新/取得/現地モード設定の既存request生成とvalidationテストを通した。
+- ✅ 状態名・用語・DBスキーマの変更はないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション941：Supabase notification clientを分割
 
 ### 背景・問題意識
