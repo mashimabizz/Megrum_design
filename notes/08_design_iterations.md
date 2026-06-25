@@ -4,6 +4,44 @@
 
 ---
 
+## イテレーション1090：proposal payment option rowを分離
+
+### 背景・問題意識
+
+`ProposalPaymentMethodStepView.swift` は、支払いstep本体と、各支払いoption rowのradio/icon/title/subtitle描画を同じファイルに抱えていた。step側をsection構成と初期選択に集中させるため、option rowを専用Viewファイルへ分離する。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/ProposalPaymentMethodStepView.swift`
+- `ProposalPaymentOptionRow` を移動した。
+- section一覧、選択状態binding、区切り線、初期選択 `selectFirstIfNeeded` は維持した。
+
+#### `ios-native/Sources/MegrumApp/ProposalPaymentOptionRow.swift`
+- `ProposalPaymentOptionRow` を追加した。
+- radio表示、icon背景、icon resolver、title/subtitle、padding、plain button styleを維持した。
+
+### 影響範囲
+
+- Swift Native iOS版の打診作成フローにおける支払い方法step。
+- 支払いoption catalog、選択状態、step遷移、送信payload、DB/API、状態名、表示文言は変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumApp/ProposalPaymentMethodStepView.swift ios-native/Sources/MegrumApp/ProposalPaymentOptionRow.swift`
+  - passed
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-proposal-payment-option-row`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-proposal-payment-option-row --enable-xctest --disable-swift-testing -j 1 --filter 'ProposalCreateFlowTests|ProposalCreateSheetTests'`
+  - passed（62 tests）
+
+### セルフレビュー結果
+
+- ✅ radio、icon、title/subtitle、padding、plain button styleを維持した。
+- ✅ `ProposalPaymentMethodStepView.swift` は 134行から 55行へ縮小し、option rowを 82行の専用ファイルへ分離した。
+- ✅ 新しい状態名・用語・DB列は追加していないため、`notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション1089：proposal meetup form fieldsを分離
 
 ### 背景・問題意識
