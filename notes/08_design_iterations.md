@@ -4,6 +4,47 @@
 
 ---
 
+## イテレーション1008：個別募集マッチ判定を生成責務別に分割
+
+### 背景・問題意識
+
+`HomeCandidateListingMatchPolicy.swift` は候補判定の入口、wanted option生成、詳細sheet用のpreview生成、提示物detail context生成まで1ファイルにまとまっていた。ホーム候補や相互マッチの条件調整で触る頻度が高く、今後の支払い条件・交換条件の調整と衝突しやすいので、外部APIと挙動を維持したまま生成責務を分けた。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/HomeCandidateListingMatchPolicy.swift`
+- 外部から使われる判定入口と `wantedOption` facade を残した。
+- detail用wanted option生成とdetail context生成を専用factoryへ委譲した。
+
+#### `ios-native/Sources/MegrumApp/HomeCandidateListingWantedOptionFactory.swift`
+- 個別募集の受け取り条件option生成、金額条件option生成、preview item生成、title/subtitle生成を集約した。
+- 通常候補では従来どおりmatching item由来のtitleを使い、detail用だけpreview titleを使う挙動を維持した。
+
+#### `ios-native/Sources/MegrumApp/HomeCandidateListingDetailContextFactory.swift`
+- 個別募集詳細に渡す提示物context、提示物quantity、条件指定時の提示物展開を集約した。
+
+### 影響範囲
+
+- Swift Native iOS版ホーム候補の個別募集Hit判定。
+- 相互マッチ/個別募集Hit detail sheet に渡すwanted optionと提示物context。
+- 状態名、用語、DBスキーマ、表示文言は変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumApp/HomeCandidateListingMatchPolicy.swift ios-native/Sources/MegrumApp/HomeCandidateListingWantedOptionFactory.swift ios-native/Sources/MegrumApp/HomeCandidateListingDetailContextFactory.swift`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-listing-match --enable-xctest --disable-swift-testing -j 1 --filter HomeCandidateComposerTests`
+  - passed（19 tests）
+
+### セルフレビュー結果
+
+- ✅ `HomeCandidateListingMatchPolicy` の既存static APIは残し、呼び出し側の変更を不要にした。
+- ✅ 通常候補とdetail候補でtitle生成に差がある箇所を維持した。
+- ✅ 個別募集Hit、相互マッチ、detail context、条件指定の提示物展開を既存テストで確認した。
+- ✅ 新しい状態名・用語・DB列は追加していないため、`notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション1007：交換条件設定画面を責務別ファイルへ分割
 
 ### 背景・問題意識
