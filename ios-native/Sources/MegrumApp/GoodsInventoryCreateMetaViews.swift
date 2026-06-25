@@ -58,17 +58,9 @@ struct GoodsInventoryCreateMetaStepView: View {
     var onToggleSelection: (UUID) -> Void
     var onSelectAll: () -> Void
     var onClearSelection: () -> Void
-    var onRemoveTag: (UUID, String) -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            GoodsCreateHintCard(
-                title: "画像を選んでまとめて設定",
-                text: allowsMemberSelection
-                    ? "登録したい画像を選んで、下の固定ボタンからメンバーやタグをまとめて割り当てます。"
-                    : "この推しはメンバー登録が不要です。登録したい画像を選んで、タグをまとめて割り当てます。"
-            )
-
             GoodsInventoryCreateMetaSelectionHeader(
                 selectedCount: selectedCreateMetaIDs.count,
                 totalCount: createMetas.count,
@@ -76,20 +68,16 @@ struct GoodsInventoryCreateMetaStepView: View {
                 onClearSelection: onClearSelection
             )
 
-            LazyVGrid(columns: [GridItem(.adaptive(minimum: 142), spacing: 12)], spacing: 12) {
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: 96), spacing: 10)], spacing: 10) {
                 ForEach($createMetas) { $meta in
                     GoodsInventoryCreateMetaTile(
                         meta: $meta,
-                        index: index(for: meta.id),
                         photo: photo(for: meta.photoID),
                         allowsMemberSelection: allowsMemberSelection,
                         memberName: memberName(for: meta.memberID),
                         isSelected: selectedCreateMetaIDs.contains(meta.id),
                         onToggleSelection: {
                             onToggleSelection(meta.id)
-                        },
-                        onRemoveTag: { tag in
-                            onRemoveTag(meta.id, tag)
                         }
                     )
                 }
@@ -103,10 +91,6 @@ struct GoodsInventoryCreateMetaStepView: View {
                 GoodsCreateErrorNotice(message: createError)
             }
         }
-    }
-
-    private func index(for metaID: UUID) -> Int {
-        createMetas.firstIndex { $0.id == metaID }.map { $0 + 1 } ?? 1
     }
 
     private func photo(for photoID: UUID?) -> GoodsCreatePhotoDraft? {
@@ -159,9 +143,6 @@ private struct GoodsInventoryCreateMetaSelectionHeader: View {
                 Text("\(selectedCount)/\(totalCount)件を選択中")
                     .font(.subheadline.weight(.black))
                     .foregroundStyle(MegrumTheme.ink)
-                Text("画像をタップして選択を切り替え")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(MegrumTheme.muted)
             }
             Spacer(minLength: 8)
             Button(selectedCount == totalCount ? "すべて解除" : "すべて選択") {
@@ -187,141 +168,83 @@ private struct GoodsInventoryCreateMetaSelectionHeader: View {
 private struct GoodsInventoryCreateMetaTile: View {
     @Binding var meta: GoodsCreateMetaDraft
 
-    var index: Int
     var photo: GoodsCreatePhotoDraft?
     var allowsMemberSelection: Bool
     var memberName: String?
     var isSelected: Bool
     var onToggleSelection: () -> Void
-    var onRemoveTag: (String) -> Void
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Button(action: onToggleSelection) {
-                VStack(alignment: .leading, spacing: 8) {
-                    thumbnail
-                    statusLabels
-                }
-                .contentShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel("画像\(index)を選択")
-            .accessibilityValue(isSelected ? "選択中" : "未選択")
-
-            VStack(alignment: .leading, spacing: 9) {
-                quantityStepper
-                tagChips
-            }
+        Button(action: onToggleSelection) {
+            thumbnail
+                .contentShape(RoundedRectangle(cornerRadius: GoodsGridLayout.tileCornerRadius, style: .continuous))
         }
-        .padding(10)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: 22, style: .continuous)
-                .strokeBorder(isSelected ? MegrumTheme.lavender.opacity(0.72) : .white.opacity(0.48), lineWidth: isSelected ? 2 : 1)
-        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("登録する画像")
+        .accessibilityValue(accessibilityValue)
     }
 
     private var thumbnail: some View {
-        ZStack {
-            if let photo {
-                GoodsCreatePhotoPreview(data: photo.upload.data)
-            } else {
-                GoodsCreatePhotoPreviewPlaceholder()
+        RoundedRectangle(cornerRadius: GoodsGridLayout.tileCornerRadius, style: .continuous)
+            .fill(MegrumTheme.lavender.opacity(0.10))
+            .aspectRatio(GoodsGridLayout.tileAspectRatio, contentMode: .fit)
+            .overlay {
+                photoContent
             }
-        }
-        .frame(maxWidth: .infinity)
-        .frame(height: 150)
-        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
-        .overlay(alignment: .topLeading) {
-            Text("#\(index)")
-                .font(.caption2.weight(.black))
-                .foregroundStyle(MegrumTheme.ink)
-                .padding(.horizontal, 7)
-                .padding(.vertical, 4)
-                .background(.white.opacity(0.82), in: Capsule())
-                .padding(7)
-        }
-        .overlay(alignment: .topTrailing) {
-            Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
-                .font(.system(size: 24, weight: .black))
-                .foregroundStyle(isSelected ? MegrumTheme.lavender : .white.opacity(0.92))
-                .padding(7)
-                .shadow(color: .black.opacity(0.12), radius: 5, y: 2)
-        }
-    }
-
-    private var statusLabels: some View {
-        VStack(alignment: .leading, spacing: 5) {
-            if allowsMemberSelection {
-                Label(memberName ?? "メンバー未設定", systemImage: memberName == nil ? "person.crop.circle.badge.exclamationmark" : "person.crop.circle.fill")
-                    .foregroundStyle(memberName == nil ? MegrumTheme.pink : MegrumTheme.ink)
+            .overlay(alignment: .topTrailing) {
+                setupStatusBadge
+                    .padding(6)
             }
-            Label(meta.tagNames.isEmpty ? "タグ未設定" : "\(meta.tagNames.count)タグ", systemImage: meta.tagNames.isEmpty ? "tag.slash" : "tag.fill")
-                .foregroundStyle(meta.tagNames.isEmpty ? MegrumTheme.muted : MegrumTheme.lavender)
-        }
-        .font(.caption.weight(.black))
-    }
-
-    private var quantityStepper: some View {
-        HStack(spacing: 10) {
-            GoodsEditorQuantityButton(systemImage: "minus") {
-                meta.quantity = max(1, meta.quantity - 1)
+            .overlay {
+                RoundedRectangle(cornerRadius: GoodsGridLayout.tileCornerRadius, style: .continuous)
+                    .strokeBorder(
+                        isSelected ? MegrumTheme.lavender.opacity(0.88) : MegrumTheme.ink.opacity(GoodsTileCollectionCardMetrics.borderOpacity),
+                        lineWidth: isSelected ? 2 : 1
+                    )
             }
-            .disabled(meta.normalizedQuantity <= 1)
-
-            let quantityBinding = Binding<Int>(
-                get: { meta.quantity },
-                set: { meta.quantity = max(1, min($0, 999)) }
+            .clipShape(RoundedRectangle(cornerRadius: GoodsGridLayout.tileCornerRadius, style: .continuous))
+            .shadow(
+                color: MegrumTheme.ink.opacity(GoodsTileCollectionCardMetrics.shadowOpacity),
+                radius: GoodsTileCollectionCardMetrics.shadowRadius,
+                x: GoodsTileCollectionCardMetrics.shadowX,
+                y: GoodsTileCollectionCardMetrics.shadowY
             )
-            let field = TextField("数量", value: quantityBinding, format: .number)
-                .multilineTextAlignment(.center)
-                .font(.system(size: 18, weight: .heavy, design: .rounded))
-                .foregroundStyle(MegrumTheme.ink)
-                .monospacedDigit()
-                .frame(height: 42)
-                .background(Color.white.opacity(0.88), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-
-            #if os(iOS)
-            field.keyboardType(.numberPad)
-            #else
-            field
-            #endif
-
-            GoodsEditorQuantityButton(systemImage: "plus") {
-                meta.quantity = min(999, meta.quantity + 1)
-            }
-            .disabled(meta.normalizedQuantity >= 999)
-        }
     }
 
     @ViewBuilder
-    private var tagChips: some View {
-        if meta.tagNames.isEmpty {
-            Text("タグ登録で検索されやすくなります")
-                .font(.caption2.weight(.bold))
-                .foregroundStyle(MegrumTheme.muted)
-                .fixedSize(horizontal: false, vertical: true)
+    private var photoContent: some View {
+        if let photo {
+            GoodsCreatePhotoPreview(data: photo.upload.data)
         } else {
-            WrappingTagFlow(spacing: 6, rowSpacing: 6) {
-                ForEach(meta.tagNames, id: \.self) { tag in
-                    Button {
-                        onRemoveTag(tag)
-                    } label: {
-                        HStack(spacing: 4) {
-                            Text("#\(tag)")
-                            Image(systemName: "xmark")
-                                .font(.system(size: 8, weight: .black))
-                        }
-                        .font(.system(size: 10, weight: .black, design: .rounded))
-                        .foregroundStyle(MegrumTheme.lavender)
-                        .padding(.horizontal, 7)
-                        .frame(height: 24)
-                        .background(MegrumTheme.lavender.opacity(0.10), in: Capsule())
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel("タグ #\(tag) を外す")
-                }
-            }
+            GoodsCreatePhotoPreviewPlaceholder()
         }
+    }
+
+    private var setupStatusBadge: some View {
+        Image(systemName: isSetupComplete ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
+            .font(.system(size: 21, weight: .black))
+            .foregroundStyle(isSetupComplete ? MegrumTheme.ok : MegrumTheme.conditionPossible)
+            .padding(5)
+            .background(.white.opacity(0.90), in: Circle())
+            .shadow(color: .black.opacity(0.12), radius: 5, y: 2)
+            .accessibilityHidden(true)
+    }
+
+    private var isSetupComplete: Bool {
+        isMemberComplete && !meta.tagNames.isEmpty
+    }
+
+    private var isMemberComplete: Bool {
+        !allowsMemberSelection || memberName != nil
+    }
+
+    private var accessibilityValue: Text {
+        var parts = [isSelected ? "選択中" : "未選択"]
+        if isSetupComplete {
+            parts.append("メンバーとタグを登録済み")
+        } else {
+            parts.append("未設定項目あり")
+        }
+        return Text(parts.joined(separator: "、"))
     }
 }

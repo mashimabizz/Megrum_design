@@ -4,6 +4,53 @@
 
 ---
 
+## イテレーション985：詳細ステップの画像グリッドを簡素化
+
+### 背景・問題意識
+
+マイグッズ追加の詳細ステップで、上部の説明カードや画像カード内の補足テキストが多く、画像一覧として見た時に重かった。オーナーから、上の説明書き、`タグ登録で検索されやすくなります` の説明、`タグ未設定` などのカード内テキストを出さず、マイグッズ一覧のように画像だけを並べたいという指摘があった。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/GoodsInventoryCreateMetaViews.swift`
+- 詳細ステップ上部の `画像を選んでまとめて設定` 説明カードを削除した。
+- 選択件数ヘッダーから `画像をタップして選択を切り替え` の補足文を削除した。
+- 画像カードからメンバー/タグのテキスト表示、数量ステッパー、タグチップ、`タグ登録で検索されやすくなります` を削除した。
+- 画像はマイグッズ一覧に近い比率のグリッドタイルとして、画像だけが並ぶ見え方へ変更した。
+- メンバー/タグが揃っていない画像は右上に警告マーク、メンバーとタグが登録済みの画像は右上に緑のチェックマークを表示するようにした。
+- 選択状態は右上アイコンではなく、タイル枠線で示すようにした。
+
+#### `ios-native/Sources/MegrumApp/GoodsEditorInventoryCreateFlowView.swift`
+- 詳細ステップカード内で個別タグ削除UIを出さなくなったため、メタステップへ渡す不要なタグ削除callbackを外した。
+
+### 影響範囲
+
+- Swift Native iOS版のマイグッズ追加フロー、詳細ステップ。
+- 画像ごとのメンバー/タグ登録状態の視認方法。
+- 保存payload、登録validation、タグ一括登録/メンバー一括登録の操作は変更しない。
+
+### 確認方法
+
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-meta-grid-build --disable-index-store`
+  - passed
+- `xcodebuild -quiet -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -destination 'id=C70DDDBB-2602-49E0-8F95-1F043BCCED76' -derivedDataPath /tmp/megrum-ios-native-meta-grid-xcode build`
+  - passed
+- `xcrun simctl install C70DDDBB-2602-49E0-8F95-1F043BCCED76 /tmp/megrum-ios-native-meta-grid-xcode/Build/Products/Debug-iphonesimulator/MegrumNative.app`
+  - passed
+- `xcrun simctl launch C70DDDBB-2602-49E0-8F95-1F043BCCED76 tokyo.megrum.native.preview`
+  - launched
+- `xcrun simctl io C70DDDBB-2602-49E0-8F95-1F043BCCED76 screenshot /tmp/megrum-meta-grid-simplified.png`
+  - screenshot captured
+
+### セルフレビュー結果
+
+- ✅ 指定された説明文とカード内補足文を削除した。
+- ✅ 画像タイル内の表示は右上の状態アイコンだけに絞り、画像一覧として見やすい構成へ寄せた。
+- ✅ 未設定項目ありは警告、メンバー/タグ登録済みは緑チェックで、色だけでなくアイコン形状でも区別できる。
+- ✅ 状態名、用語定義、DBスキーマの追加はないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション984：写真選択済みエリアのはみ出しを修正
 
 ### 背景・問題意識

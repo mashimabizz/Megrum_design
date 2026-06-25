@@ -85,8 +85,7 @@ struct GoodsInventoryCreateFlowView: View {
                     createError: createError,
                     onToggleSelection: onToggleMetaSelection,
                     onSelectAll: onSelectAllMetas,
-                    onClearSelection: onClearMetaSelection,
-                    onRemoveTag: onRemoveMetaTag
+                    onClearSelection: onClearMetaSelection
                 )
             }
         }
