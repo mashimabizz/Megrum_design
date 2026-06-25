@@ -4,6 +4,42 @@
 
 ---
 
+## イテレーション903：Trade card componentsを分割
+
+### 背景・問題意識
+
+`TradeCardViews.swift` は、取引カード本体のデータ解決と、長押し/タップexclusive gesture、選択indicator、ヘッダー、既読状態label、相手avatar、詳細link、待ち合わせsummary、divider、readStateごとの色/weight拡張が同居していた。やりとり一覧のカード本体と小さな表示部品を分け、既読状態やカードUIの調整を安全に追えるようにする。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/TradeCardViews.swift`
+- `TradeCard` 本体、proposalからの表示用goods ID解決、accessibility labelに集中させた。
+- ファイル行数を349行から111行へ縮小した。
+
+#### `ios-native/Sources/MegrumApp/TradeCardComponents.swift`
+- `TradeCardExclusivePressModifier`、`TradeSelectionIndicator`、`TradeCardHeader`、`TradeReadStateLabel`、`TradePartnerAvatar`、`TradeDetailLink`、`TradeMeetupSummaryLine`、`TradeCardDivider`、`TradeCardReadState` の表示拡張を移動した。
+
+### 影響範囲
+
+- Swift Native iOS版のやりとり一覧カード、取引カードの既読/未読/返信待ち表示、選択モード、長押し選択、タップで詳細を開く導線、待ち合わせsummary表示。
+- 挙動変更ではなく責務分離。カードのレイアウト、文字サイズ、色、長押し閾値、haptics、accessibility label/hint、goods ID解決、既読状態計算、状態名、用語、DBスキーマは変更しない。
+
+### 確認方法
+
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-trade-card-components-build --disable-index-store`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-trade-card-components-tests --disable-index-store --enable-xctest --disable-swift-testing -j 1 --filter 'TradeChatAffordanceTests'`
+  - 47 tests passed
+
+### セルフレビュー結果
+
+- ✅ `TradeCard` のproposal/viewerIDからの譲る/求めるgoods ID解決、previewItems、accessibility label/hintは変更していない。
+- ✅ exclusive tap/long press gesture、長押しduration/distance、haptics、選択indicator、既読状態ごとの背景/色/weight、待ち合わせsummary行は移動のみで値を変更していない。
+- ✅ TradeChatAffordanceTestsで、取引カードpresentation、既読/未読/返信待ち、待ち合わせsummary、取引一覧順、取引チャット周辺の導線を確認した。
+- ✅ 状態名・用語・DBスキーマの変更はないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション902：Authenticated tabs contentを分割
 
 ### 背景・問題意識
