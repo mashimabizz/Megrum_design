@@ -733,6 +733,12 @@ final class HomeDiscoveryMatchPolicyTests: XCTestCase {
             HomeDiscoveryMatchPolicy.paymentCondition(
                 for: .init(hasCompatiblePaymentMethod: true)
             ),
+            .exact
+        )
+        XCTAssertEqual(
+            HomeDiscoveryMatchPolicy.paymentCondition(
+                for: .init(hasCompatiblePaymentMethod: false, status: .needsDiscussion)
+            ),
             .compatible
         )
         XCTAssertEqual(
@@ -761,6 +767,29 @@ final class HomeDiscoveryMatchPolicyTests: XCTestCase {
         )
     }
 
+    func testPaymentPolicySeparatesConcreteCommonOtherOnlyAndMismatch() {
+        let concreteCommon = HomeCandidatePaymentPolicy.signals(
+            viewerMethods: ["paypay", "other"],
+            partnerMethods: ["paypay"]
+        )
+        XCTAssertEqual(concreteCommon.status, .compatible)
+        XCTAssertEqual(HomeDiscoveryMatchPolicy.paymentCondition(for: concreteCommon), .exact)
+
+        let otherOnlyCommon = HomeCandidatePaymentPolicy.signals(
+            viewerMethods: ["paypay", "other"],
+            partnerMethods: ["other"]
+        )
+        XCTAssertEqual(otherOnlyCommon.status, .needsDiscussion)
+        XCTAssertEqual(HomeDiscoveryMatchPolicy.paymentCondition(for: otherOnlyCommon), .compatible)
+
+        let noCommonEvenWithOther = HomeCandidatePaymentPolicy.signals(
+            viewerMethods: ["other"],
+            partnerMethods: ["paypay"]
+        )
+        XCTAssertEqual(noCommonEvenWithOther.status, .methodMismatch)
+        XCTAssertEqual(HomeDiscoveryMatchPolicy.paymentCondition(for: noCommonEvenWithOther), .warning)
+    }
+
     func testConditionTagTitlesUseCompactHomeLabels() {
         XCTAssertEqual(HomeGoodsCondition.direct.floatingTagTitle, "グッズ◎")
         XCTAssertEqual(HomeGoodsCondition.wish.floatingTagTitle, "グッズ○")
@@ -768,6 +797,7 @@ final class HomeDiscoveryMatchPolicyTests: XCTestCase {
         XCTAssertEqual(HomeExchangeCondition.exact.floatingTagTitle, "交換◎")
         XCTAssertEqual(HomeExchangeCondition.possible.floatingTagTitle, "交換○")
         XCTAssertEqual(HomeExchangeCondition.warning.floatingTagTitle, "交換▲")
+        XCTAssertEqual(HomePaymentCondition.exact.floatingTagTitle, "支払◎")
         XCTAssertEqual(HomePaymentCondition.compatible.floatingTagTitle, "支払○")
         XCTAssertEqual(HomePaymentCondition.unknown.floatingTagTitle, "支払?")
         XCTAssertEqual(HomePaymentCondition.warning.floatingTagTitle, "支払▲")
@@ -797,6 +827,13 @@ final class HomeDiscoveryMatchPolicyTests: XCTestCase {
         )
         XCTAssertTrue(directTags.homeCandidateShowsExchangeTag)
         XCTAssertEqual(directTags.homeCandidateAccessibilityText, "グッズ◎、交換◎、支払○")
+
+        let exactPaymentTags = HomeConditionTagSet(
+            goods: .direct,
+            exchange: .exact,
+            payment: .exact
+        )
+        XCTAssertEqual(exactPaymentTags.homeCandidateAccessibilityText, "グッズ◎、交換◎、支払◎")
     }
 
     func testCandidateConditionTagsFollowSelectedGoodsSignals() throws {
@@ -855,7 +892,7 @@ final class HomeDiscoveryMatchPolicyTests: XCTestCase {
 
         XCTAssertEqual(
             candidate.conditionTags(for: candidate.goods.first),
-            HomeConditionTagSet(goods: .direct, exchange: .exact, payment: .compatible)
+            HomeConditionTagSet(goods: .direct, exchange: .exact, payment: .exact)
         )
         XCTAssertEqual(
             candidate.conditionTags(for: secondGoods),

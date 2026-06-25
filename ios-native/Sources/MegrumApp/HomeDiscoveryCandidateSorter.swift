@@ -78,6 +78,8 @@ struct HomeDiscoveryCandidateSorter: Sendable {
             return 0
         }
         switch HomeDiscoveryMatchPolicy.paymentCondition(for: signals.payment) {
+        case .exact:
+            return 4
         case .compatible:
             return 3
         case .unknown:

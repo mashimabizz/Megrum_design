@@ -960,7 +960,7 @@ final class HomeCandidateComposerTests: XCTestCase {
         XCTAssertEqual(signals.linkCounts, HomeCandidateLinkCounts(wishCount: 0, listingCount: 1))
         XCTAssertEqual(HomeDiscoveryMatchPolicy.goodsCondition(for: signals.goods), .direct)
         XCTAssertEqual(HomeDiscoveryMatchPolicy.exchangeCondition(for: signals.exchange), .possible)
-        XCTAssertEqual(HomeDiscoveryMatchPolicy.paymentCondition(for: signals.payment), .compatible)
+        XCTAssertEqual(HomeDiscoveryMatchPolicy.paymentCondition(for: signals.payment), .exact)
         let partnerSelection = try XCTUnwrap(signals.individualListingSelection)
         XCTAssertEqual(partnerSelection.wantedLogic, .all)
         XCTAssertEqual(partnerSelection.offeredLogic, .all)

@@ -40,10 +40,10 @@ extension HomeMutualMatchConditionPolicy {
         case (false, true):
             status = .partnerUnset
             attentionKind = .partnerPaymentUnset
-        case (false, false) where !viewer.supportedMethods.isDisjoint(with: partner.supportedMethods):
+        case (false, false) where viewer.hasSharedSupportedMethod(with: partner):
             status = .compatible
             attentionKind = nil
-        case (false, false) where viewer.isOtherOnly || partner.isOtherOnly:
+        case (false, false) where viewer.hasOnlyOtherInCommon(with: partner):
             status = .needsDiscussion
             attentionKind = .paymentMethodNeedsDiscussion
         case (false, false):
@@ -71,8 +71,12 @@ extension HomeMutualMatchConditionPolicy {
             rawMethods.isEmpty
         }
 
-        var isOtherOnly: Bool {
-            rawMethods == [.other]
+        func hasSharedSupportedMethod(with other: PaymentProfile) -> Bool {
+            !supportedMethods.isDisjoint(with: other.supportedMethods)
+        }
+
+        func hasOnlyOtherInCommon(with other: PaymentProfile) -> Bool {
+            rawMethods.intersection(other.rawMethods) == [.other]
         }
     }
 

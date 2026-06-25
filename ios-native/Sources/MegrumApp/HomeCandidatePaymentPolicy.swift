@@ -27,9 +27,9 @@ enum HomeCandidatePaymentPolicy {
             status = partners.allSatisfy(\.isUnset) ? .unset : .viewerUnset
         } else if partners.contains(where: \.isUnset) {
             status = .partnerUnset
-        } else if partners.contains(where: { !viewer.supportedMethods.isDisjoint(with: $0.supportedMethods) }) {
+        } else if partners.contains(where: { viewer.hasSharedSupportedMethod(with: $0) }) {
             status = .compatible
-        } else if viewer.isOtherOnly || partners.contains(where: \.isOtherOnly) {
+        } else if partners.contains(where: { viewer.hasOnlyOtherInCommon(with: $0) }) {
             status = .needsDiscussion
         } else {
             status = .methodMismatch
@@ -81,8 +81,12 @@ enum HomeCandidatePaymentPolicy {
             rawMethods.isEmpty
         }
 
-        var isOtherOnly: Bool {
-            rawMethods == ["other"]
+        func hasSharedSupportedMethod(with other: PaymentProfile) -> Bool {
+            !supportedMethods.isDisjoint(with: other.supportedMethods)
+        }
+
+        func hasOnlyOtherInCommon(with other: PaymentProfile) -> Bool {
+            rawMethods.intersection(other.rawMethods) == ["other"]
         }
     }
 }

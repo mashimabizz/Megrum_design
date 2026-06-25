@@ -260,13 +260,21 @@ final class HomeMutualMatchConditionPoliciesTests: XCTestCase {
         XCTAssertEqual(bothUnset.signals.status, .unset)
         XCTAssertEqual(bothUnset.attentionKinds, [.paymentUnset])
 
-        let otherOnly = HomeMutualMatchConditionPolicy.paymentEvaluation(
+        let otherOnlyCommon = HomeMutualMatchConditionPolicy.paymentEvaluation(
+            viewerMethods: ["paypay", "other"],
+            partnerMethods: ["other"],
+            requiresPayment: true
+        )
+        XCTAssertEqual(otherOnlyCommon.signals.status, .needsDiscussion)
+        XCTAssertEqual(otherOnlyCommon.attentionKinds, [.paymentMethodNeedsDiscussion])
+
+        let noCommonEvenWithOther = HomeMutualMatchConditionPolicy.paymentEvaluation(
             viewerMethods: ["other"],
             partnerMethods: ["paypay"],
             requiresPayment: true
         )
-        XCTAssertEqual(otherOnly.signals.status, .needsDiscussion)
-        XCTAssertEqual(otherOnly.attentionKinds, [.paymentMethodNeedsDiscussion])
+        XCTAssertEqual(noCommonEvenWithOther.signals.status, .methodMismatch)
+        XCTAssertEqual(noCommonEvenWithOther.attentionKinds, [.paymentMethodMismatch])
     }
 
     private func exchangeEvaluation(

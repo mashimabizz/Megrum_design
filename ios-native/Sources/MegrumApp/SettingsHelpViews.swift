@@ -144,10 +144,10 @@ struct MutualMatchConditionHelpScreen: View {
 
             Section {
                 HelpDetailText("支払条件は、物々交換だけの候補では見ません。どちらかの求めるものに定価または金額指定が含まれる場合だけ、銀行振込、PayPay、現金交換などの共通手段を確認します。")
-                HelpDetailRow(title: "共通する支払方法がある", message: "支払条件は問題なしとして扱います。")
+                HelpDetailRow(title: "PayPayなど共通する支払方法がある", message: "支払条件は問題なしとして扱います。")
                 HelpDetailRow(title: "共通手段がない", message: "支払方法のすり合わせが必要です。")
                 HelpDetailRow(title: "未設定がある", message: "未設定の側で支払条件を設定する必要があります。")
-                HelpDetailRow(title: "その他のみ", message: "具体的な支払方法を相談する必要があります。")
+                HelpDetailRow(title: "共通手段がその他のみ", message: "具体的な支払方法を相談する必要があります。")
             } header: {
                 Text("支払条件")
             }

@@ -33,11 +33,13 @@ enum HomeDiscoveryMatchPolicy {
 
     static func paymentCondition(for signals: HomePaymentConditionSignals) -> HomePaymentCondition {
         switch signals.status {
-        case .skipped, .compatible:
+        case .compatible:
+            return .exact
+        case .skipped, .needsDiscussion:
             return .compatible
         case .viewerUnset, .partnerUnset, .unset:
             return .unknown
-        case .methodMismatch, .needsDiscussion:
+        case .methodMismatch:
             return .warning
         }
     }

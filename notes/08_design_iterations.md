@@ -4,6 +4,75 @@
 
 ---
 
+## イテレーション990：支払タグを共通手段の強さで分岐
+
+### 背景・問題意識
+
+ホームのマッチ候補で表示する支払タグは、共通する支払手段の有無と内容によって強さを分ける必要があった。オーナーから、共通する項目があれば `支払◎`、共通する項目が `その他` しかなければ `支払○`、それ以外は `支払▲` にしたいという指摘があった。なお、過去指摘済みの未設定時は判定不能のため `支払?` を維持する。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/HomeConditionTags.swift`
+- `HomePaymentCondition` に `exact = "◎"` を追加した。
+- 支払◎は既存の条件Exact色、支払○は相談可能色、支払?はmuted、支払▲はwarningのままにした。
+
+#### `ios-native/Sources/MegrumApp/HomeDiscoveryMatchPolicy.swift`
+#### `ios-native/Sources/MegrumApp/HomeDiscoveryCandidateSorter.swift`
+- `status == .compatible` を `支払◎` として表示・並び順評価するようにした。
+- `status == .needsDiscussion` は、共通手段が `その他` のみの状態として `支払○` にした。
+- 未設定系は `支払?`、不一致は `支払▲` を維持した。
+
+#### `ios-native/Sources/MegrumApp/HomeCandidatePaymentPolicy.swift`
+#### `ios-native/Sources/MegrumApp/HomeMutualMatchPaymentConditionPolicy.swift`
+- `PayPay` / `銀行振込` / `現金交換` など具体的な共通手段がある場合は `.compatible` にした。
+- 具体的な共通手段はなく、共通項目が `その他` のみの場合だけ `.needsDiscussion` にした。
+- 片方だけ `その他` を持つが共通項目がない場合は `.methodMismatch` にした。
+
+#### `ios-native/Sources/MegrumApp/SettingsHelpViews.swift`
+- 相互マッチ条件ヘルプの支払条件説明を、具体的な共通手段と `その他` のみ共通を分ける表現へ更新した。
+
+#### `ios-native/Tests/MegrumAppTests/HomeDiscoveryMatchPolicyTests.swift`
+#### `ios-native/Tests/MegrumAppTests/HomeCandidateComposerTests.swift`
+#### `ios-native/Tests/MegrumAppTests/HomeMutualMatchConditionPoliciesTests.swift`
+- `支払◎ / 支払○ / 支払? / 支払▲` の表示ラベルをテストで固定した。
+- 具体的な共通手段あり、`その他` のみ共通、片方だけ `その他` で共通なし、未設定の判定をテストで固定した。
+
+### 影響範囲
+
+- Swift Native iOS版のホーム、マッチ候補タブ、相互マッチの支払条件判定。
+- 支払条件による候補の並び順。
+- 未設定時の `支払?`、交換条件、グッズ条件、打診payload、DBスキーマ、状態名は変更しない。
+
+### 確認方法
+
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-payment-tag-test --disable-index-store --enable-xctest --disable-swift-testing -j 1 --filter 'HomeDiscoveryMatchPolicyTests/testPaymentConditionUsesSharedSupportedMethodsOnly|HomeDiscoveryMatchPolicyTests/testPaymentPolicySeparatesConcreteCommonOtherOnlyAndMismatch|HomeDiscoveryMatchPolicyTests/testConditionTagTitlesUseCompactHomeLabels|HomeDiscoveryMatchPolicyTests/testCandidateConditionTagsFollowSelectedGoodsSignals'`
+  - selected tests passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-payment-tag-test --disable-index-store --enable-xctest --disable-swift-testing -j 1 --filter HomeCandidateComposerTests/testComposerMarksIndividualListingHitAsGoodsConditionDirect`
+  - selected test passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-payment-tag-mutual-test --disable-index-store --enable-xctest --disable-swift-testing -j 1 --filter HomeMutualMatchConditionPoliciesTests/testPaymentConditionMatrixOnlyRunsWhenMoneyIsIncluded`
+  - selected test passed
+- `xcodebuild -quiet -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -destination 'id=C70DDDBB-2602-49E0-8F95-1F043BCCED76' -derivedDataPath /tmp/megrum-ios-native-payment-tag-xcode build`
+  - passed
+- `xcrun simctl install C70DDDBB-2602-49E0-8F95-1F043BCCED76 /tmp/megrum-ios-native-payment-tag-xcode/Build/Products/Debug-iphonesimulator/MegrumNative.app`
+  - passed
+- `xcrun simctl launch --terminate-running-process C70DDDBB-2602-49E0-8F95-1F043BCCED76 tokyo.megrum.native.preview`
+  - launched
+- `baguette describe-ui --udid C70DDDBB-2602-49E0-8F95-1F043BCCED76`
+  - ホームの候補タグに `グッズ◎、交換◎、支払◎` が表示されることを確認
+  - 未設定候補は `支払?` のまま表示されることを確認
+- `baguette screenshot --udid C70DDDBB-2602-49E0-8F95-1F043BCCED76 --output /tmp/megrum-payment-tag-rules.png`
+  - screenshot captured
+
+### セルフレビュー結果
+
+- ✅ 具体的な共通支払手段は `支払◎`、共通が `その他` のみなら `支払○`、共通なしは `支払▲` に分岐した。
+- ✅ 片方だけ `その他` を持つケースを安易に `支払○` にせず、共通項目がないため `支払▲` にした。
+- ✅ 未設定時は既存仕様どおり `支払?` のままにし、判定不能を三角扱いに戻さないようにした。
+- ✅ 表示タグと相互マッチの条件ヘルプを同期した。
+- ✅ 状態名、用語定義、DBスキーマの変更はないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション989：打診前CTAの文言を確認導線へ変更
 
 ### 背景・問題意識

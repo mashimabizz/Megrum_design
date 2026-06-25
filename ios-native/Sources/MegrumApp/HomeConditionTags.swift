@@ -88,6 +88,7 @@ enum HomeExchangeCondition: String, Sendable {
 }
 
 enum HomePaymentCondition: String, Sendable {
+    case exact = "◎"
     case compatible = "○"
     case unknown = "?"
     case warning = "▲"
@@ -97,6 +98,8 @@ enum HomePaymentCondition: String, Sendable {
 
     var accent: Color {
         switch self {
+        case .exact:
+            MegrumTheme.conditionExact
         case .compatible:
             MegrumTheme.conditionPossible
         case .unknown:
