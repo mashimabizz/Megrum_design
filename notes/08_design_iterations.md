@@ -4,6 +4,48 @@
 
 ---
 
+## イテレーション1118：home local mode settings contentを分離
+
+### 背景・問題意識
+
+`HomeLocalModeSettingsSheet` は、draft、位置情報状態、保存/キャンセル、`onChange` / `onAppear` の副作用を持ちながら、`Form` 内のON/OFF、公開preview、現在地、有効時間、半径、持参グッズsectionも同じ `body` に抱えていた。親sheetを状態と副作用の所有に寄せ、設定項目の表示を専用Viewへ分離する。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/HomeLocalModeSettingsSheet.swift`
+- `Form` 本体を `HomeLocalModeSettingsContent` 呼び出しへ置き換えた。
+- draft、位置情報状態、navigation title、toolbar、保存/キャンセル、`onChange` / `onAppear` は親sheetに残した。
+- 現在地取得button用の処理を `requestCurrentLocation()` へ分離した。
+
+#### `ios-native/Sources/MegrumApp/HomeLocalModeSettingsContent.swift`
+- `HomeLocalModeSettingsContent` を追加した。
+- 現地交換モードON/OFF、現在地表示preview、現在地入力、有効時間、半径、持参グッズsectionを移動した。
+- 取得済み座標の表示文言生成を `locationLabel(for:)` に閉じ込めた。
+
+### 影響範囲
+
+- Swift Native iOS版ホームの現地交換モード設定sheet。
+- 現地交換モードのdraft保存、位置情報取得/逆ジオコーディング、公開preview、有効時間/半径/持参グッズの選択UI。
+- 保存payload、Activity Window ID維持、位置情報許可処理、DB/API、状態名、表示文言は変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumApp/HomeLocalModeSettingsSheet.swift ios-native/Sources/MegrumApp/HomeLocalModeSettingsContent.swift`
+  - passed
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-home-local-mode-content`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-home-local-mode-content --enable-xctest --disable-swift-testing -j 1 --filter 'HomeLocalModeTests|MegrumAppStateTests'`
+  - passed（99 tests）
+
+### セルフレビュー結果
+
+- ✅ ON/OFF、反映先、公開preview、現在地入力、位置情報取得button、error表示、取得場所、有効時間、半径、持参グッズsectionを維持した。
+- ✅ 位置情報の `onChange`、既存座標のresolve、保存時の `draft.settings(savedAt:original:)`、dismiss順序は変更していない。
+- ✅ `HomeLocalModeSettingsSheet.swift` は211行から166行へ縮小し、Form表示を100行の専用ファイルへ分離した。
+- ✅ 新しい状態名・用語・DB列は追加していないため、`notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション1117：home match logic help contentを分離
 
 ### 背景・問題意識
