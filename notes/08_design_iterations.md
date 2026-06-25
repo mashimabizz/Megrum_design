@@ -4,6 +4,45 @@
 
 ---
 
+## イテレーション1069：settings help row viewsを分離
+
+### 背景・問題意識
+
+`SettingsHelpViews.swift` は、ヘルプ画面本体、相互マッチ条件ヘルプ画面、汎用route row、詳細説明rowを同じファイルに抱えていた。ヘルプ本文の表示文言はそのまま維持し、複数設定画面から使われる行コンポーネントだけを専用ファイルへ分離する。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/SettingsHelpViews.swift`
+- `SettingsHelpScreen` と `MutualMatchConditionHelpScreen` を残した。
+- `HelpDetailText`、`HelpDetailRow`、`HelpRouteRow` を移動した。
+
+#### `ios-native/Sources/MegrumApp/SettingsHelpRowViews.swift`
+- `HelpDetailText`、`HelpDetailRow`、`HelpRouteRow` を追加した。
+- font、foreground、padding、symbol color、accessibility label/hintを維持した。
+
+### 影響範囲
+
+- Swift Native iOS版のヘルプ画面、相互マッチ条件ヘルプ画面、設定プライバシー画面で使うhelp row。
+- ヘルプ本文、navigation title、法的文書入口、設定route、表示文言は変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumApp/SettingsHelpViews.swift ios-native/Sources/MegrumApp/SettingsHelpRowViews.swift`
+  - passed
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-settings-help-row-views`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-settings-help-row-views --enable-xctest --disable-swift-testing -j 1 --filter 'SettingsScreenTests'`
+  - passed（16 tests）
+
+### セルフレビュー結果
+
+- ✅ 既存のヘルプ本文と画面構成は `SettingsHelpViews.swift` に残し、汎用rowだけを専用ファイルへ移した。
+- ✅ `HelpRouteRow` は設定プライバシー画面からの利用を維持できるようinternalなViewとして残した。
+- ✅ `SettingsHelpViews.swift` は 225行から 166行へ縮小し、row componentsを 61行の専用ファイルへ分離した。
+- ✅ 新しい状態名・用語・DB列は追加していないため、`notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション1068：individual listing haves goods selectionを分離
 
 ### 背景・問題意識
