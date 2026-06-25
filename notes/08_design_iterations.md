@@ -4,6 +4,52 @@
 
 ---
 
+## イテレーション922：Goods collection actionsを責務別に分割
+
+### 背景・問題意識
+
+`GoodsCollectionScreenActions.swift` は、在庫/WISH一覧のフィルタ候補読み込み、クイック操作、削除確認、一括タグ、フィルタ状態の整合、作成フォーム起動が1ファイルに同居していた。個別募集作成時のグッズ/WISH選択やマイグッズ一覧のフィルタリング修正と近い責務なので、一覧操作の調査・修正対象を狭める。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/GoodsCollectionScreenActions.swift`
+- 作成フォーム起動の `openAddForm` だけに絞った。
+- ファイル行数を319行から11行へ縮小した。
+
+#### `ios-native/Sources/MegrumApp/GoodsCollectionLookupActions.swift`
+- member名解決、quick action header presentation、フィルタ候補/メンバー候補読み込みを新規ファイルへ移動した。
+
+#### `ios-native/Sources/MegrumApp/GoodsCollectionItemMutationActions.swift`
+- 単体/一括削除、削除確認、選択開始/切替、quick action、keep移動、更新input生成を新規ファイルへ移動した。
+
+#### `ios-native/Sources/MegrumApp/GoodsCollectionBulkTagActions.swift`
+- 一括タグ適用、タグ候補名、タグpreview、対象item/group抽出を新規ファイルへ移動した。
+
+#### `ios-native/Sources/MegrumApp/GoodsCollectionFilterActions.swift`
+- フィルタreset、選択済みタグ/フィルタの整合処理を新規ファイルへ移動した。
+
+### 影響範囲
+
+- Swift Native iOS版の在庫一覧、WISH一覧、quick action panel、一括選択、一括タグ、フィルタ候補読み込み。
+- 挙動変更ではなく責務分離。保存/削除payload、タグ正規化、状態名、用語、DBスキーマは変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumApp/GoodsCollectionScreenActions.swift ios-native/Sources/MegrumApp/GoodsCollectionLookupActions.swift ios-native/Sources/MegrumApp/GoodsCollectionItemMutationActions.swift ios-native/Sources/MegrumApp/GoodsCollectionBulkTagActions.swift ios-native/Sources/MegrumApp/GoodsCollectionFilterActions.swift`
+  - passed
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-goods-collection-actions-build --disable-index-store`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-goods-collection-actions-tests --disable-index-store --enable-xctest --disable-swift-testing -j 1 --filter 'GoodsGridLayoutTests|GoodsEditorDraftTests|GoodsLocalStateReducerTests|SupabaseOwnedGoodsPersistenceTests|MegrumAppStateTests/testAppStateLoadsPreviewGoodsTypes|MegrumAppStateTests/testAppStateCreatesPreviewInventoryAndWishEntries|MegrumAppStateTests/testAppStateUpdatesPreviewGoodsEntryLocally|MegrumAppStateTests/testAppStateArchivesAndDeletesPreviewGoodsLocally'`
+  - 63 tests passed
+
+### セルフレビュー結果
+
+- ✅ Quick action、削除確認、bulk tag、filter reset/reconcile、作成フォーム起動は移動のみで条件式・文言・呼び出し先を維持した。
+- ✅ GoodsGridLayoutTests / GoodsEditorDraftTests / GoodsLocalStateReducerTests / SupabaseOwnedGoodsPersistenceTests / MegrumAppStateTestsで、一覧UIポリシー、タグ候補、在庫/WISH作成・更新・削除、ローカル状態更新を確認した。
+- ✅ 状態名・用語・DBスキーマの変更はないため `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション921：Auth screen componentsを部品別に分割
 
 ### 背景・問題意識
