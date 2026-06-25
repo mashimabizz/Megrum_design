@@ -4,6 +4,46 @@
 
 ---
 
+## イテレーション1049：proposal flow step contentを分離
+
+### 背景・問題意識
+
+`ProposalCreateFlowBody.swift` は、画面全体のbody、safe area / toolbar / sheet / task / onChangeの副作用に加えて、出すもの、受け取るもの、待ち合わせ、配送、支払い、確認stepのView組み立てとfilter計算も同じextension内に抱えていた。body側はフロー制御と副作用に集中させ、step別コンテンツを専用extensionへ分離した。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/ProposalCreateFlowBody.swift`
+- step別View、selection tab、bottom bar配置、content spacing、goods filter計算を削除し、bodyとmodifier chain中心のファイルにした。
+- completion表示、active content、bottom bar、initial load、sheet、onChange、edge back swipeの構成は維持した。
+
+#### `ios-native/Sources/MegrumApp/ProposalCreateFlowStepContent.swift`
+- `ProposalCreateFlow` のstep別コンテンツextensionを追加した。
+- `giveStep` / `receiveStep` / `meetupStep` / `shippingStep` / `paymentStep` / `confirmStep` と、送受信goods filter / filter choice生成を移動した。
+- 支払いstepの `syncPaymentSelectionIfNeeded()` onAppear と、住所設定sheetを開くcallbackを維持した。
+
+### 影響範囲
+
+- Swift Native iOS版の打診作成フロー。
+- 出すもの、受け取るもの、待ち合わせ、配送、支払い、確認stepの表示組み立て。
+- step遷移、選択状態、支払い同期、住所設定sheet、submit処理、状態名、用語、DBスキーマ、表示文言は変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumApp/ProposalCreateFlowBody.swift ios-native/Sources/MegrumApp/ProposalCreateFlowStepContent.swift`
+  - passed
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-proposal-flow-step-content`
+  - passed
+
+### セルフレビュー結果
+
+- ✅ body側はcompletion/active content、sheet、task、onChange、navigation chromeの管理に集中させた。
+- ✅ step別Viewの引数、binding、filter条件、支払い同期、住所設定callbackは移動のみで維持した。
+- ✅ 新ファイルには廃止用語を追加していない。
+- ✅ `ProposalCreateFlowBody.swift` は 288行から 154行へ縮小し、step組み立てを 140行の専用ファイルへ分離した。
+- ✅ 新しい状態名・用語・DB列は追加していないため、`notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション1048：trades screen presentationを分離
 
 ### 背景・問題意識
