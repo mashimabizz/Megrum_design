@@ -11,14 +11,26 @@ struct ProposalStepHeaderTab: View {
 
     var body: some View {
         Button(action: action) {
-            label
+            ProposalStepHeaderTabLabel(
+                title: title,
+                badge: badge,
+                badgeColor: badgeColor,
+                isSelected: isSelected
+            )
         }
         .buttonStyle(.plain)
         .disabled(!isEnabled)
         .opacity(isEnabled ? 1 : 0.62)
     }
+}
 
-    private var label: some View {
+private struct ProposalStepHeaderTabLabel: View {
+    var title: String
+    var badge: String?
+    var badgeColor: Color
+    var isSelected: Bool
+
+    var body: some View {
         HStack(spacing: ProposalSectionTabsMetrics.tabGap) {
             Text(title)
                 .font(.system(size: ProposalSectionTabsMetrics.labelFontSize, weight: .black, design: .rounded))

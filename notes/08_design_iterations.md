@@ -4,6 +4,42 @@
 
 ---
 
+## イテレーション1172：proposal step tab labelを分離
+
+### 背景・問題意識
+
+打診作成ステップヘッダーのタブに、タイトルとbadgeを組み立てる computed `some View` helper が残っていた。ボタンのaction/disabled/opacityとラベル描画の責務を分け、今後のタブ表示調整時に差分が局所化されるようにする。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/ProposalStepHeaderTab.swift`
+- `ProposalStepHeaderTabLabel` を追加し、タイトル、badge、badge色、選択状態の描画を専用Viewへ分離した。
+- `ProposalStepHeaderTab` はbutton action、enabled制御、opacity制御に集中する構成へ寄せた。
+- `label` の computed `some View` helper を削除した。
+
+### 影響範囲
+
+- Swift Native iOS版の打診作成ステップヘッダー。
+- タブのタイトル、badge表示、選択状態、disabled/opacity、button action、DB/API、状態名、表示文言は変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumApp/ProposalStepHeaderTab.swift`
+  - passed
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-proposal-tab-label`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-proposal-tab-label-tests --enable-xctest --disable-swift-testing -j 1 --filter ProposalCreateFlowTests`
+  - passed（55 tests）
+
+### セルフレビュー結果
+
+- ✅ タブのタイトル、badge、badge色、選択状態の描画を維持した。
+- ✅ button action、disabled、opacityの制御を維持した。
+- ✅ DB/API、状態名、表示文言、打診作成の進行条件は変更していない。
+- ✅ 新しい状態名・用語・DB列は追加していないため、`notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション1171：proposal controlsを小さなViewへ分離
 
 ### 背景・問題意識
