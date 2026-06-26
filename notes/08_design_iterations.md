@@ -4,6 +4,43 @@
 
 ---
 
+## イテレーション1183：proposal calendar resize handleを分離
+
+### 背景・問題意識
+
+打診作成の meetup 週カレンダー候補blockに、候補タイトル/場所ラベル/編集領域高さの計算、本文button、resize handle、削除buttonが同居していた。候補block本体のgesture配線を保ちながら、resize handleの描画とgestureを専用Viewへ分ける。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/ProposalMeetupCalendarViews.swift`
+- `candidateTitle` / `placeLabel` / `editButtonHeight` を非View computed varへ分離し、`body` 内の一時値を減らした。
+- `ProposalMeetupCalendarCandidateResizeHandle` を追加し、resize handleの矩形、capsule、offset、`highPriorityGesture` を専用Viewへ分離した。
+- 親の `ProposalMeetupCalendarCandidateBlock` は背景、編集button、resize handle、削除buttonの配置に集中する構成へ寄せた。
+
+### 影響範囲
+
+- Swift Native iOS版の打診作成 meetup 週カレンダー候補block。
+- 候補タイトル、場所未入力表示、編集button高さ、move gesture、resize gesture、削除button、zIndex、frame、DB/API、状態名、表示文言は変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumApp/ProposalMeetupCalendarViews.swift`
+  - passed
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-calendar-resize-handle`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-calendar-resize-handle-tests --enable-xctest --disable-swift-testing -j 1 --filter 'ProposalCreateFlowTests|ProposalCreateSheetTests|TradeRequestDraftProposalCreateFlowTests|TradeChatAffordanceTests'`
+  - passed（112 tests）
+
+### セルフレビュー結果
+
+- ✅ move/resize/remove のgesture配線と座標空間名 `proposalMeetupCalendar` を維持した。
+- ✅ resize handleの高さ、offset、capsuleサイズ、色、zIndexを維持した。
+- ✅ 候補blockのタイトル、場所ラベル、編集button高さ、accessibility labelを維持した。
+- ✅ DB/API、状態名、表示文言は変更していない。
+- ✅ 新しい状態名・用語・DB列は追加していないため、`notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション1182：proposal meetup map pickerを分離
 
 ### 背景・問題意識

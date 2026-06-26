@@ -14,11 +14,19 @@ struct ProposalMeetupCalendarCandidateBlock: View {
     var onResizeEnded: (DragGesture.Value) -> Void
     var onRemove: () -> Void
 
-    var body: some View {
-        let candidateTitle = "候補\(index + 1)"
-        let placeLabel = draft.normalizedPlaceName.isEmpty ? "場所未入力" : draft.normalizedPlaceName
-        let editButtonHeight = max(18, height - 10)
+    private var candidateTitle: String {
+        "候補\(index + 1)"
+    }
 
+    private var placeLabel: String {
+        draft.normalizedPlaceName.isEmpty ? "場所未入力" : draft.normalizedPlaceName
+    }
+
+    private var editButtonHeight: CGFloat {
+        max(18, height - 10)
+    }
+
+    var body: some View {
         ZStack(alignment: .topTrailing) {
             ProposalMeetupCalendarCandidateBlockBackground(isSelected: isSelected)
 
@@ -40,28 +48,42 @@ struct ProposalMeetupCalendarCandidateBlock: View {
             .accessibilityLabel("候補\(index + 1)を編集")
             .zIndex(0)
 
-            Rectangle()
-                .fill(Color.white.opacity(0.7))
-                .frame(height: 8)
-                .frame(maxWidth: .infinity)
-                .offset(y: max(0, height - 8))
-                .overlay {
-                    Capsule()
-                        .fill(MegrumTheme.lavender.opacity(0.84))
-                        .frame(width: 28, height: 4)
-                }
-                .contentShape(Rectangle())
-                .highPriorityGesture(
-                    DragGesture(minimumDistance: 0, coordinateSpace: .named("proposalMeetupCalendar"))
-                        .onChanged(onResizeChanged)
-                        .onEnded(onResizeEnded)
-                )
+            ProposalMeetupCalendarCandidateResizeHandle(
+                height: height,
+                onResizeChanged: onResizeChanged,
+                onResizeEnded: onResizeEnded
+            )
                 .zIndex(2)
 
             ProposalMeetupCalendarCandidateRemoveButton(index: index, onRemove: onRemove)
                 .zIndex(3)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    }
+}
+
+private struct ProposalMeetupCalendarCandidateResizeHandle: View {
+    let height: CGFloat
+    var onResizeChanged: (DragGesture.Value) -> Void
+    var onResizeEnded: (DragGesture.Value) -> Void
+
+    var body: some View {
+        Rectangle()
+            .fill(Color.white.opacity(0.7))
+            .frame(height: 8)
+            .frame(maxWidth: .infinity)
+            .offset(y: max(0, height - 8))
+            .overlay {
+                Capsule()
+                    .fill(MegrumTheme.lavender.opacity(0.84))
+                    .frame(width: 28, height: 4)
+            }
+            .contentShape(Rectangle())
+            .highPriorityGesture(
+                DragGesture(minimumDistance: 0, coordinateSpace: .named("proposalMeetupCalendar"))
+                    .onChanged(onResizeChanged)
+                    .onEnded(onResizeEnded)
+            )
     }
 }
 
