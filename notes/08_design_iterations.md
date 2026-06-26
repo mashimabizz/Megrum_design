@@ -4,6 +4,42 @@
 
 ---
 
+## イテレーション1175：proposal week preview contentを分離
+
+### 背景・問題意識
+
+打診作成の週カレンダーpreview blockに、optional分岐、slot range計算、height/offset計算、矩形描画が同居していた。表示有無の判定を親に残し、preview本体の描画と幾何計算を専用Viewへ分ける。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/ProposalMeetupCalendarWeekPreviewBlock.swift`
+- `ProposalMeetupCalendarWeekPreviewContent` を追加し、preview矩形、stroke、height、offset計算を専用Viewへ分離した。
+- `ProposalMeetupCalendarWeekPreviewBlock` はpreview有無の分岐とcontent呼び出しに集中する構成へ寄せた。
+- `normalizedSlotRange` の返り値に合わせ、抽出先のrange型を `ClosedRange<Int>` として明示した。
+
+### 影響範囲
+
+- Swift Native iOS版の打診作成 meetup 週カレンダーpreview表示。
+- preview表示条件、slot range正規化、height下限、x/y offset、fill/stroke、DB/API、状態名、表示文言は変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumApp/ProposalMeetupCalendarWeekPreviewBlock.swift`
+  - passed
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-proposal-week-preview`
+  - passed（抽出時の `ClosedRange` 型注釈修正後）
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-proposal-week-preview-tests --enable-xctest --disable-swift-testing -j 1 --filter 'ProposalCreateFlowTests|ProposalCreateSheetTests|TradeRequestDraftProposalCreateFlowTests|TradeChatAffordanceTests'`
+  - passed（112 tests）
+
+### セルフレビュー結果
+
+- ✅ preview表示条件、slot range正規化、height下限、x/y offsetを維持した。
+- ✅ fill、stroke、cornerRadius、dash、frame幅を維持した。
+- ✅ DB/API、状態名、表示文言、打診作成の進行条件は変更していない。
+- ✅ 新しい状態名・用語・DB列は追加していないため、`notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション1174：proposal active step contentを分離
 
 ### 背景・問題意識
