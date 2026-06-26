@@ -97,16 +97,30 @@ struct TradeCollapsedSummaryCard: View {
     var body: some View {
         if let action {
             Button(action: action) {
-                cardContent
+                TradeCollapsedSummaryCardContent(
+                    label: label,
+                    summary: summary,
+                    systemImage: systemImage
+                )
             }
             .buttonStyle(.plain)
             .accessibilityHint("詳細を開きます")
         } else {
-            cardContent
+            TradeCollapsedSummaryCardContent(
+                label: label,
+                summary: summary,
+                systemImage: systemImage
+            )
         }
     }
+}
 
-    private var cardContent: some View {
+private struct TradeCollapsedSummaryCardContent: View {
+    var label: String
+    var summary: String
+    var systemImage: String
+
+    var body: some View {
         HStack(spacing: 9) {
             Image(systemName: systemImage)
                 .font(.system(size: 13, weight: .black))

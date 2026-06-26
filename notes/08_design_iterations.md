@@ -4,6 +4,44 @@
 
 ---
 
+## イテレーション1166：trade collapsed summary contentを分離
+
+### 背景・問題意識
+
+取引チャットの折りたたみサマリーカードに、カード本体を返す computed `some View` helper が残っていた。タップ可能な場合だけ `Button` にする既存挙動、詳細hint、表示文言、icon、色、font、padding、accessibility結合を維持したまま、カード内容を専用Viewへ分ける。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/TradeChatViews.swift`
+- `TradeCollapsedSummaryCardContent` を追加し、折りたたみサマリーカードのicon/label/summary/詳細表示を専用Viewへ分離した。
+- `TradeCollapsedSummaryCard` は action 有無による Button 包装だけを担当する構成に寄せた。
+- `cardContent` の computed `some View` helper を削除した。
+
+### 影響範囲
+
+- Swift Native iOS版の取引チャット内折りたたみサマリーカード。
+- 取引チャットのタップ可能カード、非タップカード、詳細hint、summary表示。
+- 表示文言、icon、色、font、padding、accessibility、DB/API、状態名は変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumApp/TradeChatViews.swift`
+  - passed
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-trade-chat-summary`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-trade-chat-summary-tests --enable-xctest --disable-swift-testing -j 1 --filter 'TradeChatAffordanceTests|TradeMessageStateReducerTests|TradeProposalStateReducerTests'`
+  - passed（58 tests）
+
+### セルフレビュー結果
+
+- ✅ action がある場合だけ `Button` として扱う既存挙動、`.buttonStyle(.plain)`、詳細hintを維持した。
+- ✅ action がない場合の非Button表示を維持した。
+- ✅ icon、label、summary、`詳細`、色/font/padding/stroke/accessibility combineを維持した。
+- ✅ DB/API、状態名、表示文言、取引状態遷移は変更していない。
+- ✅ 新しい状態名・用語・DB列は追加していないため、`notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション1165：settings/proposal small badgesを分離
 
 ### 背景・問題意識
