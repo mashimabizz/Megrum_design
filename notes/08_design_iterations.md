@@ -4,6 +4,44 @@
 
 ---
 
+## イテレーション1177：proposal week timeline背景を分離
+
+### 背景・問題意識
+
+打診作成の meetup 週カレンダー背景に、時間ラベル列、日別スロット列、選択日stroke、スロット境界線の描画が同居していた。週カレンダー本体のgestureや候補配置に触れず、背景描画だけを小さな専用Viewへ分ける。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/ProposalMeetupCalendarWeekTimelineBackground.swift`
+- `ProposalMeetupCalendarWeekTimeLabelColumn` / `ProposalMeetupCalendarWeekTimeLabel` を追加し、時間ラベル列を専用Viewへ分離した。
+- `ProposalMeetupCalendarWeekDayTimelineColumn` を追加し、日別スロット列と選択日strokeを専用Viewへ分離した。
+- `ProposalMeetupCalendarWeekTimelineSlot` を追加し、hour boundaryごとのfill/overlay線を専用Viewへ分離した。
+- `ProposalMeetupCalendarWeekTimelineBackground` は列配置とclip shapeに集中する構成へ寄せた。
+
+### 影響範囲
+
+- Swift Native iOS版の打診作成 meetup 週カレンダー背景。
+- 時間ラベル、slot count、slot height、日別column幅、選択日stroke、slot境界線、gesture、候補block、preview、DB/API、状態名、表示文言は変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumApp/ProposalMeetupCalendarWeekTimelineBackground.swift`
+  - passed
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-week-timeline-bg`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-week-timeline-bg-tests --enable-xctest --disable-swift-testing -j 1 --filter 'ProposalCreateFlowTests|ProposalCreateSheetTests|TradeRequestDraftProposalCreateFlowTests|TradeChatAffordanceTests'`
+  - passed（112 tests）
+
+### セルフレビュー結果
+
+- ✅ 時間ラベルのformat、font、色、frame、idを維持した。
+- ✅ slot fill、境界線opacity、選択日stroke色/opacity/lineWidth、cornerRadius、clip shapeを維持した。
+- ✅ board/candidate gesture、候補block、preview、打診作成の進行条件は変更していない。
+- ✅ DB/API、状態名、表示文言は変更していない。
+- ✅ 新しい状態名・用語・DB列は追加していないため、`notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション1176：proposal calendar candidate blockを分離
 
 ### 背景・問題意識
