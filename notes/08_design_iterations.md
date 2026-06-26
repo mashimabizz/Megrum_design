@@ -4,6 +4,44 @@
 
 ---
 
+## イテレーション1137：home mutual partner payload resolverを分離
+
+### 背景・問題意識
+
+`HomeMutualMatchDetailSheet` は相互マッチ詳細シートの表示/選択/遷移に加えて、選択中の相手ユーザーに絞った個別募集ヒット・Wishヒットpayloadの生成、重複排除、`HomeMockGoods` 変換まで同じView内に抱えていた。シート本体を選択状態と表示構成へ寄せ、追加候補payloadの整形を小さな専用型へ分離する。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/HomeMutualMatchDetailSheet.swift`
+- `HomeMutualMatchPartnerScopedPayloadResolver` を追加した。
+- 相手ユーザーに絞った `matchedItems + possibleItems` の抽出、重複goods排除、`HomeMockGoods.from(...)` 変換、`HomeExtraHitPayload` 生成をresolverへ移した。
+- `partnerScopedListingHitPayloads` / `partnerScopedWishHitPayloads` は、選択中partnerを渡したresolver呼び出しだけに整理した。
+- `HomeMutualMatchDetailSheet` 側の選択pair、追加選択、nested sheet、owner profile routing、proposal開始処理は変更していない。
+
+### 影響範囲
+
+- Swift Native iOS版ホームの相互マッチ詳細シート。
+- 相互マッチ詳細内の「ほかにも交換できそう」個別募集ヒット/Wishヒットpayload。
+- シート表示、選択pair、追加候補の除外条件、打診開始、nested sheet、DB/API、状態名、表示文言は変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumApp/HomeMutualMatchDetailSheet.swift`
+  - passed
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-home-mutual-partner-payload-resolver`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-home-mutual-partner-payload-resolver --enable-xctest --disable-swift-testing -j 1 --filter 'HomeDiscoveryMatchPolicyTests|HomeMutualMatchLiveDataTests|HomeMutualMatchConditionPoliciesTests'`
+  - passed（82 tests、live Supabase前提の3 testsは既存条件どおりskipped）
+
+### セルフレビュー結果
+
+- ✅ 個別募集ヒットは `hasIndividualListingHit`、Wishヒットは `hasWishHit` でfilterする既存条件を維持した。
+- ✅ 相手ユーザーIDの決定、goods重複排除順、`HomeMockGoods.from(...)` のindex/goodsTypes入力、`HomeExtraHitPayload` のkind/goods/signalsを維持した。
+- ✅ 選択pair、追加選択、nested sheet、owner profile routing、proposal selection生成は変更していない。
+- ✅ 新しい状態名・用語・DB列は追加していないため、`notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション1136：search filter apply footerを分離
 
 ### 背景・問題意識

@@ -108,56 +108,22 @@ struct HomeMutualMatchDetailSheet: View {
         selectedPair?.receiverGoods.ownerID ?? candidate.partnerID
     }
 
+    private var partnerScopedPayloadResolver: HomeMutualMatchPartnerScopedPayloadResolver {
+        HomeMutualMatchPartnerScopedPayloadResolver(
+            partnerUserID: selectedPartnerUserID,
+            matchedItems: matchedItems,
+            possibleItems: possibleItems,
+            conditionSignalsByItemID: conditionSignalsByItemID,
+            goodsTypes: goodsTypes
+        )
+    }
+
     private var partnerScopedListingHitPayloads: [HomeExtraHitPayload] {
-        partnerScopedPayloads(kind: .listing) { $0.goods.hasIndividualListingHit }
+        partnerScopedPayloadResolver.payloads(kind: .listing) { $0.goods.hasIndividualListingHit }
     }
 
     private var partnerScopedWishHitPayloads: [HomeExtraHitPayload] {
-        partnerScopedPayloads(kind: .wish) { $0.goods.hasWishHit }
-    }
-
-    private func partnerScopedPayloads(
-        kind: HomeExtraHitKind,
-        matching predicate: (HomeCandidateConditionSignals) -> Bool
-    ) -> [HomeExtraHitPayload] {
-        guard let selectedPartnerUserID else {
-            return []
-        }
-        return partnerScopedCandidateEntries(partnerUserID: selectedPartnerUserID)
-            .filter { predicate($0.signals) }
-            .map { entry in
-                HomeExtraHitPayload(
-                    kind: kind,
-                    goods: entry.goods,
-                    signals: entry.signals
-                )
-            }
-    }
-
-    private func partnerScopedCandidateEntries(
-        partnerUserID: UUID
-    ) -> [(goods: HomeMockGoods, signals: HomeCandidateConditionSignals)] {
-        let sourceItems = (matchedItems + possibleItems)
-            .filter { $0.ownerID == partnerUserID }
-        let uniqueItems = orderedUniqueGoods(sourceItems)
-        return uniqueItems.enumerated().compactMap { index, item in
-            guard let signals = conditionSignalsByItemID[item.id] else {
-                return nil
-            }
-            return (
-                goods: HomeMockGoods.from(item: item, index: index, goodsTypes: goodsTypes),
-                signals: signals
-            )
-        }
-    }
-
-    private func orderedUniqueGoods(_ items: [GoodsItem]) -> [GoodsItem] {
-        var seen: Set<UUID> = []
-        var result: [GoodsItem] = []
-        for item in items where seen.insert(item.id).inserted {
-            result.append(item)
-        }
-        return result
+        partnerScopedPayloadResolver.payloads(kind: .wish) { $0.goods.hasWishHit }
     }
 
     private func seedInitialSelection() {
@@ -201,5 +167,57 @@ struct HomeMutualMatchDetailSheet: View {
         case .parent(let userID):
             onOpenOwnerProfile(userID)
         }
+    }
+}
+
+private struct HomeMutualMatchPartnerScopedPayloadResolver {
+    var partnerUserID: UUID?
+    var matchedItems: [GoodsItem]
+    var possibleItems: [GoodsItem]
+    var conditionSignalsByItemID: [UUID: HomeCandidateConditionSignals]
+    var goodsTypes: [GoodsType]
+
+    func payloads(
+        kind: HomeExtraHitKind,
+        matching predicate: (HomeCandidateConditionSignals) -> Bool
+    ) -> [HomeExtraHitPayload] {
+        guard let partnerUserID else {
+            return []
+        }
+        return candidateEntries(partnerUserID: partnerUserID)
+            .filter { predicate($0.signals) }
+            .map { entry in
+                HomeExtraHitPayload(
+                    kind: kind,
+                    goods: entry.goods,
+                    signals: entry.signals
+                )
+            }
+    }
+
+    private func candidateEntries(
+        partnerUserID: UUID
+    ) -> [(goods: HomeMockGoods, signals: HomeCandidateConditionSignals)] {
+        let sourceItems = (matchedItems + possibleItems)
+            .filter { $0.ownerID == partnerUserID }
+        let uniqueItems = orderedUniqueGoods(sourceItems)
+        return uniqueItems.enumerated().compactMap { index, item in
+            guard let signals = conditionSignalsByItemID[item.id] else {
+                return nil
+            }
+            return (
+                goods: HomeMockGoods.from(item: item, index: index, goodsTypes: goodsTypes),
+                signals: signals
+            )
+        }
+    }
+
+    private func orderedUniqueGoods(_ items: [GoodsItem]) -> [GoodsItem] {
+        var seen: Set<UUID> = []
+        var result: [GoodsItem] = []
+        for item in items where seen.insert(item.id).inserted {
+            result.append(item)
+        }
+        return result
     }
 }
