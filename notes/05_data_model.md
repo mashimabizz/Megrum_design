@@ -296,6 +296,27 @@ RLS / 権限（iter278）：
 - 公開プロフィール読み取りは `account_status not in ('deleted', 'suspended')` のユーザーだけに限定する。
 - 本人更新ポリシーは `using (auth.uid() = id)` に加えて `with check (auth.uid() = id)` を必須にし、直接API操作で `id` を別ユーザーへ移す更新を拒否する。
 
+### `account_deletion_requests`（退会申請 / iter1221）
+
+設定一覧の「退会する」から送信される、退会理由と任意メモを保持する監査用テーブル。退会申請は `request_account_deletion_for_viewer()` RPC 経由で行い、`users.account_status='deletion_requested'` と同じトランザクションで作成する。
+
+| カラム | 型 | 説明 |
+|---|---|---|
+| `id` | uuid | PK |
+| `user_id` | uuid | → users。申請した本人 |
+| `reasons` | text[] | `not_using` / `hard_to_use` / `trade_concern` / `found_alternative` / `privacy_concern` / `other` から1〜8件 |
+| `note` | text nullable | 任意メモ。500文字以内 |
+| `requested_at` | timestamptz | 申請日時 |
+| `deletion_scheduled_at` | timestamptz | 30日後の削除予定日時 |
+| `status` | text | `requested` / `cancelled` / `completed` |
+| `cancelled_at` / `completed_at` | timestamptz nullable | 申請取消・削除完了の運用記録 |
+| `created_at` / `updated_at` | timestamptz | |
+
+ビジネスルール：
+- `proposals.status in ('sent', 'negotiating', 'agreement_one_side', 'agreed')` の進行中取引が1件でもある場合、退会申請は作成しない。
+- 申請時に `users.account_status='deletion_requested'`、`users.deletion_requested_at=now()` を更新する。
+- 本人は自分の申請行だけSELECTできる。作成はRPC経由に限定し、クライアントから直接INSERTしない。
+
 ### `user_mailing_addresses`（住所 / iter168.71）
 
 郵送交換で使うユーザー設定の住所。初回リリースでは 1 ユーザー 1 住所を基本とし、設定画面から登録・更新する。本人確認は行わず、自己申告住所として扱う。

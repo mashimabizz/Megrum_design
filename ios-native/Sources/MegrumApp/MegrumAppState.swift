@@ -101,6 +101,7 @@ public final class MegrumAppState: ObservableObject {
     @Published public internal(set) var isSavingPushNotificationSetting = false
     @Published public internal(set) var isSavingAccountSetup = false
     @Published public internal(set) var isSavingOwnProfile = false
+    @Published public internal(set) var isRequestingAccountDeletion = false
     @Published public internal(set) var homeLocalModeSettings: HomeLocalActivitySettings?
     @Published public internal(set) var isLoadingHomeLocalModeSettings = false
     @Published public internal(set) var isSavingHomeLocalModeSettings = false

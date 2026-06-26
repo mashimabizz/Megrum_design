@@ -171,4 +171,16 @@ final class SupabaseAccountProfilePersistenceTests: XCTestCase {
         XCTAssertEqual(selections[0].oshiRequestID, requestID)
         XCTAssertEqual(selections[0].characterRequestID, characterRequestID)
     }
+
+    func testAccountDeletionPayloadUsesReasonRawValuesAndNormalizedMemo() {
+        let payload = SupabaseAccountProfilePersistence.accountDeletionPayload(
+            from: AccountDeletionRequestInput(
+                reasons: [.notUsing, .privacyConcern, .notUsing],
+                note: "  少し休みます  "
+            )
+        )
+
+        XCTAssertEqual(payload.reasons, ["not_using", "privacy_concern"])
+        XCTAssertEqual(payload.note, "少し休みます")
+    }
 }

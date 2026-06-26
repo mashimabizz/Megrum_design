@@ -373,6 +373,7 @@ tar -xzf /Users/michitaka/Desktop/Megrum_backups/pre-swift-migration-20260531-03
    - iter379で、ログアウト/Auth復帰、左ドロワー項目遷移、設定一覧、自分プロフィール保存、性別保存を補強した。
    - iter380で、初回設定/プロフィール編集の完了alert、推し選択のアクセシビリティ、法的文書入口、アカウント概要のID/status表示を追加した。
    - iter1220で、認証後オンボーディングを8ステップ化し、推しL1/L2、活動エリア、名前、ユーザーID、生年月日、性別を保存してからホームへ入る流れへ更新した。
+   - iter1221で、設定一覧のログアウト下に薄い「退会する」導線を追加し、注意表示→退会理由/メモ→退会申請、進行中取引がある場合のブロック、ホーム復帰まで接続した。
    - 残: 法的文書/ヘルプ本文の最終整合。
    - 主な対象: `ios-native/Sources/MegrumApp/AuthScreen.swift`, `ios-native/Sources/MegrumApp/AccountSetupScreen.swift`, `ios-native/Sources/MegrumApp/SettingsScreen.swift`
 

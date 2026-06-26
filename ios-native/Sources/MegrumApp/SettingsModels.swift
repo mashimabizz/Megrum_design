@@ -116,6 +116,7 @@ enum SettingsEssentialRoute: String, CaseIterable, Identifiable {
     case privacyPolicy
     case commerceDisclosure
     case account
+    case accountDeletion
     case logout
 
     var id: String { rawValue }
@@ -133,6 +134,7 @@ enum SettingsEssentialRoute: String, CaseIterable, Identifiable {
         .privacyPolicy,
         .commerceDisclosure,
         .account,
+        .accountDeletion,
         .logout
     ]
 }

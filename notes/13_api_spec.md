@@ -321,10 +321,11 @@ Google OAuth経由ログイン or 新規登録。
 アカウント削除申請（30日猶予）。
 
 - **Auth**: 必須
-- **Request**: `{ reasons?: string[] }`（任意・複数選択）
-- **Response 200**: `{ deletion_scheduled_at: "..." }`（30日後）
+- **Request**: `{ reasons: string[], note?: string }`（複数選択 + 任意メモ。Swift Nativeは `request_account_deletion_for_viewer()` RPC を利用）
+- **Response 200**: `{ account_status: "deletion_requested", deletion_requested_at: "...", deletion_scheduled_at: "..." }`
+- **Error 409相当**: 進行中取引（`sent` / `negotiating` / `agreement_one_side` / `agreed`）がある場合は退会不可
 - **State**: → `deletion_requested`
-- **Screen**: `AUTH-delete`
+- **Screen**: Swift Native 設定一覧 > 退会する
 
 ### DELETE /api/v1/accounts/me/delete-request
 

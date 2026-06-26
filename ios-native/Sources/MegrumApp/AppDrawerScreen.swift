@@ -50,6 +50,9 @@ struct AppDrawerScreen: View {
                             dismiss()
                             onOpenNotificationDestination(tab)
                         },
+                        onAccountDeletionCompleted: {
+                            dismiss()
+                        },
                         onSignOut: onSignOut
                     )
                 } label: {

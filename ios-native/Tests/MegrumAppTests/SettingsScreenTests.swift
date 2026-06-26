@@ -43,9 +43,57 @@ final class SettingsScreenTests: XCTestCase {
                 .privacyPolicy,
                 .commerceDisclosure,
                 .account,
+                .accountDeletion,
                 .logout
             ]
         )
+    }
+
+    func testAccountDeletionDraftValidatorRequiresReasonAndLimitsMemo() {
+        XCTAssertEqual(
+            AccountDeletionDraftValidator.validationMessage(reasons: [], note: ""),
+            AccountDeletionDraftValidator.missingReasonMessage
+        )
+
+        let tooLongNote = String(repeating: "あ", count: AccountDeletionDraftValidator.noteMaxLength + 1)
+        XCTAssertEqual(
+            AccountDeletionDraftValidator.validationMessage(reasons: [.notUsing], note: tooLongNote),
+            AccountDeletionDraftValidator.noteTooLongMessage
+        )
+
+        let input = AccountDeletionRequestInput(
+            reasons: [.other, .notUsing, .other],
+            note: "  ありがとうございました  "
+        ).normalized
+
+        XCTAssertEqual(input.reasons, [.other, .notUsing])
+        XCTAssertEqual(input.note, "ありがとうございました")
+    }
+
+    func testAccountDeletionEligibilityBlocksOnlyOngoingParticipantTrades() {
+        let viewerID = UUID(uuidString: "20000000-0000-0000-0000-000000000021")!
+        let partnerID = UUID(uuidString: "20000000-0000-0000-0000-000000000022")!
+        let otherID = UUID(uuidString: "20000000-0000-0000-0000-000000000023")!
+        let unrelatedID = UUID(uuidString: "20000000-0000-0000-0000-000000000024")!
+
+        let proposals = [
+            Self.proposal(idSuffix: 1, senderID: viewerID, receiverID: partnerID, status: .sent),
+            Self.proposal(idSuffix: 2, senderID: viewerID, receiverID: partnerID, status: .negotiating),
+            Self.proposal(idSuffix: 3, senderID: viewerID, receiverID: partnerID, status: .agreementOneSide),
+            Self.proposal(idSuffix: 4, senderID: viewerID, receiverID: partnerID, status: .agreed),
+            Self.proposal(idSuffix: 5, senderID: viewerID, receiverID: partnerID, status: .completed),
+            Self.proposal(idSuffix: 6, senderID: viewerID, receiverID: partnerID, status: .cancelled),
+            Self.proposal(idSuffix: 7, senderID: otherID, receiverID: partnerID, status: .sent)
+        ]
+
+        let ongoing = AccountDeletionEligibility.ongoingProposals(
+            in: proposals,
+            viewerID: viewerID
+        )
+
+        XCTAssertEqual(ongoing.map(\.status), [.sent, .negotiating, .agreementOneSide, .agreed])
+        XCTAssertFalse(AccountDeletionEligibility.canRequestDeletion(proposals: proposals, viewerID: viewerID))
+        XCTAssertTrue(AccountDeletionEligibility.canRequestDeletion(proposals: proposals, viewerID: unrelatedID))
     }
 
     func testAccountSummaryFormatsViewerAndReadyAddress() {
@@ -302,5 +350,22 @@ final class SettingsScreenTests: XCTestCase {
         )
 
         XCTAssertNil(MailingAddressDraftValidator.validationMessage(for: address))
+    }
+
+    private static func proposal(
+        idSuffix: Int,
+        senderID: UUID,
+        receiverID: UUID,
+        status: ProposalStatus
+    ) -> TradeProposal {
+        TradeProposal(
+            id: UUID(uuidString: "20000000-0000-0000-0000-\(String(format: "%012d", idSuffix))")!,
+            senderID: senderID,
+            receiverID: receiverID,
+            status: status,
+            exchangeMethod: .hand,
+            senderGoodsIDs: [],
+            receiverGoodsIDs: []
+        )
     }
 }

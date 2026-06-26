@@ -102,6 +102,23 @@ struct SettingsSignOutButtonRow: View {
     }
 }
 
+struct SettingsAccountDeletionTextButton: View {
+    var onTap: () -> Void
+
+    var body: some View {
+        Button(action: onTap) {
+            Text("退会する")
+                .font(.footnote.weight(.semibold))
+                .foregroundStyle(MegrumTheme.muted.opacity(0.58))
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 6)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("退会する")
+    }
+}
+
 struct SettingsPushNotificationRow: View {
     var statusText: String
     var isEnabled: Bool

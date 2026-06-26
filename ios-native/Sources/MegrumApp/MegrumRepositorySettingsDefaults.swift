@@ -59,4 +59,8 @@ public extension MegrumRepository {
     func completeAccountSetup(_ input: AccountSetupInput) async throws -> UserProfile {
         throw MegrumRepositoryError.unsupportedMutation
     }
+
+    func requestAccountDeletion(_ input: AccountDeletionRequestInput) async throws -> AccountDeletionRequestResult {
+        throw MegrumRepositoryError.unsupportedMutation
+    }
 }

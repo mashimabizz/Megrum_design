@@ -77,6 +77,14 @@ struct SupabaseAccountProfilePersistence: Sendable {
         return rows.first?.profile ?? Self.fallbackAccountSetupProfile(input: input, userID: userID)
     }
 
+    func requestAccountDeletion(_ input: AccountDeletionRequestInput) async throws -> AccountDeletionRequestResult {
+        let rows: [AccountDeletionRequestRow] = try await client.rpcRows(
+            function: "request_account_deletion_for_viewer",
+            payload: Self.accountDeletionPayload(from: input)
+        )
+        return AccountDeletionRequestResult(deletionScheduledAt: rows.first?.deletionScheduledAt)
+    }
+
     private func fetchViewerRows() async throws -> [UserRow] {
         do {
             return try await client.fetchRows(
@@ -217,6 +225,14 @@ struct SupabaseAccountProfilePersistence: Sendable {
             birthDate: ProfileBirthDateCodec.string(from: input.birthDate),
             age: ProfileBirthDateCodec.age(from: input.birthDate),
             accountStatus: AccountStatus.active.rawValue
+        )
+    }
+
+    static func accountDeletionPayload(from input: AccountDeletionRequestInput) -> AccountDeletionRequestPayload {
+        let normalized = input.normalized
+        return AccountDeletionRequestPayload(
+            reasons: normalized.reasons.map(\.rawValue),
+            note: normalized.note
         )
     }
 

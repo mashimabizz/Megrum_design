@@ -139,6 +139,7 @@ struct SettingsSupportAccountSection: View {
 struct SettingsDangerSection: View {
     var isSigningOut: Bool
     var onSignOut: () -> Void
+    var onRequestAccountDeletion: () -> Void
 
     var body: some View {
         Section {
@@ -146,6 +147,7 @@ struct SettingsDangerSection: View {
                 isSigningOut: isSigningOut,
                 onTap: onSignOut
             )
+            SettingsAccountDeletionTextButton(onTap: onRequestAccountDeletion)
         }
     }
 }

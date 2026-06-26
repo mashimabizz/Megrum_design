@@ -216,6 +216,59 @@ final class MegrumAppStateTests: XCTestCase {
         XCTAssertNil(state.errorMessage)
     }
 
+    func testAppStateRequestsAccountDeletionThroughRepository() async {
+        let repository = AccountDeletionRecordingRepository(proposals: [])
+        let state = MegrumAppState(repository: repository)
+
+        await state.loadInitialData()
+        let requested = await state.requestAccountDeletion(
+            AccountDeletionRequestInput(
+                reasons: [.notUsing, .privacyConcern],
+                note: "  少し休みます  "
+            )
+        )
+        let recordedInputs = await repository.inputsSnapshot()
+
+        XCTAssertTrue(requested)
+        XCTAssertEqual(recordedInputs.count, 1)
+        XCTAssertEqual(recordedInputs.first?.reasons, [.notUsing, .privacyConcern])
+        XCTAssertEqual(recordedInputs.first?.note, "少し休みます")
+        XCTAssertEqual(state.viewer?.accountStatus, .deletionRequested)
+        XCTAssertFalse(state.isRequestingAccountDeletion)
+        XCTAssertNil(state.errorMessage)
+    }
+
+    func testAppStateRejectsAccountDeletionWhenOngoingTradeExists() async {
+        let viewerID = AccountDeletionRecordingRepository.viewerID
+        let partnerID = AccountDeletionRecordingRepository.partnerID
+        let repository = AccountDeletionRecordingRepository(
+            proposals: [
+                TradeProposal(
+                    id: UUID(uuidString: "60000000-0000-0000-0000-000000000401")!,
+                    senderID: viewerID,
+                    receiverID: partnerID,
+                    status: .agreed,
+                    exchangeMethod: .hand,
+                    senderGoodsIDs: [],
+                    receiverGoodsIDs: []
+                )
+            ]
+        )
+        let state = MegrumAppState(repository: repository)
+
+        await state.loadInitialData()
+        let requested = await state.requestAccountDeletion(
+            AccountDeletionRequestInput(reasons: [.tradeConcern])
+        )
+        let recordedInputs = await repository.inputsSnapshot()
+
+        XCTAssertFalse(requested)
+        XCTAssertTrue(recordedInputs.isEmpty)
+        XCTAssertEqual(state.viewer?.accountStatus, .active)
+        XCTAssertEqual(state.errorMessage, "現在進行中の取引があるため退会できません")
+        XCTAssertFalse(state.isRequestingAccountDeletion)
+    }
+
     func testAppStateRejectsInvalidOwnProfileHandle() async {
         let state = MegrumAppState(repository: PreviewMegrumRepository())
 
@@ -1797,6 +1850,45 @@ private struct SingleSnapshotRepository: MegrumRepository {
             grooms: [],
             threads: []
         )
+    }
+}
+
+private actor AccountDeletionRecordingRepository: MegrumRepository {
+    static let viewerID = UUID(uuidString: "60000000-0000-0000-0000-000000000001")!
+    static let partnerID = UUID(uuidString: "60000000-0000-0000-0000-000000000002")!
+
+    private let proposals: [TradeProposal]
+    private var inputs: [AccountDeletionRequestInput] = []
+
+    init(proposals: [TradeProposal]) {
+        self.proposals = proposals
+    }
+
+    func loadInitialSnapshot() async throws -> MegrumAppSnapshot {
+        MegrumAppSnapshot(
+            viewer: UserProfile(
+                id: Self.viewerID,
+                handle: "michilion",
+                displayName: "みちりおん",
+                accountStatus: .active
+            ),
+            inventory: [],
+            wishes: [],
+            proposals: proposals,
+            grooms: [],
+            threads: []
+        )
+    }
+
+    func requestAccountDeletion(_ input: AccountDeletionRequestInput) async throws -> AccountDeletionRequestResult {
+        inputs.append(input.normalized)
+        return AccountDeletionRequestResult(
+            deletionScheduledAt: Date(timeIntervalSince1970: 1_801_000_000)
+        )
+    }
+
+    func inputsSnapshot() -> [AccountDeletionRequestInput] {
+        inputs
     }
 }
 

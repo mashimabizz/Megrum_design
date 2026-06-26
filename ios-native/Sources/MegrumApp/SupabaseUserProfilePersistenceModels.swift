@@ -134,3 +134,15 @@ struct UserOwnProfileLegacyUpdatePayload: Encodable, Sendable {
         try container.encode(paymentMethods, forKey: .paymentMethods)
     }
 }
+
+struct AccountDeletionRequestPayload: Encodable, Sendable {
+    var reasons: [String]
+    var note: String?
+}
+
+struct AccountDeletionRequestRow: Decodable, Sendable {
+    var userId: UUID
+    var accountStatus: String
+    var deletionRequestedAt: Date?
+    var deletionScheduledAt: Date?
+}

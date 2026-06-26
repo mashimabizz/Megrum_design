@@ -42,6 +42,10 @@ struct MegrumRootDrawerDestinationSheet: View {
                 openNotificationRouteIntent(intent)
             },
             onClose: onClose,
+            onAccountDeletionCompleted: {
+                selectedTab = .home
+                drawerDestination = nil
+            },
             securityAuthState: authState,
             onSignOut: signOut
         )

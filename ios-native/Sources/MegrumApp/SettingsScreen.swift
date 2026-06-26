@@ -8,6 +8,7 @@ struct SettingsScreen: View {
     var onOpenNotificationDestination: (MegrumTab) -> Void = { _ in }
     var onOpenNotificationRouteIntent: (NotificationRouteIntent) -> Bool = { _ in false }
     var onClose: (() -> Void)?
+    var onAccountDeletionCompleted: () -> Void = {}
     var onSignOut: () async -> Void = {}
     @Environment(\.dismiss) private var dismiss
     @StateObject private var securityAuthState: MegrumAuthState
@@ -19,6 +20,7 @@ struct SettingsScreen: View {
         onOpenNotificationDestination: @escaping (MegrumTab) -> Void = { _ in },
         onOpenNotificationRouteIntent: @escaping (NotificationRouteIntent) -> Bool = { _ in false },
         onClose: (() -> Void)? = nil,
+        onAccountDeletionCompleted: @escaping () -> Void = {},
         securityAuthState: MegrumAuthState? = nil,
         onSignOut: @escaping () async -> Void = {}
     ) {
@@ -26,6 +28,7 @@ struct SettingsScreen: View {
         self.onOpenNotificationDestination = onOpenNotificationDestination
         self.onOpenNotificationRouteIntent = onOpenNotificationRouteIntent
         self.onClose = onClose
+        self.onAccountDeletionCompleted = onAccountDeletionCompleted
         self.onSignOut = onSignOut
         _securityAuthState = StateObject(wrappedValue: securityAuthState ?? MegrumAuthStateFactory.makeDefault())
     }
@@ -53,7 +56,10 @@ struct SettingsScreen: View {
 
                 SettingsDangerSection(
                     isSigningOut: isSigningOut,
-                    onSignOut: startSignOut
+                    onSignOut: startSignOut,
+                    onRequestAccountDeletion: {
+                        openRoute(.accountDeletion)
+                    }
                 )
             }
             .navigationTitle("設定")
@@ -189,6 +195,11 @@ struct SettingsScreen: View {
             LegalDocumentScreen(kind: .commerce)
         case .account:
             AccountOverviewScreen(appState: appState)
+        case .accountDeletion:
+            AccountDeletionScreen(appState: appState) {
+                onAccountDeletionCompleted()
+                closeSettings()
+            }
         case .logout:
             EmptyView()
         }

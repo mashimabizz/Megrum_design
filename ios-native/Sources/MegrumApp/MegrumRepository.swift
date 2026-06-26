@@ -213,4 +213,5 @@ public protocol MegrumRepository: Sendable {
     func revokeNativePushDeviceToken(_ token: String, revokedAt: Date) async throws
     func updateOwnProfile(_ input: OwnProfileUpdateInput) async throws -> UserProfile
     func completeAccountSetup(_ input: AccountSetupInput) async throws -> UserProfile
+    func requestAccountDeletion(_ input: AccountDeletionRequestInput) async throws -> AccountDeletionRequestResult
 }

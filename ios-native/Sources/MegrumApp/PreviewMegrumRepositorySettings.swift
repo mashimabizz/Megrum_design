@@ -60,4 +60,10 @@ public extension PreviewMegrumRepository {
     func registerNativePushDeviceToken(_ token: String, appVersion: String?) async throws {}
 
     func revokeNativePushDeviceToken(_ token: String, revokedAt: Date) async throws {}
+
+    func requestAccountDeletion(_ input: AccountDeletionRequestInput) async throws -> AccountDeletionRequestResult {
+        AccountDeletionRequestResult(
+            deletionScheduledAt: Date().addingTimeInterval(30 * 24 * 60 * 60)
+        )
+    }
 }

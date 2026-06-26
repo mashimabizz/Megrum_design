@@ -4,6 +4,93 @@
 
 ---
 
+## イテレーション1221：設定に退会申請フローを追加
+
+### 背景・問題意識
+
+オーナーから、設定一覧のログアウト下に通常項目ではない薄い「退会する」導線を追加し、退会時に失われる情報・進行中取引がある場合は退会できない旨を表示したうえで、退会理由の複数選択と任意メモを入力して退会申請できるようにしたいという指示があった。退会はアカウント状態、DB、取引状態、法的/プライバシー運用に関わるため、Swift Native UIとSupabase RPCを同時に整える標準モードとして実装した。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/SettingsScreen.swift`
+#### `ios-native/Sources/MegrumApp/SettingsScreenSections.swift`
+#### `ios-native/Sources/MegrumApp/SettingsMenuRowLabel.swift`
+#### `ios-native/Sources/MegrumApp/SettingsModels.swift`
+- 設定一覧のログアウト下に、通常の設定行ではなく薄いテキストボタン「退会する」を追加した。
+- `SettingsEssentialRoute.accountDeletion` を追加し、既存の設定 `NavigationStack` 上で退会画面へ遷移するようにした。
+
+#### `ios-native/Sources/MegrumApp/AccountDeletionScreen.swift`
+#### `ios-native/Sources/MegrumApp/AccountDeletionModels.swift`
+- 退会前の注意画面と、退会理由/メモ入力画面を2ステップで追加した。
+- 注意画面では、退会後に使えなくなる情報、安全確認のため保持される場合がある情報、進行中取引がある場合は退会できないことを表示する。
+- `sent` / `negotiating` / `agreement_one_side` / `agreed` の取引がある場合はCTAを無効化し、理由入力へ進ませないようにした。
+- 退会理由は `not_using` / `hard_to_use` / `trade_concern` / `found_alternative` / `privacy_concern` / `other` の複数選択、メモは500文字以内にした。
+
+#### `ios-native/Sources/MegrumApp/MegrumAppStateAccountDeletionActions.swift`
+#### `ios-native/Sources/MegrumApp/MegrumAppState.swift`
+#### `ios-native/Sources/MegrumApp/MegrumRepository.swift`
+#### `ios-native/Sources/MegrumApp/MegrumRepositorySettingsDefaults.swift`
+#### `ios-native/Sources/MegrumApp/PreviewMegrumRepositorySettings.swift`
+#### `ios-native/Sources/MegrumApp/SupabaseAccountProfilePersistence.swift`
+#### `ios-native/Sources/MegrumApp/SupabaseMegrumRepositorySettings.swift`
+#### `ios-native/Sources/MegrumApp/SupabaseUserProfilePersistenceModels.swift`
+- `requestAccountDeletion(_:)` をrepository境界に追加し、AppStateから退会申請を送れるようにした。
+- AppState側でも理由未選択と進行中取引を検証し、成功時は `viewer.accountStatus = .deletionRequested` へ更新する。
+- Supabase実装は `request_account_deletion_for_viewer()` RPC を呼び、理由とメモを送る。
+- Preview repositoryでは30日後の削除予定日を返す軽量実装を追加した。
+
+#### `ios-native/Sources/MegrumApp/MegrumRootDrawerDestinationSheet.swift`
+#### `ios-native/Sources/MegrumApp/AppDrawerScreen.swift`
+- 退会申請成功後は設定画面を閉じ、Swift Native rootでは `selectedTab = .home` に戻すようにした。
+
+#### `supabase/migrations/20260627012000_add_account_deletion_requests.sql`
+- `account_deletion_requests` テーブルを追加し、退会理由・任意メモ・申請日時・30日後の削除予定日を保存するようにした。
+- `request_account_deletion_for_viewer()` RPCを追加し、`users.account_status='deletion_requested'` と申請行作成を同じトランザクションで行う。
+- RPC内で進行中取引を確認し、`sent` / `negotiating` / `agreement_one_side` / `agreed` が残っている場合は退会申請を拒否する。
+
+#### `ios-native/Tests/MegrumAppTests/SettingsScreenTests.swift`
+#### `ios-native/Tests/MegrumAppTests/MegrumAppStateTests.swift`
+#### `ios-native/Tests/MegrumAppTests/SupabaseAccountProfilePersistenceTests.swift`
+- 退会ルート、理由/メモvalidation、進行中取引判定、AppState経由の退会申請、Supabase payloadのテストを追加した。
+
+#### `notes/05_data_model.md`
+#### `notes/09_state_machines.md`
+#### `notes/13_api_spec.md`
+#### `notes/22_swift_native_migration.md`
+- `account_deletion_requests` と退会申請RPC、進行中取引がある場合の状態遷移不可ルールを記録した。
+- API仕様へ `reasons` 必須、`note` 任意、進行中取引時の拒否を追記した。
+
+### 影響範囲
+
+- Swift Native iOSの設定一覧、退会申請画面、AppState、repository境界。
+- Supabaseの `users.account_status`、`users.deletion_requested_at`、`account_deletion_requests`、`proposals.status` 参照。
+- 退会成功後はログアウトせず、アカウント状態を `deletion_requested` にしたうえでホームへ戻す。
+- 新しい状態IDは追加していない。既存 `active -> deletion_requested` 遷移の制約だけを追加したため、`notes/10_glossary.md` は更新不要。
+
+### 確認方法
+
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-account-deletion-build`
+  - passed
+- `git diff --check`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-account-deletion-tests --enable-xctest --disable-swift-testing -j 1 --filter 'SettingsScreenTests|MegrumAppStateTests/testAppStateRequestsAccountDeletionThroughRepository|MegrumAppStateTests/testAppStateRejectsAccountDeletionWhenOngoingTradeExists|SupabaseAccountProfilePersistenceTests/testAccountDeletionPayloadUsesReasonRawValuesAndNormalizedMemo'`
+  - passed（23 tests, 0 failures）
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-account-deletion-full-tests --enable-xctest --disable-swift-testing -j 1`
+  - passed（1046 tests, 3 skipped, 0 failures）
+- Simulator目視確認
+  - 未実行。今回はSwiftPM build/testでコンパイル、退会判定、payload、既存回帰を確認した。
+
+### セルフレビュー結果
+
+- ✅ 設定一覧の退会入口は通常の行ではなく、ログアウト下の薄いテキストボタンにした。
+- ✅ 退会前の注意、失われる情報、保持される場合がある取引安全情報、進行中取引がある場合は退会不可の説明を表示した。
+- ✅ 進行中取引のブロックはUI/AppState/RPCの3段で行い、クライアントだけに依存しない。
+- ✅ 退会理由は複数選択、メモは任意500文字以内で保存する。
+- ✅ 退会申請成功後はログアウトせず、`deletion_requested` へ更新してホームへ戻す。
+- ⚠️ 実機/Simulatorの目視確認は未実行。画面余白とキーボード表示は次の目視確認対象。
+
+---
+
 ## イテレーション1220：認証後オンボーディングを8画面化
 
 ### 背景・問題意識
