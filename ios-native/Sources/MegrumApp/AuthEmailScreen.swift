@@ -32,21 +32,8 @@ struct AuthEmailScreen: View {
                     .frame(maxWidth: .infinity)
             }
 
-            VStack(spacing: 18) {
-                AuthInputRow(
-                    title: "メールアドレス",
-                    systemImage: "envelope",
-                    text: $email,
-                    kind: .email
-                )
-                AuthInputRow(
-                    title: "パスワード",
-                    systemImage: "lock",
-                    text: $password,
-                    kind: .password
-                )
-            }
-            .padding(.top, isSignIn ? 36 : 50)
+            AuthEmailCredentialFields(email: $email, password: $password)
+                .padding(.top, isSignIn ? 36 : 50)
 
             if let feedback {
                 AuthVisualFeedbackRow(feedback: feedback)
@@ -131,5 +118,27 @@ struct AuthEmailScreen: View {
         }
         .padding(.horizontal, 31)
         .authVisualBackground()
+    }
+}
+
+private struct AuthEmailCredentialFields: View {
+    @Binding var email: String
+    @Binding var password: String
+
+    var body: some View {
+        VStack(spacing: 18) {
+            AuthInputRow(
+                title: "メールアドレス",
+                systemImage: "envelope",
+                text: $email,
+                kind: .email
+            )
+            AuthInputRow(
+                title: "パスワード",
+                systemImage: "lock",
+                text: $password,
+                kind: .password
+            )
+        }
     }
 }

@@ -4,6 +4,43 @@
 
 ---
 
+## イテレーション1153：auth email credentialsを分離
+
+### 背景・問題意識
+
+`AuthEmailScreen` は、メール認証画面の縦構成、feedback、submit、補助リンクに加えて、メールアドレス/パスワード入力2行のまとまりも同じView body内に抱えていた。入力行のtitle、SF Symbol、kind、spacing、top padding、bindingを維持したまま、認証入力欄だけを小さな専用Viewへ分離する。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/AuthEmailScreen.swift`
+- `AuthEmailCredentialFields` を追加し、メールアドレス入力行とパスワード入力行の `VStack(spacing: 18)` を移動した。
+- `AuthEmailScreen` は、画面の縦構成、feedback、primary action、補助リンクの構成に寄せた。
+- 入力欄には `email` / `password` の `@Binding` だけを渡し、submit処理やvalidationには触れない形にした。
+
+### 影響範囲
+
+- Swift Native iOS版のメールログイン/メール登録画面内、メールアドレス/パスワード入力欄。
+- 入力欄の表示構成。
+- ログイン/新規登録submit、パスワードリセット、provider画面への戻り、ログイン/登録切替、入力validation、DB/API、状態名、表示文言は変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumApp/AuthEmailScreen.swift`
+  - passed
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-auth-email-credentials`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-auth-email-credentials-tests --enable-xctest --disable-swift-testing -j 1 --filter 'AuthScreenInputTests'`
+  - passed（15 tests）
+
+### セルフレビュー結果
+
+- ✅ メールアドレス/パスワード入力行のtitle、icon、kind、`VStack` spacing、top padding、bindingを維持した。
+- ✅ `AuthInputRow` のpassword visibility toggle、keyboard/textContentType、onChange処理には触れていない。
+- ✅ ログイン/新規登録submit、パスワードリセット、provider画面への戻り、ログイン/登録切替、入力validation、DB/API、状態名、表示文言は変更していない。
+- ✅ 新しい状態名・用語・DB列は追加していないため、`notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション1152：auth apple provider buttonを分離
 
 ### 背景・問題意識
