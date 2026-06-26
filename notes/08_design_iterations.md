@@ -4,6 +4,43 @@
 
 ---
 
+## イテレーション1178：proposal week header day cellを分離
+
+### 背景・問題意識
+
+打診作成の meetup 週カレンダーヘッダーに、左の時間軸spacer、曜日ラベル、日付ラベル、選択日の色分岐が同居していた。週カレンダー本体のgestureや表示順は維持し、ヘッダー内の小さな視覚単位だけを専用Viewへ分ける。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/ProposalMeetupCalendarWeekHeader.swift`
+- `ProposalMeetupCalendarWeekHeaderTimeSpacer` を追加し、時間軸ぶんの透明spacerを専用Viewへ分離した。
+- `ProposalMeetupCalendarWeekHeaderDayCell` を追加し、曜日ラベル、日付ラベル、選択日の文字色を専用Viewへ分離した。
+- `ProposalMeetupCalendarWeekHeader` は日付配列の列配置と選択状態の受け渡しに集中する構成へ寄せた。
+
+### 影響範囲
+
+- Swift Native iOS版の打診作成 meetup 週カレンダーヘッダー。
+- weekday/day number label、font、色、spacing、dayWidth、timeLabelWidth、日付配列、選択日判定、gesture、DB/API、状態名、表示文言は変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumApp/ProposalMeetupCalendarWeekHeader.swift`
+  - passed
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-week-header`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-week-header-tests --enable-xctest --disable-swift-testing -j 1 --filter 'ProposalCreateFlowTests|ProposalCreateSheetTests|TradeRequestDraftProposalCreateFlowTests|TradeChatAffordanceTests'`
+  - passed（112 tests）
+
+### セルフレビュー結果
+
+- ✅ timeLabelWidth spacer、曜日/日付label、font、spacing、dayWidthを維持した。
+- ✅ 選択日の文字色分岐を維持した。
+- ✅ 週swipe gesture、カレンダーgrid、候補block、preview、打診作成の進行条件は変更していない。
+- ✅ DB/API、状態名、表示文言は変更していない。
+- ✅ 新しい状態名・用語・DB列は追加していないため、`notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション1177：proposal week timeline背景を分離
 
 ### 背景・問題意識
