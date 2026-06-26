@@ -10,38 +10,7 @@ struct GroomMyStoryTile: View {
     var body: some View {
         Button(action: onAdd) {
             VStack(spacing: 8) {
-                ZStack(alignment: .bottomTrailing) {
-                    GroomAvatarCircle(
-                        avatarURL: viewer?.avatarURL,
-                        fallbackText: viewer?.displayName.nilIfBlank ?? viewer?.handle.nilIfBlank ?? "Me",
-                        size: 82,
-                        backgroundOpacity: 0.92
-                    )
-                    .overlay {
-                        Circle()
-                            .stroke(.white, lineWidth: 3)
-                    }
-                    .shadow(color: MegrumTheme.ink.opacity(0.10), radius: 10, y: 5)
-
-                    if isLoading {
-                        ProgressView()
-                            .tint(.white)
-                            .frame(width: 30, height: 30)
-                            .background(MegrumTheme.ink, in: Circle())
-                            .offset(x: 2, y: 2)
-                    } else {
-                        Image(systemName: "plus")
-                            .font(.system(size: 24, weight: .heavy))
-                            .foregroundStyle(.white)
-                            .frame(width: 34, height: 34)
-                            .background(MegrumTheme.ink, in: Circle())
-                            .overlay {
-                                Circle()
-                                    .stroke(.white, lineWidth: 3)
-                            }
-                            .offset(x: 3, y: 3)
-                    }
-                }
+                GroomMyStoryAvatar(viewer: viewer, isLoading: isLoading)
 
                 Text("グルーム")
                     .font(.system(size: 12, weight: .heavy, design: .rounded))
@@ -53,6 +22,60 @@ struct GroomMyStoryTile: View {
         .buttonStyle(.plain)
         .disabled(isLoading)
         .accessibilityLabel("グルームを追加")
+    }
+}
+
+private struct GroomMyStoryAvatar: View {
+    var viewer: UserProfile?
+    var isLoading: Bool
+
+    private var fallbackText: String {
+        viewer?.displayName.nilIfBlank ?? viewer?.handle.nilIfBlank ?? "Me"
+    }
+
+    var body: some View {
+        ZStack(alignment: .bottomTrailing) {
+            GroomAvatarCircle(
+                avatarURL: viewer?.avatarURL,
+                fallbackText: fallbackText,
+                size: 82,
+                backgroundOpacity: 0.92
+            )
+            .overlay {
+                Circle()
+                    .stroke(.white, lineWidth: 3)
+            }
+            .shadow(color: MegrumTheme.ink.opacity(0.10), radius: 10, y: 5)
+
+            GroomMyStoryStatusBadge(isLoading: isLoading)
+        }
+    }
+}
+
+private struct GroomMyStoryStatusBadge: View {
+    var isLoading: Bool
+
+    var body: some View {
+        ZStack {
+            if isLoading {
+                ProgressView()
+                    .tint(.white)
+                    .frame(width: 30, height: 30)
+                    .background(MegrumTheme.ink, in: Circle())
+                    .offset(x: 2, y: 2)
+            } else {
+                Image(systemName: "plus")
+                    .font(.system(size: 24, weight: .heavy))
+                    .foregroundStyle(.white)
+                    .frame(width: 34, height: 34)
+                    .background(MegrumTheme.ink, in: Circle())
+                    .overlay {
+                        Circle()
+                            .stroke(.white, lineWidth: 3)
+                    }
+                    .offset(x: 3, y: 3)
+            }
+        }
     }
 }
 

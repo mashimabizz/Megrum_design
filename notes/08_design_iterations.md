@@ -4,6 +4,45 @@
 
 ---
 
+## イテレーション1146：groom story tile partsを分離
+
+### 背景・問題意識
+
+`GroomMyStoryTile` は、自分のグルーム追加タイル内でavatar表示、白stroke/shadow、loading中ProgressView、通常時plus badgeを同じView body内に抱えていた。グルームstory railの見た目と追加/disabled挙動を維持したまま、avatar表示とstatus badgeを小さな専用Viewへ分離する。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/GroomStoryTileViews.swift`
+- `GroomMyStoryAvatar` を追加し、自分のavatar、fallback text、白stroke、shadow、badge配置を移動した。
+- `GroomMyStoryStatusBadge` を追加し、loading中ProgressViewと通常時plus badgeの表示を移動した。
+- `GroomMyStoryTile` はbutton、label、disabled、accessibilityLabelの構成に寄せた。
+- badge側は単一の `ZStack` rootにし、loading/plusの局所的な条件表示だけにした。
+
+### 影響範囲
+
+- Swift Native iOS版のグルームstory rail内、自分の「グルームを追加」タイル。
+- loading中のProgressView、通常時plus badge、avatar fallback表示。
+- グルーム投稿/閲覧/既読/リアクション、Supabase request、DB/API、状態名、表示文言は変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumApp/GroomStoryTileViews.swift`
+  - passed
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-groom-story-tile-parts`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-groom-story-tile-parts-tests --enable-xctest --disable-swift-testing -j 1 --filter 'GroomInteractionStateReducerTests|SupabaseGroomClientTests'`
+  - passed（14 tests）
+
+### セルフレビュー結果
+
+- ✅ avatar size/backgroundOpacity、白stroke、shadow、badge offset/size/colorを維持した。
+- ✅ loading中は白tintのProgressView、通常時はplus badgeを表示する挙動を維持した。
+- ✅ button disabled条件、`グルーム` label、`グルームを追加` accessibilityLabelを維持した。
+- ✅ グルーム投稿/閲覧/既読/リアクション、Supabase request、DB/API、状態名、表示文言は変更していない。
+- ✅ 新しい状態名・用語・DB列は追加していないため、`notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション1145：oshi request selector partsを分離
 
 ### 背景・問題意識
