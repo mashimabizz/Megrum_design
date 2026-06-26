@@ -49,39 +49,14 @@ struct IndividualListingOptionRow: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            HStack(spacing: 8) {
-                Text(IndividualListingListPresentation.optionTitle(index: index))
-                    .font(.system(size: 14, weight: .heavy, design: .rounded))
-                    .foregroundStyle(MegrumTheme.lavender)
-                    .padding(.horizontal, 12)
-                    .fixedSize(horizontal: true, vertical: false)
-                    .frame(height: 28)
-                    .background(MegrumTheme.lavender.opacity(0.11), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+            IndividualListingOptionRowHeader(index: index, logicTitle: logicTitle)
 
-                Spacer(minLength: 0)
-
-                if let logicTitle {
-                    Text(logicTitle)
-                        .font(.system(size: 12, weight: .black, design: .rounded))
-                        .foregroundStyle(MegrumTheme.ink.opacity(0.72))
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.76)
-                }
-            }
-
-            HStack(spacing: 8) {
-                if option.isCashOffer {
-                    ListingOptionPriceBadge(amount: option.cashAmount)
-                } else if wishItems.isEmpty {
-                    ListingConditionTokenFlow(tokens: conditionTokens)
-                } else {
-                    ForEach(wishItems.prefix(2)) { item in
-                        ListingGoodsImage(url: item.imageURL, title: item.title, cornerRadius: 9)
-                            .frame(width: 50, height: 50)
-                    }
-                }
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
+            IndividualListingOptionPreviewContent(
+                isCashOffer: option.isCashOffer,
+                cashAmount: option.cashAmount,
+                wishItems: wishItems,
+                conditionTokens: conditionTokens
+            )
         }
         .padding(.vertical, 14)
     }
@@ -113,6 +88,56 @@ struct IndividualListingOptionRow: View {
             return nil
         }
         return goodsTypes.first { $0.id == id }?.name
+    }
+}
+
+private struct IndividualListingOptionRowHeader: View {
+    var index: Int
+    var logicTitle: String?
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Text(IndividualListingListPresentation.optionTitle(index: index))
+                .font(.system(size: 14, weight: .heavy, design: .rounded))
+                .foregroundStyle(MegrumTheme.lavender)
+                .padding(.horizontal, 12)
+                .fixedSize(horizontal: true, vertical: false)
+                .frame(height: 28)
+                .background(MegrumTheme.lavender.opacity(0.11), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+
+            Spacer(minLength: 0)
+
+            if let logicTitle {
+                Text(logicTitle)
+                    .font(.system(size: 12, weight: .black, design: .rounded))
+                    .foregroundStyle(MegrumTheme.ink.opacity(0.72))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.76)
+            }
+        }
+    }
+}
+
+private struct IndividualListingOptionPreviewContent: View {
+    var isCashOffer: Bool
+    var cashAmount: Int?
+    var wishItems: [WishItem]
+    var conditionTokens: [String]
+
+    var body: some View {
+        HStack(spacing: 8) {
+            if isCashOffer {
+                ListingOptionPriceBadge(amount: cashAmount)
+            } else if wishItems.isEmpty {
+                ListingConditionTokenFlow(tokens: conditionTokens)
+            } else {
+                ForEach(wishItems.prefix(2)) { item in
+                    ListingGoodsImage(url: item.imageURL, title: item.title, cornerRadius: 9)
+                        .frame(width: 50, height: 50)
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
 

@@ -4,6 +4,44 @@
 
 ---
 
+## イテレーション1138：individual listing option row partsを分離
+
+### 背景・問題意識
+
+`IndividualListingOptionRow` は、個別募集パネルの「求めるもの」行で、番号/条件ラベルのheaderと、定価・Wish画像・条件tokenのpreview表示を同じbody内に抱えていた。行本体をデータ整形と部品配置へ寄せ、headerとpreview contentを小さな専用Viewへ分離する。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/IndividualListingPanelOptionViews.swift`
+- `IndividualListingOptionRowHeader` を追加し、条件番号chipとlogic title表示を移動した。
+- `IndividualListingOptionPreviewContent` を追加し、定価badge、Wish画像preview、条件token flowの分岐表示を移動した。
+- `IndividualListingOptionRow` は `wishItems` / `conditionTokens` / `logicTitle` の算出と、2つの表示部品の配置に整理した。
+- `ListingOptionPriceBadge` / `ListingConditionTokenFlow` / `IndividualListingEmptyOptionRow` / `IndividualListingAddConditionRow` は変更していない。
+
+### 影響範囲
+
+- Swift Native iOS版の個別募集パネル内「求めるもの」行。
+- option番号、logic title、定価badge、Wish画像preview、条件token表示。
+- 個別募集draft、保存/更新/削除、Supabase request、状態名、表示文言は変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumApp/IndividualListingPanelOptionViews.swift`
+  - passed
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-individual-listing-option-row-parts`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-individual-listing-option-row-parts --enable-xctest --disable-swift-testing -j 1 --filter 'IndividualListingDraftTests|IndividualListingStateReducerTests|SupabaseListingClientTests'`
+  - passed（50 tests）
+
+### セルフレビュー結果
+
+- ✅ option番号chipの文言/色/余白/角丸、logic titleのfont/色/lineLimitを維持した。
+- ✅ 定価badge、Wish画像2件preview、条件token fallbackの `条件指定`、各分岐条件を維持した。
+- ✅ 個別募集のdraft validation、保存/更新/削除、Supabase request、状態名、表示文言は変更していない。
+- ✅ 新しい状態名・用語・DB列は追加していないため、`notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション1137：home mutual partner payload resolverを分離
 
 ### 背景・問題意識
