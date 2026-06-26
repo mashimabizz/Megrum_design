@@ -4,6 +4,44 @@
 
 ---
 
+## イテレーション1142：individual listing selection filter partsを分離
+
+### 背景・問題意識
+
+`IndividualListingSelectionSearchAndFilterBar` は、検索欄、グループ/グッズ種別/タグのfilter rows、filter候補変更時のreconcileを同じView内のcomputed viewに抱えていた。個別募集editor内の選択filterの見た目と選択挙動を維持したまま、検索欄と各filter rowを小さな専用Viewへ分離する。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/IndividualListingSelectionFilterViews.swift`
+- `IndividualListingSelectionSearchField` を追加し、検索icon、TextField、検索語clear buttonを移動した。
+- `IndividualListingSelectionFilterRows` を追加し、グループ/グッズ種別/タグfilter rowの並びを移動した。
+- `IndividualListingGroupFilterRow` / `IndividualListingGoodsTypeFilterRow` / `IndividualListingTagFilterRow` を追加し、各ChoiceChip群の選択処理を分離した。
+- `IndividualListingSelectionSearchAndFilterBar` はレイアウト構成と候補変更時の `reconcileFilter()` に寄せた。
+
+### 影響範囲
+
+- Swift Native iOS版の個別募集editor内、譲るもの/Wish選択時の検索・filter bar。
+- 検索語clear、グループfilter、グッズ種別filter、タグfilter、候補変更時のreconcile。
+- 個別募集draft、選択filterの意味、保存/更新/削除、DB/API、状態名、表示文言は変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumApp/IndividualListingSelectionFilterViews.swift`
+  - passed
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-individual-listing-selection-filter-parts`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-individual-listing-selection-filter-parts --enable-xctest --disable-swift-testing -j 1 --filter 'IndividualListingDraftTests|IndividualListingStateReducerTests|SupabaseListingClientTests'`
+  - passed（50 tests）
+
+### セルフレビュー結果
+
+- ✅ 検索欄のicon/font/color/height/background、clear buttonの表示条件とaccessibility labelを維持した。
+- ✅ グループ/グッズ種別/タグの `すべて` chip、選択状態、タグtoggle、タグ行の表示条件を維持した。
+- ✅ 候補変更時の `filter.reconcile(...)`、個別募集draft、保存/更新/削除、DB/API、状態名、表示文言は変更していない。
+- ✅ 新しい状態名・用語・DB列は追加していないため、`notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション1141：individual listing editor header partsを分離
 
 ### 背景・問題意識

@@ -11,8 +11,16 @@ struct IndividualListingSelectionSearchAndFilterBar: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            searchField
-            filterRows
+            IndividualListingSelectionSearchField(
+                searchText: $filter.searchText,
+                placeholder: searchPlaceholder
+            )
+            IndividualListingSelectionFilterRows(
+                filter: $filter,
+                groups: groups,
+                goodsTypes: goodsTypes,
+                tagNames: tagNames
+            )
         }
         .onChange(of: groups.map(\.id)) { _, _ in
             reconcileFilter()
@@ -25,17 +33,30 @@ struct IndividualListingSelectionSearchAndFilterBar: View {
         }
     }
 
-    private var searchField: some View {
+    private func reconcileFilter() {
+        filter.reconcile(
+            availableGroupIDs: Set(groups.map(\.id)),
+            availableGoodsTypeIDs: Set(goodsTypes.map(\.id)),
+            availableTagNames: Set(tagNames)
+        )
+    }
+}
+
+private struct IndividualListingSelectionSearchField: View {
+    @Binding var searchText: String
+    var placeholder: String
+
+    var body: some View {
         HStack(spacing: 10) {
             Image(systemName: "magnifyingglass")
                 .font(.system(size: 18, weight: .semibold))
                 .foregroundStyle(MegrumTheme.muted.opacity(0.72))
-            TextField(searchPlaceholder, text: $filter.searchText)
+            TextField(placeholder, text: $searchText)
                 .font(.system(size: 16, weight: .semibold, design: .rounded))
                 .disableAutocorrection(true)
-            if !filter.searchText.isEmpty {
+            if !searchText.isEmpty {
                 Button {
-                    filter.searchText = ""
+                    searchText = ""
                 } label: {
                     Image(systemName: "xmark.circle.fill")
                         .font(.system(size: 17, weight: .semibold))
@@ -49,56 +70,81 @@ struct IndividualListingSelectionSearchAndFilterBar: View {
         .frame(height: 50)
         .background(MegrumTheme.ink.opacity(0.045), in: RoundedRectangle(cornerRadius: 13, style: .continuous))
     }
+}
 
-    private var filterRows: some View {
+private struct IndividualListingSelectionFilterRows: View {
+    @Binding var filter: IndividualListingSelectionFilter
+    var groups: [OshiGroup]
+    var goodsTypes: [GoodsType]
+    var tagNames: [String]
+
+    var body: some View {
         VStack(alignment: .leading, spacing: CollectionScreenLayoutMetrics.filterBarSpacing) {
-            IndividualListingFilterChoiceRow(title: "グループ") {
-                ChoiceChip(title: "すべて", isSelected: filter.groupID == nil, style: .compact) {
-                    filter.groupID = nil
-                }
-                ForEach(groups) { group in
-                    ChoiceChip(title: group.name, isSelected: filter.groupID == group.id, style: .compact) {
-                        filter.groupID = group.id
-                    }
-                }
-            }
-
-            IndividualListingFilterChoiceRow(title: "グッズ種別") {
-                ChoiceChip(title: "すべて", isSelected: filter.goodsTypeID == nil, style: .compact) {
-                    filter.goodsTypeID = nil
-                }
-                ForEach(goodsTypes) { goodsType in
-                    ChoiceChip(title: goodsType.name, isSelected: filter.goodsTypeID == goodsType.id, style: .compact) {
-                        filter.goodsTypeID = goodsType.id
-                    }
-                }
-            }
+            IndividualListingGroupFilterRow(filter: $filter, groups: groups)
+            IndividualListingGoodsTypeFilterRow(filter: $filter, goodsTypes: goodsTypes)
 
             if !tagNames.isEmpty || !filter.tagNames.isEmpty {
-                IndividualListingFilterChoiceRow(title: "タグ") {
-                    ChoiceChip(title: "すべて", isSelected: filter.tagNames.isEmpty, style: .compact) {
-                        filter.tagNames = []
-                    }
-                    ForEach(tagNames, id: \.self) { tagName in
-                        ChoiceChip(title: "#\(tagName)", isSelected: filter.tagNames.contains(tagName), style: .compact) {
-                            if filter.tagNames.contains(tagName) {
-                                filter.tagNames.remove(tagName)
-                            } else {
-                                filter.tagNames.insert(tagName)
-                            }
-                        }
-                    }
+                IndividualListingTagFilterRow(filter: $filter, tagNames: tagNames)
+            }
+        }
+    }
+}
+
+private struct IndividualListingGroupFilterRow: View {
+    @Binding var filter: IndividualListingSelectionFilter
+    var groups: [OshiGroup]
+
+    var body: some View {
+        IndividualListingFilterChoiceRow(title: "グループ") {
+            ChoiceChip(title: "すべて", isSelected: filter.groupID == nil, style: .compact) {
+                filter.groupID = nil
+            }
+            ForEach(groups) { group in
+                ChoiceChip(title: group.name, isSelected: filter.groupID == group.id, style: .compact) {
+                    filter.groupID = group.id
                 }
             }
         }
     }
+}
 
-    private func reconcileFilter() {
-        filter.reconcile(
-            availableGroupIDs: Set(groups.map(\.id)),
-            availableGoodsTypeIDs: Set(goodsTypes.map(\.id)),
-            availableTagNames: Set(tagNames)
-        )
+private struct IndividualListingGoodsTypeFilterRow: View {
+    @Binding var filter: IndividualListingSelectionFilter
+    var goodsTypes: [GoodsType]
+
+    var body: some View {
+        IndividualListingFilterChoiceRow(title: "グッズ種別") {
+            ChoiceChip(title: "すべて", isSelected: filter.goodsTypeID == nil, style: .compact) {
+                filter.goodsTypeID = nil
+            }
+            ForEach(goodsTypes) { goodsType in
+                ChoiceChip(title: goodsType.name, isSelected: filter.goodsTypeID == goodsType.id, style: .compact) {
+                    filter.goodsTypeID = goodsType.id
+                }
+            }
+        }
+    }
+}
+
+private struct IndividualListingTagFilterRow: View {
+    @Binding var filter: IndividualListingSelectionFilter
+    var tagNames: [String]
+
+    var body: some View {
+        IndividualListingFilterChoiceRow(title: "タグ") {
+            ChoiceChip(title: "すべて", isSelected: filter.tagNames.isEmpty, style: .compact) {
+                filter.tagNames = []
+            }
+            ForEach(tagNames, id: \.self) { tagName in
+                ChoiceChip(title: "#\(tagName)", isSelected: filter.tagNames.contains(tagName), style: .compact) {
+                    if filter.tagNames.contains(tagName) {
+                        filter.tagNames.remove(tagName)
+                    } else {
+                        filter.tagNames.insert(tagName)
+                    }
+                }
+            }
+        }
     }
 }
 
