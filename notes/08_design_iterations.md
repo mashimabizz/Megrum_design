@@ -4,6 +4,48 @@
 
 ---
 
+## イテレーション1134：goods inventory create action controlsを分離
+
+### 背景・問題意識
+
+`GoodsInventoryCreateControls.swift` は、グッズ一括登録の案内/エラー/statusカードと、写真選択・登録/戻る・選択chip・数量buttonまで同じファイルに抱えていた。状態表示系と操作control系を分け、各ファイルの責務を読みやすくする。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/GoodsInventoryCreateControls.swift`
+- `GoodsCreateHintCard` / `GoodsCreateErrorNotice` / `GoodsTradingCardBulkProcessingCard` / `GoodsTradingCardBulkStatusCard` だけを残した。
+- 写真選択button、primary/secondary button、selection chip、quantity buttonを専用ファイルへ移動した。
+- 案内/エラー/statusカードの文言、色、余白、枠線は維持した。
+
+#### `ios-native/Sources/MegrumApp/GoodsInventoryCreateActionControls.swift`
+- `GoodsCreatePhotoPickButton` を追加し、写真選択button表示を移動した。
+- `GoodsCreatePrimaryButton` / `GoodsCreateSecondaryButton` を追加し、登録/戻る系button表示とdisabled/opacityを移動した。
+- `GoodsEditorSelectionChip` / `GoodsEditorQuantityButton` を追加し、chipと数量button表示を移動した。
+
+### 影響範囲
+
+- Swift Native iOS版グッズ一括登録/グッズ編集で使う共通control。
+- 写真選択button、登録/戻るbutton、選択chip、数量button、案内/エラー/statusカード。
+- 保存処理、写真処理、AIカード検出、tag/member/quantity入力、DB/API、状態名、表示文言は変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumApp/GoodsInventoryCreateControls.swift ios-native/Sources/MegrumApp/GoodsInventoryCreateActionControls.swift`
+  - passed
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-goods-inventory-create-action-controls`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-goods-inventory-create-action-controls --enable-xctest --disable-swift-testing -j 1 --filter 'GoodsEditorDraftTests|GoodsInventoryCreateMetaTilePresentationTests|GoodsLocalStateReducerTests'`
+  - passed（32 tests）
+
+### セルフレビュー結果
+
+- ✅ 写真選択button、primary/secondary button、selection chip、quantity buttonの文言/アイコン/色/余白/角丸/disabled/opacityを維持した。
+- ✅ hint/error/statusカードの文言/色/余白/枠線を維持した。
+- ✅ `GoodsInventoryCreateControls.swift` は223行から87行へ縮小し、操作controlを138行の専用ファイルへ分離した。
+- ✅ 新しい状態名・用語・DB列は追加していないため、`notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション1133：individual listing haves support viewsを分離
 
 ### 背景・問題意識
