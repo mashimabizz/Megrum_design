@@ -13,8 +13,12 @@ struct OshiMasterSelectFooter: View {
     var body: some View {
         VStack(spacing: 10) {
             OshiGenreSegmentBar(options: categoryOptions, selection: $selectedGenreID)
-            searchField
-            pendingSelectionAction
+            OshiMasterSearchField(searchText: $searchText)
+            OshiMasterPendingSelectionAction(
+                allowsMultipleSelection: allowsMultipleSelection,
+                pendingSelectionCount: pendingSelectionCount,
+                onRegister: onRegister
+            )
         }
         .padding(.top, 10)
         .padding(.bottom, 14)
@@ -25,8 +29,12 @@ struct OshiMasterSelectFooter: View {
                 .frame(height: 0.5)
         }
     }
+}
 
-    private var searchField: some View {
+private struct OshiMasterSearchField: View {
+    @Binding var searchText: String
+
+    var body: some View {
         HStack(spacing: 10) {
             Image(systemName: "magnifyingglass")
                 .font(.system(size: 17, weight: .bold, design: .rounded))
@@ -44,9 +52,15 @@ struct OshiMasterSelectFooter: View {
         }
         .padding(.horizontal, 18)
     }
+}
+
+private struct OshiMasterPendingSelectionAction: View {
+    var allowsMultipleSelection: Bool
+    var pendingSelectionCount: Int
+    var onRegister: () -> Void
 
     @ViewBuilder
-    private var pendingSelectionAction: some View {
+    var body: some View {
         if allowsMultipleSelection, pendingSelectionCount > 0 {
             Text(OshiSettingsPresentationText.masterSelectionCountTitle(selectionCount: pendingSelectionCount))
                 .font(.system(size: 12, weight: .black, design: .rounded))

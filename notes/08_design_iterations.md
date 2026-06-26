@@ -4,6 +4,43 @@
 
 ---
 
+## イテレーション1156：oshi master footer partsを分離
+
+### 背景・問題意識
+
+`OshiMasterSelectFooter` は、推しマスター選択シート下部の genre segment、検索欄、複数選択時の登録actionを同じView内の computed `some View` helper として抱えていた。検索欄のbinding、複数選択時だけ表示する条件、登録callback、文言、余白、遷移を維持したまま、footer本体がセクション構成だけを読む形へ寄せる。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/OshiMasterSelectFooter.swift`
+- `OshiMasterSearchField` を追加し、検索アイコン、検索TextField、検索欄の高さ/枠/余白を移動した。
+- `OshiMasterPendingSelectionAction` を追加し、選択数ラベルと登録ボタンを複数選択時だけ出す表示条件ごと移動した。
+- `OshiMasterSelectFooter` は、genre segment、検索欄、pending actionを並べる親コンテナに寄せた。
+
+### 影響範囲
+
+- Swift Native iOS版の推しマスター選択シート下部footer。
+- 検索欄と複数選択時の登録actionの表示構成。
+- genre選択binding、検索文字列binding、複数選択条件、登録callback、表示文言、font/color/height/padding、transition、accessibility label、DB/API、状態名は変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumApp/OshiMasterSelectFooter.swift`
+  - passed
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-oshi-master-footer`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-oshi-master-footer-tests --enable-xctest --disable-swift-testing -j 1 --filter 'OshiSettingsDraftTests|AccountSetupScreenTests|OnboardingOshiSelectionTests'`
+  - passed（23 tests）
+
+### セルフレビュー結果
+
+- ✅ genre segment、検索欄、選択数ラベル、登録ボタンの配置順、spacing、padding、height、font、colorを維持した。
+- ✅ `selectedGenreID` / `searchText` binding、`allowsMultipleSelection && pendingSelectionCount > 0` 条件、`onRegister` callbackには触れていない。
+- ✅ 表示文言、transition、accessibility label、DB/API、状態名は変更していない。
+- ✅ 新しい状態名・用語・DB列は追加していないため、`notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション1155：address settings body helpersを整理
 
 ### 背景・問題意識
