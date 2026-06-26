@@ -22,12 +22,42 @@ struct AddressSettingsScreen: View {
     @State private var lastAppliedPostalCode = ""
     @State private var inputErrorMessage: String?
 
+    private var draftAddress: MailingAddress {
+        MailingAddress(
+            userID: appState.viewer?.id ?? NativePreviewData.viewerID,
+            recipientName: recipientName.trimmingCharacters(in: .whitespacesAndNewlines),
+            postalCode: MegrumAppStateInputNormalizer.postalCode(postalCode),
+            prefecture: prefecture.trimmingCharacters(in: .whitespacesAndNewlines),
+            city: city.trimmingCharacters(in: .whitespacesAndNewlines),
+            line1: line1.trimmingCharacters(in: .whitespacesAndNewlines),
+            line2: line2.nilIfBlank,
+            phoneNumber: phoneNumber.nilIfBlank
+        )
+    }
+
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
-                header
-                form
-                saveButton
+                AddressSettingsHeader()
+                AddressSettingsForm(
+                    recipientName: $recipientName,
+                    postalCode: $postalCode,
+                    prefecture: $prefecture,
+                    city: $city,
+                    line1: $line1,
+                    line2: $line2,
+                    phoneNumber: $phoneNumber,
+                    focusedField: $focusedField,
+                    isLookingUpPostalCode: appState.isLookingUpPostalCode,
+                    inputErrorMessage: inputErrorMessage,
+                    appErrorMessage: appState.errorMessage,
+                    onPostalCodeChange: handlePostalCodeChange
+                )
+                AddressSettingsSaveButton(
+                    title: saveButtonTitle,
+                    isSaving: appState.isSavingMailingAddress,
+                    action: startSave
+                )
             }
             .padding(.horizontal, 20)
             .padding(.top, 18)
@@ -63,47 +93,8 @@ struct AddressSettingsScreen: View {
         }
     }
 
-    private var header: some View {
-        AddressSettingsHeader()
-    }
-
-    private var form: some View {
-        AddressSettingsForm(
-            recipientName: $recipientName,
-            postalCode: $postalCode,
-            prefecture: $prefecture,
-            city: $city,
-            line1: $line1,
-            line2: $line2,
-            phoneNumber: $phoneNumber,
-            focusedField: $focusedField,
-            isLookingUpPostalCode: appState.isLookingUpPostalCode,
-            inputErrorMessage: inputErrorMessage,
-            appErrorMessage: appState.errorMessage,
-            onPostalCodeChange: handlePostalCodeChange
-        )
-    }
-
-    private var saveButton: some View {
-        AddressSettingsSaveButton(
-            title: saveButtonTitle,
-            isSaving: appState.isSavingMailingAddress
-        ) {
-            Task { await save() }
-        }
-    }
-
-    private var draftAddress: MailingAddress {
-        MailingAddress(
-            userID: appState.viewer?.id ?? NativePreviewData.viewerID,
-            recipientName: recipientName.trimmingCharacters(in: .whitespacesAndNewlines),
-            postalCode: MegrumAppStateInputNormalizer.postalCode(postalCode),
-            prefecture: prefecture.trimmingCharacters(in: .whitespacesAndNewlines),
-            city: city.trimmingCharacters(in: .whitespacesAndNewlines),
-            line1: line1.trimmingCharacters(in: .whitespacesAndNewlines),
-            line2: line2.nilIfBlank,
-            phoneNumber: phoneNumber.nilIfBlank
-        )
+    private func startSave() {
+        Task { await save() }
     }
 
     private func save() async {

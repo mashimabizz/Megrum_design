@@ -4,6 +4,43 @@
 
 ---
 
+## イテレーション1155：address settings body helpersを整理
+
+### 背景・問題意識
+
+`AddressSettingsScreen` は、すでに `AddressSettingsHeader` / `AddressSettingsForm` / `AddressSettingsSaveButton` へ表示部品が分かれている一方で、画面本体には `header` / `form` / `saveButton` という薄い computed `some View` helper が残っていた。住所フォームのbinding、郵便番号lookup、保存validation、dismissの挙動を維持したまま、画面bodyが実際のセクション構成を直接読める形へ寄せる。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/AddressSettingsScreen.swift`
+- `header` / `form` / `saveButton` の computed view helper を削除し、既存の専用Viewを `body` 内へ直接配置した。
+- `draftAddress` を非view computed varとして `body` より上へ移動し、SwiftUI view orderingを整理した。
+- 保存ボタンの `Task { await save() }` 起動を `startSave()` に分離し、button actionから直接呼ぶ形にした。
+
+### 影響範囲
+
+- Swift Native iOS版の住所設定画面内の画面構成コード。
+- 住所設定画面の表示部品の接続。
+- 住所入力binding、郵便番号正規化/lookup、保存validation、保存完了dismiss、DB/API、状態名、表示文言、レイアウト値は変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumApp/AddressSettingsScreen.swift`
+  - passed
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-address-settings-body`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-address-settings-body-tests --enable-xctest --disable-swift-testing -j 1 --filter 'SettingsScreenTests'`
+  - passed（16 tests: `SettingsScreenTests` 12件 + 名前一致の `HomeExchangeSettingsScreenTests` 4件）
+
+### セルフレビュー結果
+
+- ✅ `AddressSettingsHeader` / `AddressSettingsForm` / `AddressSettingsSaveButton` の既存部品、`VStack` spacing、padding、navigation title、keyboard toolbarを維持した。
+- ✅ 住所入力binding、郵便番号正規化/lookup、`draftAddress` validation、保存完了dismissには触れていない。
+- ✅ DB/API、状態名、表示文言、レイアウト値は変更していない。
+- ✅ 新しい状態名・用語・DB列は追加していないため、`notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション1154：auth password reset sectionsを分離
 
 ### 背景・問題意識
