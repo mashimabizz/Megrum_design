@@ -95,29 +95,33 @@ struct TradeSummaryGoodsThumb: View {
                     case .success(let image):
                         image.resizable().scaledToFill()
                     case .failure:
-                        fallback
+                        TradeSummaryGoodsThumbFallback(title: item.title)
                     case .empty:
                         MegrumTheme.lavender.opacity(0.08)
                     @unknown default:
-                        fallback
+                        TradeSummaryGoodsThumbFallback(title: item.title)
                     }
                 }
             } else {
-                fallback
+                TradeSummaryGoodsThumbFallback(title: item.title)
             }
         }
         .frame(width: 46, height: 46)
         .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
     }
+}
 
-    private var fallback: some View {
+private struct TradeSummaryGoodsThumbFallback: View {
+    var title: String
+
+    var body: some View {
         ZStack {
             LinearGradient(
                 colors: [MegrumTheme.lavender.opacity(0.56), MegrumTheme.sky.opacity(0.42)],
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
             )
-            Text(item.title.first.map(String.init) ?? "M")
+            Text(title.first.map(String.init) ?? "M")
                 .font(.system(size: 17, weight: .black, design: .rounded))
                 .foregroundStyle(.white)
         }

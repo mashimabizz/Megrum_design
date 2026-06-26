@@ -4,6 +4,48 @@
 
 ---
 
+## イテレーション1168：trade summary detail contentを分離
+
+### 背景・問題意識
+
+取引サマリー詳細シートと取引サマリー内グッズサムネイルに、詳細本文やfallback表示を返す computed `some View` helper が残っていた。route別の本文切り替え、候補一覧、交換内容、金額panel、サムネイルfallbackの見た目を維持したまま、表示部品を専用Viewへ分ける。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/TradeSummaryDetailSheet.swift`
+- `TradeSummaryExchangeMethodContent` を追加し、交換手段detailの本文を専用Viewへ分離した。
+- `TradeSummaryTradeContent` を追加し、交換内容detailの本文を専用Viewへ分離した。
+- `@Environment(\.dismiss)` を先頭へ寄せ、`exchangeMethodContent` / `tradeContent` の computed `some View` helper を削除した。
+
+#### `ios-native/Sources/MegrumApp/TradeSummaryGoodsComponents.swift`
+- `TradeSummaryGoodsThumbFallback` を追加し、サムネイル画像がない/失敗した場合のgradientと初期文字表示を専用Viewへ分離した。
+- `fallback` の computed `some View` helper を削除した。
+
+### 影響範囲
+
+- Swift Native iOS版の取引サマリー詳細シート。
+- 取引サマリー内のグッズサムネイルfallback表示。
+- route、候補一覧、交換内容、金額panel、サムネイル画像読み込み、fallback初期文字、色/font/padding、DB/API、状態名は変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumApp/TradeSummaryDetailSheet.swift ios-native/Sources/MegrumApp/TradeSummaryGoodsComponents.swift`
+  - passed
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-trade-summary-content`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-trade-summary-content-tests --enable-xctest --disable-swift-testing -j 1 --filter 'TradeChatAffordanceTests|TradeRequestDraftTests|TradeMessageStateReducerTests|TradeProposalStateReducerTests'`
+  - passed（64 tests）
+
+### セルフレビュー結果
+
+- ✅ route別のdetail本文切り替え、NavigationStack、閉じるボタン、navigation titleを維持した。
+- ✅ 候補一覧、交換内容、金額panel、empty表示、件数表示を維持した。
+- ✅ サムネイルのAsyncImage success/empty/failure/default分岐、fallback gradient、初期文字 `M` を維持した。
+- ✅ DB/API、状態名、表示文言、取引状態遷移は変更していない。
+- ✅ 新しい状態名・用語・DB列は追加していないため、`notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション1167：trade card contentを分離
 
 ### 背景・問題意識

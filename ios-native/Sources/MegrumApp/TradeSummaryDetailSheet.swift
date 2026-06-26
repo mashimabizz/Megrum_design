@@ -20,13 +20,14 @@ enum TradeSummaryDetailRoute: String, Identifiable {
 }
 
 struct TradeSummaryDetailSheet: View {
+    @Environment(\.dismiss) private var dismiss
+
     var route: TradeSummaryDetailRoute
     var proposal: TradeProposal
     var requestedGoods: [GoodsItem]
     var offeredGoods: [GoodsItem]
     var requestedGoodsCount: Int
     var offeredGoodsCount: Int
-    @Environment(\.dismiss) private var dismiss
 
     var body: some View {
         NavigationStack {
@@ -34,9 +35,15 @@ struct TradeSummaryDetailSheet: View {
                 VStack(alignment: .leading, spacing: 16) {
                     switch route {
                     case .exchangeMethod:
-                        exchangeMethodContent
+                        TradeSummaryExchangeMethodContent(proposal: proposal)
                     case .tradeContent:
-                        tradeContent
+                        TradeSummaryTradeContent(
+                            proposal: proposal,
+                            requestedGoods: requestedGoods,
+                            offeredGoods: offeredGoods,
+                            requestedGoodsCount: requestedGoodsCount,
+                            offeredGoodsCount: offeredGoodsCount
+                        )
                     }
                 }
                 .padding(.horizontal, 18)
@@ -55,8 +62,12 @@ struct TradeSummaryDetailSheet: View {
             }
         }
     }
+}
 
-    private var exchangeMethodContent: some View {
+private struct TradeSummaryExchangeMethodContent: View {
+    var proposal: TradeProposal
+
+    var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             if proposal.exchangeMethod.supportsHand {
                 TradeSummarySheetSection(title: "現地交換の候補") {
@@ -82,8 +93,16 @@ struct TradeSummaryDetailSheet: View {
             }
         }
     }
+}
 
-    private var tradeContent: some View {
+private struct TradeSummaryTradeContent: View {
+    var proposal: TradeProposal
+    var requestedGoods: [GoodsItem]
+    var offeredGoods: [GoodsItem]
+    var requestedGoodsCount: Int
+    var offeredGoodsCount: Int
+
+    var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             TradeSummarySheetSection(title: "交換内容") {
                 VStack(spacing: 12) {
