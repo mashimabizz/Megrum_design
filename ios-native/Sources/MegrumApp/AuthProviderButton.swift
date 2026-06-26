@@ -16,7 +16,7 @@ struct AuthProviderButton: View {
     var body: some View {
         Button(action: action) {
             HStack(spacing: 27) {
-                iconView
+                AuthProviderIconView(icon: icon)
                     .frame(width: 30, height: 30)
                 Text(title)
                     .font(.system(size: 21, weight: .bold, design: .rounded))
@@ -35,9 +35,13 @@ struct AuthProviderButton: View {
         }
         .buttonStyle(.plain)
     }
+}
+
+private struct AuthProviderIconView: View {
+    var icon: AuthProviderButton.ProviderIcon
 
     @ViewBuilder
-    private var iconView: some View {
+    var body: some View {
         switch icon {
         case .apple:
             Image(systemName: "apple.logo")

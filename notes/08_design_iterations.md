@@ -4,6 +4,43 @@
 
 ---
 
+## イテレーション1150：auth provider iconを分離
+
+### 背景・問題意識
+
+`AuthProviderButton` は、button本体のlayout/stroke/shadow/actionに加えて、Apple / Google / mail iconのswitch表示も同じView内に抱えていた。認証入口の見た目、button action、text styling、mail時のborder/colorを維持したまま、provider icon表示だけを小さな専用Viewへ分離する。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/AuthProviderButton.swift`
+- `AuthProviderIconView` を追加し、Apple logo、Google `G` gradient、mail envelopeの表示を移動した。
+- `AuthProviderButton` はbutton action、HStack、title、background、stroke、shadowの構成に寄せた。
+- icon表示には `ProviderIcon` だけを渡し、title/fill/actionには触れない形にした。
+
+### 影響範囲
+
+- Swift Native iOS版の認証選択画面内、Apple / Google / メール認証ボタン。
+- provider icon表示。
+- 認証action、OAuth/メール認証処理、入力validation、disabled/fallback制御、DB/API、状態名、表示文言は変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumApp/AuthProviderButton.swift`
+  - passed
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-auth-provider-icon`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-auth-provider-icon-tests --enable-xctest --disable-swift-testing -j 1 --filter 'AuthScreenInputTests'`
+  - passed（15 tests）
+
+### セルフレビュー結果
+
+- ✅ Apple logo、Google `G` gradient、mail envelopeのfont/color/sizeを維持した。
+- ✅ button spacing、height、background、mail border、shadow、buttonStyleを維持した。
+- ✅ 認証action、OAuth/メール認証処理、入力validation、disabled/fallback制御、DB/API、状態名、表示文言は変更していない。
+- ✅ 新しい状態名・用語・DB列は追加していないため、`notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション1149：blocked user avatarを分離
 
 ### 背景・問題意識
