@@ -4,6 +4,44 @@
 
 ---
 
+## イテレーション1139：individual listing top bar partsを分離
+
+### 背景・問題意識
+
+`IndividualListingTopBar` は、accessoryありの大きなタイトルヘッダーと、accessoryなしの中央タイトル/透明戻るplaceholder/右ellipsis placeholderを同じbody内の分岐に抱えていた。個別募集一覧chromeの見た目は維持したまま、top barの2つの表示形を小さな専用Viewへ分離する。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/IndividualListingListChromeViews.swift`
+- `IndividualListingAccessoryTopBar` を追加し、accessoryありのtitleとaccessory paddingを移動した。
+- `IndividualListingCenteredTopBar` を追加し、accessoryなしの中央タイトル/サブタイトル配置を移動した。
+- `IndividualListingBackPlaceholder` と `IndividualListingMorePlaceholder` を追加し、左右50pxのplaceholder表示を分離した。
+- `IndividualListingSkeletons` / `IndividualListingConditionStrip` / `EmptyListingView` / `AddIndividualListingButton` は変更していない。
+
+### 影響範囲
+
+- Swift Native iOS版の個別募集一覧top bar。
+- accessoryあり/なしのheader表示、透明戻るplaceholder、右ellipsis placeholder。
+- 個別募集一覧のデータ、条件strip、追加button、保存/更新/削除、DB/API、状態名、表示文言は変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumApp/IndividualListingListChromeViews.swift`
+  - passed
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-individual-listing-top-bar-parts`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-individual-listing-top-bar-parts --enable-xctest --disable-swift-testing -j 1 --filter 'IndividualListingDraftTests|IndividualListingStateReducerTests|SupabaseListingClientTests'`
+  - passed（50 tests）
+
+### セルフレビュー結果
+
+- ✅ accessoryありのtitle font/color、accessory上下padding、leading配置を維持した。
+- ✅ accessoryなしの中央title/subtitle、左右50px placeholder、透明戻るbutton、ellipsis icon、shadow、accessibilityHiddenを維持した。
+- ✅ 個別募集一覧の条件strip、empty表示、追加button、保存/更新/削除、DB/API、状態名、表示文言は変更していない。
+- ✅ 新しい状態名・用語・DB列は追加していないため、`notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション1138：individual listing option row partsを分離
 
 ### 背景・問題意識

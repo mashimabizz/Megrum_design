@@ -9,52 +9,79 @@ struct IndividualListingTopBar: View {
 
     var body: some View {
         if let accessory {
-            VStack(alignment: .leading, spacing: 6) {
-                Text(title)
-                    .font(.system(size: 42, weight: .heavy, design: .rounded))
-                    .foregroundStyle(MegrumTheme.ink)
-
-                accessory
-                    .padding(.top, CollectionScreenLayoutMetrics.headerAccessoryVerticalPadding)
-                    .padding(.bottom, CollectionScreenLayoutMetrics.headerAccessoryVerticalPadding)
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
+            IndividualListingAccessoryTopBar(title: title, accessory: accessory)
         } else {
-            HStack(alignment: .center) {
-                Button {} label: {
-                    Image(systemName: "chevron.left")
-                        .font(.system(size: 22, weight: .heavy))
-                        .foregroundStyle(MegrumTheme.ink)
-                        .frame(width: 50, height: 50)
-                        .background(.white.opacity(0.88), in: Circle())
-                        .shadow(color: MegrumTheme.ink.opacity(0.08), radius: 12, y: 6)
-                }
-                .buttonStyle(.plain)
-                .accessibilityHidden(true)
-                .opacity(0.001)
-
-                Spacer()
-
-                VStack(spacing: 5) {
-                    Text("個別募集")
-                        .font(.system(size: 25, weight: .black, design: .rounded))
-                        .foregroundStyle(MegrumTheme.ink)
-                    Text("譲るものごとに条件を見る")
-                        .font(.system(size: 14, weight: .semibold, design: .rounded))
-                        .foregroundStyle(MegrumTheme.muted)
-                }
-
-                Spacer()
-
-                Image(systemName: "ellipsis")
-                    .font(.system(size: 21, weight: .black))
-                    .foregroundStyle(MegrumTheme.ink)
-                    .frame(width: 50, height: 50)
-                    .background(.white.opacity(0.88), in: Circle())
-                    .shadow(color: MegrumTheme.ink.opacity(0.08), radius: 12, y: 6)
-                    .accessibilityHidden(true)
-            }
+            IndividualListingCenteredTopBar()
         }
+    }
+}
+
+private struct IndividualListingAccessoryTopBar: View {
+    var title: String
+    var accessory: AnyView
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(title)
+                .font(.system(size: 42, weight: .heavy, design: .rounded))
+                .foregroundStyle(MegrumTheme.ink)
+
+            accessory
+                .padding(.top, CollectionScreenLayoutMetrics.headerAccessoryVerticalPadding)
+                .padding(.bottom, CollectionScreenLayoutMetrics.headerAccessoryVerticalPadding)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
+private struct IndividualListingCenteredTopBar: View {
+    var body: some View {
+        HStack(alignment: .center) {
+            IndividualListingBackPlaceholder()
+
+            Spacer()
+
+            VStack(spacing: 5) {
+                Text("個別募集")
+                    .font(.system(size: 25, weight: .black, design: .rounded))
+                    .foregroundStyle(MegrumTheme.ink)
+                Text("譲るものごとに条件を見る")
+                    .font(.system(size: 14, weight: .semibold, design: .rounded))
+                    .foregroundStyle(MegrumTheme.muted)
+            }
+
+            Spacer()
+
+            IndividualListingMorePlaceholder()
+        }
+    }
+}
+
+private struct IndividualListingBackPlaceholder: View {
+    var body: some View {
+        Button {} label: {
+            Image(systemName: "chevron.left")
+                .font(.system(size: 22, weight: .heavy))
+                .foregroundStyle(MegrumTheme.ink)
+                .frame(width: 50, height: 50)
+                .background(.white.opacity(0.88), in: Circle())
+                .shadow(color: MegrumTheme.ink.opacity(0.08), radius: 12, y: 6)
+        }
+        .buttonStyle(.plain)
+        .accessibilityHidden(true)
+        .opacity(0.001)
+    }
+}
+
+private struct IndividualListingMorePlaceholder: View {
+    var body: some View {
+        Image(systemName: "ellipsis")
+            .font(.system(size: 21, weight: .black))
+            .foregroundStyle(MegrumTheme.ink)
+            .frame(width: 50, height: 50)
+            .background(.white.opacity(0.88), in: Circle())
+            .shadow(color: MegrumTheme.ink.opacity(0.08), radius: 12, y: 6)
+            .accessibilityHidden(true)
     }
 }
 
