@@ -42,21 +42,54 @@ struct IndividualListingEditorHeader: View {
 
     var body: some View {
         VStack(spacing: 14) {
-            ZStack {
-                backButton
-                titleText
-                optionReviewButton
-            }
+            IndividualListingEditorHeaderTopRow(
+                title: title,
+                showsOptionReviewButton: showsOptionReviewButton,
+                optionReviewCount: optionReviewCount,
+                onShowOptionReview: onShowOptionReview,
+                onBack: onBack
+            )
 
-            stepProgress
+            IndividualListingEditorStepProgress(
+                step: step,
+                onSelectStep: onSelectStep
+            )
         }
         .padding(.horizontal, 20)
         .padding(.top, 12)
         .padding(.bottom, 4)
     }
+}
 
-    private var backButton: some View {
-        Button(action: onBack) {
+private struct IndividualListingEditorHeaderTopRow: View {
+    var title: String
+    var showsOptionReviewButton: Bool
+    var optionReviewCount: Int
+    var onShowOptionReview: () -> Void
+    var onBack: () -> Void
+
+    var body: some View {
+        ZStack {
+            IndividualListingEditorHeaderBackButton(action: onBack)
+
+            Text(title)
+                .font(.system(size: 17, weight: .black, design: .rounded))
+                .foregroundStyle(MegrumTheme.ink)
+
+            IndividualListingOptionReviewHeaderButton(
+                isVisible: showsOptionReviewButton,
+                count: optionReviewCount,
+                action: onShowOptionReview
+            )
+        }
+    }
+}
+
+private struct IndividualListingEditorHeaderBackButton: View {
+    var action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
             Image(systemName: "chevron.left")
                 .font(.system(size: 24, weight: .medium))
                 .foregroundStyle(MegrumTheme.lavender)
@@ -65,21 +98,21 @@ struct IndividualListingEditorHeader: View {
         .buttonStyle(.plain)
         .frame(maxWidth: .infinity, alignment: .leading)
     }
+}
 
-    private var titleText: some View {
-        Text(title)
-            .font(.system(size: 17, weight: .black, design: .rounded))
-            .foregroundStyle(MegrumTheme.ink)
-    }
+private struct IndividualListingOptionReviewHeaderButton: View {
+    var isVisible: Bool
+    var count: Int
+    var action: () -> Void
 
     @ViewBuilder
-    private var optionReviewButton: some View {
-        if showsOptionReviewButton {
-            Button(action: onShowOptionReview) {
+    var body: some View {
+        if isVisible {
+            Button(action: action) {
                 HStack(spacing: 4) {
                     Text("選択肢を確認")
-                    if optionReviewCount > 0 {
-                        Text("\(optionReviewCount)")
+                    if count > 0 {
+                        Text("\(count)")
                             .font(.system(size: 10, weight: .black, design: .rounded))
                             .foregroundStyle(.white)
                             .frame(minWidth: 18, minHeight: 18)
@@ -100,8 +133,13 @@ struct IndividualListingEditorHeader: View {
             .frame(maxWidth: .infinity, alignment: .trailing)
         }
     }
+}
 
-    private var stepProgress: some View {
+private struct IndividualListingEditorStepProgress: View {
+    var step: IndividualListingEditorStep
+    var onSelectStep: (IndividualListingEditorStep) -> Void
+
+    var body: some View {
         HStack(spacing: 12) {
             Text("\(step.rawValue)")
                 .font(.system(size: 19, weight: .black, design: .rounded))
@@ -110,25 +148,39 @@ struct IndividualListingEditorHeader: View {
                 .font(.system(size: 15, weight: .semibold, design: .rounded))
                 .foregroundStyle(MegrumTheme.muted)
             ForEach(IndividualListingEditorStep.allCases, id: \.id) { item in
-                Button {
-                    onSelectStep(item)
-                } label: {
-                    Color.clear
-                        .frame(width: 22, height: 22)
-                        .overlay {
-                            Circle()
-                                .fill(item == step ? MegrumTheme.lavender : MegrumTheme.muted.opacity(0.22))
-                                .frame(width: item == step ? 16 : 9, height: item == step ? 16 : 9)
-                        }
-                        .contentShape(Circle())
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel(item.title)
+                IndividualListingEditorStepDotButton(
+                    item: item,
+                    currentStep: step,
+                    onSelectStep: onSelectStep
+                )
             }
         }
         .padding(.horizontal, 20)
         .frame(height: 40)
         .background(.white.opacity(0.92), in: Capsule())
         .shadow(color: MegrumTheme.ink.opacity(0.08), radius: 10, y: 4)
+    }
+}
+
+private struct IndividualListingEditorStepDotButton: View {
+    var item: IndividualListingEditorStep
+    var currentStep: IndividualListingEditorStep
+    var onSelectStep: (IndividualListingEditorStep) -> Void
+
+    var body: some View {
+        Button {
+            onSelectStep(item)
+        } label: {
+            Color.clear
+                .frame(width: 22, height: 22)
+                .overlay {
+                    Circle()
+                        .fill(item == currentStep ? MegrumTheme.lavender : MegrumTheme.muted.opacity(0.22))
+                        .frame(width: item == currentStep ? 16 : 9, height: item == currentStep ? 16 : 9)
+                }
+                .contentShape(Circle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(item.title)
     }
 }

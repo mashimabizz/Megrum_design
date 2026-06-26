@@ -4,6 +4,44 @@
 
 ---
 
+## イテレーション1141：individual listing editor header partsを分離
+
+### 背景・問題意識
+
+`IndividualListingEditorHeader` は、戻るbutton、中央title、選択肢確認button、step progress dotsを同じView内のcomputed viewとして抱えていた。個別募集editorのheader表示とstep移動の挙動を維持したまま、chrome部品を小さな専用Viewへ分ける。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/IndividualListingEditorChromeViews.swift`
+- `IndividualListingEditorHeaderTopRow` を追加し、戻るbutton/title/選択肢確認buttonのZStack構成を移動した。
+- `IndividualListingEditorHeaderBackButton` と `IndividualListingOptionReviewHeaderButton` を追加し、左右のheader操作を分離した。
+- `IndividualListingEditorStepProgress` と `IndividualListingEditorStepDotButton` を追加し、step番号表示とtappable dotsを分離した。
+- `ListingSelectableImageTile` は変更していない。
+
+### 影響範囲
+
+- Swift Native iOS版の個別募集editor header。
+- 戻るbutton、選択肢確認button、step progress dots、step tap navigation。
+- 個別募集draft、保存/更新/削除、下部bar、DB/API、状態名、表示文言は変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumApp/IndividualListingEditorChromeViews.swift`
+  - passed
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-individual-listing-header-parts`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-individual-listing-header-parts --enable-xctest --disable-swift-testing -j 1 --filter 'IndividualListingDraftTests|IndividualListingStateReducerTests|SupabaseListingClientTests'`
+  - passed（50 tests）
+
+### セルフレビュー結果
+
+- ✅ 戻るbuttonのicon/font/color/サイズ/alignment、中央titleのfont/color、選択肢確認buttonのbadge表示条件を維持した。
+- ✅ step progressの数値表示、dotsのサイズ/色、`accessibilityLabel(item.title)`、tap時の `onSelectStep(item)` を維持した。
+- ✅ 個別募集draft、保存/更新/削除、下部bar、DB/API、状態名、表示文言は変更していない。
+- ✅ 新しい状態名・用語・DB列は追加していないため、`notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション1140：individual listing bottom bar partsを分離
 
 ### 背景・問題意識
