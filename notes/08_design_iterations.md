@@ -4,6 +4,48 @@
 
 ---
 
+## イテレーション1132：individual listing options tabsを分離
+
+### 背景・問題意識
+
+`IndividualListingOptionsViews.swift` は、個別募集の受け取り条件ステップ本体に加えて、選択種別タブとWish選択gridも同じファイルに抱えていた。親Viewをoption kindの分岐と推し選択sheetのstateに寄せ、タブUIとWish選択表示を専用ファイルへ分離する。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/IndividualListingOptionsViews.swift`
+- `IndividualListingOptionsStep` だけを残し、`IndividualListingEditorTabs` と `IndividualListingWishTab` を専用ファイルへ移動した。
+- `MegrumDesign` importを外し、親Viewをstate/sheet/action wiring中心に整理した。
+- option kind切替、condition/cash分岐、Oshi master sheet、request sheetのstateとcallbackは維持した。
+
+#### `ios-native/Sources/MegrumApp/IndividualListingOptionsTabViews.swift`
+- `IndividualListingEditorTabs` を追加し、Wish/条件/定価タブの表示とselection更新を移動した。
+- `IndividualListingWishTab` を追加し、Wish検索filter、empty表示、3列grid、tile選択actionを移動した。
+- Wish filterのavailable groups/goods types/tags計算とaccessibility label/selected traitsを維持した。
+
+### 影響範囲
+
+- Swift Native iOS版の個別募集作成/編集の受け取り条件ステップ。
+- Wish/条件/定価タブ、Wish選択grid、Wish検索/filter。
+- conditionタブ、cashタブ、Oshi選択sheet、request sheet、DB/API、状態名、表示文言は変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumApp/IndividualListingOptionsViews.swift ios-native/Sources/MegrumApp/IndividualListingOptionsTabViews.swift`
+  - passed
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-individual-listing-options-tabs`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-individual-listing-options-tabs --enable-xctest --disable-swift-testing -j 1 --filter 'IndividualListingDraftTests|SupabaseListingClientTests'`
+  - passed（47 tests）
+
+### セルフレビュー結果
+
+- ✅ タブ文言、選択中タブの色/角丸、Wish検索placeholder、empty表示、3列grid、tile選択状態、accessibility label/selected traitsを維持した。
+- ✅ `optionKind` binding更新、Wish filter計算、`onToggleWish`、condition/cash分岐、Oshi master/request sheetのcallbackは変更していない。
+- ✅ `IndividualListingOptionsViews.swift` は199行から101行へ縮小し、タブ/Wish選択表示を101行の専用ファイルへ分離した。
+- ✅ 新しい状態名・用語・DB列は追加していないため、`notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション1131：individual listing selection filter viewsを分離
 
 ### 背景・問題意識
