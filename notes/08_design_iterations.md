@@ -4,6 +4,42 @@
 
 ---
 
+## イテレーション1179：proposal week long press hintを分離
+
+### 背景・問題意識
+
+打診作成の meetup 週カレンダーのlong press hintに、表示条件、ヒント本文、幅計算、縦位置計算が同居していた。表示有無の分岐を親に残し、ヒント本体の描画と幾何計算だけを専用Viewへ分ける。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/ProposalMeetupCalendarWeekLongPressHint.swift`
+- `ProposalMeetupCalendarWeekLongPressHintContent` を追加し、ヒント本文、font、背景、frame、offsetを専用Viewへ分離した。
+- `hintWidth` と `verticalOffset` を抽出先の非View computed varへ分けた。
+- `ProposalMeetupCalendarWeekLongPressHint` は `isVisible` の分岐とcontent呼び出しに集中する構成へ寄せた。
+
+### 影響範囲
+
+- Swift Native iOS版の打診作成 meetup 週カレンダーの空状態hint。
+- ヒント文言、font、padding、背景opacity、frame高、weekDayColumns幅、timeLabelWidth、13時slotへのoffset、gesture、DB/API、状態名は変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumApp/ProposalMeetupCalendarWeekLongPressHint.swift`
+  - passed
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-week-long-press-hint`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-week-long-press-hint-tests --enable-xctest --disable-swift-testing -j 1 --filter 'ProposalCreateFlowTests|ProposalCreateSheetTests|TradeRequestDraftProposalCreateFlowTests|TradeChatAffordanceTests'`
+  - passed（112 tests）
+
+### セルフレビュー結果
+
+- ✅ ヒント文言、font、padding、背景、frame、offsetを維持した。
+- ✅ 表示条件は親に残し、週カレンダーのgesture、候補block、preview、打診作成の進行条件は変更していない。
+- ✅ DB/API、状態名は変更していない。
+- ✅ 新しい状態名・用語・DB列は追加していないため、`notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション1178：proposal week header day cellを分離
 
 ### 背景・問題意識
