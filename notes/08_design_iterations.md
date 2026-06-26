@@ -4,6 +4,79 @@
 
 ---
 
+## イテレーション1223：メグルムプラス課金導線を追加
+
+### 背景・問題意識
+
+オーナーから、課金名称を「メグルムプラス」とし、月額500円で「個別募集の作成数無制限」「ホーム/検索で自分のグッズが上位表示」「グルームアーカイブ無制限」の3機能を提供したいという指示があった。課金、DB/API、取引候補表示、個別募集作成、めぐりのアーカイブに関わるため、Swift Native iOSとSupabase/Web管理側を標準モードで更新した。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumCore/SubscriptionModels.swift`
+- `megrum_plus_monthly` / `megrum_plus` を現行の課金プラン・権限キーとして追加した。
+- メグルムプラスの3特典を `MonetizationFeature` と `UserSubscriptionState` の派生プロパティに追加した。
+- 旧 `premium` / `meguri_plus` の定義は互換用 `legacyPlans` として残し、現行 `defaultPlans` はメグルムプラス月額のみへ整理した。
+
+#### `ios-native/Sources/MegrumApp/SubscriptionSettings*`
+- 左ドロワーの「交換条件の設定」の下に余白を空けて「メグルムプラス」を追加し、タップで紹介/購入画面を開くようにした。
+- 紹介画面では月額500円、3特典、現在の加入状態、購入、復元、状態更新を表示する。
+- StoreKit 2 の購入/復元クライアントを追加し、購入後は `sync_megrum_plus_purchase_for_viewer()` 経由で `user_entitlements` へ同期する。
+
+#### `ios-native/Sources/MegrumApp/MegrumPlusAccessPolicy.swift`
+- 無料プランの個別募集作成上限を3件に制限した。`active` / `paused` / `matched` をカウントし、`closed` は除外する。
+- グルームアーカイブは無料プランで最新10件までに制限し、メグルムプラスではビジネス上の保存上限を外す。アプリの取得はページサイズ単位で行う。
+
+#### `ios-native/Sources/MegrumApp/HomeCandidate*` / `SearchResultFilterPolicy.swift`
+- Supabaseからメグルムプラス有効ユーザーIDを取得し、ホーム候補と検索結果の並びでPlusオーナーのグッズを優先するようにした。
+- `GoodsItem.ownerHasMegrumPlus` と `HomeCandidateConditionSignals.ownerHasMegrumPlus` を追加した。
+
+#### `ios-native/Sources/MegrumData/*`
+- `list_megrum_plus_user_ids_for_viewer` RPC を呼ぶクライアント処理を追加した。
+- `SupabaseEntitlementClient` が `megrum_plus` を読み込むようにし、StoreKit購入同期RPCのリクエストを作れるようにした。
+
+#### `supabase/migrations/20260627023000_add_megrum_plus_subscription_foundation.sql`
+- `subscriptions.plan_type` に `megrum_plus_monthly` を追加した。
+- `list_megrum_plus_user_ids_for_viewer()`、`sync_megrum_plus_purchase_for_viewer()`、`enforce_individual_listing_free_limit()` を追加した。
+- DBトリガーでも無料ユーザーの個別募集3件上限を守るようにした。
+
+#### `web/src/app/admin/*` / `web/src/app/api/stripe/webhook/route.ts`
+- 管理画面の有料権限表示と手動付与初期値を `megrum_plus` に合わせた。
+- Stripe webhook でも `megrum_plus_monthly` を `megrum_plus` へ同期できるようにした。
+
+#### `notes/05_data_model.md` / `notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/13_api_spec.md` / `notes/16_monetization.md` / `notes/17_legal_alignment.md` / `notes/legal/*`
+- メグルムプラスのプラン名、価格、権限キー、無料制限、StoreKit同期、法務表示の更新論点を記録した。
+- 旧 `premium` / `meguri_plus` は消さず、互換・履歴として残す扱いに整理した。
+
+### 影響範囲
+
+- Swift Native iOSの左ドロワー、課金紹介画面、個別募集作成、ホーム候補、検索結果、グルームアーカイブ。
+- Supabase `subscriptions` / `user_entitlements` / `listings` トリガー / RPC。
+- Web管理画面 `/admin` / `/admin/billing` と Stripe webhook。
+- 法務表示は現行課金名称として「メグルムプラス」に寄せた。App Store Server APIによるサーバー側署名検証は本番前の残タスク。
+
+### 確認方法
+
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-plus-build`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-plus-tests --enable-xctest --disable-swift-testing -j 1`
+  - passed（1053 tests, 0 failures, 3 skipped）
+- `npm run web:lint`
+  - passed
+- `npm run web:build`
+  - passed
+- `git diff --check`
+  - passed
+
+### セルフレビュー結果
+
+- ✅ 現行課金キーは `megrum_plus` に統一し、旧 `premium` / `meguri_plus` は互換として残した。
+- ✅ 無料プラン制限はクライアントUIだけでなくDBトリガーにも追加した。
+- ✅ ホーム/検索の優先表示は既存ランキングの前段にPlus優先を追加し、既存の条件一致ロジックは維持した。
+- ✅ 法務表示は `notes/17_legal_alignment.md` を確認した上で最小変更した。
+- ⚠️ App Store Server APIでの署名検証は、App Store Connect/API認証情報が必要なため本番前タスクとして残した。
+
+---
+
 ## イテレーション1222：最低限の運用管理者画面を追加
 
 ### 背景・問題意識

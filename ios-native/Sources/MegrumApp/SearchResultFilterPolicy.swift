@@ -65,12 +65,32 @@ enum SearchResultFilterPolicy {
     static func sortedResults(_ results: [SearchResultItem], sort: SearchResultSort) -> [SearchResultItem] {
         switch sort {
         case .newest:
-            results
+            stableMegrumPlusPrioritySort(results)
         case .title:
             results.sorted { lhs, rhs in
-                lhs.item.title.localizedStandardCompare(rhs.item.title) == .orderedAscending
+                if megrumPlusRank(lhs) != megrumPlusRank(rhs) {
+                    return megrumPlusRank(lhs) > megrumPlusRank(rhs)
+                }
+                return lhs.item.title.localizedStandardCompare(rhs.item.title) == .orderedAscending
             }
         }
+    }
+
+    private static func stableMegrumPlusPrioritySort(_ results: [SearchResultItem]) -> [SearchResultItem] {
+        results.enumerated()
+            .sorted { lhs, rhs in
+                let lhsRank = megrumPlusRank(lhs.element)
+                let rhsRank = megrumPlusRank(rhs.element)
+                if lhsRank != rhsRank {
+                    return lhsRank > rhsRank
+                }
+                return lhs.offset < rhs.offset
+            }
+            .map(\.element)
+    }
+
+    private static func megrumPlusRank(_ result: SearchResultItem) -> Int {
+        result.item.ownerHasMegrumPlus == true ? 1 : 0
     }
 
     static func itemMatchesWish(_ item: GoodsItem, wishes: [WishItem]) -> Bool {

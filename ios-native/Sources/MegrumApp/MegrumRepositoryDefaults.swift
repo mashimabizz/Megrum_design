@@ -6,6 +6,25 @@ public extension MegrumRepository {
         .free
     }
 
+    func syncMegrumPlusPurchase(_ input: MegrumPlusPurchaseSyncInput) async throws -> UserSubscriptionState {
+        UserSubscriptionState(
+            planType: .megrumPlusMonthly,
+            status: .active,
+            currentPeriodEnd: input.expiresAt,
+            entitlements: [
+                UserEntitlement(
+                    key: .megrumPlus,
+                    isActive: true,
+                    source: .purchase,
+                    grantedAt: input.verifiedAt,
+                    expiresAt: input.expiresAt,
+                    updatedAt: input.verifiedAt
+                )
+            ],
+            loadedAt: input.verifiedAt
+        )
+    }
+
     func loadHomeCandidateSections() async throws -> HomeCandidateSections {
         throw MegrumRepositoryError.unsupportedMutation
     }

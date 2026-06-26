@@ -307,6 +307,7 @@ public struct HomeCandidateConditionSignals: Equatable, Sendable {
     public var matchesViewerWish: Bool
     public var matchesViewerWishCharacter: Bool
     public var tagMatchCount: Int
+    public var ownerHasMegrumPlus: Bool
 
     public init(
         goods: HomeGoodsConditionSignals,
@@ -318,7 +319,8 @@ public struct HomeCandidateConditionSignals: Equatable, Sendable {
         wishMatchedPartnerUserIDs: [UUID] = [],
         matchesViewerWish: Bool = false,
         matchesViewerWishCharacter: Bool = false,
-        tagMatchCount: Int = 0
+        tagMatchCount: Int = 0,
+        ownerHasMegrumPlus: Bool = false
     ) {
         self.goods = goods
         self.exchange = exchange
@@ -330,6 +332,7 @@ public struct HomeCandidateConditionSignals: Equatable, Sendable {
         self.matchesViewerWish = matchesViewerWish
         self.matchesViewerWishCharacter = matchesViewerWishCharacter
         self.tagMatchCount = max(0, tagMatchCount)
+        self.ownerHasMegrumPlus = ownerHasMegrumPlus
     }
 
     private static func orderedUnique(_ ids: [UUID]) -> [UUID] {

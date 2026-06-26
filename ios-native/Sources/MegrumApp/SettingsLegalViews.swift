@@ -87,7 +87,7 @@ enum LegalDocumentKind {
                 ),
                 LegalSummaryItem(
                     title: "有料機能",
-                    body: "Premium、めぐりPlus、ブーストなどの価格と提供条件は、公開前レビュー済みの本文に合わせて表示します。"
+                    body: "メグルムプラス、ブーストなどの価格と提供条件は、公開前レビュー済みの本文に合わせて表示します。"
                 ),
                 LegalSummaryItem(
                     title: "問い合わせ先",

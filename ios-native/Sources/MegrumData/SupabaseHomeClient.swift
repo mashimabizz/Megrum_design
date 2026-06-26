@@ -86,6 +86,9 @@ public final class SupabaseHomeClient: @unchecked Sendable {
         async let inventoryTags = loadInventoryTagsIfNeeded(
             inventoryIDs: (initialRows.2 + initialRows.3 + initialRows.5 + initialRows.6).map(\.id)
         )
+        async let megrumPlusUserIDs = loadMegrumPlusUserIDsIfNeeded(
+            userIDs: (initialRows.5 + initialRows.6).map(\.userId) + initialRows.8.map(\.userId)
+        )
 
         return try await SupabaseHomeComposition(
             localMode: initialRows.0.first,
@@ -101,7 +104,8 @@ public final class SupabaseHomeClient: @unchecked Sendable {
             viewerActivityWindows: initialRows.9,
             partnerActivityWindows: initialRows.10,
             inventoryTags: inventoryTags,
-            unreadNotificationIDs: initialRows.11.map(\.id)
+            unreadNotificationIDs: initialRows.11.map(\.id),
+            megrumPlusUserIDs: megrumPlusUserIDs
         )
     }
 }

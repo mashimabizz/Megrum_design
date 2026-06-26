@@ -34,7 +34,8 @@ extension HomeCandidateComposer {
         linkCounts: HomeCandidateLinkCounts,
         individualListingSelection: HomeIndividualListingSelectionContext?,
         wishMatchedOfferGoodsIDs: [UUID],
-        wishMatchedPartnerUserIDs: [UUID]
+        wishMatchedPartnerUserIDs: [UUID],
+        ownerHasMegrumPlus: Bool
     ) -> HomeCandidateConditionSignals {
         let candidateAllowsMail = exchangeAllowsMail(candidate.exchangeType)
         let candidateAllowsLocal = exchangeAllowsLocal(candidate.exchangeType)
@@ -75,7 +76,8 @@ extension HomeCandidateComposer {
             wishMatchedPartnerUserIDs: wishMatchedPartnerUserIDs,
             matchesViewerWish: matchesViewerWish,
             matchesViewerWishCharacter: matchesViewerWishCharacter,
-            tagMatchCount: tagMatchCount
+            tagMatchCount: tagMatchCount,
+            ownerHasMegrumPlus: ownerHasMegrumPlus
         )
     }
 

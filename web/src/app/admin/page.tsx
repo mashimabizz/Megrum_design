@@ -17,7 +17,7 @@ export default async function AdminDashboardPage() {
     totalUsers,
     activeUsers,
     suspendedUsers,
-    activePremium,
+    activeMegrumPlus,
     activeAdmins,
     recentAudit,
   ] = await Promise.all([
@@ -25,7 +25,7 @@ export default async function AdminDashboardPage() {
     countRows(adminSupabase, "users", [["account_status", "active"]]),
     countRows(adminSupabase, "users", [["account_status", "suspended"]]),
     countRows(adminSupabase, "user_entitlements", [
-      ["feature_key", "premium"],
+      ["feature_key", "megrum_plus"],
       ["active", true],
     ]),
     countRows(adminSupabase, "admin_roles", [["status", "active"]]),
@@ -51,7 +51,7 @@ export default async function AdminDashboardPage() {
         <AdminMetric label="総ユーザー" value={totalUsers} />
         <AdminMetric label="active ユーザー" value={activeUsers} tone="ok" />
         <AdminMetric label="停止中" value={suspendedUsers} tone="warn" />
-        <AdminMetric label="Premium 権限" value={activePremium} />
+        <AdminMetric label="メグルムプラス" value={activeMegrumPlus} />
       </div>
 
       <div className="grid gap-5 lg:grid-cols-[1.1fr_0.9fr]">
@@ -78,7 +78,7 @@ export default async function AdminDashboardPage() {
             <QuickLink
               href="/admin/billing"
               title="有料プラン"
-              body="サブスク同期、Premium権限、手動上書きを確認します。"
+              body="サブスク同期、メグルムプラス権限、手動上書きを確認します。"
             />
             <QuickLink
               href="/admin/audit"

@@ -15,6 +15,7 @@ public struct SupabaseHomeComposition: Equatable, Sendable {
     public var partnerActivityWindows: [SupabaseHomeActivityWindowRow]
     public var inventoryTags: [SupabaseHomeInventoryTagRow]
     public var unreadNotificationIDs: [UUID]
+    public var megrumPlusUserIDs: Set<UUID>
 
     public init(
         localMode: SupabaseHomeLocalModeRow?,
@@ -30,7 +31,8 @@ public struct SupabaseHomeComposition: Equatable, Sendable {
         viewerActivityWindows: [SupabaseHomeActivityWindowRow],
         partnerActivityWindows: [SupabaseHomeActivityWindowRow],
         inventoryTags: [SupabaseHomeInventoryTagRow],
-        unreadNotificationIDs: [UUID]
+        unreadNotificationIDs: [UUID],
+        megrumPlusUserIDs: Set<UUID> = []
     ) {
         self.localMode = localMode
         self.viewerUser = viewerUser
@@ -46,6 +48,7 @@ public struct SupabaseHomeComposition: Equatable, Sendable {
         self.partnerActivityWindows = partnerActivityWindows
         self.inventoryTags = inventoryTags
         self.unreadNotificationIDs = unreadNotificationIDs
+        self.megrumPlusUserIDs = megrumPlusUserIDs
     }
 
     public var unreadNotificationCount: Int {

@@ -38,7 +38,7 @@
 12. [Deals（取引）](#12-deals取引)
 13. [Disputes（異議申し立て）](#13-disputes異議申し立て)
 14. [Reports（通報）](#14-reports通報)
-15. [Subscriptions（Premium 会員 / めぐりPlus）](#15-subscriptionspremium-会員--めぐりplus)
+15. [Subscriptions（メグルムプラス / 旧Premium / 旧めぐりPlus）](#15-subscriptionsメグルムプラス--旧premium--旧めぐりplus)
 16. [Boosts（ブースト機能）](#16-boostsブースト機能)
 17. [Ads（広告配信）](#17-ads広告配信)
 18. [Misc（通知・WebSocket）](#18-misc通知websocket)
@@ -1430,42 +1430,42 @@ dispute 詳細。
 
 ---
 
-## 15. Subscriptions（Premium 会員 / めぐりPlus）
+## 15. Subscriptions（メグルムプラス / 旧Premium / 旧めぐりPlus）
 
-iter45 で追加。`notes/16_monetization.md` § Premium 会員 に対応。iter168.43 で、めぐりPlus（月額¥1,000）を `feature_key='meguri_plus'` の独立権限として追加。
+iter45 で追加。`notes/16_monetization.md` § Premium 会員 に対応。iter168.43 で、めぐりPlus（月額¥1,000）を `feature_key='meguri_plus'` の独立権限として追加。iter1223 で現行課金プランをメグルムプラス（月額¥500）へ寄せ、`feature_key='megrum_plus'` をアプリ横断の有料権限として追加。
 
 ### GET /api/v1/subscriptions/me
 
 自分のサブスクリプション情報取得。
 
 - **Auth**: 必須
-- **Response 200**: `{ subscription: { plan_type, status, started_at, current_period_end, cancelled_at } | null, is_premium: boolean, entitlements: { premium: boolean, meguri_plus: boolean } }`
+- **Response 200**: `{ subscription: { plan_type, status, started_at, current_period_end, cancelled_at } | null, is_megrum_plus: boolean, is_premium: boolean, entitlements: { megrum_plus: boolean, premium: boolean, meguri_plus: boolean } }`
 - **Screen**: `SET-top`、`PRO-hub`
 
 ### POST /api/v1/subscriptions/checkout
 
-Premium 会員またはめぐりPlusの決済セッション開始。
+メグルムプラス、旧Premium、旧めぐりPlusの決済セッション開始。
 
 - **Auth**: 必須
-- **Request**: `{ plan_type: "premium_monthly" | "premium_yearly" | "meguri_plus_monthly" | "monthly" | "yearly", provider: "stripe" | "apple" | "google" }`
+- **Request**: `{ plan_type: "megrum_plus_monthly" | "premium_monthly" | "premium_yearly" | "meguri_plus_monthly" | "monthly" | "yearly", provider: "stripe" | "apple" | "google" }`
 - **Response 200**: `{ checkout_url, session_id }`（Stripe 等の決済画面 URL）
 - **備考**: iOSのApple In-App PurchaseはStoreKitで購入し、購入後に `POST /api/v1/subscriptions/apple/sync` でサーバー検証・権限反映する。Stripe等の外部checkoutは、iOSアプリ内のデジタル機能解放導線には使わない。
-- **Screen**: 「Premium 会員になる」/「めぐりPlusをはじめる」CTA → 決済画面
+- **Screen**: 「メグルムプラス」CTA → 決済画面
 
 ### POST /api/v1/subscriptions/apple/sync
 
 Swift Native iOS版がStoreKit購入・復元・`currentEntitlements` 読み込み後に、サーバーへApple transactionを同期する。
 
 - **Auth**: 必須
-- **Request**: `{ product_id, transaction_id, original_transaction_id, signed_transaction_info, signed_renewal_info?, environment }`
-- **Response 200**: `{ subscription: { plan_type, status, current_period_end, cancelled_at } | null, entitlements: { premium: boolean, meguri_plus: boolean } }`
+- **Request**: `{ product_id, transaction_id, original_transaction_id, signed_transaction_info?, signed_renewal_info?, environment? }`
+- **Response 200**: `{ subscription: { plan_type, status, current_period_end, cancelled_at } | null, entitlements: { megrum_plus: boolean, premium: boolean, meguri_plus: boolean } }`
 - **Side effects**:
   - Apple署名済みtransactionをサーバー側で検証
   - `product_id` を `plan_type` に解決
   - `subscriptions.transaction_provider='apple'` の行をupsert
-  - `user_entitlements.feature_key='premium'` または `meguri_plus` を更新
+  - `user_entitlements.feature_key='megrum_plus'` / `premium` / `meguri_plus` を更新
   - `transactions.kind='subscription_initial' | 'subscription_renewal'` を必要に応じて記録
-- **備考**: クライアントは購入直後のUI反映にStoreKitの現在権限を使ってよいが、永続的な機能解放はサーバー集約後の `user_entitlements` を正とする。
+- **備考**: iter1223時点のSupabase実装は `sync_megrum_plus_purchase_for_viewer(product_id, transaction_id, original_transaction_id, expires_at, verified_at)` で `megrum.plus.monthly` を `megrum_plus_monthly` / `megrum_plus` に同期する。クライアントは購入直後のUI反映にStoreKitの現在権限を使ってよいが、永続的な機能解放はサーバー集約後の `user_entitlements` を正とする。App Store Server APIでの署名検証は本番前に追加する。
 
 ### POST /api/v1/subscriptions/webhooks/apple
 
@@ -1485,7 +1485,7 @@ Stripe webhook 受信。
 
 - **Auth**: webhook 署名検証
 - **実装 route**: Web App Router では `/api/stripe/webhook`（iter166）。外部公開API名として `/api/v1/subscriptions/webhooks/stripe` を維持する場合は rewrite で接続する。
-- **Side effects**: `stripe_webhook_events` に event_id を保存して冪等化、`subscriptions` レコード作成・更新。`plan_type='meguri_plus_monthly'` は `user_entitlements(feature_key='meguri_plus')`、それ以外のPremium系は `user_entitlements(feature_key='premium')` を更新。広告非表示・boost grant はPremium仕様確定後に別ジョブで反映。
+- **Side effects**: `stripe_webhook_events` に event_id を保存して冪等化、`subscriptions` レコード作成・更新。`plan_type='megrum_plus_monthly'` は `user_entitlements(feature_key='megrum_plus')`、`plan_type='meguri_plus_monthly'` は `meguri_plus`、それ以外のPremium系は `premium` を更新。広告非表示・boost grant は旧Premium仕様確定後に別ジョブで反映。
 
 ### Admin Console（server actions / iter166, iter1222）
 

@@ -54,7 +54,8 @@ enum HomeCandidateComposer {
             let candidateItem = HomeCandidateRowMapper.makeGoodsItem(
                 from: candidate,
                 tags: tagsByInventoryID[candidate.id] ?? [],
-                ownerUser: partnerUsersByID[candidate.userId]
+                ownerUser: partnerUsersByID[candidate.userId],
+                ownerHasMegrumPlus: composition.megrumPlusUserIDs.contains(candidate.userId)
             )
             let matchingViewerWishes = viewerWishes.filter { wish in
                 wishRow(wish, matches: candidate)
@@ -120,7 +121,8 @@ enum HomeCandidateComposer {
                 ),
                 individualListingSelection: individualListingSelection,
                 wishMatchedOfferGoodsIDs: partnerWishMatchedOfferItems.map(\.id),
-                wishMatchedPartnerUserIDs: partnerWishHit ? [candidate.userId] : []
+                wishMatchedPartnerUserIDs: partnerWishHit ? [candidate.userId] : [],
+                ownerHasMegrumPlus: composition.megrumPlusUserIDs.contains(candidate.userId)
             )
 
             if satisfiesViewerWish && partnerWantsViewerGoods {
@@ -259,7 +261,8 @@ private extension SupabaseHomeComposition {
             viewerActivityWindows: viewerActivityWindows,
             partnerActivityWindows: partnerActivityWindows,
             inventoryTags: inventoryTags,
-            unreadNotificationIDs: unreadNotificationIDs
+            unreadNotificationIDs: unreadNotificationIDs,
+            megrumPlusUserIDs: megrumPlusUserIDs
         )
     }
 }

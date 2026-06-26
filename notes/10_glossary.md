@@ -518,7 +518,7 @@
 | ~~AW自動登録（カスタム日時 → AW 追加）~~ | AW はマッチング演算専用に分離（iter67） | スケジュール（個人予定）に分離 |
 | ~~待ち合わせで AW から日時を選ぶ~~ | AW を打診から切り離す方針（iter67） | C-0 待ち合わせタブで日時+場所を直接入力 |
 | ~~すれ違いレター~~ | めぐり機能内の表記をLINE風の会話UIに合わせて変更（iter162.41） | **めぐりメッセージ** |
-| ~~推しすれ違い Plus / Megrum Plus~~ | ユーザー向け名称を「めぐりPlus」に統一（iter168.43） | **めぐりPlus** |
+| ~~推しすれ違い Plus~~ | ユーザー向け名称を「めぐりPlus」に統一（iter168.43）。`Megrum Plus / メグルムプラス` は iter1223 でアプリ横断の現行課金プラン名として再定義 | **めぐりPlus** / **メグルムプラス** |
 
 ## K. 表記揺れに迷う用語
 
@@ -577,6 +577,7 @@
 |---|---|---|---|
 | **ブースト** | boost | 24時間限定で自分の打診・マイグッズを相手画面で上位表示する課金機能。広告非表示も付帯 | iter45, 16 §6, iter421 |
 | **ブーストパック** | boost pack | ブースト購入時の単位（単発1個 / 5個 / 10個） | iter45 |
+| **メグルムプラス** | Megrum Plus | 月額500円のアプリ横断サブスク。個別募集の作成数無制限、ホーム/検索で自分のグッズ優先表示、グルームアーカイブ無制限を提供する現行プラン | iter1223, 16 §7 |
 | **Premium 会員** | premium subscriber | 月額/年額のサブスク会員。広告非表示＋月3ブースト＋装飾 | iter45, 16 §7 |
 | **めぐりPlus** | meguri plus, encounter plus | 月額1000円のめぐり向けサブスク。めぐりメッセージ本文の表示・返信・新規メッセージ月20通を提供する。単発の本文表示チケットは持たない | iter162.41, iter168.43, iter168.44 |
 | **Native ad** | ネイティブ広告 | マッチカード等と同形のスポンサー広告。「★ Sponsored」明示 | iter45, 16 §5 |
@@ -599,7 +600,9 @@
 | `canceled` | subscription.status | Stripe webhook 等で即時キャンセルされた状態 |
 | `expired` | subscription.status | 期間終了（更新なし） |
 | `monthly` / `yearly` | subscription.plan_type | 課金周期 |
+| `megrum_plus_monthly` | subscriptions.plan_type | 現行のメグルムプラス月額プラン |
 | `premium_monthly` / `premium_yearly` | subscriptions.plan_type | 実装側のPremium課金周期 |
+| `megrum_plus` | user_entitlements.feature_key | メグルムプラス機能（個別募集無制限、優先表示、グルームアーカイブ無制限）を判定する権限キー |
 | `premium` | user_entitlements.feature_key | アプリ側がPremium機能を判定する権限キー |
 | `meguri_plus` | user_entitlements.feature_key | めぐりPlus機能（めぐりメッセージ本文表示・返信・新規メッセージ月20通）を判定する権限キー |
 | `subscription` / `manual_override` / `system` / `purchase` | user_entitlements.source | 権限付与元 |
@@ -659,7 +662,7 @@ iter46 で整理した以下を弁護士に再レビュー依頼：
    - 服装写真の任意共有（iter34）
    - 取引チャット中の現在地共有（iter34）
    - Dispute（異議申し立て）詳細フロー（iter12-18、現規約 §16 の拡張）
-5. **価格確定**：Premium 月¥500、めぐりPlus 月¥1,000、ブースト ¥150/¥600/¥1,000（特商法 ●●● を埋める）
+5. **価格確定**：メグルムプラス 月¥500、旧Premium 月¥500、旧めぐりPlus 月¥1,000、ブースト ¥150/¥600/¥1,000（特商法 ●●● を埋める）
 6. **広告**：AdMob・AdSense は規約通り、Native ad 配置は補足説明
 
 詳細は `notes/17_legal_alignment.md` 参照。

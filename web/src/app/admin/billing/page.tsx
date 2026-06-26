@@ -116,7 +116,7 @@ export default async function AdminBillingPage() {
             <AdminTextInput
               name="feature_key"
               label="権限キー"
-              defaultValue="premium"
+              defaultValue="megrum_plus"
               required
             />
             <AdminTextInput
@@ -148,7 +148,7 @@ export default async function AdminBillingPage() {
 
       <AdminPanel
         title="現在の有料権限"
-        description="アプリ側のPremium判定は user_entitlements を参照します。"
+        description="アプリ側のメグルムプラス判定は user_entitlements を参照します。"
       >
         <div className="overflow-x-auto">
           <table className="w-full min-w-[760px] border-separate border-spacing-0 text-left">

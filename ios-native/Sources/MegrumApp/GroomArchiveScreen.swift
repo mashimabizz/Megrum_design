@@ -9,9 +9,15 @@ struct GroomArchiveScreen: View {
     @Environment(\.dismiss) private var dismiss
     @State private var cameraPosition: MapCameraPosition = .automatic
     @State private var selectedGroom: GroomPost?
+    @State private var showsMegrumPlus = false
 
     private var archivedGrooms: [GroomPost] {
         GroomArchiveOrdering.sorted(appState.ownGroomArchive)
+    }
+
+    private var isArchiveLimited: Bool {
+        MegrumPlusAccessPolicy.isGroomArchiveLimited(subscriptionState: appState.subscriptionState)
+            && archivedGrooms.count >= MegrumPlusLimits.freeGroomArchiveLimit
     }
 
     var body: some View {
@@ -40,6 +46,13 @@ struct GroomArchiveScreen: View {
 
             VStack {
                 Spacer()
+                if isArchiveLimited {
+                    GroomArchiveLimitNotice {
+                        showsMegrumPlus = true
+                    }
+                    .padding(.horizontal, 18)
+                    .padding(.bottom, 10)
+                }
                 GroomArchiveThumbnailRail(
                     grooms: archivedGrooms,
                     selectedGroomID: selectedGroom?.id,
@@ -51,6 +64,7 @@ struct GroomArchiveScreen: View {
         }
         .background(MegrumTheme.canvas)
         .task {
+            await appState.loadSubscriptionState(reportsFailure: false)
             await appState.loadGroomArchive()
             updateCameraPosition()
         }
@@ -74,6 +88,11 @@ struct GroomArchiveScreen: View {
             )
         }
         #endif
+        .sheet(isPresented: $showsMegrumPlus) {
+            NavigationStack {
+                SubscriptionSettingsScreen(appState: appState)
+            }
+        }
     }
 
     private func updateCameraPosition() {

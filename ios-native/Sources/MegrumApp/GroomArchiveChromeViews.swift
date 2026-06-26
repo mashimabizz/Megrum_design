@@ -97,6 +97,34 @@ struct GroomArchiveThumbnailRail: View {
     }
 }
 
+struct GroomArchiveLimitNotice: View {
+    var onOpenMegrumPlus: () -> Void
+
+    var body: some View {
+        Button(action: onOpenMegrumPlus) {
+            Label {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("無料プランは最新10件まで")
+                        .font(.system(size: 13, weight: .black, design: .rounded))
+                    Text("メグルムプラスでアーカイブを無制限に残せます")
+                        .font(.system(size: 11, weight: .bold, design: .rounded))
+                        .foregroundStyle(MegrumTheme.muted)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            } icon: {
+                Image(systemName: "lock.open.fill")
+                    .foregroundStyle(MegrumTheme.lavender)
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 11)
+            .background(.regularMaterial, in: Capsule())
+            .overlay(Capsule().stroke(.white.opacity(0.66), lineWidth: 1))
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("メグルムプラスでグルームアーカイブを無制限にする")
+    }
+}
+
 private struct GroomArchiveThumbnail: View {
     var groom: GroomPost
     var isSelected: Bool

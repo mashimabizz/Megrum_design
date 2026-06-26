@@ -104,6 +104,10 @@ public struct SupabaseMegrumRepository: MegrumRepository {
         try await entitlementClient.loadSubscriptionState(userID: viewerID)
     }
 
+    public func syncMegrumPlusPurchase(_ input: MegrumPlusPurchaseSyncInput) async throws -> UserSubscriptionState {
+        try await entitlementClient.syncMegrumPlusPurchase(input)
+    }
+
     public func loadHomeCandidateSections() async throws -> HomeCandidateSections {
         let composition = try await homeClient.loadHomeComposition(userID: viewerID)
         return HomeCandidateComposer.sections(from: composition)

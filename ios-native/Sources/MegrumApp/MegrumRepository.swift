@@ -126,6 +126,7 @@ public enum MegrumRepositoryError: Error, Equatable, Sendable {
 public protocol MegrumRepository: Sendable {
     func loadInitialSnapshot() async throws -> MegrumAppSnapshot
     func loadSubscriptionState() async throws -> UserSubscriptionState
+    func syncMegrumPlusPurchase(_ input: MegrumPlusPurchaseSyncInput) async throws -> UserSubscriptionState
     func loadHomeCandidateSections() async throws -> HomeCandidateSections
     func loadOshiGenres(limit: Int) async throws -> [OshiGenre]
     func loadOshiGroups(searchText: String?, limit: Int) async throws -> [OshiGroup]

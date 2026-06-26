@@ -874,7 +874,7 @@ stateDiagram-v2
 | エンティティ | 状態 | 説明 |
 |---|---|---|
 | `subscriptions` | `incomplete` / `incomplete_expired` / `trialing` / `active` / `past_due` / `cancelled` / `canceled` / `unpaid` / `expired` | Stripe等プロバイダー由来の契約状態 |
-| `user_entitlements` | `active=true/false` | アプリが参照する最終的な機能権限。`feature_key='premium'` がPremium判定、`feature_key='meguri_plus'` がめぐりPlus判定 |
+| `user_entitlements` | `active=true/false` | アプリが参照する最終的な機能権限。`feature_key='megrum_plus'` が現行メグルムプラス判定、`premium` / `meguri_plus` は旧設計互換の判定 |
 | `stripe_webhook_events` | `processing` / `processed` / `failed` / `ignored` | webhook処理の冪等性・再処理判断 |
 
 ### ビジネスルール
@@ -882,7 +882,10 @@ stateDiagram-v2
 - 管理者の追加・更新は `roles.manage` 権限が必要。最後の `owner` を無効化・降格してはいけない。
 - `requires_mfa=true` の管理者は Supabase Auth の AAL2 セッションでのみ管理者ページへ入れる。
 - ユーザー停止・権限変更・有料権限手動上書きは、理由入力を必須にし `admin_audit_logs` に保存する。
-- Stripe webhook は `stripe_webhook_events.event_id` で重複処理を防ぎ、`subscriptions` 更新後に plan_type に応じて `user_entitlements(feature_key='premium' | 'meguri_plus')` を upsert する。
+- Stripe webhook は `stripe_webhook_events.event_id` で重複処理を防ぎ、`subscriptions` 更新後に plan_type に応じて `user_entitlements(feature_key='megrum_plus' | 'premium' | 'meguri_plus')` を upsert する。
+- StoreKitで検証済みの `megrum.plus.monthly` は `sync_megrum_plus_purchase_for_viewer()` で `subscriptions.plan_type='megrum_plus_monthly'` と `user_entitlements(feature_key='megrum_plus')` へ同期する。App Store Server APIでのサーバー側署名検証は本番前タスク。
+- 個別募集は無料プランでは `active` / `paused` / `matched` の合計3件まで。`megrum_plus` が有効ならDBトリガー・クライアントUIともに上限を外す。
+- グルームアーカイブは無料プランでは最新10件まで。`megrum_plus` が有効ならビジネス上の保存上限を外し、アプリはページサイズ単位で取得する。
 - 手動上書きは `plan_overrides` に履歴を残し、同時に `user_entitlements` を更新する。
 
 ## 15. 付録：エンティティ間の関係

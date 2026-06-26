@@ -2,11 +2,15 @@ import Foundation
 import MegrumCore
 
 extension SupabaseGoodsInventoryClient {
-    func goodsItemsWithTags(from rows: [GoodsInventoryRow]) async throws -> [GoodsItem] {
+    func goodsItemsWithTags(
+        from rows: [GoodsInventoryRow],
+        megrumPlusUserIDs: Set<UUID> = []
+    ) async throws -> [GoodsItem] {
         let tagMap = try await loadGoodsTags(inventoryIDs: rows.map(\.id))
         return rows.map { row in
             var item = row.goodsItem
             item.tags = tagMap[row.id] ?? []
+            item.ownerHasMegrumPlus = megrumPlusUserIDs.contains(row.userId)
             return item
         }
     }

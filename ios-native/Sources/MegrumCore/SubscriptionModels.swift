@@ -1,6 +1,7 @@
 import Foundation
 
 public enum SubscriptionPlanType: String, Codable, Sendable, CaseIterable, Identifiable {
+    case megrumPlusMonthly = "megrum_plus_monthly"
     case premiumMonthly = "premium_monthly"
     case premiumYearly = "premium_yearly"
     case meguriPlusMonthly = "meguri_plus_monthly"
@@ -11,6 +12,8 @@ public enum SubscriptionPlanType: String, Codable, Sendable, CaseIterable, Ident
 
     public var displayName: String {
         switch self {
+        case .megrumPlusMonthly:
+            "メグルムプラス 月額"
         case .premiumMonthly:
             "Premium 月額"
         case .premiumYearly:
@@ -49,6 +52,7 @@ public enum SubscriptionStatus: String, Codable, Sendable, CaseIterable, Identif
 }
 
 public enum UserEntitlementKey: String, Codable, Sendable, CaseIterable, Identifiable {
+    case megrumPlus = "megrum_plus"
     case premium
     case meguriPlus = "meguri_plus"
 
@@ -56,6 +60,8 @@ public enum UserEntitlementKey: String, Codable, Sendable, CaseIterable, Identif
 
     public var displayName: String {
         switch self {
+        case .megrumPlus:
+            "メグルムプラス"
         case .premium:
             "Premium 会員"
         case .meguriPlus:
@@ -110,6 +116,28 @@ public struct UserEntitlement: Identifiable, Codable, Hashable, Sendable {
     }
 }
 
+public struct MegrumPlusPurchaseSyncInput: Codable, Hashable, Sendable {
+    public var productID: String
+    public var transactionID: String
+    public var originalTransactionID: String
+    public var expiresAt: Date?
+    public var verifiedAt: Date
+
+    public init(
+        productID: String,
+        transactionID: String,
+        originalTransactionID: String,
+        expiresAt: Date? = nil,
+        verifiedAt: Date = Date()
+    ) {
+        self.productID = productID
+        self.transactionID = transactionID
+        self.originalTransactionID = originalTransactionID
+        self.expiresAt = expiresAt
+        self.verifiedAt = verifiedAt
+    }
+}
+
 public struct UserSubscriptionState: Codable, Hashable, Sendable {
     public var planType: SubscriptionPlanType?
     public var status: SubscriptionStatus?
@@ -150,8 +178,24 @@ public struct UserSubscriptionState: Codable, Hashable, Sendable {
         hasActiveEntitlement(.premium)
     }
 
+    public var isMegrumPlusActive: Bool {
+        hasActiveEntitlement(.megrumPlus)
+    }
+
     public var hasMeguriPlus: Bool {
         hasActiveEntitlement(.meguriPlus)
+    }
+
+    public var hasUnlimitedIndividualListings: Bool {
+        isMegrumPlusActive
+    }
+
+    public var prioritizesMatchDisplay: Bool {
+        isMegrumPlusActive
+    }
+
+    public var hasUnlimitedGroomArchive: Bool {
+        isMegrumPlusActive
     }
 
     public var suppressesAds: Bool {
@@ -160,6 +204,9 @@ public struct UserSubscriptionState: Codable, Hashable, Sendable {
 }
 
 public enum MonetizationFeature: String, Codable, Sendable, CaseIterable, Identifiable {
+    case unlimitedIndividualListings = "unlimited_individual_listings"
+    case priorityMatchDisplay = "priority_match_display"
+    case unlimitedGroomArchive = "unlimited_groom_archive"
     case adFree = "ad_free"
     case monthlyBoostGrant = "monthly_boost_grant"
     case extendedMessageHistory = "extended_message_history"
@@ -173,6 +220,12 @@ public enum MonetizationFeature: String, Codable, Sendable, CaseIterable, Identi
 
     public var displayName: String {
         switch self {
+        case .unlimitedIndividualListings:
+            "個別募集の作成数が無制限"
+        case .priorityMatchDisplay:
+            "ホーム・検索で自分のグッズを優先表示"
+        case .unlimitedGroomArchive:
+            "グルームアーカイブが無制限"
         case .adFree:
             "広告非表示"
         case .monthlyBoostGrant:
@@ -224,11 +277,24 @@ public struct SubscriptionPlanDefinition: Identifiable, Codable, Hashable, Senda
 }
 
 public enum SubscriptionCatalog {
+    public static let megrumPlusMonthlyProductID = "megrum.plus.monthly"
     public static let premiumMonthlyProductID = "megrum.premium.monthly"
     public static let premiumYearlyProductID = "megrum.premium.yearly"
     public static let meguriPlusMonthlyProductID = "megrum.meguri_plus.monthly"
 
     public static let defaultPlans: [SubscriptionPlanDefinition] = [
+        SubscriptionPlanDefinition(
+            planType: .megrumPlusMonthly,
+            productID: megrumPlusMonthlyProductID,
+            displayName: "メグルムプラス",
+            priceLabel: "月 ¥500",
+            featureIDs: megrumPlusFeatures,
+            entitlementKey: .megrumPlus,
+            sortOrder: 10
+        )
+    ]
+
+    public static let legacyPlans: [SubscriptionPlanDefinition] = [
         SubscriptionPlanDefinition(
             planType: .premiumMonthly,
             productID: premiumMonthlyProductID,
@@ -254,8 +320,14 @@ public enum SubscriptionCatalog {
             priceLabel: "月 ¥1,000",
             featureIDs: [.meguriMessageExpansion],
             entitlementKey: .meguriPlus,
-            sortOrder: 30
+            sortOrder: 120
         )
+    ]
+
+    public static let megrumPlusFeatures: [MonetizationFeature] = [
+        .unlimitedIndividualListings,
+        .priorityMatchDisplay,
+        .unlimitedGroomArchive
     ]
 
     public static let premiumFeatures: [MonetizationFeature] = [
@@ -269,6 +341,13 @@ public enum SubscriptionCatalog {
     ]
 
     public static func plan(for productID: String) -> SubscriptionPlanDefinition? {
-        defaultPlans.first { $0.productID == productID }
+        (defaultPlans + legacyPlans).first { $0.productID == productID }
     }
+}
+
+public enum MegrumPlusLimits {
+    public static let freeIndividualListingLimit = 3
+    public static let freeGroomArchiveLimit = 10
+    public static let defaultGroomArchivePageLimit = 120
+    public static let monthlyPriceLabel = "月 ¥500"
 }

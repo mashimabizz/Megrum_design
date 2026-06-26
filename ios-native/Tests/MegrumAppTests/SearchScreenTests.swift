@@ -461,4 +461,24 @@ final class SearchScreenTests: XCTestCase {
         XCTAssertTrue(filtered.contains { $0.item.title == "ニンニン 制服" })
         XCTAssertFalse(filtered.contains { $0.item.title == "V トレカ" })
     }
+
+    func testSearchResultSortPrioritizesMegrumPlusOwners() {
+        var standardItem = NativePreviewData.inventory.first { $0.title == "V トレカ" }!
+        standardItem.ownerHasMegrumPlus = false
+        var plusItem = NativePreviewData.inventory.first { $0.title == "ニンニン 制服" }!
+        plusItem.ownerHasMegrumPlus = true
+        let results = [
+            SearchResultItem(item: standardItem, ownerUserID: standardItem.ownerID, bucket: .possible),
+            SearchResultItem(item: plusItem, ownerUserID: plusItem.ownerID, bucket: .possible)
+        ]
+
+        XCTAssertEqual(
+            SearchResultFilterPolicy.sortedResults(results, sort: .newest).map(\.item.title),
+            ["ニンニン 制服", "V トレカ"]
+        )
+        XCTAssertEqual(
+            SearchResultFilterPolicy.sortedResults(results, sort: .title).first?.item.title,
+            "ニンニン 制服"
+        )
+    }
 }

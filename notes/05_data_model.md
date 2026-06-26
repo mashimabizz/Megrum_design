@@ -4,12 +4,13 @@
 > 実装の正解集。`09_state_machines.md` と完全に整合させ、`10_glossary.md` の用語を使う。
 
 最終更新: 2026-06-27
-ステータス: Draft v2.49（iter1222 管理者運用画面の通報・推し追加・運営通知を追加）
+ステータス: Draft v2.50（iter1223 メグルムプラス課金導線と権限・無料上限を追加）
 
 ## 最新化履歴
 
 | Rev | 日付 | 変更 |
 |---|---|---|
+| **v2.50** | **2026-06-27** | **iter1223 反映（メグルムプラス `megrum_plus_monthly` / `megrum_plus` を追加。個別募集無料3件上限、ホーム/検索優先表示、グルームアーカイブ無料10件上限、StoreKit購入同期RPCを定義）** |
 | v1.0 | 2026-04-27 | 初版（マスタ階層、availability_windows、proposals 等） |
 | **v2.0** | **2026-05-01** | **iter24/29/33/34 反映（meetup, outfit, location_share, 状態名統一、deals リネーム）** |
 | **v2.1** | **2026-05-03** | **iter67 反映（schedules 新設、proposals.message_tone 追加、meetup_scheduled_aw_id 廃止、expose_calendar の対象を AW → schedules に変更）** |
@@ -1259,13 +1260,13 @@ iter12-18 の D-flow に対応するスキーマ（旧版未定義だったの�
 
 iter45 で追加。`notes/16_monetization.md` の戦略に対応するテーブル群。
 
-### `subscriptions`（Premium 会員 / めぐりPlus サブスクリプション）
+### `subscriptions`（メグルムプラス / 旧Premium / 旧めぐりPlus サブスクリプション）
 
 | カラム | 型 | 説明 |
 |---|---|---|
 | `id` | uuid | PK |
 | `user_id` | uuid | → users |
-| `plan_type` | text | `premium_monthly` / `premium_yearly` / `meguri_plus_monthly` / `monthly` / `yearly` |
+| `plan_type` | text | `megrum_plus_monthly` / `premium_monthly` / `premium_yearly` / `meguri_plus_monthly` / `monthly` / `yearly` |
 | `status` | text | `incomplete` / `incomplete_expired` / `trialing` / `active` / `past_due` / `cancelled` / `canceled` / `unpaid` / `expired` |
 | `started_at` | timestamptz | 開始日時 |
 | `current_period_end` | timestamptz | 現契約期間の終了 |
@@ -1282,16 +1283,18 @@ iter45 で追加。`notes/16_monetization.md` の戦略に対応するテーブ�
 > `subscriptions` 本体はプロバイダーIDを含むためクライアントへ直接SELECTさせず、ユーザー向け表示は server route で必要列だけ返す。
 > iter168.43: めぐりPlusは Premium とは別権限として `user_entitlements(feature_key='meguri_plus', active=true)` を参照する。`meguri_plus_monthly` の webhook は `meguri_plus` 権限を更新する。
 > iter731: Swift Native版も同じ方針に合わせ、アプリ内の広告非表示・有料導線は `user_entitlements(feature_key in ('premium','meguri_plus'))` の有効行を読む。Apple StoreKit、Stripe、管理者手動付与のどれで発生しても、最終的には `user_entitlements` へ集約する。
+> iter1223: 現行課金プランを **メグルムプラス** に統一し、`subscriptions.plan_type='megrum_plus_monthly'` / `user_entitlements.feature_key='megrum_plus'` を追加する。個別募集無料3件上限、ホーム/検索優先表示、グルームアーカイブ無料10件上限の判定はこの権限キーを見る。旧 `premium` / `meguri_plus` は互換用に残す。
 
-#### StoreKit product id 候補（iter731）
+#### StoreKit product id 候補（iter1223）
 
 | plan_type | product_id候補 | 付与する feature_key |
 |---|---|---|
+| `megrum_plus_monthly` | `megrum.plus.monthly` | `megrum_plus` |
 | `premium_monthly` | `megrum.premium.monthly` | `premium` |
 | `premium_yearly` | `megrum.premium.yearly` | `premium` |
 | `meguri_plus_monthly` | `megrum.meguri_plus.monthly` | `meguri_plus` |
 
-product_id は App Store Connect 登録時に最終決定する。DB上は `subscriptions.transaction_provider='apple'` と `transaction_provider_subscription_id` / `transactions.provider_transaction_id` にApple側IDを保存し、`user_entitlements` には利用権だけを保存する。
+product_id は App Store Connect 登録時に最終決定する。DB上は `subscriptions.transaction_provider='apple'` と `transaction_provider_subscription_id` / `transactions.provider_transaction_id` にApple側IDを保存し、`user_entitlements` には利用権だけを保存する。iter1223時点のSwift実装はStoreKit検証済みtransactionを `sync_megrum_plus_purchase_for_viewer()` でDBへ同期するが、App Store Server APIによるサーバー側署名検証は本番前に追加する。
 
 ### `boosts`（ブースト残数管理）
 
@@ -1424,7 +1427,7 @@ RLS:
 | カラム | 型 | 説明 |
 |---|---|---|
 | `user_id` | uuid PK | → users |
-| `feature_key` | text PK | `premium` / `meguri_plus` 等 |
+| `feature_key` | text PK | `megrum_plus` / `premium` / `meguri_plus` 等 |
 | `active` | boolean | 現在有効か |
 | `source` | text | `subscription` / `manual_override` / `system` / `purchase` |
 | `subscription_id` | uuid nullable | → subscriptions |
@@ -1440,7 +1443,7 @@ RLS:
 |---|---|---|
 | `id` | uuid | PK |
 | `user_id` | uuid | → users |
-| `feature_key` | text | `premium` 等 |
+| `feature_key` | text | `megrum_plus` / `premium` 等 |
 | `active` | boolean | true=付与、false=停止 |
 | `reason` | text | 管理者入力理由 |
 | `starts_at` / `expires_at` | timestamptz | 有効期間 |

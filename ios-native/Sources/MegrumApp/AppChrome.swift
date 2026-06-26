@@ -59,6 +59,18 @@ struct AppDrawerOverlay: View {
             }
             .padding(.horizontal, 18)
 
+            VStack(spacing: 2) {
+                ForEach(AppDrawerDestination.plusItems) { destination in
+                    drawerButton(
+                        title: destination.title,
+                        systemImage: destination.systemImage,
+                        destination: destination
+                    )
+                }
+            }
+            .padding(.horizontal, 18)
+            .padding(.top, 18)
+
             Spacer(minLength: 18)
 
             Divider()

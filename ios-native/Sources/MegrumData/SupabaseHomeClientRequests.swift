@@ -117,4 +117,11 @@ extension SupabaseHomeClient {
                 + SupabaseHomeQueryItems.unreadNotifications(userID: userID, limit: limit)
         )
     }
+
+    public func makeLoadMegrumPlusUserIDsRequest(userIDs: [UUID]) throws -> URLRequest {
+        try client.makeRPCRequest(
+            function: "list_megrum_plus_user_ids_for_viewer",
+            payload: MegrumPlusUserIDsPayload(userIDs: userIDs)
+        )
+    }
 }

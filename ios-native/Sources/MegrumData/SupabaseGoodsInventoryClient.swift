@@ -67,7 +67,8 @@ public final class SupabaseGoodsInventoryClient: @unchecked Sendable {
                 queryItems: searchQueryItems(viewerID: viewerID, input: input, availability: .quantity)
             )
         }
-        return try await goodsItemsWithTags(from: rows)
+        let megrumPlusUserIDs = try await loadMegrumPlusUserIDsIfNeeded(userIDs: rows.map(\.userId))
+        return try await goodsItemsWithTags(from: rows, megrumPlusUserIDs: megrumPlusUserIDs)
     }
 
     public func loadPublicTradeGoods(userID: UUID, limit: Int = 60) async throws -> [GoodsItem] {
@@ -89,7 +90,8 @@ public final class SupabaseGoodsInventoryClient: @unchecked Sendable {
                 queryItems: publicTradeGoodsQueryItems(userID: userID, limit: limit, availability: .quantity)
             )
         }
-        return try await goodsItemsWithTags(from: rows)
+        let megrumPlusUserIDs = try await loadMegrumPlusUserIDsIfNeeded(userIDs: rows.map(\.userId))
+        return try await goodsItemsWithTags(from: rows, megrumPlusUserIDs: megrumPlusUserIDs)
     }
 
     public func archiveGoodsItem(userID: UUID, itemID: UUID) async throws -> GoodsItem? {

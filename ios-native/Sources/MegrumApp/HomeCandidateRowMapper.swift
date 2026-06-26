@@ -22,7 +22,8 @@ enum HomeCandidateRowMapper {
         tags: [SupabaseHomeInventoryTagRow],
         ownerPrefecture: String?,
         ownerPaymentMethods: [String] = [],
-        ownerPaymentNote: String? = nil
+        ownerPaymentNote: String? = nil,
+        ownerHasMegrumPlus: Bool = false
     ) -> GoodsItem {
         makeGoodsItem(
             from: row,
@@ -30,14 +31,16 @@ enum HomeCandidateRowMapper {
             ownerUser: nil,
             fallbackOwnerPrefecture: ownerPrefecture,
             fallbackOwnerPaymentMethods: ownerPaymentMethods,
-            fallbackOwnerPaymentNote: ownerPaymentNote
+            fallbackOwnerPaymentNote: ownerPaymentNote,
+            ownerHasMegrumPlus: ownerHasMegrumPlus
         )
     }
 
     static func makeGoodsItem(
         from row: SupabaseHomeGoodsRow,
         tags: [SupabaseHomeInventoryTagRow],
-        ownerUser: SupabaseHomeUserRow?
+        ownerUser: SupabaseHomeUserRow?,
+        ownerHasMegrumPlus: Bool = false
     ) -> GoodsItem {
         makeGoodsItem(
             from: row,
@@ -45,7 +48,8 @@ enum HomeCandidateRowMapper {
             ownerUser: ownerUser,
             fallbackOwnerPrefecture: ownerUser?.primaryArea,
             fallbackOwnerPaymentMethods: ownerUser?.paymentMethods ?? [],
-            fallbackOwnerPaymentNote: ownerUser?.paymentNote
+            fallbackOwnerPaymentNote: ownerUser?.paymentNote,
+            ownerHasMegrumPlus: ownerHasMegrumPlus
         )
     }
 
@@ -55,7 +59,8 @@ enum HomeCandidateRowMapper {
         ownerUser: SupabaseHomeUserRow?,
         fallbackOwnerPrefecture: String?,
         fallbackOwnerPaymentMethods: [String],
-        fallbackOwnerPaymentNote: String?
+        fallbackOwnerPaymentNote: String?,
+        ownerHasMegrumPlus: Bool
     ) -> GoodsItem {
         GoodsItem(
             id: row.id,
@@ -88,7 +93,8 @@ enum HomeCandidateRowMapper {
             ownerEvaluationCount: ownerUser?.evaluationCount,
             ownerCompletedTradeCount: ownerUser?.completedTradeCount,
             ownerPaymentMethods: HomeCandidatePaymentPolicy.methods(fallbackOwnerPaymentMethods),
-            ownerPaymentNote: fallbackOwnerPaymentNote
+            ownerPaymentNote: fallbackOwnerPaymentNote,
+            ownerHasMegrumPlus: ownerHasMegrumPlus
         )
     }
 

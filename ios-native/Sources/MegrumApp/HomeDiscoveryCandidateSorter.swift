@@ -17,8 +17,8 @@ struct HomeDiscoveryCandidateSorter: Sendable {
         _ rhs: GoodsItem,
         rank: (HomeCandidateConditionSignals?) -> [Int]
     ) -> Bool {
-        let lhsRank = rank(conditionSignalsByItemID[lhs.id])
-        let rhsRank = rank(conditionSignalsByItemID[rhs.id])
+        let lhsRank = [ownerPlusRank(lhs)] + rank(conditionSignalsByItemID[lhs.id])
+        let rhsRank = [ownerPlusRank(rhs)] + rank(conditionSignalsByItemID[rhs.id])
         if lhsRank != rhsRank {
             return rhsRank.lexicographicallyPrecedes(lhsRank)
         }
@@ -43,6 +43,13 @@ struct HomeDiscoveryCandidateSorter: Sendable {
             exchangeConditionRank(signals),
             paymentConditionRank(signals)
         ]
+    }
+
+    private func ownerPlusRank(_ item: GoodsItem) -> Int {
+        if item.ownerHasMegrumPlus == true {
+            return 1
+        }
+        return conditionSignalsByItemID[item.id]?.ownerHasMegrumPlus == true ? 1 : 0
     }
 
     private func goodsConditionRank(_ signals: HomeCandidateConditionSignals?) -> Int {

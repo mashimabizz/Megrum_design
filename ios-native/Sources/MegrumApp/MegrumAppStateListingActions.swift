@@ -27,6 +27,13 @@ extension MegrumAppState {
             errorMessage = "譲るものと求めるものを選択してください"
             return false
         }
+        guard MegrumPlusAccessPolicy.canCreateIndividualListing(
+            listings: listings,
+            subscriptionState: subscriptionState
+        ) else {
+            errorMessage = MegrumPlusAccessPolicy.individualListingLimitMessage(listings: listings)
+            return false
+        }
 
         let normalizedInput = IndividualListingInputNormalizer.normalized(input)
 

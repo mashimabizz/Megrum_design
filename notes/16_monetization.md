@@ -1,10 +1,10 @@
 # 16. マネタイズ戦略（Monetization）
 
-> **目的**：Megrum の収益化戦略。広告・ブースト・Premium会員・アフィリエイト・公式コラボの設計と Phase別ロードマップ。
+> **目的**：Megrum の収益化戦略。メグルムプラス・広告・ブースト・アフィリエイト・公式コラボの設計と Phase別ロードマップ。
 > ファン層に嫌われない健全なマネタイズを実現する。
 
-最終更新: 2026-06-23（iter731）
-ステータス: Draft v1.1（戦略確定、Swift Native課金下準備を追加）
+最終更新: 2026-06-27（iter1223）
+ステータス: Draft v1.2（メグルムプラス月額500円を現行課金プランとして追加）
 
 ---
 
@@ -29,7 +29,7 @@
 4. [Phase別ロードマップ](#4-phase別ロードマップ)
 5. [広告（Ad）](#5-広告ad)
 6. [ブースト機能（Boost）](#6-ブースト機能boost)
-7. [Premium 会員](#7-premium-会員)
+7. [メグルムプラス / 旧Premium](#7-premium-会員)
 8. [アフィリエイト](#8-アフィリエイト)
 9. [公式コラボ・スポンサー](#9-公式コラボスポンサー)
 10. [B2B SaaS（Post-MVP）](#10-b2b-saaspost-mvp)
@@ -395,9 +395,28 @@ ad_overrides table:
 - 未使用月分の払い戻しは原則なし（年額契約）
 - 解約後も期間終了まで使える
 
+### 7-4a. メグルムプラス（iter1223）
+
+Swift Native iOSの現行サブスクは **メグルムプラス** に統一する。旧Premium/めぐりPlusの権限キーは互換用に残すが、新規導線・新規課金訴求はメグルムプラスを正とする。
+
+| 項目 | 内容 |
+|---|---|
+| 表示名 | メグルムプラス |
+| 価格 | 月額 ¥500（税込） |
+| StoreKit product id候補 | `megrum.plus.monthly` |
+| plan_type | `megrum_plus_monthly` |
+| 権限キー | `user_entitlements.feature_key='megrum_plus'` |
+| 対象機能1 | 個別募集の作成数無制限。無料プランは `active` / `paused` / `matched` 合計3件まで |
+| 対象機能2 | ホームのマッチ候補・検索結果で、自分のグッズが優先表示される |
+| 対象機能3 | グルームアーカイブ無制限。無料プランは最新10件まで |
+
+表示導線は左ドロワーの「交換条件の設定」配下に余白を空けて「メグルムプラス」を置き、タップ後に3特典と月額価格を説明してStoreKit購入へ進める。アプリ側の判定は `UserSubscriptionState.isMegrumPlusActive` を通じて `user_entitlements` を見る。
+
+DB側では `list_megrum_plus_user_ids_for_viewer()` によりホーム/検索ランキング用のPlusユーザーIDを返し、`enforce_individual_listing_free_limit()` により無料ユーザーの個別募集3件上限をサーバー側でも守る。StoreKit購入後は `sync_megrum_plus_purchase_for_viewer()` で `subscriptions` と `user_entitlements` へ同期する。本番前には App Store Server API によるサーバー側署名検証を追加する。
+
 ### 7-4b. めぐりPlus（iter168.43）
 
-Premium 会員とは別の、めぐり機能専用サブスク。
+旧設計。Premium 会員とは別の、めぐり機能専用サブスク。iter1223以降の新規訴求はメグルムプラスを正とし、この節は互換・履歴として残す。
 
 | 項目 | 内容 |
 |---|---|
@@ -433,14 +452,16 @@ subscriptions table:
 - iOSアプリ内でデジタル機能を解放する購入は、Apple In-App Purchase / StoreKitを前提にする。
 - アプリの機能判定は、決済プロバイダーの生ステータスではなく `user_entitlements` を見る。
 - `subscriptions` は決済・更新・解約・返金などの原本、`user_entitlements` はアプリが見る利用権の集約結果とする。
-- Premium 会員の広告非表示は `user_entitlements.feature_key='premium'` が有効な時だけ発火する。
-- めぐりPlusは `premium` に含めず、`feature_key='meguri_plus'` として分離する。
+- メグルムプラスの現行3特典は `user_entitlements.feature_key='megrum_plus'` が有効な時だけ発火する。
+- 旧Premium会員の広告非表示は `user_entitlements.feature_key='premium'` が有効な時だけ発火する。
+- 旧めぐりPlusは `premium` / `megrum_plus` に含めず、`feature_key='meguri_plus'` として分離する。
 - 打診、取引チャット、証跡、通報、評価、アカウント安全機能は有料権限にしない。
 
 #### Swift側の初期カタログ
 
 | plan_type | StoreKit product id候補 | 価格表示 | 権限 |
 |---|---|---:|---|
+| `megrum_plus_monthly` | `megrum.plus.monthly` | 月 ¥500 | `megrum_plus` |
 | `premium_monthly` | `megrum.premium.monthly` | 月 ¥500 | `premium` |
 | `premium_yearly` | `megrum.premium.yearly` | 年 ¥4,800 | `premium` |
 | `meguri_plus_monthly` | `megrum.meguri_plus.monthly` | 月 ¥1,000 | `meguri_plus` |

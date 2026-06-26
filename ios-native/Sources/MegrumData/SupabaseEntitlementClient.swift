@@ -31,13 +31,58 @@ public final class SupabaseEntitlementClient: @unchecked Sendable {
         )
     }
 
+    public func syncMegrumPlusPurchase(_ input: MegrumPlusPurchaseSyncInput) async throws -> UserSubscriptionState {
+        let rows: [UserEntitlementRow] = try await client.rpcRows(
+            function: "sync_megrum_plus_purchase_for_viewer",
+            payload: MegrumPlusPurchaseSyncPayload(input: input)
+        )
+        return UserSubscriptionState(
+            planType: .megrumPlusMonthly,
+            status: .active,
+            currentPeriodEnd: input.expiresAt,
+            entitlements: rows.compactMap(\.entitlement),
+            loadedAt: Date()
+        )
+    }
+
+    public func makeSyncMegrumPlusPurchaseRequest(_ input: MegrumPlusPurchaseSyncInput) throws -> URLRequest {
+        try client.makeRPCRequest(
+            function: "sync_megrum_plus_purchase_for_viewer",
+            payload: MegrumPlusPurchaseSyncPayload(input: input)
+        )
+    }
+
     private static let entitlementSelectFields = "feature_key,active,source,granted_at,expires_at,updated_at"
 
     private func entitlementQueryItems(userID: UUID) -> [URLQueryItem] {
         [
             URLQueryItem(name: "user_id", value: "eq.\(userID.uuidString.lowercased())"),
-            URLQueryItem(name: "feature_key", value: "in.(premium,meguri_plus)")
+            URLQueryItem(name: "feature_key", value: "in.(megrum_plus,premium,meguri_plus)")
         ]
+    }
+}
+
+private struct MegrumPlusPurchaseSyncPayload: Encodable, Sendable {
+    var productID: String
+    var transactionID: String
+    var originalTransactionID: String
+    var expiresAt: String?
+    var verifiedAt: String
+
+    enum CodingKeys: String, CodingKey {
+        case productID = "p_product_id"
+        case transactionID = "p_transaction_id"
+        case originalTransactionID = "p_original_transaction_id"
+        case expiresAt = "p_expires_at"
+        case verifiedAt = "p_verified_at"
+    }
+
+    init(input: MegrumPlusPurchaseSyncInput) {
+        self.productID = input.productID
+        self.transactionID = input.transactionID
+        self.originalTransactionID = input.originalTransactionID
+        self.expiresAt = input.expiresAt.map(SupabaseDateEncoding.isoTimestamp)
+        self.verifiedAt = SupabaseDateEncoding.isoTimestamp(input.verifiedAt)
     }
 }
 

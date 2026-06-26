@@ -137,6 +137,7 @@ async function upsertStripeSubscription(
   const planType = normalizePlanType(
     readString(metadata.plan_type),
     readString(firstPrice?.recurring_interval),
+    readString(firstPrice?.product),
   );
   const featureKey = featureKeyForPlanType(planType);
 
@@ -291,7 +292,11 @@ function readFirstPrice(subscription: StripeObject) {
 function normalizePlanType(
   metadataPlanType: string | null,
   recurringInterval: string | null,
+  productId: string | null,
 ) {
+  if (metadataPlanType === "megrum_plus_monthly") {
+    return "megrum_plus_monthly";
+  }
   if (metadataPlanType === "monthly" || metadataPlanType === "premium_monthly") {
     return "premium_monthly";
   }
@@ -301,9 +306,15 @@ function normalizePlanType(
   if (metadataPlanType === "meguri_plus_monthly") {
     return "meguri_plus_monthly";
   }
+  if (productId === "megrum.plus.monthly") {
+    return "megrum_plus_monthly";
+  }
   return recurringInterval === "year" ? "premium_yearly" : "premium_monthly";
 }
 
 function featureKeyForPlanType(planType: string) {
+  if (planType === "megrum_plus_monthly") {
+    return "megrum_plus";
+  }
   return planType === "meguri_plus_monthly" ? "meguri_plus" : "premium";
 }

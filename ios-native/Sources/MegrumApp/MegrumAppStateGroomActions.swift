@@ -26,7 +26,7 @@ extension MegrumAppState {
         isLoadingGroomMap = false
     }
 
-    public func loadGroomArchive(limit: Int = 120) async {
+    public func loadGroomArchive(limit: Int = MegrumPlusLimits.defaultGroomArchivePageLimit) async {
         guard !isLoadingGroomArchive else {
             return
         }
@@ -38,7 +38,11 @@ extension MegrumAppState {
         isLoadingGroomArchive = true
         errorMessage = nil
         do {
-            let archivedGrooms = try await repository.loadOwnGroomArchive(limit: limit)
+            let effectiveLimit = MegrumPlusAccessPolicy.groomArchiveRequestLimit(
+                requestedLimit: limit,
+                subscriptionState: subscriptionState
+            )
+            let archivedGrooms = try await repository.loadOwnGroomArchive(limit: effectiveLimit)
             let postIDs = archivedGrooms.map(\.id)
             async let reactions = repository.loadGroomReactions(postIDs: postIDs)
             async let replies = repository.loadGroomReplies(postIDs: postIDs)

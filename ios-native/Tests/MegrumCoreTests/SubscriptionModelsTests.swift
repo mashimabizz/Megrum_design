@@ -6,8 +6,12 @@ final class SubscriptionModelsTests: XCTestCase {
         let state = UserSubscriptionState.free
 
         XCTAssertFalse(state.isPremiumActive)
+        XCTAssertFalse(state.isMegrumPlusActive)
         XCTAssertFalse(state.hasMeguriPlus)
         XCTAssertFalse(state.suppressesAds)
+        XCTAssertFalse(state.hasUnlimitedIndividualListings)
+        XCTAssertFalse(state.prioritizesMatchDisplay)
+        XCTAssertFalse(state.hasUnlimitedGroomArchive)
         XCTAssertTrue(state.activeEntitlements().isEmpty)
     }
 
@@ -38,13 +42,31 @@ final class SubscriptionModelsTests: XCTestCase {
         XCTAssertTrue(state.suppressesAds)
     }
 
-    func testDefaultCatalogSeparatesPremiumAndMeguriPlus() {
-        let premium = SubscriptionCatalog.defaultPlans.filter { $0.entitlementKey == .premium }
-        let meguriPlus = SubscriptionCatalog.defaultPlans.filter { $0.entitlementKey == .meguriPlus }
+    func testMegrumPlusEntitlementUnlocksCurrentPaidFeatures() {
+        let state = UserSubscriptionState(
+            entitlements: [
+                UserEntitlement(key: .megrumPlus, isActive: true, source: .subscription)
+            ]
+        )
 
-        XCTAssertEqual(premium.count, 2)
-        XCTAssertEqual(meguriPlus.count, 1)
-        XCTAssertTrue(premium.allSatisfy { $0.featureIDs.contains(.adFree) })
-        XCTAssertFalse(meguriPlus[0].featureIDs.contains(.adFree))
+        XCTAssertTrue(state.isMegrumPlusActive)
+        XCTAssertTrue(state.hasUnlimitedIndividualListings)
+        XCTAssertTrue(state.prioritizesMatchDisplay)
+        XCTAssertTrue(state.hasUnlimitedGroomArchive)
+        XCTAssertFalse(state.suppressesAds)
+    }
+
+    func testDefaultCatalogUsesMegrumPlusAsCurrentPlan() {
+        let plans = SubscriptionCatalog.defaultPlans
+        let plan = plans.first
+
+        XCTAssertEqual(plans.count, 1)
+        XCTAssertEqual(plan?.planType, .megrumPlusMonthly)
+        XCTAssertEqual(plan?.productID, SubscriptionCatalog.megrumPlusMonthlyProductID)
+        XCTAssertEqual(plan?.displayName, "メグルムプラス")
+        XCTAssertEqual(plan?.priceLabel, "月 ¥500")
+        XCTAssertEqual(plan?.entitlementKey, .megrumPlus)
+        XCTAssertEqual(Set(plan?.featureIDs ?? []), Set(SubscriptionCatalog.megrumPlusFeatures))
+        XCTAssertNotNil(SubscriptionCatalog.plan(for: SubscriptionCatalog.premiumMonthlyProductID))
     }
 }

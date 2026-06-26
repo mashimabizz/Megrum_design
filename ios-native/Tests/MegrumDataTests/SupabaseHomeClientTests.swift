@@ -202,6 +202,27 @@ final class SupabaseHomeClientTests: XCTestCase {
         }
     }
 
+    func testBuildsMegrumPlusUserIDsRequestForRanking() throws {
+        let client = SupabaseHomeClient(configuration: configuration)
+        let firstUserID = uuid("22222222-2222-2222-2222-222222222222")
+        let secondUserID = uuid("33333333-3333-3333-3333-333333333333")
+
+        let request = try client.makeLoadMegrumPlusUserIDsRequest(userIDs: [firstUserID, secondUserID])
+        let body = try XCTUnwrap(request.httpBody)
+        let payload = try XCTUnwrap(JSONSerialization.jsonObject(with: body) as? [String: Any])
+        let userIDs = try XCTUnwrap(payload["p_user_ids"] as? [String])
+
+        XCTAssertEqual(request.httpMethod, "POST")
+        XCTAssertEqual(request.url?.path, "/rest/v1/rpc/list_megrum_plus_user_ids_for_viewer")
+        XCTAssertEqual(
+            userIDs,
+            [
+                "22222222-2222-2222-2222-222222222222",
+                "33333333-3333-3333-3333-333333333333"
+            ]
+        )
+    }
+
     func testDecodesHomeDTOsWithEmbeddedRelationsAndFlexibleNumericValues() throws {
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .iso8601

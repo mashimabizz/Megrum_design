@@ -47,7 +47,7 @@ struct SettingsPrimarySection: View {
             }
 
             SettingsNavigationButtonRow(
-                title: "Premium会員",
+                title: "メグルムプラス",
                 subtitle: subscriptionStatusText,
                 systemImage: "sparkles.rectangle.stack"
             ) {

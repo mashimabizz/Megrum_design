@@ -53,6 +53,7 @@ public struct GoodsItem: Identifiable, Codable, Hashable, Sendable {
     public var ownerCompletedTradeCount: Int?
     public var ownerPaymentMethods: [UserPaymentMethod]
     public var ownerPaymentNote: String?
+    public var ownerHasMegrumPlus: Bool?
 
     public init(
         id: UUID,
@@ -82,7 +83,8 @@ public struct GoodsItem: Identifiable, Codable, Hashable, Sendable {
         ownerEvaluationCount: Int? = nil,
         ownerCompletedTradeCount: Int? = nil,
         ownerPaymentMethods: [UserPaymentMethod] = [],
-        ownerPaymentNote: String? = nil
+        ownerPaymentNote: String? = nil,
+        ownerHasMegrumPlus: Bool? = nil
     ) {
         let normalizedQuantity = max(0, quantity)
         let normalizedLockedQuantity = max(0, lockedQuantity)
@@ -114,6 +116,7 @@ public struct GoodsItem: Identifiable, Codable, Hashable, Sendable {
         self.ownerCompletedTradeCount = ownerCompletedTradeCount
         self.ownerPaymentMethods = UserPaymentMethod.normalized(ownerPaymentMethods)
         self.ownerPaymentNote = ownerPaymentNote
+        self.ownerHasMegrumPlus = ownerHasMegrumPlus
     }
 
     public var masterDisplayName: String? {

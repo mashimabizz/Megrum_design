@@ -53,6 +53,12 @@ public struct SupabaseHomeNotificationIDRow: Decodable, Equatable, Sendable, Ide
     public var id: UUID
 }
 
+public struct SupabaseMegrumPlusUserIDRow: Decodable, Equatable, Sendable, Identifiable {
+    public var userID: UUID
+
+    public var id: UUID { userID }
+}
+
 extension SupabaseHomeUserRow {
     static let select = "id,handle,display_name,primary_area,avatar_url,gender,age,payment_methods,payment_note,is_test_account"
     static let legacySelect = "id,handle,display_name,primary_area,avatar_url,gender"
@@ -60,4 +66,16 @@ extension SupabaseHomeUserRow {
 
 extension SupabaseHomeNotificationIDRow {
     static let select = "id"
+}
+
+struct MegrumPlusUserIDsPayload: Encodable, Sendable {
+    var userIDs: [UUID]
+
+    enum CodingKeys: String, CodingKey {
+        case userIDs = "p_user_ids"
+    }
+
+    init(userIDs: [UUID]) {
+        self.userIDs = userIDs
+    }
 }

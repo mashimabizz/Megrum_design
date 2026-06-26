@@ -14,6 +14,7 @@ final class SettingsScreenTests: XCTestCase {
             AppDrawerDestination.compactItems,
             [.settings, .help]
         )
+        XCTAssertEqual(AppDrawerDestination.plusItems, [.megrumPlus])
 
         XCTAssertEqual(AppDrawerDestination.notifications.title, "通知")
         XCTAssertEqual(AppDrawerDestination.oshiSettings.title, "推し設定")
@@ -21,10 +22,12 @@ final class SettingsScreenTests: XCTestCase {
         XCTAssertEqual(AppDrawerDestination.paymentSettings.title, "支払い方法の設定")
         XCTAssertEqual(AppDrawerDestination.exchangeSettings.title, "交換条件の設定")
         XCTAssertEqual(AppDrawerDestination.help.title, "ヘルプ")
+        XCTAssertEqual(AppDrawerDestination.megrumPlus.title, "メグルムプラス")
         XCTAssertEqual(AppDrawerDestination.oshiSettings.systemImage, "sparkles")
         XCTAssertEqual(AppDrawerDestination.paymentSettings.systemImage, "yensign.circle")
         XCTAssertEqual(AppDrawerDestination.exchangeSettings.systemImage, "arrow.left.arrow.right.circle")
         XCTAssertEqual(AppDrawerDestination.settings.systemImage, "checkmark.shield")
+        XCTAssertEqual(AppDrawerDestination.megrumPlus.systemImage, "sparkles.rectangle.stack")
     }
 
     func testSettingsEssentialRoutesCoverP0Settings() {

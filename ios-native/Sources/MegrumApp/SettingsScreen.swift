@@ -112,7 +112,7 @@ struct SettingsScreen: View {
     }
 
     private var subscriptionStatusText: String {
-        appState.subscriptionState.isPremiumActive ? "有効" : "未加入"
+        appState.subscriptionState.isMegrumPlusActive ? "有効" : "未加入"
     }
 
     private var accountSummary: SettingsAccountSummary {

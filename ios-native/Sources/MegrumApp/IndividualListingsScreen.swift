@@ -14,6 +14,7 @@ struct IndividualListingsScreen: View {
     @State private var locallyEditedListings: [UUID: IndividualListing] = [:]
     @State private var didPresentInitialEditor = false
     @State private var pendingDeleteListing: IndividualListing?
+    @State private var showsMegrumPlusUpsell = false
 
     var body: some View {
         ZStack(alignment: .bottomTrailing) {
@@ -50,7 +51,7 @@ struct IndividualListingsScreen: View {
             .megrumHiddenNavigationBar()
 
             AddIndividualListingButton(title: "募集を追加") {
-                editorRoute = .create(optionKind: nil)
+                openCreateEditor(optionKind: nil)
             }
             .padding(.trailing, 18)
             .padding(.bottom, FloatingActionLayoutMetrics.bottomGapAboveFooter)
@@ -106,6 +107,11 @@ struct IndividualListingsScreen: View {
         } message: {
             Text("削除すると個別募集の一覧には表示されなくなります。")
         }
+        .sheet(isPresented: $showsMegrumPlusUpsell) {
+            NavigationStack {
+                SubscriptionSettingsScreen(appState: appState)
+            }
+        }
     }
 
     private var displayedListings: [IndividualListing] {
@@ -136,7 +142,18 @@ struct IndividualListingsScreen: View {
             return
         }
         didPresentInitialEditor = true
-        editorRoute = .create(optionKind: initialEditorOptionKind)
+        openCreateEditor(optionKind: initialEditorOptionKind)
+    }
+
+    private func openCreateEditor(optionKind: IndividualListingOptionKind?) {
+        guard MegrumPlusAccessPolicy.canCreateIndividualListing(
+            listings: displayedListings,
+            subscriptionState: appState.subscriptionState
+        ) else {
+            showsMegrumPlusUpsell = true
+            return
+        }
+        editorRoute = .create(optionKind: optionKind)
     }
 
     private func archiveListing(_ listing: IndividualListing) {

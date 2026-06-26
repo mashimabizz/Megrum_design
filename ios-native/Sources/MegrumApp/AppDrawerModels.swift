@@ -10,6 +10,7 @@ enum AppDrawerDestination: String, Identifiable {
     case schedules
     case paymentSettings
     case exchangeSettings
+    case megrumPlus
     case settings
     case help
 
@@ -21,6 +22,10 @@ enum AppDrawerDestination: String, Identifiable {
         .oshiSettings,
         .paymentSettings,
         .exchangeSettings
+    ]
+
+    static let plusItems: [AppDrawerDestination] = [
+        .megrumPlus
     ]
 
     static let compactItems: [AppDrawerDestination] = [
@@ -44,6 +49,8 @@ enum AppDrawerDestination: String, Identifiable {
             "支払い方法の設定"
         case .exchangeSettings:
             "交換条件の設定"
+        case .megrumPlus:
+            "メグルムプラス"
         case .settings:
             "設定とプライバシー"
         case .help:
@@ -67,6 +74,8 @@ enum AppDrawerDestination: String, Identifiable {
             "yensign.circle"
         case .exchangeSettings:
             "arrow.left.arrow.right.circle"
+        case .megrumPlus:
+            "sparkles.rectangle.stack"
         case .settings:
             "checkmark.shield"
         case .help:
