@@ -4,6 +4,45 @@
 
 ---
 
+## イテレーション1157：account setup body helpersを整理
+
+### 背景・問題意識
+
+`AccountSetupScreen` は、初回設定/プロフィール推し設定編集の親画面として、すでに `AccountSetupHeader` / `AccountSetupProfileForm` / `AccountSetupOshiSection` / `AccountSetupSaveSection` に表示部品が分かれている一方で、画面本体には `header` / `form` / `oshiSection` / `saveButton` という薄い computed `some View` helper が残っていた。また、推し検索とグループ選択の非同期読み込みが `body` 側の closure に直接埋まっていた。表示部品、binding、保存validation、初期ロードを維持したまま、画面bodyが実際のセクション構成を直接読める形へ寄せる。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/AccountSetupScreen.swift`
+- `header` / `form` / `oshiSection` / `saveButton` の computed view helper を削除し、既存の専用Viewを `body` 内へ直接配置した。
+- 推し検索submitの `Task` 起動を `submitOshiSearch(_:)` に分離した。
+- グループ選択時のメンバー読み込み `Task` 起動を `selectOshiGroup(_:)` に分離した。
+- `selectedOshiInputs` を非view computed varとして `init` より上へ移動し、SwiftUI view orderingを整理した。
+
+### 影響範囲
+
+- Swift Native iOS版のアカウント初期設定/推し設定編集画面内の画面構成コード。
+- プロフィール入力フォーム、推し選択セクション、保存ボタンの接続。
+- 表示部品、displayName/prefecture/search/activeGroup/selectedOshiDrafts binding、推し検索/グループ選択の読み込み、保存validation、初期推し選択seed、DB/API、状態名、表示文言、レイアウト値は変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumApp/AccountSetupScreen.swift`
+  - passed
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-account-setup-body`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-account-setup-body-tests --enable-xctest --disable-swift-testing -j 1 --filter 'AccountSetupScreenTests|OnboardingOshiSelectionTests'`
+  - passed（8 tests）
+
+### セルフレビュー結果
+
+- ✅ `AccountSetupHeader` / `AccountSetupProfileForm` / `AccountSetupOshiSection` / `AccountSetupSaveSection` の既存部品、`VStack` spacing、padding、navigation title、completion alertを維持した。
+- ✅ displayName/prefecture/search/activeGroup/selectedOshiDrafts binding、保存validation、初期推し選択seedには触れていない。
+- ✅ 推し検索/グループ選択の読み込みは同じ `Task` 起動のまま、呼び出し元だけを named method にした。
+- ✅ DB/API、状態名、表示文言、レイアウト値は変更していない。
+- ✅ 新しい状態名・用語・DB列は追加していないため、`notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション1156：oshi master footer partsを分離
 
 ### 背景・問題意識

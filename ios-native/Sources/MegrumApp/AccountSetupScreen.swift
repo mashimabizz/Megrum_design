@@ -16,6 +16,10 @@ public struct AccountSetupScreen: View {
     @State private var setupInputErrorMessage: String?
     @FocusState private var focusedField: AccountSetupFocusedField?
 
+    private var selectedOshiInputs: [AccountSetupOshiInput] {
+        OnboardingOshiSelectionLogic.accountSetupInputs(from: selectedOshiDrafts)
+    }
+
     public init(appState: MegrumAppState, mode: AccountSetupMode = .onboarding) {
         self.appState = appState
         self.mode = mode
@@ -26,10 +30,35 @@ public struct AccountSetupScreen: View {
     public var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 24) {
-                header
-                form
-                oshiSection
-                saveButton
+                AccountSetupHeader(mode: mode)
+
+                AccountSetupProfileForm(
+                    displayName: $displayName,
+                    prefecture: $prefecture,
+                    setupInputErrorMessage: $setupInputErrorMessage,
+                    focusedField: $focusedField,
+                    appErrorMessage: appState.errorMessage,
+                    onSubmit: saveFromForm
+                )
+
+                AccountSetupOshiSection(
+                    groupSearchText: $groupSearchText,
+                    activeGroup: $activeGroup,
+                    selectedOshiDrafts: $selectedOshiDrafts,
+                    setupInputErrorMessage: $setupInputErrorMessage,
+                    focusedField: $focusedField,
+                    oshiGroups: appState.oshiGroups,
+                    oshiCharacters: appState.oshiCharacters,
+                    isLoading: appState.isLoadingOshiGroups || appState.isLoadingOshiCharacters || appState.isLoadingUserOshiSelections,
+                    onSearchSubmit: submitOshiSearch,
+                    onSelectGroup: selectOshiGroup
+                )
+
+                AccountSetupSaveSection(
+                    mode: mode,
+                    isSaving: appState.isSavingAccountSetup,
+                    onSave: saveFromForm
+                )
             }
             .padding(.horizontal, 24)
             .padding(.top, 28)
@@ -49,46 +78,12 @@ public struct AccountSetupScreen: View {
         }
     }
 
-    private var header: some View {
-        AccountSetupHeader(mode: mode)
+    private func submitOshiSearch(_ searchText: String) {
+        Task { await appState.loadOshiGroups(searchText: searchText) }
     }
 
-    private var form: some View {
-        AccountSetupProfileForm(
-            displayName: $displayName,
-            prefecture: $prefecture,
-            setupInputErrorMessage: $setupInputErrorMessage,
-            focusedField: $focusedField,
-            appErrorMessage: appState.errorMessage,
-            onSubmit: saveFromForm
-        )
-    }
-
-    private var oshiSection: some View {
-        AccountSetupOshiSection(
-            groupSearchText: $groupSearchText,
-            activeGroup: $activeGroup,
-            selectedOshiDrafts: $selectedOshiDrafts,
-            setupInputErrorMessage: $setupInputErrorMessage,
-            focusedField: $focusedField,
-            oshiGroups: appState.oshiGroups,
-            oshiCharacters: appState.oshiCharacters,
-            isLoading: appState.isLoadingOshiGroups || appState.isLoadingOshiCharacters || appState.isLoadingUserOshiSelections,
-            onSearchSubmit: { searchText in
-                Task { await appState.loadOshiGroups(searchText: searchText) }
-            },
-            onSelectGroup: { group in
-                Task { await appState.loadOshiCharacters(group: group) }
-            }
-        )
-    }
-
-    private var saveButton: some View {
-        AccountSetupSaveSection(
-            mode: mode,
-            isSaving: appState.isSavingAccountSetup,
-            onSave: saveFromForm
-        )
+    private func selectOshiGroup(_ group: OshiGroup) {
+        Task { await appState.loadOshiCharacters(group: group) }
     }
 
     private func saveFromForm() {
@@ -116,10 +111,6 @@ public struct AccountSetupScreen: View {
         if completed, mode == .edit {
             showsCompletionAlert = true
         }
-    }
-
-    private var selectedOshiInputs: [AccountSetupOshiInput] {
-        OnboardingOshiSelectionLogic.accountSetupInputs(from: selectedOshiDrafts)
     }
 
     private func prepareInitialOshiState() async {
