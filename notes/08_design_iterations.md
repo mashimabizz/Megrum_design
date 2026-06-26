@@ -4,6 +4,48 @@
 
 ---
 
+## イテレーション1171：proposal controlsを小さなViewへ分離
+
+### 背景・問題意識
+
+打診作成のフッターと現金入力に、主ボタン、背景、金額入力field、参考行リストを直接組み立てる表示ブロックが残っていた。ボタン状態、number pad、金額正規化、参考行の見た目を維持したまま、各部品を専用Viewへ分ける。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/ProposalCreateBottomBarViews.swift`
+- `ProposalFlowBottomBarPrimaryButton` を追加し、主ボタンのprogress表示、gradient、shadow、disabled/opacity制御を専用Viewへ分離した。
+- `ProposalFlowBottomBarBackground` を追加し、inline時と通常時の背景切り替えを専用Viewへ分離した。
+
+#### `ios-native/Sources/MegrumApp/ProposalCreateSelectionControls.swift`
+- `ProposalCashAmountTextField` を追加し、金額入力fieldとiOS number pad指定を専用Viewへ分離した。
+- `ProposalCashReferenceRowsView` を追加し、参考行リストを専用Viewへ分離した。
+
+### 影響範囲
+
+- Swift Native iOS版の打診作成フッター。
+- 打診作成の現金入力カード。
+- ボタン文言、disabled条件、shadow/opacity、金額正規化、number pad、参考行表示、DB/API、状態名、表示文言は変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumApp/ProposalCreateBottomBarViews.swift ios-native/Sources/MegrumApp/ProposalCreateSelectionControls.swift`
+  - passed
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-proposal-controls`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-proposal-controls-tests --enable-xctest --disable-swift-testing -j 1 --filter 'ProposalCreateFlowTests|ProposalCreateSheetTests|TradeRequestDraftProposalCreateFlowTests|TradeChatAffordanceTests'`
+  - passed（112 tests）
+
+### セルフレビュー結果
+
+- ✅ 主ボタンのprogress表示、gradient、shadow、disabled、opacityを維持した。
+- ✅ inline/通常背景の切り替えとsafe area扱いを維持した。
+- ✅ 金額入力の正規化、iOS number pad、placeholder、font、alignmentを維持した。
+- ✅ 参考行のspacing、padding、font、背景を維持した。
+- ✅ DB/API、状態名、表示文言、打診作成の進行条件は変更していない。
+- ✅ 新しい状態名・用語・DB列は追加していないため、`notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション1170：proposal exchange preview contentを分離
 
 ### 背景・問題意識

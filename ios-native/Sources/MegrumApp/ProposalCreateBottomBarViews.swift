@@ -11,39 +11,17 @@ struct ProposalFlowBottomBar: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            Button(action: onPrimary) {
-                HStack(spacing: 8) {
-                    if isCreating {
-                        ProgressView()
-                            .tint(.white)
-                    }
-                    Text(primaryTitle)
-                }
-                .font(.system(size: 17, weight: .heavy, design: .rounded))
-                .foregroundStyle(.white)
-                .frame(maxWidth: .infinity)
-                .frame(minHeight: ProposalFlowBottomBarMetrics.buttonMinHeight)
-                .background(
-                    LinearGradient(
-                        colors: [
-                            MegrumTheme.lavender,
-                            MegrumTheme.lavender.opacity(0.88)
-                        ],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    ),
-                    in: RoundedRectangle(cornerRadius: ProposalFlowBottomBarMetrics.buttonCornerRadius, style: .continuous)
-                )
-                .shadow(color: MegrumTheme.lavender.opacity(canUsePrimary ? 0.28 : 0), radius: 14, y: 8)
-            }
-            .buttonStyle(.plain)
-            .disabled(!canUsePrimary)
-            .opacity(canUsePrimary ? 1 : 0.48)
+            ProposalFlowBottomBarPrimaryButton(
+                title: primaryTitle,
+                isCreating: isCreating,
+                isEnabled: canUsePrimary,
+                action: onPrimary
+            )
         }
         .padding(.horizontal, isInline ? 0 : ProposalFlowBottomBarMetrics.horizontalPadding)
         .padding(.top, isInline ? ProposalFlowBottomBarMetrics.inlineTopPadding : ProposalFlowBottomBarMetrics.topPadding)
         .padding(.bottom, isInline ? ProposalFlowBottomBarMetrics.inlineBottomPadding : ProposalFlowBottomBarMetrics.bottomPadding)
-        .background(background)
+        .background(ProposalFlowBottomBarBackground(isInline: isInline))
     }
 
     private var canUsePrimary: Bool {
@@ -57,9 +35,50 @@ struct ProposalFlowBottomBar: View {
             meetupHasTimeDraft: meetupHasTimeDraft
         )
     }
+}
 
-    @ViewBuilder
-    private var background: some View {
+private struct ProposalFlowBottomBarPrimaryButton: View {
+    var title: String
+    var isCreating: Bool
+    var isEnabled: Bool
+    var action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 8) {
+                if isCreating {
+                    ProgressView()
+                        .tint(.white)
+                }
+                Text(title)
+            }
+            .font(.system(size: 17, weight: .heavy, design: .rounded))
+            .foregroundStyle(.white)
+            .frame(maxWidth: .infinity)
+            .frame(minHeight: ProposalFlowBottomBarMetrics.buttonMinHeight)
+            .background(
+                LinearGradient(
+                    colors: [
+                        MegrumTheme.lavender,
+                        MegrumTheme.lavender.opacity(0.88)
+                    ],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                ),
+                in: RoundedRectangle(cornerRadius: ProposalFlowBottomBarMetrics.buttonCornerRadius, style: .continuous)
+            )
+            .shadow(color: MegrumTheme.lavender.opacity(isEnabled ? 0.28 : 0), radius: 14, y: 8)
+        }
+        .buttonStyle(.plain)
+        .disabled(!isEnabled)
+        .opacity(isEnabled ? 1 : 0.48)
+    }
+}
+
+private struct ProposalFlowBottomBarBackground: View {
+    var isInline: Bool
+
+    var body: some View {
         if isInline {
             Color.clear
         } else {
