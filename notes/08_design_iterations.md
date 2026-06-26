@@ -4,6 +4,44 @@
 
 ---
 
+## イテレーション1181：proposal month day cell contentを分離
+
+### 背景・問題意識
+
+打診作成の meetup 月カレンダー日セルに、日付番号、予定リスト、予定pill、今日セルの背景/枠色が同居していた。Buttonと選択actionは親セルに残し、セル内部の表示構造を小さな専用Viewへ分ける。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/ProposalMeetupMonthDayCell.swift`
+- `ProposalMeetupMonthDayCellContent` を追加し、日付番号、予定リスト、Spacerをセル内部contentとして分離した。
+- `ProposalMeetupMonthScheduleList` を追加し、最大3件の予定表示と追加件数ラベルを専用Viewへ分離した。
+- `ProposalMeetupMonthSchedulePill` を追加し、予定1件分のラベル生成、背景色、font、padding、角丸背景を専用Viewへ分離した。
+- 親セルには `Button`、padding/frame、背景/枠線、accessibility label、選択actionを残した。
+
+### 影響範囲
+
+- Swift Native iOS版の打診作成 meetup 月カレンダー日セル。
+- 日付ラベル、予定表示件数、予定pillの色/余白/角丸、今日セルの背景/枠線、tap時の週表示遷移、DB/API、状態名、表示文言は変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumApp/ProposalMeetupMonthDayCell.swift`
+  - passed
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-month-day-cell`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-month-day-cell-tests --enable-xctest --disable-swift-testing -j 1 --filter 'ProposalCreateFlowTests|ProposalCreateSheetTests|TradeRequestDraftProposalCreateFlowTests|TradeChatAffordanceTests'`
+  - passed（112 tests）
+
+### セルフレビュー結果
+
+- ✅ Button/action/accessibility labelを親セルに残し、tap時の週表示遷移を維持した。
+- ✅ 日付番号、予定ラベル、最大3件表示、追加件数ラベル、font、padding、背景色、角丸を維持した。
+- ✅ 月カレンダーgrid、週カレンダー、候補draft、打診作成の進行条件は変更していない。
+- ✅ DB/API、状態名、表示文言は変更していない。
+- ✅ 新しい状態名・用語・DB列は追加していないため、`notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション1180：proposal week candidate block配置を分離
 
 ### 背景・問題意識
