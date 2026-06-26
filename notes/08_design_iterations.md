@@ -4,6 +4,43 @@
 
 ---
 
+## イテレーション1145：oshi request selector partsを分離
+
+### 背景・問題意識
+
+`OshiRequestSheetContent` は、推し追加リクエストsheet内でkind chip群とgenre chip群を直接組み立て、genre側だけ `genreSection` computed helperとして抱えていた。sheet本体の並びと入力/選択挙動を維持したまま、kind selectorとgenre selectorを小さな専用Viewへ分離する。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/OshiRequestSheetContent.swift`
+- `OshiRequestKindSelector` を追加し、`OshiRequestKind.allCases` のchip表示とkind binding更新を移動した。
+- `OshiRequestGenreSection` を追加し、ジャンル見出し、未選択chip、genre chip表示とgenreID binding更新を移動した。
+- `OshiRequestSheetContent` はheader、name field、selector、note fieldの画面構成に寄せた。
+
+### 影響範囲
+
+- Swift Native iOS版の推し追加リクエストsheet。
+- kind chip選択、genre未選択、genre chip選択。
+- メンバー追加リクエストsheet、推し設定draft、Supabase request生成、DB/API、状態名、表示文言は変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumApp/OshiRequestSheetContent.swift`
+  - passed
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-oshi-request-sheet-content`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-oshi-request-sheet-content-tests --enable-xctest --disable-swift-testing -j 1 --filter 'OshiSettingsDraftTests|SupabaseOshiClientTests|MegrumCoreTests/testOshiRequestKindMemberSelectionBoundary'`
+  - passed（25 tests）
+
+### セルフレビュー結果
+
+- ✅ kind chipの表示順、選択状態、`kind = option` のbinding更新を維持した。
+- ✅ genre見出し、`ジャンル未選択` chip、genre chipの表示順、`genreID` のnil/selected更新を維持した。
+- ✅ name/note field、footer metrics、submit payload、Supabase request生成、DB/API、状態名、表示文言は変更していない。
+- ✅ 新しい状態名・用語・DB列は追加していないため、`notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション1144：goods create bulk CTA partsを分離
 
 ### 背景・問題意識

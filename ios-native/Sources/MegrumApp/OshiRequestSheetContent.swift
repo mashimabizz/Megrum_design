@@ -17,35 +17,10 @@ struct OshiRequestSheetContent: View {
 
             OshiRequestNameField(placeholder: "グループ・作品名", name: $name)
 
-            WrappingTagFlow(spacing: 9, rowSpacing: 9) {
-                ForEach(OshiRequestKind.allCases) { option in
-                    OshiFilterChip(title: option.displayName, isSelected: kind == option) {
-                        kind = option
-                    }
-                }
-            }
+            OshiRequestKindSelector(kind: $kind)
 
-            genreSection
+            OshiRequestGenreSection(genres: genres, genreID: $genreID)
             OshiRequestNoteField(note: $note)
-        }
-    }
-
-    private var genreSection: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text("ジャンル")
-                .font(.system(size: 14, weight: .black, design: .rounded))
-                .foregroundStyle(MegrumTheme.muted)
-
-            WrappingTagFlow(spacing: 9, rowSpacing: 9) {
-                OshiFilterChip(title: "ジャンル未選択", isSelected: genreID == nil) {
-                    genreID = nil
-                }
-                ForEach(genres) { genre in
-                    OshiFilterChip(title: genre.name, isSelected: genreID == genre.id) {
-                        genreID = genre.id
-                    }
-                }
-            }
         }
     }
 }
@@ -115,6 +90,44 @@ private struct OshiRequestHeader: View {
                     .background(.black.opacity(0.04), in: Circle())
             }
             .buttonStyle(.plain)
+        }
+    }
+}
+
+private struct OshiRequestKindSelector: View {
+    @Binding var kind: OshiRequestKind
+
+    var body: some View {
+        WrappingTagFlow(spacing: 9, rowSpacing: 9) {
+            ForEach(OshiRequestKind.allCases) { option in
+                OshiFilterChip(title: option.displayName, isSelected: kind == option) {
+                    kind = option
+                }
+            }
+        }
+    }
+}
+
+private struct OshiRequestGenreSection: View {
+    var genres: [OshiGenre]
+    @Binding var genreID: UUID?
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("ジャンル")
+                .font(.system(size: 14, weight: .black, design: .rounded))
+                .foregroundStyle(MegrumTheme.muted)
+
+            WrappingTagFlow(spacing: 9, rowSpacing: 9) {
+                OshiFilterChip(title: "ジャンル未選択", isSelected: genreID == nil) {
+                    genreID = nil
+                }
+                ForEach(genres) { genre in
+                    OshiFilterChip(title: genre.name, isSelected: genreID == genre.id) {
+                        genreID = genre.id
+                    }
+                }
+            }
         }
     }
 }
