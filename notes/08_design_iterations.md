@@ -4,6 +4,44 @@
 
 ---
 
+## イテレーション1167：trade card contentを分離
+
+### 背景・問題意識
+
+取引一覧カードの `TradeCard` に、カード本体を返す computed `some View` helper が残っていた。タップ/長押し、selection mode、未読背景、取引goods preview、meetup summary、accessibility label/hintを維持したまま、カード本体を専用Viewへ分ける。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/TradeCardViews.swift`
+- `TradeCardContent` を追加し、取引カード本体のheader、goods panel、meetup summary、divider、selection indicator、未読背景、selection disabled opacityを専用Viewへ分離した。
+- `TradeCard` は表示用presentation/goods id/accessibility算出と、tap/long press modifierの適用を担当する構成に寄せた。
+- 非View computed propertyを `body` より上に寄せ、`cardContent` の computed `some View` helper を削除した。
+
+### 影響範囲
+
+- Swift Native iOS版の取引一覧カード。
+- 取引カードのtap/long press、選択モード、未読/既読表示、goods preview、meetup summary、accessibility。
+- 表示文言、取引状態、read state、DB/API、状態名は変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumApp/TradeCardViews.swift`
+  - passed
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-trade-card-content`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-trade-card-content-tests --enable-xctest --disable-swift-testing -j 1 --filter 'TradeChatAffordanceTests|TradeMessageStateReducerTests|TradeProposalStateReducerTests'`
+  - passed（58 tests）
+
+### セルフレビュー結果
+
+- ✅ `TradeCardExclusivePressModifier`、tap/long press、selection mode hint、button accessibility traitを維持した。
+- ✅ selection indicator、未読背景gradient、disabled opacity、divider/read state表示を維持した。
+- ✅ offered/requested goodsの算出、goods preview、meetup summary、accessibility labelを維持した。
+- ✅ DB/API、状態名、表示文言、取引状態遷移は変更していない。
+- ✅ 新しい状態名・用語・DB列は追加していないため、`notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション1166：trade collapsed summary contentを分離
 
 ### 背景・問題意識

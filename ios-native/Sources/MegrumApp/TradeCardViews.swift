@@ -26,8 +26,34 @@ struct TradeCard: View {
         )
     }
 
+    private var offeredGoodsIDs: [UUID] {
+        viewerID.flatMap { proposal.goodsOffered(by: $0) } ?? proposal.senderGoodsIDs
+    }
+
+    private var requestedGoodsIDs: [UUID] {
+        viewerID.flatMap { proposal.goodsRequested(by: $0) } ?? proposal.receiverGoodsIDs
+    }
+
+    private var accessibilityLabel: String {
+        let parts = [
+            "取引",
+            presentation.readState.title,
+            proposal.exchangeMethod.displayName,
+            "ゆずるグッズ \(offeredGoodsIDs.count)件",
+            "求めるグッズ \(requestedGoodsIDs.count)件"
+        ]
+        return parts.joined(separator: "、")
+    }
+
     var body: some View {
-        cardContent
+        TradeCardContent(
+            presentation: presentation,
+            offeredItems: previewItems(for: offeredGoodsIDs),
+            requestedItems: previewItems(for: requestedGoodsIDs),
+            isSelectionMode: isSelectionMode,
+            isSelected: isSelected,
+            isSelectionEnabled: isSelectionEnabled
+        )
             .contentShape(Rectangle())
             .modifier(TradeCardExclusivePressModifier(
                 onTap: onOpen,
@@ -39,14 +65,27 @@ struct TradeCard: View {
             .accessibilityHint(isSelectionMode ? "選択状態を切り替えます" : "取引詳細をページで開きます")
     }
 
-    private var cardContent: some View {
+    private func previewItems(for ids: [UUID]) -> [GoodsItem] {
+        ids.compactMap { goodsByID[$0] }
+    }
+}
+
+private struct TradeCardContent: View {
+    var presentation: TradeCardPresentation
+    var offeredItems: [GoodsItem]
+    var requestedItems: [GoodsItem]
+    var isSelectionMode: Bool
+    var isSelected: Bool
+    var isSelectionEnabled: Bool
+
+    var body: some View {
         VStack(spacing: 0) {
             VStack(alignment: .leading, spacing: 12) {
                 TradeCardHeader(presentation: presentation)
 
                 TradeDealGoodsPanel(
-                    offeredItems: previewItems(for: offeredGoodsIDs),
-                    requestedItems: previewItems(for: requestedGoodsIDs)
+                    offeredItems: offeredItems,
+                    requestedItems: requestedItems
                 )
 
                 TradeMeetupSummaryLine(
@@ -84,28 +123,5 @@ struct TradeCard: View {
             }
         }
         .opacity(isSelectionMode && !isSelectionEnabled ? 0.48 : 1)
-    }
-
-    private func previewItems(for ids: [UUID]) -> [GoodsItem] {
-        ids.compactMap { goodsByID[$0] }
-    }
-
-    private var offeredGoodsIDs: [UUID] {
-        viewerID.flatMap { proposal.goodsOffered(by: $0) } ?? proposal.senderGoodsIDs
-    }
-
-    private var requestedGoodsIDs: [UUID] {
-        viewerID.flatMap { proposal.goodsRequested(by: $0) } ?? proposal.receiverGoodsIDs
-    }
-
-    private var accessibilityLabel: String {
-        let parts = [
-            "取引",
-            presentation.readState.title,
-            proposal.exchangeMethod.displayName,
-            "ゆずるグッズ \(offeredGoodsIDs.count)件",
-            "求めるグッズ \(requestedGoodsIDs.count)件"
-        ]
-        return parts.joined(separator: "、")
     }
 }
