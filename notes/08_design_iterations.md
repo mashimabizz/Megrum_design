@@ -4,6 +4,45 @@
 
 ---
 
+## イテレーション1163：home viewer avatar image layerを分離
+
+### 背景・問題意識
+
+`HomeDiscoveryViewerAvatar` はホーム上部のユーザーアバターとして、グラデーション背景、画像読み込み、fallback初期文字、stroke、shadowを1つのbody内で扱っていた。背景・装飾・表示サイズはそのままに、AsyncImageのphase分岐とfallback初期文字を専用Viewへ分け、ホームchrome側の部品として読みやすくする。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/HomeDiscoveryViewerAvatar.swift`
+- `HomeDiscoveryViewerAvatarImageLayer` を追加し、avatar URLの有無、AsyncImage success/default、circle clipを専用Viewへ移動した。
+- `HomeDiscoveryViewerAvatarFallbackInitial` を追加し、初期文字のfont/foreground表示を専用Viewへ移動した。
+- `HomeDiscoveryViewerAvatar` はavatar URLと初期文字を算出し、グラデーション背景、stroke、shadowを持つ構成に寄せた。
+- `fallbackInitial` computed `some View` helper を削除した。
+
+### 影響範囲
+
+- Swift Native iOS版ホーム上部のviewer avatar。
+- `HomeDiscoveryExperienceChrome` から利用される `HomeDiscoveryViewerAvatar`。
+- avatar URL、displayName先頭文字、fallback文字 `M`、font、foreground、gradient、stroke、shadow、DB/API、状態名、表示文言は変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumApp/HomeDiscoveryViewerAvatar.swift`
+  - passed
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-home-viewer-avatar`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-home-viewer-avatar-tests --enable-xctest --disable-swift-testing -j 1 --filter 'HomeScreenFlowTests'`
+  - passed（45 tests）
+
+### セルフレビュー結果
+
+- ✅ avatar URLがある場合の `AsyncImage` success表示、default時のfallback初期文字、circle clipを維持した。
+- ✅ avatar URLがない場合のfallback文字 `M` / displayName先頭文字を維持した。
+- ✅ グラデーション背景、白stroke、shadow、font、foregroundを維持した。
+- ✅ DB/API、状態名、表示文言、ホームのルーティングや候補ロジックは変更していない。
+- ✅ 新しい状態名・用語・DB列は追加していないため、`notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション1162：listing condition thumbnail image layerを分離
 
 ### 背景・問題意識
