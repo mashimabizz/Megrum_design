@@ -25,6 +25,36 @@ struct SettingsMenuRowLabel: View {
     }
 }
 
+struct SettingsNavigationButtonRow: View {
+    var title: String
+    var subtitle: String
+    var systemImage: String
+    var badgeCount: Int = 0
+    var action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 12) {
+                SettingsMenuRowLabel(
+                    title: title,
+                    subtitle: subtitle,
+                    systemImage: systemImage,
+                    badgeCount: badgeCount
+                )
+
+                Spacer(minLength: 12)
+
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(Color.secondary.opacity(0.56))
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("\(title)、\(subtitle)")
+    }
+}
+
 private struct SettingsMenuRowTextStack: View {
     var title: String
     var subtitle: String

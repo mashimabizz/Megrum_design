@@ -8,41 +8,26 @@ struct SettingsPrimarySection: View {
     var pushNotificationStatusText: String
     var addressStatusText: String
     var subscriptionStatusText: String
-    var onOpenNotificationDestination: (MegrumTab) -> Void
-    var onOpenNotificationRouteIntent: (NotificationRouteIntent) -> Bool
+    var onOpenRoute: (SettingsEssentialRoute) -> Void
     var onSetPushNotificationsEnabled: @MainActor @Sendable (Bool) -> Void
-    @Environment(\.dismiss) private var dismiss
 
     var body: some View {
         Section {
-            NavigationLink {
-                OwnProfileScreen(appState: appState)
-            } label: {
-                SettingsMenuRowLabel(
-                    title: "自分のプロフィール",
-                    subtitle: profileStatusText,
-                    systemImage: "person.crop.circle"
-                )
+            SettingsNavigationButtonRow(
+                title: "自分のプロフィール",
+                subtitle: profileStatusText,
+                systemImage: "person.crop.circle"
+            ) {
+                onOpenRoute(.profile)
             }
 
-            NavigationLink {
-                NotificationCenterScreen(appState: appState) { tab in
-                    dismiss()
-                    onOpenNotificationDestination(tab)
-                } onOpenRouteIntent: { intent in
-                    if onOpenNotificationRouteIntent(intent) {
-                        dismiss()
-                        return true
-                    }
-                    return false
-                }
-            } label: {
-                SettingsMenuRowLabel(
-                    title: "通知",
-                    subtitle: notificationStatusText,
-                    systemImage: "bell",
-                    badgeCount: appState.unreadNotificationCount
-                )
+            SettingsNavigationButtonRow(
+                title: "通知",
+                subtitle: notificationStatusText,
+                systemImage: "bell",
+                badgeCount: appState.unreadNotificationCount
+            ) {
+                onOpenRoute(.notifications)
             }
 
             SettingsPushNotificationRow(
@@ -53,34 +38,28 @@ struct SettingsPrimarySection: View {
                 onToggle: onSetPushNotificationsEnabled
             )
 
-            NavigationLink {
-                AddressSettingsScreen(appState: appState)
-            } label: {
-                SettingsMenuRowLabel(
-                    title: "住所設定",
-                    subtitle: addressStatusText,
-                    systemImage: "shippingbox"
-                )
+            SettingsNavigationButtonRow(
+                title: "住所設定",
+                subtitle: addressStatusText,
+                systemImage: "shippingbox"
+            ) {
+                onOpenRoute(.address)
             }
 
-            NavigationLink {
-                SubscriptionSettingsScreen(appState: appState)
-            } label: {
-                SettingsMenuRowLabel(
-                    title: "Premium会員",
-                    subtitle: subscriptionStatusText,
-                    systemImage: "sparkles.rectangle.stack"
-                )
+            SettingsNavigationButtonRow(
+                title: "Premium会員",
+                subtitle: subscriptionStatusText,
+                systemImage: "sparkles.rectangle.stack"
+            ) {
+                onOpenRoute(.premium)
             }
 
-            NavigationLink {
-                BlockedUsersScreen(appState: appState)
-            } label: {
-                SettingsMenuRowLabel(
-                    title: "ブロックした人",
-                    subtitle: "一覧と解除",
-                    systemImage: "person.crop.circle.badge.xmark"
-                )
+            SettingsNavigationButtonRow(
+                title: "ブロックした人",
+                subtitle: "一覧と解除",
+                systemImage: "person.crop.circle.badge.xmark"
+            ) {
+                onOpenRoute(.blockedUsers)
             }
         }
     }
@@ -88,88 +67,67 @@ struct SettingsPrimarySection: View {
 
 @MainActor
 struct SettingsSupportAccountSection: View {
-    @ObservedObject var appState: MegrumAppState
-    var securityAuthState: MegrumAuthState
     var isSigningOut: Bool
     var accountSummary: SettingsAccountSummary
     var loginSecuritySummary: LoginSecuritySummary
-    var onSignOut: () async -> Void
+    var onOpenRoute: (SettingsEssentialRoute) -> Void
 
     var body: some View {
         Section {
-            NavigationLink {
-                SettingsHelpScreen()
-            } label: {
-                SettingsMenuRowLabel(
-                    title: "ヘルプ",
-                    subtitle: "問い合わせと困った時の確認",
-                    systemImage: "questionmark.circle"
-                )
+            SettingsNavigationButtonRow(
+                title: "ヘルプ",
+                subtitle: "問い合わせと困った時の確認",
+                systemImage: "questionmark.circle"
+            ) {
+                onOpenRoute(.help)
             }
 
-            NavigationLink {
-                PrivacySettingsScreen(appState: appState)
-            } label: {
-                SettingsMenuRowLabel(
-                    title: "プライバシーと安全",
-                    subtitle: "ブロック・公開範囲・ポリシー",
-                    systemImage: "lock.shield"
-                )
+            SettingsNavigationButtonRow(
+                title: "プライバシーと安全",
+                subtitle: "ブロック・公開範囲・ポリシー",
+                systemImage: "lock.shield"
+            ) {
+                onOpenRoute(.privacy)
             }
 
-            NavigationLink {
-                LoginSecuritySettingsScreen(
-                    authState: securityAuthState,
-                    isSigningOut: isSigningOut,
-                    accountSummary: accountSummary,
-                    onSignOut: onSignOut
-                )
-            } label: {
-                SettingsMenuRowLabel(
-                    title: "ログインとセキュリティ",
-                    subtitle: loginSecuritySummary.shortStatusText,
-                    systemImage: "person.badge.key"
-                )
+            SettingsNavigationButtonRow(
+                title: "ログインとセキュリティ",
+                subtitle: loginSecuritySummary.shortStatusText,
+                systemImage: "person.badge.key"
+            ) {
+                onOpenRoute(.loginSecurity)
             }
 
-            NavigationLink {
-                LegalDocumentScreen(kind: .terms)
-            } label: {
-                SettingsMenuRowLabel(
-                    title: "利用規約",
-                    subtitle: "公開前確認用の要約",
-                    systemImage: "doc.text"
-                )
+            SettingsNavigationButtonRow(
+                title: "利用規約",
+                subtitle: "公開前確認用の要約",
+                systemImage: "doc.text"
+            ) {
+                onOpenRoute(.terms)
             }
 
-            NavigationLink {
-                LegalDocumentScreen(kind: .privacy)
-            } label: {
-                SettingsMenuRowLabel(
-                    title: "プライバシーポリシー",
-                    subtitle: "取り扱う情報の要点",
-                    systemImage: "hand.raised"
-                )
+            SettingsNavigationButtonRow(
+                title: "プライバシーポリシー",
+                subtitle: "取り扱う情報の要点",
+                systemImage: "hand.raised"
+            ) {
+                onOpenRoute(.privacyPolicy)
             }
 
-            NavigationLink {
-                LegalDocumentScreen(kind: .commerce)
-            } label: {
-                SettingsMenuRowLabel(
-                    title: "特定商取引法に基づく表記",
-                    subtitle: "有料機能と事業者表示の入口",
-                    systemImage: "building.columns"
-                )
+            SettingsNavigationButtonRow(
+                title: "特定商取引法に基づく表記",
+                subtitle: "有料機能と事業者表示の入口",
+                systemImage: "building.columns"
+            ) {
+                onOpenRoute(.commerceDisclosure)
             }
 
-            NavigationLink {
-                AccountOverviewScreen(appState: appState)
-            } label: {
-                SettingsMenuRowLabel(
-                    title: "アカウント",
-                    subtitle: accountSummary.shortStatusText,
-                    systemImage: "person.text.rectangle"
-                )
+            SettingsNavigationButtonRow(
+                title: "アカウント",
+                subtitle: accountSummary.shortStatusText,
+                systemImage: "person.text.rectangle"
+            ) {
+                onOpenRoute(.account)
             }
         } header: {
             Text("サポートとアカウント")

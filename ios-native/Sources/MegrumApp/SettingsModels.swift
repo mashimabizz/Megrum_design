@@ -102,6 +102,7 @@ enum MailingAddressDraftValidator {
 }
 
 enum SettingsEssentialRoute: String, CaseIterable, Identifiable {
+    case profile
     case notifications
     case mobilePush
     case address

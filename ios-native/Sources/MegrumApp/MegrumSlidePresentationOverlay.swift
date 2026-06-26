@@ -31,6 +31,7 @@ extension EnvironmentValues {
 }
 
 enum MegrumSlidePresentationMetrics {
+    static let leadingEdgeCaptureWidth: CGFloat = 24
     static let minimumTranslation: CGFloat = 78
     static let minimumPredictedTranslation: CGFloat = 132
     static let horizontalDominance: CGFloat = 1.16
@@ -78,23 +79,26 @@ struct MegrumSlideBoolPresentationOverlay<PresentedContent: View>: View {
     var body: some View {
         GeometryReader { proxy in
             if isPresented {
-                content(dismissPresentation)
-                    .environment(\.megrumBackSwipeHandledBySlidePresentation, true)
-                    .environment(
-                        \.megrumSlidePresentationDismiss,
-                         MegrumSlidePresentationDismissAction(action: dismissPresentation)
-                    )
-                    .frame(width: proxy.size.width, height: proxy.size.height)
-                    .background(MegrumTheme.canvas.ignoresSafeArea())
-                    .offset(x: dragOffset)
-                    .shadow(color: MegrumTheme.ink.opacity(0.16), radius: 24, x: -8, y: 0)
-                    .contentShape(Rectangle())
-                    .simultaneousGesture(backSwipeGesture(screenWidth: proxy.size.width), including: .gesture)
-                    .transition(.asymmetric(
-                        insertion: .move(edge: .trailing),
-                        removal: .move(edge: .trailing)
-                    ))
-                    .zIndex(1)
+                ZStack(alignment: .leading) {
+                    content(dismissPresentation)
+                        .environment(\.megrumBackSwipeHandledBySlidePresentation, true)
+                        .environment(
+                            \.megrumSlidePresentationDismiss,
+                             MegrumSlidePresentationDismissAction(action: dismissPresentation)
+                        )
+                        .frame(width: proxy.size.width, height: proxy.size.height)
+                        .background(MegrumTheme.canvas.ignoresSafeArea())
+                        .offset(x: dragOffset)
+                        .shadow(color: MegrumTheme.ink.opacity(0.16), radius: 24, x: -8, y: 0)
+                        .transition(.asymmetric(
+                            insertion: .move(edge: .trailing),
+                            removal: .move(edge: .trailing)
+                        ))
+                        .zIndex(1)
+
+                    leadingEdgeSwipeCaptureArea(screenWidth: proxy.size.width, screenHeight: proxy.size.height)
+                        .zIndex(2)
+                }
             }
         }
         .ignoresSafeArea()
@@ -137,6 +141,13 @@ struct MegrumSlideBoolPresentationOverlay<PresentedContent: View>: View {
             }
     }
 
+    private func leadingEdgeSwipeCaptureArea(screenWidth: CGFloat, screenHeight: CGFloat) -> some View {
+        Color.black.opacity(0.001)
+            .frame(width: MegrumSlidePresentationMetrics.leadingEdgeCaptureWidth, height: screenHeight)
+            .contentShape(Rectangle())
+            .gesture(backSwipeGesture(screenWidth: screenWidth), including: .gesture)
+    }
+
     private func dismissPresentation() {
         withAnimation(MegrumSlidePresentationMetrics.animation) {
             isPresented = false
@@ -176,23 +187,26 @@ struct MegrumSlideItemPresentationOverlay<Item: Identifiable, PresentedContent: 
     var body: some View {
         GeometryReader { proxy in
             if let item {
-                content(item, dismissPresentation)
-                    .environment(\.megrumBackSwipeHandledBySlidePresentation, true)
-                    .environment(
-                        \.megrumSlidePresentationDismiss,
-                         MegrumSlidePresentationDismissAction(action: dismissPresentation)
-                    )
-                    .frame(width: proxy.size.width, height: proxy.size.height)
-                    .background(MegrumTheme.canvas.ignoresSafeArea())
-                    .offset(x: dragOffset)
-                    .shadow(color: MegrumTheme.ink.opacity(0.16), radius: 24, x: -8, y: 0)
-                    .contentShape(Rectangle())
-                    .simultaneousGesture(backSwipeGesture(screenWidth: proxy.size.width), including: .gesture)
-                    .transition(.asymmetric(
-                        insertion: .move(edge: .trailing),
-                        removal: .move(edge: .trailing)
-                    ))
-                    .zIndex(1)
+                ZStack(alignment: .leading) {
+                    content(item, dismissPresentation)
+                        .environment(\.megrumBackSwipeHandledBySlidePresentation, true)
+                        .environment(
+                            \.megrumSlidePresentationDismiss,
+                             MegrumSlidePresentationDismissAction(action: dismissPresentation)
+                        )
+                        .frame(width: proxy.size.width, height: proxy.size.height)
+                        .background(MegrumTheme.canvas.ignoresSafeArea())
+                        .offset(x: dragOffset)
+                        .shadow(color: MegrumTheme.ink.opacity(0.16), radius: 24, x: -8, y: 0)
+                        .transition(.asymmetric(
+                            insertion: .move(edge: .trailing),
+                            removal: .move(edge: .trailing)
+                        ))
+                        .zIndex(1)
+
+                    leadingEdgeSwipeCaptureArea(screenWidth: proxy.size.width, screenHeight: proxy.size.height)
+                        .zIndex(2)
+                }
             }
         }
         .ignoresSafeArea()
@@ -233,6 +247,13 @@ struct MegrumSlideItemPresentationOverlay<Item: Identifiable, PresentedContent: 
                     resetDismissDrag(animated: true)
                 }
             }
+    }
+
+    private func leadingEdgeSwipeCaptureArea(screenWidth: CGFloat, screenHeight: CGFloat) -> some View {
+        Color.black.opacity(0.001)
+            .frame(width: MegrumSlidePresentationMetrics.leadingEdgeCaptureWidth, height: screenHeight)
+            .contentShape(Rectangle())
+            .gesture(backSwipeGesture(screenWidth: screenWidth), including: .gesture)
     }
 
     private func dismissPresentation() {

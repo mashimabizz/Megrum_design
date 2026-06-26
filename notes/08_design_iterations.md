@@ -4,6 +4,62 @@
 
 ---
 
+## イテレーション1218：設定画面の閉じると項目遷移を復旧
+
+### 背景・問題意識
+
+オーナーから、設定画面を開いた後に左上の「閉じる」を押しても閉じず、設定内の各項目を押しても該当ページへ遷移しないという指摘があった。カスタムスライド表示内で、設定画面のdismiss経路と項目タップのNavigationLinkが期待通りに動いていなかった。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/MegrumSlidePresentationOverlay.swift`
+- スライド表示の戻るスワイプ検知を画面全体から左端24ptのキャプチャ領域に限定した。
+- 画面中央やリスト行のタップをスワイプジェスチャが取りに行かないようにしつつ、左端スワイプで閉じる挙動は維持した。
+
+#### `ios-native/Sources/MegrumApp/SettingsScreen.swift`
+#### `ios-native/Sources/MegrumApp/SettingsScreenSections.swift`
+#### `ios-native/Sources/MegrumApp/SettingsMenuRowLabel.swift`
+#### `ios-native/Sources/MegrumApp/SettingsModels.swift`
+- 設定画面自身が `NavigationStack(path:)` を持ち、設定項目は明示的なroute pushで遷移するようにした。
+- `NavigationLink` 行を `SettingsNavigationButtonRow` に置き換え、プロフィール、通知、住所設定、Premium、ブロック、ヘルプ、プライバシー、ログインとセキュリティ、法務、アカウントの各入口を同じ経路で開くようにした。
+- 「閉じる」は親スライドから渡された `onClose` を優先し、通常sheet表示では `dismiss()` にfallbackするようにした。
+
+#### `ios-native/Sources/MegrumApp/MegrumRootDrawerDestinationSheet.swift`
+- 設定画面は外側の `NavigationStack` で二重に包まず、`SettingsScreen` 側のスタックへ委譲した。
+- ドロワーのヘルプ入口は `SettingsHelpScreen` を直接開き、「閉じる」で親スライドを閉じるようにした。
+
+### 影響範囲
+
+- Swift Native iOS のドロワーから開く設定画面、設定内の項目遷移、設定/ヘルプのスライドdismiss。
+- 設定項目の保存処理、DB schema、状態名、用語、Supabase API payload は変更していない。
+- 状態名・用語・データモデルの追加変更はないため、`notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の追加更新は不要。
+
+### 確認方法
+
+- `git diff --check`
+  - passed
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-settings-slide-build`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-settings-slide-tests --enable-xctest --disable-swift-testing -j 1 --filter SettingsScreenTests`
+  - passed（18 tests, 0 failures）
+- `xcodebuild -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -configuration Debug -destination 'platform=iOS Simulator,id=C70DDDBB-2602-49E0-8F95-1F043BCCED76' -derivedDataPath /tmp/megrum-ios-native-settings-slide-xcode -quiet build`
+  - passed
+- Simulator確認
+  - `iPhone 17 / iOS 26.5`
+  - `xcrun simctl install C70DDDBB-2602-49E0-8F95-1F043BCCED76 /tmp/megrum-ios-native-settings-slide-xcode/Build/Products/Debug-iphonesimulator/MegrumNative.app`
+  - `SIMCTL_CHILD_MEGRUM_VISUAL_QA_PREVIEW_AUTH=1 SIMCTL_CHILD_MEGRUM_VISUAL_QA_INITIAL_SCREEN=drawer-open xcrun simctl launch --terminate-running-process C70DDDBB-2602-49E0-8F95-1F043BCCED76 tokyo.megrum.native.preview`
+  - baguetteで設定画面を開き、ヘルプ行タップで「ヘルプ」画面、住所設定行タップで「住所設定」画面へ遷移することを確認した。
+  - baguetteで設定画面の「閉じる」をタップし、設定スライドが閉じてホーム画面へ戻ることを確認した。
+
+### セルフレビュー結果
+
+- ✅ 設定画面の「閉じる」は、ドロワーの親スライド状態を閉じる明示経路へ接続した。
+- ✅ 設定内の項目はSwiftUI標準の `NavigationStack(path:)` で遷移し、画面ごとの既存実装は維持した。
+- ✅ 左端スワイプの閉じる操作は残しつつ、リスト行のタップと競合しない範囲に限定した。
+- ✅ 保存処理、状態名、用語、DB schema、Supabase migration は変更していない。
+
+---
+
 ## イテレーション1217：支払い設定永続化と取引完了時のグッズ反映
 
 ### 背景・問題意識

@@ -7,61 +7,65 @@ struct SettingsScreen: View {
     @ObservedObject var appState: MegrumAppState
     var onOpenNotificationDestination: (MegrumTab) -> Void = { _ in }
     var onOpenNotificationRouteIntent: (NotificationRouteIntent) -> Bool = { _ in false }
+    var onClose: (() -> Void)?
     var onSignOut: () async -> Void = {}
     @Environment(\.dismiss) private var dismiss
     @StateObject private var securityAuthState: MegrumAuthState
     @State private var isSigningOut = false
+    @State private var navigationPath: [SettingsEssentialRoute] = []
 
     init(
         appState: MegrumAppState,
         onOpenNotificationDestination: @escaping (MegrumTab) -> Void = { _ in },
         onOpenNotificationRouteIntent: @escaping (NotificationRouteIntent) -> Bool = { _ in false },
+        onClose: (() -> Void)? = nil,
         securityAuthState: MegrumAuthState? = nil,
         onSignOut: @escaping () async -> Void = {}
     ) {
         self.appState = appState
         self.onOpenNotificationDestination = onOpenNotificationDestination
         self.onOpenNotificationRouteIntent = onOpenNotificationRouteIntent
+        self.onClose = onClose
         self.onSignOut = onSignOut
         _securityAuthState = StateObject(wrappedValue: securityAuthState ?? MegrumAuthStateFactory.makeDefault())
     }
 
     var body: some View {
-        List {
-            SettingsPrimarySection(
-                appState: appState,
-                profileStatusText: profileStatusText,
-                notificationStatusText: notificationStatusText,
-                pushNotificationStatusText: pushNotificationStatusText,
-                addressStatusText: addressStatusText,
-                subscriptionStatusText: subscriptionStatusText,
-                onOpenNotificationDestination: onOpenNotificationDestination,
-                onOpenNotificationRouteIntent: onOpenNotificationRouteIntent,
-                onSetPushNotificationsEnabled: setPushNotificationsEnabled
-            )
+        NavigationStack(path: $navigationPath) {
+            List {
+                SettingsPrimarySection(
+                    appState: appState,
+                    profileStatusText: profileStatusText,
+                    notificationStatusText: notificationStatusText,
+                    pushNotificationStatusText: pushNotificationStatusText,
+                    addressStatusText: addressStatusText,
+                    subscriptionStatusText: subscriptionStatusText,
+                    onOpenRoute: openRoute,
+                    onSetPushNotificationsEnabled: setPushNotificationsEnabled
+                )
 
-            SettingsSupportAccountSection(
-                appState: appState,
-                securityAuthState: securityAuthState,
-                isSigningOut: isSigningOut,
-                accountSummary: accountSummary,
-                loginSecuritySummary: loginSecuritySummary,
-                onSignOut: {
-                    await performSignOut(dismissSettings: true)
-                }
-            )
+                SettingsSupportAccountSection(
+                    isSigningOut: isSigningOut,
+                    accountSummary: accountSummary,
+                    loginSecuritySummary: loginSecuritySummary,
+                    onOpenRoute: openRoute
+                )
 
-            SettingsDangerSection(
-                isSigningOut: isSigningOut,
-                onSignOut: startSignOut
-            )
-        }
-        .navigationTitle("設定")
-        .megrumInlineNavigationTitle()
-        .toolbar {
-            ToolbarItem(placement: .cancellationAction) {
-                Button("閉じる") {
-                    dismiss()
+                SettingsDangerSection(
+                    isSigningOut: isSigningOut,
+                    onSignOut: startSignOut
+                )
+            }
+            .navigationTitle("設定")
+            .megrumInlineNavigationTitle()
+            .navigationDestination(for: SettingsEssentialRoute.self) { route in
+                destination(for: route)
+            }
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("閉じる") {
+                        closeSettings()
+                    }
                 }
             }
         }
@@ -134,6 +138,62 @@ struct SettingsScreen: View {
         }
     }
 
+    private func openRoute(_ route: SettingsEssentialRoute) {
+        navigationPath.append(route)
+    }
+
+    @ViewBuilder
+    private func destination(for route: SettingsEssentialRoute) -> some View {
+        switch route {
+        case .profile:
+            OwnProfileScreen(appState: appState)
+        case .notifications:
+            NotificationCenterScreen(appState: appState) { tab in
+                closeSettings()
+                onOpenNotificationDestination(tab)
+            } onOpenRouteIntent: { intent in
+                if onOpenNotificationRouteIntent(intent) {
+                    closeSettings()
+                    return true
+                }
+                return false
+            }
+        case .mobilePush:
+            EmptyView()
+        case .address:
+            AddressSettingsScreen(appState: appState)
+        case .payment:
+            PaymentSettingsScreen(appState: appState)
+        case .premium:
+            SubscriptionSettingsScreen(appState: appState)
+        case .blockedUsers:
+            BlockedUsersScreen(appState: appState)
+        case .privacy:
+            PrivacySettingsScreen(appState: appState)
+        case .loginSecurity:
+            LoginSecuritySettingsScreen(
+                authState: securityAuthState,
+                isSigningOut: isSigningOut,
+                accountSummary: accountSummary,
+                onSignOut: {
+                    await performSignOut(dismissSettings: true)
+                }
+            )
+        case .help:
+            SettingsHelpScreen()
+        case .terms:
+            LegalDocumentScreen(kind: .terms)
+        case .privacyPolicy:
+            LegalDocumentScreen(kind: .privacy)
+        case .commerceDisclosure:
+            LegalDocumentScreen(kind: .commerce)
+        case .account:
+            AccountOverviewScreen(appState: appState)
+        case .logout:
+            EmptyView()
+        }
+    }
+
     private func loadInitialSettingsData() async {
         if appState.mailingAddress == nil {
             await appState.loadMailingAddress()
@@ -155,6 +215,14 @@ struct SettingsScreen: View {
         isSigningOut = false
 
         if dismissSettings {
+            closeSettings()
+        }
+    }
+
+    private func closeSettings() {
+        if let onClose {
+            onClose()
+        } else {
             dismiss()
         }
     }

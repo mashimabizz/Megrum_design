@@ -12,9 +12,39 @@ struct MegrumRootDrawerDestinationSheet: View {
     var onClose: () -> Void = {}
 
     var body: some View {
-        NavigationStack {
-            destinationContent
+        switch destination {
+        case .settings:
+            settingsScreen
+        case .help:
+            NavigationStack {
+                SettingsHelpScreen()
+                    .toolbar {
+                        ToolbarItem(placement: .cancellationAction) {
+                            Button("閉じる", action: onClose)
+                        }
+                    }
+            }
+        default:
+            NavigationStack {
+                destinationContent
+            }
         }
+    }
+
+    private var settingsScreen: some View {
+        SettingsScreen(
+            appState: appState,
+            onOpenNotificationDestination: { tab in
+                selectedTab = tab
+                drawerDestination = nil
+            },
+            onOpenNotificationRouteIntent: { intent in
+                openNotificationRouteIntent(intent)
+            },
+            onClose: onClose,
+            securityAuthState: authState,
+            onSignOut: signOut
+        )
     }
 
     @ViewBuilder
@@ -40,18 +70,7 @@ struct MegrumRootDrawerDestinationSheet: View {
         case .exchangeSettings:
             HomeExchangeSettingsScreen(individualListings: appState.listings, onClose: onClose)
         case .settings, .help:
-            SettingsScreen(
-                appState: appState,
-                onOpenNotificationDestination: { tab in
-                    selectedTab = tab
-                    drawerDestination = nil
-                },
-                onOpenNotificationRouteIntent: { intent in
-                    openNotificationRouteIntent(intent)
-                },
-                securityAuthState: authState,
-                onSignOut: signOut
-            )
+            EmptyView()
         }
     }
 
