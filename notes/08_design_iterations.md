@@ -4,6 +4,44 @@
 
 ---
 
+## イテレーション1140：individual listing bottom bar partsを分離
+
+### 背景・問題意識
+
+`IndividualListingEditorBottomBar` は、親Viewの中にstep別action row、logic control row、primary/select/add option buttonの組み立てまで抱えていた。個別募集editorの下部操作の見た目と分岐は維持したまま、親Viewを表示条件とstate/action wiringへ寄せる。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/IndividualListingEditorBottomBar.swift`
+- `IndividualListingBottomBarLogicControls` を追加し、選択件数ラベルと `IndividualListingFooterLogicSegment` の表示を移動した。
+- `IndividualListingBottomBarActionRow` を追加し、step別の戻る/primary/すべて登録/選択肢追加button行を移動した。
+- `logicAllTitle` を追加し、haves/options/conditionごとのlogic title分岐を親側の算出値として明示した。
+- `IndividualListingEditorBottomBarPresentation` と既存button部品は変更していない。
+
+### 影響範囲
+
+- Swift Native iOS版の個別募集editor下部bar。
+- haves/options/exchange各stepの下部button行、logic segment、選択件数表示。
+- 個別募集draft、保存/更新/削除、選択状態、DB/API、状態名、表示文言は変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumApp/IndividualListingEditorBottomBar.swift`
+  - passed
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-individual-listing-bottom-bar-parts`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-individual-listing-bottom-bar-parts --enable-xctest --disable-swift-testing -j 1 --filter 'IndividualListingDraftTests|IndividualListingStateReducerTests|SupabaseListingClientTests'`
+  - passed（50 tests）
+
+### セルフレビュー結果
+
+- ✅ haves/options/exchangeごとのbutton title、button spacing、戻るbutton、primary button、すべて登録button、選択肢追加buttonの表示条件を維持した。
+- ✅ logic controlの表示条件、選択件数、`すべて譲る` / `全部ほしい` / `すべて希望` のtitle分岐、minimum count bindingを維持した。
+- ✅ 個別募集draft、保存/更新/削除、選択状態、DB/API、状態名、表示文言は変更していない。
+- ✅ 新しい状態名・用語・DB列は追加していないため、`notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション1139：individual listing top bar partsを分離
 
 ### 背景・問題意識

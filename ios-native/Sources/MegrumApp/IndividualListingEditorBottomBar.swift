@@ -37,10 +37,28 @@ struct IndividualListingEditorBottomBar: View {
     var body: some View {
         VStack(spacing: 13) {
             if showsLogicControls {
-                logicControlRow
+                IndividualListingBottomBarLogicControls(
+                    logic: logicBinding,
+                    minimumCount: minimumCountBinding,
+                    selectedCount: displayedSelectedCount,
+                    allowsMinimumLogic: allowsMinimumLogic,
+                    showsSingleChoiceButton: showsSingleChoiceButton,
+                    allTitle: logicAllTitle
+                )
             }
 
-            actionRow
+            IndividualListingBottomBarActionRow(
+                step: step,
+                showsSelectAllVisibleButton: showsSelectAllVisibleButton,
+                selectAllVisibleButtonTitle: selectAllVisibleButtonTitle,
+                canSelectAllVisible: canSelectAllVisible,
+                isDisabled: isDisabled,
+                isSaving: isSaving,
+                onBack: onBack,
+                onSelectAllVisible: onSelectAllVisible,
+                onAddOption: onAddOption,
+                onPrimary: onPrimary
+            )
         }
         .padding(.horizontal, 20)
         .padding(.top, 12)
@@ -53,34 +71,6 @@ struct IndividualListingEditorBottomBar: View {
         }
     }
 
-    @ViewBuilder
-    private var actionRow: some View {
-        Group {
-            if step == .exchange {
-                HStack(spacing: 15) {
-                    IndividualListingEditorBackBottomBarButton(action: onBack)
-
-                    primaryButton(title: "保存する")
-                }
-            } else if step == .options {
-                HStack(spacing: 10) {
-                    if showsSelectAllVisibleButton {
-                        selectAllVisibleButton
-                    }
-                    secondaryAddOptionButton
-                    primaryButton(title: "交換条件へ進む")
-                }
-            } else {
-                HStack(spacing: 10) {
-                    if showsSelectAllVisibleButton {
-                        selectAllVisibleButton
-                    }
-                    primaryButton(title: "この内容で次へ")
-                }
-            }
-        }
-    }
-
     private var showsLogicControls: Bool {
         if step == .haves {
             return havesTab == .goods && selectedHaveCount > 1
@@ -90,26 +80,6 @@ struct IndividualListingEditorBottomBar: View {
                 || (optionKind == .condition && usesConditionLogicChoice)
         }
         return false
-    }
-
-    private var logicControlRow: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text(IndividualListingEditorBottomBarPresentation.selectedCountTitle(displayedSelectedCount))
-                .font(.system(size: 14, weight: .black, design: .rounded))
-                .foregroundStyle(MegrumTheme.lavender)
-                .lineLimit(1)
-                .minimumScaleFactor(0.72)
-                .layoutPriority(1)
-            IndividualListingFooterLogicSegment(
-                selection: logicBinding,
-                minimumCount: minimumCountBinding,
-                selectedCount: displayedSelectedCount,
-                allowsMinimumLogic: allowsMinimumLogic,
-                showsSingleChoiceButton: showsSingleChoiceButton,
-                allTitle: step == .haves ? "すべて譲る" : (optionKind == .condition ? "全部ほしい" : "すべて希望")
-            )
-            .frame(maxWidth: .infinity)
-        }
     }
 
     private var displayedSelectedCount: Int {
@@ -135,13 +105,76 @@ struct IndividualListingEditorBottomBar: View {
         step == .options && optionKind == .condition
     }
 
-    private func primaryButton(title: String) -> some View {
-        IndividualListingEditorPrimaryBottomBarButton(
-            title: title,
-            isSaving: isSaving,
-            isDisabled: isDisabled,
-            action: onPrimary
-        )
+    private var logicAllTitle: String {
+        step == .haves ? "すべて譲る" : (optionKind == .condition ? "全部ほしい" : "すべて希望")
+    }
+}
+
+private struct IndividualListingBottomBarLogicControls: View {
+    @Binding var logic: ListingLogic
+    @Binding var minimumCount: Int
+    var selectedCount: Int
+    var allowsMinimumLogic: Bool
+    var showsSingleChoiceButton: Bool
+    var allTitle: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(IndividualListingEditorBottomBarPresentation.selectedCountTitle(selectedCount))
+                .font(.system(size: 14, weight: .black, design: .rounded))
+                .foregroundStyle(MegrumTheme.lavender)
+                .lineLimit(1)
+                .minimumScaleFactor(0.72)
+                .layoutPriority(1)
+            IndividualListingFooterLogicSegment(
+                selection: $logic,
+                minimumCount: $minimumCount,
+                selectedCount: selectedCount,
+                allowsMinimumLogic: allowsMinimumLogic,
+                showsSingleChoiceButton: showsSingleChoiceButton,
+                allTitle: allTitle
+            )
+            .frame(maxWidth: .infinity)
+        }
+    }
+}
+
+private struct IndividualListingBottomBarActionRow: View {
+    var step: IndividualListingEditorStep
+    var showsSelectAllVisibleButton: Bool
+    var selectAllVisibleButtonTitle: String
+    var canSelectAllVisible: Bool
+    var isDisabled: Bool
+    var isSaving: Bool
+    var onBack: () -> Void
+    var onSelectAllVisible: () -> Void
+    var onAddOption: () -> Void
+    var onPrimary: () -> Void
+
+    @ViewBuilder
+    var body: some View {
+        if step == .exchange {
+            HStack(spacing: 15) {
+                IndividualListingEditorBackBottomBarButton(action: onBack)
+
+                primaryButton(title: "保存する")
+            }
+        } else if step == .options {
+            HStack(spacing: 10) {
+                if showsSelectAllVisibleButton {
+                    selectAllVisibleButton
+                }
+                secondaryAddOptionButton
+                primaryButton(title: "交換条件へ進む")
+            }
+        } else {
+            HStack(spacing: 10) {
+                if showsSelectAllVisibleButton {
+                    selectAllVisibleButton
+                }
+                primaryButton(title: "この内容で次へ")
+            }
+        }
     }
 
     private var selectAllVisibleButton: some View {
@@ -162,5 +195,14 @@ struct IndividualListingEditorBottomBar: View {
 
     private var secondaryAddOptionButtonWidth: CGFloat {
         showsSelectAllVisibleButton ? 116 : 136
+    }
+
+    private func primaryButton(title: String) -> some View {
+        IndividualListingEditorPrimaryBottomBarButton(
+            title: title,
+            isSaving: isSaving,
+            isDisabled: isDisabled,
+            action: onPrimary
+        )
     }
 }
