@@ -1,18 +1,17 @@
 import MegrumDesign
-import PhotosUI
 import SwiftUI
 
 struct TradeMessageOverflowMenu: View {
     var actions: [TradeMessageOverflowActionKind]
-    @Binding var selectedChatPhotoItem: PhotosPickerItem?
-    @Binding var selectedOutfitPhotoItem: PhotosPickerItem?
     var isSending: Bool
     var canUseCamera: Bool
     var onOpenSchedule: () -> Void
     var onSendArrivalStatus: (TradeArrivalQuickAction) -> Void
     var onOpenLocationPlaceholder: () -> Void
     var onOpenChatCamera: () -> Void
+    var onOpenChatLibrary: () -> Void
     var onOpenOutfitCamera: () -> Void
+    var onOpenOutfitLibrary: () -> Void
     var onCounterProposal: () -> Void
     var onRequestLate: () -> Void
     var onRequestCancel: () -> Void
@@ -61,7 +60,7 @@ struct TradeMessageOverflowMenu: View {
             .disabled(!canUseCamera || isSending)
 #endif
         case .outfitLibrary:
-            PhotosPicker(selection: $selectedOutfitPhotoItem, matching: .images) {
+            Button(action: onOpenOutfitLibrary) {
                 Label("服装写真を選ぶ", systemImage: "photo.on.rectangle")
             }
             .disabled(isSending)
@@ -86,7 +85,7 @@ struct TradeMessageOverflowMenu: View {
             .disabled(!canUseCamera || isSending)
 #endif
         case .chatLibrary:
-            PhotosPicker(selection: $selectedChatPhotoItem, matching: .images) {
+            Button(action: onOpenChatLibrary) {
                 Label("アルバムから選ぶ", systemImage: "photo.on.rectangle")
             }
             .disabled(isSending)

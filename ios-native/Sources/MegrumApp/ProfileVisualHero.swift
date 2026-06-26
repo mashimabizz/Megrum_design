@@ -40,10 +40,12 @@ struct ProfileVisualHero: View {
                                 .lineLimit(1)
                                 .minimumScaleFactor(0.76)
 
-                            Text(bio)
-                                .font(.system(size: density.bioFontSize, weight: .semibold, design: .rounded))
-                                .foregroundStyle(MegrumTheme.ink.opacity(0.78))
-                                .lineLimit(2)
+                            if let profileBio {
+                                Text(profileBio)
+                                    .font(.system(size: density.bioFontSize, weight: .semibold, design: .rounded))
+                                    .foregroundStyle(MegrumTheme.ink.opacity(0.78))
+                                    .lineLimit(3)
+                            }
                         }
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .layoutPriority(1)
@@ -106,6 +108,10 @@ struct ProfileVisualHero: View {
             return tagItems
         }
         return chips.map { ProfileVisualTagItem(title: $0, colorKey: $0) }
+    }
+
+    private var profileBio: String? {
+        bio.nilIfBlank
     }
 
     private var tagSpacing: CGFloat {

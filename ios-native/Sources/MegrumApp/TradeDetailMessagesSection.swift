@@ -7,11 +7,18 @@ struct TradeDetailMessagesSection: View {
     var proposal: TradeProposal
     var messages: [TradeMessage]
     var viewerID: UUID?
+    var evaluationState: TradeEvaluationPromptState
     var partnerLastReadAt: Date?
+    var partnerPaymentMethods: [UserPaymentMethod]
+    var partnerPaymentNote: String?
+    var partnerMailingAddress: TradeMailingAddressSnapshot?
+    var partnerPaymentSettings: TradePaymentSettingsSnapshot?
     var isLoading: Bool
     var isApprovingCancel: Bool
     var onOpenImage: (URL) -> Void
     var onOpenDispute: (TradeDisputeSummary) -> Void
+    var onOpenMailingInfo: () -> Void
+    var onOpenPaymentInfo: () -> Void
     var onOpenEvidenceList: () -> Void
     var onApproveCancel: () -> Void
 
@@ -25,11 +32,16 @@ struct TradeDetailMessagesSection: View {
 
     var body: some View {
         VStack(spacing: 10) {
-            if isLoading {
-                ProgressView()
-                    .controlSize(.small)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 8)
+            if showsAgreementSystemTimeline {
+                TradeAgreementSystemTimeline(
+                    proposal: proposal,
+                    partnerPaymentMethods: partnerPaymentMethods,
+                    partnerPaymentNote: partnerPaymentNote,
+                    partnerMailingAddress: partnerMailingAddress,
+                    partnerPaymentSettings: partnerPaymentSettings,
+                    onOpenMailingInfo: onOpenMailingInfo,
+                    onOpenPaymentInfo: onOpenPaymentInfo
+                )
             }
 
             if messages.isEmpty, !isLoading {
@@ -56,8 +68,78 @@ struct TradeDetailMessagesSection: View {
                         onApproveCancel: onApproveCancel
                     )
                 }
+                if evaluationState.shouldRevealEvaluations {
+                    TradeEvaluationRevealCard(evaluations: evaluationState.revealedEvaluations)
+                }
             }
         }
+    }
+
+    private var showsAgreementSystemTimeline: Bool {
+        proposal.status == .agreed || proposal.status == .completed
+    }
+}
+
+private struct TradeEvaluationRevealCard: View {
+    var evaluations: [TradeCompletedEvaluationPresentation]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Label("お互いの評価", systemImage: "star.fill")
+                .font(.system(size: 14.5, weight: .black, design: .rounded))
+                .foregroundStyle(MegrumTheme.ink)
+
+            ForEach(evaluations) { evaluation in
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack(spacing: 8) {
+                        Text(evaluation.roleTag)
+                            .font(.system(size: 11.5, weight: .black, design: .rounded))
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 9)
+                            .padding(.vertical, 4)
+                            .background(
+                                evaluation.isMine ? MegrumTheme.lavender : MegrumTheme.sky,
+                                in: Capsule()
+                            )
+
+                        Text(evaluation.displayName)
+                            .font(.system(size: 13.5, weight: .heavy, design: .rounded))
+                            .foregroundStyle(MegrumTheme.ink)
+
+                        Spacer(minLength: 6)
+
+                        HStack(spacing: 1) {
+                            ForEach(1...5, id: \.self) { index in
+                                Image(systemName: index <= evaluation.stars ? "star.fill" : "star")
+                                    .font(.system(size: 11, weight: .black))
+                                    .foregroundStyle(MegrumTheme.lavender)
+                            }
+                        }
+                    }
+
+                    Text(evaluation.comment.nilIfBlank ?? "コメントなし")
+                        .font(.system(size: 13, weight: .semibold, design: .rounded))
+                        .foregroundStyle(MegrumTheme.muted)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .padding(12)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(.white.opacity(0.78), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                .overlay {
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .strokeBorder(MegrumTheme.ink.opacity(0.06), lineWidth: 1)
+                }
+            }
+        }
+        .padding(14)
+        .frame(maxWidth: 330, alignment: .leading)
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .strokeBorder(MegrumTheme.lavender.opacity(0.18), lineWidth: 1)
+        }
+        .frame(maxWidth: .infinity, alignment: .center)
+        .accessibilityLabel("お互いの評価が公開されました")
     }
 }
 

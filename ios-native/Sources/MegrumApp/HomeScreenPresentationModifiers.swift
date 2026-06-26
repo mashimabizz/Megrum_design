@@ -7,7 +7,9 @@ extension View {
         @ViewBuilder content: @escaping (HomeRelationRoute) -> Content
     ) -> some View {
         #if os(iOS)
-        fullScreenCover(item: item, content: content)
+        megrumSlideItemPresentation(item: item) { route, _ in
+            content(route)
+        }
         #else
         sheet(item: item, content: content)
         #endif
@@ -19,7 +21,9 @@ extension View {
         @ViewBuilder content: @escaping (HomeProposalRoute) -> Content
     ) -> some View {
         #if os(iOS)
-        fullScreenCover(item: item, content: content)
+        megrumSlideItemPresentation(item: item) { route, _ in
+            content(route)
+        }
         #else
         sheet(item: item, content: content)
         #endif

@@ -150,7 +150,9 @@ extension HomeMutualMatchConditionPolicy {
             localRoutePrefectureMatches: localRoute?.signals.prefectureMatches ?? false,
             localRouteDateMatches: localRoute?.signals.dateMatches ?? false,
             localRoutePrefectureUnset: localRoute?.signals.prefectureUnset ?? false,
-            localRouteDateNeedsDiscussion: localRoute?.signals.dateNeedsDiscussion ?? false
+            localRouteDateNeedsDiscussion: localRoute?.signals.dateNeedsDiscussion ?? false,
+            partnerLocalPrefectures: signals.partnerLocalPrefectures,
+            partnerLocalDateKeys: signals.partnerLocalDateKeys
         )
     }
 }

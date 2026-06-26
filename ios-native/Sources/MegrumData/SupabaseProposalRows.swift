@@ -9,6 +9,43 @@ struct ProposalRow: Decodable, Sendable {
         "listing_id",
         "status",
         "exchange_method",
+        "sender_mailing_address",
+        "receiver_mailing_address",
+        "sender_payment_settings",
+        "receiver_payment_settings",
+        "sender_have_ids",
+        "receiver_have_ids",
+        "cash_offer",
+        "cash_amount",
+        "cash_amount_side",
+        "option_tags",
+        "agreed_by_sender",
+        "agreed_by_receiver",
+        "evidence_photo_url",
+        "evidence_taken_at",
+        "evidence_taken_by",
+        "approved_by_sender",
+        "approved_by_receiver",
+        "completed_at",
+        "meetup_start_at",
+        "meetup_end_at",
+        "meetup_place_name",
+        "meetup_lat",
+        "meetup_lng",
+        "meetup_candidates",
+        "created_at",
+        "updated_at"
+    ].joined(separator: ",")
+
+    static let legacySelect = [
+        "id",
+        "sender_id",
+        "receiver_id",
+        "listing_id",
+        "status",
+        "exchange_method",
+        "sender_mailing_address",
+        "receiver_mailing_address",
         "sender_have_ids",
         "receiver_have_ids",
         "cash_offer",
@@ -39,6 +76,10 @@ struct ProposalRow: Decodable, Sendable {
     var listingId: UUID?
     var status: String
     var exchangeMethod: String?
+    var senderMailingAddress: TradeMailingAddressSnapshot?
+    var receiverMailingAddress: TradeMailingAddressSnapshot?
+    var senderPaymentSettings: TradePaymentSettingsSnapshot?
+    var receiverPaymentSettings: TradePaymentSettingsSnapshot?
     var senderHaveIds: [UUID]?
     var receiverHaveIds: [UUID]?
     var cashOffer: Bool?
@@ -89,7 +130,11 @@ struct ProposalRow: Decodable, Sendable {
             completedAt: completedAt,
             createdAt: createdAt ?? .now,
             updatedAt: updatedAt,
-            meetupCandidates: normalizedMeetupCandidates
+            meetupCandidates: normalizedMeetupCandidates,
+            senderMailingAddress: senderMailingAddress,
+            receiverMailingAddress: receiverMailingAddress,
+            senderPaymentSettings: senderPaymentSettings,
+            receiverPaymentSettings: receiverPaymentSettings
         )
     }
 
@@ -151,7 +196,8 @@ struct EvidencePhotoPositionRow: Decodable, Sendable {
 }
 
 struct EvidencePhotoRow: Decodable, Sendable {
-    static let select = "id,proposal_id,photo_url,position,taken_at,taken_by"
+    static let select = "id,proposal_id,photo_url,position,taken_at,taken_by,approved_by_sender,approved_by_receiver"
+    static let legacySelect = "id,proposal_id,photo_url,position,taken_at,taken_by"
 
     var id: UUID
     var proposalId: UUID
@@ -159,6 +205,8 @@ struct EvidencePhotoRow: Decodable, Sendable {
     var position: Int?
     var takenAt: Date?
     var takenBy: UUID
+    var approvedBySender: Bool?
+    var approvedByReceiver: Bool?
 
     var evidencePhoto: TradeEvidencePhoto? {
         guard let url = URL(string: photoUrl) else {
@@ -170,7 +218,9 @@ struct EvidencePhotoRow: Decodable, Sendable {
             photoURL: url,
             position: position ?? 1,
             takenAt: takenAt,
-            takenBy: takenBy
+            takenBy: takenBy,
+            approvedBySender: approvedBySender ?? false,
+            approvedByReceiver: approvedByReceiver ?? false
         )
     }
 }

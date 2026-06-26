@@ -6,6 +6,22 @@ import UIKit
 
 let goodsEditorMaxPhotoUploadBytes = 10 * 1_024 * 1_024
 
+func normalizedChatPhotoUpload(from data: Data) -> GoodsPhotoUpload {
+    if let contentType = detectedChatDisplayImageContentType(data),
+       data.count <= SupabaseChatPhotoStorage.maxUploadBytes {
+        return GoodsPhotoUpload(data: data, contentType: contentType)
+    }
+
+    #if canImport(UIKit)
+    if let image = UIImage(data: data),
+       let jpegData = image.jpegData(compressionQuality: 0.88) {
+        return GoodsPhotoUpload(data: jpegData, contentType: "image/jpeg")
+    }
+    #endif
+
+    return GoodsPhotoUpload(data: data, contentType: "image/jpeg")
+}
+
 func normalizedPhotoUpload(from data: Data) -> GoodsPhotoUpload {
     if let contentType = detectedSupportedImageContentType(data),
        data.count <= goodsEditorMaxPhotoUploadBytes {
@@ -66,6 +82,13 @@ func detectedSupportedImageContentType(_ data: Data) -> String? {
         }
     }
     return nil
+}
+
+private func detectedChatDisplayImageContentType(_ data: Data) -> String? {
+    guard let contentType = detectedSupportedImageContentType(data) else {
+        return nil
+    }
+    return contentType == "image/gif" ? nil : contentType
 }
 
 private extension Data {

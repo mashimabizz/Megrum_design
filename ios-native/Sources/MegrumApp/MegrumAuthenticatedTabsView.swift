@@ -198,15 +198,8 @@ struct MegrumAuthenticatedTabsView: View {
         drawerPageDestination = nil
 
         let presentationDelay: TimeInterval = showsDrawer ? 0.18 : 0
-        switch destination {
-        case .profile, .schedules:
-            DispatchQueue.main.asyncAfter(deadline: .now() + presentationDelay) {
-                drawerPageDestination = destination
-            }
-        default:
-            DispatchQueue.main.asyncAfter(deadline: .now() + presentationDelay) {
-                drawerDestination = destination
-            }
+        DispatchQueue.main.asyncAfter(deadline: .now() + presentationDelay) {
+            drawerDestination = destination
         }
     }
 }

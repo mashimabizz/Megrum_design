@@ -76,8 +76,19 @@ extension TradeDetailScreen {
         TradeDetailHeroPresentation(
             proposal: currentProposal,
             viewerID: viewerID,
-            profilesByUserID: appState.publicProfilesByUserID
+            profilesByUserID: appState.publicProfilesByUserID,
+            viewerHasCounterProposal: viewerHasCounterProposal
         )
+    }
+
+    var viewerHasCounterProposal: Bool {
+        guard let viewerID else {
+            return false
+        }
+        return messages.contains { message in
+            message.senderID == viewerID
+                && TradeCounterProposalSystemMessage.isCounterProposalNotice(message)
+        }
     }
 
     var offeredGoodsIDs: [UUID] {
@@ -96,6 +107,35 @@ extension TradeDetailScreen {
         tradeItems(for: offeredGoodsIDs)
     }
 
+    var counterProposalTargetItem: GoodsItem? {
+        guard
+            currentProposal.canCreateCounterProposal(from: viewerID),
+            let partnerID,
+            let targetGoodsID = requestedGoodsIDs.first
+        else {
+            return nil
+        }
+
+        if let item = requestedGoods.first {
+            return item
+        }
+
+        return GoodsItem(
+            id: targetGoodsID,
+            ownerID: partnerID,
+            title: "受け取るグッズ",
+            marketAvailableQuantity: 1,
+            exchangeMethod: currentProposal.exchangeMethod,
+            ownerPrefecture: partnerProfile?.prefecture,
+            ownerDisplayName: partnerProfile?.displayName,
+            ownerHandle: partnerProfile?.handle,
+            ownerAvatarURL: partnerProfile?.avatarURL,
+            ownerGender: partnerProfile?.gender,
+            ownerPaymentMethods: partnerProfile?.paymentMethods ?? [],
+            ownerPaymentNote: partnerProfile?.paymentNote
+        )
+    }
+
     var paymentSummaryText: String? {
         guard currentProposal.cashOffer else {
             return nil
@@ -105,5 +145,29 @@ extension TradeDetailScreen {
             otherNote: partnerProfile?.paymentNote,
             emptyText: "未設定"
         )
+    }
+
+    var partnerPaymentMethods: [UserPaymentMethod] {
+        partnerProfile?.paymentMethods ?? []
+    }
+
+    var partnerPaymentNote: String? {
+        partnerProfile?.paymentNote
+    }
+
+    var partnerMailingAddress: TradeMailingAddressSnapshot? {
+        partnerID.flatMap { currentProposal.mailingAddressSnapshot(for: $0) }
+    }
+
+    var partnerPaymentSettings: TradePaymentSettingsSnapshot? {
+        partnerID.flatMap { currentProposal.paymentSettingsSnapshot(for: $0) }
+    }
+
+    var viewerPaymentMethods: [UserPaymentMethod] {
+        appState.viewer?.paymentMethods ?? []
+    }
+
+    var viewerPaymentNote: String? {
+        appState.viewer?.paymentNote
     }
 }

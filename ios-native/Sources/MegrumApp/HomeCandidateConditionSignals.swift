@@ -30,6 +30,8 @@ public struct HomeExchangeConditionSignals: Equatable, Sendable {
     public var localRouteDateMatches: Bool
     public var localRoutePrefectureUnset: Bool
     public var localRouteDateNeedsDiscussion: Bool
+    public var partnerLocalPrefectures: Set<String>
+    public var partnerLocalDateKeys: Set<String>
 
     public init(
         postalAcceptedByBoth: Bool,
@@ -49,7 +51,9 @@ public struct HomeExchangeConditionSignals: Equatable, Sendable {
         localRoutePrefectureMatches: Bool? = nil,
         localRouteDateMatches: Bool? = nil,
         localRoutePrefectureUnset: Bool? = nil,
-        localRouteDateNeedsDiscussion: Bool? = nil
+        localRouteDateNeedsDiscussion: Bool? = nil,
+        partnerLocalPrefectures: Set<String> = [],
+        partnerLocalDateKeys: Set<String> = []
     ) {
         self.postalAcceptedByBoth = postalAcceptedByBoth
         self.localExchangeSelected = localExchangeSelected
@@ -69,6 +73,13 @@ public struct HomeExchangeConditionSignals: Equatable, Sendable {
         self.localRouteDateMatches = localRouteDateMatches ?? dateMatches
         self.localRoutePrefectureUnset = localRoutePrefectureUnset ?? prefectureUnset
         self.localRouteDateNeedsDiscussion = localRouteDateNeedsDiscussion ?? dateNeedsDiscussion
+        self.partnerLocalPrefectures = Set(partnerLocalPrefectures.compactMap(Self.normalizedSettingText))
+        self.partnerLocalDateKeys = Set(partnerLocalDateKeys)
+    }
+
+    private static func normalizedSettingText(_ value: String) -> String? {
+        let normalized = value.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        return normalized.isEmpty ? nil : normalized
     }
 }
 

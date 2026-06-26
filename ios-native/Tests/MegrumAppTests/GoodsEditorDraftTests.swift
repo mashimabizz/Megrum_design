@@ -13,6 +13,10 @@ final class GoodsEditorDraftTests: XCTestCase {
             "マイグッズに追加"
         )
         XCTAssertEqual(
+            GoodsEditorPresentationText.navigationTitle(mode: .create, entryKind: .wish),
+            "Wishを追加"
+        )
+        XCTAssertEqual(
             GoodsEditorPresentationText.navigationTitle(mode: .edit, entryKind: .wish),
             "Wishを編集"
         )
@@ -190,6 +194,33 @@ final class GoodsEditorDraftTests: XCTestCase {
         XCTAssertEqual(input.memberID, memberID)
         XCTAssertEqual(input.quantity, 3)
         XCTAssertEqual(input.tagNames, ["ラキドロ"])
+        XCTAssertEqual(input.photoUpload, photoUpload)
+    }
+
+    func testSharedCreateInputBuilderCanCreateWishFromPhotoMeta() throws {
+        let groupID = UUID()
+        let goodsTypeID = UUID()
+        let photoID = UUID()
+        let photoUpload = GoodsPhotoUpload(data: Data([0xFF, 0xD8, 0xFF]), contentType: "image/jpeg")
+        var draft = GoodsEditorDraft(mode: .create, entryKind: .wish)
+        draft.groupID = groupID
+        draft.goodsTypeID = goodsTypeID
+
+        let inputs = GoodsInventoryCreateInputBuilder.inputs(
+            metas: [GoodsCreateMetaDraft(photoID: photoID, quantity: 1, tagNames: ["求む"])],
+            photos: [GoodsCreatePhotoDraft(id: photoID, upload: photoUpload)],
+            sharedDraft: draft,
+            groupName: "BTS",
+            members: [],
+            goodsTypeName: "トレカ"
+        )
+
+        let input = try XCTUnwrap(inputs.first)
+        XCTAssertEqual(inputs.count, 1)
+        XCTAssertEqual(input.kind, .wish)
+        XCTAssertEqual(input.title, "BTS トレカ")
+        XCTAssertEqual(input.status, .active)
+        XCTAssertEqual(input.tagNames, ["求む"])
         XCTAssertEqual(input.photoUpload, photoUpload)
     }
 

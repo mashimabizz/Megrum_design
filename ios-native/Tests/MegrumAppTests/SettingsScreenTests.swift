@@ -6,9 +6,10 @@ final class SettingsScreenTests: XCTestCase {
     func testDrawerItemsMatchRnProfileDrawerDestinations() {
         XCTAssertEqual(
             AppDrawerDestination.primaryItems,
-            [.profile, .notifications, .oshiSettings, .schedules, .paymentSettings, .exchangeSettings]
+            [.profile, .notifications, .oshiSettings, .paymentSettings, .exchangeSettings]
         )
         XCTAssertFalse(AppDrawerDestination.primaryItems.contains(.profileEdit))
+        XCTAssertFalse(AppDrawerDestination.primaryItems.contains(.schedules))
         XCTAssertEqual(
             AppDrawerDestination.compactItems,
             [.settings, .help]
@@ -17,8 +18,8 @@ final class SettingsScreenTests: XCTestCase {
         XCTAssertEqual(AppDrawerDestination.notifications.title, "通知")
         XCTAssertEqual(AppDrawerDestination.oshiSettings.title, "推し設定")
         XCTAssertEqual(AppDrawerDestination.schedules.title, "スケジュール")
-        XCTAssertEqual(AppDrawerDestination.paymentSettings.title, "支払条件設定")
-        XCTAssertEqual(AppDrawerDestination.exchangeSettings.title, "交換条件設定")
+        XCTAssertEqual(AppDrawerDestination.paymentSettings.title, "支払い方法の設定")
+        XCTAssertEqual(AppDrawerDestination.exchangeSettings.title, "交換条件の設定")
         XCTAssertEqual(AppDrawerDestination.help.title, "ヘルプ")
         XCTAssertEqual(AppDrawerDestination.oshiSettings.systemImage, "sparkles")
         XCTAssertEqual(AppDrawerDestination.paymentSettings.systemImage, "yensign.circle")

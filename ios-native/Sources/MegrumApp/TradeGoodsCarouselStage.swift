@@ -11,8 +11,8 @@ struct TradeGoodsCarouselStage: View {
 
     var body: some View {
         GeometryReader { proxy in
-            let heroWidth = min(max(proxy.size.width * 0.58, 76), 96)
-            let heroHeight = min(proxy.size.height - 32, 132)
+            let heroWidth = min(max(proxy.size.width * 0.48, 50), 64)
+            let heroHeight = min(proxy.size.height - 22, 88)
             ZStack {
                 Ellipse()
                     .fill(
@@ -23,12 +23,12 @@ struct TradeGoodsCarouselStage: View {
                             endRadius: heroWidth * 0.72
                         )
                     )
-                    .frame(width: min(proxy.size.width * 0.82, 126), height: 24)
+                    .frame(width: min(proxy.size.width * 0.72, 88), height: 18)
                     .offset(y: heroHeight * 0.43)
                     .accessibilityHidden(true)
 
                 TradeRotatingGoodsTable(accentColor: accentColor, rotation: tableRotation)
-                    .frame(width: min(proxy.size.width * 0.86, 136), height: 48)
+                    .frame(width: min(proxy.size.width * 0.76, 96), height: 34)
                     .offset(y: heroHeight * 0.43)
                     .zIndex(0)
 

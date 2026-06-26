@@ -52,6 +52,8 @@ extension MegrumAppState {
 
         let normalizedHandle = MegrumAppStateInputNormalizer.profileHandle(input.handle)
         let trimmedDisplayName = MegrumAppStateInputNormalizer.trimmedText(input.displayName)
+        let trimmedBio = MegrumAppStateInputNormalizer.optionalText(input.bio)
+        let normalizedGender = OwnProfileEditDraft.editableGender(input.gender)
         guard let normalizedHandle else {
             errorMessage = "ユーザーIDを入力してください"
             return false
@@ -64,6 +66,15 @@ extension MegrumAppState {
             errorMessage = "表示名を入力してください"
             return false
         }
+        if (trimmedBio?.count ?? 0) > 500 {
+            errorMessage = "自己紹介は500文字以内で入力してください"
+            return false
+        }
+        if let birthDate = input.birthDate,
+           birthDate > Date() {
+            errorMessage = "生年月日は今日以前の日付を選択してください"
+            return false
+        }
 
         isSavingOwnProfile = true
         errorMessage = nil
@@ -73,8 +84,10 @@ extension MegrumAppState {
                 OwnProfileUpdateInput(
                     handle: normalizedHandle,
                     displayName: trimmedDisplayName,
-                    gender: input.gender,
+                    bio: trimmedBio,
+                    gender: normalizedGender,
                     prefecture: MegrumAppStateInputNormalizer.prefecture(input.prefecture),
+                    birthDate: input.birthDate,
                     paymentMethods: input.paymentMethods,
                     avatarURL: input.avatarURL,
                     avatarUpload: input.avatarUpload,

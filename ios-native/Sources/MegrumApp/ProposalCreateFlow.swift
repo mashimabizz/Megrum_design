@@ -14,11 +14,17 @@ struct ProposalCreateFlow: View {
     var matchType: ProposalMatchType = .perfect
     var initialExchangeMethod: ExchangeMethod? = nil
     var initialCashAmount: Int? = nil
+    var initialShippingFee: IndividualListingShippingFeeDraft? = nil
+    var initialShippingDays: IndividualListingShippingDaysDraft? = nil
     var initialStep: ProposalCreateStep = .give
+    var submissionStatusOverride: ProposalStatus?
+    var showsCompletionAfterCreate = true
     var visualQAInitialScreen: VisualQAInitialScreen? = nil
+    var onCreateSuccess: (() async -> Void)?
     var onCompletionAction: (ProposalCompletionAction) -> Void = { _ in }
 
     @Environment(\.dismiss) var dismiss
+    @Environment(\.megrumSlidePresentationDismiss) var slidePresentationDismiss
     @State var selectedStep: ProposalCreateStep = .give
     @State var selectedSenderGoodsIDs: Set<UUID> = []
     @State var selectedReceiverGoodsIDs: Set<UUID> = []

@@ -20,6 +20,8 @@ struct HomeScreen: View {
     var onOpenExchangeSettings: () -> Void = {}
     var onOpenPaymentSettings: () -> Void = {}
     var onOpenOwnerProfile: (UUID) -> Void = { _ in }
+    var onOpenRelationRoute: ((HomeRelationRoute) -> Void)?
+    var onOpenProposalRoute: ((HomeProposalRoute) -> Void)?
     var onOpenMeguri: (() -> Void)? = nil
     var onOpenTrades: (() -> Void)? = nil
     var visualQAInitialScreen: VisualQAInitialScreen? = nil
@@ -111,6 +113,8 @@ struct HomeScreen: View {
                         matchType: route.matchType,
                         initialExchangeMethod: route.initialExchangeMethod,
                         initialCashAmount: route.initialCashAmount,
+                        initialShippingFee: route.initialShippingFee,
+                        initialShippingDays: route.initialShippingDays,
                         initialStep: route.initialStep,
                         visualQAInitialScreen: visualQAInitialScreen,
                         onCompletionAction: { action in

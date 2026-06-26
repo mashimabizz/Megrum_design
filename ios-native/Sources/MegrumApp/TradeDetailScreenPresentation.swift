@@ -15,9 +15,16 @@ extension TradeDetailScreen {
             offeredGoods: offeredGoods,
             requestedGoodsCount: requestedGoodsIDs.count,
             offeredGoodsCount: offeredGoodsIDs.count,
-            paymentSummaryText: paymentSummaryText,
+            partnerPaymentMethods: partnerPaymentMethods,
+            partnerPaymentNote: partnerPaymentNote,
+            partnerMailingAddress: partnerMailingAddress,
+            partnerPaymentSettings: partnerPaymentSettings,
+            viewerPaymentMethods: viewerPaymentMethods,
+            viewerPaymentNote: viewerPaymentNote,
+            viewerHasCounterProposal: viewerHasCounterProposal,
+            isMessageComposerFocused: isMessageComposerFocused,
             evidencePhotos: appState.evidencePhotos(for: currentProposal),
-            selectedEvidencePhotoItem: $selectedEvidencePhotoItem,
+            selectedEvidencePhotoItem: evidencePhotoPickerSelection,
             partnerLastReadAt: appState.partnerLastReadAt(for: currentProposal.id),
             evaluationState: evaluationPromptState,
             isResponding: appState.respondingProposalID == currentProposal.id,
@@ -45,15 +52,14 @@ extension TradeDetailScreen {
             onOpenEvidenceCamera: {
                 isShowingEvidenceCamera = true
             },
-            onOpenEvidenceList: {
-                isShowingEvidenceList = true
-            },
+            onOpenEvidenceList: openEvidenceList,
             onOpenImage: { url in
                 selectedRemoteImage = RemoteImageSelection(url: url)
             },
-            onApproveEvidence: {
+            onOpenEvidencePhoto: openEvidencePhoto,
+            onApproveEvidence: { photo in
                 Task {
-                    await appState.approveTradeEvidence(proposalID: currentProposal.id)
+                    await appState.approveTradeEvidence(proposalID: currentProposal.id, photoID: photo.id)
                 }
             },
             onRate: {
@@ -68,56 +74,89 @@ extension TradeDetailScreen {
         .scrollDismissesKeyboard(.interactively)
         .background(MegrumTheme.canvas.ignoresSafeArea())
         .safeAreaInset(edge: .bottom) {
-            TradeDetailMessageInputBar(
-                text: $draftMessage,
-                selectedChatPhotoItem: $selectedChatPhotoItem,
-                selectedOutfitPhotoItem: $selectedOutfitPhotoItem,
-                isVisible: isChatInputVisible,
-                context: messageInputContext,
-                onOpenSchedule: {
-                    isShowingSchedulePage = true
-                },
-                onSendArrivalStatus: { action in
-                    sendArrivalQuickAction(action)
-                },
-                onOpenLocationPlaceholder: {
-                    shareCurrentLocation()
-                },
-                onOpenChatCamera: {
-                    isShowingChatCamera = true
-                },
-                onOpenOutfitCamera: {
-                    isShowingOutfitCamera = true
-                },
-                onCounterProposal: {
-                    isShowingCounterProposalPage = true
-                },
-                onRequestLate: {
-                    assistanceRequestKind = .late
-                },
-                onRequestCancel: {
-                    assistanceRequestKind = .cancel
-                },
-                onReport: {
-                    isShowingDisputePage = true
-                },
-                onSendMessage: sendDraftMessage
-            )
+            VStack(spacing: 0) {
+                if currentProposal.status == .agreed {
+                    TradeAgreementNextStepFooter(
+                        isAddingEvidence: appState.addingEvidenceProposalID == currentProposal.id,
+                        action: {
+                            isShowingEvidenceSourceDialog = true
+                        }
+                    )
+                    .padding(.horizontal, 16)
+                    .padding(.top, 10)
+                    .padding(.bottom, 2)
+                    .background(.regularMaterial)
+                } else if currentProposal.status == .completed, !evaluationPromptState.hasSubmittedEvaluation {
+                    TradeEvaluationNextStepFooter(
+                        isSubmitting: appState.submittingEvaluationProposalID == currentProposal.id,
+                        action: {
+                            isShowingEvaluationPage = true
+                        }
+                    )
+                    .padding(.horizontal, 16)
+                    .padding(.top, 10)
+                    .padding(.bottom, 2)
+                    .background(.regularMaterial)
+                }
+
+                TradeDetailMessageInputBar(
+                    text: $draftMessage,
+                    selectedChatPhotoItem: $selectedChatPhotoItem,
+                    selectedOutfitPhotoItem: $selectedOutfitPhotoItem,
+                    isVisible: isChatInputVisible,
+                    context: messageInputContext,
+                    onOpenSchedule: {
+                        isShowingSchedulePage = true
+                    },
+                    onSendArrivalStatus: { action in
+                        sendArrivalQuickAction(action)
+                    },
+                    onOpenLocationPlaceholder: {
+                        shareCurrentLocation()
+                    },
+                    onOpenChatCamera: {
+                        isShowingChatCamera = true
+                    },
+                    onOpenChatLibrary: {
+                        isShowingChatPhotoLibraryPicker = true
+                    },
+                    onOpenOutfitCamera: {
+                        isShowingOutfitCamera = true
+                    },
+                    onOpenOutfitLibrary: {
+                        isShowingOutfitPhotoLibraryPicker = true
+                    },
+                    onCounterProposal: {
+                        isShowingCounterProposalPage = true
+                    },
+                    onRequestLate: {
+                        assistanceRequestKind = .late
+                    },
+                    onRequestCancel: {
+                        assistanceRequestKind = .cancel
+                    },
+                    onReport: {
+                        isShowingDisputePage = true
+                    },
+                    onSendMessage: sendDraftMessage,
+                    onFocusChange: { focused in
+                        withAnimation(.snappy(duration: 0.18)) {
+                            isMessageComposerFocused = focused
+                        }
+                    }
+                )
+            }
         }
         .navigationTitle("@\(heroPresentation.partnerHandle)")
         .megrumInlineNavigationTitle()
 #if os(iOS)
         .toolbar(.hidden, for: .tabBar)
 #endif
-        .task {
-            await appState.loadMessages(proposalID: proposal.id)
-            await appState.loadTradeEvidencePhotos(proposal: currentProposal, reportsFailure: false)
+        .task(id: proposal.id) {
+            await loadInitialDataAfterPresentationSettles()
             if let partnerID, appState.publicProfilesByUserID[partnerID] == nil {
                 await appState.loadPublicUserProfile(userID: partnerID, reportsFailure: false)
             }
-        }
-        .onChange(of: selectedEvidencePhotoItem) { _, item in
-            handleSelectedEvidencePhoto(item)
         }
         .onChange(of: selectedChatPhotoItem) { _, item in
             handleSelectedChatPhoto(item)
@@ -156,10 +195,30 @@ extension TradeDetailScreen {
             }
         }
         .navigationDestination(isPresented: $isShowingCounterProposalPage) {
-            CounterProposalSheet(
-                appState: appState,
-                proposal: currentProposal
-            )
+            if let counterProposalTargetItem {
+                ProposalCreateFlow(
+                    appState: appState,
+                    targetItem: counterProposalTargetItem,
+                    listingID: currentProposal.listingID,
+                    receiverGoodsIDs: requestedGoodsIDs,
+                    initialSenderGoodsIDs: offeredGoodsIDs,
+                    initialExchangeMethod: currentProposal.exchangeMethod,
+                    initialStep: .give,
+                    submissionStatusOverride: .negotiating,
+                    showsCompletionAfterCreate: false,
+                    onCreateSuccess: {
+                        _ = await appState.sendSystemMessage(
+                            proposalID: currentProposal.id,
+                            body: TradeCounterProposalSystemMessage.body(
+                                actorDisplayName: appState.viewer?.displayName,
+                                actorHandle: appState.viewer?.handle
+                            )
+                        )
+                    }
+                )
+            } else {
+                CounterProposalUnavailableView()
+            }
         }
         .navigationDestination(isPresented: $isShowingSchedulePage) {
             TradeScheduleSheet(appState: appState, proposal: currentProposal)
@@ -209,5 +268,21 @@ extension TradeDetailScreen {
         .onChange(of: locationState.locationErrorMessage) { _, errorMessage in
             handleLocationErrorChange(errorMessage)
         }
+    }
+
+    func loadInitialDataAfterPresentationSettles() async {
+        do {
+            try await Task.sleep(nanoseconds: TradeDetailSlidePresentationMetrics.presentationSettledDelayNanoseconds)
+        } catch {
+            return
+        }
+        guard !Task.isCancelled else {
+            return
+        }
+        await appState.loadMessages(proposalID: proposal.id)
+        guard !Task.isCancelled else {
+            return
+        }
+        await appState.loadTradeEvidencePhotos(proposal: currentProposal, reportsFailure: false)
     }
 }

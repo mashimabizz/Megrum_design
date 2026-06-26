@@ -39,7 +39,7 @@ extension SupabaseProposalClient {
         try client.makeMutationRequest(
             path: "/rest/v1/proposals",
             queryItems: [
-                URLQueryItem(name: "select", value: ProposalRow.select)
+                URLQueryItem(name: "select", value: ProposalRow.legacySelect)
             ],
             method: "POST",
             body: encoder.encode([try ProposalCreatePayload(senderID: senderID, input: input, now: now)]),
@@ -75,7 +75,11 @@ extension SupabaseProposalClient {
         )
     }
 
-    public func makeApproveEvidenceRequest(userID: UUID, proposal: TradeProposal) throws -> URLRequest {
+    public func makeApproveEvidenceRequest(
+        userID: UUID,
+        proposal: TradeProposal,
+        photoID: UUID? = nil
+    ) throws -> URLRequest {
         guard proposal.isParticipant(userID) else {
             throw SupabaseProposalClientError.notParticipant
         }
@@ -87,7 +91,7 @@ extension SupabaseProposalClient {
         }
         return try client.makeRPCRequest(
             function: "approve_trade_evidence_for_viewer",
-            payload: ProposalApprovalRPCPayload(proposalID: proposal.id)
+            payload: ProposalApprovalRPCPayload(proposalID: proposal.id, photoID: photoID)
         )
     }
 

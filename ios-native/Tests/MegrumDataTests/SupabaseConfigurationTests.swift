@@ -1,3 +1,4 @@
+import Foundation
 import MegrumData
 import XCTest
 
@@ -110,10 +111,86 @@ final class SupabaseConfigurationTests: XCTestCase {
         XCTAssertEqual(json["expiresIn"] as? Int, 7200)
     }
 
+    func testCreateSignedURLResolvesStorageRelativeObjectPath() async throws {
+        let sessionConfiguration = URLSessionConfiguration.ephemeral
+        sessionConfiguration.protocolClasses = [StorageSignedURLMockURLProtocol.self]
+        let session = URLSession(configuration: sessionConfiguration)
+        let client = SupabaseRESTClient(configuration: configuration, session: session)
+
+        StorageSignedURLMockURLProtocol.requestHandler = { request in
+            guard let url = request.url else {
+                throw StorageSignedURLMockError.missingURL
+            }
+            guard url.path == "/storage/v1/object/sign/chat-photos/proposal/photo.jpg" else {
+                throw StorageSignedURLMockError.unexpectedRequest(url.absoluteString)
+            }
+            let data = Data(#"{"signedURL":"/object/sign/chat-photos/proposal/photo.jpg?token=abc"}"#.utf8)
+            return (StorageSignedURLMockURLProtocol.response(for: url, statusCode: 200), data)
+        }
+        defer {
+            StorageSignedURLMockURLProtocol.requestHandler = nil
+        }
+
+        let url = try await client.createSignedURL(
+            bucket: "chat-photos",
+            path: "proposal/photo.jpg"
+        )
+
+        XCTAssertEqual(
+            url.absoluteString,
+            "https://example.supabase.co/storage/v1/object/sign/chat-photos/proposal/photo.jpg?token=abc"
+        )
+    }
+
     private var configuration: SupabaseConfiguration {
         SupabaseConfiguration(
             projectURL: URL(string: "https://example.supabase.co")!,
             publishableKey: "sb_publishable_test"
         )
+    }
+}
+
+private enum StorageSignedURLMockError: Error {
+    case missingURL
+    case missingHandler
+    case unexpectedRequest(String)
+}
+
+private final class StorageSignedURLMockURLProtocol: URLProtocol {
+    nonisolated(unsafe) static var requestHandler: ((URLRequest) throws -> (HTTPURLResponse, Data))?
+
+    override class func canInit(with request: URLRequest) -> Bool {
+        true
+    }
+
+    override class func canonicalRequest(for request: URLRequest) -> URLRequest {
+        request
+    }
+
+    override func startLoading() {
+        guard let requestHandler = Self.requestHandler else {
+            client?.urlProtocol(self, didFailWithError: StorageSignedURLMockError.missingHandler)
+            return
+        }
+
+        do {
+            let (response, data) = try requestHandler(request)
+            client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
+            client?.urlProtocol(self, didLoad: data)
+            client?.urlProtocolDidFinishLoading(self)
+        } catch {
+            client?.urlProtocol(self, didFailWithError: error)
+        }
+    }
+
+    override func stopLoading() {}
+
+    static func response(for url: URL, statusCode: Int) -> HTTPURLResponse {
+        HTTPURLResponse(
+            url: url,
+            statusCode: statusCode,
+            httpVersion: nil,
+            headerFields: ["Content-Type": "application/json"]
+        )!
     }
 }

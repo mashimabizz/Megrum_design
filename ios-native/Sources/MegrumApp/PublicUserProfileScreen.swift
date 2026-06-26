@@ -10,6 +10,7 @@ struct PublicUserProfileScreen: View {
     var adPlacement: AdPlacement?
 
     @Environment(\.dismiss) var dismiss
+    @Environment(\.megrumSlidePresentationDismiss) var slidePresentationDismiss
     @State var selectedVisualTab: ProfileVisualTab = .goods
     @State var proposalTargetItem: GoodsItem?
     @State var listingProposalTarget: ListingProposalTarget?
@@ -25,7 +26,8 @@ struct PublicUserProfileScreen: View {
                 ratingText: profile.map(publicProfileRating) ?? "—",
                 chips: [],
                 oshiTags: profile.map(publicProfileOshiTags) ?? [],
-                gridItems: publicProfileGridItems(for: selectedVisualTab),
+                goodsItems: publicProfileGoodsGridItems,
+                wishItems: publicProfileWishGridItems,
                 listings: listings,
                 listingGoodsByID: goodsByID,
                 listingWishByID: publicWishByID,
@@ -48,13 +50,13 @@ struct PublicUserProfileScreen: View {
             if presentationContext.showsDismissToolbarButton {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("閉じる") {
-                        dismiss()
+                        closeProfile()
                     }
                 }
             }
         }
-        .megrumEdgeBackSwipe {
-            dismiss()
+        .megrumInteractiveBackSwipe {
+            closeProfile()
         }
         .task(id: userID) {
             await appState.loadPublicUserProfile(userID: userID)
@@ -67,12 +69,12 @@ struct PublicUserProfileScreen: View {
                 await appState.loadGoodsTypes()
             }
         }
-        .sheet(item: $proposalTargetItem) { item in
+        .megrumSlideItemPresentation(item: $proposalTargetItem) { item, _ in
             NavigationStack {
                 ProposalCreateFlow(appState: appState, targetItem: item)
             }
         }
-        .sheet(item: $listingProposalTarget) { target in
+        .megrumSlideItemPresentation(item: $listingProposalTarget) { target, _ in
             NavigationStack {
                 ProposalCreateFlow(
                     appState: appState,
@@ -92,6 +94,14 @@ struct PublicUserProfileScreen: View {
                     isSchedulePresented = false
                 }
             }
+        }
+    }
+
+    private func closeProfile() {
+        if let slidePresentationDismiss {
+            slidePresentationDismiss()
+        } else {
+            dismiss()
         }
     }
 }

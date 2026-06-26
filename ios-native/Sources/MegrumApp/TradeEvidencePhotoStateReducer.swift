@@ -7,7 +7,7 @@ public enum TradeEvidencePhotoStateReducer {
         in evidencePhotosByProposalID: [UUID: [TradeEvidencePhoto]],
         viewerID: UUID?
     ) -> [TradeEvidencePhoto] {
-        if let photos = evidencePhotosByProposalID[proposal.id], !photos.isEmpty {
+        if let photos = evidencePhotosByProposalID[proposal.id] {
             return photos
         }
         return fallbackPhotos(for: proposal, viewerID: viewerID)
@@ -38,7 +38,9 @@ public enum TradeEvidencePhotoStateReducer {
                 photoURL: url,
                 position: 1,
                 takenAt: proposal.evidenceTakenAt,
-                takenBy: takenBy
+                takenBy: takenBy,
+                approvedBySender: proposal.approvedBySender,
+                approvedByReceiver: proposal.approvedByReceiver
             )
         ]
     }

@@ -46,3 +46,5 @@ build/
 # Temp
 tmp/
 *.tmp
+.vercel
+.env*

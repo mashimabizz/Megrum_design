@@ -31,8 +31,8 @@ public extension SupabaseMegrumRepository {
         try await proposalClient.deleteEvidencePhoto(userID: viewerID, proposalID: proposalID, photoID: photoID)
     }
 
-    func approveTradeEvidence(proposalID: UUID) async throws -> TradeProposal {
-        try await proposalClient.approveEvidence(userID: viewerID, proposalID: proposalID)
+    func approveTradeEvidence(proposalID: UUID, photoID: UUID? = nil) async throws -> TradeProposal {
+        try await proposalClient.approveEvidence(userID: viewerID, proposalID: proposalID, photoID: photoID)
     }
 
     func submitTradeEvaluation(_ input: TradeEvaluationCreateInput) async throws -> UserEvaluation {
@@ -64,14 +64,20 @@ public extension SupabaseMegrumRepository {
     }
 
     func sendPhotoMessage(_ input: TradePhotoMessageCreateInput) async throws -> TradeMessage {
-        let signedURL = try await chatPhotoStorage.uploadPhoto(input)
-        return try await messageClient.sendPhotoMessage(
+        let result = try await chatPhotoStorage.uploadPhoto(input)
+        var message = try await messageClient.sendPhotoMessage(
             senderID: viewerID,
             proposalID: input.proposalID,
-            photoURL: signedURL,
+            photoURL: result.signedURL,
             body: input.body,
-            messageType: input.messageType
+            messageType: input.messageType,
+            storagePath: result.upload.path,
+            storageBucket: SupabaseChatPhotoStorage.bucket
         )
+        if let localPhotoURL = try? await PreviewTradePhotoLocalStore.shared.storeChatPhoto(input) {
+            message.photoURL = localPhotoURL
+        }
+        return message
     }
 
     func sendSystemMessage(proposalID: UUID, body: String) async throws -> TradeMessage {

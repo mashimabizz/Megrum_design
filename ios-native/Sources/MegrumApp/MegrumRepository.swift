@@ -72,8 +72,10 @@ public struct AccountSetupOshiInput: Equatable, Sendable {
 public struct OwnProfileUpdateInput: Equatable, Sendable {
     public var handle: String
     public var displayName: String
+    public var bio: String?
     public var gender: UserGender?
     public var prefecture: String?
+    public var birthDate: Date?
     public var paymentMethods: [UserPaymentMethod]
     public var avatarURL: URL?
     public var avatarUpload: GoodsPhotoUpload?
@@ -82,8 +84,10 @@ public struct OwnProfileUpdateInput: Equatable, Sendable {
     public init(
         handle: String,
         displayName: String,
+        bio: String? = nil,
         gender: UserGender? = nil,
         prefecture: String? = nil,
+        birthDate: Date? = nil,
         paymentMethods: [UserPaymentMethod] = [],
         avatarURL: URL? = nil,
         avatarUpload: GoodsPhotoUpload? = nil,
@@ -91,8 +95,10 @@ public struct OwnProfileUpdateInput: Equatable, Sendable {
     ) {
         self.handle = handle
         self.displayName = displayName
+        self.bio = bio
         self.gender = gender
         self.prefecture = prefecture
+        self.birthDate = birthDate
         self.paymentMethods = paymentMethods
         self.avatarURL = avatarURL
         self.avatarUpload = avatarUpload
@@ -143,7 +149,7 @@ public protocol MegrumRepository: Sendable {
     func addTradeEvidence(_ input: TradeEvidenceCreateInput) async throws -> TradeProposal
     func loadTradeEvidencePhotos(proposalID: UUID) async throws -> [TradeEvidencePhoto]
     func deleteTradeEvidencePhoto(proposalID: UUID, photoID: UUID) async throws -> TradeProposal
-    func approveTradeEvidence(proposalID: UUID) async throws -> TradeProposal
+    func approveTradeEvidence(proposalID: UUID, photoID: UUID?) async throws -> TradeProposal
     func submitTradeEvaluation(_ input: TradeEvaluationCreateInput) async throws -> UserEvaluation
     func fileTradeDispute(_ input: TradeDisputeCreateInput) async throws -> TradeDisputeTicket
     func loadMessages(proposalID: UUID, limit: Int) async throws -> [TradeMessage]

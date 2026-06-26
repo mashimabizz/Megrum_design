@@ -119,7 +119,7 @@ extension NativePreviewData {
             senderID: partnerID,
             receiverID: viewerID,
             status: .agreed,
-            exchangeMethod: .hand,
+            exchangeMethod: .mail,
             senderGoodsIDs: [inventory[2].id],
             receiverGoodsIDs: [inventory[1].id],
             conditionTags: ["会場付近"],
@@ -128,7 +128,39 @@ extension NativePreviewData {
             agreedBySender: true,
             agreedByReceiver: true,
             createdAt: Date(timeIntervalSinceNow: -5_400),
-            meetupCandidates: Array(previewMeetupCandidates.prefix(1))
+            meetupCandidates: Array(previewMeetupCandidates.prefix(1)),
+            senderMailingAddress: TradeMailingAddressSnapshot(
+                recipientName: "はる",
+                postalCode: "5300001",
+                prefecture: "大阪府",
+                city: "大阪市北区",
+                line1: "梅田1-1",
+                line2: "Megrumマンション101",
+                phoneNumber: "09012345678"
+            ),
+            receiverMailingAddress: TradeMailingAddressSnapshot(
+                recipientName: "みちりおん",
+                postalCode: "1000001",
+                prefecture: "東京都",
+                city: "千代田区",
+                line1: "千代田1-1",
+                line2: "Megrumビル",
+                phoneNumber: "0312345678"
+            ),
+            senderPaymentSettings: TradePaymentSettingsSnapshot(
+                bankName: "みずほ銀行",
+                bankBranchName: "渋谷支店",
+                bankAccountType: "普通",
+                bankAccountNumber: "1234567",
+                bankAccountHolder: "ハル"
+            ),
+            receiverPaymentSettings: TradePaymentSettingsSnapshot(
+                bankName: "三井住友銀行",
+                bankBranchName: "丸の内支店",
+                bankAccountType: "普通",
+                bankAccountNumber: "7654321",
+                bankAccountHolder: "ミチリオン"
+            )
         ),
         TradeProposal(
             id: UUID(uuidString: "00000000-0000-0000-0000-000000000403")!,

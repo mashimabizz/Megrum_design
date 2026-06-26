@@ -5,14 +5,24 @@ import SwiftUI
 struct TradesScreen: View {
     @ObservedObject var appState: MegrumAppState
     @Binding var requestedStage: TradeStage?
+    @Binding var detailRoute: TradeDetailRoute?
     var adDisplayContext: AdDisplayContext = AdDisplayContext()
 
     @State private var selectedStage: TradeStage = .pending
-    @State private var detailRoute: TradeDetailRoute?
     @State private var selectedPendingProposalIDs: Set<UUID> = []
+    @State private var activeDetailListSnapshot: TradeListDisplaySnapshot?
+    @State private var settledDetailProposalID: UUID?
 
     private var proposals: [TradeProposal] {
-        appState.proposals
+        activeDetailListSnapshot?.proposals ?? appState.proposals
+    }
+
+    private var messagesByProposalID: [UUID: [TradeMessage]] {
+        activeDetailListSnapshot?.messagesByProposalID ?? appState.messagesByProposalID
+    }
+
+    private var viewerReadAtByProposalID: [UUID: Date] {
+        activeDetailListSnapshot?.viewerReadAtByProposalID ?? appState.viewerReadAtByProposalID
     }
 
     private var visibleProposals: [TradeProposal] {
@@ -23,8 +33,8 @@ struct TradesScreen: View {
         TradeListOrdering.sorted(
             proposals.filter { stage.contains($0.status) },
             viewerID: appState.viewer?.id,
-            messagesByProposalID: appState.messagesByProposalID,
-            viewerReadAtByProposalID: appState.viewerReadAtByProposalID
+            messagesByProposalID: messagesByProposalID,
+            viewerReadAtByProposalID: viewerReadAtByProposalID
         )
     }
 
@@ -56,8 +66,8 @@ struct TradesScreen: View {
                         viewerID: appState.viewer?.id,
                         profilesByUserID: appState.publicProfilesByUserID,
                         goodsByID: goodsByID,
-                        messagesByProposalID: appState.messagesByProposalID,
-                        viewerReadAtByProposalID: appState.viewerReadAtByProposalID,
+                        messagesByProposalID: messagesByProposalID,
+                        viewerReadAtByProposalID: viewerReadAtByProposalID,
                         isSelectingPendingProposals: isSelectingPendingProposals,
                         selectedPendingProposalIDs: selectedPendingProposalIDs,
                         adDisplayContext: adDisplayContext,
@@ -78,13 +88,6 @@ struct TradesScreen: View {
         }
         .background(MegrumTheme.canvas.ignoresSafeArea())
         .megrumHiddenNavigationBar()
-        .modifier(
-            TradesDetailPresentationModifier(
-                detailRoute: $detailRoute,
-                appState: appState,
-                proposals: proposals
-            )
-        )
         .onAppear {
             consumeRequestedStage()
         }
@@ -93,6 +96,24 @@ struct TradesScreen: View {
         }
         .onChange(of: selectedStage) { _, _ in
             selectedPendingProposalIDs.removeAll()
+        }
+        .onChange(of: detailRoute) { _, newValue in
+            if newValue == nil {
+                settledDetailProposalID = nil
+                synchronizeActiveDetailListSnapshot()
+                clearActiveDetailListSnapshotAfterDismiss()
+            } else if let newValue {
+                scheduleActiveDetailListSnapshotSynchronization(for: newValue.proposalID)
+            }
+        }
+        .onChange(of: appState.proposals) { _, _ in
+            synchronizeActiveDetailListSnapshot()
+        }
+        .onChange(of: appState.messagesByProposalID) { _, _ in
+            synchronizeActiveDetailListSnapshot()
+        }
+        .onChange(of: appState.viewerReadAtByProposalID) { _, _ in
+            synchronizeActiveDetailListSnapshot()
         }
         .task(id: partnerProfileTaskKey) {
             for userID in visiblePartnerIDs where appState.publicProfilesByUserID[userID] == nil {
@@ -146,9 +167,66 @@ struct TradesScreen: View {
     }
 
     private func openProposal(_ proposal: TradeProposal) {
-        detailRoute = TradeDetailRoute(proposalID: proposal.id)
-        Task {
-            await appState.markProposalRead(proposalID: proposal.id)
+        settledDetailProposalID = nil
+        activeDetailListSnapshot = TradeListDisplaySnapshot.current(
+            proposals: appState.proposals,
+            messagesByProposalID: appState.messagesByProposalID,
+            viewerReadAtByProposalID: appState.viewerReadAtByProposalID
+        )
+        withAnimation(TradeDetailSlidePresentationMetrics.animation) {
+            detailRoute = TradeDetailRoute(proposalID: proposal.id)
+        }
+    }
+
+    private func scheduleActiveDetailListSnapshotSynchronization(for proposalID: UUID) {
+        settledDetailProposalID = nil
+        Task { @MainActor in
+            do {
+                try await Task.sleep(nanoseconds: TradeDetailSlidePresentationMetrics.presentationSettledDelayNanoseconds)
+            } catch {
+                return
+            }
+            guard detailRoute?.proposalID == proposalID else {
+                return
+            }
+            settledDetailProposalID = proposalID
+            synchronizeActiveDetailListSnapshot()
+        }
+    }
+
+    private func synchronizeActiveDetailListSnapshot() {
+        guard activeDetailListSnapshot != nil, canSynchronizeActiveDetailListSnapshot else {
+            return
+        }
+        var transaction = Transaction()
+        transaction.animation = nil
+        withTransaction(transaction) {
+            activeDetailListSnapshot = TradeListDisplaySnapshot.current(
+                proposals: appState.proposals,
+                messagesByProposalID: appState.messagesByProposalID,
+                viewerReadAtByProposalID: appState.viewerReadAtByProposalID
+            )
+        }
+    }
+
+    private var canSynchronizeActiveDetailListSnapshot: Bool {
+        guard let detailRoute else {
+            return true
+        }
+        return settledDetailProposalID == detailRoute.proposalID
+    }
+
+    private func clearActiveDetailListSnapshotAfterDismiss() {
+        Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 380_000_000)
+            guard detailRoute == nil else {
+                return
+            }
+            var transaction = Transaction()
+            transaction.animation = nil
+            withTransaction(transaction) {
+                activeDetailListSnapshot = nil
+            }
         }
     }
 

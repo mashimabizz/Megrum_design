@@ -14,6 +14,7 @@ public extension PreviewMegrumRepository {
                 senderGoodsIDs: [],
                 receiverGoodsIDs: []
             )
+        let photo = try await PreviewTradePhotoLocalStore.shared.storeEvidencePhoto(input, proposal: proposal)
         return TradeProposal(
             id: proposal.id,
             senderID: proposal.senderID,
@@ -28,9 +29,9 @@ public extension PreviewMegrumRepository {
             cashAmountSide: proposal.cashAmountSide,
             agreedBySender: proposal.agreedBySender,
             agreedByReceiver: proposal.agreedByReceiver,
-            evidencePhotoURL: URL(string: "https://example.com/evidence.jpg")!,
-            evidenceTakenAt: .now,
-            evidenceTakenBy: NativePreviewData.viewerID,
+            evidencePhotoURL: photo.photoURL,
+            evidenceTakenAt: photo.takenAt,
+            evidenceTakenBy: photo.takenBy,
             approvedBySender: proposal.approvedBySender,
             approvedByReceiver: proposal.approvedByReceiver,
             completedAt: proposal.completedAt,
@@ -38,7 +39,8 @@ public extension PreviewMegrumRepository {
         )
     }
 
-    func approveTradeEvidence(proposalID: UUID) async throws -> TradeProposal {
+    func approveTradeEvidence(proposalID: UUID, photoID: UUID? = nil) async throws -> TradeProposal {
+        _ = photoID
         let proposal = NativePreviewData.proposals.first { $0.id == proposalID }
             ?? TradeProposal(
                 id: proposalID,
@@ -48,7 +50,7 @@ public extension PreviewMegrumRepository {
                 exchangeMethod: .hand,
                 senderGoodsIDs: [],
                 receiverGoodsIDs: [],
-                evidencePhotoURL: URL(string: "https://example.com/evidence.jpg")!
+                evidencePhotoURL: Self.previewEvidenceFallbackURL
             )
         let approvedBySender = proposal.isSender(NativePreviewData.viewerID) ? true : proposal.approvedBySender
         let approvedByReceiver = proposal.isSender(NativePreviewData.viewerID) ? proposal.approvedByReceiver : true
@@ -66,7 +68,7 @@ public extension PreviewMegrumRepository {
             cashAmountSide: proposal.cashAmountSide,
             agreedBySender: proposal.agreedBySender,
             agreedByReceiver: proposal.agreedByReceiver,
-            evidencePhotoURL: proposal.evidencePhotoURL ?? URL(string: "https://example.com/evidence.jpg")!,
+            evidencePhotoURL: proposal.evidencePhotoURL ?? Self.previewEvidenceFallbackURL,
             evidenceTakenAt: proposal.evidenceTakenAt ?? .now,
             evidenceTakenBy: proposal.evidenceTakenBy ?? NativePreviewData.viewerID,
             approvedBySender: approvedBySender,
@@ -77,27 +79,40 @@ public extension PreviewMegrumRepository {
     }
 
     func loadTradeEvidencePhotos(proposalID: UUID) async throws -> [TradeEvidencePhoto] {
-        [
+        let localPhotos = await PreviewTradePhotoLocalStore.shared.evidencePhotos(for: proposalID)
+        if !localPhotos.isEmpty {
+            return localPhotos
+        }
+        guard await PreviewTradePhotoLocalStore.shared.shouldIncludeSeedEvidence(for: proposalID) else {
+            return []
+        }
+        let deletedIDs = await PreviewTradePhotoLocalStore.shared.deletedEvidencePhotoIDs(for: proposalID)
+        return [
             TradeEvidencePhoto(
                 id: UUID(uuidString: "00000000-0000-0000-0000-00000000e101")!,
                 proposalID: proposalID,
-                photoURL: URL(string: "https://picsum.photos/seed/megrum-evidence-1/640/480")!,
+                photoURL: NativePreviewData.testGoodsImageURL("aespa_ningning") ?? Self.previewEvidenceFallbackURL,
                 position: 1,
                 takenAt: .now,
-                takenBy: NativePreviewData.viewerID
+                takenBy: NativePreviewData.viewerID,
+                approvedBySender: true,
+                approvedByReceiver: false
             ),
             TradeEvidencePhoto(
                 id: UUID(uuidString: "00000000-0000-0000-0000-00000000e102")!,
                 proposalID: proposalID,
-                photoURL: URL(string: "https://picsum.photos/seed/megrum-evidence-2/640/480")!,
+                photoURL: NativePreviewData.testGoodsImageURL("twice_dahyun_1") ?? Self.previewEvidenceFallbackURL,
                 position: 2,
                 takenAt: .now.addingTimeInterval(-120),
-                takenBy: NativePreviewData.partnerID
+                takenBy: NativePreviewData.partnerID,
+                approvedBySender: false,
+                approvedByReceiver: true
             )
-        ]
+        ].filter { !deletedIDs.contains($0.id) }
     }
 
     func deleteTradeEvidencePhoto(proposalID: UUID, photoID: UUID) async throws -> TradeProposal {
+        await PreviewTradePhotoLocalStore.shared.deleteEvidencePhoto(proposalID: proposalID, photoID: photoID)
         let proposal = NativePreviewData.proposals.first { $0.id == proposalID }
             ?? TradeProposal(
                 id: proposalID,
@@ -108,7 +123,11 @@ public extension PreviewMegrumRepository {
                 senderGoodsIDs: [],
                 receiverGoodsIDs: []
             )
-        return proposal
+        var nextProposal = proposal
+        nextProposal.evidencePhotoURL = nil
+        nextProposal.evidenceTakenAt = nil
+        nextProposal.evidenceTakenBy = nil
+        return nextProposal
     }
 
     func submitTradeEvaluation(_ input: TradeEvaluationCreateInput) async throws -> UserEvaluation {
@@ -129,5 +148,10 @@ public extension PreviewMegrumRepository {
             ticketNo: "DPT-260531-0001",
             status: "submitted"
         )
+    }
+
+    private static var previewEvidenceFallbackURL: URL {
+        NativePreviewData.testGoodsImageURL("bts_v")
+            ?? URL(fileURLWithPath: "/tmp/megrum-preview-evidence-fallback.jpg")
     }
 }

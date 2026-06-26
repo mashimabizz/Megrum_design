@@ -1,6 +1,6 @@
 import Foundation
 import MegrumCore
-import MegrumData
+@testable import MegrumData
 import XCTest
 
 final class SupabaseProposalClientTests: XCTestCase {
@@ -13,7 +13,11 @@ final class SupabaseProposalClientTests: XCTestCase {
         let queryItems = URLComponents(string: url)?.queryItems ?? []
 
         XCTAssertEqual(request.httpMethod, "GET")
-        XCTAssertTrue(url.hasPrefix("https://example.supabase.co/rest/v1/proposals?select=id,sender_id,receiver_id,listing_id,status,exchange_method,sender_have_ids,receiver_have_ids,cash_offer,cash_amount,cash_amount_side,option_tags"))
+        XCTAssertTrue(url.hasPrefix("https://example.supabase.co/rest/v1/proposals?select=id,sender_id,receiver_id,listing_id,status,exchange_method,sender_mailing_address,receiver_mailing_address,sender_payment_settings,receiver_payment_settings,sender_have_ids,receiver_have_ids,cash_offer,cash_amount,cash_amount_side,option_tags"))
+        XCTAssertTrue(url.contains("sender_mailing_address"))
+        XCTAssertTrue(url.contains("receiver_mailing_address"))
+        XCTAssertTrue(url.contains("sender_payment_settings"))
+        XCTAssertTrue(url.contains("receiver_payment_settings"))
         XCTAssertTrue(url.contains("agreed_by_sender"))
         XCTAssertTrue(url.contains("agreed_by_receiver"))
         XCTAssertTrue(url.contains("evidence_photo_url"))
@@ -27,6 +31,16 @@ final class SupabaseProposalClientTests: XCTestCase {
         )
     }
 
+    func testProposalLegacySelectOmitsPaymentSnapshotsForUnmigratedDatabases() {
+        let columns = ProposalRow.legacySelect.split(separator: ",").map(String.init)
+
+        XCTAssertTrue(columns.contains("sender_mailing_address"))
+        XCTAssertTrue(columns.contains("receiver_mailing_address"))
+        XCTAssertTrue(columns.contains("sender_have_ids"))
+        XCTAssertFalse(columns.contains("sender_payment_settings"))
+        XCTAssertFalse(columns.contains("receiver_payment_settings"))
+    }
+
     func testBuildsLoadEvidencePhotosRequest() throws {
         let client = SupabaseProposalClient(configuration: configuration)
         let proposalID = UUID(uuidString: "33333333-3333-3333-3333-333333333333")!
@@ -35,9 +49,204 @@ final class SupabaseProposalClientTests: XCTestCase {
         let url = try XCTUnwrap(request.url?.absoluteString)
 
         XCTAssertEqual(request.httpMethod, "GET")
-        XCTAssertTrue(url.hasPrefix("https://example.supabase.co/rest/v1/proposal_evidence_photos?select=id,proposal_id,photo_url,position,taken_at,taken_by"))
+        XCTAssertTrue(url.hasPrefix("https://example.supabase.co/rest/v1/proposal_evidence_photos?select=id,proposal_id,photo_url,position,taken_at,taken_by,approved_by_sender,approved_by_receiver"))
         XCTAssertTrue(url.contains("proposal_id=eq.33333333-3333-3333-3333-333333333333"))
         XCTAssertTrue(url.contains("order=position.asc"))
+    }
+
+    func testLoadEvidencePhotosRefreshesLegacyObjectSignPhotoURL() async throws {
+        let sessionConfiguration = URLSessionConfiguration.ephemeral
+        sessionConfiguration.protocolClasses = [ProposalEvidenceMockURLProtocol.self]
+        let session = URLSession(configuration: sessionConfiguration)
+        let client = SupabaseProposalClient(configuration: configuration, session: session)
+        let proposalID = UUID(uuidString: "33333333-3333-3333-3333-333333333333")!
+
+        ProposalEvidenceMockURLProtocol.requestHandler = { request in
+            guard let url = request.url else {
+                throw ProposalEvidenceMockError.missingURL
+            }
+            switch url.path {
+            case "/rest/v1/proposal_evidence_photos":
+                let data = Data("""
+                [
+                  {
+                    "id": "44444444-4444-4444-4444-444444444444",
+                    "proposal_id": "\(proposalID.uuidString.lowercased())",
+                    "photo_url": "https://example.supabase.co/object/sign/chat-photos/proposal/evidence.jpg?token=old",
+                    "position": 1,
+                    "taken_at": "2026-06-26T00:00:00Z",
+                    "taken_by": "11111111-1111-1111-1111-111111111111",
+                    "approved_by_sender": true,
+                    "approved_by_receiver": false
+                  }
+                ]
+                """.utf8)
+                return (ProposalEvidenceMockURLProtocol.response(for: url, statusCode: 200), data)
+
+            case "/storage/v1/object/sign/chat-photos/proposal/evidence.jpg":
+                let data = Data(#"{"signedURL":"/object/sign/chat-photos/proposal/evidence.jpg?token=fresh"}"#.utf8)
+                return (ProposalEvidenceMockURLProtocol.response(for: url, statusCode: 200), data)
+
+            default:
+                throw ProposalEvidenceMockError.unexpectedRequest(url.absoluteString)
+            }
+        }
+        defer {
+            ProposalEvidenceMockURLProtocol.requestHandler = nil
+        }
+
+        let photos = try await client.loadEvidencePhotos(proposalID: proposalID)
+
+        XCTAssertEqual(photos.count, 1)
+        XCTAssertEqual(
+            photos.first?.photoURL.absoluteString,
+            "https://example.supabase.co/storage/v1/object/sign/chat-photos/proposal/evidence.jpg?token=fresh"
+        )
+    }
+
+    func testLoadEvidencePhotosRefreshesAuthenticatedObjectPhotoURL() async throws {
+        let sessionConfiguration = URLSessionConfiguration.ephemeral
+        sessionConfiguration.protocolClasses = [ProposalEvidenceMockURLProtocol.self]
+        let session = URLSession(configuration: sessionConfiguration)
+        let client = SupabaseProposalClient(configuration: configuration, session: session)
+        let proposalID = UUID(uuidString: "33333333-3333-3333-3333-333333333333")!
+
+        ProposalEvidenceMockURLProtocol.requestHandler = { request in
+            guard let url = request.url else {
+                throw ProposalEvidenceMockError.missingURL
+            }
+            switch url.path {
+            case "/rest/v1/proposal_evidence_photos":
+                let data = Data("""
+                [
+                  {
+                    "id": "44444444-4444-4444-4444-444444444444",
+                    "proposal_id": "\(proposalID.uuidString.lowercased())",
+                    "photo_url": "https://example.supabase.co/storage/v1/object/authenticated/chat-photos/proposal/evidence.jpg",
+                    "position": 1,
+                    "taken_at": "2026-06-26T00:00:00Z",
+                    "taken_by": "11111111-1111-1111-1111-111111111111",
+                    "approved_by_sender": true,
+                    "approved_by_receiver": false
+                  }
+                ]
+                """.utf8)
+                return (ProposalEvidenceMockURLProtocol.response(for: url, statusCode: 200), data)
+
+            case "/storage/v1/object/sign/chat-photos/proposal/evidence.jpg":
+                let data = Data(#"{"signedURL":"/object/sign/chat-photos/proposal/evidence.jpg?token=fresh"}"#.utf8)
+                return (ProposalEvidenceMockURLProtocol.response(for: url, statusCode: 200), data)
+
+            default:
+                throw ProposalEvidenceMockError.unexpectedRequest(url.absoluteString)
+            }
+        }
+        defer {
+            ProposalEvidenceMockURLProtocol.requestHandler = nil
+        }
+
+        let photos = try await client.loadEvidencePhotos(proposalID: proposalID)
+
+        XCTAssertEqual(photos.count, 1)
+        XCTAssertEqual(
+            photos.first?.photoURL.absoluteString,
+            "https://example.supabase.co/storage/v1/object/sign/chat-photos/proposal/evidence.jpg?token=fresh"
+        )
+    }
+
+    func testAddEvidencePhotoRetriesLegacyInsertWhenApprovalColumnsAreMissing() async throws {
+        let sessionConfiguration = URLSessionConfiguration.ephemeral
+        sessionConfiguration.protocolClasses = [ProposalEvidenceMockURLProtocol.self]
+        let session = URLSession(configuration: sessionConfiguration)
+        let client = SupabaseProposalClient(configuration: configuration, session: session)
+        let senderID = UUID(uuidString: "11111111-1111-1111-1111-111111111111")!
+        let receiverID = UUID(uuidString: "22222222-2222-2222-2222-222222222222")!
+        let proposalID = UUID(uuidString: "33333333-3333-3333-3333-333333333333")!
+        var evidenceInsertAttempts = 0
+        var legacyInsertBody: String?
+
+        ProposalEvidenceMockURLProtocol.requestHandler = { request in
+            guard let url = request.url else {
+                throw ProposalEvidenceMockError.missingURL
+            }
+            let body = Self.requestBodyString(from: request)
+            switch (request.httpMethod, url.path) {
+            case ("GET", "/rest/v1/proposals"):
+                let data = Data("""
+                [
+                  {
+                    "id": "\(proposalID.uuidString.lowercased())",
+                    "sender_id": "\(senderID.uuidString.lowercased())",
+                    "receiver_id": "\(receiverID.uuidString.lowercased())",
+                    "status": "agreed",
+                    "exchange_method": "hand",
+                    "sender_have_ids": [],
+                    "receiver_have_ids": [],
+                    "agreed_by_sender": true,
+                    "agreed_by_receiver": true,
+                    "approved_by_sender": false,
+                    "approved_by_receiver": false,
+                    "created_at": "2026-06-26T00:00:00Z"
+                  }
+                ]
+                """.utf8)
+                return (ProposalEvidenceMockURLProtocol.response(for: url, statusCode: 200), data)
+
+            case ("POST", let path) where path.hasPrefix("/storage/v1/object/chat-photos/"):
+                return (ProposalEvidenceMockURLProtocol.response(for: url, statusCode: 200), Data("{}".utf8))
+
+            case ("POST", let path) where path.hasPrefix("/storage/v1/object/sign/chat-photos/"):
+                let data = Data(#"{"signedURL":"/object/sign/chat-photos/33333333-3333-3333-3333-333333333333/evidence.jpg?token=fresh"}"#.utf8)
+                return (ProposalEvidenceMockURLProtocol.response(for: url, statusCode: 200), data)
+
+            case ("GET", "/rest/v1/proposal_evidence_photos"):
+                return (ProposalEvidenceMockURLProtocol.response(for: url, statusCode: 200), Data("[]".utf8))
+
+            case ("POST", "/rest/v1/proposal_evidence_photos"):
+                evidenceInsertAttempts += 1
+                if evidenceInsertAttempts == 1 {
+                    XCTAssertTrue(body.contains("approved_by_sender"))
+                    return (
+                        ProposalEvidenceMockURLProtocol.response(for: url, statusCode: 400),
+                        Data(#"{"message":"column approved_by_sender does not exist"}"#.utf8)
+                    )
+                }
+                legacyInsertBody = body
+                let data = Data(#"[{"id":"44444444-4444-4444-4444-444444444444"}]"#.utf8)
+                return (ProposalEvidenceMockURLProtocol.response(for: url, statusCode: 201), data)
+
+            case ("PATCH", "/rest/v1/proposals"):
+                return (
+                    ProposalEvidenceMockURLProtocol.response(for: url, statusCode: 400),
+                    Data(#"{"message":"proposal mirror columns are unavailable"}"#.utf8)
+                )
+
+            case ("POST", "/rest/v1/messages"):
+                let data = Data(#"[{"id":"55555555-5555-5555-5555-555555555555"}]"#.utf8)
+                return (ProposalEvidenceMockURLProtocol.response(for: url, statusCode: 201), data)
+
+            default:
+                throw ProposalEvidenceMockError.unexpectedRequest(url.absoluteString)
+            }
+        }
+        defer {
+            ProposalEvidenceMockURLProtocol.requestHandler = nil
+        }
+
+        let proposal = try await client.addEvidencePhoto(
+            userID: senderID,
+            input: TradeEvidenceCreateInput(
+                proposalID: proposalID,
+                imageData: Data([0xFF, 0xD8, 0xFF, 0x00]),
+                imageContentType: "image/jpeg",
+                systemMessageBody: "証跡をアップロードしました"
+            )
+        )
+
+        XCTAssertEqual(evidenceInsertAttempts, 2)
+        XCTAssertFalse(legacyInsertBody?.contains("approved_by_sender") ?? true)
+        XCTAssertFalse(legacyInsertBody?.contains("approved_by_receiver") ?? true)
+        XCTAssertEqual(proposal.evidencePhotoURL?.host, "example.supabase.co")
     }
 
     func testBuildsDeleteEvidencePhotoRequestScopedToUploader() throws {
@@ -437,7 +646,9 @@ final class SupabaseProposalClientTests: XCTestCase {
             approvedByReceiver: false
         )
 
-        let request = try client.makeApproveEvidenceRequest(userID: receiverID, proposal: proposal)
+        let photoID = UUID(uuidString: "44444444-4444-4444-4444-444444444444")!
+
+        let request = try client.makeApproveEvidenceRequest(userID: receiverID, proposal: proposal, photoID: photoID)
         let body = try XCTUnwrap(request.httpBody)
         let json = try XCTUnwrap(JSONSerialization.jsonObject(with: body) as? [String: Any])
 
@@ -445,6 +656,7 @@ final class SupabaseProposalClientTests: XCTestCase {
         XCTAssertEqual(request.url?.absoluteString, "https://example.supabase.co/rest/v1/rpc/approve_trade_evidence_for_viewer")
         XCTAssertNil(request.value(forHTTPHeaderField: "Prefer"))
         XCTAssertEqual(json["p_proposal_id"] as? String, "33333333-3333-3333-3333-333333333333")
+        XCTAssertEqual(json["p_photo_id"] as? String, "44444444-4444-4444-4444-444444444444")
     }
 
     func testBuildsApproveCancelRequestForAgreedParticipant() throws {
@@ -636,5 +848,72 @@ final class SupabaseProposalClientTests: XCTestCase {
             projectURL: URL(string: "https://example.supabase.co")!,
             publishableKey: "sb_publishable_test"
         )
+    }
+
+    private static func requestBodyString(from request: URLRequest) -> String {
+        if let body = request.httpBody {
+            return String(data: body, encoding: .utf8) ?? ""
+        }
+        guard let stream = request.httpBodyStream else {
+            return ""
+        }
+        stream.open()
+        defer { stream.close() }
+
+        var data = Data()
+        var buffer = [UInt8](repeating: 0, count: 1_024)
+        while stream.hasBytesAvailable {
+            let count = stream.read(&buffer, maxLength: buffer.count)
+            guard count > 0 else {
+                break
+            }
+            data.append(buffer, count: count)
+        }
+        return String(data: data, encoding: .utf8) ?? ""
+    }
+}
+
+private enum ProposalEvidenceMockError: Error {
+    case missingURL
+    case missingHandler
+    case unexpectedRequest(String)
+}
+
+private final class ProposalEvidenceMockURLProtocol: URLProtocol {
+    nonisolated(unsafe) static var requestHandler: ((URLRequest) throws -> (HTTPURLResponse, Data))?
+
+    override class func canInit(with request: URLRequest) -> Bool {
+        true
+    }
+
+    override class func canonicalRequest(for request: URLRequest) -> URLRequest {
+        request
+    }
+
+    override func startLoading() {
+        guard let requestHandler = Self.requestHandler else {
+            client?.urlProtocol(self, didFailWithError: ProposalEvidenceMockError.missingHandler)
+            return
+        }
+
+        do {
+            let (response, data) = try requestHandler(request)
+            client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
+            client?.urlProtocol(self, didLoad: data)
+            client?.urlProtocolDidFinishLoading(self)
+        } catch {
+            client?.urlProtocol(self, didFailWithError: error)
+        }
+    }
+
+    override func stopLoading() {}
+
+    static func response(for url: URL, statusCode: Int) -> HTTPURLResponse {
+        HTTPURLResponse(
+            url: url,
+            statusCode: statusCode,
+            httpVersion: nil,
+            headerFields: ["Content-Type": "application/json"]
+        )!
     }
 }

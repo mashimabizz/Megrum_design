@@ -31,53 +31,55 @@ extension SupabaseProposalClient {
         )
 
         let nextPosition = try await nextEvidencePhotoPosition(proposalID: input.proposalID)
-        let now = SupabaseDateEncoding.isoTimestamp(.now)
-        let _: [EvidencePhotoAckRow] = try await client.insertRows(
-            into: "proposal_evidence_photos",
-            values: [
-                EvidencePhotoInsertPayload(
-                    proposalID: input.proposalID,
-                    photoURL: signedURL.absoluteString,
-                    position: nextPosition,
-                    takenAt: now,
-                    takenBy: userID
-                )
-            ],
-            select: "id"
+        let nowDate = Date()
+        let now = SupabaseDateEncoding.isoTimestamp(nowDate)
+        try await insertEvidencePhoto(
+            proposal: proposal,
+            userID: userID,
+            proposalID: input.proposalID,
+            photoURL: signedURL,
+            position: nextPosition,
+            takenAt: now
         )
 
-        let rows: [ProposalRow] = try await client.updateRows(
-            in: "proposals",
-            values: ProposalEvidenceUpdatePayload(
-                evidencePhotoURL: proposal.evidencePhotoURL == nil ? signedURL.absoluteString : nil,
-                evidenceTakenAt: now,
-                evidenceTakenBy: userID
-            ),
-            select: ProposalRow.select,
-            queryItems: proposalQueryItems(proposalID: input.proposalID)
+        let updated = try await updateProposalMirrorAfterEvidenceInsert(
+            proposal: proposal,
+            userID: userID,
+            proposalID: input.proposalID,
+            signedURL: signedURL,
+            position: nextPosition,
+            takenAt: now,
+            takenAtDate: nowDate
         )
-        guard let updated = rows.first?.proposal else {
-            throw SupabaseProposalClientError.malformedResponse
-        }
         try? await createSystemMessage(
             proposalID: input.proposalID,
             senderID: userID,
-            body: "取引証跡が追加されました",
+            body: SupabaseTextNormalizer.optional(input.systemMessageBody) ?? "取引証跡をアップロードしました",
             meta: ["action": SupabaseProposalSystemAction.evidenceAdded.rawValue]
         )
         return updated
     }
 
     public func loadEvidencePhotos(proposalID: UUID) async throws -> [TradeEvidencePhoto] {
-        let rows: [EvidencePhotoRow] = try await client.fetchRows(
-            from: "proposal_evidence_photos",
-            select: EvidencePhotoRow.select,
-            queryItems: [
-                URLQueryItem(name: "proposal_id", value: "eq.\(proposalID.uuidString.lowercased())"),
-                URLQueryItem(name: "order", value: "position.asc")
-            ]
-        )
-        return rows.compactMap(\.evidencePhoto)
+        let queryItems = [
+            URLQueryItem(name: "proposal_id", value: "eq.\(proposalID.uuidString.lowercased())"),
+            URLQueryItem(name: "order", value: "position.asc")
+        ]
+        let rows: [EvidencePhotoRow]
+        do {
+            rows = try await client.fetchRows(
+                from: "proposal_evidence_photos",
+                select: EvidencePhotoRow.select,
+                queryItems: queryItems
+            )
+        } catch let error as SupabaseRESTError where error == .unexpectedStatus(400) {
+            rows = try await client.fetchRows(
+                from: "proposal_evidence_photos",
+                select: EvidencePhotoRow.legacySelect,
+                queryItems: queryItems
+            )
+        }
+        return await refreshedEvidencePhotos(from: rows.compactMap(\.evidencePhoto))
     }
 
     public func deleteEvidencePhoto(userID: UUID, proposalID: UUID, photoID: UUID) async throws -> TradeProposal {
@@ -133,5 +135,140 @@ extension SupabaseProposalClient {
     private func evidencePhotoPath(proposalID: UUID, contentType: String) -> String {
         let milliseconds = Int(Date().timeIntervalSince1970 * 1_000)
         return "\(proposalID.uuidString.lowercased())/evidence-\(milliseconds)-\(UUID().uuidString.lowercased()).\(SupabaseImageContentTypeNormalizer.lenientFileExtension(for: contentType))"
+    }
+
+    private func insertEvidencePhoto(
+        proposal: TradeProposal,
+        userID: UUID,
+        proposalID: UUID,
+        photoURL: URL,
+        position: Int,
+        takenAt: String
+    ) async throws {
+        do {
+            let _: [EvidencePhotoAckRow] = try await client.insertRows(
+                into: "proposal_evidence_photos",
+                values: [
+                    EvidencePhotoInsertPayload(
+                        proposalID: proposalID,
+                        photoURL: photoURL.absoluteString,
+                        position: position,
+                        takenAt: takenAt,
+                        takenBy: userID,
+                        approvedBySender: proposal.isSender(userID),
+                        approvedByReceiver: !proposal.isSender(userID)
+                    )
+                ],
+                select: "id"
+            )
+        } catch let error as SupabaseRESTError where error == .unexpectedStatus(400) {
+            let _: [EvidencePhotoAckRow] = try await client.insertRows(
+                into: "proposal_evidence_photos",
+                values: [
+                    LegacyEvidencePhotoInsertPayload(
+                        proposalID: proposalID,
+                        photoURL: photoURL.absoluteString,
+                        position: position,
+                        takenAt: takenAt,
+                        takenBy: userID
+                    )
+                ],
+                select: "id"
+            )
+        }
+    }
+
+    private func updateProposalMirrorAfterEvidenceInsert(
+        proposal: TradeProposal,
+        userID: UUID,
+        proposalID: UUID,
+        signedURL: URL,
+        position: Int,
+        takenAt: String,
+        takenAtDate: Date
+    ) async throws -> TradeProposal {
+        do {
+            let rows: [ProposalRow] = try await client.updateRows(
+                in: "proposals",
+                values: ProposalEvidenceUpdatePayload(
+                    evidencePhotoURL: proposal.evidencePhotoURL == nil ? signedURL.absoluteString : nil,
+                    evidenceTakenAt: takenAt,
+                    evidenceTakenBy: userID,
+                    approvedBySender: Self.approvedBySenderAfterEvidenceInsert(
+                        proposal: proposal,
+                        uploaderID: userID,
+                        isFirstPhoto: position == 1
+                    ),
+                    approvedByReceiver: Self.approvedByReceiverAfterEvidenceInsert(
+                        proposal: proposal,
+                        uploaderID: userID,
+                        isFirstPhoto: position == 1
+                    )
+                ),
+                select: ProposalRow.select,
+                queryItems: proposalQueryItems(proposalID: proposalID)
+            )
+            guard let updated = rows.first?.proposal else {
+                throw SupabaseProposalClientError.malformedResponse
+            }
+            return updated
+        } catch let error as SupabaseRESTError where error == .unexpectedStatus(400) {
+            var fallback = proposal
+            if fallback.evidencePhotoURL == nil {
+                fallback.evidencePhotoURL = signedURL
+                fallback.evidenceTakenAt = takenAtDate
+                fallback.evidenceTakenBy = userID
+            }
+            fallback.approvedBySender = Self.approvedBySenderAfterEvidenceInsert(
+                proposal: proposal,
+                uploaderID: userID,
+                isFirstPhoto: position == 1
+            )
+            fallback.approvedByReceiver = Self.approvedByReceiverAfterEvidenceInsert(
+                proposal: proposal,
+                uploaderID: userID,
+                isFirstPhoto: position == 1
+            )
+            return fallback
+        }
+    }
+
+    private func refreshedEvidencePhotos(from photos: [TradeEvidencePhoto]) async -> [TradeEvidencePhoto] {
+        var refreshedPhotos: [TradeEvidencePhoto] = []
+        refreshedPhotos.reserveCapacity(photos.count)
+        for var photo in photos {
+            if let storagePath = SupabaseMessagePhotoStorageMetadata.storagePath(from: photo.photoURL, bucket: Self.chatPhotoBucket),
+               let signedURL = try? await client.createSignedURL(
+                bucket: Self.chatPhotoBucket,
+                path: storagePath,
+                expiresIn: 60 * 60 * 24 * 365
+               ) {
+                photo.photoURL = signedURL
+            }
+            refreshedPhotos.append(photo)
+        }
+        return refreshedPhotos
+    }
+
+    private static func approvedBySenderAfterEvidenceInsert(
+        proposal: TradeProposal,
+        uploaderID: UUID,
+        isFirstPhoto: Bool
+    ) -> Bool {
+        if proposal.isSender(uploaderID) {
+            return isFirstPhoto ? true : proposal.approvedBySender
+        }
+        return false
+    }
+
+    private static func approvedByReceiverAfterEvidenceInsert(
+        proposal: TradeProposal,
+        uploaderID: UUID,
+        isFirstPhoto: Bool
+    ) -> Bool {
+        if proposal.isSender(uploaderID) {
+            return false
+        }
+        return isFirstPhoto ? true : proposal.approvedByReceiver
     }
 }

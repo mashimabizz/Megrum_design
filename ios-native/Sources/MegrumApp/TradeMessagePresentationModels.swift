@@ -1,8 +1,14 @@
+import CoreGraphics
 import Foundation
 import MegrumCore
 
 struct TradeEvaluationPromptState: Equatable, Sendable {
     var hasSubmittedEvaluation: Bool
+    var hasPartnerSubmittedEvaluation: Bool
+    var revealedEvaluations: [TradeCompletedEvaluationPresentation]
+    var shouldRevealEvaluations: Bool {
+        hasSubmittedEvaluation && hasPartnerSubmittedEvaluation && revealedEvaluations.count >= 2
+    }
 
     init(
         proposal: TradeProposal,
@@ -12,22 +18,38 @@ struct TradeEvaluationPromptState: Equatable, Sendable {
     ) {
         guard proposal.status == .completed, let viewerID else {
             self.hasSubmittedEvaluation = false
+            self.hasPartnerSubmittedEvaluation = false
+            self.revealedEvaluations = []
             return
         }
-        self.hasSubmittedEvaluation = localSubmission || messages.contains { message in
-            Self.isViewerEvaluationMessage(message, viewerID: viewerID)
-        }
-    }
 
-    private static func isViewerEvaluationMessage(_ message: TradeMessage, viewerID: UUID) -> Bool {
-        guard message.senderID == viewerID, message.messageType == .system else {
-            return false
+        let evaluationMessages = messages.filter { TradeEvaluationSystemMessage.isEvaluationNotice($0) }
+        self.hasSubmittedEvaluation = localSubmission || evaluationMessages.contains { message in
+            message.senderID == viewerID
         }
-        if message.meta["action"] == "evaluation_submitted" || message.meta["event_type"] == "evaluation_submitted" {
-            return true
+        self.hasPartnerSubmittedEvaluation = evaluationMessages.contains { message in
+            message.senderID != viewerID
         }
-        return message.body?.contains("取引評価を送信しました") == true
+        self.revealedEvaluations = messages
+            .compactMap { TradeEvaluationSystemMessage.evaluation(from: $0, viewerID: viewerID) }
+            .sorted { lhs, rhs in
+                if lhs.isMine != rhs.isMine {
+                    return lhs.isMine
+                }
+                return lhs.createdAt < rhs.createdAt
+            }
     }
+}
+
+struct TradeCompletedEvaluationPresentation: Identifiable, Equatable, Sendable {
+    var id: String { raterID?.uuidString ?? "\(displayName)-\(createdAt.timeIntervalSince1970)" }
+    var raterID: UUID?
+    var displayName: String
+    var roleTag: String
+    var stars: Int
+    var comment: String?
+    var createdAt: Date
+    var isMine: Bool
 }
 
 struct TradeSystemMessagePresentation: Equatable, Sendable {
@@ -49,9 +71,23 @@ struct TradeSystemMessagePresentation: Equatable, Sendable {
             return
         }
         if TradeEvidenceSystemMessage.isEvidenceNotice(message) {
-            title = isMine == true ? "取引証跡を送りました" : "取引証跡が届きました"
+            title = "取引更新"
             systemImage = "doc.viewfinder"
-            body = "タップして証跡写真を確認"
+            body = TradeEvidenceSystemMessage.displayBody(for: message)
+            detail = nil
+            return
+        }
+        if TradeCompletionSystemMessage.isCompletionNotice(message) {
+            title = "取引完了"
+            systemImage = "checkmark.seal.fill"
+            body = "取引が完了しました"
+            detail = nil
+            return
+        }
+        if TradeEvaluationSystemMessage.isEvaluationNotice(message) {
+            title = isMine == true ? "評価を送りました" : "評価が届きました"
+            systemImage = "star.bubble.fill"
+            body = fallbackBody
             detail = nil
             return
         }
@@ -94,11 +130,118 @@ struct TradeSystemMessagePresentation: Equatable, Sendable {
 
 enum TradeEvidenceSystemMessage {
     static let action = "evidence_added"
-    private static let legacyBody = "取引証跡が追加されました"
+    static let legacyBody = "取引証跡が追加されました"
+
+    static func body(actorDisplayName: String?, actorHandle: String?) -> String {
+        "\(actorName(displayName: actorDisplayName, handle: actorHandle))が取引証跡をアップロードしました"
+    }
 
     static func isEvidenceNotice(_ message: TradeMessage) -> Bool {
+        guard message.messageType == .system else {
+            return false
+        }
+        let normalizedBody = message.body?.trimmingCharacters(in: .whitespacesAndNewlines)
+        return message.meta["action"] == action
+            || message.meta["event_type"] == action
+            || normalizedBody == legacyBody
+            || normalizedBody?.hasSuffix("が証跡写真を撮りました") == true
+            || normalizedBody?.hasSuffix("が取引証跡をアップロードしました") == true
+    }
+
+    static func displayBody(for message: TradeMessage) -> String {
+        let normalizedBody = message.body?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfBlank
+        guard normalizedBody != legacyBody else {
+            return "取引証跡が追加されました"
+        }
+        return normalizedBody ?? "取引証跡が追加されました"
+    }
+}
+
+enum TradeCompletionSystemMessage {
+    static let action = "trade_completed"
+    static let body = "取引が完了しました"
+
+    static func isCompletionNotice(_ message: TradeMessage) -> Bool {
         message.messageType == .system
-            && (message.meta["action"] == action || message.body?.trimmingCharacters(in: .whitespacesAndNewlines) == legacyBody)
+            && (
+                message.meta["action"] == action
+                    || message.meta["event_type"] == action
+                    || message.body?.trimmingCharacters(in: .whitespacesAndNewlines) == body
+                    || message.body?.trimmingCharacters(in: .whitespacesAndNewlines) == "両者が承認しました。取引完了"
+            )
+    }
+}
+
+enum TradeEvaluationSystemMessage {
+    static let action = "evaluation_submitted"
+    private static let legacyBody = "取引評価を送信しました"
+
+    static func body(actorDisplayName: String?, actorHandle: String?) -> String {
+        "\(actorName(displayName: actorDisplayName, handle: actorHandle))の評価が完了しました"
+    }
+
+    static func isEvaluationNotice(_ message: TradeMessage) -> Bool {
+        guard message.messageType == .system else {
+            return false
+        }
+        let normalizedBody = message.body?.trimmingCharacters(in: .whitespacesAndNewlines)
+        return message.meta["action"] == action
+            || message.meta["event_type"] == action
+            || normalizedBody == legacyBody
+            || normalizedBody == "評価が完了しました"
+            || normalizedBody?.hasSuffix("の評価が完了しました") == true
+    }
+
+    static func evaluation(from message: TradeMessage, viewerID: UUID) -> TradeCompletedEvaluationPresentation? {
+        guard isEvaluationNotice(message), let starsText = message.meta["stars"], let stars = Int(starsText) else {
+            return nil
+        }
+        let isMine = message.senderID == viewerID
+        let displayName = normalized(message.meta["rater_display_name"])
+            ?? normalized(message.meta["rater_handle"]).map { "@\($0)" }
+            ?? (isMine ? "あなた" : "相手")
+        return TradeCompletedEvaluationPresentation(
+            raterID: message.senderID,
+            displayName: displayName,
+            roleTag: isMine ? "あなた" : "相手",
+            stars: min(max(stars, 1), 5),
+            comment: normalized(message.meta["comment"]),
+            createdAt: message.createdAt,
+            isMine: isMine
+        )
+    }
+
+    private static func normalized(_ value: String?) -> String? {
+        value?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfBlank
+    }
+}
+
+private func actorName(displayName: String?, handle: String?) -> String {
+    displayName?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfBlank
+        ?? handle?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfBlank.map { "@\($0)" }
+        ?? "ユーザー"
+}
+
+enum TradeCounterProposalSystemMessage {
+    private static let counterProposalSuffix = "が条件を変えて再出品しました"
+    private static let legacyBody = "再打診しました"
+
+    static func body(actorDisplayName: String?, actorHandle: String?) -> String {
+        let actorName = normalized(actorDisplayName)
+            ?? normalized(actorHandle).map { "@\($0)" }
+            ?? "ユーザー"
+        return "\(actorName)が条件を変えて再出品しました"
+    }
+
+    static func isCounterProposalNotice(_ message: TradeMessage) -> Bool {
+        guard message.messageType == .system, let body = normalized(message.body) else {
+            return false
+        }
+        return body.hasSuffix(counterProposalSuffix) || body == legacyBody
+    }
+
+    private static func normalized(_ value: String?) -> String? {
+        value?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfBlank
     }
 }
 
@@ -177,6 +320,34 @@ struct TradeOperationalMessagePresentation: Equatable, Sendable {
         case .left:
             "離れました"
         case .none:
+            nil
+        }
+    }
+}
+
+enum TradePhotoMessageLayout {
+    static func isPhotoMessage(_ messageType: TradeMessageType) -> Bool {
+        messageType == .photo || messageType == .outfitPhoto
+    }
+
+    static func thumbnailSize(for messageType: TradeMessageType) -> CGSize {
+        switch messageType {
+        case .outfitPhoto:
+            CGSize(width: 142, height: 188)
+        case .photo:
+            CGSize(width: 150, height: 150)
+        case .text, .location, .arrivalStatus, .system:
+            CGSize(width: 150, height: 150)
+        }
+    }
+
+    static func label(for messageType: TradeMessageType) -> String? {
+        switch messageType {
+        case .photo:
+            "写真"
+        case .outfitPhoto:
+            "服装写真"
+        case .text, .location, .arrivalStatus, .system:
             nil
         }
     }

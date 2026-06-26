@@ -13,4 +13,6 @@ public enum SupabaseProposalClientError: Error, Equatable, Sendable {
 
 enum SupabaseProposalSystemAction: String, Sendable {
     case evidenceAdded = "evidence_added"
+    case tradeCompleted = "trade_completed"
+    case evaluationSubmitted = "evaluation_submitted"
 }

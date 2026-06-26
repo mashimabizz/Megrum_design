@@ -103,7 +103,11 @@ extension SearchScreen {
         let settings = HomeDefaultExchangeSettings(
             preferenceRawValue: exchangePreferenceRawValue,
             requiresSamePrefecture: exchangeRequiresSamePrefecture,
-            requiresDateOverlap: exchangeRequiresDateOverlap
+            requiresDateOverlap: exchangeRequiresDateOverlap,
+            localPrefecture: exchangeLocalPrefecture,
+            localDateKeysRawValue: exchangeLocalDateKeysRawValue,
+            mailShippingFeeRawValue: exchangeMailShippingFeeRawValue,
+            mailShippingDaysRawValue: exchangeMailShippingDaysRawValue
         )
         switch settings.preference {
         case .local:
@@ -114,10 +118,21 @@ extension SearchScreen {
             selectedExchangeMethod = .both
         }
 
-        if settings.requiresSamePrefecture,
-           let prefecture = appState.viewer?.prefecture,
-           !prefecture.isBlank {
-            selectedMeetupPrefecture = prefecture
+        if settings.requiresSamePrefecture {
+            let prefecture = settings.localPrefecture.nilIfBlank ?? appState.viewer?.prefecture
+            if let prefecture, !prefecture.isBlank {
+                selectedMeetupPrefecture = prefecture
+            }
+        }
+
+        let dates = settings.usableLocalDateKeys.compactMap { HomeExchangeDateKey.date(from: $0) }
+        if !dates.isEmpty {
+            selectedMeetupDates = dates
+        }
+
+        if settings.preference.acceptsMail {
+            shippingFee = settings.mailShippingFee.title
+            shippingWindow = settings.mailShippingDays.title
         }
     }
 

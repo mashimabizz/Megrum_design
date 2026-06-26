@@ -2,7 +2,7 @@ import CoreGraphics
 import Foundation
 
 enum TradeGoodsCarouselLayout {
-    static let stageHeight: CGFloat = 166
+    static let stageHeight: CGFloat = 112
 
     static func cardMetrics(
         for position: Double,
@@ -13,7 +13,7 @@ enum TradeGoodsCarouselLayout {
         let clampedPosition = max(-1.18, min(1.18, position))
         let distance = min(abs(clampedPosition), 1.18)
         let prominence = max(0, 1 - min(distance, 1))
-        let sideWidth = heroWidth * 0.68
+        let sideWidth = heroWidth * 0.70
         let sideHeight = heroHeight * 0.84
         let width = sideWidth + (heroWidth - sideWidth) * prominence
         let height = sideHeight + (heroHeight - sideHeight) * prominence
@@ -21,7 +21,7 @@ enum TradeGoodsCarouselLayout {
         let maxOffsetInsideStage = max(0, (stageWidth - width) / 2 - 5)
         let orbitX = min(stageWidth * 0.26, maxOffsetInsideStage)
         let xOffset = CGFloat(sin(radians)) * orbitX
-        let yOffset = -12 + CGFloat(1 - cos(radians)) * 11
+        let yOffset = -8 + CGFloat(1 - cos(radians)) * 8
         let yaw = -clampedPosition * 24
         let opacity = max(0.48, 1 - distance * 0.16)
         let zIndex = 20 - distance

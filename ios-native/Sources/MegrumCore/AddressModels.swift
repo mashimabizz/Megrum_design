@@ -85,3 +85,51 @@ public struct PostalCodeAddress: Codable, Hashable, Sendable {
         town
     }
 }
+
+public struct TradeMailingAddressSnapshot: Codable, Hashable, Sendable {
+    public var recipientName: String
+    public var postalCode: String
+    public var prefecture: String
+    public var city: String
+    public var line1: String
+    public var line2: String?
+    public var phoneNumber: String?
+
+    public init(
+        recipientName: String,
+        postalCode: String,
+        prefecture: String,
+        city: String,
+        line1: String,
+        line2: String? = nil,
+        phoneNumber: String? = nil
+    ) {
+        self.recipientName = recipientName
+        self.postalCode = postalCode
+        self.prefecture = prefecture
+        self.city = city
+        self.line1 = line1
+        self.line2 = line2
+        self.phoneNumber = phoneNumber
+    }
+
+    public var formattedPostalCode: String {
+        guard postalCode.count > 3 else {
+            return postalCode.isEmpty ? "" : "〒\(postalCode)"
+        }
+        let prefix = postalCode.prefix(3)
+        let suffix = postalCode.dropFirst(3)
+        return "〒\(prefix)-\(suffix)"
+    }
+
+    public var addressLine: String {
+        [prefecture, city, line1, line2 ?? ""]
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+            .joined()
+    }
+
+    public var phoneNumberText: String {
+        phoneNumber?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfBlank ?? "未設定"
+    }
+}

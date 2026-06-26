@@ -27,7 +27,6 @@ extension GoodsEditorSheet {
             return
         }
         syncCreateMetasWithPhotos()
-        selectAllCreateMetas()
         createError = nil
         createStep = .meta
     }
@@ -322,7 +321,7 @@ extension GoodsEditorSheet {
             return
         }
         guard !GoodsInventoryCreateValidation.hasMissingPhotos(metas: createMetas, photos: createPhotos) else {
-            createError = "譲るグッズは写真が必要です。登録する写真を選んでください"
+            createError = "登録する画像を選んでください"
             return
         }
         guard !GoodsInventoryCreateValidation.hasMissingMemberAssignments(

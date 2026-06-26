@@ -128,6 +128,82 @@ final class SupabaseMessageClientTests: XCTestCase {
         XCTAssertNil(payload["meta"])
     }
 
+    func testBuildsPhotoMessageRequestWithStorageMetadata() throws {
+        let client = SupabaseMessageClient(configuration: configuration)
+        let senderID = UUID(uuidString: "11111111-1111-1111-1111-111111111111")!
+        let proposalID = UUID(uuidString: "22222222-2222-2222-2222-222222222222")!
+        let photoURL = URL(string: "https://example.supabase.co/storage/v1/object/sign/chat-photos/proposal/photo.jpg?token=abc")!
+
+        let request = try client.makeSendPhotoMessageRequest(
+            senderID: senderID,
+            proposalID: proposalID,
+            photoURL: photoURL,
+            messageType: .photo,
+            storagePath: "proposal/photo.jpg",
+            storageBucket: "chat-photos"
+        )
+        let payload = try messagePayload(from: request)
+        let meta = try XCTUnwrap(payload["meta"] as? [String: Any])
+
+        XCTAssertEqual(payload["message_type"] as? String, "photo")
+        XCTAssertEqual(payload["photo_url"] as? String, photoURL.absoluteString)
+        XCTAssertEqual(meta["storage_bucket"] as? String, "chat-photos")
+        XCTAssertEqual(meta["storage_path"] as? String, "proposal/photo.jpg")
+    }
+
+    func testLoadMessagesRefreshesLegacyObjectSignPhotoURL() async throws {
+        let sessionConfiguration = URLSessionConfiguration.ephemeral
+        sessionConfiguration.protocolClasses = [MessagePhotoMockURLProtocol.self]
+        let session = URLSession(configuration: sessionConfiguration)
+        let client = SupabaseMessageClient(configuration: configuration, session: session)
+        let proposalID = UUID(uuidString: "22222222-2222-2222-2222-222222222222")!
+
+        MessagePhotoMockURLProtocol.requestHandler = { request in
+            guard let url = request.url else {
+                throw MessagePhotoMockError.missingURL
+            }
+            switch url.path {
+            case "/rest/v1/messages":
+                let data = Data("""
+                [
+                  {
+                    "id": "33333333-3333-3333-3333-333333333333",
+                    "proposal_id": "\(proposalID.uuidString.lowercased())",
+                    "sender_id": "11111111-1111-1111-1111-111111111111",
+                    "message_type": "photo",
+                    "body": null,
+                    "photo_url": "https://example.supabase.co/object/sign/chat-photos/proposal/photo.jpg?token=old",
+                    "location_lat": null,
+                    "location_lng": null,
+                    "location_label": null,
+                    "meta": null,
+                    "created_at": "2026-06-26T00:00:00Z"
+                  }
+                ]
+                """.utf8)
+                return (MessagePhotoMockURLProtocol.response(for: url, statusCode: 200), data)
+
+            case "/storage/v1/object/sign/chat-photos/proposal/photo.jpg":
+                let data = Data(#"{"signedURL":"/object/sign/chat-photos/proposal/photo.jpg?token=fresh"}"#.utf8)
+                return (MessagePhotoMockURLProtocol.response(for: url, statusCode: 200), data)
+
+            default:
+                throw MessagePhotoMockError.unexpectedRequest(url.absoluteString)
+            }
+        }
+        defer {
+            MessagePhotoMockURLProtocol.requestHandler = nil
+        }
+
+        let messages = try await client.loadMessages(proposalID: proposalID)
+
+        XCTAssertEqual(messages.count, 1)
+        XCTAssertEqual(
+            messages.first?.photoURL?.absoluteString,
+            "https://example.supabase.co/storage/v1/object/sign/chat-photos/proposal/photo.jpg?token=fresh"
+        )
+    }
+
     func testBuildsOutfitPhotoMessageRequestWithDefaultBody() throws {
         let client = SupabaseMessageClient(configuration: configuration)
         let senderID = UUID(uuidString: "11111111-1111-1111-1111-111111111111")!
@@ -513,5 +589,50 @@ final class SupabaseMessageClientTests: XCTestCase {
             projectURL: URL(string: "https://example.supabase.co")!,
             publishableKey: "sb_publishable_test"
         )
+    }
+}
+
+private enum MessagePhotoMockError: Error {
+    case missingURL
+    case missingHandler
+    case unexpectedRequest(String)
+}
+
+private final class MessagePhotoMockURLProtocol: URLProtocol {
+    nonisolated(unsafe) static var requestHandler: ((URLRequest) throws -> (HTTPURLResponse, Data))?
+
+    override class func canInit(with request: URLRequest) -> Bool {
+        true
+    }
+
+    override class func canonicalRequest(for request: URLRequest) -> URLRequest {
+        request
+    }
+
+    override func startLoading() {
+        guard let requestHandler = Self.requestHandler else {
+            client?.urlProtocol(self, didFailWithError: MessagePhotoMockError.missingHandler)
+            return
+        }
+
+        do {
+            let (response, data) = try requestHandler(request)
+            client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
+            client?.urlProtocol(self, didLoad: data)
+            client?.urlProtocolDidFinishLoading(self)
+        } catch {
+            client?.urlProtocol(self, didFailWithError: error)
+        }
+    }
+
+    override func stopLoading() {}
+
+    static func response(for url: URL, statusCode: Int) -> HTTPURLResponse {
+        HTTPURLResponse(
+            url: url,
+            statusCode: statusCode,
+            httpVersion: nil,
+            headerFields: ["Content-Type": "application/json"]
+        )!
     }
 }

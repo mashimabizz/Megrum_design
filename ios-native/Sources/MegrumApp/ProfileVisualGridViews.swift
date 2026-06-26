@@ -1,11 +1,20 @@
 import MegrumDesign
 import SwiftUI
 
+enum ProfileVisualGridLayout {
+    static let columnCount = 4
+    static let spacing: CGFloat = 8
+    static let cornerRadius: CGFloat = 6
+}
+
 struct ProfileVisualGrid: View {
     var items: [ProfileVisualGridItem]
     var onSelect: ((ProfileVisualGridItem) -> Void)?
 
-    private let columns = Array(repeating: GridItem(.flexible(), spacing: 8), count: 3)
+    private let columns = Array(
+        repeating: GridItem(.flexible(), spacing: ProfileVisualGridLayout.spacing),
+        count: ProfileVisualGridLayout.columnCount
+    )
 
     var body: some View {
         if items.isEmpty {
@@ -17,7 +26,7 @@ struct ProfileVisualGrid: View {
             .frame(maxWidth: .infinity)
             .padding(.top, 42)
         } else {
-            LazyVGrid(columns: columns, spacing: 8) {
+            LazyVGrid(columns: columns, spacing: ProfileVisualGridLayout.spacing) {
                 ForEach(items) { item in
                     if let onSelect {
                         Button {
@@ -39,7 +48,7 @@ private struct ProfileVisualGridTile: View {
     var item: ProfileVisualGridItem
 
     var body: some View {
-        RoundedRectangle(cornerRadius: 6, style: .continuous)
+        RoundedRectangle(cornerRadius: ProfileVisualGridLayout.cornerRadius, style: .continuous)
             .fill(MegrumTheme.lavender.opacity(0.10))
             .aspectRatio(0.74, contentMode: .fit)
             .overlay {
@@ -63,29 +72,15 @@ private struct ProfileVisualGridTile: View {
                 }
             }
             .overlay(alignment: .topTrailing) {
-                if item.showsMatchTags {
-                    VStack(alignment: .trailing, spacing: 4) {
-                        ProfileVisualConditionTag(text: "グッズ条件◎", color: MegrumTheme.lavender)
-                        ProfileVisualConditionTag(text: "交換条件▲", color: MegrumTheme.pink)
-                    }
-                    .padding(6)
+                GoodsCollectionTagPlate(text: GoodsTileCollectionCardStyle.tagLine(for: item.tags))
+            }
+            .overlay(alignment: .bottomTrailing) {
+                if item.quantity > 1 {
+                    GoodsQuantityBadge(quantity: item.quantity)
+                        .padding(6)
                 }
             }
-            .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
-    }
-}
-
-private struct ProfileVisualConditionTag: View {
-    var text: String
-    var color: Color
-
-    var body: some View {
-        Text(text)
-            .font(.system(size: 9.5, weight: .black, design: .rounded))
-            .foregroundStyle(color)
-            .padding(.horizontal, 7)
-            .frame(height: 22)
-            .background(.white.opacity(0.88), in: RoundedRectangle(cornerRadius: 5, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: ProfileVisualGridLayout.cornerRadius, style: .continuous))
     }
 }
 

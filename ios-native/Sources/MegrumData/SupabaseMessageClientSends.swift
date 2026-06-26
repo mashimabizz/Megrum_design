@@ -16,7 +16,9 @@ extension SupabaseMessageClient {
         proposalID: UUID,
         photoURL: URL,
         body: String? = nil,
-        messageType: TradeMessageType = .photo
+        messageType: TradeMessageType = .photo,
+        storagePath: String? = nil,
+        storageBucket: String? = nil
     ) async throws -> TradeMessage {
         try validatePhotoMessageType(messageType)
         try validatePhotoURL(photoURL)
@@ -25,7 +27,11 @@ extension SupabaseMessageClient {
             proposalID: proposalID,
             messageType: messageType,
             body: body ?? defaultPhotoBody(for: messageType),
-            photoURL: photoURL
+            photoURL: photoURL,
+            meta: SupabaseMessagePhotoStorageMetadata.make(
+                storagePath: storagePath,
+                storageBucket: storageBucket
+            )
         )
     }
 

@@ -45,7 +45,7 @@ extension HomeDiscoveryExperience {
         selectedSheet = nil
         Task { @MainActor in
             try? await Task.sleep(nanoseconds: HomeDiscoveryDeferredPresentationPolicy.sheetDismissalDelayNanoseconds)
-            onStartProposal(selection)
+            onStartProposal(selection.applyingDefaultMailConditions(defaultExchangeSettings))
         }
     }
 
@@ -58,7 +58,7 @@ extension HomeDiscoveryExperience {
         selectedMutualMatchCandidate = nil
         Task { @MainActor in
             try? await Task.sleep(nanoseconds: HomeDiscoveryDeferredPresentationPolicy.sheetDismissalDelayNanoseconds)
-            onStartProposal(selection)
+            onStartProposal(selection.applyingDefaultMailConditions(defaultExchangeSettings))
         }
     }
 
@@ -86,7 +86,7 @@ extension HomeDiscoveryExperience {
         pendingProposalSelection = nil
         Task { @MainActor in
             try? await Task.sleep(nanoseconds: HomeDiscoveryDeferredPresentationPolicy.sheetDismissalDelayNanoseconds)
-            onStartProposal(selection)
+            onStartProposal(selection.applyingDefaultMailConditions(defaultExchangeSettings))
         }
     }
 }

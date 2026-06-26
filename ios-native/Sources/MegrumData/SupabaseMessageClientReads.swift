@@ -12,7 +12,7 @@ extension SupabaseMessageClient {
                 URLQueryItem(name: "limit", value: "\(max(1, min(limit, 120)))")
             ]
         )
-        return rows.compactMap(\.message)
+        return await refreshedMessages(from: rows)
     }
 
     public func loadProposalReadState(proposalID: UUID, userID: UUID) async throws -> ProposalReadState? {

@@ -30,17 +30,12 @@ struct TradeMessageBubble: View {
     }
 
     private var userMessage: some View {
-        HStack(alignment: .bottom, spacing: 6) {
-            if isMine {
-                TradeMessageMeta(message: message, isMine: isMine, isReadByPartner: isReadByPartner)
-            }
-
-            TradeUserMessageStack(message: message, isMine: isMine, onOpenImage: onOpenImage)
-
-            if !isMine {
-                TradeMessageMeta(message: message, isMine: isMine, isReadByPartner: isReadByPartner)
-            }
-        }
+        TradeUserMessageStack(
+            message: message,
+            isMine: isMine,
+            isReadByPartner: isReadByPartner,
+            onOpenImage: onOpenImage
+        )
         .frame(maxWidth: .infinity, alignment: isMine ? .trailing : .leading)
     }
 }

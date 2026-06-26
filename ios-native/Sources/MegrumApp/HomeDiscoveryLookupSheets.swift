@@ -102,7 +102,7 @@ struct HomeExtraHitDetailSheet: View {
                 title: "他にも交換できそうなグッズ",
                 goods: payload.goods,
                 conditionTags: payload.conditionTags,
-                exchangeSummary: HomeDiscoveryOwnerExchangeSummary.fromListingSignals(payload.signals),
+                exchangeSummary: HomeDiscoveryOwnerExchangeSummary.fromCandidateSignals(payload.signals),
                 listingNote: payload.individualListingSelection.listingNote,
                 listingDetail: payload.individualListingSelection.detail,
                 onOpenOwnerProfile: onOpenOwnerProfile

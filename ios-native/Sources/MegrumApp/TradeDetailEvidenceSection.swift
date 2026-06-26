@@ -15,12 +15,12 @@ struct TradeDetailEvidenceSection: View {
     var canUseCamera: Bool
     var onOpenCamera: () -> Void
     var onOpenEvidenceList: () -> Void
-    var onOpenImage: (URL) -> Void
-    var onApprove: () -> Void
+    var onOpenImage: (TradeEvidencePhoto) -> Void
+    var onApprove: (TradeEvidencePhoto) -> Void
     var onRate: () -> Void
 
     var body: some View {
-        if proposal.status == .agreed || proposal.status == .completed {
+        if shouldShowEvidencePanel {
             TradeEvidencePanel(
                 proposal: proposal,
                 viewerID: viewerID,
@@ -38,60 +38,101 @@ struct TradeDetailEvidenceSection: View {
             )
         }
     }
+
+    private var shouldShowEvidencePanel: Bool {
+        proposal.status == .agreed || proposal.status == .completed
+    }
 }
 
 struct TradeEvidenceListSheet: View {
     @Environment(\.dismiss) private var dismiss
     @State private var pendingDeletePhoto: TradeEvidencePhoto?
+    @State private var presentedPhoto: TradeEvidencePhoto?
+    @State private var locallyDeletedPhotoIDs: Set<UUID> = []
 
     var proposal: TradeProposal
     var viewerID: UUID?
     var evidencePhotos: [TradeEvidencePhoto]
-    @Binding var selectedPhotoItem: PhotosPickerItem?
     var isAddingEvidence: Bool
+    var isApproving: Bool
     var deletingPhotoID: UUID?
     var canUseCamera: Bool
     var onOpenCamera: () -> Void
-    var onOpenImage: (URL) -> Void
-    var onDelete: (TradeEvidencePhoto) -> Void
+    var onOpenPhotoLibrary: () -> Void
+    var onDelete: (TradeEvidencePhoto) async -> Bool
+    var onApprove: (TradeEvidencePhoto) -> Void
 
     var body: some View {
         NavigationStack {
-            List {
-                Section {
-                    if evidencePhotos.isEmpty {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 18) {
+                    if displayedEvidencePhotos.isEmpty {
                         ContentUnavailableView(
                             "取引証跡はまだありません",
                             systemImage: "doc.viewfinder",
                             description: Text("交換後のグッズ写真を追加できます。")
                         )
+                        .frame(maxWidth: .infinity)
+                        .padding(.top, 34)
                     } else {
-                        ForEach(evidencePhotos) { photo in
-                            evidencePhotoRow(photo)
-                        }
+                        TradeEvidencePhotoList(
+                            proposal: proposal,
+                            photos: displayedEvidencePhotos,
+                            viewerID: viewerID,
+                            showsApprovalControls: true,
+                            isApproving: isApproving,
+                            deletingPhotoID: deletingPhotoID,
+                            onOpenImage: { photo in
+                                presentedPhoto = photo
+                            },
+                            onApprove: onApprove,
+                            onDelete: { photo in
+                                pendingDeletePhoto = photo
+                            }
+                        )
                     }
-                } header: {
-                    Text("証跡写真")
-                }
 
-                Section {
-                    Button {
-                        dismiss()
-                        DispatchQueue.main.async {
-                            onOpenCamera()
+                    VStack(spacing: 10) {
+                        Button {
+                            dismiss()
+                            DispatchQueue.main.async {
+                                onOpenCamera()
+                            }
+                        } label: {
+                            Label(isAddingEvidence ? "追加中" : "写真を撮って追加", systemImage: "camera.fill")
+                                .font(.system(size: 15, weight: .heavy, design: .rounded))
+                                .frame(maxWidth: .infinity)
+                                .frame(height: 48)
+                                .background(MegrumTheme.lavender, in: Capsule())
+                                .foregroundStyle(.white)
                         }
-                    } label: {
-                        Label(isAddingEvidence ? "追加中" : "写真を撮って追加", systemImage: "camera.fill")
-                    }
-                    .disabled(isAddingEvidence || !canUseCamera)
+                        .buttonStyle(.plain)
+                        .disabled(isAddingEvidence || !canUseCamera)
 
-                    PhotosPicker(selection: $selectedPhotoItem, matching: .images) {
-                        Label("写真から追加", systemImage: "photo.on.rectangle")
+                        Button {
+                            dismiss()
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+                                onOpenPhotoLibrary()
+                            }
+                        } label: {
+                            Label("写真から追加", systemImage: "photo.on.rectangle")
+                                .font(.system(size: 14.5, weight: .heavy, design: .rounded))
+                                .frame(maxWidth: .infinity)
+                                .frame(height: 44)
+                                .background(.white.opacity(0.86), in: Capsule())
+                                .foregroundStyle(MegrumTheme.ink)
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(isAddingEvidence)
                     }
-                    .disabled(isAddingEvidence)
                 }
+                .padding(18)
+                .padding(.bottom, 126)
             }
             .navigationTitle("取引証跡")
+            .safeAreaInset(edge: .bottom) {
+                approvalFooter
+            }
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("閉じる") {
@@ -99,6 +140,9 @@ struct TradeEvidenceListSheet: View {
                     }
                 }
             }
+#if os(iOS)
+            .toolbar(presentedPhoto == nil ? .visible : .hidden, for: .navigationBar)
+#endif
             .confirmationDialog(
                 "この証跡写真を削除しますか？",
                 isPresented: Binding(
@@ -113,7 +157,7 @@ struct TradeEvidenceListSheet: View {
             ) {
                 Button("削除", role: .destructive) {
                     if let pendingDeletePhoto {
-                        onDelete(pendingDeletePhoto)
+                        deletePhoto(pendingDeletePhoto)
                     }
                     pendingDeletePhoto = nil
                 }
@@ -124,72 +168,108 @@ struct TradeEvidenceListSheet: View {
                 Text("削除すると、取引証跡の一覧から外れます。")
             }
         }
-        .presentationDetents([.medium, .large])
+        .overlay {
+            if let presentedPhoto {
+                FullScreenRemoteImageView(
+                    url: presentedPhoto.photoURL,
+                    onDismiss: {
+                        self.presentedPhoto = nil
+                    },
+                    onDelete: deleteAction(for: presentedPhoto)
+                )
+                .transition(.opacity.combined(with: .scale(scale: 0.94)))
+                .zIndex(10)
+            }
+        }
+        .presentationDetents([.large])
         .presentationDragIndicator(.visible)
     }
 
-    private func evidencePhotoRow(_ photo: TradeEvidencePhoto) -> some View {
-        HStack(spacing: 12) {
-            Button {
-                onOpenImage(photo.photoURL)
-            } label: {
-                AsyncImage(url: photo.photoURL) { phase in
-                    switch phase {
-                    case .success(let image):
-                        image
-                            .resizable()
-                            .scaledToFill()
-                    case .failure:
-                        MegrumTheme.sky.opacity(0.18)
-                            .overlay {
-                                Image(systemName: "photo")
-                                    .font(.system(size: 18, weight: .bold))
-                                    .foregroundStyle(MegrumTheme.muted)
-                            }
-                    case .empty:
-                        MegrumTheme.sky.opacity(0.12)
-                            .overlay {
-                                ProgressView()
-                            }
-                    @unknown default:
-                        Color.clear
-                    }
-                }
-                .frame(width: 72, height: 72)
-                .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-            }
-            .buttonStyle(.plain)
+    private var displayedEvidencePhotos: [TradeEvidencePhoto] {
+        evidencePhotos.filter { !locallyDeletedPhotoIDs.contains($0.id) }
+    }
 
-            VStack(alignment: .leading, spacing: 4) {
-                Text(photo.isUploadedBy(viewerID) ? "あなたが追加" : "相手が追加")
+    private func deletePhoto(_ photo: TradeEvidencePhoto) {
+        locallyDeletedPhotoIDs.insert(photo.id)
+        if presentedPhoto?.id == photo.id {
+            presentedPhoto = nil
+        }
+        Task {
+            _ = await onDelete(photo)
+        }
+    }
+
+    private func deleteAction(for photo: TradeEvidencePhoto) -> (() -> Void)? {
+        guard proposal.status == .agreed,
+              photo.isUploadedBy(viewerID),
+              deletingPhotoID != photo.id else {
+            return nil
+        }
+        return {
+            deletePhoto(photo)
+        }
+    }
+
+    private var myApproved: Bool {
+        guard let viewerID else {
+            return false
+        }
+        if !displayedEvidencePhotos.isEmpty {
+            return displayedEvidencePhotos.allSatisfy { $0.isApproved(by: viewerID, in: proposal) }
+        }
+        return proposal.approvedBy(viewerID)
+    }
+
+    private var partnerApproved: Bool {
+        guard let viewerID, let partnerID = proposal.partnerID(for: viewerID) else {
+            return false
+        }
+        if !displayedEvidencePhotos.isEmpty {
+            return displayedEvidencePhotos.allSatisfy { $0.isApproved(by: partnerID, in: proposal) }
+        }
+        return proposal.partnerApproved(for: viewerID)
+    }
+
+    private var canApprove: Bool {
+        proposal.status == .agreed && displayedEvidencePhotos.contains { !$0.isApproved(by: viewerID, in: proposal) }
+    }
+
+    @ViewBuilder
+    private var approvalFooter: some View {
+        VStack(spacing: 10) {
+            HStack(spacing: 8) {
+                TradeEvidenceApprovalChip(title: "あなた", isApproved: myApproved)
+                TradeEvidenceApprovalChip(title: "相手", isApproved: partnerApproved)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+
+            if canApprove {
+                Text("承認が必要な画像の「承認」を押してください")
+                    .font(.system(size: 13, weight: .heavy, design: .rounded))
+                    .foregroundStyle(MegrumTheme.muted)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 42)
+                    .background(.white.opacity(0.86), in: Capsule())
+            } else if proposal.status == .completed {
+                Label("取引が完了しました", systemImage: "checkmark.seal.fill")
+                    .font(.system(size: 15, weight: .heavy, design: .rounded))
+                    .foregroundStyle(MegrumTheme.ok)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 48)
+                    .background(.white.opacity(0.86), in: Capsule())
+            } else if myApproved {
+                Text("相手の承認を待っています")
                     .font(.system(size: 14, weight: .heavy, design: .rounded))
-                if let takenAt = photo.takenAt {
-                    Text(takenAt.formatted(date: .abbreviated, time: .shortened))
-                        .font(.system(size: 12, weight: .semibold, design: .rounded))
-                        .foregroundStyle(MegrumTheme.muted)
-                }
-            }
-
-            Spacer()
-
-            if canDelete(photo) {
-                Button(role: .destructive) {
-                    pendingDeletePhoto = photo
-                } label: {
-                    if deletingPhotoID == photo.id {
-                        ProgressView()
-                    } else {
-                        Image(systemName: "trash")
-                    }
-                }
-                .disabled(deletingPhotoID == photo.id)
-                .accessibilityLabel("証跡写真を削除")
+                    .foregroundStyle(MegrumTheme.muted)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 48)
+                    .background(.white.opacity(0.86), in: Capsule())
             }
         }
-        .accessibilityElement(children: .combine)
+        .padding(.horizontal, 18)
+        .padding(.top, 12)
+        .padding(.bottom, 10)
+        .background(.regularMaterial)
     }
 
-    private func canDelete(_ photo: TradeEvidencePhoto) -> Bool {
-        proposal.status == .agreed && photo.isUploadedBy(viewerID)
-    }
 }

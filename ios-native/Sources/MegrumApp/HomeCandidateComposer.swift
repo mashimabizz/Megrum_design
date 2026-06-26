@@ -147,18 +147,37 @@ enum HomeCandidateComposer {
                     HomeCandidateListingMatchPolicy.optionWantsViewerGoods(option, viewerItem: viewerItem)
                 }
             }
-            let partnerIDs = Set(matchingPartnerWishes.map(\.userId) + matchingPartnerListings.map(\.userId))
+            let orderedPartnerIDs = orderedUnique(matchingPartnerWishes.map(\.userId) + matchingPartnerListings.map(\.userId))
             let paymentSignals = HomeCandidatePaymentPolicy.signals(
                 viewerMethods: viewerUser?.paymentMethods,
-                partnerMethodsList: partnerIDs.map { partnerUsersByID[$0]?.paymentMethods }
+                partnerMethodsList: orderedPartnerIDs.map { partnerUsersByID[$0]?.paymentMethods }
             )
-            let prefectureMatches = partnerIDs.contains { partnerID in
-                prefecturesMatch(viewerUser?.primaryArea, partnerUsersByID[partnerID]?.primaryArea)
-            }
             let partnerAllowsMail = matchingPartnerWishes.contains { exchangeAllowsMail($0.exchangeType) }
                 || matchingPartnerListingOptions.contains { exchangeAllowsMail($0.exchangeType) }
             let partnerAllowsLocal = matchingPartnerWishes.contains { exchangeAllowsLocal($0.exchangeType) }
                 || matchingPartnerListingOptions.contains { exchangeAllowsLocal($0.exchangeType) }
+            let partnerLocalPrefectureNames = orderedPartnerIDs.compactMap { partnerID in
+                partnerUsersByID[partnerID]?.primaryArea
+            }
+            let partnerLocalPrefectures = Set(
+                partnerLocalPrefectureNames.compactMap(HomeCandidateComposer.normalizedArea)
+            )
+            let partnerLocalDateKeys = HomeCandidateComposer.localDateKeys(
+                from: orderedPartnerIDs.flatMap { partnerID in
+                    partnerActivityWindowsByUser[partnerID, default: []]
+                }
+            )
+            let partnerExchangeMethodTitle = HomeCandidateComposer.exchangeMethodTitle(
+                allowsLocal: partnerAllowsLocal,
+                allowsMail: partnerAllowsMail
+            )
+            let partnerLocalConditionText = HomeCandidateComposer.localConditionText(
+                prefectures: partnerLocalPrefectureNames,
+                dateKeys: partnerLocalDateKeys
+            )
+            let prefectureMatches = orderedPartnerIDs.contains { partnerID in
+                prefecturesMatch(viewerUser?.primaryArea, partnerUsersByID[partnerID]?.primaryArea)
+            }
             let individualListingSelection = HomeCandidateListingMatchPolicy.firstSelection(
                 listings: matchingPartnerListings,
                 optionsByListingID: listingOptionsByListingID,
@@ -176,7 +195,11 @@ enum HomeCandidateComposer {
                     postalAcceptedByBoth: exchangeAllowsMail(viewerItem.exchangeType) && partnerAllowsMail,
                     localExchangeSelected: exchangeAllowsLocal(viewerItem.exchangeType) && partnerAllowsLocal,
                     prefectureMatches: prefectureMatches,
-                    dateMatches: false
+                    dateMatches: false,
+                    partnerExchangeMethodTitle: partnerExchangeMethodTitle,
+                    partnerLocalConditionText: partnerAllowsLocal ? partnerLocalConditionText : nil,
+                    partnerLocalPrefectures: partnerLocalPrefectures,
+                    partnerLocalDateKeys: partnerLocalDateKeys
                 ),
                 payment: paymentSignals,
                 linkCounts: HomeCandidateLinkCounts(

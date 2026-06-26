@@ -28,13 +28,14 @@ struct TradeStagePage: View {
             LazyVStack(alignment: .leading, spacing: 0) {
                 if proposals.isEmpty {
                     EmptyTradeStage(stage: stage)
+                        .padding(.horizontal, TradeCardLayout.horizontalPadding)
                         .padding(.top, 8)
                 } else {
                     proposalRows
                     completedFooterAd
                 }
             }
-            .padding(.horizontal, 20)
+            .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.top, 8)
             .padding(.bottom, 132)
         }
@@ -48,6 +49,7 @@ struct TradeStagePage: View {
                 viewerID: viewerID,
                 profilesByUserID: profilesByUserID,
                 goodsByID: goodsByID,
+                messages: messagesByProposalID[proposal.id] ?? [],
                 lastActivityAt: TradeListOrdering.lastActivityAt(
                     for: proposal,
                     messagesByProposalID: messagesByProposalID
@@ -79,6 +81,7 @@ struct TradeStagePage: View {
                 placement: .pastTradesFooterBanner,
                 displayContext: adDisplayContext
             )
+            .padding(.horizontal, TradeCardLayout.horizontalPadding)
             .padding(.top, 12)
         }
     }

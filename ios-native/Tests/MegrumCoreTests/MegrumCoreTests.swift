@@ -140,6 +140,59 @@ final class MegrumCoreTests: XCTestCase {
         )
     }
 
+    func testTradeProposalReturnsParticipantMailingAddressSnapshot() {
+        let senderID = UUID(uuidString: "00000000-0000-0000-0000-000000000001")!
+        let receiverID = UUID(uuidString: "00000000-0000-0000-0000-000000000002")!
+        let senderAddress = TradeMailingAddressSnapshot(
+            recipientName: "送信者",
+            postalCode: "1000001",
+            prefecture: "東京都",
+            city: "千代田区",
+            line1: "千代田1-1"
+        )
+        let receiverAddress = TradeMailingAddressSnapshot(
+            recipientName: "受信者",
+            postalCode: "5300001",
+            prefecture: "大阪府",
+            city: "大阪市北区",
+            line1: "梅田1-1"
+        )
+        let senderPaymentSettings = TradePaymentSettingsSnapshot(
+            bankName: "みずほ銀行",
+            bankBranchName: "渋谷支店",
+            bankAccountType: "普通",
+            bankAccountNumber: "1234567",
+            bankAccountHolder: "ソウシンシャ"
+        )
+        let receiverPaymentSettings = TradePaymentSettingsSnapshot(
+            bankName: "三井住友銀行",
+            bankBranchName: "梅田支店",
+            bankAccountType: "普通",
+            bankAccountNumber: "7654321",
+            bankAccountHolder: "ジュシンシャ"
+        )
+        let proposal = TradeProposal(
+            id: UUID(),
+            senderID: senderID,
+            receiverID: receiverID,
+            status: .agreed,
+            exchangeMethod: .mail,
+            senderGoodsIDs: [],
+            receiverGoodsIDs: [],
+            senderMailingAddress: senderAddress,
+            receiverMailingAddress: receiverAddress,
+            senderPaymentSettings: senderPaymentSettings,
+            receiverPaymentSettings: receiverPaymentSettings
+        )
+
+        XCTAssertEqual(proposal.mailingAddressSnapshot(for: senderID)?.recipientName, "送信者")
+        XCTAssertEqual(proposal.mailingAddressSnapshot(for: receiverID)?.formattedPostalCode, "〒530-0001")
+        XCTAssertEqual(proposal.mailingAddressSnapshot(for: UUID()), nil)
+        XCTAssertEqual(proposal.paymentSettingsSnapshot(for: senderID)?.bankName, "みずほ銀行")
+        XCTAssertEqual(proposal.paymentSettingsSnapshot(for: receiverID)?.bankAccountHolder, "ジュシンシャ")
+        XCTAssertEqual(proposal.paymentSettingsSnapshot(for: UUID()), nil)
+    }
+
     func testTradeProposalCounterProposalInputRejectsNonParticipant() {
         let senderID = UUID(uuidString: "00000000-0000-0000-0000-000000000001")!
         let receiverID = UUID(uuidString: "00000000-0000-0000-0000-000000000002")!

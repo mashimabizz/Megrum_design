@@ -1,3 +1,5 @@
+import Foundation
+
 enum OwnProfileEditValidation {
     static func validationError(for draft: OwnProfileEditDraft) -> String? {
         let handle = draft.normalizedHandle
@@ -8,6 +10,19 @@ enum OwnProfileEditValidation {
         let displayName = draft.normalizedDisplayName
         if displayName.isEmpty || displayName.count > 50 {
             return "表示名は1〜50文字で入力してください"
+        }
+
+        if draft.normalizedBio.count > 500 {
+            return "自己紹介は500文字以内で入力してください"
+        }
+
+        if let birthDate = draft.birthDate,
+           birthDate > Date() {
+            return "生年月日は今日以前の日付を選択してください"
+        }
+
+        if draft.normalized.gender != .male && draft.normalized.gender != .female {
+            return "性別を選択してください"
         }
 
         let prefecture = draft.normalizedPrefecture

@@ -17,13 +17,14 @@ public extension PreviewMegrumRepository {
     }
 
     func sendPhotoMessage(_ input: TradePhotoMessageCreateInput) async throws -> TradeMessage {
-        TradeMessage(
+        let photoURL = try await PreviewTradePhotoLocalStore.shared.storeChatPhoto(input)
+        return TradeMessage(
             id: UUID(),
             proposalID: input.proposalID,
             senderID: NativePreviewData.viewerID,
             messageType: input.messageType,
             body: input.body.nilIfBlank,
-            photoURL: URL(string: "https://preview.megrum.local/chat/\(UUID().uuidString.lowercased()).jpg")
+            photoURL: photoURL
         )
     }
 

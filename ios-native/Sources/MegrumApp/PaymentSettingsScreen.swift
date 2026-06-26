@@ -5,7 +5,9 @@ import SwiftUI
 @MainActor
 struct PaymentSettingsScreen: View {
     @ObservedObject var appState: MegrumAppState
+    var onClose: (() -> Void)?
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.megrumSlidePresentationDismiss) private var slideDismiss
     @FocusState private var focusedField: PaymentSettingsField?
     @State private var draft = PaymentSettingsDraft.empty
     @State private var validationMessage: String?
@@ -28,7 +30,7 @@ struct PaymentSettingsScreen: View {
             .padding(.bottom, 104)
         }
         .background(MegrumTheme.canvas.ignoresSafeArea())
-        .navigationTitle("支払条件設定")
+        .navigationTitle("支払い方法の設定")
         .megrumInlineNavigationTitle()
         .scrollDismissesKeyboard(.interactively)
         .toolbar {
@@ -64,11 +66,11 @@ struct PaymentSettingsScreen: View {
     private var methodsCard: some View {
         VStack(spacing: 0) {
             methodRow(.bankTransfer, description: "口座情報を登録して、必要な相手に表示します")
-            Divider().padding(.leading, 52)
+            PaymentSettingsDivider()
             methodRow(.paypay, description: "リンク登録なし。対応可否だけを表示します")
-            Divider().padding(.leading, 52)
+            PaymentSettingsDivider()
             methodRow(.cashExchange, description: "現地で差額を手渡しできます")
-            Divider().padding(.leading, 52)
+            PaymentSettingsDivider()
             methodRow(.other, description: "自由入力で支払い方法を補足できます")
             if draft.contains(.other) {
                 PaymentSettingsDivider()
@@ -176,7 +178,7 @@ struct PaymentSettingsScreen: View {
     private var bottomBar: some View {
         HStack(spacing: 18) {
             Button("キャンセル") {
-                dismiss()
+                closeScreen()
             }
             .font(.system(size: 18, weight: .black, design: .rounded))
             .foregroundStyle(MegrumTheme.lavender)
@@ -220,30 +222,73 @@ struct PaymentSettingsScreen: View {
             var next = draft
             next.set(method, isSelected: !draft.contains(method))
             draft = next
+            MegrumHaptics.selectionChanged()
         } label: {
-            HStack(alignment: .top, spacing: 12) {
-                Image(systemName: draft.contains(method) ? "checkmark.circle.fill" : "circle")
-                    .font(.system(size: 24, weight: .bold))
-                    .foregroundStyle(draft.contains(method) ? MegrumTheme.lavender : MegrumTheme.muted.opacity(0.55))
-                    .frame(width: 30)
+            HStack(spacing: 16) {
+                ZStack {
+                    Circle()
+                        .stroke(draft.contains(method) ? MegrumTheme.lavender : MegrumTheme.muted.opacity(0.72), lineWidth: 2.2)
+                        .frame(width: 28, height: 28)
+                    if draft.contains(method) {
+                        Circle()
+                            .fill(MegrumTheme.lavender)
+                            .frame(width: 18, height: 18)
+                    }
+                }
+
+                ZStack {
+                    RoundedRectangle(cornerRadius: 18, style: .continuous)
+                        .fill(paymentMethodIconTint(method).opacity(0.13))
+                    Image(systemName: paymentMethodIconName(method))
+                        .font(.system(size: 30, weight: .bold))
+                        .foregroundStyle(paymentMethodIconTint(method))
+                }
+                .frame(width: 68, height: 68)
 
                 VStack(alignment: .leading, spacing: 4) {
                     Text(method.displayName)
                         .font(.system(size: 18, weight: .black, design: .rounded))
                         .foregroundStyle(MegrumTheme.ink)
                     Text(description)
-                        .font(.system(size: 13.5, weight: .bold, design: .rounded))
+                        .font(.system(size: 15, weight: .bold, design: .rounded))
                         .foregroundStyle(MegrumTheme.muted)
+                        .lineLimit(2)
                         .fixedSize(horizontal: false, vertical: true)
                 }
 
                 Spacer(minLength: 0)
             }
-            .padding(.vertical, 10)
+            .padding(.vertical, 18)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .accessibilityLabel("\(method.displayName)、\(draft.contains(method) ? "選択中" : "未選択")")
+    }
+
+    private func paymentMethodIconName(_ method: UserPaymentMethod) -> String {
+        switch method {
+        case .bankTransfer:
+            "building.columns"
+        case .paypay:
+            "p.square.fill"
+        case .cashExchange:
+            "banknote"
+        case .other:
+            "ellipsis.message"
+        }
+    }
+
+    private func paymentMethodIconTint(_ method: UserPaymentMethod) -> Color {
+        switch method {
+        case .bankTransfer:
+            MegrumTheme.sky
+        case .paypay:
+            MegrumTheme.conditionExact
+        case .cashExchange:
+            MegrumTheme.ok
+        case .other:
+            MegrumTheme.pink
+        }
     }
 
     private var otherNoteBinding: Binding<String> {
@@ -271,8 +316,18 @@ struct PaymentSettingsScreen: View {
         focusedField = nil
         Task {
             if await appState.savePaymentSettings(normalized.settings(userID: userID)) {
-                dismiss()
+                closeScreen()
             }
+        }
+    }
+
+    private func closeScreen() {
+        if let onClose {
+            onClose()
+        } else if let slideDismiss {
+            slideDismiss()
+        } else {
+            dismiss()
         }
     }
 

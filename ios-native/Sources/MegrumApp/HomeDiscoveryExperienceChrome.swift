@@ -31,12 +31,17 @@ extension HomeDiscoveryExperience {
 
     private var header: some View {
         HStack {
-            Button(action: onOpenSettings) {
-                HomeDiscoveryViewerAvatar(viewer: viewer)
-                    .frame(width: 44, height: 44)
+            HStack {
+                Button(action: onOpenSettings) {
+                    HomeDiscoveryViewerAvatar(viewer: viewer)
+                        .frame(width: 44, height: 44)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("メニューを開く")
+
+                Spacer(minLength: 0)
             }
-            .buttonStyle(.plain)
-            .accessibilityLabel("メニューを開く")
+            .frame(width: 94)
 
             Spacer()
 
@@ -46,16 +51,28 @@ extension HomeDiscoveryExperience {
 
             Spacer()
 
-            Button {
-                showsMatchHelp = true
-            } label: {
-                Image(systemName: "questionmark.circle.fill")
-                    .font(.system(size: 24, weight: .bold))
-                    .foregroundStyle(MegrumTheme.lavender)
-                    .frame(width: 44, height: 44)
+            HStack(spacing: 6) {
+                Button(action: onOpenSearch) {
+                    Image(systemName: "magnifyingglass")
+                        .font(.system(size: 22, weight: .bold))
+                        .foregroundStyle(MegrumTheme.lavender)
+                        .frame(width: 44, height: 44)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("検索")
+
+                Button {
+                    showsMatchHelp = true
+                } label: {
+                    Image(systemName: "questionmark.circle.fill")
+                        .font(.system(size: 24, weight: .bold))
+                        .foregroundStyle(MegrumTheme.lavender)
+                        .frame(width: 44, height: 44)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("マッチ表示のヘルプを開く")
             }
-            .buttonStyle(.plain)
-            .accessibilityLabel("マッチ表示のヘルプを開く")
+            .frame(width: 94)
         }
         .padding(.vertical, 2)
     }
@@ -67,4 +84,5 @@ extension HomeDiscoveryExperience {
 
 enum HomeDiscoveryHeaderMetrics {
     static let contentTopPadding: CGFloat = 122
+    static let contentBottomPadding: CGFloat = FloatingActionLayoutMetrics.contentBottomPadding + 120
 }

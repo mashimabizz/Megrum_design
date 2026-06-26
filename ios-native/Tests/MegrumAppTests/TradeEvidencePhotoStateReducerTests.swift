@@ -39,6 +39,20 @@ final class TradeEvidencePhotoStateReducerTests: XCTestCase {
         XCTAssertEqual(photos.first?.takenBy, viewerID)
     }
 
+    func testPhotosRespectExplicitlyCachedEmptyPhotos() throws {
+        let viewerID = UUID(uuidString: "00000000-0000-0000-0000-000000000813")!
+        let evidenceURL = try XCTUnwrap(URL(string: "https://example.com/evidence.jpg"))
+        let proposal = makeProposal(evidencePhotoURL: evidenceURL)
+
+        let photos = TradeEvidencePhotoStateReducer.photos(
+            for: proposal,
+            in: [proposal.id: []],
+            viewerID: viewerID
+        )
+
+        XCTAssertEqual(photos, [])
+    }
+
     func testReplacingLoadedPhotosKeepsLoadedPhotosOrUsesFallbackWhenEmpty() throws {
         let viewerID = UUID(uuidString: "00000000-0000-0000-0000-000000000804")!
         let proposal = makeProposal(evidencePhotoURL: try XCTUnwrap(URL(string: "https://example.com/fallback.jpg")))

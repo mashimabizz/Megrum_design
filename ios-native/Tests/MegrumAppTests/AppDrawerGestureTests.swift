@@ -1,4 +1,5 @@
 @testable import MegrumApp
+import MegrumCore
 import XCTest
 
 final class AppDrawerGestureTests: XCTestCase {
@@ -9,9 +10,8 @@ final class AppDrawerGestureTests: XCTestCase {
                 "プロフィール",
                 "通知",
                 "推し設定",
-                "スケジュール",
-                "支払条件設定",
-                "交換条件設定"
+                "支払い方法の設定",
+                "交換条件の設定"
             ]
         )
         XCTAssertEqual(
@@ -20,6 +20,66 @@ final class AppDrawerGestureTests: XCTestCase {
                 "設定とプライバシー",
                 "ヘルプ"
             ]
+        )
+    }
+
+    func testDrawerSettingsBadgesRequireMissingExchangeAndPaymentSettings() {
+        let todayKey = HomeExchangeDateKey.key(for: Date())
+        XCTAssertEqual(
+            AppDrawerSettingsBadgePolicy.exchangeBadgeText(
+                settings: HomeDefaultExchangeSettings(
+                    preference: .both,
+                    localPrefecture: "東京都",
+                    localDateKeys: [todayKey]
+                ),
+                isExplicitlyConfigured: false
+            ),
+            "要設定"
+        )
+        XCTAssertNil(
+            AppDrawerSettingsBadgePolicy.exchangeBadgeText(
+                settings: HomeDefaultExchangeSettings(
+                    preference: .both,
+                    localPrefecture: "東京都",
+                    localDateKeys: [todayKey]
+                ),
+                isExplicitlyConfigured: true
+            )
+        )
+        XCTAssertEqual(
+            AppDrawerSettingsBadgePolicy.paymentBadgeText(methods: []),
+            "要設定"
+        )
+        XCTAssertNil(
+            AppDrawerSettingsBadgePolicy.paymentBadgeText(methods: [.paypay])
+        )
+    }
+
+    func testDrawerExchangeBadgeRequiresFutureLocalDateForLocalMethods() {
+        let calendar = Calendar.current
+        let yesterday = calendar.date(byAdding: .day, value: -1, to: Date()) ?? Date()
+        let expiredKey = HomeExchangeDateKey.key(for: yesterday, calendar: calendar)
+
+        XCTAssertEqual(
+            AppDrawerSettingsBadgePolicy.exchangeBadgeText(
+                settings: HomeDefaultExchangeSettings(
+                    preference: .local,
+                    localPrefecture: "東京都",
+                    localDateKeys: [expiredKey]
+                ),
+                isExplicitlyConfigured: true
+            ),
+            "要設定"
+        )
+        XCTAssertNil(
+            AppDrawerSettingsBadgePolicy.exchangeBadgeText(
+                settings: HomeDefaultExchangeSettings(
+                    preference: .mail,
+                    localPrefecture: "",
+                    localDateKeys: []
+                ),
+                isExplicitlyConfigured: true
+            )
         )
     }
 

@@ -13,6 +13,7 @@ struct OwnProfileScreen: View {
     @State private var showsProfileCompletion = false
     @State private var selectedProfileTab: ProfileVisualTab = .goods
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.megrumSlidePresentationDismiss) private var slidePresentationDismiss
 
     private var summary: OwnProfileSummary? {
         OwnProfileSummary(
@@ -32,7 +33,14 @@ struct OwnProfileScreen: View {
                 selectedProfileTab: $selectedProfileTab,
                 profileBio: summary.map(profileBio) ?? "",
                 profileTagItems: profileTagItems,
-                profileGridItems: profileGridItems(for: selectedProfileTab),
+                goodsItems: ownGoodsGridItems,
+                wishItems: ownWishGridItems,
+                listings: appState.listings,
+                listingGoodsByID: ownListingGoodsByID,
+                listingWishByID: ownListingWishByID,
+                groups: appState.oshiGroups,
+                characters: appState.oshiCharacters,
+                goodsTypes: appState.goodsTypes,
                 onClose: closePage,
                 onEdit: openCurrentProfileEditor,
                 onOpenSchedule: openSchedule
@@ -40,7 +48,7 @@ struct OwnProfileScreen: View {
         }
         .background(MegrumTheme.canvas.ignoresSafeArea())
         .megrumHiddenNavigationBar()
-        .megrumEdgeBackSwipe(action: closePage)
+        .megrumInteractiveBackSwipe(action: closePage)
         .sheet(isPresented: $isProfileEditorPresented) {
             NavigationStack {
                 OwnProfileEditForm(
@@ -75,46 +83,30 @@ struct OwnProfileScreen: View {
     }
 
     private func profileBio(_ summary: OwnProfileSummary) -> String {
-        let parts = [
-            summary.prefectureText,
-            summary.genderText,
-            summary.paymentMethodsText
-        ].filter { !$0.isEmpty && $0 != "未設定" }
-        guard !parts.isEmpty else {
-            return "プロフィール情報を編集できます"
-        }
-        return parts.joined(separator: " / ")
+        summary.bio ?? ""
     }
 
-    private func profileGridItems(for tab: ProfileVisualTab) -> [ProfileVisualGridItem] {
-        switch tab {
-        case .goods:
-            return appState.inventory.map { item in
-                ProfileVisualGridItem(id: item.id, title: item.title, imageURL: item.imageURL)
-            }
-        case .listings:
-            return listingGridItems()
-        case .wish:
-            return appState.wishes.map { item in
-                ProfileVisualGridItem(id: item.id, title: item.title, imageURL: item.imageURL)
-            }
-        }
+    private var ownGoodsGridItems: [ProfileVisualGridItem] {
+        appState.inventory.map(ProfileVisualGridItem.init(goods:))
     }
 
-    private func listingGridItems() -> [ProfileVisualGridItem] {
-        let inventoryByID = Dictionary(uniqueKeysWithValues: appState.inventory.map { ($0.id, $0) })
-        return appState.listings.compactMap { listing in
-            guard let firstHave = listing.haves.first,
-                  let item = inventoryByID[firstHave.itemID] else {
-                return nil
-            }
-            return ProfileVisualGridItem(id: listing.id, title: item.title, imageURL: item.imageURL)
-        }
+    private var ownWishGridItems: [ProfileVisualGridItem] {
+        appState.wishes.map(ProfileVisualGridItem.init(wish:))
+    }
+
+    private var ownListingGoodsByID: [UUID: GoodsItem] {
+        Dictionary(uniqueKeysWithValues: appState.inventory.map { ($0.id, $0) })
+    }
+
+    private var ownListingWishByID: [UUID: WishItem] {
+        Dictionary(uniqueKeysWithValues: appState.wishes.map { ($0.id, $0) })
     }
 
     private func closePage() {
         if let onClose {
             onClose()
+        } else if let slidePresentationDismiss {
+            slidePresentationDismiss()
         } else {
             dismiss()
         }
@@ -151,8 +143,10 @@ struct OwnProfileScreen: View {
             OwnProfileUpdateInput(
                 handle: normalized.handle,
                 displayName: normalized.displayName,
+                bio: normalized.bio.nilIfBlank,
                 gender: normalized.gender,
                 prefecture: normalized.prefecture.nilIfBlank,
+                birthDate: normalized.birthDate,
                 paymentMethods: normalized.paymentMethods,
                 avatarURL: normalized.visibleAvatarURL,
                 avatarUpload: normalized.avatarUpload,

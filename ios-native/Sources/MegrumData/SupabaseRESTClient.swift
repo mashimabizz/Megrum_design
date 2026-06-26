@@ -200,10 +200,33 @@ public final class SupabaseRESTClient: @unchecked Sendable {
         if let absoluteURL = URL(string: signed), absoluteURL.scheme != nil {
             return absoluteURL
         }
-        guard let relativeURL = URL(string: signed, relativeTo: configuration.projectURL)?.absoluteURL else {
+        guard let relativeURL = resolvedStorageSignedURL(from: signed) else {
             throw SupabaseRESTError.invalidURL
         }
         return relativeURL
     }
 
+    private func resolvedStorageSignedURL(from signedURL: String) -> URL? {
+        let normalized = signedURL.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !normalized.isEmpty else {
+            return nil
+        }
+
+        let path: String
+        if normalized.hasPrefix("/storage/v1/") {
+            path = normalized
+        } else if normalized.hasPrefix("storage/v1/") {
+            path = "/\(normalized)"
+        } else if normalized.hasPrefix("/object/") {
+            path = "/storage/v1\(normalized)"
+        } else if normalized.hasPrefix("object/") {
+            path = "/storage/v1/\(normalized)"
+        } else if normalized.hasPrefix("/") {
+            path = normalized
+        } else {
+            path = "/\(normalized)"
+        }
+
+        return URL(string: path, relativeTo: configuration.projectURL)?.absoluteURL
+    }
 }

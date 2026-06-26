@@ -49,7 +49,7 @@ extension MegrumAppState {
         do {
             paymentSettings = try await repository.loadPaymentSettings()
         } catch {
-            errorMessage = "支払い条件を読み込めませんでした"
+            errorMessage = "支払い方法を読み込めませんでした"
         }
         isLoadingPaymentSettings = false
     }
@@ -72,7 +72,7 @@ extension MegrumAppState {
             isSavingPaymentSettings = false
             return true
         } catch {
-            errorMessage = "支払い条件を保存できませんでした"
+            errorMessage = "支払い方法を保存できませんでした"
             isSavingPaymentSettings = false
             return false
         }

@@ -24,15 +24,26 @@ enum MegrumHaptics {
 }
 
 extension View {
-    func megrumInteractionFeedback() -> some View {
-        modifier(MegrumInteractionFeedbackModifier())
+    func megrumInteractionFeedback(clipsToBounds: Bool = false) -> some View {
+        modifier(MegrumInteractionFeedbackModifier(clipsToBounds: clipsToBounds))
     }
 }
 
 private struct MegrumInteractionFeedbackModifier: ViewModifier {
+    var clipsToBounds: Bool
     @State private var ripples: [MegrumTapRipple] = []
 
+    @ViewBuilder
     func body(content: Content) -> some View {
+        if clipsToBounds {
+            feedbackContent(content)
+                .clipped()
+        } else {
+            feedbackContent(content)
+        }
+    }
+
+    private func feedbackContent(_ content: Content) -> some View {
         content
             .contentShape(Rectangle())
             .simultaneousGesture(tapGesture)

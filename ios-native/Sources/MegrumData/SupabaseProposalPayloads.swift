@@ -145,9 +145,11 @@ struct ProposalResponseRPCPayload: Encodable, Sendable {
 
 struct ProposalApprovalRPCPayload: Encodable, Sendable {
     var pProposalID: UUID
+    var pPhotoID: UUID?
 
-    init(proposalID: UUID) {
+    init(proposalID: UUID, photoID: UUID? = nil) {
         self.pProposalID = proposalID
+        self.pPhotoID = photoID
     }
 }
 
@@ -166,6 +168,8 @@ struct ProposalEvidenceUpdatePayload: Encodable, Sendable {
     var evidencePhotoURL: String?
     var evidenceTakenAt: String
     var evidenceTakenBy: UUID
+    var approvedBySender: Bool
+    var approvedByReceiver: Bool
 }
 
 struct ProposalEvidenceReplacementPayload: Encodable, Sendable {
@@ -212,6 +216,16 @@ struct ProposalCancelApprovalUpdatePayload: Encodable, Sendable {
 }
 
 struct EvidencePhotoInsertPayload: Encodable, Sendable {
+    var proposalID: UUID
+    var photoURL: String
+    var position: Int
+    var takenAt: String
+    var takenBy: UUID
+    var approvedBySender: Bool
+    var approvedByReceiver: Bool
+}
+
+struct LegacyEvidencePhotoInsertPayload: Encodable, Sendable {
     var proposalID: UUID
     var photoURL: String
     var position: Int

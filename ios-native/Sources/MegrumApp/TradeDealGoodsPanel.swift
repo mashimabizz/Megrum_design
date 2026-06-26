@@ -11,6 +11,7 @@ struct TradeDealGoodsPanel: View {
     var requestedTitle: String
     var offeredEmptyTitle: String
     var requestedEmptyTitle: String
+    var onCarouselTap: (() -> Void)?
 
     init(
         offeredItems: [GoodsItem],
@@ -20,7 +21,8 @@ struct TradeDealGoodsPanel: View {
         offeredTitle: String = "譲るグッズ",
         requestedTitle: String = "求めるグッズ",
         offeredEmptyTitle: String = "譲るグッズ未選択",
-        requestedEmptyTitle: String = "求めるグッズ未選択"
+        requestedEmptyTitle: String = "求めるグッズ未選択",
+        onCarouselTap: (() -> Void)? = nil
     ) {
         self.offeredItems = offeredItems
         self.requestedItems = requestedItems
@@ -30,16 +32,18 @@ struct TradeDealGoodsPanel: View {
         self.requestedTitle = requestedTitle
         self.offeredEmptyTitle = offeredEmptyTitle
         self.requestedEmptyTitle = requestedEmptyTitle
+        self.onCarouselTap = onCarouselTap
     }
 
     var body: some View {
-        HStack(alignment: .center, spacing: 8) {
+        HStack(alignment: .center, spacing: 6) {
             TradeGoodsCarouselColumn(
                 title: requestedTitle,
                 emptyTitle: requestedEmptyTitle,
                 items: requestedItems,
                 accentColor: MegrumTheme.lavender,
-                badgeTitle: requestedBadgeTitle
+                badgeTitle: requestedBadgeTitle,
+                onStageTap: onCarouselTap
             )
 
             TradeExchangeGlyph()
@@ -49,26 +53,27 @@ struct TradeDealGoodsPanel: View {
                 emptyTitle: offeredEmptyTitle,
                 items: offeredItems,
                 accentColor: MegrumTheme.pink,
-                badgeTitle: offeredBadgeTitle
+                badgeTitle: offeredBadgeTitle,
+                onStageTap: onCarouselTap
             )
         }
-        .padding(.horizontal, 2)
-        .padding(.vertical, 4)
+        .padding(.horizontal, 1)
+        .padding(.vertical, 2)
         .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
     }
 }
 
 private struct TradeExchangeGlyph: View {
     var body: some View {
-        VStack(spacing: -5) {
+        VStack(spacing: -4) {
             Image(systemName: "arrow.right")
-                .font(.system(size: 18, weight: .black))
+                .font(.system(size: 15, weight: .black))
                 .foregroundStyle(MegrumTheme.lavender)
             Image(systemName: "arrow.left")
-                .font(.system(size: 18, weight: .black))
+                .font(.system(size: 15, weight: .black))
                 .foregroundStyle(MegrumTheme.pink)
         }
-        .frame(width: 25)
+        .frame(width: 21)
         .accessibilityHidden(true)
     }
 }

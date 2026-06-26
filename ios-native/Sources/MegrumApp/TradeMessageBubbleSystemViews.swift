@@ -22,7 +22,7 @@ struct TradeSystemMessageBubble: View {
             .buttonStyle(.plain)
         } else if TradeEvidenceSystemMessage.isEvidenceNotice(message) {
             Button(action: onOpenEvidenceList) {
-                TradeSystemMessageContent(presentation: presentation, showsDisclosure: true)
+                TradeSystemMessageContent(presentation: presentation, showsDisclosure: true, actionLabel: "見る")
             }
             .buttonStyle(.plain)
         } else {
@@ -43,6 +43,7 @@ struct TradeSystemMessageBubble: View {
 private struct TradeSystemMessageContent: View {
     var presentation: TradeSystemMessagePresentation
     var showsDisclosure: Bool
+    var actionLabel: String? = nil
 
     var body: some View {
         HStack(alignment: .top, spacing: 8) {
@@ -62,9 +63,18 @@ private struct TradeSystemMessageContent: View {
                 }
             }
             if showsDisclosure {
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 10, weight: .heavy))
-                    .padding(.top, 2)
+                if let actionLabel {
+                    Text(actionLabel)
+                        .font(.system(size: 11.5, weight: .black, design: .rounded))
+                        .foregroundStyle(MegrumTheme.lavender)
+                        .padding(.horizontal, 9)
+                        .padding(.vertical, 5)
+                        .background(MegrumTheme.lavender.opacity(0.12), in: Capsule())
+                } else {
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 10, weight: .heavy))
+                        .padding(.top, 2)
+                }
             }
         }
         .foregroundStyle(MegrumTheme.muted)

@@ -86,10 +86,11 @@ enum PaymentSettingsKeyboard {
 
 extension View {
     func paymentSettingsCardStyle(strokeColor: Color = MegrumTheme.ink.opacity(0.08)) -> some View {
-        padding(18)
-            .background(.white, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        padding(.horizontal, 20)
+            .padding(.vertical, 0)
+            .background(.white.opacity(0.90), in: RoundedRectangle(cornerRadius: 24, style: .continuous))
             .overlay {
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                RoundedRectangle(cornerRadius: 24, style: .continuous)
                     .stroke(strokeColor, lineWidth: 1)
             }
             .shadow(color: .black.opacity(0.04), radius: 18, y: 10)

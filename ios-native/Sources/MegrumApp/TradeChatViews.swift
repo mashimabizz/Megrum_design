@@ -28,63 +28,36 @@ struct TradeChatPartnerStrip: View {
                             .foregroundStyle(.white)
                     }
 
-                VStack(alignment: .leading, spacing: 3) {
-                    Text("@\(presentation.partnerHandle)")
-                        .font(.system(size: 14, weight: .black, design: .rounded))
-                        .foregroundStyle(MegrumTheme.ink)
-                        .lineLimit(1)
-
+                VStack(alignment: .leading, spacing: 2) {
                     HStack(spacing: 5) {
-                        Circle()
-                            .fill(MegrumTheme.muted.opacity(0.42))
-                            .frame(width: 4.5, height: 4.5)
-                        Text(presentation.partnerMetaText)
-                            .font(.system(size: 10.5, weight: .heavy, design: .rounded))
+                        Text(presentation.partnerDisplayName)
+                            .font(.system(size: 14.2, weight: .black, design: .rounded))
+                            .foregroundStyle(MegrumTheme.ink)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.78)
+
+                        Text("@\(presentation.partnerHandle)")
+                            .font(.system(size: 11, weight: .heavy, design: .rounded))
                             .foregroundStyle(MegrumTheme.muted)
                             .lineLimit(1)
-                            .minimumScaleFactor(0.72)
+                            .minimumScaleFactor(0.7)
                     }
+
+                    Text(presentation.partnerMetaText)
+                        .font(.system(size: 10.8, weight: .heavy, design: .rounded))
+                        .foregroundStyle(MegrumTheme.muted)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.72)
                 }
 
                 Spacer(minLength: 8)
-
-                Text(presentation.agreementLabel)
-                    .font(.system(size: 11, weight: .black, design: .rounded))
-                    .foregroundStyle(statusForeground)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.7)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 6)
-                    .background(statusBackground, in: Capsule())
             }
             .frame(minHeight: 44)
         }
         .buttonStyle(.plain)
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("@\(presentation.partnerHandle)。\(presentation.partnerMetaText)。\(presentation.agreementLabel)")
+        .accessibilityLabel("\(presentation.partnerDisplayName)。@\(presentation.partnerHandle)。\(presentation.partnerMetaText)")
         .accessibilityHint("プロフィールを開きます")
-    }
-
-    private var statusForeground: Color {
-        switch presentation.statusLabel {
-        case "取引予定", "完了":
-            return MegrumTheme.ok
-        case "見送り", "キャンセル", "期限切れ":
-            return MegrumTheme.muted
-        default:
-            return MegrumTheme.lavender
-        }
-    }
-
-    private var statusBackground: Color {
-        switch presentation.statusLabel {
-        case "取引予定", "完了":
-            return MegrumTheme.ok.opacity(0.15)
-        case "見送り", "キャンセル", "期限切れ":
-            return MegrumTheme.ink.opacity(0.06)
-        default:
-            return MegrumTheme.lavender.opacity(0.14)
-        }
     }
 }
 

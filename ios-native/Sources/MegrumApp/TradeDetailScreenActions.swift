@@ -7,6 +7,16 @@ import UIKit
 #endif
 
 extension TradeDetailScreen {
+    var evidencePhotoPickerSelection: Binding<PhotosPickerItem?> {
+        Binding(
+            get: { selectedEvidencePhotoItem },
+            set: { item in
+                selectedEvidencePhotoItem = item
+                handleSelectedEvidencePhoto(item)
+            }
+        )
+    }
+
     var tradeSummaryLine: String {
         "受け取る \(receiveSummaryText)  ⇄  出す \(goodsSummary(for: offeredGoodsIDs))"
     }
@@ -94,6 +104,38 @@ extension TradeDetailScreen {
         }
     }
 
+    func openEvidenceList() {
+        isShowingEvidenceList = true
+        Task {
+            await appState.loadTradeEvidencePhotos(proposal: currentProposal, reportsFailure: false)
+        }
+    }
+
+    func openEvidencePhoto(_ photo: TradeEvidencePhoto) {
+        selectedRemoteImage = RemoteImageSelection(
+            url: photo.photoURL,
+            evidencePhotoID: photo.id,
+            canDeleteEvidencePhoto: currentProposal.status == .agreed && photo.isUploadedBy(viewerID)
+        )
+    }
+
+    func selectedRemoteImageDeleteAction(for selection: RemoteImageSelection) -> (() -> Void)? {
+        guard selection.canDeleteEvidencePhoto,
+              let photoID = selection.evidencePhotoID,
+              appState.deletingEvidencePhotoID != photoID else {
+            return nil
+        }
+        return {
+            selectedRemoteImage = nil
+            Task {
+                await appState.deleteTradeEvidencePhoto(
+                    proposalID: currentProposal.id,
+                    photoID: photoID
+                )
+            }
+        }
+    }
+
     func sendDraftMessage() {
         Task {
             let sent = await appState.sendMessage(proposalID: proposal.id, body: draftMessage)
@@ -126,15 +168,19 @@ extension TradeDetailScreen {
         guard let data = try? await item.loadTransferable(type: Data.self) else {
             return
         }
-        await addEvidence(data: data, imageContentType: inferredEvidenceImageContentType(from: data))
+        let upload = normalizedChatPhotoUpload(from: data)
+        await addEvidence(data: upload.data, imageContentType: upload.contentType)
     }
 
     func addEvidence(data: Data, imageContentType: String) async {
-        _ = await appState.addTradeEvidence(
+        let added = await appState.addTradeEvidence(
             proposalID: currentProposal.id,
             imageData: data,
             imageContentType: imageContentType
         )
+        if added {
+            isShowingEvidenceList = true
+        }
     }
 
     func addChatPhoto(from item: PhotosPickerItem, messageType: TradeMessageType) async {
@@ -152,10 +198,11 @@ extension TradeDetailScreen {
             unavailableChatAction = messageType == .photo ? .photo : .outfitPhoto
             return
         }
+        let upload = normalizedChatPhotoUpload(from: data)
         await addChatPhoto(
-            data: data,
+            data: upload.data,
             messageType: messageType,
-            imageContentType: inferredEvidenceImageContentType(from: data)
+            imageContentType: upload.contentType
         )
     }
 

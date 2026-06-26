@@ -17,26 +17,26 @@ struct TradeGoodsOrbitCard: View {
 
             if let badgeTitle, clampedProminence > 0.70 {
                 Text(badgeTitle)
-                    .font(.system(size: 9.5 + CGFloat(clampedProminence) * 1.2, weight: .black, design: .rounded))
+                    .font(.system(size: 8.5 + CGFloat(clampedProminence) * 1.0, weight: .black, design: .rounded))
                     .foregroundStyle(accentColor)
                     .lineLimit(1)
                     .minimumScaleFactor(0.70)
-                    .padding(.horizontal, 7)
-                    .padding(.vertical, 3)
+                    .padding(.horizontal, 5)
+                    .padding(.vertical, 2)
                     .background(.white.opacity(0.94), in: Capsule())
                     .overlay {
                         Capsule()
                             .strokeBorder(accentColor.opacity(0.20), lineWidth: 0.8)
                     }
-                    .padding(6)
+                    .padding(4)
                     .shadow(color: .black.opacity(0.08), radius: 3, y: 1)
             }
         }
-        .clipShape(RoundedRectangle(cornerRadius: 13 + CGFloat(clampedProminence), style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: 10 + CGFloat(clampedProminence), style: .continuous))
         .overlay {
-            RoundedRectangle(cornerRadius: 13 + CGFloat(clampedProminence), style: .continuous)
+            RoundedRectangle(cornerRadius: 10 + CGFloat(clampedProminence), style: .continuous)
                 .strokeBorder(accentColor.opacity(0.44 + clampedProminence * 0.12), lineWidth: 1.2 + CGFloat(clampedProminence) * 0.45)
         }
-        .shadow(color: accentColor.opacity(0.15 + clampedProminence * 0.08), radius: 8 + CGFloat(clampedProminence) * 4, y: 6)
+        .shadow(color: accentColor.opacity(0.13 + clampedProminence * 0.07), radius: 6 + CGFloat(clampedProminence) * 3, y: 4)
     }
 }

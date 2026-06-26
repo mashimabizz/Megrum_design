@@ -146,6 +146,62 @@ final class SupabaseOshiClientTests: XCTestCase {
         XCTAssertEqual(json.first?["priority"] as? Int, 1)
     }
 
+    func testUpsertUserSelectionsRequestKeepsStableKeysForMixedSelectionTargets() throws {
+        let client = SupabaseOshiClient(configuration: configuration)
+        let userID = UUID(uuidString: "11111111-1111-1111-1111-111111111111")!
+        let groupID = UUID(uuidString: "33333333-3333-3333-3333-333333333333")!
+        let characterID = UUID(uuidString: "44444444-4444-4444-4444-444444444444")!
+        let oshiRequestID = UUID(uuidString: "55555555-5555-5555-5555-555555555555")!
+
+        let request = try client.makeUpsertUserSelectionsRequest([
+            UserOshiSelection(
+                id: UUID(uuidString: "22222222-2222-2222-2222-222222222221")!,
+                userID: userID,
+                groupID: groupID,
+                characterID: nil,
+                kind: .box,
+                priority: 1
+            ),
+            UserOshiSelection(
+                id: UUID(uuidString: "22222222-2222-2222-2222-222222222222")!,
+                userID: userID,
+                groupID: groupID,
+                characterID: characterID,
+                kind: .specific,
+                priority: 2
+            ),
+            UserOshiSelection(
+                id: UUID(uuidString: "22222222-2222-2222-2222-222222222223")!,
+                userID: userID,
+                groupID: nil,
+                characterID: nil,
+                kind: .box,
+                priority: 3,
+                oshiRequestID: oshiRequestID
+            )
+        ])
+        let body = try XCTUnwrap(request.httpBody)
+        let json = try XCTUnwrap(JSONSerialization.jsonObject(with: body) as? [[String: Any]])
+        let expectedKeys: Set<String> = [
+            "id",
+            "user_id",
+            "group_id",
+            "character_id",
+            "oshi_request_id",
+            "character_request_id",
+            "kind",
+            "priority"
+        ]
+
+        XCTAssertEqual(json.map { Set($0.keys) }, [expectedKeys, expectedKeys, expectedKeys])
+        XCTAssertTrue(json[0]["character_id"] is NSNull)
+        XCTAssertTrue(json[0]["oshi_request_id"] is NSNull)
+        XCTAssertEqual(json[1]["character_id"] as? String, "44444444-4444-4444-4444-444444444444")
+        XCTAssertTrue(json[1]["oshi_request_id"] is NSNull)
+        XCTAssertTrue(json[2]["group_id"] is NSNull)
+        XCTAssertEqual(json[2]["oshi_request_id"] as? String, "55555555-5555-5555-5555-555555555555")
+    }
+
     private var configuration: SupabaseConfiguration {
         SupabaseConfiguration(
             projectURL: URL(string: "https://example.supabase.co")!,

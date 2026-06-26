@@ -16,7 +16,8 @@ public extension PreviewMegrumRepository {
             cashAmount: input.cashAmount,
             cashAmountSide: input.cashAmountSide,
             agreedBySender: [.sent, .negotiating, .agreementOneSide, .agreed].contains(input.status),
-            agreedByReceiver: input.status == .agreed
+            agreedByReceiver: input.status == .agreed,
+            meetupCandidates: input.meetupCandidates.isEmpty ? input.meetup.map { [$0] } : input.meetupCandidates
         )
     }
 

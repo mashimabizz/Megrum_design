@@ -47,9 +47,11 @@ public struct UserProfile: Identifiable, Codable, Hashable, Sendable {
     public var id: UUID
     public var handle: String
     public var displayName: String
+    public var bio: String?
     public var avatarURL: URL?
     public var gender: UserGender?
     public var prefecture: String?
+    public var birthDate: Date?
     public var age: Int?
     public var paymentMethods: [UserPaymentMethod]
     public var paymentNote: String?
@@ -59,9 +61,11 @@ public struct UserProfile: Identifiable, Codable, Hashable, Sendable {
         id: UUID,
         handle: String,
         displayName: String,
+        bio: String? = nil,
         avatarURL: URL? = nil,
         gender: UserGender? = nil,
         prefecture: String? = nil,
+        birthDate: Date? = nil,
         age: Int? = nil,
         paymentMethods: [UserPaymentMethod] = [],
         paymentNote: String? = nil,
@@ -70,9 +74,11 @@ public struct UserProfile: Identifiable, Codable, Hashable, Sendable {
         self.id = id
         self.handle = handle
         self.displayName = displayName
+        self.bio = bio
         self.avatarURL = avatarURL
         self.gender = gender
         self.prefecture = prefecture
+        self.birthDate = birthDate
         self.age = age
         self.paymentMethods = paymentMethods
         self.paymentNote = paymentNote

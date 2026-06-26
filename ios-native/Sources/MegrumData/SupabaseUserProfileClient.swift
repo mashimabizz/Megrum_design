@@ -65,8 +65,10 @@ private struct PublicUserProfileRow: Decodable, Sendable {
     var id: UUID
     var handle: String?
     var displayName: String?
+    var bio: String?
     var avatarUrl: URL?
     var primaryArea: String?
+    var gender: UserGender?
     var age: Int?
     var accountStatus: String?
     var averageStars: Double?
@@ -79,7 +81,9 @@ private struct PublicUserProfileRow: Decodable, Sendable {
                 id: id,
                 handle: handle ?? "unknown",
                 displayName: displayName ?? handle ?? "Megrum",
+                bio: bio,
                 avatarURL: avatarUrl,
+                gender: gender,
                 prefecture: primaryArea,
                 age: age,
                 accountStatus: AccountStatus(rawValue: accountStatus ?? "") ?? .active

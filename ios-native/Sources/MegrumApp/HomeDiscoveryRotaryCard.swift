@@ -22,6 +22,7 @@ struct HomeDiscoveryRotaryCard: View {
             showsConditionOverlay: showsConditionOverlay,
             conditionTags: { conditionTags(for: $0) },
             onTapPosition: { handleTap(position: $0) },
+            isDragEnabled: goods.count > 1 && !reduceMotion,
             onDragChanged: handleDragChanged,
             onDragEnded: handleDragEnded
         )
@@ -110,12 +111,12 @@ struct HomeDiscoveryRotaryCard: View {
         return shortest - displayedDragProgress
     }
 
-    private func handleDragChanged(_ value: DragGesture.Value, width: CGFloat) {
+    private func handleDragChanged(translation: CGSize, width: CGFloat) {
         guard goods.count > 1, !reduceMotion else {
             return
         }
-        guard let progress = carouselDragProgress(translation: value.translation, width: width) else {
-            if abs(value.translation.height) > abs(value.translation.width) {
+        guard let progress = carouselDragProgress(translation: translation, width: width) else {
+            if abs(translation.height) > abs(translation.width) {
                 dragProgress = 0
             }
             return
@@ -127,18 +128,22 @@ struct HomeDiscoveryRotaryCard: View {
         }
     }
 
-    private func handleDragEnded(_ value: DragGesture.Value, width: CGFloat) {
+    private func handleDragEnded(
+        translation: CGSize,
+        projectedTranslationWidth: CGFloat,
+        width: CGFloat
+    ) {
         guard goods.count > 1 else {
             dragProgress = 0
             return
         }
-        guard isHorizontalCarouselDrag(value.translation) else {
+        guard isHorizontalCarouselDrag(translation) else {
             dragProgress = 0
             return
         }
         let denominator = max(width * 0.58, 72)
-        let projectedProgress = -Double(value.predictedEndTranslation.width / denominator)
-        let actualProgress = -Double(value.translation.width / denominator)
+        let projectedProgress = -Double(projectedTranslationWidth / denominator)
+        let actualProgress = -Double(translation.width / denominator)
         let progress = abs(projectedProgress) > abs(actualProgress) ? projectedProgress : actualProgress
         let delta: Int
         if progress > 0.34 {

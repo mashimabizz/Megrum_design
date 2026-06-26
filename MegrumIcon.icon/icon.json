@@ -1,0 +1,68 @@
+{
+  "fill" : {
+    "linear-gradient" : [
+      "srgb:0.47976,0.74455,0.95524,1.00000",
+      "srgb:0.87729,0.66199,1.00000,1.00000"
+    ],
+    "orientation" : {
+      "start" : {
+        "x" : 0.5,
+        "y" : 1
+      },
+      "stop" : {
+        "x" : 0.5,
+        "y" : 0.3
+      }
+    }
+  },
+  "groups" : [
+    {
+      "blend-mode" : "hard-light",
+      "blur-material" : null,
+      "layers" : [
+        {
+          "image-name" : "Vector 17.svg",
+          "name" : "Vector 17",
+          "position" : {
+            "scale" : 1,
+            "translation-in-points" : [
+              16.96140082975535,
+              -164.3582402089911
+            ]
+          }
+        },
+        {
+          "image-name" : "Vector-2 12.svg",
+          "name" : "Vector-2 12"
+        },
+        {
+          "image-name" : "Vector-1 17.svg",
+          "name" : "Vector-1 17",
+          "position" : {
+            "scale" : 1,
+            "translation-in-points" : [
+              -22.8534393502664,
+              164.30594400910513
+            ]
+          }
+        }
+      ],
+      "name" : "App Icon Template (Community) (9)",
+      "shadow" : {
+        "kind" : "neutral",
+        "opacity" : 0.5
+      },
+      "specular" : true,
+      "translucency" : {
+        "enabled" : true,
+        "value" : 0.5
+      }
+    }
+  ],
+  "supported-platforms" : {
+    "circles" : [
+      "watchOS"
+    ],
+    "squares" : "shared"
+  }
+}

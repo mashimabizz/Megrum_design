@@ -100,12 +100,16 @@ enum GoodsQuickActionKind: CaseIterable, Identifiable, Equatable {
 
 enum GoodsTileCollectionCardStyle {
     static func tagLine(for item: GoodsItem) -> String {
-        guard !item.tags.isEmpty else {
+        tagLine(for: item.tags)
+    }
+
+    static func tagLine(for tags: [GoodsTag]) -> String {
+        guard !tags.isEmpty else {
             return "タグ未設定"
         }
 
-        let visibleTags = item.tags.prefix(2).map { "# \($0.name)" }.joined(separator: " ")
-        return item.tags.count > 2 ? "\(visibleTags) ..." : visibleTags
+        let visibleTags = tags.prefix(2).map { "# \($0.name)" }.joined(separator: " ")
+        return tags.count > 2 ? "\(visibleTags) ..." : visibleTags
     }
 
     static func glyph(for item: GoodsItem) -> String {

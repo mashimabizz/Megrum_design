@@ -112,7 +112,7 @@ extension GoodsEditorSheet {
     }
 
     var usesInventoryCreateFlow: Bool {
-        draft.mode == .create && draft.entryKind == .inventory
+        draft.mode == .create
     }
 
     var canAdvanceFromCreateCommon: Bool {

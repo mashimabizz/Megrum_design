@@ -95,6 +95,12 @@ struct AppDrawerForegroundLayer<Content: View, CloseGesture: Gesture, HomeGestur
                         .gesture(closeGesture)
                 }
             }
-            .simultaneousGesture(homeGesture, including: .gesture)
+            .overlay(alignment: .leading) {
+                Color.clear
+                    .frame(width: AppDrawerVisualMetrics.closedEdgeGestureWidth)
+                    .contentShape(Rectangle())
+                    .simultaneousGesture(homeGesture, including: .gesture)
+                    .zIndex(AppDrawerVisualMetrics.closedEdgeGestureZIndex)
+            }
     }
 }

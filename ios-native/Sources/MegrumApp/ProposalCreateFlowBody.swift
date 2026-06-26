@@ -4,14 +4,8 @@ import SwiftUI
 
 extension ProposalCreateFlow {
     var body: some View {
-        Group {
-            if let submittedSummary {
-                ProposalCreateCompletionView(
-                    summary: submittedSummary,
-                    onSearchMore: handleCompletionSearchMore,
-                    onOpenTrades: handleCompletionOpenTrades
-                )
-            } else {
+        ZStack {
+            if submittedSummary == nil {
                 ProposalCreateActiveContent(
                     selectedStep: $selectedStep,
                     exchangeMethod: $exchangeMethod,
@@ -49,6 +43,24 @@ extension ProposalCreateFlow {
                         confirmStep
                     }
                 )
+                .transition(.asymmetric(
+                    insertion: .move(edge: .leading).combined(with: .opacity),
+                    removal: .move(edge: .leading).combined(with: .opacity)
+                ))
+                .zIndex(0)
+            }
+
+            if let submittedSummary {
+                ProposalCreateCompletionView(
+                    summary: submittedSummary,
+                    onSearchMore: handleCompletionSearchMore,
+                    onOpenTrades: handleCompletionOpenTrades
+                )
+                .transition(.asymmetric(
+                    insertion: .move(edge: .trailing).combined(with: .opacity),
+                    removal: .move(edge: .trailing).combined(with: .opacity)
+                ))
+                .zIndex(1)
             }
         }
         .safeAreaInset(edge: .bottom, spacing: 0) {
@@ -64,7 +76,7 @@ extension ProposalCreateFlow {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(MegrumTheme.canvas.ignoresSafeArea())
-        .megrumEdgeBackSwipe(
+        .megrumInteractiveBackSwipe(
             isEnabled: submittedSummary == nil && !appState.isCreatingProposal,
             action: handleHeaderLeadingAction
         )

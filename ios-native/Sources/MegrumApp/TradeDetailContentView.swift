@@ -15,7 +15,14 @@ struct TradeDetailContent: View {
     var offeredGoods: [GoodsItem]
     var requestedGoodsCount: Int
     var offeredGoodsCount: Int
-    var paymentSummaryText: String?
+    var partnerPaymentMethods: [UserPaymentMethod]
+    var partnerPaymentNote: String?
+    var partnerMailingAddress: TradeMailingAddressSnapshot?
+    var partnerPaymentSettings: TradePaymentSettingsSnapshot?
+    var viewerPaymentMethods: [UserPaymentMethod]
+    var viewerPaymentNote: String?
+    var viewerHasCounterProposal: Bool
+    var isMessageComposerFocused: Bool
     var evidencePhotos: [TradeEvidencePhoto]
     @Binding var selectedEvidencePhotoItem: PhotosPickerItem?
     var partnerLastReadAt: Date?
@@ -34,9 +41,11 @@ struct TradeDetailContent: View {
     var onOpenEvidenceCamera: () -> Void
     var onOpenEvidenceList: () -> Void
     var onOpenImage: (URL) -> Void
-    var onApproveEvidence: () -> Void
+    var onOpenEvidencePhoto: (TradeEvidencePhoto) -> Void
+    var onApproveEvidence: (TradeEvidencePhoto) -> Void
     var onRate: () -> Void
     var onApproveCancel: () -> Void
+    @State private var agreementDisclosureRoute: TradeAgreementDisclosureRoute?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -60,9 +69,20 @@ struct TradeDetailContent: View {
                 offeredGoods: offeredGoods,
                 requestedGoodsCount: requestedGoodsCount,
                 offeredGoodsCount: offeredGoodsCount,
-                paymentSummaryText: paymentSummaryText,
+                partnerPaymentMethods: partnerPaymentMethods,
+                partnerPaymentNote: partnerPaymentNote,
+                viewerPaymentMethods: viewerPaymentMethods,
+                viewerPaymentNote: viewerPaymentNote,
+                viewerHasCounterProposal: viewerHasCounterProposal,
+                isMessageComposerFocused: isMessageComposerFocused,
                 isResponding: isResponding,
                 onOpenDispute: onOpenDispute,
+                onOpenMailingInfo: {
+                    agreementDisclosureRoute = .mailingAddress
+                },
+                onOpenPaymentInfo: {
+                    agreementDisclosureRoute = .paymentInfo
+                },
                 onAgree: onAgree,
                 onReject: onReject,
                 onCounterProposal: onCounterProposal
@@ -75,11 +95,22 @@ struct TradeDetailContent: View {
                             proposal: proposal,
                             messages: messages,
                             viewerID: viewerID,
+                            evaluationState: evaluationState,
                             partnerLastReadAt: partnerLastReadAt,
+                            partnerPaymentMethods: partnerPaymentMethods,
+                            partnerPaymentNote: partnerPaymentNote,
+                            partnerMailingAddress: partnerMailingAddress,
+                            partnerPaymentSettings: partnerPaymentSettings,
                             isLoading: isLoadingMessages,
                             isApprovingCancel: isApprovingCancel,
                             onOpenImage: onOpenImage,
                             onOpenDispute: onOpenDispute,
+                            onOpenMailingInfo: {
+                                agreementDisclosureRoute = .mailingAddress
+                            },
+                            onOpenPaymentInfo: {
+                                agreementDisclosureRoute = .paymentInfo
+                            },
                             onOpenEvidenceList: onOpenEvidenceList,
                             onApproveCancel: onApproveCancel
                         )
@@ -94,7 +125,7 @@ struct TradeDetailContent: View {
                             canUseCamera: canUseCamera,
                             onOpenCamera: onOpenEvidenceCamera,
                             onOpenEvidenceList: onOpenEvidenceList,
-                            onOpenImage: onOpenImage,
+                            onOpenImage: onOpenEvidencePhoto,
                             onApprove: onApproveEvidence,
                             onRate: onRate
                         )
@@ -104,7 +135,7 @@ struct TradeDetailContent: View {
                     }
                     .padding(.horizontal, 10)
                     .padding(.top, 12)
-                    .padding(.bottom, 118)
+                    .padding(.bottom, scrollBottomPadding)
                 }
                 .onAppear {
                     scrollToLatestMessage(proxy, animated: false)
@@ -119,9 +150,27 @@ struct TradeDetailContent: View {
                 }
             }
         }
+        .sheet(item: $agreementDisclosureRoute) { route in
+            TradeAgreementDisclosureSheet(
+                route: route,
+                proposal: proposal,
+                partnerHandle: heroPresentation.partnerHandle,
+                partnerMailingAddress: partnerMailingAddress,
+                partnerPaymentMethods: partnerPaymentMethods,
+                partnerPaymentNote: partnerPaymentNote,
+                partnerPaymentSettings: partnerPaymentSettings
+            )
+        }
     }
 
     private static let messageBottomAnchorID = "trade-detail-message-bottom-anchor"
+
+    private var scrollBottomPadding: CGFloat {
+        if proposal.status == .agreed || (proposal.status == .completed && !evaluationState.hasSubmittedEvaluation) {
+            return 206
+        }
+        return 118
+    }
 
     private func scrollToLatestMessage(_ proxy: ScrollViewProxy, animated: Bool) {
         guard !messages.isEmpty else {

@@ -12,23 +12,19 @@ enum HomeDiscoveryMatchPolicy {
     }
 
     static func exchangeCondition(for signals: HomeExchangeConditionSignals) -> HomeExchangeCondition {
-        guard signals.localExchangeSelected else {
-            if signals.postalAcceptedByBoth {
-                return signals.shippingFeeNeedsDiscussion ? .possible : .exact
-            }
-            return .warning
-        }
-        if signals.prefectureMatches
-            && signals.dateMatches
-            && !signals.prefectureUnset
-            && !signals.dateNeedsDiscussion
-            && !signals.shippingFeeNeedsDiscussion {
+        if signals.postalAcceptedByBoth {
             return .exact
         }
-        if signals.prefectureMatches || signals.dateMatches || signals.prefectureUnset || signals.dateNeedsDiscussion || signals.shippingFeeNeedsDiscussion {
-            return .possible
+
+        guard signals.localExchangeSelected else {
+            return .warning
         }
-        return .warning
+
+        if signals.prefectureMatches && signals.dateMatches && !signals.prefectureUnset {
+            return .exact
+        }
+
+        return .possible
     }
 
     static func paymentCondition(for signals: HomePaymentConditionSignals) -> HomePaymentCondition {

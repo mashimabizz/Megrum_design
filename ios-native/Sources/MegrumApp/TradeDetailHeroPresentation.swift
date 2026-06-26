@@ -2,6 +2,7 @@ import Foundation
 import MegrumCore
 
 struct TradeDetailHeroPresentation: Equatable, Sendable {
+    var partnerDisplayName: String
     var partnerHandle: String
     var partnerInitial: String
     var partnerMetaText: String
@@ -19,22 +20,24 @@ struct TradeDetailHeroPresentation: Equatable, Sendable {
     init(
         proposal: TradeProposal,
         viewerID: UUID?,
-        profilesByUserID: [UUID: PublicUserProfile]
+        profilesByUserID: [UUID: PublicUserProfile],
+        viewerHasCounterProposal: Bool = false
     ) {
         let partnerID = viewerID.flatMap { proposal.partnerID(for: $0) }
             ?? proposal.receiverID
         let profile = profilesByUserID[partnerID]?.profile
         let handle = profile?.handle
             ?? "user_\(partnerID.uuidString.prefix(4).lowercased())"
+        self.partnerDisplayName = (profile?.displayName).nilIfBlank ?? handle
         self.partnerHandle = handle
-        self.partnerInitial = String(handle.prefix(1)).uppercased()
+        self.partnerInitial = String(self.partnerDisplayName.prefix(1)).uppercased()
         self.exchangeMethodText = proposal.exchangeMethod.displayName
-        let area = (profile?.prefecture).nilIfBlank
-        self.partnerMetaText = area.map { "未共有・\($0)" } ?? "未共有"
+        self.partnerMetaText = Self.partnerMetaText(for: profile)
 
         let isSender = viewerID.map { proposal.senderID == $0 } ?? false
         let isReceiver = viewerID.map { proposal.receiverID == $0 } ?? false
-        self.relationText = Self.relationText(isSender: isSender, isReceiver: isReceiver)
+        let showsOutgoingWaitingState = isSender || viewerHasCounterProposal
+        self.relationText = Self.relationText(isSender: showsOutgoingWaitingState, isReceiver: isReceiver && !viewerHasCounterProposal)
 
         let myAgreed = viewerID.map { proposal.agreementBy($0) } ?? false
         let partnerAgreed = viewerID.map { proposal.partnerAgreement(for: $0) } ?? false
@@ -42,9 +45,23 @@ struct TradeDetailHeroPresentation: Equatable, Sendable {
         self.partnerAgreementDone = partnerAgreed
         self.myAgreementText = myAgreed ? "私 合意済" : "私 未合意"
         self.partnerAgreementText = partnerAgreed ? "相手 合意済" : "相手 未合意"
-        self.statusLabel = Self.statusLabel(for: proposal.status, isSender: isSender, isReceiver: isReceiver, myAgreed: myAgreed)
-        self.agreementLabel = Self.agreementLabel(for: proposal.status, isSender: isSender, myAgreed: myAgreed)
-        self.guidanceText = Self.guidanceText(for: proposal.status, isSender: isSender, myAgreed: myAgreed, partnerAgreed: partnerAgreed)
+        self.statusLabel = Self.statusLabel(
+            for: proposal.status,
+            isSender: showsOutgoingWaitingState,
+            isReceiver: isReceiver && !viewerHasCounterProposal,
+            myAgreed: myAgreed
+        )
+        self.agreementLabel = Self.agreementLabel(
+            for: proposal.status,
+            isSender: showsOutgoingWaitingState,
+            myAgreed: myAgreed
+        )
+        self.guidanceText = Self.guidanceText(
+            for: proposal.status,
+            isSender: showsOutgoingWaitingState,
+            myAgreed: myAgreed,
+            partnerAgreed: partnerAgreed
+        )
         self.summaryText = Self.summaryText(for: proposal, viewerID: viewerID)
     }
 
@@ -68,7 +85,7 @@ struct TradeDetailHeroPresentation: Equatable, Sendable {
         case .draft:
             return "下書き"
         case .sent:
-            return isReceiver ? "新着打診" : "相手待ち"
+            return isReceiver ? "新着打診" : "現在出品中"
         case .negotiating:
             return "ネゴ中"
         case .agreementOneSide:
@@ -97,7 +114,7 @@ struct TradeDetailHeroPresentation: Equatable, Sendable {
         case .negotiating:
             return "相談中"
         case .sent:
-            return isSender ? "返信待ち" : "未合意"
+            return isSender ? "相手からの返信待ち" : "未合意"
         case .rejected:
             return "見送り"
         case .cancelled:
@@ -118,7 +135,7 @@ struct TradeDetailHeroPresentation: Equatable, Sendable {
         switch status {
         case .sent:
             return isSender
-                ? "相手の返答を待っています。必要ならメッセージや再打診で条件を補足できます。"
+                ? "現在出品中です。相手からの返信待ちです。"
                 : "内容を確認して、承諾・再打診・見送りを選べます。"
         case .negotiating:
             return "条件を相談中です。双方が納得した内容で合意すると取引予定に進みます。"
@@ -146,5 +163,35 @@ struct TradeDetailHeroPresentation: Equatable, Sendable {
         let offeredCount = viewerID.flatMap { proposal.goodsOffered(by: $0)?.count } ?? proposal.senderGoodsIDs.count
         let requestedCount = viewerID.flatMap { proposal.goodsRequested(by: $0)?.count } ?? proposal.receiverGoodsIDs.count
         return "ゆずる \(offeredCount)点 / 求める \(requestedCount)点"
+    }
+
+    private static func partnerMetaText(for profile: UserProfile?) -> String {
+        guard let profile else {
+            return "未共有"
+        }
+        let ageDecade = profile.age.flatMap(ageDecadeText)
+        let gender = profile.gender.flatMap(publicGenderText)
+        let prefecture = profile.prefecture.nilIfBlank
+        let parts = [ageDecade, gender, prefecture].compactMap(\.self)
+        return parts.isEmpty ? "未共有" : parts.joined(separator: "・")
+    }
+
+    private static func ageDecadeText(for age: Int) -> String? {
+        guard age > 0 else {
+            return nil
+        }
+        if age < 10 {
+            return "10歳未満"
+        }
+        return "\(age / 10 * 10)代"
+    }
+
+    private static func publicGenderText(for gender: UserGender) -> String? {
+        switch gender {
+        case .noAnswer:
+            return nil
+        case .female, .male, .other:
+            return gender.displayName
+        }
     }
 }

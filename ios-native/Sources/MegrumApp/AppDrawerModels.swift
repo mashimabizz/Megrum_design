@@ -1,3 +1,5 @@
+import Foundation
+import MegrumCore
 import SwiftUI
 
 enum AppDrawerDestination: String, Identifiable {
@@ -17,7 +19,6 @@ enum AppDrawerDestination: String, Identifiable {
         .profile,
         .notifications,
         .oshiSettings,
-        .schedules,
         .paymentSettings,
         .exchangeSettings
     ]
@@ -40,9 +41,9 @@ enum AppDrawerDestination: String, Identifiable {
         case .schedules:
             "スケジュール"
         case .paymentSettings:
-            "支払条件設定"
+            "支払い方法の設定"
         case .exchangeSettings:
-            "交換条件設定"
+            "交換条件の設定"
         case .settings:
             "設定とプライバシー"
         case .help:
@@ -71,6 +72,24 @@ enum AppDrawerDestination: String, Identifiable {
         case .help:
             "doc.text"
         }
+    }
+}
+
+enum AppDrawerSettingsBadgePolicy {
+    static let needsConfigurationBadge = "要設定"
+
+    static func exchangeBadgeText(
+        settings: HomeDefaultExchangeSettings,
+        isExplicitlyConfigured: Bool,
+        now: Date = Date()
+    ) -> String? {
+        settings.needsConfiguration(isExplicitlyConfigured: isExplicitlyConfigured, now: now)
+            ? needsConfigurationBadge
+            : nil
+    }
+
+    static func paymentBadgeText(methods: [UserPaymentMethod]) -> String? {
+        UserPaymentMethod.normalized(methods).isEmpty ? needsConfigurationBadge : nil
     }
 }
 

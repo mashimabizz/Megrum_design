@@ -24,6 +24,10 @@ public struct TradeProposal: Identifiable, Codable, Hashable, Sendable {
     public var createdAt: Date
     public var updatedAt: Date?
     public var meetupCandidates: [ProposalMeetupInput]?
+    public var senderMailingAddress: TradeMailingAddressSnapshot?
+    public var receiverMailingAddress: TradeMailingAddressSnapshot?
+    public var senderPaymentSettings: TradePaymentSettingsSnapshot?
+    public var receiverPaymentSettings: TradePaymentSettingsSnapshot?
 
     public init(
         id: UUID,
@@ -48,7 +52,11 @@ public struct TradeProposal: Identifiable, Codable, Hashable, Sendable {
         completedAt: Date? = nil,
         createdAt: Date = .now,
         updatedAt: Date? = nil,
-        meetupCandidates: [ProposalMeetupInput]? = nil
+        meetupCandidates: [ProposalMeetupInput]? = nil,
+        senderMailingAddress: TradeMailingAddressSnapshot? = nil,
+        receiverMailingAddress: TradeMailingAddressSnapshot? = nil,
+        senderPaymentSettings: TradePaymentSettingsSnapshot? = nil,
+        receiverPaymentSettings: TradePaymentSettingsSnapshot? = nil
     ) {
         self.id = id
         self.senderID = senderID
@@ -73,6 +81,10 @@ public struct TradeProposal: Identifiable, Codable, Hashable, Sendable {
         self.createdAt = createdAt
         self.updatedAt = updatedAt
         self.meetupCandidates = meetupCandidates
+        self.senderMailingAddress = senderMailingAddress
+        self.receiverMailingAddress = receiverMailingAddress
+        self.senderPaymentSettings = senderPaymentSettings
+        self.receiverPaymentSettings = receiverPaymentSettings
     }
 
     public func isParticipant(_ userID: UUID) -> Bool {
@@ -105,6 +117,26 @@ public struct TradeProposal: Identifiable, Codable, Hashable, Sendable {
         }
         if receiverID == userID {
             return senderID
+        }
+        return nil
+    }
+
+    public func mailingAddressSnapshot(for userID: UUID) -> TradeMailingAddressSnapshot? {
+        if senderID == userID {
+            return senderMailingAddress
+        }
+        if receiverID == userID {
+            return receiverMailingAddress
+        }
+        return nil
+    }
+
+    public func paymentSettingsSnapshot(for userID: UUID) -> TradePaymentSettingsSnapshot? {
+        if senderID == userID {
+            return senderPaymentSettings
+        }
+        if receiverID == userID {
+            return receiverPaymentSettings
         }
         return nil
     }

@@ -207,11 +207,7 @@ private struct GoodsInventoryCreateMetaTile: View {
                 }
             }
             .overlay {
-                RoundedRectangle(cornerRadius: GoodsGridLayout.tileCornerRadius, style: .continuous)
-                    .strokeBorder(
-                        isSelected ? MegrumTheme.lavender.opacity(0.88) : MegrumTheme.ink.opacity(GoodsTileCollectionCardMetrics.borderOpacity),
-                        lineWidth: isSelected ? 2 : 1
-                    )
+                selectionBorder
             }
             .clipShape(RoundedRectangle(cornerRadius: GoodsGridLayout.tileCornerRadius, style: .continuous))
             .shadow(
@@ -220,6 +216,33 @@ private struct GoodsInventoryCreateMetaTile: View {
                 x: GoodsTileCollectionCardMetrics.shadowX,
                 y: GoodsTileCollectionCardMetrics.shadowY
             )
+    }
+
+    @ViewBuilder
+    private var selectionBorder: some View {
+        let shape = RoundedRectangle(cornerRadius: GoodsGridLayout.tileCornerRadius, style: .continuous)
+        if isSelected {
+            shape
+                .strokeBorder(
+                    LinearGradient(
+                        colors: [
+                            MegrumTheme.sky,
+                            MegrumTheme.lavender,
+                            MegrumTheme.sky.opacity(0.92)
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ),
+                    lineWidth: 5
+                )
+                .shadow(color: MegrumTheme.sky.opacity(0.46), radius: 8, x: 0, y: 0)
+        } else {
+            shape
+                .strokeBorder(
+                    MegrumTheme.ink.opacity(GoodsTileCollectionCardMetrics.borderOpacity),
+                    lineWidth: 1
+                )
+        }
     }
 
     @ViewBuilder

@@ -48,55 +48,74 @@ struct TradeCardHeader: View {
     var presentation: TradeCardPresentation
 
     var body: some View {
-        HStack(alignment: .top, spacing: 12) {
-            VStack(alignment: .leading, spacing: 6) {
-                TradeReadStateLabel(readState: presentation.readState)
+        HStack(alignment: .center, spacing: 6) {
+            TradePartnerAvatar(initial: presentation.partnerInitial, readState: presentation.readState)
 
-                HStack(spacing: 7) {
-                    TradePartnerAvatar(initial: presentation.partnerInitial, readState: presentation.readState)
+            Text("@\(presentation.partnerHandle)")
+                .font(.system(size: 12.5, weight: presentation.readState.handleWeight, design: .rounded))
+                .foregroundStyle(presentation.readState.handleColor)
+                .lineLimit(1)
+                .minimumScaleFactor(0.78)
 
-                    Text("@\(presentation.partnerHandle)")
-                        .font(.system(size: 12.5, weight: presentation.readState.handleWeight, design: .rounded))
-                        .foregroundStyle(presentation.readState.handleColor)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.78)
-
-                    Text("・\(presentation.updatedText)")
-                        .font(.system(size: 11, weight: .semibold, design: .rounded))
-                        .foregroundStyle(MegrumTheme.muted.opacity(0.76))
-                        .lineLimit(1)
-                }
+            if let demographicText = presentation.partnerDemographicText {
+                TradePartnerMetaText(demographicText)
             }
 
-            Spacer(minLength: 10)
+            if let ratingText = presentation.partnerRatingText {
+                TradePartnerMetaText(ratingText)
+            }
 
-            TradeDetailLink(readState: presentation.readState)
+            Spacer(minLength: 6)
+
+            HStack(spacing: 5) {
+                Text(presentation.updatedText)
+                    .font(.system(size: 11, weight: .semibold, design: .rounded))
+                    .foregroundStyle(MegrumTheme.muted.opacity(0.76))
+                    .lineLimit(1)
+
+                if presentation.unreadBadgeCount > 0 {
+                    TradeUnreadBadge(count: presentation.unreadBadgeCount)
+                }
+            }
+            .fixedSize(horizontal: true, vertical: false)
         }
     }
 }
 
-struct TradeReadStateLabel: View {
-    var readState: TradeCardReadState
+private struct TradeUnreadBadge: View {
+    var count: Int
+
+    private var displayText: String {
+        count > 99 ? "99+" : "\(count)"
+    }
 
     var body: some View {
-        Text(readState.title)
-            .font(.system(size: 13, weight: readState.stateWeight, design: .rounded))
-            .foregroundStyle(readState.stateColor)
+        Text(displayText)
+            .font(.system(size: 10, weight: .black, design: .rounded))
+            .foregroundStyle(.white)
+            .monospacedDigit()
             .lineLimit(1)
-            .padding(.horizontal, readState.showsStateBackground ? 8 : 0)
-            .padding(.vertical, readState.showsStateBackground ? 4 : 0)
+            .padding(.horizontal, count > 9 ? 6 : 0)
+            .frame(minWidth: 18, minHeight: 18)
             .background {
-                if readState.showsStateBackground {
-                    RoundedRectangle(cornerRadius: 8, style: .continuous)
-                        .fill(readState.stateBackgroundColor)
-                }
+                Capsule(style: .continuous)
+                    .fill(
+                        LinearGradient(
+                            colors: [
+                                MegrumTheme.pink.opacity(0.98),
+                                MegrumTheme.lavender.opacity(0.94)
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .overlay {
+                        Capsule(style: .continuous)
+                            .strokeBorder(.white.opacity(0.72), lineWidth: 1)
+                    }
             }
-            .overlay {
-                if readState.showsStateBackground {
-                    RoundedRectangle(cornerRadius: 8, style: .continuous)
-                        .strokeBorder(readState.stateBorderColor, lineWidth: 0.8)
-                }
-            }
+            .shadow(color: MegrumTheme.pink.opacity(0.34), radius: 7, y: 2)
+            .accessibilityLabel("未読\(count)件")
     }
 }
 
@@ -117,33 +136,35 @@ struct TradePartnerAvatar: View {
     }
 }
 
-struct TradeDetailLink: View {
-    var readState: TradeCardReadState
+struct TradePartnerMetaText: View {
+    var text: String
+
+    init(_ text: String) {
+        self.text = text
+    }
 
     var body: some View {
-        HStack(spacing: 4) {
-            Text("詳細")
-            Image(systemName: "chevron.right")
-                .font(.system(size: 10, weight: .bold))
-        }
-        .font(.system(size: 12, weight: readState == .unopened ? .bold : .semibold, design: .rounded))
-        .foregroundStyle(MegrumTheme.ink.opacity(readState == .waitingForReply ? 0.50 : 0.68))
-        .padding(.top, 1)
+        Text(text)
+            .font(.system(size: 10.5, weight: .bold, design: .rounded))
+            .foregroundStyle(MegrumTheme.muted.opacity(0.82))
+            .lineLimit(1)
+            .minimumScaleFactor(0.78)
     }
 }
 
 struct TradeMeetupSummaryLine: View {
     var text: String
+    var systemImage: String = "mappin.circle"
     var readState: TradeCardReadState
 
     var body: some View {
         HStack(alignment: .top, spacing: 8) {
-            Image(systemName: "mappin.circle")
-                .font(.system(size: 15.5, weight: .bold))
+            Image(systemName: systemImage)
+                .font(.system(size: 14, weight: .bold))
                 .foregroundStyle(MegrumTheme.muted.opacity(readState == .waitingForReply ? 0.54 : 0.78))
 
             Text(text)
-                .font(.system(size: 12, weight: readState == .unopened ? .bold : .semibold, design: .rounded))
+                .font(.system(size: 11.5, weight: readState == .unopened ? .bold : .semibold, design: .rounded))
                 .foregroundStyle(MegrumTheme.ink.opacity(readState == .waitingForReply ? 0.62 : 0.84))
                 .lineLimit(2)
                 .frame(maxWidth: .infinity, alignment: .leading)

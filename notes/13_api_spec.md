@@ -3,8 +3,8 @@
 > **目的**：Megrum のバックエンドAPI（REST）の draft 仕様。実装着手時の正解集。
 > 全エンドポイントを `[METHOD /path]` の形式で網羅し、各々で入力・出力・認証要否・状態遷移・備考を定義。
 
-最終更新: 2026-06-23（iter731）
-ステータス: Draft v1.7
+最終更新: 2026-06-26（iter1205）
+ステータス: Draft v1.9
 
 ---
 
@@ -292,8 +292,9 @@ Google OAuth経由ログイン or 新規登録。
 プロフィール更新。
 
 - **Auth**: 必須
-- **Request**: `{ display_name?, avatar_url?, gender?, primary_area?, ... }`
+- **Request**: `{ display_name?, bio?, avatar_url?, gender?, primary_area?, birth_date?, ... }`
 - **Response 200**: 更新後プロフィール
+- **備考**: `birth_date` は本人編集用で公開レスポンスへ直接出さず、公開表示は `age` を使う。`bio` は公開プロフィールに表示できる。
 - **Screen**: `PRO-edit`
 
 ### PUT /api/v1/accounts/me/oshi
@@ -366,7 +367,8 @@ Google OAuth経由ログイン or 新規登録。
 他ユーザーの公開プロフィール取得。
 
 - **Auth**: 必須（認証済ユーザーのみアクセス可）
-- **Response 200**: `{ id, handle, display_name, avatar_url, oshi: [...], rating_summary: {...}, trades_count, recent_disputes_count, ... }`
+- **Response 200**: `{ id, handle, display_name, bio, avatar_url, primary_area, gender, age, oshi: [...], rating_summary: {...}, trades_count, recent_disputes_count, ... }`
+- **備考**: 生年月日 `birth_date` は返さない。自己紹介 `bio` と年齢 `age` までを公開プロフィール表示に使う。
 - **Errors**: 404（存在しない）、403（ブロック中）
 - **Screen**: `PRO-other`
 
@@ -1245,17 +1247,19 @@ AW削除。
 - **Response 201**: `{ image_url, deal_status: "evidence_captured" }`
 - **State**: `arrived_both → evidence_captured`
 - **Screen**: `C3-capture`
+- **Swift Native現行実装**: Supabase Storage `chat-photos` へ保存後、`proposal_evidence_photos` をinsertする。insert行は `approved_by_sender` / `approved_by_receiver` を持ち、アップロードした本人側を初期trueにする。あわせて `messages.meta.action='evidence_added'` のsystem messageを作成し、本文は `XXが取引証跡をアップロードしました` とする。
 
 ### POST /api/v1/deals/:id/approve
 
 承認。
 
 - **Auth**: 必須（参加者のみ、`evidence_captured` 状態）
-- **Request**: `{}`
+- **Request**: `{ photo_id?: uuid }`
 - **Response 200**: `{ sender_approved, receiver_approved, deal_status }`
-- **State**: 双方承認で `evidence_captured → approved`
+- **State**: すべての証跡画像で双方承認がそろうと `evidence_captured → approved`
 - **Side effects**: 関連 `user_haves.status = 'traded'`（双方承認時）
 - **Screen**: `C3-approve`
+- **Swift Native現行実装**: Supabase RPC `approve_trade_evidence_for_viewer(p_proposal_id, p_photo_id default null)` を使う。`p_photo_id` 指定時は対象画像だけを閲覧者側承認にし、全画像の承認集約を `proposals.approved_by_sender` / `approved_by_receiver` へ反映する。両者承認後は `proposals.status='completed'` とし、`messages.meta.action='trade_completed'` のsystem messageを追加する。
 
 ### POST /api/v1/deals/:id/dispute
 

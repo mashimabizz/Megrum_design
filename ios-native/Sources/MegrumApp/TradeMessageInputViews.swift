@@ -12,12 +12,15 @@ struct TradeMessageInput: View {
     var onSendArrivalStatus: (TradeArrivalQuickAction) -> Void
     var onOpenLocationPlaceholder: () -> Void
     var onOpenChatCamera: () -> Void
+    var onOpenChatLibrary: () -> Void
     var onOpenOutfitCamera: () -> Void
+    var onOpenOutfitLibrary: () -> Void
     var onCounterProposal: () -> Void
     var onRequestLate: () -> Void
     var onRequestCancel: () -> Void
     var onReport: () -> Void
     var onSend: () -> Void
+    var onFocusChange: (Bool) -> Void = { _ in }
 
     @State private var isComposerFocused = false
 
@@ -26,15 +29,15 @@ struct TradeMessageInput: View {
             if context.shouldShowQuickActions(isComposerFocused: isComposerFocused) {
                 TradeMessageQuickActionStrip(
                     actions: context.quickActions,
-                    selectedChatPhotoItem: $selectedChatPhotoItem,
-                    selectedOutfitPhotoItem: $selectedOutfitPhotoItem,
                     isSending: context.isSending,
                     onOpenSchedule: onOpenSchedule,
                     canUseCamera: context.canUseCamera,
                     onOpenLocationPlaceholder: onOpenLocationPlaceholder,
                     onSendArrivalStatus: onSendArrivalStatus,
                     onOpenChatCamera: onOpenChatCamera,
+                    onOpenChatLibrary: onOpenChatLibrary,
                     onOpenOutfitCamera: onOpenOutfitCamera,
+                    onOpenOutfitLibrary: onOpenOutfitLibrary,
                     onCounterProposal: onCounterProposal,
                     onRequestLate: onRequestLate,
                     onRequestCancel: onRequestCancel
@@ -44,21 +47,24 @@ struct TradeMessageInput: View {
             TradeMessageComposerRow(
                 text: $text,
                 overflowActions: context.overflowActions,
-                selectedChatPhotoItem: $selectedChatPhotoItem,
-                selectedOutfitPhotoItem: $selectedOutfitPhotoItem,
                 isSending: context.isSending,
                 canUseCamera: context.canUseCamera,
                 onOpenSchedule: onOpenSchedule,
                 onSendArrivalStatus: onSendArrivalStatus,
                 onOpenLocationPlaceholder: onOpenLocationPlaceholder,
                 onOpenChatCamera: onOpenChatCamera,
+                onOpenChatLibrary: onOpenChatLibrary,
                 onOpenOutfitCamera: onOpenOutfitCamera,
+                onOpenOutfitLibrary: onOpenOutfitLibrary,
                 onCounterProposal: onCounterProposal,
                 onRequestLate: onRequestLate,
                 onRequestCancel: onRequestCancel,
                 onReport: onReport,
                 onSend: onSend,
-                onFocusChange: { isComposerFocused = $0 }
+                onFocusChange: { focused in
+                    isComposerFocused = focused
+                    onFocusChange(focused)
+                }
             )
         }
     }
@@ -67,15 +73,15 @@ struct TradeMessageInput: View {
 private struct TradeMessageComposerRow: View {
     @Binding var text: String
     var overflowActions: [TradeMessageOverflowActionKind]
-    @Binding var selectedChatPhotoItem: PhotosPickerItem?
-    @Binding var selectedOutfitPhotoItem: PhotosPickerItem?
     var isSending: Bool
     var canUseCamera: Bool
     var onOpenSchedule: () -> Void
     var onSendArrivalStatus: (TradeArrivalQuickAction) -> Void
     var onOpenLocationPlaceholder: () -> Void
     var onOpenChatCamera: () -> Void
+    var onOpenChatLibrary: () -> Void
     var onOpenOutfitCamera: () -> Void
+    var onOpenOutfitLibrary: () -> Void
     var onCounterProposal: () -> Void
     var onRequestLate: () -> Void
     var onRequestCancel: () -> Void
@@ -92,15 +98,15 @@ private struct TradeMessageComposerRow: View {
         HStack(spacing: 10) {
             TradeMessageOverflowMenu(
                 actions: overflowActions,
-                selectedChatPhotoItem: $selectedChatPhotoItem,
-                selectedOutfitPhotoItem: $selectedOutfitPhotoItem,
                 isSending: isSending,
                 canUseCamera: canUseCamera,
                 onOpenSchedule: onOpenSchedule,
                 onSendArrivalStatus: onSendArrivalStatus,
                 onOpenLocationPlaceholder: onOpenLocationPlaceholder,
                 onOpenChatCamera: onOpenChatCamera,
+                onOpenChatLibrary: onOpenChatLibrary,
                 onOpenOutfitCamera: onOpenOutfitCamera,
+                onOpenOutfitLibrary: onOpenOutfitLibrary,
                 onCounterProposal: onCounterProposal,
                 onRequestLate: onRequestLate,
                 onRequestCancel: onRequestCancel,

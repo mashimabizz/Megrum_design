@@ -6,10 +6,12 @@ struct HomeSelectedGoodsHeader: View {
     var goods: HomeMockGoods
     var conditionTags: HomeConditionTagSet
     var exchangeSummary: HomeDiscoveryOwnerExchangeSummary?
+    var exchangeCalendarContext: HomePartnerExchangeCalendarContext? = nil
     var listingNote: String?
     var listingDetail: HomeIndividualListingDetailContext?
     var onOpenOwnerProfile: (UUID) -> Void = { _ in }
     @State private var presentedListingDetail: HomeIndividualListingDetailContext?
+    @State private var presentedExchangeCalendar: HomePartnerExchangeCalendarContext?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -31,7 +33,12 @@ struct HomeSelectedGoodsHeader: View {
                     }
 
                     if let exchangeSummary {
-                        HomeExchangeMethodBlock(summary: exchangeSummary)
+                        HomeExchangeMethodBlock(
+                            summary: exchangeSummary,
+                            onOpenCalendar: exchangeCalendarContext.map { context in
+                                { presentedExchangeCalendar = context }
+                            }
+                        )
                     }
 
                     HomePaymentBox(summaryText: goods.ownerPaymentSummaryText)
@@ -52,6 +59,11 @@ struct HomeSelectedGoodsHeader: View {
         }
         .sheet(item: $presentedListingDetail) { detail in
             HomeIndividualListingDetailPopup(detail: detail)
+                .presentationDetents([.medium, .large])
+                .presentationDragIndicator(.visible)
+        }
+        .sheet(item: $presentedExchangeCalendar) { context in
+            HomePartnerExchangeCalendarSheet(context: context)
                 .presentationDetents([.medium, .large])
                 .presentationDragIndicator(.visible)
         }

@@ -40,12 +40,34 @@ struct HomeUserSummary: View {
 
 struct HomeExchangeMethodBlock: View {
     var summary: HomeDiscoveryOwnerExchangeSummary
+    var onOpenCalendar: (() -> Void)?
 
     var body: some View {
+        Group {
+            if let onOpenCalendar {
+                Button(action: onOpenCalendar) {
+                    content
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("相手の交換条件カレンダーを開く")
+            } else {
+                content
+            }
+        }
+    }
+
+    private var content: some View {
         VStack(alignment: .leading, spacing: 5) {
             HStack(spacing: 6) {
                 Image(systemName: "arrow.left.arrow.right.circle")
                 Text("交換条件")
+
+                if onOpenCalendar != nil {
+                    Spacer(minLength: 0)
+                    Image(systemName: "calendar")
+                        .font(.system(size: 11.5, weight: .black, design: .rounded))
+                        .foregroundStyle(MegrumTheme.lavender)
+                }
             }
             .font(.system(size: 12.5, weight: .semibold, design: .rounded))
             .foregroundStyle(MegrumTheme.ink)
@@ -76,6 +98,7 @@ struct HomeExchangeMethodBlock: View {
                 .foregroundStyle(MegrumTheme.ink.opacity(0.78))
             }
         }
+        .contentShape(Rectangle())
     }
 }
 

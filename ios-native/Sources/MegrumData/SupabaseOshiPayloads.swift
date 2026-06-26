@@ -21,6 +21,42 @@ struct UserOshiSelectionPayload: Encodable, Sendable {
         self.kind = selection.kind
         self.priority = selection.priority
     }
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case userId
+        case groupId
+        case characterId
+        case oshiRequestId
+        case characterRequestId
+        case kind
+        case priority
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(id, forKey: .id)
+        try container.encode(userId, forKey: .userId)
+        try container.encodeIfPresent(groupId, forKey: .groupId)
+        try container.encodeIfPresent(characterId, forKey: .characterId)
+        try container.encodeIfPresent(oshiRequestId, forKey: .oshiRequestId)
+        try container.encodeIfPresent(characterRequestId, forKey: .characterRequestId)
+        try container.encode(kind, forKey: .kind)
+        try container.encode(priority, forKey: .priority)
+
+        if groupId == nil {
+            try container.encodeNil(forKey: .groupId)
+        }
+        if characterId == nil {
+            try container.encodeNil(forKey: .characterId)
+        }
+        if oshiRequestId == nil {
+            try container.encodeNil(forKey: .oshiRequestId)
+        }
+        if characterRequestId == nil {
+            try container.encodeNil(forKey: .characterRequestId)
+        }
+    }
 }
 
 struct OshiRequestPayload: Encodable, Sendable {

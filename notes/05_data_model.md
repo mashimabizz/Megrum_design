@@ -3,8 +3,8 @@
 > **目的**：Megrum の全エンティティのDBスキーマ設計と、状態・マッチング・取引のデータフロー定義。
 > 実装の正解集。`09_state_machines.md` と完全に整合させ、`10_glossary.md` の用語を使う。
 
-最終更新: 2026-06-24
-ステータス: Draft v2.43（iter788 個別募集の最低数条件を2件以上・1個以上へ拡張）
+最終更新: 2026-06-26
+ステータス: Draft v2.47（iter1205 取引証跡の画像別承認を追加）
 
 ## 最新化履歴
 
@@ -55,6 +55,10 @@
 | **v2.41** | **2026-06-24** | **iter765 反映（`proposals.cash_amount_side` を追加し、金額指定が `sender` / `receiver` のどちら側かを保存。金額指定側にもグッズを同時に含められるようCHECKを更新）** |
 | **v2.42** | **2026-06-24** | **iter787 反映（個別募集に `at_least` ロジックを追加し、譲側 `have_min_count` / 求側 `listing_wish_options.min_count` で「何個以上」を保存。既存 qty は各アイテム数量として維持）** |
 | **v2.43** | **2026-06-24** | **iter788 反映（`at_least` を2件以上選択時から利用可能にし、最低数は1〜選択件数として保存。選択画面のフィルタ後全選択ボタンを追加）** |
+| **v2.44** | **2026-06-25** | **iter995 反映（プロフィール編集に `users.bio` と非公開の `users.birth_date` を追加。公開表示は自己紹介と年齢までに限定）** |
+| **v2.45** | **2026-06-26** | **iter1004 反映（成立後の取引チャットで支払い情報を開示するため、`proposals.sender_payment_settings/receiver_payment_settings` スナップショットを追加）** |
+| **v2.46** | **2026-06-26** | **iter1203 反映（証跡追加/取引完了/評価投稿のsystem message meta運用を追加。`evidence_added` / `trade_completed` / `evaluation_submitted` でチャット表示を再現する）** |
+| **v2.47** | **2026-06-26** | **iter1205 反映（`proposal_evidence_photos.approved_by_sender/approved_by_receiver` を追加し、証跡画像ごとに承認状態を持つ。自分がアップロードした証跡は初期承認済み）** |
 | **v2.20** | **2026-05-29** | **iter168.90 反映（`search_query_logs` と人気検索RPCを追加。検索結果はマッチ分類つきグッズパネルで表示）** |
 | **v2.21** | **2026-05-30** | **iter168.97 反映（`schedules.place_name` 追加。合意時に `both` を単一手段へ固定し、現地交換の複数候補は1件へ固定する運用を追記）** |
 
@@ -264,9 +268,11 @@ iter24 で「推し2階層」（グループ/作品 → メンバー/キャラ�
 | `oauth_subject` | text nullable | OAuth の sub |
 | `handle` | text unique | @hana_lumi 等 |
 | `display_name` | text | |
+| `bio` | text nullable | 自己紹介。500文字以内。公開プロフィールのスケジュールボタン上に表示できる |
 | `avatar_url` | text nullable | |
 | `gender` | text nullable | 任意（オンボで聞く） |
 | `primary_area` | text nullable | "東京都" 等の粗い検索用エリア |
+| `birth_date` | date nullable | 本人編集用の生年月日。公開プロフィールには直接表示しない |
 | `age` | integer nullable | プロフィール表示用の任意年齢。1〜120の範囲制約。未設定ならUIでは表示しない |
 | `payment_methods` | text[] | 支払い条件の自己申告配列。`bank_transfer` / `paypay` / `cash_exchange` / `other` |
 | `payment_note` | text nullable | 支払い条件のその他表示メモ。口座番号などの機微情報は入れない |
@@ -282,7 +288,8 @@ iter24 で「推し2階層」（グループ/作品 → メンバー/キャラ�
 - `gender` を必須にするか任意にするか（マッチング条件に使う？）
 
 RLS / 権限（iter278）：
-- `anon` / `authenticated` に公開する `users` のSELECT列は、公開プロフィール表示に使う `id, handle, display_name, avatar_url, gender, primary_area, age, account_status, created_at` に限定する。
+- `anon` / `authenticated` に公開する `users` のSELECT列は、公開プロフィール表示に使う `id, handle, display_name, bio, avatar_url, gender, primary_area, age, account_status, created_at` に限定する。
+- `birth_date` は本人編集用の非公開列であり、公開プロフィールやホーム候補には直接返さない。公開表示が必要な場合は `age` のみを使う。
 - `payment_methods` / `payment_note` は公開プロフィール表示には使わない。ホーム候補・打診前確認など、authenticated の取引前表示経路だけで参照する。
 - `email_verified_at` / `deletion_requested_at` / `last_login_at` / `updated_at` などの内部運用列は公開SELECT権限を付与しない。
 - 公開プロフィール読み取りは `account_status not in ('deleted', 'suspended')` のユーザーだけに限定する。
@@ -328,6 +335,7 @@ RLS / 権限（iter278）：
 - RLS は本人だけが SELECT / INSERT / UPDATE / DELETE できる。
 - `users.payment_methods` は対応可能な方法の要約、`user_payment_settings` は本人専用の詳細として扱う。
 - 口座詳細をホーム候補や公開プロフィールのSELECT経路へ混ぜない。
+- `cash_offer=true` の打診が成立した時点で、`respond_to_proposal_for_viewer` が本人専用行を `proposals.sender_payment_settings` / `receiver_payment_settings` へスナップショット化する。
 
 ### `notifications`（通知一覧 / iter92, iter276）
 
@@ -893,6 +901,8 @@ iter28（match_type）/ iter29（数量）/ iter30（7日期限）/ iter32（合
 | `meetup_candidates` | jsonb default `[]` | iter154.34、交換できる候補（最大3件）。各要素は `{ startAt, endAt, placeName, lat, lng, mode }`。候補1を既存 `meetup_*` 5列へミラーして旧画面・取引チャットと互換 |
 | `sender_mailing_address` | jsonb nullable | iter168.74、`exchange_method='mail'` / `both` で合意成立した時点の送信者住所スナップショット |
 | `receiver_mailing_address` | jsonb nullable | iter168.74、`exchange_method='mail'` / `both` で合意成立した時点の受信者住所スナップショット |
+| `sender_payment_settings` | jsonb nullable | iter1004、`cash_offer=true` の取引が合意成立した時点の送信者支払い情報スナップショット。銀行振込の振込先など、本人専用 `user_payment_settings` からコピーする |
+| `receiver_payment_settings` | jsonb nullable | iter1004、`cash_offer=true` の取引が合意成立した時点の受信者支払い情報スナップショット。成立後の当事者向け取引チャットで表示する |
 | `expose_calendar` | bool default false | iter67 で再定義：送信者が自分の **個人スケジュール（schedules）** を相手に公開する ON/OFF。受信側は受信表示画面で送信者の予定を見られる（取引完了で自動的に RLS 不可）。AW は対象外 |
 | `listing_id` | uuid nullable | iter64、個別募集 (`listings`) 経由の打診ならその id。直接打診なら null |
 | `cash_offer` | bool default false | iter765 更新、提案内に金額指定を含むなら true（`cash_amount` + `cash_amount_side` 必須） |
@@ -982,9 +992,12 @@ iter34 で `message_type` 拡張。
 現行実装メモ（iter347）：
 - 取引完了のSwift Native最小フローは、専用 `deals` 実テーブルではなく既存 `proposals` の `evidence_photo_url` / `evidence_taken_at` / `evidence_taken_by` / `approved_by_sender` / `approved_by_receiver` / `completed_at` / `status='completed'` と、複数枚対応の `proposal_evidence_photos`、評価の `user_evaluations` を使う。
 - 証跡画像は Storage `chat-photos` に保存し、`proposal_evidence_photos.photo_url` と `proposals.evidence_photo_url`（最初の1枚の互換ミラー）に保持する。
+- iter1205 以降、`proposal_evidence_photos` は `approved_by_sender` / `approved_by_receiver` を持ち、証跡画像ごとに承認状態を管理する。アップロードした本人側は作成時点で承認済み、相手側はその画像の「承認」でtrueにする。`proposals.approved_by_sender` / `approved_by_receiver` は全証跡画像の集約値として維持する。
 - Swift Nativeの `SupabaseProposalClient` は、証跡追加、承認、評価投稿をこの境界に接続する。
 - iter725 以降、証跡写真は `proposal_evidence_photos.id` / `proposal_id` / `taken_by` で絞って、アップロードした本人だけ削除できる。削除後は `proposals.evidence_photo_url` / `evidence_taken_at` / `evidence_taken_by` の互換ミラーを残りの先頭写真、または `NULL` に更新する。
-- 証跡追加時は `messages` に `message_type='system'`、`meta.action='evidence_added'` の通知を追加する。表示文言は閲覧者視点で `取引証跡を送りました` / `取引証跡が届きました` に変換する。
+- 証跡追加時は `messages` に `message_type='system'`、`meta.action='evidence_added'` の通知を追加する。本文は `表示名が取引証跡をアップロードしました` 形式で保存し、取引チャット上では「見る」導線から証跡写真一覧を開く。
+- 両者の証跡承認で `proposals.status='completed'` になった時は、`messages` に `meta.action='trade_completed'` / `body='取引が完了しました'` のsystem通知を追加する。
+- 評価投稿時は `user_evaluations` に従来通り保存しつつ、`messages` に `meta.action='evaluation_submitted'`、`meta.stars`、`meta.comment`、`meta.rater_display_name` / `meta.rater_handle` を持つsystem通知を追加する。取引チャットでは両者の評価通知がそろった時だけ、双方の評価文をチャット内カードとして公開する。
 
 ### `deals`（旧 `exchanges` をリネーム、用語集と一致）
 

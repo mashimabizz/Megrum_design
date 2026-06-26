@@ -34,17 +34,32 @@ struct SupabaseAccountProfilePersistence: Sendable {
         let uploadedAvatarURL = try await profilePhotoStorage.uploadIfNeeded(input.avatarUpload, userID: userID)
         let avatarUpdate = Self.resolvedAvatarUpdate(input: input, uploadedAvatarURL: uploadedAvatarURL)
 
-        let rows: [UserRow] = try await client.updateRows(
-            in: "users",
-            values: Self.ownProfileUpdatePayload(input: input, avatarUpdate: avatarUpdate),
-            select: UserRow.select,
-            queryItems: Self.viewerQueryItems(userID: userID)
-        )
-        return rows.first?.profile ?? Self.fallbackOwnProfile(
-            input: input,
-            userID: userID,
-            avatarURL: avatarUpdate.url
-        )
+        do {
+            let rows: [UserRow] = try await client.updateRows(
+                in: "users",
+                values: Self.ownProfileUpdatePayload(input: input, avatarUpdate: avatarUpdate),
+                select: UserRow.select,
+                queryItems: Self.viewerQueryItems(userID: userID)
+            )
+            return rows.first?.profile ?? Self.fallbackOwnProfile(
+                input: input,
+                userID: userID,
+                avatarURL: avatarUpdate.url
+            )
+        } catch {
+            let rows: [UserRow] = try await client.updateRows(
+                in: "users",
+                values: Self.legacyOwnProfileUpdatePayload(input: input, avatarUpdate: avatarUpdate),
+                select: UserRow.legacySelect,
+                queryItems: Self.viewerQueryItems(userID: userID)
+            )
+            return Self.mergedOwnProfile(
+                storedProfile: rows.first?.profile,
+                input: input,
+                userID: userID,
+                avatarURL: avatarUpdate.url
+            )
+        }
     }
 
     func completeAccountSetup(_ input: AccountSetupInput) async throws -> UserProfile {
@@ -112,11 +127,54 @@ struct SupabaseAccountProfilePersistence: Sendable {
         UserOwnProfileUpdatePayload(
             handle: input.handle,
             displayName: input.displayName,
+            bio: input.bio?.nilIfBlank,
+            avatarUrl: avatarUpdate.url,
+            shouldEncodeAvatarUrl: avatarUpdate.shouldEncode,
+            gender: input.gender,
+            primaryArea: input.prefecture,
+            birthDate: ProfileBirthDateCodec.string(from: input.birthDate),
+            age: ProfileBirthDateCodec.age(from: input.birthDate),
+            paymentMethods: input.paymentMethods
+        )
+    }
+
+    static func legacyOwnProfileUpdatePayload(
+        input: OwnProfileUpdateInput,
+        avatarUpdate: ResolvedAvatarUpdate
+    ) -> UserOwnProfileLegacyUpdatePayload {
+        UserOwnProfileLegacyUpdatePayload(
+            handle: input.handle,
+            displayName: input.displayName,
             avatarUrl: avatarUpdate.url,
             shouldEncodeAvatarUrl: avatarUpdate.shouldEncode,
             gender: input.gender,
             primaryArea: input.prefecture,
             paymentMethods: input.paymentMethods
+        )
+    }
+
+    static func mergedOwnProfile(
+        storedProfile: UserProfile?,
+        input: OwnProfileUpdateInput,
+        userID: UUID,
+        avatarURL: URL?
+    ) -> UserProfile {
+        guard let storedProfile else {
+            return fallbackOwnProfile(input: input, userID: userID, avatarURL: avatarURL)
+        }
+        return UserProfile(
+            id: storedProfile.id,
+            handle: storedProfile.handle,
+            displayName: storedProfile.displayName,
+            bio: input.bio,
+            avatarURL: storedProfile.avatarURL ?? avatarURL,
+            gender: storedProfile.gender ?? input.gender,
+            prefecture: storedProfile.prefecture,
+            birthDate: input.birthDate,
+            age: ProfileBirthDateCodec.age(from: input.birthDate),
+            paymentMethods: input.paymentMethods,
+            paymentNote: storedProfile.paymentNote,
+            accountStatus: storedProfile.accountStatus
         )
     }
 
@@ -129,9 +187,12 @@ struct SupabaseAccountProfilePersistence: Sendable {
             id: userID,
             handle: input.handle,
             displayName: input.displayName,
+            bio: input.bio,
             avatarURL: avatarURL,
             gender: input.gender,
             prefecture: input.prefecture,
+            birthDate: input.birthDate,
+            age: ProfileBirthDateCodec.age(from: input.birthDate),
             paymentMethods: input.paymentMethods,
             accountStatus: .active
         )

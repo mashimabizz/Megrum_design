@@ -3,6 +3,54 @@ import MegrumCore
 import XCTest
 
 final class OwnProfileScreenTests: XCTestCase {
+    func testProfileVisualGridUsesFourColumns() {
+        XCTAssertEqual(ProfileVisualGridLayout.columnCount, 4)
+    }
+
+    func testProfileGridItemKeepsGoodsTagsAndQuantity() {
+        let tag = GoodsTag(
+            id: UUID(uuidString: "20000000-0000-0000-0000-000000000301")!,
+            name: "トレカ"
+        )
+        let goods = GoodsItem(
+            id: UUID(uuidString: "20000000-0000-0000-0000-000000000302")!,
+            ownerID: UUID(uuidString: "20000000-0000-0000-0000-000000000303")!,
+            title: "モモ トレカ",
+            tags: [tag],
+            quantity: 3
+        )
+
+        let item = ProfileVisualGridItem(goods: goods)
+
+        XCTAssertEqual(item.id, goods.id)
+        XCTAssertEqual(item.tags.map(\.name), ["トレカ"])
+        XCTAssertEqual(item.quantity, 3)
+    }
+
+    func testProfileGridItemKeepsWishTagsAndQuantity() {
+        let tag = GoodsTag(
+            id: UUID(uuidString: "20000000-0000-0000-0000-000000000401")!,
+            name: "缶バッジ"
+        )
+        let wish = WishItem(
+            id: UUID(uuidString: "20000000-0000-0000-0000-000000000402")!,
+            ownerID: UUID(uuidString: "20000000-0000-0000-0000-000000000403")!,
+            title: "サナ 缶バッジ",
+            tags: [tag],
+            quantity: 2
+        )
+
+        let item = ProfileVisualGridItem(wish: wish)
+
+        XCTAssertEqual(item.id, wish.id)
+        XCTAssertEqual(item.tags.map(\.name), ["缶バッジ"])
+        XCTAssertEqual(item.quantity, 2)
+    }
+
+    func testProfileListingSectionDoesNotExposeListingEditing() {
+        XCTAssertFalse(ProfileVisualListingsPolicy.canEditFromProfile)
+    }
+
     func testOwnProfileUsesCompactHeaderMetrics() {
         XCTAssertEqual(OwnProfileLayoutMetrics.contentSpacing, 10)
         XCTAssertEqual(OwnProfileLayoutMetrics.horizontalPadding, 14)
@@ -92,8 +140,10 @@ final class OwnProfileScreenTests: XCTestCase {
         let draft = OwnProfileEditDraft(
             handle: " @Michi_Lion ",
             displayName: " みちりおん ",
+            bio: " 交換よろしくお願いします ",
             prefecture: " 東京都 ",
             gender: .noAnswer,
+            birthDate: ProfileBirthDateCodec.date(from: "2002-04-12"),
             paymentMethods: [.cashExchange, .paypay, .paypay]
         )
 
@@ -101,8 +151,10 @@ final class OwnProfileScreenTests: XCTestCase {
 
         XCTAssertEqual(normalized.handle, "michi_lion")
         XCTAssertEqual(normalized.displayName, "みちりおん")
+        XCTAssertEqual(normalized.bio, "交換よろしくお願いします")
         XCTAssertEqual(normalized.prefecture, "東京都")
-        XCTAssertEqual(normalized.gender, .noAnswer)
+        XCTAssertEqual(normalized.gender, .female)
+        XCTAssertEqual(ProfileBirthDateCodec.string(from: normalized.birthDate), "2002-04-12")
         XCTAssertEqual(normalized.paymentMethods, [.paypay, .cashExchange])
         XCTAssertNil(normalized.validationError)
     }
@@ -225,13 +277,16 @@ final class OwnProfileScreenTests: XCTestCase {
             id: UUID(uuidString: "20000000-0000-0000-0000-000000000001")!,
             handle: "old_handle",
             displayName: "古い表示名",
+            bio: "古い自己紹介",
             prefecture: "千葉県"
         )
         let localDraft = OwnProfileEditDraft(
             handle: "new_handle",
             displayName: "新しい表示名",
+            bio: "新しい自己紹介",
             prefecture: "東京都",
             gender: .female,
+            birthDate: ProfileBirthDateCodec.date(from: "2001-01-02"),
             paymentMethods: [.paypay, .cashExchange]
         )
 
@@ -245,8 +300,10 @@ final class OwnProfileScreenTests: XCTestCase {
 
         XCTAssertEqual(summary?.handleText, "@new_handle")
         XCTAssertEqual(summary?.displayName, "新しい表示名")
+        XCTAssertEqual(summary?.bio, "新しい自己紹介")
         XCTAssertEqual(summary?.prefectureText, "東京都")
         XCTAssertEqual(summary?.genderText, "女性")
+        XCTAssertEqual(ProfileBirthDateCodec.string(from: summary?.birthDate), "2001-01-02")
         XCTAssertEqual(summary?.paymentMethodsText, "PayPay / 現金交換")
     }
 
@@ -273,6 +330,6 @@ final class OwnProfileScreenTests: XCTestCase {
         )
 
         XCTAssertEqual(summary?.prefectureText, "未設定")
-        XCTAssertEqual(summary?.genderText, "未設定")
+        XCTAssertEqual(summary?.genderText, "女性")
     }
 }

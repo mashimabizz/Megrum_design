@@ -46,6 +46,7 @@ struct OwnProfileAvatarImage: View {
     var localData: Data?
     var initial: String
     var size: CGFloat
+    var showsChrome = true
 
     var body: some View {
         ZStack {
@@ -54,10 +55,12 @@ struct OwnProfileAvatarImage: View {
         .frame(width: size, height: size)
         .clipShape(Circle())
         .overlay {
-            Circle()
-                .strokeBorder(.white.opacity(0.85), lineWidth: 2)
+            if showsChrome {
+                Circle()
+                    .strokeBorder(.white.opacity(0.85), lineWidth: 2)
+            }
         }
-        .shadow(color: .black.opacity(0.10), radius: 8, x: 0, y: 4)
+        .shadow(color: showsChrome ? .black.opacity(0.10) : .clear, radius: 8, x: 0, y: 4)
         .accessibilityLabel("プロフィール画像")
     }
 

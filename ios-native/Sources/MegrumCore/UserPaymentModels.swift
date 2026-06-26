@@ -118,3 +118,33 @@ public struct UserPaymentSettings: Identifiable, Codable, Hashable, Sendable {
         value?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
     }
 }
+
+public struct TradePaymentSettingsSnapshot: Codable, Hashable, Sendable {
+    public var bankName: String
+    public var bankBranchName: String
+    public var bankAccountType: String
+    public var bankAccountNumber: String
+    public var bankAccountHolder: String
+    public var otherNote: String?
+
+    public init(
+        bankName: String = "",
+        bankBranchName: String = "",
+        bankAccountType: String = "",
+        bankAccountNumber: String = "",
+        bankAccountHolder: String = "",
+        otherNote: String? = nil
+    ) {
+        self.bankName = bankName
+        self.bankBranchName = bankBranchName
+        self.bankAccountType = bankAccountType
+        self.bankAccountNumber = bankAccountNumber
+        self.bankAccountHolder = bankAccountHolder
+        self.otherNote = otherNote
+    }
+
+    public var hasBankTransferDetails: Bool {
+        [bankName, bankBranchName, bankAccountType, bankAccountNumber, bankAccountHolder]
+            .allSatisfy { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+    }
+}

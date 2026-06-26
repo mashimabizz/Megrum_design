@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024" fill="none">
+  <g id="simple-orbit-arrows" transform="rotate(-12 512 512)">
+    <path id="upper-arrow-line" d="M170 450C295 250 575 215 760 330C781 343 800 359 816 376" stroke="#FFFFFF" stroke-width="88" stroke-linecap="round" stroke-linejoin="round"/>
+    <path id="upper-arrow-head" d="M894 468L746 428L852 322Z" fill="#FFFFFF"/>
+    <path id="lower-arrow-line" d="M854 574C729 774 449 809 264 694C243 681 224 665 208 648" stroke="#FFFFFF" stroke-width="88" stroke-linecap="round" stroke-linejoin="round"/>
+    <path id="lower-arrow-head" d="M130 556L278 596L172 702Z" fill="#FFFFFF"/>
+  </g>
+</svg>

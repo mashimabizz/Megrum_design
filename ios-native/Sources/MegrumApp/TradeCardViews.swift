@@ -3,11 +3,16 @@ import MegrumCore
 import MegrumDesign
 import SwiftUI
 
+enum TradeCardLayout {
+    static let horizontalPadding: CGFloat = 20
+}
+
 struct TradeCard: View {
     var proposal: TradeProposal
     var viewerID: UUID?
     var profilesByUserID: [UUID: PublicUserProfile] = [:]
     var goodsByID: [UUID: GoodsItem] = [:]
+    var messages: [TradeMessage] = []
     var lastActivityAt: Date?
     var viewerLastReadAt: Date?
     var isSelectionMode = false
@@ -21,6 +26,7 @@ struct TradeCard: View {
             proposal: proposal,
             viewerID: viewerID,
             profilesByUserID: profilesByUserID,
+            messages: messages,
             lastActivityAt: lastActivityAt,
             viewerLastReadAt: viewerLastReadAt
         )
@@ -35,13 +41,16 @@ struct TradeCard: View {
     }
 
     private var accessibilityLabel: String {
-        let parts = [
+        var parts = [
             "取引",
             presentation.readState.title,
             proposal.exchangeMethod.displayName,
             "ゆずるグッズ \(offeredGoodsIDs.count)件",
             "求めるグッズ \(requestedGoodsIDs.count)件"
         ]
+        if presentation.unreadBadgeCount > 0 {
+            parts.insert("未読\(presentation.unreadBadgeCount)件", at: 2)
+        }
         return parts.joined(separator: "、")
     }
 
@@ -52,13 +61,16 @@ struct TradeCard: View {
             requestedItems: previewItems(for: requestedGoodsIDs),
             isSelectionMode: isSelectionMode,
             isSelected: isSelected,
-            isSelectionEnabled: isSelectionEnabled
+            isSelectionEnabled: isSelectionEnabled,
+            onOpen: onOpen
         )
             .contentShape(Rectangle())
+            .frame(maxWidth: .infinity, alignment: .leading)
             .modifier(TradeCardExclusivePressModifier(
                 onTap: onOpen,
                 onLongPress: isSelectionEnabled ? onLongPress : nil
             ))
+            .megrumInteractionFeedback(clipsToBounds: true)
             .accessibilityAddTraits(.isButton)
             .accessibilityElement(children: .combine)
             .accessibilityLabel(accessibilityLabel)
@@ -77,26 +89,33 @@ private struct TradeCardContent: View {
     var isSelectionMode: Bool
     var isSelected: Bool
     var isSelectionEnabled: Bool
+    var onOpen: () -> Void
 
     var body: some View {
         VStack(spacing: 0) {
-            VStack(alignment: .leading, spacing: 12) {
+            VStack(alignment: .leading, spacing: 8) {
                 TradeCardHeader(presentation: presentation)
 
                 TradeDealGoodsPanel(
                     offeredItems: offeredItems,
-                    requestedItems: requestedItems
+                    requestedItems: requestedItems,
+                    onCarouselTap: onOpen
                 )
 
-                TradeMeetupSummaryLine(
-                    text: presentation.meetupSummaryText,
-                    readState: presentation.readState
-                )
+                if let meetupSummaryText = presentation.meetupSummaryText {
+                    TradeMeetupSummaryLine(
+                        text: meetupSummaryText,
+                        systemImage: presentation.conditionIconSystemName,
+                        readState: presentation.readState
+                    )
+                }
             }
-            .padding(.vertical, 17)
+            .padding(.horizontal, TradeCardLayout.horizontalPadding)
+            .padding(.vertical, 12)
 
             TradeCardDivider(readState: presentation.readState)
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
         .overlay(alignment: .topTrailing) {
             if isSelectionMode {
                 TradeSelectionIndicator(
@@ -104,22 +123,7 @@ private struct TradeCardContent: View {
                     isEnabled: isSelectionEnabled
                 )
                 .padding(.top, 15)
-                .padding(.trailing, 4)
-            }
-        }
-        .background {
-            if presentation.readState == .unopened {
-                RoundedRectangle(cornerRadius: 24, style: .continuous)
-                    .fill(
-                        LinearGradient(
-                            colors: [
-                                MegrumTheme.lavender.opacity(0.21),
-                                MegrumTheme.pink.opacity(0.13)
-                            ],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
+                .padding(.trailing, TradeCardLayout.horizontalPadding)
             }
         }
         .opacity(isSelectionMode && !isSelectionEnabled ? 0.48 : 1)

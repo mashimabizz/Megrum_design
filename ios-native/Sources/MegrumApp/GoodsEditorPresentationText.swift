@@ -5,7 +5,7 @@ enum GoodsEditorPresentationText {
         if mode == .edit {
             return entryKind == .inventory ? "マイグッズを編集" : "Wishを編集"
         }
-        return entryKind == .inventory ? "マイグッズに追加" : "Wishに追加"
+        return entryKind == .inventory ? "マイグッズに追加" : "Wishを追加"
     }
 
     static func headerDescription(usesInventoryCreateFlow: Bool, entryKind: GoodsEntryKind) -> String {

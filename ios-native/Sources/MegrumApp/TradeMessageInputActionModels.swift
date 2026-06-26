@@ -165,7 +165,7 @@ struct TradeMessageInputActionPolicy: Equatable, Sendable {
             return actions
         }
 
-        var actions: [TradeMessageQuickActionKind] = [.schedule]
+        var actions: [TradeMessageQuickActionKind] = []
         if showsCounterProposal {
             actions.append(.counterProposal)
         }
@@ -185,7 +185,10 @@ struct TradeMessageInputActionPolicy: Equatable, Sendable {
             return actions
         }
 
-        var actions: [TradeMessageOverflowActionKind] = [.schedule]
+        var actions: [TradeMessageOverflowActionKind] = []
+        if supportsHandExchange {
+            actions.append(.location)
+        }
         if showsCounterProposal {
             actions.append(.counterProposal)
         }

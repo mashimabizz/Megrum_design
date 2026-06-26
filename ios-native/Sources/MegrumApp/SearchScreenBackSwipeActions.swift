@@ -14,8 +14,16 @@ extension SearchScreen {
                 ) else {
                     return
                 }
-                dismiss()
+                closeSearch()
             }
+    }
+
+    func closeSearch() {
+        if let onDismissRequest {
+            onDismissRequest()
+        } else {
+            dismiss()
+        }
     }
 
     func markWishSuggestionHorizontalScroll() {

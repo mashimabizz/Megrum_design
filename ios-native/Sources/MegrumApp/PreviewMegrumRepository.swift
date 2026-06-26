@@ -5,6 +5,10 @@ import MegrumData
 public struct PreviewMegrumRepository: MegrumRepository {
     public init() {}
 
+    public static func resetTradePhotoLocalStoreForTesting() async {
+        await PreviewTradePhotoLocalStore.shared.reset()
+    }
+
     public func loadInitialSnapshot() async throws -> MegrumAppSnapshot {
         MegrumAppSnapshot(
             viewer: NativePreviewData.viewer,
@@ -39,8 +43,11 @@ public struct PreviewMegrumRepository: MegrumRepository {
             id: NativePreviewData.viewer.id,
             handle: NativePreviewData.viewer.handle,
             displayName: input.displayName,
+            bio: NativePreviewData.viewer.bio,
             avatarURL: NativePreviewData.viewer.avatarURL,
             prefecture: input.prefecture,
+            birthDate: NativePreviewData.viewer.birthDate,
+            age: NativePreviewData.viewer.age,
             paymentMethods: NativePreviewData.viewer.paymentMethods,
             paymentNote: NativePreviewData.viewer.paymentNote,
             accountStatus: .active
@@ -61,9 +68,12 @@ public struct PreviewMegrumRepository: MegrumRepository {
             id: NativePreviewData.viewer.id,
             handle: normalizedHandle(input.handle),
             displayName: input.displayName,
+            bio: input.bio,
             avatarURL: avatarURL,
             gender: input.gender,
             prefecture: input.prefecture,
+            birthDate: input.birthDate,
+            age: ProfileBirthDateCodec.age(from: input.birthDate) ?? NativePreviewData.viewer.age,
             paymentMethods: input.paymentMethods,
             paymentNote: NativePreviewData.viewer.paymentNote,
             accountStatus: .active
@@ -80,9 +90,12 @@ public struct PreviewMegrumRepository: MegrumRepository {
             id: NativePreviewData.viewer.id,
             handle: NativePreviewData.viewer.handle,
             displayName: NativePreviewData.viewer.displayName,
+            bio: NativePreviewData.viewer.bio,
             avatarURL: NativePreviewData.viewer.avatarURL,
             gender: NativePreviewData.viewer.gender,
             prefecture: NativePreviewData.viewer.prefecture,
+            birthDate: NativePreviewData.viewer.birthDate,
+            age: NativePreviewData.viewer.age,
             paymentMethods: normalized.methods,
             paymentNote: normalized.otherNote,
             accountStatus: .active

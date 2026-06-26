@@ -56,7 +56,6 @@ struct GoodsCreateMetaDraft: Identifiable, Equatable {
         goodsTypeName: String?
     ) -> GoodsEntryInput? {
         guard sharedDraft.mode == .create,
-              sharedDraft.entryKind == .inventory,
               sharedDraft.blockingReasons.isEmpty,
               let groupID = sharedDraft.groupID,
               let goodsTypeID = sharedDraft.goodsTypeID
@@ -68,7 +67,7 @@ struct GoodsCreateMetaDraft: Identifiable, Equatable {
             return nil
         }
         return GoodsEntryInput(
-            kind: .inventory,
+            kind: sharedDraft.entryKind,
             title: resolved,
             groupID: groupID,
             memberID: memberID,

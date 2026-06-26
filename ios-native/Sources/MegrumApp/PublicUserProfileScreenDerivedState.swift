@@ -35,6 +35,9 @@ extension PublicUserProfileScreen {
     }
 
     func publicProfileBio(_ publicProfile: PublicUserProfile) -> String {
+        if let bio = cleanText(publicProfile.profile.bio) {
+            return bio
+        }
         let parts = [
             cleanText(publicProfile.profile.prefecture),
             publicProfile.profile.gender?.displayName
@@ -58,32 +61,33 @@ extension PublicUserProfileScreen {
         }
     }
 
-    func publicProfileGridItems(for tab: ProfileVisualTab) -> [ProfileVisualGridItem] {
-        switch tab {
-        case .goods:
-            return tradeGoods.map { item in
-                ProfileVisualGridItem(id: item.id, title: item.title, imageURL: item.imageURL, showsMatchTags: true)
+    var publicProfileGoodsGridItems: [ProfileVisualGridItem] {
+        tradeGoods.map(ProfileVisualGridItem.init(goods:))
+    }
+
+    var publicProfileWishGridItems: [ProfileVisualGridItem] {
+        orderedPublicWishIDs.compactMap { id in
+            if let wish = publicWishByID[id] {
+                return ProfileVisualGridItem(wish: wish)
             }
-        case .listings:
-            return listings.compactMap { listing in
-                guard let firstHave = listing.haves.first,
-                      let item = goodsByID[firstHave.itemID] else {
-                    return nil
-                }
-                return ProfileVisualGridItem(id: listing.id, title: item.title, imageURL: item.imageURL, showsMatchTags: true)
+            if let goods = goodsByID[id] {
+                return ProfileVisualGridItem(goods: goods)
             }
-        case .wish:
-            let wishIDs = listings
-                .flatMap(\.options)
-                .flatMap(\.wishes)
-                .map(\.itemID)
-            return Array(Set(wishIDs)).compactMap { id in
-                guard let item = goodsByID[id] else {
-                    return nil
-                }
-                return ProfileVisualGridItem(id: item.id, title: item.title, imageURL: item.imageURL)
-            }
+            return nil
         }
+    }
+
+    private var orderedPublicWishIDs: [UUID] {
+        var seen: Set<UUID> = []
+        return listings
+            .flatMap(\.options)
+            .flatMap(\.wishes)
+            .compactMap { wish in
+                guard seen.insert(wish.itemID).inserted else {
+                    return nil
+                }
+                return wish.itemID
+            }
     }
 
     func cleanText(_ value: String?) -> String? {

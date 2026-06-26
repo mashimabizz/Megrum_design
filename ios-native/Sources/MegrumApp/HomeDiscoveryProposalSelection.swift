@@ -10,6 +10,8 @@ struct HomeDiscoveryProposalSelection: Equatable, Sendable {
     var senderGoods: [HomeMockGoods]
     var exchangeMethod: ExchangeMethod?
     var cashAmount: Int?
+    var initialShippingFee: IndividualListingShippingFeeDraft?
+    var initialShippingDays: IndividualListingShippingDaysDraft?
 
     init(
         receiverGoodsID: UUID,
@@ -19,7 +21,9 @@ struct HomeDiscoveryProposalSelection: Equatable, Sendable {
         receiverGoods: HomeMockGoods? = nil,
         senderGoods: [HomeMockGoods] = [],
         exchangeMethod: ExchangeMethod? = nil,
-        cashAmount: Int? = nil
+        cashAmount: Int? = nil,
+        initialShippingFee: IndividualListingShippingFeeDraft? = nil,
+        initialShippingDays: IndividualListingShippingDaysDraft? = nil
     ) {
         self.receiverGoodsID = receiverGoodsID
         self.receiverGoodsIDs = Self.orderedUnique(receiverGoodsIDs ?? [receiverGoodsID])
@@ -29,6 +33,8 @@ struct HomeDiscoveryProposalSelection: Equatable, Sendable {
         self.senderGoods = senderGoods
         self.exchangeMethod = exchangeMethod
         self.cashAmount = cashAmount.map { max(0, $0) }
+        self.initialShippingFee = initialShippingFee
+        self.initialShippingDays = initialShippingDays
     }
 
     func includingExtraSelections(_ extras: [HomeDiscoveryProposalSelection]) -> HomeDiscoveryProposalSelection {
@@ -43,7 +49,23 @@ struct HomeDiscoveryProposalSelection: Equatable, Sendable {
         if merged.cashAmount == nil {
             merged.cashAmount = extras.first(where: { $0.cashAmount != nil })?.cashAmount
         }
+        if merged.initialShippingFee == nil {
+            merged.initialShippingFee = extras.first(where: { $0.initialShippingFee != nil })?.initialShippingFee
+        }
+        if merged.initialShippingDays == nil {
+            merged.initialShippingDays = extras.first(where: { $0.initialShippingDays != nil })?.initialShippingDays
+        }
         return merged
+    }
+
+    func applyingDefaultMailConditions(_ settings: HomeDefaultExchangeSettings) -> HomeDiscoveryProposalSelection {
+        guard exchangeMethod == .mail || exchangeMethod == .both else {
+            return self
+        }
+        var updated = self
+        updated.initialShippingFee = initialShippingFee ?? settings.mailShippingFee
+        updated.initialShippingDays = initialShippingDays ?? settings.mailShippingDays
+        return updated
     }
 
     private static func orderedUnique(_ ids: [UUID]) -> [UUID] {

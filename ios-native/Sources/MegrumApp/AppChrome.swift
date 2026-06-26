@@ -1,3 +1,4 @@
+import MegrumCore
 import MegrumDesign
 import SwiftUI
 
@@ -11,6 +12,14 @@ struct AppDrawerOverlay: View {
     var onSignOut: () async -> Void
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @AppStorage(HomeExchangeSettingsStorageKeys.preference) private var exchangePreferenceRawValue = HomeDefaultExchangeSettings.standard.preference.rawValue
+    @AppStorage(HomeExchangeSettingsStorageKeys.requiresSamePrefecture) private var exchangeRequiresSamePrefecture = HomeDefaultExchangeSettings.standard.requiresSamePrefecture
+    @AppStorage(HomeExchangeSettingsStorageKeys.requiresDateOverlap) private var exchangeRequiresDateOverlap = HomeDefaultExchangeSettings.standard.requiresDateOverlap
+    @AppStorage(HomeExchangeSettingsStorageKeys.localPrefecture) private var exchangeLocalPrefecture = HomeDefaultExchangeSettings.standard.localPrefecture
+    @AppStorage(HomeExchangeSettingsStorageKeys.localDateKeys) private var exchangeLocalDateKeysRawValue = ""
+    @AppStorage(HomeExchangeSettingsStorageKeys.mailShippingFee) private var exchangeMailShippingFeeRawValue = HomeDefaultExchangeSettings.standard.mailShippingFee.rawValue
+    @AppStorage(HomeExchangeSettingsStorageKeys.mailShippingDays) private var exchangeMailShippingDaysRawValue = HomeDefaultExchangeSettings.standard.mailShippingDays.rawValue
+    @AppStorage(HomeExchangeSettingsStorageKeys.configuredAt) private var exchangeConfiguredAt = 0.0
     @State private var isClosing = false
     @State private var isSuppressingDrawerItemTap = false
 
@@ -44,7 +53,7 @@ struct AppDrawerOverlay: View {
                         title: destination.title,
                         systemImage: destination.systemImage,
                         destination: destination,
-                        badge: destination == .notifications ? appState.unreadNotificationCount : 0
+                        badgeText: drawerBadgeText(for: destination)
                     )
                 }
             }
@@ -125,7 +134,7 @@ struct AppDrawerOverlay: View {
         title: String,
         systemImage: String,
         destination: AppDrawerDestination,
-        badge: Int = 0,
+        badgeText: String? = nil,
         isCompact: Bool = false
     ) -> some View {
         Button {
@@ -145,13 +154,13 @@ struct AppDrawerOverlay: View {
 
                 Spacer(minLength: 8)
 
-                if badge > 0 {
-                    Text("\(badge)")
+                if let badgeText, !badgeText.isEmpty {
+                    Text(badgeText)
                         .font(.caption.weight(.black))
                         .foregroundStyle(.white)
                         .padding(.horizontal, 8)
                         .padding(.vertical, 4)
-                        .background(MegrumTheme.pink, in: Capsule())
+                        .background(drawerBadgeTint(for: badgeText), in: Capsule())
                 }
             }
             .contentShape(Rectangle())
@@ -193,6 +202,42 @@ struct AppDrawerOverlay: View {
             return "エリア未設定"
         }
         return parts.joined(separator: " ・ ")
+    }
+
+    private func drawerBadgeText(for destination: AppDrawerDestination) -> String? {
+        switch destination {
+        case .notifications:
+            return appState.unreadNotificationCount > 0 ? "\(appState.unreadNotificationCount)" : nil
+        case .paymentSettings:
+            return AppDrawerSettingsBadgePolicy.paymentBadgeText(
+                methods: appState.paymentSettings?.methods ?? appState.viewer?.paymentMethods ?? []
+            )
+        case .exchangeSettings:
+            return exchangeSettingsBadgeText
+        default:
+            return nil
+        }
+    }
+
+    private func drawerBadgeTint(for value: String) -> Color {
+        value.allSatisfy(\.isNumber) ? MegrumTheme.pink : MegrumTheme.conditionWarning
+    }
+
+    private var exchangeSettingsBadgeText: String? {
+        let settings = HomeDefaultExchangeSettings(
+            preferenceRawValue: exchangePreferenceRawValue,
+            requiresSamePrefecture: exchangeRequiresSamePrefecture,
+            requiresDateOverlap: exchangeRequiresDateOverlap,
+            localPrefecture: exchangeLocalPrefecture,
+            localDateKeysRawValue: exchangeLocalDateKeysRawValue,
+            mailShippingFeeRawValue: exchangeMailShippingFeeRawValue,
+            mailShippingDaysRawValue: exchangeMailShippingDaysRawValue
+        )
+        let hasSavedPreference = UserDefaults.standard.object(forKey: HomeExchangeSettingsStorageKeys.preference) != nil
+        return AppDrawerSettingsBadgePolicy.exchangeBadgeText(
+            settings: settings,
+            isExplicitlyConfigured: exchangeConfiguredAt > 0 || hasSavedPreference
+        )
     }
 
     private func select(_ destination: AppDrawerDestination) {

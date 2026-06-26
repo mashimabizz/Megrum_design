@@ -14,8 +14,8 @@ struct TradeEvidencePanel: View {
     var canUseCamera: Bool
     var onOpenCamera: () -> Void
     var onOpenEvidenceList: () -> Void
-    var onOpenImage: (URL) -> Void
-    var onApprove: () -> Void
+    var onOpenImage: (TradeEvidencePhoto) -> Void
+    var onApprove: (TradeEvidencePhoto) -> Void
     var onRate: () -> Void
 
     private var myApproved: Bool {
@@ -56,7 +56,8 @@ struct TradeEvidencePanel: View {
             }
 
             if hasEvidencePhotos {
-                TradeEvidencePhotoCarousel(
+                TradeEvidencePhotoList(
+                    proposal: proposal,
                     photos: evidencePhotos,
                     viewerID: viewerID,
                     onOpenImage: onOpenImage
@@ -73,11 +74,6 @@ struct TradeEvidencePanel: View {
                 .buttonStyle(.plain)
             }
 
-            HStack(spacing: 8) {
-                TradeEvidenceApprovalChip(title: "あなた", isApproved: myApproved)
-                TradeEvidenceApprovalChip(title: "相手", isApproved: partnerApproved)
-            }
-
             if proposal.status == .completed {
                 if evaluationState.hasSubmittedEvaluation {
                     Label("評価送信済み", systemImage: "star.fill")
@@ -88,15 +84,13 @@ struct TradeEvidencePanel: View {
                         .background(.white.opacity(0.72), in: Capsule())
                         .accessibilityLabel("評価送信済み")
                 } else {
-                    Button(action: onRate) {
-                        Label("評価を送信", systemImage: "star.fill")
-                            .font(.system(size: 16, weight: .heavy, design: .rounded))
-                            .frame(maxWidth: .infinity)
-                            .frame(height: 52)
-                            .background(MegrumTheme.lavender, in: Capsule())
-                            .foregroundStyle(.white)
-                    }
-                    .buttonStyle(.plain)
+                    Label("評価入力待ち", systemImage: "star")
+                        .font(.system(size: 15, weight: .heavy, design: .rounded))
+                        .foregroundStyle(MegrumTheme.muted)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 50)
+                        .background(.white.opacity(0.72), in: Capsule())
+                        .accessibilityLabel("評価入力待ち")
                 }
             } else if !hasEvidencePhotos {
                 Button(action: onOpenCamera) {
@@ -120,31 +114,6 @@ struct TradeEvidencePanel: View {
                 }
                 .buttonStyle(.plain)
                 .disabled(isAddingEvidence)
-            } else if !myApproved {
-                Button(action: onApprove) {
-                    Group {
-                        if isApproving {
-                            ProgressView()
-                                .tint(.white)
-                        } else {
-                            Label("証跡を承認", systemImage: "checkmark.seal.fill")
-                        }
-                    }
-                    .font(.system(size: 16, weight: .heavy, design: .rounded))
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 54)
-                    .background(MegrumTheme.lavender, in: Capsule())
-                    .foregroundStyle(.white)
-                }
-                .buttonStyle(.plain)
-                .disabled(isApproving)
-            } else {
-                Text("相手の承認を待っています")
-                    .font(.system(size: 14, weight: .heavy, design: .rounded))
-                    .foregroundStyle(MegrumTheme.muted)
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 50)
-                    .background(.white.opacity(0.68), in: Capsule())
             }
         }
         .padding(18)

@@ -1,3 +1,4 @@
+import MegrumCore
 import MegrumDesign
 import SwiftUI
 
@@ -14,7 +15,14 @@ struct OwnProfileContent: View {
     @Binding var selectedProfileTab: ProfileVisualTab
     var profileBio: String
     var profileTagItems: [ProfileVisualTagItem]
-    var profileGridItems: [ProfileVisualGridItem]
+    var goodsItems: [ProfileVisualGridItem]
+    var wishItems: [ProfileVisualGridItem]
+    var listings: [IndividualListing]
+    var listingGoodsByID: [UUID: GoodsItem]
+    var listingWishByID: [UUID: WishItem]
+    var groups: [OshiGroup]
+    var characters: [OshiCharacter]
+    var goodsTypes: [GoodsType]
     var onClose: () -> Void
     var onEdit: () -> Void
     var onOpenSchedule: () -> Void
@@ -37,14 +45,26 @@ struct OwnProfileContent: View {
                     avatarSize: OwnProfileLayoutMetrics.compactHeroAvatarSize,
                     density: .compact,
                     actionTitle: "プロフィールを編集",
-                    showsScheduleAction: true,
+                    showsScheduleAction: false,
                     onAction: onEdit,
                     onScheduleAction: onOpenSchedule
                 )
 
                 ProfileVisualTabs(selection: $selectedProfileTab)
 
-                ProfileVisualGrid(items: profileGridItems)
+                ProfileVisualTabContent(
+                    selectedTab: selectedProfileTab,
+                    goodsItems: goodsItems,
+                    wishItems: wishItems,
+                    listings: listings,
+                    listingGoodsByID: listingGoodsByID,
+                    listingWishByID: listingWishByID,
+                    groups: groups,
+                    characters: characters,
+                    goodsTypes: goodsTypes,
+                    onSelectGridItem: nil,
+                    onSelectListing: nil
+                )
             } else {
                 OwnProfileUnavailableView()
             }

@@ -1,4 +1,5 @@
 @testable import MegrumApp
+import CoreGraphics
 import MegrumCore
 import XCTest
 
@@ -24,6 +25,57 @@ final class TradeChatAffordanceTests: XCTestCase {
         XCTAssertFalse(TradeStage.completed.emptyTitle.isEmpty)
         XCTAssertTrue(TradeStage.completed.emptyMessage.contains("証跡"))
         XCTAssertTrue(TradeStage.completed.emptyMessage.contains("終了"))
+    }
+
+    func testTradeDetailSlideBackSwipeTracksOnlyRightHorizontalDrags() {
+        XCTAssertEqual(
+            TradeDetailSlideBackSwipeResolver.interactiveOffset(
+                translation: CGSize(width: 90, height: 12),
+                screenWidth: 390
+            ),
+            90
+        )
+        XCTAssertNil(
+            TradeDetailSlideBackSwipeResolver.interactiveOffset(
+                translation: CGSize(width: -90, height: 12),
+                screenWidth: 390
+            )
+        )
+        XCTAssertNil(
+            TradeDetailSlideBackSwipeResolver.interactiveOffset(
+                translation: CGSize(width: 50, height: 90),
+                screenWidth: 390
+            )
+        )
+    }
+
+    func testTradeDetailSlideBackSwipeCapturesPhysicalLeftEdge() {
+        XCTAssertGreaterThanOrEqual(TradeDetailSlidePresentationMetrics.leadingEdgeCaptureWidth, 24)
+        XCTAssertLessThanOrEqual(TradeDetailSlidePresentationMetrics.leadingEdgeCaptureWidth, 40)
+    }
+
+    func testTradeDetailSlideBackSwipeDismissesFromAnywhereAfterThreshold() {
+        XCTAssertTrue(
+            TradeDetailSlideBackSwipeResolver.shouldDismiss(
+                translation: CGSize(width: 90, height: 12),
+                predictedEndTranslationWidth: 100,
+                screenWidth: 390
+            )
+        )
+        XCTAssertTrue(
+            TradeDetailSlideBackSwipeResolver.shouldDismiss(
+                translation: CGSize(width: 35, height: 4),
+                predictedEndTranslationWidth: 180,
+                screenWidth: 390
+            )
+        )
+        XCTAssertFalse(
+            TradeDetailSlideBackSwipeResolver.shouldDismiss(
+                translation: CGSize(width: 36, height: 6),
+                predictedEndTranslationWidth: 44,
+                screenWidth: 390
+            )
+        )
     }
 
     func testTradeStageRouteRequestPrefersExplicitPendingDestination() {
@@ -59,6 +111,188 @@ final class TradeChatAffordanceTests: XCTestCase {
         XCTAssertNil(TradeAmountFormatter.cashInputValue(from: "abc"))
     }
 
+    func testTradeProposalResponsePresentationRequiresMethodChoiceForBoth() {
+        let viewerID = UUID(uuidString: "00000000-0000-0000-0000-000000000001")!
+        let partnerID = UUID(uuidString: "00000000-0000-0000-0000-000000000002")!
+        let proposal = TradeProposal(
+            id: UUID(uuidString: "00000000-0000-0000-0000-000000000401")!,
+            senderID: partnerID,
+            receiverID: viewerID,
+            status: .sent,
+            exchangeMethod: .both,
+            senderGoodsIDs: [UUID(uuidString: "11111111-1111-1111-1111-111111111111")!],
+            receiverGoodsIDs: [UUID(uuidString: "22222222-2222-2222-2222-222222222222")!],
+            cashOffer: true
+        )
+
+        let presentation = TradeProposalResponsePresentation(
+            proposal: proposal,
+            viewerID: viewerID,
+            proposedPaymentMethods: [.paypay],
+            proposedPaymentOtherNote: nil,
+            availablePaymentMethods: [.bankTransfer, .paypay],
+            availablePaymentOtherNote: nil
+        )
+
+        XCTAssertTrue(presentation.showsResponseControls)
+        XCTAssertTrue(presentation.needsExchangeMethodSelection)
+        XCTAssertTrue(presentation.showsResponseInstruction)
+        XCTAssertEqual(presentation.selectableExchangeMethods, [.hand, .mail])
+        XCTAssertEqual(presentation.defaultSelectedExchangeMethod, .mail)
+        XCTAssertEqual(presentation.primaryActionTitle(selectedExchangeMethod: .mail), "郵送交換で応じる")
+        XCTAssertEqual(presentation.paymentOptions, [.bankTransfer, .paypay, .cashExchange])
+        XCTAssertEqual(presentation.paymentMenuOptions.map(\.title), ["銀行振込", "PayPay", "現金交換"])
+        XCTAssertEqual(presentation.defaultPaymentMethod, .paypay)
+        XCTAssertEqual(presentation.defaultPaymentOptionID, "method:paypay")
+    }
+
+    func testTradeProposalResponsePresentationIncludesBothOtherPaymentNotes() {
+        let viewerID = UUID(uuidString: "00000000-0000-0000-0000-000000000001")!
+        let partnerID = UUID(uuidString: "00000000-0000-0000-0000-000000000002")!
+        let proposal = TradeProposal(
+            id: UUID(uuidString: "00000000-0000-0000-0000-000000000407")!,
+            senderID: partnerID,
+            receiverID: viewerID,
+            status: .sent,
+            exchangeMethod: .mail,
+            senderGoodsIDs: [UUID(uuidString: "11111111-1111-1111-1111-111111111111")!],
+            receiverGoodsIDs: [UUID(uuidString: "22222222-2222-2222-2222-222222222222")!],
+            cashOffer: true
+        )
+
+        let presentation = TradeProposalResponsePresentation(
+            proposal: proposal,
+            viewerID: viewerID,
+            proposedPaymentMethods: [.other],
+            proposedPaymentOtherNote: "メルペイ",
+            availablePaymentMethods: [.other],
+            availablePaymentOtherNote: "楽天ペイ"
+        )
+
+        XCTAssertEqual(
+            presentation.paymentMenuOptions.map(\.title),
+            ["銀行振込", "PayPay", "現金交換", "メルペイ", "楽天ペイ"]
+        )
+        XCTAssertEqual(presentation.defaultPaymentOptionID, "partner-other")
+        XCTAssertEqual(presentation.paymentOptionTitle(for: "viewer-other"), "楽天ペイ")
+    }
+
+    func testTradeProposalResponsePresentationUsesCompactBarterActionWhenNoChoiceIsNeeded() {
+        let viewerID = UUID(uuidString: "00000000-0000-0000-0000-000000000001")!
+        let partnerID = UUID(uuidString: "00000000-0000-0000-0000-000000000002")!
+        let proposal = TradeProposal(
+            id: UUID(uuidString: "00000000-0000-0000-0000-000000000402")!,
+            senderID: partnerID,
+            receiverID: viewerID,
+            status: .sent,
+            exchangeMethod: .hand,
+            senderGoodsIDs: [UUID(uuidString: "11111111-1111-1111-1111-111111111111")!],
+            receiverGoodsIDs: [UUID(uuidString: "22222222-2222-2222-2222-222222222222")!],
+            cashOffer: false
+        )
+
+        let presentation = TradeProposalResponsePresentation(
+            proposal: proposal,
+            viewerID: viewerID,
+            proposedPaymentMethods: [],
+            proposedPaymentOtherNote: nil,
+            availablePaymentMethods: [],
+            availablePaymentOtherNote: nil
+        )
+
+        XCTAssertTrue(presentation.showsResponseControls)
+        XCTAssertFalse(presentation.needsExchangeMethodSelection)
+        XCTAssertFalse(presentation.showsResponseInstruction)
+        XCTAssertFalse(presentation.showsPaymentSelector)
+        XCTAssertEqual(presentation.primaryActionTitle(selectedExchangeMethod: nil), "出品に応じる")
+    }
+
+    func testTradeCounterProposalSystemMessageNamesActor() {
+        XCTAssertEqual(
+            TradeCounterProposalSystemMessage.body(actorDisplayName: "  みち  ", actorHandle: "michilion"),
+            "みちが条件を変えて再出品しました"
+        )
+        XCTAssertEqual(
+            TradeCounterProposalSystemMessage.body(actorDisplayName: nil, actorHandle: "michilion"),
+            "@michilionが条件を変えて再出品しました"
+        )
+    }
+
+    func testTradeCounterProposalSystemMessageDetectsViewerNotice() {
+        let viewerID = UUID(uuidString: "00000000-0000-0000-0000-000000000001")!
+        let proposalID = UUID(uuidString: "00000000-0000-0000-0000-000000000405")!
+        let message = TradeMessage(
+            id: UUID(uuidString: "00000000-0000-0000-0000-000000000407")!,
+            proposalID: proposalID,
+            senderID: viewerID,
+            messageType: .system,
+            body: "みちが条件を変えて再出品しました"
+        )
+
+        XCTAssertTrue(TradeCounterProposalSystemMessage.isCounterProposalNotice(message))
+    }
+
+    func testTradeProposalResponsePresentationHidesAgreeAfterViewerCounterProposal() {
+        let viewerID = UUID(uuidString: "00000000-0000-0000-0000-000000000001")!
+        let partnerID = UUID(uuidString: "00000000-0000-0000-0000-000000000002")!
+        let proposal = TradeProposal(
+            id: UUID(uuidString: "00000000-0000-0000-0000-000000000406")!,
+            senderID: partnerID,
+            receiverID: viewerID,
+            status: .sent,
+            exchangeMethod: .both,
+            senderGoodsIDs: [UUID(uuidString: "11111111-1111-1111-1111-111111111111")!],
+            receiverGoodsIDs: [UUID(uuidString: "22222222-2222-2222-2222-222222222222")!],
+            cashOffer: true
+        )
+
+        let presentation = TradeProposalResponsePresentation(
+            proposal: proposal,
+            viewerID: viewerID,
+            proposedPaymentMethods: [.paypay],
+            proposedPaymentOtherNote: nil,
+            availablePaymentMethods: [.paypay],
+            availablePaymentOtherNote: nil,
+            viewerHasCounterProposal: true
+        )
+
+        XCTAssertTrue(presentation.showsResponseControls)
+        XCTAssertFalse(presentation.canAgree)
+        XCTAssertTrue(presentation.canCounterProposal)
+        XCTAssertTrue(presentation.canReject)
+        XCTAssertFalse(presentation.showsPrimaryAgreeAction)
+        XCTAssertFalse(presentation.needsExchangeMethodSelection)
+        XCTAssertFalse(presentation.showsPaymentSelector)
+        XCTAssertEqual(presentation.responseHeaderText, "現在出品中です。相手からの返信待ちです。")
+    }
+
+    func testTradeProposalResponsePresentationHidesControlsForInitialSenderWaiting() {
+        let viewerID = UUID(uuidString: "00000000-0000-0000-0000-000000000001")!
+        let partnerID = UUID(uuidString: "00000000-0000-0000-0000-000000000002")!
+        let proposal = TradeProposal(
+            id: UUID(uuidString: "00000000-0000-0000-0000-000000000403")!,
+            senderID: viewerID,
+            receiverID: partnerID,
+            status: .sent,
+            exchangeMethod: .both,
+            senderGoodsIDs: [UUID(uuidString: "11111111-1111-1111-1111-111111111111")!],
+            receiverGoodsIDs: [UUID(uuidString: "22222222-2222-2222-2222-222222222222")!]
+        )
+
+        let presentation = TradeProposalResponsePresentation(
+            proposal: proposal,
+            viewerID: viewerID,
+            proposedPaymentMethods: [.other],
+            proposedPaymentOtherNote: "メルペイ",
+            availablePaymentMethods: [.other],
+            availablePaymentOtherNote: nil
+        )
+
+        XCTAssertFalse(presentation.showsResponseControls)
+        XCTAssertFalse(presentation.canAgree)
+        XCTAssertEqual(presentation.paymentTitle(for: .other), "メルペイ")
+    }
+
     func testNativePreviewPendingListMirrorsRnVisualQaCount() {
         let pending = NativePreviewData.proposals.filter { TradeStage.pending.contains($0.status) }
         XCTAssertEqual(pending.count, 4)
@@ -81,15 +315,21 @@ final class TradeChatAffordanceTests: XCTestCase {
             senderID: partnerID,
             receiverID: viewerID,
             status: .sent,
-            exchangeMethod: .both,
+            exchangeMethod: .hand,
             senderGoodsIDs: [],
             receiverGoodsIDs: [],
             createdAt: Date(timeIntervalSince1970: 1_000)
         )
         let partner = PublicUserProfile(
-            profile: UserProfile(id: partnerID, handle: "michilion", displayName: "みち"),
-            averageStars: nil,
-            evaluationCount: 0,
+            profile: UserProfile(
+                id: partnerID,
+                handle: "michilion",
+                displayName: "みち",
+                gender: .female,
+                age: 27
+            ),
+            averageStars: 4.6,
+            evaluationCount: 12,
             completedTradeCount: 0
         )
 
@@ -101,10 +341,14 @@ final class TradeChatAffordanceTests: XCTestCase {
         )
 
         XCTAssertEqual(presentation.partnerHandle, "michilion")
+        XCTAssertEqual(presentation.partnerRatingText, "★ 4.6（12件）")
+        XCTAssertEqual(presentation.partnerDemographicText, "20代・女性")
         XCTAssertEqual(presentation.updatedText, "3分前")
         XCTAssertEqual(presentation.readState, .unopened)
         XCTAssertEqual(presentation.readState.title, "未開封")
-        XCTAssertEqual(presentation.meetupSummaryText, "横浜アリーナ × 候補確認中")
+        XCTAssertEqual(presentation.unreadBadgeCount, 1)
+        XCTAssertNil(presentation.meetupSummaryText)
+        XCTAssertEqual(presentation.conditionIconSystemName, "mappin.circle")
     }
 
     func testTradeCardPresentationUsesLastActivityAtForUpdatedText() {
@@ -256,6 +500,61 @@ final class TradeChatAffordanceTests: XCTestCase {
             ).readState,
             .waitingForReply
         )
+        XCTAssertEqual(
+            TradeCardPresentation(
+                proposal: waitingForReply,
+                viewerID: viewerID,
+                profilesByUserID: [:],
+                now: Date(timeIntervalSince1970: 1_180)
+            ).unreadBadgeCount,
+            0
+        )
+    }
+
+    func testTradeCardPresentationCountsOnlyUnreadIncomingMessagesAfterProposalWasRead() {
+        let viewerID = UUID(uuidString: "00000000-0000-0000-0000-000000000001")!
+        let partnerID = UUID(uuidString: "00000000-0000-0000-0000-000000000002")!
+        let proposalID = UUID(uuidString: "00000000-0000-0000-0000-000000000315")!
+        let proposal = TradeProposal(
+            id: proposalID,
+            senderID: partnerID,
+            receiverID: viewerID,
+            status: .negotiating,
+            exchangeMethod: .both,
+            senderGoodsIDs: [],
+            receiverGoodsIDs: [],
+            createdAt: Date(timeIntervalSince1970: 1_000),
+            updatedAt: Date(timeIntervalSince1970: 1_000)
+        )
+
+        let presentation = TradeCardPresentation(
+            proposal: proposal,
+            viewerID: viewerID,
+            profilesByUserID: [:],
+            messages: [
+                tradeMessage(
+                    proposalID: proposalID,
+                    senderID: partnerID,
+                    createdAt: Date(timeIntervalSince1970: 1_120)
+                ),
+                tradeMessage(
+                    proposalID: proposalID,
+                    senderID: viewerID,
+                    createdAt: Date(timeIntervalSince1970: 1_140)
+                ),
+                tradeMessage(
+                    proposalID: proposalID,
+                    senderID: partnerID,
+                    createdAt: Date(timeIntervalSince1970: 1_160)
+                )
+            ],
+            lastActivityAt: Date(timeIntervalSince1970: 1_160),
+            viewerLastReadAt: Date(timeIntervalSince1970: 1_080),
+            now: Date(timeIntervalSince1970: 1_200)
+        )
+
+        XCTAssertEqual(presentation.readState, .unopened)
+        XCTAssertEqual(presentation.unreadBadgeCount, 2)
     }
 
     func testTradeCardPresentationMarksOpenedProposalUnreadWhenActivityChangesAfterRead() {
@@ -353,7 +652,88 @@ final class TradeChatAffordanceTests: XCTestCase {
             now: day
         )
 
-        XCTAssertEqual(presentation.meetupSummaryText, "横浜アリーナ 北口 × 09:00-09:30 / 他1件の候補")
+        XCTAssertEqual(presentation.meetupSummaryText, "現地: 横浜アリーナ 北口 / \(firstStart.formatted(.dateTime.locale(Locale(identifier: "ja_JP")).month().day())) / 他1件")
+        XCTAssertEqual(presentation.conditionIconSystemName, "mappin.circle")
+    }
+
+    func testTradeCardPresentationShowsShippingAndBothConditionsFromProposalTags() {
+        let viewerID = UUID(uuidString: "00000000-0000-0000-0000-000000000001")!
+        let partnerID = UUID(uuidString: "00000000-0000-0000-0000-000000000002")!
+        let mailProposal = TradeProposal(
+            id: UUID(uuidString: "00000000-0000-0000-0000-000000000303")!,
+            senderID: partnerID,
+            receiverID: viewerID,
+            status: .sent,
+            exchangeMethod: .mail,
+            senderGoodsIDs: [],
+            receiverGoodsIDs: [],
+            conditionTags: ["送料: 受け取る側が負担", "発送目安: 2〜4日以内"]
+        )
+        let bothProposal = TradeProposal(
+            id: UUID(uuidString: "00000000-0000-0000-0000-000000000304")!,
+            senderID: partnerID,
+            receiverID: viewerID,
+            status: .sent,
+            exchangeMethod: .both,
+            senderGoodsIDs: [],
+            receiverGoodsIDs: [],
+            conditionTags: [
+                "待ち合わせ: 東京都 / 東京ドーム前 / 6月28日",
+                "送料: 要相談",
+                "発送目安: 1〜2日以内"
+            ]
+        )
+        let localConsultationProposal = TradeProposal(
+            id: UUID(uuidString: "00000000-0000-0000-0000-000000000305")!,
+            senderID: partnerID,
+            receiverID: viewerID,
+            status: .sent,
+            exchangeMethod: .hand,
+            senderGoodsIDs: [],
+            receiverGoodsIDs: [],
+            conditionTags: ["待ち合わせ: 東京都 / 相談して決める"]
+        )
+        let missingLocalPlaceProposal = TradeProposal(
+            id: UUID(uuidString: "00000000-0000-0000-0000-000000000306")!,
+            senderID: partnerID,
+            receiverID: viewerID,
+            status: .sent,
+            exchangeMethod: .hand,
+            senderGoodsIDs: [],
+            receiverGoodsIDs: [],
+            conditionTags: ["待ち合わせ: 未設定 / 東京ドーム前 / 6月28日"]
+        )
+
+        let mailPresentation = TradeCardPresentation(
+            proposal: mailProposal,
+            viewerID: viewerID,
+            profilesByUserID: [:]
+        )
+        let bothPresentation = TradeCardPresentation(
+            proposal: bothProposal,
+            viewerID: viewerID,
+            profilesByUserID: [:]
+        )
+        let localConsultationPresentation = TradeCardPresentation(
+            proposal: localConsultationProposal,
+            viewerID: viewerID,
+            profilesByUserID: [:]
+        )
+        let missingLocalPlacePresentation = TradeCardPresentation(
+            proposal: missingLocalPlaceProposal,
+            viewerID: viewerID,
+            profilesByUserID: [:]
+        )
+
+        XCTAssertEqual(mailPresentation.meetupSummaryText, "郵送: 送料 受け取る側が負担 / 発送目安 2〜4日以内")
+        XCTAssertEqual(mailPresentation.conditionIconSystemName, "shippingbox.circle")
+        XCTAssertEqual(
+            bothPresentation.meetupSummaryText,
+            "現地: 東京都 / 東京ドーム前 / 6月28日\n郵送: 送料 要相談 / 発送目安 1〜2日以内"
+        )
+        XCTAssertEqual(bothPresentation.conditionIconSystemName, "arrow.left.arrow.right.circle")
+        XCTAssertEqual(localConsultationPresentation.meetupSummaryText, "現地: 東京都 / 日程相談")
+        XCTAssertNil(missingLocalPlacePresentation.meetupSummaryText)
     }
 
     func testTradeGoodsCarouselLayoutKeepsDraggingCardsInsideStage() {
@@ -379,7 +759,14 @@ final class TradeChatAffordanceTests: XCTestCase {
         let viewerID = UUID(uuidString: "00000000-0000-0000-0000-000000000001")!
         let partnerID = UUID(uuidString: "00000000-0000-0000-0000-000000000002")!
         let partner = PublicUserProfile(
-            profile: UserProfile(id: partnerID, handle: "michi1", displayName: "みち"),
+            profile: UserProfile(
+                id: partnerID,
+                handle: "michi1",
+                displayName: "みち",
+                gender: .female,
+                prefecture: "神奈川県",
+                age: 27
+            ),
             averageStars: nil,
             evaluationCount: 0,
             completedTradeCount: 0
@@ -412,14 +799,48 @@ final class TradeChatAffordanceTests: XCTestCase {
             profilesByUserID: [partnerID: partner]
         )
 
+        XCTAssertEqual(incomingPresentation.partnerDisplayName, "みち")
         XCTAssertEqual(incomingPresentation.relationText, "相手から届いた打診")
+        XCTAssertEqual(incomingPresentation.partnerHandle, "michi1")
+        XCTAssertEqual(incomingPresentation.partnerMetaText, "20代・女性・神奈川県")
         XCTAssertEqual(incomingPresentation.statusLabel, "新着打診")
         XCTAssertEqual(incomingPresentation.agreementLabel, "未合意")
         XCTAssertTrue(incomingPresentation.guidanceText.contains("承諾"))
         XCTAssertEqual(outgoingPresentation.relationText, "あなたから送った打診")
-        XCTAssertEqual(outgoingPresentation.statusLabel, "相手待ち")
-        XCTAssertEqual(outgoingPresentation.agreementLabel, "返信待ち")
-        XCTAssertTrue(outgoingPresentation.guidanceText.contains("相手の返答"))
+        XCTAssertEqual(outgoingPresentation.statusLabel, "現在出品中")
+        XCTAssertEqual(outgoingPresentation.agreementLabel, "相手からの返信待ち")
+        XCTAssertTrue(outgoingPresentation.guidanceText.contains("現在出品中です"))
+    }
+
+    func testTradeDetailHeroUsesOutgoingWaitingStateAfterViewerCounterProposal() {
+        let viewerID = UUID(uuidString: "00000000-0000-0000-0000-000000000001")!
+        let partnerID = UUID(uuidString: "00000000-0000-0000-0000-000000000002")!
+        let incoming = makeProposal(
+            id: UUID(uuidString: "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbb0105")!,
+            senderID: partnerID,
+            receiverID: viewerID,
+            status: .sent
+        )
+
+        let presentation = TradeDetailHeroPresentation(
+            proposal: incoming,
+            viewerID: viewerID,
+            profilesByUserID: [:],
+            viewerHasCounterProposal: true
+        )
+
+        XCTAssertEqual(presentation.relationText, "あなたから送った打診")
+        XCTAssertEqual(presentation.statusLabel, "現在出品中")
+        XCTAssertEqual(presentation.agreementLabel, "相手からの返信待ち")
+        XCTAssertTrue(presentation.guidanceText.contains("相手からの返信待ち"))
+    }
+
+    func testTradePhotoMessageLayoutUsesCompactThumbnails() {
+        XCTAssertEqual(TradePhotoMessageLayout.thumbnailSize(for: .photo), CGSize(width: 150, height: 150))
+        XCTAssertEqual(TradePhotoMessageLayout.thumbnailSize(for: .outfitPhoto), CGSize(width: 142, height: 188))
+        XCTAssertTrue(TradePhotoMessageLayout.isPhotoMessage(.photo))
+        XCTAssertTrue(TradePhotoMessageLayout.isPhotoMessage(.outfitPhoto))
+        XCTAssertFalse(TradePhotoMessageLayout.isPhotoMessage(.text))
     }
 
     func testTradeDetailHeroReflectsAgreementAndCompletionStates() {
@@ -558,10 +979,10 @@ final class TradeChatAffordanceTests: XCTestCase {
             showsCounterProposal: true
         )
 
-        XCTAssertEqual(withoutCounter.quickActions, [.schedule])
-        XCTAssertEqual(withoutCounter.overflowActions, [.schedule, .chatCamera, .chatLibrary])
-        XCTAssertEqual(withCounter.quickActions, [.schedule, .counterProposal])
-        XCTAssertEqual(withCounter.overflowActions, [.schedule, .counterProposal, .chatCamera, .chatLibrary])
+        XCTAssertEqual(withoutCounter.quickActions, [])
+        XCTAssertEqual(withoutCounter.overflowActions, [.location, .chatCamera, .chatLibrary])
+        XCTAssertEqual(withCounter.quickActions, [.counterProposal])
+        XCTAssertEqual(withCounter.overflowActions, [.location, .counterProposal, .chatCamera, .chatLibrary])
     }
 
     func testTradeMessageInputContextDerivesActionPolicyAndState() {
@@ -675,7 +1096,13 @@ final class TradeChatAffordanceTests: XCTestCase {
             proposalID: proposalID,
             senderID: viewerID,
             messageType: .system,
-            body: "取引評価を送信しました"
+            body: TradeEvaluationSystemMessage.body(actorDisplayName: "みち", actorHandle: "michi"),
+            meta: [
+                "action": TradeEvaluationSystemMessage.action,
+                "stars": "5",
+                "comment": "ありがとうございました",
+                "rater_display_name": "みち"
+            ]
         )
 
         let state = TradeEvaluationPromptState(
@@ -685,6 +1112,8 @@ final class TradeChatAffordanceTests: XCTestCase {
         )
 
         XCTAssertTrue(state.hasSubmittedEvaluation)
+        XCTAssertFalse(state.hasPartnerSubmittedEvaluation)
+        XCTAssertFalse(state.shouldRevealEvaluations)
     }
 
     func testEvaluationPromptStateIgnoresPartnerEvaluationAndHonorsLocalSubmission() {
@@ -711,10 +1140,64 @@ final class TradeChatAffordanceTests: XCTestCase {
             TradeEvaluationPromptState(
                 proposal: proposal,
                 viewerID: viewerID,
+                messages: [partnerMessage]
+            ).hasPartnerSubmittedEvaluation
+        )
+        XCTAssertTrue(
+            TradeEvaluationPromptState(
+                proposal: proposal,
+                viewerID: viewerID,
                 messages: [],
                 localSubmission: true
             ).hasSubmittedEvaluation
         )
+    }
+
+    func testEvaluationPromptStateRevealsBothEvaluationCommentsAfterMutualSubmission() {
+        let viewerID = UUID(uuidString: "cccccccc-cccc-cccc-cccc-cccccccccccc")!
+        let partnerID = UUID(uuidString: "dddddddd-dddd-dddd-dddd-dddddddddddd")!
+        let proposalID = UUID(uuidString: "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb")!
+        let proposal = makeProposal(id: proposalID, senderID: viewerID, receiverID: partnerID, status: .completed)
+        let ownMessage = TradeMessage(
+            id: UUID(uuidString: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaea11")!,
+            proposalID: proposalID,
+            senderID: viewerID,
+            messageType: .system,
+            body: "みちの評価が完了しました",
+            meta: [
+                "action": TradeEvaluationSystemMessage.action,
+                "stars": "5",
+                "comment": "丁寧でした",
+                "rater_display_name": "みち"
+            ],
+            createdAt: Date(timeIntervalSince1970: 100)
+        )
+        let partnerMessage = TradeMessage(
+            id: UUID(uuidString: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaea12")!,
+            proposalID: proposalID,
+            senderID: partnerID,
+            messageType: .system,
+            body: "相手の評価が完了しました",
+            meta: [
+                "action": TradeEvaluationSystemMessage.action,
+                "stars": "4",
+                "comment": "スムーズでした",
+                "rater_display_name": "相手"
+            ],
+            createdAt: Date(timeIntervalSince1970: 120)
+        )
+
+        let state = TradeEvaluationPromptState(
+            proposal: proposal,
+            viewerID: viewerID,
+            messages: [partnerMessage, ownMessage]
+        )
+
+        XCTAssertTrue(state.hasSubmittedEvaluation)
+        XCTAssertTrue(state.hasPartnerSubmittedEvaluation)
+        XCTAssertTrue(state.shouldRevealEvaluations)
+        XCTAssertEqual(state.revealedEvaluations.map(\.comment), ["丁寧でした", "スムーズでした"])
+        XCTAssertEqual(state.revealedEvaluations.map(\.roleTag), ["あなた", "相手"])
     }
 
     func testAssistanceRequestLegacySystemMessageUsesTypedBodyWhenPossible() {
@@ -777,7 +1260,7 @@ final class TradeChatAffordanceTests: XCTestCase {
             proposalID: UUID(uuidString: "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb")!,
             senderID: UUID(uuidString: "cccccccc-cccc-cccc-cccc-cccccccccccc")!,
             messageType: .system,
-            body: "取引証跡が追加されました",
+            body: TradeEvidenceSystemMessage.body(actorDisplayName: "みち", actorHandle: "michi"),
             meta: ["action": TradeEvidenceSystemMessage.action]
         )
 
@@ -785,10 +1268,30 @@ final class TradeChatAffordanceTests: XCTestCase {
         let incoming = TradeSystemMessagePresentation(message: message, isMine: false)
 
         XCTAssertTrue(TradeEvidenceSystemMessage.isEvidenceNotice(message))
-        XCTAssertEqual(outgoing.title, "取引証跡を送りました")
-        XCTAssertEqual(incoming.title, "取引証跡が届きました")
+        XCTAssertEqual(TradeEvidenceSystemMessage.body(actorDisplayName: nil, actorHandle: "cash"), "@cashが取引証跡をアップロードしました")
+        XCTAssertEqual(outgoing.title, "取引更新")
+        XCTAssertEqual(incoming.title, "取引更新")
         XCTAssertEqual(outgoing.systemImage, "doc.viewfinder")
-        XCTAssertEqual(outgoing.body, "タップして証跡写真を確認")
+        XCTAssertEqual(outgoing.body, "みちが取引証跡をアップロードしました")
+        XCTAssertNil(outgoing.detail)
+    }
+
+    func testCompletionSystemMessagePresentationUsesCompletedStatusCopy() {
+        let message = TradeMessage(
+            id: UUID(uuidString: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaad")!,
+            proposalID: UUID(uuidString: "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb")!,
+            senderID: UUID(uuidString: "cccccccc-cccc-cccc-cccc-cccccccccccc")!,
+            messageType: .system,
+            body: "取引が完了しました",
+            meta: ["action": TradeCompletionSystemMessage.action]
+        )
+
+        let presentation = TradeSystemMessagePresentation(message: message)
+
+        XCTAssertTrue(TradeCompletionSystemMessage.isCompletionNotice(message))
+        XCTAssertEqual(presentation.title, "取引完了")
+        XCTAssertEqual(presentation.systemImage, "checkmark.seal.fill")
+        XCTAssertEqual(presentation.body, "取引が完了しました")
     }
 
     func testCancelApprovalPromptShowsOnlyForIncomingRequestOnAgreedTrade() {

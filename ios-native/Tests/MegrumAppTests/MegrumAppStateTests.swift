@@ -167,14 +167,17 @@ final class MegrumAppStateTests: XCTestCase {
 
     func testAppStateUpdatesPreviewOwnProfile() async {
         let state = MegrumAppState(repository: PreviewMegrumRepository())
+        let birthDate = ProfileBirthDateCodec.date(from: "2002-04-12")
 
         await state.loadInitialData()
         let saved = await state.updateOwnProfile(
             OwnProfileUpdateInput(
                 handle: " @Michi_New ",
                 displayName: " みちりおん改 ",
+                bio: " 交換よろしくお願いします ",
                 gender: .noAnswer,
                 prefecture: " 東京都 ",
+                birthDate: birthDate,
                 avatarURL: URL(string: "https://preview.megrum.jp/avatar.jpg")
             )
         )
@@ -182,8 +185,11 @@ final class MegrumAppStateTests: XCTestCase {
         XCTAssertTrue(saved)
         XCTAssertEqual(state.viewer?.handle, "michi_new")
         XCTAssertEqual(state.viewer?.displayName, "みちりおん改")
-        XCTAssertEqual(state.viewer?.gender, .noAnswer)
+        XCTAssertEqual(state.viewer?.bio, "交換よろしくお願いします")
+        XCTAssertEqual(state.viewer?.gender, .female)
         XCTAssertEqual(state.viewer?.prefecture, "東京都")
+        XCTAssertEqual(ProfileBirthDateCodec.string(from: state.viewer?.birthDate), "2002-04-12")
+        XCTAssertEqual(state.viewer?.age, ProfileBirthDateCodec.age(from: birthDate))
         XCTAssertEqual(state.viewer?.avatarURL?.absoluteString, "https://preview.megrum.jp/avatar.jpg")
         XCTAssertFalse(state.isSavingOwnProfile)
         XCTAssertNil(state.errorMessage)
@@ -981,7 +987,9 @@ final class MegrumAppStateTests: XCTestCase {
         XCTAssertTrue(sent)
         XCTAssertEqual(state.messages(for: proposalID).count, initialCount + 1)
         XCTAssertEqual(state.messages(for: proposalID).last?.messageType, .outfitPhoto)
-        XCTAssertNotNil(state.messages(for: proposalID).last?.photoURL)
+        let photoURL = try! XCTUnwrap(state.messages(for: proposalID).last?.photoURL)
+        XCTAssertTrue(photoURL.isFileURL)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: photoURL.path))
         XCTAssertNil(state.sendingMessageProposalID)
         XCTAssertNil(state.errorMessage)
     }
@@ -1004,12 +1012,15 @@ final class MegrumAppStateTests: XCTestCase {
         XCTAssertTrue(sent)
         XCTAssertEqual(state.messages(for: proposalID).count, initialCount + 1)
         XCTAssertEqual(state.messages(for: proposalID).last?.messageType, .photo)
-        XCTAssertNotNil(state.messages(for: proposalID).last?.photoURL)
+        let photoURL = try! XCTUnwrap(state.messages(for: proposalID).last?.photoURL)
+        XCTAssertTrue(photoURL.isFileURL)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: photoURL.path))
         XCTAssertNil(state.sendingMessageProposalID)
         XCTAssertNil(state.errorMessage)
     }
 
     func testAppStateAddsEvidenceApprovesAndSubmitsPreviewEvaluation() async {
+        await PreviewMegrumRepository.resetTradePhotoLocalStoreForTesting()
         let state = MegrumAppState(repository: PreviewMegrumRepository())
         await state.loadInitialData()
         let proposalID = try! XCTUnwrap(state.proposals.first(where: { $0.status == .agreed })?.id)
@@ -1021,18 +1032,25 @@ final class MegrumAppStateTests: XCTestCase {
         )
 
         XCTAssertTrue(added)
-        XCTAssertNotNil(state.proposals.first(where: { $0.id == proposalID })?.evidencePhotoURL)
-        XCTAssertFalse(state.evidencePhotos(for: state.proposals.first { $0.id == proposalID }!).isEmpty)
+        let proposal = try! XCTUnwrap(state.proposals.first(where: { $0.id == proposalID }))
+        let evidencePhotoURL = try! XCTUnwrap(proposal.evidencePhotoURL)
+        XCTAssertTrue(evidencePhotoURL.isFileURL)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: evidencePhotoURL.path))
+        let evidencePhotos = state.evidencePhotos(for: proposal)
+        XCTAssertEqual(evidencePhotos.count, 1)
+        XCTAssertFalse(evidencePhotos.isEmpty)
+        XCTAssertTrue(evidencePhotos.contains { $0.photoURL == evidencePhotoURL })
         XCTAssertTrue(
             state.messages(for: proposalID).contains { message in
                 message.messageType == .system
                     && message.meta["action"] == "evidence_added"
-                    && message.body == "取引証跡が追加されました"
+                    && message.body?.hasSuffix("が取引証跡をアップロードしました") == true
             }
         )
         XCTAssertNil(state.addingEvidenceProposalID)
+        let evidencePhotoID = try! XCTUnwrap(evidencePhotos.first?.id)
 
-        let approved = await state.approveTradeEvidence(proposalID: proposalID)
+        let approved = await state.approveTradeEvidence(proposalID: proposalID, photoID: evidencePhotoID)
 
         XCTAssertTrue(approved)
         XCTAssertTrue(state.proposals.first(where: { $0.id == proposalID })?.approvedByReceiver ?? false)
@@ -1045,7 +1063,47 @@ final class MegrumAppStateTests: XCTestCase {
         )
 
         XCTAssertTrue(submitted)
+        XCTAssertTrue(
+            state.messages(for: proposalID).contains { message in
+                message.messageType == .system
+                    && message.meta["action"] == "evaluation_submitted"
+                    && message.meta["stars"] == "5"
+            }
+        )
         XCTAssertNil(state.submittingEvaluationProposalID)
+        XCTAssertNil(state.errorMessage)
+    }
+
+    func testAppStateDeletesEvidencePhotoImmediatelyAndKeepsItDeletedAfterReload() async {
+        await PreviewMegrumRepository.resetTradePhotoLocalStoreForTesting()
+        let state = MegrumAppState(repository: PreviewMegrumRepository())
+        await state.loadInitialData()
+        let proposalID = try! XCTUnwrap(state.proposals.first(where: { $0.status == .agreed })?.id)
+
+        let added = await state.addTradeEvidence(
+            proposalID: proposalID,
+            imageData: Data([0xff, 0xd8, 0xff]),
+            imageContentType: "image/jpeg"
+        )
+
+        XCTAssertTrue(added)
+        let proposalAfterAdd = try! XCTUnwrap(state.proposals.first(where: { $0.id == proposalID }))
+        let evidencePhotosAfterAdd = state.evidencePhotos(for: proposalAfterAdd)
+        XCTAssertEqual(evidencePhotosAfterAdd.count, 1)
+        let evidencePhoto = try! XCTUnwrap(evidencePhotosAfterAdd.first)
+
+        let deleted = await state.deleteTradeEvidencePhoto(proposalID: proposalID, photoID: evidencePhoto.id)
+
+        XCTAssertTrue(deleted)
+        let proposalAfterDelete = try! XCTUnwrap(state.proposals.first(where: { $0.id == proposalID }))
+        XCTAssertTrue(state.evidencePhotos(for: proposalAfterDelete).isEmpty)
+        XCTAssertFalse(state.evidencePhotos(for: proposalAfterDelete).contains { $0.id == evidencePhoto.id })
+        XCTAssertNil(state.deletingEvidencePhotoID)
+
+        await state.loadTradeEvidencePhotos(proposal: proposalAfterDelete, reportsFailure: false)
+
+        XCTAssertTrue(state.evidencePhotos(for: proposalAfterDelete).isEmpty)
+        XCTAssertFalse(state.evidencePhotos(for: proposalAfterDelete).contains { $0.id == evidencePhoto.id })
         XCTAssertNil(state.errorMessage)
     }
 

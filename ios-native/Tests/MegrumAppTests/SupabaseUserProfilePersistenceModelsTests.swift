@@ -6,6 +6,10 @@ final class SupabaseUserProfilePersistenceModelsTests: XCTestCase {
     func testUserRowSelectsCurrentPaymentAndAgeColumns() {
         XCTAssertEqual(
             UserRow.select,
+            "id,handle,display_name,bio,avatar_url,gender,primary_area,birth_date,age,payment_methods,payment_note,account_status"
+        )
+        XCTAssertEqual(
+            UserRow.paymentSummarySelect,
             "id,handle,display_name,avatar_url,gender,primary_area,age,payment_methods,payment_note,account_status"
         )
         XCTAssertEqual(
@@ -18,16 +22,22 @@ final class SupabaseUserProfilePersistenceModelsTests: XCTestCase {
         let payload = UserOwnProfileUpdatePayload(
             handle: "michi",
             displayName: "みち",
+            bio: "よろしくお願いします",
             avatarUrl: nil,
             shouldEncodeAvatarUrl: false,
             gender: .female,
             primaryArea: "大阪府",
+            birthDate: "2002-04-12",
+            age: 24,
             paymentMethods: [.paypay]
         )
 
         let object = try encodedJSONObject(payload)
 
         XCTAssertEqual(object["handle"] as? String, "michi")
+        XCTAssertEqual(object["bio"] as? String, "よろしくお願いします")
+        XCTAssertEqual(object["birthDate"] as? String, "2002-04-12")
+        XCTAssertEqual(object["age"] as? Int, 24)
         XCTAssertNil(object["avatarUrl"])
     }
 
@@ -35,15 +45,19 @@ final class SupabaseUserProfilePersistenceModelsTests: XCTestCase {
         let payload = UserOwnProfileUpdatePayload(
             handle: "michi",
             displayName: "みち",
+            bio: nil,
             avatarUrl: nil,
             shouldEncodeAvatarUrl: true,
             gender: nil,
             primaryArea: nil,
+            birthDate: nil,
+            age: nil,
             paymentMethods: []
         )
 
         let object = try encodedJSONObject(payload)
 
+        XCTAssertTrue(object["bio"] is NSNull)
         XCTAssertTrue(object["avatarUrl"] is NSNull)
     }
 
@@ -53,9 +67,11 @@ final class SupabaseUserProfilePersistenceModelsTests: XCTestCase {
             id: userID,
             handle: "michi",
             displayName: nil,
+            bio: "自己紹介です",
             avatarUrl: nil,
             gender: nil,
             primaryArea: "東京都",
+            birthDate: "2000-02-03",
             age: 24,
             paymentMethods: nil,
             paymentNote: nil,
@@ -65,7 +81,9 @@ final class SupabaseUserProfilePersistenceModelsTests: XCTestCase {
         XCTAssertEqual(row.profile.id, userID)
         XCTAssertEqual(row.profile.handle, "michi")
         XCTAssertEqual(row.profile.displayName, "michi")
+        XCTAssertEqual(row.profile.bio, "自己紹介です")
         XCTAssertEqual(row.profile.prefecture, "東京都")
+        XCTAssertEqual(ProfileBirthDateCodec.string(from: row.profile.birthDate), "2000-02-03")
         XCTAssertEqual(row.profile.age, 24)
         XCTAssertEqual(row.profile.paymentMethods, [])
         XCTAssertEqual(row.profile.accountStatus, .active)

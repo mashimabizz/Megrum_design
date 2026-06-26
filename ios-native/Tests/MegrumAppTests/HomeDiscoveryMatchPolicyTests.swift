@@ -161,6 +161,95 @@ final class HomeDiscoveryMatchPolicyTests: XCTestCase {
         )
     }
 
+    func testOwnerExchangeSummaryFormatsDefaultPartnerExchangeForAnyGoodsCondition() {
+        let summary = HomeDiscoveryOwnerExchangeSummary.fromCandidateSignals(
+            HomeCandidateConditionSignals(
+                goods: .init(hasIndividualListingHit: false, hasWishHit: true),
+                exchange: .init(
+                    postalAcceptedByBoth: false,
+                    localExchangeSelected: false,
+                    prefectureMatches: false,
+                    dateMatches: false,
+                    partnerExchangeMethodTitle: "現地交換・郵送OK",
+                    partnerLocalPrefectures: ["東京都"],
+                    partnerLocalDateKeys: ["2099-04-25", "2099-04-27"]
+                )
+            )
+        )
+
+        XCTAssertEqual(summary?.methodTitle, "現地交換、郵送OK")
+        XCTAssertEqual(
+            summary?.rows,
+            [
+                "現地交換：東京都、4/25他",
+                "郵送交換：送料 要相談、発送目安相談"
+            ]
+        )
+    }
+
+    func testPartnerExchangeCalendarContextUsesPartnerLocalDatesAndMemo() throws {
+        let dateKey = "2099-04-25"
+        let signals = HomeCandidateConditionSignals(
+            goods: .init(hasIndividualListingHit: true, hasWishHit: false),
+            exchange: .init(
+                postalAcceptedByBoth: false,
+                localExchangeSelected: true,
+                prefectureMatches: true,
+                dateMatches: false,
+                partnerExchangeMethodTitle: "現地交換",
+                partnerLocalConditionText: "東京都 / 東京駅付近で相談 / 2099-04-25",
+                partnerLocalPrefectures: ["東京都"],
+                partnerLocalDateKeys: [dateKey]
+            )
+        )
+
+        let context = try XCTUnwrap(
+            HomePartnerExchangeCalendarContext.from(signals: signals, ownerName: "はる")
+        )
+
+        XCTAssertEqual(context.ownerName, "はる")
+        XCTAssertEqual(context.methodTitle, "現地交換")
+        XCTAssertEqual(context.initialDateKey, dateKey)
+        XCTAssertEqual(context.dateDetails[dateKey]?.prefecture, "東京都")
+        XCTAssertEqual(context.dateDetails[dateKey]?.memo, "東京駅付近で相談")
+    }
+
+    func testPartnerExchangeCalendarContextParsesDateWhenOnlyTextHasSchedule() throws {
+        let signals = HomeCandidateConditionSignals(
+            goods: .init(hasIndividualListingHit: false, hasWishHit: true),
+            exchange: .init(
+                postalAcceptedByBoth: false,
+                localExchangeSelected: true,
+                prefectureMatches: false,
+                dateMatches: false,
+                partnerExchangeMethodTitle: "現地交換",
+                partnerLocalConditionText: "大阪府 / なんば周辺 / 2099-05-02"
+            )
+        )
+
+        let context = try XCTUnwrap(
+            HomePartnerExchangeCalendarContext.from(signals: signals, ownerName: nil)
+        )
+
+        XCTAssertEqual(context.dateDetails["2099-05-02"]?.prefecture, "大阪府")
+        XCTAssertEqual(context.dateDetails["2099-05-02"]?.memo, "なんば周辺")
+    }
+
+    func testPartnerExchangeCalendarContextIsNilWhenNoLocalConditionExists() {
+        let signals = HomeCandidateConditionSignals(
+            goods: .init(hasIndividualListingHit: false, hasWishHit: true),
+            exchange: .init(
+                postalAcceptedByBoth: true,
+                localExchangeSelected: false,
+                prefectureMatches: false,
+                dateMatches: false,
+                partnerExchangeMethodTitle: "郵送交換"
+            )
+        )
+
+        XCTAssertNil(HomePartnerExchangeCalendarContext.from(signals: signals, ownerName: nil))
+    }
+
     func testFocusedWantedOptionUpdatesGoodsHitSelectionContext() {
         let firstOffer = HomeDiscoveryFixtures.offerGoods[0]
         let secondOffer = HomeDiscoveryFixtures.offerGoods[1]
@@ -362,6 +451,49 @@ final class HomeDiscoveryMatchPolicyTests: XCTestCase {
             inventoryItems: [sender]
         )
         XCTAssertEqual(handRoute?.initialStep, .meetup)
+    }
+
+    func testDiscoveryProposalSelectionAppliesDefaultMailConditionsOnlyForMailRoutes() {
+        let receiverGoodsID = UUID(uuidString: "00000000-0000-0000-0000-000000000391")!
+        let settings = HomeDefaultExchangeSettings(
+            preference: .both,
+            mailShippingFee: .owner,
+            mailShippingDays: .oneDay
+        )
+        let mailSelection = HomeDiscoveryProposalSelection(
+            receiverGoodsID: receiverGoodsID,
+            senderGoodsIDs: [],
+            matchType: .perfect,
+            exchangeMethod: .mail
+        )
+        let appliedMail = mailSelection.applyingDefaultMailConditions(settings)
+
+        XCTAssertEqual(appliedMail.initialShippingFee, .owner)
+        XCTAssertEqual(appliedMail.initialShippingDays, .oneDay)
+
+        let handSelection = HomeDiscoveryProposalSelection(
+            receiverGoodsID: receiverGoodsID,
+            senderGoodsIDs: [],
+            matchType: .perfect,
+            exchangeMethod: .hand
+        )
+        let appliedHand = handSelection.applyingDefaultMailConditions(settings)
+
+        XCTAssertNil(appliedHand.initialShippingFee)
+        XCTAssertNil(appliedHand.initialShippingDays)
+
+        let explicitSelection = HomeDiscoveryProposalSelection(
+            receiverGoodsID: receiverGoodsID,
+            senderGoodsIDs: [],
+            matchType: .perfect,
+            exchangeMethod: .mail,
+            initialShippingFee: .negotiate,
+            initialShippingDays: .afterFiveDays
+        )
+        let appliedExplicit = explicitSelection.applyingDefaultMailConditions(settings)
+
+        XCTAssertEqual(appliedExplicit.initialShippingFee, .negotiate)
+        XCTAssertEqual(appliedExplicit.initialShippingDays, .afterFiveDays)
     }
 
     func testOtherExchangePolicyExcludesCurrentSheetGoods() {
@@ -635,7 +767,7 @@ final class HomeDiscoveryMatchPolicyTests: XCTestCase {
                     dateMatches: false
                 )
             ),
-            .warning
+            .possible
         )
         XCTAssertEqual(
             HomeDiscoveryMatchPolicy.exchangeCondition(
@@ -675,7 +807,7 @@ final class HomeDiscoveryMatchPolicyTests: XCTestCase {
         )
         XCTAssertEqual(
             HomeDiscoveryMatchPolicy.exchangeCondition(for: localDateFlexible.applying(to: rawSignals)),
-            .exact
+            .possible
         )
 
         let mailOnly = HomeDefaultExchangeSettings(
@@ -689,14 +821,128 @@ final class HomeDiscoveryMatchPolicyTests: XCTestCase {
         )
     }
 
+    func testDefaultExchangeSettingsApplyStoredMailConditionsToSignals() {
+        let rawSignals = HomeExchangeConditionSignals(
+            postalAcceptedByBoth: true,
+            localExchangeSelected: false,
+            prefectureMatches: false,
+            dateMatches: false,
+            shippingFeeNeedsDiscussion: false
+        )
+
+        let ownerFast = HomeDefaultExchangeSettings(
+            preference: .mail,
+            mailShippingFee: .owner,
+            mailShippingDays: .oneDay
+        )
+        let ownerFastSignals = ownerFast.applying(to: rawSignals)
+
+        XCTAssertTrue(ownerFastSignals.postalAcceptedByBoth)
+        XCTAssertFalse(ownerFastSignals.shippingFeeNeedsDiscussion)
+        XCTAssertEqual(ownerFastSignals.viewerShippingFeeTitle, "送料 自己負担 / 発送 成立後1日以内")
+
+        let negotiateLater = HomeDefaultExchangeSettings(
+            preference: .mail,
+            mailShippingFee: .negotiate,
+            mailShippingDays: .afterFiveDays
+        )
+        let negotiateSignals = negotiateLater.applying(to: rawSignals)
+
+        XCTAssertTrue(negotiateSignals.shippingFeeNeedsDiscussion)
+        XCTAssertEqual(negotiateSignals.viewerShippingFeeTitle, "送料 要相談 / 発送 5日以降")
+    }
+
+    func testDefaultExchangeSettingsApplySelectedLocalPrefectureAndDates() {
+        let todayKey = HomeExchangeDateKey.key(for: Date())
+        let rawSignals = HomeExchangeConditionSignals(
+            postalAcceptedByBoth: false,
+            localExchangeSelected: true,
+            prefectureMatches: false,
+            dateMatches: false,
+            partnerLocalPrefectures: ["東京都"],
+            partnerLocalDateKeys: [todayKey]
+        )
+        let settings = HomeDefaultExchangeSettings(
+            preference: .local,
+            localPrefecture: "東京都",
+            localDateKeys: [todayKey]
+        )
+        let appliedSignals = settings.applying(to: rawSignals)
+
+        XCTAssertEqual(
+            HomeDiscoveryMatchPolicy.exchangeCondition(for: appliedSignals),
+            .exact
+        )
+        XCTAssertEqual(appliedSignals.partnerLocalPrefectures, ["東京都"])
+        XCTAssertEqual(appliedSignals.partnerLocalDateKeys, [todayKey])
+
+        let differentPrefecture = HomeDefaultExchangeSettings(
+            preference: .local,
+            localPrefecture: "大阪府",
+            localDateKeys: [todayKey]
+        )
+        XCTAssertEqual(
+            HomeDiscoveryMatchPolicy.exchangeCondition(for: differentPrefecture.applying(to: rawSignals)),
+            .possible
+        )
+
+        let unsetPrefecture = HomeDefaultExchangeSettings(
+            preference: .local,
+            localPrefecture: "",
+            localDateKeys: [todayKey]
+        )
+        XCTAssertEqual(
+            HomeDiscoveryMatchPolicy.exchangeCondition(
+                for: unsetPrefecture.applying(
+                    to: HomeExchangeConditionSignals(
+                        postalAcceptedByBoth: false,
+                        localExchangeSelected: true,
+                        prefectureMatches: true,
+                        dateMatches: true,
+                        partnerLocalPrefectures: ["東京都"],
+                        partnerLocalDateKeys: [todayKey]
+                    )
+                )
+            ),
+            .possible
+        )
+    }
+
+    func testDefaultExchangeSettingsNeedsConfigurationWhenUnsetOrLocalDatesExpired() {
+        let calendar = Calendar.current
+        let yesterday = calendar.date(byAdding: .day, value: -1, to: Date()) ?? Date()
+        let yesterdayKey = HomeExchangeDateKey.key(for: yesterday, calendar: calendar)
+        let expiredLocal = HomeDefaultExchangeSettings(
+            preference: .both,
+            localPrefecture: "東京都",
+            localDateKeys: [yesterdayKey]
+        )
+
+        XCTAssertTrue(
+            HomeDefaultExchangeSettings.standard.needsConfiguration(isExplicitlyConfigured: false)
+        )
+        XCTAssertTrue(expiredLocal.needsConfiguration(isExplicitlyConfigured: true))
+        XCTAssertFalse(
+            HomeDefaultExchangeSettings(
+                preference: .mail,
+                localPrefecture: "",
+                localDateKeys: []
+            )
+            .needsConfiguration(isExplicitlyConfigured: true)
+        )
+    }
+
     func testDefaultExchangeSettingsSummaryReflectsStoredChoices() {
+        let todayKey = HomeExchangeDateKey.key(for: Date())
         XCTAssertEqual(
             HomeDefaultExchangeSettings(
                 preference: .both,
                 requiresSamePrefecture: true,
-                requiresDateOverlap: false
+                requiresDateOverlap: false,
+                localPrefecture: "東京都",
+                localDateKeys: [todayKey]
             ).summaryText,
-            "現地交換・郵送OK"
+            "現地交換・郵送OK / 東京都・1日程・送料 要相談・発送 2〜4日以内"
         )
         XCTAssertEqual(
             HomeDefaultExchangeSettings(
@@ -704,7 +950,7 @@ final class HomeDiscoveryMatchPolicyTests: XCTestCase {
                 requiresSamePrefecture: true,
                 requiresDateOverlap: true
             ).summaryText,
-            "郵送交換"
+            "郵送交換 / 送料 要相談・発送 2〜4日以内"
         )
     }
 
@@ -718,14 +964,20 @@ final class HomeDiscoveryMatchPolicyTests: XCTestCase {
         XCTAssertEqual(restored.preference, .local)
         XCTAssertEqual(restored.requiresSamePrefecture, HomeDefaultExchangeSettings.standard.requiresSamePrefecture)
         XCTAssertEqual(restored.requiresDateOverlap, HomeDefaultExchangeSettings.standard.requiresDateOverlap)
+        XCTAssertEqual(restored.mailShippingFee, .negotiate)
+        XCTAssertEqual(restored.mailShippingDays, .twoToFourDays)
         XCTAssertEqual(restored.summaryText, "現地交換")
 
         let fallback = HomeDefaultExchangeSettings(
             preferenceRawValue: "unknown",
             requiresSamePrefecture: false,
-            requiresDateOverlap: true
+            requiresDateOverlap: true,
+            mailShippingFeeRawValue: "unknown",
+            mailShippingDaysRawValue: "unknown"
         )
         XCTAssertEqual(fallback.preference, .both)
+        XCTAssertEqual(fallback.mailShippingFee, .negotiate)
+        XCTAssertEqual(fallback.mailShippingDays, .twoToFourDays)
     }
 
     func testPaymentConditionUsesSharedSupportedMethodsOnly() {
@@ -803,22 +1055,22 @@ final class HomeDiscoveryMatchPolicyTests: XCTestCase {
         XCTAssertEqual(HomePaymentCondition.warning.floatingTagTitle, "支払▲")
     }
 
-    func testHomeCandidateTagSetShowsExchangeOnlyWhenGoodsConditionIsDirect() {
+    func testHomeCandidateTagSetAlwaysShowsExchangeCondition() {
         let wishTags = HomeConditionTagSet(
             goods: .wish,
             exchange: .possible,
             payment: .unknown
         )
-        XCTAssertFalse(wishTags.homeCandidateShowsExchangeTag)
-        XCTAssertEqual(wishTags.homeCandidateAccessibilityText, "グッズ○、支払?")
+        XCTAssertTrue(wishTags.homeCandidateShowsExchangeTag)
+        XCTAssertEqual(wishTags.homeCandidateAccessibilityText, "グッズ○、交換○、支払?")
 
         let noneTags = HomeConditionTagSet(
             goods: .none,
             exchange: .warning,
             payment: .warning
         )
-        XCTAssertFalse(noneTags.homeCandidateShowsExchangeTag)
-        XCTAssertEqual(noneTags.homeCandidateAccessibilityText, "グッズ▲、支払▲")
+        XCTAssertTrue(noneTags.homeCandidateShowsExchangeTag)
+        XCTAssertEqual(noneTags.homeCandidateAccessibilityText, "グッズ▲、交換▲、支払▲")
 
         let directTags = HomeConditionTagSet(
             goods: .direct,
@@ -896,13 +1148,13 @@ final class HomeDiscoveryMatchPolicyTests: XCTestCase {
         )
         XCTAssertEqual(
             candidate.conditionTags(for: secondGoods),
-            HomeConditionTagSet(goods: .wish, exchange: .warning, payment: .warning)
+            HomeConditionTagSet(goods: .wish, exchange: .possible, payment: .warning)
         )
 
         switch candidate.sheet(selectedGoods: secondGoods) {
         case .wishHit(let payload):
             XCTAssertEqual(payload.goods.id, second.id)
-            XCTAssertEqual(payload.conditionTags, HomeConditionTagSet(goods: .wish, exchange: .warning, payment: .warning))
+            XCTAssertEqual(payload.conditionTags, HomeConditionTagSet(goods: .wish, exchange: .possible, payment: .warning))
         default:
             XCTFail("Selected wish-level goods should open the wish hit sheet.")
         }
@@ -1113,7 +1365,9 @@ final class HomeDiscoveryMatchPolicyTests: XCTestCase {
             senderGoodsIDs: [senderGoodsID],
             matchType: .perfect,
             receiverGoods: receiverGoods,
-            exchangeMethod: .mail
+            exchangeMethod: .mail,
+            initialShippingFee: .owner,
+            initialShippingDays: .oneDay
         )
         let inventory = [
             GoodsItem(
@@ -1140,6 +1394,8 @@ final class HomeDiscoveryMatchPolicyTests: XCTestCase {
         XCTAssertEqual(route.senderGoodsIDs, [senderGoodsID])
         XCTAssertEqual(route.matchType, .perfect)
         XCTAssertEqual(route.initialExchangeMethod, .mail)
+        XCTAssertEqual(route.initialShippingFee, .owner)
+        XCTAssertEqual(route.initialShippingDays, .oneDay)
         XCTAssertEqual(route.initialStep, .shipping)
     }
 

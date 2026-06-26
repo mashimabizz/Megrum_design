@@ -5,17 +5,20 @@ struct HomeGoodsImagePanelRail: View {
     var goods: [HomeMockGoods]
     var selectedIndices: Set<Int>
     var selectedBannerText: String?
+    var cardSize: HomeGoodsImagePanelCardSize
     var onSelect: (Int) -> Void
 
     init(
         goods: [HomeMockGoods],
         selectedIndices: Set<Int>,
         selectedBannerText: String? = nil,
+        cardSize: HomeGoodsImagePanelCardSize = .regular,
         onSelect: @escaping (Int) -> Void
     ) {
         self.goods = goods
         self.selectedIndices = selectedIndices
         self.selectedBannerText = selectedBannerText
+        self.cardSize = cardSize
         self.onSelect = onSelect
     }
 
@@ -33,7 +36,7 @@ struct HomeGoodsImagePanelRail: View {
                         )
                     }
                     .buttonStyle(.plain)
-                    .frame(width: 118, height: 144)
+                    .frame(width: cardSize.width, height: cardSize.height)
                     .accessibilityLabel(goods.title)
                     .accessibilityAddTraits(selectedIndices.contains(index) ? [.isSelected] : [])
                 }
@@ -41,6 +44,14 @@ struct HomeGoodsImagePanelRail: View {
             .padding(.trailing, 18)
         }
     }
+}
+
+struct HomeGoodsImagePanelCardSize {
+    var width: CGFloat
+    var height: CGFloat
+
+    static let regular = HomeGoodsImagePanelCardSize(width: 118, height: 144)
+    static let compact = HomeGoodsImagePanelCardSize(width: 82, height: 100)
 }
 
 struct HomeGoodsImagePanelGrid: View {

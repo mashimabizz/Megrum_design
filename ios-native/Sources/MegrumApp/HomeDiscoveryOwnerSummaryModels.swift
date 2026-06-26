@@ -77,6 +77,10 @@ struct HomeDiscoveryOwnerExchangeSummary: Equatable, Sendable {
         guard signals.goods.hasIndividualListingHit else {
             return nil
         }
+        return fromCandidateSignals(signals)
+    }
+
+    static func fromCandidateSignals(_ signals: HomeCandidateConditionSignals) -> HomeDiscoveryOwnerExchangeSummary? {
         let exchange = signals.exchange
         let methodTitle = normalizedMethodTitle(nonBlank(exchange.partnerExchangeMethodTitle))
             ?? inferredMethodTitle(from: exchange)
@@ -88,9 +92,11 @@ struct HomeDiscoveryOwnerExchangeSummary: Equatable, Sendable {
             exchange.localExchangeSelected ? nonBlank(exchange.partnerLocalConditionText) : nil,
             exchange.postalAcceptedByBoth ? shippingDetail(exchange.partnerShippingFeeTitle) : nil
         ].compactMap { $0 }
+        let showsLocal = methodTitle.contains("現地交換") || exchange.localExchangeSelected
+        let showsMail = methodTitle.contains("郵送") || exchange.postalAcceptedByBoth
         let rows = [
-            exchange.localExchangeSelected ? localDisplayLine(exchange.partnerLocalConditionText) : nil,
-            exchange.postalAcceptedByBoth ? mailDisplayLine(exchange.partnerShippingFeeTitle) : nil
+            showsLocal ? localDisplayLine(exchange) : nil,
+            showsMail ? mailDisplayLine(exchange.partnerShippingFeeTitle) : nil
         ].compactMap { $0 }
 
         return HomeDiscoveryOwnerExchangeSummary(
@@ -123,15 +129,16 @@ struct HomeDiscoveryOwnerExchangeSummary: Equatable, Sendable {
         return "送料 \(value)"
     }
 
-    private static func localDisplayLine(_ value: String?) -> String? {
-        guard let value = nonBlank(value), !isExcluded(value) else {
-            return nil
+    private static func localDisplayLine(_ exchange: HomeExchangeConditionSignals) -> String? {
+        let parts: [String]
+        if let value = nonBlank(exchange.partnerLocalConditionText), !isExcluded(value) {
+            parts = splitDetail(value)
+        } else {
+            parts = []
         }
-        let parts = splitDetail(value)
-        guard let prefecture = parts.first else {
-            return nil
-        }
-        let schedule = parts.reversed().first { !isPlaceConsultation($0) && $0 != prefecture }
+        let prefecture = parts.first ?? displayPrefecture(from: exchange.partnerLocalPrefectures) ?? "場所相談"
+        let schedule = localDateSummary(from: exchange.partnerLocalDateKeys)
+            ?? parts.reversed().first { !isPlaceConsultation($0) && $0 != prefecture }
             .map(scheduleDisplayText)
             ?? "日程相談"
         return "現地交換：\(prefecture)、\(schedule)"
@@ -139,7 +146,7 @@ struct HomeDiscoveryOwnerExchangeSummary: Equatable, Sendable {
 
     private static func mailDisplayLine(_ value: String?) -> String? {
         guard let value = nonBlank(value), !isExcluded(value) else {
-            return nil
+            return "郵送交換：送料 要相談、発送目安相談"
         }
         let parts = splitDetail(value)
         let fee = parts.first
@@ -151,6 +158,37 @@ struct HomeDiscoveryOwnerExchangeSummary: Equatable, Sendable {
             .flatMap { nonBlank($0) }
             ?? "発送目安相談"
         return "郵送交換：送料 \(fee)、発送目安 \(shippingDays)"
+    }
+
+    private static func localDateSummary(from dateKeys: Set<String>) -> String? {
+        let usableKeys = orderedLocalDateKeys(from: dateKeys, onlyFuture: true)
+        let displayKeys = usableKeys.isEmpty ? orderedLocalDateKeys(from: dateKeys, onlyFuture: false) : usableKeys
+        guard let firstKey = displayKeys.first else {
+            return nil
+        }
+        let suffix = displayKeys.count > 1 ? "他" : ""
+        return "\(HomeExchangeDateKey.compactDisplayText(for: firstKey))\(suffix)"
+    }
+
+    private static func orderedLocalDateKeys(from dateKeys: Set<String>, onlyFuture: Bool) -> [String] {
+        dateKeys
+            .filter { !onlyFuture || HomeExchangeDateKey.isOnOrAfterToday($0) }
+            .compactMap { key -> (String, Date)? in
+                guard let date = HomeExchangeDateKey.date(from: key) else {
+                    return nil
+                }
+                return (key, date)
+            }
+            .sorted { $0.1 < $1.1 }
+            .map(\.0)
+    }
+
+    private static func displayPrefecture(from prefectures: Set<String>) -> String? {
+        prefectures
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+            .sorted()
+            .first
     }
 
     private static func splitDetail(_ value: String) -> [String] {

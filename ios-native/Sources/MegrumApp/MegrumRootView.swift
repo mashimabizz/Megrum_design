@@ -51,6 +51,7 @@ public struct MegrumRootView: View {
                 AuthScreen(authState: authState, visualQAInitialScreen: visualQAInitialScreen)
             }
         }
+        .dismissKeyboardOnNonInputTap()
         .megrumInteractionFeedback()
         .onOpenURL { url in
             Task {
@@ -109,17 +110,18 @@ public struct MegrumRootView: View {
                 await syncRepositoryWithAuthSession()
             }
         }
-        .sheet(item: $drawerDestination) { destination in
+        .megrumSlideItemPresentation(item: $drawerDestination) { destination, dismiss in
             MegrumRootDrawerDestinationSheet(
                 appState: appState,
                 authState: authState,
                 destination: destination,
                 selectedTab: $selectedTab,
                 drawerDestination: $drawerDestination,
-                publicProfileRoute: $publicProfileRoute
+                publicProfileRoute: $publicProfileRoute,
+                onClose: dismiss
             )
         }
-        .sheet(item: $publicProfileRoute) { route in
+        .megrumSlideItemPresentation(item: $publicProfileRoute) { route, _ in
             NavigationStack {
                 PublicUserProfileScreen(
                     appState: appState,
@@ -133,9 +135,11 @@ public struct MegrumRootView: View {
             NavigationStack {
                 switch route {
                 case .exchange:
-                    HomeExchangeSettingsScreen()
+                    HomeExchangeSettingsScreen(individualListings: appState.listings)
                 case .payment:
-                    PaymentSettingsScreen(appState: appState)
+                    PaymentSettingsScreen(appState: appState) {
+                        homeSettingsRoute = nil
+                    }
                 }
             }
         }

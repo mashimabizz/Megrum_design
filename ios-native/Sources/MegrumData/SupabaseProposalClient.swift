@@ -19,14 +19,24 @@ public final class SupabaseProposalClient: @unchecked Sendable {
 
     public func loadProposals(viewerID: UUID) async throws -> [TradeProposal] {
         let viewer = viewerID.uuidString.lowercased()
-        let rows: [ProposalRow] = try await client.fetchRows(
-            from: "proposals",
-            select: ProposalRow.select,
-            queryItems: [
-                URLQueryItem(name: "or", value: "(sender_id.eq.\(viewer),receiver_id.eq.\(viewer))"),
-                URLQueryItem(name: "order", value: "updated_at.desc.nullslast,created_at.desc")
-            ]
-        )
+        let queryItems = [
+            URLQueryItem(name: "or", value: "(sender_id.eq.\(viewer),receiver_id.eq.\(viewer))"),
+            URLQueryItem(name: "order", value: "updated_at.desc.nullslast,created_at.desc")
+        ]
+        let rows: [ProposalRow]
+        do {
+            rows = try await client.fetchRows(
+                from: "proposals",
+                select: ProposalRow.select,
+                queryItems: queryItems
+            )
+        } catch {
+            rows = try await client.fetchRows(
+                from: "proposals",
+                select: ProposalRow.legacySelect,
+                queryItems: queryItems
+            )
+        }
         return rows.compactMap(\.proposal)
     }
 
@@ -34,7 +44,7 @@ public final class SupabaseProposalClient: @unchecked Sendable {
         let rows: [ProposalRow] = try await client.upsertRows(
             into: "proposals",
             values: [try ProposalCreatePayload(senderID: senderID, input: input, now: now)],
-            select: ProposalRow.select
+            select: ProposalRow.legacySelect
         )
         return rows.first?.proposal ?? TradeProposal(
             id: UUID(),
@@ -52,7 +62,8 @@ public final class SupabaseProposalClient: @unchecked Sendable {
             agreedBySender: [.sent, .negotiating, .agreementOneSide, .agreed].contains(input.status),
             agreedByReceiver: input.status == .agreed,
             createdAt: now,
-            updatedAt: now
+            updatedAt: now,
+            meetupCandidates: input.meetupCandidates.isEmpty ? input.meetup.map { [$0] } : input.meetupCandidates
         )
     }
 
@@ -96,10 +107,10 @@ public final class SupabaseProposalClient: @unchecked Sendable {
         return updated
     }
 
-    public func approveEvidence(userID: UUID, proposalID: UUID) async throws -> TradeProposal {
+    public func approveEvidence(userID: UUID, proposalID: UUID, photoID: UUID? = nil) async throws -> TradeProposal {
         let rows: [ProposalRow] = try await client.rpcRows(
             function: "approve_trade_evidence_for_viewer",
-            payload: ProposalApprovalRPCPayload(proposalID: proposalID)
+            payload: ProposalApprovalRPCPayload(proposalID: proposalID, photoID: photoID)
         )
         guard let updated = rows.first?.proposal else {
             throw SupabaseProposalClientError.malformedResponse
@@ -107,7 +118,8 @@ public final class SupabaseProposalClient: @unchecked Sendable {
         try? await createSystemMessage(
             proposalID: proposalID,
             senderID: userID,
-            body: updated.status == .completed ? "両者が承認しました。取引完了" : "証跡を承認しました"
+            body: updated.status == .completed ? "取引が完了しました" : "証跡写真を承認しました",
+            meta: updated.status == .completed ? ["action": SupabaseProposalSystemAction.tradeCompleted.rawValue] : [:]
         )
         return updated
     }
@@ -161,10 +173,25 @@ public final class SupabaseProposalClient: @unchecked Sendable {
         guard let evaluation = rows.first?.evaluation else {
             throw SupabaseProposalClientError.malformedResponse
         }
+        var meta: [String: String] = [
+            "action": SupabaseProposalSystemAction.evaluationSubmitted.rawValue,
+            "stars": "\(evaluation.stars)",
+            "rater_id": userID.uuidString.lowercased()
+        ]
+        if let comment = SupabaseTextNormalizer.optional(evaluation.comment) {
+            meta["comment"] = comment
+        }
+        if let displayName = SupabaseTextNormalizer.optional(input.raterDisplayName) {
+            meta["rater_display_name"] = displayName
+        }
+        if let handle = SupabaseTextNormalizer.optional(input.raterHandle) {
+            meta["rater_handle"] = handle
+        }
         try? await createSystemMessage(
             proposalID: input.proposalID,
             senderID: userID,
-            body: "取引評価を送信しました"
+            body: SupabaseTextNormalizer.optional(input.systemMessageBody) ?? "評価が完了しました",
+            meta: meta
         )
         return evaluation
     }

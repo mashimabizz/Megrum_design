@@ -3,11 +3,20 @@ import MegrumCore
 
 extension SupabaseProposalClient {
     func loadProposal(proposalID: UUID) async throws -> TradeProposal {
-        let rows: [ProposalRow] = try await client.fetchRows(
-            from: "proposals",
-            select: ProposalRow.select,
-            queryItems: proposalQueryItems(proposalID: proposalID)
-        )
+        let rows: [ProposalRow]
+        do {
+            rows = try await client.fetchRows(
+                from: "proposals",
+                select: ProposalRow.select,
+                queryItems: proposalQueryItems(proposalID: proposalID)
+            )
+        } catch {
+            rows = try await client.fetchRows(
+                from: "proposals",
+                select: ProposalRow.legacySelect,
+                queryItems: proposalQueryItems(proposalID: proposalID)
+            )
+        }
         guard let proposal = rows.first?.proposal else {
             throw SupabaseProposalClientError.proposalNotFound
         }

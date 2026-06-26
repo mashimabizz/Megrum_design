@@ -28,6 +28,10 @@ struct HomeDiscoveryExperience: View {
     @AppStorage(HomeExchangeSettingsStorageKeys.preference) var exchangePreferenceRawValue = HomeDefaultExchangeSettings.standard.preference.rawValue
     @AppStorage(HomeExchangeSettingsStorageKeys.requiresSamePrefecture) var exchangeRequiresSamePrefecture = HomeDefaultExchangeSettings.standard.requiresSamePrefecture
     @AppStorage(HomeExchangeSettingsStorageKeys.requiresDateOverlap) var exchangeRequiresDateOverlap = HomeDefaultExchangeSettings.standard.requiresDateOverlap
+    @AppStorage(HomeExchangeSettingsStorageKeys.localPrefecture) var exchangeLocalPrefecture = HomeDefaultExchangeSettings.standard.localPrefecture
+    @AppStorage(HomeExchangeSettingsStorageKeys.localDateKeys) var exchangeLocalDateKeysRawValue = ""
+    @AppStorage(HomeExchangeSettingsStorageKeys.mailShippingFee) var exchangeMailShippingFeeRawValue = HomeDefaultExchangeSettings.standard.mailShippingFee.rawValue
+    @AppStorage(HomeExchangeSettingsStorageKeys.mailShippingDays) var exchangeMailShippingDaysRawValue = HomeDefaultExchangeSettings.standard.mailShippingDays.rawValue
     @State var selectedSheet: HomeDiscoverySheet?
     @State var selectedMutualMatchCandidate: HomeMutualMatchCandidate?
     @State var showsMatchHelp = false
@@ -80,11 +84,12 @@ struct HomeDiscoveryExperience: View {
                     }
                     .padding(.horizontal, 20)
                     .padding(.top, HomeDiscoveryHeaderMetrics.contentTopPadding)
-                    .padding(.bottom, 34)
+                    .padding(.bottom, HomeDiscoveryHeaderMetrics.contentBottomPadding)
                 }
                 .refreshable {
                     await onRefresh()
                 }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .tag(HomeDiscoveryPrimaryTab.candidates)
 
                 HomeMutualMatchPage(
@@ -97,20 +102,10 @@ struct HomeDiscoveryExperience: View {
                 .refreshable {
                     await onRefresh()
                 }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .tag(HomeDiscoveryPrimaryTab.mutual)
             }
             .megrumPageTabViewStyle()
-
-            VStack {
-                Spacer()
-                HStack {
-                    LiquidGlassSearchButton(action: onOpenSearch)
-                    Spacer()
-                }
-                .padding(.leading, FloatingActionLayoutMetrics.leadingPadding)
-                .padding(.bottom, FloatingActionLayoutMetrics.homeSearchBottomPadding)
-            }
-            .ignoresSafeArea(.keyboard, edges: .bottom)
 
             pinnedHeader
         }

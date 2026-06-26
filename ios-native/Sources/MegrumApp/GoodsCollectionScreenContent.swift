@@ -264,7 +264,7 @@ extension GoodsCollectionScreen {
     }
 
     var addButtonLabel: String {
-        entryKind == .inventory ? "マイグッズに追加" : "Wishに追加"
+        entryKind == .inventory ? "マイグッズに追加" : "Wishを追加"
     }
 
     var addButtonHint: String {

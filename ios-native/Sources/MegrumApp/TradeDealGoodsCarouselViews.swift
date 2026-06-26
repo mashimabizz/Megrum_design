@@ -8,16 +8,17 @@ struct TradeGoodsCarouselColumn: View {
     var items: [GoodsItem]
     var accentColor: Color
     var badgeTitle: String?
+    var onStageTap: (() -> Void)?
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var selectedIndex = 0
     @State private var dragProgress: Double = 0
 
     var body: some View {
-        VStack(spacing: 8) {
-            HStack(spacing: 7) {
+        VStack(spacing: 5) {
+            HStack(spacing: 5) {
                 Text(title)
-                    .font(.system(size: 13, weight: .black, design: .rounded))
+                    .font(.system(size: 11.5, weight: .black, design: .rounded))
                     .foregroundStyle(accentColor)
                     .lineLimit(1)
                     .minimumScaleFactor(0.72)
@@ -25,10 +26,10 @@ struct TradeGoodsCarouselColumn: View {
                 Spacer(minLength: 0)
 
                 Text(countText)
-                    .font(.system(size: 11, weight: .black, design: .rounded))
+                    .font(.system(size: 9.5, weight: .black, design: .rounded))
                     .foregroundStyle(.white)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 4)
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 3)
                     .background(accentColor, in: Capsule())
             }
 
@@ -68,7 +69,23 @@ struct TradeGoodsCarouselColumn: View {
                 badgeTitle: badgeTitle
             )
             .contentShape(Rectangle())
-            .highPriorityGesture(carouselDragGesture(width: proxy.size.width))
+            .modifier(TradeGoodsCarouselGestureModifier(
+                width: proxy.size.width,
+                usesScrollFriendlyPan: onStageTap != nil,
+                isPanEnabled: items.count > 1 && !reduceMotion,
+                onStageTap: onStageTap,
+                onChanged: { translation in
+                    handleCarouselDragChanged(translation: translation, width: proxy.size.width)
+                },
+                onEnded: { translation, projectedTranslationWidth in
+                    handleCarouselDragEnded(
+                        translation: translation,
+                        projectedTranslationWidth: projectedTranslationWidth,
+                        width: proxy.size.width
+                    )
+                },
+                swiftUIGesture: carouselDragGesture(width: proxy.size.width)
+            ))
         }
         .frame(height: TradeGoodsCarouselLayout.stageHeight)
         .clipped()
@@ -94,44 +111,60 @@ struct TradeGoodsCarouselColumn: View {
     private func carouselDragGesture(width: CGFloat) -> some Gesture {
         DragGesture(minimumDistance: HorizontalSwipeIntentResolver.minimumHorizontalDistance)
             .onChanged { value in
-                guard items.count > 1, !reduceMotion else {
-                    return
-                }
-                guard let progress = carouselDragProgress(translation: value.translation, width: width) else {
-                    if abs(value.translation.height) > abs(value.translation.width) {
-                        dragProgress = 0
-                    }
-                    return
-                }
-                var transaction = Transaction()
-                transaction.disablesAnimations = true
-                withTransaction(transaction) {
-                    dragProgress = progress
-                }
+                handleCarouselDragChanged(translation: value.translation, width: width)
             }
             .onEnded { value in
-                guard items.count > 1 else {
-                    dragProgress = 0
-                    return
-                }
-                guard isHorizontalCarouselDrag(value.translation) else {
-                    dragProgress = 0
-                    return
-                }
-                let denominator = max(width * 0.58, 72)
-                let projectedProgress = -Double(value.predictedEndTranslation.width / denominator)
-                let actualProgress = -Double(value.translation.width / denominator)
-                let resolvedProgress = abs(projectedProgress) > abs(actualProgress) ? projectedProgress : actualProgress
-                let indexDelta: Int
-                if resolvedProgress > 0.34 {
-                    indexDelta = 1
-                } else if resolvedProgress < -0.34 {
-                    indexDelta = -1
-                } else {
-                    indexDelta = 0
-                }
-                settleCarousel(indexDelta: indexDelta)
+                handleCarouselDragEnded(
+                    translation: value.translation,
+                    projectedTranslationWidth: value.predictedEndTranslation.width,
+                    width: width
+                )
             }
+    }
+
+    private func handleCarouselDragChanged(translation: CGSize, width: CGFloat) {
+        guard items.count > 1, !reduceMotion else {
+            return
+        }
+        guard let progress = carouselDragProgress(translation: translation, width: width) else {
+            if abs(translation.height) > abs(translation.width) {
+                dragProgress = 0
+            }
+            return
+        }
+        var transaction = Transaction()
+        transaction.disablesAnimations = true
+        withTransaction(transaction) {
+            dragProgress = progress
+        }
+    }
+
+    private func handleCarouselDragEnded(
+        translation: CGSize,
+        projectedTranslationWidth: CGFloat,
+        width: CGFloat
+    ) {
+        guard items.count > 1 else {
+            dragProgress = 0
+            return
+        }
+        guard isHorizontalCarouselDrag(translation) else {
+            dragProgress = 0
+            return
+        }
+        let denominator = max(width * 0.58, 72)
+        let projectedProgress = -Double(projectedTranslationWidth / denominator)
+        let actualProgress = -Double(translation.width / denominator)
+        let resolvedProgress = abs(projectedProgress) > abs(actualProgress) ? projectedProgress : actualProgress
+        let indexDelta: Int
+        if resolvedProgress > 0.34 {
+            indexDelta = 1
+        } else if resolvedProgress < -0.34 {
+            indexDelta = -1
+        } else {
+            indexDelta = 0
+        }
+        settleCarousel(indexDelta: indexDelta)
     }
 
     private func carouselDragProgress(translation: CGSize, width: CGFloat) -> Double? {
@@ -162,5 +195,36 @@ struct TradeGoodsCarouselColumn: View {
 
     private func wrappedIndex(_ index: Int) -> Int {
         (index % items.count + items.count) % items.count
+    }
+}
+
+private struct TradeGoodsCarouselGestureModifier<SwiftUIGesture: Gesture>: ViewModifier {
+    var width: CGFloat
+    var usesScrollFriendlyPan: Bool
+    var isPanEnabled: Bool
+    var onStageTap: (() -> Void)?
+    var onChanged: (CGSize) -> Void
+    var onEnded: (CGSize, CGFloat) -> Void
+    var swiftUIGesture: SwiftUIGesture
+
+    func body(content: Content) -> some View {
+        if usesScrollFriendlyPan {
+#if canImport(UIKit)
+            content.overlay {
+                ScrollFriendlyHorizontalPanView(
+                    isPanEnabled: isPanEnabled,
+                    onTap: { _ in
+                        onStageTap?()
+                    },
+                    onChanged: onChanged,
+                    onEnded: onEnded
+                )
+            }
+#else
+            content.simultaneousGesture(swiftUIGesture)
+#endif
+        } else {
+            content.simultaneousGesture(swiftUIGesture)
+        }
     }
 }

@@ -12,7 +12,7 @@ extension HomeScreen {
         ) else {
             return
         }
-        proposalRoute = route
+        presentProposalRoute(route)
     }
 
     func openVisualQAInitialRouteIfNeeded() {
@@ -28,6 +28,22 @@ extension HomeScreen {
             return
         }
         didOpenVisualQAInitialRoute = true
-        relationRoute = HomeRelationRoute(item: item, matchType: .perfect)
+        presentRelationRoute(HomeRelationRoute(item: item, matchType: .perfect))
+    }
+
+    private func presentRelationRoute(_ route: HomeRelationRoute) {
+        if let onOpenRelationRoute {
+            onOpenRelationRoute(route)
+        } else {
+            relationRoute = route
+        }
+    }
+
+    private func presentProposalRoute(_ route: HomeProposalRoute) {
+        if let onOpenProposalRoute {
+            onOpenProposalRoute(route)
+        } else {
+            proposalRoute = route
+        }
     }
 }

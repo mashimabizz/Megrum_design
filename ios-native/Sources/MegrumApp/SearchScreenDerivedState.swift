@@ -132,7 +132,11 @@ extension SearchScreen {
         HomeDefaultExchangeSettings(
             preferenceRawValue: exchangePreferenceRawValue,
             requiresSamePrefecture: exchangeRequiresSamePrefecture,
-            requiresDateOverlap: exchangeRequiresDateOverlap
+            requiresDateOverlap: exchangeRequiresDateOverlap,
+            localPrefecture: exchangeLocalPrefecture,
+            localDateKeysRawValue: exchangeLocalDateKeysRawValue,
+            mailShippingFeeRawValue: exchangeMailShippingFeeRawValue,
+            mailShippingDaysRawValue: exchangeMailShippingDaysRawValue
         )
     }
 

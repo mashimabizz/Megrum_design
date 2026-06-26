@@ -29,7 +29,11 @@ struct HomeWishHitDetailSheet: View {
             HomeSelectedGoodsHeader(
                 goods: selection.goods,
                 conditionTags: selection.conditionTags,
-                exchangeSummary: HomeDiscoveryOwnerExchangeSummary.fromListingSignals(selection.signals),
+                exchangeSummary: HomeDiscoveryOwnerExchangeSummary.fromCandidateSignals(selection.signals),
+                exchangeCalendarContext: HomePartnerExchangeCalendarContext.from(
+                    signals: selection.signals,
+                    ownerName: selection.goods.ownerSummary?.displayName
+                ),
                 listingNote: selection.individualListingSelection.listingNote,
                 listingDetail: selection.individualListingSelection.detail,
                 onOpenOwnerProfile: onOpenOwnerProfile

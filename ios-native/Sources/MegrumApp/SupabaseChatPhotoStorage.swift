@@ -7,6 +7,11 @@ struct SupabaseChatPhotoUpload: Equatable, Sendable {
     var contentType: String
 }
 
+struct SupabaseChatPhotoUploadResult: Equatable, Sendable {
+    var upload: SupabaseChatPhotoUpload
+    var signedURL: URL
+}
+
 struct SupabaseChatPhotoStorage: Sendable {
     static let bucket = "chat-photos"
     static let maxUploadBytes = Int(9.5 * 1_024 * 1_024)
@@ -26,7 +31,7 @@ struct SupabaseChatPhotoStorage: Sendable {
         self.makeUUID = makeUUID
     }
 
-    func uploadPhoto(_ input: TradePhotoMessageCreateInput) async throws -> URL {
+    func uploadPhoto(_ input: TradePhotoMessageCreateInput) async throws -> SupabaseChatPhotoUploadResult {
         let upload = try Self.makeUpload(input: input, now: now(), uuid: makeUUID())
         try await client.uploadObject(
             bucket: Self.bucket,
@@ -35,11 +40,12 @@ struct SupabaseChatPhotoStorage: Sendable {
             contentType: upload.contentType,
             upsert: false
         )
-        return try await client.createSignedURL(
+        let signedURL = try await client.createSignedURL(
             bucket: Self.bucket,
             path: upload.path,
             expiresIn: Self.signedURLExpirationSeconds
         )
+        return SupabaseChatPhotoUploadResult(upload: upload, signedURL: signedURL)
     }
 
     static func makeUpload(

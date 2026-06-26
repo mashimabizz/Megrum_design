@@ -8,11 +8,16 @@ struct SearchScreen: View {
     var initialCriteria: SearchInitialCriteria? = nil
     var adDisplayContext: AdDisplayContext = AdDisplayContext()
     var onRequestInterstitial: (AdPlacement) -> Void = { _ in }
+    var onDismissRequest: (() -> Void)?
 
     @Environment(\.dismiss) var dismiss
     @AppStorage(HomeExchangeSettingsStorageKeys.preference) var exchangePreferenceRawValue = HomeDefaultExchangeSettings.standard.preference.rawValue
     @AppStorage(HomeExchangeSettingsStorageKeys.requiresSamePrefecture) var exchangeRequiresSamePrefecture = HomeDefaultExchangeSettings.standard.requiresSamePrefecture
     @AppStorage(HomeExchangeSettingsStorageKeys.requiresDateOverlap) var exchangeRequiresDateOverlap = HomeDefaultExchangeSettings.standard.requiresDateOverlap
+    @AppStorage(HomeExchangeSettingsStorageKeys.localPrefecture) var exchangeLocalPrefecture = HomeDefaultExchangeSettings.standard.localPrefecture
+    @AppStorage(HomeExchangeSettingsStorageKeys.localDateKeys) var exchangeLocalDateKeysRawValue = ""
+    @AppStorage(HomeExchangeSettingsStorageKeys.mailShippingFee) var exchangeMailShippingFeeRawValue = HomeDefaultExchangeSettings.standard.mailShippingFee.rawValue
+    @AppStorage(HomeExchangeSettingsStorageKeys.mailShippingDays) var exchangeMailShippingDaysRawValue = HomeDefaultExchangeSettings.standard.mailShippingDays.rawValue
     @State var query = ""
     @State var queryDraft = ""
     @State var selectedGroupID: UUID?
@@ -55,7 +60,7 @@ struct SearchScreen: View {
                 viewerID: appState.viewer?.id,
                 adDisplayContext: adDisplayContext,
                 onBack: {
-                    dismiss()
+                    closeSearch()
                 },
                 onRemoveActiveCriteria: removeActiveCriteria,
                 onFilterTap: {
@@ -89,7 +94,16 @@ struct SearchScreen: View {
         .background(MegrumTheme.canvas.ignoresSafeArea())
         .megrumHiddenNavigationBar()
         .searchScreenTabBarVisibility()
-        .simultaneousGesture(searchBackSwipeGesture, including: .gesture)
+        .megrumInteractiveBackSwipe(
+            isSuppressed: {
+                SearchBackSwipeResolver.isSuppressedByNestedHorizontalScroll(
+                    lastNestedHorizontalScrollDate: lastWishSuggestionHorizontalScrollDate
+                )
+            },
+            action: {
+                closeSearch()
+            }
+        )
         .task {
             await loadFiltersAndSearch()
             onRequestInterstitial(.searchBrowseInterstitial)
@@ -105,12 +119,12 @@ struct SearchScreen: View {
         .onDisappear {
             searchTask?.cancel()
         }
-        .sheet(item: $proposalTargetItem) { item in
+        .megrumSlideItemPresentation(item: $proposalTargetItem) { item, _ in
             NavigationStack {
                 ProposalCreateFlow(appState: appState, targetItem: item)
             }
         }
-        .sheet(item: $profileRoute) { route in
+        .megrumSlideItemPresentation(item: $profileRoute) { route, _ in
             NavigationStack {
                 PublicUserProfileScreen(
                     appState: appState,

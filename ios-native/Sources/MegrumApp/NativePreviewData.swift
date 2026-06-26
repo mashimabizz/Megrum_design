@@ -52,8 +52,10 @@ enum NativePreviewData {
         id: viewerID,
         handle: "michilion",
         displayName: "みちりおん",
+        bio: "関西中心にライブ参戦しています。トレカと会場限定グッズの交換が多めです。",
         avatarURL: testGoodsImageURL("twice_dahyun_1"),
         prefecture: "大阪府",
+        birthDate: ProfileBirthDateCodec.date(from: "2002-04-12"),
         age: 24,
         paymentMethods: [.bankTransfer, .paypay, .cashExchange, .other],
         paymentNote: "メルペイ相談可"
@@ -63,7 +65,10 @@ enum NativePreviewData {
         id: partnerID,
         handle: "michi1",
         displayName: "michi",
+        bio: "都内イベントでの交換が多いです。",
+        gender: .female,
         prefecture: "東京都",
+        age: 27,
         paymentMethods: [.paypay, .other],
         paymentNote: "差額相談可"
     )

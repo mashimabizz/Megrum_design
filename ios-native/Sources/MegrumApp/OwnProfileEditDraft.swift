@@ -4,8 +4,10 @@ import MegrumCore
 struct OwnProfileEditDraft: Equatable, Sendable {
     var handle: String
     var displayName: String
+    var bio: String
     var prefecture: String
     var gender: UserGender?
+    var birthDate: Date?
     var paymentMethods: [UserPaymentMethod]
     var existingAvatarURL: URL?
     var localAvatarData: Data?
@@ -15,16 +17,20 @@ struct OwnProfileEditDraft: Equatable, Sendable {
     static let empty = OwnProfileEditDraft(
         handle: "",
         displayName: "",
+        bio: "",
         prefecture: "",
-        gender: nil,
+        gender: .female,
+        birthDate: nil,
         paymentMethods: []
     )
 
     init(
         handle: String,
         displayName: String,
+        bio: String = "",
         prefecture: String,
         gender: UserGender?,
+        birthDate: Date? = nil,
         paymentMethods: [UserPaymentMethod] = [],
         existingAvatarURL: URL? = nil,
         localAvatarData: Data? = nil,
@@ -33,8 +39,10 @@ struct OwnProfileEditDraft: Equatable, Sendable {
     ) {
         self.handle = handle
         self.displayName = displayName
+        self.bio = bio
         self.prefecture = prefecture
-        self.gender = gender
+        self.gender = Self.editableGender(gender)
+        self.birthDate = birthDate
         self.paymentMethods = Self.normalizedPaymentMethods(paymentMethods)
         self.existingAvatarURL = existingAvatarURL
         self.localAvatarData = localAvatarData
@@ -45,8 +53,10 @@ struct OwnProfileEditDraft: Equatable, Sendable {
     init(summary: OwnProfileSummary) {
         self.handle = summary.handle
         self.displayName = summary.displayName
+        self.bio = summary.bio ?? ""
         self.prefecture = summary.prefecture ?? ""
-        self.gender = summary.gender
+        self.gender = Self.editableGender(summary.gender)
+        self.birthDate = summary.birthDate
         self.paymentMethods = summary.paymentMethods
         self.existingAvatarURL = summary.avatarURL
         self.localAvatarData = nil
@@ -62,6 +72,10 @@ struct OwnProfileEditDraft: Equatable, Sendable {
         MegrumAppStateInputNormalizer.trimmedText(displayName)
     }
 
+    var normalizedBio: String {
+        MegrumAppStateInputNormalizer.trimmedText(bio)
+    }
+
     var normalizedPrefecture: String {
         MegrumAppStateInputNormalizer.trimmedText(prefecture)
     }
@@ -70,8 +84,10 @@ struct OwnProfileEditDraft: Equatable, Sendable {
         OwnProfileEditDraft(
             handle: normalizedHandle,
             displayName: normalizedDisplayName,
+            bio: normalizedBio,
             prefecture: normalizedPrefecture,
-            gender: gender,
+            gender: Self.editableGender(gender),
+            birthDate: birthDate,
             paymentMethods: Self.normalizedPaymentMethods(paymentMethods),
             existingAvatarURL: existingAvatarURL,
             localAvatarData: localAvatarData,
@@ -100,6 +116,10 @@ struct OwnProfileEditDraft: Equatable, Sendable {
             return nil
         }
         return existingAvatarURL
+    }
+
+    static func editableGender(_ gender: UserGender?) -> UserGender {
+        gender == .male ? .male : .female
     }
 
     mutating func setLocalAvatarUpload(_ upload: GoodsPhotoUpload) {

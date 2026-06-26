@@ -3,8 +3,8 @@
 > **目的**：Megrum で使う用語の定義を一元化。実装・デザイン・仕様書で「同じ用語を同じ意味で」使うための基準。
 > 新環境（別Claudeセッション・別エンジニア）でも、これだけ読めばコンテキストがつかめる。
 
-最終更新: 2026-06-24
-ステータス: Draft v4.00（iter788 個別募集の最低数条件を2件以上・1個以上へ拡張）
+最終更新: 2026-06-25
+ステータス: Draft v4.01（iter995 プロフィール自己紹介・生年月日を追加）
 
 ---
 
@@ -63,7 +63,9 @@
 | **画像タイプ判定** | image type classification | アップロード画像を `real_photo` / `anime` / `illustration` / `manga` / `unknown` に分類する入口。根拠のない固定判定はせず、判定不能時は `unknown` として安全側に倒す | iter614 |
 | **アニメ/イラスト認識** | anime recognition | アニメ顔・キャラクター領域・画像埋め込み類似度など、実写顔認識とは別に差し替え可能な認識処理。モデル未設定時はクラッシュさせず `unknown` / `needs_review` 扱いにする | iter614 |
 | **メンバープロフィール種別** | member profile type | `member_face_profiles.profile_type`。実写顔、アニメ顔、キャラクター分類、イラスト埋め込みを分け、誤った特徴量同士を混ぜないための種別 | iter614 |
-| **相手プロフィール** | public user profile | 他ユーザーの公開プロフィール。Swift Native版ではグッズパネルの相手所有物タップから開き、上半分にアイコン・表示名・handle・都道府県・評価サマリ・完了取引数を表示する | iter346 |
+| **相手プロフィール** | public user profile | 他ユーザーの公開プロフィール。Swift Native版ではグッズパネルの相手所有物タップから開き、上半分にアイコン・表示名・handle・自己紹介・都道府県・性別・年齢・評価サマリ・完了取引数を表示する | iter346, iter995 |
+| **プロフィール自己紹介** | bio | ユーザーが自由入力する公開プロフィール文。`users.bio` に保存し、自分/相手プロフィールのスケジュールボタン付近に表示する | iter995 |
+| **生年月日** | birth date | 本人編集用の非公開プロフィール項目。`users.birth_date` に保存し、公開プロフィールには直接表示せず、必要な場合は `users.age` だけを表示する | iter995 |
 | **評価一覧** | user evaluations | 相手プロフィールの評価サマリから開く一覧。評価者アイコン、ユーザーネーム、評価日、星、コメントを表示する。Swift Native版では公開RPC経由で読み込む | iter277, iter346 |
 | **共通ロジック** | shared core | Web/iOSで挙動を揃えるため `packages/core/` に切り出す状態判定・マッチング優先度・市場残数などの処理 | iter154.75 |
 | **OTA配信** | EAS Update, over-the-air update | App Store / TestFlightへ新しいバイナリをUploadせず、既存ビルドの同一runtimeへJS/アセット更新を配信する仕組み。ネイティブモジュール追加・Info.plist変更・Bundle ID変更は対象外 | iter168.88 |
@@ -222,7 +224,7 @@
 | **住所** | mailing address | 郵送交換で使う住所情報。合意成立までは相手に見せず、合意後に当事者同士だけへ開示する | iter168.71 |
 | **証跡撮影** | evidence | 物理交換後に交換したグッズを撮影し、取引完了判断の材料にする操作。Swift Native版ではiOSカメラまたは写真選択から `chat-photos` へ画像を保存し、`proposal_evidence_photos` と `proposals.evidence_photo_url` に反映する | C-3, iter347, iter348 |
 | **取引写真拡大** | trade photo preview | 取引チャットに共有された写真や証跡写真をタップし、黒背景の全画面ビューアで確認する操作 | iter350 |
-| **両者承認** | dual approve | 証跡撮影後に送信者・受信者が内容を確認する操作。Swift Native版では `proposals.approved_by_sender` / `approved_by_receiver` を更新し、両方trueになった時点で `completed` にする | C-3, iter347 |
+| **両者承認** | dual approve | 証跡撮影後に送信者・受信者が内容を確認する操作。Swift Native版では `proposal_evidence_photos.approved_by_sender` / `approved_by_receiver` を画像ごとに更新し、全画像の双方承認がそろうと集約値として `proposals.approved_by_sender` / `approved_by_receiver` をtrueにして `completed` にする | C-3, iter347, iter1205 |
 | **評価** | rating | 完了した取引に対する1-5 stars＋コメント。Swift Native版では取引完了後に `user_evaluations` へ投稿する | C-3, iter347 |
 | **dispute** | 異議、申告、通報、D-flow | 取引異常時の申し立てフロー。Swift Native版では取引詳細sheet右上の `通報` から理由と内容を入力し、`disputes` に `submitted` として作成する | D-flow / iter168.87 / iter351 |
 | **反論** | reply | dispute 申告に対する弁明 | D-flow |

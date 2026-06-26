@@ -18,7 +18,7 @@ extension GoodsEditorSheet {
         guard draft.mode == .create, !didAssignDefaults else {
             return
         }
-        let skipsGroupDefault = usesInventoryCreateFlow && draft.entryKind == .inventory
+        let skipsGroupDefault = usesInventoryCreateFlow
         if draft.groupID == nil && !skipsGroupDefault {
             draft.groupID = appState.oshiGroups.first?.id
         }

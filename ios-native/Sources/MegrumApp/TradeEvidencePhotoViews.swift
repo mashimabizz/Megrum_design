@@ -19,96 +19,190 @@ struct TradeEvidenceApprovalChip: View {
     }
 }
 
-struct TradeEvidencePhotoCarousel: View {
+struct TradeEvidencePhotoList: View {
+    var proposal: TradeProposal
     var photos: [TradeEvidencePhoto]
     var viewerID: UUID?
-    var onOpenImage: (URL) -> Void
+    var showsApprovalControls = false
+    var isApproving = false
+    var deletingPhotoID: UUID?
+    var onOpenImage: (TradeEvidencePhoto) -> Void
+    var onApprove: (TradeEvidencePhoto) -> Void = { _ in }
+    var onDelete: (TradeEvidencePhoto) -> Void = { _ in }
 
     var body: some View {
-        GeometryReader { proxy in
-            let cardWidth = max(246, proxy.size.width - 48)
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 12) {
-                    ForEach(Array(photos.enumerated()), id: \.element.id) { index, photo in
-                        TradeEvidencePhotoCard(
-                            photo: photo,
-                            index: index,
-                            count: photos.count,
-                            viewerID: viewerID,
-                            onOpenImage: onOpenImage
-                        )
-                        .frame(width: cardWidth)
-                    }
-                }
-                .padding(.trailing, 46)
+        LazyVGrid(columns: gridItems, spacing: 6) {
+            ForEach(photos) { photo in
+                TradeEvidencePhotoTile(
+                    proposal: proposal,
+                    photo: photo,
+                    viewerID: viewerID,
+                    showsApprovalControls: showsApprovalControls,
+                    isApproving: isApproving,
+                    isDeleting: deletingPhotoID == photo.id,
+                    onOpenImage: onOpenImage,
+                    onApprove: onApprove,
+                    onDelete: onDelete
+                )
             }
         }
-        .frame(height: 178)
+    }
+
+    private var gridItems: [GridItem] {
+        Array(repeating: GridItem(.flexible(), spacing: 6), count: 4)
     }
 }
 
-private struct TradeEvidencePhotoCard: View {
+private struct TradeEvidencePhotoTile: View {
+    var proposal: TradeProposal
     var photo: TradeEvidencePhoto
-    var index: Int
-    var count: Int
     var viewerID: UUID?
-    var onOpenImage: (URL) -> Void
+    var showsApprovalControls: Bool
+    var isApproving: Bool
+    var isDeleting: Bool
+    var onOpenImage: (TradeEvidencePhoto) -> Void
+    var onApprove: (TradeEvidencePhoto) -> Void
+    var onDelete: (TradeEvidencePhoto) -> Void
 
-    private var uploaderText: String {
-        photo.isUploadedBy(viewerID) ? "あなたがアップロード" : "相手がアップロード"
+    private var isApproved: Bool {
+        photo.isApproved(by: viewerID, in: proposal)
+    }
+
+    private var canApprove: Bool {
+        showsApprovalControls
+            && proposal.status == .agreed
+            && !isApproved
+    }
+
+    private var canDelete: Bool {
+        proposal.status == .agreed && photo.isUploadedBy(viewerID)
     }
 
     var body: some View {
-        Button {
-            onOpenImage(photo.photoURL)
-        } label: {
-            AsyncImage(url: photo.photoURL) { phase in
-                ZStack {
-                    switch phase {
-                    case .success(let image):
-                        image
-                            .resizable()
-                            .scaledToFill()
-                    case .failure:
-                        MegrumTheme.sky.opacity(0.18)
-                            .overlay {
-                                Image(systemName: "photo")
-                                    .font(.system(size: 28, weight: .bold))
-                                    .foregroundStyle(MegrumTheme.muted)
-                            }
-                    case .empty:
-                        MegrumTheme.sky.opacity(0.12)
-                            .overlay {
+        GeometryReader { proxy in
+            ZStack(alignment: .topTrailing) {
+                Button {
+                    onOpenImage(photo)
+                } label: {
+                    TradeEvidencePhotoThumbnail(url: photo.photoURL)
+                        .frame(width: proxy.size.width, height: proxy.size.width)
+                        .clipped()
+                }
+                .buttonStyle(.plain)
+
+                if isApproved {
+                    Image(systemName: "checkmark.circle.fill")
+                        .font(.system(size: 17, weight: .black))
+                        .foregroundStyle(.white, MegrumTheme.ok)
+                        .padding(5)
+                        .shadow(color: .black.opacity(0.18), radius: 4, y: 1)
+                }
+
+                if canApprove {
+                    Button {
+                        onApprove(photo)
+                    } label: {
+                        Group {
+                            if isApproving {
                                 ProgressView()
+                                    .controlSize(.mini)
+                            } else {
+                                Text("承認")
                             }
-                    @unknown default:
-                        Color.clear
-                    }
-
-                    VStack {
-                        HStack(spacing: 7) {
-                            Text(uploaderText)
-                            Text("\(index + 1)/\(count)")
                         }
-                        .font(.system(size: 12, weight: .heavy, design: .rounded))
-                        .foregroundStyle(MegrumTheme.ink)
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 7)
-                        .background(.white.opacity(0.88), in: Capsule())
-                        .padding(10)
+                        .font(.system(size: 10.5, weight: .black, design: .rounded))
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 5)
+                        .background(MegrumTheme.lavender, in: Capsule())
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(isApproving)
+                    .padding(5)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
+                    .accessibilityLabel("この取引証跡を承認")
+                }
 
-                        Spacer()
+                if isDeleting {
+                    ProgressView()
+                        .controlSize(.small)
+                        .padding(5)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+                        .background(.black.opacity(0.18))
+                }
+            }
+            .contextMenu {
+                if canDelete {
+                    Button(role: .destructive) {
+                        onDelete(photo)
+                    } label: {
+                        Label("削除", systemImage: "trash")
                     }
                 }
             }
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel(accessibilityLabel)
         }
-        .buttonStyle(.plain)
-        .accessibilityLabel("\(uploaderText)した証跡写真 \(index + 1)枚目を拡大表示")
-        .frame(height: 178)
-        .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: 22, style: .continuous)
-                .strokeBorder(.white.opacity(0.7), lineWidth: 1)
+        .aspectRatio(1, contentMode: .fit)
+    }
+
+    private var accessibilityLabel: String {
+        let uploader = photo.isUploadedBy(viewerID) ? "あなた" : "相手"
+        let approval = isApproved ? "承認済み" : "未承認"
+        return "\(uploader)がアップロードした取引証跡、\(approval)"
+    }
+}
+
+struct TradeEvidencePhotoThumbnail: View {
+    var url: URL
+
+    var body: some View {
+        GeometryReader { proxy in
+            Rectangle()
+                .fill(MegrumTheme.sky.opacity(0.18))
+                .overlay {
+                    Group {
+                        if url.isFileURL {
+                            LocalURLImage(url: url, contentMode: .fill) {
+                                placeholderContent
+                            }
+                        } else {
+                            AsyncImage(url: url) { phase in
+                                switch phase {
+                                case .success(let image):
+                                    image
+                                        .resizable()
+                                        .scaledToFill()
+                                case .failure:
+                                    placeholderContent
+                                case .empty:
+                                    MegrumTheme.sky.opacity(0.12)
+                                        .overlay {
+                                            ProgressView()
+                                        }
+                                @unknown default:
+                                    Color.clear
+                                }
+                            }
+                        }
+                    }
+                    .frame(width: proxy.size.width, height: proxy.size.height)
+                    .clipped()
+                }
+                .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
+                .overlay {
+                    RoundedRectangle(cornerRadius: 9, style: .continuous)
+                        .strokeBorder(.white.opacity(0.7), lineWidth: 1)
+                }
         }
+    }
+
+    private var placeholderContent: some View {
+        MegrumTheme.sky.opacity(0.18)
+            .overlay {
+                Image(systemName: "photo")
+                    .font(.system(size: 20, weight: .bold))
+                    .foregroundStyle(MegrumTheme.muted)
+            }
     }
 }

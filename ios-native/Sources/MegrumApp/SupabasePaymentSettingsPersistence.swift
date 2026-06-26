@@ -26,10 +26,10 @@ final class SupabasePaymentSettingsPersistence: @unchecked Sendable {
                 paymentMethods: normalized.methods,
                 paymentNote: normalized.otherNote
             ),
-            select: UserRow.select,
+            select: UserRow.paymentSummarySelect,
             queryItems: Self.userQueryItems(userID: userID)
         )
-        let storedSettings = try await settingsClient.upsertSettings(normalized)
+        let storedSettings = try? await settingsClient.upsertSettings(normalized)
         return (
             rows.first?.profile ?? Self.fallbackProfile(userID: userID, normalizedSettings: normalized),
             Self.returnedSettings(storedSettings: storedSettings, normalizedSettings: normalized)
@@ -37,10 +37,14 @@ final class SupabasePaymentSettingsPersistence: @unchecked Sendable {
     }
 
     static func returnedSettings(
-        storedSettings: UserPaymentSettings,
+        storedSettings: UserPaymentSettings?,
         normalizedSettings: UserPaymentSettings
     ) -> UserPaymentSettings {
-        UserPaymentSettings(
+        guard let storedSettings else {
+            return normalizedSettings
+        }
+
+        return UserPaymentSettings(
             userID: storedSettings.userID,
             methods: normalizedSettings.methods,
             bankName: storedSettings.bankName,

@@ -16,8 +16,37 @@ const interTight = Inter_Tight({
 });
 
 export const metadata: Metadata = {
-  title: "Megrum Admin",
-  description: "Megrum management console",
+  metadataBase: new URL("https://megrum.jp"),
+  title: {
+    default: "Megrum | 推し活グッズの現地交換アプリ",
+    template: "%s | Megrum",
+  },
+  description:
+    "Megrumは、推し活グッズの登録、wish、打診、取引チャット、現地交換の合流支援をまとめて扱うiOSアプリです。",
+  alternates: {
+    canonical: "/",
+  },
+  openGraph: {
+    title: "Megrum",
+    description:
+      "推し活グッズの交換を、現地で安心して進めるためのiOSアプリ。",
+    url: "https://megrum.jp",
+    siteName: "Megrum",
+    locale: "ja_JP",
+    type: "website",
+    images: [
+      {
+        url: "/site-assets/megrum-icon.png",
+        width: 512,
+        height: 512,
+        alt: "Megrum app icon",
+      },
+    ],
+  },
+  robots: {
+    index: true,
+    follow: true,
+  },
 };
 
 export default function RootLayout({

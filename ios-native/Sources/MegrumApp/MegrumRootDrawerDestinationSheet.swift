@@ -9,6 +9,7 @@ struct MegrumRootDrawerDestinationSheet: View {
     @Binding var selectedTab: MegrumTab
     @Binding var drawerDestination: AppDrawerDestination?
     @Binding var publicProfileRoute: PublicProfileRoute?
+    var onClose: () -> Void = {}
 
     var body: some View {
         NavigationStack {
@@ -20,7 +21,7 @@ struct MegrumRootDrawerDestinationSheet: View {
     private var destinationContent: some View {
         switch destination {
         case .profile:
-            OwnProfileScreen(appState: appState)
+            OwnProfileScreen(appState: appState, onClose: onClose)
         case .notifications:
             NotificationCenterScreen(appState: appState) { tab in
                 selectedTab = tab
@@ -35,9 +36,9 @@ struct MegrumRootDrawerDestinationSheet: View {
         case .schedules:
             PersonalScheduleScreen(appState: appState)
         case .paymentSettings:
-            PaymentSettingsScreen(appState: appState)
+            PaymentSettingsScreen(appState: appState, onClose: onClose)
         case .exchangeSettings:
-            HomeExchangeSettingsScreen()
+            HomeExchangeSettingsScreen(individualListings: appState.listings)
         case .settings, .help:
             SettingsScreen(
                 appState: appState,

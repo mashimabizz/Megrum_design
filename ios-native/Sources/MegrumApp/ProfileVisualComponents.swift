@@ -1,3 +1,4 @@
+import MegrumCore
 import MegrumDesign
 import SwiftUI
 
@@ -24,13 +25,41 @@ struct ProfileVisualGridItem: Identifiable, Hashable {
     var id: UUID
     var title: String
     var imageURL: URL?
-    var showsMatchTags: Bool
+    var tags: [GoodsTag]
+    var quantity: Int
 
-    init(id: UUID, title: String, imageURL: URL?, showsMatchTags: Bool = false) {
+    init(
+        id: UUID,
+        title: String,
+        imageURL: URL?,
+        tags: [GoodsTag] = [],
+        quantity: Int = 1
+    ) {
         self.id = id
         self.title = title
         self.imageURL = imageURL
-        self.showsMatchTags = showsMatchTags
+        self.tags = tags
+        self.quantity = max(1, quantity)
+    }
+
+    init(goods: GoodsItem) {
+        self.init(
+            id: goods.id,
+            title: goods.title,
+            imageURL: goods.imageURL,
+            tags: goods.tags,
+            quantity: goods.quantity
+        )
+    }
+
+    init(wish: WishItem) {
+        self.init(
+            id: wish.id,
+            title: wish.title,
+            imageURL: wish.imageURL,
+            tags: wish.tags,
+            quantity: wish.quantity
+        )
     }
 }
 

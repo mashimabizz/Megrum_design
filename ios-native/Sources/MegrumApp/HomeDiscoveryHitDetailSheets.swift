@@ -19,6 +19,7 @@ struct HomeGoodsHitDetailSheet: View {
     @State private var proposalConfirmation: HomeProposalStartConfirmationPayload?
     @State private var focusedWantedOptionID: UUID?
     @State private var presentedWantedOptionDetail: HomeIndividualListingDetailContext?
+    private let selectionCardSize = HomeGoodsImagePanelCardSize.compact
 
     var body: some View {
         HomeSheetScaffold(
@@ -32,7 +33,11 @@ struct HomeGoodsHitDetailSheet: View {
             HomeSelectedGoodsHeader(
                 goods: selection.goods,
                 conditionTags: selection.conditionTags,
-                exchangeSummary: HomeDiscoveryOwnerExchangeSummary.fromListingSignals(selection.signals),
+                exchangeSummary: HomeDiscoveryOwnerExchangeSummary.fromCandidateSignals(selection.signals),
+                exchangeCalendarContext: HomePartnerExchangeCalendarContext.from(
+                    signals: selection.signals,
+                    ownerName: selection.goods.ownerSummary?.displayName
+                ),
                 listingNote: selection.individualListingSelection.listingNote,
                 listingDetail: selection.individualListingSelection.detail,
                 onOpenOwnerProfile: onOpenOwnerProfile
@@ -50,6 +55,7 @@ struct HomeGoodsHitDetailSheet: View {
                     goods: selectionContext.receiveGoods,
                     selectedIndices: selectionState.selectedReceiveIndices,
                     selectedBannerText: "受け取る",
+                    cardSize: selectionCardSize,
                     onSelect: toggleReceiveGoods
                 )
             }
@@ -83,6 +89,7 @@ struct HomeGoodsHitDetailSheet: View {
                             goods: selectionContext.offerGoods,
                             selectedIndices: selectionState.selectedOfferIndices,
                             selectedBannerText: "これを譲る",
+                            cardSize: selectionCardSize,
                             onSelect: toggleOfferGoods
                         )
                     }
@@ -136,12 +143,14 @@ struct HomeGoodsHitDetailSheet: View {
             HomeGoodsImagePanelRail(
                 goods: selectionContext.wantedOptionPreviewGoods,
                 selectedIndices: selectionContext.selectedWantedOptionPreviewIndices,
+                cardSize: selectionCardSize,
                 onSelect: toggleWantedOptionPreviewGoods
             )
         } else {
             HomeGoodsImagePanelRail(
                 goods: selectionContext.wantedGoods,
                 selectedIndices: selectionState.selectedWantedIndices,
+                cardSize: selectionCardSize,
                 onSelect: toggleWantedGoods
             )
         }

@@ -8,6 +8,7 @@ final class OwnProfileSummaryTests: XCTestCase {
             id: UUID(uuidString: "20000000-0000-0000-0000-000000000001")!,
             handle: "michilion",
             displayName: "みちりおん",
+            bio: "関東で交換しています。",
             avatarURL: URL(string: "https://example.com/avatar.jpg"),
             prefecture: " 東京都 "
         )
@@ -27,6 +28,7 @@ final class OwnProfileSummaryTests: XCTestCase {
 
         XCTAssertEqual(summary?.displayName, "みちりおん")
         XCTAssertEqual(summary?.handleText, "@michilion")
+        XCTAssertEqual(summary?.bio, "関東で交換しています。")
         XCTAssertEqual(summary?.avatarURL?.absoluteString, "https://example.com/avatar.jpg")
         XCTAssertEqual(summary?.prefectureText, "東京都")
         XCTAssertEqual(summary?.inventoryCount, 12)

@@ -7,18 +7,18 @@ extension ProposalCreateFlow {
         if selectedStep == .payment || selectedStep == .confirm {
             previousStep()
         } else {
-            dismiss()
+            dismissProposalFlow()
         }
     }
 
     func handleCompletionSearchMore() {
         onCompletionAction(.searchMore)
-        dismiss()
+        dismissProposalFlow()
     }
 
     func handleCompletionOpenTrades() {
         onCompletionAction(.openTrades)
-        dismiss()
+        dismissProposalFlow()
     }
 
     func enforceMessageLimit(_ newValue: String) {
@@ -76,6 +76,9 @@ extension ProposalCreateFlow {
                 guard selectedStep != .meetup, selectedStep != .confirm else {
                     return
                 }
+                guard value.translation.width < 0 else {
+                    return
+                }
                 guard let destination = ProposalStepSwipeNavigator.destination(
                     from: selectedStep,
                     translationWidth: value.translation.width,
@@ -91,9 +94,10 @@ extension ProposalCreateFlow {
     }
 
     func createProposal() async {
-        guard configuration.canSubmit, let targetStatus = configuration.targetStatus else {
+        guard configuration.canSubmit, let defaultTargetStatus = configuration.targetStatus else {
             return
         }
+        let targetStatus = submissionStatusOverride ?? defaultTargetStatus
         saveSelectedMeetupCandidate()
         let meetupCandidates = configuration.requiresMeetupBeforeSubmit ? meetupInputsForSubmission : []
         let meetup = meetupCandidates.first
@@ -122,9 +126,22 @@ extension ProposalCreateFlow {
         )
         let created = await appState.createProposal(draft.input)
         if created {
-            withAnimation(.snappy) {
-                submittedSummary = draft.summary
+            await onCreateSuccess?()
+            if showsCompletionAfterCreate {
+                withAnimation(.snappy) {
+                    submittedSummary = draft.summary
+                }
+            } else {
+                dismissProposalFlow()
             }
+        }
+    }
+
+    func dismissProposalFlow() {
+        if let slidePresentationDismiss {
+            slidePresentationDismiss()
+        } else {
+            dismiss()
         }
     }
 

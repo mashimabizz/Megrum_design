@@ -30,7 +30,8 @@ public extension MegrumRepository {
         throw MegrumRepositoryError.unsupportedMutation
     }
 
-    func approveTradeEvidence(proposalID: UUID) async throws -> TradeProposal {
+    func approveTradeEvidence(proposalID: UUID, photoID: UUID? = nil) async throws -> TradeProposal {
+        _ = photoID
         throw MegrumRepositoryError.unsupportedMutation
     }
 

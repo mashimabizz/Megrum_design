@@ -1,18 +1,17 @@
 import MegrumDesign
-import PhotosUI
 import SwiftUI
 
 struct TradeMessageQuickActionStrip: View {
     var actions: [TradeMessageQuickActionKind]
-    @Binding var selectedChatPhotoItem: PhotosPickerItem?
-    @Binding var selectedOutfitPhotoItem: PhotosPickerItem?
     var isSending: Bool
     var onOpenSchedule: () -> Void
     var canUseCamera: Bool
     var onOpenLocationPlaceholder: () -> Void
     var onSendArrivalStatus: (TradeArrivalQuickAction) -> Void
     var onOpenChatCamera: () -> Void
+    var onOpenChatLibrary: () -> Void
     var onOpenOutfitCamera: () -> Void
+    var onOpenOutfitLibrary: () -> Void
     var onCounterProposal: () -> Void
     var onRequestLate: () -> Void
     var onRequestCancel: () -> Void
@@ -46,7 +45,7 @@ struct TradeMessageQuickActionStrip: View {
                 .disabled(!canUseCamera || isSending)
 #endif
 
-                PhotosPicker(selection: $selectedOutfitPhotoItem, matching: .images) {
+                Button(action: onOpenOutfitLibrary) {
                     Label("写真から選ぶ", systemImage: "photo.on.rectangle")
                 }
                 .disabled(isSending)
@@ -71,7 +70,7 @@ struct TradeMessageQuickActionStrip: View {
                 .disabled(!canUseCamera || isSending)
 #endif
 
-                PhotosPicker(selection: $selectedChatPhotoItem, matching: .images) {
+                Button(action: onOpenChatLibrary) {
                     Label("アルバムから選ぶ", systemImage: "photo.on.rectangle")
                 }
                 .disabled(isSending)

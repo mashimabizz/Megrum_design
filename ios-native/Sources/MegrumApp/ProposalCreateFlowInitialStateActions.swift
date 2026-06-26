@@ -62,11 +62,17 @@ extension ProposalCreateFlow {
     }
 
     func seedDefaultShippingConditionsIfNeeded() {
-        guard let summary = viewerListingExchangeSummary, summary.includesMail else {
+        if let summary = viewerListingExchangeSummary, summary.includesMail {
+            shippingFee = summary.shippingFee
+            shippingDays = summary.shippingDays
             return
         }
-        shippingFee = summary.shippingFee
-        shippingDays = summary.shippingDays
+        if let initialShippingFee {
+            shippingFee = initialShippingFee
+        }
+        if let initialShippingDays {
+            shippingDays = initialShippingDays
+        }
     }
 
     func handleExchangeMethodChange() {

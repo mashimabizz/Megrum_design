@@ -5,6 +5,7 @@ import SwiftUI
 struct TradeUserMessageStack: View {
     var message: TradeMessage
     var isMine: Bool
+    var isReadByPartner: Bool
     var onOpenImage: (URL) -> Void
 
     private var bodyText: String? {
@@ -13,30 +14,74 @@ struct TradeUserMessageStack: View {
 
     var body: some View {
         VStack(alignment: isMine ? .trailing : .leading, spacing: 4) {
-            if let photoURL = message.photoURL {
-                TradePhotoMessageBubble(message: message, photoURL: photoURL, onOpenImage: onOpenImage)
-            }
-
             switch message.messageType {
             case .location:
-                TradeLocationPreviewBubble(presentation: TradeOperationalMessagePresentation(message: message))
+                messageRow {
+                    TradeLocationPreviewBubble(presentation: TradeOperationalMessagePresentation(message: message))
+                }
             case .arrivalStatus:
                 let presentation = TradeOperationalMessagePresentation(message: message)
-                TradeRichOperationalMessageBubble(
-                    title: presentation.title,
-                    systemImage: presentation.systemImage,
-                    messageBody: presentation.body,
-                    detail: presentation.detail,
-                    isMine: isMine
-                )
+                messageRow {
+                    TradeRichOperationalMessageBubble(
+                        title: presentation.title,
+                        systemImage: presentation.systemImage,
+                        messageBody: presentation.body,
+                        detail: presentation.detail,
+                        isMine: isMine
+                    )
+                }
             case .text, .photo, .outfitPhoto:
-                if let bodyText {
-                    TradeTextMessageBubble(text: bodyText, isMine: isMine)
+                if TradePhotoMessageLayout.isPhotoMessage(message.messageType), bodyText == nil {
+                    messageRow {
+                        photoBubble
+                    }
+                } else if TradePhotoMessageLayout.isPhotoMessage(message.messageType) {
+                    photoBubble
+                    if let bodyText {
+                        messageRow {
+                            TradeTextMessageBubble(
+                                text: bodyText,
+                                isMine: isMine
+                            )
+                        }
+                    }
+                } else if let bodyText {
+                    messageRow {
+                        TradeTextMessageBubble(
+                            text: bodyText,
+                            isMine: isMine
+                        )
+                    }
                 }
             case .system:
                 EmptyView()
             }
         }
+    }
+
+    private func messageRow<Content: View>(@ViewBuilder content: () -> Content) -> some View {
+        HStack(alignment: .bottom, spacing: 6) {
+            if isMine {
+                inlineMeta
+            }
+            content()
+            if !isMine {
+                inlineMeta
+            }
+        }
+    }
+
+    private var photoBubble: some View {
+        TradePhotoMessageBubble(message: message, photoURL: message.photoURL, onOpenImage: onOpenImage)
+    }
+
+    private var inlineMeta: some View {
+        TradeMessageMeta(
+            message: message,
+            isMine: isMine,
+            isReadByPartner: isReadByPartner
+        )
+        .padding(.bottom, 3)
     }
 }
 
@@ -44,78 +89,125 @@ struct TradeMessageMeta: View {
     var message: TradeMessage
     var isMine: Bool
     var isReadByPartner: Bool
+    var alignsLeading: Bool = false
+    var foregroundColor: Color = MegrumTheme.muted.opacity(0.82)
 
     var body: some View {
-        VStack(alignment: isMine ? .trailing : .leading, spacing: 1) {
+        VStack(alignment: metaAlignment, spacing: 1) {
             if isMine, isReadByPartner {
                 Text("既読")
             }
             Text(message.createdAt.formatted(date: .omitted, time: .shortened))
         }
         .font(.system(size: 10.5, weight: .bold, design: .rounded))
-        .foregroundStyle(MegrumTheme.muted.opacity(0.82))
+        .foregroundStyle(foregroundColor)
         .padding(.bottom, 2)
+    }
+
+    private var metaAlignment: HorizontalAlignment {
+        if alignsLeading {
+            return .leading
+        }
+        return isMine ? .trailing : .leading
     }
 }
 
 private struct TradePhotoMessageBubble: View {
     var message: TradeMessage
-    var photoURL: URL
+    var photoURL: URL?
     var onOpenImage: (URL) -> Void
 
+    private var thumbnailSize: CGSize {
+        TradePhotoMessageLayout.thumbnailSize(for: message.messageType)
+    }
+
     var body: some View {
-        Button {
-            onOpenImage(photoURL)
-        } label: {
-            AsyncImage(url: photoURL) { phase in
-                switch phase {
-                case .success(let image):
-                    image
-                        .resizable()
-                        .scaledToFill()
-                case .failure:
-                    MegrumTheme.sky.opacity(0.18)
-                        .overlay {
-                            Image(systemName: "photo")
-                                .font(.system(size: 24, weight: .bold))
-                                .foregroundStyle(MegrumTheme.muted)
-                        }
-                case .empty:
-                    MegrumTheme.sky.opacity(0.12)
-                        .overlay {
-                            ProgressView()
-                        }
-                @unknown default:
-                    Color.clear
+        Group {
+            if let photoURL {
+                Button {
+                    onOpenImage(photoURL)
+                } label: {
+                    thumbnailContent(photoURL: photoURL)
                 }
+                .buttonStyle(.plain)
+            } else {
+                unavailableThumbnail
             }
-            .frame(width: 210, height: message.messageType == .outfitPhoto ? 280 : 250)
-            .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
-            .overlay(alignment: .topLeading) {
-                if let label = photoLabel {
-                    Label(label, systemImage: "photo.fill")
-                        .font(.system(size: 11, weight: .heavy, design: .rounded))
-                        .foregroundStyle(.white)
-                        .padding(.horizontal, 9)
-                        .padding(.vertical, 6)
-                        .background(.black.opacity(0.46), in: Capsule())
-                        .padding(9)
+        }
+        .accessibilityLabel(accessibilityLabel)
+    }
+
+    private func thumbnailContent(photoURL: URL) -> some View {
+        Group {
+            if photoURL.isFileURL {
+                LocalURLImage(url: photoURL, contentMode: .fill) {
+                    photoPlaceholderContent
+                }
+            } else {
+                AsyncImage(url: photoURL) { phase in
+                    switch phase {
+                    case .success(let image):
+                        image
+                            .resizable()
+                            .scaledToFill()
+                    case .failure:
+                        photoPlaceholderContent
+                    case .empty:
+                        MegrumTheme.sky.opacity(0.12)
+                            .overlay {
+                                ProgressView()
+                            }
+                    @unknown default:
+                        Color.clear
+                    }
                 }
             }
         }
-        .buttonStyle(.plain)
-        .accessibilityLabel("\(photoLabel ?? "取引チャットの写真")を拡大表示")
+        .frame(width: thumbnailSize.width, height: thumbnailSize.height)
+        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .overlay(alignment: .topLeading) {
+            if let label = photoLabel {
+                Label(label, systemImage: "photo.fill")
+                    .font(.system(size: 10.5, weight: .heavy, design: .rounded))
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 5)
+                    .background(.black.opacity(0.46), in: Capsule())
+                    .padding(7)
+            }
+        }
+    }
+
+    private var unavailableThumbnail: some View {
+        photoPlaceholderContent
+            .frame(width: thumbnailSize.width, height: thumbnailSize.height)
+            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .strokeBorder(MegrumTheme.ink.opacity(0.08), lineWidth: 1)
+            }
+    }
+
+    private var photoPlaceholderContent: some View {
+        MegrumTheme.sky.opacity(0.16)
+            .overlay {
+                VStack(spacing: 6) {
+                    Image(systemName: "photo")
+                        .font(.system(size: 22, weight: .bold))
+                    Text("写真")
+                        .font(.system(size: 11, weight: .heavy, design: .rounded))
+                }
+                .foregroundStyle(MegrumTheme.muted)
+            }
     }
 
     private var photoLabel: String? {
-        switch message.messageType {
-        case .photo:
-            "写真"
-        case .outfitPhoto:
-            "服装写真"
-        default:
-            nil
-        }
+        TradePhotoMessageLayout.label(for: message.messageType)
+    }
+
+    private var accessibilityLabel: String {
+        let label = photoLabel ?? "取引チャットの写真"
+        return photoURL == nil ? "\(label)を表示できません" : "\(label)を拡大表示"
     }
 }
 
@@ -235,17 +327,38 @@ private struct TradeTextMessageBubble: View {
     var isMine: Bool
 
     var body: some View {
+        ViewThatFits(in: .horizontal) {
+            compactBubble
+            wrappedBubble
+        }
+    }
+
+    private var compactBubble: some View {
         Text(text)
             .font(.system(size: 15, weight: .bold, design: .rounded))
             .foregroundStyle(isMine ? .white : MegrumTheme.ink)
             .multilineTextAlignment(isMine ? .trailing : .leading)
-            .fixedSize(horizontal: false, vertical: true)
+            .fixedSize(horizontal: true, vertical: false)
             .padding(.horizontal, 14)
             .padding(.vertical, 10)
             .background(
                 isMine ? AnyShapeStyle(MegrumTheme.lavender) : AnyShapeStyle(.white.opacity(0.9)),
                 in: RoundedRectangle(cornerRadius: 18, style: .continuous)
             )
-            .frame(maxWidth: 300, alignment: isMine ? .trailing : .leading)
+    }
+
+    private var wrappedBubble: some View {
+        Text(text)
+            .font(.system(size: 15, weight: .bold, design: .rounded))
+            .foregroundStyle(isMine ? .white : MegrumTheme.ink)
+            .multilineTextAlignment(isMine ? .trailing : .leading)
+            .fixedSize(horizontal: false, vertical: true)
+            .frame(maxWidth: 272, alignment: isMine ? .trailing : .leading)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 10)
+            .background(
+                isMine ? AnyShapeStyle(MegrumTheme.lavender) : AnyShapeStyle(.white.opacity(0.9)),
+                in: RoundedRectangle(cornerRadius: 18, style: .continuous)
+            )
     }
 }

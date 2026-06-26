@@ -17,7 +17,8 @@ struct PublicUserProfileContent: View {
     var ratingText: String
     var chips: [String]
     var oshiTags: [ProfileVisualTagItem]
-    var gridItems: [ProfileVisualGridItem]
+    var goodsItems: [ProfileVisualGridItem]
+    var wishItems: [ProfileVisualGridItem]
     var listings: [IndividualListing]
     var listingGoodsByID: [UUID: GoodsItem]
     var listingWishByID: [UUID: WishItem]
@@ -50,30 +51,26 @@ struct PublicUserProfileContent: View {
                     actionTitle: "打診する",
                     showsAction: showsProposalAction,
                     isPrimaryAction: true,
-                    showsScheduleAction: true,
+                    showsScheduleAction: false,
                     onAction: onPrimaryAction,
                     onScheduleAction: onOpenSchedule
                 )
 
                 ProfileVisualTabs(selection: $selectedVisualTab)
 
-                switch selectedVisualTab {
-                case .listings:
-                    PublicProfileListingsList(
-                        listings: listings,
-                        inventoryByID: listingGoodsByID,
-                        wishByID: listingWishByID,
-                        groups: groups,
-                        characters: characters,
-                        goodsTypes: goodsTypes,
-                        onSelect: onSelectListing
-                    )
-                case .goods, .wish:
-                    ProfileVisualGrid(
-                        items: gridItems,
-                        onSelect: onSelectGridItem
-                    )
-                }
+                ProfileVisualTabContent(
+                    selectedTab: selectedVisualTab,
+                    goodsItems: goodsItems,
+                    wishItems: wishItems,
+                    listings: listings,
+                    listingGoodsByID: listingGoodsByID,
+                    listingWishByID: listingWishByID,
+                    groups: groups,
+                    characters: characters,
+                    goodsTypes: goodsTypes,
+                    onSelectGridItem: onSelectGridItem,
+                    onSelectListing: onSelectListing
+                )
 
                 if let adPlacement {
                     AdBannerSlot(
@@ -108,54 +105,5 @@ private struct PublicProfileSkeleton: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 30, style: .continuous))
         .redacted(reason: .placeholder)
-    }
-}
-
-private struct PublicProfileListingsList: View {
-    var listings: [IndividualListing]
-    var inventoryByID: [UUID: GoodsItem]
-    var wishByID: [UUID: WishItem]
-    var groups: [OshiGroup]
-    var characters: [OshiCharacter]
-    var goodsTypes: [GoodsType]
-    var onSelect: (UUID) -> Void
-
-    var body: some View {
-        if listings.isEmpty {
-            ContentUnavailableView(
-                "個別募集はまだありません",
-                systemImage: "rectangle.stack.badge.plus",
-                description: Text("登録された個別募集がここに表示されます")
-            )
-            .frame(maxWidth: .infinity)
-            .padding(.top, 42)
-        } else {
-            VStack(spacing: 18) {
-                ForEach(Array(listings.enumerated()), id: \.element.id) { index, listing in
-                    Button {
-                        onSelect(listing.id)
-                    } label: {
-                        IndividualListingDesignCard(
-                            listing: listing,
-                            listingIndex: index,
-                            listingCount: listings.count,
-                            inventoryByID: inventoryByID,
-                            wishByID: wishByID,
-                            groups: groups,
-                            characters: characters,
-                            goodsTypes: goodsTypes,
-                            canEdit: false,
-                            onEditOffer: {},
-                            onAddCondition: {},
-                            onEditExchangeCondition: {},
-                            onDelete: {}
-                        )
-                        .contentShape(Rectangle())
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel("個別募集 交換条件 \(index + 1)を開く")
-                }
-            }
-        }
     }
 }

@@ -4,8 +4,10 @@ import MegrumCore
 struct OwnProfileSummary: Equatable, Sendable {
     var displayName: String
     var handle: String
+    var bio: String?
     var prefecture: String?
     var gender: UserGender?
+    var birthDate: Date?
     var paymentMethods: [UserPaymentMethod]
     var paymentNote: String?
     var avatarURL: URL?
@@ -57,11 +59,17 @@ struct OwnProfileSummary: Equatable, Sendable {
         self.displayName = localDraft?.normalizedDisplayName ?? viewer.displayName
         self.handle = localDraft?.normalizedHandle ?? viewer.handle
         if let localDraft {
+            self.bio = localDraft.normalizedBio.nilIfBlank
+        } else {
+            self.bio = viewer.bio.nilIfBlank
+        }
+        if let localDraft {
             self.prefecture = localDraft.normalizedPrefecture.nilIfBlank
         } else {
             self.prefecture = viewer.prefectureForDisplay
         }
         self.gender = localDraft?.gender ?? viewer.gender
+        self.birthDate = localDraft?.birthDate ?? viewer.birthDate
         self.paymentMethods = localDraft?.paymentMethods ?? viewer.paymentMethods
         self.paymentNote = viewer.paymentNote
         if let localDraft {

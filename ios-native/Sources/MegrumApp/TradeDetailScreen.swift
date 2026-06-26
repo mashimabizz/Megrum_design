@@ -10,6 +10,10 @@ struct TradeDetailScreen: View {
     @State var selectedEvidencePhotoItem: PhotosPickerItem?
     @State var selectedChatPhotoItem: PhotosPickerItem?
     @State var selectedOutfitPhotoItem: PhotosPickerItem?
+    @State var isShowingEvidenceSourceDialog = false
+    @State var isShowingEvidencePhotoLibraryPicker = false
+    @State var isShowingChatPhotoLibraryPicker = false
+    @State var isShowingOutfitPhotoLibraryPicker = false
     @State var isShowingEvidenceCamera = false
     @State var isShowingChatCamera = false
     @State var isShowingOutfitCamera = false
@@ -26,6 +30,7 @@ struct TradeDetailScreen: View {
     @State var disputeDetailRoute: TradeDisputeDetailRoute?
     @State var partnerProfileRoute: TradePartnerProfileRoute?
     @State var didSubmitEvaluation = false
+    @State var isMessageComposerFocused = false
     @StateObject var locationState = MegrumLocationState()
 
     var body: some View {
@@ -44,36 +49,64 @@ struct TradeDetailScreen: View {
         } message: {
             Text("断った後は、この打診では取引を進められません。")
         }
-#if os(iOS)
-        .fullScreenCover(item: $selectedRemoteImage) { selection in
-            FullScreenRemoteImageView(url: selection.url)
+        .confirmationDialog(
+            "証跡写真を追加",
+            isPresented: $isShowingEvidenceSourceDialog,
+            titleVisibility: .visible
+        ) {
+            Button("写真を撮る") {
+                isShowingEvidenceCamera = true
+            }
+            .disabled(appState.addingEvidenceProposalID == currentProposal.id || !canUseCamera)
+
+            Button("アルバムから選ぶ") {
+                isShowingEvidencePhotoLibraryPicker = true
+            }
+            .disabled(appState.addingEvidenceProposalID == currentProposal.id)
+
+            Button("キャンセル", role: .cancel) {}
+        } message: {
+            Text("交換したグッズがわかる写真を追加します。")
         }
-#else
-        .sheet(item: $selectedRemoteImage) { selection in
-            FullScreenRemoteImageView(url: selection.url)
-        }
-#endif
+        .photosPicker(
+            isPresented: $isShowingEvidencePhotoLibraryPicker,
+            selection: evidencePhotoPickerSelection,
+            matching: .images
+        )
+        .photosPicker(
+            isPresented: $isShowingChatPhotoLibraryPicker,
+            selection: $selectedChatPhotoItem,
+            matching: .images
+        )
+        .photosPicker(
+            isPresented: $isShowingOutfitPhotoLibraryPicker,
+            selection: $selectedOutfitPhotoItem,
+            matching: .images
+        )
         .sheet(isPresented: $isShowingEvidenceList) {
             TradeEvidenceListSheet(
                 proposal: currentProposal,
                 viewerID: viewerID,
                 evidencePhotos: appState.evidencePhotos(for: currentProposal),
-                selectedPhotoItem: $selectedEvidencePhotoItem,
                 isAddingEvidence: appState.addingEvidenceProposalID == currentProposal.id,
+                isApproving: appState.approvingEvidenceProposalID == currentProposal.id,
                 deletingPhotoID: appState.deletingEvidencePhotoID,
                 canUseCamera: canUseCamera,
                 onOpenCamera: {
                     isShowingEvidenceCamera = true
                 },
-                onOpenImage: { url in
-                    selectedRemoteImage = RemoteImageSelection(url: url)
+                onOpenPhotoLibrary: {
+                    isShowingEvidencePhotoLibraryPicker = true
                 },
                 onDelete: { photo in
+                    await appState.deleteTradeEvidencePhoto(
+                        proposalID: currentProposal.id,
+                        photoID: photo.id
+                    )
+                },
+                onApprove: { photo in
                     Task {
-                        await appState.deleteTradeEvidencePhoto(
-                            proposalID: currentProposal.id,
-                            photoID: photo.id
-                        )
+                        await appState.approveTradeEvidence(proposalID: currentProposal.id, photoID: photo.id)
                     }
                 }
             )
@@ -116,6 +149,22 @@ struct TradeDetailScreen: View {
                 }
             }
         }
+        .overlay {
+            if let selectedRemoteImage {
+                FullScreenRemoteImageView(
+                    url: selectedRemoteImage.url,
+                    onDismiss: {
+                        self.selectedRemoteImage = nil
+                    },
+                    onDelete: selectedRemoteImageDeleteAction(for: selectedRemoteImage)
+                )
+                .transition(.opacity.combined(with: .scale(scale: 0.94)))
+                .zIndex(10)
+            }
+        }
+#if os(iOS)
+        .toolbar(selectedRemoteImage == nil ? .visible : .hidden, for: .navigationBar)
+#endif
     }
 }
 
