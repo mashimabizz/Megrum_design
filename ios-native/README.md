@@ -2,7 +2,7 @@
 
 This directory is the Swift-first migration workspace for Megrum.
 
-The existing Expo / React Native app under `mobile/` remains the rollback source until the Swift app reaches feature parity. New user-facing iOS implementation should move into this workspace unless the task explicitly says to patch the legacy app.
+The legacy Expo / React Native app has been removed from this repository. New user-facing iOS implementation belongs in this workspace.
 
 ## Current Contents
 
@@ -86,7 +86,7 @@ Supabase redirect URLs are handled by `MegrumRootView.onOpenURL`. `SupabaseAuthR
 
 `BlockedUser` mirrors the viewer's `groom_user_blocks` relationships. `SettingsScreen` exposes a native blocked users list with pull-to-refresh and confirmation before unblock.
 
-`MegrumNotification` mirrors `notifications`. `SettingsScreen` shows an unread badge, and the native notification list can filter unread/trade notices, mark items read, mark all read, and route broad notification targets back to the matching native tab. The settings list also reads and writes `user_notification_settings.push_enabled` through a native iOS Toggle, so users can turn off device notifications while keeping the in-app notification list available. Native APNs device tokens can now be normalized and upserted into `notification_devices` with `push_provider='apns'`, and the registered native token is revoked on logout. The existing Expo Push path remains available for the legacy app.
+`MegrumNotification` mirrors `notifications`. `SettingsScreen` shows an unread badge, and the native notification list can filter unread/trade notices, mark items read, mark all read, and route broad notification targets back to the matching native tab. The settings list also reads and writes `user_notification_settings.push_enabled` through a native iOS Toggle, so users can turn off device notifications while keeping the in-app notification list available. Native APNs device tokens can now be normalized and upserted into `notification_devices` with `push_provider='apns'`, and the registered native token is revoked on logout.
 
 The Xcode app host requests iOS notification authorization for configured signed-in sessions, registers with APNs, and forwards the native device token into `MegrumAppState.registerNativePushDeviceToken(...)`.
 
@@ -117,11 +117,6 @@ xcodebuild -list -project ios-native/MegrumNative.xcodeproj
 xcodebuild -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -destination 'generic/platform=iOS Simulator' -derivedDataPath /tmp/megrum-native-xcodebuild CODE_SIGNING_ALLOWED=NO build
 ```
 
-## Migration Rule
+## Current Rule
 
-Do not delete or rewrite `mobile/` until the native app has:
-
-1. Auth and onboarding parity.
-2. Home, search, inventory, Wish, proposal, trade chat, groom, board, notifications, settings parity.
-3. TestFlight validation on the native preview bundle.
-4. A documented rollback path.
+`ios-native/` is the only user-facing iOS source in this repository. Do not reintroduce React Native / Expo code unless the owner explicitly asks for a separate rollback branch.

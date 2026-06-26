@@ -1,27 +1,11 @@
 {
   "name": "megrum-platform",
   "private": true,
-  "workspaces": [
-    "mobile",
-    "packages/*"
-  ],
   "scripts": {
     "web:dev": "npm --prefix web run dev",
     "web:build": "npm --prefix web run build",
+    "web:start": "npm --prefix web run start",
     "web:lint": "npm --prefix web run lint",
-    "mobile:start": "npm --prefix mobile run start",
-    "mobile:ios": "npm --prefix mobile run ios",
-    "mobile:typecheck": "npm --prefix mobile run typecheck",
-    "core:typecheck": "mobile/node_modules/.bin/tsc -p packages/core/tsconfig.json --noEmit",
-    "design:typecheck": "mobile/node_modules/.bin/tsc -p packages/design/tsconfig.json --noEmit",
-    "supabase:typecheck": "mobile/node_modules/.bin/tsc -p packages/supabase/tsconfig.json --noEmit",
-    "packages:typecheck": "npm run core:typecheck && npm run design:typecheck && npm run supabase:typecheck",
-    "typecheck": "npm run mobile:typecheck && npm run packages:typecheck"
-  },
-  "devDependencies": {
-    "@types/react": "~19.1.0"
-  },
-  "dependencies": {
-    "expo-linear-gradient": "~15.0.8"
+    "typecheck": "npm --prefix web run build"
   }
 }

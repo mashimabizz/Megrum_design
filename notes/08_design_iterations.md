@@ -4,6 +4,73 @@
 
 ---
 
+## イテレーション1214：RN版と旧デザイン案の削除
+
+### 背景・問題意識
+
+オーナーから「もうRN版も使わないし、デザイン案もいらないので、その辺りは消してもらって良いかもね。本番環境に影響がなければ」と指示があった。削除前にSwift Native iOS、Web管理画面、Supabase migration、Xcode app icon参照を調べ、本番ビルドに必要な `MegrumIcon.icon/` は残す方針にした。
+
+### 変更内容
+
+#### 削除したもの
+- legacy Expo / React Native版の `mobile/` を削除した。
+- legacy Web/mobile共有TS packages の `packages/` を削除した。
+- legacy JSX mockup の `Megrum/` を削除した。
+- 旧画面案PNGの `画面案/` を削除した。
+- 参照されていない旧3D素材作業フォルダ `Megrum めぐり/` を削除した。
+- 参照されていない旧App Icon素材 `MegrumIcon 起動.icon/` を削除した。
+- RN/Swift比較用の `notes/76_rn_to_swift_screen_map.md`、`notes/77_visual_screen_lookup.md`、`notes/78_rn_actual_screenshot_lookup.md`、`notes/79_rn_swift_parity_audit_20260613.md`、`notes/assets/rn-screen-lookup/`、`notes/assets/swift-visual-qa/` を削除した。
+
+#### `package.json` / `package-lock.json`
+- root npm workspace から `mobile` / `packages/*` を外し、root scriptsをWeb管理画面用に整理した。
+- root `node_modules` の旧workspace/RN残骸を削除し、lockfileをroot packageだけの状態へ再生成した。
+
+#### Docs / Bootstrap
+- `README.md` と `AGENTS.md` をSwift Native主線の現状へ更新した。
+- `ios-native/README.md` / `web/README.md` / `notes/USER_PLAYBOOK.md` / `notes/22_swift_native_migration.md` / `notes/23_release_operating_guide.md` の旧RN rollback・mockup参照を現行化した。
+- Supabase migration内の削除済みmockup参照コメントを `notes/09_state_machines.md` / `notes/13_api_spec.md` 参照へ置き換えた。SQL定義や制約は変更していない。
+
+#### 保持したもの
+- Xcode targetが参照している `MegrumIcon.icon/` は保持した。
+- `ios-native/`、`web/`、`supabase/`、法務原典、テストデータ用素材は削除対象外とした。
+
+### 影響範囲
+
+- リポジトリ構成、ローカル開発手順、Codex bootstrap、旧RN/旧mockup参照。
+- Swift Native iOSのソース、DB schema、状態名、用語、実行時ビジネスロジックは変更していない。
+- 状態名・用語・データモデルの追加変更はないため、`notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の追加更新は不要。
+
+### 確認方法
+
+- production参照スキャン
+  - `rg -n "mobile/|packages/|Megrum/|画面案|Megrum めぐり|MegrumIcon 起動|rn-screen-lookup|swift-visual-qa" ios-native web supabase package.json package-lock.json`
+  - no matches
+- `git diff --check`
+  - passed
+- `git diff --cached --check`
+  - passed
+- `swift build --package-path ios-native`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-cleanup-tests --enable-xctest --disable-swift-testing -j 1`
+  - passed（1029 tests, 3 skipped, 0 failures）
+- `npm --prefix web run build`
+  - passed
+- `npm run typecheck`
+  - passed（root script経由でWeb build）
+- `xcodebuild -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -configuration Debug -destination 'generic/platform=iOS Simulator' -derivedDataPath /tmp/megrum-ios-native-cleanup-xcode CODE_SIGNING_ALLOWED=NO build`
+  - passed（BUILD SUCCEEDED）
+
+### セルフレビュー結果
+
+- ✅ 旧RN本体、旧mockup、旧画面案、RN比較資料は削除した。
+- ✅ `MegrumIcon.icon/` はXcode asset inputとして使われているため保持した。
+- ✅ Swift Native build/test と Xcode app host build は成功した。
+- ✅ Web管理画面のproduction buildは成功した。
+- ✅ Supabase migrationはコメントのみ更新し、DB定義・RLS・Edge Functionには触れていない。
+- ✅ 状態名・用語・データモデルの追加変更はない。
+
+---
+
 ## イテレーション1213：取引証跡削除の即時反映とキーボードdismiss
 
 ### 背景・問題意識

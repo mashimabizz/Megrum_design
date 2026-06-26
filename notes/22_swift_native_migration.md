@@ -1,11 +1,11 @@
 # 22. Swift Native Migration
 
-最終更新: 2026-05-31
-ステータス: Active draft（iter413）
+最終更新: 2026-06-26
+ステータス: Active（iter1214）
 
 ## 目的
 
-MegrumはiOS一本で勝つ方針に切り替える。これ以降のユーザー向けiOS体験は、Swift / SwiftUI / UIKit / Apple標準フレームワークを正とし、Expo / React Native版は移行元・バックアップ・仕様参照として扱う。
+MegrumはiOS一本で勝つ方針に切り替え済み。これ以降のユーザー向けiOS体験は、Swift / SwiftUI / UIKit / Apple標準フレームワークを正とする。Expo / React Native版、旧JSX mockup、旧画面案素材は iter1214 で削除済みのため、通常作業では参照元・rollback線として扱わない。
 
 ## 参照した外部方針
 
@@ -46,11 +46,11 @@ tar -xzf /Users/michitaka/Desktop/Megrum_backups/pre-swift-migration-20260531-03
 
 ## 移行方針
 
-### 1. 既存アプリを消さずに並走する
+### 1. Swift Nativeを単独主線にする
 
-- `mobile/` は当面残す。
-- `ios-native/` をSwift版の主作業場にする。
-- Swift版が機能同等になるまでは、TestFlight配布の主線を急に切り替えない。
+- `ios-native/` をユーザー向けiOSアプリの主作業場にする。
+- `mobile/` は削除済み。Expo / EAS / OTA前提の運用は現在の対象外。
+- 旧mockupの見た目へ戻すのではなく、Swift Nativeの実装とiOS標準体験を正とする。
 - 最終段階で、App Store Connectの本番Bundle IDへSwift版を接続する。
 
 ### 2. Swift版の技術方針

@@ -32,10 +32,9 @@
 
 - ユーザー向けMegrumはSwift Native iOSへ全面移行する。
 - 新しいユーザー向け実装は原則 `ios-native/` を対象にする。
-- `mobile/` はExpo / React Native版の移行元・バックアップ・仕様参照として残す。
+- 旧Expo / React Native版と旧画面mockupは削除済み。通常作業では復活させない。
 - `web/` は通常ユーザー向けWeb版としては使わず、管理者画面・運用画面・サポート確認画面が必要な時だけ触る。
 - 「画面を直して」「ユーザー体験を作って」という依頼は、原則 Swift iOS / `ios-native/` の実装対象として扱う。
-- Swift版がTestFlightに乗るまでは、既存 `mobile/` Previewはrollback線として維持する。
 - Swift移行方針の一次資料は `notes/22_swift_native_migration.md`。
 
 ---
@@ -116,11 +115,11 @@ SwiftUIの小さなViewへ分け、必要な値だけを渡してください。
 
 漠然と「直して」より、再現と検証を明示した方が精度が上がる。
 
-### ✅ 完了（Phase 0-1）
+### ✅ 完了（Phase 0-1 / historical）
 
-- 80以上の画面 mockup 完了（Auth〜オンボ〜ホーム〜検索〜在庫〜ウィッシュ〜C-flow〜D-flow〜法的画面）
+- 旧画面mockup作成とGitHub Pages運用は完了済み。その後 iter1214 で削除。
 - 主要設計ドキュメント整備（要件・状態遷移・用語集まで）
-- GitHub 移行・CLAUDE.md 整備・GitHub Pages 有効化
+- GitHub 移行・CLAUDE.md 整備・GitHub Pages 有効化はhistorical。
 
 ### 🚧 進行中（Phase 2 — 実装着手前の最終整備）
 
@@ -207,10 +206,10 @@ notes/05_data_model.md を以下の観点で最新化して：
 Megrum_design リポを見て。
 
 notes/11_screen_inventory.md を新規作成。
-Megrum/*.html と Megrum/*.jsx をすべてスキャンして、
+`ios-native/Sources/MegrumApp/` と既存 `notes/12_screens/`、`notes/09_state_machines.md` をスキャンして、
 以下のカラムでマトリクス化して：
 
-| 画面ID | 名称 | 所属フロー | 関連JSX | 関連HTML | 関連 iter | 関連 docs |
+| 画面ID | 名称 | 所属フロー | Swift実装 | 関連状態 | 関連 iter | 関連 docs |
 
 mermaid で簡易フロー図も末尾に追加（ホーム→検索→C-0→C-1→...の主要動線）。
 最新仕様だけでOK（廃止画面は J. 廃止画面 セクションへ）。
@@ -248,8 +247,8 @@ notes/12_screens/ ディレクトリ作って、以下5つの spec を1ファイ
 ## 関連 API（仮）
 ## 関連 docs
 
-JSXコード（Megrum/propose-select.jsx, c-flow.jsx, nego-flow.jsx）を実際に読んで、
-暗黙的になってる仕様を文章化して。
+Swift実装（主に `ios-native/Sources/MegrumApp/`）と既存notesを実際に読んで、
+実装済みの挙動と未実装の挙動を文章化して。
 未確定項目は「⚠️ 要確認」マークを付けて。
 
 完了後、commit & push して。
@@ -260,7 +259,7 @@ JSXコード（Megrum/propose-select.jsx, c-flow.jsx, nego-flow.jsx）を実際�
 - [ ] 状態名が `09_state_machines.md` と一致（`negotiating`, `agreed` 等）
 - [ ] 用語が `10_glossary.md` と一致（譲・wish・AW等）
 - [ ] 「⚠️ 要確認」が複数あって正直
-- [ ] JSX に書いてあった内容と矛盾しない
+- [ ] Swift実装と既存notesに矛盾しない
 
 ---
 
@@ -422,16 +421,16 @@ notes/02_system_requirements.md を最新化：
 - iter記録
 - 用語追加・廃止
 - 文言修正
-- ロジック変更（JSX編集）
+- 小さなSwift/docs差分のレビュー
 
 ### 💻 PC のほうが快適
-- mockup の視覚調整（色・余白・配置）— `python3 -m http.server` で即プレビュー
+- SwiftUI画面の視覚調整、Simulator確認
 - 大規模リファクタリング（複数ファイル一括）
 - `/iter` スラッシュコマンド使用
 
 ### 💻 PC 必須
 - ターミナル操作
-- 実装フェーズ（npm install, build, test）
+- 実装フェーズ（Swift build/test、xcodebuild、npm build）
 - ローカル試験
 
 ---
@@ -479,9 +478,9 @@ notes/05_data_model.md を iter33-34 反映で更新して。
 - スマホの場合：claude.ai mobile で GitHub 連携が有効か確認
 - 「Megrum_design リポを見て」を明示的に書く
 
-### 「CLAUDE.md にこう書いてあるけど、実際の JSX と違う」
-- まず JSX を正として、CLAUDE.md を更新するのが基本
-- CLAUDE.md が間違ってる場合は、その場で修正してもらう
+### 「古いdocsとSwift実装が違う」
+- まず `ios-native/` の実装と `notes/08_design_iterations.md` の最新iterを確認する
+- 古いdocsが間違っている場合は、その場で現行方針に更新してもらう
 
 ### 「commit が空でエラーになる」
 - 既に同じ内容が反映されてる可能性

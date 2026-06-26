@@ -3,7 +3,7 @@
 `web/` は通常ユーザー向けアプリではなく、管理者コンソール専用です。
 
 - ユーザー向けアプリの主線は `ios-native/` のSwift Native iOSです。
-- `mobile/` はlegacy Expo / React Native版の移行元・rollback線です。
+- legacy Expo / React Native版は削除済みです。
 - `web/` では今後、管理者機能・運用確認・Webhookなど運営側に必要なものだけを扱います。
 
 ## Getting Started

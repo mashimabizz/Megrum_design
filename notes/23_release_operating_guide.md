@@ -1,7 +1,7 @@
 # 23. リリース運用ガイド
 
-最終更新: 2026-05-29  
-ステータス: Active（3日で App Store 審査提出まで持っていくための実務ガイド）
+最終更新: 2026-06-26
+ステータス: Historical / 要更新（RN時代の短期リリース運用メモ。現在の実装主線は `ios-native/`）
 
 ## まず最初に
 
@@ -78,30 +78,24 @@
 
 ### コア
 
-- `mobile/`
-  - iPhoneアプリ本体です。今回のユーザー向けリリース対象はここが中心です。
+- `ios-native/`
+  - Swift Native iOSアプリ本体です。現在のユーザー向けリリース対象はここが中心です。
 - `web/`
-  - Next.js のWebアプリです。現状は通常ユーザー向けというより、管理・運用・サポート確認の用途が強いです。
+  - Next.js の管理者・運用・サポート確認用Webです。
 - `supabase/`
-  - DBスキーマやRLSの変更履歴です。ここにあるSQLは「サーバー側の構造変更メモ」です。
-- `packages/`
-  - Web / mobile で共有するロジックやデザイン補助です。
-
-### 仕様 / モック
-
-- `Megrum/`
-  - 画面モックです。完成アプリそのものではありません。
+  - DBスキーマ、RLS、Edge Functions、ローカルSupabase設定です。
 - `notes/`
-  - 要件、状態遷移、設計判断、今回作った運用メモを置く場所です。
+  - 要件、状態遷移、設計判断、運用メモを置く場所です。
 - `利用規約など/`
   - 法的文書の原典です。弁護士納品のベース資料です。
 
-### ローカル素材
+### 削除済み
 
-- `Megrum めぐり/`
-  - めぐり関連の3D素材作業フォルダです。今回のリリースでは原則スコープ外です。
-- `テストデータ用/`
-  - テストや検証に使うローカル素材です。
+- `mobile/`: legacy Expo / React Native版
+- `packages/`: legacy Web/mobile共有TS packages
+- `Megrum/`: legacy JSX mockup
+- `画面案/`: legacy design proposal PNG
+- `Megrum めぐり/`: legacy 3D素材作業フォルダ
 
 ## GitHub と今のデスクトップフォルダの関係
 
@@ -116,21 +110,23 @@
 
 - **未コミットの変更は GitHub にはまだ存在しません**
 - **Codex desktop は、いまこのローカルフォルダを直接見て作業しています**
-- **Xcode も、このローカルフォルダの中の `mobile/ios` と `mobile/` を読んでいます**
+- **Xcode は、このローカルフォルダの中の `ios-native/MegrumNative.xcodeproj` と `ios-native/` を読んでいます**
 
 つまり、今のアプリの正体は:
-**ローカルファイルが一次ソース、GitHubはその履歴共有先**です。
+**`ios-native/` のローカルファイルが一次ソース、GitHubはその履歴共有先**です。
 
 ## アプリはどこの情報を読んでいるか
 
 ### iPhoneアプリ
 
-- 画面 / 導線
-  - `mobile/app/`
-- 共通UI / ロジック
-  - `mobile/src/`
-- 画像 / アイコン / 3Dアセット
-  - `mobile/assets/`
+- 画面 / 導線 / 共通UI / ロジック
+  - `ios-native/Sources/MegrumApp/`
+- Domain / data boundary
+  - `ios-native/Sources/MegrumCore/`
+  - `ios-native/Sources/MegrumData/`
+- Xcode app host
+  - `ios-native/MegrumNative.xcodeproj`
+  - `ios-native/App/`
 
 ### Web
 
@@ -148,17 +144,17 @@
 - 変更履歴
   - `supabase/migrations/*.sql`
 
-`mobile/src/lib/supabase.ts` では、`EXPO_PUBLIC_SUPABASE_URL` と `EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY` を使って Supabase に接続しています。  
+Swift Native app は `ios-native/Config/MegrumNative.xcconfig` と gitignore された local xcconfig / 環境変数から Supabase の公開設定を読みます。
 `web/src/lib/supabase/server.ts` では、通常の公開キーに加えて、必要箇所で `SUPABASE_SECRET_KEY` も使います。
 
 ## サーバー / 配信 / Apple 側の住み分け
 
 - `Supabase`
   - 認証、DB、Storage
-- `Expo / EAS`
-  - mobileアプリのビルド設定、OTA更新、Preview配信
+- `Xcode`
+  - Swift Native iOSアプリのビルド、署名、Archive作成
 - `App Store Connect / TestFlight`
-  - Apple向けのビルド配布、内部テスト、審査提出
+  - Apple側のビルド番号、配布状態、審査状態の管理
 - `megrum.jp`
   - Webの公開ドメイン。認証コールバックにも使っています。
 
