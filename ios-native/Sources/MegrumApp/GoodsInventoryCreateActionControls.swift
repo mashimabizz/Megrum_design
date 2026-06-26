@@ -38,8 +38,8 @@ struct GoodsTradingCardBulkStartButton: View {
     var body: some View {
         Button(action: action) {
             HStack(spacing: 12) {
-                icon
-                copy
+                GoodsTradingCardBulkStartIcon(isProcessing: isProcessing)
+                GoodsTradingCardBulkStartCopy()
             }
             .padding(14)
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -52,8 +52,12 @@ struct GoodsTradingCardBulkStartButton: View {
         .buttonStyle(.plain)
         .disabled(isProcessing)
     }
+}
 
-    private var icon: some View {
+private struct GoodsTradingCardBulkStartIcon: View {
+    var isProcessing: Bool
+
+    var body: some View {
         ZStack {
             Circle()
                 .fill(MegrumTheme.lavender)
@@ -69,8 +73,10 @@ struct GoodsTradingCardBulkStartButton: View {
             }
         }
     }
+}
 
-    private var copy: some View {
+private struct GoodsTradingCardBulkStartCopy: View {
+    var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             Text("トレカ専用 AIで一括登録")
                 .font(.subheadline.weight(.black))

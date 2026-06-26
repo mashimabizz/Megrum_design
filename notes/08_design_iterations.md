@@ -4,6 +4,44 @@
 
 ---
 
+## イテレーション1144：goods create bulk CTA partsを分離
+
+### 背景・問題意識
+
+`GoodsTradingCardBulkStartButton` は、トレカ一括登録CTA内のicon表示と説明copyを `icon` / `copy` computed helperとして同じView内に抱えていた。goods登録導線の見た目とdisabled条件を維持したまま、CTA内部の表示単位を小さな専用Viewへ分離する。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/GoodsInventoryCreateActionControls.swift`
+- `GoodsTradingCardBulkStartIcon` を追加し、AI表示と処理中ProgressViewの切り替えを移動した。
+- `GoodsTradingCardBulkStartCopy` を追加し、CTA title/subtitle表示を移動した。
+- `GoodsTradingCardBulkStartButton` はbutton本体、spacing、background、stroke、disabled条件の構成に寄せた。
+
+### 影響範囲
+
+- Swift Native iOS版のgoods登録内、トレカ専用AI一括登録CTA。
+- 処理中のProgressView表示、CTA copy、button disabled条件。
+- goods登録draft、写真処理、一括認識、保存処理、DB/API、状態名、表示文言は変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumApp/GoodsInventoryCreateActionControls.swift`
+  - passed
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-goods-create-action-controls`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-goods-create-action-controls-tests --enable-xctest --disable-swift-testing -j 1 --filter 'GoodsEditorDraftTests|GoodsInventoryCreateMetaTilePresentationTests'`
+  - passed（29 tests）
+
+### セルフレビュー結果
+
+- ✅ CTAのspacing、padding、background、stroke、`disabled(isProcessing)` を維持した。
+- ✅ 処理中は白tintのProgressView、通常時は `AI` labelを表示する挙動を維持した。
+- ✅ CTA title/subtitleのfont/color/fixedSizeと表示文言を維持した。
+- ✅ goods登録draft、写真処理、一括認識、保存処理、DB/API、状態名、表示文言は変更していない。
+- ✅ 新しい状態名・用語・DB列は追加していないため、`notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション1143：individual listing logic segment partsを分離
 
 ### 背景・問題意識
