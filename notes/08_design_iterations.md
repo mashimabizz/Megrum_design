@@ -4,6 +4,43 @@
 
 ---
 
+## イテレーション1180：proposal week candidate block配置を分離
+
+### 背景・問題意識
+
+打診作成の meetup 週カレンダー候補一覧に、`ForEach`、候補1件分の `ProposalMeetupCalendarCandidateBlock`、tap/move/resize/remove のaction配線、frame/position計算が同居していた。候補一覧の反復構造を親に残し、候補1件分の配置とaction配線を専用Viewへ分ける。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/ProposalMeetupCalendarWeekCandidateBlocks.swift`
+- `ProposalMeetupCalendarWeekPositionedCandidateBlock` を追加し、候補1件分の `ProposalMeetupCalendarCandidateBlock` 呼び出し、tap/move/resize/remove action配線、frame/positionを専用Viewへ分離した。
+- `centerX` / `centerY` を抽出先の非View computed varへ分けた。
+- `ProposalMeetupCalendarWeekCandidateBlocks` は `blocks` の `ForEach` とpositioned block呼び出しに集中する構成へ寄せた。
+
+### 影響範囲
+
+- Swift Native iOS版の打診作成 meetup 週カレンダー候補block配置。
+- 候補blockのdraft/index/選択状態/height、tap、move、resize、remove、frame、position、gesture、DB/API、状態名、表示文言は変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumApp/ProposalMeetupCalendarWeekCandidateBlocks.swift`
+  - passed
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-week-candidate-blocks`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-week-candidate-blocks-tests --enable-xctest --disable-swift-testing -j 1 --filter 'ProposalCreateFlowTests|ProposalCreateSheetTests|TradeRequestDraftProposalCreateFlowTests|TradeChatAffordanceTests'`
+  - passed（112 tests）
+
+### セルフレビュー結果
+
+- ✅ tap、move、resize、remove のaction配線とaction種別を維持した。
+- ✅ frame幅/高さ、position中心計算、候補blockの入力値を維持した。
+- ✅ カレンダーgesture、preview、long press hint、打診作成の進行条件は変更していない。
+- ✅ DB/API、状態名、表示文言は変更していない。
+- ✅ 新しい状態名・用語・DB列は追加していないため、`notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション1179：proposal week long press hintを分離
 
 ### 背景・問題意識

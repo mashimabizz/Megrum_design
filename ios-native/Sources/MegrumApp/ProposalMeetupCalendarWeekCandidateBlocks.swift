@@ -24,32 +24,58 @@ struct ProposalMeetupCalendarWeekCandidateBlocks: View {
 
     var body: some View {
         ForEach(blocks) { block in
-            ProposalMeetupCalendarCandidateBlock(
-                draft: block.draft,
-                index: block.index,
-                isSelected: block.isSelected,
-                height: block.height,
-                onTap: {
-                    onTap(block.index)
-                },
-                onMoveChanged: { value in
-                    onChange(value, block.index, .move)
-                },
-                onMoveEnded: { value in
-                    onEnd(value, block.index, .move)
-                },
-                onResizeChanged: { value in
-                    onChange(value, block.index, .resizeEnd)
-                },
-                onResizeEnded: { value in
-                    onEnd(value, block.index, .resizeEnd)
-                },
-                onRemove: {
-                    onRemove(block.index)
-                }
+            ProposalMeetupCalendarWeekPositionedCandidateBlock(
+                block: block,
+                onTap: onTap,
+                onChange: onChange,
+                onEnd: onEnd,
+                onRemove: onRemove
             )
-            .frame(width: block.width, height: block.height)
-            .position(x: block.x + block.width / 2, y: block.y + block.height / 2)
         }
+    }
+}
+
+private struct ProposalMeetupCalendarWeekPositionedCandidateBlock: View {
+    let block: ProposalMeetupCalendarRenderedCandidateBlock
+    let onTap: (Int) -> Void
+    let onChange: (DragGesture.Value, Int, ProposalMeetupCalendarCandidateEditAction) -> Void
+    let onEnd: (DragGesture.Value, Int, ProposalMeetupCalendarCandidateEditAction) -> Void
+    let onRemove: (Int) -> Void
+
+    private var centerX: CGFloat {
+        block.x + block.width / 2
+    }
+
+    private var centerY: CGFloat {
+        block.y + block.height / 2
+    }
+
+    var body: some View {
+        ProposalMeetupCalendarCandidateBlock(
+            draft: block.draft,
+            index: block.index,
+            isSelected: block.isSelected,
+            height: block.height,
+            onTap: {
+                onTap(block.index)
+            },
+            onMoveChanged: { value in
+                onChange(value, block.index, .move)
+            },
+            onMoveEnded: { value in
+                onEnd(value, block.index, .move)
+            },
+            onResizeChanged: { value in
+                onChange(value, block.index, .resizeEnd)
+            },
+            onResizeEnded: { value in
+                onEnd(value, block.index, .resizeEnd)
+            },
+            onRemove: {
+                onRemove(block.index)
+            }
+        )
+        .frame(width: block.width, height: block.height)
+        .position(x: centerX, y: centerY)
     }
 }
