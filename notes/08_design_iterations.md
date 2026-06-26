@@ -4,6 +4,49 @@
 
 ---
 
+## イテレーション1216：取引チャット終端の余分な下スクロールを削減
+
+### 背景・問題意識
+
+オーナーから、取引チャットで入力フッターのさらに下まで大きくスクロールできてしまい、フッター手前が画面の終端に見えないという指摘があった。あわせて、取引証跡フッターが出る状態では本文や証跡CTAがフッターに隠れないことも求められた。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/TradeDetailContentView.swift`
+- チャット本文ScrollView内の大きな下padding（通常118pt、証跡フッター時206pt）を廃止した。
+- フッター領域の確保は既存の `safeAreaInset(edge: .bottom)` に任せ、ScrollView内は終端の小さな余白 `12pt` のみにした。
+- 証跡フッターありの状態でも、`safeAreaInset` がフッター高さを確保する構造は維持した。
+
+### 影響範囲
+
+- Swift Native iOS の取引チャット本文スクロール終端。
+- 入力フッター、再打診CTA、取引証跡フッター、証跡撮影CTAの表示ロジックは変更していない。
+- 状態名・用語・DB schema・取引状態遷移は変更していないため、`notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の追加更新は不要。
+
+### 確認方法
+
+- `git diff --check`
+  - passed
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-trade-scroll-build`
+  - passed
+- Build iOS Apps / XcodeBuildMCP
+  - project: `ios-native/MegrumNative.xcodeproj`
+  - scheme: `MegrumNative`
+  - simulator: `iPhone 17 / iOS 26.5`
+  - `build_run_sim`
+  - passed
+- Simulator確認
+  - 打診中の取引チャットで、最後の取引更新カードから入力フッターまでの余分な下スクロールが大きく残らないことを確認。
+  - 進行中の取引チャットで、取引証跡フッターと入力フッターが表示されても、取引証跡セクションと「交換したら証跡写真を撮る」CTAが隠れないことを確認。
+
+### セルフレビュー結果
+
+- ✅ ScrollView内部の二重気味な大きいbottom paddingを削減した。
+- ✅ フッター領域の確保は既存の `safeAreaInset` に任せているため、証跡フッターありでも隠れにくい構造を維持した。
+- ✅ 入力フッター、証跡フッター、取引状態、DB/API payloadには触れていない。
+
+---
+
 ## イテレーション1215：起動画面を白背景の専用アイコン表示へ変更
 
 ### 背景・問題意識

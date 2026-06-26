@@ -135,7 +135,7 @@ struct TradeDetailContent: View {
                     }
                     .padding(.horizontal, 10)
                     .padding(.top, 12)
-                    .padding(.bottom, scrollBottomPadding)
+                    .padding(.bottom, scrollContentBottomSpacing)
                 }
                 .onAppear {
                     scrollToLatestMessage(proxy, animated: false)
@@ -165,11 +165,8 @@ struct TradeDetailContent: View {
 
     private static let messageBottomAnchorID = "trade-detail-message-bottom-anchor"
 
-    private var scrollBottomPadding: CGFloat {
-        if proposal.status == .agreed || (proposal.status == .completed && !evaluationState.hasSubmittedEvaluation) {
-            return 206
-        }
-        return 118
+    private var scrollContentBottomSpacing: CGFloat {
+        12
     }
 
     private func scrollToLatestMessage(_ proxy: ScrollViewProxy, animated: Bool) {
