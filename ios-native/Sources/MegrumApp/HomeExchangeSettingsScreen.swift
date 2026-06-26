@@ -12,8 +12,10 @@ struct HomeExchangeSettingsScreen: View {
     @AppStorage(HomeExchangeSettingsStorageKeys.mailShippingDays) private var storedMailShippingDaysRawValue = HomeDefaultExchangeSettings.standard.mailShippingDays.rawValue
     @AppStorage(HomeExchangeSettingsStorageKeys.configuredAt) private var configuredAt = 0.0
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.megrumSlidePresentationDismiss) private var slideDismiss
 
     var individualListings: [IndividualListing] = []
+    var onClose: (() -> Void)?
 
     @State private var draftPreference = HomeDefaultExchangeSettings.standard.preference
     @State private var draftLocalPrefecture = ""
@@ -34,7 +36,7 @@ struct HomeExchangeSettingsScreen: View {
             visibleMonth: $visibleMonth,
             selectedDateKeys: displayedLocalDateKeys,
             dateDetails: displayedLocalDateDetails,
-            onClose: dismiss.callAsFunction,
+            onClose: closeScreen,
             onSelectPreference: selectPreference,
             onTapDay: tapDate,
             onFinishDragSelection: finishDragSelection
@@ -92,7 +94,17 @@ struct HomeExchangeSettingsScreen: View {
         storedMailShippingFeeRawValue = draftMailShippingFee.rawValue
         storedMailShippingDaysRawValue = draftMailShippingDays.rawValue
         configuredAt = Date().timeIntervalSince1970
-        dismiss()
+        closeScreen()
+    }
+
+    private func closeScreen() {
+        if let onClose {
+            onClose()
+        } else if let slideDismiss {
+            slideDismiss()
+        } else {
+            dismiss()
+        }
     }
 
     private var primaryLocalPrefecture: String {

@@ -225,7 +225,7 @@ extension MegrumAppState {
         )
     }
 
-    private var currentGoodsLocalState: GoodsLocalState {
+    var currentGoodsLocalState: GoodsLocalState {
         GoodsLocalState(
             inventory: inventory,
             wishes: wishes,
@@ -237,7 +237,7 @@ extension MegrumAppState {
         )
     }
 
-    private func applyGoodsLocalState(_ state: GoodsLocalState) {
+    func applyGoodsLocalState(_ state: GoodsLocalState) {
         inventory = state.inventory
         wishes = state.wishes
         homeMatchedItems = state.homeMatchedItems

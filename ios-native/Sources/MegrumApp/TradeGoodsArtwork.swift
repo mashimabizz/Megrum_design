@@ -7,7 +7,7 @@ struct TradeGoodsArtwork: View {
     var accentColor: Color
 
     var body: some View {
-        ZStack {
+        ZStack(alignment: .bottomTrailing) {
             LinearGradient(
                 colors: [
                     accentColor.opacity(0.42),
@@ -37,6 +37,12 @@ struct TradeGoodsArtwork: View {
                 }
             } else {
                 TradeGoodsFallbackArtwork(item: item)
+            }
+
+            if item.quantity > 1 {
+                GoodsQuantityBadge(quantity: item.quantity)
+                    .scaleEffect(0.86, anchor: .bottomTrailing)
+                    .padding(4)
             }
         }
         .clipped()

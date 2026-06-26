@@ -137,9 +137,7 @@ extension SearchScreen {
     }
 
     func applyDefaultPaymentCondition() {
-        let methods = UserPaymentMethod.normalized(
-            appState.paymentSettings?.methods ?? appState.viewer?.paymentMethods ?? []
-        )
+        let methods = PaymentSettingsResolver.methods(settings: appState.paymentSettings, viewer: appState.viewer)
         if !methods.isEmpty {
             selectedPaymentMethods = Set(methods)
         }

@@ -4,6 +4,77 @@
 
 ---
 
+## イテレーション1217：支払い設定永続化と取引完了時のグッズ反映
+
+### 背景・問題意識
+
+オーナーから、支払い方法の設定が保存直後は反映されたように見えるがアプリ再起動後にリセットされること、交換条件画面の左上閉じる・保存後に画面が閉じないこと、取引完了後にグッズ在庫へ自動反映されないこと、やりとり一覧で譲る/求めるグッズの数量が見えないことを指摘された。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/PaymentSettingsResolver.swift`
+- 支払い設定の有効値を解決する共通ヘルパーを追加した。
+- 保存済み `UserPaymentSettings.methods` が空でない場合は保存済み設定を優先し、空の場合のみプロフィール側 `viewer.paymentMethods` へフォールバックするようにした。
+
+#### `ios-native/Sources/MegrumApp/PaymentSettingsDraft.swift`
+#### `ios-native/Sources/MegrumApp/ProposalCreateFlowPaymentDerivedState.swift`
+#### `ios-native/Sources/MegrumApp/SearchScreenFilterActions.swift`
+#### `ios-native/Sources/MegrumApp/SearchScreenDerivedState.swift`
+#### `ios-native/Sources/MegrumApp/AppChrome.swift`
+- 支払い方法設定の初期表示、打診作成、検索条件、ドロワー表示で同じ解決ロジックを使うように統一した。
+
+#### `ios-native/Sources/MegrumApp/HomeExchangeSettingsScreen.swift`
+#### `ios-native/Sources/MegrumApp/MegrumRootView.swift`
+#### `ios-native/Sources/MegrumApp/MegrumRootDrawerDestinationSheet.swift`
+- 交換条件画面に明示的な `onClose` を渡せるようにし、左上閉じるはそのまま閉じ、保存は `@AppStorage` へ保存後に同じ経路で閉じるようにした。
+- スライド表示環境の dismiss と通常 sheet dismiss の fallback は維持した。
+
+#### `ios-native/Sources/MegrumApp/GoodsLocalStateReducer.swift`
+#### `ios-native/Sources/MegrumApp/MegrumAppStateGoodsActions.swift`
+#### `ios-native/Sources/MegrumApp/MegrumAppStateTradeEvidenceActions.swift`
+- 取引証跡承認で proposal が初めて `completed` へ変わった時、ビューアー視点のグッズ移動をローカル在庫へ反映するようにした。
+- 自分が受け取ったグッズは `自分用キープ`、自分が譲ったグッズは `過去に譲った` として追加する。
+- 譲った元グッズは数量分だけ `譲る候補` から減算し、残数が0なら在庫・ホーム候補・検索結果・個別出品参照から外す。
+- Preview repositoryでは静的fixture再読込でローカル反映が消えないよう、完了直後の自動refreshを抑制した。本番repositoryでは完了後に通常の再取得も行う。
+
+#### `ios-native/Sources/MegrumApp/TradeGoodsArtwork.swift`
+- やりとり一覧の譲る/求めるグッズ画像にも、マイグッズと同じ `×2` 形式の数量バッジを右下表示するようにした。
+
+#### `ios-native/Tests/MegrumAppTests/SettingsScreenTests.swift`
+#### `ios-native/Tests/MegrumAppTests/GoodsLocalStateReducerTests.swift`
+- 保存済み支払い設定が再起動相当の初期化で優先されること、保存済み方法が空ならプロフィール側へ fallback することを追加テストした。
+- 完了取引で、譲ったグッズが3個から2個へ減り、受け取ったグッズが `自分用キープ`、譲った1個が `過去に譲った` へ入ることを追加テストした。
+
+### 影響範囲
+
+- Swift Native iOS の支払い方法設定、交換条件設定、打診作成/検索条件の支払い方法参照、取引証跡承認による取引完了、マイグッズ在庫、やりとり一覧のグッズ表示。
+- 取引状態名、用語、DB schema、Supabase RPC の仕様は変更していない。
+- 状態名・用語・データモデルの追加変更はないため、`notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の追加更新は不要。
+
+### 確認方法
+
+- `git diff --check`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-payment-trade-tests --enable-xctest --disable-swift-testing -j 1 --filter 'SettingsScreenTests|GoodsLocalStateReducerTests|MegrumAppStateTests/testAppStateSavesPreviewPaymentSettings'`
+  - passed（23 tests, 0 failures）
+- `xcodebuild -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -configuration Debug -destination 'platform=iOS Simulator,id=C70DDDBB-2602-49E0-8F95-1F043BCCED76' -derivedDataPath /tmp/megrum-ios-native-payment-trade-xcode -quiet build`
+  - passed
+- Simulator確認
+  - `iPhone 17 / iOS 26.5`
+  - `xcrun simctl install C70DDDBB-2602-49E0-8F95-1F043BCCED76 /tmp/megrum-ios-native-payment-trade-xcode/Build/Products/Debug-iphonesimulator/MegrumNative.app`
+  - `xcrun simctl launch C70DDDBB-2602-49E0-8F95-1F043BCCED76 tokyo.megrum.native.preview`
+  - アプリ起動とホーム表示を確認した。
+
+### セルフレビュー結果
+
+- ✅ 支払い方法は保存済み設定が空でない限り、再起動相当の初期化でも保存済み設定を優先する。
+- ✅ 交換条件画面の閉じる/保存は、表示元の sheet / drawer 状態を閉じる明示経路を通す。
+- ✅ 取引完了時のグッズ移動は、数量減算・0個時の削除・履歴追加を reducer に集約した。
+- ✅ やりとり一覧の数量表示は既存の `GoodsQuantityBadge` を再利用し、マイグッズの表現と揃えた。
+- ✅ 状態名・用語・DB schema・Supabase migration は変更していない。
+
+---
+
 ## イテレーション1216：取引チャット終端の余分な下スクロールを削減
 
 ### 背景・問題意識

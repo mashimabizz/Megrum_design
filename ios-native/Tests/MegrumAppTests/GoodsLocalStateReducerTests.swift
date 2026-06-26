@@ -164,6 +164,90 @@ final class GoodsLocalStateReducerTests: XCTestCase {
         XCTAssertTrue(updated.listings.first?.options.last?.isCashOffer == true)
     }
 
+    func testApplyingCompletedTradeMovesGivenAndReceivedGoodsForViewer() {
+        let viewerID = UUID(uuidString: "00000000-0000-0000-0000-000000001118")!
+        let partnerID = UUID(uuidString: "00000000-0000-0000-0000-000000001119")!
+        let givenID = UUID(uuidString: "00000000-0000-0000-0000-000000001120")!
+        let receivedID = UUID(uuidString: "00000000-0000-0000-0000-000000001121")!
+        let given = makeGoodsItem(
+            id: givenID,
+            ownerID: viewerID,
+            title: "譲るトレカ",
+            quantity: 3,
+            lockedQuantity: 1,
+            marketAvailableQuantity: 2,
+            status: .active
+        )
+        let received = makeGoodsItem(
+            id: receivedID,
+            ownerID: partnerID,
+            title: "受け取るトレカ",
+            quantity: 2,
+            status: .active
+        )
+        let listing = IndividualListing(
+            id: UUID(uuidString: "00000000-0000-0000-0000-000000001122")!,
+            ownerID: viewerID,
+            haves: [ListingItemQuantity(itemID: givenID, quantity: 3)],
+            options: [
+                IndividualListingWishOption(
+                    id: UUID(uuidString: "00000000-0000-0000-0000-000000001123")!,
+                    listingID: UUID(uuidString: "00000000-0000-0000-0000-000000001122")!,
+                    position: 1,
+                    wishes: [ListingItemQuantity(itemID: receivedID, quantity: 1)]
+                )
+            ]
+        )
+        let state = makeState(
+            inventory: [given],
+            homeMatchedItems: [given],
+            homePossibleItems: [given],
+            searchResults: [SearchResultItem(item: given, ownerUserID: viewerID, bucket: .matched)],
+            listings: [listing]
+        )
+        let proposal = TradeProposal(
+            id: UUID(uuidString: "00000000-0000-0000-0000-000000001124")!,
+            senderID: viewerID,
+            receiverID: partnerID,
+            status: .completed,
+            exchangeMethod: .hand,
+            senderGoodsIDs: [givenID],
+            receiverGoodsIDs: [receivedID]
+        )
+        let viewer = UserProfile(
+            id: viewerID,
+            handle: "viewer",
+            displayName: "ビューアー",
+            prefecture: "東京都"
+        )
+
+        let updated = GoodsLocalStateReducer.applyingCompletedTrade(
+            proposal: proposal,
+            viewerID: viewerID,
+            viewerProfile: viewer,
+            knownGoodsByID: [givenID: given, receivedID: received],
+            to: state
+        )
+
+        let activeGiven = updated.inventory.first { $0.id == givenID }
+        XCTAssertEqual(activeGiven?.quantity, 2)
+        XCTAssertEqual(activeGiven?.lockedQuantity, 0)
+        XCTAssertEqual(activeGiven?.marketAvailableQuantity, 2)
+        XCTAssertEqual(updated.homeMatchedItems.first?.quantity, 2)
+        XCTAssertEqual(updated.searchResults.first?.item.quantity, 2)
+        XCTAssertEqual(updated.listings.first?.haves, [ListingItemQuantity(itemID: givenID, quantity: 2)])
+
+        let keepItem = updated.inventory.first { $0.status == .keep }
+        XCTAssertEqual(keepItem?.ownerID, viewerID)
+        XCTAssertEqual(keepItem?.title, "受け取るトレカ")
+        XCTAssertEqual(keepItem?.quantity, 1)
+
+        let tradedItem = updated.inventory.first { $0.status == .traded }
+        XCTAssertEqual(tradedItem?.ownerID, viewerID)
+        XCTAssertEqual(tradedItem?.title, "譲るトレカ")
+        XCTAssertEqual(tradedItem?.quantity, 1)
+    }
+
     private func makeState(
         inventory: [GoodsItem] = [],
         wishes: [WishItem] = [],
@@ -201,14 +285,22 @@ final class GoodsLocalStateReducerTests: XCTestCase {
         ownerID: UUID,
         groupID: UUID? = nil,
         goodsTypeID: UUID? = nil,
-        title: String
+        title: String,
+        quantity: Int = 1,
+        lockedQuantity: Int = 0,
+        marketAvailableQuantity: Int? = nil,
+        status: GoodsEntryStatus? = nil
     ) -> GoodsItem {
         GoodsItem(
             id: id,
             ownerID: ownerID,
+            status: status,
             groupID: groupID,
             goodsTypeID: goodsTypeID,
-            title: title
+            title: title,
+            quantity: quantity,
+            lockedQuantity: lockedQuantity,
+            marketAvailableQuantity: marketAvailableQuantity
         )
     }
 

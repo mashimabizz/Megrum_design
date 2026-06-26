@@ -141,7 +141,7 @@ extension SearchScreen {
     }
 
     var currentDefaultPaymentMethods: [UserPaymentMethod] {
-        UserPaymentMethod.normalized(appState.paymentSettings?.methods ?? appState.viewer?.paymentMethods ?? [])
+        PaymentSettingsResolver.methods(settings: appState.paymentSettings, viewer: appState.viewer)
     }
 
     var activeFilterCount: Int {

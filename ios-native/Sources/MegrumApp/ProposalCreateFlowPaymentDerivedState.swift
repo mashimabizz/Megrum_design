@@ -69,8 +69,8 @@ extension ProposalCreateFlow {
 
     var viewerPaymentSummaryText: String {
         UserPaymentMethod.displayText(
-            for: appState.paymentSettings?.methods ?? appState.viewer?.paymentMethods ?? [],
-            otherNote: appState.paymentSettings?.otherNote ?? appState.viewer?.paymentNote
+            for: PaymentSettingsResolver.methods(settings: appState.paymentSettings, viewer: appState.viewer),
+            otherNote: PaymentSettingsResolver.otherNote(settings: appState.paymentSettings, viewer: appState.viewer)
         )
     }
 
@@ -85,7 +85,7 @@ extension ProposalCreateFlow {
     }
 
     var viewerPaymentOtherNote: String? {
-        appState.paymentSettings?.otherNote ?? appState.viewer?.paymentNote
+        PaymentSettingsResolver.otherNote(settings: appState.paymentSettings, viewer: appState.viewer)
     }
 
     var partnerPaymentOtherNote: String? {
@@ -96,7 +96,7 @@ extension ProposalCreateFlow {
     }
 
     var viewerPaymentMethods: [UserPaymentMethod] {
-        UserPaymentMethod.normalized(appState.paymentSettings?.methods ?? appState.viewer?.paymentMethods ?? [])
+        PaymentSettingsResolver.methods(settings: appState.paymentSettings, viewer: appState.viewer)
     }
 
     var partnerPaymentMethods: [UserPaymentMethod] {

@@ -145,6 +145,48 @@ final class SettingsScreenTests: XCTestCase {
         XCTAssertNil(draft.settings(userID: UUID()).otherNote)
     }
 
+    func testPaymentSettingsDraftRestoresStoredMethodsBeforeViewerFallback() {
+        let userID = UUID(uuidString: "00000000-0000-0000-0000-000000000821")!
+        let viewer = UserProfile(
+            id: userID,
+            handle: "michi",
+            displayName: "みち",
+            paymentMethods: [],
+            paymentNote: "プロフィール側"
+        )
+        let settings = UserPaymentSettings(
+            userID: userID,
+            methods: [.paypay, .other],
+            otherNote: "設定側"
+        )
+
+        let draft = PaymentSettingsDraft(settings: settings, viewer: viewer)
+
+        XCTAssertEqual(draft.methods, [.paypay, .other])
+        XCTAssertEqual(draft.otherNote, "設定側")
+    }
+
+    func testPaymentSettingsDraftFallsBackToViewerMethodsWhenStoredMethodsAreEmpty() {
+        let userID = UUID(uuidString: "00000000-0000-0000-0000-000000000822")!
+        let viewer = UserProfile(
+            id: userID,
+            handle: "michi",
+            displayName: "みち",
+            paymentMethods: [.bankTransfer, .cashExchange],
+            paymentNote: "プロフィール側"
+        )
+        let settings = UserPaymentSettings(
+            userID: userID,
+            methods: [],
+            otherNote: nil
+        )
+
+        let draft = PaymentSettingsDraft(settings: settings, viewer: viewer)
+
+        XCTAssertEqual(draft.methods, [.bankTransfer, .cashExchange])
+        XCTAssertEqual(draft.otherNote, "プロフィール側")
+    }
+
     func testLoginSecuritySummaryFormatsAuthenticatedSession() {
         let viewerID = UUID(uuidString: "20000000-0000-0000-0000-000000000003")!
         let authUserID = UUID(uuidString: "99999999-9999-9999-9999-999999999999")!

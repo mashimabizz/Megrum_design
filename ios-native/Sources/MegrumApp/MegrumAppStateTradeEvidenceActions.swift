@@ -140,10 +140,15 @@ extension MegrumAppState {
         do {
             let proposal = try await repository.approveTradeEvidence(proposalID: proposalID, photoID: photoID)
             replaceProposal(proposal)
+            applyCompletedTradeInventoryTransferIfNeeded(
+                previousProposal: previousProposal,
+                proposal: proposal
+            )
             approvingEvidenceProposalID = nil
             await loadTradeEvidencePhotos(proposal: proposal, reportsFailure: false)
             await loadMessages(proposalID: proposalID)
             appendLocalCompletionNoticeIfNeeded(proposal: proposal)
+            await refreshCompletedTradeInventoryIfNeeded(previousProposal: previousProposal, proposal: proposal)
             return true
         } catch {
             if let previousProposal {
@@ -156,6 +161,51 @@ extension MegrumAppState {
             approvingEvidenceProposalID = nil
             return false
         }
+    }
+
+    private func applyCompletedTradeInventoryTransferIfNeeded(
+        previousProposal: TradeProposal?,
+        proposal: TradeProposal
+    ) {
+        guard proposal.status == .completed,
+              previousProposal?.status != .completed,
+              let viewerID = viewer?.id
+        else {
+            return
+        }
+
+        applyGoodsLocalState(
+            GoodsLocalStateReducer.applyingCompletedTrade(
+                proposal: proposal,
+                viewerID: viewerID,
+                viewerProfile: viewer,
+                knownGoodsByID: currentTradeGoodsByID,
+                to: currentGoodsLocalState
+            )
+        )
+    }
+
+    private func refreshCompletedTradeInventoryIfNeeded(
+        previousProposal: TradeProposal?,
+        proposal: TradeProposal
+    ) async {
+        guard proposal.status == .completed,
+              previousProposal?.status != .completed,
+              !(repository is PreviewMegrumRepository)
+        else {
+            return
+        }
+        await refreshHomeDiscovery()
+    }
+
+    private var currentTradeGoodsByID: [UUID: GoodsItem] {
+        TradeGoodsLookup.build(
+            inventory: inventory,
+            homeMatchedItems: homeMatchedItems,
+            homePossibleItems: homePossibleItems,
+            wishes: wishes,
+            publicTradeGoodsByUserID: publicTradeGoodsByUserID
+        )
     }
 
     private func appendLocalEvidenceNoticeIfNeeded(proposalID: UUID, body: String) {

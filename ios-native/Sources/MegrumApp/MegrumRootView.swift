@@ -135,7 +135,9 @@ public struct MegrumRootView: View {
             NavigationStack {
                 switch route {
                 case .exchange:
-                    HomeExchangeSettingsScreen(individualListings: appState.listings)
+                    HomeExchangeSettingsScreen(individualListings: appState.listings) {
+                        homeSettingsRoute = nil
+                    }
                 case .payment:
                     PaymentSettingsScreen(appState: appState) {
                         homeSettingsRoute = nil

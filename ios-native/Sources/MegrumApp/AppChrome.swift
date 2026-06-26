@@ -210,7 +210,7 @@ struct AppDrawerOverlay: View {
             return appState.unreadNotificationCount > 0 ? "\(appState.unreadNotificationCount)" : nil
         case .paymentSettings:
             return AppDrawerSettingsBadgePolicy.paymentBadgeText(
-                methods: appState.paymentSettings?.methods ?? appState.viewer?.paymentMethods ?? []
+                methods: PaymentSettingsResolver.methods(settings: appState.paymentSettings, viewer: appState.viewer)
             )
         case .exchangeSettings:
             return exchangeSettingsBadgeText

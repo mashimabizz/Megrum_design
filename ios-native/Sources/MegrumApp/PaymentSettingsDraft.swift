@@ -23,13 +23,13 @@ struct PaymentSettingsDraft: Equatable, Sendable {
     )
 
     init(settings: UserPaymentSettings?, viewer: UserProfile?) {
-        self.methods = UserPaymentMethod.normalized(viewer?.paymentMethods ?? settings?.methods ?? [])
+        self.methods = PaymentSettingsResolver.methods(settings: settings, viewer: viewer)
         self.bankName = settings?.bankName ?? ""
         self.bankBranchName = settings?.bankBranchName ?? ""
         self.bankAccountType = settings?.bankAccountType ?? ""
         self.bankAccountNumber = settings?.bankAccountNumber ?? ""
         self.bankAccountHolder = settings?.bankAccountHolder ?? ""
-        self.otherNote = Self.limitedOtherNote(Self.trimmed(settings?.otherNote ?? viewer?.paymentNote ?? ""))
+        self.otherNote = Self.limitedOtherNote(Self.trimmed(PaymentSettingsResolver.otherNote(settings: settings, viewer: viewer) ?? ""))
     }
 
     init(
