@@ -4,6 +4,43 @@
 
 ---
 
+## イテレーション1174：proposal active step contentを分離
+
+### 背景・問題意識
+
+打診作成の `ProposalCreateActiveContent` に、画面骨格とステップごとの中身切り替えが同居していた。ヘッダー、スクロール、タブ表示条件を親に残し、ステップ別contentとconfirm時のinline bottom barを専用Viewへ分ける。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/ProposalCreateFlowContentViews.swift`
+- `ProposalCreateActiveStepContent` を追加し、`selectedStep` ごとのcontent切り替えとconfirm時のinline bottom bar表示を専用Viewへ分離した。
+- `ProposalCreateActiveContent` は画面ヘッダー、スクロール領域、交換方法セレクタ、ステップヘッダーの配置に集中する構成へ寄せた。
+- `stepContent` の computed `some View` helper を削除した。
+
+### 影響範囲
+
+- Swift Native iOS版の打診作成フロー本体。
+- ステップ切り替え、各contentの表示順、confirm時のinline bottom bar、padding、spacing、DB/API、状態名、表示文言は変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumApp/ProposalCreateFlowContentViews.swift`
+  - passed
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-proposal-active-step-content`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-proposal-active-step-content-tests --enable-xctest --disable-swift-testing -j 1 --filter 'ProposalCreateFlowTests|ProposalCreateSheetTests|TradeRequestDraftProposalCreateFlowTests|TradeChatAffordanceTests'`
+  - passed（112 tests）
+
+### セルフレビュー結果
+
+- ✅ ステップごとのcontent切り替えと表示順を維持した。
+- ✅ confirm時のinline bottom bar表示条件とprimary actionを維持した。
+- ✅ 親View側のpadding、spacing、交換方法セレクタ、ステップヘッダー表示条件を維持した。
+- ✅ DB/API、状態名、表示文言、打診作成の進行条件は変更していない。
+- ✅ 新しい状態名・用語・DB列は追加していないため、`notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション1173：proposal card section headerを分離
 
 ### 背景・問題意識

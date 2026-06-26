@@ -92,7 +92,20 @@ struct ProposalCreateActiveContent<GiveContent: View, ReceiveContent: View, Meet
                         )
                     }
 
-                    stepContent
+                    ProposalCreateActiveStepContent(
+                        selectedStep: selectedStep,
+                        configuration: configuration,
+                        meetupHasTimeDraft: meetupHasTimeDraft,
+                        usesInlineBottomBar: usesInlineBottomBar,
+                        isCreating: isCreating,
+                        onPrimary: onPrimary,
+                        giveContent: giveContent,
+                        receiveContent: receiveContent,
+                        meetupContent: meetupContent,
+                        shippingContent: shippingContent,
+                        paymentContent: paymentContent,
+                        confirmContent: confirmContent
+                    )
                 }
                 .padding(.horizontal, horizontalContentPadding)
                 .padding(.top, 10)
@@ -100,9 +113,52 @@ struct ProposalCreateActiveContent<GiveContent: View, ReceiveContent: View, Meet
             }
         }
     }
+}
+
+private struct ProposalCreateActiveStepContent<GiveContent: View, ReceiveContent: View, MeetupContent: View, ShippingContent: View, PaymentContent: View, ConfirmContent: View>: View {
+    var selectedStep: ProposalCreateStep
+    var configuration: ProposalCreateConfiguration
+    var meetupHasTimeDraft: Bool
+    var usesInlineBottomBar: Bool
+    var isCreating: Bool
+    var onPrimary: () -> Void
+    private var giveContent: () -> GiveContent
+    private var receiveContent: () -> ReceiveContent
+    private var meetupContent: () -> MeetupContent
+    private var shippingContent: () -> ShippingContent
+    private var paymentContent: () -> PaymentContent
+    private var confirmContent: () -> ConfirmContent
+
+    init(
+        selectedStep: ProposalCreateStep,
+        configuration: ProposalCreateConfiguration,
+        meetupHasTimeDraft: Bool,
+        usesInlineBottomBar: Bool,
+        isCreating: Bool,
+        onPrimary: @escaping () -> Void,
+        @ViewBuilder giveContent: @escaping () -> GiveContent,
+        @ViewBuilder receiveContent: @escaping () -> ReceiveContent,
+        @ViewBuilder meetupContent: @escaping () -> MeetupContent,
+        @ViewBuilder shippingContent: @escaping () -> ShippingContent,
+        @ViewBuilder paymentContent: @escaping () -> PaymentContent,
+        @ViewBuilder confirmContent: @escaping () -> ConfirmContent
+    ) {
+        self.selectedStep = selectedStep
+        self.configuration = configuration
+        self.meetupHasTimeDraft = meetupHasTimeDraft
+        self.usesInlineBottomBar = usesInlineBottomBar
+        self.isCreating = isCreating
+        self.onPrimary = onPrimary
+        self.giveContent = giveContent
+        self.receiveContent = receiveContent
+        self.meetupContent = meetupContent
+        self.shippingContent = shippingContent
+        self.paymentContent = paymentContent
+        self.confirmContent = confirmContent
+    }
 
     @ViewBuilder
-    private var stepContent: some View {
+    var body: some View {
         switch selectedStep {
         case .give:
             giveContent()
