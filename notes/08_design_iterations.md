@@ -4,6 +4,45 @@
 
 ---
 
+## イテレーション1147：goods detail sheet partsを分離
+
+### 背景・問題意識
+
+`GoodsDetailSheet` は、sheet本体のscroll/navigation構成と、hero表示、copy/metrics表示を同じView内の `hero` / `copy` computed helperとして抱えていた。グッズ詳細sheetの見た目、タグ表示、状態pill、数量/状態metricsを維持したまま、表示単位を小さな専用Viewへ分離する。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/GoodsDetailSheetViews.swift`
+- `GoodsDetailHero` を追加し、gradient背景、remote image / placeholder、先頭tag pill、status pill、shadowを移動した。
+- `GoodsDetailCopy` を追加し、title、tag flow、数量/状態metricsを移動した。
+- `GoodsDetailSheet` はScrollView、padding、navigation title、dismiss toolbarの構成に寄せた。
+- 子Viewには `GoodsItem`、`quantityLabel`、`statusLabel` だけを渡し、sheet context全体は渡さない形にした。
+
+### 影響範囲
+
+- Swift Native iOS版のgoods gridから開くグッズ詳細sheet。
+- hero画像/placeholder、先頭tag pill、status pill、title、tags、数量/状態metrics。
+- goods保存/編集/一括登録、tile presentation計算、DB/API、状態名、表示文言は変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumApp/GoodsDetailSheetViews.swift`
+  - passed
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-goods-detail-sheet-parts`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-goods-detail-sheet-parts-tests --enable-xctest --disable-swift-testing -j 1 --filter 'GoodsEditorDraftTests|GoodsInventoryCreateMetaTilePresentationTests'`
+  - passed（29 tests）
+
+### セルフレビュー結果
+
+- ✅ heroのcornerRadius、gradient色/opacity、aspectRatio、image placeholder、tag/status pill配置、shadowを維持した。
+- ✅ title font/color、tag flow表示条件、数量の `max(1, item.quantity)`、状態metric表示を維持した。
+- ✅ navigation title、dismiss toolbar、padding、背景、sheet導線を変更していない。
+- ✅ goods保存/編集/一括登録、tile presentation計算、DB/API、状態名、表示文言は変更していない。
+- ✅ 新しい状態名・用語・DB列は追加していないため、`notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション1146：groom story tile partsを分離
 
 ### 背景・問題意識

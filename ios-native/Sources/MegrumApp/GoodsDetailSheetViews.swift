@@ -14,8 +14,12 @@ struct GoodsDetailSheet: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
-                hero
-                copy
+                GoodsDetailHero(item: item, statusLabel: presentation.statusLabel)
+                GoodsDetailCopy(
+                    item: item,
+                    quantityLabel: context.quantityLabel,
+                    statusLabel: presentation.statusLabel
+                )
             }
             .padding(.horizontal, 20)
             .padding(.top, 18)
@@ -32,8 +36,13 @@ struct GoodsDetailSheet: View {
             }
         }
     }
+}
 
-    private var hero: some View {
+private struct GoodsDetailHero: View {
+    var item: GoodsItem
+    var statusLabel: String
+
+    var body: some View {
         RoundedRectangle(cornerRadius: 28, style: .continuous)
             .fill(
                 LinearGradient(
@@ -67,13 +76,19 @@ struct GoodsDetailSheet: View {
                 }
             }
             .overlay(alignment: .topLeading) {
-                GoodsStatusPill(text: presentation.statusLabel)
+                GoodsStatusPill(text: statusLabel)
                     .padding(14)
             }
             .shadow(color: MegrumTheme.ink.opacity(0.12), radius: 22, y: 12)
     }
+}
 
-    private var copy: some View {
+private struct GoodsDetailCopy: View {
+    var item: GoodsItem
+    var quantityLabel: String
+    var statusLabel: String
+
+    var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text(item.title)
                 .font(.system(size: 28, weight: .heavy, design: .rounded))
@@ -84,8 +99,8 @@ struct GoodsDetailSheet: View {
             }
 
             HStack(spacing: 12) {
-                DetailMetric(label: context.quantityLabel, value: "\(max(1, item.quantity))")
-                DetailMetric(label: "状態", value: presentation.statusLabel)
+                DetailMetric(label: quantityLabel, value: "\(max(1, item.quantity))")
+                DetailMetric(label: "状態", value: statusLabel)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
