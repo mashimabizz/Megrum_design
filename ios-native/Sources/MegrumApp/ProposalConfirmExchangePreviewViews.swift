@@ -10,19 +10,30 @@ struct ProposalExchangePreviewRow: View {
     var receiverCashAmount: Int? = nil
 
     var body: some View {
-        content
+        ProposalExchangePreviewRowContent(
+            senderGoods: senderGoods,
+            receiverGoods: receiverGoods,
+            senderCashAmount: senderCashAmount,
+            receiverCashAmount: receiverCashAmount
+        )
             .padding(.horizontal, 12)
             .padding(.top, 14)
             .padding(.bottom, 12)
-        .background(.white.opacity(0.92), in: RoundedRectangle(cornerRadius: 24, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: 24, style: .continuous)
-                .strokeBorder(MegrumTheme.ink.opacity(0.10), lineWidth: 1)
-        }
+            .background(.white.opacity(0.92), in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: 24, style: .continuous)
+                    .strokeBorder(MegrumTheme.ink.opacity(0.10), lineWidth: 1)
+            }
     }
+}
 
-    @ViewBuilder
-    private var content: some View {
+private struct ProposalExchangePreviewRowContent: View {
+    var senderGoods: [GoodsItem]
+    var receiverGoods: [GoodsItem]
+    var senderCashAmount: Int?
+    var receiverCashAmount: Int?
+
+    var body: some View {
         if senderCashAmount == nil, receiverCashAmount == nil {
             TradeDealGoodsPanel(
                 offeredItems: senderGoods,

@@ -4,6 +4,42 @@
 
 ---
 
+## イテレーション1170：proposal exchange preview contentを分離
+
+### 背景・問題意識
+
+打診作成の交換プレビュー行に、現金を含まない通常プレビューと現金を含むプレビューを切り替える computed `some View` helper が残っていた。プレビューの外枠、padding、通常表示、現金込み表示を維持したまま、分岐部分を専用Viewへ分ける。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/ProposalConfirmExchangePreviewViews.swift`
+- `ProposalExchangePreviewRowContent` を追加し、通常の `TradeDealGoodsPanel` と現金対応プレビューの切り替えを専用Viewへ分離した。
+- `ProposalExchangePreviewRow` は入力値の受け渡しと外枠装飾に集中する構成へ寄せた。
+- `content` の computed `some View` helper を削除した。
+
+### 影響範囲
+
+- Swift Native iOS版の打診作成確認プレビュー。
+- 通常プレビュー、現金込みプレビュー、タイトル、empty表示、外枠、padding、DB/API、状態名、表示文言は変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumApp/ProposalConfirmExchangePreviewViews.swift`
+  - passed
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-proposal-preview`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-proposal-preview-tests --enable-xctest --disable-swift-testing -j 1 --filter 'ProposalCreateFlowTests|ProposalCreateSheetTests|TradeRequestDraftProposalCreateFlowTests|TradeChatAffordanceTests'`
+  - passed（112 tests）
+
+### セルフレビュー結果
+
+- ✅ 通常プレビューと現金込みプレビューの切り替え条件を維持した。
+- ✅ 外枠、padding、stroke、タイトル、empty表示を維持した。
+- ✅ DB/API、状態名、表示文言、打診作成の進行条件は変更していない。
+- ✅ 新しい状態名・用語・DB列は追加していないため、`notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション1169：proposal artwork thumbnailsを分離
 
 ### 背景・問題意識
