@@ -9,11 +9,18 @@ import UIKit
 struct ListingConditionThumbnail: View {
     var imageName: String
 
+    private var imageURL: URL? {
+        Bundle.module.url(forResource: imageName, withExtension: "png", subdirectory: "TestGoodsImages")
+            ?? URL(fileURLWithPath: #filePath)
+                .deletingLastPathComponent()
+                .appendingPathComponent("Resources/TestGoodsImages/\(imageName).png")
+    }
+
     var body: some View {
         RoundedRectangle(cornerRadius: 12)
             .fill(MegrumTheme.lavender.opacity(0.12))
             .overlay {
-                imageLayer
+                ListingConditionThumbnailImageLayer(imageURL: imageURL)
             }
             .frame(
                 width: ListingConditionDesignMetrics.optionThumbnailSize,
@@ -25,16 +32,12 @@ struct ListingConditionThumbnail: View {
                     .strokeBorder(Color.white.opacity(0.78), lineWidth: 1)
             }
     }
+}
 
-    private var imageURL: URL? {
-        Bundle.module.url(forResource: imageName, withExtension: "png", subdirectory: "TestGoodsImages")
-            ?? URL(fileURLWithPath: #filePath)
-                .deletingLastPathComponent()
-                .appendingPathComponent("Resources/TestGoodsImages/\(imageName).png")
-    }
+private struct ListingConditionThumbnailImageLayer: View {
+    var imageURL: URL?
 
-    @ViewBuilder
-    private var imageLayer: some View {
+    var body: some View {
         #if canImport(UIKit)
         if let imageURL,
            let data = try? Data(contentsOf: imageURL),
@@ -43,14 +46,16 @@ struct ListingConditionThumbnail: View {
                 .resizable()
                 .scaledToFill()
         } else {
-            placeholder
+            ListingConditionThumbnailPlaceholder()
         }
         #else
-        placeholder
+        ListingConditionThumbnailPlaceholder()
         #endif
     }
+}
 
-    private var placeholder: some View {
+private struct ListingConditionThumbnailPlaceholder: View {
+    var body: some View {
         LinearGradient(
             colors: [
                 MegrumTheme.lavender.opacity(0.42),

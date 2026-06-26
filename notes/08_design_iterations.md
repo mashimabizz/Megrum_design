@@ -4,6 +4,45 @@
 
 ---
 
+## イテレーション1162：listing condition thumbnail image layerを分離
+
+### 背景・問題意識
+
+`ListingConditionThumbnail` は個別募集条件のデザインpreviewで使う小さなサムネイルだが、枠・サイズ・strokeの本体表示と、画像読み込み/placeholder表示の分岐が同じView内の computed `some View` helper に混在していた。サムネイルの見た目、画像探索パス、UIKit画像読み込み、fallbackグラデーションを維持したまま、画像レイヤーを専用Viewへ分ける。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/ListingConditionThumbnail.swift`
+- `ListingConditionThumbnailImageLayer` を追加し、UIKitでの画像データ読み込みとfallback分岐を専用Viewへ移動した。
+- `ListingConditionThumbnailPlaceholder` を追加し、lavender/pinkのfallbackグラデーションを専用Viewへ移動した。
+- `ListingConditionThumbnail` はサムネイル枠、サイズ、clip、strokeを表す構成に寄せた。
+- `imageLayer` / `placeholder` の computed `some View` helper を削除した。
+
+### 影響範囲
+
+- Swift Native iOS版 DEBUG preview の個別募集条件サムネイル。
+- `ListingConditionDesignPreviewPanels` / `ListingConditionReceivePanel` から利用される `ListingConditionThumbnail`。
+- 画像名、画像探索パス、サムネイルサイズ、cornerRadius、背景色、stroke、fallbackグラデーション、DB/API、状態名、表示文言は変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumApp/ListingConditionThumbnail.swift`
+  - passed
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-listing-condition-thumbnail`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-listing-condition-thumbnail-tests --enable-xctest --disable-swift-testing -j 1 --filter 'IndividualListingDraftTests'`
+  - passed（36 tests）
+
+### セルフレビュー結果
+
+- ✅ サムネイルの `ListingConditionDesignMetrics.optionThumbnailSize`、cornerRadius 12、背景色、白stroke、clipを維持した。
+- ✅ `Bundle.module` と `#filePath` fallback による画像探索パスを維持した。
+- ✅ UIKit利用可能時の `Data(contentsOf:)` / `UIImage(data:)` / `scaledToFill()` と、非UIKit時のfallbackグラデーションを維持した。
+- ✅ DEBUG preview用の小さな構造整理のみで、DB/API、状態名、表示文言、個別募集ロジックは変更していない。
+- ✅ 新しい状態名・用語・DB列は追加していないため、`notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション1161：blocked users row partsを分離
 
 ### 背景・問題意識
