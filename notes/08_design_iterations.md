@@ -4,6 +4,45 @@
 
 ---
 
+## イテレーション1160：account setup oshi componentsを分離
+
+### 背景・問題意識
+
+`AccountSetupOshiComponents` は、前回分離した推し選択セクションの共有部品として、`AccountSetupOshiChip` 内に薄い `chipLabel` computed `some View` helper を持ち、選択済み推し一覧でも横スクロールと削除actionを `AccountSetupSelectedOshiSummary` 内の helper に抱えていた。chipの見た目、選択済み表示、選択解除、入力エラー解除、accessibilityを維持したまま、表示部品を専用Viewへ分けて親Viewの責務を薄くする。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/AccountSetupOshiComponents.swift`
+- `AccountSetupOshiChip` の薄い `chipLabel` helper を削除し、button labelを `body` に直接配置した。
+- `AccountSetupSelectedOshiDraftScroller` を追加し、選択済み推しchipの横スクロール表示を専用Viewへ分離した。
+- `AccountSetupSelectedOshiDraftChip` を追加し、選択済み推しchipのlabel/font/padding/background/foregroundを専用Viewへ分離した。
+- `AccountSetupSelectedOshiSummary` は、空状態表示と選択済み一覧の切り替え、選択解除時の入力エラー解除だけを担う構成にした。
+
+### 影響範囲
+
+- Swift Native iOS版のアカウント初期設定/推し設定編集画面内、推しchipと選択済み推しサマリーの画面構成コード。
+- グループ/メンバーchipの表示、選択済み推しchipの表示、選択解除の接続。
+- chip title/icon、selected/unselected色、font、height、padding、border、empty state、`selectedOshiDrafts` binding、`onClearInputError` callback、accessibility label/value/hint、DB/API、状態名、表示文言、レイアウト値は変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumApp/AccountSetupOshiComponents.swift`
+  - passed
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-account-setup-oshi-components`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-account-setup-oshi-components-tests --enable-xctest --disable-swift-testing -j 1 --filter 'AccountSetupScreenTests|OnboardingOshiSelectionTests|OshiSettingsDraftTests'`
+  - passed（23 tests）
+
+### セルフレビュー結果
+
+- ✅ `AccountSetupOshiChip` のtitle/icon、selected色、font、height、padding、border、accessibility label/value/hintを維持した。
+- ✅ 選択済み推しchipの横スクロール、spacing、padding、label、systemImage、font、height、background、foreground、accessibility labelを維持した。
+- ✅ 選択解除時は従来どおり `onClearInputError` を呼んでから `selectedOshiDrafts` から対象draftを削除する。
+- ✅ 空状態の表示文言、font、背景、余白は変更していない。
+- ✅ 新しい状態名・用語・DB列は追加していないため、`notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション1159：account setup oshi sectionを分離
 
 ### 背景・問題意識

@@ -32,31 +32,27 @@ struct AccountSetupOshiChip: View {
 
     var body: some View {
         Button(action: action) {
-            chipLabel
+            Label {
+                Text(title)
+            } icon: {
+                Image(systemName: systemImage)
+            }
+            .font(.system(size: 15, weight: .black, design: .rounded))
+            .lineLimit(1)
+            .padding(.horizontal, 14)
+            .frame(height: 42)
+            .background(fillColor, in: Capsule())
+            .foregroundStyle(foregroundColor)
+            .overlay(
+                Capsule()
+                    .strokeBorder(borderColor, lineWidth: 1)
+            )
         }
         .buttonStyle(.plain)
         .accessibilityAddTraits(isSelected ? .isSelected : [])
         .accessibilityLabel(title)
         .accessibilityValue(isSelected ? "選択済み" : "未選択")
         .accessibilityHint(accessibilityHint)
-    }
-
-    private var chipLabel: some View {
-        Label {
-            Text(title)
-        } icon: {
-            Image(systemName: systemImage)
-        }
-        .font(.system(size: 15, weight: .black, design: .rounded))
-        .lineLimit(1)
-        .padding(.horizontal, 14)
-        .frame(height: 42)
-        .background(fillColor, in: Capsule())
-        .foregroundStyle(foregroundColor)
-        .overlay(
-            Capsule()
-                .strokeBorder(borderColor, lineWidth: 1)
-        )
     }
 
     private var fillColor: Color {
@@ -90,26 +86,30 @@ struct AccountSetupSelectedOshiSummary: View {
                     .padding(14)
                     .background(Color.white.opacity(0.72), in: RoundedRectangle(cornerRadius: 16))
             } else {
-                selectedOshiDraftScroller
+                AccountSetupSelectedOshiDraftScroller(
+                    selectedOshiDrafts: selectedOshiDrafts,
+                    onRemoveDraft: removeDraft
+                )
             }
         }
     }
 
-    private var selectedOshiDraftScroller: some View {
+    private func removeDraft(_ draft: OnboardingOshiDraft) {
+        onClearInputError()
+        selectedOshiDrafts.removeAll { $0.id == draft.id }
+    }
+}
+
+private struct AccountSetupSelectedOshiDraftScroller: View {
+    var selectedOshiDrafts: [OnboardingOshiDraft]
+    var onRemoveDraft: (OnboardingOshiDraft) -> Void
+
+    var body: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 8) {
                 ForEach(selectedOshiDrafts) { draft in
-                    Button {
-                        onClearInputError()
-                        selectedOshiDrafts.removeAll { $0.id == draft.id }
-                    } label: {
-                        Label(draft.displayName, systemImage: "xmark.circle.fill")
-                            .font(.system(size: 13, weight: .black, design: .rounded))
-                            .lineLimit(1)
-                            .padding(.horizontal, 12)
-                            .frame(height: 34)
-                            .background(MegrumTheme.lavender.opacity(0.14), in: Capsule())
-                            .foregroundStyle(MegrumTheme.lavender)
+                    Button(action: { onRemoveDraft(draft) }) {
+                        AccountSetupSelectedOshiDraftChip(displayName: draft.displayName)
                     }
                     .buttonStyle(.plain)
                     .accessibilityLabel("\(draft.displayName)を選択から外す")
@@ -117,5 +117,19 @@ struct AccountSetupSelectedOshiSummary: View {
             }
             .padding(.vertical, 2)
         }
+    }
+}
+
+private struct AccountSetupSelectedOshiDraftChip: View {
+    var displayName: String
+
+    var body: some View {
+        Label(displayName, systemImage: "xmark.circle.fill")
+            .font(.system(size: 13, weight: .black, design: .rounded))
+            .lineLimit(1)
+            .padding(.horizontal, 12)
+            .frame(height: 34)
+            .background(MegrumTheme.lavender.opacity(0.14), in: Capsule())
+            .foregroundStyle(MegrumTheme.lavender)
     }
 }
