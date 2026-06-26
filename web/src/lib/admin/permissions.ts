@@ -15,6 +15,9 @@ export const ADMIN_PERMISSION_OPTIONS = [
   { key: "entitlements.manage", label: "有料権限付与/停止" },
   { key: "reports.read", label: "通報閲覧" },
   { key: "reports.moderate", label: "通報対応" },
+  { key: "oshi_requests.read", label: "推し追加リクエスト閲覧" },
+  { key: "oshi_requests.manage", label: "推しマスタ承認" },
+  { key: "notifications.send", label: "運営通知送信" },
   { key: "audit.read", label: "監査ログ閲覧" },
 ] as const;
 

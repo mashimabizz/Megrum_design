@@ -1487,7 +1487,7 @@ Stripe webhook 受信。
 - **実装 route**: Web App Router では `/api/stripe/webhook`（iter166）。外部公開API名として `/api/v1/subscriptions/webhooks/stripe` を維持する場合は rewrite で接続する。
 - **Side effects**: `stripe_webhook_events` に event_id を保存して冪等化、`subscriptions` レコード作成・更新。`plan_type='meguri_plus_monthly'` は `user_entitlements(feature_key='meguri_plus')`、それ以外のPremium系は `user_entitlements(feature_key='premium')` を更新。広告非表示・boost grant はPremium仕様確定後に別ジョブで反映。
 
-### Admin Console（server actions / iter166）
+### Admin Console（server actions / iter166, iter1222）
 
 `/admin` 配下は一般公開 REST API ではなく、Next.js Server Actions + server-side service role で実装する。
 
@@ -1497,6 +1497,10 @@ Stripe webhook 受信。
   - `user.account_status.update`: `users.update_status` 権限、理由必須、`admin_audit_logs` 保存
   - `admin_role.upsert`: `roles.manage` 権限、最後の `owner` 無効化不可、`admin_audit_logs` 保存
   - `entitlement.manual_override`: `entitlements.manage` 権限、`plan_overrides` + `user_entitlements` + `admin_audit_logs` 保存
+  - `report.status.update`: `reports.moderate` 権限。`reports` / `goods_reports` / `groom_reports` / `meguri_board_reports` / `disputes` の状態更新を理由必須で保存
+  - `oshi_request.approve_new_group` / `oshi_request.merge_group` / `oshi_request.reject`: `oshi_requests.manage` 権限。`groups_master` 登録または既存L1統合後、`oshi_requests` を `approved` / `merged` / `rejected` に更新
+  - `character_request.approve_new_character` / `character_request.merge_character` / `character_request.reject`: `oshi_requests.manage` 権限。`characters_master` 登録または既存L2統合後、`character_requests` を更新
+  - `notification.admin_announcement.send`: `notifications.send` 権限。任意ユーザーまたは `account_status in ('verified','onboarding','active')` の全ユーザーへ `notifications.kind='admin_announcement'` を作成し、既存モバイル通知配送へ委譲
 
 ### POST /api/v1/subscriptions/me/cancel
 

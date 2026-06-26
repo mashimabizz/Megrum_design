@@ -186,7 +186,8 @@ final class SupabaseRequestParityTests: XCTestCase {
             "groom_reply",
             "meguri_message",
             "meguri_board_reply",
-            "meguri_board_mention"
+            "meguri_board_mention",
+            "admin_announcement"
         ]
         let requestKinds = Set(
             MegrumNotificationKind.allCases

@@ -21,7 +21,27 @@ const ACCOUNT_STATUSES = [
   "deleted",
 ] as const;
 
+const REPORT_SOURCES = [
+  "reports",
+  "goods_reports",
+  "groom_reports",
+  "meguri_board_reports",
+  "disputes",
+] as const;
+
+const REPORT_STATUS_OPTIONS = {
+  reports: ["open", "reviewing", "resolved", "dismissed"],
+  goods_reports: ["open", "reviewing", "resolved", "dismissed"],
+  groom_reports: ["open", "reviewing", "resolved", "dismissed"],
+  meguri_board_reports: ["open", "reviewing", "resolved", "rejected"],
+  disputes: ["submitted", "response_pending", "arbitrating", "closed"],
+} as const;
+
+const GROUP_KINDS = ["group", "work", "solo"] as const;
+const ADMIN_NOTIFICATION_KIND = "admin_announcement";
+
 type AccountStatus = (typeof ACCOUNT_STATUSES)[number];
+type ReportSource = (typeof REPORT_SOURCES)[number];
 type ServiceSupabase = ReturnType<typeof createServiceRoleClient>;
 
 const UUID_RE =
@@ -230,9 +250,440 @@ export async function setManualEntitlement(formData: FormData) {
   redirect(safeReturnTo(formData));
 }
 
+export async function updateModerationReportStatus(formData: FormData) {
+  const context = await getAdminContext(["reports.moderate"]);
+  const adminSupabase = createServiceRoleClient();
+  const source = requiredString(formData, "source");
+  const reportId = requiredUUID(formData, "report_id");
+  const status = requiredString(formData, "status");
+  const reason = requiredString(formData, "reason");
+  const operatorComment = optionalBoundedString(formData, "operator_comment", 2_000);
+  const outcome = optionalBoundedString(formData, "outcome", 40);
+
+  if (!isReportSource(source)) {
+    throw new Error("未対応の通報種別です");
+  }
+  if (!REPORT_STATUS_OPTIONS[source].includes(status as never)) {
+    throw new Error("未対応の通報ステータスです");
+  }
+
+  const { data: before, error: beforeError } = await adminSupabase
+    .from(source)
+    .select("*")
+    .eq("id", reportId)
+    .single();
+  if (beforeError) throw new Error(beforeError.message);
+
+  const updatePayload: Record<string, unknown> = { status };
+  if (source === "reports") {
+    updatePayload.resolved_at =
+      status === "resolved" || status === "dismissed" ? new Date().toISOString() : null;
+  }
+  if (source === "disputes") {
+    if (operatorComment !== null) {
+      updatePayload.operator_comment = operatorComment;
+    }
+    if (outcome !== null) {
+      updatePayload.outcome = outcome || null;
+    }
+    updatePayload.closed_at = status === "closed" ? new Date().toISOString() : null;
+  }
+
+  const { data: after, error } = await adminSupabase
+    .from(source)
+    .update(updatePayload)
+    .eq("id", reportId)
+    .select("*")
+    .single();
+  if (error) throw new Error(error.message);
+
+  await writeAdminAuditLog({
+    actorUserId: context.user.id,
+    action: "report.status.update",
+    targetType: source,
+    targetId: reportId,
+    reason,
+    beforeState: before as Record<string, unknown>,
+    afterState: after as Record<string, unknown>,
+  });
+
+  revalidatePath("/admin");
+  revalidatePath("/admin/operations");
+  redirect(safeReturnTo(formData));
+}
+
+export async function approveOshiRequestAsNew(formData: FormData) {
+  const context = await getAdminContext(["oshi_requests.manage"]);
+  const adminSupabase = createServiceRoleClient();
+  const requestId = requiredUUID(formData, "request_id");
+  const reason = requiredString(formData, "reason");
+  const genreId = requiredUUID(formData, "genre_id");
+  const name = boundedRequiredString(formData, "name", 100);
+  const kind = requiredString(formData, "kind");
+  const aliases = parseAliasList(formData.get("aliases"));
+  const displayOrder = parseOptionalInteger(formData.get("display_order")) ?? 0;
+
+  if (!GROUP_KINDS.includes(kind as (typeof GROUP_KINDS)[number])) {
+    throw new Error("未対応の推しL1種別です");
+  }
+
+  const before = await loadPendingOshiRequest(adminSupabase, requestId);
+
+  const { data: group, error: groupError } = await adminSupabase
+    .from("groups_master")
+    .insert({
+      genre_id: genreId,
+      name,
+      aliases,
+      kind,
+      display_order: displayOrder,
+    })
+    .select("id, genre_id, name, aliases, kind, display_order")
+    .single();
+  if (groupError) throw new Error(groupError.message);
+
+  const { data: after, error } = await adminSupabase
+    .from("oshi_requests")
+    .update({
+      status: "approved",
+      approved_group_id: group.id,
+      approved_at: new Date().toISOString(),
+      rejection_reason: null,
+    })
+    .eq("id", requestId)
+    .select("*")
+    .single();
+  if (error) throw new Error(error.message);
+
+  await writeAdminAuditLog({
+    actorUserId: context.user.id,
+    action: "oshi_request.approve_new_group",
+    targetType: "oshi_request",
+    targetId: requestId,
+    reason,
+    beforeState: before,
+    afterState: after as Record<string, unknown>,
+    metadata: { approved_group: group },
+  });
+
+  revalidatePath("/admin");
+  revalidatePath("/admin/operations");
+  redirect(safeReturnTo(formData));
+}
+
+export async function mergeOshiRequestIntoGroup(formData: FormData) {
+  const context = await getAdminContext(["oshi_requests.manage"]);
+  const adminSupabase = createServiceRoleClient();
+  const requestId = requiredUUID(formData, "request_id");
+  const groupId = requiredUUID(formData, "approved_group_id");
+  const reason = requiredString(formData, "reason");
+
+  const before = await loadPendingOshiRequest(adminSupabase, requestId);
+  const group = await loadGroup(adminSupabase, groupId);
+
+  const { data: after, error } = await adminSupabase
+    .from("oshi_requests")
+    .update({
+      status: "merged",
+      approved_group_id: groupId,
+      approved_at: new Date().toISOString(),
+      rejection_reason: null,
+    })
+    .eq("id", requestId)
+    .select("*")
+    .single();
+  if (error) throw new Error(error.message);
+
+  await writeAdminAuditLog({
+    actorUserId: context.user.id,
+    action: "oshi_request.merge_group",
+    targetType: "oshi_request",
+    targetId: requestId,
+    reason,
+    beforeState: before,
+    afterState: after as Record<string, unknown>,
+    metadata: { approved_group: group },
+  });
+
+  revalidatePath("/admin");
+  revalidatePath("/admin/operations");
+  redirect(safeReturnTo(formData));
+}
+
+export async function rejectOshiRequest(formData: FormData) {
+  const context = await getAdminContext(["oshi_requests.manage"]);
+  const adminSupabase = createServiceRoleClient();
+  const requestId = requiredUUID(formData, "request_id");
+  const reason = boundedRequiredString(formData, "reason", 500);
+  const before = await loadPendingOshiRequest(adminSupabase, requestId);
+
+  const { data: after, error } = await adminSupabase
+    .from("oshi_requests")
+    .update({
+      status: "rejected",
+      approved_group_id: null,
+      approved_at: null,
+      rejection_reason: reason,
+    })
+    .eq("id", requestId)
+    .select("*")
+    .single();
+  if (error) throw new Error(error.message);
+
+  await writeAdminAuditLog({
+    actorUserId: context.user.id,
+    action: "oshi_request.reject",
+    targetType: "oshi_request",
+    targetId: requestId,
+    reason,
+    beforeState: before,
+    afterState: after as Record<string, unknown>,
+  });
+
+  revalidatePath("/admin");
+  revalidatePath("/admin/operations");
+  redirect(safeReturnTo(formData));
+}
+
+export async function approveCharacterRequestAsNew(formData: FormData) {
+  const context = await getAdminContext(["oshi_requests.manage"]);
+  const adminSupabase = createServiceRoleClient();
+  const requestId = requiredUUID(formData, "request_id");
+  const reason = requiredString(formData, "reason");
+  const groupId = requiredUUID(formData, "group_id");
+  const name = boundedRequiredString(formData, "name", 100);
+  const aliases = parseAliasList(formData.get("aliases"));
+  const displayOrder = parseOptionalInteger(formData.get("display_order")) ?? 0;
+
+  const before = await loadPendingCharacterRequest(adminSupabase, requestId);
+  const group = await loadGroup(adminSupabase, groupId);
+
+  const { data: character, error: characterError } = await adminSupabase
+    .from("characters_master")
+    .insert({
+      group_id: groupId,
+      genre_id: group.genre_id,
+      name,
+      aliases,
+      display_order: displayOrder,
+    })
+    .select("id, group_id, genre_id, name, aliases, display_order")
+    .single();
+  if (characterError) throw new Error(characterError.message);
+
+  const { data: after, error } = await adminSupabase
+    .from("character_requests")
+    .update({
+      status: "approved",
+      approved_character_id: character.id,
+      approved_at: new Date().toISOString(),
+      rejection_reason: null,
+    })
+    .eq("id", requestId)
+    .select("*")
+    .single();
+  if (error) throw new Error(error.message);
+
+  await writeAdminAuditLog({
+    actorUserId: context.user.id,
+    action: "character_request.approve_new_character",
+    targetType: "character_request",
+    targetId: requestId,
+    reason,
+    beforeState: before,
+    afterState: after as Record<string, unknown>,
+    metadata: { approved_character: character },
+  });
+
+  revalidatePath("/admin");
+  revalidatePath("/admin/operations");
+  redirect(safeReturnTo(formData));
+}
+
+export async function mergeCharacterRequestIntoCharacter(formData: FormData) {
+  const context = await getAdminContext(["oshi_requests.manage"]);
+  const adminSupabase = createServiceRoleClient();
+  const requestId = requiredUUID(formData, "request_id");
+  const characterId = requiredUUID(formData, "approved_character_id");
+  const reason = requiredString(formData, "reason");
+
+  const before = await loadPendingCharacterRequest(adminSupabase, requestId);
+  const { data: character, error: characterError } = await adminSupabase
+    .from("characters_master")
+    .select("id, group_id, genre_id, name, aliases, display_order")
+    .eq("id", characterId)
+    .single();
+  if (characterError) throw new Error(characterError.message);
+
+  const { data: after, error } = await adminSupabase
+    .from("character_requests")
+    .update({
+      status: "merged",
+      approved_character_id: characterId,
+      approved_at: new Date().toISOString(),
+      rejection_reason: null,
+    })
+    .eq("id", requestId)
+    .select("*")
+    .single();
+  if (error) throw new Error(error.message);
+
+  await writeAdminAuditLog({
+    actorUserId: context.user.id,
+    action: "character_request.merge_character",
+    targetType: "character_request",
+    targetId: requestId,
+    reason,
+    beforeState: before,
+    afterState: after as Record<string, unknown>,
+    metadata: { approved_character: character },
+  });
+
+  revalidatePath("/admin");
+  revalidatePath("/admin/operations");
+  redirect(safeReturnTo(formData));
+}
+
+export async function rejectCharacterRequest(formData: FormData) {
+  const context = await getAdminContext(["oshi_requests.manage"]);
+  const adminSupabase = createServiceRoleClient();
+  const requestId = requiredUUID(formData, "request_id");
+  const reason = boundedRequiredString(formData, "reason", 500);
+  const before = await loadPendingCharacterRequest(adminSupabase, requestId);
+
+  const { data: after, error } = await adminSupabase
+    .from("character_requests")
+    .update({
+      status: "rejected",
+      approved_character_id: null,
+      approved_at: null,
+      rejection_reason: reason,
+    })
+    .eq("id", requestId)
+    .select("*")
+    .single();
+  if (error) throw new Error(error.message);
+
+  await writeAdminAuditLog({
+    actorUserId: context.user.id,
+    action: "character_request.reject",
+    targetType: "character_request",
+    targetId: requestId,
+    reason,
+    beforeState: before,
+    afterState: after as Record<string, unknown>,
+  });
+
+  revalidatePath("/admin");
+  revalidatePath("/admin/operations");
+  redirect(safeReturnTo(formData));
+}
+
+export async function sendAdminNotification(formData: FormData) {
+  const context = await getAdminContext(["notifications.send"]);
+  const adminSupabase = createServiceRoleClient();
+  const audience = requiredString(formData, "audience");
+  const title = boundedRequiredString(formData, "title", 100);
+  const body = optionalBoundedString(formData, "body", 500);
+  const linkPath = optionalBoundedString(formData, "link_path", 500);
+  const reason = requiredString(formData, "reason");
+
+  if (linkPath !== null && linkPath !== "" && !linkPath.startsWith("/")) {
+    throw new Error("link_path はアプリ内パス（/ から始まる値）で指定してください");
+  }
+
+  let recipientIds: string[];
+  if (audience === "all") {
+    const { data, error } = await adminSupabase
+      .from("users")
+      .select("id")
+      .in("account_status", ["verified", "onboarding", "active"]);
+    if (error) throw new Error(error.message);
+    recipientIds = (data ?? []).map((row) => row.id as string);
+  } else if (audience === "user") {
+    recipientIds = [
+      await resolveUserId(
+        adminSupabase,
+        requiredString(formData, "recipient_user"),
+      ),
+    ];
+  } else {
+    throw new Error("通知の宛先が不正です");
+  }
+
+  if (recipientIds.length === 0) {
+    throw new Error("通知対象ユーザーが見つかりません");
+  }
+
+  let insertedCount = 0;
+  for (const batch of chunks(recipientIds, 500)) {
+    const { data, error } = await adminSupabase
+      .from("notifications")
+      .insert(
+        batch.map((userId) => ({
+          user_id: userId,
+          kind: ADMIN_NOTIFICATION_KIND,
+          title,
+          body,
+          link_path: linkPath || "/notifications",
+        })),
+      )
+      .select("id");
+    if (error) throw new Error(error.message);
+    insertedCount += data?.length ?? batch.length;
+  }
+
+  await writeAdminAuditLog({
+    actorUserId: context.user.id,
+    action: "notification.admin_announcement.send",
+    targetType: "notification",
+    targetId: audience === "user" ? recipientIds[0] : "all",
+    reason,
+    metadata: {
+      audience,
+      recipient_count: insertedCount,
+      title,
+      link_path: linkPath || "/notifications",
+    },
+  });
+
+  revalidatePath("/admin");
+  revalidatePath("/admin/operations");
+  redirect(safeReturnTo(formData));
+}
+
 function requiredString(formData: FormData, key: string) {
   const value = String(formData.get(key) ?? "").trim();
   if (!value) throw new Error(`${key} が未入力です`);
+  return value;
+}
+
+function boundedRequiredString(formData: FormData, key: string, maxLength: number) {
+  const value = requiredString(formData, key);
+  if (value.length > maxLength) {
+    throw new Error(`${key} は${maxLength}文字以内で入力してください`);
+  }
+  return value;
+}
+
+function optionalBoundedString(
+  formData: FormData,
+  key: string,
+  maxLength: number,
+) {
+  const value = String(formData.get(key) ?? "").trim();
+  if (!value) return null;
+  if (value.length > maxLength) {
+    throw new Error(`${key} は${maxLength}文字以内で入力してください`);
+  }
+  return value;
+}
+
+function requiredUUID(formData: FormData, key: string) {
+  const value = requiredString(formData, key);
+  if (!UUID_RE.test(value)) {
+    throw new Error(`${key} はUUIDで指定してください`);
+  }
   return value;
 }
 
@@ -243,6 +694,10 @@ function safeReturnTo(formData: FormData) {
 
 function isAccountStatus(value: string): value is AccountStatus {
   return ACCOUNT_STATUSES.includes(value as AccountStatus);
+}
+
+function isReportSource(value: string): value is ReportSource {
+  return REPORT_SOURCES.includes(value as ReportSource);
 }
 
 function normalizePermissions(permissions: string[]) {
@@ -311,4 +766,82 @@ async function resolveUserId(adminSupabase: ServiceSupabase, rawValue: string) {
   }
 
   throw new Error("対象ユーザーが見つかりません");
+}
+
+function parseAliasList(value: FormDataEntryValue | null) {
+  return Array.from(
+    new Set(
+      String(value ?? "")
+        .split(/[\n,]+/)
+        .map((alias) => alias.trim())
+        .filter(Boolean),
+    ),
+  ).slice(0, 30);
+}
+
+function parseOptionalInteger(value: FormDataEntryValue | null) {
+  const raw = String(value ?? "").trim();
+  if (!raw) return null;
+  const parsed = Number.parseInt(raw, 10);
+  if (!Number.isFinite(parsed)) {
+    throw new Error("数値の形式が正しくありません");
+  }
+  return parsed;
+}
+
+function chunks<T>(items: T[], size: number) {
+  const result: T[][] = [];
+  for (let index = 0; index < items.length; index += size) {
+    result.push(items.slice(index, index + size));
+  }
+  return result;
+}
+
+async function loadPendingOshiRequest(
+  adminSupabase: ServiceSupabase,
+  requestId: string,
+) {
+  const { data, error } = await adminSupabase
+    .from("oshi_requests")
+    .select("*")
+    .eq("id", requestId)
+    .single();
+  if (error) throw new Error(error.message);
+  if (data.status !== "pending") {
+    throw new Error("pending 以外の推し追加リクエストは処理できません");
+  }
+  return data as Record<string, unknown>;
+}
+
+async function loadPendingCharacterRequest(
+  adminSupabase: ServiceSupabase,
+  requestId: string,
+) {
+  const { data, error } = await adminSupabase
+    .from("character_requests")
+    .select("*")
+    .eq("id", requestId)
+    .single();
+  if (error) throw new Error(error.message);
+  if (data.status !== "pending") {
+    throw new Error("pending 以外のメンバー追加リクエストは処理できません");
+  }
+  return data as Record<string, unknown>;
+}
+
+async function loadGroup(adminSupabase: ServiceSupabase, groupId: string) {
+  const { data, error } = await adminSupabase
+    .from("groups_master")
+    .select("id, genre_id, name, aliases, kind, display_order")
+    .eq("id", groupId)
+    .single();
+  if (error) throw new Error(error.message);
+  return data as {
+    id: string;
+    genre_id: string;
+    name: string;
+    aliases: string[];
+    kind: string;
+    display_order: number;
+  };
 }

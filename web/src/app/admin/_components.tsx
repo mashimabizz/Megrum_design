@@ -111,6 +111,38 @@ export function AdminTextInput({
   );
 }
 
+export function AdminTextarea({
+  name,
+  label,
+  placeholder,
+  required,
+  defaultValue,
+  rows = 3,
+}: {
+  name: string;
+  label: string;
+  placeholder?: string;
+  required?: boolean;
+  defaultValue?: string;
+  rows?: number;
+}) {
+  return (
+    <label className="block">
+      <span className="mb-1 block text-[11px] font-bold text-slate-500">
+        {label}
+      </span>
+      <textarea
+        name={name}
+        required={required}
+        defaultValue={defaultValue}
+        placeholder={placeholder}
+        rows={rows}
+        className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-[13px] font-semibold text-slate-900 outline-none focus:border-megrum-lavender focus:ring-2 focus:ring-megrum-lavender/20"
+      />
+    </label>
+  );
+}
+
 export function AdminSelect({
   name,
   label,

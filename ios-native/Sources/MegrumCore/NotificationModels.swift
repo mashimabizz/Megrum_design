@@ -18,6 +18,7 @@ public enum MegrumNotificationKind: String, Codable, Sendable, CaseIterable, Ide
     case meguriMessage = "meguri_message"
     case meguriBoardReply = "meguri_board_reply"
     case meguriBoardMention = "meguri_board_mention"
+    case adminAnnouncement = "admin_announcement"
     case unknown
 
     public var id: String { rawValue }

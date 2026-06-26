@@ -670,7 +670,10 @@ iter46 で整理した以下を弁護士に再レビュー依頼：
 
 | 用語 | 別名/英 | 定義 | 関連 |
 |---|---|---|---|
-| **管理者ページ** | admin console | `/admin` 配下の運営用Web画面。ユーザー管理、管理者権限、有料プラン、監査ログを扱う | iter166 |
+| **管理者ページ** | admin console | `/admin` 配下の運営用Web画面。ユーザー管理、運用管理、管理者権限、有料プラン、監査ログを扱う | iter166, iter1222 |
+| **運用管理** | admin operations | `/admin/operations` で扱う最低限の運用画面。通報窓口、推し追加リクエスト承認、運営通知送信をまとめる | iter1222 |
+| **通報窓口** | moderation reports | アプリ内から届くユーザー/取引/グッズ/めぐり/掲示板の通報を管理者が横断確認し、状態を更新する運用領域 | iter1222 |
+| **運営通知** | admin announcement | 管理者が任意ユーザーまたは有効ユーザー全体へ送る通知。`notifications.kind='admin_announcement'` としてアプリ内通知一覧と既存モバイル通知配送に乗せる | iter1222 |
 | **管理者ロール** | admin role | `admin_roles.role`。`owner` / `support` / `trust_safety` / `billing` / `viewer` の5種類 | iter166 |
 | **管理者権限** | permission | `users.read` などの細分化された操作権限。`owner` または `*` は全権限 | iter166 |
 | **MFA必須管理者** | AAL2 required admin | `admin_roles.requires_mfa=true` の管理者。Supabase Auth の AAL2 セッションでのみ管理者ページへ入れる | iter166 |

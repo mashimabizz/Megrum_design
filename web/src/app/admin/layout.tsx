@@ -8,6 +8,7 @@ export const metadata = {
 
 const NAV_ITEMS = [
   { href: "/admin", label: "概要" },
+  { href: "/admin/operations", label: "運用" },
   { href: "/admin/users", label: "ユーザー" },
   { href: "/admin/roles", label: "権限" },
   { href: "/admin/billing", label: "有料プラン" },

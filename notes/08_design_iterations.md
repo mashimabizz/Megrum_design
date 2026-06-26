@@ -4,6 +4,86 @@
 
 ---
 
+## イテレーション1222：最低限の運用管理者画面を追加
+
+### 背景・問題意識
+
+オーナーから、現在の megrum.jp に続く形で最低限の運用管理者画面を作り、アプリ内から届く通報の確認、推し追加リクエストの確認とマスタ登録、管理者から任意ユーザーまたは全ユーザーへ通知送信できるようにしたいという指示があった。通報、DB/API、通知配送、管理者権限に関わるため、既存の `/admin`、`admin_roles`、`admin_audit_logs`、`notifications` の設計に乗せて標準モードとして実装した。
+
+### 変更内容
+
+#### `web/src/app/admin/operations/page.tsx`
+- `/admin/operations` を新規追加し、通報窓口、推し追加リクエスト、運営通知送信を1画面に集約した。
+- 通報窓口は `reports` / `goods_reports` / `groom_reports` / `meguri_board_reports` / `disputes` を横断して表示し、通報者、対象ID、対象ユーザー、理由、本文、証跡URL、ステータスを確認できるようにした。
+- 推し追加リクエストは `oshi_requests` と `character_requests` の pending を表示し、新規L1/L2としてマスタ登録、既存マスタへの統合、却下を操作できるようにした。
+- 運営通知は任意ユーザーまたは有効ユーザー全体を宛先にし、`admin_announcement` として通知行を作るフォームを追加した。
+
+#### `web/src/app/admin/actions.ts`
+- 通報状態更新、推しL1/L2承認・統合・却下、運営通知送信の Server Actions を追加した。
+- 各 action は直接POSTされても安全なよう、冒頭で `getAdminContext([...])` による権限確認を行う。
+- すべての管理操作に理由入力を必須にし、`admin_audit_logs` へ before/after または送信件数を記録するようにした。
+- 運営通知は `notifications` へユーザーごとに行を作成し、既存の `send_mobile_push_for_notification()` にOSプッシュ配送を委譲する。
+
+#### `web/src/lib/admin/permissions.ts`
+#### `web/src/app/admin/layout.tsx`
+#### `web/src/app/admin/page.tsx`
+#### `web/src/app/admin/_components.tsx`
+- `oshi_requests.read` / `oshi_requests.manage` / `notifications.send` 権限を追加した。
+- 上部ナビとダッシュボードから `/admin/operations` へ遷移できるようにした。
+- 管理画面共通の textarea 入力部品を追加した。
+
+#### `supabase/migrations/20260627015000_add_admin_operations_console_support.sql`
+- 汎用 `reports` テーブルを実テーブル化し、ユーザー/取引/メッセージ対象の通報を保存できるようにした。
+- `notifications.kind` に `admin_announcement` を追加した。
+- `admin_roles.permissions` のコメントへ運用管理用の権限を追記した。
+
+#### `ios-native/Sources/MegrumCore/NotificationModels.swift`
+#### `ios-native/Sources/MegrumApp/NotificationCenterViews.swift`
+#### `ios-native/Tests/MegrumDataTests/SupabaseRequestParityTests.swift`
+- Swift Native側の通知kindに `admin_announcement` を追加した。
+- 通知センターでは運営通知をメガホンアイコンで表示し、取引filterには含めないようにした。
+- DBの通知kind check constraint想定とSwift enumの同期テストを更新した。
+
+#### `notes/05_data_model.md`
+#### `notes/10_glossary.md`
+#### `notes/13_api_spec.md`
+- 汎用 `reports`、`admin_announcement`、運用管理権限、Server Actions を記録した。
+
+### 影響範囲
+
+- Web管理画面 `/admin` と `/admin/operations`。
+- Supabase `reports`、`notifications.kind`、`admin_roles.permissions` コメント。
+- Swift Native iOSの通知kind表示。
+- 新しい管理者操作はすべて service role + Server Action + audit log 経由で行い、ブラウザに service role key は出さない。
+- 既存の `user_notification_settings.push_enabled` 方針は維持し、OFF時もアプリ内通知行は残る。
+- 新しい状態遷移は追加していないため、`notes/09_state_machines.md` は更新不要。
+
+### 確認方法
+
+- `npm run web:lint`
+  - passed
+- `npm run web:build`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-admin-ops-targeted-tests --enable-xctest --disable-swift-testing -j 1 --filter 'SupabaseRequestParityTests/testNotificationKindRawValuesMatchCurrentSchemaNames'`
+  - passed（1 test, 0 failures）
+- `git diff --check`
+  - passed
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-admin-ops-build`
+  - passed
+- `supabase db lint --workdir supabase --fail-on error`
+  - local Supabase Postgres `127.0.0.1:54322` が起動していないため未実行（connection refused）
+
+### セルフレビュー結果
+
+- ✅ 管理画面は既存 `/admin` の Supabase Auth + `admin_roles` + Server Actions の枠に統合した。
+- ✅ 通報は既存の分散テーブルと汎用 `reports` を横断して見えるようにし、何の情報で通報が来ているか確認できる構成にした。
+- ✅ 推し追加リクエストは既存の承認トリガーを活かし、マスタ登録/統合後に `oshi_requests` / `character_requests` を更新するだけで仮登録反映に乗るようにした。
+- ✅ 運営通知は `admin_announcement` として `notifications` に作成し、既存のモバイル通知配送に委譲した。
+- ✅ すべての管理操作で権限チェックと監査ログ保存を行う。
+- ⚠️ 実DBへの migration 適用と管理者アカウントでの実画面操作は未実行。Supabase local が起動している環境で migration lint / apply と動作確認が必要。
+
+---
+
 ## イテレーション1221：設定に退会申請フローを追加
 
 ### 背景・問題意識

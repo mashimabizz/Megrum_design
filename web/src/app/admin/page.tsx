@@ -57,9 +57,14 @@ export default async function AdminDashboardPage() {
       <div className="grid gap-5 lg:grid-cols-[1.1fr_0.9fr]">
         <AdminPanel
           title="運用チェック"
-          description="ユーザー管理、権限管理、有料プラン管理の入口です。"
+          description="通報、マスタ追加、通知、ユーザー管理、権限管理の入口です。"
         >
           <div className="grid gap-3 sm:grid-cols-2">
+            <QuickLink
+              href="/admin/operations"
+              title="運用管理"
+              body="通報、推し追加リクエスト、運営通知をまとめて処理します。"
+            />
             <QuickLink
               href="/admin/users"
               title="ユーザー管理"

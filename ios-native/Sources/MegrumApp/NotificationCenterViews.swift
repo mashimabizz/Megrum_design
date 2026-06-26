@@ -119,6 +119,8 @@ extension MegrumNotificationKind {
             "message"
         case .meguriBoardReply, .meguriBoardMention:
             "text.bubble"
+        case .adminAnnouncement:
+            "megaphone"
         case .unknown:
             "bell"
         }
@@ -134,6 +136,8 @@ extension MegrumNotificationKind {
             MegrumTheme.pink
         case .messageReceived:
             MegrumTheme.sky
+        case .adminAnnouncement:
+            MegrumTheme.lavender
         default:
             MegrumTheme.lavender
         }
@@ -146,7 +150,8 @@ extension MegrumNotificationKind {
              .disputeReceived, .disputeResponded, .disputeClosed, .cancelRequested,
              .expiresSoon:
             true
-        case .groomReply, .meguriMessage, .meguriBoardReply, .meguriBoardMention, .unknown:
+        case .groomReply, .meguriMessage, .meguriBoardReply, .meguriBoardMention,
+             .adminAnnouncement, .unknown:
             false
         }
     }

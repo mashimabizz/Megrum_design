@@ -4,7 +4,7 @@
 > 実装の正解集。`09_state_machines.md` と完全に整合させ、`10_glossary.md` の用語を使う。
 
 最終更新: 2026-06-27
-ステータス: Draft v2.48（iter1219 交換イベント通知を追加）
+ステータス: Draft v2.49（iter1222 管理者運用画面の通報・推し追加・運営通知を追加）
 
 ## 最新化履歴
 
@@ -60,6 +60,7 @@
 | **v2.46** | **2026-06-26** | **iter1203 反映（証跡追加/取引完了/評価投稿のsystem message meta運用を追加。`evidence_added` / `trade_completed` / `evaluation_submitted` でチャット表示を再現する）** |
 | **v2.47** | **2026-06-26** | **iter1205 反映（`proposal_evidence_photos.approved_by_sender/approved_by_receiver` を追加し、証跡画像ごとに承認状態を持つ。自分がアップロードした証跡は初期承認済み）** |
 | **v2.48** | **2026-06-27** | **iter1219 反映（交換イベントから `notifications` 行を作成。`message_received` kind と `message_id` / `evidence_photo_id` / `evaluation_id` 参照列を追加し、APNs配送は既存 `push_enabled` 設定へ委譲）** |
+| **v2.49** | **2026-06-27** | **iter1222 反映（管理者運用画面用に汎用 `reports` を実テーブル化し、`notifications.kind='admin_announcement'` と推し追加リクエスト承認/運営通知送信の管理権限を追加）** |
 | **v2.20** | **2026-05-29** | **iter168.90 反映（`search_query_logs` と人気検索RPCを追加。検索結果はマッチ分類つきグッズパネルで表示）** |
 | **v2.21** | **2026-05-30** | **iter168.97 反映（`schedules.place_name` 追加。合意時に `both` を単一手段へ固定し、現地交換の複数候補は1件へ固定する運用を追記）** |
 
@@ -361,20 +362,20 @@ RLS / 権限（iter278）：
 
 ### `notifications`（通知一覧 / iter92, iter276）
 
-アプリ内の通知一覧と未読バッジの基礎テーブル。打診、取引チャット、グルーム返信、めぐりメッセージ、スポット掲示板返信/メンションなどの通知を保存する。
+アプリ内の通知一覧と未読バッジの基礎テーブル。打診、取引チャット、グルーム返信、めぐりメッセージ、スポット掲示板返信/メンション、運営通知などの通知を保存する。
 
 | カラム | 型 | 説明 |
 |---|---|---|
 | `id` | uuid | PK |
 | `user_id` | uuid | 通知を受け取るユーザー |
-| `kind` | text | `proposal_received` / `message_received` / `groom_reply` / `meguri_board_reply` など |
+| `kind` | text | `proposal_received` / `message_received` / `groom_reply` / `meguri_board_reply` / `admin_announcement` など |
 | `title` / `body` | text | 通知一覧と端末通知に表示する内容 |
 | `link_path` | text nullable | タップ時の遷移先 |
 | `proposal_id` / `message_id` / `evidence_photo_id` / `evaluation_id` / `dispute_id` ほか | uuid nullable | 関連エンティティ |
 | `read_at` | timestamptz nullable | nullなら未読 |
 | `created_at` | timestamptz | |
 
-iter276以降、`notifications` に行が追加されると、`notification_devices` の有効トークンへExpo Pushを送るDBトリガーが動く。iter338以降、Swift Native iOS版はAPNs tokenを保存する。iter344で `send-apns-notification` Edge Functionを追加し、iter345でDB triggerからも `app.settings.apns_dispatch_url` / `app.settings.apns_dispatch_secret` が設定済みの場合だけAPNs配送Functionへ `notification_id` を渡すようにした。iter1219以降、打診受信/再打診/見送り/成立、取引チャットメッセージ、キャンセル要請、証跡写真、取引完了、相互評価完了はDB triggerまたはRPC内で `notifications` 行を作成する。`user_notification_settings.push_enabled=false` の場合もアプリ内通知行は残り、OSプッシュ配送だけを止める。
+iter276以降、`notifications` に行が追加されると、`notification_devices` の有効トークンへExpo Pushを送るDBトリガーが動く。iter338以降、Swift Native iOS版はAPNs tokenを保存する。iter344で `send-apns-notification` Edge Functionを追加し、iter345でDB triggerからも `app.settings.apns_dispatch_url` / `app.settings.apns_dispatch_secret` が設定済みの場合だけAPNs配送Functionへ `notification_id` を渡すようにした。iter1219以降、打診受信/再打診/見送り/成立、取引チャットメッセージ、キャンセル要請、証跡写真、取引完了、相互評価完了はDB triggerまたはRPC内で `notifications` 行を作成する。iter1222以降、管理者画面の `notifications.send` 権限を持つ管理者は `admin_announcement` を任意ユーザーまたは有効ユーザー全体へ作成できる。`user_notification_settings.push_enabled=false` の場合もアプリ内通知行は残り、OSプッシュ配送だけを止める。
 
 ### `user_notification_settings`（通知設定 / iter93, iter276）
 
@@ -1134,7 +1135,9 @@ iter34 で到着ステータス・サブステート追加。
 
 片方向記憶。重複打診の自動フィルタに使用。
 
-### `reports`（通報）— 新規
+### `reports`（汎用通報 / iter1222）
+
+ユーザー、取引、取引チャットメッセージに対する通報。グッズ単位の表示通報は `goods_reports`、取引完了前後の異議申し立て/仲裁は `disputes` として分けるが、管理者画面ではこれらを横断して確認する。
 
 | カラム | 型 | 説明 |
 |---|---|---|
@@ -1143,12 +1146,18 @@ iter34 で到着ステータス・サブステート追加。
 | `target_user_id` | uuid nullable | → users |
 | `target_proposal_id` | uuid nullable | → proposals |
 | `target_message_id` | uuid nullable | → messages |
-| `category` | text | 'spam', 'harassment', 'fake_item', 'no_show', 'other' |
-| `description` | text | |
+| `category` | text | `spam` / `harassment` / `fake_item` / `no_show` / `unsafe` / `privacy` / `other` |
+| `description` | text nullable | 補足。4000文字以内 |
 | `evidence_urls` | text[] | スクショ等 |
-| `status` | text | 'open', 'reviewing', 'resolved', 'dismissed' |
+| `status` | text | `open` / `reviewing` / `resolved` / `dismissed` |
 | `resolved_at` | timestamptz nullable | |
-| `created_at` | timestamptz | |
+| `created_at` / `updated_at` | timestamptz | |
+
+RLS:
+- ログインユーザーは自分の `reporter_id` の行だけinsert/selectできる。
+- `target_user_id` / `target_proposal_id` / `target_message_id` の少なくとも1つを必須にする。
+- `target_user_id` がある場合は `reporter_id <> target_user_id` を必須にし、自分自身へのユーザー通報を禁止する。
+- 管理者画面は service role + `reports.read` / `reports.moderate` で横断閲覧・状態更新する。
 
 ### `goods_reports`（グッズ通報 / iter353）
 
@@ -1384,7 +1393,7 @@ ad_impressions table（オプション、Post-MVP で詳細分析用）:
 |---|---|---|
 | `user_id` | uuid PK | → users。管理者対象ユーザー |
 | `role` | text | `owner` / `support` / `trust_safety` / `billing` / `viewer` |
-| `permissions` | text[] | `users.read` 等。`*` は全権限 |
+| `permissions` | text[] | `users.read` / `reports.read` / `oshi_requests.manage` / `notifications.send` 等。`*` は全権限 |
 | `status` | text | `active` / `disabled` |
 | `requires_mfa` | boolean | true の場合、AAL2 セッションのみ管理者ページへ入れる |
 | `created_by` | uuid nullable | 付与した管理者 |
@@ -1393,6 +1402,7 @@ ad_impressions table（オプション、Post-MVP で詳細分析用）:
 RLS:
 - SELECT: 自分の管理者レコード、または `roles.read` 権限を持つ管理者のみ
 - INSERT/UPDATE/DELETE: クライアントからは許可しない。管理者Server Actionが service role で更新し、必ず `admin_audit_logs` に記録する。
+- iter1222以降、通報横断閲覧/対応は `reports.read` / `reports.moderate`、推し追加リクエスト確認/承認は `oshi_requests.read` / `oshi_requests.manage`、運営通知送信は `notifications.send` を使う。
 
 ### `admin_audit_logs`
 
