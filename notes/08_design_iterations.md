@@ -4,6 +4,44 @@
 
 ---
 
+## イテレーション1136：search filter apply footerを分離
+
+### 背景・問題意識
+
+`SearchFilterSheet` は検索フィルターのForm構成に加えて、下部固定の適用buttonの大きなmarkupと、条件一致toggle変更時のデフォルト条件反映処理を同じbody内に抱えていた。画面の見た目とフィルター挙動は維持したまま、親Viewをフィルター構成とstate/action wiringへ寄せる。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/SearchFilterViews.swift`
+- `SearchFilterApplyFooter` を追加し、「この条件で検索」buttonのgradient、shadow、material背景、余白、button styleを専用Viewへ移動した。
+- 適用処理を `applyAndDismiss()` に分け、`onApply(draft)` とdismissの順序を維持した。
+- `conditionMatches` の `onChange` からデフォルト交換条件/支払条件の反映を `applyDefaultConditions(previous:current:)` へ移し、body内の副作用分岐を薄くした。
+- toolbarの「リセット」は既存 `resetDraft` actionを直接渡す形に整理した。
+
+### 影響範囲
+
+- Swift Native iOS版の検索フィルターsheet。
+- 検索条件適用button、条件一致toggleをONにした時のデフォルト交換条件/支払条件反映。
+- 検索条件の意味、検索実行、タグ選択sheet、グループ/メンバー/グッズ種別選択、DB/API、状態名、表示文言は変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumApp/SearchFilterViews.swift`
+  - passed
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-search-filter-apply-footer`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-search-filter-apply-footer --enable-xctest --disable-swift-testing -j 1 --filter 'SearchScreenTests|HomeDiscoveryMatchPolicyTests'`
+  - passed（83 tests）
+
+### セルフレビュー結果
+
+- ✅ 「この条件で検索」buttonの文言、font、色、gradient、shadow、height、padding、material背景、button styleを維持した。
+- ✅ `onApply(draft)` の後にdismissする適用順序、リセット時のdraft初期化とmember再読み込み、条件一致ON時のデフォルト交換条件/支払条件反映を維持した。
+- ✅ `SearchFilterSheet` のbodyから大きめのfooter markupと副作用分岐を外し、Form構成を読みやすくした。
+- ✅ 新しい状態名・用語・DB列は追加していないため、`notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション1135：trading card bulk start buttonを分離
 
 ### 背景・問題意識

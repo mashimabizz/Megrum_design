@@ -106,9 +106,7 @@ struct SearchFilterSheet: View {
         .megrumInlineNavigationTitle()
         .toolbar {
             ToolbarItem(placement: .cancellationAction) {
-                Button("リセット") {
-                    resetDraft()
-                }
+                Button("リセット", action: resetDraft)
             }
             ToolbarItem(placement: .confirmationAction) {
                 Button("閉じる") {
@@ -117,30 +115,7 @@ struct SearchFilterSheet: View {
             }
         }
         .safeAreaInset(edge: .bottom) {
-            Button {
-                onApply(draft)
-                dismiss()
-            } label: {
-                Text("この条件で検索")
-                    .font(.system(size: 18, weight: .heavy, design: .rounded))
-                    .foregroundStyle(.white)
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 58)
-                    .background(
-                        LinearGradient(
-                            colors: [MegrumTheme.lavender, MegrumTheme.pink],
-                            startPoint: .leading,
-                            endPoint: .trailing
-                        ),
-                        in: Capsule()
-                    )
-                    .shadow(color: MegrumTheme.lavender.opacity(0.25), radius: 16, y: 8)
-            }
-            .buttonStyle(.plain)
-            .padding(.horizontal, 22)
-            .padding(.top, 10)
-            .padding(.bottom, 12)
-            .background(.regularMaterial)
+            SearchFilterApplyFooter(action: applyAndDismiss)
         }
         .sheet(isPresented: $isShowingTagPicker) {
             NavigationStack {
@@ -152,15 +127,7 @@ struct SearchFilterSheet: View {
             }
         }
         .onChange(of: draft.conditionMatches) { previous, current in
-            if current.matchesExchangeCondition, !previous.matchesExchangeCondition {
-                draft.applyDefaultExchangeCondition(
-                    settings: defaultExchangeSettings,
-                    viewer: appState.viewer
-                )
-            }
-            if current.matchesPaymentCondition, !previous.matchesPaymentCondition {
-                draft.applyDefaultPaymentCondition(methods: defaultPaymentMethods)
-            }
+            applyDefaultConditions(previous: previous, current: current)
         }
     }
 
@@ -199,5 +166,53 @@ struct SearchFilterSheet: View {
         Task {
             await appState.loadOshiCharacters(group: nil)
         }
+    }
+
+    private func applyAndDismiss() {
+        onApply(draft)
+        dismiss()
+    }
+
+    private func applyDefaultConditions(
+        previous: SearchConditionMatchFilters,
+        current: SearchConditionMatchFilters
+    ) {
+        if current.matchesExchangeCondition, !previous.matchesExchangeCondition {
+            draft.applyDefaultExchangeCondition(
+                settings: defaultExchangeSettings,
+                viewer: appState.viewer
+            )
+        }
+        if current.matchesPaymentCondition, !previous.matchesPaymentCondition {
+            draft.applyDefaultPaymentCondition(methods: defaultPaymentMethods)
+        }
+    }
+}
+
+private struct SearchFilterApplyFooter: View {
+    var action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Text("この条件で検索")
+                .font(.system(size: 18, weight: .heavy, design: .rounded))
+                .foregroundStyle(.white)
+                .frame(maxWidth: .infinity)
+                .frame(height: 58)
+                .background(
+                    LinearGradient(
+                        colors: [MegrumTheme.lavender, MegrumTheme.pink],
+                        startPoint: .leading,
+                        endPoint: .trailing
+                    ),
+                    in: Capsule()
+                )
+                .shadow(color: MegrumTheme.lavender.opacity(0.25), radius: 16, y: 8)
+        }
+        .buttonStyle(.plain)
+        .padding(.horizontal, 22)
+        .padding(.top, 10)
+        .padding(.bottom, 12)
+        .background(.regularMaterial)
     }
 }
