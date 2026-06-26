@@ -4,6 +4,44 @@
 
 ---
 
+## イテレーション1143：individual listing logic segment partsを分離
+
+### 背景・問題意識
+
+`IndividualListingFooterLogicSegment` は、logic button本体、`atLeast` 選択時のpopover、minimum count pickerを同じView内の `logicButton` / `minimumPicker` computed helperとして抱えていた。個別募集editor下部barのlogic選択挙動と見た目を維持したまま、button表示とminimum pickerを小さな専用Viewへ分離する。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/IndividualListingFooterLogicSegment.swift`
+- `IndividualListingLogicSegmentButton` を追加し、segment buttonのtitle、selected背景、font/color/heightを移動した。
+- `IndividualListingMinimumCountPicker` を追加し、`何個以上にしますか？` popover内のcount選択UIを移動した。
+- `selectLogic(_:)` を追加し、`.atLeast` 選択時だけpopoverを開く既存挙動を明示した。
+- `minimumChoices` / `minimumTitle` の算出と `selection` / `minimumCount` bindingは親View側に残した。
+
+### 影響範囲
+
+- Swift Native iOS版の個別募集editor下部barのlogic segment。
+- `どれか1つだけ` / `何個以上` / `すべて譲る` / `全部ほしい` / `すべて希望` の選択UI。
+- `atLeast` 選択時のpopover、minimum count選択、選択後のpopover dismiss。
+- 個別募集draft、保存/更新/削除、DB/API、状態名、表示文言は変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumApp/IndividualListingFooterLogicSegment.swift`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-individual-listing-logic-segment-parts --enable-xctest --disable-swift-testing -j 1 --filter 'IndividualListingDraftTests|IndividualListingStateReducerTests|SupabaseListingClientTests'`
+  - passed（50 tests）
+
+### セルフレビュー結果
+
+- ✅ segment buttonのfont/color/height/selected lavender背景、container padding/background/strokeを維持した。
+- ✅ `.atLeast` 選択時だけ `selection = .atLeast` にしてpopoverを開く挙動、minimum count選択後に `selection = .atLeast` を維持してdismissする挙動を維持した。
+- ✅ `minimumChoices` は `selectedCount >= 2` の時だけ `1...selectedCount` にする既存条件を維持した。
+- ✅ 個別募集draft、保存/更新/削除、DB/API、状態名、表示文言は変更していない。
+- ✅ 新しい状態名・用語・DB列は追加していないため、`notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション1142：individual listing selection filter partsを分離
 
 ### 背景・問題意識

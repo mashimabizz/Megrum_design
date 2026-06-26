@@ -14,12 +14,36 @@ struct IndividualListingFooterLogicSegment: View {
     var body: some View {
         HStack(spacing: 0) {
             if showsSingleChoiceButton {
-                logicButton(.one, title: "どれか1つだけ")
+                IndividualListingLogicSegmentButton(
+                    title: "どれか1つだけ",
+                    isSelected: selection == .one
+                ) {
+                    selectLogic(.one)
+                }
             }
             if allowsMinimumLogic {
-                logicButton(.atLeast, title: minimumTitle)
+                IndividualListingLogicSegmentButton(
+                    title: minimumTitle,
+                    isSelected: selection == .atLeast
+                ) {
+                    selectLogic(.atLeast)
+                }
+                .popover(isPresented: $showsMinimumPicker, attachmentAnchor: .point(.bottom), arrowEdge: .bottom) {
+                    IndividualListingMinimumCountPicker(
+                        selection: $selection,
+                        minimumCount: $minimumCount,
+                        choices: minimumChoices
+                    ) {
+                        showsMinimumPicker = false
+                    }
+                }
             }
-            logicButton(.all, title: allTitle)
+            IndividualListingLogicSegmentButton(
+                title: allTitle,
+                isSelected: selection == .all
+            ) {
+                selectLogic(.all)
+            }
         }
         .padding(3)
         .background(.white.opacity(0.95), in: RoundedRectangle(cornerRadius: 13, style: .continuous))
@@ -29,60 +53,71 @@ struct IndividualListingFooterLogicSegment: View {
         }
     }
 
-    private func logicButton(_ logic: ListingLogic, title: String) -> some View {
-        let button = Button {
-            withAnimation(.smooth(duration: 0.18)) {
-                if logic == .atLeast {
-                    selection = .atLeast
-                    showsMinimumPicker = true
-                } else {
-                    selection = logic
-                }
+    private var minimumTitle: String {
+        ListingLogic.minimumCountTitle(minimumCount)
+    }
+
+    private var minimumChoices: [Int] {
+        guard selectedCount >= 2 else {
+            return []
+        }
+        return Array(1...selectedCount)
+    }
+
+    private func selectLogic(_ logic: ListingLogic) {
+        withAnimation(.smooth(duration: 0.18)) {
+            if logic == .atLeast {
+                selection = .atLeast
+                showsMinimumPicker = true
+            } else {
+                selection = logic
             }
-        } label: {
+        }
+    }
+}
+
+private struct IndividualListingLogicSegmentButton: View {
+    var title: String
+    var isSelected: Bool
+    var action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
             Text(title)
                 .font(.system(size: 14, weight: .bold, design: .rounded))
-                .foregroundStyle(selection == logic ? .white : MegrumTheme.ink.opacity(0.78))
+                .foregroundStyle(isSelected ? .white : MegrumTheme.ink.opacity(0.78))
                 .lineLimit(1)
                 .minimumScaleFactor(0.78)
                 .frame(maxWidth: .infinity)
                 .frame(height: 38)
                 .background {
-                    if selection == logic {
+                    if isSelected {
                         RoundedRectangle(cornerRadius: 10, style: .continuous)
                             .fill(MegrumTheme.lavender)
                     }
                 }
         }
         .buttonStyle(.plain)
-
-        return Group {
-            if logic == .atLeast {
-                button
-                    .popover(isPresented: $showsMinimumPicker, attachmentAnchor: .point(.bottom), arrowEdge: .bottom) {
-                        minimumPicker
-                    }
-            } else {
-                button
-            }
-        }
     }
+}
 
-    private var minimumTitle: String {
-        ListingLogic.minimumCountTitle(minimumCount)
-    }
+private struct IndividualListingMinimumCountPicker: View {
+    @Binding var selection: ListingLogic
+    @Binding var minimumCount: Int
+    var choices: [Int]
+    var onDismiss: () -> Void
 
-    private var minimumPicker: some View {
+    var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text("何個以上にしますか？")
                 .font(.system(size: 14, weight: .black, design: .rounded))
                 .foregroundStyle(MegrumTheme.ink)
 
-            ForEach(minimumChoices, id: \.self) { count in
+            ForEach(choices, id: \.self) { count in
                 Button {
                     minimumCount = count
                     selection = .atLeast
-                    showsMinimumPicker = false
+                    onDismiss()
                 } label: {
                     HStack(spacing: 8) {
                         Text(ListingLogic.minimumCountTitle(count))
@@ -109,12 +144,5 @@ struct IndividualListingFooterLogicSegment: View {
         }
         .padding(12)
         .presentationCompactAdaptation(.popover)
-    }
-
-    private var minimumChoices: [Int] {
-        guard selectedCount >= 2 else {
-            return []
-        }
-        return Array(1...selectedCount)
     }
 }
