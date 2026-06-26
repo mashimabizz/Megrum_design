@@ -51,20 +51,7 @@ struct AuthChoiceScreen: View {
             }
             .padding(.top, isSignIn ? 132 : 34)
 
-            Button(action: onSwitch) {
-                HStack(spacing: 6) {
-                    Text(isSignIn ? "はじめての方は" : "すでにアカウントをお持ちの方は")
-                        .foregroundStyle(MegrumTheme.ink.opacity(0.86))
-                    Text(isSignIn ? "新規登録" : "ログイン")
-                        .fontWeight(.black)
-                        .foregroundStyle(MegrumTheme.lavender)
-                    Image(systemName: "chevron.right")
-                        .font(.system(size: 18, weight: .bold))
-                        .foregroundStyle(MegrumTheme.lavender)
-                }
-                .font(.system(size: 17, weight: .semibold, design: .rounded))
-            }
-            .buttonStyle(.plain)
+            AuthChoiceModeSwitchButton(isSignIn: isSignIn, action: onSwitch)
             .padding(.top, 54)
 
             if !isSignIn {
@@ -107,5 +94,27 @@ struct AuthChoiceScreen: View {
             action: {}
         )
         #endif
+    }
+}
+
+private struct AuthChoiceModeSwitchButton: View {
+    var isSignIn: Bool
+    var action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 6) {
+                Text(isSignIn ? "はじめての方は" : "すでにアカウントをお持ちの方は")
+                    .foregroundStyle(MegrumTheme.ink.opacity(0.86))
+                Text(isSignIn ? "新規登録" : "ログイン")
+                    .fontWeight(.black)
+                    .foregroundStyle(MegrumTheme.lavender)
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 18, weight: .bold))
+                    .foregroundStyle(MegrumTheme.lavender)
+            }
+            .font(.system(size: 17, weight: .semibold, design: .rounded))
+        }
+        .buttonStyle(.plain)
     }
 }

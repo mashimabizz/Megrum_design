@@ -4,6 +4,43 @@
 
 ---
 
+## イテレーション1151：auth choice switch buttonを分離
+
+### 背景・問題意識
+
+`AuthChoiceScreen` は、認証入口の画面構成、provider button群、Apple認証overlay、ログイン/登録切替ボタンを同じView body内に抱えていた。ログイン/登録切替ボタンの文言、font、color、chevron、actionを維持したまま、切替button表示だけを小さな専用Viewへ分離する。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/AuthChoiceScreen.swift`
+- `AuthChoiceModeSwitchButton` を追加し、ログイン/登録切替ボタンのHStack、文言、chevron、font/color、plain button styleを移動した。
+- `AuthChoiceScreen` は、認証入口の縦構成とprovider button配置に寄せた。
+- 切替表示には `isSignIn` と `action` だけを渡し、認証状態やprovider actionには触れない形にした。
+
+### 影響範囲
+
+- Swift Native iOS版の認証選択画面内、ログイン/新規登録の切替ボタン。
+- 切替ボタンの表示構成。
+- Apple / Google / メール認証ボタン、OAuth/メール認証処理、入力validation、disabled/fallback制御、DB/API、状態名、表示文言は変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumApp/AuthChoiceScreen.swift`
+  - passed
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-auth-choice-switch`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-auth-choice-switch-tests --enable-xctest --disable-swift-testing -j 1 --filter 'AuthScreenInputTests'`
+  - passed（15 tests）
+
+### セルフレビュー結果
+
+- ✅ 切替ボタンの文言、HStack spacing、font、fontWeight、色、chevron size/color、plain button styleを維持した。
+- ✅ `padding(.top, 54)` は親の画面レイアウト側に残し、縦配置を維持した。
+- ✅ Apple / Google / メール認証ボタン、OAuth/メール認証処理、入力validation、disabled/fallback制御、DB/API、状態名、表示文言は変更していない。
+- ✅ 新しい状態名・用語・DB列は追加していないため、`notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション1150：auth provider iconを分離
 
 ### 背景・問題意識
