@@ -4,6 +4,44 @@
 
 ---
 
+## イテレーション1158：home exchange calendar card helpersを整理
+
+### 背景・問題意識
+
+`HomeExchangeSettingsCalendarCard` は、交換しやすい日付設定カレンダーの親カードとして、すでに `HomeExchangeCalendarHeader` / `HomeExchangeSettingsCalendarWeekdayHeader` / `HomeExchangeSettingsCalendarGrid` / `HomeExchangeCalendarLegend` に表示部品が分かれている一方で、親側には `weekdayHeader` / `calendarGrid` という薄い computed `some View` helper が残っていた。カレンダーの月移動、曜日色、選択色、ドラッグ選択、凡例生成を維持したまま、親 `body` が実際のセクション構成を直接読める形へ寄せる。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/HomeExchangeSettingsCalendarViews.swift`
+- `weekdayHeader` / `calendarGrid` の computed view helper を削除し、既存の専用Viewを `body` 内へ直接配置した。
+- `calendarWeeks` / `monthTitle` / `unsetSelectionColor` / `legendEntries` / `flattenedDays` を非view computed varとして `body` より上へ整理した。
+- Header、WeekdayHeader、Grid、Legend の順序と親カードのpadding/background/overlay/shadowは維持した。
+
+### 影響範囲
+
+- Swift Native iOS版の交換条件設定内、現地交換カレンダーカードの画面構成コード。
+- カレンダー曜日ヘッダーと日付グリッドの接続。
+- 月移動、表示月生成、選択済み日付、日付詳細、ドラッグ選択、都道府県別の選択色/凡例、DB/API、状態名、表示文言、レイアウト値は変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumApp/HomeExchangeSettingsCalendarViews.swift`
+  - passed
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-home-exchange-calendar-card`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-home-exchange-calendar-card-tests --enable-xctest --disable-swift-testing -j 1 --filter 'HomeExchangeSettingsScreenTests'`
+  - passed（4 tests）
+
+### セルフレビュー結果
+
+- ✅ Header、WeekdayHeader、Grid、Legend の順序、spacing、padding、background、overlay、shadowを維持した。
+- ✅ `visibleMonth` / `selectedPrefecture` binding、`selectedDateKeys`、`dateDetails`、`onTapDay`、`onFinishDragSelection` の接続を維持した。
+- ✅ 月移動、曜日色、選択色、都道府県凡例生成、ドラッグ選択ロジックには触れていない。
+- ✅ DB/API、状態名、表示文言、レイアウト値は変更していない。
+- ✅ 新しい状態名・用語・DB列は追加していないため、`notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション1157：account setup body helpersを整理
 
 ### 背景・問題意識

@@ -12,45 +12,6 @@ struct HomeExchangeSettingsCalendarCard: View {
 
     private let calendar = Calendar.current
 
-    var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HomeExchangeCalendarHeader(
-                monthTitle: monthTitle,
-                selectedPrefecture: $selectedPrefecture,
-                onPreviousMonth: previousMonth,
-                onNextMonth: nextMonth
-            )
-            weekdayHeader
-            calendarGrid
-            HomeExchangeCalendarLegend(entries: legendEntries)
-        }
-        .padding(12)
-        .background(Color.white.opacity(0.90), in: RoundedRectangle(cornerRadius: 24))
-        .overlay {
-            RoundedRectangle(cornerRadius: 24)
-                .stroke(Color.white.opacity(0.92), lineWidth: 1)
-        }
-        .shadow(color: MegrumTheme.lavender.opacity(0.10), radius: 22, y: 12)
-    }
-
-    private var weekdayHeader: some View {
-        HomeExchangeSettingsCalendarWeekdayHeader { symbol, isCurrentMonth in
-            weekdayColor(symbol: symbol, isCurrentMonth: isCurrentMonth)
-        }
-    }
-
-    private var calendarGrid: some View {
-        HomeExchangeSettingsCalendarGrid(
-            calendarWeeks: calendarWeeks,
-            dateDetails: dateDetails,
-            selectedDateKeys: selectedDateKeys,
-            dayColor: dayColor,
-            selectionColor: { day in color(for: day) },
-            onTapDay: onTapDay,
-            onFinishDragSelection: onFinishDragSelection
-        )
-    }
-
     private var calendarWeeks: [[HomeExchangeCalendarDay]] {
         HomeExchangeCalendarMonthBuilder.weeks(containing: visibleMonth, calendar: calendar)
     }
@@ -92,6 +53,37 @@ struct HomeExchangeSettingsCalendarCard: View {
 
     private var flattenedDays: [HomeExchangeCalendarDay] {
         calendarWeeks.flatMap(\.self)
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HomeExchangeCalendarHeader(
+                monthTitle: monthTitle,
+                selectedPrefecture: $selectedPrefecture,
+                onPreviousMonth: previousMonth,
+                onNextMonth: nextMonth
+            )
+            HomeExchangeSettingsCalendarWeekdayHeader { symbol, isCurrentMonth in
+                weekdayColor(symbol: symbol, isCurrentMonth: isCurrentMonth)
+            }
+            HomeExchangeSettingsCalendarGrid(
+                calendarWeeks: calendarWeeks,
+                dateDetails: dateDetails,
+                selectedDateKeys: selectedDateKeys,
+                dayColor: dayColor,
+                selectionColor: { day in color(for: day) },
+                onTapDay: onTapDay,
+                onFinishDragSelection: onFinishDragSelection
+            )
+            HomeExchangeCalendarLegend(entries: legendEntries)
+        }
+        .padding(12)
+        .background(Color.white.opacity(0.90), in: RoundedRectangle(cornerRadius: 24))
+        .overlay {
+            RoundedRectangle(cornerRadius: 24)
+                .stroke(Color.white.opacity(0.92), lineWidth: 1)
+        }
+        .shadow(color: MegrumTheme.lavender.opacity(0.10), radius: 22, y: 12)
     }
 
     private func previousMonth() {
