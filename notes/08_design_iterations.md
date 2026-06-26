@@ -4,6 +4,43 @@
 
 ---
 
+## イテレーション1149：blocked user avatarを分離
+
+### 背景・問題意識
+
+`BlockedUserRow` は、ブロック中ユーザー行の本文、解除ボタン、ブロック日時表示に加えて、avatar URL / placeholder の条件表示も同じView内に抱えていた。ブロック一覧の行レイアウト、解除操作、loading状態、日時表示を維持したまま、avatar表示だけを小さな専用Viewへ分離する。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/BlockedUsersContent.swift`
+- `BlockedUserAvatar` を追加し、`AsyncImage` 表示、placeholder、circle clip、サイズ、fallback initial表示を移動した。
+- `BlockedUserRow` は行本文、解除button、blockedAt表示の構成に寄せた。
+- avatar表示には `avatarURL` と `displayName` だけを渡し、`BlockedUser` 全体は渡さない形にした。
+
+### 影響範囲
+
+- Swift Native iOS版の設定/プライバシー内、ブロック中ユーザー一覧。
+- avatar画像表示、placeholder initial表示。
+- ブロック解除処理、loading/disabled状態、一覧header、empty/loading row、DB/API、状態名、表示文言は変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumApp/BlockedUsersContent.swift`
+  - passed
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-blocked-user-avatar`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-blocked-user-avatar-tests --enable-xctest --disable-swift-testing -j 1 --filter 'BlockedUserStateReducerTests|MegrumAppStateTests/testAppStateLoadsAndUnblocksPreviewBlockedUsers|SettingsScreenTests/testSettingsEssentialRoutesCoverP0Settings'`
+  - passed（4 tests）
+
+### セルフレビュー結果
+
+- ✅ avatar size、circle clip、placeholder background/color/font、fallback initialの生成を維持した。
+- ✅ ブロック解除button、loading中ProgressView、disabled条件、blockedAt文言、一覧header/empty/loading rowを維持した。
+- ✅ ブロック解除処理、repository/API、DB、状態名、表示文言は変更していない。
+- ✅ 新しい状態名・用語・DB列は追加していないため、`notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション1148：account overview sectionsを分離
 
 ### 背景・問題意識

@@ -65,7 +65,10 @@ private struct BlockedUserRow: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            avatar
+            BlockedUserAvatar(
+                avatarURL: user.avatarURL,
+                displayName: user.displayName
+            )
 
             VStack(alignment: .leading, spacing: 4) {
                 Text(user.displayName)
@@ -99,9 +102,21 @@ private struct BlockedUserRow: View {
         .padding(.vertical, 8)
     }
 
+    private var blockedAtText: String {
+        guard let blockedAt = user.blockedAt else {
+            return "ブロック中"
+        }
+        return blockedAt.formatted(.dateTime.month().day()) + "からブロック中"
+    }
+}
+
+private struct BlockedUserAvatar: View {
+    var avatarURL: URL?
+    var displayName: String
+
     @ViewBuilder
-    private var avatar: some View {
-        if let avatarURL = user.avatarURL {
+    var body: some View {
+        if let avatarURL {
             AsyncImage(url: avatarURL) { image in
                 image
                     .resizable()
@@ -121,16 +136,9 @@ private struct BlockedUserRow: View {
             .fill(MegrumTheme.lavender.opacity(0.18))
             .frame(width: 46, height: 46)
             .overlay {
-                Text(String(user.displayName.prefix(1)))
+                Text(String(displayName.prefix(1)))
                     .font(.headline.weight(.black))
                     .foregroundStyle(MegrumTheme.lavender)
             }
-    }
-
-    private var blockedAtText: String {
-        guard let blockedAt = user.blockedAt else {
-            return "ブロック中"
-        }
-        return blockedAt.formatted(.dateTime.month().day()) + "からブロック中"
     }
 }
