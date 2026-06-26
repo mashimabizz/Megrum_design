@@ -105,9 +105,13 @@ final class SupabaseAccountProfilePersistenceTests: XCTestCase {
     }
 
     func testAccountSetupPayloadAndFallbackActivateProfile() {
+        let birthDate = ProfileBirthDateCodec.date(from: "2000-02-03")
         let input = AccountSetupInput(
+            handle: "michirion",
             displayName: "みちりおん",
+            gender: .female,
             prefecture: "東京都",
+            birthDate: birthDate,
             oshiSelections: []
         )
 
@@ -117,13 +121,20 @@ final class SupabaseAccountProfilePersistenceTests: XCTestCase {
             userID: userID
         )
 
+        XCTAssertEqual(payload.handle, "michirion")
         XCTAssertEqual(payload.displayName, "みちりおん")
+        XCTAssertEqual(payload.gender, .female)
         XCTAssertEqual(payload.primaryArea, "東京都")
+        XCTAssertEqual(payload.birthDate, "2000-02-03")
+        XCTAssertEqual(payload.age, ProfileBirthDateCodec.age(from: birthDate))
         XCTAssertEqual(payload.accountStatus, AccountStatus.active.rawValue)
         XCTAssertEqual(profile.id, userID)
-        XCTAssertEqual(profile.handle, "megrum")
+        XCTAssertEqual(profile.handle, "michirion")
         XCTAssertEqual(profile.displayName, "みちりおん")
+        XCTAssertEqual(profile.gender, .female)
         XCTAssertEqual(profile.prefecture, "東京都")
+        XCTAssertEqual(ProfileBirthDateCodec.string(from: profile.birthDate), "2000-02-03")
+        XCTAssertEqual(profile.age, ProfileBirthDateCodec.age(from: birthDate))
         XCTAssertEqual(profile.accountStatus, .active)
     }
 

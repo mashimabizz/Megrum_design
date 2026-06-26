@@ -593,18 +593,25 @@ final class MegrumAppStateTests: XCTestCase {
     func testAppStateCompletesAccountSetupThroughRepository() async {
         let state = MegrumAppState(repository: PreviewMegrumRepository())
         let groupID = UUID(uuidString: "00000000-0000-0000-0000-000000000011")!
+        let birthDate = ProfileBirthDateCodec.date(from: "2000-02-03")
 
         let completed = await state.completeAccountSetup(
+            handle: "michirion",
             displayName: "みちりおん",
             prefecture: "山形県",
+            birthDate: birthDate,
+            gender: .female,
             oshiSelections: [
                 AccountSetupOshiInput(groupID: groupID, characterID: nil, kind: .box)
             ]
         )
 
         XCTAssertTrue(completed)
+        XCTAssertEqual(state.viewer?.handle, "michirion")
         XCTAssertEqual(state.viewer?.displayName, "みちりおん")
         XCTAssertEqual(state.viewer?.prefecture, "山形県")
+        XCTAssertEqual(ProfileBirthDateCodec.string(from: state.viewer?.birthDate), "2000-02-03")
+        XCTAssertEqual(state.viewer?.gender, .female)
         XCTAssertEqual(state.viewer?.accountStatus, .active)
         XCTAssertEqual(state.userOshiSelections.first?.groupID, groupID)
         XCTAssertEqual(state.userOshiSelections.first?.kind, .box)
@@ -629,7 +636,13 @@ final class MegrumAppStateTests: XCTestCase {
     func testAppStateRequiresOshiSelectionForAccountSetup() async {
         let state = MegrumAppState(repository: PreviewMegrumRepository())
 
-        let completed = await state.completeAccountSetup(displayName: "みちりおん", prefecture: "山形県")
+        let completed = await state.completeAccountSetup(
+            handle: "michirion",
+            displayName: "みちりおん",
+            prefecture: "山形県",
+            birthDate: ProfileBirthDateCodec.date(from: "2000-02-03"),
+            gender: .female
+        )
 
         XCTAssertFalse(completed)
         XCTAssertEqual(state.errorMessage, "推しを選択してください")

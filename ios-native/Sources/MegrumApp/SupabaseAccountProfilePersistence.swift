@@ -210,8 +210,12 @@ struct SupabaseAccountProfilePersistence: Sendable {
 
     static func accountSetupUpdatePayload(from input: AccountSetupInput) -> UserProfileUpdatePayload {
         UserProfileUpdatePayload(
+            handle: input.handle,
             displayName: input.displayName,
+            gender: input.gender,
             primaryArea: input.prefecture,
+            birthDate: ProfileBirthDateCodec.string(from: input.birthDate),
+            age: ProfileBirthDateCodec.age(from: input.birthDate),
             accountStatus: AccountStatus.active.rawValue
         )
     }
@@ -222,9 +226,12 @@ struct SupabaseAccountProfilePersistence: Sendable {
     ) -> UserProfile {
         UserProfile(
             id: userID,
-            handle: "megrum",
+            handle: input.handle,
             displayName: input.displayName,
+            gender: input.gender,
             prefecture: input.prefecture,
+            birthDate: input.birthDate,
+            age: ProfileBirthDateCodec.age(from: input.birthDate),
             accountStatus: .active
         )
     }

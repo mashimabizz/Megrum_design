@@ -60,7 +60,7 @@ struct MegrumRootDrawerDestinationSheet: View {
                 openNotificationRouteIntent(intent)
             }
         case .profileEdit:
-            AccountSetupScreen(appState: appState, mode: .edit)
+            OwnProfileScreen(appState: appState, onClose: onClose)
         case .oshiSettings:
             OshiSettingsScreen(appState: appState)
         case .schedules:

@@ -3,16 +3,36 @@ import MegrumCore
 
 extension MegrumAppState {
     public func completeAccountSetup(
+        handle: String,
         displayName: String,
         prefecture: String?,
+        birthDate: Date?,
+        gender: UserGender?,
         oshiSelections: [AccountSetupOshiInput] = []
     ) async -> Bool {
         guard !isSavingAccountSetup else {
             return false
         }
+        guard let normalizedHandle = MegrumAppStateInputNormalizer.profileHandle(handle) else {
+            errorMessage = "ユーザーIDを入力してください"
+            return false
+        }
+        guard MegrumAppStateInputNormalizer.isValidProfileHandle(normalizedHandle) else {
+            errorMessage = "ユーザーIDは半角英数字・_ の3〜20文字で入力してください"
+            return false
+        }
         let trimmedDisplayName = MegrumAppStateInputNormalizer.trimmedText(displayName)
         guard !trimmedDisplayName.isEmpty else {
             errorMessage = "表示名を入力してください"
+            return false
+        }
+        if let birthDate,
+           birthDate > Date() {
+            errorMessage = "生年月日は今日以前の日付を選択してください"
+            return false
+        }
+        guard gender != nil else {
+            errorMessage = "性別を選択してください"
             return false
         }
         guard !oshiSelections.isEmpty else {
@@ -26,8 +46,11 @@ extension MegrumAppState {
         do {
             let savedViewer = try await repository.completeAccountSetup(
                 AccountSetupInput(
+                    handle: normalizedHandle,
                     displayName: trimmedDisplayName,
+                    gender: gender,
                     prefecture: MegrumAppStateInputNormalizer.prefecture(prefecture),
+                    birthDate: birthDate,
                     oshiSelections: oshiSelections
                 )
             )

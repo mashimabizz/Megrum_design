@@ -33,13 +33,26 @@ public struct MegrumAppSnapshot: Sendable {
 }
 
 public struct AccountSetupInput: Equatable, Sendable {
+    public var handle: String
     public var displayName: String
+    public var gender: UserGender?
     public var prefecture: String?
+    public var birthDate: Date?
     public var oshiSelections: [AccountSetupOshiInput]
 
-    public init(displayName: String, prefecture: String? = nil, oshiSelections: [AccountSetupOshiInput] = []) {
+    public init(
+        handle: String = "",
+        displayName: String,
+        gender: UserGender? = nil,
+        prefecture: String? = nil,
+        birthDate: Date? = nil,
+        oshiSelections: [AccountSetupOshiInput] = []
+    ) {
+        self.handle = handle
         self.displayName = displayName
+        self.gender = gender
         self.prefecture = prefecture
+        self.birthDate = birthDate
         self.oshiSelections = oshiSelections
     }
 }

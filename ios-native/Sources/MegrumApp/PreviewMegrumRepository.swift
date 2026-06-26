@@ -41,13 +41,14 @@ public struct PreviewMegrumRepository: MegrumRepository {
     public func completeAccountSetup(_ input: AccountSetupInput) async throws -> UserProfile {
         UserProfile(
             id: NativePreviewData.viewer.id,
-            handle: NativePreviewData.viewer.handle,
+            handle: normalizedHandle(input.handle),
             displayName: input.displayName,
             bio: NativePreviewData.viewer.bio,
             avatarURL: NativePreviewData.viewer.avatarURL,
+            gender: input.gender,
             prefecture: input.prefecture,
-            birthDate: NativePreviewData.viewer.birthDate,
-            age: NativePreviewData.viewer.age,
+            birthDate: input.birthDate,
+            age: ProfileBirthDateCodec.age(from: input.birthDate) ?? NativePreviewData.viewer.age,
             paymentMethods: NativePreviewData.viewer.paymentMethods,
             paymentNote: NativePreviewData.viewer.paymentNote,
             accountStatus: .active

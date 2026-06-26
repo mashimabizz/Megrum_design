@@ -1,7 +1,7 @@
 # 22. Swift Native Migration
 
-最終更新: 2026-06-26
-ステータス: Active（iter1214）
+最終更新: 2026-06-27
+ステータス: Active（iter1220）
 
 ## 目的
 
@@ -112,6 +112,7 @@ tar -xzf /Users/michitaka/Desktop/Megrum_backups/pre-swift-migration-20260531-03
 - iter308で、`users.account_status` を `AccountStatus` としてSwift型化し、`registered / verified / onboarding` のユーザーを初回プロフィール設定画面へ分岐できるようにした。
 - iter309で、`OshiKind` / `OshiGroup` / `OshiCharacter` / `UserOshiSelection` と `SupabaseOshiClient` を追加し、`groups_master` と `characters_master` をSwift側から読める境界を作った。
 - iter310で、初回プロフィール設定画面に推しグループ/メンバー選択を追加し、`user_oshi` を差し替え保存してから `users.account_status='active'` へ進めるようにした。
+- iter1220で、認証後オンボーディングを Welcome / 推し設定 / 活動エリア / 名前 / ユーザーID / 生年月日 / 性別 / 完了の8ステップへ分割した。推し設定はL1マスタ選択から入り、メンバー選択が必要なL1だけL2選択画面を表示する。完了時は `handle` / `display_name` / `primary_area` / `birth_date` / `age` / `gender` / `user_oshi` / `account_status='active'` を保存する。
 - iter311で、設定一覧と住所設定フォームを追加し、`user_mailing_addresses` をSwift側から取得/upsertできる境界を作った。
 - iter312で、郵便番号7桁入力からzipcloud公式APIで住所候補を取得し、住所設定フォームへ反映する境界を追加した。
 - iter313で、Supabase redirect URLのquery / fragmentからsession tokenを復元し、SwiftUI `.onOpenURL` でアプリへ反映する境界を追加した。
@@ -371,7 +372,8 @@ tar -xzf /Users/michitaka/Desktop/Megrum_backups/pre-swift-migration-20260531-03
    - iter377で、設定内のヘルプ/法的文書/アカウント概要の下層画面と、プロフィール編集時の推し設定復元を追加した。
    - iter379で、ログアウト/Auth復帰、左ドロワー項目遷移、設定一覧、自分プロフィール保存、性別保存を補強した。
    - iter380で、初回設定/プロフィール編集の完了alert、推し選択のアクセシビリティ、法的文書入口、アカウント概要のID/status表示を追加した。
-   - 残: RN版のオンボーディング分割設計、法的文書/ヘルプ本文の最終整合。
+   - iter1220で、認証後オンボーディングを8ステップ化し、推しL1/L2、活動エリア、名前、ユーザーID、生年月日、性別を保存してからホームへ入る流れへ更新した。
+   - 残: 法的文書/ヘルプ本文の最終整合。
    - 主な対象: `ios-native/Sources/MegrumApp/AuthScreen.swift`, `ios-native/Sources/MegrumApp/AccountSetupScreen.swift`, `ios-native/Sources/MegrumApp/SettingsScreen.swift`
 
 ### P1

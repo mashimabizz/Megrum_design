@@ -4,6 +4,82 @@
 
 ---
 
+## イテレーション1220：認証後オンボーディングを8画面化
+
+### 背景・問題意識
+
+オーナーから、メール認証完了後、Google登録後、Apple ID登録後の初回設定を、Welcome→推し→活動エリア→名前→ユーザーID→生年月日→性別→完了の流れに変更したいという指示があった。推し設定はまずL1マスタを選ばせ、次画面で既存の推しメンバー設定機能を使ってL2マスタを登録する。ただしL1がソロのみの場合はL2画面を飛ばしてよい。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/AccountSetupScreen.swift`
+- 認証後オンボーディングを8ステップの画面遷移へ再構成した。
+- 推し設定はL1マスタ選択画面とL2メンバー選択画面に分け、L1がソロのみの場合はL2選択をskipして活動エリアへ進むようにした。
+- 複数のL1マスタを選んだ場合は、メンバー選択が必要な各マスタについて「メンバー」または「グループ全体」を選ばないと次へ進めないようにした。
+- 完了画面から保存すると `handle` / `displayName` / `prefecture` / `birthDate` / `gender` / `oshiSelections` をまとめて保存するようにした。
+
+#### `ios-native/Sources/MegrumApp/AccountSetupFormViews.swift`
+- 添付デザイン案を参考に、白背景、ラベンダーの8分割progress、中央寄せタイトル、大きな下部CTAのオンボーディング部品を追加した。
+- Welcome、活動エリア、名前、ユーザーID、生年月日、性別、完了確認の各ステップViewを追加した。
+- iOS専用のキーボード指定は `#if os(iOS)` に閉じ、SwiftPMのmacOS package build互換を維持した。
+
+#### `ios-native/Sources/MegrumApp/AccountSetupOshiSection.swift`
+- L1マスタ検索、ジャンルタブ、複数選択、選択中サマリーを持つオンボーディング用推しマスタ選択画面を追加した。
+- L2メンバー選択では既存の推し選択ロジックを使い、グループ全体/メンバー複数選択/選択サマリーを表示するようにした。
+
+#### `ios-native/Sources/MegrumApp/MegrumAppStateProfileSettingsActions.swift`
+#### `ios-native/Sources/MegrumApp/MegrumRepository.swift`
+#### `ios-native/Sources/MegrumApp/SupabaseAccountProfilePersistence.swift`
+#### `ios-native/Sources/MegrumApp/SupabaseUserProfilePersistenceModels.swift`
+#### `ios-native/Sources/MegrumApp/PreviewMegrumRepository.swift`
+- 初回設定保存の入力とSupabase payloadを拡張し、ユーザーID、生年月日、年齢、性別も初回設定完了時に保存するようにした。
+- 既存の `account_status='active'` への遷移と `user_oshi` 保存は維持した。
+
+#### `ios-native/Sources/MegrumApp/MegrumRootDrawerDestinationSheet.swift`
+- 残存していた `.profileEdit` 導線が新しい初回設定画面を開かないよう、自分プロフィール画面へ戻した。
+
+#### `ios-native/Tests/MegrumAppTests/AccountSetupScreenTests.swift`
+#### `ios-native/Tests/MegrumAppTests/MegrumAppStateTests.swift`
+#### `ios-native/Tests/MegrumAppTests/SupabaseAccountProfilePersistenceTests.swift`
+- 8ステップで必須になったユーザーID、活動エリア、生年月日、性別、推し設定のvalidationを追加した。
+- 初回設定保存時に新しいプロフィール項目がrepository payloadとfallback profileへ反映されることを確認した。
+
+#### `notes/09_state_machines.md`
+#### `notes/22_swift_native_migration.md`
+- Account Lifecycleの状態IDは維持し、`onboarding` 中の画面順をiter1220の新仕様へ更新した。
+- Swift Native移行メモへ、認証後オンボーディング8ステップ化と保存項目を追記した。
+
+### 影響範囲
+
+- Swift Native iOSの認証後初回設定フロー。
+- Supabase `users` への初回設定保存payloadと、`user_oshi` 保存前後のAppState更新。
+- 状態ID、DB schema、Auth redirect、Apple/Googleログイン境界は変更していない。
+- 新しい用語は追加していないため、`notes/10_glossary.md` は更新不要。既存profile fieldsへの保存拡張でschema追加はないため、`notes/05_data_model.md` も更新不要。
+
+### 確認方法
+
+- `git diff --check`
+  - passed
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-onboarding-build`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-onboarding-tests --enable-xctest --disable-swift-testing -j 1 --filter 'AccountSetupScreenTests|MegrumAppStateTests/testAppStateCompletesAccountSetupThroughRepository|MegrumAppStateTests/testAppStateRequiresOshiSelectionForAccountSetup|SupabaseAccountProfilePersistenceTests/testAccountSetupPayloadAndFallbackActivateProfile|OnboardingOshiSelectionTests|OshiSettingsDraftTests'`
+  - passed（34 tests, 0 failures）
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-onboarding-full-tests --enable-xctest --disable-swift-testing -j 1`
+  - passed（1041 tests, 3 skipped, 0 failures）
+- Simulator目視確認
+  - 未実行。今回はSwiftPM build/testでコンパイル、保存payload、validation、既存回帰を確認した。
+
+### セルフレビュー結果
+
+- ✅ オーナー指定のナンバリングごとに画面を分け、1/8〜8/8のprogressを持つ流れへ変更した。
+- ✅ 推し設定はL1マスタ選択→必要な場合だけL2メンバー選択の構成にし、ソロのみ選択時はL2をskipする。
+- ✅ L2が必要なマスタを複数選んだ場合、各マスタごとのメンバー/グループ全体選択を必須にした。
+- ✅ 初回設定完了時に、表示名だけでなくユーザーID、活動エリア、生年月日、年齢、性別、推し設定を保存する。
+- ✅ 状態IDやDB schemaは増やさず、既存 `onboarding -> active` と `user_oshi` 保存境界を維持した。
+- ⚠️ Simulatorでの目視確認は未実行。実機/Simulatorでの余白・キーボード・DatePicker表示は次の目視確認対象。
+
+---
+
 ## イテレーション1219：交換イベント通知をDB側で作成
 
 ### 背景・問題意識

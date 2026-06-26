@@ -43,8 +43,12 @@ struct UserPaymentSummaryUpdatePayload: Encodable, Sendable {
 }
 
 struct UserProfileUpdatePayload: Encodable, Sendable {
+    var handle: String
     var displayName: String
+    var gender: UserGender?
     var primaryArea: String?
+    var birthDate: String?
+    var age: Int?
     var accountStatus: String
 }
 
