@@ -35,7 +35,15 @@ struct AuthChoiceScreen: View {
             }
 
             VStack(spacing: 18) {
-                appleProviderButton
+                #if canImport(AuthenticationServices)
+                AuthAppleProviderButton(
+                    isSignIn: isSignIn,
+                    onRequest: onAppleRequest,
+                    onCompletion: onAppleCompletion
+                )
+                #else
+                AuthAppleProviderButton(isSignIn: isSignIn)
+                #endif
                 AuthProviderButton(
                     title: isSignIn ? "Googleでログイン" : "Googleで登録",
                     icon: .google,
@@ -52,7 +60,7 @@ struct AuthChoiceScreen: View {
             .padding(.top, isSignIn ? 132 : 34)
 
             AuthChoiceModeSwitchButton(isSignIn: isSignIn, action: onSwitch)
-            .padding(.top, 54)
+                .padding(.top, 54)
 
             if !isSignIn {
                 Spacer(minLength: 102)
@@ -69,9 +77,17 @@ struct AuthChoiceScreen: View {
         .frame(maxWidth: .infinity)
         .authVisualBackground()
     }
+}
+
+private struct AuthAppleProviderButton: View {
+    var isSignIn: Bool
+    #if canImport(AuthenticationServices)
+    var onRequest: (ASAuthorizationAppleIDRequest) -> Void
+    var onCompletion: (Result<ASAuthorization, Error>) -> Void
+    #endif
 
     @ViewBuilder
-    private var appleProviderButton: some View {
+    var body: some View {
         #if canImport(AuthenticationServices)
         ZStack {
             AuthProviderButton(
@@ -80,7 +96,7 @@ struct AuthChoiceScreen: View {
                 filled: true,
                 action: {}
             )
-            SignInWithAppleButton(.continue, onRequest: onAppleRequest, onCompletion: onAppleCompletion)
+            SignInWithAppleButton(.continue, onRequest: onRequest, onCompletion: onCompletion)
                 .signInWithAppleButtonStyle(.white)
                 .clipShape(RoundedRectangle(cornerRadius: 15, style: .continuous))
                 .opacity(0.015)

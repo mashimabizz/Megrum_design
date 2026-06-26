@@ -4,6 +4,43 @@
 
 ---
 
+## イテレーション1152：auth apple provider buttonを分離
+
+### 背景・問題意識
+
+`AuthChoiceScreen` は、provider button群の配置に加えて、Apple認証だけに必要な `SignInWithAppleButton` overlay と accessibility label も同じ computed helper内に抱えていた。Apple標準認証ボタンの薄いoverlay、見た目用の `AuthProviderButton`、fallback表示、認証callbackを維持したまま、Apple provider button表示だけを小さな専用Viewへ分離する。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/AuthChoiceScreen.swift`
+- `AuthAppleProviderButton` を追加し、Apple provider表示、`SignInWithAppleButton` overlay、clipShape、opacity、accessibilityLabel、fallback表示を移動した。
+- `AuthChoiceScreen` はprovider button群の縦配置とログイン/登録モード切替に寄せた。
+- Apple認証表示には `isSignIn` とApple認証callbackだけを渡し、Google/メール認証actionや認証状態管理には触れない形にした。
+
+### 影響範囲
+
+- Swift Native iOS版の認証選択画面内、Apple認証ボタン。
+- `AuthenticationServices` 利用可能環境のApple認証overlayと、利用不可環境のfallback表示。
+- Google / メール認証ボタン、OAuth/メール認証処理、入力validation、disabled/fallback制御、DB/API、状態名、表示文言は変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumApp/AuthChoiceScreen.swift`
+  - passed
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-auth-apple-provider`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-auth-apple-provider-tests --enable-xctest --disable-swift-testing -j 1 --filter 'AuthScreenInputTests'`
+  - passed（15 tests）
+
+### セルフレビュー結果
+
+- ✅ Apple buttonのtitle、icon、filled、見た目用button action、`SignInWithAppleButton(.continue)`、white style、corner radius、opacity、accessibilityLabelを維持した。
+- ✅ `canImport(AuthenticationServices)` の分岐とfallback表示を維持した。
+- ✅ Google / メール認証ボタン、OAuth/メール認証処理、入力validation、disabled/fallback制御、DB/API、状態名、表示文言は変更していない。
+- ✅ 新しい状態名・用語・DB列は追加していないため、`notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション1151：auth choice switch buttonを分離
 
 ### 背景・問題意識
