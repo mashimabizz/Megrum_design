@@ -4,6 +4,42 @@
 
 ---
 
+## イテレーション1182：proposal meetup map pickerを分離
+
+### 背景・問題意識
+
+打診作成の meetup フォームに、日時入力、地図表示、map tapの座標変換、場所名/緯度経度入力、候補chip、現在地ステータスが同居していた。親フォームには入力値同期と副作用を残し、地図ラベルとMapReaderの表示を専用Viewへ分ける。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/ProposalCreateMeetupViews.swift`
+- `ProposalMeetupMapPicker` を追加し、地図ラベル、`MapReader`、`Map`、選択済みmarker、地図tap時の座標変換を専用Viewへ分離した。
+- `ProposalFlowMeetupForm` は `ProposalMeetupMapPicker` 呼び出しに置き換え、tap後の座標検証/入力値更新/カメラ同期は既存の `applyMapSelection` と `syncCameraToSelectedCoordinate` に残した。
+
+### 影響範囲
+
+- Swift Native iOS版の打診作成 meetup フォームの地図入力部分。
+- 地図高さ、角丸、枠線、interactionModes、marker表示、tap時の座標反映、場所名/緯度経度入力、候補chip、現在地ステータス、DB/API、状態名、表示文言は変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumApp/ProposalCreateMeetupViews.swift`
+  - passed
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-meetup-map-picker`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-meetup-map-picker-tests --enable-xctest --disable-swift-testing -j 1 --filter 'ProposalCreateFlowTests|ProposalCreateSheetTests|TradeRequestDraftProposalCreateFlowTests|TradeChatAffordanceTests'`
+  - passed（112 tests）
+
+### セルフレビュー結果
+
+- ✅ map tap 後の座標検証、placeName補完、カメラ同期処理を親フォーム側に維持した。
+- ✅ 地図表示の高さ、角丸、枠線、marker色、interactionModesを維持した。
+- ✅ 日時入力、場所名/緯度経度入力、候補chip、現在地ステータス、focus制御は変更していない。
+- ✅ DB/API、状態名、表示文言は変更していない。
+- ✅ 新しい状態名・用語・DB列は追加していないため、`notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション1181：proposal month day cell contentを分離
 
 ### 背景・問題意識

@@ -33,36 +33,12 @@ struct ProposalFlowMeetupForm: View {
                 ProposalMeetupDateRangeFields(startAt: $startAt, endAt: $endAt)
 
                 VStack(alignment: .leading, spacing: 10) {
-                    Label("地図で場所を選択", systemImage: "map")
-                        .font(.system(size: 14, weight: .heavy, design: .rounded))
-                        .foregroundStyle(MegrumTheme.ink)
-
-                    MapReader { proxy in
-                        Map(position: $cameraPosition, interactionModes: [.pan, .zoom]) {
-                            if let selectedCoordinate {
-                                Marker(
-                                    placeName.isBlank ? "待ち合わせ" : placeName,
-                                    coordinate: selectedCoordinate
-                                )
-                                .tint(MegrumTheme.lavender)
-                            }
-                        }
-                        .frame(height: 184)
-                        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
-                        .overlay {
-                            RoundedRectangle(cornerRadius: 18, style: .continuous)
-                                .stroke(.white.opacity(0.7), lineWidth: 1)
-                        }
-                        .gesture(
-                            SpatialTapGesture()
-                                .onEnded { value in
-                                    guard let coordinate = proxy.convert(value.location, from: .local) else {
-                                        return
-                                    }
-                                    applyMapSelection(coordinate)
-                                }
-                        )
-                    }
+                    ProposalMeetupMapPicker(
+                        cameraPosition: $cameraPosition,
+                        placeName: placeName,
+                        selectedCoordinate: selectedCoordinate,
+                        onSelectCoordinate: applyMapSelection
+                    )
 
                     VStack(spacing: 0) {
                         TextField("場所名", text: $placeName)
@@ -137,6 +113,48 @@ struct ProposalFlowMeetupForm: View {
             }
         } else {
             cameraPosition = .region(region)
+        }
+    }
+}
+
+private struct ProposalMeetupMapPicker: View {
+    @Binding var cameraPosition: MapCameraPosition
+    let placeName: String
+    let selectedCoordinate: CLLocationCoordinate2D?
+    var onSelectCoordinate: (CLLocationCoordinate2D) -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Label("地図で場所を選択", systemImage: "map")
+                .font(.system(size: 14, weight: .heavy, design: .rounded))
+                .foregroundStyle(MegrumTheme.ink)
+
+            MapReader { proxy in
+                Map(position: $cameraPosition, interactionModes: [.pan, .zoom]) {
+                    if let selectedCoordinate {
+                        Marker(
+                            placeName.isBlank ? "待ち合わせ" : placeName,
+                            coordinate: selectedCoordinate
+                        )
+                        .tint(MegrumTheme.lavender)
+                    }
+                }
+                .frame(height: 184)
+                .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+                .overlay {
+                    RoundedRectangle(cornerRadius: 18, style: .continuous)
+                        .stroke(.white.opacity(0.7), lineWidth: 1)
+                }
+                .gesture(
+                    SpatialTapGesture()
+                        .onEnded { value in
+                            guard let coordinate = proxy.convert(value.location, from: .local) else {
+                                return
+                            }
+                            onSelectCoordinate(coordinate)
+                        }
+                )
+            }
         }
     }
 }
