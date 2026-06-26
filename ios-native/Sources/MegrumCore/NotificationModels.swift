@@ -5,6 +5,7 @@ public enum MegrumNotificationKind: String, Codable, Sendable, CaseIterable, Ide
     case proposalAccepted = "proposal_accepted"
     case proposalRejected = "proposal_rejected"
     case proposalRevised = "proposal_revised"
+    case messageReceived = "message_received"
     case evidenceAdded = "evidence_added"
     case tradeCompleted = "trade_completed"
     case evaluationReceived = "evaluation_received"

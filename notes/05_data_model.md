@@ -3,8 +3,8 @@
 > **目的**：Megrum の全エンティティのDBスキーマ設計と、状態・マッチング・取引のデータフロー定義。
 > 実装の正解集。`09_state_machines.md` と完全に整合させ、`10_glossary.md` の用語を使う。
 
-最終更新: 2026-06-26
-ステータス: Draft v2.47（iter1205 取引証跡の画像別承認を追加）
+最終更新: 2026-06-27
+ステータス: Draft v2.48（iter1219 交換イベント通知を追加）
 
 ## 最新化履歴
 
@@ -59,6 +59,7 @@
 | **v2.45** | **2026-06-26** | **iter1004 反映（成立後の取引チャットで支払い情報を開示するため、`proposals.sender_payment_settings/receiver_payment_settings` スナップショットを追加）** |
 | **v2.46** | **2026-06-26** | **iter1203 反映（証跡追加/取引完了/評価投稿のsystem message meta運用を追加。`evidence_added` / `trade_completed` / `evaluation_submitted` でチャット表示を再現する）** |
 | **v2.47** | **2026-06-26** | **iter1205 反映（`proposal_evidence_photos.approved_by_sender/approved_by_receiver` を追加し、証跡画像ごとに承認状態を持つ。自分がアップロードした証跡は初期承認済み）** |
+| **v2.48** | **2026-06-27** | **iter1219 反映（交換イベントから `notifications` 行を作成。`message_received` kind と `message_id` / `evidence_photo_id` / `evaluation_id` 参照列を追加し、APNs配送は既存 `push_enabled` 設定へ委譲）** |
 | **v2.20** | **2026-05-29** | **iter168.90 反映（`search_query_logs` と人気検索RPCを追加。検索結果はマッチ分類つきグッズパネルで表示）** |
 | **v2.21** | **2026-05-30** | **iter168.97 反映（`schedules.place_name` 追加。合意時に `both` を単一手段へ固定し、現地交換の複数候補は1件へ固定する運用を追記）** |
 
@@ -345,14 +346,14 @@ RLS / 権限（iter278）：
 |---|---|---|
 | `id` | uuid | PK |
 | `user_id` | uuid | 通知を受け取るユーザー |
-| `kind` | text | `proposal_received` / `groom_reply` / `meguri_board_reply` など |
+| `kind` | text | `proposal_received` / `message_received` / `groom_reply` / `meguri_board_reply` など |
 | `title` / `body` | text | 通知一覧と端末通知に表示する内容 |
 | `link_path` | text nullable | タップ時の遷移先 |
-| `proposal_id` / `dispute_id` ほか | uuid nullable | 関連エンティティ |
+| `proposal_id` / `message_id` / `evidence_photo_id` / `evaluation_id` / `dispute_id` ほか | uuid nullable | 関連エンティティ |
 | `read_at` | timestamptz nullable | nullなら未読 |
 | `created_at` | timestamptz | |
 
-iter276以降、`notifications` に行が追加されると、`notification_devices` の有効トークンへExpo Pushを送るDBトリガーが動く。iter338以降、Swift Native iOS版はAPNs tokenを保存する。iter344で `send-apns-notification` Edge Functionを追加し、iter345でDB triggerからも `app.settings.apns_dispatch_url` / `app.settings.apns_dispatch_secret` が設定済みの場合だけAPNs配送Functionへ `notification_id` を渡すようにした。
+iter276以降、`notifications` に行が追加されると、`notification_devices` の有効トークンへExpo Pushを送るDBトリガーが動く。iter338以降、Swift Native iOS版はAPNs tokenを保存する。iter344で `send-apns-notification` Edge Functionを追加し、iter345でDB triggerからも `app.settings.apns_dispatch_url` / `app.settings.apns_dispatch_secret` が設定済みの場合だけAPNs配送Functionへ `notification_id` を渡すようにした。iter1219以降、打診受信/再打診/見送り/成立、取引チャットメッセージ、キャンセル要請、証跡写真、取引完了、相互評価完了はDB triggerまたはRPC内で `notifications` 行を作成する。`user_notification_settings.push_enabled=false` の場合もアプリ内通知行は残り、OSプッシュ配送だけを止める。
 
 ### `user_notification_settings`（通知設定 / iter93, iter276）
 

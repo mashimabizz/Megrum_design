@@ -1,4 +1,5 @@
 @testable import MegrumApp
+import MegrumCore
 import XCTest
 
 final class NotificationRouteTests: XCTestCase {
@@ -13,6 +14,12 @@ final class NotificationRouteTests: XCTestCase {
         XCTAssertEqual(NotificationRouteIntent(linkPath: "/transactions/\(tradeID)/capture"), .tradeEvidenceCapture(id: tradeID))
         XCTAssertEqual(NotificationRouteIntent(linkPath: "/transactions/\(tradeID)/approve"), .tradeEvidenceApproval(id: tradeID))
         XCTAssertEqual(NotificationRouteIntent(linkPath: "/transactions/\(tradeID)/rate"), .tradeEvaluation(id: tradeID))
+        XCTAssertEqual(NotificationRouteIntent(linkPath: "/trades/\(tradeID)/approve"), .tradeEvidenceApproval(id: tradeID))
+        XCTAssertEqual(NotificationRouteIntent(linkPath: "/trades/\(tradeID)/rate"), .tradeEvaluation(id: tradeID))
+        XCTAssertEqual(
+            NotificationRouteIntent(linkPath: "/trades/\(tradeID)/cancel-or-late?kind=cancel"),
+            .tradeAssistance(id: tradeID, kind: .cancel)
+        )
         XCTAssertEqual(
             NotificationRouteIntent(linkPath: "/transactions/\(tradeID)/cancel-or-late?kind=late"),
             .tradeAssistance(id: tradeID, kind: .late)
@@ -64,5 +71,10 @@ final class NotificationRouteTests: XCTestCase {
         XCTAssertEqual(try XCTUnwrap(NotificationRouteIntent(linkPath: "/disputes/\(disputeID)")).fallbackTab, .trades)
         XCTAssertEqual(try XCTUnwrap(NotificationRouteIntent(linkPath: "/meguri-board-thread?id=thread-1")).fallbackTab, .meguri)
         XCTAssertEqual(try XCTUnwrap(NotificationRouteIntent(linkPath: "/users/\(userID)")).fallbackTab, .home)
+    }
+
+    func testMessageReceivedNotificationIsTradeRelated() {
+        XCTAssertTrue(MegrumNotificationKind.messageReceived.isTradeRelatedForCenter)
+        XCTAssertEqual(MegrumNotificationKind.messageReceived.centerSymbolName, "message")
     }
 }

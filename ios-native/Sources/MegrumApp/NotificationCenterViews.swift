@@ -105,6 +105,8 @@ extension MegrumNotificationKind {
             "xmark.circle"
         case .proposalRevised:
             "pencil.circle"
+        case .messageReceived:
+            "message"
         case .evidenceAdded:
             "camera"
         case .evaluationReceived:
@@ -130,6 +132,8 @@ extension MegrumNotificationKind {
             Color.orange
         case .evaluationReceived, .meguriBoardMention, .expiresSoon:
             MegrumTheme.pink
+        case .messageReceived:
+            MegrumTheme.sky
         default:
             MegrumTheme.lavender
         }
@@ -138,8 +142,9 @@ extension MegrumNotificationKind {
     var isTradeRelatedForCenter: Bool {
         switch self {
         case .proposalReceived, .proposalAccepted, .proposalRejected, .proposalRevised,
-             .evidenceAdded, .tradeCompleted, .evaluationReceived, .disputeReceived,
-             .disputeResponded, .disputeClosed, .cancelRequested, .expiresSoon:
+             .messageReceived, .evidenceAdded, .tradeCompleted, .evaluationReceived,
+             .disputeReceived, .disputeResponded, .disputeClosed, .cancelRequested,
+             .expiresSoon:
             true
         case .groomReply, .meguriMessage, .meguriBoardReply, .meguriBoardMention, .unknown:
             false

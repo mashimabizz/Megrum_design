@@ -4,6 +4,66 @@
 
 ---
 
+## イテレーション1219：交換イベント通知をDB側で作成
+
+### 背景・問題意識
+
+オーナーから、iOS側にはAPNs登録・モバイル通知ON/OFF・通知タップ遷移・Supabase Edge Function配送の土台があるが、交換機能の各イベントで `notifications` 行を作る処理が不足しているという指摘があった。通知・DB/API・取引状態に触るため、標準モードとしてDB側の発生源に近い場所で通知行を作成し、既存のモバイル通知配送に乗せる方針で実装した。
+
+### 変更内容
+
+#### `supabase/migrations/20260627003000_add_trade_event_notifications.sql`
+- `notifications.kind` に `message_received` を追加し、`message_id` / `evidence_photo_id` / `evaluation_id` の参照列と索引を追加した。
+- 打診作成、取引チャットメッセージ、証跡写真追加、評価投稿のDB triggerを追加し、相手または先に評価済みのユーザーへ `notifications` 行を作成するようにした。
+- `respond_to_proposal_for_viewer` に見送り/成立通知を追加し、既存の行ロック・在庫availability確認・mail address snapshot・市場ロック処理は維持した。
+- `approve_trade_evidence_for_viewer` に取引完了通知を追加し、既存の写真別承認・在庫移動・listing close処理は維持した。
+- 通常テキストは本文を正規化して100文字で切り詰め、写真/服装写真/現在地/証跡/system messageは安全な定型文にした。
+- 証跡追加や評価投稿は専用triggerで通知し、対応するsystem messageでは通知しないことで重複を避けた。
+
+#### `ios-native/Sources/MegrumCore/NotificationModels.swift`
+- Swift側の `MegrumNotificationKind` に `message_received` を追加した。
+
+#### `ios-native/Sources/MegrumApp/NotificationCenterViews.swift`
+- `message_received` を通知センターの取引関連filter対象に追加し、表示アイコン/色を設定した。
+
+#### `ios-native/Tests/MegrumAppTests/NotificationRouteTests.swift`
+#### `ios-native/Tests/MegrumDataTests/SupabaseRequestParityTests.swift`
+- `/trades/{id}/approve` / `/trades/{id}/rate` / `/trades/{id}/cancel-or-late?kind=cancel` の通知タップ遷移テストを追加した。
+- Swift enum とDB check constraint想定のkind一覧に `message_received` を追加した。
+
+#### `notes/05_data_model.md`
+- `notifications` のkind例と関連エンティティ列を更新し、交換イベント通知と `push_enabled=false` 時の扱いを追記した。
+
+### 影響範囲
+
+- Supabaseの `notifications`、`proposals`、`messages`、`proposal_evidence_photos`、`user_evaluations` 周辺。
+- Swift Native iOSの通知kind、通知センター表示、通知タップ遷移テスト。
+- 既存の `user_notification_settings.push_enabled` / `notification_devices` / `send_mobile_push_for_notification()` 設計は維持し、OFF時もアプリ内通知行は残してOSプッシュだけ止まる。
+- 状態名は追加していないため `notes/09_state_machines.md` は更新不要。新しい用語ではなくDB kind追加のため `notes/10_glossary.md` も更新不要。
+
+### 確認方法
+
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-notifications-targeted-tests --enable-xctest --disable-swift-testing -j 1 --filter 'NotificationRouteTests|SupabaseRequestParityTests/testNotificationKindRawValuesMatchCurrentSchemaNames'`
+  - passed（7 tests, 0 failures）
+- `supabase db lint --workdir supabase --fail-on error`
+  - local Postgres `127.0.0.1:54322` が起動していないため未実行（connection refused）
+- `git diff --check`
+  - 最終確認で実行
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-notifications-build`
+  - 最終確認で実行
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-notifications-tests --enable-xctest --disable-swift-testing -j 1`
+  - 最終確認で実行
+
+### セルフレビュー結果
+
+- ✅ 通知行作成はDB trigger/RPC側へ寄せ、取引状態変更・証跡追加・評価投稿と同じトランザクションに乗る範囲を広げた。
+- ✅ `push_enabled=false` は既存配送trigger側でOSプッシュだけ止め、アプリ内通知行は残す設計を維持した。
+- ✅ 双方合意、写真別証跡承認、片方が先に評価するケースは、行ロック・参照ID・重複抑制で多重通知を避けるようにした。
+- ✅ 通常メッセージ本文は100文字で切り詰め、画像/現在地/服装写真/証跡/system messageは安全な文言にした。
+- ✅ `notes/05_data_model.md` は更新済み。状態名・用語の追加はないため `notes/09_state_machines.md` / `notes/10_glossary.md` は更新不要。
+
+---
+
 ## イテレーション1218：設定画面の閉じると項目遷移を復旧
 
 ### 背景・問題意識

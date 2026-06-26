@@ -174,6 +174,7 @@ final class SupabaseRequestParityTests: XCTestCase {
             "proposal_accepted",
             "proposal_rejected",
             "proposal_revised",
+            "message_received",
             "evidence_added",
             "trade_completed",
             "evaluation_received",
