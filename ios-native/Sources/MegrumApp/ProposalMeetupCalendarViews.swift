@@ -20,31 +20,13 @@ struct ProposalMeetupCalendarCandidateBlock: View {
         let editButtonHeight = max(18, height - 10)
 
         ZStack(alignment: .topTrailing) {
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .fill(isSelected ? MegrumTheme.lavender : MegrumTheme.sky)
-                .allowsHitTesting(false)
-
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .strokeBorder(.white.opacity(isSelected ? 0.9 : 0.62), lineWidth: isSelected ? 1.5 : 1)
-                .allowsHitTesting(false)
+            ProposalMeetupCalendarCandidateBlockBackground(isSelected: isSelected)
 
             Button(action: onTap) {
-                ZStack(alignment: .topLeading) {
-                    RoundedRectangle(cornerRadius: 14, style: .continuous)
-                        .fill(Color.white.opacity(0.025))
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(candidateTitle)
-                            .font(.system(size: 11, weight: .black, design: .rounded))
-                            .foregroundStyle(.white)
-                        Text(placeLabel)
-                            .font(.system(size: 11, weight: .bold, design: .rounded))
-                            .foregroundStyle(.white.opacity(0.92))
-                            .lineLimit(2)
-                    }
-                    .padding(.horizontal, 8)
-                    .padding(.top, 8)
-                    .padding(.bottom, 16)
-                }
+                ProposalMeetupCalendarCandidateButtonContent(
+                    candidateTitle: candidateTitle,
+                    placeLabel: placeLabel
+                )
             }
             .buttonStyle(.plain)
             .frame(height: editButtonHeight)
@@ -76,20 +58,68 @@ struct ProposalMeetupCalendarCandidateBlock: View {
                 )
                 .zIndex(2)
 
-            Button(action: onRemove) {
-                Image(systemName: "xmark")
-                    .font(.system(size: 10, weight: .black))
-                    .foregroundStyle(MegrumTheme.ink)
-                    .frame(width: 22, height: 22)
-                    .background(.white.opacity(0.92), in: Circle())
-                    .shadow(color: MegrumTheme.ink.opacity(0.16), radius: 4, y: 2)
-            }
-            .buttonStyle(.plain)
-            .padding(4)
-            .accessibilityLabel("候補\(index + 1)を削除")
-            .zIndex(3)
+            ProposalMeetupCalendarCandidateRemoveButton(index: index, onRemove: onRemove)
+                .zIndex(3)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    }
+}
+
+private struct ProposalMeetupCalendarCandidateBlockBackground: View {
+    var isSelected: Bool
+
+    var body: some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .fill(isSelected ? MegrumTheme.lavender : MegrumTheme.sky)
+
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .strokeBorder(.white.opacity(isSelected ? 0.9 : 0.62), lineWidth: isSelected ? 1.5 : 1)
+        }
+        .allowsHitTesting(false)
+    }
+}
+
+private struct ProposalMeetupCalendarCandidateButtonContent: View {
+    let candidateTitle: String
+    let placeLabel: String
+
+    var body: some View {
+        ZStack(alignment: .topLeading) {
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .fill(Color.white.opacity(0.025))
+            VStack(alignment: .leading, spacing: 4) {
+                Text(candidateTitle)
+                    .font(.system(size: 11, weight: .black, design: .rounded))
+                    .foregroundStyle(.white)
+                Text(placeLabel)
+                    .font(.system(size: 11, weight: .bold, design: .rounded))
+                    .foregroundStyle(.white.opacity(0.92))
+                    .lineLimit(2)
+            }
+            .padding(.horizontal, 8)
+            .padding(.top, 8)
+            .padding(.bottom, 16)
+        }
+    }
+}
+
+private struct ProposalMeetupCalendarCandidateRemoveButton: View {
+    let index: Int
+    var onRemove: () -> Void
+
+    var body: some View {
+        Button(action: onRemove) {
+            Image(systemName: "xmark")
+                .font(.system(size: 10, weight: .black))
+                .foregroundStyle(MegrumTheme.ink)
+                .frame(width: 22, height: 22)
+                .background(.white.opacity(0.92), in: Circle())
+                .shadow(color: MegrumTheme.ink.opacity(0.16), radius: 4, y: 2)
+        }
+        .buttonStyle(.plain)
+        .padding(4)
+        .accessibilityLabel("候補\(index + 1)を削除")
     }
 }
 

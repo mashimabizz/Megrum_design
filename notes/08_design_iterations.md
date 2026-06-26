@@ -4,6 +4,44 @@
 
 ---
 
+## イテレーション1176：proposal calendar candidate blockを分離
+
+### 背景・問題意識
+
+打診作成の meetup 週カレンダー候補ブロックに、背景、編集ボタン内ラベル、resize handle、削除ボタンが同居していた。move/resize の gesture は親に残し、視覚部品を小さな専用Viewへ分ける。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/ProposalMeetupCalendarViews.swift`
+- `ProposalMeetupCalendarCandidateBlockBackground` を追加し、選択状態ごとのfill/strokeを専用Viewへ分離した。
+- `ProposalMeetupCalendarCandidateButtonContent` を追加し、候補名と場所ラベルの描画を専用Viewへ分離した。
+- `ProposalMeetupCalendarCandidateRemoveButton` を追加し、削除ボタンの見た目とaccessibility labelを専用Viewへ分離した。
+- move/resize の `DragGesture` とcandidate block全体のframe/zIndex構造は親Viewに維持した。
+
+### 影響範囲
+
+- Swift Native iOS版の打診作成 meetup 週カレンダー候補ブロック。
+- 選択状態のfill/stroke、候補名、場所fallback、編集/削除accessibility label、move/resize gesture、DB/API、状態名、表示文言は変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumApp/ProposalMeetupCalendarViews.swift`
+  - passed
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-proposal-calendar-candidate-block`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-proposal-calendar-candidate-block-tests --enable-xctest --disable-swift-testing -j 1 --filter 'ProposalCreateFlowTests|ProposalCreateSheetTests|TradeRequestDraftProposalCreateFlowTests|TradeChatAffordanceTests'`
+  - passed（112 tests）
+
+### セルフレビュー結果
+
+- ✅ 選択状態のfill/stroke、lineWidth、hit testingを維持した。
+- ✅ 候補名、場所fallback、font、padding、lineLimitを維持した。
+- ✅ move/resize gesture、削除button action、accessibility labelを維持した。
+- ✅ DB/API、状態名、表示文言、打診作成の進行条件は変更していない。
+- ✅ 新しい状態名・用語・DB列は追加していないため、`notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション1175：proposal week preview contentを分離
 
 ### 背景・問題意識
