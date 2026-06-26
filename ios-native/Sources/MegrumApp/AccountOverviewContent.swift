@@ -6,12 +6,16 @@ struct AccountOverviewContent: View {
 
     var body: some View {
         List {
-            basicInformationSection
-            settingsStatusSection
+            AccountOverviewBasicInformationSection(summary: summary)
+            AccountOverviewSettingsStatusSection(summary: summary)
         }
     }
+}
 
-    private var basicInformationSection: some View {
+private struct AccountOverviewBasicInformationSection: View {
+    var summary: SettingsAccountSummary
+
+    var body: some View {
         Section {
             SettingsValueRow(title: "アカウントID", value: summary.userIDText, isMonospaced: true)
             SettingsValueRow(title: "ユーザーID", value: summary.handleText)
@@ -23,8 +27,12 @@ struct AccountOverviewContent: View {
             Text("基本情報")
         }
     }
+}
 
-    private var settingsStatusSection: some View {
+private struct AccountOverviewSettingsStatusSection: View {
+    var summary: SettingsAccountSummary
+
+    var body: some View {
         Section {
             SettingsValueRow(title: "モバイル通知", value: summary.pushNotificationText)
             SettingsValueRow(title: "住所登録", value: summary.addressStatusText)

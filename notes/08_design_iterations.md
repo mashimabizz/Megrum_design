@@ -4,6 +4,44 @@
 
 ---
 
+## イテレーション1148：account overview sectionsを分離
+
+### 背景・問題意識
+
+`AccountOverviewContent` は、List本体と基本情報/設定状態sectionを同じView内の computed helperとして抱えていた。アカウント概要画面の行順、文言、monospaced指定、text selection、accessibilityを維持したまま、section単位を小さな専用Viewへ分離する。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/AccountOverviewContent.swift`
+- `AccountOverviewBasicInformationSection` を追加し、アカウントID、ユーザーID、表示名、活動エリア、支払い条件、アカウント状態の行を移動した。
+- `AccountOverviewSettingsStatusSection` を追加し、モバイル通知、住所登録の行を移動した。
+- `AccountOverviewContent` はList構成だけに寄せた。
+- `SettingsValueRow` の表示、text selection、accessibilityLabelは変更していない。
+
+### 影響範囲
+
+- Swift Native iOS版の設定内、アカウント概要画面。
+- 基本情報/設定状態sectionの表示構成。
+- account summary生成、設定保存、住所/支払い設定、DB/API、状態名、表示文言は変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumApp/AccountOverviewContent.swift`
+  - passed
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-account-overview-section-parts`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-account-overview-section-parts-tests --enable-xctest --disable-swift-testing -j 1 --filter 'SettingsScreenTests'`
+  - passed（16 tests）
+
+### セルフレビュー結果
+
+- ✅ 基本情報/設定状態sectionのheader文言、行順、行title/value参照を維持した。
+- ✅ アカウントIDのmonospaced指定、`SettingsValueRow` のfont/color/text selection/accessibilityLabelを維持した。
+- ✅ account summary生成、設定保存、住所/支払い設定、DB/API、状態名、表示文言は変更していない。
+- ✅ 新しい状態名・用語・DB列は追加していないため、`notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション1147：goods detail sheet partsを分離
 
 ### 背景・問題意識
