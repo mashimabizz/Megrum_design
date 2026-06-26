@@ -4,6 +4,45 @@
 
 ---
 
+## イテレーション1161：blocked users row partsを分離
+
+### 背景・問題意識
+
+`BlockedUsersContent` はブロック済みユーザー一覧として、行表示自体は小さく分割されている一方で、`BlockedUserRow` に解除buttonのloading分岐が直接入り、`BlockedUserAvatar` には `avatarPlaceholder` computed `some View` helper が残っていた。解除操作、loading表示、disabled条件、アバターplaceholder、行の表示文言とレイアウトを維持したまま、行内の部品を専用Viewへ分けて読みやすくする。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/BlockedUsersContent.swift`
+- `BlockedUserUnblockButton` を追加し、解除button、loading中の `ProgressView`、bordered/capsule style、disabled条件を専用Viewへ移動した。
+- `BlockedUserAvatarPlaceholder` を追加し、画像未設定時およびAsyncImage placeholderの丸背景と頭文字表示を専用Viewへ移動した。
+- `BlockedUserRow` はアバター、ユーザー情報、解除buttonを並べる構成に寄せた。
+- `BlockedUserAvatar` の computed `avatarPlaceholder` helper を削除し、placeholder Viewを直接配置した。
+
+### 影響範囲
+
+- Swift Native iOS版の設定配下「ブロックした人」一覧画面。
+- ブロック済みユーザー行のアバターplaceholderと解除button。
+- loading row、empty row、ユーザー名/handle/ブロック日時表示、解除callback、button style、disabled条件、アバターサイズ/色、DB/API、状態名、表示文言、レイアウト値は変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumApp/BlockedUsersContent.swift`
+  - passed
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-blocked-users-content`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-blocked-users-content-tests --enable-xctest --disable-swift-testing -j 1 --filter 'BlockedUserStateReducerTests'`
+  - passed（2 tests）
+
+### セルフレビュー結果
+
+- ✅ ブロック済みユーザー行のアバター、displayName、handle、ブロック日時、spacing、paddingを維持した。
+- ✅ 解除buttonの文言、loading中の `ProgressView`、`.bordered` style、capsule shape、`isUnblocking` によるdisabled条件を維持した。
+- ✅ 画像未設定時とAsyncImage placeholderは同じ丸背景、46pxサイズ、lavender色、頭文字表示を使い続ける。
+- ✅ loading row / empty row、解除callback、DB/API、状態名、表示文言、レイアウト値は変更していない。
+- ✅ 新しい状態名・用語・DB列は追加していないため、`notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション1160：account setup oshi componentsを分離
 
 ### 背景・問題意識

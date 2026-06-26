@@ -84,20 +84,10 @@ private struct BlockedUserRow: View {
 
             Spacer(minLength: 8)
 
-            Button {
-                onUnblock()
-            } label: {
-                if isUnblocking {
-                    ProgressView()
-                        .controlSize(.small)
-                } else {
-                    Text("解除")
-                        .font(.subheadline.weight(.bold))
-                }
-            }
-            .buttonStyle(.bordered)
-            .buttonBorderShape(.capsule)
-            .disabled(isUnblocking)
+            BlockedUserUnblockButton(
+                isUnblocking: isUnblocking,
+                onUnblock: onUnblock
+            )
         }
         .padding(.vertical, 8)
     }
@@ -122,16 +112,40 @@ private struct BlockedUserAvatar: View {
                     .resizable()
                     .scaledToFill()
             } placeholder: {
-                avatarPlaceholder
+                BlockedUserAvatarPlaceholder(displayName: displayName)
             }
             .frame(width: 46, height: 46)
             .clipShape(Circle())
         } else {
-            avatarPlaceholder
+            BlockedUserAvatarPlaceholder(displayName: displayName)
         }
     }
+}
 
-    private var avatarPlaceholder: some View {
+private struct BlockedUserUnblockButton: View {
+    var isUnblocking: Bool
+    var onUnblock: () -> Void
+
+    var body: some View {
+        Button(action: onUnblock) {
+            if isUnblocking {
+                ProgressView()
+                    .controlSize(.small)
+            } else {
+                Text("解除")
+                    .font(.subheadline.weight(.bold))
+            }
+        }
+        .buttonStyle(.bordered)
+        .buttonBorderShape(.capsule)
+        .disabled(isUnblocking)
+    }
+}
+
+private struct BlockedUserAvatarPlaceholder: View {
+    var displayName: String
+
+    var body: some View {
         Circle()
             .fill(MegrumTheme.lavender.opacity(0.18))
             .frame(width: 46, height: 46)
