@@ -331,3 +331,39 @@ struct HomeDefaultExchangeSettings: Equatable, Sendable {
         return normalized.isEmpty ? nil : normalized
     }
 }
+
+extension HomeDefaultExchangeSettings {
+    func makeListingExchangeSummary(now: Date = Date.now) -> IndividualListingExchangeSummary {
+        IndividualListingExchangeSummary(
+            handoffMethod: preference.listingHandoffDraft,
+            localPrefecture: localPrefecture.nilIfBlank ?? IndividualListingExchangeSummary.defaultLocalPrefecture,
+            localPlaceMemo: "",
+            localSchedule: listingLocalScheduleText(now: now),
+            shippingFee: mailShippingFee,
+            shippingDays: mailShippingDays,
+            acceptsOutsideCondition: true
+        )
+    }
+
+    private func listingLocalScheduleText(now: Date) -> String {
+        let dateText = localDateKeys
+            .filter { HomeExchangeDateKey.isOnOrAfterToday($0, now: now) }
+            .prefix(3)
+            .map { HomeExchangeDateKey.compactDisplayText(for: $0) }
+            .joined(separator: "、")
+        return dateText.nilIfBlank ?? IndividualListingExchangeSummary.defaultLocalSchedule
+    }
+}
+
+private extension HomeExchangePreference {
+    var listingHandoffDraft: IndividualListingHandoffDraft {
+        switch self {
+        case .local:
+            .local
+        case .mail:
+            .mail
+        case .both:
+            .both
+        }
+    }
+}

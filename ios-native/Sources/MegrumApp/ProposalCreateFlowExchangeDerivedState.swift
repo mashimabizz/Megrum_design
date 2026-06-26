@@ -14,6 +14,22 @@ extension ProposalCreateFlow {
         )
     }
 
+    var defaultExchangeSettings: HomeDefaultExchangeSettings {
+        HomeDefaultExchangeSettings(
+            preferenceRawValue: exchangePreferenceRawValue,
+            requiresSamePrefecture: exchangeRequiresSamePrefecture,
+            requiresDateOverlap: exchangeRequiresDateOverlap,
+            localPrefecture: exchangeLocalPrefecture,
+            localDateKeysRawValue: exchangeLocalDateKeysRawValue,
+            mailShippingFeeRawValue: exchangeMailShippingFeeRawValue,
+            mailShippingDaysRawValue: exchangeMailShippingDaysRawValue
+        )
+    }
+
+    var defaultExchangeSummary: IndividualListingExchangeSummary {
+        defaultExchangeSettings.makeListingExchangeSummary()
+    }
+
     var viewerListingExchangeSummary: IndividualListingExchangeSummary? {
         let selectedOrInitialSenderIDs = selectedSenderGoodsIDs.union(Set(initialSenderGoodsIDs))
         if let listingID,

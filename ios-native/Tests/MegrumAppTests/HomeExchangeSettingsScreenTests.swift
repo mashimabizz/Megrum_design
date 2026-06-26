@@ -85,6 +85,26 @@ final class HomeExchangeSettingsScreenTests: XCTestCase {
         XCTAssertTrue(details.isEmpty)
     }
 
+    func testDefaultExchangeSettingsBuildListingSummaryFromConfiguredDefault() {
+        let settings = HomeDefaultExchangeSettings(
+            preference: .local,
+            localPrefecture: "大阪府",
+            localDateKeys: ["2026-07-01", "2026-07-03"],
+            mailShippingFee: .owner,
+            mailShippingDays: .oneDay
+        )
+
+        let summary = settings.makeListingExchangeSummary(
+            now: makeDate(year: 2026, month: 6, day: 27)
+        )
+
+        XCTAssertEqual(summary.handoffMethod, .local)
+        XCTAssertEqual(summary.localPrefecture, "大阪府")
+        XCTAssertEqual(summary.localSchedule, "7/1、7/3")
+        XCTAssertEqual(summary.shippingFee, .owner)
+        XCTAssertEqual(summary.shippingDays, .oneDay)
+    }
+
     private func makeListing(
         localPrefecture: String,
         localPlaceMemo: String,

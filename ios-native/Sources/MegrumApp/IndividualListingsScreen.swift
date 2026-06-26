@@ -4,6 +4,13 @@ import SwiftUI
 
 struct IndividualListingsScreen: View {
     @ObservedObject var appState: MegrumAppState
+    @AppStorage(HomeExchangeSettingsStorageKeys.preference) private var exchangePreferenceRawValue = HomeDefaultExchangeSettings.standard.preference.rawValue
+    @AppStorage(HomeExchangeSettingsStorageKeys.requiresSamePrefecture) private var exchangeRequiresSamePrefecture = HomeDefaultExchangeSettings.standard.requiresSamePrefecture
+    @AppStorage(HomeExchangeSettingsStorageKeys.requiresDateOverlap) private var exchangeRequiresDateOverlap = HomeDefaultExchangeSettings.standard.requiresDateOverlap
+    @AppStorage(HomeExchangeSettingsStorageKeys.localPrefecture) private var exchangeLocalPrefecture = HomeDefaultExchangeSettings.standard.localPrefecture
+    @AppStorage(HomeExchangeSettingsStorageKeys.localDateKeys) private var exchangeLocalDateKeysRawValue = ""
+    @AppStorage(HomeExchangeSettingsStorageKeys.mailShippingFee) private var exchangeMailShippingFeeRawValue = HomeDefaultExchangeSettings.standard.mailShippingFee.rawValue
+    @AppStorage(HomeExchangeSettingsStorageKeys.mailShippingDays) private var exchangeMailShippingDaysRawValue = HomeDefaultExchangeSettings.standard.mailShippingDays.rawValue
     var headerTitle: String = "個別募集"
     var headerAccessory: AnyView?
     var showsHeader = true
@@ -76,6 +83,7 @@ struct IndividualListingsScreen: View {
                     IndividualListingEditorSheet(
                         appState: appState,
                         initialOptionKind: optionKind,
+                        defaultExchangeSummary: defaultExchangeSettings.makeListingExchangeSummary(),
                         initialStep: initialEditorStep,
                         onSaved: { editorRoute = nil }
                     )
@@ -126,6 +134,18 @@ struct IndividualListingsScreen: View {
 
     private var wishByID: [UUID: WishItem] {
         Dictionary(uniqueKeysWithValues: appState.wishes.map { ($0.id, $0) })
+    }
+
+    private var defaultExchangeSettings: HomeDefaultExchangeSettings {
+        HomeDefaultExchangeSettings(
+            preferenceRawValue: exchangePreferenceRawValue,
+            requiresSamePrefecture: exchangeRequiresSamePrefecture,
+            requiresDateOverlap: exchangeRequiresDateOverlap,
+            localPrefecture: exchangeLocalPrefecture,
+            localDateKeysRawValue: exchangeLocalDateKeysRawValue,
+            mailShippingFeeRawValue: exchangeMailShippingFeeRawValue,
+            mailShippingDaysRawValue: exchangeMailShippingDaysRawValue
+        )
     }
 
     private func loadChoicesIfNeeded() async {

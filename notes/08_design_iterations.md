@@ -4,6 +4,57 @@
 
 ---
 
+## イテレーション1224：交換条件の既定場所を募集へ反映
+
+### 背景・問題意識
+
+オーナーから、交換条件設定のカレンダー上部にある「既定」を大阪にした場合、自分のデフォルト交換場所も大阪になるようにしてほしいという指摘があった。保存側は `AppStorage` に既定都道府県を保持していたが、新規個別募集の交換条件初期値は `東京都` 固定で、打診作成も個別募集条件が見つからない場合はプロフィール都道府県へ落ちていた。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/HomeExchangeConditionSettings.swift`
+- `HomeDefaultExchangeSettings` から `IndividualListingExchangeSummary` を生成する `makeListingExchangeSummary(now:)` を追加した。
+- 既定都道府県、選択済み日程、郵送送料/発送目安を個別募集の交換条件サマリーへ流せるようにした。
+
+#### `ios-native/Sources/MegrumApp/IndividualListingDraftModels.swift`
+#### `ios-native/Sources/MegrumApp/IndividualListingEditorSheet.swift`
+#### `ios-native/Sources/MegrumApp/IndividualListingsScreen.swift`
+- 新規個別募集ドラフトの交換条件初期値に、交換条件設定の既定値を注入するようにした。
+- 既存個別募集の編集時は、従来通り募集note内の交換条件サマリーを復元する挙動を維持した。
+
+#### `ios-native/Sources/MegrumApp/ProposalCreateFlow*.swift`
+- 打診作成時、自分の個別募集交換条件が見つからない場合のフォールバックとして、交換条件設定の既定値を使うようにした。
+- 既存の `initialShippingFee` / `initialShippingDays` が明示されている場合は、従来通りそちらを優先する。
+
+#### `ios-native/Tests/MegrumAppTests/HomeExchangeSettingsScreenTests.swift`
+#### `ios-native/Tests/MegrumAppTests/IndividualListingDraftTests.swift`
+- 交換条件設定の既定都道府県がサマリーへ反映されることを追加テストした。
+- 新規個別募集ドラフトに大阪府などの既定値が入り、保存noteへ出力されることを追加テストした。
+
+### 影響範囲
+
+- Swift Native iOSの交換条件設定、個別募集新規作成、打診作成初期値。
+- 既存個別募集編集、状態遷移、DB/APIスキーマ、用語定義には影響なし。
+
+### 確認方法
+
+- `git diff --check`
+  - passed
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-exchange-default-build`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-exchange-default-tests --enable-xctest --disable-swift-testing -j 1`
+  - passed（1055 tests, 0 failures, 3 skipped）
+
+### セルフレビュー結果
+
+- ✅ 交換条件設定の保存キーを新規個別募集の初期値へ接続した。
+- ✅ 打診作成では、自分の個別募集条件がある場合はそちらを優先し、ない場合だけ既定値へフォールバックする。
+- ✅ 状態名追加なしのため `notes/09_state_machines.md` 更新不要。
+- ✅ 新用語/廃止用語なしのため `notes/10_glossary.md` 更新不要。
+- ✅ DB/APIスキーマ変更なしのため `notes/05_data_model.md` 更新不要。
+
+---
+
 ## イテレーション1223：メグルムプラス課金導線を追加
 
 ### 背景・問題意識

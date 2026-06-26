@@ -54,6 +54,13 @@ extension ProposalCreateFlow {
                 meetupStartAt = date
                 meetupEndAt = date.addingTimeInterval(30 * 60)
             }
+        } else if defaultExchangeSummary.includesLocal {
+            meetupPrefecture = defaultExchangeSummary.localPrefecture
+            meetupPlaceMemo = defaultExchangeSummary.localPlaceMemo
+            if let date = Self.date(fromScheduleText: defaultExchangeSummary.localSchedule) {
+                meetupStartAt = date
+                meetupEndAt = date.addingTimeInterval(30 * 60)
+            }
         } else if let viewerPrefecture = appState.viewer?.prefecture.nilIfBlank {
             meetupPrefecture = viewerPrefecture
         } else if let ownerPrefecture = targetItem.ownerPrefecture.nilIfBlank {
@@ -72,6 +79,12 @@ extension ProposalCreateFlow {
         }
         if let initialShippingDays {
             shippingDays = initialShippingDays
+        }
+        if initialShippingFee == nil, defaultExchangeSummary.includesMail {
+            shippingFee = defaultExchangeSummary.shippingFee
+        }
+        if initialShippingDays == nil, defaultExchangeSummary.includesMail {
+            shippingDays = defaultExchangeSummary.shippingDays
         }
     }
 

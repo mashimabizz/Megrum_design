@@ -44,6 +44,48 @@ final class IndividualListingDraftTests: XCTestCase {
         )
     }
 
+    func testCreateDraftUsesConfiguredDefaultExchangeSummary() throws {
+        let groupID = UUID()
+        let goodsTypeID = UUID()
+        let have = GoodsItem(
+            id: UUID(),
+            ownerID: UUID(),
+            groupID: groupID,
+            goodsTypeID: goodsTypeID,
+            title: "譲るアクスタ",
+            quantity: 1
+        )
+        let wish = WishItem(
+            id: UUID(),
+            ownerID: UUID(),
+            groupID: groupID,
+            goodsTypeID: goodsTypeID,
+            title: "ほしいアクスタ"
+        )
+        let defaultSummary = IndividualListingExchangeSummary(
+            handoffMethod: .local,
+            localPrefecture: "大阪府",
+            localPlaceMemo: "京セラ周辺",
+            localSchedule: "7/1",
+            shippingFee: .owner,
+            shippingDays: .oneDay
+        )
+
+        var draft = IndividualListingDraft(
+            mode: .create(preselectedWishID: wish.id),
+            defaultExchangeSummary: defaultSummary
+        )
+        draft.toggleHave(have.id, maxQuantity: have.quantity)
+
+        let input = try XCTUnwrap(draft.createInput(inventory: [have], wishes: [wish]))
+
+        XCTAssertEqual(draft.localPrefecture, "大阪府")
+        XCTAssertEqual(
+            input.note,
+            "交換手段: 現地交換 / 都道府県: 大阪府 / 場所メモ: 京セラ周辺 / 日程: 7/1 / 条件外打診: 可"
+        )
+    }
+
     func testDraftRestoresExchangeSummaryWhenEditing() throws {
         let listingID = UUID()
         let original = IndividualListing(

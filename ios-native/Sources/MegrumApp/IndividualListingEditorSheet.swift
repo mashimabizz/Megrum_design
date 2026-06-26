@@ -23,13 +23,17 @@ struct IndividualListingEditorSheet: View {
         appState: MegrumAppState,
         preselectedWishID: UUID? = nil,
         initialOptionKind: IndividualListingOptionKind? = nil,
+        defaultExchangeSummary: IndividualListingExchangeSummary = IndividualListingExchangeSummary(),
         initialStep: IndividualListingEditorStep = .haves,
         onSaved: (() -> Void)? = nil
     ) {
         self.appState = appState
         self.onLocalEditSaved = nil
         self.onSaved = onSaved
-        var draft = IndividualListingDraft(mode: .create(preselectedWishID: preselectedWishID))
+        var draft = IndividualListingDraft(
+            mode: .create(preselectedWishID: preselectedWishID),
+            defaultExchangeSummary: defaultExchangeSummary
+        )
         if let initialOptionKind {
             draft.setOptionKind(initialOptionKind)
         }

@@ -35,7 +35,10 @@ struct IndividualListingDraft: Equatable {
     var acceptsOutsideCondition: Bool
     var includesExchangeConditionSummary: Bool
 
-    init(mode: IndividualListingEditorMode) {
+    init(
+        mode: IndividualListingEditorMode,
+        defaultExchangeSummary: IndividualListingExchangeSummary = IndividualListingExchangeSummary()
+    ) {
         self.mode = mode
         switch mode {
         case .create(let preselectedWishID):
@@ -62,13 +65,13 @@ struct IndividualListingDraft: Equatable {
             self.exchangeType = .any
             self.status = .active
             self.note = ""
-            self.handoffMethod = .both
-            self.localPrefecture = "東京都"
-            self.localPlaceMemo = ""
-            self.localSchedule = IndividualListingExchangeSummary.defaultLocalSchedule
-            self.shippingFee = .negotiate
-            self.shippingDays = .twoToFourDays
-            self.acceptsOutsideCondition = true
+            self.handoffMethod = defaultExchangeSummary.handoffMethod
+            self.localPrefecture = defaultExchangeSummary.localPrefecture
+            self.localPlaceMemo = defaultExchangeSummary.localPlaceMemo
+            self.localSchedule = defaultExchangeSummary.localSchedule
+            self.shippingFee = defaultExchangeSummary.shippingFee
+            self.shippingDays = defaultExchangeSummary.shippingDays
+            self.acceptsOutsideCondition = defaultExchangeSummary.acceptsOutsideCondition
             self.includesExchangeConditionSummary = true
         case .edit(let listing):
             let primaryOption = listing.options.sorted { $0.position < $1.position }.first

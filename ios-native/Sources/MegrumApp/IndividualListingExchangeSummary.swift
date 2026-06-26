@@ -1,6 +1,7 @@
 import Foundation
 
 struct IndividualListingExchangeSummary: Equatable {
+    static let defaultLocalPrefecture = "東京都"
     static let defaultLocalSchedule = "相談して決める"
 
     var handoffMethod: IndividualListingHandoffDraft
@@ -13,7 +14,7 @@ struct IndividualListingExchangeSummary: Equatable {
 
     init(
         handoffMethod: IndividualListingHandoffDraft = .both,
-        localPrefecture: String = "東京都",
+        localPrefecture: String = Self.defaultLocalPrefecture,
         localPlaceMemo: String = "",
         localSchedule: String = Self.defaultLocalSchedule,
         shippingFee: IndividualListingShippingFeeDraft = .negotiate,
@@ -124,7 +125,7 @@ struct IndividualListingExchangeSummary: Equatable {
 
         return IndividualListingExchangeSummary(
             handoffMethod: method,
-            localPrefecture: value(for: "都道府県:") ?? legacyLocalPrefecture(from: tokens) ?? "東京都",
+            localPrefecture: value(for: "都道府県:") ?? legacyLocalPrefecture(from: tokens) ?? Self.defaultLocalPrefecture,
             localPlaceMemo: restoredBlank(value(for: "場所メモ:"), blankMarkers: ["相談", "場所相談"]),
             localSchedule: value(for: "日程:") ?? Self.defaultLocalSchedule,
             shippingFee: IndividualListingShippingFeeDraft.allCases.first { $0.title == value(for: "送料:") } ?? .negotiate,
