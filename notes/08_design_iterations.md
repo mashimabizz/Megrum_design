@@ -4,6 +4,62 @@
 
 ---
 
+## イテレーション1215：起動画面を白背景の専用アイコン表示へ変更
+
+### 背景・問題意識
+
+オーナーから「最初にアプリを起動した時のローディング画面は、真っ白の背景に、このMegrumicon 起動のアイコンが中央に表示されるような仕様にして」と指示があった。直前の旧素材削除で `MegrumIcon 起動.icon/` を削除していたため、同フォルダを復元し、起動専用素材として使う方針に戻した。
+
+### 変更内容
+
+#### `MegrumIcon 起動.icon/`
+- 起動用Icon Composer素材を復元した。
+
+#### `ios-native/App/Assets.xcassets/LaunchIcon.imageset/`
+- `MegrumIcon 起動.icon/` のSVGレイヤーを合成し、iOS launch screenから参照できる `LaunchIcon` 画像アセットを追加した。
+- 1x / 2x / 3x のPNGを用意した。
+
+#### `ios-native/App/Assets.xcassets/LaunchBackground.colorset/`
+- launch screen用の白背景カラー `LaunchBackground` を追加した。
+
+#### `ios-native/App/Info.plist`
+- `UILaunchScreen` に `UIColorName = LaunchBackground` と `UIImageName = LaunchIcon` を設定した。
+
+#### `ios-native/Sources/MegrumApp/MegrumRootAuxiliaryViews.swift`
+- アプリ内の初期ロード画面 `NativeLoadingScreen` も、白背景に中央 `LaunchIcon` を表示する構成へ変更した。
+- 読み込みテキストとスピナーは視覚表示から外し、既存の `title` はアクセシビリティラベルとして保持した。
+
+### 影響範囲
+
+- Swift Native iOS のOS launch screenと、viewer読込中に表示されるアプリ内初期ロード画面。
+- 状態名・用語・DB schema・取引フロー・認証フローのロジックは変更していない。
+- 状態名・用語・データモデルの追加変更はないため、`notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の追加更新は不要。
+
+### 確認方法
+
+- `git diff --check`
+  - passed
+- `node -e "for (const f of ['ios-native/App/Assets.xcassets/LaunchIcon.imageset/Contents.json','ios-native/App/Assets.xcassets/LaunchBackground.colorset/Contents.json']) { JSON.parse(require('fs').readFileSync(f, 'utf8')); console.log(f + ': OK'); }"`
+  - passed
+- `swift build --package-path ios-native`
+  - failed（既存の `ios-native/.build/build.db` disk I/O error）
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-launch-screen-swift-build`
+  - passed
+- `xcodebuild -project ios-native/MegrumNative.xcodeproj -scheme MegrumNative -configuration Debug -destination 'generic/platform=iOS Simulator' -derivedDataPath /tmp/megrum-ios-native-launch-screen-xcode CODE_SIGNING_ALLOWED=NO build`
+  - passed（BUILD SUCCEEDED）
+- Built app確認
+  - `UILaunchScreen` が `UIColorName = LaunchBackground` / `UIImageName = LaunchIcon` を参照していることを確認した。
+  - `Assets.car` に `LaunchBackground` と `LaunchIcon` が含まれることを確認した。
+
+### セルフレビュー結果
+
+- ✅ `MegrumIcon 起動.icon/` を復元した。
+- ✅ OS launch screenは白背景と中央アイコン指定になっている。
+- ✅ アプリ内初期ロード画面も同じ白背景と中央アイコンに揃えた。
+- ✅ 状態名・用語・DB schema・取引ロジックは変更していない。
+
+---
+
 ## イテレーション1214：RN版と旧デザイン案の削除
 
 ### 背景・問題意識
