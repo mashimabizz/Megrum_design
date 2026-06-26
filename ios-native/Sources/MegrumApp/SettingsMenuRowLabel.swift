@@ -11,25 +11,25 @@ struct SettingsMenuRowLabel: View {
         Label {
             if badgeCount > 0 {
                 HStack(spacing: 10) {
-                    textStack
+                    SettingsMenuRowTextStack(title: title, subtitle: subtitle)
                     Spacer()
-                    Text("\(badgeCount)")
-                        .font(.caption.weight(.black))
-                        .foregroundStyle(.white)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 4)
-                        .background(MegrumTheme.pink, in: Capsule())
+                    SettingsMenuRowBadge(count: badgeCount)
                 }
             } else {
-                textStack
+                SettingsMenuRowTextStack(title: title, subtitle: subtitle)
             }
         } icon: {
             Image(systemName: systemImage)
                 .foregroundStyle(MegrumTheme.lavender)
         }
     }
+}
 
-    private var textStack: some View {
+private struct SettingsMenuRowTextStack: View {
+    var title: String
+    var subtitle: String
+
+    var body: some View {
         VStack(alignment: .leading, spacing: 3) {
             Text(title)
                 .font(.body.weight(.semibold))
@@ -37,6 +37,19 @@ struct SettingsMenuRowLabel: View {
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(MegrumTheme.muted)
         }
+    }
+}
+
+private struct SettingsMenuRowBadge: View {
+    var count: Int
+
+    var body: some View {
+        Text("\(count)")
+            .font(.caption.weight(.black))
+            .foregroundStyle(.white)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+            .background(MegrumTheme.pink, in: Capsule())
     }
 }
 

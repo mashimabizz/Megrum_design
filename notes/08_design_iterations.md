@@ -4,6 +4,48 @@
 
 ---
 
+## イテレーション1165：settings/proposal small badgesを分離
+
+### 背景・問題意識
+
+設定メニューrowと打診完了カードに、小さな装飾を返す computed `some View` helper が残っていた。表示文言、badge件数表示、checkmark装飾、色、font、padding、完了コピーを維持したまま、局所的な表示部品を専用Viewへ分ける。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/SettingsMenuRowLabel.swift`
+- `SettingsMenuRowTextStack` を追加し、設定rowのtitle/subtitle表示を専用Viewへ分離した。
+- `SettingsMenuRowBadge` を追加し、badge件数表示を専用Viewへ分離した。
+- `textStack` の computed `some View` helper を削除した。
+
+#### `ios-native/Sources/MegrumApp/ProposalCompletionCard.swift`
+- `ProposalCompletionCheckmarkBadge` を追加し、打診完了カードのcheckmark badgeを専用Viewへ分離した。
+- `checkmarkBadge` の computed `some View` helper を削除した。
+
+### 影響範囲
+
+- Swift Native iOS版の設定メニューrow、ログアウトrow/通知rowから利用される `SettingsMenuRowLabel`。
+- Swift Native iOS版の打診作成完了カード。
+- 表示文言、badge条件、checkmark icon、色、font、padding、完了summary、DB/API、状態名は変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumApp/SettingsMenuRowLabel.swift ios-native/Sources/MegrumApp/ProposalCompletionCard.swift`
+  - passed
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-small-badges`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-small-badges-tests --enable-xctest --disable-swift-testing -j 1 --filter 'SettingsScreenTests|ProposalCreateFlowTests|ProposalCreateSheetTests'`
+  - passed（78 tests）
+
+### セルフレビュー結果
+
+- ✅ 設定rowのtitle/subtitle、badgeCount > 0 の条件、badge色/font/paddingを維持した。
+- ✅ `SettingsPushNotificationRow` のToggle/ProgressView分岐とcallbackは変更していない。
+- ✅ 打診完了カードのcheckmark icon、circleサイズ、shadow、完了title/message表示を維持した。
+- ✅ DB/API、状態名、表示文言、ルーティング仕様は変更していない。
+- ✅ 新しい状態名・用語・DB列は追加していないため、`notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション1164：settings static sectionsを分離
 
 ### 背景・問題意識

@@ -13,7 +13,7 @@ struct ProposalCompletionCard: View {
             ProposalCompletionDecorativeBackground()
 
             VStack(spacing: 20) {
-                checkmarkBadge
+                ProposalCompletionCheckmarkBadge()
 
                 VStack(spacing: 12) {
                     Text(summary.completionTitle)
@@ -36,8 +36,10 @@ struct ProposalCompletionCard: View {
         .frame(height: 316)
         .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
     }
+}
 
-    private var checkmarkBadge: some View {
+private struct ProposalCompletionCheckmarkBadge: View {
+    var body: some View {
         ZStack {
             Circle()
                 .fill(MegrumTheme.lavender.opacity(0.12))
