@@ -4,6 +4,41 @@
 
 ---
 
+## イテレーション1173：proposal card section headerを分離
+
+### 背景・問題意識
+
+打診作成の共通カード `ProposalCardSection` に、外枠レイアウトとヘッダー行の描画が同居していた。カード本体のpadding/material/strokeと、タイトル・補助テキスト行の責務を分け、共通カードの変更範囲を小さくする。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/ProposalConfirmCards.swift`
+- `ProposalCardSectionHeader` を追加し、タイトルと右側補助テキストの描画を専用Viewへ分離した。
+- `ProposalCardSection` はカード外枠、spacing、content配置に集中する構成へ寄せた。
+
+### 影響範囲
+
+- Swift Native iOS版の打診作成カードセクション。
+- タイトル表示、右側補助テキスト表示条件、font、spacing、padding、material、stroke、DB/API、状態名、表示文言は変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumApp/ProposalConfirmCards.swift`
+  - passed
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-proposal-card-section`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-proposal-card-section-tests --enable-xctest --disable-swift-testing -j 1 --filter 'ProposalCreateFlowTests|ProposalCreateSheetTests|TradeRequestDraftProposalCreateFlowTests|TradeChatAffordanceTests'`
+  - passed（112 tests）
+
+### セルフレビュー結果
+
+- ✅ タイトルと右側補助テキストの表示条件、font、spacingを維持した。
+- ✅ カード本体のpadding、material、stroke、content配置を維持した。
+- ✅ DB/API、状態名、表示文言、打診作成の進行条件は変更していない。
+- ✅ 新しい状態名・用語・DB列は追加していないため、`notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション1172：proposal step tab labelを分離
 
 ### 背景・問題意識

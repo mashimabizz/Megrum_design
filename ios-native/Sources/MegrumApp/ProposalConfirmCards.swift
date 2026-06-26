@@ -9,17 +9,7 @@ struct ProposalCardSection<Content: View>: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            HStack(alignment: .firstTextBaseline, spacing: 12) {
-                Text(title)
-                    .font(.system(size: 18, weight: .heavy, design: .rounded))
-                    .foregroundStyle(MegrumTheme.ink)
-                Spacer(minLength: 0)
-                if let rightText, !rightText.isEmpty {
-                    Text(rightText)
-                        .font(.system(size: 13, weight: .black, design: .rounded))
-                        .foregroundStyle(MegrumTheme.muted)
-                }
-            }
+            ProposalCardSectionHeader(title: title, rightText: rightText)
             content
         }
         .padding(16)
@@ -27,6 +17,25 @@ struct ProposalCardSection<Content: View>: View {
         .overlay {
             RoundedRectangle(cornerRadius: 24, style: .continuous)
                 .stroke(.white.opacity(0.62), lineWidth: 1)
+        }
+    }
+}
+
+private struct ProposalCardSectionHeader: View {
+    var title: String
+    var rightText: String?
+
+    var body: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 12) {
+            Text(title)
+                .font(.system(size: 18, weight: .heavy, design: .rounded))
+                .foregroundStyle(MegrumTheme.ink)
+            Spacer(minLength: 0)
+            if let rightText, !rightText.isEmpty {
+                Text(rightText)
+                    .font(.system(size: 13, weight: .black, design: .rounded))
+                    .foregroundStyle(MegrumTheme.muted)
+            }
         }
     }
 }
