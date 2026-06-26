@@ -4,6 +4,48 @@
 
 ---
 
+## イテレーション1133：individual listing haves support viewsを分離
+
+### 背景・問題意識
+
+`IndividualListingHavesViews.swift` は、個別募集の譲るものステップ本体に加えて、譲る/定価タブ、定価入力カード、選択empty表示も同じファイルに抱えていた。`HavesStep` をステップ分岐とgoods/cash切替に寄せ、共通表示部品を専用ファイルへ分離する。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/IndividualListingHavesViews.swift`
+- `IndividualListingHavesStep` だけを残し、`IndividualListingHaveTabs` / `IndividualListingCashAmountCard` / `IndividualListingSelectionEmptyMessage` を専用ファイルへ移動した。
+- `MegrumDesign` importを外し、ステップ本体をstate/action wiring中心に整理した。
+- goods tabとcash tabの切替、`IndividualListingHavesGoodsSelection` への入力、cash bindingは維持した。
+
+#### `ios-native/Sources/MegrumApp/IndividualListingHavesSupportViews.swift`
+- `IndividualListingHaveTabs` を追加し、譲る/定価タブの表示とselection更新を移動した。
+- `IndividualListingCashAmountCard` を追加し、金額入力UIとiOS number pad指定を移動した。
+- `IndividualListingSelectionEmptyMessage` を追加し、Haves/Options双方から使うempty表示を移動した。
+
+### 影響範囲
+
+- Swift Native iOS版の個別募集作成/編集の譲るものステップ。
+- 譲る/定価タブ、定価入力カード、選択empty表示。
+- goods selection、cash amount binding、filter判定、DB/API、状態名、表示文言は変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumApp/IndividualListingHavesViews.swift ios-native/Sources/MegrumApp/IndividualListingHavesSupportViews.swift`
+  - passed
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-individual-listing-haves-support`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-individual-listing-haves-support --enable-xctest --disable-swift-testing -j 1 --filter 'IndividualListingDraftTests|SupabaseListingClientTests'`
+  - passed（47 tests）
+
+### セルフレビュー結果
+
+- ✅ 譲る/定価タブ文言、選択中タブの色/角丸、金額入力placeholder/¥表示、empty文言、アイコン、余白、角丸、色を維持した。
+- ✅ `selectedTab` binding更新、goods selectionの入力、cash amount binding、iOS number pad指定、empty表示の利用箇所は変更していない。
+- ✅ `IndividualListingHavesViews.swift` は164行から49行へ縮小し、共通表示部品を115行の専用ファイルへ分離した。
+- ✅ 新しい状態名・用語・DB列は追加していないため、`notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション1132：individual listing options tabsを分離
 
 ### 背景・問題意識
