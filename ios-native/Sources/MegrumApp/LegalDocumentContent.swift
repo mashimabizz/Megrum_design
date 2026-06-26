@@ -6,13 +6,17 @@ struct LegalDocumentContent: View {
 
     var body: some View {
         List {
-            statusSection
-            summarySection
-            contactSection
+            LegalDocumentStatusSection(kind: kind)
+            LegalDocumentSummarySection(items: kind.summaryItems)
+            LegalDocumentContactSection()
         }
     }
+}
 
-    private var statusSection: some View {
+private struct LegalDocumentStatusSection: View {
+    var kind: LegalDocumentKind
+
+    var body: some View {
         Section {
             Text(kind.statusMessage)
                 .font(.body)
@@ -22,18 +26,24 @@ struct LegalDocumentContent: View {
             Text("ステータス")
         }
     }
+}
 
-    private var summarySection: some View {
+private struct LegalDocumentSummarySection: View {
+    var items: [LegalSummaryItem]
+
+    var body: some View {
         Section {
-            ForEach(kind.summaryItems) { item in
+            ForEach(items) { item in
                 LegalSummaryRow(item: item)
             }
         } header: {
             Text("主要項目")
         }
     }
+}
 
-    private var contactSection: some View {
+private struct LegalDocumentContactSection: View {
+    var body: some View {
         Section {
             Text("support@megrum.jp")
                 .font(.body.weight(.semibold))

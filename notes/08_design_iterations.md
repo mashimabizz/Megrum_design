@@ -4,6 +4,53 @@
 
 ---
 
+## イテレーション1164：settings static sectionsを分離
+
+### 背景・問題意識
+
+設定/通知まわりの小さなSwiftUI画面に、`Section` やloading/empty rowを返す computed `some View` helper が残っていた。`PrivacySettingsContent`、`LegalDocumentContent`、`NotificationCenterContent` の表示文言、NavigationLink、filter、loading/empty表示、色、padding、callbackを維持したまま、静的sectionと通知rowを専用Viewへ分ける。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/PrivacySettingsContent.swift`
+- `PrivacySafetyManagementSection` を追加し、ブロックした人/プライバシーポリシーへのNavigationLinkを専用sectionへ移動した。
+- `PrivacySharedInformationSection` を追加し、位置情報/通知/住所情報の説明rowを専用sectionへ移動した。
+- `safetyManagementSection` / `sharedInformationSection` の computed `some View` helper を削除した。
+
+#### `ios-native/Sources/MegrumApp/LegalDocumentContent.swift`
+- `LegalDocumentStatusSection` / `LegalDocumentSummarySection` / `LegalDocumentContactSection` を追加し、法務ページの3sectionを専用Viewへ分離した。
+- `statusSection` / `summarySection` / `contactSection` の computed `some View` helper を削除した。
+
+#### `ios-native/Sources/MegrumApp/NotificationCenterContent.swift`
+- `NotificationCenterLoadingRow` を追加し、通知読み込み中rowを専用Viewへ分離した。
+- `NotificationCenterEmptyRow` を追加し、filter別empty titleと説明文のrowを専用Viewへ分離した。
+- `loadingRow` / `emptyRow` の computed `some View` helper を削除し、通知filterの算出は非View computed propertyとして残した。
+
+### 影響範囲
+
+- Swift Native iOS版のプライバシー設定、法務文書画面、通知センター一覧。
+- ブロックした人/プライバシーポリシーへの遷移、法務ステータス/主要項目/問い合わせ先、通知filter/件数/header/loading/empty/row選択。
+- 表示文言、NavigationLink先、filter条件、callback、色、font、padding、DB/API、状態名は変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumApp/PrivacySettingsContent.swift ios-native/Sources/MegrumApp/LegalDocumentContent.swift ios-native/Sources/MegrumApp/NotificationCenterContent.swift`
+  - passed
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-settings-static-sections`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-settings-static-sections-tests --enable-xctest --disable-swift-testing -j 1 --filter 'SettingsScreenTests|NotificationRouteTests|NotificationReadStateReducerTests'`
+  - passed（25 tests）
+
+### セルフレビュー結果
+
+- ✅ プライバシー設定の「安全管理」「共有される情報」の見出し、row文言、NavigationLink先を維持した。
+- ✅ 法務文書のステータス、主要項目、問い合わせ先、support email、text selection、色/font/padding/accessibilityを維持した。
+- ✅ 通知センターのsegmented picker、visible notification filter、件数header、loading文言、empty文言、row選択callbackを維持した。
+- ✅ DB/API、状態名、表示文言、ルーティング仕様は変更していない。
+- ✅ 新しい状態名・用語・DB列は追加していないため、`notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション1163：home viewer avatar image layerを分離
 
 ### 背景・問題意識

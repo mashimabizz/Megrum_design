@@ -6,12 +6,17 @@ struct PrivacySettingsContent: View {
 
     var body: some View {
         List {
-            safetyManagementSection
-            sharedInformationSection
+            PrivacySafetyManagementSection(appState: appState)
+            PrivacySharedInformationSection()
         }
     }
+}
 
-    private var safetyManagementSection: some View {
+@MainActor
+private struct PrivacySafetyManagementSection: View {
+    @ObservedObject var appState: MegrumAppState
+
+    var body: some View {
         Section {
             NavigationLink {
                 BlockedUsersScreen(appState: appState)
@@ -36,8 +41,10 @@ struct PrivacySettingsContent: View {
             Text("安全管理")
         }
     }
+}
 
-    private var sharedInformationSection: some View {
+private struct PrivacySharedInformationSection: View {
+    var body: some View {
         Section {
             HelpRouteRow(
                 iconName: "location.circle",

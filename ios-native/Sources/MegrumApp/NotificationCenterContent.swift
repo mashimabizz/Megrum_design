@@ -22,9 +22,9 @@ struct NotificationCenterContent: View {
 
             Section {
                 if isLoading {
-                    loadingRow
+                    NotificationCenterLoadingRow()
                 } else if visibleNotifications.isEmpty {
-                    emptyRow
+                    NotificationCenterEmptyRow(title: emptyTitle)
                 } else {
                     ForEach(visibleNotifications) { notification in
                         NotificationCenterRow(notification: notification) {
@@ -37,8 +37,10 @@ struct NotificationCenterContent: View {
             }
         }
     }
+}
 
-    private var loadingRow: some View {
+private struct NotificationCenterLoadingRow: View {
+    var body: some View {
         HStack(spacing: 10) {
             ProgressView()
                 .controlSize(.small)
@@ -47,10 +49,14 @@ struct NotificationCenterContent: View {
                 .foregroundStyle(MegrumTheme.muted)
         }
     }
+}
 
-    private var emptyRow: some View {
+private struct NotificationCenterEmptyRow: View {
+    var title: String
+
+    var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text(emptyTitle)
+            Text(title)
                 .font(.headline.weight(.bold))
             Text("打診、取引チャット、掲示板の更新がここにまとまります。")
                 .font(.subheadline.weight(.semibold))
@@ -58,7 +64,9 @@ struct NotificationCenterContent: View {
         }
         .padding(.vertical, 8)
     }
+}
 
+private extension NotificationCenterContent {
     private var visibleNotifications: [MegrumNotification] {
         switch filter {
         case .all:
