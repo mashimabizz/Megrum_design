@@ -19,21 +19,7 @@ struct AuthPasswordResetScreen: View {
             AuthBrandLockup(compact: true)
                 .padding(.bottom, 48)
 
-            Image(systemName: "envelope")
-                .font(.system(size: 38, weight: .regular))
-                .foregroundStyle(MegrumTheme.lavender)
-                .frame(width: 84, height: 84)
-                .background(MegrumTheme.lavender.opacity(0.08), in: Circle())
-                .padding(.bottom, 42)
-
-            Text("パスワードを再設定")
-                .font(.system(size: 32, weight: .black, design: .rounded))
-                .foregroundStyle(MegrumTheme.ink)
-
-            Text("登録メールアドレスを入力してください")
-                .font(.system(size: 17, weight: .semibold, design: .rounded))
-                .foregroundStyle(MegrumTheme.muted)
-                .padding(.top, 17)
+            AuthPasswordResetIntro()
 
             AuthInputRow(
                 title: "メールアドレス",
@@ -49,6 +35,48 @@ struct AuthPasswordResetScreen: View {
                     .padding(.top, 14)
             }
 
+            AuthPasswordResetActions(
+                isSending: isSending,
+                onSend: onSend,
+                onLogin: onLogin
+            )
+
+            Spacer(minLength: 300)
+        }
+        .padding(.horizontal, 31)
+        .authVisualBackground()
+    }
+}
+
+private struct AuthPasswordResetIntro: View {
+    var body: some View {
+        VStack(spacing: 0) {
+            Image(systemName: "envelope")
+                .font(.system(size: 38, weight: .regular))
+                .foregroundStyle(MegrumTheme.lavender)
+                .frame(width: 84, height: 84)
+                .background(MegrumTheme.lavender.opacity(0.08), in: Circle())
+                .padding(.bottom, 42)
+
+            Text("パスワードを再設定")
+                .font(.system(size: 32, weight: .black, design: .rounded))
+                .foregroundStyle(MegrumTheme.ink)
+
+            Text("登録メールアドレスを入力してください")
+                .font(.system(size: 17, weight: .semibold, design: .rounded))
+                .foregroundStyle(MegrumTheme.muted)
+                .padding(.top, 17)
+        }
+    }
+}
+
+private struct AuthPasswordResetActions: View {
+    var isSending: Bool
+    var onSend: () -> Void
+    var onLogin: () -> Void
+
+    var body: some View {
+        VStack(spacing: 0) {
             AuthPrimaryActionButton(
                 title: "再設定メールを送信",
                 isLoading: isSending,
@@ -60,10 +88,6 @@ struct AuthPasswordResetScreen: View {
                 .font(.system(size: 17, weight: .black, design: .rounded))
                 .foregroundStyle(MegrumTheme.lavender)
                 .padding(.top, 44)
-
-            Spacer(minLength: 300)
         }
-        .padding(.horizontal, 31)
-        .authVisualBackground()
     }
 }

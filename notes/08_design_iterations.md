@@ -4,6 +4,44 @@
 
 ---
 
+## イテレーション1154：auth password reset sectionsを分離
+
+### 背景・問題意識
+
+`AuthPasswordResetScreen` は、パスワード再設定画面の縦構成、メール入力、feedback、送信、ログイン復帰に加えて、説明アイコン/見出し/補助文と下部action群も同じView body内に抱えていた。画面の余白、文言、callback、password reset validationを維持したまま、再設定画面の説明ブロックとactionブロックを小さな専用Viewへ分離する。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/AuthPasswordResetScreen.swift`
+- `AuthPasswordResetIntro` を追加し、envelope icon、見出し、補助文の表示を移動した。
+- `AuthPasswordResetActions` を追加し、再設定メール送信ボタンとログイン復帰ボタンの表示を移動した。
+- `AuthPasswordResetScreen` は、top bar、brand、入力欄、feedback、section配置の構成に寄せた。
+- action表示には `isSending` と `onSend` / `onLogin` だけを渡し、email binding、onChange、validation、認証状態には触れない形にした。
+
+### 影響範囲
+
+- Swift Native iOS版のパスワード再設定画面内、説明ブロックと送信/ログイン復帰action表示。
+- 画面内の表示構成。
+- メール入力、password reset送信処理、validation、feedback表示条件、ログイン復帰callback、DB/API、状態名、表示文言は変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumApp/AuthPasswordResetScreen.swift`
+  - passed
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-auth-password-reset`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-auth-password-reset-tests --enable-xctest --disable-swift-testing -j 1 --filter 'AuthScreenInputTests'`
+  - passed（15 tests）
+
+### セルフレビュー結果
+
+- ✅ 説明アイコン、見出し、補助文、送信ボタン、ログイン復帰ボタンの文言、font、color、paddingを維持した。
+- ✅ メール入力のbinding、`AuthInputRow` kind、`onEmailChanged`、feedback表示条件には触れていない。
+- ✅ password reset送信処理、validation、ログイン復帰callback、DB/API、状態名、表示文言は変更していない。
+- ✅ 新しい状態名・用語・DB列は追加していないため、`notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション1153：auth email credentialsを分離
 
 ### 背景・問題意識
