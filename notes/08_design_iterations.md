@@ -4,6 +4,48 @@
 
 ---
 
+## イテレーション1135：trading card bulk start buttonを分離
+
+### 背景・問題意識
+
+`GoodsInventoryCreateShootStepView` は、写真選択・AI一括登録・処理中/status・写真grid・footer buttonを並べる親Viewの中に、トレカ専用AI一括登録buttonの大きな computed `some View` も抱えていた。親Viewを撮影ステップの構成に寄せ、AI一括登録buttonを専用Viewへ分離する。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/GoodsInventoryCreateViews.swift`
+- `tradingCardBulkButton` computed viewを削除した。
+- `GoodsTradingCardBulkStartButton(isProcessing:action:)` 呼び出しへ置き換えた。
+- `isTradingCardType` による表示条件、`isProcessingTradingCardBulk`、`onStartTradingCardBulk` の受け渡しは維持した。
+
+#### `ios-native/Sources/MegrumApp/GoodsInventoryCreateActionControls.swift`
+- `GoodsTradingCardBulkStartButton` を追加した。
+- AI badge / ProgressView、title/subtitle、material背景、枠線、disabled制御を移動した。
+- 既存の写真選択button、primary/secondary button、chip、quantity buttonは変更していない。
+
+### 影響範囲
+
+- Swift Native iOS版グッズ一括登録の撮影ステップ。
+- トレカ専用AI一括登録button。
+- AIカード検出処理、写真追加/削除/切り取り、保存処理、DB/API、状態名、表示文言は変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumApp/GoodsInventoryCreateViews.swift ios-native/Sources/MegrumApp/GoodsInventoryCreateActionControls.swift`
+  - passed
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-goods-trading-card-bulk-start-button`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-goods-trading-card-bulk-start-button --enable-xctest --disable-swift-testing -j 1 --filter 'GoodsEditorDraftTests|GoodsInventoryCreateMetaTilePresentationTests|GoodsLocalStateReducerTests'`
+  - passed（32 tests）
+
+### セルフレビュー結果
+
+- ✅ AI一括登録buttonのtitle/subtitle、AI badge/ProgressView、背景、枠線、disabled制御、余白、角丸、色を維持した。
+- ✅ `isTradingCardType` 条件、`isProcessingTradingCardBulk` の表示切替、`onStartTradingCardBulk` actionは変更していない。
+- ✅ `GoodsInventoryCreateShootStepView` から大きめの computed viewを削除し、撮影ステップの構成を読みやすくした。
+- ✅ 新しい状態名・用語・DB列は追加していないため、`notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション1134：goods inventory create action controlsを分離
 
 ### 背景・問題意識

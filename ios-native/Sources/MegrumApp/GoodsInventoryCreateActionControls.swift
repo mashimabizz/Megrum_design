@@ -31,6 +31,58 @@ struct GoodsCreatePhotoPickButton: View {
     }
 }
 
+struct GoodsTradingCardBulkStartButton: View {
+    var isProcessing: Bool
+    var action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 12) {
+                icon
+                copy
+            }
+            .padding(14)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                    .strokeBorder(MegrumTheme.lavender.opacity(0.20), lineWidth: 1)
+            }
+        }
+        .buttonStyle(.plain)
+        .disabled(isProcessing)
+    }
+
+    private var icon: some View {
+        ZStack {
+            Circle()
+                .fill(MegrumTheme.lavender)
+                .frame(width: 36, height: 36)
+            if isProcessing {
+                ProgressView()
+                    .tint(.white)
+                    .controlSize(.small)
+            } else {
+                Text("AI")
+                    .font(.caption.weight(.black))
+                    .foregroundStyle(.white)
+            }
+        }
+    }
+
+    private var copy: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text("トレカ専用 AIで一括登録")
+                .font(.subheadline.weight(.black))
+                .foregroundStyle(MegrumTheme.ink)
+            Text("検出した枠を黄色で確認してから、必要な分だけ追加します。")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(MegrumTheme.muted)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+}
+
 struct GoodsCreatePrimaryButton: View {
     var title: String
     var isDisabled: Bool = false

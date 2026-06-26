@@ -101,7 +101,10 @@ struct GoodsInventoryCreateShootStepView: View {
             }
 
             if isTradingCardType {
-                tradingCardBulkButton
+                GoodsTradingCardBulkStartButton(
+                    isProcessing: isProcessingTradingCardBulk,
+                    action: onStartTradingCardBulk
+                )
             }
 
             if isProcessingTradingCardBulk {
@@ -136,44 +139,5 @@ struct GoodsInventoryCreateShootStepView: View {
                 )
             }
         }
-    }
-
-    private var tradingCardBulkButton: some View {
-        Button(action: onStartTradingCardBulk) {
-            HStack(spacing: 12) {
-                ZStack {
-                    Circle()
-                        .fill(MegrumTheme.lavender)
-                        .frame(width: 36, height: 36)
-                    if isProcessingTradingCardBulk {
-                        ProgressView()
-                            .tint(.white)
-                            .controlSize(.small)
-                    } else {
-                        Text("AI")
-                            .font(.caption.weight(.black))
-                            .foregroundStyle(.white)
-                    }
-                }
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("トレカ専用 AIで一括登録")
-                        .font(.subheadline.weight(.black))
-                        .foregroundStyle(MegrumTheme.ink)
-                    Text("検出した枠を黄色で確認してから、必要な分だけ追加します。")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(MegrumTheme.muted)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-            }
-            .padding(14)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
-            .overlay {
-                RoundedRectangle(cornerRadius: 20, style: .continuous)
-                    .strokeBorder(MegrumTheme.lavender.opacity(0.20), lineWidth: 1)
-            }
-        }
-        .buttonStyle(.plain)
-        .disabled(isProcessingTradingCardBulk)
     }
 }
