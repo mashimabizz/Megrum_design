@@ -10,7 +10,7 @@ struct ProposalSelectableGoodsRow: View {
 
     var body: some View {
         HStack(spacing: ProposalSelectableGoodsRowMetrics.rowSpacing) {
-            thumbnail
+            ProposalSelectableGoodsThumbnail(item: item)
 
             VStack(alignment: .leading, spacing: 6) {
                 Text(item.title)
@@ -66,9 +66,12 @@ struct ProposalSelectableGoodsRow: View {
             ? MegrumTheme.lavender.opacity(ProposalSelectableGoodsRowMetrics.selectedBorderOpacity)
             : MegrumTheme.ink.opacity(ProposalSelectableGoodsRowMetrics.defaultBorderOpacity)
     }
+}
 
-    @ViewBuilder
-    private var thumbnail: some View {
+private struct ProposalSelectableGoodsThumbnail: View {
+    var item: GoodsItem
+
+    var body: some View {
         RoundedRectangle(cornerRadius: ProposalSelectableGoodsRowMetrics.thumbnailCornerRadius, style: .continuous)
             .fill(ProposalSelectableGoodsRowStyle.thumbnailColor(for: item))
             .frame(

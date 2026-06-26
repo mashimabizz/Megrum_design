@@ -4,6 +4,47 @@
 
 ---
 
+## イテレーション1169：proposal artwork thumbnailsを分離
+
+### 背景・問題意識
+
+打診作成の確認アートワークと選択行に、現金表示・件数バッジ・画像fallback・サムネイルを直接組み立てる表示ブロックが残っていた。確認カードと選択行の見た目、画像読み込み分岐、accessibility、選択状態を維持したまま、読みやすい専用Viewへ分ける。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/ProposalConfirmExchangeArtworkViews.swift`
+- `ProposalConfirmCashArtwork` を追加し、現金側のplaceholderアートワークを専用Viewへ分離した。
+- `ProposalConfirmExchangeArtworkCountBadge` を追加し、複数件表示バッジを専用Viewへ分離した。
+- `ProposalConfirmGoodsArtworkFallback` を追加し、画像なし/読み込み失敗時のfallback表示を専用Viewへ分離した。
+
+#### `ios-native/Sources/MegrumApp/ProposalSelectableGoodsRow.swift`
+- `ProposalSelectableGoodsThumbnail` を追加し、選択行のサムネイル背景、remote画像、glyph fallbackを専用Viewへ分離した。
+- row本体はタイトル、タグ、hint、checkmark、選択状態の背景/枠/accessibilityに集中する構成へ寄せた。
+
+### 影響範囲
+
+- Swift Native iOS版の打診作成確認カード。
+- 打診作成のグッズ選択行。
+- 現金表示、件数表示、remote画像、fallback glyph、選択状態、accessibility、DB/API、状態名、表示文言は変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumApp/ProposalConfirmExchangeArtworkViews.swift ios-native/Sources/MegrumApp/ProposalSelectableGoodsRow.swift`
+  - passed
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-proposal-artwork`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-proposal-artwork-tests --enable-xctest --disable-swift-testing -j 1 --filter 'ProposalCreateFlowTests|ProposalCreateSheetTests|TradeRequestDraftProposalCreateFlowTests|TradeChatAffordanceTests'`
+  - passed（112 tests）
+
+### セルフレビュー結果
+
+- ✅ 現金placeholder、件数バッジ、fallback glyph、remote画像読み込み、選択行の背景/枠/サイズを維持した。
+- ✅ 選択行のtap gesture、accessibility label/value/button traitを維持した。
+- ✅ DB/API、状態名、表示文言、打診作成の進行条件は変更していない。
+- ✅ 新しい状態名・用語・DB列は追加していないため、`notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション1168：trade summary detail contentを分離
 
 ### 背景・問題意識

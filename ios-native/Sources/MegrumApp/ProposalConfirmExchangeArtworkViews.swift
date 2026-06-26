@@ -12,37 +12,54 @@ struct ProposalConfirmExchangeArtwork: View {
             if let first = goods.first {
                 ProposalConfirmGoodsArtwork(item: first)
             } else {
-                RoundedRectangle(cornerRadius: 15, style: .continuous)
-                    .fill(tint.opacity(0.12))
-                    .overlay {
-                        VStack(spacing: 7) {
-                            Image(systemName: "yensign.circle.fill")
-                                .font(.system(size: 24, weight: .black))
-                                .foregroundStyle(tint)
-                            Text(cashAmount.map(TradeAmountFormatter.compactYen) ?? "未選択")
-                                .font(.system(size: 19, weight: .black, design: .rounded))
-                                .foregroundStyle(MegrumTheme.ink)
-                                .lineLimit(1)
-                                .minimumScaleFactor(0.72)
-                        }
-                        .padding(.horizontal, 8)
-                    }
+                ProposalConfirmCashArtwork(cashAmount: cashAmount, tint: tint)
             }
 
             if displayCount > 1 {
-                Text("\(displayCount)件")
-                    .font(.system(size: 10, weight: .black, design: .rounded))
-                    .foregroundStyle(MegrumTheme.ink)
-                    .padding(.horizontal, 7)
-                    .padding(.vertical, 4)
-                    .background(.white.opacity(0.92), in: Capsule())
-                    .padding(6)
+                ProposalConfirmExchangeArtworkCountBadge(count: displayCount)
             }
         }
     }
 
     private var displayCount: Int {
         goods.count + (cashAmount == nil ? 0 : 1)
+    }
+}
+
+private struct ProposalConfirmCashArtwork: View {
+    var cashAmount: Int?
+    var tint: Color
+
+    var body: some View {
+        RoundedRectangle(cornerRadius: 15, style: .continuous)
+            .fill(tint.opacity(0.12))
+            .overlay {
+                VStack(spacing: 7) {
+                    Image(systemName: "yensign.circle.fill")
+                        .font(.system(size: 24, weight: .black))
+                        .foregroundStyle(tint)
+                    Text(cashAmount.map(TradeAmountFormatter.compactYen) ?? "未選択")
+                        .font(.system(size: 19, weight: .black, design: .rounded))
+                        .foregroundStyle(MegrumTheme.ink)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.72)
+                }
+                .padding(.horizontal, 8)
+            }
+    }
+}
+
+private struct ProposalConfirmExchangeArtworkCountBadge: View {
+    var count: Int
+
+    var body: some View {
+        Text("\(count)件")
+            .font(.system(size: 10, weight: .black, design: .rounded))
+            .foregroundStyle(MegrumTheme.ink)
+            .padding(.horizontal, 7)
+            .padding(.vertical, 4)
+            .background(.white.opacity(0.92), in: Capsule())
+            .padding(6)
     }
 }
 
@@ -61,17 +78,17 @@ struct ProposalConfirmGoodsArtwork: View {
                                 .resizable()
                                 .scaledToFill()
                         case .failure:
-                            fallback
+                            ProposalConfirmGoodsArtworkFallback(title: item.title)
                         case .empty:
                             ProgressView()
                                 .controlSize(.small)
                                 .tint(MegrumTheme.lavender)
                         @unknown default:
-                            fallback
+                            ProposalConfirmGoodsArtworkFallback(title: item.title)
                         }
                     }
                 } else {
-                    fallback
+                    ProposalConfirmGoodsArtworkFallback(title: item.title)
                 }
             }
             .clipShape(RoundedRectangle(cornerRadius: 15, style: .continuous))
@@ -80,14 +97,18 @@ struct ProposalConfirmGoodsArtwork: View {
                     .stroke(MegrumTheme.ink.opacity(0.08), lineWidth: 1)
             }
     }
+}
 
-    private var fallback: some View {
+private struct ProposalConfirmGoodsArtworkFallback: View {
+    var title: String
+
+    var body: some View {
         ZStack {
             Circle()
                 .fill(.white.opacity(0.22))
                 .frame(width: 56, height: 56)
                 .offset(x: -20, y: -22)
-            Text(ProposalPreviewGlyphResolver.glyph(for: item.title))
+            Text(ProposalPreviewGlyphResolver.glyph(for: title))
                 .font(.system(size: 30, weight: .black, design: .rounded))
                 .foregroundStyle(.white)
                 .minimumScaleFactor(0.7)
