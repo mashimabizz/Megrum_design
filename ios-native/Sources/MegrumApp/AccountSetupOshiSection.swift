@@ -17,12 +17,26 @@ struct AccountSetupOshiSection: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             AccountSetupOshiHeader(isLoading: isLoading)
-            searchField
-            oshiGroupScroller
-            activeGroupMembers
+            AccountSetupOshiSearchField(
+                groupSearchText: $groupSearchText,
+                focusedField: $focusedField,
+                onSearchSubmit: onSearchSubmit
+            )
+            AccountSetupOshiGroupScroller(
+                oshiGroups: oshiGroups,
+                activeGroup: activeGroup,
+                selectedOshiDrafts: selectedOshiDrafts,
+                onSelectGroup: selectGroup
+            )
+            AccountSetupActiveGroupMembers(
+                activeGroup: activeGroup,
+                oshiCharacters: oshiCharacters,
+                selectedOshiDrafts: $selectedOshiDrafts,
+                onClearInputError: clearInputError
+            )
             AccountSetupSelectedOshiSummary(
                 selectedOshiDrafts: $selectedOshiDrafts,
-                onClearInputError: { setupInputErrorMessage = nil }
+                onClearInputError: clearInputError
             )
         }
         .padding(18)
@@ -33,7 +47,23 @@ struct AccountSetupOshiSection: View {
         )
     }
 
-    private var searchField: some View {
+    private func selectGroup(_ group: OshiGroup) {
+        clearInputError()
+        activeGroup = group
+        onSelectGroup(group)
+    }
+
+    private func clearInputError() {
+        setupInputErrorMessage = nil
+    }
+}
+
+private struct AccountSetupOshiSearchField: View {
+    @Binding var groupSearchText: String
+    @FocusState.Binding var focusedField: AccountSetupFocusedField?
+    var onSearchSubmit: (String) -> Void
+
+    var body: some View {
         TextField("グループ名で検索", text: $groupSearchText)
             .focused($focusedField, equals: .groupSearch)
             .submitLabel(.search)
@@ -44,8 +74,15 @@ struct AccountSetupOshiSection: View {
             .accessibilityLabel("推しグループ検索")
             .accessibilityHint("グループ名で候補を絞り込みます")
     }
+}
 
-    private var oshiGroupScroller: some View {
+private struct AccountSetupOshiGroupScroller: View {
+    var oshiGroups: [OshiGroup]
+    var activeGroup: OshiGroup?
+    var selectedOshiDrafts: [OnboardingOshiDraft]
+    var onSelectGroup: (OshiGroup) -> Void
+
+    var body: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 10) {
                 ForEach(oshiGroups) { group in
@@ -56,8 +93,6 @@ struct AccountSetupOshiSection: View {
                         isSelected: activeGroup?.id == group.id || hasSelection,
                         accessibilityHint: "タップするとこのグループのメンバー選択を表示します"
                     ) {
-                        setupInputErrorMessage = nil
-                        activeGroup = group
                         onSelectGroup(group)
                     }
                 }
@@ -65,30 +100,66 @@ struct AccountSetupOshiSection: View {
             .padding(.vertical, 2)
         }
     }
+}
+
+private struct AccountSetupActiveGroupMembers: View {
+    var activeGroup: OshiGroup?
+    var oshiCharacters: [OshiCharacter]
+    @Binding var selectedOshiDrafts: [OnboardingOshiDraft]
+    var onClearInputError: () -> Void
 
     @ViewBuilder
-    private var activeGroupMembers: some View {
+    var body: some View {
         if let activeGroup {
             VStack(alignment: .leading, spacing: 10) {
                 Text("\(activeGroup.name) のメンバー")
                     .font(.system(size: 14, weight: .black, design: .rounded))
                     .foregroundStyle(MegrumTheme.ink)
 
-                wholeGroupButton(activeGroup)
-                oshiCharacterScroller
+                AccountSetupWholeGroupButton(
+                    activeGroup: activeGroup,
+                    isSelected: isWholeGroupSelected(activeGroup),
+                    onToggle: { toggleWholeGroup(activeGroup) }
+                )
+                AccountSetupOshiCharacterScroller(
+                    activeGroup: activeGroup,
+                    oshiCharacters: oshiCharacters,
+                    selectedOshiDrafts: selectedOshiDrafts,
+                    onToggleCharacter: toggleCharacter
+                )
             }
         }
     }
 
-    private func wholeGroupButton(_ activeGroup: OshiGroup) -> some View {
-        let isSelected = isWholeGroupSelected(activeGroup)
-        return Button {
-            setupInputErrorMessage = nil
-            selectedOshiDrafts = OnboardingOshiSelectionLogic.toggleWholeGroup(
-                activeGroup,
-                in: selectedOshiDrafts
-            )
-        } label: {
+    private func toggleWholeGroup(_ activeGroup: OshiGroup) {
+        onClearInputError()
+        selectedOshiDrafts = OnboardingOshiSelectionLogic.toggleWholeGroup(
+            activeGroup,
+            in: selectedOshiDrafts
+        )
+    }
+
+    private func toggleCharacter(_ character: OshiCharacter, activeGroup: OshiGroup) {
+        onClearInputError()
+        selectedOshiDrafts = OnboardingOshiSelectionLogic.toggleCharacter(
+            character,
+            group: activeGroup,
+            in: selectedOshiDrafts
+        )
+    }
+
+    private func isWholeGroupSelected(_ group: OshiGroup) -> Bool {
+        OnboardingOshiSelectionLogic.isWholeGroupSelected(group, in: selectedOshiDrafts)
+    }
+}
+
+private struct AccountSetupWholeGroupButton: View {
+    var activeGroup: OshiGroup
+    var isSelected: Bool
+    var onToggle: () -> Void
+
+    var body: some View {
+        Button(action: onToggle) {
             HStack {
                 Text("グループ全体")
                 Spacer()
@@ -106,8 +177,15 @@ struct AccountSetupOshiSection: View {
         .accessibilityValue(isSelected ? "選択済み" : "未選択")
         .accessibilityHint("タップするとグループ全体の選択を切り替えます")
     }
+}
 
-    private var oshiCharacterScroller: some View {
+private struct AccountSetupOshiCharacterScroller: View {
+    var activeGroup: OshiGroup
+    var oshiCharacters: [OshiCharacter]
+    var selectedOshiDrafts: [OnboardingOshiDraft]
+    var onToggleCharacter: (OshiCharacter, OshiGroup) -> Void
+
+    var body: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 10) {
                 ForEach(oshiCharacters) { character in
@@ -118,23 +196,11 @@ struct AccountSetupOshiSection: View {
                         isSelected: isSelected,
                         accessibilityHint: isSelected ? "タップするとこのメンバーを選択から外します" : "タップするとこのメンバーを推しに追加します"
                     ) {
-                        guard let activeGroup else {
-                            return
-                        }
-                        setupInputErrorMessage = nil
-                        selectedOshiDrafts = OnboardingOshiSelectionLogic.toggleCharacter(
-                            character,
-                            group: activeGroup,
-                            in: selectedOshiDrafts
-                        )
+                        onToggleCharacter(character, activeGroup)
                     }
                 }
             }
             .padding(.vertical, 2)
         }
-    }
-
-    private func isWholeGroupSelected(_ group: OshiGroup) -> Bool {
-        OnboardingOshiSelectionLogic.isWholeGroupSelected(group, in: selectedOshiDrafts)
     }
 }

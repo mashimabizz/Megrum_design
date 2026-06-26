@@ -4,6 +4,46 @@
 
 ---
 
+## イテレーション1159：account setup oshi sectionを分離
+
+### 背景・問題意識
+
+`AccountSetupOshiSection` は、初回設定/推し設定編集の推し選択セクションとして、検索欄、グループchip一覧、選択中グループのメンバー一覧、グループ全体選択、選択済みサマリーを同じView内の computed `some View` helper と action に抱えていた。検索submit、activeGroup更新、入力エラー解除、全体/メンバーtoggle、表示文言、アクセシビリティ、レイアウト値を維持したまま、親Viewがセクション構成だけを読む形へ寄せる。
+
+### 変更内容
+
+#### `ios-native/Sources/MegrumApp/AccountSetupOshiSection.swift`
+- `AccountSetupOshiSearchField` を追加し、検索TextField、focus、submit、accessibilityを移動した。
+- `AccountSetupOshiGroupScroller` を追加し、グループchip横スクロールと選択状態表示を移動した。
+- `AccountSetupActiveGroupMembers` を追加し、active group がある場合のメンバー見出し、グループ全体選択、メンバーchip一覧をまとめた。
+- `AccountSetupWholeGroupButton` / `AccountSetupOshiCharacterScroller` を追加し、全体選択buttonとメンバーchip横スクロールを専用Viewへ分離した。
+- 親 `AccountSetupOshiSection` は header、search、group scroller、member section、selected summary を並べる構成に寄せ、入力エラー解除とグループ選択だけを薄い orchestration として残した。
+
+### 影響範囲
+
+- Swift Native iOS版のアカウント初期設定/推し設定編集画面内、推し選択セクションの画面構成コード。
+- グループ検索、グループ選択、グループ全体選択、メンバー個別選択、選択済みサマリーの接続。
+- `groupSearchText` / `focusedField` / `activeGroup` / `selectedOshiDrafts` / `setupInputErrorMessage` binding、検索submit、`onSelectGroup` callback、`OnboardingOshiSelectionLogic` のtoggle処理、chip title/icon/accessibility、padding/background/overlay、DB/API、状態名、表示文言、レイアウト値は変更しない。
+
+### 確認方法
+
+- `git diff --check -- ios-native/Sources/MegrumApp/AccountSetupOshiSection.swift`
+  - passed
+- `swift build --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-account-setup-oshi-section`
+  - passed
+- `swift test --package-path ios-native --scratch-path /tmp/megrum-ios-native-refactor-account-setup-oshi-section-tests --enable-xctest --disable-swift-testing -j 1 --filter 'AccountSetupScreenTests|OnboardingOshiSelectionTests|OshiSettingsDraftTests'`
+  - passed（23 tests）
+
+### セルフレビュー結果
+
+- ✅ 検索欄、グループchip、メンバー見出し、グループ全体button、メンバーchip、選択済みサマリーの表示順とspacing/padding/background/overlayを維持した。
+- ✅ `groupSearchText` / `focusedField` / `activeGroup` / `selectedOshiDrafts` / `setupInputErrorMessage` binding、検索submit、`onSelectGroup` callbackを維持した。
+- ✅ グループ全体選択とメンバー個別選択は同じ `OnboardingOshiSelectionLogic` を呼び続け、入力エラー解除のタイミングも維持した。
+- ✅ 表示文言、systemImage、accessibility label/value/hint、DB/API、状態名、レイアウト値は変更していない。
+- ✅ 新しい状態名・用語・DB列は追加していないため、`notes/09_state_machines.md` / `notes/10_glossary.md` / `notes/05_data_model.md` の更新は不要と判断した。
+
+---
+
 ## イテレーション1158：home exchange calendar card helpersを整理
 
 ### 背景・問題意識
