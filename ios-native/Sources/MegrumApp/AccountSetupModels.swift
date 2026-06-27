@@ -145,6 +145,17 @@ public enum AccountSetupMode: Sendable, Equatable {
     }
 }
 
+enum AccountSetupGenderOptions {
+    static let all: [UserGender] = [.female, .male]
+
+    static func contains(_ gender: UserGender?) -> Bool {
+        guard let gender else {
+            return false
+        }
+        return all.contains(gender)
+    }
+}
+
 public enum AccountSetupDraftValidator {
     public static let missingDisplayNameMessage = "表示名を入力してください"
     public static let invalidDisplayNameMessage = "表示名は50文字以内で入力してください"
@@ -226,7 +237,7 @@ public enum AccountSetupDraftValidator {
             }
             return birthDate <= Date() ? nil : futureBirthDateMessage
         case .gender:
-            return gender == nil ? missingGenderMessage : nil
+            return AccountSetupGenderOptions.contains(gender) ? nil : missingGenderMessage
         }
     }
 }

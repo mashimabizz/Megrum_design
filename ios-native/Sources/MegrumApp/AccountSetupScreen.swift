@@ -70,7 +70,7 @@ public struct AccountSetupScreen: View {
         _handle = State(initialValue: mode == .onboarding ? "" : (appState.viewer?.handle ?? ""))
         _prefecture = State(initialValue: appState.viewer?.prefecture ?? "")
         _birthDate = State(initialValue: appState.viewer?.birthDate ?? Self.defaultBirthDate)
-        _gender = State(initialValue: appState.viewer?.gender)
+        _gender = State(initialValue: AccountSetupGenderOptions.contains(appState.viewer?.gender) ? appState.viewer?.gender : nil)
     }
 
     public var body: some View {

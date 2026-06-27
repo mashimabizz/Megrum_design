@@ -67,10 +67,12 @@ final class AccountSetupScreenTests: XCTestCase {
         XCTAssertEqual(message, AccountSetupDraftValidator.missingGenderMessage)
     }
 
-    func testAccountSetupDraftValidatorAcceptsAllGenderOptions() {
-        for gender in UserGender.allCases {
-            XCTAssertNil(validationMessage(gender: gender), "\(gender) should be accepted")
-        }
+    func testAccountSetupDraftValidatorAcceptsOnlyFemaleAndMale() {
+        XCTAssertEqual(AccountSetupGenderOptions.all, [.female, .male])
+        XCTAssertNil(validationMessage(gender: .female))
+        XCTAssertNil(validationMessage(gender: .male))
+        XCTAssertEqual(validationMessage(gender: .other), AccountSetupDraftValidator.missingGenderMessage)
+        XCTAssertEqual(validationMessage(gender: .noAnswer), AccountSetupDraftValidator.missingGenderMessage)
     }
 
     func testAccountSetupDraftValidatorAcceptsReadyDraft() {
@@ -92,6 +94,39 @@ final class AccountSetupScreenTests: XCTestCase {
             [.welcome, .oshi, .area, .displayName, .handle, .birthDate, .gender, .completion]
         )
         XCTAssertEqual(AccountSetupStep.totalCount, 8)
+    }
+
+    func testBirthDateCalendarBuildsTouchableDaysInStableTimezone() throws {
+        let month = try XCTUnwrap(ProfileBirthDateCodec.date(from: "2000-01-01"))
+        let days = AccountSetupBirthDateCalendarLogic.days(for: month)
+        let actualDates = days.compactMap(\.date)
+
+        XCTAssertEqual(days.first?.date, nil)
+        XCTAssertEqual(ProfileBirthDateCodec.string(from: actualDates.first), "2000-01-01")
+        XCTAssertEqual(ProfileBirthDateCodec.string(from: actualDates.last), "2000-01-31")
+        XCTAssertEqual(AccountSetupBirthDateCalendarLogic.dayNumber(for: actualDates[0]), 1)
+        XCTAssertEqual(AccountSetupBirthDateCalendarLogic.monthTitle(for: month), "2000年1月")
+    }
+
+    func testBirthDateCalendarYearNavigationKeepsMonthAndBounds() throws {
+        let visibleMonth = try XCTUnwrap(ProfileBirthDateCodec.date(from: "1998-12-01"))
+        let maxDate = try XCTUnwrap(ProfileBirthDateCodec.date(from: "2026-06-27"))
+
+        let previousYear = try XCTUnwrap(
+            AccountSetupBirthDateCalendarLogic.addYears(-1, to: visibleMonth, maxDate: maxDate)
+        )
+        let nextYear = try XCTUnwrap(
+            AccountSetupBirthDateCalendarLogic.addYears(1, to: visibleMonth, maxDate: maxDate)
+        )
+
+        XCTAssertEqual(AccountSetupBirthDateCalendarLogic.monthTitle(for: previousYear), "1997年12月")
+        XCTAssertEqual(AccountSetupBirthDateCalendarLogic.monthTitle(for: nextYear), "1999年12月")
+
+        let minimumMonth = try XCTUnwrap(ProfileBirthDateCodec.date(from: "1900-01-01"))
+        XCTAssertNil(AccountSetupBirthDateCalendarLogic.addYears(-1, to: minimumMonth, maxDate: maxDate))
+
+        let futureMonth = try XCTUnwrap(ProfileBirthDateCodec.date(from: "2025-12-01"))
+        XCTAssertNil(AccountSetupBirthDateCalendarLogic.addYears(1, to: futureMonth, maxDate: maxDate))
     }
 
     private func validationMessage(
