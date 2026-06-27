@@ -63,6 +63,15 @@ struct UserProfileAccountSetupUpsertPayload: Encodable, Sendable {
     var accountStatus: String
 }
 
+struct UserProfileAccountSetupLegacyUpsertPayload: Encodable, Sendable {
+    var id: UUID
+    var handle: String
+    var displayName: String
+    var gender: UserGender?
+    var primaryArea: String?
+    var accountStatus: String
+}
+
 struct UserOwnProfileUpdatePayload: Encodable, Sendable {
     var handle: String
     var displayName: String

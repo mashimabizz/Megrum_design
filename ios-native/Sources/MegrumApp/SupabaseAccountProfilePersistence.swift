@@ -63,33 +63,57 @@ struct SupabaseAccountProfilePersistence: Sendable {
     }
 
     func completeAccountSetup(_ input: AccountSetupInput) async throws -> UserProfile {
-        _ = try await upsertAccountSetupProfile(input, accountStatus: .onboarding)
-
+        let rows = try await upsertAccountSetupProfile(input, accountStatus: .active)
+        let profile = Self.mergedAccountSetupProfile(
+            storedProfile: rows.first?.profile,
+            input: input,
+            userID: userID
+        )
         let selections = Self.accountSetupSelections(from: input, userID: userID)
         if !selections.isEmpty {
-            _ = try await oshiClient.replaceUserSelections(userID: userID, selections: selections)
+            do {
+                _ = try await oshiClient.replaceUserSelections(userID: userID, selections: selections)
+            } catch {
+                #if DEBUG
+                MegrumAppLogger.general.debug("Account setup oshi save failed: \(String(describing: error), privacy: .public)")
+                #endif
+            }
         }
 
-        let rows = try await upsertAccountSetupProfile(input, accountStatus: .active)
-        return rows.first?.profile ?? Self.fallbackAccountSetupProfile(input: input, userID: userID)
+        return profile
     }
 
     private func upsertAccountSetupProfile(
         _ input: AccountSetupInput,
         accountStatus: AccountStatus
     ) async throws -> [UserRow] {
-        try await client.upsertRows(
-            into: "users",
-            values: [
-                Self.accountSetupUpsertPayload(
-                    from: input,
-                    userID: userID,
-                    accountStatus: accountStatus
-                )
-            ],
-            select: UserRow.select,
-            onConflict: "id"
-        )
+        do {
+            return try await client.upsertRows(
+                into: "users",
+                values: [
+                    Self.accountSetupUpsertPayload(
+                        from: input,
+                        userID: userID,
+                        accountStatus: accountStatus
+                    )
+                ],
+                select: Self.accountSetupProfileSelect,
+                onConflict: "id"
+            )
+        } catch {
+            return try await client.upsertRows(
+                into: "users",
+                values: [
+                    Self.accountSetupLegacyUpsertPayload(
+                        from: input,
+                        userID: userID,
+                        accountStatus: accountStatus
+                    )
+                ],
+                select: Self.accountSetupProfileSelect,
+                onConflict: "id"
+            )
+        }
     }
 
     func requestAccountDeletion(_ input: AccountDeletionRequestInput) async throws -> AccountDeletionRequestResult {
@@ -260,6 +284,21 @@ struct SupabaseAccountProfilePersistence: Sendable {
         )
     }
 
+    static func accountSetupLegacyUpsertPayload(
+        from input: AccountSetupInput,
+        userID: UUID,
+        accountStatus: AccountStatus = .active
+    ) -> UserProfileAccountSetupLegacyUpsertPayload {
+        UserProfileAccountSetupLegacyUpsertPayload(
+            id: userID,
+            handle: input.handle,
+            displayName: input.displayName,
+            gender: input.gender,
+            primaryArea: input.prefecture,
+            accountStatus: accountStatus.rawValue
+        )
+    }
+
     static func accountDeletionPayload(from input: AccountDeletionRequestInput) -> AccountDeletionRequestPayload {
         let normalized = input.normalized
         return AccountDeletionRequestPayload(
@@ -281,6 +320,32 @@ struct SupabaseAccountProfilePersistence: Sendable {
             birthDate: input.birthDate,
             age: ProfileBirthDateCodec.age(from: input.birthDate),
             accountStatus: .active
+        )
+    }
+
+    static let accountSetupProfileSelect = "id,handle,display_name,avatar_url,gender,primary_area,account_status"
+
+    static func mergedAccountSetupProfile(
+        storedProfile: UserProfile?,
+        input: AccountSetupInput,
+        userID: UUID
+    ) -> UserProfile {
+        guard let storedProfile else {
+            return fallbackAccountSetupProfile(input: input, userID: userID)
+        }
+        return UserProfile(
+            id: storedProfile.id,
+            handle: storedProfile.handle,
+            displayName: storedProfile.displayName,
+            bio: storedProfile.bio,
+            avatarURL: storedProfile.avatarURL,
+            gender: storedProfile.gender ?? input.gender,
+            prefecture: storedProfile.prefecture ?? input.prefecture,
+            birthDate: input.birthDate,
+            age: ProfileBirthDateCodec.age(from: input.birthDate),
+            paymentMethods: storedProfile.paymentMethods,
+            paymentNote: storedProfile.paymentNote,
+            accountStatus: storedProfile.accountStatus
         )
     }
 }

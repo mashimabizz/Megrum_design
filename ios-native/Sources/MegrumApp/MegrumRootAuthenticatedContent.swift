@@ -13,6 +13,7 @@ struct MegrumRootAuthenticatedContent<AuthenticatedTabs: View>: View {
     var adDisplayContext: AdDisplayContext
     var onRetryLoading: () async -> Void
     var onSignOutFromLoadingFailure: () async -> Void
+    var onReturnToLoginFromIncompleteAccount: () async -> Void
     var onDismissDrawerPage: () -> Void
     var onProposalCompletionAction: (ProposalCompletionAction) -> Void
     var authenticatedTabs: () -> AuthenticatedTabs
@@ -28,6 +29,7 @@ struct MegrumRootAuthenticatedContent<AuthenticatedTabs: View>: View {
         adDisplayContext: AdDisplayContext,
         onRetryLoading: @escaping () async -> Void,
         onSignOutFromLoadingFailure: @escaping () async -> Void,
+        onReturnToLoginFromIncompleteAccount: @escaping () async -> Void,
         onDismissDrawerPage: @escaping () -> Void,
         onProposalCompletionAction: @escaping (ProposalCompletionAction) -> Void,
         @ViewBuilder authenticatedTabs: @escaping () -> AuthenticatedTabs
@@ -42,6 +44,7 @@ struct MegrumRootAuthenticatedContent<AuthenticatedTabs: View>: View {
         self.adDisplayContext = adDisplayContext
         self.onRetryLoading = onRetryLoading
         self.onSignOutFromLoadingFailure = onSignOutFromLoadingFailure
+        self.onReturnToLoginFromIncompleteAccount = onReturnToLoginFromIncompleteAccount
         self.onDismissDrawerPage = onDismissDrawerPage
         self.onProposalCompletionAction = onProposalCompletionAction
         self.authenticatedTabs = authenticatedTabs
@@ -51,10 +54,18 @@ struct MegrumRootAuthenticatedContent<AuthenticatedTabs: View>: View {
         Group {
             if appState.viewer == nil {
                 loadingContent
-            } else if appState.viewer?.accountStatus.requiresSetup == true {
+            } else if visualQAInitialScreen == .accountSetup {
                 NavigationStack {
                     AccountSetupScreen(appState: appState)
                 }
+            } else if AccountSetupSessionPolicy.shouldReturnToLogin(
+                accountStatus: appState.viewer?.accountStatus,
+                visualQAInitialScreen: visualQAInitialScreen
+            ) {
+                NativeLoadingScreen(title: "ログイン画面へ戻しています")
+                    .task(id: appState.viewer?.accountStatus) {
+                        await onReturnToLoginFromIncompleteAccount()
+                    }
             } else if let route = directVisualQARelationRoute {
                 NavigationStack {
                     MatchRelationScreen(

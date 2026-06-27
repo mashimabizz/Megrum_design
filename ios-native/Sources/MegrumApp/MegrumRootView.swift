@@ -92,6 +92,9 @@ public struct MegrumRootView: View {
                     await appState.revokeRegisteredNativePushDeviceToken()
                 }
             },
+            onReturnToLoginFromIncompleteAccount: {
+                await authState.signOut()
+            },
             onDismissDrawerPage: {
                 drawerPageDestination = nil
             },
