@@ -1,3 +1,4 @@
+import MegrumCore
 import MegrumDesign
 import SwiftUI
 
@@ -131,5 +132,78 @@ private struct AccountSetupSelectedOshiDraftChip: View {
             .frame(height: 34)
             .background(MegrumTheme.lavender.opacity(0.14), in: Capsule())
             .foregroundStyle(MegrumTheme.lavender)
+    }
+}
+
+struct AccountSetupSelectedGroupChip: View {
+    var title: String
+    var foregroundColor: Color
+    var backgroundColor: Color
+
+    var body: some View {
+        Text(title)
+            .font(.system(size: 13, weight: .black, design: .rounded))
+            .lineLimit(1)
+            .padding(.horizontal, 12)
+            .frame(height: 34)
+            .background(backgroundColor, in: Capsule())
+            .foregroundStyle(foregroundColor)
+    }
+}
+
+struct AccountSetupWholeGroupButton: View {
+    var activeGroup: OshiGroup
+    var isSelected: Bool
+    var onToggle: () -> Void
+
+    var body: some View {
+        Button(action: onToggle) {
+            HStack {
+                Text("グループ全体")
+                Spacer()
+                if isSelected {
+                    Image(systemName: "checkmark.circle.fill")
+                }
+            }
+        }
+        .buttonStyle(.plain)
+        .padding(.horizontal, 14)
+        .frame(height: 48)
+        .background(isSelected ? MegrumTheme.lavender.opacity(0.16) : Color.white.opacity(0.82), in: RoundedRectangle(cornerRadius: 16))
+        .foregroundStyle(isSelected ? MegrumTheme.lavender : MegrumTheme.ink)
+        .accessibilityLabel("\(activeGroup.name) 全体")
+        .accessibilityValue(isSelected ? "選択済み" : "未選択")
+        .accessibilityHint("タップするとグループ全体の選択を切り替えます")
+    }
+}
+
+struct AccountSetupOshiCharacterScroller: View {
+    var activeGroup: OshiGroup
+    var oshiCharacters: [OshiCharacter]
+    var selectedOshiDrafts: [OnboardingOshiDraft]
+    var onToggleCharacter: (OshiCharacter, OshiGroup) -> Void
+    var onRequestMember: (() -> Void)? = nil
+
+    var body: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 10) {
+                ForEach(oshiCharacters) { character in
+                    let isSelected = OnboardingOshiSelectionLogic.isCharacterSelected(character, in: selectedOshiDrafts)
+                    AccountSetupOshiChip(
+                        title: character.name,
+                        systemImage: isSelected ? "checkmark.circle.fill" : "person.crop.circle",
+                        isSelected: isSelected,
+                        accessibilityHint: isSelected ? "タップするとこのメンバーを選択から外します" : "タップするとこのメンバーを推しに追加します"
+                    ) {
+                        onToggleCharacter(character, activeGroup)
+                    }
+                }
+
+                if let onRequestMember {
+                    OshiMemberRequestTag(action: onRequestMember)
+                }
+            }
+            .padding(.vertical, 2)
+        }
     }
 }
